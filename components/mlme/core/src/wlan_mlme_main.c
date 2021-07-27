@@ -2615,6 +2615,21 @@ bool mlme_get_peer_pmf_status(struct wlan_objmgr_peer *peer)
 	return peer_priv->is_pmf_enabled;
 }
 
+qdf_freq_t wlan_get_operation_chan_freq(struct wlan_objmgr_vdev *vdev)
+{
+	qdf_freq_t chan_freq = 0;
+	struct wlan_channel *chan;
+
+	if (!vdev)
+		return chan_freq;
+
+	chan = wlan_vdev_get_active_channel(vdev);
+	if (chan)
+		chan_freq = chan->ch_freq;
+
+	return chan_freq;
+}
+
 void mlme_set_discon_reason_n_from_ap(struct wlan_objmgr_psoc *psoc,
 				      uint8_t vdev_id, bool from_ap,
 				      uint32_t reason_code)

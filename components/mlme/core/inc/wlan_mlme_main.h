@@ -541,6 +541,15 @@ void mlme_set_peer_pmf_status(struct wlan_objmgr_peer *peer,
 bool mlme_get_peer_pmf_status(struct wlan_objmgr_peer *peer);
 
 /**
+ * wlan_get_operation_chan_freq() - get operating chan freq of
+ * given vdev
+ * @vdev: vdev
+ *
+ * Return: chan freq of given vdev id
+ */
+qdf_freq_t wlan_get_operation_chan_freq(struct wlan_objmgr_vdev *vdev);
+
+/**
  * mlme_set_discon_reason_n_from_ap() - set disconnect reason and from ap flag
  * @psoc: PSOC pointer
  * @vdev_id: vdev id
