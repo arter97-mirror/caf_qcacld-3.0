@@ -750,3 +750,5 @@ CONFIG_WLAN_SYSFS_MEM_STATS := y
 
 #Enable PCI low power interrupt register mask configuration
 CONFIG_PCI_LOW_POWER_INT_REG := y
+
+CONFIG_ALLOC_CONTIGUOUS_MULTI_PAGE := y
