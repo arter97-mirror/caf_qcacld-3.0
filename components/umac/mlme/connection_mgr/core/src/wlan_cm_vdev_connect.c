@@ -1015,8 +1015,15 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NOSUPPORT;
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
-	if (rso_cfg)
-		rso_cfg->rsn_cap = req->crypto.rsn_caps;
+	if (rso_cfg) {
+		rso_cfg->orig_sec_info.rsn_caps = req->crypto.rsn_caps;
+		rso_cfg->orig_sec_info.authmodeset = req->crypto.auth_type;
+		rso_cfg->orig_sec_info.ucastcipherset =
+					req->crypto.ciphers_pairwise;
+		rso_cfg->orig_sec_info.mcastcipherset =
+					req->crypto.group_cipher;
+		rso_cfg->orig_sec_info.key_mgmt = req->crypto.akm_suites;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1421,6 +1428,7 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 					     mlme_get_tdls_prohibited(vdev),
 					     vdev);
 		wlan_p2p_status_connect(vdev);
+
 	}
 
 	if (op_mode == QDF_STA_MODE)
