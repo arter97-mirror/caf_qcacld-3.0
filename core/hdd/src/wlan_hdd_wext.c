@@ -6522,6 +6522,20 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		ret = hdd_get_sta_cxn_info(hdd_ctx, adapter, extra);
 		wrqu->data.length = strlen(extra) + 1;
 		break;
+	case WE_GET_DISABLED_CHANS:
+	{
+		int copied_length;
+
+		hdd_debug("Received Command to get disable Channels list");
+
+		copied_length = hdd_get_disable_ch_list(hdd_ctx, extra, WE_MAX_STR_LEN);
+		if (copied_length == 0) {
+			hdd_err("disable channel list is not yet programmed");
+			return -EINVAL;
+		}
+		wrqu->data.length = strlen(extra) + 1;
+		break;
+	}
 
 	default:
 		hdd_err("Invalid IOCTL command %d", sub_cmd);
@@ -6635,7 +6649,6 @@ static int __iw_setnone_getnone(struct net_device *dev,
 		}
 		sme_ht40_stop_obss_scan(mac_handle, adapter->vdev_id);
 		break;
-
 	default:
 		hdd_err("unknown ioctl %d", sub_cmd);
 		break;
@@ -7450,6 +7463,30 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 		break;
 	}
 #endif /* FW_THERMAL_THROTTLE_SUPPORT */
+	case WE_SET_DISABLED_CHANS:
+	{
+		uint8_t i, *ptr, arg_size;
+		uint8_t dis_chans_arg[512] = {0};
+		int arg;
+		char command[]={"set_dis_chan "};
+		ptr = dis_chans_arg;
+		scnprintf(ptr, sizeof(command), command);
+		ptr += strlen(command);
+		for (i = 0; i < num_args; i++) {
+			arg_size = 0;
+			arg = apps_args[i];
+			while(arg) {
+				arg /= 10;
+				arg_size++;
+			}
+			/*add space and trailing null space*/
+			arg_size++;
+			scnprintf(ptr, arg_size + 1, "%d ", apps_args[i]);
+			ptr += arg_size;
+		}
+		hdd_parse_disable_chan_cmd(adapter, dis_chans_arg);
+		break;
+	}
 	default:
 	{
 		hdd_err("Invalid IOCTL command %d", sub_cmd);
@@ -9425,6 +9462,19 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "set_thermal_cfg"},
 #endif /* FW_THERMAL_THROTTLE_SUPPORT */
+	{
+		WE_SET_DISABLED_CHANS,
+		IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+		0, "set_dis_chan"
+	}
+	,
+	{
+		WE_GET_DISABLED_CHANS,
+		0,
+		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
+		"get_dis_chan"
+	}
+	,
 	{WE_SET_BTCOEX_MODE,
 	IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	0, "set_btc_mode" },

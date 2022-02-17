@@ -6302,7 +6302,7 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
  * Return: 0 on success, Error code on failure
  */
 
-static int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr)
+int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint8_t *param;
@@ -6508,7 +6508,7 @@ static int drv_cmd_set_disable_chan_list(struct hdd_adapter *adapter,
  *
  * Return: length of data copied to buf
  */
-static int hdd_get_disable_ch_list(struct hdd_context *hdd_ctx, uint8_t *buf,
+int hdd_get_disable_ch_list(struct hdd_context *hdd_ctx, uint8_t *buf,
 				   uint32_t buf_len)
 {
 	struct hdd_cache_channel_info *ch_list;
