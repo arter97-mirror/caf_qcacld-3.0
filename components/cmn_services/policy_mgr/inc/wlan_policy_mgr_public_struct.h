@@ -205,6 +205,8 @@ enum policy_mgr_pcl_group_id {
  * @POLICY_MGR_PCL_ORDER_NONE: no order
  * @POLICY_MGR_PCL_ORDER_24G_THEN_5G: 2.4 Ghz channel followed by 5 Ghz channel
  * @POLICY_MGR_PCL_ORDER_5G_THEN_2G: 5 Ghz channel followed by 2.4 Ghz channel
+ * @POLICY_MGR_PCL_ORDER_2G: 2G channels
+ * @POLICY_MGR_PCL_ORDER_5G: 5G channels
  *
  * Order in which the PCL is requested
  */
@@ -212,6 +214,8 @@ enum policy_mgr_pcl_channel_order {
 	POLICY_MGR_PCL_ORDER_NONE,
 	POLICY_MGR_PCL_ORDER_24G_THEN_5G,
 	POLICY_MGR_PCL_ORDER_5G_THEN_2G,
+	POLICY_MGR_PCL_ORDER_2G,
+	POLICY_MGR_PCL_ORDER_5G,
 };
 
 /**
@@ -331,6 +335,7 @@ enum policy_mgr_mac_use {
  * @PM_SCC_CH_5G: SCC channel & 5 Ghz channels
  * @PM_24G_SCC_CH: 2.4 Ghz channels & SCC channel
  * @PM_5G_SCC_CH: 5 Ghz channels & SCC channel
+ * @PM_SCC_ON_5_CH_5G: 5 Ghz SCC channel & 5 Ghz channels
  * @PM_SCC_ON_5_SCC_ON_24_24G: SCC channel on 5 Ghz, SCC
  *	channel on 2.4 Ghz & 2.4 Ghz channels
  * @PM_SCC_ON_5_SCC_ON_24_5G: SCC channel on 5 Ghz, SCC channel
@@ -339,6 +344,7 @@ enum policy_mgr_mac_use {
  *	channel on 5 Ghz & 2.4 Ghz channels
  * @PM_SCC_ON_24_SCC_ON_5_5G: SCC channel on 2.4 Ghz, SCC
  *	channel on 5 Ghz & 5 Ghz channels
+ * @PM_SCC_ON_24_CH_24G: SCC channel on 2.4 GHz & 2.4 GHz channels
  * @PM_SCC_ON_5_SCC_ON_24: SCC channel on 5 Ghz, SCC channel on
  *	2.4 Ghz
  * @PM_SCC_ON_24_SCC_ON_5: SCC channel on 2.4 Ghz, SCC channel
@@ -368,10 +374,12 @@ enum policy_mgr_pcl_type {
 	PM_SCC_CH_5G,
 	PM_24G_SCC_CH,
 	PM_5G_SCC_CH,
+	PM_SCC_ON_5_CH_5G,
 	PM_SCC_ON_5_SCC_ON_24_24G,
 	PM_SCC_ON_5_SCC_ON_24_5G,
 	PM_SCC_ON_24_SCC_ON_5_24G,
 	PM_SCC_ON_24_SCC_ON_5_5G,
+	PM_SCC_ON_24_CH_24G,
 	PM_SCC_ON_5_SCC_ON_24,
 	PM_SCC_ON_24_SCC_ON_5,
 	PM_MCC_CH_24G,
