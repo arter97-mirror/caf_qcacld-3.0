@@ -46,6 +46,14 @@ static inline uint32_t wma_ndp_get_eventid_from_tlvtag(uint32_t tag)
 #define WMA_IS_VDEV_IN_NDI_MODE(intf, vdev_id) \
 				(WMI_VDEV_TYPE_NDI == intf[vdev_id].type)
 
+/**
+ * wma_add_sta_ndi_mode() - Process ADD_STA for NaN Data path
+ * @wma: wma handle
+ * @add_sta: Parameters of ADD_STA command
+ *
+ * Sends CREATE_PEER command to firmware
+ * Return: none
+ */
 void wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta);
 
 /**
