@@ -353,5 +353,11 @@ static inline QDF_STATUS ucfg_mc_cp_stats_get_vdev_wake_lock_stats(
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline void
+ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
+			      int *dbm)
+{}
+
 #endif /* QCA_SUPPORT_CP_STATS */
 #endif /* __WLAN_CP_STATS_MC_UCFG_API_H__ */
