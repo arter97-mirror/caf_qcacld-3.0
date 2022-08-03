@@ -1056,4 +1056,14 @@ void mlme_reinit_control_config_lfr_params(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_mlme_get_mac_vdev_id(struct wlan_objmgr_pdev *pdev,
 				     uint8_t vdev_id,
 				     struct qdf_mac_addr *self_mac);
+
+#ifdef WLAN_FEATURE_SAE
+/**
+ * wlan_vdev_is_sae_auth_type() - is vdev SAE auth type
+ * @vdev: pointer to vdev
+ *
+ * Return: true if vdev is SAE auth type
+ */
+bool wlan_vdev_is_sae_auth_type(struct wlan_objmgr_vdev *vdev);
+#endif /* WLAN_FEATURE_SAE */
 #endif

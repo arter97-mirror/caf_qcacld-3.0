@@ -5901,6 +5901,7 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx, uint8_t vdev_id,
 	struct pe_session *session;
 	uint16_t auth_ack_status;
 	enum rateid min_rid = RATEID_DEFAULT;
+	uint16_t channel_freq = 0;
 
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session) {
@@ -5928,6 +5929,18 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx, uint8_t vdev_id,
 		mgmt_data.frame_subtype = MGMT_SUBTYPE_AUTH;
 		mgmt_frame_info = &mgmt_data;
 	}
+	if (fc->subType == SIR_MAC_MGMT_AUTH) {
+		tpSirFTPreAuthReq pre_auth_req;
+		uint16_t auth_algo = *(uint16_t *)(frame +
+						   sizeof(tSirMacMgmtHdr));
+
+		if ((auth_algo == eSIR_AUTH_TYPE_SAE) &&
+		    (session->ftPEContext.pFTPreAuthReq)) {
+			pre_auth_req = session->ftPEContext.pFTPreAuthReq;
+			channel_freq = pre_auth_req->pre_auth_channel_freq;
+		}
+		pe_debug("TX SAE pre-auth frame on freq %d", channel_freq);
+	}
 
 	qdf_status = wma_tx_frameWithTxComplete(mac_ctx, packet,
 					 (uint16_t)msg_len,
@@ -5935,7 +5948,8 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx, uint8_t vdev_id,
 					 7, lim_tx_complete, frame,
 					 lim_auth_tx_complete_cnf,
 					 mgmt_frame_info,
-					 0, vdev_id, false, 0, min_rid, 0);
+					 0, vdev_id, false, channel_freq,
+					 min_rid, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		session->peSessionId, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {

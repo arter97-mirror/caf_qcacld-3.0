@@ -2745,4 +2745,24 @@ void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
  * Return: void
  */
 void lim_send_conc_params_update(void);
+
+#ifdef WLAN_FEATURE_SAE
+/**
+ * lim_trigger_auth_req_sae() - sends SAE auth request to sme
+ * @mac_ctx: Global MAC pointer
+ * @session: pointer to pe session
+ * @peer_bssid: bssid to do SAE auth
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_trigger_auth_req_sae(struct mac_context *mac_ctx,
+				    struct pe_session *session,
+				    struct qdf_mac_addr *peer_bssid);
+#else
+static inline QDF_STATUS lim_trigger_auth_req_sae(
+					struct mac_context *mac_ctx,
+					struct pe_session *session,
+					struct qdf_mac_addr *peer_bssid)
+{}
+#endif
 #endif /* __LIM_UTILS_H */
