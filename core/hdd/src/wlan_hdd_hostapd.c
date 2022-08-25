@@ -7086,6 +7086,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		enum channel_state ch_state;
 		enum phy_ch_width sub_20_ch_width = CH_WIDTH_INVALID;
 		struct sap_config *sap_cfg = &adapter->session.ap.sap_config;
+		struct ch_params ch_params;
 
 		if (CHANNEL_STATE_DFS ==
 		    wlan_reg_get_channel_state_from_secondary_list_for_freq(
@@ -7103,9 +7104,13 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			sub_20_ch_width = CH_WIDTH_5MHZ;
 		if (cds_is_10_mhz_enabled())
 			sub_20_ch_width = CH_WIDTH_10MHZ;
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
+		ch_params.ch_width = sub_20_ch_width;
 		if (WLAN_REG_IS_5GHZ_CH_FREQ(freq))
-			ch_state = wlan_reg_get_5g_bonded_channel_state_for_freq(hdd_ctx->pdev, freq,
-										 sub_20_ch_width);
+			ch_state =
+			wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+						hdd_ctx->pdev, freq, &ch_params,
+						REG_CURRENT_PWR_MODE);
 		else
 			ch_state = wlan_reg_get_2g_bonded_channel_state_for_freq(hdd_ctx->pdev, freq,
 										 sub_20_ch_width, 0);

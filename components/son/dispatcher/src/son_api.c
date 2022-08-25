@@ -102,6 +102,7 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 	enum phy_ch_width bandwidth = mlme_get_vht_ch_width();
 	struct wlan_objmgr_psoc *psoc;
 	bool is_he_enabled;
+	struct ch_params ch_params;
 
 	if (!pdev) {
 		qdf_err("invalid pdev");
@@ -119,6 +120,7 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 					&sub_20_channel_width);
 
 	qdf_mem_zero(chan_params, sizeof(*chan_params));
+	qdf_mem_zero(&ch_params, sizeof(ch_params));
 	qdf_mem_zero(&ch_width40_ch_params, sizeof(ch_width40_ch_params));
 	if (wlan_reg_is_24ghz_ch_freq(freq)) {
 		if (bandwidth == CH_WIDTH_80P80MHZ ||
@@ -127,10 +129,13 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 			bandwidth = CH_WIDTH_40MHZ;
 	}
 
+	ch_params.ch_width = bandwidth;
 	switch (bandwidth) {
 	case CH_WIDTH_80P80MHZ:
-		if (wlan_reg_get_5g_bonded_channel_state_for_freq(pdev, freq,
-								  bandwidth) !=
+		ch_params.ch_width = CH_WIDTH_80P80MHZ;
+		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+					pdev, freq,
+					&ch_params, REG_CURRENT_PWR_MODE) !=
 		    CHANNEL_STATE_INVALID) {
 			if (!flag_160) {
 				chan_params->ch_width = CH_WIDTH_80P80MHZ;
@@ -145,8 +150,10 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 		bandwidth = CH_WIDTH_160MHZ;
 	/* FALLTHROUGH */
 	case CH_WIDTH_160MHZ:
-		if (wlan_reg_get_5g_bonded_channel_state_for_freq(pdev, freq,
-								  bandwidth) !=
+		ch_params.ch_width = CH_WIDTH_160MHZ;
+		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+					pdev, freq,
+					&ch_params, REG_CURRENT_PWR_MODE) !=
 		    CHANNEL_STATE_INVALID) {
 			if (flag_160) {
 				chan_params->ch_width = CH_WIDTH_160MHZ;
@@ -161,8 +168,10 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 		bandwidth = CH_WIDTH_80MHZ;
 	/* FALLTHROUGH */
 	case CH_WIDTH_80MHZ:
-		if (wlan_reg_get_5g_bonded_channel_state_for_freq(pdev, freq,
-								  bandwidth) !=
+		ch_params.ch_width = CH_WIDTH_80MHZ;
+		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+					pdev, freq,
+					&ch_params, REG_CURRENT_PWR_MODE) !=
 		    CHANNEL_STATE_INVALID) {
 			if (!flag_160 &&
 			    chan_params->ch_width != CH_WIDTH_80P80MHZ) {
