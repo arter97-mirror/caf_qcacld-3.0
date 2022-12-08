@@ -8672,6 +8672,10 @@ QDF_STATUS sme_init_thermal_info(mac_handle_t mac_handle)
 				thermal_temp.throttle_dutycycle_level[2];
 	pWmaParam->throttle_duty_cycle_tbl[3] =
 				thermal_temp.throttle_dutycycle_level[3];
+	pWmaParam->throttle_duty_cycle_tbl[4] =
+				thermal_temp.throttle_dutycycle_level[4];
+	pWmaParam->throttle_duty_cycle_tbl[5] =
+				thermal_temp.throttle_dutycycle_level[5];
 
 	pWmaParam->thermalLevels[0].minTempThreshold =
 				thermal_temp.thermal_temp_min_level[0];
@@ -8689,6 +8693,14 @@ QDF_STATUS sme_init_thermal_info(mac_handle_t mac_handle)
 				thermal_temp.thermal_temp_min_level[3];
 	pWmaParam->thermalLevels[3].maxTempThreshold =
 				thermal_temp.thermal_temp_max_level[3];
+	pWmaParam->thermalLevels[4].minTempThreshold =
+				thermal_temp.thermal_temp_min_level[4];
+	pWmaParam->thermalLevels[4].maxTempThreshold =
+				thermal_temp.thermal_temp_max_level[4];
+	pWmaParam->thermalLevels[5].minTempThreshold =
+				thermal_temp.thermal_temp_min_level[5];
+	pWmaParam->thermalLevels[5].maxTempThreshold =
+				thermal_temp.thermal_temp_max_level[5];
 	pWmaParam->thermal_action = thermal_temp.thermal_action;
 	if (QDF_STATUS_SUCCESS == sme_acquire_global_lock(&mac->sme)) {
 		msg.type = WMA_INIT_THERMAL_INFO_CMD;
