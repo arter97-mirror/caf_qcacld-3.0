@@ -958,6 +958,7 @@ uint32_t policy_mgr_get_channel(struct wlan_objmgr_psoc *psoc,
  * @len: length of the PCL
  * @pcl_weight: Weights of the PCL
  * @weight_len: Max length of the weights list
+ * @vdev_id: Vdev id
  *
  * This function provides the preferred channel list on which
  * policy manager wants the new connection to come up. Various
@@ -969,7 +970,8 @@ uint32_t policy_mgr_get_channel(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 			      enum policy_mgr_con_mode mode,
 			      uint32_t *pcl_channels, uint32_t *len,
-			      uint8_t *pcl_weight, uint32_t weight_len);
+			      uint8_t *pcl_weight, uint32_t weight_len,
+			      uint8_t vdev_id);
 
 /**
  * policy_mgr_init_chan_avoidance() - init channel avoidance in policy manager.
@@ -1010,6 +1012,7 @@ void policy_mgr_update_with_safe_channel_list(struct wlan_objmgr_psoc *psoc,
  * @mode: mode for which preferred non-dfs channel is requested
  * @for_existing_conn: flag to indicate if preferred channel is requested
  *                     for existing connection
+ * @vdev_id: Vdev Id
  *
  * this routine will return non-dfs channel
  * 1) for getting non-dfs preferred channel, first we check if there are any
@@ -1024,7 +1027,8 @@ void policy_mgr_update_with_safe_channel_list(struct wlan_objmgr_psoc *psoc,
 uint32_t
 policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
 					enum policy_mgr_con_mode mode,
-					bool for_existing_conn);
+					bool for_existing_conn,
+					uint8_t vdev_id);
 
 /**
  * policy_mgr_is_any_nondfs_chnl_present() - Find any non-dfs
@@ -1076,6 +1080,7 @@ bool policy_mgr_is_any_dfs_beaconing_session_present(
  * @ch_freq: channel frequency on which new connection is coming up
  * @bw: Bandwidth requested by the connection (optional)
  * @ext_flags: extended flags for concurrency check (union conc_ext_flag)
+ * @vdev_id: vdev id
  *
  * When a new connection is about to come up check if current
  * concurrency combination including the new connection is
@@ -1087,7 +1092,7 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 				  enum policy_mgr_con_mode mode,
 				  uint32_t ch_freq,
 				  enum hw_mode_bandwidth bw,
-				  uint32_t ext_flags);
+				  uint32_t ext_flags, uint8_t vdev_id);
 
 /**
  * policy_mgr_check_scc_sbs_channel() - Check for allowed
@@ -2272,6 +2277,7 @@ uint32_t policy_mgr_get_mcc_operating_channel(struct wlan_objmgr_psoc *psoc,
  * @pcl_weight: Pointer to the weights of the PCL
  * @weight_len: Max length of the weights list
  * @all_matching_cxn_to_del: Need remove all entries before getting pcl
+ * @vdev_id: Vdev Id
  *
  * Get the PCL for an existing connection
  *
@@ -2282,7 +2288,8 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
 		enum policy_mgr_con_mode mode,
 		uint32_t *pcl_ch, uint32_t *len,
 		uint8_t *pcl_weight, uint32_t weight_len,
-		bool all_matching_cxn_to_del);
+		bool all_matching_cxn_to_del,
+		uint8_t vdev_id);
 
 /**
  * policy_mgr_get_pcl_for_vdev_id() - Get PCL for 1 vdev

@@ -1718,7 +1718,8 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	pcl_weight[0] = 0;
 	status = policy_mgr_get_pcl(psoc, mode, &pcl_channels[1], &pcl_len,
 				    &pcl_weight[1],
-				    QDF_ARRAY_SIZE(pcl_weight) - 1);
+				    QDF_ARRAY_SIZE(pcl_weight) - 1,
+				    sap_vdev_id);
 	if (status == QDF_STATUS_SUCCESS)
 		pcl_len++;
 	else
@@ -2042,7 +2043,8 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc)
 		return;
 
 	sap_freq = policy_mgr_get_nondfs_preferred_channel(psoc, PM_SAP_MODE,
-							   false);
+							   false,
+							   sap_info->vdev_id);
 	policy_mgr_debug("User/ACS orig Freq: %d New SAP Freq: %d",
 			 policy_mgr_get_user_config_sap_freq(
 						psoc, sap_info->vdev_id),

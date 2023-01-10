@@ -711,9 +711,9 @@ bool ucfg_is_ndi_dbs_supported(struct wlan_objmgr_psoc *psoc)
 }
 
 bool ucfg_is_nan_enable_allowed(struct wlan_objmgr_psoc *psoc,
-				uint32_t nan_ch_freq)
+				uint32_t nan_ch_freq, uint8_t vdev_id)
 {
-	return nan_is_enable_allowed(psoc, nan_ch_freq);
+	return nan_is_enable_allowed(psoc, nan_ch_freq, vdev_id);
 }
 
 bool ucfg_is_nan_disc_active(struct wlan_objmgr_psoc *psoc)
@@ -1217,7 +1217,8 @@ bool ucfg_nan_is_sta_ndp_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 
 	/* The final freq would be provided by FW, it is not known now */
 	return policy_mgr_allow_concurrency(psoc, PM_NDI_MODE, 0,
-					    HW_MODE_20_MHZ, conc_ext_flags);
+					    HW_MODE_20_MHZ, conc_ext_flags,
+					    wlan_vdev_get_id(vdev));
 }
 
 bool

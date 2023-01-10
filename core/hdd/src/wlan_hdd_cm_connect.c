@@ -543,7 +543,7 @@ def_chan:
 	if (!ch_freq || wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) ||
 	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq))
 		ch_freq = policy_mgr_get_nondfs_preferred_channel(
-			hdd_ctx->psoc, PM_SAP_MODE, true);
+			hdd_ctx->psoc, PM_SAP_MODE, true, ap_adapter->vdev_id);
 	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
 	    ch_bw > CH_WIDTH_20MHZ) {
 		struct ch_params ch_params;

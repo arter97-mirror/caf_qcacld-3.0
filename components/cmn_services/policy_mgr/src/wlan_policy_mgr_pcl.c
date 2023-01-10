@@ -79,7 +79,8 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
 		enum policy_mgr_con_mode mode,
 		uint32_t *pcl_ch, uint32_t *len,
 		uint8_t *pcl_weight, uint32_t weight_len,
-		bool all_matching_cxn_to_del)
+		bool all_matching_cxn_to_del,
+		uint8_t vdev_id)
 {
 	struct policy_mgr_conc_connection_info
 			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
@@ -94,6 +95,7 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
 		policy_mgr_err("Invalid Context");
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	*len = 0;
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	if (policy_mgr_mode_specific_connection_count(psoc, mode, NULL) > 0) {
@@ -102,7 +104,7 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
 				all_matching_cxn_to_del, info, &num_cxn_del);
 		/* Get the PCL */
 		status = policy_mgr_get_pcl(psoc, mode, pcl_ch, len,
-					    pcl_weight, weight_len);
+					    pcl_weight, weight_len, vdev_id);
 		policy_mgr_debug("Get PCL to FW for mode:%d", mode);
 		/* Restore the connection info */
 		policy_mgr_restore_deleted_conn_info(psoc, info, num_cxn_del);
@@ -306,7 +308,7 @@ QDF_STATUS policy_mgr_get_pcl_for_vdev_id(struct wlan_objmgr_psoc *psoc,
 
 	/* Get the PCL */
 	status = policy_mgr_get_pcl(psoc, mode, pcl_ch, len,
-				    pcl_weight, weight_len);
+				    pcl_weight, weight_len, vdev_id);
 	policy_mgr_debug("Get PCL to FW for mode:%d", mode);
 	/* Restore the connection info */
 	policy_mgr_restore_deleted_conn_info(psoc, info, total_del);
@@ -1100,7 +1102,8 @@ static inline enum policy_mgr_pcl_type policy_mgr_get_pcl_4_port(
 QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 			      enum policy_mgr_con_mode mode,
 			      uint32_t *pcl_channels, uint32_t *len,
-			      uint8_t *pcl_weight, uint32_t weight_len)
+			      uint8_t *pcl_weight, uint32_t weight_len,
+			      uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint32_t num_connections = 0;
@@ -1124,8 +1127,9 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 
 	/* find the current connection state from pm_conc_connection_list*/
 	num_connections = policy_mgr_get_connection_count(psoc);
-	policy_mgr_debug("connections:%d pref:%d requested mode:%d",
-		num_connections, pm_ctx->cur_conc_system_pref, mode);
+	policy_mgr_debug("connections:%d pref:%d requested mode:%d vdev_id:%d",
+			 num_connections, pm_ctx->cur_conc_system_pref, mode,
+			 vdev_id);
 
 	switch (pm_ctx->cur_conc_system_pref) {
 	case 0:
@@ -2271,7 +2275,8 @@ enum policy_mgr_three_connection_mode
 uint32_t
 policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
 					enum policy_mgr_con_mode mode,
-					bool for_existing_conn)
+					bool for_existing_conn,
+					uint8_t vdev_id)
 {
 	uint32_t pcl_channels[NUM_CHANNELS];
 	uint8_t pcl_weight[NUM_CHANNELS];
@@ -2306,12 +2311,12 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
 					psoc, mode,
 					pcl_channels, &pcl_len,
 					pcl_weight, QDF_ARRAY_SIZE(pcl_weight),
-					false))
+					false, vdev_id))
 			return freq;
 	} else {
 		if (QDF_STATUS_SUCCESS != policy_mgr_get_pcl(
 		    psoc, mode, pcl_channels, &pcl_len, pcl_weight,
-		    QDF_ARRAY_SIZE(pcl_weight)))
+		    QDF_ARRAY_SIZE(pcl_weight), vdev_id))
 			return freq;
 	}
 
@@ -2596,7 +2601,7 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 	status = policy_mgr_get_pcl_for_existing_conn(
 			psoc, PM_SAP_MODE, pcl.pcl_list, &pcl.pcl_len,
 			pcl.weight_list, QDF_ARRAY_SIZE(pcl.weight_list),
-			false);
+			false, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("Unable to get PCL for SAP");
 		return status;
@@ -2614,7 +2619,7 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 				psoc, PM_SAP_MODE,
 				pcl.pcl_list, &pcl.pcl_len,
 				pcl.weight_list,
-				QDF_ARRAY_SIZE(pcl.weight_list));
+				QDF_ARRAY_SIZE(pcl.weight_list), vdev_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			policy_mgr_err("Unable to get PCL for SAP: policy_mgr_get_pcl");
 			return status;
@@ -2866,7 +2871,7 @@ uint32_t policy_mgr_get_alternate_channel_for_sap(
 						      &info, &num_cxn_del);
 	if (QDF_STATUS_SUCCESS == policy_mgr_get_pcl(
 	    psoc, con_mode, pcl_channels, &pcl_len,
-	    pcl_weight, QDF_ARRAY_SIZE(pcl_weight))) {
+	    pcl_weight, QDF_ARRAY_SIZE(pcl_weight), sap_vdev_id)) {
 		for (i = 0; i < pcl_len; i++) {
 			/*
 			 * The API is expected to select the channel on the
