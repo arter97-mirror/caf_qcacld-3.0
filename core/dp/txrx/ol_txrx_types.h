@@ -1032,6 +1032,8 @@ struct ol_txrx_pdev_t {
 		int throttle_time_ms[THROTTLE_LEVEL_MAX][THROTTLE_PHASE_MAX];
 		/* mark true if traffic is paused due to thermal throttling */
 		bool is_paused;
+		/* Save outstanding packet number */
+		uint16_t prev_outstanding_num;
 	} tx_throttle;
 
 #if defined(FEATURE_TSO)
