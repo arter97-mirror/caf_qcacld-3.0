@@ -342,7 +342,8 @@ CONFIG_HTT_PADDR64 := y
 CONFIG_RX_OL := y
 CONFIG_TX_TID_OVERRIDE := y
 CONFIG_DP_TXRX_SOC_ATTACH := y
-endif
+CONFIG_REO_DESC_DEFER_FREE := y
+endif #CONFIG_LITHIUM
 
 # As per target team, build is done as follows:
 # Defconfig : build with default flags
