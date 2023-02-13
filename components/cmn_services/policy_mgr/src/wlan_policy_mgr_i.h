@@ -1135,6 +1135,22 @@ bool
 policy_mgr_sbs_24_shared_with_low_5(struct policy_mgr_psoc_priv_obj *pm_ctx);
 
 /**
+ * policy_mgr_2_freq_same_mac_in_dbs() - to check provided frequencies are
+ * in dbs freq range or not
+ *
+ * @pm_ctx: policy mgr psoc priv object
+ * @freq_1: first frequency
+ * @freq_2: second frequency
+ *
+ * This API is used to check provided frequencies are in dbs freq range or not
+ *
+ * Return: true/false.
+ */
+bool
+policy_mgr_2_freq_same_mac_in_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  qdf_freq_t freq_1, qdf_freq_t freq_2);
+
+/**
  * policy_mgr_2_freq_same_mac_in_sbs() - to check provided frequencies are
  * in sbs freq range or not
  *

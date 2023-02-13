@@ -1384,6 +1384,13 @@ QDF_STATUS sme_update_add_ie(mac_handle_t mac_handle,
 		tSirUpdateIE *pUpdateIE, eUpdateIEsType updateType);
 QDF_STATUS sme_update_connect_debug(mac_handle_t mac_handle,
 				    uint32_t set_value);
+
+/**
+ * sme_bss_type_to_string() - converts bss type to string.
+ * @bss_type: bss type enum
+ *
+ * Return: printable string for bss type
+ */
 const char *sme_bss_type_to_string(const uint8_t bss_type);
 QDF_STATUS sme_ap_disable_intra_bss_fwd(mac_handle_t mac_handle,
 					uint8_t sessionId,
