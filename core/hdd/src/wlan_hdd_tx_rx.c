@@ -3132,6 +3132,9 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 	if (hdd_adapter_is_link_adapter(adapter))
 		return;
 
+	hdd_debug("netif_control's vdev_id: %d, action: %d, reason: %d",
+		  adapter->vdev_id, action, reason);
+
 	switch (action) {
 
 	case WLAN_NETIF_CARRIER_ON:
