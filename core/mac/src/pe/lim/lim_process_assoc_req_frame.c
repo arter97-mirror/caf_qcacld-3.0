@@ -3013,7 +3013,28 @@ lim_convert_channel_width_enum(enum phy_ch_width ch_width)
 static uint32_t lim_convert_rate_flags_enum(uint32_t rate_flags,
 					    enum phy_ch_width ch_width)
 {
-	if (rate_flags & (TX_RATE_VHT160 |
+	if (rate_flags & (TX_RATE_HE160 |
+			  TX_RATE_HE80 |
+			  TX_RATE_HE40 |
+			  TX_RATE_HE20)) {
+		switch (ch_width) {
+		case CH_WIDTH_20MHZ:
+			rate_flags |= TX_RATE_HE20;
+			break;
+		case CH_WIDTH_40MHZ:
+			rate_flags |= TX_RATE_HE40;
+			break;
+		case CH_WIDTH_80MHZ:
+			rate_flags |= TX_RATE_HE80;
+			break;
+		case CH_WIDTH_160MHZ:
+		case CH_WIDTH_80P80MHZ:
+			rate_flags |= TX_RATE_HE160;
+			break;
+		default:
+			break;
+		}
+	} else if (rate_flags & (TX_RATE_VHT160 |
 			  TX_RATE_VHT80 |
 			  TX_RATE_VHT40 |
 			  TX_RATE_VHT20)) {

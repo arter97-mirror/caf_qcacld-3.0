@@ -4863,7 +4863,7 @@ static void hdd_get_max_rate_vht(struct hdd_station_info *stainfo,
  * @rate_flags: HDD rate flags
  * @mcsidx: mcs index
  * @nss: number of streams
- * @vht: vht mode or not
+ * @rate_info_flag: rate info flags
  *
  * This function will fill ch width and mcs flags
  *
@@ -4873,18 +4873,32 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 			    enum tx_rate_info rate_flags,
 			    uint8_t mcsidx,
 			    uint8_t nss,
-			    bool vht)
+			    uint8_t rate_info_flag)
 {
-	if (vht) {
+	if (rate_info_flag == RATE_INFO_FLAGS_HE_MCS) {
+		rate_info->nss = nss;
+		rate_info->mcs = mcsidx;
+		rate_info->flags |= RATE_INFO_FLAGS_HE_MCS;
+		if (rate_flags & TX_RATE_HE160)
+			rate_info->bw = RATE_INFO_BW_160;
+		else if (rate_flags & TX_RATE_HE80)
+			rate_info->bw = RATE_INFO_BW_80;
+		else if (rate_flags & TX_RATE_HE40)
+			rate_info->bw = RATE_INFO_BW_40;
+		else if (rate_flags & TX_RATE_HE20)
+			rate_info->bw = RATE_INFO_BW_20;
+	} else if (rate_info_flag == RATE_INFO_FLAGS_VHT_MCS) {
 		rate_info->nss = nss;
 		rate_info->mcs = mcsidx;
 		rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
-		if (rate_flags & TX_RATE_VHT80)
+		if (rate_flags & TX_RATE_VHT160)
+			rate_info->bw = RATE_INFO_BW_160;
+		else if (rate_flags & TX_RATE_VHT80)
 			rate_info->bw = RATE_INFO_BW_80;
 		else if (rate_flags & TX_RATE_VHT40)
 			rate_info->bw = RATE_INFO_BW_40;
 		else if (rate_flags & TX_RATE_VHT20)
-			rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
+			rate_info->bw = RATE_INFO_BW_20;
 	} else {
 		rate_info->mcs = (nss - 1) << 3;
 		rate_info->mcs |= mcsidx;
@@ -4900,7 +4914,7 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
  * @rate_flags: HDD rate flags
  * @mcsidx: mcs index
  * @nss: number of streams
- * @vht: vht mode or not
+ * @rate_info_flag: rate info flags
  *
  * This function will fill ch width and mcs flags
  *
@@ -4910,9 +4924,9 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 			    enum tx_rate_info rate_flags,
 			    uint8_t mcsidx,
 			    uint8_t nss,
-			    bool vht)
+			    uint8_t rate_info_flag)
 {
-	if (vht) {
+	if (rate_info_flag == RATE_INFO_FLAGS_VHT_MCS) {
 		rate_info->nss = nss;
 		rate_info->mcs = mcsidx;
 		rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
@@ -4921,7 +4935,7 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 		else if (rate_flags & TX_RATE_VHT40)
 			rate_info->flags |= RATE_INFO_FLAGS_40_MHZ_WIDTH;
 		else if (rate_flags & TX_RATE_VHT20)
-			rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
+			rate_info->bw = RATE_INFO_BW_20;
 	} else {
 		rate_info->mcs = (nss - 1) << 3;
 		rate_info->mcs |= mcsidx;
@@ -4931,25 +4945,6 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 	}
 }
 #endif
-
-/**
- * hdd_fill_bw_mcs_vht() - fill ch width and mcs flags for VHT mode
- * @rate_info: pointer to struct rate_info
- * @rate_flags: HDD rate flags
- * @mcsidx: mcs index
- * @nss: number of streams
- *
- * This function will fill ch width and mcs flags for VHT mode
- *
- * Return: None
- */
-static void hdd_fill_bw_mcs_vht(struct rate_info *rate_info,
-				enum tx_rate_info rate_flags,
-				uint8_t mcsidx,
-				uint8_t nss)
-{
-	hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss, true);
-}
 
 /**
  * hdd_fill_sinfo_rate_info() - fill rate info of sinfo struct
@@ -4984,15 +4979,25 @@ static void hdd_fill_sinfo_rate_info(struct station_info *sinfo,
 	} else {
 		/* must be MCS */
 		if (rate_flags &
-				(TX_RATE_VHT80 |
-				 TX_RATE_VHT40 |
-				 TX_RATE_VHT20))
-			hdd_fill_bw_mcs_vht(rate_info, rate_flags, mcsidx, nss);
-
-		if (rate_flags & (TX_RATE_HT20 | TX_RATE_HT40))
+				(TX_RATE_HE160 |
+				 TX_RATE_HE80 |
+				 TX_RATE_HE40 |
+				 TX_RATE_HE20)) {
 			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
-					false);
-
+					RATE_INFO_FLAGS_HE_MCS);
+		}
+		if (rate_flags &
+				(TX_RATE_VHT160 |
+				 TX_RATE_VHT80 |
+				 TX_RATE_VHT40 |
+				 TX_RATE_VHT20)) {
+			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+					RATE_INFO_FLAGS_VHT_MCS);
+		}
+		if (rate_flags & (TX_RATE_HT20 | TX_RATE_HT40)) {
+			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+					RATE_INFO_FLAGS_MCS);
+		}
 		if (rate_flags & TX_RATE_SGI) {
 			if (!(rate_info->flags & RATE_INFO_FLAGS_VHT_MCS))
 				rate_info->flags |= RATE_INFO_FLAGS_MCS;
