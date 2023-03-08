@@ -541,33 +541,32 @@ def_chan:
 	 */
 	ch_bw = hdd_ap_ctx->sap_config.ch_width_orig;
 	if (!ch_freq || wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) ||
-	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq)) {
+	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq))
 		ch_freq = policy_mgr_get_nondfs_preferred_channel(
 			hdd_ctx->psoc, PM_SAP_MODE, true);
-		if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
-		    ch_bw > CH_WIDTH_20MHZ) {
-			struct ch_params ch_params;
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
+	    ch_bw > CH_WIDTH_20MHZ) {
+		struct ch_params ch_params;
 
-			qdf_mem_zero(&ch_params, sizeof(ch_params));
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
+		ch_params.ch_width = ch_bw;
+		ch_state =
+		wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+				hdd_ctx->pdev, ch_freq, &ch_params,
+				REG_CURRENT_PWR_MODE);
+		while (ch_bw > CH_WIDTH_20MHZ &&
+		       ch_state != CHANNEL_STATE_ENABLE) {
+			ch_bw =
+			wlan_reg_get_next_lower_bandwidth(ch_bw);
 			ch_params.ch_width = ch_bw;
 			ch_state =
-			wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
-					hdd_ctx->pdev, ch_freq, &ch_params,
-					REG_CURRENT_PWR_MODE);
-			while (ch_bw > CH_WIDTH_20MHZ &&
-			       ch_state != CHANNEL_STATE_ENABLE) {
-				ch_bw =
-				wlan_reg_get_next_lower_bandwidth(ch_bw);
-				ch_params.ch_width = ch_bw;
-				ch_state =
-				wlan_reg_get_5g_bonded_channel_state_for_pwrmode
-					(hdd_ctx->pdev, ch_freq, &ch_params,
-					REG_CURRENT_PWR_MODE);
-			}
-			hdd_debug("bw change from %d to %d",
-				  hdd_ap_ctx->sap_config.ch_width_orig,
-				  ch_bw);
+			wlan_reg_get_5g_bonded_channel_state_for_pwrmode
+				(hdd_ctx->pdev, ch_freq, &ch_params,
+				REG_CURRENT_PWR_MODE);
 		}
+		hdd_debug("bw change from %d to %d",
+			  hdd_ap_ctx->sap_config.ch_width_orig,
+			  ch_bw);
 	}
 
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
