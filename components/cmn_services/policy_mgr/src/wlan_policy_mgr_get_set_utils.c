@@ -2539,6 +2539,36 @@ done:
 	return status;
 }
 
+uint32_t policy_mgr_mode_get_macid_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					      uint32_t vdev_id)
+{
+	uint32_t conn_index = 0;
+	uint32_t mac_id = 0xFF;
+	enum policy_mgr_con_mode mode;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return vdev_id;
+	}
+	mode = policy_mgr_con_mode_by_vdev_id(psoc, vdev_id);
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+		conn_index++) {
+		if ((pm_conc_connection_list[conn_index].mode == mode) &&
+		    pm_conc_connection_list[conn_index].in_use &&
+		    vdev_id == pm_conc_connection_list[conn_index].vdev_id) {
+			mac_id = pm_conc_connection_list[conn_index].mac;
+			break;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return mac_id;
+}
+
 bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 				  enum policy_mgr_con_mode mode,
 				  uint32_t ch_freq,

@@ -30,6 +30,7 @@
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include <wlan_cp_stats_utils_api.h>
 #include "../../core/src/wlan_cp_stats_defs.h"
+#include "wlan_policy_mgr_api.h"
 
 static bool tgt_mc_cp_stats_is_last_event(struct stats_event *ev,
 					  enum stats_req_type stats_type)
@@ -118,7 +119,8 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 	if (is_station_stats)
 		goto end;
 
-	if (tgt_mc_cp_stats_is_last_event(ev, TYPE_CONNECTION_TX_POWER)) {
+	if (policy_mgr_mode_get_macid_by_vdev_id(psoc, last_req.vdev_id) ==
+	    ev->mac_seq_num) {
 		ucfg_mc_cp_stats_reset_pending_req(psoc,
 						   TYPE_CONNECTION_TX_POWER,
 						   &last_req,
@@ -126,6 +128,7 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 		if (last_req.u.get_tx_power_cb && pending)
 			last_req.u.get_tx_power_cb(max_pwr, last_req.cookie);
 	}
+
 end:
 	if (vdev)
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);

@@ -590,6 +590,7 @@ struct peer_stats_info_ext_event {
  * @tx_rate_flags: tx rate flags, (enum tx_rate_info)
  * @last_event: The LSB indicates if the event is the last event or not and the
  *              MSB indicates if this feature is supported by FW or not.
+ * @mac_seq_num: sequence number of event when fw update to host
  * @num_peer_stats_info_ext: number of peer extended stats info
  * @peer_stats_info_ext: peer extended stats info
  * @pmf_bcn_protect_stats: pmf bcn protect stats
@@ -616,6 +617,7 @@ struct stats_event {
 	uint32_t rx_rate;
 	enum tx_rate_info tx_rate_flags;
 	uint32_t last_event;
+	uint8_t mac_seq_num;
 	uint32_t num_peer_stats_info_ext;
 	struct peer_stats_info_ext_event *peer_stats_info_ext;
 	struct pmf_bcn_protect_stats bcn_protect_stats;

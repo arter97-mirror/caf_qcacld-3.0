@@ -541,6 +541,16 @@ void mlme_set_peer_pmf_status(struct wlan_objmgr_peer *peer,
 bool mlme_get_peer_pmf_status(struct wlan_objmgr_peer *peer);
 
 /**
+ * wlan_get_opmode_vdev_id() - get operating mode of given vdev id
+ * @pdev: Pointer to pdev
+ * @vdev_id: vdev id
+ *
+ * Return: opmode
+ */
+enum QDF_OPMODE wlan_get_opmode_vdev_id(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id);
+
+/**
  * mlme_set_discon_reason_n_from_ap() - set disconnect reason and from ap flag
  * @psoc: PSOC pointer
  * @vdev_id: vdev id

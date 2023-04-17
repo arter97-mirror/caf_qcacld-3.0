@@ -36,6 +36,7 @@
 #include "wlan_mlme_api.h"
 #include "sap_api.h"
 #include "wlan_mlme_api.h"
+#include "wlan_mlme_main.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -1416,6 +1417,24 @@ policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return status;
+}
+
+enum policy_mgr_con_mode
+policy_mgr_con_mode_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+			       uint8_t vdev_id)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	enum policy_mgr_con_mode mode = PM_MAX_NUM_OF_MODE;
+	enum QDF_OPMODE op_mode;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return mode;
+	}
+
+	op_mode = wlan_get_opmode_vdev_id(pm_ctx->pdev, vdev_id);
+	return policy_mgr_convert_device_mode_to_qdf_type(op_mode);
 }
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
