@@ -1718,7 +1718,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 	case ACTION_CATEGORY_HT:
 		/** Type of HT Action to be performed*/
 		switch (action_hdr->actionID) {
-		case SIR_MAC_SM_POWER_SAVE:
+		case HT_ACTION_SMPS:
 			if (LIM_IS_AP_ROLE(session))
 				__lim_process_sm_power_save_update(mac_ctx,
 						(uint8_t *)rx_pkt_info,
@@ -1814,7 +1814,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		}
 		break;
 
-	case SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY:
+	case ACTION_CATEGORY_VENDOR_SPECIFIC:
 		vendor_specific = (tpSirMacVendorSpecificFrameHdr) action_hdr;
 		mac_hdr = NULL;
 
@@ -1867,11 +1867,11 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 
 		switch (action_hdr->actionID) {
-		case SIR_MAC_ACTION_EXT_CHANNEL_SWITCH_ID:
+		case PUB_ACTION_EXT_CHANNEL_SWITCH_ID:
 			lim_process_ext_channel_switch_action_frame(mac_ctx,
 							rx_pkt_info, session);
 			break;
-		case SIR_MAC_ACTION_VENDOR_SPECIFIC:
+		case PUB_ACTION_VENDOR_SPECIFIC:
 			pub_action =
 				(tpSirMacVendorSpecificPublicActionFrameHdr)
 				action_hdr;
@@ -1892,12 +1892,12 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			}
 			/* send the frame to supplicant */
 			/* fallthrough */
-		case SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY:
-		case SIR_MAC_ACTION_2040_BSS_COEXISTENCE:
-		case SIR_MAC_ACTION_GAS_INITIAL_REQUEST:
-		case SIR_MAC_ACTION_GAS_INITIAL_RESPONSE:
-		case SIR_MAC_ACTION_GAS_COMEBACK_REQUEST:
-		case SIR_MAC_ACTION_GAS_COMEBACK_RESPONSE:
+		case ACTION_CATEGORY_VENDOR_SPECIFIC:
+		case PUB_ACTION_2040_BSS_COEXISTENCE:
+		case PUB_ACTION_GAS_INITIAL_REQUEST:
+		case PUB_ACTION_GAS_INITIAL_RESPONSE:
+		case PUB_ACTION_GAS_COMEBACK_REQUEST:
+		case PUB_ACTION_GAS_COMEBACK_RESPONSE:
 			/*
 			 * Forward to the SME to HDD to wpa_supplicant
 			 * type is ACTION
@@ -1946,11 +1946,11 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		if (!session->vhtCapability)
 			break;
 		switch (action_hdr->actionID) {
-		case SIR_MAC_VHT_OPMODE_NOTIFICATION:
+		case VHT_ACTION_OPMODE_NOTIF:
 			__lim_process_operating_mode_action_frame(mac_ctx,
 					rx_pkt_info, session);
 			break;
-		case SIR_MAC_VHT_GID_NOTIFICATION:
+		case VHT_ACTION_GID_NOTIF:
 			/* Only if ini supports it */
 			if (session->enableVhtGid)
 				__lim_process_gid_management_action_frame(
@@ -1985,10 +1985,10 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		pe_debug("Rcvd Protected Dual of Public Action: %d",
 			action_hdr->actionID);
 		switch (action_hdr->actionID) {
-		case SIR_MAC_PDPA_GAS_INIT_REQ:
-		case SIR_MAC_PDPA_GAS_INIT_RSP:
-		case SIR_MAC_PDPA_GAS_COMEBACK_REQ:
-		case SIR_MAC_PDPA_GAS_COMEBACK_RSP:
+		case PDPA_GAS_INIT_REQ:
+		case PDPA_GAS_INIT_RSP:
+		case PDPA_GAS_COMEBACK_REQ:
+		case PDPA_GAS_COMEBACK_RSP:
 			mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 			rssi = WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
 			lim_send_sme_mgmt_frame_ind(mac_ctx,
@@ -2065,7 +2065,7 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 	switch (action_hdr->category) {
 	case ACTION_CATEGORY_PUBLIC:
 		switch (action_hdr->actionID) {
-		case SIR_MAC_ACTION_VENDOR_SPECIFIC:
+		case PUB_ACTION_VENDOR_SPECIFIC:
 			vendor_specific =
 				(tpSirMacVendorSpecificPublicActionFrameHdr)
 				action_hdr;
@@ -2088,10 +2088,10 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 				break;
 			}
 			/* fallthrough */
-		case SIR_MAC_ACTION_GAS_INITIAL_REQUEST:
-		case SIR_MAC_ACTION_GAS_INITIAL_RESPONSE:
-		case SIR_MAC_ACTION_GAS_COMEBACK_REQUEST:
-		case SIR_MAC_ACTION_GAS_COMEBACK_RESPONSE:
+		case PUB_ACTION_GAS_INITIAL_REQUEST:
+		case PUB_ACTION_GAS_INITIAL_RESPONSE:
+		case PUB_ACTION_GAS_COMEBACK_REQUEST:
+		case PUB_ACTION_GAS_COMEBACK_RESPONSE:
 			/*
 			 * Forward the GAS frames to  wpa_supplicant
 			 * type is ACTION

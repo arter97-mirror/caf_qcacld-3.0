@@ -859,7 +859,7 @@ hdd_sendactionframe(struct hdd_adapter *adapter, const uint8_t *bssid,
 	chan.center_freq = freq;
 	/* Check if it is specific action frame */
 	if (vendor->category ==
-	    SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY) {
+	    ACTION_CATEGORY_VENDOR_SPECIFIC) {
 		static const uint8_t oui[] = { 0x00, 0x00, 0xf0 };
 
 		if (!qdf_mem_cmp(vendor->Oui, oui, 3)) {

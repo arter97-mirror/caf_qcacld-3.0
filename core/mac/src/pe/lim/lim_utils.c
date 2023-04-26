@@ -6091,7 +6091,7 @@ QDF_STATUS lim_send_action_frm_tb_ppdu_cfg(struct mac_context *mac_ctx,
 
 	frm = (tDot11fvendor_action_frame *)(data_buf + sizeof(*cfg_msg));
 
-	frm->Category.category = SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY;
+	frm->Category.category = ACTION_CATEGORY_VENDOR_SPECIFIC;
 
 	frm->vendor_oui.oui_data[0] = 0x00;
 	frm->vendor_oui.oui_data[1] = 0xA0;

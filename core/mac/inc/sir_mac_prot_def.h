@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -95,7 +96,6 @@
 #define SIR_MAC_MGMT_RESERVED15   0xF
 
 #define SIR_MAC_ACTION_TX             1
-#define SIR_MAC_ACTION_RX             2
 
 #define SIR_MAC_BA_POLICY_IMMEDIATE     1
 #define SIR_MAC_BA_DEFAULT_BUFF_SIZE    64
@@ -110,7 +110,6 @@
 
 /* RRM related. */
 /* Refer IEEE Std 802.11k-2008, Section 7.3.2.21, table 7.29 */
-
 #define SIR_MAC_RRM_CHANNEL_LOAD_TYPE          3
 #define SIR_MAC_RRM_NOISE_HISTOGRAM_BEACON     4
 #define SIR_MAC_RRM_BEACON_TYPE                5
@@ -121,36 +120,9 @@
 #define SIR_MAC_RRM_LOCATION_CIVIC_TYPE        11
 #define SIR_MAC_RRM_FINE_TIME_MEAS_TYPE        16
 
-/* VHT Action Field */
-#define SIR_MAC_VHT_GID_NOTIFICATION           1
-#define SIR_MAC_VHT_OPMODE_NOTIFICATION        2
-
 #define SIR_MAC_VHT_OPMODE_SIZE                3
 
 #define NUM_OF_SOUNDING_DIMENSIONS	1 /*Nss - 1, (Nss = 2 for 2x2)*/
-/* HT Action Field Codes */
-#define SIR_MAC_SM_POWER_SAVE       1
-
-/* block acknowledgment action frame types */
-#define SIR_MAC_ACTION_VENDOR_SPECIFIC 9
-#define SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY     0x7F
-#define SIR_MAC_ACTION_P2P_SUBTYPE_PRESENCE_RSP     2
-
-/* Public Action for 20/40 BSS Coexistence */
-#define SIR_MAC_ACTION_2040_BSS_COEXISTENCE     0
-#define SIR_MAC_ACTION_EXT_CHANNEL_SWITCH_ID    4
-
-/* Public Action frames for GAS */
-#define SIR_MAC_ACTION_GAS_INITIAL_REQUEST      0x0A
-#define SIR_MAC_ACTION_GAS_INITIAL_RESPONSE     0x0B
-#define SIR_MAC_ACTION_GAS_COMEBACK_REQUEST     0x0C
-#define SIR_MAC_ACTION_GAS_COMEBACK_RESPONSE    0x0D
-
-/* Protected Dual of Public Action(PDPA) frames Action field */
-#define SIR_MAC_PDPA_GAS_INIT_REQ      10
-#define SIR_MAC_PDPA_GAS_INIT_RSP      11
-#define SIR_MAC_PDPA_GAS_COMEBACK_REQ  12
-#define SIR_MAC_PDPA_GAS_COMEBACK_RSP  13
 
 /* ----------------------------------------------------------------------------- */
 /* EID (Element ID) definitions */

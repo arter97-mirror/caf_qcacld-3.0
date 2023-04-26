@@ -4244,7 +4244,7 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	qdf_mem_zero(&frm, sizeof(frm));
 
 	frm.Category.category     = ACTION_CATEGORY_PUBLIC;
-	frm.Action.action         = SIR_MAC_ACTION_EXT_CHANNEL_SWITCH_ID;
+	frm.Action.action         = PUB_ACTION_EXT_CHANNEL_SWITCH_ID;
 
 	frm.ext_chan_switch_ann_action.switch_mode = mode;
 	frm.ext_chan_switch_ann_action.op_class = new_op_class;
@@ -4408,7 +4408,7 @@ lim_p2p_oper_chan_change_confirm_action_frame(struct mac_context *mac_ctx,
 
 	qdf_mem_zero(&frm, sizeof(frm));
 
-	frm.Category.category     = SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY;
+	frm.Category.category     = ACTION_CATEGORY_VENDOR_SPECIFIC;
 
 	qdf_mem_copy(frm.p2p_action_oui.oui_data,
 		SIR_MAC_P2P_OUI, SIR_MAC_P2P_OUI_SIZE);
