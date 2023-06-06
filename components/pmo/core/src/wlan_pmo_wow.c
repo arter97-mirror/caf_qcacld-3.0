@@ -28,6 +28,7 @@
 #include "wlan_reg_services_api.h"
 #include "cfg_nan_api.h"
 #include "wlan_utility.h"
+#include "cds_api.h"
 
 void pmo_set_wow_event_bitmap(WOW_WAKE_EVENT_TYPE event,
 			      uint32_t wow_bitmap_size,
@@ -284,10 +285,24 @@ bool pmo_core_is_wow_applicable(struct wlan_objmgr_psoc *psoc)
 	int vdev_id;
 	struct wlan_objmgr_vdev *vdev;
 	bool is_wow_applicable = false;
+	qdf_device_t qdf_dev;
+	const struct pci_device_id *id;
 
 	if (!psoc) {
 		pmo_err("psoc is null");
 		return false;
+	}
+
+	qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	if (!qdf_dev) {
+		pmo_err("dev is null");
+		return false;
+	}
+
+	id = (const struct pci_device_id *)(qdf_dev->bid);
+	if (id->device == QCA6490_DEVICE_ID) {
+		pmo_debug("qca6490 supports only wow, enabling wow");
+		return true;
 	}
 
 	if (pmo_support_wow_for_beaconing(psoc)) {
