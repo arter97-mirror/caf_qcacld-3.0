@@ -6186,6 +6186,9 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U32},
 	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_THRESHOLD_PERCENTAGE] = {
 			.type = NLA_U8},
+	[QCA_ATTR_ROAM_CONTROL_NEIGHBOR_LOOKUP_RSSI_THRESHOLD] = {
+			.type = NLA_S8},
+	[QCA_ATTR_ROAM_CONTROL_ROAM_RSSI_DIFF] = {.type = NLA_U8},
 };
 
 /**
@@ -6896,8 +6899,12 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 	struct wlan_hdd_link_info *link_info;
 	uint8_t roam_control_enable = false;
 	bool is_rso_update_required = false;
+	int8_t rssi;
+	uint8_t lookup_threshold, roam_rssi_diff;
 
 	hdd_enter();
+
+	hdd_debug("Start to set roam config parameters.");
 
 	/* The command must carry PARAM_ROAM_CONTROL_CONFIG */
 	if (!tb[PARAM_ROAM_CONTROL_CONFIG]) {
@@ -7345,6 +7352,54 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 		wlan_roam_update_cfg(hdd_ctx->psoc, vdev_id,
 				     ROAM_SCAN_OFFLOAD_UPDATE_CFG);
 
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_NEIGHBOR_LOOKUP_RSSI_THRESHOLD];
+	if (attr) {
+		rssi = nla_get_s8(attr);
+
+		if (!cfg_in_range(CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD,
+				  rssi)) {
+			hdd_err("RSSI Threshold value %d is out of range (Min: %d Max: %d)",
+				rssi,
+				cfg_min(CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD),
+				cfg_max(CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD));
+			return -EINVAL;
+		}
+
+		lookup_threshold = abs(rssi);
+
+		hdd_debug("Set Roam trigger: Neighbor lookup threshold = %d",
+			  lookup_threshold);
+
+		status = sme_set_neighbor_lookup_rssi_threshold(hdd_ctx->mac_handle,
+								vdev_id,
+								lookup_threshold);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set neighbor lookup threshold, try again");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_ROAM_RSSI_DIFF];
+	if (attr) {
+		roam_rssi_diff = nla_get_u8(attr);
+
+		if (!cfg_in_range(CFG_LFR_ROAM_RSSI_DIFF, roam_rssi_diff)) {
+			hdd_err("Roam rssi diff value %d is out of range (Min: %d Max: %d)",
+				roam_rssi_diff,
+				cfg_min(CFG_LFR_ROAM_RSSI_DIFF),
+				cfg_max(CFG_LFR_ROAM_RSSI_DIFF));
+			return -EINVAL;
+		}
+
+		hdd_debug("Received Command to Set roam rssi diff = %d",
+			  roam_rssi_diff);
+
+		status = sme_update_roam_rssi_diff(hdd_ctx->mac_handle,
+					  vdev_id,
+					  roam_rssi_diff);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set roam rssi diff, try again");
+	}
+
 	return qdf_status_to_os_return(status);
 }
 
@@ -7455,6 +7510,11 @@ hdd_roam_control_config_buf_size(struct hdd_context *hdd_ctx,
 
 	if (tb[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_THRESHOLD_PERCENTAGE])
 		skb_len += NLA_HDRLEN + sizeof(uint32_t);
+	if (tb[QCA_ATTR_ROAM_CONTROL_NEIGHBOR_LOOKUP_RSSI_THRESHOLD])
+		skb_len += NLA_HDRLEN + sizeof(int8_t);
+
+	if (tb[QCA_ATTR_ROAM_CONTROL_ROAM_RSSI_DIFF])
+		skb_len += NLA_HDRLEN + sizeof(uint8_t);
 
 	return skb_len;
 }
@@ -7505,6 +7565,8 @@ hdd_roam_control_config_fill_data(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 	uint32_t i = 0, freq_list[NUM_CHANNELS] = { 0 };
 	struct wlan_hdd_link_info *link_info;
 	uint32_t roam_periodic_scan_interval, roam_score_delta;
+	int8_t rssi;
+	uint8_t lookup_threshold, rssi_diff;
 
 	config = nla_nest_start(skb, PARAM_ROAM_CONTROL_CONFIG);
 	if (!config) {
@@ -7636,6 +7698,39 @@ hdd_roam_control_config_fill_data(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 		}
 	}
 
+	if (tb[QCA_ATTR_ROAM_CONTROL_NEIGHBOR_LOOKUP_RSSI_THRESHOLD]) {
+		status = ucfg_cm_get_neighbor_lookup_rssi_threshold(hdd_ctx->psoc,
+								    vdev_id,
+								    &lookup_threshold);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto out;
+
+		hdd_debug("vdev_id: %u, lookup_threshold: %u",
+			  vdev_id, lookup_threshold);
+
+		rssi = (-1) * lookup_threshold;
+		if (nla_put_s8(skb,
+			       QCA_ATTR_ROAM_CONTROL_NEIGHBOR_LOOKUP_RSSI_THRESHOLD,
+			       rssi)) {
+			hdd_info("failed to put lookup threshold");
+			return -ENOMEM;
+		}
+	}
+
+	if (tb[QCA_ATTR_ROAM_CONTROL_ROAM_RSSI_DIFF]) {
+		status = ucfg_cm_get_roam_rssi_diff(hdd_ctx->psoc, vdev_id,
+						    &rssi_diff);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto out;
+
+		hdd_debug("vdev_id: %u, rssi_diff: %u", vdev_id, rssi_diff);
+		if (nla_put_u8(skb, QCA_ATTR_ROAM_CONTROL_ROAM_RSSI_DIFF,
+			       rssi_diff)) {
+			hdd_info("failed to put roam rssi diff");
+			return -ENOMEM;
+		}
+	}
+
 	nla_nest_end(skb, config);
 
 out:
@@ -7701,6 +7796,8 @@ static int hdd_get_roam_control_config(struct hdd_context *hdd_ctx,
 {
 	QDF_STATUS status;
 	struct nlattr *tb2[QCA_ATTR_ROAM_CONTROL_MAX + 1];
+
+	hdd_debug("Start to get roam config parameters.");
 
 	/* The command must carry PARAM_ROAM_CONTROL_CONFIG */
 	if (!tb[PARAM_ROAM_CONTROL_CONFIG]) {
@@ -7995,6 +8092,8 @@ wlan_hdd_cfg80211_set_ext_roam_params(struct wiphy *wiphy,
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
+
+	hdd_debug("Start to handle QCA_NL80211_VENDOR_SUBCMD_ROAM.");
 
 	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
 	if (errno)
