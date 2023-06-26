@@ -2850,7 +2850,7 @@ int hdd_set_power_config(struct hdd_context *hddctx,
 		return -EINVAL;
 	}
 
-	if (power > PMO_PS_ADVANCED_POWER_SAVE_ENABLE ||
+	if (power > PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED ||
 	    power < PMO_PS_ADVANCED_POWER_SAVE_DISABLE) {
 		hdd_err("invalid power value: %d", power);
 		return -EINVAL;
