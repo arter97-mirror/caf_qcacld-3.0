@@ -503,4 +503,17 @@ struct pmo_igmp_offload_req {
 	uint32_t num_grp_ip_address;
 	uint32_t grp_ip_address[MAX_MC_IP_ADDR];
 };
+
+/**
+ * struct pmo_ps_params - structure to hold OPM params
+ *
+ * @opm_mode: OPM mode
+ * @ps_ito: power save inactivity timeout
+ * @spec_wake: OPM speculative wake interval
+ */
+struct pmo_ps_params {
+	enum powersave_mode opm_mode;
+	uint16_t ps_ito;
+	uint16_t spec_wake;
+};
 #endif /* end  of _WLAN_PMO_COMMONP_STRUCT_H_ */

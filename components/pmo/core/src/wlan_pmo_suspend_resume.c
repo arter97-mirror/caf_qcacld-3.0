@@ -207,7 +207,7 @@ static void pmo_configure_vdev_suspend_params(
 			vdev_id);
 	}
 
-	non_wow_inactivity_time = PS_DATA_INACTIVITY_TIMEOUT;
+	non_wow_inactivity_time = PMO_PS_DATA_INACTIVITY_TIMEOUT;
 	wow_inactivity_time = psoc_cfg->wow_data_inactivity_timeout;
 	/*
 	 * To keep ito repeat count same in wow mode as in non wow mode,
@@ -244,14 +244,14 @@ static void pmo_configure_vdev_resume_params(
 		return;
 	ret = pmo_tgt_send_vdev_sta_ps_param(vdev,
 					 pmo_sta_ps_param_inactivity_time,
-					 PS_DATA_INACTIVITY_TIMEOUT);
+					 vdev_ctx->ps_params.ps_ito);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		pmo_err("Failed to Set inactivity timeout vdevId %d",
 			vdev_id);
 	}
 	ret = pmo_tgt_send_vdev_sta_ps_param(vdev,
 					     pmo_sta_ps_param_spec_wake_interval,
-					     PS_DATA_SPEC_WAKE);
+					     vdev_ctx->ps_params.spec_wake);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		pmo_err("Failed to Set wow spec wake interval vdevId %d",
 			vdev_id);
