@@ -6942,6 +6942,9 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_NSS] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPTIMIZED_POWER_MANAGEMENT] = {
 		.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_ITO] = {.type = NLA_U16 },
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_SPEC_WAKE_INTERVAL] = {
+		.type = NLA_U16 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_UDP_QOS_UPGRADE] = {
 		.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_NUM_TX_CHAINS] = {.type = NLA_U8 },
@@ -7916,20 +7919,81 @@ static int hdd_config_udp_qos_upgrade_threshold(struct hdd_adapter *adapter,
 	return hdd_set_udp_qos_upgrade_config(adapter, priority);
 }
 
+static enum powersave_mode
+hdd_vendor_opm_to_pmo_opm(enum qca_wlan_vendor_opm_mode opm_mode)
+{
+	switch (opm_mode) {
+	case QCA_WLAN_VENDOR_OPM_MODE_DISABLE:
+		return PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
+	case QCA_WLAN_VENDOR_OPM_MODE_ENABLE:
+		return PMO_PS_ADVANCED_POWER_SAVE_ENABLE;
+	case QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED:
+		return PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED;
+	default:
+		hdd_debug("Invalid opm_mode: %d", opm_mode);
+		return PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
+	}
+}
+
 static int hdd_config_power(struct hdd_adapter *adapter,
-			    const struct nlattr *attr)
+			    struct nlattr *tb[])
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	uint8_t power;
+	struct wlan_objmgr_vdev *vdev;
+	enum qca_wlan_vendor_opm_mode opm_mode;
+	struct pmo_ps_params ps_params = {0};
+	struct nlattr *power_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_QPOWER];
+	struct nlattr *opm_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPTIMIZED_POWER_MANAGEMENT];
+	struct nlattr *ps_ito_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_ITO];
+	struct nlattr *spec_wake_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_SPEC_WAKE_INTERVAL];
+	int ret;
+
+	if (!power_attr && !opm_attr)
+		return 0;
+
+	if (power_attr && opm_attr) {
+		hdd_err_rl("Invalid OPM set attribute");
+		return -EINVAL;
+	}
 
 	if (!ucfg_pmo_get_default_power_save_mode(hdd_ctx->psoc)) {
 		hdd_err_rl("OPM power save is disabled in ini");
 		return -EINVAL;
 	}
 
-	power = nla_get_u8(attr);
+	opm_mode = power_attr ? nla_get_u8(power_attr) : nla_get_u8(opm_attr);
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED)
+		if (!ps_ito_attr || !spec_wake_attr) {
+			hdd_err_rl("Invalid User defined OPM attributes");
+			return -EINVAL;
+		}
 
-	return hdd_set_power_config(hdd_ctx, adapter, power);
+	ret = hdd_set_power_config(hdd_ctx, adapter, &opm_mode);
+	if (ret)
+		return ret;
+
+	ps_params.opm_mode = hdd_vendor_opm_to_pmo_opm(opm_mode);
+	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) {
+		ps_params.ps_ito = nla_get_u16(ps_ito_attr);
+		ps_params.spec_wake = nla_get_u16(spec_wake_attr);
+		ret = hdd_set_power_config_params(hdd_ctx, adapter,
+						  ps_params.ps_ito,
+						  ps_params.spec_wake);
+		if (ret)
+			return ret;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	if (vdev) {
+		ucfg_pmo_set_ps_params(vdev, &ps_params);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+	}
+
+	return 0;
 }
 
 static int hdd_config_stats_avg_factor(struct hdd_adapter *adapter,
@@ -8753,8 +8817,6 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_config_lro},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_SCAN_ENABLE,
 	 hdd_config_scan_enable},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_QPOWER,
-	 hdd_config_power},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_STATS_AVG_FACTOR,
 	 hdd_config_stats_avg_factor},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_GUARD_TIME,
@@ -8823,8 +8885,6 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_dynamic_bw},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_NSS,
 	 hdd_set_nss},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_OPTIMIZED_POWER_MANAGEMENT,
-	 hdd_config_power},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_UDP_QOS_UPGRADE,
 	 hdd_config_udp_qos_upgrade_threshold},
 };
@@ -9425,6 +9485,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_msdu_aggregation,
 	hdd_config_vdev_chains,
 	hdd_config_ani,
+	hdd_config_power,
 };
 
 /**

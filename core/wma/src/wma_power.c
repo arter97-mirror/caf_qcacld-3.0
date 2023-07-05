@@ -818,7 +818,30 @@ void wma_disable_sta_ps_mode(tpDisablePsParams ps_req)
 	}
 }
 
-QDF_STATUS wma_set_power_config(uint8_t vdev_id, enum powersave_mode power)
+/**
+ * wma_convert_opm_mode() - convert opm with equivalent wmi opm
+ * @opm_mode: Optimized power management mode
+ *
+ * Return: enum wmi_sta_ps_scheme_cfg
+ */
+static enum wmi_sta_ps_scheme_cfg
+wma_convert_opm_mode(enum wma_sta_ps_scheme_cfg opm_mode)
+{
+	switch (opm_mode) {
+	case WMA_STA_PS_OPM_CONSERVATIVE:
+		return WMI_STA_PS_OPM_CONSERVATIVE;
+	case WMA_STA_PS_OPM_AGGRESSIVE:
+		return WMI_STA_PS_OPM_AGGRESSIVE;
+	case WMA_STA_PS_USER_DEF:
+		return WMI_STA_PS_USER_DEF;
+	default:
+		wma_err("Invalid opm_mode: %d", opm_mode);
+		return WMI_STA_PS_OPM_CONSERVATIVE;
+	}
+}
+
+QDF_STATUS wma_set_power_config(uint8_t vdev_id,
+				enum wma_sta_ps_scheme_cfg power)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 
@@ -831,7 +854,35 @@ QDF_STATUS wma_set_power_config(uint8_t vdev_id, enum powersave_mode power)
 	return wma_unified_set_sta_ps_param(wma->wmi_handle,
 					    vdev_id,
 					    WMI_STA_PS_ENABLE_OPM,
-					    power);
+					    wma_convert_opm_mode(power));
+}
+
+QDF_STATUS wma_set_power_config_ito(uint8_t vdev_id, uint16_t ps_ito)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma) {
+		wma_err("wma_handle is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
+					   WMI_STA_PS_PARAM_INACTIVITY_TIME,
+					   ps_ito);
+}
+
+QDF_STATUS wma_set_power_config_spec_wake(uint8_t vdev_id, uint16_t spec_wake)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma) {
+		wma_err("wma_handle is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
+			WMI_STA_PS_PARAM_SPEC_WAKE_INTERVAL,
+			spec_wake);
 }
 
 void wma_enable_uapsd_mode(tp_wma_handle wma, tpEnableUapsdParams ps_req)
