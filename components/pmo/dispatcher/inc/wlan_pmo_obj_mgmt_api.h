@@ -271,6 +271,26 @@ QDF_STATUS pmo_register_is_device_in_low_pwr_mode(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 pmo_unregister_is_device_in_low_pwr_mode(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_pmo_set_ps_params() - Set vdev OPM params
+ * @vdev: pointer to vdev object
+ * @ps_params: pointer to OPM params
+ *
+ * Return: None
+ */
+void wlan_pmo_set_ps_params(struct wlan_objmgr_vdev *vdev,
+			    struct pmo_ps_params *ps_params);
+
+/**
+ * wlan_pmo_get_ps_params() - Get vdev OPM params
+ * @vdev: pointer to vdev object
+ * @ps_params: Pointer to get OPM params
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_pmo_get_ps_params(struct wlan_objmgr_vdev *vdev,
+				  struct pmo_ps_params *ps_params);
+
 #else /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
 static inline QDF_STATUS pmo_init(void)
@@ -422,6 +442,18 @@ pmo_unregister_get_beacon_interval_callback(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline
+void wlan_pmo_set_ps_params(struct wlan_objmgr_vdev *vdev,
+			    struct pmo_ps_params *ps_params)
+{
+}
+
+static inline QDF_STATUS
+wlan_pmo_get_ps_params(struct wlan_objmgr_vdev *vdev,
+		       struct pmo_ps_params *ps_params)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
 #endif /* end  of _WLAN_PMO_OBJ_MGMT_API_H_ */

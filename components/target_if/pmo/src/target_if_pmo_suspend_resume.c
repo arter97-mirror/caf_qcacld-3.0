@@ -115,7 +115,7 @@ QDF_STATUS target_if_pmo_send_vdev_ps_param_req(
 	 */
 	switch (param_id) {
 	case pmo_sta_ps_enable_advanced_power:
-		param_id = WMI_STA_PS_ENABLE_QPOWER;
+		param_id = WMI_STA_PS_ENABLE_OPM;
 		break;
 	case pmo_sta_ps_param_inactivity_time:
 		param_id = WMI_STA_PS_PARAM_INACTIVITY_TIME;

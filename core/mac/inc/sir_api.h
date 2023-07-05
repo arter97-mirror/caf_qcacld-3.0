@@ -50,12 +50,6 @@ struct mac_context;
 #include "qca_vendor.h"
 #include "wlan_cp_stats_mc_defs.h"
 
-/* The ini gDataInactivityTimeout is deprecated. So, definng a new macro
- * PS_DATA_INACTIVITY_TIMEOUT with the ini's default value.
- */
-#define PS_DATA_INACTIVITY_TIMEOUT (200)
-#define PS_DATA_SPEC_WAKE (0)
-
 #define OFFSET_OF(structType, fldName)   (&((structType *)0)->fldName)
 
 /* / Max supported channel list */
