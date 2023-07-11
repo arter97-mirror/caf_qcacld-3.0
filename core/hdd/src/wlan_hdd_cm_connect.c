@@ -458,6 +458,7 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	qdf_list_t *list = NULL;
 	qdf_list_node_t *cur_lst = NULL;
 	struct scan_cache_node *cur_node = NULL;
+	bool is_6ghz_cap = false;
 
 	ap_adapter = hdd_get_sap_adapter_of_dfs(hdd_ctx);
 	/* probably no dfs sap running, no handling required */
@@ -540,10 +541,19 @@ def_chan:
 	 * for 3port MCC scenario.
 	 */
 	ch_bw = hdd_ap_ctx->sap_config.ch_width_orig;
+	if (ch_freq)
+		is_6ghz_cap = policy_mgr_get_ap_6ghz_capable(hdd_ctx->psoc,
+						ap_adapter->vdev_id,
+							     NULL);
+
 	if (!ch_freq || wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) ||
-	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq))
+	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq) ||
+	    wlan_reg_is_passive_for_freq(hdd_ctx->pdev, ch_freq) ||
+	    (WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq) && !is_6ghz_cap))
 		ch_freq = policy_mgr_get_nondfs_preferred_channel(
-			hdd_ctx->psoc, PM_SAP_MODE, true, ap_adapter->vdev_id);
+				hdd_ctx->psoc, PM_SAP_MODE,
+				true, ap_adapter->vdev_id);
+
 	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
 	    ch_bw > CH_WIDTH_20MHZ) {
 		struct ch_params ch_params;

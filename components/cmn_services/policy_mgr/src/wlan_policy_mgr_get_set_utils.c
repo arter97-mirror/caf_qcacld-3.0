@@ -5054,7 +5054,8 @@ bool policy_mgr_is_any_dfs_beaconing_session_present(
 	return status;
 }
 
-bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc)
+bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc,
+					      qdf_freq_t *freq)
 {
 	qdf_freq_t dfs_ch_frq = 0;
 	qdf_freq_t dfs_sta_frq = 0;
@@ -5068,6 +5069,8 @@ bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc)
 							&ch_width);
 	if (!dfs_ch_frq)
 		return false;
+
+	*freq = dfs_ch_frq;
 
 	status = policy_mgr_get_sta_sap_scc_on_dfs_chnl(psoc,
 						&sta_sap_scc_on_dfs_chnl);
