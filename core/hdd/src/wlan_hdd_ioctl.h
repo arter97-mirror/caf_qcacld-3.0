@@ -48,6 +48,10 @@ QDF_STATUS hdd_update_smps_antenna_mode(struct hdd_context *hdd_ctx, int mode);
 int hdd_set_antenna_mode(struct hdd_adapter *adapter,
 			  struct hdd_context *hdd_ctx, int mode);
 
+int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr);
+int hdd_get_disable_ch_list(struct hdd_context *hdd_ctx, uint8_t *buf,
+				   uint32_t buf_len);
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * hdd_get_roam_scan_ch_cb() - roam scan channel list callback handler

@@ -1903,6 +1903,20 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		hdd_wlan_list_fw_profile(&(wrqu->data.length),
 					extra, WE_MAX_STR_LEN);
 		break;
+	case QCSAP_GET_DISABLED_CHANS:
+	{
+		int copied_length;
+
+		hdd_debug("Received Command to get disable Channels list");
+
+		copied_length = hdd_get_disable_ch_list(hdd_ctx, extra, WE_MAX_STR_LEN);
+		if (copied_length == 0) {
+			hdd_err("disable channel list is not yet programmed");
+			return -EINVAL;
+		}
+		wrqu->data.length = strlen(extra) + 1;
+		break;
+	}
 	}
 
 	hdd_exit();
@@ -3215,6 +3229,19 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	{	QCSAP_ENABLE_RTS_BURSTING,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "rts_bursting"
+	}
+	,
+	{
+		WE_SET_DISABLED_CHANS,
+		IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
+		0, "set_dis_chan"
+	}
+	,
+	{
+		QCSAP_GET_DISABLED_CHANS,
+		0,
+		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
+		"get_dis_chan"
 	}
 	,
 };

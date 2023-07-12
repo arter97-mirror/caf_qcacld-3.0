@@ -89,6 +89,10 @@ struct channel_list_info {
 
 #define WE_SET_THERMAL_THROTTLE_CFG     27
 
+
+#define WE_SET_DISABLED_CHANS	28
+#define WE_GET_DISABLED_CHANS	29
+
 #define WE_P2P_NOA_CMD  2
 
 #define QCSAP_IOCTL_MODIFY_ACL          (SIOCIWFIRSTPRIV + 18)
@@ -239,6 +243,7 @@ enum {
 	QCASAP_SET_HE_BSS_COLOR,
 	QCSAP_SET_BTCOEX_MODE,
 	QCSAP_SET_BTCOEX_LOW_RSSI_THRESHOLD,
+	QCSAP_GET_DISABLED_CHANS,
 };
 
 int iw_get_channel_list_with_cc(struct net_device *dev,
