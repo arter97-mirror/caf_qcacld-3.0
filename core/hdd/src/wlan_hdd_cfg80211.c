@@ -23481,6 +23481,11 @@ configure_fw:
 					gi_val, errno);
 			}
 		} else
+#else
+		if (bit_rate == -1) {
+			errno = -EINVAL;
+			continue;
+		}
 #endif
 		if (mask->control[band].gi) {
 			if (NL80211_TXRATE_FORCE_SGI == mask->control[band].gi)
