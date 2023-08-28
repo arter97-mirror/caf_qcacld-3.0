@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -988,7 +988,7 @@ static void hdd_cm_save_bss_info(struct hdd_adapter *adapter,
 	} else {
 		hdd_sta_ctx->conn_info.conn_flag.ht_present = false;
 	}
-	if (hdd_is_roam_sync_in_progress(hdd_ctx, adapter->vdev_id))
+	if (rsp->is_reassoc)
 		hdd_sta_ctx->conn_info.roam_count++;
 
 	if (assoc_resp->HTInfo.present) {
