@@ -69,7 +69,7 @@
  * Usage: Internal
  *
  */
-#define CFG_STA_BSS_MAX_IDLE_PERIOD CFG_UINT( \
+#define CFG_STA_BSS_MAX_IDLE_PERIOD CFG_INI_UINT( \
 	"bss_max_idle_period", \
 	0, \
 	100, \
