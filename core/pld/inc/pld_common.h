@@ -195,11 +195,13 @@ enum pld_uevent {
 /**
  * enum pld_bus_event - PLD bus event types
  * @PLD_BUS_EVENT_PCIE_LINK_DOWN: PCIe link is down
+ * @PLD_BUS_EVENT_PCIE_LINK_RESUME_FAIL: PCIe link resume failed
  * @PLD_BUS_EVENT_INVALID: invalid event type
  */
 
 enum pld_bus_event {
 	PLD_BUS_EVENT_PCIE_LINK_DOWN = 0,
+	PLD_BUS_EVENT_PCIE_LINK_RESUME_FAIL = 1,
 
 	PLD_BUS_EVENT_INVALID = 0xFFFF,
 };

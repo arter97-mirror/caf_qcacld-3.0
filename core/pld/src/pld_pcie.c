@@ -34,6 +34,7 @@
 #include "pld_internal.h"
 #include "pld_pcie.h"
 #include "osif_psoc_sync.h"
+#include "cds_api.h"
 
 #ifdef CONFIG_PCI
 
@@ -89,15 +90,18 @@ static void pld_pcie_remove(struct pci_dev *pdev)
 {
 	struct pld_context *pld_context;
 	int errno;
-	struct osif_psoc_sync *psoc_sync;
+	struct osif_psoc_sync *psoc_sync = NULL;
 
-	errno = osif_psoc_sync_trans_start_wait(&pdev->dev, &psoc_sync);
-	if (errno)
-		return;
+	if (!cds_is_pcie_link_resume_fail()) {
+		errno = osif_psoc_sync_trans_start_wait(&pdev->dev, &psoc_sync);
+		if (errno)
+			return;
+	}
 
 	osif_psoc_sync_unregister(&pdev->dev);
 
-	osif_psoc_sync_wait_for_ops(psoc_sync);
+	if(psoc_sync)
+		osif_psoc_sync_wait_for_ops(psoc_sync);
 
 	pld_context = pld_get_global_context();
 
@@ -109,8 +113,10 @@ static void pld_pcie_remove(struct pci_dev *pdev)
 	pld_del_dev(pld_context, &pdev->dev);
 
 out:
-	osif_psoc_sync_trans_stop(psoc_sync);
-	osif_psoc_sync_destroy(psoc_sync);
+	if (psoc_sync) {
+		osif_psoc_sync_trans_stop(psoc_sync);
+		osif_psoc_sync_destroy(psoc_sync);
+	}
 }
 
 #ifdef CONFIG_PLD_PCIE_CNSS
@@ -271,7 +277,7 @@ out:
 	return;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
 /**
  * pld_bus_event_type_convert() - Convert enum cnss_bus_event_type
  *		to enum pld_bus_event
@@ -290,6 +296,9 @@ enum pld_bus_event pld_bus_event_type_convert(enum cnss_bus_event_type etype)
 	switch (etype) {
 	case BUS_EVENT_PCI_LINK_DOWN:
 		pld_etype = PLD_BUS_EVENT_PCIE_LINK_DOWN;
+		break;
+	case BUS_EVENT_PCI_LINK_RESUME_FAIL:
+		pld_etype = PLD_BUS_EVENT_PCIE_LINK_RESUME_FAIL;
 		break;
 	default:
 		break;
@@ -701,7 +710,7 @@ struct cnss_wlan_driver pld_pcie_ops = {
 	.crash_shutdown = pld_pcie_crash_shutdown,
 	.modem_status   = pld_pcie_notify_handler,
 	.update_status  = pld_pcie_uevent,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
 	.update_event = pld_pcie_update_event,
 #endif
 #ifdef CONFIG_PM
