@@ -9035,7 +9035,6 @@ void hdd_wlan_exit(struct hdd_context *hdd_ctx)
 		hdd_lpass_notify_stop(hdd_ctx);
 	}
 
-	hdd_exit_netlink_services(hdd_ctx);
 #ifdef FEATURE_WLAN_CH_AVOID
 	mutex_destroy(&hdd_ctx->avoid_freq_lock);
 #endif
