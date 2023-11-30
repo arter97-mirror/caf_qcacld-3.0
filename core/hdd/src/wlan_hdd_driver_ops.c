@@ -2135,12 +2135,14 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 	case PLD_BUS_EVENT:
 		hdd_debug("Bus event received");
 
-		/* Currently only link_down taken care.
+		/* Currently only link_down and link_resume_fail taken care.
 		 * Need to extend event buffer to define more bus info,
 		 * if need later.
 		 */
 		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_DOWN)
 			host_log_device_status(WLAN_STATUS_BUS_EXCEPTION);
+		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_RESUME_FAIL)
+			cds_set_driver_state(CDS_DRIVER_STATE_PCIE_LINK_RESUME_FAIL);
 		break;
 	default:
 		/* other events intentionally not handled */
