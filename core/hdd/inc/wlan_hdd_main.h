@@ -169,14 +169,16 @@ struct hdd_apf_context {
 #define HDD_IS_RATE_LIMIT_REQ(flag, rate)\
 	do {\
 		static ulong __last_ticks;\
+		static bool __first_time = true;\
 		ulong __ticks = jiffies;\
 		flag = false; \
-		if (!time_after(__ticks,\
+		if (!__first_time && !time_after(__ticks,\
 		    __last_ticks + rate * HZ)) {\
 			flag = true; \
 		} \
 		else { \
 			__last_ticks = __ticks;\
+			__first_time = false; \
 		} \
 	} while (0)
 
