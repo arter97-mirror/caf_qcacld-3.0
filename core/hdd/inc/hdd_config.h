@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -136,7 +136,11 @@ enum hdd_dot11_mode {
 #ifdef QCA_WIFI_EMULATION
 #define CFG_INTERFACE_CHANGE_WAIT_DEFAULT	300000
 #else
+#ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+#define CFG_INTERFACE_CHANGE_WAIT_DEFAULT	10000
+#else
 #define CFG_INTERFACE_CHANGE_WAIT_DEFAULT	250
+#endif
 #endif
 
 /*

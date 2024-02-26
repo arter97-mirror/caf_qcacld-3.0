@@ -84,6 +84,7 @@
 #include <linux/ctype.h>
 #include <linux/compat.h>
 #include <linux/ethtool.h>
+#include <linux/suspend.h>
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 #include "qdf_periodic_work.h"
@@ -9575,6 +9576,95 @@ out:
 	return ret;
 }
 
+#ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+static QDF_STATUS
+hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
+{
+#define SHUTDOWN_IN_SUSPEND_RETRY 30
+
+	int count = 0;
+	enum pmo_suspend_mode mode;
+
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		hdd_debug("Driver Modules not Enabled ");
+		return 0;
+	}
+
+	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
+	hdd_debug("suspend mode is %d", mode);
+
+	if (mode == PMO_SUSPEND_NONE || mode == PMO_SUSPEND_LEGENCY) {
+		hdd_debug("needn't shutdown in suspend");
+		return 0;
+	}
+
+	if (!hdd_is_any_interface_open(hdd_ctx)) {
+		return pld_idle_shutdown(hdd_ctx->parent_dev,
+					 hdd_psoc_idle_shutdown);
+	} else {
+		if (mode == PMO_SUSPEND_WOW)
+			return 0;
+	}
+
+	/*try to wait interface down for PMO_SUSPEND_SHUTDOWN mode*/
+	while (hdd_is_any_interface_open(hdd_ctx) &&
+	       count < SHUTDOWN_IN_SUSPEND_RETRY) {
+		count++;
+		hdd_debug_rl("sleep 50ms to wait adapters stopped, #%d", count);
+		msleep(50);
+	}
+	if (count >= SHUTDOWN_IN_SUSPEND_RETRY) {
+		hdd_err("some adapters not stopped");
+		return -EBUSY;
+	}
+	return pld_idle_shutdown(hdd_ctx->parent_dev, hdd_psoc_idle_shutdown);
+}
+
+static int hdd_pm_notify(struct notifier_block *b,
+			 unsigned long event, void *p)
+{
+	struct hdd_context *hdd_ctx = container_of(b, struct hdd_context,
+						   pm_notifier);
+
+	if (wlan_hdd_validate_context(hdd_ctx) != 0)
+		return NOTIFY_STOP;
+
+	hdd_debug("got PM event: %lu", event);
+
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
+	case PM_HIBERNATION_PREPARE:
+		if (0 != hdd_shutdown_wlan_in_suspend_prepare(hdd_ctx))
+			return NOTIFY_STOP;
+		break;
+	case PM_POST_SUSPEND:
+	case PM_POST_HIBERNATION:
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static void hdd_pm_notifier_init(struct hdd_context *hdd_ctx)
+{
+	hdd_ctx->pm_notifier.notifier_call = hdd_pm_notify;
+	register_pm_notifier(&hdd_ctx->pm_notifier);
+}
+
+static void hdd_pm_notifier_deinit(struct hdd_context *hdd_ctx)
+{
+	unregister_pm_notifier(&hdd_ctx->pm_notifier);
+}
+#else
+static inline void hdd_pm_notifier_init(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline void hdd_pm_notifier_deinit(struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 /**
  * hdd_rx_wake_lock_destroy() - Destroy RX wakelock
  * @hdd_ctx:	HDD context.
@@ -9646,6 +9736,7 @@ void hdd_context_destroy(struct hdd_context *hdd_ctx)
 	hdd_ctx->config = NULL;
 	cfg_release();
 
+	hdd_pm_notifier_deinit(hdd_ctx);
 	qdf_delayed_work_destroy(&hdd_ctx->psoc_idle_timeout_work);
 	wiphy_free(hdd_ctx->wiphy);
 }
@@ -12756,12 +12847,29 @@ list_destroy:
 	return ret;
 }
 
-void hdd_psoc_idle_timer_start(struct hdd_context *hdd_ctx)
+#ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+static void hdd_idle_timer_in_active(uint32_t timeout_ms)
 {
-	uint32_t timeout_ms = hdd_ctx->config->iface_change_wait_time;
+	/* do nothing because idle shutdown will be called in system
+	 * suspend prepare
+	 */
+}
+#else
+/* ensure idle shutdown can be called/finished once timer started */
+static void hdd_idle_timer_in_active(uint32_t timeout_ms)
+{
 	uint32_t suspend_timeout_ms;
 	enum wake_lock_reason reason =
 		WIFI_POWER_EVENT_WAKELOCK_IFACE_CHANGE_TIMER;
+
+	suspend_timeout_ms = timeout_ms + HDD_PSOC_IDLE_SHUTDOWN_SUSPEND_DELAY;
+	hdd_prevent_suspend_timeout(suspend_timeout_ms, reason);
+}
+#endif
+
+void hdd_psoc_idle_timer_start(struct hdd_context *hdd_ctx)
+{
+	uint32_t timeout_ms = hdd_ctx->config->iface_change_wait_time;
 
 	if (!timeout_ms) {
 		hdd_info("psoc idle timer is disabled");
@@ -12779,8 +12887,7 @@ void hdd_psoc_idle_timer_start(struct hdd_context *hdd_ctx)
 	}
 
 	qdf_delayed_work_start(&hdd_ctx->psoc_idle_timeout_work, timeout_ms);
-	suspend_timeout_ms = timeout_ms + HDD_PSOC_IDLE_SHUTDOWN_SUSPEND_DELAY;
-	hdd_prevent_suspend_timeout(suspend_timeout_ms, reason);
+	hdd_idle_timer_in_active(timeout_ms);
 }
 
 void hdd_psoc_idle_timer_stop(struct hdd_context *hdd_ctx)
@@ -13282,6 +13389,8 @@ struct hdd_context *hdd_context_create(struct device *dev)
 		ret = qdf_status_to_os_return(status);
 		goto wiphy_dealloc;
 	}
+
+	hdd_pm_notifier_init(hdd_ctx);
 
 	hdd_ctx->parent_dev = dev;
 	hdd_ctx->last_scan_reject_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
@@ -18225,37 +18334,6 @@ static int hdd_register_driver_retry(void)
 	}
 
 	return errno;
-}
-
-#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
-int hdd_set_suspend_mode(struct hdd_context *hdd_ctx)
-{
-	int errno;
-
-	if (wlan_hdd_is_full_power_down_enable(hdd_ctx))
-		errno = pld_set_suspend_mode(PLD_FULL_POWER_DOWN);
-	else
-		errno = pld_set_suspend_mode(PLD_SUSPEND);
-
-	return errno;
-}
-#endif
-
-void hdd_shutdown_wlan_in_suspend(struct hdd_context *hdd_ctx)
-{
-/* schedule timeout cb as soon as possible */
-#define SHUTDOWN_IN_SUSPEND_WAIT_TIMEOUT 0
-/* prevent system suspend to let shutdown_restart work can be invoked */
-#define SHUTDOWN_IN_SUSPEND_PREVENT_TIMEOUT 5
-
-	if (!hdd_is_any_interface_open(hdd_ctx)) {
-		qdf_delayed_work_start(&hdd_ctx->psoc_idle_timeout_work,
-				       SHUTDOWN_IN_SUSPEND_WAIT_TIMEOUT);
-		hdd_prevent_suspend_timeout(SHUTDOWN_IN_SUSPEND_PREVENT_TIMEOUT,
-				WIFI_POWER_EVENT_WAKELOCK_DRIVER_IDLE_SHUTDOWN);
-	} else {
-		hdd_err("some adapter not stopped");
-	}
 }
 
 int hdd_driver_load(void)
