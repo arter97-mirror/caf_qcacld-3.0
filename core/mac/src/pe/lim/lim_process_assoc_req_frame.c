@@ -897,6 +897,8 @@ enum wlan_status_code lim_check_rsn_ie(struct pe_session *session,
 	struct wlan_objmgr_vdev *vdev;
 	tSirMacRsnInfo *rsn_ie;
 	struct wlan_crypto_params peer_crypto_params;
+	enum wlan_status_code status_code = STATUS_SUCCESS;
+	QDF_STATUS status;
 
 	rsn_ie = qdf_mem_malloc(sizeof(*rsn_ie));
 	if (!rsn_ie) {
@@ -910,9 +912,12 @@ enum wlan_status_code lim_check_rsn_ie(struct pe_session *session,
 	rsn_ie->length = assoc_req->rsn.length + 2;
 	qdf_mem_copy(&rsn_ie->info[2], assoc_req->rsn.info,
 		     assoc_req->rsn.length);
-	if (wlan_crypto_check_rsn_match(mac_ctx->psoc, session->smeSessionId,
-					&rsn_ie->info[0], rsn_ie->length,
-					&peer_crypto_params)) {
+	status = wlan_crypto_check_rsn_match(mac_ctx->psoc,
+					     session->smeSessionId,
+					     &rsn_ie->info[0],
+					     rsn_ie->length,
+					     &peer_crypto_params);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 							session->smeSessionId,
 							WLAN_LEGACY_MAC_ID);
@@ -930,13 +935,19 @@ enum wlan_status_code lim_check_rsn_ie(struct pe_session *session,
 		qdf_mem_free(rsn_ie);
 		return lim_check_crypto_param(assoc_req, &peer_crypto_params);
 
+	} else if (status == QDF_STATUS_MCAST_CIPHER_ERROR) {
+		pe_err("Invalid rsn group cipher!");
+		status_code = STATUS_GROUP_CIPHER_NOT_VALID;
+	} else if (status == QDF_STATUS_UCAST_CIPHER_ERROR) {
+		pe_err("Invalid rsn pairwise cipher!");
+		status_code = STATUS_PAIRWISE_CIPHER_NOT_VALID;
 	} else {
-		qdf_mem_free(rsn_ie);
-		return STATUS_INVALID_IE;
+		pe_err("Invalid rsn ie!");
+		status_code = STATUS_INVALID_IE;
 	}
 
 	qdf_mem_free(rsn_ie);
-	return STATUS_SUCCESS;
+	return status_code;
 }
 
 static enum wlan_status_code lim_check_wpa_ie(struct pe_session *session,
@@ -948,6 +959,8 @@ static enum wlan_status_code lim_check_wpa_ie(struct pe_session *session,
 	uint32_t dot11f_status, written = 0, nbuffer = WLAN_MAX_IE_LEN;
 	tSirMacRsnInfo *wpa_ie;
 	struct wlan_crypto_params peer_crypto_params;
+	enum wlan_status_code status_code = STATUS_SUCCESS;
+	QDF_STATUS status;
 
 	buffer = qdf_mem_malloc(WLAN_MAX_IE_LEN);
 	if (!buffer) {
@@ -974,15 +987,27 @@ static enum wlan_status_code lim_check_wpa_ie(struct pe_session *session,
 	qdf_mem_copy(&wpa_ie->info[0], buffer, wpa_ie->length);
 	qdf_mem_free(buffer);
 
-	if (wlan_crypto_check_wpa_match(mac_ctx->psoc, session->smeSessionId,
-					&wpa_ie->info[0], wpa_ie->length,
-					&peer_crypto_params)) {
+	status = wlan_crypto_check_wpa_match(mac_ctx->psoc,
+					     session->smeSessionId,
+					     &wpa_ie->info[0],
+					     wpa_ie->length,
+					     &peer_crypto_params);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
 		qdf_mem_free(wpa_ie);
 		return lim_check_crypto_param(assoc_req, &peer_crypto_params);
+	} else if (status == QDF_STATUS_MCAST_CIPHER_ERROR) {
+		pe_err("Invalid wpa group cipher!");
+		status_code = STATUS_GROUP_CIPHER_NOT_VALID;
+	} else if (status == QDF_STATUS_UCAST_CIPHER_ERROR) {
+		pe_err("Invalid wpa pairwise cipher!");
+		status_code = STATUS_PAIRWISE_CIPHER_NOT_VALID;
+	} else {
+		pe_err("Invalid wpa ie!");
+		status_code = STATUS_INVALID_IE;
 	}
 
 	qdf_mem_free(wpa_ie);
-	return STATUS_INVALID_IE;
+	return status_code;
 }
 
 /**
