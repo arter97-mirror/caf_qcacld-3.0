@@ -1881,12 +1881,16 @@ static void lim_process_ft_sae_auth_frame(struct mac_context *mac,
 
 	if (!pe_session || !pe_session->ftPEContext.pFTPreAuthReq) {
 		pe_debug("cannot find session or FT in FT pre-auth phase");
+		if (pe_session)
+			pe_session->ftPEContext.ftPreAuthSession = false;
 		return;
 	}
 
-	if (auth->authTransactionSeqNumber == SIR_MAC_AUTH_FRAME_2)
+	if (auth->authTransactionSeqNumber == SIR_MAC_AUTH_FRAME_2) {
 		lim_handle_ft_pre_auth_rsp(mac, QDF_STATUS_SUCCESS, body,
 					   frame_len, pe_session);
+		pe_session->ftPEContext.ftPreAuthSession = false;
+	}
 }
 #endif
 
@@ -1936,12 +1940,8 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 		/* Find first free room in session table */
 		if (mac->lim.gpSession[i].valid == true &&
 		    mac->lim.gpSession[i].ftPEContext.ftPreAuthSession ==
-		    true) {
-			/* Found the session */
+		    true)
 			pe_session = &mac->lim.gpSession[i];
-			mac->lim.gpSession[i].ftPEContext.ftPreAuthSession =
-				false;
-		}
 	}
 
 	sae_auth_frame = lim_process_sae_preauth_frame(mac, pBd);
@@ -1956,7 +1956,8 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 	if (!pe_session) {
 		pe_debug("cannot find session id in FT pre-auth phase");
 		return QDF_STATUS_E_FAILURE;
-	}
+	} else
+		pe_session->ftPEContext.ftPreAuthSession = false;
 
 	if (!pe_session->ftPEContext.pFTPreAuthReq) {
 		pe_err("Error: No FT");

@@ -4008,6 +4008,10 @@ void csr_roam_joined_state_msg_processor(struct mac_context *mac, void *msg_buf)
 		qdf_mem_free(roam_info);
 	}
 	break;
+	case eWNI_SME_TRIGGER_SAE:
+		sme_debug("Invoke SAE callback");
+		csr_sae_callback(mac, pSirMsg);
+		break;
 	default:
 		csr_roam_check_for_link_status_change(mac, pSirMsg);
 		break;

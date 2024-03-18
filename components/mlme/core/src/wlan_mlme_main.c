@@ -1316,14 +1316,17 @@ static bool is_sae_sap_enabled(struct wlan_objmgr_psoc *psoc)
 
 bool wlan_vdev_is_sae_auth_type(struct wlan_objmgr_vdev *vdev)
 {
-	int32_t auth_mode;
+	int32_t auth_mode, key_mgmt;
 
 	auth_mode = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE);
+	key_mgmt = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
 
-	if (auth_mode == -1)
+	if (auth_mode == -1 || key_mgmt == -1)
 		return false;
 
-	if (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_SAE))
+	if (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_SAE) ||
+	    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_FT_SAE) ||
+	    QDF_HAS_PARAM(key_mgmt, WLAN_CRYPTO_KEY_MGMT_SAE))
 		return true;
 
 	return false;
