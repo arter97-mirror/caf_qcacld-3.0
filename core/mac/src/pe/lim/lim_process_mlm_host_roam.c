@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -546,6 +546,39 @@ end:
 			     (uint32_t *) &mlmReassocCnf);
 }
 
+/**
+ * lim_update_rmf_for_ft_reassoc() - Update reassoc rmf
+ * @mac_ctx: Global MAC context
+ * @pe_session: PE Session
+ *
+ * This function is used to update reassoc rmf when roaming
+ * occur between wpa2/wpa3.
+ *
+ *  Return: None
+ */
+static void
+lim_update_rmf_for_ft_reassoc(struct mac_context *mac_ctx,
+			      struct pe_session *session)
+{
+	struct bss_params *add_bss;
+
+	session->limRmfEnabled =
+			lim_get_vdev_rmf_capable(mac_ctx, session);
+
+	if (session->ftPEContext.pAddBssReq) {
+		add_bss = (struct bss_params *)
+			session->ftPEContext.pAddBssReq;
+
+		if (session->limRmfEnabled) {
+			add_bss->rmfEnabled = 1;
+			add_bss->staContext.rmfEnabled = 1;
+		} else {
+			add_bss->rmfEnabled = 0;
+			add_bss->staContext.rmfEnabled = 0;
+		}
+	}
+}
+
 void lim_process_mlm_ft_reassoc_req(struct mac_context *mac,
 				    tLimMlmReassocReq *reassoc_req)
 {
@@ -585,6 +618,8 @@ void lim_process_mlm_ft_reassoc_req(struct mac_context *mac,
 		pe_err("pAddBssReq is NULL");
 		return;
 	}
+
+	lim_update_rmf_for_ft_reassoc(mac, session);
 
 	qdf_mem_copy(reassoc_req->peerMacAddr,
 		     session->bssId, sizeof(tSirMacAddr));
