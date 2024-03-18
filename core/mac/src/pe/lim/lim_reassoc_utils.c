@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -403,6 +403,8 @@ QDF_STATUS lim_add_ft_sta_self(struct mac_context *mac_ctx, uint16_t assoc_id,
 	add_sta_params = session_entry->ftPEContext.pAddStaReq;
 	add_sta_params->assocId = assoc_id;
 	add_sta_params->smesessionId = session_entry->smeSessionId;
+	if (session_entry->limRmfEnabled)
+		add_sta_params->rmfEnabled = true;
 
 	qdf_mem_copy(add_sta_params->supportedRates.supportedMCSSet,
 		     sta_ds->supportedRates.supportedMCSSet,
