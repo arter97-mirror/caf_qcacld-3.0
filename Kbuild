@@ -2266,7 +2266,6 @@ DP_OBJS += $(DP_SRC)/dp_txrx_wds.o
 endif
 
 ifeq ($(CONFIG_QCACLD_FEATURE_SON), y)
-DP_OBJS += $(WLAN_COMMON_ROOT)/dp/cmn_dp_api/dp_ratetable.o
 DP_INC += -I$(WLAN_COMMON_INC)/dp/cmn_dp_api
 endif
 

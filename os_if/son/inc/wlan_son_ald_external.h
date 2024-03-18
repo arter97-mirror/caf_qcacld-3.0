@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2009 Atheros Communications Inc.  All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -26,7 +26,7 @@
  */
 
 #ifndef _WLAN_SON_ALD_EXTERNAL_H_
-#define _WLAN_SON_ALD_EXTRRNAL_H_
+#define _WLAN_SON_ALD_EXTERNAL_H_
 
 struct son_ald_assoc_event_info {
 	u_int8_t macaddr[QDF_MAC_ADDR_SIZE];
@@ -49,4 +49,4 @@ struct son_act_frm_info {
 	} data;
 };
 
-#endif // _WLAN_SON_ALD_EXTRRNAL_H_
+#endif // _WLAN_SON_ALD_EXTERNAL_H_

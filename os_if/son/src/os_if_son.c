@@ -1417,6 +1417,7 @@ static void os_if_son_reg_get_op_channels(struct wlan_objmgr_pdev *pdev,
 	uint8_t nsoc = 0;
 	struct regdmn_ap_cap_opclass_t *reg_ap_cap;
 	struct wlan_objmgr_psoc *psoc;
+	enum phy_ch_width ch_width;
 
 	if (!pdev || !op_chan) {
 		osif_err("invalid input parameters");
@@ -1454,25 +1455,26 @@ static void os_if_son_reg_get_op_channels(struct wlan_objmgr_pdev *pdev,
 			switch (reg_ap_cap[idx].ch_width) {
 			case BW_20_MHZ:
 			case BW_25_MHZ:
-				op_chan->ch_width = CH_WIDTH_20MHZ;
+				ch_width = CH_WIDTH_20MHZ;
 				break;
 			case BW_40_MHZ:
-				op_chan->ch_width = CH_WIDTH_40MHZ;
+				ch_width = CH_WIDTH_40MHZ;
 				break;
 			case BW_80_MHZ:
 				if (reg_ap_cap[idx].behav_limit == BIT(BEHAV_BW80_PLUS) &&
 				    ucfg_mlme_get_restricted_80p80_bw_supp(psoc))
-					op_chan->ch_width = CH_WIDTH_80P80MHZ;
+					ch_width = CH_WIDTH_80P80MHZ;
 				else
-					op_chan->ch_width = CH_WIDTH_80MHZ;
+					ch_width = CH_WIDTH_80MHZ;
 				break;
 			case BW_160_MHZ:
-				op_chan->ch_width  = CH_WIDTH_160MHZ;
+				ch_width  = CH_WIDTH_160MHZ;
 				break;
 			default:
-				op_chan->ch_width = INVALID_WIDTH;
+				ch_width = INVALID_WIDTH;
 				break;
 			}
+			op_chan->ch_width = (wlan_ch_width)ch_width;
 			op_chan->num_oper_chan =
 					reg_ap_cap[idx].num_supported_chan;
 			qdf_mem_copy(op_chan->oper_chan_num,
@@ -1511,6 +1513,7 @@ static void os_if_son_reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
 	uint8_t idx;
 	uint8_t n_opclasses = 0;
 	uint8_t chan_idx;
+	enum phy_ch_width ch_width;
 	uint8_t max_supp_op_class = REG_MAX_SUPP_OPER_CLASSES;
 	struct regdmn_ap_cap_opclass_t *reg_ap_cap =
 			qdf_mem_malloc(max_supp_op_class * sizeof(*reg_ap_cap));
@@ -1538,24 +1541,25 @@ static void os_if_son_reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
 		switch (reg_ap_cap[idx].ch_width) {
 		case BW_20_MHZ:
 		case BW_25_MHZ:
-			op_class->ch_width = CH_WIDTH_20MHZ;
+			ch_width = CH_WIDTH_20MHZ;
 			break;
 		case BW_40_MHZ:
-			op_class->ch_width = CH_WIDTH_40MHZ;
+			ch_width = CH_WIDTH_40MHZ;
 			break;
 		case BW_80_MHZ:
 			if (reg_ap_cap[idx].behav_limit == BIT(BEHAV_BW80_PLUS))
-				op_class->ch_width = CH_WIDTH_80P80MHZ;
+				ch_width = CH_WIDTH_80P80MHZ;
 			else
-				op_class->ch_width = CH_WIDTH_80MHZ;
+				ch_width = CH_WIDTH_80MHZ;
 			break;
 		case BW_160_MHZ:
-			op_class->ch_width  = CH_WIDTH_160MHZ;
+			ch_width  = CH_WIDTH_160MHZ;
 			break;
 		default:
-			op_class->ch_width = CH_WIDTH_INVALID;
+			ch_width = CH_WIDTH_INVALID;
 			break;
 		}
+		op_class->ch_width = (wlan_ch_width)ch_width;
 		switch (reg_ap_cap[idx].behav_limit) {
 		case BIT(BEHAV_NONE):
 			op_class->sc_loc = IEEE80211_SEC_CHAN_OFFSET_SCN;
