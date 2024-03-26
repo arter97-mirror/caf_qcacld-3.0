@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -242,6 +242,14 @@ struct hdd_adapter *hdd_get_ml_adapter(struct hdd_context *hdd_ctx)
 #endif
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+/**
+ * hdd_mlo_channel_switch_notify - channel switch notify to HDD
+ * @link_mac_address: standby link mac address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_mlo_channel_switch_notify(struct qdf_mac_addr *link_mac_address);
+
 /**
  * hdd_adapter_set_ml_adapter() - set adapter as ml adapter
  * @adapter: HDD adapter

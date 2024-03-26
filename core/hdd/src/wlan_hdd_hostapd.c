@@ -1103,6 +1103,69 @@ static QDF_STATUS hdd_create_chandef(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static struct wlan_channel *wlan_hdd_get_standby_channel(
+					struct wlan_hdd_link_info *link_info)
+{
+	struct wlan_mlo_dev_context *ml_dev_ctx;
+	uint8_t link_id;
+	struct mlo_link_info *ml_link_info;
+	struct wlan_channel *chan;
+	struct hdd_station_ctx *sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	if (!sta_ctx) {
+		hdd_err("Invalid station context");
+		return NULL;
+	}
+
+	ml_dev_ctx = link_info->adapter->deflink->vdev->mlo_dev_ctx;
+	if (!ml_dev_ctx) {
+		hdd_err("Invalid mlo dev context");
+		return NULL;
+	}
+
+	link_id = sta_ctx->conn_info.ieee_link_id;
+	ml_link_info = mlo_mgr_get_ap_link_by_link_id(ml_dev_ctx, link_id);
+	if (!ml_link_info) {
+		hdd_debug("mlo link info is NULL for standby link id: %d",
+			  link_id);
+		return NULL;
+	}
+
+	chan = ml_link_info->link_chan_info;
+	if (!chan) {
+		hdd_debug("link chan info for standby link id: %d is NULL",
+			  link_id);
+		return NULL;
+	}
+
+	return chan;
+}
+
+static uint16_t wlan_hdd_get_link_id_from_sta_ctx(
+					   struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_station_ctx *sta_ctx =
+					WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	return sta_ctx->conn_info.ieee_link_id;
+}
+
+#else
+static inline struct
+wlan_channel *wlan_hdd_get_standby_channel(struct wlan_hdd_link_info *link_info)
+{
+	return NULL;
+}
+
+static inline uint16_t
+wlan_hdd_get_link_id_from_sta_ctx(struct wlan_hdd_link_info *link_info)
+{
+	return 0;
+}
+#endif
+
 static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
@@ -1115,18 +1178,28 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 	struct net_device *dev;
 	struct cfg80211_chan_def chandef;
 	uint16_t puncture_bitmap = 0;
-	uint8_t vdev_id;
+	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 
 	if (!mac_handle) {
 		hdd_err("mac_handle is NULL");
 		return;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
-	if (!vdev)
-		return;
-
 	dev = adapter->dev;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_wiphy_lock(NULL, dev->ieee80211_ptr);
+		link_id = wlan_hdd_get_link_id_from_sta_ctx(link_info);
+
+		/* Update chan info for standby link to user space*/
+		chan = wlan_hdd_get_standby_channel(link_info);
+		if (!chan)
+			goto exit;
+
+		goto notify;
+	}
+
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	wlan_twt_concurrency_update(adapter->hdd_ctx);
@@ -1163,7 +1236,7 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 
 	if (!chan)
 		goto exit;
-
+notify:
 	status = hdd_create_chandef(adapter, chan, &chandef);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("Vdev %d failed to create channel def", vdev_id);
@@ -1180,7 +1253,8 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id, puncture_bitmap);
 exit:
 	hdd_wiphy_unlock(NULL, dev->ieee80211_ptr);
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	if (vdev)
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP
