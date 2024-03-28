@@ -1136,7 +1136,7 @@ static void __hdd_soc_recovery_shutdown(void)
  *
  * Return: void
  */
-static void hdd_soc_recovery_shutdown(struct device *dev)
+static void hdd_soc_recovery_shutdown(struct device *dev, int type)
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
@@ -1157,6 +1157,8 @@ static void hdd_soc_recovery_shutdown(struct device *dev)
 	__hdd_soc_recovery_shutdown();
 
 	/* SSR transition is concluded at the end of soc re-init */
+	if (type) /* shutdown only */
+		osif_psoc_sync_trans_stop(psoc_sync);
 }
 
 /**
@@ -1977,11 +1979,11 @@ static int wlan_hdd_pld_idle_restart(struct device *dev,
  * Return: void
  */
 static void wlan_hdd_pld_shutdown(struct device *dev,
-				  enum pld_bus_type bus_type)
+				  enum pld_bus_type bus_type, int type)
 {
 	hdd_enter();
 
-	hdd_soc_recovery_shutdown(dev);
+	hdd_soc_recovery_shutdown(dev, type);
 
 	hdd_exit();
 }

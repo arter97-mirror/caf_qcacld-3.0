@@ -625,7 +625,7 @@ struct pld_driver_ops {
 	int (*idle_restart)(struct device *dev,
 			     enum pld_bus_type bus_type);
 	void (*shutdown)(struct device *dev,
-			 enum pld_bus_type bus_type);
+			 enum pld_bus_type bus_type, int type);
 	int (*reinit)(struct device *dev,
 		      enum pld_bus_type bus_type,
 		      void *bdev, void *id);

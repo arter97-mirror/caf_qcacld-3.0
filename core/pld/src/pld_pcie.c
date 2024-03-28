@@ -230,13 +230,13 @@ static int pld_pcie_reinit(struct pci_dev *pdev,
  *
  * Return: void
  */
-static void pld_pcie_shutdown(struct pci_dev *pdev)
+static void pld_pcie_shutdown(struct pci_dev *pdev, int type)
 {
 	struct pld_context *pld_context;
 
 	pld_context = pld_get_global_context();
 	if (pld_context->ops->shutdown)
-		pld_context->ops->shutdown(&pdev->dev, PLD_BUS_TYPE_PCIE);
+		pld_context->ops->shutdown(&pdev->dev, PLD_BUS_TYPE_PCIE, type);
 }
 
 /**
