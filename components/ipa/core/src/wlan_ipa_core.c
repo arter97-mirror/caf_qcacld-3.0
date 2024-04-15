@@ -2294,17 +2294,13 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 		qdf_mutex_acquire(&ipa_ctx->event_lock);
 
 		/* STA already connected and without disconnect, connect again
-		 * This is Roaming scenario, clean up ipa iface first, then add
-		 * ipa iface later, sta_connected-- first, sta_connected++
-		 * later to reflect real sta number on DUT.
+		 * This is Roaming scenario
 		 */
 		if (ipa_ctx->sta_connected) {
 			iface_ctx = wlan_ipa_get_iface_by_mode_netdev(
 					ipa_ctx, net_dev, QDF_STA_MODE);
-			if (iface_ctx) {
-				ipa_ctx->sta_connected--;
+			if (iface_ctx)
 				wlan_ipa_cleanup_iface(iface_ctx);
-			}
 			status = wlan_ipa_send_msg(net_dev,
 						   QDF_IPA_STA_DISCONNECT,
 						   mac_addr);
