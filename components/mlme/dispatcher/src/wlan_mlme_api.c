@@ -8094,3 +8094,21 @@ rel_pdev:
 	return status;
 }
 #endif
+
+QDF_STATUS
+wlan_mlme_get_reduce_pwr_scan_mode(struct wlan_objmgr_psoc *psoc,
+				   bool *scan_mode)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*scan_mode =
+			cfg_default(CFG_REDUCE_PWR_SCAN_MODE);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*scan_mode = mlme_obj->cfg.reduce_pwr_scan_mode;
+	return QDF_STATUS_SUCCESS;
+}
+
