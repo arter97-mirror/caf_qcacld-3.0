@@ -265,6 +265,31 @@ wlan_cm_roaming_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 QDF_STATUS wlan_cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				 uint8_t reason);
 
+#ifdef WLAN_STA_SEAMLESS_ROAMING
+/**
+ * wlan_cm_roam_set_ipa_sw_routing() - Set the roam ipa sw routing enable/disable
+ * @psoc: psoc pointer
+ * @vdev: Pointer to vdev
+ * @mac_addr: MAC address of the wlan client
+ * @vdev_id: vdev id
+ * @is_enable: enable/disable ipa sw routing
+ *
+ * Return: void
+ */
+void wlan_cm_roam_set_ipa_sw_routing(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev,
+				     uint8_t *mac_addr, uint8_t vdev_id,
+				     bool is_enable);
+#else
+static inline
+void wlan_cm_roam_set_ipa_sw_routing(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev,
+				     uint8_t *mac_addr, uint8_t vdev_id,
+				     bool is_enable)
+{
+}
+#endif
+
 /**
  * wlan_cm_roam_cfg_get_value  - Get RSO config value from mlme vdev private
  * object

@@ -48,6 +48,11 @@
 #include "wlan_mlo_link_recfg.h"
 #include <../../core/src/wlan_cm_roam_offload.h>
 #include "wlan_mlo_mgr_sta.h"
+#ifdef WLAN_STA_SEAMLESS_ROAMING
+#include "wlan_ipa_ucfg_api.h"
+#include "wlan_osif_priv.h"
+#include <net/cfg80211.h>
+#endif
 
 /* Support for "Fast roaming" (i.e., ESE, LFR, or 802.11r.) */
 #define BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN 15
@@ -894,6 +899,61 @@ void wlan_cm_set_reconnect_disallow_period(struct wlan_objmgr_psoc *psoc,
 
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id, RECONNECT_DISALLOW_PERIOD,
 				   &src_config);
+}
+#endif
+
+#ifdef WLAN_STA_SEAMLESS_ROAMING
+void wlan_cm_roam_set_ipa_sw_routing(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev,
+				     uint8_t *mac_addr, uint8_t vdev_id,
+				     bool is_enable)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_mlme_cfg *mlme_cfg;
+	struct vdev_osif_priv *osif_priv;
+	struct net_device *dev;
+
+	if (!psoc) {
+		target_if_err("psoc is null");
+		return;
+	}
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_err("Failed to get MLME Obj");
+		return;
+	}
+	mlme_cfg = &mlme_obj->cfg;
+
+	/**
+	 * If seamless roaming is disabled, it is meaningless to do ipa
+	 * sw routing switch during roaming scenario, so do not need to
+	 * set the ipa sw routing enable/disable if seamless roaming is
+	 * disabled.
+	 */
+	if (!mlme_cfg->lfr.seamless_roaming_enabled) {
+		mlme_err("seamless roaming is disabled!");
+		return;
+	}
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (osif_priv && osif_priv->wdev) {
+		dev = osif_priv->wdev->netdev;
+	} else {
+		mlme_err("osif_priv is null");
+		return;
+	}
+
+	mlme_debug("set ipa sw routing %s.",
+		   is_enable ? "enable for roam start" : "disable for roam completed");
+	if (mac_addr)
+		mlme_debug("roam compl for " QDF_MAC_ADDR_FMT,
+			   QDF_MAC_ADDR_REF(mac_addr));
+
+	ucfg_ipa_sw_routing_set(wlan_vdev_get_pdev(vdev),
+				(qdf_netdev_t)dev,
+				QDF_STA_MODE, vdev_id,
+				mac_addr, is_enable);
 }
 #endif
 

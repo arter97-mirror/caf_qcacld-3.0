@@ -1426,6 +1426,7 @@ cm_get_and_disable_link_from_roam_ind(struct wlan_objmgr_psoc *psoc,
 				      struct roam_offload_synch_ind *synch_data)
 {}
 #endif
+
 QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 {
 	struct roam_offload_synch_ind *roam_synch_data;
@@ -1587,7 +1588,13 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 				    REASON_DRIVER_DISABLED);
 	}
 
+	if (status == QDF_STATUS_SUCCESS)
+		wlan_cm_roam_set_ipa_sw_routing(psoc, cm_ctx->vdev,
+						roam_synch_data->bssid.bytes,
+						vdev_id, false);
+
 end:
+
 	return status;
 }
 

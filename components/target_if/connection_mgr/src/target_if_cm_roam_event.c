@@ -35,6 +35,11 @@
 #include <target_if_psoc_wake_lock.h>
 #include "wlan_mlo_mgr_peer.h"
 #include "wlan_crypto_global_api.h"
+#ifdef WLAN_STA_SEAMLESS_ROAMING
+#include "wlan_ipa_ucfg_api.h"
+#include "wlan_osif_priv.h"
+#include <net/cfg80211.h>
+#endif
 
 struct wlan_cm_roam_rx_ops *
 target_if_cm_get_roam_rx_ops(struct wlan_objmgr_psoc *psoc)
@@ -88,6 +93,77 @@ target_if_cm_roam_register_rx_ops(struct wlan_cm_roam_rx_ops *rx_ops)
 	target_if_cm_roam_register_vendor_handoff_rx_ops(rx_ops);
 }
 
+#ifdef WLAN_STA_SEAMLESS_ROAMING
+static void target_if_cm_roam_reset_ipa_sw_routing_setting(
+				struct roam_offload_roam_event *roam_event)
+{
+	struct vdev_osif_priv *osif_priv;
+	struct net_device *dev;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_mlme_cfg *mlme_cfg;
+
+	psoc = roam_event->psoc;
+	if (!psoc) {
+		target_if_err("psoc is null");
+		return;
+	}
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		target_if_err("Failed to get MLME Obj");
+		return;
+	}
+	mlme_cfg = &mlme_obj->cfg;
+
+	/**
+	 * If seamless roaming is disabled, the ipa will do cleanup and
+	 * re-setup during roaming, so it is meaningless to do ipa sw
+	 * routing switch in this roaming scenario, so do not need to
+	 * do the ipa sw routing reset if seamless roaming is disabled.
+	 */
+	if (!mlme_cfg->lfr.seamless_roaming_enabled) {
+		target_if_info("seamless roaming is disabled!");
+		return;
+	}
+
+	target_if_debug("reset the ipa sw routing setting!");
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, roam_event->vdev_id,
+						    WLAN_PSOC_TARGET_IF_ID);
+	if (!vdev) {
+		target_if_err("vdev_id(%d) not found", roam_event->vdev_id);
+		return;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		target_if_err("Failed to find pdev");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_PSOC_TARGET_IF_ID);
+		return;
+	}
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_PSOC_TARGET_IF_ID);
+	if (osif_priv && osif_priv->wdev) {
+		dev = osif_priv->wdev->netdev;
+	} else {
+		target_if_err("osif_priv is null");
+		return;
+	}
+
+	ucfg_ipa_sw_routing_set(pdev, (qdf_netdev_t)dev, QDF_STA_MODE,
+				roam_event->vdev_id, NULL, false);
+}
+#else
+static inline void
+target_if_cm_roam_reset_ipa_sw_routing_setting(
+				struct roam_offload_roam_event *roam_event)
+{
+}
+#endif
+
 int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 {
 	QDF_STATUS qdf_status;
@@ -137,6 +213,9 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 			target_if_allow_pm_after_roam(psoc);
 	} else if (roam_event->reason == ROAM_REASON_HO_FAILED) {
 		target_if_allow_pm_after_roam(psoc);
+		target_if_cm_roam_reset_ipa_sw_routing_setting(roam_event);
+	} else if (roam_event->reason == ROAM_REASON_DEAUTH) {
+		target_if_cm_roam_reset_ipa_sw_routing_setting(roam_event);
 	}
 
 	roam_rx_ops = target_if_cm_get_roam_rx_ops(psoc);

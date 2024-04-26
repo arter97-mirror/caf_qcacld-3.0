@@ -221,6 +221,8 @@ QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	}
 
 	wlan_cm_set_cross_vdev_roam(vdev);
+	wlan_cm_roam_set_ipa_sw_routing(psoc, vdev, NULL, vdev_id, true);
+
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_START,
 				     0, NULL);
 
