@@ -46,6 +46,9 @@
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_ipa_ucfg_api.h"
+#include "wlan_osif_priv.h"
+#include <net/cfg80211.h>
 
 QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			       void *event, uint32_t event_data_len)
@@ -902,6 +905,8 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t vdev_id;
+	struct vdev_osif_priv *osif_priv;
+	struct net_device *dev;
 
 	roam_synch_data = (struct roam_offload_synch_ind *)data;
 	vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
@@ -1000,6 +1005,26 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 					  REASON_DISCONNECTED);
 	policy_mgr_check_concurrent_intf_and_restart_sap(psoc);
 end:
+
+	if (status == QDF_STATUS_SUCCESS) {
+		osif_priv = wlan_vdev_get_ospriv(cm_ctx->vdev);
+		if (osif_priv && osif_priv->wdev) {
+			dev = osif_priv->wdev->netdev;
+		} else {
+			mlme_err("osif_priv is null");
+			return status;
+		}
+		mlme_debug("set sw routing disable!");
+		mlme_debug("roam compl for " QDF_MAC_ADDR_FMT,
+			   QDF_MAC_ADDR_REF(roam_synch_data->bssid.bytes));
+		status = ucfg_ipa_sw_routing_set(pdev, (qdf_netdev_t)dev,
+						 QDF_STA_MODE,
+						 vdev_id,
+						 roam_synch_data->bssid.bytes,
+						 false);
+		if (status != QDF_STATUS_SUCCESS)
+			mlme_err("ucfg_ipa_sw_routing_set sw routing disable failed!");
+	}
 	return status;
 }
 

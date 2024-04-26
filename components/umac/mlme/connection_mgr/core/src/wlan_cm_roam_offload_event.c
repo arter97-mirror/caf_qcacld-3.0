@@ -38,6 +38,9 @@
 #include "connection_mgr/core/src/wlan_cm_main_api.h"
 #include "wlan_roam_debug.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_ipa_ucfg_api.h"
+#include "wlan_osif_priv.h"
+#include <net/cfg80211.h>
 
 #define FW_ROAM_SYNC_TIMEOUT 7000
 
@@ -205,6 +208,8 @@ QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
+	struct vdev_osif_priv *osif_priv;
+	struct net_device *dev;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
@@ -213,7 +218,21 @@ QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		mlme_err("vdev object is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (osif_priv && osif_priv->wdev) {
+		dev = osif_priv->wdev->netdev;
+	} else {
+		mlme_err("osif_priv is null");
+		goto roam_start;
+	}
 
+	mlme_debug("set sw routing enable!");
+	status = ucfg_ipa_sw_routing_set(wlan_vdev_get_pdev(vdev), dev, QDF_STA_MODE,
+					 vdev_id, NULL, true);
+	if (status != QDF_STATUS_SUCCESS)
+		mlme_err("set sw routing enable failed!");
+
+roam_start:
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_START,
 				     0, NULL);
 
