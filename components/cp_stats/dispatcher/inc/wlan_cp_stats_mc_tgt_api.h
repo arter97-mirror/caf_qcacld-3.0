@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,6 +27,12 @@
 
 #ifdef QCA_SUPPORT_CP_STATS
 #include "wlan_cp_stats_mc_defs.h"
+
+/* FW update to host tx power 63 is FW init value.
+ * Host should convert it to zero which will reply to
+ * user space when use iw dev get tx power.
+ */
+#define TARGET_MAX_TX_POWER    63
 
 /**
  * tgt_mc_cp_stats_process_stats_event(): API to process stats event

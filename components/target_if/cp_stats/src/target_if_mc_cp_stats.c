@@ -398,6 +398,8 @@ static QDF_STATUS target_if_cp_stats_extract_pdev_stats(
 		 * It's 0.5 db unit from halphy. so correct the value here
 		 */
 		ev->pdev_stats[i].max_pwr = pdev_stats->chan_tx_pwr >> 1;
+		if (ev->pdev_stats[i].max_pwr == TARGET_MAX_TX_POWER)
+			ev->pdev_stats[i].max_pwr = 0;
 
 		target_if_cp_stats_extract_congestion(&ev->pdev_stats[i],
 						      pdev_stats);
