@@ -3241,6 +3241,27 @@ static void cm_fill_stop_reason(struct wlan_roam_stop_config *stop_req,
 		stop_req->reason = REASON_SME_ISSUED;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void
+cm_roam_enable_btm_offload(struct wlan_objmgr_psoc *psoc,
+			   struct wlan_roam_stop_config *stop_req,
+			   uint8_t reason)
+{
+	if (!stop_req)
+		return;
+
+	if (reason == REASON_SUPPLICANT_DISABLED_ROAMING)
+		MLME_SET_BIT(stop_req->btm_config.btm_offload_config,
+			     BTM_OFFLOAD_CONFIG_BIT_0);
+}
+#else
+static inline void
+cm_roam_enable_btm_offload(struct wlan_objmgr_psoc *psoc,
+			   struct wlan_roam_stop_config *stop_req,
+			   uint8_t reason)
+{}
+#endif
+
 QDF_STATUS
 cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		 uint8_t reason, bool *send_resp, bool start_timer)
@@ -3277,6 +3298,8 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		goto rel_vdev_ref;
 
 	stop_req->btm_config.vdev_id = vdev_id;
+	cm_roam_enable_btm_offload(psoc, stop_req, reason);
+
 	stop_req->disconnect_params.vdev_id = vdev_id;
 	stop_req->idle_params.vdev_id = vdev_id;
 	stop_req->roam_triggers.vdev_id = vdev_id;
