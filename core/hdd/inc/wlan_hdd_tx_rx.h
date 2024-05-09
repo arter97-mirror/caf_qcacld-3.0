@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -81,6 +82,8 @@ struct hdd_context;
 #define SME_QOS_UAPSD_CFG_BE_CHANGED_MASK     0xF2
 #define SME_QOS_UAPSD_CFG_VI_CHANGED_MASK     0xF4
 #define SME_QOS_UAPSD_CFG_VO_CHANGED_MASK     0xF8
+
+void wlan_skb_dequeu(void *data);
 
 netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
 

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1433,6 +1434,11 @@ struct hdd_adapter {
 	ol_txrx_rx_fp rx_stack;
 
 	qdf_work_t netdev_features_update_work;
+
+	qdf_nbuf_queue_t skb_queue_head;
+	atomic_t tx_enq_num;
+	qdf_spinlock_t skb_lock;
+	qdf_work_t skb_work;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)

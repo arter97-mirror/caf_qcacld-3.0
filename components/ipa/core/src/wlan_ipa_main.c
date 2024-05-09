@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -487,6 +488,31 @@ void ipa_flush(struct wlan_objmgr_pdev *pdev)
 	}
 
 	return wlan_ipa_flush(ipa_obj);
+}
+
+QDF_STATUS ipa_sw_routing_set(struct wlan_objmgr_pdev *pdev,
+			      qdf_netdev_t net_dev, uint8_t device_mode,
+			      uint8_t session_id, uint8_t *mac_addr, bool is_enable)
+{
+	struct wlan_ipa_priv *ipa_obj;
+
+	if (!ipa_config_is_enabled()) {
+		ipa_debug("ipa is disabled");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (!ipa_is_ready())
+		return QDF_STATUS_SUCCESS;
+
+	ipa_obj = ipa_pdev_get_priv_obj(pdev);
+	if (!ipa_obj) {
+		ipa_err("IPA object is NULL");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return wlan_ipa_sw_routing_set(net_dev, device_mode,
+				       session_id, mac_addr, is_enable);
+
 }
 
 QDF_STATUS ipa_suspend(struct wlan_objmgr_pdev *pdev)

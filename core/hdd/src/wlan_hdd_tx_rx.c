@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -72,6 +73,7 @@
 #include "nan_ucfg_api.h"
 #include <wlan_hdd_sar_limits.h>
 #include "wlan_hdd_object_manager.h"
+#include "wlan_ipa_ucfg_api.h"
 
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
 /*
@@ -958,6 +960,36 @@ static void wlan_hdd_fix_broadcast_eapol(struct hdd_adapter *adapter,
 }
 #endif /* HANDLE_BROADCAST_EAPOL_TX_FRAME */
 
+#define MAX_ROAMING_TX_QUEUE_NUM 1000
+
+void wlan_skb_dequeu(void *data)
+{
+	struct hdd_adapter *adapter = (struct hdd_adapter *)data;
+	qdf_nbuf_t skb;
+	uint32_t dequeued = 0;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	hdd_info("the Enqueued tx num is %d", qdf_atomic_read(&adapter->tx_enq_num));
+	qdf_spin_lock_bh(&adapter->skb_lock);
+	while (((skb = qdf_nbuf_queue_remove(&adapter->skb_queue_head)) !=
+	       NULL)) {
+		dequeued++;
+		qdf_atomic_dec(&adapter->tx_enq_num);
+		if (hdd_skb_nontso_linearize(skb) != QDF_STATUS_SUCCESS ||
+		    !adapter->tx_fn || adapter->tx_fn(soc, adapter->vdev_id,
+		    (qdf_nbuf_t)skb)) {
+			hdd_debug("Failed to send the packet, drop it!");
+			qdf_net_buf_debug_release_skb(skb);
+			kfree_skb(skb);
+			++adapter->stats.tx_dropped;
+			++adapter->hdd_stats.tx_rx_stats.tx_dropped;
+		}
+	}
+	qdf_spin_unlock_bh(&adapter->skb_lock);
+	hdd_info("the Dequeued tx num is %d, the rest Enqueued tx num is %d",
+		 dequeued, qdf_atomic_read(&adapter->tx_enq_num));
+}
+
 /**
  * __hdd_hard_start_xmit() - Transmit a frame
  * @skb: pointer to OS packet (sk_buff)
@@ -1183,13 +1215,37 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 
 	if (!hdd_is_tx_allowed(skb, adapter->vdev_id,
 			       mac_addr_tx_allowed.bytes)) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
-			  QDF_TRACE_LEVEL_INFO_HIGH,
-			  FL("Tx not allowed for sta: "
-			  QDF_MAC_ADDR_FMT), QDF_MAC_ADDR_REF(
-			  mac_addr_tx_allowed.bytes));
-		++adapter->hdd_stats.tx_rx_stats.tx_dropped_ac[ac];
-		goto drop_pkt_and_release_skb;
+		if (ucfg_ipa_is_enabled()) {
+			if (qdf_atomic_read(&adapter->tx_enq_num) < MAX_ROAMING_TX_QUEUE_NUM) {
+				QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
+					  QDF_TRACE_LEVEL_INFO_HIGH,
+					  FL("enqueue for sta: "
+					  QDF_MAC_ADDR_FMT), QDF_MAC_ADDR_REF(
+					  mac_addr_tx_allowed.bytes));
+				/* eapol will not come here */
+				qdf_spin_lock_bh(&adapter->skb_lock);
+				qdf_atomic_inc(&adapter->tx_enq_num);
+				qdf_nbuf_queue_add(&adapter->skb_queue_head, (qdf_nbuf_t)skb);
+				qdf_spin_unlock_bh(&adapter->skb_lock);
+				return;
+			} else {
+				QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
+					  QDF_TRACE_LEVEL_INFO_HIGH,
+					  FL("Tx not allowed for sta: "
+					  QDF_MAC_ADDR_FMT), QDF_MAC_ADDR_REF(
+					  mac_addr_tx_allowed.bytes));
+				++adapter->hdd_stats.tx_rx_stats.tx_dropped_ac[ac];
+				goto drop_pkt_and_release_skb;
+			}
+		} else {
+			QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
+				  QDF_TRACE_LEVEL_INFO_HIGH,
+				  FL("Tx not allowed for sta: "
+				  QDF_MAC_ADDR_FMT), QDF_MAC_ADDR_REF(
+				  mac_addr_tx_allowed.bytes));
+			++adapter->hdd_stats.tx_rx_stats.tx_dropped_ac[ac];
+			goto drop_pkt_and_release_skb;
+		}
 	}
 
 	/* check whether need to linearize skb, like non-linear udp data */

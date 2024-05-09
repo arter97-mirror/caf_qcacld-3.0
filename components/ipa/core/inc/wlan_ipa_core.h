@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -698,6 +699,10 @@ QDF_STATUS wlan_ipa_uc_ol_deinit(struct wlan_ipa_priv *ipa_ctx);
  * Return: None
  */
 void wlan_ipa_flush(struct wlan_ipa_priv *ipa_ctx);
+
+QDF_STATUS wlan_ipa_sw_routing_set(qdf_netdev_t net_dev,
+				   uint8_t device_mode, uint8_t session_id,
+				   uint8_t *mac_addr, bool is_enable);
 
 /**
  * wlan_ipa_suspend() - Suspend IPA

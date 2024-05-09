@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2033,6 +2033,44 @@ void wlan_ipa_uc_bw_monitor(struct wlan_ipa_priv *ipa_ctx, bool stop)
 }
 #endif
 
+/**
+ * wlan_ipa_send_msg() - Allocate and send message to IPA
+ * @net_dev: Interface net device
+ * @type: event enum of type ipa_wlan_event
+ * @mac_address: MAC address associated with the event
+ *
+ * Return: QDF STATUS
+ */
+static QDF_STATUS wlan_ipa_send_msg(qdf_netdev_t net_dev,
+				    qdf_ipa_wlan_event type,
+				    uint8_t *mac_addr)
+{
+	qdf_ipa_msg_meta_t meta;
+	qdf_ipa_wlan_msg_t *msg;
+
+	QDF_IPA_MSG_META_MSG_LEN(&meta) = sizeof(qdf_ipa_wlan_msg_t);
+
+	msg = qdf_mem_malloc(QDF_IPA_MSG_META_MSG_LEN(&meta));
+	if (!msg)
+		return QDF_STATUS_E_NOMEM;
+
+	QDF_IPA_SET_META_MSG_TYPE(&meta, type);
+	strlcpy(QDF_IPA_WLAN_MSG_NAME(msg), net_dev->name, IPA_RESOURCE_NAME_MAX);
+	qdf_mem_copy(QDF_IPA_WLAN_MSG_MAC_ADDR(msg), mac_addr, QDF_NET_ETH_LEN);
+
+	ipa_debug("%s: Evt: %d", QDF_IPA_WLAN_MSG_NAME(msg), QDF_IPA_MSG_META_MSG_TYPE(&meta));
+
+	if (qdf_ipa_send_msg(&meta, msg, wlan_ipa_msg_free_fn)) {
+		ipa_err("%s: Evt: %d fail",
+				   QDF_IPA_WLAN_MSG_NAME(msg),
+				   QDF_IPA_MSG_META_MSG_TYPE(&meta));
+		qdf_mem_free(msg);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef IPA_LAN_RX_NAPI_SUPPORT
 void wlan_ipa_handle_multiple_sap_evt(struct wlan_ipa_priv *ipa_ctx,
 				      qdf_ipa_wlan_event type)
@@ -2083,6 +2121,47 @@ wlan_ipa_save_bssid_iface_ctx(struct wlan_ipa_priv *ipa_ctx, uint8_t iface_id,
 {
 	qdf_mem_copy(ipa_ctx->iface_context[iface_id].bssid.bytes,
 		     mac_addr, QDF_MAC_ADDR_SIZE);
+}
+
+QDF_STATUS wlan_ipa_sw_routing_set(qdf_netdev_t net_dev, uint8_t device_mode,
+				   uint8_t session_id, uint8_t *mac_addr,
+				   bool is_enable)
+{
+	struct wlan_ipa_priv *ipa_ctx = gp_ipa;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (ipa_ctx->roaming && is_enable) {
+		ipa_err("IPA SW Routing has already been Enabled, return!");
+		return status;
+	}
+	if (!ipa_ctx->roaming && !is_enable) {
+		ipa_err("IPA SW Routing has already been Disabled, return!");
+		return status;
+	}
+
+	if (device_mode == QDF_STA_MODE) {
+		if (is_enable) {
+			ipa_ctx->roaming = true;
+			status = wlan_ipa_send_msg(net_dev,
+						   QDF_IPA_SW_ROUTING_ENABLE,
+						   ipa_ctx->iface_context[wlan_ipa_get_ifaceid(ipa_ctx, session_id)].bssid.bytes);
+			if (status != QDF_STATUS_SUCCESS)
+				ipa_err("QDF_IPA_SW_ROUTING_ENABLE send failed %u", status);
+			else
+				ipa_debug("Roaming Started: QDF_IPA_SW_ROUTING_ENABLE send successfully");
+		} else {
+			status = wlan_ipa_send_msg(net_dev,
+						   QDF_IPA_SW_ROUTING_DISABLE,
+						   mac_addr);
+			if (status != QDF_STATUS_SUCCESS)
+				ipa_err("QDF_IPA_SW_ROUTING_DISABLE send failed %u", status);
+			else
+				ipa_debug("Roaming End: QDF_IPA_SW_ROUTING_DISABLE send successfully");
+
+			ipa_ctx->roaming = false;
+		}
+	}
+	return status;
 }
 
 /**

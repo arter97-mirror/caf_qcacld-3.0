@@ -4398,6 +4398,7 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 	struct hdd_station_ctx *sta_ctx = NULL;
 	struct cfg80211_bss *bss_status;
 	struct hdd_context *hdd_ctx;
+	int tx_enq_num;
 
 	hdd_debug("CSR Callback: status=%d result=%d roamID=%d",
 		  roam_status, roam_result, roam_id);
@@ -4453,6 +4454,14 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 		sta_ctx->hdd_reassoc_scenario = true;
 		hdd_debug("hdd_reassoc_scenario set to: %d, due to eCSR_ROAM_FT_START, session: %d",
 			  sta_ctx->hdd_reassoc_scenario, adapter->vdev_id);
+
+		qdf_ret_status = ucfg_ipa_sw_routing_set(hdd_ctx->pdev, adapter->dev,
+							 adapter->device_mode,
+							 adapter->vdev_id,
+							 roam_info->bssid.bytes, true);
+		if (qdf_ret_status != QDF_STATUS_SUCCESS)
+			hdd_info("ucfg_ipa_sw_routing_set sw routing failed!");
+
 		break;
 	case eCSR_ROAM_NAPI_OFF:
 		hdd_debug("After Roam Synch Comp: NAPI Serialize OFF");
@@ -4559,6 +4568,18 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 			hdd_debug("hdd_reassoc_scenario set to: %d, set key complete, session: %d",
 				  sta_ctx->hdd_reassoc_scenario,
 				  adapter->vdev_id);
+			qdf_ret_status = ucfg_ipa_sw_routing_set(hdd_ctx->pdev, adapter->dev,
+								 adapter->device_mode,
+								 adapter->vdev_id,
+								 roam_info->bssid.bytes, false);
+			if (qdf_ret_status != QDF_STATUS_SUCCESS)
+				hdd_info("ucfg_ipa_sw_routing_set sw routing disable failed!");
+
+			tx_enq_num = qdf_atomic_read(&adapter->tx_enq_num);
+			if (tx_enq_num) {
+				hdd_info("the enqeued tx num is %d", tx_enq_num);
+				qdf_sched_work(0, &adapter->skb_work);
+			}
 		}
 	}
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD

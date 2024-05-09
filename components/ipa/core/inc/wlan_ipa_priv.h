@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -620,6 +621,7 @@ struct wlan_ipa_priv {
 	qdf_work_t pm_work;
 	qdf_spinlock_t pm_lock;
 	bool suspended;
+	bool roaming;
 	qdf_spinlock_t q_lock;
 	qdf_spinlock_t enable_disable_lock;
 	/* Flag to indicate wait on pending TX completions */
@@ -759,6 +761,8 @@ static inline char *wlan_ipa_wlan_event_to_str(qdf_ipa_wlan_event event)
 	switch (event) {
 	CASE_RETURN_STRING(QDF_IPA_CLIENT_CONNECT);
 	CASE_RETURN_STRING(QDF_IPA_CLIENT_DISCONNECT);
+	CASE_RETURN_STRING(QDF_IPA_SW_ROUTING_ENABLE);
+	CASE_RETURN_STRING(QDF_IPA_SW_ROUTING_DISABLE);
 	CASE_RETURN_STRING(QDF_IPA_AP_CONNECT);
 	CASE_RETURN_STRING(QDF_IPA_AP_DISCONNECT);
 	CASE_RETURN_STRING(QDF_IPA_STA_CONNECT);
