@@ -590,7 +590,6 @@ int ol_write_ramdump_to_file(uint32_t file_no, int8_t *buf, uint32_t size)
 {
 	int ret = 0;
 	struct file *fp;
-	mm_segment_t old_fs;
 	loff_t pos = 0;
 	struct timespec64 ts;
 	char filename[128];
@@ -635,9 +634,6 @@ int ol_write_ramdump_to_file(uint32_t file_no, int8_t *buf, uint32_t size)
 		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 		tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-	/* change to KERNEL_DS address limit */
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
 	/* open file to write */
 	fp = filp_open(filename, O_WRONLY | O_CREAT | O_DSYNC, 0640);
 	if (IS_ERR(fp)) {
@@ -653,9 +649,6 @@ exit:
 	/* close file before return */
 	if (!IS_ERR(fp))
 		filp_close(fp, current->files);
-
-	/* restore previous address limit */
-	set_fs(old_fs);
 
 	pr_err("%s: EXIT\n", __func__);
 
