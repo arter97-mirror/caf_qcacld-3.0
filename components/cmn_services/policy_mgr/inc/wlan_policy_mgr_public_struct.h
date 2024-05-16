@@ -57,10 +57,14 @@
 
 #define MAX_MAC 2
 
+#ifdef FEATURE_FIFTH_CONNECTION
+#define MAX_NUMBER_OF_CONC_CONNECTIONS 5
+#else
 #ifdef FEATURE_FOURTH_CONNECTION
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 4
 #else
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 3
+#endif
 #endif
 
 /* Policy manager default request id */
@@ -852,6 +856,8 @@ enum policy_mgr_two_connection_mode {
  * @PM_NDI_NDI_NAN_DISC_24_SMM: Both NDI, NAN Disc on 2.4ghz SMM
  * @PM_SAP_SAP_SCC_24_SAP_5_DBS: Both SAP on 2.4Ghz and another SAP on 5Ghz DBS
  * @PM_SAP_SAP_SCC_5_SAP_24_DBS: Both SAP on 5Ghz and another SAP on 2.4Ghz DBS
+ * @PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS: NAN Disc on 2.4Ghz and and STA,
+ * SAP SCC MCC on DBS
  */
 enum policy_mgr_three_connection_mode {
 	PM_STA_SAP_SCC_24_SAP_5_DBS,
@@ -870,8 +876,28 @@ enum policy_mgr_three_connection_mode {
 	PM_NDI_NDI_NAN_DISC_24_SMM,
 	PM_SAP_SAP_SCC_24_SAP_5_DBS,
 	PM_SAP_SAP_SCC_5_SAP_24_DBS,
+	PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS,
 
 	PM_MAX_THREE_CONNECTION_MODE
+};
+#endif
+
+#ifdef FEATURE_FIFTH_CONNECTION
+/**
+ * enum policy_mgr_four_connection_mode - Combination of first four
+ * connection type, concurrency state, band used.
+ * @PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS: NAN on 2GHz, both STA SCC
+ * or MCC on 2GHz/5GHz and SAP SCC on 2GHz
+ * @PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS : NAN on 2GHz, NDI on 2GHz/5GHz
+ * and both STA SCC or MCC on 2GHz/5GHz,
+ * @PM_MAX_FOUR_CONNECTION_MODE: Maximum enumeration
+ */
+enum policy_mgr_four_connection_mode {
+	/* NAN disc + ML-STA + SAP */
+	PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS,
+	/* NAN disc + NDI + ML-STA */
+	PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS,
+	PM_MAX_FOUR_CONNECTION_MODE,
 };
 #endif
 

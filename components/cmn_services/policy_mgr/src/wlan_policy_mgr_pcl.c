@@ -891,8 +891,9 @@ static enum policy_mgr_pcl_type policy_mgr_get_pcl_4_port(
 	}
 
 	if (mode != PM_STA_MODE && mode != PM_SAP_MODE &&
-	    mode != PM_NDI_MODE) {
-		policy_mgr_err("Can't start 4th port if not STA, SAP, NDI");
+	    mode != PM_NDI_MODE && mode != PM_P2P_GO_MODE &&
+	    mode != PM_NAN_DISC_MODE) {
+		policy_mgr_err("Can't start 4th port if not STA, SAP, GO, NDI, NAN");
 		return PM_MAX_PCL_TYPE;
 	}
 
@@ -914,6 +915,51 @@ static inline enum policy_mgr_pcl_type policy_mgr_get_pcl_4_port(
 				enum policy_mgr_con_mode mode,
 				enum policy_mgr_conc_priority_mode pref)
 {return PM_MAX_PCL_TYPE; }
+#endif
+
+#ifdef FEATURE_FIFTH_CONNECTION
+static enum policy_mgr_pcl_type policy_mgr_get_pcl_5_port(
+				struct wlan_objmgr_psoc *psoc,
+				enum policy_mgr_con_mode mode,
+				enum policy_mgr_conc_priority_mode pref)
+{
+	enum policy_mgr_four_connection_mode fifth_index = 0;
+	enum policy_mgr_pcl_type pcl;
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc)) {
+		policy_mgr_err("Can't find index for 5th port pcl table for non dbs capable");
+		return PM_MAX_PCL_TYPE;
+	}
+
+	if (mode != PM_SAP_MODE && mode != PM_NDI_MODE) {
+		policy_mgr_err("Can't start 5th port if not SAP, NDI");
+		return PM_MAX_PCL_TYPE;
+	}
+
+	fifth_index =
+		policy_mgr_get_fifth_connection_pcl_table_index(psoc);
+
+	if (PM_MAX_FOUR_CONNECTION_MODE == fifth_index) {
+		policy_mgr_err("Can't find index for 5th port pcl table");
+		return PM_MAX_PCL_TYPE;
+	}
+
+	policy_mgr_debug("Index for 5th port pcl table: %d", fifth_index);
+
+	pcl = fifth_connection_pcl_dbs_sbs_table[fifth_index][mode][pref];
+
+	return pcl;
+}
+
+#else
+static inline enum policy_mgr_pcl_type policy_mgr_get_pcl_5_port(
+				struct wlan_objmgr_psoc *psoc,
+				enum policy_mgr_con_mode mode,
+				enum policy_mgr_conc_priority_mode pref)
+{
+	return PM_MAX_PCL_TYPE;
+}
+
 #endif
 
 QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
@@ -1008,6 +1054,9 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 		break;
 	case 3:
 		pcl = policy_mgr_get_pcl_4_port(psoc, mode, conc_system_pref);
+		break;
+	case 4:
+		pcl = policy_mgr_get_pcl_5_port(psoc, mode, conc_system_pref);
 		break;
 	default:
 		policy_mgr_err("unexpected num_connections value %d",
@@ -2161,6 +2210,8 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_ndi[0]].freq)) {
 			index = PM_STA_NDI_NAN_DISC_24_SMM;
 		}
+	} else if (count_nan_disc == 1 && count_sap == 1 && count_sta == 1) {
+		index = PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS;
 	} else if (count_nan_disc == 1 && count_ndi == 2) {
 		/* Policy mgr only considers NAN Disc ch in 2.4GHz */
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(
@@ -2220,6 +2271,66 @@ enum policy_mgr_three_connection_mode
 		pm_conc_connection_list[0].freq,
 		pm_conc_connection_list[1].freq,
 		pm_conc_connection_list[2].freq,
+		pm_conc_connection_list[0].chain_mask, index);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return index;
+}
+#endif
+
+#ifdef FEATURE_FIFTH_CONNECTION
+enum policy_mgr_four_connection_mode
+		policy_mgr_get_fifth_connection_pcl_table_index(
+		struct wlan_objmgr_psoc *psoc)
+{
+	enum policy_mgr_four_connection_mode index =
+				PM_MAX_FOUR_CONNECTION_MODE;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t count_sap = 0;
+	uint32_t count_ndi = 0;
+	uint32_t count_nan_disc = 0;
+	uint8_t num_ml_sta = 0;
+	uint32_t list_sap[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint32_t list_ndi[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint32_t list_nan_disc[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return index;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	count_sap += policy_mgr_mode_specific_connection_count(
+			psoc, PM_SAP_MODE, &list_sap[count_sap]);
+
+	count_ndi = policy_mgr_mode_specific_connection_count(
+					psoc, PM_NDI_MODE, list_ndi);
+	count_nan_disc = policy_mgr_mode_specific_connection_count(
+					psoc, PM_NAN_DISC_MODE, list_nan_disc);
+
+	policy_mgr_debug("sap:%d ndi:%d nan disc:%d ml_sta:%d",
+			 count_sap, count_ndi, count_nan_disc,
+			 num_ml_sta);
+	if (num_ml_sta == 2 && count_sap == 1 && count_nan_disc == 1)
+		index = PM_NAN_DISC_24_STA_STA_MCC_SCC_SAP_SCC_MCC_DBS;
+	else if (num_ml_sta == 2 && count_nan_disc == 1 && count_ndi == 1)
+		index = PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS;
+	else
+		index =  PM_MAX_FOUR_CONNECTION_MODE;
+
+	policy_mgr_debug(
+		"mode0:%d mode1:%d mode2:%d mode3:%d chan0:%d chan1:%d chan2:%d chan3:%dchain:%d index:%d",
+		pm_conc_connection_list[0].mode,
+		pm_conc_connection_list[1].mode,
+		pm_conc_connection_list[2].mode,
+		pm_conc_connection_list[3].mode,
+		pm_conc_connection_list[0].freq,
+		pm_conc_connection_list[1].freq,
+		pm_conc_connection_list[2].freq,
+		pm_conc_connection_list[3].freq,
 		pm_conc_connection_list[0].chain_mask, index);
 
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
