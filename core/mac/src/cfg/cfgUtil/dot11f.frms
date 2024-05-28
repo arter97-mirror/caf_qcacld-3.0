@@ -1457,7 +1457,7 @@ IE RSN (EID_RSN)                          // 7.3.2.25
     OPTIONAL akm_suite_cnt, 2;
     // Again, I see nothing in the Standard explicitly limiting the number of
     // AKM suite selectors other than the maximum size of an IE.
-    akm_suite[4][0..6] COUNTIS akm_suite_cnt;
+    akm_suite[4][0..8] COUNTIS akm_suite_cnt;
     OPTIONAL RSN_Cap[2];
     // Finally, the IE may contain zero or more PMKIDs:
     OPTIONAL pmkid_count, 2;
