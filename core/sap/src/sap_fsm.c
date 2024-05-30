@@ -2193,6 +2193,99 @@ static bool sap_save_ft_pending_assoc_ind(struct sap_context *sap_ctx,
 /* Last cac result */
 static struct prev_cac_result prev_cac_history;
 
+#ifdef WLAN_FEATURE_SON
+/* Save each DFS channel CAC history */
+static struct prev_cac_result son_cac_history[NUM_DFS_CHANS];
+
+/**
+ * sap_son_save_cac_history() - function to save one DFS channel CAC record
+ * @mac_ctx: MAX context
+ * @event_id: CAC event id
+ * @cac: pointer to one CAC record to be saved
+ *
+ * Return: None
+ */
+static void sap_son_save_cac_history(struct mac_context *mac_ctx,
+				     eSapHddEvent event_id,
+				     struct prev_cac_result *cac)
+{
+	int8_t index;
+	uint8_t num_freq, i;
+	qdf_freq_t freq_list[MAX_BONDED_CHANNELS] = {};
+	struct ch_params *ch_params = &cac->cac_ch_param;
+
+	if (!ch_params->mhz_freq_seg0)
+		return;
+
+	if (event_id != eSAP_DFS_CAC_START && event_id != eSAP_DFS_CAC_END)
+		return;
+
+	num_freq = sap_ch_params_to_bonding_channels(ch_params, freq_list);
+
+	for (i = 0; i < num_freq; i++) {
+		if (!wlan_reg_is_dfs_for_freq(mac_ctx->pdev, freq_list[i]))
+			continue;
+
+		utils_dfs_convert_freq_to_index(freq_list[i], &index);
+		if (index < 0)
+			continue;
+
+		qdf_mem_copy(&son_cac_history[index], cac, sizeof(*cac));
+		sap_debug("son cac history saved channel %d event %d",
+			  freq_list[i], event_id);
+	}
+}
+
+/**
+ * sap_son_get_cac_status() - function to get CAC start/end time
+ * @mac_ctx: MAX context
+ * @freq: DFS channel frequency to query
+ * @cac_start_us: retrieve CAC start time in microsecond
+ * @cac_end_us: retrieve CAC end time in microsecond
+ *
+ * Return: If CAC not start return failure, otherwise return start/end time
+ */
+static QDF_STATUS
+sap_son_get_cac_status(struct mac_context *mac_ctx,
+		       qdf_freq_t freq,
+		       uint64_t *cac_start_us,
+		       uint64_t *cac_end_us)
+{
+	int8_t index;
+	struct prev_cac_result *cac;
+
+	if (!wlan_reg_is_dfs_for_freq(mac_ctx->pdev, freq))
+		return QDF_STATUS_E_FAILURE;
+
+	utils_dfs_convert_freq_to_index(freq, &index);
+	if (index < 0)
+		return QDF_STATUS_E_FAILURE;
+
+	cac = &son_cac_history[index];
+	if (!cac->ap_start_time)
+		return QDF_STATUS_E_FAILURE;
+
+	*cac_start_us = cac->ap_start_time;
+
+	/*
+	 * If cac not complete, ap_end_time is 0,
+	 * if cac complete, ap_end_time has valid time.
+	 */
+	*cac_end_us = cac->ap_end_time;
+
+	sap_debug("channel %d cac start time %llu cac end time %llu",
+		  freq, cac->ap_start_time, cac->ap_end_time);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline void sap_son_save_cac_history(struct mac_context *mac_ctx,
+					    eSapHddEvent event_id,
+					    struct prev_cac_result *cac)
+{
+}
+#endif
+
 /**
  * sap_update_cac_history() - record SAP Radar found result in last
  * "active" or CAC period
@@ -2271,6 +2364,8 @@ sap_update_cac_history(struct mac_context *mac_ctx,
 	default:
 		break;
 	}
+
+	sap_son_save_cac_history(mac_ctx, event_id, cac_result);
 }
 
 /**
@@ -2422,6 +2517,72 @@ wlansap_query_radar_history(mac_handle_t mac_handle,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_SON
+QDF_STATUS
+wlansap_get_nol_cac_status_for_freq(qdf_freq_t freq,
+				    struct wlan_son_sap_cac_status *cac_status)
+{
+	struct mac_context *mac_ctx = sap_get_mac_context();
+	uint32_t i;
+	struct dfsreq_nolinfo *nol_info;
+	uint64_t cac_start, cac_end;
+
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	if (!wlan_reg_is_dfs_for_freq(mac_ctx->pdev, freq) ||
+	    !cac_status)
+		return QDF_STATUS_E_INVAL;
+
+	nol_info = qdf_mem_malloc(sizeof(struct dfsreq_nolinfo));
+	if (!nol_info)
+		return QDF_STATUS_E_NOMEM;
+
+	/* DFS channel requires CAC by default */
+	cac_status->status = CH_DFS_S_CAC_REQ;
+
+	ucfg_dfs_getnol(mac_ctx->pdev, nol_info);
+
+	for (i = 0; i < nol_info->dfs_ch_nchans && i < DFS_CHAN_MAX; i++) {
+		if (nol_info->dfs_nol[i].nol_freq == freq) {
+			cac_status->status = CH_DFS_S_NOL;
+			cac_status->nol_start_time_us =
+				nol_info->dfs_nol[i].nol_start_us;
+			cac_status->nol_timeout_ms =
+				nol_info->dfs_nol[i].nol_timeout_ms;
+			break;
+		}
+	}
+
+	/* Channel in NOL list is disable, will not trigger CAC */
+	if (cac_status->status != CH_DFS_S_NOL) {
+		if (sap_son_get_cac_status(mac_ctx, freq,
+					   &cac_start, &cac_end) ==
+		    QDF_STATUS_SUCCESS) {
+			cac_status->cac_start_time_us = cac_start;
+			cac_status->cac_complete_time_us = cac_end;
+			if (cac_end)
+				cac_status->status = CH_DFS_S_CAC_COMPLETED;
+			else
+				cac_status->status = CH_DFS_S_CAC_STARTED;
+		}
+	}
+
+	sap_debug("channel %d state %d nol start %llu nol timeout %d cac start %llu cac end %llu",
+		  freq, cac_status->status,
+		  cac_status->nol_start_time_us,
+		  cac_status->nol_timeout_ms,
+		  cac_status->cac_start_time_us,
+		  cac_status->cac_complete_time_us);
+
+	qdf_mem_free(nol_info);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #else
 static inline void
 sap_update_cac_history(struct mac_context *mac_ctx,
