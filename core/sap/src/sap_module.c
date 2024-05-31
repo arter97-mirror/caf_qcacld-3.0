@@ -2220,12 +2220,12 @@ QDF_STATUS wlansap_dfs_send_csa_ie_request(struct sap_context *sap_ctx)
 QDF_STATUS wlansap_get_dfs_ignore_cac(mac_handle_t mac_handle,
 				      uint8_t *ignore_cac)
 {
-	struct mac_context *mac = NULL;
+	struct mac_context *mac;
 
-	if (mac_handle) {
-		mac = MAC_CONTEXT(mac_handle);
-	} else {
-		sap_err("Invalid mac_handle pointer");
+	mac = mac_handle ? MAC_CONTEXT(mac_handle) : sap_get_mac_context();
+
+	if (!mac) {
+		sap_err("Invalid mac context");
 		return QDF_STATUS_E_FAULT;
 	}
 
@@ -2236,12 +2236,12 @@ QDF_STATUS wlansap_get_dfs_ignore_cac(mac_handle_t mac_handle,
 QDF_STATUS wlansap_set_dfs_ignore_cac(mac_handle_t mac_handle,
 				      uint8_t ignore_cac)
 {
-	struct mac_context *mac = NULL;
+	struct mac_context *mac;
 
-	if (mac_handle) {
-		mac = MAC_CONTEXT(mac_handle);
-	} else {
-		sap_err("Invalid mac_handle pointer");
+	mac = mac_handle ? MAC_CONTEXT(mac_handle) : sap_get_mac_context();
+
+	if (!mac) {
+		sap_err("Invalid mac context");
 		return QDF_STATUS_E_FAULT;
 	}
 
