@@ -1833,6 +1833,23 @@ enum policy_mgr_four_connection_mode
 		struct wlan_objmgr_psoc *psoc);
 #endif
 
+#ifdef FEATURE_SIXTH_CONNECTION
+/**
+ * policy_mgr_get_sixth_connection_pcl_table_index() - provides the row index
+ * to sixthConnectionPclTable to get to the correct pcl
+ * @psoc: PSOC object information
+ *
+ * This function provides the row index to
+ * sixthConnectionPclTable. The index is derived based on
+ * current connection, band on which it is on & chain mask it is
+ * using, as obtained from pm_conc_connection_list.
+ *
+ * Return: table index
+ */
+enum policy_mgr_five_connection_mode
+policy_mgr_get_sixth_connection_pcl_table_index(struct wlan_objmgr_psoc *psoc);
+#endif
+
 /**
  * policy_mgr_incr_connection_count() - adds the new connection to
  * the current connections list

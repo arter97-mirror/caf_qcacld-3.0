@@ -254,6 +254,13 @@ extern const enum policy_mgr_pcl_type
 	[PM_MAX_CONC_PRIORITY_MODE];
 #endif
 
+#ifdef FEATURE_SIXTH_CONNECTION
+extern const enum policy_mgr_pcl_type
+	sixth_connection_pcl_dbs_sbs_table
+	[PM_MAX_FIVE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
+	[PM_MAX_CONC_PRIORITY_MODE];
+#endif
+
 extern policy_mgr_next_action_two_connection_table_type
 		*next_action_two_connection_2x2_2g_1x1_5g_table;
 extern policy_mgr_next_action_three_connection_table_type

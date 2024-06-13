@@ -1896,6 +1896,56 @@ static inline enum policy_mgr_pcl_type policy_mgr_get_pcl_5_port(
 
 #endif
 
+#ifdef FEATURE_SIXTH_CONNECTION
+/**
+ * policy_mgr_get_pcl_6_port() - API to provide PCL type for the 6th connection
+ * @psoc: PSOC object
+ * @mode: Connection mode of 6th connection request
+ * @pref: Prefer connection priority mode
+ *
+ * Return: PCL type
+ */
+static enum policy_mgr_pcl_type
+policy_mgr_get_pcl_6_port(struct wlan_objmgr_psoc *psoc,
+			  enum policy_mgr_con_mode mode,
+			  enum policy_mgr_conc_priority_mode pref)
+{
+	enum policy_mgr_five_connection_mode sixth_index;
+	enum policy_mgr_pcl_type pcl;
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc)) {
+		policy_mgr_err("Can't find index for 6th port pcl table for non dbs capable");
+		return PM_MAX_PCL_TYPE;
+	}
+
+	if (mode != PM_SAP_MODE) {
+		policy_mgr_err("Can't start 6th port if not SAP");
+		return PM_MAX_PCL_TYPE;
+	}
+
+	sixth_index = policy_mgr_get_sixth_connection_pcl_table_index(psoc);
+
+	if (PM_MAX_FIVE_CONNECTION_MODE == sixth_index) {
+		policy_mgr_err("Can't find index for 6th port pcl table");
+		return PM_MAX_PCL_TYPE;
+	}
+
+	policy_mgr_debug("Index for 6th port pcl table: %d", sixth_index);
+
+	pcl = sixth_connection_pcl_dbs_sbs_table[sixth_index][mode][pref];
+
+	return pcl;
+}
+#else
+static inline enum policy_mgr_pcl_type
+policy_mgr_get_pcl_6_port(struct wlan_objmgr_psoc *psoc,
+			  enum policy_mgr_con_mode mode,
+			  enum policy_mgr_conc_priority_mode pref)
+{
+	return PM_MAX_PCL_TYPE;
+}
+#endif
+
 QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 			      enum policy_mgr_con_mode mode,
 			      uint32_t *pcl_channels, uint32_t *len,
@@ -1996,6 +2046,9 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 	case 4:
 		pcl = policy_mgr_get_pcl_5_port(psoc, mode, conc_system_pref,
 						vdev_id);
+		break;
+	case 5:
+		pcl = policy_mgr_get_pcl_6_port(psoc, mode, conc_system_pref);
 		break;
 	default:
 		policy_mgr_err("unexpected num_connections value %d",
@@ -4168,6 +4221,79 @@ enum policy_mgr_three_connection_mode
 #endif
 
 #ifdef FEATURE_FIFTH_CONNECTION
+/**
+ * policy_mgr_get_index_for_4sap_dbs() - Function to provide current 4 APs
+ * connection mode when current HW mode is DBS
+ * @pm_ctx: Pointer to policy mgr context
+ * @index: Pointer to save four connection mode index
+ * @freq_list: List of 4 APs frequency
+ *
+ * Return: None
+ */
+static void
+policy_mgr_get_index_for_4sap_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  enum policy_mgr_four_connection_mode *index,
+				  qdf_freq_t *freq_list)
+{
+	uint32_t i, sap_on_24g = 0, sap_on_5g = 0;
+
+	for (i = 0; i < 4; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq_list[i]))
+			sap_on_24g++;
+		else
+			sap_on_5g++;
+	}
+
+	if (sap_on_24g == 2 && sap_on_5g == 2)
+		*index = PM_SAP_SAP_24G_SAP_SAP_5G_DBS;
+	else if (sap_on_24g == 1 && sap_on_5g == 3)
+		*index = PM_SAP_SAP_SAP_5G_SAP_24G_DBS;
+	else if (sap_on_24g == 3 && sap_on_5g == 1)
+		*index = PM_SAP_SAP_SAP_24G_SAP_5G_DBS;
+}
+
+/**
+ * policy_mgr_get_index_for_4sap_sbs() - Function to provide current 4 APs
+ * connection mode when current HW mode is SBS
+ * @pm_ctx: Pointer to policy mgr context
+ * @index: Pointer to save four connection mode index
+ * @freq_list: List of 4 APs frequency
+ *
+ * Return: None
+ */
+static void
+policy_mgr_get_index_for_4sap_sbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  enum policy_mgr_four_connection_mode *index,
+				  qdf_freq_t *freq_list)
+{
+	uint32_t i, sap_on_low = 0, sap_on_high = 0;
+	qdf_freq_t sbs_cut_off_freq;
+
+	sbs_cut_off_freq =  policy_mgr_get_sbs_cut_off_freq(pm_ctx->psoc);
+	if (!sbs_cut_off_freq) {
+		policy_mgr_err("Invalid cutoff freq");
+		return;
+	}
+
+	for (i = 0; i < 4; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq_list[i])) {
+			policy_mgr_err("Invalid 2.4 GHz freq in sbs");
+			return;
+		}
+		if (freq_list[i] < sbs_cut_off_freq)
+			sap_on_low++;
+		else
+			sap_on_high++;
+	}
+
+	if (sap_on_low == 2 && sap_on_high == 2)
+		*index = PM_SAP_SAP_5G_SAP_SAP_5G_SBS;
+	else if (sap_on_low == 1 && sap_on_high == 3)
+		*index = PM_SAP_SAP_SAP_5G_HIGH_SAP_5G_LOW_SBS;
+	else if (sap_on_low == 3 && sap_on_high == 1)
+		*index = PM_SAP_SAP_SAP_5G_LOW_SAP_5G_HIGH_SBS;
+}
+
 enum policy_mgr_four_connection_mode
 		policy_mgr_get_fifth_connection_pcl_table_index(
 		struct wlan_objmgr_psoc *psoc)
@@ -4178,9 +4304,9 @@ enum policy_mgr_four_connection_mode
 	uint32_t count_sap = 0;
 	uint32_t count_ndi = 0;
 	uint32_t count_nan_disc = 0;
-	uint8_t count_p2p;
+	uint8_t count_p2p, i;
 	uint8_t num_ml_sta = 0, num_non_ml_sta = 0;
-	uint32_t list_sap[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint32_t freq_list_sap[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint32_t list_ndi[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint32_t list_nan_disc[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint8_t ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
@@ -4197,8 +4323,14 @@ enum policy_mgr_four_connection_mode
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 
-	count_sap += policy_mgr_mode_specific_connection_count(
-			psoc, PM_SAP_MODE, &list_sap[count_sap]);
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (pm_conc_connection_list[i].mode == PM_SAP_MODE &&
+		    pm_conc_connection_list[i].in_use) {
+			freq_list_sap[count_sap] =
+				pm_conc_connection_list[i].freq;
+			count_sap++;
+		}
+	}
 
 	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml_sta, ml_sta_idx,
 					       &num_non_ml_sta, non_ml_sta_idx,
@@ -4229,6 +4361,14 @@ enum policy_mgr_four_connection_mode
 							    p2p_freq_list[0],
 							    freq_list,
 							    ml_sta_idx);
+	else if (count_sap == 4 && policy_mgr_is_current_hwmode_dbs(psoc))
+		policy_mgr_get_index_for_4sap_dbs(pm_ctx,
+						  &index,
+						  freq_list_sap);
+	else if (count_sap == 4 && policy_mgr_is_current_hwmode_sbs(psoc))
+		policy_mgr_get_index_for_4sap_sbs(pm_ctx,
+						  &index,
+						  freq_list_sap);
 	else
 		index =  PM_MAX_FOUR_CONNECTION_MODE;
 
@@ -4242,6 +4382,134 @@ enum policy_mgr_four_connection_mode
 		pm_conc_connection_list[1].freq,
 		pm_conc_connection_list[2].freq,
 		pm_conc_connection_list[3].freq,
+		pm_conc_connection_list[0].chain_mask, index);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return index;
+}
+#endif
+
+#ifdef FEATURE_SIXTH_CONNECTION
+/**
+ * policy_mgr_get_index_for_5sap_dbs() - Function to provide current 5 APs
+ * connection mode when current HW mode is DBS
+ * @pm_ctx: Pointer to policy mgr context
+ * @index: Pointer to save five connection mode index
+ * @freq_list: List of 5 APs frequency
+ *
+ * Return: None
+ */
+static void
+policy_mgr_get_index_for_5sap_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  enum policy_mgr_five_connection_mode *index,
+				  qdf_freq_t *freq_list)
+{
+	uint32_t i, sap_on_24g = 0, sap_on_5g = 0;
+
+	for (i = 0; i < 5; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq_list[i]))
+			sap_on_24g++;
+		else
+			sap_on_5g++;
+	}
+
+	if (sap_on_24g == 2 && sap_on_5g == 3)
+		*index = PM_SAP_SAP_SAP_5G_SAP_SAP_24G_DBS;
+	else if (sap_on_24g == 3 && sap_on_5g == 2)
+		*index = PM_SAP_SAP_SAP_24G_SAP_SAP_5G_DBS;
+}
+
+/**
+ * policy_mgr_get_index_for_5sap_sbs() - Function to provide current 5 APs
+ * connection mode when current HW mode is SBS
+ * @pm_ctx: Pointer to policy mgr context
+ * @index: Pointer to save five connection mode index
+ * @freq_list: List of 5 APs frequency
+ *
+ * Return: None
+ */
+static void
+policy_mgr_get_index_for_5sap_sbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  enum policy_mgr_five_connection_mode *index,
+				  qdf_freq_t *freq_list)
+{
+	uint32_t i, sap_on_low = 0, sap_on_high = 0;
+	qdf_freq_t sbs_cut_off_freq;
+
+	sbs_cut_off_freq =  policy_mgr_get_sbs_cut_off_freq(pm_ctx->psoc);
+	if (!sbs_cut_off_freq) {
+		policy_mgr_err("Invalid cutoff freq");
+		return;
+	}
+
+	for (i = 0; i < 5; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq_list[i])) {
+			policy_mgr_err("Invalid 2.4 GHz freq in sbs");
+			return;
+		}
+		if (freq_list[i] < sbs_cut_off_freq)
+			sap_on_low++;
+		else
+			sap_on_high++;
+	}
+
+	if (sap_on_low == 2 && sap_on_high == 3)
+		*index = PM_SAP_SAP_SAP_5G_HIGH_SAP_SAP_5G_LOW_SBS;
+	else if (sap_on_low == 3 && sap_on_high == 2)
+		*index = PM_SAP_SAP_SAP_5G_LOW_SAP_SAP_5G_HIGH_SBS;
+}
+
+enum policy_mgr_five_connection_mode
+policy_mgr_get_sixth_connection_pcl_table_index(struct wlan_objmgr_psoc *psoc)
+{
+	enum policy_mgr_five_connection_mode index =
+				PM_MAX_FIVE_CONNECTION_MODE;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t count_sap = 0;
+	uint8_t i;
+	uint32_t freq_list_sap[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return index;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (pm_conc_connection_list[i].mode == PM_SAP_MODE &&
+		    pm_conc_connection_list[i].in_use) {
+			freq_list_sap[count_sap] =
+				pm_conc_connection_list[i].freq;
+			count_sap++;
+		}
+	}
+
+	if (count_sap == 5 && policy_mgr_is_current_hwmode_dbs(psoc))
+		policy_mgr_get_index_for_5sap_dbs(pm_ctx,
+						  &index,
+						  freq_list_sap);
+	else if (count_sap == 5 && policy_mgr_is_current_hwmode_sbs(psoc))
+		policy_mgr_get_index_for_5sap_sbs(pm_ctx,
+						  &index,
+						  freq_list_sap);
+	else
+		index =  PM_MAX_FIVE_CONNECTION_MODE;
+
+	policy_mgr_debug(
+		"mode0:%d mode1:%d mode2:%d mode3:%d mode4:%d chan0:%d chan1:%d chan2:%d chan3:%d chan4:%d chain:%d index:%d",
+		pm_conc_connection_list[0].mode,
+		pm_conc_connection_list[1].mode,
+		pm_conc_connection_list[2].mode,
+		pm_conc_connection_list[3].mode,
+		pm_conc_connection_list[4].mode,
+		pm_conc_connection_list[0].freq,
+		pm_conc_connection_list[1].freq,
+		pm_conc_connection_list[2].freq,
+		pm_conc_connection_list[3].freq,
+		pm_conc_connection_list[4].freq,
 		pm_conc_connection_list[0].chain_mask, index);
 
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);

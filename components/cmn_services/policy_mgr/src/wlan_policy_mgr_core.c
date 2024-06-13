@@ -4425,6 +4425,29 @@ bool policy_mgr_is_5g_channel_allowed(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * policy_mgr_is_scc_with_existing_connection() - Helper function to check if
+ * pcl frequency is same as any existing connection
+ * @pcl_freq: PCL frequency to check
+ *
+ * This function can only call when locked by qdf_conc_list_lock
+ *
+ * Return: True if pcl frequency is same as any existing connection
+ */
+static bool
+policy_mgr_is_scc_with_existing_connection(qdf_freq_t pcl_freq)
+{
+	uint32_t i;
+
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (pm_conc_connection_list[i].in_use &&
+		    pcl_freq == pm_conc_connection_list[i].freq)
+			return true;
+	}
+
+	return false;
+}
+
+/**
  * policy_mgr_get_pref_force_scc_freq() - Get preferred force SCC
  * channel frequency
  * @psoc: Pointer to Psoc
@@ -4540,12 +4563,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 			same_mac = policy_mgr_2_freq_always_on_same_mac(psoc,
 								sap_ch_freq,
 								pcl_freq);
-		if (!((pm_conc_connection_list[0].in_use &&
-		       (pcl_freq == pm_conc_connection_list[0].freq)) ||
-		      (pm_conc_connection_list[1].in_use &&
-		       (pcl_freq == pm_conc_connection_list[1].freq)) ||
-		      (pm_conc_connection_list[2].in_use &&
-		       (pcl_freq == pm_conc_connection_list[2].freq)))) {
+		if (!policy_mgr_is_scc_with_existing_connection(pcl_freq)) {
 			if (sap_ch_freq == pcl_freq)
 				non_scc_ch_freq_same_as_sap = pcl_freq;
 			else if (!non_scc_ch_freq_on_same_mac && same_mac)
