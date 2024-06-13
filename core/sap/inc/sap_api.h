@@ -60,7 +60,7 @@ extern "C" {
 
 #define       MAX_CHANNEL_LIST_LEN         256
 #define       QDF_MAX_NO_OF_SAP_MODE       2    /* max # of SAP */
-#define       SAP_MAX_NUM_SESSION          5
+#define       SAP_MAX_NUM_SESSION          WLAN_MAX_VDEVS
 #define       SAP_MAX_OBSS_STA_CNT         1    /* max # of OBSS STA */
 #define       SAP_ACS_WEIGHT_MAX           (26664)
 
