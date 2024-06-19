@@ -2089,8 +2089,8 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 		return;
 	}
 
-	wlan_set_vdev_crypto_prarams_from_ie(ft_session->vdev, assoc_ies,
-					     assoc_ies_len);
+	wlan_set_vdev_crypto_params_from_ie(ft_session->vdev, assoc_ies,
+					    assoc_ies_len);
 	ft_session->limRmfEnabled =
 		lim_get_vdev_rmf_capable(mac_ctx, ft_session);
 	crypto_params = wlan_crypto_vdev_get_crypto_params(ft_session->vdev);
