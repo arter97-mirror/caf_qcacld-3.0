@@ -1765,6 +1765,10 @@ fourth_connection_pcl_dbs_table
 	[PM_SAP_SAP_SCC_24_SAP_5_DBS] = {
 	[PM_SAP_MODE] = { PM_5G, PM_5G, PM_5G } },
 	[PM_SAP_SAP_SCC_5_SAP_24_DBS] = {
+	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } },
+	[PM_SAP_SAP_SAP_SCC_24_SMM] = {
+	[PM_SAP_MODE] =	{ PM_5G, PM_5G, PM_5G } },
+	[PM_SAP_SAP_SAP_SCC_5_SMM] = {
 	[PM_SAP_MODE] = { PM_24G, PM_24G, PM_24G } }
 };
 #else
