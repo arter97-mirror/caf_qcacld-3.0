@@ -4905,6 +4905,8 @@ ifneq ($(WLAN_CTRL_NAME),)
 ccflags-y += -DWLAN_CTRL_NAME=\"$(WLAN_CTRL_NAME)\"
 endif
 
+ccflags-$(CONFIG_CFG80211_PROP_MULTI_LINK_SUPPORT) += -DCFG80211_PROP_MULTI_LINK_SUPPORT
+
 # inject some build related information
 ifeq ($(CONFIG_BUILD_TAG), y)
 CLD_CHECKOUT = $(shell cd "$(WLAN_ROOT)" && \
