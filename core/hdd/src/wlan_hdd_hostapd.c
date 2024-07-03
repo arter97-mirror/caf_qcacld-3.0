@@ -7193,8 +7193,13 @@ exit:
 }
 
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+#ifdef CFG80211_PROP_MULTI_LINK_SUPPORT
+int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
+			      struct cfg80211_ap_settings *settings)
+#else
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
 			      unsigned int link_id)
+#endif
 #else
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
 #endif
