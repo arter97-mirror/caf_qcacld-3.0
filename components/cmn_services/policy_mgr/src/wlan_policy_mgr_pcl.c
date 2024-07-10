@@ -112,8 +112,16 @@ QDF_STATUS policy_mgr_get_pcl_for_existing_conn(
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	if (policy_mgr_mode_specific_connection_count(psoc, mode, NULL) > 0) {
 		/* Check, store and temp delete the mode's parameter */
-		policy_mgr_store_and_del_conn_info(psoc, mode,
-				all_matching_cxn_to_del, info, &num_cxn_del);
+		if (all_matching_cxn_to_del)
+			policy_mgr_store_and_del_conn_info(
+							psoc, mode,
+							all_matching_cxn_to_del,
+							info, &num_cxn_del);
+		else
+			policy_mgr_store_and_del_conn_info_by_vdev_id(
+								psoc, vdev_id,
+								info,
+								&num_cxn_del);
 		/* Get the PCL */
 		status = policy_mgr_get_pcl(psoc, mode, pcl_ch, len,
 					    pcl_weight, weight_len, vdev_id);
@@ -4045,15 +4053,19 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sap[0]].freq) &&
 		     WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq) &&
-		     WLAN_REG_IS_5GHZ_CH_FREQ(
-			pm_conc_connection_list[list_sap[1]].freq)) {
+		     (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[1]].freq) ||
+			wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sap[1]].freq))) {
 			index = PM_STA_SAP_SCC_24_SAP_5_DBS;
 		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[1]].freq) &&
 		     WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq) &&
-		     WLAN_REG_IS_5GHZ_CH_FREQ(
-			pm_conc_connection_list[list_sap[0]].freq)) {
+		     (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) ||
+			wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sap[0]].freq))) {
 			index = PM_STA_SAP_SCC_24_SAP_5_DBS;
 		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
@@ -4070,19 +4082,47 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sap[0]].freq)) {
 			index = PM_STA_SAP_SCC_5_SAP_24_DBS;
 		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
-			pm_conc_connection_list[list_sta[0]].freq) &&
-		    WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
-		    WLAN_REG_IS_5GHZ_CH_FREQ(
+		     wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[1]].freq)) {
-			index = PM_SAP_SAP_SCC_5_STA_24_DBS;
+			index = PM_STA_SAP_SCC_5_SAP_24_DBS;
+		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[1]].freq) &&
+		     wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		     wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sap[0]].freq)) {
+			index = PM_STA_SAP_SCC_5_SAP_24_DBS;
 		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
-			pm_conc_connection_list[list_sta[0]].freq) &&
-		    WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
-		    WLAN_REG_IS_5GHZ_CH_FREQ(
+		     WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[1]].freq)) {
-			index = PM_SAP_SAP_STA_SCC_5_DBS;
+			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[1]].freq) &&
+		     WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		     wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sap[0]].freq)) {
+			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+		} else if (wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+		     wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		     WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[1]].freq)) {
+			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+		} else if (wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sap[1]].freq) &&
+		     wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+		     WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq)) {
+			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -4111,15 +4151,19 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
-		     WLAN_REG_IS_5GHZ_CH_FREQ(
-			pm_conc_connection_list[list_sta[1]].freq)) {
+		     (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[1]].freq) ||
+			wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[1]].freq))) {
 			index = PM_STA_SAP_24_STA_5_DBS;
 		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[1]].freq) &&
 		     WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
-		     WLAN_REG_IS_5GHZ_CH_FREQ(
-			pm_conc_connection_list[list_sta[0]].freq)) {
+		     (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) ||
+			wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[0]].freq))) {
 			index = PM_STA_SAP_24_STA_5_DBS;
 		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq) &&
@@ -4135,6 +4179,48 @@ enum policy_mgr_three_connection_mode
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq)) {
 			index = PM_STA_SAP_5_STA_24_DBS;
+		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+			 wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+			wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[1]].freq)) {
+			index = PM_STA_SAP_5_STA_24_DBS;
+		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[1]].freq) &&
+			wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+			wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[0]].freq)) {
+			index = PM_STA_SAP_5_STA_24_DBS;
+		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+			 wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+			wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[1]].freq)) {
+			index = PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS;
+		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[1]].freq) &&
+			wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+			wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[0]].freq)) {
+			index = PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS;
+		} else if (wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[0]].freq) &&
+			 WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+			WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[1]].freq)) {
+			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+		} else if (wlan_reg_is_6ghz_chan_freq(
+			pm_conc_connection_list[list_sta[1]].freq) &&
+			 WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sap[0]].freq) &&
+			WLAN_REG_IS_5GHZ_CH_FREQ(
+			pm_conc_connection_list[list_sta[0]].freq)) {
+			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}

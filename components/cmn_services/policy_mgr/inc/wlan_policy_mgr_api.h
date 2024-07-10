@@ -716,6 +716,19 @@ bool policy_mgr_is_chnl_in_diff_band(struct wlan_objmgr_psoc *psoc,
 				     uint32_t ch_freq);
 
 /**
+ * policy_mgr_is_mlo_ap() - to check that given vdev id
+ * belongs to an mlo ap vdev or not
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev_id
+ *
+ * This API will check that if the given vdev_id belongs to mlo ap vdev or not.
+ *
+ * Return: true if vdev id belongs to an mlo sap
+ */
+bool policy_mgr_is_mlo_ap(struct wlan_objmgr_psoc *psoc,
+			  uint8_t vdev_id);
+
+/**
  * policy_mgr_is_pcl_weightage_required() - to check that PCL weightage req or
  * not
  * @psoc: pointer to psoc

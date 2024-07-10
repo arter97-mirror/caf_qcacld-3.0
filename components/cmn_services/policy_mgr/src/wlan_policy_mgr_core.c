@@ -4450,6 +4450,43 @@ policy_mgr_is_scc_with_existing_connection(qdf_freq_t pcl_freq)
 }
 
 /**
+ * policy_mgr_get_conc_ml_sap_link_freq()- Get concurrent ML SAP link frequency
+ * @psoc: Pointer to Psoc
+ * @vdev_id: vdev id
+ * @ml_sap_vdev: ml sap vdev or not
+ *
+ * This API returns concurrent ml sap freq if there are any.
+ * This function can only call when locked by qdf_conc_list_lock.
+ *
+ * Return: Concurrent ml sap freq if present. Otherwise 0.
+ */
+static uint32_t policy_mgr_get_conc_ml_sap_link_freq(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						bool *ml_sap_vdev)
+{
+	uint32_t conc_ml_sap_freq = 0, i;
+
+	if (policy_mgr_is_mlo_ap(psoc, vdev_id)) {
+		*ml_sap_vdev = true;
+		for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+			if (pm_conc_connection_list[i].in_use &&
+			    pm_conc_connection_list[i].mode == PM_SAP_MODE &&
+			    pm_conc_connection_list[i].vdev_id != vdev_id &&
+			    policy_mgr_is_mlo_ap(
+					psoc,
+					pm_conc_connection_list[i].vdev_id)) {
+				conc_ml_sap_freq =
+						pm_conc_connection_list[i].freq;
+				break;
+			}
+		}
+	}
+
+	return conc_ml_sap_freq;
+}
+
+/**
  * policy_mgr_get_pref_force_scc_freq() - Get preferred force SCC
  * channel frequency
  * @psoc: Pointer to Psoc
@@ -4491,6 +4528,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	qdf_freq_t pcl_freq;
 	bool same_mac, sbs_ml_sta_present = false, dbs_ml_sta_present = false;
 	qdf_freq_t ll_lt_sap_freq;
+	bool ml_sap_vdev = false;
+	uint32_t conc_sap_freq = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -4505,6 +4544,12 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 
 	op_mode = wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id);
 	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
+
+	if (mode == PM_SAP_MODE)
+		conc_sap_freq = policy_mgr_get_conc_ml_sap_link_freq(
+								psoc,
+								vdev_id,
+								&ml_sap_vdev);
 
 	qdf_mem_zero(&pcl, sizeof(pcl));
 	status = policy_mgr_get_pcl(psoc, mode, pcl.pcl_list, &pcl.pcl_len,
@@ -4539,6 +4584,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 		if (!allow_6ghz && WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl_freq))
 			continue;
 		if (allow_2ghz_only && !WLAN_REG_IS_24GHZ_CH_FREQ(pcl_freq))
+			continue;
+		if (ml_sap_vdev && (conc_sap_freq == pcl_freq))
 			continue;
 
 		/* Skip LL LT SAP freq and for SAP skip same mac freq */
