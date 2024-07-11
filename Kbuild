@@ -4739,6 +4739,8 @@ ccflags-y += -DQMI_WFDS
 endif
 endif
 
+cppflags-$(CONFIG_FEATURE_SINGLE_MSI) += -DFEATURE_SINGLE_MSI
+
 ifdef CONFIG_MAX_LOGS_PER_SEC
 ccflags-y += -DWLAN_MAX_LOGS_PER_SEC=$(CONFIG_MAX_LOGS_PER_SEC)
 endif
