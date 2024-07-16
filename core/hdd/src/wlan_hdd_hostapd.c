@@ -282,10 +282,17 @@ static struct sap_context *
 hdd_hostapd_init_sap_session(struct hdd_adapter *adapter, bool reinit)
 {
 	struct sap_context *sap_ctx;
+	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
 
 	if (!adapter) {
 		hdd_err("invalid adapter");
+		return NULL;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is null");
 		return NULL;
 	}
 
@@ -296,8 +303,10 @@ hdd_hostapd_init_sap_session(struct hdd_adapter *adapter, bool reinit)
 		return NULL;
 	}
 	status = sap_init_ctx(sap_ctx, adapter->device_mode,
-			       adapter->mac_addr.bytes,
-			       adapter->vdev_id, reinit);
+			      adapter->mac_addr.bytes,
+			      adapter->vdev_id,
+			      hdd_ctx->dfs_cac_offload,
+			      reinit);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wlansap_start failed!! status: %d", status);
 		adapter->session.ap.sap_context = NULL;
@@ -6281,7 +6290,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	mgmt_frame = (struct ieee80211_mgmt *)beacon->head;
 
 	config->beacon_int = mgmt_frame->u.beacon.beacon_int;
-	config->dfs_cac_offload = hdd_ctx->dfs_cac_offload;
 	config->dtim_period = beacon->dtim_period;
 
 	if (config->acs_cfg.acs_mode == true) {
