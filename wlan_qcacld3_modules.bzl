@@ -2338,7 +2338,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         cmd = cmd,
     )
 
-    copts.append("-Wno-format")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 

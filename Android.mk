@@ -45,6 +45,12 @@ LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
 endif
 
+ifeq ($(TARGET_BOARD_PLATFORM), canoe)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+endif
+
+
 LOCAL_PATH := $(call my-dir)
 $(call wlog,LOCAL_PATH=$(LOCAL_PATH))
 BOARD_OPENSOURCE_DIR ?= vendor/qcom/opensource

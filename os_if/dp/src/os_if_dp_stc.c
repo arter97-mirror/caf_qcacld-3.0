@@ -459,15 +459,15 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 
 	osif_nofl_debug("STC: Burst Stats: ");
 	osif_nofl_debug("STC: %20s %15s %15s", "", "UL", "DL");
-	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
 			"burst_duration_min: ",
 			burst_sample->tx.burst_duration_min,
 			burst_sample->rx.burst_duration_min);
-	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
 			"burst_duration_max: ",
 			burst_sample->tx.burst_duration_max,
 			burst_sample->rx.burst_duration_max);
-	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
 			"burst_duration_sum: ",
 			burst_sample->tx.burst_duration_sum,
 			burst_sample->rx.burst_duration_sum);
@@ -479,7 +479,7 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 			"burst_size_max: ",
 			burst_sample->tx.burst_size_max,
 			burst_sample->rx.burst_size_max);
-	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
+	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
 			"burst_size_sum: ",
 			burst_sample->tx.burst_size_sum,
 			burst_sample->rx.burst_size_sum);
@@ -745,7 +745,7 @@ os_if_dp_fill_txrx_win_samples(struct sk_buff *flow_sample_event,
 		if (flow_sample_event) {
 			win_attr = nla_nest_start(flow_sample_event, i);
 			if (!win_attr) {
-				osif_err("STC: win array[%] start put failed",
+				osif_err("STC: win array[%d] start put failed",
 					 i);
 				goto fail;
 			}
