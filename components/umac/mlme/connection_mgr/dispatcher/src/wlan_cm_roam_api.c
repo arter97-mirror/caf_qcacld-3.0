@@ -3599,6 +3599,29 @@ wlan_cm_get_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
 }
 
 void
+wlan_cm_clear_roam_offload_bssid(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	struct qdf_mac_addr *mlme_bssid;
+	struct qdf_mac_addr zero_mac_addr = QDF_MAC_ADDR_ZERO_INIT;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return;
+	}
+
+	mlme_bssid = &(mlme_priv->cm_roam.sae_offload.bssid);
+
+	if (qdf_is_macaddr_zero(mlme_bssid)) {
+		mlme_debug("offolad BSSID already zero");
+		return;
+	}
+	qdf_mem_copy(mlme_bssid->bytes, zero_mac_addr.bytes, QDF_MAC_ADDR_SIZE);
+	mlme_debug("Set offload bssid to zero");
+}
+
+void
 wlan_cm_set_roam_offload_ssid(struct wlan_objmgr_vdev *vdev,
 			      uint8_t *ssid, uint8_t len)
 {

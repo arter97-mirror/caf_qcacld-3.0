@@ -3819,6 +3819,7 @@ cm_roam_switch_to_deinit(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	enum roam_offload_state cur_state = mlme_get_roam_state(psoc, vdev_id);
 	bool sup_disabled_roam;
+	struct wlan_objmgr_vdev *vdev = NULL;
 
 	switch (cur_state) {
 	/*
@@ -3875,6 +3876,13 @@ cm_roam_switch_to_deinit(struct wlan_objmgr_pdev *pdev,
 	status = cm_roam_init_req(psoc, vdev_id, false);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_NB_ID);
+	if (vdev) {
+		wlan_cm_clear_roam_offload_bssid(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+	}
 
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_DEINIT);
 	mlme_clear_operations_bitmap(psoc, vdev_id);
