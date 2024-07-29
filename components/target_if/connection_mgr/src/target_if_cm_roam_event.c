@@ -31,6 +31,9 @@
 #include <../../core/src/wlan_cm_roam_i.h>
 #include "wlan_cm_roam_api.h"
 #include "target_if_cm_roam_offload.h"
+#include "wlan_ipa_ucfg_api.h"
+#include "wlan_osif_priv.h"
+#include <net/cfg80211.h>
 
 struct wlan_cm_roam_rx_ops *
 target_if_cm_get_roam_rx_ops(struct wlan_objmgr_psoc *psoc)
@@ -213,6 +216,10 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 	struct roam_offload_roam_event *roam_event = NULL;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_cm_roam_rx_ops *roam_rx_ops;
+	struct vdev_osif_priv *osif_priv;
+	struct net_device *dev;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
 
 	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
@@ -246,6 +253,40 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 	if (roam_event->reason == ROAM_REASON_RSO_STATUS ||
 	    roam_event->reason == ROAM_REASON_HO_FAILED)
 		target_if_stop_rso_stop_timer(roam_event);
+
+	if (roam_event->reason == ROAM_REASON_DEAUTH) {
+		target_if_debug("deauth: set sw routing false!");
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, roam_event->vdev_id,
+							    WLAN_PSOC_TARGET_IF_ID);
+		if (!vdev) {
+			target_if_err("vdev_id: %d vdev not found", roam_event->vdev_id);
+			goto skip_switch;
+		}
+		pdev = wlan_vdev_get_pdev(vdev);
+		if (!pdev) {
+			target_if_err("Failed to find pdev");
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_PSOC_TARGET_IF_ID);
+			goto skip_switch;
+		}
+
+		osif_priv = wlan_vdev_get_ospriv(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_PSOC_TARGET_IF_ID);
+		if (osif_priv && osif_priv->wdev) {
+			dev = osif_priv->wdev->netdev;
+		} else {
+			target_if_err("osif_priv is null");
+			goto skip_switch;
+		}
+
+		qdf_status = ucfg_ipa_sw_routing_set(pdev, (qdf_netdev_t)dev,
+						     QDF_STA_MODE,
+						     roam_event->vdev_id,
+						     NULL,
+						     false);
+		if (qdf_status != QDF_STATUS_SUCCESS)
+			target_if_err("conn: wlan_ipa_sw_routing_set sw routing false failed!");
+	}
+skip_switch:
 
 	roam_rx_ops = target_if_cm_get_roam_rx_ops(psoc);
 	if (!roam_rx_ops || !roam_rx_ops->roam_event_rx) {
