@@ -9479,7 +9479,7 @@ out:
 static QDF_STATUS
 hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
 {
-#define SHUTDOWN_IN_SUSPEND_RETRY 10
+#define SHUTDOWN_IN_SUSPEND_RETRY 30
 
 	int count = 0;
 	enum pmo_suspend_mode mode;
@@ -9492,7 +9492,7 @@ hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
 	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
 	hdd_debug("suspend mode is %d", mode);
 
-	if (mode == PMO_SUSPEND_NONE || PMO_SUSPEND_LEGENCY) {
+	if (mode == PMO_SUSPEND_NONE || mode == PMO_SUSPEND_LEGENCY) {
 		hdd_debug("needn't shutdown in suspend");
 		return 0;
 	}
@@ -9505,7 +9505,7 @@ hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx)
 			return 0;
 	}
 
-	/*try to wait interfacee down for PMO_SUSPEND_SHUTDOWN mode*/
+	/*try to wait interface down for PMO_SUSPEND_SHUTDOWN mode*/
 	while (hdd_is_any_interface_open(hdd_ctx) &&
 	       count < SHUTDOWN_IN_SUSPEND_RETRY) {
 		count++;
