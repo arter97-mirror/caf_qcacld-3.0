@@ -70,6 +70,7 @@
  * @os_if_get_peer_capability: Gets peer capability
  * @os_if_get_peer_max_mcs_idx: Gets peer max MCS index
  * @os_if_get_sta_stats: Get sta stats
+ * @os_if_set_def_tidmap_prty: Set default tid map priority
  */
 struct son_callbacks {
 	uint32_t (*os_if_is_acs_in_progress)(struct wlan_objmgr_vdev *vdev);
@@ -140,6 +141,8 @@ struct son_callbacks {
 	int (*os_if_get_sta_stats)(struct wlan_objmgr_vdev *vdev,
 				   uint8_t *mac_addr,
 				   struct ieee80211_nodestats *stats);
+	int (*os_if_set_def_tidmap_prty)(struct wlan_objmgr_vdev *vdev,
+					 uint32_t pri);
 };
 
 /**
@@ -851,4 +854,14 @@ QDF_STATUS
 os_if_son_send_status_nlink_msg(uint32_t event_id,
 				enum osif_son_status_evt_type event_type,
 				char *module_name);
+
+/**
+ * os_if_son_set_def_tidmap_prty() - set default tidmap priority
+ * @vdev: vdev
+ * @pri: tidmap priority
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int os_if_son_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
+				  uint32_t pri);
 #endif
