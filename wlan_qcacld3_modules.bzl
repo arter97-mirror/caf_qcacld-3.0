@@ -2065,14 +2065,14 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         out = out,
         kernel_build = "//msm-kernel:{}".format(tv),
         deps = [
-            "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
+            "//vendor/qcom/opensource/monaco/wlan/platform:{}_icnss2".format(tv),
+            "//vendor/qcom/opensource/monaco/wlan/platform:{}_cnss_prealloc".format(tv),
+            "//vendor/qcom/opensource/monaco/wlan/platform:{}_cnss_utils".format(tv),
+            "//vendor/qcom/opensource/monaco/wlan/platform:{}_cnss_nl".format(tv),
             "//msm-kernel:all_headers",
-            "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
-            "//vendor/qcom/opensource/dataipa:include_headers",
-            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
+            "//vendor/qcom/opensource/monaco/wlan/platform:wlan-platform-headers",
+            "//vendor/qcom/opensource/monaco/dataipa:include_headers",
+            "//vendor/qcom/opensource/monaco/dataipa:{}_{}_ipam".format(target, variant),
         ],
     )
 
