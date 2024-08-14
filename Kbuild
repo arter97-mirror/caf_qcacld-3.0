@@ -4615,6 +4615,9 @@ ccflags-$(CONFIG_FW_THERMAL_THROTTLE) += -DFW_THERMAL_THROTTLE
 #Flag to enable/disable LTE COEX support
 ccflags-$(CONFIG_LTE_COEX) += -DLTE_COEX
 
+#Flag to always allow start SAP on unsafe channel if acs disabled
+ccflags-$(CONFIG_SAP_UNSAFE_FIXED_CHAN_ALLOW) += -DWLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW
+
 #Flag to enable/disable HOST_OPCLASS
 ccflags-$(CONFIG_HOST_OPCLASS) += -DHOST_OPCLASS
 ccflags-$(CONFIG_HOST_OPCLASS) += -DHOST_OPCLASS_EXT

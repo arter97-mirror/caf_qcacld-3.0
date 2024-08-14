@@ -5,6 +5,7 @@ CONFIG_INCLUDE_HAL_KIWI := y
 ifeq ($(CONFIG_ARCH_SDXPINN), y)
 CONFIG_MOBILE_ROUTER := y
 CONFIG_WLAN_SYSFS := y
+CONFIG_SAP_UNSAFE_FIXED_CHAN_ALLOW := y
 endif
 
 include $(WLAN_ROOT)/configs/default_defconfig
