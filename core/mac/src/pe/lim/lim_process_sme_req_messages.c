@@ -6210,7 +6210,10 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 			chan_psd_power_info->tx_power = single_tpe.tx_power[i];
 		}
 
-		curr_freq = bonded_freq->start_freq;
+		if (!bonded_freq)
+			curr_freq = curr_op_freq;
+		else
+			curr_freq = bonded_freq->start_freq;
 		ext_power_updated =
 				lim_update_ext_tpe_power(mac, session,
 							 &single_tpe,
