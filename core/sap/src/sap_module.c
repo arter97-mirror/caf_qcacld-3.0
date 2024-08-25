@@ -1938,7 +1938,16 @@ static void
 wlansap_fill_channel_change_puncture(struct channel_change_req *req,
 				     struct ch_params *ch_param)
 {
-	req->target_punc_bitmap = ch_param->input_punc_bitmap;
+	sap_debug("target freq %d bw %d ccfs1 %d reg_punc 0x%x input_punc 0x%x",
+		  req->target_chan_freq,
+		  req->ch_width,
+		  req->center_freq_seg1,
+		  ch_param->reg_punc_bitmap,
+		  ch_param->input_punc_bitmap);
+	if (ch_param->reg_punc_bitmap)
+		req->target_punc_bitmap = ch_param->reg_punc_bitmap;
+	else
+		req->target_punc_bitmap = ch_param->input_punc_bitmap;
 }
 #else
 static inline void

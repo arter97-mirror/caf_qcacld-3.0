@@ -176,19 +176,30 @@ static uint8_t *sap_hdd_event_to_string(eSapHddEvent event)
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE
+static inline
+bool sap_is_same_punc(struct ch_params *new_params,
+		      struct ch_params *old_params)
+{
+	sap_debug("punct, new 0x%x, old 0x%x",
+		  new_params->reg_punc_bitmap,
+		  old_params->reg_punc_bitmap);
+
+	return (new_params->reg_punc_bitmap == old_params->reg_punc_bitmap);
+}
+#else
+static inline
+bool sap_is_same_punc(struct ch_params *new_params,
+		      struct ch_params *old_params)
+{
+	return true;
+}
+#endif
+
 #ifdef QCA_DFS_BW_PUNCTURE
-/**
- * sap_is_chan_change_needed() - Check if SAP channel change needed
- * @sap_ctx: sap context.
- *
- * Even some 20 MHz sub channel disabled for nol, if puncture pattern is valid,
- * SAP still can keep current channel width and primary channel, don't need
- * change channel.
- *
- * Return: bool, true: channel change needed
- */
-static bool
-sap_is_chan_change_needed(struct sap_context *sap_ctx)
+bool
+sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
+				    qdf_freq_t *freq)
 {
 	uint8_t ch_wd;
 	uint16_t pri_freq_puncture = 0;
@@ -230,6 +241,15 @@ sap_is_chan_change_needed(struct sap_context *sap_ctx)
 						ch_params,
 						REG_CURRENT_PWR_MODE);
 	if (ch_params->ch_width == sap_ctx->ch_params.ch_width) {
+		if (sap_is_same_punc(ch_params, &sap_ctx->ch_params)) {
+			sap_debug("No CSA needed, same freq %d, bw %d and puncture",
+				  sap_ctx->chan_freq,
+				  ch_params->ch_width);
+			mac_ctx->sap.SapDfsInfo.new_chanWidth =
+						ch_params->ch_width;
+			*freq = 0;
+			return false;
+		}
 		status = wlan_reg_extract_puncture_by_bw(ch_params->ch_width,
 							 ch_params->reg_punc_bitmap,
 							 sap_ctx->chan_freq,
@@ -242,16 +262,11 @@ sap_is_chan_change_needed(struct sap_context *sap_ctx)
 				  sap_ctx->chan_freq);
 			mac_ctx->sap.SapDfsInfo.new_chanWidth =
 						ch_params->ch_width;
+			*freq = sap_ctx->chan_freq;
 			return false;
 		}
 	}
 
-	return true;
-}
-#else
-static inline bool
-sap_is_chan_change_needed(struct sap_context *sap_ctx)
-{
 	return true;
 }
 #endif
@@ -4775,9 +4790,6 @@ qdf_freq_t sap_indicate_radar(struct sap_context *sap_ctx)
 	    sap_signal_hdd_event(sap_ctx, NULL, eSAP_DFS_NEXT_CHANNEL_REQ,
 	    (void *) eSAP_STATUS_SUCCESS)))
 		return 0;
-
-	if (!sap_is_chan_change_needed(sap_ctx))
-		return sap_ctx->chan_freq;
 
 	chan_freq = sap_random_channel_sel(sap_ctx);
 	if (!chan_freq)
