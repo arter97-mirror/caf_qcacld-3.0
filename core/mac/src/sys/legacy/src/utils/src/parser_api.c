@@ -356,11 +356,8 @@ populate_dot11_supp_operating_classes(struct mac_context *mac_ptr,
  * update_ext_max_tpe_power() - To update ext max transmit power element
  * @mac: mac context
  * @tpe: transmit power env Ie
- * @is_psd: is psd or not
  * @curr_freq: current freq
  * @ext_count: no of extension power count for tpe
- * @max_tx_pwr_interpret: max tx power interpret
- * @max_tx_pwr_category: max tx power category
  *
  * Return: None
  */
@@ -368,7 +365,7 @@ populate_dot11_supp_operating_classes(struct mac_context *mac_ptr,
 static void
 update_ext_max_tpe_power(struct mac_context *mac,
 			 tDot11fIEtransmit_power_env *tpe,
-			 bool is_psd, uint32_t curr_freq, uint8_t ext_count)
+			 uint32_t curr_freq, uint8_t ext_count)
 {
 	uint16_t eirp_power, psd_power;
 	uint8_t i;
@@ -379,10 +376,35 @@ update_ext_max_tpe_power(struct mac_context *mac,
 					      curr_freq,
 					      &psd_tpe,
 					      &eirp_power, &psd_power);
-	if (is_psd) {
-		if (ext_count > 0)
-			tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count = ext_count;
 
+	switch (tpe->max_tx_pwr_interpret) {
+	case LOCAL_EIRP:
+		tpe->ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320 = eirp_power;
+		pe_debug("non-psd ext max tx power %d",
+			 tpe->ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320);
+		break;
+	case LOCAL_EIRP_PSD:
+		tpe->ext_max_tx_power.ext_max_tx_power_local_psd.ext_count = ext_count;
+		pe_debug("Ext count : %d ", ext_count);
+		for (i = 0; i < ext_count; i++) {
+			wlan_reg_get_client_power_for_6ghz_ap(mac->pdev,
+					      tpe->max_tx_pwr_category,
+					      curr_freq,
+					      &psd_tpe,
+					      &eirp_power, &psd_power);
+			tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power[i] = psd_power * 2;
+			curr_freq += 20;
+			pe_debug("psd ext max tx power %d",
+				 tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power[i]);
+		}
+		break;
+	case REGULATORY_CLIENT_EIRP:
+		tpe->ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320 = eirp_power * 2;
+		pe_debug("non-psd ext max tx power %d",
+			 tpe->ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320);
+		break;
+	case REGULATORY_CLIENT_EIRP_PSD:
+		tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count = ext_count;
 		pe_debug("Ext count : %d ", ext_count);
 		for (i = 0; i < ext_count; i++) {
 			wlan_reg_get_client_power_for_6ghz_ap(mac->pdev,
@@ -395,46 +417,39 @@ update_ext_max_tpe_power(struct mac_context *mac,
 			pe_debug("psd ext max tx power %d",
 				 tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power[i]);
 		}
-
-	} else {
-		if (tpe->max_tx_pwr_interpret == LOCAL_EIRP) {
-			tpe->ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320 = eirp_power;
-			pe_debug("non-psd ext max tx power %d",
-				 tpe->ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320);
-		} else {
-			tpe->ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320 = eirp_power * 2;
-			pe_debug("non-psd ext max tx power %d",
-				 tpe->ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320);
-		}
+		break;
+	default:
+		break;
 	}
 }
 #else
 static inline void
 update_ext_max_tpe_power(struct mac_context *mac,
 			 tDot11fIEtransmit_power_env *tpe,
-			 bool is_psd, uint32_t curr_freq, uint8_t ext_count)
+			 uint32_t curr_freq, uint8_t ext_count)
 {
 }
 #endif
 
 void
 populate_dot11f_tx_power_env(struct mac_context *mac,
+			     struct pe_session *session,
 			     tDot11fIEtransmit_power_env *tpe_ptr,
 			     enum phy_ch_width chan_width, uint32_t chan_freq,
 			     uint16_t *num_tpe, bool is_chan_switch)
 {
-	uint8_t count;
-	uint16_t eirp_power, psd_power;
+	uint8_t count, band_mask;
+	uint16_t eirp_power, psd_power, punct_bitmap = NO_SCHANS_PUNC;
 	int power_for_bss;
 	bool add_eirp_power = false;
 	struct ch_params chan_params;
 	bool psd_tpe = false;
 	uint32_t bw_threshold, bw_val;
 	int num_tpe_ies = 0;
-	uint32_t num_tx_power, num_tx_power_psd;
-	uint32_t max_tx_pwr_count, max_tx_pwr_count_psd;
-	qdf_freq_t psd_start_freq, curr_freq = 0;
-	uint8_t num_octets = 0, expect_num;
+	uint32_t num_tx_power, num_tx_power_psd = 0, num_extn_tx_pwr;
+	uint32_t max_tx_pwr_count, max_tx_pwr_count_psd = 0, total_tx_pwr_psd;
+	qdf_freq_t psd_start_freq, curr_freq = chan_freq;
+	enum phy_ch_width legacy_bw;
 
 	if (!wlan_reg_is_6ghz_chan_freq(chan_freq)) {
 		psd_tpe = false;
@@ -451,37 +466,23 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 	switch (chan_width) {
 	case CH_WIDTH_20MHZ:
 		max_tx_pwr_count = 0;
-		max_tx_pwr_count_psd = 1;
 		num_tx_power = 1;
-		num_tx_power_psd = 1;
 		break;
-
 	case CH_WIDTH_40MHZ:
 		max_tx_pwr_count = 1;
-		max_tx_pwr_count_psd = 2;
 		num_tx_power = 2;
-		num_tx_power_psd = 2;
 		break;
-
 	case CH_WIDTH_80MHZ:
 		max_tx_pwr_count = 2;
-		max_tx_pwr_count_psd = 3;
 		num_tx_power = 3;
-		num_tx_power_psd = 4;
 		break;
-
+	case CH_WIDTH_320MHZ:
+		num_extn_tx_pwr = 1;
+		fallthrough;
 	case CH_WIDTH_160MHZ:
 	case CH_WIDTH_80P80MHZ:
 		max_tx_pwr_count = 3;
-		max_tx_pwr_count_psd = 4;
 		num_tx_power = 4;
-		num_tx_power_psd = 8;
-		break;
-	case CH_WIDTH_320MHZ:
-		max_tx_pwr_count = 3;
-		max_tx_pwr_count_psd = 4;
-		num_tx_power = 5;
-		num_tx_power_psd = 16;
 		break;
 	default:
 		return;
@@ -500,13 +501,50 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 		for (count = 0; count < num_tx_power; count++)
 			tpe_ptr->tx_power[count] = eirp_power;
 
-		if (chan_width == CH_WIDTH_320MHZ)
-			update_ext_max_tpe_power(mac, tpe_ptr, psd_tpe,
-						 curr_freq, 0);
+		if (num_extn_tx_pwr)
+			update_ext_max_tpe_power(mac, tpe_ptr, curr_freq, 0);
 		num_tpe_ies++;
 		tpe_ptr++;
-	} else {
-		/* max_tx_pwr_interpret 2 */
+
+		goto end;
+	}
+
+	/* max_tx_pwr_interpret 2 */
+	bw_val = wlan_reg_get_bw_value(chan_width);
+	bw_threshold = 20;
+	power_for_bss = psd_power + 13;
+
+	while ((eirp_power > power_for_bss) && (bw_threshold < bw_val)) {
+		bw_threshold = 2 * bw_threshold;
+		power_for_bss += 3;
+	}
+	if (bw_threshold < bw_val)
+		add_eirp_power = true;
+
+	pe_debug("bw_threshold %d", bw_threshold);
+
+	if (add_eirp_power) {
+		tpe_ptr->present = 1;
+		tpe_ptr->max_tx_pwr_count = max_tx_pwr_count;
+		tpe_ptr->max_tx_pwr_interpret = REGULATORY_CLIENT_EIRP;
+		tpe_ptr->max_tx_pwr_category = REG_DEFAULT_CLIENT;
+		tpe_ptr->num_tx_power = num_tx_power;
+		for (count = 0; count < num_tx_power; count++) {
+			tpe_ptr->tx_power[count] = eirp_power * 2;
+			pe_debug("non-psd default TPE %d %d",
+				 count, tpe_ptr->tx_power[count]);
+		}
+		if (num_extn_tx_pwr)
+			update_ext_max_tpe_power(mac, tpe_ptr, curr_freq, 0);
+		num_tpe_ies++;
+		tpe_ptr++;
+	}
+
+	wlan_reg_get_client_power_for_6ghz_ap(mac->pdev, REG_SUBORDINATE_CLIENT,
+					      chan_freq, &psd_tpe,
+					      &eirp_power, &psd_power);
+
+	if (eirp_power) {
 		bw_val = wlan_reg_get_bw_value(chan_width);
 		bw_threshold = 20;
 		power_for_bss = psd_power + 13;
@@ -519,150 +557,155 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 		if (bw_threshold < bw_val)
 			add_eirp_power = true;
 
-		pe_debug("bw_threshold %d", bw_threshold);
-
 		if (add_eirp_power) {
 			tpe_ptr->present = 1;
 			tpe_ptr->max_tx_pwr_count = max_tx_pwr_count;
 			tpe_ptr->max_tx_pwr_interpret = REGULATORY_CLIENT_EIRP;
-			tpe_ptr->max_tx_pwr_category = REG_DEFAULT_CLIENT;
+			tpe_ptr->max_tx_pwr_category = REG_SUBORDINATE_CLIENT;
 			tpe_ptr->num_tx_power = num_tx_power;
 			for (count = 0; count < num_tx_power; count++) {
 				tpe_ptr->tx_power[count] = eirp_power * 2;
-				pe_debug("non-psd default TPE %d %d",
+				pe_debug("non-psd subord TPE %d %d",
 					 count, tpe_ptr->tx_power[count]);
 			}
-			if (chan_width == CH_WIDTH_320MHZ)
-				update_ext_max_tpe_power(
-						mac, tpe_ptr, psd_tpe,
-						curr_freq, 0);
-			num_tpe_ies++;
-			tpe_ptr++;
-		}
-
-		wlan_reg_get_client_power_for_6ghz_ap(mac->pdev,
-						      REG_SUBORDINATE_CLIENT,
-						      chan_freq,
-						      &psd_tpe,
-						      &eirp_power,
-						      &psd_power);
-
-		if (eirp_power) {
-			bw_val = wlan_reg_get_bw_value(chan_width);
-			bw_threshold = 20;
-			power_for_bss = psd_power + 13;
-
-			while ((eirp_power > power_for_bss) &&
-			       (bw_threshold < bw_val)) {
-				bw_threshold = 2 * bw_threshold;
-				power_for_bss += 3;
-			}
-			if (bw_threshold < bw_val)
-				add_eirp_power = true;
-
-			if (add_eirp_power) {
-				tpe_ptr->present = 1;
-				tpe_ptr->max_tx_pwr_count = max_tx_pwr_count;
-				tpe_ptr->max_tx_pwr_interpret = REGULATORY_CLIENT_EIRP;
-				tpe_ptr->max_tx_pwr_category = REG_SUBORDINATE_CLIENT;
-				tpe_ptr->num_tx_power = num_tx_power;
-				for (count = 0; count < num_tx_power; count++) {
-					tpe_ptr->tx_power[count] =
-							eirp_power * 2;
-					pe_debug("non-psd subord TPE %d %d",
-						 count,
-						 tpe_ptr->tx_power[count]);
-				}
-				if (chan_width == CH_WIDTH_320MHZ)
-					update_ext_max_tpe_power(
-						mac, tpe_ptr, psd_tpe,
-						curr_freq, 0);
-				num_tpe_ies++;
-				tpe_ptr++;
-			}
-		}
-		/* max_tx_pwr_interpret 3 */
-		tpe_ptr->present = 1;
-		tpe_ptr->max_tx_pwr_count = max_tx_pwr_count_psd;
-		tpe_ptr->max_tx_pwr_interpret = REGULATORY_CLIENT_EIRP_PSD;
-		tpe_ptr->max_tx_pwr_category = REG_DEFAULT_CLIENT;
-
-		expect_num = num_tx_power_psd;
-		num_octets = 1 << (tpe_ptr->max_tx_pwr_count - 1);
-		num_octets = QDF_MIN(num_octets, expect_num);
-		pe_debug("expect_num : %d num_octets : %d", expect_num, num_octets);
-
-		tpe_ptr->num_tx_power = num_octets;
-		chan_params.ch_width = chan_width;
-		bw_val = wlan_reg_get_bw_value(chan_width);
-		wlan_reg_set_channel_params_for_pwrmode(mac->pdev, chan_freq,
-							chan_freq, &chan_params,
-							REG_CURRENT_PWR_MODE);
-
-		if (chan_params.mhz_freq_seg1)
-			psd_start_freq =
-				chan_params.mhz_freq_seg1 - bw_val / 2 + 10;
-		else
-			psd_start_freq =
-				chan_params.mhz_freq_seg0 - bw_val / 2 + 10;
-
-		curr_freq = psd_start_freq;
-		for (count = 0; count < num_octets; count++) {
-			wlan_reg_get_client_power_for_6ghz_ap(
-							mac->pdev,
-							REG_DEFAULT_CLIENT,
-							curr_freq,
-							&psd_tpe,
-							&eirp_power,
-							&psd_power);
-			tpe_ptr->tx_power[count] = psd_power * 2;
-			curr_freq += 20;
-			pe_debug("psd default TPE %d %d",
-				 count, tpe_ptr->tx_power[count]);
-		}
-		if (chan_width == CH_WIDTH_320MHZ)
-			update_ext_max_tpe_power(mac, tpe_ptr, psd_tpe,
-						 curr_freq,
-						 expect_num - num_octets);
-		num_tpe_ies++;
-		tpe_ptr++;
-
-		wlan_reg_get_client_power_for_6ghz_ap(mac->pdev,
-						      REG_SUBORDINATE_CLIENT,
-						      chan_freq,
-						      &psd_tpe,
-						      &eirp_power,
-						      &psd_power);
-		curr_freq = psd_start_freq;
-		if (psd_power) {
-			tpe_ptr->present = 1;
-			tpe_ptr->max_tx_pwr_count = max_tx_pwr_count_psd;
-			tpe_ptr->max_tx_pwr_interpret = REGULATORY_CLIENT_EIRP_PSD;
-			tpe_ptr->max_tx_pwr_category = REG_SUBORDINATE_CLIENT;
-			tpe_ptr->num_tx_power = num_octets;
-
-			for (count = 0; count < num_octets; count++) {
-				wlan_reg_get_client_power_for_6ghz_ap(
-							mac->pdev,
-							REG_SUBORDINATE_CLIENT,
-							curr_freq,
-							&psd_tpe,
-							&eirp_power,
-							&psd_power);
-				tpe_ptr->tx_power[count] = psd_power * 2;
-				curr_freq += 20;
-				pe_debug("psd subord TPE %d %d",
-					 count, tpe_ptr->tx_power[count]);
-			}
-			if (chan_width == CH_WIDTH_320MHZ)
-				update_ext_max_tpe_power(
-						mac, tpe_ptr, psd_tpe,
-						curr_freq,
-						expect_num - num_octets);
+			if (num_extn_tx_pwr)
+				update_ext_max_tpe_power(mac, tpe_ptr,
+							 curr_freq, 0);
 			num_tpe_ies++;
 			tpe_ptr++;
 		}
 	}
+
+	bw_val = wlan_reg_get_bw_value(chan_width);
+	total_tx_pwr_psd = bw_val / BW_20_MHZ;
+
+	if (lim_is_session_eht_capable(session)) {
+		band_mask = BIT(wlan_reg_freq_to_band(chan_freq));
+		if (is_chan_switch) {
+			punct_bitmap = lim_get_chan_switch_puncture(session);
+			chan_params.mhz_freq_seg1 =
+				wlan_reg_chan_band_to_freq(mac->pdev,
+							   session->gLimWiderBWChannelSwitch.newCenterChanFreq1,
+							   band_mask);
+		} else {
+			punct_bitmap = lim_get_punc_chan_bit_map(session);
+			chan_params.mhz_freq_seg1 =
+				wlan_reg_chan_band_to_freq(mac->pdev,
+							   session->ch_center_freq_seg1,
+							   band_mask);
+		}
+	}
+
+	chan_params.ch_width = chan_width;
+	wlan_reg_set_channel_params_for_pwrmode(mac->pdev, chan_freq,
+						chan_freq, &chan_params,
+						REG_CURRENT_PWR_MODE);
+
+	if (chan_params.mhz_freq_seg1)
+		psd_start_freq = chan_params.mhz_freq_seg1 - bw_val / 2 + 10;
+	else
+		psd_start_freq = chan_params.mhz_freq_seg0 - bw_val / 2 + 10;
+
+	if (punct_bitmap) {
+		wlan_reg_set_input_punc_bitmap(&chan_params, punct_bitmap);
+		wlan_reg_set_non_eht_ch_params(&chan_params, true);
+		wlan_reg_set_channel_params_for_pwrmode(mac->pdev, chan_freq,
+							chan_freq, &chan_params,
+							REG_CURRENT_PWR_MODE);
+		legacy_bw = chan_params.ch_width;
+	} else if (bw_val == 320) {
+		legacy_bw = CH_WIDTH_160MHZ;
+	} else {
+		legacy_bw = chan_width;
+	}
+
+	switch (legacy_bw) {
+	case CH_WIDTH_20MHZ:
+		max_tx_pwr_count_psd = 1;
+		num_tx_power_psd = 1;
+		break;
+	case CH_WIDTH_40MHZ:
+		max_tx_pwr_count_psd = 2;
+		num_tx_power_psd = 2;
+		break;
+	case CH_WIDTH_80MHZ:
+		max_tx_pwr_count_psd = 3;
+		num_tx_power_psd = 4;
+		break;
+	case CH_WIDTH_160MHZ:
+	case CH_WIDTH_80P80MHZ:
+		max_tx_pwr_count_psd = 4;
+		num_tx_power_psd = 8;
+		break;
+	default:
+		return;
+	}
+
+	num_extn_tx_pwr = total_tx_pwr_psd - num_tx_power_psd;
+
+	/* max_tx_pwr_interpret 3 */
+	tpe_ptr->present = 1;
+	tpe_ptr->max_tx_pwr_count = max_tx_pwr_count_psd;
+	tpe_ptr->max_tx_pwr_interpret = REGULATORY_CLIENT_EIRP_PSD;
+	tpe_ptr->max_tx_pwr_category = REG_DEFAULT_CLIENT;
+
+	tpe_ptr->num_tx_power = num_tx_power_psd;
+	curr_freq = psd_start_freq;
+	for (count = 0; count < num_tx_power_psd; count++) {
+		wlan_reg_get_client_power_for_6ghz_ap(
+						mac->pdev,
+						REG_DEFAULT_CLIENT,
+						curr_freq,
+						&psd_tpe,
+						&eirp_power,
+						&psd_power);
+		tpe_ptr->tx_power[count] = psd_power * 2;
+		curr_freq += 20;
+		pe_debug("psd default TPE %d %d",
+			 count, tpe_ptr->tx_power[count]);
+	}
+
+	if (num_extn_tx_pwr)
+		update_ext_max_tpe_power(mac, tpe_ptr, curr_freq,
+					 num_extn_tx_pwr);
+	num_tpe_ies++;
+	tpe_ptr++;
+
+	wlan_reg_get_client_power_for_6ghz_ap(mac->pdev,
+					      REG_SUBORDINATE_CLIENT,
+					      chan_freq,
+					      &psd_tpe,
+					      &eirp_power,
+					      &psd_power);
+	curr_freq = psd_start_freq;
+	if (psd_power) {
+		tpe_ptr->present = 1;
+		tpe_ptr->max_tx_pwr_count = max_tx_pwr_count_psd;
+		tpe_ptr->max_tx_pwr_interpret = REGULATORY_CLIENT_EIRP_PSD;
+		tpe_ptr->max_tx_pwr_category = REG_SUBORDINATE_CLIENT;
+		tpe_ptr->num_tx_power = num_tx_power_psd;
+
+		for (count = 0; count < num_tx_power_psd; count++) {
+			wlan_reg_get_client_power_for_6ghz_ap(
+						mac->pdev,
+						REG_SUBORDINATE_CLIENT,
+						curr_freq,
+						&psd_tpe,
+						&eirp_power,
+						&psd_power);
+			tpe_ptr->tx_power[count] = psd_power * 2;
+			curr_freq += 20;
+			pe_debug("psd subord TPE %d %d",
+				 count, tpe_ptr->tx_power[count]);
+		}
+		if (num_extn_tx_pwr)
+			update_ext_max_tpe_power(mac, tpe_ptr, curr_freq,
+						 num_extn_tx_pwr);
+		num_tpe_ies++;
+		tpe_ptr++;
+	}
+
+end:
 	*num_tpe = num_tpe_ies;
 }
 
@@ -718,7 +761,7 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	 * Add the Transmit power Envelope Sublement.
 	 */
 	if (pe_session->vhtCapability) {
-		populate_dot11f_tx_power_env(mac,
+		populate_dot11f_tx_power_env(mac, pe_session,
 				&pDot11f->transmit_power_env,
 				pe_session->gLimChannelSwitch.ch_width,
 				pe_session->gLimChannelSwitch.sw_target_freq,

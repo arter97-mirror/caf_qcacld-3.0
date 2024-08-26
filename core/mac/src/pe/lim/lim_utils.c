@@ -12360,20 +12360,26 @@ uint16_t lim_get_tpe_ie_length(enum phy_ch_width chan_width,
 		total_ie_len += 1;
 		total_ie_len += tpe_ie[idx].num_tx_power;
 
-		if (!(chan_width == CH_WIDTH_320MHZ &&
-		      tpe_ie[idx].max_tx_pwr_interpret))
-			continue;
-
-		if (tpe_ie[idx].max_tx_pwr_interpret == LOCAL_EIRP ||
-		    tpe_ie[idx].max_tx_pwr_interpret == REGULATORY_CLIENT_EIRP) {
+		switch (tpe_ie[idx].max_tx_pwr_interpret) {
+		case LOCAL_EIRP:
+		case REGULATORY_CLIENT_EIRP:
 			/* Maximum Transmit Power For 320 MHz */
-			total_ie_len += 1;
-		} else if (tpe_ie[idx].max_tx_pwr_interpret == LOCAL_EIRP_PSD ||
-			   tpe_ie[idx].max_tx_pwr_interpret == REGULATORY_CLIENT_EIRP_PSD) {
+			if (tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320)
+				total_ie_len += 1;
+			break;
+		case LOCAL_EIRP_PSD:
+		case REGULATORY_CLIENT_EIRP_PSD:
+			if (!tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count)
+				break;
+
 			/* Extension Transmit PSD Information */
 			total_ie_len += 1;
 			/* Maximum Transmit PSD power */
-			total_ie_len += EXT_TX_PSD_POWER;
+			total_ie_len +=
+				tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count;
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -12424,12 +12430,11 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 		consumed += tpe_ptr[idx].num_tx_power;
 		target += tpe_ptr[idx].num_tx_power;
 
-		if (!(chan_width == CH_WIDTH_320MHZ &&
-		      tpe_ptr[idx].max_tx_pwr_interpret))
-			goto end;
-
 		switch (tpe_ptr[idx].max_tx_pwr_interpret) {
 		case LOCAL_EIRP:
+			if (!tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320)
+				break;
+
 			/* Maximum Local EIRP Transmit Power For 320 MHz */
 			*target = tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320;
 			target += 1;
@@ -12439,16 +12444,24 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 			local_psd = 0U;
 			local_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.ext_count << 0);
 			local_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.reserved << 4);
+
+			if (!local_psd)
+				break;
+
 			/* Extension Transmit Local PSD Information */
 			*target = local_psd;
 			target += 1;
 			consumed += 1;
 			/* Maximum Transmit Local PSD power */
-			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power, EXT_TX_PSD_POWER);
-			target += EXT_TX_PSD_POWER;
-			consumed += EXT_TX_PSD_POWER;
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power,
+				     QDF_GET_BITS(local_psd, 0, 4));
+			target += QDF_GET_BITS(local_psd, 0, 4);
+			consumed += QDF_GET_BITS(local_psd, 0, 4);
 			break;
 		case REGULATORY_CLIENT_EIRP:
+			if (!tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320)
+				break;
+
 			/* Maximum Regulatory EIRP Transmit Power For 320 MHz */
 			*target = tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320;
 			target += 1;
@@ -12458,17 +12471,22 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 			reg_psd = 0U;
 			reg_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count << 0);
 			reg_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.reserved << 4);
+
+			if (!reg_psd)
+				break;
+
 			/* Extension Transmit Regulatory PSD Information */
 			*target = reg_psd;
 			consumed += 1;
 			target += 1;
 			/* Maximum Transmit Regulatory PSD power */
-			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power, EXT_TX_PSD_POWER);
-			target += EXT_TX_PSD_POWER;
-			consumed += EXT_TX_PSD_POWER;
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power,
+				     QDF_GET_BITS(reg_psd, 0, 4));
+			target += QDF_GET_BITS(reg_psd, 0, 4);
+			consumed += QDF_GET_BITS(reg_psd, 0, 4);
 			break;
 		}
-end:
+
 		if (ie_len && consumed >= 2) {
 			total_consumed += consumed;
 			/* -2 for element id and length */

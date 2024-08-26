@@ -812,7 +812,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		if (!transmit_power_env)
 			goto err_ret;
 
-		populate_dot11f_tx_power_env(mac_ctx,
+		populate_dot11f_tx_power_env(mac_ctx, pe_session,
 					     transmit_power_env,
 					     pe_session->ch_width,
 					     pe_session->curr_op_freq,
