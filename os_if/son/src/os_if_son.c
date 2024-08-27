@@ -1378,6 +1378,13 @@ int os_if_son_reg_get_ap_hw_cap(struct wlan_objmgr_pdev *pdev,
 		hwcap->opclasses[nsoc].opclass = reg_ap_cap[idx].op_class;
 		hwcap->opclasses[nsoc].max_tx_pwr_dbm =
 					reg_ap_cap[idx].max_tx_pwr_dbm;
+		if (reg_ap_cap[idx].num_non_supported_chan >
+		    MAX_CHANNELS_PER_OP_CLASS) {
+			osif_err("max channel per op class exceed %d, skip",
+				 reg_ap_cap[idx].num_non_supported_chan);
+			reg_ap_cap[idx].num_non_supported_chan =
+				MAX_CHANNELS_PER_OP_CLASS;
+		}
 		hwcap->opclasses[nsoc].num_non_oper_chan =
 					reg_ap_cap[idx].num_non_supported_chan;
 		qdf_mem_copy(hwcap->opclasses[nsoc].non_oper_chan_num,
@@ -1385,6 +1392,10 @@ int os_if_son_reg_get_ap_hw_cap(struct wlan_objmgr_pdev *pdev,
 			     reg_ap_cap[idx].num_non_supported_chan);
 		hwcap->wlan_radio_basic_capabilities_valid = 1;
 		nsoc++;
+		if (nsoc >= MAX_OPERATING_CLASSES) {
+			osif_err("max operating classes exceed %d, skip", nsoc);
+			break;
+		}
 	}
 	hwcap->num_supp_op_classes = nsoc;
 

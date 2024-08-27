@@ -410,11 +410,9 @@ typedef ieee80211_ssid wlan_ssid;
 typedef enum ieee80211_phymode wlan_phy_mode;
 
 #ifdef CONFIG_BAND_6GHZ
-//#define MAX_OPERATING_CLASSES 22
-#define MAX_OPERATING_CLASSES 32
+#define MAX_OPERATING_CLASSES 22
 #else
-//#define MAX_OPERATING_CLASSES 17
-#define MAX_OPERATING_CLASSES 32
+#define MAX_OPERATING_CLASSES 17
 #endif
 
 #ifdef CONFIG_BAND_6GHZ
