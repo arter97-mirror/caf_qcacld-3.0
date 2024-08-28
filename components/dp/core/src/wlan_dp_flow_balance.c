@@ -302,7 +302,8 @@ get_next_ring:
 		ring_wtg = &balanced_wtgs[i];
 
 		if (wlan_dp_check_is_ring_ipa_rx(dp_ctx->cdp_soc,
-						 ring->ring_id)) {
+						 ring->ring_id) ||
+		    dp_rx_is_ring_latency_sensitive_reo(ring->ring_id)) {
 			ring_idx++;
 			goto get_next_ring;
 		}
@@ -571,6 +572,7 @@ void wlan_dp_fb_update_num_rx_rings(struct wlan_objmgr_psoc *psoc)
 
 	for (i = 0; i < MAX_REO_DEST_RINGS; i++) {
 		if ((BIT(i) & soc_param.cdp_reo_rings_mapping) &&
+		    !dp_rx_is_ring_latency_sensitive_reo(i) &&
 		    !wlan_dp_check_is_ring_ipa_rx(dp_ctx->cdp_soc, i))
 			num_rx_rings++;
 	}

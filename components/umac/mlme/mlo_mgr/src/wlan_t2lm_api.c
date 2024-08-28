@@ -946,7 +946,11 @@ wlan_t2lm_init_default_mapping(struct wlan_t2lm_context *t2lm_ctx)
 	if (!t2lm_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	qdf_mem_zero(t2lm_ctx, sizeof(struct wlan_t2lm_context));
+	qdf_mem_zero(&t2lm_ctx->established_t2lm,
+		     sizeof(struct wlan_mlo_t2lm_ie));
+	qdf_mem_zero(&t2lm_ctx->upcoming_t2lm, sizeof(struct wlan_mlo_t2lm_ie));
+	t2lm_ctx->mst_start_tsf = 0;
+	t2lm_ctx->mst_end_tsf = 0;
 
 	t2lm_ctx->established_t2lm.t2lm.default_link_mapping = 1;
 	t2lm_ctx->established_t2lm.t2lm.direction = WLAN_T2LM_BIDI_DIRECTION;

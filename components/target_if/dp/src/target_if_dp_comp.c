@@ -309,7 +309,7 @@ target_if_dp_lro_config_cmd(struct wlan_objmgr_psoc *psoc,
 }
 
 #ifdef WLAN_DP_FEATURE_STC
-QDF_STATUS
+static QDF_STATUS
 target_if_dp_send_opm_stats_cmd(struct wlan_objmgr_psoc *psoc,
 				uint8_t pdev_id)
 {

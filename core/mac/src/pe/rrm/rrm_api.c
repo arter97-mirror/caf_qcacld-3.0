@@ -1759,7 +1759,7 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 					beacon_xmit_ind->duration;
 				beacon_report->phyType = bss_desc->nwType;
 				beacon_report->bcnProbeRsp = 1;
-				beacon_report->rsni = bss_desc->sinr;
+				beacon_report->rsni = 0;
 
 				rrm_calculate_and_fill_rcpi(&beacon_report->rcpi,
 							    bss_desc->rssi);
@@ -2462,6 +2462,9 @@ QDF_STATUS rrm_reject_req(tpSirMacRadioMeasureReport *radiomes_report,
  * @peer: Macaddress of the peer requesting the radio measurement.
  * @rrm_req: Array of Measurement request IEs
  * @session_entry: session entry.
+ * @pHdr: pointer to mac mgmt frame header
+ * @frame_len: Frame length
+ * @pRxPacketInfo: pointer to Rx packet info
  *
  * Processes the Radio Resource Measurement request.
  *
@@ -2471,7 +2474,9 @@ QDF_STATUS
 rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 				      tSirMacAddr peer,
 				      tDot11fRadioMeasurementRequest *rrm_req,
-				      struct pe_session *session_entry)
+				      struct pe_session *session_entry,
+				      tpSirMacMgmtHdr pHdr, uint32_t frame_len,
+				      uint8_t *pRxPacketInfo)
 {
 	uint8_t i, index;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -2572,6 +2577,12 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 		case SIR_MAC_RRM_LCI_TYPE:
 		case SIR_MAC_RRM_LOCATION_CIVIC_TYPE:
 		case SIR_MAC_RRM_FINE_TIME_MEAS_TYPE:
+			lim_send_sme_mgmt_frame_ind(
+				mac_ctx, pHdr->fc.subType, (uint8_t *)pHdr,
+				frame_len + sizeof(tSirMacMgmtHdr), 0,
+				WMA_GET_RX_FREQ(pRxPacketInfo),
+				WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo),
+				RXMGMT_FLAG_NONE);
 			pe_debug("RRM with type: %d sent to userspace",
 			    rrm_req->MeasurementRequest[i].measurement_type);
 			break;

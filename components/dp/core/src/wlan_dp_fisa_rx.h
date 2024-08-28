@@ -70,6 +70,11 @@
 
 #define FISA_FT_ENTRY_AGING_US	1000000
 
+enum dp_ft_action {
+	DP_FT_ADD,
+	DP_FT_DEL,
+};
+
 struct dp_fisa_rx_fst_update_elem {
 	/* Do not add new entries here */
 	qdf_list_node_t node;
@@ -78,6 +83,7 @@ struct dp_fisa_rx_fst_update_elem {
 	uint16_t peer_id;
 	uint8_t vdev_id;
 	uint32_t flow_idx;
+	enum dp_ft_action action_code;
 	uint32_t reo_dest_indication;
 	bool is_tcp_flow;
 	bool is_udp_flow;
@@ -251,6 +257,11 @@ dp_fisa_rx_add_tcp_flow_to_fst(struct wlan_dp_psoc_context *dp_ctx)
 
 	rx_fst->add_tcp_flow_to_fst = true;
 }
+
+static inline bool dp_is_fisa_in_cmem(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return dp_ctx->fst_in_cmem;
+}
 #else
 static inline void
 dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
@@ -280,7 +291,21 @@ static inline void
 dp_fisa_rx_add_tcp_flow_to_fst(struct wlan_dp_psoc_context *dp_ctx)
 {
 }
+
+static inline bool dp_is_fisa_in_cmem(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return false;
+}
 #endif
+
+/**
+ * dp_rx_is_ring_latency_sensitive_reo() - Check if the ring idx is latency
+ *					   sensitive reo index
+ * @ring_id: ring idx
+ *
+ * Return: None
+ */
+bool dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id);
 
 #if defined(WLAN_SUPPORT_RX_FISA) && \
 	defined(WLAN_DP_FLOW_BALANCE_SUPPORT)

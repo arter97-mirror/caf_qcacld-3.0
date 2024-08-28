@@ -32,7 +32,7 @@
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
     defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
     defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_WCN6450) || \
-    defined(QCA_WIFI_WCN7750)
+    defined(QCA_WIFI_WCN7750) || defined(QCA_WIFI_QCC2072)
 #ifdef WLAN_FEATURE_LRO_CTX_IN_CB
 static qdf_lro_ctx_t osif_dp_get_lro_ctx(struct sk_buff *skb)
 {

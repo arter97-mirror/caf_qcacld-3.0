@@ -55,6 +55,11 @@ struct wlan_objmgr_vdev;
 
 #define NAN_PASN_PEER_CREATE 0x0c
 #define NAN_PASN_PEER_DELETE 0x0d
+
+#define NAN_5GHZ_SOCIAL_CH_149_FREQ 5745
+#define NAN_5GHZ_SOCIAL_CH_44_FREQ 5220
+#define NAN_2GHZ_SOCIAL_CH_FREQ 2437
+
 /**
  * enum nan_discovery_msg_type - NAN msg type
  * @NAN_GENERIC_REQ: Type for all the NAN requests other than enable/disable
@@ -337,12 +342,14 @@ struct peer_nan_datapath_map {
 
 /**
  * struct nan_datapath_channel_info - ndp channel and channel bandwidth
+ * @phymode: Channel phymode(wmi_channel_phymode) of the npd connection
  * @freq: channel freq in mhz of the ndp connection
  * @ch_width: channel width (wmi_channel_width) of the ndp connection
  * @nss: nss used for ndp connection
  * @mac_id: MAC ID associated with the NDP channel
  */
 struct nan_datapath_channel_info {
+	uint32_t phymode;
 	uint32_t freq;
 	uint32_t ch_width;
 	uint32_t nss;
@@ -939,22 +946,28 @@ struct wlan_nan_rx_ops {
  * @nan_pairing_peer_create_cap: create NAN pairing peer in host when it is true
  * @sta_sap_ndp_support: supports STA + SAP + NDP
  * @sta_p2p_ndp_conc: Target supports STA+P2P+NAN+NDP concurrency
+ * @caps: uint32_t to dump the capabilities
  */
 struct nan_tgt_caps {
-	uint32_t nan_conc_control:1;
-	uint32_t nan_dbs_supported:1;
-	uint32_t ndi_dbs_supported:1;
-	uint32_t nan_sap_supported:1;
-	uint32_t ndi_sap_supported:1;
-	uint32_t nan_vdev_allowed:1;
-	uint32_t sta_nan_ndi_ndi_allowed:1;
-	uint32_t ndi_txbf_supported:1;
+	union  {
+		struct {
+			uint32_t nan_conc_control:1;
+			uint32_t nan_dbs_supported:1;
+			uint32_t ndi_dbs_supported:1;
+			uint32_t nan_sap_supported:1;
+			uint32_t ndi_sap_supported:1;
+			uint32_t nan_vdev_allowed:1;
+			uint32_t sta_nan_ndi_ndi_allowed:1;
+			uint32_t ndi_txbf_supported:1;
 #ifdef WLAN_FEATURE_11BE_MLO
-	uint32_t mlo_sta_nan_ndi_allowed:1;
+			uint32_t mlo_sta_nan_ndi_allowed:1;
 #endif
-	uint32_t nan_pairing_peer_create_cap:1;
-	uint32_t sta_sap_ndp_support:1;
-	uint32_t sta_p2p_ndp_conc:1;
+			uint32_t nan_pairing_peer_create_cap:1;
+			uint32_t sta_sap_ndp_support:1;
+			uint32_t sta_p2p_ndp_conc:1;
+		};
+		uint32_t caps;
+	};
 };
 
 #endif

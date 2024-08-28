@@ -133,4 +133,18 @@ bool ll_lt_sap_get_bearer_switch_cap_for_csa(struct wlan_objmgr_psoc *psoc);
 bool ll_lt_sap_is_freq_in_avoid_list(
 			struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj,
 			qdf_freq_t freq);
+
+/**
+ * ll_lt_store_to_avoid_list_and_flush_old() - Store the current frequency in
+ * avoid list and flush old/expired frequencies from avoid list
+ * @psoc: pointer to psoc object
+ * @freq: given frequency
+ * @csa_src: Source for CSA
+ *
+ * Return: True/False
+ */
+void ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
+					     qdf_freq_t freq,
+					     enum ll_sap_csa_source csa_src);
+
 #endif /* _WLAN_LL_SAP_MAIN_H_ */

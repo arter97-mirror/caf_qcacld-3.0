@@ -210,7 +210,7 @@ error:
 			pe_session = NULL;
 		}
 	}
-	lim_send_sme_join_reassoc_rsp(mac, eWNI_SME_REASSOC_RSP, resultCode,
+	lim_send_sme_join_reassoc_rsp(mac, true, resultCode,
 		protStatusCode, pe_session, smesessionId);
 }
 
@@ -300,7 +300,7 @@ void lim_process_mlm_reassoc_cnf(struct mac_context *mac_ctx, uint32_t *msg_buf)
 
 		/* Need to send Reassoc rsp with Reassoc success to Host. */
 		lim_send_sme_join_reassoc_rsp(
-					mac_ctx, eWNI_SME_REASSOC_RSP,
+					mac_ctx, true,
 					lim_mlm_reassoc_cnf->resultCode,
 					lim_mlm_reassoc_cnf->protStatusCode,
 					session, session->smeSessionId);
@@ -312,7 +312,7 @@ void lim_process_mlm_reassoc_cnf(struct mac_context *mac_ctx, uint32_t *msg_buf)
 		 * so that disconnect can be initiated.
 		 */
 		lim_send_sme_join_reassoc_rsp(
-					mac_ctx, eWNI_SME_REASSOC_RSP,
+					mac_ctx, true,
 					lim_mlm_reassoc_cnf->resultCode,
 					lim_mlm_reassoc_cnf->protStatusCode,
 					session, session->smeSessionId);
@@ -367,7 +367,7 @@ QDF_STATUS lim_sta_reassoc_error_handler(struct reassoc_params *param)
 
 		/* Need to send Reassoc rsp with Assoc failure to Host. */
 		lim_send_sme_join_reassoc_rsp(
-					mac_ctx, eWNI_SME_REASSOC_RSP,
+					mac_ctx, true,
 					param->result_code,
 					param->prot_status_code,
 					session, session->smeSessionId);

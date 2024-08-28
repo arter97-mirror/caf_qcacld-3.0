@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -147,11 +147,35 @@
 					0, \
 					"Allow P2P GO on 5 GHz indoor channels")
 
+/*
+ * <ini>
+ * p2p_go_ignore_non_p2p_probe_req - P2P GO ignore non-P2P probe req
+ *
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable P2P GO ignore non-P2P probe req and don't
+ * send probe rsp to non-p2p device like STA.
+ *
+ *
+ * Supported Feature: P2P GO
+ *
+ * Usage: external
+ *
+ * </ini>
+ */
+#define CFG_GO_IGNORE_NON_P2P_PROBE_REQ CFG_INI_BOOL(\
+					"go_ignore_non_p2p_probe_req", \
+					0, \
+					"P2P GO ignore non-P2P probe req")
+
 #define CFG_P2P_ALL \
 	CFG(CFG_ACTION_FRAME_RANDOM_SEQ_NUM_ENABLED) \
 	CFG(CFG_GO_KEEP_ALIVE_PERIOD) \
 	CFG(CFG_GO_LINK_MONITOR_PERIOD) \
 	CFG(CFG_P2P_DEVICE_ADDRESS_ADMINISTRATED) \
-	CFG(CFG_P2P_GO_ON_5GHZ_INDOOR_CHANNEL)
+	CFG(CFG_P2P_GO_ON_5GHZ_INDOOR_CHANNEL) \
+	CFG(CFG_GO_IGNORE_NON_P2P_PROBE_REQ)
 
 #endif

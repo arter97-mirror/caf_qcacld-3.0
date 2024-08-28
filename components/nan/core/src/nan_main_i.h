@@ -91,37 +91,41 @@ enum nan_disc_state {
  * @enable: NAN feature enable
  * @dp_enable: NAN Datapath feature enable
  * @ndi_mac_randomize: Randomize NAN datapath interface MAC
- * @ndp_inactivity_timeout: NDP inactivity timeout
  * @nan_separate_iface_support: To supports separate iface creation for NAN
- * @ndp_keep_alive_period: To configure duration of how many seconds to
- * wait to kickout peer if peer is not reachable
  * @support_mp0_discovery: To support discovery of NAN cluster with Master
  * Preference (MP) as 0 when a new device is enabling NAN
+ * @disable_6g_nan: Disable NAN in 6GHz frequency band
+ * @enable_nan_eht_cap: Enable(1)/Disable(0) NAN EHT capability
+ * @support_sta_sap_ndp: support STA + SAP + NDP
+ * @support_sta_p2p_ndp: support STA + P2P + NDP
+ * @prefer_nan_chan_for_p2p: Prefer NAN social channels for P2P PCL
+ * @reserved: Bits reserved for future use
+ * @ndp_inactivity_timeout: NDP inactivity timeout
+ * @ndp_keep_alive_period: To configure duration of how many seconds to
+ * wait to kickout peer if peer is not reachable
  * @max_ndp_sessions: max ndp sessions host supports
  * @max_ndi: max number of ndi host supports
  * @nan_feature_config: Bitmap to enable/disable a particular NAN feature
  *                      configuration in firmware. It's sent to firmware through
  *                      wmi_vdev_param_enable_disable_nan_config_features
- * @disable_6g_nan: Disable NAN in 6GHz frequency band
- * @enable_nan_eht_cap: Enable(1)/Disable(0) NAN EHT capability
- * @support_sta_sap_ndp: support STA + SAP + NDP
- * @support_sta_p2p_ndp: support STA + P2P + NDP
  */
 struct nan_cfg_params {
-	bool enable;
-	bool dp_enable;
-	bool ndi_mac_randomize;
+	uint32_t enable:1;
+	uint32_t dp_enable:1;
+	uint32_t ndi_mac_randomize:1;
+	uint32_t nan_separate_iface_support:1;
+	uint32_t support_mp0_discovery:1;
+	uint32_t disable_6g_nan:1;
+	uint32_t enable_nan_eht_cap:1;
+	uint32_t support_sta_sap_ndp:1;
+	uint32_t support_sta_p2p_ndp:1;
+	uint32_t prefer_nan_chan_for_p2p:1;
+	uint32_t reserved:22;
 	uint16_t ndp_inactivity_timeout;
-	bool nan_separate_iface_support;
 	uint16_t ndp_keep_alive_period;
-	bool support_mp0_discovery;
 	uint32_t max_ndp_sessions;
 	uint32_t max_ndi;
 	uint32_t nan_feature_config;
-	bool disable_6g_nan;
-	bool enable_nan_eht_cap;
-	bool support_sta_sap_ndp;
-	bool support_sta_p2p_ndp;
 };
 
 /**

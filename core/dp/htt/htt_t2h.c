@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -752,6 +752,7 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 	qdf_nbuf_t htt_t2h_msg = (qdf_nbuf_t) pkt->pPktContext;
 	uint32_t *msg_word;
 	enum htt_t2h_msg_type msg_type;
+	uint16_t *msdu_ids;
 
 	/* check for successful message reception */
 	if (pkt->Status != QDF_STATUS_SUCCESS) {
@@ -897,8 +898,7 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		}
 
 		if (num_msdus & 0x1) {
-			struct htt_tx_compl_ind_base *compl =
-				(void *)msg_word;
+			msdu_ids = (uint16_t *)(msg_word + 1);
 
 			/*
 			 * Host CPU endianness can be different from FW CPU.
@@ -908,11 +908,9 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 			 * location payload[size-1], where the message
 			 * handler function expects to find it
 			 */
-			if (compl->payload[num_msdus] !=
-			    HTT_TX_COMPL_INV_MSDU_ID) {
-				compl->payload[num_msdus - 1] =
-					compl->payload[num_msdus];
-			}
+			msdu_ids = msdu_ids + (num_msdus - 1);
+			if (*(msdu_ids + 1) != HTT_TX_COMPL_INV_MSDU_ID)
+				*msdu_ids = *(msdu_ids + 1);
 		}
 
 		if (pdev->cfg.is_high_latency &&
@@ -1014,8 +1012,7 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		}
 
 		if (num_msdus & 0x1) {
-			struct htt_tx_compl_ind_base *compl =
-				(void *)msg_word;
+			msdu_ids = (uint16_t *)(msg_word + 1);
 
 			/*
 			 * Host CPU endianness can be different from FW CPU.
@@ -1025,11 +1022,9 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 			 * location payload[size-1], where the message handler
 			 * function expects to find it
 			 */
-			if (compl->payload[num_msdus] !=
-			    HTT_TX_COMPL_INV_MSDU_ID) {
-				compl->payload[num_msdus - 1] =
-					compl->payload[num_msdus];
-			}
+			msdu_ids = msdu_ids + (num_msdus - 1);
+			if (*(msdu_ids + 1) != HTT_TX_COMPL_INV_MSDU_ID)
+				*msdu_ids = *(msdu_ids + 1);
 		}
 		ol_tx_inspect_handler(pdev->txrx_pdev, num_msdus,
 				      msg_word + 1);
@@ -1116,6 +1111,7 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 	enum htt_t2h_msg_type msg_type;
 	uint32_t msg_len;
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint16_t *msdu_ids;
 
 	for (i = 0; i < num_cmpls; i++) {
 		htt_t2h_msg = cmpl_msdus[i];
@@ -1241,8 +1237,7 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 			}
 
 			if (num_msdus & 0x1) {
-				struct htt_tx_compl_ind_base *compl =
-					(void *)msg_word;
+				msdu_ids = (uint16_t *)(msg_word + 1);
 
 				/*
 				 * Host CPU endianness can be different
@@ -1254,11 +1249,9 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 				 * payload[size-1],where the message
 				 * handler function expects to find it
 				 */
-				if (compl->payload[num_msdus] !=
-				    HTT_TX_COMPL_INV_MSDU_ID) {
-					compl->payload[num_msdus - 1] =
-						compl->payload[num_msdus];
-				}
+				msdu_ids = msdu_ids + (num_msdus - 1);
+				if (*(msdu_ids + 1) != HTT_TX_COMPL_INV_MSDU_ID)
+					*msdu_ids = *(msdu_ids + 1);
 			}
 			ol_tx_completion_handler(pdev->txrx_pdev, num_msdus,
 						 status, msg_word);
@@ -1393,8 +1386,7 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 			}
 
 			if (num_msdus & 0x1) {
-				struct htt_tx_compl_ind_base *compl =
-					(void *)msg_word;
+				msdu_ids = (uint16_t *)(msg_word + 1);
 
 				/*
 				 * Host CPU endianness can be different
@@ -1406,11 +1398,9 @@ void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 				 * payload[size-1], where the message
 				 * handler function expects to find it
 				 */
-				if (compl->payload[num_msdus] !=
-				    HTT_TX_COMPL_INV_MSDU_ID) {
-					compl->payload[num_msdus - 1] =
-					compl->payload[num_msdus];
-				}
+				msdu_ids = msdu_ids + (num_msdus - 1);
+				if (*(msdu_ids + 1) != HTT_TX_COMPL_INV_MSDU_ID)
+					*msdu_ids = *(msdu_ids + 1);
 			}
 			ol_tx_inspect_handler(pdev->txrx_pdev,
 					      num_msdus, msg_word + 1);

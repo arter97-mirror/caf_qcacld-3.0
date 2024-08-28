@@ -227,16 +227,8 @@ char *lim_msg_str(uint32_t msgType)
 	switch (msgType) {
 	case eWNI_SME_SYS_READY_IND:
 		return "eWNI_SME_SYS_READY_IND";
-	case eWNI_SME_JOIN_REQ:
-		return "eWNI_SME_JOIN_REQ";
-	case eWNI_SME_JOIN_RSP:
-		return "eWNI_SME_JOIN_RSP";
 	case eWNI_SME_SETCONTEXT_RSP:
 		return "eWNI_SME_SETCONTEXT_RSP";
-	case eWNI_SME_REASSOC_REQ:
-		return "eWNI_SME_REASSOC_REQ";
-	case eWNI_SME_REASSOC_RSP:
-		return "eWNI_SME_REASSOC_RSP";
 	case eWNI_SME_DISASSOC_REQ:
 		return "eWNI_SME_DISASSOC_REQ";
 	case eWNI_SME_DISASSOC_RSP:
@@ -4946,7 +4938,7 @@ bool lim_check_vht_op_mode_change(struct mac_context *mac,
 	if (update_allow) {
 		tUpdateVHTOpMode tempParam;
 
-		tempParam.opMode = chanWidth;
+		tempParam.chwidth = chanWidth;
 		tempParam.smesessionId = pe_session->smeSessionId;
 		qdf_mem_copy(tempParam.peer_mac, peerMac, sizeof(tSirMacAddr));
 
@@ -8255,6 +8247,8 @@ void lim_update_sta_mlo_info(struct pe_session *session,
 		pe_debug("mld mac " QDF_MAC_ADDR_FMT " assoc peer %d",
 			 QDF_MAC_ADDR_REF(add_sta_params->mld_mac_addr),
 			 add_sta_params->is_assoc_peer);
+		add_sta_params->eml_info = sta_ds->eml_info;
+		add_sta_params->mld_info = sta_ds->mld_info;
 		return;
 	}
 
@@ -8415,7 +8409,7 @@ static void lim_populate_eht_160_mcs_set(struct mac_context *mac_ctx,
 			fw_5g_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11);
 	rates->bw_160_rx_max_nss_for_mcs_10_and_11 =
 		QDF_MIN(peer_eht_caps->bw_160_rx_max_nss_for_mcs_10_and_11,
-			fw_5g_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11);
+			fw_5g_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11);
 	rates->bw_160_tx_max_nss_for_mcs_0_to_9 =
 		QDF_MIN(peer_eht_caps->bw_160_tx_max_nss_for_mcs_0_to_9,
 			fw_5g_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9);
@@ -8490,7 +8484,7 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
-				    uint8_t nss)
+				    enum phy_ch_width ch_width)
 {
 	if ((!peer_eht_caps) || (!peer_eht_caps->present)) {
 		pe_debug("peer not eht capable or eht_caps NULL");
@@ -8501,7 +8495,9 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	switch (session_entry->ch_width) {
+	pe_debug("bw is %d", ch_width);
+
+	switch (ch_width) {
 	case CH_WIDTH_320MHZ:
 		lim_populate_eht_320_mcs_set(mac_ctx, rates, peer_eht_caps);
 		fallthrough;
@@ -8969,18 +8965,26 @@ void lim_log_eht_op(struct mac_context *mac, tDot11fIEeht_op *eht_ops,
 }
 
 static void
-lim_revise_eht_caps(struct mac_context *mac, tDot11fIEeht_cap *eht_cap)
+lim_revise_eht_caps_per_band(struct mac_context *mac, enum cds_band_type band,
+			     tDot11fIEeht_cap *eht_cap)
 {
 	uint32_t country_max_allowed_bw;
+
+	if (band == CDS_BAND_2GHZ)
+		return;
 
 	country_max_allowed_bw = wlan_reg_get_country_max_allowed_bw(mac->pdev);
 	if (!country_max_allowed_bw) {
 		pe_debug("Failed to get country_max_allowed_bw");
 		return;
+	} else {
+		pe_debug("max_allowed_bw %d", country_max_allowed_bw);
 	}
 
 	if (country_max_allowed_bw < BW_320_MHZ)
 		eht_cap->support_320mhz_6ghz = 0;
+	else if (country_max_allowed_bw == BW_320_MHZ)
+		eht_cap->support_320mhz_6ghz = 1;
 }
 
 void lim_set_eht_caps(struct mac_context *mac,
@@ -9002,7 +9006,7 @@ void lim_set_eht_caps(struct mac_context *mac,
 		is_band_2g = true;
 
 	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap, NULL);
-	lim_revise_eht_caps(mac, &dot11_cap);
+	lim_revise_eht_caps_per_band(mac, band, &dot11_cap);
 	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap,
 					NULL);
 	lim_log_eht_cap(mac, &dot11_cap);
@@ -9389,6 +9393,9 @@ void lim_extract_ml_info(struct pe_session *session,
 					session->vdev->mlo_dev_ctx,
 					link_id);
 		if (!link_info)
+			continue;
+
+		if (ml_partner_info->partner_link_info[i].link_status_code)
 			continue;
 
 		ml_link->partner_info[partner_idx].vdev_id = link_info->vdev_id;
@@ -10477,7 +10484,7 @@ QDF_STATUS lim_ap_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 	if (!wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev))
 		lim_configure_fd_for_existing_6ghz_sap(session, true);
 
-	msg.type = SIR_HAL_SEND_AP_VDEV_UP;
+	msg.type = WMA_SEND_AP_VDEV_UP;
 	msg.bodyval = session->smeSessionId;
 
 	status = scheduler_post_message(QDF_MODULE_ID_PE, QDF_MODULE_ID_WMA,
@@ -11301,6 +11308,20 @@ void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 }
 
 
+uint8_t lim_convert_phy_width_to_vht_width(enum phy_ch_width ch_width)
+{
+	if (ch_width == CH_WIDTH_80P80MHZ)
+		return WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
+	if (ch_width >= CH_WIDTH_160MHZ)
+		return WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+	if (ch_width == CH_WIDTH_80MHZ)
+		return WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+	if (ch_width == CH_WIDTH_40MHZ || ch_width == CH_WIDTH_20MHZ)
+		return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+
+	return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+}
+
 bool lim_update_channel_width(struct mac_context *mac_ctx,
 			      tpDphHashNode sta_ptr,
 			      struct pe_session *session,
@@ -11345,22 +11366,9 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 		 QDF_MAC_ADDR_REF(sta_ptr->staAddr), oper_mode,
 		 ch_width, fw_vht_ch_wd);
 
-	if (ch_width >= CH_WIDTH_160MHZ) {
-		sta_ptr->vhtSupportedChannelWidthSet =
-				WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
-		ch_width = CH_WIDTH_160MHZ;
-	} else if (ch_width == CH_WIDTH_80MHZ) {
-		sta_ptr->vhtSupportedChannelWidthSet =
-				WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
-	} else if (ch_width == CH_WIDTH_40MHZ) {
-		sta_ptr->vhtSupportedChannelWidthSet =
-				WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
-	} else if (ch_width == CH_WIDTH_20MHZ) {
-		sta_ptr->vhtSupportedChannelWidthSet =
-				WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
-	} else {
-		return false;
-	}
+	sta_ptr->vhtSupportedChannelWidthSet =
+			lim_convert_phy_width_to_vht_width(ch_width);
+
 	if (ch_width >= CH_WIDTH_40MHZ)
 		sta_ptr->htSupportedChannelWidthSet = CH_WIDTH_40MHZ;
 	else
@@ -11371,41 +11379,70 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 					    sta_ptr->staAddr);
 }
 
-uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
-			     tDot11fIEVHTOperation *vht_op,
-			     tDot11fIEHTInfo *ht_info)
+enum phy_ch_width
+lim_get_omn_channel_width(tDot11fIEOperatingMode *omn_ie)
+{
+	if (omn_ie->chanWidth < WNI_OMI_CH_WIDTH_80MHZ)
+		return omn_ie->chanWidth;
+	if (omn_ie->chanWidth == WNI_OMI_CH_WIDTH_80MHZ) {
+		if (!omn_ie->vht_160_80p80_supp)
+			return CH_WIDTH_80MHZ;
+		return CH_WIDTH_160MHZ;
+	}
+
+	return CH_WIDTH_INVALID;
+}
+
+enum phy_ch_width lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
+				       tDot11fIEVHTOperation *vht_op,
+				       tDot11fIEHTInfo *ht_info,
+				       tDot11fIEOperatingMode *omn_ie)
 {
 	uint8_t ccfs0, ccfs1, offset;
-	uint8_t ch_width;
+	enum phy_ch_width vht_ch_width, omn_ch_width;
 
 	ccfs0 = vht_op->chan_center_freq_seg0;
 	ccfs1 = vht_op->chan_center_freq_seg1;
-	ch_width = vht_op->chanWidth;
-
-	if (ch_width > WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ) {
-		pe_err("Invalid ch width in vht operation IE %d", ch_width);
-		return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
-	}
 
 	if (vht_cap->vht_extended_nss_bw_cap &&
 	    vht_cap->extended_nss_bw_supp && ht_info && ht_info->present)
 		ccfs1 = ht_info->chan_center_freq_seg2;
 
-	/* According to new VHTOP IE definition, vht ch_width will
-	 * be 1 for 80MHz, 160MHz and 80+80MHz.
-	 *
-	 * To get the correct operation ch_width, find center
-	 * frequency difference.
-	 */
-	if (ch_width == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ && ccfs1) {
-		offset = abs(ccfs0 - ccfs1);
-
-		if (offset == 8)
-			ch_width =  WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
-		else if (offset > 16)
-			ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
+	/* Process the VHT OP and retrieve the max channel width */
+	switch (vht_op->chanWidth) {
+	case WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ:
+		if (ht_info && ht_info->present &&
+		    ht_info->recommendedTxWidthSet)
+			vht_ch_width = CH_WIDTH_40MHZ;
+		else
+			vht_ch_width = CH_WIDTH_20MHZ;
+		break;
+	case WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ:
+		vht_ch_width = CH_WIDTH_80MHZ;
+		if (ccfs1) {
+			offset = abs(ccfs0 - ccfs1);
+			if (offset == 8)
+				vht_ch_width = CH_WIDTH_160MHZ;
+			else if (offset > 16)
+				vht_ch_width = CH_WIDTH_80P80MHZ;
+		}
+		break;
+	default:
+		pe_err("Invalid ch width in vht operation IE %d",
+		       vht_op->chanWidth);
+		return CH_WIDTH_20MHZ;
 	}
-	return ch_width;
+
+	/*
+	 * Process the OMN IE and reduce the max channel width to
+	 * the operating channel width
+	 */
+	if (!(omn_ie && omn_ie->present))
+		return vht_ch_width;
+
+	omn_ch_width = lim_get_omn_channel_width(omn_ie);
+
+	return QDF_MIN(omn_ch_width, vht_ch_width);
 }
 
 bool
@@ -11734,28 +11771,6 @@ next:
 	return NULL;
 }
 
-enum phy_ch_width
-lim_convert_vht_chwidth_to_phy_chwidth(uint8_t ch_width, bool is_40)
-{
-	switch (ch_width) {
-	case WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ:
-		return CH_WIDTH_80P80MHZ;
-	case WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ:
-		return CH_WIDTH_160MHZ;
-	case WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ:
-		return CH_WIDTH_80MHZ;
-	case WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ:
-		if (is_40)
-			return CH_WIDTH_40MHZ;
-		else
-			return CH_WIDTH_20MHZ;
-	default:
-		pe_debug("Unknown VHT ch width %d", ch_width);
-			break;
-	}
-	return CH_WIDTH_20MHZ;
-}
-
 void
 lim_configure_fd_for_existing_6ghz_sap(struct pe_session *session,
 				       bool is_sap_starting)
@@ -11873,7 +11888,8 @@ void lim_update_disconnect_vdev_id(struct mac_context *mac,  uint8_t vdev_id)
 	}
 
 	if (session->vdev) {
-		wlan_mlme_set_disconnect_receive(session->vdev, true);
+		if (mac->sme.set_disconnect_link_id_cb)
+			mac->sme.set_disconnect_link_id_cb(vdev_id);
 		pe_debug("disconnect received on vdev id %d", vdev_id);
 	}
 }
@@ -12260,3 +12276,141 @@ void lim_cp_stats_cstats_log_csa_evt(struct pe_session *pe_session,
 	wlan_cstats_host_stats(sizeof(struct cstats_csa_evt), &stat);
 }
 #endif /* WLAN_CHIPSET_STATS */
+
+uint16_t lim_get_tpe_ie_length(enum phy_ch_width chan_width,
+			       tDot11fIEtransmit_power_env *tpe_ie,
+			       uint16_t num_tpe)
+{
+	uint16_t total_ie_len = 0;
+	uint16_t idx = 0;
+
+
+	for (idx = 0; idx < num_tpe; idx++) {
+		if (!tpe_ie[idx].present)
+			return total_ie_len;
+
+		/* +2 for including element id and length */
+		total_ie_len += 2;
+		/* +1 for including tx power info */
+		total_ie_len += 1;
+		total_ie_len += tpe_ie[idx].num_tx_power;
+
+		if (!(chan_width == CH_WIDTH_320MHZ &&
+		      tpe_ie[idx].max_tx_pwr_interpret))
+			continue;
+
+		if (tpe_ie[idx].max_tx_pwr_interpret == LOCAL_EIRP ||
+		    tpe_ie[idx].max_tx_pwr_interpret == REGULATORY_CLIENT_EIRP) {
+			/* Maximum Transmit Power For 320 MHz */
+			total_ie_len += 1;
+		} else if (tpe_ie[idx].max_tx_pwr_interpret == LOCAL_EIRP_PSD ||
+			   tpe_ie[idx].max_tx_pwr_interpret == REGULATORY_CLIENT_EIRP_PSD) {
+			/* Extension Transmit PSD Information */
+			total_ie_len += 1;
+			/* Maximum Transmit PSD power */
+			total_ie_len += MAX_TX_PSD_POWER;
+		}
+	}
+
+	return total_ie_len;
+}
+
+QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
+				    uint16_t tpe_ie_len,
+				    tDot11fIEtransmit_power_env *tpe_ptr,
+				    uint16_t num_tpe, uint8_t *target)
+{
+	uint8_t *ie_len = NULL;
+	uint32_t consumed = 0;
+	uint32_t total_consumed = 0;
+	uint8_t tx_pwr_info = 0U;
+	uint8_t local_psd = 0U;
+	uint8_t reg_psd = 0U;
+	uint8_t *on_entry_target = target;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint16_t idx = 0;
+
+	for (idx = 0; idx < num_tpe; idx++) {
+		if (!tpe_ptr[idx].present)
+			return QDF_STATUS_E_INVAL;
+
+		consumed = 0;
+		*target = WLAN_ELEMID_VHT_TX_PWR_ENVLP;
+		++target;
+		++consumed;
+
+		ie_len = target;
+		++target;
+		++consumed;
+
+		tx_pwr_info = 0U;
+		tx_pwr_info |= (tpe_ptr[idx].max_tx_pwr_count << 0);
+		tx_pwr_info |= (tpe_ptr[idx].max_tx_pwr_interpret << 3);
+		tx_pwr_info |= (tpe_ptr[idx].max_tx_pwr_category << 6);
+		*target = tx_pwr_info;
+		++consumed;
+		++target;
+
+		qdf_mem_copy(target, &tpe_ptr[idx].tx_power, tpe_ptr[idx].num_tx_power);
+		consumed += tpe_ptr[idx].num_tx_power;
+		target += tpe_ptr[idx].num_tx_power;
+
+		if (!(chan_width == CH_WIDTH_320MHZ &&
+		      tpe_ptr[idx].max_tx_pwr_interpret))
+			goto end;
+
+		switch (tpe_ptr[idx].max_tx_pwr_interpret) {
+		case LOCAL_EIRP:
+			/* Maximum Local EIRP Transmit Power For 320 MHz */
+			*target = tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320;
+			target += 1;
+			consumed += 1;
+			break;
+		case LOCAL_EIRP_PSD:
+			local_psd = 0U;
+			local_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.ext_count << 0);
+			local_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.reserved << 4);
+			/* Extension Transmit Local PSD Information */
+			*target = local_psd;
+			target += 1;
+			consumed += 1;
+			/* Maximum Transmit Local PSD power */
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power, MAX_TX_PSD_POWER);
+			target += MAX_TX_PSD_POWER;
+			consumed += MAX_TX_PSD_POWER;
+			break;
+		case REGULATORY_CLIENT_EIRP:
+			/* Maximum Regulatory EIRP Transmit Power For 320 MHz */
+			*target = tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320;
+			target += 1;
+			consumed += 1;
+			break;
+		case REGULATORY_CLIENT_EIRP_PSD:
+			reg_psd = 0U;
+			reg_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count << 0);
+			reg_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.reserved << 4);
+			/* Extension Transmit Regulatory PSD Information */
+			*target = reg_psd;
+			consumed += 1;
+			target += 1;
+			/* Maximum Transmit Regulatory PSD power */
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power, MAX_TX_PSD_POWER);
+			target += MAX_TX_PSD_POWER;
+			consumed += MAX_TX_PSD_POWER;
+			break;
+		}
+end:
+		if (ie_len && consumed >= 2) {
+			total_consumed += consumed;
+			/* -2 for element id and length */
+			*ie_len = consumed - 2;
+		}
+	}
+
+	pe_debug("pack tpe ie %d bytes, expected to copy %d bytes",
+		 total_consumed, tpe_ie_len);
+	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   on_entry_target, total_consumed);
+
+	return status;
+}

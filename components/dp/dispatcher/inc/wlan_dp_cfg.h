@@ -1437,7 +1437,7 @@
  * dp_stc_enable - Control STC feature enablement
  * @Min: 0
  * @Max: 1
- * @Default: 1
+ * @Default: 0
  *
  * This ini is used to enable DP STC
  *
@@ -1456,6 +1456,55 @@
 #else
 #define CFG_DP_STC
 #endif
+
+#ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
+/*
+ * <ini>
+ * dp_dynamic_resource_mgmt - Control DP dynamic resource management
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable DP dynamic resource management feature
+ *
+ * Supported mode: All modes
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_DYNAMIC_RESOURCE_MGMT_ENABLE \
+	CFG_INI_BOOL("dp_dynamic_resource_mgmt", false, \
+		     "Enable/Disable DP dynamic resource management")
+
+#define CFG_DP_DYNAMIC_RESOURCE_MGMT \
+	CFG(CFG_DP_DYNAMIC_RESOURCE_MGMT_ENABLE)
+
+#else
+#define CFG_DP_DYNAMIC_RESOURCE_MGMT
+#endif
+
+/*
+ * <ini>
+ * dp_ipa_debug_enable - support IPA debugging
+ * @Min: 0
+ * @Max: 16
+ * @Default: 0
+ *
+ * This ini is used to enable ipa debugging
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_IPA_DEBUG_ENABLE \
+	CFG_INI_UINT("dp_ipa_debug_enable", \
+		     0, \
+		     16, \
+		     0, \
+		     CFG_VALUE_OR_DEFAULT, "IPA debug support")
 
 #define CFG_DP_ALL \
 	CFG(CFG_DP_RX_THREAD_CPU_MASK) \
@@ -1487,6 +1536,8 @@
 	CFG_DP_DIRECT_LINK \
 	CFG_DP_LOAD_BALANCE \
 	CFG_DP_FLOW_BALANCE \
-	CFG_DP_STC
+	CFG_DP_STC \
+	CFG_DP_DYNAMIC_RESOURCE_MGMT \
+	CFG(CFG_DP_IPA_DEBUG_ENABLE)
 
 #endif /* WLAN_DP_CFG_H__ */

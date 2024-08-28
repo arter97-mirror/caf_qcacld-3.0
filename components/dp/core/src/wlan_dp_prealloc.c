@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,6 +37,9 @@
 #include "mon_ingress_ring.h"
 #include "mon_destination_ring.h"
 #include "dp_mon_2.0.h"
+#endif
+#ifdef WLAN_DP_FEATURE_STC
+#include "wlan_dp_stc.h"
 #endif
 
 #ifdef DP_MEM_PRE_ALLOC
@@ -275,6 +278,17 @@ static struct dp_prealloc_context g_dp_context_allocs[] = {
 #ifdef WLAN_PKT_CAPTURE_TX_2_0
 	{DP_MON_TX_DESC_POOL_TYPE, 0, false, false, NULL},
 #endif
+#ifdef WLAN_DP_FEATURE_STC
+	{DP_STC_CONTEXT_TYPE, sizeof(struct wlan_dp_stc), false,  true, NULL},
+	{DP_STC_SAMPLING_TABLE_TYPE, sizeof(struct wlan_dp_stc_sampling_table),
+	 false,  true, NULL},
+	{DP_STC_RX_FLOW_TABLE_TYPE, sizeof(struct wlan_dp_stc_rx_flow_table),
+	 false,  true, NULL},
+	{DP_STC_TX_FLOW_TABLE_TYPE, sizeof(struct wlan_dp_stc_tx_flow_table),
+	 false,  true, NULL},
+	{DP_STC_CLASSIFIED_FLOW_TABLE_TYPE,
+	 sizeof(struct wlan_dp_stc_classified_flow_table), false,  true, NULL},
+#endif
 };
 
 static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
@@ -416,8 +430,22 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	{QDF_DP_HW_LINK_DESC_TYPE, HW_LINK_DESC_SIZE, NUM_HW_LINK_DESCS, 0,
 	 NON_CACHEABLE, { 0 } },
 #ifdef CONFIG_BERYLLIUM
-	{QDF_DP_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
-	 ((DP_TX_RX_DESC_MAX_NUM * sizeof(uint64_t)) / qdf_page_size),
+	{QDF_DP_TX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((WLAN_CFG_NUM_TX_DESC_MAX * sizeof(uint64_t)) / qdf_page_size),
+	 0, NON_CACHEABLE, { 0 } },
+	{QDF_DP_TX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((WLAN_CFG_NUM_TX_DESC_MAX * sizeof(uint64_t)) / qdf_page_size),
+	 0, NON_CACHEABLE, { 0 } },
+	{QDF_DP_TX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((WLAN_CFG_NUM_TX_DESC_MAX * sizeof(uint64_t)) / qdf_page_size),
+	 0, NON_CACHEABLE, { 0 } },
+#if !defined(QCA_WIFI_WCN7750)
+	{QDF_DP_TX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((WLAN_CFG_NUM_TX_DESC_MAX * sizeof(uint64_t)) / qdf_page_size),
+	 0, NON_CACHEABLE, { 0 } },
+#endif
+	{QDF_DP_RX_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((WLAN_CFG_RX_SW_DESC_NUM_SIZE_MAX * sizeof(uint64_t)) / qdf_page_size),
 	 0, NON_CACHEABLE, { 0 } },
 #endif
 #ifdef FEATURE_DIRECT_LINK
@@ -739,6 +767,14 @@ dp_update_num_elements_by_desc_type(struct wlan_dp_prealloc_cfg *cfg,
 		return;
 	case QDF_DP_RX_DESC_BUF_TYPE:
 		*num_elements = cfg->num_rx_sw_desc * WLAN_CFG_RX_SW_DESC_WEIGHT_SIZE;
+		return;
+	case QDF_DP_TX_HW_CC_SPT_PAGE_TYPE:
+		*num_elements = (cfg->num_tx_desc * sizeof(uint64_t)) /
+			qdf_page_size;
+		return;
+	case QDF_DP_RX_HW_CC_SPT_PAGE_TYPE:
+		*num_elements = (cfg->num_rx_sw_desc * sizeof(uint64_t)) /
+			qdf_page_size;
 		return;
 	default:
 		return;

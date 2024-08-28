@@ -165,3 +165,34 @@ void wlan_dp_send_ipa_wds_peer_disconnect(struct cdp_ctrl_objmgr_psoc *cpsoc,
 						       false);
 }
 #endif /* IPA_WDS_EASYMESH_FEATURE */
+
+#ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
+void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
+					  uint32_t old_mac_id,
+					  uint32_t new_mac_id)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx || !dp_ctx->rsrc_mgr_ctx)
+		return;
+
+	wlan_dp_resource_mgr_notify_vdev_mac_id_migration(dp_ctx->rsrc_mgr_ctx,
+							  vdev, old_mac_id,
+							  new_mac_id);
+}
+
+void
+wlan_dp_notify_ndp_channel_info(struct wlan_objmgr_peer *peer,
+				struct nan_datapath_channel_info *ch_info,
+				uint32_t num_channels)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx || !dp_ctx->rsrc_mgr_ctx)
+		return;
+
+	wlan_dp_resource_mgr_notify_ndp_channel_info(dp_ctx->rsrc_mgr_ctx,
+						     peer, ch_info,
+						     num_channels);
+}
+#endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */

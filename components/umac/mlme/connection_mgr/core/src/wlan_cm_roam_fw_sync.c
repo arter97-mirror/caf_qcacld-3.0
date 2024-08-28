@@ -51,6 +51,7 @@
 #include <wlan_psoc_mlme_api.h>
 #include <wma.h>
 #include "wlan_objmgr_vdev_obj.h"
+#include "utils_mlo.h"
 
 /*
  * cm_is_peer_preset_on_other_sta() - Check if peer exists on other STA
@@ -333,6 +334,53 @@ cm_fill_fils_ie(struct wlan_connect_rsp_ies *connect_ies,
 #endif
 
 static QDF_STATUS
+cm_roam_fetch_link_specific_assoc_rsp(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      struct roam_offload_synch_ind *data,
+				      struct element_info *assoc_rsp)
+{
+	uint8_t link_id, *reassoc_rsp;
+	struct qdf_mac_addr sta_link_addr;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	link_id = mlo_roam_get_link_id(vdev_id, data);
+
+	status = wlan_get_self_macaddr_from_vdev_id(psoc, vdev_id,
+						    WLAN_MLME_SB_ID,
+						    &sta_link_addr);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	if (data->reassoc_resp_length > sizeof(struct wlan_frame_hdr)) {
+		assoc_rsp->len = data->reassoc_resp_length;
+		assoc_rsp->ptr = qdf_mem_malloc(assoc_rsp->len);
+		if (!assoc_rsp->ptr)
+			return QDF_STATUS_E_NOMEM;
+
+		reassoc_rsp = (uint8_t *)data + data->reassoc_resp_offset +
+						WLAN_MAC_HDR_LEN_3A;
+		status = util_gen_link_assoc_rsp(
+				reassoc_rsp,
+				data->reassoc_resp_length - WLAN_MAC_HDR_LEN_3A,
+				true, link_id,
+				sta_link_addr,
+				assoc_rsp->ptr,
+				data->reassoc_resp_length,
+				(qdf_size_t *)&assoc_rsp->len);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			qdf_mem_free(assoc_rsp->ptr);
+			assoc_rsp->ptr = NULL;
+			assoc_rsp->len = 0;
+			mlme_err("MLO ROAM: link_id:%d vdev:%d Reassoc generation failed %d",
+				 link_id, vdev_id, status);
+			return status;
+		}
+	}
+
+	return status;
+}
+
+static QDF_STATUS
 cm_populate_connect_ies(struct roam_offload_synch_ind *roam_synch_data,
 			struct cm_vdev_join_rsp *rsp)
 {
@@ -340,6 +388,9 @@ cm_populate_connect_ies(struct roam_offload_synch_ind *roam_synch_data,
 	uint8_t *bcn_probe_rsp_ptr;
 	uint8_t *reassoc_rsp_ptr;
 	uint8_t *reassoc_req_ptr;
+	QDF_STATUS status;
+	struct element_info link_assoc_rsp = {0};
+	uint32_t reassoc_rsp_len;
 
 	connect_ies = &rsp->connect_rsp.connect_ies;
 
@@ -374,22 +425,43 @@ cm_populate_connect_ies(struct roam_offload_synch_ind *roam_synch_data,
 			     connect_ies->link_bcn_probe_rsp.len);
 	}
 
-	/* ReAssoc Rsp IE data */
 	if (roam_synch_data->reassoc_resp_length >
-	    sizeof(struct wlan_frame_hdr)) {
-		connect_ies->assoc_rsp.len =
-				roam_synch_data->reassoc_resp_length -
-				sizeof(struct wlan_frame_hdr);
-		reassoc_rsp_ptr = (uint8_t *)roam_synch_data +
-				  roam_synch_data->reassoc_resp_offset +
-				  sizeof(struct wlan_frame_hdr);
+					sizeof(struct wlan_frame_hdr)) {
+		if (wlan_vdev_mlme_get_is_mlo_link(rsp->psoc,
+						   rsp->connect_rsp.vdev_id)) {
+			status = cm_roam_fetch_link_specific_assoc_rsp(
+						rsp->psoc,
+						rsp->connect_rsp.vdev_id,
+						roam_synch_data,
+						&link_assoc_rsp);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
+			reassoc_rsp_ptr = link_assoc_rsp.ptr;
+			reassoc_rsp_len = link_assoc_rsp.len;
+		} else {
+			reassoc_rsp_ptr = (uint8_t *)roam_synch_data +
+					  roam_synch_data->reassoc_resp_offset;
+			reassoc_rsp_len = roam_synch_data->reassoc_resp_length;
+		}
+
+		mlme_debug("vdevid: %d Assoc Rsp",
+			   rsp->connect_rsp.vdev_id);
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_MLME, QDF_TRACE_LEVEL_DEBUG,
+				   reassoc_rsp_ptr, reassoc_rsp_len);
+
+		/* Skip header and cache the IEs */
+		connect_ies->assoc_rsp.len = reassoc_rsp_len -
+					sizeof(struct wlan_frame_hdr);
 		connect_ies->assoc_rsp.ptr =
 			qdf_mem_malloc(connect_ies->assoc_rsp.len);
-		if (!connect_ies->assoc_rsp.ptr)
+		if (!connect_ies->assoc_rsp.ptr) {
+			qdf_mem_free(link_assoc_rsp.ptr);
 			return QDF_STATUS_E_NOMEM;
-
-		qdf_mem_copy(connect_ies->assoc_rsp.ptr, reassoc_rsp_ptr,
+		}
+		qdf_mem_copy(connect_ies->assoc_rsp.ptr,
+			     reassoc_rsp_ptr + sizeof(struct wlan_frame_hdr),
 			     connect_ies->assoc_rsp.len);
+		qdf_mem_free(link_assoc_rsp.ptr);
 	}
 
 	/* ReAssoc Req IE data */
@@ -1124,6 +1196,14 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		status = QDF_STATUS_E_NOMEM;
 		goto error;
 	}
+
+	rsp->psoc = wlan_vdev_get_psoc(vdev);
+	if (!rsp->psoc) {
+		mlme_err(CM_PREFIX_FMT "Failed to find psoc",
+			 CM_PREFIX_REF(vdev_id, cm_id));
+		status = QDF_STATUS_E_FAILURE;
+		goto error;
+	}
 	status = cm_fill_roam_info(vdev, roam_synch_data, rsp, cm_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err(CM_PREFIX_FMT " fail to prepare rsp",
@@ -1191,13 +1271,21 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		goto error;
 	}
 
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+		status =
+		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp,
+					  roam_synch_data->auth_status);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlme_err(CM_PREFIX_FMT " fail to copy reassoc resp status %d",
+				 CM_PREFIX_REF(vdev_id, cm_id), status);
+			goto error;
+		}
+	}
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
-
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
-		mlo_roam_copy_reassoc_rsp(vdev, connect_rsp);
 
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
@@ -1330,7 +1418,8 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		roam_synch_data->hw_mode_trans_ind.new_hw_mode_index,
 		roam_synch_data->hw_mode_trans_ind.num_vdev_mac_entries,
 		roam_synch_data->hw_mode_trans_ind.vdev_mac_map,
-		0, NULL, psoc);
+		roam_synch_data->hw_mode_trans_ind.num_freq_map,
+		roam_synch_data->hw_mode_trans_ind.mac_freq_map, psoc);
 	ml_nlink_conn_change_notify(
 			psoc, vdev_id,
 			ml_nlink_roam_sync_completion_evt, NULL);

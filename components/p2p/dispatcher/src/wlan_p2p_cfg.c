@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -97,3 +98,18 @@ bool cfg_p2p_is_roam_config_disabled(struct wlan_objmgr_psoc *psoc)
 
 	return false;
 }
+
+bool
+cfg_p2p_is_go_ignore_non_p2p_probe_req(struct wlan_objmgr_psoc *psoc)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	p2p_soc_obj = wlan_psoc_get_p2p_object(psoc);
+	if (!p2p_soc_obj) {
+		p2p_err("p2p psoc null");
+		return false;
+	}
+
+	return p2p_soc_obj->param.go_ignore_non_p2p_probe_req;
+}
+

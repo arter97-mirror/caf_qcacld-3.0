@@ -139,6 +139,16 @@ bool cfg_nan_get_support_sta_sap_ndp(struct wlan_objmgr_psoc *psoc);
  * or not
  */
 bool cfg_nan_get_support_sta_p2p_ndp(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * cfg_nan_get_prefer_nan_chan_for_p2p()- get value of prefer NAN social
+ * channels for P2P
+ * @psoc: pointer to psoc object
+ *
+ * Return: Boolean flag indicating whether NAN social channels can be preferred
+ * for P2P or not
+ */
+bool cfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 bool cfg_nan_is_roam_config_disabled(struct wlan_objmgr_psoc *psoc)
@@ -212,6 +222,11 @@ bool cfg_nan_get_support_sta_p2p_ndp(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
+static inline
+bool cfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif
 
 #endif

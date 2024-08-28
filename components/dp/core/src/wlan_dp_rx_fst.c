@@ -500,7 +500,8 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 	qdf_atomic_init(&dp_ctx->skip_fisa_param.skip_fisa);
 	qdf_atomic_init(&fst->pm_suspended);
 
-	if (wlan_dp_fb_enabled(dp_ctx))
+	if (wlan_dp_fb_enabled(dp_ctx) ||
+	    wlan_dp_rx_is_latency_sensitive_reo_enabled())
 		fst->add_tcp_flow_to_fst = true;
 
 	QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_ERROR,

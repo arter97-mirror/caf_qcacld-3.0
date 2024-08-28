@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -46,6 +46,7 @@
 #include "wlan_hdd_object_manager.h"
 #include <wlan_reg_ucfg_api.h>
 #include "wlan_tdls_api.h"
+#include "wlan_policy_mgr_ucfg.h"
 
 /**
  * enum qca_wlan_vendor_tdls_trigger_mode_hdd_map: Maps the user space TDLS
@@ -118,47 +119,6 @@ int wlan_hdd_tdls_get_all_peers(struct hdd_adapter *adapter,
 
 	return ret;
 }
-
-static const struct nla_policy
-	wlan_hdd_tdls_config_enable_policy[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_MAX +
-					   1] = {
-	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_MAC_ADDR] =
-		VENDOR_NLA_POLICY_MAC_ADDR,
-	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_CHANNEL] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_GLOBAL_OPERATING_CLASS] = {.type =
-								NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_MAX_LATENCY_MS] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_TDLS_ENABLE_MIN_BANDWIDTH_KBPS] = {.type =
-								NLA_U32},
-};
-static const struct nla_policy
-	wlan_hdd_tdls_config_disable_policy[QCA_WLAN_VENDOR_ATTR_TDLS_DISABLE_MAX +
-					    1] = {
-	[QCA_WLAN_VENDOR_ATTR_TDLS_DISABLE_MAC_ADDR] =
-		VENDOR_NLA_POLICY_MAC_ADDR,
-};
-static const struct nla_policy
-	wlan_hdd_tdls_config_state_change_policy[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_MAX
-						 + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_MAC_ADDR] =
-		VENDOR_NLA_POLICY_MAC_ADDR,
-	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_NEW_STATE] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_REASON] = {.type = NLA_S32},
-	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_CHANNEL] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_TDLS_STATE_GLOBAL_OPERATING_CLASS] = {.type =
-								NLA_U32},
-};
-static const struct nla_policy
-	wlan_hdd_tdls_config_get_status_policy
-[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_MAX + 1] = {
-	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_MAC_ADDR] =
-		VENDOR_NLA_POLICY_MAC_ADDR,
-	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_STATE] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_REASON] = {.type = NLA_S32},
-	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_CHANNEL] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_TDLS_GET_STATUS_GLOBAL_OPERATING_CLASS] = {
-							.type = NLA_U32},
-};
 
 const struct nla_policy
 	wlan_hdd_tdls_disc_rsp_policy
@@ -852,12 +812,35 @@ static int __wlan_hdd_cfg80211_tdls_mgmt(struct wiphy *wiphy,
 
 	if (hdd_ctx->tdls_umac_comp_active) {
 		int ret;
+		bool is_dbs_target = false;
+		struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+
+		if (!psoc) {
+			hdd_err("psoc is null");
+			return -EINVAL;
+		}
 
 		link_id = wlan_hdd_get_tdls_link_id(hdd_ctx, link_id);
-		ret = wlan_cfg80211_tdls_mgmt_mlo(adapter, peer,
-						  action_code, dialog_token,
-						  status_code, peer_capability,
-						  buf, len, link_id);
+		is_dbs_target = ucfg_policy_mgr_is_fw_supports_dbs(psoc);
+
+		if (is_dbs_target) {
+			ret = wlan_cfg80211_tdls_mgmt_mlo(adapter, peer,
+							  action_code,
+							  dialog_token,
+							  status_code,
+							  peer_capability,
+							  buf, len, link_id);
+		} else {
+			ret = wlan_cfg80211_tdls_send_mgmt_on_active_link(
+								adapter, peer,
+								action_code,
+								dialog_token,
+								status_code,
+								peer_capability,
+								buf, len,
+								link_id);
+		}
+
 		return ret;
 	}
 

@@ -596,9 +596,6 @@ wlan_populate_roam_mld_log_param(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	if (!mlo_is_mld_sta(vdev))
-		return status;
-
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
 		return QDF_STATUS_E_INVAL;
@@ -617,7 +614,8 @@ wlan_populate_roam_mld_log_param(struct wlan_objmgr_vdev *vdev,
 #define REJECTED_LINK_STATUS 1
 
 void
-wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
+wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
+				  bool is_band_present)
 {
 	uint i = 0;
 	struct mlo_link_switch_context *link_ctx = NULL;
@@ -627,7 +625,16 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
 				 struct wlan_diag_mlo_setup);
 
-	if (!mlo_is_mld_sta(vdev))
+	/*
+	 * MLO setup event need to be logged in the following cases:
+	 *
+	 * 1. When connection request is initiated and the ML
+	 *    candidate is selected.
+	 * 2. When roamed successfully to ML AP
+	 *
+	 */
+	if ((wlan_cm_is_vdev_connecting(vdev) && !mlo_is_mld_sta(vdev)) ||
+	    (wlan_cm_is_vdev_active(vdev) && !is_band_present))
 		return;
 
 	qdf_mem_zero(&wlan_diag_event, sizeof(struct wlan_diag_mlo_setup));
@@ -1013,7 +1020,7 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MGMT);
 
 	if (tag == WLAN_ASSOC_RSP || tag == WLAN_REASSOC_RSP)
-		wlan_connectivity_mlo_setup_event(vdev);
+		wlan_connectivity_mlo_setup_event(vdev, false);
 
 out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
@@ -1034,6 +1041,8 @@ wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
 	/* for candidate not found case*/
 	if (con_req) {
 		req = *con_req;
+		qdf_mem_zero(&req.scan_ie, sizeof(struct element_info));
+		qdf_mem_zero(&req.assoc_ie, sizeof(struct element_info));
 	} else {
 		status = wlan_cm_get_active_connect_req_param(vdev, &req);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -1073,6 +1082,16 @@ wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.grp_cipher = req.crypto.user_grp_cipher;
 	wlan_diag_event.akm = req.crypto.user_akm_suite;
 	wlan_diag_event.auth_algo = req.crypto.user_auth_type;
+
+	if (req.scan_ie.len) {
+		qdf_mem_free(req.scan_ie.ptr);
+		qdf_mem_zero(&req.scan_ie, sizeof(struct element_info));
+	}
+
+	if (req.assoc_ie.len) {
+		qdf_mem_free(req.assoc_ie.ptr);
+		qdf_mem_zero(&req.assoc_ie, sizeof(struct element_info));
+	}
 
 	wlan_diag_event.bt_coex =
 		wlan_mlme_get_bt_profile_con(wlan_vdev_get_psoc(vdev));

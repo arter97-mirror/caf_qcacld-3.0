@@ -39,6 +39,7 @@
 #include <wlan_mlo_mgr_public_structs.h>
 #include "wlan_objmgr_vdev_obj.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_ll_sap_api.h"
 
 #define CASE_RETURN_STR(n) {\
 	case (n): return (# n);\
@@ -67,6 +68,7 @@ const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 		CASE_RETURN_STR(eCSR_ROAM_STA_CHANNEL_SWITCH);
 		CASE_RETURN_STR(eCSR_ROAM_NDP_STATUS_UPDATE);
 		CASE_RETURN_STR(eCSR_ROAM_CHANNEL_COMPLETE_IND);
+		CASE_RETURN_STR(eCSR_ROAM_CAC_COMPLETE_IND);
 		CASE_RETURN_STR(eCSR_ROAM_SAE_COMPUTE);
 		CASE_RETURN_STR(eCSR_ROAM_CHANNEL_INFO_EVENT_IND);
 		CASE_RETURN_STR(eCSR_ROAM_CHANNEL_SWITCH_STARTED_IND);
@@ -80,41 +82,18 @@ const char *get_e_csr_roam_result_str(eCsrRoamResult val)
 	switch (val) {
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_NONE);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_FAILURE);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_ASSOCIATED);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NOT_ASSOCIATED);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_MIC_FAILURE);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_FORCED);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_DISASSOC_IND);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_CAP_CHANGED);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_LOSTLINK);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_MIC_ERROR_UNICAST);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_MIC_ERROR_GROUP);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_AUTHENTICATED);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NEW_RSN_BSS);
- #ifdef FEATURE_WLAN_WAPI
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NEW_WAPI_BSS);
- #endif /* FEATURE_WLAN_WAPI */
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_INFRA_STARTED);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_INFRA_START_FAILED);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_INFRA_STOPPED);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_INFRA_ASSOCIATION_IND);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_INFRA_ASSOCIATION_CNF);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_INFRA_DISASSOCIATED);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_WPS_PBC_PROBE_REQ_IND);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_SEND_ACTION_FAIL);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_MAX_ASSOC_EXCEEDED);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_ASSOC_FAIL_CON_CHANNEL);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_ADD_TDLS_PEER);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_UPDATE_TDLS_PEER);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_DELETE_TDLS_PEER);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_TEARDOWN_TDLS_PEER_IND);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_DELETE_ALL_TDLS_PEER_IND);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_LINK_ESTABLISH_REQ_RSP);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_TDLS_SHOULD_DISCOVER);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_TDLS_SHOULD_TEARDOWN);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_TDLS_SHOULD_PEER_DISCONNECTED);
-		CASE_RETURN_STR
-			(eCSR_ROAM_RESULT_TDLS_CONNECTION_TRACKER_NOTIFICATION);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_DFS_RADAR_FOUND_IND);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_CHANNEL_CHANGE_SUCCESS);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_CHANNEL_CHANGE_FAILURE);
@@ -123,16 +102,7 @@ const char *get_e_csr_roam_result_str(eCsrRoamResult val)
 		CASE_RETURN_STR(eCSR_ROAM_EXT_CHG_CHNL_UPDATE_IND);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDI_CREATE_RSP);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDI_DELETE_RSP);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDP_INITIATOR_RSP);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDP_NEW_PEER_IND);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDP_CONFIRM_IND);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDP_INDICATION);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDP_SCHED_UPDATE_RSP);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDP_RESPONDER_RSP);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDP_END_RSP);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDP_PEER_DEPARTED_IND);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_NDP_END_IND);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE);
+		CASE_RETURN_STR(eCSR_ROAM_RESULT_CAC_END_IND);
 		CASE_RETURN_STR(eCSR_ROAM_RESULT_CHANNEL_SWITCH_STARTED_NOTIFY);
 	default:
 		return "unknown";
@@ -542,6 +512,7 @@ static eCSR_BW_Val csr_get_half_bw(enum phy_ch_width ch_width)
  * @intf_hbw: concurrent SAP/GO half bw
  * @intf_cfreq: concurrent SAP/GO channel frequency
  * @op_mode: opmode
+ * @cc_switch_mode: channel switch mode
  *
  * This routine is called to check if one SAP/GO channel is overlapping with
  * other SAP/GO channel
@@ -605,23 +576,23 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	enum phy_ch_width ch_width;
 	enum channel_state state;
 	qdf_freq_t new_sap_freq = 0;
-	bool is_ll_lt_sap_present = false;
+	qdf_freq_t ll_lt_sap_freq = 0;
+	bool force_mcc_required = false;
+	enum sap_csa_reason_code csa_reason;
 
 	if (mac_ctx->roam.configParam.cc_switch_mode ==
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
 		return 0;
 
-	policy_mgr_ll_lt_sap_get_valid_freq(
-				mac_ctx->psoc, mac_ctx->pdev,
-				vdev_id, sap_ch_freq,
-				mac_ctx->roam.configParam.cc_switch_mode,
-				&new_sap_freq,
-				&is_ll_lt_sap_present);
-	/*
-	 * If ll_lt_sap is present, then it has already updated the frequency
-	 * according to current concurrency, so, return from here
-	 */
-	if (is_ll_lt_sap_present) {
+	if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id)) {
+		new_sap_freq = wlan_get_ll_lt_sap_restart_freq(mac_ctx->pdev,
+								sap_ch_freq,
+								vdev_id,
+								&csa_reason);
+		/*
+		 * If ll_lt_sap is present, then it has already updated the freq
+		 * according to current concurrency, so, return from here
+		 */
 		if (new_sap_freq == sap_ch_freq)
 			return 0;
 
@@ -629,6 +600,16 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			  new_sap_freq, vdev_id);
 		return new_sap_freq;
 	}
+
+	ll_lt_sap_freq = policy_mgr_get_ll_lt_sap_freq(mac_ctx->psoc);
+	op_mode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
+
+	/* check if force MCC is required for LL LT SAP */
+	if (ll_lt_sap_freq && ((sap_ch_freq == ll_lt_sap_freq) ||
+	    (op_mode == QDF_SAP_MODE &&
+	     policy_mgr_are_2_freq_on_same_mac(mac_ctx->psoc, sap_ch_freq,
+					       ll_lt_sap_freq))))
+		force_mcc_required = true;
 
 	if (sap_ch_freq != 0) {
 		sap_cfreq = sap_ch_freq;
@@ -651,7 +632,9 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	for (i = 0; i < WLAN_MAX_VDEVS; i++) {
 		if (!CSR_IS_SESSION_VALID(mac_ctx, i))
 			continue;
-
+		/* Skip LL SAP freq for SCC */
+		if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, i))
+			continue;
 		session = CSR_GET_SESSION(mac_ctx, i);
 		op_mode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, i);
 		if ((op_mode == QDF_STA_MODE ||
@@ -732,8 +715,9 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			((intf_lfreq > sap_lfreq && intf_lfreq < sap_hfreq) ||
 			(intf_hfreq > sap_lfreq && intf_hfreq < sap_hfreq))))
 			intf_ch_freq = 0;
-	} else if (intf_ch_freq && sap_ch_freq != intf_ch_freq &&
-		   (policy_mgr_is_force_scc(mac_ctx->psoc))) {
+	} else if (((intf_ch_freq && sap_ch_freq != intf_ch_freq) ||
+		    force_mcc_required) &&
+		    policy_mgr_is_force_scc(mac_ctx->psoc)) {
 		policy_mgr_check_scc_channel(mac_ctx->psoc, &intf_ch_freq,
 					     sap_ch_freq, vdev_id,
 					     cc_switch_mode);

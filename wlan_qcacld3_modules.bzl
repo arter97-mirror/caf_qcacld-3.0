@@ -790,6 +790,7 @@ _conditional_srcs = {
         True: [
             "cmn/target_if/dcs/src/target_if_dcs.c",
             "cmn/umac/dcs/core/src/wlan_dcs.c",
+	    "cmn/umac/dcs/dispatcher/src/wlan_dcs_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_init_deinit_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_tgt_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_ucfg_api.c",
@@ -2194,6 +2195,11 @@ _conditional_srcs = {
             "os_if/mlme/sap/ll_sap/src/os_if_ll_sap.c",
         ],
     },
+    "CONFIG_WLAN_DP_DYNAMIC_RESOURCE_MGMT": {
+        True: [
+            "components/dp/core/src/wlan_dp_resource_mgr.c",
+        ],
+    },
     "CONFIG_WLAN_SUPPORT_FLOW_PRIORTIZATION": {
         True: [
             "components/dp/core/src/wlan_dp_fpm.c",
@@ -2212,6 +2218,23 @@ _conditional_srcs = {
     "CONFIG_WLAN_SUPPORT_LAPB": {
         True: [
             "components/dp/core/src/wlan_dp_lapb_flow.c",
+        ],
+    },
+    "CONFIG_WLAN_DP_FEATURE_STC": {
+        True: [
+            "components/dp/core/src/wlan_dp_stc.c",
+            "components/dp/dispatcher/src/wlan_dp_stc_ucfg_api.c",
+            "os_if/dp/src/os_if_dp_stc.c",
+	    "components/dp/core/src/wlan_dp_spm.c",
+	    "components/dp/core/src/wlan_dp_fpm.c",
+	    "components/dp/dispatcher/src/wlan_dp_flow_ucfg_api.c",
+	    "core/hdd/src/wlan_hdd_sysfs_dp_stc.c",
+        ],
+    },
+    "CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE": {
+        True: [
+            "cmn/dp/wifi3.0/dp_rx_buffer_pool.c",
+	    "cmn/qdf/linux/src/qdf_page_pool.c",
         ],
     },
 }

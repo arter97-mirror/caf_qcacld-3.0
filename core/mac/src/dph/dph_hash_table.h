@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2015, 2017-2019 The Linux Foundation. All rights reserved.
- *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
  * above copyright notice and this permission notice appear in all
@@ -57,6 +57,24 @@ struct dph_hash_table {
 tpDphHashNode dph_lookup_hash_entry(struct mac_context *mac, uint8_t staAddr[],
 				    uint16_t *pStaId,
 				    struct dph_hash_table *hash_table);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+tpDphHashNode dph_lookup_hash_entry_by_mld_addr(
+				struct mac_context *mac,
+				uint8_t staAddr[],
+				uint16_t *pStaId,
+				struct dph_hash_table *hash_table);
+#else
+static inline
+tpDphHashNode dph_lookup_hash_entry_by_mld_addr(
+				struct mac_context *mac,
+				uint8_t staAddr[],
+				uint16_t *pStaId,
+				struct dph_hash_table *hash_table)
+{
+	return NULL;
+}
+#endif
 
 /* Get a pointer to the hash node */
 tpDphHashNode dph_get_hash_entry(struct mac_context *mac, uint16_t staId,

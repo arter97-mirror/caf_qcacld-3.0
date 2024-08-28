@@ -669,4 +669,11 @@ static inline bool cds_is_driver_transitioning(void)
 		__CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_BAD);
 }
 
+/**
+ * cds_is_pm_fw_debug_enable() - This API provides PMO FW debug enable check.
+ *
+ * Return: true if PMO FW debug is enable and otherwise  false
+ */
+bool cds_is_pm_fw_debug_enable(void);
+
 #endif /* if !defined __CDS_API_H */

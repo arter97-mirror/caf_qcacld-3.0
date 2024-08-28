@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2011-2015, 2017-2019, 2021 The Linux Foundation.
  * All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -85,5 +85,10 @@
 #ifdef WLAN_FEATURE_11BE
 #define WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ 4
 #endif
+
+/* OMI element channel width definitions */
+#define WNI_OMI_CH_WIDTH_20MHZ	0
+#define WNI_OMI_CH_WIDTH_40MHZ	1
+#define WNI_OMI_CH_WIDTH_80MHZ	2
 
 #endif /* __MAC_PROP_EXTS_H */

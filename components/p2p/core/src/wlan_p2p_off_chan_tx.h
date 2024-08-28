@@ -46,9 +46,6 @@
 
 #define P2P_TX_PKT_MIN_HEADROOM                (64)
 
-#define P2P_OUI                                 "\x50\x6f\x9a\x09"
-#define P2P_OUI_SIZE                            4
-
 #define P2P_ACTION_FRAME_RSP_WAIT               500
 #define P2P_ACTION_FRAME_ACK_WAIT               300
 #define P2P_ACTION_FRAME_TX_TIMEOUT             2000

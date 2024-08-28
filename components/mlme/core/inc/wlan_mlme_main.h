@@ -100,6 +100,18 @@ enum wmm_user_mode {
 
 };
 
+/**
+ * struct peer_mac_addresses -Peer MAC address info
+ * @mac: Provided peer MAC address
+ * @peer_mac: Peer MAC address
+ * @peer_mld: Peer MLD address
+ */
+struct peer_mac_addresses {
+	struct qdf_mac_addr mac;
+	struct qdf_mac_addr peer_mac;
+	struct qdf_mac_addr peer_mld;
+};
+
 struct pwr_channel_info {
 	uint32_t first_freq;
 	uint8_t num_chan;
@@ -816,6 +828,7 @@ struct enhance_roam_info {
  * @is_user_std_set: true if user set the @wifi_std
  * @wifi_std: wifi standard version
  * @max_mcs_index: Max supported mcs index of vdev
+ * @mac_4_addr: flag of mac 4 address
  * @vdev_traffic_type: to set if vdev is LOW_LATENCY or HIGH_TPUT
  * @country_ie_for_all_band: take all band channel info in country ie
  * @mlme_ap: SAP related vdev private configurations
@@ -827,7 +840,6 @@ struct enhance_roam_info {
  * @best_6g_power_type: best 6g power type
  * @mac_id: vdev mac_id
  * @ap_nss: AP advertised NSS
- * @is_disconnect_received: Is disconnect received on this vdev
  * @keep_alive_period: KEEPALIVE period in seconds
  */
 struct mlme_legacy_priv {
@@ -890,6 +902,7 @@ struct mlme_legacy_priv {
 	WMI_HOST_WIFI_STANDARD wifi_std;
 #ifdef WLAN_FEATURE_SON
 	uint8_t max_mcs_index;
+	bool mac_4_addr;
 #endif
 	uint8_t vdev_traffic_type;
 	bool country_ie_for_all_band;
@@ -903,7 +916,6 @@ struct mlme_legacy_priv {
 	enum reg_6g_ap_type best_6g_power_type;
 	uint32_t mac_id;
 	uint8_t ap_nss;
-	bool is_disconnect_received;
 	uint16_t keep_alive_period;
 };
 
@@ -2006,4 +2018,18 @@ uint8_t wlan_mlme_get_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS wlan_mlme_set_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev,
 					   uint8_t psd_power);
+
+/**
+ * wlan_find_peer_and_get_mac_and_mld_addr() - This API find peer from the peer
+ * list and cache peer MAC and MLD address in the peer_mac_info.
+ * @psoc: PSOC object
+ * @peer_mac_info: Peer MAC address info
+ *
+ * Return: None
+ */
+QDF_STATUS
+wlan_find_peer_and_get_mac_and_mld_addr(
+				struct wlan_objmgr_psoc *psoc,
+				struct peer_mac_addresses *peer_mac_info);
+
 #endif

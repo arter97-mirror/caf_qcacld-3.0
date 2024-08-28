@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2016, 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -56,10 +57,10 @@ static inline void mac_trace(struct mac_context *mac_ctx, uint16_t code,
 #define eLOG_PROC_DEAUTH_FRAME_SCENARIO 1
 
 uint8_t *mac_trace_get_lim_msg_string(uint16_t limMsg);
-uint8_t *mac_trace_get_sme_msg_string(uint16_t smeMsg);
 uint8_t *mac_trace_get_info_log_string(uint16_t infoLog);
 
 #endif
+uint8_t *mac_trace_get_sme_msg_string(uint16_t smeMsg);
 uint8_t *mac_trace_get_wma_msg_string(uint16_t wmaMsg);
 uint8_t *mac_trace_getcsr_roam_state(uint16_t csr_roamState);
 uint8_t *mac_trace_getcsr_roam_sub_state(uint16_t csr_roamSubState);

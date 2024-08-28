@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -25,6 +26,7 @@
 #include "qdf_types.h"
 #include "wlan_dsc_psoc.h"
 #include "wlan_dsc_vdev.h"
+#include "__wlan_dsc.h"
 
 /**
  * struct osif_psoc_sync - a psoc synchronization context
@@ -312,6 +314,8 @@ int __osif_psoc_sync_op_start(struct device *dev,
 	errno = __osif_psoc_sync_start_callback(dev, out_psoc_sync, func,
 						_dsc_psoc_op_start);
 	osif_psoc_sync_unlock();
+	if (errno)
+		dsc_exit_status(errno);
 
 	return errno;
 }

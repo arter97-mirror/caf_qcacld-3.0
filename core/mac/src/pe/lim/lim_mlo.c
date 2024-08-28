@@ -588,12 +588,68 @@ lim_mlo_sap_vdev_get_link_id(struct wlan_objmgr_vdev *vdev)
 {
 	return wlan_vdev_get_link_id(vdev);
 }
+
+/**
+ * wlan_mlo_peer_initialize_eml_info () - Set eml info for ml peer context
+ * @link_peer: pointer to link peer
+ * @eml_info: eml capability info
+ *
+ * Return: None
+ */
+static void
+wlan_mlo_peer_initialize_eml_info(struct wlan_objmgr_peer *link_peer,
+				  struct wlan_mlo_eml_cap *eml_info)
+{
+	if (!wlan_vdev_mlme_is_ap(wlan_peer_get_vdev(link_peer)))
+		return;
+
+	if (wlan_peer_mlme_is_assoc_peer(link_peer) &&
+	    eml_info && link_peer->mlo_peer_ctx)
+		qdf_mem_copy(&link_peer->mlo_peer_ctx->mlpeer_emlcap,
+			     eml_info,
+			     sizeof(struct wlan_mlo_eml_cap));
+}
+
+/**
+ * wlan_mlo_peer_initialize_mld_info () - Set mld info for ml peer context
+ * @link_peer: pointer to link peer
+ * @mld_info: mld capability and operation info
+ *
+ * Return: None
+ */
+static void
+wlan_mlo_peer_initialize_mld_info(struct wlan_objmgr_peer *link_peer,
+				  struct wlan_mlo_mld_cap *mld_info)
+{
+	if (!wlan_vdev_mlme_is_ap(wlan_peer_get_vdev(link_peer)))
+		return;
+
+	if (wlan_peer_mlme_is_assoc_peer(link_peer) &&
+	    mld_info && link_peer->mlo_peer_ctx)
+		qdf_mem_copy(&link_peer->mlo_peer_ctx->mlpeer_mldcap,
+			     mld_info,
+			     sizeof(struct wlan_mlo_eml_cap));
+}
+
 #else
 static inline uint8_t
 lim_mlo_sap_vdev_get_link_id(struct wlan_objmgr_vdev *vdev)
 {
 	return 0;
 }
+
+static void
+wlan_mlo_peer_initialize_eml_info(struct wlan_objmgr_peer *link_peer,
+				  struct wlan_mlo_eml_cap *eml_info)
+{
+}
+
+static void
+wlan_mlo_peer_initialize_mld_info(struct wlan_objmgr_peer *link_peer,
+				  struct wlan_mlo_mld_cap *mld_info)
+{
+}
+
 #endif
 
 QDF_STATUS lim_mlo_proc_assoc_req_frm(struct wlan_objmgr_vdev *vdev,
@@ -806,6 +862,12 @@ void lim_ap_mlo_sta_peer_ind(struct mac_context *mac,
 						     &info,
 						     assoc_req->assoc_req_buf,
 						     sta->assocId);
+				/* update eml info for mld peer */
+				wlan_mlo_peer_initialize_eml_info(peer,
+								  &sta->eml_info);
+
+				wlan_mlo_peer_initialize_mld_info(peer,
+								  &sta->mld_info);
 			} else {
 				pe_err("invalid partner link number %d",
 				       assoc_req->mlo_info.num_partner_links);
@@ -1053,6 +1115,12 @@ void lim_mlo_save_mlo_info(tpDphHashNode sta_ds,
 	}
 
 	qdf_mem_copy(&sta_ds->mlo_info, mlo_info, sizeof(sta_ds->mlo_info));
+}
+
+void lim_mlo_save_eml_info(tpDphHashNode sta_ds,
+			   struct wlan_mlo_eml_cap *eml_info)
+{
+	sta_ds->eml_info = *eml_info;
 }
 
 QDF_STATUS lim_fill_complete_mlo_ie(struct pe_session *session,

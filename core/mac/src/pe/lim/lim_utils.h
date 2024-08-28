@@ -1843,7 +1843,7 @@ QDF_STATUS lim_strip_eht_cap_ie(struct mac_context *mac_ctx,
  * @rates: pointer to supported rate set
  * @peer_eht_caps: pointer to peer EHT capabilities
  * @session_entry: pe session entry
- * @nss: number of spatial streams
+ * @ch_width: channel width of the association
  *
  * Populates EHT mcs rate set based on peer and self capabilities
  *
@@ -1853,7 +1853,7 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
-				    uint8_t nss);
+				    enum phy_ch_width ch_width);
 
 /**
  * lim_update_eht_bw_cap_mcs(): Update eht mcs map per bandwidth
@@ -2225,7 +2225,7 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
-				    uint8_t nss)
+				    enum phy_ch_width ch_width)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -3057,18 +3057,26 @@ static inline void lim_ap_check_6g_compatible_peer(
 {}
 #endif
 
+#define MAX_TX_PSD_POWER 15
+
 /**
  * enum max_tx_power_interpretation
  * @LOCAL_EIRP: Local power interpretation
  * @LOCAL_EIRP_PSD: Local PSD power interpretation
  * @REGULATORY_CLIENT_EIRP: Regulatory power interpretation
  * @REGULATORY_CLIENT_EIRP_PSD: Regulatory PSD power interpretation
+ * @ADDITIONAL_REGULATORY_CLIENT_EIRP: Additional Regulatory power
+ * interpretation
+ * @ADDITIONAL_REGULATORY_CLIENT_EIRP_PSD: Additional Regulatory PSD power
+ * interpretation
  */
 enum max_tx_power_interpretation {
 	LOCAL_EIRP = 0,
 	LOCAL_EIRP_PSD,
 	REGULATORY_CLIENT_EIRP,
 	REGULATORY_CLIENT_EIRP_PSD,
+	ADDITIONAL_REGULATORY_CLIENT_EIRP,
+	ADDITIONAL_REGULATORY_CLIENT_EIRP_PSD,
 };
 
 /**
@@ -3100,6 +3108,15 @@ void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
 				    struct pe_session *session,
 				    struct bss_description *bss_desc,
 				    bool *has_tpe_updated);
+
+/**
+ * lim_is_ap_power_type_6g_invalid() - Check if the AP power type for 6 GHz
+ * channel is invalid
+ * @session: pe session
+ *
+ * Return: true if invalid else false
+ */
+bool lim_is_ap_power_type_6g_invalid(struct pe_session *session);
 
 /**
  * lim_send_conc_params_update() - Function to check and update params based on
@@ -3218,6 +3235,15 @@ uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset);
 void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 		    uint8_t rx_nss, struct pe_session *session);
 
+/*
+ * lim_convert_phy_width_to_vht_width() - Function to convert the
+ * enum phy_ch_width to the vht channel width definition.
+ * @ch_width: phy ch width
+ *
+ * Return: VHT channel width
+ */
+uint8_t lim_convert_phy_width_to_vht_width(enum phy_ch_width ch_width);
+
 /**
  * lim_update_channel_width() - Function to update channel width
  * @mac_ctx: pointer to Global Mac structure
@@ -3243,12 +3269,24 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
  * @vht_cap: Pointer to VHT Caps IE.
  * @vht_op: Pointer to VHT Operation IE.
  * @ht_info: Pointer to HT Info IE.
+ * @opmode_ie: Pointer to Operating mode IE
  *
- * Return: VHT channel width
+ * Return: phy channel width
  */
-uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
-			     tDot11fIEVHTOperation *vht_op,
-			     tDot11fIEHTInfo *ht_info);
+enum phy_ch_width lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
+				       tDot11fIEVHTOperation *vht_op,
+				       tDot11fIEHTInfo *ht_info,
+				       tDot11fIEOperatingMode *omn_ie);
+
+/*
+ * lim_get_omn_channel_width() - Function to get the OMN channel width
+ * from the OMN IE fields
+ * @omn_ie: OMN IE
+ *
+ * Return: phy channel width
+ */
+enum phy_ch_width
+lim_get_omn_channel_width(tDot11fIEOperatingMode *omn_ie);
 
 /*
  * lim_set_tpc_power() - Function to compute and send TPC power level to the
@@ -3390,18 +3428,6 @@ lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
 				enum QDF_OPMODE opmode,
 				qdf_freq_t start_freq,
 				qdf_freq_t end_freq);
-
-/**
- * lim_convert_vht_chwidth_to_phy_chwidth() - Convert VHT operation
- * ch width into phy ch width
- *
- * @ch_width: VHT op channel width
- * @is_40: is 40 MHz
- *
- * Return: phy chwidth
- */
-enum phy_ch_width
-lim_convert_vht_chwidth_to_phy_chwidth(uint8_t ch_width, bool is_40);
 
 /**
  * lim_update_cu_flag() - Update cu flag in capability information
@@ -3699,4 +3725,31 @@ lim_cp_stats_cstats_log_csa_evt(struct pe_session *pe_session,
 {
 }
 #endif /* WLAN_CHIPSET_STATS */
+
+/**
+ * lim_get_tpe_ie_length() : Get the tpe ie length
+ * @ch_width: phy channel width
+ * @tpe_ie: pointer to dot11f TPE IE structure
+ * @num_tpe: number of TPE IE
+ *
+ * Return: tpe ie length
+ */
+uint16_t lim_get_tpe_ie_length(enum phy_ch_width ch_width,
+			       tDot11fIEtransmit_power_env *tpe_ie,
+			       uint16_t num_tpe);
+
+/**
+ * lim_fill_complete_tpe_ie() : fill tpe ie to target buffer
+ * @ch_width: phy channel width
+ * @tpe_ie_len: the total bytes to fill target buffer
+ * @tpe_ptr: pointer to dot11f TPE IE structure
+ * @num_tpe: number of TPE IE
+ * @target: the buffer to fill data
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width ch_width,
+				    uint16_t tpe_ie_len,
+				    tDot11fIEtransmit_power_env *tpe_ptr,
+				    uint16_t num_tpe, uint8_t *target);
 #endif /* __LIM_UTILS_H */

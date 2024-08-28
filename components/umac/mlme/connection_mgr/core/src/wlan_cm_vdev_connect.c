@@ -1426,7 +1426,6 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 			    struct wlan_cm_vdev_connect_req *req)
 {
 	struct cm_vdev_join_req *join_req;
-	struct scheduler_msg msg;
 	QDF_STATUS status;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -1445,7 +1444,6 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 	if (!mlme_obj)
 		return QDF_STATUS_E_INVAL;
 
-	qdf_mem_zero(&msg, sizeof(msg));
 	join_req = qdf_mem_malloc(sizeof(*join_req));
 	if (!join_req)
 		return QDF_STATUS_E_NOMEM;
@@ -1475,18 +1473,7 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 			   req->bss->entry->neg_sec_info.key_mgmt,
 			   req->bss->entry->channel.chan_freq);
 
-	msg.bodyptr = join_req;
-	msg.type = CM_CONNECT_REQ;
-	msg.flush_callback = cm_flush_join_req;
-
-	status = scheduler_post_message(QDF_MODULE_ID_MLME,
-					QDF_MODULE_ID_PE,
-					QDF_MODULE_ID_PE, &msg);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_err(CM_PREFIX_FMT "msg post fail",
-			 CM_PREFIX_REF(req->vdev_id, req->cm_id));
-		cm_free_join_req(join_req);
-	}
+	cm_process_join_req(join_req);
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)
 		wlan_register_txrx_packetdump(OL_TXRX_PDEV_ID);

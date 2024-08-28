@@ -1215,7 +1215,8 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 
 /** cpuidle_governor_latency_req() is not exported by upstream kernel **/
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) && \
-	defined(__ANDROID_COMMON_KERNEL__))
+	defined(__ANDROID_COMMON_KERNEL__) && \
+	!defined(CONFIG_X86))
 bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
 {
 	long long curr_val_ns;
@@ -1240,6 +1241,11 @@ bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
 		return true;
 	else
 		return false;
+}
+#else
+bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
+{
+	return true;
 }
 #endif
 #endif
@@ -1849,6 +1855,32 @@ static void hdd_restore_ignore_cac(struct hdd_context *hdd_ctx)
 }
 
 /**
+ * hdd_apctx_set_ap_suspend() - set AP in suspend mode as per ap ctx
+ * @hdd_ctx:   hdd context
+ * @link_info: Link info
+ *
+ * Return: nothing
+ */
+static void hdd_apctx_set_ap_suspend(struct hdd_context *hdd_ctx,
+				     struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+	struct qdf_mac_addr *mld_addr;
+	struct vdev_suspend_param param = {0};
+
+	if (ap_ctx && qdf_atomic_read(&ap_ctx->is_ap_suspend)) {
+		mld_addr = hdd_get_mld_mac_addr_from_vdev(link_info->vdev);
+		if (mld_addr)
+			qdf_mem_copy(&param.mac_addr, mld_addr,
+				     sizeof(QDF_MAC_ADDR_SIZE));
+		param.vdev_id = link_info->vdev_id;
+		param.suspend = 1;
+		ucfg_mlme_set_sap_suspend_resume(hdd_ctx->psoc, &param);
+		qdf_atomic_set(&link_info->vdev->is_ap_suspend, 1);
+	}
+}
+
+/**
  * hdd_ssr_restart_sap() - restart sap on SSR
  * @hdd_ctx:   hdd context
  *
@@ -1859,8 +1891,7 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct wlan_hdd_link_info *link_info;
 	bool ignore_cac_updated = false;
-	struct vdev_suspend_param param = {0};
-	struct qdf_mac_addr *mld_addr;
+	bool restart_due_to_cac_pending = false;
 
 	hdd_enter();
 
@@ -1868,7 +1899,8 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 					   NET_DEV_HOLD_SSR_RESTART_SAP) {
 		if (adapter->device_mode != QDF_SAP_MODE)
 			goto next_adapter;
-
+restart_post_cac_links:
+		restart_due_to_cac_pending = false;
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			if (!test_bit(SOFTAP_INIT_DONE, &link_info->link_flags))
 				continue;
@@ -1877,7 +1909,10 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 				hdd_restore_ignore_cac(hdd_ctx);
 				ignore_cac_updated = true;
 			}
-
+			if (hdd_ssr_restart_sap_cac_link(adapter, link_info)) {
+				restart_due_to_cac_pending = true;
+				continue;
+			}
 			hdd_debug("Restart prev SAP session(vdev %d), event_flags 0x%lx, link_flags 0x%lx(%s)",
 				  link_info->vdev_id,
 				  adapter->event_flags,
@@ -1885,18 +1920,10 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 				  adapter->dev->name);
 			wlan_hdd_set_twt_responder(hdd_ctx, adapter);
 			wlan_hdd_start_sap(link_info, true);
-			if (qdf_atomic_read(&link_info->vdev->is_ap_suspend)) {
-				mld_addr =
-				hdd_get_mld_mac_addr_from_vdev(link_info->vdev);
-				if (mld_addr)
-					qdf_mem_copy(&param.mac_addr, mld_addr,
-						     sizeof(QDF_MAC_ADDR_SIZE));
-				param.vdev_id = link_info->vdev_id;
-				param.suspend = 1;
-				ucfg_mlme_set_sap_suspend_resume(hdd_ctx->psoc,
-								 &param);
-			}
+			hdd_apctx_set_ap_suspend(hdd_ctx, link_info);
 		}
+		if (restart_due_to_cac_pending)
+			goto restart_post_cac_links;
 next_adapter:
 		hdd_adapter_dev_put_debug(adapter,
 					  NET_DEV_HOLD_SSR_RESTART_SAP);
@@ -3010,6 +3037,11 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 	if (0 != status)
 		return status;
 
+	if (wlan_hdd_is_lpc_powersave_disabled(hdd_ctx)) {
+		hdd_debug("LPC has disabled power save");
+		return -EINVAL;
+	}
+
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug("Driver Module not enabled return success");
 		return 0;
@@ -3022,7 +3054,7 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 	flush_work(&adapter->ipv4_notifier_work);
 	hdd_adapter_flush_ipv6_notifier_work(adapter);
 
-	if (hdd_adapter_is_ml_adapter(adapter)) {
+	if (wlan_hdd_is_mlo_connection(adapter->deflink)) {
 		status = wlan_hdd_set_mlo_ps(adapter, allow_power_save,
 					     timeout, -1);
 		goto exit;

@@ -146,7 +146,7 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	tDot11fIEeht_cap *eht_cap = NULL;
 	struct bss_description *bss_desc = NULL;
 	tDot11fIEVHTOperation *vht_oper = NULL;
-	enum phy_ch_width omn_ie_ch_width;
+	enum phy_ch_width omn_ie_ch_width, vht_ch_width;
 
 	lim_get_phy_mode(mac_ctx, &phy_mode, session_entry);
 	sta_ds->staType = STA_ENTRY_SELF;
@@ -183,14 +183,18 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 		 */
 		sta_ds->htMaxRxAMpduFactor = vht_caps->maxAMPDULenExp;
 		if (session_entry->htSupportedChannelWidthSet) {
-			if (vht_oper && vht_oper->present)
+			if (vht_oper && vht_oper->present) {
+				vht_ch_width =
+					lim_get_vht_ch_width(vht_caps,
+							     vht_oper,
+							     &assoc_rsp->HTInfo,
+							     &assoc_rsp->oper_mode_ntf);
 				sta_ds->vhtSupportedChannelWidthSet =
-				     lim_get_vht_ch_width(vht_caps,
-							  vht_oper,
-							  &assoc_rsp->HTInfo);
-			else
+					lim_convert_phy_width_to_vht_width(vht_ch_width);
+			} else {
 				sta_ds->vhtSupportedChannelWidthSet =
 					   WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+			}
 		}
 		sta_ds->vht_mcs_10_11_supp = 0;
 		if (mac_ctx->mlme_cfg->vht_caps.vht_cap_info.
@@ -313,9 +317,11 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 		 * OMN IE is present in the Assoc response, but the channel
 		 * width/Rx NSS update will happen through the peer_assoc cmd.
 		 */
-		omn_ie_ch_width = assoc_rsp->oper_mode_ntf.chanWidth;
-		pe_debug("OMN IE present in re/assoc rsp, omn_ie_ch_width: %d",
-			 omn_ie_ch_width);
+		omn_ie_ch_width =
+			lim_get_omn_channel_width(&assoc_rsp->oper_mode_ntf);
+		pe_debug("OMN IE in (re)assoc rsp, ie width %d ch_width %d",
+			 assoc_rsp->oper_mode_ntf.chanWidth, omn_ie_ch_width);
+
 		lim_update_omn_ie_ch_width(session_entry->vdev,
 					   omn_ie_ch_width);
 	}

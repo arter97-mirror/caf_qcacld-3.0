@@ -132,7 +132,8 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	ifmgr_debug("check for SAP restart");
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
-		policy_mgr_ll_lt_sap_restart_concurrent_sap(psoc, true);
+		policy_mgr_ll_lt_sap_restart_concurrent_sap(
+						psoc, LL_LT_SAP_EVENT_STARTED);
 	else
 		policy_mgr_check_concurrent_intf_and_restart_sap(
 				psoc,
@@ -194,7 +195,8 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 		policy_mgr_check_concurrent_intf_and_restart_sap(psoc, false);
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
-		policy_mgr_ll_lt_sap_restart_concurrent_sap(psoc, false);
+		policy_mgr_ll_lt_sap_restart_concurrent_sap(
+						psoc, LL_LT_SAP_EVENT_STOPPED);
 
 	return QDF_STATUS_SUCCESS;
 }

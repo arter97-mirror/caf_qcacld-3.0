@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,10 +52,10 @@ struct wlan_dp_link;
  *
  * Return: pointer to DP peer private object
  */
-static inline struct wlan_dp_sta_info *
+static inline struct wlan_dp_peer_priv_context *
 dp_get_peer_priv_obj(struct wlan_objmgr_peer *peer)
 {
-	struct wlan_dp_sta_info *peer_info;
+	struct wlan_dp_peer_priv_context *peer_info;
 
 	peer_info = wlan_objmgr_peer_get_comp_private_obj(peer, WLAN_COMP_DP);
 	if (!peer_info) {

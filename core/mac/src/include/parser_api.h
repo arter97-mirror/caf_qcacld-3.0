@@ -397,6 +397,8 @@ typedef struct sSirAssocReq {
 	tDot11fIEeht_cap eht_cap;
 	bool is_sae_authenticated;
 	struct mlo_partner_info mlo_info;
+	struct wlan_mlo_eml_cap eml_info;
+	struct wlan_mlo_mld_cap mld_info;
 	uint8_t mld_mac[QDF_MAC_ADDR_SIZE];
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 	tDot11fIEfils_session fils_session;
@@ -560,8 +562,8 @@ typedef struct sSirEseBcnReportMandatoryIe {
  * This structure is used to encode/decode the byte array present in
  * dot11f IE structure.
  */
-
 struct s_ext_cap {
+	/* octet 1 */
 	uint8_t bss_coexist_mgmt_support:1;
 	uint8_t reserved1:1;
 	uint8_t ext_chan_switch:1;
@@ -570,6 +572,7 @@ struct s_ext_cap {
 	uint8_t reserved3:1;
 	uint8_t spsmp_cap:1;
 	uint8_t event:1;
+	/* octet 2 */
 	uint8_t diagnostics:1;
 	uint8_t multi_diagnostics:1;
 	uint8_t loc_tracking:1;
@@ -578,6 +581,7 @@ struct s_ext_cap {
 	uint8_t co_loc_intf_reporting:1;
 	uint8_t civic_loc:1;
 	uint8_t geospatial_loc:1;
+	/* octet 3 */
 	uint8_t tfs:1;
 	uint8_t wnm_sleep_mode:1;
 	uint8_t tim_broadcast:1;
@@ -586,6 +590,7 @@ struct s_ext_cap {
 	uint8_t ac_sta_cnt:1;
 	uint8_t multi_bssid:1;
 	uint8_t timing_meas:1;
+	/* octet 4 */
 	uint8_t chan_usage:1;
 	uint8_t ssid_list:1;
 	uint8_t dms:1;
@@ -594,6 +599,7 @@ struct s_ext_cap {
 	uint8_t tdls_peer_psm_supp:1;
 	uint8_t tdls_channel_switching:1;
 	uint8_t interworking_service:1;
+	/* octet 5 */
 	uint8_t qos_map:1;
 	uint8_t ebr:1;
 	uint8_t sspn_interface:1;
@@ -602,12 +608,14 @@ struct s_ext_cap {
 	uint8_t tdls_support:1;
 	uint8_t tdls_prohibited:1;
 	uint8_t tdls_chan_swit_prohibited:1;
+	/* octet 6 */
 	uint8_t reject_unadmitted_traffic:1;
 	uint8_t service_interval_granularity:3;
 	uint8_t identifier_loc:1;
 	uint8_t uapsd_coexistence:1;
 	uint8_t wnm_notification:1;
 	uint8_t qa_bcapbility:1;
+	/* octet 7 */
 	uint8_t utf8_ssid:1;
 	uint8_t qmf_activated:1;
 	uint8_t qm_frecon_act:1;
@@ -616,6 +624,7 @@ struct s_ext_cap {
 	uint8_t mesh_gcr:1;
 	uint8_t scs:1;
 	uint8_t q_load_report:1;
+	/* octet 8 */
 	uint8_t alternate_edca:1;
 	uint8_t unprot_txo_pneg:1;
 	uint8_t prot_txo_pneg:1;
@@ -624,6 +633,7 @@ struct s_ext_cap {
 	uint8_t tdls_wider_bw:1;
 	uint8_t oper_mode_notification:1;
 	uint8_t max_num_of_msdu_bit1:1;
+	/* octet 9 */
 	uint8_t max_num_of_msdu_bit2:1;
 	uint8_t chan_sch_mgmt:1;
 	uint8_t geo_db_inband_en_signal:1;
@@ -632,6 +642,7 @@ struct s_ext_cap {
 	uint8_t chan_avail_query:1;
 	uint8_t fine_time_meas_responder:1;
 	uint8_t fine_time_meas_initiator:1;
+	/* octet 10 */
 	uint8_t fils_capability:1;
 	uint8_t ext_spectrum_management:1;
 	uint8_t future_channel_guidance:1;
@@ -639,8 +650,16 @@ struct s_ext_cap {
 	uint8_t twt_requestor_support:1;
 	uint8_t twt_responder_support:1;
 	uint8_t reserved8: 1;
+	/* octet 11 */
 	uint8_t reserved9: 4;
 	uint8_t beacon_protection_enable: 1;
+	uint8_t reserved10: 3;
+	/* octet 12 */
+	uint8_t reserved12;
+	/* octet 13 */
+	uint8_t dmg_loc_supp_aps:1;
+	uint8_t i2r_lmr_feedback_policy:1;
+	uint8_t reserved13:6;
 };
 
 void swap_bit_field16(uint16_t in, uint16_t *out);

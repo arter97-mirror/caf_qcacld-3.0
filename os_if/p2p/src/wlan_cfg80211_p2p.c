@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -39,6 +39,62 @@
 #define MAX_NO_OF_2_4_CHANNELS 14
 #define MAX_OFFCHAN_TIME_FOR_DNBS 150
 
+#ifdef FEATURE_WLAN_SUPPORT_USD
+const struct nla_policy
+p2p_usd_chan_config_policy[QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_DEFAULT_FREQ] = {
+		.type = NLA_U32,
+		.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_FREQ_LIST] = {
+		.type = NLA_BINARY,
+		.len = P2P_USD_CHAN_CONFIG_FREQ_LIST_MAX_SIZE * sizeof(uint32_t)
+	},
+};
+
+const struct nla_policy
+p2p_usd_attr_policy[QCA_WLAN_VENDOR_ATTR_USD_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_USD_SRC_ADDR] = {
+		.type = NLA_BINARY,
+		.len = QDF_MAC_ADDR_SIZE
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_OP_TYPE] = {
+		.type = NLA_U8,
+		.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_INSTANCE_ID] = {
+		.type = NLA_U8,
+		.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_SERVICE_ID] = {
+		.type = NLA_BINARY,
+		.len = P2P_USD_SERVICE_LEN
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_SERVICE_PROTOCOL_TYPE] = {
+		.type = NLA_U8,
+		.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_SSI] = {
+		.type = NLA_BINARY,
+		.len = P2P_USD_SSI_LEN
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG] = {
+		.type = NLA_NESTED,
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_ELEMENT_CONTAINER] = {
+		.type = NLA_BINARY,
+		.len = P2P_USD_FRAME_LEN
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_TTL] = {
+		.type = NLA_U16,
+		.len = sizeof(uint16_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_USD_STATUS] = {
+		.type = NLA_U8,
+	},
+};
+#endif /* FEATURE_WLAN_SUPPORT_USD */
+
 /**
  * wlan_p2p_rx_callback() - Callback for rx mgmt frame
  * @user_data: pointer to soc object
@@ -56,6 +112,7 @@ static void wlan_p2p_rx_callback(void *user_data,
 	struct vdev_osif_priv *osif_priv;
 	struct wireless_dev *wdev;
 	enum QDF_OPMODE opmode;
+	uint32_t mgmt_frm_registration_update = 0;
 
 	psoc = user_data;
 	if (!psoc) {
@@ -68,6 +125,16 @@ static void wlan_p2p_rx_callback(void *user_data,
 	if (!vdev) {
 		osif_err("vdev is null");
 		return;
+	}
+
+	if (rx_frame->frm_type == MGMT_PROBE_REQ) {
+		mgmt_frm_registration_update =
+			ucfg_p2p_get_mgmt_frm_registration_update(psoc);
+		if (!(mgmt_frm_registration_update & BIT(MGMT_SUBTYPE_PROBE_REQ >> 4))) {
+			osif_debug("Drop mgmt frame_type %d, kernel registration is not open",
+				   rx_frame->frm_type);
+			goto fail;
+		}
 	}
 
 	assoc_vdev = vdev;
@@ -502,3 +569,216 @@ int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
 	return qdf_status_to_os_return(
 		ucfg_p2p_mgmt_tx_cancel(psoc, vdev, cookie));
 }
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			     const void *data, int data_len)
+{
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_USD_MAX + 1];
+	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_MAX + 1];
+	struct p2p_usd_attr_params *usd_param;
+	QDF_STATUS status;
+	uint8_t freq_config;
+	int ret = -EINVAL;
+
+	/* Parse and fetch USD params*/
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_USD_MAX,
+				    data, data_len, p2p_usd_attr_policy)) {
+		osif_err("Invalid USD vendor command attributes");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_USD_OP_TYPE]) {
+		osif_err("P2P USD OP type parse failed");
+		return -EINVAL;
+	}
+
+	usd_param = qdf_mem_malloc(sizeof(*usd_param));
+	if (!usd_param)
+		return -ENOMEM;
+
+	qdf_mem_zero(usd_param, sizeof(*usd_param));
+
+	usd_param->op_type =
+			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_USD_OP_TYPE]);
+
+	if (usd_param->op_type == QCA_WLAN_VENDOR_USD_OP_TYPE_FLUSH)
+		goto end;
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_USD_INSTANCE_ID]) {
+		osif_err("P2P instance ID parse failed");
+		goto mem_free;
+	}
+
+	usd_param->instance_id =
+		nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_USD_INSTANCE_ID]);
+
+	osif_debug("op type %d instance id %d", usd_param->op_type,
+		   usd_param->instance_id);
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_USD_SSI]) {
+		usd_param->ssi.len = nla_len(tb[QCA_WLAN_VENDOR_ATTR_USD_SSI]);
+
+		usd_param->ssi.data = qdf_mem_malloc(
+						sizeof(*usd_param->ssi.data));
+		if (!usd_param->ssi.data)
+			goto mem_free;
+
+		qdf_mem_copy(usd_param->ssi.data,
+			     nla_data(tb[QCA_WLAN_VENDOR_ATTR_USD_SSI]),
+			     usd_param->ssi.len);
+
+		osif_debug("SSI dump:");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   usd_param->ssi.data, usd_param->ssi.len);
+	}
+
+	/**
+	 * no need to parse other attributes for the OP type other than
+	 * Publish and Subscribe
+	 */
+	if (usd_param->op_type != QCA_WLAN_VENDOR_USD_OP_TYPE_PUBLISH &&
+	    usd_param->op_type != QCA_WLAN_VENDOR_USD_OP_TYPE_SUBSCRIBE)
+		goto end;
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_USD_SRC_ADDR]) {
+		osif_err("P2P MAC address parse failed");
+		goto mem_free;
+	}
+
+	qdf_mem_copy(usd_param->p2p_mac_addr.bytes,
+		     nla_data(tb[QCA_WLAN_VENDOR_ATTR_USD_SRC_ADDR]),
+		     QDF_MAC_ADDR_SIZE);
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_USD_SERVICE_ID]) {
+		osif_err("P2P service ID parse failed");
+		goto mem_free;
+	}
+
+	usd_param->service_info.len =
+			nla_len(tb[QCA_WLAN_VENDOR_ATTR_USD_SERVICE_ID]);
+
+	usd_param->service_info.service_id =
+			qdf_mem_malloc(
+				sizeof(*usd_param->service_info.service_id));
+	if (!usd_param->service_info.service_id)
+		goto mem_free;
+
+	qdf_mem_copy(usd_param->service_info.service_id,
+		     nla_data(tb[QCA_WLAN_VENDOR_ATTR_USD_SERVICE_ID]),
+		     usd_param->service_info.len);
+
+	osif_debug("service id dump:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			   usd_param->service_info.service_id,
+			   usd_param->service_info.len);
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_USD_SERVICE_PROTOCOL_TYPE]) {
+		osif_err("P2P service protocol type parse failed");
+		goto mem_free;
+	}
+
+	usd_param->service_info.protocol_type =
+	nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_USD_SERVICE_PROTOCOL_TYPE]);
+
+	osif_debug("service protocol type %d",
+		   usd_param->service_info.protocol_type);
+
+	freq_config = QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG;
+	if (!tb[freq_config]) {
+		osif_err("freq config parse failed");
+		goto mem_free;
+	}
+
+	if (wlan_cfg80211_nla_parse_nested(
+				tb2, QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_MAX,
+				tb[freq_config], p2p_usd_chan_config_policy)) {
+		osif_err("Failed to parse channel config");
+		goto mem_free;
+	}
+
+	freq_config = QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_DEFAULT_FREQ;
+
+	if (!tb2[freq_config]) {
+		osif_err("P2P freq config default freq parse fail");
+		goto mem_free;
+	}
+
+	usd_param->freq_config.default_freq = nla_get_u32(tb2[freq_config]);
+
+	freq_config = QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_FREQ_LIST;
+
+	if (tb2[freq_config]) {
+		usd_param->freq_config.freq_list.len =
+						nla_len(tb2[freq_config]);
+
+		usd_param->freq_config.freq_list.freq =
+			qdf_mem_malloc(
+				sizeof(*usd_param->freq_config.freq_list.freq));
+		if (!usd_param->freq_config.freq_list.freq)
+			goto mem_free;
+
+		qdf_mem_copy(usd_param->freq_config.freq_list.freq,
+			     nla_data(tb2[freq_config]),
+			     usd_param->freq_config.freq_list.len);
+
+		osif_debug("freq list dump:");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   usd_param->freq_config.freq_list.freq,
+				   usd_param->freq_config.freq_list.len);
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_USD_ELEMENT_CONTAINER]) {
+		osif_err("fail to fetch P2P USD frame");
+		goto mem_free;
+	}
+
+	usd_param->frame.len =
+		nla_len(tb[QCA_WLAN_VENDOR_ATTR_USD_ELEMENT_CONTAINER]);
+
+	usd_param->frame.data = qdf_mem_malloc(sizeof(*usd_param->frame.data));
+	if (!usd_param->frame.data)
+		goto mem_free;
+
+	qdf_mem_copy(
+		usd_param->frame.data,
+		nla_data(tb[QCA_WLAN_VENDOR_ATTR_USD_ELEMENT_CONTAINER]),
+		usd_param->frame.len);
+
+	osif_debug("Frame dump:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			   usd_param->frame.data, usd_param->frame.len);
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_USD_TTL]) {
+		osif_err("fail to fetch P2P TTL");
+		goto mem_free;
+	}
+
+	usd_param->ttl = nla_get_u16(tb[QCA_WLAN_VENDOR_ATTR_USD_TTL]);
+
+end:
+	usd_param->vdev_id = vdev_id;
+	status = ucfg_p2p_send_usd_params(psoc, usd_param);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("fail to send P2P USD params");
+		goto mem_free;
+	}
+
+	osif_debug("P2P USD request success");
+	ret = 0;
+
+mem_free:
+	if (usd_param->ssi.data)
+		qdf_mem_free(usd_param->ssi.data);
+	if (usd_param->service_info.service_id)
+		qdf_mem_free(usd_param->service_info.service_id);
+	if (usd_param->freq_config.freq_list.freq)
+		qdf_mem_free(usd_param->freq_config.freq_list.freq);
+	if (usd_param->frame.data)
+		qdf_mem_free(usd_param->frame.data);
+
+	qdf_mem_free(usd_param);
+
+	return ret;
+}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

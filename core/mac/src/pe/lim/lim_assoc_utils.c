@@ -493,6 +493,7 @@ lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
  * lim_send_del_sta_cnf() - Send Del sta confirmation
  * @mac: Pointer to Global MAC structure
  * @sta_dsaddr: sta ds address
+ * @sta_mld_addr: sta mld address
  * @staDsAssocId: sta ds association id
  * @mlmStaContext: MLM station context
  * @status_code: Status code
@@ -504,6 +505,7 @@ lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
  */
 void
 lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
+		     struct qdf_mac_addr sta_mld_addr,
 		     uint16_t staDsAssocId,
 		     struct lim_sta_context mlmStaContext,
 		     tSirResultCodes status_code, struct pe_session *pe_session)
@@ -600,7 +602,7 @@ lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
 				mlmStaContext.protStatusCode,
 				pe_session->peSessionId);
 
-			lim_send_sme_join_reassoc_rsp(mac, eWNI_SME_REASSOC_RSP,
+			lim_send_sme_join_reassoc_rsp(mac, true,
 						      mlmStaContext.resultCode,
 						      mlmStaContext.protStatusCode,
 						      pe_session, smesessionId);
@@ -619,7 +621,7 @@ lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
 				mlmStaContext.protStatusCode,
 				pe_session->peSessionId);
 
-			lim_send_sme_join_reassoc_rsp(mac, eWNI_SME_JOIN_RSP,
+			lim_send_sme_join_reassoc_rsp(mac, false,
 						      mlmStaContext.resultCode,
 						      mlmStaContext.protStatusCode,
 						      pe_session, smesessionId);
@@ -634,6 +636,9 @@ lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
 
 		qdf_mem_copy((uint8_t *) &mlmDisassocCnf.peerMacAddr,
 			     (uint8_t *) sta_dsaddr.bytes, QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy((uint8_t *)&mlmDisassocCnf.peerMldAddr,
+			     (uint8_t *)sta_mld_addr.bytes, QDF_MAC_ADDR_SIZE);
+
 		mlmDisassocCnf.resultCode = status_code;
 		mlmDisassocCnf.disassocTrigger = eLIM_DUPLICATE_ENTRY;
 		/* Update PE session Id */
@@ -1576,7 +1581,7 @@ QDF_STATUS lim_populate_own_rate_set(struct mac_context *mac_ctx,
 	lim_populate_he_mcs_set(mac_ctx, rates, he_caps,
 			session_entry, session_entry->nss);
 	lim_populate_eht_mcs_set(mac_ctx, rates, eht_caps,
-				 session_entry, session_entry->nss);
+				 session_entry, session_entry->ch_width);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1831,7 +1836,7 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 	lim_populate_he_mcs_set(mac, pRates, peer_he_caps,
 			pe_session, pe_session->nss);
 	lim_populate_eht_mcs_set(mac, pRates, eht_caps,
-				 pe_session, pe_session->nss);
+				 pe_session, pe_session->ch_width);
 
 	pe_debug("nss 1x1 %d nss %d", pe_session->supported_nss_1x1,
 		 pe_session->nss);
@@ -2070,7 +2075,7 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 	lim_populate_he_mcs_set(mac_ctx, &sta_ds->supportedRates, he_caps,
 				session_entry, session_entry->nss);
 	lim_populate_eht_mcs_set(mac_ctx, &sta_ds->supportedRates, eht_caps,
-				 session_entry, session_entry->nss);
+				 session_entry, sta_ds->ch_width);
 	/*
 	 * Set the erpEnabled bit if the phy is in G mode and at least
 	 * one A rate is supported
@@ -2646,22 +2651,57 @@ lim_add_sta(struct mac_context *mac_ctx,
 			add_sta_params->stbc_capable = 0;
 	}
 
-	if (session_entry->opmode == QDF_SAP_MODE ||
-	    session_entry->opmode == QDF_P2P_GO_MODE) {
-		if (session_entry->parsedAssocReq) {
-			uint16_t aid = sta_ds->assocId;
-			/* Get a copy of the already parsed Assoc Request */
-			assoc_req =
-			(tpSirAssocReq) session_entry->parsedAssocReq[aid];
+	if ((session_entry->opmode == QDF_SAP_MODE ||
+	     session_entry->opmode == QDF_P2P_GO_MODE) &&
+	     session_entry->parsedAssocReq) {
+		struct wlan_crypto_params *peer_crypto_params;
+		QDF_STATUS status;
+		uint32_t length;
+		const uint8_t *ies;
+		uint16_t aid = sta_ds->assocId;
 
-			if (assoc_req) {
-				add_sta_params->wpa_rsn = assoc_req->rsnPresent;
-				add_sta_params->wpa_rsn |=
-					(assoc_req->wpaPresent << 1);
-			}
+		/* Get a copy of the already parsed Assoc Request */
+		assoc_req = (tpSirAssocReq) session_entry->parsedAssocReq[aid];
+		if (!assoc_req)
+			goto next_action;
+
+		add_sta_params->wpa_rsn = assoc_req->rsnPresent;
+		add_sta_params->wpa_rsn |= assoc_req->wpaPresent << 1;
+
+		if (!assoc_req->rsnPresent) {
+			pe_debug("RSN is not present");
+			goto next_action;
 		}
+
+		if (assoc_req->assocReqFrameLength < WLAN_ASSOC_REQ_IES_OFFSET)
+			goto next_action;
+
+		ies = assoc_req->assocReqFrame + WLAN_ASSOC_REQ_IES_OFFSET;
+		length = assoc_req->assocReqFrameLength -
+						WLAN_ASSOC_REQ_IES_OFFSET;
+		peer_crypto_params =
+				qdf_mem_malloc(sizeof(*peer_crypto_params));
+		if (!peer_crypto_params)
+			goto next_action;
+
+		status = wlan_get_crypto_params_from_rsn_ie(peer_crypto_params,
+							    ies, length);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("vdev:%d Failed to extract crypto_params",
+			       session_entry->vdev_id);
+			qdf_mem_free(peer_crypto_params);
+			goto next_action;
+		}
+
+		add_sta_params->sec_info.key_mgmt =
+					peer_crypto_params->key_mgmt;
+		pe_debug("Peer key_mgmt:0x%x",
+			 add_sta_params->sec_info.key_mgmt);
+
+		qdf_mem_free(peer_crypto_params);
 	}
 
+next_action:
 	lim_update_he_stbc_capable(add_sta_params);
 	lim_update_he_mcs_12_13(add_sta_params, sta_ds);
 
@@ -3013,9 +3053,10 @@ lim_add_sta_self(struct mac_context *mac, uint8_t updateSta,
 	msgQ.bodyptr = pAddStaParams;
 	msgQ.bodyval = 0;
 
-	pe_debug(QDF_MAC_ADDR_FMT ": vdev %d Sending WMA_ADD_STA_REQ.LI %d",
+	pe_debug(QDF_MAC_ADDR_FMT ": vdev %d Sending WMA_ADD_STA_REQ LI %d no_ptk:%d",
 		 QDF_MAC_ADDR_REF(pAddStaParams->staMac),
-		 pe_session->vdev_id, pAddStaParams->listenInterval);
+		 pe_session->vdev_id, pAddStaParams->listenInterval,
+		 pAddStaParams->no_ptk_4_way);
 	MTRACE(mac_trace_msg_tx(mac, pe_session->peSessionId, msgQ.type));
 
 	retCode = wma_post_ctrl_msg(mac, &msgQ);
@@ -3570,26 +3611,36 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
  * lim_update_vht_oper_assoc_resp : Update VHT Operations in assoc response.
  * @mac_ctx Pointer to Global MAC structure
  * @pAddBssParams: parameters required for add bss params.
- * @vht_caps: VHT CAP IE to update.
- * @vht_oper: VHT Operations to update.
- * @ht_info: HT Info IE to update.
+ * @assoc_rsp: assoc response from AP.
  * @pe_session : session entry.
  *
  * Return : void
  */
 static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
-		struct bss_params *pAddBssParams,
-		tDot11fIEVHTCaps *vht_caps, tDot11fIEVHTOperation *vht_oper,
-		tDot11fIEHTInfo *ht_info, struct pe_session *pe_session)
+					   struct bss_params *pAddBssParams,
+					   tpSirAssocRsp assoc_rsp,
+					   struct pe_session *pe_session)
 {
-	uint8_t ch_width;
+	tDot11fIEVHTOperation *vht_oper = NULL;
+	tDot11fIEVHTCaps *vht_caps = NULL;
+	enum phy_ch_width ch_width;
 
 	ch_width = pAddBssParams->ch_width;
+
+	if (assoc_rsp->VHTCaps.present) {
+		vht_caps = &assoc_rsp->VHTCaps;
+		vht_oper = &assoc_rsp->VHTOperation;
+	} else if (assoc_rsp->vendor_vht_ie.VHTCaps.present) {
+		vht_caps = &assoc_rsp->vendor_vht_ie.VHTCaps;
+		vht_oper = &assoc_rsp->vendor_vht_ie.VHTOperation;
+	}
 
 	if (vht_oper->chanWidth == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ &&
 	    pe_session->ch_width)
 		ch_width =
-			lim_get_vht_ch_width(vht_caps, vht_oper, ht_info) + 1;
+			lim_get_vht_ch_width(vht_caps, vht_oper,
+					     &assoc_rsp->HTInfo,
+					     &assoc_rsp->oper_mode_ntf);
 
 	if (ch_width > pe_session->ch_width)
 		ch_width = pe_session->ch_width;
@@ -3810,8 +3861,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	if (pAddBssParams->vhtCapable) {
 		if (vht_oper)
 			lim_update_vht_oper_assoc_resp(mac, pAddBssParams,
-						       vht_caps, vht_oper,
-						       &pAssocRsp->HTInfo,
+						       pAssocRsp,
 						       pe_session);
 		if (vht_caps)
 			lim_update_vhtcaps_assoc_resp(mac, pAddBssParams,
@@ -4130,15 +4180,6 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	if (pe_session->isNonRoamReassoc)
 		pAddBssParams->nonRoamReassoc = 1;
 
-	pe_debug("update %d MxAmpduDen %d mimoPS %d vht_mcs11 %d shortSlot %d BI %d DTIM %d enc type %d p2p cab STA %d",
-		 updateEntry,
-		 pAddBssParams->staContext.maxAmpduDensity,
-		 pAddBssParams->staContext.mimoPS,
-		 pAddBssParams->staContext.vht_mcs_10_11_supp,
-		 pAddBssParams->shortSlotTimeSupported,
-		 pAddBssParams->beaconInterval, pAddBssParams->dtimPeriod,
-		 pAddBssParams->staContext.encryptType,
-		 pAddBssParams->staContext.p2pCapableSta);
 	if (cds_is_5_mhz_enabled()) {
 		pAddBssParams->ch_width = CH_WIDTH_5MHZ;
 		pAddBssParams->staContext.ch_width = CH_WIDTH_5MHZ;
@@ -4150,6 +4191,16 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 
 	if (lim_is_fils_connection(pe_session))
 		pAddBssParams->no_ptk_4_way = true;
+
+	pe_debug("update %d MxAmpduDen %d mimoPS %d vht_mcs11 %d shortSlot %d BI %d DTIM %d enc type %d p2p cab STA %d is_fils:%d",
+		 updateEntry, pAddBssParams->staContext.maxAmpduDensity,
+		 pAddBssParams->staContext.mimoPS,
+		 pAddBssParams->staContext.vht_mcs_10_11_supp,
+		 pAddBssParams->shortSlotTimeSupported,
+		 pAddBssParams->beaconInterval, pAddBssParams->dtimPeriod,
+		 pAddBssParams->staContext.encryptType,
+		 pAddBssParams->staContext.p2pCapableSta,
+		 lim_is_fils_connection(pe_session));
 
 	/* we need to defer the message until we get the response back */
 	SET_LIM_PROCESS_DEFD_MESGS(mac, false);
@@ -4512,6 +4563,20 @@ void lim_prepare_and_send_del_all_sta_cnf(struct mac_context *mac,
 			    (uint32_t *)&mlm_deauth);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void lim_copy_mld_mac_addr(uint8_t *sta_mld_addr,
+				  tpDphHashNode sta)
+{
+	qdf_mem_copy(sta_mld_addr, sta->mld_addr, QDF_MAC_ADDR_SIZE);
+}
+#else
+static inline
+void lim_copy_mld_mac_addr(uint8_t *sta_mld_addr,
+			   tpDphHashNode sta)
+{
+}
+#endif
+
 /**
  * lim_prepare_and_send_del_sta_cnf() - prepares and send del sta cnf
  *
@@ -4532,6 +4597,7 @@ lim_prepare_and_send_del_sta_cnf(struct mac_context *mac, tpDphHashNode sta,
 {
 	uint16_t staDsAssocId = 0;
 	struct qdf_mac_addr sta_dsaddr;
+	struct qdf_mac_addr sta_mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 	struct lim_sta_context mlmStaContext;
 	bool mlo_conn = false;
 
@@ -4543,6 +4609,7 @@ lim_prepare_and_send_del_sta_cnf(struct mac_context *mac, tpDphHashNode sta,
 	staDsAssocId = sta->assocId;
 	qdf_mem_copy((uint8_t *) sta_dsaddr.bytes,
 		     sta->staAddr, QDF_MAC_ADDR_SIZE);
+	lim_copy_mld_mac_addr(sta_mld_addr.bytes, sta);
 
 	mlmStaContext = sta->mlmStaContext;
 
@@ -4565,7 +4632,8 @@ lim_prepare_and_send_del_sta_cnf(struct mac_context *mac, tpDphHashNode sta,
 				 pe_session->limMlmState));
 	}
 
-	lim_send_del_sta_cnf(mac, sta_dsaddr, staDsAssocId, mlmStaContext,
+	lim_send_del_sta_cnf(mac, sta_dsaddr, sta_mld_addr, staDsAssocId,
+			     mlmStaContext,
 			     status_code, pe_session);
 }
 
@@ -4795,4 +4863,66 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 	ie.len = deauth_disassoc_frame_len - ie_offset;
 
 	mlme_set_peer_disconnect_ies(session->vdev, &ie);
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static void lim_get_sta_mld_log(tpDphHashNode sta_ds, tSirMacAddr mld_mac,
+				char *mld_log_str)
+{
+	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)mld_mac))
+		qdf_scnprintf(mld_log_str, MAC_ADDR_DUMP_LEN,
+			      " SA mld: " QDF_MAC_ADDR_FMT,
+			      QDF_MAC_ADDR_REF(mld_mac));
+
+	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)
+	    sta_ds->mld_addr))
+		qdf_scnprintf(mld_log_str, MAC_ADDR_DUMP_LEN,
+			      " STA DS mld: " QDF_MAC_ADDR_FMT,
+			      QDF_MAC_ADDR_REF(sta_ds->mld_addr));
+}
+#else
+static inline
+void lim_get_sta_mld_log(tpDphHashNode sta_ds, tSirMacAddr mld_mac,
+			 char *mld_log_str)
+{
+}
+#endif
+
+tpDphHashNode lim_get_sta_ds(struct mac_context *mac_ctx,
+			     tSirMacAddr sa, tSirMacAddr mld_mac,
+			     uint16_t *assoc_id,
+			     struct pe_session *session)
+{
+	tpDphHashNode sta_ds = NULL;
+	char mld_log_str[52] = {0};
+
+	/* Check if STA present with SA address */
+	sta_ds = dph_lookup_hash_entry(
+				mac_ctx, sa,
+				assoc_id,
+				&session->dph.dphHashTable);
+	/* Check if STA present with MLD address,
+	 * this can happen if SAP is non ML,
+	 * so the MLD address will be used as address for connected STA
+	 */
+	if (!sta_ds && !qdf_is_macaddr_zero((struct qdf_mac_addr *)mld_mac))
+		sta_ds = dph_lookup_hash_entry(
+				mac_ctx, mld_mac,
+				assoc_id,
+				&session->dph.dphHashTable);
+	/* Check if STA present with same MLD address as current SA,
+	 * this can happen if SAP is ML, so the MLD address will be
+	 * used as SA address for connected STA
+	 */
+	if (!sta_ds && wlan_vdev_mlme_is_mlo_vdev(session->vdev))
+		sta_ds = dph_lookup_hash_entry_by_mld_addr(
+				mac_ctx, sa,
+				assoc_id,
+				&session->dph.dphHashTable);
+	if (sta_ds) {
+		lim_get_sta_mld_log(sta_ds, mld_mac, mld_log_str);
+		pe_debug("Vdev %d STA found for " QDF_MAC_ADDR_FMT "%s",
+			 session->vdev_id, QDF_MAC_ADDR_REF(sa), mld_log_str);
+	}
+	return sta_ds;
 }

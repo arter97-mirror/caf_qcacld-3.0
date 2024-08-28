@@ -2668,7 +2668,7 @@ wlan_update_mlo_link_chn_width(struct hdd_adapter *adapter,
 	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_ctx *sta_ctx;
 
-	link_info = hdd_get_link_info_by_ieee_link_id(adapter, link_id);
+	link_info = hdd_get_link_info_by_ieee_link_id(adapter, link_id, false);
 	if (!link_info)
 		return NULL;
 

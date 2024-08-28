@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -121,6 +121,52 @@ tpDphHashNode dph_lookup_hash_entry(struct mac_context *mac, uint8_t staAddr[],
 	}
 	return ptr;
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/* --------------------------------------------------------------------- */
+/**
+ * dph_lookup_hash_entry_by_mld_addr
+ *
+ * FUNCTION:
+ * Look up an entry in hash table
+ *
+ * LOGIC:
+ *
+ * ASSUMPTIONS:
+ *
+ * NOTE:
+ *
+ * @param mld_addr MLD MAC address of the station
+ * @param pStaId pointer to the Station ID assigned to the station
+ * @return pointer to STA hash entry if lookup was a success \n
+ *         NULL if lookup was a failure
+ */
+
+tpDphHashNode dph_lookup_hash_entry_by_mld_addr(
+				struct mac_context *mac,
+				uint8_t mld_addr[],
+				uint16_t *pAssocId,
+				struct dph_hash_table *hash_table)
+{
+	tpDphHashNode ptr = NULL;
+	uint16_t i = 0;
+
+	if (!hash_table->pHashTable) {
+		pe_err("pHashTable is NULL");
+		return ptr;
+	}
+
+	for (i = 0; i < hash_table->size; i++) {
+		for (ptr = hash_table->pHashTable[i]; ptr; ptr = ptr->next) {
+			if (dph_compare_mac_addr(mld_addr, ptr->mld_addr)) {
+				*pAssocId = ptr->assocId;
+				return ptr;
+			}
+		}
+	}
+	return ptr;
+}
+#endif
 
 /* --------------------------------------------------------------------- */
 /**

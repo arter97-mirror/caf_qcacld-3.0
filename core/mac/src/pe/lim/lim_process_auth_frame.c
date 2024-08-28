@@ -398,43 +398,6 @@ lim_process_fils_auth_req_frame(struct mac_context *mac_ctx,
 {}
 #endif
 
-static QDF_STATUS
-lim_validate_mac_address_in_auth_frame(struct mac_context *mac_ctx,
-				       tpSirMacMgmtHdr mac_hdr,
-				       struct qdf_mac_addr *mld_addr,
-				       uint8_t vdev_id)
-{
-	struct wlan_objmgr_vdev *vdev;
-
-	/* SA is same as any of the device vdev, return failure */
-	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac_ctx->pdev,
-							 mac_hdr->sa,
-							 WLAN_LEGACY_MAC_ID);
-	if (vdev) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-		return QDF_STATUS_E_ALREADY;
-	}
-
-	if (mlo_mgr_ml_peer_exist_on_diff_ml_ctx(mac_hdr->sa, &vdev_id))
-		return QDF_STATUS_E_ALREADY;
-
-	if (qdf_is_macaddr_zero(mld_addr))
-		return QDF_STATUS_SUCCESS;
-
-	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac_ctx->pdev,
-							 mld_addr->bytes,
-							 WLAN_LEGACY_MAC_ID);
-	if (vdev) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-		return QDF_STATUS_E_ALREADY;
-	}
-
-	if (mlo_mgr_ml_peer_exist_on_diff_ml_ctx(mld_addr->bytes, &vdev_id))
-		return QDF_STATUS_E_ALREADY;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #ifdef WLAN_FEATURE_SAE
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
@@ -707,18 +670,20 @@ static QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
 			     QDF_MAC_ADDR_SIZE);
 		break;
 	case QDF_STA_MODE:
-		if (!wlan_cm_is_vdev_roaming(vdev)) {
-			status = wlan_vdev_get_bss_peer_mld_mac(vdev,
-								&peer_mld_addr);
-			if (QDF_IS_STATUS_ERROR(status))
-				return status;
-		} else {
+		if (wlan_cm_is_vdev_active(vdev)) {
+			/* Roaming Pre-auth frame */
 			peer_roaming_mld_addr =
 				wlan_cm_roaming_get_peer_mld_addr(vdev);
 			if (!peer_roaming_mld_addr)
 				return QDF_STATUS_E_FAILURE;
 
 			peer_mld_addr = *peer_roaming_mld_addr;
+		} else {
+			/* Initial connection */
+			status = wlan_vdev_get_bss_peer_mld_mac(vdev,
+								&peer_mld_addr);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
 		}
 
 		qdf_mem_copy(mac_hdr->sa, peer_mld_addr.bytes,
@@ -897,15 +862,6 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 			 */
 			lim_get_sta_mld_address(pe_session->vdev, body_ptr,
 						frame_len, &peer_mld);
-			status = lim_validate_mac_address_in_auth_frame(mac_ctx,
-									mac_hdr,
-									&peer_mld,
-									pe_session->vdev_id);
-			if (QDF_IS_STATUS_ERROR(status)) {
-				pe_debug("Drop SAE auth, duplicate entity found");
-				return;
-			}
-
 			lim_external_auth_add_pre_auth_node(mac_ctx, mac_hdr,
 						eLIM_MLM_WT_SAE_AUTH_STATE,
 						&peer_mld);
@@ -1044,26 +1000,6 @@ static void lim_process_ft_auth_frame(struct mac_context *mac_ctx,
 	}
 }
 
-static uint8_t
-lim_get_pasn_peer_vdev_id(struct mac_context *mac, uint8_t *bssid)
-{
-	struct wlan_objmgr_peer *peer;
-	uint8_t vdev_id;
-
-	peer = wlan_objmgr_get_peer_by_mac(mac->psoc, bssid,
-					   WLAN_MGMT_RX_ID);
-	if (!peer) {
-		pe_err("PASN peer doesn't exist for bssid: " QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(bssid));
-		return WLAN_UMAC_VDEV_ID_MAX;
-	}
-
-	vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
-	wlan_objmgr_peer_release_ref(peer, WLAN_MGMT_RX_ID);
-
-	return vdev_id;
-}
-
 /**
  * lim_process_pasn_auth_frame()- Process PASN authentication frame
  * @mac_ctx: MAC context
@@ -1107,7 +1043,6 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 	struct tLimPreAuthNode *auth_node;
 	uint32_t maxnum_preauth;
 	uint16_t associd = 0;
-	QDF_STATUS status;
 
 	if (lim_check_and_trigger_pmf_sta_deletion(mac_ctx, pe_session,
 						   mac_hdr))
@@ -1199,27 +1134,6 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 	if (lim_is_auth_algo_supported(mac_ctx,
 			(tAniAuthType) rx_auth_frm_body->authAlgoNumber,
 			pe_session)) {
-		struct qdf_mac_addr *mld_addr = &rx_auth_frm_body->peer_mld;
-
-		status = lim_validate_mac_address_in_auth_frame(mac_ctx,
-								mac_hdr,
-								mld_addr,
-								pe_session->vdev_id);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_err("Duplicate MAC address found, reject auth");
-			auth_frame->authAlgoNumber =
-				rx_auth_frm_body->authAlgoNumber;
-			auth_frame->authTransactionSeqNumber =
-				rx_auth_frm_body->authTransactionSeqNumber + 1;
-			auth_frame->authStatusCode =
-				STATUS_UNSPECIFIED_FAILURE;
-
-			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
-				mac_hdr->sa, LIM_NO_WEP_IN_FC,
-				pe_session);
-			return;
-		}
-
 		switch (rx_auth_frm_body->authAlgoNumber) {
 		case eSIR_OPEN_SYSTEM:
 			lim_process_auth_open_system_algo(mac_ctx, mac_hdr,
@@ -1902,6 +1816,14 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
+	if (wlan_vdev_is_restart_progress(pe_session->vdev) ==
+			QDF_STATUS_SUCCESS) {
+		pe_debug("vdev %d is restarting, drop auth frame sa:"QDF_MAC_ADDR_FMT,
+			 pe_session->vdev_id,
+			 QDF_MAC_ADDR_REF(mac_hdr->sa));
+		return;
+	}
+
 	curr_seq_num = (mac_hdr->seqControl.seqNumHi << 4) |
 		(mac_hdr->seqControl.seqNumLo);
 
@@ -2417,6 +2339,35 @@ static void lim_process_ft_sae_auth_frame(struct mac_context *mac,
 #endif
 
 /**
+ * lim_get_vdev_id_from_macaddr() - This API will get VDEV Id from PDEV and MAC
+ * address
+ * @pdev: pointer to PDEV object
+ * @mac_addr: VDEV MAC address
+ *
+ * Return: VDEV ID
+ */
+static uint8_t
+lim_get_vdev_id_from_macaddr(struct wlan_objmgr_pdev *pdev, uint8_t *mac_addr)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(pdev, mac_addr,
+							 WLAN_MGMT_RX_ID);
+
+	if (!vdev) {
+		pe_err("vdev is null for macaddr " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(mac_addr));
+		return WLAN_UMAC_VDEV_ID_MAX;
+	}
+
+	vdev_id =  wlan_vdev_get_id(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MGMT_RX_ID);
+
+	return vdev_id;
+}
+
+/**
  *
  * Pass the received Auth frame. This is possibly the pre-auth from the
  * neighbor AP, in the same mobility domain.
@@ -2474,7 +2425,8 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 	}
 
 	if (auth_alg == eSIR_AUTH_TYPE_PASN) {
-		vdev_id = lim_get_pasn_peer_vdev_id(mac, mac_hdr->bssId);
+		vdev_id = lim_get_vdev_id_from_macaddr(mac->pdev, mac_hdr->da);
+
 		if (vdev_id == WLAN_UMAC_VDEV_ID_MAX) {
 			/*
 			 * This can be NAN auth mgmt frame and for NAN, PASN

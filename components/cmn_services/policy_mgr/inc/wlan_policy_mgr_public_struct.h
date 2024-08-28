@@ -102,7 +102,7 @@ typedef int (*send_mode_change_event_cb)(void);
  * @CSA_REASON_GO_BSS_STARTED: P2P go started
  * @CSA_REASON_SAP_ACS: 2.4 GHz preferred SAP ACS starting
  * @CSA_REASON_SAP_FIX_CH_CONC_WITH_GO: SAP fix channel start
- * @CSA_REASON_CONCURRENT_LL_LT_SAP_EVENT: LL_LT_SAP concurrency
+ * @CSA_REASON_LL_LT_SAP_EVENT: LL_LT_SAP csa event
  *  and move GO to other band
  */
 enum sap_csa_reason_code {
@@ -122,7 +122,7 @@ enum sap_csa_reason_code {
 	CSA_REASON_GO_BSS_STARTED,
 	CSA_REASON_SAP_ACS,
 	CSA_REASON_SAP_FIX_CH_CONC_WITH_GO,
-	CSA_REASON_CONCURRENT_LL_LT_SAP_EVENT
+	CSA_REASON_LL_LT_SAP_EVENT
 };
 
 /*
@@ -510,6 +510,10 @@ enum policy_mgr_mac_use {
  * followed by MCC channels on 5G high frequencies
  * @PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW: SCC channels on 5G high frequencies
  * followed by MCC channels on 5G low frequencies
+ * @PM_SCC_ON_5G_LOW_CH_24G: SCC channels on 5G low frequencies followed by
+ * 2.4 GHz channels.
+ * @PM_SCC_ON_5G_HIGH_CH_24G: SCC channels on 5G high frequencies followed by
+ * 2.4 GHz channels.
  *
  * @PM_MAX_PCL_TYPE: Max place holder
  *
@@ -568,6 +572,8 @@ enum policy_mgr_pcl_type {
 	PM_MCC_CH_SCC_ON_24G,
 	PM_SCC_ON_5G_LOW_MCC_ON_5G_HIGH,
 	PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW,
+	PM_SCC_ON_5G_LOW_CH_24G,
+	PM_SCC_ON_5G_HIGH_CH_24G,
 
 	PM_MAX_PCL_TYPE
 };
@@ -1244,8 +1250,10 @@ enum policy_mgr_two_connection_mode {
  * and second STA on 5Ghz SMM
  * @PM_NAN_DISC_24_STA_24_STA_5_DBS: NAN Disc on 2.4Ghz and first STA on 2.4Ghz
  * and second STA on 5Ghz DBS
- * @PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS: NAN Disc on 2.4Ghz and and STA,
+ * @PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS: NAN Disc on 2.4Ghz and STA,
  * SAP SCC MCC on DBS
+ * @PM_NAN_DISC_24_STA_STA_SCC_MCC_DBS: NAN Disc on 2.4Ghz and STA,
+ * STA SCC MCC on DBS
  * @PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS: ANY 2 link on 5 GHZ high mac
  * and one link on 5 GHZ low doing SBS
  * @PM_STA_24_SAP_5_HIGH_MCC_STA_5_LOW_SBS : First STA on 2.4 GHZ & SAP on high
@@ -1350,6 +1358,7 @@ enum policy_mgr_three_connection_mode {
 	PM_NAN_DISC_24_STA_24_STA_5_SMM,
 	PM_NAN_DISC_24_STA_24_STA_5_DBS,
 	PM_NAN_DISC_24_STA_SAP_SCC_MCC_DBS,
+	PM_NAN_DISC_24_STA_STA_SCC_MCC_DBS,
 	PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_STA_24_SAP_5_HIGH_MCC_STA_5_LOW_SBS =
 		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
@@ -1688,17 +1697,10 @@ enum conn_6ghz_flag {
 	CONN_6GHZ_FLAG_NO_LEGACY_CLIENT = 0x0008,
 };
 
-#ifdef WLAN_FEATURE_AFC_DCS_SKIP_ACS_RANGE
-/* To support DCS to 6 Ghz channel when AFC response receive */
-#define CONN_6GHZ_CAPABLE (CONN_6GHZ_FLAG_VALID | \
-			     CONN_6GHZ_FLAG_SECURITY_ALLOWED | \
-			     CONN_6GHZ_FLAG_NO_LEGACY_CLIENT)
-#else
 #define CONN_6GHZ_CAPABLE (CONN_6GHZ_FLAG_VALID | \
 			     CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED | \
 			     CONN_6GHZ_FLAG_SECURITY_ALLOWED | \
 			     CONN_6GHZ_FLAG_NO_LEGACY_CLIENT)
-#endif
 
 /**
  * struct policy_mgr_conc_connection_info - information of all existing

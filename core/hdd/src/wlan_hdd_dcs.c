@@ -32,6 +32,10 @@
 #include <wlan_dcs_ucfg_api.h>
 #include "wlan_ll_sap_ucfg_api.h"
 #include "wlan_dlm_api.h"
+#include "wlan_ll_sap_public_structs.h"
+#include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_ll_sap_api.h"
+#include "wlan_hdd_regulatory.h"
 
 /* Time(in milliseconds) before which the AP doesn't expect a connection */
 #define HDD_DCS_AWGN_BSS_RETRY_DELAY (5 * 60 * 1000)
@@ -210,9 +214,12 @@ hdd_dcs_select_random_chan(struct wlan_objmgr_pdev *pdev,
 		qdf_mem_free(res_msg);
 		return QDF_STATUS_E_INVAL;
 	}
-	hdd_debug("channel count %d for band %d", count, REG_BAND_6G);
+
 	for (i = 0; i < count; i++)
 		final_lst[i] = res_msg[i].freq;
+
+	hdd_remove_vlp_depriority_channels(pdev, final_lst, &count);
+	hdd_debug("channel count %d for band %d", count, REG_BAND_6G);
 
 	intf_ch_freq = wlan_get_rand_from_lst_for_freq(final_lst, count);
 	if (!intf_ch_freq || intf_ch_freq > wlan_reg_max_6ghz_chan_freq()) {
@@ -243,61 +250,73 @@ hdd_dcs_select_random_chan(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
+#ifdef WLAN_FEATURE_LL_LT_SAP
 /**
- * hdd_dcs_trigger_csa_for_ll_lt_sap() - Trigger CSA for ll_sap
- * once dcs threshold reaches
- * @psoc: psoc object
- * @hdd_ctx: hdd_ctx
- * @vdev_id: vdev_id
+ * ll_lt_sap_acs_complete_bearer_switch_req_cb() - Callback function, which will
+ * be invoked with the bearer switch request status.
+ * @psoc: Psoc pointer
+ * @vdev_id: vdev id of the requester
+ * @request_id: Request ID
+ * @status: Status of the bearer switch request
+ * @req_value: Request value for the bearer switch request
+ * @request_params: Request params for the bearer switch request
+ *
+ * Return: None
+ */
+static void ll_lt_sap_acs_complete_bearer_switch_req_cb(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						wlan_bs_req_id request_id,
+						QDF_STATUS status,
+						uint32_t req_value,
+						void *request_params)
+{
+	/* Drop this response as no action is required */
+}
+
+/**
+ * hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete() - Switch the bearer to
+ * wlan on ll_lt_sap acs complete
+ * @psoc: Psoc pointer
+ * @vdev_id: vdev id of the requester
+ *
+ * This function switches bearer to wlan on ll sap acs complete
  *
  * Return: None
  */
 static void
-hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
-				  struct hdd_context *hdd_ctx,
-				  uint8_t vdev_id)
+hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id)
 {
-	struct wlan_hdd_link_info *link_info;
-	struct wlan_objmgr_vdev *vdev;
-	qdf_freq_t restart_freq, curr_freq;
-	QDF_STATUS status;
+	struct wlan_bearer_switch_request bs_request = {0};
+	qdf_freq_t ll_lt_sap_freq;
 
-	if (!ucfg_is_vdev_level_dcs_supported(psoc))
-		goto end;
+	ll_lt_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
 
-	curr_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
-
-	/**
-	 * For LL_LT_SAP, use LL_LT_SAP channel selection logic instead
-	 * of going with ACS flow to select new channel. Because ACS
-	 * will do scan and selects best channel. This will increase
-	 * dcs overall time for LL_LT_SAP.
-	 */
-	restart_freq = ucfg_ll_sap_get_valid_freq_for_csa(psoc, vdev_id,
-							  curr_freq,
-							  LL_SAP_CSA_DCS);
-
-	hdd_debug("vdev_id %d freq %d selected for LL_LT_SAP DCS",
-		  vdev_id, restart_freq);
-	if (!restart_freq)
-		goto end;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
-					psoc, vdev_id,
-					WLAN_HDD_ID_OBJ_MGR);
-	if (!vdev) {
-		hdd_debug("vdev %d is null", vdev_id);
+	if (!ll_lt_sap_freq) {
+		hdd_debug("ll_lt_sap is not resent");
 		return;
 	}
-	status = ucfg_dcs_switch_chan(vdev, restart_freq,
-				      CH_WIDTH_20MHZ);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto end;
 
-	return;
+	bs_request.vdev_id = vdev_id;
+	bs_request.request_id = wlan_ll_lt_sap_bearer_switch_get_id(psoc);
+	bs_request.req_type = WLAN_BS_REQ_TO_WLAN;
+	bs_request.source = BEARER_SWITCH_REQ_ACS;
+	bs_request.requester_cb = ll_lt_sap_acs_complete_bearer_switch_req_cb;
 
-end:
+	hdd_debug("ACS completed, switch bearer back to wlan vdev %d", vdev_id);
+
+	wlan_ll_lt_sap_switch_bearer_to_wlan(psoc, &bs_request);
+}
+
+static void
+hdd_dcs_continue_csa_for_ll_lt_sap_post_bearer_switch(
+						struct hdd_context *hdd_ctx,
+						uint8_t vdev_id)
+{
+	struct wlan_hdd_link_info *link_info;
+
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx,
 					      vdev_id);
 	if (!link_info) {
@@ -305,7 +324,109 @@ end:
 			vdev_id);
 		return;
 	}
-	wlan_hdd_cfg80211_start_acs(link_info);
+
+	if (wlan_hdd_cfg80211_start_acs(link_info))
+		hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
+								hdd_ctx->psoc,
+								vdev_id);
+}
+
+/**
+ * hdd_ll_lt_sap_acs_start_bearer_switch_requester_cb() - Callback function,
+ * which will be invoked with the bearer switch request status.
+ * @psoc: Psoc pointer
+ * @vdev_id: vdev id of the requester
+ * @request_id: Request ID
+ * @status: Status of the bearer switch request
+ * @req_value: Request value for the bearer switch request
+ * @request_params: Request params for the bearer switch request
+ *
+ * Return: None
+ */
+static void
+hdd_ll_lt_sap_acs_start_bearer_switch_requester_cb(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					wlan_bs_req_id request_id,
+					QDF_STATUS status, uint32_t req_value,
+					void *request_params)
+{
+	struct hdd_context *hdd_ctx = request_params;
+
+	hdd_debug("Continue ACS post bearer switch vdev %d", vdev_id);
+
+	hdd_dcs_continue_csa_for_ll_lt_sap_post_bearer_switch(hdd_ctx, vdev_id);
+}
+
+/**
+ * hdd_switch_bearer_to_ble_on_ll_lt_sap_acs_start() - Switch the bearer to ble
+ * on acs start
+ * @psoc: Psoc pointer
+ * @hdd_ctx: hdd context
+ * @vdev_id: vdev id of the requester
+ * @src: ll sap csa source
+ * This function switches bearer to ble on acs start
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_switch_bearer_to_ble_on_ll_lt_sap_acs_start(struct wlan_objmgr_psoc *psoc,
+						struct hdd_context *hdd_ctx,
+						uint8_t vdev_id,
+						enum ll_sap_csa_source src)
+{
+	struct wlan_bearer_switch_request bs_request = {0};
+	QDF_STATUS status = QDF_STATUS_E_ALREADY;
+	qdf_freq_t ll_lt_sap_freq;
+
+	ll_lt_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
+
+	if (!ll_lt_sap_freq) {
+		hdd_debug("ll_lt_sap is not resent");
+		return status;
+	}
+
+	wlan_ll_lt_store_to_avoid_list_and_flush_old(psoc, ll_lt_sap_freq, src);
+
+	bs_request.vdev_id = vdev_id;
+	bs_request.request_id = wlan_ll_lt_sap_bearer_switch_get_id(psoc);
+	bs_request.req_type = WLAN_BS_REQ_TO_NON_WLAN;
+	bs_request.source = BEARER_SWITCH_REQ_ACS;
+	bs_request.requester_cb =
+			hdd_ll_lt_sap_acs_start_bearer_switch_requester_cb;
+	bs_request.arg = hdd_ctx;
+
+	status = wlan_ll_lt_sap_switch_bearer_to_ble(psoc, &bs_request);
+
+	return status;
+}
+
+#else
+static inline void
+hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id)
+
+{
+}
+
+static inline QDF_STATUS
+hdd_switch_bearer_to_ble_on_ll_lt_sap_acs_start(struct wlan_objmgr_psoc *psoc,
+						struct hdd_context *hdd_ctx,
+						uint8_t vdev_id,
+						enum ll_sap_csa_source src)
+{
+	return QDF_STATUS_E_ALREADY;
+}
+#endif /* WLAN_FEATURE_LL_LT_SAP */
+
+void
+hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
+				  struct hdd_context *hdd_ctx,
+				  uint8_t vdev_id, enum ll_sap_csa_source src)
+{
+	hdd_switch_bearer_to_ble_on_ll_lt_sap_acs_start(psoc, hdd_ctx,
+							vdev_id, src);
 }
 
 /**
@@ -339,8 +460,8 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, struct dcs_param *param,
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, param->vdev_id))
 		return hdd_dcs_trigger_csa_for_ll_lt_sap(psoc, hdd_ctx,
-							 param->vdev_id);
-
+							 param->vdev_id,
+							 LL_SAP_CSA_DCS);
 	if (policy_mgr_is_force_scc(psoc) &&
 	    policy_mgr_is_sta_gc_active_on_mac(psoc, param->mac_id)) {
 		ucfg_config_dcs_event_data(psoc, param->mac_id, true);
@@ -460,14 +581,25 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 	struct wlan_hdd_link_info *link_info;
 	uint32_t dcs_ch = wlan_reg_freq_to_chan(hdd_ctx->pdev, dcs_ch_freq);
 
-	status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc, vdev_id,
-						     &mac_id);
+	/* For LL SAP switch only for LL SAP, not for all vdev on same MAC */
+	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id)) {
+		hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
+								hdd_ctx->psoc,
+								vdev_id);
+		count = 1;
+		list[0] = vdev_id;
+	} else {
+		status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
+							     vdev_id,
+							     &mac_id);
 
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("get mac id failed");
-		return QDF_STATUS_E_INVAL;
+			if (QDF_IS_STATUS_ERROR(status)) {
+				hdd_err("get mac id failed");
+				return QDF_STATUS_E_INVAL;
+		}
+		count = policy_mgr_get_sap_go_count_on_mac(hdd_ctx->psoc, list,
+							   mac_id);
 	}
-	count = policy_mgr_get_sap_go_count_on_mac(hdd_ctx->psoc, list, mac_id);
 
 	/*
 	 * Dcs can only be enabled after all vdev finish csa.
@@ -489,6 +621,7 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 		else
 			wlansap_dcs_set_vdev_starting(sap_ctx, false);
 	}
+
 	for (conn_idx = 0; conn_idx < count; conn_idx++) {
 		link_info = hdd_get_link_info_by_vdev(hdd_ctx, list[conn_idx]);
 		if (!link_info) {

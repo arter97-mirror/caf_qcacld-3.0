@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -974,18 +974,6 @@ QDF_STATUS wma_tx_detach(tp_wma_handle wma_handle);
  */
 int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 					     uint32_t len);
-#endif
-
-#if defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL)
-QDF_STATUS wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
-					struct t_bad_peer_txtcl_config *config);
-#else
-static inline QDF_STATUS
-wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
-			struct t_bad_peer_txtcl_config *config)
-{
-	return QDF_STATUS_E_FAILURE;
-}
 #endif
 
 QDF_STATUS wma_process_init_thermal_info(tp_wma_handle wma,

@@ -59,6 +59,8 @@
 #include <wlan_mlo_mgr_sta.h>
 #include "wlan_mlo_mgr_public_structs.h"
 #include "wlan_p2p_api.h"
+#include "wlan_ll_sap_api.h"
+#include "wlan_dcs_api.h"
 
 #define SA_QUERY_REQ_MIN_LEN \
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
@@ -130,6 +132,36 @@ void lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId)
 	return;
 }
 
+#ifdef WLAN_FEATURE_LL_LT_SAP
+static void
+lim_process_ecsa_frame_for_ll_lt_sap(struct mac_context *mac_ctx,
+				     struct pe_session *session_entry,
+				     uint32_t rcv_freq)
+{
+	if (!rcv_freq ||
+	    (rcv_freq != (qdf_freq_t)session_entry->curr_op_freq ||
+	     mlme_is_chan_switch_in_progress(session_entry->vdev))) {
+		pe_err("vdev: %d current freq: %d rcv_freq: %d / chan_switch_in_progress: %d",
+		       session_entry->vdev_id, session_entry->curr_op_freq,
+		       rcv_freq,
+		       mlme_is_chan_switch_in_progress(session_entry->vdev));
+		return;
+	}
+
+	wlan_dcs_start_dcs(mac_ctx->psoc,
+			   wlan_objmgr_pdev_get_pdev_id(mac_ctx->pdev),
+			   session_entry->vdev_id,
+			   WLAN_HOST_DCS_WLANIM);
+}
+#else
+static inline void
+lim_process_ecsa_frame_for_ll_lt_sap(struct mac_context *mac_ctx,
+				     struct pe_session *session_entry,
+				     uint32_t rcv_freq)
+{
+}
+#endif
+
 /**
  * lim_process_ext_channel_switch_action_frame()- Process ECSA Action
  * Frames.
@@ -151,13 +183,14 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 	tDot11fext_channel_switch_action_frame *ext_channel_switch_frame;
 	uint32_t                frame_len;
 	uint32_t                status;
-	uint32_t                target_freq;
+	uint32_t                target_freq = 0;
 
 	hdr = WMA_GET_RX_MAC_HEADER(rx_packet_info);
 	body = WMA_GET_RX_MPDU_DATA(rx_packet_info);
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_packet_info);
 
-	pe_debug("Received EXT Channel switch action frame");
+	pe_debug("vdev: %d Received EXT Channel switch action frame",
+		 session_entry->vdev_id);
 
 	ext_channel_switch_frame =
 		 qdf_mem_malloc(sizeof(*ext_channel_switch_frame));
@@ -188,12 +221,19 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 	}
 
 	target_freq =
-		wlan_reg_chan_opclass_to_freq(ext_channel_switch_frame->ext_chan_switch_ann_action.new_channel,
-					      ext_channel_switch_frame->ext_chan_switch_ann_action.op_class,
-					      false);
-
+	wlan_reg_chan_opclass_to_freq(ext_channel_switch_frame->ext_chan_switch_ann_action.new_channel,
+				      ext_channel_switch_frame->ext_chan_switch_ann_action.op_class,
+				      false);
 	/* Free ext_channel_switch_frame here as its no longer needed */
 	qdf_mem_free(ext_channel_switch_frame);
+
+	if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
+					 session_entry->vdev_id)) {
+		return lim_process_ecsa_frame_for_ll_lt_sap(mac_ctx,
+							    session_entry,
+							    target_freq);
+	}
+
 	/*
 	 * Now, validate if channel change is required for the passed
 	 * channel and if is valid in the current regulatory domain,
@@ -232,6 +272,7 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 		mmh_msg.bodyval = 0;
 		lim_sys_process_mmh_msg_api(mac_ctx, &mmh_msg);
 	}
+
 	return;
 } /*** end lim_process_ext_channel_switch_action_frame() ***/
 
@@ -1135,7 +1176,8 @@ __lim_process_radio_measure_request(struct mac_context *mac, uint8_t *pRxPacketI
 		 pHdr->fc.type, pHdr->fc.subType, curr_seq_num);
 
 	rrm_process_radio_measurement_request(mac, pe_session->bssId, frm,
-					      pe_session);
+					      pe_session, pHdr, frameLen,
+					      pRxPacketInfo);
 err:
 	qdf_mem_free(frm);
 }
@@ -1950,7 +1992,8 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		break;
 
 	case ACTION_CATEGORY_RRM:
-
+		pe_debug("RRM Action category: %d action: %d",
+			 action_hdr->category, action_hdr->actionID);
 		if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
 		    LIM_IS_AP_ROLE(session) &&
 		    action_hdr->actionID == RRM_RADIO_MEASURE_RPT) {

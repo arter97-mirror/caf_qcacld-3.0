@@ -278,6 +278,7 @@ mlo_get_link_mac_addr_from_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
  *
  * @vdev: vdev pointer
  * @reassoc_rsp: cm vdev reassoc rsp pointer
+ * @auth_status: auth status from roam sync event
  *
  * This api will be called to copy cm vdev reassoc rsp which will
  * be used to later bring up link vdev/s.
@@ -286,7 +287,8 @@ mlo_get_link_mac_addr_from_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS
 mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
-			  struct wlan_cm_connect_resp *reassoc_rsp);
+			  struct wlan_cm_connect_resp *reassoc_rsp,
+			  uint32_t auth_status);
 
 /**
  * mlo_roam_link_connect_notify - Send connect req
@@ -625,7 +627,8 @@ mlo_roam_set_link_id(struct wlan_objmgr_vdev *vdev,
 
 static inline QDF_STATUS
 mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
-			  struct wlan_cm_connect_resp *reassoc_rsp)
+			  struct wlan_cm_connect_resp *reassoc_rsp,
+			  uint32_t auth_status)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

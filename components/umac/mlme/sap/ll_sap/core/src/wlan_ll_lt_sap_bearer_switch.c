@@ -21,7 +21,7 @@
 #include "wlan_policy_mgr_ll_sap.h"
 
 #define BEARER_SWITCH_TIMEOUT 5000
-#define BEARER_SWITCH_WLAN_REQ_TIMEOUT 10000
+#define BEARER_SWITCH_WLAN_REQ_TIMEOUT 5000
 
 #define BS_PREFIX_FMT "BS_SM_%d req_id 0x%x: "
 #define BS_PREFIX_REF(vdev_id, req_id) (vdev_id), (req_id)
@@ -1851,13 +1851,19 @@ ll_lt_sap_request_for_audio_transport_switch(
 		 * Total_ref_count zero indicates that no module wants to stay
 		 * in non-wlan mode so this request can be accepted
 		 */
-		if (!qdf_atomic_read(&bearer_switch_ctx->total_ref_count)) {
+		if (!qdf_atomic_read(&bearer_switch_ctx->total_ref_count) &&
+		    (QDF_TIMER_STATE_RUNNING !=
+			qdf_mc_timer_get_current_state(
+				&bearer_switch_ctx->bs_wlan_request_timer))) {
 			ll_sap_debug("BS_SM vdev %d WLAN_BS_REQ_TO_WLAN accepted",
 				     wlan_vdev_get_id(vdev));
 			return QDF_STATUS_SUCCESS;
 		}
-		ll_sap_debug("BS_SM vdev %d WLAN_BS_REQ_TO_WLAN rejected",
-			     wlan_vdev_get_id(vdev));
+		ll_sap_debug("BS_SM vdev %d WLAN_BS_REQ_TO_WLAN rejected, total ref count %d timer state %d",
+			     wlan_vdev_get_id(vdev),
+			     qdf_atomic_read(&bearer_switch_ctx->total_ref_count),
+			     qdf_mc_timer_get_current_state(
+				&bearer_switch_ctx->bs_wlan_request_timer));
 
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1998,10 +2004,35 @@ ll_lt_sap_deliver_audio_transport_switch_resp(
 								vdev,
 								status);
 
-	else if (req_type == WLAN_BS_REQ_TO_WLAN)
+	else if (req_type == WLAN_BS_REQ_TO_WLAN) {
+		struct ll_sap_vdev_priv_obj *ll_sap_obj;
+		struct bearer_switch_info *bs_ctx;
+
+		ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
+
+		if (!ll_sap_obj) {
+			ll_sap_err("BS_SM vdev %d ll_sap obj null",
+				   wlan_vdev_get_id(vdev));
+			return;
+		}
+
+		bs_ctx = ll_sap_obj->bearer_switch_ctx;
+		if (!bs_ctx)
+			return;
+		/* If any module wants to be in non-wlan bearer then
+		 * dont update the state of the BS state machine, this will
+		 * be updated when the respective module will decrement its
+		 * reference count.
+		 */
+		if (qdf_atomic_read(&bs_ctx->total_ref_count)) {
+			ll_sap_debug("Reject bearer switch to wlan, ref_count %d",
+				      qdf_atomic_read(&bs_ctx->total_ref_count));
+			return;
+		}
 		ll_lt_sap_deliver_wlan_audio_transport_switch_resp(
 								vdev,
 								status);
+	}
 	else
 		ll_sap_err("Vdev %d Invalid req_type %d ",
 			   wlan_vdev_get_id(vdev), req_type);

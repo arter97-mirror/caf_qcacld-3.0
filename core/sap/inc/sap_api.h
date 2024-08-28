@@ -62,7 +62,7 @@ extern "C" {
 #ifndef QDF_MAX_NO_OF_SAP_MODE
 #define       QDF_MAX_NO_OF_SAP_MODE       2    /* max # of SAP */
 #endif
-#define       SAP_MAX_NUM_SESSION          5
+#define       SAP_MAX_NUM_SESSION          WLAN_MAX_VDEVS
 #define       SAP_MAX_OBSS_STA_CNT         1    /* max # of OBSS STA */
 #define       SAP_ACS_WEIGHT_MAX           (26664)
 /* ACS will mark non ACS channels(filtered by PCL) or channels not in
@@ -522,6 +522,12 @@ struct sap_acs_cfg {
 	bool       skip_acs_scan;
 	uint32_t   last_scan_ageout_time;
 	struct master_acs master_acs_cfg;
+	bool	   is_linear_bss_count;
+	bool	   is_linear_rssi;
+	int16_t	   linear_rssi_threshold;
+	bool	   is_same_weight_rand_enabled;
+	bool	   is_wifi_non_wifi_load_score_enabled;
+	bool	   is_early_terminate_enabled;
 };
 
 /*
@@ -585,7 +591,6 @@ struct sap_config {
 	enum sap_acs_dfs_mode acs_dfs_mode;
 	struct hdd_channel_info *channel_info;
 	uint32_t channel_info_count;
-	bool dfs_cac_offload;
 #ifdef WLAN_SUPPORT_TWT
 	bool cfg80211_twt_responder;
 #endif
@@ -682,7 +687,6 @@ typedef struct sSapDfsInfo {
 	uint8_t sap_ch_switch_beacon_cnt;
 	uint8_t sap_ch_switch_mode;
 	uint16_t reduced_beacon_interval;
-	uint8_t vdev_id;
 } tSapDfsInfo;
 
 /* MAX number of CAC channels to be recorded */
@@ -809,6 +813,7 @@ QDF_STATUS sap_destroy_ctx(struct sap_context *sap_ctx);
  * @mode: Device mode
  * @addr: MAC address of the SAP
  * @session_id: Pointer to the session id
+ * @cac_offload: if CAC is offloaded
  * @reinit: if called as part of reinit
  *
  * sap_create_ctx() allocates the sap context which is uninitialized.
@@ -820,8 +825,9 @@ QDF_STATUS sap_destroy_ctx(struct sap_context *sap_ctx);
  *         QDF_STATUS_SUCCESS: Success
  */
 QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
-			 enum QDF_OPMODE mode,
-			 uint8_t *addr, uint32_t session_id, bool reinit);
+			enum QDF_OPMODE mode,
+			uint8_t *addr, uint32_t session_id,
+			bool cac_offload, bool reinit);
 
 /**
  * sap_deinit_ctx() - De-initialize the sap context
@@ -1484,6 +1490,17 @@ QDF_STATUS wlansap_set_invalid_session(struct sap_context *sap_ctx);
  */
 QDF_STATUS wlansap_release_vdev_ref(struct sap_context *sap_ctx);
 
+#ifdef WLAN_FEATURE_MULTI_LINK_SAP
+/*
+ * is_sap_cac_required_for_chan() - Check whether need do cac for specific sap
+ * @sap_ctx: pointer to the SAP context
+ *
+ * Return: true if need cac otherwise false.
+ */
+bool
+is_sap_cac_required_for_chan(struct sap_context *sap_ctx);
+#endif
+
 /**
  * sap_get_cac_dur_dfs_region() - get cac duration and dfs region.
  * @sap_ctx: sap context
@@ -1801,16 +1818,6 @@ static inline qdf_freq_t wlansap_dcs_get_freq(struct sap_context *sap_context)
  */
 bool wlansap_filter_vendor_unsafe_ch_freq(
 	struct sap_context *sap_context, struct sap_config *sap_config);
-
-/**
- * wlansap_dump_acs_ch_freq() - print acs channel frequency
- * @sap_context: sap context
- *
- * This function is used to print acs channel frequecny
- *
- * Return: None
- */
-void wlansap_dump_acs_ch_freq(struct sap_context *sap_context);
 
 /**
  * wlansap_set_acs_ch_freq() - set acs channel frequency

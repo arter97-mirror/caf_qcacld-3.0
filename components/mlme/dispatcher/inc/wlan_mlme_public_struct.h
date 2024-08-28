@@ -1494,6 +1494,7 @@ struct wlan_mlme_aux_dev_caps {
  * @t2lm_negotiation_support: T2LM negotiation supported enum value
  * @enable_emlsr_mode: 11BE eMLSR mode support
  * @mld_id: MLD ID of requested BSS within ML probe request frame
+ * @enable_sap_emlsr_mode: 11BE eMLSR mode support for sap
  * @oem_eht_mlo_crypto_bitmap: Bitmap of APs allowed by OEMs to connect
  * in EHT/MLO.
  * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
@@ -1558,6 +1559,7 @@ struct wlan_mlme_generic {
 	bool enable_emlsr_mode;
 	enum t2lm_negotiation_support t2lm_negotiation_support;
 	uint8_t mld_id;
+	bool enable_sap_emlsr_mode;
 #endif
 #ifdef WLAN_FEATURE_11BE
 	uint32_t oem_eht_mlo_crypto_bitmap;
@@ -1631,6 +1633,12 @@ struct acs_weight_range {
  * by ACS
  * @acs_prefer_6ghz_psc: Select 6 GHz PSC channel as priority
  * @np_chan_weightage: Weightage to be given to non preferred channels.
+ * @lin_bss_score_en: Linear BSS score enable
+ * @lin_rssi_score_en: Linear RSSI score enable
+ * @load_score_en: Wi-Fi + Non Wi-Fi loading score enable
+ * @same_weight_chan_rand_en: Enable randomization of same weight channels
+ * @termi_on_1st_clean_chan_en: Early terminate ACS scan on 1st clean channel
+ * @rssi_score_thrs: RSSI score threshold defined
  */
 struct wlan_mlme_acs {
 	bool is_acs_with_more_param;
@@ -1645,6 +1653,12 @@ struct wlan_mlme_acs {
 	bool force_sap_start;
 	bool acs_prefer_6ghz_psc;
 	uint32_t np_chan_weightage;
+	bool lin_bss_score_en;
+	bool lin_rssi_score_en;
+	bool load_score_en;
+	bool same_weight_chan_rand_en;
+	bool termi_on_1st_clean_chan_en;
+	int16_t rssi_score_thrs;
 };
 
 /**

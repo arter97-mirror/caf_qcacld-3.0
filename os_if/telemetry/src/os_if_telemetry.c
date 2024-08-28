@@ -52,6 +52,7 @@ QDF_STATUS os_if_telemetry_stats_service(struct wlan_objmgr_vdev *vdev,
 		spt = nla_get_u8(tb[STATS_POLICY_TYPE]);
 
 		if (spt != QCA_ASYNC_STATS_TYPE_FLOW_STATS &&
+		    spt != QCA_ASYNC_STATS_TYPE_CLASSIFIED_FLOW_STATS &&
 		    spt != QCA_ASYNC_STATS_TYPE_POWERSAVE) {
 			osif_err("Invalid stats policy type: %d", spt);
 			goto error;

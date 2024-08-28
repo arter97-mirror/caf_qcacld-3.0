@@ -1026,6 +1026,9 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	uint32_t congestion_timeout = 0, reason;
 	uint8_t peer_cap;
 	QDF_STATUS qdf_status;
+	struct wlan_channel *bss_chan;
+	uint8_t band;
+	bool is_24ghz_enabled;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -1052,6 +1055,27 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	ret = osif_twt_parse_add_dialog_attrs(tb2, &params);
 	if (ret)
 		return ret;
+
+	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
+	if (!bss_chan) {
+		osif_err("Unable to find bss chan");
+		return -EINVAL;
+	}
+
+	band = wlan_reg_freq_to_band((qdf_freq_t)bss_chan->ch_freq);
+	if (band == REG_BAND_UNKNOWN) {
+		osif_err("Invalid bss freq");
+		return -EINVAL;
+	}
+
+	ucfg_twt_cfg_get_24ghz_enabled(psoc, &is_24ghz_enabled);
+
+	if (!is_24ghz_enabled &&
+	    !wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    band == REG_BAND_2G) {
+		osif_err("TWT disabled for 2.4 GHz band");
+		return -EINVAL;
+	}
 
 	qdf_status = ucfg_twt_get_peer_capabilities(psoc, &params.peer_macaddr,
 						    &peer_cap);
@@ -1400,6 +1424,7 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_pdev *pdev)
 {
 	uint32_t num_connections, sap_count, sta_count;
+	uint32_t p2p_cli_count, p2p_go_count;
 	QDF_STATUS status;
 	struct twt_conc_context twt_arg;
 	uint32_t reason;
@@ -1413,24 +1438,48 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 							      NULL);
 	sap_count = policy_mgr_get_sap_mode_count(psoc, NULL);
 
+	p2p_cli_count = policy_mgr_mode_specific_connection_count(
+							psoc,
+							PM_P2P_CLIENT_MODE,
+							NULL);
+
+	p2p_go_count = policy_mgr_mode_specific_connection_count(
+								psoc,
+								PM_P2P_GO_MODE,
+								NULL);
 	twt_arg.psoc = psoc;
 
-	osif_debug("Total connection %d, sta_count %d, sap_count %d",
-		  num_connections, sta_count, sap_count);
+	osif_debug("Total connection %d, sta_count %d, sap_count %d p2p_cli_count %d p2p_go_count %d",
+		   num_connections, sta_count, sap_count, p2p_cli_count,
+		   p2p_go_count);
 	switch (num_connections) {
 	case 1:
-		if (sta_count == 1) {
-			policy_mgr_get_mode_specific_conn_info(psoc, freq_list,
-							       vdev_id_list,
-							       PM_STA_MODE);
+		if (sta_count || p2p_cli_count) {
+			if (sta_count)
+				policy_mgr_get_mode_specific_conn_info(
+								psoc, freq_list,
+								vdev_id_list,
+								PM_STA_MODE);
+			else
+				policy_mgr_get_mode_specific_conn_info(
+							psoc, freq_list,
+							vdev_id_list,
+							PM_P2P_CLIENT_MODE);
+
 			mac_id = policy_mgr_mode_get_macid_by_vdev_id(
 					pdev->pdev_objmgr.wlan_psoc,
 					vdev_id_list[0]);
 			osif_twt_send_requestor_enable_cmd(psoc, mac_id);
-		} else if (sap_count == 1) {
+		} else if (sap_count || p2p_go_count) {
+			if (sap_count)
+				policy_mgr_get_sap_mode_info(psoc, freq_list,
+							     vdev_id_list);
+			else
+				policy_mgr_get_mode_specific_conn_info(
+							psoc, freq_list,
+							vdev_id_list,
+							PM_P2P_GO_MODE);
 
-			policy_mgr_get_sap_mode_info(psoc, freq_list,
-						     vdev_id_list);
 			mac_id = policy_mgr_mode_get_macid_by_vdev_id(
 					pdev->pdev_objmgr.wlan_psoc,
 					vdev_id_list[0]);

@@ -586,6 +586,16 @@ ucfg_nan_send_pasn_peer_create_cmd(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS ucfg_nan_send_delete_pasn_peer(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id,
 					  struct qdf_mac_addr *peer_mac_addr);
+
+/**
+ * ucfg_nan_get_prefer_nan_chan_for_p2p() - get value of prefer NAN social
+ * channels for P2P
+ * @psoc: pointer to psoc object
+ *
+ * Return: Boolean flag indicating whether NAN social channels can be preferred
+ * for P2P or not
+ */
+bool ucfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc);
 #else /* WLAN_FEATURE_NAN */
 
 static inline
@@ -753,6 +763,12 @@ ucfg_nan_send_delete_pasn_peer(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			       struct qdf_mac_addr *peer_mac_addr)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool
+ucfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 #endif /* WLAN_FEATURE_NAN */
 #endif /* _NAN_UCFG_API_H_ */

@@ -27,6 +27,7 @@
 #include "wlan_hdd_sysfs_connect_info.h"
 #include "qwlan_version.h"
 #include "wlan_policy_mgr_ucfg.h"
+#include "wlan_hdd_object_manager.h"
 
 /**
  * wlan_hdd_version_info() - Populate driver, FW and HW version
@@ -352,23 +353,13 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	bool is_legacy = false;
 	bool is_standby = false;
 	uint8_t curr_hw_mode;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		len = scnprintf(buf, buf_avail_len,
 				"STA is not connected\n");
 		if (len >= 0)
 			return length;
-	}
-
-	len = scnprintf(buf, buf_avail_len,
-			"CONNECTION DETAILS\n");
-	if (len <= 0)
-		return length;
-
-	length += len;
-	if (length >= buf_avail_len) {
-		hdd_err("No sufficient buf_avail_len");
-		return buf_avail_len;
 	}
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
@@ -391,19 +382,29 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		return buf_avail_len;
 	}
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_CM_ID);
+	if (!vdev)
+		return length;
+
+	curr_hw_mode = ucfg_policy_mgr_find_current_hw_mode(
+						wlan_vdev_get_psoc(vdev));
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
+
 	len = scnprintf(buf + length, buf_avail_len - length,
 			"ssid: %s\n"
 			"bssid: " QDF_MAC_ADDR_FMT "\n"
 			"connect_time: %s\n"
 			"auth_time: %s\n"
 			"last_auth_type: %s\n"
-			"dot11mode: %s\n",
+			"dot11mode: %s\n"
+			"current HW mode: %s\n",
 			hdd_sta_ctx->conn_info.last_ssid.SSID.ssId,
 			QDF_MAC_ADDR_REF(hdd_sta_ctx->conn_info.bssid.bytes),
 			hdd_sta_ctx->conn_info.connect_time,
 			hdd_sta_ctx->conn_info.auth_time,
 			hdd_auth_type_str(hdd_sta_ctx->conn_info.last_auth_type),
-			hdd_dot11_mode_str(hdd_sta_ctx->conn_info.dot11mode));
+			hdd_dot11_mode_str(hdd_sta_ctx->conn_info.dot11mode),
+			hdd_curr_hw_mode_str(curr_hw_mode));
 	if (len <= 0)
 		return length;
 	length += len;
@@ -476,14 +477,6 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 				rx_bit_rate,
 				hdd_auth_type_str(conn_info->last_auth_type),
 				hdd_dot11_mode_str(conn_info->dot11mode));
-
-		if (len <= 0)
-			return length;
-
-		curr_hw_mode = ucfg_policy_mgr_find_current_hw_mode(wlan_vdev_get_psoc(link_info->vdev));
-		len = scnprintf(buf + length, buf_avail_len - length,
-				"current HW mode: %s\n",
-				hdd_curr_hw_mode_str(curr_hw_mode));
 
 		if (len <= 0)
 			return length;

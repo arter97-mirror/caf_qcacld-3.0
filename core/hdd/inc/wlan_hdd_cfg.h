@@ -121,7 +121,9 @@ struct hdd_config {
 	bool is_11k_offload_supported;
 	bool is_unit_test_framework_enabled;
 	bool disable_channel;
-
+#ifdef WLAN_FEATURE_UL_JITTER
+	bool ul_jitter_log;
+#endif
 	/* HDD converged ini items are listed below this*/
 	bool bug_on_reinit_failure;
 	bool is_ramdump_enabled;

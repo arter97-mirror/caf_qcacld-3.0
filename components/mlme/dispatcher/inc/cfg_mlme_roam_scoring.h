@@ -55,6 +55,10 @@
 #define RoamEmergency_TargetMinRSSI_max 0
 #define RoamEmergency_TargetMinRSSI_default -75
 #endif
+
+#define Aggressive_RoamCommon_Delta_min 0
+#define Aggressive_RoamCommon_Delta_max 30
+#define Aggressive_RoamCommon_Delta_default 10
 /*
  * <ini>
  * roam_score_delta_bitmap - bitmap to enable roam triggers on
@@ -131,6 +135,35 @@
 
 /*
  * <ini>
+ * Aggressive_RoamCommon_Delta  - Percentage increment in roam
+ * score value that is expected from a roaming candidate AP.
+ * @Min: 0
+ * @Max: 100
+ * @Default: 0
+ *
+ * This ini is used to provide the percentage increment value over roam
+ * score for the candidate APs so that they can be preferred over current
+ * AP for roaming.
+ * This value is applicable only when the roam scan policy is aggressive
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_AGGRESSIVE_ROAM_SCORE_DELTA CFG_INI_UINT( \
+			"Aggressive_RoamCommon_Delta", \
+			Aggressive_RoamCommon_Delta_min,\
+			Aggressive_RoamCommon_Delta_max, \
+			Aggressive_RoamCommon_Delta_default, \
+			CFG_VALUE_OR_DEFAULT, \
+			"candidate AP's percentage roam score delta")
+
+/*
+ * <ini>
  * min_roam_score_delta - Difference of roam score values between connected
  * AP and roam candidate AP.
  * @Min: 0
@@ -199,6 +232,44 @@
 			"Diff bet connected AP's and candidate AP's roam score")
 
 /*
+ * <ini>
+ * Aggressive_Roam Common_MinRoamDelta - Difference of roam score values between
+ * connected AP and roam candidate AP.
+ * @Min: 0
+ * @Max: 100
+ * @Default: 10
+ *
+ * This ini is used during CU and low rssi based aggressive roam triggers,
+ * consider AP as roam candidate only if its roam score is better than connected
+ * AP score by at least Aggressive_RoamCommon_MinRoamDelta.
+ * If user configured "Aggressive_RoamCommon_MinRoamDelta"
+ * then firmware selects roam candidate AP by considering values of both
+ * INIs.
+ * Example: If DUT is connected with AP1 and roam candidate AP2 has roam
+ * score greater than Aggressive_RoamCommon_Delta and
+ * Aggressive_Roam Common_MinRoamDelta  then only firmware will trigger roaming
+ * to AP2. This value needs to be given in percentage
+ *
+ * Related: RoamCommon_Delta
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA CFG_INI_UINT( \
+			"Aggressive_RoamCommon_MinRoamDelta", \
+			0, \
+			100, \
+			10, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Diff bet connected AP's and candidate AP's roam score")
+
+/*
+ * <ini>
+ * enable_scoring_for_roam - enable/disable scoring logic in FW for candidate
+ *
  * <ini>
  * enable_scoring_for_roam - enable/disable scoring logic in FW for candidate
  * selection during roaming
@@ -395,6 +466,8 @@
 	CFG(CFG_BMISS_ROAM_MIN_RSSI) \
 	CFG(CFG_2G_TO_5G_ROAM_MIN_RSSI) \
 	CFG(CFG_IDLE_ROAM_SCORE_DELTA) \
-	CFG(CFG_BTM_ROAM_SCORE_DELTA)
+	CFG(CFG_BTM_ROAM_SCORE_DELTA) \
+	CFG(CFG_AGGRESSIVE_ROAM_SCORE_DELTA) \
+	CFG(CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA)
 
 #endif /* __CFG_MLME_ROAM_SCORING_H */

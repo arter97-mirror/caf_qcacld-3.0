@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -60,24 +60,18 @@ void hdd_deinit_regulatory_update_event(struct hdd_context *hdd_ctx);
 
 int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy);
 
-/**
- * hdd_regulatory_deinit() - cleanup all components of regulatory
- * @hdd_ctx: HDD context
- *
- * Return: None
- */
-void hdd_regulatory_deinit(struct hdd_context *hdd_ctx);
-
 void hdd_program_country_code(struct hdd_context *hdd_ctx);
 void hdd_reset_global_reg_params(void);
 
 /**
  * hdd_send_wiphy_regd_sync_event() - sends the regulatory sync event
  * @hdd_ctx: HDD context
+ * @send_sync_event: Send regd sync event bool flag
  *
  * Return: None
  */
-void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx);
+void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx,
+				    bool send_sync_event);
 
 /**
  * hdd_reg_wait_for_country_change() - Wait for country change event
@@ -154,4 +148,16 @@ void hdd_modify_indoor_channel_state_flags(
  */
 void hdd_update_regdb_offload_config(struct hdd_context *hdd_ctx);
 
+/**
+ * hdd_remove_vlp_depriority_channels() - Removes VLP depriority
+ * channels from the channel list.
+ * @pdev: PDEV object.
+ * @ch_freq_list: Frequency list pointer.
+ * @num_channels: Number of channels pointer.
+ *
+ * Return: None
+ */
+void hdd_remove_vlp_depriority_channels(struct wlan_objmgr_pdev *pdev,
+					uint16_t *ch_freq_list,
+					uint32_t *num_channels);
 #endif

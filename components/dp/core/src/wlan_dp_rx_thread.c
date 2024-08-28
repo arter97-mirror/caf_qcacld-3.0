@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +30,7 @@
 #include "wlan_dp_main.h"
 #include "wlan_dp_public_struct.h"
 #include "wlan_dp_ucfg_api.h"
+#include "wlan_dp_resource_mgr.h"
 #include "qdf_nbuf.h"
 #include "qdf_threads.h"
 #include "qdf_net_if.h"
@@ -711,6 +712,18 @@ static int dp_rx_refill_thread_sub_loop(struct dp_rx_refill_thread *rx_thread,
 			dp_debug("shutting down (%s) pid %d",
 				 qdf_get_current_comm(), qdf_get_current_pid());
 			*shutdown = true;
+			break;
+		}
+
+		if (qdf_atomic_test_and_clear_bit(RX_RESOURCE_UPSCALE_EVENT,
+						  &rx_thread->event_flag)) {
+			wlan_dp_resource_mgr_upscale_resources(rx_thread);
+			break;
+		}
+
+		if (qdf_atomic_test_and_clear_bit(RX_RESOURCE_DOWNSCALE_EVENT,
+						  &rx_thread->event_flag)) {
+			wlan_dp_resource_mgr_downscale_resources();
 			break;
 		}
 
@@ -1504,7 +1517,6 @@ QDF_STATUS dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	uint8_t num_dp_rx_threads;
 	struct dp_pdev *pdev;
-	struct dp_soc *dp_soc;
 
 	if (qdf_unlikely(!soc)) {
 		dp_err("soc is NULL");
@@ -1532,21 +1544,18 @@ QDF_STATUS dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 	dp_ext_hdl->rx_tm_hdl.txrx_handle_cmn =
 				dp_txrx_get_cmn_hdl_frm_ext_hdl(dp_ext_hdl);
 
-	dp_soc = cdp_soc_t_to_dp_soc(soc);
-	if (wlan_cfg_is_rx_refill_buffer_pool_enabled(dp_soc->wlan_cfg_ctx)) {
-		dp_ext_hdl->refill_thread.soc = soc;
-		dp_ext_hdl->refill_thread.enabled = true;
-		qdf_status =
-			dp_rx_refill_thread_init(&dp_ext_hdl->refill_thread);
-		if (qdf_status != QDF_STATUS_SUCCESS) {
-			dp_err("Failed to initialize RX refill thread status:%d",
-			       qdf_status);
-			qdf_mem_free(dp_ext_hdl);
-			return qdf_status;
-		}
-		cdp_register_rx_refill_thread_sched_handler(soc,
-							    dp_rx_refill_thread_schedule);
+	dp_ext_hdl->refill_thread.soc = soc;
+	qdf_status =
+		dp_rx_refill_thread_init(&dp_ext_hdl->refill_thread);
+	if (qdf_status != QDF_STATUS_SUCCESS) {
+		dp_err("Failed to initialize RX refill thread status:%d",
+		       qdf_status);
+		qdf_mem_free(dp_ext_hdl);
+		return qdf_status;
 	}
+	dp_ext_hdl->refill_thread.enabled = true;
+	cdp_register_rx_refill_thread_sched_handler(soc,
+						    dp_rx_refill_thread_schedule);
 
 	num_dp_rx_threads = dp_get_rx_threads_num(soc);
 	dp_info("%d RX threads in use", num_dp_rx_threads);
@@ -1565,7 +1574,6 @@ QDF_STATUS dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 QDF_STATUS dp_txrx_deinit(ol_txrx_soc_handle soc)
 {
 	struct dp_txrx_handle *dp_ext_hdl;
-	struct dp_soc *dp_soc;
 
 	if (!soc)
 		return QDF_STATUS_E_INVAL;
@@ -1574,8 +1582,7 @@ QDF_STATUS dp_txrx_deinit(ol_txrx_soc_handle soc)
 	if (!dp_ext_hdl)
 		return QDF_STATUS_E_FAULT;
 
-	dp_soc = cdp_soc_t_to_dp_soc(soc);
-	if (wlan_cfg_is_rx_refill_buffer_pool_enabled(dp_soc->wlan_cfg_ctx)) {
+	if (dp_ext_hdl->refill_thread.enabled) {
 		dp_rx_refill_thread_deinit(&dp_ext_hdl->refill_thread);
 		dp_ext_hdl->refill_thread.soc = NULL;
 		dp_ext_hdl->refill_thread.enabled = false;

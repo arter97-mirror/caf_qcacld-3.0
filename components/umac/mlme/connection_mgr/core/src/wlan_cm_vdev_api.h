@@ -556,13 +556,13 @@ QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg);
 
 /**
  * cm_process_join_req() - Process vdev join req
- * @msg: scheduler message
+ * @join_req: join request
  *
  * Process connect request in LIM and copy all join req params.
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS cm_process_join_req(struct scheduler_msg *msg);
+QDF_STATUS cm_process_join_req(struct cm_vdev_join_req *join_req);
 
 #ifdef WLAN_FEATURE_HOST_ROAM
 /**

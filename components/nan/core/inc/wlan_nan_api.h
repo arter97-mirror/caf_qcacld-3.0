@@ -188,12 +188,32 @@ wlan_nan_get_connection_info(struct wlan_objmgr_psoc *psoc,
 			     struct policy_mgr_vdev_entry_info *conn_info);
 
 /**
+ * wlan_nan_get_disc_24g_ch_freq: Get NAN Disc 2.4GHz channel frequency
+ * @psoc: pointer to psoc object
+ *
+ * Return: NAN Disc 2.4GHz channel frequency
+ */
+qdf_freq_t wlan_nan_get_disc_24g_ch_freq(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_nan_get_disc_5g_ch_freq: Get NAN Disc 5G channel frequency
  * @psoc: pointer to psoc object
  *
  * Return: NAN Disc 5G channel frequency
  */
 uint32_t wlan_nan_get_disc_5g_ch_freq(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_nan_get_5ghz_social_ch_freq(): Get NAN 5GHz social channel
+ * @pdev: PDEV object
+ *
+ * This API returns 5745(channel-149) if it's valid as per regulatory rules
+ * and returns 5220(channel-44) otherwise.
+ *
+ * Return: NAN social channel frequency
+ */
+qdf_freq_t
+wlan_nan_get_5ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev);
 
 /**
  * wlan_nan_get_sap_conc_support: Get NAN+SAP conc support
@@ -248,6 +268,19 @@ void nan_handle_emlsr_concurrency(struct wlan_objmgr_psoc *psoc,
  * Return true if STA + SAP + NAN allowed
  */
 bool wlan_nan_is_sta_sap_nan_allowed(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_nan_sap_override_freq() - Return frequency of NAN 2GHz channel
+ * @psoc: pointer to psoc object
+ * @vdev_id: Vdev Id
+ * @chan_freq: current frequency
+ *
+ * Return: valid NAN frequency
+ */
+qdf_freq_t wlan_nan_sap_override_freq(struct wlan_objmgr_psoc *psoc,
+				      uint32_t vdev_id,
+				      qdf_freq_t chan_freq);
+
 #else /* WLAN_FEATURE_NAN */
 static inline QDF_STATUS nan_init(void)
 {
@@ -276,8 +309,20 @@ wlan_nan_get_connection_info(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_FAILURE;
 }
 
+static inline qdf_freq_t
+wlan_nan_get_disc_24g_ch_freq(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
 static inline uint32_t
 wlan_nan_get_disc_5g_ch_freq(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline
+qdf_freq_t wlan_nan_get_5ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
 {
 	return 0;
 }
@@ -315,6 +360,15 @@ bool wlan_nan_is_sta_sap_nan_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
+
+static inline
+qdf_freq_t wlan_nan_sap_override_freq(struct wlan_objmgr_psoc *psoc,
+				      uint32_t vdev_id,
+				      qdf_freq_t chan_freq)
+{
+	return chan_freq;
+}
+
 #endif /* WLAN_FEATURE_NAN */
 
 #if defined(WLAN_FEATURE_NAN) && defined(WLAN_FEATURE_11BE_MLO)

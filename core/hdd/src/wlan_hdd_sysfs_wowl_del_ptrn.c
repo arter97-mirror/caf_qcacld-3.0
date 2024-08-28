@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -55,7 +55,7 @@ __hdd_sysfs_wowl_del_ptrn_store(struct net_device *net_dev,
 	if (!buf_local)
 		return -EINVAL;
 
-	strlcpy(buf_local, buf, count);
+	strscpy(buf_local, buf, count);
 
 	buf_local[count - 1] = '\0';
 

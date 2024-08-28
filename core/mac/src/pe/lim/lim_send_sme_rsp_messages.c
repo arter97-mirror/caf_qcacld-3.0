@@ -60,6 +60,9 @@
 #include <wlan_mlo_mgr_sta.h>
 #include <spatial_reuse_api.h>
 #include <wlan_mlo_mgr_cmn.h>
+#include "wlan_mlme_public_struct.h"
+#include <wlan_mlo_mgr_link_switch.h>
+#include "wlan_policy_mgr_i.h"
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -445,6 +448,10 @@ lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 		lim_send_smps_intolerent(mac_ctx, pe_session, bcn_len, bcn_ptr);
 		lim_cm_fill_rsp_from_stads(mac_ctx, pe_session, rsp);
 		rsp->uapsd_mask = pe_session->gUapsdPerAcBitmask;
+
+		mlo_mgr_update_link_status_code(pe_session->vdev,
+						wlan_vdev_get_link_id(pe_session->vdev),
+						STATUS_SUCCESS);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -529,6 +536,12 @@ static void lim_copy_ml_partner_info(struct cm_vdev_join_rsp *rsp,
 		qdf_copy_macaddr(
 			&rsp_partner_info->partner_link_info[i].link_addr,
 			&partner_info->partner_link_info[i].link_addr);
+		rsp_partner_info->partner_link_info[i].link_status_code =
+			partner_info->partner_link_info[i].link_status_code;
+
+		mlo_mgr_update_link_status_code(pe_session->vdev,
+			partner_info->partner_link_info[i].link_id,
+			partner_info->partner_link_info[i].link_status_code);
 
 		wlan_get_chan_by_bssid_from_rnr(
 			pe_session->vdev,
@@ -659,25 +672,24 @@ lim_cm_get_fail_reason_from_result_code(tSirResultCodes result_code)
 static
 void lim_send_assoc_rsp_diag_event(struct mac_context *mac_ctx,
 				   struct pe_session *session_entry,
-				   uint16_t msg_type, uint16_t result_code)
+				   bool is_reassoc, uint16_t result_code)
 {
-	if (msg_type == eWNI_SME_REASSOC_RSP)
-		lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_REASSOC_RSP_EVENT,
-				      session_entry, result_code, 0);
-	else
-		lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_JOIN_RSP_EVENT,
-				      session_entry, result_code, 0);
+	uint16_t diag_evt_type = is_reassoc ?
+		WLAN_PE_DIAG_REASSOC_RSP_EVENT : WLAN_PE_DIAG_JOIN_RSP_EVENT;
+
+	lim_diag_event_report(mac_ctx, diag_evt_type, session_entry,
+			      result_code, 0);
 }
 #else
 static inline
 void lim_send_assoc_rsp_diag_event(struct mac_context *mac_ctx,
 				   struct pe_session *session_entry,
-				   uint16_t msg_type, uint16_t result_code)
+				   bool is_reassoc, uint16_t result_code)
 {}
 #endif
 
 void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
-				   uint16_t msg_type,
+				   bool is_reassoc,
 				   tSirResultCodes result_code,
 				   uint16_t prot_status_code,
 				   struct pe_session *session_entry,
@@ -686,11 +698,12 @@ void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
 	QDF_STATUS connect_status;
 	enum wlan_cm_connect_fail_reason fail_reason = 0;
 
-	lim_send_assoc_rsp_diag_event(mac_ctx, session_entry, msg_type,
+	lim_send_assoc_rsp_diag_event(mac_ctx, session_entry, is_reassoc,
 				      result_code);
 
-	pe_debug("Sending message: %s with reasonCode: %s",
-		 lim_msg_str(msg_type), lim_result_code_str(result_code));
+	pe_debug("Sending %s resp, with %s (%d)",
+		 is_reassoc ? "Reassoc" : "Join",
+		 lim_result_code_str(result_code), result_code);
 
 	if (result_code == eSIR_SME_SUCCESS) {
 		connect_status = QDF_STATUS_SUCCESS;
@@ -702,9 +715,7 @@ void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
 
 	return lim_cm_send_connect_rsp(mac_ctx, session_entry, NULL,
 				       fail_reason, connect_status,
-				       prot_status_code,
-				       msg_type == eWNI_SME_JOIN_RSP ?
-				       false : true);
+				       prot_status_code, is_reassoc);
 
 	/* add reassoc resp API */
 }
@@ -881,6 +892,7 @@ void lim_send_sme_disassoc_deauth_ntf(struct mac_context *mac,
 
 void lim_send_sme_disassoc_ntf(struct mac_context *mac,
 			       tSirMacAddr peerMacAddr,
+			       tSirMacAddr peerMldAddr,
 			       tSirResultCodes reasonCode,
 			       uint16_t disassocTrigger,
 			       uint16_t aid,
@@ -912,9 +924,9 @@ void lim_send_sme_disassoc_ntf(struct mac_context *mac,
 			if (session->valid &&
 			    (session->opmode == QDF_SAP_MODE)) {
 				/* Find the sta ds entry in another session */
-				sta_ds = dph_lookup_hash_entry(mac,
-						peerMacAddr, &assoc_id,
-						&session->dph.dphHashTable);
+				sta_ds = lim_get_sta_ds(mac, peerMacAddr,
+							peerMldAddr, &assoc_id,
+							session);
 				if (sta_ds)
 					break;
 			}
@@ -1237,7 +1249,6 @@ lim_send_sme_mgmt_tx_completion(struct mac_context *mac,
 
 	mgmt_tx_completion_ind->tx_complete_status = txCompleteStatus;
 
-	msg.type = eWNI_SME_MGMT_FRM_TX_COMPLETION_IND;
 	msg.bodyptr = mgmt_tx_completion_ind;
 	msg.bodyval = 0;
 
@@ -1808,16 +1819,11 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	    !policy_mgr_is_interband_mcc_supported(mac_ctx->psoc)) {
 		is_allowed = wlan_reg_is_same_band_freqs(ch_freq1, csa_freq);
 	} else if (cnx_count > 2) {
-		is_allowed =
-		policy_mgr_allow_concurrency_csa(
-			mac_ctx->psoc,
-			policy_mgr_qdf_opmode_to_pm_con_mode(mac_ctx->psoc,
-							     mode,
-							     session_entry->vdev_id),
-			csa_freq,
-			policy_mgr_get_bw(new_ch_width),
-			session_entry->vdev_id, false,
-			CSA_REASON_UNKNOWN);
+		is_allowed = policy_mgr_allow_concurrency_sta_csa(mac_ctx->psoc,
+								  wlan_vdev_get_id(session_entry->vdev),
+								  mode,
+								  csa_freq,
+								  new_ch_width);
 	}
 
 	return is_allowed;
@@ -1977,6 +1983,75 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 	return true;
 }
 
+/**
+ * lim_get_max_channel_width_from_dot11mode()- This API will get maximum
+ * channel width allowed for given dot11mode.
+ * @dot11mode: dot11 mode
+ *
+ * Return: channel width
+ */
+static enum phy_ch_width
+lim_get_max_channel_width_from_dot11mode(enum mlme_dot11_mode dot11mode)
+{
+	switch (dot11mode) {
+	case MLME_DOT11_MODE_ABG:
+	case MLME_DOT11_MODE_11A:
+	case MLME_DOT11_MODE_11B:
+	case MLME_DOT11_MODE_11G:
+	case MLME_DOT11_MODE_11G_ONLY:
+		return CH_WIDTH_20MHZ;
+	case MLME_DOT11_MODE_11N:
+	case MLME_DOT11_MODE_11N_ONLY:
+		return CH_WIDTH_40MHZ;
+	case MLME_DOT11_MODE_11AC:
+	case MLME_DOT11_MODE_11AC_ONLY:
+	case MLME_DOT11_MODE_11AX:
+	case MLME_DOT11_MODE_11AX_ONLY:
+		return CH_WIDTH_160MHZ;
+	case MLME_DOT11_MODE_11BE:
+	case MLME_DOT11_MODE_11BE_ONLY:
+	case MLME_DOT11_MODE_ALL:
+		return CH_WIDTH_320MHZ;
+	default:
+		pe_err("Invalid dot11mode %d", dot11mode);
+		break;
+	}
+
+	return CH_WIDTH_INVALID;
+}
+
+/**
+ * lim_csa_update_channel_width_for_dot11mode()- This API will get maximum
+ * channel width allowed for given dot11mode and update CSA channel width.
+ * @session_entry: Session pointer
+ * @csa_params: Pointer to CSA params
+ *
+ * Return: None
+ */
+static void lim_csa_update_channel_width_for_dot11mode(
+					struct pe_session *session_entry,
+					struct csa_offload_params *csa_params)
+{
+	enum phy_ch_width max_ch_width;
+
+	max_ch_width = lim_get_max_channel_width_from_dot11mode(
+						session_entry->dot11mode);
+
+	/* If AP wants to set in 80 + 80 BW, do not change to 160 MHz */
+	if (csa_params->new_ch_width == CH_WIDTH_80P80MHZ &&
+	    max_ch_width == CH_WIDTH_160MHZ)
+		return;
+
+	if (csa_params->new_ch_width != CH_WIDTH_5MHZ &&
+	    csa_params->new_ch_width != CH_WIDTH_10MHZ &&
+	    csa_params->new_ch_width > max_ch_width) {
+		pe_debug("Downgrade bw from %d to max supported bw %d for dot11mode %d ",
+			 csa_params->new_ch_width, max_ch_width,
+			 session_entry->dot11mode);
+		csa_params->new_ch_width = max_ch_width;
+	}
+}
+
 void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 			      struct csa_offload_params *csa_params,
 			      bool send_status)
@@ -2027,6 +2102,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	}
 
 	lim_ch_switch = &session_entry->gLimChannelSwitch;
+
+	lim_csa_update_channel_width_for_dot11mode(session_entry, csa_params);
 	ch_params.ch_width = csa_params->new_ch_width;
 
 	if (IS_DOT11_MODE_EHT(session_entry->dot11mode))
@@ -2348,6 +2425,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	lim_prepare_for11h_channel_switch(mac_ctx, session_entry);
 
 	lim_flush_bssid(mac_ctx, session_entry->bssId);
+	session_entry->cal_tpc_post_csa = true;
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 	lim_diag_event_report(mac_ctx,
@@ -2356,7 +2434,6 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 #endif
 free:
 	qdf_mem_free(csa_params);
-	session_entry->cal_tpc_post_csa = true;
 	return;
 send_event:
 	if (send_status)

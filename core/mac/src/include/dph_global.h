@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -216,6 +216,8 @@ typedef struct sDphHashNode {
 	bool recv_assoc_frm;
 	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
 	struct mlo_partner_info mlo_info;
+	struct wlan_mlo_eml_cap eml_info;
+	struct wlan_mlo_mld_cap mld_info;
 #endif
 } tDphHashNode, *tpDphHashNode;
 

@@ -29,3 +29,27 @@ QDF_STATUS ucfg_dp_flow_stats_policy(enum qca_async_stats_type type,
 {
 	return wlan_dp_stc_handle_flow_stats_policy(type, action);
 }
+
+uint32_t ucfg_dp_stc_get_logmask(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return 0;
+	}
+
+	return wlan_dp_stc_get_logmask(dp_ctx);
+}
+
+void ucfg_dp_stc_update_logmask(struct wlan_objmgr_psoc *psoc, uint32_t mask)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
+	wlan_dp_stc_update_logmask(dp_ctx, mask);
+}

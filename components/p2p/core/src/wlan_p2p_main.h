@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -213,6 +213,7 @@ void p2p_status_update(struct p2p_soc_priv_obj *p2p_soc_obj,
  * @skip_dfs_channel_p2p_search:    skip DFS Channel in case of P2P Search
  * @is_random_seq_num_enabled:      Flag to generate random sequence numbers
  * @indoor_channel_support:         support to allow GO in indoor channels
+ * @go_ignore_non_p2p_probe_req:    P2P GO ignore non-P2P probe req
  */
 struct p2p_param {
 	uint32_t go_keepalive_period;
@@ -220,6 +221,7 @@ struct p2p_param {
 	bool p2p_device_addr_admin;
 	bool is_random_seq_num_enabled;
 	bool indoor_channel_support;
+	bool go_ignore_non_p2p_probe_req;
 };
 
 /**
@@ -241,6 +243,7 @@ struct p2p_param {
  * @param:            p2p parameters to be used
  * @connection_status:Global P2P connection status
  * @mcc_quota_ev_os_if_cb:  callback to OS IF to indicate mcc quota event
+ * @mgmt_frm_registration_update: mgmt frame registration update
  */
 struct p2p_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -262,6 +265,7 @@ struct p2p_soc_priv_obj {
 #ifdef WLAN_FEATURE_MCC_QUOTA
 	mcc_quota_event_callback mcc_quota_ev_os_if_cb;
 #endif
+	uint32_t mgmt_frm_registration_update;
 };
 
 /**
@@ -626,4 +630,46 @@ QDF_STATUS
 p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_vdev *vdev);
 #endif /* WLAN_FEATURE_P2P_P2P_STA */
+
+/**
+ * p2p_set_mgmt_frm_registration_update() - Set mgmt registration update
+ * @psoc: pointer to psoc object
+ * @mgmt_frm_registration_update: mgmt frame registration update value
+ *
+ * Return: None
+ */
+void
+p2p_set_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc,
+				     uint32_t mgmt_frm_registration_update);
+
+/**
+ * p2p_get_mgmt_frm_registration_update() - Get mgmt registration update
+ * @psoc: pointer to psoc object
+ *
+ * Return: uint32_t
+ */
+uint32_t
+p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * p2p_parse_assoc_ie_for_device_info() - This function finds P2P interface
+ * address from assocaition IE
+ * @assoc_ie: Association request IE
+ * @assoc_ie_len: Association IE length
+ *
+ * Return: pointer to P2P address
+ */
+const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
+						  uint32_t assoc_ie_len);
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * p2p_send_usd_params() - Sent USD parameters to target
+ * @psoc: pointer to PSOC object
+ * @param: pointer to USD attributes parameters structure
+ *
+ * Return: QDF status
+ */
+QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+			       struct p2p_usd_attr_params *param);
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif /* _WLAN_P2P_MAIN_H_ */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -466,8 +466,6 @@ static int __wlan_hdd_open_ll_stats_debugfs(struct net_device *net_dev)
 	struct hdd_context *hdd_ctx;
 	int errno;
 
-	hdd_enter();
-
 	errno = hdd_validate_adapter(adapter);
 	if (errno)
 		return errno;
@@ -487,15 +485,10 @@ static int __wlan_hdd_open_ll_stats_debugfs(struct net_device *net_dev)
 	if (errno)
 		goto free_buf;
 
-	hdd_exit();
-
 	return 0;
 
 free_buf:
 	wlan_hdd_llstats_free_buf();
-
-	hdd_exit();
-
 	return errno;
 }
 

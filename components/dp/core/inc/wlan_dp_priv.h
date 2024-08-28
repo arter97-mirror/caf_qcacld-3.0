@@ -40,6 +40,7 @@
 #include "htc_api.h"
 #include "wlan_dp_wfds.h"
 #include "wlan_dp_load_balance.h"
+#include "wlan_dp_resource_mgr.h"
 
 #ifndef NUM_TX_RX_HISTOGRAM
 #define NUM_TX_RX_HISTOGRAM 128
@@ -49,30 +50,13 @@
 
 #if defined(WLAN_FEATURE_DP_BUS_BANDWIDTH) && defined(FEATURE_RUNTIME_PM)
 /**
- * enum dp_rtpm_tput_policy_state - states to track runtime_pm tput policy
- * @DP_RTPM_TPUT_POLICY_STATE_INVALID: invalid state
- * @DP_RTPM_TPUT_POLICY_STATE_REQUIRED: state indicating runtime_pm is required
- * @DP_RTPM_TPUT_POLICY_STATE_NOT_REQUIRED: state indicating runtime_pm is NOT
- * required
- */
-enum dp_rtpm_tput_policy_state {
-	DP_RTPM_TPUT_POLICY_STATE_INVALID,
-	DP_RTPM_TPUT_POLICY_STATE_REQUIRED,
-	DP_RTPM_TPUT_POLICY_STATE_NOT_REQUIRED
-};
-
-/**
  * struct dp_rtpm_tput_policy_context - RTPM throughput policy context
- * @curr_state: current state of throughput policy (RTPM require or not)
- * @wake_lock: wakelock for QDF wake_lock acquire/release APIs
  * @rtpm_lock: lock use for QDF rutime PM prevent/allow APIs
  * @high_tput_vote: atomic variable to keep track of voting
  */
 struct dp_rtpm_tput_policy_context {
-	enum dp_rtpm_tput_policy_state curr_state;
-	qdf_wake_lock_t wake_lock;
 	qdf_runtime_lock_t rtpm_lock;
-	qdf_atomic_t high_tput_vote;
+	unsigned long high_tput_vote;
 };
 #endif
 
@@ -469,8 +453,8 @@ struct fisa_pkt_hist {
  * @num_pkts: number of packets received on this flow
  * @num_pkts_prev: number of packets received on this flow previously
  * @avg_pkts_per_sec: average packets per second received on this flow
- * @last_pkt_rcvd_tstamp: last packet received timestamp on this flow
- * @last_avg_cal_tstamp: last average calculated timestamp for this flow
+ * @last_pkt_rcvd_time: last packet received time on this flow in ns
+ * @last_avg_cal_time: last average calculated time for this flow in ns
  * @elig_for_balance: flow is eligible for flow balance or not
  * @track_flow_stats: flag to indicate if this flow is to be tracked
  * @selected_to_sample: flag to indicate flow has been selected to sample
@@ -534,8 +518,8 @@ struct dp_fisa_rx_sw_ft {
 #ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
 	uint64_t num_pkts_prev;
 	uint32_t avg_pkts_per_sec;
-	qdf_time_t last_pkt_rcvd_tstamp;
-	qdf_time_t last_avg_cal_tstamp;
+	qdf_time_t last_pkt_rcvd_time;
+	qdf_time_t last_avg_cal_time;
 	bool elig_for_balance;
 #endif
 	uint8_t track_flow_stats;
@@ -676,6 +660,10 @@ struct dp_rx_fst {
  *		     particular rx_context
  * @fisa_force_flushed: Flag to indicate FISA flow has been flushed for a
  *			particular rx_context
+ * @route_to_latency_sensitive_reo: Enable rx routing to
+ *				    latency sensitive reo2sw ring
+ * @runtime_disable_rx_fisa_aggr: Runtime disable FISA aggregation but allows
+ *				  flow entry addition to FSE
  * @runtime_disable_rx_thread: Runtime Rx thread flag
  * @rx_stack: function pointer Rx packet handover
  * @tx_fn: function pointer to send Tx packet
@@ -749,6 +737,10 @@ struct wlan_dp_intf {
 	 */
 	uint8_t fisa_disallowed[MAX_REO_DEST_RINGS];
 	uint8_t fisa_force_flushed[MAX_REO_DEST_RINGS];
+#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
+	bool route_to_latency_sensitive_reo;
+#endif
+	bool runtime_disable_rx_fisa_aggr;
 #endif
 
 	bool runtime_disable_rx_thread;
@@ -930,6 +922,8 @@ struct wlan_dp_stc;
  * @dp_stc: STC context
  * @spm_ctx: Servicy policy manager context
  * @gl_flow_recs: Global Tx flow table for all dp_interfaces
+ * @rsrc_mgr_ctx: DP resource manager context reference
+ * @monitor_flag: Monitor interface flags configured when add Mon interface
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1050,6 +1044,18 @@ struct wlan_dp_psoc_context {
 	struct wlan_dp_spm_context *spm_ctx;
 	struct wlan_dp_spm_flow_info *gl_flow_recs;
 #endif
+	struct wlan_dp_resource_mgr_ctx *rsrc_mgr_ctx;
+	uint32_t monitor_flag;
+};
+
+/**
+ * struct wlan_dp_peer_priv_context - DP peer priv context
+ * @sta_info: STA info per peer
+ * @vote_node: Resource vote node context
+ */
+struct wlan_dp_peer_priv_context {
+	struct wlan_dp_sta_info sta_info;
+	struct wlan_dp_resource_vote_node *vote_node;
 };
 
 #ifdef WLAN_DP_PROFILE_SUPPORT

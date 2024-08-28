@@ -118,6 +118,7 @@ struct csr_channel {
 struct roam_cmd {
 	enum csr_roam_reason roamReason;
 	tSirMacAddr peerMac;
+	struct qdf_mac_addr peer_mld_addr;
 	enum wlan_reason_code reason;
 };
 

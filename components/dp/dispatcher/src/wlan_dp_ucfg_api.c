@@ -47,6 +47,9 @@
 #ifdef WLAN_SUPPORT_LAPB
 #include "wlan_dp_lapb_flow.h"
 #endif
+#ifdef WLAN_SUPPORT_RX_FISA
+#include <wlan_dp_fisa_rx.h>
+#endif
 #include "cdp_txrx_ctrl.h"
 #include "wlan_dp_load_balance.h"
 #include "wlan_dp_flow_balance.h"
@@ -877,6 +880,7 @@ void ucfg_dp_update_dhcp_state_on_disassoc(struct wlan_objmgr_vdev *vdev,
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 	struct wlan_objmgr_peer *peer;
+	struct wlan_dp_peer_priv_context *priv_ctx;
 	struct wlan_dp_sta_info *stainfo;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -895,11 +899,12 @@ void ucfg_dp_update_dhcp_state_on_disassoc(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	stainfo = dp_get_peer_priv_obj(peer);
-	if (!stainfo) {
+	priv_ctx = dp_get_peer_priv_obj(peer);
+	if (!priv_ctx) {
 		wlan_objmgr_peer_release_ref(peer, WLAN_DP_ID);
 		return;
 	}
+	stainfo = &priv_ctx->sta_info;
 
 	/* Send DHCP STOP indication to FW */
 	stainfo->dhcp_phase = DHCP_PHASE_ACK;
@@ -1273,6 +1278,7 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
 		txrx_ops.rx.rx_flush = NULL;
+		txrx_ops.rx.rx_gro_flush = dp_rx_gro_flush_cbk;
 	}
 
 	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
@@ -1329,6 +1335,7 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 		txrx_ops.rx.rx = dp_rx_packet_cbk;
 		txrx_ops.rx.rx_stack = NULL;
 		txrx_ops.rx.rx_flush = NULL;
+		txrx_ops.rx.rx_gro_flush = dp_rx_gro_flush_cbk;
 	}
 
 	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
@@ -1457,9 +1464,11 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 		txrx_ops->rx.rx = dp_softap_rx_packet_cbk;
 		txrx_ops->rx.rx_stack = NULL;
 		txrx_ops->rx.rx_flush = NULL;
+		txrx_ops->rx.rx_gro_flush = dp_rx_gro_flush_cbk;
 	}
 
-	if (wlan_dp_fb_enabled(dp_intf->dp_ctx) &&
+	if ((wlan_dp_fb_enabled(dp_intf->dp_ctx) ||
+	     wlan_dp_rx_is_latency_sensitive_reo_enabled()) &&
 	    wlan_dp_cfg_is_rx_fisa_enabled(&dp_intf->dp_ctx->dp_cfg) &&
 	    dp_intf->device_mode != QDF_MONITOR_MODE) {
 		dp_debug("FISA feature enabled");
@@ -2664,6 +2673,98 @@ void ucfg_dp_runtime_disable_rx_thread(struct wlan_objmgr_vdev *vdev,
 				       bool value)
 {
 	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	if (!dp_link) {
+		dp_err("Unable to get DP link");
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (qdf_unlikely(!dp_intf))
+		return;
+
+	dp_ctx = dp_intf->dp_ctx;
+	if (qdf_unlikely(!dp_ctx))
+		return;
+
+	if (!dp_ctx->enable_dp_rx_threads) {
+		dp_info("rx_thread is not enabled");
+		return;
+	}
+
+	qdf_atomic_inc(&dp_intf->num_active_task);
+
+	if (dp_intf->runtime_disable_rx_thread != value) {
+		dp_intf->runtime_disable_rx_thread = value;
+		dp_txrx_flush_pkts_by_vdev_id(soc, dp_link->link_id);
+	}
+
+	qdf_atomic_dec(&dp_intf->num_active_task);
+}
+
+#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
+static void dp_flush_fisa_entries_by_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
+	struct wlan_dp_psoc_context *dp_ctx;
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	if (qdf_unlikely(!soc))
+		return;
+
+	dp_ctx = dp_intf->dp_ctx;
+	if (qdf_unlikely(!dp_ctx))
+		return;
+
+	qdf_atomic_inc(&dp_intf->num_active_task);
+
+	/* do fisa flush for this vdev */
+	if (wlan_dp_cfg_is_rx_fisa_enabled(&dp_ctx->dp_cfg))
+		wlan_dp_rx_fisa_flush_by_vdev_id((struct dp_soc *)soc,
+						 dp_link->link_id);
+
+	qdf_atomic_dec(&dp_intf->num_active_task);
+}
+
+void ucfg_dp_fisa_route_to_latency_sensitive_reo(struct wlan_objmgr_vdev *vdev,
+						 bool value)
+{
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	if (!dp_link) {
+		dp_err("Unable to get DP link");
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (qdf_unlikely(!dp_intf))
+		return;
+
+	dp_ctx = dp_intf->dp_ctx;
+	if (qdf_unlikely(!dp_ctx))
+		return;
+
+	if (dp_intf->route_to_latency_sensitive_reo != value) {
+		if (!dp_is_fisa_in_cmem(dp_ctx)) {
+			dp_err("lsr feature not supported");
+			return;
+		}
+
+		dp_intf->route_to_latency_sensitive_reo = value;
+		dp_flush_fisa_entries_by_vdev(vdev);
+	}
+}
+
+void ucfg_dp_runtime_disable_rx_fisa_aggr(struct wlan_objmgr_vdev *vdev,
+					  bool value)
+{
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
 	struct wlan_dp_intf *dp_intf;
 
 	if (!dp_link) {
@@ -2672,8 +2773,21 @@ void ucfg_dp_runtime_disable_rx_thread(struct wlan_objmgr_vdev *vdev,
 	}
 
 	dp_intf = dp_link->dp_intf;
-	dp_intf->runtime_disable_rx_thread = value;
+
+	if (dp_intf->runtime_disable_rx_fisa_aggr != value)
+		dp_intf->runtime_disable_rx_fisa_aggr = value;
 }
+#else
+void ucfg_dp_fisa_route_to_latency_sensitive_reo(struct wlan_objmgr_vdev *vdev,
+						 bool value)
+{
+}
+
+void ucfg_dp_runtime_disable_rx_fisa_aggr(struct wlan_objmgr_vdev *vdev,
+					  bool value)
+{
+}
+#endif
 
 bool ucfg_dp_get_napi_enabled(struct wlan_objmgr_psoc *psoc)
 {
@@ -3130,11 +3244,31 @@ void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags)
 		return;
 	}
 
+	dp_ctx->monitor_flag = flags;
 	val.cdp_monitor_flag = flags;
 	status = cdp_txrx_set_psoc_param(dp_ctx->cdp_soc,
 					 CDP_MONITOR_FLAG, val);
 	if (QDF_IS_STATUS_ERROR(status))
 		dp_err("Failed to set flag %d status %d", flags, status);
+}
+
+void ucfg_dp_recover_mon_conf_flags(struct wlan_objmgr_psoc *psoc)
+{
+	cdp_config_param_type val;
+	QDF_STATUS status;
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx) {
+		dp_err("Failed to set flag dp_ctx NULL");
+		return;
+	}
+
+	val.cdp_monitor_flag = dp_ctx->monitor_flag;
+	status = cdp_txrx_set_psoc_param(dp_ctx->cdp_soc,
+					 CDP_MONITOR_FLAG, val);
+	if (QDF_IS_STATUS_ERROR(status))
+		dp_err("Failed to set flag %d status %d",
+		       dp_ctx->monitor_flag, status);
 }
 
 void
@@ -3151,4 +3285,16 @@ ucfg_dp_rx_aggr_dis_req(struct wlan_objmgr_vdev *vdev,
 	}
 
 	wlan_dp_rx_aggr_dis_req(dp_link->dp_intf, id, disable);
+}
+
+bool ucfg_dp_ipa_ctrl_debug_supported(struct wlan_objmgr_psoc *psoc)
+{
+	uint8_t is_ipa_ctrl_debug_supported =
+		cfg_get(psoc, CFG_DP_IPA_DEBUG_ENABLE);
+
+	if (is_ipa_ctrl_debug_supported ==
+		       IPA_DEBUG_OPT_DP_CTRL)
+		return true;
+
+	return false;
 }

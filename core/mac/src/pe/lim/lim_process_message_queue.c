@@ -544,8 +544,6 @@ static bool def_msg_decision(struct mac_context *mac_ctx,
 		    (lim_msg->type != WMA_SET_STA_BCASTKEY_RSP) &&
 		    (lim_msg->type != WMA_AGGR_QOS_RSP) &&
 		    (lim_msg->type != WMA_SET_MIMOPS_RSP) &&
-		    (lim_msg->type != WMA_SWITCH_CHANNEL_RSP) &&
-		    (lim_msg->type != WMA_P2P_NOA_ATTR_IND) &&
 		    (lim_msg->type != WMA_ADD_TS_RSP) &&
 		    /*
 		     * LIM won't process any defer queue commands if gLimAddtsSent is
@@ -1347,16 +1345,10 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 		    (fc.subType != SIR_MAC_MGMT_PROBE_REQ) &&
 		    (fc.subType != SIR_MAC_MGMT_PROBE_RSP) &&
 		    (fc.subType != SIR_MAC_MGMT_BEACON) &&
-		    (fc.subType != SIR_MAC_MGMT_ACTION)) {
-			pe_debug("RX MGMT - Type %hu, SubType %hu, seq num[%d]",
-				 fc.type, fc.subType,
-				 ((pHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET) |
-				 pHdr->seqControl.seqNumLo));
-			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE,
-					   QDF_TRACE_LEVEL_DEBUG, pHdr,
-					   WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo)
-					   + SIR_MAC_HDR_LEN_3A);
-		}
+		    (fc.subType != SIR_MAC_MGMT_ACTION))
+			mgmt_txrx_frame_hex_dump((uint8_t *)pHdr,
+					 WMA_GET_RX_MPDU_LEN(pRxPacketInfo),
+					 false);
 	}
 
 #ifdef FEATURE_WLAN_EXTSCAN
@@ -1509,16 +1501,17 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 			break;
 
 		case SIR_MAC_MGMT_ACTION:
+			pe_debug("RX MGMT - Type %hu, SubType %hu, seq num[%d]",
+				 fc.type, fc.subType,
+				 ((pHdr->seqControl.seqNumHi <<
+				   HIGH_SEQ_NUM_OFFSET) |
+				  pHdr->seqControl.seqNumLo));
 			if (!pe_session)
 				lim_process_action_frame_no_session(mac,
 								    pRxPacketInfo);
 			else {
 				if (mac->mlme_cfg->gen.debug_packet_log &
 				    DEBUG_PKTLOG_TYPE_ACTION) {
-					pe_debug("RX MGMT - Type %hu, SubType %hu, seq num[%d]",
-						 fc.type, fc.subType,
-						 ((pHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET) |
-						 pHdr->seqControl.seqNumLo));
 					QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE,
 							   QDF_TRACE_LEVEL_DEBUG,
 							   pHdr,
@@ -1713,8 +1706,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		 * and when crash happens we loose critical trace logs
 		 * if these are also logged
 		 */
-		if (msg->type != SIR_BB_XPORT_MGMT_MSG &&
-		    msg->type != WMA_RX_SCAN_EVENT)
+		if (msg->type != SIR_BB_XPORT_MGMT_MSG)
 			MTRACE(mac_trace_msg_rx(mac_ctx, NO_SESSION,
 				LIM_TRACE_MAKE_RXMSG(msg->type,
 				LIM_MSG_PROCESSED)));
@@ -1786,7 +1778,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_TDLS_SEND_MGMT_REQ:
 	case eWNI_SME_TDLS_ADD_STA_REQ:
 	case eWNI_SME_TDLS_DEL_STA_REQ:
-	case eWNI_SME_TDLS_LINK_ESTABLISH_REQ:
 #endif
 	case eWNI_SME_SET_HW_MODE_REQ:
 	case eWNI_SME_SET_DUAL_MAC_CFG_REQ:
@@ -1803,8 +1794,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_PDEV_SET_HT_VHT_IE:
 	case eWNI_SME_SET_VDEV_IES_PER_BAND:
 	case eWNI_SME_SYS_READY_IND:
-	case eWNI_SME_JOIN_REQ:
-	case eWNI_SME_REASSOC_REQ:
 	case eWNI_SME_START_BSS_REQ:
 	case eWNI_SME_STOP_BSS_REQ:
 	case eWNI_SME_SWITCH_CHL_IND:
@@ -1978,15 +1967,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 			msg->bodyptr = NULL;
 		}
 		break;
-	case SIR_LIM_ADDR2_MISS_IND:
-		pe_err(
-			FL("Addr2 mismatch interrupt received %X"), msg->type);
-		/* message from HAL indicating addr2 mismatch interrupt occurred
-		 * msg->bodyptr contains only pointer to 48-bit addr2 field
-		 */
-		qdf_mem_free((void *)(msg->bodyptr));
-		msg->bodyptr = NULL;
-		break;
 	case WMA_AGGR_QOS_RSP:
 		lim_process_ft_aggr_qos_rsp(mac_ctx, msg);
 		break;
@@ -2155,9 +2135,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		break;
 	case CM_BSS_PEER_CREATE_REQ:
 		cm_process_peer_create(msg);
-		break;
-	case CM_CONNECT_REQ:
-		cm_process_join_req(msg);
 		break;
 	case CM_REASSOC_REQ:
 		cm_process_reassoc_req(msg);

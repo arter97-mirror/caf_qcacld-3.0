@@ -777,6 +777,24 @@ ucfg_cm_roam_stats_info_put(struct enhance_roam_info *roam_info)
 {
 	qdf_mem_free(roam_info);
 }
+
+/**
+ * ucfg_cm_roam_info_get() - get vdev roam info
+ *
+ * @vdev: pointer to vdev
+ * @roam_info: pointer to buffer to copy roam stats info
+ * @idx: index of roam stats cache buffer
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_cm_roam_info_get(struct wlan_objmgr_vdev *vdev,
+		      struct enhance_roam_info **roam_info,
+		      uint8_t idx)
+{
+	return wlan_cm_roam_info_get(vdev, roam_info, idx);
+}
+
 #else
 static inline QDF_STATUS
 ucfg_cm_roam_stats_info_get(struct wlan_objmgr_vdev *vdev,

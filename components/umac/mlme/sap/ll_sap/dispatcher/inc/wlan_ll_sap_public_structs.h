@@ -64,6 +64,7 @@ enum bearer_switch_status {
  * @BEARER_SWITCH_REQ_CSA: Bearer switch requester is CSA
  * @BEARER_SWITCH_REQ_FW: Bearer switch requester is FW
  * @BEARER_SWITCH_REQ_P2P_GO: Bearer switch requester is P2P_GO
+ * @BEARER_SWITCH_REQ_ACS: Bearer switch requester is ACS
  * @BEARER_SWITCH_REQ_MAX: Indicates MAX bearer switch requester
  */
 enum bearer_switch_req_source {
@@ -71,6 +72,7 @@ enum bearer_switch_req_source {
 	BEARER_SWITCH_REQ_CSA,
 	BEARER_SWITCH_REQ_FW,
 	BEARER_SWITCH_REQ_P2P_GO,
+	BEARER_SWITCH_REQ_ACS,
 	BEARER_SWITCH_REQ_MAX,
 };
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,6 +27,7 @@
 #include "target_if_p2p.h"
 #include "target_if_p2p_mcc_quota.h"
 #include "init_deinit_lmac.h"
+#include "wmi_unified_p2p_api.h"
 
 static inline struct wlan_lmac_if_p2p_rx_ops *
 target_if_psoc_get_p2p_rx_ops(struct wlan_objmgr_psoc *psoc)
@@ -482,3 +483,18 @@ void target_if_p2p_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	/* register P2P listen offload callbacks */
 	target_if_p2p_lo_register_tx_ops(p2p_tx_ops);
 }
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+QDF_STATUS target_if_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+					 struct p2p_usd_attr_params *param)
+{
+	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
+
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return wmi_unified_send_p2p_usd_req_cmd(wmi_handle, param);
+}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

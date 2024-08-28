@@ -735,6 +735,7 @@ struct wlan_dp_stc_burst_samples {
 #define WLAN_DP_TXRX_SAMPLES_READY BIT(0)
 #define WLAN_DP_BURST_SAMPLES_READY BIT(1)
 #define WLAN_DP_FLOW_CLASSIFIED BIT(2)
+#define WLAN_DP_LOG_ENABLE BIT(3)
 
 /*
  * struct wlan_dp_stc_flow_samples - Flow samples

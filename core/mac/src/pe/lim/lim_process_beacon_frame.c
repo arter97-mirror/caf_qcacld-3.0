@@ -185,25 +185,7 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 			return;
 		}
 
-		if (csa_ie) {
-			csa_param.channel = csa_ie->newchannel;
-			csa_param.csa_chan_freq = wlan_reg_legacy_chan_to_freq(
-						pdev, csa_ie->newchannel);
-			if (!csa_param.csa_chan_freq) {
-				pe_nofl_rl_debug("invalid freq from csa ie newchannel %d link %d",
-						 csa_ie->newchannel,
-						 link_id);
-				return;
-			}
-			csa_param.switch_mode = csa_ie->switchmode;
-			csa_param.ies_present_flag |= MLME_CSA_IE_PRESENT;
-			mlo_sta_handle_csa_standby_link(mlo_ctx, link_id,
-							&csa_param, vdev);
-
-			if (!is_sta_csa_synced)
-				mlo_sta_csa_save_params(mlo_ctx, link_id,
-							&csa_param);
-		} else if (xcsa_ie) {
+		if (xcsa_ie) {
 			csa_param.channel = xcsa_ie->newchannel;
 			csa_param.switch_mode = xcsa_ie->switchmode;
 			csa_param.new_op_class = xcsa_ie->newClass;
@@ -221,10 +203,44 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 						 xcsa_ie->newchannel,
 						 link_id);
 				return;
+			} else if (wlan_reg_is_disable_for_pwrmode(
+						pdev, csa_param.csa_chan_freq,
+						REG_CURRENT_PWR_MODE)) {
+				pe_nofl_rl_debug("reg disable freq %d from xcsa ie newchannel %d link %d",
+						 csa_param.csa_chan_freq,
+						 xcsa_ie->newchannel,
+						 link_id);
+				return;
 			}
 			csa_param.ies_present_flag |= MLME_XCSA_IE_PRESENT;
 			mlo_sta_handle_csa_standby_link(mlo_ctx, link_id,
 							&csa_param, vdev);
+			if (!is_sta_csa_synced)
+				mlo_sta_csa_save_params(mlo_ctx, link_id,
+							&csa_param);
+		} else if (csa_ie) {
+			csa_param.channel = csa_ie->newchannel;
+			csa_param.csa_chan_freq = wlan_reg_legacy_chan_to_freq(
+						pdev, csa_ie->newchannel);
+			if (!csa_param.csa_chan_freq) {
+				pe_nofl_rl_debug("invalid freq from csa ie newchannel %d link %d",
+						 csa_ie->newchannel,
+						 link_id);
+				return;
+			} else if (wlan_reg_is_disable_for_pwrmode(
+						pdev, csa_param.csa_chan_freq,
+						REG_CURRENT_PWR_MODE)) {
+				pe_nofl_rl_debug("reg disable freq %d from csa ie newchannel %d link %d",
+						 csa_param.csa_chan_freq,
+						 csa_ie->newchannel,
+						 link_id);
+				return;
+			}
+			csa_param.switch_mode = csa_ie->switchmode;
+			csa_param.ies_present_flag |= MLME_CSA_IE_PRESENT;
+			mlo_sta_handle_csa_standby_link(mlo_ctx, link_id,
+							&csa_param, vdev);
+
 			if (!is_sta_csa_synced)
 				mlo_sta_csa_save_params(mlo_ctx, link_id,
 							&csa_param);
@@ -621,7 +637,9 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			qdf_mem_copy(session->beacon,
 				WMA_GET_RX_MAC_HEADER(rx_pkt_info),
 				session->bcnLen);
-
+		mgmt_txrx_frame_hex_dump((uint8_t *)mac_hdr,
+					 WMA_GET_RX_MPDU_LEN(rx_pkt_info),
+					 false);
 		lim_check_and_announce_join_success(mac_ctx, bcn_ptr,
 				mac_hdr, session);
 	}

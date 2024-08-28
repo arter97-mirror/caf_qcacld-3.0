@@ -201,6 +201,8 @@
 
 #define policy_mgr_rl_debug(params...) \
 	QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_POLICY_MGR, params)
+#define policy_mgr_rl_nofl_debug(params...) \
+	QDF_TRACE_DEBUG_RL_NO_FL(QDF_MODULE_ID_POLICY_MGR, params)
 
 #define PM_CONC_CONNECTION_LIST_VALID_INDEX(index) \
 		((MAX_NUMBER_OF_CONC_CONNECTIONS > index) && \

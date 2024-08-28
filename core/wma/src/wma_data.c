@@ -1586,108 +1586,6 @@ int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
 
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
 
-#if defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL)
-
-/**
- * wma_set_peer_rate_report_condition -
- *                    this function set peer rate report
- *                    condition info to firmware.
- * @handle:	Handle of WMA
- * @config:	Bad peer configuration from SIR module
- *
- * It is a wrapper function to sent WMI_PEER_SET_RATE_REPORT_CONDITION_CMDID
- * to the firmware\target. If the command sent to firmware failed, free the
- * buffer that allocated.
- *
- * Return: QDF_STATUS based on values sent to firmware
- */
-static
-QDF_STATUS wma_set_peer_rate_report_condition(WMA_HANDLE handle,
-			struct t_bad_peer_txtcl_config *config)
-{
-	tp_wma_handle wma_handle = (tp_wma_handle)handle;
-	struct wmi_peer_rate_report_params rate_report_params = {0};
-	u_int32_t i, j;
-
-	rate_report_params.rate_report_enable = config->enable;
-	rate_report_params.backoff_time = config->tgt_backoff;
-	rate_report_params.timer_period = config->tgt_report_prd;
-	for (i = 0; i < WMI_PEER_RATE_REPORT_COND_MAX_NUM; i++) {
-		rate_report_params.report_per_phy[i].cond_flags =
-			config->threshold[i].cond;
-		rate_report_params.report_per_phy[i].delta.delta_min  =
-			config->threshold[i].delta;
-		rate_report_params.report_per_phy[i].delta.percent =
-			config->threshold[i].percentage;
-		for (j = 0; j < WMI_MAX_NUM_OF_RATE_THRESH; j++) {
-			rate_report_params.report_per_phy[i].
-				report_rate_threshold[j] =
-					config->threshold[i].thresh[j];
-		}
-	}
-
-	return wmi_unified_peer_rate_report_cmd(wma_handle->wmi_handle,
-						&rate_report_params);
-}
-
-/**
- * wma_process_init_bad_peer_tx_ctl_info -
- *                this function to initialize peer rate report config info.
- * @handle:	Handle of WMA
- * @config:	Bad peer configuration from SIR module
- *
- * This function initializes the bad peer tx control data structure in WMA,
- * sends down the initial configuration to the firmware and configures
- * the peer status update setting in the tx_rx module.
- *
- * Return: QDF_STATUS based on procedure status
- */
-
-QDF_STATUS wma_process_init_bad_peer_tx_ctl_info(tp_wma_handle wma,
-					struct t_bad_peer_txtcl_config *config)
-{
-	/* Parameter sanity check */
-	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-
-	if (!wma || !config) {
-		wma_err("Invalid input");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	wma_debug("enable %d period %d txq limit %d\n",
-		 config->enable,
-		 config->period,
-		 config->txq_limit);
-
-	/* Only need to initialize the setting
-	 * when the feature is enabled
-	 */
-	if (config->enable) {
-		int i = 0;
-
-		cdp_bad_peer_txctl_set_setting(soc,
-					WMI_PDEV_ID_SOC,
-					config->enable,
-					config->period,
-					config->txq_limit);
-
-		for (i = 0; i < WLAN_WMA_IEEE80211_MAX_LEVEL; i++) {
-			u_int32_t threshold, limit;
-
-			threshold = config->threshold[i].thresh[0];
-			limit =	config->threshold[i].txlimit;
-			cdp_bad_peer_txctl_update_threshold(soc,
-						WMI_PDEV_ID_SOC,
-						i,
-						threshold,
-						limit);
-		}
-	}
-
-	return wma_set_peer_rate_report_condition(wma, config);
-}
-#endif /* defined(CONFIG_HL_SUPPORT) && defined(QCA_BAD_PEER_TX_FLOW_CL) */
-
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 /**
  * wma_update_thermal_mitigation_to_fw - update thermal mitigation to fw
@@ -2734,31 +2632,16 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	}
 
 	if (pFc->type == WLAN_FC0_TYPE_MGMT) {
-		if ((mac->mlme_cfg->gen.debug_packet_log &
+		if (((mac->mlme_cfg->gen.debug_packet_log &
 		    DEBUG_PKTLOG_TYPE_MGMT) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_REQ) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_RSP) &&
-		    (pFc->subType != SIR_MAC_MGMT_ACTION)) {
-			wma_debug("TX MGMT - Type %hu, SubType %hu seq_num[%d]",
-				  pFc->type, pFc->subType,
-				  ((mHdr->seqControl.seqNumHi << 4) |
-				  mHdr->seqControl.seqNumLo));
-			qdf_trace_hex_dump(QDF_MODULE_ID_WMA,
-					   QDF_TRACE_LEVEL_DEBUG, pData,
-					   frmLen);
-		} else if ((mac->mlme_cfg->gen.debug_packet_log &
-			   DEBUG_PKTLOG_TYPE_ACTION) &&
-			   (pFc->subType == SIR_MAC_MGMT_ACTION)) {
-			wma_debug("TX MGMT - Type %hu, SubType %hu seq_num[%d]",
-				  pFc->type, pFc->subType,
-				 ((mHdr->seqControl.seqNumHi << 4) |
-				 mHdr->seqControl.seqNumLo));
-			qdf_trace_hex_dump(QDF_MODULE_ID_WMA,
-					   QDF_TRACE_LEVEL_DEBUG, pData,
-					   frmLen);
-		}
+		    (pFc->subType != SIR_MAC_MGMT_ACTION)) ||
+		    ((mac->mlme_cfg->gen.debug_packet_log &
+		      DEBUG_PKTLOG_TYPE_ACTION) &&
+		     (pFc->subType == SIR_MAC_MGMT_ACTION)))
+			mgmt_txrx_frame_hex_dump(pData, frmLen, true);
 	}
-
 	if (wlan_reg_is_5ghz_ch_freq(wma_handle->interfaces[vdev_id].ch_freq))
 		is_5g = true;
 

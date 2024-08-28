@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -208,28 +208,70 @@ void lim_process_gen_probe_rsp_frame(struct mac_context *mac_ctx,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static
-void lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
-				 struct pe_session *session_entry,
-				 struct qdf_mac_addr *mac_addr,
-				 tpSirProbeRespBeacon probe_rsp)
+static QDF_STATUS
+lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
+			    struct pe_session *session_entry,
+			    struct qdf_mac_addr *mac_addr,
+			    tpSirProbeRespBeacon probe_rsp,
+			    uint8_t *probe_rsp_frm,
+			    uint32_t probe_rsp_len,
+			    int8_t rssi,
+			    uint8_t snr,
+			    uint32_t tsf_delta)
 {
+	QDF_STATUS status;
+	struct mlo_link_info *link_info;
+
 	if (!(session_entry->lim_join_req &&
-	      session_entry->lim_join_req->is_ml_probe_req_sent &&
-	      probe_rsp->mlo_ie.mlo_ie_present))
-		return;
+	      session_entry->lim_join_req->is_ml_probe_req_sent))
+		return QDF_STATUS_SUCCESS;
+
+	status = lim_add_bcn_probe(session_entry->vdev,
+				   probe_rsp_frm,
+				   probe_rsp_len,
+				   probe_rsp->chan_freq, rssi,
+				   snr,
+				   tsf_delta);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("failed to add assoc link probe rsp %d freq %d", status,
+		       probe_rsp->chan_freq);
 
 	lim_update_mlo_mgr_info(mac_ctx, session_entry->vdev, mac_addr,
 				session_entry->lim_join_req->assoc_link_id,
 				probe_rsp->chan_freq);
+
+	link_info = mlo_mgr_get_ap_link_by_link_id(
+			session_entry->vdev->mlo_dev_ctx,
+			session_entry->lim_join_req->assoc_link_id);
+	if (!link_info) {
+		pe_err("fail to get link info for link id %d",
+		       session_entry->lim_join_req->assoc_link_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!link_info->link_chan_info ||
+	    !link_info->link_chan_info->ch_freq) {
+		pe_err("fail to update ch freq for link id %d, freq %d",
+		       session_entry->lim_join_req->assoc_link_id,
+		       probe_rsp->chan_freq);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 #else
-static inline
-void lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
-				 struct pe_session *session_entry,
-				 struct qdf_mac_addr *mac_addr,
-				 tpSirProbeRespBeacon probe_rsp)
+static inline QDF_STATUS
+lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
+			    struct pe_session *session_entry,
+			    struct qdf_mac_addr *mac_addr,
+			    tpSirProbeRespBeacon probe_rsp,
+			    uint8_t *probe_rsp_frm,
+			    uint32_t probe_rsp_len,
+			    int8_t rssi,
+			    uint8_t snr,
+			    uint32_t tsf_delta)
 {
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -340,15 +382,36 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 		goto mem_free;
 	}
 
+	if (!probe_rsp->chan_freq) {
+		probe_rsp->chan_freq = WMA_GET_RX_FREQ(rx_Packet_info);
+	} else if (probe_rsp->chan_freq != WMA_GET_RX_FREQ(rx_Packet_info)) {
+		pe_debug("mismatch freq %d rx %d op %d",
+			 probe_rsp->chan_freq,
+			 WMA_GET_RX_FREQ(rx_Packet_info),
+			 session_entry->curr_op_freq);
+		if (WMA_GET_RX_FREQ(rx_Packet_info) ==
+					session_entry->curr_op_freq)
+			probe_rsp->chan_freq = WMA_GET_RX_FREQ(rx_Packet_info);
+	}
+
 	if (!lim_validate_probe_rsp_mld_addr(session_entry, probe_rsp))
 		goto mem_free;
 
-	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, body,
-			   frame_len);
-
+	status =
 	lim_update_mlo_mgr_prb_info(mac_ctx, session_entry,
 				    (struct qdf_mac_addr *)header->bssId,
-				    probe_rsp);
+				    probe_rsp,
+				    (uint8_t *)header,
+				    WMA_GET_RX_MPDU_LEN(rx_Packet_info),
+				    mac_ctx->lim.bss_rssi,
+				    WMA_GET_RX_SNR(rx_Packet_info),
+				    WMA_GET_RX_TSF_DELTA(rx_Packet_info));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("fail to update mlo info status %d rx freq %d prb freq %d op freq %d",
+		       status, WMA_GET_RX_FREQ(rx_Packet_info),
+		       probe_rsp->chan_freq, session_entry->curr_op_freq);
+		goto mem_free;
+	}
 
 	lim_process_bcn_prb_rsp_t2lm(mac_ctx, session_entry, probe_rsp);
 	lim_gen_link_specific_probe_rsp(mac_ctx, session_entry,
@@ -394,7 +457,10 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 					     (rx_Packet_info),
 				     session_entry->bcnLen);
 		}
-			/* STA in WT_JOIN_BEACON_STATE */
+		/* STA in WT_JOIN_BEACON_STATE */
+		mgmt_txrx_frame_hex_dump((uint8_t *)header,
+					 WMA_GET_RX_MPDU_LEN(rx_Packet_info),
+					 false);
 		lim_check_and_announce_join_success(mac_ctx, probe_rsp,
 						header,
 						session_entry);

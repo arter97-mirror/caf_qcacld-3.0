@@ -353,6 +353,11 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
 		    qdf_mc_timer_get_current_state(
 					&tdls_vdev_obj->peer_discovery_timer))
 			qdf_mc_timer_stop(&tdls_vdev_obj->peer_discovery_timer);
+
+		if (tdls_vdev_obj->rx_mgmt) {
+			qdf_mem_free(tdls_vdev_obj->rx_mgmt);
+			tdls_vdev_obj->rx_mgmt = NULL;
+		}
 	}
 
 	qdf_event_destroy(&tdls_vdev_obj->tdls_teardown_comp);

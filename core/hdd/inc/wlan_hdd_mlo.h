@@ -256,11 +256,13 @@ void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter);
  * start.
  * @vdev: VDEV on which link switch will happen
  * @non_trans_vdev_id: VDEV not part of link switch.
+ * @is_start_notify: Set to %true if notify is due to start else set to %false
  *
  * Return: QDF_STATUS.
  */
 QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
-						uint8_t non_trans_vdev_id);
+						uint8_t non_trans_vdev_id,
+						bool is_start_notify);
 
 /**
  * hdd_mlo_t2lm_register_callback() - Register T2LM callback
@@ -356,6 +358,22 @@ QDF_STATUS hdd_derive_link_address_from_mld(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 /**
+ * hdd_adapter_restore_link_vdev_map() - Change the VDEV to link info mapping
+ * in adapter.
+ * @adapter: HDD adapter pointer
+ * @same_vdev_mac_map: Maintain VDEV to MAC address mapping during the restore.
+ *
+ * This API restores the VDEV to HDD link info mapping to its initial order
+ * which could have got remapped in the process of link switch. If
+ * @same_vdev_mac_map is set to %true then the MAC address to VDEV mapping is
+ * preserved.
+ *
+ * Returns: %true if any mapping changes or %false otherwise.
+ */
+bool hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter,
+				       bool same_vdev_mac_map);
+
+/**
  * hdd_mlo_mgr_register_osif_ops() - Register OSIF ops with global MLO manager
  * for callback to notify.
  *
@@ -376,6 +394,13 @@ QDF_STATUS hdd_mlo_mgr_register_osif_ops(void);
  */
 QDF_STATUS hdd_mlo_mgr_unregister_osif_ops(void);
 #else
+static inline bool
+hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter,
+				  bool same_vdev_mac_map)
+{
+	return false;
+}
+
 static inline QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)
 {
 	return QDF_STATUS_SUCCESS;

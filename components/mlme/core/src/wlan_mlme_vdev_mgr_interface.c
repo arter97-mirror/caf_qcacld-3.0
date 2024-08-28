@@ -54,6 +54,7 @@
 #endif
 
 #include "wlan_nan_api_i.h"
+#include "wlan_tdls_api.h"
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -2517,5 +2518,6 @@ static struct mlo_mlme_ext_ops mlo_ext_ops = {
 	.mlo_mlme_ext_peer_assoc_fail = lim_mlo_ap_sta_assoc_fail,
 	.mlo_mlme_ext_assoc_resp = lim_mlo_ap_sta_assoc_suc,
 	.mlo_mlme_ext_handle_sta_csa_param = lim_handle_mlo_sta_csa_param,
+	.mlo_mlme_ext_teardown_tdls = wlan_tdls_teardown_links_for_non_dbs,
 };
 #endif

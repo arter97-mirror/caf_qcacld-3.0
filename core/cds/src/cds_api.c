@@ -928,6 +928,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	ucfg_dp_update_num_rx_rings(psoc);
 	ucfg_pmo_psoc_update_dp_handle(psoc, gp_cds_context->dp_soc);
 	ucfg_ocb_update_dp_handle(psoc, gp_cds_context->dp_soc);
+	ucfg_dp_recover_mon_conf_flags(psoc);
 
 	cds_set_ac_specs_params(cds_cfg);
 	cds_cfg_update_ac_specs_params((struct txrx_pdev_cfg_param_t *)
@@ -1037,7 +1038,8 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	    hdd_ctx->target_type == TARGET_TYPE_MANGO ||
 	    hdd_ctx->target_type == TARGET_TYPE_PEACH ||
 	    hdd_ctx->target_type == TARGET_TYPE_WCN6450 ||
-	    hdd_ctx->target_type == TARGET_TYPE_WCN7750) {
+	    hdd_ctx->target_type == TARGET_TYPE_WCN7750 ||
+	    hdd_ctx->target_type == TARGET_TYPE_QCC2072) {
 		qdf_status = cdp_pdev_init(cds_get_context(QDF_MODULE_ID_SOC),
 					   gp_cds_context->htc_ctx,
 					   gp_cds_context->qdf_ctx, 0);
@@ -3125,3 +3127,14 @@ int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)
 	return 0;
 }
 #endif
+
+bool cds_is_pm_fw_debug_enable(void)
+{
+	struct cds_context *cds_ctx = cds_get_global_context();
+
+	if (cds_ctx && cds_ctx->cds_cfg &&
+	    cds_ctx->cds_cfg->is_pm_fw_debug_enable)
+		return true;
+
+	return false;
+}

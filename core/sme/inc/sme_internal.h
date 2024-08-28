@@ -529,6 +529,7 @@ struct sme_context {
 #endif
 	QDF_STATUS (*sme_vdev_del_cb)(mac_handle_t mac_handle,
 				      struct wlan_objmgr_vdev *vdev);
+	void (*set_disconnect_link_id_cb)(uint8_t vdev_id);
 };
 
 #endif /* #if !defined( __SMEINTERNAL_H ) */

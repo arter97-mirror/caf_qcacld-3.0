@@ -988,6 +988,7 @@ void lim_process_mlm_disassoc_cnf(struct mac_context *mac_ctx,
 	tSirResultCodes result_code;
 	tLimMlmDisassocCnf *disassoc_cnf;
 	struct pe_session *session_entry;
+	struct qdf_mac_addr mld_mac = QDF_MAC_ADDR_ZERO_INIT;
 
 	disassoc_cnf = (tLimMlmDisassocCnf *) msg;
 
@@ -1040,13 +1041,16 @@ void lim_process_mlm_disassoc_cnf(struct mac_context *mac_ctx,
 				session_entry->peSessionId,
 				session_entry->limSmeState));
 			lim_send_sme_disassoc_ntf(mac_ctx,
-				disassoc_cnf->peerMacAddr, result_code,
+				disassoc_cnf->peerMacAddr,
+				(uint8_t *)mld_mac.bytes, result_code,
 				disassoc_cnf->disassocTrigger,
 				disassoc_cnf->aid, session_entry->smeSessionId,
 				session_entry);
 		}
 	} else if (LIM_IS_AP_ROLE(session_entry)) {
-		lim_send_sme_disassoc_ntf(mac_ctx, disassoc_cnf->peerMacAddr,
+		lim_send_sme_disassoc_ntf(
+			mac_ctx, disassoc_cnf->peerMacAddr,
+			disassoc_cnf->peerMldAddr,
 			result_code, disassoc_cnf->disassocTrigger,
 			disassoc_cnf->aid, session_entry->smeSessionId,
 			session_entry);
@@ -1189,6 +1193,7 @@ void lim_process_mlm_purge_sta_ind(struct mac_context *mac, uint32_t *msg_buf)
 	tSirResultCodes resultCode;
 	tpLimMlmPurgeStaInd pMlmPurgeStaInd;
 	struct pe_session *pe_session;
+	struct qdf_mac_addr mld_addr = QDF_MAC_ADDR_ZERO_INIT;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -1240,6 +1245,7 @@ void lim_process_mlm_purge_sta_ind(struct mac_context *mac, uint32_t *msg_buf)
 		} else
 			lim_send_sme_disassoc_ntf(mac,
 						  pMlmPurgeStaInd->peerMacAddr,
+						  (uint8_t *)mld_addr.bytes,
 						  resultCode,
 						  pMlmPurgeStaInd->purgeTrigger,
 						  pMlmPurgeStaInd->aid,
@@ -1331,7 +1337,7 @@ void lim_join_result_callback(struct mac_context *mac,
 	if (!session) {
 		return;
 	}
-	lim_send_sme_join_reassoc_rsp(mac, eWNI_SME_JOIN_RSP,
+	lim_send_sme_join_reassoc_rsp(mac, false,
 				      session->result_code,
 				      session->prot_status_code,
 				      session, vdev_id);
@@ -1435,7 +1441,7 @@ void lim_handle_sme_join_result(struct mac_context *mac_ctx,
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_START_SUCCESS,
 					      0, NULL);
-		return lim_send_sme_join_reassoc_rsp(mac_ctx, eWNI_SME_JOIN_RSP,
+		return lim_send_sme_join_reassoc_rsp(mac_ctx, false,
 						     result_code,
 						     prot_status_code, session,
 						     session->smeSessionId);
@@ -1665,13 +1671,6 @@ void lim_process_mlm_del_bss_rsp(struct mac_context *mac,
 		return;
 	}
 	lim_process_sta_mlm_del_bss_rsp(mac, vdev_stop_rsp, pe_session);
-
-	if (pe_session->limRmfEnabled) {
-		if (QDF_STATUS_SUCCESS !=
-		    lim_send_exclude_unencrypt_ind(mac, true, pe_session)) {
-			pe_err("Could not send down Exclude Unencrypted Indication!");
-		}
-	}
 }
 
 void lim_process_sta_mlm_del_bss_rsp(struct mac_context *mac,
@@ -2495,14 +2494,6 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 							session_entry);
 		}
 	}
-
-	if (session_entry->limRmfEnabled) {
-		if (QDF_STATUS_SUCCESS !=
-			lim_send_exclude_unencrypt_ind(mac_ctx, false,
-				session_entry)) {
-			pe_err("Failed to send Exclude Unencrypted Ind");
-		}
-	}
 err:
 	qdf_mem_free(add_bss_rsp);
 }
@@ -2928,6 +2919,8 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 
 	assoc_rsp.len = 0;
 	mlo_get_assoc_rsp(session_entry->vdev, &assoc_rsp);
+	if (!assoc_rsp.len)
+		return QDF_STATUS_E_INVAL;
 
 	if (!session_entry->ml_partner_info.num_partner_links) {
 		pe_debug("MLO_ROAM: vdev:%d num_partner_links is 0",
@@ -2942,9 +2935,6 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 	pe_err("vdev:%d sta_link_addr" QDF_MAC_ADDR_FMT,
 	       session_entry->vdev_id,
 	       QDF_MAC_ADDR_REF(&sta_link_addr.bytes[0]));
-
-	if (!assoc_rsp.len)
-		return QDF_STATUS_SUCCESS;
 
 	mlm_join_cnf.resultCode = eSIR_SME_SUCCESS;
 	mlm_join_cnf.protStatusCode = STATUS_SUCCESS;

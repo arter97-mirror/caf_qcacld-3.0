@@ -335,12 +335,12 @@ ll_lt_sap_dump_stored_freq_list(struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj)
 	qdf_mem_free(freq_list);
 }
 
-static void
-ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
-					qdf_freq_t freq,
-					enum ll_sap_csa_source csa_src)
+void ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
+					     qdf_freq_t freq,
+					     enum ll_sap_csa_source csa_src)
 {
 	struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj;
+	uint8_t num_ch;
 
 	ll_sap_psoc_obj = wlan_objmgr_psoc_get_comp_private_obj(
 							psoc,
@@ -350,10 +350,7 @@ ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	if (ll_sap_psoc_obj->avoid_freq.stored_num_ch) {
-		ll_sap_debug("stored list before modification");
-		ll_lt_sap_dump_stored_freq_list(ll_sap_psoc_obj);
-	}
+	num_ch = ll_sap_psoc_obj->avoid_freq.stored_num_ch;
 	/*
 	 * Reset frequency and it's timestamp if stored channel
 	 * timestamp is greater than DCS_DB_AGEOUT_TIME
@@ -363,8 +360,11 @@ ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
 	if (freq && csa_src == LL_SAP_CSA_DCS)
 		ll_lt_sap_store_curr_chan_in_db(ll_sap_psoc_obj, freq);
 
-	if (ll_sap_psoc_obj->avoid_freq.stored_num_ch) {
-		ll_sap_debug("stored list after modification");
+	if ((csa_src != LL_SAP_CSA_DCS && num_ch) ||
+	    num_ch != ll_sap_psoc_obj->avoid_freq.stored_num_ch) {
+		ll_sap_debug("src %d old count %d new count %d",
+			     csa_src, num_ch,
+			     ll_sap_psoc_obj->avoid_freq.stored_num_ch);
 		ll_lt_sap_dump_stored_freq_list(ll_sap_psoc_obj);
 	}
 }

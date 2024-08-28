@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,34 +22,21 @@
 
 #include "wlan_objmgr_psoc_obj.h"
 
-#ifdef WLAN_FEATURE_LL_LT_SAP
 /**
- * policy_mgr_ll_lt_sap_get_valid_freq() - Check and get valid frequency for
- * the current interface (SAP/P2PGO/LL_LT_SAP)
- * @psoc: PSOC object
- * @pdev: PDEV pointer
- * @vdev_id: Vdev id of the current interface
- * @sap_ch_freq: Frequency of the current interface
- * @cc_switch_mode: Channel switch mode
- * @new_sap_freq: Updated frequency
- * @is_ll_lt_sap_present: Indicates if ll_lt_sap is present or not
- *
- * This API checks if ll_lt_sap is present or not and if ll_lt_sap is present
- * then if current frequency of the ll_lt_sap or concurrent SAP or concurrent
- * P2PGO is valid or not according to ll_lt_sap concurrency, if valid, does not
- * fill anything in the new_sap_freq and if not valid, update the new_sap_freq
- * with some new valid frequency.
- *
- * Return: true/false
+ * enum ll_lt_sap_event - event of LL SAP
+ * @LL_LT_SAP_EVENT_STARTING: LL_LT_SAP is starting
+ * @LL_LT_SAP_EVENT_STARTED: LL_LT_SAP has started.
+ * @LL_LT_SAP_EVENT_STOPPED: LL_LT_SAP has stopped.
+ * @LL_LT_SAP_EVENT_MAX: LL_LT_SAP max event
  */
-void policy_mgr_ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
-					 struct wlan_objmgr_pdev *pdev,
-					 uint8_t vdev_id,
-					 qdf_freq_t sap_ch_freq,
-					 uint8_t cc_switch_mode,
-					 qdf_freq_t *new_sap_freq,
-					 bool *is_ll_lt_sap_present);
+enum ll_lt_sap_event {
+	LL_LT_SAP_EVENT_STARTING = 1,
+	LL_LT_SAP_EVENT_STARTED,
+	LL_LT_SAP_EVENT_STOPPED,
+	LL_LT_SAP_EVENT_MAX,
+};
 
+#ifdef WLAN_FEATURE_LL_LT_SAP
 /**
  * wlan_policy_mgr_get_ll_lt_sap_vdev_id() - Get ll_lt_sap vdev id
  * @psoc: PSOC object
@@ -80,8 +67,7 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_ll_lt_sap_restart_concurrent_sap() - Check and restart
  * concurrent SAP or ll_lt_sap
  * @psoc: PSOC object
- * @is_ll_lt_sap_enabled: Indicates if ll_lt_sap is getting enabled or
- * getting disabled
+ * @event: Indicates if ll_lt_sap is getting enabled or getting disabled
  *
  * This API checks and restarts concurrent SAP or ll_lt_sap when ll_lt_sap comes
  * up or goes down.
@@ -98,24 +84,13 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
  * Return: None
  */
 void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
-						 bool is_ll_lt_sap_enabled);
+						 enum ll_lt_sap_event event);
 #else
 
 static inline bool
 policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
-}
-
-static inline
-void policy_mgr_ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
-					 struct wlan_objmgr_pdev *pdev,
-					 uint8_t vdev_id,
-					 qdf_freq_t sap_ch_freq,
-					 uint8_t cc_switch_mode,
-					 qdf_freq_t *new_sap_freq,
-					 bool *is_ll_lt_sap_present)
-{
 }
 
 static inline
@@ -126,7 +101,7 @@ uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
 
 static inline void
 policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
-					    bool is_ll_lt_sap_enabled)
+					    enum ll_lt_sap_event event)
 {
 }
 #endif

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -114,4 +114,50 @@ int wlan_cfg80211_mgmt_tx(struct wlan_objmgr_vdev *vdev,
 int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
 		uint64_t cookie);
 
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * osif_p2p_send_usd_params() - This function parse USD vendor command and
+ * send the USD params to P2P module.
+ * @psoc: PSOC object
+ * @vdev_id: VDEV ID
+ * @data: pointer to data
+ * @data_len: data length
+ *
+ * Return: 0 on success, negative errno if error
+ */
+int osif_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			     const void *data, int data_len);
+
+/**
+ * wlan_hdd_cfg80211_p2p_send_usd_cmd - This function send USD command to lower
+ * layers
+ * @wiphy: pointer to wiphy structure
+ * @wdev: pointer to wireless device
+ * @data: pointer to data
+ * @data_len: data length
+ *
+ * Return: 0 on success, negative errno if error
+ */
+int wlan_hdd_cfg80211_p2p_send_usd_cmd(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       const void *data, int data_len);
+
+extern const struct nla_policy
+p2p_usd_attr_policy[QCA_WLAN_VENDOR_ATTR_USD_MAX + 1];
+
+#define FEATURE_P2P_SECURE_USD_VENDOR_COMMANDS			\
+{								\
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,		\
+	.info.subcmd =						\
+		QCA_NL80211_VENDOR_SUBCMD_USD,			\
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |			\
+			WIPHY_VENDOR_CMD_NEED_NETDEV |		\
+			WIPHY_VENDOR_CMD_NEED_RUNNING,		\
+	.doit = wlan_hdd_cfg80211_p2p_send_usd_cmd,		\
+	vendor_command_policy(p2p_usd_attr_policy,		\
+			      QCA_WLAN_VENDOR_ATTR_USD_MAX)	\
+},
+#else
+#define FEATURE_P2P_SECURE_USD_VENDOR_COMMANDS
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif /* _WLAN_CFG80211_P2P_H_ */

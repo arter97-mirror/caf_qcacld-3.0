@@ -2283,7 +2283,7 @@ void csr_cm_get_sta_cxn_info(struct mac_context *mac_ctx, uint8_t vdev_id,
 #endif
 #endif
 
-QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t sessionId,
+QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t vdev_id,
 				  struct csr_roam_info *roam_info,
 				  eRoamCmdStatus u1, eCsrRoamResult u2)
 {
@@ -2291,35 +2291,40 @@ QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t sessionId,
 	struct csr_roam_session *pSession;
 	qdf_freq_t chan_freq;
 
-	if (!CSR_IS_SESSION_VALID(mac, sessionId)) {
-		sme_err("Session ID: %d is not valid", sessionId);
+	if (!CSR_IS_SESSION_VALID(mac, vdev_id)) {
+		sme_err("Session ID: %d is not valid", vdev_id);
 		QDF_ASSERT(0);
 		return QDF_STATUS_E_FAILURE;
 	}
-	pSession = CSR_GET_SESSION(mac, sessionId);
+	pSession = CSR_GET_SESSION(mac, vdev_id);
 
 	if (false == pSession->sessionActive) {
 		sme_debug("Session is not Active");
 		return QDF_STATUS_E_FAILURE;
 	}
-	chan_freq = wlan_get_operation_chan_freq_vdev_id(mac->pdev, sessionId);
+	chan_freq = wlan_get_operation_chan_freq_vdev_id(mac->pdev, vdev_id);
 
 	if (mac->session_roam_complete_cb)
-		status = mac->session_roam_complete_cb(mac->psoc, sessionId,
+		status = mac->session_roam_complete_cb(mac->psoc, vdev_id,
 						       roam_info, u1, u2);
 
 	return status;
 }
 
 static bool csr_peer_mac_match_cmd(tSmeCmd *sme_cmd,
-				   struct qdf_mac_addr peer_macaddr,
+				   struct qdf_mac_addr *peer_macaddr,
+				   struct qdf_mac_addr *peer_mld_addr,
 				   uint8_t vdev_id)
 {
 	if (sme_cmd->command == eSmeCommandRoam &&
 	    (sme_cmd->u.roamCmd.roamReason == eCsrForcedDisassocSta ||
 	     sme_cmd->u.roamCmd.roamReason == eCsrForcedDeauthSta) &&
-	    !qdf_mem_cmp(peer_macaddr.bytes, sme_cmd->u.roamCmd.peerMac,
-			 QDF_MAC_ADDR_SIZE))
+	     (qdf_is_macaddr_equal(
+			peer_macaddr,
+			(struct qdf_mac_addr *)sme_cmd->u.roamCmd.peerMac) ||
+	      (!qdf_is_macaddr_zero(peer_mld_addr) &&
+	       qdf_is_macaddr_equal(peer_mld_addr,
+				    &sme_cmd->u.roamCmd.peer_mld_addr))))
 		return true;
 
 	if (sme_cmd->command == eSmeCommandWmStatusChange) {
@@ -2327,15 +2332,23 @@ static bool csr_peer_mac_match_cmd(tSmeCmd *sme_cmd,
 
 		wms_cmd = &sme_cmd->u.wmStatusChangeCmd;
 		if (wms_cmd->Type == eCsrDisassociated &&
-		    !qdf_mem_cmp(peer_macaddr.bytes,
-				 wms_cmd->u.DisassocIndMsg.peer_macaddr.bytes,
-				 QDF_MAC_ADDR_SIZE))
+		    (qdf_is_macaddr_equal(
+				peer_macaddr,
+				&wms_cmd->u.DisassocIndMsg.peer_macaddr) ||
+		     (!qdf_is_macaddr_zero(peer_mld_addr) &&
+		      qdf_is_macaddr_equal(
+				peer_mld_addr,
+				&wms_cmd->u.DisassocIndMsg.peer_mld_addr))))
 			return true;
 
 		if (wms_cmd->Type == eCsrDeauthenticated &&
-		    !qdf_mem_cmp(peer_macaddr.bytes,
-				 wms_cmd->u.DeauthIndMsg.peer_macaddr.bytes,
-				 QDF_MAC_ADDR_SIZE))
+		    (qdf_is_macaddr_equal(
+				peer_macaddr,
+				&wms_cmd->u.DeauthIndMsg.peer_macaddr) ||
+		     (!qdf_is_macaddr_zero(peer_mld_addr) &&
+		      qdf_is_macaddr_equal(
+				peer_mld_addr,
+				&wms_cmd->u.DeauthIndMsg.peer_mld_addr))))
 			return true;
 	}
 
@@ -2345,7 +2358,8 @@ static bool csr_peer_mac_match_cmd(tSmeCmd *sme_cmd,
 static bool
 csr_is_deauth_disassoc_in_pending_q(struct mac_context *mac_ctx,
 				    uint8_t vdev_id,
-				    struct qdf_mac_addr peer_macaddr)
+				    struct qdf_mac_addr *peer_macaddr,
+				    struct qdf_mac_addr *peer_mld_addr)
 {
 	tListElem *entry = NULL;
 	tSmeCmd *sme_cmd;
@@ -2354,7 +2368,8 @@ csr_is_deauth_disassoc_in_pending_q(struct mac_context *mac_ctx,
 	while (entry) {
 		sme_cmd = GET_BASE_ADDR(entry, tSmeCmd, Link);
 		if ((sme_cmd->vdev_id == vdev_id) &&
-		    csr_peer_mac_match_cmd(sme_cmd, peer_macaddr, vdev_id))
+		    csr_peer_mac_match_cmd(sme_cmd, peer_macaddr,
+					   peer_mld_addr, vdev_id))
 			return true;
 		entry = csr_nonscan_pending_ll_next(mac_ctx, entry,
 						    LL_ACCESS_NOLOCK);
@@ -2366,20 +2381,23 @@ csr_is_deauth_disassoc_in_pending_q(struct mac_context *mac_ctx,
 static bool
 csr_is_deauth_disassoc_in_active_q(struct mac_context *mac_ctx,
 				   uint8_t vdev_id,
-				   struct qdf_mac_addr peer_macaddr)
+				   struct qdf_mac_addr *peer_macaddr,
+				   struct qdf_mac_addr *peer_mld_addr)
 {
 	tSmeCmd *sme_cmd;
 
 	sme_cmd = wlan_serialization_get_active_cmd(mac_ctx->psoc, vdev_id,
 						WLAN_SER_CMD_FORCE_DEAUTH_STA);
 
-	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, peer_macaddr, vdev_id))
+	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, peer_macaddr,
+					      peer_mld_addr, vdev_id))
 		return true;
 
 	sme_cmd = wlan_serialization_get_active_cmd(mac_ctx->psoc, vdev_id,
 					WLAN_SER_CMD_FORCE_DISASSOC_STA);
 
-	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, peer_macaddr, vdev_id))
+	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, peer_macaddr,
+					      peer_mld_addr, vdev_id))
 		return true;
 
 	/*
@@ -2388,7 +2406,8 @@ csr_is_deauth_disassoc_in_active_q(struct mac_context *mac_ctx,
 	 */
 	sme_cmd = wlan_serialization_get_active_cmd(mac_ctx->psoc, vdev_id,
 						WLAN_SER_CMD_WM_STATUS_CHANGE);
-	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, peer_macaddr, vdev_id))
+	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, peer_macaddr,
+					      peer_mld_addr, vdev_id))
 		return true;
 
 	return false;
@@ -2399,7 +2418,8 @@ csr_is_deauth_disassoc_in_active_q(struct mac_context *mac_ctx,
  *  disassoc is already in progress.
  * @mac_ctx: Global MAC context
  * @vdev_id: vdev id
- * @peer_macaddr: Peer MAC address
+ * @peer_macaddr: Peer MAC address to check
+ * @peer_mld_addr: peer MLD address to check
  *
  * Return: True if deauth/disassoc indication can be dropped
  *  else false
@@ -2407,111 +2427,136 @@ csr_is_deauth_disassoc_in_active_q(struct mac_context *mac_ctx,
 static bool
 csr_is_deauth_disassoc_already_active(struct mac_context *mac_ctx,
 				      uint8_t vdev_id,
-				      struct qdf_mac_addr peer_macaddr)
+				      struct qdf_mac_addr *peer_macaddr,
+				      struct qdf_mac_addr *peer_mld_addr)
 {
-	bool ret = csr_is_deauth_disassoc_in_pending_q(mac_ctx,
-						      vdev_id,
-						      peer_macaddr);
+	char mld_log_str[MAC_ADDR_DUMP_LEN] = {0};
+
+	bool ret = csr_is_deauth_disassoc_in_pending_q(
+					mac_ctx, vdev_id, peer_macaddr,
+					peer_mld_addr);
 	if (!ret)
 		/**
 		 * commands are not found in pending queue, check in active
 		 * queue as well
 		 */
-		ret = csr_is_deauth_disassoc_in_active_q(mac_ctx,
-							  vdev_id,
-							  peer_macaddr);
+		ret = csr_is_deauth_disassoc_in_active_q(
+					mac_ctx, vdev_id,
+					peer_macaddr, peer_mld_addr);
 
-	if (ret)
-		sme_debug("Deauth/Disassoc already in progress for "QDF_MAC_ADDR_FMT,
-			  QDF_MAC_ADDR_REF(peer_macaddr.bytes));
+	if (ret) {
+		if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)&peer_mld_addr))
+			qdf_scnprintf(mld_log_str, MAC_ADDR_DUMP_LEN,
+				      " mld: " QDF_MAC_ADDR_FMT,
+				      QDF_MAC_ADDR_REF(peer_mld_addr->bytes));
+		sme_debug("Deauth/Disassoc already in progress for " QDF_MAC_ADDR_FMT "%s",
+			  QDF_MAC_ADDR_REF(peer_macaddr->bytes), mld_log_str);
+	}
 
 	return ret;
 }
 
-/**
- * csr_roam_issue_disassociate_sta_cmd() - disassociate a associated station
- * @sessionId:     Session Id for Soft AP
- * @p_del_sta_params: Pointer to parameters of the station to disassoc
+/*
+ * csr_is_deauth_disassoc_cmd_active() - Function to check if deauth or
+ *  disassoc is already in progress.
+ * @mac_ctx: Global MAC context
+ * @vdev_id: vdev ID
+ * @macaddr: mac address provided (mld/link/mac for the peer to check)
+ * @peer_mac: found peer mac
+ * @peer_mld_mac: found peer mld if ML connection
  *
- * CSR function that HDD calls to delete a associated station
- *
- * Return: QDF_STATUS_SUCCESS on success or another QDF_STATUS_* on error
+ * Return: True if deauth/disassoc indication can be dropped else false
  */
-QDF_STATUS csr_roam_issue_disassociate_sta_cmd(struct mac_context *mac,
-					       uint32_t sessionId,
-					       struct csr_del_sta_params
-					       *p_del_sta_params)
-
+static bool
+csr_is_deauth_disassoc_cmd_active(struct mac_context *mac_ctx,
+				  uint8_t vdev_id, struct qdf_mac_addr macaddr,
+				  struct qdf_mac_addr *peer_mac,
+				  struct qdf_mac_addr *peer_mld_mac)
 {
+	struct peer_mac_addresses peer_mac_info;
+
+	qdf_mem_zero(&peer_mac_info, sizeof(struct peer_mac_addresses));
+	qdf_copy_macaddr(&peer_mac_info.mac, &macaddr);
+	wlan_find_peer_and_get_mac_and_mld_addr(mac_ctx->psoc, &peer_mac_info);
+	if (csr_is_deauth_disassoc_already_active(mac_ctx, vdev_id,
+						  &peer_mac_info.peer_mac,
+						  &peer_mac_info.peer_mld))
+		return true;
+
+	if (peer_mac && peer_mld_mac) {
+		if (!qdf_is_macaddr_equal(&macaddr, &peer_mac_info.peer_mac))
+			sme_debug("Vdev %d, given mac " QDF_MAC_ADDR_FMT " found peer mac " QDF_MAC_ADDR_FMT,
+				  vdev_id, QDF_MAC_ADDR_REF(macaddr.bytes),
+				  QDF_MAC_ADDR_REF(peer_mac_info.peer_mac.bytes));
+		qdf_copy_macaddr(peer_mac, &peer_mac_info.peer_mac);
+		qdf_copy_macaddr(peer_mld_mac, &peer_mac_info.peer_mld);
+	}
+
+	return false;
+}
+
+static QDF_STATUS
+csr_roam_issue_discon_sta_roam_cmd(struct mac_context *mac,
+				   uint8_t vdev_id,
+				   enum csr_roam_reason discon_reason,
+				   struct csr_del_sta_params *del_sta_params)
+{
+	tSmeCmd *cmd;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	tSmeCmd *pCommand;
+	struct qdf_mac_addr peer_mac = QDF_MAC_ADDR_ZERO_INIT;
+	struct qdf_mac_addr peer_mld_mac = QDF_MAC_ADDR_ZERO_INIT;
 
-	do {
-		if (csr_is_deauth_disassoc_already_active(mac, sessionId,
-					      p_del_sta_params->peerMacAddr))
-			break;
-		pCommand = csr_get_command_buffer(mac);
-		if (!pCommand) {
-			sme_err("fail to get command buffer");
-			status = QDF_STATUS_E_RESOURCES;
-			break;
-		}
-		pCommand->command = eSmeCommandRoam;
-		pCommand->vdev_id = (uint8_t) sessionId;
-		pCommand->u.roamCmd.roamReason = eCsrForcedDisassocSta;
-		qdf_mem_copy(pCommand->u.roamCmd.peerMac,
-				p_del_sta_params->peerMacAddr.bytes,
-				sizeof(pCommand->u.roamCmd.peerMac));
-		pCommand->u.roamCmd.reason = p_del_sta_params->reason_code;
+	if (csr_is_deauth_disassoc_cmd_active(mac, vdev_id,
+					      del_sta_params->peerMacAddr,
+					      &peer_mac, &peer_mld_mac))
+		return status;
 
-		status = csr_queue_sme_command(mac, pCommand, false);
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			sme_err("fail to send message status: %d", status);
-	} while (0);
+	cmd = csr_get_command_buffer(mac);
+	if (!cmd) {
+		sme_err("Vdev %d " QDF_MAC_ADDR_FMT " fails to get command buffer for reason %d",
+			vdev_id,
+			QDF_MAC_ADDR_REF(del_sta_params->peerMacAddr.bytes),
+			discon_reason);
+		return QDF_STATUS_E_RESOURCES;
+	}
+
+	cmd->command = eSmeCommandRoam;
+	cmd->vdev_id = vdev_id;
+	cmd->u.roamCmd.roamReason = discon_reason;
+	qdf_copy_macaddr((struct qdf_mac_addr *)&cmd->u.roamCmd.peerMac,
+			 &peer_mac);
+	qdf_copy_macaddr(&cmd->u.roamCmd.peer_mld_addr, &peer_mld_mac);
+	cmd->u.roamCmd.reason = del_sta_params->reason_code;
+
+	status = csr_queue_sme_command(mac, cmd, false);
+	if (QDF_IS_STATUS_ERROR(status))
+		sme_err("Vdev %d " QDF_MAC_ADDR_FMT " fails to get send message status: %d",
+			vdev_id,
+			QDF_MAC_ADDR_REF(del_sta_params->peerMacAddr.bytes),
+			status);
 
 	return status;
 }
 
-/**
- * csr_roam_issue_deauthSta() - delete a associated station
- * @sessionId:     Session Id for Soft AP
- * @pDelStaParams: Pointer to parameters of the station to deauthenticate
- *
- * CSR function that HDD calls to delete a associated station
- *
- * Return: QDF_STATUS_SUCCESS on success or another QDF_STATUS_** on error
- */
-QDF_STATUS csr_roam_issue_deauth_sta_cmd(struct mac_context *mac,
-		uint32_t sessionId,
-		struct csr_del_sta_params *pDelStaParams)
+QDF_STATUS
+csr_roam_issue_disassociate_sta_cmd(struct mac_context *mac,
+				    uint8_t vdev_id,
+				    struct csr_del_sta_params *del_sta_params)
+
 {
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	tSmeCmd *pCommand;
+	return csr_roam_issue_discon_sta_roam_cmd(mac, vdev_id,
+						  eCsrForcedDisassocSta,
+						  del_sta_params);
+}
 
-	do {
-		if (csr_is_deauth_disassoc_already_active(mac, sessionId,
-					      pDelStaParams->peerMacAddr))
-			break;
-		pCommand = csr_get_command_buffer(mac);
-		if (!pCommand) {
-			sme_err("fail to get command buffer");
-			status = QDF_STATUS_E_RESOURCES;
-			break;
-		}
-		pCommand->command = eSmeCommandRoam;
-		pCommand->vdev_id = (uint8_t) sessionId;
-		pCommand->u.roamCmd.roamReason = eCsrForcedDeauthSta;
-		qdf_mem_copy(pCommand->u.roamCmd.peerMac,
-			     pDelStaParams->peerMacAddr.bytes,
-			     sizeof(tSirMacAddr));
-		pCommand->u.roamCmd.reason = pDelStaParams->reason_code;
-
-		status = csr_queue_sme_command(mac, pCommand, false);
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			sme_err("fail to send message status: %d", status);
-	} while (0);
-
-	return status;
+QDF_STATUS
+csr_roam_issue_deauth_sta_cmd(struct mac_context *mac,
+			      uint8_t vdev_id,
+			      struct csr_del_sta_params *del_sta_params)
+{
+	return csr_roam_issue_discon_sta_roam_cmd(mac, vdev_id,
+						  eCsrForcedDeauthSta,
+						  del_sta_params);
 }
 
 /**
@@ -4089,45 +4134,47 @@ static void
 csr_roam_chk_lnk_disassoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 {
 	struct csr_roam_session *session;
-	uint32_t sessionId = WLAN_UMAC_VDEV_ID_MAX;
-	struct disassoc_ind *pDisassocInd;
+	uint8_t vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	struct disassoc_ind *disassoc_ind;
 
 	/*
 	 * Check if AP dis-associated us because of MIC failure. If so,
 	 * then we need to take action immediately and not wait till the
 	 * the WmStatusChange requests is pushed and processed
 	 */
-	pDisassocInd = (struct disassoc_ind *)msg_ptr;
-	sessionId = pDisassocInd->vdev_id;
+	disassoc_ind = (struct disassoc_ind *)msg_ptr;
+	vdev_id = disassoc_ind->vdev_id;
 
-	if (!CSR_IS_SESSION_VALID(mac_ctx, sessionId)) {
+	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
 		sme_err("vdev:%d Invalid session. BSSID: " QDF_MAC_ADDR_FMT,
-			sessionId, QDF_MAC_ADDR_REF(pDisassocInd->bssid.bytes));
+			vdev_id, QDF_MAC_ADDR_REF(disassoc_ind->bssid.bytes));
 
 		return;
 	}
 
-	if (!csr_if_peer_present(mac_ctx, &pDisassocInd->bssid.bytes[0],
-				 &pDisassocInd->peer_macaddr.bytes[0]))
+	if (!csr_if_peer_present(mac_ctx, &disassoc_ind->bssid.bytes[0],
+				 &disassoc_ind->peer_macaddr.bytes[0]))
 		return;
 
-	if (csr_is_deauth_disassoc_already_active(mac_ctx, sessionId,
-	    pDisassocInd->peer_macaddr))
+	if (csr_is_deauth_disassoc_cmd_active(mac_ctx, vdev_id,
+					      disassoc_ind->peer_macaddr,
+					      &disassoc_ind->peer_macaddr,
+					      &disassoc_ind->peer_mld_addr))
 		return;
 
-	session = CSR_GET_SESSION(mac_ctx, sessionId);
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
 	if (!session) {
-		sme_err("vdev: %d not found", sessionId);
+		sme_err("vdev %d session not found", vdev_id);
 		return;
 	}
 	sme_debug("Vdev %d, peer " QDF_MAC_ADDR_FMT " reason: %d status: %d",
-		  sessionId, QDF_MAC_ADDR_REF(pDisassocInd->peer_macaddr.bytes),
-		  pDisassocInd->reasonCode, pDisassocInd->status_code);
+		  vdev_id, QDF_MAC_ADDR_REF(disassoc_ind->peer_macaddr.bytes),
+		  disassoc_ind->reasonCode, disassoc_ind->status_code);
 	/* Update the disconnect stats */
 	session->disconnect_stats.disconnection_cnt++;
 	session->disconnect_stats.disassoc_by_peer++;
 
-	csr_roam_issue_wm_status_change(mac_ctx, sessionId,
+	csr_roam_issue_wm_status_change(mac_ctx, vdev_id,
 					eCsrDisassociated, msg_ptr);
 }
 
@@ -4135,37 +4182,40 @@ static void
 csr_roam_chk_lnk_deauth_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 {
 	struct csr_roam_session *session;
-	uint32_t sessionId = WLAN_UMAC_VDEV_ID_MAX;
-	struct deauth_ind *pDeauthInd;
+	uint8_t vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	struct deauth_ind *deauth_ind;
 
-	pDeauthInd = (struct deauth_ind *)msg_ptr;
+	deauth_ind = (struct deauth_ind *)msg_ptr;
 
-	sessionId = pDeauthInd->vdev_id;
-	if (!CSR_IS_SESSION_VALID(mac_ctx, sessionId)) {
+	vdev_id = deauth_ind->vdev_id;
+	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
 		sme_err("vdev %d: Invalid session BSSID: " QDF_MAC_ADDR_FMT,
-			pDeauthInd->vdev_id,
-			QDF_MAC_ADDR_REF(pDeauthInd->bssid.bytes));
+			deauth_ind->vdev_id,
+			QDF_MAC_ADDR_REF(deauth_ind->bssid.bytes));
 		return;
 	}
 
-	if (!csr_if_peer_present(mac_ctx, &pDeauthInd->bssid.bytes[0],
-				 &pDeauthInd->peer_macaddr.bytes[0]))
+	if (!csr_if_peer_present(mac_ctx, &deauth_ind->bssid.bytes[0],
+				 &deauth_ind->peer_macaddr.bytes[0]))
 		return;
 
-	if (csr_is_deauth_disassoc_already_active(mac_ctx, sessionId,
-	    pDeauthInd->peer_macaddr))
+	if (csr_is_deauth_disassoc_cmd_active(mac_ctx, vdev_id,
+					      deauth_ind->peer_macaddr,
+					      &deauth_ind->peer_macaddr,
+					      &deauth_ind->peer_mld_addr))
 		return;
-	session = CSR_GET_SESSION(mac_ctx, sessionId);
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
 	if (!session) {
-		sme_err("session %d not found", sessionId);
+		sme_err("vdev %d session not found", vdev_id);
 		return;
 	}
 	sme_debug("vdev %d bssid " QDF_MAC_ADDR_FMT " reason: %d status: %d",
-		  pDeauthInd->vdev_id,
-		  QDF_MAC_ADDR_REF(pDeauthInd->bssid.bytes),
-		  pDeauthInd->reasonCode, pDeauthInd->status_code);
+		  deauth_ind->vdev_id,
+		  QDF_MAC_ADDR_REF(deauth_ind->bssid.bytes),
+		  deauth_ind->reasonCode, deauth_ind->status_code);
 	/* Update the disconnect stats */
-	switch (pDeauthInd->reasonCode) {
+	switch (deauth_ind->reasonCode) {
 	case REASON_DISASSOC_DUE_TO_INACTIVITY:
 		session->disconnect_stats.disconnection_cnt++;
 		session->disconnect_stats.peer_kickout++;
@@ -4188,7 +4238,7 @@ csr_roam_chk_lnk_deauth_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		break;
 	}
 
-	csr_roam_issue_wm_status_change(mac_ctx, sessionId,
+	csr_roam_issue_wm_status_change(mac_ctx, vdev_id,
 					eCsrDeauthenticated,
 					msg_ptr);
 }
@@ -4970,6 +5020,8 @@ QDF_STATUS csr_roam_set_psk_pmk(struct mac_context *mac,
 	    !csr_pmk_match_mlo_address(vdev, pmksa)) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 		sme_debug("Set pmksa received for non-connected bss");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_MLME, QDF_TRACE_LEVEL_DEBUG,
+				   pmksa->pmk, WLAN_MAX_PMK_DUMP_BYTES);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -5528,11 +5580,6 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 		goto purge_list;
 
 	wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc, cur_node->entry);
-	pe_debug("Dump scan entry frm:");
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   cur_node->entry->raw_frame.ptr,
-			   cur_node->entry->raw_frame.len);
-
 	src_cfg.uint_value = bss_desc->mbo_oce_enabled_ap;
 	wlan_cm_roam_cfg_set_value(mac_ctx->psoc, vdev_id, MBO_OCE_ENABLED_AP,
 				   &src_cfg);
@@ -6600,7 +6647,7 @@ QDF_STATUS csr_invoke_neighbor_report_request(
 
 	sme_debug("Sending SIR_HAL_INVOKE_NEIGHBOR_REPORT");
 
-	msg.type = SIR_HAL_INVOKE_NEIGHBOR_REPORT;
+	msg.type = WMA_INVOKE_NEIGHBOR_REPORT;
 	msg.reserved = 0;
 	msg.bodyptr = invoke_params;
 

@@ -51,6 +51,7 @@
 #include <target_if_vdev_mgr_tx_ops.h>
 #include <wlan_cmn_ieee80211.h>
 #include <wlan_mgmt_txrx_utils_api.h>
+#include <wlan_p2p_cfg_api.h>
 
 /* Fils Discovery Frame */
 /**
@@ -858,6 +859,12 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 		pprobeRespParams->probeRespTemplateLen = nBytes;
 		qdf_mem_copy(pprobeRespParams->ucProxyProbeReqValidIEBmap,
 			     IeBitmap, (sizeof(uint32_t) * 8));
+		if (pe_session->opmode == QDF_P2P_GO_MODE &&
+		    cfg_p2p_is_go_ignore_non_p2p_probe_req(mac->psoc)) {
+			pe_debug("GO ignore non-P2P probe req");
+			pprobeRespParams->go_ignore_non_p2p_probe_req = true;
+		}
+
 		msgQ.type = WMA_SEND_PROBE_RSP_TMPL;
 		msgQ.reserved = 0;
 		msgQ.bodyptr = pprobeRespParams;

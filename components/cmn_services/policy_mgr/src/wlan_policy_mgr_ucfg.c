@@ -24,8 +24,15 @@
 #include "wlan_mlo_link_force.h"
 #include "wlan_mlme_api.h"
 
-/* Fix max concurrent conn to 4 for NAN */
+/*
+ * Max allowed active vdevs as per firmware. MAX_CONC_CXNS should be
+ * same as this.
+ */
+#ifdef WLAN_FEATURE_SON
+#define MAX_CONC_CXNS    MAX_NUMBER_OF_CONC_CONNECTIONS
+#else
 #define MAX_CONC_CXNS 4
+#endif
 
 #ifdef WLAN_FEATURE_SR
 /**
@@ -89,12 +96,10 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_err("max_conc_cxns %d non-nan", cfg->max_conc_cxns);
 	}
 
-	if (cfg->max_conc_cxns > MAX_CONC_CXNS)
-		cfg->max_conc_cxns = MAX_CONC_CXNS;
-	policy_mgr_debug("max_conc_cxns %d ", cfg->max_conc_cxns);
-
 	cfg->max_conc_cxns = QDF_MIN(cfg->max_conc_cxns,
-				     MAX_NUMBER_OF_CONC_CONNECTIONS);
+				     QDF_MIN(MAX_NUMBER_OF_CONC_CONNECTIONS,
+					     MAX_CONC_CXNS));
+
 	cfg->conc_rule1 = cfg_get(psoc, CFG_ENABLE_CONC_RULE1);
 	cfg->conc_rule2 = cfg_get(psoc, CFG_ENABLE_CONC_RULE2);
 	cfg->pcl_band_priority = cfg_get(psoc, CFG_PCL_BAND_PRIORITY);
@@ -390,6 +395,12 @@ QDF_STATUS ucfg_policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
 {
 	return policy_mgr_get_dbs_hw_modes(psoc, one_by_one_dbs,
 					   two_by_two_dbs);
+}
+
+QDF_STATUS
+ucfg_policy_mgr_wait_chan_switch_complete_evt(struct wlan_objmgr_psoc *psoc)
+{
+	return policy_mgr_wait_chan_switch_complete_evt(psoc);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO

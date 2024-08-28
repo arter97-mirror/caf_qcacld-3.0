@@ -151,6 +151,20 @@ QDF_STATUS lim_del_peer_info(struct mac_context *mac,
  */
 QDF_STATUS lim_del_sta_all(struct mac_context *mac,
 			   struct pe_session *pe_session);
+/**
+ * lim_get_sta_ds() -get sta ds
+ * @mac_ctx: mac ctx
+ * @sa: source addr
+ * @mld_mac: mld mac
+ * @assoc_id: assoc id
+ * @session: pe session ctx
+ *
+ * @Return: sta ds in case of success else NULL
+ */
+tpDphHashNode lim_get_sta_ds(struct mac_context *mac_ctx,
+			     tSirMacAddr sa, tSirMacAddr mld_mac,
+			     uint16_t *assoc_id,
+			     struct pe_session *session);
 
 #ifdef WLAN_FEATURE_HOST_ROAM
 void lim_restore_pre_reassoc_state(struct mac_context *,
@@ -227,6 +241,7 @@ static inline bool lim_is_roam_synch_in_progress(struct wlan_objmgr_psoc *psoc,
 
 void
 lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
+		     struct qdf_mac_addr sta_mld_addr,
 		     uint16_t staDsAssocId,
 		     struct lim_sta_context mlmStaContext,
 		     tSirResultCodes status_code,

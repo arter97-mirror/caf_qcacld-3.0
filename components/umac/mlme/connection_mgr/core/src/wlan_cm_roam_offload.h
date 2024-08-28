@@ -757,4 +757,20 @@ cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
  * Return: True if connected AP is MBO capable without PMF
  */
 bool cm_is_mbo_ap_without_pmf(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * cm_fill_rso_channel_list() - Fill roam frequencies in chan_info
+ * @psoc: PSOC pointer
+ * @vdev: vdev pointer
+ * @rso_cfg: roam config
+ * @chan_info: roam scan channel list
+ * @reason: Channel update reason
+ *
+ * Return: None
+ */
+void cm_fill_rso_channel_list(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_objmgr_vdev *vdev,
+			      struct rso_config *rso_cfg,
+			      struct wlan_roam_scan_channel_list *chan_info,
+			      uint8_t reason);
 #endif /* _WLAN_CM_ROAM_OFFLOAD_H_ */

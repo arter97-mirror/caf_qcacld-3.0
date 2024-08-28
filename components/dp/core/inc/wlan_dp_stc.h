@@ -115,6 +115,7 @@ enum wlan_dp_stc_burst_state {
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_START: sampling started
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS: sampling burst stats
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_DONE: sampling completed
+ * @WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL: sampling failed
  * @WLAN_DP_SAMPLING_STATE_SAMPLES_SENT: samples sent
  * @WLAN_DP_SAMPLING_STATE_CLASSIFIED: flow classified
  */
@@ -124,6 +125,7 @@ enum wlan_stc_sampling_state {
 	WLAN_DP_SAMPLING_STATE_SAMPLING_START,
 	WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS,
 	WLAN_DP_SAMPLING_STATE_SAMPLING_DONE,
+	WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL,
 	WLAN_DP_SAMPLING_STATE_SAMPLES_SENT,
 	WLAN_DP_SAMPLING_STATE_CLASSIFIED,
 };
@@ -145,8 +147,8 @@ enum wlan_dp_flow_dir {
  * @peer_id: Peer ID
  * @flags: flags
  * @tx_flow_id: TX flow ID
- * @tx_flow_metadata: TX flow metadata
  * @rx_flow_id: RX flow ID
+ * @tx_flow_metadata: TX flow metadata
  * @rx_flow_metadata: RX flow metadata
  * @flow_tuple: flow tuple
  * @dir: flow direction
@@ -154,9 +156,9 @@ enum wlan_dp_flow_dir {
 struct wlan_dp_stc_sampling_candidate {
 	uint16_t peer_id;
 	uint32_t flags;
-	uint32_t tx_flow_id;
+	uint16_t tx_flow_id;
+	uint16_t rx_flow_id;
 	uint32_t tx_flow_metadata;
-	uint32_t rx_flow_id;
 	uint32_t rx_flow_metadata;
 	struct flow_info flow_tuple;
 	enum wlan_dp_flow_dir dir;
@@ -176,6 +178,7 @@ struct wlan_dp_stc_sampling_candidate {
  * struct wlan_dp_stc_sampling_table_entry - Sampling table entry
  * @state: State of sampling for this flow
  * @dir: direction of flow
+ * @burst_stats_report_ts: Burst stats reported timestamp
  * @flags: flags set by timer
  * @flags1: flags set by periodic work
  * @next_sample_idx: next sample index to fill min/max stats in per-packet path
@@ -183,9 +186,11 @@ struct wlan_dp_stc_sampling_candidate {
  * @max_num_sample_attempts: max number of sampling_timer runs to collect
  *			     txrx and burst state
  * @tx_flow_id: tx flow ID
- * @tx_flow_metadata: tx flow metadata
  * @rx_flow_id: rx flow ID
+ * @tx_flow_metadata: tx flow metadata
  * @rx_flow_metadata: rx flow metadata
+ * @tuple_hash: Flow tuple hash
+ * @flow_tuple: Flow tuple info
  * @tx_stats_ref: tx window stats reference
  * @rx_stats_ref: rx window stats reference
  * @flow_samples: flow samples
@@ -201,9 +206,9 @@ struct wlan_dp_stc_sampling_table_entry {
 	uint8_t max_num_sample_attempts;
 	uint8_t traffic_type;
 	uint16_t peer_id;
-	uint32_t tx_flow_id;
+	uint16_t tx_flow_id;
+	uint16_t rx_flow_id;
 	uint32_t tx_flow_metadata;
-	uint32_t rx_flow_id;
 	uint32_t rx_flow_metadata;
 	uint64_t tuple_hash;
 	struct flow_info flow_tuple;
@@ -268,7 +273,7 @@ struct wlan_dp_stc_flow_table_entry {
 	struct wlan_dp_stc_burst_stats burst_stats;
 };
 
-#define DP_STC_FLOW_TABLE_ENTRIES_MAX 256
+#define DP_STC_FLOW_TABLE_ENTRIES_MAX 384
 /**
  * struct wlan_dp_stc_rx_flow_table - RX flow table
  * @entries: RX flow table records
@@ -317,15 +322,15 @@ struct wlan_dp_stc_peer_traffic_map {
 #define DP_STC_CLASSIFIED_TABLE_FLOW_MAX 256
 struct wlan_dp_stc_classified_flow_entry {
 	uint8_t flow_active;
-	enum qca_traffic_type traffic_type;
+	uint8_t vdev_id;
 	uint16_t tx_flow_id;
-	uint8_t rx_flow_id;
+	uint16_t rx_flow_id;
+	uint16_t peer_id;
 	uint32_t prev_tx_pkts;
 	uint32_t prev_rx_pkts;
-	uint8_t vdev_id;
-	uint16_t peer_id;
 	unsigned long flags;
 	unsigned long del_flags;
+	enum qca_traffic_type traffic_type;
 	qdf_atomic_t state;
 };
 
@@ -342,6 +347,7 @@ struct wlan_dp_stc_classified_flow_table {
  *				flow stats are to be reported
  * @flow_monitor_work: periodic work to process all the misc work for STC
  * @flow_monitor_interval: periodic flow monitor work interval
+ * @logmask: mask indicating which logs are enabled
  * @periodic_work_state: States of the periodic flow monitor work
  * @flow_sampling_timer: timer to sample all the short-listed flows
  * @sample_timer_state: sampling timer state
@@ -359,14 +365,15 @@ struct wlan_dp_stc {
 	uint8_t send_classified_flow_stats;
 	struct qdf_periodic_work flow_monitor_work;
 	uint32_t flow_monitor_interval;
+	uint32_t logmask;
 	enum wlan_dp_stc_periodic_work_state periodic_work_state;
 	qdf_timer_t flow_sampling_timer;
 	enum wlan_dp_stc_timer_state sample_timer_state;
 	struct wlan_dp_stc_peer_traffic_map peer_traffic_map[DP_STC_MAX_PEERS];
-	struct wlan_dp_stc_sampling_table sampling_flow_table;
-	struct wlan_dp_stc_rx_flow_table rx_flow_table;
-	struct wlan_dp_stc_tx_flow_table tx_flow_table;
-	struct wlan_dp_stc_classified_flow_table classified_flow_table;
+	struct wlan_dp_stc_sampling_table *sampling_flow_table;
+	struct wlan_dp_stc_rx_flow_table *rx_flow_table;
+	struct wlan_dp_stc_tx_flow_table *tx_flow_table;
+	struct wlan_dp_stc_classified_flow_table *classified_flow_table;
 	struct wlan_dp_stc_sampling_candidate candidates[DP_STC_SAMPLE_FLOWS_MAX];
 };
 
@@ -510,13 +517,16 @@ wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 			       uint8_t c_flow_id)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
-	struct wlan_dp_stc_classified_flow_table *c_table =
-						&dp_stc->classified_flow_table;
+	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
+
+	if (!dp_stc)
+		return;
 
 	if (!classified)
 		return;
 
+	c_table = dp_stc->classified_flow_table;
 	c_entry = &c_table->entries[c_flow_id];
 	if (qdf_atomic_read(&c_entry->state) ==
 					WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
@@ -534,13 +544,16 @@ wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 			       uint8_t c_flow_id)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
-	struct wlan_dp_stc_classified_flow_table *c_table =
-						&dp_stc->classified_flow_table;
+	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
+
+	if (!dp_stc)
+		return;
 
 	if (!classified)
 		return;
 
+	c_table = dp_stc->classified_flow_table;
 	c_entry = &c_table->entries[c_flow_id];
 	if (qdf_atomic_read(&c_entry->state) ==
 					WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
@@ -566,6 +579,9 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
 	bool send_fw_indication = false;
+
+	if (!dp_stc)
+		return;
 
 	if (peer_id == 0xFFFF)
 		return;
@@ -636,6 +652,10 @@ wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 	if (qdf_likely(!QDF_NBUF_CB_RX_TRACK_FLOW(nbuf)))
 		return QDF_STATUS_SUCCESS;
 
+	/* Do not update flow feature stats for TCP pure acks */
+	if (qdf_unlikely(QDF_NBUF_CB_RX_TCP_PURE_ACK(nbuf)))
+		return QDF_STATUS_SUCCESS;
+
 	dp_stc = dp_ctx->dp_stc;
 	vdev_id = QDF_NBUF_CB_RX_VDEV_ID(nbuf);
 	peer_id = QDF_NBUF_CB_RX_PEER_ID(nbuf);
@@ -643,7 +663,7 @@ wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 	metadata = QDF_NBUF_CB_RX_FLOW_METADATA(nbuf);
 	pkt_len = qdf_nbuf_len(nbuf);
 
-	flow_entry = &dp_stc->rx_flow_table.entries[flow_id];
+	flow_entry = &dp_stc->rx_flow_table->entries[flow_id];
 
 	return wlan_dp_stc_track_flow_features(dp_stc, nbuf, flow_entry,
 					       vdev_id, peer_id, pkt_len,
@@ -677,7 +697,12 @@ wlan_dp_stc_check_n_track_tx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 	if (qdf_likely(!flow_track_enabled))
 		return QDF_STATUS_SUCCESS;
 
-	flow_entry = &dp_stc->tx_flow_table.entries[flow_id];
+	/* Do not update flow feature stats for TCP pure acks */
+	if (qdf_unlikely(QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) ==
+					QDF_NBUF_CB_PACKET_TYPE_TCP_ACK))
+		return QDF_STATUS_SUCCESS;
+
+	flow_entry = &dp_stc->tx_flow_table->entries[flow_id];
 	pkt_len = qdf_nbuf_len(nbuf) - sizeof(qdf_ether_header_t);
 
 	return wlan_dp_stc_track_flow_features(dp_stc, nbuf, flow_entry,
@@ -730,6 +755,24 @@ static inline bool wlan_dp_cfg_is_stc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 {
 	return dp_cfg->stc_enable;
 }
+
+/**
+ * wlan_dp_stc_get_logmask() - Get STC log mask
+ * @dp_ctx: DP global psoc context
+ *
+ * Return: logmask configured in STC
+ */
+uint32_t wlan_dp_stc_get_logmask(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_stc_update_logmask() - Set STC log mask
+ * @dp_ctx: DP global psoc context
+ * @mask: new log mask to be set
+ *
+ * Return: None
+ */
+void wlan_dp_stc_update_logmask(struct wlan_dp_psoc_context *dp_ctx,
+				uint32_t mask);
 
 /**
  * wlan_dp_stc_attach() - STC attach
@@ -803,6 +846,18 @@ static inline void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
 static inline bool wlan_dp_cfg_is_stc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 {
 	return false;
+}
+
+static inline
+uint32_t wlan_dp_stc_get_logmask(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return 0;
+}
+
+static inline
+void wlan_dp_stc_update_logmask(struct wlan_dp_psoc_context *dp_ctx,
+				uint32_t mask)
+{
 }
 
 static inline

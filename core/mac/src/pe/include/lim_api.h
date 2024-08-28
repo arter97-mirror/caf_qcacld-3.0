@@ -664,21 +664,24 @@ void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /*
- * lim_add_bcn_probe() - Add the generated probe resp to scan DB
+ * lim_add_bcn_probe() - Add the probe resp to scan DB
  * @vdev: VDEV object manager
  * @bcn_probe: Pointer to bcn/probe
  * @len: Length of frame.
  * @freq: Freq on frame.
  * @rssi: RSSI of the frame.
+ * @snr: SNR of frame
+ * @tsf_delta: TSF delta of frame
  *
- * Prepares the meta data to add the generated bcn/probe frame to
+ * Prepares the meta data to add the bcn/probe frame to
  * scan DB.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
-		  uint32_t len, qdf_freq_t freq, int32_t rssi);
+		  uint32_t len, qdf_freq_t freq, int32_t rssi,
+		  uint8_t snr, uint32_t tsf_delta);
 
 /**
  * lim_update_mlo_mgr_info() - API to update mlo_mgr link info
@@ -747,7 +750,8 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 #else
 static inline QDF_STATUS
 lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
-		  uint32_t len, qdf_freq_t freq, int32_t rssi)
+		  uint32_t len, qdf_freq_t freq, int32_t rssi,
+		  uint8_t snr, uint32_t tsf_delta)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -907,12 +911,11 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
  *
  * This api will create mlo peer called during mlo roaming scenario
  *
- * Return: none
+ * Return: QDF_STATUS
  */
-void lim_roam_mlo_create_peer(struct mac_context *mac,
-			      struct roam_offload_synch_ind *sync_ind,
-			      uint8_t vdev_id,
-			      uint8_t *peer_mac);
+QDF_STATUS lim_roam_mlo_create_peer(struct mac_context *mac,
+				    struct roam_offload_synch_ind *sync_ind,
+				    uint8_t vdev_id, uint8_t *peer_mac);
 
 /**
  * lim_mlo_roam_delete_link_peer() - Delete mlo link peer
@@ -954,12 +957,12 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
-static inline void
+static inline QDF_STATUS
 lim_roam_mlo_create_peer(struct mac_context *mac,
 			 struct roam_offload_synch_ind *sync_ind,
-			 uint8_t vdev_id,
-			 uint8_t *peer_mac)
+			 uint8_t vdev_id, uint8_t *peer_mac)
 {
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline void

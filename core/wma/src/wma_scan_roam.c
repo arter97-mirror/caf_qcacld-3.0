@@ -689,9 +689,9 @@ wma_delete_all_peers(tp_wma_handle wma,
  * respect to the self sta and the peer after roaming and completes
  * the roam synch propagation with respect to WMA layer.
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-static void
+static QDF_STATUS
 wma_roam_update_vdev(tp_wma_handle wma,
 		     struct roam_offload_synch_ind *roam_synch_ind_ptr,
 		     uint8_t roamed_vdev_id)
@@ -707,8 +707,7 @@ wma_roam_update_vdev(tp_wma_handle wma,
 	wma->interfaces[vdev_id].nss = roam_synch_ind_ptr->nss;
 
 	/* update channel width */
-	wma->interfaces[vdev_id].chan_width =
-		roam_synch_ind_ptr->chan_width;
+	wma->interfaces[vdev_id].chan_width = roam_synch_ind_ptr->chan_width;
 	/* Fill link freq from roam_synch_ind */
 	if (is_multi_link_roam(roam_synch_ind_ptr))
 		wma->interfaces[vdev_id].ch_freq =
@@ -718,9 +717,8 @@ wma_roam_update_vdev(tp_wma_handle wma,
 			roam_synch_ind_ptr->chan_freq;
 
 	add_sta_params = qdf_mem_malloc(sizeof(*add_sta_params));
-	if (!add_sta_params) {
-		return;
-	}
+	if (!add_sta_params)
+		return QDF_STATUS_E_INVAL;
 
 	if (is_multi_link_roam(roam_synch_ind_ptr))
 		mlo_get_sta_link_mac_addr(vdev_id, roam_synch_ind_ptr,
@@ -745,35 +743,45 @@ wma_roam_update_vdev(tp_wma_handle wma,
 
 	add_sta_params->staType = STA_ENTRY_SELF;
 	add_sta_params->smesessionId = vdev_id;
-	qdf_mem_copy(&add_sta_params->bssId, &mac_addr,
-			 QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(&add_sta_params->bssId, &mac_addr, QDF_MAC_ADDR_SIZE);
 	add_sta_params->assocId = roam_synch_ind_ptr->aid;
 
 	bssid = wma_get_vdev_bssid(wma->interfaces[vdev_id].vdev);
 	if (!bssid) {
 		wma_err("Failed to get bssid for vdev_%d", vdev_id);
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	is_assoc_peer = wlan_vdev_mlme_get_is_mlo_vdev(wma->psoc, vdev_id);
 	if (is_multi_link_roam(roam_synch_ind_ptr)) {
-		wma_create_peer(wma, mac_addr.bytes,
-				WMI_PEER_TYPE_DEFAULT, vdev_id,
-				roam_synch_ind_ptr->bssid.bytes,
-				is_assoc_peer);
+		status = wma_create_peer(wma, mac_addr.bytes,
+					 WMI_PEER_TYPE_DEFAULT, vdev_id,
+					 roam_synch_ind_ptr->bssid.bytes,
+					 is_assoc_peer);
 	} else {
-		wma_create_peer(wma, mac_addr.bytes,
-				WMI_PEER_TYPE_DEFAULT,
-				vdev_id,
-				NULL,
-				is_assoc_peer);
+		status = wma_create_peer(wma, mac_addr.bytes,
+					 WMI_PEER_TYPE_DEFAULT, vdev_id, NULL,
+					 is_assoc_peer);
 	}
 
-	if (is_multi_link_roam(roam_synch_ind_ptr))
-		lim_roam_mlo_create_peer(wma->mac_context,
-					 roam_synch_ind_ptr,
-					 vdev_id,
-					 mac_addr.bytes);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Failed to create peer " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(mac_addr.bytes));
+		goto end;
+	}
+
+	if (is_multi_link_roam(roam_synch_ind_ptr)) {
+		status = lim_roam_mlo_create_peer(wma->mac_context,
+						  roam_synch_ind_ptr, vdev_id,
+						  mac_addr.bytes);
+
+		/* The created peer will be destroyed on HO failure cleanup */
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("Failed to attach MLO peer " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_addr.bytes));
+			goto end;
+		}
+	}
 
 	if (wlan_vdev_mlme_get_opmode(wma->interfaces[vdev_id].vdev) ==
 								QDF_STA_MODE)
@@ -796,6 +804,7 @@ wma_roam_update_vdev(tp_wma_handle wma,
 				      roam_synch_ind_ptr);
 end:
 	qdf_mem_free(add_sta_params);
+	return status;
 }
 
 static void wma_update_phymode_on_roam(tp_wma_handle wma,
@@ -2695,13 +2704,6 @@ static void wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
 	qdf_mem_free(roam_synch_data);
 }
 
-void wma_handle_roam_sync_timeout(tp_wma_handle wma_handle,
-				  struct roam_sync_timeout_timer_info *info)
-{
-	wma_invalid_roam_reason_handler(wma_handle, info->vdev_id,
-					CM_ROAM_NOTIF_ROAM_ABORT);
-}
-
 void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif,
 				    uint32_t reason)
 {
@@ -3146,19 +3148,24 @@ QDF_STATUS wma_send_ht40_obss_scanind(tp_wma_handle wma,
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-void cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
-			 struct roam_offload_synch_ind *sync_ind)
+QDF_STATUS cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
+			       struct roam_offload_synch_ind *sync_ind)
 {
+	QDF_STATUS status;
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct qdf_mac_addr *self_mac_addr;
 	uint8_t vdev_id;
 
 	if (!wma)
-		return;
+		return QDF_STATUS_E_INVAL;
 
 	vdev_id = wlan_vdev_get_id(vdev);
 
-	wma_roam_update_vdev(wma, sync_ind, vdev_id);
+	status = wma_roam_update_vdev(wma, sync_ind, vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_debug("VDEV update failed for roam on %d", vdev_id);
+		return status;
+	}
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		self_mac_addr =
@@ -3168,13 +3175,15 @@ void cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
-		return;
+		return QDF_STATUS_SUCCESS;
 
 	self_mac_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
 
 update_deflink:
 	/* Set the assoc vdev as DP deflink after roaming */
 	wlan_dp_update_def_link(wma->psoc, self_mac_addr, vdev);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS

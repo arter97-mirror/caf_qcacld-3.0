@@ -79,7 +79,7 @@
 #define SAP_24GHZ_FOURTH_OVERLAP_CHAN_RSSI_EFFECT_PRIMARY     (-40)     /* In 2.4GHZ, Effect of Primary  Channel RSSI on Fourth Overlapping Channel */
 
 /* Maximum character to print in single line */
-#define SAP_MAX_CHANNEL_INFO_LOG 200
+#define SAP_MAX_CHANNEL_INFO_LOG 150
 
 /* size to print freq */
 #define SAP_FREQ_LOG_LEN 6

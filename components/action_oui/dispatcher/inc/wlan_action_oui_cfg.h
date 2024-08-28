@@ -888,6 +888,33 @@
 	"", \
 	"Limit BW for specified AP")
 
+/*
+ * <ini>
+ * gActionOUIDisableAuxListen - Used to specify action OUIs to disable AUX
+ * Listen operation during the connection with specified APs.
+ *
+ * This ini is used to specify AP OUIs. Aux listen is prone to ITO issues.
+ * Thus, this INI is needed to ensure Aux listen can be disabled if we detect
+ * some ITO issue with specific APs.
+ * Note: User should strictly add new action OUIs at the end of this
+ * default value.
+ * If no OUI set, then allow STA to disable Aux listen for ALL APs.
+ * If INI is set to "ffffff 00 01", then STA is not allowed to disable Aux
+ * listen for any AP.
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_DISABLE_AUX_LISTEN CFG_INI_STRING( \
+	"gActionOUIDisableAuxListen", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"ffffff 00 01", \
+	"Used to specify action OUIs to control Aux listen configuration")
+
 #define CFG_ACTION_OUI \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1) \
@@ -910,5 +937,6 @@
 	CFG(CFG_ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ) \
 	CFG(CFG_ACTION_OUI_DISABLE_BFORMEE) \
 	CFG(CFG_ACTION_OUI_LIMIT_BW) \
+	CFG(CFG_ACTION_OUI_DISABLE_AUX_LISTEN) \
 	CFG(CFG_ENABLE_ACTION_OUI)
 #endif

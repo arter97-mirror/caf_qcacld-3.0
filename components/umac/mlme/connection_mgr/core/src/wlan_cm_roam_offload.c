@@ -857,6 +857,8 @@ QDF_STATUS cm_roam_update_vendor_handoff_config(struct wlan_objmgr_psoc *psoc,
 		case VENDOR_CONTROL_PARAM_ROAM_TRIGGER:
 			cfg_params->neighbor_lookup_threshold =
 							abs(param_value);
+			cfg_params->next_rssi_threshold =
+					cfg_params->neighbor_lookup_threshold;
 			break;
 		case VENDOR_CONTROL_PARAM_ROAM_DELTA:
 			cfg_params->roam_rssi_diff = param_value;
@@ -1108,6 +1110,8 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 	QDF_STATUS status;
 	uint8_t reason = REASON_SUPPLICANT_DE_INIT_ROAMING;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+	struct wlan_roam_idle_params idle_params;
+	bool send_idle_config = false;
 
 	if (!psoc)
 		return QDF_STATUS_E_INVAL;
@@ -1123,6 +1127,19 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 	if (trigger->trigger_bitmap)
 		reason = REASON_SUPPLICANT_INIT_ROAMING;
 
+	/*
+	 * Prevent RSO update if RSO is already enabled and no state change
+	 * is expected due to the new trigger bitmap.
+	 */
+	if (wlan_is_rso_enabled(pdev, vdev_id) && trigger->trigger_bitmap) {
+		send_idle_config = true;
+		cm_roam_triggers(psoc, vdev_id, trigger);
+		cm_roam_idle_params(psoc, vdev_id, &idle_params);
+		if (!(trigger->trigger_bitmap & BIT(ROAM_TRIGGER_REASON_IDLE)))
+			idle_params.enable = false;
+		goto send_trigger;
+	}
+
 	status = cm_roam_state_change(pdev, vdev_id,
 			trigger->trigger_bitmap ? WLAN_ROAM_RSO_ENABLED :
 			WLAN_ROAM_DEINIT,
@@ -1130,7 +1147,12 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-	return wlan_cm_tgt_send_roam_triggers(psoc, vdev_id, trigger);
+send_trigger:
+	status = wlan_cm_tgt_send_roam_triggers(psoc, vdev_id, trigger);
+	if (!send_idle_config)
+		return status;
+
+	return wlan_cm_tgt_send_idle_params(psoc, vdev_id, &idle_params);
 }
 
 static void cm_roam_set_roam_reason_better_ap(struct wlan_objmgr_psoc *psoc,
@@ -2275,12 +2297,11 @@ static void cm_update_rso_freq_list_from_partner_link(
 }
 #endif
 
-static void
-cm_fill_rso_channel_list(struct wlan_objmgr_psoc *psoc,
-			 struct wlan_objmgr_vdev *vdev,
-			 struct rso_config *rso_cfg,
-			 struct wlan_roam_scan_channel_list *chan_info,
-			 uint8_t reason)
+void cm_fill_rso_channel_list(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_objmgr_vdev *vdev,
+			      struct rso_config *rso_cfg,
+			      struct wlan_roam_scan_channel_list *chan_info,
+			      uint8_t reason)
 {
 	QDF_STATUS status;
 	uint8_t ch_cache_str[128] = {0};
@@ -4182,6 +4203,7 @@ cm_roam_switch_to_deinit(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	enum roam_offload_state cur_state = mlme_get_roam_state(psoc, vdev_id);
 	bool sup_disabled_roam;
+	struct wlan_objmgr_vdev *vdev = NULL;
 
 	switch (cur_state) {
 	/*
@@ -4238,6 +4260,13 @@ cm_roam_switch_to_deinit(struct wlan_objmgr_pdev *pdev,
 	status = cm_roam_init_req(psoc, vdev_id, false);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_NB_ID);
+	if (vdev) {
+		wlan_cm_clear_roam_offload_bssid(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+	}
 
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_DEINIT);
 	mlme_clear_operations_bitmap(psoc, vdev_id);
@@ -4656,6 +4685,7 @@ cm_roam_switch_to_roam_sync(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	enum roam_offload_state cur_state = mlme_get_roam_state(psoc, vdev_id);
+	QDF_STATUS status;
 
 	switch (cur_state) {
 	case WLAN_ROAM_RSO_ENABLED:
@@ -4684,11 +4714,23 @@ cm_roam_switch_to_roam_sync(struct wlan_objmgr_pdev *pdev,
 					    WLAN_ROAM_SYNCH_IN_PROG);
 			break;
 		}
+
+		mlme_debug("ROAM: ROAM_SYNCH received in state: %d", cur_state);
 		/*
-		 * transition to WLAN_ROAM_SYNCH_IN_PROG not allowed otherwise
-		 * if we're already RSO stopped, fall through to return failure
-		 */
-		fallthrough;
+		* If ROAM SYNC come to host in below scenario:
+		* 1. HOST sends RSO stop command with scan mode 4, in order
+		*    to process supplicant disabled roaming request
+		* 2. FW already queued the roam sync event before RSO STOP
+		*    command receive from host
+		* In this case host should send RSO STOP with scan mode = 0
+		* to allow FW to move into RSO STOP state
+		*/
+		status = cm_roam_stop_req(psoc, vdev_id, REASON_ROAM_ABORT,
+					  NULL, false);
+		if (QDF_IS_STATUS_ERROR(status))
+			mlme_err("ROAM: Unable to process RSO STOP req");
+
+		return QDF_STATUS_E_FAILURE;
 	case WLAN_ROAM_INIT:
 	case WLAN_ROAM_DEINIT:
 	case WLAN_ROAM_SYNCH_IN_PROG:
@@ -4963,7 +5005,11 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
 	    mlo_check_if_all_vdev_up(vdev) &&
 	    reason == REASON_VDEV_RESTART_FROM_HOST) {
 		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
-
+		if (!assoc_vdev) {
+			mlme_err("Assoc vdev is NULL");
+			status = QDF_STATUS_E_FAILURE;
+			goto end;
+		}
 		*is_rso_skip = false;
 		*vdev_id = wlan_vdev_get_id(assoc_vdev);
 		mlme_debug("MLO_CSA: Send RSO on assoc vdev %d", *vdev_id);
@@ -5357,6 +5403,7 @@ QDF_STATUS cm_neighbor_roam_update_config(struct wlan_objmgr_pdev *pdev,
 	case REASON_LOOKUP_THRESH_CHANGED:
 		old_value = cfg_params->neighbor_lookup_threshold;
 		cfg_params->neighbor_lookup_threshold = value;
+		cfg_params->next_rssi_threshold = value;
 		break;
 	case REASON_OPPORTUNISTIC_THRESH_DIFF_CHANGED:
 		old_value = cfg_params->opportunistic_threshold_diff;
@@ -5421,6 +5468,8 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 	cfg_params->neighbor_scan_period =
 			mlme_obj->cfg.lfr.neighbor_scan_timer_period;
 	cfg_params->neighbor_lookup_threshold =
+			mlme_obj->cfg.lfr.neighbor_lookup_rssi_threshold;
+	cfg_params->next_rssi_threshold =
 			mlme_obj->cfg.lfr.neighbor_lookup_rssi_threshold;
 	cfg_params->roam_rssi_diff =
 			mlme_obj->cfg.lfr.roam_rssi_diff;
@@ -7471,6 +7520,7 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t i;
 	uint16_t diag_event;
+	bool is_mlo = false;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_packet_info);
 
@@ -7524,16 +7574,29 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 						 !frame_data->is_rsp);
 		diag_event = EVENT_WLAN_MGMT;
 
-		status = wlan_populate_roam_mld_log_param(vdev,
-							  &wlan_diag_event,
-							  wlan_diag_event.subtype);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			mlme_err("vdev: %d Unable to populate MLO parameter",
-				 wlan_vdev_get_id(vdev));
-			return status;
+		wlan_diag_event.supported_links = frame_data->band;
+
+		/*
+		 * Frame_data->band will be '0' for legacy connection and
+		 * And will be band bit map for MLO connection where band bitmap
+		 * as follows:
+		 * BIT 0: 2 GHz link
+		 * BIT 1: 5 GHz link
+		 * BIT 2: 6 GHz link
+		 */
+		if (frame_data->band) {
+			is_mlo = true;
+			status =
+			wlan_populate_roam_mld_log_param(vdev,
+							 &wlan_diag_event,
+							 wlan_diag_event.subtype);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				mlme_err("vdev: %d Unable to populate MLO parameter",
+					 wlan_vdev_get_id(vdev));
+				return status;
+			}
 		}
 
-		wlan_diag_event.supported_links = frame_data->band;
 	}
 
 	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
@@ -7547,7 +7610,7 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, diag_event);
 	if (wlan_diag_event.subtype == WLAN_CONN_DIAG_REASSOC_RESP_EVENT ||
 	    wlan_diag_event.subtype == WLAN_CONN_DIAG_ASSOC_RESP_EVENT) {
-		wlan_connectivity_mlo_setup_event(vdev);
+		wlan_connectivity_mlo_setup_event(vdev, is_mlo);
 
 		/*
 		 * Send STA info event when roaming is successful

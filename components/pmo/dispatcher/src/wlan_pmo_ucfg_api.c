@@ -1141,3 +1141,8 @@ QDF_STATUS ucfg_pmo_get_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
 {
 	return pmo_get_vdev_bridge_addr(vdev, bridgeaddr);
 }
+
+bool ucfg_pmo_is_fw_debug_enable(struct wlan_objmgr_psoc *psoc)
+{
+	return cfg_get(psoc, CFG_PMO_FW_DEBUG_ENABLE);
+}

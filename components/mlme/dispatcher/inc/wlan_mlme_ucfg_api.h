@@ -685,6 +685,109 @@ ucfg_mlme_get_external_acs_policy(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_get_acs_linear_bss_status() - Get linear bss acs status flag
+ *
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_linear_bss_status(struct wlan_objmgr_psoc *psoc,
+				    bool *value)
+{
+	return wlan_mlme_get_acs_linear_bss_status(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_linear_rssi_status() - Get linear rssi acs status flag
+ *
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_linear_rssi_status(struct wlan_objmgr_psoc *psoc,
+				     bool *value)
+{
+	return wlan_mlme_get_acs_linear_rssi_status(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_wifi_non_wifi_load_status() - Get Wi-Fi, Non Wi-Fi
+ *						    acs load status flag
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_wifi_non_wifi_load_status(struct wlan_objmgr_psoc *psoc,
+					    bool *value)
+{
+	return wlan_mlme_get_acs_wifi_non_wifi_load_status(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_same_chan_weight_rand_status() - Get acs same weight
+ *						      channels randomization
+ *						      status flag
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_same_chan_weight_rand_status(struct wlan_objmgr_psoc *psoc,
+					       bool *value)
+{
+	return wlan_mlme_get_acs_same_chan_weight_rand_status(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_early_terminate_status() - Get acs scan early terminate
+ *						status flag
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_early_terminate_status(struct wlan_objmgr_psoc *psoc,
+					 bool *value)
+{
+	return wlan_mlme_get_acs_early_terminate_status(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_acs_rssi_threshold_score() - Get acs rssi threshold
+ *
+ * @psoc: pointer to psoc object
+ * @value: Value that needs to be set from the caller
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_acs_rssi_threshold_score(struct wlan_objmgr_psoc *psoc,
+				       int16_t *value)
+{
+	return wlan_mlme_get_acs_rssi_threshold_score(psoc, value);
+}
+
+/**
  * ucfg_mlme_get_acs_support_for_dfs_ltecoex() - Is DFS LTE CoEx ACS supported
  * @psoc: pointer to psoc object
  * @value: Value that needs to be set from the caller

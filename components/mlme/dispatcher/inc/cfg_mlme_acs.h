@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -23,6 +23,37 @@
 
 #ifndef __CFG_MLME_ACS_H
 #define __CFG_MLME_ACS_H
+
+/**
+ * enum acs_config_feature_bitmap - ACS feature bitmap for various configs
+ *
+ * @ACS_CONFIG_FEATURE_BITMAP_DEFAULT: Default enumeration
+ * @ACS_CONFIG_LINEAR_BSS_SCORE_ENABLE: Enable BSS score linearly during ACS
+ * @ACS_CONFIG_LINEAR_RSSI_SCORE_ENABLE: Enable RSSI score linearly during ACS
+ * @ACS_CONFIG_WIFI_NONWIFI_LOADING_ENABLE: Enable load scoring for both Wi-Fi
+ *                                          and Non-Wifi Load
+ * @ACS_CONFIG_SAME_WC_CHAN_RAND_ENABLE: Enable randomization when multiple
+ *					 channels have same weight and bss cnt.
+ * @ACS_CONFIG_TERMI_ON_1ST_CLN_CHAN_ENABLE: Enable early termination of ACS on
+ *					     1st clean channel
+ * @ACS_CONFIG_FEATURE_BITMAP_MAX: Max enumeration
+ */
+enum acs_config_feature_bitmap {
+	ACS_CONFIG_FEATURE_BITMAP_DEFAULT	= 0x00,
+	ACS_CONFIG_LINEAR_BSS_SCORE_ENABLE	= 0x01,
+	ACS_CONFIG_LINEAR_RSSI_SCORE_ENABLE	= 0x02,
+	ACS_CONFIG_WIFI_NONWIFI_LOADING_ENABLE	= 0x04,
+	ACS_CONFIG_SAME_WC_CHAN_RAND_ENABLE	= 0x08,
+	ACS_CONFIG_TERMI_ON_1ST_CLN_CHAN_ENABLE	= 0x10,
+	ACS_CONFIG_FEATURE_BITMAP_MAX,
+};
+
+#define ACS_CONFIG_FEATURE_BITMAP_ENABLE_ALL      \
+	(ACS_CONFIG_LINEAR_BSS_SCORE_ENABLE |     \
+	 ACS_CONFIG_LINEAR_RSSI_SCORE_ENABLE |    \
+	 ACS_CONFIG_WIFI_NONWIFI_LOADING_ENABLE | \
+	 ACS_CONFIG_SAME_WC_CHAN_RAND_ENABLE |    \
+	 ACS_CONFIG_TERMI_ON_1ST_CLN_CHAN_ENABLE)
 
 /*
  * <ini>
@@ -267,6 +298,62 @@
 		CFG_VALUE_OR_DEFAULT, \
 		"np chan weight")
 
+/*
+ * <ini>
+ * acs_config_feature_bitmap - Control for which feature to enable for ACS
+ * @Min: ACS_CONFIG_FEATURE_BITMAP_DEFAULT
+ * @Max: ACS_CONFIG_FEATURE_BITMAP_ENABLE_ALL
+ * @Default: ACS_CONFIG_FEATURE_BITMAP_DEFAULT
+ *
+ * This ini is used to config, control parameters for ACS to select channel.
+ * These config will define criteria for channel selection logic.
+ *
+ * Linear BSS Score Enable					0x01
+ * Linear RSSI Score Enable					0x02
+ * Wi-Fi + Non-Wi-Fi Loading Score Enable			0x04
+ * Same weight and bss count channels Randomization Enable	0x08
+ * Terminate ACS early once 1st clean channel is found Enable	0x10
+ *
+ * Related: None
+ *
+ * Supported Feature: ACS
+ *
+ * Usage: Internal
+ *
+ * <ini>
+ */
+#define CFG_ACS_CONFIG_FEATURE_BITMAP CFG_INI_UINT("acs_config_feature_bitmap",\
+					ACS_CONFIG_FEATURE_BITMAP_DEFAULT, \
+					ACS_CONFIG_FEATURE_BITMAP_ENABLE_ALL, \
+					ACS_CONFIG_FEATURE_BITMAP_DEFAULT, \
+					CFG_VALUE_OR_DEFAULT, \
+					"ACS feature config for optimisation")
+
+/*
+ * <ini>
+ * acs_rssi_score_threshold - Set value for ACS RSSI Score Threshold
+ * @Min: -100
+ * @Max: 0
+ * @Default: -62
+ *
+ * This config is used to set value for ACS RSSI Score Threshold
+ *
+ * Related: None
+ *
+ * Supported Feature: ACS
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_ACS_RSSI_SCORE_THR CFG_INI_INT( \
+		"acs_rssi_score_threshold", \
+		-100, \
+		0, \
+		-62, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Set value for ACS RSSI Score Threshold")
+
 #define CFG_ACS_ALL \
 	CFG(CFG_ACS_WITH_MORE_PARAM) \
 	CFG(CFG_AUTO_CHANNEL_SELECT_WEIGHT) \
@@ -276,6 +363,8 @@
 	CFG(CFG_NORMALIZE_ACS_WEIGHT) \
 	CFG(CFG_ACS_PREFER_6GHZ_PSC) \
 	CFG(CFG_ACS_FORCE_START_SAP) \
-	CFG(CFG_ACS_NP_CHAN_WEIGHT)
+	CFG(CFG_ACS_NP_CHAN_WEIGHT) \
+	CFG(CFG_ACS_CONFIG_FEATURE_BITMAP) \
+	CFG(CFG_ACS_RSSI_SCORE_THR)
 
 #endif /* __CFG_MLME_ACS_H */

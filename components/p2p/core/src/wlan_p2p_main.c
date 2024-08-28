@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -555,6 +555,9 @@ static QDF_STATUS p2p_object_init_params(
 			cfg_get(psoc, CFG_ACTION_FRAME_RANDOM_SEQ_NUM_ENABLED);
 	p2p_soc_obj->param.indoor_channel_support =
 			cfg_get(psoc, CFG_P2P_GO_ON_5GHZ_INDOOR_CHANNEL);
+	p2p_soc_obj->param.go_ignore_non_p2p_probe_req =
+			cfg_get(psoc, CFG_GO_IGNORE_NON_P2P_PROBE_REQ);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1093,36 +1096,46 @@ QDF_STATUS p2p_event_flush_callback(struct scheduler_msg *msg)
 	return QDF_STATUS_SUCCESS;
 }
 
-bool p2p_check_oui_and_force_1x1(uint8_t *assoc_ie, uint32_t assoc_ie_len)
+const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
+						  uint32_t assoc_ie_len)
 {
 	const uint8_t *vendor_ie, *p2p_ie, *pos;
-	uint8_t rem_len, attr;
-	uint16_t attr_len;
+	uint8_t attr_id;
+	uint32_t rem_len, attr_len;
 
-	vendor_ie = (uint8_t *)p2p_get_p2pie_ptr(assoc_ie, assoc_ie_len);
+	vendor_ie = (uint8_t *)wlan_get_vendor_ie_ptr_from_oui(P2P_OUI,
+							       P2P_OUI_SIZE,
+							       assoc_ie,
+							       assoc_ie_len);
 	if (!vendor_ie) {
-		p2p_debug("P2P IE not found");
-		return false;
+		p2p_err("P2P IE not found");
+		return NULL;
 	}
 
-	rem_len = vendor_ie[1];
-	if (rem_len < (2 + OUI_SIZE_P2P) || rem_len > WLAN_MAX_IE_LEN) {
-		p2p_err("Invalid IE len %d", rem_len);
-		return false;
+	if (!is_p2p_oui(vendor_ie)) {
+		p2p_err("P2P OUI not found");
+		return NULL;
 	}
 
 	p2p_ie = vendor_ie + HEADER_LEN_P2P_IE;
-	rem_len -= OUI_SIZE_P2P;
+	rem_len = vendor_ie[1];
+	if (rem_len < (2 + P2P_OUI_SIZE) || rem_len > WLAN_MAX_IE_LEN) {
+		p2p_err("Invalid IE len %d", rem_len);
+		return NULL;
+	}
+
+	rem_len -= P2P_OUI_SIZE;
 
 	while (rem_len) {
-		attr = p2p_ie[0];
+		attr_id = p2p_ie[0];
 		attr_len = LE_READ_2(&p2p_ie[1]);
 		if (attr_len > rem_len)  {
-			p2p_err("Invalid len %d for elem:%d", attr_len, attr);
-			return false;
+			p2p_err("Invalid len %d for elem:%d", attr_len,
+				attr_id);
+			return NULL;
 		}
 
-		switch (attr) {
+		switch (attr_id) {
 		case P2P_ATTR_CAPABILITY:
 		case P2P_ATTR_DEVICE_ID:
 		case P2P_ATTR_GROUP_OWNER_INTENT:
@@ -1133,7 +1146,6 @@ bool p2p_check_oui_and_force_1x1(uint8_t *assoc_ie, uint32_t assoc_ie_len)
 		case P2P_ATTR_MANAGEABILITY:
 		case P2P_ATTR_CHANNEL_LIST:
 			break;
-
 		case P2P_ATTR_DEVICE_INFO:
 			if (attr_len < (QDF_MAC_ADDR_SIZE +
 					MAX_CONFIG_METHODS_LEN + 8 +
@@ -1145,33 +1157,44 @@ bool p2p_check_oui_and_force_1x1(uint8_t *assoc_ie, uint32_t assoc_ie_len)
 
 			/* move by attr id and 2 bytes of attr len */
 			pos = p2p_ie + 3;
-
-			/*
-			 * the P2P Device info is of format:
-			 * attr_id - 1 byte
-			 * attr_len - 2 bytes
-			 * device mac addr - 6 bytes
-			 * config methods - 2 bytes
-			 * primary device type - 8bytes
-			 *  -primary device type category - 1 byte
-			 *  -primary device type oui - 4bytes
-			 * number of secondary device type - 2 bytes
-			 */
-			pos += ETH_ALEN + MAX_CONFIG_METHODS_LEN +
-			       DEVICE_CATEGORY_MAX_LEN;
-
-			if (!qdf_mem_cmp(pos, P2P_1X1_WAR_OUI,
-					 P2P_1X1_OUI_LEN))
-				return true;
-
-			break;
+			return pos;
 		default:
-			p2p_err("Invalid P2P attribute");
+			p2p_err("Unknown attribute in P2P IE %d", attr_id);
 			break;
 		}
+
 		p2p_ie += (3 + attr_len);
 		rem_len -= (3 + attr_len);
 	}
+
+	return NULL;
+}
+
+bool p2p_check_oui_and_force_1x1(uint8_t *assoc_ie, uint32_t assoc_ie_len)
+{
+	const uint8_t *pos;
+
+	pos = p2p_parse_assoc_ie_for_device_info(assoc_ie, assoc_ie_len);
+
+	if (!pos)
+		return false;
+
+	/*
+	 * the P2P Device info is of format:
+	 * attr_id - 1 byte
+	 * attr_len - 2 bytes
+	 * device mac addr - 6 bytes
+	 * config methods - 2 bytes
+	 * primary device type - 8bytes
+	 *  -primary device type category - 1 byte
+	 *  -primary device type oui - 4bytes
+	 * number of secondary device type - 2 bytes
+	 */
+
+	pos += ETH_ALEN + MAX_CONFIG_METHODS_LEN + DEVICE_CATEGORY_MAX_LEN;
+
+	if (!qdf_mem_cmp(pos, P2P_1X1_WAR_OUI, P2P_1X1_OUI_LEN))
+		return true;
 
 	return false;
 }
@@ -1567,3 +1590,50 @@ QDF_STATUS p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+void
+p2p_set_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc,
+				     uint32_t mgmt_frm_registration_update)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							    WLAN_UMAC_COMP_P2P);
+
+	if (!p2p_soc_obj) {
+		p2p_err("p2p soc context is NULL");
+		return;
+	}
+
+	p2p_soc_obj->mgmt_frm_registration_update =
+				mgmt_frm_registration_update;
+	p2p_debug("set mgmt regis update value %u",
+		  p2p_soc_obj->mgmt_frm_registration_update);
+}
+
+uint32_t
+p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							    WLAN_UMAC_COMP_P2P);
+
+	if (!p2p_soc_obj) {
+		p2p_err("p2p soc context is NULL");
+		return 0;
+	}
+
+	p2p_debug("get mgmt regis update value %u",
+		  p2p_soc_obj->mgmt_frm_registration_update);
+
+	return p2p_soc_obj->mgmt_frm_registration_update;
+}
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+			       struct p2p_usd_attr_params *param)
+{
+	return tgt_p2p_send_usd_params(psoc, param);
+}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

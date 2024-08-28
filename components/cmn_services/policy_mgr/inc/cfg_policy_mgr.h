@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -96,7 +96,7 @@
  */
 #define CFG_MAX_CONC_CXNS CFG_INI_UINT(\
 					"gMaxConcurrentActiveSessions", \
-					1, 4, 3, \
+					1, WLAN_MAX_VDEVS, 3, \
 					CFG_VALUE_OR_DEFAULT, \
 					"Config max num allowed connections")
 

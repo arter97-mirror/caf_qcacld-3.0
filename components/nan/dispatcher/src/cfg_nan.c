@@ -186,3 +186,15 @@ bool cfg_nan_get_support_sta_p2p_ndp(struct wlan_objmgr_psoc *psoc)
 
 	return nan_obj->cfg_param.support_sta_p2p_ndp;
 }
+
+bool cfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *nan_obj = cfg_nan_get_priv_obj(psoc);
+
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return cfg_default(CFG_STA_SAP_P2P_CONCURRENCY);
+	}
+
+	return nan_obj->cfg_param.prefer_nan_chan_for_p2p;
+}

@@ -2523,4 +2523,13 @@ QDF_STATUS ucfg_pmo_set_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS ucfg_pmo_get_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
 					 struct qdf_mac_addr *bridgeaddr);
+
+/**
+ * ucfg_pmo_is_fw_debug_enable() - This function tells if FW logging debug
+ * is enable or not.
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if FW debug is enable otherwise false
+ */
+bool ucfg_pmo_is_fw_debug_enable(struct wlan_objmgr_psoc *psoc);
 #endif /* end  of _WLAN_PMO_UCFG_API_H_ */

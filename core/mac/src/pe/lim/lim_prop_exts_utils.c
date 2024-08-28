@@ -46,6 +46,7 @@
 #include "lim_session.h"
 #include "wma.h"
 #include "wlan_utility.h"
+#include "wlan_mlo_mgr_sta.h"
 
 #ifdef FEATURE_WLAN_ESE
 /**
@@ -128,8 +129,7 @@ static void lim_extract_he_op(struct pe_session *session,
 		session->he_op.oper_info_6g.info.center_freq_seg1;
 	session->ap_defined_power_type_6g =
 		session->he_op.oper_info_6g.info.reg_info;
-	if (session->ap_defined_power_type_6g < REG_INDOOR_AP ||
-	    session->ap_defined_power_type_6g > REG_MAX_SUPP_AP_TYPE) {
+	if (lim_is_ap_power_type_6g_invalid(session)) {
 		session->ap_defined_power_type_6g = REG_CURRENT_MAX_AP_TYPE;
 		pe_debug("AP power type invalid, defaulting to MAX_AP_TYPE");
 	}
@@ -413,6 +413,7 @@ void lim_objmgr_update_emlsr_caps(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_objmgr_vdev *vdev;
 	bool ap_emlsr_cap = false;
+	struct wlan_objmgr_vdev *assoc_vdev;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_LEGACY_MAC_ID);
@@ -440,9 +441,28 @@ void lim_objmgr_update_emlsr_caps(struct wlan_objmgr_psoc *psoc,
 			pe_debug("EML caps present in assoc rsp");
 		}
 	} else {
-		pe_debug("no change required for link vdev");
+		if (wlan_cm_is_vdev_active(vdev) ||
+		    wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
+			pe_debug("no change required for link vdev");
+			goto rel_ref;
+		}
+
+		assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+		if (assoc_vdev) {
+			if (!wlan_vdev_mlme_cap_get(
+					assoc_vdev, WLAN_VDEV_C_EMLSR_CAP)) {
+				wlan_vdev_obj_lock(vdev);
+				wlan_vdev_mlme_cap_clear(
+						vdev, WLAN_VDEV_C_EMLSR_CAP);
+				wlan_vdev_obj_unlock(vdev);
+				pe_debug("Cleared link vdev EML caps.");
+			} else {
+				pe_debug("no change required for link vdev");
+			}
+		}
 	}
 
+rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
 #endif

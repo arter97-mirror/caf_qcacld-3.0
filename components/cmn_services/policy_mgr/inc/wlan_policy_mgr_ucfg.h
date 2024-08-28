@@ -469,6 +469,16 @@ QDF_STATUS ucfg_policy_mgr_get_dbs_hw_modes(struct wlan_objmgr_psoc *psoc,
 					    bool *one_by_one_dbs,
 					    bool *two_by_two_dbs);
 
+/**
+ * ucfg_policy_mgr_wait_chan_switch_complete_evt() - Wait for SAP/GO CSA complete
+ * event
+ * @psoc: PSOC object information
+ *
+ * Return: QDF_STATUS_SUCCESS if CSA complete
+ */
+QDF_STATUS
+ucfg_policy_mgr_wait_chan_switch_complete_evt(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * ucfg_policy_mgr_pre_ap_start() - handle ap start request

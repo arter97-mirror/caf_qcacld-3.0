@@ -35,6 +35,9 @@
 
 #define CSR_INVALID_SCANRESULT_HANDLE       (NULL)
 
+/* Length to print MAC 12 char + 5 ":" + 2 space + mld string */
+#define MAC_ADDR_DUMP_LEN 26
+
 enum csr_akm_type {
 	/* never used */
 	eCSR_AUTH_TYPE_NONE,
@@ -299,21 +302,11 @@ typedef enum {
 	 * struct csr_roam_info's bss_desc may pass back
 	 */
 	eCSR_ROAM_RESULT_FAILURE,
-	/* Pass back pointer to struct csr_roam_info */
-	eCSR_ROAM_RESULT_ASSOCIATED,
-	eCSR_ROAM_RESULT_NOT_ASSOCIATED,
-	eCSR_ROAM_RESULT_MIC_FAILURE,
 	eCSR_ROAM_RESULT_FORCED,
 	eCSR_ROAM_RESULT_DISASSOC_IND,
-	eCSR_ROAM_RESULT_CAP_CHANGED,
-	eCSR_ROAM_RESULT_LOSTLINK,
 	eCSR_ROAM_RESULT_MIC_ERROR_UNICAST,
 	eCSR_ROAM_RESULT_MIC_ERROR_GROUP,
 	eCSR_ROAM_RESULT_AUTHENTICATED,
-	eCSR_ROAM_RESULT_NEW_RSN_BSS,
-#ifdef FEATURE_WLAN_WAPI
-	eCSR_ROAM_RESULT_NEW_WAPI_BSS,
-#endif /* FEATURE_WLAN_WAPI */
 	/* INFRA started successfully */
 	eCSR_ROAM_RESULT_INFRA_STARTED,
 	/* INFRA start failed */
@@ -324,47 +317,18 @@ typedef enum {
 	eCSR_ROAM_RESULT_INFRA_ASSOCIATION_IND,
 	/* A station joined INFRA AP */
 	eCSR_ROAM_RESULT_INFRA_ASSOCIATION_CNF,
-	/* INFRA disassociated */
-	eCSR_ROAM_RESULT_INFRA_DISASSOCIATED,
 	eCSR_ROAM_RESULT_WPS_PBC_PROBE_REQ_IND,
-	eCSR_ROAM_RESULT_SEND_ACTION_FAIL,
 	/* peer rejected assoc because max assoc limit reached */
 	eCSR_ROAM_RESULT_MAX_ASSOC_EXCEEDED,
-	/* Assoc rejected due to concurrent session running on a diff channel */
-	eCSR_ROAM_RESULT_ASSOC_FAIL_CON_CHANNEL,
-	/* TDLS events */
-	eCSR_ROAM_RESULT_ADD_TDLS_PEER,
-	eCSR_ROAM_RESULT_UPDATE_TDLS_PEER,
-	eCSR_ROAM_RESULT_DELETE_TDLS_PEER,
-	eCSR_ROAM_RESULT_TEARDOWN_TDLS_PEER_IND,
-	eCSR_ROAM_RESULT_DELETE_ALL_TDLS_PEER_IND,
-	eCSR_ROAM_RESULT_LINK_ESTABLISH_REQ_RSP,
-	eCSR_ROAM_RESULT_TDLS_SHOULD_DISCOVER,
-	eCSR_ROAM_RESULT_TDLS_SHOULD_TEARDOWN,
-	eCSR_ROAM_RESULT_TDLS_SHOULD_PEER_DISCONNECTED,
-	eCSR_ROAM_RESULT_TDLS_CONNECTION_TRACKER_NOTIFICATION,
 	eCSR_ROAM_RESULT_DFS_RADAR_FOUND_IND,
 	eCSR_ROAM_RESULT_CHANNEL_CHANGE_SUCCESS,
 	eCSR_ROAM_RESULT_CHANNEL_CHANGE_FAILURE,
 	eCSR_ROAM_RESULT_CSA_RESTART_RSP,
 	eCSR_ROAM_RESULT_DFS_CHANSW_UPDATE_SUCCESS,
 	eCSR_ROAM_EXT_CHG_CHNL_UPDATE_IND,
-
 	eCSR_ROAM_RESULT_NDI_CREATE_RSP,
 	eCSR_ROAM_RESULT_NDI_DELETE_RSP,
-	eCSR_ROAM_RESULT_NDP_INITIATOR_RSP,
-	eCSR_ROAM_RESULT_NDP_NEW_PEER_IND,
-	eCSR_ROAM_RESULT_NDP_CONFIRM_IND,
-	eCSR_ROAM_RESULT_NDP_INDICATION,
-	eCSR_ROAM_RESULT_NDP_SCHED_UPDATE_RSP,
-	eCSR_ROAM_RESULT_NDP_RESPONDER_RSP,
-	eCSR_ROAM_RESULT_NDP_END_RSP,
-	eCSR_ROAM_RESULT_NDP_PEER_DEPARTED_IND,
-	eCSR_ROAM_RESULT_NDP_END_IND,
 	eCSR_ROAM_RESULT_CAC_END_IND,
-	/* If Scan for SSID failed to found proper BSS */
-	eCSR_ROAM_RESULT_SCAN_FOR_SSID_FAILURE,
-	eCSR_ROAM_RESULT_INVOKE_FAILED,
 	eCSR_ROAM_RESULT_CHANNEL_SWITCH_STARTED_NOTIFY,
 } eCsrRoamResult;
 
@@ -390,27 +354,6 @@ typedef enum {
 	eCSR_OPERATING_CHANNEL_AUTO = eCSR_OPERATING_CHANNEL_ALL,
 	eCSR_OPERATING_CHANNEL_ANY = eCSR_OPERATING_CHANNEL_ALL,
 } eOperationChannel;
-
-typedef enum {
-	/*
-	 * Roaming because HDD requested for reassoc by changing one of the
-	 * fields in tCsrRoamModifyProfileFields. OR Roaming because SME
-	 * requested for reassoc by changing one of the fields in
-	 * tCsrRoamModifyProfileFields.
-	 */
-	eCsrRoamReasonStaCapabilityChanged,
-	/*
-	 * Roaming because SME requested for reassoc to a different AP,
-	 * as part of inter AP handoff.
-	 */
-	eCsrRoamReasonBetterAP,
-	/*
-	 * Roaming because SME requested it as the link is lost - placeholder,
-	 * will clean it up once handoff code gets in
-	 */
-	eCsrRoamReasonSmeIssuedForLostLink,
-
-} eCsrRoamReasonCodes;
 
 /*
  * Following fields might need modification dynamically once STA is up
@@ -753,6 +696,7 @@ typedef struct tagCsrEseBeaconReq {
 
 struct csr_del_sta_params {
 	struct qdf_mac_addr peerMacAddr;
+	struct qdf_mac_addr peer_mld_addr;
 	uint16_t reason_code;
 	uint8_t subtype;
 };

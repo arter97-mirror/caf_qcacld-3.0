@@ -554,6 +554,17 @@ static inline int pld_pci_get_thermal_state(struct device *dev,
 	return 0;
 }
 
+static inline void
+pld_pcie_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
+					    unsigned int *cpumask)
+{
+}
+
+static inline void
+pld_pcie_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
+						 unsigned int *cpumask)
+{
+}
 #else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 int pld_pcie_set_wfc_mode(struct device *dev,
@@ -1046,5 +1057,33 @@ int pld_pcie_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
 	return -EINVAL;
 }
 #endif
+
+#ifdef CONFIG_DT_CPU_MASK_DP_INTR
+static inline void
+pld_pcie_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
+					    unsigned int *cpumask)
+{
+	cnss_get_cpumask_for_wlan_rx_interrupts(dev, cpumask);
+}
+
+static inline void
+pld_pcie_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
+						 unsigned int *cpumask)
+{
+	cnss_get_cpumask_for_wlan_tx_comp_interrupts(dev, cpumask);
+}
+#else
+static inline void
+pld_pcie_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
+					    unsigned int *cpumask)
+{
+}
+
+static inline void
+pld_pcie_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
+						 unsigned int *cpumask)
+{
+}
+#endif /* CONFIG_DT_CPU_MASK_DP_INTR */
 #endif
 #endif

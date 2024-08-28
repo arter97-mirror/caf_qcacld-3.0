@@ -626,7 +626,7 @@
  * gGO11ACOverride - Override bw to 11ac for P2P GO
  * @Min: 0
  * @Max: 1
- * @Default: 1
+ * @Default: 0
  *
  * This ini is used to enable/disable 11AC override for GO.
  * P2P GO also follows start_bss and since P2P GO could not be
@@ -643,7 +643,7 @@
  */
 #define CFG_GO_11AC_OVERRIDE CFG_INI_BOOL( \
 				"gGO11ACOverride", \
-				1, \
+				0, \
 				"Override bw to 11ac for P2P GO")
 
 /*

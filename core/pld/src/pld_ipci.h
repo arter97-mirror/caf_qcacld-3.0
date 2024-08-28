@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -214,6 +214,18 @@ static inline int pld_ipci_is_pci_ep_awake(struct device *dev)
 static inline int pld_ipci_get_irq(struct device *dev, int ce_id)
 {
 	return 0;
+}
+
+static inline void
+pld_ipci_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
+					    unsigned int *cpumask)
+{
+}
+
+static inline void
+pld_ipci_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
+						 unsigned int *cpumask)
+{
 }
 #else
 /**
@@ -436,5 +448,33 @@ static inline int pld_ipci_mhi_state(struct device *dev)
 {
 	return icnss_get_mhi_state(dev);
 }
+
+#ifdef CONFIG_DT_CPU_MASK_DP_INTR
+static inline void
+pld_ipci_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
+					    unsigned int *cpumask)
+{
+	icnss_get_cpumask_for_wlan_rx_interrupts(dev, cpumask);
+}
+
+static inline void
+pld_ipci_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
+						 unsigned int *cpumask)
+{
+	icnss_get_cpumask_for_wlan_tx_comp_interrupts(dev, cpumask);
+}
+#else
+static inline void
+pld_ipci_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
+					    unsigned int *cpumask)
+{
+}
+
+static inline void
+pld_ipci_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
+						 unsigned int *cpumask)
+{
+}
+#endif /* CONFIG_DT_CPU_MASK_DP_INTR */
 #endif
 #endif

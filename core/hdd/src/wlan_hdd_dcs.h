@@ -27,6 +27,7 @@
 
 #include <wlan_hdd_main.h>
 #include "wlan_dcs_ucfg_api.h"
+#include "wlan_ll_sap_public_structs.h"
 
 #ifdef DCS_INTERFERENCE_DETECTION
 /**
@@ -76,6 +77,20 @@ void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter);
  */
 void hdd_dcs_clear(struct hdd_adapter *adapter);
 
+/*
+ * hdd_dcs_trigger_csa_for_ll_lt_sap() - trigger csa for ll lt sap
+ * @psoc: psoc object
+ * @hdd_ctx: hdd context
+ * @vdev_id: vdev id
+ * @src: CSA source
+ *
+ * Return: None
+ */
+void hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
+				       struct hdd_context *hdd_ctx,
+				       uint8_t vdev_id,
+				       enum ll_sap_csa_source src);
+
 #ifdef WLAN_FEATURE_VDEV_DCS
 /**
  * hdd_send_dcs_cmd() - Send dcs command to firmware
@@ -120,6 +135,14 @@ void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 		      uint32_t mac_id, uint8_t vdev_id)
 {
 }
-#endif
 
+static inline
+void hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
+				       struct hdd_context *hdd_ctx,
+				       uint8_t vdev_id,
+				       enum ll_sap_csa_source src)
+{
+}
+
+#endif
 #endif /* end #if !defined(WLAN_HDD_DCS_H) */

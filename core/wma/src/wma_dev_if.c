@@ -475,6 +475,10 @@ wma_release_vdev_ref(struct wma_txrx_node *iface)
 	struct wlan_objmgr_vdev *vdev;
 
 	vdev = iface->vdev;
+	if (!vdev) {
+		wma_debug("vdev context is NULL");
+		return;
+	}
 	wma_debug("vdev state: %d", vdev->obj_state);
 	if (vdev->obj_state != WLAN_OBJ_STATE_LOGICALLY_DELETED) {
 		wma_debug("no vdev delete");
@@ -733,7 +737,7 @@ QDF_STATUS wma_vdev_detach(struct del_vdev_params *pdel_vdev_req_param)
 	iface = &wma_handle->interfaces[vdev_id];
 	if (!iface->vdev) {
 		wma_err("vdev %d is NULL", vdev_id);
-		return status;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	status = wma_check_for_deferred_peer_delete(wma_handle,
@@ -1350,9 +1354,6 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id))
-		policy_mgr_update_dfs_master_dynamic_enabled(psoc, true);
-
 	iface = &wma->interfaces[rsp->vdev_id];
 	if (!iface->vdev) {
 		wma_err("Invalid vdev");
@@ -1376,6 +1377,12 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 		wma_debug("vdev:%d tx ss=%d rx ss=%d chain mask=%d mac=%d",
 			  rsp->vdev_id, rsp->cfgd_tx_streams,
 			  rsp->cfgd_rx_streams, rsp->chain_mask, mac_id);
+
+		if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id))
+			policy_mgr_update_dfs_master_dynamic_enabled(
+					psoc,
+					true,
+					iface->vdev->vdev_mlme.des_chan);
 
 		/* Fill bss_chan after vdev start */
 		qdf_mem_copy(iface->vdev->vdev_mlme.bss_chan,
@@ -4187,7 +4194,6 @@ void wma_remove_req(tp_wma_handle wma, uint8_t vdev_id,
  * @shortSlotTimeSupported: short slot time
  * @llbCoexist: llbCoexist
  * @maxTxPower: max tx power
- * @bss_max_idle_period: BSS max idle period
  *
  * Return: QDF_STATUS
  */
@@ -4195,14 +4201,14 @@ static QDF_STATUS
 wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 			tSirMacBeaconInterval beaconInterval,
 			uint8_t dtimPeriod, uint8_t shortSlotTimeSupported,
-			uint8_t llbCoexist, int8_t maxTxPower,
-			uint16_t bss_max_idle_period)
+			uint8_t llbCoexist, int8_t maxTxPower)
 {
 	uint32_t slot_time;
 	struct wma_txrx_node *intr = wma->interfaces;
 	struct dev_set_param setparam[MAX_VDEV_SET_BSS_PARAMS];
 	uint8_t index = 0;
 	enum ieee80211_protmode prot_mode;
+	uint32_t keep_alive_period;
 	QDF_STATUS ret;
 
 	ret = QDF_STATUS_E_FAILURE;
@@ -4280,11 +4286,12 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 		goto error;
 	}
 	mlme_set_max_reg_power(intr[vdev_id].vdev, maxTxPower);
-	if (bss_max_idle_period)
-		wma_set_sta_keep_alive(
+	wlan_mlme_get_sta_keep_alive_period(wma->psoc,
+					    &keep_alive_period);
+	wma_set_sta_keep_alive(
 				wma, vdev_id,
 				SIR_KEEP_ALIVE_NULL_PKT,
-				bss_max_idle_period,
+				keep_alive_period,
 				NULL, NULL, NULL);
 error:
 	return ret;
@@ -4439,7 +4446,7 @@ QDF_STATUS wma_post_vdev_start_setup(uint8_t vdev_id)
 				    mlme_obj->proto.generic.dtim_period,
 				    mlme_obj->proto.generic.slot_time,
 				    mlme_obj->proto.generic.protection_mode,
-				    bss_power, 0)) {
+				    bss_power)) {
 		wma_err("Failed to set wma_vdev_set_bss_params");
 	}
 
@@ -4756,8 +4763,7 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 				    add_bss->dtimPeriod,
 				    add_bss->shortSlotTimeSupported,
 				    add_bss->llbCoexist,
-				    add_bss->maxTxPower,
-				    add_bss->bss_max_idle_period)) {
+				    add_bss->maxTxPower)) {
 		wma_err("Failed to set bss params");
 	}
 
@@ -4821,6 +4827,110 @@ static void wma_get_mld_info_ap(tpAddStaParams add_sta,
 		*is_assoc_peer = false;
 	}
 }
+
+static inline QDF_STATUS
+wma_check_for_mlo_peer_conflict(struct wlan_mlo_peer_context *peer_1,
+				struct wlan_mlo_peer_context *peer_2)
+{
+	if (!peer_1 && !peer_2)
+		return QDF_STATUS_SUCCESS;
+
+	if (!peer_2) {
+		wma_err("ML-peer with same mac address exists for a different AID");
+		return QDF_STATUS_E_ALREADY;
+	} else if (peer_1 == peer_2) {
+		return QDF_STATUS_SUCCESS;
+	}
+
+	/* Two ML-peers exists with different AID */
+	QDF_ASSERT(0);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS
+wma_validate_mac_for_conflict_on_same_ml_ctx(tp_wma_handle wma,
+					     tpAddStaParams add_sta,
+					     uint8_t *peer_mld)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_mlo_peer_context *ml_peer, *tmp_ml_peer;
+	struct qdf_mac_addr sta_addr = {0};
+	struct wlan_objmgr_peer *peer;
+	QDF_STATUS status =  QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
+						    add_sta->smesessionId,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	/* Not an ML-SAP, therefore skip the validation */
+	if (!vdev->mlo_dev_ctx)
+		goto release_ref;
+
+	qdf_mem_copy(&sta_addr.bytes[0], add_sta->staMac,
+		     sizeof(tSirMacAddr));
+
+	ml_peer = wlan_mlo_get_mlpeer(vdev->mlo_dev_ctx,
+				      &sta_addr);
+	/*
+	 * ML-peer exists on the ML-dev with same address.
+	 * If the AID is different, then another ML-STA
+	 * is already associated to this SAP using the
+	 * same MLD mac
+	 */
+	if (ml_peer) {
+		tmp_ml_peer = wlan_mlo_get_mlpeer_by_aid(vdev->mlo_dev_ctx,
+							 add_sta->assocId);
+
+		status = wma_check_for_mlo_peer_conflict(ml_peer, tmp_ml_peer);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("Link mac address conflicts with another MLO peer on same interface");
+			goto release_ref;
+		}
+	}
+
+	/*
+	 * ML-peer exists on the ML-dev with same MLD address.
+	 * If the AID is different, reject the peer create
+	 */
+	ml_peer = wlan_mlo_get_mlpeer(vdev->mlo_dev_ctx,
+				      (struct qdf_mac_addr *)peer_mld);
+	if (ml_peer) {
+		tmp_ml_peer = wlan_mlo_get_mlpeer_by_aid(vdev->mlo_dev_ctx,
+							 add_sta->assocId);
+		status = wma_check_for_mlo_peer_conflict(ml_peer, tmp_ml_peer);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("MLD mac address conflicts with another MLO peer on same interface");
+			goto release_ref;
+		}
+	}
+
+	/*
+	 * If the link address of another ML-peer(with different AID) matches
+	 * with the MLD address of the incoming peer, reject the peer create.
+	 *
+	 * Note: Legacy MLD mac - link mac conflict is taken care at
+	 * wma_create_peer_validate_mld_address()
+	 */
+	peer = wlan_objmgr_get_peer_by_mac(wma->psoc, peer_mld,
+					   WLAN_LEGACY_WMA_ID);
+	if (!peer) {
+		goto release_ref;
+	} else {
+		if (peer->mlo_peer_ctx &&
+		    peer->mlo_peer_ctx->assoc_id != add_sta->assocId) {
+			wma_err("MLD mac address conflicts with link mac address of another ML-peer on same interface");
+			status = QDF_STATUS_E_FAILURE;
+		}
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+	}
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+	return status;
+}
 #else
 static void wma_get_mld_info_ap(tpAddStaParams add_sta,
 				uint8_t **peer_mld_addr,
@@ -4828,6 +4938,54 @@ static void wma_get_mld_info_ap(tpAddStaParams add_sta,
 {
 	*peer_mld_addr = NULL;
 	*is_assoc_peer = false;
+}
+
+static QDF_STATUS
+wma_validate_mac_for_conflict_on_same_ml_ctx(tp_wma_handle wma,
+					     tpAddStaParams add_sta,
+					     uint8_t *peer_mld)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef WLAN_FEATURE_SON
+static void wma_set_peer_use_4addr(tp_wma_handle wma,
+				   tpAddStaParams add_sta)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
+						    add_sta->smesessionId,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev) {
+		wma_debug("Invalid vdev");
+		return;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		wma_err("vdev legacy private object is NULL");
+		return;
+	}
+
+	if (mlme_priv->mac_4_addr) {
+		status = wma_set_peer_param(wma, add_sta->staMac,
+					    WMI_HOST_PEER_USE_4ADDR,
+					    true, add_sta->smesessionId);
+		if (status != QDF_STATUS_SUCCESS) {
+			wma_err("Failed to set 4 addr for " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(add_sta->staMac));
+		}
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+}
+#else
+static void wma_set_peer_use_4addr(tp_wma_handle wma,
+				   tpAddStaParams add_sta)
+{
 }
 #endif
 
@@ -4894,6 +5052,15 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 	wma_delete_invalid_peer_entries(add_sta->smesessionId, add_sta->staMac);
 
 	wma_get_mld_info_ap(add_sta, &peer_mld_addr, &is_assoc_peer);
+
+	status = wma_validate_mac_for_conflict_on_same_ml_ctx(wma, add_sta,
+							      peer_mld_addr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Conflict detected with mac address, peer create failed");
+		add_sta->status = status;
+		goto send_rsp;
+	}
+
 	status = wma_create_peer(wma, add_sta->staMac, WMI_PEER_TYPE_DEFAULT,
 				 add_sta->smesessionId, peer_mld_addr,
 				 is_assoc_peer);
@@ -4903,6 +5070,8 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 		add_sta->status = status;
 		goto send_rsp;
 	}
+
+	wma_set_peer_use_4addr(wma, add_sta);
 
 	if (!cdp_find_peer_exist_on_vdev(soc, add_sta->smesessionId,
 					 add_sta->staMac)) {
@@ -5185,13 +5354,15 @@ static void wma_send_bss_color_change_enable(tp_wma_handle wma,
 }
 #endif
 
-#define MAX_VDEV_STA_REQ_PARAMS 5
+#define MAX_VDEV_STA_REQ_PARAMS 7
 /* params being sent:
  * 1.wmi_vdev_param_max_li_of_moddtim
  * 2.wmi_vdev_param_max_li_of_moddtim_ms
  * 3.wmi_vdev_param_dyndtim_cnt
  * 4.wmi_vdev_param_moddtim_cnt
  * 5.wmi_vdev_param_moddtim_cnt
+ * 6.wmi_vdev_param_telesdtim_cnt
+ * 7.wmi_vdev_param_min_teles_dtim_lvl
  */
 
 /**
@@ -5338,8 +5509,7 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 	if (wma_vdev_set_bss_params(wma, params->smesessionId,
 				    iface->beaconInterval, iface->dtimPeriod,
 				    iface->shortSlotTimeSupported,
-				    iface->llbCoexist, maxTxPower,
-				    iface->bss_max_idle_period)) {
+				    iface->llbCoexist, maxTxPower)) {
 		wma_err("Failed to bss params");
 	}
 
@@ -5862,7 +6032,8 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 			wmi_debug("sap d3 wow");
 			wma_sap_d3_wow_client_connect(wma);
 		}
-		wma_sap_prevent_runtime_pm(wma);
+		if (!policy_mgr_is_vdev_ll_lt_sap(wma->psoc, vdev_id))
+			wma_sap_prevent_runtime_pm(wma);
 
 		return;
 	}

@@ -804,41 +804,32 @@ struct bss_description {
 	/* offset of the ieFields from bssId. */
 	uint16_t length;
 	tSirMacAddr bssId;
-	unsigned long scansystimensec;
 	uint32_t timeStamp[2];
 	uint16_t beaconInterval;
 	uint16_t capabilityInfo;
 	tSirNwType nwType;      /* Indicates 11a/b/g */
 	int8_t rssi;
 	int8_t rssi_raw;
-	int8_t sinr;
 	/* channel frequency what peer sent in beacon/probersp. */
 	uint32_t chan_freq;
 	/* Based on system time, not a relative time. */
-	uint64_t received_time;
 	uint32_t parentTSF;
 	uint32_t startTSF[2];
 	uint8_t mdiePresent;
 	/* MDIE for 11r, picked from the beacons */
 	uint8_t mdie[SIR_MDIE_SIZE];
-#ifdef FEATURE_WLAN_ESE
-	uint16_t QBSSLoad_present;
-	uint16_t QBSSLoad_avail;
-#endif
 	/* whether it is from a probe rsp */
 	uint8_t fProbeRsp;
-	tSirMacSeqCtl seq_ctrl;
-	uint32_t tsf_delta;
 	struct scan_mbssid_info mbssid_info;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct fils_ind_elements fils_info_element;
 #endif
-	uint32_t assoc_disallowed;
 	uint32_t adaptive_11r_ap;
 	uint32_t mbo_oce_enabled_ap;
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 	uint32_t is_single_pmk;
 #endif
+	uint32_t is_ml_ap;
 	/* Please keep the structure 4 bytes aligned above the ieFields */
 	QDF_FLEX_ARRAY(uint32_t, ieFields);
 };
@@ -1192,6 +1183,7 @@ struct disassoc_ind {
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peer_macaddr;
+	struct qdf_mac_addr peer_mld_addr;
 	uint16_t staId;
 	uint32_t reasonCode;
 	bool from_ap;
@@ -1263,6 +1255,7 @@ struct deauth_ind {
 	tSirResultCodes status_code;
 	struct qdf_mac_addr bssid;      /* AP BSSID */
 	struct qdf_mac_addr peer_macaddr;
+	struct qdf_mac_addr peer_mld_addr;
 
 	uint16_t staId;
 	uint32_t reasonCode;
@@ -1913,14 +1906,6 @@ struct roam_init_params {
 	uint8_t enable;
 };
 
-/**
- * struct roam_sync_timeout_timer_info - Info related to roam sync timer
- * @vdev_id: Vdev id for which host waiting roam sync ind from fw
- */
-struct roam_sync_timeout_timer_info {
-	uint8_t vdev_id;
-};
-
 struct roam_offload_scan_rsp {
 	uint8_t sessionId;
 	uint32_t reason;
@@ -2067,11 +2052,6 @@ enum set_antenna_mode_status {
 struct sir_antenna_mode_resp {
 	enum set_antenna_mode_status status;
 };
-
-typedef struct sSirWlanExcludeUnencryptParam {
-	bool excludeUnencrypt;
-	struct qdf_mac_addr bssid;
-} tSirWlanExcludeUnencryptParam, *tpSirWlanExcludeUnencryptParam;
 
 typedef enum {
 	P2P_SCAN_TYPE_SEARCH = 1,       /* P2P Search */
@@ -2402,34 +2382,6 @@ struct tx_power_limit {
 	/* Thermal limits for 2g and 5g */
 	uint32_t txPower2g;
 	uint32_t txPower5g;
-};
-
-enum bad_peer_thresh_levels {
-	WLAN_WMA_IEEE80211_B_LEVEL = 0,
-	WLAN_WMA_IEEE80211_AG_LEVEL,
-	WLAN_WMA_IEEE80211_N_LEVEL,
-	WLAN_WMA_IEEE80211_AC_LEVEL,
-	WLAN_WMA_IEEE80211_AX_LEVEL,
-	WLAN_WMA_IEEE80211_MAX_LEVEL,
-};
-
-#define NUM_OF_RATE_THRESH_MAX    (4)
-struct t_bad_peer_info {
-	uint32_t cond;
-	uint32_t delta;
-	uint32_t percentage;
-	uint32_t thresh[NUM_OF_RATE_THRESH_MAX];
-	uint32_t txlimit;
-};
-
-struct t_bad_peer_txtcl_config {
-	/* Array of thermal levels */
-	struct t_bad_peer_info threshold[WLAN_WMA_IEEE80211_MAX_LEVEL];
-	uint32_t enable;
-	uint32_t period;
-	uint32_t txq_limit;
-	uint32_t tgt_backoff;
-	uint32_t tgt_report_prd;
 };
 
 /* notify MODEM power state to FW */
@@ -4327,28 +4279,6 @@ struct sme_update_access_policy_vendor_ie {
 struct sme_tx_fail_cnt_threshold {
 	uint8_t session_id;
 	uint32_t tx_fail_cnt_threshold;
-};
-
-/**
- * struct sme_short_retry_limit - transmission retry limit for short frames.
- * @session_id: Session id
- * @short_retry_limit: transmission retry limit for short frame.
- *
- */
-struct sme_short_retry_limit {
-	uint8_t session_id;
-	uint32_t short_retry_limit;
-};
-
-/**
- * struct sme_long_retry_limit - transmission retry limit for long frames
- * @session_id: Session id
- * @short_retry_limit: transmission retry limit for long frames.
- *
- */
-struct sme_long_retry_limit {
-	uint8_t session_id;
-	uint32_t long_retry_limit;
 };
 
 /**

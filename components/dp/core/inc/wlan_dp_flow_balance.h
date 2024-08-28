@@ -86,6 +86,20 @@ enum wlan_dp_fb_status {
 	FLOW_BALANCE_NOT_ELIGIBLE,
 };
 
+#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
+static inline
+bool wlan_dp_rx_is_latency_sensitive_reo_enabled(void)
+{
+	return true;
+}
+#else
+static inline
+bool wlan_dp_rx_is_latency_sensitive_reo_enabled(void)
+{
+	return false;
+}
+#endif
+
 #ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
 enum wlan_dp_fb_status
 wlan_dp_fb_handler(struct wlan_dp_psoc_context *dp_ctx,

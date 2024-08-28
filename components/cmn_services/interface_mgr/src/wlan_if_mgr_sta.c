@@ -272,6 +272,8 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 		return status;
 	}
 
+	policy_mgr_sta_post_disconnect_conc_check(psoc);
+
 	return QDF_STATUS_SUCCESS;
 }
 

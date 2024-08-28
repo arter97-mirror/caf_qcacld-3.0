@@ -403,55 +403,6 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 exit:
 	return status;
 }
-
-void tdls_set_no_force_vdev(struct wlan_objmgr_vdev *vdev, bool flag)
-{
-	uint8_t i;
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *mlo_vdev;
-	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	bool is_mlo_vdev;
-	struct ml_nlink_change_event data;
-	QDF_STATUS status;
-
-	if (!vdev)
-		return;
-
-	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
-	if (!is_mlo_vdev)
-		return;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc)
-		return;
-
-	qdf_mem_zero(&data, sizeof(data));
-
-	mlo_dev_ctx = vdev->mlo_dev_ctx;
-	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-		mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
-		if (!mlo_vdev)
-			continue;
-
-		/* flag: true means no force all vdevs,
-		 * false means except the current one
-		 */
-		if (!flag && (mlo_vdev == vdev))
-			continue;
-		data.evt.tdls.link_bitmap |=
-				1 << wlan_vdev_get_link_id(mlo_vdev);
-		data.evt.tdls.mlo_vdev_lst[data.evt.tdls.vdev_count] =
-				wlan_vdev_get_id(mlo_vdev);
-		data.evt.tdls.vdev_count++;
-	}
-
-	data.evt.tdls.mode = MLO_LINK_FORCE_MODE_NO_FORCE;
-	data.evt.tdls.reason = MLO_LINK_FORCE_REASON_TDLS;
-	status = ml_nlink_conn_change_notify(psoc,
-					     wlan_vdev_get_id(vdev),
-					     ml_nlink_tdls_request_evt,
-					     &data);
-}
 #else
 struct wlan_objmgr_vdev *
 tdls_mlo_get_tdls_link_vdev(struct wlan_objmgr_vdev *vdev)
@@ -489,10 +440,6 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 			      struct tdls_rx_mgmt_frame *rx_mgmt)
 {
 	return QDF_STATUS_SUCCESS;
-}
-
-void tdls_set_no_force_vdev(struct wlan_objmgr_vdev *vdev, bool flag)
-{
 }
 #endif
 
@@ -562,6 +509,8 @@ static QDF_STATUS tdls_process_rx_mgmt(
 				tdls_vdev =
 				     wlan_objmgr_vdev_get_comp_private_obj(vdev,
 							   WLAN_UMAC_COMP_TDLS);
+				if (!tdls_vdev)
+					return QDF_STATUS_E_EXISTS;
 				rx_mgmt = tdls_vdev->rx_mgmt;
 				tdls_vdev_select = true;
 				tdls_debug("choice vdev %d as tdls vdev",

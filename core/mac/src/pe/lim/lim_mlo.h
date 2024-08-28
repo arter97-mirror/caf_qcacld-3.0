@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -240,6 +240,16 @@ void lim_mlo_save_mlo_info(tpDphHashNode sta_ds,
 			   struct mlo_partner_info *mlo_info);
 
 /**
+ * lim_mlo_save_eml_info() - Save the eml capability info
+ * @sta_ds: Pointer to internal STA Datastructure
+ * @eml_info: EML capability structure
+ *
+ * Return: void
+ */
+void lim_mlo_save_eml_info(tpDphHashNode sta_ds,
+			   struct wlan_mlo_eml_cap *eml_info);
+
+/**
  * lim_add_frag_ie_for_sta_profile() - add frag IE if STA prof len more than 255
  * @data: sta profile ie data
  * @len: the length of the data
@@ -469,6 +479,12 @@ static inline QDF_STATUS lim_mlo_assoc_ind_upper_layer(
 
 static inline void lim_mlo_save_mlo_info(tpDphHashNode sta_ds,
 					 struct mlo_partner_info *mlo_info)
+{
+}
+
+static inline void
+lim_mlo_save_eml_info(tpDphHashNode sta_ds,
+		      struct wlan_mlo_eml_cap *eml_info)
 {
 }
 

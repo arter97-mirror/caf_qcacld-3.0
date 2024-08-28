@@ -2192,4 +2192,22 @@ int pld_oem_event_smem_write(struct device *dev, int flags, const __u8 *data,
 
 #endif
 
+#ifdef CONFIG_DT_CPU_MASK_DP_INTR
+void pld_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
+					    unsigned int *cpumask);
+void pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
+						 unsigned int *cpumask);
+#else
+static inline void
+pld_get_cpumask_for_wlan_rx_interrupts(struct device *dev,
+				       unsigned int *cpumask)
+{
+}
+
+static inline void
+pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
+					    unsigned int *cpumask)
+{
+}
+#endif
 #endif

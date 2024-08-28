@@ -122,11 +122,9 @@ bool osif_dp_mark_pkt_type_by_priority(struct sk_buff *skb)
 	uint32_t pkt_type =
 		qdf_nbuf_get_priority_pkt_type(skb);
 
-	if (qdf_unlikely(pkt_type == QDF_NBUF_PRIORITY_PKT_TCP_ACK)) {
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-					QDF_NBUF_CB_PACKET_TYPE_TCP_ACK;
+	if (qdf_unlikely(pkt_type == QDF_NBUF_PRIORITY_PKT_TCP_ACK))
 		type_marked = true;
-	}
+
 	/* cleanup the packet type in priority */
 	qdf_nbuf_remove_priority_pkt_type(skb);
 
@@ -562,7 +560,7 @@ bool osif_dp_cfg80211_rx_control_port(qdf_netdev_t dev, u8 *ta_addr,
 				      qdf_nbuf_t nbuf, bool unencrypted)
 {
 	return cfg80211_rx_control_port((struct net_device *)dev,
-					ta_addr, (struct sk_buff *)nbuf,
+					(struct sk_buff *)nbuf,
 					unencrypted);
 }
 #endif

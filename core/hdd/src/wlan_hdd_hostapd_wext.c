@@ -2303,6 +2303,13 @@ static int hdd_softap_get_sta_info(struct hdd_adapter *adapter,
 				     " ecsa=%d\n",
 				     QDF_MAC_ADDR_REF(sta->sta_mac.bytes),
 				     sta->ecsa_capable);
+
+		if (!qdf_is_macaddr_zero(&sta->mld_addr))
+			written += scnprintf(buf + written, size - written,
+					     "MLD:"
+					     QDF_MAC_ADDR_FMT"\n",
+					     QDF_MAC_ADDR_REF(sta->mld_addr.bytes));
+
 		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta, true,
 				     STA_INFO_SOFTAP_GET_STA_INFO);
 	}

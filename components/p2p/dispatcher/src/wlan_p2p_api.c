@@ -145,3 +145,12 @@ QDF_STATUS wlan_p2p_abort_scan(struct wlan_objmgr_pdev *pdev)
 						 wlan_p2p_abort_vdev_scan,
 						 NULL, 0, WLAN_P2P_ID);
 }
+
+const uint8_t *wlan_p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
+						       uint32_t assoc_ie_len)
+{
+	if (!assoc_ie || !assoc_ie_len)
+		return NULL;
+
+	return p2p_parse_assoc_ie_for_device_info(assoc_ie, assoc_ie_len);
+}

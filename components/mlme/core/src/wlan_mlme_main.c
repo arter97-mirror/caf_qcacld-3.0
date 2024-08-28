@@ -39,6 +39,7 @@
 #include "wlan_vdev_mgr_utils_api.h"
 #include <wmi_unified_priv.h>
 #include <target_if.h>
+#include "wlan_dp_api.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
@@ -1303,6 +1304,7 @@ static void mlme_init_emlsr_mode(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_mlme_generic *gen)
 {
 	gen->enable_emlsr_mode = cfg_default(CFG_EMLSR_MODE_ENABLE);
+	gen->enable_sap_emlsr_mode = cfg_get(psoc, CFG_SAP_EMLSR_MODE_ENABLE);
 }
 
 /**
@@ -2548,6 +2550,8 @@ end:
 static void mlme_init_acs_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_acs *acs)
 {
+	uint32_t acs_config_features;
+
 	acs->is_acs_with_more_param =
 		cfg_get(psoc, CFG_ACS_WITH_MORE_PARAM);
 	acs->auto_channel_select_weight =
@@ -2563,6 +2567,19 @@ static void mlme_init_acs_cfg(struct wlan_objmgr_psoc *psoc,
 	acs->np_chan_weightage = cfg_get(psoc, CFG_ACS_NP_CHAN_WEIGHT);
 	acs->acs_prefer_6ghz_psc = cfg_default(CFG_ACS_PREFER_6GHZ_PSC);
 	mlme_acs_parse_weight_list(psoc, acs);
+
+	acs_config_features = cfg_get(psoc, CFG_ACS_CONFIG_FEATURE_BITMAP);
+	acs->lin_bss_score_en =
+		acs_config_features & ACS_CONFIG_LINEAR_BSS_SCORE_ENABLE;
+	acs->lin_rssi_score_en =
+		acs_config_features & ACS_CONFIG_LINEAR_RSSI_SCORE_ENABLE;
+	acs->load_score_en =
+		acs_config_features & ACS_CONFIG_WIFI_NONWIFI_LOADING_ENABLE;
+	acs->same_weight_chan_rand_en =
+		acs_config_features & ACS_CONFIG_SAME_WC_CHAN_RAND_ENABLE;
+	acs->termi_on_1st_clean_chan_en =
+		acs_config_features & ACS_CONFIG_TERMI_ON_1ST_CLN_CHAN_ENABLE;
+	acs->rssi_score_thrs = cfg_get(psoc, CFG_ACS_RSSI_SCORE_THR);
 }
 
 static void
@@ -2602,6 +2619,8 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_SAME_LINK_MLD_ADDR);
 	sta->mlo_5gl_5gh_mlsr =
 		cfg_get(psoc, CFG_MLO_MLO_5GL_5GH_MLSR);
+	sta->epcs_capability =
+		cfg_get(psoc, CFG_MLO_EPCS_SUPPORT_ENABLE);
 
 	mlme_debug("mlo_support_link_num: %d, mlo_support_link_band: 0x%x",
 		   sta->mlo_support_link_num, sta->mlo_support_link_band);
@@ -2848,7 +2867,8 @@ static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_MAX_LI_MODULATED_DTIM_MS);
 
 	mlme_init_sta_mlo_cfg(psoc, sta);
-	wlan_mlme_set_epcs_capability(psoc, false);
+	wlan_mlme_set_epcs_capability(psoc,
+				      wlan_mlme_get_epcs_capability(psoc));
 	wlan_mlme_set_usr_disable_sta_eht(psoc, false);
 	wlan_mlme_set_eht_disable_punct_in_us_lpi(psoc,
 						  cfg_default(CFG_EHT_DISABLE_PUNCT_IN_US_LPI));
@@ -5717,6 +5737,7 @@ void wlan_mlme_set_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *vdev_mlme_priv;
+	uint8_t old_mac_id;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 						    WLAN_LEGACY_MAC_ID);
@@ -5729,7 +5750,10 @@ void wlan_mlme_set_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
 		goto rel_ref;
 	}
 
+	old_mac_id = vdev_mlme_priv->mac_id;
 	vdev_mlme_priv->mac_id = mac_id;
+
+	wlan_dp_notify_vdev_mac_id_migration(vdev, old_mac_id, mac_id);
 rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
@@ -5801,4 +5825,69 @@ wlan_mlme_set_sap_psd_for_20mhz(struct wlan_objmgr_vdev *vdev,
 
 	mlme_priv->mlme_ap.psd_20mhz = psd_power;
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_peer_find_mld_peer_n_get_mac_info() - This API will find MLD peer from
+ * peer list.
+ * @psoc: Pointer to psoc object
+ * @obj: Pointer to peer object
+ * @args: Pointer to void * argument
+ *
+ * Return: void
+ */
+static void
+wlan_peer_find_mld_peer_n_get_mac_info(struct wlan_objmgr_psoc *psoc,
+				       void *obj, void *args)
+{
+	struct wlan_objmgr_peer *peer = (struct wlan_objmgr_peer *)obj;
+	struct peer_mac_addresses *peer_mac_info =
+				(struct peer_mac_addresses *)args;
+	uint8_t *mld_mac, *peer_mac, *given_mac;
+
+	mld_mac = wlan_peer_mlme_get_mldaddr(peer);
+	peer_mac = wlan_peer_get_macaddr(peer);
+	given_mac = peer_mac_info->mac.bytes;
+
+	if (!mld_mac || WLAN_ADDR_EQ(mld_mac, given_mac) != QDF_STATUS_SUCCESS)
+		return;
+	qdf_copy_macaddr(&peer_mac_info->peer_mac,
+			 (struct qdf_mac_addr *)peer_mac);
+	qdf_copy_macaddr(&peer_mac_info->peer_mld,
+			 (struct qdf_mac_addr *)mld_mac);
+}
+
+QDF_STATUS wlan_find_peer_and_get_mac_and_mld_addr(
+				struct wlan_objmgr_psoc *psoc,
+				struct peer_mac_addresses *peer_mac_info)
+{
+	struct wlan_objmgr_peer *peer;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac_info->mac.bytes,
+					   WLAN_LEGACY_MAC_ID);
+	if (peer) {
+		qdf_copy_macaddr(
+			&peer_mac_info->peer_mac,
+			(struct qdf_mac_addr *)wlan_peer_get_macaddr(peer));
+		if (wlan_peer_mlme_get_mldaddr(peer))
+			qdf_copy_macaddr(
+				&peer_mac_info->peer_mld,
+				(struct qdf_mac_addr *)
+				wlan_peer_mlme_get_mldaddr(peer));
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+		return status;
+	}
+
+	/* if not found with mac address try finding using MLD address */
+	wlan_objmgr_iterate_obj_list(psoc, WLAN_PEER_OP,
+				     wlan_peer_find_mld_peer_n_get_mac_info,
+				     peer_mac_info, 0, WLAN_LEGACY_MAC_ID);
+	if (qdf_is_macaddr_zero(&peer_mac_info->peer_mac)) {
+		mlme_err("peer is null for mac:" QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(peer_mac_info->mac.bytes));
+		return QDF_STATUS_E_EXISTS;
+	}
+
+	return status;
 }

@@ -108,4 +108,16 @@ wlan_p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * wlan_p2p_parse_assoc_ie_for_device_info() - wrapper API for
+ * "p2p_parse_assoc_ie_for_device_info"
+ *
+ * @assoc_ie: Association request IE
+ * @assoc_ie_len: Association IE length
+ *
+ * Return: pointer to P2P address
+ */
+const uint8_t *wlan_p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
+						       uint32_t assoc_ie_len);
 #endif

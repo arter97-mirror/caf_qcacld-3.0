@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -137,5 +137,15 @@ QDF_STATUS target_if_p2p_set_ps(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS target_if_p2p_set_noa(struct wlan_objmgr_psoc *psoc,
 	uint32_t vdev_id, bool disable_noa);
-
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * target_if_p2p_send_usd_params() - send USD parameter to WMI layer
+ * @psoc: pointer to PSOC object
+ * @param: pointer to USD attributes parameters
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+QDF_STATUS target_if_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+					 struct p2p_usd_attr_params *param);
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif /* _TARGET_IF_P2P_H_ */

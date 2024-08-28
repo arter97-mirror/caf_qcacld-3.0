@@ -923,4 +923,20 @@ QDF_STATUS
 wma_peer_flush_tids_send(uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 			 struct peer_flush_params *param);
 #endif
+
+#ifdef FEATURE_EPM
+bool wma_is_epm_supported_cfg(WMA_HANDLE handle);
+bool wma_is_epm_supported_fw(WMA_HANDLE handle);
+#else
+static inline bool wma_is_epm_supported_cfg(WMA_HANDLE handle)
+{
+	return false;
+}
+
+static inline bool wma_is_epm_supported_fw(WMA_HANDLE handle)
+{
+	return false;
+}
+#endif
+
 #endif /* WMA_API_H */

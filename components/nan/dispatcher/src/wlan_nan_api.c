@@ -124,15 +124,16 @@ bool wlan_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc)
 		cfg_nan_get_support_sta_p2p_ndp(psoc));
 }
 
-qdf_freq_t wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_psoc *psoc)
+qdf_freq_t wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
 {
-	struct nan_psoc_priv_obj *psoc_nan_obj;
+	qdf_freq_t freq = 0;
 
-	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
-	if (!psoc_nan_obj) {
-		nan_err("psoc_nan_obj is null");
-		return 0;
-	}
+	freq = wlan_nan_get_disc_24g_ch_freq(wlan_pdev_get_psoc(pdev));
 
-	return psoc_nan_obj->nan_social_ch_2g_freq;
+	if (!freq && wlan_reg_is_freq_enabled(pdev, NAN_2GHZ_SOCIAL_CH_FREQ,
+					      REG_CURRENT_PWR_MODE))
+		freq = NAN_2GHZ_SOCIAL_CH_FREQ;
+
+	return freq;
 }
+

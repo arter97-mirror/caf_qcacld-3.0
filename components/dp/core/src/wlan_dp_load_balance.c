@@ -837,6 +837,7 @@ void wlan_dp_load_balancer_init(struct wlan_objmgr_psoc *psoc)
 	unsigned int cpus;
 	int package_id;
 	int num_cpus = 0;
+	unsigned int cpumask = 0;
 
 	if (dp_ctx->dp_cfg.is_load_balance_enabled)
 		hif_set_load_balance_enabled_flag(dp_ctx->hif_handle);
@@ -846,16 +847,30 @@ void wlan_dp_load_balancer_init(struct wlan_objmgr_psoc *psoc)
 	lb_data = &dp_ctx->lb_data;
 	qdf_spinlock_create(&lb_data->load_balance_lock);
 
-	qdf_for_each_possible_cpu(cpus) {
+	pld_get_cpumask_for_wlan_rx_interrupts(dp_ctx->qdf_dev->dev, &cpumask);
+	if (cpumask) {
+		qdf_for_each_online_cpu(cpus) {
+			if (BIT(cpus) & cpumask)
+				qdf_cpumask_set_cpu(cpus,
+						    &lb_data->def_cpumask);
+		}
+	}
+
+	if (!qdf_cpumask_empty(&lb_data->def_cpumask))
+		goto update_cpumask;
+
+	qdf_for_each_online_cpu(cpus) {
 		package_id = qdf_topology_physical_package_id(cpus);
 		if (package_id == CPU_CLUSTER_TYPE_LITTLE) {
-			qdf_cpumask_set_cpu(cpus, &lb_data->def_cpumask);
+			qdf_cpumask_set_cpu(cpus,
+					    &lb_data->def_cpumask);
 			num_cpus++;
 			if (num_cpus >= NUM_CPUS_FOR_LOAD_BALANCE)
 				break;
 		}
 	}
 
+update_cpumask:
 	qdf_cpumask_copy(&lb_data->preferred_cpu_mask,
 			 &lb_data->def_cpumask);
 	qdf_cpumask_copy(&lb_data->curr_cpu_mask,

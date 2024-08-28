@@ -1801,6 +1801,10 @@ tdls_wma_update_peer_state(struct tdls_soc_priv_obj *soc_obj,
 	struct scheduler_msg msg = {0,};
 	QDF_STATUS status;
 
+	status = tdls_validate_current_mode(soc_obj);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
 	tdls_debug("update TDLS peer " QDF_MAC_ADDR_FMT " vdev %d, state %d",
 		   QDF_MAC_ADDR_REF(peer_state->peer_macaddr),
 		   peer_state->vdev_id, peer_state->peer_state);

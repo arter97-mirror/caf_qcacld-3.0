@@ -2184,6 +2184,28 @@ uint16_t hdd_get_queue_index(uint16_t up, bool is_critical)
 }
 #endif
 
+#if defined(DP_TX_PACKET_INSPECT_FOR_ILP) || defined(WLAN_DP_FEATURE_STC)
+/**
+ * hdd_update_pkt_pure_ack_info() - update TX packets CB with pure TCP ack info
+ * @skb: network buffer
+ *
+ * Update TX packets CB with TCP pure ack info, this info is used later.
+ *
+ * Return: None
+ */
+static inline
+void hdd_update_pkt_pure_ack_info(struct sk_buff *skb)
+{
+	if (qdf_unlikely(qdf_nbuf_is_ipv4_v6_pure_tcp_ack(skb)))
+		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
+					QDF_NBUF_CB_PACKET_TYPE_TCP_ACK;
+}
+#else
+static inline
+void hdd_update_pkt_pure_ack_info(struct sk_buff *skb)
+{
+}
+#endif
 #ifdef DP_TX_PACKET_INSPECT_FOR_ILP
 /**
  * hdd_update_pkt_priority_with_inspection() - update TX packets priority
@@ -2201,9 +2223,10 @@ void hdd_update_pkt_priority_with_inspection(struct sk_buff *skb,
 {
 	skb->priority = up;
 
-	if (qdf_unlikely(qdf_nbuf_is_ipv4_v6_pure_tcp_ack(skb)))
-		qdf_nbuf_set_priority_pkt_type(
-				skb, QDF_NBUF_PRIORITY_PKT_TCP_ACK);
+	if (qdf_unlikely(QDF_NBUF_CB_GET_PACKET_TYPE(skb) ==
+					QDF_NBUF_CB_PACKET_TYPE_TCP_ACK))
+		qdf_nbuf_set_priority_pkt_type(skb,
+					       QDF_NBUF_PRIORITY_PKT_TCP_ACK);
 }
 #else
 static inline
@@ -2228,6 +2251,8 @@ static uint16_t __hdd_wmm_select_queue(struct net_device *dev,
 		skb->priority = SME_QOS_WMM_UP_BE;
 		return TX_GET_QUEUE_IDX(HDD_LINUX_AC_BE, 0);
 	}
+
+	hdd_update_pkt_pure_ack_info(skb);
 
 	/* Get the user priority from IP header */
 	hdd_wmm_classify_pkt(adapter, skb, &up, &is_critical);

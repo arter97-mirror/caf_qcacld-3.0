@@ -300,6 +300,7 @@ typedef struct sLimMlmDisassocReq {
 
 typedef struct sLimMlmDisassocCnf {
 	tSirMacAddr peerMacAddr;
+	tSirMacAddr peerMldAddr;
 	tSirResultCodes resultCode;
 	uint16_t disassocTrigger;
 	uint16_t aid;

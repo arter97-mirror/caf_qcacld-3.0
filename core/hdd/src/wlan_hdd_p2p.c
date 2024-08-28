@@ -1275,16 +1275,29 @@ __hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 	}
 
 	/* Get adapter from Destination mac address of the frame */
+	dest_addr = &pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET];
 	if (type == WLAN_FC0_TYPE_MGMT &&
 	    sub_type != SIR_MAC_MGMT_PROBE_REQ && !is_pasn_auth_frame &&
-	    !qdf_is_macaddr_broadcast(
-	     (struct qdf_mac_addr *)&pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET])) {
-		dest_addr = &pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET];
+	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)dest_addr)) {
 		adapter = hdd_get_adapter_by_macaddr(hdd_ctx, dest_addr);
 		if (!adapter)
 			adapter = hdd_get_adapter_by_rand_macaddr(hdd_ctx,
 								  dest_addr);
 		if (!adapter) {
+			/* check if it is P2P MC address */
+			if (!qdf_mem_cmp(dest_addr,
+					 P2P_MC_ADDR, P2P_MC_ADDR_SIZE)) {
+				adapter = hdd_get_adapter(hdd_ctx,
+							  QDF_P2P_DEVICE_MODE);
+				if (!adapter) {
+					hdd_err("P2P adapter is null for frame %d len %d rx freq %d",
+						frame_type, frm_len, rx_freq);
+					return;
+				}
+
+				goto check_adapter;
+			}
+
 			/*
 			 * Under assumption that we don't receive any action
 			 * frame with BCST as destination,
@@ -1726,3 +1739,70 @@ void wlan_hdd_set_mcc_latency(struct hdd_adapter *adapter, int set_value)
 		hdd_info("MCC is not active. Exit w/o setting latency");
 	}
 }
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * __wlan_hdd_cfg80211_p2p_send_usd_cmd() - Function to send USD vendor command
+ * to the lower layers.
+ * @wiphy: wiphy pointer
+ * @wdev: Wireless device
+ * @data: pointer to data
+ * @data_len: data length
+ *
+ * Return: 0 on success, negative errno if error
+ */
+static int __wlan_hdd_cfg80211_p2p_send_usd_cmd(struct wiphy *wiphy,
+						struct wireless_dev *wdev,
+						const void *data,
+						int data_len)
+{
+	struct hdd_adapter *adapter;
+	struct net_device *dev = wdev->netdev;
+	struct hdd_context *hdd_ctx;
+	int ret;
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
+	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_err("Command not allowed in FTM/Monitor mode");
+		return -EPERM;
+	}
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	ret = hdd_validate_adapter(adapter);
+	if (ret)
+		return ret;
+
+	hdd_ctx = adapter->hdd_ctx;
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	if (!hdd_ctx->psoc) {
+		hdd_err("psoc is null");
+		return -EINVAL;
+	}
+
+	return osif_p2p_send_usd_params(hdd_ctx->psoc,
+					adapter->deflink->vdev_id,
+					data, data_len);
+}
+
+int wlan_hdd_cfg80211_p2p_send_usd_cmd(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       const void *data, int data_len)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_p2p_send_usd_cmd(wiphy, wdev, data,
+						     data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

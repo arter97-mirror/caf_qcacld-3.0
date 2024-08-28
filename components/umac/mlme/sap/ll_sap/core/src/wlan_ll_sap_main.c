@@ -19,10 +19,10 @@
 #include "qca_vendor.h"
 #include "wlan_ll_lt_sap_main.h"
 #include "target_if_ll_sap.h"
+#include "wlan_mlme_vdev_mgr_interface.h"
 
 struct ll_sap_ops *global_ll_sap_ops;
 
-#ifdef WLAN_FEATUTE_LL_LT_SAP_CSA
 static
 void ll_sap_tsf_timer_timeout(void *user_data)
 {
@@ -30,7 +30,7 @@ void ll_sap_tsf_timer_timeout(void *user_data)
 	struct wlan_objmgr_vdev *vdev;
 	struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj;
 
-	psoc = (struct wlan_objmgr_psoc *)data;
+	psoc = (struct wlan_objmgr_psoc *)user_data;
 
 	if (!psoc) {
 		ll_sap_err("Invalid psoc");
@@ -59,12 +59,6 @@ void ll_sap_tsf_timer_timeout(void *user_data)
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
 }
-#else
-static inline
-void ll_sap_tsf_timer_timeout(void *user_data)
-{
-}
-#endif
 
 static QDF_STATUS ll_sap_psoc_obj_created_notification(struct wlan_objmgr_psoc *psoc, void *arg_list)
 {

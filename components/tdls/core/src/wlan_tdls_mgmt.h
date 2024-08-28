@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -149,15 +149,6 @@ QDF_STATUS tdls_set_rssi(struct wlan_objmgr_vdev *vdev,
  */
 struct wlan_objmgr_vdev *
 tdls_process_mlo_choice_tdls_vdev(struct wlan_objmgr_vdev *vdev);
-
-/**
- * tdls_set_no_force_vdev() - set no force for the vdev
- * @vdev: object manager vdev
- * @flag: true, set all vdev as no force; false, except the current one.
- *
- * Return: void
- */
-void tdls_set_no_force_vdev(struct wlan_objmgr_vdev *vdev, bool flag);
 
 /**
  * tdls_set_link_mode() - force active or unfore link for MLO case

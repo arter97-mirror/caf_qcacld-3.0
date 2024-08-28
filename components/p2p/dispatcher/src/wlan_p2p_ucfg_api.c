@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -680,3 +680,24 @@ ucfg_is_p2p_device_dynamic_set_mac_addr_supported(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
+void
+ucfg_p2p_set_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc,
+					  uint32_t mgmt_frm_registration_update)
+{
+	p2p_set_mgmt_frm_registration_update(psoc,
+					     mgmt_frm_registration_update);
+}
+
+uint32_t
+ucfg_p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_get_mgmt_frm_registration_update(psoc);
+}
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+				    struct p2p_usd_attr_params *param)
+{
+	return p2p_send_usd_params(psoc, param);
+}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

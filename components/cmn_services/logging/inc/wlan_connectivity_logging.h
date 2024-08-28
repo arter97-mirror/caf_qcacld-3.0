@@ -1315,10 +1315,12 @@ wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev);
 /**
  * wlan_connectivity_mlo_setup_event() - Fill and send MLO setup data
  * @vdev: vdev pointer
+ * @is_band_present: If Band is present(Associated link band is shared by FW)
  *
  * Return: None
  */
-void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev);
+void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
+				       bool is_band_present);
 
 /**
  * wlan_connectivity_t2lm_req_resp_event - API to send t2lm Req/resp
@@ -1382,7 +1384,8 @@ wlan_connectivity_mlo_reconfig_event(struct wlan_objmgr_vdev *vdev)
 }
 
 static inline void
-wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev)
+wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
+				  bool is_band_present)
 {
 }
 

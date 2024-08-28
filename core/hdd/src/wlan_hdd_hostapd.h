@@ -500,12 +500,13 @@ enum qca_wlan_802_11_mode hdd_convert_dot11mode_from_phymode(int phymode);
 void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
 
 /**
- * hdd_is_any_sta_connecting() - check if any sta is connecting
+ * hdd_is_sta_connect_or_link_switch_in_prog() - check if any sta is connecting
+ * or in the middle of a link switch
  * @hdd_ctx: hdd context
  *
- * Return: true if any sta is connecting
+ * Return: true if any sta is connecting/in link switch
  */
-bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx);
+bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx);
 
 /**
  * wlan_hdd_configure_twt_responder() - configure twt responder in sap_config
@@ -708,5 +709,23 @@ static inline void hdd_fils_hlp_rx(uint8_t vdev_id, hdd_cb_handle ctx,
 static inline void hdd_fils_hlp_workqueue_init(struct hdd_context *hdd_ctx)
 {}
 #endif
+
+/**
+ * hdd_ssr_restart_sap_cac_link() - Whether postpone sap link or not for SSR
+ * @adapter: adapter structure
+ * @link_info: link info structure
+ *
+ * This API use to check if the DFS sap link need to be postponed start or not
+ * in the SSR case if there is another partner link.
+ * And it can cover below cases:
+ * 1. If there is only one created/remaining DFS sap link not started, do not postpone.
+ * 2. If there is another 6GHz sap link not started, postpone the DFS sap link.
+ * 3. If there is another non-6GHz sap link not started, do not postpone.
+ *
+ * Return: True if need postpone otherwise false.
+ */
+bool
+hdd_ssr_restart_sap_cac_link(struct hdd_adapter *adapter,
+			     struct wlan_hdd_link_info *link_info);
 
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */

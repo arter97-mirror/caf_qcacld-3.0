@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -70,4 +71,12 @@ cfg_p2p_get_device_addr_admin(struct wlan_objmgr_psoc *psoc,
  */
 bool cfg_p2p_is_roam_config_disabled(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * cfg_p2p_is_go_ignore_non_p2p_probe_req() - Is P2P GO ignore non-P2P probe
+ * req enabled
+ * @psoc:        pointer to psoc object
+ *
+ * If P2P GO ignore non-P2P probe req enabled, don't send probe rsp to STA
+ */
+bool cfg_p2p_is_go_ignore_non_p2p_probe_req(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_P2P_CFG_API_H_ */

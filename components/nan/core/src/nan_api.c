@@ -526,6 +526,22 @@ bool wlan_nan_is_sta_sap_nan_allowed(struct wlan_objmgr_psoc *psoc)
 	return QDF_MIN(psoc_priv->cfg_param.support_sta_sap_ndp,
 		       psoc_priv->nan_caps.sta_sap_ndp_support);
 }
+
+qdf_freq_t wlan_nan_sap_override_freq(struct wlan_objmgr_psoc *psoc,
+				      uint32_t vdev_id,
+				      qdf_freq_t chan_freq)
+{
+	qdf_freq_t nan_freq_2g = 0;
+
+	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+		return chan_freq;
+
+	nan_freq_2g = policy_mgr_mode_specific_get_channel(psoc,
+							   PM_NAN_DISC_MODE);
+	if (!nan_freq_2g)
+		return chan_freq;
+	return nan_freq_2g;
+}
 #endif
 
 #if defined(WLAN_FEATURE_NAN) && defined(WLAN_CHIPSET_STATS)

@@ -1118,7 +1118,8 @@ os_if_dp_send_flow_stats_event(struct wlan_objmgr_psoc *psoc,
 	enum qca_nl80211_vendor_subcmds_index index =
 				QCA_NL80211_VENDOR_SUBCMD_FLOW_STATS_INDEX;
 
-	os_if_dp_print_flow_stats(flow_samples, flags);
+	if (flags & WLAN_DP_LOG_ENABLE)
+		os_if_dp_print_flow_stats(flow_samples, flags);
 	return os_if_dp_send_flow_stats(psoc, flow_samples, index, flags);
 }
 
@@ -1131,6 +1132,8 @@ os_if_dp_send_flow_report_event(struct wlan_objmgr_psoc *psoc,
 			QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_REPORT_INDEX;
 
 	flags |= WLAN_DP_FLOW_CLASSIFIED;
+	if (flags & WLAN_DP_LOG_ENABLE)
+		os_if_dp_print_flow_stats(flow_samples, flags);
 	return os_if_dp_send_flow_stats(psoc, flow_samples, index, flags);
 }
 

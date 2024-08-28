@@ -19,6 +19,7 @@
 #include <wlan_dp_main.h>
 #include <wlan_dp_fisa_rx.h>
 #include "hal_rx_flow.h"
+#include "dp_rx.h"
 #include "dp_htt.h"
 #include "dp_internal.h"
 #include "hif.h"
@@ -136,10 +137,64 @@ void dp_fisa_record_pkt(struct dp_fisa_rx_sw_ft *fisa_flow, qdf_nbuf_t nbuf,
 
 #endif
 
+static inline
+struct wlan_dp_intf *dp_fisa_rx_get_dp_intf_for_vdev(struct dp_vdev *vdev)
+{
+	struct wlan_dp_link *dp_link =
+				(struct wlan_dp_link *)vdev->osif_vdev;
+
+	/* dp_link cannot be invalid if vdev is present */
+	return dp_link->dp_intf;
+}
+
+#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
+static inline
+bool dp_rx_is_route_to_latency_sensitive_reo_enabled(struct dp_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+
+	dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
+
+	return dp_intf->route_to_latency_sensitive_reo;
+}
+
+static inline void
+dp_rx_override_latency_sensitive_reo(struct dp_vdev *vdev,
+				     struct dp_fisa_rx_fst_update_elem *elem)
+{
+	if (dp_rx_is_route_to_latency_sensitive_reo_enabled(vdev)) {
+		elem->reo_id = LSR_DEST_RING_IDX;
+		elem->reo_dest_indication = LSR_DEST_RING;
+	}
+}
+
+bool dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id)
+{
+	return (ring_id == LSR_DEST_RING_IDX);
+}
+#else
+static inline
+bool dp_rx_is_route_to_latency_sensitive_reo_enabled(struct dp_vdev *vdev)
+{
+	return false;
+}
+
+static inline void
+dp_rx_override_latency_sensitive_reo(struct dp_vdev *vdev,
+				     struct dp_fisa_rx_fst_update_elem *elem)
+{
+}
+
+bool dp_rx_is_ring_latency_sensitive_reo(uint8_t ring_id)
+{
+	return false;
+}
+#endif
+
 #ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
-/* time in us */
-#define LONG_LIVED_FLOW_TIME_THRESH 1000000
-#define ACTIVE_FLOW_TIME_THRESH 100000
+/* time in ns */
+#define LONG_LIVED_FLOW_TIME_THRESH 1000000000
+#define ACTIVE_FLOW_TIME_THRESH 1000000000
 
 static inline void
 dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow,
@@ -149,7 +204,7 @@ dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow,
 		return;
 
 	fisa_flow->num_pkts++;
-	fisa_flow->last_pkt_rcvd_tstamp = qdf_get_log_timestamp();
+	fisa_flow->last_pkt_rcvd_time = qdf_sched_clock();
 }
 
 /**
@@ -167,10 +222,10 @@ void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
 	struct dp_rx_fst *rx_fst = dp_ctx->rx_fst;
 	struct dp_fisa_rx_sw_ft *sw_ft_base;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
-	qdf_time_t cur_tstamp;
-	uint64_t time_us;
-	uint64_t flow_init_time_us;
-	uint64_t last_pkt_rcvd_time_us;
+	qdf_time_t cur_time_ns;
+	uint64_t time_ns;
+	uint64_t flow_init_time_ns;
+	uint64_t last_pkt_rcvd_time_ns;
 	uint64_t pkts_per_sec;
 	uint64_t num_pkts;
 	int i;
@@ -178,30 +233,27 @@ void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
 	if (!wlan_dp_fb_enabled(dp_ctx) || !rx_fst)
 		return;
 
-	cur_tstamp = qdf_get_log_timestamp();
-
 	qdf_spin_lock_bh(&rx_fst->dp_rx_fst_lock);
 	sw_ft_base = (struct dp_fisa_rx_sw_ft *)rx_fst->base;
 
 	for (i = 0; i < rx_fst->max_entries; i++) {
 		sw_ft_entry = &sw_ft_base[i];
 
-		if (!sw_ft_entry->is_populated)
+		if (!sw_ft_entry->is_populated ||
+		    dp_rx_is_ring_latency_sensitive_reo(sw_ft_entry->napi_id))
 			continue;
 
-		flow_init_time_us =
-			qdf_log_timestamp_to_usecs(cur_tstamp -
-						   sw_ft_entry->flow_init_ts);
-		last_pkt_rcvd_time_us =
-		qdf_log_timestamp_to_usecs(qdf_get_log_timestamp() -
-					   sw_ft_entry->last_pkt_rcvd_tstamp);
+		cur_time_ns = qdf_sched_clock();
+		flow_init_time_ns = cur_time_ns - sw_ft_entry->flow_init_ts;
+		last_pkt_rcvd_time_ns = cur_time_ns -
+					 sw_ft_entry->last_pkt_rcvd_time;
 
 		/* calculate avg only for the long lived and active flow */
-		if ((flow_init_time_us < LONG_LIVED_FLOW_TIME_THRESH) ||
-		    (last_pkt_rcvd_time_us > ACTIVE_FLOW_TIME_THRESH)) {
+		if ((flow_init_time_ns < LONG_LIVED_FLOW_TIME_THRESH) ||
+		    (last_pkt_rcvd_time_ns > ACTIVE_FLOW_TIME_THRESH)) {
 			sw_ft_entry->elig_for_balance = false;
 			sw_ft_entry->num_pkts = sw_ft_entry->num_pkts_prev;
-			sw_ft_entry->last_avg_cal_tstamp = cur_tstamp;
+			sw_ft_entry->last_avg_cal_time = cur_time_ns;
 			continue;
 		}
 
@@ -209,15 +261,14 @@ void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
 
 		if (!sw_ft_entry->num_pkts_prev) {
 			sw_ft_entry->num_pkts_prev = sw_ft_entry->num_pkts;
-			sw_ft_entry->last_avg_cal_tstamp = cur_tstamp;
+			sw_ft_entry->last_avg_cal_time = cur_time_ns;
 			continue;
 		} else {
 			num_pkts = sw_ft_entry->num_pkts -
 					 sw_ft_entry->num_pkts_prev;
 			sw_ft_entry->num_pkts_prev = sw_ft_entry->num_pkts;
-			time_us = cur_tstamp - sw_ft_entry->last_avg_cal_tstamp;
-			pkts_per_sec = (num_pkts * 1000000) /
-					qdf_log_timestamp_to_usecs(time_us);
+			time_ns = cur_time_ns - sw_ft_entry->last_avg_cal_time;
+			pkts_per_sec = (num_pkts * 1000000000) / time_ns;
 
 			if (!sw_ft_entry->avg_pkts_per_sec)
 				sw_ft_entry->avg_pkts_per_sec = pkts_per_sec;
@@ -226,7 +277,7 @@ void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
 				((sw_ft_entry->avg_pkts_per_sec * 25) / 100) +
 				((pkts_per_sec * 75) / 100);
 
-			sw_ft_entry->last_avg_cal_tstamp = cur_tstamp;
+			sw_ft_entry->last_avg_cal_time = cur_time_ns;
 		}
 	}
 
@@ -644,16 +695,6 @@ dp_rx_fisa_setup_cmem_fse(struct dp_rx_fst *fisa_hdl, uint32_t hashed_flow_idx,
 					  &flow);
 }
 
-static inline
-struct wlan_dp_intf *dp_fisa_rx_get_dp_intf_for_vdev(struct dp_vdev *vdev)
-{
-	struct wlan_dp_link *dp_link =
-				(struct wlan_dp_link *)vdev->osif_vdev;
-
-	/* dp_link cannot be invalid if vdev is present */
-	return dp_link->dp_intf;
-}
-
 /**
  * dp_rx_fisa_update_sw_ft_entry() - Helper function to update few SW FT entry
  * @sw_ft_entry: Pointer to softerware flow table entry
@@ -982,6 +1023,16 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	qdf_mem_zero(sw_ft_entry, sizeof(*sw_ft_entry));
 	dp_rx_fisa_restore_pkt_hist(sw_ft_entry, &pkt_hist);
 
+	if (!elem) {
+		hal_rx_flow_delete_cmem_fse(fisa_hdl->dp_ctx->hal_soc,
+					    fisa_hdl->cmem_ba,
+					    hashed_flow_idx);
+
+		fisa_hdl->del_flow_count++;
+		dp_rx_fisa_release_ft_lock(fisa_hdl, reo_id);
+		return;
+	}
+
 	dp_rx_fisa_update_sw_ft_entry(sw_ft_entry, elem->flow_idx, elem->vdev,
 				      fisa_hdl->dp_ctx, hashed_flow_idx);
 
@@ -1002,6 +1053,7 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 
 	sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 	sw_ft_entry->is_flow_udp = elem->is_udp_flow;
+	sw_ft_entry->peer_id = elem->peer_id;
 	sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
 	sw_ft_entry->flow_init_ts = qdf_sched_clock();
 
@@ -1034,6 +1086,29 @@ dp_fisa_rx_get_hw_ft_timestamp(struct dp_rx_fst *fisa_hdl,
 				hal_soc_hdl, sw_ft_entry->cmem_offset);
 
 	return ((struct rx_flow_search_entry *)sw_ft_entry->hw_fse)->timestamp;
+}
+
+static void dp_fisa_rx_fst_del(struct dp_rx_fst *fisa_hdl,
+			       struct dp_fisa_rx_fst_update_elem *elem)
+{
+	uint32_t flow_hash;
+	uint32_t hashed_flow_idx;
+
+	flow_hash = elem->flow_idx;
+	hashed_flow_idx = flow_hash & fisa_hdl->hash_mask;
+
+	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
+	dp_fisa_rx_delete_flow(fisa_hdl, NULL, hashed_flow_idx);
+	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
+
+	if (fisa_hdl->fse_cache_flush_allow &&
+	    (qdf_atomic_inc_return(&fisa_hdl->fse_cache_flush_posted) == 1)) {
+		/* return 1 after increment implies FSE cache flush message
+		 * already posted. so start restart the timer
+		 */
+		qdf_timer_start(&fisa_hdl->fse_cache_flush_timer,
+				FSE_CACHE_FLUSH_TIME_OUT);
+	}
 }
 
 /**
@@ -1211,8 +1286,19 @@ void dp_fisa_rx_fst_update_work(void *arg)
 		 * node is queued.
 		 */
 		if (vdev) {
-			if (vdev == elem->vdev)
-				dp_fisa_rx_fst_update(fisa_hdl, elem);
+			if (vdev == elem->vdev) {
+				switch (elem->action_code) {
+				case DP_FT_ADD:
+					dp_fisa_rx_fst_update(fisa_hdl, elem);
+					break;
+				case DP_FT_DEL:
+					dp_fisa_rx_fst_del(fisa_hdl, elem);
+					break;
+				default:
+					dp_err("invalid action code:%u",
+					       elem->action_code);
+				}
+			}
 
 			dp_vdev_unref_delete(fisa_hdl->soc_hdl, vdev,
 					     DP_MOD_ID_RX);
@@ -1259,6 +1345,41 @@ dp_fisa_rx_is_fst_work_queued(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx)
 	} while (status == QDF_STATUS_SUCCESS);
 
 	return false;
+}
+
+static void dp_fisa_rx_fst_del_queue(struct dp_rx_fst *fisa_hdl,
+				     uint32_t flow_idx, struct dp_vdev *vdev)
+{
+	struct dp_fisa_rx_fst_update_elem *elem;
+
+	if (!fisa_hdl->fst_in_cmem)
+		return;
+
+	if (!fisa_hdl->flow_deletion_supported)
+		return;
+
+	elem = qdf_mem_malloc(sizeof(*elem));
+	if (!elem) {
+		dp_fisa_debug("failed to allocate memory for FST update");
+		return;
+	}
+	elem->flow_idx = flow_idx;
+	elem->vdev = vdev;
+	elem->vdev_id = vdev->vdev_id;
+	elem->action_code = DP_FT_DEL;
+
+	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
+	qdf_list_insert_back(&fisa_hdl->fst_update_list, &elem->node);
+	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
+
+	if (qdf_atomic_read(&fisa_hdl->pm_suspended)) {
+		fisa_hdl->fst_wq_defer = true;
+		dp_info("defer fst update task in WoW");
+	} else {
+		qdf_queue_work(fisa_hdl->dp_ctx->qdf_dev,
+			       fisa_hdl->fst_update_wq,
+			       &fisa_hdl->fst_update_work);
+	}
 }
 
 /**
@@ -1328,9 +1449,11 @@ dp_fisa_rx_queue_fst_update_work(struct dp_rx_fst *fisa_hdl, uint32_t flow_idx,
 	elem->is_udp_flow = proto_params.udp_proto;
 	elem->reo_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
 	elem->reo_dest_indication = reo_dest_indication;
+	dp_rx_override_latency_sensitive_reo(vdev, elem);
 	elem->vdev = vdev;
 	elem->vdev_id = vdev->vdev_id;
 	elem->peer_id = QDF_NBUF_CB_RX_PEER_ID(nbuf);
+	elem->action_code = DP_FT_ADD;
 
 	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
 	qdf_list_insert_back(&fisa_hdl->fst_update_list, &elem->node);
@@ -1380,7 +1503,7 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 
 	sw_ft_entry = &sw_ft_base[flow_idx];
 	if (!sw_ft_entry->is_populated) {
-		dp_info("Pkt rx for non configured flow idx 0x%x", flow_idx);
+		dp_info_rl("Pkt rx for non configured flow idx 0x%x", flow_idx);
 		DP_STATS_INC(fisa_hdl, invalid_flow_index, 1);
 		return NULL;
 	}
@@ -1407,6 +1530,20 @@ dp_fisa_rx_get_sw_ft_entry(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 	return sw_ft_entry;
 }
 
+#ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
+static inline
+bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
+{
+	return (tlv_reo_dest_ind == LSR_DEST_RING);
+}
+#else
+static inline
+bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
+{
+	return false;
+}
+#endif
+
 #ifdef DP_OFFLOAD_FRAME_WITH_SW_EXCEPTION
 /*
  * dp_rx_reo_dest_honor_check() - check if packet reo destination is changed
@@ -1425,6 +1562,7 @@ dp_rx_reo_dest_honor_check(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 			qdf_nbuf_get_rx_reo_dest_ind_or_sw_excpt(nbuf);
 
 	if (fisa_hdl->rx_hash_enabled &&
+	    !dp_rx_is_routed_to_latency_sensitive_reo(tlv_reo_dest_ind) &&
 	    (tlv_reo_dest_ind < HAL_REO_DEST_IND_START_OFFSET))
 		return QDF_STATUS_E_FAILURE;
 	/*
@@ -1450,7 +1588,8 @@ dp_rx_reo_dest_honor_check(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 	if (tlv_reo_dest_ind != ring_reo_dest_ind ||
 	    REO_DEST_IND_IPA_REROUTE == ring_reo_dest_ind ||
 	    (fisa_hdl->rx_hash_enabled &&
-	     (tlv_reo_dest_ind < HAL_REO_DEST_IND_START_OFFSET)))
+	     !dp_rx_is_routed_to_latency_sensitive_reo(tlv_reo_dest_ind) &&
+	      (tlv_reo_dest_ind < HAL_REO_DEST_IND_START_OFFSET)))
 		return QDF_STATUS_E_FAILURE;
 
 	return QDF_STATUS_SUCCESS;
@@ -2391,6 +2530,26 @@ wlan_dp_fisa_nbuf_mark_flow_info(struct dp_fisa_rx_sw_ft *fisa_flow,
 		QDF_NBUF_CB_RX_TRACK_FLOW(nbuf) = 1;
 }
 
+static bool dp_runtime_fisa_aggr_disabled_for_vdev(struct dp_vdev *vdev,
+						   uint8_t rx_ctx_id)
+{
+	struct wlan_dp_intf *dp_intf;
+
+	dp_intf = dp_fisa_rx_get_dp_intf_for_vdev(vdev);
+	if (!dp_intf->runtime_disable_rx_fisa_aggr) {
+		if (qdf_unlikely(dp_intf->fisa_force_flushed[rx_ctx_id]))
+			dp_intf->fisa_force_flushed[rx_ctx_id] = 0;
+		return false;
+	}
+
+	if (qdf_unlikely(!dp_intf->fisa_force_flushed[rx_ctx_id])) {
+		dp_rx_fisa_flush_by_intf_ctx_id(dp_intf, rx_ctx_id);
+		dp_intf->fisa_force_flushed[rx_ctx_id] = 1;
+	}
+
+	return true;
+}
+
 QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		      struct dp_vdev *vdev,
 		      qdf_nbuf_t nbuf_list)
@@ -2451,16 +2610,20 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		/* Add new flow if the there is no ongoing flow */
 		fisa_flow = dp_rx_get_fisa_flow(dp_fisa_rx_hdl, vdev,
 						head_nbuf);
-		if (fisa_flow)
+		if (fisa_flow) {
 			wlan_dp_fisa_nbuf_mark_flow_info(fisa_flow, head_nbuf);
-
-		if (fisa_flow)
 			dp_fisa_update_flow_balance_stats(fisa_flow, dp_ctx);
+		}
 
 		/* Do not FISA aggregate IPSec packets */
 		if (fisa_flow &&
 		    fisa_flow->rx_flow_tuple_info.is_exception) {
 			fisa_flow->last_accessed_ts = qdf_sched_clock();
+			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
+			goto pull_nbuf;
+		}
+
+		if (dp_runtime_fisa_aggr_disabled_for_vdev(vdev, rx_ctx_id)) {
 			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
 			goto pull_nbuf;
 		}
@@ -2581,6 +2744,7 @@ QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id)
 				      &sw_ft_entry[i], vdev);
 
 			dp_rx_fisa_flush_flow_wrap(&sw_ft_entry[i]);
+			dp_fisa_rx_fst_del_queue(fisa_hdl, i, vdev);
 		}
 		dp_rx_fisa_release_ft_lock(fisa_hdl, reo_id);
 	}

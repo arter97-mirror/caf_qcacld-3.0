@@ -53,60 +53,6 @@ static void dp_fim_hash_table_init(struct fim_hash_table *ht, uint32_t len)
 }
 
 /**
- * dp_fim_parse_skb_flow_info() - Parse flow info from skb
- * @skb: network buffer
- * @flow: pointer to flow tuple info
- * @keys: keys to dissect flow
- *
- * Return: none
- */
-static void dp_fim_parse_skb_flow_info(struct sk_buff *skb,
-				       struct flow_info *flow,
-				       qdf_flow_keys_t *keys)
-{
-	qdf_nbuf_flow_dissect_flow_keys(skb, keys);
-
-	if (qdf_unlikely(qdf_flow_is_first_frag(keys))) {
-		if (skb->protocol == htons(ETH_P_IP)) {
-			qdf_nbuf_flow_get_ports(skb, keys);
-		} else {
-			flow->flags |= FLOW_INFO_PRESENT_IP_FRAGMENT;
-			return;
-		}
-	} else if (qdf_flow_is_frag(keys)) {
-		flow->flags |= FLOW_INFO_PRESENT_IP_FRAGMENT;
-		return;
-	}
-
-	flow->src_port = qdf_ntohs(qdf_flow_parse_src_port(keys));
-	flow->flags |= FLOW_INFO_PRESENT_SRC_PORT;
-
-	flow->dst_port = qdf_ntohs(qdf_flow_parse_dst_port(keys));
-	flow->flags |= FLOW_INFO_PRESENT_DST_PORT;
-
-	flow->proto = qdf_flow_get_proto(keys);
-	flow->flags |= FLOW_INFO_PRESENT_PROTO;
-
-	if (skb->protocol == qdf_ntohs(QDF_NBUF_TRAC_IPV4_ETH_TYPE)) {
-		flow->src_ip.ipv4_addr =
-				qdf_ntohl(qdf_flow_get_ipv4_src_addr(keys));
-		flow->flags |= FLOW_INFO_PRESENT_IPV4_SRC_IP;
-
-		flow->dst_ip.ipv4_addr =
-				qdf_ntohl(qdf_flow_get_ipv4_dst_addr(keys));
-		flow->flags |= FLOW_INFO_PRESENT_IPV4_DST_IP;
-	} else if (skb->protocol == qdf_ntohs(QDF_NBUF_TRAC_IPV6_ETH_TYPE)) {
-		qdf_flow_get_ipv6_src_addr(keys, &flow->src_ip.ipv6_addr);
-		flow->flags |= FLOW_INFO_PRESENT_IPV6_SRC_IP;
-
-		qdf_flow_get_ipv6_dst_addr(keys, &flow->dst_ip.ipv6_addr);
-		flow->flags |= FLOW_INFO_PRESENT_IPV4_DST_IP;
-
-		flow->flow_label = qdf_flow_get_flow_label(keys);
-	}
-}
-
-/**
  * dp_fim_flow_exact_match() - Check if two flows are matching.
  * @fi: pointer to 1st flow tuple info
  * @flow: pointer to 2nd flow tuple info to match with 1st
@@ -291,7 +237,7 @@ static inline bool dp_fim_is_proto_supported(struct sk_buff *skb)
 {
 	if (skb->sk &&
 	    (qdf_nbuf_sock_is_ipv4_pkt(skb) ||
-	     qdf_nbuf_sock_is_ipv6_pkt(skb)) &&
+	    qdf_nbuf_sock_is_ipv6_pkt(skb)) &&
 	    (qdf_nbuf_sock_is_udp_pkt(skb) ||
 	     qdf_nbuf_sock_is_tcp_pkt(skb)))
 		return true;
@@ -324,13 +270,12 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 	struct flow_info flow = {0};
 	struct sock *sk = NULL;
 	enum dp_fpm_status status;
-	qdf_flow_keys_t keys;
 
-	if (!skb || !fim_ctx)
+	if (qdf_unlikely(!skb || !fim_ctx))
 		return QDF_STATUS_E_INVAL;
 
 	if (!fim_ctx->fim_enable) {
-		skb->mark = FIM_INVALID_METADATA;
+		skb->mark = FLOW_INVALID_METADATA;
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -338,10 +283,10 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 	if (qdf_unlikely(!sk || !sk->sk_txhash)) {
 		DP_STATS_INC(fim_ctx, sk_invalid, 1);
 
-		dp_fim_parse_skb_flow_info(skb, &flow, &keys);
+		dp_fim_parse_skb_flow_info(skb, &flow);
 		if (!flow.flags || flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT) {
 			DP_STATS_INC(fim_ctx, pkt_not_support, 1);
-			skb->mark = FIM_INVALID_METADATA;
+			skb->mark = FLOW_INVALID_METADATA;
 			return QDF_STATUS_E_INVAL;
 		}
 
@@ -350,7 +295,7 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 		DP_STATS_INC(fim_ctx, sk_valid, 1);
 		if (!dp_fim_is_proto_supported(skb)) {
 			DP_STATS_INC(fim_ctx, pkt_not_support, 1);
-			skb->mark = FIM_INVALID_METADATA;
+			skb->mark = FLOW_INVALID_METADATA;
 			return QDF_STATUS_E_INVAL;
 		}
 		hash = sk->sk_txhash;
@@ -367,7 +312,7 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 	} else {
 		qdf_rcu_read_unlock_bh();
 		if (match_flags & FIM_SOCK_FLAG_BIT)
-			dp_fim_parse_skb_flow_info(skb, &flow, &keys);
+			dp_fim_parse_skb_flow_info(skb, &flow);
 
 		if (!flow.flags || flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT) {
 			DP_STATS_INC(fim_ctx, pkt_not_support, 1);
@@ -377,7 +322,7 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 		status = fpm_policy_flow_match(dp_intf, skb, &metadata, &flow,
 					       &policy_id);
 		if (status == FLOW_MATCH_DO_NOT_FOUND) {
-			metadata = FIM_INVALID_METADATA;
+			metadata = FLOW_INVALID_METADATA;
 			policy_id = FIM_INVALID_POLICY_ID;
 		}
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,6 +34,7 @@
 #include "../../core/src/wlan_p2p_main.h"
 #include "../../core/src/wlan_p2p_roc.h"
 #include "../../core/src/wlan_p2p_off_chan_tx.h"
+#include "target_if_p2p.h"
 
 #define IEEE80211_FC0_TYPE_MASK              0x0c
 #define P2P_NOISE_FLOOR_DBM_DEFAULT          (-96)
@@ -427,3 +428,11 @@ QDF_STATUS  tgt_p2p_noa_event_cb(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+QDF_STATUS tgt_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
+				   struct p2p_usd_attr_params *param)
+{
+	return target_if_p2p_send_usd_params(psoc, param);
+}
+#endif /* FEATURE_WLAN_SUPPORT_USD */

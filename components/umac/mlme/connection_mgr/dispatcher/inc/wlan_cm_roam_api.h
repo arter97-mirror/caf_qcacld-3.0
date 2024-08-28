@@ -1216,6 +1216,16 @@ wlan_cm_get_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
 			       struct qdf_mac_addr *bssid);
 
 /**
+ * wlan_cm_clear_roam_offload_bssid() - Clear the roam offload bssid of the sae
+ * roam candidate
+ * @vdev: pointer to vdevs
+ *
+ * Return: None
+ */
+void
+wlan_cm_clear_roam_offload_bssid(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_cm_set_roam_offload_ssid() - Set the roam offload candidate ssid
  *
  * @vdev: pointer to vdev
@@ -1367,6 +1377,22 @@ QDF_STATUS
 wlan_cm_roam_stats_info_get(struct wlan_objmgr_vdev *vdev,
 			    struct enhance_roam_info **roam_info,
 			    uint32_t  *roam_num);
+
+/**
+ * wlan_cm_roam_info_get() - get vdev roam info
+ *
+ * @vdev: pointer to vdev
+ * @roam_info: pointer to buffer to copy roam stats info
+ * @idx: index of roam stats cache buffer
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS
+wlan_cm_roam_info_get(struct wlan_objmgr_vdev *vdev,
+		      struct enhance_roam_info **roam_info,
+		      uint8_t idx);
+
 #else
 static inline
 void mlme_cm_alloc_roam_stats_info(struct vdev_mlme_obj *vdev_mlme)
@@ -1651,6 +1677,11 @@ wlan_cm_set_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
 static inline void
 wlan_cm_get_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
 			       struct qdf_mac_addr *bssid)
+{
+}
+
+static inline void
+wlan_cm_clear_roam_offload_bssid(struct wlan_objmgr_vdev *vdev)
 {
 }
 
@@ -1997,10 +2028,10 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
  * respect to the self sta and the peer after roaming and completes
  * the roam synch propagation with respect to WMA layer.
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-void cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
-			 struct roam_offload_synch_ind *sync_ind);
+QDF_STATUS cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
+			       struct roam_offload_synch_ind *sync_ind);
 
 /**
  * cm_roam_pe_sync_callback() - Callback registered at pe, gets invoked when

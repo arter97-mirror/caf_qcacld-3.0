@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -713,6 +713,8 @@ static struct pci_device_id pld_pcie_id_table[] = {
 #endif
 #elif defined(QCN7605_SUPPORT)
 	{ 0x17cb, 0x1102, PCI_ANY_ID, PCI_ANY_ID },
+#elif defined(QCA_WIFI_QCC2072)
+	{ 0x17cb, 0x1112, PCI_ANY_ID, PCI_ANY_ID },
 #else
 	{ 0x168c, 0x003c, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x0041, PCI_ANY_ID, PCI_ANY_ID },
@@ -957,7 +959,7 @@ int pld_pcie_get_soc_info(struct device *dev, struct pld_soc_info *info)
 	info->board_id = cnss_info.board_id;
 	info->soc_id = cnss_info.soc_id;
 	info->fw_version = cnss_info.fw_version;
-	strlcpy(info->fw_build_timestamp, cnss_info.fw_build_timestamp,
+	strscpy(info->fw_build_timestamp, cnss_info.fw_build_timestamp,
 		sizeof(info->fw_build_timestamp));
 	info->device_version.family_number =
 		cnss_info.device_version.family_number;
@@ -971,7 +973,7 @@ int pld_pcie_get_soc_info(struct device *dev, struct pld_soc_info *info)
 		info->dev_mem_info[i].start = cnss_info.dev_mem_info[i].start;
 		info->dev_mem_info[i].size = cnss_info.dev_mem_info[i].size;
 	}
-	strlcpy(info->fw_build_id, cnss_info.fw_build_id,
+	strscpy(info->fw_build_id, cnss_info.fw_build_id,
 		sizeof(info->fw_build_id));
 
 	return 0;

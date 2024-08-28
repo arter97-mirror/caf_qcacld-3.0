@@ -282,6 +282,7 @@ ol_txrx_find_peer_by_addr_and_vdev(struct cdp_pdev *ppdev,
  * ol_txrx_get_vdevid() - Get virtual interface id which peer registered
  * @soc_hdl - data path soc handle
  * @peer_mac - peer mac address
+ * @peer_type: peer type
  * @vdev_id - virtual interface id which peer registered
  *
  * Get virtual interface id which peer registered
@@ -290,7 +291,9 @@ ol_txrx_find_peer_by_addr_and_vdev(struct cdp_pdev *ppdev,
  *         QDF_STATUS_E_NOSUPPORT not support this feature
  */
 static QDF_STATUS ol_txrx_get_vdevid(struct cdp_soc_t *soc_hdl,
-				     uint8_t *peer_mac, uint8_t *vdev_id)
+				     uint8_t *peer_mac,
+				     enum cdp_peer_type peer_type,
+				     uint8_t *vdev_id)
 {
 	uint8_t pdev_id = OL_TXRX_PDEV_ID;
 	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);

@@ -103,6 +103,7 @@ enum dlm_reject_ap_type {
  * reject received with reason code 130
  * @REASON_EHT_NOT_SUPPORTED: Assoc reject received with reason code 135
  * @REASON_TX_LINK_NOT_ACCEPTED: Assoc reject received with reason code 139
+ * @REASON_LINK_REJECTED: Link is rejected during ML association.
  */
 enum dlm_reject_ap_reason {
 	REASON_UNKNOWN = 0,
@@ -123,6 +124,7 @@ enum dlm_reject_ap_reason {
 	REASON_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOCIATION,
 	REASON_EHT_NOT_SUPPORTED,
 	REASON_TX_LINK_NOT_ACCEPTED,
+	REASON_LINK_REJECTED,
 };
 
 /**

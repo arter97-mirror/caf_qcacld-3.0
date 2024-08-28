@@ -75,6 +75,7 @@
 #include <wlan_hdd_sysfs_pkt_log.h>
 #include <wlan_hdd_sysfs_policy_mgr.h>
 #include <wlan_hdd_sysfs_dp_aggregation.h>
+#include <wlan_hdd_sysfs_dp_stc.h>
 #include <wlan_hdd_sysfs_dl_modes.h>
 #include <wlan_hdd_sysfs_swlm.h>
 #include <wlan_hdd_sysfs_dump_in_progress.h>
@@ -107,6 +108,11 @@
 #define DRIVER_NAME "wifi"
 #endif
 
+#ifdef WLAN_CHIPSET_LOG_MAX_SIZE
+#define MIN_CHIPSET_LOG_SIZE 50
+#define MAX_CHIPSET_LOG_SIZE 1024
+#endif
+
 static struct kobject *wlan_kobject;
 static struct kobject *driver_kobject;
 static struct kobject *fw_kobject;
@@ -127,7 +133,7 @@ hdd_sysfs_validate_and_copy_buf(char *dest_buf, size_t dest_buf_size,
 	 * is not needed. Doing this extra copy operation just to ensure
 	 * the local buf is properly null-terminated.
 	 */
-	strlcpy(dest_buf, source_buf, dest_buf_size);
+	strscpy(dest_buf, source_buf, dest_buf_size);
 	/* default 'echo' cmd takes new line character to here */
 	if (dest_buf[source_buf_size - 1] == '\n')
 		dest_buf[source_buf_size - 1] = '\0';
@@ -615,6 +621,193 @@ static void hdd_sysfs_destroy_powerstats_interface(void)
 }
 #endif
 
+#ifdef WLAN_CHIPSET_LOG_MAX_SIZE
+static void
+hdd_init_max_chipset_log_size(struct hdd_context *hdd_ctx)
+{
+	hdd_ctx->max_chipset_log_size = WLAN_CHIPSET_LOG_MAX_SIZE;
+}
+
+static ssize_t
+__hdd_sysfs_max_chipset_log_size_store(struct hdd_context *hdd_ctx,
+				       struct kobj_attribute *attr,
+				       char const *buf, size_t size)
+{
+	char buf_local[MAX_SYSFS_USER_COMMAND_SIZE_LENGTH + 1];
+	int ret;
+	uint32_t value;
+	char *sptr, *token;
+
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	ret = hdd_sysfs_validate_and_copy_buf(buf_local, sizeof(buf_local),
+					      buf, size);
+	if (ret) {
+		hdd_err_rl("invalid input");
+		return ret;
+	}
+
+	sptr = buf_local;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+
+	if (kstrtou32(token, 0, &value))
+		return -EINVAL;
+
+	hdd_debug_rl("max_chipset_log_size %d", value);
+	if (value < MIN_CHIPSET_LOG_SIZE || value > MAX_CHIPSET_LOG_SIZE) {
+		hdd_debug_rl("max_chipset_log_size range is 50 to 1024");
+		return -EINVAL;
+	}
+
+	hdd_ctx->max_chipset_log_size = value;
+
+	return size;
+}
+
+static ssize_t
+hdd_sysfs_max_chipset_log_size_store(struct kobject *kobj,
+				     struct kobj_attribute *attr,
+				     char const *buf,
+				     size_t size)
+{
+	struct osif_psoc_sync *psoc_sync;
+	ssize_t errno_size;
+	int ret = -EINVAL;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		hdd_err_rl("hdd_ctx is NULL");
+		return ret;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+					     &psoc_sync);
+
+	if (errno_size)
+		return errno_size;
+
+	errno_size = __hdd_sysfs_max_chipset_log_size_store(hdd_ctx, attr, buf,
+							    size);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno_size;
+}
+
+static ssize_t
+__hdd_sysfs_max_chipset_log_size_show(struct hdd_context *hdd_ctx,
+				      struct kobj_attribute *attr, char *buf)
+{
+	ssize_t ret_val;
+
+	hdd_debug_rl("max_chipset_log_size %d", hdd_ctx->max_chipset_log_size);
+	ret_val = scnprintf(buf, PAGE_SIZE, "%d\n",
+			    hdd_ctx->max_chipset_log_size);
+
+	return ret_val;
+}
+
+static ssize_t hdd_sysfs_max_chipset_log_size_show(struct kobject *kobj,
+						   struct kobj_attribute *attr,
+						   char *buf)
+{
+	struct osif_psoc_sync *psoc_sync;
+	ssize_t errno_size;
+	int ret = -EINVAL;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		hdd_err_rl("hdd_ctx is NULL");
+		return ret;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+					     &psoc_sync);
+	if (errno_size)
+		return errno_size;
+
+	errno_size = __hdd_sysfs_max_chipset_log_size_show(hdd_ctx, attr, buf);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+	return errno_size;
+}
+
+static struct kobj_attribute max_chipset_log_size_attribute =
+	__ATTR(max_chipset_log_size, 0664, hdd_sysfs_max_chipset_log_size_show,
+	       hdd_sysfs_max_chipset_log_size_store);
+
+static void
+hdd_sysfs_create_max_chipset_log_size_interface(struct kobject *wifi_kobject,
+						struct hdd_context *hdd_ctx)
+{
+	int error;
+
+	if (!wifi_kobject) {
+		hdd_err("could not get wifi kobject!");
+		return;
+	}
+
+	if (!hdd_ctx->max_chipset_log_size_enable) {
+		hdd_err("max_chipset_log_size feature is disabled/no supp");
+		return;
+	}
+
+	error = sysfs_create_file(wifi_kobject,
+				  &max_chipset_log_size_attribute.attr);
+	if (error)
+		hdd_err("could not create max_chipset_log_size sysfs file");
+	else
+		hdd_init_max_chipset_log_size(hdd_ctx);
+}
+
+static void
+hdd_sysfs_destroy_max_chipset_log_size_interface(struct kobject *wifi_kobject)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		hdd_err_rl("hdd_ctx is NULL");
+		return;
+	}
+
+	if (!wifi_kobject) {
+		hdd_err("could not get wifi kobject!");
+		return;
+	}
+
+	if (!hdd_ctx->max_chipset_log_size_enable) {
+		hdd_err("max_chipset_log_size feature is disabled/no supp");
+		return;
+	}
+
+	sysfs_remove_file(wifi_kobject,
+			  &max_chipset_log_size_attribute.attr);
+}
+#else
+static inline void
+hdd_sysfs_create_max_chipset_log_size_interface(struct kobject *wifi_kobject,
+						struct hdd_context *hdd_ctx)
+{
+}
+
+static inline void
+hdd_sysfs_destroy_max_chipset_log_size_interface(struct kobject *wifi_kobject)
+{
+}
+#endif /* WLAN_CHIPSET_LOG_MAX_SIZE */
+
 static ssize_t
 hdd_sysfs_wakeup_logs_to_console_store(struct kobject *kobj,
 				       struct kobj_attribute *attr,
@@ -1013,11 +1206,13 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
 	hdd_sysfs_sta_bitrates_create(adapter);
+	hdd_sysfs_ipa_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_ipa_destroy(adapter);
 	hdd_sysfs_sta_bitrates_destroy(adapter);
 	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
@@ -1134,6 +1329,8 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 	hdd_sysfs_mem_stats_create(wlan_kobject);
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
 		hdd_sysfs_create_powerstats_interface();
+		hdd_sysfs_create_max_chipset_log_size_interface(wifi_kobject,
+								hdd_ctx);
 		hdd_sysfs_create_dump_in_progress_interface(wifi_kobject);
 		hdd_sysfs_fw_mode_config_create(driver_kobject);
 		hdd_sysfs_scan_disable_create(driver_kobject);
@@ -1146,6 +1343,7 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_pm_cinfo_create(driver_kobject);
 		hdd_sysfs_pm_pcl_create(driver_kobject);
 		hdd_sysfs_dp_aggregation_create(driver_kobject);
+		hdd_sysfs_dp_stc_logmask_create(driver_kobject);
 		hdd_sysfs_dp_swlm_create(driver_kobject);
 		hdd_sysfs_create_wakeup_logs_to_console();
 		hdd_sysfs_dp_txrx_stats_sysfs_create(driver_kobject);
@@ -1157,12 +1355,16 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_roam_trigger_bitmap_create(driver_kobject);
 		hdd_sysfs_rf_test_mode_create(driver_kobject);
 		hdd_sysfs_create_logging_config_interface(driver_kobject);
+		hdd_sysfs_ipa_opt_dp_ctrl_create(driver_kobject);
+		hdd_sysfs_ipa_opt_dp_ctrl_rm_create(driver_kobject);
 	}
 }
 
 void hdd_destroy_sysfs_files(void)
 {
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
+		hdd_sysfs_ipa_opt_dp_ctrl_rm_destroy(driver_kobject);
+		hdd_sysfs_ipa_opt_dp_ctrl_destroy(driver_kobject);
 		hdd_sysfs_destroy_logging_config_interface(driver_kobject);
 		hdd_sysfs_rf_test_mode_destroy(driver_kobject);
 		hdd_sysfs_roam_trigger_bitmap_destroy(driver_kobject);
@@ -1175,6 +1377,7 @@ void hdd_destroy_sysfs_files(void)
 		hdd_sysfs_destroy_wakeup_logs_to_console();
 		hdd_sysfs_dp_swlm_destroy(driver_kobject);
 		hdd_sysfs_dp_aggregation_destroy(driver_kobject);
+		hdd_sysfs_dp_stc_logmask_destroy(driver_kobject);
 		hdd_sysfs_pm_pcl_destroy(driver_kobject);
 		hdd_sysfs_pm_cinfo_destroy(driver_kobject);
 		hdd_sysfs_pktlog_destroy(driver_kobject);
@@ -1186,6 +1389,7 @@ void hdd_destroy_sysfs_files(void)
 		hdd_sysfs_scan_disable_destroy(driver_kobject);
 		hdd_sysfs_fw_mode_config_destroy(driver_kobject);
 		hdd_sysfs_destroy_dump_in_progress_interface(wifi_kobject);
+		hdd_sysfs_destroy_max_chipset_log_size_interface(wifi_kobject);
 		hdd_sysfs_destroy_powerstats_interface();
 	}
 	hdd_sysfs_mem_stats_destroy(wlan_kobject);

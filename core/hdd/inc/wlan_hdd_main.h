@@ -881,6 +881,7 @@ struct hdd_fw_txrx_stats {
  * @country_ie_updated: country ie is updated or not by hdd hostapd
  * @during_auth_offload: auth mgmt frame is offloading to hostapd
  * @reg_punc_bitmap: puncturing bitmap
+ * @is_ap_suspend: SAP suspend state
  */
 struct hdd_ap_ctx {
 	struct hdd_hostapd_state hostapd_state;
@@ -906,6 +907,7 @@ struct hdd_ap_ctx {
 #ifdef WLAN_FEATURE_11BE
 	uint16_t reg_punc_bitmap;
 #endif
+	qdf_atomic_t is_ap_suspend;
 };
 
 /**
@@ -1337,6 +1339,8 @@ struct get_station_client_info {
  * @link_state_cached_timestamp: link state cached timestamp
  * @keep_alive_interval: user configured STA keep alive interval
  * @sta_client_info: To store get station user application port_id's
+ * @disconnect_link_id: cache disconnect link_id, for legacy link_id will
+ *			be @WLAN_INVALID_LINK_ID
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1532,6 +1536,7 @@ struct hdd_adapter {
 #endif
 	uint16_t keep_alive_interval;
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
+	int32_t disconnect_link_id;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -2094,6 +2099,8 @@ enum wlan_state_ctrl_str_id {
  * @twt_en_dis_work: work to send twt enable/disable cmd on MCC/SCC concurrency
  * @is_wifi3_0_target:
  * @dump_in_progress: Stores value of dump in progress
+ * @max_chipset_log_size_enable: ini flag to enable/disable max_chipset_log_size
+ * @max_chipset_log_size: Stores max chipset log size value
  * @dual_sta_policy: Concurrent STA policy configuration
  * @is_therm_stats_in_progress:
  * @is_vdev_macaddr_dynamic_update_supported:
@@ -2110,6 +2117,7 @@ enum wlan_state_ctrl_str_id {
  * @num_mlo_peers: Total number of MLO peers
  * @more_peer_data: more mlo peer data in peer stats
  * @lpc_info: Local packet capture info
+ * @is_lpc_ps_disabled: Indicate if LPC has disabled power save
  * @combination: interface combination register to wiphy
  * @wlan_hdd_akm_suites: Supported AKM suites for various interfaces
  * @sta_akms: Station mode supported AKMs
@@ -2376,6 +2384,8 @@ struct hdd_context {
 #endif
 	bool is_wifi3_0_target;
 	bool dump_in_progress;
+	bool max_chipset_log_size_enable;
+	uint16_t max_chipset_log_size;
 	struct hdd_dual_sta_policy dual_sta_policy;
 #ifdef THERMAL_STATS_SUPPORT
 	bool is_therm_stats_in_progress;
@@ -2403,6 +2413,7 @@ struct hdd_context {
 #endif
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 	struct hdd_lpc_info lpc_info;
+	bool is_lpc_ps_disabled;
 #endif
 
 	struct ieee80211_iface_combination *combination;
@@ -2958,15 +2969,18 @@ wlan_hdd_get_link_info_from_objmgr(struct wlan_objmgr_vdev *vdev);
 /**
  * hdd_adapter_disable_all_links() - Reset the links on stop adapter.
  * @adapter: HDD adapter
+ * @clear_macaddr: Clears mac address if set to true
  *
  * Resets the MAC address in each link info and resets the link info
  * mapping in adapter array.
  *
  * Return: void
  */
-void hdd_adapter_disable_all_links(struct hdd_adapter *adapter);
+void
+hdd_adapter_disable_all_links(struct hdd_adapter *adapter, bool clear_macaddr);
 #else
-static inline void hdd_adapter_disable_all_links(struct hdd_adapter *adapter)
+static inline void
+hdd_adapter_disable_all_links(struct hdd_adapter *adapter, bool clear_macaddr)
 {
 }
 #endif
@@ -3742,6 +3756,15 @@ QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
 				    qdf_freq_t chan_freq,
 				    enum phy_ch_width ch_width,
 				    bool forced);
+
+/**
+ * hdd_is_chan_switch_in_progress() - Check if any adapter has channel switch
+ * in progress
+ *
+ * Return: true, if any adapter has channel switch in
+ * progress else false
+ */
+bool hdd_is_chan_switch_in_progress(void);
 
 #if defined(FEATURE_WLAN_CH_AVOID)
 QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
@@ -5542,6 +5565,23 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
+/**
+ * hdd_link_rej_mac_addr_update() - API to update OSIF/HDD on VDEV
+ * mac addr update due to link rejection.
+ * @ieee_rej_link_id: Rejected IEEE link ID
+ * @ieee_acc_link_id: Accepted IEEE link ID
+ * @vdev_id: VDEV undergoing link rejection.
+ *
+ * Check if both @ieee_rej_link_id and @ieee_acc_link_id are part of adapter
+ * corresponding to @vdev_id. Then take necessary actions to support link reject
+ * MAC update and reset hdd adapter link info for rejected link.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_link_rej_mac_addr_update(uint8_t ieee_rej_link_id,
+			     uint8_t ieee_acc_link_id,
+			     uint8_t vdev_id);
 
 /**
  * hdd_link_switch_vdev_mac_addr_update() - API to update OSIF/HDD on VDEV
@@ -5561,10 +5601,28 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 				     int32_t ieee_new_link_id, uint8_t vdev_id);
 
 /**
+ * hdd_roam_vdev_mac_addr_update() - API to update OSIF/HDD on VDEV
+ * mac addr update due to roaming.
+ * @vdev: vdev pointer
+ * @old_self_mac: Current self link mac of VDEV
+ * @new_self_mac: New self link mac of VDEV
+ *
+ * Check if both @old_self_mac and @new_self_mac are part of adapter
+ * corresponding to @vdev_id. Then take necessary actions to support
+ * MAC update and update DP to change link MAC address to new link's address.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
+					 struct qdf_mac_addr *old_self_mac,
+					 struct qdf_mac_addr *new_self_mac);
+
+/**
  * hdd_get_link_info_by_ieee_link_id() - Find link info pointer matching with
  * IEEE link ID.
  * @adapter: HDD adapter
  * @link_id: IEEE link ID to search for.
+ * @is_cache: Set this flag to get the link_id from cache_conn_info
  *
  * Search the station ctx connection info for matching link ID in @adapter and
  * return the link info pointer on match. The IEEE link ID is updated in station
@@ -5573,12 +5631,25 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
  * Return: link info pointer
  */
 struct wlan_hdd_link_info *
-hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id);
+hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
+				  int32_t link_id, bool is_cache);
+
+QDF_STATUS
+hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
+					struct wlan_hdd_link_info *new_link_info);
 #else
 static inline struct wlan_hdd_link_info *
-hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter, int32_t link_id)
+hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
+				  int32_t link_id, bool is_cache)
 {
 	return NULL;
+}
+
+static inline QDF_STATUS
+hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
+					struct wlan_hdd_link_info *new_link_info)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -5734,6 +5805,31 @@ void wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
  */
 bool hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx);
 
+/**
+ * wlan_hdd_set_lpc_powersave_disabled() - Set if power save disabled for LPC
+ * @hdd_ctx: hdd_ctx
+ * @is_disabled: Is power save disabled
+ *
+ * Return: None
+ */
+static inline void
+wlan_hdd_set_lpc_powersave_disabled(struct hdd_context *hdd_ctx,
+				    bool is_disabled)
+{
+	hdd_ctx->is_lpc_ps_disabled = is_disabled;
+}
+
+/**
+ * wlan_hdd_is_lpc_powersave_disabled() - Check if LPC has disabled power save
+ * @hdd_ctx: hdd_ctx
+ *
+ * Return: true - power save disabled, false - not
+ */
+static inline bool
+wlan_hdd_is_lpc_powersave_disabled(struct hdd_context *hdd_ctx)
+{
+	return hdd_ctx->is_lpc_ps_disabled;
+}
 #else
 static inline void
 wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
@@ -5742,6 +5838,18 @@ wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
 
 static inline bool
 hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
+
+static inline void
+wlan_hdd_set_lpc_powersave_disabled(struct hdd_context *hdd_ctx,
+				    bool is_disabled)
+{
+}
+
+static inline bool
+wlan_hdd_is_lpc_powersave_disabled(struct hdd_context *hdd_ctx)
 {
 	return false;
 }
@@ -5834,4 +5942,68 @@ hdd_update_sub20_chan_width(struct wlan_hdd_link_info *link_info,
  */
 bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
                         enum QDF_OPMODE mode);
+
+/**
+ *hdd_set_disconnect_link_id_cb() - set STA disconnected link_id
+ *@vdev_id: vdev_id
+ *
+ * Return: None
+ */
+void
+hdd_set_disconnect_link_id_cb(uint8_t vdev_id);
+
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+/*
+ * wlan_hdd_is_link_switch_in_progress() - Function to check if there is any
+ * link switch in progress
+ * @link_info: Link info pointer in HDD adapter
+ *
+ * Return: true if link switch in progress, false otherwise
+ */
+bool wlan_hdd_is_link_switch_in_progress(struct wlan_hdd_link_info *link_info);
+#else
+static inline bool
+wlan_hdd_is_link_switch_in_progress(struct wlan_hdd_link_info *link_info)
+{
+	return false;
+}
+#endif
+
+/*
+ * wlan_hdd_is_mlo_connection() - Check if connection is legacy or mlo
+ * @link_info: Link info pointer in HDD adapter
+ *
+ * Return: True if MLO connection, else False
+ */
+bool wlan_hdd_is_mlo_connection(struct wlan_hdd_link_info *link_info);
+
+#if defined(CONFIG_HDD_INIT_WITH_RTNL_LOCK)
+/**
+ * hdd_hold_rtnl_lock - Hold RTNL lock
+ *
+ * Hold RTNL lock
+ *
+ * Return: True if held and false otherwise
+ */
+static inline bool hdd_hold_rtnl_lock(void)
+{
+	rtnl_lock();
+	return true;
+}
+
+/**
+ * hdd_release_rtnl_lock - Release RTNL lock
+ *
+ * Release RTNL lock
+ *
+ * Return: None
+ */
+static inline void hdd_release_rtnl_lock(void)
+{
+	rtnl_unlock();
+}
+#else
+static inline bool hdd_hold_rtnl_lock(void) { return false; }
+static inline void hdd_release_rtnl_lock(void) { }
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

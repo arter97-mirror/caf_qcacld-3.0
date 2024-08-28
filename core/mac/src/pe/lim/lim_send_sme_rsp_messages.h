@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -74,20 +74,19 @@ void lim_send_sme_start_bss_rsp(struct mac_context *mac,
 /**
  * lim_send_sme_join_reassoc_rsp() - Send Response to Upper Layers
  * @mac_ctx: Pointer to Global MAC structure
- * @msg_type: Indicates message type
+ * @is_reassoc: Indicates if its assoc or reassoc rsp
  * @result_code: Indicates the result of previously issued request
  * @prot_status_code: Protocol Status Code
  * @session_entry: PE Session Info
  * @vdev_id: vdev_id
  *
  * This function is called by lim_process_sme_req_messages() to send
- * eWNI_SME_JOIN_RSP or eWNI_SME_REASSOC_RSP messages to applications
- * above MAC Software.
+ * join or reassoc rsp to applications above MAC Software.
  *
  * Return: None
  */
 void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
-				   uint16_t msg_type,
+				   bool is_reassoc,
 				   tSirResultCodes result_code,
 				   uint16_t prot_status_code,
 				   struct pe_session *session_entry,
@@ -134,6 +133,7 @@ QDF_STATUS lim_prepare_disconnect_done_ind(struct mac_context *mac_ctx,
  * lim_send_sme_disassoc_ntf() - Send disassoc notification to upper layer
  * @mac: Global MAC context
  * @peerMacAddr: The peer MAC addr to which disassociate was initiated
+ * @peerMldAddr: Peer MLD mac
  * @reasonCode: The reason for Disassociation
  * @disassocTrigger: The trigger for Disassociation
  * @aid: The STAID. This parameter is present only on AP
@@ -148,6 +148,7 @@ QDF_STATUS lim_prepare_disconnect_done_ind(struct mac_context *mac_ctx,
  */
 void lim_send_sme_disassoc_ntf(struct mac_context *mac,
 			       tSirMacAddr peerMacAddr,
+			       tSirMacAddr peerMldAddr,
 			       tSirResultCodes reasonCode,
 			       uint16_t disassocTrigger,
 			       uint16_t aid,

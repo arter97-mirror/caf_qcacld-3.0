@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2012, 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -57,7 +57,9 @@ QDF_STATUS
 rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 				      tSirMacAddr peer,
 				      tDot11fRadioMeasurementRequest *rrm_req,
-				      struct pe_session *session_entry);
+				      struct pe_session *session_entry,
+				      tpSirMacMgmtHdr pHdr, uint32_t frame_len,
+				      uint8_t *pRxPacketInfo);
 
 QDF_STATUS rrm_process_neighbor_report_response(struct mac_context *mac,
 						tDot11fNeighborReportResponse

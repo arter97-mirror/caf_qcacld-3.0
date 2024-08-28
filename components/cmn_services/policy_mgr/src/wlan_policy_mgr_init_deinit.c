@@ -39,6 +39,7 @@
 #include "wlan_objmgr_global_obj.h"
 #include "target_if.h"
 #ifdef WLAN_FEATURE_11BE_MLO
+#include "target_if_mlo_mgr.h"
 #include "wlan_mlo_link_force.h"
 #endif
 
@@ -144,6 +145,50 @@ static void policy_mgr_vdev_obj_status_cb(struct wlan_objmgr_vdev *vdev,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+#define MAX_TRACE_NUM_OF_SET_LINK 8
+
+struct trace_set_link_cmd {
+	uint64_t time;
+	struct mlo_link_set_active_param cmd;
+};
+
+static qdf_atomic_t g_trace_set_link_cmd_index;
+static struct trace_set_link_cmd *g_trace_set_link_cmd;
+
+struct trace_set_link_evt {
+	uint64_t time;
+	struct mlo_link_set_active_resp evt;
+};
+
+static qdf_atomic_t g_trace_set_link_evt_index;
+static struct trace_set_link_evt *g_trace_set_link_evt;
+
+static void pm_init_trace_set_link_mem(void)
+{
+	if (!g_trace_set_link_cmd)
+		g_trace_set_link_cmd = qdf_mem_malloc(
+			MAX_TRACE_NUM_OF_SET_LINK *
+			sizeof(struct trace_set_link_cmd));
+	qdf_atomic_init(&g_trace_set_link_cmd_index);
+	if (!g_trace_set_link_evt)
+		g_trace_set_link_evt = qdf_mem_malloc(
+			MAX_TRACE_NUM_OF_SET_LINK *
+			sizeof(struct trace_set_link_evt));
+	qdf_atomic_init(&g_trace_set_link_evt_index);
+}
+
+static void pm_deinit_trace_set_link_mem(void)
+{
+	if (g_trace_set_link_cmd) {
+		qdf_mem_free(g_trace_set_link_cmd);
+		g_trace_set_link_cmd = NULL;
+	}
+	if (g_trace_set_link_evt) {
+		qdf_mem_free(g_trace_set_link_evt);
+		g_trace_set_link_evt = NULL;
+	}
+}
+
 static void pm_emlsr_opportunistic_timer_handler(void *ctx)
 {
 	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)ctx;
@@ -230,6 +275,14 @@ static QDF_STATUS policy_mgr_unregister_link_switch_notifier(void)
 	return status;
 }
 #else
+static inline void pm_init_trace_set_link_mem(void)
+{
+}
+
+static inline void pm_deinit_trace_set_link_mem(void)
+{
+}
+
 static inline QDF_STATUS
 policy_mgr_init_emlsr_timer(struct policy_mgr_psoc_priv_obj *pm_ctx)
 {
@@ -487,6 +540,7 @@ QDF_STATUS policy_mgr_psoc_open(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_deinit_emlsr_timer(pm_ctx);
 		return QDF_STATUS_E_FAILURE;
 	}
+	pm_init_trace_set_link_mem();
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -494,6 +548,8 @@ QDF_STATUS policy_mgr_psoc_open(struct wlan_objmgr_psoc *psoc)
 QDF_STATUS policy_mgr_psoc_close(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_deinit_trace_set_link_mem();
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -567,6 +623,32 @@ static inline void policy_mgr_memzero_disabled_ml_list(void)
 	qdf_mem_zero(pm_disabled_ml_links, sizeof(pm_disabled_ml_links));
 }
 
+static void
+policy_mgr_trace_link_set_active_cb(
+			struct wlan_objmgr_psoc *psoc,
+			struct mlo_link_set_active_param *cmd,
+			struct mlo_link_set_active_resp *event)
+{
+	int32_t index;
+
+	if (cmd && g_trace_set_link_cmd) {
+		index = qdf_atomic_inc_return(&g_trace_set_link_cmd_index) &
+				(MAX_TRACE_NUM_OF_SET_LINK - 1);
+		qdf_mem_copy(&g_trace_set_link_cmd[index].cmd,
+			     cmd, sizeof(*cmd));
+		g_trace_set_link_cmd[index].time =
+				qdf_get_log_timestamp();
+	}
+	if (event && g_trace_set_link_evt) {
+		index = qdf_atomic_inc_return(&g_trace_set_link_evt_index) &
+				(MAX_TRACE_NUM_OF_SET_LINK - 1);
+		qdf_mem_copy(&g_trace_set_link_evt[index].evt,
+			     event, sizeof(*event));
+		g_trace_set_link_evt[index].time =
+				qdf_get_log_timestamp();
+	}
+}
+
 static QDF_STATUS
 policy_mgr_init_ml_link_update(struct policy_mgr_psoc_priv_obj *pm_ctx)
 {
@@ -579,6 +661,10 @@ policy_mgr_init_ml_link_update(struct policy_mgr_psoc_priv_obj *pm_ctx)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	target_if_mlo_register_trace_link_set_active_cb(
+			pm_ctx->psoc,
+			policy_mgr_trace_link_set_active_cb);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -586,6 +672,9 @@ static QDF_STATUS
 policy_mgr_deinit_ml_link_update(struct policy_mgr_psoc_priv_obj *pm_ctx)
 {
 	QDF_STATUS qdf_status;
+
+	target_if_mlo_register_trace_link_set_active_cb(
+			pm_ctx->psoc, NULL);
 
 	qdf_atomic_set(&pm_ctx->link_in_progress, 0);
 	qdf_status = qdf_event_destroy(&pm_ctx->set_link_update_done_evt);
@@ -933,6 +1022,8 @@ QDF_STATUS policy_mgr_register_hdd_cb(struct wlan_objmgr_psoc *psoc,
 		hdd_cbacks->wlan_check_cc_intf_cb;
 	pm_ctx->hdd_cbacks.wlan_set_tx_rx_nss_cb =
 		hdd_cbacks->wlan_set_tx_rx_nss_cb;
+	pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason =
+		hdd_cbacks->wlan_hdd_set_sap_csa_reason;
 
 	return QDF_STATUS_SUCCESS;
 }

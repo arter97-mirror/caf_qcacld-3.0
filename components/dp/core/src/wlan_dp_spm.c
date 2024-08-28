@@ -179,6 +179,7 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 	uint64_t curr_ts = qdf_sched_clock();
 	int i;
 
+	qdf_spinlock_acquire(&spm_intf->flow_list_lock);
 	for (i = 0; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++, cursor++) {
 		cursor = spm_intf->origin_aft[i];
 		if (!cursor)
@@ -200,6 +201,7 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 			spm_intf->o_stats.deleted++;
 		}
 	}
+	qdf_spinlock_release(&spm_intf->flow_list_lock);
 }
 
 /**
@@ -1016,7 +1018,6 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	qdf_spinlock_release(&spm_intf->flow_list_lock);
 
 	if (!flow_rec) {
-		qdf_spinlock_release(&spm_intf->flow_list_lock);
 		*flow_id = WLAN_DP_SPM_INVALID_FLOW_ID;
 		dp_info_rl("records freelist size: %u, Active flow table full!",
 			   spm_intf->o_flow_rec_freelist.count);

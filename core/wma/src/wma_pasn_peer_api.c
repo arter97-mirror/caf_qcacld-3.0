@@ -405,7 +405,7 @@ wma_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
 		wlan_nan_vdev_delete_all_pasn_peers(vdev);
 	} else {
 		rx_ops = wifi_pos_get_rx_ops(wma->psoc);
-		if (rx_ops ||
+		if (!rx_ops ||
 		    !rx_ops->wifi_pos_vdev_delete_all_ranging_peers_cb) {
 			wma_err("rx_ops is NULL");
 			return QDF_STATUS_E_NULL_VALUE;

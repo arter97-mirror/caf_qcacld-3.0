@@ -92,7 +92,7 @@
 # define RoamScan_AwayTime_default 0
 # define RoamRSSI_Trigger_min -100
 # define RoamRSSI_Trigger_max -50
-# define RoamRSSI_Trigger_default -78
+# define RoamRSSI_Trigger_default -76
 # define RoamCU_Trigger_min 0
 # define RoamCU_Trigger_max 100
 # define RoamCU_Trigger_default 70
@@ -126,6 +126,7 @@
 # define RoamIdle_InactiveTime_default 10
 #endif
 
+# define Aggressive_RoamRSSI_Trigger_default -65
 /*
  * <ini>
  * RoamScan_PassiveCH_DwellTime - Set max channel time for roam passive scan
@@ -1560,9 +1561,9 @@
  * <ini>
  * gNeighborLookupThreshold/RoamRSSI_Trigger - Set neighbor lookup rssi
  * threshold
- * @Min: 50
- * @Max: 100
- * @Default: 78
+ * @Min: -100
+ * @Max: -50
+ * @Default: -76
  *
  * This is used to control the RSSI threshold for neighbor lookup.
  *
@@ -1579,6 +1580,32 @@
 	RoamRSSI_Trigger_min, \
 	RoamRSSI_Trigger_max, \
 	RoamRSSI_Trigger_default, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Neighbor lookup rssi threshold")
+
+/*
+ * <ini>
+ * Aggressive_RoamRSSI_Trigger  - Set neighbor
+ * lookup rssi threshold
+ * @Min: -100
+ * @Max: -50
+ * @Default: -65
+ *
+ * This is used to control the Aggressive RSSI threshold for neighbor lookup.
+ *
+ * Related: None
+ *
+ * Supported Feature: LFR Scan
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD CFG_INI_INT( \
+	"Aggressive_RoamRSSI_Trigger", \
+	RoamRSSI_Trigger_min, \
+	RoamRSSI_Trigger_max, \
+	Aggressive_RoamRSSI_Trigger_default, \
 	CFG_VALUE_OR_DEFAULT, \
 	"Neighbor lookup rssi threshold")
 
@@ -3424,6 +3451,7 @@
 	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP) \
 	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP) \
 	CFG(CFG_LFR3_ROAM_INFO_STATS_NUM) \
-	CFG(CFG_HS_20_BTM_OFFLOAD_DISABLE)
+	CFG(CFG_HS_20_BTM_OFFLOAD_DISABLE) \
+	CFG(CFG_LFR_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD)
 
 #endif /* CFG_MLME_LFR_H__ */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -81,7 +81,7 @@ QDF_STATUS csr_scan_close(struct mac_context *mac);
 void csr_free_scan_result_entry(struct mac_context *mac, struct tag_csrscan_result
 				*pResult);
 
-QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t sessionId,
+QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t vdev_id,
 				  struct csr_roam_info *roam_info,
 				  eRoamCmdStatus u1, eCsrRoamResult u2);
 void csr_roam_complete(struct mac_context *mac, uint8_t session_id);
@@ -374,31 +374,32 @@ QDF_STATUS csr_roam_issue_stop_bss_cmd(struct mac_context *mac, uint8_t vdev_id,
 
 /**
  * csr_roam_issue_disassociate_sta_cmd() - disassociate a associated station
- * @mac:          Pointer to global structure for MAC
- * @sessionId:     Session Id for Soft AP
- * @p_del_sta_params: Pointer to parameters of the station to disassoc
+ * @mac: Pointer to global structure for MAC
+ * @vdev_id: vdev Id for Soft AP
+ * @del_sta_params: Pointer to parameters of the station to disassoc
  *
  * CSR function that HDD calls to issue a deauthenticate station command
  *
  * Return: QDF_STATUS_SUCCESS on success or another QDF_STATUS_* on error
  */
-QDF_STATUS csr_roam_issue_disassociate_sta_cmd(struct mac_context *mac,
-					       uint32_t sessionId,
-					       struct csr_del_sta_params
-					       *p_del_sta_params);
+QDF_STATUS
+csr_roam_issue_disassociate_sta_cmd(struct mac_context *mac,
+				    uint8_t vdev_id,
+				    struct csr_del_sta_params *del_sta_params);
 /**
  * csr_roam_issue_deauth_sta_cmd() - issue deauthenticate station command
- * @mac:          Pointer to global structure for MAC
- * @sessionId:     Session Id for Soft AP
- * @pDelStaParams: Pointer to parameters of the station to deauthenticate
+ * @mac: Pointer to global structure for MAC
+ * @vdev_id: vdev Id for Soft AP
+ * @del_sta_params: Pointer to parameters of the station to deauthenticate
  *
  * CSR function that HDD calls to issue a deauthenticate station command
  *
  * Return: QDF_STATUS_SUCCESS on success or another QDF_STATUS_** on error
  */
-QDF_STATUS csr_roam_issue_deauth_sta_cmd(struct mac_context *mac,
-		uint32_t sessionId,
-		struct csr_del_sta_params *pDelStaParams);
+QDF_STATUS
+csr_roam_issue_deauth_sta_cmd(struct mac_context *mac,
+			      uint8_t vdev_id,
+			      struct csr_del_sta_params *del_sta_params);
 
 /*
  * csr_send_chng_mcc_beacon_interval() -

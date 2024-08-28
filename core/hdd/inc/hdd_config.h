@@ -166,7 +166,7 @@ enum hdd_dot11_mode {
  * cpu_cxpc_threshold - PM QOS threshold
  * @Min: 0
  * @Max: 2000000000
- * @Default: 100000
+ * @Default: 16000
  *
  * This ini is used to set PM QOS threshold value
  *
@@ -182,7 +182,7 @@ enum hdd_dot11_mode {
 			"cpu_cxpc_threshold", \
 			0, \
 			2000000000, \
-			100000, \
+			16000, \
 			CFG_VALUE_OR_DEFAULT, \
 			"PM QOS threshold")
 #define CFG_CPU_CXPC_THRESHOLD_ALL CFG(CFG_CPU_CXPC_THRESHOLD)
@@ -198,6 +198,63 @@ enum hdd_dot11_mode {
 #else
 #define CFG_INTERFACE_CHANGE_WAIT_DEFAULT	250
 #endif
+#endif
+
+#ifdef FEATURE_EPM
+/*
+ * <ini>
+ * epm_enable - enable epm functionality
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable epm functionality
+ *
+ * Related: None.
+ *
+ * Supported Feature: ALL
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+ #define CFG_EPM_ENABLE CFG_INI_BOOL( \
+			"epm_enable", \
+			0, \
+			"enable epm functionality")
+#define CFG_EPM_ENABLE_ALL CFG(CFG_EPM_ENABLE)
+#else
+#define CFG_EPM_ENABLE_ALL
+#endif
+
+#ifdef FEATURE_EPM
+/*
+ * <ini>
+ * epm_value - set epm value
+ * @Min: 0
+ * @Max: 2000000000
+ * @Default: 100000
+ *
+ * This ini is used to set epm value
+ *
+ * Related: None.
+ *
+ * Supported Feature: ALL
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+ #define CFG_EPM_VALUE CFG_INI_UINT( \
+			"epm_value", \
+			0, \
+			2000000000, \
+			100000, \
+			CFG_VALUE_OR_DEFAULT, \
+			"epm value")
+#define CFG_EPM_VALUE_ALL CFG(CFG_EPM_VALUE)
+#else
+#define CFG_EPM_VALUE_ALL
 #endif
 
 /*
@@ -764,7 +821,7 @@ struct dhcp_server {
 #define CFG_NUM_VDEV_ENABLE CFG_INI_UINT( \
 		"gNumVdevs", \
 		1, \
-		5, \
+		WLAN_MAX_VDEVS, \
 		CFG_TGT_NUM_VDEV, \
 		CFG_VALUE_OR_DEFAULT, \
 		"Number of VDEVs")
@@ -1464,7 +1521,7 @@ enum host_log_level {
  */
 #define CFG_SAP_STA_NDP_CONCURRENCY CFG_INI_BOOL( \
 		"g_sap_sta_ndp_concurrency", \
-		0, \
+		1, \
 		"This ini is used to enable/disable SAP-STA-NDP concurrency")
 
 /*
@@ -1491,6 +1548,31 @@ enum host_log_level {
 		"g_no_sta_sap_concurrency", \
 		0, \
 		"This ini is used to disable STA-SAP concurrency")
+
+/*
+ * <ini>
+ * g_sap_sap_sta_concurrency  - enable SAP-SAP-STA concurrency
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini will not allow SAP-SAP-STA concurrency to be included in the
+ * iface combinations.
+ *
+ * 0: disable SAP-SAP-STA concurrency
+ * 1: enable SAP-SAP-STA concurrency
+ * Related: None
+ *
+ * Supported Feature: IFACE combinations
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAP_SAP_STA_CONCURRENCY CFG_INI_BOOL( \
+		"g_sap_sap_sta_concurrency", \
+		0, \
+		"This ini is used to enable SAP-SAP-STA concurrency")
 
 /*
  * <ini>
@@ -1522,7 +1604,7 @@ enum host_log_level {
  * g_sta_p2p_ndp_concurrency - STA + P2P + NAN + NDP concurrency support
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini allows P2P + STA + NAN + NDP Concurrency. Concurrency
  * to be included in the iface combinations when this ini is set and
@@ -1542,6 +1624,79 @@ enum host_log_level {
 		"g_sta_p2p_ndp_concurrency", \
 		1, \
 		"This ini is used to enable STA+P2P+NDP concurrency")
+
+/*
+ * <ini>
+ * g_prefer_nan_chan_for_p2p - Prefer NAN channels for P2P group formation
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini allows to prefer NAN social channels (149 and 6) for the
+ * P2P group formation. Rest of the channels to get next weightage. This helps
+ * to avoid MCC in case of NAN + P2P concurrency.
+ *
+ * Supported Feature: NAN + P2P
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_PREFER_NAN_CHAN_FOR_P2P CFG_INI_BOOL( \
+		"g_prefer_nan_chan_for_p2p", \
+		0, \
+		"This ini is used to prefer NAN social channels for P2P")
+
+#ifdef WLAN_FEATURE_UL_JITTER
+/*
+ * <ini>
+ * ul_jitter_log - Control UL jitter test logging
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to Control UL jitter test logging
+ *
+ * Supported Feature: WLAN_FEATURE_UL_JITTER
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_UL_JITTER_LOG \
+	CFG_INI_BOOL("ul_jitter_log", 0, \
+		     "Enable/Disable UL Jitter Logging")
+#define CFG_UL_JITTER_LOG_ALL CFG(CFG_UL_JITTER_LOG)
+#else
+#define CFG_UL_JITTER_LOG_ALL
+#endif
+
+#ifdef WLAN_CHIPSET_LOG_MAX_SIZE
+/*
+ * <ini>
+ * max_chipset_log_size_enable - Flag to enable max_chipset_log_size sysfs node
+ *
+ * @Min: 0
+ * @Max: 1
+ * Default: 0
+ *
+ * This INI is used to enable / disable max_chipset_log_size sysfs node.
+ * config are as follows:
+ * 0 - Disable max_chipset_log_size sysfs node
+ * 1 - Enable max_chipset_log_size sysfs node
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_MAX_CHIPSET_LOG_SIZE_ENABLE CFG_INI_BOOL( \
+	"max_chipset_log_size_enable", \
+	false, \
+	"This ini is used to enable/disable max_chipset_log_size sysfs node")
+#define CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL CFG(CFG_MAX_CHIPSET_LOG_SIZE_ENABLE)
+#else
+#define CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL
+#endif
 
 #define CFG_HDD_ALL \
 	CFG_DYNAMIC_MAC_ADDR_UPDATE_SUPPORTED_ALL \
@@ -1590,5 +1745,11 @@ enum host_log_level {
 	CFG(CFG_NO_SAP_NAN_CONCURRENCY) \
 	CFG(CFG_NO_P2P_CONCURRENCY) \
 	CFG(CFG_STA_P2P_NDP_CONCURRENCY) \
-	CFG(CFG_STA_SAP_P2P_CONCURRENCY)
+	CFG(CFG_PREFER_NAN_CHAN_FOR_P2P) \
+	CFG(CFG_STA_SAP_P2P_CONCURRENCY) \
+	CFG(CFG_SAP_SAP_STA_CONCURRENCY) \
+	CFG_UL_JITTER_LOG_ALL \
+	CFG_EPM_ENABLE_ALL \
+	CFG_EPM_VALUE_ALL \
+	CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL
 #endif

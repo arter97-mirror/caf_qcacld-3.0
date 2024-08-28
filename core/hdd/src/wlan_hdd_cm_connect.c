@@ -23,6 +23,7 @@
  */
 
 #include "wlan_hdd_main.h"
+#include <wlan_hdd_mlo.h>
 #include "wlan_hdd_cm_api.h"
 #include "wlan_hdd_trace.h"
 #include "wlan_hdd_object_manager.h"
@@ -350,30 +351,55 @@ QDF_STATUS hdd_cm_save_connected_links_info(struct qdf_mac_addr *self_mac,
 	}
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	hdd_cm_set_ieee_link_id(link_info, link_id);
+	hdd_cm_set_ieee_link_id(link_info, link_id, false);
+	hdd_cm_set_ieee_link_id(link_info, link_id, true);
 	qdf_copy_macaddr(&sta_ctx->conn_info.bssid, bssid);
 	return QDF_STATUS_SUCCESS;
 }
 
 void
-hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id)
+hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id,
+			bool is_cache)
 {
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	hdd_debug("old_link_id:%d new_link_id:%d",
+	hdd_debug("%s: old_link_id:%d new_link_id:%d",
+		  is_cache ? "cache_conn_info" : "conn_info",
+		  is_cache ? sta_ctx->cache_conn_info.ieee_link_id :
 		  sta_ctx->conn_info.ieee_link_id, link_id);
-	sta_ctx->conn_info.ieee_link_id = link_id;
+	if (is_cache)
+		sta_ctx->cache_conn_info.ieee_link_id = link_id;
+	else
+		sta_ctx->conn_info.ieee_link_id = link_id;
 }
 
 void
-hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info)
+hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache)
 {
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	hdd_debug("clear link id:%d", sta_ctx->conn_info.ieee_link_id);
-	sta_ctx->conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
+	hdd_debug("%s: clear link id:%d",
+		  is_cache ? "cache_conn_info" : "conn_info",
+		  is_cache ? sta_ctx->cache_conn_info.ieee_link_id :
+		  sta_ctx->conn_info.ieee_link_id);
+	if (is_cache)
+		sta_ctx->cache_conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
+	else
+		sta_ctx->conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
+}
+
+int32_t
+hdd_cm_get_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache)
+{
+	struct hdd_station_ctx *sta_ctx =
+				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	if (is_cache)
+		return sta_ctx->cache_conn_info.ieee_link_id;
+	else
+		return sta_ctx->conn_info.ieee_link_id;
 }
 #endif
 
@@ -1542,7 +1568,7 @@ hdd_cm_mlme_send_standby_link_chn_width(struct hdd_adapter *adapter,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	link_info = hdd_get_link_info_by_ieee_link_id(adapter, link_id);
+	link_info = hdd_get_link_info_by_ieee_link_id(adapter, link_id, false);
 	if (!link_info) {
 		hdd_err("Link info not found by linkid:%u", link_id);
 		return QDF_STATUS_E_INVAL;
@@ -1594,7 +1620,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	mac_handle_t mac_handle;
 	bool is_auth_required = true;
 	bool is_roam_offload = false;
-	bool is_roam = rsp->is_reassoc;
+	bool is_roam = rsp->is_reassoc, is_vdev_repurpose;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint8_t uapsd_mask = 0;
 	uint32_t time_buffer_size;
@@ -1669,7 +1695,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 	hdd_cm_handle_assoc_event(vdev, rsp->bssid.bytes);
 
-	if (ucfg_cm_is_link_switch_connect_resp(rsp)) {
+	is_vdev_repurpose = ucfg_cm_is_link_switch_connect_resp(rsp);
+	if (is_vdev_repurpose) {
 		if (hdd_cm_mlme_send_standby_link_chn_width(adapter, vdev))
 			hdd_debug("send standby link chn width fail");
 	}
@@ -1687,7 +1714,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			wlan_hdd_set_mas(adapter, hdd_ctx->miracast_value);
 	}
 
-	if (!is_roam) {
+	if (!is_roam && !is_vdev_repurpose) {
 		/* Initialize the Linkup event completion variable */
 		INIT_COMPLETION(adapter->linkup_event_var);
 
@@ -1756,8 +1783,19 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 					     &rsp->bssid, is_auth_required);
 	}
 
-	hdd_debug("Enabling queues");
-	hdd_cm_netif_queue_enable(adapter);
+	if (!is_vdev_repurpose) {
+		hdd_debug("Enabling queues");
+		hdd_cm_netif_queue_enable(adapter);
+
+		if (adapter->device_mode == QDF_STA_MODE)
+			cdp_reset_rx_hw_ext_stats(soc);
+
+		wlan_hdd_auto_shutdown_enable(hdd_ctx, false);
+		if (adapter->keep_alive_interval)
+			hdd_vdev_send_sta_keep_alive_interval(link_info,
+							      hdd_ctx,
+						adapter->keep_alive_interval);
+	}
 
 	/* send peer status indication to oem app */
 	if (vdev_mlme) {
@@ -1786,10 +1824,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				  alt_pipe);
 	}
 
-	if (adapter->device_mode == QDF_STA_MODE)
-		cdp_reset_rx_hw_ext_stats(soc);
-
-	wlan_hdd_auto_shutdown_enable(hdd_ctx, false);
 
 	DPTRACE(qdf_dp_trace_mgmt_pkt(QDF_DP_TRACE_MGMT_PACKET_RECORD,
 		link_info->vdev_id, QDF_TRACE_DEFAULT_PDEV_ID,
@@ -1798,24 +1832,11 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	if (is_roam)
 		ucfg_dp_nud_indicate_roam(vdev);
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
-
-	if (adapter->keep_alive_interval)
-		hdd_vdev_send_sta_keep_alive_interval(link_info, hdd_ctx,
-						adapter->keep_alive_interval);
 }
 
-static void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
+static inline void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
 {
-	struct wlan_hdd_link_info *link_info = NULL;
-	uint8_t i;
-
-	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_info = &adapter->link_info[i];
-		if (link_info && link_info->vdev) {
-			wlan_mlme_set_disconnect_receive(
-						link_info->vdev, false);
-		}
-	}
+	adapter->disconnect_link_id = WLAN_INVALID_LINK_ID;
 }
 
 static void
@@ -1885,6 +1906,28 @@ static void hdd_cm_connect_success(struct wlan_objmgr_vdev *vdev,
 		hdd_cm_connect_success_post_user_update(vdev, rsp);
 	}
 }
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+void hdd_cm_connect_active_notify(uint8_t vdev_id)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("Link info not found for vdev %d", vdev_id);
+		return;
+	}
+
+	if (hdd_adapter_restore_link_vdev_map(link_info->adapter, true))
+		hdd_adapter_update_mlo_mgr_mac_addr(link_info->adapter);
+}
+#endif
 
 QDF_STATUS hdd_cm_connect_complete(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_cm_connect_resp *rsp,
@@ -2322,7 +2365,7 @@ QDF_STATUS hdd_cm_ft_preauth_complete(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NOMEM;
 
 	/* need to send the RIC IEs first */
-	str_len = strlcpy(buff, "RIC=", IW_CUSTOM_MAX);
+	str_len = strscpy(buff, "RIC=", IW_CUSTOM_MAX);
 	if (rsp->ric_ies_length &&
 	    (rsp->ric_ies_length <= (IW_CUSTOM_MAX - str_len))) {
 		qdf_mem_copy(&buff[str_len], rsp->ric_ies,
@@ -2336,7 +2379,7 @@ QDF_STATUS hdd_cm_ft_preauth_complete(struct wlan_objmgr_vdev *vdev,
 
 	/* need to provide the Auth Resp */
 	qdf_mem_zero(buff, IW_CUSTOM_MAX);
-	str_len = strlcpy(buff, "AUTH=", IW_CUSTOM_MAX);
+	str_len = strscpy(buff, "AUTH=", IW_CUSTOM_MAX);
 	hdd_cm_get_ft_preauth_response(vdev, rsp, &buff[str_len],
 				       (IW_CUSTOM_MAX - str_len),
 				       &auth_resp_len);

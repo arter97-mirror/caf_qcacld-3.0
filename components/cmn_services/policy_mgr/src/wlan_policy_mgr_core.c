@@ -1598,17 +1598,18 @@ static uint32_t policy_mgr_dump_current_concurrency_5_connection(
 
 	mode = pm_conc_connection_list[4].mode;
 	qdf_scnprintf(buf, sizeof(buf), "(vdev %d)",
-		      pm_conc_connection_list[3].vdev_id);
+		      pm_conc_connection_list[4].vdev_id);
 
 	switch (mode) {
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
 					pm_ctx->psoc, cc_mode, length);
 		count += strlcat(cc_mode, "+", length);
-		count += strlcat(cc_mode,
-				 ml_sta_prefix(
-				 pm_ctx->psoc, pm_conc_connection_list[3].vdev_id),
-				 length);
+		count += strlcat(
+			cc_mode,
+			ml_sta_prefix(
+			pm_ctx->psoc, pm_conc_connection_list[4].vdev_id),
+			length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
@@ -4019,6 +4020,7 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SCC_ON_5G_LOW:
+	case PM_SCC_ON_5G_LOW_CH_24G:
 		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
 				      pcl_weights, pcl_sz,
 				      len,
@@ -4028,9 +4030,17 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				      POLICY_MGR_PCL_ORDER_SCC_5G_LOW,
 				      &high_5_band_scc_present,
 				      &low_5_band_scc_present);
+
+		if (pcl == PM_SCC_ON_5G_LOW_CH_24G)
+			add_chlist_to_pcl(pm_ctx->pdev,
+					  pcl_channels, pcl_weights, pcl_sz,
+					  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
+					  channel_list_24, chan_index_24,
+					  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SCC_ON_5G_HIGH:
+	case PM_SCC_ON_5G_HIGH_CH_24G:
 		add_sbs_chlist_to_pcl(psoc,  pcl_channels,
 				      pcl_weights, pcl_sz,
 				      len,
@@ -4040,6 +4050,13 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				      POLICY_MGR_PCL_ORDER_SCC_5G_HIGH,
 				      &high_5_band_scc_present,
 				      &low_5_band_scc_present);
+
+		if (pcl == PM_SCC_ON_5G_HIGH_CH_24G)
+			add_chlist_to_pcl(pm_ctx->pdev,
+					  pcl_channels, pcl_weights, pcl_sz,
+					  len, WEIGHT_OF_GROUP2_PCL_CHANNELS,
+					  channel_list_24, chan_index_24,
+					  false);
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SBS_CH_MCC_CH_SCC_ON_24_24G:
@@ -4110,8 +4127,6 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 				POLICY_MGR_PCL_ORDER_SCC_5G_LOW_MCC_5G_HIGH,
 				&high_5_band_scc_present,
 				&low_5_band_scc_present);
-		status = QDF_STATUS_SUCCESS;
-		break;
 		status = QDF_STATUS_SUCCESS;
 		break;
 	case PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW:
@@ -4279,6 +4294,8 @@ bool policy_mgr_allow_new_home_channel(
 	uint32_t ext_flags)
 {
 	bool status = true;
+	uint8_t conn_index, count = 0;
+	bool nan_present;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool on_same_mac = false, force_switch_without_dis = false;
 
@@ -4298,6 +4315,33 @@ bool policy_mgr_allow_new_home_channel(
 		QDF_MCC_TO_SCC_SWITCH_FORCE_PREFERRED_WITHOUT_DISCONNECTION;
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	/* Allow 3rd home channel on same mac if NAN interface is present */
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if (pm_conc_connection_list[conn_index].in_use &&
+		    pm_conc_connection_list[conn_index].mode !=
+		    PM_NAN_DISC_MODE &&
+		    pm_conc_connection_list[conn_index].mode != PM_NDI_MODE) {
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(
+			    pm_conc_connection_list[conn_index].freq))
+				count++;
+		}
+	}
+
+	nan_present = policy_mgr_mode_specific_connection_count(
+					psoc,
+					PM_NAN_DISC_MODE,
+					NULL);
+
+	if (count <= 2 && nan_present &&
+	    WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq) &&
+	    (wlan_nan_is_sta_sap_nan_allowed(psoc) ||
+	    wlan_nan_is_sta_p2p_ndp_supported(psoc))) {
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+		return true;
+	}
+
 	if (num_connections == 3) {
 		status = policy_mgr_allow_4th_new_freq(psoc,
 						       ch_freq, mode,
@@ -4421,6 +4465,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	enum QDF_OPMODE op_mode;
 	qdf_freq_t pcl_freq;
 	bool same_mac, sbs_ml_sta_present = false, dbs_ml_sta_present = false;
+	qdf_freq_t ll_lt_sap_freq;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -4452,6 +4497,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	     WLAN_REG_IS_24GHZ_CH_FREQ(sap_ch_freq))
 		allow_2ghz_only = true;
 
+	ll_lt_sap_freq = policy_mgr_get_ll_sap_freq(psoc);
+
 	/*
 	 * The preferred force SCC channel is SAP original channel,
 	 * and then the SCC channel on the same mac, and then the SCC
@@ -4467,6 +4514,13 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 		if (!allow_6ghz && WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl_freq))
 			continue;
 		if (allow_2ghz_only && !WLAN_REG_IS_24GHZ_CH_FREQ(pcl_freq))
+			continue;
+
+		/* Skip LL LT SAP freq and for SAP skip same mac freq */
+		if (ll_lt_sap_freq && (ll_lt_sap_freq == pcl_freq ||
+		    (op_mode == QDF_SAP_MODE &&
+		     policy_mgr_are_2_freq_on_same_mac(psoc, pcl_freq,
+						       ll_lt_sap_freq))))
 			continue;
 
 		/*
@@ -4524,13 +4578,14 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	else
 		*intf_ch_freq = 0;
 
-	policy_mgr_debug("2ghz_only %d allow_6ghz %d, ml sta SBS:%d DBS:%d, SCC: same_as_sap %d same_mac %d on_diff_mac %d, NON-SCC: same_as_sap %d same_mac %d on_diff_mac %d. intf_ch_freq %d",
+	policy_mgr_debug("2ghz_only %d allow_6ghz %d, ml sta SBS:%d DBS:%d, SCC: same_as_sap %d same_mac %d on_diff_mac %d, NON-SCC: same_as_sap %d same_mac %d on_diff_mac %d. intf_ch_freq %d ll_lt_sap_freq %d",
 			 allow_2ghz_only, allow_6ghz, sbs_ml_sta_present,
 			 dbs_ml_sta_present, scc_ch_freq_same_as_sap,
 			 scc_ch_freq_on_same_mac, scc_ch_freq_on_diff_mac,
 			 non_scc_ch_freq_same_as_sap,
 			 non_scc_ch_freq_on_same_mac,
-			 non_scc_ch_freq_on_diff_mac, *intf_ch_freq);
+			 non_scc_ch_freq_on_diff_mac, *intf_ch_freq,
+			 ll_lt_sap_freq);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4777,7 +4832,7 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 		*intf_ch_freq = 0;
 		break;
 	default:
-		if (num_connections > 3) {
+		if (num_connections > (MAX_NUMBER_OF_CONC_CONNECTIONS - 1)) {
 			policy_mgr_debug("invalid num_connections: %d",
 					 num_connections);
 			break;

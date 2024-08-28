@@ -595,7 +595,8 @@ static QDF_STATUS hdd_ipa_unmap_wds_peer(struct hdd_context *hdd_ctx,
 	}
 
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list, wds_macaddr,
-					   STA_INFO_SAP_GET_WDS_CLIENT_INFO);
+					   STA_INFO_SAP_GET_WDS_CLIENT_INFO,
+					   STA_INFO_MATCH_STA_MAC_ONLY);
 	if (sta_info) {
 		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info,
 				     true, STA_INFO_SAP_GET_WDS_CLIENT_INFO);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1208,6 +1208,81 @@ wlan_cfg80211_tdls_mgmt(struct wlan_objmgr_vdev *vdev,
 
 error_mgmt_req:
 	return status;
+}
+
+int wlan_cfg80211_tdls_send_mgmt_on_active_link(struct hdd_adapter *adapter,
+						const uint8_t *peer,
+						uint8_t action_code,
+						uint8_t dialog_token,
+						uint16_t status_code,
+						uint32_t peer_capability,
+						const uint8_t *buf,
+						size_t len, int link_id)
+{
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_vdev *tdls_vdev = NULL;
+	int ret = -EINVAL;
+	uint8_t vdev_id;
+	bool is_mlo_vdev = true;
+
+	if (!hdd_ctx) {
+		osif_err("hdd_ctx is null");
+		return -EINVAL;
+	}
+
+	if (!hdd_ctx->psoc) {
+		osif_err("psoc is null");
+		return -EINVAL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
+	if (!vdev) {
+		osif_err("vdev is null");
+		return -EINVAL;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		tdls_vdev = vdev;
+		is_mlo_vdev = false;
+		goto end;
+	}
+
+	vdev_id = ucfg_mlo_get_active_vdev_id(vdev);
+	if (vdev_id == WLAN_UMAC_VDEV_ID_MAX) {
+		osif_err("vdev id is not valid");
+		goto ref_rel;
+	}
+
+	tdls_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc,
+							 vdev_id,
+							 WLAN_OSIF_TDLS_ID);
+
+	if (!tdls_vdev) {
+		osif_err("vdev is not found for id %d", vdev_id);
+		goto ref_rel;
+	}
+
+end:
+	if (action_code == TDLS_DISCOVERY_REQUEST &&
+	    ucfg_tdls_discovery_on_going(tdls_vdev)) {
+		osif_err("discovery request is going");
+		ret = -EAGAIN;
+		goto ref_rel;
+	}
+
+	ret = wlan_cfg80211_tdls_mgmt(tdls_vdev, peer, action_code,
+				      dialog_token, status_code,
+				      peer_capability, buf, len, link_id);
+
+ref_rel:
+	if (vdev)
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_TDLS_ID);
+
+	if (is_mlo_vdev && tdls_vdev)
+		wlan_objmgr_vdev_release_ref(tdls_vdev, WLAN_OSIF_TDLS_ID);
+
+	return ret;
 }
 
 int
