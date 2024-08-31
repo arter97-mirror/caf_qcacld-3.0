@@ -8771,3 +8771,30 @@ void wlan_mlme_get_24_chan_bonding_mode(struct wlan_objmgr_psoc *psoc,
 {
 	*chan_bonding = cfg_get(psoc, CFG_CHANNEL_BONDING_MODE_24GHZ);
 }
+
+bool
+wlan_mlme_get_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return cfg_default(CFG_ENABLE_SAP_DFS_PUNCTURE);
+
+	return mlme_obj->cfg.dfs_cfg.enable_sap_dfs_puncture;
+}
+
+QDF_STATUS
+wlan_mlme_set_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc,
+			       bool enable_sap_dfs_puncture)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.dfs_cfg.enable_sap_dfs_puncture = enable_sap_dfs_puncture;
+
+	return QDF_STATUS_SUCCESS;
+}
