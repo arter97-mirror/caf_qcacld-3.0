@@ -207,6 +207,11 @@ sap_is_chan_change_needed(struct sap_context *sap_ctx)
 		return true;
 	}
 
+	if (!wlan_mlme_get_sap_dfs_puncture(mac_ctx->psoc)) {
+		sap_debug("dfs punct disabled");
+		return true;
+	}
+
 	ch_params = &mac_ctx->sap.SapDfsInfo.new_ch_params;
 	if (mac_ctx->sap.SapDfsInfo.orig_chanWidth == 0) {
 		ch_wd = sap_ctx->ch_width_orig;
