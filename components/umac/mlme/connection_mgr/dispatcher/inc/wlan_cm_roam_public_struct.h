@@ -1007,7 +1007,7 @@ struct scoring_param {
 	struct per_slot_score oce_wan_scoring;
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t eht_caps_weightage;
-	uint8_t mlo_weightage;
+	uint32_t mlo_weightage;
 #endif
 	int32_t security_weightage;
 	uint32_t security_index_score;
