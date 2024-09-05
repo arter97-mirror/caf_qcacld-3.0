@@ -530,7 +530,7 @@ dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 	peer_state = peer_info.state;
 
 	if (peer_state == OL_TXRX_PEER_STATE_AUTH)
-		return QDF_STATUS_SUCCESS;
+		goto update_sa;
 
 	if (peer_state == OL_TXRX_PEER_STATE_INVALID)
 		return dp_get_hlp_peer_state(dp_link->dp_intf, &mac_addr);
@@ -549,6 +549,7 @@ dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 		}
 	}
 
+update_sa:
 	if (qdf_ntohs(qdf_nbuf_get_protocol(nbuf)) == ETHERTYPE_PAE) {
 		/*
 		 * update the sa for legacy link peer that
