@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -430,7 +430,8 @@ QDF_STATUS cm_preauth_active(struct cnx_mgr *cm_ctx, wlan_cm_id *cm_id)
 
 	cm_ctx->active_cm_id = *cm_id;
 	roam_req = &cm_req->roam_req;
-	if (roam_req->req.source == CM_ROAMING_HOST)
+	if (roam_req->req.source == CM_ROAMING_HOST ||
+	    roam_req->req.source == CM_ROAMING_FW)
 		cm_update_per_peer_crypto_params_for_roam(cm_ctx->vdev,
 							  roam_req);
 
