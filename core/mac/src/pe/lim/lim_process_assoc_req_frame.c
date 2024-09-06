@@ -270,7 +270,7 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 					frame_len - WLAN_ASSOC_REQ_IES_OFFSET,
 					&assoc_req->eht_cap,
 					assoc_req->he_cap,
-					session->curr_op_freq);
+					session->curr_op_freq, true);
 		if (status != QDF_STATUS_SUCCESS) {
 			pe_err("Failed to extract eht cap");
 			return false;

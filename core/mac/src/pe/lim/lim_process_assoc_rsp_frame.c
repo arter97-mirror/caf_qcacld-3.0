@@ -1208,12 +1208,12 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			return;
 		}
 
-		status = lim_strip_and_decode_eht_cap(
-					body + ies_offset,
-					frame_body_len - ies_offset,
-					&assoc_rsp->eht_cap,
-					assoc_rsp->he_cap,
-					session_entry->curr_op_freq);
+		status = lim_strip_and_decode_eht_cap(body + ies_offset,
+						      frame_body_len - ies_offset,
+						      &assoc_rsp->eht_cap,
+						      assoc_rsp->he_cap,
+						      session_entry->curr_op_freq,
+						      false);
 		if (status != QDF_STATUS_SUCCESS) {
 			pe_err("Failed to extract eht cap");
 			return;
