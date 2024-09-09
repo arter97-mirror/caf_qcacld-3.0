@@ -805,6 +805,8 @@ struct wlan_dp_stc_flow_samples {
  * @wlan_dp_ipa_wds_peer_cb: Callback to handle IPA WDS peer events
  * @send_flow_stats_event: Callback to send flow stats vendor command
  * @send_flow_report_event: Callback to send flow report vendor command
+ * @osif_dp_get_net_dev_from_vdev: Callback API to get net device reference
+ * with the vdev
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
@@ -911,6 +913,8 @@ struct wlan_dp_psoc_callbacks {
 				      struct wlan_dp_stc_flow_samples *flow_samples,
 				      uint32_t flags);
 #endif
+	int (*osif_dp_get_net_dev_from_vdev)(struct wlan_objmgr_vdev *vdev,
+					     qdf_netdev_t *netdev);
 };
 
 /**
