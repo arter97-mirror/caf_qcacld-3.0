@@ -11182,15 +11182,15 @@ static void lim_update_ap_puncture(struct pe_session *session,
 }
 #endif
 
-QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
-			      struct vdev_mlme_obj *mlme_obj,
-			      struct pe_session *session)
+QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
+					  struct pe_session *session)
 {
 	struct wlan_channel *des_chan;
 	enum reg_wifi_band band;
 	uint8_t band_mask;
 	struct ch_params ch_params = {0};
 	qdf_freq_t sec_chan_freq = 0;
+	struct vdev_mlme_obj *mlme_obj;
 
 	band = wlan_reg_freq_to_band(session->curr_op_freq);
 	band_mask = 1 << band;
@@ -11216,11 +11216,6 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 
 	if (LIM_IS_AP_ROLE(session))
 		lim_apply_puncture(mac, session, ch_params.mhz_freq_seg1);
-
-	if (LIM_IS_STA_ROLE(session))
-		wlan_cdp_set_peer_freq(mac->psoc, session->bssId,
-				       session->curr_op_freq,
-				       wlan_vdev_get_id(session->vdev));
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode) &&
 	    !(LIM_IS_STA_ROLE(session) && !lim_get_punc_chan_bit_map(session)))
@@ -11254,6 +11249,16 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 	if (LIM_IS_STA_ROLE(session))
 		lim_overwrite_sta_puncture(session, &ch_params);
 
+	session->ch_width = ch_params.ch_width;
+	session->ch_center_freq_seg0 = ch_params.center_freq_seg0;
+	session->ch_center_freq_seg1 = ch_params.center_freq_seg1;
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+	if (!mlme_obj) {
+		pe_err("vdev component object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	des_chan = mlme_obj->vdev->vdev_mlme.des_chan;
 	des_chan->ch_freq = session->curr_op_freq;
 	des_chan->ch_width = ch_params.ch_width;
@@ -11261,12 +11266,10 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 	des_chan->ch_freq_seg2 = ch_params.center_freq_seg1;
 	des_chan->ch_ieee = wlan_reg_freq_to_chan(mac->pdev, des_chan->ch_freq);
 	lim_update_des_chan_puncture(des_chan, &ch_params);
-	if (LIM_IS_AP_ROLE(session))
-		lim_update_ap_puncture(session, &ch_params);
-	session->ch_width = ch_params.ch_width;
-	session->ch_center_freq_seg0 = ch_params.center_freq_seg0;
-	session->ch_center_freq_seg1 = ch_params.center_freq_seg1;
+
 	if (LIM_IS_AP_ROLE(session)) {
+		lim_update_ap_puncture(session, &ch_params);
+
 		/* Update he ops for puncture */
 		wlan_reg_set_create_punc_bitmap(&ch_params, false);
 		wlan_reg_set_non_eht_ch_params(&ch_params, true);
@@ -11288,6 +11291,25 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 			wlan_mlme_set_ap_oper_ch_width(session->vdev,
 						       CH_WIDTH_160MHZ);
 	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
+			      struct vdev_mlme_obj *mlme_obj,
+			      struct pe_session *session)
+{
+	QDF_STATUS status;
+
+	status = lim_set_session_channel_params(mac, session);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	if (LIM_IS_STA_ROLE(session))
+		wlan_cdp_set_peer_freq(mac->psoc, session->bssId,
+				       session->curr_op_freq,
+				       wlan_vdev_get_id(session->vdev));
+
 	mlme_obj->mgmt.generic.maxregpower = session->maxTxPower;
 	mlme_obj->proto.generic.beacon_interval =
 				session->beaconParams.beaconInterval;
