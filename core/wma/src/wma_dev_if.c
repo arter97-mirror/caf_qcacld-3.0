@@ -1279,6 +1279,44 @@ static QDF_STATUS wma_get_ratemask_type(enum wlan_mlme_ratemask_type type,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * wma_set_and_update_mac_id() - set and update mac_id for vdev_id
+ * @wma: WMA context
+ * @mac_ctx: mac context
+ * @vdev_mlme: vdev mlme obj
+ * @rsp: vdev start response
+ * @dp_soc: data patch soc handle
+ * mac_id: mac id
+ *
+ * Return: None
+ */
+static void
+wma_set_and_update_mac_id(tp_wma_handle wma, struct mac_context *mac_ctx,
+			  struct vdev_mlme_obj *vdev_mlme,
+			  struct vdev_start_response *rsp,
+			  void *dp_soc, uint32_t mac_id)
+{
+	if (mac_id >= MAX_MAC) {
+		wma_err("Invalid mac_id %d", mac_id);
+		QDF_ASSERT(0);
+		return;
+	}
+
+	wlan_mlme_set_vdev_mac_id(wma->pdev, rsp->vdev_id, mac_id);
+
+	if (wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev) ||
+	    wma->interfaces[rsp->vdev_id].type ==
+	    WMI_VDEV_TYPE_MONITOR)
+		cdp_update_mac_id(dp_soc, rsp->vdev_id, mac_id);
+
+	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id)) {
+		wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
+		wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
+							    mac_id,
+							    rsp);
+	}
+}
+
 QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 				       struct vdev_start_response *rsp)
 {
@@ -1349,7 +1387,7 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 		} else {
 			mac_id = rsp->mac_id;
 		}
-		wlan_mlme_set_vdev_mac_id(wma->pdev, rsp->vdev_id, mac_id);
+
 		wma_debug("vdev:%d tx ss=%d rx ss=%d chain mask=%d mac=%d",
 			  rsp->vdev_id, rsp->cfgd_tx_streams,
 			  rsp->cfgd_rx_streams, rsp->chain_mask, mac_id);
@@ -1359,22 +1397,8 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 			     iface->vdev->vdev_mlme.des_chan,
 			     sizeof(struct wlan_channel));
 
-		if (wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev) ||
-		    wma->interfaces[rsp->vdev_id].type ==
-		    WMI_VDEV_TYPE_MONITOR)
-			cdp_update_mac_id(dp_soc, rsp->vdev_id, mac_id);
-	}
-
-	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id)) {
-		if (mac_id < MAX_MAC) {
-			wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
-			wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
-								    mac_id,
-								    rsp);
-		} else {
-			wma_err("Invalid mac_id: %u", mac_id);
-			return QDF_STATUS_E_INVAL;
-		}
+		wma_set_and_update_mac_id(wma, mac_ctx, vdev_mlme, rsp, dp_soc,
+					  mac_id);
 	}
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
