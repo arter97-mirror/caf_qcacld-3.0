@@ -1189,8 +1189,6 @@ static void hdd_son_get_sta_list(struct wlan_objmgr_vdev *vdev,
 				qdf_system_ticks_to_msecs(assoc_time) / 1000;
 			si->isi_tr069_assoc_time.tv_nsec =
 				qdf_system_ticks_to_nsecs(assoc_time);
-			qdf_mem_copy(&si->isi_tr069_assoc_time, &current_ts,
-				     sizeof(si->isi_tr069_assoc_time));
 			si->isi_rssi = sta_info->rssi;
 			si->isi_len = len;
 			si->isi_ie_len = 0;
