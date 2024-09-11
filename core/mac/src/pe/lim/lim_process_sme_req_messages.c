@@ -3659,6 +3659,11 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	if (wlan_reg_is_6ghz_chan_freq(bss_desc->chan_freq)) {
 		if (!ie_struct->Country.present)
 			pe_debug("Channel is 6G but country IE not present");
+
+		if (session->ap_defined_power_type_6g == REG_VERY_LOW_POWER_AP &&
+		    wlan_reg_is_indoor_ap_detected(mac_ctx->pdev))
+			session->ap_defined_power_type_6g = REG_INDOOR_ENABLED_AP;
+
 		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev,
 				&power_type_6g,
@@ -6796,7 +6801,8 @@ lim_update_both_eirp_psd(struct wlan_objmgr_vdev *vdev, int8_t max_tx_power,
 }
 
 void lim_calculate_tpc(struct mac_context *mac,
-		       struct pe_session *session)
+		       struct pe_session *session,
+		       bool force_ap_vlp_pwr)
 {
 	bool is_psd_power = false;
 	bool is_tpe_present = false, is_6ghz_freq = false;
@@ -6848,11 +6854,15 @@ void lim_calculate_tpc(struct mac_context *mac,
 	} else {
 		is_6ghz_freq = true;
 		/* Power mode calculation for 6 GHz STA*/
-		if (LIM_IS_STA_ROLE(session))
+		if (LIM_IS_STA_ROLE(session)) {
 			ap_power_type_6g = session->best_6g_power_type;
+			if (ap_power_type_6g == REG_INDOOR_ENABLED_AP)
+				skip_tpe = true;
+		}
 	}
 
-	if (mlme_obj->reg_tpc_obj.num_pwr_levels) {
+	if (LIM_IS_STA_ROLE(session) &&
+	    mlme_obj->reg_tpc_obj.num_pwr_levels) {
 		is_tpe_present = true;
 		num_pwr_levels = mlme_obj->reg_tpc_obj.num_pwr_levels;
 		is_psd_power = mlme_obj->reg_tpc_obj.is_psd_power;
@@ -6905,7 +6915,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 					 is_psd_power, &reg_max,
 					 &reg_psd_pwr_max);
 				} else {
-					if (wlan_reg_decide_6ghz_power_within_bw_for_freq(
+					if (!force_ap_vlp_pwr &&
+					    wlan_reg_decide_6ghz_power_within_bw_for_freq(
 							mac->pdev, oper_freq,
 							session->ch_width,
 							&is_psd_power,
@@ -6920,9 +6931,14 @@ void lim_calculate_tpc(struct mac_context *mac,
 						reg_psd_pwr_max =
 							psd_power_within_bw;
 					} else {
-						wlan_reg_get_cur_6g_ap_pwr_type(
-							mac->pdev,
-							&ap_power_type_6g);
+						if (force_ap_vlp_pwr)
+							ap_power_type_6g =
+								REG_VERY_LOW_POWER_AP;
+						else
+							wlan_reg_get_cur_6g_ap_pwr_type(
+								mac->pdev,
+								&ap_power_type_6g);
+
 						wlan_reg_get_6g_chan_ap_power(
 							mac->pdev,
 							mlme_obj->reg_tpc_obj.

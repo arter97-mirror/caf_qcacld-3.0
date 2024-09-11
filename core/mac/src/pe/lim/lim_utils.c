@@ -89,6 +89,7 @@
 #include "wlan_epcs_api.h"
 #include "wlan_nan_api_i.h"
 #include "wlan_mlme_api.h"
+#include "wlan_tdls_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -11659,7 +11660,7 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
 	    session->opmode == QDF_P2P_GO_MODE)
 		mlme_obj->reg_tpc_obj.num_pwr_levels = 0;
 
-	lim_calculate_tpc(mac_ctx, session);
+	lim_calculate_tpc(mac_ctx, session, false);
 
 	tx_ops->set_tpc_power(mac_ctx->psoc, session->vdev_id,
 			      &mlme_obj->reg_tpc_obj);
@@ -11947,6 +11948,112 @@ set_tpc:
 		bss_desc = &session->lim_join_req->bssDescription;
 
 	lim_set_tpc_power(mac_ctx, session, bss_desc);
+}
+
+/**
+ * lim_recompute_sta_cli_tpc() - Recompute TPC for STA and P2P clinet
+ * @mac: Mac context pointer
+ * @session: PE session pointer
+ *
+ * Return: None
+ */
+static void
+lim_recompute_sta_cli_tpc(struct mac_context *mac,
+			  struct pe_session *session)
+{
+	enum reg_6g_ap_type power_type_6g;
+	QDF_STATUS status;
+
+	if (wlan_is_tdls_session_present(session->vdev))
+		wlan_tdls_recompute_offchannel_mode(mac->psoc,
+						    session->vdev);
+
+	if (!wlan_reg_is_6ghz_chan_freq(session->curr_op_freq))
+		return;
+
+	if (session->ap_defined_power_type_6g == REG_VERY_LOW_POWER_AP &&
+	    wlan_reg_is_indoor_ap_detected(mac->pdev))
+		session->ap_defined_power_type_6g = REG_INDOOR_ENABLED_AP;
+	else if (session->ap_defined_power_type_6g == REG_INDOOR_ENABLED_AP &&
+		 !wlan_reg_is_indoor_ap_detected(mac->pdev))
+		session->ap_defined_power_type_6g = REG_VERY_LOW_POWER_AP;
+
+	status = wlan_reg_get_best_6g_power_type(
+				mac->psoc, mac->pdev,
+				&power_type_6g,
+				session->ap_defined_power_type_6g,
+				session->curr_op_freq);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	if (power_type_6g == session->best_6g_power_type)
+		return;
+
+	mlme_set_best_6g_power_type(session->vdev, power_type_6g);
+	session->best_6g_power_type = power_type_6g;
+	lim_set_tpc_power(mac, session, NULL);
+}
+
+/**
+ * lim_recompute_sap_go_tpc_bcn() - Recompute SAP/Go TPC and beacon
+ * @mac: Mac context pointer
+ * @session: PE session pointer
+ *
+ * Return: None
+ */
+static void
+lim_recompute_sap_go_tpc_bcn(struct mac_context *mac,
+			     struct pe_session *session)
+{
+	enum reg_6g_ap_type cur_ap_pwr_type, reg_ap_pwr_type;
+
+	if (!wlan_reg_is_6ghz_chan_freq(session->curr_op_freq) ||
+	    policy_mgr_is_vdev_ll_lt_sap(mac->psoc, session->vdev_id))
+		return;
+
+	cur_ap_pwr_type = wlan_mlme_get_curr_6g_power_type(session->vdev);
+	wlan_reg_get_cur_6g_ap_pwr_type(mac->pdev, &reg_ap_pwr_type);
+
+	if (reg_ap_pwr_type == cur_ap_pwr_type) {
+		pe_debug("No change in SAP/Go power type");
+		return;
+	}
+
+	lim_set_tpc_power(mac, session, NULL);
+}
+
+void
+lim_update_tpc_bcn_on_c2c_detect_cb(struct wlan_objmgr_psoc *psoc)
+{
+	uint32_t conn_count, idx, vdev_id;
+	struct mac_context *mac_ctx;
+	struct pe_session *session;
+	struct connection_info info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx) {
+		pe_err("mac ctx is null");
+		return;
+	}
+
+	conn_count = policy_mgr_get_connection_info(psoc, info);
+	if (!conn_count)
+		return;
+
+	for (idx = 0; idx < conn_count; idx++) {
+		vdev_id = info[idx].vdev_id;
+		session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+		if (!session) {
+			pe_err("Unable to find session");
+			continue;
+		}
+
+		if (LIM_IS_STA_ROLE(session))
+			lim_recompute_sta_cli_tpc(mac_ctx, session);
+		else if (LIM_IS_AP_ROLE(session))
+			lim_recompute_sap_go_tpc_bcn(mac_ctx, session);
+	}
 }
 
 struct wlan_channel *

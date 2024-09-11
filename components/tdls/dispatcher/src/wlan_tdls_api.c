@@ -680,3 +680,25 @@ bool wlan_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
 
 	return false;
 }
+
+void wlan_tdls_recompute_offchannel_mode(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							WLAN_UMAC_COMP_TDLS);
+	if (!soc_obj) {
+		tdls_err("Failed to get tdls psoc component");
+		return;
+	}
+
+	/*
+	 * Offchannel is allowed only when TDLS is connected with one peer.
+	 * If more than one peer is connected then Offchannel is disabled by
+	 * WMI_TDLS_SET_OFFCHAN_MODE_CMDID with DISABLE_CHANSWITCH.
+	 * Hence, re-enable offchannel when only one connected peer is left.
+	 */
+	if (soc_obj->connected_peer_count == 1)
+		tdls_set_tdls_offchannelmode(vdev, ENABLE_CHANSWITCH);
+}

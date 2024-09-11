@@ -1076,6 +1076,10 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 					mac->psoc,
 					lim_update_tx_pwr_on_ctry_change_cb);
 
+	wlan_reg_register_c2c_detect_callback(
+					mac->psoc,
+					lim_update_tpc_bcn_on_c2c_detect_cb);
+
 	wlan_reg_register_is_chan_connected_callback(mac->psoc,
 					lim_get_connected_chan_for_mode);
 
@@ -1125,6 +1129,10 @@ QDF_STATUS pe_close(struct mac_context *mac)
 	wlan_reg_unregister_ctry_change_callback(
 					mac->psoc,
 					lim_update_tx_pwr_on_ctry_change_cb);
+
+	wlan_reg_unregister_c2c_detect_callback(
+					mac->psoc,
+					lim_update_tpc_bcn_on_c2c_detect_cb);
 
 	wlan_reg_unregister_is_chan_connected_callback(mac->psoc,
 					lim_get_connected_chan_for_mode);

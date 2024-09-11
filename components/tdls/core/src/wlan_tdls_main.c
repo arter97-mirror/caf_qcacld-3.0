@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -887,12 +887,13 @@ uint32_t tdls_get_6g_pwr_for_power_type(struct wlan_objmgr_vdev *vdev,
 	num_chan = wlan_reg_get_band_channel_list_for_pwrmode(pdev,
 							      band_mask,
 							      chan,
-							      REG_CLI_DEF_VLP,
+							      pwr_typ,
 							      false);
 
 	for (chn_idx = 0; chn_idx < num_chan; chn_idx++) {
 		if (chan[chn_idx].center_freq == freq) {
-			tdls_debug("VLP power for channel %d is %d",
+			tdls_debug("power for power type %d channel %d is %d",
+				   pwr_typ,
 				   chan[chn_idx].center_freq,
 				   chan[chn_idx].tx_power);
 			tx_power = chan[chn_idx].tx_power;

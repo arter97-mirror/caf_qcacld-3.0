@@ -13529,16 +13529,18 @@ policy_mgr_is_chan_eligible_for_sap(struct policy_mgr_psoc_priv_obj *pm_ctx,
 	 * move the SAP to STA SCC in 6 GHz only if:
 	 * a) The channel is PSC
 	 * b) The channel supports AP in VLP power type
-	 * c) The DUT is configured to operate SAP in VLP only
+	 * c) The DUT is configured to operate SAP in VLP or C2C only
 	 * d) The STA is connected to the 6 GHz AP in
-	 *    either VLP or LPI.
+	 *    either VLP or C2C or LPI.
 	 *    - If the STA is in LPI, then lim_update_tx_power()
 	 *	would move the STA to VLP.
 	 */
 	if (WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(freq) &&
-	    ap_power_type_6g == REG_VERY_LOW_POWER_AP &&
+	    (ap_power_type_6g == REG_VERY_LOW_POWER_AP ||
+	     ap_power_type_6g == REG_INDOOR_ENABLED_AP) &&
 	    ch_state == CHANNEL_STATE_ENABLE &&
 	    (sta_connected_pwr_type == REG_VERY_LOW_POWER_AP ||
+	     sta_connected_pwr_type == REG_INDOOR_ENABLED_AP ||
 	     sta_connected_pwr_type == REG_INDOOR_AP))
 		is_eligible = true;
 

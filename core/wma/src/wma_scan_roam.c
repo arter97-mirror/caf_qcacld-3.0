@@ -238,6 +238,8 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 		chan_p++;
 	}
 
+	scan_ch_param->is_c2c_supp = wlan_reg_does_country_supp_c2c(
+							wma_handle->pdev);
 	qdf_status = wmi_unified_scan_chan_list_cmd_send(wma_handle->wmi_handle,
 				scan_ch_param);
 

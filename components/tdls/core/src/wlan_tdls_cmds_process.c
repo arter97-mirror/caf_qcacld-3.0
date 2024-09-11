@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -90,6 +90,9 @@ void tdls_set_mlme_ch_power(struct wlan_objmgr_vdev *vdev,
 	if (REG_VERY_LOW_POWER_AP == reg_power_info->power_type_6g)
 		tx_power = tdls_get_6g_pwr_for_power_type(vdev, freq,
 							  REG_CLI_DEF_VLP);
+	else if (REG_INDOOR_ENABLED_AP == reg_power_info->power_type_6g)
+		tx_power = tdls_get_6g_pwr_for_power_type(vdev, freq,
+							  REG_CLI_DEF_C2C);
 	else
 		tx_power = tdls_soc_obj->bss_sta_power;
 
@@ -152,18 +155,24 @@ void tdls_update_6g_power(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (enable_link) {
-		tdls_soc_obj->bss_sta_power_type = REG_VERY_LOW_POWER_AP;
-		/*
-		 * No need to update power if BSS-STA link is already configured
-		 * as VLP
-		 */
-		if (tdls_soc_obj->bss_sta_power_type ==
-		    mlme_obj->reg_tpc_obj.power_type_6g)
-			return;
-
 		tdls_soc_obj->bss_sta_power_type =
 					mlme_obj->reg_tpc_obj.power_type_6g;
-		mlme_obj->reg_tpc_obj.power_type_6g = REG_VERY_LOW_POWER_AP;
+
+		/*
+		 * No need to update power if BSS-STA link is already configured
+		 * as VLP or indoor enabled AP power
+		 */
+		if (tdls_soc_obj->bss_sta_power_type == REG_VERY_LOW_POWER_AP ||
+		    tdls_soc_obj->bss_sta_power_type == REG_INDOOR_ENABLED_AP)
+			return;
+
+
+		if (wlan_reg_is_indoor_ap_detected(pdev))
+			mlme_obj->reg_tpc_obj.power_type_6g =
+						REG_INDOOR_ENABLED_AP;
+		else
+			mlme_obj->reg_tpc_obj.power_type_6g =
+						REG_VERY_LOW_POWER_AP;
 		tdls_soc_obj->bss_sta_power = tdls_get_mlme_ch_power(mlme_obj,
 								     freq);
 		tdls_debug("Updated power_type from %d to %d bss link power %d",
@@ -171,7 +180,8 @@ void tdls_update_6g_power(struct wlan_objmgr_vdev *vdev,
 			   mlme_obj->reg_tpc_obj.power_type_6g,
 			   tdls_soc_obj->bss_sta_power);
 	} else {
-		if (REG_VERY_LOW_POWER_AP == tdls_soc_obj->bss_sta_power_type)
+		if (tdls_soc_obj->bss_sta_power_type == REG_VERY_LOW_POWER_AP ||
+		    tdls_soc_obj->bss_sta_power_type == REG_INDOOR_ENABLED_AP)
 			return;
 
 		tdls_debug("Updated power_type_6g from %d to %d",

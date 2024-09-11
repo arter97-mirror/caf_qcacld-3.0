@@ -7734,7 +7734,7 @@ void wlan_mlme_set_safe_mode_enable(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.gen.safe_mode_enable = safe_mode_enable;
 }
 
-uint32_t wlan_mlme_get_6g_ap_power_type(struct wlan_objmgr_vdev *vdev)
+uint32_t wlan_mlme_get_curr_6g_power_type(struct wlan_objmgr_vdev *vdev)
 {
 	struct vdev_mlme_obj *mlme_obj;
 

@@ -1094,7 +1094,7 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	uint32_t vdev_id = 0, pcl_len = 0, i;
 	struct wlan_objmgr_vdev *vdev;
 	qdf_freq_t sta_gc_6ghz_freq = 0;
-	uint32_t ap_pwr_type_6g = 0;
+	uint32_t sta_pwr_type_6g = 0;
 	bool indoor_ch_support = false;
 	bool keep_6ghz_sta_cli_conn;
 
@@ -1140,8 +1140,8 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	 * LPI STA + SAP - Allowed with VLP power if channel supports VLP.
 	 * LPI STA + SAP - Allowed with LPI power if gindoor_channel_support=1
 	 */
-	ap_pwr_type_6g = wlan_mlme_get_6g_ap_power_type(vdev);
-	policy_mgr_debug("STA power type : %d", ap_pwr_type_6g);
+	sta_pwr_type_6g = wlan_mlme_get_curr_6g_power_type(vdev);
+	policy_mgr_debug("STA power type : %d", sta_pwr_type_6g);
 
 	ucfg_mlme_get_indoor_channel_support(psoc, &indoor_ch_support);
 	keep_6ghz_sta_cli_conn = wlan_reg_get_keep_6ghz_sta_cli_connection(
@@ -1151,9 +1151,10 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 			if (!WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(pcl_list_org[i]) ||
 			    keep_6ghz_sta_cli_conn)
 				continue;
-			if (ap_pwr_type_6g == REG_VERY_LOW_POWER_AP)
+			if (sta_pwr_type_6g == REG_VERY_LOW_POWER_AP ||
+			    sta_pwr_type_6g == REG_INDOOR_ENABLED_AP)
 				goto add_freq;
-			else if (ap_pwr_type_6g == REG_INDOOR_AP &&
+			else if (sta_pwr_type_6g == REG_INDOOR_AP &&
 				 (!wlan_reg_is_freq_indoor(pm_ctx->pdev,
 							   pcl_list_org[i]) ||
 				  indoor_ch_support))
@@ -5444,7 +5445,7 @@ policy_mgr_sap_on_non_psc_channel(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	ap_pwr_type_6g = wlan_mlme_get_6g_ap_power_type(vdev);
+	ap_pwr_type_6g = wlan_mlme_get_curr_6g_power_type(vdev);
 	qdf_mem_zero(&pcl, sizeof(pcl));
 
 	/* PCL list is filtered with Non-PSC channels during
@@ -5465,8 +5466,9 @@ policy_mgr_sap_on_non_psc_channel(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < pcl.pcl_len; i++) {
 		if ((WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl.pcl_list[i])) &&
 		    pcl.pcl_list[i] == *intf_ch_freq &&
-		    ap_pwr_type_6g == REG_VERY_LOW_POWER_AP) {
-			policy_mgr_debug("STA is in PSC channel %d in VLP mode, Hence SAP + STA allowed in PSC",
+		    (ap_pwr_type_6g == REG_VERY_LOW_POWER_AP ||
+		     ap_pwr_type_6g == REG_INDOOR_ENABLED_AP)) {
+			policy_mgr_debug("STA is in PSC channel %d in VLP/C2C mode, Hence SAP + STA allowed in PSC",
 					 *intf_ch_freq);
 			*intf_ch_freq = 0;
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);

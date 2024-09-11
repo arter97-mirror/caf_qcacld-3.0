@@ -2418,15 +2418,74 @@ static void lim_process_sta_mlm_add_bss_rsp(struct mac_context *mac_ctx,
 	}
 }
 
+/**
+ * lim_set_tpc_for_sap_go() - Set SAP/Go TPC
+ * @mac_ctx: Mac context pointer
+ * @session_entry: Pe session pointer
+ * @mlme_obj: MLME object pointer
+ *
+ * Return: None
+ */
+static void
+lim_set_tpc_for_sap_go(struct mac_context *mac_ctx,
+		       struct pe_session *session_entry)
+{
+	struct wlan_lmac_if_reg_tx_ops *tx_ops;
+	uint32_t ap_power_type_6g;
+	struct pe_session *sta_session;
+	struct vdev_mlme_obj *mlme_obj;
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session_entry->vdev);
+	if (!mlme_obj) {
+		pe_err("vdev component object is NULL");
+		return;
+	}
+
+	tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
+	wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_power_type_6g);
+	if (wlan_reg_is_6ghz_chan_freq(session_entry->curr_op_freq) &&
+	    ap_power_type_6g == REG_INDOOR_ENABLED_AP) {
+		lim_calculate_tpc(mac_ctx, session_entry, true);
+		if (tx_ops->set_tpc_power)
+			tx_ops->set_tpc_power(mac_ctx->psoc,
+					      session_entry->vdev_id,
+					      &mlme_obj->reg_tpc_obj);
+
+		if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
+						 session_entry->vdev_id))
+			goto update_sta_tpc;
+	}
+
+	lim_calculate_tpc(mac_ctx, session_entry, false);
+	if (tx_ops->set_tpc_power)
+		tx_ops->set_tpc_power(mac_ctx->psoc,
+				      session_entry->vdev_id,
+				      &mlme_obj->reg_tpc_obj);
+
+update_sta_tpc:
+	if (wlan_get_tpc_update_required_for_sta(session_entry->vdev)) {
+		sta_session = lim_get_concurrent_session(
+							mac_ctx,
+							session_entry->vdev_id,
+							session_entry->opmode);
+		if (!sta_session) {
+			pe_err("TPC update required is set, but concurrent session doesn't exist");
+			wlan_set_tpc_update_required_for_sta(
+						session_entry->vdev,
+						false);
+		} else {
+			lim_update_tx_power(mac_ctx, session_entry,
+					    sta_session, false);
+		}
+	}
+}
+
 void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 			    struct add_bss_rsp *add_bss_rsp)
 {
 	tLimMlmStartCnf mlm_start_cnf;
 	struct pe_session *session_entry;
 	enum bss_type bss_type;
-	struct wlan_lmac_if_reg_tx_ops *tx_ops;
-	struct vdev_mlme_obj *mlme_obj;
-	struct pe_session *sta_session;
 
 	if (!add_bss_rsp) {
 		pe_err("add_bss_rsp is NULL");
@@ -2449,41 +2508,11 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 		       add_bss_rsp->vdev_id);
 		goto err;
 	}
-	if (LIM_IS_AP_ROLE(session_entry)) {
-		if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc)) {
-			mlme_obj =
-			wlan_vdev_mlme_get_cmpt_obj(session_entry->vdev);
-			if (!mlme_obj) {
-				pe_err("vdev component object is NULL");
-				goto err;
-			}
-			tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
 
-			lim_calculate_tpc(mac_ctx, session_entry);
+	if (LIM_IS_AP_ROLE(session_entry))
+		if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc))
+			lim_set_tpc_for_sap_go(mac_ctx, session_entry);
 
-			if (tx_ops->set_tpc_power)
-				tx_ops->set_tpc_power(mac_ctx->psoc,
-						      session_entry->vdev_id,
-						      &mlme_obj->reg_tpc_obj);
-			if (wlan_get_tpc_update_required_for_sta(
-							session_entry->vdev)) {
-				sta_session =
-					lim_get_concurrent_session(mac_ctx,
-							   session_entry->vdev_id,
-							   session_entry->opmode);
-				if (!sta_session) {
-					pe_err("TPC update required is set, but concurrent session doesn't exist");
-					wlan_set_tpc_update_required_for_sta(
-							session_entry->vdev,
-							false);
-				} else {
-					lim_update_tx_power(mac_ctx,
-						    session_entry, sta_session,
-						    false);
-				}
-			}
-		}
-	}
 	bss_type = session_entry->bssType;
 	/* update PE session Id */
 	mlm_start_cnf.sessionId = session_entry->peSessionId;
@@ -3159,7 +3188,25 @@ lim_process_bcn_tpe_and_set_tpc(struct mac_context *mac_ctx,
 			return;
 		}
 
-		lim_calculate_tpc(mac_ctx, session_entry);
+		if (wlan_reg_is_6ghz_chan_freq(session_entry->curr_op_freq) &&
+		    session_entry->best_6g_power_type == REG_INDOOR_ENABLED_AP) {
+			/**
+			 * If STA-AP intersected power type is Indoor enabled AP
+			 * power then first send VLP TPC to FW and then send
+			 * indoor enabled AP TPC, so that FW can cache VLP TPC
+			 * and use during system suspend
+			 */
+			session_entry->best_6g_power_type = REG_VERY_LOW_POWER_AP;
+			lim_calculate_tpc(mac_ctx, session_entry, false);
+			if (tx_ops->set_tpc_power)
+				tx_ops->set_tpc_power(mac_ctx->psoc,
+						      session_entry->vdev_id,
+						      &mlme_obj->reg_tpc_obj);
+
+			session_entry->best_6g_power_type =
+						REG_INDOOR_ENABLED_AP;
+		}
+		lim_calculate_tpc(mac_ctx, session_entry, false);
 
 		if (tx_ops->set_tpc_power)
 			tx_ops->set_tpc_power(mac_ctx->psoc,

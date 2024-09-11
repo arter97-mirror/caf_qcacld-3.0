@@ -5110,14 +5110,14 @@ void wlan_mlme_get_safe_mode_enable(struct wlan_objmgr_psoc *psoc,
 				    bool *safe_mode_enable);
 
 /**
- * wlan_mlme_get_6g_ap_power_type() - get the power type of the
+ * wlan_mlme_get_curr_6g_power_type() - get the current 6ghz power type of the
  * vdev operating on 6GHz.
  *
  * @vdev: vdev context
  *
  * Return: 6g_power_type
  */
-uint32_t wlan_mlme_get_6g_ap_power_type(struct wlan_objmgr_vdev *vdev);
+uint32_t wlan_mlme_get_curr_6g_power_type(struct wlan_objmgr_vdev *vdev);
 
 QDF_STATUS wlan_connect_hw_mode_change_resp(struct wlan_objmgr_pdev *pdev,
 					    uint8_t vdev_id,

@@ -3600,7 +3600,7 @@ wlansap_is_power_change_required(struct mac_context *mac_ctx,
 	if (!sta_vdev)
 		return false;
 
-	ap_pwr_type_6g = wlan_mlme_get_6g_ap_power_type(sta_vdev);
+	ap_pwr_type_6g = wlan_mlme_get_curr_6g_power_type(sta_vdev);
 
 	wlan_objmgr_vdev_release_ref(sta_vdev, WLAN_LEGACY_SAP_ID);
 

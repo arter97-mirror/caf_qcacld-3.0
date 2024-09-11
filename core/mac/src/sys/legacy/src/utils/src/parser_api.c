@@ -374,12 +374,19 @@ update_ext_max_tpe_power(struct mac_context *mac,
 	uint16_t eirp_power, psd_power;
 	uint8_t i;
 	bool psd_tpe = false;
+	bool get_vlp_pwr = false;
+	enum reg_6g_ap_type ap_pwr_type;
+
+	wlan_reg_get_cur_6g_ap_pwr_type(mac->pdev, &ap_pwr_type);
+	if (ap_pwr_type == REG_INDOOR_ENABLED_AP)
+		get_vlp_pwr = true;
 
 	wlan_reg_get_client_power_for_6ghz_ap(mac->pdev,
 					      tpe->max_tx_pwr_category,
 					      curr_freq,
 					      &psd_tpe,
-					      &eirp_power, &psd_power);
+					      &eirp_power, &psd_power,
+					      get_vlp_pwr);
 
 	switch (tpe->max_tx_pwr_interpret) {
 	case LOCAL_EIRP:
@@ -395,7 +402,8 @@ update_ext_max_tpe_power(struct mac_context *mac,
 					      tpe->max_tx_pwr_category,
 					      curr_freq,
 					      &psd_tpe,
-					      &eirp_power, &psd_power);
+					      &eirp_power,
+					      &psd_power, get_vlp_pwr);
 			tpe->ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power[i] = psd_power * 2;
 			curr_freq += 20;
 			pe_debug("psd ext max tx power %d",
@@ -415,7 +423,8 @@ update_ext_max_tpe_power(struct mac_context *mac,
 					      tpe->max_tx_pwr_category,
 					      curr_freq,
 					      &psd_tpe,
-					      &eirp_power, &psd_power);
+					      &eirp_power,
+					      &psd_power, get_vlp_pwr);
 			tpe->ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power[i] = psd_power * 2;
 			curr_freq += 20;
 			pe_debug("psd ext max tx power %d",
@@ -454,6 +463,12 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 	uint32_t max_tx_pwr_count, max_tx_pwr_count_psd = 0, total_tx_pwr_psd;
 	qdf_freq_t psd_start_freq, curr_freq = chan_freq;
 	enum phy_ch_width legacy_bw;
+	bool get_vlp_pwr = false;
+	enum reg_6g_ap_type ap_pwr_type;
+
+	wlan_reg_get_cur_6g_ap_pwr_type(mac->pdev, &ap_pwr_type);
+	if (ap_pwr_type == REG_INDOOR_ENABLED_AP)
+		get_vlp_pwr = true;
 
 	if (!wlan_reg_is_6ghz_chan_freq(chan_freq)) {
 		psd_tpe = false;
@@ -462,7 +477,8 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 						      REG_DEFAULT_CLIENT,
 						      chan_freq,
 						      &psd_tpe,
-						      &eirp_power, &psd_power);
+						      &eirp_power,
+						      &psd_power, get_vlp_pwr);
 		pe_debug("chan_freq %d, eirp_power %d, psd_power %d",
 			 chan_freq, eirp_power, psd_power);
 	}
@@ -546,7 +562,8 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 
 	wlan_reg_get_client_power_for_6ghz_ap(mac->pdev, REG_SUBORDINATE_CLIENT,
 					      chan_freq, &psd_tpe,
-					      &eirp_power, &psd_power);
+					      &eirp_power, &psd_power,
+					      get_vlp_pwr);
 
 	if (eirp_power) {
 		bw_val = wlan_reg_get_bw_value(chan_width);
@@ -664,7 +681,8 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 						curr_freq,
 						&psd_tpe,
 						&eirp_power,
-						&psd_power);
+						&psd_power,
+						get_vlp_pwr);
 		tpe_ptr->tx_power[count] = psd_power * 2;
 		curr_freq += 20;
 		pe_debug("psd default TPE %d %d",
@@ -682,7 +700,8 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 					      chan_freq,
 					      &psd_tpe,
 					      &eirp_power,
-					      &psd_power);
+					      &psd_power,
+					      get_vlp_pwr);
 	curr_freq = psd_start_freq;
 	if (psd_power) {
 		tpe_ptr->present = 1;
@@ -698,7 +717,8 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 						curr_freq,
 						&psd_tpe,
 						&eirp_power,
-						&psd_power);
+						&psd_power,
+						get_vlp_pwr);
 			tpe_ptr->tx_power[count] = psd_power * 2;
 			curr_freq += 20;
 			pe_debug("psd subord TPE %d %d",
@@ -8407,6 +8427,8 @@ populate_dot11f_he_operation(struct mac_context *mac_ctx,
 		he_op->oper_info_6g.info.dup_bcon = 0;
 		he_op->oper_info_6g.info.min_rate = 0;
 		wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_pwr_type);
+		if (ap_pwr_type == REG_INDOOR_ENABLED_AP)
+			ap_pwr_type = REG_VERY_LOW_POWER_AP;
 		he_op->oper_info_6g.info.reg_info = ap_pwr_type;
 	}
 
@@ -12640,12 +12662,19 @@ mlo_rnr_get_6g_20mhz_psd(struct mac_context *mac_ctx,
 	uint16_t max_reg_eirp_pwr = 0;
 	uint16_t max_reg_eirp_psd_pwr = 0;
 	int8_t psd_20mhz = 0;
+	bool get_vlp_pwr = false;
+	enum reg_6g_ap_type ap_pwr_type;
+
+	wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_pwr_type);
+	if (ap_pwr_type == REG_INDOOR_ENABLED_AP)
+		get_vlp_pwr = true;
 
 	wlan_reg_get_client_power_for_6ghz_ap(mac_ctx->pdev,
 					      REG_DEFAULT_CLIENT,
 					      freq,
 					      &is_psd_pwr, &max_reg_eirp_pwr,
-					      &max_reg_eirp_psd_pwr);
+					      &max_reg_eirp_psd_pwr,
+					      get_vlp_pwr);
 	pe_debug("chan_freq %d, is_psd_pwr %d eirp_pwr %d, eirp_psd_pwr %d",
 		 freq, is_psd_pwr, max_reg_eirp_pwr, max_reg_eirp_psd_pwr);
 
