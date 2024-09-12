@@ -6,6 +6,10 @@ ifeq ($(CONFIG_ARCH_SDXPINN), y)
 CONFIG_MOBILE_ROUTER := y
 CONFIG_WLAN_SYSFS := y
 CONFIG_SAP_UNSAFE_FIXED_CHAN_ALLOW := y
+CONFIG_QCACLD_FEATURE_SON := y
+ifeq ($(CONFIG_SLUB_DEBUG), y)
+	CONFIG_LOCK_STATS_ON:= y
+endif
 endif
 
 include $(WLAN_ROOT)/configs/default_defconfig
