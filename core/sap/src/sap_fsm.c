@@ -257,9 +257,12 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 							 CH_WIDTH_20MHZ,
 							 &pri_freq_puncture);
 		if (QDF_IS_STATUS_SUCCESS(status) && !pri_freq_puncture) {
-			sap_debug("Eht valid puncture : 0x%x, keep freq %d",
+			sap_debug("Eht valid puncture : 0x%x, keep freq %d bw %d ccfs0 %d ccfs1 %d",
 				  ch_params->reg_punc_bitmap,
-				  sap_ctx->chan_freq);
+				  sap_ctx->chan_freq,
+				  ch_params->ch_width,
+				  ch_params->mhz_freq_seg0,
+				  ch_params->mhz_freq_seg1);
 			mac_ctx->sap.SapDfsInfo.new_chanWidth =
 						ch_params->ch_width;
 			*freq = sap_ctx->chan_freq;
@@ -583,7 +586,7 @@ bool sap_plus_sap_cac_skip(struct mac_context *mac,
 		struct sap_context *sap_context =
 			mac->sap.sapCtxList[intf].sap_context;
 
-		if (!sap_context || sap_context == sap_ctx)
+		if (!sap_context)
 			continue;
 		if (mac->sap.sapCtxList[intf].sapPersona != QDF_SAP_MODE &&
 		    mac->sap.sapCtxList[intf].sapPersona != QDF_P2P_GO_MODE)
@@ -591,7 +594,7 @@ bool sap_plus_sap_cac_skip(struct mac_context *mac,
 		if (sap_context->isCacEndNotified &&
 		    sap_context->chan_freq == chan_freq &&
 		    sap_operating_on_dfs(mac, sap_context)) {
-			sap_debug("SAP vid %d CAC can skip due to CAC completed on other SAP vid %d",
+			sap_debug("SAP vid %d CAC can skip due to CAC completed on SAP vid %d",
 				  sap_ctx->sessionId, sap_context->sessionId);
 			return true;
 		}
