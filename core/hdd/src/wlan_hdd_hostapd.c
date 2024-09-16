@@ -2301,7 +2301,9 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 		link_id = wlan_vdev_get_link_id(vdev);
 
 	ucfg_mlme_get_sap_chn_switch_bcn_count(psoc, &ch_switch_count);
-	input_punc_bitmap = wlan_reg_get_input_punc_bitmap(ch_params);
+	input_punc_bitmap = wlan_reg_get_reg_punc_bitmap(ch_params);
+	if (!input_punc_bitmap)
+		input_punc_bitmap = wlan_reg_get_input_punc_bitmap(ch_params);
 
 	hdd_debug("channel switch started notify: link_id %d, vdev_id %d chan:%d width:%d freq1:%d freq2:%d punct 0x%x ch_switch_count %d",
 		  link_id, vdev_id, chandef.chan->center_freq, chandef.width,

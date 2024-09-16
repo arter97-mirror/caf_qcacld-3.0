@@ -1686,6 +1686,7 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 	bool is_dfs;
 	struct ch_params tmp_ch_params = {0};
 	enum channel_state state;
+	bool is_cac_reset_needed = true;
 
 	if (!sap_ctx) {
 		sap_err("Invalid SAP pointer");
@@ -1709,8 +1710,9 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 		sap_err("%u is unsafe channel freq", target_chan_freq);
 		return QDF_STATUS_E_FAULT;
 	}
-	sap_nofl_debug("SAP CSA: %d BW %d ---> %d BW %d ccfs1 %d, punc 0x%x, conn on 5GHz:%d, csa_reason:%s(%d) strict %d vdev %d",
+	sap_nofl_debug("SAP CSA: %d BW %d punct 0x%x ---> %d BW %d ccfs1 %d, punc 0x%x, conn on 5GHz:%d, csa_reason:%s(%d) strict %d vdev %d",
 		       sap_ctx->chan_freq, sap_ctx->ch_params.ch_width,
+		       wlan_reg_get_reg_punc_bitmap(&sap_ctx->ch_params),
 		       target_chan_freq, target_bw, ccfs1, punct_bitmap,
 		       policy_mgr_is_any_mode_active_on_band_along_with_session(
 		       mac->psoc, sap_ctx->sessionId, POLICY_MGR_BAND_5),
@@ -1749,12 +1751,17 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 						&tmp_ch_params,
 						REG_CURRENT_PWR_MODE);
 	if (sap_ctx->chan_freq == target_chan_freq &&
-	    sap_ctx->ch_params.ch_width == tmp_ch_params.ch_width &&
-	    wlan_reg_get_reg_punc_bitmap(&sap_ctx->ch_params) == punct_bitmap) {
-		sap_nofl_debug("target freq and bw %d not changed",
-			       tmp_ch_params.ch_width);
-		return QDF_STATUS_E_FAULT;
+	    sap_ctx->ch_params.ch_width == tmp_ch_params.ch_width) {
+		if (wlan_reg_get_reg_punc_bitmap(&sap_ctx->ch_params) ==
+		    punct_bitmap) {
+			sap_nofl_debug("target freq and bw %d not changed",
+				       tmp_ch_params.ch_width);
+			return QDF_STATUS_E_FAULT;
+		}
+
+		is_cac_reset_needed = false;
 	}
+
 	is_dfs = wlan_mlme_check_chan_param_has_dfs(
 			mac->pdev, &tmp_ch_params,
 			target_chan_freq);
@@ -1839,7 +1846,8 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 			 * request was issued.
 			 */
 			sap_ctx->sap_radar_found_status = true;
-			sap_cac_reset_current_notify(sap_ctx);
+			if (is_cac_reset_needed)
+				sap_cac_reset_current_notify(sap_ctx);
 
 			/*
 			 * If hw_mode_status is QDF_STATUS_SUCCESS mean HW mode
