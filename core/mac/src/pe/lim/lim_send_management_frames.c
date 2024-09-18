@@ -1024,6 +1024,11 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	    pe_session->opmode == QDF_P2P_GO_MODE)
 		tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
 
+	/* Don't add new IEs after this */
+	lim_reorder_vendor_ies(mac_ctx,
+			       frame + WLAN_MAC_HDR_LEN_3A + WLAN_PROBE_RESP_IES_OFFSET,
+			       bytes - WLAN_MAC_HDR_LEN_3A - WLAN_PROBE_RESP_IES_OFFSET);
+
 	/* Queue Probe Response frame in high priority WQ */
 	qdf_status = wma_tx_frame(mac_ctx, packet,
 				  (uint16_t)bytes,
@@ -1997,6 +2002,26 @@ end:
 	qdf_nbuf_free(buf);
 null_buf:
 	return QDF_STATUS_E_FAILURE;
+}
+
+void lim_reorder_vendor_ies(struct mac_context *mac_ctx, uint8_t *frame_ies,
+			    uint16_t ie_buf_size)
+{
+	uint16_t orig_iter_len, trim_vsie_size = ie_buf_size;
+	uint8_t extracted_vsie_buf[WLAN_MAX_IE_LEN + MIN_IE_LEN];
+
+	do {
+		orig_iter_len = trim_vsie_size;
+		lim_strip_ie(mac_ctx, frame_ies, &trim_vsie_size,
+			     WLAN_ELEMID_VENDOR, ONE_BYTE, NULL, 0,
+			     extracted_vsie_buf, WLAN_MAX_IE_LEN);
+
+		if (orig_iter_len - trim_vsie_size) {
+			qdf_mem_copy(frame_ies + trim_vsie_size,
+				     extracted_vsie_buf,
+				     orig_iter_len - trim_vsie_size);
+		}
+	} while (orig_iter_len - trim_vsie_size);
 }
 
 #ifdef WLAN_FEATURE_11BE
