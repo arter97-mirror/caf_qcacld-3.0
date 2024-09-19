@@ -1710,7 +1710,7 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_dl_modes.c",
         ],
     },
-    "CONFIG_WLAN_DUMP_IN_PROGRESS": {
+    "CONFIG_CONFIG_WLAN_DUMP_IN_PROGRESS": {
         True: [
             "core/hdd/src/wlan_hdd_sysfs_dump_in_progress.c",
         ],
