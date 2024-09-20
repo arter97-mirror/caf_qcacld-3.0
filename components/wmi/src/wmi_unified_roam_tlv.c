@@ -5084,7 +5084,7 @@ send_update_mlo_roam_params(wmi_roam_cnd_scoring_param *score_param,
 				ap_profile->param.eht_caps_weightage;
 	score_param->mlo_weightage_pcnt =
 				ap_profile->param.mlo_weightage;
-	wmi_debug("11be score params weightage: EHT %d MLO %d",
+	wmi_debug("11be score params weightage: EHT %d MLO 0x%x",
 		  score_param->eht_weightage_pcnt,
 		  score_param->mlo_weightage_pcnt);
 }
