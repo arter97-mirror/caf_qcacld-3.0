@@ -3543,6 +3543,7 @@ endif
 
 #Enable NL80211 test mode
 ccflags-$(CONFIG_NL80211_TESTMODE) += -DWLAN_NL80211_TESTMODE
+ccflags-$(CONFIG_NL80211_TESTMODE) += -DCONFIG_NL80211_TESTMODE
 
 # Flag to enable bus auto suspend
 ifeq ($(CONFIG_BUS_AUTO_SUSPEND), y)
