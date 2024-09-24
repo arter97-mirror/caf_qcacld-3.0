@@ -239,6 +239,7 @@ static inline void lim_set_chan_switch_puncture(struct pe_session *session,
 	if (!session)
 		return;
 
+	pe_debug("0x%x", punct_bitmap);
 	session->gLimChannelSwitch.puncture_bitmap = punct_bitmap;
 }
 #else

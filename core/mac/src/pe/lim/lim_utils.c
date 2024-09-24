@@ -8894,6 +8894,8 @@ void lim_decide_eht_op(struct mac_context *mac_ctx, uint32_t *mlme_eht_ops,
 		 ori_puncture_bitmap, session->eht_op.channel_width,
 		 session->eht_op.ccfs0, session->eht_op.ccfs1);
 
+	session->puncture_bitmap = ori_puncture_bitmap;
+
 	wma_update_vdev_eht_ops(mlme_eht_ops, &session->eht_op);
 }
 
@@ -10625,11 +10627,7 @@ void lim_apply_puncture(struct mac_context *mac,
 {
 	uint16_t puncture_bitmap;
 
-	if (mlme_is_chan_switch_in_progress(session->vdev))
-		puncture_bitmap = session->gLimChannelSwitch.puncture_bitmap;
-	else
-		puncture_bitmap =
-			*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
+	puncture_bitmap = session->puncture_bitmap;
 
 	if (puncture_bitmap) {
 		pe_debug("Apply puncture to reg: bitmap 0x%x, freq: %d, bw %d, mhz_freq_seg1: %d",
@@ -10648,13 +10646,9 @@ void lim_apply_puncture(struct mac_context *mac,
 void lim_remove_puncture(struct mac_context *mac,
 			 struct pe_session *session)
 {
-	uint16_t puncture_bitmap;
-
-	puncture_bitmap =
-		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
-	if (puncture_bitmap) {
+	if (session->puncture_bitmap) {
 		pe_debug("Remove puncture from reg: bitmap 0x%x",
-			 puncture_bitmap);
+			 session->puncture_bitmap);
 		wlan_reg_remove_puncture(mac->pdev);
 	}
 }
@@ -11081,27 +11075,6 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 }
 
 #ifdef WLAN_FEATURE_11BE
-/**
- * lim_update_ap_puncture() - set puncture_bitmap for ap session
- * @session: session
- * @ch_params: pointer to ch_params
- *
- * Return: void
- */
-static void lim_update_ap_puncture(struct pe_session *session,
-				   struct ch_params *ch_params)
-{
-	if (ch_params->reg_punc_bitmap) {
-		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap =
-					ch_params->reg_punc_bitmap;
-		session->eht_op.disabled_sub_chan_bitmap_present = true;
-		pe_debug("vdev %d, puncture %d", session->vdev_id,
-			 ch_params->reg_punc_bitmap);
-	} else if (session->eht_op.disabled_sub_chan_bitmap_present) {
-		session->eht_op.disabled_sub_chan_bitmap_present = false;
-	}
-}
-
 void lim_update_des_chan_puncture(struct wlan_channel *des_chan,
 				  struct ch_params *ch_params)
 {
@@ -11124,10 +11097,6 @@ void lim_overwrite_sta_puncture(struct pe_session *session,
 	session->puncture_bitmap = new_punc;
 }
 #else
-static void lim_update_ap_puncture(struct pe_session *session,
-				   struct ch_params *ch_params)
-{
-}
 #endif
 
 QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
@@ -11194,8 +11163,7 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (LIM_IS_STA_ROLE(session))
-		lim_overwrite_sta_puncture(session, &ch_params);
+	lim_overwrite_sta_puncture(session, &ch_params);
 
 	session->ch_width = ch_params.ch_width;
 	session->ch_center_freq_seg0 = ch_params.center_freq_seg0;
@@ -11216,8 +11184,6 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 	lim_update_des_chan_puncture(des_chan, &ch_params);
 
 	if (LIM_IS_AP_ROLE(session)) {
-		lim_update_ap_puncture(session, &ch_params);
-
 		/* Update he ops for puncture */
 		wlan_reg_set_create_punc_bitmap(&ch_params, false);
 		wlan_reg_set_non_eht_ch_params(&ch_params, true);
