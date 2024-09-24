@@ -10512,6 +10512,17 @@ void lim_ieee80211_pack_ehtop(uint8_t *ie, tDot11fIEeht_op dot11f_eht_op,
 	ehtoplen = ehtop->elem_len + WLAN_IE_HDR_LEN;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void populate_dot11f_eht_op_puncture(struct pe_session *session,
+					    tDot11fIEeht_op *eht_op)
+{
+	eht_op->disabled_sub_chan_bitmap_present =
+			session->puncture_bitmap ? 1 : 0;
+	*(uint16_t *)eht_op->disabled_sub_chan_bitmap =
+				session->puncture_bitmap;
+}
+#endif
+
 QDF_STATUS populate_dot11f_eht_operation(struct mac_context *mac_ctx,
 					 struct pe_session *session,
 					 tDot11fIEeht_op *eht_op)
@@ -10546,6 +10557,12 @@ QDF_STATUS populate_dot11f_eht_operation(struct mac_context *mac_ctx,
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_20;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;
 		eht_op->ccfs1 = 0;
+	}
+
+	if (oper_ch_width == CH_WIDTH_320MHZ ||
+	    oper_ch_width == CH_WIDTH_160MHZ ||
+	    oper_ch_width == CH_WIDTH_80MHZ) {
+		populate_dot11f_eht_op_puncture(session, eht_op);
 	}
 
 	lim_log_eht_op(mac_ctx, eht_op, session);
@@ -10586,6 +10603,10 @@ QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
 	}
 	bw_ind->ccfs0 = ch_switch->ch_center_freq_seg0;
 	bw_ind->ccfs1 = ch_switch->ch_center_freq_seg1;
+
+	pe_nofl_debug("bw_ind:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   bw_ind, sizeof(tDot11fIEbw_ind_element));
 
 	return QDF_STATUS_SUCCESS;
 }

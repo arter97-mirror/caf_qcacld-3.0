@@ -9964,13 +9964,22 @@ static bool
 lim_is_puncture_bitmap_changed(struct pe_session *session,
 			       struct channel_change_req *ch_change_req)
 {
-	uint16_t ori_puncture_bitmap;
 
-	ori_puncture_bitmap =
-		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
+	pe_debug("punct orig 0x%x target 0x%x", session->puncture_bitmap,
+		 ch_change_req->target_punc_bitmap);
 
-	return ori_puncture_bitmap != ch_change_req->target_punc_bitmap;
+	return session->puncture_bitmap != ch_change_req->target_punc_bitmap;
 }
+
+static void
+lim_change_puncture_bitmap(struct pe_session *session,
+			   struct channel_change_req *ch_change_req)
+{
+	pe_debug("punct 0x%x --> 0x%x", session->puncture_bitmap,
+		 ch_change_req->target_punc_bitmap);
+	session->puncture_bitmap = ch_change_req->target_punc_bitmap;
+}
+
 #else
 static inline bool
 lim_is_puncture_bitmap_changed(struct pe_session *session,
@@ -9978,6 +9987,13 @@ lim_is_puncture_bitmap_changed(struct pe_session *session,
 {
 	return false;
 }
+
+static void
+lim_change_puncture_bitmap(struct pe_session *session,
+			   struct channel_change_req *ch_change_req)
+{
+}
+
 #endif
 
 /**
@@ -10150,9 +10166,10 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		session_entry->channelChangeReasonCode =
 			LIM_SWITCH_CHANNEL_MONITOR;
 
-	pe_nofl_debug("SAP CSA: %d ---> %d, ch_bw %d, nw_type %d, dot11mode %d, old dot11mode %d",
+	pe_nofl_debug("SAP CSA: %d --> %d, ch_bw %d --> %d, nw_type %d, dot11mode %d, old dot11mode %d",
 		      session_entry->curr_op_freq, target_freq,
-		      ch_change_req->ch_width, ch_change_req->nw_type,
+		      session_entry->ch_width, ch_change_req->ch_width,
+		      ch_change_req->nw_type,
 		      ch_change_req->dot11mode, session_entry->dot11mode);
 
 	/* Update ht/vht/he/eht capability as per the new dot11mode */
@@ -10239,6 +10256,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 			 ch_change_req->center_freq_seg0;
 	session_entry->ch_center_freq_seg1 =
 			ch_change_req->center_freq_seg1;
+	lim_change_puncture_bitmap(session_entry, ch_change_req);
 	session_entry->htSecondaryChannelOffset = ch_change_req->sec_ch_offset;
 	session_entry->htSupportedChannelWidthSet =
 		(ch_change_req->ch_width ? 1 : 0);
@@ -10873,6 +10891,9 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 		return;
 	}
 
+	qdf_mem_zero(&session_entry->gLimChannelSwitch,
+		     sizeof(session_entry->gLimChannelSwitch));
+
 	/* target channel */
 	session_entry->gLimChannelSwitch.primaryChannel =
 		wlan_reg_freq_to_chan(mac_ctx->pdev,
@@ -10939,6 +10960,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 				dfs_csa_ie_req->ch_params.center_freq_seg0;
 		session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
 				dfs_csa_ie_req->ch_params.center_freq_seg1;
+		lim_set_chan_switch_puncture(session_entry, punct_bitmap);
 
 		pe_debug("EHT BW %d CCFS0 %d, CCFS1 %d",
 			 dfs_csa_ie_req->ch_params.ch_width,
