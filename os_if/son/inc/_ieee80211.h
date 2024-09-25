@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2008 Atheros Communications Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -20,6 +20,7 @@
 
 #include "ieee80211_rrm.h"
 #include "ieee80211_wnm_proto.h"
+#include "ieee80211_external_config.h"
 
 #ifdef CONFIG_BAND_6GHZ
 #define IEEE80211_CHAN_MAX      2047
@@ -180,6 +181,9 @@ struct ieee80211_ath_channel {
 #define IEEE80211_CHAN_HTCAP            0x0000000000001000
 #define IEEE80211_CHAN_VHTCAP           0x0000000000002000
 #define IEEE80211_CHAN_HECAP            0x0000000000003000
+#ifdef WLAN_FEATURE_11BE
+#define IEEE80211_CHAN_EHTCAP           0x0000000000004000
+#endif /* WLAN_FEATURE_11BE */
 
 #define IEEE80211_CHAN_2GHZ     0x0000000000000010 /* 2 GHz spectrum channel */
 #define IEEE80211_CHAN_5GHZ     0x0000000000000020 /* 5 GHz spectrum channel */
@@ -235,6 +239,8 @@ struct ieee80211_ath_channel {
 	(((_flag) & IEEE80211_CHAN_CAP_MASK) == IEEE80211_CHAN_VHTCAP)
 #define IEEE80211_IS_FLAG_HE(_flag) \
 	(((_flag) & IEEE80211_CHAN_CAP_MASK) == IEEE80211_CHAN_HECAP)
+#define IEEE80211_IS_FLAG_EHT(_flag) \
+	    (((_flag) & IEEE80211_CHAN_CAP_MASK) == IEEE80211_CHAN_EHTCAP)
 
 #define IEEE80211_IS_FLAG_TURBO(_flag) \
 	((_flag) & IEEE80211_CHAN_TURBO)
@@ -260,6 +266,10 @@ struct ieee80211_ath_channel {
 
 #define IEEE80211_IS_CHAN_5GHZ_6GHZ(_c) \
 	(IEEE80211_IS_CHAN_5GHZ(_c) || IEEE80211_IS_CHAN_6GHZ(_c))
+
+#define IEEE80211_IS_CHAN_BW_EHT(_c)   IEEE80211_IS_FLAG_EHT((_c)->ic_flags)
+
+#define IEEE80211_IS_CHAN_EHT(_c)  IEEE80211_IS_CHAN_BW_EHT(_c)
 
 #define IEEE80211_IS_CHAN_108A(_c) \
 	(((_c)->ic_flags & IEEE80211_CHAN_108A) == IEEE80211_CHAN_108A)
@@ -298,9 +308,66 @@ struct ieee80211_ath_channel {
 	((IEEE80211_IS_CHAN_5GHZ_6GHZ(_c) || IEEE80211_IS_CHAN_2GHZ(_c)) && \
 	 IEEE80211_IS_CHAN_HE(_c))
 
+#define IEEE80211_IS_CHAN_11BE(_c) \
+	((IEEE80211_IS_CHAN_5GHZ_6GHZ(_c) || IEEE80211_IS_CHAN_2GHZ(_c)) && \
+	 IEEE80211_IS_CHAN_EHT(_c))
+
 struct ieee80211_rateset {
 	u_int8_t                rs_nrates;
 	u_int8_t                rs_rates[IEEE80211_RATE_MAXSIZE];
+};
+
+/**
+ * enum wlan_channel_dfs_state - DFS  channel states.
+ * @WLAN_CH_DFS_S_INVALID: The DFS state for invalid channel numbers
+ *                         that are not part of the radio's channel list.
+ * @WLAN_CH_DFS_S_CAC_REQ: Indicates that the CAC/Off-channel CAC has
+ *                         to performed before Tx on the DFS channel.
+ * @WLAN_CH_DFS_S_CAC_STARTED: Indicates that the CAC has been started
+ *                         for the DFS channel.
+ * @WLAN_CH_DFS_S_CAC_COMPLETED: Indicates that the CAC has been completed
+ *                               for the DFS channel.
+ * @WLAN_CH_DFS_S_NOL: Indicates that the DFS channel is in NOL.
+ * @WLAN_CH_DFS_S_PRECAC_STARTED: Indicates that the PreCAC has been
+ *                                started for the DFS channel.
+ * @WLAN_CH_DFS_S_PRECAC_COMPLETED: Indicates that the PreCAC has been
+ *                                  completed for the DFS channel.
+ * @WLAN_CH_DFS_S_NON_DFS: Indicates that it is a non-DFS channel.
+ */
+enum wlan_channel_dfs_state {
+	WLAN_CH_DFS_S_INVALID,
+	WLAN_CH_DFS_S_CAC_REQ,
+	WLAN_CH_DFS_S_CAC_STARTED,
+	WLAN_CH_DFS_S_CAC_COMPLETED,
+	WLAN_CH_DFS_S_NOL,
+	WLAN_CH_DFS_S_PRECAC_STARTED,
+	WLAN_CH_DFS_S_PRECAC_COMPLETED,
+	WLAN_CH_DFS_S_NON_DFS,
+};
+
+#define NUM_5GHZ_CHANS 40
+
+enum wlan_afc_power_type {
+	AFC_POWER_TYPE_LP,
+	AFC_POWER_TYPE_SP,
+	AFC_POWER_TYPE_VLP,
+	AFC_POWER_TYPE_MAX,
+};
+
+struct wlan_chan_6g {
+	uint8_t chan_idx;
+	uint8_t cfreq2;
+	uint16_t puncture_bitmap;
+	int16_t psd_pwr;
+	int32_t eirp_pwr;
+};
+
+/* Rounded value */
+#define NUM_6GHZ_CHANS 60
+
+struct wlan_chan_list_6g {
+	uint16_t num_valid_chan[IEEE80211_CWM_WIDTH_MAX];
+	struct wlan_chan_6g chan[IEEE80211_CWM_WIDTH_MAX][NUM_6GHZ_CHANS];
 };
 
 #endif //__IEEE80211_H_

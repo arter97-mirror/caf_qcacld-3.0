@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,6 +13,9 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+#include <queue.h>
+#include "ieee80211_external_config.h"
 
 #ifndef _IEEE80211_WNM_PROTO_H_
 #define _IEEE80211_WNM_PROTO_H_
@@ -94,6 +97,8 @@ struct ieee80211_bstm_reqinfo {
 	u_int8_t optie_buf[ieee80211_bstm_req_max_optie];
 } __packed;
 
+#define IEEE80211_WNM_WLAN_MAX_MLO_VDEVS 3
+
 /* candidate BSSID for BSS Transition Management Request */
 struct ieee80211_bstm_candidate {
 	/* candidate BSSID */
@@ -106,6 +111,14 @@ struct ieee80211_bstm_candidate {
 	u_int8_t op_class;
 	/* PHY type */
 	u_int8_t phy_type;
+#ifdef WLAN_FEATURE_11BE_MLO
+	/* MLD candidate */
+	u_int8_t mld;
+	/* MLD MAC */
+	u_int8_t mld_addr[MAC_ADDR_LEN];
+	u_int8_t recommend_link;
+	u_int8_t linkid[IEEE80211_WNM_WLAN_MAX_MLO_VDEVS];
+#endif
 } __packed;
 
 /*
@@ -124,6 +137,8 @@ struct ieee80211_bstm_reqinfo_target {
 	/*If we use trans reason code in QCN IE */
 	u_int8_t qcn_trans_reason;
 #endif
+	/*abrdiged*/
+	u_int8_t abridged;
 	struct ieee80211_bstm_candidate
 		candidates[ieee80211_bstm_req_max_candidates];
 	u_int8_t trans_reason;
@@ -143,5 +158,103 @@ struct ieee80211_user_bssid_pref {
 	u_int8_t regclass;
 	u_int8_t chan;
 } __packed;
+
+struct ieee80211_bstmresp_ev_data {
+	u_int8_t type;
+	u_int8_t token;
+	u_int8_t status;
+	u_int8_t termination_delay;
+	u_int8_t peer_mac[6];
+	u_int8_t target_mac[6];
+	u_int8_t reject_code;
+	u_int16_t num_candidate;
+	u_int8_t candidates[1];
+} __packed;
+
+struct ieee80211_bstmquery_ev_data {
+	u_int8_t type;
+	u_int8_t token;
+	u_int16_t reason;
+	u_int16_t num_candidate;
+	u_int8_t peer_mac[6];
+	u_int8_t candidates[1];
+} __packed;
+
+enum {
+	BSTM_QUERY_DATA = 1,
+	BSTM_RESP_DATA,
+	BSTM_INVALID,
+};
+
+/* BSTM MBO/QCN Transition Request Reason Code */
+enum IEEE80211_BSTM_REQ_REASON_CODE {
+	IEEE80211_BSTM_REQ_REASON_UNSPECIFIED,
+	IEEE80211_BSTM_REQ_REASON_FRAME_LOSS_RATE,
+	IEEE80211_BSTM_REQ_REASON_DELAY_FOR_TRAFFIC,
+	IEEE80211_BSTM_REQ_REASON_INSUFFICIENT_BANDWIDTH,
+	IEEE80211_BSTM_REQ_REASON_LOAD_BALANCING,
+	IEEE80211_BSTM_REQ_REASON_LOW_RSSI,
+	IEEE80211_BSTM_REQ_REASON_EXCESSIVE_RETRANSMISSION,
+	IEEE80211_BSTM_REQ_REASON_HIGH_INTERFERENCE,
+	IEEE80211_BSTM_REQ_REASON_GRAY_ZONE,
+	IEEE80211_BSTM_REQ_REASON_PREMIUM_AP,
+
+	IEEE80211_BSTM_REQ_REASON_INVALID
+};
+
+/*
+ * BSS Transition Management response status codes
+ * Taken from 802.11v standard
+ */
+enum IEEE80211_WNM_BSTM_RESP_STATUS {
+	IEEE80211_WNM_BSTM_RESP_SUCCESS,
+};
+
+/**
+ * enum IEEE80211_BSTM_REJECT_REASON_CODE - BSTM MBO/QCN Transition
+ *                                          Rejection Reason Code
+ * @IEEE80211_BSTM_REJECT_REASON_UNSPECIFIED:
+ * @IEEE80211_BSTM_REJECT_REASON_FRAME_LOSS_RATE: Excessive frame loss rate
+ *                                                is expected by STA
+ * @IEEE80211_BSTM_REJECT_REASON_DELAY_FOR_TRAFFIC: Excessive traffic delay
+ *                                              will be incurred this time
+ * @IEEE80211_BSTM_REJECT_REASON_INSUFFICIENT_CAPACITY: Insufficient QoS
+ *                   capacity for current traffic stream expected by STA
+ * @IEEE80211_BSTM_REJECT_REASON_LOW_RSSI: STA receiving low RSSI in frames
+ *                                         from suggested channel(s)
+ * @IEEE80211_BSTM_REJECT_REASON_HIGH_INTERFERENCE: High Interference is
+ *                                  expected at the candidate channel(s)
+ * @IEEE80211_BSTM_REJECT_REASON_SERVICE_UNAVAILABLE: Required services by
+ *                              STA are not available on requested channel
+ * @IEEE80211_BSTM_REJECT_REASON_INVALID: value 7 - 255 is reserved and
+ *                                        considered invalid
+ */
+enum IEEE80211_BSTM_REJECT_REASON_CODE {
+	IEEE80211_BSTM_REJECT_REASON_UNSPECIFIED,
+	IEEE80211_BSTM_REJECT_REASON_FRAME_LOSS_RATE,
+	IEEE80211_BSTM_REJECT_REASON_DELAY_FOR_TRAFFIC,
+	IEEE80211_BSTM_REJECT_REASON_INSUFFICIENT_CAPACITY,
+	IEEE80211_BSTM_REJECT_REASON_LOW_RSSI,
+	IEEE80211_BSTM_REJECT_REASON_HIGH_INTERFERENCE,
+	IEEE80211_BSTM_REJECT_REASON_SERVICE_UNAVAILABLE,
+	IEEE80211_BSTM_REJECT_REASON_INVALID
+};
+
+typedef struct ieee80211_tclas_processing {
+	u_int8_t elem_id;
+	u_int8_t length;
+	u_int8_t tclas_process;
+} __packed ieee80211_tclas_processing;
+
+enum ieee80211_bstm_cmd {
+	IEEE80211_SET_BSTMRPT_ENABLE = 1,
+	IEEE80211_GET_BSTMRPT_ENABLE = 2,
+	IEEE80211_GET_BSTMRPT_IMPLEMENTED = 3,
+};
+
+typedef struct ieee80211_bstm_cmd_s {
+	enum ieee80211_bstm_cmd cmdid;
+	u_int8_t val;
+} ieee80211_bstm_cmd_t;
 
 #endif //_IEEE80211_WNM_PROTO_H_
