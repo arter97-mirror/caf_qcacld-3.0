@@ -18,6 +18,7 @@
 #define _IEEE80211_H_
 
 #include "_ieee80211.h"
+#include "ieee80211_external_config.h"
 
 #define RRM_CAPS_LEN 5
 
@@ -130,6 +131,12 @@ typedef struct timespec timespec_t;
 typedef struct timespec timespec_t;
 #endif /* __KERNEL__ */
 
+#define WPA_OUI                     0xf25000
+
+#define WME_OUI                     0xf25000
+#define WME_OUI_TYPE                    0x02
+#define WME_INFO_OUI_SUBTYPE            0x00
+
 /*
  * Reason codes
  *
@@ -210,6 +217,9 @@ enum {
  * Management information element payloads.
  */
 enum {
+	IEEE80211_ELEMID_TCLAS = 14,
+	IEEE80211_ELEMID_TCLAS_PROCESS = 44,
+	IEEE80211_ELEMID_INT_ACC_CAT_PRIORITY = 184,
 	IEEE80211_ELEMID_VENDOR           = 221,  /* vendor private */
 };
 
@@ -271,6 +281,14 @@ struct ieee80211_qos_req {
 	uint8_t policy_id_list[IEEE80211_DSCP_ACTION_MAX_POLICIES];
 } __packed;
 #endif
+
+#define IEEE80211_MAX_MLD_LINKS 3
+
+struct mlo_link_peer_info {
+	u_int8_t isi_link_id;
+	u_int8_t isi_linkaddr[IEEE80211_ADDR_LEN];
+	u_int8_t isi_is_bridge;
+};
 
 /*
  * Station information block; the mac address is used
@@ -363,6 +381,15 @@ struct ieee80211req_sta_info {
 	u_int16_t isi_ehtcap_txmcsnssmap[EHTHANDLE_CAP_TXRX_MCS_NSS_SIZE];
 	u_int32_t isi_ehtcap_phyinfo[EHTHANDLE_CAP_PHYINFO_SIZE];
 #endif /* WLAN_FEATURE_11BE */
+#if WLAN_FEATURE_11BE_MLO
+	u_int8_t isi_is_mlo;
+	u_int8_t isi_mldaddr[IEEE80211_ADDR_LEN];
+	u_int8_t isi_num_links;
+	u_int8_t isi_is_emlsr;
+	u_int8_t isi_is_emlmr;
+	u_int8_t isi_is_str;
+	struct mlo_link_peer_info isi_link_info[IEEE80211_MAX_MLD_LINKS];
+#endif /* WLAN_FEATURE_11BE_MLO */
 };
 
 #define HECAP_TXRX_MCS_NSS_IDX7  7
@@ -468,6 +495,159 @@ struct ieee80211_ie_whc_rept_info {
 	u_int8_t    whc_rept_info_type;
 	u_int8_t    whc_rept_info_subtype;
 	u_int8_t    whc_rept_info_version;
+} __packed;
+
+#define IC_HECAP_PHYDWORD_IDX0  0
+#define IC_HECAP_PHYDWORD_IDX1  1
+
+/* HE PHY capabilities , field starting idx and
+ * no of bits positions as per IC HE populated
+ * capabilities from target
+ */
+#define IC_HECAP_PHY_UL_MUMIMO_IDX                       22
+#define IC_HECAP_PHY_UL_MUMIMO_BITS                      1
+#define IC_HECAP_PHY_UL_MUOFDMA_IDX                      23
+#define IC_HECAP_PHY_UL_MUOFDMA_BITS                     1
+#define IC_HECAP_PHY_SU_BFER_IDX                         31
+#define IC_HECAP_PHY_SU_BFER_BITS                        1
+#define IC_HECAP_PHY_MU_BFER_IDX                         1
+#define IC_HECAP_PHY_MU_BFER_BITS                        1
+#define IC_HECAP_PHY_DL_MU_MIMO_PARTIAL_BW_IDX           22
+#define IC_HECAP_PHY_DL_MU_MIMO_PARTIAL_BW_BITS          1
+
+/*Indicates support for operation as an SU beamformer.*/
+#define HECAP_PHY_SUBFMR_GET_FROM_IC(hecap_phy)          \
+	HE_GET_BITS(hecap_phy[IC_HECAP_PHYDWORD_IDX0],   \
+	IC_HECAP_PHY_SU_BFER_IDX, IC_HECAP_PHY_SU_BFER_BITS)
+#define HECAP_PHY_SUBFMR_SET_TO_IC(hecap_phy, value)     \
+	HE_SET_BITS(hecap_phy[IC_HECAP_PHYDWORD_IDX0],   \
+	IC_HECAP_PHY_SU_BFER_IDX, IC_HECAP_PHY_SU_BFER_BITS, value)
+
+/*Indicates support for operation as an MU Beamformer*/
+#define HECAP_PHY_MUBFMR_GET_FROM_IC(hecap_phy)         \
+	HE_GET_BITS(hecap_phy[IC_HECAP_PHYDWORD_IDX1],  \
+	IC_HECAP_PHY_MU_BFER_IDX, IC_HECAP_PHY_MU_BFER_BITS)
+
+/*
+ * If the transmitting STA is an AP: indicates STA supports of reception
+ * of full bandwidth UL MU-MIMO transmission.
+ * If the transmitting STA is a non-AP STA: indicates STA supports of
+ * transmission of full bandwidth UL MU-MIMO transmission.
+ */
+#define HECAP_PHY_UL_MU_MIMO_GET_FROM_IC(hecap_phy)     \
+	HE_GET_BITS(hecap_phy[IC_HECAP_PHYDWORD_IDX0],  \
+	IC_HECAP_PHY_UL_MUMIMO_IDX, IC_HECAP_PHY_UL_MUMIMO_BITS)
+
+/*
+ * If the transmitting STA is an AP: indicates STA supports of reception
+ * of UL  MUMIMO transmission on an RU in an HE MU PPDU where the RU
+ * does not span the entire PPDU bandwidth.
+ * If the transmitting STA is a non-AP STA: indicates STA supports of
+ * transmission of UL MU-MIMO transmission on an RU in an HE MU PPDU
+ * where the RU does not span the entire PPDU bandwidth.
+ */
+#define HECAP_PHY_ULOFDMA_GET_FROM_IC(hecap_phy)       \
+	HE_GET_BITS(hecap_phy[IC_HECAP_PHYDWORD_IDX0], \
+	IC_HECAP_PHY_UL_MUOFDMA_IDX, IC_HECAP_PHY_UL_MUOFDMA_BITS)
+
+/*
+ * Indicates that the non-AP STA supports reception of a DL
+ * MU-MIMO transmission on an RU in an HE MU PPDU where the
+ * RU does not span the entire PPDU bandwidth.
+ */
+#define HECAP_PHY_DLMUMIMOPARTIALBW_GET_FROM_IC(hecap_phy)    \
+	HE_GET_BITS(hecap_phy[IC_HECAP_PHYDWORD_IDX1],        \
+	IC_HECAP_PHY_DL_MU_MIMO_PARTIAL_BW_IDX,               \
+	IC_HECAP_PHY_DL_MU_MIMO_PARTIAL_BW_BITS)
+
+#define IEEE80211_MSCS_MAX_DISALLOW_LIST 10
+#define IEEE80211_MSCS_DISALLOW_GET_LIST 1
+
+struct ieee80211_mscs_disallow_candidate_list {
+	uint8_t bssid[MAC_ADDR_LEN];
+};
+
+struct ieee80211_mscs_disallow_db {
+	uint8_t count;
+	struct ieee80211_mscs_disallow_candidate_list
+		candidate[IEEE80211_MSCS_MAX_DISALLOW_LIST];
+	/* Only used by the application to specify type of request */
+	uint8_t type;
+	uint8_t is_true;
+} __packed;
+
+#define HE_GET_BITS(_val, _index, _num_bits)      \
+	(((_val) >> (_index)) & ((1 << (_num_bits)) - 1))
+
+/* secondary channel above */
+#define IEEE80211_SEC_CHAN_OFFSET_SCA               1
+/* secondary channel below */
+#define IEEE80211_SEC_CHAN_OFFSET_SCB               3
+
+#define IEEE80211_EXTCAPIE_BSSTRANSITION        0x00080000
+
+#define IEEE80211_DSCP_ACTION_MAX_POLICIES 6
+
+struct ieee80211_qos_mgmt_ie {
+	uint8_t dialog_token;
+	uint8_t reset;
+	uint8_t no_of_policies;
+	struct ieee80211_qos_mgmt_attr
+		qos_mgmt_attr[IEEE80211_DSCP_ACTION_MAX_POLICIES];
+} __packed;
+
+/* TCLAS Mask element */
+
+struct ieee80211_tclas_mask_elem_type4 {
+	u_int8_t classifier_type;
+	u_int8_t classifier_mask;
+} __packed;
+
+struct ieee80211_tclas_mask_elem {
+	u_int8_t elem;
+	u_int8_t ie_len;
+	u_int8_t elem_ext;
+	struct ieee80211_tclas_mask_elem_type4 tclas_mask_elem_type4;
+} __packed;
+
+struct ieee80211_mscs_user_priority_ctrl {
+	u_int8_t user_priority_bitmap;
+#if _BYTE_ORDER == _BIG_ENDIAN
+	u_int8_t upc_reserved:5,
+		 user_priority_limit:3;
+#else
+	u_int8_t user_priority_limit:3,
+		 upc_reserved:5;
+#endif
+};
+
+#define IEEE80211_MSCS_MAX_TCLAS_ELEM_SIZE 4
+
+/* MSCS Descriptor Element */
+
+struct ieee80211_mscs_descriptor {
+	u_int8_t elemid;
+	u_int8_t ie_len;
+	u_int8_t elem_ext;
+	u_int8_t req_type;
+	struct ieee80211_mscs_user_priority_ctrl user_pri_ctrl;
+	u_int32_t stream_timeout;
+	struct ieee80211_tclas_mask_elem
+		tclas_mask_elem[IEEE80211_MSCS_MAX_TCLAS_ELEM_SIZE];
+} __packed;
+
+#define CHWIDTH_20                             20  /* Channel width 20 */
+#define CHWIDTH_40                             40  /* Channel width 40 */
+#define CHWIDTH_80                             80  /* Channel width 80 */
+#define CHWIDTH_160                            160 /* Channel width 160 */
+#ifdef WLAN_FEATURE_11BE
+#define CHWIDTH_320                            320 /* Channel width 320 */
+#endif /* WLAN_FEATURE_11BE */
+
+struct intra_access_priority_category_elem {
+	uint8_t elem;
+	uint8_t ie_len;
+	uint8_t intra_access_priority;
 } __packed;
 
 #endif //_IEEE80211_H_

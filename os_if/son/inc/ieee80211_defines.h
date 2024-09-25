@@ -40,6 +40,328 @@ typedef struct _ieee80211_ssid {
 	u_int8_t    ssid[IEEE80211_NWID_LEN + 1];
 } ieee80211_ssid;
 
+/**
+ * struct ieee80211_mac_stats
+ * @ims_rx_badkeyid:  rx w/ incorrect keyid
+ * @ims_rx_decryptok: rx decrypt okay
+ * @ims_rx_pnerr:     rx PN failed
+ * @ims_rx_wepfail:   rx wep processing failed
+ * @ims_rx_tkipreplay: rx seq# violation (TKIP)
+ * @ims_rx_tkipformat: rx format bad (TKIP)
+ * @ims_rx_tkipicv:    rx ICV check failed (TKIP)
+ * @ims_rx_ccmpreplay: rx seq# violation (CCMP)
+ * @ims_rx_ccmpformat: rx format bad (CCMP)
+ * @ims_rx_ccmpmic:    rx MIC check failed (CCMP)
+ * @ims_rx_wpireplay:  rx seq# violation (WPI)
+ * @ims_rx_wpimic:     rx MIC check failed (WPI)
+ * @ims_rx_countermeasure: rx TKIP countermeasure activation count
+ * @ims_tx_mgmt: tx mgmt frames
+ * @ims_rx_mgmt: rx mgmt frames
+ * end of stats moved to cp stats component
+ * @ims_tx_packets: frames successfully transmitted
+ * @ims_rx_packets: frames successfully received
+ * @ims_tx_bytes: bytes successfully transmitted
+ * @ims_rx_bytes: bytes successfully received
+ * TODO: For the byte counts below, we need to handle some scenarios
+ * such as encryption related decaps, etc
+ * @ims_tx_data_packets: data frames successfully transmitted
+ * @ims_rx_data_packets: data frames successfully received
+ * @ims_tx_bcast_data_packets: bcast frames successfully transmitted
+ * @ims_tx_bcast_data_bytes: bcast bytes successfully transmitted
+ * @ims_rx_bcast_data_packets: bcast frames successfully received
+ * @ims_rx_bcast_data_bytes: bcast bytes successfully received
+ * @ims_tx_data_bytes: data bytes successfully transmitted, inclusive of FCS.
+ * @ims_rx_data_bytes: data bytes successfully received, inclusive of FCS.
+ * @ims_tx_datapyld_bytes: data payload bytes successfully transmitted
+ * @ims_rx_datapyld_bytes: data payload successfully received
+ * @ims_tx_wme: data frames transmitted per AC
+ * @ims_rx_wme: data frames received per AC
+ * Decryption errors
+ * @ims_rx_unencrypted: rx w/o wep and privacy on
+ * @ims_rx_decryptcrc: rx decrypt failed on crc
+ * @ims_rx_tkipmic: rx MIC check failed (TKIP)
+ * @ims_rx_fcserr: rx MIC check failed (CCMP)
+ * Other Tx/Rx errors
+ * @ims_tx_discard:  tx dropped by NIC
+ * @ims_rx_discard:  rx dropped by NIC
+ * @ims_last_tx_rate:
+ * @ims_last_tx_rate_mcs:
+ * @ims_retries: retries
+ * @ims_tx_eapol_packets: tx eapol frames
+ */
+struct ieee80211_mac_stats {
+	u_int64_t   ims_rx_badkeyid;
+	u_int64_t   ims_rx_decryptok;
+	u_int64_t   ims_rx_pnerr;
+	u_int64_t   ims_rx_wepfail;
+	u_int64_t   ims_rx_tkipreplay;
+	u_int64_t   ims_rx_tkipformat;
+	u_int64_t   ims_rx_tkipicv;
+	u_int64_t   ims_rx_ccmpreplay;
+	u_int64_t   ims_rx_ccmpformat;
+	u_int64_t   ims_rx_ccmpmic;
+	u_int64_t   ims_rx_wpireplay;
+	u_int64_t   ims_rx_wpimic;
+	u_int64_t   ims_rx_countermeasure;
+	u_int64_t   ims_tx_mgmt;
+	u_int64_t   ims_rx_mgmt;
+	u_int64_t   ims_tx_packets;
+	u_int64_t   ims_rx_packets;
+	u_int64_t   ims_tx_bytes;
+	u_int64_t   ims_rx_bytes;
+	u_int64_t   ims_tx_data_packets;
+	u_int64_t   ims_rx_data_packets;
+	u_int64_t   ims_tx_bcast_data_packets;
+	u_int64_t   ims_tx_bcast_data_bytes;
+	u_int64_t   ims_rx_bcast_data_packets;
+	u_int64_t   ims_rx_bcast_data_bytes;
+	u_int64_t   ims_tx_data_bytes;
+	u_int64_t   ims_rx_data_bytes;
+	u_int64_t   ims_tx_datapyld_bytes;
+	u_int64_t   ims_rx_datapyld_bytes;
+	u_int64_t   ims_tx_wme[4];
+	u_int64_t   ims_rx_wme[4];
+	u_int64_t   ims_rx_unencrypted;
+	u_int64_t   ims_rx_decryptcrc;
+	u_int64_t   ims_rx_tkipmic;
+	u_int64_t   ims_rx_fcserr;
+	u_int64_t   ims_tx_discard;
+	u_int64_t   ims_rx_discard;
+	u_int64_t   ims_last_tx_rate;
+	u_int64_t   ims_last_tx_rate_mcs;
+	u_int64_t   ims_retries;
+	u_int64_t   ims_tx_eapol_packets;
+};
+
+/**
+ * struct ieee80211_stats - Summary statistics
+ * This structure should be 64 bit aligned. Please make sure it is 64
+ * bit(multiples of 8) aligned after adding new variables.
+ * @is_rx_wrongbss:   rx from wrong bssid
+ * @is_rx_wrongdir:   rx w/ wrong direction
+ * @is_rx_mcastecho:  rx discard 'cuz mcast echo
+ * @is_rx_notassoc:   rx discard 'cuz sta !assoc
+ * @is_rx_noprivacy:  rx w/ wep but privacy off
+ * @is_rx_mgtdiscard: rx discard mgt frames
+ * @is_rx_ctl:        rx discard ctrl frames
+ * @is_rx_rstoobig:   rx rate set truncated
+ * @is_rx_elem_missing:  rx required element missing
+ * @is_rx_elem_toobig: rx element too big
+ * @is_rx_badchan:     rx frame w/ invalid chan
+ * @is_rx_nodealloc:   rx frame dropped
+ * @is_rx_ssidmismatch:     rx frame ssid mismatch
+ * @is_rx_auth_unsupported: rx w/ unsupported auth alg
+ * @is_rx_auth_fail: rx sta auth failure
+ * @is_rx_auth_countermeasures: rx auth discard 'cuz CM
+ * @is_rx_assoc_bss: rx assoc from wrong bssid
+ * @is_rx_assoc_notauth:     rx assoc w/o auth
+ * @is_rx_assoc_capmismatch: rx assoc w/ cap mismatch
+ * @is_rx_assoc_norate:   rx assoc w/ no rate match
+ * @is_rx_assoc_badwpaie: rx assoc w/ bad WPA IE
+ * @is_rx_action:   rx action mgt
+ * @is_rx_bad_auth: rx bad auth request
+ * @is_tx_nodefkey: tx failed 'cuz no defkey
+ * @is_tx_noheadroom: tx failed 'cuz no space
+ * @is_rx_acl:    rx discard 'cuz acl policy
+ * @is_rx_nowds:  4-addr packets received with no wds enabled
+ * @is_tx_nobuf:  tx failed for lack of buf
+ * @is_tx_nonode: tx failed for no node
+ * @is_tx_badcipher: tx failed 'cuz key type
+ * @is_tx_not_ok:    tx ok not set in desc
+ * @tx_beacon_swba_cnt:  Beacon intr SWBA counter host gets
+ * @is_node_timeout:     nodes timed out inactivity
+ * @is_crypto_nomem:     no memory for crypto ctx
+ * @is_crypto_tkip:      tkip crypto done in s/w
+ * @is_crypto_tkipenmic:  tkip en-MIC done in s/w
+ * @is_crypto_tkipcm:     tkip counter measures
+ * @is_crypto_ccmp:       ccmp crypto done in s/w
+ * @is_crypto_wep:        wep crypto done in s/w
+ * @is_crypto_setkey_cipher: cipher rejected key
+ * @is_crypto_setkey_nokey:  no key index for setkey
+ * @is_crypto_delkey:        driver key delete failed
+ * @is_crypto_badcipher:     unknown cipher
+ * @is_crypto_attachfail:    cipher attach failed
+ * @is_crypto_swfallback:    cipher fallback to s/w
+ * @is_crypto_keyfail:      driver key alloc failed
+ * @is_crypto_enmicfail:  en-MIC failed
+ * @is_ibss_capmismatch:  merge failed-cap mismatch
+ * @is_ps_unassoc:        ps-poll for unassoc. sta
+ * @is_ps_badaid:         ps-poll w/ incorrect aid
+ * @padding: make structure size to 64 bit aligned. multiples of 8
+ * @total_num_offchan_tx_mgmt: total number of offchan TX mgmt frames
+ * @total_num_offchan_tx_data: total number of offchan TX data frames
+ * @num_offchan_tx_failed: number of offchan TX frames failed
+ * @total_invalid_macaddr_nodealloc_failcnt: number of invalid mac addr
+ *                                           node alloc fail count
+ * @tx_bcn_succ_cnt:
+ * @tx_bcn_outage_cnt:
+ * @sta_xceed_rlim: no of connections refused after radio limit
+ * @sta_xceed_vlim: no of connections refused after vap limit
+ * @mlme_auth_attempt: no of 802.11 MLME Auth Attempt
+ * @mlme_auth_success: no of 802.11 MLME Auth Success
+ * @authorize_attempt: no of Authorization Attempt
+ * @authorize_success: no of Authorization successful
+ * end of cp stats
+ * @is_scan_active: active scans started
+ * @is_rx_unauth: rx on unauthorized port
+ * @is_rx_tooshort: rx frame too short
+ * @peer_delete_req: no of peer delete req sent to target
+ * @peer_delete_resp: no of peer delete resp rcvd from target
+ * @peer_delete_all_req:  no of peer delete all req
+ * @peer_delete_all_resp: no of peer delete all resp
+ * @prob_req_drops: no of drop request drops
+ * @oob_probe_req_count:  no of out of band probe requests
+ * @wc_probe_req_drops:  no of wildcard probe req drops
+ * unused, can be cleaned up
+ * @is_rx_badversion: rx frame with bad version
+ * @is_rx_decap: rx decapsulation failed
+ * @is_rx_beacon: rx beacon frames
+ * @is_rx_elem_toosmall:  rx element too small
+ * @is_rx_elem_unknown:  rx element unknown
+ * @is_rx_chanmismatch:  rx frame chan mismatch
+ * @is_rx_deauth: rx deauthentication
+ * @is_rx_disassoc: rx disassociation
+ * @is_rx_badsubtype: rx frame w/ unknown subtype
+ * @is_rx_nobuf: rx failed for lack of buf
+ * @is_rx_ahdemo_mgt: rx discard ahdemo mgt frame
+ * @is_rx_badcipher: rx failed 'cuz key type
+ * @is_rx_nocipherctx: rx failed 'cuz key !setup
+ * @is_rx_ffcnt: rx fast frames
+ * @is_rx_badathtnl: driver key alloc failed
+ * @is_tx_unknownmgt: tx of unknown mgt frame
+ * @is_tx_ffokcnt: tx fast frames sent success
+ * @is_tx_fferrcnt: tx fast frames sent success
+ * @is_scan_passive: passive scans started
+ * @is_crypto_tkipdemic:  tkip de-MIC done in s/w
+ * @is_crypto_nocipher:  cipher not available
+ * @is_ibss_norate: merge failed-rate mismatch
+ * @is_ps_qempty: ps-poll w/ nothing to send
+ * @tx_offer_pkt_cnt: no of pkts offered to umac for Tx
+ * @tx_offer_pkt_bytes_cnt: no of bytes offered to umac for Tx
+ * @mgmt_tx_fail: mgmt Tx failure
+ * @ims_tx_packets: frames successfully transmitted
+ * @ims_tx_bytes: bytes successfully transmitted
+ * @total_rx_packets: pkt count for good frames rcvd
+ * @total_rx_bytes: byte count for good frames rcvd
+ * @fils_frames_sent: Fils frame sent successfully
+ * @fils_frames_sent_fail: Fils frame sent failed
+ * @tx_offload_prb_resp_succ_cnt: tx unsolicited probe response success count
+ * @tx_offload_prb_resp_fail_cnt: tx unsolicited probe response fail count
+ * @tx_20TU_prb_resp: tx 20 TU probe response active status
+ * @tx_20TU_prb_interval:  tx 20 TU probe response interval
+ */
+struct ieee80211_stats {
+	u_int64_t   is_rx_wrongbss;
+	u_int64_t   is_rx_wrongdir;
+	u_int64_t   is_rx_mcastecho;
+	u_int64_t   is_rx_notassoc;
+	u_int64_t   is_rx_noprivacy;
+	u_int64_t   is_rx_mgtdiscard;
+	u_int64_t   is_rx_ctl;
+	u_int64_t   is_rx_rstoobig;
+	u_int64_t   is_rx_elem_missing;
+	u_int64_t   is_rx_elem_toobig;
+	u_int64_t   is_rx_badchan;
+	u_int64_t   is_rx_nodealloc;
+	u_int64_t   is_rx_ssidmismatch;
+	u_int64_t   is_rx_auth_unsupported;
+	u_int64_t   is_rx_auth_fail;
+	u_int64_t   is_rx_auth_countermeasures;
+	u_int64_t   is_rx_assoc_bss;
+	u_int64_t   is_rx_assoc_notauth;
+	u_int64_t   is_rx_assoc_capmismatch;
+	u_int64_t   is_rx_assoc_norate;
+	u_int64_t   is_rx_assoc_badwpaie;
+	u_int64_t   is_rx_action;
+	u_int64_t   is_rx_bad_auth;
+	u_int64_t   is_tx_nodefkey;
+	u_int64_t   is_tx_noheadroom;
+	u_int64_t   is_rx_acl;
+	u_int64_t   is_rx_nowds;
+	u_int64_t   is_tx_nobuf;
+	u_int64_t   is_tx_nonode;
+	u_int64_t   is_tx_badcipher;
+	u_int64_t   is_tx_not_ok;
+	u_int64_t   tx_beacon_swba_cnt;
+	u_int64_t   is_node_timeout;
+	u_int64_t   is_crypto_nomem;
+	u_int64_t   is_crypto_tkip;
+	u_int64_t   is_crypto_tkipenmic;
+	u_int64_t   is_crypto_tkipcm;
+	u_int64_t   is_crypto_ccmp;
+	u_int64_t   is_crypto_wep;
+	u_int64_t   is_crypto_setkey_cipher;
+	u_int64_t   is_crypto_setkey_nokey;
+	u_int64_t   is_crypto_delkey;
+	u_int64_t   is_crypto_badcipher;
+	u_int64_t   is_crypto_attachfail;
+	u_int64_t   is_crypto_swfallback;
+	u_int64_t   is_crypto_keyfail;
+	u_int64_t   is_crypto_enmicfail;
+	u_int64_t   is_ibss_capmismatch;
+	u_int64_t   is_ps_unassoc;
+	u_int64_t   is_ps_badaid;
+	u_int64_t   padding;
+	u_int64_t   total_num_offchan_tx_mgmt;
+	u_int64_t   total_num_offchan_tx_data;
+	u_int64_t   num_offchan_tx_failed;
+	u_int64_t   total_invalid_macaddr_nodealloc_failcnt;
+	u_int64_t   tx_bcn_succ_cnt;
+	u_int64_t   tx_bcn_outage_cnt;
+	u_int64_t   sta_xceed_rlim;
+	u_int64_t   sta_xceed_vlim;
+	u_int64_t   mlme_auth_attempt;
+	u_int64_t   mlme_auth_success;
+	u_int64_t   authorize_attempt;
+	u_int64_t   authorize_success;
+	u_int64_t   is_scan_active;
+	u_int64_t   is_rx_unauth;
+	u_int64_t   is_rx_tooshort;
+	u_int64_t   peer_delete_req;
+	u_int64_t   peer_delete_resp;
+	u_int64_t   peer_delete_all_req;
+	u_int64_t   peer_delete_all_resp;
+	u_int64_t   prob_req_drops;
+	u_int64_t   oob_probe_req_count;
+	u_int64_t   wc_probe_req_drops;
+	u_int64_t   is_rx_badversion;
+	u_int64_t   is_rx_decap;
+	u_int64_t   is_rx_beacon;
+	u_int64_t   is_rx_elem_toosmall;
+	u_int64_t   is_rx_elem_unknown;
+	u_int64_t   is_rx_chanmismatch;
+	u_int64_t   is_rx_deauth;
+	u_int64_t   is_rx_disassoc;
+	u_int64_t   is_rx_badsubtype;
+	u_int64_t   is_rx_nobuf;
+	u_int64_t   is_rx_ahdemo_mgt;
+	u_int64_t   is_rx_badcipher;
+	u_int64_t   is_rx_nocipherctx;
+	u_int64_t   is_rx_ffcnt;
+	u_int64_t   is_rx_badathtnl;
+	u_int64_t   is_tx_unknownmgt;
+	u_int64_t   is_tx_ffokcnt;
+	u_int64_t   is_tx_fferrcnt;
+	u_int64_t   is_scan_passive;
+	u_int64_t   is_crypto_tkipdemic;
+	u_int64_t   is_crypto_nocipher;
+	u_int64_t   is_ibss_norate;
+	u_int64_t   is_ps_qempty;
+	u_int64_t   tx_offer_pkt_cnt;
+	u_int64_t   tx_offer_pkt_bytes_cnt;
+	u_int64_t   mgmt_tx_fail;
+	u_int64_t   ims_tx_packets;
+	u_int64_t   ims_tx_bytes;
+	u_int64_t   total_rx_packets;
+	u_int64_t   total_rx_bytes;
+	u_int64_t   fils_frames_sent;
+	u_int64_t   fils_frames_sent_fail;
+	u_int64_t   tx_offload_prb_resp_succ_cnt;
+	u_int64_t   tx_offload_prb_resp_fail_cnt;
+	u_int64_t   tx_20TU_prb_resp;
+	u_int64_t   tx_20TU_prb_interval;
+};
+
 /*
  * The type of the CBS event
  */
@@ -93,6 +415,7 @@ typedef enum {
  * @ns_rx_ccmpmic:          rx CCMP MIC failure
  * @ns_rx_wpimic:           rx WAPI MIC failure
  * @ns_rx_tkipicv:          rx ICV check failed (TKIP)
+ * @ns_rx_pnerr:            rx PN error
  * @ns_tx_mgmt:             tx management frames
  * @ns_is_tx_not_ok:        tx not ok
  * @ns_ps_discard:          ps discard 'cuz of age
@@ -226,6 +549,7 @@ struct ieee80211_nodestats {
 	u_int32_t    ns_rx_ccmpmic;
 	u_int32_t    ns_rx_wpimic;
 	u_int32_t    ns_rx_tkipicv;
+	u_int32_t    ns_rx_pnerr;
 	u_int32_t    ns_tx_mgmt;
 	u_int32_t    ns_is_tx_not_ok;
 	u_int32_t    ns_ps_discard;
@@ -780,17 +1104,6 @@ union wlan_mlme_vdev_data {
 	u_int8_t bss_pref;
 };
 
-union wlan_mlme_pdev_data {
-	wlan_esp_data esp_info;
-	int32_t desc_poolsize;
-	u_int32_t phy_errcnt;
-	wlan_radio_basic_capabilities cap;
-	wlan_op_chan op_chan;
-	wlan_op_class op_class;
-	u_int8_t hmwds_en : 1;
-	u_int8_t skip_6ghz;
-};
-
 enum ieee80211_event_type {
 	MLME_EVENT_NONE,
 	MLME_EVENT_ASSOC_DISASSOC,
@@ -1131,4 +1444,32 @@ struct wlan_beacon_frm_info {
 	u_int8_t nss;
 };
 
+/*
+ * Get the DFS channel parameters of a given input freq.
+ */
+struct ieee80211_dfs_ch_params {
+	uint8_t op_class;
+	uint8_t chan_num;
+	enum wlan_channel_dfs_state chan_state;
+	uint32_t remaining_cac_time;
+	uint64_t cac_completion_time;
+	uint32_t remaining_nol_time;
+};
+
+typedef struct ieee80211req_dfs_chan_list_info {
+	uint8_t num_chans;
+	struct ieee80211_dfs_ch_params dfs_chan_info[NUM_5GHZ_CHANS];
+} wlan_radio_chan_list_info;
+
+union wlan_mlme_pdev_data {
+	wlan_esp_data esp_info;
+	int32_t desc_poolsize;
+	u_int32_t phy_errcnt;
+	wlan_radio_basic_capabilities cap;
+	wlan_radio_chan_list_info cac_tlv;
+	wlan_op_chan op_chan;
+	wlan_op_class op_class;
+	u_int8_t hmwds_en : 1;
+	u_int8_t skip_6ghz;
+};
 #endif //_IEEE80211_H_
