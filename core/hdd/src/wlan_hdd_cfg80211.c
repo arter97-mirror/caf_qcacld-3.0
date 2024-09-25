@@ -26173,6 +26173,7 @@ static int wlan_hdd_add_key_sap(struct wlan_hdd_link_info *link_info,
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
 		hdd_err("psoc is NULL");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return -EINVAL;
 	}
 
@@ -26185,6 +26186,7 @@ static int wlan_hdd_add_key_sap(struct wlan_hdd_link_info *link_info,
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("Vdev %d wait for csa event failed!!",
 				link_info->vdev_id);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 			return qdf_status_to_os_return(status);
 		}
 	}
