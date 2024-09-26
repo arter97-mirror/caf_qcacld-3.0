@@ -14899,6 +14899,10 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 			return -EINVAL;
 		}
 		link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+		if (!link_info) {
+			hdd_err("invalid link_info");
+			return -EINVAL;
+		}
 	}
 
 	ret = hdd_set_independent_configuration(link_info, tb);
@@ -25720,6 +25724,10 @@ static int __wlan_hdd_cfg80211_change_bss(struct wiphy *wiphy,
 	link_id = hdd_nb_get_link_id_from_params(params, NB_CHANGE_BSS);
 
 	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
 
 	if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
 		return -EINVAL;
@@ -28722,6 +28730,10 @@ static int __wlan_hdd_set_txq_params(struct wiphy *wiphy,
 
 	link_id = hdd_nb_get_link_id_from_params(params, NB_SET_TXQ);
 	link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
 
 	status = sme_update_session_txq_edca_params(mac_handle,
 						    link_info->vdev_id,
