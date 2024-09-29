@@ -282,7 +282,6 @@ static int hdd_son_set_chan_ext_offset(
 	enum eSirMacHTChannelType chan_type;
 	QDF_STATUS status;
 	int retval = -EINVAL;
-	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
@@ -368,7 +367,7 @@ static enum sec20_chan_offset hdd_son_get_chan_ext_offset(
 		return 0;
 	}
 
-	status = hdd_get_sap_ht2040_mode(link_info->adapter, &chan_type);
+	status = hdd_get_sap_ht2040_mode(link_info, &chan_type);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Cannot set SAP HT20/40 mode!");
 		return 0;
@@ -911,7 +910,6 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct sap_config *sap_config;
-	struct wlan_hdd_link_info *link_info;
 
 	if (!vdev) {
 		hdd_err("null vdev");
@@ -1140,7 +1138,7 @@ static void hdd_son_get_sta_list(struct wlan_objmgr_vdev *vdev,
 	struct wlan_hdd_link_info *link_info;
 	struct hdd_station_info *sta_info, *tmp = NULL;
 	uint32_t len;
-	qdf_time_t current_ts;
+	qdf_time_t current_ts, assoc_time;
 
 	if (!vdev) {
 		hdd_err("null vdev");
@@ -1186,8 +1184,13 @@ static void hdd_son_get_sta_list(struct wlan_objmgr_vdev *vdev,
 			si->isi_operating_bands = sta_info->supported_band;
 			si->isi_assoc_time = sta_info->assoc_ts;
 			current_ts = qdf_system_ticks();
-			jiffies_to_timespec(current_ts - sta_info->assoc_ts,
-					    &si->isi_tr069_assoc_time);
+			assoc_time = current_ts - sta_info->assoc_ts;
+			si->isi_tr069_assoc_time.tv_sec =
+				qdf_system_ticks_to_msecs(assoc_time) / 1000;
+			si->isi_tr069_assoc_time.tv_nsec =
+				qdf_system_ticks_to_nsecs(assoc_time);
+			qdf_mem_copy(&si->isi_tr069_assoc_time, &current_ts,
+				     sizeof(si->isi_tr069_assoc_time));
 			si->isi_rssi = sta_info->rssi;
 			si->isi_len = len;
 			si->isi_ie_len = 0;
@@ -1393,7 +1396,7 @@ static int hdd_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
-	lin_info = wlan_hdd_get_link_info_from_objmgr(vdev);
+	link_info = wlan_hdd_get_link_info_from_objmgr(vdev);
 	if (!link_info) {
 		hdd_err("null adapter");
 		return -EINVAL;
@@ -1465,7 +1468,7 @@ static uint8_t hdd_son_get_rx_nss(struct wlan_objmgr_vdev *vdev)
 		return 0;
 	}
 
-	hdd_get_rx_nss(link_info->adapter, &rx_nss);
+	hdd_get_rx_nss(link_info, &rx_nss);
 	return rx_nss;
 }
 
@@ -1728,7 +1731,7 @@ hdd_son_trigger_objmgr_object_creation(enum wlan_umac_comp_id id)
 
 	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
 					   son_trigger_pdev_obj_creation,
-					   &id, 0, id);
+					   &id, 0, WLAN_SON_ID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		hdd_err("pdev object create trigger failed");
 		goto fail;
@@ -1736,7 +1739,7 @@ hdd_son_trigger_objmgr_object_creation(enum wlan_umac_comp_id id)
 
 	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_VDEV_OP,
 					   son_trigger_vdev_obj_creation,
-					   &id, 0, id);
+					   &id, 0, WLAN_SON_ID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		hdd_err("vdev object create trigger failed");
 		goto fail1;
@@ -1747,7 +1750,7 @@ hdd_son_trigger_objmgr_object_creation(enum wlan_umac_comp_id id)
 fail1:
 	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
 					   son_trigger_pdev_obj_deletion,
-					   &id, 0, id);
+					   &id, 0, WLAN_SON_ID);
 	if (QDF_IS_STATUS_ERROR(ret))
 		hdd_err("pdev object delete trigger failed");
 fail:
@@ -1827,19 +1830,19 @@ hdd_son_trigger_objmgr_object_deletion(enum wlan_umac_comp_id id)
 
 	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_PEER_OP,
 					   son_trigger_peer_obj_deletion,
-					   &id, 0, id);
+					   &id, 0, WLAN_SON_ID);
 	if (QDF_IS_STATUS_ERROR(ret))
 		hdd_err("peer object deletion trigger failed");
 
 	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_VDEV_OP,
 					   son_trigger_vdev_obj_deletion,
-					   &id, 0, id);
+					   &id, 0, WLAN_SON_ID);
 	if (QDF_IS_STATUS_ERROR(ret))
 		hdd_err("vdev object deletion trigger failed");
 
 	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
 					   son_trigger_pdev_obj_deletion,
-					   &id, 0, id);
+					   &id, 0, WLAN_SON_ID);
 	if (QDF_IS_STATUS_ERROR(ret))
 		hdd_err("pdev object delete trigger failed");
 
@@ -2138,7 +2141,6 @@ static void get_son_acs_report_values(struct wlan_objmgr_vdev *vdev,
 	struct scan_filter *filter = qdf_mem_malloc(sizeof(*filter));
 	struct scan_cache_node *cur_node;
 	struct scan_cache_entry *se;
-	enum ieee80211_phymode phymode_se;
 	struct ieee80211_ie_hecap *hecap_ie;
 	struct ieee80211_ie_srp_extie *srp_ie;
 	qdf_list_node_t *cur_lst = NULL, *next_lst = NULL;
@@ -2170,7 +2172,6 @@ static void get_son_acs_report_values(struct wlan_objmgr_vdev *vdev,
 			   util_scan_entry_hecap(se);
 		srp_ie = (struct ieee80211_ie_srp_extie *)
 			 util_scan_entry_spatial_reuse_parameter(se);
-		phymode_se = util_scan_entry_phymode(se);
 
 		if (hecap_ie) {
 			hecap_phy_ie = &hecap_ie->hecap_phyinfo[0];
@@ -2365,7 +2366,7 @@ static const uint8_t wlanphymode2ieeephymode[WLAN_PHYMODE_MAX] = {
 #ifdef WLAN_FEATURE_11BE
 	[WLAN_PHYMODE_11BEA_EHT20] = IEEE80211_MODE_11BEA_EHT20,
 	[WLAN_PHYMODE_11BEG_EHT20] = IEEE80211_MODE_11BEG_EHT20,
-	[WLAN_PHYMODE_11BEA_EHT40MINUS] = IEEE80211_MODE_11BEA_EHT40,
+	[WLAN_PHYMODE_11BEA_EHT40] = IEEE80211_MODE_11BEA_EHT40,
 	[WLAN_PHYMODE_11BEG_EHT40PLUS] = IEEE80211_MODE_11BEG_EHT40PLUS,
 	[WLAN_PHYMODE_11BEG_EHT40MINUS] = IEEE80211_MODE_11BEG_EHT40MINUS,
 	[WLAN_PHYMODE_11BEG_EHT40] = IEEE80211_MODE_11BEG_EHT40,
@@ -2792,7 +2793,7 @@ void hdd_son_deliver_peer_authorize_event(struct wlan_hdd_link_info *link_info,
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 		return;
 	}
-	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac, WLAN_UMAC_COMP_SON);
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac, WLAN_SON_ID);
 	if (!peer) {
 		hdd_err("No peer object for sta" QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(peer_mac));
@@ -2806,7 +2807,7 @@ void hdd_son_deliver_peer_authorize_event(struct wlan_hdd_link_info *link_info,
 		hdd_err("ALD ASSOCIATED Event failed for" QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(peer_mac));
 
-	wlan_objmgr_peer_release_ref(peer, WLAN_UMAC_COMP_SON);
+	wlan_objmgr_peer_release_ref(peer, WLAN_SON_ID);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 }
 
