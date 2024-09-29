@@ -2498,9 +2498,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			sap_event->sapevt.sapStartBssCompleteEvent.ch_width;
 
 		hdd_nofl_info("AP %s vid %d freq %d BW %d",
-			      link_info->vdev_id,
 			      sap_event->sapevt.sapStartBssCompleteEvent.status ?
 			      "failed" : "started",
+			      link_info->vdev_id,
 			      ap_ctx->operating_chan_freq,
 			      sap_config->ch_params.ch_width);
 
@@ -3394,12 +3394,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch_freq;
 		ap_ctx->sap_config.acs_cfg.ch_width =
 			sap_event->sapevt.sap_ch_selected.ch_width;
-		hdd_nofl_info("Vdev %d ACS Completed freq %d BW %d flag %x ACS in progress %d",
+		hdd_nofl_info("Vdev %d ACS Completed freq %d BW %d flag 0x%lx ACS in progress %d",
 			      link_info->vdev_id,
 			      ap_ctx->sap_config.acs_cfg.pri_ch_freq,
 			      ap_ctx->sap_config.acs_cfg.ch_width,
 			      link_info->link_flags,
-			      ap_ctx->acs_in_progress);
+			      qdf_atomic_read(&ap_ctx->acs_in_progress));
 
 		if (qdf_atomic_read(&ap_ctx->acs_in_progress) &&
 		    test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
