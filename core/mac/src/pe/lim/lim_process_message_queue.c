@@ -120,8 +120,7 @@ static void lim_process_sae_msg_sta(struct mac_context *mac,
 
 			qdf_mem_zero(session->lim_join_req->rsnIE.rsnIEdata,
 				     WLAN_MAX_IE_LEN + 2);
-			lim_update_connect_rsn_ie(mac, session, rsn_ie_buf,
-						  pmksa);
+			lim_update_connect_rsn_ie(session, rsn_ie_buf, pmksa);
 
 			qdf_mem_free(pmksa);
 			qdf_mem_free(rsn_ie_buf);
