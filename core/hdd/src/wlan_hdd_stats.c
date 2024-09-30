@@ -6771,6 +6771,12 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
 			WMI_RATE_PREAMBLE_VHT)
 		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_VHT;
+	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
+			WMI_RATE_PREAMBLE_HE)
+		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_HE;
+	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
+			WMI_RATE_PREAMBLE_EHT)
+		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_EHT;
 	else
 		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_LEGACY;
 
