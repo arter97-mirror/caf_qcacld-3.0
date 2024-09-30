@@ -1635,7 +1635,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	}
 
 	if (vote_level_change || tx_level_change || rx_level_change) {
-		dp_info("tx:%llu[%llu(off)+%llu(no-off)] rx:%llu[%llu(off)+%llu(no-off)] next_level(vote %u rx %u tx %u rtpm %u) pm_qos(rx:%u,%*pb tx:%u,%*pb on_low_tput:%u)",
+		dp_info("tx:%llu[%llu(off)+%llu(no-off)] rx:%llu[%llu(off)+%llu(no-off)] next_level(vote %u rx %u tx %u rtpm %lu) pm_qos(rx:%u,%*pb tx:%u,%*pb on_low_tput:%u)",
 			tx_packets,
 			dp_ctx->prev_tx_offload_pkts,
 			dp_ctx->prev_no_tx_offload_pkts,

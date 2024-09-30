@@ -239,7 +239,7 @@ static int osif_fpm_update(struct fpm_table *fpm,
 	if (status != QDF_STATUS_SUCCESS)
 		return qdf_status_to_os_return(status);
 
-	osif_info("fpm: policy-update: [flags:0x%x][prio:%d][policy_id:0x%lx][src_ip:%d][dst_ip:%d][src_port:%d][dst_port:%d][proto:%d][tid:%d][svc:%d]",
+	osif_info("fpm: policy-update: [flags:0x%x][prio:%d][policy_id:0x%llx][src_ip:%d][dst_ip:%d][src_port:%d][dst_port:%d][proto:%d][tid:%d][svc:%d]",
 		  policy.flags, policy.prio, policy.policy_id,
 		  policy.flow.src_ip.ipv4_addr,
 		  policy.flow.dst_ip.ipv4_addr,
@@ -306,7 +306,7 @@ static int osif_fpm_add(struct fpm_table *fpm, struct nlattr *fpm_param_attr,
 	if (status != QDF_STATUS_SUCCESS)
 		return qdf_status_to_os_return(status);
 
-	osif_info("fpm: policy-add: [flags:0x%x][prio:%d][policy_id:0x%lx][src_ip:%d][dst_ip:%d][src_port:%d][dst_port:%d][proto:%d][tid:%d][svc:%d]",
+	osif_info("fpm: policy-add: [flags:0x%x][prio:%d][policy_id:0x%llx][src_ip:%d][dst_ip:%d][src_port:%d][dst_port:%d][proto:%d][tid:%d][svc:%d]",
 		  policy.flags, policy.prio, policy.policy_id,
 		  policy.flow.src_ip.ipv4_addr, policy.flow.dst_ip.ipv4_addr,
 		  policy.flow.src_port, policy.flow.dst_port, policy.flow.proto,

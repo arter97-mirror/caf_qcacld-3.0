@@ -7953,7 +7953,7 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 	uint8_t iter;
 	int flags = cds_get_gfp_flags();
 
-	hdd_debug("RSSI %d tx_bytes %u rx_bytes %u", sinfo->signal,
+	hdd_debug("RSSI %d tx_bytes %llu rx_bytes %llu", sinfo->signal,
 		  sinfo->tx_bytes, sinfo->rx_bytes);
 	nl_buf_len = wlan_hdd_calculate_get_sta_len();
 	for (iter = 0; iter < GET_STA_MAX_HOST_CLIENT; iter++) {
