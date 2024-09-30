@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -208,6 +208,23 @@ hdd_reset_sta_keep_alive_interval(struct hdd_adapter *adapter,
 	}
 }
 
+/**
+ * hdd_clear_conn_info_roam_count() - clear roam count in conn info.
+ * @adapter: hostapd interface
+ *
+ * This function loop through the link info and clear roam count in
+ * conn info.
+ *
+ * Return: None
+ */
+static void hdd_clear_conn_info_roam_count(struct hdd_adapter *adapter)
+{
+	struct hdd_station_ctx *hdd_sta_ctx;
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	hdd_sta_ctx->conn_info.roam_count = 0;
+}
+
 void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 						  struct wlan_objmgr_vdev *vdev)
 {
@@ -280,6 +297,7 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter,
 	hdd_reset_sta_keep_alive_interval(adapter, hdd_ctx);
 
 	hdd_cm_print_bss_info(sta_ctx);
+	hdd_clear_conn_info_roam_count(adapter);
 }
 
 #ifdef WLAN_FEATURE_MSCS
