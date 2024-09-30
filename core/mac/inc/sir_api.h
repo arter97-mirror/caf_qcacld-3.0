@@ -1037,7 +1037,8 @@ struct oem_channel_info {
 enum sir_sme_phy_mode {
 	SIR_SME_PHY_MODE_LEGACY = 0,
 	SIR_SME_PHY_MODE_HT = 1,
-	SIR_SME_PHY_MODE_VHT = 2
+	SIR_SME_PHY_MODE_VHT = 2,
+	SIR_SME_PHY_MODE_HE = 3,
 };
 
 /* / Definition for Association indication from peer */
