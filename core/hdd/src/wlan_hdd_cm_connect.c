@@ -57,6 +57,8 @@
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "wlan_action_oui_ucfg_api.h"
 
+#define MAX_ROAM_COUNT_VALUE (999)
+
 bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -940,6 +942,22 @@ static void hdd_cm_update_prev_ap_ie(struct hdd_station_ctx *hdd_sta_ctx,
 	}
 }
 
+static void hdd_cm_update_roam_count(struct hdd_station_ctx *sta_ctx)
+{
+	if (!sta_ctx) {
+		hdd_err("Invalid sta_ctx. Unable to update roam count");
+		return;
+	}
+
+	sta_ctx->conn_info.roam_count++;
+
+	/* Reset the roam count value after reaching 999 */
+	if (sta_ctx->conn_info.roam_count > MAX_ROAM_COUNT_VALUE) {
+		hdd_debug_rl("Resetting the roam_count value to 0");
+		sta_ctx->conn_info.roam_count = 0;
+	}
+}
+
 static void hdd_cm_save_bss_info(struct hdd_adapter *adapter,
 				 struct wlan_cm_connect_resp *rsp)
 {
@@ -989,7 +1007,7 @@ static void hdd_cm_save_bss_info(struct hdd_adapter *adapter,
 		hdd_sta_ctx->conn_info.conn_flag.ht_present = false;
 	}
 	if (rsp->is_reassoc)
-		hdd_sta_ctx->conn_info.roam_count++;
+		hdd_cm_update_roam_count(hdd_sta_ctx);
 
 	if (assoc_resp->HTInfo.present) {
 		hdd_sta_ctx->conn_info.conn_flag.ht_op_present = true;
