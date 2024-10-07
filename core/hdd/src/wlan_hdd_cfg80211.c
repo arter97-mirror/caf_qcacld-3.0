@@ -33838,11 +33838,6 @@ static void __wlan_hdd_cfg80211_update_mgmt_frame_registrations(
 
 	hdd_debug("Mode: %d, set mgmt regis update value 0x%x",
 		  adapter->device_mode, upd->interface_stypes);
-
-	if (adapter->device_mode == QDF_P2P_DEVICE_MODE)
-		ucfg_p2p_set_mgmt_frm_registration_update(
-						hdd_ctx->psoc,
-						upd->interface_stypes);
 }
 
 /**
