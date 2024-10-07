@@ -2047,7 +2047,8 @@ lim_get_self_dot11_mode(struct mac_context *mac_ctx, enum QDF_OPMODE opmode,
 static bool
 lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 			      struct bss_description *bss_desc,
-			      tDot11fBeaconIEs *ie_struct)
+			      tDot11fBeaconIEs *ie_struct,
+			      uint8_t vdev_id)
 {
 	struct scan_cache_entry *scan_entry;
 	bool is_eht_allowed;
@@ -2055,9 +2056,11 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 	if (!ie_struct->eht_cap.present)
 		return false;
 
-	scan_entry = wlan_scan_get_entry_by_bssid(mac_ctx->pdev,
-						  (struct qdf_mac_addr *)
-						  bss_desc->bssId);
+	scan_entry =
+		wlan_scan_entry_by_bssid_and_security(mac_ctx->pdev,
+						      (struct qdf_mac_addr *)
+						       bss_desc->bssId,
+						       vdev_id);
 
 	/*
 	 * If AP advertises multiple AKMs(WPA2 PSK + WPA3), allow connection
@@ -2084,7 +2087,7 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 static enum mlme_dot11_mode
 lim_get_bss_dot11_mode(struct mac_context *mac_ctx,
 		       struct bss_description *bss_desc,
-		       tDot11fBeaconIEs *ie_struct)
+		       tDot11fBeaconIEs *ie_struct, uint8_t vdev_id)
 {
 	enum mlme_dot11_mode bss_dot11_mode;
 
@@ -2115,7 +2118,8 @@ lim_get_bss_dot11_mode(struct mac_context *mac_ctx,
 		bss_dot11_mode = MLME_DOT11_MODE_11AX;
 
 	if (ie_struct->eht_cap.present &&
-	    lim_get_bss_11be_mode_allowed(mac_ctx, bss_desc, ie_struct))
+	    lim_get_bss_11be_mode_allowed(mac_ctx, bss_desc, ie_struct,
+					  vdev_id))
 		bss_dot11_mode = MLME_DOT11_MODE_11BE;
 
 	return bss_dot11_mode;
@@ -2798,7 +2802,8 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 						 session->vdev_id,
 						 self_dot11_mode);
 
-	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
+	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct,
+						session->vdev_id);
 
 	status = lim_get_intersected_dot11_mode_sta_ap(mac_ctx, self_dot11_mode,
 						       bss_dot11_mode,
@@ -5545,7 +5550,8 @@ lim_fill_preauth_req_dot11_mode(struct mac_context *mac_ctx,
 		   lim_intersect_user_dot11_mode(mac_ctx, QDF_STA_MODE,
 						 vdev_id, self_dot11_mode);
 
-	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
+	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct,
+						vdev_id);
 
 	status = lim_get_intersected_dot11_mode_sta_ap(mac_ctx, self_dot11_mode,
 						       bss_dot11_mode,
