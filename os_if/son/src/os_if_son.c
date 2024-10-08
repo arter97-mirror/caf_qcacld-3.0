@@ -1405,6 +1405,128 @@ end_reg_get_ap_hw_cap:
 	return nsoc;
 }
 
+/**
+ * os_if_son_bw_to_ieee_chwidth() - function to convert bandwidth to
+ * enum ieee80211_cwm_width
+ * @bw: channel bandwidth
+ *
+ * Return: enum ieee80211_cwm_width mapping to bandwidth
+ */
+static enum ieee80211_cwm_width os_if_son_bw_to_ieee_chwidth(uint16_t bw)
+{
+	enum ieee80211_cwm_width chwidth;
+
+	switch (bw) {
+	case BW_20_MHZ:
+	case BW_25_MHZ:
+		chwidth = IEEE80211_CWM_WIDTH20;
+		break;
+	case BW_40_MHZ:
+		chwidth = IEEE80211_CWM_WIDTH40;
+		break;
+	case BW_80_MHZ:
+		chwidth = IEEE80211_CWM_WIDTH80;
+		break;
+	case BW_160_MHZ:
+		chwidth = IEEE80211_CWM_WIDTH160;
+		break;
+	default:
+		osif_err("Invalid bw %d", bw);
+		chwidth = IEEE80211_CWM_WIDTHINVALID;
+		break;
+	}
+
+	return chwidth;
+}
+
+/**
+ * os_if_son_reg_get_dfs_op_channels() - API to get DFS operating channels
+ * information for SON
+ * @pdev: PDEV object
+ * @reg_cap: regdmn operating class and channel information array pointer
+ * @n_opclasses: number of regdmn operating class and channel information array
+ * @op_chan: operating channel list fill for SON
+ *
+ * Return: None
+ */
+static void
+os_if_son_reg_get_dfs_op_channels(struct wlan_objmgr_pdev *pdev,
+				  struct regdmn_ap_cap_opclass_t *reg_cap,
+				  uint8_t n_opclasses,
+				  struct wlan_op_chan *op_chan)
+{
+	uint8_t i, idx, chan_idx, chan, opclass, out_idx = 0, out_ch_idx;
+	uint16_t bw;
+	qdf_freq_t chan_freq;
+	struct ch_params chan_params;
+
+	if (!pdev || !reg_cap || !op_chan) {
+		osif_err("Input pointer null");
+		return;
+	}
+
+	for (idx = 0; idx < n_opclasses && reg_cap[idx].op_class; idx++) {
+		if (reg_cap[idx].ch_width > BW_160_MHZ ||
+		    reg_cap[idx].behav_limit == BIT(BEHAV_BW80_PLUS) ||
+		    reg_cap[idx].start_freq != FIVEG_STARTING_FREQ)
+			continue;
+
+		opclass = reg_cap[idx].op_class;
+		bw = reg_cap[idx].ch_width;
+
+		chan_idx = 0;
+		out_ch_idx = 0;
+
+		while (chan_idx < reg_cap[idx].num_supported_chan) {
+			chan = reg_cap[idx].sup_chan_list[chan_idx];
+			chan_freq = wlan_reg_chan_opclass_to_freq(chan,
+								  opclass,
+								  true);
+
+			qdf_mem_zero(&chan_params, sizeof(chan_params));
+			chan_params.ch_width =
+				wlan_reg_find_chwidth_from_bw(bw);
+			if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+			    pdev, chan_freq, &chan_params,
+			    REG_CURRENT_PWR_MODE) != CHANNEL_STATE_DFS) {
+				chan_idx++;
+				continue;
+			}
+
+			if (out_ch_idx >= MAX_CHANNELS_PER_OP_CLASS) {
+				osif_err("max channel per opclass exceed %d",
+					 out_ch_idx);
+				break;
+			}
+			/* Fill supported DFS channels in current opclass */
+			op_chan[out_idx].oper_chan_num[out_ch_idx++] = chan;
+			osif_debug("DFS channel %d added", chan);
+			chan_idx++;
+		}
+
+		/* Fill one opclass if at least one supported DFS channel */
+		if (out_ch_idx) {
+			if (out_idx >= MAX_OPERATING_CLASSES) {
+				osif_err("max opclass exceed %d", out_idx);
+				break;
+			}
+			op_chan[out_idx].num_oper_chan = out_ch_idx;
+			op_chan[out_idx].opclass = opclass;
+			op_chan[out_idx].ch_width =
+				os_if_son_bw_to_ieee_chwidth(bw);
+			out_idx++;
+			osif_debug("%d: opclass %d bw %d chans %d",
+				   out_idx, opclass, bw, out_ch_idx);
+		}
+	}
+
+	if (out_idx) {
+		/* Update num_supp_op_classes for each entity */
+		for (i = 0; i < out_idx; i++)
+			op_chan[i].num_supp_op_classes = out_idx;
+	}
+}
+
 static void os_if_son_reg_get_op_channels(struct wlan_objmgr_pdev *pdev,
 					  struct wlan_op_chan *op_chan,
 					  bool dfs_required)
@@ -1441,8 +1563,17 @@ static void os_if_son_reg_get_op_channels(struct wlan_objmgr_pdev *pdev,
 		osif_err("Failed to get SAP regulatory capabilities");
 		goto end_reg_get_op_channels;
 	}
-	osif_debug("n_opclasses: %u op_chan->opclass: %u",
-		   n_opclasses, op_chan->opclass);
+	osif_debug("n_opclasses: %u op_chan->opclass: %u dfs required: %d",
+		   n_opclasses, op_chan->opclass, dfs_required);
+
+	if (dfs_required) {
+		os_if_son_reg_get_dfs_op_channels(pdev,
+						  reg_ap_cap,
+						  n_opclasses,
+						  op_chan);
+		goto end_reg_get_op_channels;
+	}
+
 	for (idx = 0; reg_ap_cap[idx].op_class && idx < n_opclasses; idx++) {
 		if ((reg_ap_cap[idx].ch_width == BW_160_MHZ) ||
 		    (op_chan->opclass != reg_ap_cap[idx].op_class))
@@ -1477,18 +1608,21 @@ static void os_if_son_reg_get_op_channels(struct wlan_objmgr_pdev *pdev,
 			op_chan->ch_width = (wlan_ch_width)ch_width;
 			op_chan->num_oper_chan =
 					reg_ap_cap[idx].num_supported_chan;
+			if (reg_ap_cap[idx].num_supported_chan >
+			    MAX_CHANNELS_PER_OP_CLASS) {
+				osif_err("num supported chan exceed max %d",
+					 reg_ap_cap[idx].num_supported_chan);
+				op_chan->num_oper_chan =
+					MAX_CHANNELS_PER_OP_CLASS;
+			}
 			qdf_mem_copy(op_chan->oper_chan_num,
 				     reg_ap_cap[idx].sup_chan_list,
-				     reg_ap_cap[idx].num_supported_chan);
+				     op_chan->num_oper_chan);
 		}
 	}
 	osif_debug("num of supported channel: %u",
 		   op_chan->num_oper_chan);
-	/*
-	 * TBD: DFS channel support needs to be added
-	 * Variable nsoc will be update whenever we add DFS
-	 * channel support for Easymesh.
-	 */
+
 	op_chan->num_supp_op_classes = nsoc;
 
 end_reg_get_op_channels:
