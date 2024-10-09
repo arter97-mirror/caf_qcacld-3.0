@@ -2256,4 +2256,23 @@ wlan_is_scc_tpc_power_supp_enabled(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS
 mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
+
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * mlme_get_c2c_support () - Get C2C support info
+ * @psoc: psoc ctx
+ * @value: c2c support flag pointer
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value);
+#else
+static inline QDF_STATUS
+mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	*value = false;
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif

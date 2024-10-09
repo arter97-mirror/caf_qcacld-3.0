@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -485,6 +485,30 @@ enum ignore_fw_coex_info_modes {
 #define CFG_COEX_UNSAFE_CHAN_ALL
 #endif
 
+#ifdef CONFIG_BAND_6GHZ
+/*
+ * <ini>
+ * enable_c2c_support - Used to enable C2C support
+ *
+ * @Min: 0 (Disable C2C support)
+ * @Max: 1 (Enable C2C support)
+ * Default: 0
+ *
+ * This ini is used to enable/disable C2C support
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_C2C_SUPPORT CFG_INI_BOOL( \
+		"enable_c2c_support", \
+		false, \
+		"Enable C2C support")
+#define CFG_C2C_SUPPORT \
+	CFG(CFG_ENABLE_C2C_SUPPORT)
+#else
+#define CFG_C2C_SUPPORT
+#endif
+
 #define CFG_REG_ALL \
 	CFG_COEX_UNSAFE_CHAN_ALL \
 	CFG(CFG_SELF_GEN_FRM_PWR) \
@@ -499,6 +523,7 @@ enum ignore_fw_coex_info_modes {
 	CFG(CFG_IGNORE_FW_REG_OFFLOAD_IND) \
 	CFG_AFC_REG_ALL \
 	CFG(CFG_RETAIN_NOL_ACROSS_REG_DOMAIN) \
-	CFG_SAP_AVOID_ACS_FREQ_LIST_ALL
+	CFG_SAP_AVOID_ACS_FREQ_LIST_ALL \
+	CFG_C2C_SUPPORT
 
 #endif /* CFG_MLME_REG_H__ */

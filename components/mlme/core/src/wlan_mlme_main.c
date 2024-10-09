@@ -4086,6 +4086,27 @@ static void mlme_init_coex_unsafe_chan_reg_disable_cfg(
 }
 #endif
 
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * mlme_init_enable_c2c_support() - Populate enable_c2c_support INI in mlme
+ * regulatory sturct
+ * @psoc: Pointer to psoc
+ * @reg: Pointer to mlme regulatory struct
+ *
+ * Return: None
+ */
+static void mlme_init_enable_c2c_support(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_mlme_reg *reg)
+{
+	reg->enable_c2c_support = cfg_get(psoc, CFG_ENABLE_C2C_SUPPORT);
+}
+#else
+static inline void mlme_init_enable_c2c_support(struct wlan_objmgr_psoc *psoc,
+						struct wlan_mlme_reg *reg)
+{
+}
+#endif
+
 static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_reg *reg)
 {
@@ -4115,6 +4136,7 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 	mlme_init_coex_unsafe_chan_cfg(psoc, reg);
 	mlme_init_coex_unsafe_chan_reg_disable_cfg(psoc, reg);
+	mlme_init_enable_c2c_support(psoc, reg);
 }
 
 static void
@@ -6390,3 +6412,21 @@ QDF_STATUS mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef CONFIG_BAND_6GHZ
+QDF_STATUS
+mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = cfg_default(CFG_ENABLE_C2C_SUPPORT);
+		mlme_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*value = mlme_obj->cfg.reg.enable_c2c_support;
+	return QDF_STATUS_SUCCESS;
+}
+#endif

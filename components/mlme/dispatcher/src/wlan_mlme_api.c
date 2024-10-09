@@ -9273,3 +9273,11 @@ void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+
+#ifdef CONFIG_BAND_6GHZ
+QDF_STATUS
+wlan_mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	return mlme_get_c2c_support(psoc, value);
+}
+#endif

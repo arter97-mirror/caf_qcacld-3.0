@@ -5537,4 +5537,23 @@ uint16_t wlan_mlme_get_sap_he_rx_mcs_map_160(struct wlan_objmgr_psoc *psoc);
 void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
 					   struct rso_cfg_params *cfg_params,
 					   struct wlan_mlme_psoc_ext_obj *mlme_obj);
+
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * wlan_mlme_get_c2c_support () - Get C2C support info
+ * @psoc: psoc ctx
+ * @value: c2c support flag pointer
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value);
+#else
+static inline QDF_STATUS
+wlan_mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	*value = false;
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif /* _WLAN_MLME_API_H_ */
