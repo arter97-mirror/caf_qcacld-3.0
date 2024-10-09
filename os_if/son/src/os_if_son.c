@@ -227,6 +227,235 @@ uint32_t os_if_son_get_band_info(struct wlan_objmgr_vdev *vdev)
 qdf_export_symbol(os_if_son_get_band_info);
 
 #define BW_WITHIN(min, bw, max) ((min) <= (bw) && (bw) <= (max))
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * os_if_son_fill_chan_params() - fill chan info
+ * @chan_params: chan params to fill
+ * @chan_num: chan number
+ * @primary_freq: chan frequency
+ * @ch_num_seg1: channel number for segment 1
+ * @ch_num_seg2: channel number for segment 2
+ * @seg_index: seg index
+ *
+ * Return: void
+ */
+static void
+os_if_son_fill_chan_params(struct ieee80211_channel_params *chan_params,
+			   uint8_t chan_num, qdf_freq_t primary_freq,
+			   uint8_t ch_num_seg1, uint8_t ch_num_seg2,
+			   uint8_t seg_index)
+{
+	chan_params->ieee = chan_num;
+	chan_params->freq = primary_freq;
+	chan_params->vhtop_ch_num_seg1 = ch_num_seg1;
+
+	if (seg_index != INVALID_SEG2_CENTER_INDEX)
+		chan_params->vhtop_ch_num_seg2[seg_index] = ch_num_seg2;
+}
+
+/**
+ * os_if_son_update_chan_params() - update chan params
+ * @pdev: pdev
+ * @flag_160: flag indicating the API to fill the center frequencies of 160MHz.
+ * @cur_chan_list: pointer to regulatory_channel
+ * @channel_params: chan params to fill
+ * @half_and_quarter_rate_flags: half and quarter rate flags
+ *
+ * Return: void
+ */
+static void os_if_son_update_chan_params(
+			struct wlan_objmgr_pdev *pdev, bool flag_160,
+			struct regulatory_channel *cur_chan_list,
+			struct ieee80211_channel_params *channel_params,
+			uint64_t half_and_quarter_rate_flags)
+{
+	qdf_freq_t primary_freq = cur_chan_list->center_freq;
+	struct ch_params chan_params = {0};
+	uint8_t seg_index = INVALID_SEG2_CENTER_INDEX;
+
+	if (!channel_params) {
+		osif_err("null chan info");
+		return;
+	}
+
+	if (flag_160)
+		seg_index = INDEX_160_SEG2_CENTER;
+
+	if (cur_chan_list->chan_flags & REGULATORY_CHAN_NO_OFDM)
+		channel_params->flags |=
+			VENDOR_CHAN_FLAG2(QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_B);
+	else
+		channel_params->flags |=
+			ucfg_son_get_chan_flag(pdev, primary_freq,
+					       flag_160, &chan_params);
+
+	if (cur_chan_list->chan_flags & REGULATORY_CHAN_RADAR) {
+		channel_params->flags_ext |=
+			QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_EXT_DFS;
+		channel_params->flags_ext |=
+			QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_EXT_DISALLOW_ADHOC;
+		channel_params->flags |=
+			QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_PASSIVE;
+	} else if (cur_chan_list->chan_flags & REGULATORY_CHAN_NO_IR) {
+		/* For 2Ghz passive channels. */
+		channel_params->flags |=
+			QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_PASSIVE;
+	}
+
+	if (WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(primary_freq))
+		channel_params->flags_ext |=
+			QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_EXT_PSC;
+
+	os_if_son_fill_chan_params(channel_params, cur_chan_list->chan_num,
+				   primary_freq,
+				   chan_params.center_freq_seg0,
+				   chan_params.center_freq_seg1,
+				   seg_index);
+}
+
+int os_if_son_get_chan_list(struct wlan_objmgr_vdev *vdev,
+			    struct ieee80211_ath_channel *chan_list,
+			    struct ieee80211_channel_params *chan_params,
+			    uint8_t *nchans, bool flag_160, bool flag_6ghz)
+{
+	struct regulatory_channel *cur_chan_list;
+	int i;
+	uint32_t phybitmap;
+	uint32_t reg_wifi_band_bitmap;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	struct regulatory_channel *chan;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return -EINVAL;
+	}
+
+	if (!chan_params) {
+		osif_err("null chan info");
+		return -EINVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		osif_err("null pdev");
+		return -EINVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("null psoc");
+		return -EINVAL;
+	}
+
+	status = ucfg_reg_get_band(pdev, &reg_wifi_band_bitmap);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		osif_err("failed to get band");
+		return -EINVAL;
+	}
+
+	cur_chan_list = qdf_mem_malloc(NUM_CHANNELS *
+			sizeof(struct regulatory_channel));
+	if (!cur_chan_list) {
+		osif_err("cur_chan_list allocation fails");
+		return -EINVAL;
+	}
+
+	if (wlan_reg_get_current_chan_list(
+	    pdev, cur_chan_list) != QDF_STATUS_SUCCESS) {
+		qdf_mem_free(cur_chan_list);
+		osif_err("fail to get current chan list");
+		return -EINVAL;
+	}
+
+	ucfg_reg_get_band(pdev, &phybitmap);
+
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		uint64_t band_flags;
+		qdf_freq_t primary_freq = cur_chan_list[i].center_freq;
+		uint64_t half_and_quarter_rate_flags = 0;
+
+		chan = &cur_chan_list[i];
+		if ((chan->chan_flags & REGULATORY_CHAN_DISABLED) &&
+		    chan->state == CHANNEL_STATE_DISABLE &&
+		    !chan->nol_chan && !chan->nol_history)
+			continue;
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(primary_freq)) {
+			if (!flag_6ghz ||
+			    !(reg_wifi_band_bitmap & BIT(REG_BAND_6G)))
+				continue;
+			band_flags = VENDOR_CHAN_FLAG2(
+				QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_6GHZ);
+		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(primary_freq)) {
+			if (!(reg_wifi_band_bitmap & BIT(REG_BAND_2G)))
+				continue;
+			band_flags = QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_2GHZ;
+		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(primary_freq)) {
+			if (!(reg_wifi_band_bitmap & BIT(REG_BAND_5G)))
+				continue;
+			band_flags = QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_5GHZ;
+		} else if (WLAN_REG_IS_49GHZ_FREQ(primary_freq)) {
+			if (!(reg_wifi_band_bitmap & BIT(REG_BAND_5G)))
+				continue;
+			band_flags = QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_5GHZ;
+			/**
+			 * If 4.9G Half and Quarter rates are supported
+			 * by the channel, update them as separate entries
+			 * to the list
+			 */
+			if (BW_WITHIN(chan->min_bw, BW_10_MHZ, chan->max_bw)) {
+				os_if_son_fill_chan_params(
+						&chan_params[*nchans],
+						chan->chan_num,
+						primary_freq, 0, 0,
+						INVALID_SEG2_CENTER_INDEX);
+				chan_params[*nchans].flags |=
+					QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_HALF;
+				chan_params[*nchans].flags |=
+					VENDOR_CHAN_FLAG2(
+					QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_A);
+				half_and_quarter_rate_flags =
+					chan_params[*nchans].flags;
+				if (++(*nchans) >= IEEE80211_CHAN_MAX)
+					break;
+			}
+			if (BW_WITHIN(chan->min_bw, BW_5_MHZ, chan->max_bw)) {
+				os_if_son_fill_chan_params(
+						&chan_params[*nchans],
+						chan->chan_num,
+						primary_freq, 0, 0,
+						INVALID_SEG2_CENTER_INDEX);
+				chan_params[*nchans].flags |=
+				    QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_QUARTER;
+				chan_params[*nchans].flags |=
+					VENDOR_CHAN_FLAG2(
+					QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_A);
+				half_and_quarter_rate_flags =
+					chan_params[*nchans].flags;
+				if (++(*nchans) >= IEEE80211_CHAN_MAX)
+					break;
+			}
+		} else {
+			continue;
+		}
+
+		os_if_son_update_chan_params(pdev, flag_160, chan,
+					     &chan_params[*nchans],
+					     half_and_quarter_rate_flags);
+
+		if (++(*nchans) >= IEEE80211_CHAN_MAX)
+			break;
+	}
+
+	qdf_mem_free(cur_chan_list);
+	osif_debug("vdev %d channel_info exit", wlan_vdev_get_id(vdev));
+
+	return 0;
+}
+
+#else
 /**
  * os_if_son_fill_chan_info() - fill chan info
  * @chan_info: chan info to fill
@@ -434,6 +663,9 @@ int os_if_son_get_chan_list(struct wlan_objmgr_vdev *vdev,
 
 	return 0;
 }
+
+#endif /* WLAN_FEATURE_11BE */
+
 qdf_export_symbol(os_if_son_get_chan_list);
 
 uint32_t os_if_son_get_sta_count(struct wlan_objmgr_vdev *vdev)

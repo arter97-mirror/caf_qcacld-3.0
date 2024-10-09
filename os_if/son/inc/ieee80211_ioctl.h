@@ -937,6 +937,10 @@ struct reg_power_val {
 };
 
 #define MAX_NUM_SEG2_CENTERS 3
+
+#define INDEX_160_SEG2_CENTER 0
+#define INVALID_SEG2_CENTER_INDEX 0xF
+
 #define MAX_AP_PWR_TYPE 3
 
 struct ieee80211_channel_params {

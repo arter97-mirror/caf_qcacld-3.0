@@ -314,6 +314,23 @@ uint32_t os_if_son_get_bandwidth(struct wlan_objmgr_vdev *vdev);
  */
 uint32_t os_if_son_get_band_info(struct wlan_objmgr_vdev *vdev);
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * os_if_son_get_chan_list() - get a list of chan information
+ * @vdev: vdev
+ * @ic_chans: chan information array to get
+ * @chan_params: pointer to ieee80211_channel_params to get
+ * @ic_nchans: number of chan information it gets
+ * @flag_160: flag indicating the API to fill the center frequencies of 160MHz.
+ * @flag_6ghz: flag indicating the API to include 6 GHz or not
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int os_if_son_get_chan_list(struct wlan_objmgr_vdev *vdev,
+			    struct ieee80211_ath_channel *ic_chans,
+			    struct ieee80211_channel_params *chan_params,
+			    uint8_t *ic_nchans, bool flag_160, bool flag_6ghz);
+#else
 /**
  * os_if_son_get_chan_list() - get a list of chan information
  * @vdev: vdev
@@ -329,6 +346,7 @@ int os_if_son_get_chan_list(struct wlan_objmgr_vdev *vdev,
 			    struct ieee80211_ath_channel *ic_chans,
 			    struct ieee80211_channel_info *chan_info,
 			    uint8_t *ic_nchans, bool flag_160, bool flag_6ghz);
+#endif
 
 /**
  * os_if_son_get_sta_count() - get connected STA count
