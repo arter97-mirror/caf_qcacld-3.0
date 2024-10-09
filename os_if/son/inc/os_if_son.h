@@ -394,6 +394,8 @@ int os_if_son_set_chan(struct wlan_objmgr_vdev *vdev,
  * @vdev: vdev
  * @cac_timeout: cac timeount to set
  *
+ * cac_timeout 0 set CAC ignore, non-zero set normal CAC
+ *
  * Return: 0 if cac time out is set successfully
  */
 int os_if_son_set_cac_timeout(struct wlan_objmgr_vdev *vdev,
@@ -403,6 +405,9 @@ int os_if_son_set_cac_timeout(struct wlan_objmgr_vdev *vdev,
  * os_if_son_get_cac_timeout() - get cac timeout
  * @vdev: vdev
  * @cac_timeout: cac timeout to get
+ *
+ * If CAC is ignored, cac_timeout retrieve 0
+ * If CAC is normally adopted, cac_timeout retrieve non-zero
  *
  * Return 0 if cac time out is get successfully
  */

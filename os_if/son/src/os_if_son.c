@@ -755,56 +755,45 @@ qdf_export_symbol(os_if_son_set_def_tidmap_prty);
 int os_if_son_set_cac_timeout(struct wlan_objmgr_vdev *vdev,
 			      int cac_timeout)
 {
-	struct wlan_objmgr_pdev *pdev;
-	int status;
+	bool ignore_cac;
 
 	if (!vdev) {
 		osif_err("null vdev");
 		return -EINVAL;
 	}
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		osif_err("null pdev");
-		return -EINVAL;
-	}
 
-	if (QDF_IS_STATUS_ERROR(ucfg_dfs_override_cac_timeout(
-		pdev, cac_timeout, &status))) {
+	ignore_cac = !cac_timeout ? true : false;
+
+	if (QDF_IS_STATUS_ERROR(wlansap_set_dfs_ignore_cac(NULL, ignore_cac))) {
 		osif_err("cac timeout override fails");
 		return -EINVAL;
 	}
-	osif_debug("vdev %d cac_timeout %d status %d",
-		   wlan_vdev_get_id(vdev), cac_timeout, status);
 
-	return status;
+	osif_debug("vdev %d cac_timeout %d",
+		   wlan_vdev_get_id(vdev), cac_timeout);
+
+	return 0;
 }
 qdf_export_symbol(os_if_son_set_cac_timeout);
 
 int os_if_son_get_cac_timeout(struct wlan_objmgr_vdev *vdev,
 			      int *cac_timeout)
 {
-	struct wlan_objmgr_pdev *pdev;
-	int status;
+	uint8_t ignore_cac = 0;
 
 	if (!vdev) {
 		osif_err("null vdev");
 		return -EINVAL;
 	}
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		osif_err("null pdev");
-		return -EINVAL;
-	}
 
-	if (QDF_IS_STATUS_ERROR(ucfg_dfs_get_override_cac_timeout(
-		pdev, cac_timeout, &status))) {
-		osif_err("fails to get cac timeout");
-		return -EINVAL;
-	}
-	osif_debug("vdev %d cac_timeout %d status %d",
-		   wlan_vdev_get_id(vdev), *cac_timeout, status);
+	wlansap_get_dfs_ignore_cac(NULL, &ignore_cac);
 
-	return status;
+	*cac_timeout = ignore_cac ? 0 : -1;
+
+	osif_debug("vdev %d cac_timeout %d",
+		   wlan_vdev_get_id(vdev), *cac_timeout);
+
+	return 0;
 }
 qdf_export_symbol(os_if_son_get_cac_timeout);
 
