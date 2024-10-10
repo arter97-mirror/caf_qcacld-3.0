@@ -2221,7 +2221,7 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 {
 	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
-	uint8_t  acs_entry_id = 0;
+	uint8_t  acs_entry_id = 0, tmp_zero_nchans = 0;
 	ACS_LIST_TYPE acs_type = 0;
 	int ret = 0, i = 0;
 	struct sap_acs_cfg *acs_cfg;
@@ -2250,7 +2250,12 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 		goto end;
 	}
 	if (hdd_son_is_acs_in_progress(vdev)) {
-		acs_report->nchans = 0;
+		not_copied = copy_to_user(&acs_report->nchans,
+					  &tmp_zero_nchans,
+					  sizeof(acs_report->nchans));
+		if (not_copied)
+			hdd_debug("%ul is not copied to zero nchans",
+				  not_copied);
 		hdd_err("ACS is in-progress");
 		ret = -EAGAIN;
 		goto end;
