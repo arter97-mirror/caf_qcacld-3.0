@@ -40,6 +40,8 @@
 #include <wlan_nlink_common.h>
 #include <ieee80211_defines.h>
 #include <include/wlan_mlme_cmn.h>
+#include <wlan_cp_stats_mc_ucfg_api.h>
+#include <wlan_hdd_main.h>
 
 static struct son_callbacks g_son_os_if_cb;
 static struct wlan_os_if_son_ops g_son_os_if_txrx_ops;
@@ -2375,13 +2377,24 @@ QDF_STATUS os_if_son_get_node_datarate_info(struct wlan_objmgr_vdev *vdev,
 					    wlan_node_info *node_info)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+	int dbm = 0;
 
 	if (WLAN_ADDR_EQ(wlan_vdev_mlme_get_macaddr(vdev), mac_addr) ==
 							   QDF_STATUS_SUCCESS) {
 		node_info->max_chwidth = os_if_son_get_chwidth(vdev);
 		node_info->phymode = os_if_son_get_phymode(vdev);
 		node_info->num_streams = os_if_son_get_rx_streams(vdev);
-		node_info->max_txpower = 0;
+
+		link_info = hdd_get_link_info_by_vdev(hdd_ctx,
+						      vdev->vdev_objmgr.vdev_id);
+		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+			ucfg_mc_cp_stats_get_tx_power(vdev, &dbm);
+			node_info->max_txpower = (uint8_t)dbm;
+		} else {
+			node_info->max_txpower = 0;
+		}
 		node_info->max_MCS = ucfg_mlme_get_vdev_max_mcs_idx(vdev);
 		if (node_info->max_MCS == INVALID_MCS_NSS_INDEX) {
 			osif_err("invalid mcs index");
