@@ -13260,6 +13260,15 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
+	/* Multi-SAP case, SAP on same mac found, override to same channel */
+	if (cc_count >= 5 && ap_index < cc_count) {
+		*con_freq = op_freq[ap_index];
+		*con_vdev_id = vdev_id[ap_index];
+		policy_mgr_debug("con freq %d con vdev %d",
+				 *con_freq, *con_vdev_id);
+		return false;
+	}
+
 	/* For fourth connect check, if SAP setup freq not found in
 	 * pcl.pcl_list, set ap_index 0 avoid return true, then
 	 * SAP can start on ap_index's home channel instead of
