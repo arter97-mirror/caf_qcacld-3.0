@@ -33,6 +33,8 @@
 #include <wlan_vdev_mgr_ucfg_api.h>
 #include <wlan_mlme_ucfg_api.h>
 #include <wlan_reg_services_api.h>
+#include <sap_internal.h>
+#include <wlan_dfs_utils_api.h>
 #include <wlan_scan_ucfg_api.h>
 #include <wlan_dcs_ucfg_api.h>
 #include <wlan_nlink_common.h>
@@ -1955,6 +1957,200 @@ end_reg_get_opclass_details:
 	qdf_mem_free(reg_ap_cap);
 }
 
+/**
+ * os_if_display_5ghz_chan_info() - function to print debug log for son get CAC
+ * TLV information
+ * @ch_list: pointer to DFS channel list information
+ *
+ * Return: None
+ */
+static void
+os_if_display_5ghz_chan_info(struct ieee80211req_dfs_chan_list_info *ch_list)
+{
+	uint32_t i;
+	struct ieee80211_dfs_ch_params *dfs_ch_param;
+
+	if (ch_list->num_chans >
+	    QDF_ARRAY_SIZE(ch_list->dfs_chan_info)) {
+		osif_err("Number:%u is greater than NUM_5GHZ_CHANS, limit it",
+			 ch_list->num_chans);
+		ch_list->num_chans =
+			QDF_ARRAY_SIZE(ch_list->dfs_chan_info);
+	}
+
+	for (i = 0; i < ch_list->num_chans; i++) {
+		dfs_ch_param = &ch_list->dfs_chan_info[i];
+		osif_debug("chan_num: %u, opclass: %u, state: %u, rem_cac_time: %d cac_comp_time: %llu, rem_nol_time: %d",
+			   dfs_ch_param->chan_num, dfs_ch_param->op_class,
+			   dfs_ch_param->chan_state,
+			   dfs_ch_param->remaining_cac_time,
+			   dfs_ch_param->cac_completion_time,
+			   dfs_ch_param->remaining_nol_time);
+	}
+}
+
+/**
+ * os_if_son_get_cac_timeout_ms() - function to get CAC timeout value
+ * @pdev: PDEV object
+ * @freq: DFS channel frequency
+ *
+ * Return: CAC timeout value
+ */
+static inline uint32_t
+os_if_son_get_cac_timeout_ms(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
+{
+	enum dfs_reg dfs_region;
+
+	wlan_reg_get_dfs_region(pdev, &dfs_region);
+
+	if (dfs_region != DFS_ETSI_REGION)
+		return DEFAULT_CAC_TIMEOUT;
+
+	if (IS_ETSI_WEATHER_FREQ(freq))
+		return ETSI_WEATHER_CH_CAC_TIMEOUT;
+
+	return DEFAULT_CAC_TIMEOUT;
+}
+
+/**
+ * os_if_son_fill_nol_remain_time() - function to fill NOL remain time
+ * @son_cac: pointer to SON CAC/NOL status record
+ * @dfs_ch_param: pointer to DFS channel information to be filled
+ *
+ * Return: None
+ */
+static void
+os_if_son_fill_nol_remain_time(struct wlan_son_sap_cac_status *son_cac,
+			       struct ieee80211_dfs_ch_params *dfs_ch_param)
+{
+	uint32_t nol_time_past_ms;
+
+	dfs_ch_param->chan_state = WLAN_CH_DFS_S_NOL;
+
+	nol_time_past_ms = qdf_do_div(qdf_get_monotonic_boottime() -
+				      son_cac->nol_start_time_us, 1000);
+
+	dfs_ch_param->remaining_nol_time = son_cac->nol_timeout_ms;
+	if (nol_time_past_ms <= son_cac->nol_timeout_ms)
+		dfs_ch_param->remaining_nol_time -= nol_time_past_ms;
+}
+
+/**
+ * os_if_son_fill_cac_remain_time() - function to fill CAC remain time
+ * @pdev: PDEV object
+ * @freq: DFS channel frequency
+ * @son_cac: pointer to SON CAC/NOL status record
+ * @dfs_ch_param: pointer to DFS channel information to be filled
+ *
+ * Return: None
+ */
+static void
+os_if_son_fill_cac_remain_time(struct wlan_objmgr_pdev *pdev,
+			       qdf_freq_t freq,
+			       struct wlan_son_sap_cac_status *son_cac,
+			       struct ieee80211_dfs_ch_params *dfs_ch_param)
+{
+	uint32_t cac_start_past_ms;
+	uint32_t cac_timeout_ms;
+
+	if (son_cac->status == CH_DFS_S_CAC_STARTED) {
+		dfs_ch_param->chan_state = WLAN_CH_DFS_S_CAC_STARTED;
+		cac_timeout_ms = os_if_son_get_cac_timeout_ms(pdev, freq);
+		cac_start_past_ms =
+			qdf_do_div(qdf_get_monotonic_boottime() -
+				   son_cac->cac_start_time_us, 1000);
+		dfs_ch_param->remaining_cac_time = cac_timeout_ms;
+		if (cac_start_past_ms <= cac_timeout_ms)
+			dfs_ch_param->remaining_cac_time -= cac_start_past_ms;
+	} else {
+		dfs_ch_param->chan_state = WLAN_CH_DFS_S_CAC_COMPLETED;
+		dfs_ch_param->cac_completion_time =
+			son_cac->cac_complete_time_us;
+	}
+}
+
+/**
+ * os_if_son_get_5ghz_chan_info() - function to get 5 GHz channel information
+ * @pdev: PDEV object
+ * @cac_out: pointer to information of DFS CAC channel list
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+os_if_son_get_5ghz_chan_info(struct wlan_objmgr_pdev *pdev,
+			     struct ieee80211req_dfs_chan_list_info *cac_out)
+{
+	QDF_STATUS status;
+	struct regulatory_channel *cur_chan_list;
+	qdf_freq_t freq;
+	uint8_t chan;
+	uint32_t i, chan_idx = 0;
+	struct ieee80211_dfs_ch_params *dfs_ch_param;
+	struct wlan_son_sap_cac_status son_cac;
+
+	cur_chan_list = qdf_mem_malloc(NUM_CHANNELS *
+				       sizeof(struct regulatory_channel));
+	if (!cur_chan_list)
+		return QDF_STATUS_E_NOMEM;
+
+	status = wlan_reg_get_current_chan_list(pdev, cur_chan_list);
+	if (status != QDF_STATUS_SUCCESS) {
+		osif_err("Get current chan list failed");
+		goto free_mem;
+	}
+
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		freq = cur_chan_list[i].center_freq;
+		chan = cur_chan_list[i].chan_num;
+
+		if (!WLAN_REG_IS_5GHZ_CH_FREQ(freq))
+			continue;
+
+		if (wlan_reg_is_chan_disabled_and_not_nol(&cur_chan_list[i]))
+			continue;
+
+		if (chan_idx > NUM_5GHZ_CHANS - 1)
+			break;
+
+		dfs_ch_param = &cac_out->dfs_chan_info[chan_idx];
+		qdf_mem_zero(dfs_ch_param, sizeof(*dfs_ch_param));
+		dfs_ch_param->op_class =
+			wlan_reg_get_opclass_from_freq_width(NULL,
+							     freq,
+							     BW_20_MHZ,
+							     BIT(BEHAV_NONE));
+		dfs_ch_param->chan_num = chan;
+		if (!IS_CHAN_DFS(cur_chan_list[i].chan_flags)) {
+			dfs_ch_param->chan_state = WLAN_CH_DFS_S_NON_DFS;
+		} else {
+			qdf_mem_zero(&son_cac, sizeof(son_cac));
+			wlansap_get_nol_cac_status_for_freq(freq, &son_cac);
+
+			if (son_cac.status != CH_DFS_S_NOL &&
+			    son_cac.status != CH_DFS_S_CAC_STARTED &&
+			    son_cac.status != CH_DFS_S_CAC_COMPLETED)
+				continue;
+
+			if (son_cac.status == CH_DFS_S_NOL)
+				os_if_son_fill_nol_remain_time(&son_cac,
+							       dfs_ch_param);
+			else
+				os_if_son_fill_cac_remain_time(pdev,
+							       freq,
+							       &son_cac,
+							       dfs_ch_param);
+		}
+		chan_idx++;
+	}
+
+	cac_out->num_chans = chan_idx;
+	os_if_display_5ghz_chan_info(cac_out);
+
+free_mem:
+	qdf_mem_free(cur_chan_list);
+	return status;
+}
+
 QDF_STATUS os_if_son_pdev_ops(struct wlan_objmgr_pdev *pdev,
 			      enum wlan_mlme_pdev_param type,
 			      void *data, void *ret)
@@ -1991,6 +2187,9 @@ QDF_STATUS os_if_son_pdev_ops(struct wlan_objmgr_pdev *pdev,
 		memcpy(&out->op_class, &in->op_class,
 		       sizeof(struct wlan_op_class));
 		os_if_son_reg_get_opclass_details(pdev, &out->op_class);
+		break;
+	case PDEV_GET_CAC_TLV:
+		status = os_if_son_get_5ghz_chan_info(pdev, &out->cac_tlv);
 		break;
 	default:
 		break;
