@@ -715,6 +715,11 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 		return false;
 	}
 
+	if (policy_mgr_is_sta_sap_scc(hdd_ctx->psoc,
+				      hdd_ap_ctx->operating_chan_freq)) {
+		hdd_debug("DFS SAP is already in SCC with STA");
+		return true;
+	}
 	if (req->channel && req->channel->center_freq) {
 		ch_freq = req->channel->center_freq;
 		goto def_chan;
