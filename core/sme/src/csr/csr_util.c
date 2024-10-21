@@ -686,7 +686,13 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 					&sap_cfreq, &intf_ch_freq, &intf_hbw,
 					&intf_cfreq, op_mode,
 					cc_switch_mode);
-			if (intf_ch_freq && (intf_ch_freq != sap_ch_freq))
+			/*
+			 *If op_chan_freq is same as sap_chan_freq, check for
+			 *vdev_id and copy only if they are not same.
+			 */
+			if (ml_sap_vdev && i != vdev_id && !intf_ch_freq)
+				intf_ch_freq = sap_ch_freq;
+			if (intf_ch_freq)
 				conc_sap_freq = intf_ch_freq;
 		}
 
@@ -706,6 +712,8 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 
 		if (ml_sap_vdev) {
 			if (intf_ch_freq &&
+			    !policy_mgr_is_scc_with_this_vdev_id(mac_ctx->psoc,
+								 i) &&
 			    policy_mgr_are_2_freq_on_same_mac(mac_ctx->psoc,
 							      intf_ch_freq,
 							      sap_ch_freq))
@@ -734,7 +742,8 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	 * the concurrent ML SAP link vdev. This is to ensure
 	 * ML SAP vdev links comes up on 2 different frequency bands.
 	 */
-		if (conc_sap_freq && conc_sta1_freq && conc_sta2_freq) {
+		if (policy_mgr_is_sta_sap_scc(mac_ctx->psoc, conc_sap_freq) &&
+		    conc_sta1_freq && conc_sta2_freq) {
 			if (conc_sap_freq != conc_sta1_freq)
 				intf_ch_freq = conc_sta1_freq;
 			else if (conc_sap_freq != conc_sta2_freq)
