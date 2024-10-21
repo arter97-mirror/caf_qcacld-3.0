@@ -4568,6 +4568,7 @@ static inline void fill_crypto_filter_params(struct scan_filter *filter,
 	filter->mgmtcipherset =
 		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_MGMT_CIPHER);
 	filter->ignore_pmf_cap = true;
+	filter->mrsno_gen = wlan_vdev_get_rsno_gen_supported(vdev);
 }
 
 static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)

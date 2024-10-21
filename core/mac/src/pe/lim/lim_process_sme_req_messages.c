@@ -4698,6 +4698,19 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 				      NULL, 0,
 				      mlme_priv->connect_info.ext_cap_ie,
 				      DOT11F_IE_EXTCAP_MAX_LEN);
+
+		/*
+		 * rsno_gen_used is used to append RSN selection IE in the
+		 * assoc request, therefore set the rsn gen only if the
+		 * DUT and AP supports MRSNO.
+		 */
+		if (wlan_vdev_get_rsno_gen_supported(session->vdev) &&
+		    (util_scan_entry_wifi6_rsno(req->entry) ||
+		     util_scan_entry_wifi7_rsno(req->entry)))
+			session->rsno_gen_used = req->rsno_gen_used;
+		else
+			session->rsno_gen_used = 0;
+
 		qdf_mem_free(add_ie);
 
 		if (QDF_IS_STATUS_ERROR(status)) {
