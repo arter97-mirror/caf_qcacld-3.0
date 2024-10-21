@@ -4140,6 +4140,7 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 	uint8_t *rsnxe = NULL, *new_rsnxe = NULL;
 	uint8_t *ap_rsnxe = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t rsn_gen;
 
 	akm = wlan_crypto_get_param(session->vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
 	if (akm == -1 ||
@@ -4171,11 +4172,9 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 		return status;
 	}
 
-	ap_rsnxe = util_scan_entry_rsnxe(req->entry);
-	if (!ap_rsnxe)
-		ap_rsnxe_len = 0;
-	else
-		ap_rsnxe_len = ap_rsnxe[SIR_MAC_IE_LEN_OFFSET];
+	rsn_gen = req->entry->neg_sec_info.rsn_gen_selected;
+	ap_rsnxe = util_scan_entry_rsnxe_by_gen(req->entry, rsn_gen);
+	ap_rsnxe_len = util_get_rsnxe_len_by_gen(req->entry, rsn_gen);
 
 	/*
 	 * Do not modify userspace RSNXE if either:
@@ -4607,6 +4606,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	qdf_mem_copy(session->ssId.ssId, req->entry->ssid.ssid,
 		     session->ssId.length);
 	session->ssidHidden = req->is_ssid_hidden;
+	session->rsno_gen_used = req->rsno_gen_used;
 
 	status = lim_fill_pe_session(mac_ctx, session, bss_desc,
 				     req->entry->phy_mode);
@@ -5231,7 +5231,8 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 	lim_strip_rsnx_ie(mac_ctx, session_entry, req);
 
 	if (lim_is_rsn_profile(session_entry) &&
-	    !util_scan_entry_rsnxe(req->entry)) {
+	    !util_scan_entry_rsnxe_by_gen(req->entry,
+				req->entry->neg_sec_info.rsn_gen_selected)) {
 		pe_debug("Bss bcn has no RSNXE, strip if has");
 		status = lim_strip_ie(mac_ctx, req->assoc_ie.ptr,
 				      (uint16_t *)&req->assoc_ie.len,

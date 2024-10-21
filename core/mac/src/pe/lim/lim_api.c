@@ -2078,8 +2078,8 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 	assoc_ies_len = roam_synch->reassoc_req_length -
 				sizeof(tSirMacMgmtHdr) - ies_offset;
 
-	rsn_ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSN, assoc_ies,
-					  assoc_ies_len);
+	rsn_ie = wlan_get_rsn_data_from_ie_ptr(assoc_ies, assoc_ies_len);
+
 	wpa_oui = WLAN_WPA_SEL(WLAN_WPA_OUI_TYPE);
 	wpa_ie = wlan_get_vendor_ie_ptr_from_oui((uint8_t *)&wpa_oui,
 						 WLAN_OUI_SIZE, assoc_ies,

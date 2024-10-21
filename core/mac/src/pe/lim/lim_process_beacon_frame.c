@@ -257,7 +257,7 @@ lim_validate_rsn_ie(const uint8_t *ie_ptr, uint16_t ie_len)
 	const uint8_t *rsn_ie;
 	struct wlan_crypto_params crypto_params;
 
-	rsn_ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSN, ie_ptr, ie_len);
+	rsn_ie = wlan_get_rsn_data_from_ie_ptr(ie_ptr, ie_len);
 	if (!rsn_ie)
 		return QDF_STATUS_SUCCESS;
 

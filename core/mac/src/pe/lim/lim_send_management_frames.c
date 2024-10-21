@@ -2941,6 +2941,25 @@ QDF_STATUS lim_fill_adaptive_11r_ie(struct pe_session *pe_session,
 }
 #endif
 
+static inline void
+lim_strip_rsno_ie(struct mac_context *mac_ctx, uint8_t *add_ie,
+		  uint16_t *add_ie_len, uint8_t mrsno_gen)
+{
+	/*
+	 * Legacy RSN connection: Strip all the generation MRSNO IEs
+	 * MRSNO connection: Strip all the other generation IEs except
+	 * the connecting generation
+	 */
+	if (mrsno_gen != RSNO_GEN_WIFI7 && *add_ie_len != 0)
+		lim_strip_ie(mac_ctx, add_ie, add_ie_len, WLAN_ELEMID_VENDOR,
+			     ONE_BYTE, RSNO_OUI_WIFI7_RSN, RSNO_OUI_SIZE,
+			     NULL, 0);
+	if (mrsno_gen != RSNO_GEN_WIFI6 && *add_ie_len != 0)
+		lim_strip_ie(mac_ctx, add_ie, add_ie_len, WLAN_ELEMID_VENDOR,
+			     ONE_BYTE, RSNO_OUI_WIFI6_RSN, RSNO_OUI_SIZE,
+			     NULL, 0);
+}
+
 /**
  * lim_send_assoc_req_mgmt_frame() - Send association request
  * @mac_ctx: Handle to MAC context
@@ -3469,6 +3488,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * Append the IEs just before MBO IEs as MBO IEs have to be at the
 	 * end of the frame.
 	 */
+	lim_strip_rsno_ie(mac_ctx, add_ie, &add_ie_len,
+			  pe_session->rsno_gen_used);
 	if (add_ie_len &&
 	    wlan_get_ie_ptr_from_eid(WLAN_ELEMID_VENDOR, add_ie, add_ie_len)) {
 		vendor_ies = qdf_mem_malloc(MAX_VENDOR_IES_LEN + 2);
