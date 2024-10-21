@@ -4529,7 +4529,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	bool same_mac, sbs_ml_sta_present = false, dbs_ml_sta_present = false;
 	qdf_freq_t ll_lt_sap_freq;
 	bool ml_sap_vdev = false;
-	uint32_t conc_sap_freq = 0;
+	uint32_t conc_ml_sap_freq = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -4546,7 +4546,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
 
 	if (mode == PM_SAP_MODE)
-		conc_sap_freq = policy_mgr_get_conc_ml_sap_link_freq(
+		conc_ml_sap_freq = policy_mgr_get_conc_ml_sap_link_freq(
 								psoc,
 								vdev_id,
 								&ml_sap_vdev);
@@ -4585,7 +4585,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 			continue;
 		if (allow_2ghz_only && !WLAN_REG_IS_24GHZ_CH_FREQ(pcl_freq))
 			continue;
-		if (ml_sap_vdev && (conc_sap_freq == pcl_freq))
+		if (ml_sap_vdev && (conc_ml_sap_freq == pcl_freq))
 			continue;
 
 		/* Skip LL LT SAP freq and for SAP skip same mac freq */
@@ -4600,15 +4600,31 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 		 * check same band logic as per the ML hw mode, else
 		 * use the API which is hw mode agnostic.
 		 */
-		if (dbs_ml_sta_present)
-			same_mac = policy_mgr_2_freq_same_mac_in_dbs(psoc,
+		if (dbs_ml_sta_present) {
+			if (conc_ml_sap_freq &&
+			    policy_mgr_is_current_hwmode_sbs(psoc))
+				same_mac = policy_mgr_2_freq_same_mac_in_sbs(
+								pm_ctx,
 								sap_ch_freq,
 								pcl_freq);
-		else if (sbs_ml_sta_present)
-			same_mac = policy_mgr_2_freq_same_mac_in_sbs(pm_ctx,
+			else
+				same_mac = policy_mgr_2_freq_same_mac_in_dbs(
+								psoc,
 								sap_ch_freq,
 								pcl_freq);
-		else
+		} else if (sbs_ml_sta_present) {
+			if (conc_ml_sap_freq &&
+			    policy_mgr_is_current_hwmode_dbs(psoc))
+				same_mac = policy_mgr_2_freq_same_mac_in_dbs(
+								psoc,
+								sap_ch_freq,
+								pcl_freq);
+			else
+				same_mac = policy_mgr_2_freq_same_mac_in_sbs(
+								pm_ctx,
+								sap_ch_freq,
+								pcl_freq);
+		} else
 			same_mac = policy_mgr_2_freq_always_on_same_mac(psoc,
 								sap_ch_freq,
 								pcl_freq);
