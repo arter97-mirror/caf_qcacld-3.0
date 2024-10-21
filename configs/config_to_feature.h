@@ -2933,7 +2933,7 @@
 #define DP_MLO_LINK_STATS_SUPPORT (1)
 #endif
 
-#ifdef CONFIG_MULTI_IF_NAME
+#if defined(CONFIG_MULTI_IF_NAME) && !defined(CONFIG_MDM_PLATFORM)
 #define MULTI_IF_NAME CONFIG_MULTI_IF_NAME
 #endif
 

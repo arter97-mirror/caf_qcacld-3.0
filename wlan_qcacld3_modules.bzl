@@ -29,6 +29,9 @@ _target_chipset_map = {
     "x1e80100": [
         "kiwi-v2",
     ],
+    "sdxkova": [
+        "kiwi-v2",
+    ],
 }
 
 _chipset_hw_map = {
@@ -2369,11 +2372,31 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         ],
         cmd = "cat $(SRCS) > $@",
     )
-
+    native.genrule(
+        name = "configs/{}_defconfig_generate_perf-defconfig".format(tvc),
+        outs = ["configs/{}_defconfig.generated_perf-defconfig".format(tvc)],
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
+        name = "configs/{}_defconfig_generate_debug-defconfig".format(tvc),
+        outs = ["configs/{}_defconfig.generated_debug-defconfig".format(tvc)],
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+            "configs/{}_consolidate_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
+    if target == "sdxkova":
+        out = "wlan.ko"
+    else:
+        out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
+
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
@@ -2398,6 +2421,18 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
+        ]
+
+    if target == "sdxkova":
+        tgt = "target-aarch64_cortex-a53_musl"
+        board = "sdx85"
+        deps = [
+            "//msm-kernel:all_headers",
+            "//build_dir/{}/linux-{}/wlan-cnss2:wlan-platform-headers".format(tgt, board),
+            "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss2".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_utils".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_prealloc".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_nl".format(tgt, board, tv),
         ]
 
     print("name=", name)
@@ -2441,16 +2476,17 @@ def define_dist(target, variant, chipsets):
             mode_overrides = {"**/*": "644"},
             log = "info",
         )
-    copy_to_dist_dir(
-        name = "{}_all_modules_dist".format(tv),
-        data = dataList,
-        dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
-        flat = True,
-        wipe_dist_dir = False,
-        allow_duplicate_filenames = False,
-        mode_overrides = {"**/*": "644"},
-        log = "info",
-    )
+    if target != "sdxkova":
+        copy_to_dist_dir(
+            name = "{}_all_modules_dist".format(tv),
+            data = dataList,
+            dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+            flat = True,
+            wipe_dist_dir = False,
+            allow_duplicate_filenames = False,
+            mode_overrides = {"**/*": "644"},
+            log = "info",
+        )
 
 def define_modules():
     for (t, v) in get_all_variants():
