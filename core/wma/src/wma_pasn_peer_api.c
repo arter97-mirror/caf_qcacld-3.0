@@ -203,7 +203,7 @@ wma_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
 	 * The peer object should be created before sending the WMI peer
 	 * create command to firmware.
 	 */
-	obj_peer = wma_create_objmgr_peer(wma, vdev_id, NULL,
+	obj_peer = wma_create_objmgr_peer(wma, vdev_id, peer_addr->bytes,
 					  WMI_PEER_TYPE_PASN, NULL);
 	if (!obj_peer) {
 		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);

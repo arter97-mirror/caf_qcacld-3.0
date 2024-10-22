@@ -799,6 +799,7 @@ struct wlan_mlme_cfg_sap {
  * @dfs_beacon_tx_enhanced: enhance dfs beacon tx
  * @dfs_prefer_non_dfs: perefer non dfs channel after radar
  * @dfs_disable_japan_w53: Disable W53 channels
+ * @enable_sap_dfs_puncture: Enable sap dfs puncture
  * @sap_tx_leakage_threshold: sap tx leakage threshold
  * @dfs_pri_multiplier: dfs_pri_multiplier for handle missing pulses
  */
@@ -810,6 +811,7 @@ struct wlan_mlme_dfs_cfg {
 	bool dfs_beacon_tx_enhanced;
 	bool dfs_prefer_non_dfs;
 	bool dfs_disable_japan_w53;
+	bool enable_sap_dfs_puncture;
 	uint32_t sap_tx_leakage_threshold;
 	uint32_t dfs_pri_multiplier;
 };
@@ -1943,6 +1945,8 @@ enum roaming_dfs_channel_type {
  * @threshold: Bss load threshold value above which roaming should start
  * @sample_time: Time duration in milliseconds for which the bss load value
  * should be monitored
+ * @bss_load_alpha: Factor for computing average bss load from current channel
+ * utilization
  * @rssi_threshold_6ghz: RSSI threshold of the current connected AP below which
  * roam should be triggered if bss load threshold exceeds the configured value.
  * This value is applicable only when we are connected in 6GHz band.
@@ -1957,6 +1961,7 @@ struct bss_load_trigger {
 	bool enabled;
 	uint32_t threshold;
 	uint32_t sample_time;
+	uint32_t bss_load_alpha;
 	uint32_t rssi_threshold_6ghz;
 	int32_t rssi_threshold_5ghz;
 	int32_t rssi_threshold_24ghz;
@@ -2257,7 +2262,7 @@ struct wlan_mlme_lfr_cfg {
 	bool disconnect_on_nud_roam_invoke_fail;
 	bool hs20_btm_offload_disable;
 	uint32_t roam_aggre_scan_step_rssi;
-	uint32_t roam_aggre_threshold;
+	uint8_t roam_aggre_threshold;
 };
 
 /**
@@ -3135,6 +3140,7 @@ enum ll_ap_type {
  * @weight_copy: copy of the original weight
  * @valid: Is this a valid center frequency for regulatory domain
  * @weight_calc_done: Weight calculation done for this channel
+ * @num_bonded_pairs: number of valid bonded pairs
  */
 struct sap_ch_info {
 	uint32_t chan_freq;
@@ -3144,6 +3150,7 @@ struct sap_ch_info {
 	uint32_t weight_copy;
 	bool valid;
 	bool weight_calc_done;
+	uint8_t num_bonded_pairs;
 };
 
 /**

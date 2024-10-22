@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -58,7 +58,7 @@ void csr_roam_update_ndp_return_params(struct mac_context *mac_ctx,
 	case CSR_SAP_START_BSS_FAILURE:
 		roam_info->ndp.ndi_create_params.status = NDP_RSP_STATUS_ERROR;
 		roam_info->ndp.ndi_create_params.reason =
-					NDP_NAN_DATA_IFACE_CREATE_FAILED;
+				NAN_DATAPATH_NAN_DATA_IFACE_CREATE_FAILED;
 		*roam_status = eCSR_ROAM_NDP_STATUS_UPDATE;
 		*roam_result = eCSR_ROAM_RESULT_NDI_CREATE_RSP;
 		break;
@@ -72,7 +72,7 @@ void csr_roam_update_ndp_return_params(struct mac_context *mac_ctx,
 	case CSR_SAP_STOP_BSS_FAILURE:
 		roam_info->ndp.ndi_delete_params.status = NDP_RSP_STATUS_ERROR;
 		roam_info->ndp.ndi_delete_params.reason =
-					NDP_NAN_DATA_IFACE_DELETE_FAILED;
+				NAN_DATAPATH_NAN_DATA_IFACE_DELETE_FAILED;
 		*roam_status = eCSR_ROAM_NDP_STATUS_UPDATE;
 		*roam_result = eCSR_ROAM_RESULT_NDI_DELETE_RSP;
 		break;

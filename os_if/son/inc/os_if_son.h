@@ -26,6 +26,7 @@
 #define _OS_IF_SON_H_
 
 #include <qdf_types.h>
+#include <qdf_net_if.h>
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_objmgr_pdev_obj.h>
@@ -70,6 +71,7 @@
  * @os_if_get_peer_capability: Gets peer capability
  * @os_if_get_peer_max_mcs_idx: Gets peer max MCS index
  * @os_if_get_sta_stats: Get sta stats
+ * @os_if_set_def_tidmap_prty: Set default tid map priority
  */
 struct son_callbacks {
 	uint32_t (*os_if_is_acs_in_progress)(struct wlan_objmgr_vdev *vdev);
@@ -140,6 +142,8 @@ struct son_callbacks {
 	int (*os_if_get_sta_stats)(struct wlan_objmgr_vdev *vdev,
 				   uint8_t *mac_addr,
 				   struct ieee80211_nodestats *stats);
+	int (*os_if_set_def_tidmap_prty)(struct wlan_objmgr_vdev *vdev,
+					 uint32_t pri);
 };
 
 /**
@@ -311,6 +315,23 @@ uint32_t os_if_son_get_bandwidth(struct wlan_objmgr_vdev *vdev);
  */
 uint32_t os_if_son_get_band_info(struct wlan_objmgr_vdev *vdev);
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * os_if_son_get_chan_list() - get a list of chan information
+ * @vdev: vdev
+ * @ic_chans: chan information array to get
+ * @chan_params: pointer to ieee80211_channel_params to get
+ * @ic_nchans: number of chan information it gets
+ * @flag_160: flag indicating the API to fill the center frequencies of 160MHz.
+ * @flag_6ghz: flag indicating the API to include 6 GHz or not
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int os_if_son_get_chan_list(struct wlan_objmgr_vdev *vdev,
+			    struct ieee80211_ath_channel *ic_chans,
+			    struct ieee80211_channel_params *chan_params,
+			    uint8_t *ic_nchans, bool flag_160, bool flag_6ghz);
+#else
 /**
  * os_if_son_get_chan_list() - get a list of chan information
  * @vdev: vdev
@@ -326,6 +347,7 @@ int os_if_son_get_chan_list(struct wlan_objmgr_vdev *vdev,
 			    struct ieee80211_ath_channel *ic_chans,
 			    struct ieee80211_channel_info *chan_info,
 			    uint8_t *ic_nchans, bool flag_160, bool flag_6ghz);
+#endif
 
 /**
  * os_if_son_get_sta_count() - get connected STA count
@@ -373,6 +395,8 @@ int os_if_son_set_chan(struct wlan_objmgr_vdev *vdev,
  * @vdev: vdev
  * @cac_timeout: cac timeount to set
  *
+ * cac_timeout 0 set CAC ignore, non-zero set normal CAC
+ *
  * Return: 0 if cac time out is set successfully
  */
 int os_if_son_set_cac_timeout(struct wlan_objmgr_vdev *vdev,
@@ -382,6 +406,9 @@ int os_if_son_set_cac_timeout(struct wlan_objmgr_vdev *vdev,
  * os_if_son_get_cac_timeout() - get cac timeout
  * @vdev: vdev
  * @cac_timeout: cac timeout to get
+ *
+ * If CAC is ignored, cac_timeout retrieve 0
+ * If CAC is normally adopted, cac_timeout retrieve non-zero
  *
  * Return 0 if cac time out is get successfully
  */
@@ -849,4 +876,34 @@ QDF_STATUS
 os_if_son_send_status_nlink_msg(uint32_t event_id,
 				enum osif_son_status_evt_type event_type,
 				char *module_name);
+
+/**
+ * wlan_mlme_register_tx_ops() - Register tx ops
+ *
+ * Register tx ops for son driver update
+ *
+ * Return: mlme_external_tx_ops
+ */
+struct mlme_external_tx_ops *wlan_mlme_register_tx_ops(void);
+
+/**
+ * os_if_son_set_def_tidmap_prty() - set default tidmap priority
+ * @vdev: vdev
+ * @pri: tidmap priority
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int os_if_son_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
+				  uint32_t pri);
+
+/**
+ * os_if_son_netif_release_dev() - Release reference to network device
+ * @nif: network device
+ *
+ * This function releases reference to the network device
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS os_if_son_netif_release_dev(struct qdf_net_if *nif);
+
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,6 +30,29 @@
 #define IEEE80211_NUM_REGCLASS 5
 
 #define IEEE80211_RRM_MEASRPT_MODE_SUCCESS         0x00
+
+/*
+ * Number of RRM beacon reports in a single OTA message can be conveyed in
+ * in single event up to user space. Multiple events will be sent if more
+ * than this number of reports is included in a single OTA message.
+ */
+#define IEEE80211_RRM_NUM_BCNRPT_MAX 8
+
+#ifndef __packed
+#define __packed __attribute__((packed))
+#endif
+
+enum ieee80211_rrm_cmd {
+	IEEE80211_SET_NEIGHTRPT_ENABLE = 1,
+	IEEE80211_GET_NEIGHTRPT_ENABLE = 2,
+	IEEE80211_CANCEL_BCNRPT = 3,
+	IEEE80211_GET_RRM_CAP = 4,
+};
+
+typedef struct ieee80211_rrm_cmd_s {
+	enum ieee80211_rrm_cmd cmdid;
+	u_int8_t val;
+} ieee80211_rrm_cmd_t;
 
 struct ieee80211_beaconreq_chaninfo {
 	u_int8_t regclass;
@@ -392,4 +415,85 @@ typedef struct ieee80211req_rrmstats_s {
  */
 #define IEEE80211_RRM_CAPS_BEACON_REPORT_PASSIVE	BIT(4)
 #define IEEE80211_RRM_CAPS_BEACON_REPORT_ACTIVE		BIT(5)
+
+/*
+ * Enumeration for 802.11k beacon report request measurement mode,
+ * as defined in Table 7-29e in IEEE Std 802.11k-2008
+ */
+typedef enum {
+	IEEE80211_RRM_BCNRPT_MEASMODE_PASSIVE  = 0,
+	IEEE80211_RRM_BCNRPT_MEASMODE_ACTIVE   = 1,
+	IEEE80211_RRM_BCNRPT_MEASMODE_BCNTABLE = 2,
+	IEEE80211_RRM_BCNRPT_MEASMODE_RESERVED
+} IEEE80211_RRM_BCNRPT_MEASMODE;
+
+/*
+ * Enumeration for 802.11 regulatory class as defined in Annex E of
+ * 802.11-Revmb/D12, November 2011
+ *
+ * It currently includes a subset of global operating classes as
+ * defined in Table E-4.
+ */
+typedef enum {
+	IEEE80211_RRM_REGCLASS_81 = 81,
+	IEEE80211_RRM_REGCLASS_82 = 82,
+	IEEE80211_RRM_REGCLASS_112 = 112,
+	IEEE80211_RRM_REGCLASS_115 = 115,
+	IEEE80211_RRM_REGCLASS_118 = 118,
+	IEEE80211_RRM_REGCLASS_121 = 121,
+	IEEE80211_RRM_REGCLASS_124 = 124,
+	IEEE80211_RRM_REGCLASS_125 = 125,
+	IEEE80211_RRM_REGCLASS_131 = 131,
+	IEEE80211_RRM_REGCLASS_136 = 136,
+	IEEE80211_RRM_REGCLASS_RESERVED
+} IEEE80211_RRM_REGCLASS;
+
+/**
+ * enum ieee80211_phytype_mode - ieee80211 phy type mode
+ * as per 802.11mc spec anex C, used in Radio resource mgmt reports.
+ * @IEEE80211_PHY_TYPE_UNKNOWN: Unknown phy type
+ * @IEEE80211_PHY_TYPE_FHSS: 802.11 2.4GHz 1997
+ * @IEEE80211_PHY_TYPE_DSSS: 802.11 2.4GHz 1997
+ * @IEEE80211_PHY_TYPE_IRBASEBAND:
+ * @IEEE80211_PHY_TYPE_OFDM: 802.11ag
+ * @IEEE80211_PHY_TYPE_HRDSSS: 802.11b 1999
+ * @IEEE80211_PHY_TYPE_ERP: 802.11g 2003
+ * @IEEE80211_PHY_TYPE_HT: 802.11n
+ * @IEEE80211_PHY_TYPE_DMG: 802.11ad
+ * @IEEE80211_PHY_TYPE_VHT: 802.11ac
+ * @IEEE80211_PHY_TYPE_TVHT: 802.11af
+ * @IEEE80211_PHY_TYPE_S1G:
+ * @IEEE80211_PHY_TYPE_CDMG:
+ * @IEEE80211_PHY_TYPE_CMMG:
+ * @IEEE80211_PHY_TYPE_HE: 802.11ax
+ * @IEEE80211_PHY_TYPE_EHT: 802.11be
+ */
+enum ieee80211_phytype_mode {
+	IEEE80211_PHY_TYPE_UNKNOWN = 0,
+	IEEE80211_PHY_TYPE_FHSS    = 1,
+	IEEE80211_PHY_TYPE_DSSS    = 2,
+	IEEE80211_PHY_TYPE_IRBASEBAND = 3,
+	IEEE80211_PHY_TYPE_OFDM       = 4,
+	IEEE80211_PHY_TYPE_HRDSSS     = 5,
+	IEEE80211_PHY_TYPE_ERP  = 6,
+	IEEE80211_PHY_TYPE_HT   = 7,
+	IEEE80211_PHY_TYPE_DMG  = 8,
+	IEEE80211_PHY_TYPE_VHT  = 9,
+	IEEE80211_PHY_TYPE_TVHT = 10,
+	IEEE80211_PHY_TYPE_S1G  = 11,
+	IEEE80211_PHY_TYPE_CDMG = 12,
+	IEEE80211_PHY_TYPE_CMMG = 13,
+	IEEE80211_PHY_TYPE_HE   = 14,
+	IEEE80211_PHY_TYPE_EHT  = 15,
+};
+
+struct ev_rrm_report_data {
+	u_int32_t bcnrpt_count;
+	u_int8_t rrm_type;
+	u_int8_t dialog_token;
+	u_int8_t mode;
+	u_int8_t macaddr[6];
+	u_int8_t bcnrpt[1];
+};
+
 #endif //__IEEE80211_RRM_H_

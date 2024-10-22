@@ -304,6 +304,9 @@ enum wlan_dp_stc_timer_state {
 	WLAN_DP_STC_TIMER_RUNNING,
 };
 
+#define WLAN_DP_STC_TRAFFIC_BK BIT(0)
+#define WLAN_DP_STC_TRAFFIC_PING BIT(1)
+
 /**
  * struct wlan_dp_stc_peer_traffic_context - peer traffic context
  * @mac_addr: peer mac address
@@ -311,13 +314,15 @@ enum wlan_dp_stc_timer_state {
  * @vdev_id: vdev_id for the peer
  * @peer_id: peer_id assigned to this peer
  * @last_ping_ts: Last seen ping pkt timestamp
+ * @prev_tx_pkts: Previous cached TX packet count
+ * @prev_rx_pkts: Previous cached RX packet count
+ * @prev_pkt_count: Previous cached total packet count
+ * @prev_tput_check_ts: Timestamp when last background throughput was checked
  * @num_streaming: Number of streaming flows on this peer
  * @num_gaming: Number of gaming flows on this peer
  * @num_voice_call: Number of voice call flows on this peer
  * @num_video_call: Number of video call flows on this peer
- * @active_bk_traffic: Flag to indicate if background traffic is
- *		       active on this peer
- * @active_ping: Flag to indicate if ping is active on this peer
+ * @non_flow_traffic: BITMAP to indicate active non-TCP/UDP traffic on the peer
  * @send_fw_ind: Flag to mark if traffic_map indication is to be sent to FW
  */
 struct wlan_dp_stc_peer_traffic_context {
@@ -326,12 +331,15 @@ struct wlan_dp_stc_peer_traffic_context {
 	uint8_t vdev_id;
 	uint16_t peer_id;
 	uint64_t last_ping_ts;
+	uint64_t prev_tx_pkts;
+	uint64_t prev_rx_pkts;
+	uint64_t prev_pkt_count;
+	uint64_t prev_tput_check_ts;
 	qdf_atomic_t num_streaming;
 	qdf_atomic_t num_gaming;
 	qdf_atomic_t num_voice_call;
 	qdf_atomic_t num_video_call;
-	qdf_atomic_t active_bk_traffic;
-	qdf_atomic_t active_ping;
+	unsigned long non_flow_traffic;
 	qdf_atomic_t send_fw_ind;
 };
 
@@ -629,7 +637,8 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 		send_fw_indication = true;
 
 	peer_tc->last_ping_ts = dp_stc_get_timestamp();
-	qdf_atomic_set(&peer_tc->active_ping, 1);
+	qdf_atomic_set_bit(WLAN_DP_STC_TRAFFIC_PING,
+			   &peer_tc->non_flow_traffic);
 
 	if (send_fw_indication)
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);

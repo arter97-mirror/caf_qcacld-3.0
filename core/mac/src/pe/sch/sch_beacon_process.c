@@ -310,8 +310,8 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 	/* Read beacon interval session Entry */
 	bi = session->beaconParams.beaconInterval;
 	if (bi != bcn->beaconInterval) {
-		pe_debug("Beacon interval changed from %d to %d",
-		       bcn->beaconInterval, bi);
+		pe_debug("Beacon interval changed from %d to %d", bi,
+			bcn->beaconInterval);
 
 		bi = bcn->beaconInterval;
 		session->beaconParams.beaconInterval = (uint16_t) bi;
@@ -466,8 +466,7 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 		vht_op = &bcn->vendor_vht_ie.VHTOperation;
 	}
 	if (!session->vhtCapability ||
-	    !(bcn->OperatingMode.present ||
-	      (vht_op && vht_op->present && vht_caps)))
+	    !(vht_op && vht_op->present && vht_caps))
 		return;
 
 	is_40 = bcn->HTInfo.present ?
@@ -802,12 +801,16 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		lim_send_beacon_params(mac_ctx, &beaconParams, session);
 	}
 
-	if ((session->opmode == QDF_P2P_CLIENT_MODE) &&
-	    session->send_p2p_conf_frame) {
-		lim_p2p_oper_chan_change_confirm_action_frame(mac_ctx,
-							      session->bssId,
-							      session);
-		session->send_p2p_conf_frame = false;
+	if (session->opmode == QDF_P2P_CLIENT_MODE) {
+		if (session->send_p2p_conf_frame) {
+			lim_p2p_oper_chan_change_confirm_action_frame(mac_ctx,
+								      session->bssId,
+								      session);
+			session->send_p2p_conf_frame = false;
+		}
+
+		if (session->post_csa_notify_cap)
+			lim_send_channel_usage_req_notif_cap_action_frame(session->vdev_id);
 	}
 
 	lim_process_beacon_eht(mac_ctx, session, bcn);

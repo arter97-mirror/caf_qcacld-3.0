@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -88,4 +88,17 @@ tgt_twt_nudge_req_send(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 tgt_twt_ac_pdev_param_send(struct wlan_objmgr_psoc *psoc,
 			   enum twt_traffic_ac twt_ac);
-#endif
+
+/**
+ * tgt_twt_send_unavailability_mode() - Send unavailability mode vdev TWT param
+ * @psoc: Pointer to psoc object
+ * @vdev: Pointer to vdev object
+ * @unavailability_mode: unavailability mode value
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+tgt_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_objmgr_vdev *vdev,
+				 bool unavailability_mode);
+#endif /* _WLAN_TWT_TGT_IF_EXT_TX_API_H_ */

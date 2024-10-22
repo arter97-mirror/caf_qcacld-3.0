@@ -639,6 +639,7 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 
 	flow->active_ts = qdf_sched_clock();
 	skb->mark = flow->svc_metadata;
+	flow->num_pkts++;
 
 	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, skb,
 						   flow->track_flow_stats,
@@ -818,7 +819,7 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
 
 	if (qdf_unlikely(flow->cookie != cookie)) {
-		dp_info("Flow cookie %lu mismatch against table %lu", cookie,
+		dp_info("Flow cookie %llu mismatch against table %llu", cookie,
 			flow->cookie);
 		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
 	}
@@ -1072,5 +1073,5 @@ void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
 	if (flow_rec && flow_rec->guid == flow_guid)
 		flow_rec->active_ts = qdf_sched_clock();
 	else
-		dp_info("Flow %u with guid %lu not found", flow_id, flow_guid);
+		dp_info("Flow %u with guid %llu not found", flow_id, flow_guid);
 }

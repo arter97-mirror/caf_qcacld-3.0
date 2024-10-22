@@ -45,6 +45,40 @@ wlan_psoc_get_p2p_tx_ops(struct wlan_objmgr_psoc *psoc)
 	return &(psoc->soc_cb.tx_ops->p2p);
 }
 
+QDF_STATUS
+tgt_p2p_unregister_ap_assist_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_p2p_tx_ops *p2p_ops;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	p2p_ops = wlan_psoc_get_p2p_tx_ops(psoc);
+	if (p2p_ops && p2p_ops->unreg_ap_assist_bmiss_ev_handler) {
+		status = p2p_ops->unreg_ap_assist_bmiss_ev_handler(psoc);
+		if (QDF_IS_STATUS_ERROR(status))
+			p2p_debug("unreg ap assist bmiss event status %d",
+				  status);
+	}
+
+	return status;
+}
+
+QDF_STATUS
+tgt_p2p_register_ap_assist_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_p2p_tx_ops *p2p_ops;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	p2p_ops = wlan_psoc_get_p2p_tx_ops(psoc);
+	if (p2p_ops && p2p_ops->reg_ap_assist_bmiss_ev_handler) {
+		status = p2p_ops->reg_ap_assist_bmiss_ev_handler(psoc);
+		if (QDF_IS_STATUS_ERROR(status))
+			p2p_debug("reg ap assist bmiss event status %d",
+				  status);
+	}
+
+	return status;
+}
+
 #ifdef FEATURE_P2P_LISTEN_OFFLOAD
 QDF_STATUS tgt_p2p_register_lo_ev_handler(
 	struct wlan_objmgr_psoc *psoc)
@@ -436,3 +470,42 @@ QDF_STATUS tgt_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 	return target_if_p2p_send_usd_params(psoc, param);
 }
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+QDF_STATUS
+tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,
+					     uint8_t vdev_id)
+{
+	QDF_STATUS status;
+	struct scheduler_msg msg = {0};
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+	struct p2p_ap_assist_dfs_group_bmiss *ev_data;
+
+	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							    WLAN_UMAC_COMP_P2P);
+	if (!p2p_soc_obj) {
+		p2p_err("p2p soc object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ev_data = qdf_mem_malloc(sizeof(*ev_data));
+	if (!ev_data)
+		return QDF_STATUS_E_NOMEM;
+
+	ev_data->p2p_soc_obj = p2p_soc_obj;
+	ev_data->vdev_id = vdev_id;
+
+	msg.type = P2P_EVENT_AP_ASSIST_DFS_GROUP_BMISS_IND;
+	msg.bodyptr = ev_data;
+	msg.callback = p2p_process_evt;
+	msg.flush_callback = p2p_event_flush_callback;
+
+	status = scheduler_post_message(QDF_MODULE_ID_P2P, QDF_MODULE_ID_P2P,
+					QDF_MODULE_ID_TARGET_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		p2p_nofl_debug("p2p failed to post msg (%d), status (%d)",
+			       P2P_EVENT_AP_ASSIST_DFS_GROUP_BMISS_IND, status);
+		qdf_mem_free(ev_data);
+	}
+
+	return status;
+}

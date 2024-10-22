@@ -1451,56 +1451,6 @@ enum host_log_level {
 
 /*
  * <ini>
- * g_no_sap_nan_concurrency - disable SAP-NAN concurrency
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini will not allow SAP-NAN Concurrency to be included in the
- * iface combinations.
- *
- * 0: enable SAP-NAN concurrency
- * 1: disable SAP-NAN concurrency
- * Related: None
- *
- * Supported Feature: IFACE combinations
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_NO_SAP_NAN_CONCURRENCY CFG_INI_BOOL( \
-		"g_no_sap_nan_concurrency", \
-		0, \
-		"This ini is used to disable SAP-NAN concurrency")
-
-/*
- * <ini>
- * g_no_sta_nan_concurrency - disable STA-NAN concurrency
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini will not allow STA-NAN Concurrency to be included in the
- * iface combinations.
- *
- * 0: enable STA-NAN concurrency
- * 1: disable STA-NAN concurrency
- * Related: None
- *
- * Supported Feature: IFACE combinations
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_NO_STA_NAN_CONCURRENCY CFG_INI_BOOL( \
-		"g_no_sta_nan_concurrency", \
-		0, \
-		"This ini is used to disable STA-NAN concurrency")
-
-/*
- * <ini>
  * g_sap_sta_ndp_concurrency - Enable/disable SAP-STA-NDP concurrency
  * @Min: 0
  * @Max: 1
@@ -1523,31 +1473,6 @@ enum host_log_level {
 		"g_sap_sta_ndp_concurrency", \
 		1, \
 		"This ini is used to enable/disable SAP-STA-NDP concurrency")
-
-/*
- * <ini>
- * g_no_sta_sap_concurrency - disable STA-SAP concurrency
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini will not allow STA-SAP concurrency to be included in the
- * iface combinations.
- *
- * 0: enable STA-SAP concurrency
- * 1: disable STA-SAP concurrency
- * Related: None
- *
- * Supported Feature: IFACE combinations
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_NO_STA_SAP_CONCURRENCY CFG_INI_BOOL( \
-		"g_no_sta_sap_concurrency", \
-		0, \
-		"This ini is used to disable STA-SAP concurrency")
 
 /*
  * <ini>
@@ -1739,10 +1664,7 @@ enum host_log_level {
 	CFG(CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME) \
 	CFG_LINK_STATE_CACHE_EXPIRY_ALL \
 	CFG(CFG_ENABLE_SMEM_MAILBOX) \
-	CFG(CFG_NO_STA_SAP_CONCURRENCY) \
-	CFG(CFG_NO_STA_NAN_CONCURRENCY) \
 	CFG(CFG_SAP_STA_NDP_CONCURRENCY) \
-	CFG(CFG_NO_SAP_NAN_CONCURRENCY) \
 	CFG(CFG_NO_P2P_CONCURRENCY) \
 	CFG(CFG_STA_P2P_NDP_CONCURRENCY) \
 	CFG(CFG_PREFER_NAN_CHAN_FOR_P2P) \

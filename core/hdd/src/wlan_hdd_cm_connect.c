@@ -1858,7 +1858,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 static inline void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
 {
-	adapter->disconnect_link_id = WLAN_INVALID_LINK_ID;
+	adapter->discon_link_info = NULL;
 }
 
 static void

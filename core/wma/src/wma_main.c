@@ -125,6 +125,7 @@
 #include "wlan_dp_api.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wma_pasn_peer_api.h"
+#include "target_if_mgmt_rx_srng.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -7843,6 +7844,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 	wma_init_dbr_params(wma_handle);
 
 	wma_set_coex_res_cfg(wma_handle, wmi_handle, wlan_res_cfg);
+
+	target_if_mgmt_rx_srng_update_support(wma_handle->psoc, wmi_handle);
 
 	return 0;
 }

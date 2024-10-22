@@ -3058,7 +3058,12 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		qdf_mem_free(pMsg->bodyptr);
 		break;
 	case eWNI_SME_MONITOR_MODE_VDEV_UP:
-		status = sme_process_monitor_mode_vdev_up_evt(pMsg->bodyval);
+		status = sme_process_monitor_mode_vdev_evt(pMsg->bodyval,
+							   true);
+		break;
+	case eWNI_SME_MONITOR_MODE_VDEV_STOP:
+		status = sme_process_monitor_mode_vdev_evt(pMsg->bodyval,
+							   false);
 		break;
 	case eWNI_SME_TWT_ADD_DIALOG_EVENT:
 		sme_process_twt_add_dialog_event(mac, pMsg->bodyptr);
@@ -7762,17 +7767,17 @@ QDF_STATUS sme_set_ht2040_mode(mac_handle_t mac_handle, uint8_t sessionId,
 
 	switch (channel_type) {
 	case eHT_CHAN_HT20:
-		if (!session->cb_mode)
+		if (session->cb_mode == PHY_SINGLE_CHANNEL_CENTERED)
 			return QDF_STATUS_SUCCESS;
 		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
 		break;
 	case eHT_CHAN_HT40MINUS:
-		if (session->cb_mode)
+		if (session->cb_mode != PHY_SINGLE_CHANNEL_CENTERED)
 			return QDF_STATUS_SUCCESS;
 		cb_mode = PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
 		break;
 	case eHT_CHAN_HT40PLUS:
-		if (session->cb_mode)
+		if (session->cb_mode != PHY_SINGLE_CHANNEL_CENTERED)
 			return QDF_STATUS_SUCCESS;
 		cb_mode = PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
 		break;
@@ -8499,6 +8504,29 @@ QDF_STATUS sme_ch_avoid_update_req(mac_handle_t mac_handle)
 	return status;
 }
 #endif
+
+QDF_STATUS sme_set_p2p_go_bcn_int(mac_handle_t mac_handle, uint8_t vdev_id,
+				  uint16_t bcn_int)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	enum QDF_OPMODE op_mode;
+	QDF_STATUS status;
+
+	op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
+	if (op_mode != QDF_P2P_GO_MODE) {
+		sme_err("Invalid opmode %d for GO bcn int update", op_mode);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->roam.roamSession[vdev_id].update_bcn_int = true;
+		mac->roam.roamSession[vdev_id].bcn_int = bcn_int;
+		status = csr_send_chng_mcc_beacon_interval(mac, vdev_id);
+		sme_release_global_lock(&mac->sme);
+	}
+	return status;
+}
 
 /**
  * sme_set_miracast() - Function to set miracast value to UMAC
@@ -11755,7 +11783,11 @@ int sme_update_he_full_ul_mumimo(mac_handle_t mac_handle, uint8_t session_id,
 		sme_err("No session for id %d", session_id);
 		return -EINVAL;
 	}
+
+	sme_info("UL MU mimo: %d", cfg_val);
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.ul_mu = cfg_val;
+	mac_ctx->he_cap_2g.ul_mu = cfg_val;
+	mac_ctx->he_cap_5g.ul_mu = cfg_val;
 
 	csr_update_session_he_cap(mac_ctx, session);
 
@@ -14575,9 +14607,8 @@ QDF_STATUS sme_unpack_assoc_rsp(mac_handle_t mac_handle,
 
 	lim_strip_and_decode_eht_cap(rsp->connect_ies.assoc_rsp.ptr + ies_offset,
 				     rsp->connect_ies.assoc_rsp.len - ies_offset,
-				     &assoc_resp->eht_cap,
-				     assoc_resp->he_cap,
-				     rsp->freq);
+				     &assoc_resp->eht_cap, assoc_resp->he_cap,
+				     rsp->freq, false);
 	return status;
 }
 
@@ -15382,17 +15413,21 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 void sme_config_ba_mode_all_vdevs(mac_handle_t mac_handle, uint8_t val)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	enum QDF_OPMODE op_mode;
 	uint8_t vdev_id;
 	int ret_val = 0;
+	struct wlan_objmgr_vdev *vdev;
 
 	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
-		op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
-		if (op_mode == QDF_STA_MODE) {
-			ret_val = wma_cli_set_command(
-						vdev_id,
-						wmi_vdev_param_set_ba_mode,
-						val, VDEV_CMD);
+		vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev,
+					vdev_id, WLAN_LEGACY_SME_ID);
+		if (!vdev)
+			continue;
+
+		ret_val = wma_cli_set_command(vdev_id,
+					      wmi_vdev_param_set_ba_mode,
+					      val, VDEV_CMD);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 
 		if (QDF_IS_STATUS_ERROR(ret_val))
 			sme_err("BA mode set failed for vdev: %d, ret %d",
@@ -15400,7 +15435,6 @@ void sme_config_ba_mode_all_vdevs(mac_handle_t mac_handle, uint8_t val)
 		else
 			sme_debug("vdev: %d ba mode: %d param id %d",
 				  vdev_id, val, wmi_vdev_param_set_ba_mode);
-		}
 	}
 }
 #endif
@@ -16753,7 +16787,8 @@ QDF_STATUS sme_get_ani_level(mac_handle_t mac_handle, uint32_t *freqs,
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 
 QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
-				   void (*monitor_mode_cb)(uint8_t vdev_id))
+				   void (*monitor_mode_cb)(uint8_t vdev_id,
+							   bool is_up))
 {
 	QDF_STATUS qdf_status;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
@@ -16769,7 +16804,7 @@ QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
 	return qdf_status;
 }
 
-QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
+QDF_STATUS sme_process_monitor_mode_vdev_evt(uint8_t vdev_id, bool is_up)
 {
 	mac_handle_t mac_handle;
 	struct mac_context *mac;
@@ -16781,7 +16816,7 @@ QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
 	mac = MAC_CONTEXT(mac_handle);
 
 	if (mac->sme.monitor_mode_cb)
-		mac->sme.monitor_mode_cb(vdev_id);
+		mac->sme.monitor_mode_cb(vdev_id, is_up);
 	else {
 		sme_warn_rl("monitor_mode_cb is not registered");
 		return QDF_STATUS_E_FAILURE;
@@ -17228,7 +17263,7 @@ sme_validate_txrx_chain_mask(uint32_t id, uint32_t value)
 }
 
 void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
-				    void (*set_disconnect_link_id_cb)
+				    void (*set_disconnect_link_info_cb)
 				    (uint8_t vdev_id))
 {
 	QDF_STATUS status;
@@ -17238,8 +17273,8 @@ void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		mac->sme.set_disconnect_link_id_cb =
-					set_disconnect_link_id_cb;
+		mac->sme.set_disconnect_link_info_cb =
+					set_disconnect_link_info_cb;
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -17255,7 +17290,7 @@ void sme_deregister_disconnect_cb(mac_handle_t mac_handle)
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		mac->sme.set_disconnect_link_id_cb = NULL;
+		mac->sme.set_disconnect_link_info_cb = NULL;
 		sme_release_global_lock(&mac->sme);
 	}
 

@@ -208,6 +208,24 @@ void lim_process_sae_auth_timeout(struct mac_context *mac_ctx)
 	}
 }
 
+void lim_process_channel_vacate_timeout(struct mac_context *mac_ctx)
+{
+	struct pe_session *session;
+	TX_TIMER *channel_vacate_timer =
+		&mac_ctx->lim.lim_timers.channel_vacate_timer;
+	uint16_t session_id = channel_vacate_timer->sessionId;
+
+	session = pe_find_session_by_session_id(mac_ctx, session_id);
+	if (!session) {
+		pe_err("Session does not exist for given session id %d",
+		       session_id);
+		return;
+	}
+
+	if (session->opmode == QDF_P2P_CLIENT_MODE)
+		lim_handle_heart_beat_failure(mac_ctx, session);
+}
+
 /**
  * lim_process_mlm_req_messages() - process mlm request messages
  * @mac_ctx: global MAC context
@@ -268,6 +286,9 @@ void lim_process_mlm_req_messages(struct mac_context *mac_ctx,
 		break;
 	case SIR_LIM_RRM_STA_STATS_RSP_TIMEOUT:
 		lim_process_rrm_sta_stats_rsp_timeout(mac_ctx);
+		break;
+	case SIR_LIM_CHANNEL_VACATE_TIMEOUT:
+		lim_process_channel_vacate_timeout(mac_ctx);
 		break;
 	case LIM_MLM_TSPEC_REQ:
 	default:

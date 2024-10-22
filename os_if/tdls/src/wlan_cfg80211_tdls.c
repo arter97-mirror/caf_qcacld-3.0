@@ -41,6 +41,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_object_manager.h"
+#include "wlan_tdls_main.h"
 
 static int wlan_cfg80211_tdls_validate_mac_addr(const uint8_t *mac)
 {
@@ -245,8 +246,9 @@ tdls_fill_chan_freq_from_supported_ch_list(struct wlan_objmgr_pdev *pdev,
 			continue;
 
 		if (wlan_reg_is_6ghz_chan_freq(freq) &&
-		    !wlan_reg_is_6ghz_psc_chan_freq(freq)) {
-			osif_debug("skipping non-psc channel %d", freq);
+		    !tdls_is_6g_freq_allowed(pdev, freq)) {
+			osif_debug("skipping non-psc or non-vlp freq %d",
+				   freq);
 			continue;
 		}
 
@@ -269,8 +271,9 @@ tdls_fill_chan_freq_from_supported_ch_list(struct wlan_objmgr_pdev *pdev,
 				continue;
 
 			if (wlan_reg_is_6ghz_chan_freq(freq) &&
-			    !wlan_reg_is_6ghz_psc_chan_freq(freq)) {
-				osif_debug("skipping non-psc channel %d", freq);
+			    !tdls_is_6g_freq_allowed(pdev, freq)) {
+				osif_debug("skipping non-psc or non-vlp freq %d",
+					   freq);
 				continue;
 			}
 
@@ -299,26 +302,23 @@ tdls_calc_channels_from_staparams(struct wlan_objmgr_vdev *vdev,
 	const uint8_t *src_chans, *src_opclass;
 	qdf_freq_t *dest_freq;
 	uint8_t country[REG_ALPHA2_LEN + 1];
-	QDF_STATUS status;
 	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!vdev) {
 		osif_err("null vdev");
 		return;
 	}
 
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		osif_err("null pdev");
-		return;
-	}
 	src_chans = params->supported_channels;
 	src_opclass = params->supported_oper_classes;
 	dest_freq = req_info->supported_chan_freq;
 	pdev = wlan_vdev_get_pdev(vdev);
-	status = wlan_cm_get_country_code(pdev, wlan_vdev_get_id(vdev),
-					  country);
+	psoc  = wlan_vdev_get_psoc(vdev);
+	if (!psoc || !pdev)
+		return;
 
+	wlan_reg_read_current_country(psoc, country);
 	osif_debug("Country info from AP:%c%c 0x%x", country[0],
 		   country[1], country[2]);
 
@@ -1085,9 +1085,9 @@ bool wlan_cfg80211_tdls_is_fw_wideband_capable(struct wlan_objmgr_vdev *vdev)
 }
 
 #ifdef WLAN_FEATURE_11AX
-bool wlan_cfg80211_tdls_is_fw_6ghz_capable(struct wlan_objmgr_vdev *vdev)
+bool wlan_cfg80211_tdls_is_fw_6ghz_capable(struct wlan_objmgr_pdev *pdev)
 {
-	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 
 	if (!psoc)
 		return false;

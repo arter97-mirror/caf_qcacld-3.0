@@ -108,6 +108,7 @@
 /* AP start timeout = vdev start + 2 sec */
 #define SME_CMD_VDEV_START_BSS_TIMEOUT (START_RESPONSE_TIMER + 2000)
 #define SME_CMD_START_BSS_TIMEOUT (SME_CMD_VDEV_START_BSS_TIMEOUT + 1000)
+#define SME_CMD_STOP_VDEV_TIMEOUT (STOP_RESPONSE_TIMER + 1000)
 
 /* AP stop timeout = vdev stop + self peer delete + 1 sec */
 #define SME_CMD_STOP_BSS_CMD_TIMEOUT (STOP_RESPONSE_TIMER + \
@@ -4703,25 +4704,28 @@ void sme_vdev_del_resp(uint8_t vdev_id);
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
-				   void (*monitor_mode_cb)(uint8_t vdev_id));
+				   void (*monitor_mode_cb)(uint8_t vdev_id,
+							   bool is_up));
 
 /*
- * sme_process_monitor_mode_vdev_up_evt() - Handle vdev up completion
+ * sme_process_monitor_mode_vdev_evt() - Handle vdev up completion
  * @vdev_id: vdev id
+ * @is_up: is vdev up
  *
  * Return: QDF_STATUS.
  */
-QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id);
+QDF_STATUS sme_process_monitor_mode_vdev_evt(uint8_t vdev_id, bool is_up);
 #else
 static inline
 QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
-				   void (*monitor_mode_cb)(uint8_t vdev_id))
+				   void (*monitor_mode_cb)(uint8_t vdev_id,
+							   bool is_up))
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 static inline QDF_STATUS
-sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
+sme_process_monitor_mode_vdev_evt(uint8_t vdev_id, bool is_up)
 {
 	return QDF_STATUS_E_FAILURE;
 }
@@ -4872,6 +4876,16 @@ QDF_STATUS sme_start_bss(mac_handle_t mac_handle, uint8_t vdev_id,
 			 struct start_bss_config *bss_config);
 
 /**
+ * sme_set_p2p_go_bcn_int() - Sets the P2P GO beacon interval
+ * @mac_handle: mac hancle
+ * @vdev_id: vdev id
+ * @bcn_int: beacon interval value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_p2p_go_bcn_int(mac_handle_t mac_handle, uint8_t vdev_id,
+				  uint16_t bcn_int);
+/**
  * sme_sap_ser_callback() - callback from serialization module
  * @cmd: serialization command
  * @reason: reason why serialization module has given this callback
@@ -4925,13 +4939,13 @@ QDF_STATUS sme_update_beacon_country_ie(mac_handle_t mac_handle,
  * sme_register_set_disconnect_cb() - function to register cb to set
  * disconnect link_id
  * @mac_handle: Opaque handle to the global MAC context
- * @hdd_set_disconnect_link_id_cb: callback to be registered
+ * @hdd_set_disconnect_link_info_cb: callback to be registered
  *
  * Return: None
  */
 
 void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
-				    void (*set_disconnect_link_id_cb)
+				    void (*set_disconnect_link_info_cb)
 				    (uint8_t vdev_id));
 
 /**

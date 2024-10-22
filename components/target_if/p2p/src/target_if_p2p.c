@@ -201,6 +201,124 @@ target_if_p2p_lo_register_tx_ops(struct wlan_lmac_if_p2p_tx_ops *p2p_tx_ops)
 }
 #endif /* FEATURE_P2P_LISTEN_OFFLOAD */
 
+static int target_p2p_ap_assist_dfs_bmiss_event_handler(ol_scn_t scn,
+							uint8_t *data,
+							uint32_t datalen)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_psoc *psoc;
+	struct wmi_unified *wmi_handle;
+	struct wlan_lmac_if_p2p_rx_ops *p2p_rx_ops;
+	uint8_t vdev_id;
+
+	if (!scn || !data) {
+		target_if_err("scn: 0x%pK, data: 0x%pK", scn, data);
+		return -EINVAL;
+	}
+
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		target_if_err("null psoc");
+		return -EINVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("null wmi handle");
+		return -EINVAL;
+	}
+
+	if (wmi_extract_p2p_ap_assist_dfs_group_bmiss(wmi_handle, data,
+						      &vdev_id)) {
+		target_if_err("Failed to extract event");
+		return -EINVAL;
+	}
+
+	if (vdev_id >= WLAN_INVALID_VDEV_ID) {
+		target_if_err("invalid VDEV %d", vdev_id);
+		return -EINVAL;
+	}
+
+	p2p_rx_ops = target_if_psoc_get_p2p_rx_ops(psoc);
+	if (p2p_rx_ops->ap_assist_dfs_group_bmiss_ev_handler) {
+		status = p2p_rx_ops->ap_assist_dfs_group_bmiss_ev_handler(psoc,
+									  vdev_id);
+		if (QDF_IS_STATUS_ERROR(status))
+			target_if_debug("p2p ap assist bmiss handler error %d",
+					status);
+	}
+
+	return qdf_status_to_os_return(status);
+}
+
+static QDF_STATUS
+target_if_p2p_reg_assist_dfs_group_bmiss_evt_handler(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status;
+	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
+
+	if (!wmi_handle) {
+		target_if_err("Invalid wmi handle");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wmi_unified_register_event(wmi_handle,
+					    wmi_p2p_cli_dfs_ap_bmiss_detected_eventid,
+					    target_p2p_ap_assist_dfs_bmiss_event_handler);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_debug("Failed to register event handler %d", status);
+
+	return status;
+}
+
+static QDF_STATUS
+target_if_p2p_unreg_assist_dfs_group_bmiss_evt_handler(struct wlan_objmgr_psoc *psoc)
+{
+	QDF_STATUS status;
+	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
+
+	if (!wmi_handle) {
+		target_if_err("Invalid wmi handle");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wmi_unified_unregister_event(wmi_handle,
+					      wmi_p2p_cli_dfs_ap_bmiss_detected_eventid);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_debug("Failed to unregister event handler %d",
+				status);
+
+	return status;
+}
+
+static QDF_STATUS
+target_if_p2p_send_ap_assist_dfs_group_params(struct wlan_objmgr_psoc *psoc,
+					      struct p2p_ap_assist_dfs_group_params *params)
+{
+	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
+
+	if (!wmi_handle) {
+		target_if_err("Invalid wmi handle");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wmi_unified_p2p_send_ap_assist_dfs_group_params(wmi_handle,
+							       params);
+}
+
+static inline void
+target_if_p2p_register_ap_assist_dfs_tx_ops(struct wlan_lmac_if_p2p_tx_ops *p2p_tx_ops)
+{
+	p2p_tx_ops->reg_ap_assist_bmiss_ev_handler =
+			target_if_p2p_reg_assist_dfs_group_bmiss_evt_handler;
+	p2p_tx_ops->unreg_ap_assist_bmiss_ev_handler =
+			target_if_p2p_unreg_assist_dfs_group_bmiss_evt_handler;
+	p2p_tx_ops->send_ap_assist_dfs_group_params =
+			target_if_p2p_send_ap_assist_dfs_group_params;
+}
+
 /**
  * target_p2p_noa_event_handler() - WMI callback for noa event
  * @scn:       pointer to scn
@@ -482,6 +600,9 @@ void target_if_p2p_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 
 	/* register P2P listen offload callbacks */
 	target_if_p2p_lo_register_tx_ops(p2p_tx_ops);
+
+	/* Register P2P AP assisted DFS group callbacks */
+	target_if_p2p_register_ap_assist_dfs_tx_ops(p2p_tx_ops);
 }
 
 #ifdef FEATURE_WLAN_SUPPORT_USD

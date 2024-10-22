@@ -596,6 +596,14 @@ QDF_STATUS ucfg_nan_send_delete_pasn_peer(struct wlan_objmgr_psoc *psoc,
  * for P2P or not
  */
 bool ucfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_nan_get_fw_addr() - wrapper for nan_get_fw_addr() API
+ * @psoc: pointer to psoc object
+ *
+ * Return: NAN MAC address
+ */
+struct qdf_mac_addr *ucfg_nan_get_fw_addr(struct wlan_objmgr_psoc *psoc);
 #else /* WLAN_FEATURE_NAN */
 
 static inline
@@ -769,6 +777,12 @@ static inline bool
 ucfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
+}
+
+static inline struct qdf_mac_addr *
+ucfg_nan_get_fw_addr(struct wlan_objmgr_psoc *psoc)
+{
+	return NULL;
 }
 #endif /* WLAN_FEATURE_NAN */
 #endif /* _NAN_UCFG_API_H_ */

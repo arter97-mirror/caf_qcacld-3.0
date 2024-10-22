@@ -1804,3 +1804,8 @@ bool ucfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc)
 {
 	return cfg_nan_get_prefer_nan_chan_for_p2p(psoc);
 }
+
+struct qdf_mac_addr *ucfg_nan_get_fw_addr(struct wlan_objmgr_psoc *psoc)
+{
+	return nan_get_fw_addr(psoc);
+}

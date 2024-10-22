@@ -505,7 +505,7 @@ wlan_dp_lb_check_for_cpu_mask_change(struct wlan_dp_psoc_context *dp_ctx)
 			qdf_cpumask_copy(&lb_data->preferred_cpu_mask,
 					 &updated_cpu_mask);
 
-		dp_debug("Audio taken cpus old:%*pbl new:%*pbl updated_cpumask:%pbl",
+		dp_debug("Audio taken cpus old:%*pbl new:%*pbl updated_cpumask:%*pbl",
 			 qdf_cpumask_pr_args(&lb_data->audio_taken_cpumask),
 			 qdf_cpumask_pr_args(&audio_taken_cpus),
 			 qdf_cpumask_pr_args(&lb_data->preferred_cpu_mask));

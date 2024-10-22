@@ -308,6 +308,7 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 				CFG_INTERVAL_FOR_PAGEFAULT_WAKEUP_COUNT);
 	psoc_cfg->ssr_frequency_on_pagefault =
 			cfg_get(psoc, CFG_SSR_FREQUENCY_ON_PAGEFAULT);
+	psoc_cfg->ra_priority_enable = cfg_get(psoc, CFG_RA_PRIORITY);
 }
 
 QDF_STATUS pmo_psoc_open(struct wlan_objmgr_psoc *psoc)

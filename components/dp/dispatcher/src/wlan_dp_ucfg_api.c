@@ -54,47 +54,6 @@
 #include "wlan_dp_load_balance.h"
 #include "wlan_dp_flow_balance.h"
 
-#ifdef FEATURE_DIRECT_LINK
-/**
- * wlan_dp_set_vdev_direct_link_cfg() - Set direct link config in DP vdev
- * @psoc: objmgr psoc handle
- * @dp_intf: pointer to DP component interface handle
- *
- * Return: direct link configuration
- */
-static inline
-QDF_STATUS wlan_dp_set_vdev_direct_link_cfg(struct wlan_objmgr_psoc *psoc,
-					    struct wlan_dp_intf *dp_intf)
-{
-	struct wlan_dp_link *dp_link, *dp_link_next;
-	cdp_config_param_type vdev_param = {0};
-	QDF_STATUS status;
-
-	if (dp_intf->device_mode != QDF_SAP_MODE ||
-	    !dp_intf->dp_ctx->dp_direct_link_ctx)
-		return QDF_STATUS_SUCCESS;
-
-	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
-		vdev_param.cdp_vdev_tx_to_fw =
-					dp_intf->direct_link_config.config_set;
-		status = cdp_txrx_set_vdev_param(wlan_psoc_get_dp_handle(psoc),
-						 dp_link->link_id,
-						 CDP_VDEV_TX_TO_FW, vdev_param);
-		if (QDF_IS_STATUS_ERROR(status))
-			break;
-	}
-
-	return status;
-}
-#else
-static inline
-QDF_STATUS wlan_dp_set_vdev_direct_link_cfg(struct wlan_objmgr_psoc *psoc,
-					    struct wlan_dp_intf *dp_intf)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline
 QDF_STATUS wlan_dp_update_vdev_mac_addr(struct wlan_dp_psoc_context *dp_ctx,
@@ -216,8 +175,6 @@ void ucfg_dp_update_intf_mac(struct wlan_objmgr_psoc *psoc,
 		dp_link ? dp_link->link_id : 255);
 	if (dp_link && dp_link->dp_intf == dp_intf)
 		dp_intf->def_link = dp_link;
-
-	wlan_dp_set_vdev_direct_link_cfg(psoc, dp_intf);
 }
 
 static inline uint8_t
@@ -3320,3 +3277,40 @@ void ucfg_dp_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
 						      cdp_host_reo_dest_ring_3);
 }
 #endif /* IPA_WDI3_VLAN_SUPPORT */
+
+int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
+				uint32_t pri)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	ol_txrx_soc_handle soc_txrx_handle;
+	cdp_config_param_type value = {0};
+	QDF_STATUS status;
+
+	if (!vdev) {
+		dp_err("null vdev");
+		return -EINVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		dp_err("null pdev");
+		return -EINVAL;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+	if (!soc_txrx_handle) {
+		dp_err("dp handle is null");
+		return -EINVAL;
+	}
+
+	value.cdp_pdev_param_tidmap_prty = pri;
+
+	status = cdp_txrx_set_pdev_param(soc_txrx_handle,
+					 wlan_objmgr_pdev_get_pdev_id(pdev),
+					 CDP_TIDMAP_PRTY, value);
+
+	return qdf_status_to_os_return(status);
+}

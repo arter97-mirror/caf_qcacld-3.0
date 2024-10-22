@@ -1252,12 +1252,11 @@ static int osif_dp_lpass_ssr_cb(struct notifier_block *nb, unsigned long event,
 
 	switch (event) {
 	case QCOM_SSR_BEFORE_SHUTDOWN:
-		if (!notify_data->crashed)
-			return NOTIFY_DONE;
+		dp_info("LPASS before shutdown event received - crashed:%u",
+			notify_data->crashed);
 
-		dp_info("LPASS before shutdown event received");
-
-		ucfg_dp_direct_link_handle_lpass_ssr_notif(dp_lpass_ssr_nb_param->psoc);
+		if (notify_data->crashed)
+			ucfg_dp_direct_link_handle_lpass_ssr_notif(dp_lpass_ssr_nb_param->psoc);
 		break;
 	case QCOM_SSR_AFTER_SHUTDOWN:
 	case QCOM_SSR_BEFORE_POWERUP:

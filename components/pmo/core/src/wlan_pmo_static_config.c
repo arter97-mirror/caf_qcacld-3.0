@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -385,7 +385,8 @@ void pmo_register_wow_default_patterns(struct wlan_objmgr_vdev *vdev)
 		 * APF internally handles RA filtering.
 		 */
 		if (psoc_ctx->psoc_cfg.ra_ratelimit_enable &&
-		    !pmo_intersect_apf(psoc_ctx)) {
+		    (psoc_ctx->psoc_cfg.ra_priority_enable ||
+		    !pmo_intersect_apf(psoc_ctx))) {
 			pmo_debug("Config STA RA wow pattern vdev_id %d",
 				  vdev_id);
 			pmo_tgt_send_ra_filter_req(vdev);

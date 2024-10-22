@@ -1702,6 +1702,11 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 	if (SAP_INIT != sap_ctx->fsm_state)
 		return;
 
+	if (!sap_ctx->acs_cfg) {
+		sap_debug("acs_cfg is null");
+		return;
+	}
+
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(roam_info->chan_info_freq) &&
 	    !sap_ctx->acs_cfg->is_early_terminate_enabled)
 		return;
@@ -1714,11 +1719,6 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 
 	if (sap_ctx->optimize_acs_chan_selected)
 		return;
-
-	if (!sap_ctx->acs_cfg) {
-		sap_debug("acs_cfg is null");
-		return;
-	}
 
 	/* If chan_info_freq is not preferred band's freq
 	 * do not select it as ACS result.

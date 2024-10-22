@@ -4860,6 +4860,26 @@ QDF_STATUS wma_mon_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 	return status;
 }
 
+QDF_STATUS wma_mon_mlme_vdev_stop_resp(struct vdev_mlme_obj *vdev_mlme)
+{
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct scheduler_msg sme_msg = {0};
+
+	sme_msg.type = eWNI_SME_MONITOR_MODE_VDEV_STOP;
+	sme_msg.bodyptr = NULL;
+	sme_msg.bodyval = wlan_vdev_get_id(vdev_mlme->vdev);
+
+	qdf_status = scheduler_post_message(QDF_MODULE_ID_WMA,
+					    QDF_MODULE_ID_SME,
+					    QDF_MODULE_ID_SME, &sme_msg);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		wma_err("Fail to post set vdev stop response");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef FEATURE_WLM_STATS
 int wma_wlm_stats_req(int vdev_id, uint32_t bitmask, uint32_t max_size,
 		      wma_wlm_stats_cb cb, void *cookie)

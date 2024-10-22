@@ -703,9 +703,10 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 		return WLAN_PHYMODE_AUTO;
 
 	if (chan_width >= CH_WIDTH_INVALID || !bw_val ||
+	    dot11_mode == MLME_DOT11_MODE_ABG ||
 	    (wlan_reg_is_24ghz_ch_freq(freq) && bw_val > 40)) {
-		wma_err_rl("Invalid channel width %d freq %d",
-			   chan_width, freq);
+		wma_err_rl("Invalid channel width %d freq %d dot11_mode %d",
+			   chan_width, freq, dot11_mode);
 		return WLAN_PHYMODE_AUTO;
 	}
 
@@ -2001,6 +2002,8 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 	case WOW_REASON_XGAP:
 		return "XGAP";
 #endif
+	case WOW_REASON_PF_BLOCKING_LAST_TIME:
+		return "PF_BLOCKING_LAST_TIME";
 	default:
 		return "unknown";
 	}
@@ -6370,7 +6373,14 @@ QDF_STATUS
 wma_peer_txq_flush_config_send(struct peer_txq_flush_config_params *params)
 {
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	struct wmi_unified *wmi_handle = wma_handle->wmi_handle;
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma_handle))
+		return QDF_STATUS_E_INVAL;
+
+	wmi_handle = wma_handle->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
 
 	return wmi_unified_peer_txq_flush_config_send(wmi_handle, params);
 }
@@ -6387,7 +6397,14 @@ wma_peer_flush_tids_send(uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 			 struct peer_flush_params *param)
 {
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	struct wmi_unified *wmi_handle = wma_handle->wmi_handle;
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma_handle))
+		return QDF_STATUS_E_INVAL;
+
+	wmi_handle = wma_handle->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
 
 	return wmi_unified_peer_flush_tids_send(wmi_handle, peer_addr, param);
 }

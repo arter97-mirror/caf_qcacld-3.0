@@ -291,7 +291,7 @@ hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 {
 	struct sap_context *sap_ctx;
 	struct hdd_adapter *adapter = link_info->adapter;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx;
 	struct qdf_mac_addr *link_mac;
 	QDF_STATUS status;
 
@@ -300,8 +300,13 @@ hdd_hostapd_init_sap_session(struct wlan_hdd_link_info *link_info, bool reinit)
 		return NULL;
 	}
 
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is null");
+		return NULL;
+	}
 
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		hdd_err("can't allocate the sap_ctx");
 		return NULL;
@@ -736,28 +741,6 @@ static int hdd_hostapd_change_mtu(struct net_device *net_dev, int new_mtu)
 	return errno;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
-static void hdd_wiphy_lock(struct wireless_dev *dev_ptr)
-{
-	mutex_lock(&dev_ptr->mtx);
-}
-
-static void hdd_wiphy_unlock(struct wireless_dev *dev_ptr)
-{
-	mutex_unlock(&dev_ptr->mtx);
-}
-#else
-static void hdd_wiphy_lock(struct wireless_dev *dev_ptr)
-{
-	mutex_lock(&dev_ptr->wiphy->mtx);
-}
-
-static void hdd_wiphy_unlock(struct wireless_dev *dev_ptr)
-{
-	mutex_unlock(&dev_ptr->wiphy->mtx);
-}
-#endif
-
 #ifdef QCA_HT_2040_COEX
 QDF_STATUS hdd_set_sap_ht2040_mode(struct wlan_hdd_link_info *link_info,
 				   uint8_t channel_type)
@@ -1152,7 +1135,7 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 		dev = assoc_adapter->dev;
 	}
 
-	hdd_wiphy_lock(dev->ieee80211_ptr);
+	hdd_wiphy_lock(NULL, dev->ieee80211_ptr);
 	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS) {
 		hdd_debug("Vdev %d mode %d not UP", vdev_id,
 			  adapter->device_mode);
@@ -1189,7 +1172,7 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id, puncture_bitmap);
 exit:
-	hdd_wiphy_unlock(dev->ieee80211_ptr);
+	hdd_wiphy_unlock(NULL, dev->ieee80211_ptr);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
@@ -2299,7 +2282,7 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 	dev = adapter->dev;
 	vdev_id = wlan_vdev_get_id(vdev);
 
-	hdd_wiphy_lock(dev->ieee80211_ptr);
+	hdd_wiphy_lock(NULL, dev->ieee80211_ptr);
 	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS &&
 	    wlan_vdev_is_restart_progress(vdev) != QDF_STATUS_SUCCESS) {
 		hdd_debug("Vdev %d mode %d not UP", vdev_id,
@@ -2330,7 +2313,7 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 					       input_punc_bitmap);
 
 exit:
-	hdd_wiphy_unlock(dev->ieee80211_ptr);
+	hdd_wiphy_unlock(NULL, dev->ieee80211_ptr);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
@@ -2515,9 +2498,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			sap_event->sapevt.sapStartBssCompleteEvent.ch_width;
 
 		hdd_nofl_info("AP %s vid %d freq %d BW %d",
-			      link_info->vdev_id,
 			      sap_event->sapevt.sapStartBssCompleteEvent.status ?
 			      "failed" : "started",
+			      link_info->vdev_id,
 			      ap_ctx->operating_chan_freq,
 			      sap_config->ch_params.ch_width);
 
@@ -3411,12 +3394,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		sap_event->sapevt.sap_ch_selected.vht_seg1_center_ch_freq;
 		ap_ctx->sap_config.acs_cfg.ch_width =
 			sap_event->sapevt.sap_ch_selected.ch_width;
-		hdd_nofl_info("Vdev %d ACS Completed freq %d BW %d flag %x ACS in progress %d",
+		hdd_nofl_info("Vdev %d ACS Completed freq %d BW %d flag 0x%lx ACS in progress %d",
 			      link_info->vdev_id,
 			      ap_ctx->sap_config.acs_cfg.pri_ch_freq,
 			      ap_ctx->sap_config.acs_cfg.ch_width,
 			      link_info->link_flags,
-			      ap_ctx->acs_in_progress);
+			      qdf_atomic_read(&ap_ctx->acs_in_progress));
 
 		if (qdf_atomic_read(&ap_ctx->acs_in_progress) &&
 		    test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
@@ -7896,6 +7879,65 @@ int hdd_destroy_acs_timer(struct hdd_adapter *adapter)
 	return 0;
 }
 
+static QDF_STATUS
+hdd_check_ap_assist_dfs_group_start_req(struct wlan_hdd_link_info *link_info,
+					const uint8_t *ie, uint16_t ie_len,
+					qdf_freq_t freq)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	bool is_dfs_master = 0, is_fw_cap = false;
+	bool is_valid_ap_assist = false, is_go_dfs_owner = false;
+	struct qdf_mac_addr ap_bssid;
+
+	vdev =  hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		status = QDF_STATUS_E_INVAL;
+		goto vdev_ref;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	ucfg_mlme_get_dfs_master_capability(psoc, &is_dfs_master);
+	if (is_dfs_master) {
+		hdd_debug_rl("Driver is DFS Master Cap so ignore checks");
+		status = QDF_STATUS_SUCCESS;
+		goto vdev_ref;
+	}
+
+	is_fw_cap = ucfg_p2p_fw_support_ap_assist_dfs_group(psoc);
+
+	status = ucfg_p2p_extract_ap_assist_dfs_params(vdev, ie, ie_len,
+						       true, freq, true);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("Error parsing P2P2 IE");
+		goto vdev_ref;
+	}
+
+	status = ucfg_p2p_get_ap_assist_dfs_params(vdev, &is_go_dfs_owner,
+						   &is_valid_ap_assist,
+						   &ap_bssid, NULL, NULL);
+
+	if (is_go_dfs_owner || !is_valid_ap_assist || !is_fw_cap) {
+		hdd_debug("error GO DFS owner %d, FW CAP %d",
+			  is_go_dfs_owner, is_fw_cap);
+		status = QDF_STATUS_E_FAILURE;
+		goto vdev_ref;
+	}
+
+	status = ucfg_p2p_check_ap_assist_dfs_group_go(vdev);
+
+vdev_ref:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return status;
+}
+
 /**
  * __wlan_hdd_cfg80211_stop_ap() - stop soft ap
  * @wiphy: Pointer to wiphy structure
@@ -8956,6 +8998,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			p2p_link_info = p2p_adapter->deflink;
 			wlan_hdd_cleanup_remain_on_channel_ctx(p2p_link_info);
 		}
+
+		if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, freq)) {
+			status = hdd_check_ap_assist_dfs_group_start_req(link_info,
+									 params->beacon.tail,
+									 params->beacon.tail_len,
+									 freq);
+			if (QDF_IS_STATUS_ERROR(status))
+				return -EINVAL;
+		}
 	}
 
 	if ((adapter->device_mode == QDF_SAP_MODE)
@@ -9141,9 +9192,9 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
 	struct hdd_beacon_data *old, *new;
-	int status;
+	int status, link_id;
 	struct wlan_hdd_link_info *link_info;
-	int link_id;
+	struct sap_config *config;
 
 	hdd_enter();
 
@@ -9198,6 +9249,24 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 
 	link_info->session.ap.beacon = new;
 	hdd_debug("update beacon for P2P GO/SAP");
+
+	/* Re-check if assisted AP params got changed or not, not doing
+	 * validation, might need to check with framework implementation
+	 */
+	config = &(WLAN_HDD_GET_AP_CTX_PTR(link_info))->sap_config;
+	if (adapter->device_mode == QDF_P2P_GO_MODE && new->tail_len) {
+		status = ucfg_p2p_extract_ap_assist_dfs_params(link_info->vdev,
+							       new->tail,
+							       new->tail_len,
+							       true,
+							       config->chan_freq,
+							       true);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_debug("Failed parsing P2P2 IE");
+			return -EINVAL;
+		}
+	}
+
 	status = wlan_hdd_cfg80211_start_bss(link_info, params,
 					     NULL, 0, 0, false);
 

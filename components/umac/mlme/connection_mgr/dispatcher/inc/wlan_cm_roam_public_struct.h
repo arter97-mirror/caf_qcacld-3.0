@@ -94,6 +94,7 @@
 #define REASON_ROAM_SET_PRIMARY                     54
 #define REASON_ROAM_LINK_SWITCH_ASSOC_VDEV_CHANGE   55
 #define REASON_VDEV_RESTART_FROM_HOST               56
+#define REASON_AGGRESSIVE_ROAM_ENABLED              57
 
 #define FILS_MAX_KEYNAME_NAI_LENGTH WLAN_CM_FILS_MAX_KEYNAME_NAI_LENGTH
 #define WLAN_FILS_MAX_REALM_LEN WLAN_CM_FILS_MAX_REALM_LEN
@@ -430,6 +431,8 @@ enum roam_fail_params {
  * roam scan started.
  * @ROAM_FAIL_REASON_REASSOC_TO_SAME_AP: Host internal reason code. Reassoc
  * command rejected due to reassociation request received for same AP.
+ * @ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED: Roaming is not triggered as part
+ * of the first roam scan as additional scan is required to scan all MLD links
  * @ROAM_FAIL_REASON_UNKNOWN: Default reason
  */
 enum wlan_roam_failure_reason_code {
@@ -474,6 +477,7 @@ enum wlan_roam_failure_reason_code {
 	ROAM_FAIL_REASON_SCREEN_ACTIVITY,
 	ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN,
 	ROAM_FAIL_REASON_REASSOC_TO_SAME_AP,
+	ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED,
 	ROAM_FAIL_REASON_UNKNOWN = 255,
 };
 
@@ -1003,7 +1007,7 @@ struct scoring_param {
 	struct per_slot_score oce_wan_scoring;
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t eht_caps_weightage;
-	uint8_t mlo_weightage;
+	uint32_t mlo_weightage;
 #endif
 	int32_t security_weightage;
 	uint32_t security_index_score;
@@ -1406,6 +1410,8 @@ struct wlan_roam_11k_offload_params {
  * @bss_load_threshold: BSS load threshold after which roam scan should trigger
  * @bss_load_sample_time: Time duration in milliseconds for which the bss load
  * trigger needs to be enabled
+ * @bss_load_alpha: Factor for computing average bss load from current channel
+ * utilization
  * @rssi_threshold_6ghz: RSSI threshold of the current connected AP below which
  * roam should be triggered if bss load threshold exceeds the configured value.
  * This value is applicable only when we are connected in 6GHz band.
@@ -1420,6 +1426,7 @@ struct wlan_roam_bss_load_config {
 	uint32_t vdev_id;
 	uint32_t bss_load_threshold;
 	uint32_t bss_load_sample_time;
+	uint32_t bss_load_alpha;
 	int32_t rssi_threshold_6ghz;
 	int32_t rssi_threshold_5ghz;
 	int32_t rssi_threshold_24ghz;

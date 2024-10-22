@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2014, 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -56,7 +56,8 @@ enum limtimertype {
 	eLIM_INSERT_SINGLESHOT_NOA_TIMER,
 	eLIM_AUTH_RETRY_TIMER,
 	eLIM_AUTH_SAE_TIMER,
-	eLIM_RRM_STA_STATS_RSP_TIMER
+	eLIM_RRM_STA_STATS_RSP_TIMER,
+	LIM_CHANNEL_VACATE_TIMER,
 };
 
 #define LIM_DISASSOC_DEAUTH_ACK_TIMEOUT         500

@@ -329,6 +329,22 @@ QDF_STATUS ucfg_p2p_lo_stop(struct wlan_objmgr_psoc *soc,
 #endif
 
 /**
+ * ucfg_p2p_send_chan_switch_req() - OSIF wrapper API to send channel switch
+ * request params to P2P module
+ * @psoc: PSOC object manager
+ * @vdev_id: VDEV ID of p2p entity for channel switch request
+ * @channel: Channel number of requested channel
+ * @opclass: Operating class of request channel
+ *
+ * Posts command to P2P module for channel switch request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_p2p_send_chan_switch_req(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint8_t channel,
+					 uint8_t opclass);
+
+/**
  * p2p_peer_authorized() - Process peer authorized event
  * @vdev: vdev structure to which peer is associated
  * @mac_addr: peer mac address
@@ -530,4 +546,61 @@ ucfg_p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 				    struct p2p_usd_attr_params *param);
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+/**
+ * ucfg_p2p_fw_support_ap_assist_dfs_group() - Wrapper API to get the FW
+ * support for assisted AP DFS P2P group operation
+ * @psoc: PSOC object manager
+ *
+ * Return: bool
+ */
+bool ucfg_p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_p2p_extract_ap_assist_dfs_params() - Wrapper API to parse the P2P2 IE
+ * and save the assisted DFS params in VDEV
+ * @vdev: VDEV object manager pointer
+ * @ie: Pointer to IE buffer
+ * @ie_len: Length go bytes pointed by @ie
+ * @is_connected: If set to %true only connected APs are extracted
+ * @freq: Frequency to filter out APs from the WLAN AP info attr
+ * @is_self: If set to %true, the extracted AP info is filled in VDEV priv
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+				      const uint8_t *ie, uint16_t ie_len,
+				      bool is_connected, qdf_freq_t freq,
+				      bool is_self);
+
+/**
+ * ucfg_p2p_get_ap_assist_dfs_params() - Wrapper API to get the parsed DFS
+ * operation P2P group assisted AP params
+ * @vdev: VDEV object manager
+ * @is_dfs_owner: Pointer to get the DFS owner cap
+ * @is_valid_ap_assist: Is valid AP assist params
+ * @ap_bssid: BSSID of the assisted AP
+ * @opclass: Operating class of the assisted AP
+ * @chan: Channel number of assisted AP
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					     bool *is_dfs_owner,
+					     bool *is_valid_ap_assist,
+					     struct qdf_mac_addr *ap_bssid,
+					     uint8_t *opclass, uint8_t *chan);
+
+/**
+ * ucfg_p2p_check_ap_assist_dfs_group_go() - Check DFS P2P GO operation under
+ * assisted AP mode requirements.
+ * @vdev: VDEV object manager for P2P GO
+ *
+ * Validates the conditions for P2P GO operation in DFS channel in AP assisted
+ * mode without triggering CSA if conditions didn't meet.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev);
 #endif /* _WLAN_P2P_UCFG_API_H_ */

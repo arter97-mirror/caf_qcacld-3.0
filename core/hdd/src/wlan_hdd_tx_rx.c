@@ -1359,7 +1359,7 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx =  WLAN_HDD_GET_CTX(adapter);
 	int ret;
-	QDF_STATUS qdf_status;
+	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct wlan_hdd_link_info *link_info;
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {

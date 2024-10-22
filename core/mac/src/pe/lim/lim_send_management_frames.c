@@ -812,7 +812,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		if (!transmit_power_env)
 			goto err_ret;
 
-		populate_dot11f_tx_power_env(mac_ctx,
+		populate_dot11f_tx_power_env(mac_ctx, pe_session,
 					     transmit_power_env,
 					     pe_session->ch_width,
 					     pe_session->curr_op_freq,
@@ -1052,6 +1052,485 @@ err_ret:
 	return;
 
 } /* End lim_send_probe_rsp_mgmt_frame. */
+
+#define MIN_WNM_CHAN_USAGE_TOKEN (1)
+static uint8_t lim_get_wnm_action_dialog_token(struct pe_session *session)
+{
+	if (!session->wnm_action_dialog_token)
+		session->wnm_action_dialog_token = MIN_WNM_CHAN_USAGE_TOKEN;
+
+	return session->wnm_action_dialog_token++;
+}
+
+static QDF_STATUS
+lim_chan_usage_req_tx_complete_cnf_handler(void *context, qdf_nbuf_t buf,
+					   uint32_t tx_complete, void *params)
+{
+	struct mac_context *mac_ctx = (struct mac_context *)context;
+	struct wmi_mgmt_params *mgmt_params = (struct wmi_mgmt_params *)params;
+	struct pe_session *session;
+	tLimTimers *lim_timers = &mac_ctx->lim.lim_timers;
+
+	if (buf)
+		qdf_nbuf_free(buf);
+
+	session = pe_find_session_by_vdev_id(mac_ctx, mgmt_params->vdev_id);
+
+	lim_timers->channel_vacate_timer.sessionId = session->peSessionId;
+	if (tx_complete != WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK ||
+	    tx_timer_activate(&lim_timers->channel_vacate_timer) !=
+	    TX_SUCCESS) {
+		lim_timer_handler(mac_ctx, SIR_LIM_CHANNEL_VACATE_TIMEOUT);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	session->dfs_p2p_info.chan_usage_req_resp_inprog = true;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
+{
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	struct pe_session *session;
+	uint8_t code[REG_ALPHA2_LEN + 1];
+	QDF_STATUS qdf_status;
+	struct wlan_objmgr_psoc *psoc;
+	qdf_freq_t freq;
+	uint8_t chan, op_class;
+	enum phy_ch_width ch_width;
+	void *pkt_ptr = NULL;
+	uint8_t *frame_ptr;
+	uint8_t tx_flag = 0;
+	tpSirMacMgmtHdr mac_hdr;
+	uint32_t status, num_bytes, payload;
+	tDot11fchannel_usage_req frm = {0};
+
+	if (!mac_ctx)
+		return;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session || session->opmode != QDF_P2P_CLIENT_MODE ||
+	    !session->post_csa_notify_cap)
+		return;
+
+	psoc = wlan_vdev_get_psoc(session->vdev);
+	if (!psoc)
+		return;
+
+	frm.Category.category = ACTION_CATEGORY_WNM;
+	frm.Action.action = WNM_CHAN_USAGE_REQ;
+	frm.DialogToken.token = lim_get_wnm_action_dialog_token(session);
+
+	frm.channel_usage.present = true;
+	frm.channel_usage.usage_mode = CHAN_USAGE_CAPABILITY_NOTIFY;
+
+	wlan_reg_read_current_country(psoc, code);
+	freq = session->curr_op_freq;
+	ch_width = session->ch_width;
+	chan = wlan_reg_freq_to_chan(wlan_vdev_get_pdev(session->vdev), freq);
+	op_class = wlan_reg_get_opclass_from_freq_width(code, freq, ch_width,
+							BIT(BEHAV_NONE));
+
+	frm.channel_usage.num_channel_entry = 2;
+	frm.channel_usage.channel_entry[0] = op_class;
+	frm.channel_usage.channel_entry[1] = chan;
+
+	populate_dot11_supp_operating_classes(mac_ctx,
+					      &frm.SuppOperatingClasses,
+					      session);
+
+	populate_dot11f_ht_caps(mac_ctx, session, &frm.HTCaps);
+
+	if (wlan_reg_is_5ghz_ch_freq(freq) ||
+	    (wlan_reg_is_24ghz_ch_freq(freq) &&
+	     mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band)) {
+		populate_dot11f_vht_caps(mac_ctx, NULL, &frm.VHTCaps);
+	}
+
+	if (lim_is_session_he_capable(session)) {
+		populate_dot11f_he_caps(mac_ctx, NULL, &frm.he_cap);
+		if (wlan_reg_is_6ghz_chan_freq(freq)) {
+			populate_dot11f_he_6ghz_cap(mac_ctx, NULL,
+						    &frm.he_6ghz_band_cap);
+		}
+	}
+
+	status = dot11f_get_packed_channel_usage_reqSize(mac_ctx, &frm,
+							 &payload);
+	if (DOT11F_FAILED(status)) {
+		pe_debug("Failed to calculate the packed size(0x%08x).",
+			 status);
+		return;
+	} else if (DOT11F_WARNED(status)) {
+		pe_warn("Warnings in calculating the packed size(0x%08x).",
+			status);
+	}
+
+	num_bytes = payload + sizeof(*mac_hdr);
+	qdf_status = cds_packet_alloc(num_bytes, (void **)&frame_ptr,
+				      (void **)&pkt_ptr);
+	if (QDF_IS_STATUS_ERROR(qdf_status) || !pkt_ptr) {
+		pe_err("Failed to allocate %d bytes", num_bytes);
+		return;
+	}
+
+	qdf_mem_zero(frame_ptr, num_bytes);
+
+	/* Update A3 with the BSSID */
+	mac_hdr = (tpSirMacMgmtHdr)frame_ptr;
+	sir_copy_mac_addr(mac_hdr->bssId, session->bssId);
+
+	lim_populate_mac_header(mac_ctx, frame_ptr, WLAN_FC0_TYPE_MGMT,
+				SIR_MAC_MGMT_ACTION, mac_hdr->bssId,
+				session->self_mac_addr);
+
+	lim_set_protected_bit(mac_ctx, session, mac_hdr->bssId, mac_hdr);
+
+	status = dot11f_pack_channel_usage_req(mac_ctx, &frm,
+					       frame_ptr + sizeof(*mac_hdr),
+					       num_bytes, &payload);
+	if (DOT11F_FAILED(status)) {
+		pe_debug("Failed to pack frame(0x%08x).", status);
+		/* Free the allocated cds packet */
+		cds_packet_free((void *)pkt_ptr);
+		return;
+	} else if (DOT11F_WARNED(status)) {
+		pe_warn("Warnings in packing frame0x%08x).", status);
+	}
+
+	tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+
+	mgmt_txrx_frame_hex_dump(frame_ptr, num_bytes, true);
+
+	qdf_status = wma_tx_frame(mac, pkt_ptr, (uint16_t)num_bytes,
+				  TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
+				  7, lim_tx_complete, frame_ptr, tx_flag,
+				  session->smeSessionId, 0, RATEID_DEFAULT, 0);
+
+	/* Pkt will be freed up by the callback lim_tx_complete */
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		pe_debug("Failed to send chan usage req frame(0x%x)!",
+			 qdf_status);
+		cds_packet_free((void *)pkt_ptr);
+	}
+
+	session->post_csa_notify_cap = false;
+}
+
+void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
+					     struct pe_session *session,
+					     uint8_t req_chan,
+					     uint8_t req_op_class)
+{
+	QDF_STATUS qdf_status;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+	uint8_t opclass, chan_num;
+	qdf_freq_t freq;
+	void *pkt_ptr = NULL;
+	uint8_t *frame_ptr;
+	uint8_t tx_flag = 0;
+	tpSirMacMgmtHdr mac_hdr;
+	uint32_t status, num_bytes, payload;
+	struct policy_mgr_pcl_list pcl = {0};
+	struct dfs_p2p_group_info *dfs_p2p_info = &session->dfs_p2p_info;
+	tDot11fchannel_usage_req *frm = &dfs_p2p_info->chan_usage_req;
+
+	/* If not p2p client mode or if already request is sent, don't send
+	 * new request again.
+	 */
+	if (session->opmode != QDF_P2P_CLIENT_MODE ||
+	    dfs_p2p_info->chan_usage_req_resp_inprog)
+		return;
+
+	pdev = wlan_vdev_get_pdev(session->vdev);
+	if (!pdev)
+		return;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return;
+
+	qdf_mem_zero(frm, sizeof(*frm));
+	frm->Category.category = ACTION_CATEGORY_WNM;
+	frm->Action.action = WNM_CHAN_USAGE_REQ;
+	frm->DialogToken.token = lim_get_wnm_action_dialog_token(session);
+
+	frm->channel_usage.present = true;
+	frm->channel_usage.usage_mode = CHAN_USAGE_AIDABLE_BSS_CSA_REQ;
+
+	qdf_status =
+		policy_mgr_get_pcl_for_vdev_id(psoc, PM_P2P_CLIENT_MODE,
+					       pcl.pcl_list, &pcl.pcl_len,
+					       pcl.weight_list,
+					       QDF_ARRAY_SIZE(pcl.weight_list),
+					       session->vdev_id);
+
+	/* TODO: Make sure the chan and op class are part of supported channels
+	 * in this session.
+	 */
+	if (req_chan && req_op_class) {
+		frm->channel_usage.num_channel_entry = 2;
+		frm->channel_usage.channel_entry[0] = req_op_class;
+		frm->channel_usage.channel_entry[1] = req_chan;
+		if (wlan_reg_is_6ghz_op_class(pdev, req_op_class)) {
+			freq = wlan_reg_chan_band_to_freq(pdev, req_chan,
+							  BIT(REG_BAND_6G));
+		} else {
+			freq = wlan_reg_legacy_chan_to_freq(pdev, req_chan);
+		}
+	} else if (pcl.pcl_len) {
+		wlan_reg_freq_to_chan_op_class(pdev, pcl.pcl_list[0], true,
+					       BIT(BEHAV_NONE), &opclass,
+					       &chan_num);
+		frm->channel_usage.num_channel_entry = 2;
+		frm->channel_usage.channel_entry[0] = opclass;
+		frm->channel_usage.channel_entry[1] = chan_num;
+
+		freq = pcl.pcl_list[0];
+	} else {
+		freq = 0;
+	}
+
+	populate_dot11_supp_operating_classes(mac_ctx,
+					      &frm->SuppOperatingClasses,
+					      session);
+
+	if (!freq)
+		goto pack_frame;
+
+	populate_dot11f_ht_caps(mac_ctx, session, &frm->HTCaps);
+
+	if (wlan_reg_is_5ghz_ch_freq(freq) ||
+	    (wlan_reg_is_24ghz_ch_freq(freq) &&
+	     mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band)) {
+		populate_dot11f_vht_caps(mac_ctx, NULL, &frm->VHTCaps);
+	}
+
+	if (lim_is_session_he_capable(session)) {
+		populate_dot11f_he_caps(mac_ctx, NULL, &frm->he_cap);
+		if (wlan_reg_is_6ghz_chan_freq(freq)) {
+			populate_dot11f_he_6ghz_cap(mac_ctx, NULL,
+						    &frm->he_6ghz_band_cap);
+		}
+	}
+
+pack_frame:
+	status = dot11f_get_packed_channel_usage_reqSize(mac_ctx, frm,
+							 &payload);
+	if (DOT11F_FAILED(status)) {
+		pe_debug("Failed to calculate the packed size(0x%08x)", status);
+		return;
+	} else if (DOT11F_WARNED(status)) {
+		pe_warn("Warnings in calculating the packed size(0x%08x)",
+			status);
+	}
+
+	num_bytes = payload + sizeof(*mac_hdr);
+	qdf_status = cds_packet_alloc(num_bytes, (void **)&frame_ptr,
+				      (void **)&pkt_ptr);
+	if (QDF_IS_STATUS_ERROR(qdf_status) || !pkt_ptr) {
+		pe_err("Failed to allocate %d bytes", num_bytes);
+		return;
+	}
+
+	qdf_mem_zero(frame_ptr, num_bytes);
+
+	/* Update A3 with the BSSID */
+	mac_hdr = (tpSirMacMgmtHdr)frame_ptr;
+	sir_copy_mac_addr(mac_hdr->bssId, session->bssId);
+
+	lim_populate_mac_header(mac_ctx, frame_ptr, WLAN_FC0_TYPE_MGMT,
+				SIR_MAC_MGMT_ACTION, mac_hdr->bssId,
+				session->self_mac_addr);
+
+	lim_set_protected_bit(mac_ctx, session, mac_hdr->bssId, mac_hdr);
+
+	status = dot11f_pack_channel_usage_req(mac_ctx, frm,
+					       frame_ptr + sizeof(*mac_hdr),
+					       num_bytes, &payload);
+	if (DOT11F_FAILED(status)) {
+		pe_debug("Failed to pack frame(0x%08x)", status);
+		/* Free the allocated cds packet */
+		cds_packet_free((void *)pkt_ptr);
+		return;
+	} else if (DOT11F_WARNED(status)) {
+		pe_warn("Warnings in packing frame0x%08x)", status);
+	}
+
+	tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+
+	/* Make sure the timer is not running before sending the frame,
+	 * the timer will be started on receivng tx completion from FW.
+	 */
+	tx_timer_deactivate(&mac_ctx->lim.lim_timers.channel_vacate_timer);
+
+	mgmt_txrx_frame_hex_dump(frame_ptr, num_bytes, true);
+
+	qdf_status = wma_tx_frameWithTxComplete(mac_ctx, pkt_ptr,
+						(uint16_t)num_bytes,
+						TXRX_FRM_802_11_MGMT,
+						ANI_TXDIR_TODS, 7,
+						lim_tx_complete, frame_ptr,
+						lim_chan_usage_req_tx_complete_cnf_handler,
+						tx_flag, session->smeSessionId,
+						false, 0, RATEID_DEFAULT, 0, 0);
+	/* Pkt will be freed up by the callback lim_tx_complete */
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		pe_debug("Failed to send chan usage req frame(0x%x)!",
+			 qdf_status);
+		cds_packet_free((void *)pkt_ptr);
+		lim_timer_handler(mac_ctx, SIR_LIM_CHANNEL_VACATE_TIMEOUT);
+	}
+}
+
+void lim_send_channel_usage_resp_action_frame(struct mac_context *mac_ctx,
+					      struct pe_session *session,
+					      tSirMacAddr peer_addr)
+{
+	QDF_STATUS qdf_status;
+	uint8_t cc[REG_ALPHA2_LEN + 1];
+	bool found;
+	qdf_freq_t freq;
+	void *pkt_ptr = NULL;
+	uint8_t *frame_ptr;
+	tpSirMacMgmtHdr mac_hdr;
+	uint32_t status, payload, num_bytes;
+	struct policy_mgr_pcl_list pcl = {0};
+	uint8_t idx, index, iter, opclass, chan_num, tx_flag = 0;
+	struct dfs_p2p_group_info *dfs_p2p_info = &session->dfs_p2p_info;
+	tDot11fchannel_usage_req *req = &dfs_p2p_info->chan_usage_req;
+	tDot11fchannel_usage_resp *frm = &dfs_p2p_info->chan_usage_resp;
+
+	if (session->opmode != QDF_P2P_GO_MODE ||
+	    !dfs_p2p_info->chan_usage_req_resp_inprog)
+		return;
+
+	if ((req->channel_usage.num_channel_entry % 2) != 0)
+		return;
+
+	qdf_mem_zero(frm, sizeof(*frm));
+	frm->Category.category = ACTION_CATEGORY_WNM;
+	frm->Action.action = WNM_CHAN_USAGE_RESP;
+	frm->DialogToken.token = req->DialogToken.token;
+
+	frm->channel_usage.present = true;
+	frm->channel_usage.usage_mode = req->channel_usage.usage_mode;
+
+	qdf_status =
+		policy_mgr_get_pcl_for_vdev_id(mac_ctx->psoc,
+					       PM_P2P_GO_MODE, pcl.pcl_list,
+					       &pcl.pcl_len, pcl.weight_list,
+					       QDF_ARRAY_SIZE(pcl.weight_list),
+					       session->vdev_id);
+
+	if (!pcl.pcl_len)
+		return;
+
+	if (!req->channel_usage.num_channel_entry)
+		iter = 0;
+
+	for (idx = 0; idx < req->channel_usage.num_channel_entry && !found;
+	     idx = idx + 2) {
+		freq = wlan_reg_chan_opclass_to_freq(req->channel_usage.channel_entry[idx + 1],
+						     req->channel_usage.channel_entry[idx],
+						     true);
+		if (!freq)
+			continue;
+
+		for (iter = 0; iter < pcl.pcl_len; iter++) {
+			if (freq == pcl.pcl_list[iter]) {
+				found = true;
+				break;
+			}
+		}
+	}
+
+	wlan_reg_read_current_country(mac_ctx->psoc, cc);
+	/* advertise global operating class */
+	cc[REG_ALPHA2_LEN] = 0x04;
+
+	if (!found)
+		goto pack_frame;
+
+	index = iter;
+	wlan_reg_freq_to_chan_op_class(wlan_vdev_get_pdev(session->vdev),
+				       pcl.pcl_list[index], true,
+				       BIT(BEHAV_NONE), &opclass, &chan_num);
+	frm->channel_usage.num_channel_entry = 2;
+	frm->channel_usage.channel_entry[0] = opclass;
+	frm->channel_usage.channel_entry[1] = chan_num;
+
+pack_frame:
+	status = dot11f_get_packed_channel_usage_respSize(mac_ctx, frm,
+							  &payload);
+	if (DOT11F_FAILED(status)) {
+		pe_debug("Failed to calculate the packed size(0x%08x)", status);
+		return;
+	} else if (DOT11F_WARNED(status)) {
+		pe_warn("Warnings in calculating the packed size(0x%08x)",
+			status);
+	}
+
+	num_bytes = payload + sizeof(*mac_hdr) + sizeof(cc);
+	qdf_status = cds_packet_alloc(num_bytes, (void **)&frame_ptr,
+				      (void **)&pkt_ptr);
+	if (QDF_IS_STATUS_ERROR(qdf_status) || !pkt_ptr) {
+		pe_err("Failed to allocate %d bytes", num_bytes);
+		return;
+	}
+
+	qdf_mem_zero(frame_ptr, num_bytes);
+
+	lim_populate_mac_header(mac_ctx, frame_ptr, WLAN_FC0_TYPE_MGMT,
+				SIR_MAC_MGMT_ACTION, peer_addr,
+				session->self_mac_addr);
+
+	/* Update A3 with the BSSID */
+	mac_hdr = (tpSirMacMgmtHdr)frame_ptr;
+	sir_copy_mac_addr(mac_hdr->bssId, session->bssId);
+
+	lim_set_protected_bit(mac_ctx, session, peer_addr, mac_hdr);
+
+	status = dot11f_pack_channel_usage_resp(mac_ctx, frm,
+						frame_ptr + sizeof(*mac_hdr),
+						num_bytes, &payload);
+	if (DOT11F_FAILED(status)) {
+		pe_debug("Failed to pack frame(0x%08x)", status);
+		/* Free the allocated cds packet */
+		cds_packet_free((void *)pkt_ptr);
+		return;
+	} else if (DOT11F_WARNED(status)) {
+		pe_warn("Warnings in packing frame0x%08x)", status);
+	}
+
+	qdf_mem_copy(frame_ptr + sizeof(*mac_hdr) + payload, cc, sizeof(cc));
+
+	tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   frame_ptr, num_bytes);
+
+	qdf_status = wma_tx_frame(mac, pkt_ptr, (uint16_t)num_bytes,
+				  TXRX_FRM_802_11_MGMT, ANI_TXDIR_FROMDS,
+				  7, lim_tx_complete, frame_ptr, tx_flag,
+				  session->smeSessionId, 0, RATEID_DEFAULT, 0);
+
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		pe_debug("Failed to send chan usage resp frame(0x%x)!",
+			 qdf_status);
+		cds_packet_free((void *)pkt_ptr);
+	}
+
+	dfs_p2p_info->chan_usage_req_resp_inprog = false;
+	if (frm->channel_usage.num_channel_entry) {
+		policy_mgr_change_sap_channel_with_csa(mac_ctx->psoc,
+						       session->smeSessionId,
+						       pcl.pcl_list[0],
+						       CH_WIDTH_MAX, true);
+	}
+}
 
 void
 lim_send_addts_req_action_frame(struct mac_context *mac,
@@ -2288,6 +2767,12 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 		else
 			qdf_tx_complete = QDF_TX_RX_STATUS_NO_ACK;
 
+		if (params->peer_rssi)
+			rssi = params->peer_rssi;
+		else
+			wlan_get_rssi_by_bssid(mac->pdev, &mac_hdr->i_addr3[0],
+					       &rssi);
+
 		if (tag == WLAN_AUTH_REQ) {
 			uint16_t algo = 0, type = 0, seq = 0, status = 0;
 
@@ -2301,13 +2786,6 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 
 			if (algo == eSIR_AUTH_TYPE_SAE)
 				type = seq;
-
-			if (params->peer_rssi)
-				rssi = params->peer_rssi;
-			else
-				wlan_get_rssi_by_bssid(mac->pdev,
-						       &mac_hdr->i_addr3[0],
-						       &rssi);
 
 			wlan_connectivity_mgmt_event(
 					mac->psoc,

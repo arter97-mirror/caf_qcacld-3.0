@@ -5084,7 +5084,7 @@ send_update_mlo_roam_params(wmi_roam_cnd_scoring_param *score_param,
 				ap_profile->param.eht_caps_weightage;
 	score_param->mlo_weightage_pcnt =
 				ap_profile->param.mlo_weightage;
-	wmi_debug("11be score params weightage: EHT %d MLO %d",
+	wmi_debug("11be score params weightage: EHT %d MLO 0x%x",
 		  score_param->eht_weightage_pcnt,
 		  score_param->mlo_weightage_pcnt);
 }
@@ -6077,13 +6077,15 @@ send_roam_bss_load_config_tlv(wmi_unified_t wmi_handle,
 
 	cmd->vdev_id = params->vdev_id;
 	cmd->bss_load_threshold = params->bss_load_threshold;
+	cmd->bss_load_alpha_pct = params->bss_load_alpha;
 	cmd->monitor_time_window = params->bss_load_sample_time;
 	cmd->rssi_2g_threshold = params->rssi_threshold_24ghz;
 	cmd->rssi_5g_threshold = params->rssi_threshold_5ghz;
 	cmd->rssi_6g_threshold = params->rssi_threshold_6ghz;
 
-	wmi_debug("RSO_CFG: vdev:%d bss_load_thres:%d monitor_time:%d rssi_2g:%d rssi_5g:%d, rssi_6g:%d",
+	wmi_debug("RSO_CFG: vdev:%d bss_load_thres:%d bss_alpha:%d monitor_time:%d rssi_2g:%d rssi_5g:%d, rssi_6g:%d",
 		  cmd->vdev_id, cmd->bss_load_threshold,
+		  cmd->bss_load_alpha_pct,
 		  cmd->monitor_time_window, cmd->rssi_2g_threshold,
 		  cmd->rssi_5g_threshold, cmd->rssi_6g_threshold);
 

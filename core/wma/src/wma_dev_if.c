@@ -495,27 +495,6 @@ wma_release_vdev_ref(struct wma_txrx_node *iface)
 }
 
 /**
- * wma_handle_monitor_mode_vdev_detach() - Stop and down monitor mode vdev
- * @wma: wma handle
- * @vdev_id: used to get wma interface txrx node
- *
- * Monitor mode is unconneted mode, so do explicit vdev stop and down
- *
- * Return: None
- */
-static void wma_handle_monitor_mode_vdev_detach(tp_wma_handle wma,
-						uint8_t vdev_id)
-{
-	struct wma_txrx_node *iface;
-
-	iface = &wma->interfaces[vdev_id];
-	wlan_vdev_mlme_sm_deliver_evt(iface->vdev,
-				      WLAN_VDEV_SM_EV_DOWN,
-				      0, NULL);
-	iface->vdev_active = false;
-}
-
-/**
  * wma_handle_vdev_detach() - wma vdev detach handler
  * @wma_handle: pointer to wma handle
  * @del_vdev_req_param: pointer to del req param
@@ -531,17 +510,9 @@ static QDF_STATUS wma_handle_vdev_detach(tp_wma_handle wma_handle,
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wmi_mgmt_params mgmt_params = {};
 
-	if (!soc) {
+	if (!soc)
 		status = QDF_STATUS_E_FAILURE;
-		goto rel_ref;
-	}
 
-	if ((cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE) ||
-	    (policy_mgr_is_sta_mon_concurrency(wma_handle->psoc) &&
-	    wlan_vdev_mlme_get_opmode(iface->vdev) == QDF_MONITOR_MODE))
-		wma_handle_monitor_mode_vdev_detach(wma_handle, vdev_id);
-
-rel_ref:
 	wma_cdp_vdev_detach(soc, wma_handle, vdev_id);
 	if (qdf_is_recovering())
 		wlan_mgmt_txrx_vdev_drain(iface->vdev,
@@ -1323,7 +1294,7 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 	const struct wlan_mlme_ratemask *ratemask_cfg;
 	struct config_ratemask_params rparams = {0};
 	void *dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
-	uint32_t mac_id;
+	uint32_t mac_id = MAX_MAC;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma)
@@ -1383,12 +1354,6 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 			  rsp->vdev_id, rsp->cfgd_tx_streams,
 			  rsp->cfgd_rx_streams, rsp->chain_mask, mac_id);
 
-		if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id))
-			policy_mgr_update_dfs_master_dynamic_enabled(
-					psoc,
-					true,
-					iface->vdev->vdev_mlme.des_chan);
-
 		/* Fill bss_chan after vdev start */
 		qdf_mem_copy(iface->vdev->vdev_mlme.bss_chan,
 			     iface->vdev->vdev_mlme.des_chan,
@@ -1401,9 +1366,15 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id)) {
-		wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
-		wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
-							    mac_id, rsp);
+		if (mac_id < MAX_MAC) {
+			wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
+			wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
+								    mac_id,
+								    rsp);
+		} else {
+			wma_err("Invalid mac_id: %u", mac_id);
+			return QDF_STATUS_E_INVAL;
+		}
 	}
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE

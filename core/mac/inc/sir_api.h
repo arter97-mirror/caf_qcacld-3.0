@@ -4107,43 +4107,6 @@ enum nan_status_type {
 };
 
 /**
- * enum nan_reason_code - NDP command rsp reason code value
- * @NDP_UNSUPPORTED_CONCURRENCY: Will be used in unsupported concurrency cases
- * @NDP_NAN_DATA_IFACE_CREATE_FAILED: ndi create failed
- * @NDP_NAN_DATA_IFACE_DELETE_FAILED: ndi delete failed
- * @NDP_DATA_INITIATOR_REQ_FAILED: data initiator request failed
- * @NDP_DATA_RESPONDER_REQ_FAILED: data responder request failed
- * @NDP_INVALID_SERVICE_INSTANCE_ID: invalid service instance id
- * @NDP_INVALID_NDP_INSTANCE_ID: invalid ndp instance id
- * @NDP_INVALID_RSP_CODE: invalid response code in ndp responder request
- * @NDP_INVALID_APP_INFO_LEN: invalid app info length
- * @NDP_NMF_REQ_FAIL: OTA nan mgmt frame failure for data request
- * @NDP_NMF_RSP_FAIL: OTA nan mgmt frame failure for data response
- * @NDP_NMF_CNF_FAIL: OTA nan mgmt frame failure for confirm
- * @NDP_END_FAILED: ndp end failed
- * @NDP_NMF_END_REQ_FAIL: OTA nan mgmt frame failure for data end
- * @NDP_VENDOR_SPECIFIC_ERROR: other vendor specific failures
- */
-enum nan_reason_code {
-	NDP_UNSUPPORTED_CONCURRENCY = 9000,
-	NDP_NAN_DATA_IFACE_CREATE_FAILED = 9001,
-	NDP_NAN_DATA_IFACE_DELETE_FAILED = 9002,
-	NDP_DATA_INITIATOR_REQ_FAILED = 9003,
-	NDP_DATA_RESPONDER_REQ_FAILED = 9004,
-	NDP_INVALID_SERVICE_INSTANCE_ID = 9005,
-	NDP_INVALID_NDP_INSTANCE_ID = 9006,
-	NDP_INVALID_RSP_CODE = 9007,
-	NDP_INVALID_APP_INFO_LEN = 9008,
-	NDP_NMF_REQ_FAIL = 9009,
-	NDP_NMF_RSP_FAIL = 9010,
-	NDP_NMF_CNF_FAIL = 9011,
-	NDP_END_FAILED = 9012,
-	NDP_NMF_END_REQ_FAIL = 9013,
-	/* 9500 onwards vendor specific error codes */
-	NDP_VENDOR_SPECIFIC_ERROR = 9500,
-};
-
-/**
  * struct ndi_create_rsp - ndi create response params
  * @status: request status
  * @reason: reason if any

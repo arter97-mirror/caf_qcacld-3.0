@@ -210,17 +210,22 @@ void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
 		goto exit;
 	}
 
-	tdls_debug("CSA complete");
+	tdls_debug("vdev %d CSA complete", wlan_vdev_get_id(tdls_vdev));
 	/*
 	 * Channel Switch can cause SCC -> MCC switch on
 	 * STA vdev. Disable TDLS if CSA causes STA vdev to be in MCC with
 	 * other vdev.
 	 */
-	if (!tdls_is_concurrency_allowed(psoc)) {
+	if (!tdls_check_is_tdls_allowed(tdls_vdev)) {
 		tdls_disable_offchan_and_teardown_links(tdls_vdev);
-		tdls_debug("Disable the tdls in FW after CSA");
+		tdls_debug("vdev %d disable the tdls in FW after CSA",
+			   wlan_vdev_get_id(tdls_vdev));
 	} else {
-		tdls_process_enable_for_vdev(tdls_vdev);
+		if (wlan_vdev_mlme_is_mlo_vdev(tdls_vdev))
+			tdls_process_enable_disable_for_ml_vdev(tdls_vdev,
+								true);
+		else
+			tdls_process_enable_for_vdev(tdls_vdev);
 		tdls_set_tdls_offchannelmode(tdls_vdev, ENABLE_CHANSWITCH);
 	}
 

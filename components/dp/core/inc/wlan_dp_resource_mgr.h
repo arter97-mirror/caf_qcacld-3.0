@@ -30,6 +30,9 @@
 #endif
 #define RESOURCE_LVL_2_RX_BUFFERS ((16 * 1024) - 1)
 #define UNKNOWN_MAC_ID 0xf
+
+#define DP_RSRC_MGR_TIMER_MS	1000
+
 /**
  * enum wlan_dp_resource_level - DP Resource levels
  * @RESOURCE_LVL_1: Default Resource level
@@ -118,6 +121,7 @@ struct wlan_dp_resource_vote_node {
  * @mac_list: MAC based vote nodes list
  * @nan_list: NAN connections vote node list
  * @mac_count: total number of MACs supported
+ * @timer: Resource manager timer handle
  * @max_phymode_nodes: max phymodes selected across system
  * @rsrc_mgr_lock: lock to protect operations from parallel contexts
  */
@@ -131,6 +135,7 @@ struct wlan_dp_resource_mgr_ctx {
 	qdf_list_t mac_list[MAX_MAC_RESOURCES];
 	qdf_list_t nan_list;
 	uint32_t mac_count;
+	qdf_timer_t timer;
 	struct wlan_dp_resource_vote_node *max_phymode_nodes[MAX_MAC_RESOURCES];
 	qdf_spinlock_t rsrc_mgr_lock;
 };

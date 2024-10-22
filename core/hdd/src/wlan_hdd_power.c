@@ -2304,6 +2304,36 @@ int wlan_hdd_set_powersave(struct wlan_hdd_link_info *link_info,
 	return qdf_status_to_os_return(status);
 }
 
+#if defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV) && \
+	defined(FEATURE_ML_LOCAL_PKT_CAPTURE)
+void wlan_hdd_lpc_set_bmps(struct hdd_adapter *adapter,
+			   bool allow_power_save, uint32_t timeout)
+{
+	struct wlan_hdd_link_info *link_info;
+	mac_handle_t mac_handle;
+
+	if (!adapter) {
+		hdd_err_rl("null hdd_adapter pointer");
+		return;
+	}
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	if (!mac_handle) {
+		hdd_err_rl("null mac_handle pointer");
+		return;
+	}
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info)
+		wlan_hdd_set_powersave(link_info, allow_power_save, timeout);
+}
+#else
+void wlan_hdd_lpc_set_bmps(struct hdd_adapter *adapter,
+			   bool allow_power_save, uint32_t timeout)
+{
+	wlan_hdd_set_powersave(adapter->deflink, allow_power_save, timeout);
+}
+#endif
+
 static void wlan_hdd_print_suspend_fail_stats(struct hdd_context *hdd_ctx)
 {
 	struct suspend_resume_stats *stats = &hdd_ctx->suspend_resume_stats;

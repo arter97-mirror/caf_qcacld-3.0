@@ -878,7 +878,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			status = QDF_STATUS_E_NOMEM;
 			goto free_and_exit;
 		}
-		populate_dot11f_tx_power_env(mac_ctx,
+		populate_dot11f_tx_power_env(mac_ctx, session,
 					     transmit_power_env,
 					     session->ch_width,
 					     session->curr_op_freq,

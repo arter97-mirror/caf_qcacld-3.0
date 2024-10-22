@@ -538,6 +538,49 @@ QDF_STATUS ucfg_p2p_lo_stop(struct wlan_objmgr_psoc *soc,
 }
 #endif
 
+QDF_STATUS ucfg_p2p_send_chan_switch_req(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint8_t chan,
+					 uint8_t opclass)
+{
+	QDF_STATUS status;
+	struct scheduler_msg msg = {0};
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+	struct p2p_chan_switch_req_params *ch_switch_params;
+
+	if (vdev_id >= WLAN_INVALID_VDEV_ID) {
+		p2p_err("Invalid VDEV");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							    WLAN_UMAC_COMP_P2P);
+	if (!p2p_soc_obj) {
+		p2p_err("p2p soc context is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ch_switch_params = qdf_mem_malloc(sizeof(*ch_switch_params));
+	if (!ch_switch_params)
+		return QDF_STATUS_E_NOMEM;
+
+	ch_switch_params->p2p_soc_obj = p2p_soc_obj;
+	ch_switch_params->vdev_id = vdev_id;
+	ch_switch_params->channel = chan;
+	ch_switch_params->op_class = opclass;
+
+	msg.type = P2P_GROUP_CHAN_SWITCH_CMD;
+	msg.bodyptr = ch_switch_params;
+	msg.callback = p2p_process_cmd;
+	status = scheduler_post_message(QDF_MODULE_ID_HDD, QDF_MODULE_ID_P2P,
+					QDF_MODULE_ID_OS_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(ch_switch_params);
+		p2p_nofl_debug("p2p chan switch post msg fail %d", status);
+	}
+
+	return status;
+}
+
 QDF_STATUS  ucfg_p2p_set_noa(struct wlan_objmgr_psoc *soc,
 	uint32_t vdev_id, bool disable_noa)
 {
@@ -701,3 +744,37 @@ QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 	return p2p_send_usd_params(psoc, param);
 }
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+bool ucfg_p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_fw_support_ap_assist_dfs_group(psoc);
+}
+
+QDF_STATUS
+ucfg_p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+				      const uint8_t *ie, uint16_t ie_len,
+				      bool is_connected, qdf_freq_t freq,
+				      bool is_self)
+{
+	if (!ie || !ie_len)
+		return QDF_STATUS_SUCCESS;
+
+	return p2p_extract_ap_assist_dfs_params(vdev, ie, ie_len, is_connected,
+						freq, is_self);
+}
+
+QDF_STATUS ucfg_p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					     bool *is_dfs_owner,
+					     bool *is_valid_ap_assist,
+					     struct qdf_mac_addr *ap_bssid,
+					     uint8_t *opclass, uint8_t *chan)
+{
+	return p2p_get_ap_assist_dfs_params(vdev, is_dfs_owner,
+					    is_valid_ap_assist, ap_bssid,
+					    opclass, chan);
+}
+
+QDF_STATUS ucfg_p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev)
+{
+	return p2p_check_ap_assist_dfs_group_go(vdev);
+}

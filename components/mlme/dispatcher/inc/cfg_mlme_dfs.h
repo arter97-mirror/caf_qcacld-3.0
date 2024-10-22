@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -224,6 +224,28 @@
 			0, \
 			"Block W53 channels in random selection")
 
+/*
+ * <ini>
+ * gIgnoreCAC - Used to enable SAP DFS puncture
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable SAP DFS puncture
+ *
+ * Related: None
+ *
+ * Supported Feature: DFS
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_SAP_DFS_PUNCTURE CFG_INI_BOOL( \
+			"g_enable_sap_dfs_puncture", \
+			0, \
+			"ignore CAC on DFS channel")
+
 #define CFG_DFS_ALL \
 	CFG(CFG_IGNORE_CAC) \
 	CFG(CFG_DISABLE_DFS_CH_SWITCH) \
@@ -233,6 +255,7 @@
 	CFG(CFG_ENABLE_NON_DFS_CHAN_ON_RADAR) \
 	CFG(CFG_ENABLE_DFS_MASTER_CAPABILITY) \
 	CFG(CFG_DISABLE_DFS_JAPAN_W53) \
-	CFG(CFG_ENABLE_DFS_PHYERR_FILTEROFFLOAD)
+	CFG(CFG_ENABLE_DFS_PHYERR_FILTEROFFLOAD) \
+	CFG(CFG_ENABLE_SAP_DFS_PUNCTURE)
 
 #endif /* __CFG_MLME_DFS_H */

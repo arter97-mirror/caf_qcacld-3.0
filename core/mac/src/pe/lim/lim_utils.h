@@ -614,6 +614,7 @@ void lim_update_sta_run_time_ht_info(struct mac_context *mac,
 /**
  * lim_is_channel_valid_for_channel_switch - check channel valid for switching
  * @mac: Global mac context
+ * @session: PE session
  * @channel_freq: channel freq (MHz)
  *
  * This function checks if the channel to which AP is expecting us to switch,
@@ -622,6 +623,7 @@ void lim_update_sta_run_time_ht_info(struct mac_context *mac,
  * Return bool, true if channel is valid
  */
 bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac,
+					     struct pe_session *session,
 					     uint32_t channel_freq);
 
 QDF_STATUS lim_restore_pre_channel_switch_state(struct mac_context *mac,

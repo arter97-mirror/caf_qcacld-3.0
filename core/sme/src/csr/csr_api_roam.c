@@ -6013,7 +6013,6 @@ QDF_STATUS csr_send_chng_mcc_beacon_interval(struct mac_context *mac,
 {
 	struct wlan_change_bi *pMsg;
 	uint16_t len = 0;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct csr_roam_session *pSession = CSR_GET_SESSION(mac, sessionId);
 
 	if (!pSession) {
@@ -6033,27 +6032,23 @@ QDF_STATUS csr_send_chng_mcc_beacon_interval(struct mac_context *mac,
 	len = sizeof(*pMsg);
 	pMsg = qdf_mem_malloc(len);
 	if (!pMsg)
-		status = QDF_STATUS_E_NOMEM;
-	else
-		status = QDF_STATUS_SUCCESS;
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		pMsg->message_type = eWNI_SME_CHNG_MCC_BEACON_INTERVAL;
-		pMsg->length = len;
+		return QDF_STATUS_E_NOMEM;
 
-		wlan_mlme_get_mac_vdev_id(mac->pdev, sessionId,
-					  &pMsg->bssid);
-		sme_debug("CSR Attempting to change BI for Bssid= "
-			  QDF_MAC_ADDR_FMT,
-			  QDF_MAC_ADDR_REF(pMsg->bssid.bytes));
-		pMsg->session_id = sessionId;
-		sme_debug("session %d BeaconInterval %d",
+	pMsg->message_type = eWNI_SME_CHNG_MCC_BEACON_INTERVAL;
+	pMsg->length = len;
+
+	wlan_mlme_get_mac_vdev_id(mac->pdev, sessionId,
+			&pMsg->bssid);
+	sme_debug("CSR Attempting to change BI for Bssid= "
+			QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(pMsg->bssid.bytes));
+	pMsg->session_id = sessionId;
+	sme_debug("session %d BeaconInterval %d",
 			sessionId,
 			mac->roam.roamSession[sessionId].bcn_int);
-		pMsg->beacon_interval =
-			mac->roam.roamSession[sessionId].bcn_int;
-		status = umac_send_mb_message_to_mac(pMsg);
-	}
-	return status;
+	pMsg->beacon_interval =
+		mac->roam.roamSession[sessionId].bcn_int;
+	return umac_send_mb_message_to_mac(pMsg);
 }
 
 #ifdef QCA_HT_2040_COEX

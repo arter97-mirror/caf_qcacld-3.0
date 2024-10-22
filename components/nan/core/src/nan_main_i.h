@@ -147,6 +147,7 @@ struct nan_cfg_params {
  * @nan_pairing_create_ctx: NAN Pairing create context
  * @nan_pairing_delete_ctx: NAN Pairing delete context
  * @nan_delete_all_peer_ctx: Delete all peer context
+ * @fw_nan_addr: NAN MAC address which is randomized by target
  */
 struct nan_psoc_priv_obj {
 	qdf_spinlock_t lock;
@@ -165,6 +166,7 @@ struct nan_psoc_priv_obj {
 	void *nan_pairing_create_ctx;
 	void *nan_pairing_delete_ctx;
 	void *nan_delete_all_peer_ctx;
+	struct qdf_mac_addr fw_nan_addr;
 };
 
 #define MAX_NAN_MIGRATED_PEERS 5
@@ -456,5 +458,13 @@ QDF_STATUS nan_cleanup_pasn_peers(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc, uint8_t nan_vdev_id,
 			 struct qdf_mac_addr *peer_mac);
+
+/**
+ * nan_get_fw_addr() - get NAN MAC address randomized by target.
+ * @psoc: pointer to psoc object
+ *
+ * Return: NAN MAC address
+ */
+struct qdf_mac_addr *nan_get_fw_addr(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

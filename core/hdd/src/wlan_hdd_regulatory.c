@@ -1555,7 +1555,9 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx,
 	}
 
 	if (send_sync_event && hdd_hold_rtnl_lock()) {
+		hdd_wiphy_lock(hdd_ctx->wiphy, NULL);
 		hdd_regulatory_set_wiphy_regd_sync(hdd_ctx->wiphy, regd);
+		hdd_wiphy_unlock(hdd_ctx->wiphy, NULL);
 		hdd_release_rtnl_lock();
 	} else {
 		regulatory_set_wiphy_regd(hdd_ctx->wiphy, regd);
@@ -2063,23 +2065,11 @@ int hdd_init_regulatory_update_event(struct hdd_context *hdd_ctx)
 		hdd_err("Failed to create regulatory update event");
 		goto failure;
 	}
-
 	status = qdf_mutex_create(&hdd_ctx->regulatory_status_lock);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to create regulatory status mutex");
 		goto failure;
 	}
-
-	status = qdf_create_work(0, &hdd_ctx->country_change_work,
-				 hdd_country_change_work_handle, hdd_ctx);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to create country change work.");
-		goto failure;
-	}
-
-	ucfg_reg_register_chan_change_callback(hdd_ctx->psoc,
-					       hdd_regulatory_dyn_cbk, NULL);
-	qdf_mem_zero(hdd_ctx->reg.alpha2, REG_ALPHA2_LEN + 1);
 	hdd_ctx->is_regulatory_update_in_progress = false;
 
 failure:
@@ -2096,6 +2086,12 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	if (!cur_chan_list) {
 		return -ENOMEM;
 	}
+
+	qdf_create_work(0, &hdd_ctx->country_change_work,
+			hdd_country_change_work_handle, hdd_ctx);
+	ucfg_reg_register_chan_change_callback(hdd_ctx->psoc,
+					       hdd_regulatory_dyn_cbk,
+					       NULL);
 
 	ret = hdd_update_country_code(hdd_ctx);
 	if (ret) {
@@ -2125,6 +2121,7 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_2GHZ);
 	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_5GHZ);
 	fill_wiphy_6ghz_band_channels(wiphy, cur_chan_list);
+	ucfg_reg_get_current_country(hdd_ctx->psoc, hdd_ctx->reg.alpha2);
 
 	qdf_mem_free(cur_chan_list);
 	return 0;
@@ -2162,13 +2159,13 @@ void hdd_deinit_regulatory_update_event(struct hdd_context *hdd_ctx)
 	status = qdf_event_destroy(&hdd_ctx->regulatory_update_event);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to destroy regulatory update event");
-
 	status = qdf_mutex_destroy(&hdd_ctx->regulatory_status_lock);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to destroy regulatory status mutex");
+}
 
-	ucfg_reg_unregister_chan_change_callback(hdd_ctx->psoc,
-						 hdd_regulatory_dyn_cbk);
+void hdd_regulatory_deinit(struct hdd_context *hdd_ctx)
+{
 	qdf_flush_work(&hdd_ctx->country_change_work);
 	qdf_destroy_work(0, &hdd_ctx->country_change_work);
 }

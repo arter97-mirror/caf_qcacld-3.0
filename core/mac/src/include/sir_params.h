@@ -563,6 +563,8 @@ enum halmsgtype {
 
 #define SIR_LIM_PROCESS_DEFERRED_QUEUE (SIR_LIM_TIMEOUT_MSG_START + 0x2F)
 
+#define SIR_LIM_CHANNEL_VACATE_TIMEOUT (SIR_LIM_TIMEOUT_MSG_START + 0x30)
+
 #define SIR_LIM_MSG_TYPES_END            (SIR_LIM_MSG_TYPES_BEGIN+0xFF)
 
 /* ****************************************** *

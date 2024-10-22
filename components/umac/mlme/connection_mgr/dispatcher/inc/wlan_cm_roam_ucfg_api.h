@@ -572,7 +572,7 @@ ucfg_cm_get_roam_rescan_rssi_diff(struct wlan_objmgr_psoc *psoc, uint8_t *val);
  * get neighbor lookup rssi threshold
  * @psoc: pointer to psoc object
  * @vdev_id: vdev identifier
- * @lookup_threshold: Buffer to fill the neighbor lookup threshold.
+ * @next_rssi_threshold: Buffer to fill the next rssi threshold.
  *			Valid only if the return status is success.
  *
  * Return: QDF_STATUS
@@ -580,7 +580,7 @@ ucfg_cm_get_roam_rescan_rssi_diff(struct wlan_objmgr_psoc *psoc, uint8_t *val);
 QDF_STATUS
 ucfg_cm_get_neighbor_lookup_rssi_threshold(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id,
-					   uint8_t *lookup_threshold);
+					   uint8_t *next_rssi_threshold);
 
 /**
  * ucfg_cm_get_empty_scan_refresh_period() - get empty scan refresh period

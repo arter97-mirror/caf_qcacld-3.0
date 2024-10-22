@@ -718,6 +718,22 @@ struct dfs_radar_history {
 	uint16_t ch_freq;
 };
 
+/**
+ * struct wlan_son_sap_cac_status - record a DFS channel CAC status
+ * @cac_start_time_us: CAC start time in microsecond
+ * @cac_complete_time_us: CAC complete time in microsecond
+ * @nol_start_time_us: NOL start time in microsecond
+ * @status: channel DFS status
+ * @nol_timeout_ms: NOL timeout value in millisecond
+ */
+struct wlan_son_sap_cac_status {
+	uint64_t cac_start_time_us;
+	uint64_t cac_complete_time_us;
+	uint64_t nol_start_time_us;
+	enum channel_dfs_state status;
+	uint32_t nol_timeout_ms;
+};
+
 #ifdef DCS_INTERFERENCE_DETECTION
 /**
  * struct sap_dcs_info - record sap dcs information.
@@ -1364,6 +1380,18 @@ QDF_STATUS
 wlansap_son_update_sap_config_phymode(struct wlan_objmgr_vdev *vdev,
 				      struct sap_config *config,
 				      enum qca_wlan_vendor_phy_mode phy_mode);
+
+/**
+ * wlansap_get_nol_cac_status_for_freq() - API to get a DFS channel CAC/NOL
+ * status for son
+ * @freq: DFS channel frequency requested
+ * @cac_status: retrieve DFS channel CAC/NOL information
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlansap_get_nol_cac_status_for_freq(qdf_freq_t freq,
+				    struct wlan_son_sap_cac_status *cac_status);
 #endif
 
 /**

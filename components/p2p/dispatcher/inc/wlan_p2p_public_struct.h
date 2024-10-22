@@ -42,6 +42,9 @@
 #define P2P_OUI                  "\x50\x6f\x9a\x09"
 #define P2P_OUI_SIZE             4
 
+#define P2P2_OUI                 "\x50\x6f\x9a\x28"
+#define P2P2_OUI_SIZE            4
+
 /**
  * struct p2p_ps_params - P2P powersave related params
  * @opp_ps: opportunistic power save
@@ -267,11 +270,49 @@ struct p2p_noa_info {
 };
 
 /**
+ * struct p2p_chan_switch_req_params - Channel switch parameters for P2P GO/CLI
+ * @p2p_soc_obj: P2P soc priv object
+ * @vdev_id: VDEV ID of the p2p entity
+ * @channel: Channel number of channel switch request
+ * @op_class: operating class of channel switch request
+ */
+struct p2p_chan_switch_req_params {
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+	uint8_t vdev_id;
+	uint8_t channel;
+	uint8_t op_class;
+};
+
+/**
+ * struct p2p_ap_assist_dfs_group_params - Params of assisted AP for DFS
+ * P2P group
+ * @vdev_id: VDEV ID of p2p entity
+ * @bssid: BSSID of the assisted infra BSS
+ * @non_tx_bssid: Non-TxBSSID of the assisted infra BSS
+ */
+struct p2p_ap_assist_dfs_group_params {
+	uint8_t vdev_id;
+	struct qdf_mac_addr bssid;
+	struct qdf_mac_addr non_tx_bssid;
+};
+
+/**
  * struct p2p_protocol_callbacks - callback to non-converged driver
  * @is_mgmt_protected: func to get 11w mgmt protection status
+ * @ap_assist_dfs_group_bmiss_notify: Received BMISS event from FW for DFS group
+ * which is in infra BSS assisted mode.
+ * @p2p_group_chan_switch_req: Channel switch request params for
+ * P2P group entity
+ * @ap_assist_dfs_group_fw_monitor_update: Update FW monitoring status for the
+ * assisted infra BSS in DFS operation
  */
 struct p2p_protocol_callbacks {
 	bool (*is_mgmt_protected)(uint32_t vdev_id, const uint8_t *peer_addr);
+	void (*ap_assist_dfs_group_bmiss_notify)(uint8_t vdev_id);
+	void (*p2p_group_chan_switch_req)(uint8_t vdev_id, uint8_t chan,
+					  uint8_t op_class);
+	void (*ap_assist_dfs_group_fw_monitor_update)(uint8_t vdev_id,
+						      bool val);
 };
 
 /**
@@ -304,6 +345,8 @@ struct p2p_protocol_callbacks {
  * @P2P_ATTR_SESSION_ID: Session ID attribute
  * @P2P_ATTR_FEATURE_CAPABILITY: Feature capability attribute
  * @P2P_ATTR_PERSISTENT_GROUP: Persistent group attribute
+ * @P2P_ATTR_EXT_CAPABILITY: P2P extended capability attribute in P2P2 IE
+ * @P2P_ATTR_WLAN_AP_INFO: WLAN AP info attribute in P2P2 IE
  * @P2P_ATTR_VENDOR_SPECIFIC: Vendor specific attribute
  */
 enum p2p_attr_id {
@@ -335,6 +378,8 @@ enum p2p_attr_id {
 	P2P_ATTR_SESSION_ID = 26,
 	P2P_ATTR_FEATURE_CAPABILITY = 27,
 	P2P_ATTR_PERSISTENT_GROUP = 28,
+	P2P_ATTR_EXT_CAPABILITY = 29,
+	P2P_ATTR_WLAN_AP_INFO = 30,
 	P2P_ATTR_VENDOR_SPECIFIC = 221
 };
 

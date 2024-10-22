@@ -747,6 +747,57 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			      struct pe_session *pe_session,
 			      uint8_t preq_p2pie);
 
+/**
+ * lim_send_channel_usage_req_notif_cap_action_frame() - Send channel usage
+ * request with notify cap mode post CSA
+ * @vdev_id: VDEV ID of P2P entity
+ *
+ * Currently only supports for P2P CLI and after CSA to new channel when
+ * device advertises notifiy_cap_support in extended capability, then
+ * client needs to send channel usage request frame with usage mode set to
+ * notify capability with in 5 beacon intervals on new channel.
+ *
+ * Return: void
+ */
+void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id);
+
+/**
+ * lim_send_channel_usage_req_action_frame() - Send channel usage request
+ * action frame.
+ * @mac_ctx; Global MAC context
+ * @session: PE session
+ * @req_chan: Requested channel to send in action frame
+ * @req_op_class: Requested op class to send in action frame
+ *
+ * Prepare and send channel usage request frame to connected BSSID to request
+ * channel switch via non-infra CSA mode and start expected channel switch
+ * timer.
+ *
+ * Return: void
+ */
+void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
+					     struct pe_session *session,
+					     uint8_t req_chan,
+					     uint8_t req_op_class);
+
+/**
+ * lim_send_channel_usage_resp_action_frame() - Send channel usage response
+ * action frame.
+ * @mac_ctx: Global MAC context
+ * @session: PE session
+ * @peer_addr: Peer address to send the frame
+ *
+ * Prepare and send channel usage response frame to peer pointed by @peer_addr.
+ * If any channel is specified only accept if it is allowed by policy manager
+ * PCL list or else reject. If no channel is sent, pick the first channel from
+ * PCL and send success.
+ *
+ * Return: void
+ */
+void lim_send_channel_usage_resp_action_frame(struct mac_context *mac_ctx,
+					      struct pe_session *session,
+					      tSirMacAddr peer_addr);
+
 void lim_send_auth_mgmt_frame(struct mac_context *, tSirMacAuthFrameBody *, tSirMacAddr,
 			      uint8_t, struct pe_session *);
 void lim_send_assoc_req_mgmt_frame(struct mac_context *, tLimMlmAssocReq *, struct pe_session *);
@@ -1650,6 +1701,15 @@ void lim_process_sae_auth_timeout(struct mac_context *mac_ctx);
  * @Return: None
  */
 void lim_process_rrm_sta_stats_rsp_timeout(struct mac_context *mac_ctx);
+
+/**
+ * lim_process_channel_vacate_timeout() - Process timeout of channel vacate
+ * timer.
+ * @mac_ctx: Pointer to global MAC struct
+ *
+ * Return: None
+ */
+void lim_process_channel_vacate_timeout(struct mac_context *mac_ctx);
 
 /**
  * lim_send_frame() - API to send frame

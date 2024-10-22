@@ -3074,6 +3074,7 @@ wma_drop_delba(tp_wma_handle wma, uint8_t vdev_id,
 	struct wlan_objmgr_vdev *vdev;
 	qdf_time_t last_ts, ts = qdf_mc_timer_get_system_time();
 	bool drop = false;
+	uint32_t interval;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, vdev_id,
 						    WLAN_MLME_CM_ID);
@@ -3081,12 +3082,14 @@ wma_drop_delba(tp_wma_handle wma, uint8_t vdev_id,
 		wma_err("vdev is NULL");
 		return drop;
 	}
-	if (!wlan_mlme_is_ba_2k_jump_iot_ap(vdev))
-		goto done;
+	if (wlan_mlme_is_ba_2k_jump_iot_ap(vdev))
+		interval = CDP_DELBA_INTERVAL_MS;
+	else
+		interval = CDP_DELBA_INTERVAL_MS / 10;
 
 	last_ts = wlan_mlme_get_last_delba_sent_time(vdev);
 	if ((last_ts && cdp_reason_code == CDP_DELBA_2K_JUMP) &&
-	    (ts - last_ts) < CDP_DELBA_INTERVAL_MS) {
+	    (ts - last_ts) < interval) {
 		wma_debug("Drop DELBA, last sent ts: %lu current ts: %lu",
 			  last_ts, ts);
 		drop = true;
@@ -3094,7 +3097,6 @@ wma_drop_delba(tp_wma_handle wma, uint8_t vdev_id,
 
 	wlan_mlme_set_last_delba_sent_time(vdev, ts);
 
-done:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	return drop;

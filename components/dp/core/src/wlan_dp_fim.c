@@ -151,7 +151,7 @@ static void dp_fim_free_cb(qdf_rcu_head_t *rp)
 {
 	struct fim_node *fn = container_of(rp, struct fim_node, rcu);
 
-	dp_info("FIM: reclaim node for policy_id:%x metadata:%x",
+	dp_info("FIM: reclaim node for policy_id:%llx metadata:%x",
 		fn->policy_id, fn->metadata);
 	qdf_mem_free(fn);
 }
@@ -338,9 +338,9 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 		fn->policy_id = policy_id;
 		skb->mark = fn->metadata;
 		DP_STATS_INC(fn, num_pkt, 1);
-		dp_info("New FIM node policy_id:0x%x metadata:%x "
+		dp_info("New FIM node policy_id:0x%llx metadata:%x "
 			"srcport:%d dstport:%d proto:%d flags:0x%x "
-			"timestamp:%u num_pkt:%d",
+			"timestamp:%lu num_pkt:%d",
 			fn->policy_id, skb->mark,
 			fn->flow.src_port, fn->flow.dst_port,
 			fn->flow.proto, fn->flow.flags,
@@ -369,14 +369,14 @@ void dp_fim_display_hash_table(struct wlan_dp_intf *dp_intf)
 	struct qdf_ht *lhead;
 	struct fim_node *fn;
 
-	dp_info("fim hash table - current_timestamp %d", qdf_system_ticks());
+	dp_info("fim hash table - current_timestamp %lu", qdf_system_ticks());
 	qdf_rcu_read_lock_bh();
 	for (hash_idx = 0; hash_idx < FIM_HASH_SIZE; hash_idx++) {
 		lhead = &ht->hlist_hash_table_head[hash_idx];
 		qdf_hl_for_each_entry_rcu(fn, lhead, hnode) {
 			dp_info("hash_id:%d src_ip:%x dst_ip:%x "
 				"srcport:%d dstport:%d proto:%d flags:0x%x "
-				"policy_id:%x timestamp:%d "
+				"policy_id:%llx timestamp:%lu "
 				"num_pkt:%d metadata:%x",
 				hash_idx, fn->flow.src_ip.ipv4_addr,
 				fn->flow.dst_ip.ipv4_addr, fn->flow.src_port,
@@ -457,7 +457,7 @@ static int dp_fim_policy_update_notifier(struct notifier_block *block,
 		return -EINVAL;
 	}
 
-	dp_info("policy notifier called state:%d id:%d prio:%d", state,
+	dp_info("policy notifier called state:%lu id:%llu prio:%hhu", state,
 		policy->policy_id, policy->prio);
 
 	switch (state) {
@@ -476,7 +476,7 @@ static int dp_fim_policy_update_notifier(struct notifier_block *block,
 		DP_STATS_INC(fim_ctx, policy_update, 1);
 		break;
 	default:
-		dp_err("not supported state:%d", state);
+		dp_err("not supported state:%lu", state);
 	}
 
 	stats = &fim_ctx->stats;

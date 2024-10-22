@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -327,6 +327,8 @@ static QDF_STATUS p2p_destroy_roc_ctx(struct p2p_roc_context *roc_ctx,
 			p2p_send_roc_event(roc_ctx, ROC_EVENT_READY_ON_CHAN);
 		p2p_send_roc_event(roc_ctx, ROC_EVENT_COMPLETED);
 	}
+
+	p2p_cancel_tx_frame_by_roc(p2p_soc_obj, (uintptr_t)roc_ctx);
 
 	if (in_roc_queue) {
 		status = qdf_list_remove_node(&p2p_soc_obj->roc_q,

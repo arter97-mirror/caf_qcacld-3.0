@@ -3235,6 +3235,58 @@ lim_disable_bformee_for_iot_ap(struct mac_context *mac_ctx,
 	}
 }
 
+#ifdef WLAN_FEATURE_11AX
+static
+void lim_disable_he_dynamic_smps(struct pe_session *session)
+{
+	pe_debug("Disable HE D-SMPS");
+	session->he_config.he_dynamic_smps = 0;
+}
+#else
+static inline
+void lim_disable_he_dynamic_smps(struct pe_session *session)
+{}
+#endif
+
+/**
+ * lim_disable_dsmps_for_iot_ap() - disable dynamic SMPS for IOT AP
+ *@mac_ctx: mac context
+ *@session: pe session
+ *@bss_desc: bss descriptor
+ *
+ * When connecting to specific IOT AP, disable STA HT and HE dynamic SMPS
+ * capabilities.
+ *
+ * Return: None
+ */
+static void
+lim_disable_dsmps_for_iot_ap(struct mac_context *mac_ctx,
+			     struct pe_session *session,
+			     struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr vendor_ap_search_attr = {0};
+	uint16_t ie_len;
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+
+	if (wlan_action_oui_search(mac_ctx->psoc,
+				   &vendor_ap_search_attr,
+				   ACTION_OUI_DISABLE_DYNAMIC_SMPS)) {
+		mac_ctx->mlme_cfg->ht_caps.enable_smps = 0;
+		/*
+		 * For HT D-SMPS type,
+		 * 0 - Static, 1 - Dynamic, 2 - Reserved/Invalid, 3 - Disabled
+		 */
+		mac_ctx->mlme_cfg->ht_caps.smps = 3;
+		mac_ctx->mlme_cfg->ht_caps.ht_cap_info.mimo_power_save = 3;
+		lim_disable_he_dynamic_smps(session);
+		pe_debug("Disable HT and HE D-SMPS for this IOT AP");
+	}
+}
+
 QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		    struct bss_description *bss_desc,
@@ -3509,6 +3561,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		&local_power_constraint, session, &is_pwr_constraint);
 
 	lim_disable_bformee_for_iot_ap(mac_ctx, session, bss_desc);
+
+	lim_disable_dsmps_for_iot_ap(mac_ctx, session, bss_desc);
 
 	mlme_obj->reg_tpc_obj.is_power_constraint_abs =
 						!is_pwr_constraint;
@@ -4194,8 +4248,17 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 		     (uint16_t *)&req->assoc_ie.len, WLAN_ELEMID_RSNXE,
 		     ONE_BYTE, NULL, 0, rsnxe, WLAN_MAX_IE_LEN);
 
-	if (!rsnxe[0])
+	if (!rsnxe[SIR_MAC_IE_TYPE_OFFSET] || !rsnxe[SIR_MAC_IE_LEN_OFFSET])
 		goto end;
+
+	/*
+	 * Do not rebuild the RSNXE with length 1, if none of the caps are set
+	 * in the first octet. It leads to the creation of an empty RSNXE.
+	 */
+	if (!(rsnxe[2] & 0xF0)) {
+		pe_debug("None of the caps are set in 1st octet, strip RSNXE");
+		goto end;
+	}
 
 	switch (ap_rsnxe_len) {
 	case 0:
@@ -4801,6 +4864,44 @@ QDF_STATUS cm_process_join_req(struct cm_vdev_join_req *join_req)
 	QDF_STATUS status;
 
 	status = lim_cm_handle_join_req(join_req);
+	if (status != QDF_STATUS_E_PENDING)
+		cm_free_join_req(join_req);
+
+	return status;
+}
+
+static QDF_STATUS
+lim_cm_remove_force_bss_on_join_fail(struct cm_vdev_join_req *req)
+{
+	struct mac_context *mac_ctx;
+	QDF_STATUS status;
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma)
+		return QDF_STATUS_E_INVAL;
+
+	if (!req)
+		return QDF_STATUS_E_INVAL;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	status = wma_remove_bss_peer_before_join(wma, req->vdev_id, req);
+	if (status != QDF_STATUS_E_PENDING)
+		lim_cm_send_connect_rsp(mac_ctx, NULL, req,
+					CM_ABORT_DUE_TO_NEW_REQ_RECVD,
+					QDF_STATUS_E_FAILURE, 0, false);
+	return status;
+}
+
+QDF_STATUS
+cm_remove_force_bss_on_join_fail(struct cm_vdev_join_req *join_req)
+{
+	QDF_STATUS status;
+
+	status = lim_cm_remove_force_bss_on_join_fail(join_req);
 	if (status != QDF_STATUS_E_PENDING)
 		cm_free_join_req(join_req);
 
@@ -5840,29 +5941,6 @@ static uint8_t lim_get_num_tpe_octets(uint8_t max_transmit_power_count)
 	return 1 << (max_transmit_power_count - 1);
 }
 
-static enum reg_6g_ap_type
-lim_get_ap_power_type_for_tpc_calc(struct mac_context *mac,
-				   struct pe_session *session)
-{
-	bool rf_test_mode = false;
-	bool safe_mode_enable = false;
-	enum reg_6g_ap_type ap_power_type_6g;
-
-	ap_power_type_6g = session->best_6g_power_type;
-	wlan_mlme_get_safe_mode_enable(mac->psoc,
-				       &safe_mode_enable);
-	wlan_mlme_is_rf_test_mode_enabled(mac->psoc,
-					  &rf_test_mode);
-	/*
-	 * set LPI power if safe mode is enabled OR RF test
-	 * mode is enabled.
-	 */
-	if (rf_test_mode || safe_mode_enable)
-		ap_power_type_6g = REG_INDOOR_AP;
-
-	return ap_power_type_6g;
-}
-
 void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		      tDot11fIEtransmit_power_env *tpe_ies, uint8_t num_tpe_ies,
 		      tDot11fIEhe_op *he_op, bool *has_tpe_updated)
@@ -5970,8 +6048,7 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	bw_val = wlan_reg_get_bw_value(session->ch_width);
 
 	if (wlan_reg_is_6ghz_chan_freq(curr_op_freq)) {
-		ap_power_type_6g =
-			lim_get_ap_power_type_for_tpc_calc(mac, session);
+		ap_power_type_6g = session->best_6g_power_type;
 		if (psd_set) {
 			wlan_reg_get_client_power_for_connecting_ap(
 				mac->pdev, ap_power_type_6g,
@@ -6348,7 +6425,7 @@ void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
 
 	status = lim_strip_and_decode_eht_cap(buf, buf_len, &bcn_ie->eht_cap,
 					      bcn_ie->he_cap,
-					      session->curr_op_freq);
+					      session->curr_op_freq, false);
 	if (status != QDF_STATUS_SUCCESS) {
 		pe_err("Failed to extract eht cap");
 		return;
@@ -6494,8 +6571,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 		is_6ghz_freq = true;
 		/* Power mode calculation for 6 GHz STA*/
 		if (LIM_IS_STA_ROLE(session))
-			ap_power_type_6g =
-			lim_get_ap_power_type_for_tpc_calc(mac, session);
+			ap_power_type_6g = session->best_6g_power_type;
 	}
 
 	if (mlme_obj->reg_tpc_obj.num_pwr_levels) {

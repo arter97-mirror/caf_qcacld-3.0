@@ -1960,6 +1960,8 @@ static void mlme_init_dfs_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_SAP_TX_LEAKAGE_THRESHOLD);
 	dfs_cfg->dfs_pri_multiplier =
 		cfg_get(psoc, CFG_DFS_RADAR_PRI_MULTIPLIER);
+	dfs_cfg->enable_sap_dfs_puncture =
+		cfg_get(psoc, CFG_ENABLE_SAP_DFS_PUNCTURE);
 }
 
 static void mlme_init_feature_flag_in_cfg(
@@ -3084,6 +3086,7 @@ mlme_init_bss_load_trigger_params(struct wlan_objmgr_psoc *psoc,
 	bss_load_trig->enabled =
 		cfg_get(psoc, CFG_ENABLE_BSS_LOAD_TRIGGERED_ROAM);
 	bss_load_trig->threshold = cfg_get(psoc, CFG_BSS_LOAD_THRESHOLD);
+	bss_load_trig->bss_load_alpha = cfg_get(psoc, CFG_BSS_LOAD_ALPHA);
 
 	ucfg_mlme_get_connection_roaming_ini_present(psoc, &val);
 	if (val)
@@ -3247,10 +3250,14 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_NEIGHBOR_SCAN_MIN_TIMER_PERIOD);
 	lfr->neighbor_lookup_rssi_threshold =
 		abs(cfg_get(psoc, CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD));
+	lfr->roam_aggre_threshold =
+		abs(cfg_get(psoc, CFG_LFR_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD));
 	lfr->opportunistic_scan_threshold_diff =
 		cfg_get(psoc, CFG_LFR_OPPORTUNISTIC_SCAN_THRESHOLD_DIFF);
 	lfr->roam_rescan_rssi_diff =
 		cfg_get(psoc, CFG_LFR_ROAM_RESCAN_RSSI_DIFF);
+	lfr->roam_aggre_scan_step_rssi =
+		cfg_get(psoc, CFG_ROAM_AGGRESSIVE_SCAN_STEP_RSSI);
 	lfr->neighbor_scan_min_chan_time =
 		cfg_get(psoc, CFG_LFR_NEIGHBOR_SCAN_MIN_CHAN_TIME);
 	lfr->neighbor_scan_max_chan_time =
@@ -3384,6 +3391,11 @@ static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
 		scoring_cfg->min_roam_score_delta =
 			cfg_get(psoc, CFG_CAND_MIN_ROAM_SCORE_DELTA);
 	}
+
+	scoring_cfg->aggre_min_roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA);
+	scoring_cfg->roam_aggre_score_delta =
+			cfg_get(psoc, CFG_AGGRESSIVE_ROAM_SCORE_DELTA);
 }
 
 static void mlme_init_oce_cfg(struct wlan_objmgr_psoc *psoc,

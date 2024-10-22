@@ -567,12 +567,12 @@ ucfg_cm_get_roam_rescan_rssi_diff(struct wlan_objmgr_psoc *psoc, uint8_t *val)
 QDF_STATUS
 ucfg_cm_get_neighbor_lookup_rssi_threshold(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id,
-					   uint8_t *lookup_threshold)
+					   uint8_t *next_rssi_threshold)
 {
 	struct cm_roam_values_copy temp;
 
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id, NEXT_RSSI_THRESHOLD, &temp);
-	*lookup_threshold = temp.uint_value;
+	*next_rssi_threshold = temp.uint_value;
 
 	return QDF_STATUS_SUCCESS;
 }

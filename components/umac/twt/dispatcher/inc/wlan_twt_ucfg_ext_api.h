@@ -138,6 +138,32 @@ ucfg_twt_ac_pdev_param_send(struct wlan_objmgr_psoc *psoc,
 			    enum twt_traffic_ac twt_ac);
 
 /**
+ * ucfg_twt_send_unavailability_mode() - Send unavailability mode
+ * @psoc: Pointer to PSOC object
+ * @vdev: Pointer to vdev object
+ * @unavailability_mode: unavailability_mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  bool unavailability_mode);
+
+/**
+ * ucfg_twt_send_unavailability_mode() - Send unavailability mode
+ * @psoc: Pointer to PSOC object
+ * @vdev: Pointer to vdev object
+ * @unavailability_mode: unavailability_mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  bool unavailability_mode);
+
+/**
  * ucfg_twt_is_max_sessions_reached() - Check if the maximum number of
  * TWT sessions reached or not excluding the given dialog_id
  * @psoc: Pointer to global PSOC object

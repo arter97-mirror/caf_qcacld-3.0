@@ -262,7 +262,13 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 			if (!wlan_reg_is_dfs_for_freq(mac->pdev, chan_freq))
 				send_bcon_ind = true;
 		}
-		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq))
+
+		/* If currently in AP assisted P2P DFS operation then
+		 * don't move to CAC wait state as radar is assisted by
+		 * concurrent STA interface.
+		 */
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq) ||
+		    pe_session->dfs_p2p_info.is_assisted_p2p_group)
 			send_bcon_ind = true;
 
 		if (send_bcon_ind) {
@@ -2128,6 +2134,8 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 			       pe_session->limMlmState));
 		pe_session->limSystemRole = eLIM_AP_ROLE;
 
+		lim_fill_dfs_p2p_group_params(pe_session);
+
 		sch_edca_profile_update(mac, pe_session, NULL);
 		/* For dual AP case, delete pre auth node if any */
 		lim_delete_pre_auth_list(mac);
@@ -2974,7 +2982,6 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 		lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
 				     (uint32_t *)&assoc_cnf);
 
-		session_entry->limMlmState = eLIM_MLM_IDLE_STATE;
 		qdf_mem_free(link_assoc_rsp.ptr);
 
 		return status;
@@ -3386,6 +3393,9 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	} else {
 		pe_session->nwType = eSIR_11A_NW_TYPE;
 	}
+
+	lim_fill_dfs_p2p_group_params(pe_session);
+
 	pe_debug("new network type for peer: %d", pe_session->nwType);
 	switch (channelChangeReasonCode) {
 	case LIM_SWITCH_CHANNEL_REASSOC:
@@ -3420,6 +3430,7 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		if (pe_session->opmode == QDF_P2P_CLIENT_MODE) {
 			pe_debug("Send p2p operating channel change conf action frame once first beacon is received on new channel");
 			pe_session->send_p2p_conf_frame = true;
+			pe_session->post_csa_notify_cap = true;
 		}
 
 		if (ucfg_pkt_capture_get_pktcap_mode(mac->psoc))

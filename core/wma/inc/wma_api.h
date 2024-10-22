@@ -813,6 +813,15 @@ QDF_STATUS wma_mon_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 				       uint16_t data_len, void *data);
 
 /**
+ * wma_mon_mlme_vdev_stop_resp() - VDEV down operation
+ * @vdev_mlme:  VDEV MLME comp object
+ *
+ * Return: SUCCESS on successful completion of VDEV stop response
+ *         FAILURE, if it fails due to any
+ */
+QDF_STATUS wma_mon_mlme_vdev_stop_resp(struct vdev_mlme_obj *vdev_mlme);
+
+/**
  * wma_vdev_detach_callback() - VDEV delete response handler
  * @rsp: pointer to vdev delete response
  *

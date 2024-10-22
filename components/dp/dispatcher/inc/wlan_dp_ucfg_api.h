@@ -2101,4 +2101,14 @@ ucfg_dp_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* IPA_WDI3_VLAN_SUPPORT */
 
+/**
+ * ucfg_dp_set_def_tidmap_prty() - Set default tidmap priority
+ * @vdev: vdev
+ * @pri: tidmap priority value
+ *
+ * Return: int
+ */
+int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
+				uint32_t pri);
+
 #endif /* _WLAN_DP_UCFG_API_H_ */

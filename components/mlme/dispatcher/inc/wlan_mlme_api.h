@@ -4126,6 +4126,17 @@ QDF_STATUS
 wlan_mlme_get_bss_load_threshold(struct wlan_objmgr_psoc *psoc, uint32_t *val);
 
 /**
+ * wlan_mlme_get_bss_load_alpha() - Get bss load alpha multiplier factor
+ * for bss load average calculation
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_bss_load_alpha(struct wlan_objmgr_psoc *psoc, uint32_t *val);
+
+/**
  * wlan_mlme_get_bss_load_sample_time() - Get bss load sample time
  * @psoc: pointer to psoc object
  * @val:  Pointer to the value which will be filled for the caller
@@ -5225,4 +5236,26 @@ wlan_mlme_get_sta_keep_alive_period(struct wlan_objmgr_psoc *psoc,
  */
 void wlan_mlme_get_24_chan_bonding_mode(struct wlan_objmgr_psoc *psoc,
 					int *chan_bonding);
+
+/*
+ * wlan_mlme_get_sap_dfs_puncture() - Get sap dfs puncture state
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool sap dfs puncture state
+ */
+bool
+wlan_mlme_get_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * wlan_mlme_set_sap_dfs_puncture() - Set sap dfs puncture state
+ * @psoc: pointer to psoc object
+ * @enable_sap_dfs_puncture: sap dfs puncture state, true: enable,
+ * false: disable
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc,
+			       bool enable_sap_dfs_puncture);
+
 #endif /* _WLAN_MLME_API_H_ */

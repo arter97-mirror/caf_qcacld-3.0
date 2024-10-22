@@ -1996,3 +1996,35 @@ wlan_cm_handle_hw_mode_change_resp(struct wlan_objmgr_pdev *pdev,
 
 	return qdf_status;
 }
+
+QDF_STATUS
+cm_send_force_bss_peer_delete_req(struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	struct wlan_cm_vdev_connect_req req;
+	struct cm_vdev_join_req *join_req;
+	QDF_STATUS status;
+
+	if (!cm_get_active_connect_req(vdev, &req)) {
+		mlme_err("Failed to get vdev %d active connect req", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	join_req = qdf_mem_malloc(sizeof(*join_req));
+	if (!join_req) {
+		mlme_err("malloc fail");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	status = cm_copy_join_params(vdev, join_req, &req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err(CM_PREFIX_FMT "Failed to copy join req",
+			 CM_PREFIX_REF(req.vdev_id, req.cm_id));
+		cm_free_join_req(join_req);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = cm_remove_force_bss_on_join_fail(join_req);
+
+	return QDF_STATUS_SUCCESS;
+}

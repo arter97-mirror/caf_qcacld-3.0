@@ -7953,7 +7953,7 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 	uint8_t iter;
 	int flags = cds_get_gfp_flags();
 
-	hdd_debug("RSSI %d tx_bytes %u rx_bytes %u", sinfo->signal,
+	hdd_debug("RSSI %d tx_bytes %llu rx_bytes %llu", sinfo->signal,
 		  sinfo->tx_bytes, sinfo->rx_bytes);
 	nl_buf_len = wlan_hdd_calculate_get_sta_len();
 	for (iter = 0; iter < GET_STA_MAX_HOST_CLIENT; iter++) {
@@ -7975,12 +7975,22 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 		nla_attr = nla_nest_start(
 			skb,
 			QCA_WLAN_VENDOR_ATTR_ASYNC_GET_STATION_RESPONSE);
+		if (!nla_attr) {
+			hdd_err("nla_nest_start fail");
+			goto fail;
+		}
+
 		if (nla_put(skb, NL80211_ATTR_MAC, QDF_MAC_ADDR_SIZE, mac)) {
 			hdd_err("put mac addr failed");
 			goto fail;
 		}
 
 		nla_attr_1 = nla_nest_start(skb, NL80211_ATTR_STA_INFO);
+		if (!nla_attr_1) {
+			hdd_err("nla_nest_start fail");
+			goto fail;
+		}
+
 		if (nla_put_u32(skb, NL80211_STA_INFO_RX_BYTES,
 				sinfo->rx_bytes)) {
 			hdd_err("put rx_bytes failed");
@@ -8000,6 +8010,7 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 
 		nla_nest_end(skb, nla_attr_1);
 		nla_nest_end(skb, nla_attr);
+		hdd_debug("PortId: %u", client_info->port_id);
 		wlan_cfg80211_vendor_event(skb, flags);
 	}
 	return QDF_STATUS_SUCCESS;
@@ -10205,6 +10216,7 @@ hdd_convert_roam_failures_reason(enum wlan_roam_failure_reason_code fail)
 	case ROAM_FAIL_REASON_SCREEN_ACTIVITY:
 	case ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN:
 	case ROAM_FAIL_REASON_REASSOC_TO_SAME_AP:
+	case ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED:
 	case ROAM_FAIL_REASON_UNKNOWN:
 		hdd_err("Invalid roam failures reason");
 		break;

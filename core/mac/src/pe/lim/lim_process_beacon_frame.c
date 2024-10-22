@@ -537,7 +537,7 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	uint8_t bpcc;
 	bool cu_flag = true;
 	QDF_STATUS status;
-	struct bss_description *bss;
+	struct bss_description *bss = NULL;
 	struct vdev_mlme_obj *mlme_obj;
 	struct wlan_lmac_if_reg_tx_ops *tx_ops;
 	bool tpe_change = false;
@@ -651,11 +651,17 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (cu_flag) {
 		lim_process_beacon_eht(mac_ctx, session, bcn_ptr);
-		bss = &session->lim_join_req->bssDescription;
+		if (session->lim_join_req)
+			bss = &session->lim_join_req->bssDescription;
 		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
 
+		if (!bss) {
+			pe_err("bss descriptor is NULL");
+			goto end;
+		}
+
 		lim_process_tpe_ie_from_beacon(mac_ctx, session,
-				bss, &tpe_change);
+					       bss, &tpe_change);
 
 		mlme_obj =
 			wlan_vdev_mlme_get_cmpt_obj(session->vdev);

@@ -662,6 +662,8 @@ void lim_cleanup_mlm(struct mac_context *mac_ctx)
 		tx_timer_delete(&lim_timer->sae_auth_timer);
 		tx_timer_delete(&lim_timer->rrm_sta_stats_resp_timer);
 
+		tx_timer_delete(&lim_timer->channel_vacate_timer);
+
 		mac_ctx->lim.gLimTimersCreated = 0;
 	}
 } /*** end lim_cleanup_mlm() ***/
@@ -1876,7 +1878,8 @@ __lim_process_channel_switch_timeout(struct pe_session *pe_session)
 	 * Else, just don't bother to switch. Indicate HDD to look for a
 	 * better AP to associate
 	 */
-	if (!lim_is_channel_valid_for_channel_switch(mac, channel_freq)) {
+	if (!lim_is_channel_valid_for_channel_switch(mac, pe_session,
+						     channel_freq)) {
 		/* We need to restore pre-channelSwitch state on the STA */
 		if (lim_restore_pre_channel_switch_state(mac, pe_session) !=
 		    QDF_STATUS_SUCCESS) {
@@ -4266,9 +4269,12 @@ lim_get_b_dfrom_rx_packet(struct mac_context *mac, void *body, uint32_t **pRxPac
 } /*** end lim_get_b_dfrom_rx_packet() ***/
 
 bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac,
+					     struct pe_session *session,
 					     uint32_t channel_freq)
 {
 	bool ok = false;
+	TX_TIMER *channel_vacate_timer =
+		&mac->lim.lim_timers.channel_vacate_timer;
 
 	if (policy_mgr_is_chan_ok_for_dnbs(mac->psoc, channel_freq,
 					   &ok)) {
@@ -4281,12 +4287,34 @@ bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac,
 		return false;
 	}
 
-	if (wlan_reg_is_freq_enabled(mac->pdev, channel_freq,
-				     REG_CURRENT_PWR_MODE))
-		return true;
-
 	/* channel does not belong to list of valid channels */
-	return false;
+	if (!wlan_reg_is_freq_enabled(mac->pdev, channel_freq,
+				      REG_CURRENT_PWR_MODE)) {
+		return false;
+	}
+
+	/*
+	 * Do not allow CSA to different DFS channel when the CLI is already
+	 * operating in DFS channel under assisted AP mode and the timer for
+	 * channel vacate is running.
+	 *
+	 * If moving to non-DFS channel, then stop the timer.
+	 */
+	if (session->opmode == QDF_P2P_CLIENT_MODE &&
+	    session->dfs_p2p_info.is_assisted_p2p_group) {
+		if (tx_timer_running(channel_vacate_timer) &&
+		    channel_vacate_timer->sessionId == session->peSessionId) {
+			if (wlan_reg_is_dfs_for_freq(mac->pdev, channel_freq)) {
+				pe_debug("Channel change to DFS for assisted AP P2P group");
+				return false;
+			}
+
+			pe_debug("Stop channel vacate timer");
+			tx_timer_deactivate(channel_vacate_timer);
+		}
+	}
+
+	return true;
 }
 
 /**
@@ -7372,6 +7400,14 @@ void lim_update_he_caps_mcs(struct mac_context *mac, struct pe_session *session)
 }
 
 static void
+lim_print_he_config(tDot11fIEhe_cap he_config)
+{
+	pe_debug("he_config: 0x");
+	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   (void *)&he_config, sizeof(he_config));
+}
+
+static void
 lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 			       struct pe_session *session)
 {
@@ -7435,8 +7471,8 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 		he_config->codebook_su = mac->he_cap_5g.codebook_su;
 		he_config->codebook_mu = mac->he_cap_5g.codebook_mu;
 	}
+	lim_print_he_config(mlme_priv->he_config);
 
-	pe_debug("he_config: 0x%x", mlme_priv->he_config);
 }
 
 static void
@@ -9836,12 +9872,15 @@ enum rateid lim_get_min_session_txrate(struct pe_session *session,
 /**
  * lim_override_vdev_id_broadcast() - Function to update vdev_id
  * @frame: Pointer to management frame buffer
+ * @frame_type: Frame type
  * @vdev_id: vdev id
  *
  * Return: Overridden vdev id as needed
  */
 static inline uint16_t
-lim_override_vdev_id_broadcast(uint8_t *frame, uint16_t vdev_id)
+lim_override_vdev_id_broadcast(uint8_t *frame,
+			       uint8_t frame_type,
+			       uint16_t vdev_id)
 {
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)(frame + 4)) &&
 	    !vdev_id)
@@ -9851,9 +9890,15 @@ lim_override_vdev_id_broadcast(uint8_t *frame, uint16_t vdev_id)
 }
 #else
 static inline uint16_t
-lim_override_vdev_id_broadcast(uint8_t *frame, uint16_t vdev_id)
+lim_override_vdev_id_broadcast(uint8_t *frame,
+			       uint8_t frame_type,
+			       uint16_t vdev_id)
 {
-	return vdev_id;
+	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)(frame + 4)) &&
+	    !vdev_id && frame_type == SIR_MAC_MGMT_ACTION)
+		return SME_SESSION_ID_BROADCAST;
+	else
+		return vdev_id;
 }
 #endif
 
@@ -9872,7 +9917,7 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
 	if (!sme_mgmt_frame)
 		return;
 
-	vdev_id = lim_override_vdev_id_broadcast(frame, vdev_id);
+	vdev_id = lim_override_vdev_id_broadcast(frame, frame_type, vdev_id);
 
 	sme_mgmt_frame->frame_len = frame_len;
 	sme_mgmt_frame->sessionId = vdev_id;
@@ -10193,6 +10238,12 @@ QDF_STATUS lim_sta_mlme_vdev_restart_send(struct vdev_mlme_obj *vdev_mlme,
 		return QDF_STATUS_E_INVAL;
 	}
 	if (mlme_is_chan_switch_in_progress(vdev_mlme->vdev)) {
+		/* If STA interface is moving to different channel, check if
+		 * need to reevaluate the operation of P2P group in DFS channel.
+		 */
+		if (wlan_vdev_mlme_get_opmode(vdev_mlme->vdev) == QDF_STA_MODE)
+			lim_check_ap_assist_dfs_p2p_group(false);
+
 		switch (session->channelChangeReasonCode) {
 		case LIM_SWITCH_CHANNEL_OPERATION:
 			status = __lim_process_channel_switch_timeout(session);
@@ -10347,7 +10398,8 @@ void lim_send_beacon(struct mac_context *mac_ctx, struct pe_session *session)
 					session->vdev,
 					WLAN_VDEV_SM_EV_CHAN_SWITCH_DISABLED,
 					sizeof(*session), session);
-	else
+	else if (wlan_vdev_is_up_active_state(session->vdev) !=
+		 QDF_STATUS_SUCCESS)
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_START_SUCCESS,
 					      sizeof(*session), session);
@@ -11910,8 +11962,8 @@ void lim_update_disconnect_vdev_id(struct mac_context *mac,  uint8_t vdev_id)
 	}
 
 	if (session->vdev) {
-		if (mac->sme.set_disconnect_link_id_cb)
-			mac->sme.set_disconnect_link_id_cb(vdev_id);
+		if (mac->sme.set_disconnect_link_info_cb)
+			mac->sme.set_disconnect_link_info_cb(vdev_id);
 		pe_debug("disconnect received on vdev id %d", vdev_id);
 	}
 }
@@ -12055,8 +12107,13 @@ void lim_cp_stats_cstats_log_assoc_req_evt(struct pe_session *pe_session,
 	stat.cmn.time_tick = qdf_get_log_timestamp();
 
 	stat.freq = pe_session->curr_op_freq;
-	stat.ssid_len = ssid_len;
-	qdf_mem_copy(stat.ssid, ssid, ssid_len);
+
+	if (ssid_len > WLAN_SSID_MAX_LEN)
+		stat.ssid_len = WLAN_SSID_MAX_LEN;
+	else
+		stat.ssid_len = ssid_len;
+
+	qdf_mem_copy(stat.ssid, ssid, stat.ssid_len);
 
 	stat.direction = dir;
 	CSTATS_MAC_COPY(stat.bssid, bssid);
@@ -12317,20 +12374,26 @@ uint16_t lim_get_tpe_ie_length(enum phy_ch_width chan_width,
 		total_ie_len += 1;
 		total_ie_len += tpe_ie[idx].num_tx_power;
 
-		if (!(chan_width == CH_WIDTH_320MHZ &&
-		      tpe_ie[idx].max_tx_pwr_interpret))
-			continue;
-
-		if (tpe_ie[idx].max_tx_pwr_interpret == LOCAL_EIRP ||
-		    tpe_ie[idx].max_tx_pwr_interpret == REGULATORY_CLIENT_EIRP) {
+		switch (tpe_ie[idx].max_tx_pwr_interpret) {
+		case LOCAL_EIRP:
+		case REGULATORY_CLIENT_EIRP:
 			/* Maximum Transmit Power For 320 MHz */
-			total_ie_len += 1;
-		} else if (tpe_ie[idx].max_tx_pwr_interpret == LOCAL_EIRP_PSD ||
-			   tpe_ie[idx].max_tx_pwr_interpret == REGULATORY_CLIENT_EIRP_PSD) {
+			if (tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320)
+				total_ie_len += 1;
+			break;
+		case LOCAL_EIRP_PSD:
+		case REGULATORY_CLIENT_EIRP_PSD:
+			if (!tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count)
+				break;
+
 			/* Extension Transmit PSD Information */
 			total_ie_len += 1;
 			/* Maximum Transmit PSD power */
-			total_ie_len += EXT_TX_PSD_POWER;
+			total_ie_len +=
+				tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count;
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -12377,12 +12440,11 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 		consumed += tpe_ptr[idx].num_tx_power;
 		target += tpe_ptr[idx].num_tx_power;
 
-		if (!(chan_width == CH_WIDTH_320MHZ &&
-		      tpe_ptr[idx].max_tx_pwr_interpret))
-			goto end;
-
 		switch (tpe_ptr[idx].max_tx_pwr_interpret) {
 		case LOCAL_EIRP:
+			if (!tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320)
+				break;
+
 			/* Maximum Local EIRP Transmit Power For 320 MHz */
 			*target = tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320;
 			target += 1;
@@ -12392,16 +12454,24 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 			local_psd = 0U;
 			local_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.ext_count << 0);
 			local_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.reserved << 4);
+
+			if (!local_psd)
+				break;
+
 			/* Extension Transmit Local PSD Information */
 			*target = local_psd;
 			target += 1;
 			consumed += 1;
 			/* Maximum Transmit Local PSD power */
-			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power, EXT_TX_PSD_POWER);
-			target += EXT_TX_PSD_POWER;
-			consumed += EXT_TX_PSD_POWER;
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power,
+				     QDF_GET_BITS(local_psd, 0, 4));
+			target += QDF_GET_BITS(local_psd, 0, 4);
+			consumed += QDF_GET_BITS(local_psd, 0, 4);
 			break;
 		case REGULATORY_CLIENT_EIRP:
+			if (!tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320)
+				break;
+
 			/* Maximum Regulatory EIRP Transmit Power For 320 MHz */
 			*target = tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320;
 			target += 1;
@@ -12411,17 +12481,22 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 			reg_psd = 0U;
 			reg_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count << 0);
 			reg_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.reserved << 4);
+
+			if (!reg_psd)
+				break;
+
 			/* Extension Transmit Regulatory PSD Information */
 			*target = reg_psd;
 			consumed += 1;
 			target += 1;
 			/* Maximum Transmit Regulatory PSD power */
-			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power, EXT_TX_PSD_POWER);
-			target += EXT_TX_PSD_POWER;
-			consumed += EXT_TX_PSD_POWER;
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power,
+				     QDF_GET_BITS(reg_psd, 0, 4));
+			target += QDF_GET_BITS(reg_psd, 0, 4);
+			consumed += QDF_GET_BITS(reg_psd, 0, 4);
 			break;
 		}
-end:
+
 		if (ie_len && consumed >= 2) {
 			total_consumed += consumed;
 			/* -2 for element id and length */

@@ -959,6 +959,8 @@ QDF_STATUS policy_mgr_register_conc_cb(struct wlan_objmgr_psoc *psoc,
 
 	pm_ctx->conc_cbacks.connection_info_update =
 					conc_cbacks->connection_info_update;
+	pm_ctx->conc_cbacks.ap_assist_dfs_group_notify =
+					conc_cbacks->ap_assist_dfs_group_notify;
 	return QDF_STATUS_SUCCESS;
 }
 

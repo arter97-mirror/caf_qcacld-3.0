@@ -520,13 +520,21 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
 		if (!curr_peer)
 			continue;
 
-		tdls_notice("indicate TDLS teardown "QDF_MAC_ADDR_FMT,
+		tdls_notice("vdev %d indicate TDLS teardown " QDF_MAC_ADDR_FMT,
+			    wlan_vdev_get_id(tdls_vdev->vdev),
 			    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
 
 		/* Indicate teardown to supplicant */
-		tdls_indicate_teardown(tdls_vdev,
-				       curr_peer,
-				       TDLS_TEARDOWN_PEER_UNSPEC_REASON);
+		status = tdls_indicate_teardown(
+					tdls_vdev, curr_peer,
+					TDLS_TEARDOWN_PEER_UNSPEC_REASON);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			tdls_err("vdev %d teardown indication failed for peer "
+				 QDF_MAC_ADDR_FMT,
+				 wlan_vdev_get_id(tdls_vdev->vdev),
+				 QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
+			continue;
+		}
 
 		tdls_reset_peer(tdls_vdev, curr_peer->peer_mac.bytes);
 
@@ -890,60 +898,32 @@ uint32_t tdls_get_6g_pwr_for_power_type(struct wlan_objmgr_vdev *vdev,
 	return tx_power;
 }
 
-bool tdls_is_6g_freq_allowed(struct wlan_objmgr_vdev *vdev,
+bool tdls_is_6g_freq_allowed(struct wlan_objmgr_pdev *pdev,
 			     qdf_freq_t freq)
 {
-	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
-	struct regulatory_channel *chan;
 	bool is_allowed = false;
-	uint8_t country_code[REG_ALPHA2_LEN + 1];
-	uint8_t chn_idx, num_chan = 0;
-	uint8_t band_mask = BIT(REG_BAND_6G);
+	uint8_t chan_idx;
+
+	if (!pdev)
+		return false;
 
 	/* Return if freq is not 6 Ghz freq */
 	if (!wlan_reg_is_6ghz_chan_freq(freq))
 		return false;
 
-	if (!wlan_cfg80211_tdls_is_fw_6ghz_capable(vdev))
+	if (!wlan_cfg80211_tdls_is_fw_6ghz_capable(pdev))
 		return false;
 
-	if (!pdev)
-		return false;
+	chan_idx = wlan_reg_get_chan_enum_for_freq(freq);
+	if (wlan_reg_is_6ghz_psc_chan_freq(freq) &&
+	    wlan_reg_is_freq_idx_enabled(pdev, chan_idx, REG_CLI_DEF_VLP))
+		is_allowed = true;
 
-	wlan_cm_get_country_code(pdev, wlan_vdev_get_id(vdev), country_code);
-	if (!wlan_reg_ctry_support_vlp(country_code))
-		return false;
-
-	chan = qdf_mem_malloc(sizeof(struct regulatory_channel) * NUM_CHANNELS);
-	if (!chan)
-		return false;
-
-	num_chan = wlan_reg_get_band_channel_list_for_pwrmode(pdev,
-							      band_mask,
-							      chan,
-							      REG_CLI_DEF_VLP,
-							      false);
-	tdls_debug("Country IE:%c%c freq %d num_chan %d", country_code[0],
-			   country_code[1], freq, num_chan);
-	if (!num_chan)
-		goto error;
-
-	for (chn_idx = 0; chn_idx < num_chan; chn_idx++) {
-		if (chan[chn_idx].center_freq == freq) {
-			tdls_debug("TDLS 6ghz freq: %d supports VLP power",
-				   chan[chn_idx].center_freq);
-			is_allowed = true;
-			break;
-		}
-	}
-
-error:
-	qdf_mem_free(chan);
 	return is_allowed;
 }
 #else
-bool tdls_is_6g_freq_allowed(struct wlan_objmgr_vdev *vdev,
-				    qdf_freq_t freq)
+bool tdls_is_6g_freq_allowed(struct wlan_objmgr_pdev *pdev,
+			     qdf_freq_t freq)
 {
 	return false;
 }
@@ -970,6 +950,10 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 	QDF_STATUS status;
 	uint32_t connection_count;
 	uint8_t sta_count, p2p_cli_count;
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+
+	if (!pdev)
+		return false;
 
 	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -1026,7 +1010,7 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 
 	ch_freq = wlan_get_operation_chan_freq(vdev);
 	if (wlan_reg_is_6ghz_chan_freq(ch_freq) &&
-	    !tdls_is_6g_freq_allowed(vdev, ch_freq)) {
+	    !tdls_is_6g_freq_allowed(pdev, ch_freq)) {
 		tdls_debug("6GHz freq:%d not allowed for TDLS", ch_freq);
 		state = false;
 	}
@@ -1412,7 +1396,7 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	struct tdls_config_params *threshold_params;
 	uint32_t tdls_feature_flags;
 	QDF_STATUS status;
-	bool tdls_mlo;
+	enum tdls_feature_mode current_mode = TDLS_SUPPORT_DISABLED;
 
 	tdls_feature_flags = tdls_soc_obj->tdls_configs.tdls_feature_flags;
 	if (!TDLS_IS_ENABLED(tdls_feature_flags)) {
@@ -1420,29 +1404,31 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 		return;
 	}
 
-	tdls_mlo = wlan_tdls_is_fw_11be_mlo_capable(tdls_soc_obj->soc);
-
 	/* If AP or caller indicated TDLS Prohibited then disable tdls mode */
 	if (sta_connect_event) {
 		if (tdls_prohibited) {
-			tdls_soc_obj->tdls_current_mode =
-					TDLS_SUPPORT_DISABLED;
+			current_mode = TDLS_SUPPORT_DISABLED;
 		} else {
 			if (!TDLS_IS_IMPLICIT_TRIG_ENABLED(tdls_feature_flags))
-				tdls_soc_obj->tdls_current_mode =
-					TDLS_SUPPORT_EXP_TRIG_ONLY;
+				current_mode = TDLS_SUPPORT_EXP_TRIG_ONLY;
 			else if (TDLS_IS_EXTERNAL_CONTROL_ENABLED(
 				tdls_feature_flags))
-				tdls_soc_obj->tdls_current_mode =
-					TDLS_SUPPORT_EXT_CONTROL;
+				current_mode = TDLS_SUPPORT_EXT_CONTROL;
 			else
-				tdls_soc_obj->tdls_current_mode =
-					TDLS_SUPPORT_IMP_MODE;
+				current_mode = TDLS_SUPPORT_IMP_MODE;
 		}
 	} else {
-		tdls_soc_obj->tdls_current_mode =
-				TDLS_SUPPORT_DISABLED;
+		current_mode = TDLS_SUPPORT_DISABLED;
 	}
+
+	if (!wlan_cm_is_vdev_connected(tdls_vdev_obj->vdev) &&
+	    sta_connect_event && current_mode != TDLS_SUPPORT_DISABLED) {
+		tdls_debug("Vdev:%d is not connected. Don't enable TDLS",
+			   wlan_vdev_get_id(tdls_vdev_obj->vdev));
+		return;
+	}
+
+	tdls_soc_obj->tdls_current_mode = current_mode;
 
 	tdls_info_to_fw = qdf_mem_malloc(sizeof(struct tdls_info));
 	if (!tdls_info_to_fw)
@@ -1551,12 +1537,9 @@ void tdls_process_enable_disable_for_ml_vdev(struct wlan_objmgr_vdev *vdev,
 					     bool is_enable)
 {
 	struct wlan_mlo_dev_context *ml_dev_ctx;
+	struct wlan_objmgr_vdev *vdev_iter;
 	QDF_STATUS status;
 	uint8_t i;
-	struct wlan_objmgr_vdev *vdev_iter;
-
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
-		return;
 
 	ml_dev_ctx = vdev->mlo_dev_ctx;
 	if (!ml_dev_ctx)

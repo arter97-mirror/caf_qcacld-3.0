@@ -129,6 +129,17 @@ QDF_STATUS wlan_twt_ac_pdev_param_send(struct wlan_objmgr_psoc *psoc,
 				       enum twt_traffic_ac twt_ac);
 
 /**
+ * wlan_twt_send_unavailability_mode() - Send TWT unavailability mode
+ * @psoc: Pointer to PSOC object
+ * @vdev: Pointer to vdev object
+ * @unavailability_mode: unavailability mode value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_objmgr_vdev *vdev,
+					     bool unavailability_mode);
+/**
  * wlan_twt_is_setup_in_progress() - Get if TWT setup command is in progress
  * for given dialog id
  * @psoc: Pointer to global psoc object
@@ -435,6 +446,22 @@ wlan_twt_ac_pdev_param_send(struct wlan_objmgr_psoc *psoc,
 			    enum twt_traffic_ac twt_ac)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_objmgr_vdev *vdev,
+					     bool unavailability_mode)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS wlan_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_objmgr_vdev *vdev,
+					     bool unavailability_mode)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
 static inline bool

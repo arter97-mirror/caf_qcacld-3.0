@@ -554,6 +554,10 @@ config FIX_TXDMA_LIMITATION
 	bool "Enable FIX_TXDMA_LIMITATION"
 	default n
 
+config SIXTH_CONNECTION
+	bool "Enable SIXTH_CONNECTION"
+	default n
+
 config FIFTH_CONNECTION
 	bool "Enable FIFTH_CONNECTION"
 	default n
@@ -2208,6 +2212,10 @@ config WLAN_MCC_MIN_CHANNEL_QUOTA
 
 config WLAN_DP_FEATURE_STC
 	bool "Enable WLAN_DP_FEATURE_STC"
+	default n
+
+config FEATURE_MGMT_RX_OVER_SRNG
+	bool "enable FEATURE_MGMT_RX_OVER_SRNG"
 	default n
 
 config DP_FEATURE_RX_BUFFER_RECYCLE

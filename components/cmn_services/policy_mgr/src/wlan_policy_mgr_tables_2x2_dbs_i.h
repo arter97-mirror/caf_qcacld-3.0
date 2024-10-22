@@ -2792,7 +2792,7 @@ pm_third_connection_pcl_dbs_2x2_table = {
 	[PM_STA_MODE] = {
 		PM_SBS_CH_5G, PM_SBS_CH, PM_SBS_CH},
 	[PM_SAP_MODE] = {
-		PM_SBS_CH_5G, PM_SBS_CH, PM_SBS_CH},
+		PM_SBS_CH, PM_SBS_CH, PM_SBS_CH},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
 	[PM_P2P_GO_MODE] = {
@@ -4787,8 +4787,8 @@ fourth_connection_pcl_dbs_sbs_table
 			     PM_SCC_ON_5_5G_SCC_ON_24G,
 			     PM_SCC_ON_5_5G_SCC_ON_24G},
 	[PM_NAN_DISC_MODE] = {PM_NONE, PM_NONE, PM_NONE},
-	[PM_SAP_MODE] = { PM_SCC_ON_5_SCC_ON_24, PM_SCC_ON_5_SCC_ON_24,
-			 PM_SCC_ON_5_SCC_ON_24},
+	[PM_SAP_MODE] = { PM_SCC_ON_5_SCC_ON_24_5G, PM_SCC_ON_5_SCC_ON_24_5G,
+			 PM_SCC_ON_5_SCC_ON_24_5G},
 	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE } },
 	[PM_5_SCC_MCC_PLUS_24_DBS] = {
 	[PM_STA_MODE] = { PM_SBS_CH_2G, PM_SBS_CH_2G,
@@ -4796,8 +4796,8 @@ fourth_connection_pcl_dbs_sbs_table
 	[PM_P2P_GO_MODE] = { PM_SBS_CH_24G_SCC_CH, PM_SBS_CH_24G_SCC_CH,
 			     PM_SBS_CH_24G_SCC_CH },
 	[PM_NAN_DISC_MODE] = {PM_NONE, PM_NONE, PM_NONE},
-	[PM_SAP_MODE] = { PM_SCC_ON_24_SCC_ON_5, PM_SCC_ON_24_SCC_ON_5,
-			  PM_SCC_ON_24_SCC_ON_5 },
+	[PM_SAP_MODE] = { PM_SCC_ON_24_SCC_ON_5_24G, PM_SCC_ON_24_SCC_ON_5_24G,
+			  PM_SCC_ON_24_SCC_ON_5_24G },
 	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE } },
 	[PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS] = {
 	[PM_STA_MODE] = {PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
@@ -5138,7 +5138,24 @@ fifth_connection_pcl_dbs_sbs_table
 const enum policy_mgr_pcl_type
 fifth_connection_pcl_dbs_sbs_table
 	[PM_MAX_FOUR_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
-	[PM_MAX_CONC_PRIORITY_MODE] = {};
+	[PM_MAX_CONC_PRIORITY_MODE] = {
+	[PM_SAP_SAP_24G_SAP_SAP_5G_DBS] = {
+	[PM_SAP_MODE] = {PM_SCC_CH, PM_SCC_CH, PM_SCC_CH} },
+	[PM_SAP_SAP_SAP_24G_SAP_5G_DBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_5_CH_5G, PM_SCC_ON_5_CH_5G,
+			 PM_SCC_ON_5_CH_5G} },
+	[PM_SAP_SAP_SAP_5G_SAP_24G_DBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_24_CH_24G, PM_SCC_ON_24_CH_24G,
+			 PM_SCC_ON_24_CH_24G} },
+	[PM_SAP_SAP_5G_SAP_SAP_5G_SBS] = {
+	[PM_SAP_MODE] = {PM_SCC_CH, PM_SCC_CH, PM_SCC_CH} },
+	[PM_SAP_SAP_SAP_5G_LOW_SAP_5G_HIGH_SBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_5G_HIGH, PM_SCC_ON_5G_HIGH,
+			 PM_SCC_ON_5G_HIGH} },
+	[PM_SAP_SAP_SAP_5G_HIGH_SAP_5G_LOW_SBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_5G_LOW, PM_SCC_ON_5G_LOW,
+			 PM_SCC_ON_5G_LOW} },
+};
 #else
 /*
  * fifth_connection_pcl_dbs_sbs_table - table which provides PCL for
@@ -5171,6 +5188,61 @@ fifth_connection_pcl_dbs_sbs_table
 #endif
 #endif
 
+#ifdef FEATURE_SIXTH_CONNECTION
+#if defined(AUTO_PLATFORM)
+/*
+ * sixth_connection_pcl_dbs_sbs_table - table which provides PCL for
+ * the 6th connection, when we have 5 connections already in
+ * the system (with DBS & SBS supported by HW), this table is for mobile
+ * products If you want to support any 6 port other than the below in MCL add
+ * below as other concurrencies supported by auto may not be PORed for mobile
+ * products and vice-versa.
+ */
+const enum policy_mgr_pcl_type
+sixth_connection_pcl_dbs_sbs_table
+	[PM_MAX_FIVE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
+	[PM_MAX_CONC_PRIORITY_MODE] = {};
+#elif defined(MDM_PLATFORM)
+/*
+ * sixth_connection_pcl_dbs_sbs_table - table which provides PCL for
+ * the 6th connection, when we have 5 connections already in
+ * the system (with DBS & SBS supported by HW), this table is for mobile
+ * products If you want to support any 6 port other than the below in MCL add
+ * below as other concurrencies supported by auto may not be PORed for mobile
+ * products and vice-versa.
+ */
+const enum policy_mgr_pcl_type
+sixth_connection_pcl_dbs_sbs_table
+	[PM_MAX_FIVE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
+	[PM_MAX_CONC_PRIORITY_MODE] = {
+	[PM_SAP_SAP_SAP_24G_SAP_SAP_5G_DBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_5_CH_5G, PM_SCC_ON_5_CH_5G,
+			 PM_SCC_ON_5_CH_5G} },
+	[PM_SAP_SAP_SAP_5G_SAP_SAP_24G_DBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_24_CH_24G, PM_SCC_ON_24_CH_24G,
+			 PM_SCC_ON_24_CH_24G} },
+	[PM_SAP_SAP_SAP_5G_LOW_SAP_SAP_5G_HIGH_SBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_5G_HIGH, PM_SCC_ON_5G_HIGH,
+			 PM_SCC_ON_5G_HIGH} },
+	[PM_SAP_SAP_SAP_5G_HIGH_SAP_SAP_5G_LOW_SBS] = {
+	[PM_SAP_MODE] = {PM_SCC_ON_5G_LOW, PM_SCC_ON_5G_LOW,
+			 PM_SCC_ON_5G_LOW} },
+};
+#else
+/*
+ * sixth_connection_pcl_dbs_sbs_table - table which provides PCL for
+ * the 6th connection, when we have 5 connections already in
+ * the system (with DBS & SBS supported by HW), this table is for mobile
+ * products If you want to support any 6 port other than the below in MCL add
+ * below as other concurrencies supported by auto may not be PORed for mobile
+ * products and vice-versa.
+ */
+const enum policy_mgr_pcl_type
+sixth_connection_pcl_dbs_sbs_table
+	[PM_MAX_FIVE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
+	[PM_MAX_CONC_PRIORITY_MODE] = {};
+#endif
+#endif
 /*
  * next_action_two_connection_table - table which provides next
  * action while a new connection is coming up, with one

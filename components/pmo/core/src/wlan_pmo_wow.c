@@ -423,6 +423,10 @@ void pmo_set_sta_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmap_size)
 
 	pmo_set_wow_event_bitmap(WOW_RTT_11AZ_EVENT,
 				 wow_bitmap_size, bitmask);
+
+	pmo_set_wow_event_bitmap(WOW_PAGE_FAULT_EVENT,
+				 wow_bitmap_size,
+				 bitmask);
 }
 
 void pmo_set_sap_wow_bitmask(uint32_t *bitmask, uint32_t wow_bitmap_size)

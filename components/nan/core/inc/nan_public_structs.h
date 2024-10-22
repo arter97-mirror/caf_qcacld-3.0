@@ -541,12 +541,14 @@ struct nan_datapath_end_all_ndps {
  * @nan_event_id_enable_rsp: NAN Enable Response event ID
  * @nan_event_id_disable_ind: NAN Disable Indication event ID
  * @nan_event_id_generic_rsp: All remaining NAN events, treated as passthrough
+ * @nan_event_id_de_ind: Discovery Engine event Indication
  */
 enum nan_event_id_types {
 	nan_event_id_error_rsp = 0,
 	nan_event_id_enable_rsp,
 	nan_event_id_disable_ind,
 	nan_event_id_generic_rsp,
+	nan_event_id_de_ind,
 };
 
 /**
@@ -557,6 +559,7 @@ enum nan_event_id_types {
  * @mac_id: MAC ID associated with NAN Discovery from NAN Enable Response event
  * @vdev_id: vdev id of the interface created for NAN discovery
  * @buf_len: Event buffer length
+ * @nan_mac_addr: NAN MAC address which is randomized by target
  * @buf: Event buffer starts here
  */
 struct nan_event_params {
@@ -566,6 +569,7 @@ struct nan_event_params {
 	uint8_t mac_id;
 	uint8_t vdev_id;
 	uint32_t buf_len;
+	struct qdf_mac_addr nan_mac_addr;
 	/* Variable length, do not add anything after this */
 	uint8_t buf[];
 };
@@ -586,7 +590,6 @@ struct nan_msg_hdr {
 	uint16_t reserved[3];
 };
 
-#define NAN_STATUS_SUCCESS 0
 #define NAN_STATUS_UNSUPPORTED_CONCURRENCY_NAN_DISABLED 12
 
 /**

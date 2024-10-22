@@ -749,14 +749,14 @@ uint32_t tdls_get_6g_pwr_for_power_type(struct wlan_objmgr_vdev *vdev,
 
 /**
  * tdls_is_6g_freq_allowed() - check is tdls 6ghz allowed or not
- * @vdev: vdev object
+ * @pdev: pdev object
  * @freq: 6g freq
  *
  * Function determines the whether TDLS on 6ghz is allowed in the system
  *
  * Return: true or false
  */
-bool tdls_is_6g_freq_allowed(struct wlan_objmgr_vdev *vdev, qdf_freq_t freq);
+bool tdls_is_6g_freq_allowed(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
 
 /**
  * tdls_check_is_user_tdls_enable() - Check is tdls enabled or not

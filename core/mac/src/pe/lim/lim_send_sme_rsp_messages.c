@@ -2689,14 +2689,18 @@ lim_send_sme_ap_channel_switch_resp(struct mac_context *mac,
 	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq))
 		is_ch_dfs = false;
 
-	if (is_ch_dfs) {
+	/* If currently in AP assisted P2P DFS operation then
+	 * don't move to CAC wait state as radar is assisted by
+	 * concurrent STA interface.
+	 */
+	if (is_ch_dfs && !pe_session->dfs_p2p_info.is_assisted_p2p_group) {
 		lim_sap_move_to_cac_wait_state(pe_session);
-
 	} else {
 		lim_apply_configuration(mac, pe_session);
 		lim_send_beacon(mac, pe_session);
 		lim_obss_send_detection_cfg(mac, pe_session, true);
 	}
+
 	return;
 }
 

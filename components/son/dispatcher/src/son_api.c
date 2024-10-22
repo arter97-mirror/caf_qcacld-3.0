@@ -1230,7 +1230,7 @@ int wlan_son_cbs_enable(struct wlan_objmgr_vdev *vdev)
 			(cbs->min_dwell_rest_time /
 			(2 * DEFAULT_BEACON_INTERVAL)) *
 			(2 * DEFAULT_BEACON_INTERVAL) +
-			(cbs->min_dwell_rest_time % 200 < 100) ? 100 : 200;
+			((cbs->min_dwell_rest_time % 200 < 100) ? 100 : 200);
 	}
 
 	wlan_son_cbs_init_dwell_params(cbs,
@@ -1320,10 +1320,10 @@ int wlan_son_set_cbs_wait_time(struct wlan_objmgr_vdev *vdev,
 	if (val % DEFAULT_BEACON_INTERVAL != 0) {
 		val = (val / (2 * DEFAULT_BEACON_INTERVAL)) *
 			(2 * DEFAULT_BEACON_INTERVAL) +
-			(val % (2 * DEFAULT_BEACON_INTERVAL) <
+			((val % (2 * DEFAULT_BEACON_INTERVAL) <
 				DEFAULT_BEACON_INTERVAL) ?
 				DEFAULT_BEACON_INTERVAL :
-				2 * DEFAULT_BEACON_INTERVAL;
+				2 * DEFAULT_BEACON_INTERVAL);
 	}
 	qdf_spin_lock_bh(&g_cbs_lock);
 	g_son_cbs[wlan_vdev_get_id(vdev)]->wait_time = val;

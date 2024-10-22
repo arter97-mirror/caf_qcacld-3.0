@@ -2739,11 +2739,8 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	struct direct_link_info *config = &dp_intf->direct_link_config;
-	struct wlan_dp_link *dp_link, *dp_link_next;
 	void *htc_handle;
 	bool prev_ll, update_ll;
-	cdp_config_param_type vdev_param = {0};
-	QDF_STATUS status;
 
 	if (!dp_ctx || !dp_ctx->psoc) {
 		dp_err("DP Handle is NULL");
@@ -2766,15 +2763,6 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 	update_ll = config_direct_link ? enable_low_latency : prev_ll;
 	config->config_set = config_direct_link;
 	config->low_latency = enable_low_latency;
-	dp_for_each_link_held_safe(dp_intf, dp_link, dp_link_next) {
-		vdev_param.cdp_vdev_tx_to_fw = config_direct_link;
-		status = cdp_txrx_set_vdev_param(
-				wlan_psoc_get_dp_handle(dp_ctx->psoc),
-				dp_link->link_id, CDP_VDEV_TX_TO_FW,
-				vdev_param);
-		if (QDF_IS_STATUS_ERROR(status))
-			break;
-	}
 
 	if (config_direct_link) {
 		if (update_ll)
@@ -2793,7 +2781,7 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 	}
 	qdf_mutex_release(&dp_ctx->dp_direct_link_lock);
 
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS

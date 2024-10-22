@@ -6379,6 +6379,22 @@ wlan_mlme_get_bss_load_threshold(struct wlan_objmgr_psoc *psoc, uint32_t *val)
 }
 
 QDF_STATUS
+wlan_mlme_get_bss_load_alpha(struct wlan_objmgr_psoc *psoc, uint32_t *val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*val = cfg_default(CFG_BSS_LOAD_ALPHA);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = mlme_obj->cfg.lfr.bss_load_trig.bss_load_alpha;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_get_bss_load_sample_time(struct wlan_objmgr_psoc *psoc,
 				   uint32_t *val)
 {
@@ -7568,42 +7584,6 @@ wlan_mlme_get_p2p_p2p_host_conc_support(struct wlan_objmgr_psoc *psoc)
 #endif
 
 /**
- * wlan_mlme_get_sta_sap_host_conc_support() - This API checks if STA and SAP
- * concurrency is allowed or not
- * @psoc: psoc context
- *
- * Return: true if STA and SAP concurrency is allowed otherwise false
- */
-static bool
-wlan_mlme_get_sta_sap_host_conc_support(struct wlan_objmgr_psoc *psoc)
-{
-	bool no_sta_sap_concurrency = cfg_get(psoc, CFG_NO_STA_SAP_CONCURRENCY);
-
-	if (no_sta_sap_concurrency)
-		return false;
-
-	return true;
-}
-
-/**
- * wlan_mlme_get_sta_nan_host_conc_support() - This API checks if STA and NAN
- * concurrency is allowed or not
- * @psoc: psoc context
- *
- * Return: true if STA and NAN concurrency is allowed otherwise false
- */
-static bool
-wlan_mlme_get_sta_nan_host_conc_support(struct wlan_objmgr_psoc *psoc)
-{
-	bool no_sta_nan_concurrency = cfg_get(psoc, CFG_NO_STA_NAN_CONCURRENCY);
-
-	if (no_sta_nan_concurrency)
-		return false;
-
-	return true;
-}
-
-/**
  * wlan_mlme_get_sta_sap_nan_host_conc_support() - This API checks if STA, SAP
  * and NAN concurrency is allowed or not
  * @psoc: psoc context
@@ -7630,12 +7610,10 @@ static bool
 wlan_mlme_get_sta_sap_p2p_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
 	bool no_p2p_concurrency = cfg_get(psoc, CFG_NO_P2P_CONCURRENCY);
-	bool no_sta_sap_concurrency = cfg_get(psoc, CFG_NO_STA_SAP_CONCURRENCY);
 	bool sta_sap_p2p_concurrenecy = cfg_get(psoc,
 						CFG_STA_SAP_P2P_CONCURRENCY);
 
-	if ((no_p2p_concurrency && !sta_sap_p2p_concurrenecy) ||
-	    no_sta_sap_concurrency)
+	if (no_p2p_concurrency && !sta_sap_p2p_concurrenecy)
 		return false;
 
 	return true;
@@ -7678,24 +7656,6 @@ wlan_mlme_get_sta_p2p_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
 }
 
 /**
- * wlan_mlme_get_sta_sap_tdls_host_conc_support() - This API checks if
- * STA-SAP-TDLS concurrency is allowed or not
- * @psoc: psoc context
- *
- * Return: true if STA-SAP-TDLS concurrency is allowed otherwise false
- */
-static bool
-wlan_mlme_get_sta_sap_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
-{
-	bool no_sta_sap_concurrency = cfg_get(psoc, CFG_NO_STA_SAP_CONCURRENCY);
-
-	if (no_sta_sap_concurrency)
-		return false;
-
-	return true;
-}
-
-/**
  * wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support() - This API checks if
  * STA-SAP-P2P-TDLS concurrency is allowed or not
  * @psoc: psoc context
@@ -7706,12 +7666,10 @@ static bool
 wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
 	bool no_p2p_concurrency = cfg_get(psoc, CFG_NO_P2P_CONCURRENCY);
-	bool no_sta_sap_concurrency = cfg_get(psoc, CFG_NO_STA_SAP_CONCURRENCY);
 	bool sta_sap_p2p_concurrenecy = cfg_get(psoc,
 						CFG_STA_SAP_P2P_CONCURRENCY);
 
-	if ((no_p2p_concurrency && !sta_sap_p2p_concurrenecy) ||
-	    no_sta_sap_concurrency)
+	if (no_p2p_concurrency && !sta_sap_p2p_concurrenecy)
 		return false;
 
 	return true;
@@ -7719,12 +7677,6 @@ wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
 #else
 static bool
 wlan_mlme_get_sta_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
-static bool
-wlan_mlme_get_sta_sap_tdls_host_conc_support(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -7781,11 +7733,9 @@ wlan_mlme_set_iface_combinations(struct wlan_objmgr_psoc *psoc,
 {
 	mlme_feature_set->iface_combinations = 0;
 	mlme_feature_set->iface_combinations |= MLME_IFACE_STA_P2P_SUPPORT;
-	if (wlan_mlme_get_sta_sap_host_conc_support(psoc))
-		mlme_feature_set->iface_combinations |=
+	mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_SAP_SUPPORT;
-	if (wlan_mlme_get_sta_nan_host_conc_support(psoc))
-		mlme_feature_set->iface_combinations |=
+	mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_NAN_SUPPORT;
 	if (wlan_mlme_get_sta_tdls_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
@@ -7799,8 +7749,7 @@ wlan_mlme_set_iface_combinations(struct wlan_objmgr_psoc *psoc,
 	if (wlan_mlme_get_sta_p2p_tdls_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_P2P_TDLS_SUPPORT;
-	if (wlan_mlme_get_sta_sap_tdls_host_conc_support(psoc))
-		mlme_feature_set->iface_combinations |=
+	mlme_feature_set->iface_combinations |=
 					MLME_IFACE_STA_SAP_TDLS_SUPPORT;
 	if (wlan_mlme_get_sta_sap_p2p_tdls_host_conc_support(psoc))
 		mlme_feature_set->iface_combinations |=
@@ -7830,7 +7779,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 	wlan_mlme_get_sap_max_peers(psoc, &sap_max_num_clients);
 	mlme_feature_set->sap_max_num_clients = sap_max_num_clients;
 	mlme_feature_set->vendor_req_1_version =
-					WMI_HOST_VENDOR1_REQ1_VERSION_4_10;
+					WMI_HOST_VENDOR1_REQ1_VERSION_4_20;
 	roam_triggers = wlan_mlme_get_roaming_triggers(psoc);
 
 	wlan_mlme_get_bss_load_enabled(psoc, &is_bss_load_enabled);
@@ -8821,4 +8770,31 @@ void wlan_mlme_get_24_chan_bonding_mode(struct wlan_objmgr_psoc *psoc,
 					int *chan_bonding)
 {
 	*chan_bonding = cfg_get(psoc, CFG_CHANNEL_BONDING_MODE_24GHZ);
+}
+
+bool
+wlan_mlme_get_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return cfg_default(CFG_ENABLE_SAP_DFS_PUNCTURE);
+
+	return mlme_obj->cfg.dfs_cfg.enable_sap_dfs_puncture;
+}
+
+QDF_STATUS
+wlan_mlme_set_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc,
+			       bool enable_sap_dfs_puncture)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.dfs_cfg.enable_sap_dfs_puncture = enable_sap_dfs_puncture;
+
+	return QDF_STATUS_SUCCESS;
 }

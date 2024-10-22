@@ -1409,9 +1409,7 @@ static QDF_STATUS sme_rrm_process_chan_load_req_ind(struct mac_context *mac,
 	sme_rrm_ctx->randnIntvl = QDF_MAX(chan_load->randomization_intv,
 			mac->rrm.rrmConfig.max_randn_interval);
 	sme_rrm_ctx->currentIndex = 0;
-	qdf_mem_copy((uint8_t *)&sme_rrm_ctx->duration,
-		     (uint8_t *)&chan_load->meas_duration,
-		     SIR_ESE_MAX_MEAS_IE_REQS);
+	sme_rrm_ctx->duration[0] = chan_load->meas_duration;
 	sme_rrm_ctx->measurement_type = RRM_CHANNEL_LOAD;
 	req_info = &sme_rrm_ctx->chan_load_req_info;
 	req_info->channel = chan_load->channel;

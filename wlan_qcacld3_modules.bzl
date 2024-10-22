@@ -15,6 +15,7 @@ _target_chipset_map = {
 	"peach",
 	"kiwi-v2",
 	"qca6750",
+	"wcn7750",
     ],
     "sun": [
 	"peach-v2",
@@ -241,6 +242,8 @@ _fixed_ipaths = [
     "components/fw_offload/dispatcher/inc",
     "components/interop_issues_ap/core/inc",
     "components/interop_issues_ap/dispatcher/inc",
+    "components/mgmt_rx_srng/core/inc",
+    "components/mgmt_rx_srng/dispatcher/inc",
     "components/mlme/core/inc",
     "components/mlme/core/src",
     "components/mlme/dispatcher/inc",
@@ -273,6 +276,7 @@ _fixed_ipaths = [
     "components/target_if/dp/inc",
     "components/target_if/fw_offload/inc",
     "components/target_if/interop_issues_ap/inc",
+    "components/target_if/mgmt_rx_srng/inc",
     "components/target_if/nan/inc",
     "components/target_if/p2p/inc",
     "components/target_if/pkt_capture/inc",
@@ -357,6 +361,7 @@ _fixed_srcs = [
     "cmn/dp/wifi3.0/dp_arch_ops.c",
     "cmn/dp/wifi3.0/dp_htt.c",
     "cmn/dp/wifi3.0/dp_main.c",
+    "cmn/dp/wifi3.0/dp_hist.c",
     "cmn/dp/wifi3.0/dp_peer.c",
     "cmn/dp/wifi3.0/dp_rx.c",
     "cmn/dp/wifi3.0/dp_rx_defrag.c",
@@ -2231,6 +2236,14 @@ _conditional_srcs = {
 	    "core/hdd/src/wlan_hdd_sysfs_dp_stc.c",
         ],
     },
+    "CONFIG_FEATURE_MGMT_RX_OVER_SRNG": {
+        True: [
+            "components/mgmt_rx_srng/core/src/wlan_mgmt_rx_srng.c",
+            "components/mgmt_rx_srng/dispatcher/src/wlan_mgmt_rx_srng_ucfg_api.c",
+	    "components/target_if/mgmt_rx_srng/src/target_if_mgmt_rx_srng.c",
+	    "components/mgmt_rx_srng/dispatcher/src/wlan_mgmt_rx_srng_tgt_api.c",
+        ],
+    },
     "CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE": {
         True: [
             "cmn/dp/wifi3.0/dp_rx_buffer_pool.c",
@@ -2325,7 +2338,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         cmd = cmd,
     )
 
-    copts.append("-Wno-format")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 

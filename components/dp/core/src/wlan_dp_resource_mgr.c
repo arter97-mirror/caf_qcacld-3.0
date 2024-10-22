@@ -131,11 +131,19 @@ wlan_dp_resource_mgr_post_upscale_resource_req(
 
 static void
 wlan_dp_resource_mgr_post_downscale_resource_req(
-				struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+				bool delay_req)
 {
 	ol_txrx_soc_handle cdp_soc = rsrc_ctx->dp_ctx->cdp_soc;
 	struct dp_rx_refill_thread *refill_thread;
 	struct dp_txrx_handle *dp_ext_hdl;
+
+	if (delay_req) {
+		dp_rsrc_mgr_debug("DP rsrc mgr downscale req dealyed to timer ctx");
+		qdf_timer_mod(&rsrc_ctx->timer,
+			      DP_RSRC_MGR_TIMER_MS);
+		return;
+	}
 
 	dp_rsrc_mgr_debug("Posting Downscale resource");
 	dp_ext_hdl = cdp_soc_get_dp_txrx_handle(cdp_soc);
@@ -149,6 +157,40 @@ wlan_dp_resource_mgr_post_downscale_resource_req(
 		    &refill_thread->event_flag);
 	qdf_set_bit(RX_REFILL_POST_EVENT, &refill_thread->event_flag);
 	qdf_wake_up_interruptible(&refill_thread->wait_q);
+}
+
+static void
+wlan_dp_resource_mgr_timer_handler(void *arg)
+{
+	struct wlan_dp_resource_mgr_ctx *rsrc_ctx =
+		(struct wlan_dp_resource_mgr_ctx *)arg;
+	struct cdp_soc_t *cdp_soc = rsrc_ctx->dp_ctx->cdp_soc;
+	enum wlan_dp_resource_level rsrc_level;
+	uint64_t cur_req_rx_buff_descs;
+	uint64_t req_rx_buff_descs;
+	uint64_t in_use_rx_buff_descs;
+	QDF_STATUS status;
+
+	dp_rsrc_mgr_debug("DP rsrc mgr timer handler scheduled");
+	status = cdp_get_num_buff_descs_info(cdp_soc,
+					     &cur_req_rx_buff_descs,
+					     &in_use_rx_buff_descs, 0);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to fetch DP rx desc info");
+		return;
+	}
+
+	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
+	rsrc_level = rsrc_ctx->cur_resource_level;
+	req_rx_buff_descs = rsrc_ctx->cur_rsrc_map[rsrc_level].num_rx_buffers;
+
+	if (cur_req_rx_buff_descs > req_rx_buff_descs) {
+		dp_info("Downscale required cur_rx_buf:%u to req_rx_buf:%u",
+			cur_req_rx_buff_descs, req_rx_buff_descs);
+		wlan_dp_resource_mgr_post_downscale_resource_req(rsrc_ctx,
+								 false);
+	}
+	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
 }
 
 void wlan_dp_resource_mgr_downscale_resources(void)
@@ -180,7 +222,7 @@ void wlan_dp_resource_mgr_downscale_resources(void)
 			  rsrc_level, cur_req_rx_buff_descs,
 			  in_use_rx_buff_descs, req_rx_buff_descs);
 
-	if (cur_req_rx_buff_descs != req_rx_buff_descs) {
+	if (cur_req_rx_buff_descs > req_rx_buff_descs) {
 		dp_info("Downscaling cur_rx_buf:%u to req_rx_buf:%u",
 			cur_req_rx_buff_descs, req_rx_buff_descs);
 		status = cdp_set_req_buff_descs(cdp_soc, req_rx_buff_descs, 0);
@@ -510,7 +552,8 @@ wlan_dp_resource_mgr_select_resource_level(
 	if (prev_level < rsrc_ctx->cur_resource_level)
 		wlan_dp_resource_mgr_post_upscale_resource_req(rsrc_ctx);
 	else if (prev_level > rsrc_ctx->cur_resource_level)
-		wlan_dp_resource_mgr_post_downscale_resource_req(rsrc_ctx);
+		wlan_dp_resource_mgr_post_downscale_resource_req(rsrc_ctx,
+								 true);
 	else
 		dp_info("Resource level change not required");
 
@@ -1304,6 +1347,10 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	rsrc_ctx->mac_count = MAX_MAC_RESOURCES;
 
+	qdf_timer_init(NULL, &rsrc_ctx->timer,
+		       wlan_dp_resource_mgr_timer_handler,
+		       rsrc_ctx, QDF_TIMER_TYPE_SW);
+
 	rsrc_ctx->dp_ctx = dp_ctx;
 	dp_ctx->rsrc_mgr_ctx = rsrc_ctx;
 
@@ -1333,6 +1380,7 @@ void wlan_dp_resource_mgr_detach(struct wlan_dp_psoc_context *dp_ctx)
 			return;
 		}
 
+		qdf_timer_free(&dp_ctx->rsrc_mgr_ctx->timer);
 		wlan_dp_resource_mgr_list_detach(dp_ctx->rsrc_mgr_ctx);
 		qdf_spinlock_destroy(&dp_ctx->rsrc_mgr_ctx->rsrc_mgr_lock);
 		qdf_mem_free(dp_ctx->rsrc_mgr_ctx);

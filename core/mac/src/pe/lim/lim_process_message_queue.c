@@ -1910,6 +1910,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case SIR_LIM_AUTH_RETRY_TIMEOUT:
 	case SIR_LIM_AUTH_SAE_TIMEOUT:
 	case SIR_LIM_RRM_STA_STATS_RSP_TIMEOUT:
+	case SIR_LIM_CHANNEL_VACATE_TIMEOUT:
 		/* These timeout messages are handled by MLM sub module */
 		lim_process_mlm_req_messages(mac_ctx, msg);
 		break;

@@ -915,6 +915,33 @@
 	"ffffff 00 01", \
 	"Used to specify action OUIs to control Aux listen configuration")
 
+/*
+ * <ini>
+ * CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS - Used to disable Dynamic SMPS
+ * capability for specified AP.
+ *
+ * Default OUIs: (All values in Hex)
+ * OUI 1: f832e4
+ *   OUI data Len: 00
+ *   Info Mask : 01 - only OUI present in Info mask
+ *
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS CFG_INI_STRING( \
+	"gActionOUIDisableDynamicSMPS", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"F832E4 00 01", \
+	"disable dynamic SMPS capability for specified AP")
+
 #define CFG_ACTION_OUI \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1) \
@@ -938,5 +965,6 @@
 	CFG(CFG_ACTION_OUI_DISABLE_BFORMEE) \
 	CFG(CFG_ACTION_OUI_LIMIT_BW) \
 	CFG(CFG_ACTION_OUI_DISABLE_AUX_LISTEN) \
+	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS) \
 	CFG(CFG_ENABLE_ACTION_OUI)
 #endif

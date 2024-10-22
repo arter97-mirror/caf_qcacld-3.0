@@ -60,14 +60,14 @@
 
 #define MAX_MAC 2
 
-#ifdef FEATURE_FIFTH_CONNECTION
+#if defined(FEATURE_SIXTH_CONNECTION)
+#define MAX_NUMBER_OF_CONC_CONNECTIONS 6
+#elif defined(FEATURE_FIFTH_CONNECTION)
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 5
-#else
-#ifdef FEATURE_FOURTH_CONNECTION
+#elif defined(FEATURE_FOURTH_CONNECTION)
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 4
 #else
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 3
-#endif
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -1419,6 +1419,14 @@ enum policy_mgr_three_connection_mode {
  * @PM_NAN_DISC_STA_STA_P2P_5_SCC_MCC_DBS: NAN on 2GHz and ML-STA & P2P on 5GHz
  * @PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS : NAN on 2GHz, NDI on 2GHz/5GHz
  * and both STA SCC or MCC on 2GHz/5GHz,
+ * @PM_SAP_SAP_24G_SAP_SAP_5G_DBS: AP+AP on 2 GHz, AP+AP on 5 GHz
+ * @PM_SAP_SAP_SAP_24G_SAP_5G_DBS: AP+AP+AP on 2 GHz, AP on 5 GHz
+ * @PM_SAP_SAP_SAP_5G_SAP_24G_DBS: AP+AP+AP on 5 GHz, AP on 2 GHz
+ * @PM_SAP_SAP_5G_SAP_SAP_5G_SBS: AP+AP on 5 GHz high, AP+AP on 5 GHz low
+ * @PM_SAP_SAP_SAP_5G_LOW_SAP_5G_HIGH_SBS: AP+AP+AP on 5 GHz low,
+ *					   AP on 5 GHz high
+ * @PM_SAP_SAP_SAP_5G_HIGH_SAP_5G_LOW_SBS: AP+AP+AP on 5 GHz high,
+ *					   AP on 5 GHz low
  * @PM_MAX_FOUR_CONNECTION_MODE: Maximum enumeration
  */
 enum policy_mgr_four_connection_mode {
@@ -1436,7 +1444,37 @@ enum policy_mgr_four_connection_mode {
 
 	/* NAN disc + NDI + ML-STA */
 	PM_NAN_DISC_24_NDI_STA_STA_SCC_MCC_DBS,
+
+	/* 4 SAP */
+	PM_SAP_SAP_24G_SAP_SAP_5G_DBS,
+	PM_SAP_SAP_SAP_24G_SAP_5G_DBS,
+	PM_SAP_SAP_SAP_5G_SAP_24G_DBS,
+	PM_SAP_SAP_5G_SAP_SAP_5G_SBS,
+	PM_SAP_SAP_SAP_5G_LOW_SAP_5G_HIGH_SBS,
+	PM_SAP_SAP_SAP_5G_HIGH_SAP_5G_LOW_SBS,
+
 	PM_MAX_FOUR_CONNECTION_MODE,
+};
+
+/**
+ * enum policy_mgr_five_connection_mode - Combination of first five
+ * connection type, concurrency state, band used.
+ * @PM_SAP_SAP_SAP_24G_SAP_SAP_5G_DBS: AP+AP+AP on 2 GHz, AP+AP on 5 GHz
+ * @PM_SAP_SAP_SAP_5G_SAP_SAP_24G_DBS: AP+AP+AP on 5 GHz, AP+AP on 2 GHz
+ * @PM_SAP_SAP_SAP_5G_LOW_SAP_SAP_5G_HIGH_SBS: AP+AP+AP on 5 GHz low,
+ * AP+AP on 5 GHz high
+ * @PM_SAP_SAP_SAP_5G_HIGH_SAP_SAP_5G_LOW_SBS: AP+AP+AP on 5 GHz high,
+ * AP+AP on 5 GHz low
+ * @PM_MAX_FIVE_CONNECTION_MODE: Maximum enumeration
+ */
+enum policy_mgr_five_connection_mode {
+	/* 5 SAP */
+	PM_SAP_SAP_SAP_24G_SAP_SAP_5G_DBS,
+	PM_SAP_SAP_SAP_5G_SAP_SAP_24G_DBS,
+	PM_SAP_SAP_SAP_5G_LOW_SAP_SAP_5G_HIGH_SBS,
+	PM_SAP_SAP_SAP_5G_HIGH_SAP_SAP_5G_LOW_SBS,
+
+	PM_MAX_FIVE_CONNECTION_MODE,
 };
 
 /**

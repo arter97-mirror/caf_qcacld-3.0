@@ -1735,6 +1735,13 @@ endif
 
 $(call add-wlan-objs,pkt_capture,$(PKT_CAPTURE_OBJS))
 
+########## MGMT RX SRNG ##########
+
+MGMT_RX_SRNG_DIR := components/mgmt_rx_srng
+MGMT_RX_SRNG_INC := -I$(WLAN_ROOT)/$(MGMT_RX_SRNG_DIR)/core/inc \
+		    -I$(WLAN_ROOT)/$(MGMT_RX_SRNG_DIR)/dispatcher/inc \
+		    -I$(WLAN_ROOT)/components/target_if/mgmt_rx_srng/inc
+
 ########## FTM TIME SYNC ##########
 
 FTM_TIME_SYNC_DIR := components/ftm_time_sync
@@ -2178,6 +2185,7 @@ DP_OBJS := $(DP_SRC)/dp_main.o \
 		$(DP_SRC)/dp_peer.o \
 		$(DP_SRC)/dp_rx_desc.o \
 		$(DP_SRC)/dp_rx_defrag.o \
+		$(DP_SRC)/dp_hist.o \
 		$(DP_SRC)/dp_stats.o \
 		$(WLAN_COMMON_ROOT)/target_if/dp/src/target_if_dp.o
 
@@ -2258,7 +2266,6 @@ DP_OBJS += $(DP_SRC)/dp_txrx_wds.o
 endif
 
 ifeq ($(CONFIG_QCACLD_FEATURE_SON), y)
-DP_OBJS += $(WLAN_COMMON_ROOT)/dp/cmn_dp_api/dp_ratetable.o
 DP_INC += -I$(WLAN_COMMON_INC)/dp/cmn_dp_api
 endif
 
@@ -3391,6 +3398,7 @@ INCS +=		$(HOST_DIAG_LOG_INC)
 INCS +=		$(DISA_INC)
 INCS +=		$(ACTION_OUI_INC)
 INCS +=		$(PKT_CAPTURE_INC)
+INCS +=		$(MGMT_RX_SRNG_INC)
 INCS +=		$(FTM_TIME_SYNC_INC)
 INCS +=		$(WLAN_PRE_CAC_INC)
 
@@ -4606,6 +4614,9 @@ ccflags-$(CONFIG_FW_THERMAL_THROTTLE) += -DFW_THERMAL_THROTTLE
 #Flag to enable/disable LTE COEX support
 ccflags-$(CONFIG_LTE_COEX) += -DLTE_COEX
 
+#Flag to always allow start SAP on unsafe channel if acs disabled
+ccflags-$(CONFIG_SAP_UNSAFE_FIXED_CHAN_ALLOW) += -DWLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW
+
 #Flag to enable/disable HOST_OPCLASS
 ccflags-$(CONFIG_HOST_OPCLASS) += -DHOST_OPCLASS
 ccflags-$(CONFIG_HOST_OPCLASS) += -DHOST_OPCLASS_EXT
@@ -4973,6 +4984,7 @@ ccflags-$(CONFIG_HASTINGS_BT_WAR) += -DHASTINGS_BT_WAR
 ccflags-$(CONFIG_HIF_DEBUG) += -DHIF_CONFIG_SLUB_DEBUG_ON
 ccflags-$(CONFIG_HAL_DEBUG) += -DHAL_CONFIG_SLUB_DEBUG_ON
 
+ccflags-$(CONFIG_SIXTH_CONNECTION) += -DFEATURE_SIXTH_CONNECTION
 ccflags-$(CONFIG_FIFTH_CONNECTION) += -DFEATURE_FIFTH_CONNECTION
 ccflags-$(CONFIG_FOURTH_CONNECTION) += -DFEATURE_FOURTH_CONNECTION
 ccflags-$(CONFIG_FOURTH_CONNECTION_AUTO) += -DFOURTH_CONNECTION_AUTO

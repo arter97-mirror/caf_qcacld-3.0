@@ -150,7 +150,7 @@
 		"twt_bcast_req_resp_config", \
 		0, \
 		3, \
-		1, \
+		3, \
 		CFG_VALUE_OR_DEFAULT, \
 		"BROADCAST TWT CAPABILITY")
 

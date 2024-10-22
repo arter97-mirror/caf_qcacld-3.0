@@ -129,6 +129,7 @@
  * @ACTION_OUI_RESTRICT_MAX_MLO_LINKS: Downgrade MLO if particular AP
  *                                     build present.
  * @ACTION_OUI_LIMIT_BW: Limit BW if vendor OUI is received in beacon.
+ * @ACTION_OUI_DISABLE_DYNAMIC_SMPS: Disable Dynamic SMPS for specified AP
  * @ACTION_OUI_MAXIMUM_ID: maximum number of action oui types
  */
 enum action_oui_id {
@@ -157,6 +158,7 @@ enum action_oui_id {
 	ACTION_OUI_ENABLE_CTS2SELF,
 	ACTION_OUI_RESTRICT_MAX_MLO_LINKS,
 	ACTION_OUI_LIMIT_BW,
+	ACTION_OUI_DISABLE_DYNAMIC_SMPS,
 	ACTION_OUI_MAXIMUM_ID
 };
 

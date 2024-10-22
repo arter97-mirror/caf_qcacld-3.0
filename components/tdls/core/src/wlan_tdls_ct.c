@@ -641,30 +641,32 @@ int tdls_recv_discovery_resp(struct tdls_vdev_priv_obj *tdls_vdev,
 	return status;
 }
 
-void tdls_indicate_teardown(struct tdls_vdev_priv_obj *tdls_vdev,
-			    struct tdls_peer *curr_peer,
-			    uint16_t reason)
+QDF_STATUS tdls_indicate_teardown(struct tdls_vdev_priv_obj *tdls_vdev,
+				  struct tdls_peer *curr_peer,
+				  uint16_t reason)
 {
 	struct tdls_soc_priv_obj *tdls_soc;
 	struct tdls_osif_indication indication;
 
 	if (!tdls_vdev || !curr_peer) {
-		tdls_err("tdls_vdev: %pK, curr_peer: %pK",
-			 tdls_vdev, curr_peer);
-		return;
+		tdls_err("%s is NULL",
+			 !tdls_vdev ? "tdls_vdev" : "curr_peer");
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	tdls_soc = wlan_vdev_get_tdls_soc_obj(tdls_vdev->vdev);
 	if (!tdls_soc) {
-		tdls_err("tdls_soc: %pK", tdls_soc);
-		return;
+		tdls_err("vdev:%d tdls_soc: is NULL",
+			 wlan_vdev_get_id(tdls_vdev->vdev));
+		return QDF_STATUS_E_EXISTS;
 	}
 
 	if (curr_peer->link_status != TDLS_LINK_CONNECTED) {
-		tdls_err("link state %d peer:" QDF_MAC_ADDR_FMT,
+		tdls_err("vdev:%d link state %d peer:" QDF_MAC_ADDR_FMT,
+			 wlan_vdev_get_id(tdls_vdev->vdev),
 			 curr_peer->link_status,
 			 QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	tdls_set_peer_link_status(curr_peer, TDLS_LINK_TEARING,
@@ -688,6 +690,8 @@ void tdls_indicate_teardown(struct tdls_vdev_priv_obj *tdls_vdev,
 	if (tdls_soc->tdls_event_cb)
 		tdls_soc->tdls_event_cb(tdls_soc->tdls_evt_cb_data,
 				     TDLS_EVENT_TEARDOWN_REQ, &indication);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -1250,7 +1254,7 @@ tdls_update_peer_off_channel_list(struct wlan_objmgr_pdev *pdev,
 		if ((!freq || freq == peer_freq) &&
 		    (!wlan_reg_is_24ghz_ch_freq(peer_freq) ||
 		     (wlan_reg_is_6ghz_chan_freq(peer_freq) &&
-		      tdls_is_6g_freq_allowed(vdev, peer_freq)))) {
+		      tdls_is_6g_freq_allowed(pdev, peer_freq)))) {
 			off_channels[params->num_off_channels] =
 					peer_info->peer_cap.peer_chan[i];
 			tdls_debug("allowd_chan:%d idx:%d",
@@ -1290,39 +1294,48 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 
 	status = tdls_get_vdev_objects(vdev, &tdls_vdev, &tdls_soc);
-
-	if (status != QDF_STATUS_SUCCESS)
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("vdev:%d Unable to fetch vdev objects",
+			 wlan_vdev_get_id(vdev));
 		return -EINVAL;
-
+	}
 
 	if (offchanmode < ENABLE_CHANSWITCH ||
 	    offchanmode > DISABLE_ACTIVE_CHANSWITCH) {
-		tdls_err("Invalid tdls off channel mode %d", offchanmode);
+		tdls_err("vdev:%d Invalid tdls off channel mode %d",
+			 wlan_vdev_get_id(vdev), offchanmode);
 		return -EINVAL;
 	}
 
 	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS) {
-		tdls_err("tdls off channel req in not associated state %d",
-			offchanmode);
+		tdls_err("vdev:%d tdls off channel req in not associated state %d",
+			 wlan_vdev_get_id(vdev), offchanmode);
 		return -EPERM;
 	}
 
 	tdls_feature_flags = tdls_soc->tdls_configs.tdls_feature_flags;
 	if (!TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags) ||
 	    TDLS_SUPPORT_SUSPENDED >= tdls_soc->tdls_current_mode) {
-		tdls_err("Either TDLS or TDLS Off-channel is not enabled");
+		tdls_err("vdev:%d TDLS %sis not enabled. current_mode:%d",
+			 wlan_vdev_get_id(vdev),
+			 !TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags) ? "Off-Channel " : "",
+			 tdls_soc->tdls_current_mode);
 		return  -ENOTSUPP;
 	}
 
 	conn_peer = tdls_find_first_connected_peer(tdls_vdev);
 	if (!conn_peer) {
-		tdls_debug("No TDLS Connected Peer");
+		tdls_debug("vdev:%d No TDLS Connected Peer",
+			   wlan_vdev_get_id(vdev));
 		return -EPERM;
 	}
 
-	tdls_notice("TDLS Channel Switch in off_chan_mode=%d tdls_off_channel %d offchanoffset %d",
+	tdls_notice("vdev:%d TDLS off_chan_mode=%d tdls_off_channel %d offchanoffset %d peer_off_chan_cap:%d peer_pref_off_chan_freq:%d",
+		    wlan_vdev_get_id(vdev),
 		    offchanmode, tdls_soc->tdls_off_channel,
-		    tdls_soc->tdls_channel_offset);
+		    tdls_soc->tdls_channel_offset,
+		    conn_peer->off_channel_capable,
+		    conn_peer->pref_off_chan_freq);
 
 	chan_switch_params = qdf_mem_malloc(sizeof(*chan_switch_params));
 	if (!chan_switch_params)
@@ -1351,10 +1364,10 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 			chan_switch_params->tdls_off_chan_freq =
 						 conn_peer->pref_off_chan_freq;
 		} else {
-			tdls_err("TDLS off-channel parameters are not set yet!!!");
+			tdls_err("vdev:%d TDLS off-channel params are not set yet",
+				 wlan_vdev_get_id(vdev));
 			qdf_mem_free(chan_switch_params);
 			return -EINVAL;
-
 		}
 
 		/*
@@ -1472,7 +1485,8 @@ QDF_STATUS tdls_delete_all_tdls_peers(struct wlan_objmgr_vdev *vdev,
 	/* Send the request to PE. */
 	qdf_mem_zero(&msg, sizeof(msg));
 
-	tdls_debug("sending delete all peers req to PE ");
+	tdls_debug("vdev %d sending delete all peers req to PE",
+		   wlan_vdev_get_id(vdev));
 
 	msg.type = del_msg->msg_type;
 	msg.bodyptr = del_msg;
@@ -1489,8 +1503,7 @@ QDF_STATUS tdls_delete_all_tdls_peers(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-void tdls_disable_offchan_and_teardown_links(
-				struct wlan_objmgr_vdev *vdev)
+void tdls_disable_offchan_and_teardown_links(struct wlan_objmgr_vdev *vdev)
 {
 	uint16_t connected_tdls_peers = 0;
 	uint8_t staidx;
@@ -1504,7 +1517,7 @@ void tdls_disable_offchan_and_teardown_links(
 
 	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
 	if (is_mlo_vdev) {
-		tdls_debug("try to set vdev %d to unforce",
+		tdls_debug("try to set ml vdev %d to unforce",
 			   wlan_vdev_get_id(vdev));
 		tdls_set_link_unforce(vdev);
 	}
@@ -1515,41 +1528,37 @@ void tdls_disable_offchan_and_teardown_links(
 		return;
 	}
 
-	if (TDLS_SUPPORT_SUSPENDED >= tdls_soc->tdls_current_mode) {
-		tdls_debug("TDLS mode %d is disabled OR not suspended now",
-			   tdls_soc->tdls_current_mode);
-		return;
-	}
-
 	connected_tdls_peers = tdls_soc->connected_peer_count;
 	if (tdls_is_progress(tdls_vdev, NULL, 0))
 		tdls_in_progress = true;
 
 	if (!(connected_tdls_peers || tdls_in_progress)) {
-		vdev_id = vdev->vdev_objmgr.vdev_id;
-		tdls_debug("No TDLS connected/progress peers to delete Disable tdls for vdev id %d, "
-			   "FW as second interface is coming up", vdev_id);
+		vdev_id = wlan_vdev_get_id(vdev);
+		tdls_debug("vdev:%d is_ml_vdev:%d tdls_in_prog:%d conn_peers:%d Disable tdls at FW"
+			   " as second interface is coming up", vdev_id,
+			   is_mlo_vdev, tdls_in_progress, connected_tdls_peers);
 		tdls_send_update_to_fw(tdls_vdev, tdls_soc, true, true, false,
 				       vdev_id);
 		return;
 	}
 
-	/* TDLS is not supported in case of concurrency.
-	 * Disable TDLS Offchannel in FW to avoid more
-	 * than two concurrent channels and generate TDLS
-	 * teardown indication to supplicant.
-	 * Below function Finds the first connected peer and
-	 * disables TDLS offchannel for that peer.
-	 * FW enables TDLS offchannel only when there is
-	 * one TDLS peer. When there are more than one TDLS peer,
-	 * there will not be TDLS offchannel in FW.
+	/*
+	 * TDLS is not supported in case of MCC concurrency on TDLS interface
+	 * MAC.
+	 * Disable TDLS Offchannel in FW to avoid more than two concurrent
+	 * channels and generate TDLS teardown indication to supplicant.
+	 * Below function Finds the first connected peer and disables TDLS
+	 * offchannel for that peer.
+	 * FW enables TDLS offchannel only when there is one TDLS peer. When
+	 * there are more than one TDLS peer, there will not be TDLS
+	 * offchannel in FW.
 	 * So to avoid sending multiple request to FW, for now,
 	 * just invoke offchannel mode functions only once
 	 */
 	tdls_set_tdls_offchannel(tdls_soc,
-				tdls_soc->tdls_configs.tdls_pre_off_chan_num);
+				 tdls_soc->tdls_configs.tdls_pre_off_chan_num);
 	tdls_set_tdls_secoffchanneloffset(tdls_soc,
-			TDLS_SEC_OFFCHAN_OFFSET_40PLUS);
+					  TDLS_SEC_OFFCHAN_OFFSET_40PLUS);
 	tdls_set_tdls_offchannelmode(vdev, DISABLE_ACTIVE_CHANSWITCH);
 
 	/* Send Msg to PE for deleting all the TDLS peers */
@@ -1559,20 +1568,32 @@ void tdls_disable_offchan_and_teardown_links(
 		if (!tdls_soc->tdls_conn_info[staidx].valid_entry)
 			continue;
 
+		if (tdls_soc->tdls_conn_info[staidx].session_id !=
+		    wlan_vdev_get_id(vdev))
+			continue;
+
 		curr_peer = tdls_find_all_peer(tdls_soc,
 			tdls_soc->tdls_conn_info[staidx].peer_mac.bytes);
 		if (!curr_peer)
 			continue;
 
-		tdls_notice("indicate TDLS teardown "QDF_MAC_ADDR_FMT,
+		tdls_notice("vdev %d indicate TDLS teardown " QDF_MAC_ADDR_FMT,
+			    wlan_vdev_get_id(tdls_vdev->vdev),
 			    QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
 
 		/* Indicate teardown to supplicant */
-		tdls_indicate_teardown(tdls_vdev, curr_peer,
-				       TDLS_TEARDOWN_PEER_UNSPEC_REASON);
+		status = tdls_indicate_teardown(
+					tdls_vdev, curr_peer,
+					TDLS_TEARDOWN_PEER_UNSPEC_REASON);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			tdls_err("vdev %d teardown indication failed for peer "
+				 QDF_MAC_ADDR_FMT,
+				 wlan_vdev_get_id(tdls_vdev->vdev),
+				 QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
+			continue;
+		}
 
 		tdls_decrement_peer_count(vdev, tdls_soc);
-
 		/*
 		 * Del Sta happened already as part of tdls_delete_all_tdls_peers
 		 * Hence clear tdls vdev data structure.

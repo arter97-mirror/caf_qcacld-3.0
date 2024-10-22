@@ -500,6 +500,26 @@
 #endif
 
 /* <ini>
+ * gRAPriority
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini will configure the RA filter to FW
+ * irrespective of APF configured or not.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_RA_PRIORITY CFG_INI_BOOL( \
+		"gRAPriority", \
+		0, \
+		"Enable RA Priority")
+
+/* <ini>
  * gtsf_gpio_pin
  * @Min: 0
  * @Max: 254
@@ -1003,6 +1023,7 @@
 	CFG(CFG_ENABLE_FW_LOG_TYPE) \
 	CFG(CFG_ENABLE_FW_MODULE_LOG_LEVEL) \
 	CFG(CFG_RA_FILTER_ENABLE) \
+	CFG(CFG_RA_PRIORITY) \
 	CFG(CFG_SET_TSF_GPIO_PIN) \
 	__CFG_SET_TSF_IRQ_HOST_GPIO_PIN \
 	__CFG_SET_TSF_SYNC_HOST_GPIO_PIN \

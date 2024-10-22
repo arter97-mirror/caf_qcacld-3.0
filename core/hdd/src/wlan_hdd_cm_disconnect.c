@@ -300,7 +300,7 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		}
 	}
 
-	if (!is_link_switch && source != CM_MLO_ROAM_INTERNAL_DISCONNECT) {
+	if (!is_link_switch) {
 		/* Clear saved connection information in HDD */
 		hdd_conn_remove_connect_info(sta_ctx);
 
@@ -310,7 +310,10 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		 * valid link_info for the given adapter. So avoid this reset
 		 * for Link Switch disconnect/internal disconnect
 		 */
-		hdd_adapter_reset_station_ctx(adapter);
+		if (source != CM_MLO_ROAM_INTERNAL_DISCONNECT)
+			hdd_adapter_reset_station_ctx(adapter);
+		else
+			hdd_cm_clear_ieee_link_id(link_info, false);
 	}
 
 	ucfg_dp_remove_conn_info(vdev);
@@ -482,6 +485,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 */
 	adapter->last_disconnect_reason =
 			osif_cm_mac_to_qca_reason(rsp->req.req.reason_code);
+	hdd_set_disconnect_link_info_cb(link_info->vdev_id);
 
 	return QDF_STATUS_SUCCESS;
 }

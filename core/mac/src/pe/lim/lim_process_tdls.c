@@ -225,7 +225,7 @@ static void populate_dot11f_tdls_offchannel_params(
 				tDot11fIESuppChannels *suppChannels,
 				tDot11fIESuppOperatingClasses *suppOperClasses)
 {
-	uint32_t numChans = CFG_VALID_CHANNEL_LIST_LEN;
+	uint32_t num_chans = CFG_VALID_CHANNEL_LIST_LEN;
 	uint8_t validChan[CFG_VALID_CHANNEL_LIST_LEN];
 	uint8_t i, count_opclss = 1;
 	uint8_t valid_count = 0;
@@ -237,11 +237,10 @@ static void populate_dot11f_tdls_offchannel_params(
 	uint8_t nss_2g;
 	uint8_t nss_5g;
 	qdf_freq_t ch_freq;
-	bool is_vlp_country;
-	uint8_t ap_cc[REG_ALPHA2_LEN + 1];
 	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
+	int num_6g_chans = 0;
 
-	numChans = mac->mlme_cfg->reg.valid_channel_list_num;
+	num_chans = mac->mlme_cfg->reg.valid_channel_list_num;
 
 	if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq))
 		band = BAND_2G;
@@ -253,13 +252,8 @@ static void populate_dot11f_tdls_offchannel_params(
 	nss_2g = QDF_MIN(mac->vdev_type_nss_2g.tdls,
 			 mac->user_configured_nss);
 
-	wlan_cm_get_country_code(mac->pdev, pe_session->vdev_id, ap_cc);
-	wlan_reg_read_current_country(mac->psoc, reg_cc);
-	is_vlp_country = wlan_reg_ctry_support_vlp(ap_cc) &&
-			 wlan_reg_ctry_support_vlp(reg_cc);
-
 	/* validating the channel list for DFS and 2G channels */
-	for (i = 0; i < numChans; i++) {
+	for (i = 0; i < num_chans; i++) {
 		ch_freq = mac->mlme_cfg->reg.valid_channel_freq_list[i];
 
 		validChan[i] = wlan_reg_freq_to_chan(mac->pdev,
@@ -283,12 +277,14 @@ static void populate_dot11f_tdls_offchannel_params(
 			}
 		}
 
-		if (wlan_reg_is_6ghz_chan_freq(ch_freq) &&
-		    !(is_vlp_country &&
-		      wlan_reg_is_6ghz_psc_chan_freq(ch_freq))) {
-			pe_debug("skipping is_vlp_country %d or non-psc channel %d",
-				 is_vlp_country, ch_freq);
-			continue;
+		if (wlan_reg_is_6ghz_chan_freq(ch_freq)) {
+			if (!tdls_is_6g_freq_allowed(mac->pdev, ch_freq)) {
+				pe_debug("6 GHz freq non VLP or non PSC %d",
+					 ch_freq);
+				continue;
+			} else {
+				num_6g_chans += 1;
+			}
 		}
 
 		if (valid_count >= ARRAY_SIZE(suppChannels->bands))
@@ -321,6 +317,7 @@ static void populate_dot11f_tdls_offchannel_params(
 		break;
 	}
 
+	wlan_reg_read_current_country(mac->psoc, reg_cc);
 	op_class = wlan_reg_dmn_get_opclass_from_channel(
 		reg_cc,
 		wlan_reg_freq_to_chan(mac->pdev, pe_session->curr_op_freq),
@@ -333,7 +330,7 @@ static void populate_dot11f_tdls_offchannel_params(
 
 	for (i = 0; i < numClasses; i++) {
 		if (wlan_reg_is_6ghz_op_class(mac->pdev, classes[i]) &&
-		    !is_vlp_country)
+		    !num_6g_chans)
 			continue;
 
 		suppOperClasses->classes[count_opclss] = classes[i];
@@ -4213,8 +4210,6 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 	struct pe_session *pe_session;
 	uint8_t session_id;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	tSirMacAddr peer;
-	struct tdls_peer *curr_peer;
 	struct tdls_vdev_priv_obj *vdev_obj;
 
 	pe_debug("TDLS Delete STA Request Received");
@@ -4262,20 +4257,6 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 		pe_err("Del Sta received in invalid LIMsme state: %d",
 		       pe_session->limSmeState);
 		goto lim_tdls_del_sta_error;
-	}
-
-	curr_peer = wlan_tdls_find_peer(vdev_obj, del_sta_req->peermac.bytes);
-	if (!curr_peer) {
-		pe_err("tdls peer is null");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (curr_peer->link_status ==  TDLS_LINK_CONNECTED &&
-	    curr_peer->valid_entry) {
-		qdf_mem_copy(peer, del_sta_req->peermac.bytes,
-			     sizeof(tSirMacAddr));
-		lim_send_deauth_mgmt_frame(mac, REASON_DEAUTH_NETWORK_LEAVING,
-					   peer, pe_session, false);
 	}
 
 	status = lim_tdls_del_sta(mac, del_sta_req->peermac,
