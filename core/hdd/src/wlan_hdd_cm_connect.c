@@ -947,14 +947,6 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	hdd_update_scan_ie_for_connect(adapter, &params);
 	hdd_update_action_oui_for_connect(hdd_ctx, req);
 
-	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
-		/*
-		 * Clear user/wpa_supplicant disabled_roaming flag for new
-		 * connection
-		 */
-		ucfg_clear_user_disabled_roaming(hdd_ctx->psoc,
-						 adapter->deflink->vdev_id);
-	}
 	status = osif_cm_connect(ndev, vdev, req, &params);
 
 	if (status || ucfg_cm_is_vdev_roaming(vdev)) {

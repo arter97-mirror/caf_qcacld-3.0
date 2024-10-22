@@ -262,9 +262,7 @@ struct wlan_mlme_roam_state_info {
  * @roam_trigger_bitmap: Master bitmap of roaming triggers. If the bitmap is
  *  zero, roaming module will be deinitialized at firmware for this vdev.
  * @supplicant_disabled_roaming: Enable/disable roam scan in firmware; will be
- *  used by supplicant to do roam invoke after disabling roam scan in firmware,
- *  it is only effective for current connection, it will be cleared during new
- *  connection.
+ *  used by supplicant to do roam invoke after disabling roam scan in firmware
  * @roam_policy: Current Roam Policy. refer enum wlan_roam_policy
  */
 struct wlan_mlme_roaming_config {

@@ -43,18 +43,6 @@ ucfg_user_space_enable_disable_rso(struct wlan_objmgr_pdev *pdev,
 				   const bool is_fast_roam_enabled);
 
 /**
- * ucfg_clear_user_disabled_roaming() - clear user/wpa_supplicant
- * disabled_roaming flag in driver
- * @psoc: Pointer to pdev
- * @vdev_id: vdev id
- *
- * Return: void
- */
-void
-ucfg_clear_user_disabled_roaming(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id);
-
-/**
  * ucfg_set_roam_policy() - Set roam policy
  * @psoc:  Pointer to psoc
  * @vdev_id: vdev id
