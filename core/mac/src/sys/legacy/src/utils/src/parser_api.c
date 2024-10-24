@@ -2238,6 +2238,27 @@ QDF_STATUS populate_dot11f_ssid2(struct pe_session *pe_session,
 } /* End populate_dot11f_ssid2. */
 
 void
+populate_dot11f_lci(tDot11fIEMeasurementRequest *MeasurementRequest)
+{
+        MeasurementRequest->present = 1;
+        MeasurementRequest->measurement_token = 1;
+        MeasurementRequest->measurement_type = 8;
+        MeasurementRequest->measurement_request.lci.loc_subject = 1;
+} /* End populate_dot11f_lci. */
+
+void
+populate_dot11f_civic(tDot11fIEMeasurementRequest *MeasurementRequest)
+{
+        MeasurementRequest->present = 1;
+        MeasurementRequest->measurement_token = 2;
+        MeasurementRequest->measurement_type = 11;
+        MeasurementRequest->measurement_request.civic.loc_subject = 1;
+        MeasurementRequest->measurement_request.civic.civic_loc_type = 0;
+        MeasurementRequest->measurement_request.civic.loc_ser_int_units = 0;
+        MeasurementRequest->measurement_request.civic.loc_ser_interval = 0;
+} /* End populate_dot11f_civic. */
+
+void
 populate_dot11f_schedule(tSirMacScheduleIE *pSchedule,
 			 tDot11fIESchedule *pDot11f)
 {

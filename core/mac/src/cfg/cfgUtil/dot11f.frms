@@ -3223,6 +3223,13 @@ IE MeasurementRequest (EID_MEAS_REQUEST)  // 7.3.2.21
           OPTIE tgt_mac_addr;
           OPTIE max_age;
        }
+       civic (measurement_type IS 11)
+       {
+          loc_subject,       1;
+          civic_loc_type,    1;
+          loc_ser_int_units, 1;
+          loc_ser_interval,  2;
+       }
        ftmrr (measurement_type IS 16)
        {
           random_interval,   2;
@@ -4830,6 +4837,7 @@ FRAME NeighborReportRequest
    FF     Action;
    FF     DialogToken;
    OPTIE  SSID;
+   OPTIE  MeasurementRequest[1..2];
    //Optional vendor specific IE...ignoring.
 }
 

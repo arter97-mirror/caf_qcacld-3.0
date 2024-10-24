@@ -1015,6 +1015,15 @@ populate_dot11f_ssid(struct mac_context *mac,
 QDF_STATUS populate_dot11f_ssid2(struct pe_session *pe_session,
 				tDot11fIESSID *pDot11f);
 
+/* / Populate a lci measurement request in Neighbor report request */
+void
+populate_dot11f_lci(tDot11fIEMeasurementRequest *MeasurementRequest);
+
+/* / Populate a civic measurement request in Neighbor report request */
+void
+populate_dot11f_civic(tDot11fIEMeasurementRequest *MeasurementRequest);
+
+
 /**
  * \brief Populate a tDot11fIESchedule
  *
