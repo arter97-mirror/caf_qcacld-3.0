@@ -97,6 +97,7 @@
 #include <wlan_hdd_sysfs_roam_trigger_bitmap.h>
 #include <wlan_hdd_sysfs_bitrates.h>
 #include <wlan_hdd_sysfs_rf_test_mode.h>
+#include <wlan_hdd_sysfs_11k_neighbor_req.h>
 #include "wlan_module_ids.h"
 #include <wlan_coex_ucfg_api.h>
 
@@ -1189,6 +1190,7 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_dcm_create(adapter);
 	hdd_sysfs_wowl_add_ptrn_create(adapter);
 	hdd_sysfs_wowl_del_ptrn_create(adapter);
+	hdd_sysfs_11k_neighbor_req_create(adapter);
 	hdd_sysfs_tx_stbc_create(adapter);
 	hdd_sysfs_txrx_fw_st_rst_create(adapter);
 	hdd_sysfs_gtx_bw_mask_create(adapter);
@@ -1232,6 +1234,7 @@ hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_tx_stbc_destroy(adapter);
 	hdd_sysfs_wowl_del_ptrn_destroy(adapter);
 	hdd_sysfs_wowl_add_ptrn_destroy(adapter);
+	hdd_sysfs_11k_neighbor_req_destroy(adapter);
 	hdd_sysfs_dcm_destroy(adapter);
 	hdd_sysfs_connect_info_interface_destroy(adapter);
 	hdd_sysfs_unit_test_target_destroy(adapter);

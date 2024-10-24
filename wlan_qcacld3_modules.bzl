@@ -1965,6 +1965,7 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_modify_acl.c",
             "core/hdd/src/wlan_hdd_sysfs_policy_mgr.c",
             "core/hdd/src/wlan_hdd_sysfs_dp_aggregation.c",
+            "core/hdd/src/wlan_hdd_sysfs_11k_neighbor_req.c",
         ],
     },
     "CONFIG_WLAN_SYSFS_CHANNEL": {

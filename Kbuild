@@ -334,6 +334,7 @@ HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_mem_stats.o
 endif
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_unit_test.o
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_modify_acl.o
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_11k_neighbor_req.o
 ifeq ($(CONFIG_WLAN_SYSFS_CONNECT_INFO), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_connect_info.o
 endif
