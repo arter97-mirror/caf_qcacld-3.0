@@ -2254,7 +2254,7 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 					  &tmp_zero_nchans,
 					  sizeof(acs_report->nchans));
 		if (not_copied)
-			hdd_debug("%ul is not copied to zero nchans",
+			hdd_debug("%zu is not copied to zero nchans",
 				  not_copied);
 		hdd_err("ACS is in-progress");
 		ret = -EAGAIN;
@@ -2324,7 +2324,7 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 		}
 		not_copied = copy_to_user(acs_report, acs_r, sizeof(*acs_r));
 		if (not_copied)
-			hdd_debug("%ul is not copied", not_copied);
+			hdd_debug("%zu is not copied", not_copied);
 	} else if (acs_type == ACS_CHAN_NF_STATS) {
 	} else if (acs_type == ACS_NEIGHBOUR_GET_LIST_COUNT ||
 		   acs_type == ACS_NEIGHBOUR_GET_LIST) {

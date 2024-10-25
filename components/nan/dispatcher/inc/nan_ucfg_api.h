@@ -673,7 +673,8 @@ bool ucfg_nan_is_sta_nan_ndi_4_port_allowed(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
-static inline ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc)
+static inline
+bool ucfg_nan_is_sta_sap_ndp_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
