@@ -1396,6 +1396,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_oem_eht_mlo_cfg(psoc, gen);
 	mlme_init_lpass_support_cfg(psoc, gen);
 	gen->enabled_rf_test_mode = cfg_default(CFG_RF_TEST_MODE_SUPP_ENABLED);
+	gen->rf_mode_force_pwr_type = cfg_default(CFG_RF_MODE_FORCE_PWR_TYPE);
 	gen->enabled_11h = cfg_get(psoc, CFG_11H_SUPPORT_ENABLED);
 	gen->enabled_11d = cfg_get(psoc, CFG_11D_SUPPORT_ENABLED);
 	gen->enable_beacon_reception_stats =
@@ -1960,6 +1961,8 @@ static void mlme_init_dfs_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_SAP_TX_LEAKAGE_THRESHOLD);
 	dfs_cfg->dfs_pri_multiplier =
 		cfg_get(psoc, CFG_DFS_RADAR_PRI_MULTIPLIER);
+	dfs_cfg->enable_sap_dfs_puncture =
+		cfg_get(psoc, CFG_ENABLE_SAP_DFS_PUNCTURE);
 }
 
 static void mlme_init_feature_flag_in_cfg(
@@ -3084,6 +3087,7 @@ mlme_init_bss_load_trigger_params(struct wlan_objmgr_psoc *psoc,
 	bss_load_trig->enabled =
 		cfg_get(psoc, CFG_ENABLE_BSS_LOAD_TRIGGERED_ROAM);
 	bss_load_trig->threshold = cfg_get(psoc, CFG_BSS_LOAD_THRESHOLD);
+	bss_load_trig->bss_load_alpha = cfg_get(psoc, CFG_BSS_LOAD_ALPHA);
 
 	ucfg_mlme_get_connection_roaming_ini_present(psoc, &val);
 	if (val)
@@ -3247,10 +3251,14 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_NEIGHBOR_SCAN_MIN_TIMER_PERIOD);
 	lfr->neighbor_lookup_rssi_threshold =
 		abs(cfg_get(psoc, CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD));
+	lfr->roam_aggre_threshold =
+		abs(cfg_get(psoc, CFG_LFR_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD));
 	lfr->opportunistic_scan_threshold_diff =
 		cfg_get(psoc, CFG_LFR_OPPORTUNISTIC_SCAN_THRESHOLD_DIFF);
 	lfr->roam_rescan_rssi_diff =
 		cfg_get(psoc, CFG_LFR_ROAM_RESCAN_RSSI_DIFF);
+	lfr->roam_aggre_scan_step_rssi =
+		cfg_get(psoc, CFG_ROAM_AGGRESSIVE_SCAN_STEP_RSSI);
 	lfr->neighbor_scan_min_chan_time =
 		cfg_get(psoc, CFG_LFR_NEIGHBOR_SCAN_MIN_CHAN_TIME);
 	lfr->neighbor_scan_max_chan_time =
@@ -3384,6 +3392,11 @@ static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
 		scoring_cfg->min_roam_score_delta =
 			cfg_get(psoc, CFG_CAND_MIN_ROAM_SCORE_DELTA);
 	}
+
+	scoring_cfg->aggre_min_roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA);
+	scoring_cfg->roam_aggre_score_delta =
+			cfg_get(psoc, CFG_AGGRESSIVE_ROAM_SCORE_DELTA);
 }
 
 static void mlme_init_oce_cfg(struct wlan_objmgr_psoc *psoc,
@@ -3667,22 +3680,77 @@ static void mlme_init_btm_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_MIN_BTM_CANDIDATE_SCORE);
 }
 
-static void
-mlme_init_roam_score_config(struct wlan_objmgr_psoc *psoc,
-			    struct wlan_mlme_cfg *mlme_cfg)
+/**
+ * mlme_init_roam_score_delta - Set score delta for each INI config
+ * @psoc: psoc
+ * @mlme_cfg: mlme_cfg
+ *
+ * Set score delta for each roam trigger based on INI config.
+ *
+ * Return: None
+ */
+static void mlme_init_roam_score_delta(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_mlme_cfg *mlme_cfg)
 {
+	uint8_t trig_score_delta[ROAM_TRIGGER_REASON_MAX * 2];
+	qdf_size_t trig_score_delta_num = 0;
+	enum roam_trigger_reason roam_trig;
+	uint8_t score_delta;
+	uint32_t i;
 	struct roam_trigger_score_delta *score_delta_param;
-	struct roam_trigger_min_rssi *min_rssi_param;
+	struct psoc_mlme_obj *mlme_psoc_obj;
+	struct scoring_cfg *score_config;
 
-	score_delta_param = &mlme_cfg->trig_score_delta[IDLE_ROAM_TRIGGER];
+	for (i = 0; i < ROAM_TRIGGER_REASON_MAX; i++) {
+		score_delta_param =
+				&mlme_cfg->trig_score_delta[i];
+		score_delta_param->roam_score_delta = ROAM_MAX_CFG_VALUE;
+	}
+
+	qdf_uint8_array_parse(cfg_get(psoc,
+				      CFG_ROAM_TRIGGER_SCORE_DELTA),
+			      trig_score_delta,
+			      ROAM_TRIGGER_REASON_MAX * 2,
+			      &trig_score_delta_num);
+
+	for (i = 0; i + 1 < trig_score_delta_num; i += 2) {
+		roam_trig = trig_score_delta[i];
+		score_delta = trig_score_delta[i + 1];
+		if (roam_trig < ROAM_TRIGGER_REASON_MAX && roam_trig > 0) {
+			score_delta_param =
+				&mlme_cfg->trig_score_delta[roam_trig];
+			score_delta_param->roam_score_delta = score_delta;
+			score_delta_param->trigger_reason = roam_trig;
+		}
+	}
+
+	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(psoc);
+	if (!mlme_psoc_obj)
+		return;
+	score_config = &mlme_psoc_obj->psoc_cfg.score_config;
+	if (!score_config->vendor_roam_score_algorithm)
+		return;
+
+	score_delta_param =
+		&mlme_cfg->trig_score_delta[ROAM_TRIGGER_REASON_IDLE];
 	score_delta_param->roam_score_delta =
 			cfg_get(psoc, CFG_IDLE_ROAM_SCORE_DELTA);
 	score_delta_param->trigger_reason = ROAM_TRIGGER_REASON_IDLE;
 
-	score_delta_param = &mlme_cfg->trig_score_delta[BTM_ROAM_TRIGGER];
+	score_delta_param =
+		&mlme_cfg->trig_score_delta[ROAM_TRIGGER_REASON_BTM];
 	score_delta_param->roam_score_delta =
 			cfg_get(psoc, CFG_BTM_ROAM_SCORE_DELTA);
 	score_delta_param->trigger_reason = ROAM_TRIGGER_REASON_BTM;
+}
+
+static void
+mlme_init_roam_score_config(struct wlan_objmgr_psoc *psoc,
+			    struct wlan_mlme_cfg *mlme_cfg)
+{
+	struct roam_trigger_min_rssi *min_rssi_param;
+
+	mlme_init_roam_score_delta(psoc, mlme_cfg);
 
 	min_rssi_param = &mlme_cfg->trig_min_rssi[DEAUTH_MIN_RSSI];
 	min_rssi_param->min_rssi =
@@ -4806,30 +4874,34 @@ QDF_STATUS wlan_strip_ie(uint8_t *addn_ie, uint16_t *addn_ielen,
 			return QDF_STATUS_E_FAILURE;
 		}
 
+		ie_len = elem_len + size_of_len_field + 1;
 		if (eid != elem_id ||
 				(oui && qdf_mem_cmp(oui,
 						&ptr[size_of_len_field + 1],
 						oui_length))) {
-			qdf_mem_copy(tmp_buf + tmp_len, &ptr[0],
-				     elem_len + size_of_len_field + 1);
-			tmp_len += (elem_len + size_of_len_field + 1);
+			qdf_mem_copy(tmp_buf + tmp_len, &ptr[0], ie_len);
+			tmp_len += ie_len;
 		} else {
 			/*
 			 * eid matched and if provided OUI also matched
 			 * take oui IE and store in provided buffer.
 			 */
 			if (extracted_ie) {
-				ie_len = elem_len + size_of_len_field + 1;
-				if (ie_len <= eid_max_len - extracted_ie_len) {
+				if (ie_len <= (eid_max_len + size_of_len_field +
+					       1 - extracted_ie_len)) {
 					qdf_mem_copy(
 					extracted_ie + extracted_ie_len,
 					&ptr[0], ie_len);
 					extracted_ie_len += ie_len;
+				} else {
+					qdf_mem_copy(tmp_buf + tmp_len, &ptr[0],
+						     ie_len);
+					tmp_len += ie_len;
 				}
 			}
 		}
 		left -= elem_len;
-		ptr += (elem_len + size_of_len_field + 1);
+		ptr += ie_len;
 	}
 	qdf_mem_copy(addn_ie, tmp_buf, tmp_len);
 
@@ -5227,6 +5299,56 @@ mlme_get_roam_state(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return roam_state;
+}
+
+void mlme_set_roam_policy(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			  enum wlan_roam_policy roam_policy)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+
+	if (!vdev) {
+		mlme_err("vdev%d: vdev object is NULL", vdev_id);
+		return;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev%d: vdev legacy private object is NULL", vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	mlme_priv->mlme_roam.roam_cfg.roam_policy = roam_policy;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+}
+
+enum wlan_roam_policy mlme_get_roam_policy(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+
+	if (!vdev) {
+		mlme_err("vdev%d: vdev object is NULL", vdev_id);
+		return WLAN_ROAMING_NOT_ALLOWED;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev%d: vdev legacy private object is NULL", vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return WLAN_ROAMING_NOT_ALLOWED;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+	return mlme_priv->mlme_roam.roam_cfg.roam_policy;
 }
 
 void mlme_set_roam_state(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
@@ -5890,4 +6012,67 @@ QDF_STATUS wlan_find_peer_and_get_mac_and_mld_addr(
 	}
 
 	return status;
+}
+
+QDF_STATUS
+mlme_set_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *mac_addr)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return QDF_STATUS_E_FAILURE;
+
+	if (!mac_addr) {
+		qdf_mem_set(&vdev_mlme->p2p_dev_data.p2p_dev_addr,
+			    QDF_MAC_ADDR_SIZE, 0);
+	} else {
+		qdf_copy_macaddr(&vdev_mlme->p2p_dev_data.p2p_dev_addr,
+				 mac_addr);
+		mlme_debug("set mac_addr " QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(
+			   vdev_mlme->p2p_dev_data.p2p_dev_addr.bytes));
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *mac_addr)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_copy_macaddr(mac_addr, &vdev_mlme->p2p_dev_data.p2p_dev_addr);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+mlme_set_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev, uint16_t seq_num)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return QDF_STATUS_E_FAILURE;
+
+	vdev_mlme->p2p_dev_data.seq_num = seq_num;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint16_t mlme_get_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return 0;
+
+	return vdev_mlme->p2p_dev_data.seq_num;
 }

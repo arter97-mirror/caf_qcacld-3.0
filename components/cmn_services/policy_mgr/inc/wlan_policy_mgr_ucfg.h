@@ -505,6 +505,26 @@ ucfg_policy_mgr_post_ap_start_failed(
 			     uint8_t vdev_id);
 
 /**
+ * ucfg_policy_mgr_acs_start() - handle ACS start request
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id of SAP
+ *
+ * Return: Failure in case of error otherwise success
+ */
+QDF_STATUS
+ucfg_policy_mgr_acs_start(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * ucfg_policy_mgr_acs_completed() - handle ACS complete request
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id of SAP
+ *
+ * Return: Failure in case of error otherwise success
+ */
+QDF_STATUS
+ucfg_policy_mgr_acs_completed(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
  * ucfg_policy_mgr_pre_sta_p2p_start() - handle STA P2P start request
  * @psoc: pointer to psoc
  * @vdev_id: vdev id of starting sta
@@ -592,6 +612,18 @@ static inline QDF_STATUS
 ucfg_policy_mgr_post_ap_start_failed(
 			     struct wlan_objmgr_psoc *psoc,
 			     uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_policy_mgr_acs_start(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_policy_mgr_acs_completed(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -1266,7 +1266,7 @@ void hdd_cleanup_ndi(struct wlan_hdd_link_info *link_info)
 	sta_ctx->conn_info.conn_state = eConnectionState_NdiDisconnected;
 	hdd_conn_set_connection_state(adapter,
 		eConnectionState_NdiDisconnected);
-	hdd_debug("Stop netif tx queues.");
+	hdd_debug("vdev %d Disabling queues", link_info->vdev_id);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);

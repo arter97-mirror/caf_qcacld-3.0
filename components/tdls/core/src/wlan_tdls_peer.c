@@ -63,8 +63,8 @@ struct tdls_peer *tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
 		status = qdf_list_peek_next(head, p_node, &p_node);
 	}
 
-	tdls_debug("no tdls peer " QDF_MAC_ADDR_FMT,
-		   QDF_MAC_ADDR_REF(macaddr));
+	tdls_debug("vdev %d no tdls peer " QDF_MAC_ADDR_FMT,
+		   wlan_vdev_get_id(vdev_obj->vdev), QDF_MAC_ADDR_REF(macaddr));
 	return NULL;
 }
 
@@ -164,10 +164,12 @@ qdf_freq_t tdls_get_offchan_freq(struct wlan_objmgr_vdev *vdev,
 	 * allowed then fill pref 6 GHz frequency
 	 * Otherwise, fill 5 GHz preferred frequency
 	 */
-	if (pref_6g_freq && tdls_is_6g_freq_allowed(vdev, pref_6g_freq))
+	if (pref_6g_freq && tdls_is_6g_freq_allowed(pdev, pref_6g_freq)) {
+		tdls_debug("6 GHz freq: %d supported for TDLS", pref_6g_freq);
 		pref_freq = pref_6g_freq;
-	else
+	} else {
 		pref_freq = wlan_reg_legacy_chan_to_freq(pdev, pref_non6g_ch);
+	}
 
 	return pref_freq;
 }
@@ -974,6 +976,12 @@ static void tdls_update_off_chan_peer_caps(struct tdls_vdev_priv_obj *vdev_obj,
 						  REG_CLI_DEF_VLP))
 			continue;
 
+		if (wlan_reg_is_6ghz_chan_freq(peer_freq) &&
+		    !wlan_reg_is_6ghz_psc_chan_freq(peer_freq)) {
+			tdls_debug("skipping non-psc channel %d", peer_freq);
+			continue;
+		}
+
 		if (peer->pref_off_chan_freq == peer_freq)
 			break;
 
@@ -981,11 +989,13 @@ static void tdls_update_off_chan_peer_caps(struct tdls_vdev_priv_obj *vdev_obj,
 			peer_5g_supportd = true;
 			peer_5g_freq = ini_pref_non6g_freq;
 		}
+
 		if (!peer_5g_supportd &&
 		    wlan_reg_is_5ghz_ch_freq(peer_freq)) {
 			peer_5g_freq = peer_freq;
 			peer_5g_supportd = true;
 		}
+
 		if (!peer_6g_supportd &&
 		    wlan_reg_is_6ghz_chan_freq(peer_freq)) {
 			peer_6g_freq = peer_freq;
@@ -1147,6 +1157,33 @@ QDF_STATUS tdls_set_extctrl_param(struct tdls_peer *peer, qdf_freq_t ch_freq,
 	}
 	peer->op_class_for_pref_off_chan = (uint8_t)op_class;
 	peer->pref_off_chan_freq = ch_freq;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
+					  uint8_t *macaddr)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+	struct tdls_vdev_priv_obj *vdev_obj;
+	struct tdls_peer *curr_peer;
+	QDF_STATUS status;
+
+	status = tdls_get_vdev_objects(vdev, &vdev_obj, &soc_obj);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("Error getting TDLS priv objects");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	curr_peer = tdls_find_peer(vdev_obj, macaddr);
+	if (!curr_peer) {
+		tdls_err("tdls peer not found for mac:");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	curr_peer->sta_kickout_count++;
+	tdls_debug("vdev:%d TDLS peer: " QDF_MAC_ADDR_FMT,
+		   wlan_vdev_get_id(vdev), QDF_MAC_ADDR_REF(macaddr));
 
 	return QDF_STATUS_SUCCESS;
 }

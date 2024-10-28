@@ -717,15 +717,18 @@ QDF_STATUS lim_cache_fils_key(struct pe_session *pe_session, bool unicast,
 			break;
 		}
 	}
-	crypto_key = wlan_crypto_get_key(pe_session->vdev, key_id);
+	crypto_key = wlan_crypto_get_key(pe_session->vdev,
+					 (const uint8_t *)mac_addr->bytes,
+					 key_id);
 	if (!crypto_key) {
 		crypto_key = qdf_mem_malloc(sizeof(*crypto_key));
 		if (!crypto_key) {
 			pe_err("Failed to allocated memory for Crypto Key");
 			return QDF_STATUS_E_FAILURE;
 		}
-		status = wlan_crypto_save_key(pe_session->vdev, key_id,
-					      crypto_key);
+		status = wlan_crypto_save_key(pe_session->vdev,
+					      (const uint8_t *)mac_addr->bytes,
+					      key_id, crypto_key);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("Failed to save crypto key");
 			qdf_mem_free(crypto_key);
@@ -751,7 +754,7 @@ QDF_STATUS lim_set_fils_key(struct pe_session *pe_session, bool unicast,
 {
 	struct wlan_crypto_key *crypto_key;
 
-	crypto_key = wlan_crypto_get_key(pe_session->vdev, key_idx);
+	crypto_key = wlan_crypto_get_key(pe_session->vdev, NULL, key_idx);
 
 	return wlan_crypto_set_key_req(pe_session->vdev, crypto_key, (unicast ?
 				       WLAN_CRYPTO_KEY_TYPE_UNICAST :

@@ -264,10 +264,12 @@ struct wlan_mlme_roam_state_info {
  *  used by supplicant to do roam invoke after disabling roam scan in firmware,
  *  it is only effective for current connection, it will be cleared during new
  *  connection.
+ * @roam_policy: Current Roam Policy. refer enum wlan_roam_policy
  */
 struct wlan_mlme_roaming_config {
 	uint32_t roam_trigger_bitmap;
 	bool supplicant_disabled_roaming;
+	enum wlan_roam_policy roam_policy;
 };
 
 /**
@@ -1340,7 +1342,10 @@ wlan_get_op_chan_freq_info_vdev_id(struct wlan_objmgr_pdev *pdev,
  * @eid_max_len: maximum length of IE @eid
  *
  * This utility function is used to strip of the requested IE if present
- * in IE buffer.
+ * in IE buffer. If the buffer pointed by @extracted is not %NULL and if
+ * any matching IE can't be added to buffer pointed by @extracted due to
+ * lack of enough memory in @extracted buffer, they will still remain in
+ * the original frame pointed by @addn_ie.
  *
  * Return: QDF_STATUS
  */
@@ -1429,6 +1434,27 @@ mlme_get_roam_trigger_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
  */
 void mlme_set_roam_trigger_bitmap(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id, uint32_t val);
+
+/**
+ * mlme_set_roam_policy() - Set Roam Policy
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev ID
+ * @roam_policy: Roam policy to set. Refer enum wlan_roam_policy
+ *
+ * Return: void
+ */
+void mlme_set_roam_policy(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			  enum wlan_roam_policy roam_policy);
+
+/**
+ * mlme_get_roam_policy() - Get current roam policy
+ * @psoc: Pointer to psoc pointer
+ * @vdev_id: vdev ID
+ *
+ * Return: Current roam_policy. REfer enum wlan_roam_policy
+ */
+enum wlan_roam_policy mlme_get_roam_policy(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
 
 /**
  * mlme_get_roam_state() - Get roam state from vdev object
@@ -2032,4 +2058,45 @@ wlan_find_peer_and_get_mac_and_mld_addr(
 				struct wlan_objmgr_psoc *psoc,
 				struct peer_mac_addresses *peer_mac_info);
 
+/**
+ * mlme_set_p2p_device_mac_addr() - set p2p device interface mac
+ * address in sta vdev mlme object
+ * @vdev: pointer to vdev
+ * @mac_addr: p2p device mac addr
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_set_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *mac_addr);
+
+/**
+ * mlme_get_p2p_device_mac_addr() - get p2p device interface mac
+ * address from sta vdev mlme object
+ * @vdev: pointer to vdev
+ * @mac_addr: mac addr
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *mac_addr);
+
+/**
+ * mlme_set_p2p_device_seq_num() - set sequence number for p2p device frame
+ * @vdev: pointer to vdev
+ * @seq_num: sequence number to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_set_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev, uint16_t seq_num);
+
+/**
+ * mlme_get_p2p_device_seq_num() - get p2p device sequence number
+ * @vdev: pointer to vdev
+ *
+ * Return: sequence number
+ */
+uint16_t mlme_get_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev);
 #endif

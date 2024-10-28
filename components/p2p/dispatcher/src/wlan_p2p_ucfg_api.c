@@ -32,6 +32,7 @@
 #include "../../core/src/wlan_p2p_roc.h"
 #include "../../core/src/wlan_p2p_off_chan_tx.h"
 #include "target_if.h"
+#include "wlan_mlme_api.h"
 
 static inline struct wlan_lmac_if_p2p_tx_ops *
 ucfg_p2p_psoc_get_tx_ops(struct wlan_objmgr_psoc *psoc)
@@ -113,7 +114,9 @@ QDF_STATUS ucfg_p2p_psoc_stop(struct wlan_objmgr_psoc *soc)
 }
 
 QDF_STATUS ucfg_p2p_roc_req(struct wlan_objmgr_psoc *soc,
-	struct p2p_roc_req *roc_req, uint64_t *cookie)
+			    struct p2p_roc_req *roc_req,
+			    uint64_t *cookie,
+			    enum QDF_OPMODE opmode)
 {
 	struct scheduler_msg msg = {0};
 	struct p2p_soc_priv_obj *p2p_soc_obj;
@@ -147,6 +150,16 @@ QDF_STATUS ucfg_p2p_roc_req(struct wlan_objmgr_psoc *soc,
 		p2p_err("failed to alloc idr, status %d", status);
 		return status;
 	}
+	if (opmode == QDF_P2P_DEVICE_MODE &&
+	    p2p_is_sta_vdev_usage_allowed_for_p2p_dev(soc)) {
+		status = wlan_p2p_set_rand_mac_for_p2p_dev(soc,
+							   roc_req->vdev_id,
+							   roc_req->chan_freq,
+							   id,
+							   roc_req->duration);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto done;
+	}
 
 	*cookie = (uint64_t)id;
 	roc_ctx->p2p_soc_obj = p2p_soc_obj;
@@ -157,6 +170,7 @@ QDF_STATUS ucfg_p2p_roc_req(struct wlan_objmgr_psoc *soc,
 	roc_ctx->roc_state = ROC_STATE_IDLE;
 	roc_ctx->roc_type = USER_REQUESTED;
 	roc_ctx->id = id;
+	roc_ctx->opmode = opmode;
 	msg.type = P2P_ROC_REQ;
 	msg.bodyptr = roc_ctx;
 	msg.callback = p2p_process_cmd;
@@ -164,6 +178,7 @@ QDF_STATUS ucfg_p2p_roc_req(struct wlan_objmgr_psoc *soc,
 					QDF_MODULE_ID_P2P,
 					QDF_MODULE_ID_OS_IF,
 					&msg);
+done:
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mem_free(roc_ctx);
 		qdf_idr_remove(&p2p_soc_obj->p2p_idr, id);
@@ -175,7 +190,9 @@ QDF_STATUS ucfg_p2p_roc_req(struct wlan_objmgr_psoc *soc,
 }
 
 QDF_STATUS ucfg_p2p_roc_cancel_req(struct wlan_objmgr_psoc *soc,
-	uint64_t cookie)
+				   struct wlan_objmgr_vdev *vdev,
+				   uint64_t cookie,
+				   enum QDF_OPMODE opmode)
 {
 	struct scheduler_msg msg = {0};
 	struct p2p_soc_priv_obj *p2p_soc_obj;
@@ -203,6 +220,13 @@ QDF_STATUS ucfg_p2p_roc_cancel_req(struct wlan_objmgr_psoc *soc,
 		p2p_debug("invalid id for cookie 0x%llx", cookie);
 		return QDF_STATUS_E_INVAL;
 	}
+
+	/* Filter gets cleaned up as part of P2P-GO off */
+	if (opmode == QDF_P2P_DEVICE_MODE &&
+
+	    p2p_is_sta_vdev_usage_allowed_for_p2p_dev(soc) &&
+	    !policy_mgr_mode_specific_get_channel(soc, PM_P2P_GO_MODE))
+		p2p_del_random_mac(soc, wlan_vdev_get_id(vdev), cookie);
 
 	cancel_roc = qdf_mem_malloc(sizeof(*cancel_roc));
 	if (!cancel_roc)
@@ -343,6 +367,7 @@ QDF_STATUS ucfg_p2p_mgmt_tx(struct wlan_objmgr_psoc *soc,
 	tx_action->no_cck = mgmt_frm->no_cck;
 	tx_action->no_ack = mgmt_frm->dont_wait_for_ack;
 	tx_action->off_chan = mgmt_frm->off_chan;
+	tx_action->opmode = mgmt_frm->opmode;
 	tx_action->buf = qdf_mem_malloc(tx_action->buf_len);
 	if (!(tx_action->buf)) {
 		qdf_mem_free(tx_action);
@@ -354,10 +379,11 @@ QDF_STATUS ucfg_p2p_mgmt_tx(struct wlan_objmgr_psoc *soc,
 
 	p2p_rand_mac_tx(pdev, tx_action);
 
-	p2p_debug("soc:%pK, vdev_id:%d, freq:%d, wait:%d, buf_len:%d, cck:%d, no ack:%d, off chan:%d cookie = 0x%llx",
+	p2p_debug("soc:%pK, vdev_id:%d, freq:%d, wait:%d, buf_len:%d, cck:%d, no ack:%d, off chan:%d cookie = 0x%llx opmode:%d",
 		  soc, mgmt_frm->vdev_id, mgmt_frm->chan_freq,
 		  mgmt_frm->wait, mgmt_frm->len, mgmt_frm->no_cck,
-		  mgmt_frm->dont_wait_for_ack, mgmt_frm->off_chan, *cookie);
+		  mgmt_frm->dont_wait_for_ack, mgmt_frm->off_chan, *cookie,
+		  tx_action->opmode);
 
 	msg.type = P2P_MGMT_TX;
 	msg.bodyptr = tx_action;
@@ -379,7 +405,9 @@ QDF_STATUS ucfg_p2p_mgmt_tx(struct wlan_objmgr_psoc *soc,
 }
 
 QDF_STATUS ucfg_p2p_mgmt_tx_cancel(struct wlan_objmgr_psoc *soc,
-	struct wlan_objmgr_vdev *vdev, uint64_t cookie)
+				   struct wlan_objmgr_vdev *vdev,
+				   uint64_t cookie,
+				   enum QDF_OPMODE opmode)
 {
 	struct scheduler_msg msg = {0};
 	struct p2p_soc_priv_obj *p2p_soc_obj;
@@ -407,7 +435,11 @@ QDF_STATUS ucfg_p2p_mgmt_tx_cancel(struct wlan_objmgr_psoc *soc,
 		p2p_debug("invalid id for cookie 0x%llx", cookie);
 		return QDF_STATUS_E_INVAL;
 	}
-	p2p_del_random_mac(soc, wlan_vdev_get_id(vdev), cookie);
+	/* Filter gets cleaned up as part of P2P-GO off */
+	if (opmode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(soc) &&
+	    !policy_mgr_mode_specific_get_channel(soc, PM_P2P_GO_MODE))
+		p2p_del_random_mac(soc, wlan_vdev_get_id(vdev), cookie);
 
 	cancel_tx = qdf_mem_malloc(sizeof(*cancel_tx));
 	if (!cancel_tx)
@@ -537,6 +569,49 @@ QDF_STATUS ucfg_p2p_lo_stop(struct wlan_objmgr_psoc *soc,
 	return status;
 }
 #endif
+
+QDF_STATUS ucfg_p2p_send_chan_switch_req(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint8_t chan,
+					 uint8_t opclass)
+{
+	QDF_STATUS status;
+	struct scheduler_msg msg = {0};
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+	struct p2p_chan_switch_req_params *ch_switch_params;
+
+	if (vdev_id >= WLAN_INVALID_VDEV_ID) {
+		p2p_err("Invalid VDEV");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							    WLAN_UMAC_COMP_P2P);
+	if (!p2p_soc_obj) {
+		p2p_err("p2p soc context is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ch_switch_params = qdf_mem_malloc(sizeof(*ch_switch_params));
+	if (!ch_switch_params)
+		return QDF_STATUS_E_NOMEM;
+
+	ch_switch_params->p2p_soc_obj = p2p_soc_obj;
+	ch_switch_params->vdev_id = vdev_id;
+	ch_switch_params->channel = chan;
+	ch_switch_params->op_class = opclass;
+
+	msg.type = P2P_GROUP_CHAN_SWITCH_CMD;
+	msg.bodyptr = ch_switch_params;
+	msg.callback = p2p_process_cmd;
+	status = scheduler_post_message(QDF_MODULE_ID_HDD, QDF_MODULE_ID_P2P,
+					QDF_MODULE_ID_OS_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(ch_switch_params);
+		p2p_nofl_debug("p2p chan switch post msg fail %d", status);
+	}
+
+	return status;
+}
 
 QDF_STATUS  ucfg_p2p_set_noa(struct wlan_objmgr_psoc *soc,
 	uint32_t vdev_id, bool disable_noa)
@@ -700,4 +775,79 @@ QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 {
 	return p2p_send_usd_params(psoc, param);
 }
+
+bool ucfg_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_is_fw_support_usd(psoc);
+}
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+bool ucfg_p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_fw_support_ap_assist_dfs_group(psoc);
+}
+
+QDF_STATUS
+ucfg_p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+				      const uint8_t *ie, uint16_t ie_len,
+				      bool is_connected, qdf_freq_t freq,
+				      bool is_self)
+{
+	if (!ie || !ie_len)
+		return QDF_STATUS_SUCCESS;
+
+	return p2p_extract_ap_assist_dfs_params(vdev, ie, ie_len, is_connected,
+						freq, is_self);
+}
+
+QDF_STATUS ucfg_p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					     bool *is_dfs_owner,
+					     bool *is_valid_ap_assist,
+					     struct qdf_mac_addr *ap_bssid,
+					     uint8_t *opclass, uint8_t *chan)
+{
+	return p2p_get_ap_assist_dfs_params(vdev, is_dfs_owner,
+					    is_valid_ap_assist, ap_bssid,
+					    opclass, chan);
+}
+
+QDF_STATUS ucfg_p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev)
+{
+	return p2p_check_ap_assist_dfs_group_go(vdev);
+}
+
+bool
+ucfg_is_sta_vdev_for_p2p_device_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_get_sta_vdev_for_p2p_dev_cap(psoc);
+}
+
+bool ucfg_p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap(
+					struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap(psoc);
+}
+
+void ucfg_p2p_set_sta_vdev_for_p2p_dev_operations(
+					struct wlan_objmgr_psoc *psoc,
+					bool val)
+{
+	p2p_set_sta_vdev_for_p2p_dev_operations(psoc, val);
+}
+
+bool
+ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc);
+}
+
+void ucfg_p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
+{
+	p2p_psoc_priv_set_sta_vdev_id(psoc, vdev_id);
+}
+
+uint8_t ucfg_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc)
+{
+	return p2p_psoc_priv_get_sta_vdev_id(psoc);
+}

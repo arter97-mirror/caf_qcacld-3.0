@@ -56,6 +56,7 @@ struct wlan_hdd_link_info;
 
 #define RATE_TYPE_LEGACY 0
 #define RATE_TYPE_MCS 1
+#define RATE_MCS13 13
 
 /* 2GHz band legacy rates */
 #define RATE_1 1
@@ -63,7 +64,7 @@ struct wlan_hdd_link_info;
 #define RATE_5_5 5
 #define RATE_11 11
 
-/* 5GHz/6GHz band legacy rates */
+/* 2GHz/5GHz/6GHz band legacy rates */
 #define RATE_6 6
 #define RATE_9 9
 #define RATE_12 12
@@ -1230,4 +1231,13 @@ int hdd_vdev_send_sta_keep_alive_interval(struct wlan_hdd_link_info *link_info,
  */
 void wlan_hdd_save_sta_keep_alive_interval(struct hdd_adapter *adapter,
 					   uint16_t sta_alive_interval);
+/**
+ * hdd_convert_phy_bw_to_nl_bw - Convert phy bandwidth to nl bandwidth
+ * @bw: phy bandwidth
+ *
+ * Return: nl bandwidth
+ */
+enum nl80211_chan_width
+hdd_convert_phy_bw_to_nl_bw(enum phy_ch_width bw);
+
 #endif

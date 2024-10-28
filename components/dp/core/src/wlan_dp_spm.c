@@ -639,6 +639,7 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 
 	flow->active_ts = qdf_sched_clock();
 	skb->mark = flow->svc_metadata;
+	flow->num_pkts++;
 
 	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, skb,
 						   flow->track_flow_stats,
@@ -876,11 +877,18 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 	}
 
 	flow_rec = spm_intf->flow_rec_base;
-	for (i = 1; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++) {
+	for (i = 0; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++) {
 		qdf_mem_zero(flow_rec, sizeof(struct wlan_dp_spm_flow_info));
 		flow_rec->id = i;
-		qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
-				     &flow_rec->node);
+		/* flow_id 0 is invalid and hence do not add it to freelist.
+		 * But it is necessary to have the indexing start from 0 for
+		 * consistent/contiguous indexing in global Tx flow table.
+		 *
+		 * Global Tx flow table index will be (intf_id << 6 | idx)
+		 */
+		if (i)
+			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
+					     &flow_rec->node);
 		flow_rec++;
 	}
 
@@ -1021,6 +1029,7 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 		*flow_id = WLAN_DP_SPM_INVALID_FLOW_ID;
 		dp_info_rl("records freelist size: %u, Active flow table full!",
 			   spm_intf->o_flow_rec_freelist.count);
+		wlan_dp_spm_flow_retire(dp_intf->spm_intf_ctx, false);
 		return QDF_STATUS_E_EMPTY;
 	}
 
@@ -1044,6 +1053,7 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 
 	*flow_id = flow_rec->id;
 	flow_rec->is_populated = 1;
+	flow_rec->active_ts = qdf_sched_clock();
 
 	/* Trigger flow retiring event at threshold */
 	if (qdf_unlikely(spm_intf->o_flow_rec_freelist.count <

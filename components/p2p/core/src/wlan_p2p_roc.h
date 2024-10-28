@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -88,6 +88,11 @@ enum roc_state {
  * @roc_timer:   RoC timer
  * @roc_state:   Roc state
  * @id:          identifier of roc
+ * @tx_mgmt_mac_addr: TX Mgmt mac address
+ * @opmode: Interface type
+ * @flag:       Indicate scan type. BIT[0] indicate whether
+ *              scan type is for p2p or not when sta vdev gets
+ *              use during p2p device mode operation
  */
 struct p2p_roc_context {
 	qdf_list_node_t node;
@@ -102,6 +107,9 @@ struct p2p_roc_context {
 	qdf_mc_timer_t roc_timer;
 	enum roc_state roc_state;
 	int32_t id;
+	struct qdf_mac_addr tx_mgmt_mac_addr;
+	enum QDF_OPMODE opmode;
+	uint32_t flag;
 };
 
 /**

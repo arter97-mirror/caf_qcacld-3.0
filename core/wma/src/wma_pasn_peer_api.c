@@ -139,7 +139,8 @@ QDF_STATUS wma_nan_pasn_peer_remove(struct wlan_objmgr_psoc *psoc,
 		wma_debug("Wait for the peer delete. vdev_id %d", vdev_id);
 		del_req = wma_fill_hold_req(wma, vdev_id,
 					    WMA_DELETE_STA_REQ,
-					     type, peer_del_resp,
+					     type, NULL,
+					     peer_del_resp,
 					     WMA_DELETE_STA_TIMEOUT);
 		if (!del_req) {
 			wma_err("Failed to allocate request vdev_id %d",
@@ -243,7 +244,8 @@ wma_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_copy(peer_create_rsp->peer_mac.bytes, peer_addr->bytes,
 		     QDF_MAC_ADDR_SIZE);
 	wma_req = wma_fill_hold_req(wma, vdev_id, WMA_PEER_CREATE_REQ,
-				    pasn_peer_msg_type, peer_create_rsp,
+				    pasn_peer_msg_type, peer_addr->bytes,
+				    peer_create_rsp,
 				    WMA_PEER_CREATE_RESPONSE_TIMEOUT);
 	if (!wma_req) {
 		wma_err("vdev:%d failed to fill peer create req", vdev_id);
@@ -359,7 +361,7 @@ wma_pasn_peer_delete_all_complete(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	req_msg = wma_find_remove_req_msgtype(wma, vdev_id,
+	req_msg = wma_find_remove_req_msgtype(wma, vdev_id, NULL,
 					      WMA_PASN_PEER_DELETE_REQUEST);
 	if (!req_msg) {
 		wma_debug("vdev:%d Failed to lookup pasn peer del req",
@@ -421,7 +423,7 @@ wma_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
 
 	msg = wma_fill_hold_req(wma, vdev_id,
 				WMA_PASN_PEER_DELETE_REQUEST,
-				WMA_PASN_PEER_DELETE_RESPONSE, NULL,
+				WMA_PASN_PEER_DELETE_RESPONSE, NULL, NULL,
 				WMA_PEER_DELETE_RESPONSE_TIMEOUT);
 	if (!msg) {
 		wma_err("Failed to allocate request for vdev_id %d", vdev_id);

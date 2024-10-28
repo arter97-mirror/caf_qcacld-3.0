@@ -308,7 +308,6 @@ static inline void hdd_wlan_ssr_shutdown_event(void) { }
 static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
 {
 	hdd_enter();
-	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
 
 	cds_shutdown_notifier_call();
 	cds_shutdown_notifier_purge();
@@ -2277,10 +2276,6 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 			host_log_device_status(WLAN_STATUS_BUS_EXCEPTION);
 		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_RESUME_FAIL)
 			cds_set_driver_state(CDS_DRIVER_STATE_PCIE_LINK_RESUME_FAIL);
-		break;
-	case PLD_SYS_REBOOT:
-		hdd_info("Received system reboot");
-		cds_set_sys_rebooting();
 		break;
 	default:
 		/* other events intentionally not handled */

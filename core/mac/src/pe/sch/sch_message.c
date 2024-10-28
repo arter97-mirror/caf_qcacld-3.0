@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -91,7 +91,7 @@ void sch_edca_profile_update_all(struct mac_context *pmac)
 	for (i = 0; i < pmac->lim.maxBssId; i++) {
 		psession_entry = &pmac->lim.gpSession[i];
 		if (psession_entry->valid)
-			sch_edca_profile_update(pmac, psession_entry);
+			sch_edca_profile_update(pmac, psession_entry, NULL);
 	}
 }
 
@@ -260,7 +260,9 @@ broadcast_wmm_of_concurrent_sta_session(struct mac_context *mac_ctx,
 	return true;
 }
 
-void sch_qos_update_broadcast(struct mac_context *mac, struct pe_session *pe_session)
+void sch_qos_update_broadcast(struct mac_context *mac,
+			      struct pe_session *pe_session,
+			      uint32_t usr_params[][CFG_EDCA_DATA_LEN])
 {
 	uint32_t params[4][CFG_EDCA_DATA_LEN];
 	uint32_t cwminidx, cwmaxidx, txopidx;
@@ -271,10 +273,14 @@ void sch_qos_update_broadcast(struct mac_context *mac, struct pe_session *pe_ses
 	uint8_t *debug_str;
 	uint32_t len = 0;
 
-	if (sch_get_params(mac, params, false) != QDF_STATUS_SUCCESS) {
+	if (pe_session->user_edca_set && usr_params) {
+		qdf_mem_copy(params, &usr_params[0],
+			     4 * CFG_EDCA_DATA_LEN * sizeof(uint32_t));
+	} else if (sch_get_params(mac, params, false) != QDF_STATUS_SUCCESS) {
 		pe_debug("QosUpdateBroadcast: failed");
 		return;
 	}
+
 	lim_get_phy_mode(mac, &phyMode, pe_session);
 
 	if (phyMode == WNI_CFG_PHY_MODE_11G) {
@@ -357,7 +363,9 @@ void sch_qos_update_broadcast(struct mac_context *mac, struct pe_session *pe_ses
 		pe_err("Unable to set beacon fields!");
 }
 
-void sch_qos_update_local(struct mac_context *mac, struct pe_session *pe_session)
+void sch_qos_update_local(struct mac_context *mac,
+			  struct pe_session *pe_session,
+			  uint32_t usr_params[][CFG_EDCA_DATA_LEN])
 {
 
 	uint32_t params[4][CFG_EDCA_DATA_LEN];
@@ -373,6 +381,8 @@ void sch_qos_update_local(struct mac_context *mac, struct pe_session *pe_session
 		}
 
 		set_sch_edca_params(mac, params, pe_session);
+	} else if (usr_params) {
+		set_sch_edca_params(mac, usr_params, pe_session);
 	}
 
 	lim_set_active_edca_params(mac, pe_session->gLimEdcaParams, pe_session);
@@ -529,11 +539,13 @@ static void sch_qos_update_edca_pifs_param_for_ll_sap(struct mac_context *mac,
  *
  * Return  none
  */
-void sch_edca_profile_update(struct mac_context *mac, struct pe_session *pe_session)
+void sch_edca_profile_update(struct mac_context *mac,
+			     struct pe_session *pe_session,
+			     uint32_t usr_params[][CFG_EDCA_DATA_LEN])
 {
 	if (LIM_IS_AP_ROLE(pe_session)) {
-		sch_qos_update_local(mac, pe_session);
-		sch_qos_update_broadcast(mac, pe_session);
+		sch_qos_update_local(mac, pe_session, usr_params);
+		sch_qos_update_broadcast(mac, pe_session, usr_params);
 		sch_qos_concurrency_update();
 
 		if (policy_mgr_is_vdev_ll_lt_sap(

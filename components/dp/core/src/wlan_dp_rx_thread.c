@@ -1583,6 +1583,7 @@ QDF_STATUS dp_txrx_deinit(ol_txrx_soc_handle soc)
 		return QDF_STATUS_E_FAULT;
 
 	if (dp_ext_hdl->refill_thread.enabled) {
+		wlan_dp_resource_mgr_notify_refill_thread_deinit();
 		dp_rx_refill_thread_deinit(&dp_ext_hdl->refill_thread);
 		dp_ext_hdl->refill_thread.soc = NULL;
 		dp_ext_hdl->refill_thread.enabled = false;

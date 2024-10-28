@@ -927,6 +927,8 @@ struct wlan_dp_psoc_callbacks {
  * @dp_send_dhcp_ind: Callback to send DHCP indication
  * @dp_send_active_traffic_map: Callback to send active traffic mapping
  * @dp_send_opm_stats_cmd: Callback to send OPM stats command
+ * @dp_send_pdev_pkt_routing_vlan: Callback to send pdev pkt routing command
+ *				   for VLAN tagged packets
  */
 struct wlan_dp_psoc_sb_ops {
 	/*TODO to add target if TX ops*/
@@ -946,6 +948,11 @@ struct wlan_dp_psoc_sb_ops {
 #ifdef WLAN_DP_FEATURE_STC
 	QDF_STATUS (*dp_send_opm_stats_cmd)(struct wlan_objmgr_psoc *psoc,
 					    uint8_t pdev_id);
+#endif
+#ifdef IPA_WDI3_VLAN_SUPPORT
+	void (*dp_send_pdev_pkt_routing_vlan)(struct wlan_objmgr_psoc *psoc,
+					      uint8_t pdev_id,
+					      uint32_t dest_ring);
 #endif
 };
 

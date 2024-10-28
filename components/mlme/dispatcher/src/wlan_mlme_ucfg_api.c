@@ -1972,6 +1972,11 @@ bool ucfg_mlme_get_coex_unsafe_chan_reg_disable(
 }
 #endif
 
+bool ucfg_mlme_is_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev)
+{
+	return mlme_is_chan_switch_in_progress(vdev);
+}
+
 #if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
 QDF_STATUS
 ucfg_mlme_get_enable_6ghz_sp_mode_support(struct wlan_objmgr_psoc *psoc,

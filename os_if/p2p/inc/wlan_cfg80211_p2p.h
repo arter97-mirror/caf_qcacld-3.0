@@ -56,6 +56,7 @@ QDF_STATUS p2p_psoc_disable(struct wlan_objmgr_psoc *psoc);
  * @chan: Pointer to channel
  * @duration: Duration for this roc request
  * @cookie: Pointer to return cookie to up layer
+ * @opmode: Interface type
  *
  * API to trigger remain on channel request. It returns cookie
  * as the identifier of roc.
@@ -64,20 +65,21 @@ QDF_STATUS p2p_psoc_disable(struct wlan_objmgr_psoc *psoc);
  */
 int wlan_cfg80211_roc(struct wlan_objmgr_vdev *vdev,
 	struct ieee80211_channel *chan, uint32_t duration,
-	uint64_t *cookie);
+	uint64_t *cookie, enum QDF_OPMODE opmode);
 
 /**
  * wlan_cfg80211_cancel_roc() - API to process cfg80211 cancel remain
  * on channel request
  * @vdev: Pointer to vdev object
  * @cookie: Find out the roc request by cookie
+ * @opmode: OPMODE for which the current roc_cancel is issued
  *
  * API to trigger cancel remain on channel request.
  *
  * Return: 0 for success, non zero for failure
  */
-int wlan_cfg80211_cancel_roc(struct wlan_objmgr_vdev *vdev,
-	uint64_t cookie);
+int wlan_cfg80211_cancel_roc(struct wlan_objmgr_vdev *vdev, uint64_t cookie,
+			     enum QDF_OPMODE opmode);
 
 /**
  * wlan_cfg80211_mgmt_tx() - API to process cfg80211 mgmt tx request
@@ -90,6 +92,7 @@ int wlan_cfg80211_cancel_roc(struct wlan_objmgr_vdev *vdev,
  * @no_cck: Required cck or not
  * @dont_wait_for_ack: Wait for ack or not
  * @cookie: Return the cookie to caller
+ * @opmode: Interface type
  *
  * API to trigger mgmt frame tx request. It returns cookie as the
  * identifier of this tx.
@@ -97,22 +100,24 @@ int wlan_cfg80211_cancel_roc(struct wlan_objmgr_vdev *vdev,
  * Return: 0 for success, non zero for failure
  */
 int wlan_cfg80211_mgmt_tx(struct wlan_objmgr_vdev *vdev,
-	struct ieee80211_channel *chan, bool offchan, uint32_t wait,
-	const uint8_t *buf, uint32_t len, bool no_cck,
-	bool dont_wait_for_ack, uint64_t *cookie);
+			  struct ieee80211_channel *chan, bool offchan,
+			  uint32_t wait, const uint8_t *buf, uint32_t len,
+			  bool no_cck, bool dont_wait_for_ack, uint64_t *cookie,
+			  enum QDF_OPMODE opmode);
 
 /**
  * wlan_cfg80211_mgmt_tx_cancel() - API to process cfg80211 cancel to
  * wait mgmt tx
  * @vdev: Pointer to vdev object
  * @cookie: Find out the mgmt tx request by cookie
+ * @opmode: OPMODE for which the current mgmt_tx_cancel is issued
  *
  * API to trigger cancel mgmt frame tx request.
  *
  * Return: 0 for success, non zero for failure
  */
 int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
-		uint64_t cookie);
+				 uint64_t cookie, enum QDF_OPMODE opmode);
 
 #ifdef FEATURE_WLAN_SUPPORT_USD
 /**

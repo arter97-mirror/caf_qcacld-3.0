@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -180,11 +180,6 @@ tgt_twt_ac_pdev_param_send(struct wlan_objmgr_psoc *psoc,
 	struct wlan_lmac_if_twt_tx_ops *tx_ops;
 	QDF_STATUS status;
 
-	if (!psoc) {
-		twt_err("psoc is null");
-		return QDF_STATUS_E_INVAL;
-	}
-
 	tx_ops = wlan_twt_get_tx_ops(psoc);
 	if (!tx_ops || !tx_ops->set_ac_param) {
 		twt_err("set_ac_param is null");
@@ -197,3 +192,22 @@ tgt_twt_ac_pdev_param_send(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
+QDF_STATUS
+tgt_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_objmgr_vdev *vdev,
+				 bool unavailability_mode)
+{
+	struct wlan_lmac_if_twt_tx_ops *tx_ops;
+	QDF_STATUS status;
+
+	tx_ops = wlan_twt_get_tx_ops(psoc);
+	if (!tx_ops || !tx_ops->unavailability_mode) {
+		twt_err("unavailability_mode ops is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		return status;
+	}
+
+	status = tx_ops->unavailability_mode(psoc, vdev, unavailability_mode);
+
+	return status;
+}

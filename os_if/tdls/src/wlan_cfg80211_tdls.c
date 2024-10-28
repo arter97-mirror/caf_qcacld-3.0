@@ -41,6 +41,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_object_manager.h"
+#include "wlan_tdls_main.h"
 
 static int wlan_cfg80211_tdls_validate_mac_addr(const uint8_t *mac)
 {
@@ -245,8 +246,9 @@ tdls_fill_chan_freq_from_supported_ch_list(struct wlan_objmgr_pdev *pdev,
 			continue;
 
 		if (wlan_reg_is_6ghz_chan_freq(freq) &&
-		    !wlan_reg_is_6ghz_psc_chan_freq(freq)) {
-			osif_debug("skipping non-psc channel %d", freq);
+		    !tdls_is_6g_freq_allowed(pdev, freq)) {
+			osif_debug("skipping non-psc or non-vlp freq %d",
+				   freq);
 			continue;
 		}
 
@@ -269,8 +271,9 @@ tdls_fill_chan_freq_from_supported_ch_list(struct wlan_objmgr_pdev *pdev,
 				continue;
 
 			if (wlan_reg_is_6ghz_chan_freq(freq) &&
-			    !wlan_reg_is_6ghz_psc_chan_freq(freq)) {
-				osif_debug("skipping non-psc channel %d", freq);
+			    !tdls_is_6g_freq_allowed(pdev, freq)) {
+				osif_debug("skipping non-psc or non-vlp freq %d",
+					   freq);
 				continue;
 			}
 
@@ -299,26 +302,23 @@ tdls_calc_channels_from_staparams(struct wlan_objmgr_vdev *vdev,
 	const uint8_t *src_chans, *src_opclass;
 	qdf_freq_t *dest_freq;
 	uint8_t country[REG_ALPHA2_LEN + 1];
-	QDF_STATUS status;
 	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!vdev) {
 		osif_err("null vdev");
 		return;
 	}
 
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		osif_err("null pdev");
-		return;
-	}
 	src_chans = params->supported_channels;
 	src_opclass = params->supported_oper_classes;
 	dest_freq = req_info->supported_chan_freq;
 	pdev = wlan_vdev_get_pdev(vdev);
-	status = wlan_cm_get_country_code(pdev, wlan_vdev_get_id(vdev),
-					  country);
+	psoc  = wlan_vdev_get_psoc(vdev);
+	if (!psoc || !pdev)
+		return;
 
+	wlan_reg_read_current_country(psoc, country);
 	osif_debug("Country info from AP:%c%c 0x%x", country[0],
 		   country[1], country[2]);
 
@@ -1085,9 +1085,9 @@ bool wlan_cfg80211_tdls_is_fw_wideband_capable(struct wlan_objmgr_vdev *vdev)
 }
 
 #ifdef WLAN_FEATURE_11AX
-bool wlan_cfg80211_tdls_is_fw_6ghz_capable(struct wlan_objmgr_vdev *vdev)
+bool wlan_cfg80211_tdls_is_fw_6ghz_capable(struct wlan_objmgr_pdev *pdev)
 {
-	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 
 	if (!psoc)
 		return false;
@@ -1306,7 +1306,7 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 
 	/* STA should be connected before sending any TDLS frame */
 	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS) {
-		osif_err("STA is not connected");
+		osif_err_rl("STA is not connected");
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
 		return -EAGAIN;
 	}
@@ -1320,7 +1320,7 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 				hdd_objmgr_put_vdev_by_user(vdev,
 							    WLAN_OSIF_TDLS_ID);
 				if (link_id < 0) {
-					osif_err("link id is invalid");
+					osif_err_rl("link id is invalid");
 					return -EINVAL;
 				}
 				/* Get the candidate vdev per link id */
@@ -1329,14 +1329,15 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 							      WLAN_OSIF_TDLS_ID,
 							      link_id);
 				if (!vdev) {
-					osif_err("vdev is null");
+					osif_err_rl("vdev is null");
 					return -EINVAL;
 				}
 			} else if (action_code == TDLS_DISCOVERY_REQUEST) {
 				if (ucfg_tdls_discovery_on_going(vdev)) {
-					osif_err("discovery request is going");
 					hdd_objmgr_put_vdev_by_user(vdev,
 							     WLAN_OSIF_TDLS_ID);
+					osif_err_rl("discovery request is going on vdev %d",
+						    wlan_vdev_get_id(vdev));
 					return -EAGAIN;
 				}
 				dis_req_more = true;
@@ -1353,7 +1354,7 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 			mlo_vdev = ucfg_tdls_get_mlo_vdev(vdev, i,
 							  WLAN_OSIF_TDLS_ID);
 			if (!mlo_vdev) {
-				osif_err("mlo vdev is NULL");
+				osif_err_rl("mlo vdev is NULL");
 				continue;
 			}
 			ret = wlan_cfg80211_tdls_mgmt(mlo_vdev, peer,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,8 +37,8 @@
 
 /* Type Declarations */
 
-static char *g_hdd_wowl_ptrns[WOWL_MAX_PTRNS_ALLOWED];
-static bool g_hdd_wowl_ptrns_debugfs[WOWL_MAX_PTRNS_ALLOWED] = { 0 };
+static char *g_hdd_wowl_ptrns[WLAN_UMAC_PSOC_MAX_VDEVS][WOWL_MAX_PTRNS_ALLOWED];
+static bool g_hdd_wowl_ptrns_debugfs[WLAN_UMAC_PSOC_MAX_VDEVS][WOWL_MAX_PTRNS_ALLOWED] = { 0 };
 
 static uint8_t g_hdd_wowl_ptrns_count;
 
@@ -112,10 +112,19 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 	uint8_t num_filters;
 	bool invalid_ptrn = false;
 	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
 
 	status = hdd_get_num_wow_filters(hdd_ctx, &num_filters);
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		return false;
+	}
+	vdev_id = wlan_vdev_get_id(vdev);
 
 	/* There has to have at least 1 byte for each field (pattern
 	 * size, mask size, pattern, mask) e.g. PP:QQ:RR:SS ==> 11
@@ -127,15 +136,15 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 
 		/* check if pattern is already configured */
 		for (i = num_filters - 1; i >= 0; i--) {
-			if (!g_hdd_wowl_ptrns[i]) {
+			if (!g_hdd_wowl_ptrns[vdev_id][i]) {
 				empty_slot = i;
 				continue;
 			}
 
-			if (strlen(g_hdd_wowl_ptrns[i]) == len) {
-				if (!memcmp(ptrn, g_hdd_wowl_ptrns[i], len)) {
-					hdd_err("WoWL pattern '%s' already configured",
-						g_hdd_wowl_ptrns[i]);
+			if (strlen(g_hdd_wowl_ptrns[vdev_id][i]) == len) {
+				if (!memcmp(ptrn, g_hdd_wowl_ptrns[vdev_id][i], len)) {
+					hdd_err("WoWL pattern '%s' already configured for vdev %d",
+						g_hdd_wowl_ptrns[vdev_id][i], vdev_id);
 					ptrn += len;
 					goto next_ptrn;
 				}
@@ -143,7 +152,7 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 		}
 
 		/* Maximum number of patterns have been configured already */
-		if (empty_slot == -1) {
+		if (empty_slot == -1 || g_hdd_wowl_ptrns_count >= num_filters) {
 			hdd_err("Max WoW patterns (%u) reached", num_filters);
 			return false;
 		}
@@ -219,31 +228,25 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 		}
 
 		/* All is good. Store the pattern locally */
-		g_hdd_wowl_ptrns[empty_slot] = qdf_mem_malloc(len + 1);
-		if (!g_hdd_wowl_ptrns[empty_slot])
+		g_hdd_wowl_ptrns[vdev_id][empty_slot] = qdf_mem_malloc(len + 1);
+		if (!g_hdd_wowl_ptrns[vdev_id][empty_slot])
 			return false;
 
-		memcpy(g_hdd_wowl_ptrns[empty_slot], temp, len);
-		g_hdd_wowl_ptrns[empty_slot][len] = '\0';
+		memcpy(g_hdd_wowl_ptrns[vdev_id][empty_slot], temp, len);
+		g_hdd_wowl_ptrns[vdev_id][empty_slot][len] = '\0';
+		g_hdd_wowl_ptrns_count++;
 		wow_pattern.pattern_id = empty_slot;
 		wow_pattern.pattern_byte_offset = 0;
 
-		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-						   WLAN_OSIF_POWER_ID);
-		if (!vdev) {
-			hdd_err("vdev is null");
-			qdf_mem_free(g_hdd_wowl_ptrns[empty_slot]);
-			g_hdd_wowl_ptrns[empty_slot] = NULL;
-			return false;
-		}
 		/* Register the pattern downstream */
 		status = ucfg_pmo_add_wow_user_pattern(vdev, &wow_pattern);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			/* Add failed, so invalidate the local storage */
 			hdd_err("sme_wowl_add_bcast_pattern failed with error code (%d)",
 				status);
-			qdf_mem_free(g_hdd_wowl_ptrns[empty_slot]);
-			g_hdd_wowl_ptrns[empty_slot] = NULL;
+			qdf_mem_free(g_hdd_wowl_ptrns[vdev_id][empty_slot]);
+			g_hdd_wowl_ptrns[vdev_id][empty_slot] = NULL;
+			g_hdd_wowl_ptrns_count--;
 		}
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 		dump_hdd_wowl_ptrn(&wow_pattern);
@@ -280,17 +283,24 @@ bool hdd_del_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint8_t num_filters;
 	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
 
 	status = hdd_get_num_wow_filters(hdd_ctx, &num_filters);
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
+	if (!vdev)
+		return false;
+	vdev_id = wlan_vdev_get_id(vdev);
+
 	/* lookup pattern */
 	for (id = 0; id < num_filters; id++) {
-		if (!g_hdd_wowl_ptrns[id])
+		if (!g_hdd_wowl_ptrns[vdev_id][id])
 			continue;
 
-		if (qdf_str_eq(ptrn, g_hdd_wowl_ptrns[id])) {
+		if (qdf_str_eq(ptrn, g_hdd_wowl_ptrns[vdev_id][id])) {
 			patternFound = true;
 			break;
 		}
@@ -300,21 +310,18 @@ bool hdd_del_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 	if (!patternFound)
 		return false;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev)
-		return false;
-
 	status = ucfg_pmo_del_wow_user_pattern(vdev, id);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
 
 	/* Remove from local storage as well */
-	hdd_err("Deleted pattern with id %d [%s]", id, g_hdd_wowl_ptrns[id]);
+	hdd_err("Deleted pattern with vdev %d and id %d [%s]", vdev_id, id,
+		g_hdd_wowl_ptrns[vdev_id][id]);
 
-	qdf_mem_free(g_hdd_wowl_ptrns[id]);
-	g_hdd_wowl_ptrns[id] = NULL;
+	qdf_mem_free(g_hdd_wowl_ptrns[vdev_id][id]);
+	g_hdd_wowl_ptrns[vdev_id][id] = NULL;
+	g_hdd_wowl_ptrns_count--;
 
 	return true;
 }
@@ -338,6 +345,7 @@ bool hdd_add_wowl_ptrn_debugfs(struct hdd_adapter *adapter, uint8_t pattern_idx,
 	QDF_STATUS qdf_ret_status;
 	uint16_t pattern_len, mask_len, i;
 	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
 
 	if (pattern_idx > (WOWL_MAX_PTRNS_ALLOWED - 1)) {
 		hdd_err("WoW pattern index %d is out of range (0 ~ %d)",
@@ -415,6 +423,7 @@ bool hdd_add_wowl_ptrn_debugfs(struct hdd_adapter *adapter, uint8_t pattern_idx,
 					   WLAN_OSIF_POWER_ID);
 	if (!vdev)
 		return false;
+	vdev_id = wlan_vdev_get_id(vdev);
 
 	/* Register the pattern downstream */
 	qdf_ret_status = ucfg_pmo_add_wow_user_pattern(vdev, &wow_pattern);
@@ -427,8 +436,8 @@ bool hdd_add_wowl_ptrn_debugfs(struct hdd_adapter *adapter, uint8_t pattern_idx,
 	}
 
 	/* All is good. */
-	if (!g_hdd_wowl_ptrns_debugfs[pattern_idx]) {
-		g_hdd_wowl_ptrns_debugfs[pattern_idx] = 1;
+	if (!g_hdd_wowl_ptrns_debugfs[vdev_id][pattern_idx]) {
+		g_hdd_wowl_ptrns_debugfs[vdev_id][pattern_idx] = 1;
 		g_hdd_wowl_ptrns_count++;
 	}
 
@@ -450,6 +459,7 @@ bool hdd_del_wowl_ptrn_debugfs(struct hdd_adapter *adapter,
 {
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS qdf_ret_status;
+	uint8_t vdev_id;
 
 	if (pattern_idx > (WOWL_MAX_PTRNS_ALLOWED - 1)) {
 		hdd_err("WoW pattern index %d is not in the range (0 ~ %d).",
@@ -458,17 +468,18 @@ bool hdd_del_wowl_ptrn_debugfs(struct hdd_adapter *adapter,
 		return false;
 	}
 
-	if (!g_hdd_wowl_ptrns_debugfs[pattern_idx]) {
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_POWER_ID);
+	if (!vdev)
+		return false;
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	if (!g_hdd_wowl_ptrns_debugfs[vdev_id][pattern_idx]) {
 		hdd_err("WoW pattern %d is not in the table.",
 			pattern_idx);
 
 		return false;
 	}
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_OSIF_POWER_ID);
-	if (!vdev)
-		return false;
 
 	qdf_ret_status = ucfg_pmo_del_wow_user_pattern(vdev, pattern_idx);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
@@ -479,7 +490,7 @@ bool hdd_del_wowl_ptrn_debugfs(struct hdd_adapter *adapter,
 		return false;
 	}
 
-	g_hdd_wowl_ptrns_debugfs[pattern_idx] = 0;
+	g_hdd_wowl_ptrns_debugfs[vdev_id][pattern_idx] = 0;
 	g_hdd_wowl_ptrns_count--;
 
 	return true;
@@ -487,12 +498,13 @@ bool hdd_del_wowl_ptrn_debugfs(struct hdd_adapter *adapter,
 
 void hdd_free_user_wowl_ptrns(void)
 {
-	int i;
+	int i, j;
 
-	for (i = 0; i < WOWL_MAX_PTRNS_ALLOWED; ++i) {
-		if (g_hdd_wowl_ptrns[i]) {
-			qdf_mem_free(g_hdd_wowl_ptrns[i]);
-			g_hdd_wowl_ptrns[i] = NULL;
+	for (i = 0; i < WLAN_UMAC_PSOC_MAX_VDEVS; ++i)
+		for (j = 0; j < WOWL_MAX_PTRNS_ALLOWED; ++j) {
+			if (g_hdd_wowl_ptrns[i][j]) {
+				qdf_mem_free(g_hdd_wowl_ptrns[i][j]);
+				g_hdd_wowl_ptrns[i][j] = NULL;
+			}
 		}
-	}
 }

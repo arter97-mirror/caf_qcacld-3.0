@@ -116,11 +116,11 @@ QDF_STATUS lim_send_switch_chnl_params(struct mac_context *mac,
 		pe_err("vdev component object is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	session->ch_switch_in_progress = true;
 	status = lim_pre_vdev_start(mac, mlme_obj, session);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto send_resp;
-
-	session->ch_switch_in_progress = true;
 
 	/* we need to defer the message until we
 	 * get the response back from WMA

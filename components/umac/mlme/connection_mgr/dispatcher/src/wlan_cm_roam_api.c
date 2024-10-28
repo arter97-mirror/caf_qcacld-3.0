@@ -40,6 +40,9 @@
 #include "wlan_psoc_mlme_api.h"
 #include <wlan_cp_stats_chipset_stats.h>
 #include "wlan_dlm_api.h"
+#ifdef WLAN_FEATURE_11BE_MLO
+#include "wlan_mlo_link_force.h"
+#endif
 
 /* Support for "Fast roaming" (i.e., ESE, LFR, or 802.11r.) */
 #define BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN 15
@@ -519,7 +522,8 @@ bool wlan_cm_roam_is_pcl_per_vdev_active(struct wlan_objmgr_psoc *psoc,
  * @psoc: Pointer to PSOC object
  * @freq: Frequency in the given frequency list for the STA that is about to
  * connect
- * @connected_sta_freq: 1st connected sta freq
+ * @connected_sta_freq_list: list of connected sta freq
+ * @sta_count: number of freq in list
  *
  * Make sure to validate the STA+STA condition before calling this
  *
@@ -528,17 +532,78 @@ bool wlan_cm_roam_is_pcl_per_vdev_active(struct wlan_objmgr_psoc *psoc,
  */
 static bool
 wlan_cm_dual_sta_is_freq_allowed(struct wlan_objmgr_psoc *psoc,
-				 qdf_freq_t freq, qdf_freq_t connected_sta_freq)
+				 qdf_freq_t freq,
+				 qdf_freq_t *connected_sta_freq_list,
+				 uint32_t sta_count)
 {
-	if (!connected_sta_freq)
+	uint8_t i;
+
+	if (!connected_sta_freq_list || !sta_count)
 		return true;
 
-	if (policy_mgr_2_freq_always_on_same_mac(psoc, freq,
-						 connected_sta_freq))
-		return false;
+	for (i = 0; i < sta_count; i++) {
+		if (connected_sta_freq_list[i] == freq)
+			return true;
+		if (!policy_mgr_2_freq_always_on_same_mac(
+					psoc, freq,
+					connected_sta_freq_list[i]))
+			return true;
+	}
 
-	return true;
+	return false;
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static uint8_t
+wlan_cm_get_disable_ml_sta_for_roam_check(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t *op_ch_freq_list,
+					  uint8_t *vdev_id_list,
+					  uint32_t list_max_size)
+{
+	uint8_t disabled_count;
+	struct wlan_objmgr_vdev *vdev;
+	struct ml_link_force_state force_state = {0};
+	uint8_t disabled_vdev_id;
+	uint8_t link_id;
+
+	disabled_count =
+	policy_mgr_get_disabled_ml_links_count(psoc, op_ch_freq_list,
+					       vdev_id_list,
+					       list_max_size);
+	if (!disabled_count)
+		return 0;
+
+	disabled_vdev_id = vdev_id_list[0];
+	vdev =
+	wlan_objmgr_get_vdev_by_id_from_psoc(psoc, disabled_vdev_id,
+					     WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		mlme_err("invalid vdev for id %d", disabled_vdev_id);
+		return 0;
+	}
+
+	ml_nlink_get_curr_force_state(psoc, vdev, &force_state);
+	link_id = wlan_vdev_get_link_id(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	/* If the disabled link is forced inactive such as link removal case,
+	 * or due to concurrency cases,  don't consider it for second STA MCC
+	 * checking, e.g. don't add it to freq list.
+	 */
+	if ((force_state.force_inactive_bitmap & (1 << link_id)))
+		disabled_count = 0;
+
+	return disabled_count;
+}
+#else
+static uint8_t
+wlan_cm_get_disable_ml_sta_for_roam_check(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t *op_ch_freq_list,
+					  uint8_t *vdev_id_list,
+					  uint32_t list_max_size)
+{
+	return 0;
+}
+#endif
 
 void
 wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
@@ -553,7 +618,7 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 	uint32_t buff_len;
 	char *chan_buff;
 	uint32_t len = 0;
-	uint32_t sta_count;
+	uint32_t sta_count, disabled_sta_count = 0;
 	qdf_freq_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 
@@ -562,8 +627,16 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 							   vdev_id_list,
 							   PM_STA_MODE);
 
-	if (policy_mgr_is_mlo_sta_present(psoc))
-		sta_count += policy_mgr_get_disabled_ml_links_count(psoc);
+	if (policy_mgr_is_mlo_sta_present(psoc) &&
+	    sta_count < QDF_ARRAY_SIZE(op_ch_freq_list)) {
+		disabled_sta_count =
+		wlan_cm_get_disable_ml_sta_for_roam_check(
+				psoc,
+				&op_ch_freq_list[sta_count],
+				&vdev_id_list[sta_count],
+				QDF_ARRAY_SIZE(op_ch_freq_list) - sta_count);
+		sta_count += disabled_sta_count;
+	}
 
 	/* No need to fill freq list, if no other STA is in connected state */
 	if (!sta_count)
@@ -575,9 +648,11 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 	dual_sta_policy = &mlme_obj->cfg.gen.dual_sta_policy;
 	mlme_cfg = &mlme_obj->cfg;
 
-	mlme_debug("sta_count %d, primary vdev is %d dual sta roaming enabled %d",
-		   sta_count, dual_sta_policy->primary_vdev_id,
-		   wlan_mlme_get_dual_sta_roaming_enabled(psoc));
+	mlme_debug("sta_count %d disabled_sta_count %d, primary vdev is %d dual sta roaming enabled %d policy %d",
+		   sta_count, disabled_sta_count,
+		   dual_sta_policy->primary_vdev_id,
+		   wlan_mlme_get_dual_sta_roaming_enabled(psoc),
+		   dual_sta_policy->concurrent_sta_policy);
 
 	if (!wlan_mlme_get_dual_sta_roaming_enabled(psoc))
 		return;
@@ -608,8 +683,21 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 	 * post connection as only one link is present.
 	 */
 	if (policy_mgr_is_mlo_sta_present(psoc) && sta_count > 1) {
-		mlme_debug("Multi link mlo sta present");
-		return;
+		mlme_debug("Multi link mlo sta present, freq %d %d",
+			   op_ch_freq_list[0], op_ch_freq_list[1]);
+		/* DBS RD ML STA on 5G+6G (2 links always on same mac),
+		 * SBS RD ML STA on 5GL+5GL or 5GH+5GH(2 links always on
+		 * same mac). Both case, the 2nd STA is not allowed on same
+		 * MAC mcc channel, need to filter the channel list for 2nd
+		 * STA.
+		 * For other cases (2 links not always on same mac),
+		 * allow 2nd STA connect to available bands/channels, no
+		 * channel list filter.
+		 */
+		if (!policy_mgr_2_freq_always_on_same_mac(psoc,
+							  op_ch_freq_list[0],
+							  op_ch_freq_list[1]))
+			return;
 	}
 
 	/*
@@ -633,7 +721,8 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < num_channels; i++) {
 		is_ch_allowed =
 			wlan_cm_dual_sta_is_freq_allowed(psoc, channel_list[i],
-							 op_ch_freq_list[0]);
+							 &op_ch_freq_list[0],
+							 sta_count);
 		if (!is_ch_allowed)
 			continue;
 
@@ -738,15 +827,15 @@ wlan_cm_roam_get_score_delta_params(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_roam_triggers *params)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	uint8_t i;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
 		return;
 
-	params->score_delta_param[IDLE_ROAM_TRIGGER] =
-			mlme_obj->cfg.trig_score_delta[IDLE_ROAM_TRIGGER];
-	params->score_delta_param[BTM_ROAM_TRIGGER] =
-			mlme_obj->cfg.trig_score_delta[BTM_ROAM_TRIGGER];
+	for (i = 0; i < ROAM_TRIGGER_REASON_MAX; i++)
+		params->score_delta_param[i] =
+			mlme_obj->cfg.trig_score_delta[i];
 }
 
 void
@@ -778,11 +867,16 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 	struct rso_config *rso_cfg;
 	struct rso_cfg_params *src_cfg;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct rso_config_params *rso_config;
+	struct wlan_mlme_lfr_cfg *lfr_cfg;
 
 	qdf_mem_zero(dst_config, sizeof(*dst_config));
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
+
+	rso_config = &mlme_obj->cfg.lfr.rso_user_config;
+	lfr_cfg = &mlme_obj->cfg.lfr;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_NB_ID);
@@ -835,7 +929,21 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 		dst_config->uint_value = src_cfg->neighbor_lookup_threshold;
 		break;
 	case NEXT_RSSI_THRESHOLD:
-		dst_config->uint_value = src_cfg->next_rssi_threshold;
+		mlme_debug("is_agg: %d, control_enable: %d, alert_rssi_th: %d",
+			   rso_cfg->is_aggressive_roaming_mode,
+			   rso_cfg->roam_control_enable,
+			   rso_config->alert_rssi_threshold);
+
+		if (rso_cfg->is_aggressive_roaming_mode &&
+		    !rso_cfg->roam_control_enable) {
+			dst_config->uint_value = lfr_cfg->roam_aggre_threshold;
+		} else if (rso_config->alert_rssi_threshold) {
+			dst_config->uint_value =
+					rso_config->alert_rssi_threshold;
+		} else {
+			dst_config->uint_value =
+				src_cfg->next_rssi_threshold;
+		}
 		break;
 	case SCAN_N_PROBE:
 		dst_config->uint_value = src_cfg->roam_scan_n_probes;
@@ -883,6 +991,24 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 		break;
 	case ROAM_CONFIG_ENABLE:
 		dst_config->bool_value = rso_cfg->roam_control_enable;
+		break;
+	case IS_ROAM_AGGRESSIVE:
+		dst_config->bool_value = rso_cfg->is_aggressive_roaming_mode;
+		break;
+	case ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA:
+		dst_config->uint_value =
+			mlme_obj->cfg.roam_scoring.aggre_min_roam_score_delta;
+		break;
+	case ROAM_AGGRESSIVE_SCORE_DELTA:
+		dst_config->uint_value =
+			mlme_obj->cfg.roam_scoring.roam_aggre_score_delta;
+		break;
+	case ROAM_AGGRESSIVE_SCAN_STEP_RSSI:
+		dst_config->int_value =
+				mlme_obj->cfg.lfr.roam_aggre_scan_step_rssi;
+		break;
+	case ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD:
+		dst_config->uint_value = mlme_obj->cfg.lfr.roam_aggre_threshold;
 		break;
 	default:
 		mlme_err("Invalid roam config requested:%d", roam_cfg_type);
@@ -1289,6 +1415,7 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			   struct cm_roam_values_copy *src_config)
 {
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct rso_config *rso_cfg;
 	struct rso_cfg_params *dst_cfg;
@@ -1304,6 +1431,12 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (!vdev) {
 		mlme_err("vdev object is NULL");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return QDF_STATUS_E_INVAL;
 	}
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
@@ -1375,6 +1508,28 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		break;
 	case IS_ROAM_AGGRESSIVE:
 		rso_cfg->is_aggressive_roaming_mode = src_config->bool_value;
+		if (rso_cfg->roam_control_enable)
+			break;
+		if (mlme_obj->cfg.lfr.roam_scan_offload_enabled &&
+		    cm_is_vdevid_active(pdev, vdev_id) &&
+		    rso_cfg->is_aggressive_roaming_mode)
+			cm_roam_update_cfg(psoc, vdev_id,
+					   REASON_AGGRESSIVE_ROAM_ENABLED);
+		break;
+	case ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA:
+		mlme_obj->cfg.roam_scoring.aggre_min_roam_score_delta =
+							src_config->uint_value;
+		break;
+	case ROAM_AGGRESSIVE_SCORE_DELTA:
+		mlme_obj->cfg.roam_scoring.roam_aggre_score_delta =
+							src_config->uint_value;
+		break;
+	case ROAM_AGGRESSIVE_SCAN_STEP_RSSI:
+		mlme_obj->cfg.lfr.roam_aggre_scan_step_rssi =
+							src_config->int_value;
+		break;
+	case ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD:
+		mlme_obj->cfg.lfr.roam_aggre_threshold = src_config->uint_value;
 		break;
 	case ROAM_PREFERRED_CHAN:
 		/*

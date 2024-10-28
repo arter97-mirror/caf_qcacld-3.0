@@ -102,6 +102,7 @@ const EID_OBSS_SCAN_PARAMETERS       =  74;
 const EID_FT_RIC_DESCRIPTOR          =  75;
 const EID_MSCS_STATUS                =  76;
 const EID_BSS_MAX_IDLE_PERIOD        =  90;
+const EID_CHANNEL_USAGE              =  97;
 const EID_LINK_IDENTIFIER            = 101;
 const EID_PTI_CONTROL                = 105;
 const EID_PU_BUFFER_STATUS           = 106;
@@ -222,6 +223,8 @@ const TLV_P2P_GROUP_ID                       =  15;
 const TLV_P2P_INTERFACE                      =  16;
 const TLV_OPERATING_CHANNEL                  =  17;
 const TLV_INVITATION_FLAGS                   =  18;
+const TLV_P2P_EXTN_CAPABILITY                =  29;
+const TLV_P2P_WLAN_AP_INFO                   =  30;
 const TLV_P2P_VENDOR_SPECIFIC                = 221;
 
 
@@ -372,7 +375,7 @@ FF SMPowerModeSet (1)				//7.3.1.25
      }
 }
 
-FF TSInfo (3)                             // 7.3.2.30
+FF TSInfo (4)                             // 7.3.2.30
 {
     {
         traffic_type:    1;
@@ -1083,7 +1086,6 @@ TLV P2PGroupInfo ( TLV_P2P_GROUP_INFO ) ( 1 : 2 ) LSB
 {
     P2PClientInfoDesc[0..1024];
 }
-
 
 /**
  * \brief P2P Interface Attribute
@@ -2472,6 +2474,11 @@ IE P2PIEOpaque (EID_VENDOR_SPECIFIC) OUI ( 0x50, 0x6F, 0x9A, 0x09 )
     data[ 2..249 ];
 }
 
+IE P2P2IEOpaque (EID_VENDOR_SPECIFIC) OUI ( 0x50, 0x6F, 0x9A, 0x28 )
+{
+    data[ 2..249 ];
+}
+
 IE WFDIEOpaque (EID_VENDOR_SPECIFIC) OUI ( 0x50, 0x6F, 0x9A, 0x0A )
 {
     data[ 2..249 ];
@@ -2509,6 +2516,12 @@ IE bss_max_idle_period (EID_BSS_MAX_IDLE_PERIOD)
         prot_keep_alive_reqd: 1;
         reserved:             7;
     }
+}
+
+IE channel_usage (EID_CHANNEL_USAGE)
+{
+    usage_mode, 1;
+    channel_entry[0..254];
 }
 
 IE VHTCaps (EID_VHT_CAPABILITIES)
@@ -4350,6 +4363,7 @@ FRAME AssocRequest                        // 7.2.3.4
     OPTIE  ESERadMgmtCap;
     OPTIE  ESEVersion;
     OPTIE  P2PIEOpaque;
+    OPTIE  P2P2IEOpaque;
     OPTIE  WFDIEOpaque;
     OPTIE  vendor_vht_ie;
     OPTIE  hs20vendor_ie;
@@ -4457,6 +4471,7 @@ FRAME ReAssocRequest                      // 7.2.3.6
     OPTIE  WMMTSPEC[0..4];
     OPTIE  ESETrafStrmRateSet;
     OPTIE  P2PIEOpaque;
+    OPTIE  P2P2IEOpaque;
     OPTIE  WFDIEOpaque;
     OPTIE  vendor_vht_ie;
     OPTIE  hs20vendor_ie;
@@ -5122,6 +5137,27 @@ FRAME epcs_teardown
 {
     FF    Category;
     FF    Action;
+}
+
+FRAME channel_usage_req
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+    MANDIE channel_usage;
+    MANDIE SuppOperatingClasses;
+    OPTIE  VHTCaps;
+    OPTIE  HTCaps;
+    OPTIE  he_cap;
+    OPTIE  he_6ghz_band_cap;
+}
+
+FRAME channel_usage_resp
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+    MANDIE channel_usage;
 }
 
 // Local Variables:

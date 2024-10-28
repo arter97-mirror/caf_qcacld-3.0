@@ -170,12 +170,49 @@
 					0, \
 					"P2P GO ignore non-P2P probe req")
 
+/*
+ * <ini>
+ * sta_vdev_for_p2p_device - Use sta vdev for p2p device operation
+ *
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to use sta vdev for p2p device operation
+ */
+#define CFG_USE_STA_VDEV_FOR_P2P_DEVICE CFG_INI_BOOL(\
+					"sta_vdev_for_p2p_device", \
+					false, \
+					"use sta vdev for p2p device")
+
+/*
+ * <ini>
+ * sta_vdev_for_p2p_device_upon_vdev_exhaust - Use sta vdev for p2p device
+ *
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to use sta vdev for p2p device operation when number
+ * of created vdev has already reached to max limit but still new interface
+ * tries to comes up. To accommodate the new interface, host will check
+ * if any p2p device mode is present, if it's present then host will
+ * destroy the p2p device vdev and redirect all p2p device operation
+ * to sta vdev.
+ * If "sta_vdev_for_p2p_device" is enable then this ini gets disabled.
+ */
+#define STA_VDEV_FOR_P2P_DEVICE_UPON_VDEV_EXHAUST CFG_INI_BOOL(\
+			"sta_vdev_for_p2p_device_upon_vdev_exhaust", \
+			false, \
+			"use sta vdev for p2p device upon vdev exhaust")
 #define CFG_P2P_ALL \
 	CFG(CFG_ACTION_FRAME_RANDOM_SEQ_NUM_ENABLED) \
 	CFG(CFG_GO_KEEP_ALIVE_PERIOD) \
 	CFG(CFG_GO_LINK_MONITOR_PERIOD) \
 	CFG(CFG_P2P_DEVICE_ADDRESS_ADMINISTRATED) \
 	CFG(CFG_P2P_GO_ON_5GHZ_INDOOR_CHANNEL) \
-	CFG(CFG_GO_IGNORE_NON_P2P_PROBE_REQ)
+	CFG(CFG_GO_IGNORE_NON_P2P_PROBE_REQ) \
+	CFG(CFG_USE_STA_VDEV_FOR_P2P_DEVICE) \
+	CFG(STA_VDEV_FOR_P2P_DEVICE_UPON_VDEV_EXHAUST)
 
 #endif

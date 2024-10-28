@@ -96,6 +96,15 @@ void ucfg_tdls_update_fw_wideband_capability(struct wlan_objmgr_psoc *psoc,
  */
 bool ucfg_tdls_is_fw_wideband_capable(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * ucfg_tdls_get_current_mode() - Get current tdls mode
+ * @psoc: psoc object
+ *
+ * Return: current tdls mode
+ */
+enum tdls_feature_mode
+ucfg_tdls_get_current_mode(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_FEATURE_11AX
 /**
  * ucfg_tdls_update_fw_11ax_capability() - Update FW TDLS 11ax capability in

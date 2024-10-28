@@ -849,4 +849,12 @@ QDF_STATUS
 os_if_son_send_status_nlink_msg(uint32_t event_id,
 				enum osif_son_status_evt_type event_type,
 				char *module_name);
+/**
+ * wlan_mlme_register_tx_ops() - Register tx ops
+ *
+ * Register tx ops for son driver update
+ *
+ * Return: mlme_external_tx_ops
+ */
+struct mlme_external_tx_ops *wlan_mlme_register_tx_ops(void);
 #endif

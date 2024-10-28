@@ -195,8 +195,16 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 					    WLAN_VDEV_OP_CU_CAT2);
 	}
 
-	qdf_mem_copy(&link_ie->link_wmm_params, &bcn_2->WMMParams,
-		     sizeof(bcn_2->WMMParams));
+	if (qdf_mem_cmp(&link_ie->link_wmm_params, &bcn_2->WMMParams,
+			sizeof(bcn_2->WMMParams))) {
+		qdf_mem_copy(&link_ie->link_wmm_params, &bcn_2->WMMParams,
+			     sizeof(bcn_2->WMMParams));
+		bss_param_change = true;
+		pe_debug("vdev id %d WMMParamSet changed, critical update",
+			 wlan_vdev_get_id(session->vdev));
+		wlan_vdev_mlme_op_flags_set(session->vdev,
+					    WLAN_VDEV_OP_CU_CAT2);
+	}
 
 	qdf_mem_copy(&link_ie->link_wmm_caps, &bcn_2->WMMCaps,
 		     sizeof(bcn_2->WMMCaps));
@@ -680,7 +688,6 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	uint8_t *addn_ie = NULL;
 	tDot11fIEExtCap extracted_extcap;
 	bool extcap_present = true, addnie_present = false;
-	bool is_6ghz_chsw;
 	uint8_t *eht_op_ie = NULL, eht_op_ie_len = 0;
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
 	bool is_band_2g;
@@ -785,29 +792,25 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	}
 	session->schBeaconOffsetBegin = offset + (uint16_t) n_bytes;
 	/* Initialize the 'new' fields at the end of the beacon */
-	is_6ghz_chsw =
-		WLAN_REG_IS_6GHZ_CHAN_FREQ(session->curr_op_freq) ||
-		WLAN_REG_IS_6GHZ_CHAN_FREQ
-			(session->gLimChannelSwitch.sw_target_freq);
 	if (session->limSystemRole == eLIM_AP_ROLE &&
 	    (session->dfsIncludeChanSwIe == true ||
 	     session->bw_update_include_ch_sw_ie == true)) {
 		if (!CHAN_HOP_ALL_BANDS_ENABLE ||
-		    session->lim_non_ecsa_cap_num == 0 || is_6ghz_chsw) {
+		    session->lim_non_ecsa_cap_num == 0) {
 			tDot11fIEext_chan_switch_ann *ext_csa =
 						&bcn_2->ext_chan_switch_ann;
 			populate_dot_11_f_ext_chann_switch_ann(mac_ctx,
 							       ext_csa,
 							       session);
 			if (lim_is_session_eht_capable(session)) {
-				bcn_2->ChannelSwitchWrapper.present = 1;
 				populate_dot11f_bw_ind_element(mac_ctx,
-						session,
-				&bcn_2->ChannelSwitchWrapper.bw_ind_element);
+							       session,
+							       &bcn_2->ChannelSwitchWrapper.bw_ind_element);
+				if (bcn_2->ChannelSwitchWrapper.bw_ind_element.present)
+					bcn_2->ChannelSwitchWrapper.present = true;
 			}
 		}
-		if (session->lim_non_ecsa_cap_num &&
-		    !is_6ghz_chsw)
+		if (session->lim_non_ecsa_cap_num)
 			populate_channel_switch_ann(mac_ctx, bcn_2, session);
 
 	}
@@ -826,7 +829,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		/* Need to insert channel switch announcement here */
 		if ((LIM_IS_AP_ROLE(session) ||
 		     LIM_IS_P2P_DEVICE_GO(session)) &&
-		    session->dfsIncludeChanSwIe && !is_6ghz_chsw) {
+		    session->dfsIncludeChanSwIe) {
 			populate_channel_switch_ann(mac_ctx, bcn_2, session);
 		}
 	}
@@ -973,7 +976,8 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			 *     MLO SAP + 6G legacy SAP
 			 */
 			populate_dot11f_6g_rnr(mac_ctx, session,
-					       &bcn_2->reduced_neighbor_report[0]);
+					       &bcn_2->reduced_neighbor_report[0],
+					       &bcn_2->num_reduced_neighbor_report);
 		}
 		/*
 		 * Can be efficiently updated whenever new IE added  in Probe
@@ -982,6 +986,10 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		lim_update_probe_rsp_template_ie_bitmap_beacon2(mac_ctx, bcn_2,
 					&session->DefProbeRspIeBitmap[0],
 					&session->probeRespFrame);
+
+		qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+				   &bcn_2->reduced_neighbor_report[0],
+				   sizeof(tDot11fIEreduced_neighbor_report));
 
 		/* update probe response WPS IE instead of beacon WPS IE */
 		if (session->wps_state != SAP_WPS_DISABLED) {
@@ -1548,6 +1556,7 @@ void lim_update_probe_rsp_template_ie_bitmap_beacon2(struct mac_context *mac,
 		qdf_mem_copy(&prb_rsp->reduced_neighbor_report[i],
 			     &beacon2->reduced_neighbor_report[i],
 			     sizeof(beacon2->reduced_neighbor_report[i]));
+
 	}
 	prb_rsp->num_reduced_neighbor_report = num_rnr;
 
@@ -1603,6 +1612,10 @@ static QDF_STATUS write_beacon_to_memory(struct mac_context *mac, uint16_t size,
 			       size, pe_session->schBeaconOffsetEnd);
 			return QDF_STATUS_E_FAILURE;
 		}
+
+		lim_reorder_vendor_ies(mac, pe_session->pSchBeaconFrameEnd,
+				       pe_session->schBeaconOffsetEnd);
+
 		for (i = 0; i < pe_session->schBeaconOffsetEnd; i++)
 			pe_session->pSchBeaconFrameBegin[size++] =
 				pe_session->pSchBeaconFrameEnd[i];

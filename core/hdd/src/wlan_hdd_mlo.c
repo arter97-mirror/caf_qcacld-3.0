@@ -314,7 +314,7 @@ QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (is_start_notify) {
-		errno = osif_vdev_sync_trans_start(adapter->dev, &vdev_sync);
+		errno = osif_vdev_sync_op_start(adapter->dev, &vdev_sync);
 		if (errno)
 			return QDF_STATUS_E_FAILURE;
 	}
@@ -334,7 +334,7 @@ QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 	if (is_start_notify) {
 		link_switch_vdev_sync = vdev_sync;
 	} else if (link_switch_vdev_sync) {
-		osif_vdev_sync_trans_stop(link_switch_vdev_sync);
+		osif_vdev_sync_op_stop(link_switch_vdev_sync);
 		link_switch_vdev_sync = NULL;
 	}
 

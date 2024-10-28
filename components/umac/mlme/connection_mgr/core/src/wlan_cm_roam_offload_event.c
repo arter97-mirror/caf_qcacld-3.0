@@ -39,8 +39,6 @@
 #include "wlan_roam_debug.h"
 #include "wlan_mlo_mgr_roam.h"
 
-#define FW_ROAM_SYNC_TIMEOUT 7000
-
 static QDF_STATUS
 cm_fw_roam_ser_cb(struct wlan_serialization_command *cmd,
 		  enum wlan_serialization_cb_reason reason)

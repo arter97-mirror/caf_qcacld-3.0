@@ -87,7 +87,7 @@ void hdd_softap_tx_resume_timer_expired_handler(void *adapter_context)
 		return;
 	}
 
-	hdd_debug("Enabling queues");
+	hdd_debug("vdev %d Enabling queues", adapter->deflink->vdev_id);
 	wlan_hdd_netif_queue_control(adapter, WLAN_WAKE_ALL_NETIF_QUEUE,
 				     WLAN_CONTROL_PATH);
 }
@@ -109,7 +109,7 @@ hdd_softap_tx_resume_false(struct hdd_adapter *adapter, bool tx_resume)
 	if (true == tx_resume)
 		return;
 
-	hdd_debug("Disabling queues");
+	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
 	wlan_hdd_netif_queue_control(adapter, WLAN_STOP_ALL_NETIF_QUEUE,
 				     WLAN_DATA_FLOW_CONTROL);
 
@@ -143,7 +143,7 @@ void hdd_softap_tx_resume_cb(void *adapter_context, bool tx_resume)
 			qdf_mc_timer_stop(&adapter->tx_flow_control_timer);
 		}
 
-		hdd_debug("Enabling queues");
+		hdd_debug("vdev %d Enabling queues", adapter->deflink->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					WLAN_WAKE_ALL_NETIF_QUEUE,
 					WLAN_DATA_FLOW_CONTROL);
@@ -610,8 +610,8 @@ QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
 	txrx_desc.bw = hdd_convert_ch_width_to_cdp_peer_bw(ch_width);
 	qdf_status = cdp_peer_register(soc, OL_TXRX_PDEV_ID, &txrx_desc);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		hdd_debug("cdp_peer_register() failed to register.  Status = %d [0x%08X]",
-			  qdf_status, qdf_status);
+		hdd_debug("vdev %d cdp_peer_register() failed to register.  Status = %d [0x%08X]",
+			  link_info->vdev_id, qdf_status, qdf_status);
 		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 				     STA_INFO_SOFTAP_REGISTER_STA);
 		return qdf_status;
@@ -626,8 +626,9 @@ QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
 	sta_info->is_qos_enabled = wmm_enabled;
 
 	if (!auth_required) {
-		hdd_debug("open/shared/FILS auth STA MAC= " QDF_MAC_ADDR_FMT
-			  ".  Changing TL state to AUTHENTICATED at Join time",
+		hdd_debug("Vdev %d open/shared/FILS auth STA " QDF_MAC_ADDR_FMT
+			  " Changing TL state to AUTHENTICATED at Join time",
+			 link_info->vdev_id,
 			 QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
 
 		/* Connections that do not need Upper layer auth,
@@ -644,9 +645,10 @@ QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
 							sta_mac);
 	} else {
 
-		hdd_debug("ULA auth STA MAC = " QDF_MAC_ADDR_FMT
-			  ".  Changing TL state to CONNECTED at Join time",
-			 QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
+		hdd_debug("Vdev %d ULA auth STA " QDF_MAC_ADDR_FMT
+			  " Changing TL state to CONNECTED at Join time",
+			  link_info->vdev_id,
+			  QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
 
 		qdf_status = hdd_change_peer_state(link_info,
 						   txrx_desc.peer_addr.bytes,
@@ -662,7 +664,7 @@ QDF_STATUS hdd_softap_register_sta(struct wlan_hdd_link_info *link_info,
 			     STA_INFO_SOFTAP_REGISTER_STA);
 
 	if (is_macaddr_broadcast) {
-		hdd_debug("Enabling queues");
+		hdd_debug("vdev %d Enabling queues", link_info->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
 					     WLAN_CONTROL_PATH);
@@ -792,8 +794,8 @@ hdd_softap_change_per_sta_state(struct wlan_hdd_link_info *link_info,
 
 	qdf_status =
 		hdd_change_peer_state(link_info, mac_addr.bytes, state);
-	hdd_debug("Station " QDF_MAC_ADDR_FMT " changed to state %d",
-		  QDF_MAC_ADDR_REF(mac_addr.bytes), state);
+	hdd_debug("Vdev %d, Station " QDF_MAC_ADDR_FMT " changed to state %d",
+		  link_info->vdev_id, QDF_MAC_ADDR_REF(mac_addr.bytes), state);
 
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		goto put_ref;

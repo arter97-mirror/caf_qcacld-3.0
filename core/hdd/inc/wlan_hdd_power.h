@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012, 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -487,7 +487,8 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
  *	   or an false otherwise
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) && \
-	defined(__ANDROID_COMMON_KERNEL__))
+	defined(__ANDROID_COMMON_KERNEL__) && \
+	!defined(CONFIG_X86))
 bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx);
 #else
 static inline bool
@@ -561,6 +562,17 @@ void hdd_wlan_suspend_resume_event(uint8_t state) {}
  * Return: 0 on success, non-zero on any error
  */
 int wlan_hdd_set_powersave(struct wlan_hdd_link_info *link_info,
+			   bool allow_power_save, uint32_t timeout);
+
+/**
+ * wlan_hdd_lpc_set_bmps() - Set BMPS power save mode for LPC
+ * @adapter: HDD adapter
+ * @allow_power_save: is wlan allowed to go into power save mode
+ * @timeout: timeout period in ms
+ *
+ * Return: None
+ */
+void wlan_hdd_lpc_set_bmps(struct hdd_adapter *adapter,
 			   bool allow_power_save, uint32_t timeout);
 
 /**

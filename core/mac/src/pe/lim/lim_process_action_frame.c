@@ -61,6 +61,7 @@
 #include "wlan_p2p_api.h"
 #include "wlan_ll_sap_api.h"
 #include "wlan_dcs_api.h"
+#include "wlan_tdls_api.h"
 
 #define SA_QUERY_REQ_MIN_LEN \
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
@@ -224,6 +225,14 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 	wlan_reg_chan_opclass_to_freq(ext_channel_switch_frame->ext_chan_switch_ann_action.new_channel,
 				      ext_channel_switch_frame->ext_chan_switch_ann_action.op_class,
 				      false);
+
+	if (!target_freq) {
+		pe_err_rl("Invalid op_class %d",
+			  ext_channel_switch_frame->ext_chan_switch_ann_action.op_class);
+		qdf_mem_free(ext_channel_switch_frame);
+		return;
+	}
+
 	/* Free ext_channel_switch_frame here as its no longer needed */
 	qdf_mem_free(ext_channel_switch_frame);
 
@@ -893,6 +902,127 @@ static void __lim_process_del_ts_req(struct mac_context *mac_ctx,
 #endif
 }
 
+static void
+__lim_process_channel_usage_req_action_frame(struct mac_context *mac_ctx,
+					     uint8_t *rx_pkt_info,
+					     struct pe_session *session)
+{
+	uint32_t status;
+	uint16_t aid;
+	tpSirMacMgmtHdr mac_hdr;
+	uint32_t frame_len;
+	uint8_t *body_ptr;
+	tpDphHashNode sta_ptr;
+	struct dfs_p2p_group_info *dfs_p2p_info = &session->dfs_p2p_info;
+	tDot11fchannel_usage_req *frm = &dfs_p2p_info->chan_usage_req;
+
+	/* If the current opmode is not P2P GO mode drop the frame */
+	if (session->opmode != QDF_P2P_GO_MODE)
+		return;
+
+	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
+	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+
+	sta_ptr = dph_lookup_hash_entry(mac_ctx, mac_hdr->sa, &aid,
+					&session->dph.dphHashTable);
+	if (!sta_ptr) {
+		pe_err("Entry not found " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(mac_hdr->sa));
+		return;
+	}
+
+	qdf_mem_zero(frm, sizeof(*frm));
+	status = dot11f_unpack_channel_usage_req(mac_ctx, body_ptr, frame_len,
+						 frm, false);
+	if (DOT11F_FAILED(status)) {
+		pe_debug("Error parsing channel usage req action frame (0x%08x, %d bytes):",
+			 status, frame_len);
+		return;
+	} else if (DOT11F_WARNED(status)) {
+		pe_debug("There were warnings while unpacking channel usage req action frame  (0x%08x, %d bytes):",
+			 status, frame_len);
+	}
+
+	dfs_p2p_info->chan_usage_req_resp_inprog = true;
+
+	/* Currently only support handling non-Infra channel switch requests */
+	if (frm->channel_usage.usage_mode != 4)
+		return;
+
+	lim_send_channel_usage_resp_action_frame(mac_ctx, session, mac_hdr->sa);
+}
+
+static void
+__lim_process_channel_usage_resp_action_frame(struct mac_context *mac_ctx,
+					      uint8_t *rx_pkt_info,
+					      struct pe_session *session)
+{
+	uint32_t status;
+	tpSirMacMgmtHdr mac_hdr;
+	uint32_t frame_len, trunc_frame_len, minlen;
+	uint8_t *body_ptr;
+	struct dfs_p2p_group_info *dfs_p2p_info = &session->dfs_p2p_info;
+	tDot11fchannel_usage_resp *frm = &dfs_p2p_info->chan_usage_resp;
+
+	if (session->opmode != QDF_P2P_CLIENT_MODE ||
+	    !dfs_p2p_info->chan_usage_req_resp_inprog)
+		return;
+
+	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
+	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+
+	if (qdf_mem_cmp(mac_hdr->sa, session->bssId, ETH_ALEN)) {
+		pe_debug("Ignore resp frame not from GO" QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(mac_hdr->sa));
+		return;
+	}
+
+	minlen = sizeof(*mac_hdr) + 3 + MIN_IE_LEN;
+	if (frame_len < minlen ||
+	    frame_len < (minlen + body_ptr[minlen - 1] + 3))
+		return;
+
+	trunc_frame_len = minlen + body_ptr[minlen - 1];
+
+	qdf_mem_zero(frm, sizeof(*frm));
+	/* Only parse till the channel usage IEs */
+	status = dot11f_unpack_channel_usage_resp(mac_ctx, body_ptr,
+						  trunc_frame_len, frm, false);
+	if (DOT11F_FAILED(status)) {
+		pe_debug("Error parsing channel usage resp action frame (0x%08x, %d bytes):",
+			 status, frame_len);
+		return;
+	} else if (DOT11F_WARNED(status)) {
+		pe_debug("There were warnings while unpacking channel usage resp action frame  (0x%08x, %d bytes):",
+			 status, frame_len);
+	}
+
+	if ((frm->channel_usage.usage_mode !=
+	     dfs_p2p_info->chan_usage_req.channel_usage.usage_mode) ||
+	    (frm->DialogToken.token !=
+	     dfs_p2p_info->chan_usage_req.DialogToken.token)) {
+		pe_debug("Ignore mismtach usage mode or dialogtoken");
+		return;
+	}
+
+	dfs_p2p_info->chan_usage_req_resp_inprog = false;
+
+	/* Atleast one channel means the channel usage request is accepted.
+	 * So restart timer to expect channel switch.
+	 */
+	if (frm->channel_usage.num_channel_entry &&
+	    (frm->channel_usage.num_channel_entry % 2) == 0) {
+		lim_deactivate_and_change_timer(mac_ctx,
+						LIM_CHANNEL_VACATE_TIMER);
+		return;
+	}
+
+	tx_timer_deactivate(&mac_ctx->lim.lim_timers.channel_vacate_timer);
+	lim_timer_handler(mac_ctx, SIR_LIM_CHANNEL_VACATE_TIMEOUT);
+}
+
 /**
  * __lim_process_qos_map_configure_frame() - to process QoS map configure frame
  * @mac_ctx: pointer to mac context
@@ -1303,6 +1433,14 @@ lim_check_oci_match(struct mac_context *mac, struct pe_session *pe_session,
 	 * Primary channel      : 1 byte
 	 * Freq_seg_1_ch_num    : 1 byte
 	 */
+
+	if (oci_ie[SIR_MAC_IE_LEN_OFFSET] <
+	    MIN_OCI_IE_LEN - sizeof(struct ie_header)) {
+		pe_err("OCI len %d is incorrect",
+		       oci_ie[SIR_MAC_IE_LEN_OFFSET]);
+		return false;
+	}
+
 	status = dot11f_unpack_ie_oci(mac,
 				      (uint8_t *)&oci_ie[OCI_IE_OP_CLS_OFFSET],
 				      oci_ie[SIR_MAC_IE_LEN_OFFSET] -
@@ -1604,7 +1742,8 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	struct wlan_mlme_qos *qos_aggr;
 
 	if (mlo_is_any_link_disconnecting(session->vdev)) {
-		pe_err("Ignore ADDBA, vdev is in not in conncted state");
+		pe_err("Ignore ADDBA, vdev:%d is in not in conncted state",
+		       wlan_vdev_get_id(session->vdev));
 		return;
 	}
 
@@ -1621,7 +1760,6 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	/* Unpack ADDBA request frame */
 	status = dot11f_unpack_addba_req(mac_ctx, body_ptr, frame_len,
 					 addba_req, false);
-
 	if (DOT11F_FAILED(status)) {
 		pe_err("Failed to unpack and parse (0x%08x, %d bytes)",
 			status, frame_len);
@@ -1633,6 +1771,21 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 
 	sta_ds = dph_lookup_hash_entry(mac_ctx, mac_hdr->sa, &aid,
 				       &session->dph.dphHashTable);
+	/*
+	 * TDLS peer addba request for some TID could be received before
+	 * TDLS_CHANGE_STA is received from userspace in some scenario
+	 * for example when the DUT sends TDLS setup response directly
+	 * to an already discovered peer and peer sends the addba request
+	 * immediately for TID 0.
+	 */
+	if (sta_ds && sta_ds->staType == STA_ENTRY_TDLS_PEER &&
+	    !wlan_tdls_is_addba_request_allowed(session->vdev,
+						(struct qdf_mac_addr *)sta_ds->staAddr)) {
+		pe_err("vdev:%d Dropping TDLS peer addba req received before change_sta",
+		       wlan_vdev_get_id(session->vdev));
+		goto error;
+	}
+
 	if (sta_ds &&
 	    (lim_is_session_he_capable(session) ||
 	     sta_ds->staType == STA_ENTRY_TDLS_PEER))
@@ -1983,6 +2136,16 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					session->vdev_id,
 					WMA_GET_RX_FREQ(rx_pkt_info),
 					rssi, RXMGMT_FLAG_NONE);
+			break;
+		case WNM_CHAN_USAGE_REQ:
+			__lim_process_channel_usage_req_action_frame(mac_ctx,
+								     rx_pkt_info,
+								     session);
+			break;
+		case WNM_CHAN_USAGE_RESP:
+			__lim_process_channel_usage_resp_action_frame(mac_ctx,
+								      rx_pkt_info,
+								      session);
 			break;
 		default:
 			pe_debug("Action ID: %d not handled in WNM category",

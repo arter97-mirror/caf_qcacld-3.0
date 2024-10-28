@@ -45,6 +45,12 @@ flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1] 
 	[FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE] = {.type = NLA_U8},
 };
 
+#define NS_PER_MS 1000000
+#define NS_PER_US 1000
+
+#define NS_TO_MS(t) ((t) / NS_PER_MS)
+#define NS_TO_US(t) ((t) / NS_PER_US)
+
 QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,
 					 int data_len)
 {
@@ -643,7 +649,7 @@ os_if_dp_fill_txrx_stats(struct sk_buff *flow_sample_event,
 	attr_id = QCA_WLAN_VENDOR_ATTR_TXRX_STATS_PKT_IAT_MIN;
 	if (flow_sample_event &&
 	    wlan_cfg80211_nla_put_u64(flow_sample_event, attr_id,
-				      txrx_stats->pkt_iat_min)) {
+				      NS_TO_US(txrx_stats->pkt_iat_min))) {
 		osif_err("STC: pkt_iat_min put failed");
 		goto fail;
 	} else {
@@ -653,7 +659,7 @@ os_if_dp_fill_txrx_stats(struct sk_buff *flow_sample_event,
 	attr_id = QCA_WLAN_VENDOR_ATTR_TXRX_STATS_PKT_IAT_MAX;
 	if (flow_sample_event &&
 	    wlan_cfg80211_nla_put_u64(flow_sample_event, attr_id,
-				      txrx_stats->pkt_iat_max)) {
+				      NS_TO_US(txrx_stats->pkt_iat_max))) {
 		osif_err("STC: pkt_iat_max put failed");
 		goto fail;
 	} else {
@@ -663,7 +669,7 @@ os_if_dp_fill_txrx_stats(struct sk_buff *flow_sample_event,
 	attr_id = QCA_WLAN_VENDOR_ATTR_TXRX_STATS_PKT_IAT_SUM;
 	if (flow_sample_event &&
 	    wlan_cfg80211_nla_put_u64(flow_sample_event, attr_id,
-				      txrx_stats->pkt_iat_sum)) {
+				      NS_TO_US(txrx_stats->pkt_iat_sum))) {
 		osif_err("STC: pkt_iat_sum put failed");
 		goto fail;
 	} else {
@@ -836,7 +842,7 @@ os_if_dp_fill_burst_stats(struct sk_buff *flow_sample_event,
 	if (flow_sample_event &&
 	    nla_put_u32(flow_sample_event,
 			QCA_WLAN_VENDOR_ATTR_BURST_STATS_BURST_DURATION_MIN,
-			burst_stats->burst_duration_min)) {
+			NS_TO_MS(burst_stats->burst_duration_min))) {
 		osif_err("STC: burst_duration_min put failed");
 		goto fail;
 	} else {
@@ -846,7 +852,7 @@ os_if_dp_fill_burst_stats(struct sk_buff *flow_sample_event,
 	if (flow_sample_event &&
 	    nla_put_u32(flow_sample_event,
 			QCA_WLAN_VENDOR_ATTR_BURST_STATS_BURST_DURATION_MAX,
-			burst_stats->burst_duration_max)) {
+			NS_TO_MS(burst_stats->burst_duration_max))) {
 		osif_err("STC: burst_duration_max put failed");
 		goto fail;
 	} else {
@@ -856,7 +862,7 @@ os_if_dp_fill_burst_stats(struct sk_buff *flow_sample_event,
 	attr_id = QCA_WLAN_VENDOR_ATTR_BURST_STATS_BURST_DURATION_SUM;
 	if (flow_sample_event &&
 	    wlan_cfg80211_nla_put_u64(flow_sample_event, attr_id,
-				      burst_stats->burst_duration_sum)) {
+				      NS_TO_MS(burst_stats->burst_duration_sum))) {
 		osif_err("STC: burst_duration_sum put failed");
 		goto fail;
 	} else {

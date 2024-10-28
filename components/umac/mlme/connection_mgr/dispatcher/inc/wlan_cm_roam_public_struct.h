@@ -94,6 +94,7 @@
 #define REASON_ROAM_SET_PRIMARY                     54
 #define REASON_ROAM_LINK_SWITCH_ASSOC_VDEV_CHANGE   55
 #define REASON_VDEV_RESTART_FROM_HOST               56
+#define REASON_AGGRESSIVE_ROAM_ENABLED              57
 
 #define FILS_MAX_KEYNAME_NAI_LENGTH WLAN_CM_FILS_MAX_KEYNAME_NAI_LENGTH
 #define WLAN_FILS_MAX_REALM_LEN WLAN_CM_FILS_MAX_REALM_LEN
@@ -113,6 +114,8 @@
 #define MAX_BSSID_AVOID_LIST     16
 #define MAX_BSSID_FAVORED      16
 #define WLAN_MAX_BTM_CANDIDATES      8
+
+#define FW_ROAM_SYNC_TIMEOUT 7000
 
 /* Default value of WTC reason code */
 #define DISABLE_VENDOR_BTM_CONFIG 2
@@ -164,13 +167,8 @@
 #define NEIGHBOR_REPORT_PARAM_INVALID (0xFFFFFFFFU)
 
 /*
- * Currently roam score delta value is sent for 2 triggers and min rssi
- * values are sent for 3 triggers
+ * Currently  min rssi values are sent for 3 triggers
  */
-#define NUM_OF_ROAM_TRIGGERS 2
-#define IDLE_ROAM_TRIGGER 0
-#define BTM_ROAM_TRIGGER  1
-
 #define NUM_OF_ROAM_MIN_RSSI 3
 #define DEAUTH_MIN_RSSI 0
 #define BMISS_MIN_RSSI  1
@@ -200,6 +198,8 @@
  * @ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU: Roam scan triggered due to
  * first periodic timer exiry when full scan count is 0 and roam scan trigger
  * is CU load
+ * @ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN: Additional partial roam scan
+ * triggered during MLO usecase.
  */
 enum roam_trigger_sub_reason {
 	ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER = 1,
@@ -211,6 +211,7 @@ enum roam_trigger_sub_reason {
 	ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY,
 	ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY_CU,
 	ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU,
+	ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN,
 };
 
 /**
@@ -432,6 +433,8 @@ enum roam_fail_params {
  * roam scan started.
  * @ROAM_FAIL_REASON_REASSOC_TO_SAME_AP: Host internal reason code. Reassoc
  * command rejected due to reassociation request received for same AP.
+ * @ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED: Roaming is not triggered as part
+ * of the first roam scan as additional scan is required to scan all MLD links
  * @ROAM_FAIL_REASON_UNKNOWN: Default reason
  */
 enum wlan_roam_failure_reason_code {
@@ -476,6 +479,7 @@ enum wlan_roam_failure_reason_code {
 	ROAM_FAIL_REASON_SCREEN_ACTIVITY,
 	ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN,
 	ROAM_FAIL_REASON_REASSOC_TO_SAME_AP,
+	ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED,
 	ROAM_FAIL_REASON_UNKNOWN = 255,
 };
 
@@ -783,6 +787,12 @@ struct rso_config_params {
  * @ROAM_RSSI_DIFF_6GHZ: roam rssi diff for 6 GHz AP
  * @IS_DISABLE_BTM: disable btm roaming
  * @IS_ROAM_AGGRESSIVE : Aggressive Roaming mode
+ * @ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA: Roam min roam delta in aggressive
+ *                                         mode
+ * @ROAM_AGGRESSIVE_SCORE_DELTA: Roam score delta in aggressive mode
+ * @ROAM_AGGRESSIVE_SCAN_STEP_RSSI: Roam scan step rssi in aggressive mode
+ * @ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD: Roam neighbour lookup
+ *                                                  threshold in aggressive mode
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -817,6 +827,10 @@ enum roam_cfg_param {
 	ROAM_RSSI_DIFF_6GHZ,
 	IS_DISABLE_BTM,
 	IS_ROAM_AGGRESSIVE,
+	ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA,
+	ROAM_AGGRESSIVE_SCORE_DELTA,
+	ROAM_AGGRESSIVE_SCAN_STEP_RSSI,
+	ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD,
 };
 
 /**
@@ -995,7 +1009,7 @@ struct scoring_param {
 	struct per_slot_score oce_wan_scoring;
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t eht_caps_weightage;
-	uint8_t mlo_weightage;
+	uint32_t mlo_weightage;
 #endif
 	int32_t security_weightage;
 	uint32_t security_index_score;
@@ -1223,7 +1237,7 @@ struct wlan_roam_triggers {
 	uint32_t roam_scan_scheme_bitmap;
 	struct wlan_cm_roam_vendor_btm_params vendor_btm_param;
 	struct roam_trigger_min_rssi min_rssi_params[NUM_OF_ROAM_MIN_RSSI];
-	struct roam_trigger_score_delta score_delta_param[NUM_OF_ROAM_TRIGGERS];
+	struct roam_trigger_score_delta score_delta_param[ROAM_TRIGGER_REASON_MAX];
 };
 
 /**
@@ -1240,7 +1254,7 @@ struct ap_profile_params {
 	struct ap_profile profile;
 	struct scoring_param param;
 	struct roam_trigger_min_rssi min_rssi_params[NUM_OF_ROAM_MIN_RSSI];
-	struct roam_trigger_score_delta score_delta_param[NUM_OF_ROAM_TRIGGERS];
+	struct roam_trigger_score_delta score_delta_param[ROAM_TRIGGER_REASON_MAX];
 	struct owe_transition_mode_info owe_ap_profile;
 };
 
@@ -1398,6 +1412,8 @@ struct wlan_roam_11k_offload_params {
  * @bss_load_threshold: BSS load threshold after which roam scan should trigger
  * @bss_load_sample_time: Time duration in milliseconds for which the bss load
  * trigger needs to be enabled
+ * @bss_load_alpha: Factor for computing average bss load from current channel
+ * utilization
  * @rssi_threshold_6ghz: RSSI threshold of the current connected AP below which
  * roam should be triggered if bss load threshold exceeds the configured value.
  * This value is applicable only when we are connected in 6GHz band.
@@ -1412,6 +1428,7 @@ struct wlan_roam_bss_load_config {
 	uint32_t vdev_id;
 	uint32_t bss_load_threshold;
 	uint32_t bss_load_sample_time;
+	uint32_t bss_load_alpha;
 	int32_t rssi_threshold_6ghz;
 	int32_t rssi_threshold_5ghz;
 	int32_t rssi_threshold_24ghz;
@@ -2180,6 +2197,21 @@ enum roam_offload_state {
 	WLAN_ROAMING_IN_PROG,
 	WLAN_ROAM_SYNCH_IN_PROG,
 	WLAN_MLO_ROAM_SYNCH_IN_PROG,
+};
+
+/**
+ * enum wlan_roam_policy - Represents the policies for roaming.
+ * @WLAN_ROAMING_NOT_ALLOWED: Roaming is not allowed/disabled.
+ * @WLAN_ROAMING_ALLOWED_WITHIN_ESS: Roaming is allowed with in an ESS with
+ * default RSSI thresholds.
+ * @WLAN_ROAMING_MODE_AGGRESSIVE: This mode is an extension of
+ * WLAN_ROAMING_MODE_AGGRESSIVE. The driver/firmware roams on higher RSSI
+ * thresholds when compared to WLAN_ROAMING_ALLOWED_WITHIN_ESS.
+ */
+enum wlan_roam_policy {
+	WLAN_ROAMING_NOT_ALLOWED,
+	WLAN_ROAMING_ALLOWED_WITHIN_ESS,
+	WLAN_ROAMING_MODE_AGGRESSIVE,
 };
 
 #define WLAN_ROAM_SCAN_CANDIDATE_AP 0

@@ -863,6 +863,7 @@ int pld_request_bus_bandwidth(struct device *dev, int bandwidth)
 	case PLD_BUS_TYPE_SNOC:
 		break;
 	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_request_bus_bandwidth(dev, bandwidth);
 		break;
 	case PLD_BUS_TYPE_SDIO:
 		/* To do Add call cns API */
@@ -924,6 +925,21 @@ bool pld_is_audio_shared_iommu_group(struct device *dev)
 	switch (pld_get_bus_type(dev)) {
 	case PLD_BUS_TYPE_PCIE:
 		ret = pld_pcie_is_audio_shared_iommu_group(dev);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+bool pld_is_ipa_shared_smmu_enable(struct device *dev)
+{
+	bool ret = false;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_is_ipa_shared_smmu_enable(dev);
 		break;
 	default:
 		break;
@@ -2379,8 +2395,9 @@ int pld_qmi_indication(struct device *dev, void *cb_ctx,
 	case PLD_BUS_TYPE_SNOC:
 	case PLD_BUS_TYPE_SDIO:
 	case PLD_BUS_TYPE_USB:
-	case PLD_BUS_TYPE_IPCI:
 		return -EINVAL;
+	case PLD_BUS_TYPE_IPCI:
+		return pld_ipci_register_qmi_ind(dev, cb_ctx, cb);
 	default:
 		pr_err("Invalid device type %d\n", bus_type);
 		return -EINVAL;

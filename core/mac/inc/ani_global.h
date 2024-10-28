@@ -287,6 +287,8 @@ typedef struct sLimTimers {
 
 	/* RRM sta stats response related timer */
 	TX_TIMER rrm_sta_stats_resp_timer;
+
+	TX_TIMER channel_vacate_timer;
 /* ********************TIMER SECTION ENDS************************************************** */
 /* ALL THE FIELDS BELOW THIS CAN BE ZEROED OUT in lim_initialize */
 /* **************************************************************************************** */

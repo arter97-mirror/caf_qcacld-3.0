@@ -31,6 +31,7 @@
 #include "wlan_cm_roam_ucfg_api.h"
 #include "wlan_hdd_nud_tracking.h"
 #include "wlan_hdd_object_manager.h"
+#include "wlan_mlo_mgr_public_api.h"
 
 static void
 hdd_handle_nud_fail_sta(struct hdd_context *hdd_ctx,
@@ -69,9 +70,15 @@ hdd_handle_nud_fail_sta(struct hdd_context *hdd_ctx,
 static void
 hdd_handle_nud_fail_non_sta(struct wlan_hdd_link_info *link_info)
 {
-	wlan_hdd_cm_issue_disconnect(link_info,
-				     REASON_GATEWAY_REACHABILITY_FAILURE,
-				     false);
+	QDF_STATUS status;
+
+	status = wlan_mlo_mgr_link_switch_defer_disconnect_req(link_info->vdev,
+							       CM_OSIF_DISCONNECT,
+							       REASON_GATEWAY_REACHABILITY_FAILURE);
+	if (status != QDF_STATUS_E_ALREADY && QDF_IS_STATUS_ERROR(status))
+		wlan_hdd_cm_issue_disconnect(link_info,
+					     REASON_GATEWAY_REACHABILITY_FAILURE,
+					     false);
 }
 
 /**

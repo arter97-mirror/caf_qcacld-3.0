@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -68,8 +68,12 @@
 
 #define tdls_notice(params...) \
 	QDF_TRACE_INFO(QDF_MODULE_ID_TDLS, params)
+#define tdls_notice_rl(params...) \
+	QDF_TRACE_INFO_RL(QDF_MODULE_ID_TDLS, params)
 #define tdls_warn(params...) \
 	QDF_TRACE_WARN(QDF_MODULE_ID_TDLS, params)
+#define tdls_warn_rl(params...) \
+	QDF_TRACE_WARN_RL(QDF_MODULE_ID_TDLS, params)
 #define tdls_err(params...) \
 	QDF_TRACE_ERROR(QDF_MODULE_ID_TDLS, params)
 #define tdls_alert(params...) \
@@ -142,6 +146,14 @@ struct tdls_set_state_info {
 };
 
 /**
+ * struct tdls_callbacks - vdev id state info
+ * @delete_all_tdls_peers: Callback to lim to delete TDLS peers
+ */
+struct tdls_callbacks {
+	QDF_STATUS (*delete_all_tdls_peers) (struct wlan_objmgr_vdev *vdev);
+};
+
+/**
  * struct tdls_soc_priv_obj - tdls soc private context
  * @soc: objmgr psoc
  * @tdls_current_mode: current tdls mode
@@ -198,6 +210,7 @@ struct tdls_set_state_info {
  * @timer_cnt: used for mlo tdls to monitor discovery response
  * @fw_tdls_wideband_capability: bool for tdls wideband fw capability
  * @is_user_tdls_enable: bool to check whether TDLS enable through userspace
+ * @tdls_cb: TDLS callbacks to other modules
  */
 struct tdls_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -258,6 +271,7 @@ struct tdls_soc_priv_obj {
 	qdf_atomic_t timer_cnt;
 	bool fw_tdls_wideband_capability;
 	bool is_user_tdls_enable;
+	struct tdls_callbacks tdls_cb;
 };
 
 /**
@@ -335,6 +349,8 @@ struct tdls_peer_mlme_info {
  * @peer_idle_timer: time to check idle traffic in tdls peers
  * @is_peer_idle_timer_initialised: Flag to check idle timer init
  * @spatial_streams: Number of TX/RX spatial streams for TDLS
+ * @sta_kickout_count: Number of times STA kickout event received for this
+ * peer
  * @reason: reason
  * @state_change_notification: state change notification
  * @qos: QOS capability of TDLS link
@@ -368,6 +384,7 @@ struct tdls_peer {
 	qdf_mc_timer_t peer_idle_timer;
 	bool is_peer_idle_timer_initialised;
 	uint8_t spatial_streams;
+	uint8_t sta_kickout_count;
 	enum tdls_link_state_reason reason;
 	tdls_state_change_callback state_change_notification;
 	uint8_t qos;
@@ -739,14 +756,14 @@ uint32_t tdls_get_6g_pwr_for_power_type(struct wlan_objmgr_vdev *vdev,
 
 /**
  * tdls_is_6g_freq_allowed() - check is tdls 6ghz allowed or not
- * @vdev: vdev object
+ * @pdev: pdev object
  * @freq: 6g freq
  *
  * Function determines the whether TDLS on 6ghz is allowed in the system
  *
  * Return: true or false
  */
-bool tdls_is_6g_freq_allowed(struct wlan_objmgr_vdev *vdev, qdf_freq_t freq);
+bool tdls_is_6g_freq_allowed(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
 
 /**
  * tdls_check_is_user_tdls_enable() - Check is tdls enabled or not

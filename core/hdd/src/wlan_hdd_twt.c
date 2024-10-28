@@ -232,14 +232,14 @@ static int hdd_twt_configure(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	hdd_debug("TWT_Operation: 0x%x", twt_oper);
-
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_TWT_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
 	}
 
+	hdd_debug("vdev:%d TWT_Operation: 0x%x", wlan_vdev_get_id(vdev),
+		  twt_oper);
 	switch (twt_oper) {
 	case QCA_WLAN_TWT_SET:
 		ret = osif_twt_setup_req(vdev, twt_param_attr);
@@ -348,6 +348,8 @@ qca_wlan_vendor_twt_nudge_dialog_policy[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAX + 1] 
 static const struct nla_policy
 qca_wlan_vendor_twt_set_param_policy[QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_AP_AC_VALUE] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_UNAVAILABILITY_MODE] = {
+						.type = NLA_FLAG},
 };
 
 static
@@ -4259,7 +4261,6 @@ static int hdd_twt_configure(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	hdd_debug("TWT Operation 0x%x", twt_oper);
 
 	switch (twt_oper) {
 	case QCA_WLAN_TWT_SET:
@@ -5053,6 +5054,7 @@ __wlan_hdd_cfg80211_wifi_twt_config(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
+	hdd_enter_dev(dev);
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno)
 		return errno;

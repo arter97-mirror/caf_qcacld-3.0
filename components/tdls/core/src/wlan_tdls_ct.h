@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -107,11 +107,11 @@ int tdls_recv_discovery_resp(struct tdls_vdev_priv_obj *tdls_vdev,
  * @curr_peer: teardown peer
  * @reason: teardown reason
  *
- * Return: Void
+ * Return: QDF_STATUS
  */
-void tdls_indicate_teardown(struct tdls_vdev_priv_obj *tdls_vdev,
-				struct tdls_peer *curr_peer,
-				uint16_t reason);
+QDF_STATUS tdls_indicate_teardown(struct tdls_vdev_priv_obj *tdls_vdev,
+				  struct tdls_peer *curr_peer,
+				  uint16_t reason);
 
 /**
  * tdls_ct_handler() - TDLS connection tracker handler
@@ -175,8 +175,7 @@ void tdls_teardown_connections(struct tdls_link_teardown *tdls_teardown);
  *
  * Return: None
  */
-void tdls_disable_offchan_and_teardown_links(
-				struct wlan_objmgr_vdev *vdev);
+void tdls_disable_offchan_and_teardown_links(struct wlan_objmgr_vdev *vdev);
 
 /**
  * tdls_delete_all_tdls_peers() - send request to delete tdls peers

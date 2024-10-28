@@ -91,6 +91,7 @@ void wlan_connectivity_logging_stop(void)
 	qdf_spin_unlock_bh(&global_cl.write_ptr_lock);
 	qdf_spinlock_destroy(&global_cl.write_ptr_lock);
 }
+
 #endif
 
 #if defined(WLAN_FEATURE_ROAM_OFFLOAD) && \
@@ -641,7 +642,7 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
 
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
-	wlan_diag_event.version = DIAG_MLO_SETUP_VERSION_V2;
+	wlan_diag_event.version = DIAG_MLO_SETUP_VERSION_V3;
 
 	if (!vdev->mlo_dev_ctx) {
 		logging_err("vdev: %d MLO dev ctx not found",
@@ -684,10 +685,54 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
 			wlan_diag_event.mlo_cmn_info[i].status =
 							REJECTED_LINK_STATUS;
 
+		/*
+		 * Below parameter are populated to cmn ext fields of the
+		 * wlan_diag_mlo_setup structure. cmn ext structure has the same
+		 * parameters present in the wlan_diag_mlo_cmn_info structure as
+		 * wlan_diag_mlo_cmn_info  structure will not be used further.
+		 * Any new field added for MLO SETUP event logging will be part
+		 * of the cmn ext field of wlan_diag_mlo_setup structure.
+		 */
+
+		wlan_diag_event.mlo_cmn_info_ext[num_links].link_id =
+				link_ctx->links_info[i].link_id;
+		wlan_diag_event.mlo_cmn_info_ext[num_links].vdev_id =
+				link_ctx->links_info[i].vdev_id;
+
+		qdf_mem_copy(wlan_diag_event.mlo_cmn_info_ext[num_links].link_addr,
+			     link_ctx->links_info[i].ap_link_addr.bytes,
+			     QDF_MAC_ADDR_SIZE);
+
+		wlan_diag_event.mlo_cmn_info_ext[num_links].freq =
+							chan_info->ch_freq;
+
+		wlan_diag_event.mlo_cmn_info_ext[num_links].band =
+			wlan_convert_freq_to_diag_band(chan_info->ch_freq);
+
+		if (wlan_diag_event.mlo_cmn_info[num_links].band ==
+							 WLAN_INVALID_BAND)
+			wlan_diag_event.mlo_cmn_info_ext[i].status =
+							REJECTED_LINK_STATUS;
 		num_links++;
 	}
 
 	wlan_diag_event.num_links = num_links;
+	wlan_diag_event.num_link_ext = num_links;
+	wlan_diag_event.max_links_ext = MAX_NUM_LINKS_PER_EVENT;
+
+	/*
+	 * ext_link_info_size field in wlan_diag_mlo_setup structure
+	 * indicates the the size of link data indicated by the
+	 * structure wlan_diag_mlo_setup. This field is added to
+	 * enable to userspace the to help in navigating through the
+	 * the data present in the mlo_cmn_info_ext of the
+	 * wlan_diag_mlo_setup event if there is a difference in
+	 * the number of field of the mlo_cmn_info_ext between
+	 * Host driver and user space.
+	 */
+
+	wlan_diag_event.ext_link_info_size =
+		sizeof(struct wlan_diag_mlo_cmn_info_ext);
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MLO_SETUP);
 }
@@ -819,6 +864,31 @@ wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+enum wlan_diag_tx_rx_status
+wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status)
+{
+	switch (tx_status) {
+	case QDF_TX_RX_STATUS_FW_DISCARD:
+		return WLAN_DIAG_TX_RX_STATUS_FW_DISCARD;
+	case QDF_TX_RX_STATUS_INVALID:
+		return WLAN_DIAG_TX_RX_STATUS_INVALID;
+	case QDF_TX_RX_STATUS_DROP:
+		return WLAN_DIAG_TX_RX_STATUS_DROP;
+	case QDF_TX_RX_STATUS_DOWNLOAD_SUCC:
+		return WLAN_DIAG_TX_RX_STATUS_DOWNLOAD_SUCC;
+	case QDF_TX_RX_STATUS_NO_ACK:
+		return WLAN_DIAG_TX_RX_STATUS_NO_ACK;
+	case QDF_TX_RX_STATUS_OK:
+		return WLAN_DIAG_TX_RX_STATUS_OK;
+	case QDF_TX_RX_STATUS_MAX:
+		return WLAN_DIAG_TX_RX_STATUS_MAX;
+	default:
+		return WLAN_DIAG_TX_RX_STATUS_INVALID;
+	}
+
+	return WLAN_DIAG_TX_RX_STATUS_INVALID;
+}
 
 enum wlan_diag_wifi_band
 wlan_convert_freq_to_diag_band(uint16_t ch_freq)

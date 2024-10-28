@@ -370,6 +370,11 @@ typedef struct sLimChannelSwitchInfo {
 	int8_t switchCount;
 	uint32_t switchTimeoutValue;
 	uint8_t switchMode;
+
+	uint8_t legacy_sec_ch_offset;
+	uint8_t legacy_ccfs0;
+	uint8_t legacy_ccfs1;
+	enum phy_ch_width legacy_ch_width;
 } tLimChannelSwitchInfo, *tpLimChannelSwitchInfo;
 
 typedef struct sLimOperatingModeInfo {

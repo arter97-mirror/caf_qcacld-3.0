@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,9 @@
 #include "wlan_hdd_avoid_freq_ext.h"
 #include "wlan_reg_ucfg_api.h"
 #include "wlan_reg_services_api.h"
+#include "wlan_hdd_main.h"
+#include "wlan_dcs_ucfg_api.h"
+#include "wlan_ll_sap_api.h"
 
 #define AVOID_FREQ_EXT_MAX QCA_WLAN_VENDOR_ATTR_AVOID_FREQUENCY_MAX
 
@@ -39,6 +42,7 @@ avoid_freq_ext_policy [QCA_WLAN_VENDOR_ATTR_AVOID_FREQUENCY_MAX + 1] = {
 								NLA_S32},
 	[QCA_WLAN_VENDOR_ATTR_AVOID_FREQUENCY_IFACES_BITMASK] = {.type =
 								NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_AVOID_FREQUENCY_IFINDEX] = {.type = NLA_U32},
 };
 
 /**
@@ -68,6 +72,7 @@ __wlan_hdd_cfg80211_avoid_freq_ext(struct wiphy *wiphy,
 	struct nlattr *freq_ext;
 	int id, rem, i, sub_id;
 	struct ch_avoid_freq_type *avoid_freq_range;
+	struct hdd_adapter *if_adapter;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -87,7 +92,15 @@ __wlan_hdd_cfg80211_avoid_freq_ext(struct wiphy *wiphy,
 	if (ret)
 		return ret;
 
-	if (hdd_is_connection_in_progress(NULL, NULL)) {
+	if_adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	if (!if_adapter) {
+		hdd_err_rl("adapter not found for ifindex: %d",
+			   wdev->netdev->ifindex);
+	}
+
+	if (hdd_is_connection_in_progress(NULL, NULL) &&
+	    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+					  if_adapter->deflink->vdev_id)) {
 		hdd_debug_rl("Update chan list refused: conn in progress");
 		ret = -EPERM;
 		goto out;
@@ -203,6 +216,47 @@ __wlan_hdd_cfg80211_avoid_freq_ext(struct wiphy *wiphy,
 		hdd_warn_rl("Number of freq range %u less than expected %u",
 			    i, CH_AVOID_MAX_RANGE);
 		avoid_freq_list.ch_avoid_range_cnt = i;
+	}
+
+	sub_id = QCA_WLAN_VENDOR_ATTR_AVOID_FREQUENCY_IFINDEX;
+
+	if (tb[sub_id]) {
+		bool csa_in_progress = false;
+		uint8_t pdev_id;
+		uint8_t vdev_id;
+		uint32_t ifindex;
+
+		ifindex = nla_get_u32(tb[sub_id]);
+
+		if_adapter = hdd_get_adapter_by_ifindex(hdd_ctx, ifindex);
+		if (!if_adapter) {
+			hdd_err_rl("HDD adapter for ifindex: %d not found",
+				   ifindex);
+			return -EINVAL;
+		}
+
+		vdev_id = if_adapter->deflink->vdev_id;
+
+		if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id)) {
+			hdd_err_rl("vdev: %d Current SAP is not LL SAP",
+				   vdev_id);
+			return -EINVAL;
+		}
+
+		csa_in_progress =
+		ucfg_mlme_is_chan_switch_in_progress(if_adapter->deflink->vdev);
+		if (csa_in_progress) {
+			hdd_err_rl("vdev: %d CSA is currently in progress",
+				   vdev_id);
+			return -EINVAL;
+		}
+
+		pdev_id = wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev);
+
+		ucfg_dcs_trigger_dcs(hdd_ctx->psoc, pdev_id, vdev_id,
+				     WLAN_HOST_DCS_WLANIM);
+
+		return ret;
 	}
 
 process_avoid_channel_ext:

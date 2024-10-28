@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2011-2015, 2017-2019, 2021 The Linux Foundation. All rights
  * reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,20 +38,24 @@
 
 /* update only the broadcast qos params */
 void sch_qos_update_broadcast(struct mac_context *mac,
-			      struct pe_session *pe_session);
+			      struct pe_session *pe_session,
+			      uint32_t usr_params[][CFG_EDCA_DATA_LEN]);
 
 /* fill in the default local edca parameter into gLimEdcaParams[] */
 void sch_set_default_edca_params(struct mac_context *mac, struct pe_session *pe_session);
 
 /* update only local qos params */
-void sch_qos_update_local(struct mac_context *mac, struct pe_session *pe_session);
+void sch_qos_update_local(struct mac_context *mac,
+			  struct pe_session *pe_session,
+			  uint32_t usr_params[][CFG_EDCA_DATA_LEN]);
 
 /* update the edca profile parameters based on STA-SAP concurrency */
 void sch_qos_concurrency_update(void);
 
 /* update the edca profile parameters */
 void sch_edca_profile_update(struct mac_context *mac,
-			     struct pe_session *pe_session);
+			     struct pe_session *pe_session,
+			     uint32_t usr_params[][CFG_EDCA_DATA_LEN]);
 
 /* / Set the fixed fields in a beacon frame */
 QDF_STATUS sch_set_fixed_beacon_fields(struct mac_context *mac,

@@ -158,6 +158,7 @@ struct hdd_conn_flag {
  * to which currently sta is connected.
  * @prev_ap_bcn_ie: ap beacon IE information to which sta is currently connected
  * @ieee_link_id: AP Link Id valid for MLO connection
+ * @mld_addr: AP MLD addr for MLO connection
  * @eht_operation: EHT operation info
  * @eht_oper_len: length of @eht_operation
  * @ap_nss: AP advertised nss
@@ -203,6 +204,7 @@ struct hdd_connection_info {
 	struct element_info prev_ap_bcn_ie;
 #ifdef WLAN_FEATURE_11BE_MLO
 	int32_t ieee_link_id;
+	struct qdf_mac_addr mld_addr;
 #endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
 	defined(WLAN_FEATURE_11BE)

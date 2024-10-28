@@ -537,6 +537,11 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	uint8_t bpcc;
 	bool cu_flag = true;
 	QDF_STATUS status;
+	struct bss_description *bss = NULL;
+	struct vdev_mlme_obj *mlme_obj;
+	struct wlan_lmac_if_reg_tx_ops *tx_ops;
+	bool tpe_change = false;
+
 
 	/*
 	 * here is it required to increment session specific heartBeat
@@ -644,8 +649,35 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				mac_hdr, session);
 	}
 
-	if (cu_flag)
+	if (cu_flag) {
 		lim_process_beacon_eht(mac_ctx, session, bcn_ptr);
+		if (session->lim_join_req)
+			bss = &session->lim_join_req->bssDescription;
+		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
+
+		if (!bss) {
+			pe_err("bss descriptor is NULL");
+			goto end;
+		}
+
+		lim_process_tpe_ie_from_beacon(mac_ctx, session,
+					       bss, &tpe_change);
+
+		mlme_obj =
+			wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+		if (!mlme_obj) {
+			pe_err("vdev component object is NULL");
+			goto end;
+		}
+
+		lim_calculate_tpc(mac_ctx, session);
+
+		if (tx_ops->set_tpc_power)
+			tx_ops->set_tpc_power(mac_ctx->psoc,
+					      session->vdev_id,
+					      &mlme_obj->reg_tpc_obj);
+       }
+
 end:
 	qdf_mem_free(bcn_ptr);
 	return;

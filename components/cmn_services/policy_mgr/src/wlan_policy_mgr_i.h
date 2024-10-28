@@ -235,6 +235,10 @@ extern policy_mgr_next_action_two_connection_table_type
 		*next_action_two_connection_table;
 extern policy_mgr_next_action_three_connection_table_type
 		*next_action_three_connection_table;
+#ifdef FEATURE_FOURTH_CONNECTION
+extern policy_mgr_next_action_four_connection_table_type
+		*next_action_four_connection_table;
+#endif
 
 #ifdef FEATURE_FOURTH_CONNECTION
 extern const enum policy_mgr_pcl_type
@@ -1163,7 +1167,7 @@ policy_mgr_sbs_24_shared_with_low_5(struct policy_mgr_psoc_priv_obj *pm_ctx);
  * policy_mgr_2_freq_same_mac_in_dbs() - to check provided frequencies are
  * in dbs freq range or not
  *
- * @pm_ctx: policy mgr psoc priv object
+ * @psoc: PSOC object information
  * @freq_1: first frequency
  * @freq_2: second frequency
  *
@@ -1172,7 +1176,7 @@ policy_mgr_sbs_24_shared_with_low_5(struct policy_mgr_psoc_priv_obj *pm_ctx);
  * Return: true/false.
  */
 bool
-policy_mgr_2_freq_same_mac_in_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+policy_mgr_2_freq_same_mac_in_dbs(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t freq_1, qdf_freq_t freq_2);
 
 /**

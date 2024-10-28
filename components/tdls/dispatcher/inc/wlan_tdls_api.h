@@ -56,6 +56,16 @@ void wlan_tdls_get_features_info(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * wlan_tdls_register_lim_callbacks() - Register callbacks for legacy LIM API
+ * @psoc: Pointer to psoc object
+ * @cbs: Pointer to callback struct
+ *
+ * Return: None
+ */
+void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
+				      struct tdls_callbacks *cbs);
+
+/**
  * wlan_tdls_teardown_links() - notify TDLS module to teardown all TDLS links
  * @psoc: psoc object
  *
@@ -236,7 +246,40 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_tdls_is_addba_request_allowed() - API to check if Add Block ack request
+ * is allowed for TDLS peer in current state.
+ * @vdev: Vdev object pointer
+ * @mac_addr: Mac address of the peer
+ *
+ * Return: True if ADDBA frame can be allowed
+ */
+bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mac_addr);
+/*
+ * wlan_tdls_delete_all_peers() - Delete all TDLS peers in lim
+ * @vdev: Pointer to vdev object
+ *
+ * Return: None
+ */
+void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * wlan_tdls_update_peer_kickout_count() - Update the TDLS peer sta kickout
+ * count
+ * @vdev: Pointer to vdev private object
+ * @macaddr: Peer mac address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
+					       uint8_t *macaddr);
 #else
+static inline
+void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
+				      struct tdls_callbacks *cbs)
+{}
 
 #ifdef FEATURE_SET
 static inline
@@ -325,6 +368,24 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 
 static inline
 QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mac_addr)
+{
+	return false;
+}
+
+static inline
+void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev)
+{}
+
+static inline
+QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
+					       uint8_t *macaddr)
 {
 	return QDF_STATUS_SUCCESS;
 }

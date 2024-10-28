@@ -522,14 +522,14 @@ struct sme_context {
 	sme_get_raom_scan_ch_callback roam_scan_ch_callback;
 	void *roam_scan_ch_get_context;
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
-	void (*monitor_mode_cb)(uint8_t vdev_id);
+	void (*monitor_mode_cb)(uint8_t vdev_id, bool is_up);
 #endif
 #if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
 	void (*beacon_latency_event_cb)(uint32_t latency_level);
 #endif
 	QDF_STATUS (*sme_vdev_del_cb)(mac_handle_t mac_handle,
 				      struct wlan_objmgr_vdev *vdev);
-	void (*set_disconnect_link_id_cb)(uint8_t vdev_id);
+	void (*set_disconnect_link_info_cb)(uint8_t vdev_id);
 };
 
 #endif /* #if !defined( __SMEINTERNAL_H ) */

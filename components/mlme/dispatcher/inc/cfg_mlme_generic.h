@@ -344,6 +344,36 @@ enum wlan_epcs_frame {
 		0, \
 		"rf test mode Enable Flag")
 
+/*
+ * rf_mode_force_pwr_type - Force 6 GHz power type for RF mode enabled case
+ * @Min: -1
+ * @Max: 2
+ * @Default: -1
+ *
+ * This cfg is used to set force power type for RF mode enabled case
+ * as below.
+ *
+ * rf_mode_force_pwr_type -> Force power type
+ * -1 -> Use AP and STA intersected power type
+ *  0 -> Force LPI power
+ *  1 -> Force SP power
+ *  2 -> Force VLP power
+ *
+ *  For rf_mode_force_pwr_type 1 and 2 if STA doesn't support SP and VLP
+ *  power respectively for connection frequency try to force LPI power.
+ *
+ *  Related: None
+ *
+ *  Supported Feature: STA
+ */
+#define CFG_RF_MODE_FORCE_PWR_TYPE CFG_INT( \
+		"rf_mode_force_pwr_type", \
+		-1, \
+		2, \
+		-1, \
+		CFG_VALUE_OR_DEFAULT, \
+		"rf test mode force power type")
+
 #ifdef CONFIG_BAND_6GHZ
 /*
  * standard_6ghz_connection_policy - Enable 6 GHz standard connection policy
@@ -1295,7 +1325,7 @@ enum wlan_epcs_frame {
  */
 #define CFG_REDUCE_PWR_SCAN_MODE CFG_INI_BOOL( \
 	"enable_reduce_pwr_scan", \
-	1, \
+	0, \
 	"Reduce power scan mode")
 
 #define CFG_GENERIC_ALL \
@@ -1334,6 +1364,7 @@ enum wlan_epcs_frame {
 	CFG(CFG_WLS_6GHZ_CAPABLE) \
 	CFG(CFG_MONITOR_MODE_CONCURRENCY) \
 	CFG(CFG_RF_TEST_MODE_SUPP_ENABLED) \
+	CFG(CFG_RF_MODE_FORCE_PWR_TYPE) \
 	CFG_WDS_MODE_ALL \
 	CFG(CFG_TX_RETRY_MULTIPLIER) \
 	CFG(CFG_MGMT_FRAME_HW_TX_RETRY_COUNT) \

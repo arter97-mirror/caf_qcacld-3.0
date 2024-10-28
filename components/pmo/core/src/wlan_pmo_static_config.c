@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -51,6 +51,9 @@ void pmo_register_wow_wakeup_events(struct wlan_objmgr_vdev *vdev)
 	switch (vdev_opmode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
+		pmo_set_wow_event_bitmap(WOW_BEACON_EVENT,
+					 PMO_WOW_MAX_EVENT_BM_LEN,
+					 event_bitmap);
 		/* set power on failure event only for STA and P2P_CLI mode*/
 		psoc_ctx =  pmo_vdev_get_psoc_priv(vdev);
 		if (psoc_ctx->psoc_cfg.auto_power_save_fail_mode ==
@@ -385,7 +388,8 @@ void pmo_register_wow_default_patterns(struct wlan_objmgr_vdev *vdev)
 		 * APF internally handles RA filtering.
 		 */
 		if (psoc_ctx->psoc_cfg.ra_ratelimit_enable &&
-		    !pmo_intersect_apf(psoc_ctx)) {
+		    (psoc_ctx->psoc_cfg.ra_priority_enable ||
+		    !pmo_intersect_apf(psoc_ctx))) {
 			pmo_debug("Config STA RA wow pattern vdev_id %d",
 				  vdev_id);
 			pmo_tgt_send_ra_filter_req(vdev);
@@ -431,6 +435,38 @@ static void set_action_id_drop_pattern_for_public_action(
 {
 	action_id_per_category[PMO_MAC_ACTION_PUBLIC_USAGE]
 				= DROP_PUBLIC_ACTION_FRAME_BITMAP;
+}
+
+/**
+ * set_action_id_drop_pattern_for_wnm_btm() - Set the action id of action
+ * frames in WNM subtype that can be dropped in fw.
+ *
+ * @vdev: vdev object
+ * @action_id_per_category: Pointer to action id bitmaps
+ *
+ * Return: None
+ */
+static void
+set_action_id_drop_pattern_for_wnm_btm(struct wlan_objmgr_vdev *vdev,
+				       uint32_t *action_id_per_category)
+{
+	struct cm_roam_values_copy temp = {0};
+	struct wlan_objmgr_psoc *psoc;
+	bool btm_disabled;
+
+	psoc = pmo_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	wlan_cm_roam_cfg_get_value(psoc, pmo_vdev_get_id(vdev),
+				   IS_DISABLE_BTM, &temp);
+
+	btm_disabled = temp.bool_value;
+	if (!btm_disabled)
+		return;
+
+	action_id_per_category[PMO_MAC_ACTION_WNM]
+					= DROP_WNM_ACTION_FRAME_BITMAP;
 }
 
 #define PMO_MAX_WAKE_PATTERN_LEN 350
@@ -479,6 +515,7 @@ pmo_register_action_frame_patterns(struct wlan_objmgr_vdev *vdev,
 	set_action_id_drop_pattern_for_spec_mgmt(cmd->action_per_category);
 	set_action_id_drop_pattern_for_public_action(cmd->action_per_category);
 	set_action_id_drop_pattern_for_block_ack(&cmd->action_category_map[0]);
+	set_action_id_drop_pattern_for_wnm_btm(vdev, cmd->action_per_category);
 
 	info = qdf_mem_malloc(PMO_MAX_WAKE_PATTERN_LEN);
 	if (!info) {
@@ -509,9 +546,10 @@ pmo_register_action_frame_patterns(struct wlan_objmgr_vdev *vdev,
 	if (len > 0)
 		pmo_nofl_debug("serial_num[action wakeup pattern in fw]:%s",
 			       info);
-	pmo_debug("Spectrum mgmt action id drop bitmap: 0x%x, Public action id drop bitmap: 0x%x",
-			cmd->action_per_category[PMO_MAC_ACTION_SPECTRUM_MGMT],
-			cmd->action_per_category[PMO_MAC_ACTION_PUBLIC_USAGE]);
+	pmo_debug("Action frame drop bitmasks - spec_mgmt: %x public_usage: %x wnm: %x",
+		  cmd->action_per_category[PMO_MAC_ACTION_SPECTRUM_MGMT],
+		  cmd->action_per_category[PMO_MAC_ACTION_PUBLIC_USAGE],
+		  cmd->action_per_category[PMO_MAC_ACTION_WNM]);
 
 	/*  config action frame patterns */
 	status = pmo_tgt_send_action_frame_pattern_req(vdev, cmd);

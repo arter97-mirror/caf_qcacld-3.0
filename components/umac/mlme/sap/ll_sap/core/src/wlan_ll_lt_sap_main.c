@@ -24,6 +24,7 @@
 #include "wlan_scan_api.h"
 #include "target_if.h"
 #include "wlan_twt_cfg_ext_api.h"
+#include "wlan_policy_mgr_ll_sap.h"
 
 bool ll_lt_sap_is_supported(struct wlan_objmgr_psoc *psoc)
 {
@@ -916,9 +917,10 @@ QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp)
 	struct wlan_objmgr_vdev *vdev;
 	uint64_t twt_target_tsf = 0;
 	uint64_t non_twt_target_tsf = 0;
+	uint8_t ll_sap_vdev_id;
 
 	if (!rsp) {
-		ll_sap_err("vdev %d rsp is null", rsp->twt_params.vdev_id);
+		ll_sap_err("rsp is null");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -930,16 +932,18 @@ QDF_STATUS ll_lt_sap_continue_csa_after_tsf_rsp(struct ll_sap_csa_tsf_rsp *rsp)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	/*
-	 * stop target_tsf timer after getting response from firmware
-	 */
-	if (QDF_TIMER_STATE_RUNNING == qdf_mc_timer_get_current_state(
+	if (QDF_TIMER_STATE_RUNNING != qdf_mc_timer_get_current_state(
 					&psoc_ll_sap_obj->tsf_timer))
-		qdf_mc_timer_stop(&psoc_ll_sap_obj->tsf_timer);
+		return QDF_STATUS_SUCCESS;
 
-	if (rsp->twt_params.vdev_id == WLAN_INVALID_VDEV_ID) {
-		ll_sap_err("Invalid vdev %d", rsp->twt_params.vdev_id);
-		return QDF_STATUS_E_INVAL;
+	qdf_mc_timer_stop(&psoc_ll_sap_obj->tsf_timer);
+
+	if (!policy_mgr_is_vdev_ll_lt_sap(rsp->psoc, rsp->twt_params.vdev_id)) {
+		ll_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(
+								rsp->psoc);
+		ll_sap_err("Invalid ll_sap vdev %d, get valid ll_sap vdev %d",
+			   rsp->twt_params.vdev_id, ll_sap_vdev_id);
+		rsp->twt_params.vdev_id = ll_sap_vdev_id;
 	}
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(rsp->psoc,

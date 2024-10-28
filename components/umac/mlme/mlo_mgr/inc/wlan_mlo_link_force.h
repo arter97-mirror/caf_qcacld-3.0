@@ -50,6 +50,8 @@
  * @ml_nlink_nan_pre_enable_evt: nan pre enable
  * @ml_nlink_nan_post_enable_evt: nan post enable
  * @ml_nlink_nan_post_disable_evt: nan post disable
+ * @ml_nlink_acs_start_evt: sap acs start
+ * @ml_nlink_acs_completed_evt: sap acs complete
  */
 enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_start_evt,
@@ -76,6 +78,8 @@ enum ml_nlink_change_event_type {
 	ml_nlink_nan_pre_enable_evt,
 	ml_nlink_nan_post_enable_evt,
 	ml_nlink_nan_post_disable_evt,
+	ml_nlink_acs_start_evt,
+	ml_nlink_acs_completed_evt,
 };
 
 enum ml_emlsr_disable_request {
@@ -87,6 +91,7 @@ enum ml_emlsr_disable_request {
 	ML_EMLSR_DISALLOW_BY_OPP_TIMER = 1 << 5,
 	ML_EMLSR_DOWNGRADE_BY_OPP_TIMER = 1 << 6,
 	ML_EMLSR_DISALLOW_BY_NAN_DISC = 1 << 7,
+	ML_EMLSR_DOWNGRADE_BY_ACS_START = 1 << 8,
 };
 
 #define ML_EMLSR_DISALLOW_MASK_ALL (ML_EMLSR_DISALLOW_BY_CONCURENCY | \
@@ -97,7 +102,8 @@ enum ml_emlsr_disable_request {
 #define ML_EMLSR_DOWNGRADE_MASK_ALL (ML_EMLSR_DOWNGRADE_BY_AP_CSA | \
 				     ML_EMLSR_DOWNGRADE_BY_AP_START | \
 				     ML_EMLSR_DOWNGRADE_BY_STA_START | \
-				     ML_EMLSR_DOWNGRADE_BY_OPP_TIMER)
+				     ML_EMLSR_DOWNGRADE_BY_OPP_TIMER | \
+				     ML_EMLSR_DOWNGRADE_BY_ACS_START)
 
 #define ML_EMLSR_DISABLE_MASK_ALL (ML_EMLSR_DISALLOW_MASK_ALL | \
 				   ML_EMLSR_DOWNGRADE_MASK_ALL)
@@ -221,6 +227,8 @@ static inline const char *link_evt_to_string(uint32_t evt)
 	CASE_RETURN_STRING(ml_nlink_nan_pre_enable_evt);
 	CASE_RETURN_STRING(ml_nlink_nan_post_enable_evt);
 	CASE_RETURN_STRING(ml_nlink_nan_post_disable_evt);
+	CASE_RETURN_STRING(ml_nlink_acs_start_evt);
+	CASE_RETURN_STRING(ml_nlink_acs_completed_evt);
 	default:
 		return "Unknown";
 	}

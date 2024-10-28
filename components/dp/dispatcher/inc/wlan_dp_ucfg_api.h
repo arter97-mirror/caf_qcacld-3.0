@@ -2083,4 +2083,32 @@ static inline void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf,
 }
 #endif
 
+#ifdef IPA_WDI3_VLAN_SUPPORT
+/**
+ * ucfg_dp_send_pdev_pkt_routing_vlan() - Send pdev update packet routing cmd
+ * @psoc: psoc handle
+ * @pdev_id: DP pdev id
+ *
+ * Return: void
+ */
+void ucfg_dp_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
+					uint8_t pdev_id);
+#else /* !IPA_WDI3_VLAN_SUPPORT */
+static inline void
+ucfg_dp_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
+				   uint8_t pdev_id)
+{
+}
+#endif /* IPA_WDI3_VLAN_SUPPORT */
+
+/**
+ * ucfg_dp_set_def_tidmap_prty() - Set default tidmap priority
+ * @vdev: vdev
+ * @pri: tidmap priority value
+ *
+ * Return: int
+ */
+int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
+				uint32_t pri);
+
 #endif /* _WLAN_DP_UCFG_API_H_ */

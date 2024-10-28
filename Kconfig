@@ -673,6 +673,10 @@ config LEAK_DETECTION
 	bool "Enable LEAK_DETECTION"
 	default n
 
+config DP_PEER_UNMAP_TRACK
+	bool "Enable PEER_UNMAP_TRACK"
+	default n
+
 config LFR_SUBNET_DETECTION
 	bool "Enable LFR Subnet Change Detection"
 	default n
@@ -2208,6 +2212,10 @@ config WLAN_MCC_MIN_CHANNEL_QUOTA
 
 config WLAN_DP_FEATURE_STC
 	bool "Enable WLAN_DP_FEATURE_STC"
+	default n
+
+config FEATURE_MGMT_RX_OVER_SRNG
+	bool "enable FEATURE_MGMT_RX_OVER_SRNG"
 	default n
 
 config DP_FEATURE_RX_BUFFER_RECYCLE

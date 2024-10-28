@@ -225,7 +225,7 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 		/*TODO: Set WMI_SET_CHANNEL_ANTENNA_MAX */
 		/*TODO: WMI_SET_CHANNEL_REG_CLASSID */
 		chan_p->maxregpower = chan_list->chanParam[i].pwr;
-
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
 		wma_update_ch_list_11be_params(&ch_params);
 
 		wlan_reg_set_channel_params_for_pwrmode(wma_handle->pdev,

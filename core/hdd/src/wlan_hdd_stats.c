@@ -1241,32 +1241,33 @@ bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 	     (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 	     (QDF_P2P_DEVICE_MODE == adapter->device_mode))) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-		if (hdd_cm_is_disconnected(link_info))
-			info->state = WIFI_DISCONNECTED;
 
-		if (hdd_cm_is_connecting(link_info)) {
+		if (QDF_STA_MODE == adapter->device_mode &&
+		    link_info->vdev_id == WLAN_INVALID_VDEV_ID) {
+			info->state = WIFI_ASSOCIATED;
+		} else if (hdd_cm_is_disconnected(link_info)) {
+			info->state = WIFI_DISCONNECTED;
+		} else if (hdd_cm_is_connecting(link_info)) {
 			hdd_debug("Session ID %d, Connection is in progress",
 				  link_info->vdev_id);
 			info->state = WIFI_ASSOCIATING;
+		} else if (hdd_cm_is_vdev_associated(link_info)) {
+			if (!sta_ctx->conn_info.is_authenticated) {
+				hdd_err("client " QDF_MAC_ADDR_FMT " is in the middle of WPS/EAPOL exchange.",
+					QDF_MAC_ADDR_REF(mac->bytes));
+				info->state = WIFI_AUTHENTICATING;
+			} else {
+				info->state = WIFI_ASSOCIATED;
+			}
 		}
-		if (hdd_cm_is_vdev_associated(link_info) &&
-		    !sta_ctx->conn_info.is_authenticated) {
-			hdd_err("client " QDF_MAC_ADDR_FMT
-				" is in the middle of WPS/EAPOL exchange.",
-				QDF_MAC_ADDR_REF(mac->bytes));
-			info->state = WIFI_AUTHENTICATING;
-		}
-		if (hdd_cm_is_vdev_associated(link_info) ||
-		    link_info->vdev_id == WLAN_INVALID_VDEV_ID) {
-			info->state = WIFI_ASSOCIATED;
+
+		if (info->state == WIFI_ASSOCIATED) {
 			qdf_copy_macaddr(&info->bssid,
 					 &sta_ctx->conn_info.bssid);
 			qdf_mem_copy(info->ssid,
 				     sta_ctx->conn_info.ssid.SSID.ssId,
 				     sta_ctx->conn_info.ssid.SSID.length);
-			/*
-			 * NULL Terminate the string
-			 */
+			/* NULL Terminate the string */
 			info->ssid[sta_ctx->conn_info.ssid.SSID.length] = 0;
 		}
 	}
@@ -3247,19 +3248,19 @@ wlan_hdd_set_station_stats_request_pending(struct wlan_hdd_link_info *link_info,
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct wlan_objmgr_psoc *psoc = adapter->hdd_ctx->psoc;
 	bool is_mlo_vdev = false;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	if (!adapter->hdd_ctx->is_get_station_clubbed_in_ll_stats_req)
-		return QDF_STATUS_E_INVAL;
+		return status;
 
 	if (ucfg_mc_cp_stats_is_req_pending(psoc, TYPE_STATION_STATS)) {
 		hdd_debug("Station stats request pending");
-		return QDF_STATUS_E_INVAL;
+		return status;
 	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev)
-		return QDF_STATUS_E_INVAL;
+		return status;
 
 	info.cookie = adapter;
 	info.u.get_station_stats_cb = cache_station_stats_cb;
@@ -3287,10 +3288,12 @@ wlan_hdd_set_station_stats_request_pending(struct wlan_hdd_link_info *link_info,
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
 
-	ucfg_mc_cp_stats_set_pending_req(psoc, TYPE_STATION_STATS, &info);
+	status = ucfg_mc_cp_stats_set_pending_req(psoc, TYPE_STATION_STATS,
+						  &info);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
-	return QDF_STATUS_SUCCESS;
+
+	return status;
 }
 
 static void
@@ -7721,6 +7724,7 @@ wlan_hdd_update_mlo_peer_stats(struct wlan_hdd_link_info *link_info,
 
 	sinfo->tx_bytes = peer_stats->tx.tx_success.bytes;
 	sinfo->rx_bytes = peer_stats->rx.rcvd.bytes;
+	sinfo->tx_packets = peer_stats->tx.tx_success.num;
 	sinfo->rx_packets = peer_stats->rx.rcvd.num;
 
 	hdd_nofl_debug("Updated sinfo with per peer stats");
@@ -7881,6 +7885,7 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	ucfg_dp_get_net_dev_stats(vdev, &stats);
 	sinfo->tx_bytes = stats.tx_bytes;
 	sinfo->rx_bytes = stats.rx_bytes;
+	sinfo->tx_packets = stats.tx_packets;
 	sinfo->rx_packets = stats.rx_packets;
 	wlan_hdd_update_mlo_peer_stats(link_info, sinfo);
 
@@ -7919,18 +7924,51 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 }
 
 static int
-wlan_hdd_calculate_get_sta_len(void)
+wlan_hdd_calculate_get_sta_len(struct station_info *sinfo)
 {
 	int nl_buf_len = NLMSG_HDRLEN;
 
 	/* NL80211_ATTR_MAC */
-	nl_buf_len += nla_total_size(QDF_MAC_ADDR_SIZE) +
-			/* STATION_INFO_RX_BYTES */
-			nla_total_size(sizeof(uint32_t)) +
-			/* STATION_INFO_TX_BYTES */
-			nla_total_size(sizeof(uint32_t)) +
-			/* NL80211_STA_INFO_SIGNAL */
-			nla_total_size(sizeof(int8_t));
+	nl_buf_len += nla_total_size(QDF_MAC_ADDR_SIZE);
+	/* NL80211_STA_INFO_RX_BYTES */
+	if (sinfo->filled & HDD_INFO_RX_BYTES)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_TX_BYTES */
+	if (sinfo->filled & HDD_INFO_TX_BYTES)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_SIGNAL */
+	if (sinfo->filled & HDD_INFO_SIGNAL)
+		nl_buf_len += nla_total_size(sizeof(int8_t));
+	/* NL80211_STA_INFO_TX_PACKETS */
+	if (sinfo->filled & HDD_INFO_TX_PACKETS)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_RX_PACKETS */
+	if (sinfo->filled & HDD_INFO_RX_PACKETS)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_TX_RETRIES */
+	if (sinfo->filled & HDD_INFO_TX_RETRIES)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_TX_FAILED */
+	if (sinfo->filled & HDD_INFO_TX_FAILED)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_RX_MPDUS */
+	if (sinfo->filled & HDD_INFO_RX_MPDUS)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_FCS_ERROR_COUNT */
+	if (sinfo->filled & HDD_INFO_FCS_ERROR_COUNT)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_SIGNAL_AVG */
+	if (sinfo->filled & HDD_INFO_SIGNAL_AVG)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_EXPECTED_THROUGHPUT */
+	if (sinfo->filled & HDD_INFO_EXPECTED_THROUGHPUT)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_CONNECTED_TIME */
+	if (sinfo->filled & HDD_INFO_CONNECTED_TIME)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
+	/* NL80211_STA_INFO_INACTIVE_TIME */
+	if (sinfo->filled & HDD_INFO_INACTIVE_TIME)
+		nl_buf_len += nla_total_size(sizeof(uint32_t));
 
 	return nl_buf_len;
 }
@@ -7950,9 +7988,7 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 	uint8_t iter;
 	int flags = cds_get_gfp_flags();
 
-	hdd_debug("RSSI %d tx_bytes %u rx_bytes %u", sinfo->signal,
-		  sinfo->tx_bytes, sinfo->rx_bytes);
-	nl_buf_len = wlan_hdd_calculate_get_sta_len();
+	nl_buf_len = wlan_hdd_calculate_get_sta_len(sinfo);
 	for (iter = 0; iter < GET_STA_MAX_HOST_CLIENT; iter++) {
 		client_info = &adapter->sta_client_info[iter];
 
@@ -7972,33 +8008,141 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 		nla_attr = nla_nest_start(
 			skb,
 			QCA_WLAN_VENDOR_ATTR_ASYNC_GET_STATION_RESPONSE);
+		if (!nla_attr) {
+			hdd_err("nla_nest_start fail");
+			goto fail;
+		}
+
 		if (nla_put(skb, NL80211_ATTR_MAC, QDF_MAC_ADDR_SIZE, mac)) {
 			hdd_err("put mac addr failed");
 			goto fail;
 		}
 
 		nla_attr_1 = nla_nest_start(skb, NL80211_ATTR_STA_INFO);
-		if (nla_put_u32(skb, NL80211_STA_INFO_RX_BYTES,
-				sinfo->rx_bytes)) {
-			hdd_err("put rx_bytes failed");
+		if (!nla_attr_1) {
+			hdd_err("nla_nest_start STA_INFO fail");
 			goto fail;
 		}
 
-		if (nla_put_u32(skb, NL80211_STA_INFO_TX_BYTES,
-				sinfo->tx_bytes)) {
-			hdd_err("put tx_bytes failed");
-			goto fail;
+		if (sinfo->filled & HDD_INFO_RX_BYTES) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_RX_BYTES,
+					sinfo->rx_bytes)) {
+				hdd_err("put rx_bytes failed");
+				goto fail;
+			}
 		}
 
-		if (nla_put_u8(skb, NL80211_STA_INFO_SIGNAL, sinfo->signal)) {
-			hdd_err("put rssi failed");
-			goto fail;
+		if (sinfo->filled & HDD_INFO_TX_BYTES) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_TX_BYTES,
+					sinfo->tx_bytes)) {
+				hdd_err("put tx_bytes failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_SIGNAL) {
+			if (nla_put_u8(skb, NL80211_STA_INFO_SIGNAL,
+				       sinfo->signal)) {
+				hdd_err("put rssi failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_TX_PACKETS) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_TX_PACKETS,
+					sinfo->tx_packets)) {
+				hdd_err("put tx_packets failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_RX_PACKETS) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_RX_PACKETS,
+					sinfo->rx_packets)) {
+				hdd_err("put rx_packets failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_TX_RETRIES) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_TX_RETRIES,
+					sinfo->tx_retries)) {
+				hdd_err("put tx_retries failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_TX_FAILED) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_TX_FAILED,
+					sinfo->tx_failed)) {
+				hdd_err("put tx_failed failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_RX_MPDUS) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_RX_MPDUS,
+					sinfo->rx_mpdu_count)) {
+				hdd_err("put rx_mpdu failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_FCS_ERROR_COUNT) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_FCS_ERROR_COUNT,
+					sinfo->fcs_err_count)) {
+				hdd_err("put FCS error count failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_SIGNAL_AVG) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_SIGNAL_AVG,
+					sinfo->signal_avg)) {
+				hdd_err("put chain_signal failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_EXPECTED_THROUGHPUT) {
+			if (nla_put_u32(skb,
+					NL80211_STA_INFO_EXPECTED_THROUGHPUT,
+					sinfo->expected_throughput)) {
+				hdd_err("put expected_throughput failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_CONNECTED_TIME) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_CONNECTED_TIME,
+					sinfo->connected_time)) {
+				hdd_err("put connected_time failed");
+				goto fail;
+			}
+		}
+
+		if (sinfo->filled & HDD_INFO_INACTIVE_TIME) {
+			if (nla_put_u32(skb, NL80211_STA_INFO_INACTIVE_TIME,
+					sinfo->inactive_time)) {
+				hdd_err("put inactive_time failed");
+				goto fail;
+			}
 		}
 
 		nla_nest_end(skb, nla_attr_1);
 		nla_nest_end(skb, nla_attr);
+		hdd_debug("PortId: %u", client_info->port_id);
 		wlan_cfg80211_vendor_event(skb, flags);
 	}
+
+	hdd_nofl_debug("RSSI %d tx_bytes %llu rx_bytes %llu tx_packets %u rx_packets %u tx_retries %u tx_failed %u rx_mpdu %u fcs_count %u signal_avg %u expected throughput %u connected time %u inactive time %u",
+		       sinfo->signal, sinfo->tx_bytes, sinfo->rx_bytes,
+		       sinfo->tx_packets, sinfo->rx_packets, sinfo->tx_retries,
+		       sinfo->tx_failed, sinfo->rx_mpdu_count,
+		       sinfo->fcs_err_count, sinfo->signal_avg,
+		       sinfo->expected_throughput, sinfo->connected_time,
+		       sinfo->inactive_time);
+
 	return QDF_STATUS_SUCCESS;
 fail:
 	wlan_cfg80211_vendor_free_skb(skb);
@@ -10202,6 +10346,7 @@ hdd_convert_roam_failures_reason(enum wlan_roam_failure_reason_code fail)
 	case ROAM_FAIL_REASON_SCREEN_ACTIVITY:
 	case ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN:
 	case ROAM_FAIL_REASON_REASSOC_TO_SAME_AP:
+	case ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED:
 	case ROAM_FAIL_REASON_UNKNOWN:
 		hdd_err("Invalid roam failures reason");
 		break;

@@ -1389,9 +1389,9 @@ wma_populate_peer_mlo_common_info_sta(tp_wma_handle wma,
 		return;
 	}
 
-	if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
-							true) ||
-	    policy_mgr_is_emlsr_sta_concurrency_present(psoc)) {
+	if (policy_mgr_is_hw_dbs_capable(psoc) &&
+	    (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev, true) ||
+	    policy_mgr_is_emlsr_sta_concurrency_present(psoc))) {
 		req->mlo_params.mlo_force_link_inactive = 1;
 		link_id_bitmap = 1 << params->link_id;
 		ml_nlink_set_curr_force_inactive_state(

@@ -95,6 +95,7 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
+	QDF_STATUS status;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -129,7 +130,6 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		policy_mgr_check_sap_go_force_scc(psoc, vdev,
 						  CSA_REASON_GO_BSS_STARTED);
-	ifmgr_debug("check for SAP restart");
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
 		policy_mgr_ll_lt_sap_restart_concurrent_sap(
@@ -143,6 +143,17 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	 */
 	if (event_data && QDF_IS_STATUS_ERROR(event_data->status))
 		wlan_tdls_notify_start_bss_failure(psoc);
+
+	/*
+	 * Configure random mac address listen for P2P-device frames on
+	 * P2P-GO channel
+	 */
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc))
+		status = wlan_p2p_set_rand_mac_for_p2p_dev(psoc,
+				wlan_p2p_psoc_priv_get_sta_vdev_id(psoc),
+				policy_mgr_mode_specific_get_channel(psoc,
+						PM_P2P_GO_MODE), 0, 0);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -160,6 +171,7 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	uint8_t mcc_scc_switch;
+	QDF_STATUS status;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -181,12 +193,9 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 	 * is active on any vdev.
 	 */
 	if (cfg_p2p_is_roam_config_disabled(psoc) &&
-	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE) {
-		ifmgr_debug("p2p go disconnected enable roam");
+	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		if_mgr_enable_roaming(pdev, vdev, RSO_START_BSS);
-	}
 
-	ifmgr_debug("SAP/P2P-GO is stopped, re-enable roaming if it's stopped due to SAP/P2P-GO CSA");
 	if_mgr_enable_roaming(pdev, vdev, RSO_SAP_CHANNEL_CHANGE);
 
 	policy_mgr_get_mcc_scc_switch(psoc, &mcc_scc_switch);
@@ -197,6 +206,17 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
 		policy_mgr_ll_lt_sap_restart_concurrent_sap(
 						psoc, LL_LT_SAP_EVENT_STOPPED);
+
+	/*
+	 * Remove the P2P-device mac address filter to stop listen for
+	 * P2P-device frames. P2P-device configures filter as part ROC start in
+	 * standalone cases.
+	 */
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc))
+		status = wlan_p2p_del_random_mac(psoc,
+				wlan_p2p_psoc_priv_get_sta_vdev_id(psoc),
+						 0);
 
 	return QDF_STATUS_SUCCESS;
 }

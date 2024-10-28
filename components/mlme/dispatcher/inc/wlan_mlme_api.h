@@ -52,6 +52,10 @@
 #define RATECODE_V1_NSS_OFFSET  0x4
 #define RATECODE_V1_NSS_MASK    0x7
 
+/* Band mask for first and Second STA frequencies */
+#define BAND_MASK_FIRST_FREQ  0x3000000
+#define BAND_MASK_SECOND_FREQ 0xC000000
+
 #ifdef FEATURE_SET
 /**
  * wlan_mlme_get_feature_info() - Get mlme features
@@ -2911,6 +2915,28 @@ wlan_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
 QDF_STATUS
 wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
+/**
+ * wlan_mlme_set_rf_mode_force_pwr_type() - Set RF mode force power type
+ * @psoc: psoc context
+ * @value: Enable/Disable value.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_rf_mode_force_pwr_type(struct wlan_objmgr_psoc *psoc,
+				     int8_t value);
+
+/**
+ * wlan_mlme_get_rf_mode_force_pwr_type() - Get RF mode force power type
+ * @psoc: psoc context
+ * @value: Enable/Disable value.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_rf_mode_force_pwr_type(struct wlan_objmgr_psoc *psoc,
+				     int8_t *value);
+
 #ifdef CONFIG_BAND_6GHZ
 /**
  * wlan_mlme_is_standard_6ghz_conn_policy_enabled() - Get the 6 GHz standard
@@ -4126,6 +4152,17 @@ QDF_STATUS
 wlan_mlme_get_bss_load_threshold(struct wlan_objmgr_psoc *psoc, uint32_t *val);
 
 /**
+ * wlan_mlme_get_bss_load_alpha() - Get bss load alpha multiplier factor
+ * for bss load average calculation
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_bss_load_alpha(struct wlan_objmgr_psoc *psoc, uint32_t *val);
+
+/**
  * wlan_mlme_get_bss_load_sample_time() - Get bss load sample time
  * @psoc: pointer to psoc object
  * @val:  Pointer to the value which will be filled for the caller
@@ -5216,4 +5253,56 @@ QDF_STATUS
 wlan_mlme_get_sta_keep_alive_period(struct wlan_objmgr_psoc *psoc,
 				    uint32_t *keep_alive_period);
 
+/**
+ * wlan_mlme_get_24_chan_bonding_mode() - reset 24 GHz chan bonding
+ * @psoc: pointer to psoc object
+ * @chan_bonding: chan bonding
+ *
+ * Return: None
+ */
+void wlan_mlme_get_24_chan_bonding_mode(struct wlan_objmgr_psoc *psoc,
+					int *chan_bonding);
+
+/*
+ * wlan_mlme_get_sap_dfs_puncture() - Get sap dfs puncture state
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool sap dfs puncture state
+ */
+bool
+wlan_mlme_get_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * wlan_mlme_set_sap_dfs_puncture() - Set sap dfs puncture state
+ * @psoc: pointer to psoc object
+ * @enable_sap_dfs_puncture: sap dfs puncture state, true: enable,
+ * false: disable
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc,
+			       bool enable_sap_dfs_puncture);
+/**
+ * wlan_mlme_set_p2p_device_mac_addr() - set p2p device interface mac
+ * address in sta vdev mlme object
+ * @vdev: pointer to vdev
+ * @mac_addr: p2p device mac addr
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+				  struct qdf_mac_addr *mac_addr);
+/**
+ * wlan_mlme_get_p2p_device_mac_addr() - get p2p device interface mac
+ * address from sta vdev mlme object
+ * @vdev: pointer to vdev
+ * @mac_addr: mac addr
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
+				  struct qdf_mac_addr *mac_addr);
 #endif /* _WLAN_MLME_API_H_ */

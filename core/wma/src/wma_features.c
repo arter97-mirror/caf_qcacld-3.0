@@ -605,6 +605,137 @@ QDF_STATUS wma_set_wisa_params(tp_wma_handle wma_handle,
 	return status;
 }
 
+#ifdef FEATURE_WLAN_APF
+/*
+ * get_fw_active_apf_mode() - convert HDD APF mode to FW configurable APF
+ * mode
+ * @mode: APF mode maintained in HDD
+ *
+ * Return: FW configurable BP mode
+ */
+static enum wmi_host_active_apf_mode
+get_fw_active_apf_mode(enum active_apf_mode mode)
+{
+	switch (mode) {
+	case ACTIVE_APF_DISABLED:
+		return WMI_HOST_ACTIVE_APF_DISABLED;
+	case ACTIVE_APF_ENABLED:
+		return WMI_HOST_ACTIVE_APF_ENABLED;
+	case ACTIVE_APF_ADAPTIVE:
+		return WMI_HOST_ACTIVE_APF_ADAPTIVE;
+	default:
+		wma_err("Invalid Active APF Mode %d; Using 'disabled'", mode);
+		return WMI_HOST_ACTIVE_APF_DISABLED;
+	}
+}
+
+QDF_STATUS wma_enable_active_apf_mode(WMA_HANDLE handle, tAniDHCPInd *ta_dhcp_ind)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	enum wmi_host_active_apf_mode uc_mode, mcbc_mode;
+	struct vdev_mlme_obj *vdev_mlme;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+
+	if (!ta_dhcp_ind) {
+		wma_err("DHCP indication is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	wma_debug("Enabling active apf mode");
+
+	if (wma_find_vdev_id_by_addr(wma_handle,
+				     ta_dhcp_ind->adapterMacAddr.bytes,
+				     &vdev_id)) {
+		wma_err("Failed to find vdev id for DHCP indication");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma_handle->psoc,
+						    vdev_id,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		wma_err("Failed to get vdev mlme obj!");
+		ret = -EINVAL;
+		goto release_ref_and_return;
+	}
+	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
+	    ucfg_pmo_is_apf_enabled(wma_handle->psoc)) {
+		uc_mode = get_fw_active_apf_mode(wma_handle->active_uc_apf_mode);
+		mcbc_mode = get_fw_active_apf_mode(wma_handle->active_mc_bc_apf_mode);
+		wma_debug("Configuring Active APF Mode UC:%d MC/BC:%d for vdev %u",
+			  uc_mode, mcbc_mode, vdev_id);
+
+		ret = wmi_unified_set_active_apf_mode_cmd(wma_handle->wmi_handle, vdev_id,
+							  uc_mode, mcbc_mode);
+
+		if (QDF_IS_STATUS_ERROR(ret))
+			wma_err("Failed to configure active APF mode");
+	}
+release_ref_and_return:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+	return ret;
+}
+
+QDF_STATUS wma_disable_active_apf_mode(WMA_HANDLE handle, tAniDHCPInd *ta_dhcp_ind)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+	enum wmi_host_active_apf_mode uc_mode, mcbc_mode;
+	struct vdev_mlme_obj *vdev_mlme;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+
+	if (!ta_dhcp_ind) {
+		wma_err("DHCP indication is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wma_debug("Disabling active apf mode");
+
+	if (wma_find_vdev_id_by_addr(wma_handle,
+				     ta_dhcp_ind->adapterMacAddr.bytes,
+				     &vdev_id)) {
+		wma_err("Failed to find vdev id for DHCP indication");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma_handle->psoc,
+						    vdev_id,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		wma_err("Failed to get vdev mlme obj!");
+		ret = -EINVAL;
+		goto release_ref_and_return;
+	}
+	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
+	    ucfg_pmo_is_apf_enabled(wma_handle->psoc)) {
+		uc_mode = WMI_HOST_ACTIVE_APF_DISABLED;
+		mcbc_mode = WMI_HOST_ACTIVE_APF_DISABLED;
+
+		wma_debug("Configuring Active APF Mode UC:%d MC/BC:%d for vdev %u",
+			  uc_mode, mcbc_mode, vdev_id);
+
+		ret = wmi_unified_set_active_apf_mode_cmd(wma_handle->wmi_handle, vdev_id,
+							  uc_mode, mcbc_mode);
+
+		if (QDF_IS_STATUS_ERROR(ret))
+			wma_err("Failed to configure active APF mode");
+	}
+release_ref_and_return:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+	return ret;
+}
+#endif /* FEATURE_WLAN_APF */
+
 /**
  * wma_process_dhcp_ind() - process dhcp indication from SME
  * @wma_handle: wma handle
@@ -2001,6 +2132,8 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 	case WOW_REASON_XGAP:
 		return "XGAP";
 #endif
+	case WOW_REASON_PF_BLOCKING_LAST_TIME:
+		return "PF_BLOCKING_LAST_TIME";
 	default:
 		return "unknown";
 	}
@@ -3600,10 +3733,10 @@ wma_wow_wakeup_pagefault_notify(tp_wma_handle wma, void *ev, uint32_t ev_len)
 		return;
 	}
 
-	cur_time = qdf_get_system_uptime();
+	cur_time = (qdf_time_t)qdf_get_monotonic_boottime();
 	pf_wakeup_intv =
 		wlan_pmo_get_interval_for_pagefault_wakeup_counts(psoc);
-	cutoff_time = cur_time - qdf_system_msecs_to_ticks(pf_wakeup_intv);
+	cutoff_time = cur_time - (qdf_time_t)WMA_MSEC_TO_USEC(pf_wakeup_intv);
 
 	status = wma_wow_pagefault_parse_event(psoc, ev, ev_len, &pf_sym_list);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -6173,8 +6306,8 @@ int wma_vdev_obss_detection_info_handler(void *handle, uint8_t *event,
 	return 0;
 }
 
-static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
-				 uint8_t key_index)
+static void wma_send_set_key_rsp(uint8_t vdev_id, const uint8_t *peer_mac,
+				 bool pairwise, uint8_t key_index)
 {
 	tSetStaKeyParams *key_info_uc;
 	tSetBssKeyParams *key_info_mc;
@@ -6186,14 +6319,13 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 	if (!wma)
 		return;
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
-						    vdev_id,
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, vdev_id,
 						    WLAN_LEGACY_WMA_ID);
 	if (!vdev) {
 		wma_err("VDEV object not found");
 		return;
 	}
-	crypto_key = wlan_crypto_get_key(vdev, key_index);
+	crypto_key = wlan_crypto_get_key(vdev, peer_mac, key_index);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 	if (!crypto_key) {
@@ -6255,7 +6387,7 @@ void wma_set_peer_ucast_cipher(uint8_t *mac_addr, int32_t uc_cipher,
 }
 
 void wma_update_set_key(uint8_t session_id, bool pairwise,
-			uint8_t key_index,
+			uint8_t key_index, const uint8_t *peer_mac,
 			enum wlan_crypto_cipher_type cipher_type)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -6273,7 +6405,7 @@ void wma_update_set_key(uint8_t session_id, bool pairwise,
 	if (iface)
 		iface->is_waiting_for_key = false;
 
-	wma_send_set_key_rsp(session_id, pairwise, key_index);
+	wma_send_set_key_rsp(session_id, peer_mac, pairwise, key_index);
 }
 
 int wma_vdev_bss_color_collision_info_handler(void *handle,
@@ -6371,7 +6503,14 @@ QDF_STATUS
 wma_peer_txq_flush_config_send(struct peer_txq_flush_config_params *params)
 {
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	struct wmi_unified *wmi_handle = wma_handle->wmi_handle;
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma_handle))
+		return QDF_STATUS_E_INVAL;
+
+	wmi_handle = wma_handle->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
 
 	return wmi_unified_peer_txq_flush_config_send(wmi_handle, params);
 }
@@ -6388,7 +6527,14 @@ wma_peer_flush_tids_send(uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
 			 struct peer_flush_params *param)
 {
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	struct wmi_unified *wmi_handle = wma_handle->wmi_handle;
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma_handle))
+		return QDF_STATUS_E_INVAL;
+
+	wmi_handle = wma_handle->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
 
 	return wmi_unified_peer_flush_tids_send(wmi_handle, peer_addr, param);
 }

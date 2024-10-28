@@ -153,6 +153,7 @@ typedef enum eMgmtFrmDropReason {
 	eMGMT_DROP_DUPLICATE_AUTH_FRAME,
 	eMGMT_DROP_EXCESSIVE_MGMT_FRAME,
 	eMGMT_DROP_DEAUTH_DURING_ROAM_STARTED,
+	eMGMT_DROP_CONNECT_DURING_ROAMING,
 } tMgmtFrmDropReason;
 
 /**
@@ -174,6 +175,27 @@ void pe_stop(struct mac_context *mac);
  * Return: True if RMF enabled and key is installed
  */
 bool is_mgmt_protected(uint32_t vdev_id, const uint8_t *peer_mac_addr);
+
+/**
+ * lim_check_ap_assist_dfs_p2p_group() - Evaluate AP assisted DFS P2P entities
+ *
+ * The API checks if any active AP assisted P2P entities are present and calls
+ * P2P module to re-evaulate the conditions for continued group operation when
+ * any concurrency changes on STA interface.
+ * @is_incr_session: Is callback due to session count increase
+ *
+ * Return: void
+ */
+void lim_check_ap_assist_dfs_p2p_group(bool is_incr_session);
+
+/**
+ * lim_fill_dfs_p2p_group_params() - Fill the params of P2P group operating
+ * in DFS channel.
+ * @pe_session: Session
+ *
+ * Return: void
+ */
+void lim_fill_dfs_p2p_group_params(struct pe_session *pe_session);
 
 /**
  * lim_stop_pmfcomeback_timer() - stop pmf comeback timer
@@ -661,6 +683,22 @@ lim_fill_pe_session(struct mac_context *mac_ctx,
  */
 void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
 				enum phy_ch_width ch_width);
+
+/**
+ * lim_is_he_dynamic_smps_enabled() - Check if Dynamic SMPS enabled in HE caps
+ * @session: PE session
+ *
+ * Return: True if Dynamic SMPS is enabled, False otherwise
+ */
+#ifdef WLAN_FEATURE_11AX
+bool lim_is_he_dynamic_smps_enabled(struct pe_session *session);
+#else
+static inline
+bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
+{
+	return false;
+}
+#endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /*

@@ -79,4 +79,28 @@ bool cfg_p2p_is_roam_config_disabled(struct wlan_objmgr_psoc *psoc);
  * If P2P GO ignore non-P2P probe req enabled, don't send probe rsp to STA
  */
 bool cfg_p2p_is_go_ignore_non_p2p_probe_req(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * cfg_p2p_get_sta_vdev_for_p2p_dev_cap() - Check ini support
+ * @psoc: pointer to psoc object
+ *
+ * This function checks host capability through ini param
+ * sta_vdev_for_p2p_device
+ *
+ * Return: True if ini param sta_vdev_for_p2p_device is set
+ */
+bool
+cfg_p2p_get_sta_vdev_for_p2p_dev_cap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * cfg_p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap()
+ * @psoc: pointer to psoc object
+ *
+ * This function checks whether use of STA vdev for P2P device operation
+ * is allowed or not when vdevs are exhausted, i.e. checks for the ini param
+ * sta_vdev_for_p2p_device_upon_vdev_exhaust
+ */
+bool
+cfg_p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap(
+					struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_P2P_CFG_API_H_ */

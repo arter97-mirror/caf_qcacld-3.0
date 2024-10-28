@@ -33,6 +33,21 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlo_mgr_sta.h"
 
+void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
+				      struct tdls_callbacks *cbs)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							WLAN_UMAC_COMP_TDLS);
+	if (!soc_obj) {
+		tdls_err("Failed to get tdls psoc component");
+		return;
+	}
+
+	soc_obj->tdls_cb.delete_all_tdls_peers = cbs->delete_all_tdls_peers;
+}
+
 static QDF_STATUS tdls_teardown_flush_cb(struct scheduler_msg *msg)
 {
 	struct tdls_link_teardown *tdls_teardown = msg->bodyptr;
@@ -195,17 +210,22 @@ void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
 		goto exit;
 	}
 
-	tdls_debug("CSA complete");
+	tdls_debug("vdev %d CSA complete", wlan_vdev_get_id(tdls_vdev));
 	/*
 	 * Channel Switch can cause SCC -> MCC switch on
 	 * STA vdev. Disable TDLS if CSA causes STA vdev to be in MCC with
 	 * other vdev.
 	 */
-	if (!tdls_is_concurrency_allowed(psoc)) {
+	if (!tdls_check_is_tdls_allowed(tdls_vdev)) {
 		tdls_disable_offchan_and_teardown_links(tdls_vdev);
-		tdls_debug("Disable the tdls in FW after CSA");
+		tdls_debug("vdev %d disable the tdls in FW after CSA",
+			   wlan_vdev_get_id(tdls_vdev));
 	} else {
-		tdls_process_enable_for_vdev(tdls_vdev);
+		if (wlan_vdev_mlme_is_mlo_vdev(tdls_vdev))
+			tdls_process_enable_disable_for_ml_vdev(tdls_vdev,
+								true);
+		else
+			tdls_process_enable_for_vdev(tdls_vdev);
 		tdls_set_tdls_offchannelmode(tdls_vdev, ENABLE_CHANSWITCH);
 	}
 
@@ -567,4 +587,55 @@ QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc)
 		status = wlan_tdls_teardown_links(psoc);
 
 	return status;
+}
+
+bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
+					struct qdf_mac_addr *mac_addr)
+{
+	struct tdls_vdev_priv_obj *vdev_obj;
+	struct tdls_peer *curr_peer;
+
+	vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
+	if (!vdev_obj) {
+		tdls_err("vdev_obj: %pK is null", vdev_obj);
+		return false;
+	}
+
+	curr_peer = wlan_tdls_find_peer(vdev_obj, mac_addr->bytes);
+	if (!curr_peer) {
+		tdls_err("tdls peer is null");
+		return false;
+	}
+
+	if (curr_peer->valid_entry &&
+	    curr_peer->link_status ==  TDLS_LINK_CONNECTED)
+		return true;
+
+	return false;
+}
+
+void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct tdls_soc_priv_obj *soc_obj;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	soc_obj = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							WLAN_UMAC_COMP_TDLS);
+	if (!soc_obj) {
+		tdls_err("Failed to get tdls psoc component");
+		return;
+	}
+
+	if (soc_obj->tdls_cb.delete_all_tdls_peers)
+		soc_obj->tdls_cb.delete_all_tdls_peers(vdev);
+}
+
+QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
+					       uint8_t *macaddr)
+{
+	return tdls_update_peer_kickout_count(vdev, macaddr);
 }

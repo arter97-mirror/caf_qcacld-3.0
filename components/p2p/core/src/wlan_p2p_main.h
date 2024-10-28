@@ -84,6 +84,7 @@ struct tx_action_context;
  * @P2P_CLEANUP_ROC:        Cleanup roc queue
  * @P2P_CLEANUP_TX:         Cleanup tx mgmt queue
  * @P2P_SET_RANDOM_MAC: Set Random MAC addr filter request
+ * @P2P_GROUP_CHAN_SWITCH_CMD: Channel switch request on P2P device
  */
 enum p2p_cmd_type {
 	P2P_ROC_REQ = 0,
@@ -93,6 +94,7 @@ enum p2p_cmd_type {
 	P2P_CLEANUP_ROC,
 	P2P_CLEANUP_TX,
 	P2P_SET_RANDOM_MAC,
+	P2P_GROUP_CHAN_SWITCH_CMD,
 };
 
 /**
@@ -103,6 +105,8 @@ enum p2p_cmd_type {
  * @P2P_EVENT_LO_STOPPED:        P2P listen offload stopped event
  * @P2P_EVENT_NOA:               P2P noa event
  * @P2P_EVENT_ADD_MAC_RSP: Set Random MAC addr event
+ * @P2P_EVENT_AP_ASSIST_DFS_GROUP_BMISS_IND: P2P AP assisted DFS group bmiss
+ * indication from FW.
  */
 enum p2p_event_type {
 	P2P_EVENT_SCAN_EVENT = 0,
@@ -111,6 +115,7 @@ enum p2p_event_type {
 	P2P_EVENT_LO_STOPPED,
 	P2P_EVENT_NOA,
 	P2P_EVENT_ADD_MAC_RSP,
+	P2P_EVENT_AP_ASSIST_DFS_GROUP_BMISS_IND,
 };
 
 /**
@@ -167,6 +172,17 @@ struct p2p_mac_filter_rsp {
 	uint32_t status;
 };
 
+/**
+ * struct p2p_ap_assist_dfs_group_bmiss - P2P AP assisted DFS group bmiss
+ * notify params
+ * @p2p_soc_obj: P2P soc priv object.
+ * @vdev_id: VDEV ID of bmiss
+ */
+struct p2p_ap_assist_dfs_group_bmiss {
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+	uint8_t vdev_id;
+};
+
 #ifdef WLAN_FEATURE_P2P_DEBUG
 /**
  * enum p2p_connection_status - p2p connection status
@@ -214,14 +230,19 @@ void p2p_status_update(struct p2p_soc_priv_obj *p2p_soc_obj,
  * @is_random_seq_num_enabled:      Flag to generate random sequence numbers
  * @indoor_channel_support:         support to allow GO in indoor channels
  * @go_ignore_non_p2p_probe_req:    P2P GO ignore non-P2P probe req
+ * @sta_vdev_for_p2p_device:        Use sta vdev for p2p device operation
+ * @sta_vdev_for_p2p_device_upon_vdev_exhaust: Use sta vdev for p2p device
+ * operation when maximum vdev creation reaches to limit
  */
 struct p2p_param {
 	uint32_t go_keepalive_period;
 	uint32_t go_link_monitor_period;
-	bool p2p_device_addr_admin;
-	bool is_random_seq_num_enabled;
-	bool indoor_channel_support;
-	bool go_ignore_non_p2p_probe_req;
+	uint32_t p2p_device_addr_admin:1;
+	uint32_t is_random_seq_num_enabled:1;
+	uint32_t indoor_channel_support:1;
+	uint32_t go_ignore_non_p2p_probe_req:1;
+	uint32_t sta_vdev_for_p2p_device:1;
+	uint32_t sta_vdev_for_p2p_device_upon_vdev_exhaust:1;
 };
 
 /**
@@ -244,6 +265,8 @@ struct p2p_param {
  * @connection_status:Global P2P connection status
  * @mcc_quota_ev_os_if_cb:  callback to OS IF to indicate mcc quota event
  * @mgmt_frm_registration_update: mgmt frame registration update
+ * @sta_vdev_for_p2p_dev_operations: Use sta vdev for p2p device operations
+ * @sta_vdev_id: store sta vdev_id to use it for p2p device operation.
  */
 struct p2p_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -266,6 +289,8 @@ struct p2p_soc_priv_obj {
 	mcc_quota_event_callback mcc_quota_ev_os_if_cb;
 #endif
 	uint32_t mgmt_frm_registration_update;
+	bool sta_vdev_for_p2p_dev_operations;
+	uint32_t sta_vdev_id;
 };
 
 /**
@@ -335,6 +360,44 @@ struct p2p_set_mac_filter_req {
 	void *req_cookie;
 };
 
+#define WLAN_P2P_MAX_WLAN_AP_INFO 10
+/**
+ * struct p2p_ap_assist_dfs_ap_info - Struct to hold WLAN per AP info in P2P2 IE
+ * @is_connected: Is connected bit set in WLAN AP info attr
+ * @is_valid: Is WLAN AP info is valid
+ * @ap_bssid: BSSID of the WLAN AP
+ * @op_class: Operating class of the WLAN AP
+ * @chan: Channel number of the WLAN AP
+ */
+struct p2p_ap_assist_dfs_ap_info {
+	bool is_connected;
+	bool is_valid;
+	struct qdf_mac_addr ap_bssid;
+	uint8_t op_class;
+	uint8_t chan;
+};
+
+/**
+ * struct p2p_ap_assist_dfs_group_info - Extracted info from P2P2 IE related
+ * to DFS owner capability and AP assisted params
+ * @is_dfs_owner: Is DFS owner
+ * @is_client_csa: Can client send CSA request
+ * @extn_cap_attr_found: Is extended cap attr found
+ * @wlan_ap_info_attr_found: Is WLAN AP info attr found
+ * @is_valid_ap_assist: Is assisted AP params valid
+ * @num_ap_info: Number of APs in WLAN AP info attr
+ * @ap_info: List of WLAN AP extracted from WLAN AP info attr
+ */
+struct p2p_ap_assist_dfs_group_info {
+	bool is_dfs_owner;
+	bool is_client_csa;
+	bool extn_cap_attr_found;
+	bool wlan_ap_info_attr_found;
+	bool is_valid_ap_assist;
+	uint8_t num_ap_info;
+	struct p2p_ap_assist_dfs_ap_info ap_info[WLAN_P2P_MAX_WLAN_AP_INFO];
+};
+
 /**
  * struct p2p_vdev_priv_obj - Per vdev p2p private object
  * @vdev:               Pointer to vdev context
@@ -346,6 +409,7 @@ struct p2p_set_mac_filter_req {
  * @pending_req:        pending set mac filter request.
  * @prev_action_frame_addr2: Address2 field (TA) of the last transmitted
  *                           action frame.
+ * @ap_assist_dfs:      AP assisted DFS group operation info
  */
 struct p2p_vdev_priv_obj {
 	struct   wlan_objmgr_vdev *vdev;
@@ -358,6 +422,8 @@ struct p2p_vdev_priv_obj {
 	struct action_frame_random_mac random_mac[MAX_RANDOM_MAC_ADDRS];
 	struct p2p_set_mac_filter_req pending_req;
 	uint8_t prev_action_frame_addr2[QDF_MAC_ADDR_SIZE];
+
+	struct p2p_ap_assist_dfs_group_info ap_assist_dfs;
 };
 
 /**
@@ -671,5 +737,199 @@ const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
  */
 QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 			       struct p2p_usd_attr_params *param);
+/**
+ * p2p_is_fw_support_usd() - wrapper API for API
+ * tgt_p2p_is_fw_support_usd()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if USD is supported by FW else false
+ */
+bool p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+/**
+ * p2p_extract_ap_assist_dfs_params() - Extract P2P2 IE for assisted AP
+ * operation info
+ * @vdev: VDEV object manager pointer
+ * @ie: Buffer pointer to IE
+ * @ie_len: Length of bytes pointer by @ie
+ * @is_connected: If set to %true, only connected AP info is extracted from
+ * WLAN AP info attr in P2P2 IE
+ * @freq: Frequency to filter from the available APs in WLAN AP info attr in
+ * P2P@ IE
+ * @is_self: If set to %true, the extracted info is saved in VDEV priv
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					    const uint8_t *ie, uint16_t ie_len,
+					    bool is_connected, qdf_freq_t freq,
+					    bool is_self);
+
+/**
+ * p2p_get_ap_assist_dfs_params() - Get the parameters of attributes in P2P2 IE
+ * @vdev: VDEV object manager pointer of P2P entity
+ * @is_dfs_owner: Pointer to get DFS owner capability in extended cap of P2P2 IE
+ * @is_valid_ap_assist: Is assisted AP params valid
+ * @ap_bssid: Pointer to get AP BSSID of assisted AP in DFS oper extracted from
+ * wlan ap info attribute
+ * @opclass: Operating class of the AP pointed in @ap_bssid
+ * @chan: Channel number of the AP pointed in @ap_bssid
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					bool *is_dfs_owner,
+					bool *is_valid_ap_assist,
+					struct qdf_mac_addr *ap_bssid,
+					uint8_t *opclass, uint8_t *chan);
+
+/**
+ * p2p_fw_support_ap_assist_dfs_group() - API to return the FW capability of
+ * AP assisted DFS P2P group
+ * @psoc: PSOC object manager
+ *
+ * This API checks the FW capability attribute to support for AP assisted
+ * DFS P2P group operation
+ *
+ * Return: bool
+ */
+bool p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * p2p_check_ap_assist_dfs_group_cli() - API to check the status of P2P CLI
+ * for operation in DFS channel under assisted AP mode
+ * @vdev: VDEV object manager pointer of P2P_CLI entity
+ *
+ * Checks the conditions for P2P CLI to operate in DFS channel in AP assisted
+ * mode and sends command to FW to either monitor the assisted or not.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS p2p_check_ap_assist_dfs_group_cli(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * p2p_check_ap_assist_dfs_group_go() - API to check the status of P2P GO
+ * for operation in DFS channel under assisted AP mode
+ * @vdev: VDEV object manager pointer of P2P_GO entity
+ *
+ * Checks the requirements for P2P GO to operate in DFS channel in AP assisted
+ * mode.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * p2p_check_ap_assist_dfs_group_go_with_csa() - API to check the status of
+ * P2P GO for operation in DFS channel
+ * @vdev: VDEV object manager pointer of P2P_GO entity
+ *
+ * Checks the requirements for P2P GO to operate in DFS channel in AP assisted
+ * mode and triggers CSA incase any condition fails.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+p2p_check_ap_assist_dfs_group_go_with_csa(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * p2p_validate_ap_assist_dfs_group() - Validate the params of extracted
+ * assisted AP params from P2P2 IE
+ * @vdev: VDEV object manager pointer of P2P device
+ *
+ * Validates the info parsed from the P2P2 IE related to DFS operation under
+ * assisted AP mode.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS p2p_validate_ap_assist_dfs_group(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * p2p_get_sta_vdev_for_p2p_dev_cap() - Check fw and host capability
+ * @psoc: pointer to psoc
+ *
+ * This API checks if STA vdev for P2P device operation is supported by both
+ * host and firmware.
+ *
+ * Return: True/False
+ */
+bool p2p_get_sta_vdev_for_p2p_dev_cap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap()
+ * @psoc: pointer to psoc
+ *
+ * This api will check if STA vdev for P2P device operation is supported or
+ * not. If it's supported then host will use STA vdev for P2P device operation
+ * whenever the new interface tries to comes up but there is no more vdev
+ * available to create.
+ * In this case, host will try to accommodate the new interface by destroying
+ * the p2p device vdev if it's present and it will redirect the p2p device
+ * operation on STA vdev itself.
+ *
+ * Return: True/False
+ */
+bool p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap(
+					struct wlan_objmgr_psoc *psoc);
+
+/**
+ * p2p_set_sta_vdev_for_p2p_dev_operations() - Allow current p2p device to
+ *						    use sta vdev
+ * @psoc: pointer to psoc
+ * @val: value
+ *
+ * This is called with value true when firmware and the host INI params support
+ * the feature "use STA vdev for P2P" and STA vdev is available
+ *
+ * Return: None
+ */
+void p2p_set_sta_vdev_for_p2p_dev_operations(struct wlan_objmgr_psoc *psoc,
+					     bool val);
+
+/**
+ * p2p_is_sta_vdev_usage_allowed_for_p2p_dev() - Check whether sta vdev
+ *					can be used for current P2P device
+ * @psoc: pointer to psoc
+ *
+ * Return: True/False
+ */
+bool p2p_is_sta_vdev_usage_allowed_for_p2p_dev(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * p2p_psoc_priv_set_sta_vdev_id() - Cache STA vdev id
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id to set
+ *
+ * Cache STA vdev_id in psoc p2p priv object.
+ *
+ * Return: None
+ */
+void p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id);
+
+/**
+ * p2p_psoc_priv_get_sta_vdev_id() - Get cached STA vdev id
+ * @psoc: pointer to psoc
+ *
+ * Return: uint8_t
+ */
+uint8_t p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * p2p_set_rand_mac_for_p2p_dev() - set P2P device mac addr to rx filters
+ * @soc: pointer to psoc
+ * @vdev_id: vdev id to fetch p2p_vdev_priv_obj
+ * @freq: frequency on which the filtering(allow) is expected
+ * @rnd_cookie: cookie value
+ * @duration: duration of the filter validity. p2p_mac_clear_timeout() is called
+ *            and filter would be removed upon timeout, if not removed already
+ *
+ * Return: None
+ */
+QDF_STATUS
+p2p_set_rand_mac_for_p2p_dev(struct wlan_objmgr_psoc *soc,
+			     uint32_t vdev_id, uint32_t freq,
+			     uint64_t rnd_cookie, uint32_t duration);
+
 #endif /* _WLAN_P2P_MAIN_H_ */

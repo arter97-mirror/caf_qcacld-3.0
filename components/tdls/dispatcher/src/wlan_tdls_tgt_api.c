@@ -132,8 +132,8 @@ QDF_STATUS tgt_tdls_register_ev_handler(struct wlan_objmgr_psoc *psoc)
 	tdls_ops = wlan_psoc_get_tdls_txops(psoc);
 	if (tdls_ops && tdls_ops->tdls_reg_ev_handler)
 		return tdls_ops->tdls_reg_ev_handler(psoc, NULL);
-	else
-		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS tgt_tdls_unregister_ev_handler(struct wlan_objmgr_psoc *psoc)

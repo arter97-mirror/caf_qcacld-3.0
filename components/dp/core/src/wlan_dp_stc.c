@@ -26,6 +26,7 @@
 #include "target_if.h"
 #include "dp_internal.h"
 #include "wlan_dp_prealloc.h"
+#include <cdp_txrx_ctrl.h>
 
 #ifdef WLAN_DP_FEATURE_STC
 
@@ -34,6 +35,17 @@
 #define FLOW_INACTIVE_TIME_THRESH_NS 20000000000
 #define FLOW_RESUME_TIME_THRESH_NS 500000000
 #define FLOW_SHORTLIST_PKT_RATE_PER_SEC_THRESH 15
+#define WLAN_DP_STC_BK_TPUT_TEST_THRESH_NS 1000000000
+/*
+ * Value of WLAN_DP_STC_BK_PKT_THRESH is dependent on the value of
+ * WLAN_DP_STC_BK_TPUT_TEST_THRESH_NS.
+ *
+ * Since WLAN_DP_STC_BK_TPUT_TEST_THRESH_NS = 1 second, the threshold
+ * number of pkts also will be calculated for 1 second.
+ * 26000 pkts/sec = 26000 * 1460 * 8 = 303,680,000 bits/sec
+ */
+#define WLAN_DP_STC_BK_PKT_THRESH 26000
+
 
 /* Macros used by STC logmask */
 #define WLAN_DP_STC_LOGMASK_FLOW_STATS BIT(0)
@@ -504,23 +516,223 @@ wlan_dp_stc_remove_sampling_table_entry(struct wlan_dp_stc *dp_stc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline uint64_t
+wlan_dp_stc_get_tx_flow_pkts(struct wlan_dp_stc *dp_stc,
+			     struct wlan_dp_stc_classified_flow_entry *c_entry)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_spm_flow_info *tx_flow;
+
+	/* Check if TX flow is valid */
+	if (qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_FLAGS_TX_FLOW_VALID,
+				&c_entry->flags)) {
+		uint64_t num_tx_pkts, pkt_delta;
+
+		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, c_entry->tx_flow_id);
+		num_tx_pkts = tx_flow->num_pkts;
+		pkt_delta = num_tx_pkts - c_entry->prev_tx_pkts;
+		c_entry->prev_tx_pkts = num_tx_pkts;
+		return pkt_delta;
+	}
+
+	return 0;
+}
+
+static inline uint64_t
+wlan_dp_stc_get_rx_flow_pkts(struct wlan_dp_stc *dp_stc,
+			     struct wlan_dp_stc_classified_flow_entry *c_entry)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct dp_fisa_rx_sw_ft *rx_flow;
+
+	/* Check if RX flow is valid */
+	if (qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_FLAGS_RX_FLOW_VALID,
+				&c_entry->flags)) {
+		uint64_t num_rx_pkts, pkt_delta;
+
+		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, c_entry->rx_flow_id);
+		num_rx_pkts = rx_flow->num_pkts;
+		pkt_delta = num_rx_pkts - c_entry->prev_rx_pkts;
+		c_entry->prev_rx_pkts = num_rx_pkts;
+		return pkt_delta;
+	}
+
+	return 0;
+}
+
+static inline uint64_t
+wlan_dp_stc_get_known_traffic_pkt(struct wlan_dp_stc *dp_stc,
+				  struct wlan_dp_stc_peer_traffic_context *peer_tc)
+{
+	struct wlan_dp_stc_classified_flow_table *c_table;
+	struct wlan_dp_stc_classified_flow_entry *c_entry;
+	uint64_t tx_flow_pkts = 0, rx_flow_pkts = 0;
+	uint32_t state;
+	uint16_t c_id;
+
+	c_table = dp_stc->classified_flow_table;
+	for (c_id = 0; c_id < DP_STC_CLASSIFIED_TABLE_FLOW_MAX; c_id++) {
+		c_entry = &c_table->entries[c_id];
+		state = qdf_atomic_read(&c_entry->state);
+		if (state != WLAN_DP_STC_CLASSIFIED_FLOW_STATE_ADDED)
+			continue;
+
+		if (c_entry->peer_id != peer_tc->peer_id)
+			continue;
+
+		tx_flow_pkts += wlan_dp_stc_get_tx_flow_pkts(dp_stc, c_entry);
+		rx_flow_pkts += wlan_dp_stc_get_rx_flow_pkts(dp_stc, c_entry);
+	}
+
+	return (tx_flow_pkts + rx_flow_pkts);
+}
+
+static inline void
+wlan_dp_stc_set_bk_tput(struct wlan_dp_stc *dp_stc,
+			struct wlan_dp_stc_peer_traffic_context *peer_tc,
+			uint8_t bk_tput_active)
+{
+	int32_t val;
+	uint8_t send_fw_ind;
+	static uint8_t prev_bk_tput_active, hysterisis_period;
+
+	/*
+	 * If the BK traffic indication changes from 0->1 or 1->0, the
+	 * hysterisis period starts by assigning hysterisis_period = 1.
+	 * This will apply a 2-second hysterisis for changing the value of
+	 * BK traffic indication, and sending wmi command to FW.
+	 */
+
+	if (prev_bk_tput_active != bk_tput_active) {
+		prev_bk_tput_active = bk_tput_active;
+		/*
+		 * Account for the current 1-second for the changed BK traffic
+		 * indication
+		 */
+		hysterisis_period = 1;
+		return;
+	}
+
+	if (hysterisis_period) {
+		hysterisis_period++;
+		prev_bk_tput_active = bk_tput_active;
+	}
+
+	if (hysterisis_period < 2)
+		return;
+
+	hysterisis_period = 0;
+	if (bk_tput_active) {
+		val = qdf_atomic_test_and_set_bit(WLAN_DP_STC_TRAFFIC_BK,
+						  &peer_tc->non_flow_traffic);
+		send_fw_ind = val == 0 ? 1 : 0;
+	} else {
+		val = qdf_atomic_test_and_clear_bit(WLAN_DP_STC_TRAFFIC_BK,
+						    &peer_tc->non_flow_traffic);
+		send_fw_ind = val == 1 ? 1 : 0;
+	}
+
+	if (send_fw_ind)
+		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
+}
+
+static inline uint64_t
+wlan_dp_stc_get_peer_tx_pkts(struct wlan_dp_stc *dp_stc,
+			     struct wlan_dp_stc_peer_traffic_context *peer_tc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	cdp_config_param_type val = {0};
+	QDF_STATUS status;
+	uint64_t delta;
+
+	status = cdp_txrx_get_peer_param(wlan_psoc_get_dp_handle(dp_ctx->psoc),
+					 DP_VDEV_ALL, peer_tc->mac_addr.bytes,
+					 CDP_CONFIG_TX_PKT_INFO, &val);
+	if (QDF_IS_STATUS_ERROR(status))
+		return 0;
+
+	/* TODO - Validate peer_id */
+
+	delta = val.pkt_info.pkts.num - peer_tc->prev_tx_pkts;
+	peer_tc->prev_tx_pkts = val.pkt_info.pkts.num;
+	return delta;
+}
+
+static inline uint64_t
+wlan_dp_stc_get_peer_rx_pkts(struct wlan_dp_stc *dp_stc,
+			     struct wlan_dp_stc_peer_traffic_context *peer_tc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	cdp_config_param_type val = {0};
+	QDF_STATUS status;
+	uint64_t delta;
+
+	status = cdp_txrx_get_peer_param(wlan_psoc_get_dp_handle(dp_ctx->psoc),
+					 DP_VDEV_ALL, peer_tc->mac_addr.bytes,
+					 CDP_CONFIG_RX_PKT_INFO, &val);
+	if (QDF_IS_STATUS_ERROR(status))
+		return 0;
+
+	/* TODO - Validate peer_id */
+
+	delta = val.pkt_info.pkts.num - peer_tc->prev_rx_pkts;
+	peer_tc->prev_rx_pkts = val.pkt_info.pkts.num;
+	return delta;
+}
+
+/* Pass cur_ts to this API, since we need TPUT calculation */
+static inline void
+wlan_dp_stc_check_bk_tput(struct wlan_dp_stc *dp_stc,
+			  struct wlan_dp_stc_peer_traffic_context *peer_tc,
+			  uint64_t cur_ts)
+{
+	uint64_t time_delta, tx_pkts, rx_pkts, c_num_pkts, bk_tput;
+
+	/* Check Background TPUT only at certain time interval */
+	time_delta = cur_ts - peer_tc->prev_tput_check_ts;
+	if (time_delta < WLAN_DP_STC_BK_TPUT_TEST_THRESH_NS)
+		return;
+
+	peer_tc->prev_tput_check_ts = cur_ts;
+
+	/*
+	 * Get the classified/known flows pkts count in the tput
+	 * calculation window.
+	 */
+	c_num_pkts = wlan_dp_stc_get_known_traffic_pkt(dp_stc, peer_tc);
+
+	/* Get the total TX and RX pkts for this peer */
+	tx_pkts = wlan_dp_stc_get_peer_tx_pkts(dp_stc, peer_tc);
+	rx_pkts = wlan_dp_stc_get_peer_rx_pkts(dp_stc, peer_tc);
+
+	if (c_num_pkts > (tx_pkts + rx_pkts))
+		return;
+
+	bk_tput = ((tx_pkts + rx_pkts - c_num_pkts) *
+			WLAN_DP_STC_BK_TPUT_TEST_THRESH_NS) / time_delta;
+	wlan_dp_stc_set_bk_tput(dp_stc, peer_tc,
+				(bk_tput > WLAN_DP_STC_BK_PKT_THRESH) ? 1 : 0);
+}
+
 static inline void
 wlan_dp_stc_check_ping_activity(struct wlan_dp_stc *dp_stc,
 				uint16_t peer_id)
 {
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	uint64_t cur_ts = dp_stc_get_timestamp();
 
-	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[peer_id];
+	if (!peer_tc->valid)
 		return;
 
-	if ((qdf_atomic_read(&active_traffic_map->active_ping) == 1) &&
-	    (cur_ts - active_traffic_map->last_ping_ts >
+	if (qdf_atomic_test_bit(WLAN_DP_STC_TRAFFIC_PING,
+				&peer_tc->non_flow_traffic) &&
+	    (cur_ts - peer_tc->last_ping_ts >
 				WLAN_DP_STC_PING_INACTIVE_TIMEOUT_NS)) {
-		active_traffic_map->last_ping_ts = 0;
-		qdf_atomic_set(&active_traffic_map->active_ping, 0);
-		qdf_atomic_set(&active_traffic_map->send_fw_ind, 1);
+		peer_tc->last_ping_ts = 0;
+		qdf_atomic_clear_bit(WLAN_DP_STC_TRAFFIC_PING,
+				     &peer_tc->non_flow_traffic);
+		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 	}
 }
 
@@ -529,7 +741,9 @@ wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
 				  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_classified_flow_table *c_table =
+						dp_stc->classified_flow_table;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 
@@ -559,13 +773,14 @@ wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
 		 */
 	}
 
-	active_traffic_map = &dp_stc->peer_traffic_map[c_entry->peer_id];
-	if (active_traffic_map->valid && c_entry->flow_active)
-		wlan_dp_stc_dec_traffic_type(active_traffic_map,
+	peer_tc = &dp_stc->peer_tc[c_entry->peer_id];
+	if (peer_tc->valid && c_entry->flow_active)
+		wlan_dp_stc_dec_traffic_type(peer_tc,
 					     c_entry->traffic_type);
 
 	qdf_mem_zero(c_entry, sizeof(*c_entry));
 	qdf_atomic_set(&c_entry->state, WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT);
+	qdf_atomic_dec(&c_table->num_valid_entries);
 }
 
 static inline void
@@ -586,7 +801,7 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 				  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint64_t cur_ts = dp_stc_get_timestamp();
@@ -603,8 +818,8 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, c_entry->tx_flow_id);
 		flow_active_ts = tx_flow->active_ts;
 		cur_ts = dp_stc_get_timestamp();
-		if (cur_ts - flow_active_ts > FLOW_INACTIVE_TIME_THRESH_NS)
-			goto flow_inactive;
+		if (cur_ts - flow_active_ts < FLOW_INACTIVE_TIME_THRESH_NS)
+			return;
 	}
 
 	if (rx_flow_valid) {
@@ -613,13 +828,10 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, c_entry->rx_flow_id);
 		flow_active_ts = rx_flow->last_accessed_ts;
 		cur_ts = dp_stc_get_timestamp();
-		if (cur_ts - flow_active_ts > FLOW_INACTIVE_TIME_THRESH_NS)
-			goto flow_inactive;
+		if (cur_ts - flow_active_ts < FLOW_INACTIVE_TIME_THRESH_NS)
+			return;
 	}
 
-	return;
-
-flow_inactive:
 	/*
 	 * Set inactive flag for the flow, but then how will it be added back
 	 * when the same flow starts again ?
@@ -634,11 +846,11 @@ flow_inactive:
 	 */
 	c_entry->flow_active = 0;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[c_entry->peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[c_entry->peer_id];
+	if (!peer_tc->valid)
 		return;
 
-	wlan_dp_stc_dec_traffic_type(active_traffic_map, c_entry->traffic_type);
+	wlan_dp_stc_dec_traffic_type(peer_tc, c_entry->traffic_type);
 }
 
 static inline void
@@ -646,7 +858,7 @@ wlan_dp_stc_check_flow_resumption(struct wlan_dp_stc *dp_stc,
 				  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint64_t cur_ts = dp_stc_get_timestamp();
@@ -687,26 +899,26 @@ flow_active:
 	 */
 	c_entry->flow_active = 1;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[c_entry->peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[c_entry->peer_id];
+	if (!peer_tc->valid)
 		return;
 
-	wlan_dp_stc_inc_traffic_type(active_traffic_map, c_entry->traffic_type);
+	wlan_dp_stc_inc_traffic_type(peer_tc, c_entry->traffic_type);
 }
 
 static inline void
 wlan_dp_stc_process_add_classified_flow(struct wlan_dp_stc *dp_stc,
 					struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	enum qca_traffic_type traffic_type = c_entry->traffic_type;
 	uint16_t peer_id = c_entry->peer_id;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[peer_id];
+	if (!peer_tc->valid)
 		return;
 
-	wlan_dp_stc_inc_traffic_type(active_traffic_map, traffic_type);
+	wlan_dp_stc_inc_traffic_type(peer_tc, traffic_type);
 }
 
 static inline QDF_STATUS
@@ -715,40 +927,42 @@ wlan_dp_stc_send_active_traffic_map_ind(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
 	struct wlan_dp_psoc_sb_ops *sb_ops = &dp_ctx->sb_ops;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 	struct dp_active_traffic_map_params req_buf;
 	uint32_t wmi_active_traffic_map = 0;
 	QDF_STATUS status;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
-	if (!active_traffic_map->valid)
+	peer_tc = &dp_stc->peer_tc[peer_id];
+	if (!peer_tc->valid)
 		return QDF_STATUS_SUCCESS;
 
-	if (qdf_atomic_read(&active_traffic_map->send_fw_ind) == 0)
+	if (qdf_atomic_read(&peer_tc->send_fw_ind) == 0)
 		return QDF_STATUS_SUCCESS;
 
-	qdf_atomic_set(&active_traffic_map->send_fw_ind, 0);
+	qdf_atomic_set(&peer_tc->send_fw_ind, 0);
 
-	if (qdf_atomic_read(&active_traffic_map->num_streaming))
+	if (qdf_atomic_read(&peer_tc->num_streaming))
 		wmi_active_traffic_map |=
 				WMI_PEER_ACTIVE_TRAFFIC_TYPE_STREAMING_M;
-	if (qdf_atomic_read(&active_traffic_map->active_ping))
+	if (qdf_atomic_test_bit(WLAN_DP_STC_TRAFFIC_PING,
+				&peer_tc->non_flow_traffic))
 		wmi_active_traffic_map |= WMI_PEER_ACTIVE_TRAFFIC_TYPE_PING_M;
-	if (qdf_atomic_read(&active_traffic_map->active_bk_traffic))
+	if (qdf_atomic_test_bit(WLAN_DP_STC_TRAFFIC_BK,
+				&peer_tc->non_flow_traffic))
 		wmi_active_traffic_map |=
 				WMI_PEER_ACTIVE_TRAFFIC_TYPE_BACKGROUND_M;
 
-	if (qdf_atomic_read(&active_traffic_map->num_gaming))
+	if (qdf_atomic_read(&peer_tc->num_gaming))
 		wmi_active_traffic_map |= WMI_PEER_ACTIVE_TRAFFIC_TYPE_GAMING_M;
-	if (qdf_atomic_read(&active_traffic_map->num_voice_call))
+	if (qdf_atomic_read(&peer_tc->num_voice_call))
 		wmi_active_traffic_map |= WMI_PEER_ACTIVE_TRAFFIC_TYPE_VOIP_M;
-	if (qdf_atomic_read(&active_traffic_map->num_video_call))
+	if (qdf_atomic_read(&peer_tc->num_video_call))
 		wmi_active_traffic_map |=
 				WMI_PEER_ACTIVE_TRAFFIC_TYPE_VIDEO_CONF_M;
 
-	req_buf.vdev_id = active_traffic_map->vdev_id;
+	req_buf.vdev_id = peer_tc->vdev_id;
 	qdf_mem_copy(&req_buf.mac.bytes,
-		     active_traffic_map->mac_addr.bytes,
+		     peer_tc->mac_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
 	req_buf.active_traffic_map = wmi_active_traffic_map;
 	status = sb_ops->dp_send_active_traffic_map(dp_ctx->psoc,
@@ -803,6 +1017,57 @@ wlan_dp_stc_is_traffic_type_known(enum qca_traffic_type traffic_type)
 	return true;
 }
 
+#define BUF_LEN_MAX 256
+static inline bool is_flow_tuple_ipv4(struct flow_info *flow_tuple)
+{
+	if (qdf_likely((flow_tuple->flags | DP_FLOW_TUPLE_FLAGS_IPV4)))
+		return true;
+
+	return false;
+}
+
+static inline bool is_flow_tuple_ipv6(struct flow_info *flow_tuple)
+{
+	if (qdf_likely((flow_tuple->flags | DP_FLOW_TUPLE_FLAGS_IPV6)))
+		return true;
+
+	return false;
+}
+
+static inline uint8_t *dp_print_tuple_to_str(struct flow_info *flow_tuple,
+					     uint8_t *buf, uint16_t buf_len)
+{
+	uint16_t len = 0;
+
+	if (is_flow_tuple_ipv4(flow_tuple)) {
+		len += scnprintf(buf + len, buf_len - len,
+				 "0x%x", flow_tuple->src_ip.ipv4_addr);
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x", flow_tuple->dst_ip.ipv4_addr);
+	} else if (is_flow_tuple_ipv6(flow_tuple)) {
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x-0x%x-0x%x-0x%x",
+				 flow_tuple->src_ip.ipv6_addr[0],
+				 flow_tuple->src_ip.ipv6_addr[1],
+				 flow_tuple->src_ip.ipv6_addr[2],
+				 flow_tuple->src_ip.ipv6_addr[3]);
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x-0x%x-0x%x-0x%x",
+				 flow_tuple->dst_ip.ipv6_addr[0],
+				 flow_tuple->dst_ip.ipv6_addr[1],
+				 flow_tuple->dst_ip.ipv6_addr[2],
+				 flow_tuple->dst_ip.ipv6_addr[3]);
+	}
+
+	len += scnprintf(buf + len, buf_len - len,
+			 " %u", flow_tuple->src_port);
+	len += scnprintf(buf + len, buf_len - len,
+			 " %u", flow_tuple->dst_port);
+	len += scnprintf(buf + len, buf_len - len, " %u", flow_tuple->proto);
+
+	return buf;
+}
+
 /*
  * This function should just mark something in the sampling entry.
  * The periodic work can take care of moving this entry to classified table
@@ -818,6 +1083,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint16_t c_id;
+	uint8_t buf[BUF_LEN_MAX];
 
 	/*
 	 * 1) Move sampling flow to classified flow table
@@ -859,7 +1125,9 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 		if (state > WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
 			continue;
 
-		dp_info("STC: Move flow to classified flow %d for peer %d",
+		dp_info("STC: Move flow (%s) to classified flow %d for peer %d",
+			dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
+					      buf, BUF_LEN_MAX),
 			c_id, s_entry->peer_id);
 		/* Got a free entry */
 		qdf_atomic_set(&c_entry->state,
@@ -956,7 +1224,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 						  &tx_flow_id,
 						  &tx_flow_metadata);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			if (rx) {
+			if (rx && rx_flow->is_flow_udp) {
 				/* This is a RX only flow. */
 				wlan_dp_stc_fill_rx_flow_candidate(dp_stc,
 						&candidates[candidate_idx],
@@ -1112,11 +1380,18 @@ other_checks:
 
 skip_classified_table_check:
 	for (peer_id = 0; peer_id < DP_STC_MAX_PEERS; peer_id++) {
+		struct wlan_dp_stc_peer_traffic_context *peer_tc;
+
+		peer_tc = &dp_stc->peer_tc[peer_id];
+		if (!peer_tc->valid)
+			continue;
+
 		/*
 		 * 1) Check ping inactivity
 		 */
 		wlan_dp_stc_check_ping_activity(dp_stc, peer_id);
 
+		wlan_dp_stc_check_bk_tput(dp_stc, peer_tc, cur_ts);
 		/*
 		 * 2) Send wmi command to FW if required
 		 */
@@ -1575,6 +1850,7 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 	struct wlan_dp_stc_sampling_table_entry *s_entry;
 	uint64_t hash;
 	int i;
+	uint8_t buf[BUF_LEN_MAX];
 
 	hash = wlan_dp_get_flow_hash(dp_ctx, flow_tuple);
 	s_table = dp_stc->sampling_flow_table;
@@ -1601,8 +1877,9 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		 * The classification result is for this flow only.
 		 */
 		s_entry->traffic_type = flow_classify_result->traffic_type;
-		dp_info("STC: sampling flow %d result %d burst_reported %d",
-			i, flow_classify_result->traffic_type,
+		dp_info("STC: sampling flow %d tuple (%s) result %d burst_reported %d",
+			i, dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
+			flow_classify_result->traffic_type,
 			wlan_dp_burst_samples_reported(s_entry));
 		/*
 		 * 1) Indicate to TX and RX flow
@@ -1641,7 +1918,7 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
-	struct wlan_dp_stc_peer_traffic_map *active_traffic_map;
+	struct wlan_dp_stc_peer_traffic_context *peer_tc;
 
 	if (!dp_stc)
 		return QDF_STATUS_E_NOSUPPORT;
@@ -1649,37 +1926,37 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 	if (peer_id >= DP_STC_MAX_PEERS)
 		return QDF_STATUS_E_INVAL;
 
-	active_traffic_map = &dp_stc->peer_traffic_map[peer_id];
+	peer_tc = &dp_stc->peer_tc[peer_id];
 
 	dp_info("STC: notify for peer %d, event %d, valid %d",
-		peer_id, event, active_traffic_map->valid);
+		peer_id, event, peer_tc->valid);
 	switch (event) {
 	case CDP_PEER_EVENT_MAP:
-		if (active_traffic_map->valid) {
+		if (peer_tc->valid) {
 			dp_info("STC: Peer map notify for active peer");
 			qdf_assert_always(0);
 			return QDF_STATUS_E_BUSY;
 		}
 
-		active_traffic_map->vdev_id = vdev_id;
-		active_traffic_map->peer_id = peer_id;
-		qdf_mem_copy(active_traffic_map->mac_addr.bytes,
+		peer_tc->vdev_id = vdev_id;
+		peer_tc->peer_id = peer_id;
+		qdf_mem_copy(peer_tc->mac_addr.bytes,
 			     peer_mac_addr, QDF_MAC_ADDR_SIZE);
-		active_traffic_map->valid = 1;
+		peer_tc->valid = 1;
 		break;
 	case CDP_PEER_EVENT_UNMAP:
-		if (!active_traffic_map->valid) {
+		if (!peer_tc->valid) {
 			dp_info("STC: Peer unmap notify for inactive peer");
 			qdf_assert_always(0);
 			return QDF_STATUS_E_BUSY;
 		}
 
-		if (qdf_mem_cmp(active_traffic_map->mac_addr.bytes,
+		if (qdf_mem_cmp(peer_tc->mac_addr.bytes,
 				peer_mac_addr, QDF_MAC_ADDR_SIZE) != 0) {
 			dp_err("STC: peer unmap notify: mac addr mismatch");
 			return QDF_STATUS_E_INVAL;
 		}
-		active_traffic_map->valid = 0;
+		peer_tc->valid = 0;
 		break;
 	default:
 		break;

@@ -143,6 +143,8 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_CH_WIDTH_V2
 #define EHT_OPERATION \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_EHT_OPERATION
+#define ASSOCIATED_BW \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOCIATED_BW
 
 /*
  * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
@@ -802,6 +804,25 @@ static inline int32_t hdd_add_eht_oper_info(
 }
 #endif
 
+static int32_t hdd_add_associated_bw(struct sk_buff *skb,
+				     struct hdd_station_ctx *hdd_sta_ctx)
+{
+	int32_t ret = 0;
+	struct hdd_connection_info *conn_info;
+	uint32_t bw = 0;
+
+	conn_info = &hdd_sta_ctx->cache_conn_info;
+	bw = hdd_convert_phy_bw_to_nl_bw(conn_info->ch_width);
+
+	if (nla_put_u32(skb, ASSOCIATED_BW,
+			bw)) {
+		hdd_err("Failed to put associated bw");
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
 static uint32_t hdd_get_prev_connected_bss_ies_len(
 					struct hdd_station_ctx *hdd_sta_ctx)
 {
@@ -989,6 +1010,12 @@ hdd_populate_station_info_skb(struct sk_buff *skb,
 		hdd_err("disconnect_reason put fail");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (hdd_add_associated_bw(skb, hdd_sta_ctx)) {
+		hdd_err("associated bw put fail");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1695,27 +1722,10 @@ static int hdd_get_station_remote(struct wlan_hdd_link_info *link_info,
  *
  * Return: link_info pointer on success, otherwise NULL
  */
-static struct wlan_hdd_link_info
+static inline struct wlan_hdd_link_info
 *hdd_get_link_info_disconnect_receive(struct hdd_adapter *adapter)
 {
-	struct wlan_hdd_link_info *link_info;
-
-	if (adapter->disconnect_link_id == WLAN_INVALID_LINK_ID) {
-		hdd_debug("Legacy connection stats");
-		return adapter->deflink;
-	}
-
-	link_info = hdd_get_link_info_by_ieee_link_id(
-						adapter,
-						adapter->disconnect_link_id,
-						true);
-	if (!link_info) {
-		hdd_debug("Populate stats on Assoc vdev, link_id %d",
-			  adapter->disconnect_link_id);
-		return adapter->deflink;
-	}
-
-	return link_info;
+	return adapter->discon_link_info;
 }
 
 /**
@@ -1766,6 +1776,11 @@ __hdd_cfg80211_get_station_cmd(struct wiphy *wiphy,
 	/* Parse and fetch Command Type*/
 	if (tb[STATION_INFO]) {
 		link_info = hdd_get_link_info_disconnect_receive(adapter);
+		if (!link_info) {
+			hdd_debug("link_info NULL");
+			status = -EINVAL;
+			goto out;
+		}
 		status = hdd_get_station_info(link_info);
 	} else if (tb[STATION_ASSOC_FAIL_REASON]) {
 		status = hdd_get_station_assoc_fail(adapter->deflink);
@@ -2607,8 +2622,7 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 
 	if (QDF_IS_STATUS_ERROR(hdd_get_txrx_nss(adapter, skb))) {
 		hdd_err_rl("hdd_get txrx nss fail");
-		wlan_cfg80211_vendor_free_skb(skb);
-		return -EINVAL;
+		goto error;
 	}
 
 	if (QDF_IS_STATUS_ERROR(hdd_add_uplink_delay(adapter, skb))) {
@@ -2623,8 +2637,7 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 
 	if (QDF_IS_STATUS_ERROR(hdd_add_uplink_jitter(adapter, skb))) {
 		hdd_err_rl("hdd_add_uplink_jitter fail");
-		wlan_cfg80211_vendor_free_skb(skb);
-		return -EINVAL;
+		goto error;
 	}
 
 	ret = wlan_cfg80211_vendor_cmd_reply(skb);
@@ -2638,8 +2651,10 @@ error:
 	wlan_cfg80211_vendor_free_skb(skb);
 
 free_sta_info:
-	if (stainfo)
+	if (stainfo) {
+		hdd_free_tx_rx_pkts_per_mcs(stainfo);
 		qdf_mem_free(stainfo);
+	}
 	return -EINVAL;
 }
 

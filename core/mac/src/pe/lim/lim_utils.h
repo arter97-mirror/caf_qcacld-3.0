@@ -226,6 +226,33 @@ bool lim_create_peer_idxpool(struct pe_session *pe_session,
  * Return: Void
  */
 void lim_free_peer_idxpool(struct pe_session *pe_session);
+#ifdef WLAN_FEATURE_11BE
+static inline uint16_t lim_get_chan_switch_puncture(struct pe_session *session)
+{
+	return session ? session->gLimChannelSwitch.puncture_bitmap :
+			 NO_SCHANS_PUNC;
+}
+
+static inline void lim_set_chan_switch_puncture(struct pe_session *session,
+						uint16_t punct_bitmap)
+{
+	if (!session)
+		return;
+
+	pe_debug("0x%x", punct_bitmap);
+	session->gLimChannelSwitch.puncture_bitmap = punct_bitmap;
+}
+#else
+static inline uint16_t lim_get_chan_switch_puncture(struct pe_session *session)
+{
+	return 0;
+}
+
+static inline void lim_set_chan_switch_puncture(struct pe_session *session,
+						uint16_t punct_bitmap)
+{
+}
+#endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
@@ -298,7 +325,23 @@ void lim_strip_mlo_ie(struct mac_context *mac_ctx,
  */
 void lim_set_emlsr_caps(struct mac_context *mac_ctx,
 			struct pe_session *session);
+
+/**
+ * lim_remove_puncture() - Remove the existing puncturing in the regulatory
+ * @mac_ctx: Global mac pointer
+ * @session: PE session of BSS
+ *
+ * Removes the current puncturing bitmap from global regulatory.
+ */
+void lim_remove_puncture(struct mac_context *mac_ctx,
+			 struct pe_session *session);
 #else
+static inline
+void lim_remove_puncture(struct mac_context *mac,
+			 struct pe_session *session)
+{
+}
+
 static inline uint16_t lim_assign_mlo_conn_idx(struct mac_context *mac,
 					       struct pe_session *pe_session,
 					       uint16_t partner_peer_idx)
@@ -478,6 +521,16 @@ uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
 				 qdf_freq_t chan_freq);
 
 /**
+ * lim_get_sta_cb_mode_for_24ghz() - Get cb mode for 2GHz
+ * @mac: pointer to Global MAC structure
+ * @vdev_id: vdev id
+ *
+ * Return: cb mode allowed for the freq
+ */
+uint8_t lim_get_sta_cb_mode_for_24ghz(struct mac_context *mac,
+				      uint8_t vdev_id);
+
+/**
  * lim_update_sta_run_time_ht_switch_chnl_params() - Process change in HT
  * bandwidth
  * @mac: pointer to Global MAC structure
@@ -562,6 +615,7 @@ void lim_update_sta_run_time_ht_info(struct mac_context *mac,
 /**
  * lim_is_channel_valid_for_channel_switch - check channel valid for switching
  * @mac: Global mac context
+ * @session: PE session
  * @channel_freq: channel freq (MHz)
  *
  * This function checks if the channel to which AP is expecting us to switch,
@@ -570,6 +624,7 @@ void lim_update_sta_run_time_ht_info(struct mac_context *mac,
  * Return bool, true if channel is valid
  */
 bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac,
+					     struct pe_session *session,
 					     uint32_t channel_freq);
 
 QDF_STATUS lim_restore_pre_channel_switch_state(struct mac_context *mac,
@@ -1797,6 +1852,22 @@ lim_update_he_6ghz_band_caps(struct mac_context *mac,
 {
 }
 #endif
+
+/**
+ * lim_reorder_vendor_ies() - Aggregate all vendor specific IEs to the end
+ * of the buffer.
+ * @mac_ctx: MAC context
+ * @frame_ies: Buffer pointer which contain IEs
+ * @ie_buf_size: Size of buffer pointed by @frame_ies.
+ *
+ * Extract all the vendor specific IEs in the buffer pointed by @frame_ies and
+ * move thoes IEs to the end of the buffer. The final length is still be same
+ * as the API will only reorder the IEs and will not change any contents.
+ *
+ * Return: void.
+ */
+void lim_reorder_vendor_ies(struct mac_context *mac_ctx,
+			    uint8_t *frame_ies, uint16_t ie_buf_size);
 
 #ifdef WLAN_FEATURE_11BE
 static inline bool lim_is_session_eht_capable(struct pe_session *session)
@@ -3057,7 +3128,7 @@ static inline void lim_ap_check_6g_compatible_peer(
 {}
 #endif
 
-#define MAX_TX_PSD_POWER 15
+#define EXT_TX_PSD_POWER 8
 
 /**
  * enum max_tx_power_interpretation
@@ -3430,6 +3501,17 @@ lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
 				qdf_freq_t end_freq);
 
 /**
+ * @ch_width: phy channel width
+ *
+ * Convert the current PHY channel width to VHT speicifc BW. 320MHz is not
+ * supported in VHT so return 160MHz for 320MHz input.
+ *
+ * Return: phy chwidth
+ */
+uint8_t
+lim_convert_phy_chwidth_to_vht_chwidth(enum phy_ch_width ch_width);
+
+/**
  * lim_update_cu_flag() - Update cu flag in capability information
  * @pcap_info: pointer to return capability information
  * @pe_session: pointer to pe session
@@ -3752,4 +3834,18 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width ch_width,
 				    uint16_t tpe_ie_len,
 				    tDot11fIEtransmit_power_env *tpe_ptr,
 				    uint16_t num_tpe, uint8_t *target);
+
+/**
+ * lim_set_session_channel_params() : set session channel params
+ * @mac: pointer to MAC
+ * @session: pointer to session
+ *
+ * check and update channel params of pe session by regulatory
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
+					  struct pe_session *session);
+
 #endif /* __LIM_UTILS_H */

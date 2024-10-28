@@ -600,7 +600,7 @@ t2lm_find_tid_mapped_link_id(struct wlan_t2lm_info *t2lm_info,
 		}
 	}
 
-	*tid_mapped_link_id = t2lm_get_tids_mapped_link_id(link_map_tid);
+	*tid_mapped_link_id = link_map_tid;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -614,6 +614,8 @@ wlan_t2lm_validate_candidate(struct cnx_mgr *cm_ctx,
 	uint16_t tid_map_link_id;
 	uint16_t established_tid_mapped_link_id = 0;
 	uint16_t upcoming_tid_mapped_link_id = 0;
+	uint16_t established_tid_mapped = 0;
+	uint16_t upcoming_tid_mapped = 0;
 	struct wlan_objmgr_psoc *psoc;
 
 	if (!scan_entry || !cm_ctx || !cm_ctx->vdev)
@@ -648,16 +650,28 @@ wlan_t2lm_validate_candidate(struct cnx_mgr *cm_ctx,
 		goto end;
 
 	status = t2lm_find_tid_mapped_link_id(&t2lm_ctx.established_t2lm.t2lm,
-					      &established_tid_mapped_link_id);
+					      &established_tid_mapped);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto end;
 
 	status = t2lm_find_tid_mapped_link_id(&t2lm_ctx.upcoming_t2lm.t2lm,
-					      &upcoming_tid_mapped_link_id);
+					      &upcoming_tid_mapped);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto end;
 
-	t2lm_debug("self link id %d established_tid_mapped_link_id %x upcoming_tid_mapped_link_id %x",
+	if (!established_tid_mapped) {
+		t2lm_debug("established TID mapping: 0x%x not present, upcoming TID mapping: 0x%x",
+			   established_tid_mapped, upcoming_tid_mapped);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	established_tid_mapped_link_id =
+			t2lm_get_tids_mapped_link_id(established_tid_mapped);
+
+	upcoming_tid_mapped_link_id =
+			t2lm_get_tids_mapped_link_id(upcoming_tid_mapped);
+
+	t2lm_debug("self link id %d established_tid_mapped_link_id 0x%x upcoming_tid_mapped_link_id 0x%x",
 		   scan_entry->ml_info.self_link_id,
 		   established_tid_mapped_link_id, upcoming_tid_mapped_link_id);
 

@@ -220,9 +220,6 @@ struct cds_context {
 	qdf_work_t cds_recovery_work;
 	qdf_workqueue_t *cds_recovery_wq;
 	enum qdf_hang_reason recovery_reason;
-
-	/* To protect bit(CDS_DRIVER_STATE_SYS_REBOOTING) of driver_state */
-	qdf_mutex_t sys_reboot_lock;
 };
 
 /*---------------------------------------------------------------------------

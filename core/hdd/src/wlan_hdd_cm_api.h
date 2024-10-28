@@ -456,6 +456,26 @@ hdd_cm_clear_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache);
 int32_t
 hdd_cm_get_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache);
 
+/**
+ * hdd_cm_save_conn_info_mld_addr() - Save AP MLD addr for MLO connection in
+ *				      struct hdd_station_ctx
+ * @link_info: Link info pointer in HDD adapter
+ * @rsp: pointer to struct wlan_cm_connect_resp
+ *
+ * Return: none
+ */
+void hdd_cm_save_conn_info_mld_addr(struct wlan_hdd_link_info *link_info,
+				    struct wlan_cm_connect_resp *rsp);
+
+/**
+ * hdd_cm_clear_conn_info_mld_addr() - Clean AP MLD addr for MLO connection
+ *				       in struct hdd_station_ctx
+ * @sta_ctx: pointer to struct hdd_station_ctx
+ *
+ * Return: none
+ */
+void hdd_cm_clear_conn_info_mld_addr(struct hdd_station_ctx *sta_ctx);
+
 #else
 static inline void
 hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id,
@@ -480,6 +500,17 @@ static inline int32_t
 hdd_cm_get_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache)
 {
 	return WLAN_INVALID_LINK_ID;
+}
+
+static inline void
+hdd_cm_save_conn_info_mld_addr(struct wlan_hdd_link_info *link_info,
+			       struct wlan_cm_connect_resp *rsp)
+{
+}
+
+static inline void
+hdd_cm_clear_conn_info_mld_addr(struct hdd_station_ctx *sta_ctx)
+{
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* __WLAN_HDD_CM_API_H */

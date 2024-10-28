@@ -1561,6 +1561,32 @@ static void nan_handle_host_update(struct nan_datapath_host_event *evt,
 	*vdev = evt->vdev;
 }
 
+/**
+ * nan_handle_de_ind() - API to handle DE indication event.
+ * @nan_event: pointer to NAN event params structure
+ *
+ * This API caches NAN MAC address in NAN PSOC private object.
+ *
+ * Return: none
+ */
+static void nan_handle_de_ind(struct nan_event_params *nan_event)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = nan_event->psoc;
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is NULL");
+		return;
+	}
+
+	psoc_nan_obj->fw_nan_addr = nan_event->nan_mac_addr;
+
+	nan_debug("nan addr " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(psoc_nan_obj->fw_nan_addr.bytes));
+}
+
 QDF_STATUS nan_discovery_event_handler(struct scheduler_msg *msg)
 {
 	struct nan_event_params *nan_event;
@@ -1592,6 +1618,9 @@ QDF_STATUS nan_discovery_event_handler(struct scheduler_msg *msg)
 		break;
 	case nan_event_id_generic_rsp:
 	case nan_event_id_error_rsp:
+		break;
+	case nan_event_id_de_ind:
+		nan_handle_de_ind(nan_event);
 		break;
 	default:
 		nan_err("Unknown event ID type - %d", msg->type);
@@ -2514,4 +2543,17 @@ QDF_STATUS nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
 ref_rel:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 	return status;
+}
+
+struct qdf_mac_addr *nan_get_fw_addr(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *psoc_priv;
+
+	psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_priv) {
+		nan_err("psoc_nan_obj is null");
+		return NULL;
+	}
+
+	return &psoc_priv->fw_nan_addr;
 }

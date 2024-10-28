@@ -108,6 +108,7 @@
 /* AP start timeout = vdev start + 2 sec */
 #define SME_CMD_VDEV_START_BSS_TIMEOUT (START_RESPONSE_TIMER + 2000)
 #define SME_CMD_START_BSS_TIMEOUT (SME_CMD_VDEV_START_BSS_TIMEOUT + 1000)
+#define SME_CMD_STOP_VDEV_TIMEOUT (STOP_RESPONSE_TIMER + 1000)
 
 /* AP stop timeout = vdev stop + self peer delete + 1 sec */
 #define SME_CMD_STOP_BSS_CMD_TIMEOUT (STOP_RESPONSE_TIMER + \
@@ -760,6 +761,52 @@ QDF_STATUS sme_neighbor_report_request(mac_handle_t mac_handle,
 		 uint8_t sessionId,
 		tpRrmNeighborReq pRrmNeighborReq,
 		tpRrmNeighborRspCallbackInfo callbackInfo);
+
+#ifdef FEATURE_WLAN_APF
+
+/*
+ * sme_enable_active_apf_mode_ind() -
+ * API to signal the FW about active APF enablement.
+ *
+ * mac_handle: Opaque handle to the global MAC context.
+ * device_mode - mode(AP,SAP etc) of the device.
+ * macAddr - MAC address of the adapter.
+ * sessionId - session ID.
+ * Return QDF_STATUS  SUCCESS.
+ * FAILURE or RESOURCES  The API finished and failed.
+ */
+
+QDF_STATUS sme_enable_active_apf_mode_ind(mac_handle_t mac_handle,
+					  uint8_t device_mode,
+					  uint8_t *macAddr, uint8_t sessionId);
+
+/*
+ * sme_disable_active_apf_mode_ind() -
+ * API to signal the FW about active APF disablement.
+ *
+ * mac_handle: Opaque handle to the global MAC context.
+ * device_mode - mode(AP,SAP etc) of the device.
+ * macAddr - MAC address of the adapter.
+ * sessionId - session ID.
+ * Return QDF_STATUS  SUCCESS.
+ * FAILURE or RESOURCES  The API finished and failed.
+ */
+QDF_STATUS sme_disable_active_apf_mode_ind(mac_handle_t mac_handle,
+					   uint8_t device_mode,
+					   uint8_t *macAddr, uint8_t sessionId);
+#else
+QDF_STATUS sme_enable_active_apf_mode_ind(mac_handle_t mac_handle,
+					  uint8_t device_mode,
+					  uint8_t *macAddr, uint8_t sessionId)
+{
+}
+
+QDF_STATUS sme_disable_active_apf_mode_ind(mac_handle_t mac_handle,
+					   uint8_t device_mode,
+					   uint8_t *macAddr, uint8_t sessionId)
+{
+}
+#endif
 
 /**
  * sme_register_pagefault_cb() - Register cb to handle host action on pagefault
@@ -3908,13 +3955,14 @@ void sme_set_mlo_assoc_link_band(mac_handle_t mac_handle, uint8_t vdev_id,
  * @mac_handle: Opaque handle to the global MAC context
  * @session_id: session id
  * @num_links: number of links to be forced active
- * @active_link_addr: link mac address of (up to 2) links to be forced active
+ * @active_link_addr: link mac address of (up to WLAN_MLO_MAX_VDEVS) links to be
+ * forced active
  *
  * Return: void
  */
 void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t num_links,
-			    struct qdf_mac_addr active_link_addr[2]);
+			    struct qdf_mac_addr active_link_addr[WLAN_MLO_MAX_VDEVS]);
 
 /**
  * sme_update_eht_caps() - Update the session EHT caps
@@ -4582,6 +4630,18 @@ QDF_STATUS sme_set_aggressive_roaming(mac_handle_t mac_handle,
 				      bool is_aggressive_roam_mode);
 
 /**
+ * sme_get_aggressive_roaming() - Get Aggressive roaming in SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @is_aggressive_roam_mode: True if roaming mode is set to aggressive
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_get_aggressive_roaming(mac_handle_t mac_handle,
+				      uint8_t vdev_id,
+				      bool *is_aggressive_roam_mode);
+
+/**
  * sme_send_vendor_btm_params - Send vendor btm params to FW
  * @hdd_ctx: HDD context
  * @vdev_id: vdev id
@@ -4691,25 +4751,28 @@ void sme_vdev_del_resp(uint8_t vdev_id);
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
-				   void (*monitor_mode_cb)(uint8_t vdev_id));
+				   void (*monitor_mode_cb)(uint8_t vdev_id,
+							   bool is_up));
 
 /*
- * sme_process_monitor_mode_vdev_up_evt() - Handle vdev up completion
+ * sme_process_monitor_mode_vdev_evt() - Handle vdev up completion
  * @vdev_id: vdev id
+ * @is_up: is vdev up
  *
  * Return: QDF_STATUS.
  */
-QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id);
+QDF_STATUS sme_process_monitor_mode_vdev_evt(uint8_t vdev_id, bool is_up);
 #else
 static inline
 QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
-				   void (*monitor_mode_cb)(uint8_t vdev_id))
+				   void (*monitor_mode_cb)(uint8_t vdev_id,
+							   bool is_up))
 {
 	return QDF_STATUS_SUCCESS;
 }
 
 static inline QDF_STATUS
-sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
+sme_process_monitor_mode_vdev_evt(uint8_t vdev_id, bool is_up)
 {
 	return QDF_STATUS_E_FAILURE;
 }
@@ -4913,13 +4976,13 @@ QDF_STATUS sme_update_beacon_country_ie(mac_handle_t mac_handle,
  * sme_register_set_disconnect_cb() - function to register cb to set
  * disconnect link_id
  * @mac_handle: Opaque handle to the global MAC context
- * @hdd_set_disconnect_link_id_cb: callback to be registered
+ * @hdd_set_disconnect_link_info_cb: callback to be registered
  *
  * Return: None
  */
 
 void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
-				    void (*set_disconnect_link_id_cb)
+				    void (*set_disconnect_link_info_cb)
 				    (uint8_t vdev_id));
 
 /**

@@ -113,6 +113,18 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa_complete(
 						uint8_t vdev_id);
 
 /**
+ * wlan_ll_sap_switch_bearer_on_stop_ap() - Switch bearer when stop_ap is
+ * issued on LL_LT_SAP
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id
+ * Return: QDF_STATUS_SUCCESS on successful bearer switch
+ *	   else failure
+ */
+QDF_STATUS wlan_ll_sap_switch_bearer_on_stop_ap(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
+
+/**
  * wlan_ll_lt_sap_get_freq_list() - Get frequency list for LL_LT_SAP
  * @psoc: Pointer to psoc object
  * @freq_list: Pointer to wlan_ll_lt_sap_freq_list structure
@@ -359,6 +371,14 @@ static inline
 QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa_complete(
 						struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS wlan_ll_sap_switch_bearer_on_stop_ap(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

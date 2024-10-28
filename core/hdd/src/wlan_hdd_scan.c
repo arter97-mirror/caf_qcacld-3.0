@@ -461,6 +461,7 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 	QDF_STATUS qdf_status;
 	bool enable_connected_scan;
 	enum phy_ch_width con_dfs_ch_width;
+	uint8_t sta_vdev_id = WLAN_INVALID_VDEV_ID;
 
 	if (cds_is_fw_down()) {
 		hdd_err("firmware is down, scan cmd cannot be processed");
@@ -652,7 +653,19 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 		ucfg_nan_disable_concurrency(hdd_ctx->psoc);
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_SCAN_ID);
+	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+							hdd_ctx->psoc)) {
+		params.opmode = QDF_P2P_DEVICE_MODE;
+		sta_vdev_id = ucfg_p2p_psoc_priv_get_sta_vdev_id(hdd_ctx->psoc);
+		vdev = wlan_hdd_get_sta_vdev_for_p2p_dev(hdd_ctx->psoc,
+							 sta_vdev_id,
+							 WLAN_OSIF_SCAN_ID);
+	} else {
+		vdev = hdd_objmgr_get_vdev_by_user(link_info,
+						   WLAN_OSIF_SCAN_ID);
+	}
+
 	if (!vdev) {
 		status = -EINVAL;
 		goto error;

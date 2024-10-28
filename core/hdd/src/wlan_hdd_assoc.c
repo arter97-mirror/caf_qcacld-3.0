@@ -188,15 +188,7 @@ static const int beacon_filter_table[] = {
 	WLAN_ELEMID_VHTOP,
 	WLAN_ELEMID_QUIET_CHANNEL,
 	WLAN_ELEMID_TWT,
-#ifdef WLAN_FEATURE_11AX_BSS_COLOR
-	/*
-	 * EID: 221 vendor IE is being used temporarily by 11AX
-	 * bss-color-change IE till it gets any fixed number. This
-	 * vendor EID needs to be replaced with bss-color-change IE
-	 * number.
-	 */
-	WLAN_ELEMID_VENDOR,
-#endif
+	WLAN_ELEMID_VHT_TX_PWR_ENVLP,
 };
 
 /*
@@ -208,6 +200,9 @@ static const int beacon_filter_extn_table[] = {
 	WLAN_EXTN_ELEMID_MUEDCA,
 #ifdef WLAN_FEATURE_11BE
 	WLAN_EXTN_ELEMID_EHTOP,
+#endif
+#ifdef WLAN_FEATURE_11AX_BSS_COLOR
+	WLAN_EXTN_ELEMID_BSS_COLOR_CHANGE_ANNOUNCE,
 #endif
 };
 
@@ -1417,6 +1412,9 @@ void hdd_conn_remove_connect_info(struct hdd_station_ctx *sta_ctx)
 	qdf_mem_zero(&sta_ctx->conn_info.peer_macaddr[0],
 		     QDF_MAC_ADDR_SIZE);
 
+	/* Clear AP MLD addr */
+	hdd_cm_clear_conn_info_mld_addr(sta_ctx);
+
 	/* Clear all security settings */
 	sta_ctx->conn_info.auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
 	sta_ctx->conn_info.uc_encrypt_type = eCSR_ENCRYPT_TYPE_NONE;
@@ -1647,6 +1645,48 @@ QDF_STATUS hdd_roam_register_sta(struct wlan_hdd_link_info *link_info,
 	return qdf_status;
 }
 
+#ifdef IPA_HANDLE_MLO_DEF_LINK_REG
+/**
+ * hdd_handle_ipa_sta_mlo_conn() - Handle STA MLO connection for IPA
+ * @link_info: Link info pointer in HDD adapter
+ * @sta_ctx: Pointer to struct hdd_station_ctx
+ * @mac_addr: pointer to AP mld addr if MLO connection
+ *
+ * This function handles STA MLO connection and only deflink information
+ * is registered to IPA component for STA_CONNECT event.
+ *
+ * Return: true to notify IPA component of the STA_CONNECT event.
+ *	   false to not notify IPA component.
+ */
+static bool hdd_handle_ipa_sta_mlo_conn(struct wlan_hdd_link_info *link_info,
+					struct hdd_station_ctx *sta_ctx,
+					uint8_t **mac_addr)
+{
+	if (!wlan_vdev_mlme_is_mlo_vdev(link_info->vdev))
+		return true;
+
+	/* Only deflink information is passed to IPA */
+	if (!WLAN_HDD_IS_DEFLINK(link_info))
+		return false;
+
+	/* If mac based rules are needed from IPA, it's based on ethernet
+	 * headers, which is SA or DA. Hence mld address should be passed
+	 * instead of link address of the AP.
+	 */
+	*mac_addr = sta_ctx->conn_info.mld_addr.bytes;
+
+	return true;
+}
+#else /* !IPA_HANDLE_MLO_DEF_LINK_REG */
+static inline bool
+hdd_handle_ipa_sta_mlo_conn(struct wlan_hdd_link_info *link_info,
+			    struct hdd_station_ctx *sta_ctx,
+			    uint8_t **mac_addr)
+{
+	return true;
+}
+#endif /* IPA_HANDLE_MLO_DEF_LINK_REG */
+
 /**
  * hdd_change_sta_state_authenticated()-
  * This function changes STA state to authenticated
@@ -1679,6 +1719,9 @@ hdd_change_sta_state_authenticated(struct wlan_hdd_link_info *link_info,
 	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_OPEN_SYSTEM &&
 	    sta_ctx->conn_info.auth_type != eCSR_AUTH_TYPE_SHARED_KEY) {
 
+		if (!hdd_handle_ipa_sta_mlo_conn(link_info, sta_ctx, &mac_addr))
+			goto set_peer_auth;
+
 		hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 		status = hdd_ipa_get_tx_pipe(hdd_ctx, link_info, &alt_pipe);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -1694,6 +1737,7 @@ hdd_change_sta_state_authenticated(struct wlan_hdd_link_info *link_info,
 				  alt_pipe);
 	}
 
+set_peer_auth:
 	hdd_cm_set_peer_authenticate(link_info,
 				     &sta_ctx->conn_info.bssid, false);
 
@@ -2484,7 +2528,7 @@ void wlan_hdd_ft_set_key_delay(struct wlan_objmgr_vdev *vdev)
 
 	if (ucfg_cm_ft_key_ready_for_install(vdev))
 		errno =
-		wlan_cfg80211_crypto_add_key(vdev,
+		wlan_cfg80211_crypto_add_key(vdev, NULL,
 					     WLAN_CRYPTO_KEY_TYPE_UNICAST,
 					     0, false);
 	if (errno)

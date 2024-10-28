@@ -113,3 +113,31 @@ cfg_p2p_is_go_ignore_non_p2p_probe_req(struct wlan_objmgr_psoc *psoc)
 	return p2p_soc_obj->param.go_ignore_non_p2p_probe_req;
 }
 
+bool
+cfg_p2p_get_sta_vdev_for_p2p_dev_cap(struct wlan_objmgr_psoc *psoc)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	p2p_soc_obj = wlan_psoc_get_p2p_object(psoc);
+	if (!p2p_soc_obj) {
+		p2p_err("p2p psoc null");
+		return false;
+	}
+
+	return p2p_soc_obj->param.sta_vdev_for_p2p_device;
+}
+
+bool
+cfg_p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap(
+				struct wlan_objmgr_psoc *psoc)
+{
+	struct p2p_soc_priv_obj *p2p_soc_obj;
+
+	p2p_soc_obj = wlan_psoc_get_p2p_object(psoc);
+	if (!p2p_soc_obj) {
+		p2p_err("p2p psoc null");
+		return false;
+	}
+
+	return p2p_soc_obj->param.sta_vdev_for_p2p_device_upon_vdev_exhaust;
+}

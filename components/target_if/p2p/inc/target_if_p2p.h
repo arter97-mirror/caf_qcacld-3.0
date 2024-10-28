@@ -147,5 +147,14 @@ QDF_STATUS target_if_p2p_set_noa(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS target_if_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 					 struct p2p_usd_attr_params *param);
+
+/**
+ * target_if_p2p_is_fw_support_usd() - return USD service capability
+ * from FW.
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if USD supported by FW otherwise false
+ */
+bool target_if_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif /* _TARGET_IF_P2P_H_ */

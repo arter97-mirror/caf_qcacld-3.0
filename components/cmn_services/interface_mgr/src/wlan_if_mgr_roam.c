@@ -39,7 +39,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlo_mgr_link_switch.h"
 #include <wlan_action_oui_main.h>
-
+#include <wlan_p2p_api.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline bool
@@ -91,7 +91,8 @@ static void if_mgr_enable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 
 	if (curr_vdev_id != vdev_id &&
 	    vdev->vdev_mlme.mlme_state == WLAN_VDEV_S_UP) {
-		ifmgr_debug("Enable roaming for vdev_id %d", vdev_id);
+		ifmgr_debug("Enable roaming for vdev_id %d, requestor %d",
+			    vdev_id, roam_arg->requestor);
 		wlan_cm_enable_rso(pdev, vdev_id,
 				   roam_arg->requestor,
 				   REASON_DRIVER_ENABLED);
@@ -986,5 +987,32 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 	if (conc_freq)
 		return QDF_STATUS_E_INVAL;
 
+	if (op_mode == QDF_P2P_CLIENT_MODE &&
+	    wlan_reg_is_dfs_for_freq(pdev, chan_freq)) {
+		const uint8_t *ie;
+		uint16_t ie_len;
+		bool is_dfs_owner = false, is_valid_ap_assist = false;
+
+		ie = util_scan_entry_ie_data(candidate_info->scan_entry);
+		ie_len = util_scan_entry_ie_len(candidate_info->scan_entry);
+		wlan_p2p_extract_ap_assist_dfs_params(vdev, ie, ie_len,
+						      true, chan_freq, true);
+		wlan_p2p_get_ap_assist_dfs_params(vdev, &is_dfs_owner,
+						  &is_valid_ap_assist,
+						  NULL, NULL, NULL);
+		if (is_dfs_owner)
+			goto end;
+
+		if (!wlan_p2p_fw_support_ap_assist_dfs_group(psoc)) {
+			ifmgr_debug("FW doesn't support assisted AP for P2P");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		if (!is_valid_ap_assist) {
+			ifmgr_debug("Invalid AP assist params");
+			return QDF_STATUS_E_INVAL;
+		}
+	}
+end:
 	return QDF_STATUS_SUCCESS;
 }

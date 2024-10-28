@@ -36,6 +36,8 @@
 #include <wlan_scan_ucfg_api.h>
 #include <wlan_dcs_ucfg_api.h>
 #include <wlan_nlink_common.h>
+#include <ieee80211_defines.h>
+#include <include/wlan_mlme_cmn.h>
 
 static struct son_callbacks g_son_os_if_cb;
 static struct wlan_os_if_son_ops g_son_os_if_txrx_ops;
@@ -1003,6 +1005,10 @@ QDF_STATUS os_if_son_vdev_ops(struct wlan_objmgr_vdev *vdev,
 		break;
 	case VDEV_SET_WNM_BSS_PREF:
 		break;
+	case VDEV_SET_SON_MAP_VERSION:
+		break;
+	case VDEV_SET_MCTBL:
+		break;
 	case VDEV_GET_NSS:
 		break;
 	case VDEV_GET_CHAN:
@@ -1146,6 +1152,8 @@ QDF_STATUS os_if_son_peer_ops(struct wlan_objmgr_peer *peer,
 						(peer, WLAN_PEER_F_EXT_STATS);
 			}
 		}
+		break;
+	case PEER_SET_VLAN_ID:
 		break;
 	case PEER_REQ_INST_STAT:
 		status = wlan_son_peer_req_inst_stats(pdev, peer->macaddr,
@@ -1895,3 +1903,32 @@ nla_put_failed:
 }
 
 qdf_export_symbol(os_if_son_send_status_nlink_msg);
+
+#ifdef WLAN_FEATURE_SON
+struct mlme_external_tx_ops mlme_tx_ops;
+
+#define wlan_peer_ops_data os_if_son_peer_ops
+
+static
+QDF_STATUS wlan_peer_ops(struct wlan_objmgr_peer *peer,
+			 enum wlan_mlme_peer_param type,
+			 void *data, void *ret)
+{
+	return wlan_peer_ops_data(peer, type, (union wlan_mlme_peer_data *)data,
+				  (union wlan_mlme_peer_data *)ret);
+}
+
+struct mlme_external_tx_ops *wlan_mlme_register_tx_ops(void)
+{
+	struct mlme_external_tx_ops *ops = &mlme_tx_ops;
+
+	ops->peer_ops = wlan_peer_ops;
+	ops->vdev_ops = os_if_son_vdev_ops;
+	ops->pdev_ops = os_if_son_pdev_ops;
+	ops->scan_db_iterate = os_if_son_scan_db_iterate;
+
+	return ops;
+}
+
+qdf_export_symbol(wlan_mlme_register_tx_ops);
+#endif //WLAN_FEATURE_SON

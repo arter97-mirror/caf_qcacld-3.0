@@ -179,11 +179,11 @@ bool wlan_cfg80211_tdls_is_fw_wideband_capable(struct wlan_objmgr_vdev *vdev);
 /**
  * wlan_cfg80211_tdls_is_fw_6ghz_capable() - Check whether fw supports 6 GHz
  *                                           band TDLS
- * @vdev:     Pointer to vdev
+ * @pdev:     Pointer to pdev
  *
  * Return: true if fw supports 6 GHz TDLS connection
  */
-bool wlan_cfg80211_tdls_is_fw_6ghz_capable(struct wlan_objmgr_vdev *vdev);
+bool wlan_cfg80211_tdls_is_fw_6ghz_capable(struct wlan_objmgr_pdev *pdev);
 #endif
 
 /**

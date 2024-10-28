@@ -208,4 +208,17 @@ void wlan_hdd_set_mcc_latency(struct hdd_adapter *adapter, int set_value);
  * Return: None
  */
 void wlan_hdd_cleanup_actionframe(struct wlan_hdd_link_info *link_info);
+
+/**
+ * wlan_hdd_get_sta_vdev_for_p2p_dev() - Get STA vdev to use for P2P device
+ * @psoc: pointer to psoc obj
+ * @vdev_id: vdev id
+ * @comp_id: Component id
+ *
+ * Return: STA vdev
+ */
+struct wlan_objmgr_vdev *
+wlan_hdd_get_sta_vdev_for_p2p_dev(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id,
+				  wlan_objmgr_ref_dbgid comp_id);
 #endif /* __P2P_H */

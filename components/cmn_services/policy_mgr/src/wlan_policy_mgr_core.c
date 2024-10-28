@@ -4529,7 +4529,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 		 * use the API which is hw mode agnostic.
 		 */
 		if (dbs_ml_sta_present)
-			same_mac = policy_mgr_2_freq_same_mac_in_dbs(pm_ctx,
+			same_mac = policy_mgr_2_freq_same_mac_in_dbs(psoc,
 								sap_ch_freq,
 								pcl_freq);
 		else if (sbs_ml_sta_present)
@@ -4741,6 +4741,9 @@ policy_mgr_handle_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	uint8_t sta_count, go_count;
 
+	if (wlan_nan_is_disc_active(psoc))
+		return QDF_STATUS_SUCCESS;
+
 	go_count = policy_mgr_mode_specific_connection_count(psoc,
 							     PM_P2P_GO_MODE,
 							     NULL);
@@ -4775,7 +4778,13 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	struct policy_mgr_conc_connection_info
 			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	struct policy_mgr_conc_connection_info
+			info_sap[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	struct policy_mgr_conc_connection_info
+			info_go[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
 	uint8_t num_cxn_del = 0;
+	uint8_t num_cxn_del_sap = 0;
+	uint8_t num_cxn_del_go = 0;
 	bool allow_6ghz = true;
 	uint8_t sta_count;
 
@@ -4819,12 +4828,26 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	/*
-	 * For SAP restart case SAP entry might be present in table,
+	 * For SAP restart case SAP/GO entry might be present in table,
 	 * so delete it temporary
 	 */
 	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, vdev_id, info,
-						      &num_cxn_del);
-
+								&num_cxn_del);
+	if (policy_mgr_is_3vifs_mcc_to_scc_enabled(psoc)) {
+		/* Needs to del all sap/go,
+		 * because sap+go+sta SCC is supported.
+		 */
+		policy_mgr_store_and_del_conn_info_by_chan_and_mode(psoc,
+							sap_ch_freq,
+							PM_SAP_MODE,
+							info_sap,
+							&num_cxn_del_sap);
+		policy_mgr_store_and_del_conn_info_by_chan_and_mode(psoc,
+							sap_ch_freq,
+							PM_P2P_GO_MODE,
+							info_go,
+							&num_cxn_del_go);
+	}
 	num_connections = policy_mgr_get_connection_count(psoc);
 	switch (num_connections) {
 	case 0:
@@ -4847,6 +4870,14 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 	/* Restore the connection entry */
 	if (num_cxn_del > 0)
 		policy_mgr_restore_deleted_conn_info(psoc, info, num_cxn_del);
+	if (policy_mgr_is_3vifs_mcc_to_scc_enabled(psoc)) {
+		if (num_cxn_del_sap > 0)
+			policy_mgr_restore_deleted_conn_info(psoc, info_sap,
+							     num_cxn_del_sap);
+		if (num_cxn_del_go > 0)
+			policy_mgr_restore_deleted_conn_info(psoc, info_go,
+							     num_cxn_del_go);
+	}
 
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 }

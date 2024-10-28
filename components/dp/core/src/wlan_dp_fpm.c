@@ -68,6 +68,17 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 
 	/* sk_tx_flow_id != 0 means flow_id valid */
 	if (qdf_unlikely(!sk_tx_flow_id)) {
+		/* Bypass special packets so that it does not
+		 * consume TX flow table entries.
+		 */
+		if (qdf_nbuf_data_is_ipv6_pkt(skb->data) ||
+		    qdf_nbuf_data_is_dns_query(skb) ||
+		    qdf_nbuf_data_is_dns_response(skb) ||
+		    qdf_nbuf_data_is_ipv4_dhcp_pkt(skb->data)) {
+			skb->mark = FLOW_INVALID_METADATA;
+			return QDF_STATUS_E_INVAL;
+		}
+
 		dp_fim_parse_skb_flow_info(skb, &flow);
 		if (qdf_unlikely(!flow.flags ||
 				 flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT)) {

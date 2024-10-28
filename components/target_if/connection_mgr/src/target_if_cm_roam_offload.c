@@ -1955,7 +1955,7 @@ target_if_cm_roam_send_stop(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS rso_stop_status = QDF_STATUS_E_INVAL;
 	wmi_unified_t wmi_handle;
 	struct wlan_objmgr_psoc *psoc;
-	uint8_t vdev_id;
+	uint8_t vdev_id, i;
 
 	wmi_handle = target_if_cm_roam_get_wmi_handle_from_vdev(vdev);
 	if (!wmi_handle)
@@ -2034,6 +2034,9 @@ target_if_cm_roam_send_stop(struct wlan_objmgr_vdev *vdev,
 		req->roam_triggers.vdev_id = vdev_id;
 		req->roam_triggers.trigger_bitmap = 0;
 		req->roam_triggers.roam_scan_scheme_bitmap = 0;
+		for (i = 0; i < ROAM_TRIGGER_REASON_MAX; i++)
+			req->roam_triggers.score_delta_param[i].roam_score_delta =
+				ROAM_MAX_CFG_VALUE;
 		target_if_cm_roam_triggers(vdev, &req->roam_triggers);
 	}
 end:

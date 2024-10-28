@@ -3058,7 +3058,12 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		qdf_mem_free(pMsg->bodyptr);
 		break;
 	case eWNI_SME_MONITOR_MODE_VDEV_UP:
-		status = sme_process_monitor_mode_vdev_up_evt(pMsg->bodyval);
+		status = sme_process_monitor_mode_vdev_evt(pMsg->bodyval,
+							   true);
+		break;
+	case eWNI_SME_MONITOR_MODE_VDEV_STOP:
+		status = sme_process_monitor_mode_vdev_evt(pMsg->bodyval,
+							   false);
 		break;
 	case eWNI_SME_TWT_ADD_DIALOG_EVENT:
 		sme_process_twt_add_dialog_event(mac, pMsg->bodyptr);
@@ -3905,6 +3910,116 @@ QDF_STATUS sme_generic_change_country_code(mac_handle_t mac_handle,
 
 	return status;
 }
+
+#ifdef FEATURE_WLAN_APF
+QDF_STATUS sme_enable_active_apf_mode_ind(mac_handle_t mac_handle,
+					  uint8_t device_mode,
+					  uint8_t *macAddr, uint8_t sessionId)
+{
+	QDF_STATUS status;
+	QDF_STATUS qdf_status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct scheduler_msg message = {0};
+	tAniDHCPInd *pMsg;
+	struct csr_roam_session *pSession;
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (status == QDF_STATUS_SUCCESS) {
+		pSession = CSR_GET_SESSION(mac, sessionId);
+
+		if (!pSession) {
+			sme_err("Session: %d not found", sessionId);
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_FAILURE;
+		}
+		pSession->dhcp_done = false;
+
+		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
+		if (!pMsg) {
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_NOMEM;
+		}
+		pMsg->msgType = WMA_ENABLE_ACTIVE_APF_MODE_IND;
+		pMsg->msgLen = (uint16_t)sizeof(tAniDHCPInd);
+		pMsg->device_mode = device_mode;
+		qdf_mem_copy(pMsg->adapterMacAddr.bytes, macAddr,
+			     QDF_MAC_ADDR_SIZE);
+		wlan_mlme_get_bssid_vdev_id(mac->pdev, sessionId,
+					    &pMsg->peerMacAddr);
+
+		message.type = WMA_ENABLE_ACTIVE_APF_MODE_IND;
+		message.bodyptr = pMsg;
+		message.reserved = 0;
+		MTRACE(qdf_trace(QDF_MODULE_ID_SME, TRACE_CODE_SME_TX_WMA_MSG,
+				 sessionId, message.type));
+		qdf_status = scheduler_post_message(QDF_MODULE_ID_SME,
+						    QDF_MODULE_ID_WMA,
+						    QDF_MODULE_ID_WMA,
+						    &message);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			sme_err("Post enable APF mode MSG fail");
+			qdf_mem_free(pMsg);
+			status = QDF_STATUS_E_FAILURE;
+		}
+		sme_release_global_lock(&mac->sme);
+	}
+	return status;
+}
+
+QDF_STATUS sme_disable_active_apf_mode_ind(mac_handle_t mac_handle,
+					   uint8_t device_mode,
+					   uint8_t *macAddr, uint8_t sessionId)
+{
+	QDF_STATUS status;
+	QDF_STATUS qdf_status;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct scheduler_msg message = {0};
+	tAniDHCPInd *pMsg;
+	struct csr_roam_session *pSession;
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (status == QDF_STATUS_SUCCESS) {
+		pSession = CSR_GET_SESSION(mac, sessionId);
+
+		if (!pSession) {
+			sme_err("Session: %d not found", sessionId);
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_FAILURE;
+		}
+		pSession->dhcp_done = false;
+
+		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
+		if (!pMsg) {
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_NOMEM;
+		}
+		pMsg->msgType = WMA_DISABLE_ACTIVE_APF_MODE_IND;
+		pMsg->msgLen = (uint16_t)sizeof(tAniDHCPInd);
+		pMsg->device_mode = device_mode;
+		qdf_mem_copy(pMsg->adapterMacAddr.bytes, macAddr,
+			     QDF_MAC_ADDR_SIZE);
+		wlan_mlme_get_bssid_vdev_id(mac->pdev, sessionId,
+					    &pMsg->peerMacAddr);
+
+		message.type = WMA_DISABLE_ACTIVE_APF_MODE_IND;
+		message.bodyptr = pMsg;
+		message.reserved = 0;
+		MTRACE(qdf_trace(QDF_MODULE_ID_SME, TRACE_CODE_SME_TX_WMA_MSG,
+				 sessionId, message.type));
+		qdf_status = scheduler_post_message(QDF_MODULE_ID_SME,
+						    QDF_MODULE_ID_WMA,
+						    QDF_MODULE_ID_WMA,
+						    &message);
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			sme_err("Post disable APF mode MSG fail");
+			qdf_mem_free(pMsg);
+			status = QDF_STATUS_E_FAILURE;
+		}
+		sme_release_global_lock(&mac->sme);
+	}
+	return status;
+}
+#endif
 
 /*
  * sme_dhcp_start_ind() -
@@ -7762,17 +7877,17 @@ QDF_STATUS sme_set_ht2040_mode(mac_handle_t mac_handle, uint8_t sessionId,
 
 	switch (channel_type) {
 	case eHT_CHAN_HT20:
-		if (!session->cb_mode)
+		if (session->cb_mode == PHY_SINGLE_CHANNEL_CENTERED)
 			return QDF_STATUS_SUCCESS;
 		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
 		break;
 	case eHT_CHAN_HT40MINUS:
-		if (session->cb_mode)
+		if (session->cb_mode != PHY_SINGLE_CHANNEL_CENTERED)
 			return QDF_STATUS_SUCCESS;
 		cb_mode = PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
 		break;
 	case eHT_CHAN_HT40PLUS:
-		if (session->cb_mode)
+		if (session->cb_mode != PHY_SINGLE_CHANNEL_CENTERED)
 			return QDF_STATUS_SUCCESS;
 		cb_mode = PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
 		break;
@@ -8125,7 +8240,7 @@ int sme_set_no_ack_policy(mac_handle_t mac_handle, uint8_t session_id,
 	}
 	sme_debug("no ack is set to %d for ac %d", set_val, ac);
 	qdf_mem_zero(&msg, sizeof(msg));
-	msg.type = eWNI_SME_UPDATE_EDCA_PROFILE;
+	msg.type = eWNI_SME_UPDATE_EDCA_ACTIVE_PROFILE;
 	msg.reserved = 0;
 	msg.bodyval = session_id;
 	status = scheduler_post_message(QDF_MODULE_ID_SME,
@@ -8488,12 +8603,11 @@ QDF_STATUS sme_ch_avoid_update_req(mac_handle_t mac_handle)
 						    QDF_MODULE_ID_WMA,
 						    &message);
 		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			sme_err("Post Ch Avoid Update MSG fail");
+			sme_err("Post WMA_CH_AVOID_UPDATE_REQ fail");
 			qdf_mem_free(cauReq);
 			sme_release_global_lock(&mac->sme);
 			return QDF_STATUS_E_FAILURE;
 		}
-		sme_debug("Posted Ch Avoid Update MSG");
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -11756,7 +11870,11 @@ int sme_update_he_full_ul_mumimo(mac_handle_t mac_handle, uint8_t session_id,
 		sme_err("No session for id %d", session_id);
 		return -EINVAL;
 	}
+
+	sme_info("UL MU mimo: %d", cfg_val);
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.ul_mu = cfg_val;
+	mac_ctx->he_cap_2g.ul_mu = cfg_val;
+	mac_ctx->he_cap_5g.ul_mu = cfg_val;
 
 	csr_update_session_he_cap(mac_ctx, session);
 
@@ -12138,6 +12256,7 @@ QDF_STATUS sme_soc_set_dual_mac_config(struct policy_mgr_dual_mac_config msg)
 	cmd->u.set_dual_mac_cmd.scan_config = msg.scan_config;
 	cmd->u.set_dual_mac_cmd.fw_mode_config = msg.fw_mode_config;
 	cmd->u.set_dual_mac_cmd.set_dual_mac_cb = msg.set_dual_mac_cb;
+	cmd->vdev_id = msg.vdev_id;
 
 	sme_debug("set_dual_mac_config scan_config: %x fw_mode_config: %x",
 		cmd->u.set_dual_mac_cmd.scan_config,
@@ -14576,9 +14695,8 @@ QDF_STATUS sme_unpack_assoc_rsp(mac_handle_t mac_handle,
 
 	lim_strip_and_decode_eht_cap(rsp->connect_ies.assoc_rsp.ptr + ies_offset,
 				     rsp->connect_ies.assoc_rsp.len - ies_offset,
-				     &assoc_resp->eht_cap,
-				     assoc_resp->he_cap,
-				     rsp->freq);
+				     &assoc_resp->eht_cap, assoc_resp->he_cap,
+				     rsp->freq, false);
 	return status;
 }
 
@@ -15383,17 +15501,21 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 void sme_config_ba_mode_all_vdevs(mac_handle_t mac_handle, uint8_t val)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	enum QDF_OPMODE op_mode;
 	uint8_t vdev_id;
 	int ret_val = 0;
+	struct wlan_objmgr_vdev *vdev;
 
 	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
-		op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
-		if (op_mode == QDF_STA_MODE) {
-			ret_val = wma_cli_set_command(
-						vdev_id,
-						wmi_vdev_param_set_ba_mode,
-						val, VDEV_CMD);
+		vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev,
+					vdev_id, WLAN_LEGACY_SME_ID);
+		if (!vdev)
+			continue;
+
+		ret_val = wma_cli_set_command(vdev_id,
+					      wmi_vdev_param_set_ba_mode,
+					      val, VDEV_CMD);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 
 		if (QDF_IS_STATUS_ERROR(ret_val))
 			sme_err("BA mode set failed for vdev: %d, ret %d",
@@ -15401,7 +15523,6 @@ void sme_config_ba_mode_all_vdevs(mac_handle_t mac_handle, uint8_t val)
 		else
 			sme_debug("vdev: %d ba mode: %d param id %d",
 				  vdev_id, val, wmi_vdev_param_set_ba_mode);
-		}
 	}
 }
 #endif
@@ -15599,7 +15720,9 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 		     &mac_ctx->eht_cap_5g_orig,
 		     sizeof(tDot11fIEeht_cap));
 	mac_ctx->usr_eht_testbed_cfg = false;
-	mac_ctx->roam.configParam.channelBondingMode24GHz = 1;
+	wlan_mlme_get_24_chan_bonding_mode(
+			mac_ctx->psoc,
+			&mac_ctx->roam.configParam.channelBondingMode24GHz);
 	wlan_mlme_set_sta_mlo_conn_band_bmp(mac_ctx->psoc, 0x77);
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, 2);
 	status = ucfg_mlme_get_bss_color_collision_det_support(mac_ctx->psoc,
@@ -15760,7 +15883,7 @@ void sme_update_eht_cap_mcs(mac_handle_t mac_handle, uint8_t vdev_id,
 
 void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t num_links,
-			    struct qdf_mac_addr active_link_addr[2])
+			    struct qdf_mac_addr active_link_addr[WLAN_MLO_MAX_VDEVS])
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
@@ -16649,6 +16772,19 @@ QDF_STATUS sme_set_aggressive_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
 					  &src_config);
 }
 
+QDF_STATUS sme_get_aggressive_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
+				      bool *is_aggressive_roam_mode)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy temp;
+
+	wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id, IS_ROAM_AGGRESSIVE,
+				   &temp);
+	*is_aggressive_roam_mode = temp.bool_value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS sme_get_roam_config_status(mac_handle_t mac_handle,
 				      uint8_t vdev_id,
 				      uint8_t *config_status)
@@ -16739,7 +16875,8 @@ QDF_STATUS sme_get_ani_level(mac_handle_t mac_handle, uint32_t *freqs,
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 
 QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
-				   void (*monitor_mode_cb)(uint8_t vdev_id))
+				   void (*monitor_mode_cb)(uint8_t vdev_id,
+							   bool is_up))
 {
 	QDF_STATUS qdf_status;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
@@ -16755,7 +16892,7 @@ QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
 	return qdf_status;
 }
 
-QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
+QDF_STATUS sme_process_monitor_mode_vdev_evt(uint8_t vdev_id, bool is_up)
 {
 	mac_handle_t mac_handle;
 	struct mac_context *mac;
@@ -16767,7 +16904,7 @@ QDF_STATUS sme_process_monitor_mode_vdev_up_evt(uint8_t vdev_id)
 	mac = MAC_CONTEXT(mac_handle);
 
 	if (mac->sme.monitor_mode_cb)
-		mac->sme.monitor_mode_cb(vdev_id);
+		mac->sme.monitor_mode_cb(vdev_id, is_up);
 	else {
 		sme_warn_rl("monitor_mode_cb is not registered");
 		return QDF_STATUS_E_FAILURE;
@@ -17214,7 +17351,7 @@ sme_validate_txrx_chain_mask(uint32_t id, uint32_t value)
 }
 
 void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
-				    void (*set_disconnect_link_id_cb)
+				    void (*set_disconnect_link_info_cb)
 				    (uint8_t vdev_id))
 {
 	QDF_STATUS status;
@@ -17224,8 +17361,8 @@ void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		mac->sme.set_disconnect_link_id_cb =
-					set_disconnect_link_id_cb;
+		mac->sme.set_disconnect_link_info_cb =
+					set_disconnect_link_info_cb;
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -17241,7 +17378,7 @@ void sme_deregister_disconnect_cb(mac_handle_t mac_handle)
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		mac->sme.set_disconnect_link_id_cb = NULL;
+		mac->sme.set_disconnect_link_info_cb = NULL;
 		sme_release_global_lock(&mac->sme);
 	}
 

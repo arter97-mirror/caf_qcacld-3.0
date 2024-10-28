@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -36,6 +36,7 @@
 #include "wlan_p2p_roc.h"
 #include "wlan_p2p_main.h"
 #include "wlan_p2p_off_chan_tx.h"
+#include "wlan_mlme_api.h"
 
 /**
  * p2p_mgmt_rx_ops() - register or unregister rx callback
@@ -87,6 +88,7 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 	struct wlan_objmgr_pdev *pdev;
 	bool is_dbs;
 	enum QDF_OPMODE opmode;
+	struct qdf_mac_addr mac_addr = {0};
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
 			p2p_soc_obj->soc, roc_ctx->vdev_id,
@@ -126,6 +128,27 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 	req->scan_req.num_bssid = 1;
 	qdf_set_macaddr_broadcast(&req->scan_req.bssid_list[0]);
 
+	if (roc_ctx->opmode == QDF_P2P_DEVICE_MODE &&
+	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+						p2p_soc_obj->soc)) {
+		/* Fill same mac addr in scan_random.mac_addr which is received
+		 * from supplicant if roc type is OFF_CHANNEL_TX. Otherwise,
+		 * fill p2p interface mac address.
+		 */
+		if (roc_ctx->roc_type == OFF_CHANNEL_TX) {
+			qdf_mem_copy(req->scan_req.scan_random.mac_addr,
+				     roc_ctx->tx_mgmt_mac_addr.bytes,
+				     QDF_MAC_ADDR_SIZE);
+		} else {
+			wlan_mlme_get_p2p_device_mac_addr(req->vdev, &mac_addr);
+			qdf_mem_copy(req->scan_req.scan_random.mac_addr,
+				     &mac_addr,
+				     QDF_MAC_ADDR_SIZE);
+		}
+		req->scan_req.scan_random.randomize = true;
+		req->scan_req.scan_ctrl_flags_ext |= SCAN_FLAG_EXT_P2P_SCAN;
+	}
+
 	if (req->scan_req.dwell_time_passive < P2P_MAX_ROC_DURATION) {
 		go_num = policy_mgr_mode_specific_connection_count(
 				p2p_soc_obj->soc, PM_P2P_GO_MODE, NULL);
@@ -142,7 +165,10 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 		/* Modify the ROC duration only for P2P modes */
 		if (opmode == QDF_P2P_DEVICE_MODE ||
 		    opmode == QDF_P2P_CLIENT_MODE ||
-		    opmode == QDF_P2P_GO_MODE) {
+		    opmode == QDF_P2P_GO_MODE ||
+		    (roc_ctx->opmode == QDF_P2P_DEVICE_MODE &&
+		     ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(
+						p2p_soc_obj->soc))) {
 			if (go_num)
 			/* Check any P2P GO is already present or not. If it's
 			 * present then add fixed ROC timer value by 300ms
@@ -292,9 +318,11 @@ static QDF_STATUS p2p_send_roc_event(
 	p2p_evt.cookie = (uint64_t)roc_ctx->id;
 	p2p_evt.chan_freq = roc_ctx->chan_freq;
 	p2p_evt.duration = roc_ctx->duration;
+	p2p_evt.opmode = roc_ctx->opmode;
+	p2p_evt.flag = roc_ctx->flag;
 
-	p2p_debug("roc_event: %d, cookie:%llx", p2p_evt.roc_event,
-		  p2p_evt.cookie);
+	p2p_debug("roc_event: %d, cookie:%llx flag:%d", p2p_evt.roc_event,
+		  p2p_evt.cookie, p2p_evt.flag);
 
 	start_param->event_cb(start_param->event_cb_data, &p2p_evt);
 
@@ -327,6 +355,8 @@ static QDF_STATUS p2p_destroy_roc_ctx(struct p2p_roc_context *roc_ctx,
 			p2p_send_roc_event(roc_ctx, ROC_EVENT_READY_ON_CHAN);
 		p2p_send_roc_event(roc_ctx, ROC_EVENT_COMPLETED);
 	}
+
+	p2p_cancel_tx_frame_by_roc(p2p_soc_obj, (uintptr_t)roc_ctx);
 
 	if (in_roc_queue) {
 		status = qdf_list_remove_node(&p2p_soc_obj->roc_q,
@@ -943,9 +973,10 @@ QDF_STATUS p2p_process_cancel_roc_req(
 		return QDF_STATUS_E_INVAL;
 	}
 
-	p2p_debug("roc ctx:%pK vdev_id:%d, scan_id:%d, roc_type:%d, roc_state:%d",
-		curr_roc_ctx, curr_roc_ctx->vdev_id, curr_roc_ctx->scan_id,
-		curr_roc_ctx->roc_type, curr_roc_ctx->roc_state);
+	p2p_debug("roc ctx:%pK vdev_id:%d, scan_id:%d, roc_type:%d, roc_state:%d opmode:%d",
+		  curr_roc_ctx, curr_roc_ctx->vdev_id, curr_roc_ctx->scan_id,
+		  curr_roc_ctx->roc_type, curr_roc_ctx->roc_state,
+		  curr_roc_ctx->opmode);
 
 	if (curr_roc_ctx->roc_state == ROC_STATE_IDLE) {
 		status = p2p_destroy_roc_ctx(curr_roc_ctx, true, true);
@@ -967,7 +998,8 @@ void p2p_scan_event_cb(struct wlan_objmgr_vdev *vdev,
 	struct p2p_soc_priv_obj *p2p_soc_obj;
 	struct p2p_roc_context *curr_roc_ctx;
 
-	p2p_debug("soc:%pK, scan event:%d", arg, event->type);
+	p2p_debug("soc:%pK, scan event:%d flag:%d", arg, event->type,
+		  event->flag);
 
 	p2p_soc_obj = (struct p2p_soc_priv_obj *)arg;
 	if (!p2p_soc_obj) {
@@ -979,6 +1011,22 @@ void p2p_scan_event_cb(struct wlan_objmgr_vdev *vdev,
 	if (!curr_roc_ctx) {
 		p2p_err("Failed to find valid P2P roc context");
 		return;
+	}
+
+	/**
+	 * When cancel roc cmd comes, driver will trigger stop scan internally
+	 * and sends the scan event to upper layer. By this time, firmware will
+	 * not send this event to driver. So, to redirect the event to p2p
+	 * interface, set the flag manually whenever stop scan gets trigger
+	 * by driver as part of cancel roc cmd.
+	 */
+	if (!(event->flag & P2P_SCAN_IN_STA_VDEV_FLAG) &&
+	    curr_roc_ctx->opmode == QDF_P2P_DEVICE_MODE) {
+		curr_roc_ctx->flag = 0;
+		curr_roc_ctx->flag = P2P_SCAN_IN_STA_VDEV_FLAG |
+					curr_roc_ctx->flag;
+	} else {
+		curr_roc_ctx->flag = event->flag;
 	}
 
 	qdf_mtrace(QDF_MODULE_ID_SCAN, QDF_MODULE_ID_P2P, event->type,

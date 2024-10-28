@@ -279,4 +279,15 @@ void tdls_peer_idle_timers_destroy(struct tdls_vdev_priv_obj *vdev_obj);
  * Return: None
  */
 void tdls_free_peer_list(struct tdls_vdev_priv_obj *vdev_obj);
+
+/**
+ * tdls_update_peer_kickout_count() - Update peer kickout count for the given
+ * TDLS peer
+ * @vdev:  Vdev object pointer
+ * @macaddr: Mac address of the TDLS peer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
+					  uint8_t *macaddr);
 #endif

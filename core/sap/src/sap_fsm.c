@@ -65,6 +65,7 @@
 #include <target_if.h>
 #include "wlan_ll_sap_api.h"
 #include "wlan_nan_api.h"
+#include <wlan_p2p_api.h>
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -175,19 +176,30 @@ static uint8_t *sap_hdd_event_to_string(eSapHddEvent event)
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE
+static inline
+bool sap_is_same_punc(struct ch_params *new_params,
+		      struct ch_params *old_params)
+{
+	sap_debug("punct, new 0x%x, old 0x%x",
+		  new_params->reg_punc_bitmap,
+		  old_params->reg_punc_bitmap);
+
+	return (new_params->reg_punc_bitmap == old_params->reg_punc_bitmap);
+}
+#else
+static inline
+bool sap_is_same_punc(struct ch_params *new_params,
+		      struct ch_params *old_params)
+{
+	return true;
+}
+#endif
+
 #ifdef QCA_DFS_BW_PUNCTURE
-/**
- * sap_is_chan_change_needed() - Check if SAP channel change needed
- * @sap_ctx: sap context.
- *
- * Even some 20 MHz sub channel disabled for nol, if puncture pattern is valid,
- * SAP still can keep current channel width and primary channel, don't need
- * change channel.
- *
- * Return: bool, true: channel change needed
- */
-static bool
-sap_is_chan_change_needed(struct sap_context *sap_ctx)
+bool
+sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
+				    qdf_freq_t *freq)
 {
 	uint8_t ch_wd;
 	uint16_t pri_freq_puncture = 0;
@@ -203,6 +215,11 @@ sap_is_chan_change_needed(struct sap_context *sap_ctx)
 	mac_ctx = sap_get_mac_context();
 	if (!mac_ctx) {
 		sap_err("Invalid MAC context");
+		return true;
+	}
+
+	if (!wlan_mlme_get_sap_dfs_puncture(mac_ctx->psoc)) {
+		sap_debug("dfs punct disabled");
 		return true;
 	}
 
@@ -224,6 +241,15 @@ sap_is_chan_change_needed(struct sap_context *sap_ctx)
 						ch_params,
 						REG_CURRENT_PWR_MODE);
 	if (ch_params->ch_width == sap_ctx->ch_params.ch_width) {
+		if (sap_is_same_punc(ch_params, &sap_ctx->ch_params)) {
+			sap_debug("No CSA needed, same freq %d, bw %d and puncture",
+				  sap_ctx->chan_freq,
+				  ch_params->ch_width);
+			mac_ctx->sap.SapDfsInfo.new_chanWidth =
+						ch_params->ch_width;
+			*freq = 0;
+			return false;
+		}
 		status = wlan_reg_extract_puncture_by_bw(ch_params->ch_width,
 							 ch_params->reg_punc_bitmap,
 							 sap_ctx->chan_freq,
@@ -231,21 +257,19 @@ sap_is_chan_change_needed(struct sap_context *sap_ctx)
 							 CH_WIDTH_20MHZ,
 							 &pri_freq_puncture);
 		if (QDF_IS_STATUS_SUCCESS(status) && !pri_freq_puncture) {
-			sap_debug("Eht valid puncture : 0x%x, keep freq %d",
+			sap_debug("Eht valid puncture : 0x%x, keep freq %d bw %d ccfs0 %d ccfs1 %d",
 				  ch_params->reg_punc_bitmap,
-				  sap_ctx->chan_freq);
+				  sap_ctx->chan_freq,
+				  ch_params->ch_width,
+				  ch_params->mhz_freq_seg0,
+				  ch_params->mhz_freq_seg1);
 			mac_ctx->sap.SapDfsInfo.new_chanWidth =
 						ch_params->ch_width;
+			*freq = sap_ctx->chan_freq;
 			return false;
 		}
 	}
 
-	return true;
-}
-#else
-static inline bool
-sap_is_chan_change_needed(struct sap_context *sap_ctx)
-{
 	return true;
 }
 #endif
@@ -562,7 +586,7 @@ bool sap_plus_sap_cac_skip(struct mac_context *mac,
 		struct sap_context *sap_context =
 			mac->sap.sapCtxList[intf].sap_context;
 
-		if (!sap_context || sap_context == sap_ctx)
+		if (!sap_context)
 			continue;
 		if (mac->sap.sapCtxList[intf].sapPersona != QDF_SAP_MODE &&
 		    mac->sap.sapCtxList[intf].sapPersona != QDF_P2P_GO_MODE)
@@ -570,7 +594,7 @@ bool sap_plus_sap_cac_skip(struct mac_context *mac,
 		if (sap_context->isCacEndNotified &&
 		    sap_context->chan_freq == chan_freq &&
 		    sap_operating_on_dfs(mac, sap_context)) {
-			sap_debug("SAP vid %d CAC can skip due to CAC completed on other SAP vid %d",
+			sap_debug("SAP vid %d CAC can skip due to CAC completed on SAP vid %d",
 				  sap_ctx->sessionId, sap_context->sessionId);
 			return true;
 		}
@@ -2600,9 +2624,6 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 		bss_complete->status = (eSapStatus) context;
 		bss_complete->staId = sap_ctx->sap_sta_id;
 
-		sap_debug("(eSAP_START_BSS_EVENT): staId = %d",
-			  bss_complete->staId);
-
 		bss_complete->operating_chan_freq = sap_ctx->chan_freq;
 		bss_complete->ch_width = sap_ctx->ch_params.ch_width;
 		if (QDF_IS_STATUS_SUCCESS(bss_complete->status)) {
@@ -3029,6 +3050,12 @@ void sap_cac_reset_notify(mac_handle_t mac_handle)
 	}
 }
 
+void sap_cac_reset_current_notify(struct sap_context *sap_ctx)
+{
+	sap_ctx->isCacStartNotified = false;
+	sap_ctx->isCacEndNotified = false;
+}
+
 /**
  * sap_cac_start_notify() - Notify CAC start to HDD
  * @mac_handle: Opaque handle to the global MAC context
@@ -3330,7 +3357,6 @@ wlansap_is_power_change_required(struct mac_context *mac_ctx,
 	struct wlan_objmgr_vdev *sta_vdev;
 	uint8_t sta_vdev_id;
 	enum hw_mode_bandwidth ch_wd;
-	uint8_t country[CDS_COUNTRY_CODE_LEN + 1];
 	enum channel_state state;
 	uint32_t ap_pwr_type_6g = 0;
 	bool indoor_ch_support = false;
@@ -3359,12 +3385,6 @@ wlansap_is_power_change_required(struct mac_context *mac_ctx,
 
 	if (ap_pwr_type_6g == REG_INDOOR_AP && indoor_ch_support) {
 		sap_debug("STA is connected to Indoor AP and indoor concurrency is supported");
-		return false;
-	}
-
-	wlan_reg_read_current_country(mac_ctx->psoc, country);
-	if (!wlan_reg_ctry_support_vlp(country)) {
-		sap_debug("Device country doesn't support VLP");
 		return false;
 	}
 
@@ -3854,6 +3874,7 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 	uint32_t ch_cfreq1 = 0;
 	enum reg_wifi_band band;
 	eSapDfsCACState_t cac_state = eSAP_DFS_DO_NOT_SKIP_CAC;
+	bool is_valid_ap_assist = false, is_dfs_owner = false;
 
 	if (msg == eSAP_MAC_START_BSS_SUCCESS) {
 		/*
@@ -3937,8 +3958,17 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_ctx->chan_freq))
 			is_dfs = false;
 
-		sap_debug("vdev %d freq %d, is_dfs %d", sap_ctx->vdev_id,
-			  sap_ctx->chan_freq, is_dfs);
+		wlan_p2p_get_ap_assist_dfs_params(sap_ctx->vdev, &is_dfs_owner,
+						  &is_valid_ap_assist, NULL,
+						  NULL, NULL);
+
+		sap_debug("vdev %d freq %d, is_dfs %d is_dfs_owner %d is_valid_ap_assist %d",
+			  sap_ctx->vdev_id, sap_ctx->chan_freq, is_dfs,
+			  is_dfs_owner, is_valid_ap_assist);
+
+		if (is_dfs && !is_dfs_owner && is_valid_ap_assist)
+			is_dfs = false;
+
 		if (is_dfs) {
 			sap_dfs_info = &mac_ctx->sap.SapDfsInfo;
 			if (sap_plus_sap_cac_skip(mac_ctx, sap_ctx,
@@ -4769,9 +4799,6 @@ qdf_freq_t sap_indicate_radar(struct sap_context *sap_ctx)
 	    sap_signal_hdd_event(sap_ctx, NULL, eSAP_DFS_NEXT_CHANNEL_REQ,
 	    (void *) eSAP_STATUS_SUCCESS)))
 		return 0;
-
-	if (!sap_is_chan_change_needed(sap_ctx))
-		return sap_ctx->chan_freq;
 
 	chan_freq = sap_random_channel_sel(sap_ctx);
 	if (!chan_freq)

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,7 +42,7 @@
 struct pmo_mc_addr_list_params {
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t vdev_id;
-	uint8_t count;
+	int count;
 	struct qdf_mac_addr mc_addr[PMO_MAX_MC_ADDR_LIST];
 };
 

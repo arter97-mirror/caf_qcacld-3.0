@@ -1408,11 +1408,13 @@ hdd_sysfs_create_ndi_adapter_root_obj(struct hdd_adapter *adapter)
 {
 	hdd_sysfs_unit_test_target_create(adapter);
 	hdd_sysfs_11be_rate_create(adapter);
+	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_ndi_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
 	hdd_sysfs_11be_rate_destroy(adapter);
 	hdd_sysfs_unit_test_target_destroy(adapter);
 }

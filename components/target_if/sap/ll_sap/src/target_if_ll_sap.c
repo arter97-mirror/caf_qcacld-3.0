@@ -239,6 +239,7 @@ bool target_if_ll_sap_is_twt_event_type_query_rsp(
 {
 	struct wmi_unified *wmi_hdl;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj;
 
 	wmi_hdl = get_wmi_unified_hdl_from_psoc(psoc);
 	if (!wmi_hdl) {
@@ -252,6 +253,17 @@ bool target_if_ll_sap_is_twt_event_type_query_rsp(
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("Unable to extract twt params");
+		ll_sap_psoc_obj = wlan_objmgr_psoc_get_comp_private_obj(
+						psoc,
+						WLAN_UMAC_COMP_LL_SAP);
+		if (!ll_sap_psoc_obj) {
+			target_if_err("ll_sap_psoc_obj is null");
+			return false;
+		}
+		if (QDF_TIMER_STATE_RUNNING == qdf_mc_timer_get_current_state(
+						&ll_sap_psoc_obj->tsf_timer))
+			return true;
+
 		return false;
 	}
 

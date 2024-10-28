@@ -99,6 +99,15 @@ ucfg_twt_ac_pdev_param_send(struct wlan_objmgr_psoc *psoc,
 	return wlan_twt_ac_pdev_param_send(psoc, twt_ac);
 }
 
+QDF_STATUS
+ucfg_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev,
+				  bool unavailability_mode)
+{
+	return wlan_twt_send_unavailability_mode(psoc, vdev,
+						 unavailability_mode);
+}
+
 bool ucfg_twt_is_max_sessions_reached(struct wlan_objmgr_psoc *psoc,
 				      struct qdf_mac_addr *peer_mac,
 				      uint8_t dialog_id)

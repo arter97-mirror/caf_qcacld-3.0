@@ -47,7 +47,7 @@
  *	1, if element1 weight is lesser than the element2 weight
  *	0, if both weights are equal
  */
-int wlan_dp_lb_sort_ring_weightages(const void *e1, const void *e2)
+static int wlan_dp_lb_sort_ring_weightages(const void *e1, const void *e2)
 {
 	struct wlan_dp_rx_ring_wtg *w1 = (struct wlan_dp_rx_ring_wtg *)e1;
 	struct wlan_dp_rx_ring_wtg *w2 = (struct wlan_dp_rx_ring_wtg *)e2;
@@ -173,7 +173,7 @@ wlan_dp_lb_irq_balance_handler(struct wlan_dp_psoc_context *dp_ctx,
  *	1, if element1 weight is lesser than the element2 weight
  *	0, if both weights are equal
  */
-int wlan_dp_lb_sort_cpu_load(const void *elem1, const void *elem2)
+static int wlan_dp_lb_sort_cpu_load(const void *elem1, const void *elem2)
 {
 	struct cpu_load *c1 = (struct cpu_load *)elem1;
 	struct cpu_load *c2 = (struct cpu_load *)elem2;
@@ -224,6 +224,7 @@ wlan_dp_lb_check_eligible_for_flow_balance(struct wlan_dp_psoc_context *dp_ctx,
 					   uint32_t total_avg_pkts)
 {
 	if (wlan_dp_fb_enabled(dp_ctx) &&
+	    wlan_dp_cfg_is_rx_fisa_enabled(&dp_ctx->dp_cfg) &&
 	    total_avg_pkts > FLOW_BALANCE_THRESH)
 		return true;
 
@@ -409,7 +410,8 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 								 num_cpus);
 	}
 
-	if (!do_load_balance)
+	if (!do_load_balance ||
+	    !wlan_dp_cfg_is_rx_fisa_enabled(&dp_ctx->dp_cfg))
 		dp_info("load balance is not needed");
 	else
 		wlan_dp_lb_irq_balance_handler(dp_ctx, &cpu_load_avgs[0],

@@ -3648,6 +3648,7 @@ static QDF_STATUS csr_roam_issue_set_context_req(struct mac_context *mac_ctx,
 	struct wlan_crypto_key *crypto_key;
 	uint8_t wep_key_idx = 0;
 	struct wlan_objmgr_vdev *vdev;
+	const uint8_t *peer_mac = (const uint8_t *)mac_addr->bytes;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, session_id,
 						    WLAN_LEGACY_MAC_ID);
@@ -3655,14 +3656,14 @@ static QDF_STATUS csr_roam_issue_set_context_req(struct mac_context *mac_ctx,
 		sme_err("VDEV object not found for session_id %d", session_id);
 		return QDF_STATUS_E_INVAL;
 	}
-	cipher = wlan_crypto_get_cipher(vdev, unicast, key_idx);
+	cipher = wlan_crypto_get_cipher(vdev, peer_mac, unicast, key_idx);
 	if (IS_WEP_CIPHER(cipher)) {
 		wep_key_idx = wlan_crypto_get_default_key_idx(vdev, !unicast);
-		crypto_key = wlan_crypto_get_key(vdev, wep_key_idx);
+		crypto_key = wlan_crypto_get_key(vdev, peer_mac, wep_key_idx);
 		csr_update_wep_key_peer_macaddr(vdev, crypto_key, unicast,
 						mac_addr);
 	} else {
-		crypto_key = wlan_crypto_get_key(vdev, key_idx);
+		crypto_key = wlan_crypto_get_key(vdev, peer_mac, key_idx);
 	}
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);

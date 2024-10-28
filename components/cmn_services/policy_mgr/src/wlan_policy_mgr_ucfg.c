@@ -430,6 +430,28 @@ ucfg_policy_mgr_post_ap_start_failed(
 }
 
 QDF_STATUS
+ucfg_policy_mgr_acs_start(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	if (wlan_mlme_is_aux_emlsr_support(psoc))
+		return ml_nlink_conn_change_notify(psoc, vdev_id,
+						   ml_nlink_acs_start_evt,
+						   NULL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_policy_mgr_acs_completed(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	if (wlan_mlme_is_aux_emlsr_support(psoc))
+		return ml_nlink_conn_change_notify(psoc, vdev_id,
+						   ml_nlink_acs_completed_evt,
+						   NULL);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 ucfg_policy_mgr_pre_sta_p2p_start(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id)
 {

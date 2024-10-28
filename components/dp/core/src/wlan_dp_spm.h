@@ -16,7 +16,7 @@
 #define WLAN_DP_SPM_INVALID_METADATA 0xFF
 
 /* Timeout in nano seconds */
-#define WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT 10000000000
+#define WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT 5000000000
 #define WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK 5
 
 /**
@@ -80,6 +80,7 @@ struct wlan_dp_spm_flow_tbl_stats {
  * @flags: flow flags
  * @flow_add_ts: Flow add timestamp
  * @active_ts: last active timestamp
+ * @num_pkts: Num of packets for this flow
  * @c_flow_id: STC classification table ID
  * @track_flow_stats: is stats tracking enabled for flow
  * @selected_to_sample: Selected for classification stats collection
@@ -102,6 +103,7 @@ struct wlan_dp_spm_flow_info {
 	uint32_t flags;
 	uint64_t flow_add_ts;
 	uint64_t active_ts;
+	uint64_t num_pkts;
 #ifdef WLAN_DP_FEATURE_STC
 	uint8_t c_flow_id;
 	uint8_t track_flow_stats;

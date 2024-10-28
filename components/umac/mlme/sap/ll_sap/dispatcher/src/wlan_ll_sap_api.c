@@ -216,6 +216,28 @@ QDF_STATUS wlan_ll_sap_switch_bearer_on_ll_sap_csa_complete(
 			0, NULL);
 }
 
+static void wlan_ll_sap_stop_ap_bearer_switch_requester_cb(
+						struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						wlan_bs_req_id request_id,
+						QDF_STATUS status,
+						uint32_t req_value,
+						void *request_params)
+{
+	/* Drop this response as no action is required */
+}
+
+QDF_STATUS wlan_ll_sap_switch_bearer_on_stop_ap(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
+{
+	return ll_lt_sap_switch_bearer(
+			psoc, vdev_id, WLAN_BS_REQ_TO_NON_WLAN,
+			BEARER_SWITCH_REQ_STOP_AP,
+			wlan_ll_sap_stop_ap_bearer_switch_requester_cb,
+			0, NULL);
+}
+
 QDF_STATUS wlan_ll_lt_sap_get_freq_list(
 				struct wlan_objmgr_psoc *psoc,
 				struct wlan_ll_lt_sap_freq_list *freq_list,

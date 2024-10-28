@@ -1735,6 +1735,13 @@ endif
 
 $(call add-wlan-objs,pkt_capture,$(PKT_CAPTURE_OBJS))
 
+########## MGMT RX SRNG ##########
+
+MGMT_RX_SRNG_DIR := components/mgmt_rx_srng
+MGMT_RX_SRNG_INC := -I$(WLAN_ROOT)/$(MGMT_RX_SRNG_DIR)/core/inc \
+		    -I$(WLAN_ROOT)/$(MGMT_RX_SRNG_DIR)/dispatcher/inc \
+		    -I$(WLAN_ROOT)/components/target_if/mgmt_rx_srng/inc
+
 ########## FTM TIME SYNC ##########
 
 FTM_TIME_SYNC_DIR := components/ftm_time_sync
@@ -2178,6 +2185,7 @@ DP_OBJS := $(DP_SRC)/dp_main.o \
 		$(DP_SRC)/dp_peer.o \
 		$(DP_SRC)/dp_rx_desc.o \
 		$(DP_SRC)/dp_rx_defrag.o \
+		$(DP_SRC)/dp_hist.o \
 		$(DP_SRC)/dp_stats.o \
 		$(WLAN_COMMON_ROOT)/target_if/dp/src/target_if_dp.o
 
@@ -2529,6 +2537,12 @@ CP_STATS_OBJS := $(CP_MC_STATS_COMPONENT_SRC)/wlan_cp_stats_mc_tgt_api.o	\
 endif
 
 $(call add-wlan-objs,cp_stats,$(CP_STATS_OBJS))
+
+ifeq ($(CONFIG_WLAN_CHIPSET_STATS), y)
+WLAN_CHIPSET_STATS_OBJS := $(CP_STATS_CORE_SRC)/wlan_cp_stats_chipset_stats.o
+endif
+
+$(call add-wlan-objs,wlan_chipset_stats,$(WLAN_CHIPSET_STATS_OBJS))
 
 ###### DCS ######
 DCS_TGT_IF_SRC := $(WLAN_COMMON_ROOT)/target_if/dcs/src
@@ -3391,6 +3405,7 @@ INCS +=		$(HOST_DIAG_LOG_INC)
 INCS +=		$(DISA_INC)
 INCS +=		$(ACTION_OUI_INC)
 INCS +=		$(PKT_CAPTURE_INC)
+INCS +=		$(MGMT_RX_SRNG_INC)
 INCS +=		$(FTM_TIME_SYNC_INC)
 INCS +=		$(WLAN_PRE_CAC_INC)
 
@@ -3487,6 +3502,11 @@ ifeq ($(findstring yes, $(found)), yes)
 ifeq ($(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG), y)
 CONFIG_WLAN_FEATURE_MULTI_LINK_SAP := y
 endif
+endif
+
+found = $(shell if grep -qF "IEEE80211_CHANCTX_CHANGE_PUNCTURING" $(srctree)/include/net/mac80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_RU_PUNC_CHANDEF
 endif
 
 ifeq ($(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP), y)
@@ -4109,6 +4129,7 @@ ccflags-$(CONFIG_IPA_OFFLOAD) += -DIPA_OFFLOAD
 ifeq ($(CONFIG_IPA_OFFLOAD), y)
 ccflags-$(CONFIG_IPA_WDS_EASYMESH) += -DIPA_WDS_EASYMESH_FEATURE
 ccflags-$(CONFIG_IPA_WDI3_VLAN_SUPPORT) += -DIPA_WDI3_VLAN_SUPPORT
+ccflags-$(CONFIG_IPA_HANDLE_MLO_DEF_LINK_REG) += -DIPA_HANDLE_MLO_DEF_LINK_REG
 endif
 
 #Enable IPA optional Wifi datapath
@@ -4406,6 +4427,10 @@ ccflags-$(CONFIG_QCA_GET_TSF_VIA_REG) += -DQCA_GET_TSF_VIA_REG
 ccflags-$(CONFIG_DP_TX_COMP_RING_DESC_SANITY_CHECK) += -DDP_TX_COMP_RING_DESC_SANITY_CHECK
 ccflags-$(CONFIG_HAL_SRNG_REG_HIS_DEBUG) += -DHAL_SRNG_REG_HIS_DEBUG
 ccflags-$(CONFIG_DP_MLO_LINK_STATS_SUPPORT) += -DDP_MLO_LINK_STATS_SUPPORT
+ccflags-$(CONFIG_FEATURE_ML_LOCAL_PKT_CAPTURE) += -DFEATURE_ML_LOCAL_PKT_CAPTURE
+ccflags-$(CONFIG_WLAN_FEATURE_UL_JITTER) += -DWLAN_FEATURE_UL_JITTER
+ccflags-$(CONFIG_WLAN_CHIPSET_STATS) += -DWLAN_CHIPSET_STATS
+ccflags-$(CONFIG_WLAN_AUX_SUPPORT) += -DWLAN_AUX_SUPPORT
 ccflags-$(CONFIG_DP_RX_BUFFER_OPTIMIZATION) += -DDP_RX_BUFFER_OPTIMIZATION
 ccflags-$(CONFIG_WORD_BASED_TLV) += -DBE_NON_AP_COMPACT_TLV
 
@@ -4806,6 +4831,9 @@ ccflags-y += -DWLAN_MAX_ML_VDEVS=$(CONFIG_WLAN_MAX_ML_VDEVS)
 
 CONFIG_WLAN_MAX_VDEVS ?= 6
 ccflags-y += -DWLAN_MAX_VDEVS=$(CONFIG_WLAN_MAX_VDEVS)
+
+CONFIG_WLAN_CE4_SZ_QCN7605 ?= 4096
+ccflags-y += -DWLAN_CE4_SZ_QCN7605=$(CONFIG_WLAN_CE4_SZ_QCN7605)
 
 ifdef CONFIG_WLAN_FEATURE_11BE_MLO
 CONFIG_WLAN_MAX_MLD ?= 2

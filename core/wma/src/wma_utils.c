@@ -4499,7 +4499,7 @@ QDF_STATUS wma_remove_bss_peer_before_join(
 		del_req = wma_fill_hold_req(wma, vdev_id,
 					    WMA_DELETE_STA_REQ,
 					    WMA_DELETE_STA_CONNECT_RSP,
-					    cm_join_req,
+					    mac_addr, cm_join_req,
 					    WMA_DELETE_STA_TIMEOUT);
 		if (!del_req) {
 			wma_err("Failed to allocate request. vdev_id %d",
@@ -4858,6 +4858,26 @@ QDF_STATUS wma_mon_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 				      NULL);
 
 	return status;
+}
+
+QDF_STATUS wma_mon_mlme_vdev_stop_resp(struct vdev_mlme_obj *vdev_mlme)
+{
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct scheduler_msg sme_msg = {0};
+
+	sme_msg.type = eWNI_SME_MONITOR_MODE_VDEV_STOP;
+	sme_msg.bodyptr = NULL;
+	sme_msg.bodyval = wlan_vdev_get_id(vdev_mlme->vdev);
+
+	qdf_status = scheduler_post_message(QDF_MODULE_ID_WMA,
+					    QDF_MODULE_ID_SME,
+					    QDF_MODULE_ID_SME, &sme_msg);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		wma_err("Fail to post set vdev stop response");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 #ifdef FEATURE_WLM_STATS

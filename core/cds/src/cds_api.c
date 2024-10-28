@@ -294,64 +294,16 @@ static void cds_update_recovery_reason(enum qdf_hang_reason recovery_reason)
 	gp_cds_context->recovery_reason = recovery_reason;
 }
 
-/**
- * cds_sys_reboot_lock_init() - Create lock for system reboot
- *
- * Return: QDF_STATUS_SUCCESS if the lock was created and an error on failure
- */
-static QDF_STATUS cds_sys_reboot_lock_init(void)
-{
-	return qdf_mutex_create(&gp_cds_context->sys_reboot_lock);
-}
-
-/**
- * cds_sys_reboot_lock_deinit() - destroy lock for system reboot
- *
- * Return: none
- */
-static void cds_sys_reboot_lock_deinit(void)
-{
-	qdf_mutex_destroy(&gp_cds_context->sys_reboot_lock);
-}
-
-void cds_set_sys_rebooting(void)
-{
-	qdf_mutex_acquire(&gp_cds_context->sys_reboot_lock);
-	cds_set_driver_state(CDS_DRIVER_STATE_SYS_REBOOTING);
-	qdf_mutex_release(&gp_cds_context->sys_reboot_lock);
-}
-
-bool cds_sys_reboot_protect(void)
-{
-	enum cds_driver_state state;
-
-	qdf_mutex_acquire(&gp_cds_context->sys_reboot_lock);
-
-	state = cds_get_driver_state();
-	return __CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_SYS_REBOOTING);
-}
-
-void cds_sys_reboot_unprotect(void)
-{
-	qdf_mutex_release(&gp_cds_context->sys_reboot_lock);
-}
-
 QDF_STATUS cds_init(void)
 {
 	QDF_STATUS status;
 
 	gp_cds_context = &g_cds_context;
 
-	status = cds_sys_reboot_lock_init();
-	if (QDF_IS_STATUS_ERROR(status)) {
-		cds_err("Failed to init sys reboot lock; status:%u", status);
-		goto deinit;
-	}
-
 	status = cds_recovery_work_init();
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_err("Failed to init recovery work; status:%u", status);
-		goto destroy_lock;
+		goto deinit;
 	}
 
 	cds_ssr_protect_init();
@@ -373,8 +325,6 @@ QDF_STATUS cds_init(void)
 
 	return QDF_STATUS_SUCCESS;
 
-destroy_lock:
-	cds_sys_reboot_lock_deinit();
 deinit:
 	gp_cds_context = NULL;
 	qdf_mem_zero(&g_cds_context, sizeof(g_cds_context));
@@ -409,7 +359,6 @@ void cds_deinit(void)
 	/* currently, no ssr_protect_deinit */
 
 	cds_recovery_work_deinit();
-	cds_sys_reboot_lock_deinit();
 
 	gp_cds_context = NULL;
 	qdf_mem_zero(&g_cds_context, sizeof(g_cds_context));

@@ -1391,7 +1391,7 @@ static QDF_STATUS ucfg_nan_pasn_peer_delete_all(struct wlan_objmgr_psoc *psoc)
 	if (!nan_vdev_obj) {
 		nan_err("NAN vdev priv obj is null");
 		status = QDF_STATUS_E_NULL_VALUE;
-		goto ref_rel;
+		goto error;
 	}
 
 	if (!nan_vdev_obj->num_pasn_peers ||
@@ -1452,7 +1452,7 @@ static QDF_STATUS ucfg_nan_pasn_peer_delete_all(struct wlan_objmgr_psoc *psoc)
 
 ref_rel:
 	nan_vdev_obj->is_delete_all_pasn_peer_in_progress = false;
-
+error:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 
 	if (request)
@@ -1803,4 +1803,9 @@ end:
 bool ucfg_nan_get_prefer_nan_chan_for_p2p(struct wlan_objmgr_psoc *psoc)
 {
 	return cfg_nan_get_prefer_nan_chan_for_p2p(psoc);
+}
+
+struct qdf_mac_addr *ucfg_nan_get_fw_addr(struct wlan_objmgr_psoc *psoc)
+{
+	return nan_get_fw_addr(psoc);
 }

@@ -1242,11 +1242,6 @@ bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
 	else
 		return false;
 }
-#else
-bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
-{
-	return true;
-}
 #endif
 #endif
 
@@ -1745,7 +1740,8 @@ static int hdd_pause_ns(struct hdd_context *hdd_ctx)
 		}
 
 		/* stop all TX queues before suspend */
-		hdd_debug("Disabling queues for dev mode %s",
+		hdd_debug("vdev %d Disabling queues for dev mode %s",
+			  adapter->deflink->vdev_id,
 			  qdf_opmode_str(adapter->device_mode));
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_STOP_ALL_NETIF_QUEUE,
@@ -1903,6 +1899,10 @@ restart_post_cac_links:
 		restart_due_to_cac_pending = false;
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			if (!test_bit(SOFTAP_INIT_DONE, &link_info->link_flags))
+				continue;
+
+			if (test_bit(SOFTAP_BSS_STARTED,
+				     &link_info->link_flags))
 				continue;
 
 			if (!ignore_cac_updated) {
@@ -2298,6 +2298,36 @@ int wlan_hdd_set_powersave(struct wlan_hdd_link_info *link_info,
 
 	return qdf_status_to_os_return(status);
 }
+
+#if defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV) && \
+	defined(FEATURE_ML_LOCAL_PKT_CAPTURE)
+void wlan_hdd_lpc_set_bmps(struct hdd_adapter *adapter,
+			   bool allow_power_save, uint32_t timeout)
+{
+	struct wlan_hdd_link_info *link_info;
+	mac_handle_t mac_handle;
+
+	if (!adapter) {
+		hdd_err_rl("null hdd_adapter pointer");
+		return;
+	}
+
+	mac_handle = hdd_adapter_get_mac_handle(adapter);
+	if (!mac_handle) {
+		hdd_err_rl("null mac_handle pointer");
+		return;
+	}
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info)
+		wlan_hdd_set_powersave(link_info, allow_power_save, timeout);
+}
+#else
+void wlan_hdd_lpc_set_bmps(struct hdd_adapter *adapter,
+			   bool allow_power_save, uint32_t timeout)
+{
+	wlan_hdd_set_powersave(adapter->deflink, allow_power_save, timeout);
+}
+#endif
 
 static void wlan_hdd_print_suspend_fail_stats(struct hdd_context *hdd_ctx)
 {

@@ -1228,8 +1228,10 @@ enum policy_mgr_two_connection_mode {
  * @PM_NAN_DISC_NDI_24_STA_5_DBS: NDI and NAN Disc on 2.4Ghz and STA on 5ghz DBS
  * @PM_NAN_DISC_NDI_24_NDI_5_DBS: NDI and NAN Disc on 2.4Ghz and second NDI in
  * 5ghz DBS
- * @PM_SAP_SAP_SCC_24_SAP_5_DBS: Both SAP on 2.4Ghz and another SAP on 5Ghz DBS
- * @PM_SAP_SAP_SCC_5_SAP_24_DBS: Both SAP on 5Ghz and another SAP on 2.4Ghz DBS
+ * @PM_SAP_SAP_SAP_SCC_24_SMM: AP+AP+AP on 2.4Ghz in SMM mode
+ * @PM_SAP_SAP_SAP_SCC_5_SMM: AP+AP+AP on 5Ghz in SMM mode
+ * @PM_SAP_SAP_SCC_5_STA_24_DBS: Both SAP on 5Ghz and another STA on 2.4Ghz DBS
+ * @PM_SAP_SAP_STA_SCC_5_DBS: Both SAP on 5Ghz and another STA on 5Ghz DBS
  * @PM_STA_STA_5_NAN_DISC_24_DBS: Both STA on 5Ghz and NAN Disc on 2.4Ghz DBS
  * @PM_NAN_DISC_24_STA_STA_5_DBS: NAN Disc on 2.4Ghz and both STA on 5Ghz DBS
  * @PM_STA_STA_24_NAN_DISC_24_SMM: Both STA on 2.4Ghz and NAN Disc on 2.4Ghz SMM
@@ -1343,8 +1345,10 @@ enum policy_mgr_three_connection_mode {
 	PM_NAN_DISC_NDI_P2P_SCC_MCC_5_DBS = PM_NAN_NDI_P2P_SCC_MCC_DBS,
 	PM_NAN_DISC_NDI_P2P_SCC_MCC_24_DBS = PM_NAN_NDI_P2P_SCC_MCC_DBS,
 
-	PM_SAP_SAP_SCC_24_SAP_5_DBS,
-	PM_SAP_SAP_SCC_5_SAP_24_DBS,
+	PM_SAP_SAP_SAP_SCC_24_SMM,
+	PM_SAP_SAP_SAP_SCC_5_SMM,
+	PM_SAP_SAP_SCC_5_STA_24_DBS,
+	PM_SAP_SAP_STA_SCC_5_DBS,
 	PM_STA_STA_5_NAN_DISC_24_DBS,
 	PM_NAN_DISC_24_STA_STA_5_DBS,
 	PM_STA_STA_24_NAN_DISC_24_SMM,
@@ -1783,11 +1787,13 @@ struct policy_mgr_hw_mode_params {
  * @scan_config: Scan configuration
  * @fw_mode_config: FW mode configuration
  * @set_dual_mac_cb: Callback function to be executed on response to the command
+ * @vdev_id: vdev id to serialize the mac config cmd
  */
 struct policy_mgr_dual_mac_config {
 	uint32_t scan_config;
 	uint32_t fw_mode_config;
 	dual_mac_cb set_dual_mac_cb;
+	uint8_t vdev_id;
 };
 
 /**

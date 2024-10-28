@@ -65,6 +65,7 @@ enum bearer_switch_status {
  * @BEARER_SWITCH_REQ_FW: Bearer switch requester is FW
  * @BEARER_SWITCH_REQ_P2P_GO: Bearer switch requester is P2P_GO
  * @BEARER_SWITCH_REQ_ACS: Bearer switch requester is ACS
+ * @BEARER_SWITCH_REQ_STOP_AP: Bearer switch requester is STOP_AP
  * @BEARER_SWITCH_REQ_MAX: Indicates MAX bearer switch requester
  */
 enum bearer_switch_req_source {
@@ -73,6 +74,7 @@ enum bearer_switch_req_source {
 	BEARER_SWITCH_REQ_FW,
 	BEARER_SWITCH_REQ_P2P_GO,
 	BEARER_SWITCH_REQ_ACS,
+	BEARER_SWITCH_REQ_STOP_AP,
 	BEARER_SWITCH_REQ_MAX,
 };
 
@@ -286,7 +288,8 @@ struct wlan_ll_sap_rx_ops {
 struct ll_sap_ops {
 		void (*ll_sap_send_audio_transport_switch_req_cb)(
 					struct wlan_objmgr_vdev *vdev,
-					enum bearer_switch_req_type req_type);
+					enum bearer_switch_req_type req_type,
+					enum bearer_switch_req_source source);
 		void (*ll_sap_send_high_ap_availability_resp_cb)(
 				struct wlan_objmgr_vdev *vdev,
 				enum high_ap_availability_operation operation,

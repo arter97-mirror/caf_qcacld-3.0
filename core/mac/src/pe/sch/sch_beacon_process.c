@@ -466,8 +466,7 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 		vht_op = &bcn->vendor_vht_ie.VHTOperation;
 	}
 	if (!session->vhtCapability ||
-	    !(bcn->OperatingMode.present ||
-	      (vht_op && vht_op->present && vht_caps)))
+	    !(vht_op && vht_op->present && vht_caps))
 		return;
 
 	is_40 = bcn->HTInfo.present ?
@@ -612,6 +611,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	uint8_t bpcc;
 	bool cu_flag = true;
 	bool is_power_constraint_abs = false;
+	int8_t rf_mode_force_pwr_type;
 
 	if (mlo_is_mld_sta(session->vdev)) {
 		cu_flag = false;
@@ -680,10 +680,18 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						REG_CURRENT_MAX_AP_TYPE;
 		}
 
+		status = wlan_mlme_get_rf_mode_force_pwr_type(
+						mac_ctx->psoc,
+						&rf_mode_force_pwr_type);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("Failed to get RF test mode for power type value");
+			return;
+		}
+
 		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev, &pwr_type_6g,
 				session->ap_defined_power_type_6g,
-				bcn->chan_freq);
+				bcn->chan_freq, rf_mode_force_pwr_type);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 
@@ -802,12 +810,16 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		lim_send_beacon_params(mac_ctx, &beaconParams, session);
 	}
 
-	if ((session->opmode == QDF_P2P_CLIENT_MODE) &&
-	    session->send_p2p_conf_frame) {
-		lim_p2p_oper_chan_change_confirm_action_frame(mac_ctx,
-							      session->bssId,
-							      session);
-		session->send_p2p_conf_frame = false;
+	if (session->opmode == QDF_P2P_CLIENT_MODE) {
+		if (session->send_p2p_conf_frame) {
+			lim_p2p_oper_chan_change_confirm_action_frame(mac_ctx,
+								      session->bssId,
+								      session);
+			session->send_p2p_conf_frame = false;
+		}
+
+		if (session->post_csa_notify_cap)
+			lim_send_channel_usage_req_notif_cap_action_frame(session->vdev_id);
 	}
 
 	lim_process_beacon_eht(mac_ctx, session, bcn);

@@ -1397,16 +1397,27 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	}
 
 	/*
-	 * Following operations need to be done once roam sync
-	 * completion is sent to FW, hence called here:
-	 * 1) Firmware has already updated DBS policy. Update connection
-	 *	  table in the host driver.
-	 * 2) Force SCC switch if needed
+	 * For non-dbs target, move link vdev to disabled table after updating
+	 * the connection info for that link policy manager entry.
 	 */
-	/* first update connection info from wma interface */
-	status = policy_mgr_update_connection_info(psoc, vdev_id);
-	if (status == QDF_STATUS_NOT_INITIALIZED)
-		policy_mgr_incr_active_session(psoc, QDF_STA_MODE, vdev_id);
+	if (wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev) &&
+	    !policy_mgr_is_hw_dbs_capable(psoc)) {
+		policy_mgr_move_vdev_from_connection_to_disabled_tbl(psoc,
+								     vdev_id);
+	} else {
+		/*
+		 * Following operations need to be done once roam sync
+		 * completion is sent to FW, hence called here:
+		 * 1) Firmware has already updated DBS policy. Update connection
+		 *    table in the host driver.
+		 * 2) Force SCC switch if needed
+		 */
+		/* first update connection info from wma interface */
+		status = policy_mgr_update_connection_info(psoc, vdev_id);
+		if (status == QDF_STATUS_NOT_INITIALIZED)
+			policy_mgr_incr_active_session(psoc, QDF_STA_MODE,
+						       vdev_id);
+	}
 
 	/* Check if FW as indicated this link as disabled */
 	cm_get_and_disable_link_from_roam_ind(psoc, vdev_id, roam_synch_data);

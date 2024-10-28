@@ -123,6 +123,59 @@ static void hdd_cm_print_bss_info(struct hdd_station_ctx *hdd_sta_ctx)
 		       conn_info->hs20vendor_ie.release_num : 0);
 }
 
+#ifdef IPA_HANDLE_MLO_DEF_LINK_REG
+/**
+ * hdd_handle_ipa_sta_mlo_disconn() - Handle STA MLO disconnection for IPA
+ * @link_info: Link info pointer in HDD adapter
+ * @sta_ctx: pointer to struct hdd_station_ctx
+ * @mac_addr: pointer to AP mld addr if MLO deflink. Otherwise pointer to
+ *	      AP BSSID.
+ *
+ * This function handles STA MLO connection and only deflink information
+ * is registered to IPA component for STA_DISCONNECT event.
+ *
+ * Return: true to notify IPA component of the STA_DISCONNECT event.
+ *	   false to not notify IPA component.
+ */
+static bool hdd_handle_ipa_sta_mlo_disconn(struct wlan_hdd_link_info *link_info,
+					   struct hdd_station_ctx *sta_ctx,
+					   uint8_t **mac_addr)
+{
+	struct qdf_mac_addr mac = {0};
+
+	if (wlan_vdev_mlme_is_mlo_vdev(link_info->vdev)) {
+		if (WLAN_HDD_IS_DEFLINK(link_info)) {
+			qdf_mem_copy(&mac, &sta_ctx->conn_info.mld_addr,
+				     QDF_MAC_ADDR_SIZE);
+			*mac_addr = sta_ctx->conn_info.mld_addr.bytes;
+		} else {
+			return false;
+		}
+	} else {
+		qdf_mem_copy(&mac, &sta_ctx->conn_info.bssid,
+			     QDF_MAC_ADDR_SIZE);
+		*mac_addr = sta_ctx->conn_info.bssid.bytes;
+	}
+
+	return QDF_IS_STATUS_SUCCESS(wlan_hdd_validate_mac_address(&mac));
+}
+#else /* !IPA_HANDLE_MLO_DEF_LINK_REG */
+static bool hdd_handle_ipa_sta_mlo_disconn(struct wlan_hdd_link_info *link_info,
+					   struct hdd_station_ctx *sta_ctx,
+					   uint8_t **mac_addr)
+{
+	QDF_STATUS status;
+
+	status = wlan_hdd_validate_mac_address(&sta_ctx->conn_info.bssid);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
+
+	*mac_addr = sta_ctx->conn_info.bssid.bytes;
+
+	return true;
+}
+#endif /* IPA_HANDLE_MLO_DEF_LINK_REG */
+
 void
 __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info)
 {
@@ -131,19 +184,20 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 	struct hdd_station_ctx *sta_ctx;
 	uint32_t time_buffer_size;
 	struct wlan_objmgr_vdev *vdev;
+	uint8_t *mac_addr;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	hdd_stop_tsf_sync(adapter);
 	time_buffer_size = sizeof(sta_ctx->conn_info.connect_time);
 	qdf_mem_zero(sta_ctx->conn_info.connect_time, time_buffer_size);
+
 	if (ucfg_ipa_is_enabled() &&
-	    QDF_IS_STATUS_SUCCESS(wlan_hdd_validate_mac_address(
-				  &sta_ctx->conn_info.bssid)))
+	    hdd_handle_ipa_sta_mlo_disconn(link_info, sta_ctx, &mac_addr))
 		ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
 				  link_info->vdev_id,
 				  WLAN_IPA_STA_DISCONNECT,
-				  sta_ctx->conn_info.bssid.bytes,
+				  mac_addr,
 				  false);
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
@@ -198,6 +252,28 @@ hdd_reset_sta_keep_alive_interval(struct wlan_hdd_link_info *link_info,
 					      keep_alive_interval);
 }
 
+/**
+ * hdd_clear_conn_info_roam_count() - clear roam count in conn info.
+ * @adapter: hostapd interface
+ *
+ * This function loop through the link info and clear roam count in
+ * conn info.
+ *
+ * Return: None
+ */
+static void hdd_clear_conn_info_roam_count(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_station_ctx *hdd_sta_ctx;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+		if (!hdd_sta_ctx)
+			continue;
+		hdd_sta_ctx->conn_info.roam_count = 0;
+	}
+}
+
 void
 __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_info,
 					     struct wlan_objmgr_vdev *vdev,
@@ -246,7 +322,7 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		}
 	}
 
-	if (!is_link_switch && source != CM_MLO_ROAM_INTERNAL_DISCONNECT) {
+	if (!is_link_switch) {
 		/* Clear saved connection information in HDD */
 		hdd_conn_remove_connect_info(sta_ctx);
 
@@ -256,7 +332,10 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		 * valid link_info for the given adapter. So avoid this reset
 		 * for Link Switch disconnect/internal disconnect
 		 */
-		hdd_adapter_reset_station_ctx(adapter);
+		if (source != CM_MLO_ROAM_INTERNAL_DISCONNECT)
+			hdd_adapter_reset_station_ctx(adapter);
+		else
+			hdd_cm_clear_ieee_link_id(link_info, false);
 	}
 
 	ucfg_dp_remove_conn_info(vdev);
@@ -281,6 +360,7 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 
 	ucfg_dp_reset_cont_txtimeout_cnt(vdev);
 
+	ucfg_dp_clear_net_dev_stats(adapter->dev);
 	ucfg_dp_nud_reset_tracking(vdev);
 	hdd_reset_limit_off_chan(adapter);
 
@@ -288,6 +368,7 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		hdd_reset_sta_keep_alive_interval(link_info, hdd_ctx);
 
 	hdd_cm_print_bss_info(sta_ctx);
+	hdd_clear_conn_info_roam_count(adapter);
 }
 
 #ifdef WLAN_FEATURE_MSCS
@@ -427,6 +508,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 */
 	adapter->last_disconnect_reason =
 			osif_cm_mac_to_qca_reason(rsp->req.req.reason_code);
+	hdd_set_disconnect_link_info_cb(link_info->vdev_id);
 
 	return QDF_STATUS_SUCCESS;
 }

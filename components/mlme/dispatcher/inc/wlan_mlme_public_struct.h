@@ -799,6 +799,7 @@ struct wlan_mlme_cfg_sap {
  * @dfs_beacon_tx_enhanced: enhance dfs beacon tx
  * @dfs_prefer_non_dfs: perefer non dfs channel after radar
  * @dfs_disable_japan_w53: Disable W53 channels
+ * @enable_sap_dfs_puncture: Enable sap dfs puncture
  * @sap_tx_leakage_threshold: sap tx leakage threshold
  * @dfs_pri_multiplier: dfs_pri_multiplier for handle missing pulses
  */
@@ -810,6 +811,7 @@ struct wlan_mlme_dfs_cfg {
 	bool dfs_beacon_tx_enhanced;
 	bool dfs_prefer_non_dfs;
 	bool dfs_disable_japan_w53;
+	bool enable_sap_dfs_puncture;
 	uint32_t sap_tx_leakage_threshold;
 	uint32_t dfs_pri_multiplier;
 };
@@ -1483,6 +1485,7 @@ struct wlan_mlme_aux_dev_caps {
  * @sae_connect_retries: sae connect retry bitmask
  * @wls_6ghz_capable: wifi location service(WLS) is 6ghz capable
  * @enabled_rf_test_mode: Enable/disable the RF test mode config
+ * @rf_mode_force_pwr_type: Force power type for RF mode enabled
  * @monitor_mode_concurrency: Monitor mode concurrency supported
  * @ocv_support: FW supports OCV or not
  * @wds_mode: wds mode supported
@@ -1545,6 +1548,7 @@ struct wlan_mlme_generic {
 	uint32_t sae_connect_retries;
 	bool wls_6ghz_capable;
 	bool enabled_rf_test_mode;
+	int8_t rf_mode_force_pwr_type;
 	enum monitor_mode_concurrency monitor_mode_concurrency;
 	bool ocv_support;
 	enum wlan_wds_mode wds_mode;
@@ -1943,6 +1947,8 @@ enum roaming_dfs_channel_type {
  * @threshold: Bss load threshold value above which roaming should start
  * @sample_time: Time duration in milliseconds for which the bss load value
  * should be monitored
+ * @bss_load_alpha: Factor for computing average bss load from current channel
+ * utilization
  * @rssi_threshold_6ghz: RSSI threshold of the current connected AP below which
  * roam should be triggered if bss load threshold exceeds the configured value.
  * This value is applicable only when we are connected in 6GHz band.
@@ -1957,6 +1963,7 @@ struct bss_load_trigger {
 	bool enabled;
 	uint32_t threshold;
 	uint32_t sample_time;
+	uint32_t bss_load_alpha;
 	uint32_t rssi_threshold_6ghz;
 	int32_t rssi_threshold_5ghz;
 	int32_t rssi_threshold_24ghz;
@@ -2125,6 +2132,8 @@ struct fw_scan_channels {
  * roam invoke fail on nud.
  * @hs20_btm_offload_disable: indicate whether btm offload is enable/disable
  * for Hotspot 2.0
+ * @roam_aggre_scan_step_rssi: Roam scan step RSSI in aggressive mode
+ * @roam_aggre_threshold: Roam threshold in aggressive mode
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2254,6 +2263,8 @@ struct wlan_mlme_lfr_cfg {
 	uint8_t roam_full_scan_6ghz_on_disc;
 	bool disconnect_on_nud_roam_invoke_fail;
 	bool hs20_btm_offload_disable;
+	uint32_t roam_aggre_scan_step_rssi;
+	uint8_t roam_aggre_threshold;
 };
 
 /**
@@ -2466,6 +2477,10 @@ struct wlan_mlme_rssi_cfg_score  {
  * @apsd_enabled: Enable automatic power save delivery
  * @min_roam_score_delta: Minimum difference between connected AP's and
  *			candidate AP's roam score to start roaming.
+ * @aggre_min_roam_score_delta: Minimum difference between connected AP's and
+ *			candidate AP's roam score to start roaming in Aggressive
+ *			roaming mode.
+ * @roam_aggre_score_delta: percentage delta in roam score in Aggressive mode
  */
 struct wlan_mlme_roam_scoring_cfg {
 	bool enable_scoring_for_roam;
@@ -2473,6 +2488,8 @@ struct wlan_mlme_roam_scoring_cfg {
 	uint32_t roam_score_delta;
 	bool apsd_enabled;
 	uint32_t min_roam_score_delta;
+	uint32_t aggre_min_roam_score_delta;
+	uint32_t roam_aggre_score_delta;
 };
 
 /* struct wlan_mlme_threshold - Threshold related config items
@@ -2931,7 +2948,7 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_mwc mwc;
 	struct wlan_mlme_dot11_mode dot11_mode;
 	struct wlan_mlme_reg reg;
-	struct roam_trigger_score_delta trig_score_delta[NUM_OF_ROAM_TRIGGERS];
+	struct roam_trigger_score_delta trig_score_delta[ROAM_TRIGGER_REASON_MAX];
 	struct roam_trigger_min_rssi trig_min_rssi[NUM_OF_ROAM_MIN_RSSI];
 	struct wlan_mlme_ratemask ratemask_cfg;
 	struct wlan_mlme_iot iot;

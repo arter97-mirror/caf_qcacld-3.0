@@ -3635,8 +3635,8 @@ static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 		vht_oper = &assoc_rsp->vendor_vht_ie.VHTOperation;
 	}
 
-	if (vht_oper->chanWidth == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ &&
-	    pe_session->ch_width)
+	if (vht_oper && vht_caps && pe_session->ch_width &&
+	    vht_oper->chanWidth == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
 		ch_width =
 			lim_get_vht_ch_width(vht_caps, vht_oper,
 					     &assoc_rsp->HTInfo,
@@ -3870,6 +3870,9 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 
 	if (lim_is_session_he_capable(pe_session) &&
 			(pAssocRsp->he_cap.present)) {
+		/* Use STA SMPS capability as AP's SMPS value is not valid */
+		pAssocRsp->he_cap.he_dynamic_smps =
+				lim_is_he_dynamic_smps_enabled(pe_session);
 		lim_add_bss_he_cap(pAddBssParams, pAssocRsp);
 		lim_add_bss_he_cfg(pAddBssParams, pe_session);
 	}
@@ -4008,6 +4011,9 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 						  pAssocRsp);
 		}
 
+		/* Use STA SMPS capability as AP's SMPS value is not valid */
+		pAssocRsp->HTCaps.mimoPowerSave =
+			pe_session->ht_config.mimo_power_save;
 		pAddBssParams->staContext.mimoPS =
 			(tSirMacHTMIMOPowerSaveState)
 			pAssocRsp->HTCaps.mimoPowerSave;
@@ -4092,6 +4098,9 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 				lim_update_he_6gop_assoc_resp(pAddBssParams,
 							      &pAssocRsp->he_op,
 							      pe_session);
+			/* Use STA SMPS cap as AP's SMPS value is not valid */
+			pAssocRsp->he_6ghz_band_cap.sm_pow_save =
+					pe_session->ht_config.mimo_power_save;
 			lim_update_he_6ghz_band_caps(mac,
 						&pAssocRsp->he_6ghz_band_cap,
 						&pAddBssParams->staContext);

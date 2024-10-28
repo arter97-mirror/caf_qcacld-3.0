@@ -908,6 +908,13 @@ QDF_STATUS ucfg_mc_cp_stats_set_pending_req(struct wlan_objmgr_psoc *psoc,
 		wlan_cp_stats_psoc_obj_unlock(psoc_cp_stats_priv);
 		return QDF_STATUS_E_AGAIN;
 	}
+
+	if (psoc_mc_stats->pending.type_map & (1 << type)) {
+		cp_stats_err("Stats request of type %d is in progress", type);
+		wlan_cp_stats_psoc_obj_unlock(psoc_cp_stats_priv);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	psoc_mc_stats->pending.type_map |= (1 << type);
 	psoc_mc_stats->pending.req[type] = *req;
 	wlan_cp_stats_psoc_obj_unlock(psoc_cp_stats_priv);

@@ -173,6 +173,7 @@ struct p2p_frame_info {
  * @tx_timer:       RoC timer
  * @frame_info:     Frame type information
  * @nbuf:           Network buffer
+ * @opmode:     Interface type on which tx mgmt came
  */
 struct tx_action_context {
 	qdf_list_node_t node;
@@ -192,6 +193,7 @@ struct tx_action_context {
 	qdf_mc_timer_t tx_timer;
 	struct p2p_frame_info frame_info;
 	qdf_nbuf_t nbuf;
+	enum QDF_OPMODE opmode;
 };
 
 /**
@@ -269,17 +271,31 @@ p2p_is_vdev_support_rand_mac(struct wlan_objmgr_vdev *vdev);
 void p2p_dump_tx_queue(struct p2p_soc_priv_obj *p2p_soc_obj);
 
 /**
- * p2p_ready_to_tx_frame() - dump tx queue
+ * p2p_ready_to_tx_frame() - tx frame waiting for roc queue
  * @p2p_soc_obj: p2p soc private object
  * @cookie: cookie is pointer to roc
  *
- * This function find out the tx context in wait for roc queue and tx
- * this frame.
+ * This function finds out the context of tx frame in wait for roc queue and
+ * tx the frame
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
 QDF_STATUS p2p_ready_to_tx_frame(struct p2p_soc_priv_obj *p2p_soc_obj,
 	uint64_t cookie);
+
+/**
+ * p2p_cancel_tx_frame_by_roc() - cancel tx frame waiting for roc queue
+ * @p2p_soc_obj: p2p soc private object
+ * @cookie: cookie is pointer to roc
+ *
+ * This function finds out the tx context in wait for roc queue and cancel
+ * the tx frame.
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+QDF_STATUS
+p2p_cancel_tx_frame_by_roc(struct p2p_soc_priv_obj *p2p_soc_obj,
+			   uint64_t cookie);
 
 /**
  * p2p_cleanup_tx_sync() - Cleanup tx queue
@@ -502,4 +518,33 @@ void p2p_deinit_random_mac_vdev(struct p2p_vdev_priv_obj *p2p_vdev_obj);
  */
 const uint8_t *p2p_get_p2pie_ptr(const uint8_t *ie, uint16_t ie_len);
 
+/**
+ * p2p_get_p2p2_ie_ptr() - Get the pointer of P2P2 IE
+ * @ie: Pointer to IE buffer
+ * @ie_len: Num of bytes pointed at @ie
+ *
+ * This function finds out p2p2 ie by P2P2 OUI and returns the pointer.
+ *
+ * Return: Pointer to P2P2 IE
+ */
+const uint8_t *p2p_get_p2p2_ie_ptr(const uint8_t *ie, uint16_t ie_len);
+
+/**
+ * p2p_request_random_mac() - request random mac mgmt tx
+ * @soc: soc
+ * @vdev_id: vdev id
+ * @mac: mac addr
+ * @freq: freq
+ * @rnd_cookie: cookie to be returned
+ * @duration: duration of tx timeout
+ *
+ * This function will add/append the random mac addr filter entry to vdev.
+ * If it is new added entry, it will request to set filter in target.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+p2p_request_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
+		       uint8_t *mac, uint32_t freq, uint64_t rnd_cookie,
+		       uint32_t duration);
 #endif /* _WLAN_P2P_OFF_CHAN_TX_H_ */

@@ -2900,7 +2900,7 @@ static int drv_cmd_get_roam_trigger(struct wlan_hdd_link_info *link_info,
 				    struct hdd_priv_data *priv_data)
 {
 	int ret = 0;
-	uint8_t lookup_threshold;
+	uint8_t next_rssi_threshold;
 	int rssi;
 	char extra[32];
 	uint8_t len = 0;
@@ -2909,18 +2909,18 @@ static int drv_cmd_get_roam_trigger(struct wlan_hdd_link_info *link_info,
 	status = ucfg_cm_get_neighbor_lookup_rssi_threshold(
 						hdd_ctx->psoc,
 						link_info->vdev_id,
-						&lookup_threshold);
+						&next_rssi_threshold);
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_GETROAMTRIGGER_IOCTL,
-		   link_info->vdev_id, lookup_threshold);
+		   link_info->vdev_id, next_rssi_threshold);
 
-	hdd_debug("vdev_id: %u, lookup_threshold: %u",
-		  link_info->vdev_id, lookup_threshold);
+	hdd_debug("vdev_id: %u, NEXT_RSSI_THRESHOLD: %u",
+		  link_info->vdev_id, next_rssi_threshold);
 
-	rssi = (-1) * lookup_threshold;
+	rssi = (-1) * next_rssi_threshold;
 
 	len = scnprintf(extra, sizeof(extra), "%s %d", command, rssi);
 	len = QDF_MIN(priv_data->total_len, len + 1);
@@ -3193,6 +3193,36 @@ exit:
 	return ret;
 }
 
+#ifdef FEATURE_WLAN_APF
+static void hdd_enable_active_apf_mode(struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	sme_enable_active_apf_mode_ind(hdd_ctx->mac_handle, adapter->device_mode,
+				       adapter->mac_addr.bytes, link_info->vdev_id);
+}
+
+static void hdd_disable_active_apf_mode(struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	sme_disable_active_apf_mode_ind(hdd_ctx->mac_handle, adapter->device_mode,
+					adapter->mac_addr.bytes, link_info->vdev_id);
+}
+#else
+static void
+hdd_enable_active_apf_mode(struct wlan_hdd_link_info *link_info)
+{
+}
+
+static void
+hdd_disable_active_apf_mode(struct wlan_hdd_link_info *link_info)
+{
+}
+#endif
+
 static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 				    struct hdd_context *hdd_ctx,
 				    uint8_t *command,
@@ -3225,6 +3255,11 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 	}
 
 	hdd_debug("idle_monitor:%d", idle_monitor);
+	if (idle_monitor == 0)
+		hdd_disable_active_apf_mode(link_info);
+	else if (idle_monitor == 1)
+		hdd_enable_active_apf_mode(link_info);
+
 	status = ucfg_pmo_tgt_psoc_send_idle_roam_suspend_mode(hdd_ctx->psoc,
 							       idle_monitor);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -3508,7 +3543,7 @@ void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 	osif_request_put(request);
 }
 
-static uint32_t
+static int
 hdd_get_roam_chan_from_fw(struct hdd_adapter *adapter, uint32_t *chan_list,
 			  uint8_t *num_channels)
 {
@@ -3578,7 +3613,7 @@ hdd_get_roam_scan_freq(struct hdd_adapter *adapter, mac_handle_t mac_handle,
 	if (is_roam_ch_from_fw_supported(adapter->hdd_ctx)) {
 		ret = hdd_get_roam_chan_from_fw(adapter, chan_list,
 						num_channels);
-		if (ret != QDF_STATUS_SUCCESS) {
+		if (ret) {
 			hdd_err("failed to get roam scan channel list from FW");
 			return -EFAULT;
 		}
@@ -6603,8 +6638,8 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 		chan_number = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
 							   chan_number);
 
-	status = hdd_softap_set_channel_change(link_info, chan_number,
-					       width, false, true);
+	status = hdd_softap_set_channel_change(link_info, chan_number, 0, width,
+					       NO_SCHANS_PUNC, false, true);
 	if (status) {
 		hdd_err("Set channel change fail");
 		return status;
@@ -6681,12 +6716,16 @@ static bool check_disable_channels(struct hdd_context *hdd_ctx,
 	    !hdd_ctx->original_channels->channel_info)
 		return false;
 
+	qdf_mutex_acquire(&hdd_ctx->cache_channel_lock);
 	num_channels = hdd_ctx->original_channels->num_channels;
 	for (i = 0; i < num_channels; i++) {
 		if (operating_freq ==
-		    hdd_ctx->original_channels->channel_info[i].freq)
+		    hdd_ctx->original_channels->channel_info[i].freq) {
+			qdf_mutex_release(&hdd_ctx->cache_channel_lock);
 			return true;
+		}
 	}
+	qdf_mutex_release(&hdd_ctx->cache_channel_lock);
 
 	return false;
 }

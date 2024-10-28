@@ -58,6 +58,8 @@
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "wlan_action_oui_ucfg_api.h"
 
+#define MAX_ROAM_COUNT_VALUE (999)
+
 bool hdd_cm_is_vdev_associated(struct wlan_hdd_link_info *link_info)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -401,7 +403,25 @@ hdd_cm_get_ieee_link_id(struct wlan_hdd_link_info *link_info, bool is_cache)
 	else
 		return sta_ctx->conn_info.ieee_link_id;
 }
-#endif
+
+void hdd_cm_save_conn_info_mld_addr(struct wlan_hdd_link_info *link_info,
+				    struct wlan_cm_connect_resp *rsp)
+{
+	struct hdd_station_ctx *sta_ctx;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(link_info->vdev))
+		return;
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	qdf_copy_macaddr(&sta_ctx->conn_info.mld_addr, &rsp->mld_addr);
+}
+
+void hdd_cm_clear_conn_info_mld_addr(struct hdd_station_ctx *sta_ctx)
+{
+	qdf_mem_zero(&sta_ctx->conn_info.mld_addr, QDF_MAC_ADDR_SIZE);
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 
 #ifdef FEATURE_WLAN_WAPI
 static bool hdd_cm_is_wapi_sta(enum csr_akm_type auth_type)
@@ -810,8 +830,8 @@ def_chan:
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->deflink->vdev_id,
 				    CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);
 
-	ret = hdd_softap_set_channel_change(ap_adapter->deflink, ch_freq,
-					    ch_bw, false, true);
+	ret = hdd_softap_set_channel_change(ap_adapter->deflink, ch_freq, 0,
+					    ch_bw, NO_SCHANS_PUNC, false, true);
 	if (ret) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");
 		return false;
@@ -1040,7 +1060,7 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 	 * netdev queues as it will lead to data stall/NUD failure.
 	 */
 	if (!(rsp->cm_id & CM_ID_LSWITCH_BIT)) {
-		hdd_debug("Disabling queues");
+		hdd_debug("vdev %d Disabling queues", link_info->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 					     WLAN_CONTROL_PATH);
@@ -1105,6 +1125,22 @@ static void hdd_cm_update_prev_ap_ie(struct hdd_station_ctx *hdd_sta_ctx,
 	}
 }
 
+static void hdd_cm_update_roam_count(struct hdd_station_ctx *sta_ctx)
+{
+	if (!sta_ctx) {
+		hdd_err("Invalid sta_ctx. Unable to update roam count");
+		return;
+	}
+
+	sta_ctx->conn_info.roam_count++;
+
+	/* Reset the roam count value after reaching 999 */
+	if (sta_ctx->conn_info.roam_count > MAX_ROAM_COUNT_VALUE) {
+		hdd_debug_rl("Resetting the roam_count value to 0");
+		sta_ctx->conn_info.roam_count = 0;
+	}
+}
+
 static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 				 struct wlan_cm_connect_resp *rsp)
 {
@@ -1157,7 +1193,7 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 		hdd_sta_ctx->conn_info.conn_flag.ht_present = false;
 	}
 	if (rsp->is_reassoc)
-		hdd_sta_ctx->conn_info.roam_count++;
+		hdd_cm_update_roam_count(hdd_sta_ctx);
 
 	if (assoc_resp->HTInfo.present) {
 		hdd_sta_ctx->conn_info.conn_flag.ht_op_present = true;
@@ -1387,6 +1423,10 @@ static void hdd_cm_save_connect_info(struct wlan_hdd_link_info *link_info,
 				sme_phy_mode_to_dot11mode(des_chan->ch_phymode);
 
 	sta_ctx->conn_info.ch_width = des_chan->ch_width;
+
+	/* Save AP MLD addr for MLO connection */
+	hdd_cm_save_conn_info_mld_addr(link_info, rsp);
+
 	if (!rsp->connect_ies.bcn_probe_rsp.ptr ||
 	    (rsp->connect_ies.bcn_probe_rsp.len <
 	     (sizeof(struct wlan_frame_hdr) +
@@ -1836,7 +1876,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 static inline void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
 {
-	adapter->disconnect_link_id = WLAN_INVALID_LINK_ID;
+	adapter->discon_link_info = NULL;
 }
 
 static void
@@ -1984,6 +2024,7 @@ QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
 	retval = osif_request_wait_for_response(request);
 	if (retval) {
 		hdd_err("Target response timed out");
+		ucfg_cm_roam_reset_vendor_handoff_req(psoc, vdev_id);
 		status = qdf_status_from_os_return(retval);
 	}
 error:

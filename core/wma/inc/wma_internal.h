@@ -574,8 +574,8 @@ __wma_handle_vdev_stop_rsp(struct vdev_stop_response *resp_event);
 void wma_hold_req_timer(void *data);
 struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 				    uint8_t vdev_id, uint32_t msg_type,
-				    uint8_t type, void *params,
-				    uint32_t timeout);
+				    uint8_t type, uint8_t *mac_addr,
+				    void *params, uint32_t timeout);
 
 /**
  * wma_add_bss() - Add BSS request to fw as per opmode
@@ -938,7 +938,8 @@ QDF_STATUS wma_set_mcc_channel_time_latency
 QDF_STATUS wma_set_mcc_channel_time_quota
 	(tp_wma_handle wma,
 	uint32_t adapter_1_chan_number,
-	uint32_t adapter_1_quota, uint32_t adapter_2_chan_number);
+	uint32_t adapter_1_quota, uint32_t adapter_2_chan_number,
+	uint8_t band_1, uint8_t band_2);
 
 /**
  * wma_process_rate_update_indate() - rate update indication
@@ -1365,6 +1366,7 @@ void wma_remove_req(tp_wma_handle wma, uint8_t vdev_id,
  * wma_find_remove_req_msgtype() - find and remove request for vdev id
  * @wma: wma handle
  * @vdev_id: vdev id
+ * @macaddr: MAC address
  * @msg_type: message request type
  *
  * Find target request for given vdev id & sub type of request.
@@ -1374,6 +1376,7 @@ void wma_remove_req(tp_wma_handle wma, uint8_t vdev_id,
  */
 struct wma_target_req *wma_find_remove_req_msgtype(tp_wma_handle wma,
 						   uint8_t vdev_id,
+						   struct qdf_mac_addr *macaddr,
 						   uint32_t msg_type);
 
 /**

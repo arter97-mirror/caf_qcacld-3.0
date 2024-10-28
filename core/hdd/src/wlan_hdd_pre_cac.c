@@ -95,9 +95,9 @@ static void wlan_hdd_pre_cac_success(struct hdd_adapter *adapter)
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->deflink->vdev_id,
 				    CSA_REASON_PRE_CAC_SUCCESS);
 	chan_freq = ucfg_pre_cac_get_freq(ap_adapter->deflink->vdev);
-	i = hdd_softap_set_channel_change(ap_adapter->deflink,
-					  chan_freq,
-					  pre_cac_ch_width, false, false);
+	i = hdd_softap_set_channel_change(ap_adapter->deflink, chan_freq, 0,
+					  pre_cac_ch_width, NO_SCHANS_PUNC,
+					  false, false);
 	if (i) {
 		hdd_err("failed to change channel");
 		ucfg_pre_cac_complete_set(ap_adapter->deflink->vdev, false);

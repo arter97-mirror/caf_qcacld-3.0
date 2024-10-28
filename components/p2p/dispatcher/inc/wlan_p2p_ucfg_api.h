@@ -199,25 +199,32 @@ QDF_STATUS ucfg_p2p_psoc_stop(struct wlan_objmgr_psoc *soc);
  * @soc: soc context
  * @roc_req: Roc request parameters
  * @cookie: return cookie to caller
+ * @opmode: interface type
  *
  * This function delivers roc request to P2P component.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
 QDF_STATUS ucfg_p2p_roc_req(struct wlan_objmgr_psoc *soc,
-	struct p2p_roc_req *roc_req, uint64_t *cookie);
+			    struct p2p_roc_req *roc_req,
+			    uint64_t *cookie,
+			    enum QDF_OPMODE opmode);
 
 /**
  * ucfg_p2p_roc_cancel_req() - Cancel roc request
  * @soc: soc context
+ * @vdev: pointer to vdev object
  * @cookie: Find out the roc request by cookie
+ * @opmode: OPMODE for which the current roc_cancel is issued
  *
  * This function delivers cancel roc request to P2P component.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
 QDF_STATUS ucfg_p2p_roc_cancel_req(struct wlan_objmgr_psoc *soc,
-	uint64_t cookie);
+				   struct wlan_objmgr_vdev *vdev,
+				   uint64_t cookie,
+				   enum QDF_OPMODE opmode);
 
 /**
  * ucfg_p2p_cleanup_roc_by_vdev() - Cleanup roc request by vdev
@@ -280,6 +287,7 @@ QDF_STATUS ucfg_p2p_mgmt_tx(struct wlan_objmgr_psoc *soc,
  * @soc: soc context
  * @vdev: vdev object
  * @cookie: Find out the mgmt tx request by cookie
+ * @opmode: OPMODE for which the current mgmt_tx_cancel is issued
  *
  * This function delivers cancel mgmt frame tx request request to P2P
  * component.
@@ -287,7 +295,9 @@ QDF_STATUS ucfg_p2p_mgmt_tx(struct wlan_objmgr_psoc *soc,
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
 QDF_STATUS ucfg_p2p_mgmt_tx_cancel(struct wlan_objmgr_psoc *soc,
-	struct wlan_objmgr_vdev *vdev, uint64_t cookie);
+				   struct wlan_objmgr_vdev *vdev,
+				   uint64_t cookie,
+				   enum QDF_OPMODE opmode);
 
 /**
  * ucfg_p2p_set_ps() - P2P set power save
@@ -327,6 +337,22 @@ QDF_STATUS ucfg_p2p_lo_start(struct wlan_objmgr_psoc *soc,
 QDF_STATUS ucfg_p2p_lo_stop(struct wlan_objmgr_psoc *soc,
 	uint32_t vdev_id);
 #endif
+
+/**
+ * ucfg_p2p_send_chan_switch_req() - OSIF wrapper API to send channel switch
+ * request params to P2P module
+ * @psoc: PSOC object manager
+ * @vdev_id: VDEV ID of p2p entity for channel switch request
+ * @channel: Channel number of requested channel
+ * @opclass: Operating class of request channel
+ *
+ * Posts command to P2P module for channel switch request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_p2p_send_chan_switch_req(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint8_t channel,
+					 uint8_t opclass);
 
 /**
  * p2p_peer_authorized() - Process peer authorized event
@@ -529,5 +555,136 @@ ucfg_p2p_get_mgmt_frm_registration_update(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS ucfg_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 				    struct p2p_usd_attr_params *param);
+
+/**
+ * ucfg_p2p_is_fw_support_usd() - wrapper API for API
+ * p2p_is_fw_support_usd()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if USD is supported by FW else false
+ */
+bool ucfg_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+/**
+ * ucfg_p2p_fw_support_ap_assist_dfs_group() - Wrapper API to get the FW
+ * support for assisted AP DFS P2P group operation
+ * @psoc: PSOC object manager
+ *
+ * Return: bool
+ */
+bool ucfg_p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_p2p_extract_ap_assist_dfs_params() - Wrapper API to parse the P2P2 IE
+ * and save the assisted DFS params in VDEV
+ * @vdev: VDEV object manager pointer
+ * @ie: Pointer to IE buffer
+ * @ie_len: Length go bytes pointed by @ie
+ * @is_connected: If set to %true only connected APs are extracted
+ * @freq: Frequency to filter out APs from the WLAN AP info attr
+ * @is_self: If set to %true, the extracted AP info is filled in VDEV priv
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+				      const uint8_t *ie, uint16_t ie_len,
+				      bool is_connected, qdf_freq_t freq,
+				      bool is_self);
+
+/**
+ * ucfg_p2p_get_ap_assist_dfs_params() - Wrapper API to get the parsed DFS
+ * operation P2P group assisted AP params
+ * @vdev: VDEV object manager
+ * @is_dfs_owner: Pointer to get the DFS owner cap
+ * @is_valid_ap_assist: Is valid AP assist params
+ * @ap_bssid: BSSID of the assisted AP
+ * @opclass: Operating class of the assisted AP
+ * @chan: Channel number of assisted AP
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
+					     bool *is_dfs_owner,
+					     bool *is_valid_ap_assist,
+					     struct qdf_mac_addr *ap_bssid,
+					     uint8_t *opclass, uint8_t *chan);
+
+/**
+ * ucfg_p2p_check_ap_assist_dfs_group_go() - Check DFS P2P GO operation under
+ * assisted AP mode requirements.
+ * @vdev: VDEV object manager for P2P GO
+ *
+ * Validates the conditions for P2P GO operation in DFS channel in AP assisted
+ * mode without triggering CSA if conditions didn't meet.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_is_sta_vdev_for_p2p_device_supported() - Check whether use of STA vdev
+ * for P2P device operation allowed or not
+ * @psoc: pointer to psoc
+ *
+ * Return: True/False
+ */
+bool
+ucfg_is_sta_vdev_for_p2p_device_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap()
+ * @psoc: pointer to psoc
+ *
+ * return: True/False
+ */
+bool ucfg_p2p_get_sta_vdev_for_p2p_dev_upon_vdev_exhaust_cap(
+					struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_p2p_set_sta_vdev_for_p2p_dev_operations()
+ * @psoc: pointer to psoc
+ * @val: value
+ *
+ * ucfg wrapper for p2p_set_sta_vdev_for_p2p_dev_operations
+ *
+ * Return: None
+ */
+void
+ucfg_p2p_set_sta_vdev_for_p2p_dev_operations(struct wlan_objmgr_psoc *psoc,
+					     bool val);
+
+/**
+ * ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev()
+ * @psoc: pointer to psoc
+ *
+ * ucfg wrapper for p2p_is_sta_vdev_usage_allowed_for_p2p_dev()
+ *
+ * Return: True/False
+ */
+bool
+ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_p2p_psoc_priv_set_sta_vdev_id()
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id to set
+ *
+ * ucfg wrapper for p2p_psoc_priv_set_sta_vdev_id()
+ *
+ * Return: None
+ */
+void ucfg_p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
+
+/**
+ * ucfg_p2p_psoc_priv_get_sta_vdev_id()
+ * @psoc: pointer to psoc
+ *
+ * ucfg wrapper for p2p_psoc_priv_get_sta_vdev_id()
+ *
+ * Return: vdev_id
+ */
+uint8_t ucfg_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_P2P_UCFG_API_H_ */

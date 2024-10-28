@@ -52,9 +52,9 @@
 #ifdef WLAN_FEATURE_LL_LT_SAP
 #include "wlan_ll_sap_api.h"
 #endif
-
 #include "wlan_nan_api_i.h"
 #include "wlan_tdls_api.h"
+#include <wlan_p2p_api.h>
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -457,8 +457,10 @@ static QDF_STATUS sta_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
 	status = wma_sta_vdev_up_send(vdev_mlme, event_data_len, event_data);
 
-	if (QDF_IS_STATUS_SUCCESS(status))
+	if (QDF_IS_STATUS_SUCCESS(status)) {
 		mlme_sr_update(vdev_mlme->vdev, true);
+		wlan_p2p_validate_ap_assist_dfs_group(vdev_mlme->vdev);
+	}
 
 	return status;
 }
@@ -1928,6 +1930,21 @@ static QDF_STATUS mon_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 	return wma_mon_mlme_vdev_down_send(vdev_mlme, data_len, data);
 }
 
+static QDF_STATUS mon_mlme_vdev_stop_resp(struct vdev_mlme_obj *vdev_mlme,
+					  struct vdev_stop_response *rsp)
+{
+	mlme_legacy_debug("vdev id = %d",
+			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+	return wma_mon_mlme_vdev_stop_resp(vdev_mlme);
+}
+
+static void mon_mlme_vdev_down(struct vdev_mlme_obj *vdev_mlme)
+{
+	mlme_legacy_debug("vdev id = %d",
+			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+	wma_mon_mlme_vdev_stop_resp(vdev_mlme);
+}
+
 /**
  * vdevmgr_vdev_delete_rsp_handle() - callback to handle vdev delete response
  * @psoc: psoc object
@@ -2480,7 +2497,9 @@ static struct vdev_mlme_ops mon_mlme_ops = {
 	.mlme_vdev_disconnect_peers = mon_mlme_vdev_disconnect_peers,
 	.mlme_vdev_stop_send = mon_mlme_vdev_stop_send,
 	.mlme_vdev_down_send = mon_mlme_vdev_down_send,
+	.mlme_vdev_ext_stop_rsp = mon_mlme_vdev_stop_resp,
 	.mlme_vdev_ext_start_rsp = vdevmgr_vdev_start_rsp_handle,
+	.mlme_vdev_init_down = mon_mlme_vdev_down,
 };
 
 static struct mlme_ext_ops ext_ops = {
@@ -2499,6 +2518,7 @@ static struct mlme_ext_ops ext_ops = {
 	.mlme_cm_ext_disconnect_start_ind_cb = cm_disconnect_start_ind,
 	.mlme_cm_ext_disconnect_req_cb = cm_handle_disconnect_req,
 	.mlme_cm_ext_bss_peer_delete_req_cb = cm_send_bss_peer_delete_req,
+	.mlme_cm_ext_force_bss_peer_delete_req_cb = cm_send_force_bss_peer_delete_req,
 	.mlme_cm_ext_disconnect_complete_ind_cb = cm_disconnect_complete_ind,
 	.mlme_cm_ext_vdev_down_req_cb = cm_send_vdev_down_req,
 	.mlme_cm_ext_reassoc_req_cb = cm_handle_reassoc_req,

@@ -185,7 +185,7 @@ void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 	cdp_display_stats(soc, CDP_DUMP_TX_FLOW_POOL_INFO,
 			  QDF_STATS_VERBOSITY_LEVEL_LOW);
 	wlan_hdd_display_adapter_netif_queue_history(adapter);
-	hdd_debug("Enabling queues");
+	hdd_debug("vdev %d Enabling queues", adapter->deflink->vdev_id);
 	spin_lock_bh(&adapter->pause_map_lock);
 	p_qpaused = adapter->pause_map & BIT(WLAN_DATA_FLOW_CONTROL_PRIORITY);
 	np_qpaused = adapter->pause_map & BIT(WLAN_DATA_FLOW_CONTROL);
@@ -230,7 +230,7 @@ void hdd_tx_resume_timer_expired_handler(void *adapter_context)
 		return;
 	}
 
-	hdd_debug("Enabling queues");
+	hdd_debug("vdev %d Enabling queues", adapter->deflink->vdev_id);
 	wlan_hdd_netif_queue_control(adapter, WLAN_WAKE_ALL_NETIF_QUEUE,
 				     WLAN_CONTROL_PATH);
 }
@@ -253,7 +253,7 @@ hdd_tx_resume_false(struct hdd_adapter *adapter, bool tx_resume)
 		return;
 
 	/* Pause TX  */
-	hdd_debug("Disabling queues");
+	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
 	wlan_hdd_netif_queue_control(adapter, WLAN_STOP_ALL_NETIF_QUEUE,
 				     WLAN_DATA_FLOW_CONTROL);
 
@@ -303,7 +303,7 @@ void hdd_tx_resume_cb(void *adapter_context, bool tx_resume)
 						   tx_flow_control_timer)) {
 			qdf_mc_timer_stop(&adapter->tx_flow_control_timer);
 		}
-		hdd_debug("Enabling queues");
+		hdd_debug("vdev %d Enabling queues", adapter->deflink->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_WAKE_ALL_NETIF_QUEUE,
 					     WLAN_DATA_FLOW_CONTROL);
@@ -385,8 +385,8 @@ void hdd_get_tx_resource(uint8_t vdev_id,
 				   adapter->tx_flow_hi_watermark_offset))
 		return;
 
-	hdd_debug("Disabling queues lwm %d hwm offset %d",
-		  adapter->tx_flow_low_watermark,
+	hdd_debug("vdev %d Disabling queues lwm %d hwm offset %d",
+		  adapter->deflink->vdev_id, adapter->tx_flow_low_watermark,
 		  adapter->tx_flow_hi_watermark_offset);
 	wlan_hdd_netif_queue_control(adapter, WLAN_STOP_ALL_NETIF_QUEUE,
 				     WLAN_DATA_FLOW_CONTROL);
@@ -1359,7 +1359,7 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx =  WLAN_HDD_GET_CTX(adapter);
 	int ret;
-	QDF_STATUS qdf_status;
+	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct wlan_hdd_link_info *link_info;
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {

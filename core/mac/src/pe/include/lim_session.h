@@ -83,7 +83,7 @@ struct reassoc_params {
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
 #define MAX_BSS_COLOR_VALUE 63
 #define TIME_BEACON_NOT_UPDATED 30000
-#define BSS_COLOR_SWITCH_COUNTDOWN 5
+#define BSS_COLOR_SWITCH_COUNTDOWN 10
 #define OBSS_COLOR_COLLISION_DETECTION_STA_PERIOD_MS 120000
 #define OBSS_COLOR_COLLISION_DETECTION_AP_PERIOD_MS 120000
 /*
@@ -380,6 +380,28 @@ struct wlan_mlo_ie_info {
 #define MAX_NUM_RNR_ENTRY 2
 
 /**
+ * struct dfs_p2p_group_info - Data struct to hold DFS operating P2P group info
+ * @is_assisted_p2p_group: Is AP assisted DFS group
+ * @chan_usage_req_resp_inprog: Is channel usage exchange in progress
+ * @is_ap_bcn_monitor_active: Is FW monitoring assisted AP beacons
+ * @reserved: Reserved
+ * @ap_bssid: BSSID of assisted AP
+ * @non_tx_bssid: Non-TxBSSID of assisted AP
+ * @chan_usage_req: Channel usage request info
+ * @chan_usage_resp: Channel usage response info
+ */
+struct dfs_p2p_group_info {
+	uint8_t is_assisted_p2p_group:1,
+		chan_usage_req_resp_inprog:1,
+		is_ap_bcn_monitor_active:1,
+		reserved:5;
+	struct qdf_mac_addr ap_bssid;
+	struct qdf_mac_addr non_tx_bssid;
+	tDot11fchannel_usage_req chan_usage_req;
+	tDot11fchannel_usage_resp chan_usage_resp;
+};
+
+/**
  * struct pe_session - per-vdev PE context
  * @available: true if the entry is available, false if it is in use
  * @cm_id:
@@ -644,6 +666,7 @@ struct wlan_mlo_ie_info {
  * @enable_bcast_probe_rsp:
  * @ht_client_cnt:
  * @ch_switch_in_progress:
+ * @post_csa_notify_cap: Send notify capability pending post CSA
  * @he_with_wep_tkip:
  * @fils_info:
  * @prev_auth_seq_num: Sequence number of previously received auth frame to
@@ -689,6 +712,8 @@ struct wlan_mlo_ie_info {
  * on 2.4 GHz
  * @join_probe_cnt: join probe request count
  * @cal_tpc_post_csa: Recalculate tx power power csa
+ * @wnm_action_dialog_token: Dialog token for WNM action frames.
+ * @dfs_p2p_info: DFS P2P group operation info.
  */
 struct pe_session {
 	uint8_t available;
@@ -968,6 +993,7 @@ struct pe_session {
 	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
 	bool ch_switch_in_progress;
+	bool post_csa_notify_cap;
 	bool he_with_wep_tkip;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct pe_fils_session *fils_info;
@@ -1020,6 +1046,9 @@ struct pe_session {
 	bool is_unexpected_peer_error;
 	uint8_t join_probe_cnt;
 	bool cal_tpc_post_csa;
+
+	uint8_t wnm_action_dialog_token;
+	struct dfs_p2p_group_info dfs_p2p_info;
 };
 
 /*-------------------------------------------------------------------------

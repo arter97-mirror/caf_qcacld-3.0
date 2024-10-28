@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * 2011-2016 Qualcomm Atheros, Inc.
  * Qualcomm Atheros, Inc. has chosen to take madwifi subject to the BSD license and terms.
@@ -394,6 +394,10 @@ typedef enum wlan_mlme_pdev_param {
 	PDEV_GET_CAPABILITY,
 	PDEV_GET_OPERABLE_CHAN,
 	PDEV_GET_OPERABLE_CLASS,
+	PDEV_GET_OPCLASS_FOR_CUR_HWMODE,
+	PDEV_SET_EMESH_RELAYFS_INIT,
+	PDEV_SET_EMESH_RELAYFS_DEINIT,
+	PDEV_GET_CAC_TLV,
 } wlan_mlme_pdev_param;
 
 /* Interface for External modules to interact with wlan driver */
@@ -422,6 +426,9 @@ typedef enum ieee80211_phymode wlan_phy_mode;
 #define WME_AC_MAX 4
 
 #define MAX_HE_MCS 6
+
+//Supported EHT MCS set value of supported EHT Tx and Rx MCS
+#define MAX_SET_SUPPORT_EHT_TX_RX_MCS 8
 
 #define IEEE1905_MAX_ROLES 2
 
@@ -656,22 +663,39 @@ typedef struct wlan_ap_wifi6_capabilities {
 	} role_cap[IEEE1905_MAX_ROLES];
 } wlan_ap_wifi6_capabilities;
 
+typedef struct wlan_ap_eht_capabilities {
+	u_int8_t num_mcs_entries;
+	u_int32_t supported_eht_mcs[MAX_SET_SUPPORT_EHT_TX_RX_MCS];
+	u_int8_t max_tx_nss;
+	u_int8_t max_rx_nss;
+} wlan_ap_eht_capabilities;
+
+/**
+ * struct wlan_ap_cap - ap capabilities
+ * @htcap: ht capabilities
+ * @vhtcap: vht capabilities
+ * @hecap: he capabilities
+ * @wifi6cap: wifi6 capabilities
+ * @ehtcap: eht capabilities
+ * @wlan_ap_ht_capabilities_valid: HT capabilities are valid
+ * @wlan_ap_vht_capabilities_valid: VHT capabilities are valid
+ * @wlan_ap_he_capabilities_valid: HE capabilities are valid
+ * @wlan_ap_wifi6_capabilites_valid: wifi6 capabilities are valid
+ * @wlan_ap_eht_capabilities_valid: EHT capabilities are valid
+ * @reserved: reserved bits
+ */
 typedef struct wlan_ap_cap {
 	wlan_ap_ht_capabilities htcap;
 	wlan_ap_vht_capabilities vhtcap;
 	wlan_ap_he_capabilities hecap;
 	wlan_ap_wifi6_capabilities wifi6cap;
-		 // HT capabilities are valid
+	wlan_ap_eht_capabilities ehtcap;
 	u_int8_t wlan_ap_ht_capabilities_valid : 1,
-
-		 // VHT capabilities are valid
 		 wlan_ap_vht_capabilities_valid : 1,
-
-		 // HE capabilities are valid
 		 wlan_ap_he_capabilities_valid : 1,
-
 		 wlan_ap_wifi6_capabilites_valid : 1,
-		 reserved : 3;
+		 wlan_ap_eht_capabilities_valid : 1,
+		 reserved : 2;
 } wlan_ap_cap;
 
 /* Peer param and commands */
@@ -711,6 +735,8 @@ typedef enum wlan_mlme_vdev_param {
 	VDEV_SET_MBO_IE_BSTM,
 	VDEV_SET_WPS_ACL_ENABLE,
 	VDEV_SET_WNM_BSS_PREF,
+	VDEV_SET_SON_MAP_VERSION,
+	VDEV_SET_MCTBL,
 	VDEV_GET_NSS,
 	VDEV_GET_CHAN,
 	VDEV_GET_CHAN_WIDTH,
@@ -785,6 +811,10 @@ enum ieee80211_event_type {
 	MLME_EVENT_INST_RSSI,
 	MLME_EVENT_TX_PWR_CHANGE,
 	MLME_EVENT_CHAN_CHANGE,
+	MLME_EVENT_MSCS,
+	MLME_EVENT_SCS,
+	MLME_EVENT_DSCP_POLICY_QUERY,
+	MLME_EVENT_DSCP_POLICY_RESPONSE,
 };
 
 union wlan_mlme_peer_data {
@@ -794,12 +824,15 @@ union wlan_mlme_peer_data {
 	u_int32_t mcs;
 	/* generic flag to enable/disable */
 	u_int8_t enable : 1;
+	/* map ie vlan id */
+	u_int16_t vlan_id;
 };
 
 typedef enum wlan_mlme_peer_param {
 	PEER_SET_KICKOUT,
 	PEER_SET_KICKOUT_ALLOW,
 	PEER_SET_EXT_STATS,
+	PEER_SET_VLAN_ID,
 	PEER_REQ_INST_STAT,
 	PEER_GET_CAPABILITY,
 	PEER_GET_MAX_MCS,

@@ -226,6 +226,9 @@ QDF_STATUS if_mgr_disconnect_start(struct wlan_objmgr_vdev *vdev,
 
 	qdf_runtime_pm_prevent_suspend(&mlme_priv->disconnect_runtime_lock);
 
+	if (mlo_mgr_is_link_switch_in_progress(vdev))
+		wlan_tdls_delete_all_peers(vdev);
+
 	return QDF_STATUS_SUCCESS;
 }
 

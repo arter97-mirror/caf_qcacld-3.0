@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -153,12 +153,14 @@ osif_convert_high_ap_availability_oper_to_qca(
  * switch request
  * @vdev: pointer to vdev structure.
  * @req_type: Request type.
+ * @source: Source of the request
  *
  * Return: None.
  */
 static void
 wlan_osif_send_audio_transport_switch_req(struct wlan_objmgr_vdev *vdev,
-					  enum bearer_switch_req_type req_type)
+					  enum bearer_switch_req_type req_type,
+					  enum bearer_switch_req_source source)
 {
 	struct sk_buff *vendor_event;
 	struct wireless_dev *wdev;
@@ -202,6 +204,17 @@ wlan_osif_send_audio_transport_switch_req(struct wlan_objmgr_vdev *vdev,
 			 vdev_id);
 		wlan_cfg80211_vendor_free_skb(vendor_event);
 		return;
+	}
+
+	if (source == BEARER_SWITCH_REQ_STOP_AP) {
+		if (nla_put_u8(vendor_event,
+			       QCA_WLAN_VENDOR_ATTR_AUDIO_TRANSPORT_SWITCH_REASON,
+			       QCA_WLAN_AUDIO_TRANSPORT_SWITCH_REASON_TERMINATING)) {
+			osif_err("Vdev %d AUDIO_TRANSPORT_SWITCH_REASON put fail",
+				 vdev_id);
+			wlan_cfg80211_vendor_free_skb(vendor_event);
+			return;
+		}
 	}
 
 	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);

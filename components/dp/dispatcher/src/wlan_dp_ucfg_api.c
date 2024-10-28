@@ -3298,3 +3298,62 @@ bool ucfg_dp_ipa_ctrl_debug_supported(struct wlan_objmgr_psoc *psoc)
 
 	return false;
 }
+
+#ifdef IPA_WDI3_VLAN_SUPPORT
+void ucfg_dp_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
+					uint8_t pdev_id)
+{
+	struct wlan_dp_psoc_sb_ops *sb_ops = dp_intf_get_tx_ops(psoc);
+
+	if (!ucfg_ipa_is_enabled() || !ucfg_ipa_is_vlan_enabled()) {
+		dp_info("IPA VLAN feature is not enabled");
+		return;
+	}
+
+	if (!sb_ops) {
+		dp_err("Unable to get ops");
+		return;
+	}
+
+	if (sb_ops->dp_send_pdev_pkt_routing_vlan)
+		sb_ops->dp_send_pdev_pkt_routing_vlan(psoc, pdev_id,
+						      cdp_host_reo_dest_ring_3);
+}
+#endif /* IPA_WDI3_VLAN_SUPPORT */
+
+int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
+				uint32_t pri)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	ol_txrx_soc_handle soc_txrx_handle;
+	cdp_config_param_type value = {0};
+	QDF_STATUS status;
+
+	if (!vdev) {
+		dp_err("null vdev");
+		return -EINVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		dp_err("null pdev");
+		return -EINVAL;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+	if (!soc_txrx_handle) {
+		dp_err("dp handle is null");
+		return -EINVAL;
+	}
+
+	value.cdp_pdev_param_tidmap_prty = pri;
+
+	status = cdp_txrx_set_pdev_param(soc_txrx_handle,
+					 wlan_objmgr_pdev_get_pdev_id(pdev),
+					 CDP_TIDMAP_PRTY, value);
+
+	return qdf_status_to_os_return(status);
+}

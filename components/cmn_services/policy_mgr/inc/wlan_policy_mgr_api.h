@@ -57,6 +57,12 @@ typedef const enum policy_mgr_conc_next_action
 	policy_mgr_next_action_three_connection_table_type
 	[PM_MAX_TWO_CONNECTION_MODE][POLICY_MGR_MAX_BAND];
 
+#ifdef FEATURE_FOURTH_CONNECTION
+typedef const enum policy_mgr_conc_next_action
+	policy_mgr_next_action_four_connection_table_type
+	[PM_MAX_THREE_CONNECTION_MODE][POLICY_MGR_MAX_BAND];
+#endif
+
 #define PM_FW_MODE_STA_STA_BIT_POS       0
 #define PM_FW_MODE_STA_P2P_BIT_POS       1
 
@@ -686,6 +692,22 @@ uint32_t
 policy_mgr_get_connection_count_with_mlo(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_mode_specific_connection_count_with_mlo() - provides the
+ * count of given connections
+ * @psoc: PSOC object information
+ * @mode: connection mode
+ *
+ * This function provides the count of given connections, MLD dev count
+ * 1 connection no matter how many links connection.
+ *
+ * Return: connection count
+ */
+uint32_t
+policy_mgr_mode_specific_connection_count_with_mlo(
+				struct wlan_objmgr_psoc *psoc,
+				enum policy_mgr_con_mode mode);
+
+/**
  * policy_mgr_get_concurrency_mode() - return concurrency mode
  * @psoc: PSOC object information
  *
@@ -1263,12 +1285,20 @@ bool policy_mgr_is_ml_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
  * policy_mgr_get_disabled_ml_links_count() - provides the count of
  * disabled ml links
  * @psoc: PSOC object information
+ * @op_ch_freq_list: home channel list of disabled vdev
+ * @vdev_id_list: disabled vdev id list
+ * @list_max_size: list max number of items
  *
- * This function provides the count of disabled ml links
+ * This function provides the count of disabled ml links, frequency list
+ * vdev id list.
  *
  * Return: disabled ml links count
  */
-uint32_t policy_mgr_get_disabled_ml_links_count(struct wlan_objmgr_psoc *psoc);
+uint32_t
+policy_mgr_get_disabled_ml_links_count(struct wlan_objmgr_psoc *psoc,
+				       qdf_freq_t *op_ch_freq_list,
+				       uint8_t *vdev_id_list,
+				       uint32_t list_max_size);
 
 /**
  * policy_mgr_move_vdev_from_disabled_to_connection_tbl() - re-enable a ml link
@@ -2292,10 +2322,15 @@ struct policy_mgr_hdd_cbacks {
  *                          concurrency.such as EDCA params and RTS threshold.
  *                          If updated, it will also send the updated parameters
  *                          to FW.
+ * @ap_assist_dfs_group_notify: Notify on change in STA interface entry in
+ * policy manager either due to addition or removal from connection table to
+ * re-evaluate the status of P2P Group which are assisted by concurrent DFS
+ * infra connection
  */
 
 struct policy_mgr_conc_cbacks {
 	void (*connection_info_update)(void);
+	void (*ap_assist_dfs_group_notify)(bool is_incr_session);
 };
 
 /**
@@ -6055,4 +6090,21 @@ QDF_STATUS policy_mgr_modify_pcl_for_vlp_channels(struct wlan_objmgr_psoc *psoc,
 						  struct wlan_objmgr_pdev *pdev,
 						  struct weighed_pcl *pcl,
 						  uint32_t num_pcl);
+
+#ifdef AUTO_PLATFORM
+/**
+ * policy_mgr_is_3vifs_mcc_to_scc_enabled() - Check if 3vifs mcc to scc is
+ * enabled.
+ * @psoc: psoc pointer
+ *
+ * Return: true/false.
+ */
+bool policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
 #endif /* __WLAN_POLICY_MGR_API_H */

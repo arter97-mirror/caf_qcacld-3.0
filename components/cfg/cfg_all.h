@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,6 +42,12 @@
 #define CFG_NAN_ALL
 #endif
 
+#ifdef FEATURE_MGMT_RX_OVER_SRNG
+#include "wlan_mgmt_rx_srng_cfg.h"
+#else
+#define CFG_MGMT_RX_SRNG
+#endif
+
 #include "cfg_ftm_time_sync.h"
 
 #include "wlan_pmo_cfg.h"
@@ -70,5 +76,6 @@
 	CFG_TDLS_ALL \
 	CFG_PKT_CAPTURE_MODE_ALL \
 	CFG_TIME_SYNC_FTM_ALL \
-	CFG_ACTION_OUI
+	CFG_ACTION_OUI \
+	CFG_MGMT_RX_SRNG
 

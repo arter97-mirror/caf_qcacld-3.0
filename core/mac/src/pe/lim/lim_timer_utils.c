@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,6 +48,7 @@
  * authentication.
  */
 #define LIM_AUTH_SAE_TIMER_MS 5000
+#define LIM_CHANNEL_VACATE_TIMER_MS 5000
 
 /*
  * STA stats resp timer of 10secs. This is required for duration of RRM
@@ -143,6 +144,17 @@ static bool lim_create_non_ap_timers(struct mac_context *mac)
 		SYS_MS_TO_TICKS(LIM_AUTH_SAE_TIMER_MS), 0,
 		TX_NO_ACTIVATE)) != TX_SUCCESS) {
 		pe_err("could not create SAE AUTH Timer");
+		return false;
+	}
+
+	if ((tx_timer_create(mac,
+			     &mac->lim.lim_timers.channel_vacate_timer,
+			     "Channel vacate timer",
+			     lim_timer_handler,
+			     SIR_LIM_CHANNEL_VACATE_TIMEOUT,
+			     SYS_MS_TO_TICKS(LIM_CHANNEL_VACATE_TIMER_MS),
+			     0, TX_NO_ACTIVATE)) != TX_SUCCESS) {
+		pe_err("could not create channel vacate timer");
 		return false;
 	}
 
@@ -269,6 +281,7 @@ err_timer:
 	tx_timer_delete(&mac->lim.lim_timers.gLimPeriodicJoinProbeReqTimer);
 	tx_timer_delete(&mac->lim.lim_timers.g_lim_periodic_auth_retry_timer);
 	tx_timer_delete(&mac->lim.lim_timers.sae_auth_timer);
+	tx_timer_delete(&mac->lim.lim_timers.channel_vacate_timer);
 
 	if (mac->lim.gLimPreAuthTimerTable.pTable) {
 		for (i = 0; i < mac->lim.gLimPreAuthTimerTable.numEntry; i++)
@@ -709,7 +722,20 @@ void lim_deactivate_and_change_timer(struct mac_context *mac, uint32_t timerId)
 			pe_err("unable to change STA STATS RSP timer");
 
 		break;
+	case LIM_CHANNEL_VACATE_TIMER:
+		if (tx_timer_deactivate
+		    (&mac->lim.lim_timers.channel_vacate_timer)
+		    != TX_SUCCESS)
+			pe_err("Unable to deactivate channel vacate timer");
 
+		/* Change timer to reactivate it in future */
+		val = SYS_MS_TO_TICKS(LIM_CHANNEL_VACATE_TIMER_MS);
+
+		if (tx_timer_change(
+			&mac->lim.lim_timers.channel_vacate_timer,
+			val, 0) != TX_SUCCESS)
+			pe_err("unable to change channel vacate timer");
+		break;
 	default:
 		/* Invalid timerId. Log error */
 		break;

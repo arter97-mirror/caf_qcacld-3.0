@@ -116,6 +116,8 @@
  * @ACTION_OUI_SEND_SMPS_FRAME_WITH_OMN: Send SMPS frame along with OMN
  * frame for specified IoT APs.
  * @ACTION_OUI_DISABLE_AUX_LISTEN: disable Aux Listen for specified IoT APs
+ * @ACTION_OUI_RESTRICT_MAX_MLO_LINKS: Downgrade MLO if particular AP
+ *                                     build present.
  * @ACTION_OUI_HOST_ONLY: host only action id start - placeholder.
  * New Firmware related "ACTION" needs to be added before this placeholder.
  * @ACTION_OUI_HOST_RECONN: reconnect to the same BSSID when wait for
@@ -126,9 +128,8 @@
  * @ACTION_OUI_DISABLE_BFORMEE: disable SU/MU beam formee capability for
  * specified AP
  * @ACTION_OUI_ENABLE_CTS2SELF: enable cts to self for specified AP's
- * @ACTION_OUI_RESTRICT_MAX_MLO_LINKS: Downgrade MLO if particular AP
- *                                     build present.
  * @ACTION_OUI_LIMIT_BW: Limit BW if vendor OUI is received in beacon.
+ * @ACTION_OUI_DISABLE_DYNAMIC_SMPS: Disable Dynamic SMPS for specified AP
  * @ACTION_OUI_MAXIMUM_ID: maximum number of action oui types
  */
 enum action_oui_id {
@@ -146,8 +147,9 @@ enum action_oui_id {
 	ACTION_OUI_ENABLE_CTS2SELF_WITH_QOS_NULL = 11,
 	ACTION_OUI_SEND_SMPS_FRAME_WITH_OMN = 12,
 	ACTION_OUI_DISABLE_AUX_LISTEN = 13,
-	/* host&fw interface add above here */
+	ACTION_OUI_RESTRICT_MAX_MLO_LINKS = 16,
 
+	/* host&fw interface add above here */
 	ACTION_OUI_HOST_ONLY,
 	ACTION_OUI_HOST_RECONN = ACTION_OUI_HOST_ONLY,
 	ACTION_OUI_TAKE_ALL_BAND_INFO,
@@ -155,8 +157,9 @@ enum action_oui_id {
 	ACTION_OUI_DISABLE_BFORMEE,
 	ACTION_OUI_DISABLE_AGGRESSIVE_EDCA,
 	ACTION_OUI_ENABLE_CTS2SELF,
-	ACTION_OUI_RESTRICT_MAX_MLO_LINKS,
+
 	ACTION_OUI_LIMIT_BW,
+	ACTION_OUI_DISABLE_DYNAMIC_SMPS,
 	ACTION_OUI_MAXIMUM_ID
 };
 

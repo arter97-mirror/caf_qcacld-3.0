@@ -142,8 +142,9 @@ static QDF_STATUS hdd_dcs_switch_chan_cb(struct wlan_objmgr_vdev *vdev,
 		wlan_hdd_set_sap_csa_reason(psoc, link_info->vdev_id,
 					    CSA_REASON_DCS);
 
-		ret = hdd_softap_set_channel_change(link_info, tgt_freq,
-						    tgt_width, true, false);
+		ret = hdd_softap_set_channel_change(link_info, tgt_freq, 0,
+						    tgt_width, NO_SCHANS_PUNC,
+						    true, false);
 		status = qdf_status_from_os_return(ret);
 		break;
 	default:
@@ -727,13 +728,10 @@ void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
 void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 		      uint32_t mac_id, uint8_t vdev_id)
 {
-	/* Send DCS command only for low latency sap*/
-	if (policy_mgr_is_vdev_ll_sap(psoc, vdev_id)) {
-		if (ucfg_is_vdev_level_dcs_supported(psoc))
-			ucfg_wlan_dcs_cmd_for_vdev(psoc, mac_id, vdev_id);
-		else
-			ucfg_wlan_dcs_cmd(psoc, mac_id, true);
-	}
+	if (ucfg_is_vdev_level_dcs_supported(psoc))
+		ucfg_wlan_dcs_cmd_for_vdev(psoc, mac_id, vdev_id);
+	else
+		ucfg_wlan_dcs_cmd(psoc, mac_id, true);
 }
 #endif
 

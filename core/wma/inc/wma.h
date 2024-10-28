@@ -1535,8 +1535,8 @@ QDF_STATUS wma_send_pdev_set_antenna_mode(tp_wma_handle wma_handle,
 
 struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 				    uint8_t vdev_id, uint32_t msg_type,
-				    uint8_t type, void *params,
-				    uint32_t timeout);
+				    uint8_t type, uint8_t *mac_addr,
+				    void *params, uint32_t timeout);
 
 int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 				   uint32_t len);
@@ -2457,12 +2457,13 @@ void wma_set_peer_ucast_cipher(uint8_t *mac_addr, int32_t cipher,
  * @session_id: vdev session identifier
  * @pairwise: denotes if it is pairwise or group key
  * @key_index: Key Index
+ * @peer_mac: MAC address of crypto key entity
  * @cipher_type: cipher type being used for the encryption/decryption
  *
  * Return: None
  */
 void wma_update_set_key(uint8_t session_id, bool pairwise,
-			uint8_t key_index,
+			uint8_t key_index, const uint8_t *peer_mac,
 			enum wlan_crypto_cipher_type cipher_type);
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION

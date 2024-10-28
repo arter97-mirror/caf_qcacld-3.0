@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,6 +33,9 @@
 #include "utils_parser.h"
 #include "lim_ser_des_utils.h"
 
+#define P2P_EID_VENDOR                          0xdd
+#define P2P2_OUI                                "\x50\x6f\x9a\x28"
+#define P2P2_OUI_SIZE                            4
 void convert_ssid(struct mac_context *mac, tSirMacSSid *pOld, tDot11fIESSID *pNew)
 {
 	pOld->length = pNew->num_ssid;
@@ -159,6 +163,27 @@ QDF_STATUS convert_p2p_opaque(struct mac_context *mac,
 	pOld->addIEdata[curAddIELen++] = 0x6f;
 	pOld->addIEdata[curAddIELen++] = 0x9A;
 	pOld->addIEdata[curAddIELen++] = 0x09;
+	qdf_mem_copy(pOld->addIEdata + curAddIELen, pNew->data, pNew->num_data);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS convert_p2p2_opaque(struct mac_context *mac,
+			       tSirAddie *pOld, tDot11fIEP2P2IEOpaque *pNew)
+{
+	/*
+	 * This is awful, I know, but the old code just rammed
+	 * the IE into an opaque array. Note that we need to explicitly
+	 * add the vendorIE and OUI
+	 */
+	uint16_t curAddIELen = pOld->length;
+
+	pOld->length = curAddIELen + pNew->num_data +
+		       P2P2_OUI_SIZE + MIN_IE_LEN;
+	pOld->addIEdata[curAddIELen++] = P2P_EID_VENDOR;
+	pOld->addIEdata[curAddIELen++] = pNew->num_data + P2P2_OUI_SIZE;
+	qdf_mem_copy(pOld->addIEdata + curAddIELen, P2P2_OUI, P2P2_OUI_SIZE);
+	curAddIELen += P2P2_OUI_SIZE;
 	qdf_mem_copy(pOld->addIEdata + curAddIELen, pNew->data, pNew->num_data);
 
 	return QDF_STATUS_SUCCESS;

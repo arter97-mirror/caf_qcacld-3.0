@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -88,6 +88,8 @@ QDF_STATUS convert_wsc_opaque(struct mac_context *, tSirAddie *,
 			      tDot11fIEWscIEOpaque *);
 QDF_STATUS convert_p2p_opaque(struct mac_context *, tSirAddie *,
 			      tDot11fIEP2PIEOpaque *);
+QDF_STATUS convert_p2p2_opaque(struct mac_context *, tSirAddie *,
+			       tDot11fIEP2P2IEOpaque *);
 #ifdef WLAN_FEATURE_WFD
 QDF_STATUS convert_wfd_opaque(struct mac_context *, tSirAddie *,
 			      tDot11fIEWFDIEOpaque *);

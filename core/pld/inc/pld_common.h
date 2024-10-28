@@ -203,7 +203,6 @@ struct pld_platform_cap {
  * @PLD_FW_HANG_EVENT: firmware update hang event
  * @PLD_BUS_EVENT: update bus/link event
  * @PLD_SMMU_FAULT: SMMU fault
- * @PLD_SYS_REBOOT: system is rebooting
  */
 enum pld_uevent {
 	PLD_FW_DOWN,
@@ -212,7 +211,6 @@ enum pld_uevent {
 	PLD_FW_HANG_EVENT,
 	PLD_BUS_EVENT,
 	PLD_SMMU_FAULT,
-	PLD_SYS_REBOOT,
 };
 
 /**
@@ -1239,6 +1237,16 @@ bool pld_audio_is_direct_link_supported(struct device *dev);
  *         false on failure or if not supported
  */
 bool pld_is_audio_shared_iommu_group(struct device *dev);
+
+/**
+ * pld_is_ipa_shared_smmu_enable() - Get whether shared ctx bank is supported
+ *				     by IPA or not
+ * @dev: device
+ *
+ * Return: true if supported
+ *         false on failure or if not supported
+ */
+bool pld_is_ipa_shared_smmu_enable(struct device *dev);
 
 /**
  * pld_force_wake_request_sync() - Request to awake MHI synchronously

@@ -668,7 +668,7 @@ void dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
 	fst->cmem_ba = cmem_ba_lo;
 
 	/* Address is not NULL then address is already known during init */
-	if (dp_ctx->fst_cmem_base == 0)
+	if (dp_ctx->fst_in_cmem && dp_ctx->fst_cmem_base == 0)
 		qdf_event_set(&fst->cmem_resp_event);
 }
 

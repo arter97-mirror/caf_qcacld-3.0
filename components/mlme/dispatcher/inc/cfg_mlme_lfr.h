@@ -2266,6 +2266,29 @@
 		CFG_VALUE_OR_DEFAULT, \
 		"bss load threshold")
 
+ /*
+  * <ini>
+  * bss_load_alpha - bss load multiplier value in percentage of the current
+  * channel utilization which should be used to calculate the bss load average
+  * @Min: 0
+  * @Max: 100
+  * @Default: 70
+  *
+  * Related: None
+  *
+  * Supported Feature: Roaming
+  *
+  * Usage: External
+  *
+  * </ini>
+  */
+#define CFG_BSS_LOAD_ALPHA CFG_INI_UINT( \
+		"bss_load_alpha", \
+		0, \
+		100, \
+		70, \
+		CFG_VALUE_OR_DEFAULT, \
+		"bss load alpha")
 /*
  * <ini>
  * bss_load_sample_time - Time in milliseconds for which the bss load values
@@ -3424,6 +3447,7 @@
 	CFG(CFG_LFR_DELAY_BEFORE_VDEV_STOP) \
 	CFG(CFG_ENABLE_BSS_LOAD_TRIGGERED_ROAM) \
 	CFG(CFG_BSS_LOAD_THRESHOLD) \
+	CFG(CFG_BSS_LOAD_ALPHA) \
 	CFG(CFG_BSS_LOAD_SAMPLE_TIME) \
 	CFG(CFG_ROAM_CU_MONITOR_TIME) \
 	CFG(CFG_LFR3_ROAM_HO_DELAY_FOR_RX) \

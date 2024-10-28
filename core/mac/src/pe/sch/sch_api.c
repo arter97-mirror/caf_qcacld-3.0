@@ -52,6 +52,7 @@
 #include <wlan_cmn_ieee80211.h>
 #include <wlan_mgmt_txrx_utils_api.h>
 #include <wlan_p2p_cfg_api.h>
+#include <utils_parser.h>
 
 /* Fils Discovery Frame */
 /**
@@ -558,6 +559,34 @@ memfree:
 	return status;
 }
 
+/**
+ * lim_get_concurrent_ap_vdevid() - loop every vdev to get 2g/5g
+ * and return valid vdev id
+ * @psoc: pointer to psoc
+ * @pe_session: pe session
+ *
+ * Return: uint8_t
+ */
+static uint8_t
+lim_get_concurrent_ap_vdevid(struct mac_context *mac_ctx,
+			     struct pe_session *pe_session)
+{
+	uint8_t i;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t vdev_num;
+
+	vdev_num = policy_mgr_get_sap_mode_info(mac_ctx->psoc, freq_list,
+						vdev_id_list);
+	for (i = 0; i < vdev_num; i++) {
+		if (wlan_reg_is_24ghz_ch_freq(freq_list[i]) ||
+		    wlan_reg_is_5ghz_ch_freq(freq_list[i])) {
+			return vdev_id_list[i];
+		}
+	}
+	return INVALID_VDEV_ID;
+}
+
 QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 			       uint16_t size, struct pe_session *pe_session,
 			       enum sir_bcn_update_reason reason)
@@ -565,6 +594,8 @@ QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 	struct scheduler_msg msgQ = {0};
 	tpSendbeaconParams beaconParams = NULL;
 	QDF_STATUS retCode;
+	uint8_t vdev_id = INVALID_VDEV_ID;
+	bool is_curr_ap_6g = false;
 
 	if (LIM_IS_AP_ROLE(pe_session) &&
 	   (mac->sch.beacon_changed)) {
@@ -574,11 +605,21 @@ QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 		if (QDF_STATUS_SUCCESS != retCode)
 			pe_err("FAILED to send probe response template with retCode %d",
 				retCode);
-		/*Fils Discovery Template */
-		retCode = lim_send_fils_discovery_template(mac, pe_session);
-		if (QDF_STATUS_SUCCESS != retCode)
-			pe_err("FAILED to send fils discovery template retCode %d",
-			       retCode);
+		/* FILS discovery IE should only be included
+		 * if standalone AP operating on 6ghz
+		 * check if another AP is operating on 2/5ghz
+		 * then do not include FILS IE
+		 */
+		vdev_id = lim_get_concurrent_ap_vdevid(mac, pe_session);
+		is_curr_ap_6g = wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq);
+		if (vdev_id == INVALID_VDEV_ID && is_curr_ap_6g) {
+			/*Fils Discovery Template */
+			retCode = lim_send_fils_discovery_template(mac,
+								   pe_session);
+			if (retCode != QDF_STATUS_SUCCESS)
+				pe_err("FAILED to send fils discovery template retCode %d",
+				       retCode);
+		}
 	}
 
 	beaconParams = qdf_mem_malloc(sizeof(tSendbeaconParams));
@@ -685,6 +726,65 @@ static uint32_t lim_remove_p2p_ie_from_add_ie(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void lim_populate_prb_rsp_eht_ies_from_beacon(struct mac_context *mac,
+						     struct pe_session *session,
+						     uint8_t *prb_rsp_ie_ptr,
+						     uint16_t *prb_rsp_ie_len,
+						     uint16_t max_ie_len)
+{
+	QDF_STATUS status;
+	uint16_t cur_ie_len;
+	const uint8_t *eht_op_ptr, *eht_cap_ptr;
+
+	/* Strip EHT OP */
+	status = lim_strip_eht_op_ie(mac, prb_rsp_ie_ptr,
+				     prb_rsp_ie_len, NULL);
+	eht_op_ptr =
+		wlan_get_ext_ie_ptr_from_ext_id(EHT_OP_OUI_TYPE,
+						EHT_OP_OUI_SIZE,
+						session->pSchBeaconFrameEnd,
+						session->schBeaconOffsetEnd);
+
+	if (!eht_op_ptr)
+		return;
+
+	cur_ie_len = eht_op_ptr[TAG_LEN_POS] + MIN_IE_LEN;
+	if ((*prb_rsp_ie_len + cur_ie_len) > max_ie_len)
+		return;
+
+	qdf_mem_copy(prb_rsp_ie_ptr + *prb_rsp_ie_len, eht_op_ptr, cur_ie_len);
+	*prb_rsp_ie_len = *prb_rsp_ie_len + cur_ie_len;
+
+	/* Strip EHT CAP */
+	status = lim_strip_eht_cap_ie(mac, prb_rsp_ie_ptr,
+				      prb_rsp_ie_len, NULL);
+	eht_cap_ptr =
+		wlan_get_ext_ie_ptr_from_ext_id(EHT_CAP_OUI_TYPE,
+						EHT_CAP_OUI_SIZE,
+						session->pSchBeaconFrameEnd,
+						session->schBeaconOffsetEnd);
+	if (!eht_cap_ptr)
+		return;
+
+	cur_ie_len = eht_cap_ptr[TAG_LEN_POS] + MIN_IE_LEN;
+	if ((*prb_rsp_ie_len + cur_ie_len) > max_ie_len)
+		return;
+
+	qdf_mem_copy(prb_rsp_ie_ptr + *prb_rsp_ie_len, eht_cap_ptr, cur_ie_len);
+	*prb_rsp_ie_len = *prb_rsp_ie_len + cur_ie_len;
+}
+#else
+static inline void
+lim_populate_prb_rsp_eht_ies_from_beacon(struct mac_context *mac,
+					 struct pe_session *session,
+					 uint8_t *prb_rsp_ie_ptr,
+					 uint16_t *prb_rsp_ie_len,
+					 uint16_t max_ie_len)
+{
+}
+#endif
+
 uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 					    struct pe_session *pe_session,
 					    uint32_t *IeBitmap)
@@ -696,7 +796,8 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	uint32_t nPayload, nBytes = 0, nStatus;
 	tpSirMacMgmtHdr pMacHdr;
 	uint32_t addnIEPresent = false;
-	uint8_t *addIE = NULL;
+	uint8_t *addIE = NULL, *tpe_ie_buf, *prb_rsp_ie_ptr;
+	const uint8_t *tpe_ie_ptr, *next_tpe_ie_ptr;
 	uint8_t *addIeWoP2pIe = NULL;
 	uint32_t addnIELenWoP2pIe = 0;
 	uint32_t retStatus;
@@ -704,8 +805,10 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	bool extcap_present = false;
 	tDot11fProbeResponse *prb_rsp_frm;
 	QDF_STATUS status;
-	uint16_t addn_ielen = 0;
-	uint16_t mlo_ie_len;
+	uint16_t tpe_ie_buf_max_size, tpe_ie_buf_cons;
+	uint16_t next_tpe_offset, next_tpe_ie_len_rem;
+	uint16_t addn_ielen = 0, mlo_ie_len, cur_ie_len;
+	uint16_t prb_rsp_ie_len, prb_rsp_ie_max_len;
 
 	/* Check if probe response IE is present or not */
 	addnIEPresent = (pe_session->add_ie_params.probeRespDataLen != 0);
@@ -784,8 +887,46 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 			nStatus);
 	}
 
+	tpe_ie_buf_max_size =
+		WLAN_MAX_NUM_TPE_IE * sizeof(tDot11fIEtransmit_power_env);
+	tpe_ie_buf = qdf_mem_malloc(tpe_ie_buf_max_size);
+	if (!tpe_ie_buf) {
+		pe_err("Malloc failed for TPE IE");
+		qdf_mem_free(addIE);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	/* TPE IE */
+	next_tpe_offset = 0;
+	tpe_ie_buf_cons = 0;
+	while (tpe_ie_buf_cons < tpe_ie_buf_max_size) {
+		next_tpe_ie_ptr =
+			pe_session->pSchBeaconFrameEnd + next_tpe_offset;
+		next_tpe_ie_len_rem =
+			pe_session->schBeaconOffsetEnd - next_tpe_offset;
+		tpe_ie_ptr =
+			wlan_get_ie_ptr_from_eid(EID_TRANSMIT_POWER_ENVELOPE,
+						 next_tpe_ie_ptr,
+						 next_tpe_ie_len_rem);
+
+		if (!tpe_ie_ptr)
+			break;
+
+		cur_ie_len = tpe_ie_ptr[TAG_LEN_POS] + MIN_IE_LEN;
+		if (cur_ie_len > (tpe_ie_buf_max_size - tpe_ie_buf_cons))
+			break;
+
+		qdf_mem_copy(tpe_ie_buf + tpe_ie_buf_cons,
+			     tpe_ie_ptr, cur_ie_len);
+
+		tpe_ie_buf_cons += cur_ie_len;
+		next_tpe_offset = tpe_ie_ptr - pe_session->pSchBeaconFrameEnd +
+				  cur_ie_len;
+	}
+
 	mlo_ie_len = lim_get_frame_mlo_ie_len(pe_session);
-	nBytes += nPayload + sizeof(tSirMacMgmtHdr) + mlo_ie_len;
+	nBytes += nPayload + sizeof(tSirMacMgmtHdr) +
+		  mlo_ie_len + tpe_ie_buf_cons;
 
 	if (addnIEPresent) {
 		if ((nBytes + addn_ielen) <= SIR_MAX_PROBE_RESP_SIZE)
@@ -798,6 +939,7 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	if (nBytes > SIR_MAX_PROBE_RESP_SIZE) {
 		pe_err("nBytes %d greater than max size", nBytes);
 		qdf_mem_free(addIE);
+		qdf_mem_free(tpe_ie_buf);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -825,56 +967,88 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 			nStatus);
 
 		qdf_mem_free(addIE);
+		qdf_mem_free(tpe_ie_buf);
 		return retCode; /* allocated! */
 	} else if (DOT11F_WARNED(nStatus)) {
 		pe_warn("There were warnings while packing a P"
 			"robe Response (0x%08x)", nStatus);
 	}
 
-	if (mlo_ie_len) {
+	prb_rsp_ie_ptr = pFrame2Hal + sizeof(tSirMacMgmtHdr) +
+			 WLAN_PROBE_RESP_IES_OFFSET;
+	prb_rsp_ie_len = nPayload - WLAN_PROBE_RESP_IES_OFFSET;
+	prb_rsp_ie_max_len = nBytes - sizeof(tSirMacMgmtHdr) -
+			     WLAN_PROBE_RESP_IES_OFFSET;
+
+	if (lim_is_session_eht_capable(pe_session)) {
+		lim_populate_prb_rsp_eht_ies_from_beacon(mac, pe_session,
+							 prb_rsp_ie_ptr,
+							 &prb_rsp_ie_len,
+							 prb_rsp_ie_max_len);
+	}
+
+	if (mlo_ie_len &&
+	    ((prb_rsp_ie_len + mlo_ie_len) <= prb_rsp_ie_max_len)) {
 		status = lim_fill_complete_mlo_ie(pe_session, mlo_ie_len,
-					 pFrame2Hal + sizeof(tSirMacMgmtHdr) +
-					      nPayload);
+						  prb_rsp_ie_ptr + prb_rsp_ie_len);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_debug("assemble ml ie error");
 			mlo_ie_len = 0;
 		}
-		nPayload += mlo_ie_len;
+		prb_rsp_ie_len += mlo_ie_len;
 	}
 
-	if (addnIEPresent) {
-		qdf_mem_copy(&pFrame2Hal[nBytes - addn_ielen],
+	if (tpe_ie_buf_cons &&
+	    ((prb_rsp_ie_len + tpe_ie_buf_cons) <= prb_rsp_ie_max_len)) {
+		qdf_mem_copy(prb_rsp_ie_ptr + prb_rsp_ie_len,
+			     tpe_ie_buf, tpe_ie_buf_cons);
+		prb_rsp_ie_len += tpe_ie_buf_cons;
+	}
+
+	qdf_mem_free(tpe_ie_buf);
+
+	if (addnIEPresent &&
+	    ((prb_rsp_ie_len + addn_ielen) <= prb_rsp_ie_max_len)) {
+		qdf_mem_copy(prb_rsp_ie_ptr + prb_rsp_ie_len,
 			     &addIE[0], addn_ielen);
+		prb_rsp_ie_len += addn_ielen;
 	}
 
 	qdf_mem_free(addIE);
 
+	lim_reorder_vendor_ies(mac, prb_rsp_ie_ptr, prb_rsp_ie_len);
+
+	nBytes = sizeof(tSirMacMgmtHdr) + WLAN_PROBE_RESP_IES_OFFSET +
+		 prb_rsp_ie_len;
+
 	pprobeRespParams = qdf_mem_malloc(sizeof(tSendProbeRespParams));
 	if (!pprobeRespParams) {
 		pe_err("malloc failed for bytes %d", nBytes);
-	} else {
-		sir_copy_mac_addr(pprobeRespParams->bssId, pe_session->bssId);
-		qdf_mem_copy(pprobeRespParams->probeRespTemplate,
-			     pFrame2Hal, nBytes);
-		pprobeRespParams->probeRespTemplateLen = nBytes;
-		qdf_mem_copy(pprobeRespParams->ucProxyProbeReqValidIEBmap,
-			     IeBitmap, (sizeof(uint32_t) * 8));
-		if (pe_session->opmode == QDF_P2P_GO_MODE &&
-		    cfg_p2p_is_go_ignore_non_p2p_probe_req(mac->psoc)) {
-			pe_debug("GO ignore non-P2P probe req");
-			pprobeRespParams->go_ignore_non_p2p_probe_req = true;
-		}
+		return retCode;
+	}
 
-		msgQ.type = WMA_SEND_PROBE_RSP_TMPL;
-		msgQ.reserved = 0;
-		msgQ.bodyptr = pprobeRespParams;
-		msgQ.bodyval = 0;
+	sir_copy_mac_addr(pprobeRespParams->bssId, pe_session->bssId);
+	qdf_mem_copy(pprobeRespParams->probeRespTemplate,
+		     pFrame2Hal, nBytes);
+	pprobeRespParams->probeRespTemplateLen = nBytes;
 
-		retCode = wma_post_ctrl_msg(mac, &msgQ);
-		if (QDF_STATUS_SUCCESS != retCode) {
-			pe_err("FAIL bytes %d retcode[%X]", nBytes, retCode);
-			qdf_mem_free(pprobeRespParams);
-		}
+	qdf_mem_copy(pprobeRespParams->ucProxyProbeReqValidIEBmap,
+		     IeBitmap, (sizeof(uint32_t) * 8));
+	if (pe_session->opmode == QDF_P2P_GO_MODE &&
+	    cfg_p2p_is_go_ignore_non_p2p_probe_req(mac->psoc)) {
+		pe_debug("GO ignore non-P2P probe req");
+		pprobeRespParams->go_ignore_non_p2p_probe_req = true;
+	}
+
+	msgQ.type = WMA_SEND_PROBE_RSP_TMPL;
+	msgQ.reserved = 0;
+	msgQ.bodyptr = pprobeRespParams;
+	msgQ.bodyval = 0;
+
+	retCode = wma_post_ctrl_msg(mac, &msgQ);
+	if (QDF_STATUS_SUCCESS != retCode) {
+		pe_err("FAIL bytes %d retcode[%X]", nBytes, retCode);
+		qdf_mem_free(pprobeRespParams);
 	}
 
 	return retCode;

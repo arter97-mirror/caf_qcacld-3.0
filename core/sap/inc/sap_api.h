@@ -998,7 +998,9 @@ QDF_STATUS wlansap_deauth_sta(struct sap_context *sap_ctx,
  */
 QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 					       uint32_t target_chan_freq,
+					       uint32_t ccfs1,
 					       enum phy_ch_width target_bw,
+					       uint32_t punct_bitmap,
 					       bool strict);
 
 

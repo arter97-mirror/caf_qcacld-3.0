@@ -131,11 +131,28 @@ wlan_dp_resource_mgr_post_upscale_resource_req(
 
 static void
 wlan_dp_resource_mgr_post_downscale_resource_req(
-				struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
+				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
+				bool delay_req)
 {
 	ol_txrx_soc_handle cdp_soc = rsrc_ctx->dp_ctx->cdp_soc;
 	struct dp_rx_refill_thread *refill_thread;
 	struct dp_txrx_handle *dp_ext_hdl;
+
+	/*
+	 * Refill thread got de-inited first due to dp cleanup
+	 * so, downscale request can be skipped.
+	 */
+	if (rsrc_ctx->refill_thread_deinit) {
+		dp_info("Downscale not required as refill de-init done");
+		return;
+	}
+
+	if (delay_req) {
+		dp_rsrc_mgr_debug("DP rsrc mgr downscale req dealyed to timer ctx");
+		qdf_timer_mod(&rsrc_ctx->timer,
+			      DP_RSRC_MGR_TIMER_MS);
+		return;
+	}
 
 	dp_rsrc_mgr_debug("Posting Downscale resource");
 	dp_ext_hdl = cdp_soc_get_dp_txrx_handle(cdp_soc);
@@ -149,6 +166,40 @@ wlan_dp_resource_mgr_post_downscale_resource_req(
 		    &refill_thread->event_flag);
 	qdf_set_bit(RX_REFILL_POST_EVENT, &refill_thread->event_flag);
 	qdf_wake_up_interruptible(&refill_thread->wait_q);
+}
+
+static void
+wlan_dp_resource_mgr_timer_handler(void *arg)
+{
+	struct wlan_dp_resource_mgr_ctx *rsrc_ctx =
+		(struct wlan_dp_resource_mgr_ctx *)arg;
+	struct cdp_soc_t *cdp_soc = rsrc_ctx->dp_ctx->cdp_soc;
+	enum wlan_dp_resource_level rsrc_level;
+	uint64_t cur_req_rx_buff_descs;
+	uint64_t req_rx_buff_descs;
+	uint64_t in_use_rx_buff_descs;
+	QDF_STATUS status;
+
+	dp_rsrc_mgr_debug("DP rsrc mgr timer handler scheduled");
+	status = cdp_get_num_buff_descs_info(cdp_soc,
+					     &cur_req_rx_buff_descs,
+					     &in_use_rx_buff_descs, 0);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Unable to fetch DP rx desc info");
+		return;
+	}
+
+	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
+	rsrc_level = rsrc_ctx->cur_resource_level;
+	req_rx_buff_descs = rsrc_ctx->cur_rsrc_map[rsrc_level].num_rx_buffers;
+
+	if (cur_req_rx_buff_descs > req_rx_buff_descs) {
+		dp_info("Downscale required cur_rx_buf:%u to req_rx_buf:%u",
+			cur_req_rx_buff_descs, req_rx_buff_descs);
+		wlan_dp_resource_mgr_post_downscale_resource_req(rsrc_ctx,
+								 false);
+	}
+	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
 }
 
 void wlan_dp_resource_mgr_downscale_resources(void)
@@ -180,7 +231,7 @@ void wlan_dp_resource_mgr_downscale_resources(void)
 			  rsrc_level, cur_req_rx_buff_descs,
 			  in_use_rx_buff_descs, req_rx_buff_descs);
 
-	if (cur_req_rx_buff_descs != req_rx_buff_descs) {
+	if (cur_req_rx_buff_descs > req_rx_buff_descs) {
 		dp_info("Downscaling cur_rx_buf:%u to req_rx_buf:%u",
 			cur_req_rx_buff_descs, req_rx_buff_descs);
 		status = cdp_set_req_buff_descs(cdp_soc, req_rx_buff_descs, 0);
@@ -510,7 +561,8 @@ wlan_dp_resource_mgr_select_resource_level(
 	if (prev_level < rsrc_ctx->cur_resource_level)
 		wlan_dp_resource_mgr_post_upscale_resource_req(rsrc_ctx);
 	else if (prev_level > rsrc_ctx->cur_resource_level)
-		wlan_dp_resource_mgr_post_downscale_resource_req(rsrc_ctx);
+		wlan_dp_resource_mgr_post_downscale_resource_req(rsrc_ctx,
+								 true);
 	else
 		dp_info("Resource level change not required");
 
@@ -747,209 +799,6 @@ select_max_phymodes:
 	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
 }
 
-static struct wlan_dp_resource_vote_node*
-wlan_dp_resource_mgr_find_ml_vote_node(qdf_list_t *mac_n_list,
-				       uint8_t *self_mac, uint8_t *remote_mac)
-{
-	struct wlan_dp_resource_vote_node *vote_node_cur;
-	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
-	QDF_STATUS status;
-
-	status = qdf_list_peek_front(mac_n_list, &cur_node);
-	while (QDF_IS_STATUS_SUCCESS(status)) {
-		vote_node_cur = qdf_container_of(cur_node,
-				struct wlan_dp_resource_vote_node, node);
-
-		if ((qdf_mem_cmp(self_mac, &vote_node_cur->self_mac,
-			       QDF_MAC_ADDR_SIZE) == 0) &&
-		   (qdf_mem_cmp(remote_mac, &vote_node_cur->remote_mac,
-			       QDF_MAC_ADDR_SIZE) == 0)) {
-			return vote_node_cur;
-		}
-
-		status = qdf_list_peek_next(mac_n_list, cur_node, &next_node);
-		cur_node = next_node;
-		next_node = NULL;
-	}
-
-	return NULL;
-}
-
-static void
-wlan_dp_resource_mgr_handle_ml_sta_phymode_update(
-				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
-				struct wlan_objmgr_peer *peer)
-{
-	qdf_list_t *mac_n_list = &rsrc_ctx->mac_n_list;
-	struct wlan_dp_resource_vote_node *vote_node;
-	struct wlan_dp_resource_ml_vote_info *ml_vote_info = NULL;
-	uint8_t *self_mac =
-		wlan_vdev_mlme_get_macaddr(wlan_peer_get_vdev(peer));
-	uint8_t *remote_mac = wlan_peer_get_macaddr(peer);
-	enum wlan_phymode phymode;
-	struct mlo_link_info *link_info;
-	uint8_t link_info_iter;
-
-	/*vote is based on connected BSS peer*/
-	if (wlan_peer_get_peer_type(peer) != WLAN_PEER_AP)
-		return;
-
-	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
-	/*Vote node is part of list, update existing phymode*/
-	vote_node = wlan_dp_resource_mgr_find_ml_vote_node(mac_n_list, self_mac,
-							   remote_mac);
-	if (vote_node) {
-		/*Increment refcount only for first time set phymode*/
-		if (vote_node->vdev_id == WLAN_INVALID_VDEV_ID) {
-			qdf_atomic_inc(&vote_node->ml_vote_info->ref_cnt);
-			vote_node->vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
-			dp_info("Partner link assoc ref_cnt:%u",
-				qdf_atomic_read(&vote_node->ml_vote_info->ref_cnt));
-		}
-
-		phymode = wlan_peer_get_phymode(peer);
-		if (vote_node->phymode == phymode) {
-			qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
-			return;
-		}
-		vote_node->phymode = phymode;
-		vote_node->tput =
-			wlan_dp_resource_mgr_phymode_to_tput(phymode);
-
-		/*
-		 * Removing from the sorted list, since phymode changed.
-		 * Adding to list in based on new phymode throughput value.
-		 */
-		qdf_list_remove_node(mac_n_list, &vote_node->node);
-		wlan_dp_resource_mgr_list_insert_vote_node(mac_n_list,
-							   vote_node,
-							   QDF_STA_MODE);
-		goto select_max_phymodes;
-	}
-
-	/*
-	 * vote node is not part of list, first link assoc happening
-	 * fetch partner links and add vote nodes for all the links.
-	 */
-	link_info = mlo_mgr_get_ap_link(wlan_peer_get_vdev(peer));
-	if (!link_info) {
-		qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
-		dp_err("Resource mgr not able to get STA ML link info");
-		return;
-	}
-
-	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
-	     link_info_iter++) {
-		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
-			break;
-
-		vote_node = qdf_mem_malloc(sizeof(*vote_node));
-		if (!vote_node) {
-			dp_err("Failed to allocate memory for resource vote node");
-			break;
-		}
-
-		/*Allocate common STA ML info*/
-		if (!ml_vote_info) {
-			ml_vote_info = qdf_mem_malloc(sizeof(struct wlan_dp_resource_ml_vote_info));
-			if (!ml_vote_info) {
-				qdf_mem_free(vote_node);
-				dp_err("Failed to allocate memory for resource vote node");
-					break;
-			}
-		}
-
-		ml_vote_info->num_links++;
-		vote_node->ml_vote_info = ml_vote_info;
-		vote_node->phymode = link_info->link_chan_info->ch_phymode;
-		vote_node->tput = wlan_dp_resource_mgr_phymode_to_tput(vote_node->phymode);
-		vote_node->mac_id = UNKNOWN_MAC_ID;
-		vote_node->vdev_id = WLAN_INVALID_VDEV_ID;
-		qdf_copy_macaddr(&vote_node->self_mac, &link_info->link_addr);
-		qdf_copy_macaddr(&vote_node->remote_mac, &link_info->ap_link_addr);
-		if((qdf_mem_cmp(self_mac, &vote_node->self_mac,
-				QDF_MAC_ADDR_SIZE) == 0) &&
-				(qdf_mem_cmp(remote_mac, &vote_node->remote_mac,
-				QDF_MAC_ADDR_SIZE) == 0)) {
-			/*Main assoc link vote node ref count*/
-			vote_node->vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
-			qdf_atomic_inc(&ml_vote_info->ref_cnt);
-			dp_rsrc_mgr_debug("Main assoc link node added ref_cnt:%u", qdf_atomic_read(&ml_vote_info->ref_cnt));
-		}
-
-		wlan_dp_resource_mgr_list_insert_vote_node(mac_n_list,
-							   vote_node,
-							   QDF_STA_MODE);
-		link_info++;
-	}
-
-	dp_info("ML STA vote nodes added num_links:%u", link_info_iter);
-	if (!ml_vote_info) {
-		qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
-		dp_err("Resource mgr ML STA links not added");
-		return;
-	}
-
-select_max_phymodes:
-	wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);
-	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
-}
-
-static void
-wlan_dp_resource_mgr_handle_ml_sta_remove_phymode(
-				struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
-				struct wlan_objmgr_peer *peer)
-{
-	qdf_list_t *mac_n_list = &rsrc_ctx->mac_n_list;
-	struct wlan_dp_resource_ml_vote_info *ml_vote_info = NULL;
-	uint8_t *self_mac =
-		wlan_vdev_mlme_get_macaddr(wlan_peer_get_vdev(peer));
-	uint8_t *remote_mac = wlan_peer_get_macaddr(peer);
-	struct wlan_dp_resource_vote_node *vote_node_cur;
-	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
-	QDF_STATUS status;
-
-	dp_rsrc_mgr_debug("ML STA remove phymode called");
-	vote_node_cur = wlan_dp_resource_mgr_find_ml_vote_node(mac_n_list, self_mac,
-							       remote_mac);
-	if (!vote_node_cur) {
-		dp_rsrc_mgr_debug("ML STA vote node not present to remove");
-		return;
-	}
-	ml_vote_info = vote_node_cur->ml_vote_info;
-
-	if (vote_node_cur->vdev_id == WLAN_INVALID_VDEV_ID)
-		return;
-	vote_node_cur->vdev_id = WLAN_INVALID_VDEV_ID;
-	/*ML STA peer delete as part of link switch*/
-	if (!qdf_atomic_dec_and_test(&ml_vote_info->ref_cnt))
-		return;
-
-	/*ML STA disconnection, remove all link vote nodes*/
-	status = qdf_list_peek_front(mac_n_list, &cur_node);
-	while (QDF_IS_STATUS_SUCCESS(status)) {
-		vote_node_cur = qdf_container_of(cur_node,
-						 struct wlan_dp_resource_vote_node, node);
-
-		status = qdf_list_peek_next(mac_n_list, cur_node, &next_node);
-		if(vote_node_cur->ml_vote_info == ml_vote_info) {
-			qdf_list_remove_node(mac_n_list, &vote_node_cur->node);
-			qdf_mem_free(vote_node_cur);
-			ml_vote_info->num_links--;
-
-		}
-
-		cur_node = next_node;
-		next_node = NULL;
-	}
-
-	if (ml_vote_info->num_links)
-		dp_err("DP resource mgr ML link vote nodes are not in sync");
-	qdf_mem_free(ml_vote_info);
-
-	wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);
-}
-
 static void
 wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 {
@@ -972,10 +821,6 @@ wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 	/*NAN peers handled by NDP events*/
 	if (opmode == QDF_NDI_MODE)
 		return;
-
-	if ((opmode == QDF_STA_MODE) && wlan_peer_is_mlo(peer))
-		return wlan_dp_resource_mgr_handle_ml_sta_phymode_update(
-							rsrc_ctx, peer);
 
 	if ((opmode == QDF_SAP_MODE) || (opmode == QDF_P2P_GO_MODE)) {
 		/*
@@ -1088,9 +933,7 @@ wlan_dp_resource_mgr_vote_node_free(struct wlan_objmgr_peer *peer)
 		qdf_mem_free(vote_node);
 		priv_ctx->vote_node = NULL;
 		wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);
-	} else if (opmode == QDF_STA_MODE)
-		wlan_dp_resource_mgr_handle_ml_sta_remove_phymode(rsrc_ctx,
-								  peer);
+	}
 
 	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
 }
@@ -1111,10 +954,7 @@ void wlan_dp_resource_mgr_notify_vdev_mac_id_migration(
 		return;
 
 	dp_rsrc_mgr_debug("vdev migration came for opmode:%u", opmode);
-	/*ML-STA connections are mac_n_list no handling required*/
-	if (((opmode == QDF_STA_MODE) &&
-	    wlan_vdev_mlme_is_mlo_vdev(vdev)) ||
-			(opmode == QDF_NDI_MODE))
+	if (opmode == QDF_NDI_MODE)
 		return;
 
 	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
@@ -1174,6 +1014,27 @@ wlan_dp_resource_mgr_list_detach(struct wlan_dp_resource_mgr_ctx *rsrc_ctx)
 	qdf_list_destroy(&rsrc_ctx->nan_list);
 	for (i = 0; i < MAX_MAC_RESOURCES; i++)
 		qdf_list_destroy(&rsrc_ctx->mac_list[i]);
+}
+
+void
+wlan_dp_resource_mgr_notify_refill_thread_deinit(void)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct wlan_dp_resource_mgr_ctx *rsrc_ctx;
+
+	dp_ctx =  dp_get_context();
+	if (!dp_ctx) {
+		dp_err("DP context is NULL");
+		return;
+	}
+
+	rsrc_ctx = dp_ctx->rsrc_mgr_ctx;
+	if (!rsrc_ctx)
+		return;
+
+	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
+	rsrc_ctx->refill_thread_deinit = true;
+	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
 }
 
 void
@@ -1304,6 +1165,10 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	rsrc_ctx->mac_count = MAX_MAC_RESOURCES;
 
+	qdf_timer_init(NULL, &rsrc_ctx->timer,
+		       wlan_dp_resource_mgr_timer_handler,
+		       rsrc_ctx, QDF_TIMER_TYPE_SW);
+
 	rsrc_ctx->dp_ctx = dp_ctx;
 	dp_ctx->rsrc_mgr_ctx = rsrc_ctx;
 
@@ -1333,6 +1198,10 @@ void wlan_dp_resource_mgr_detach(struct wlan_dp_psoc_context *dp_ctx)
 			return;
 		}
 
+		/*Remove timer before it expires*/
+		qdf_timer_stop(&dp_ctx->rsrc_mgr_ctx->timer);
+		/*wait for timer which started execution*/
+		qdf_timer_free(&dp_ctx->rsrc_mgr_ctx->timer);
 		wlan_dp_resource_mgr_list_detach(dp_ctx->rsrc_mgr_ctx);
 		qdf_spinlock_destroy(&dp_ctx->rsrc_mgr_ctx->rsrc_mgr_lock);
 		qdf_mem_free(dp_ctx->rsrc_mgr_ctx);

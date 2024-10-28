@@ -203,7 +203,6 @@ dp_fisa_update_flow_balance_stats(struct dp_fisa_rx_sw_ft *fisa_flow,
 	if (!wlan_dp_fb_enabled(dp_ctx))
 		return;
 
-	fisa_flow->num_pkts++;
 	fisa_flow->last_pkt_rcvd_time = qdf_sched_clock();
 }
 
@@ -2523,7 +2522,6 @@ static inline void
 wlan_dp_fisa_nbuf_mark_flow_info(struct dp_fisa_rx_sw_ft *fisa_flow,
 				 qdf_nbuf_t nbuf)
 {
-	fisa_flow->num_pkts++;
 	QDF_NBUF_CB_EXT_RX_FLOW_ID(nbuf) = fisa_flow->flow_id;
 	QDF_NBUF_CB_RX_FLOW_METADATA(nbuf) = fisa_flow->metadata;
 	if (fisa_flow->track_flow_stats)
@@ -2541,6 +2539,8 @@ static bool dp_runtime_fisa_aggr_disabled_for_vdev(struct dp_vdev *vdev,
 			dp_intf->fisa_force_flushed[rx_ctx_id] = 0;
 		return false;
 	}
+
+	dp_rx_fisa_release_ft_lock(dp_intf->dp_ctx->rx_fst, rx_ctx_id);
 
 	if (qdf_unlikely(!dp_intf->fisa_force_flushed[rx_ctx_id])) {
 		dp_rx_fisa_flush_by_intf_ctx_id(dp_intf, rx_ctx_id);
@@ -2611,6 +2611,7 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		fisa_flow = dp_rx_get_fisa_flow(dp_fisa_rx_hdl, vdev,
 						head_nbuf);
 		if (fisa_flow) {
+			fisa_flow->num_pkts++;
 			wlan_dp_fisa_nbuf_mark_flow_info(fisa_flow, head_nbuf);
 			dp_fisa_update_flow_balance_stats(fisa_flow, dp_ctx);
 		}
@@ -2624,7 +2625,7 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		}
 
 		if (dp_runtime_fisa_aggr_disabled_for_vdev(vdev, rx_ctx_id)) {
-			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
+			/* fst lock released when true returned */
 			goto pull_nbuf;
 		}
 

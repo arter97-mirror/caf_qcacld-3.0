@@ -336,9 +336,10 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 			if (!mlo_vdev)
 				continue;
 
-			tdls_vdev =
-			       wlan_objmgr_vdev_get_comp_private_obj(mlo_vdev,
-							   WLAN_UMAC_COMP_TDLS);
+			tdls_vdev = wlan_vdev_get_tdls_vdev_obj(mlo_vdev);
+			if (!tdls_vdev)
+				continue;
+
 			tdls_vdev->discovery_sent_cnt = 0;
 			if (QDF_TIMER_STATE_RUNNING ==
 			    qdf_mc_timer_get_current_state(
@@ -351,56 +352,59 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 		tdls_debug("peer is legacy device, timer_cnt %d",
 			   qdf_atomic_read(&tdls_soc->timer_cnt));
 
-		status = QDF_STATUS_E_INVAL;
-	} else {
-		tdls_debug("peer is mlo device, timer_cnt %d",
-			   qdf_atomic_read(&tdls_soc->timer_cnt));
+		return QDF_STATUS_E_INVAL;
+	}
+	tdls_debug("peer is mlo device, timer_cnt %d",
+		   qdf_atomic_read(&tdls_soc->timer_cnt));
 
-		/* If peer is MLD, it uses ml mac address to send the
-		 * disconvery response, it needs to find out the
-		 * corresponding vdev per the bssid in link identifier ie.
-		 */
-		tdls_vdev = tdls_get_correct_vdev(tdls_vdev, rx_mgmt);
-		status = QDF_STATUS_TDLS_MLO_SYNC;
-		if (!tdls_vdev || tdls_vdev->rx_mgmt) {
-			tdls_err("rx dup tdls discovery resp on same vdev");
-			goto exit;
-		}
-
-		if (qdf_atomic_read(&tdls_soc->timer_cnt) == 1)
-			waitmore = tdls_check_wait_more(vdev);
-
-		if (waitmore) {
-			/* do not stop the timer */
-			tdls_debug("vdev:%d wait further for tdls response",
-				   wlan_vdev_get_id(vdev));
-		} else {
-			tdls_vdev->discovery_sent_cnt = 0;
-			qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
-			qdf_atomic_dec(&tdls_soc->timer_cnt);
-		}
-
-		tdls_vdev->rx_mgmt = qdf_mem_malloc_atomic(sizeof(*rx_mgmt) +
-							   rx_mgmt->frame_len);
-		if (tdls_vdev->rx_mgmt) {
-			tdls_vdev->rx_mgmt->frame_len = rx_mgmt->frame_len;
-			tdls_vdev->rx_mgmt->rx_freq = rx_mgmt->rx_freq;
-			tdls_vdev->rx_mgmt->vdev_id = rx_mgmt->vdev_id;
-			tdls_vdev->rx_mgmt->frm_type = rx_mgmt->frm_type;
-			tdls_vdev->rx_mgmt->rx_rssi = rx_mgmt->rx_rssi;
-			qdf_mem_copy(tdls_vdev->rx_mgmt->buf,
-				     rx_mgmt->buf, rx_mgmt->frame_len);
-		} else {
-			tdls_err("alloc rx mgmt buf error");
-		}
-
-		if (qdf_atomic_read(&tdls_soc->timer_cnt) == 0) {
-			tdls_process_mlo_cal_tdls_link_score(vdev);
-			status = QDF_STATUS_SUCCESS;
-		}
+	/*
+	 * If peer is MLD, it uses ml mac address to send the
+	 * discovery response, it needs to find out the
+	 * corresponding vdev per the bssid in link identifier ie.
+	 */
+	tdls_vdev = tdls_get_correct_vdev(tdls_vdev, rx_mgmt);
+	status = QDF_STATUS_TDLS_MLO_SYNC;
+	if (!tdls_vdev || tdls_vdev->rx_mgmt) {
+		tdls_err("rx dup tdls discovery resp on same vdev:%d",
+			 wlan_vdev_get_id(tdls_vdev->vdev));
+		return status;
 	}
 
-exit:
+	if (qdf_atomic_read(&tdls_soc->timer_cnt) == 1)
+		waitmore = tdls_check_wait_more(vdev);
+
+	if (waitmore) {
+		/* do not stop the timer */
+		tdls_debug("vdev:%d wait further for tdls response",
+			   wlan_vdev_get_id(vdev));
+	} else {
+		tdls_vdev->discovery_sent_cnt = 0;
+		qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
+		qdf_atomic_dec(&tdls_soc->timer_cnt);
+	}
+
+	if (tdls_vdev->rx_mgmt) {
+		qdf_mem_free(tdls_vdev->rx_mgmt);
+		tdls_vdev->rx_mgmt = NULL;
+	}
+
+	tdls_vdev->rx_mgmt = qdf_mem_malloc_atomic(sizeof(*rx_mgmt) +
+						   rx_mgmt->frame_len);
+	if (tdls_vdev->rx_mgmt) {
+		tdls_vdev->rx_mgmt->frame_len = rx_mgmt->frame_len;
+		tdls_vdev->rx_mgmt->rx_freq = rx_mgmt->rx_freq;
+		tdls_vdev->rx_mgmt->vdev_id = rx_mgmt->vdev_id;
+		tdls_vdev->rx_mgmt->frm_type = rx_mgmt->frm_type;
+		tdls_vdev->rx_mgmt->rx_rssi = rx_mgmt->rx_rssi;
+		qdf_mem_copy(tdls_vdev->rx_mgmt->buf,
+			     rx_mgmt->buf, rx_mgmt->frame_len);
+	}
+
+	if (qdf_atomic_read(&tdls_soc->timer_cnt) == 0) {
+		tdls_process_mlo_cal_tdls_link_score(vdev);
+		status = QDF_STATUS_SUCCESS;
+	}
+
 	return status;
 }
 #else
@@ -513,7 +517,7 @@ static QDF_STATUS tdls_process_rx_mgmt(
 					return QDF_STATUS_E_EXISTS;
 				rx_mgmt = tdls_vdev->rx_mgmt;
 				tdls_vdev_select = true;
-				tdls_debug("choice vdev %d as tdls vdev",
+				tdls_debug("choose vdev %d as tdls vdev",
 					   wlan_vdev_get_id(vdev));
 			} else {
 				tdls_vdev = tdls_get_correct_vdev(tdls_vdev,
@@ -522,24 +526,21 @@ static QDF_STATUS tdls_process_rx_mgmt(
 					return QDF_STATUS_SUCCESS;
 				vdev = tdls_vdev->vdev;
 			}
-		} else {
-			if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-				tdls_link_vdev =
-					      tdls_mlo_get_tdls_link_vdev(vdev);
-				tdls_vdev =
-				      tdls_get_correct_vdev(tdls_vdev, rx_mgmt);
-				if (!tdls_link_vdev || !tdls_vdev) {
-					tdls_debug("not expected frame");
-					return QDF_STATUS_SUCCESS;
-				}
-				if (tdls_link_vdev != tdls_vdev->vdev) {
-					tdls_debug("not forward to userspace");
-					return QDF_STATUS_SUCCESS;
-				}
-				rx_mgmt->vdev_id =
-					       wlan_vdev_get_id(tdls_link_vdev);
-				vdev = tdls_link_vdev;
+		} else if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+			tdls_link_vdev = tdls_mlo_get_tdls_link_vdev(vdev);
+			tdls_vdev = tdls_get_correct_vdev(tdls_vdev, rx_mgmt);
+			if (!tdls_link_vdev || !tdls_vdev) {
+				tdls_debug("not expected frame");
+				return QDF_STATUS_SUCCESS;
 			}
+
+			if (tdls_link_vdev != tdls_vdev->vdev) {
+				tdls_debug("not forward to userspace");
+				return QDF_STATUS_SUCCESS;
+			}
+
+			rx_mgmt->vdev_id = wlan_vdev_get_id(tdls_link_vdev);
+				vdev = tdls_link_vdev;
 		}
 
 		/* this is mld mac address for mlo case*/
