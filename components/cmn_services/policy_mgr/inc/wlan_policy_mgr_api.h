@@ -3514,6 +3514,24 @@ policy_mgr_are_3_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t freq_3);
 
 /**
+ * policy_mgr_get_conc_freq_if_ml_sta_in_smm() - Function to get concurrent
+ * frequency for SAP if ML STA is in SMM
+ * @psoc: Pointer to psoc
+ * @sap_ch_freq: User given SAP channel frequency
+ * @ml_sta1_freq: ML STA link 1 frequency
+ * @ml_sta2_freq: ML STA link2 freq
+ *
+ * Return: Interference freq for given SAP channel
+ */
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+qdf_freq_t
+policy_mgr_get_conc_freq_if_ml_sta_in_smm(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t sap_ch_freq,
+					  qdf_freq_t ml_sta1_freq,
+					  qdf_freq_t ml_sta2_freq);
+#endif
+
+/**
  * policy_mgr_allow_4th_new_freq() - Function to check whether 4th freq can
  * be allowed with existing 3 vifs
  * @psoc: Pointer to Psoc

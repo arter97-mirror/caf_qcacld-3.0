@@ -1390,7 +1390,7 @@ policy_mgr_allow_4more_new_freq(struct wlan_objmgr_psoc *psoc,
 			continue;
 
 		if (policy_mgr_is_current_hwmode_sbs(psoc))
-			mcc = policy_mgr_2_freq_same_mac_in_sbs(pm_ctx,
+			mcc = policy_mgr_2_freq_same_mac_in_sbs(psoc,
 								ch_freq,
 								conn_freq);
 		else
@@ -3441,7 +3441,7 @@ static void policy_mgr_get_index_for_3_given_freq_sbs(
 	 * if freq1 on freq2 same mac, get the 5 / 6 GHZ freq from it check
 	 * and determine shared mac.
 	 */
-	if (policy_mgr_2_freq_same_mac_in_sbs(pm_ctx, freq1, freq2)) {
+	if (policy_mgr_2_freq_same_mac_in_sbs(pm_ctx->psoc, freq1, freq2)) {
 		/*
 		 * If freq1 is 2.4 GHZ that mean freq2 is 5 / 6 GHZ.
 		 * so take decision using freq2.
@@ -3451,7 +3451,8 @@ static void policy_mgr_get_index_for_3_given_freq_sbs(
 		else
 			/* freq1 5 / 6 GHZ, use freq1 */
 			shared_5_ghz_freq = freq1;
-	} else if (policy_mgr_2_freq_same_mac_in_sbs(pm_ctx, freq2, freq3)) {
+	} else if (policy_mgr_2_freq_same_mac_in_sbs(pm_ctx->psoc, freq2,
+						     freq3)) {
 		/*
 		 * If freq2 is 2.4 GHZ that mean freq3 is 5 / 6 GHZ.
 		 * so take decision using freq3.
@@ -3461,7 +3462,8 @@ static void policy_mgr_get_index_for_3_given_freq_sbs(
 		else
 			/* freq2 5 / 6 GHZ, use freq1 */
 			shared_5_ghz_freq = freq2;
-	} else if (policy_mgr_2_freq_same_mac_in_sbs(pm_ctx, freq3, freq1)) {
+	} else if (policy_mgr_2_freq_same_mac_in_sbs(pm_ctx->psoc,
+						     freq3, freq1)) {
 		/*
 		 * If freq1 is 2.4 GHZ that mean freq3 is 5 / 6 GHZ.
 		 * so take decision using freq3.
@@ -3767,7 +3769,7 @@ static void policy_mgr_get_index_for_ml_sta_sap_sbs(
 		 * which SAP freq is sharing mac and select index accordingly
 		 */
 		if (policy_mgr_2_freq_same_mac_in_sbs(
-						pm_ctx, sap_freq,
+						pm_ctx->psoc, sap_freq,
 						sta_freq_list[ml_sta_idx[0]])) {
 			/*
 			 * SAP is sharig mac with link ml_sta_idx[0], so check
@@ -3817,7 +3819,8 @@ static void policy_mgr_get_index_for_ml_sta_sap_sbs(
 		 * high Band.
 		 */
 		if (policy_mgr_2_freq_same_mac_in_sbs(
-					pm_ctx, sta_freq_list[ml_sta_idx[0]],
+					pm_ctx->psoc,
+					sta_freq_list[ml_sta_idx[0]],
 					sta_freq_list[ml_sta_idx[1]])) {
 			if (sap_freq < sbs_cut_off_freq)
 				*index = PM_STA_24_STA_5_HIGH_MCC_SAP_5_LOW_SBS;
@@ -3849,7 +3852,7 @@ static void policy_mgr_get_index_for_ml_sta_sap_sbs(
 	 * low 5 GHZ frequency or high 5 GHZ frequency based on sap frequency
 	 */
 	if (policy_mgr_2_freq_same_mac_in_sbs(
-				pm_ctx, sta_freq_list[ml_sta_idx[0]],
+				pm_ctx->psoc, sta_freq_list[ml_sta_idx[0]],
 				sta_freq_list[ml_sta_idx[1]])) {
 		if (sap_freq < sbs_cut_off_freq)
 			*index = PM_STA_STA_5_HIGH_MCC_SAP_5_LOW_SBS;
