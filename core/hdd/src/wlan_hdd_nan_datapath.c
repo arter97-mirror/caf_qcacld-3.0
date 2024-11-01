@@ -796,6 +796,18 @@ int hdd_ndi_open(const char *iface_name, bool is_add_virtual_iface)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0) || \
 (defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+static void hdd_ndi_configure_ml_params(struct hdd_adapter *adapter)
+{
+	adapter->mlo_adapter_info.is_ml_adapter = false;
+}
+#else
+static void hdd_ndi_configure_ml_params(struct hdd_adapter *adapter)
+{
+}
+#endif
+
 int hdd_ndi_set_mode(const char *iface_name)
 {
 	struct hdd_adapter *adapter;
@@ -830,6 +842,8 @@ int hdd_ndi_set_mode(const char *iface_name)
 	}
 
 	adapter->device_mode = QDF_NDI_MODE;
+	hdd_ndi_configure_ml_params(adapter);
+
 	hdd_debug("Created NDI with device mode:%d and iface_name:%s",
 		  adapter->device_mode, iface_name);
 
