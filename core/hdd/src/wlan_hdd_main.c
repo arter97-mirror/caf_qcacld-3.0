@@ -8382,7 +8382,7 @@ QDF_STATUS hdd_init_station_mode(struct wlan_hdd_link_info *link_info)
 					     link_info->vdev_id,
 					     roam_triggers);
 		mlme_set_roam_policy(hdd_ctx->psoc, link_info->vdev_id,
-				     WLAN_ROAMING_NOT_ALLOWED);
+				     WLAN_ROAMING_ALLOWED_WITHIN_ESS);
 
 		status = hdd_vdev_configure_rtt_params(vdev);
 		if (QDF_IS_STATUS_ERROR(status))
