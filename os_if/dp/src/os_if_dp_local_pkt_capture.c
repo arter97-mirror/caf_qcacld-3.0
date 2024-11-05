@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -45,6 +45,8 @@
 	QCA_WLAN_VENDOR_ATTR_SET_MONITOR_MODE_CTRL_TX_FRAME_TYPE
 #define SET_MONITOR_MODE_CTRL_RX_FRAME_TYPE \
 	QCA_WLAN_VENDOR_ATTR_SET_MONITOR_MODE_CTRL_RX_FRAME_TYPE
+#define SET_MONITOR_MODE_CONNECTED_BEACON_INTERVAL \
+	QCA_WLAN_VENDOR_ATTR_SET_MONITOR_MODE_CONNECTED_BEACON_INTERVAL
 
 /* Short name for QCA_NL80211_VENDOR_SUBCMD_GET_MONITOR_MODE command */
 #define GET_MONITOR_MODE_CONFIG_MAX \
@@ -58,6 +60,10 @@
 #define DATA_FRAME_TYPE    1
 #define CTRL_FRAME_TYPE    2
 
+#define DATA_MAX_FILTER BIT(18)
+#define MGMT_MAX_FILTER BIT(5)
+#define CTRL_MAX_FILTER BIT(3)
+
 const struct nla_policy
 set_monitor_mode_policy[SET_MONITOR_MODE_CONFIG_MAX + 1] = {
 	[SET_MONITOR_MODE_DATA_TX_FRAME_TYPE] = { .type = NLA_U32 },
@@ -66,6 +72,7 @@ set_monitor_mode_policy[SET_MONITOR_MODE_CONFIG_MAX + 1] = {
 	[SET_MONITOR_MODE_MGMT_RX_FRAME_TYPE] = { .type = NLA_U32 },
 	[SET_MONITOR_MODE_CTRL_TX_FRAME_TYPE] = { .type = NLA_U32 },
 	[SET_MONITOR_MODE_CTRL_RX_FRAME_TYPE] = { .type = NLA_U32 },
+	[SET_MONITOR_MODE_CONNECTED_BEACON_INTERVAL] = { .type = NLA_U32 },
 };
 
 static
@@ -166,6 +173,7 @@ os_if_stop_capture_allowed(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifndef WLAN_LOCAL_PKT_CAPTURE_SUBFILTER
 static
 QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 					    struct nlattr **tb)
@@ -278,6 +286,113 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 error:
 	return status;
 }
+#else
+static
+QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
+					    struct nlattr **tb)
+{
+	QDF_STATUS status;
+	struct cdp_monitor_filter filter = {0};
+	uint32_t pkt_type = 0, val;
+	void *soc;
+
+	status = os_if_start_capture_allowed(vdev);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto error;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc)
+		return QDF_STATUS_E_INVAL;
+
+	if (tb[SET_MONITOR_MODE_MGMT_TX_FRAME_TYPE]) {
+		val = nla_get_u32(tb[SET_MONITOR_MODE_MGMT_TX_FRAME_TYPE]);
+		if (!val && val > MGMT_MAX_FILTER) {
+			osif_err("Invalid value Mgmt filter");
+			status = QDF_STATUS_E_INVAL;
+			goto error;
+		}
+		filter.fp_subfilter.mgmt_tx_frame_filter = val;
+		pkt_type |= BIT(MGMT_FRAME_TYPE);
+	}
+
+	if (tb[SET_MONITOR_MODE_MGMT_RX_FRAME_TYPE]) {
+		val = nla_get_u32(tb[SET_MONITOR_MODE_MGMT_RX_FRAME_TYPE]);
+		if (!val && val > MGMT_MAX_FILTER) {
+			osif_err("Invalid value Mgmt filter");
+			status = QDF_STATUS_E_INVAL;
+			goto error;
+		}
+		filter.fp_subfilter.mgmt_rx_frame_filter = val;
+		pkt_type |= BIT(MGMT_FRAME_TYPE);
+	}
+
+	if (tb[SET_MONITOR_MODE_DATA_TX_FRAME_TYPE]) {
+		val = nla_get_u32(tb[SET_MONITOR_MODE_DATA_TX_FRAME_TYPE]);
+		if (!val && val > DATA_MAX_FILTER) {
+			osif_err("Invalid value Data filter");
+			status = QDF_STATUS_E_INVAL;
+			goto error;
+		}
+		filter.fp_subfilter.data_tx_frame_filter = val;
+		pkt_type |= BIT(DATA_FRAME_TYPE);
+	}
+
+	if (tb[SET_MONITOR_MODE_DATA_RX_FRAME_TYPE]) {
+		val = nla_get_u32(tb[SET_MONITOR_MODE_DATA_RX_FRAME_TYPE]);
+		if (!val && val > DATA_MAX_FILTER) {
+			osif_err("Invalid value Data filter");
+			status = QDF_STATUS_E_INVAL;
+			goto error;
+		}
+		filter.fp_subfilter.data_rx_frame_filter = val;
+		pkt_type |= BIT(DATA_FRAME_TYPE);
+	}
+
+	if (tb[SET_MONITOR_MODE_CTRL_TX_FRAME_TYPE]) {
+		val = nla_get_u32(tb[SET_MONITOR_MODE_CTRL_TX_FRAME_TYPE]);
+		if (!val && val > CTRL_MAX_FILTER) {
+			osif_err("Invalid value Ctrl filter");
+			status = QDF_STATUS_E_INVAL;
+			goto error;
+		}
+		filter.fp_subfilter.ctrl_tx_frame_filter = val;
+		pkt_type |= BIT(CTRL_FRAME_TYPE);
+	}
+
+	if (tb[SET_MONITOR_MODE_CTRL_RX_FRAME_TYPE]) {
+		val = nla_get_u32(tb[SET_MONITOR_MODE_CTRL_RX_FRAME_TYPE]);
+		if (!val && val > CTRL_MAX_FILTER) {
+			osif_err("Invalid value Ctrl filter");
+			status = QDF_STATUS_E_INVAL;
+			goto error;
+		}
+		filter.fp_subfilter.ctrl_rx_frame_filter = val;
+		pkt_type |= BIT(CTRL_FRAME_TYPE);
+	}
+
+	if (tb[SET_MONITOR_MODE_CONNECTED_BEACON_INTERVAL]) {
+		filter.fp_subfilter.connected_beacon_interval =
+		nla_get_u32(tb[SET_MONITOR_MODE_CONNECTED_BEACON_INTERVAL]);
+	}
+
+	if (pkt_type == 0) {
+		osif_err("Invalid config, pkt_type: %d", pkt_type);
+		status = QDF_STATUS_E_INVAL;
+		goto error;
+	}
+	osif_debug("start capture config pkt_type:0x%x", pkt_type);
+
+	filter.mode = MON_FILTER_PASS;
+	filter.fp_mgmt = pkt_type & BIT(MGMT_FRAME_TYPE) ? FILTER_MGMT_ALL : 0;
+	filter.fp_data = pkt_type & BIT(DATA_FRAME_TYPE) ? FILTER_DATA_ALL : 0;
+	filter.fp_ctrl = pkt_type & BIT(CTRL_FRAME_TYPE) ? FILTER_CTRL_ALL : 0;
+
+	status = cdp_start_local_pkt_capture(soc, OL_TXRX_PDEV_ID, &filter);
+
+error:
+	return status;
+}
+#endif /* End of WLAN_LOCAL_PKT_CAPTURE_SUBFILTER */
 
 QDF_STATUS os_if_dp_set_lpc_configure(struct wlan_objmgr_vdev *vdev,
 				      const void *data, int data_len)
