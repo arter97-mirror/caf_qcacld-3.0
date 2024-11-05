@@ -6067,6 +6067,13 @@ lim_send_neighbor_report_request_frame(struct mac_context *mac,
 		populate_dot11f_ssid(mac, &pNeighborReq->ssid, &frm.SSID);
 	}
 
+	/* populate LCI measurement request */
+	populate_dot11f_lci(&frm.MeasurementRequest[0]);
+	frm.num_MeasurementRequest += 1;
+	/* populate Location Civic measurement request */
+	populate_dot11f_civic(&frm.MeasurementRequest[1]);
+	frm.num_MeasurementRequest += 1;
+
 	nStatus =
 		dot11f_get_packed_neighbor_report_request_size(mac, &frm, &nPayload);
 	if (DOT11F_FAILED(nStatus)) {
