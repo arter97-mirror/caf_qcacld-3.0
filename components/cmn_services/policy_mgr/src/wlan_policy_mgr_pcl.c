@@ -4205,9 +4205,12 @@ enum policy_mgr_four_connection_mode
 	count_p2p = policy_mgr_get_mode_specific_conn_info(psoc, p2p_freq_list,
 							   NULL,
 							   PM_P2P_CLIENT_MODE);
-	count_p2p += policy_mgr_get_mode_specific_conn_info(psoc,
-					&p2p_freq_list[count_p2p], NULL,
-					PM_P2P_GO_MODE);
+	if (count_p2p < MAX_NUMBER_OF_CONC_CONNECTIONS)
+		count_p2p += policy_mgr_get_mode_specific_conn_info(psoc,
+						&p2p_freq_list[count_p2p], NULL,
+						PM_P2P_GO_MODE);
+	else
+		policy_mgr_err("p2p client count %d", count_p2p);
 
 	policy_mgr_debug("sap:%d ndi:%d nan disc:%d ml_sta:%d p2p: %d",
 			 count_sap, count_ndi, count_nan_disc,

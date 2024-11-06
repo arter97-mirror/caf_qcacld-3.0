@@ -950,6 +950,8 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 					dual_freq_lst, dual_linkid_lst,
 					force_active_bitmap);
 
+			tmp_num_of_modes =
+				QDF_MIN(tmp_num_of_modes, MAX_DISALLOW_MODE);
 			/* Combine the 3 disallowed mode bitmaps into one for 3-link */
 			for (k = 0; k < tmp_num_of_modes; k++) {
 				if (num_of_modes < MAX_DISALLOW_MODE) {
