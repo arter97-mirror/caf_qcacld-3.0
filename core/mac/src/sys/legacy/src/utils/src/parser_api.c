@@ -446,7 +446,7 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 	bool psd_tpe = false;
 	uint32_t bw_threshold, bw_val;
 	int num_tpe_ies = 0;
-	uint32_t num_tx_power, num_tx_power_psd = 0, num_extn_tx_pwr;
+	uint32_t num_tx_power, num_tx_power_psd = 0, num_extn_tx_pwr = 0;
 	uint32_t max_tx_pwr_count, max_tx_pwr_count_psd = 0, total_tx_pwr_psd;
 	qdf_freq_t psd_start_freq, curr_freq = chan_freq;
 	enum phy_ch_width legacy_bw;
