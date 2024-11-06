@@ -2013,7 +2013,7 @@ static int hdd_son_set_acs_channels(struct wlan_objmgr_vdev *vdev,
 	/* Append the new channels with existing channel list */
 	bool append;
 	/* Duplicate */
-	bool dup;
+	bool dup = false;
 	uint32_t freq_list[ACS_MAX_CHANNEL_COUNT];
 	uint32_t num_channels;
 	uint32_t chan_idx = 0;
@@ -2022,8 +2022,8 @@ static int hdd_son_set_acs_channels(struct wlan_objmgr_vdev *vdev,
 	uint16_t i, j;
 	uint16_t acs_chan_count = 0;
 	uint32_t *prev_acs_list;
-	struct ieee80211_chan_def *chans = req->data.user_chanlist.chans;
-	uint16_t nchans = req->data.user_chanlist.n_chan;
+	struct ieee80211_chan_def *chans;
+	uint16_t nchans;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
@@ -2034,6 +2034,9 @@ static int hdd_son_set_acs_channels(struct wlan_objmgr_vdev *vdev,
 		hdd_err("null adapter or req");
 		return -EINVAL;
 	}
+
+	chans = req->data.user_chanlist.chans;
+	nchans = req->data.user_chanlist.n_chan;
 
 	adapter = link_info->adapter;
 	if (adapter->device_mode != QDF_SAP_MODE) {
@@ -2152,6 +2155,10 @@ static void get_son_acs_report_values(struct wlan_objmgr_vdev *vdev,
 	filter->num_of_channels = 1;
 	filter->chan_freq_list[0] = chan_freq;
 	scan_list = ucfg_scan_get_result(pdev, filter);
+
+	if (!scan_list)
+		return;
+
 	acs_r->chan_nbss = qdf_list_size(scan_list);
 
 	acs_r->chan_maxrssi = 0;
