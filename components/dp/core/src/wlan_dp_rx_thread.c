@@ -1172,8 +1172,8 @@ dp_rx_tm_flush_nbuf_list(struct dp_rx_tm_handle *rx_tm_hdl, uint8_t vdev_id)
 	struct dp_rx_thread *rx_thread;
 	int i;
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
-	struct wlan_objmgr_vdev *vdev;
 	qdf_netdev_t netdev;
+	QDF_STATUS status;
 
 	for (i = 0; i < rx_tm_hdl->num_dp_rx_threads; i++) {
 		rx_thread = rx_tm_hdl->rx_thread[i];
@@ -1213,21 +1213,14 @@ dp_rx_tm_flush_nbuf_list(struct dp_rx_tm_handle *rx_tm_hdl, uint8_t vdev_id)
 		if (qdf_unlikely(vdev_id >= WLAN_PDEV_MAX_VDEVS))
 			goto wake_thread;
 
-		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(dp_ctx->psoc,
-							    vdev_id,
-							    WLAN_DP_ID);
-
-		if (vdev &&
-		    !dp_ctx->dp_ops.osif_dp_get_net_dev_from_vdev(vdev, &netdev)) {
-			if (!rx_thread->net_dev[vdev_id]) {
-				qdf_net_if_hold_dev((struct qdf_net_if *)netdev);
-				rx_thread->net_dev[vdev_id] = netdev;
-				rx_thread->stats.num_ndev_hold++;
-			}
+		status = dp_ctx->dp_ops.dp_get_ndev_by_vdev_id(vdev_id,
+							       &netdev);
+		if (status == QDF_STATUS_SUCCESS &&
+		    !rx_thread->net_dev[vdev_id]) {
+			qdf_net_if_hold_dev((struct qdf_net_if *)netdev);
+			rx_thread->net_dev[vdev_id] = netdev;
+			rx_thread->stats.num_ndev_hold++;
 		}
-
-		if (vdev)
-			dp_comp_vdev_put_ref(vdev);
 
 		qdf_event_reset(&rx_thread->vdev_del_event[vdev_id]);
 		qdf_set_bit(vdev_id, &rx_thread->vdev_del_event_flag);
