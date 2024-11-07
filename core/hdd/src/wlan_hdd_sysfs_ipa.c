@@ -116,7 +116,8 @@ static ssize_t hdd_sysfs_ipaucstate_store(struct device *dev,
 
 static uint32_t convert_ip(char *sptr)
 {
-	uint8_t var[4], i = 0;
+	uint8_t var[4] = {0};
+	uint8_t i = 0;
 	char *token;
 	uint32_t ip;
 
