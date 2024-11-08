@@ -228,6 +228,7 @@
 #include "wlan_cfg80211_p2p.h"
 #include "wlan_ll_sap_api.h"
 #include "wlan_mlo_link_recfg.h"
+#include "wlan_psoc_mlme.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -15756,6 +15757,8 @@ end:
 static const struct nla_policy
 wlan_hdd_connect_ext_attr[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_ALLOWED_BSSIDS] = {
+						.type = NLA_NESTED},
 };
 
 static int
@@ -15770,6 +15773,11 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t ext_features = 0, rsno_gen = 0;
 	int8_t ret = 0;
+	struct nlattr *curr_attr;
+	struct qdf_mac_addr allowed_bss_link_addr[WLAN_MAX_NUM_ALLOWED_BSSIDS];
+	struct qdf_mac_addr *mac_addr_ptr;
+	uint32_t cmd_id, num_links = 0;
+	int len;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
@@ -15808,6 +15816,29 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 				    wmi_vdev_param_connect_ext_features,
 				    ext_features, VDEV_CMD);
 	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_ALLOWED_BSSIDS;
+	if (tb[cmd_id]) {
+		nla_for_each_nested(curr_attr, tb[cmd_id], len) {
+			if (num_links >= WLAN_MAX_NUM_ALLOWED_BSSIDS) {
+				hdd_err("num links %d exceed max allowed BSSID",
+					num_links);
+				ret = -EINVAL;
+				goto rel;
+			}
+
+			mac_addr_ptr = &allowed_bss_link_addr[num_links];
+			qdf_mem_copy(mac_addr_ptr, nla_data(curr_attr),
+				     ETH_ALEN);
+			hdd_debug(QDF_MAC_ADDR_FMT " is allowed BSS link[%d] mac address",
+				  QDF_MAC_ADDR_REF(mac_addr_ptr->bytes),
+				  num_links);
+			num_links++;
+		}
+		wlan_cm_set_mlo_allowed_bss_links(hdd_ctx->psoc, num_links,
+						  allowed_bss_link_addr);
+	}
+	hdd_debug("number of allowed bss: %d", num_links);
 
 rel:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
