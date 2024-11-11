@@ -1075,6 +1075,8 @@ lim_chan_usage_req_tx_complete_cnf_handler(void *context, qdf_nbuf_t buf,
 		qdf_nbuf_free(buf);
 
 	session = pe_find_session_by_vdev_id(mac_ctx, mgmt_params->vdev_id);
+	if (!session)
+		return QDF_STATUS_E_INVAL;
 
 	lim_timers->channel_vacate_timer.sessionId = session->peSessionId;
 	if (tx_complete != WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK ||
