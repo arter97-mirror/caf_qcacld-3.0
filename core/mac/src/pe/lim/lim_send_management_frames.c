@@ -1391,14 +1391,14 @@ void lim_send_channel_usage_resp_action_frame(struct mac_context *mac_ctx,
 {
 	QDF_STATUS qdf_status;
 	uint8_t cc[REG_ALPHA2_LEN + 1];
-	bool found;
+	bool found = false;
 	qdf_freq_t freq;
 	void *pkt_ptr = NULL;
 	uint8_t *frame_ptr;
 	tpSirMacMgmtHdr mac_hdr;
 	uint32_t status, payload, num_bytes;
 	struct policy_mgr_pcl_list pcl = {0};
-	uint8_t idx, index, iter, opclass, chan_num, tx_flag = 0;
+	uint8_t idx, index, iter = 0, opclass, chan_num, tx_flag = 0;
 	struct dfs_p2p_group_info *dfs_p2p_info = &session->dfs_p2p_info;
 	tDot11fchannel_usage_req *req = &dfs_p2p_info->chan_usage_req;
 	tDot11fchannel_usage_resp *frm = &dfs_p2p_info->chan_usage_resp;
