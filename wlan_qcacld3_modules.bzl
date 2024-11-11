@@ -2184,6 +2184,9 @@ _conditional_srcs = {
     "CONFIG_AFC_SUPPORT": {
         True: [
             "core/hdd/src/wlan_hdd_afc.c",
+            "cmn/os_if/linux/afc/src/wlan_cfg80211_afc.c",
+            "cmn/umac/afc/core/src/wlan_afc_main.c",
+            "cmn/umac/afc/dispatcher/src/wlan_afc_ucfg_api.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_LL_LT_SAP": {

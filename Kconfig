@@ -2226,6 +2226,106 @@ config FEATURE_WLAN_SUPPORT_USD
 	bool "enable FEATURE_WLAN_SUPPORT_USD"
 	default n
 
+config AFC_SUPPORT
+	bool "Enable AFC_SUPPORT"
+	default n
+
+config BEACON_TX_OFFLOAD_MAX_VDEV
+	int "Enable WLAN_MCC_MIN_CHANNEL_QUOTA"
+        default 3
+
+config BYPASS_WDS_OL_OPS
+	bool "Enable BYPASS_WDS_OL_OPS"
+	default n
+
+config FEATURE_AP_MCC_CH_AVOIDANCE
+	bool "Enable FEATURE_AP_MCC_CH_AVOIDANCE"
+	default n
+
+config FEATURE_MCL_REPEATER
+	bool "Enable FEATURE_MCL_REPEATER"
+	default n
+
+config FEATURE_MEC
+	bool "Enable FEATURE_MEC"
+	default n
+
+config FEATURE_STA_MODE_VOTE_LINK
+	bool "Enable FEATURE_STA_MODE_VOTE_LINK"
+	default n
+
+config FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+	bool "Enable FEATURE_WLAN_AP_AP_ACS_OPTIMIZE"
+	default n
+
+config FEATURE_WLAN_AUTO_SHUTDOWN
+	bool "Enable FEATURE_WLAN_AUTO_SHUTDOWN"
+	default n
+
+config FEATURE_WLAN_MCC_TO_SCC_SWITCH
+	bool "Enable FEATURE_WLAN_MCC_TO_SCC_SWITCH"
+	default n
+
+config FEATURE_WLAN_STA_4ADDR_SCHEME
+	bool "Enable FEATURE_WLAN_STA_4ADDR_SCHEME"
+	default n
+
+config IPA_HANDLE_MLO_DEF_LINK_REG
+	bool "Enable IPA_HANDLE_MLO_DEF_LINK_REG"
+	default n
+
+config IPA_WDI3_TX_TWO_PIPES
+	bool "Enable IPA_WDI3_TX_TWO_PIPES"
+	default n
+
+config IPA_WDI3_VLAN_SUPPORT
+	bool "Enable IPA_WDI3_VLAN_SUPPORT"
+	default n
+
+config MAX_CLIENTS_ALLOWED
+	int "enable MAX_CLIENTS_ALLOWED"
+	default 32
+
+config MDM_PLATFORM
+	bool "Enable MDM_PLATFORM"
+	default n
+
+config MOBILE_ROUTER
+	bool "Enable MOBILE_ROUTER"
+	default n
+
+config MONITOR_MODULARIZED_ENABLE
+	bool "Enable MONITOR_MODULARIZED_ENABLE"
+	default n
+
+config NUM_IPA_IFACE
+	int "enable NUM_IPA_IFACE"
+	default 3
+
+config QDF_MAX_NO_OF_SAP_MODE
+	int "enable QDF_MAX_NO_OF_SAP_MODE"
+	default 2
+
+config SAP_UNSAFE_FIXED_CHAN_ALLOW
+	bool "Enable SAP_UNSAFE_FIXED_CHAN_ALLOW"
+	default n
+
+config WDS_CONV_TARGET_IF_OPS_ENABLE
+	bool "Enable WDS_CONV_TARGET_IF_OPS_ENABLE"
+	default n
+
+config WLAN_FEATURE_AFC_DCS_SKIP_ACS_RANGE
+	bool "Enable WLAN_FEATURE_AFC_DCS_SKIP_ACS_RANGE"
+	default n
+
+config WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG
+	bool "Enable WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG"
+	default n
+
+config WLAN_TSF_UPLINK_DELAY
+	bool "Enable WLAN_TSF_UPLINK_DELAY"
+	default n
+
 if CNSS_KIWI_V2
 config CFG_BMISS_OFFLOAD_MAX_VDEV
 	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
