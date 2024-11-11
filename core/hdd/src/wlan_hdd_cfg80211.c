@@ -8987,6 +8987,8 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_SCS_TRAFFIC_SUPPORT] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_RSNE_ADD_RANDOM_PMKIDS] = {
+			.type = NLA_U8}
 };
 
 /**
@@ -16071,6 +16073,17 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 							cfg_val);
 		if (ret_val)
 			hdd_err("Failed to set SCS traffic desc support");
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_RSNE_ADD_RANDOM_PMKIDS;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("Add %d random PMKID to the assoc request", cfg_val);
+		if (cfg_val > 12)
+			cfg_val = 0;
+		wlan_crypto_set_vdev_param(link_info->vdev,
+					   WLAN_CRYPTO_PARAM_RANDOM_PMKID,
+					   cfg_val);
 	}
 
 	if (update_sme_cfg)
