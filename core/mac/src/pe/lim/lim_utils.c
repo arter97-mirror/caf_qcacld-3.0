@@ -11846,6 +11846,8 @@ lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id)
 	struct mac_context *mac_ctx;
 	struct pe_session *session;
 	struct bss_description *bss_desc = NULL;
+	QDF_STATUS status;
+	enum reg_6g_ap_type power_type_6g = REG_MAX_AP_TYPE;
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	if (!mac_ctx) {
@@ -11859,6 +11861,33 @@ lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id)
 		return;
 	}
 
+	if (!wlan_reg_is_6ghz_chan_freq(session->curr_op_freq))
+		goto set_tpc;
+
+	status = wlan_reg_get_best_6g_power_type(
+					mac_ctx->psoc, mac_ctx->pdev,
+					&power_type_6g,
+					session->ap_defined_power_type_6g,
+					session->curr_op_freq);
+	if ((QDF_IS_STATUS_ERROR(status))) {
+		if (lim_is_sb_disconnect_allowed(session)) {
+			pe_err("No power type found for connection frequency, trigger DISCONNECT");
+			lim_send_deauth_mgmt_frame(mac_ctx,
+						   REASON_BAD_PWR_CAPABILITY,
+						   session->bssId,
+						   session, false);
+			lim_tear_down_link_with_ap(mac_ctx,
+						   session->peSessionId,
+						   REASON_BAD_PWR_CAPABILITY,
+						   eLIM_HOST_DISASSOC);
+		}
+		return;
+	}
+
+	session->best_6g_power_type = power_type_6g;
+	mlme_set_best_6g_power_type(session->vdev, power_type_6g);
+
+set_tpc:
 	if (session->lim_join_req)
 		bss_desc = &session->lim_join_req->bssDescription;
 

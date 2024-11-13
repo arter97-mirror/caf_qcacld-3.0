@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -535,7 +535,6 @@ static QDF_STATUS lim_fill_session_power_info(
 	struct vdev_mlme_obj *mlme_obj;
 	enum reg_6g_ap_type power_type_6g;
 	QDF_STATUS status;
-	int8_t rf_mode_force_pwr_type;
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
 	if (!mlme_obj) {
@@ -552,20 +551,11 @@ static QDF_STATUS lim_fill_session_power_info(
 	mlme_obj->reg_tpc_obj.is_power_constraint_abs = !is_pwr_constraint;
 
 	if (wlan_reg_is_6ghz_chan_freq(pbssDescription->chan_freq)) {
-		status = wlan_mlme_get_rf_mode_force_pwr_type(
-						mac->psoc,
-						&rf_mode_force_pwr_type);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_err("Get rf test mode force power type failed");
-			return status;
-		}
-
 		status = wlan_reg_get_best_6g_power_type(
 				mac->psoc, mac->pdev,
 				&power_type_6g,
 				ft_session->ap_defined_power_type_6g,
-				pbssDescription->chan_freq,
-				rf_mode_force_pwr_type);
+				pbssDescription->chan_freq);
 		if (QDF_IS_STATUS_ERROR(status))
 			return status;
 

@@ -4095,8 +4095,6 @@ wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 	return QDF_STATUS_SUCCESS;
 }
 
-#define RF_MODE_FORCE_PWR_TYPE_MIN -1
-#define RF_MODE_FORCE_PWR_TYPE_MAX 2
 QDF_STATUS
 wlan_mlme_set_rf_mode_force_pwr_type(struct wlan_objmgr_psoc *psoc,
 				     int8_t value)
