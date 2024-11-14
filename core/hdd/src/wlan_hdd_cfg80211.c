@@ -14646,6 +14646,9 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 		if (!link_info->vdev)
 			continue;
 		wlan_vdev_set_rsno_gen_supported(link_info->vdev, rsno_gen);
+		wma_cli_set_command(link_info->vdev_id,
+				    wmi_vdev_param_connect_ext_features,
+				    ext_features, VDEV_CMD);
 	}
 
 rel:

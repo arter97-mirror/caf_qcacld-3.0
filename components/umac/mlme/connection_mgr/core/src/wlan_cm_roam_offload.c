@@ -2873,6 +2873,11 @@ static void cm_update_driver_assoc_ies(struct wlan_objmgr_psoc *psoc,
 	if (!pdev)
 		return;
 
+	/* Strip RSNO selector IE before sending to firmware */
+	wlan_strip_ie(rso_cfg->assoc_ie.ptr, (uint16_t *)&rso_cfg->assoc_ie.len,
+		      WLAN_ELEMID_VENDOR, ONE_BYTE, RSNO_OUI_SELECTION,
+		      RSNO_OUI_SIZE, NULL, 0);
+
 	rrm_cap_ie_data = wlan_cm_get_rrm_cap_ie_data();
 	/* Re-Assoc IE TLV parameters */
 	rso_mode_cfg->assoc_ie_length = rso_cfg->assoc_ie.len;
