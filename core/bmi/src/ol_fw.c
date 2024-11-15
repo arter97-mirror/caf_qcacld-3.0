@@ -50,6 +50,13 @@
 static struct hash_fw fw_hash;
 #endif
 
+#ifdef TARGET_DUMP_FOR_NON_QC_PLATFORM
+#include <linux/fs.h>
+#include <linux/uaccess.h>
+#include <linux/timekeeping.h>
+#include <linux/slab.h>
+#endif
+
 static uint32_t refclk_speed_to_hz[] = {
 	48000000,               /* SOC_REFCLK_48_MHZ */
 	19200000,               /* SOC_REFCLK_19_2_MHZ */
@@ -584,52 +591,58 @@ int ol_write_ramdump_to_file(uint32_t file_no, int8_t *buf, uint32_t size)
 	struct file *fp;
 	mm_segment_t old_fs;
 	loff_t pos = 0;
+	struct timespec64 ts;
+	char filename[128];
+	struct rtc_time tm;
 
 	pr_err("%s: ENTER\n", __func__);
+
+	/* Get current time */
+	ktime_get_real_ts64(&ts);
+
+	/* Create filename with timestamp */
+	snprintf(filename, sizeof(filename), "/home/root/");
+
+	/* Convert rtc to local time */
+	ts.tv_sec -= sys_tz.tz_minuteswest * 60;
+
+	rtc_time64_to_tm(ts.tv_sec, &tm);
+
+	if (file_no == 0) {
+		strlcat(filename, "ramdump_ar6320_",
+			sizeof(filename) - strlen(filename) - 1);
+	} else if (file_no == 1) {
+		strlcat(filename, "axi_ar6320_",
+			sizeof(filename) - strlen(filename) - 1);
+	} else if (file_no == 2) {
+		strlcat(filename, "register_ar6320_",
+			sizeof(filename) - strlen(filename) - 1);
+	} else if (file_no == 3) {
+		strlcat(filename, "iram1_ar6320_",
+			sizeof(filename) - strlen(filename) - 1);
+	} else if (file_no == 4) {
+		strlcat(filename, "iram2_ar6320_",
+			sizeof(filename) - strlen(filename) - 1);
+	} else {
+		pr_err("%s: invalid file_no\n", __func__);
+		return -EINVAL;
+	}
+
+	scnprintf(filename + strlen(filename),
+		sizeof(filename) - strlen(filename),
+		"%04d-%02d-%02d-%02d-%02d-%02d.bin",
+		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+		tm.tm_hour, tm.tm_min, tm.tm_sec);
 
 	/* change to KERNEL_DS address limit */
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	if (file_no == 0) {
-		/* open file to write */
-		fp = filp_open("/home/root/ramdump_ar6320.bin", O_WRONLY|O_CREAT|O_DSYNC, 0640);
-		if (!fp) {
-			pr_err("%s: open file error\n", __FUNCTION__);
-			ret = -1;
-			goto exit;
-		}
-	} else if (file_no == 1) {
-		/* open file to write */
-		fp = filp_open("/home/root/axi_ar6320.bin", O_WRONLY|O_CREAT|O_DSYNC, 0640);
-		if (!fp) {
-			pr_err("%s: open file error\n", __FUNCTION__);
-			ret = -1;
-			goto exit;
-		}
-	} else if (file_no == 2) {
-		/* open file to write */
-		fp = filp_open("/home/root/register_ar6320.bin", O_WRONLY|O_CREAT|O_DSYNC, 0640);
-		if (!fp) {
-			pr_err("%s: open file error\n", __FUNCTION__);
-			ret = -1;
-			goto exit;
-		}
-	} else if (file_no == 3) {
-		/* open file to write */
-		fp = filp_open("/home/root/iram1_ar6320.bin", O_WRONLY|O_CREAT|O_DSYNC, 0640);
-		if (!fp) {
-			pr_err("%s: open file error\n", __FUNCTION__);
-			ret = -1;
-			goto exit;
-		}
-	} else if (file_no == 4) {
-		/* open file to write */
-		fp = filp_open("/home/root/iram2_ar6320.bin", O_WRONLY|O_CREAT|O_DSYNC, 0640);
-		if (!fp) {
-			pr_err("%s: open file error\n", __FUNCTION__);
-			ret = -1;
-			goto exit;
-		}
+	/* open file to write */
+	fp = filp_open(filename, O_WRONLY | O_CREAT | O_DSYNC, 0640);
+	if (IS_ERR(fp)) {
+		pr_err("%s: open file error\n", __func__);
+		ret = PTR_ERR(fp);
+		goto exit;
 	}
 
 	/* Write buf to file */
@@ -637,8 +650,9 @@ int ol_write_ramdump_to_file(uint32_t file_no, int8_t *buf, uint32_t size)
 
 exit:
 	/* close file before return */
-	if (fp)
+	if (!IS_ERR(fp))
 		filp_close(fp, current->files);
+
 	/* restore previous address limit */
 	set_fs(old_fs);
 
