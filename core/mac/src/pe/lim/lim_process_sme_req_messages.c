@@ -2917,7 +2917,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	ePhyChanBondState cb_mode;
 	const uint8_t *vendor_ie;
 	uint16_t ie_len;
-	int8_t local_power_constraint;
+	int8_t local_power_constraint = 0;
 	struct vdev_mlme_obj *mlme_obj;
 	bool is_pwr_constraint;
 	tSirMacCapabilityInfo *ap_cap_info;
@@ -5307,17 +5307,22 @@ void lim_calculate_tpc(struct mac_context *mac,
 
 		/* max tx power calculation */
 		max_tx_power = mlme_obj->reg_tpc_obj.reg_max[i];
-		/* If AP local power constraint is present */
-		if (mlme_obj->reg_tpc_obj.ap_constraint_power) {
-			local_constraint =
-				mlme_obj->reg_tpc_obj.ap_constraint_power;
-			reg_max = mlme_obj->reg_tpc_obj.reg_max[i];
-			if (is_pwr_constraint_absolute)
+
+		local_constraint = mlme_obj->reg_tpc_obj.ap_constraint_power;
+		pe_debug("local constraint: %d power constraint absolute %d",
+			 local_constraint, is_pwr_constraint_absolute);
+		if (is_pwr_constraint_absolute) {
+			if (!local_constraint) {
+				pe_debug("ignore abs ap constraint power 0!");
+				max_tx_power = reg_max;
+			} else {
 				max_tx_power = QDF_MIN(reg_max,
 						       local_constraint);
-			else
-				max_tx_power = reg_max - local_constraint;
+			}
+		} else {
+			max_tx_power = reg_max - local_constraint;
 		}
+
 		/* If TPE is present */
 		if (is_tpe_present && !skip_tpe) {
 			if (!is_psd_power && mlme_obj->reg_tpc_obj.eirp_power)
