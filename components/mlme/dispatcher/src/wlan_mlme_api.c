@@ -8918,7 +8918,7 @@ void wlan_mlme_reset_sta_keepalive_period(struct wlan_objmgr_psoc *psoc,
 	       return;
        }
        mlme_obj->cfg.sta.sta_keep_alive_period =
-		cfg_default(CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
+		cfg_get(psoc, CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
        mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
        if (!mlme_priv) {
                mlme_err("vdev legacy private object is NULL");
@@ -8926,7 +8926,7 @@ void wlan_mlme_reset_sta_keepalive_period(struct wlan_objmgr_psoc *psoc,
        }
 
        mlme_priv->keep_alive_period =
-                       cfg_default(CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
+			cfg_get(psoc, CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
 }
 
 QDF_STATUS
