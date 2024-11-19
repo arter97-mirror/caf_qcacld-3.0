@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -144,6 +144,7 @@ enum txrate_gi {
  * @ipv6_mcast_ra_stats:        ipv6 multicast ra stats
  * @ipv6_mcast_ns_stats:        ipv6 multicast ns stats
  * @ipv6_mcast_na_stats:        ipv6 multicast na stats
+ * @ipv6_mcast_mlq_stats:	ipv6 multicast mlq stats
  * @icmpv4_count:               ipv4 icmp packet count
  * @icmpv6_count:               ipv6 icmp packet count
  * @rssi_breach_wake_up_count:  rssi breach wakeup count
@@ -173,6 +174,7 @@ struct wake_lock_stats {
 	uint32_t ipv6_mcast_ra_stats;
 	uint32_t ipv6_mcast_ns_stats;
 	uint32_t ipv6_mcast_na_stats;
+	uint32_t ipv6_mcast_mlq_stats;
 	uint32_t icmpv4_count;
 	uint32_t icmpv6_count;
 	uint32_t rssi_breach_wake_up_count;

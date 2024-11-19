@@ -133,6 +133,7 @@ static inline void qdf_wma_wow_wakeup_stats_event(tp_wma_handle wma)
 	wow_stats.wow_ipv6_mcast_ra_stats = stats.ipv6_mcast_ra_stats;
 	wow_stats.wow_ipv6_mcast_ns_stats = stats.ipv6_mcast_ns_stats;
 	wow_stats.wow_ipv6_mcast_na_stats = stats.ipv6_mcast_na_stats;
+	wow_stats.wow_ipv6_mcast_mlq_stats = stats.ipv6_mcast_mlq_stats;
 	wow_stats.wow_pno_match_wake_up_count = stats.pno_match_wake_up_count;
 	wow_stats.wow_pno_complete_wake_up_count =
 				stats.pno_complete_wake_up_count;
@@ -2205,7 +2206,7 @@ static void wma_wow_stats_display(struct wake_lock_stats *stats)
 	wma_conditional_log(is_wakeup_event_console_logs_enabled,
 			    "WLAN wake reason counters:");
 	wma_conditional_log(is_wakeup_event_console_logs_enabled,
-			    "uc:%d bc:%d v4_mc:%d v6_mc:%d ra:%d ns:%d na:%d "
+			    "uc:%d bc:%d v4_mc:%d v6_mc:%d ra:%d ns:%d na:%d mlq:%d"
 			    "icmp:%d icmpv6:%d",
 			    stats->ucast_wake_up_count,
 			    stats->bcast_wake_up_count,
@@ -2214,6 +2215,7 @@ static void wma_wow_stats_display(struct wake_lock_stats *stats)
 			    stats->ipv6_mcast_ra_stats,
 			    stats->ipv6_mcast_ns_stats,
 			    stats->ipv6_mcast_na_stats,
+			    stats->ipv6_mcast_mlq_stats,
 			    stats->icmpv4_count,
 			    stats->icmpv6_count);
 
@@ -2490,6 +2492,8 @@ wma_pkt_proto_subtype_to_string(enum qdf_proto_subtype proto_subtype)
 		return "ICMPV6 NS";
 	case QDF_PROTO_ICMPV6_NA:
 		return "ICMPV6 NA";
+	case QDF_PROTO_ICMPV6_MLQ:
+		return "ICMPV6 MLQ";
 	case QDF_PROTO_IPV4_UDP:
 		return "IPV4 UDP Packet";
 	case QDF_PROTO_IPV4_TCP:
@@ -2586,6 +2590,11 @@ wma_wow_get_pkt_proto_subtype(uint8_t *data, uint32_t len)
 
 		proto_type = qdf_nbuf_data_get_ipv6_proto(data);
 		wma_debug("IPV6_proto_type: %u", proto_type);
+
+		if (proto_type == 0) {
+			proto_type = qdf_nbuf_data_get_ipv6_proto_mlq(data);
+			wma_debug("ICMPV6_proto_type: %u", proto_type);
+		}
 
 		switch (proto_type) {
 		case QDF_NBUF_TRAC_ICMPV6_TYPE:
@@ -2829,6 +2838,7 @@ static void wma_wow_parse_data_pkt(t_wma_handle *wma,
 	case QDF_PROTO_ICMPV6_RA:
 	case QDF_PROTO_ICMPV6_NS:
 	case QDF_PROTO_ICMPV6_NA:
+	case QDF_PROTO_ICMPV6_MLQ:
 		wma_wow_inc_wake_lock_stats_by_protocol(wma, vdev_id,
 							proto_subtype);
 		wma_log_pkt_icmpv6(data, length);
