@@ -2439,6 +2439,10 @@ config IPA_OPT_WIFI_DP_LOGGING
 	depends on IPA_OPT_WIFI_DP
 	default n
 
+config IPA_WDI3_PENDING_BUFF_REPORT
+        bool "Enable IPA_WDI3_PENDING_BUFF_REPORT"
+        default n
+
 config DP_RX_MSDU_DONE_FAIL_HISTORY
         bool "Enable DP_RX_MSDU_DONE_FAIL_HISTORY"
         default n
