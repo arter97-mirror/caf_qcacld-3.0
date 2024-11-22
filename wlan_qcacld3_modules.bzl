@@ -2373,6 +2373,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     )
 
     copts.append("-Wunused-but-set-parameter")
+    copts.append("-Wno-enum-compare")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 
