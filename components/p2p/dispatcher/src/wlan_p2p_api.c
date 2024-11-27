@@ -155,6 +155,11 @@ const uint8_t *wlan_p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
 	return p2p_parse_assoc_ie_for_device_info(assoc_ie, assoc_ie_len);
 }
 
+bool wlan_p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
+{
+	return p2p_is_vdev_wfd_r2_mode(vdev);
+}
+
 QDF_STATUS
 wlan_p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 				      const uint8_t *ie, uint16_t ie_len,
@@ -176,11 +181,13 @@ bool wlan_p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
 QDF_STATUS wlan_p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 					     bool *is_dfs_owner,
 					     bool *is_valid_ap_assist,
+					     bool *is_usr_restrict_csa,
 					     struct qdf_mac_addr *ap_bssid,
 					     uint8_t *opclass, uint8_t *chan)
 {
 	return p2p_get_ap_assist_dfs_params(vdev, is_dfs_owner,
-					    is_valid_ap_assist, ap_bssid,
+					    is_valid_ap_assist,
+					    is_usr_restrict_csa, ap_bssid,
 					    opclass, chan);
 }
 

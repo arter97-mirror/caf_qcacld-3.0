@@ -661,6 +661,7 @@ bool lim_enable_cts_to_self_for_exempted_iot_ap(
  * @session: pe session
  * @bss_desc: Pointer to bss description
  * @phy_mode: phy mode of scan entry
+ * @req_fail_status_code: Connect req fail status code pointer
  *
  * This api will fill lim pe session with info
  * from bss description
@@ -671,7 +672,8 @@ QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx,
 		    struct pe_session *session,
 		    struct bss_description *bss_desc,
-		    enum wlan_phymode phy_mode);
+		    enum wlan_phymode phy_mode,
+		    enum wlan_status_code *req_fail_status_code);
 
 /**
  * lim_update_omn_ie_ch_width() - update omn_ie_ch_width in struct
@@ -703,7 +705,7 @@ bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
 #ifdef WLAN_FEATURE_11BE_MLO
 /*
  * lim_add_bcn_probe() - Add the probe resp to scan DB
- * @vdev: VDEV object manager
+ * @pdev: PDEV object manager
  * @bcn_probe: Pointer to bcn/probe
  * @len: Length of frame.
  * @freq: Freq on frame.
@@ -717,7 +719,7 @@ bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
  * Return: QDF_STATUS
  */
 QDF_STATUS
-lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
+lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
 		  uint32_t len, qdf_freq_t freq, int32_t rssi,
 		  uint8_t snr, uint32_t tsf_delta);
 
@@ -771,23 +773,20 @@ QDF_STATUS lim_check_for_ml_probe_req(struct pe_session *session);
  * lim_process_cu_for_probe_rsp() - process critical update for probe response
  * @mac_ctx: Pointer to mac context
  * @session: pe session
- * @probe_rsp: ptr to probe response
- * @probe_rsp_len: length of probe response
+ * @rx_packet_info: Received Rx packet
  *
  * This api will generate link specific probe response and invoke function
  * to process critical update IEs
  *
  * Return: qdf status
  */
-QDF_STATUS
-lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
-			     struct pe_session *session,
-			     uint8_t *probe_rsp,
-			     uint32_t probe_rsp_len);
+QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
+					struct pe_session *session,
+					uint8_t *rx_packet_info);
 
 #else
 static inline QDF_STATUS
-lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
+lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
 		  uint32_t len, qdf_freq_t freq, int32_t rssi,
 		  uint8_t snr, uint32_t tsf_delta)
 {
@@ -823,8 +822,7 @@ lim_check_for_ml_probe_req(struct pe_session *session)
 static inline QDF_STATUS
 lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 			     struct pe_session *session,
-			     uint8_t *probe_rsp,
-			     uint32_t probe_rsp_len)
+			     uint8_t *rx_packet_info)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -53,6 +53,7 @@
 #include "wlan_vdev_mgr_api.h"
 #include "wmi_unified.h"
 #include "wlan_cm_public_struct.h"
+#include "wlan_policy_mgr_i.h"
 
 
 #ifdef WLAN_FEATURE_SAE
@@ -1565,6 +1566,7 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 	struct psoc_mlme_obj *mlme_psoc_obj;
 	struct scoring_cfg *score_config;
 	struct dual_sta_policy *dual_sta_policy;
+	uint32_t mcc_to_scc_switch;
 
 	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(psoc);
 	if (!mlme_psoc_obj)
@@ -1612,6 +1614,22 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 		weight_config->oce_subnet_id_weightage;
 	req_score_params->sae_pk_ap_weightage =
 		weight_config->sae_pk_ap_weightage;
+
+	mcc_to_scc_switch = policy_mgr_get_mcc_to_scc_switch_mode(psoc);
+
+	/**
+	 * Don't consider STA_SAP_MCC weight_config if:
+	 * 1. HW is DBS chip
+	 * 2. vendor_roam_score_algorithm is not set
+	 * 3. mcc_to_cc_switch is not QDF_MCC_TO_SCC_WITH_PREFERRED_BAND
+	 */
+	if (!policy_mgr_is_hw_dbs_capable(psoc) &&
+	    !score_config->vendor_roam_score_algorithm &&
+	    mcc_to_scc_switch == QDF_MCC_TO_SCC_WITH_PREFERRED_BAND)
+		req_score_params->sta_sap_mcc_weightage =
+			weight_config->sta_sap_mcc_weightage;
+	else
+		req_score_params->sta_sap_mcc_weightage = 0;
 
 	cm_update_mlo_score_params(req_score_params, weight_config);
 
@@ -2946,6 +2964,11 @@ static void cm_update_driver_assoc_ies(struct wlan_objmgr_psoc *psoc,
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
 		return;
+
+	/* Strip RSNO selector IE before sending to firmware */
+	wlan_strip_ie(rso_cfg->assoc_ie.ptr, (uint16_t *)&rso_cfg->assoc_ie.len,
+		      WLAN_ELEMID_VENDOR, ONE_BYTE, RSNO_OUI_SELECTION,
+		      RSNO_OUI_SIZE, NULL, 0);
 
 	rrm_cap_ie_data = wlan_cm_get_rrm_cap_ie_data();
 	/* Re-Assoc IE TLV parameters */
@@ -5780,7 +5803,7 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 	}
 
 	cm_roam_control_restore_default_config(pdev, vdev_id);
-	mlme_set_roam_policy(psoc, vdev_id, WLAN_ROAMING_NOT_ALLOWED);
+	mlme_set_roam_policy(psoc, vdev_id, WLAN_ROAMING_ALLOWED_WITHIN_ESS);
 
 
 	/* Reset to non-aggressive mode */
@@ -6289,7 +6312,8 @@ send_evt:
 	if (source == CM_ROAMING_HOST ||
 	    source == CM_ROAMING_NUD_FAILURE ||
 	    source == CM_ROAMING_LINK_REMOVAL ||
-	    source == CM_ROAMING_USER)
+	    source == CM_ROAMING_USER ||
+	    source == CM_ROAMING_STA_SAP_MCC)
 		rso_cfg->roam_invoke_source = source;
 
 	cm_req->roam_req.req.vdev_id = vdev_id;
@@ -6688,9 +6712,6 @@ void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 				    EVENT_WLAN_ROAM_CAND_INFO);
 }
 
-#define WLAN_ROAM_SCAN_TYPE_PARTIAL_SCAN 0
-#define WLAN_ROAM_SCAN_TYPE_FULL_SCAN 1
-
 #ifdef WLAN_FEATURE_11BE_MLO
 static void
 cm_populate_roam_success_mlo_param(struct wlan_objmgr_psoc *psoc,
@@ -6974,16 +6995,7 @@ cm_find_roam_candidate(struct wlan_objmgr_pdev *pdev,
 }
 
 #if (defined(CONNECTIVITY_DIAG_EVENT) && defined(WLAN_FEATURE_ROAM_OFFLOAD))
-/**
- * cm_roam_reject_reassoc_event() - Send connectivity diag log
- * event while rejecting reassoc request to connected BSSID
- * @psoc: Pointer to PSOC object
- * @vdev: Pointer to vdev object
- * @bssid: connected BSSID
- *
- * Return: None
- */
-static inline void
+void
 cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
 			     struct wlan_objmgr_vdev *vdev,
 			     struct qdf_mac_addr *bssid)
@@ -7062,25 +7074,11 @@ cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
 
 	cm_roam_cancel_event(vdev_id, ROAM_FAIL_REASON_REASSOC_TO_SAME_AP, 0);
 }
-#else
-static inline void
-cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
-			     struct wlan_objmgr_vdev *vdev,
-			     struct qdf_mac_addr *bssid)
-{}
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/**
- * cm_is_bssid_present_on_any_assoc_link() - Check if bssid belongs to any
- *                                           assoc link
- * @vdev: VDEV pointer
- * @bssid: bssid pointer
- *
- * Return: True if bssid belongs to any assoc else return false
- */
-static bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
-						  struct qdf_mac_addr *bssid)
+bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
+					   struct qdf_mac_addr *bssid)
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx = vdev->mlo_dev_ctx;
 	struct mlo_link_info *links_info;
@@ -7109,8 +7107,8 @@ static bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
 	return false;
 }
 #else
-static bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
-						  struct qdf_mac_addr *bssid)
+bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
+					   struct qdf_mac_addr *bssid)
 {
 	struct qdf_mac_addr connected_bssid;
 	QDF_STATUS status;

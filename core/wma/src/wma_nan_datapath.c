@@ -115,7 +115,8 @@ QDF_STATUS wma_delete_sta_req_ndi_mode(tp_wma_handle wma,
 	status = wma_remove_peer(wma, del_sta->staMac, vdev_id, false);
 	del_sta->status = QDF_STATUS_SUCCESS;
 
-	if (wmi_service_enabled(wma->wmi_handle,
+	if (QDF_IS_STATUS_SUCCESS(status) &&
+	    wmi_service_enabled(wma->wmi_handle,
 				wmi_service_sync_delete_cmds)) {
 		wma_debug("Wait for the peer delete. vdev_id %d", vdev_id);
 		del_req = wma_fill_hold_req(wma, vdev_id, WMA_DELETE_STA_REQ,
@@ -125,10 +126,15 @@ QDF_STATUS wma_delete_sta_req_ndi_mode(tp_wma_handle wma,
 		if (!del_req) {
 			wma_err("Failed to allocate request for vdev_id %d",
 				vdev_id);
-			qdf_mem_free(del_sta);
-			return QDF_STATUS_E_NULL_VALUE;
+			status = QDF_STATUS_E_NULL_VALUE;
+			goto send_rsp;
 		}
-	} else if (del_sta->respReqd) {
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+send_rsp:
+	if (del_sta->respReqd) {
 		wma_debug("Sending del rsp to umac (status: %d)",
 			  del_sta->status);
 		wma_send_msg_high_priority(wma, WMA_DELETE_STA_RSP, del_sta, 0);

@@ -423,26 +423,6 @@ enum wlan_epcs_frame {
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /*
- * emlsr_mode_enable - Enable eMLSR mode support
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This cfg is used to enable eMLSR mode
- * If 0 - MLMR mode (Default mode)
- * If 1 - eMLSR mode
- *
- * Related: None
- *
- * Supported Feature: STA
- */
-#define CFG_EMLSR_MODE_ENABLE CFG_BOOL( \
-		"emlsr_mode_enable", \
-		0, \
-		"eMLSR mode enable flag")
-#define CFG_EMLSR_MODE_ENABLED	CFG(CFG_EMLSR_MODE_ENABLE)
-
-/*
  * sap_emlsr_mode_enable - Enable sap eMLSR mode support
  * @Min: 0
  * @Max: 1
@@ -463,7 +443,6 @@ enum wlan_epcs_frame {
 #define CFG_SAP_EMLSR_MODE_ENABLED	CFG(CFG_SAP_EMLSR_MODE_ENABLE)
 
 #else
-#define CFG_EMLSR_MODE_ENABLED
 #define CFG_SAP_EMLSR_MODE_ENABLED
 #endif
 
@@ -1306,8 +1285,29 @@ enum wlan_epcs_frame {
 					"T2LM negotiation supported value")
 
 #define CFG_T2LM_NEGOTIATION_SUPPORTED CFG(CFG_T2LM_NEGOTIATION_SUPPORT)
+
+/*
+ * link_recfg_support - Enable Link Reconfig support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This cfg is used to enable Link Reconfiguration support
+ *
+ *
+ * Supported Feature: STA
+ *
+ */
+#define CFG_LINK_RECFG_SUPPORT CFG_INI_BOOL( \
+		"link_recfg_support", \
+		0, \
+		"Enable/Disable Link Reconfiguration support")
+
+#define CFG_LINK_RECFG_SUPPORTED CFG(CFG_LINK_RECFG_SUPPORT)
+
 #else
 #define CFG_T2LM_NEGOTIATION_SUPPORTED
+#define CFG_LINK_RECFG_SUPPORTED
 #endif
 
 /*
@@ -1325,7 +1325,7 @@ enum wlan_epcs_frame {
  */
 #define CFG_REDUCE_PWR_SCAN_MODE CFG_INI_BOOL( \
 	"enable_reduce_pwr_scan", \
-	0, \
+	1, \
 	"Reduce power scan mode")
 
 #define CFG_GENERIC_ALL \
@@ -1369,10 +1369,10 @@ enum wlan_epcs_frame {
 	CFG(CFG_TX_RETRY_MULTIPLIER) \
 	CFG(CFG_MGMT_FRAME_HW_TX_RETRY_COUNT) \
 	CFG_6GHZ_STD_CONN_POLICY \
-	CFG_EMLSR_MODE_ENABLED \
 	CFG_SAP_EMLSR_MODE_ENABLED \
 	CFG_SR_ENABLE_MODES_ALL \
 	CFG_T2LM_NEGOTIATION_SUPPORTED \
+	CFG_LINK_RECFG_SUPPORTED \
 	CFG_RELAXED_LPI_CONN_POLICY \
 	CFG(CFG_REDUCE_PWR_SCAN_MODE)
 #endif /* __CFG_MLME_GENERIC_H */

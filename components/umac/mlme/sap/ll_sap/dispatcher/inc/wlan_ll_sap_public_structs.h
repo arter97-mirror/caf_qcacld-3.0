@@ -200,11 +200,13 @@ struct wlan_bearer_switch_request {
  * @connect_req_type: Connect request type
  * @vdev_available_duration: Vdev available duratin, for which vdev, identified
  * with vdev id will remain on its current channel
+ * @operation: high ap availability operation type
  */
 struct ll_sap_oob_connect_request {
 	uint8_t vdev_id;
 	enum high_ap_availability_operation connect_req_type;
 	uint32_t vdev_available_duration;
+	enum high_ap_availability_operation operation;
 };
 
 /**
@@ -256,7 +258,7 @@ struct wlan_ll_sap_tx_ops {
 					enum bearer_switch_status status);
 	QDF_STATUS (*send_oob_connect_request)(
 					struct wlan_objmgr_psoc *psoc,
-					struct ll_sap_oob_connect_request req);
+					struct ll_sap_oob_connect_request *req);
 	QDF_STATUS (*get_tsf_stats_for_csa)(
 					struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);

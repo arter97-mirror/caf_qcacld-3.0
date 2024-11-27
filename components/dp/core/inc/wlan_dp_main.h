@@ -1099,10 +1099,12 @@ QDF_STATUS wlan_dp_select_profile_cfg(struct wlan_objmgr_psoc *psoc)
 /**
  * wlan_dp_link_cdp_vdev_delete_notification() - CDP vdev delete notification
  * @context: osif_vdev handle
+ * @cdp_vdev: CDP vdev handle
  *
  * Return: None
  */
-void wlan_dp_link_cdp_vdev_delete_notification(void *context);
+void wlan_dp_link_cdp_vdev_delete_notification(ol_osif_vdev_handle context,
+					       struct cdp_vdev *cdp_vdev);
 
 /* DP CFG APIs - START */
 
@@ -1270,4 +1272,19 @@ wlan_dp_get_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
 
 	return ((a ^ b) ^ (c ^ d) ^ e);
 }
+
+static inline bool wlan_dp_link_check_cdp_vdev(struct wlan_dp_link *dp_link,
+					       struct cdp_vdev *cdp_vdev)
+{
+	struct cdp_vdev *temp_cdp_vdev;
+
+	TAILQ_FOREACH(temp_cdp_vdev, &dp_link->cdp_vdev_list,
+		      cdp_vdev_list_elem) {
+		if (temp_cdp_vdev == cdp_vdev)
+			return true;
+	}
+
+	return false;
+}
+
 #endif

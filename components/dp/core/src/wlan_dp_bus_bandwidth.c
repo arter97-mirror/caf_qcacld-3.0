@@ -42,6 +42,7 @@
 #include "cdp_txrx_host_stats.h"
 #include "wlan_cm_roam_api.h"
 #include "hif_main.h"
+#include "wlan_dp_stc.h"
 
 #ifdef FEATURE_BUS_BANDWIDTH_MGR
 /*
@@ -1155,6 +1156,7 @@ static void dp_display_periodic_stats(struct wlan_dp_psoc_context *dp_ctx,
 				(ctx, QDF_STATS_VERBOSITY_LEVEL_LOW);
 			cdp_display_txrx_hw_info(soc);
 			qdf_dp_trace_dump_stats();
+			wlan_dp_stc_dump_periodic_stats(dp_ctx);
 		}
 		counter = 0;
 		data_in_time_period = false;

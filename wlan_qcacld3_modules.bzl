@@ -3,6 +3,9 @@ load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//msm-kernel:target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
+    "seraph": [
+	"peach-v2",
+    ],
     "neo-la": [
 	"kiwi-v2",
     ],
@@ -18,6 +21,7 @@ _target_chipset_map = {
 	"peach",
 	"kiwi-v2",
 	"qca6750",
+	"wcn6450",
     ],
     "sun": [
 	"peach-v2",
@@ -37,6 +41,9 @@ _target_chipset_map = {
         "peach-v2",
         "kiwi-v2",
     ],
+    "sdxkova": [
+        "kiwi-v2",
+    ],
 }
 
 _chipset_hw_map = {
@@ -46,6 +53,7 @@ _chipset_hw_map = {
     "qca6750": "MOSELLE",
     "wcn7750": "BERYLLIUM",
     "qca6490": "LITHIUM",
+    "wcn6450": "RHINE",
 }
 
 _chipset_header_map = {
@@ -73,6 +81,10 @@ _chipset_header_map = {
         "api/hw/qca6490/v1",
         "cmn/hal/wifi3.0/qca6490",
     ],
+    "wcn6450": [
+        "api/hw/wcn6450/v1",
+        "cmn/hal/wifi3.0/wcn6450",
+    ],
 }
 
 _hw_header_map = {
@@ -84,6 +96,9 @@ _hw_header_map = {
     ],
     "LITHIUM": [
         "cmn/hal/wifi3.0/li",
+    ],
+    "RHINE": [
+        "cmn/hal/wifi3.0/rh",
     ],
 }
 
@@ -1410,6 +1425,14 @@ _conditional_srcs = {
             "cmn/hal/wifi3.0/hal_srng.c",
             "cmn/wlan_cfg/wlan_cfg.c",
             "components/dp/core/src/wlan_dp_prealloc.c",
+            "cmn/hif/src/ce/ce_service_legacy.c",
+            "cmn/hif/src/hif_main_legacy.c",
+            "cmn/hal/wifi3.0/rh/hal_rh_generic_api.c"
+        ],
+    },
+	"CONFIG_CNSS_WCN6450": {
+        True: [
+            "cmn/hal/wifi3.0/wcn6450/hal_wcn6450.c",
         ],
     },
     "CONFIG_RX_FISA": {
@@ -2192,6 +2215,9 @@ _conditional_srcs = {
     "CONFIG_AFC_SUPPORT": {
         True: [
             "core/hdd/src/wlan_hdd_afc.c",
+            "cmn/os_if/linux/afc/src/wlan_cfg80211_afc.c",
+            "cmn/umac/afc/core/src/wlan_afc_main.c",
+            "cmn/umac/afc/dispatcher/src/wlan_afc_ucfg_api.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_LL_LT_SAP": {
@@ -2346,6 +2372,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         cmd = cmd,
     )
 
+    copts.append("-Wunused-but-set-parameter")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 
@@ -2374,15 +2401,35 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         ],
         cmd = "cat $(SRCS) > $@",
     )
-
+    native.genrule(
+        name = "configs/{}_defconfig_generate_perf-defconfig".format(tvc),
+        outs = ["configs/{}_defconfig.generated_perf-defconfig".format(tvc)],
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
+        name = "configs/{}_defconfig_generate_debug-defconfig".format(tvc),
+        outs = ["configs/{}_defconfig.generated_debug-defconfig".format(tvc)],
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+            "configs/{}_consolidate_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
+    if target == "sdxkova":
+        out = "wlan.ko"
+    else:
+        out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
+
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
-    if chipset == "qca6750" or chipset == "wcn7750":
+    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450":
         deps = [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
@@ -2399,10 +2446,22 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
         ]
 
-    if target != "x1e80100" and target != "anorak" and target != "neo-la":
+    if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
+        ]
+
+    if target == "sdxkova":
+        tgt = "target-aarch64_cortex-a53_musl"
+        board = "sdx85"
+        deps = [
+            "//msm-kernel:all_headers",
+            "//build_dir/{}/linux-{}/wlan-cnss2:wlan-platform-headers".format(tgt, board),
+            "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss2".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_utils".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_prealloc".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_nl".format(tgt, board, tv),
         ]
 
     print("name=", name)
@@ -2446,16 +2505,17 @@ def define_dist(target, variant, chipsets):
             mode_overrides = {"**/*": "644"},
             log = "info",
         )
-    copy_to_dist_dir(
-        name = "{}_all_modules_dist".format(tv),
-        data = dataList,
-        dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
-        flat = True,
-        wipe_dist_dir = False,
-        allow_duplicate_filenames = False,
-        mode_overrides = {"**/*": "644"},
-        log = "info",
-    )
+    if target != "sdxkova":
+        copy_to_dist_dir(
+            name = "{}_all_modules_dist".format(tv),
+            data = dataList,
+            dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+            flat = True,
+            wipe_dist_dir = False,
+            allow_duplicate_filenames = False,
+            mode_overrides = {"**/*": "644"},
+            log = "info",
+        )
 
 def define_modules():
     for (t, v) in get_all_variants():

@@ -593,15 +593,15 @@ hdd_get_dot11mode_filter(struct hdd_context *hdd_ctx)
 }
 
 /**
- * hdd_get_sap_adapter_of_dfs - Get sap adapter on dfs channel
+ * hdd_get_sap_link_info_of_dfs - Get sap link info on dfs channel
  * @hdd_ctx: HDD context
  *
- * This function is used to get the sap adapter on dfs channel.
+ * This function is used to get the sap link info on dfs channel.
  *
- * Return: pointer to adapter or null
+ * Return: pointer to link_info or null
  */
-static struct hdd_adapter *
-hdd_get_sap_adapter_of_dfs(struct hdd_context *hdd_ctx)
+static struct wlan_hdd_link_info *
+hdd_get_sap_link_info_of_dfs(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER;
@@ -659,7 +659,7 @@ hdd_get_sap_adapter_of_dfs(struct hdd_context *hdd_ctx)
 					hdd_adapter_dev_put_debug(next_adapter,
 								  dbgid);
 
-				return adapter;
+				return link_info;
 			}
 		}
 loop_next:
@@ -682,7 +682,6 @@ static
 bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 					 struct cfg80211_connect_params *req)
 {
-	struct hdd_adapter *ap_adapter;
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct hdd_hostapd_state *hostapd_state;
 	QDF_STATUS status;
@@ -695,10 +694,11 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	struct scan_cache_node *cur_node = NULL;
 	bool is_6ghz_cap = false;
 	int ret;
+	struct wlan_hdd_link_info *link_info;
 
-	ap_adapter = hdd_get_sap_adapter_of_dfs(hdd_ctx);
+	link_info = hdd_get_sap_link_info_of_dfs(hdd_ctx);
 	/* probably no dfs sap running, no handling required */
-	if (!ap_adapter)
+	if (!link_info)
 		return true;
 
 	/* if sap is currently doing CAC then don't allow sta to go further */
@@ -711,12 +711,17 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	 * log and return error, if we allow STA to go through, we don't
 	 * know what is going to happen better stop sta connection
 	 */
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(ap_adapter->deflink);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	if (!hdd_ap_ctx) {
 		hdd_err("AP context not found");
 		return false;
 	}
 
+	if (policy_mgr_is_sta_sap_scc(hdd_ctx->psoc,
+				      hdd_ap_ctx->operating_chan_freq)) {
+		hdd_debug("DFS SAP is already in SCC with STA");
+		return true;
+	}
 	if (req->channel && req->channel->center_freq) {
 		ch_freq = req->channel->center_freq;
 		goto def_chan;
@@ -789,7 +794,7 @@ def_chan:
 	ch_bw = hdd_ap_ctx->sap_config.ch_width_orig;
 	if (ch_freq)
 		is_6ghz_cap = policy_mgr_get_ap_6ghz_capable(hdd_ctx->psoc,
-						ap_adapter->deflink->vdev_id,
+						link_info->vdev_id,
 							     NULL);
 
 	if (!ch_freq || wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) ||
@@ -798,7 +803,7 @@ def_chan:
 	    (WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq) && !is_6ghz_cap))
 		ch_freq = policy_mgr_get_nondfs_preferred_channel(
 				hdd_ctx->psoc, PM_SAP_MODE,
-				true, ap_adapter->deflink->vdev_id);
+				true, link_info->vdev_id);
 
 	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
 	    ch_bw > CH_WIDTH_20MHZ) {
@@ -825,12 +830,12 @@ def_chan:
 			  ch_bw);
 	}
 
-	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter->deflink);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 	qdf_event_reset(&hostapd_state->qdf_event);
-	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->deflink->vdev_id,
+	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
 				    CSA_REASON_STA_CONNECT_DFS_TO_NON_DFS);
 
-	ret = hdd_softap_set_channel_change(ap_adapter->deflink, ch_freq, 0,
+	ret = hdd_softap_set_channel_change(link_info, ch_freq, 0,
 					    ch_bw, NO_SCHANS_PUNC, false, true);
 	if (ret) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");
@@ -854,6 +859,11 @@ def_chan:
 	}
 
 	return true;
+}
+
+static inline void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
+{
+	adapter->discon_link_info = NULL;
 }
 
 int wlan_hdd_cm_connect(struct wiphy *wiphy,
@@ -965,6 +975,8 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	}
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
+	hdd_clear_disconnect_receive(adapter);
+
 	return status;
 }
 
@@ -1789,12 +1801,16 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			       sta_ctx->conn_info.chan_freq);
 	hdd_wmm_assoc(adapter, false, uapsd_mask);
 
-	if (!rsp->is_wps_connection &&
+	/*
+	 * for vdev is_vdev_repurpose/OPEN/WEP/FILS, Set is auth required as
+	 * false, as keys are already set.
+	 */
+	if (is_vdev_repurpose || (!rsp->is_wps_connection &&
 	    !rsp->is_osen_connection &&
 	    (sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_NONE ||
 	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_OPEN_SYSTEM ||
 	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_SHARED_KEY ||
-	     hdd_cm_is_fils_connection(rsp)))
+	     hdd_cm_is_fils_connection(rsp))))
 		is_auth_required = false;
 
 	if (is_roam)
@@ -1811,8 +1827,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				wlan_acquire_peer_key_wakelock(hdd_ctx->pdev,
 							      rsp->bssid.bytes);
 		}
-		hdd_debug("is_roam_offload %d, is_roam %d, is_auth_required %d",
-			  is_roam_offload, is_roam, is_auth_required);
+		hdd_debug("is_roam_offload %d is_roam %d vdev repurpose %d is_auth_required %d",
+			  is_roam_offload, is_roam,  is_vdev_repurpose, is_auth_required);
 		hdd_roam_register_sta(link_info, &rsp->bssid, is_auth_required);
 	} else {
 		/* for host roam/LFR2 */
@@ -1869,11 +1885,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	if (is_roam)
 		ucfg_dp_nud_indicate_roam(vdev);
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
-}
-
-static inline void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
-{
-	adapter->discon_link_info = NULL;
 }
 
 static void

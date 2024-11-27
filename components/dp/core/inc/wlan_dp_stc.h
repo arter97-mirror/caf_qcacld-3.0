@@ -26,6 +26,27 @@
 #include "wlan_dp_main.h"
 #include "wlan_dp_spm.h"
 
+/* Macros used by STC logmask */
+#define WLAN_DP_STC_LOGMASK_FLOW_STATS BIT(0)
+#define WLAN_DP_STC_LOGMASK_CLASSIFIED_FLOW_STATS BIT(1)
+/* L1 is the lowest verbosity level */
+#define WLAN_DP_STC_LOGMASK_VERBOSE_L1 BIT(2)
+#define WLAN_DP_STC_LOGMASK_VERBOSE_L2 BIT(3)
+
+#define dp_stc_info(debug_mask, params...)				\
+	do {								\
+		if (unlikely((debug_mask) &				\
+		    WLAN_DP_STC_LOGMASK_VERBOSE_L1))			\
+			QDF_TRACE_INFO(QDF_MODULE_ID_DP, params);	\
+	} while (0)
+
+#define dp_stc_debug(debug_mask, params...)				\
+	do {								\
+		if (unlikely((debug_mask) &				\
+		    WLAN_DP_STC_LOGMASK_VERBOSE_L2))			\
+			QDF_TRACE_INFO(QDF_MODULE_ID_DP, params);	\
+	} while (0)
+
 #define DP_STC_UPDATE_MIN_MAX_STATS(__field, __val)			\
 	do {								\
 		if (__field##_min == 0 || __field##_min > __val)	\
@@ -181,6 +202,7 @@ struct wlan_dp_stc_sampling_candidate {
  * @burst_stats_report_ts: Burst stats reported timestamp
  * @flags: flags set by timer
  * @flags1: flags set by periodic work
+ * @id: index of this sampling table entry in the sampling table
  * @next_sample_idx: next sample index to fill min/max stats in per-packet path
  * @next_win_idx: next window index to fill min/max stats in per-packet path
  * @max_num_sample_attempts: max number of sampling_timer runs to collect
@@ -201,6 +223,7 @@ struct wlan_dp_stc_sampling_table_entry {
 	uint64_t burst_stats_report_ts;
 	uint32_t flags;
 	uint32_t flags1;
+	uint8_t id;
 	uint8_t next_sample_idx;
 	uint8_t next_win_idx;
 	uint8_t max_num_sample_attempts;
@@ -351,12 +374,17 @@ struct wlan_dp_stc_peer_traffic_context {
  * @tx_flow_id: TX flow table index
  * @rx_flow_id: RX flow table index
  * @peer_id: ID of the peer on which the flow is running
+ * @id: index of this classified flow entry in the classified flow table
  * @prev_tx_pkts: Last snapshot for TX pkts count
  * @prev_rx_pkts: Last snapshot for RX pkts count
  * @flags: flags bitmap
  * @del_flags: delete flags bitmap
  * @traffic_type: Traffic type identified
  * @state: STATE
+ * @inactivity_start_ts: start timestamp when flow was marked inactive
+ * @num_inactive: number of times this flow became inactive
+ * @inactive_time: Total time for which the flow was inactive
+ * @add_ts: timestamp when the flow was added to classified flow table
  */
 struct wlan_dp_stc_classified_flow_entry {
 	uint8_t flow_active;
@@ -364,12 +392,17 @@ struct wlan_dp_stc_classified_flow_entry {
 	uint16_t tx_flow_id;
 	uint16_t rx_flow_id;
 	uint16_t peer_id;
+	uint16_t id;
 	uint32_t prev_tx_pkts;
 	uint32_t prev_rx_pkts;
 	unsigned long flags;
 	unsigned long del_flags;
 	enum qca_traffic_type traffic_type;
 	qdf_atomic_t state;
+	uint64_t inactivity_start_ts;
+	uint32_t num_inactive;
+	uint64_t inactive_time;
+	uint64_t add_ts;
 };
 
 /**
@@ -423,6 +456,65 @@ struct wlan_dp_stc {
 /* Function Declaration - START */
 
 #ifdef WLAN_DP_FEATURE_STC
+#define BUF_LEN_MAX 256
+static inline bool is_flow_tuple_ipv4(struct flow_info *flow_tuple)
+{
+	if (qdf_likely((flow_tuple->flags | DP_FLOW_TUPLE_FLAGS_IPV4)))
+		return true;
+
+	return false;
+}
+
+static inline bool is_flow_tuple_ipv6(struct flow_info *flow_tuple)
+{
+	if (qdf_likely((flow_tuple->flags | DP_FLOW_TUPLE_FLAGS_IPV6)))
+		return true;
+
+	return false;
+}
+
+/**
+ * dp_print_tuple_to_str() - Print flow tuple to a string
+ * @flow_tuple: Flow tuple
+ * @buf: Buffer to which the tuple is to be printed
+ * @buf_len: buffer length
+ *
+ * Return: buffer where flow tuple is printed as string
+ */
+static inline uint8_t *dp_print_tuple_to_str(struct flow_info *flow_tuple,
+					     uint8_t *buf, uint16_t buf_len)
+{
+	uint16_t len = 0;
+
+	if (is_flow_tuple_ipv4(flow_tuple)) {
+		len += scnprintf(buf + len, buf_len - len,
+				 "0x%x", flow_tuple->src_ip.ipv4_addr);
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x", flow_tuple->dst_ip.ipv4_addr);
+	} else if (is_flow_tuple_ipv6(flow_tuple)) {
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x-0x%x-0x%x-0x%x",
+				 flow_tuple->src_ip.ipv6_addr[0],
+				 flow_tuple->src_ip.ipv6_addr[1],
+				 flow_tuple->src_ip.ipv6_addr[2],
+				 flow_tuple->src_ip.ipv6_addr[3]);
+		len += scnprintf(buf + len, buf_len - len,
+				 " 0x%x-0x%x-0x%x-0x%x",
+				 flow_tuple->dst_ip.ipv6_addr[0],
+				 flow_tuple->dst_ip.ipv6_addr[1],
+				 flow_tuple->dst_ip.ipv6_addr[2],
+				 flow_tuple->dst_ip.ipv6_addr[3]);
+	}
+
+	len += scnprintf(buf + len, buf_len - len,
+			 " %u", flow_tuple->src_port);
+	len += scnprintf(buf + len, buf_len - len,
+			 " %u", flow_tuple->dst_port);
+	len += scnprintf(buf + len, buf_len - len, " %u", flow_tuple->proto);
+
+	return buf;
+}
+
 /**
  * dp_stc_get_timestamp() - Get current timestamp to be used in STC
  *			    critical per packet path and its related calculation
@@ -645,15 +737,35 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 }
 
 /**
- * wlan_dp_indicate_rx_flow_add() - Indication to STC when rx flow is added
+ * wlan_dp_indicate_flow_add() - Indication to STC when flow is added
  * @dp_ctx: Global DP psoc context
+ * @dir: direction of flow (RX/TX)
+ * @flow_tuple: Tuple of the flow which got added
  *
  * Return: None
  */
 static inline void
-wlan_dp_indicate_rx_flow_add(struct wlan_dp_psoc_context *dp_ctx)
+wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
+			  enum wlan_dp_flow_dir dir,
+			  struct flow_info *flow_tuple)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	uint8_t buf[BUF_LEN_MAX];
+
+	switch (dir) {
+	case WLAN_DP_FLOW_DIR_TX:
+		dp_stc_debug(dp_stc->logmask, "STC: Add TX flow %s",
+			     dp_print_tuple_to_str(flow_tuple, buf,
+						   BUF_LEN_MAX));
+		break;
+	case WLAN_DP_FLOW_DIR_RX:
+		dp_stc_debug(dp_stc->logmask, "STC: Add RX flow %s",
+			     dp_print_tuple_to_str(flow_tuple, buf,
+						   BUF_LEN_MAX));
+		break;
+	default:
+		break;
+	}
 
 	/* RCU or atomic variable?? */
 	if (dp_stc && dp_stc->periodic_work_state < WLAN_DP_STC_WORK_STARTED) {
@@ -819,6 +931,39 @@ void wlan_dp_stc_update_logmask(struct wlan_dp_psoc_context *dp_ctx,
 				uint32_t mask);
 
 /**
+ * wlan_dp_stc_dump_periodic_stats() - Function to print STC periodic stats
+ * @dp_ctx: Datapath component context
+ *
+ * Return: None
+ */
+void wlan_dp_stc_dump_periodic_stats(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_stc_print_sampling_table() - Dump the sampling table
+ * @dp_ctx: Datapath component context
+ *
+ * Return: None
+ */
+void wlan_dp_stc_print_sampling_table(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_stc_print_classified_table() - Dump the classified table
+ * @dp_ctx: Datapath component context
+ *
+ * Return: None
+ */
+void wlan_dp_stc_print_classified_table(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_stc_print_active_traffic_map() - Dump the active traffic map
+ *					    for all the valid peers
+ * @dp_ctx: Datapath component context
+ *
+ * Return: None
+ */
+void wlan_dp_stc_print_active_traffic_map(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
  * wlan_dp_stc_attach() - STC attach
  * @dp_ctx: DP global psoc context
  *
@@ -841,7 +986,9 @@ wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 }
 
 static inline void
-wlan_dp_indicate_rx_flow_add(struct wlan_dp_psoc_context *dp_ctx)
+wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
+			  enum wlan_dp_flow_dir dir,
+			  struct flow_info *flow_tuple)
 {
 }
 
@@ -901,6 +1048,26 @@ uint32_t wlan_dp_stc_get_logmask(struct wlan_dp_psoc_context *dp_ctx)
 static inline
 void wlan_dp_stc_update_logmask(struct wlan_dp_psoc_context *dp_ctx,
 				uint32_t mask)
+{
+}
+
+static inline void
+wlan_dp_stc_dump_periodic_stats(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+
+static inline void
+wlan_dp_stc_print_sampling_table(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+
+static inline void
+wlan_dp_stc_print_classified_table(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+
+static inline void
+wlan_dp_stc_print_active_traffic_map(struct wlan_dp_psoc_context *dp_ctx)
 {
 }
 

@@ -318,13 +318,19 @@ typedef enum {
 #define WIFI_FEATURE_IE_ALLOWLIST       0x1000000 /* Support Probe IE allow
 						   * listing
 						   */
-#define WIFI_FEATURE_SCAN_RAND          0x2000000 /* Support MAC & Probe Sequence Number randomization */
-#define WIFI_FEATURE_SET_LATENCY_MODE   0x40000000 /* Set latency mode */
-/* Support changing MAC address without iface reset(down and up) */
-#define WIFI_FEATURE_DYNAMIC_SET_MAC    0x10000000
-
+/* Support MAC & Probe Sequence Number randomization */
+#define WIFI_FEATURE_SCAN_RAND          0x2000000
 /* Support Tx Power Limit setting */
 #define WIFI_FEATURE_SET_TX_POWER_LIMIT 0x4000000
+/* Support changing MAC address without iface reset(down and up) */
+#define WIFI_FEATURE_DYNAMIC_SET_MAC    0x10000000
+#define WIFI_FEATURE_SET_LATENCY_MODE   0x40000000 /* Set latency mode */
+/* Support for configuring roaming mode */
+#define WIFI_FEATURE_ROAMING_MODE_CONTROL 0x800000000
+
+#define WIFI_FEATURE_CACHED_SCAN_RESULTS 0x2000000000
+
+#define WIFI_FEATURE_MAX_BIT_POS 64
 
 /* Add more features here */
 #define WIFI_TDLS_SUPPORT			BIT(0)
@@ -425,6 +431,37 @@ extern const struct nla_policy
 	.doit = wlan_hdd_cfg80211_set_trace_level,			\
 	vendor_command_policy(qca_wlan_vendor_set_trace_level_policy,	\
 			      QCA_WLAN_VENDOR_ATTR_SET_TRACE_LEVEL_MAX)	\
+},
+
+#define CHAN_USAGE_REQ_CHAN_LIST_MAX \
+			QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_CHAN_LIST_MAX
+
+#define CHAN_USAGE_REQ_CHAN_LIST_CHAN \
+			QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_CHAN_LIST_CHAN
+
+#define CHAN_USAGE_REQ_CHAN_LIST_OP_CLASS \
+			QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_CHAN_LIST_OP_CLASS
+
+#define CHAN_USAGE_REQ_MAX       QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_MAX
+#define CHAN_USAGE_REQ_MODE      QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_MODE
+#define CHAN_USAGE_REQ_CHAN_LIST QCA_WLAN_VENDOR_ATTR_CHAN_USAGE_REQ_CHAN_LIST
+
+extern const struct nla_policy
+qca_wlan_vendor_p2p_chan_switch_params[CHAN_USAGE_REQ_CHAN_LIST_MAX + 1];
+
+extern const struct nla_policy
+qca_wlan_vendor_p2p_chan_req_mode[CHAN_USAGE_REQ_MAX + 1];
+
+#define FEATURE_AP_ASSIST_P2P_DFS_GROUP					\
+{									\
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,			\
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_CHAN_USAGE_REQ,	\
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |				\
+		 WIPHY_VENDOR_CMD_NEED_NETDEV |				\
+		 WIPHY_VENDOR_CMD_NEED_RUNNING,				\
+	.doit = wlan_hdd_cfg80211_p2p_chan_usage_req,			\
+	vendor_command_policy(qca_wlan_vendor_p2p_chan_req_mode,	\
+			      CHAN_USAGE_REQ_MAX)			\
 },
 
 /**

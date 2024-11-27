@@ -1306,3 +1306,8 @@ void ucfg_tdls_set_user_tdls_enable(struct wlan_objmgr_vdev *vdev,
 {
 	return tdls_set_user_tdls_enable(vdev, is_user_tdls_enable);
 }
+
+bool ucfg_tdls_is_vdev_allowed_to_tx(struct wlan_objmgr_vdev *vdev)
+{
+	return tdls_is_vdev_allowed_to_tx(vdev);
+}

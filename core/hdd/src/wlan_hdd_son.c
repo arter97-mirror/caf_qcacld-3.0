@@ -23,6 +23,7 @@
 #include <wlan_hdd_main.h>
 #include <wlan_hdd_sta_info.h>
 #include <wlan_hdd_regulatory.h>
+#include "cdp_txrx_host_stats.h"
 #include <os_if_son.h>
 #include <sap_internal.h>
 #include <wma_api.h>
@@ -2254,7 +2255,7 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 					  &tmp_zero_nchans,
 					  sizeof(acs_report->nchans));
 		if (not_copied)
-			hdd_debug("%ul is not copied to zero nchans",
+			hdd_debug("%zu is not copied to zero nchans",
 				  not_copied);
 		hdd_err("ACS is in-progress");
 		ret = -EAGAIN;
@@ -2324,7 +2325,7 @@ static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
 		}
 		not_copied = copy_to_user(acs_report, acs_r, sizeof(*acs_r));
 		if (not_copied)
-			hdd_debug("%ul is not copied", not_copied);
+			hdd_debug("%zu is not copied", not_copied);
 	} else if (acs_type == ACS_CHAN_NF_STATS) {
 	} else if (acs_type == ACS_NEIGHBOUR_GET_LIST_COUNT ||
 		   acs_type == ACS_NEIGHBOUR_GET_LIST) {
@@ -2390,6 +2391,56 @@ wlan_hdd_son_get_ieee_phymode(enum wlan_phymode wlan_phymode)
 }
 
 /**
+ * hdd_son_update_peer_stats() - Function to update peer stats for SON
+ * @stats: Pointer to peer stats event
+ *
+ * Return: None
+ */
+static void hdd_son_update_peer_stats(struct stats_event *stats)
+{
+	struct cdp_peer_stats *peer_stats;
+	struct peer_stats_info_ext_event *peer_stats_info_ext;
+	QDF_STATUS status;
+	ol_txrx_soc_handle soc;
+	uint8_t vdev_id;
+	int i;
+
+	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
+	if (!peer_stats)
+		return;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	for (i = 0; i < stats->num_peer_stats_info_ext; i++) {
+		peer_stats_info_ext = &stats->peer_stats_info_ext[i];
+
+		status = cdp_peer_get_vdevid(soc,
+					     peer_stats_info_ext->
+					     peer_macaddr.bytes,
+					     &vdev_id);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_err("Unable to find peer" QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(peer_stats->mac_addr.bytes));
+			continue;
+		}
+
+		qdf_mem_copy(&peer_stats->mac_addr,
+			     &peer_stats_info_ext->peer_macaddr,
+			     sizeof(peer_stats->mac_addr));
+		peer_stats->tx.last_tx_rate = peer_stats_info_ext->tx_rate;
+		peer_stats->rx.last_snr = peer_stats_info_ext->rssi;
+
+		cdp_son_update_peer_stats(soc, vdev_id, peer_stats);
+		hdd_debug("i=%d, tx rate=%d, rssi=%d, mac addr: "
+			  QDF_MAC_ADDR_FMT, i,
+			  peer_stats_info_ext->tx_rate,
+			  peer_stats_info_ext->rssi,
+			  QDF_MAC_ADDR_REF(peer_stats->mac_addr.bytes));
+	}
+	qdf_mem_free(peer_stats);
+}
+
+/**
  * hdd_son_get_peer_tx_rate() - Get peer tx rate from FW
  * @vdev: pointer to object mgr vdev
  * @peer_macaddr: peer mac address
@@ -2412,6 +2463,8 @@ static uint32_t hdd_son_get_peer_tx_rate(struct wlan_objmgr_vdev *vdev,
 		hdd_err("Unable to get peer tx rate from fw");
 		return tx_rate;
 	}
+
+	hdd_son_update_peer_stats(stats);
 
 	tx_rate = stats->peer_stats_info_ext->tx_rate;
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);

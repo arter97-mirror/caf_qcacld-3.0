@@ -25,6 +25,8 @@
 #include <wlan_hdd_includes.h>
 #include "osif_psoc_sync.h"
 #include <wlan_hdd_sysfs.h>
+#include "osif_vdev_sync.h"
+#include "wlan_hdd_object_manager.h"
 #include <wlan_hdd_sysfs_dp_stc.h>
 #include "wlan_dp_ucfg_api.h"
 
@@ -137,11 +139,175 @@ hdd_sysfs_dp_stc_logmask_store(struct kobject *kobj,
 	return errno_size;
 }
 
+static ssize_t __hdd_sysfs_dp_stc_c_table_show(struct hdd_context *hdd_ctx,
+					       struct kobj_attribute *attr,
+					       char *buf)
+{
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	ucfg_dp_stc_print_classified_table(hdd_ctx->psoc);
+
+	return 0;
+}
+
+static ssize_t hdd_sysfs_dp_stc_c_table_show(struct kobject *kobj,
+					     struct kobj_attribute *attr,
+					     char *buf)
+{
+	struct osif_psoc_sync *psoc_sync;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	ssize_t errno_size;
+	int ret;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+					     &psoc_sync);
+	if (errno_size)
+		return errno_size;
+
+	errno_size = __hdd_sysfs_dp_stc_c_table_show(hdd_ctx, attr, buf);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno_size;
+}
+
+static ssize_t __hdd_sysfs_dp_stc_s_table_show(struct hdd_context *hdd_ctx,
+					       struct kobj_attribute *attr,
+					       char *buf)
+{
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	ucfg_dp_stc_print_sampling_table(hdd_ctx->psoc);
+
+	return 0;
+}
+
+static ssize_t hdd_sysfs_dp_stc_s_table_show(struct kobject *kobj,
+					     struct kobj_attribute *attr,
+					     char *buf)
+{
+	struct osif_psoc_sync *psoc_sync;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	ssize_t errno_size;
+	int ret;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+					     &psoc_sync);
+	if (errno_size)
+		return errno_size;
+
+	errno_size = __hdd_sysfs_dp_stc_s_table_show(hdd_ctx, attr, buf);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno_size;
+}
+
+static ssize_t
+__hdd_sysfs_dp_stc_active_traffic_map_show(struct hdd_context *hdd_ctx,
+					   struct kobj_attribute *attr,
+					   char *buf)
+{
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	ucfg_dp_stc_print_active_traffic_map(hdd_ctx->psoc);
+
+	return 0;
+}
+
+static ssize_t
+hdd_sysfs_dp_stc_active_traffic_map_show(struct kobject *kobj,
+					 struct kobj_attribute *attr,
+					 char *buf)
+{
+	struct osif_psoc_sync *psoc_sync;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	ssize_t errno_size;
+	int ret;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+					     &psoc_sync);
+	if (errno_size)
+		return errno_size;
+
+	errno_size = __hdd_sysfs_dp_stc_active_traffic_map_show(hdd_ctx, attr,
+								buf);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno_size;
+}
+
+static ssize_t __hdd_sysfs_dp_stc_tx_aft_show(struct hdd_context *hdd_ctx,
+					      struct kobj_attribute *attr,
+					      char *buf)
+{
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	ucfg_dp_spm_dump_tx_aft(hdd_ctx->psoc);
+
+	return 0;
+}
+
+static ssize_t hdd_sysfs_dp_stc_tx_aft_show(struct kobject *kobj,
+					    struct kobj_attribute *attr,
+					    char *buf)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct osif_psoc_sync *psoc_sync;
+	ssize_t errno_size;
+	int ret;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+					     &psoc_sync);
+	if (errno_size)
+		return errno_size;
+
+	errno_size = __hdd_sysfs_dp_stc_tx_aft_show(hdd_ctx, attr, buf);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno_size;
+}
+
+static struct kobj_attribute dp_stc_tx_aft_attribute =
+	__ATTR(stc_tx_aft, 0444, hdd_sysfs_dp_stc_tx_aft_show, NULL);
+
+static struct kobj_attribute dp_stc_c_table_attribute =
+	__ATTR(stc_c_table, 0444, hdd_sysfs_dp_stc_c_table_show, NULL);
+
+static struct kobj_attribute dp_stc_s_table_attribute =
+	__ATTR(stc_s_table, 0444, hdd_sysfs_dp_stc_s_table_show, NULL);
+
+static struct kobj_attribute dp_stc_active_traffic_map_attribute =
+	__ATTR(stc_active_traffic_map, 0444,
+	       hdd_sysfs_dp_stc_active_traffic_map_show, NULL);
+
 static struct kobj_attribute dp_stc_logmask_attribute =
 	__ATTR(stc_logmask, 0664, hdd_sysfs_dp_stc_logmask_show,
 	       hdd_sysfs_dp_stc_logmask_store);
 
-int hdd_sysfs_dp_stc_logmask_create(struct kobject *driver_kobject)
+int hdd_sysfs_dp_stc_create(struct kobject *driver_kobject)
 {
 	int error;
 
@@ -155,11 +321,30 @@ int hdd_sysfs_dp_stc_logmask_create(struct kobject *driver_kobject)
 	if (error)
 		hdd_err("could not create stc_logmask sysfs file");
 
+	error = sysfs_create_file(driver_kobject,
+				  &dp_stc_c_table_attribute.attr);
+	if (error)
+		hdd_err("could not create stc_c_table sysfs file");
+
+	error = sysfs_create_file(driver_kobject,
+				  &dp_stc_s_table_attribute.attr);
+	if (error)
+		hdd_err("could not create stc_s_table sysfs file");
+
+	error = sysfs_create_file(driver_kobject,
+				  &dp_stc_active_traffic_map_attribute.attr);
+	if (error)
+		hdd_err("could not create stc_active_traffic_map sysfs file");
+
+	error = sysfs_create_file(driver_kobject,
+				  &dp_stc_tx_aft_attribute.attr);
+	if (error)
+		hdd_err("could not create stc_tx_aft sysfs file");
+
 	return error;
 }
 
-void
-hdd_sysfs_dp_stc_logmask_destroy(struct kobject *driver_kobject)
+void hdd_sysfs_dp_stc_destroy(struct kobject *driver_kobject)
 {
 	if (!driver_kobject) {
 		hdd_err("could not get driver kobject!");
@@ -167,4 +352,9 @@ hdd_sysfs_dp_stc_logmask_destroy(struct kobject *driver_kobject)
 	}
 
 	sysfs_remove_file(driver_kobject, &dp_stc_logmask_attribute.attr);
+	sysfs_remove_file(driver_kobject, &dp_stc_c_table_attribute.attr);
+	sysfs_remove_file(driver_kobject, &dp_stc_s_table_attribute.attr);
+	sysfs_remove_file(driver_kobject,
+			  &dp_stc_active_traffic_map_attribute.attr);
+	sysfs_remove_file(driver_kobject, &dp_stc_tx_aft_attribute.attr);
 }

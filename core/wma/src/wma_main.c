@@ -764,6 +764,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	wma_set_peer_map_unmap_v2_config(wma_handle->psoc, tgt_cfg);
 
 	tgt_cfg->notify_frame_support = DP_MARK_NOTIFY_FRAME_SUPPORT;
+	tgt_cfg->enable_optimize_power =
+			cfg_get(wma_handle->psoc, CFG_ENABLE_OPTIMIZE_POWER);
 
 	if (wma_is_smem_mailbox_supported(wma_handle))
 		wma_set_smem_mailbox_feature(wma_handle, tgt_cfg);
@@ -6731,6 +6733,10 @@ static void wma_set_mlme_caps(struct wlan_objmgr_psoc *psoc)
 	status = mlme_set_tgt_wpa3_roam_cap(psoc, akm_bitmap);
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("Failed to set sae roam support");
+
+	tgt_cap = wmi_service_enabled(wma->wmi_handle,
+				      wmi_service_mrsno_support);
+	ucfg_mlme_set_mrsno_support(psoc, tgt_cap);
 }
 
 #ifdef WLAN_FEATURE_BIG_DATA_STATS

@@ -2431,11 +2431,10 @@ QDF_STATUS rrm_reject_req(tpSirMacRadioMeasureReport *radiomes_report,
 {
 	tpSirMacRadioMeasureReport report;
 
-	if (!*radiomes_report) {
 	/*
-	 * Allocate memory to send reports for
-	 * any subsequent requests.
+	 * Allocate memory to send reports for any subsequent requests.
 	 */
+	if (!*radiomes_report) {
 		*radiomes_report = qdf_mem_malloc(sizeof(*report) *
 				(rrm_req->num_MeasurementRequest - index));
 		if (!*radiomes_report)
@@ -2481,6 +2480,7 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 	uint8_t i, index;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tpSirMacRadioMeasureReport report = NULL;
+	tDot11fIEMeasurementRequest *req;
 	uint8_t num_report = 0;
 	bool reject = false;
 
@@ -2497,10 +2497,36 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 		qdf_mem_free(report);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (QDF_IS_STATUS_ERROR(wlan_vdev_is_up(session_entry->vdev))) {
+		pe_info_rl("Vdev:%d is not up, reject RRM request",
+			   session_entry->vdev_id);
+		req = &rrm_req->MeasurementRequest[0];
+		wlan_diag_log_beacon_rpt_req_event(
+			rrm_req->DialogToken.token,
+			req->measurement_request.Beacon.meas_mode,
+			req->measurement_request.Beacon.regClass,
+			req->measurement_request.Beacon.channel,
+			req->measurement_type,
+			req->measurement_request.Beacon.meas_duration,
+			session_entry);
+		reject = true;
+		goto reject;
+	}
+
 	/* PF Fix */
 	if (rrm_req->NumOfRepetitions.repetitions > 0) {
 		pe_info("RX: [802.11 RRM] number of repetitions %d, sending incapable report",
 			rrm_req->NumOfRepetitions.repetitions);
+		req = &rrm_req->MeasurementRequest[0];
+		wlan_diag_log_beacon_rpt_req_event(
+			rrm_req->DialogToken.token,
+			req->measurement_request.Beacon.meas_mode,
+			req->measurement_request.Beacon.regClass,
+			req->measurement_request.Beacon.channel,
+			req->measurement_type,
+			req->measurement_request.Beacon.meas_duration,
+			session_entry);
 		/*
 		 * Send a report with incapable bit set.
 		 * Not supporting repetitions.
@@ -2516,6 +2542,15 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 
 	for (index = 0; index < MAX_MEASUREMENT_REQUEST; index++) {
 		if (mac_ctx->rrm.rrmPEContext.pCurrentReq[index]) {
+			req = &rrm_req->MeasurementRequest[0];
+			wlan_diag_log_beacon_rpt_req_event(
+				rrm_req->DialogToken.token,
+				req->measurement_request.Beacon.meas_mode,
+				req->measurement_request.Beacon.regClass,
+				req->measurement_request.Beacon.channel,
+				req->measurement_type,
+				req->measurement_request.Beacon.meas_duration,
+				session_entry);
 			reject = true;
 			pe_debug("RRM req for index: %d is already in progress",
 				 index);
@@ -2523,6 +2558,7 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 		}
 	}
 
+reject:
 	if (reject) {
 		for (i = 0; i < rrm_req->num_MeasurementRequest; i++) {
 			status =

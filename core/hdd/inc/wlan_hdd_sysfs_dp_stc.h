@@ -27,38 +27,40 @@
 
 #if defined(WLAN_SYSFS) && defined(WLAN_DP_FEATURE_STC)
 /**
- * hdd_sysfs_dp_stc_logmask_create() - API to create STC logging
- *				       related sysfs entry
+ * hdd_sysfs_dp_stc_create() - API to create STC related sysfs entries
  * @driver_kobject: sysfs driver kobject
  *
- * file path: /sys/kernel/wifi/dp_stc_logging
+ * file path:
+ *	/sys/kernel/wifi/stc_logmask
+ *	/sys/kernel/wifi/stc_tx_aft
+ *	/sys/kernel/wifi/stc_c_table
+ *	/sys/kernel/wifi/stc_s_table
+ *	/sys/kernel/wifi/stc_active_traffic_map
  *
  * usage:
  *      echo [0/1] > stc_logging
+ *      cat stc_tx_aft
+ *      cat stc_c_table
+ *      cat stc_s_table
+ *      cat stc_active_traffic_map
  *
  * Return: 0 on success and errno on failure
  */
-int
-hdd_sysfs_dp_stc_logmask_create(struct kobject *driver_kobject);
+int hdd_sysfs_dp_stc_create(struct kobject *driver_kobject);
 
 /**
- * hdd_sysfs_dp_stc_logmask_destroy() - API to destroy STC logging related
- *					sysfs entry
+ * hdd_sysfs_dp_stc_destroy() - API to destroy STC related sysfs entries
  * @driver_kobject: sysfs driver kobject
  *
  * Return: None
  */
-void
-hdd_sysfs_dp_stc_logmask_destroy(struct kobject *driver_kobject);
+void hdd_sysfs_dp_stc_destroy(struct kobject *driver_kobject);
 #else
-static inline int
-hdd_sysfs_dp_stc_logmask_create(struct kobject *driver_kobject)
+static inline void hdd_sysfs_dp_stc_create(struct kobject *driver_kobject)
 {
-	return 0;
 }
 
-static inline void
-hdd_sysfs_dp_stc_logmask_destroy(struct kobject *driver_kobject)
+static inline void hdd_sysfs_dp_stc_destroy(struct kobject *driver_kobject)
 {
 }
 #endif

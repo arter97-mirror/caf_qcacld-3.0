@@ -64,6 +64,7 @@
 #include "wlan_connectivity_logging.h"
 #include "wlan_mlo_mgr_ap.h"
 #include "wlan_scan_api.h"
+#include "wlan_action_oui_main.h"
 
 /**
  *
@@ -357,7 +358,8 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)bssid)) {
 		lim_update_session_eht_capable(mac_ctx, pesession);
 
-		if (pesession->lim_join_req->bssDescription.is_ml_ap)
+		if (pesession->lim_join_req->bssDescription.is_ml_ap &&
+		    pesession->rsno_gen_used != RSNO_GEN_WIFI6)
 			mlo_ie_len = lim_send_probe_req_frame_mlo(mac_ctx, pesession);
 	}
 
@@ -2968,6 +2970,100 @@ QDF_STATUS lim_fill_adaptive_11r_ie(struct pe_session *pe_session,
 }
 #endif
 
+static inline void
+lim_strip_rsno_ie(struct mac_context *mac_ctx, uint8_t *add_ie,
+		  uint16_t *add_ie_len, uint8_t mrsno_gen)
+{
+	if (*add_ie_len != 0)
+		lim_strip_ie(mac_ctx, add_ie, add_ie_len, WLAN_ELEMID_VENDOR,
+			     ONE_BYTE, RSNO_OUI_SELECTION, RSNO_OUI_SIZE,
+			     NULL, 0);
+}
+
+static
+QDF_STATUS lim_fill_wifi_gen_cap_ie(struct pe_session *pe_session,
+				    uint8_t **ie_buf, uint8_t *ie_len)
+{
+	uint8_t *cap_ie = NULL, *buf = NULL;
+	uint8_t supp_gen = 0, cert_gen = 0;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	/*
+	 * EID		0xDD
+	 * IE_LEN	0X0B
+	 * OUI		"\x50\x6F\x9A"
+	 * OUI_LENGTH	0x03
+	 * OUI_TYPE	0x23
+	 */
+
+	cap_ie = qdf_mem_malloc(WFA_CAPABILITIES_IE_LENGTH + 2);
+	if (!cap_ie) {
+		pe_err("no mem for cap_ie");
+		return status;
+	}
+
+	buf = cap_ie;
+	*buf = WLAN_ELEMID_VENDOR;
+	buf++;
+
+	*buf = WFA_CAPABILITIES_IE_LENGTH;
+	buf++;
+
+	/* Fill the WFA Vendor specific OUI(0x50 0x6F 0x9A) */
+	qdf_mem_copy(buf, WFA_CAPABILITIES_OUI, WFA_CAPABILITIES_OUI_LENGTH);
+	buf += WFA_CAPABILITIES_OUI_LENGTH;
+
+	/* Fill the WFA Vendor specific OUI Type (0x23) */
+	*buf = WFA_CAPABILITIES_OUI_TYPE;
+	buf++;
+
+	/* Fill WFA Capabilities length. Currently no capabilities for WFA. */
+	*buf = WFA_CAPABILITIES_LENGTH;
+	buf++;
+
+	/* Fill WFA Capabilities Attribute Info
+	 * attribute - WiFi generation indication
+	 * attribute id - 0x01
+	 * attribute length - 0x04
+	 */
+	*buf = WIFI_GENERATION_CAPABILITY_ATTR_ID;
+	buf++;
+
+	*buf = WIFI_GENERATION_CAPABILITY_ATTR_LENGTH;
+	buf++;
+
+	/* Fill attribute data */
+	*buf = WIFI_SUPPORTED_GENERATIONS_LENGTH;
+	buf++;
+
+	/* Get supported wifi generation info advertised  by FW */
+	status = wlan_mlme_get_supported_wifi_generations_info(
+						pe_session->mac_ctx->psoc,
+						&supp_gen, &cert_gen);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Unable to get supported wifi generations info");
+		qdf_mem_free(cap_ie);
+		return status;
+	}
+
+	pe_nofl_rl_info("WiFi Generations Supported, Certified: [0x%x, 0x%x]",
+			supp_gen, cert_gen);
+
+	*buf = supp_gen;
+	buf++;
+
+	*buf = WIFI_CERTIFIED_GENERATIONS_LENGTH;
+	buf++;
+
+	*buf = cert_gen;
+	buf++;
+
+	*ie_len = WFA_CAPABILITIES_IE_LENGTH + 2;
+	*ie_buf = cap_ie;
+
+	return status;
+}
+
 /**
  * lim_send_assoc_req_mgmt_frame() - Send association request
  * @mac_ctx: Handle to MAC context
@@ -3016,10 +3112,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
 	bool bss_mfp_capable, frag_ie_present = false;
 	int8_t peer_rssi = 0;
-	bool is_band_2g, is_ml_ap;
-	uint16_t mlo_ie_len = 0, fils_hlp_ie_len = 0;
+	bool is_band_2g, is_ml_ap = false;
+	uint16_t mlo_ie_len = 0, fils_hlp_ie_len = 0, rsn_sel_ie_len = 0;
 	uint8_t *fils_hlp_ie = NULL;
 	struct cm_roam_values_copy mdie_cfg = {0};
+	uint8_t *wfa_gen_cap_ie = NULL, wfa_gen_cap_ie_len = 0;
+	uint8_t rsn_sel_ie[] = {0xdd, 0x5, 0x50, 0x6f, 0x9a, 0x2c, 0x00};
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -3258,18 +3356,6 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		lim_strip_mlo_ie(mac_ctx, add_ie, &add_ie_len);
 	}
 
-	is_ml_ap = !!pe_session->lim_join_req->bssDescription.is_ml_ap;
-	if (is_ml_ap)
-		mlo_ie_len = lim_fill_assoc_req_mlo_ie(mac_ctx, pe_session, frm);
-
-	/**
-	 * In case of ML connection, if ML IE length is 0 then return failure.
-	 */
-	if (is_ml_ap && mlo_is_mld_sta(pe_session->vdev) && !mlo_ie_len) {
-		pe_err("Failed to add ML IE for vdev:%d", pe_session->vdev_id);
-		goto end;
-	}
-
 	if (pe_session->is11Rconnection) {
 		struct bss_description *bssdescr;
 
@@ -3496,6 +3582,22 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * Append the IEs just before MBO IEs as MBO IEs have to be at the
 	 * end of the frame.
 	 */
+	lim_strip_rsno_ie(mac_ctx, add_ie, &add_ie_len,
+			  pe_session->rsno_gen_used);
+	if (pe_session->rsno_gen_used) {
+		/*
+		 * Append the RSN selector IE to the assoc request if RSN(O)
+		 * support is enabled by the userspace
+		 *
+		 * Indication of the RSNE variant chosen for association:
+		 * 0 = RSNE
+		 * 1 = RSNE Override element
+		 * 2 = RSNE Override 2 element
+		 */
+		rsn_sel_ie_len = QDF_ARRAY_SIZE(rsn_sel_ie);
+		rsn_sel_ie[rsn_sel_ie_len - 1] = pe_session->rsno_gen_used - 1;
+	}
+
 	if (add_ie_len &&
 	    wlan_get_ie_ptr_from_eid(WLAN_ELEMID_VENDOR, add_ie, add_ie_len)) {
 		vendor_ies = qdf_mem_malloc(MAX_VENDOR_IES_LEN + 2);
@@ -3520,6 +3622,29 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 					      &adaptive_11r_ie_len);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		pe_err("Failed to fill adaptive 11r IE");
+		goto end;
+	}
+
+	qdf_status = lim_fill_wifi_gen_cap_ie(pe_session, &wfa_gen_cap_ie,
+					      &wfa_gen_cap_ie_len);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		pe_err("Failed to fill WFA Generation Capability IE");
+		goto end;
+	}
+
+	if (pe_session->lim_join_req->bssDescription.is_ml_ap &&
+	    pe_session->rsno_gen_used != RSNO_GEN_WIFI6)
+		is_ml_ap = true;
+
+	if (is_ml_ap)
+		mlo_ie_len = lim_fill_assoc_req_mlo_ie(mac_ctx, pe_session,
+						       frm);
+
+	/**
+	 * In case of ML connection, if ML IE length is 0 then return failure.
+	 */
+	if (is_ml_ap && mlo_is_mld_sta(pe_session->vdev) && !mlo_ie_len) {
+		pe_err("Failed to add ML IE for vdev:%d", pe_session->vdev_id);
 		goto end;
 	}
 
@@ -3572,8 +3697,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
 		rsnx_ie_len + mbo_ie_len + adaptive_11r_ie_len +
 		mscs_ext_ie_len + vendor_ie_len + mlo_ie_len + fils_hlp_ie_len +
-		eht_cap_ie_len;
-
+		eht_cap_ie_len + wfa_gen_cap_ie_len + rsn_sel_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -3637,6 +3761,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		payload = payload + mscs_ext_ie_len;
 	}
 
+	if (rsn_sel_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     rsn_sel_ie, rsn_sel_ie_len);
+		payload = payload + rsn_sel_ie_len;
+	}
+
 	/* Copy the vendor IEs to the end of the frame */
 	qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 		     vendor_ies, vendor_ie_len);
@@ -3663,6 +3793,16 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			mlo_ie_len = 0;
 		}
 		payload = payload + mlo_ie_len;
+	}
+
+	/*
+	 * Copy the WFA Vendor specific WiFi generation capability IE
+	 * to the end of the assoc request frame
+	 */
+	if (wfa_gen_cap_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     wfa_gen_cap_ie, wfa_gen_cap_ie_len);
+		payload += wfa_gen_cap_ie_len;
 	}
 
 	if (pe_session->assoc_req) {
@@ -3760,6 +3900,7 @@ end:
 	qdf_mem_free(mscs_ext_ie);
 
 	/* Free up buffer allocated for mlm_assoc_req */
+	qdf_mem_free(wfa_gen_cap_ie);
 	qdf_mem_free(adaptive_11r_ie);
 	qdf_mem_free(mlm_assoc_req);
 	qdf_mem_free(add_ie);
@@ -8248,27 +8389,65 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx, uint8_t vdev_id,
 	qdf_mtrace(QDF_MODULE_ID_PE, QDF_MODULE_ID_WMA, TRACE_CODE_TX_MGMT,
 		   session_id, 0);
 
-	if (opmode != QDF_NAN_DISC_MODE) {
-		if (fc->subType == SIR_MAC_MGMT_AUTH) {
-			tpSirFTPreAuthReq pre_auth_req;
-			uint16_t auth_algo = *(uint16_t *)(frame +
-						sizeof(tSirMacMgmtHdr));
+	if (opmode == QDF_NAN_DISC_MODE)
+		goto tx_frame;
 
-			if (auth_algo == eSIR_AUTH_TYPE_SAE) {
-				if (session->ftPEContext.pFTPreAuthReq) {
-					pre_auth_req =
-					     session->ftPEContext.pFTPreAuthReq;
-					channel_freq =
-					    pre_auth_req->pre_auth_channel_freq;
+	if (fc->subType == SIR_MAC_MGMT_AUTH) {
+		tpSirFTPreAuthReq pre_auth_req;
+		uint16_t auth_algo = *(uint16_t *)(frame +
+				     sizeof(tSirMacMgmtHdr));
+		tpSirMacMgmtHdr mac_hdr = (tpSirMacMgmtHdr)frame;
+		struct scan_cache_entry *scan_entry;
+		struct action_oui_search_attr attr = {0};
+		struct qdf_mac_addr *bssid;
+
+		if (auth_algo == eSIR_AUTH_TYPE_SAE) {
+			if (wlan_cm_is_vdev_active(session->vdev)) {
+				bssid = (struct qdf_mac_addr *)mac_hdr->bssId;
+				/* Roaming Pre-auth frame */
+				scan_entry = wlan_scan_get_entry_by_bssid(mac_ctx->pdev,
+									  bssid);
+				if (!scan_entry) {
+					pe_debug(QDF_MAC_ADDR_FMT " scan entry not found",
+						 QDF_MAC_ADDR_REF(mac_hdr->bssId));
+					goto not_found;
 				}
+
+				channel_freq = scan_entry->channel.chan_freq;
+				if (WLAN_REG_IS_24GHZ_CH_FREQ(channel_freq)) {
+					attr.ie_data = util_scan_entry_ie_data(scan_entry);
+					attr.ie_length = util_scan_entry_ie_len(scan_entry);
+					if (wlan_action_oui_search(mac_ctx->psoc, &attr,
+								   ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ)) {
+						pe_debug("Send pre-auth with 6Mbps on freq %d",
+							 channel_freq);
+						min_rid = RATEID_6MBPS;
+						util_scan_free_cache_entry(scan_entry);
+						goto tx_frame;
+					}
+				}
+				util_scan_free_cache_entry(scan_entry);
+				goto set_freq;
+			}
+not_found:
+			if (session->ftPEContext.pFTPreAuthReq) {
+				pre_auth_req =
+					session->ftPEContext.pFTPreAuthReq;
+				channel_freq =
+					pre_auth_req->pre_auth_channel_freq;
+			}
+set_freq:
+			if (channel_freq) {
+				pe_debug("TX SAE pre-auth frame on freq %d",
+					 channel_freq);
 				pre_auth_freq = &channel_freq;
 			}
-			pe_debug("TX SAE pre-auth frame on freq %d",
-				 channel_freq);
 		}
-		min_rid = lim_get_min_session_txrate(session, pre_auth_freq);
-	}
 
+	}
+	min_rid = lim_get_min_session_txrate(session, pre_auth_freq);
+
+tx_frame:
 	qdf_status = wma_tx_frameWithTxComplete(mac_ctx, packet,
 					 (uint16_t)msg_len,
 					 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,

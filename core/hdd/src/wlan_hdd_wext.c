@@ -2293,19 +2293,6 @@
  */
 #define WE_SET_TXRX_STATS    24
 
-
-#ifdef FEATURE_WLAN_TDLS
-#undef  MAX_VAR_ARGS
-#define MAX_VAR_ARGS         11
-#else
-#undef  MAX_VAR_ARGS
-#define MAX_VAR_ARGS         9
-#endif
-
-#ifdef WLAN_FEATURE_MOTION_DETECTION
-#undef  MAX_VAR_ARGS
-#define MAX_VAR_ARGS                              15
-#endif /* WLAN_FEATURE_MOTION_DETECTION */
 #define WE_MOTION_DET_CONFIG_PARAM                25
 #define WE_MOTION_DET_BASE_LINE_CONFIG_PARAM      26
 

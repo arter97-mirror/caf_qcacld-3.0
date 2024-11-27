@@ -268,6 +268,9 @@ wlan_dp_is_load_balance_needed(struct wlan_dp_lb_data *lb_data,
 		dp_info("CPU%d CWW:%d AWW:%d", load->cpu_id,
 			curr_wtg, load->allowed_wtg);
 
+		if (!curr_wtg && !load->allowed_wtg)
+			continue;
+
 		/* check whether the current wlan weightage is +-10% of the
 		 * allowed weightage. If not, load balance is needed.
 		 */

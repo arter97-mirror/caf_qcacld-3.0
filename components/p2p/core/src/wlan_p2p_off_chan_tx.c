@@ -1948,7 +1948,7 @@ static QDF_STATUS p2p_execute_tx_action_frame(
 			p2p_move_tx_context_to_ack_queue(tx_ctx);
 		}
 	} else {
-		p2p_err("failed to tx mgmt frame");
+		p2p_err_rl("failed to tx mgmt frame");
 		qdf_nbuf_free(packet);
 	}
 
@@ -3302,7 +3302,7 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 		}
 		status = p2p_execute_tx_action_frame(tx_ctx);
 		if (status != QDF_STATUS_SUCCESS) {
-			p2p_err("execute tx fail");
+			p2p_err_rl("execute tx fail");
 			goto fail;
 		} else
 			return QDF_STATUS_SUCCESS;

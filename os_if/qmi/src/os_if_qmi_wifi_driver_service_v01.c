@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -360,6 +360,24 @@ struct qmi_elem_info wfds_config_req_msg_v01_ei[] = {
 		.tlv_type       = 0x15,
 		.offset         = offsetof(struct wfds_config_req_msg_v01,
 					   fw_shared_wrmem_size),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x16,
+		.offset         = offsetof(struct wfds_config_req_msg_v01,
+					   target_type_valid),
+	},
+	{
+		.data_type      = QMI_SIGNED_4_BYTE_ENUM,
+		.elem_len       = 1,
+		.elem_size      = sizeof(enum wifi_drv_qmi_wifi_target_type_v01),
+		.array_type     = NO_ARRAY,
+		.tlv_type       = 0x16,
+		.offset         = offsetof(struct wfds_config_req_msg_v01,
+					   target_type),
 	},
 	{
 		.data_type      = QMI_EOTI,

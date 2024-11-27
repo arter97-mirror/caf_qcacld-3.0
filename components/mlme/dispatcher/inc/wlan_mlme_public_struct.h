@@ -1500,6 +1500,7 @@ struct wlan_mlme_aux_dev_caps {
  * @enable_emlsr_mode: 11BE eMLSR mode support
  * @mld_id: MLD ID of requested BSS within ML probe request frame
  * @enable_sap_emlsr_mode: 11BE eMLSR mode support for sap
+ * @link_recfg_support: Link Reconfiguration feature support
  * @oem_eht_mlo_crypto_bitmap: Bitmap of APs allowed by OEMs to connect
  * in EHT/MLO.
  * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
@@ -1566,6 +1567,7 @@ struct wlan_mlme_generic {
 	enum t2lm_negotiation_support t2lm_negotiation_support;
 	uint8_t mld_id;
 	bool enable_sap_emlsr_mode;
+	bool link_recfg_support;
 #endif
 #ifdef WLAN_FEATURE_11BE
 	uint32_t oem_eht_mlo_crypto_bitmap;
@@ -2005,6 +2007,8 @@ struct fw_scan_channels {
  * @lfr3_roaming_offload: Enable/disable roam offload feature
  * @lfr3_dual_sta_roaming_enabled: Enable/Disable dual sta roaming offload
  *                                 feature
+ * @lfr3_support_single_mac_dual_sta_roaming: Support single mac dual sta
+ *                                            roaming feature
  * @enable_self_bss_roam: enable roaming to connected BSSID
  * @enable_disconnect_roam_offload: enable disassoc/deauth roam scan.
  * @enable_idle_roam: flag to enable/disable idle roam in fw
@@ -2136,6 +2140,7 @@ struct fw_scan_channels {
  * for Hotspot 2.0
  * @roam_aggre_scan_step_rssi: Roam scan step RSSI in aggressive mode
  * @roam_aggre_threshold: Roam threshold in aggressive mode
+ * @mrsno_support: FW support for Multi RSNO feature
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2145,6 +2150,7 @@ struct wlan_mlme_lfr_cfg {
 	struct wlan_cm_roam_rt_stats roam_rt_stats;
 	bool lfr3_roaming_offload;
 	bool lfr3_dual_sta_roaming_enabled;
+	bool lfr3_support_single_mac_dual_sta_roaming;
 	bool enable_self_bss_roam;
 	bool enable_disconnect_roam_offload;
 	bool enable_idle_roam;
@@ -2267,6 +2273,7 @@ struct wlan_mlme_lfr_cfg {
 	bool hs20_btm_offload_disable;
 	uint32_t roam_aggre_scan_step_rssi;
 	uint8_t roam_aggre_threshold;
+	bool mrsno_support;
 };
 
 /**

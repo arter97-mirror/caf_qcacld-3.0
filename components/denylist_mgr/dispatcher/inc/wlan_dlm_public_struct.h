@@ -104,6 +104,7 @@ enum dlm_reject_ap_type {
  * @REASON_EHT_NOT_SUPPORTED: Assoc reject received with reason code 135
  * @REASON_TX_LINK_NOT_ACCEPTED: Assoc reject received with reason code 139
  * @REASON_LINK_REJECTED: Link is rejected during ML association.
+ * @REASON_EAPOL_TIMEOUT: Deauth received with reason code 15
  */
 enum dlm_reject_ap_reason {
 	REASON_UNKNOWN = 0,
@@ -125,6 +126,7 @@ enum dlm_reject_ap_reason {
 	REASON_EHT_NOT_SUPPORTED,
 	REASON_TX_LINK_NOT_ACCEPTED,
 	REASON_LINK_REJECTED,
+	REASON_EAPOL_TIMEOUT,
 };
 
 /**

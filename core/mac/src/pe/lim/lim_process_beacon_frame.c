@@ -257,7 +257,7 @@ lim_validate_rsn_ie(const uint8_t *ie_ptr, uint16_t ie_len)
 	const uint8_t *rsn_ie;
 	struct wlan_crypto_params crypto_params;
 
-	rsn_ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSN, ie_ptr, ie_len);
+	rsn_ie = wlan_get_rsn_data_from_ie_ptr(ie_ptr, ie_len);
 	if (!rsn_ie)
 		return QDF_STATUS_SUCCESS;
 
@@ -588,8 +588,12 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (mlo_is_mld_sta(session->vdev)) {
 		cu_flag = false;
 		status = lim_get_bpcc_from_mlo_ie(bcn_ptr, &bpcc);
-		if (QDF_IS_STATUS_SUCCESS(status))
-			cu_flag = lim_check_cu_happens(session->vdev, bpcc);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			uint8_t link_id = wlan_vdev_get_link_id(session->vdev);
+
+			cu_flag = lim_check_cu_happens(session->vdev, link_id,
+						       bpcc);
+		}
 		lim_process_ml_reconfig(mac_ctx, session, rx_pkt_info);
 	}
 
@@ -667,7 +671,10 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 		lim_process_tpe_ie_from_beacon(mac_ctx, session,
 					       bss, &tpe_change);
-
+		if (!tpe_change) {
+			pe_nofl_rl_debug("no change in TPE IE");
+			goto end;
+		}
 		mlme_obj =
 			wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 		if (!mlme_obj) {

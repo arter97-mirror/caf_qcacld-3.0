@@ -545,6 +545,9 @@ dlm_update_avoidlist_reject_reason(struct dlm_reject_ap *entry,
 	case REASON_TX_LINK_NOT_ACCEPTED:
 		entry->tx_link_denied = true;
 		break;
+	case REASON_EAPOL_TIMEOUT:
+		entry->eapol_timeout = true;
+		break;
 
 	default:
 		dlm_err("Invalid reason passed %d", reject_reason);
@@ -1267,6 +1270,8 @@ dlm_get_reject_ap_reason(struct dlm_reject_ap *dlm_entry)
 		return REASON_TX_LINK_NOT_ACCEPTED;
 	else if (dlm_entry->same_address_present_in_ap)
 		return REASON_STA_AFFILIATED_WITH_MLD_WITH_EXISTING_MLD_ASSOCIATION;
+	else if (dlm_entry->eapol_timeout)
+		return REASON_EAPOL_TIMEOUT;
 	else if (dlm_entry->other)
 		return REASON_OTHER;
 

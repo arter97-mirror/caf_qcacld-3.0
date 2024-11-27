@@ -187,7 +187,6 @@ QDF_STATUS t2lm_handle_tx_teardown(struct wlan_objmgr_vdev *vdev,
 
 /**
  * wlan_t2lm_validate_candidate - Validate candidate based on T2LM IE
- * @cm_ctx: connection manager context pointer
  * @scan_entry: scan entry pointer
  *
  * This api will be called to validate candidate based on T2LM IE received
@@ -197,8 +196,7 @@ QDF_STATUS t2lm_handle_tx_teardown(struct wlan_objmgr_vdev *vdev,
  */
 
 QDF_STATUS
-wlan_t2lm_validate_candidate(struct cnx_mgr *cm_ctx,
-			     struct scan_cache_entry *scan_entry);
+wlan_t2lm_validate_candidate(struct scan_cache_entry *scan_entry);
 /**
  * wlan_t2lm_deliver_event() - TID-to-link-mapping event handler
  * @vdev: vdev object
@@ -365,8 +363,7 @@ t2lm_handle_tx_teardown(struct wlan_objmgr_vdev *vdev,
 }
 
 static inline QDF_STATUS
-wlan_t2lm_validate_candidate(struct cnx_mgr *cm_ctx,
-			     struct scan_cache_entry *scan_entry)
+wlan_t2lm_validate_candidate(struct scan_cache_entry *scan_entry)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

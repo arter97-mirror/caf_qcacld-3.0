@@ -180,10 +180,8 @@ void lim_process_gen_probe_rsp_frame(struct mac_context *mac_ctx,
 	}
 
 	probe_rsp = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
-	if (!probe_rsp) {
-		pe_err("Unable to allocate memory");
+	if (!probe_rsp)
 		return;
-	}
 
 	header = (struct wlan_frame_hdr *)(bcn_probe);
 	pe_debug("Generate Probe Resp for cu (len %d): " QDF_MAC_ADDR_FMT,
@@ -198,7 +196,7 @@ void lim_process_gen_probe_rsp_frame(struct mac_context *mac_ctx,
 	status = sir_convert_probe_frame2_struct(mac_ctx,
 						 bcn_probe, len, probe_rsp);
 	if (QDF_IS_STATUS_ERROR(status) || !probe_rsp->ssidPresent) {
-		pe_err("Parse error ProbeResponse, length=%d", len);
+		pe_debug("Parse error ProbeResponse, length=%d", len);
 		qdf_mem_free(probe_rsp);
 		return;
 	}
@@ -226,12 +224,8 @@ lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
 	      session_entry->lim_join_req->is_ml_probe_req_sent))
 		return QDF_STATUS_SUCCESS;
 
-	status = lim_add_bcn_probe(session_entry->vdev,
-				   probe_rsp_frm,
-				   probe_rsp_len,
-				   probe_rsp->chan_freq, rssi,
-				   snr,
-				   tsf_delta);
+	status = lim_add_bcn_probe(mac_ctx->pdev, probe_rsp_frm, probe_rsp_len,
+				   probe_rsp->chan_freq, rssi, snr, tsf_delta);
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("failed to add assoc link probe rsp %d freq %d", status,
 		       probe_rsp->chan_freq);
@@ -423,11 +417,15 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 	if (mlo_is_mld_sta(session_entry->vdev)) {
 		cu_flag = false;
 		status = lim_get_bpcc_from_mlo_ie(probe_rsp, &bpcc);
-		if (QDF_IS_STATUS_SUCCESS(status))
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			uint8_t link_id =
+				wlan_vdev_get_link_id(session_entry->vdev);
+
 			cu_flag = lim_check_cu_happens(session_entry->vdev,
-						       bpcc);
+						       link_id, bpcc);
+		}
 		lim_process_cu_for_probe_rsp(mac_ctx, session_entry,
-					     body, frame_len);
+					     rx_Packet_info);
 	}
 
 	if (session_entry->limMlmState ==

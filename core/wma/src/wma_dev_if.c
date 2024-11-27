@@ -3151,6 +3151,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	struct vdev_mlme_obj *vdev_mlme;
 	tp_wma_handle wma_handle;
 	uint8_t enable_sifs_burst = 0;
+	enum station_keepalive_method val = SIR_KEEP_ALIVE_NULL_PKT;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -3180,13 +3181,15 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	wma_handle->interfaces[vdev_id].sub_type =
 		vdev_mlme->mgmt.generic.subtype;
 
+	ret = ucfg_mlme_get_sta_keepalive_method(mac->psoc, &val);
+	if (QDF_IS_STATUS_ERROR(ret))
+		wma_err("Failed to get ini config for keep sta alive method");
+
 	qos_aggr = &mac->mlme_cfg->qos_mlme_params;
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA) {
-		wma_set_sta_keep_alive(
-				wma_handle, vdev_id,
-				SIR_KEEP_ALIVE_NULL_PKT,
-				mac->mlme_cfg->sta.sta_keep_alive_period,
-				NULL, NULL, NULL);
+		wma_set_sta_keep_alive(wma_handle, vdev_id, val,
+				       mac->mlme_cfg->sta.sta_keep_alive_period,
+				       NULL, NULL, NULL);
 
 		/* offload STA SA query related params to fwr */
 		if (wmi_service_enabled(wma_handle->wmi_handle,
@@ -4225,6 +4228,7 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 	struct dev_set_param setparam[MAX_VDEV_SET_BSS_PARAMS];
 	uint8_t index = 0;
 	enum ieee80211_protmode prot_mode;
+	enum station_keepalive_method val = SIR_KEEP_ALIVE_NULL_PKT;
 	uint32_t keep_alive_period;
 	QDF_STATUS ret;
 
@@ -4305,11 +4309,12 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 	mlme_set_max_reg_power(intr[vdev_id].vdev, maxTxPower);
 	wlan_mlme_get_sta_keep_alive_period(wma->psoc,
 					    &keep_alive_period);
-	wma_set_sta_keep_alive(
-				wma, vdev_id,
-				SIR_KEEP_ALIVE_NULL_PKT,
-				keep_alive_period,
-				NULL, NULL, NULL);
+	ret = ucfg_mlme_get_sta_keepalive_method(wma->psoc, &val);
+	if (QDF_IS_STATUS_ERROR(ret))
+		wma_err("Failed to get ini config for keep sta alive method");
+
+	wma_set_sta_keep_alive(wma, vdev_id, val, keep_alive_period,
+			       NULL, NULL, NULL);
 error:
 	return ret;
 }

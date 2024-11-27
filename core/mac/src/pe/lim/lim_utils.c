@@ -1948,15 +1948,15 @@ void lim_disconnect_complete(struct pe_session *session, bool del_bss)
 		lim_send_stop_bss_failure_resp(mac, session);
 }
 
-void lim_process_channel_switch(struct mac_context *mac_ctx, uint8_t vdev_id)
+QDF_STATUS lim_process_channel_switch(struct mac_context *mac_ctx, uint8_t vdev_id)
 {
 	struct pe_session *session_entry;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	session_entry = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (!session_entry) {
 		pe_err("Session does not exist for given vdev_id %d", vdev_id);
-		return;
+		return status;
 	}
 
 	session_entry->channelChangeReasonCode = LIM_SWITCH_CHANNEL_OPERATION;
@@ -1968,6 +1968,8 @@ void lim_process_channel_switch(struct mac_context *mac_ctx, uint8_t vdev_id)
 					session_entry);
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_set_chan_switch_in_progress(session_entry->vdev, false);
+
+	return status;
 }
 
 /** ------------------------------------------------------------------------ **/
@@ -4367,19 +4369,23 @@ lim_restore_pre_channel_switch_state(struct mac_context *mac, struct pe_session 
  *
  * @param  mac - Pointer to Global MAC structure
  * @param  pe_session
- * @return None
+ * @return QDF_STATUS
  */
-void
+QDF_STATUS
 lim_prepare_for11h_channel_switch(struct mac_context *mac, struct pe_session *pe_session)
 {
+	QDF_STATUS status;
+
 	if (!LIM_IS_STA_ROLE(pe_session))
-		return;
+		return QDF_STATUS_E_INVAL;
 
 	/* Flag to indicate 11h channel switch in progress */
 	pe_session->gLimSpecMgmt.dot11hChanSwState = eLIM_11H_CHANSW_RUNNING;
 
 	/** We are safe to switch channel at this point */
-	lim_stop_tx_and_switch_channel(mac, pe_session->peSessionId);
+	status = lim_stop_tx_and_switch_channel(mac, pe_session->peSessionId);
+
+	return status;
 }
 
 tSirNwType lim_get_nw_type(struct mac_context *mac, uint32_t chan_freq, uint32_t type,
@@ -6080,6 +6086,15 @@ static void lim_update_ap_he_op(struct pe_session *session,
 						ch_params->ch_width;
 	}
 }
+
+void lim_print_he_channel_widths(tDot11fIEhe_cap *he_cap)
+{
+	pe_debug("HE width 0:%d 1:%d 2:%d 3:%d 4:%d 5:%d 6:%d",
+		 he_cap->chan_width_0, he_cap->chan_width_1,
+		 he_cap->chan_width_2, he_cap->chan_width_3,
+		 he_cap->chan_width_4, he_cap->chan_width_5,
+		 he_cap->chan_width_6);
+}
 #else
 static inline void
 lim_update_ext_cap_he_params(struct mac_context *mac_ctx,
@@ -7543,6 +7558,7 @@ void lim_copy_join_req_he_cap(struct pe_session *session)
 		session->he_config.chan_width_4 = 0;
 		session->he_config.chan_width_6 = 0;
 	}
+	lim_print_he_channel_widths(&session->he_config);
 }
 
 void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap)
@@ -11122,6 +11138,11 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 	band = wlan_reg_freq_to_band(session->curr_op_freq);
 	band_mask = 1 << band;
 
+	if (session->ch_width == CH_WIDTH_80P80MHZ) {
+		session->ch_width = CH_WIDTH_80MHZ;
+		session->ch_center_freq_seg1 = 0;
+	}
+
 	ch_params.ch_width = session->ch_width;
 	ch_params.mhz_freq_seg0 =
 		wlan_reg_chan_band_to_freq(mac->pdev,
@@ -11358,8 +11379,6 @@ uint8_t lim_convert_phy_width_to_vht_width(enum phy_ch_width ch_width)
 		return WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
 	if (ch_width == CH_WIDTH_80MHZ)
 		return WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
-	if (ch_width == CH_WIDTH_40MHZ || ch_width == CH_WIDTH_20MHZ)
-		return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
 
 	return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
 }
@@ -11952,7 +11971,7 @@ void lim_update_disconnect_vdev_id(struct mac_context *mac,  uint8_t vdev_id)
 
 	if (session->vdev) {
 		if (mac->sme.set_disconnect_link_info_cb)
-			mac->sme.set_disconnect_link_info_cb(vdev_id);
+			mac->sme.set_disconnect_link_info_cb(vdev_id, true);
 		pe_debug("disconnect received on vdev id %d", vdev_id);
 	}
 }
@@ -12366,12 +12385,14 @@ uint16_t lim_get_tpe_ie_length(enum phy_ch_width chan_width,
 		switch (tpe_ie[idx].max_tx_pwr_interpret) {
 		case LOCAL_EIRP:
 		case REGULATORY_CLIENT_EIRP:
+		case ADDITIONAL_REGULATORY_CLIENT_EIRP:
 			/* Maximum Transmit Power For 320 MHz */
 			if (tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320)
 				total_ie_len += 1;
 			break;
 		case LOCAL_EIRP_PSD:
 		case REGULATORY_CLIENT_EIRP_PSD:
+		case ADDITIONAL_REGULATORY_CLIENT_EIRP_PSD:
 			if (!tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count)
 				break;
 

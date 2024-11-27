@@ -806,6 +806,28 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 	qdf_spinlock_release(&spm_intf->flow_list_lock);
 }
 
+void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_spm_flow_info *flow;
+	int i, count = 0;
+	uint32_t num_entries = WLAN_DP_SPM_FLOW_REC_TBL_MAX * WLAN_DP_INTF_MAX;
+	uint8_t buf[BUF_LEN_MAX];
+
+	for (i = 0; i < num_entries; i++) {
+		flow = &dp_ctx->gl_flow_recs[i];
+		if (qdf_unlikely(!flow->is_populated))
+			continue;
+
+		count++;
+		dp_info("Flow id %u pkts %llu tuple: %s",
+			i, flow->num_pkts,
+			dp_print_tuple_to_str(&flow->info, buf,
+					      BUF_LEN_MAX));
+	}
+
+	dp_info("Printed %d flow entries of TX AFT", count);
+}
+
 uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 				      qdf_nbuf_t nbuf, uint16_t flow_id,
 				      uint64_t cookie)
@@ -825,6 +847,7 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 	}
 
 	flow->active_ts = qdf_sched_clock();
+	flow->num_pkts++;
 
 	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, nbuf,
 						   flow->track_flow_stats,
@@ -1045,7 +1068,8 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	flow_rec->cookie = cookie_sk;
 
 	wlan_dp_spm_update_tx_flow_hash(dp_ctx, flow_rec);
-	wlan_dp_indicate_rx_flow_add(dp_ctx);
+	wlan_dp_indicate_flow_add(dp_ctx, WLAN_DP_FLOW_DIR_TX,
+				  &flow_rec->info);
 
 	/* put the flow record in table and fill stats */
 	spm_intf->origin_aft[flow_rec->id] = flow_rec;

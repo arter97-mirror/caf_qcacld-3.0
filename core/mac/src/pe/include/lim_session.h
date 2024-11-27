@@ -182,6 +182,7 @@ struct eml_capabilities {
  * @tid_link_map_supported: TID link map support
  * @str_freq_separation: STR freq separation
  * @aar_support: AAR support
+ * @link_reconfig_operation_support: Link reconfig operation support (13th BIT)
  * @reserved: reserve
  */
 struct mld_capab_and_op {
@@ -190,7 +191,8 @@ struct mld_capab_and_op {
 	uint16_t tid_link_map_supported:2;
 	uint16_t str_freq_separation:5;
 	uint16_t aar_support:1;
-	uint16_t reserved:3;
+	uint16_t link_reconfig_operation_support:1;
+	uint16_t reserved:2;
 };
 
 /**
@@ -400,6 +402,16 @@ struct dfs_p2p_group_info {
 	tDot11fchannel_usage_req chan_usage_req;
 	tDot11fchannel_usage_resp chan_usage_resp;
 };
+
+#define WFA_CAPABILITIES_IE_LENGTH		0x0B
+#define WFA_CAPABILITIES_OUI			"\x50\x6F\x9A"
+#define WFA_CAPABILITIES_OUI_LENGTH		0x03
+#define WFA_CAPABILITIES_OUI_TYPE		0x23
+#define WFA_CAPABILITIES_LENGTH			0x00
+#define WIFI_GENERATION_CAPABILITY_ATTR_ID	0x01
+#define WIFI_GENERATION_CAPABILITY_ATTR_LENGTH	0x04
+#define WIFI_SUPPORTED_GENERATIONS_LENGTH	0x01
+#define WIFI_CERTIFIED_GENERATIONS_LENGTH	0x01
 
 /**
  * struct pe_session - per-vdev PE context
@@ -712,6 +724,7 @@ struct dfs_p2p_group_info {
  * on 2.4 GHz
  * @join_probe_cnt: join probe request count
  * @cal_tpc_post_csa: Recalculate tx power power csa
+ * @rsno_gen_used: rsno gen used for connection
  * @wnm_action_dialog_token: Dialog token for WNM action frames.
  * @dfs_p2p_info: DFS P2P group operation info.
  */
@@ -1046,7 +1059,7 @@ struct pe_session {
 	bool is_unexpected_peer_error;
 	uint8_t join_probe_cnt;
 	bool cal_tpc_post_csa;
-
+	uint8_t rsno_gen_used;
 	uint8_t wnm_action_dialog_token;
 	struct dfs_p2p_group_info dfs_p2p_info;
 };

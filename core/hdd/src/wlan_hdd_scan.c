@@ -1295,6 +1295,53 @@ int wlan_hdd_scan_abort(struct wlan_hdd_link_info *link_info)
 	return 0;
 }
 
+#ifdef FEATURE_WLAN_ZERO_POWER_SCAN
+static int
+__wlan_hdd_cfg80211_fetch_zero_power_scan_report(struct wiphy *wiphy,
+						 struct wireless_dev *wdev)
+{
+	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam() ||
+	    QDF_GLOBAL_MONITOR_MODE == hdd_get_conparam()) {
+		hdd_err_rl("Command not allowed in FTM/Monitor mode");
+		return -EINVAL;
+	}
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return -EINVAL;
+
+	status = wlan_cfg80211_scan_request_cached_scan_report(wiphy, wdev,
+							       hdd_ctx->pdev);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_debug("Failed to get scan report %d", status);
+
+	return qdf_status_to_os_return(status);
+}
+
+int wlan_hdd_cfg80211_fetch_zero_power_scan_report(struct wiphy *wiphy,
+						   struct wireless_dev *wdev,
+						   const void *data,
+						   int data_len)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	hdd_enter_dev(wdev->netdev);
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_fetch_zero_power_scan_report(wiphy, wdev);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif
+
 #ifdef FEATURE_WLAN_SCAN_PNO
 /**
  * __wlan_hdd_cfg80211_sched_scan_start() - cfg80211 scheduled scan(pno) start
@@ -1616,6 +1663,31 @@ void wlan_hdd_cfg80211_abort_scan(struct wiphy *wiphy,
 }
 #endif
 
+static void hdd_scan_flush_cds_recovery_handler(void)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_objmgr_pdev *pdev;
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED ||
+	    !hdd_ctx->psoc)
+		return;
+
+	pdev = wlan_objmgr_get_pdev_by_id(hdd_ctx->psoc,
+					  0, WLAN_SCAN_ID);
+	if (!pdev) {
+		hdd_err("pdev is NULL");
+		return;
+	}
+
+	wlan_cfg80211_cleanup_scan_queue(pdev, NULL);
+
+	if (pdev)
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_SCAN_ID);
+}
+
 /**
  * hdd_scan_context_destroy() - Destroy scan context
  * @hdd_ctx:	HDD context.
@@ -1626,6 +1698,7 @@ void wlan_hdd_cfg80211_abort_scan(struct wiphy *wiphy,
  */
 void hdd_scan_context_destroy(struct hdd_context *hdd_ctx)
 {
+	cds_unregister_scan_flush_recovery_callback();
 }
 
 /**
@@ -1638,5 +1711,7 @@ void hdd_scan_context_destroy(struct hdd_context *hdd_ctx)
  */
 int hdd_scan_context_init(struct hdd_context *hdd_ctx)
 {
+	cds_register_scan_flush_recovery_callback(
+			hdd_scan_flush_cds_recovery_handler);
 	return 0;
 }

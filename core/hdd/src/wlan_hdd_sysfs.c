@@ -1313,11 +1313,13 @@ hdd_sysfs_create_monitor_adapter_root_obj(struct hdd_adapter *adapter)
 {
 	hdd_sysfs_txrx_stats_create(adapter);
 	hdd_sysfs_monitor_mode_channel_create(adapter);
+	hdd_sysfs_unit_test_target_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_monitor_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_unit_test_target_destroy(adapter);
 	hdd_sysfs_monitor_mode_channel_destroy(adapter);
 	hdd_sysfs_txrx_stats_destroy(adapter);
 }
@@ -1343,7 +1345,7 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_pm_cinfo_create(driver_kobject);
 		hdd_sysfs_pm_pcl_create(driver_kobject);
 		hdd_sysfs_dp_aggregation_create(driver_kobject);
-		hdd_sysfs_dp_stc_logmask_create(driver_kobject);
+		hdd_sysfs_dp_stc_create(driver_kobject);
 		hdd_sysfs_dp_swlm_create(driver_kobject);
 		hdd_sysfs_create_wakeup_logs_to_console();
 		hdd_sysfs_dp_txrx_stats_sysfs_create(driver_kobject);
@@ -1377,7 +1379,7 @@ void hdd_destroy_sysfs_files(void)
 		hdd_sysfs_destroy_wakeup_logs_to_console();
 		hdd_sysfs_dp_swlm_destroy(driver_kobject);
 		hdd_sysfs_dp_aggregation_destroy(driver_kobject);
-		hdd_sysfs_dp_stc_logmask_destroy(driver_kobject);
+		hdd_sysfs_dp_stc_destroy(driver_kobject);
 		hdd_sysfs_pm_pcl_destroy(driver_kobject);
 		hdd_sysfs_pm_cinfo_destroy(driver_kobject);
 		hdd_sysfs_pktlog_destroy(driver_kobject);

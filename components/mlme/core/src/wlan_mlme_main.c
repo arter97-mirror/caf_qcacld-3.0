@@ -415,17 +415,63 @@ mlme_get_scan_phy_mode_for_chan_load(enum phy_ch_width scan_ch_width)
 		scan_phymode = SCAN_PHY_MODE_11BE_EHT160;
 		break;
 	default:
-		mlme_debug("Invalid scan_ch_width:%d", scan_ch_width);
+		mlme_debug("11BE: Invalid scan_ch_width:%d", scan_ch_width);
 		break;
 	}
 
 	return scan_phymode;
 }
-#else
-static inline enum scan_phy_mode
+
+#elif defined(WLAN_FEATURE_11AX)
+static enum scan_phy_mode
 mlme_get_scan_phy_mode_for_chan_load(enum phy_ch_width scan_ch_width)
 {
-	return SCAN_PHY_MODE_UNKNOWN;
+	enum scan_phy_mode scan_phymode = SCAN_PHY_MODE_UNKNOWN;
+
+	switch (scan_ch_width) {
+	case CH_WIDTH_20MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AX_HE20;
+		break;
+	case CH_WIDTH_40MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AX_HE40;
+		break;
+	case CH_WIDTH_80MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AX_HE80;
+		break;
+	case CH_WIDTH_160MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AX_HE160;
+		break;
+	default:
+		mlme_debug("11AX: Invalid scan_ch_width:%d", scan_ch_width);
+		break;
+	}
+
+	return scan_phymode;
+}
+
+#else
+static enum scan_phy_mode
+mlme_get_scan_phy_mode_for_chan_load(enum phy_ch_width scan_ch_width)
+{
+	enum scan_phy_mode scan_phymode = SCAN_PHY_MODE_11AC_VHT20;
+
+	switch (scan_ch_width) {
+	case CH_WIDTH_20MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AC_VHT20;
+		break;
+	case CH_WIDTH_40MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AC_VHT40;
+		break;
+	case CH_WIDTH_80MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AC_VHT80;
+		break;
+	default:
+		mlme_debug("11AC: Invalid scan_ch_width:%d", scan_ch_width);
+		break;
+	}
+
+	return scan_phymode;
+
 }
 #endif
 
@@ -1303,7 +1349,7 @@ static void mlme_init_mgmt_hw_tx_retry_count_cfg(
 static void mlme_init_emlsr_mode(struct wlan_objmgr_psoc *psoc,
 				 struct wlan_mlme_generic *gen)
 {
-	gen->enable_emlsr_mode = cfg_default(CFG_EMLSR_MODE_ENABLE);
+	gen->enable_emlsr_mode = cfg_get(psoc, CFG_ENABLE_EMLSR_MODE);
 	gen->enable_sap_emlsr_mode = cfg_get(psoc, CFG_SAP_EMLSR_MODE_ENABLE);
 }
 
@@ -1315,10 +1361,24 @@ static void mlme_init_emlsr_mode(struct wlan_objmgr_psoc *psoc,
  * Return: None
  */
 static void mlme_init_tl2m_negotiation_support(struct wlan_objmgr_psoc *psoc,
-						 struct wlan_mlme_generic *gen)
+					       struct wlan_mlme_generic *gen)
 {
 	gen->t2lm_negotiation_support = cfg_get(psoc,
 						CFG_T2LM_NEGOTIATION_SUPPORT);
+}
+
+/**
+ * mlme_init_link_recfg_support() - initialize Link Reconfig support
+ * @psoc: Pointer to PSOC
+ * @gen: pointer to generic CFG items
+ *
+ * Return: None
+ */
+static void mlme_init_link_recfg_support(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_mlme_generic *gen)
+{
+	gen->link_recfg_support = cfg_get(psoc,
+					  CFG_LINK_RECFG_SUPPORT);
 }
 #else
 static void mlme_init_emlsr_mode(struct wlan_objmgr_psoc *psoc,
@@ -1327,7 +1387,12 @@ static void mlme_init_emlsr_mode(struct wlan_objmgr_psoc *psoc,
 }
 
 static void mlme_init_tl2m_negotiation_support(struct wlan_objmgr_psoc *psoc,
-						 struct wlan_mlme_generic *gen)
+					       struct wlan_mlme_generic *gen)
+{
+}
+
+static void mlme_init_link_recfg_support(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_mlme_generic *gen)
 {
 }
 #endif
@@ -1424,6 +1489,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_tl2m_negotiation_support(psoc, gen);
 	mlme_init_standard_6ghz_conn_policy(psoc, gen);
 	mlme_init_relaxed_lpi_conn_policy(psoc, gen);
+	mlme_init_link_recfg_support(psoc, gen);
 }
 
 static void mlme_init_edca_ani_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2952,6 +3018,8 @@ static void mlme_init_roam_offload_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR3_ROAMING_OFFLOAD);
 	lfr->lfr3_dual_sta_roaming_enabled =
 		cfg_get(psoc, CFG_ENABLE_DUAL_STA_ROAM_OFFLOAD);
+	lfr->lfr3_support_single_mac_dual_sta_roaming =
+		cfg_get(psoc, CFG_SUPPORT_SINGLE_MAC_DUAL_STA_ROAM);
 	lfr->enable_self_bss_roam = cfg_get(psoc, CFG_LFR3_ENABLE_SELF_BSS_ROAM);
 	lfr->enable_roam_reason_vsie =
 		cfg_get(psoc, CFG_ENABLE_ROAM_REASON_VSIE);
@@ -6078,3 +6146,24 @@ uint16_t mlme_get_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev)
 
 	return vdev_mlme->p2p_dev_data.seq_num;
 }
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+uint8_t wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t wfd_mode = P2P_MODE_WFD_INVALID;
+
+	if (!psoc)
+		return wfd_mode;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_P2P_ID);
+	if (!vdev)
+		return wfd_mode;
+
+	wfd_mode = wlan_vdev_mlme_get_wfd_mode(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+
+	return wfd_mode;
+}
+#endif

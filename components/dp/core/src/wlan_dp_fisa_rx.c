@@ -753,7 +753,6 @@ wlan_dp_fisa_get_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
 	struct flow_info flow_tuple = {0};
 
 	wlan_dp_stc_populate_flow_tuple(&flow_tuple, flow_tuple_info);
-
 	return wlan_dp_get_flow_hash(dp_ctx, &flow_tuple);
 }
 #else
@@ -1004,6 +1003,7 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	struct wlan_dp_psoc_context *dp_ctx = fisa_hdl->dp_ctx;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
 	struct fisa_pkt_hist pkt_hist;
+	struct flow_info flow_tuple = {0};
 	u8 reo_id;
 
 	sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
@@ -1046,10 +1046,10 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	sw_ft_entry->reo_dest_indication = elem->reo_dest_indication;
 	qdf_mem_copy(&sw_ft_entry->rx_flow_tuple_info, &elem->flow_tuple_info,
 		     sizeof(struct cdp_rx_flow_tuple_info));
-	sw_ft_entry->flow_tuple_hash =
-		wlan_dp_fisa_get_flow_hash(fisa_hdl->dp_ctx,
-					   &sw_ft_entry->rx_flow_tuple_info);
-
+	wlan_dp_stc_populate_flow_tuple(&flow_tuple,
+					&sw_ft_entry->rx_flow_tuple_info);
+	sw_ft_entry->flow_tuple_hash = wlan_dp_get_flow_hash(dp_ctx,
+							     &flow_tuple);
 	sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 	sw_ft_entry->is_flow_udp = elem->is_udp_flow;
 	sw_ft_entry->peer_id = elem->peer_id;
@@ -1058,8 +1058,8 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 
 	fisa_hdl->add_flow_count++;
 	fisa_hdl->del_flow_count++;
-	wlan_dp_indicate_rx_flow_add(fisa_hdl->dp_ctx);
-
+	wlan_dp_indicate_flow_add(fisa_hdl->dp_ctx, WLAN_DP_FLOW_DIR_RX,
+				  &flow_tuple);
 	dp_rx_fisa_release_ft_lock(fisa_hdl, reo_id);
 }
 
@@ -1127,6 +1127,7 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
+	struct flow_info flow_tuple = {0};
 	bool is_fst_updated = false;
 	uint32_t hashed_flow_idx;
 	uint32_t flow_hash;
@@ -1173,10 +1174,10 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			qdf_mem_copy(&sw_ft_entry->rx_flow_tuple_info,
 				     rx_flow_tuple_info,
 				     sizeof(struct cdp_rx_flow_tuple_info));
+			wlan_dp_stc_populate_flow_tuple(&flow_tuple,
+							&sw_ft_entry->rx_flow_tuple_info);
 			sw_ft_entry->flow_tuple_hash =
-				wlan_dp_fisa_get_flow_hash(fisa_hdl->dp_ctx,
-					&sw_ft_entry->rx_flow_tuple_info);
-
+				wlan_dp_get_flow_hash(dp_ctx, &flow_tuple);
 			sw_ft_entry->flow_init_ts = qdf_sched_clock();
 			sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 			sw_ft_entry->is_flow_udp = elem->is_udp_flow;
@@ -1185,7 +1186,9 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
 
 			is_fst_updated = true;
-			wlan_dp_indicate_rx_flow_add(dp_ctx);
+			wlan_dp_indicate_flow_add(fisa_hdl->dp_ctx,
+						  WLAN_DP_FLOW_DIR_RX,
+						  &flow_tuple);
 			fisa_hdl->add_flow_count++;
 			break;
 		}

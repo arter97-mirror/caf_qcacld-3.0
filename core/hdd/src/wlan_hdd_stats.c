@@ -5718,7 +5718,7 @@ wlan_hdd_fill_per_link_summary_stats(tCsrSummaryStatsInfo *stats,
 	status = ucfg_dp_get_per_link_peer_stats(soc, link_info->vdev_id,
 						 peer_mac, peer_stats,
 						 CDP_WILD_PEER_TYPE,
-						 WLAN_MAX_MLD);
+						 DP_STAT_NUM_SINGLE_LINK);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Unable to get per link peer stats for the peer: "
@@ -6567,6 +6567,7 @@ static void wlan_hdd_fill_station_info(struct wlan_objmgr_psoc *psoc,
 	sinfo->tx_failed = stats->tx_failed;
 	sinfo->filled |= HDD_INFO_TX_FAILED;
 	sinfo->tx_retries = stats->tx_retries;
+	sinfo->filled |= HDD_INFO_TX_RETRIES;
 
 	/* sta flags */
 	hdd_fill_sta_flags(sinfo, stainfo);
@@ -6770,6 +6771,12 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
 			WMI_RATE_PREAMBLE_VHT)
 		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_VHT;
+	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
+			WMI_RATE_PREAMBLE_HE)
+		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_HE;
+	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
+			WMI_RATE_PREAMBLE_EHT)
+		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_EHT;
 	else
 		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_LEGACY;
 
@@ -7720,7 +7727,7 @@ wlan_hdd_update_mlo_peer_stats(struct wlan_hdd_link_info *link_info,
 	ucfg_dp_get_per_link_peer_stats(soc, link_info->vdev_id,
 					peer_mac, peer_stats,
 					CDP_WILD_PEER_TYPE,
-					WLAN_MAX_MLD);
+					DP_STAT_NUM_SINGLE_LINK);
 
 	sinfo->tx_bytes = peer_stats->tx.tx_success.bytes;
 	sinfo->rx_bytes = peer_stats->rx.rcvd.bytes;
@@ -9652,7 +9659,7 @@ wlan_hdd_get_per_peer_stats(struct wlan_hdd_link_info *link_info,
 	status = ucfg_dp_get_per_link_peer_stats(soc, link_info->vdev_id,
 						 peer_mac, peer_stats,
 						 CDP_WILD_PEER_TYPE,
-						 WLAN_MAX_MLD);
+						 DP_STAT_NUM_SINGLE_LINK);
 	return status;
 }
 
@@ -11179,6 +11186,11 @@ wlan_hdd_cfg80211_enhance_roam_events_callback(struct wlan_hdd_link_info *link_i
 						 ROAM_STATS_EVENT_INDEX,
 						 GFP_KERNEL);
 
+	if (!vendor_event) {
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed.");
+		return;
+	}
+
 	if (hdd_nla_put_roam_stats_info(vendor_event, roam_info, 0)) {
 		wlan_cfg80211_vendor_free_skb(vendor_event);
 		hdd_err("nla put failure");
@@ -11233,7 +11245,7 @@ wlan_hdd_cfg80211_roam_events_callback(struct roam_stats_event *roam_stats,
 
 #ifdef WLAN_FEATURE_TX_LATENCY_STATS
 #define TX_LATENCY_BUCKET_DISTRIBUTION_LEN \
-	(sizeof(uint32_t) * CDP_TX_LATENCY_TYPE_MAX)
+	(sizeof(uint32_t) * CDP_TX_LATENCY_DISTR_LV_MAX)
 
 #define TX_LATENCY_ATTR(_name) QCA_WLAN_VENDOR_ATTR_TX_LATENCY_ ## _name
 
@@ -11479,6 +11491,8 @@ static uint32_t hdd_tx_latency_get_skb_len(uint32_t num)
 	/* QCA_WLAN_VENDOR_ATTR_TX_LATENCY_BUCKET_TYPE */
 	per_bucket_len += nla_total_size(sizeof(uint8_t));
 	/* QCA_WLAN_VENDOR_ATTR_TX_LATENCY_BUCKET_GRANULARITY */
+	per_bucket_len += nla_total_size(sizeof(uint32_t));
+	/* QCA_WLAN_VENDOR_ATTR_TX_LATENCY_BUCKET_AVERAGE */
 	per_bucket_len += nla_total_size(sizeof(uint32_t));
 	/* QCA_WLAN_VENDOR_ATTR_TX_LATENCY_BUCKET_DISTRIBUTION */
 	per_bucket_len += nla_total_size(TX_LATENCY_BUCKET_DISTRIBUTION_LEN);

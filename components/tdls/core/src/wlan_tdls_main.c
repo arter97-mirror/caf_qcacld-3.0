@@ -1439,6 +1439,11 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	}
 
 	tdls_soc_obj->tdls_current_mode = current_mode;
+	/*
+	 * Update the previous TDLS mode also so that scan done callback
+	 * doesn't enable TDLS again
+	 */
+	tdls_soc_obj->tdls_last_mode = current_mode;
 
 	tdls_info_to_fw = qdf_mem_malloc(sizeof(struct tdls_info));
 	if (!tdls_info_to_fw)
@@ -1475,7 +1480,6 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	if (TDLS_IS_SLEEP_STA_ENABLED(tdls_feature_flags))
 		tdls_info_to_fw->tdls_options |=  ENA_TDLS_SLEEP_STA;
 
-
 	tdls_info_to_fw->peer_traffic_ind_window =
 		tdls_soc_obj->tdls_configs.tdls_uapsd_pti_window;
 	tdls_info_to_fw->peer_traffic_response_timeout =
@@ -1497,11 +1501,11 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	if (QDF_IS_STATUS_ERROR(status))
 		goto done;
 
-	if (sta_connect_event) {
+	if (sta_connect_event)
 		tdls_soc_obj->set_state_info.vdev_id = session_id;
-	}
 
-	tdls_debug("FW tdls state sent for vdev id %d", session_id);
+	tdls_debug("FW tdls state%d sent for vdev id %d",
+		   tdls_info_to_fw->tdls_state, session_id);
 done:
 	qdf_mem_free(tdls_info_to_fw);
 	return;

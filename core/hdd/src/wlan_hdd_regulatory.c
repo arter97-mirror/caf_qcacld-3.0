@@ -2058,7 +2058,6 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 sync_chanlist:
 
 	hdd_debug("process channel list update from regulatory");
-	ucfg_reg_update_max_bw_6ghz_chan(pdev, chan_list);
 	hdd_regulatory_chanlist_dump(chan_list);
 
 	fill_wiphy_band_channels(wiphy, chan_list, NL80211_BAND_2GHZ);

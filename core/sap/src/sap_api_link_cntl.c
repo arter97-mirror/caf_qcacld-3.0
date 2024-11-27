@@ -1039,17 +1039,18 @@ sap_check_and_process_go_force_scc(struct sap_context *sap_ctx)
 #endif
 
 /**
- * sap_is_csa_restart_state() - check if sap is in csa restart state
+ * sap_is_csa_vdev_restart_state() - check if sap is in csa or vdev restart
+ * state
  * @psoc: PSOC object
  * @sap_ctx: sap context to check
  *
- * Return: true if sap is in csa restart state
+ * Return: true if sap is in csa or vdev restart state
  */
-static bool sap_is_csa_restart_state(struct wlan_objmgr_psoc *psoc,
-				     struct sap_context *sap_ctx)
+static bool sap_is_csa_vdev_restart_state(struct wlan_objmgr_psoc *psoc,
+					  struct sap_context *sap_ctx)
 {
 	struct wlan_objmgr_vdev *vdev;
-	QDF_STATUS status;
+	QDF_STATUS csa_status, vdev_status;
 
 	if (!psoc || !sap_ctx) {
 		sap_err("Invalid params");
@@ -1064,10 +1065,12 @@ static bool sap_is_csa_restart_state(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
-	status = wlan_vdev_mlme_is_csa_restart(vdev);
+	csa_status = wlan_vdev_mlme_is_csa_restart(vdev);
+	vdev_status = wlan_vdev_is_restart_progress(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_DFS_ID);
 
-	return QDF_IS_STATUS_SUCCESS(status);
+	return QDF_IS_STATUS_SUCCESS(csa_status) ||
+	       QDF_IS_STATUS_SUCCESS(vdev_status);
 }
 
 #ifdef PRE_CAC_SUPPORT
@@ -1184,7 +1187,7 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		}
 
 		if (sap_ctx->fsm_state == SAP_STARTED &&
-		    sap_is_csa_restart_state(mac_ctx->psoc, sap_ctx)) {
+		    sap_is_csa_vdev_restart_state(mac_ctx->psoc, sap_ctx)) {
 			sap_debug("Ignore Radar event in csa restart state");
 			goto EXIT;
 		}
@@ -1215,13 +1218,10 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			break;
 		} else if (!is_csa_needed && chan_freq) {
 			mac_ctx->sap.SapDfsInfo.target_chan_freq = chan_freq;
+			break;
 		} else {
 			mac_ctx->sap.SapDfsInfo.target_chan_freq =
 						sap_indicate_radar(sap_ctx);
-			if (mac_ctx->sap.SapDfsInfo.target_chan_freq != 0) {
-				sap_cac_reset_notify(mac_handle);
-				break;
-			}
 		}
 
 		/* if there is an assigned next channel hopping */
@@ -1236,6 +1236,11 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		    !mac_ctx->sap.SapDfsInfo.target_chan_freq) {
 			/* Return from here, processing will be done later */
 			goto EXIT;
+		}
+
+		if (mac_ctx->sap.SapDfsInfo.target_chan_freq != 0) {
+			sap_cac_reset_notify(mac_handle);
+			break;
 		}
 
 		/* Issue stopbss for each sapctx */

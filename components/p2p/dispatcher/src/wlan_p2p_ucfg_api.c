@@ -768,6 +768,11 @@ bool ucfg_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
 }
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 
+bool ucfg_p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
+{
+	return p2p_is_vdev_wfd_r2_mode(vdev);
+}
+
 bool ucfg_p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
 {
 	return p2p_fw_support_ap_assist_dfs_group(psoc);
@@ -789,11 +794,13 @@ ucfg_p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS ucfg_p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 					     bool *is_dfs_owner,
 					     bool *is_valid_ap_assist,
+					     bool *is_usr_restrict_csa,
 					     struct qdf_mac_addr *ap_bssid,
 					     uint8_t *opclass, uint8_t *chan)
 {
 	return p2p_get_ap_assist_dfs_params(vdev, is_dfs_owner,
-					    is_valid_ap_assist, ap_bssid,
+					    is_valid_ap_assist,
+					    is_usr_restrict_csa, ap_bssid,
 					    opclass, chan);
 }
 
@@ -836,4 +843,16 @@ void ucfg_p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
 uint8_t ucfg_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc)
 {
 	return p2p_psoc_priv_get_sta_vdev_id(psoc);
+}
+
+bool ucfg_p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id)
+{
+	return p2p_is_p2p_go_noa_in_progress(pdev, vdev_id);
+}
+
+QDF_STATUS
+ucfg_p2p_force_restrict_dfs_go_csa(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return p2p_force_restrict_dfs_go_csa(vdev, val);
 }

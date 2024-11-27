@@ -163,6 +163,7 @@ struct dlm_reject_mlo_ap_info {
  * @eht_not_supported:EHT not supported
  * @tx_link_denied: TX LINK not accepted by AP
  * @same_address_present_in_ap: same MLD address present in AP
+ * @eapol_timeout: Deauth with EAPOL timeout reason
  * @other: other reasons
  * @source: source of the rejection
  * @connect_timestamp: Timestamp when the STA got connected with this BSSID
@@ -205,6 +206,7 @@ struct dlm_reject_ap {
 				 eht_not_supported:1,
 				 tx_link_denied:1,
 				 same_address_present_in_ap:1,
+				 eapol_timeout:1,
 				 other:1;
 		};
 		uint32_t reject_ap_reason;

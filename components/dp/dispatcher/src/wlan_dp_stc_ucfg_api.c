@@ -53,3 +53,51 @@ void ucfg_dp_stc_update_logmask(struct wlan_objmgr_psoc *psoc, uint32_t mask)
 
 	wlan_dp_stc_update_logmask(dp_ctx, mask);
 }
+
+void ucfg_dp_spm_dump_tx_aft(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
+	wlan_dp_spm_dump_tx_aft(dp_ctx);
+}
+
+void ucfg_dp_stc_print_classified_table(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
+	wlan_dp_stc_print_classified_table(dp_ctx);
+}
+
+void ucfg_dp_stc_print_sampling_table(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
+	wlan_dp_stc_print_sampling_table(dp_ctx);
+}
+
+void ucfg_dp_stc_print_active_traffic_map(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("Unable to get DP context");
+		return;
+	}
+
+	wlan_dp_stc_print_active_traffic_map(dp_ctx);
+}

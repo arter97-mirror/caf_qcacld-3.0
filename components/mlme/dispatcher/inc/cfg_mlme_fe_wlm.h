@@ -380,7 +380,7 @@
  *
  * </ini>
  */
-#define CFG_DEFAULT_ULTLOW_FLAGS "0xc83"
+#define CFG_DEFAULT_ULTLOW_FLAGS "0x180C83"
 #define CFG_LATENCY_FLAGS_ULTLOW \
 		CFG_INI_STRING("wlm_latency_flags_ultralow",\
 			       0, \

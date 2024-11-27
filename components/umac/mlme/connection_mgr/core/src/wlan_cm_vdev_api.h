@@ -54,6 +54,8 @@
  * @partner_info: Partner link information for an ML connection
  * @assoc_link_id: Assoc link ID of an ML connection
  * @owe_trans_ssid: owe trans ssid to be used when scan entry ssid is wildcard
+ * @req_fail_status_code: Connection request fail status code
+ * @rsno_gen_used: RSN generation of the candidate
  */
 struct cm_vdev_join_req {
 	uint8_t vdev_id;
@@ -70,6 +72,8 @@ struct cm_vdev_join_req {
 	uint8_t assoc_link_id;
 #endif
 	struct wlan_ssid owe_trans_ssid;
+	enum wlan_status_code req_fail_status_code;
+	uint8_t rsno_gen_used;
 };
 
 /**

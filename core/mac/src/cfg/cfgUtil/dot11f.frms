@@ -487,6 +487,11 @@ FF vendor_action_subtype (1)
     subtype, 1;
 }
 
+FF count (1)
+{
+    count, 1;
+}
+
 IE addba_extn_element(EID_ADDBA_EXTN_ELEMENT)
 {
     {
@@ -2616,6 +2621,17 @@ IE transmit_power_env (EID_TRANSMIT_POWER_ENVELOPE)
                max_tx_power_for_320, 1;
        }
        ext_max_tx_power_reg_psd (max_tx_pwr_interpret IS 3) {
+               //ext_transmit_psd_info, 1;
+               {
+                       ext_count: 4;
+                       reserved: 4;
+               }
+               max_tx_psd_power[15];
+       }
+       ext_max_tx_power_addn_reg_eirp (max_tx_pwr_interpret IS 4) {
+	       max_tx_power_for_320, 1;
+       }
+       ext_max_tx_power_addn_reg_psd (max_tx_pwr_interpret IS 5) {
                //ext_transmit_psd_info, 1;
                {
                        ext_count: 4;
@@ -5158,6 +5174,23 @@ FRAME channel_usage_resp
     FF    Action;
     FF    DialogToken;
     MANDIE channel_usage;
+}
+
+FRAME link_recfg_req
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+    MANDIE  mlo_ie;
+    OPTIE  oci;
+}
+
+FRAME link_recfg_rsp
+{
+    FF    Category;
+    FF    Action;
+    FF    DialogToken;
+    FF    count;
 }
 
 // Local Variables:

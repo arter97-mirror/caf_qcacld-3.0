@@ -3952,18 +3952,14 @@ QDF_STATUS sme_enable_active_apf_mode_ind(mac_handle_t mac_handle,
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct scheduler_msg message = {0};
 	tAniDHCPInd *pMsg;
-	struct csr_roam_session *pSession;
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (status == QDF_STATUS_SUCCESS) {
-		pSession = CSR_GET_SESSION(mac, sessionId);
-
-		if (!pSession) {
-			sme_err("Session: %d not found", sessionId);
+		if (!CSR_IS_SESSION_VALID(mac, sessionId)) {
+			sme_err("invalid vdev %d", sessionId);
 			sme_release_global_lock(&mac->sme);
-			return QDF_STATUS_E_FAILURE;
+			return QDF_STATUS_E_INVAL;
 		}
-		pSession->dhcp_done = false;
 
 		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
 		if (!pMsg) {
@@ -4006,18 +4002,14 @@ QDF_STATUS sme_disable_active_apf_mode_ind(mac_handle_t mac_handle,
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct scheduler_msg message = {0};
 	tAniDHCPInd *pMsg;
-	struct csr_roam_session *pSession;
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (status == QDF_STATUS_SUCCESS) {
-		pSession = CSR_GET_SESSION(mac, sessionId);
-
-		if (!pSession) {
-			sme_err("Session: %d not found", sessionId);
+		if (!CSR_IS_SESSION_VALID(mac, sessionId)) {
+			sme_err("invalid vdev %d", sessionId);
 			sme_release_global_lock(&mac->sme);
-			return QDF_STATUS_E_FAILURE;
+			return QDF_STATUS_E_INVAL;
 		}
-		pSession->dhcp_done = false;
 
 		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
 		if (!pMsg) {
@@ -11910,6 +11902,7 @@ int sme_update_he_twt_req_support(mac_handle_t mac_handle, uint8_t session_id,
 	}
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request = cfg_val;
 
+	ucfg_twt_cfg_set_requestor(mac_ctx->psoc, cfg_val);
 	csr_update_session_he_cap(mac_ctx, session);
 
 	return 0;
@@ -17439,7 +17432,7 @@ sme_validate_txrx_chain_mask(uint32_t id, uint32_t value)
 
 void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
 				    void (*set_disconnect_link_info_cb)
-				    (uint8_t vdev_id))
+				    (uint8_t vdev_id, bool is_disconnect_sent))
 {
 	QDF_STATUS status;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);

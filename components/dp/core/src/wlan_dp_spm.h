@@ -353,6 +353,14 @@ QDF_STATUS wlan_dp_spm_policy_update(struct dp_policy *policy)
 
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 /**
+ * wlan_dp_spm_dump_tx_aft() - Dump TX active fow table
+ * @dp_ctx: Global DP component context
+ *
+ * Return: None
+ */
+void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
  * wlan_dp_spm_flow_table_attach() - SPM flow table attach
  * @dp_ctx: Global DP component context
  *
@@ -410,6 +418,10 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
 				 uint16_t flow_id, uint64_t flow_guid);
 #else
+static inline void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+
 static inline void
 wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
 {

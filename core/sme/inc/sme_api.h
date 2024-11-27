@@ -804,16 +804,20 @@ QDF_STATUS sme_disable_active_apf_mode_ind(mac_handle_t mac_handle,
 					   uint8_t device_mode,
 					   uint8_t *macAddr, uint8_t sessionId);
 #else
+static inline
 QDF_STATUS sme_enable_active_apf_mode_ind(mac_handle_t mac_handle,
 					  uint8_t device_mode,
 					  uint8_t *macAddr, uint8_t sessionId)
 {
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
+static inline
 QDF_STATUS sme_disable_active_apf_mode_ind(mac_handle_t mac_handle,
 					   uint8_t device_mode,
 					   uint8_t *macAddr, uint8_t sessionId)
 {
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 
@@ -5002,7 +5006,7 @@ QDF_STATUS sme_update_beacon_country_ie(mac_handle_t mac_handle,
 
 void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
 				    void (*set_disconnect_link_info_cb)
-				    (uint8_t vdev_id));
+				    (uint8_t vdev_id, bool is_disconnect_sent));
 
 /**
  * sme_deregister_disconnect_cb() - function to deregister cb to

@@ -379,17 +379,18 @@ bool lim_is_ml_peer_state_disconn(struct mac_context *mac_ctx,
 bool lim_is_emlsr_band_supported(struct pe_session *session);
 
 /**
- * lim_cu_info_from_rnr_per_link_id() - get the cu info from rnr per link id
+ * lim_get_partner_link_info_from_rnr() - get the cu info from rnr per link id
  * @rnr: rnr element
  * @linkid: link id
  * @bpcc: pointer to save BSS parameters change count
- * @aui: pointer to save all updates included flag
+ * @opclass: pointer to save opclass
+ * @chan: Pointer to save chan index.
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS lim_cu_info_from_rnr_per_link_id(const uint8_t *rnr,
-					    uint8_t linkid, uint8_t *bpcc,
-					    uint8_t *aui);
+QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
+					      uint8_t linkid, uint8_t *bpcc,
+					      uint8_t *opclass, uint8_t *chan);
 
 /**
  * lim_get_bpcc_from_mlo_ie() - get the bpcc from mlo_ie info
@@ -404,11 +405,13 @@ QDF_STATUS lim_get_bpcc_from_mlo_ie(tSchBeaconStruct *bcn,
 /**
  * lim_check_cu_happens() - check whether cu happens
  * @vdev: vdev object
+ * @link_id: Link ID to check BPCC for
  * @new_bpcc: the new bpcc
  *
  * Return: bool
  */
-bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev, uint8_t new_bpcc);
+bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev,
+			  uint8_t link_id, uint8_t new_bpcc);
 #else
 static inline void lim_mlo_roam_peer_disconn_del(struct wlan_objmgr_vdev *vdev)
 {
@@ -559,8 +562,9 @@ bool lim_is_emlsr_band_supported(struct pe_session *session)
 }
 
 static inline
-QDF_STATUS lim_cu_info_from_rnr_per_link_id(const uint8_t *rnr, uint8_t linkid,
-					    uint8_t *bpcc, uint8_t *aui)
+QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
+					      uint8_t linkid, uint8_t *bpcc,
+					      uint8_t *opclass, uint8_t *chan)
 {
 	return QDF_STATUS_E_INVAL;
 }
@@ -573,7 +577,8 @@ QDF_STATUS lim_get_bpcc_from_mlo_ie(tSchBeaconStruct *bcn,
 }
 
 static inline
-bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev, uint8_t nbpcc)
+bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev,
+			  uint8_t link_id, uint8_t new_bpcc)
 {
 	return true;
 }

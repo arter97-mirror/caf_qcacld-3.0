@@ -51,7 +51,9 @@
 #define p2p_debug_rl(params...) \
 	QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_P2P, params)
 #define p2p_info_rl(params...) \
-		QDF_TRACE_INFO_RL(QDF_MODULE_ID_P2P, params)
+	QDF_TRACE_INFO_RL(QDF_MODULE_ID_P2P, params)
+#define p2p_err_rl(params...) \
+	QDF_TRACE_ERROR_RL(QDF_MODULE_ID_P2P, params)
 
 #define p2p_alert(params ...) \
 	QDF_TRACE_FATAL(QDF_MODULE_ID_P2P, params)
@@ -380,6 +382,7 @@ struct p2p_ap_assist_dfs_ap_info {
  * to DFS owner capability and AP assisted params
  * @is_dfs_owner: Is DFS owner
  * @is_client_csa: Can client send CSA request
+ * @is_user_restrict_csa: User restrict CSA on P2P GO
  * @extn_cap_attr_found: Is extended cap attr found
  * @wlan_ap_info_attr_found: Is WLAN AP info attr found
  * @is_valid_ap_assist: Is assisted AP params valid
@@ -389,6 +392,7 @@ struct p2p_ap_assist_dfs_ap_info {
 struct p2p_ap_assist_dfs_group_info {
 	bool is_dfs_owner;
 	bool is_client_csa;
+	bool is_user_restrict_csa;
 	bool extn_cap_attr_found;
 	bool wlan_ap_info_attr_found;
 	bool is_valid_ap_assist;
@@ -723,6 +727,20 @@ QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
  * Return: true if USD is supported by FW else false
  */
 bool p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * p2p_is_vdev_wfd_r2_mode() - Returns true if current mode of VDEV operation
+ * is WFD-R2.
+ * @vdev: VDEV object manager.
+ *
+ * Return: bool
+ */
+bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev);
+#else
+static inline bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 
 /**
@@ -749,6 +767,7 @@ QDF_STATUS p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
  * @vdev: VDEV object manager pointer of P2P entity
  * @is_dfs_owner: Pointer to get DFS owner capability in extended cap of P2P2 IE
  * @is_valid_ap_assist: Is assisted AP params valid
+ * @is_usr_restrict_csa: Is user restricted CSA
  * @ap_bssid: Pointer to get AP BSSID of assisted AP in DFS oper extracted from
  * wlan ap info attribute
  * @opclass: Operating class of the AP pointed in @ap_bssid
@@ -759,6 +778,7 @@ QDF_STATUS p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 					bool *is_dfs_owner,
 					bool *is_valid_ap_assist,
+					bool *is_usr_restrict_csa,
 					struct qdf_mac_addr *ap_bssid,
 					uint8_t *opclass, uint8_t *chan);
 
@@ -910,4 +930,27 @@ p2p_set_rand_mac_for_p2p_dev(struct wlan_objmgr_psoc *soc,
 			     uint32_t vdev_id, uint32_t freq,
 			     uint64_t rnd_cookie, uint32_t duration);
 
+/**
+ * p2p_is_p2p_go_noa_in_progress() - Check whether P2P GO single shot noa
+ * is in progress or not
+ * @pdev: PDEV object manager for P2P GO
+ * @vdev_id: vdev id
+ *
+ * Return: True/False
+ */
+bool p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id);
+
+/**
+ * p2p_force_restrict_dfs_go_csa() - API to handle user restricted CSA via
+ * test configuration.
+ * @vdev: VDEV object manager.
+ * @val: User config value.
+ *
+ * API to configure restriction of CSA from user for assisted P2P group.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+p2p_force_restrict_dfs_go_csa(struct wlan_objmgr_vdev *vdev, bool val);
 #endif /* _WLAN_P2P_MAIN_H_ */

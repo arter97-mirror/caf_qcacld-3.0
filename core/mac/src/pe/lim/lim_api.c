@@ -726,13 +726,14 @@ void lim_fill_dfs_p2p_group_params(struct pe_session *pe_session)
 	dfs_p2p_info = &pe_session->dfs_p2p_info;
 	qdf_mem_zero(dfs_p2p_info, sizeof(*dfs_p2p_info));
 	if (!wlan_reg_is_dfs_for_freq(wlan_vdev_get_pdev(pe_session->vdev),
-				      pe_session->curr_op_freq)) {
+				      pe_session->curr_op_freq) ||
+	    !wlan_p2p_is_vdev_wfd_r2_mode(pe_session->vdev)) {
 		return;
 	}
 
 	wlan_p2p_get_ap_assist_dfs_params(pe_session->vdev, &is_dfs_owner,
-					  &is_valid_ap_assist, &ap_bssid,
-					  NULL, NULL);
+					  &is_valid_ap_assist, NULL,
+					  &ap_bssid, NULL, NULL);
 
 	if (is_dfs_owner || !is_valid_ap_assist)
 		return;
@@ -2078,8 +2079,8 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 	assoc_ies_len = roam_synch->reassoc_req_length -
 				sizeof(tSirMacMgmtHdr) - ies_offset;
 
-	rsn_ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSN, assoc_ies,
-					  assoc_ies_len);
+	rsn_ie = wlan_get_rsn_data_from_ie_ptr(assoc_ies, assoc_ies_len);
+
 	wpa_oui = WLAN_WPA_SEL(WLAN_WPA_OUI_TYPE);
 	wpa_ie = wlan_get_vendor_ie_ptr_from_oui((uint8_t *)&wpa_oui,
 						 WLAN_OUI_SIZE, assoc_ies,
@@ -2089,8 +2090,8 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 		return;
 	}
 
-	wlan_set_vdev_crypto_prarams_from_ie(ft_session->vdev, assoc_ies,
-					     assoc_ies_len);
+	wlan_set_vdev_crypto_params_from_ie(ft_session->vdev, assoc_ies,
+					    assoc_ies_len);
 	ft_session->limRmfEnabled =
 		lim_get_vdev_rmf_capable(mac_ctx, ft_session);
 	crypto_params = wlan_crypto_vdev_get_crypto_params(ft_session->vdev);
@@ -2487,12 +2488,14 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	bss_desc_ptr->beaconInterval = parsed_frm_ptr->beaconInterval;
 	bss_desc_ptr->timeStamp[0]   = parsed_frm_ptr->timeStamp[0];
 	bss_desc_ptr->timeStamp[1]   = parsed_frm_ptr->timeStamp[1];
-	qdf_mem_copy(&bss_desc_ptr->capabilityInfo,
-	&bcn_proberesp_ptr[SIR_MAC_HDR_LEN_3A + SIR_MAC_B_PR_CAPAB_OFFSET], 2);
-
+	bss_desc_ptr->capabilityInfo =
+			lim_get_u16((uint8_t *)&parsed_frm_ptr->capabilityInfo);
 	qdf_mem_copy((uint8_t *) &bss_desc_ptr->bssId,
 		     (uint8_t *)&bssid.bytes,
 		     sizeof(tSirMacAddr));
+	pe_debug("Non-tx bss desc: privacy bit: %d, bssid " QDF_MAC_ADDR_FMT,
+		 SIR_MAC_GET_PRIVACY(bss_desc_ptr->capabilityInfo),
+		 QDF_MAC_ADDR_REF(bss_desc_ptr->bssId));
 
 	if (parsed_frm_ptr->mdiePresent) {
 		bss_desc_ptr->mdiePresent = parsed_frm_ptr->mdiePresent;
@@ -2724,7 +2727,7 @@ end:
 	}
 
 	if (mac->sme.set_disconnect_link_info_cb)
-		mac->sme.set_disconnect_link_info_cb(session->vdev_id);
+		mac->sme.set_disconnect_link_info_cb(session->vdev_id, true);
 
 	lim_tear_down_link_with_ap(mac, session->peSessionId,
 				   reason_code,
@@ -3860,7 +3863,7 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 	}
 
 	status = lim_fill_pe_session(mac_ctx, pe_session, bss_desc,
-				     sync_ind->phy_mode);
+				     sync_ind->phy_mode, NULL);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to fill pe session vdev id %d",
 		       pe_session->vdev_id);
@@ -4121,29 +4124,21 @@ lim_match_link_info(uint8_t req_link_id,
 }
 
 QDF_STATUS
-lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
+lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
 		  uint32_t len, qdf_freq_t freq, int32_t rssi,
 		  uint8_t snr, uint32_t tsf_delta)
 {
 	qdf_nbuf_t buf;
-	struct wlan_objmgr_pdev *pdev;
-	uint8_t *data, i, vdev_id;
+	uint8_t *data, i;
 	struct mgmt_rx_event_params rx_param = {0};
 	struct wlan_frame_hdr *hdr;
 	enum mgmt_frame_type frm_type = MGMT_BEACON;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	vdev_id = wlan_vdev_get_id(vdev);
 	if (!bcn_probe || !len || (len < sizeof(*hdr)) ||
 	    len > MAX_MGMT_MPDU_LEN) {
 		pe_err("bcn_probe is null or invalid len %d",
 		       len);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		pe_err("Failed to find pdev");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -4174,8 +4169,8 @@ lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
 
 	pe_debug("MLO: add prb rsp to scan db");
 	/* buf will be freed by scan module in error or success case */
-	status = wlan_scan_process_bcn_probe_rx_sync(wlan_pdev_get_psoc(pdev), buf,
-			&rx_param, frm_type);
+	status = wlan_scan_process_bcn_probe_rx_sync(wlan_pdev_get_psoc(pdev),
+						     buf, &rx_param, frm_type);
 
 	return status;
 }
@@ -4248,7 +4243,7 @@ lim_clear_ml_partner_info(struct pe_session *session_entry, int8_t idx)
 			continue;
 
 		mlo_mgr_clear_ap_link_info(session_entry->vdev,
-			partner_info->partner_link_info[idx].link_addr.bytes);
+			&partner_info->partner_link_info[idx].link_addr);
 		qdf_mem_zero(&partner_info->partner_link_info[idx],
 			     sizeof(struct mlo_link_info));
 		partner_info->partner_link_info[idx].link_id =
@@ -4337,8 +4332,9 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	cache_entry = wlan_scan_get_scan_entry_by_mac_freq(pdev, link_addr,
-							   freq);
+	cache_entry =
+		wlan_scan_entry_by_bssid_and_security(pdev, link_addr,
+						      wlan_vdev_get_id(vdev));
 	if (!cache_entry)
 		return QDF_STATUS_E_FAILURE;
 
@@ -4575,6 +4571,23 @@ static void lim_gen_link_specific_rnr_ie(struct mac_context *mac_ctx,
 			   new_rnr_ie[1] + MIN_IE_LEN);
 }
 
+static inline void fill_crypto_filter_params(struct scan_filter *filter,
+					     struct wlan_objmgr_vdev *vdev)
+{
+	filter->authmodeset =
+		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE);
+	filter->ucastcipherset =
+		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_UCAST_CIPHER);
+	filter->mcastcipherset =
+		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_MCAST_CIPHER);
+	filter->key_mgmt =
+		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+	filter->mgmtcipherset =
+		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_MGMT_CIPHER);
+	filter->ignore_pmf_cap = true;
+	filter->mrsno_gen = wlan_vdev_get_rsno_gen_supported(vdev);
+}
+
 static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 {
 	struct scan_filter *filter;
@@ -4645,6 +4658,8 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 
 	if (!filter->num_of_bssid)
 		goto mem_free;
+
+	fill_crypto_filter_params(filter, session->vdev);
 
 	wlan_vdev_get_bss_peer_mld_mac(session->vdev, &mld_addr);
 	filter->match_mld_addr = true;
@@ -4890,7 +4905,7 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 				goto end;
 			}
 
-			status = lim_add_bcn_probe(session_entry->vdev,
+			status = lim_add_bcn_probe(mac_ctx->pdev,
 						   link_probe_rsp.ptr,
 						   link_probe_rsp.len,
 						   chan_freq, rssi, 0, 0);
@@ -4927,12 +4942,12 @@ end:
 	return status;
 }
 
-QDF_STATUS
-lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
-			     struct pe_session *session,
-			     uint8_t *probe_rsp,
-			     uint32_t probe_rsp_len)
+QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
+					struct pe_session *session,
+					uint8_t *rx_packet_info)
 {
+	uint8_t *probe_ies, *probe_rsp, *cc;
+	uint32_t probe_ies_len, probe_rsp_len;
 	struct element_info link_probe_rsp;
 	struct qdf_mac_addr sta_link_addr;
 	struct wlan_objmgr_vdev *vdev;
@@ -4940,25 +4955,32 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	uint8_t *ml_ie = NULL;
 	qdf_size_t ml_ie_total_len = 0;
 	struct mlo_partner_info partner_info;
-	uint8_t i, link_id, vdev_id;
-	uint8_t bpcc, aui;
-	bool cu_flag = false;
-	const uint8_t *rnr;
+	int8_t rssi;
+	uint8_t i, link_id, vdev_id, bpcc, snr, chan, opclass;
 	bool msd_cap_found = false;
+	const uint8_t *rnr;
+	qdf_freq_t chan_freq;
+	struct wlan_country_ie *cc_ie;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	vdev = session->vdev;
 	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return status;
 
+	snr = WMA_GET_RX_SNR(rx_packet_info);
+	rssi = WMA_GET_RX_RSSI_NORMALIZED(rx_packet_info);
+	probe_rsp = WMA_GET_RX_MPDU_DATA(rx_packet_info);
+	probe_rsp_len = WMA_GET_RX_PAYLOAD_LEN(rx_packet_info);
+
+	probe_ies = probe_rsp + WLAN_PROBE_RESP_IES_OFFSET;
+	probe_ies_len = probe_rsp_len - WLAN_PROBE_RESP_IES_OFFSET;
+
 	rnr = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_REDUCED_NEIGHBOR_REPORT,
-				   probe_rsp + WLAN_PROBE_RESP_IES_OFFSET,
-				   probe_rsp_len - WLAN_PROBE_RESP_IES_OFFSET);
+				       probe_ies, probe_ies_len);
 	if (!rnr)
 		return status;
 
-	status = util_find_mlie(probe_rsp + WLAN_PROBE_RESP_IES_OFFSET,
-				probe_rsp_len - WLAN_PROBE_RESP_IES_OFFSET,
+	status = util_find_mlie(probe_ies, probe_ies_len,
 				&ml_ie, &ml_ie_total_len);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Mlo ie not found in Probe response");
@@ -4985,36 +5007,34 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	if (!link_probe_rsp.ptr)
 		return QDF_STATUS_E_NOMEM;
 
+	qdf_mem_copy(&sta_link_addr, session->self_mac_addr,
+		     QDF_MAC_ADDR_SIZE);
+
+	cc_ie = (struct wlan_country_ie *)
+			wlan_get_ie_ptr_from_eid(WLAN_ELEMID_COUNTRY,
+						 probe_ies, probe_ies_len);
+	if (cc_ie && cc_ie->len)
+		cc = cc_ie->cc;
+	else
+		cc = NULL;
+
 	for (i = 0; i < partner_info.num_partner_links; i++) {
 		link_id = partner_info.partner_link_info[i].link_id;
-		partner_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
-						       WLAN_LEGACY_MAC_ID);
-		if (!partner_vdev) {
-			pe_debug("No partner vdev for link id %d", link_id);
+		status = lim_get_partner_link_info_from_rnr(rnr, link_id,
+							    &bpcc, &opclass,
+							    &chan);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("no cu info in rnr for link id %d", link_id);
 			continue;
 		}
 
-		status = lim_cu_info_from_rnr_per_link_id(rnr, link_id,
-							  &bpcc, &aui);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_debug("no cu info in rnr for link id %d", link_id);
-			goto ref_rel;
-		}
+		if (!lim_check_cu_happens(vdev, link_id, bpcc))
+			continue;
 
-		cu_flag = lim_check_cu_happens(partner_vdev, bpcc);
-		if (!cu_flag)
-			goto ref_rel;
-
-		vdev_id = wlan_vdev_get_id(partner_vdev);
-		session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
-		if (!session) {
-			pe_debug("session is null for vdev id %d", vdev_id);
-			goto ref_rel;
-		}
-
-		qdf_mem_copy(&sta_link_addr, session->self_mac_addr,
-			     QDF_MAC_ADDR_SIZE);
-
+		chan_freq = wlan_reg_chan_opclass_to_freq_prefer_global(mac_ctx->pdev,
+									cc,
+									chan,
+									opclass);
 		link_probe_rsp.len = probe_rsp_len;
 		/* Todo:
 		 * it needs to use link_id as parameter to generate
@@ -5027,16 +5047,29 @@ lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 					     probe_rsp_len,
 					     (qdf_size_t *)&link_probe_rsp.len);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_err("MLO: Link probe response generation failed %d",
-			       status);
-			goto ref_rel;
+			pe_debug("MLO: Link probe response generation failed %d",
+				 status);
+			continue;
 		}
 
-		lim_process_gen_probe_rsp_frame(mac_ctx, session,
-						link_probe_rsp.ptr,
-						link_probe_rsp.len);
+		lim_add_bcn_probe(mac_ctx->pdev, link_probe_rsp.ptr,
+				  link_probe_rsp.len, chan_freq, rssi, snr, 0);
 
-ref_rel:
+		partner_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
+						       WLAN_LEGACY_MAC_ID);
+		if (!partner_vdev) {
+			pe_debug("No partner vdev for link id %d", link_id);
+			continue;
+		}
+
+		vdev_id = wlan_vdev_get_id(partner_vdev);
+		session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+		if (session) {
+			lim_process_gen_probe_rsp_frame(mac_ctx, session,
+							link_probe_rsp.ptr,
+							link_probe_rsp.len);
+		}
+
 		wlan_objmgr_vdev_release_ref(partner_vdev, WLAN_LEGACY_MAC_ID);
 	}
 

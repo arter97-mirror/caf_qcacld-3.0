@@ -1742,7 +1742,7 @@ static QDF_STATUS wma_get_dp_peer_stats(wmi_unified_t wmi_handle,
 
 	return ucfg_dp_get_per_link_peer_stats(dp_soc, vdev_id, peer_mac,
 					       dp_stats, CDP_WILD_PEER_TYPE,
-					       WLAN_MAX_MLD);
+					       DP_STAT_NUM_SINGLE_LINK);
 }
 
 /**

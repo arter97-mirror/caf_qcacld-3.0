@@ -338,7 +338,7 @@
 /*
  * <ini>
  * gTcpAdvWinScaleEnable - Control to enable  TCP adv window scaling
- * @Default: true
+ * @Default: false
  *
  * This ini is used to enable dynamic configuration of TCP adv window scaling
  * system parameter.
@@ -352,7 +352,7 @@
 #define CFG_DP_ENABLE_TCP_ADV_WIN_SCALE \
 		CFG_INI_BOOL( \
 		"gTcpAdvWinScaleEnable", \
-		true, \
+		false, \
 		"Control to enable  TCP adv window scaling")
 
 /*

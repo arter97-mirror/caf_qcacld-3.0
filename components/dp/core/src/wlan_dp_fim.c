@@ -290,7 +290,7 @@ QDF_STATUS dp_fim_update_metadata(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb)
 			return QDF_STATUS_E_INVAL;
 		}
 
-		hash = skb_get_hash(skb);
+		hash = qdf_nbuf_get_hash(skb);
 	} else {
 		DP_STATS_INC(fim_ctx, sk_valid, 1);
 		if (!dp_fim_is_proto_supported(skb)) {

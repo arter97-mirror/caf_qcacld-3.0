@@ -420,18 +420,6 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		if(!is_legacy && conn_info->ieee_link_id == WLAN_INVALID_LINK_ID)
 			continue;
 
-		if (hdd_cm_is_vdev_roaming(link_info)) {
-			len = scnprintf(buf + length, buf_avail_len - length,
-					"Roaming is in progress");
-			if (len <= 0)
-				return length;
-
-			length += len;
-		}
-
-		tx_bit_rate = cfg80211_calculate_bitrate(&conn_info->txrate);
-		rx_bit_rate = cfg80211_calculate_bitrate(&conn_info->rxrate);
-
 		if (!is_legacy) {
 			len = scnprintf(buf + length, buf_avail_len - length,
 					"\nlink_id: %d\n",
@@ -446,8 +434,11 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 			}
 
 			if (link_info->vdev_id == WLAN_INVALID_VDEV_ID &&
-			    conn_info->ieee_link_id != WLAN_INVALID_LINK_ID)
+			    conn_info->ieee_link_id != WLAN_INVALID_LINK_ID) {
 				is_standby = true;
+			} else {
+				is_standby = false;
+			}
 
 			len = scnprintf(buf + length, buf_avail_len - length,
 					"stand-by link: %d\n",
@@ -461,6 +452,21 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 				return buf_avail_len;
 			}
 		}
+
+		/* Avoid to check roaming in progress for standby. Standyby link
+		 * don't have valid vdev.
+		 */
+		if (!is_standby && hdd_cm_is_vdev_roaming(link_info)) {
+			len = scnprintf(buf + length, buf_avail_len - length,
+					"Roaming is in progress");
+			if (len <= 0)
+				return length;
+
+			length += len;
+		}
+
+		tx_bit_rate = cfg80211_calculate_bitrate(&conn_info->txrate);
+		rx_bit_rate = cfg80211_calculate_bitrate(&conn_info->rxrate);
 
 		len = scnprintf(buf + length, buf_avail_len - length,
 				"freq: %u\n"

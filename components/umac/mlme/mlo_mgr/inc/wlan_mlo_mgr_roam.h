@@ -187,18 +187,6 @@ void mlo_roam_copy_partner_info(struct mlo_partner_info *partner_info,
 				uint8_t skip_vdev_id, bool fill_all_links);
 
 /**
- * mlo_roam_init_cu_bpcc() - init cu bpcc per roam sync data
- * @vdev: vdev object
- * @sync_ind: roam sync ind pointer
- *
- * This api will be called to init cu bpcc from connect response.
- *
- * Return: none
- */
-void mlo_roam_init_cu_bpcc(struct wlan_objmgr_vdev *vdev,
-			   struct roam_offload_synch_ind *sync_ind);
-
-/**
  * mlo_roam_update_connected_links - update connected links bitmap after roaming
  *
  * @vdev: vdev pointer
@@ -567,11 +555,6 @@ static inline void
 mlo_roam_copy_partner_info(struct mlo_partner_info *partner_info,
 			   struct roam_offload_synch_ind *sync_ind,
 			   uint8_t skip_vdev_id, bool fill_all_links)
-{}
-
-static inline
-void mlo_roam_init_cu_bpcc(struct wlan_objmgr_vdev *vdev,
-			   struct roam_offload_synch_ind *sync_ind)
 {}
 
 static inline void

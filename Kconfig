@@ -538,6 +538,10 @@ config FEATURE_WLAN_SCAN_PNO
 	bool "Enable FEATURE_WLAN_SCAN_PNO"
 	default n
 
+config FEATURE_WLAN_ZERO_POWER_SCAN
+	bool "Enable Zero Power Scan"
+	default n
+
 config WALT_GET_CPU_TAKEN_SUPPORT
 	bool "enable WALT_GET_CPU_TAKEN_SUPPORT"
 	default n
@@ -2230,6 +2234,110 @@ config FEATURE_WLAN_SUPPORT_USD
 	bool "enable FEATURE_WLAN_SUPPORT_USD"
 	default n
 
+config WLAN_SUPPORT_BCAST_TWT
+	bool "enable WLAN_SUPPORT_BCAST_TWT"
+	default n
+
+config AFC_SUPPORT
+	bool "Enable AFC_SUPPORT"
+	default n
+
+config BEACON_TX_OFFLOAD_MAX_VDEV
+	int "Enable WLAN_MCC_MIN_CHANNEL_QUOTA"
+        default 3
+
+config BYPASS_WDS_OL_OPS
+	bool "Enable BYPASS_WDS_OL_OPS"
+	default n
+
+config FEATURE_AP_MCC_CH_AVOIDANCE
+	bool "Enable FEATURE_AP_MCC_CH_AVOIDANCE"
+	default n
+
+config FEATURE_MCL_REPEATER
+	bool "Enable FEATURE_MCL_REPEATER"
+	default n
+
+config FEATURE_MEC
+	bool "Enable FEATURE_MEC"
+	default n
+
+config FEATURE_STA_MODE_VOTE_LINK
+	bool "Enable FEATURE_STA_MODE_VOTE_LINK"
+	default n
+
+config FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+	bool "Enable FEATURE_WLAN_AP_AP_ACS_OPTIMIZE"
+	default n
+
+config FEATURE_WLAN_AUTO_SHUTDOWN
+	bool "Enable FEATURE_WLAN_AUTO_SHUTDOWN"
+	default n
+
+config FEATURE_WLAN_MCC_TO_SCC_SWITCH
+	bool "Enable FEATURE_WLAN_MCC_TO_SCC_SWITCH"
+	default n
+
+config FEATURE_WLAN_STA_4ADDR_SCHEME
+	bool "Enable FEATURE_WLAN_STA_4ADDR_SCHEME"
+	default n
+
+config IPA_HANDLE_MLO_DEF_LINK_REG
+	bool "Enable IPA_HANDLE_MLO_DEF_LINK_REG"
+	default n
+
+config IPA_WDI3_TX_TWO_PIPES
+	bool "Enable IPA_WDI3_TX_TWO_PIPES"
+	default n
+
+config IPA_WDI3_VLAN_SUPPORT
+	bool "Enable IPA_WDI3_VLAN_SUPPORT"
+	default n
+
+config MAX_CLIENTS_ALLOWED
+	int "enable MAX_CLIENTS_ALLOWED"
+	default 32
+
+config MDM_PLATFORM
+	bool "Enable MDM_PLATFORM"
+	default n
+
+config MOBILE_ROUTER
+	bool "Enable MOBILE_ROUTER"
+	default n
+
+config MONITOR_MODULARIZED_ENABLE
+	bool "Enable MONITOR_MODULARIZED_ENABLE"
+	default n
+
+config NUM_IPA_IFACE
+	int "enable NUM_IPA_IFACE"
+	default 3
+
+config QDF_MAX_NO_OF_SAP_MODE
+	int "enable QDF_MAX_NO_OF_SAP_MODE"
+	default 2
+
+config SAP_UNSAFE_FIXED_CHAN_ALLOW
+	bool "Enable SAP_UNSAFE_FIXED_CHAN_ALLOW"
+	default n
+
+config WDS_CONV_TARGET_IF_OPS_ENABLE
+	bool "Enable WDS_CONV_TARGET_IF_OPS_ENABLE"
+	default n
+
+config WLAN_FEATURE_AFC_DCS_SKIP_ACS_RANGE
+	bool "Enable WLAN_FEATURE_AFC_DCS_SKIP_ACS_RANGE"
+	default n
+
+config WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG
+	bool "Enable WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG"
+	default n
+
+config WLAN_TSF_UPLINK_DELAY
+	bool "Enable WLAN_TSF_UPLINK_DELAY"
+	default n
+
 if CNSS_KIWI_V2
 config CFG_BMISS_OFFLOAD_MAX_VDEV
 	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
@@ -2292,6 +2400,79 @@ config DP_RX_REFILL_BUFF_POOL_SIZE
 config DP_RX_REFILL_THRD_THRESHOLD
         int "Enable DP_RX_REFILL_THRD_THRESHOLD"
         default 512
+endif
+
+config ADRASTEA_RRI_ON_DDR
+	bool "Enable ADRASTEA_RRI_ON_DDR"
+	default n
+
+config ADRASTEA_SHADOW_REGISTERS
+	bool "Enable ADRASTEA_SHADOW_REGISTERS"
+	default n
+
+config CE_LEGACY_MSI_SUPPORT
+	bool "Enable CE_LEGACY_MSI_SUPPORT"
+	default n
+
+config CNSS_WCN6450
+	bool "Enable CNSS_WCN6450"
+	default n
+
+config FEATURE_HIF_DELAYED_REG_WRITE
+	bool "Enable FEATURE_HIF_DELAYED_REG_WRITE"
+	default n
+
+config HIF_HAL_REG_ACCESS_SUPPORT
+	bool "Enable HIF_HAL_REG_ACCESS_SUPPORT"
+	default n
+
+config QCA_WIFI_WCN6450
+	bool "Enable CONFIG_QCA_WIFI_WCN6450"
+	default n
+
+config RHINE
+	bool "Enable RHINE"
+	default n
+
+config WCN6450_HEADERS_DEF
+	bool "Enable WCN6450_HEADERS_DEF"
+	default n
+
+config WIFI_3_0_ADRASTEA
+	bool "Enable WIFI_3_0_ADRASTEA"
+	default n
+
+config WLAN_SEND_DSCP_UP_MAP_TO_FW
+	bool "Enable WLAN_SEND_DSCP_UP_MAP_TO_FW"
+	default n
+
+config DP_FT_LOCK_HISTORY
+	bool "Enable DP_FT_LOCK_HISTORY"
+	default n
+if CNSS_WCN6450
+config DP_LEGACY_MODE_CSM_DEFAULT_DISABLE
+	int "Enable DP_LEGACY_MODE_CSM_DEFAULT_DISABLE"
+	default 1
+
+config DP_RX_BUFFER_POOL_ALLOC_THRES
+	int "Enable DP_RX_BUFFER_POOL_ALLOC_THRES"
+	default 5
+
+config DP_RX_BUFFER_POOL_SIZE
+	int "Enable DP_RX_BUFFER_POOL_SIZE"
+	default 128
+
+config DP_RX_REFILL_BUFF_POOL_SIZE
+	int "Enable DP_RX_REFILL_BUFF_POOL_SIZE"
+	default 2048
+
+config DP_RX_REFILL_THRD_THRESHOLD
+	int "Enable DP_RX_REFILL_THRD_THRESHOLD"
+	default 512
+
+config ROME_IF
+	string "Enable ROME_IF"
+	default ipci
 endif
 
 if CNSS_WCN7750

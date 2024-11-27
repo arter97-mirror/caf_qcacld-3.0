@@ -81,6 +81,21 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_result *res,
 			       struct wmi_roam_scan_data *scan_data,
 			       uint8_t vdev_id);
+
+ /**
+  * cm_roam_reject_reassoc_event() - Send connectivity diag log
+  * event while rejecting reassoc request to connected BSSID
+  * @psoc: Pointer to PSOC object
+  * @vdev: Pointer to vdev object
+  * @bssid: connected BSSID
+  *
+  * Return: None
+  */
+void
+cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *bssid);
+
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING) && \
     defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
@@ -132,6 +147,22 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_result *res,
 			       struct wmi_roam_scan_data *scan_data,
 			       uint8_t vdev_id);
+
+/**
+ * cm_roam_reject_reassoc_event() - Send connectivity diag log
+ * event while rejecting reassoc request to connected BSSID
+ * @psoc: Pointer to PSOC object
+ * @vdev: Pointer to vdev object
+ * @bssid: connected BSSID
+ *
+ * Return: None
+ */
+static inline void
+cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *bssid)
+{
+}
 #else
 static inline void
 cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
@@ -160,7 +191,25 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       uint8_t vdev_id)
 {
 }
+
+static inline void
+cm_roam_reject_reassoc_event(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_objmgr_vdev *vdev,
+			     struct qdf_mac_addr *bssid)
+{
+}
 #endif /* WLAN_FEATURE_CONNECTIVITY_LOGGING */
+
+/**
+ * cm_is_bssid_present_on_any_assoc_link() - Check if bssid belongs to any
+ * assoc link
+ * @vdev: VDEV pointer
+ * @bssid: bssid pointer
+ *
+ * Return: True if bssid belongs to any assoc else return false
+ */
+bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
+					   struct qdf_mac_addr *bssid);
 
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
 

@@ -923,9 +923,11 @@ ifneq ($(CONFIG_ARCH_SDXPRAIRIE), y)
 ifneq ($(CONFIG_ARCH_SA515), y)
 ifneq ($(CONFIG_ARCH_SDXLEMUR), y)
 ifneq ($(CONFIG_ARCH_SDXBAAGHA), y)
+ifneq ($(CONFIG_ARCH_SDXKOVA), y)
 ifneq ($(CONFIG_ARCH_SDXPINN), y)
 CONFIG_FEATURE_WLAN_STA_AP_MODE_DFS_DISABLE := y
 endif # CONFIG_ARCH_SDXPINN
+endif
 endif
 endif
 endif

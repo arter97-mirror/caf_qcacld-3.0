@@ -30,7 +30,7 @@
  */
 static QDF_STATUS target_if_send_oob_connect_request(
 					struct wlan_objmgr_psoc *psoc,
-					struct ll_sap_oob_connect_request req)
+					struct ll_sap_oob_connect_request *req)
 {
 	struct wmi_unified *wmi_handle;
 	struct wmi_oob_connect_request request;
@@ -41,9 +41,9 @@ static QDF_STATUS target_if_send_oob_connect_request(
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	request.vdev_id = req.vdev_id;
-	request.vdev_available_duration = req.vdev_available_duration;
-	request.connect_req_type = req.connect_req_type;
+	request.vdev_id = req->vdev_id;
+	request.vdev_available_duration = req->vdev_available_duration;
+	request.connect_req_type = req->connect_req_type;
 
 	return wmi_unified_oob_connect_request_send(wmi_handle, request);
 }

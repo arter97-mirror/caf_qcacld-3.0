@@ -1209,12 +1209,26 @@ static QDF_STATUS wlan_dp_get_tsf_time(void *dp_link_ctx,
 }
 #endif
 
+static inline void wlan_dp_add_cdp_vdev(struct wlan_dp_link *dp_link,
+					struct cdp_vdev *cdp_vdev)
+{
+	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
+
+	qdf_spin_lock_bh(&dp_ctx->dp_link_del_lock);
+	if (!wlan_dp_link_check_cdp_vdev(dp_link, cdp_vdev))
+		TAILQ_INSERT_TAIL(&dp_link->cdp_vdev_list, cdp_vdev,
+				  cdp_vdev_list_elem);
+	qdf_spin_unlock_bh(&dp_ctx->dp_link_del_lock);
+}
+
 QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 {
 	struct ol_txrx_ops txrx_ops;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
+	struct cdp_vdev *cdp_vdev = NULL;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (unlikely(!dp_link)) {
@@ -1250,17 +1264,14 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.tx.tx = NULL;
 	txrx_ops.get_tsf_time = wlan_dp_get_tsf_time;
 	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
-	cdp_vdev_register(soc, dp_link->link_id, (ol_osif_vdev_handle)dp_link,
-			  &txrx_ops);
+	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
+				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
 	if (!txrx_ops.tx.tx) {
 		dp_err("vdev register fail");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_link->cdp_vdev_registered = 1;
-	dp_link->cdp_vdev_deleted = 0;
-	dp_link->destroyed = 0;
-
+	wlan_dp_add_cdp_vdev(dp_link, cdp_vdev);
 	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
@@ -1273,6 +1284,7 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
+	struct cdp_vdev *cdp_vdev = NULL;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (unlikely(!dp_link)) {
@@ -1307,17 +1319,14 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.tx.tx = NULL;
 
 	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
-	cdp_vdev_register(soc, dp_link->link_id, (ol_osif_vdev_handle)dp_link,
-			  &txrx_ops);
-
+	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
+				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
 	if (!txrx_ops.tx.tx) {
 		dp_err("vdev register fail");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_link->cdp_vdev_registered = 1;
-	dp_link->cdp_vdev_deleted = 0;
-	dp_link->destroyed = 0;
+	wlan_dp_add_cdp_vdev(dp_link, cdp_vdev);
 	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
@@ -1330,6 +1339,7 @@ QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
+	struct cdp_vdev *cdp_vdev = NULL;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (unlikely(!dp_link)) {
@@ -1344,16 +1354,14 @@ QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.rx.stats_rx = dp_tx_rx_collect_connectivity_stats_info;
 	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 
-	cdp_vdev_register(soc, dp_link->link_id, (ol_osif_vdev_handle)dp_link,
-			  &txrx_ops);
+	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
+				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
 	if (!txrx_ops.tx.tx) {
 		dp_err("vdev register fail");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_link->cdp_vdev_registered = 1;
-	dp_link->cdp_vdev_deleted = 0;
-	dp_link->destroyed = 0;
+	wlan_dp_add_cdp_vdev(dp_link, cdp_vdev);
 	dp_intf->txrx_ops = txrx_ops;
 
 	qdf_copy_macaddr(&dp_link->conn_info.peer_macaddr,
@@ -1369,6 +1377,7 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
+	struct cdp_vdev *cdp_vdev = NULL;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (unlikely(!dp_link)) {
@@ -1381,13 +1390,10 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.rx.rx = dp_mon_rx_packet_cbk;
 	dp_monitor_set_rx_monitor_cb(&txrx_ops, dp_rx_monitor_callback);
 	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
-	cdp_vdev_register(soc, dp_link->link_id,
-			  (ol_osif_vdev_handle)dp_link,
-			  &txrx_ops);
+	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
+				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
 
-	dp_link->cdp_vdev_registered = 1;
-	dp_link->cdp_vdev_deleted = 0;
-	dp_link->destroyed = 0;
+	wlan_dp_add_cdp_vdev(dp_link, cdp_vdev);
 	dp_intf->txrx_ops = txrx_ops;
 
 	return QDF_STATUS_SUCCESS;
@@ -1400,6 +1406,7 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
+	struct cdp_vdev *cdp_vdev = NULL;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
 	if (unlikely(!dp_link)) {
@@ -1434,18 +1441,14 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 
 	txrx_ops->get_tsf_time = wlan_dp_get_tsf_time;
 	txrx_ops->vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
-	cdp_vdev_register(soc,
-			  dp_link->link_id,
-			  (ol_osif_vdev_handle)dp_link,
-			  txrx_ops);
+	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
+				     (ol_osif_vdev_handle)dp_link, txrx_ops);
 	if (!txrx_ops->tx.tx) {
 		dp_err("vdev register fail");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_link->cdp_vdev_registered = 1;
-	dp_link->cdp_vdev_deleted = 0;
-	dp_link->destroyed = 0;
+	wlan_dp_add_cdp_vdev(dp_link, cdp_vdev);
 	dp_intf->txrx_ops = *txrx_ops;
 	dp_link->sap_tx_block_mask &= ~DP_TX_FN_CLR;
 
@@ -3203,6 +3206,18 @@ void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags)
 	}
 
 	dp_ctx->monitor_flag = flags;
+
+	/* CDP SoC context will be NULL if the device is in
+	 * idle shutdown; Since the flags are set in dp_ctx, simply
+	 * return from here, ucfg_dp_recover_mon_conf_flags()
+	 * will take care of setting the monitor flags in CDP SoC
+	 * during cds_open() as part of idle restart.
+	 */
+	if (!dp_ctx->cdp_soc) {
+		dp_info("Failed to set flag %d, cdp_soc NULL", flags);
+		return;
+	}
+
 	val.cdp_monitor_flag = flags;
 	status = cdp_txrx_set_psoc_param(dp_ctx->cdp_soc,
 					 CDP_MONITOR_FLAG, val);

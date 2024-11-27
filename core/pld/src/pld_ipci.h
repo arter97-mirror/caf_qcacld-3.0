@@ -241,6 +241,40 @@ int pld_ipci_request_bus_bandwidth(struct device *dev, int bandwidth)
 {
 	return 0;
 }
+
+static inline bool pld_ipci_is_direct_link_supported(struct device *dev)
+{
+	return false;
+}
+
+static inline bool pld_ipci_audio_is_direct_link_supported(struct device *dev)
+{
+	return false;
+}
+
+static inline bool pld_ipci_is_audio_shared_iommu_group(struct device *dev)
+{
+	return false;
+}
+
+static inline
+int pld_ipci_audio_smmu_map(struct device *dev, phys_addr_t paddr,
+			    dma_addr_t iova, size_t size)
+{
+	return 0;
+}
+
+static inline
+void pld_ipci_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
+{
+}
+
+static inline
+int pld_ipci_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+				     size_t *size)
+{
+	return -EINVAL;
+}
 #else
 /**
  * pld_ipci_register_driver() - Register platform device callback functions
@@ -514,5 +548,76 @@ int pld_ipci_request_bus_bandwidth(struct device *dev, int bandwidth)
 {
 	return icnss_request_bus_bandwidth(dev, bandwidth);
 }
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+static inline bool pld_ipci_is_direct_link_supported(struct device *dev)
+{
+	return icnss_get_fw_direct_link_cap(dev);
+}
+
+static inline bool pld_ipci_audio_is_direct_link_supported(struct device *dev)
+{
+	return icnss_audio_is_direct_link_supported(dev);
+}
+
+static inline bool pld_ipci_is_audio_shared_iommu_group(struct device *dev)
+{
+	return icnss_get_audio_shared_iommu_group_cap(dev);
+}
+
+static inline
+int pld_ipci_audio_smmu_map(struct device *dev, phys_addr_t paddr,
+			    dma_addr_t iova, size_t size)
+{
+	return icnss_audio_smmu_map(dev, paddr, iova, size);
+}
+
+static inline
+void pld_ipci_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
+{
+	icnss_audio_smmu_unmap(dev, iova, size);
+}
+
+static inline
+int pld_ipci_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+				     size_t *size)
+{
+	return icnss_get_fw_lpass_shared_mem(dev, iova, size);
+}
+#else
+static inline bool pld_ipci_is_direct_link_supported(struct device *dev)
+{
+	return false;
+}
+
+static inline bool pld_ipci_audio_is_direct_link_supported(struct device *dev)
+{
+	return false;
+}
+
+static inline bool pld_ipci_is_audio_shared_iommu_group(struct device *dev)
+{
+	return false;
+}
+
+static inline
+int pld_ipci_audio_smmu_map(struct device *dev, phys_addr_t paddr,
+			    dma_addr_t iova, size_t size)
+{
+	return 0;
+}
+
+static inline
+void pld_ipci_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
+{
+}
+
+static inline
+int pld_ipci_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+				     size_t *size)
+{
+	return -EINVAL;
+}
+#endif
 #endif
 #endif

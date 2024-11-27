@@ -45,6 +45,7 @@
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_psoc_mlme_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_cm_roam_api.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -3270,6 +3271,164 @@ policy_mgr_switch_sap_vdev_table_sequence(struct policy_mgr_psoc_priv_obj *pm_ct
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static uint8_t
+policy_mgr_get_assoc_link_vdev_id(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  uint8_t sta_vdev_id)
+{
+	struct wlan_objmgr_vdev *sta_vdev = NULL;
+	struct wlan_objmgr_vdev *sta_assoc_vdev = NULL;
+	uint8_t assoc_link_vdev_id = sta_vdev_id;
+
+	sta_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(pm_ctx->psoc,
+							sta_vdev_id,
+							WLAN_POLICY_MGR_ID);
+	if (!sta_vdev) {
+		policy_mgr_err("vdev %d object is NULL", sta_vdev_id);
+		return assoc_link_vdev_id;
+	}
+
+	/* for MLO vdev get assoc vdev id */
+	if (wlan_vdev_mlme_is_mlo_vdev(sta_vdev)) {
+		sta_assoc_vdev = wlan_mlo_get_assoc_link_vdev(sta_vdev);
+		if (sta_assoc_vdev)
+			assoc_link_vdev_id = wlan_vdev_get_id(sta_assoc_vdev);
+	}
+	wlan_objmgr_vdev_release_ref(sta_vdev, WLAN_POLICY_MGR_ID);
+
+	return assoc_link_vdev_id;
+}
+
+#else
+static inline uint8_t
+policy_mgr_get_assoc_link_vdev_id(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  uint8_t sta_vdev_id)
+{
+	return sta_vdev_id;
+}
+#endif
+
+/*
+ * policy_mgr_trigger_roam_on_sta_sap_mcc() - Trigger roaming if current
+ * STA+SAP on MCC
+ * @pm_ctx: policy mgr ctx
+ * @sta_vdev_id: sta vdev_id
+ * @sta_freq: sta freq
+ * @sap freq: sap freq
+ *
+ * During concurrency, if STA+SAP is in MCC, then trigger roam by
+ * roaming invoke command.
+ */
+static void
+policy_mgr_roam_invoke_on_sta_for_mcc(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				      uint8_t sta_vdev_id, qdf_freq_t sta_freq,
+				      qdf_freq_t sap_freq)
+{
+	QDF_STATUS status;
+	struct qdf_mac_addr bssid;
+	uint8_t roam_invoke_vdev_id;
+
+	roam_invoke_vdev_id =
+			policy_mgr_get_assoc_link_vdev_id(pm_ctx, sta_vdev_id);
+
+	policy_mgr_debug("STA(%d) + SAP(%d) in MCC, try roam on sta vdev %d (RSO enabled %d)",
+			 sta_freq, sap_freq, roam_invoke_vdev_id,
+			 MLME_IS_ROAM_STATE_RSO_ENABLED(pm_ctx->psoc,
+							roam_invoke_vdev_id));
+
+	if (!MLME_IS_ROAM_STATE_RSO_ENABLED(pm_ctx->psoc, roam_invoke_vdev_id))
+		return;
+	/**
+	 * Keep Bssid as Broadcast, FW will select the candidate based on
+	 * FW scoring algorithm and current connection will be kept
+	 * if current AP has highest score and host will not do disconnect
+	 * if roam invoke fail.
+	 */
+	qdf_set_macaddr_broadcast(&bssid);
+	status = wlan_cm_roam_invoke(pm_ctx->pdev, roam_invoke_vdev_id, &bssid,
+				     0, CM_ROAMING_STA_SAP_MCC);
+	if (QDF_IS_STATUS_ERROR(status))
+		policy_mgr_err("Vdev %d roam invoke failed", sta_vdev_id);
+}
+
+void
+policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(struct wlan_objmgr_psoc *psoc)
+{
+	uint8_t sta_count, sap_count;
+	uint8_t mcc_to_scc_switch;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t sta_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t sta_op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t sap_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t sap_op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t target_ch_freq = 0;
+
+	if (policy_mgr_is_hw_dbs_capable(psoc))
+		return;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return;
+	}
+
+	policy_mgr_get_mcc_scc_switch(psoc, &mcc_to_scc_switch);
+
+	if (mcc_to_scc_switch != QDF_MCC_TO_SCC_WITH_PREFERRED_BAND)
+		return;
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	sta_count = policy_mgr_get_mode_specific_conn_info(psoc,
+							   sta_op_ch_freq_list,
+							   sta_vdev_id_list,
+							   PM_STA_MODE);
+	if (sta_count != 1) {
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+		return;
+	}
+
+	sap_count = policy_mgr_get_mode_specific_conn_info(psoc,
+							   sap_op_ch_freq_list,
+							   sap_vdev_id_list,
+							   PM_SAP_MODE);
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	if (sap_count != 1)
+		return;
+
+	/*
+	 * Check SAP's freq is same as STA freq or same as one of the inactive
+	 * ML freqs (inactive and standby links), then no need to send roam
+	 * invoke.
+	 */
+	if ((sap_op_ch_freq_list[0] == sta_op_ch_freq_list[0]) ||
+	    policy_mgr_if_freq_n_inactive_links_freq_same(psoc,
+						sap_op_ch_freq_list[0]))
+		return;
+
+	/* SAP is MCC, check if it can be moved to SCC or other freq */
+	policy_mgr_check_scc_channel(psoc, &target_ch_freq,
+				     sap_op_ch_freq_list[0],
+				     sap_vdev_id_list[0], mcc_to_scc_switch);
+
+	/*
+	 * If target channel is calculated and its not same as SAP current
+	 * freq, mean SAP can restart to this new target channel and thus
+	 * roam invoke decision will be taken post SAP moving to new channel
+	 * so return
+	 */
+	if (target_ch_freq && (target_ch_freq != sap_op_ch_freq_list[0]))
+		return;
+
+	/*
+	 * Current SAP channel is MCC and it cannot be moved to any
+	 * SCC STA channel
+	 */
+	policy_mgr_roam_invoke_on_sta_for_mcc(pm_ctx,
+					      sta_vdev_id_list[0],
+					      sta_op_ch_freq_list[0],
+					      sap_op_ch_freq_list[0]);
+}
+
 static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 				struct policy_mgr_psoc_priv_obj *pm_ctx)
 {
@@ -3280,6 +3439,7 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	struct sta_ap_intf_check_work_ctx *work_info;
 	bool handled = false;
+	bool is_dbs;
 
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid context");
@@ -3406,16 +3566,17 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 						  &vdev_id[0],
 						  cc_count);
 
+	is_dbs = policy_mgr_is_hw_dbs_capable(pm_ctx->psoc);
+
 	if (cc_count <= MAX_NUMBER_OF_CONC_CONNECTIONS)
 		for (i = 0; i < cc_count; i++) {
 			status = pm_ctx->hdd_cbacks.
 				wlan_hdd_get_channel_for_sap_restart
 					(pm_ctx->psoc, vdev_id[i], &ch_freq);
-			if (status == QDF_STATUS_SUCCESS) {
+			if (QDF_IS_STATUS_SUCCESS(status)) {
 				policy_mgr_debug("SAP vdev id %d restarts, old ch freq :%d new ch freq: %d",
 						 vdev_id[i],
 						 op_ch_freq_list[i], ch_freq);
-				break;
 			}
 		}
 
@@ -3553,6 +3714,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	bool is_sta_sap_scc;
 	enum policy_mgr_con_mode con_mode;
 	uint32_t nan_2g_freq, nan_5g_freq;
+	uint8_t cc_mode;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3592,6 +3754,8 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	nan_2g_freq =
 		policy_mgr_mode_specific_get_channel(psoc, PM_NAN_DISC_MODE);
 	nan_5g_freq = wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
+
+	policy_mgr_get_mcc_scc_switch(psoc, &cc_mode);
 
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
@@ -3669,12 +3833,23 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 				return QDF_STATUS_E_FAILURE;
 			}
 		} else {
-			/* MCC not supported for non-DBS chip*/
+			/**
+			 * MCC supported for non-DBS chip only for cc_mode as
+			 * QDF_MCC_TO_SCC_WITH_PREFERRED_BAND
+			 */
 			ch_freq = 0;
 			if (con_mode == PM_SAP_MODE) {
-				policymgr_nofl_debug("MCC situation in non-dbs hw STA freq %d SAP freq %d not supported",
-						     *con_ch_freq, sap_ch_freq);
-				return QDF_STATUS_E_FAILURE;
+				if (cc_mode !=
+					QDF_MCC_TO_SCC_WITH_PREFERRED_BAND) {
+					policymgr_nofl_debug("MCC situation in non-dbs hw STA freq %d SAP freq %d not supported",
+							     *con_ch_freq,
+							     sap_ch_freq);
+					return QDF_STATUS_E_FAILURE;
+				}
+
+				policymgr_nofl_debug("MCC situation in non-dbs hw STA freq %d SAP freq %d cc_mode %d",
+						     *con_ch_freq, sap_ch_freq,
+						     cc_mode);
 			} else {
 				policymgr_nofl_debug("MCC situation in non-dbs hw STA freq %d GO freq %d SCC not supported",
 						     *con_ch_freq, sap_ch_freq);

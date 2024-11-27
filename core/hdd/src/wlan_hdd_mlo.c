@@ -1149,7 +1149,7 @@ free_event:
 	return status;
 }
 
-#define MLD_MAX_SUPPORTED_LINKS 2
+#define MLD_MAX_SUPPORTED_LINKS 3
 
 int wlan_handle_mlo_link_state_operation(struct hdd_adapter *adapter,
 					 struct wiphy *wiphy,

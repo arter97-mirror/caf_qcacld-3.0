@@ -175,6 +175,9 @@
 #define MIN_RSSI_2G_TO_5G_ROAM 2
 #define CM_CFG_VALID_CHANNEL_LIST_LEN 100
 
+#define WLAN_ROAM_SCAN_TYPE_PARTIAL_SCAN 0
+#define WLAN_ROAM_SCAN_TYPE_FULL_SCAN 1
+
 /**
  * enum roam_trigger_sub_reason - Roam trigger sub reasons
  * @ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER: Roam scan triggered due to
@@ -980,6 +983,7 @@ struct ap_profile {
  *                BITS 16-23 :- It contains scoring percentage of WPA3 security
  *                BITS 24-31 :- reserved
  *                The value of each index must be 0-100
+ * @sta_sap_mcc_weightage: STA + SAP MCC weightage
  */
 struct scoring_param {
 	uint32_t disable_bitmap;
@@ -1013,6 +1017,7 @@ struct scoring_param {
 #endif
 	int32_t security_weightage;
 	uint32_t security_index_score;
+	uint32_t sta_sap_mcc_weightage;
 };
 
 /**

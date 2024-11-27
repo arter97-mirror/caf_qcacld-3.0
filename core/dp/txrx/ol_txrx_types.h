@@ -1187,6 +1187,7 @@ struct tcp_del_ack_hash_node {
 };
 
 struct ol_txrx_vdev_t {
+	struct cdp_vdev cdp_vdev;
 	struct ol_txrx_pdev_t *pdev; /* pdev - the physical device that is
 				      * the parent of this virtual device
 				      */
@@ -1219,7 +1220,7 @@ struct ol_txrx_vdev_t {
 	ol_txrx_completion_fp tx_comp;
 
 	/* delete notifier to DP component */
-	ol_txrx_vdev_delete_cb vdev_del_notify;
+	ol_txrx_vdev_del_notify_cb vdev_del_notify;
 
 	struct {
 		/*

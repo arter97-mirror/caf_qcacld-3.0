@@ -25,6 +25,7 @@
 #include "target_if.h"
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_serialization_api.h"
 
 bool ll_lt_sap_is_supported(struct wlan_objmgr_psoc *psoc)
 {
@@ -667,31 +668,40 @@ qdf_freq_t ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
 	return freq_list.best_freq;
 }
 
-QDF_STATUS
-ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
-			       enum high_ap_availability_operation operation,
-			       uint32_t duration, uint16_t cookie)
+void
+ll_lt_sap_high_ap_availability_ser_cmd_remove(
+					struct wlan_objmgr_vdev *vdev,
+					enum wlan_serialization_cmd_type type)
 {
-	struct ll_sap_vdev_priv_obj *ll_sap_obj;
-	uint8_t i;
+	struct wlan_serialization_queued_cmd_info cmd = {0};
+
+	cmd.cmd_type = type;
+	cmd.cmd_id = 0;
+	cmd.vdev = vdev;
+
+	wlan_serialization_remove_cmd(&cmd);
+}
+
+static QDF_STATUS
+ll_lt_sap_high_ap_availability_process(struct wlan_objmgr_vdev *vdev,
+				       struct ll_sap_oob_connect_request *req)
+{
 	uint16_t new_cookie;
+	uint8_t i;
+	struct wlan_ll_sap_tx_ops *tx_ops;
 	struct ll_sap_ops *osif_cbk;
 	struct wlan_objmgr_psoc *psoc;
 	struct ll_sap_psoc_priv_obj *psoc_ll_sap_obj;
-	struct ll_sap_oob_connect_request req;
-	struct wlan_ll_sap_tx_ops *tx_ops;
-
-	if (operation == HiGH_AP_AVAILABILITY_OPERATION_INVALID) {
-		ll_sap_err("Invalid operation value received");
-		return QDF_STATUS_E_INVAL;
-	}
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
 
 	if (!ll_sap_obj) {
 		ll_sap_err("vdev %d ll_sap obj null",
 			   wlan_vdev_get_id(vdev));
-		return QDF_STATUS_E_INVAL;
+		status = QDF_STATUS_E_INVAL;
+		goto end;
 	}
 
 	psoc = wlan_vdev_get_psoc(vdev);
@@ -700,28 +710,27 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 							WLAN_UMAC_COMP_LL_SAP);
 	if (!psoc_ll_sap_obj) {
 		ll_sap_err("psoc_ll_sap_obj is null");
-		return QDF_STATUS_E_INVAL;
+		status = QDF_STATUS_E_INVAL;
+		goto end;
 	}
-
-	/* Send this request to FW */
-	req.connect_req_type = operation;
-	req.vdev_available_duration = duration;
-	req.vdev_id = wlan_vdev_get_id(vdev);
 
 	tx_ops = &psoc_ll_sap_obj->tx_ops;
 	if (!tx_ops->send_oob_connect_request) {
 		ll_sap_err("send_oob_connect_request op is NULL");
-		return QDF_STATUS_E_INVAL;
+		status = QDF_STATUS_E_INVAL;
+		goto end;
 	}
 
-	tx_ops->send_oob_connect_request(psoc, req);
+	status = tx_ops->send_oob_connect_request(psoc, req);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto end;
 
 	/*
 	 * If operation is HIGH_AP_AVAILABILITY_OPERATION_REQUEST, means this
 	 * is the first request, assign the cookie for this request and send
 	 * this cookie to userspace
 	 */
-	if (operation == HIGH_AP_AVAILABILITY_OPERATION_REQUEST) {
+	if (req->operation == HIGH_AP_AVAILABILITY_OPERATION_REQUEST) {
 		for (i = 0; i < MAX_HIGH_AP_AVAILABILITY_REQUESTS; i++) {
 			if (ll_sap_obj->high_ap_availability_cookie[i] ==
 							LL_SAP_INVALID_COOKIE)
@@ -729,7 +738,8 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 		}
 		if (i == MAX_HIGH_AP_AVAILABILITY_REQUESTS) {
 			ll_sap_debug("Invalid high AP availability request");
-			return QDF_STATUS_E_INVAL;
+			status = QDF_STATUS_E_INVAL;
+			goto end;
 		}
 		qdf_get_random_bytes(&new_cookie, sizeof(new_cookie));
 		ll_sap_debug("LL_LT_SAP vdev %d high ap availability cookie %d",
@@ -741,8 +751,141 @@ ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
 		if (osif_cbk &&
 		    osif_cbk->ll_sap_send_high_ap_availability_resp_cb)
 			osif_cbk->ll_sap_send_high_ap_availability_resp_cb(
-						vdev, operation, new_cookie);
+							vdev, req->operation,
+							new_cookie);
 	}
+
+end:
+	return status;
+}
+
+static QDF_STATUS
+ll_lt_sap_high_ap_availability_ser_cb(struct wlan_serialization_command *cmd,
+				      enum wlan_serialization_cb_reason reason)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct ll_sap_oob_connect_request *req;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!cmd || !cmd->umac_cmd) {
+		ll_sap_err("NULL ser cmd");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	req = cmd->umac_cmd;
+	vdev = cmd->vdev;
+
+	switch (reason) {
+	case WLAN_SER_CB_ACTIVATE_CMD:
+		/* command moved to active list */
+		status = ll_lt_sap_high_ap_availability_process(vdev, req);
+		break;
+	case WLAN_SER_CB_CANCEL_CMD:
+		/* command removed from pending list.*/
+		ll_sap_err("ll_lt_sap ser cmd cancelled");
+		break;
+
+	case WLAN_SER_CB_ACTIVE_CMD_TIMEOUT:
+		break;
+
+	case WLAN_SER_CB_RELEASE_MEM_CMD:
+		/* command successfully completed.release vdev reference */
+		wlan_objmgr_vdev_release_ref(cmd->vdev, WLAN_LL_SAP_ID);
+		qdf_mem_free(req);
+		break;
+
+	default:
+		status = QDF_STATUS_E_INVAL;
+		break;
+	}
+
+	return status;
+}
+
+QDF_STATUS
+ll_lt_sap_high_ap_availability(struct wlan_objmgr_vdev *vdev,
+			       enum high_ap_availability_operation operation,
+			       uint32_t duration, uint16_t cookie)
+{
+	struct ll_sap_oob_connect_request *req;
+	struct wlan_serialization_command cmd;
+	enum wlan_serialization_status ser_cmd_status;
+	uint8_t i, vdev_id = wlan_vdev_get_id(vdev);
+	struct ll_sap_vdev_priv_obj *ll_sap_obj;
+
+	ll_sap_obj = ll_sap_get_vdev_priv_obj(vdev);
+
+	if (!ll_sap_obj) {
+		ll_sap_err("vdev %d ll_sap obj null", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (operation == HiGH_AP_AVAILABILITY_OPERATION_INVALID) {
+		ll_sap_err("Invalid operation value received");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (operation == HIGH_AP_AVAILABILITY_OPERATION_REQUEST) {
+		for (i = 0; i < MAX_HIGH_AP_AVAILABILITY_REQUESTS; i++) {
+			if (ll_sap_obj->high_ap_availability_cookie[i] ==
+							LL_SAP_INVALID_COOKIE)
+				break;
+		}
+		if (i == MAX_HIGH_AP_AVAILABILITY_REQUESTS) {
+			ll_sap_debug("Invalid high AP availability request");
+			return QDF_STATUS_E_INVAL;
+		}
+	}
+
+	req = qdf_mem_malloc(sizeof(*req));
+	if (!req)
+		return QDF_STATUS_E_NOMEM;
+
+	/* Send this request to FW */
+	req->connect_req_type = operation;
+	req->vdev_available_duration = duration;
+	req->vdev_id = vdev_id;
+	req->operation = operation;
+
+	cmd.cmd_type = WLAN_SER_CMD_HIGH_AP_AVAILABILITY;
+	cmd.cmd_cb = ll_lt_sap_high_ap_availability_ser_cb;
+	cmd.cmd_id = 0;
+	cmd.cmd_timeout_duration = 1700;
+	cmd.vdev = vdev;
+	cmd.source = WLAN_UMAC_COMP_LL_SAP;
+	cmd.is_high_priority = false;
+	cmd.umac_cmd = req;
+
+	/*
+	 * If command is already present in active queue, don't serialize the
+	 * command again, just update the serialization command timeout
+	 * and send the command directly to the FW
+	 */
+	if (wlan_serialization_is_cmd_present_in_active_queue(
+				wlan_vdev_get_psoc(vdev), &cmd)) {
+		QDF_STATUS status;
+		ll_sap_debug("cmd already in active queue, update timeout");
+		wlan_serialization_update_timer(&cmd);
+		status = ll_lt_sap_high_ap_availability_process(vdev, req);
+		qdf_mem_free(req);
+		return status;
+	}
+
+	wlan_objmgr_vdev_get_ref(vdev, WLAN_LL_SAP_ID);
+	ser_cmd_status = wlan_serialization_request(&cmd);
+	switch (ser_cmd_status) {
+	case WLAN_SER_CMD_PENDING:
+		/* command moved to pending list. Do nothing */
+		break;
+	case WLAN_SER_CMD_ACTIVE:
+		/* command moved to active list. Do nothing */
+		break;
+	default:
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
+		qdf_mem_free(req);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 

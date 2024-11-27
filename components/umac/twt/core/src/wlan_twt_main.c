@@ -2088,7 +2088,8 @@ wlan_twt_handle_sta_del_dialog_event(struct wlan_objmgr_psoc *psoc,
 	    event->dialog_id != TWT_ALL_SESSIONS_DIALOG_ID &&
 	    event->status != HOST_TWT_DEL_STATUS_ROAMING &&
 	    event->status != HOST_TWT_DEL_STATUS_PEER_INIT_TEARDOWN &&
-	    event->status != HOST_TWT_DEL_STATUS_CONCURRENCY) {
+	    event->status != HOST_TWT_DEL_STATUS_CONCURRENCY &&
+	    event->status != HOST_TWT_DEL_STATUS_MULTIPLE_LINKS_ACTIVE_TERMINATE) {
 		twt_err("Drop TWT Del dialog event for dialog_id:%d status:%d active_cmd:%d",
 			event->dialog_id, event->status, active_cmd);
 
@@ -2103,7 +2104,8 @@ wlan_twt_handle_sta_del_dialog_event(struct wlan_objmgr_psoc *psoc,
 	mlme_twt_osif_teardown_complete_ind(psoc, event);
 
 	if (event->status == HOST_TWT_DEL_STATUS_ROAMING ||
-	    event->status == HOST_TWT_DEL_STATUS_CONCURRENCY)
+	    event->status == HOST_TWT_DEL_STATUS_CONCURRENCY ||
+	    event->status == HOST_TWT_DEL_STATUS_MULTIPLE_LINKS_ACTIVE_TERMINATE)
 		wlan_twt_set_wait_for_notify(psoc, event->vdev_id, true);
 
 	wlan_twt_set_command_in_progress(psoc, &event->peer_macaddr,

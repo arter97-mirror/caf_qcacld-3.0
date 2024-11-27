@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -165,12 +166,52 @@
 		CFG_VALUE_OR_DEFAULT, \
 		"Chain selection diversity value")
 
+/*
+ * <ini>
+ * enable_optimize_power - Enable power optimization
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This INI is used to enable power optimization
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_OPTIMIZE_POWER CFG_INI_BOOL( \
+		"enable_optimize_power", \
+		1, \
+		"Enable/Disable power optimization")
+
+/*
+ * <ini>
+ * enable_emlsr_mode - Enable EMLSR mode support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This INI is used to enable EMLSR mode
+ *
+ * Usage: External
+ *
+ * Supported Feature: STA
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_EMLSR_MODE CFG_INI_BOOL( \
+		"enable_emlsr_mode", \
+		0, \
+		"Enable/Disable EMLSR mode")
+
 #define CFG_POWERSAVE_ALL \
 	CFG(CFG_ENABLE_IMPS) \
 	CFG(CFG_ENABLE_PS) \
 	CFG(CFG_AUTO_BMPS_ENABLE_TIMER) \
 	CFG(CFG_BMPS_MINIMUM_LI) \
 	CFG(CFG_BMPS_MAXIMUM_LI) \
-	CFG(CFG_DTIM_SELECTION_DIVERSITY)
+	CFG(CFG_DTIM_SELECTION_DIVERSITY) \
+	CFG(CFG_ENABLE_OPTIMIZE_POWER) \
+	CFG(CFG_ENABLE_EMLSR_MODE)
 
 #endif /* __CFG_MLME_POWERSAVE_H */

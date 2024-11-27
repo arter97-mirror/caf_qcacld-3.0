@@ -563,17 +563,23 @@ void lim_handle_update_olbc_cache(struct mac_context *mac);
 
 uint8_t lim_is_null_ssid(tSirMacSSid *pSsid);
 
-/* 11h Support */
-void lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId);
+/**
+ * lim_stop_tx_and_switch_channel() - Process channel switch
+ * @mac: pointer to Global MAC structure
+ * @sessionId: PE session Id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId);
 
 /**
  * lim_process_channel_switch() - Process channel switch
  * @mac: pointer to Global MAC structure
  * @vdev_id: Vdev on which CSA is happening
  *
- * Return: none
+ * Return: QDF_STATUS
  */
-void lim_process_channel_switch(struct mac_context *mac, uint8_t vdev_id);
+QDF_STATUS lim_process_channel_switch(struct mac_context *mac, uint8_t vdev_id);
 
 /**
  * lim_switch_primary_channel() - switch primary channel of session
@@ -630,8 +636,8 @@ bool lim_is_channel_valid_for_channel_switch(struct mac_context *mac,
 QDF_STATUS lim_restore_pre_channel_switch_state(struct mac_context *mac,
 		struct pe_session *pe_session);
 
-void lim_prepare_for11h_channel_switch(struct mac_context *mac,
-		struct pe_session *pe_session);
+QDF_STATUS lim_prepare_for11h_channel_switch(struct mac_context *mac,
+					     struct pe_session *pe_session);
 void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 		uint32_t *data, struct pe_session *pe_session);
 
@@ -1672,6 +1678,13 @@ void lim_update_he_6ghz_band_caps(struct mac_context *mac,
 				  tDot11fIEhe_6ghz_band_cap *he_6ghz_band_cap,
 				  tpAddStaParams params);
 
+/*
+ * lim_print_he_channel_widths() - Print the HE channel widths
+ * he_cap: HE cap
+ *
+ * Return: None
+ */
+void lim_print_he_channel_widths(tDot11fIEhe_cap *he_cap);
 #else
 static inline void lim_add_he_cap(struct mac_context *mac_ctx,
 				  struct pe_session *pe_session,
@@ -1849,6 +1862,11 @@ static inline void
 lim_update_he_6ghz_band_caps(struct mac_context *mac,
 			     tDot11fIEhe_6ghz_band_cap *he_6ghz_band_cap,
 			     tpAddStaParams params)
+{
+}
+
+static inline
+void lim_print_he_channel_widths(tDot11fIEhe_cap *he_cap)
 {
 }
 #endif

@@ -26,6 +26,7 @@
 #define _OS_IF_SON_H_
 
 #include <qdf_types.h>
+#include <qdf_net_if.h>
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_objmgr_pdev_obj.h>
@@ -894,4 +895,15 @@ struct mlme_external_tx_ops *wlan_mlme_register_tx_ops(void);
  */
 int os_if_son_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
 				  uint32_t pri);
+
+/**
+ * os_if_son_netif_release_dev() - Release reference to network device
+ * @nif: network device
+ *
+ * This function releases reference to the network device
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS os_if_son_netif_release_dev(struct qdf_net_if *nif);
+
 #endif

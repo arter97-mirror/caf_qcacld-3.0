@@ -4272,9 +4272,12 @@ extract_roam_ml_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		dst->ml_info[dst->num_links].link_band =
 				wmi_convert_mlo_to_reg_band(wmi_band);
 
-		/* is Link Accepted or rejected */
+		/* is Link Accepted or rejected
+		 * 0 - Accepted
+		 * 1 - Rejected
+		 */
 		dst->ml_info[dst->num_links].link_accepted =
-			WMI_MLO_LINK_INFO_GET_STATUS(src_link_info->link_info) ? true : false;
+			WMI_MLO_LINK_INFO_GET_STATUS(src_link_info->link_info) ? false : true;
 
 		/* Self Link mac address */
 		WMI_MAC_ADDR_TO_CHAR_ARRAY(&src_link_info->link_addr,
@@ -5480,8 +5483,10 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	update_mlo_prefer_percentage(wmi_handle->soc->wmi_psoc,
 				     &mlo_prefer_percentage);
 	score_param->mlo_etp_weightage_pcnt = mlo_prefer_percentage;
+	score_param->mcc_score_factor_pcnt =
+			ap_profile->param.sta_sap_mcc_weightage;
 	send_update_mlo_roam_params(score_param, ap_profile);
-	wmi_debug("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d subnet id %d sae-pk %d security %d mlo_etp_weight_pct %d",
+	wmi_debug("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d subnet id %d sae-pk %d security %d mlo_etp_weight_pct %d sta_sap_mcc_pcnt %d",
 		  score_param->disable_bitmap, score_param->rssi_weightage_pcnt,
 		  score_param->ht_weightage_pcnt,
 		  score_param->vht_weightage_pcnt,
@@ -5498,7 +5503,8 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 		  score_param->oce_ap_subnet_id_weightage_pcnt,
 		  score_param->sae_pk_ap_weightage_pcnt,
 		  score_param->security_weightage_pcnt,
-		  score_param->mlo_etp_weightage_pcnt);
+		  score_param->mlo_etp_weightage_pcnt,
+		  score_param->mcc_score_factor_pcnt);
 
 	score_param->bw_scoring.score_pcnt = ap_profile->param.bw_index_score;
 	score_param->band_scoring.score_pcnt =

@@ -29,6 +29,7 @@
 struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
 struct ieee80211_channel;
+struct hdd_adapter;
 
 /**
  * p2p_psoc_enable() - psoc API to enable p2p component
@@ -162,6 +163,18 @@ p2p_usd_attr_policy[QCA_WLAN_VENDOR_ATTR_USD_MAX + 1];
 	vendor_command_policy(p2p_usd_attr_policy,		\
 			      QCA_WLAN_VENDOR_ATTR_USD_MAX)	\
 },
+
+/**
+ * osif_p2p_parse_wfd_params - This function parse P2P mode params
+ * @adapter: pointer to adapter object
+ * @data: pointer to data
+ * @data_len: data length
+ *
+ * Return: 0 on success, negative errno if error
+ */
+int osif_p2p_parse_wfd_params(struct hdd_adapter *adapter, const void *data,
+			      int data_len);
+
 #else
 #define FEATURE_P2P_SECURE_USD_VENDOR_COMMANDS
 #endif /* FEATURE_WLAN_SUPPORT_USD */

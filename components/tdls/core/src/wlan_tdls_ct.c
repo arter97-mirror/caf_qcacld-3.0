@@ -41,13 +41,21 @@ bool tdls_is_vdev_authenticated(struct wlan_objmgr_vdev *vdev)
 
 	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_TDLS_NB_ID);
 	if (!peer) {
-		tdls_err("peer is null");
+		tdls_err("BSS peer for vdev %d is null",
+			 wlan_vdev_get_id(vdev));
 		return false;
 	}
 
 	is_authenticated = wlan_peer_mlme_get_auth_state(peer);
 	wlan_objmgr_peer_release_ref(peer, WLAN_TDLS_NB_ID);
+
 	return is_authenticated;
+}
+
+bool tdls_is_vdev_allowed_to_tx(struct wlan_objmgr_vdev *vdev)
+{
+	return (wlan_vdev_is_up(vdev) == QDF_STATUS_SUCCESS) &&
+		tdls_is_vdev_authenticated(vdev);
 }
 
 /**

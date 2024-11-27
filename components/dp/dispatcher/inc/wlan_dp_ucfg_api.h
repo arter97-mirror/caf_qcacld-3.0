@@ -1295,6 +1295,39 @@ void ucfg_dp_rx_skip_fisa(uint32_t value)
 }
 #endif
 
+/**
+ * ucfg_dp_spm_dump_tx_aft() - Dump TX active flow table
+ * @psoc: Objmgr psoc handle
+ *
+ * Return: None
+ */
+void ucfg_dp_spm_dump_tx_aft(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_stc_print_classified_table() - Print classified flow table
+ * @psoc: Objmgr psoc handle
+ *
+ * Return: NULL
+ */
+void ucfg_dp_stc_print_classified_table(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_stc_print_sampling_table() - Print sampling flow table
+ * @psoc: Objmgr psoc handle
+ *
+ * Return: NULL
+ */
+void ucfg_dp_stc_print_sampling_table(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_stc_print_active_traffic_map() - Print active traffic map
+ *					    for all the peers
+ * @psoc: Objmgr psoc handle
+ *
+ * Return: NULL
+ */
+void ucfg_dp_stc_print_active_traffic_map(struct wlan_objmgr_psoc *psoc);
+
 #ifdef DP_TRAFFIC_END_INDICATION
 /**
  * ucfg_dp_traffic_end_indication_get() - Get data end indication info
@@ -1681,12 +1714,14 @@ QDF_STATUS ucfg_dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,
 				     qdf_cpu_mask *new_mask);
 
+#define DP_STAT_NUM_SINGLE_LINK 1
+#define DP_STAT_NUM_ALL_LINKS WLAN_MAX_MLD
 /**
  * ucfg_dp_get_per_link_peer_stats() - Call to get per link peer stats
  * @soc: soc handle
  * @vdev_id: vdev_id of vdev object
  * @peer_mac: mac address of the peer
- * @peer_stats: destination buffer
+ * @peer_stats: destination buffer, num_link * size of cdp_peer_stats
  * @peer_type: Peer type
  * @num_link: Number of ML links
  *

@@ -544,6 +544,17 @@ bool ucfg_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 
 /**
+ * ucfg_p2p_is_vdev_wfd_r2_mode() - Wrapper API to get VDEV WFD mode of
+ * operation
+ * @vdev: VDEV object manager
+ *
+ * Returns %true if current mode support WFD-R2 else %false
+ *
+ * Return: bool
+ */
+bool ucfg_p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev);
+
+/**
  * ucfg_p2p_fw_support_ap_assist_dfs_group() - Wrapper API to get the FW
  * support for assisted AP DFS P2P group operation
  * @psoc: PSOC object manager
@@ -576,6 +587,7 @@ ucfg_p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
  * @vdev: VDEV object manager
  * @is_dfs_owner: Pointer to get the DFS owner cap
  * @is_valid_ap_assist: Is valid AP assist params
+ * @is_usr_restrict_csa: Is CSA restricted by user
  * @ap_bssid: BSSID of the assisted AP
  * @opclass: Operating class of the assisted AP
  * @chan: Channel number of assisted AP
@@ -585,6 +597,7 @@ ucfg_p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS ucfg_p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 					     bool *is_dfs_owner,
 					     bool *is_valid_ap_assist,
+					     bool *is_usr_restrict_csa,
 					     struct qdf_mac_addr *ap_bssid,
 					     uint8_t *opclass, uint8_t *chan);
 
@@ -664,4 +677,28 @@ void ucfg_p2p_psoc_priv_set_sta_vdev_id(struct wlan_objmgr_psoc *psoc,
  * Return: vdev_id
  */
 uint8_t ucfg_p2p_psoc_priv_get_sta_vdev_id(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_p2p_is_p2p_go_noa_in_progress() - Check whether P2P GO single shot noa
+ * is in progress or not
+ * @pdev: PDEV object manager for P2P GO
+ * @vdev_id: vdev id
+ *
+ * Return: True/False
+ */
+bool ucfg_p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id);
+
+/**
+ * ucfg_p2p_force_restrict_dfs_go_csa() - User restricted CSA for assisted P2P
+ * group operation
+ * @vdev: VDEV object manager
+ * @val: Value from user.
+ *
+ * Test configuration to restrict CSA from happening via assisted P2P group
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_p2p_force_restrict_dfs_go_csa(struct wlan_objmgr_vdev *vdev, bool val);
 #endif /* _WLAN_P2P_UCFG_API_H_ */

@@ -2210,6 +2210,7 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 	case PLD_FW_DOWN:
 		hdd_debug("Received firmware down indication");
 		hdd_dump_log_buffer(NULL, NULL);
+		cds_scan_flush_on_recovery();
 		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
 		hdd_init_start_completion();

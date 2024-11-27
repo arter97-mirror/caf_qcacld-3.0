@@ -3189,8 +3189,6 @@ static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 		mgmt_params.vdev_id = vdev_id;
 
 	mgmt_params.peer_rssi = peer_rssi;
-	vdev_id = mgmt_txrx_get_vdev_id(pdev, desc_id);
-	mgmt_params.vdev_id = vdev_id;
 	mgmt_params.band = band;
 
 	wma_mgmt_pktdump_tx_handler(wma_handle, buf, mgmt_params.vdev_id,

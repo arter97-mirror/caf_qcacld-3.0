@@ -325,16 +325,6 @@ mlme_set_mbssid_info(struct wlan_objmgr_vdev *vdev,
 		     struct scan_mbssid_info *mbssid_info, qdf_freq_t freq);
 
 /**
- * mlme_get_mbssid_info() - get mbssid info
- * @vdev: vdev pointer
- * @mbss_11ax: mbss 11ax info
- *
- * Return: None
- */
-void mlme_get_mbssid_info(struct wlan_objmgr_vdev *vdev,
-			  struct vdev_mlme_mbss_11ax *mbss_11ax);
-
-/**
  * mlme_set_tx_power() - set tx power
  * @vdev: vdev pointer
  * @tx_power: tx power to be set

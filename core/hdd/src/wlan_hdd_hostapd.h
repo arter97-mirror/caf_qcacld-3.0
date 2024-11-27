@@ -504,7 +504,7 @@ void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
 
 /**
  * hdd_is_sta_connect_or_link_switch_in_prog() - check if any sta is connecting
- * or in the middle of a link switch
+ * or in the middle of a link switch or or eapol is in progress
  * @hdd_ctx: hdd context
  *
  * Return: true if any sta is connecting/in link switch

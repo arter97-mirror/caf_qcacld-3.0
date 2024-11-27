@@ -200,6 +200,9 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 		policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
 				wlan_util_vdev_mgr_get_acs_mode_for_vdev(vdev));
 
+	if (QDF_IS_STATUS_SUCCESS(status))
+		policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(psoc);
+
 	wlan_ll_sap_switch_bearer_on_sta_connect_complete(psoc, vdev_id);
 
 	return QDF_STATUS_SUCCESS;
@@ -296,6 +299,7 @@ if_mgr_sta_csa_complete(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 
 	wlan_tdls_notify_channel_switch_complete(psoc, wlan_vdev_get_id(vdev));
+	policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(psoc);
 
 	return QDF_STATUS_SUCCESS;
 }

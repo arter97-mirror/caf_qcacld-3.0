@@ -809,9 +809,6 @@ wlan_mlme_update_aux_dev_caps(
 		struct wlan_mlme_aux_dev_caps wlan_mlme_aux_dev_caps[])
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-	struct wlan_mlme_aux_dev_caps *wlan_mlme_aux0_dev_caps;
-	uint32_t supported_modes_bitmap = 0;
-	uint8_t idx = WLAN_MLME_HW_MODE_AUX_EMLSR_SINGLE;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -820,13 +817,6 @@ wlan_mlme_update_aux_dev_caps(
 	qdf_mem_copy(&mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps[0],
 		     &wlan_mlme_aux_dev_caps[0],
 		     sizeof(mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps));
-	wlan_mlme_aux0_dev_caps = mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps;
-	supported_modes_bitmap =
-			wlan_mlme_aux0_dev_caps[idx].supported_modes_bitmap;
-	if (supported_modes_bitmap & (0x1 << WLAN_MLME_AUX_MODE_EMLSR_BIT)) {
-		mlme_debug("set the mlme config for emlsr");
-		wlan_mlme_set_emlsr_mode_enabled(psoc, true);
-	}
 }
 
 bool wlan_mlme_cfg_get_aux_supported_modes(
@@ -4290,6 +4280,40 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+bool
+wlan_mlme_is_link_recfg_support(struct wlan_objmgr_psoc *psoc)
+{
+	return target_if_get_fw_link_reconfig_support(psoc) &&
+		wlan_mlme_get_link_recfg_support(psoc);
+}
+
+bool
+wlan_mlme_get_link_recfg_support(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.gen.link_recfg_support;
+}
+
+QDF_STATUS
+wlan_mlme_set_link_recfg_support(struct wlan_objmgr_psoc *psoc,
+				 bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.gen.link_recfg_support = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 uint8_t
 wlan_mlme_get_eht_mld_id(struct wlan_objmgr_psoc *psoc)
 {
@@ -6183,6 +6207,9 @@ wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc)
 
 	if (!mlme_obj)
 		return cfg_default(CFG_ENABLE_DUAL_STA_ROAM_OFFLOAD);
+
+	if (mlme_obj->cfg.lfr.lfr3_support_single_mac_dual_sta_roaming)
+		return true;
 
 	dual_sta_roaming_enabled =
 			mlme_obj->cfg.lfr.lfr3_roaming_offload &&
@@ -8875,4 +8902,22 @@ wlan_mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
 				  struct qdf_mac_addr *mac_addr)
 {
 	return mlme_get_p2p_device_mac_addr(vdev, mac_addr);
+}
+
+QDF_STATUS
+wlan_mlme_get_supported_wifi_generations_info(struct wlan_objmgr_psoc *psoc,
+					      uint8_t *supp, uint8_t *cert)
+{
+	struct target_psoc_info *tgt_hdl;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		mlme_err("target psoc info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*supp = target_psoc_get_supp_wifi_gen_info(tgt_hdl);
+	*cert = target_psoc_get_cert_wifi_gen_info(tgt_hdl);
+
+	return QDF_STATUS_SUCCESS;
 }

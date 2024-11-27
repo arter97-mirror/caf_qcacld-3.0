@@ -66,6 +66,7 @@
 #include "wlan_ll_sap_api.h"
 #include "wlan_nan_api.h"
 #include <wlan_p2p_api.h>
+#include <wlan_cfg80211_scan.h>
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -361,6 +362,19 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 				utils_dfs_get_vdev_random_channel_for_freq(
 					pdev, sap_ctx->vdev, flag, ch_params,
 					&hw_mode, &chan_freq, &acs_info))) {
+		/* Allow SAP in 2.4 GHz band if there are no 5 GHz safe channels
+		 * are available to choose.
+		 */
+		chan_freq = wlansap_get_2g_first_safe_chan_freq(sap_ctx);
+
+		if (chan_freq != INVALID_CHANNEL_ID) {
+			wlan_reg_set_channel_params_for_pwrmode(
+						pdev, chan_freq, 0,
+						ch_params,
+						REG_CURRENT_PWR_MODE);
+			goto update_params;
+		}
+
 		/* No available channel found */
 		sap_err("No available channel found!!!");
 		sap_signal_hdd_event(sap_ctx, NULL,
@@ -369,6 +383,7 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 		return 0;
 	}
 
+update_params:
 	mac_ctx->sap.SapDfsInfo.new_chanWidth = ch_params->ch_width;
 	sap_ctx->ch_params.ch_width = ch_params->ch_width;
 	sap_ctx->ch_params.sec_ch_offset = ch_params->sec_ch_offset;
@@ -3516,20 +3531,23 @@ static void sap_validate_chanmode_and_chwidth(struct mac_context *mac_ctx,
 	     sap_ctx->phyMode == eCSR_DOT11_MODE_11g ||
 	     sap_ctx->phyMode == eCSR_DOT11_MODE_11b)) {
 		sap_ctx->ch_params.ch_width = CH_WIDTH_20MHZ;
-		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
-					       sap_ctx->chan_freq,
-					       sap_ctx->ch_params.sec_ch_offset,
-					       &sap_ctx->ch_params,
-					       REG_CURRENT_PWR_MODE);
 	} else if (sap_ctx->ch_params.ch_width > CH_WIDTH_40MHZ &&
 		   sap_ctx->phyMode == eCSR_DOT11_MODE_11n) {
 		sap_ctx->ch_params.ch_width = CH_WIDTH_40MHZ;
-		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
-					       sap_ctx->chan_freq,
-					       sap_ctx->ch_params.sec_ch_offset,
-					       &sap_ctx->ch_params,
-					       REG_CURRENT_PWR_MODE);
+	} else if (sap_ctx->ch_params.ch_width > CH_WIDTH_80P80MHZ &&
+		   (sap_ctx->phyMode == eCSR_DOT11_MODE_11ac ||
+		    sap_ctx->phyMode == eCSR_DOT11_MODE_11ac_ONLY ||
+		    sap_ctx->phyMode == eCSR_DOT11_MODE_11ax ||
+		    sap_ctx->phyMode == eCSR_DOT11_MODE_11ax_ONLY)) {
+		sap_ctx->ch_params.ch_width = CH_WIDTH_160MHZ;
 	}
+
+	if (orig_ch_width != sap_ctx->ch_params.ch_width)
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+						       sap_ctx->chan_freq,
+						       sap_ctx->ch_params.sec_ch_offset,
+						       &sap_ctx->ch_params,
+						       REG_CURRENT_PWR_MODE);
 
 	if (orig_ch_width != sap_ctx->ch_params.ch_width ||
 	    orig_phymode != sap_ctx->phyMode)
@@ -3730,6 +3748,12 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	sap_ctx->sap_radar_found_status = false;
 
 	sap_debug("session: %d", sap_ctx->sessionId);
+
+	/* Cancel all ongoing/pending scan requests */
+	if (wlan_get_pdev_status(mac_ctx->pdev) != SCAN_NOT_IN_PROGRESS)
+		wlan_abort_scan(mac_ctx->pdev,
+				wlan_objmgr_pdev_get_pdev_id(mac_ctx->pdev),
+				INVAL_VDEV_ID, INVAL_SCAN_ID, false);
 
 	qdf_status = sme_start_bss(mac_handle, sap_ctx->sessionId,
 				   &sap_ctx->sap_bss_cfg);
@@ -4147,16 +4171,19 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_ctx->chan_freq))
 			is_dfs = false;
 
-		wlan_p2p_get_ap_assist_dfs_params(sap_ctx->vdev, &is_dfs_owner,
-						  &is_valid_ap_assist, NULL,
-						  NULL, NULL);
+		if (is_dfs && wlan_p2p_is_vdev_wfd_r2_mode(sap_ctx->vdev)) {
+			wlan_p2p_get_ap_assist_dfs_params(sap_ctx->vdev,
+							  &is_dfs_owner,
+							  &is_valid_ap_assist,
+							  NULL, NULL,
+							  NULL, NULL);
+			if (!is_dfs_owner && is_valid_ap_assist)
+				is_dfs = false;
+		}
 
 		sap_debug("vdev %d freq %d, is_dfs %d is_dfs_owner %d is_valid_ap_assist %d",
 			  sap_ctx->vdev_id, sap_ctx->chan_freq, is_dfs,
 			  is_dfs_owner, is_valid_ap_assist);
-
-		if (is_dfs && !is_dfs_owner && is_valid_ap_assist)
-			is_dfs = false;
 
 		if (is_dfs) {
 			sap_dfs_info = &mac_ctx->sap.SapDfsInfo;

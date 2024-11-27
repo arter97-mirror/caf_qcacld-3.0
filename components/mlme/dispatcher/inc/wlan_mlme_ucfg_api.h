@@ -5673,4 +5673,24 @@ ucfg_mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
 {
 	return wlan_mlme_get_p2p_device_mac_addr(vdev, mac_addr);
 }
+
+/*
+ * ucfg_mlme_set_mrsno_support() - Set MRSNO support
+ * @psoc: psoc object
+ * @val: MRSNO support
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+ucfg_mlme_set_mrsno_support(struct wlan_objmgr_psoc *psoc, bool val);
+
+/*
+ * ucfg_mlme_get_mrsno_support() - Get MRSNO support
+ * @psoc: psoc object
+ * @val: pointer to mrsno support
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+ucfg_mlme_get_mrsno_support(struct wlan_objmgr_psoc *psoc, bool *val);
 #endif /* _WLAN_MLME_UCFG_API_H_ */

@@ -1272,8 +1272,6 @@ void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 	wlan_diag_event.prev_active_link =
 		wlan_convert_link_id_to_diag_band(&src->mld_addr,
 						  src->prev_link_bitmap);
-	if (!wlan_diag_event.prev_active_link)
-		return;
 
 	if (!mld_ctx->link_ctx) {
 		logging_err("link ctx for mld_mac: "

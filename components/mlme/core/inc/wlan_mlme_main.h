@@ -2099,4 +2099,22 @@ mlme_set_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev, uint16_t seq_num);
  * Return: sequence number
  */
 uint16_t mlme_get_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev);
+
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * wlan_get_wfd_mode_from_vdev_id() - Get WFD mode from VDEV ID
+ * @psoc: pointer to PSOC object
+ * @vdev_id: VDEV ID
+ *
+ * Return: WFD mode
+ */
+uint8_t wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id);
+#else
+static inline uint8_t
+wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	return 0xFF;
+}
+#endif /* FEATURE_WLAN_SUPPORT_USD */
 #endif

@@ -15,16 +15,20 @@
 #define MGMT_RX_SRNG_ENTRIES 64
 #define MGMT_RX_BUF_SIZE 3520
 
-#ifdef IPA_OFFLOAD
-#ifdef FEATURE_DIRECT_LINK
+#if defined(IPA_OFFLOAD) && defined(FEATURE_DIRECT_LINK)
 #ifdef IPA_WDI3_VLAN_SUPPORT
 #define MGMT_RX_BUF_REFILL_RING_IDX 5
 #else
 #define MGMT_RX_BUF_REFILL_RING_IDX 4
 #endif
+#elif defined(IPA_OFFLOAD)
+#ifdef IPA_WDI3_VLAN_SUPPORT
+#define MGMT_RX_BUF_REFILL_RING_IDX 4
 #else
 #define MGMT_RX_BUF_REFILL_RING_IDX 3
 #endif
+#elif defined(FEATURE_DIRECT_LINK)
+#define MGMT_RX_BUF_REFILL_RING_IDX 3
 #else
 #define MGMT_RX_BUF_REFILL_RING_IDX 2
 #endif
@@ -87,6 +91,8 @@ struct mgmt_srng_cfg {
 /**
  * struct mgmt_rx_srng_pdev_priv - mgmt_rx_srng component pdev priv
  * @pdev: pdev obj
+ * @new_skb_alloc_fail_cnt: Counter increments on each failure to allocate
+ * new skb to replenish the SRNG with new buffer.
  * @osdev: os dev
  * @hal_soc: opaque hal object
  * @mgmt_rx_srng_cfg: srng config
@@ -96,6 +102,7 @@ struct mgmt_srng_cfg {
  */
 struct mgmt_rx_srng_pdev_priv {
 	struct wlan_objmgr_pdev *pdev;
+	uint32_t new_skb_alloc_fail_cnt;
 	qdf_device_t osdev;
 	void *hal_soc;
 	struct mgmt_srng_cfg mgmt_rx_srng_cfg;

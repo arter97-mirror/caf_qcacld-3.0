@@ -2529,4 +2529,12 @@ struct mlme_external_tx_ops *wlan_mlme_register_tx_ops(void)
 }
 
 qdf_export_symbol(wlan_mlme_register_tx_ops);
+
+QDF_STATUS os_if_son_netif_release_dev(struct qdf_net_if *nif)
+{
+	return qdf_net_if_release_dev(nif);
+}
+
+qdf_export_symbol(os_if_son_netif_release_dev);
+
 #endif //WLAN_FEATURE_SON
