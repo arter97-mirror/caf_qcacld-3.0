@@ -12411,9 +12411,13 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 	uint8_t tx_pwr_info = 0U;
 	uint8_t local_psd = 0U;
 	uint8_t reg_psd = 0U;
-	uint8_t *on_entry_target = target;
+	uint8_t *on_entry_target = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint16_t idx = 0;
+
+	if (!target)
+		return QDF_STATUS_E_INVAL;
+	on_entry_target = target;
 
 	for (idx = 0; idx < num_tpe; idx++) {
 		if (!tpe_ptr[idx].present)
