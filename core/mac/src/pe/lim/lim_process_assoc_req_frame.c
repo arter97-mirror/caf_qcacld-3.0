@@ -2185,25 +2185,95 @@ static bool lim_is_sae_akm_present(tDot11fIERSN * const rsn_ie)
 	return false;
 }
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * lim_pmkid_cache_search_partner_link() -Search pmkid in the partner link
+ * with assoc peer
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session: pe session entry
+ * @pmkid_cache: pmkid data structure
+ *
+ * Return: True if found the pmkid entry otherwise return false.
+ */
+static bool
+lim_pmkid_cache_search_partner_link(struct mac_context *mac_ctx,
+				    struct pe_session *session,
+				    struct wlan_crypto_pmksa *pmkid_cache)
+{
+	uint16_t vdev_count, link;
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint8_t vdev_id;
+	bool found =  false;
+
+	/* search pmkid under parter link */
+	lim_get_mlo_vdev_list(session, &vdev_count, wlan_vdev_list);
+	for (link = 0; link < vdev_count; link++) {
+		if (!wlan_vdev_list[link])
+			continue;
+		vdev_id = wlan_vdev_get_id(wlan_vdev_list[link]);
+
+		/* skip itself */
+		if (session->vdev_id == vdev_id)
+			continue;
+
+		if (!wlan_vdev_mlme_is_mlo_ap(wlan_vdev_list[link]))
+			continue;
+
+		found = cm_lookup_pmkid_using_bssid(mac_ctx->psoc, vdev_id,
+						    pmkid_cache);
+		if (found)
+			break;
+	}
+	/* release ref that ever claim in lim_get_mlo_vdev_list */
+	for (link = 0; link < vdev_count; link++) {
+		if (!wlan_vdev_list[link])
+			continue;
+
+		lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
+	}
+	return found;
+}
+
+#else
+static bool
+lim_pmkid_cache_search_partner_link(struct mac_context *mac_ctx,
+				    struct pe_session *session,
+				    struct wlan_crypto_pmksa *pmkid_cache)
+{
+	return false;
+}
+#endif
+
 static bool lim_is_pmkid_found_for_peer(struct mac_context *mac_ctx,
 					tSirMacAddr peer_mac_addr,
 					struct pe_session *session,
 					uint8_t *pmkid,
-					uint16_t pmkid_count)
+					uint16_t pmkid_count,
+					struct qdf_mac_addr *mld_addr)
 {
 	uint32_t i;
 	uint8_t *session_pmkid;
 	struct wlan_crypto_pmksa *pmkid_cache;
+	bool found =  false;
 
 	pmkid_cache = qdf_mem_malloc(sizeof(*pmkid_cache));
 
 	if (!pmkid_cache)
 		return false;
 
-	qdf_mem_copy(pmkid_cache->bssid.bytes, peer_mac_addr,
-		     QDF_MAC_ADDR_SIZE);
+	if (!qdf_is_macaddr_zero(mld_addr))
+		qdf_mem_copy(pmkid_cache->bssid.bytes, mld_addr->bytes,
+			     QDF_MAC_ADDR_SIZE);
+	else
+		qdf_mem_copy(pmkid_cache->bssid.bytes, peer_mac_addr,
+			     QDF_MAC_ADDR_SIZE);
 
-	if (!cm_lookup_pmkid_using_bssid(mac_ctx->psoc, session->vdev_id,
+	found = lim_pmkid_cache_search_partner_link(mac_ctx, session,
+						    pmkid_cache);
+
+	/* search pmkid under itself if not found under parter link */
+	if (!found &&
+	    !cm_lookup_pmkid_using_bssid(mac_ctx->psoc, session->vdev_id,
 					 pmkid_cache)) {
 		qdf_mem_free(pmkid_cache);
 		return false;
@@ -2282,7 +2352,8 @@ static bool lim_is_sae_peer_allowed(struct mac_context *mac_ctx,
 		pe_debug("No PMKID present in RSNIE; Tried to use SAE AKM after non-SAE authentication");
 	} else if (lim_is_pmkid_found_for_peer(mac_ctx, peer_mac_addr, session,
 					       &rsn_ie->pmkid[0][0],
-					       rsn_ie->pmkid_count)) {
+					       rsn_ie->pmkid_count,
+					       (struct qdf_mac_addr *)assoc_req->mld_mac)) {
 		pe_debug("Valid PMKID found for SAE peer");
 		is_allowed = true;
 	} else {
