@@ -2070,10 +2070,10 @@ ol_txrx_vdev_attach(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
  *  vdev objects, so the data SW can use the OS shim vdev handle
  *  when passing rx data received by a vdev up to the OS shim.
  */
-static QDF_STATUS ol_txrx_vdev_register(struct cdp_soc_t *soc_hdl,
-					uint8_t vdev_id,
-					ol_osif_vdev_handle osif_vdev,
-					struct ol_txrx_ops *txrx_ops)
+static struct cdp_vdev *ol_txrx_vdev_register(struct cdp_soc_t *soc_hdl,
+					      uint8_t vdev_id,
+					      ol_osif_vdev_handle osif_vdev,
+					      struct ol_txrx_ops *txrx_ops)
 {
 	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
 	ol_txrx_vdev_handle vdev = ol_txrx_get_vdev_from_soc_vdev_id(soc,
@@ -2082,7 +2082,7 @@ static QDF_STATUS ol_txrx_vdev_register(struct cdp_soc_t *soc_hdl,
 	if (qdf_unlikely(!vdev) || qdf_unlikely(!txrx_ops)) {
 		qdf_print("vdev/txrx_ops is NULL!");
 		qdf_assert(0);
-		return QDF_STATUS_E_FAILURE;
+		return NULL;
 	}
 
 	vdev->osif_dev = osif_vdev;
@@ -2092,7 +2092,7 @@ static QDF_STATUS ol_txrx_vdev_register(struct cdp_soc_t *soc_hdl,
 	vdev->vdev_del_notify = txrx_ops->vdev_del_notify;
 	txrx_ops->tx.tx = ol_tx_data;
 
-	return QDF_STATUS_SUCCESS;
+	return (struct cdp_vdev *)vdev;
 }
 
 /**
@@ -2197,7 +2197,7 @@ ol_txrx_vdev_detach(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	ol_txrx_vdev_handle vdev = ol_txrx_get_vdev_from_soc_vdev_id(soc,
 								     vdev_id);
 	struct ol_txrx_pdev_t *pdev;
-	ol_txrx_vdev_delete_cb vdev_del_notify;
+	ol_txrx_vdev_del_notify_cb vdev_del_notify;
 	void *vdev_del_context;
 
 	if (qdf_unlikely(!vdev))
@@ -2287,6 +2287,9 @@ ol_txrx_vdev_detach(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	 */
 	ol_txrx_tx_desc_reset_vdev(vdev);
 
+	if (vdev_del_notify)
+		vdev_del_notify(vdev_del_context, (struct cdp_vdev *)vdev);
+
 	/*
 	 * Doesn't matter if there are outstanding tx frames -
 	 * they will be freed once the target sends a tx completion
@@ -2295,9 +2298,6 @@ ol_txrx_vdev_detach(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	qdf_mem_free(vdev);
 	if (callback)
 		callback(context);
-
-	if (vdev_del_notify)
-		vdev_del_notify(vdev_del_context);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3365,7 +3365,7 @@ int ol_txrx_peer_release_ref(ol_txrx_peer_handle peer,
 					vdev->delete.callback;
 				void *vdev_delete_context =
 					vdev->delete.context;
-				ol_txrx_vdev_delete_cb vdev_del_notify =
+				ol_txrx_vdev_del_notify_cb vdev_del_notify =
 						vdev->vdev_del_notify;
 				void *vdev_del_context = vdev->osif_dev;
 				/*
@@ -3390,13 +3390,16 @@ int ol_txrx_peer_release_ref(ol_txrx_peer_handle peer,
 					"deleting vdev object %pK ("QDF_MAC_ADDR_FMT") - its last peer is done",
 					vdev,
 					QDF_MAC_ADDR_REF(vdev->mac_addr.raw));
+				if (vdev_del_notify)
+					vdev_del_notify(vdev_del_context,
+							(struct cdp_vdev *)vdev);
+
 				/* all peers are gone, go ahead and delete it */
 				qdf_mem_free(vdev);
+
 				if (vdev_delete_cb)
 					vdev_delete_cb(vdev_delete_context);
 
-				if (vdev_del_notify)
-					vdev_del_notify(vdev_del_context);
 			} else {
 				qdf_spin_unlock_bh(&pdev->peer_ref_mutex);
 			}

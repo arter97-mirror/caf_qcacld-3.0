@@ -833,6 +833,7 @@ populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 
 void
 populate_dot11f_tx_power_env(struct mac_context *mac,
+			     struct pe_session *session,
 			     tDot11fIEtransmit_power_env *pDot11f,
 			     enum phy_ch_width ch_width, uint32_t chan_freq,
 			     uint16_t *num_tpe, bool is_ch_switch);

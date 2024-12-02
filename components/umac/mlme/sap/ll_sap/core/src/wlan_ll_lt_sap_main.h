@@ -27,6 +27,7 @@
 #include <qdf_types.h>
 #include "wlan_ll_sap_main.h"
 #include "wlan_ll_sap_public_structs.h"
+#include "wlan_serialization_api.h"
 
 /**
  * ll_lt_sap_is_supported() - Check if ll_lt_sap is supported or not
@@ -78,6 +79,18 @@ QDF_STATUS ll_lt_sap_init(struct wlan_objmgr_vdev *vdev);
  * else error code
  */
 QDF_STATUS ll_lt_sap_deinit(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ll_lt_sap_high_ap_availability_ser_cmd_remove() - Remove high ap availability
+ * command from serialization
+ * @vdev: LL_LT_SAP vdev
+ * @type: Type of the serialization command
+ *
+ * Return: none
+ */
+void ll_lt_sap_high_ap_availability_ser_cmd_remove(
+					struct wlan_objmgr_vdev *vdev,
+					enum wlan_serialization_cmd_type type);
 
 /**
  * ll_lt_sap_high_ap_availability() - Request for high ap availability

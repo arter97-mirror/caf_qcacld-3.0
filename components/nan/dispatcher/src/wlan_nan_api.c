@@ -99,10 +99,9 @@ QDF_STATUS wlan_nan_handle_delete_all_pasn_peers(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS wlan_ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id,
 					 struct qdf_mac_addr *peer_mac)
 {
-	return ndi_add_pasn_peer_to_nan(psoc, vdev_id, peer_mac);
+	return ndi_add_pasn_peer_to_nan(psoc, peer_mac);
 }
 
 bool wlan_nan_is_sta_p2p_ndp_supp_by_fw(struct wlan_objmgr_psoc *psoc)

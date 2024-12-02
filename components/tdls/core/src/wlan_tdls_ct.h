@@ -160,6 +160,15 @@ void tdls_implicit_disable(struct tdls_vdev_priv_obj *tdls_vdev);
  */
 bool tdls_is_vdev_authenticated(struct wlan_objmgr_vdev *vdev);
 
+/*
+ * tdls_is_vdev_allowed_to_tx() - Is the VDEV active and authenticated to send
+ * mgmt frames
+ * @vdev: Pointer to vdev object
+ *
+ * Return: true or false
+ */
+bool tdls_is_vdev_allowed_to_tx(struct wlan_objmgr_vdev *vdev);
+
 /**
  * tdls_teardown_connections() - teardown and delete all the tdls peers
  * @tdls_teardown: tdls teardown struct

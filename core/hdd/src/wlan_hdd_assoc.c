@@ -180,7 +180,6 @@ uint8_t ccp_wapi_oui02[HDD_WAPI_OUI_SIZE] = { 0x00, 0x14, 0x72, 0x02 };
  */
 static const int beacon_filter_table[] = {
 	WLAN_ELEMID_DSPARMS,
-	WLAN_ELEMID_ERP,
 	WLAN_ELEMID_EDCAPARMS,
 	WLAN_ELEMID_QOS_CAPABILITY,
 	WLAN_ELEMID_HTINFO_ANA,

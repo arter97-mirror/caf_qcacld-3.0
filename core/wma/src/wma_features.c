@@ -1712,14 +1712,14 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	csa_offload_event = qdf_mem_malloc(sizeof(*csa_offload_event));
 	if (!csa_offload_event) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
-			return -EINVAL;
+		goto send_event;
 	}
 	if (wlan_cm_is_vdev_roaming(vdev)) {
 		wma_err("Roaming in progress for vdev %d, ignore csa event",
 			 vdev_id);
 		qdf_mem_free(csa_offload_event);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
-		return -EINVAL;
+		goto send_event;
 	}
 
 	qdf_mem_zero(csa_offload_event, sizeof(*csa_offload_event));
@@ -1730,7 +1730,7 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		wma_err("CSA Event error: No CSA IE present");
 		qdf_mem_free(csa_offload_event);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
-		return -EINVAL;
+		goto send_event;
 	}
 
 	if (csa_event->ies_present_flag & WMI_CSWRAP_IE_EXT_VER_2_PRESENT) {
@@ -1810,11 +1810,16 @@ got_chan:
 		wma_err("CSA Event with channel %d. Ignore !!",
 			 csa_offload_event->channel);
 		qdf_mem_free(csa_offload_event);
-		return -EINVAL;
+		goto send_event;
 	}
 
 	wma_send_msg(wma, WMA_CSA_OFFLOAD_EVENT, (void *)csa_offload_event, 0);
+
 	return 0;
+
+send_event:
+	wlan_mlme_send_csa_event_status_ind(vdev, 0);
+	return -EINVAL;
 }
 
 #ifdef FEATURE_OEM_DATA_SUPPORT

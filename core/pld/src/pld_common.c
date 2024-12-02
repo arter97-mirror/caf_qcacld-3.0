@@ -889,6 +889,8 @@ bool pld_is_direct_link_supported(struct device *dev)
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_SNOC:
 	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_is_direct_link_supported(dev);
+		break;
 	case PLD_BUS_TYPE_SDIO:
 	default:
 		break;
@@ -910,6 +912,8 @@ bool pld_audio_is_direct_link_supported(struct device *dev)
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_SNOC:
 	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_audio_is_direct_link_supported(dev);
+		break;
 	case PLD_BUS_TYPE_SDIO:
 	default:
 		break;
@@ -925,6 +929,9 @@ bool pld_is_audio_shared_iommu_group(struct device *dev)
 	switch (pld_get_bus_type(dev)) {
 	case PLD_BUS_TYPE_PCIE:
 		ret = pld_pcie_is_audio_shared_iommu_group(dev);
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_is_audio_shared_iommu_group(dev);
 		break;
 	default:
 		break;
@@ -2889,6 +2896,9 @@ int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
 	case PLD_BUS_TYPE_PCIE:
 		ret = pld_pcie_audio_smmu_map(dev, paddr, iova, size);
 		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_audio_smmu_map(dev, paddr, iova, size);
+		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -2903,6 +2913,9 @@ void pld_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
 	case PLD_BUS_TYPE_PCIE:
 		pld_pcie_audio_smmu_unmap(dev, iova, size);
 		break;
+	case PLD_BUS_TYPE_IPCI:
+		pld_ipci_audio_smmu_unmap(dev, iova, size);
+		break;
 	default:
 		break;
 	}
@@ -2916,6 +2929,9 @@ int pld_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
 	switch (pld_get_bus_type(dev)) {
 	case PLD_BUS_TYPE_PCIE:
 		ret = pld_pcie_get_fw_lpass_shared_mem(dev, iova, size);
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_get_fw_lpass_shared_mem(dev, iova, size);
 		break;
 	default:
 		ret = -EINVAL;

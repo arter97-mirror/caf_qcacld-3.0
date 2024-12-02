@@ -125,6 +125,18 @@ cds_send_delba(struct cdp_ctrl_objmgr_psoc *psoc,
 }
 
 /**
+ * cds_dp_trigger_recovery() - callback for DP trigger recovery
+ * @reason: reason for recovery
+ *
+ * Return: None
+ */
+static inline void
+cds_dp_trigger_recovery(enum qdf_hang_reason reason)
+{
+	cds_trigger_recovery(reason);
+}
+
+/**
  * wlan_dp_stc_peer_event_notify() - Handle the peer map/unmap events
  * @soc: CDP soc
  * @event: Peer event
@@ -149,6 +161,7 @@ static struct ol_if_ops dp_ol_if_ops = {
 	.get_con_mode = cds_get_conparam,
 	.send_delba = cds_send_delba,
 	.dp_rx_get_pending = dp_rx_tm_get_pending,
+	.dp_trigger_recovery = cds_dp_trigger_recovery,
 #ifdef DP_MEM_PRE_ALLOC
 	.dp_prealloc_get_context = dp_prealloc_get_context_memory,
 	.dp_prealloc_put_context = dp_prealloc_put_context_memory,
@@ -176,6 +189,24 @@ static struct ol_if_ops dp_ol_if_ops = {
 	.dp_rx_get_pending = cds_get_rx_thread_pending,
 };
 #endif /* QCA_WIFI_QCA8074 */
+
+static scan_flush_recovery_callback cds_scan_flush_recovery_callback;
+
+void cds_register_scan_flush_recovery_callback(scan_flush_recovery_callback cb)
+{
+	cds_scan_flush_recovery_callback = cb;
+}
+
+void cds_unregister_scan_flush_recovery_callback(void)
+{
+	cds_scan_flush_recovery_callback = NULL;
+}
+
+void cds_scan_flush_on_recovery(void)
+{
+	if (cds_scan_flush_recovery_callback)
+		cds_scan_flush_recovery_callback();
+}
 
 static void cds_trigger_recovery_work(void *param);
 
@@ -2022,7 +2053,7 @@ static void cds_trigger_recovery_handler(const char *func, const uint32_t line)
 
 	cds_err("critical host timeout trigger fw recovery for reason code %d",
 		gp_cds_context->recovery_reason);
-
+	cds_scan_flush_on_recovery();
 	cds_set_recovery_in_progress(true);
 	cds_set_assert_target_in_progress(true);
 	if (pld_force_collect_target_dump(qdf->dev))

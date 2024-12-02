@@ -189,14 +189,12 @@ __wlan_hdd_cfg80211_ll_lt_sap_high_ap_availability(struct wiphy *wiphy,
 	enum qca_high_ap_availability_operation operation;
 	uint16_t cookie = LL_SAP_INVALID_COOKIE;
 	uint32_t duration = 0;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	uint8_t reject_vdev_id = INVALID_VDEV_ID;
+	enum scan_reject_states reject_reason = SCAN_REJECT_DEFAULT;
+	struct wlan_serialization_command cmd = {0};
 
 	hdd_enter_dev(dev);
-
-	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
-		hdd_err("Command not allowed in FTM mode");
-		return -EPERM;
-	}
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return -EINVAL;
@@ -209,27 +207,18 @@ __wlan_hdd_cfg80211_ll_lt_sap_high_ap_availability(struct wiphy *wiphy,
 
 	if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 					  adapter->deflink->vdev_id)) {
-		hdd_err("Command not allowed on vdev %d",
-			adapter->deflink->vdev_id);
+		hdd_err_rl("Command not allowed on vdev %d",
+			   adapter->deflink->vdev_id);
 		return -EINVAL;
 	}
 
-	if (hdd_is_connection_in_progress(NULL, NULL))
-		return -EBUSY;
-
-	if (wlan_cfg80211_nla_parse(
-			tb, QCA_WLAN_VENDOR_ATTR_HIGH_AP_AVAILABILITY_MAX,
-			data, data_len,
-			wlan_hdd_ll_lt_sap_high_ap_availability_policy)) {
-		hdd_err("vdev %d Invalid attribute", adapter->deflink->vdev_id);
-		return -EINVAL;
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EPERM;
 	}
 
-	if (!tb[QCA_WLAN_VENDOR_ATTR_HIGH_AP_AVAILABILITY_OPERATION]) {
-		hdd_err("Vdev %d attr high ap availability operation failed",
-			adapter->deflink->vdev_id);
-		return -EINVAL;
-	}
+	if (hdd_is_chan_switch_in_progress())
+		return -EAGAIN;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(hdd_ctx->psoc,
 						    adapter->deflink->vdev_id,
@@ -237,6 +226,47 @@ __wlan_hdd_cfg80211_ll_lt_sap_high_ap_availability(struct wiphy *wiphy,
 	if (!vdev) {
 		hdd_err("vdev %d not found", adapter->deflink->vdev_id);
 		return -EINVAL;
+	}
+	cmd.cmd_type = WLAN_SER_CMD_HIGH_AP_AVAILABILITY;
+	cmd.cmd_id = 0;
+	cmd.vdev = vdev;
+	cmd.is_high_priority = false;
+
+	if (wlan_serialization_is_cmd_present_in_active_queue(hdd_ctx->psoc,
+							      &cmd)) {
+		/*
+		 * One Command is already in active queue dont check for
+		 * connection in progress, just allow it, there could be a
+		 * scenario where one EB has already requested for high AP
+		 * availability and before second EB requests, connection starts
+		 * at the station, now if second EB sends high AP availability
+		 * request, HS should not reject it.
+		 */
+	} else if (hdd_is_connection_in_progress(&reject_vdev_id,
+						 &reject_reason)) {
+		if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+						  reject_vdev_id)) {
+			hdd_err_rl("connection in progress vdev %d reason %d",
+				   reject_vdev_id, reject_reason);
+			status = QDF_STATUS_E_BUSY;
+			goto err;
+		}
+	}
+
+	if (wlan_cfg80211_nla_parse(
+			tb, QCA_WLAN_VENDOR_ATTR_HIGH_AP_AVAILABILITY_MAX,
+			data, data_len,
+			wlan_hdd_ll_lt_sap_high_ap_availability_policy)) {
+		hdd_err("vdev %d Invalid attribute", adapter->deflink->vdev_id);
+		status = QDF_STATUS_E_INVAL;
+		goto err;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_HIGH_AP_AVAILABILITY_OPERATION]) {
+		hdd_err("Vdev %d attr high ap availability operation failed",
+			adapter->deflink->vdev_id);
+		status = QDF_STATUS_E_INVAL;
+		goto err;
 	}
 
 	operation = nla_get_u8(
@@ -254,7 +284,7 @@ __wlan_hdd_cfg80211_ll_lt_sap_high_ap_availability(struct wiphy *wiphy,
 
 	status = osif_ll_lt_sap_high_ap_availability(vdev, operation, duration,
 						     cookie);
-
+err:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LL_SAP_ID);
 
 	return qdf_status_to_os_return(status);

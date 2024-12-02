@@ -1852,6 +1852,13 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 	int i;
 	uint8_t buf[BUF_LEN_MAX];
 
+	if (!dp_stc) {
+		dp_info_rl("STC context detached! Tuple (%s), result %d",
+			   dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
+			   flow_classify_result->traffic_type);
+		return;
+	}
+
 	hash = wlan_dp_get_flow_hash(dp_ctx, flow_tuple);
 	s_table = dp_stc->sampling_flow_table;
 

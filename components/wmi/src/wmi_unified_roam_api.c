@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -516,6 +516,21 @@ wmi_unified_extract_roam_extract_frame_info(wmi_unified_t wmi, void *evt_buf,
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+QDF_STATUS
+wmi_unified_extract_roam_ml_info(wmi_unified_t wmi_handle, void *event,
+				 struct roam_mlo_link_info *dst,
+				 uint64_t timestamp, uint8_t idx)
+{
+	if (wmi_handle->ops->extract_roam_stats_event)
+		return wmi_handle->ops->extract_roam_ml_info(wmi_handle, event,
+							     dst, timestamp,
+							     idx);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 QDF_STATUS
 wmi_extract_roam_stats_event(wmi_unified_t wmi_handle,

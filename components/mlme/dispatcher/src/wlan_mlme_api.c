@@ -809,9 +809,6 @@ wlan_mlme_update_aux_dev_caps(
 		struct wlan_mlme_aux_dev_caps wlan_mlme_aux_dev_caps[])
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-	struct wlan_mlme_aux_dev_caps *wlan_mlme_aux0_dev_caps;
-	uint32_t supported_modes_bitmap = 0;
-	uint8_t idx = WLAN_MLME_HW_MODE_AUX_EMLSR_SINGLE;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -820,13 +817,6 @@ wlan_mlme_update_aux_dev_caps(
 	qdf_mem_copy(&mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps[0],
 		     &wlan_mlme_aux_dev_caps[0],
 		     sizeof(mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps));
-	wlan_mlme_aux0_dev_caps = mlme_obj->cfg.gen.wlan_mlme_aux0_dev_caps;
-	supported_modes_bitmap =
-			wlan_mlme_aux0_dev_caps[idx].supported_modes_bitmap;
-	if (supported_modes_bitmap & (0x1 << WLAN_MLME_AUX_MODE_EMLSR_BIT)) {
-		mlme_debug("set the mlme config for emlsr");
-		wlan_mlme_set_emlsr_mode_enabled(psoc, true);
-	}
 }
 
 bool wlan_mlme_cfg_get_aux_supported_modes(

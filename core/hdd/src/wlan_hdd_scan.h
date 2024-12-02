@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,6 +48,45 @@ extern const struct nla_policy scan_policy[
 },
 
 #define EXTSCAN_PARAM_MAX QCA_WLAN_VENDOR_ATTR_EXTSCAN_SUBCMD_CONFIG_PARAM_MAX
+
+#ifdef FEATURE_WLAN_ZERO_POWER_SCAN
+#define FEATURE_FETCH_ZERO_POWER_SCAN_REPORT \
+{ \
+	.info.vendor_id = QCA_NL80211_VENDOR_ID, \
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_GET_FW_SCAN_REPORT, \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV | \
+		 WIPHY_VENDOR_CMD_NEED_NETDEV | \
+		 WIPHY_VENDOR_CMD_NEED_RUNNING, \
+	.doit = wlan_hdd_cfg80211_fetch_zero_power_scan_report, \
+	vendor_command_policy(VENDOR_CMD_RAW_DATA, 0) \
+},
+
+/**
+ * wlan_hdd_cfg80211_fetch_zero_power_scan_report() - Vendor interface to
+ * request zero power scan results from FW.
+ *
+ * @wiphy: Global wiphy context
+ * @wdev: WLAN abstraction of netdev
+ * @data: Pointer to request
+ * @data_len: Length of buffer pointed by @data.
+ *
+ * Driver to fetch WOW mode scan results from FW and send the data to userspace.
+ *
+ * Return: 0 on success or negative failure code.
+ */
+int wlan_hdd_cfg80211_fetch_zero_power_scan_report(struct wiphy *wiphy,
+						   struct wireless_dev *wdev,
+						   const void *data,
+						   int data_len);
+#else
+static inline int
+wlan_hdd_cfg80211_fetch_zero_power_scan_report(struct wiphy *wiphy,
+					       struct wireless_dev *wdev,
+					       const void *data, int data_len)
+{
+	return -EINVAL;
+}
+#endif
 
 int hdd_scan_context_init(struct hdd_context *hdd_ctx);
 void hdd_scan_context_destroy(struct hdd_context *hdd_ctx);

@@ -1101,6 +1101,7 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 	struct wlan_dp_resource_mgr_ctx *rsrc_ctx;
 	struct cdp_soc_t *cdp_soc = dp_ctx->cdp_soc;
 	cdp_config_param_type val = {0};
+	cdp_config_param_type set_val = {0};
 	QDF_STATUS status;
 	int i;
 
@@ -1160,6 +1161,15 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 		goto attach_err;
 	}
 
+	set_val.cdp_dyn_resource_mgr_support = true;
+	status = cdp_txrx_set_psoc_param(dp_ctx->cdp_soc,
+					 CDP_DYN_RESOURCE_MGR_SUPPORT, set_val);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Failed to set dynamic resource mgr support status %d",
+		       status);
+		goto unregister_handler;
+	}
+
 	qdf_spinlock_create(&rsrc_ctx->rsrc_mgr_lock);
 	wlan_dp_resource_mgr_list_attach(rsrc_ctx);
 
@@ -1176,6 +1186,12 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 		rsrc_ctx->mac_count);
 	return;
 
+unregister_handler:
+	status = wlan_objmgr_unregister_peer_phymode_change_notify_handler(
+			WLAN_COMP_DP, wlan_dp_resource_mgr_phymode_update,
+			rsrc_ctx);
+	if (QDF_IS_STATUS_ERROR(status))
+		dp_err("Failed to unregister peer phymode notification handler");
 attach_err:
 	dp_err("DP resource mgr attach failure");
 	qdf_mem_free(rsrc_ctx);

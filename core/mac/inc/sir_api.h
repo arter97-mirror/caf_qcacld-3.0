@@ -4929,6 +4929,7 @@ struct channel_change_req {
  * @cac_duration_ms: cac duration in ms
  * @dfs_regdomain: dfs regdomain
  * @rnrie: rnr ie
+ * @curr_conn_count: current policy mgr conn count
  */
 struct start_bss_config {
 	uint8_t vdev_id;
@@ -4959,6 +4960,7 @@ struct start_bss_config {
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
 	struct ssirrnrie rnrie;
+	uint8_t curr_conn_count;
 };
 
 #endif /* __SIR_API_H */

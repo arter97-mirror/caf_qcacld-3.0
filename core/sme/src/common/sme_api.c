@@ -3921,18 +3921,14 @@ QDF_STATUS sme_enable_active_apf_mode_ind(mac_handle_t mac_handle,
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct scheduler_msg message = {0};
 	tAniDHCPInd *pMsg;
-	struct csr_roam_session *pSession;
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (status == QDF_STATUS_SUCCESS) {
-		pSession = CSR_GET_SESSION(mac, sessionId);
-
-		if (!pSession) {
-			sme_err("Session: %d not found", sessionId);
+		if (!CSR_IS_SESSION_VALID(mac, sessionId)) {
+			sme_err("invalid vdev %d", sessionId);
 			sme_release_global_lock(&mac->sme);
-			return QDF_STATUS_E_FAILURE;
+			return QDF_STATUS_E_INVAL;
 		}
-		pSession->dhcp_done = false;
 
 		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
 		if (!pMsg) {
@@ -3975,18 +3971,14 @@ QDF_STATUS sme_disable_active_apf_mode_ind(mac_handle_t mac_handle,
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct scheduler_msg message = {0};
 	tAniDHCPInd *pMsg;
-	struct csr_roam_session *pSession;
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (status == QDF_STATUS_SUCCESS) {
-		pSession = CSR_GET_SESSION(mac, sessionId);
-
-		if (!pSession) {
-			sme_err("Session: %d not found", sessionId);
+		if (!CSR_IS_SESSION_VALID(mac, sessionId)) {
+			sme_err("invalid vdev %d", sessionId);
 			sme_release_global_lock(&mac->sme);
-			return QDF_STATUS_E_FAILURE;
+			return QDF_STATUS_E_INVAL;
 		}
-		pSession->dhcp_done = false;
 
 		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
 		if (!pMsg) {
@@ -15883,7 +15875,7 @@ void sme_update_eht_cap_mcs(mac_handle_t mac_handle, uint8_t vdev_id,
 
 void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t num_links,
-			    struct qdf_mac_addr active_link_addr[WLAN_MLO_MAX_VDEVS])
+			    struct qdf_mac_addr *active_link_addr)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
@@ -17133,11 +17125,38 @@ static QDF_STATUS sme_send_start_bss_msg(struct mac_context *mac,
 					 struct start_bss_config *cfg)
 {
 	struct scheduler_msg msg = {0};
-	struct start_bss_config *start_bss_cfg;
-	struct start_bss_rsp rsp;
+	struct start_bss_config *start_bss_cfg = NULL;
+	struct start_bss_rsp rsp = {0};
+	enum QDF_OPMODE op_mode;
+	enum policy_mgr_con_mode pm_con_mode;
+	uint8_t conn_count;
 
-	if (!cfg)
+	if (!cfg || !mac || !mac->pdev || !mac->psoc) {
+		sme_err("invalid parameter");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, cfg->vdev_id);
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(mac->psoc, op_mode,
+							   cfg->vdev_id);
+	/* When WLAN_SER_CMD_VDEV_START_BSS is active, check concurrency allow
+	 * for third interface to avoid 3 home channel MCC in same mac in race
+	 * condition case.
+	 */
+	conn_count = policy_mgr_get_connection_count(mac->psoc);
+	if ((pm_con_mode == PM_SAP_MODE ||
+	     pm_con_mode == PM_P2P_GO_MODE) &&
+	    conn_count != cfg->curr_conn_count &&
+	    conn_count > 1 &&
+	    !policy_mgr_allow_concurrency(mac->psoc,
+					  pm_con_mode,
+					  cfg->oper_ch_freq,
+					  HW_MODE_20_MHZ, 0,
+					  cfg->vdev_id)) {
+		sme_debug("reject start bss due to conc, freq %d vdev %d op mode %d",
+			  cfg->oper_ch_freq, cfg->vdev_id, op_mode);
+		goto failure;
+	}
 
 	csr_roam_state_change(mac, eCSR_ROAMING_STATE_JOINING, cfg->vdev_id);
 	csr_roam_substate_change(mac, eCSR_ROAM_SUBSTATE_START_BSS_REQ,
@@ -17161,9 +17180,9 @@ static QDF_STATUS sme_send_start_bss_msg(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 failure:
 	sme_err("Failed to post start bss request to PE for vdev : %d",
-		start_bss_cfg->vdev_id);
+		cfg->vdev_id);
 	csr_process_sap_response(mac, CSR_SAP_START_BSS_FAILURE, &rsp,
-				 start_bss_cfg->vdev_id);
+				 cfg->vdev_id);
 	qdf_mem_free(start_bss_cfg);
 	return QDF_STATUS_E_FAILURE;
 }
@@ -17352,7 +17371,7 @@ sme_validate_txrx_chain_mask(uint32_t id, uint32_t value)
 
 void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
 				    void (*set_disconnect_link_info_cb)
-				    (uint8_t vdev_id))
+				    (uint8_t vdev_id, bool is_disconnect_sent))
 {
 	QDF_STATUS status;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);

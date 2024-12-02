@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -465,6 +465,39 @@ QDF_STATUS
 wmi_unified_extract_roam_extract_frame_info(wmi_unified_t wmi, void *evt_buf,
 					    struct roam_frame_stats *dst,
 					    uint8_t idx, uint8_t num_frames);
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/**
+ * wmi_unified_extract_roam_ml_info() - Extract roam ML info into dst buffer
+ * @wmi:   wmi handle
+ * @event: Pointer to the event buffer
+ * @dst: Destination buffer to fill the ML link info
+ * @timestamp: FW timestamp( in milliseconds)
+ * @idx: Index of the TLV to be read from the event
+ */
+QDF_STATUS
+wmi_unified_extract_roam_ml_info(wmi_unified_t wmi, void *event,
+				 struct roam_mlo_link_info *dst,
+				 uint64_t timestamp, uint8_t idx);
+
+static inline QDF_STATUS
+wmi_unified_extract_ml_roam_info(wmi_unified_t wmi, void *event,
+				 struct roam_frame_info *dst,
+				 uint64_t timestamp, uint8_t idx)
+{
+	return wmi_unified_extract_roam_ml_info(wmi, event,
+						&dst->link_info,
+						timestamp, idx);
+}
+#else
+static inline QDF_STATUS
+wmi_unified_extract_ml_roam_info(wmi_unified_t wmi, void *event,
+				 struct roam_frame_info *dst,
+				 uint64_t timestamp, uint8_t idx)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 /**
  * wmi_extract_auth_offload_event  - Extract auth offload event

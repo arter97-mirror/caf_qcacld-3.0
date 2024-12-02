@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -162,6 +162,8 @@ os_if_qmi_wfds_send_config_msg(struct wlan_qmi_wfds_config_req_msg *src_info)
 				src_info->fw_shared_wrmem_size_valid;
 	req->fw_shared_wrmem_size =
 				src_info->fw_shared_wrmem_size;
+	req->target_type_valid = src_info->target_type_valid;
+	req->target_type = src_info->target_type;
 
 	status = os_if_qmi_txn_init(&qmi_wfds, &txn, wfds_gen_resp_msg_v01_ei,
 				    resp);

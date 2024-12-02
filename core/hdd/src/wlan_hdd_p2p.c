@@ -2044,4 +2044,53 @@ int wlan_hdd_cfg80211_p2p_send_usd_cmd(struct wiphy *wiphy,
 
 	return errno;
 }
+
+/**
+ * __wlan_hdd_cfg80211_p2p_parse_wfd_params - This function parse P2P mode
+ * params
+ * @wiphy: pointer to wiphy structure
+ * @wdev: pointer to wireless device
+ * @data: pointer to data
+ * @data_len: data length
+ *
+ * Return: 0 on success, negative errno if error
+ */
+static int __wlan_hdd_cfg80211_p2p_parse_wfd_params(struct wiphy *wiphy,
+						    struct wireless_dev *wdev,
+						    const void *data,
+						    int data_len)
+{
+	int ret;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
+	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_err_rl("Command not allowed in FTM/Monitor mode");
+		return -EPERM;
+	}
+
+	ret = wlan_hdd_validate_context(adapter->hdd_ctx);
+	if (ret)
+		return ret;
+
+	return osif_p2p_parse_wfd_params(adapter, data, data_len);
+}
+
+int wlan_hdd_cfg80211_p2p_parse_wfd_params(struct wiphy *wiphy,
+					   struct wireless_dev *wdev,
+					   const void *data, int data_len)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_p2p_parse_wfd_params(wiphy, wdev, data,
+							 data_len);
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
 #endif /* FEATURE_WLAN_SUPPORT_USD */

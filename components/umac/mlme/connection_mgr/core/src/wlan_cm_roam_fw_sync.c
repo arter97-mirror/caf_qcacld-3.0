@@ -52,6 +52,7 @@
 #include <wma.h>
 #include "wlan_objmgr_vdev_obj.h"
 #include "utils_mlo.h"
+#include "lim_utils.h"
 
 /*
  * cm_is_peer_preset_on_other_sta() - Check if peer exists on other STA
@@ -1112,8 +1113,7 @@ cm_update_scan_db_on_roam_success(struct wlan_objmgr_vdev *vdev,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static void
-cm_roam_ml_clear_prev_ap_keys(struct wlan_objmgr_vdev *vdev)
+void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_mlo_dev_context *ml_dev;
 	struct mlo_link_info *link_info;
@@ -1137,10 +1137,6 @@ cm_roam_ml_clear_prev_ap_keys(struct wlan_objmgr_vdev *vdev)
 		link_info++;
 	}
 }
-#else
-static void
-cm_roam_ml_clear_prev_ap_keys(struct wlan_objmgr_vdev *vdev)
-{}
 #endif
 
 QDF_STATUS
@@ -1156,9 +1152,18 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_cm_connect_resp *connect_rsp;
 	bool eht_capab = false;
+	struct pe_session *session;
+	struct mac_context *mac_ctx =
+			cds_get_context(QDF_MODULE_ID_PE);
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		/* couldn't find session */
+		pe_err("Session not found for vdev_id: %d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	if (!vdev) {
 		mlme_err("vdev object is NULL");
@@ -1188,7 +1193,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			   roam_synch_data->bssid.bytes, 0, 0);
 
 	cm_roam_update_mlo_mgr_info(vdev, roam_synch_data);
-	cm_roam_ml_clear_prev_ap_keys(vdev);
+	cm_delete_crypto_keys_for_all_links(vdev);
 
 	cm_id = roam_req->cm_id;
 	rsp = qdf_mem_malloc(sizeof(struct cm_vdev_join_rsp));
@@ -1226,9 +1231,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	 * Re-enable the disabled link on roaming as decision
 	 * will be taken again to disable the link on roam sync completion.
 	 */
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
-		policy_mgr_move_vdev_from_disabled_to_connection_tbl(psoc,
-								     vdev_id);
+	policy_mgr_move_vdev_from_disabled_to_connection_tbl(psoc, vdev_id);
 	cm_mlo_roam_copy_partner_info(connect_rsp, roam_synch_data);
 	mlo_roam_init_cu_bpcc(vdev, roam_synch_data);
 	mlo_roam_set_link_id(vdev, roam_synch_data);
@@ -1286,9 +1289,11 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
+	lim_set_tpc_power(mac_ctx, session, NULL);
 
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
+	policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(psoc);
 
 	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
 	if (eht_capab) {

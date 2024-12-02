@@ -553,9 +553,46 @@ static int hdd_parse_reassoc_command_v1_data(const uint8_t *command,
 	return 0;
 }
 
+static int
+hdd_check_and_reject_reassoc_command(struct wlan_hdd_link_info *link_info,
+				     struct qdf_mac_addr *target_bssid)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr connected_bssid;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
+	wlan_vdev_get_bss_peer_mac(vdev, &connected_bssid);
+
+	if (ucfg_cm_roam_get_roam_score_algo(hdd_ctx->pdev) ==
+	    VENDOR_ROAM_SCORE_ALGORITHM_1 &&
+	    ucfg_cm_is_bssid_present_on_any_assoc_link(vdev, target_bssid)) {
+		hdd_debug("vdev: %d reject self REASSOC cmd on connected bssid" QDF_MAC_ADDR_FMT,
+			  link_info->adapter->deflink->vdev_id,
+			  QDF_MAC_ADDR_REF(target_bssid->bytes));
+		/*
+		 * Send roam cancel event when roam invoke triggered by
+		 * userspace reassoc command is rejected
+		 */
+		ucfg_cm_roam_reject_reassoc_event(hdd_ctx->pdev, vdev,
+						  &connected_bssid);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EINVAL;
+	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return 0;
+}
+
 /**
  * hdd_parse_reassoc_v1() - parse version 1 of the REASSOC command
- * @adapter:	Adapter upon which the command was received
+ * @link_info: Link info pointer in HDD adapter
  * @command:	ASCII text command that was received
  *
  * This function parses the v1 REASSOC command with the format
@@ -571,17 +608,18 @@ static int hdd_parse_reassoc_command_v1_data(const uint8_t *command,
  *
  * Return: 0 for success non-zero for failure
  */
-static int hdd_parse_reassoc_v1(struct hdd_adapter *adapter, const char *command)
+static int hdd_parse_reassoc_v1(struct wlan_hdd_link_info *link_info,
+				const char *command)
 {
 	qdf_freq_t freq = 0;
 	tSirMacAddr bssid;
 	int ret;
 	struct qdf_mac_addr target_bssid;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	QDF_STATUS status;
 	struct wlan_objmgr_pdev *pdev;
 
-	pdev = wlan_vdev_get_pdev(adapter->deflink->vdev);
+	pdev = wlan_vdev_get_pdev(link_info->adapter->deflink->vdev);
 	ret = hdd_parse_reassoc_command_v1_data(command, bssid, &freq, pdev);
 	if (ret) {
 		hdd_err("Failed to parse reassoc command data");
@@ -589,8 +627,12 @@ static int hdd_parse_reassoc_v1(struct hdd_adapter *adapter, const char *command
 	}
 
 	qdf_mem_copy(target_bssid.bytes, bssid, sizeof(tSirMacAddr));
+	ret = hdd_check_and_reject_reassoc_command(link_info, &target_bssid);
+	if (ret)
+		return ret;
+
 	status = ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev,
-					  adapter->deflink->vdev_id,
+					  link_info->adapter->deflink->vdev_id,
 					  &target_bssid, freq,
 					  CM_ROAMING_USER);
 	return qdf_status_to_os_return(status);
@@ -598,7 +640,7 @@ static int hdd_parse_reassoc_v1(struct hdd_adapter *adapter, const char *command
 
 /**
  * hdd_parse_reassoc_v2() - parse version 2 of the REASSOC command
- * @adapter:	Adapter upon which the command was received
+ * @link_info: Link info pointer in HDD adapter
  * @command:	Command that was received, ASCII command
  *		followed by binary data
  * @total_len:  Total length of the command received
@@ -609,20 +651,19 @@ static int hdd_parse_reassoc_v1(struct hdd_adapter *adapter, const char *command
  *
  * Return: 0 for success non-zero for failure
  */
-static int hdd_parse_reassoc_v2(struct hdd_adapter *adapter,
-				const char *command,
-				int total_len)
+static int hdd_parse_reassoc_v2(struct wlan_hdd_link_info *link_info,
+				const char *command, int total_len)
 {
 	struct android_wifi_reassoc_params params;
 	tSirMacAddr bssid;
 	qdf_freq_t freq = 0;
 	int ret;
 	struct qdf_mac_addr target_bssid;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	QDF_STATUS status;
 	struct wlan_objmgr_pdev *pdev;
 
-	pdev = wlan_vdev_get_pdev(adapter->deflink->vdev);
+	pdev = wlan_vdev_get_pdev(link_info->adapter->deflink->vdev);
 	if (total_len < sizeof(params) + 8) {
 		hdd_err("Invalid command length");
 		return -EINVAL;
@@ -645,10 +686,15 @@ static int hdd_parse_reassoc_v2(struct hdd_adapter *adapter,
 			return -EINVAL;
 
 		qdf_mem_copy(target_bssid.bytes, bssid, sizeof(tSirMacAddr));
+		ret = hdd_check_and_reject_reassoc_command(link_info,
+							   &target_bssid);
+		if (ret)
+			return ret;
+
 		status = ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev,
-						  adapter->deflink->vdev_id,
-						  &target_bssid, freq,
-						  CM_ROAMING_USER);
+					link_info->adapter->deflink->vdev_id,
+					&target_bssid, freq,
+					CM_ROAMING_USER);
 		ret = qdf_status_to_os_return(status);
 	}
 
@@ -657,7 +703,7 @@ static int hdd_parse_reassoc_v2(struct hdd_adapter *adapter,
 
 /**
  * hdd_parse_reassoc() - parse the REASSOC command
- * @adapter:	Adapter upon which the command was received
+ * @link_info: Link info pointer in HDD adapter
  * @command:	Command that was received
  * @total_len:  Total length of the command received
  *
@@ -670,8 +716,8 @@ static int hdd_parse_reassoc_v2(struct hdd_adapter *adapter,
  *
  * Return: 0 for success non-zero for failure
  */
-static int hdd_parse_reassoc(struct hdd_adapter *adapter, const char *command,
-			     int total_len)
+static int hdd_parse_reassoc(struct wlan_hdd_link_info *link_info,
+			     const char *command, int total_len)
 {
 	int ret;
 
@@ -695,9 +741,9 @@ static int hdd_parse_reassoc(struct hdd_adapter *adapter, const char *command,
 	}
 
 	if (command[25])
-		ret = hdd_parse_reassoc_v1(adapter, command);
+		ret = hdd_parse_reassoc_v1(link_info, command);
 	else
-		ret = hdd_parse_reassoc_v2(adapter, command, total_len);
+		ret = hdd_parse_reassoc_v2(link_info, command, total_len);
 
 	return ret;
 }
@@ -4306,7 +4352,7 @@ static int drv_cmd_reassoc(struct wlan_hdd_link_info *link_info,
 			   uint8_t command_len,
 			   struct hdd_priv_data *priv_data)
 {
-	return hdd_parse_reassoc(link_info->adapter, command,
+	return hdd_parse_reassoc(link_info, command,
 				 priv_data->total_len);
 }
 

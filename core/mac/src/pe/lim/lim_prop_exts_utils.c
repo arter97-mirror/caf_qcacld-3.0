@@ -305,6 +305,12 @@ void lim_update_he_bw_cap_mcs(struct pe_session *session,
 		*(uint16_t *)session->he_config.tx_he_mcs_map_80_80 =
 							HE_MCS_ALL_DISABLED;
 	}
+
+	if (beacon)
+		pe_debug("Session width %d, AP: he_cap %d wd_2 %d is_80 %d",
+			 session->ch_width, beacon->he_cap.present,
+			 beacon->he_cap.chan_width_2, is_80mhz);
+	lim_print_he_channel_widths(&session->he_config);
 }
 
 void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,

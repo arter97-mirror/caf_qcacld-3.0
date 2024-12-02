@@ -322,6 +322,39 @@ ucfg_wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			 struct qdf_mac_addr *bssid, qdf_freq_t ch_freq,
 			 enum wlan_cm_source source);
 
+/**
+ * ucfg_cm_roam_get_roam_score_algo() - get value of INI
+ * vendor_roam_score_algorithm
+ * @pdev: Pointer to pdev
+ *
+ * Return: value of vendor_roam_score_algorithm
+ */
+uint32_t ucfg_cm_roam_get_roam_score_algo(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * ucfg_cm_is_bssid_present_on_any_assoc_link() : Check if bssid belongs to any
+ * assoc link
+ * @vdev: Pointer to vdev
+ * @target_bssid: target bssid
+ *
+ * Return: True if bssid belongs to any assoc else return false
+ */
+bool ucfg_cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
+				       struct qdf_mac_addr *target_bssid);
+
+/**
+ * ucfg_cm_roam_reject_reassoc_event() - send reassoc reject log event
+ * vendor_roam_score_algorithm
+ * @pdev: Pointer to pdev
+ * @vdev: Pointer to vdev
+ * @connected_bssid: connected BSSID
+ *
+ * Return: none
+ */
+void ucfg_cm_roam_reject_reassoc_event(struct wlan_objmgr_pdev *pdev,
+				       struct wlan_objmgr_vdev *vdev,
+				       struct qdf_mac_addr *connected_bssid);
+
 #ifdef WLAN_FEATURE_FILS_SK
 QDF_STATUS
 ucfg_cm_update_fils_config(struct wlan_objmgr_psoc *psoc,
@@ -883,4 +916,20 @@ ucfg_cm_roaming_get_peer_mld_addr(struct wlan_objmgr_vdev *vdev)
 	return NULL;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * ucfg_cm_delete_crypto_keys_for_all_links() - This API is wrapper for
+ * "cm_delete_crypto_keys_for_all_links" function
+ * @vdev: pointer to VDEV
+ *
+ * Return: none
+ */
+void ucfg_cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev);
+#else
+static inline
+void ucfg_cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* _WLAN_CM_ROAM_UCFG_API_H_ */

@@ -684,6 +684,40 @@ wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		    enum wlan_cm_source source);
 
 /**
+ * wlan_cm_roam_get_roam_score_algo() - get value of INI
+ * vendor_roam_score_algorithm
+ * @pdev: Pointer to pdev
+ *
+ * Return: value of vendor_roam_score_algorithm
+ */
+uint32_t wlan_cm_roam_get_roam_score_algo(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * wlan_cm_is_bssid_present_on_any_assoc_link() : Check if bssid belongs to any
+ * assoc link
+ * @vdev: Pointer to vdev
+ * @target_bssid: target bssid
+ *
+ * Return: True if bssid belongs to any assoc else return false
+ */
+bool
+wlan_cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
+					   struct qdf_mac_addr *target_bssid);
+
+/**
+ * wlan_cm_roam_reject_reassoc_event() - send reassoc reject log event
+ * vendor_roam_score_algorithm
+ * @pdev: Pointer to pdev
+ * @vdev: Pointer to vdev
+ * @connected_bssid: connected BSSID
+ *
+ * Return: none
+ */
+void wlan_cm_roam_reject_reassoc_event(struct wlan_objmgr_pdev *pdev,
+				       struct wlan_objmgr_vdev *vdev,
+				       struct qdf_mac_addr *connected_bssid);
+
+/**
  * cm_is_fast_roam_enabled() - check fast roam enabled or not
  * @psoc: psoc pointer
  *

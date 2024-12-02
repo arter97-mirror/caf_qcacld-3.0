@@ -1346,6 +1346,7 @@ struct get_station_client_info {
  *		      based on wlm mode
  * @discon_link_info: link_info pointer on which post disconnect stats to be
  *                    fetched
+ * @wfd_mode: WFD mode for P2P interface
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1544,6 +1545,9 @@ struct hdd_adapter {
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
 	bool wlm_ll_conn_flag;
 	struct wlan_hdd_link_info *discon_link_info;
+#ifdef FEATURE_WLAN_SUPPORT_USD
+	uint8_t wfd_mode;
+#endif
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -4885,13 +4889,15 @@ QDF_STATUS hdd_component_psoc_open(struct wlan_objmgr_psoc *psoc);
 /**
  * hdd_component_psoc_close() - Close the legacy components
  * @psoc: Pointer to psoc object
+ * @is_recovering: is driver recovery in progress
  *
  * This function closes the legacy components and resets the
  * component's private objects.
  *
  * Return: None
  */
-void hdd_component_psoc_close(struct wlan_objmgr_psoc *psoc);
+void hdd_component_psoc_close(struct wlan_objmgr_psoc *psoc,
+			      bool is_recovering);
 
 /**
  * hdd_component_psoc_enable() - Trigger psoc enable for CLD Components
@@ -5958,11 +5964,12 @@ bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
 /**
  *hdd_set_disconnect_link_info_cb() - set STA disconnected link info
  *@vdev_id: vdev_id
+ *@is_disconnect_sent: Is disconnect sent OTA
  *
  * Return: None
  */
 void
-hdd_set_disconnect_link_info_cb(uint8_t vdev_id);
+hdd_set_disconnect_link_info_cb(uint8_t vdev_id, bool is_disconnect_sent);
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /*

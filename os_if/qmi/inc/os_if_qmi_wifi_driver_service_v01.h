@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -100,6 +100,20 @@ enum wifi_drv_qmi_adsp_crash_type_v01 {
 };
 
 /**
+ * enum wifi_drv_qmi_wifi_target_type_v01 - WiFi target type
+ * @WIFI_DRV_QMI_WIFI_TARGET_TYPE_MIN_VAL_V01: wifi target type enum min value
+ * @WFDS_TARGET_TYPE_DISCRETE_V01: discrete wifi attach
+ * @WFDS_TARGET_TYPE_INTG_V01: integrated wifi attach
+ * @WIFI_DRV_QMI_WIFI_TARGET_TYPE_MAX_VAL_V01: wifi target type enum max value
+ */
+enum wifi_drv_qmi_wifi_target_type_v01 {
+	WIFI_DRV_QMI_WIFI_TARGET_TYPE_MIN_VAL_V01 = INT_MIN,
+	WFDS_TARGET_TYPE_DISCRETE_V01 = 0,
+	WFDS_TARGET_TYPE_INTG_V01 = 1,
+	WIFI_DRV_QMI_WIFI_TARGET_TYPE_MAX_VAL_V01 = INT_MAX,
+};
+
+/**
  * enum wifi_drv_qmi_pipe_dir_v01 - pipe direction
  * @WIFI_DRV_QMI_PIPE_DIR_MIN_VAL_V01: pipe direction enum min value
  * @WFDS_PIPEDIR_NONE_V01: none pipe direction
@@ -159,6 +173,8 @@ struct wifi_drv_qmi_ce_information_v01 {
  * @fw_shared_wrmem_size_valid: whether corresponding QMI field is valid or
  *  not
  * @fw_shared_wrmem_size: FW shared write memory size
+ * @target_type_valid: whether corresponding QMI field is valid or not
+ * @target_type: wifi target type
  */
 struct wfds_config_req_msg_v01 {
 	u32 ce_info_len;
@@ -185,9 +201,11 @@ struct wfds_config_req_msg_v01 {
 	u64 fw_shared_wrmem_paddr;
 	u8 fw_shared_wrmem_size_valid;
 	u32 fw_shared_wrmem_size;
+	u8 target_type_valid;
+	enum wifi_drv_qmi_wifi_target_type_v01 target_type;
 };
 
-#define WFDS_CONFIG_REQ_MSG_V01_MAX_MSG_LEN 307
+#define WFDS_CONFIG_REQ_MSG_V01_MAX_MSG_LEN 314
 extern struct qmi_elem_info wfds_config_req_msg_v01_ei[];
 
 /**

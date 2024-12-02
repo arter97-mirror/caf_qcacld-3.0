@@ -458,7 +458,7 @@ static QDF_STATUS lim_populate_fd_tmpl_frame(struct mac_context *mac,
 	/* Add TPE IE */
 	if ((wlan_reg_is_6ghz_chan_freq(cur_chan_freq)) ||
 	    (pe_session->vhtCapability)) {
-		populate_dot11f_tx_power_env(mac, &tpe[0], chwidth,
+		populate_dot11f_tx_power_env(mac, pe_session, &tpe[0], chwidth,
 					     cur_chan_freq, &tpe_num, false);
 		if (tpe_num > WLAN_MAX_NUM_TPE_IE) {
 			pe_err("tpe_num  %d greater than max size", tpe_num);

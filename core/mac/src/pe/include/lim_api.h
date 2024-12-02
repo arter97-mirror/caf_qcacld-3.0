@@ -661,6 +661,7 @@ bool lim_enable_cts_to_self_for_exempted_iot_ap(
  * @session: pe session
  * @bss_desc: Pointer to bss description
  * @phy_mode: phy mode of scan entry
+ * @req_fail_status_code: Connect req fail status code pointer
  *
  * This api will fill lim pe session with info
  * from bss description
@@ -671,7 +672,8 @@ QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx,
 		    struct pe_session *session,
 		    struct bss_description *bss_desc,
-		    enum wlan_phymode phy_mode);
+		    enum wlan_phymode phy_mode,
+		    enum wlan_status_code *req_fail_status_code);
 
 /**
  * lim_update_omn_ie_ch_width() - update omn_ie_ch_width in struct

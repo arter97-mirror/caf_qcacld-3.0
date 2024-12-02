@@ -1291,6 +1291,7 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 			    uint16_t status_code, uint32_t peer_capability,
 			    const uint8_t *buf, size_t len, int link_id)
 {
+	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct wlan_objmgr_vdev *tdls_link_vdev = NULL;
 	struct wlan_objmgr_vdev *mlo_vdev = NULL;
 	struct wlan_objmgr_vdev *vdev;
@@ -1299,6 +1300,11 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 	bool dis_req_more = false;
 	uint8_t i;
 	int ret = 0;
+
+	if (!hdd_ctx) {
+		osif_err_rl("hdd_ctx is null");
+		return -EINVAL;
+	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_TDLS_ID);
 	if (!vdev)
@@ -1357,6 +1363,14 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 				osif_err_rl("mlo vdev is NULL");
 				continue;
 			}
+
+			if (!ucfg_tdls_is_vdev_allowed_to_tx(mlo_vdev) ||
+			    !wlan_hdd_is_tdls_allowed(hdd_ctx, mlo_vdev)) {
+				ucfg_tdls_release_mlo_vdev(mlo_vdev,
+							   WLAN_OSIF_TDLS_ID);
+				continue;
+			}
+
 			ret = wlan_cfg80211_tdls_mgmt(mlo_vdev, peer,
 						      action_code,
 						      dialog_token, status_code,

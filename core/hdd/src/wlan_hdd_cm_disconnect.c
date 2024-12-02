@@ -508,7 +508,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 */
 	adapter->last_disconnect_reason =
 			osif_cm_mac_to_qca_reason(rsp->req.req.reason_code);
-	hdd_set_disconnect_link_info_cb(link_info->vdev_id);
+	hdd_set_disconnect_link_info_cb(link_info->vdev_id, false);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -687,12 +687,8 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 	if (des_chan->ch_width != assoc_ch_width)
 		wlan_hdd_re_enable_320mhz_6g_conection(hdd_ctx, assoc_ch_width);
 
-	if (wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq))
-		ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc, &cb_mode);
-	else
-		ucfg_mlme_get_channel_bonding_5ghz(hdd_ctx->psoc, &cb_mode);
-
-	if (cb_mode == 0)
+	wlan_mlme_get_channel_bonding_5ghz(hdd_ctx->psoc, &cb_mode);
+	if (cb_mode == 0 && !wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq))
 		max_bw = cb_mode;
 	else
 		max_bw = get_max_bw();

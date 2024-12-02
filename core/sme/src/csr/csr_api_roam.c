@@ -3576,6 +3576,7 @@ csr_roam_chk_lnk_set_ctx_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 			qdf_mem_free(roam_info);
 			return;
 		}
+		policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(mac_ctx->psoc);
 	}
 	if (eSIR_SME_SUCCESS == pRsp->status_code) {
 		qdf_copy_macaddr(&roam_info->peerMac, &pRsp->peer_macaddr);
@@ -8048,6 +8049,8 @@ QDF_STATUS csr_bss_start(struct mac_context *mac, uint32_t vdev_id,
 					&candidate);
 	bss_config->beaconInterval = candidate.beacon_interval;
 	session->bcn_int = candidate.beacon_interval;
+	bss_config->curr_conn_count =
+		policy_mgr_get_connection_count(mac->psoc);
 
 	cmd.cmd_id = start_bss_cfg->cmd_id;
 	csr_set_sap_ser_params(&cmd, WLAN_SER_CMD_VDEV_START_BSS);

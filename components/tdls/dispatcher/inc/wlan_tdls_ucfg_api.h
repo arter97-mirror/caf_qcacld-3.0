@@ -467,6 +467,14 @@ bool ucfg_tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev);
 void ucfg_tdls_set_user_tdls_enable(struct wlan_objmgr_vdev *vdev,
 				    bool is_user_tdls_enable);
 
+/*
+ * ucfg_tdls_is_vdev_allowed_to_tx() - ucg api to check if the VDEV is active
+ * and authenticated to send mgmt frames
+ * @vdev: Pointer to vdev object
+ *
+ * Return: true or false
+ */
+bool ucfg_tdls_is_vdev_allowed_to_tx(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 bool ucfg_tdls_link_vdev_is_matching(struct wlan_objmgr_vdev *vdev)

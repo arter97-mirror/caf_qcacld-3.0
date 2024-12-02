@@ -450,13 +450,12 @@ QDF_STATUS nan_cleanup_pasn_peers(struct wlan_objmgr_psoc *psoc);
  * ndi_add_pasn_peer_to_nan(): This API will add PASN peer to NAN VDEV on
  * peer migration
  * @psoc: pointer to PSOC object
- * @nan_vdev_id: VDEV ID
  * @peer_mac: address of peer
  *
- * Return: Success when handled response, otherwise error
+ * Return: QDF STATUS
  */
 QDF_STATUS
-ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc, uint8_t nan_vdev_id,
+ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
 			 struct qdf_mac_addr *peer_mac);
 
 /**

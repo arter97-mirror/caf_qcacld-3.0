@@ -190,6 +190,7 @@
 #define WMA_NAN_PASN_PEER_CREATE_RESPONSE 0x0c
 #define WMA_NAN_PASN_PEER_DELETE_RESPONSE 0x0d
 
+#define WMA_DELETE_NDP_PEER_RSP 0x0e
 /* FW response timeout values in milli seconds */
 #define WMA_VDEV_PLCY_MGR_TIMEOUT        SIR_VDEV_PLCY_MGR_TIMEOUT
 #define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT WMA_VDEV_PLCY_MGR_TIMEOUT
@@ -2629,6 +2630,15 @@ void wma_delete_peer_mlo(struct wlan_objmgr_psoc *psoc, uint8_t *macaddr)
 {
 }
 #endif
+
+/**
+ * wma_send_peer_phy_mode() - set phymode
+ * @session:
+ * @phy_mode
+ */
+void
+wma_send_peer_phy_mode(tSirMacAddr bssId, uint8_t vdev_id,
+		       enum wlan_phymode phy_mode);
 
 /**
  * wma_remove_bss_peer_on_failure() - remove the bss peers in case of

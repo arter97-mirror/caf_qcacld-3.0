@@ -612,8 +612,6 @@ wlan_populate_roam_mld_log_param(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-#define REJECTED_LINK_STATUS 1
-
 void
 wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
 				  bool is_band_present)
@@ -1105,6 +1103,12 @@ wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_connect);
 
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE ||
+	    (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
+	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))))
+		return;
+
 	if (!wlan_cm_is_first_candidate_connect_attempt(vdev))
 		return;
 
@@ -1268,8 +1272,6 @@ void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 	wlan_diag_event.prev_active_link =
 		wlan_convert_link_id_to_diag_band(&src->mld_addr,
 						  src->prev_link_bitmap);
-	if (!wlan_diag_event.prev_active_link)
-		return;
 
 	if (!mld_ctx->link_ctx) {
 		logging_err("link ctx for mld_mac: "

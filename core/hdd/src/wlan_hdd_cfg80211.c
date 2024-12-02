@@ -4906,11 +4906,21 @@ bool hdd_is_wlm_latency_manager_supported(struct hdd_context *hdd_ctx)
 		return false;
 }
 
+static void wlan_hdd_set_supported_features_extn(uint8_t *feature_bitmap,
+						 uint64_t feature)
+{
+	if (!feature)
+		return;
+
+	wlan_cfg80211_set_feature(feature_bitmap, qdf_ffs64(feature) - 1);
+}
+
+#define MAX_FEATURES_STR_LEN 75
 static int
 __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
-					 struct wireless_dev *wdev,
-					 const void *data,
-					 int data_len)
+					   struct wireless_dev *wdev,
+					   const void *data,
+					   int data_len)
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct sk_buff *skb = NULL;
@@ -4920,6 +4930,10 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 	bool bvalue;
 #endif
 	uint32_t fine_time_meas_cap;
+	uint8_t fset_extn[WIFI_FEATURE_MAX_BIT_POS / 8] = {0};
+	char buf[MAX_FEATURES_STR_LEN];
+	size_t pos = 0, buf_len = MAX_FEATURES_STR_LEN;
+	uint8_t i;
 
 	/* ENTER_DEV() intentionally not used in a frequently invoked API */
 
@@ -4935,31 +4949,45 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 	if (wiphy->interface_modes & BIT(NL80211_IFTYPE_STATION)) {
 		hdd_debug("Infra Station mode is supported by driver");
 		fset |= WIFI_FEATURE_INFRA;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_INFRA);
 	}
 	if (true == hdd_is_5g_supported(hdd_ctx)) {
 		hdd_debug("INFRA_5G is supported by firmware");
 		fset |= WIFI_FEATURE_INFRA_5G;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_INFRA_5G);
 	}
 #ifdef WLAN_FEATURE_P2P
 	if ((wiphy->interface_modes & BIT(NL80211_IFTYPE_P2P_CLIENT)) &&
 	    (wiphy->interface_modes & BIT(NL80211_IFTYPE_P2P_GO))) {
 		hdd_debug("WiFi-Direct is supported by driver");
 		fset |= WIFI_FEATURE_P2P;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_P2P);
 	}
 #endif
 	fset |= WIFI_FEATURE_SOFT_AP;
+	wlan_hdd_set_supported_features_extn(fset_extn, WIFI_FEATURE_SOFT_AP);
 
 	/* HOTSPOT is a supplicant feature, enable it by default */
 	fset |= WIFI_FEATURE_HOTSPOT;
+	wlan_hdd_set_supported_features_extn(fset_extn, WIFI_FEATURE_HOTSPOT);
 
 	if (ucfg_extscan_get_enable(hdd_ctx->psoc) &&
 	    sme_is_feature_supported_by_fw(EXTENDED_SCAN)) {
 		hdd_debug("EXTScan is supported by firmware");
 		fset |= WIFI_FEATURE_EXTSCAN | WIFI_FEATURE_HAL_EPNO;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_EXTSCAN);
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_HAL_EPNO);
 	}
 	if (wlan_hdd_nan_is_supported(hdd_ctx)) {
 		hdd_debug("NAN is supported by firmware");
 		fset |= WIFI_FEATURE_NAN;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_NAN);
 	}
 
 	ucfg_mlme_get_fine_time_meas_cap(hdd_ctx->psoc, &fine_time_meas_cap);
@@ -4970,22 +4998,33 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 			  fine_time_meas_cap);
 		fset |= WIFI_FEATURE_D2D_RTT;
 		fset |= WIFI_FEATURE_D2AP_RTT;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_D2D_RTT);
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_D2AP_RTT);
 	}
 #ifdef FEATURE_WLAN_SCAN_PNO
 	if (ucfg_scan_get_pno_scan_support(hdd_ctx->psoc) &&
 	    sme_is_feature_supported_by_fw(PNO)) {
 		hdd_debug("PNO is supported by firmware");
 		fset |= WIFI_FEATURE_PNO;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_PNO);
 	}
 #endif
-	if (ucfg_policy_mgr_get_dual_sta_feature(hdd_ctx->psoc))
+	if (ucfg_policy_mgr_get_dual_sta_feature(hdd_ctx->psoc)) {
 		fset |= WIFI_FEATURE_ADDITIONAL_STA;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_ADDITIONAL_STA);
+	}
 
 #ifdef FEATURE_WLAN_TDLS
 	cfg_tdls_get_support_enable(hdd_ctx->psoc, &bvalue);
 	if ((bvalue) && sme_is_feature_supported_by_fw(TDLS)) {
 		hdd_debug("TDLS is supported by firmware");
 		fset |= WIFI_FEATURE_TDLS;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_TDLS);
 	}
 
 	cfg_tdls_get_off_channel_enable(hdd_ctx->psoc, &bvalue);
@@ -4993,28 +5032,62 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 	    bvalue && sme_is_feature_supported_by_fw(TDLS_OFF_CHANNEL)) {
 		hdd_debug("TDLS off-channel is supported by firmware");
 		fset |= WIFI_FEATURE_TDLS_OFFCHANNEL;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_TDLS_OFFCHANNEL);
 	}
 #endif
 	fset |= WIFI_FEATURE_AP_STA;
+	wlan_hdd_set_supported_features_extn(fset_extn, WIFI_FEATURE_AP_STA);
 	fset |= WIFI_FEATURE_RSSI_MONITOR;
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_RSSI_MONITOR);
 	fset |= WIFI_FEATURE_TX_TRANSMIT_POWER;
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_TX_TRANSMIT_POWER);
 	fset |= WIFI_FEATURE_SET_TX_POWER_LIMIT;
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_SET_TX_POWER_LIMIT);
 	fset |= WIFI_FEATURE_CONFIG_NDO;
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_CONFIG_NDO);
 
-	if (hdd_link_layer_stats_supported())
+	if (hdd_link_layer_stats_supported()) {
 		fset |= WIFI_FEATURE_LINK_LAYER_STATS;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_LINK_LAYER_STATS);
+	}
 
-	if (hdd_roaming_supported(hdd_ctx))
+	if (hdd_roaming_supported(hdd_ctx)) {
 		fset |= WIFI_FEATURE_CONTROL_ROAMING;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_CONTROL_ROAMING);
 
-	if (hdd_scan_random_mac_addr_supported())
+		/* Support for aggressive roaming */
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_ROAMING_MODE_CONTROL);
+	}
+
+	if (hdd_scan_random_mac_addr_supported()) {
 		fset |= WIFI_FEATURE_SCAN_RAND;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_SCAN_RAND);
+	}
 
-	if (hdd_is_wlm_latency_manager_supported(hdd_ctx))
+	if (hdd_is_wlm_latency_manager_supported(hdd_ctx)) {
 		fset |= WIFI_FEATURE_SET_LATENCY_MODE;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_SET_LATENCY_MODE);
+	}
 
-	if (hdd_dynamic_mac_addr_supported(hdd_ctx))
+	if (hdd_dynamic_mac_addr_supported(hdd_ctx)) {
 		fset |= WIFI_FEATURE_DYNAMIC_SET_MAC;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_DYNAMIC_SET_MAC);
+	}
+
+	if (ucfg_scan_get_cached_scan_report_fw_cap(hdd_ctx->pdev))
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_CACHED_SCAN_RESULTS);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(fset) +
 						       NLMSG_HDRLEN);
@@ -5023,7 +5096,19 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 	hdd_debug("Supported Features : 0x%x", fset);
-	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_FEATURE_SET, fset)) {
+	for (i = 0; i < WIFI_FEATURE_MAX_BIT_POS / 8; i += 4) {
+		uint32_t value = 0;
+
+		qdf_mem_copy(&value, &fset_extn[i], sizeof(value));
+		if (value)
+			pos += qdf_scnprintf(buf + pos, buf_len - pos,
+					     "[%d]0x%x ", (i / 4), value);
+	}
+
+	hdd_debug("Supported Features Ext : %s", buf);
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_FEATURE_SET, fset) ||
+	    nla_put(skb, QCA_WLAN_VENDOR_ATTR_FEATURE_SET_EXT,
+		    sizeof(fset_extn), fset_extn)) {
 		hdd_err("nla put fail");
 		goto nla_put_failure;
 	}
@@ -5185,28 +5270,6 @@ wlan_hdd_cfg80211_set_scanning_mac_oui(struct wiphy *wiphy,
 	return errno;
 }
 
-#define NUM_BITS_IN_BYTE       8
-
-/**
- * wlan_hdd_cfg80211_set_feature() - Set the bitmask for supported features
- * @feature_flags: pointer to the byte array of features.
- * @feature: Feature to be turned ON in the byte array.
- *
- * Return: None
- *
- * This is called to turn ON or SET the feature flag for the requested feature.
- **/
-static void wlan_hdd_cfg80211_set_feature(uint8_t *feature_flags,
-					  uint8_t feature)
-{
-	uint32_t index;
-	uint8_t bit_mask;
-
-	index = feature / NUM_BITS_IN_BYTE;
-	bit_mask = 1 << (feature % NUM_BITS_IN_BYTE);
-	feature_flags[index] |= bit_mask;
-}
-
 /**
  * wlan_hdd_set_ndi_feature() - Set NDI related features
  * @feature_flags: pointer to the byte array of features.
@@ -5217,8 +5280,8 @@ static void wlan_hdd_cfg80211_set_feature(uint8_t *feature_flags,
 (defined CFG80211_CHANGE_NETDEV_REGISTRATION_SEMANTICS))
 static void wlan_hdd_set_ndi_feature(uint8_t *feature_flags)
 {
-	wlan_hdd_cfg80211_set_feature(feature_flags,
-				      QCA_WLAN_VENDOR_FEATURE_USE_ADD_DEL_VIRTUAL_INTF_FOR_NDI);
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_USE_ADD_DEL_VIRTUAL_INTF_FOR_NDI);
 }
 #else
 static inline void wlan_hdd_set_ndi_feature(uint8_t *feature_flags)
@@ -5237,8 +5300,8 @@ static inline void wlan_hdd_set_ll_lt_sap_feature(struct wlan_objmgr_psoc *psoc,
 		hdd_debug("ll_lt_sap feature is disabled in FW");
 		return;
 	}
-	wlan_hdd_cfg80211_set_feature(feature_flags,
-				      QCA_WLAN_VENDOR_FEATURE_ENHANCED_AUDIO_EXPERIENCE_OVER_WLAN);
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_ENHANCED_AUDIO_EXPERIENCE_OVER_WLAN);
 }
 
 #ifdef FEATURE_WLAN_SUPPORT_USD
@@ -5257,8 +5320,8 @@ static inline void wlan_hdd_set_usd_feature(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	wlan_hdd_cfg80211_set_feature(feature_flags,
-				      QCA_WLAN_VENDOR_FEATURE_NAN_USD_OFFLOAD);
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_NAN_USD_OFFLOAD);
 }
 #else
 static inline void wlan_hdd_set_usd_feature(struct wlan_objmgr_psoc *psoc,
@@ -5266,6 +5329,20 @@ static inline void wlan_hdd_set_usd_feature(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+
+static inline void wlan_hdd_set_mrsno_feature(struct wlan_objmgr_psoc *psoc,
+					      uint8_t *feature_flags)
+{
+	bool val = false;
+
+	if (QDF_IS_STATUS_ERROR(ucfg_mlme_get_mrsno_support(psoc, &val)) ||
+	    !val)
+		return;
+
+	hdd_debug("Target supports MRSNO");
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_RSN_OVERRIDE_STA);
+}
 
 #define MAX_CONCURRENT_CHAN_ON_24G    2
 #define MAX_CONCURRENT_CHAN_ON_5G     2
@@ -5313,38 +5390,38 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 
 	if (roaming_offload_enabled(hdd_ctx)) {
 		hdd_debug("Key Mgmt Offload is supported");
-		wlan_hdd_cfg80211_set_feature(feature_flags,
-				QCA_WLAN_VENDOR_FEATURE_KEY_MGMT_OFFLOAD);
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_KEY_MGMT_OFFLOAD);
 	}
 
-	wlan_hdd_cfg80211_set_feature(feature_flags,
-				QCA_WLAN_VENDOR_FEATURE_SUPPORT_HW_MODE_ANY);
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_HW_MODE_ANY);
 	if (policy_mgr_is_scan_simultaneous_capable(hdd_ctx->psoc))
-		wlan_hdd_cfg80211_set_feature(feature_flags,
-			QCA_WLAN_VENDOR_FEATURE_OFFCHANNEL_SIMULTANEOUS);
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_OFFCHANNEL_SIMULTANEOUS);
 
 	if (policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc))
-		wlan_hdd_cfg80211_set_feature(feature_flags,
-			QCA_WLAN_VENDOR_FEATURE_CONCURRENT_BAND_SESSIONS);
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_CONCURRENT_BAND_SESSIONS);
 
 	if (wma_is_p2p_lo_capable())
-		wlan_hdd_cfg80211_set_feature(feature_flags,
-			QCA_WLAN_VENDOR_FEATURE_P2P_LISTEN_OFFLOAD);
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_P2P_LISTEN_OFFLOAD);
 
 	value = false;
 	status = ucfg_mlme_get_oce_sta_enabled_info(hdd_ctx->psoc, &value);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("could not get OCE STA enable info");
 	if (value)
-		wlan_hdd_cfg80211_set_feature(feature_flags,
-					      QCA_WLAN_VENDOR_FEATURE_OCE_STA);
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_OCE_STA);
 
 	value = false;
 	status = ucfg_mlme_get_oce_sap_enabled_info(hdd_ctx->psoc, &value);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("could not get OCE SAP enable info");
 	if (value)
-		wlan_hdd_cfg80211_set_feature(feature_flags,
+		wlan_cfg80211_set_feature(feature_flags,
 					  QCA_WLAN_VENDOR_FEATURE_OCE_STA_CFON);
 
 	value = false;
@@ -5353,7 +5430,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 		hdd_err("could not get FT-Adaptive 11R info");
 	if (value) {
 		hdd_debug("FT-Adaptive 11R is Enabled");
-		wlan_hdd_cfg80211_set_feature(feature_flags,
+		wlan_cfg80211_set_feature(feature_flags,
 					  QCA_WLAN_VENDOR_FEATURE_ADAPTIVE_11R);
 	}
 
@@ -5362,12 +5439,11 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	hdd_debug("twt_req:%d twt_res:%d", twt_req, twt_res);
 
 	if (twt_req || twt_res) {
-		wlan_hdd_cfg80211_set_feature(feature_flags,
-					      QCA_WLAN_VENDOR_FEATURE_TWT);
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_TWT);
 
-		wlan_hdd_cfg80211_set_feature(
-				feature_flags,
-				QCA_WLAN_VENDOR_FEATURE_TWT_ASYNC_SUPPORT);
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_TWT_ASYNC_SUPPORT);
 	}
 
 	/* Check the kernel version for upstream commit aced43ce780dc5 that
@@ -5376,21 +5452,21 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	 */
 #if defined CFG80211_USER_HINT_CELL_BASE_SELF_MANAGED || \
 	    (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0))
-	wlan_hdd_cfg80211_set_feature(feature_flags,
-			QCA_WLAN_VENDOR_FEATURE_SELF_MANAGED_REGULATORY);
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SELF_MANAGED_REGULATORY);
 #endif
 
 	if (wlan_hdd_thermal_config_support())
-		wlan_hdd_cfg80211_set_feature(feature_flags,
-					QCA_WLAN_VENDOR_FEATURE_THERMAL_CONFIG);
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_THERMAL_CONFIG);
 
 	wlan_hdd_set_ndi_feature(feature_flags);
-	wlan_hdd_cfg80211_set_feature(
-				feature_flags,
-				QCA_WLAN_VENDOR_FEATURE_AP_ALLOWED_FREQ_LIST);
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_AP_ALLOWED_FREQ_LIST);
 	wlan_wifi_pos_cfg80211_set_features(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_ll_lt_sap_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_usd_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
@@ -9026,6 +9102,10 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_SCS_TRAFFIC_SUPPORT] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_DISABLE_CHAN_SWITCH_INITIATION] = {
+			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_RSNE_ADD_RANDOM_PMKIDS] = {
+			.type = NLA_U8}
 };
 
 /**
@@ -13065,7 +13145,7 @@ static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 {
 	struct hdd_context *hdd_ctx = NULL;
 	struct nlattr *curr_attr;
-	struct qdf_mac_addr active_link_addr[WLAN_MLO_MAX_VDEVS];
+	struct qdf_mac_addr active_link_addr[WLAN_MAX_ML_BSS_LINKS];
 	struct qdf_mac_addr *mac_addr_ptr;
 	uint32_t num_links = 0, i = 0;
 	int32_t len;
@@ -13077,8 +13157,8 @@ static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 
 	if (attr && adapter->device_mode == QDF_STA_MODE) {
 		nla_for_each_nested(curr_attr, &attr[0], len) {
-			if (++i > WLAN_MLO_MAX_VDEVS) {
-				hdd_err("No. of force active links %d exceeds allowed links",
+			if (++i > WLAN_MAX_ML_BSS_LINKS) {
+				hdd_err("No. of force active links %d exceeds max allowed BSS links",
 					i);
 				return -EINVAL;
 			}
@@ -14625,6 +14705,86 @@ end:
 	return ret;
 }
 
+static const struct nla_policy
+wlan_hdd_connect_ext_attr[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES] = {.type = NLA_U8},
+};
+
+static int
+__wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     const void *data, int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX + 1];
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t ext_features = 0, rsno_gen = 0;
+	int8_t ret = 0;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX,
+				    data, data_len,
+				    wlan_hdd_connect_ext_attr)) {
+		hdd_err("Invalid qca_wlan_vendor_attr_connect_ext attr");
+		ret = -EINVAL;
+		goto rel;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES]) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES attribute");
+		ret = -EINVAL;
+		goto rel;
+	}
+
+	ext_features =
+		nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES]);
+	hdd_debug("Received extended connect features %x", ext_features);
+
+	if (ext_features &  BIT(QCA_CONNECT_EXT_FEATURE_RSNO))
+		rsno_gen = RSNO_GEN_WIFI7;
+
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		if (!link_info->vdev)
+			continue;
+		wlan_vdev_set_rsno_gen_supported(link_info->vdev, rsno_gen);
+		wma_cli_set_command(link_info->vdev_id,
+				    wmi_vdev_param_connect_ext_features,
+				    ext_features, VDEV_CMD);
+	}
+
+rel:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return ret;
+}
+
+static int
+wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
+					   struct wireless_dev *wdev,
+					   const void *data, int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_set_connect_ext_features(wiphy, wdev,
+							     data, data_len);
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 /**
  * __wlan_hdd_cfg80211_wifi_configuration_set() - Wifi configuration
  * vendor command
@@ -14968,6 +15128,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	struct hdd_station_ctx *hdd_sta_ctx =
 			WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	uint8_t op_mode;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter_dev(dev);
 
@@ -16114,6 +16275,32 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 							cfg_val);
 		if (ret_val)
 			hdd_err("Failed to set SCS traffic desc support");
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_DISABLE_CHAN_SWITCH_INITIATION;
+	if (tb[cmd_id] && adapter->device_mode == QDF_P2P_GO_MODE) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("Restrict CSA params %d", cfg_val);
+		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+		if (vdev) {
+			status = ucfg_p2p_force_restrict_dfs_go_csa(vdev,
+								    cfg_val);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+			ret_val = qdf_status_to_os_return(status);
+		} else {
+			ret_val = qdf_status_to_os_return(QDF_STATUS_E_INVAL);
+		}
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_RSNE_ADD_RANDOM_PMKIDS;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("Add %d random PMKID to the assoc request", cfg_val);
+		if (cfg_val > 12)
+			cfg_val = 0;
+		wlan_crypto_set_vdev_param(link_info->vdev,
+					   WLAN_CRYPTO_PARAM_RANDOM_PMKID,
+					   cfg_val);
 	}
 
 	if (update_sme_cfg)
@@ -20084,6 +20271,119 @@ static int wlan_hdd_cfg80211_set_trace_level(struct wiphy *wiphy,
 	return errno;
 }
 
+const struct nla_policy
+qca_wlan_vendor_p2p_chan_switch_params[CHAN_USAGE_REQ_CHAN_LIST_MAX + 1] = {
+	[CHAN_USAGE_REQ_CHAN_LIST_CHAN] = {.type = NLA_U8},
+	[CHAN_USAGE_REQ_CHAN_LIST_OP_CLASS] = {.type = NLA_U8},
+};
+
+const struct nla_policy
+qca_wlan_vendor_p2p_chan_req_mode[CHAN_USAGE_REQ_MAX + 1] = {
+	[CHAN_USAGE_REQ_MODE] = {.type = NLA_U8},
+	[CHAN_USAGE_REQ_CHAN_LIST] = {.type = NLA_NESTED},
+};
+
+static int __wlan_hdd_cfg80211_p2p_chan_usage_req(struct wiphy *wiphy,
+						  struct wireless_dev *wdev,
+						  const void *data,
+						  int data_len)
+{
+	qdf_freq_t freq;
+	uint16_t ch_width;
+	uint8_t chan = 0, opclass = 0;
+	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct nlattr *tb1[CHAN_USAGE_REQ_MAX + 1];
+	struct nlattr *tb2[CHAN_USAGE_REQ_CHAN_LIST_MAX + 1];
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+
+	hdd_enter();
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
+		hdd_err_rl("Command not allowed in FTM mode");
+		return -EINVAL;
+	}
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return -EINVAL;
+
+	if (adapter->device_mode != QDF_P2P_CLIENT_MODE &&
+	    adapter->device_mode != QDF_P2P_GO_MODE)
+		return -EINVAL;
+
+	if (wlan_cfg80211_nla_parse(tb1, CHAN_USAGE_REQ_MAX, data, data_len,
+				    qca_wlan_vendor_p2p_chan_req_mode)) {
+		hdd_debug("Failed to parse mode switch attribute");
+		return -EINVAL;
+	}
+
+	if (!tb1[CHAN_USAGE_REQ_MODE] ||
+	    (nla_get_u8(tb1[CHAN_USAGE_REQ_MODE]) !=
+	     QCA_CHAN_USAGE_MODE_CHANNEL_SWITCH_REQ)) {
+		hdd_debug("Required attribute not set or invalid usage mode");
+		return -EINVAL;
+	}
+
+	if (tb1[CHAN_USAGE_REQ_CHAN_LIST]) {
+		if (wlan_cfg80211_nla_parse_nested(tb2,
+						   CHAN_USAGE_REQ_CHAN_LIST,
+						   tb1[CHAN_USAGE_REQ_CHAN_LIST],
+						   qca_wlan_vendor_p2p_chan_switch_params)) {
+			hdd_debug("Failed to parse channel switch params");
+			return -EINVAL;
+		}
+
+		if (tb2[CHAN_USAGE_REQ_CHAN_LIST_CHAN] &&
+		    tb2[CHAN_USAGE_REQ_CHAN_LIST_OP_CLASS]) {
+			chan = nla_get_u8(tb2[CHAN_USAGE_REQ_CHAN_LIST_CHAN]);
+			opclass =
+			    nla_get_u8(tb2[CHAN_USAGE_REQ_CHAN_LIST_OP_CLASS]);
+			hdd_debug("CSA opclass %d chan %d", opclass, chan);
+		}
+	}
+
+	if (adapter->device_mode == QDF_P2P_GO_MODE) {
+		if (wlan_reg_is_6ghz_op_class(hdd_ctx->pdev, opclass)) {
+			freq = wlan_reg_chan_opclass_to_freq(chan, opclass,
+							     false);
+		} else {
+			freq = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
+							    chan);
+		}
+
+		wlan_reg_read_current_country(hdd_ctx->psoc, reg_cc);
+		ch_width = wlan_reg_dmn_get_chanwidth_from_opclass(reg_cc, chan,
+								   opclass);
+		policy_mgr_change_sap_channel_with_csa(hdd_ctx->psoc,
+						       adapter->deflink->vdev_id,
+						       freq, ch_width, true);
+	} else {
+		ucfg_p2p_send_chan_switch_req(hdd_ctx->psoc,
+					      adapter->deflink->vdev_id,
+					      chan, opclass);
+	}
+
+	return 0;
+}
+
+static int wlan_hdd_cfg80211_p2p_chan_usage_req(struct wiphy *wiphy,
+						struct wireless_dev *wdev,
+						const void *data, int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_p2p_chan_usage_req(wiphy, wdev,
+						       data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
 /**
  * __wlan_hdd_cfg80211_set_nud_stats() - set arp stats command to firmware
  * @wiphy: pointer to wireless wiphy structure.
@@ -22891,6 +23191,10 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 
 	FEATURE_TRIGGER_SCAN_VENDOR_COMMANDS
 
+#ifdef FEATURE_WLAN_ZERO_POWER_SCAN
+	FEATURE_FETCH_ZERO_POWER_SCAN_REPORT
+#endif
+
 	/* Vendor abort scan */
 	FEATURE_ABORT_SCAN_VENDOR_COMMANDS
 
@@ -22987,6 +23291,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_P2P_LISTEN_OFFLOAD_VENDOR_COMMANDS
 
 	FEATURE_P2P_SECURE_USD_VENDOR_COMMANDS
+	FEATURE_P2P_SET_MODE_VENDOR_COMMANDS
 
 	FEATURE_SAP_COND_CHAN_SWITCH_VENDOR_COMMANDS
 	{
@@ -23050,6 +23355,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_SAR_LIMITS_VENDOR_COMMANDS
 	BCN_RECV_FEATURE_VENDOR_COMMANDS
 	FEATURE_VENDOR_SUBCMD_SET_TRACE_LEVEL
+	FEATURE_AP_ASSIST_P2P_DFS_GROUP
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
@@ -23175,6 +23481,16 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 		.doit = wlan_hdd_cfg80211_async_get_station,
 		vendor_command_policy(wlan_hdd_async_get_station,
 				      GET_STATION_MAX)
+	},
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd =  QCA_NL80211_VENDOR_SUBCMD_CONNECT_EXT,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			 WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_set_connect_ext_features,
+		vendor_command_policy(wlan_hdd_connect_ext_attr,
+				      QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX)
 	},
 };
 

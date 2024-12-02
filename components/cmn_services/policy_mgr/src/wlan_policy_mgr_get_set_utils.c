@@ -3151,6 +3151,87 @@ bool policy_mgr_is_pcl_weightage_required(struct wlan_objmgr_psoc *psoc)
 	return true;
 }
 
+bool
+policy_mgr_is_sta_sap_mcc_weightage_required(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_objmgr_pdev *sta_pdev,
+					     uint32_t sta_freq)
+{
+	uint32_t mcc_to_scc_switch;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t sap_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t sap_op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t sap_count;
+	bool allow_2ghz_only = false, allow_6ghz = true;
+	uint32_t acs_band = QCA_ACS_MODE_IEEE80211ANY;
+	QDF_STATUS status;
+	uint32_t sap_freq;
+	uint8_t sap_vdev_id;
+	uint32_t sta_sap_scc_on_dfs_chan;
+	bool indoor_support;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	/* For DBS chip, Don't consider STA+SAP MCC weightage */
+	if (policy_mgr_is_hw_dbs_capable(psoc))
+		return false;
+
+	mcc_to_scc_switch = policy_mgr_get_mcc_to_scc_switch_mode(psoc);
+	if (mcc_to_scc_switch != QDF_MCC_TO_SCC_WITH_PREFERRED_BAND)
+		return false;
+
+	sap_count = policy_mgr_get_mode_specific_conn_info(psoc,
+							   sap_op_ch_freq_list,
+							   sap_vdev_id_list,
+							   PM_SAP_MODE);
+
+	if (!sap_count)
+		return false;
+
+	sap_freq = sap_op_ch_freq_list[0];
+	sap_vdev_id = sap_vdev_id_list[0];
+
+	if (pm_ctx->hdd_cbacks.wlan_get_sap_acs_band) {
+		status = pm_ctx->hdd_cbacks.wlan_get_sap_acs_band(psoc,
+								  sap_vdev_id,
+								  &acs_band);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			policy_mgr_debug("acs_band: %d", acs_band);
+	}
+
+	if ((acs_band == QCA_ACS_MODE_IEEE80211B ||
+	     acs_band == QCA_ACS_MODE_IEEE80211G) &&
+	     WLAN_REG_IS_24GHZ_CH_FREQ(sap_freq))
+		allow_2ghz_only = true;
+
+	if (sap_freq && !WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_freq) &&
+	    !policy_mgr_get_ap_6ghz_capable(psoc, sap_vdev_id, NULL))
+		allow_6ghz = false;
+
+	sta_sap_scc_on_dfs_chan =
+			policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
+	indoor_support =
+			policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc);
+	/**
+	 * Weighatage is required if SAP is on lower or same band
+	 * and if dfs/indoor INIs is disabled and STA is on DFS/indoor channel?
+	 */
+	if (allow_2ghz_only && !WLAN_REG_IS_24GHZ_CH_FREQ(sta_freq)) {
+		return true;
+	} else if ((!allow_6ghz && WLAN_REG_IS_6GHZ_CHAN_FREQ(sta_freq)) ||
+		   (wlan_reg_is_dfs_for_freq(sta_pdev, sta_freq) &&
+		    !sta_sap_scc_on_dfs_chan) ||
+		   (wlan_reg_is_freq_indoor(sta_pdev, sta_freq) &&
+		    !indoor_support)){
+		return true;
+	}
+
+	return false;
+}
+
 bool policy_mgr_is_interband_mcc_supported(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -4443,8 +4524,13 @@ void policy_mgr_move_vdev_from_disabled_to_connection_tbl(
 	}
 
 	if (!policy_mgr_is_ml_vdev_id(psoc, vdev_id)) {
-		policy_mgr_err("vdev %d is not ML", vdev_id);
-		return;
+		if (!wlan_cm_is_roam_sync_in_progress(psoc, vdev_id)) {
+			policy_mgr_err("vdev %d is not ML", vdev_id);
+			return;
+		} else {
+			policy_mgr_debug("vdev %d is not ML in roam sync",
+					 vdev_id);
+		}
 	}
 
 	status = policy_mgr_delete_from_disabled_links(pm_ctx, vdev_id);
@@ -5978,9 +6064,10 @@ uint32_t policy_mgr_get_mode_specific_conn_info(
 		return count;
 	}
 
+	/* Take lock before count so that index dont change */
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	count = policy_mgr_mode_specific_connection_count(
 				psoc, mode, list);
-	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	if (count == 1) {
 		if (ch_freq_list)
 			*ch_freq_list =
@@ -8671,8 +8758,11 @@ policy_mgr_handle_ml_sta_links_on_vdev_up_csa(struct wlan_objmgr_psoc *psoc,
 
 /* Add extra buff if any connection is disconnecting */
 #define SET_LINK_TIMEOUT ((STOP_RESPONSE_TIMER) + 6000)
+/* Max retry wait for set link timeout */
+#define SET_LINK_WAIT_RETRY_MAX 2
 
-QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
+static QDF_STATUS
+policy_mgr_single_wait_for_set_link(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	QDF_STATUS status;
@@ -8684,8 +8774,8 @@ QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
 	}
 
 	if (!policy_mgr_get_link_in_progress(pm_ctx)) {
-		policy_mgr_err("link is not in progress");
-		return QDF_STATUS_E_FAILURE;
+		policy_mgr_debug("link is not in progress");
+		return QDF_STATUS_CMD_NOT_QUEUED;
 	}
 
 	status =
@@ -8695,7 +8785,34 @@ QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_set_link_in_progress(pm_ctx, false);
 		policy_mgr_err("wait for set_link_in_progress failed");
+	} else {
+		policy_mgr_debug("complete wait for set_link_in_progress");
 	}
+
+	return status;
+}
+
+QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	QDF_STATUS status;
+	uint8_t retry = SET_LINK_WAIT_RETRY_MAX;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	do {
+		status = policy_mgr_single_wait_for_set_link(psoc);
+		if (QDF_IS_STATUS_ERROR(status))
+			break;
+		if (!policy_mgr_get_link_in_progress(pm_ctx))
+			break;
+		policy_mgr_debug("retry %d", retry);
+		status = QDF_STATUS_E_INVAL;
+	} while (retry--);
 
 	return status;
 }
@@ -9430,6 +9547,7 @@ policy_mgr_is_link_active_allowed(struct wlan_objmgr_psoc *psoc,
 	uint16_t ch_freq, iter;
 	struct wlan_channel *chan_info;
 	struct mlo_link_info *link_info;
+	unsigned long act_link_bitmap = active_link_bitmap;
 
 	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
@@ -9447,7 +9565,7 @@ policy_mgr_is_link_active_allowed(struct wlan_objmgr_psoc *psoc,
 		ch_freq = chan_info->ch_freq;
 
 		if (qdf_test_bit(link_info->link_id,
-		    (unsigned long *)&active_link_bitmap) &&
+		    &act_link_bitmap) &&
 		    (wlan_reg_freq_to_band((qdf_freq_t)ch_freq) ==
 		     REG_BAND_2G)) {
 			policy_mgr_err("vdev: %d Invalid link activation for link: %d at freq: %d",

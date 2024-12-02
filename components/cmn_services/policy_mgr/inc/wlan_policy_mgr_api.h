@@ -778,6 +778,24 @@ policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
 				 enum policy_mgr_conn_update_reason reason,
 				 uint32_t request_id);
 
+/**
+ * policy_mgr_is_sta_sap_mcc_weightage_required() - Check that STA+SAP MCC
+ *                                                  weightage is required or
+ *                                                  not
+ * @psoc: Psoc ptr
+ * @sta_pdev: Pdev
+ * @sta_freq: STA freq
+ *
+ * This API will check that whether STA_SAP_MCC weightage need to consider in
+ * best candidate selection or not. If STA and SAP is in MCC, those AP will get
+ * less score.
+ *
+ * Return: True if STA_SAP_MCC weightage is required
+ */
+bool
+policy_mgr_is_sta_sap_mcc_weightage_required(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_objmgr_pdev *sta_pdev,
+					     uint32_t sta_freq);
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 /**
  * policy_mgr_check_concurrent_intf_and_restart_sap() - Check
@@ -1678,6 +1696,19 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 				  uint32_t ch_freq,
 				  enum hw_mode_bandwidth bw,
 				  uint32_t ext_flags, uint8_t vdev_id);
+
+/**
+ * policy_mgr_if_freq_n_inactive_links_freq_same() - API to check if
+ * the given freq and ML connection inactive/standby link are on same
+ * @psoc: psoc
+ * @freq: given freq to check
+ *
+ * Return: True if freq matches one of the ML connection inactive/standby
+ * link freq
+ */
+bool
+policy_mgr_if_freq_n_inactive_links_freq_same(struct wlan_objmgr_psoc *psoc,
+					      uint32_t freq);
 
 /**
  * policy_mgr_check_scc_channel() - Check if SAP/GO freq need to be updated
@@ -3766,6 +3797,17 @@ policy_mgr_sta_post_disconnect_conc_check(struct wlan_objmgr_psoc *psoc);
  */
 void
 policy_mgr_check_sap_restart(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs() - Trigger roaming in
+ * case of MCC for STA + SAP
+ * @psoc: Pointer to soc
+ *
+ * Return: None
+ */
+void
+policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(struct wlan_objmgr_psoc *psoc);
+
 
 /**
  * policy_mgr_check_sta_ap_concurrent_ch_intf() - Restart SAP in STA-AP case

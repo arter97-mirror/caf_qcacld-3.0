@@ -856,6 +856,11 @@ def_chan:
 	return true;
 }
 
+static inline void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
+{
+	adapter->discon_link_info = NULL;
+}
+
 int wlan_hdd_cm_connect(struct wiphy *wiphy,
 			struct net_device *ndev,
 			struct cfg80211_connect_params *req)
@@ -965,6 +970,8 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	}
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
+	hdd_clear_disconnect_receive(adapter);
+
 	return status;
 }
 
@@ -1872,11 +1879,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	if (is_roam)
 		ucfg_dp_nud_indicate_roam(vdev);
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
-}
-
-static inline void hdd_clear_disconnect_receive(struct hdd_adapter *adapter)
-{
-	adapter->discon_link_info = NULL;
 }
 
 static void

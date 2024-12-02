@@ -2623,6 +2623,17 @@ IE transmit_power_env (EID_TRANSMIT_POWER_ENVELOPE)
                }
                max_tx_psd_power[15];
        }
+       ext_max_tx_power_addn_reg_eirp (max_tx_pwr_interpret IS 4) {
+	       max_tx_power_for_320, 1;
+       }
+       ext_max_tx_power_addn_reg_psd (max_tx_pwr_interpret IS 5) {
+               //ext_transmit_psd_info, 1;
+               {
+                       ext_count: 4;
+                       reserved: 4;
+               }
+               max_tx_psd_power[15];
+       }
 
     };
 }

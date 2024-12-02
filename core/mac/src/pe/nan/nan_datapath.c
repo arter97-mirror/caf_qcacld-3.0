@@ -289,10 +289,8 @@ void lim_process_ndi_del_sta_rsp(struct mac_context *mac_ctx,
 	tpDphHashNode sta_ds;
 	tpDeleteStaParams del_sta_params = (tpDeleteStaParams) lim_msg->bodyptr;
 	struct wlan_objmgr_vdev *vdev;
-	struct wlan_objmgr_vdev *nan_vdev;
 	struct wlan_objmgr_psoc *psoc = mac_ctx->psoc;
 	struct nan_datapath_peer_ind peer_ind;
-	uint8_t nan_vdev_id;
 
 	if (!del_sta_params) {
 		pe_err("del_sta_params is NULL");
@@ -339,24 +337,11 @@ void lim_process_ndi_del_sta_rsp(struct mac_context *mac_ctx,
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 
-	nan_vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc,
-							    QDF_NAN_DISC_MODE,
-							    WLAN_NAN_ID);
-	if (!nan_vdev) {
-		pe_err("Failed to get nan vdev");
-		goto skip_event;
-	}
-
-	nan_vdev_id = wlan_vdev_get_id(nan_vdev);
-
 	/*
 	 * Check if this peer was migrated from NAN to NDI.
 	 * If yes, then move the peer back to NAN.
 	 */
-	wlan_ndi_add_pasn_peer_to_nan(psoc, nan_vdev_id,
-				      &peer_ind.peer_mac_addr);
-
-	wlan_objmgr_vdev_release_ref(nan_vdev, WLAN_NAN_ID);
+	wlan_ndi_add_pasn_peer_to_nan(psoc, &peer_ind.peer_mac_addr);
 
 skip_event:
 	qdf_mem_free(del_sta_params);

@@ -15,6 +15,7 @@ _target_chipset_map = {
 	"peach",
 	"kiwi-v2",
 	"qca6750",
+	"wcn6450",
     ],
     "sun": [
 	"peach-v2",
@@ -39,6 +40,7 @@ _chipset_hw_map = {
     "qca6750": "MOSELLE",
     "wcn7750": "BERYLLIUM",
     "qca6490": "LITHIUM",
+    "wcn6450": "RHINE",
 }
 
 _chipset_header_map = {
@@ -66,6 +68,10 @@ _chipset_header_map = {
         "api/hw/qca6490/v1",
         "cmn/hal/wifi3.0/qca6490",
     ],
+    "wcn6450": [
+        "api/hw/wcn6450/v1",
+        "cmn/hal/wifi3.0/wcn6450",
+    ],
 }
 
 _hw_header_map = {
@@ -77,6 +83,9 @@ _hw_header_map = {
     ],
     "LITHIUM": [
         "cmn/hal/wifi3.0/li",
+    ],
+    "RHINE": [
+        "cmn/hal/wifi3.0/rh",
     ],
 }
 
@@ -1403,6 +1412,14 @@ _conditional_srcs = {
             "cmn/hal/wifi3.0/hal_srng.c",
             "cmn/wlan_cfg/wlan_cfg.c",
             "components/dp/core/src/wlan_dp_prealloc.c",
+            "cmn/hif/src/ce/ce_service_legacy.c",
+            "cmn/hif/src/hif_main_legacy.c",
+            "cmn/hal/wifi3.0/rh/hal_rh_generic_api.c"
+        ],
+    },
+	"CONFIG_CNSS_WCN6450": {
+        True: [
+            "cmn/hal/wifi3.0/wcn6450/hal_wcn6450.c",
         ],
     },
     "CONFIG_RX_FISA": {
@@ -2377,7 +2394,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
-    if chipset == "qca6750" or chipset == "wcn7750":
+    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450":
         deps = [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]

@@ -1622,6 +1622,19 @@ wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
 						enum phy_ch_width *ch_width);
 
 /**
+ * wlansap_get_2g_first_safe_chan_freq() - Get safe and active 2 GHz channel
+ * for SAP restart
+ * @sap_ctx: sap context
+ *
+ * Get a safe and active 2 GHz channel to restart SAP. PCL already takes into
+ * account the unsafe channels.
+ *
+ * Return: Chan freq num to restart SAP in case of success. In case of any
+ * failure, the channel number returned is zero.
+ */
+uint32_t wlansap_get_2g_first_safe_chan_freq(struct sap_context *sap_ctx);
+
+/**
  * wlansap_get_safe_channel_from_pcl_for_sap() - Get safe and active channel
  * for SAP restart
  * @sap_ctx: sap context

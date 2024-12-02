@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -109,14 +109,34 @@ QDF_STATUS wma_delete_sta_req_ndi_mode(tp_wma_handle wma,
 				       tpDeleteStaParams del_sta)
 {
 	QDF_STATUS status;
+	uint8_t vdev_id = del_sta->smesessionId;
+	struct wma_target_req *del_req;
 
-	status = wma_remove_peer(wma, del_sta->staMac,
-				 del_sta->smesessionId, false);
+	status = wma_remove_peer(wma, del_sta->staMac, vdev_id, false);
 	del_sta->status = QDF_STATUS_SUCCESS;
 
+	if (QDF_IS_STATUS_SUCCESS(status) &&
+	    wmi_service_enabled(wma->wmi_handle,
+				wmi_service_sync_delete_cmds)) {
+		wma_debug("Wait for the peer delete. vdev_id %d", vdev_id);
+		del_req = wma_fill_hold_req(wma, vdev_id, WMA_DELETE_STA_REQ,
+					    WMA_DELETE_NDP_PEER_RSP,
+					    del_sta->staMac, del_sta,
+					    WMA_DELETE_STA_TIMEOUT);
+		if (!del_req) {
+			wma_err("Failed to allocate request for vdev_id %d",
+				vdev_id);
+			status = QDF_STATUS_E_NULL_VALUE;
+			goto send_rsp;
+		}
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+send_rsp:
 	if (del_sta->respReqd) {
 		wma_debug("Sending del rsp to umac (status: %d)",
-				del_sta->status);
+			  del_sta->status);
 		wma_send_msg_high_priority(wma, WMA_DELETE_STA_RSP, del_sta, 0);
 	} else {
 		wma_debug("NDI Del Sta resp not needed");

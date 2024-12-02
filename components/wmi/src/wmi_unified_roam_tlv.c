@@ -2008,7 +2008,7 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	WMI_ROAM_STATS_EVENTID_param_tlvs *param_buf;
 	wmi_roam_frame_info *src_data = NULL;
 	struct roam_frame_info *dst_buf;
-	uint8_t i, subtype;
+	uint8_t i, subtype, idx;
 
 	param_buf = (WMI_ROAM_STATS_EVENTID_param_tlvs *)evt_buf;
 
@@ -2082,6 +2082,14 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 		dst_buf->band =
 			WMI_GET_MLO_BITMAP_BAND_INFO(src_data->frame_info_ext);
+
+		if (dst_buf->subtype == MGMT_SUBTYPE_ASSOC_RESP ||
+		    dst_buf->subtype == MGMT_SUBTYPE_REASSOC_RESP) {
+			idx = WMI_GET_MAP_ID(src_data->frame_info_ext);
+			wmi_unified_extract_ml_roam_info(wmi_handle, evt_buf,
+							 dst_buf,
+							 dst_buf->timestamp, idx);
+		}
 
 		dst_buf++;
 		src_data++;
@@ -4194,10 +4202,103 @@ free_keys:
 	return status;
 }
 
+static enum reg_wifi_band
+wmi_convert_mlo_to_reg_band(enum wmi_mlo_band_info wmi_band)
+{
+	switch (wmi_band) {
+	case WMI_MLO_BAND_2GHZ_MLO:
+		return REG_BAND_2G;
+	case WMI_MLO_BAND_5GHZ_MLO:
+		return REG_BAND_5G;
+	case WMI_MLO_BAND_6GHZ_MLO:
+		return REG_BAND_6G;
+	case WMI_MLO_BAND_NO_MLO:
+		fallthrough;
+	default:
+		return REG_BAND_UNKNOWN;
+	}
+
+	return REG_BAND_UNKNOWN;
+}
+
+static QDF_STATUS
+extract_roam_ml_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
+			 struct roam_mlo_link_info *dst,
+			 uint64_t timestamp, uint8_t id)
+{
+	WMI_ROAM_STATS_EVENTID_param_tlvs *param_buf;
+	wmi_mlo_link_info *src_link_info;
+	uint8_t parsed_tlv_count = 0;
+	enum wmi_mlo_band_info wmi_band;
+
+	param_buf = (WMI_ROAM_STATS_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf)
+		return QDF_STATUS_E_INVAL;
+
+	if (!param_buf->mlo_link_info ||
+	    !param_buf->num_mlo_link_info) {
+		wmi_debug("Empty roam ml info param buf :%d",
+			  param_buf->num_mlo_link_info);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_zero(dst, sizeof(*dst));
+
+	src_link_info = param_buf->mlo_link_info;
+	while (src_link_info) {
+		if (parsed_tlv_count >= param_buf->num_mlo_link_info)
+			break;
+
+		/*
+		 * Fill the destination link info for the given map ID.
+		 * Map Id would be sent over the roam frame ext TLV by
+		 * the firmware.
+		 */
+		if (WMI_MLO_LINK_INFO_GET_MAP_ID(src_link_info->link_info) !=
+		    id) {
+			src_link_info++;
+			parsed_tlv_count++;
+			continue;
+		}
+
+		dst->present = true;
+
+		/* Self Link ID */
+		dst->ml_info[dst->num_links].link_id =
+			WMI_MLO_LINK_INFO_GET_IEEE_LINK_ID(src_link_info->link_info);
+
+		/* Reg Band */
+		wmi_band = WMI_MLO_LINK_INFO_GET_BAND(src_link_info->link_info);
+		dst->ml_info[dst->num_links].link_band =
+				wmi_convert_mlo_to_reg_band(wmi_band);
+
+		/* is Link Accepted or rejected */
+		dst->ml_info[dst->num_links].link_accepted =
+			WMI_MLO_LINK_INFO_GET_STATUS(src_link_info->link_info) ? true : false;
+
+		/* Self Link mac address */
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(&src_link_info->link_addr,
+					   dst->ml_info[dst->num_links].link_addr.bytes);
+
+		dst->ml_info[dst->num_links].freq =
+					WMI_MLO_LINK_INFO_GET_FREQ(src_link_info->link_info);
+
+		dst->ml_info[dst->num_links].timestamp = timestamp;
+
+		dst->num_links++;
+
+		src_link_info++;
+		parsed_tlv_count++;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void
 wmi_roam_offload_attach_mlo_tlv(struct wmi_ops *ops)
 {
 	ops->extract_roam_synch_key_event = extract_roam_synch_key_event_tlv;
+	ops->extract_roam_ml_info = extract_roam_ml_info_tlv;
 }
 #else
 static inline void
@@ -5379,8 +5480,10 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	update_mlo_prefer_percentage(wmi_handle->soc->wmi_psoc,
 				     &mlo_prefer_percentage);
 	score_param->mlo_etp_weightage_pcnt = mlo_prefer_percentage;
+	score_param->mcc_score_factor_pcnt =
+			ap_profile->param.sta_sap_mcc_weightage;
 	send_update_mlo_roam_params(score_param, ap_profile);
-	wmi_debug("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d subnet id %d sae-pk %d security %d mlo_etp_weight_pct %d",
+	wmi_debug("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d subnet id %d sae-pk %d security %d mlo_etp_weight_pct %d sta_sap_mcc_pcnt %d",
 		  score_param->disable_bitmap, score_param->rssi_weightage_pcnt,
 		  score_param->ht_weightage_pcnt,
 		  score_param->vht_weightage_pcnt,
@@ -5397,7 +5500,8 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 		  score_param->oce_ap_subnet_id_weightage_pcnt,
 		  score_param->sae_pk_ap_weightage_pcnt,
 		  score_param->security_weightage_pcnt,
-		  score_param->mlo_etp_weightage_pcnt);
+		  score_param->mlo_etp_weightage_pcnt,
+		  score_param->mcc_score_factor_pcnt);
 
 	score_param->bw_scoring.score_pcnt = ap_profile->param.bw_index_score;
 	score_param->band_scoring.score_pcnt =

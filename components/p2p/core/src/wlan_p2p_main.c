@@ -1501,6 +1501,7 @@ QDF_STATUS p2p_extract_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 					bool *is_dfs_owner,
 					bool *is_valid_ap_assist,
+					bool *is_usr_restrict_csa,
 					struct qdf_mac_addr *ap_bssid,
 					uint8_t *opclass, uint8_t *chan)
 {
@@ -1519,6 +1520,9 @@ QDF_STATUS p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 	if (is_valid_ap_assist)
 		*is_valid_ap_assist = dfs_info->is_valid_ap_assist;
 
+	if (is_usr_restrict_csa)
+		*is_usr_restrict_csa = dfs_info->is_user_restrict_csa;
+
 	if (ap_bssid)
 		qdf_copy_macaddr(ap_bssid, &dfs_info->ap_info[0].ap_bssid);
 
@@ -1527,6 +1531,25 @@ QDF_STATUS p2p_get_ap_assist_dfs_params(struct wlan_objmgr_vdev *vdev,
 
 	if (chan)
 		*chan = dfs_info->ap_info[0].chan;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+p2p_force_restrict_dfs_go_csa(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	struct p2p_vdev_priv_obj *p2p_vdev_obj;
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_P2P_GO_MODE)
+		return QDF_STATUS_E_INVAL;
+
+	p2p_vdev_obj =
+		wlan_objmgr_vdev_get_comp_private_obj(vdev, WLAN_UMAC_COMP_P2P);
+	if (!p2p_vdev_obj)
+		return QDF_STATUS_E_INVAL;
+
+	p2p_vdev_obj->ap_assist_dfs.is_user_restrict_csa = val;
+	p2p_debug("P2P force restrict %d", val);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1998,6 +2021,19 @@ bool p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
 {
 	return tgt_p2p_is_fw_support_usd(psoc);
 }
+
+bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t wfd_mode;
+
+	wfd_mode = wlan_get_wfd_mode_from_vdev_id(wlan_vdev_get_psoc(vdev),
+						  wlan_vdev_get_id(vdev));
+	if (wfd_mode != P2P_MODE_WFD_R2 &&
+	    wfd_mode != P2P_MODE_WFD_PCC)
+		return false;
+
+	return true;
+}
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 
 bool p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
@@ -2019,6 +2055,9 @@ bool p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
 
 QDF_STATUS p2p_validate_ap_assist_dfs_group(struct wlan_objmgr_vdev *vdev)
 {
+	if (!p2p_is_vdev_wfd_r2_mode(vdev))
+		return QDF_STATUS_SUCCESS;
+
 	switch (wlan_vdev_mlme_get_opmode(vdev)) {
 	case QDF_P2P_GO_MODE:
 		return p2p_check_ap_assist_dfs_group_go_with_csa(vdev);
@@ -2066,19 +2105,24 @@ QDF_STATUS p2p_check_ap_assist_dfs_group_go(struct wlan_objmgr_vdev *vdev)
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct wlan_objmgr_psoc *psoc;
 	bool is_dfs_owner = false, is_valid_ap_assist = false;
+	bool is_usr_restrict_csa = false;
 	uint8_t chan = 0;
 
 	if (!pdev)
 		return QDF_STATUS_E_INVAL;
 
 	p2p_get_ap_assist_dfs_params(vdev, &is_dfs_owner, &is_valid_ap_assist,
-				     &ap_bssid, NULL, &chan);
+				     &is_usr_restrict_csa, &ap_bssid,
+				     NULL, &chan);
 
 	if (is_dfs_owner)
 		return QDF_STATUS_SUCCESS;
 
 	if (!is_valid_ap_assist)
 		return QDF_STATUS_E_INVAL;
+
+	if (is_usr_restrict_csa)
+		return QDF_STATUS_SUCCESS;
 
 	if (wlan_vdev_mlme_is_init_state(vdev) == QDF_STATUS_SUCCESS) {
 		/* Ignore opclass check as the valid ap assist flag is true */
@@ -2156,7 +2200,7 @@ QDF_STATUS p2p_check_ap_assist_dfs_group_cli(struct wlan_objmgr_vdev *vdev)
 	}
 
 	p2p_get_ap_assist_dfs_params(vdev, &is_dfs_owner, &is_valid_ap_assist,
-				     &params.bssid, NULL, NULL);
+				     NULL, &params.bssid, NULL, NULL);
 
 	if (is_dfs_owner)
 		return QDF_STATUS_SUCCESS;

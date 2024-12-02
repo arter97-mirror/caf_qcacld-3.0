@@ -1215,13 +1215,10 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			break;
 		} else if (!is_csa_needed && chan_freq) {
 			mac_ctx->sap.SapDfsInfo.target_chan_freq = chan_freq;
+			break;
 		} else {
 			mac_ctx->sap.SapDfsInfo.target_chan_freq =
 						sap_indicate_radar(sap_ctx);
-			if (mac_ctx->sap.SapDfsInfo.target_chan_freq != 0) {
-				sap_cac_reset_notify(mac_handle);
-				break;
-			}
 		}
 
 		/* if there is an assigned next channel hopping */
@@ -1236,6 +1233,11 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		    !mac_ctx->sap.SapDfsInfo.target_chan_freq) {
 			/* Return from here, processing will be done later */
 			goto EXIT;
+		}
+
+		if (mac_ctx->sap.SapDfsInfo.target_chan_freq != 0) {
+			sap_cac_reset_notify(mac_handle);
+			break;
 		}
 
 		/* Issue stopbss for each sapctx */

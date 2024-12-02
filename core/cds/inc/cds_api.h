@@ -649,4 +649,30 @@ static inline bool cds_is_driver_transitioning(void)
  */
 bool cds_is_pm_fw_debug_enable(void);
 
+typedef void (*scan_flush_recovery_callback)(void);
+
+/**
+ * cds_register_scan_flush_recovery_callback() - This API to register scan
+ * flush callback to cds
+ * @cb: scan flush callback
+ *
+ * Return: void
+ */
+void
+cds_register_scan_flush_recovery_callback(scan_flush_recovery_callback cb);
+
+/**
+ * cds_unregister_scan_flush_recovery_callback() - This API to unregister scan
+ * flush callback from cds
+ * Return: void
+ */
+void cds_unregister_scan_flush_recovery_callback(void);
+
+/**
+ * cds_scan_flush_on_recovery() - This API flush scan request when recovery
+ * start
+ *
+ * Return: void
+ */
+void cds_scan_flush_on_recovery(void);
 #endif /* if !defined __CDS_API_H */

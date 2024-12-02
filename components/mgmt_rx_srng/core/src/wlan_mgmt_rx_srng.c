@@ -76,7 +76,7 @@ void wlan_mgmt_rx_srng_reap_buf(struct wlan_objmgr_pdev *pdev,
 	struct wmi_unified *wmi_handle;
 	void *srng;
 	qdf_dma_addr_t paddr;
-	QDF_STATUS status;
+	QDF_STATUS replenish_status;
 	uint16_t len;
 	int num_buf_recv = 0;
 	qdf_nbuf_t nbuf_head = NULL, nbuf_tail = NULL, nbuf, next;
@@ -108,35 +108,49 @@ void wlan_mgmt_rx_srng_reap_buf(struct wlan_objmgr_pdev *pdev,
 			continue;
 		}
 
-		hal_rx_buf_cookie_rbm_get(pdev_priv->hal_soc,
-					  (uint32_t *)ring_entry, &buf_info);
-		status = wlan_mgmt_rx_srng_alloc_buf(pdev_priv,
-						     buf_info.sw_cookie,
-						     &paddr);
-
-		if (QDF_IS_STATUS_SUCCESS(status)) {
-			hal_rxdma_buff_addr_info_set(
-				pdev_priv->hal_soc, ring_entry, paddr,
-				pdev_priv->rx_desc[pdev_priv->write_idx].cookie,
-				0);
-
-			pdev_priv->write_idx =
-			(pdev_priv->write_idx + 1) % MGMT_RX_SRNG_ENTRIES;
-		} else {
-			mgmt_rx_srng_err("Low mem: MGMT_SRNG buf alloc fail");
-			break;
-		}
-
-		if (pdev_priv->rx_desc[pdev_priv->read_idx].in_use) {
-			nbuf = pdev_priv->rx_desc[pdev_priv->read_idx].nbuf;
-			pdev_priv->rx_desc[pdev_priv->read_idx].in_use = false;
-			qdf_nbuf_unmap_single(pdev_priv->osdev, nbuf,
-					      QDF_DMA_FROM_DEVICE);
-			pdev_priv->read_idx =
-			(pdev_priv->read_idx + 1) % MGMT_RX_SRNG_ENTRIES;
-		} else {
+		if (!pdev_priv->rx_desc[pdev_priv->read_idx].in_use) {
 			mgmt_rx_srng_err("Received invalid cookie buffer");
 			qdf_assert_always(0);
+			continue;
+		}
+
+		hal_rx_buf_cookie_rbm_get(pdev_priv->hal_soc,
+					  (uint32_t *)ring_entry, &buf_info);
+		/**
+		 * The replenish_status variable saves the status of allocation
+		 * of new skb and gets checked in other places in this API,
+		 * don't override the value of this variable within this block.
+		 */
+		replenish_status = wlan_mgmt_rx_srng_alloc_buf(pdev_priv,
+						buf_info.sw_cookie, &paddr);
+
+		nbuf = pdev_priv->rx_desc[pdev_priv->read_idx].nbuf;
+		if (qdf_likely(QDF_IS_STATUS_SUCCESS(replenish_status))) {
+			qdf_nbuf_unmap_single(pdev_priv->osdev, nbuf,
+					      QDF_DMA_FROM_DEVICE);
+		} else {
+			paddr = qdf_nbuf_get_frag_paddr(nbuf, 0);
+
+			pdev_priv->rx_desc[pdev_priv->write_idx].nbuf = nbuf;
+			pdev_priv->rx_desc[pdev_priv->write_idx].pa = paddr;
+			pdev_priv->rx_desc[pdev_priv->write_idx].in_use = true;
+		}
+
+		hal_rxdma_buff_addr_info_set(
+			pdev_priv->hal_soc, ring_entry, paddr,
+			pdev_priv->rx_desc[pdev_priv->write_idx].cookie,
+			0);
+
+		pdev_priv->write_idx =
+		(pdev_priv->write_idx + 1) % MGMT_RX_SRNG_ENTRIES;
+
+		pdev_priv->rx_desc[pdev_priv->read_idx].in_use = false;
+		pdev_priv->read_idx =
+		(pdev_priv->read_idx + 1) % MGMT_RX_SRNG_ENTRIES;
+
+		if (qdf_unlikely(QDF_IS_STATUS_ERROR(replenish_status))) {
+			pdev_priv->new_skb_alloc_fail_cnt++;
+			continue;
 		}
 
 		if (!nbuf_head) {
@@ -321,6 +335,7 @@ wlan_mgmt_rx_srng_setup(struct mgmt_rx_srng_pdev_priv *pdev_priv)
 
 	pdev_priv->read_idx = 0;
 	pdev_priv->write_idx = 0;
+	pdev_priv->new_skb_alloc_fail_cnt = 0;
 
 	return status;
 }

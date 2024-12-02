@@ -50,6 +50,7 @@
 #include <cds_ieee80211_common.h>
 #endif
 #include "wlan_t2lm_api.h"
+#include "wma.h"
 
 /*Invalid Recommended Max Simultaneous Links value */
 #define RESERVED_REC_LINK_VALUE 1
@@ -256,7 +257,7 @@ lim_validate_rsn_ie(const uint8_t *ie_ptr, uint16_t ie_len)
 	const uint8_t *rsn_ie;
 	struct wlan_crypto_params crypto_params;
 
-	rsn_ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSN, ie_ptr, ie_len);
+	rsn_ie = wlan_get_rsn_data_from_ie_ptr(ie_ptr, ie_len);
 	if (!rsn_ie)
 		return QDF_STATUS_SUCCESS;
 
@@ -278,6 +279,7 @@ lim_validate_rsn_ie(const uint8_t *ie_ptr, uint16_t ie_len)
  * @ori_bw: bandwdith from beacon
  * @new_bw: bandwidth intersection between reference AP and STA
  * @update_allow: return true if bw and puncture can be updated directly
+ * @phy_mode: update the value of phy_mode
  *
  * Return: QDF_STATUS
  */
@@ -285,11 +287,11 @@ static QDF_STATUS
 lim_get_update_eht_bw_puncture_allow(struct pe_session *session,
 				     enum phy_ch_width ori_bw,
 				     enum phy_ch_width *new_bw,
-				     bool *update_allow)
+				     bool *update_allow,
+				     enum wlan_phymode *phy_mode)
 {
 	enum phy_ch_width ch_width;
 	struct wlan_objmgr_psoc *psoc;
-	enum wlan_phymode phy_mode;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	*update_allow = false;
@@ -299,13 +301,13 @@ lim_get_update_eht_bw_puncture_allow(struct pe_session *session,
 		pe_err("psoc object invalid");
 		return QDF_STATUS_E_INVAL;
 	}
-	status = mlme_get_peer_phymode(psoc, session->bssId, &phy_mode);
+	status = mlme_get_peer_phymode(psoc, session->bssId, phy_mode);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("failed to get phy_mode %d mac: " QDF_MAC_ADDR_FMT,
 		       status, QDF_MAC_ADDR_REF(session->bssId));
 		return QDF_STATUS_E_INVAL;
 	}
-	ch_width = wlan_mlme_get_ch_width_from_phymode(phy_mode);
+	ch_width = wlan_mlme_get_ch_width_from_phymode(*phy_mode);
 
 	if (ori_bw <= ch_width) {
 		*new_bw = ori_bw;
@@ -349,6 +351,7 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 	struct wlan_channel *current_chan = NULL;
 	uint8_t band_mask;
 	uint32_t ch_cfreq2 = 0;
+	enum wlan_phymode phy_mode;
 
 	if (!bcn_ptr || !session || !session->mac_ctx || !session->vdev) {
 		pe_err("invalid input parameters");
@@ -431,7 +434,8 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 update_bw:
 	status = lim_get_update_eht_bw_puncture_allow(session, ori_bw,
 						      &new_bw,
-						      &update_allow);
+						      &update_allow,
+						      &phy_mode);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
@@ -441,6 +445,7 @@ update_bw:
 					       ccfs0,
 					       ccfs1,
 					       new_bw);
+		wma_send_peer_phy_mode(session->bssId, session->vdev_id, phy_mode);
 	} else {
 		csa_param = qdf_mem_malloc(sizeof(*csa_param));
 		if (!csa_param) {
@@ -662,7 +667,10 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 		lim_process_tpe_ie_from_beacon(mac_ctx, session,
 					       bss, &tpe_change);
-
+		if (!tpe_change) {
+			pe_nofl_rl_debug("no change in TPE IE");
+			goto end;
+		}
 		mlme_obj =
 			wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 		if (!mlme_obj) {

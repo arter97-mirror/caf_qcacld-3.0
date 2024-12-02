@@ -927,6 +927,22 @@ static void wma_handle_hidden_ssid_restart(tp_wma_handle wma,
 				      0, NULL);
 }
 
+void
+wma_send_peer_phy_mode(tSirMacAddr bssId, uint8_t vdev_id,
+		       enum wlan_phymode phy_mode)
+{
+	uint32_t fw_phymode;
+	tp_wma_handle wma;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma)
+		return;
+
+	fw_phymode = wmi_host_to_fw_phymode(phy_mode);
+	wma_set_peer_param(wma, bssId, WMI_HOST_PEER_PHYMODE,
+					fw_phymode, vdev_id);
+}
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * wma_get_peer_phymode() - get phy mode and eht puncture
@@ -3135,6 +3151,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	struct vdev_mlme_obj *vdev_mlme;
 	tp_wma_handle wma_handle;
 	uint8_t enable_sifs_burst = 0;
+	enum station_keepalive_method val = SIR_KEEP_ALIVE_NULL_PKT;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -3164,13 +3181,15 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	wma_handle->interfaces[vdev_id].sub_type =
 		vdev_mlme->mgmt.generic.subtype;
 
+	ret = ucfg_mlme_get_sta_keepalive_method(mac->psoc, &val);
+	if (QDF_IS_STATUS_ERROR(ret))
+		wma_err("Failed to get ini config for keep sta alive method");
+
 	qos_aggr = &mac->mlme_cfg->qos_mlme_params;
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA) {
-		wma_set_sta_keep_alive(
-				wma_handle, vdev_id,
-				SIR_KEEP_ALIVE_NULL_PKT,
-				mac->mlme_cfg->sta.sta_keep_alive_period,
-				NULL, NULL, NULL);
+		wma_set_sta_keep_alive(wma_handle, vdev_id, val,
+				       mac->mlme_cfg->sta.sta_keep_alive_period,
+				       NULL, NULL, NULL);
 
 		/* offload STA SA query related params to fwr */
 		if (wmi_service_enabled(wma_handle->wmi_handle,
@@ -3782,6 +3801,10 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 		wma_pasn_peer_delete_handler(wma->psoc, macaddr, event->vdev_id,
 					     req_msg->user_data);
 		break;
+	case WMA_DELETE_NDP_PEER_RSP:
+		wma_send_msg_high_priority(wma, WMA_DELETE_STA_RSP,
+					   req_msg->user_data, 0);
+		break;
 	default:
 		break;
 	}
@@ -3874,11 +3897,13 @@ void wma_hold_req_timer(void *data)
 		wma_send_add_bss_resp(wma, tgt_req->vdev_id,
 				      QDF_STATUS_E_TIMEOUT);
 	} else if ((tgt_req->msg_type == WMA_DELETE_STA_REQ) &&
-		(tgt_req->type == WMA_DELETE_STA_RSP_START)) {
+		   (tgt_req->type == WMA_DELETE_STA_RSP_START ||
+		    tgt_req->type == WMA_DELETE_NDP_PEER_RSP)) {
 		tpDeleteStaParams params =
 				(tpDeleteStaParams) tgt_req->user_data;
 		params->status = QDF_STATUS_E_TIMEOUT;
-		wma_err("WMA_DEL_STA_REQ timed out");
+		wma_err("WMA_DEL_STA_REQ timed out for rsp type %d",
+			tgt_req->type);
 		wma_debug("Sending del sta rsp to umac (mac:"QDF_MAC_ADDR_FMT", status:%d)",
 			 QDF_MAC_ADDR_REF(params->staMac), params->status);
 
@@ -4203,6 +4228,7 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 	struct dev_set_param setparam[MAX_VDEV_SET_BSS_PARAMS];
 	uint8_t index = 0;
 	enum ieee80211_protmode prot_mode;
+	enum station_keepalive_method val = SIR_KEEP_ALIVE_NULL_PKT;
 	uint32_t keep_alive_period;
 	QDF_STATUS ret;
 
@@ -4283,11 +4309,12 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 	mlme_set_max_reg_power(intr[vdev_id].vdev, maxTxPower);
 	wlan_mlme_get_sta_keep_alive_period(wma->psoc,
 					    &keep_alive_period);
-	wma_set_sta_keep_alive(
-				wma, vdev_id,
-				SIR_KEEP_ALIVE_NULL_PKT,
-				keep_alive_period,
-				NULL, NULL, NULL);
+	ret = ucfg_mlme_get_sta_keepalive_method(wma->psoc, &val);
+	if (QDF_IS_STATUS_ERROR(ret))
+		wma_err("Failed to get ini config for keep sta alive method");
+
+	wma_set_sta_keep_alive(wma, vdev_id, val, keep_alive_period,
+			       NULL, NULL, NULL);
 error:
 	return ret;
 }

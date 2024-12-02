@@ -42,6 +42,8 @@
 #include "wlan_connectivity_logging.h"
 #include "cds_ieee80211_common.h"
 #include <lim_mlo.h>
+#include "wlan_dlm_public_struct.h"
+#include "wlan_dlm_api.h"
 
 /**
  * lim_process_deauth_frame
@@ -72,6 +74,7 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 	uint8_t roamSessionId;
 	uint32_t frameLen;
 	int32_t frame_rssi;
+	struct reject_ap_info ap_info;
 
 	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
 
@@ -198,6 +201,16 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		}
 	} else if (LIM_IS_STA_ROLE(pe_session)) {
 		switch (reasonCode) {
+		case REASON_4WAY_HANDSHAKE_TIMEOUT:
+			qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
+			qdf_mem_copy(ap_info.bssid.bytes, pHdr->sa,
+				     QDF_MAC_ADDR_SIZE);
+			ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
+			ap_info.reject_reason = REASON_EAPOL_TIMEOUT;
+			ap_info.source = ADDED_BY_DRIVER;
+			wlan_dlm_add_bssid_to_reject_list(mac->pdev, &ap_info);
+			break;
+
 		case REASON_UNSPEC_FAILURE:
 		case REASON_PREV_AUTH_NOT_VALID:
 		case REASON_DEAUTH_NETWORK_LEAVING:

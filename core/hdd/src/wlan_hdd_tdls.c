@@ -150,8 +150,8 @@ const struct nla_policy
 						.type = NLA_S32},
 };
 
-static bool wlan_hdd_is_tdls_allowed(struct hdd_context *hdd_ctx,
-				     struct wlan_objmgr_vdev *vdev)
+bool wlan_hdd_is_tdls_allowed(struct hdd_context *hdd_ctx,
+			      struct wlan_objmgr_vdev *vdev)
 {
 	bool tdls_support;
 	struct wlan_hdd_link_info *link_info;

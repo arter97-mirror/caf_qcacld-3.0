@@ -215,6 +215,17 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 		dp_err("Unable to allocate apss_lpass shared memory");
 	}
 
+	if (qdf_dev->bus_type == QDF_BUS_TYPE_PCI) {
+		info->target_type_valid = 1;
+		info->target_type = QMI_WFDS_TARGET_TYPE_DISCRETE_V01;
+	} else if (qdf_dev->bus_type == QDF_BUS_TYPE_IPCI) {
+		info->target_type_valid = 1;
+		info->target_type = QMI_WFDS_TARGET_TYPE_INTG_V01;
+	} else {
+		dp_err("Direct link not supported for %d bus type",
+		       qdf_dev->bus_type);
+	}
+
 	status = wlan_qmi_wfds_send_config_msg(dp_ctx->psoc, info);
 	qdf_mem_free(info);
 

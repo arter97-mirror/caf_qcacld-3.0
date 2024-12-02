@@ -605,43 +605,15 @@ t2lm_find_tid_mapped_link_id(struct wlan_t2lm_info *t2lm_info,
 }
 
 QDF_STATUS
-wlan_t2lm_validate_candidate(struct cnx_mgr *cm_ctx,
-			     struct scan_cache_entry *scan_entry)
+wlan_t2lm_validate_candidate(struct scan_cache_entry *scan_entry)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct wlan_objmgr_vdev *vdev;
 	struct wlan_t2lm_context t2lm_ctx;
 	uint16_t tid_map_link_id;
 	uint16_t established_tid_mapped_link_id = 0;
 	uint16_t upcoming_tid_mapped_link_id = 0;
 	uint16_t established_tid_mapped = 0;
 	uint16_t upcoming_tid_mapped = 0;
-	struct wlan_objmgr_psoc *psoc;
-
-	if (!scan_entry || !cm_ctx || !cm_ctx->vdev)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	vdev = cm_ctx->vdev;
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	if (!wlan_mlme_get_t2lm_negotiation_supported(psoc)) {
-		mlme_rl_debug("T2LM negotiation not supported");
-		return QDF_STATUS_SUCCESS;
-	}
-
-	/*
-	 * Skip T2LM validation for following cases:
-	 *  - Is link VDEV
-	 *  - Is not STA VDEV
-	 *  - T2LM IE not present in scan entry
-	 */
-	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
-	    wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE ||
-	    !scan_entry->ie_list.t2lm[0]) {
-		return QDF_STATUS_SUCCESS;
-	}
 
 	status = wlan_mlo_parse_bcn_prbresp_t2lm_ie(&t2lm_ctx,
 					util_scan_entry_t2lm(scan_entry),

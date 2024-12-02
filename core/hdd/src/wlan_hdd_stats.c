@@ -11179,6 +11179,11 @@ wlan_hdd_cfg80211_enhance_roam_events_callback(struct wlan_hdd_link_info *link_i
 						 ROAM_STATS_EVENT_INDEX,
 						 GFP_KERNEL);
 
+	if (!vendor_event) {
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed.");
+		return;
+	}
+
 	if (hdd_nla_put_roam_stats_info(vendor_event, roam_info, 0)) {
 		wlan_cfg80211_vendor_free_skb(vendor_event);
 		hdd_err("nla put failure");

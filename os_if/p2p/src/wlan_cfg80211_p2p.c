@@ -37,6 +37,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlme_api.h"
 #include "osif_vdev_mgr_util.h"
+#include "wlan_hdd_main.h"
 
 #define MAX_NO_OF_2_4_CHANNELS 14
 #define MAX_OFFCHAN_TIME_FOR_DNBS 150
@@ -94,6 +95,11 @@ p2p_usd_attr_policy[QCA_WLAN_VENDOR_ATTR_USD_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_USD_STATUS] = {
 		.type = NLA_U8,
 	},
+};
+
+const struct nla_policy
+p2p_wfdr2_attr_policy[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_CONFIG] = {.type = NLA_U8,},
 };
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 
@@ -927,6 +933,67 @@ mem_free:
 		qdf_mem_free(usd_param->frame.data);
 
 	qdf_mem_free(usd_param);
+
+	return ret;
+}
+
+/**
+ * osif_p2p_mode_convert_qca_enum_to_p2p_enum() - This API converts
+ * QCA_P2P_MODE_WFD_XX to P2P_MODE_WFD_XX
+ *
+ * @qca_type: QCA WLAN vendor attribute WFD mode type
+ * @p2p_type: pointer to P2P mode type
+ *
+ * Return: 0 in case of success else error value
+ */
+static int
+osif_p2p_mode_convert_qca_enum_to_p2p_enum(enum qca_wlan_vendor_p2p_mode qca_type,
+					   enum p2p_mode_type *p2p_type)
+{
+	switch (qca_type) {
+	case QCA_P2P_MODE_WFD_R1:
+		*p2p_type = P2P_MODE_WFD_R1;
+		break;
+	case QCA_P2P_MODE_WFD_R2:
+		*p2p_type = P2P_MODE_WFD_R2;
+		break;
+	case QCA_P2P_MODE_WFD_PCC:
+		*p2p_type = P2P_MODE_WFD_PCC;
+		break;
+	default:
+		osif_debug("invalid p2p mode type %d", qca_type);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+int osif_p2p_parse_wfd_params(struct hdd_adapter *adapter, const void *data,
+			      int data_len)
+{
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_MAX + 1];
+	enum qca_wlan_vendor_p2p_mode qca_enum;
+	enum p2p_mode_type p2p_enum;
+	int ret = 0;
+
+	/* Parse and fetch USD params*/
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_MAX,
+				    data, data_len, p2p_wfdr2_attr_policy)) {
+		osif_debug("Invalid P2P vendor command attributes");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_CONFIG]) {
+		osif_debug("P2P USD OP type parse failed");
+		return -EINVAL;
+	}
+
+	qca_enum = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_CONFIG]);
+	osif_debug("p2p_mode %d", qca_enum);
+
+	ret = osif_p2p_mode_convert_qca_enum_to_p2p_enum(qca_enum, &p2p_enum);
+	if (!ret)
+		adapter->wfd_mode = p2p_enum;
 
 	return ret;
 }

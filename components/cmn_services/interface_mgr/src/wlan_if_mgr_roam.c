@@ -40,6 +40,7 @@
 #include "wlan_mlo_mgr_link_switch.h"
 #include <wlan_action_oui_main.h>
 #include <wlan_p2p_api.h>
+#include <wlan_t2lm_api.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline bool
@@ -132,7 +133,7 @@ static void if_mgr_disable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 
 	if (curr_vdev_id == vdev_id ||
 	    wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE ||
-	    wlan_cm_is_vdev_roam_sync_inprogress(vdev) ||
+	    wlan_cm_is_vdev_roaming(vdev) ||
 	    vdev->vdev_mlme.mlme_state != WLAN_VDEV_S_UP)
 		return;
 
@@ -773,6 +774,38 @@ static void if_mgr_get_vdev_id_from_bssid(struct wlan_objmgr_pdev *pdev,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+static QDF_STATUS
+if_mgr_t2lm_validate_candidate(struct cnx_mgr *cm_ctx,
+			       struct scan_cache_entry *scan_entry)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!scan_entry || !cm_ctx || !cm_ctx->vdev)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	vdev = cm_ctx->vdev;
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	if (!wlan_mlme_get_t2lm_negotiation_supported(psoc))
+		return QDF_STATUS_SUCCESS;
+
+	/*
+	 * Skip T2LM validation for following cases:
+	 *  - Is link VDEV
+	 *  - Is not STA VDEV
+	 *  - T2LM IE not present in scan entry
+	 */
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+	    wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE ||
+	    !scan_entry->ie_list.t2lm[0])
+		return QDF_STATUS_SUCCESS;
+
+	return wlan_t2lm_validate_candidate(scan_entry);
+}
+
 /**
  * if_mgr_get_conc_ext_flags() - get extended flags for concurrency check
  * @vdev: pointer to vdev on which new connection is coming up
@@ -850,6 +883,12 @@ static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
 				 allowed_partner_links);
 }
 #else
+static inline QDF_STATUS
+if_mgr_t2lm_validate_candidate(struct cnx_mgr *cm_ctx,
+			       struct scan_cache_entry *scan_entry)
+{
+	return QDF_STATUS_SUCCESS;
+}
 static inline uint32_t
 if_mgr_get_conc_ext_flags(struct wlan_objmgr_vdev *vdev,
 			  struct validate_bss_data *candidate_info)
@@ -876,6 +915,12 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 		&event_data->validate_bss_info;
 	uint32_t chan_freq = candidate_info->chan_freq;
 	uint32_t conc_freq = 0, conc_ext_flags;
+	struct cnx_mgr *cm_ctx;
+	QDF_STATUS status;
+
+	cm_ctx = cm_get_cm_ctx(vdev);
+	if (!cm_ctx)
+		return QDF_STATUS_E_FAILURE;
 
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 
@@ -888,18 +933,36 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 
 	if_mgr_update_candidate(psoc, vdev, candidate_info);
-	/*
-	 * Do not allow STA to connect on 6Ghz or indoor channel for non dbs
-	 * hardware if SAP and skip_6g_and_indoor_freq_scan ini are present
-	 */
-	if (op_mode == QDF_STA_MODE &&
-	    !policy_mgr_is_sta_chan_valid_for_connect_and_roam(pdev,
-							       chan_freq)) {
-		ifmgr_debug("STA connection not allowed on bssid: "QDF_MAC_ADDR_FMT" with freq: %d (6Ghz or indoor(%d)), as not valid for connection",
-			    QDF_MAC_ADDR_REF(candidate_info->peer_addr.bytes),
-			    chan_freq,
-			    wlan_reg_is_freq_indoor(pdev, chan_freq));
-		return QDF_STATUS_E_INVAL;
+
+	if (op_mode == QDF_STA_MODE) {
+		/*
+		 * Do not allow STA to connect on 6Ghz or indoor channel for
+		 * non dbs hardware if SAP and skip_6g_and_indoor_freq_scan
+		 * ini are present
+		 */
+		if (!policy_mgr_is_sta_chan_valid_for_connect_and_roam(pdev,
+								       chan_freq)) {
+			ifmgr_debug("STA connection not allowed on bssid: "QDF_MAC_ADDR_FMT" with freq: %d (6Ghz or indoor(%d)), as not valid for connection",
+				    QDF_MAC_ADDR_REF(candidate_info->peer_addr.bytes),
+				    chan_freq,
+				    wlan_reg_is_freq_indoor(pdev, chan_freq));
+			return QDF_STATUS_E_INVAL;
+		}
+
+		/*
+		 * If TTLM mapping and self link ID are not same then
+		 * return FAILURE
+		 */
+		status =
+			if_mgr_t2lm_validate_candidate(cm_ctx,
+						       candidate_info->scan_entry);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			ifmgr_debug("STA connection not allowed on bssid: "QDF_MAC_ADDR_FMT" with freq: %d (6Ghz or indoor(%d)), as TTLM is not mapped on this link",
+				    QDF_MAC_ADDR_REF(candidate_info->peer_addr.bytes),
+				    chan_freq,
+				    wlan_reg_is_freq_indoor(pdev, chan_freq));
+			return QDF_STATUS_E_INVAL;
+		}
 	}
 
 	/*
@@ -988,7 +1051,8 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 
 	if (op_mode == QDF_P2P_CLIENT_MODE &&
-	    wlan_reg_is_dfs_for_freq(pdev, chan_freq)) {
+	    wlan_reg_is_dfs_for_freq(pdev, chan_freq) &&
+	    wlan_p2p_is_vdev_wfd_r2_mode(vdev)) {
 		const uint8_t *ie;
 		uint16_t ie_len;
 		bool is_dfs_owner = false, is_valid_ap_assist = false;
@@ -999,7 +1063,7 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 						      true, chan_freq, true);
 		wlan_p2p_get_ap_assist_dfs_params(vdev, &is_dfs_owner,
 						  &is_valid_ap_assist,
-						  NULL, NULL, NULL);
+						  NULL, NULL, NULL, NULL);
 		if (is_dfs_owner)
 			goto end;
 

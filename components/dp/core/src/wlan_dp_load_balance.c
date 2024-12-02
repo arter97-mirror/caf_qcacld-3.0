@@ -268,6 +268,9 @@ wlan_dp_is_load_balance_needed(struct wlan_dp_lb_data *lb_data,
 		dp_info("CPU%d CWW:%d AWW:%d", load->cpu_id,
 			curr_wtg, load->allowed_wtg);
 
+		if (!curr_wtg && !load->allowed_wtg)
+			continue;
+
 		/* check whether the current wlan weightage is +-10% of the
 		 * allowed weightage. If not, load balance is needed.
 		 */
@@ -507,7 +510,7 @@ wlan_dp_lb_check_for_cpu_mask_change(struct wlan_dp_psoc_context *dp_ctx)
 			qdf_cpumask_copy(&lb_data->preferred_cpu_mask,
 					 &updated_cpu_mask);
 
-		dp_debug("Audio taken cpus old:%*pbl new:%*pbl updated_cpumask:%pbl",
+		dp_debug("Audio taken cpus old:%*pbl new:%*pbl updated_cpumask:%*pbl",
 			 qdf_cpumask_pr_args(&lb_data->audio_taken_cpumask),
 			 qdf_cpumask_pr_args(&audio_taken_cpus),
 			 qdf_cpumask_pr_args(&lb_data->preferred_cpu_mask));
