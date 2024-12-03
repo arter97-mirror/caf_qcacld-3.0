@@ -96,11 +96,9 @@ __wlan_hdd_cfg80211_avoid_freq_ext(struct wiphy *wiphy,
 	if (!if_adapter) {
 		hdd_err_rl("adapter not found for ifindex: %d",
 			   wdev->netdev->ifindex);
-	}
-
-	if (hdd_is_connection_in_progress(NULL, NULL) &&
-	    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
-					  if_adapter->deflink->vdev_id)) {
+	} else if (hdd_is_connection_in_progress(NULL, NULL) &&
+		   !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+					if_adapter->deflink->vdev_id)) {
 		hdd_debug_rl("Update chan list refused: conn in progress");
 		ret = -EPERM;
 		goto out;

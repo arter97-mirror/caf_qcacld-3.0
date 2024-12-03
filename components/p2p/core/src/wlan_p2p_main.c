@@ -2192,7 +2192,8 @@ QDF_STATUS p2p_check_ap_assist_dfs_group_cli(struct wlan_objmgr_vdev *vdev)
 update_lim:
 	p2p_soc_obj =
 		wlan_objmgr_psoc_get_comp_private_obj(psoc, WLAN_UMAC_COMP_P2P);
-	if (p2p_soc_obj->p2p_cb.ap_assist_dfs_group_fw_monitor_update)
+	if (p2p_soc_obj &&
+	    p2p_soc_obj->p2p_cb.ap_assist_dfs_group_fw_monitor_update)
 		p2p_soc_obj->p2p_cb.ap_assist_dfs_group_fw_monitor_update(wlan_vdev_get_id(vdev),
 									  !conc_scc_sta_present);
 
