@@ -148,10 +148,10 @@ void dp_rtpm_tput_policy_apply(struct wlan_dp_psoc_context *dp_ctx,
 {
 }
 
-static inline int
+static inline unsigned long
 dp_rtpm_tput_policy_get_vote(struct wlan_dp_psoc_context *dp_ctx)
 {
-	return -EINVAL;
+	return 0;
 }
 #endif /* WLAN_FEATURE_DP_BUS_BANDWIDTH && FEATURE_RUNTIME_PM */
 

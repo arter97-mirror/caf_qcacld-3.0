@@ -1093,11 +1093,6 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 
 	switch (request->initiator) {
 	case NL80211_REGDOM_SET_BY_USER:
-
-		if (request->user_reg_hint_type !=
-		    NL80211_USER_REG_HINT_CELL_BASE)
-			return;
-
 		qdf_event_reset(&hdd_ctx->regulatory_update_event);
 		qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
 		hdd_ctx->is_regulatory_update_in_progress = true;

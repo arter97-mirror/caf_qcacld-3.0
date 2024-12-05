@@ -313,7 +313,7 @@ QDF_STATUS t2lm_handle_tx_req(struct wlan_objmgr_vdev *vdev,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO_TTLM
-static QDF_STATUS
+static void
 t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					     struct wlan_mlo_peer_context *ml_peer,
 					     struct wlan_t2lm_onging_negotiation_info *t2lm_rsp)
@@ -327,7 +327,7 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 	t2lm_req = &ml_peer->t2lm_policy.ongoing_tid_to_link_mapping;
 	if (!t2lm_req) {
 		t2lm_err("Ongoing tid neg is null");
-		return QDF_STATUS_E_FAILURE;
+		return;
 	}
 
 	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
@@ -349,16 +349,14 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 			}
 		}
 	}
-
-	return status;
 }
 #else
-static QDF_STATUS
+static void
 t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					     struct wlan_mlo_peer_context *ml_peer,
 					     struct wlan_t2lm_onging_negotiation_info *t2lm_rsp)
 {
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct wlan_t2lm_onging_negotiation_info *t2lm_req;
 	uint8_t dir;
 	struct wlan_t2lm_info *t2lm_info, *t2lm_nego;
@@ -366,13 +364,13 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 
 	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLO_MGR_ID);
 	if (!peer)
-		return QDF_STATUS_E_NULL_VALUE;
+		return;
 
 	t2lm_req = &ml_peer->t2lm_policy.ongoing_tid_to_link_mapping;
 	if (!t2lm_req) {
 		t2lm_err("Ongoing tid neg is null");
 		wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
-		return QDF_STATUS_E_FAILURE;
+		return;
 	}
 
 	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
@@ -403,8 +401,6 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 	}
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
-
-	return status;
 }
 #endif
 
@@ -450,8 +446,8 @@ QDF_STATUS t2lm_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	status = t2lm_populate_peer_level_tid_to_link_mapping(vdev, ml_peer,
-							      &t2lm_rsp);
+	t2lm_populate_peer_level_tid_to_link_mapping(vdev, ml_peer,
+						     &t2lm_rsp);
 
 	channel = wlan_vdev_mlme_get_bss_chan(vdev);
 	if (!channel) {

@@ -716,6 +716,7 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	int ret;
 	struct hdd_adapter_create_param create_params = {0};
 	uint8_t *device_address = NULL;
+	bool eht_capab = false;
 
 	hdd_enter();
 
@@ -849,6 +850,11 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 		device_address = wlan_hdd_get_intf_addr(hdd_ctx, mode);
 		if (!device_address)
 			return ERR_PTR(-EINVAL);
+
+		ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
+		if ((QDF_SAP_MODE == mode || QDF_STA_MODE == mode) &&
+		    eht_capab)
+			create_params.is_ml_adapter = true;
 
 		adapter = hdd_open_adapter(hdd_ctx, mode, name,
 					   device_address,

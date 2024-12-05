@@ -1657,7 +1657,7 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_check_scc_channel() - Check if SAP/GO freq need to be updated
- * as per exiting concurrency
+ * as per existing concurrency
  * @psoc: PSOC object information
  * @intf_ch_freq: Channel frequency of existing concurrency
  * @sap_ch_freq: Given SAP/GO channel frequency
@@ -1666,7 +1666,7 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
  *
  * When SAP/GO is starting or re-starting, check SAP/GO freq need to be
  * aligned with the existing concurrencies. i.e. Forced to be on same freq as
- * exiting concurrency.
+ * existing concurrency.
  *
  * Return: True/False
  */

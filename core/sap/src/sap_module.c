@@ -1472,7 +1472,8 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 							sap_context->vdev);
 	}
 	ch_params.ch_width = ch_width;
-	ch_params.mhz_freq_seg1 = tgt_ch_params->mhz_freq_seg1;
+	if (tgt_ch_params)
+		ch_params.mhz_freq_seg1 = tgt_ch_params->mhz_freq_seg1;
 	if (sap_phymode_is_eht(sap_context->phyMode))
 		wlan_reg_set_create_punc_bitmap(&ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac->pdev, chan_freq,

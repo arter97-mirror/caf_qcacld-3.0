@@ -977,7 +977,8 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	prb_rsp_ie_ptr = pFrame2Hal + sizeof(tSirMacMgmtHdr) +
 			 WLAN_PROBE_RESP_IES_OFFSET;
 	prb_rsp_ie_len = nPayload - WLAN_PROBE_RESP_IES_OFFSET;
-	prb_rsp_ie_max_len = prb_rsp_ie_len;
+	prb_rsp_ie_max_len = nBytes - sizeof(tSirMacMgmtHdr) -
+			     WLAN_PROBE_RESP_IES_OFFSET;
 
 	if (lim_is_session_eht_capable(pe_session)) {
 		lim_populate_prb_rsp_eht_ies_from_beacon(mac, pe_session,

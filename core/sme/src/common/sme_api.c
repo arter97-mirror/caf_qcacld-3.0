@@ -14580,9 +14580,8 @@ QDF_STATUS sme_unpack_assoc_rsp(mac_handle_t mac_handle,
 
 	lim_strip_and_decode_eht_cap(rsp->connect_ies.assoc_rsp.ptr + ies_offset,
 				     rsp->connect_ies.assoc_rsp.len - ies_offset,
-				     &assoc_resp->eht_cap,
-				     assoc_resp->he_cap,
-				     rsp->freq);
+				     &assoc_resp->eht_cap, assoc_resp->he_cap,
+				     rsp->freq, false);
 	return status;
 }
 

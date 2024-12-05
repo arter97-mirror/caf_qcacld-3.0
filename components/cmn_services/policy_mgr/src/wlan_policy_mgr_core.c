@@ -4768,6 +4768,74 @@ policy_mgr_handle_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_FAILURE;
 }
 
+/**
+ * policy_mgr_check_scc_channel_non_dbs() - Check if SAP/GO freq need to be
+ * updated as per existing concurrency for non-dbs chip
+ * @psoc: PSOC object information
+ * @intf_ch_freq: Channel frequency of existing concurrency
+ * @vdev_id: Vdev id of the SAP/GO
+ *
+ * When SAP/GO is starting or re-starting, check SAP/GO freq need to be
+ * aligned with the existing concurrencies. i.e. Forced to be on same freq as
+ * existing concurrency.
+ *
+ * Return: Void
+ */
+static
+void policy_mgr_check_scc_channel_non_dbs(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t *intf_ch_freq,
+					  uint8_t vdev_id)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	QDF_STATUS status;
+	struct policy_mgr_conc_connection_info
+			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	uint8_t num_cxn_del = 0;
+	uint32_t org_ch_freq;
+	enum policy_mgr_con_mode mode;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return;
+	}
+
+	status = policy_mgr_get_chan_by_session_id(psoc, vdev_id, &org_ch_freq);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Failed to get channel for vdev:%d", vdev_id);
+		org_ch_freq = 0;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	/*
+	 * For SAP restart case SAP/GO entry might be present in table,
+	 * so delete it temporary
+	 * Also delete other SAP entries doing SCC with restarting SAP
+	 * for all SAPs to switch band with reason CSA_REASON_BAND_RESTRICTED
+	 */
+	if (org_ch_freq) {
+		mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc,
+			  wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id),
+			  vdev_id);
+		policy_mgr_store_and_del_conn_info_by_chan_and_mode(psoc,
+					org_ch_freq, mode, info, &num_cxn_del);
+	} else
+		policy_mgr_store_and_del_conn_info_by_vdev_id(psoc,
+							      vdev_id, info,
+							      &num_cxn_del);
+
+	if (policy_mgr_get_connection_count(psoc) == 0) {
+		/* use sap channel */
+		*intf_ch_freq = 0;
+	}
+
+	/* Restore the connection entry */
+	if (num_cxn_del > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, info, num_cxn_del);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+}
+
 void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t *intf_ch_freq,
 				  qdf_freq_t sap_ch_freq,
@@ -4795,8 +4863,11 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/* Always do force SCC on non-DBS platforms */
-	if (!policy_mgr_is_hw_dbs_capable(psoc))
+	if (!policy_mgr_is_hw_dbs_capable(psoc)) {
+		policy_mgr_check_scc_channel_non_dbs(psoc,
+						     intf_ch_freq, vdev_id);
 		return;
+	}
 
 	sta_count = policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
 							      NULL);
