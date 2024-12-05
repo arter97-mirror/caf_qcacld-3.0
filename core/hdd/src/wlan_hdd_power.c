@@ -1876,6 +1876,8 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	/* De-register the HDD callbacks */
 	hdd_deregister_cb(hdd_ctx);
 
+	qdf_dp_trace_deinit();
+
 	hdd_wlan_stop_modules(hdd_ctx, false);
 
 	hdd_lpass_notify_stop(hdd_ctx);
