@@ -1590,12 +1590,20 @@
 #define QCA_WIFI_PEACH_V2 (1)
 #endif
 
+#ifdef CONFIG_CNSS_FIG
+#define QCA_WIFI_FIG (1)
+#endif
+
 #ifdef CONFIG_INCLUDE_HAL_KIWI
 #define INCLUDE_HAL_KIWI (1)
 #endif
 
 #ifdef CONFIG_INCLUDE_HAL_PEACH
 #define INCLUDE_HAL_PEACH (1)
+#endif
+
+#ifdef CONFIG_INCLUDE_HAL_FIG
+#define INCLUDE_HAL_FIG (1)
 #endif
 
 #ifdef CONFIG_QCA_WIFI_QCA8074

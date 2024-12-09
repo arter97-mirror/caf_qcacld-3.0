@@ -65,6 +65,10 @@ config BERYLLIUM
 	bool "Enable BERYLLIUM"
 	default n
 
+config BORON
+	bool "Enable BORON"
+	default n
+
 config BUILD_TAG
 	bool "Embed tags and timestamp in wlan version"
 	default n
@@ -105,12 +109,20 @@ config CNSS_PEACH_V2
 	bool "Enable CNSS_PEACH_V2"
 	default n
 
+config CNSS_FIG
+	bool "Enable CNSS_FIG"
+	default n
+
 config INCLUDE_HAL_KIWI
 	bool "Enable INCLUDE_HAL_KIWI"
 	default n
 
 config INCLUDE_HAL_PEACH
 	bool "Enable INCLUDE_HAL_PEACH"
+	default n
+
+config INCLUDE_HAL_FIG
+	bool "Enable INCLUDE_HAL_FIG"
 	default n
 
 config CNSS_UTILS_MODULE
@@ -2067,6 +2079,10 @@ config QDF_TIMER_MULTIPLIER_FRAC_ENABLE
 
 config QCA_WIFI_PEACH
 	bool "enable QCA_WIFI_PEACH"
+	default n
+
+config QCA_WIFI_FIG
+	bool "enable QCA_WIFI_FIG"
 	default n
 
 config BCN_RATECODE_ENABLE
