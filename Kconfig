@@ -2829,4 +2829,9 @@ config WLAN_UMAC_MLO_MAX_DEV
         int "Enable WLAN_UMAC_MLO_MAX_DEV"
         default 3
 endif
+
+config WLAN_TX_POWERBOOST
+	bool "Enable WLAN_TX_POWERBOOST"
+	default n
+
 endif # QCA_CLD_WLAN

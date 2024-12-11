@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -3193,6 +3193,10 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 
 #ifdef CONFIG_WLAN_SUPPORT_BCAST_TWT
 #define WLAN_SUPPORT_BCAST_TWT (1)
+#endif
+
+#ifdef CONFIG_WLAN_TX_POWERBOOST
+#define FEATURE_WLAN_TX_POWERBOOST (1)
 #endif
 
 #ifdef CONFIG_WLAN_LOCAL_PKT_CAPTURE_SUBFILTER
