@@ -13264,9 +13264,18 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	uint8_t sta_vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
 	QDF_STATUS status;
 	struct policy_mgr_pcl_list pcl;
+	bool ml_sap_vdev = false;
+	uint32_t conc_ml_sap_freq;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
 	if (!psoc || !vdev || !pdev) {
 		policy_mgr_debug("psoc or vdev or pdev is NULL");
+		return false;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
 		return false;
 	}
 
@@ -13410,6 +13419,21 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	 * primary channel are same.
 	 */
 	if (*con_freq == ch_freq && wlan_reg_get_bw_value(ch_width) > 20)
+		return false;
+
+	/*
+	 * In case of MLO SAP if the existing link freq is
+	 * same as ch_freq, don't allow. Instead override it.
+	 */
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	conc_ml_sap_freq = policy_mgr_get_conc_ml_sap_link_freq(
+							psoc,
+							wlan_vdev_get_id(vdev),
+							&ml_sap_vdev);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	if (conc_ml_sap_freq == ch_freq)
 		return false;
 
 	return true;

@@ -4460,10 +4460,9 @@ policy_mgr_is_scc_with_existing_connection(qdf_freq_t pcl_freq)
  *
  * Return: Concurrent ml sap freq if present. Otherwise 0.
  */
-static uint32_t policy_mgr_get_conc_ml_sap_link_freq(
-						struct wlan_objmgr_psoc *psoc,
-						uint8_t vdev_id,
-						bool *ml_sap_vdev)
+uint32_t policy_mgr_get_conc_ml_sap_link_freq(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      bool *ml_sap_vdev)
 {
 	uint32_t conc_ml_sap_freq = 0, i;
 
