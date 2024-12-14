@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1696,6 +1696,32 @@ enum host_log_level {
 			CFG_VALUE_OR_DEFAULT, \
 			"User delay interval")
 
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+/*
+ * <ini>
+ * tx_powerboost - Control Tx Powerboost feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to Control Tx Powerboost feature
+ *
+ * Supported Feature: FEATURE_WLAN_TX_POWERBOOST
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_TX_POWERBOOST \
+	CFG_INI_BOOL("tx_powerboost", 0, \
+		     "Enable/Disable Tx Powerboost")
+
+#define CFG_TX_POWERBOOST_ALL \
+	CFG(CFG_TX_POWERBOOST)
+#else
+#define CFG_TX_POWERBOOST_ALL
+#endif
+
 #define CFG_HDD_ALL \
 	CFG_DYNAMIC_MAC_ADDR_UPDATE_SUPPORTED_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
@@ -1749,5 +1775,6 @@ enum host_log_level {
 	CFG_EPM_VALUE_ALL \
 	CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL \
 	CFG(CFG_CHIPSET_STATS_PUSH_RBS_DELAY_VAL_MS) \
-	CFG(CFG_CHIPSET_STATS_PUSH_RBS_DELAY_INTERVAL)
+	CFG(CFG_CHIPSET_STATS_PUSH_RBS_DELAY_INTERVAL) \
+	CFG_TX_POWERBOOST_ALL
 #endif
