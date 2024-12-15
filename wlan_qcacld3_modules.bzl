@@ -2410,6 +2410,11 @@ _conditional_srcs = {
             "cmn/qdf/linux/src/qdf_page_pool.c",
         ],
     },
+    "CONFIG_WLAN_TX_POWERBOOST": {
+        True: [
+            "core/hdd/src/wlan_hdd_tx_powerboost.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):

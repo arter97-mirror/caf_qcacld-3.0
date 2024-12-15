@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1974,6 +1974,17 @@ enum wlan_state_ctrl_str_id {
 #define MAX_TGT_HW_NAME_LEN 32
 #define HDD_MAX_IFACE_TYPE 2
 
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+/**
+ * struct hdd_tx_powerboost - HDD Tx powerboost
+ *
+ * @tx_powerboost_enabled: Feature enabled or not
+ */
+struct hdd_tx_powerboost {
+	bool tx_powerboost_enabled;
+};
+#endif
+
 /**
  * struct hdd_context - hdd shared driver and psoc/device context
  * @psoc: object manager psoc context
@@ -2183,6 +2194,7 @@ enum wlan_state_ctrl_str_id {
  * @get_sta_user_notif: Get station notifier callback to handle port_id on
  *			userspace application close/abort
  * @usd_adapter: adapter on which USD frames to be forwarded to userspace
+ * @tx_pb: Tx powerboost context
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2487,6 +2499,9 @@ struct hdd_context {
 	struct notifier_block get_sta_user_notif;
 #ifdef FEATURE_WLAN_SUPPORT_USD
 	struct hdd_adapter *usd_adapter;
+#endif
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+	struct hdd_tx_powerboost tx_pb;
 #endif
 };
 

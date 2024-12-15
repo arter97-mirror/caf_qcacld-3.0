@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -255,6 +255,7 @@
 #include "wifi_pos_api.h"
 #include "wlan_mgmt_rx_srng_ucfg_api.h"
 #include <cfg_mlme_vht_caps.h>
+#include "wlan_hdd_tx_powerboost.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -3238,6 +3239,7 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	hdd_runtime_suspend_context_init(hdd_ctx);
 
 	/* Configure NAN datapath features */
+	hdd_tx_powerboost_target_config(hdd_ctx, cfg);
 	hdd_nan_datapath_target_config(hdd_ctx, cfg);
 	ucfg_nan_set_tgt_caps(hdd_ctx->psoc, &cfg->nan_caps);
 	hdd_ctx->dfs_cac_offload = cfg->dfs_cac_offload;

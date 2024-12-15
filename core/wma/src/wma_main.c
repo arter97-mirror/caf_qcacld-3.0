@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6096,6 +6096,21 @@ wma_update_sar_flag(struct wlan_psoc_host_service_ext2_param *param,
 	cfg->sar_flag = param ? param->sar_flag : SAR_SET_CTL_GROUPING_DISABLE;
 }
 
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+static void
+wma_update_tx_powerboost(struct wlan_psoc_host_service_ext2_param *param,
+			 struct wma_tgt_cfg *cfg)
+{
+	cfg->tx_powerboost = param->tx_powerboost;
+}
+#else
+static void
+wma_update_tx_powerboost(struct wlan_psoc_host_service_ext2_param *param,
+			 struct wma_tgt_cfg *cfg)
+{
+}
+#endif
+
 /**
  * wma_update_hdd_band_cap() - update band cap which hdd understands
  * @supported_band: supported band which has been given by FW
@@ -6608,6 +6623,7 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	wma_update_twt_tgt_cap(wma_handle, &tgt_cfg);
 	wma_update_restricted_80p80_bw_support(wma_handle, &tgt_cfg);
 	wma_update_aux_dev_caps(tgt_hdl, &tgt_cfg);
+	wma_update_tx_powerboost(service_ext2_param, &tgt_cfg);
 	/* Take the max of chains supported by FW, which will limit nss */
 	for (i = 0; i < tgt_hdl->info.total_mac_phy_cnt; i++)
 		wma_fill_chain_cfg(tgt_hdl, i);
