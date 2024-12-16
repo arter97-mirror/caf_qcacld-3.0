@@ -1172,9 +1172,8 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 {
 	qdf_size_t ncfglen;
 	QDF_STATUS nSirStatus;
-	uint8_t disable_high_ht_mcs_2x2 = 0;
+	uint8_t i, max_nss, cb_mode, disable_high_ht_mcs_2x2 = 0;
 	struct ch_params ch_params = {0};
-	uint8_t cb_mode;
 
 	tSirMacTxBFCapabilityInfo *pTxBFCapabilityInfo;
 	tSirMacASCapabilityInfo *pASCapabilityInfo;
@@ -1235,9 +1234,8 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 
 	/* Ensure that shortGI40MHz is Disabled if supportedChannelWidthSet is
 	   eHT_CHANNEL_WIDTH_20MHZ */
-	if (pDot11f->supportedChannelWidthSet == eHT_CHANNEL_WIDTH_20MHZ) {
+	if (pDot11f->supportedChannelWidthSet == eHT_CHANNEL_WIDTH_20MHZ)
 		pDot11f->shortGI40MHz = 0;
-	}
 
 	pDot11f->maxRxAMPDUFactor =
 		mac->mlme_cfg->ht_caps.ampdu_params.max_rx_ampdu_factor;
@@ -1246,32 +1244,41 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 	pDot11f->reserved1 = mac->mlme_cfg->ht_caps.ampdu_params.reserved;
 
 	ncfglen = SIZE_OF_SUPPORTED_MCS_SET;
-	nSirStatus = wlan_mlme_get_cfg_str(
-		pDot11f->supportedMCSSet,
-		&mac->mlme_cfg->rates.supported_mcs_set,
-		&ncfglen);
+	nSirStatus =
+		wlan_mlme_get_cfg_str(pDot11f->supportedMCSSet,
+				      &mac->mlme_cfg->rates.supported_mcs_set,
+				      &ncfglen);
 	if (QDF_IS_STATUS_ERROR(nSirStatus)) {
 		pe_err("Failed to retrieve nItem from CFG status: %d",
 		       (nSirStatus));
-			return nSirStatus;
+		return nSirStatus;
 	}
 
 	if (pe_session) {
-		disable_high_ht_mcs_2x2 =
-				mac->mlme_cfg->rates.disable_high_ht_mcs_2x2;
-		if (pe_session->nss == NSS_1x1_MODE) {
-			pDot11f->supportedMCSSet[1] = 0;
+		if (pe_session->nss < NSS_2x2_MODE) {
 			pDot11f->txSTBC = 0;
-		} else if (wlan_reg_is_24ghz_ch_freq(
-			   pe_session->curr_op_freq) &&
-			   disable_high_ht_mcs_2x2 &&
-			   (pe_session->opmode == QDF_STA_MODE)) {
+		} else {
+			disable_high_ht_mcs_2x2 =
+				mac->mlme_cfg->rates.disable_high_ht_mcs_2x2;
+		}
+
+		if (disable_high_ht_mcs_2x2 &&
+		    pe_session->opmode == QDF_STA_MODE &&
+		    wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
 			pe_debug("Disabling high HT MCS [%d]",
 				 disable_high_ht_mcs_2x2);
 			pDot11f->supportedMCSSet[1] =
-					(pDot11f->supportedMCSSet[1] >>
-						disable_high_ht_mcs_2x2);
+				pDot11f->supportedMCSSet[1] >>
+							disable_high_ht_mcs_2x2;
+
+			/* Reset all higher MCS, means NSS3 and NSS4 */
+			max_nss = QDF_MIN(NSS_2x2_MODE, pe_session->nss);
+		} else {
+			max_nss = pe_session->nss;
 		}
+
+		for (i = max_nss; i < WLAN_MAX_VDEV_NSS; i++)
+			pDot11f->supportedMCSSet[i] = 0x0;
 
 		wlan_ll_lt_sap_get_mcs(mac->psoc, pe_session->vdev_id,
 				       pDot11f->supportedMCSSet);

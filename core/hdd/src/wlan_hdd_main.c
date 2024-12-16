@@ -2290,7 +2290,7 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	uint8_t mpdu_density;
 	struct mlme_ht_capabilities_info ht_cap_info;
 	uint8_t mcs_set[SIZE_OF_SUPPORTED_MCS_SET];
-	uint8_t enable_mimo;
+	uint8_t num_chains_cap_mimo;
 
 	/* get the MPDU density */
 	status = ucfg_mlme_get_ht_mpdu_density(hdd_ctx->psoc, &mpdu_density);
@@ -2345,49 +2345,54 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	hdd_ctx->num_rf_chains = cfg->num_rf_chains;
 	hdd_ctx->ht_tx_stbc_supported = cfg->ht_tx_stbc;
 
-	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
+					    &num_chains_cap_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	enable_mimo = enable_mimo && (cfg->num_rf_chains >= 2);
+	if (num_chains_cap_mimo > (cfg->num_rf_chains - 1)) {
+		uint8_t updated_mimo_cap = cfg->num_rf_chains - 1;
 
-	status = ucfg_mlme_set_vht_mimo_cap(hdd_ctx->psoc, enable_mimo);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("unable to set vht_enable2x2");
+		status = ucfg_mlme_set_vht_mimo_cap(hdd_ctx->psoc,
+						    updated_mimo_cap);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("unable to set vht_mimo cap");
+		else
+			hdd_debug("update vht mimo ini value %d to %d",
+				  num_chains_cap_mimo, updated_mimo_cap);
 
-	if (!enable_mimo)
-		ht_cap_info.tx_stbc = 0;
+		num_chains_cap_mimo = updated_mimo_cap;
+	}
 
-	if (!(cfg->ht_tx_stbc && enable_mimo))
+	if (!(cfg->ht_tx_stbc && num_chains_cap_mimo))
 		ht_cap_info.tx_stbc = 0;
 
 	status = ucfg_mlme_set_ht_cap_info(hdd_ctx->psoc, ht_cap_info);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_err("could not set HT capability to CCM");
-#define WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES 0xff
+
+	if (!num_chains_cap_mimo)
+		return;
+
+	hdd_debug("Read MCS rate set");
 	value_len = SIZE_OF_SUPPORTED_MCS_SET;
-	if (ucfg_mlme_get_supported_mcs_set(
-				hdd_ctx->psoc, mcs_set,
-				&value_len) == QDF_STATUS_SUCCESS) {
-		hdd_debug("Read MCS rate set");
-		if (cfg->num_rf_chains > SIZE_OF_SUPPORTED_MCS_SET)
-			cfg->num_rf_chains = SIZE_OF_SUPPORTED_MCS_SET;
+	status = ucfg_mlme_get_supported_mcs_set(hdd_ctx->psoc, mcs_set,
+						 &value_len);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
 
-		if (enable_mimo) {
-			for (value = 0;
-			     value < QDF_MIN(NSS_2x2_MODE, cfg->num_rf_chains);
-			     value++)
-				mcs_set[value] =
-					WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES;
+#define WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES 0xff
+	for (value = 0; value <= num_chains_cap_mimo; value++)
+		mcs_set[value] = WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES;
 
-			status = ucfg_mlme_set_supported_mcs_set(
-					hdd_ctx->psoc,
-					mcs_set,
-					(qdf_size_t)SIZE_OF_SUPPORTED_MCS_SET);
-			if (QDF_IS_STATUS_ERROR(status))
-				hdd_err("could not set MCS SET to CCM");
-		}
-	}
+	/* If set, the Tx MCS set is same as Rx MCS set in HT connection */
+	QDF_SET_BITS(mcs_set[WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS / BITS_IN_A_BYTE],
+		     WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS % BITS_IN_A_BYTE, 1, 1);
+
+	status = ucfg_mlme_set_supported_mcs_set(hdd_ctx->psoc, mcs_set,
+						 value_len);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("could not set MCS SET to CCM");
 #undef WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES
 }
 

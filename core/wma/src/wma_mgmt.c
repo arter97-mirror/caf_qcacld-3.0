@@ -1732,10 +1732,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 		if (params->supportedRates.supportedMCSSet[i / 8] &
 		    (1 << (i % 8))) {
 			rate_pos[peer_ht_rates.num_rates++] = i;
-			if (i >= 8) {
-				/* MCS8 or higher rate is present, must be 2x2 */
-				peer_nss = 2;
-			}
+			if (((i / 8) + 1) <= WLAN_MAX_VDEV_NSS)
+				peer_nss = (i / 8) + 1;
 		}
 		if (peer_ht_rates.num_rates == max_rates)
 			break;

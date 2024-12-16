@@ -5878,9 +5878,9 @@ static void wma_update_target_ext_ht_cap(struct target_psoc_info *tgt_hdl,
 					mac_phy_cap[i].rx_chain_mask_2G);
 		if (ht_5g)
 			wma_derive_ext_ht_cap(&tmp_ht_cap,
-					ht_5g,
-					mac_phy_cap[i].tx_chain_mask_5G,
-					mac_phy_cap[i].rx_chain_mask_5G);
+					      ht_5g,
+					      mac_phy_cap[i].tx_chain_mask_5G,
+					      mac_phy_cap[i].rx_chain_mask_5G);
 	}
 
 	if (qdf_mem_cmp(&tmp_cap, &tmp_ht_cap,

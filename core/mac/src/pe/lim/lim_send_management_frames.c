@@ -2348,6 +2348,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			is_vht = true;
 		} else if (sta->mlmStaContext.force_1x1 &&
 			   frm.HTCaps.present) {
+			uint8_t idx;
+
 			/*
 			 * WAR: In P2P GO mode, if the P2P client device
 			 * is only HT capable and not VHT capable, but the P2P
@@ -2360,8 +2362,11 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			 * peer device is only HT capable and will not
 			 * understand OMN IE.
 			 */
-			frm.HTInfo.basicMCSSet[1] = 0;
-			frm.HTCaps.supportedMCSSet[1] = 0;
+			for (idx = NSS_2x2_MODE; idx <= WLAN_MAX_VDEV_NSS;
+			     idx++) {
+				frm.HTInfo.basicMCSSet[idx - 1] = 0;
+				frm.HTCaps.supportedMCSSet[idx - 1] = 0;
+			}
 		}
 
 		if (pe_session->vhtCapability &&

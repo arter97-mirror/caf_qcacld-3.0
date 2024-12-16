@@ -983,6 +983,7 @@ typedef struct sHtCaps {
 #define SIZE_OF_BASIC_MCS_SET                              16
 #define VALID_MCS_SIZE                                     77   /* 0-76 */
 #define MCS_RX_HIGHEST_SUPPORTED_RATE_BYTE_OFFSET          10
+#define WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS                 96
 #define VALID_MAX_MCS_INDEX                                8
 
 /* */

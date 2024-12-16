@@ -1785,6 +1785,8 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 
 	if (IS_DOT11_MODE_HT(pe_session->dot11mode) &&
 	    !lim_is_he_6ghz_band(pe_session)) {
+		uint8_t idx;
+
 		val_len = SIZE_OF_SUPPORTED_MCS_SET;
 		if (wlan_mlme_get_cfg_str(
 			pRates->supportedMCSSet,
@@ -1793,8 +1795,9 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 			pe_err("could not retrieve supportedMCSSet");
 			return QDF_STATUS_E_FAILURE;
 		}
-		if (pe_session->nss == NSS_1x1_MODE)
-			pRates->supportedMCSSet[1] = 0;
+
+		for (idx = pe_session->nss; idx < WLAN_MAX_VDEV_NSS; idx++)
+			pRates->supportedMCSSet[idx] = 0;
 
 		/* if supported MCS Set of the peer is passed in, then do the
 		 * intersection, else use the MCS set from local CFG.
@@ -2051,6 +2054,8 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 		(sta_ds->mlmStaContext.htCapability))
 #endif
 	{
+		uint8_t idx;
+
 		val_len = SIZE_OF_SUPPORTED_MCS_SET;
 		if (wlan_mlme_get_cfg_str(
 			mcs_set,
@@ -2060,8 +2065,8 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		if (session_entry->nss == NSS_1x1_MODE)
-			mcs_set[1] = 0;
+		for (idx = session_entry->nss; idx < WLAN_MAX_VDEV_NSS; idx++)
+			mcs_set[idx] = 0;
 
 		wlan_ll_lt_sap_get_mcs(mac_ctx->psoc, session_entry->vdev_id,
 				       mcs_set);
