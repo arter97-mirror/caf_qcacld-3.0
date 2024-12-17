@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3666,6 +3667,14 @@ QDF_STATUS sme_dhcp_start_ind(mac_handle_t mac_handle,
 			sme_release_global_lock(&mac->sme);
 			return QDF_STATUS_E_FAILURE;
 		}
+
+		/*DHCP is completed, no need to protect*/
+		if (pSession->dhcp_done) {
+			sme_warn("dhcp done, no need to protect");
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_FAILURE;
+		}
+
 		pSession->dhcp_done = false;
 
 		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
@@ -3732,7 +3741,18 @@ QDF_STATUS sme_dhcp_stop_ind(mac_handle_t mac_handle,
 			sme_release_global_lock(&mac->sme);
 			return QDF_STATUS_E_FAILURE;
 		}
+
+		/* will reach here either by DHCP or static IP */
 		pSession->dhcp_done = true;
+
+		/* Do not send ind in disconnected status*/
+		if (eCSR_ASSOC_STATE_TYPE_INFRA_CONNECTED != pSession->connectState &&
+			eCSR_ASSOC_STATE_TYPE_INFRA_ASSOCIATED != pSession->connectState &&
+			eCSR_ASSOC_STATE_TYPE_WDS_CONNECTED != pSession->connectState) {
+			sme_warn("Not connected, status %d, should not send ind\n", pSession->connectState);
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_FAILURE;
+		}
 
 		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
 		if (!pMsg) {

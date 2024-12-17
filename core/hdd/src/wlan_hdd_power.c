@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -268,8 +269,6 @@ static void __wlan_hdd_ipv6_changed(struct net_device *net_dev,
 	if (event == NETDEV_UP &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-		hdd_debug("invoking sme_dhcp_done_ind");
-		sme_dhcp_done_ind(hdd_ctx->mac_handle, adapter->vdev_id);
 		schedule_work(&adapter->ipv6_notifier_work);
 	}
 
@@ -999,8 +998,10 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		hdd_debug("invoking sme_dhcp_done_ind");
-		sme_dhcp_done_ind(hdd_ctx->mac_handle, adapter->vdev_id);
+		hdd_debug("invoking sme_dhcp_stop_ind");
+		/* send dhcp prot stop ind when ip address is obtained */
+		sme_dhcp_stop_ind(hdd_ctx->mac_handle, adapter->device_mode,
+				adapter->mac_addr.bytes, adapter->vdev_id);
 
 		if (!ucfg_pmo_is_arp_offload_enabled(hdd_ctx->psoc)) {
 			hdd_debug("Offload not enabled");

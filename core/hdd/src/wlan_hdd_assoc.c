@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2000,9 +2000,22 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 
 	if ((QDF_STA_MODE == adapter->device_mode) ||
 	    (QDF_P2P_CLIENT_MODE == adapter->device_mode)) {
+		struct mac_context *mac = MAC_CONTEXT(mac_handle);
+		struct csr_roam_session *pSession;
+
 		sme_ps_disable_auto_ps_timer(mac_handle,
 					     adapter->vdev_id);
 		adapter->send_mode_change = true;
+
+		pSession = CSR_GET_SESSION(mac, adapter->vdev_id);
+
+		if (!pSession) {
+			sme_err("Session: %d not found", adapter->vdev_id);
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_FAILURE;
+		}
+		/* Clear the flag in disconnected status */
+		pSession->dhcp_done = false;
 	}
 	wlan_hdd_clear_link_layer_stats(adapter);
 
@@ -3278,6 +3291,13 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					cdp_hl_fc_set_td_limit(soc,
 							       adapter->vdev_id,
 							       conn_info_freq);
+					if (adapter->device_mode == QDF_STA_MODE ||
+						adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+						/* inform FW to start DHCP prot */
+						sme_dhcp_start_ind(hdd_ctx->mac_handle, adapter->device_mode,
+							   adapter->mac_addr.bytes,
+							   adapter->vdev_id);
+					}
 				}
 			}
 			if (!hddDisconInProgress) {
