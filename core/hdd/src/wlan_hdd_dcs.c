@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -587,7 +587,7 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint32_t conn_idx, count;
 	struct wlan_hdd_link_info *link_info;
-	uint32_t dcs_ch = wlan_reg_freq_to_chan(hdd_ctx->pdev, dcs_ch_freq);
+	uint16_t dcs_ch_width;
 
 	status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc, vdev_id,
 						     &mac_id);
@@ -661,11 +661,13 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 			continue;
 
 		hdd_ctx->acs_policy.acs_chan_freq = AUTO_CHANNEL_SELECT;
-		hdd_debug("dcs triggers old ch:%d new ch:%d",
-			  ap_ctx->operating_chan_freq, dcs_ch_freq);
+		dcs_ch_width = ap_ctx->sap_config.acs_cfg.ch_width;
+		hdd_debug("dcs triggers old ch:%d new ch:%d new BW:%d",
+			  ap_ctx->operating_chan_freq, dcs_ch_freq, dcs_ch_width);
 		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
 					    link_info->vdev_id, CSA_REASON_DCS);
-		status = hdd_switch_sap_channel(link_info, dcs_ch, true);
+		status = hdd_switch_sap_chan_freq(link_info->adapter, dcs_ch_freq,
+						  dcs_ch_width, true);
 		if (status == QDF_STATUS_SUCCESS)
 			status = QDF_STATUS_E_PENDING;
 		return status;
