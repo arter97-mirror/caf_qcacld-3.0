@@ -7895,7 +7895,7 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
-	    wlan_diag_event.subtype < WLAN_CONN_DIAG_BMISS_EVENT)
+	    wlan_diag_event.subtype < WLAN_CONN_DIAG_DISCONNECT_EVENT)
 		wlan_diag_event.reason = frame_data->status_code;
 
 	if (wlan_diag_event.subtype == WLAN_CONN_DIAG_DEAUTH_RX_EVENT ||
@@ -7948,7 +7948,7 @@ cm_roam_beacon_loss_disconnect_event(struct wlan_objmgr_psoc *psoc,
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
 			  0, &bssid);
 
-	wlan_diag_event.subtype = WLAN_CONN_DIAG_BMISS_EVENT;
+	wlan_diag_event.subtype = WLAN_CONN_DIAG_DISCONNECT_EVENT;
 	wlan_diag_event.version = DIAG_MGMT_VERSION;
 	wlan_diag_event.rssi = mlme_get_hb_ap_rssi(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
