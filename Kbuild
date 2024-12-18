@@ -2236,6 +2236,13 @@ DP_OBJS += $(DP_SRC)/../cmn_dp_api/dp_ratetable.o
 ifeq ($(CONFIG_BERYLLIUM), y)
 DP_INC += -I$(WLAN_COMMON_INC)/dp/wifi3.0/be
 
+ifeq ($(CONFIG_BORON), y)
+DP_INC += -I$(WLAN_COMMON_INC)/dp/wifi3.0/bn
+
+DP_OBJS += $(DP_SRC)/bn/dp_bn_tx.o
+ DP_OBJS += $(DP_SRC)/bn/dp_bn_rx.o
+endif
+
 DP_OBJS += $(DP_SRC)/be/dp_be.o
 DP_OBJS += $(DP_SRC)/be/dp_be_tx.o
 DP_OBJS += $(DP_SRC)/be/dp_be_rx.o
@@ -3003,7 +3010,7 @@ endif
 
 HIF_CE_OBJS +=  $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_service_srng.o
 else ifeq ($(CONFIG_BERYLLIUM), y)
-ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2) $CONFIG_CNSS_PEACH))
+ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2) $(CONFIG_CNSS_PEACH) $(CONFIG_CNSS_FIG)))
 HIF_CE_OBJS +=  $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/kiwidef.o
 endif
 
@@ -3140,7 +3147,15 @@ HAL_OBJS +=	$(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/be/hal_be_generic_api.o
 
 HAL_OBJS +=	$(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/be/hal_be_reo.o \
 
-ifeq (y,$(findstring y,$(CONFIG_INCLUDE_HAL_PEACH)))
+ifeq ($(CONFIG_BORON), y)
+HAL_INC += 	-I$(WLAN_COMMON_INC)/$(HAL_DIR)/wifi3.0/bn
+endif
+
+ifeq (y,$(findstring y,$(CONFIG_INCLUDE_HAL_FIG)))
+HAL_INC += -I$(WLAN_COMMON_INC)/$(HAL_DIR)/wifi3.0/fig
+HAL_OBJS += $(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/fig/hal_fig.o
+ccflags-y += -DINCLUDE_HAL_FIG
+else ifeq (y,$(findstring y,$(CONFIG_INCLUDE_HAL_PEACH)))
 HAL_INC += -I$(WLAN_COMMON_INC)/$(HAL_DIR)/wifi3.0/peach
 HAL_OBJS += $(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/peach/hal_peach.o
 ccflags-y += -DINCLUDE_HAL_PEACH
@@ -3299,6 +3314,10 @@ ifeq ($(CONFIG_CNSS_WCN6450), y)
 TARGET_INC +=	-I$(WLAN_FW_API)/hw/wcn6450/v1
 endif
 
+
+ifeq ($(CONFIG_CNSS_FIG), y)
+TARGET_INC +=	-I$(WLAN_FW_API)/hw/fig/v1/
+else
 ifeq ($(CONFIG_CNSS_PEACH), y)
 TARGET_INC +=	-I$(WLAN_FW_API)/hw/peach/v1/
 else
@@ -3317,6 +3336,7 @@ ifeq ($(CONFIG_CNSS_QCC2072), y)
 TARGET_INC +=   -I$(WLAN_FW_API)/hw/qcc2072/v1/
 endif
 
+endif
 endif
 endif
 
@@ -3578,6 +3598,10 @@ ccflags-$(CONFIG_DSC_TEST) += -DWLAN_DSC_TEST
 
 ifeq ($(CONFIG_LITHIUM), y)
 ccflags-y += -DCONFIG_LITHIUM
+endif
+
+ifeq ($(CONFIG_BORON), y)
+ccflags-y += -DCONFIG_BORON
 endif
 
 ifeq ($(CONFIG_BERYLLIUM), y)
@@ -4455,6 +4479,7 @@ ccflags-$(CONFIG_FEATURE_HIF_DELAYED_REG_WRITE) += -DFEATURE_HIF_DELAYED_REG_WRI
 ccflags-$(CONFIG_CNSS_KIWI_V2) += -DQCA_WIFI_KIWI_V2
 ccflags-$(CONFIG_CNSS_MANGO) += -DQCA_WIFI_MANGO
 ccflags-$(CONFIG_CNSS_PEACH) += -DQCA_WIFI_PEACH
+ccflags-$(CONFIG_CNSS_FIG) += -DQCA_WIFI_FIG
 ccflags-$(CONFIG_QCA_WIFI_QCA8074) += -DQCA_WIFI_QCA8074
 ccflags-$(CONFIG_SCALE_INCLUDES) += -DSCALE_INCLUDES
 ccflags-$(CONFIG_QCA_WIFI_QCA8074_VP) += -DQCA_WIFI_QCA8074_VP
@@ -5235,7 +5260,6 @@ ccflags-y += -Wframe-larger-than=4096
 endif
 endif
 ccflags-y += -Wmissing-prototypes
-
 ifeq ($(call cc-option-yn, -Wheader-guard), y)
 ccflags-y += -Wheader-guard
 endif
