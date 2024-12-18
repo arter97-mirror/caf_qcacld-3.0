@@ -6485,17 +6485,49 @@ static void hdd_fill_rate_info(struct wlan_objmgr_psoc *psoc,
 	/* report current rx rate*/
 	rate_flags = stainfo->rate_flags;
 	if (!(rate_flags & TX_RATE_LEGACY)) {
-		if (stats->rx_rate.rate_flags)
-			rate_flags = stats->rx_rate.rate_flags;
-		nss = stats->rx_rate.nss;
+		nss = stainfo->nss;
+		if (ucfg_mlme_stats_is_link_speed_report_actual(psoc)) {
+			/* Get current rate flags if report actual */
+			if (stats->rx_rate.rate_flags)
+				rate_flags = stats->rx_rate.rate_flags;
+			nss = stats->rx_rate.nss;
+		}
 		if (stats->rx_rate.mcs == INVALID_MCS_IDX)
 			rate_flags = TX_RATE_LEGACY;
 	}
-	if (!(rate_flags & TX_RATE_LEGACY))
-		mcsidx = stats->rx_rate.mcs;
+
+	if (!ucfg_mlme_stats_is_link_speed_report_actual(psoc) &&
+	    rssidx != 3) {
+		/*
+		 * make sure we report a value at least as big as our
+		 * current rate
+		 */
+		if (maxrate < rx_rate || maxrate == 0) {
+			maxrate = rx_rate;
+			if (!(rate_flags & TX_RATE_LEGACY)) {
+				mcsidx = stats->rx_rate.mcs;
+				/*
+				 * 'IEEE_P802.11ac_2013.pdf' page 325, 326
+				 * - MCS9 is valid for VHT20 when Nss = 3 or
+				 *   Nss = 6
+				 * - MCS9 is not valid for VHT20 when
+				 *   Nss = 1,2,4,5,7,8
+				 */
+				if ((rate_flags & TX_RATE_VHT20) &&
+				    mcsidx > 8 &&
+				    (nss != 3 && nss != 6))
+					mcsidx = 8;
+			}
+		}
+	} else {
+		/* report current rate instead of max rate */
+		maxrate = rx_rate;
+		if (!(rate_flags & TX_RATE_LEGACY))
+			mcsidx = stats->rx_rate.mcs;
+	}
 
 	hdd_fill_sinfo_rate_info(sinfo, rate_flags, mcsidx, nss,
-				 rx_rate, false);
+				 maxrate, false);
 
 	sinfo->expected_throughput = stainfo->max_phy_rate;
 	sinfo->filled |= HDD_INFO_EXPECTED_THROUGHPUT;
