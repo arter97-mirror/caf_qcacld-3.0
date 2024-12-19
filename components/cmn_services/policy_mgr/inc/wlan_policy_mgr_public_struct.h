@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -516,6 +516,7 @@ enum policy_mgr_mac_use {
  * 2.4 GHz channels.
  * @PM_SCC_ON_5G_HIGH_CH_24G: SCC channels on 5G high frequencies followed by
  * 2.4 GHz channels.
+ * @PM_SCC_STA_ON_24_OR_5: SCC on STA 2 GHz or 5  GHz
  *
  * @PM_MAX_PCL_TYPE: Max place holder
  *
@@ -576,6 +577,7 @@ enum policy_mgr_pcl_type {
 	PM_SCC_ON_5G_HIGH_MCC_ON_5G_LOW,
 	PM_SCC_ON_5G_LOW_CH_24G,
 	PM_SCC_ON_5G_HIGH_CH_24G,
+	PM_SCC_STA_ON_24_OR_5,
 
 	PM_MAX_PCL_TYPE
 };

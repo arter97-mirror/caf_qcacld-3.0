@@ -4143,6 +4143,15 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 
 		status = QDF_STATUS_SUCCESS;
 		break;
+	case PM_SCC_STA_ON_24_OR_5:
+		policy_mgr_get_connection_channels(
+					psoc, mode,
+					POLICY_MGR_PCL_ORDER_NONE,
+					false,
+					POLICY_MGR_PCL_GROUP_ID1_ID2,
+					pcl_channels, pcl_weights, pcl_sz, len);
+		status = QDF_STATUS_SUCCESS;
+		break;
 	default:
 		policy_mgr_err("unknown pcl value %d", pcl);
 		break;

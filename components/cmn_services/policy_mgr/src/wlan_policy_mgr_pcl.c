@@ -45,6 +45,7 @@
 #include "wlan_ll_sap_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_nan_api_i.h"
+#include "wlan_crypto_global_api.h"
 
 /*
  * first_connection_pcl_table - table which provides PCL for the
@@ -1370,6 +1371,73 @@ policy_mgr_modify_sap_pcl_filter_mcc(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * policy_mgr_modify_dual_sap_band_pcl_filter() - API to filter out dual sap
+ * channel with
+ * existing SAP and STA connection frequency.
+ * @psoc: pointer to SOC
+ * @pcl_list_org: channel list to filter out
+ * @weight_list_org: weight of channel list
+ * @pcl_len_org: length of channel list
+ * @mode: Policy manager connection mode
+ * @pm_ctx: pm ctx
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+policy_mgr_modify_dual_sap_band_pcl_filter(
+				struct wlan_objmgr_psoc *psoc,
+				uint32_t *pcl_list_org,
+				uint8_t *weight_list_org,
+				uint32_t *pcl_len_org,
+				enum policy_mgr_con_mode mode,
+				struct policy_mgr_psoc_priv_obj *pm_ctx,
+				uint8_t vdev_id)
+{
+	uint8_t sap_count = 0, i;
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint32_t pcl_len = 0;
+	bool multi_sap_allowed_on_same_band;
+
+	if (mode != PM_SAP_MODE)
+		return QDF_STATUS_SUCCESS;
+
+	sap_count = policy_mgr_get_mode_specific_conn_info(
+							psoc, freq_list,
+							vdev_id_list,
+							PM_SAP_MODE);
+	if (!sap_count || sap_count > 1)
+		return QDF_STATUS_SUCCESS;
+
+	/* check only when multi sap on same band is not supported */
+	policy_mgr_get_multi_sap_allowed_on_same_band(
+					psoc,
+					&multi_sap_allowed_on_same_band);
+
+	if (multi_sap_allowed_on_same_band)
+		return QDF_STATUS_SUCCESS;
+
+	/* check owe */
+	if (policy_mgr_is_owe_connection_present(pm_ctx->pdev, vdev_id))
+		return QDF_STATUS_SUCCESS;
+
+	for (i = 0; i < *pcl_len_org; i++) {
+		/* filter frequency of existing SAP */
+		if (WLAN_REG_IS_SAME_BAND_FREQS(pcl_list_org[i],
+						freq_list[0]))
+			continue;
+
+		pcl_list_org[pcl_len] = pcl_list_org[i];
+		weight_list_org[pcl_len++] = weight_list_org[i];
+	}
+
+	*pcl_len_org = pcl_len;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * policy_mgr_modify_sap_go_4th_conc_disallow() - filter out channel that
  * is not allowed for 4th sap/go connection
  * @psoc: pointer to soc
@@ -1450,6 +1518,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 	bool band_6ghz_modified_pcl = false;
 	bool fourth_conc_modified_pcl = false;
 	bool mcc_modified_pcl = false;
+	bool dual_sap_modified_pcl = false;
 	bool srd_chan_enabled;
 	uint32_t pcl_len, orig_len;
 
@@ -1577,18 +1646,30 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to modify pcl for filter mcc");
 		return status;
 	}
+
 	if (pcl_len != *len) {
 		mcc_modified_pcl = true;
 		pcl_len = *len;
 	}
 
+	status = policy_mgr_modify_dual_sap_band_pcl_filter(
+						psoc,
+						pcl_channels,
+						pcl_weight, len,
+						mode, pm_ctx, vdev_id);
+	if (pcl_len != *len) {
+		dual_sap_modified_pcl = true;
+		pcl_len = *len;
+	}
+
 	if (orig_len != *len)
-		policy_mgr_debug("Modified by: safe_ch %d mandatory %d nol %d dfs %d srd %d indoor %d passive %d 6 Ghz %d 4th_conc %d mcc %d",
+		policy_mgr_debug("Modified by: safe_ch %d mandatory %d nol %d dfs %d srd %d indoor %d passive %d 6 Ghz %d 4th_conc %d mcc %d dual_sap %d",
 				 safe_chan_modified_pcl, mandatory_modified_pcl,
 				 nol_modified_pcl, dfs_modified_pcl,
 				 srd_modified_pcl, indoor_modified_pcl,
 				 passive_modified_pcl, band_6ghz_modified_pcl,
-				 fourth_conc_modified_pcl, mcc_modified_pcl);
+				 fourth_conc_modified_pcl, mcc_modified_pcl,
+				 dual_sap_modified_pcl);
 
 	return QDF_STATUS_SUCCESS;
 }
