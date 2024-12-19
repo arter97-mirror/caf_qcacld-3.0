@@ -956,6 +956,8 @@ hdd_reset_sta_info_during_reattach(struct hdd_station_info *sta_info)
 	sta_info->disassoc_ts = 0;
 	sta_info->tx_rate = 0;
 	sta_info->rx_rate = 0;
+	sta_info->tx_retries_ratio = 0;
+	sta_info->tx_failed_retrylimit = 0;
 	sta_info->ampdu = 0;
 	sta_info->sgi_enable = 0;
 	sta_info->tx_stbc = 0;

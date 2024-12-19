@@ -133,7 +133,7 @@ typedef struct sIEDefn {
 #define DOT11F_PARAMETER_CHECK2(pSrc, pBuf, nBuf, pnConsumed) \
 	do { \
 		if (!pSrc || IsBadReadPtr(pSrc, 4))\
-			eturn DOT11F_BAD_INPUT_BUFFER; \
+			return DOT11F_BAD_INPUT_BUFFER; \
 		if (!pBuf || IsBadWritePtr(pBuf, nBuf))\
 			return DOT11F_BAD_OUTPUT_BUFFER; \
 		if (!nBuf)\
@@ -6355,7 +6355,7 @@ uint32_t dot11f_unpack_ie_country(tpAniSirGlobal pCtx,
 		return 0U;
 	} else {
 		pDst->num_more_triplets = (uint8_t)(ielen / 3);
-		if (ielen / 3 > 80) {
+		if (ielen > 80 * 3) {
 			pDst->present = 0;
 			return DOT11F_SKIPPED_BAD_IE;
 		}
@@ -18250,7 +18250,7 @@ uint32_t dot11f_get_packed_del_ts_size(tpAniSirGlobal pCtx,
 	tDot11fDelTS *pFrm, uint32_t *pnNeeded)
 {
 	uint32_t status = 0;
-	*pnNeeded = 7;
+	*pnNeeded = 8;
 	status = get_packed_size_core(pCtx, (uint8_t *)pFrm, pnNeeded,
 				      IES_DelTS);
 	return status;

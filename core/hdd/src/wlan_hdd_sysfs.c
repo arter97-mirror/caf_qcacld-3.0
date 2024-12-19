@@ -702,8 +702,19 @@ static void hdd_sysfs_destroy_bcn_reception_interface(struct hdd_adapter
 {
 	device_remove_file(&adapter->dev->dev, &dev_attr_beacon_stats);
 }
+#else /* !WLAN_FEATURE_BEACON_RECEPTION_STATS */
+static inline int
+hdd_sysfs_create_bcn_reception_interface(struct hdd_adapter *adapter)
+{
+	return 0;
+}
 
-#endif
+static inline void
+hdd_sysfs_destroy_bcn_reception_interface(struct hdd_adapter *adapter)
+{
+}
+
+#endif /* WLAN_FEATURE_BEACON_RECEPTION_STATS */
 
 static void
 hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)

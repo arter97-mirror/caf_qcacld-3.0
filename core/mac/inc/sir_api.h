@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1019,7 +1019,9 @@ struct oem_channel_info {
 enum sir_sme_phy_mode {
 	SIR_SME_PHY_MODE_LEGACY = 0,
 	SIR_SME_PHY_MODE_HT = 1,
-	SIR_SME_PHY_MODE_VHT = 2
+	SIR_SME_PHY_MODE_VHT = 2,
+	SIR_SME_PHY_MODE_HE = 3,
+	SIR_SME_PHY_MODE_EHT = 4,
 };
 
 /* / Definition for Association indication from peer */

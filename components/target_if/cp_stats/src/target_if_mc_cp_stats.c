@@ -1049,6 +1049,10 @@ target_if_cp_stats_extract_peer_stats_event(struct wmi_unified *wmi_hdl,
 		peer_stats_info->rx_bytes = stats_info.rx_bytes;
 		peer_stats_info->tx_retries = stats_info.tx_retries;
 		peer_stats_info->tx_failed = stats_info.tx_failed;
+		peer_stats_info->tx_retries_ratio =
+			stats_info.tx_retries_ratio;
+		peer_stats_info->tx_failed_retrylimit =
+			stats_info.tx_failed_retrylimit;
 		peer_stats_info->tx_succeed = stats_info.tx_succeed;
 		peer_stats_info->rssi = stats_info.peer_rssi;
 		peer_stats_info->tx_rate = stats_info.last_tx_bitrate_kbps;

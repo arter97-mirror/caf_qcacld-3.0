@@ -142,6 +142,10 @@
 #define ASSOC_REQ_IES \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_REQ_IES
 
+#define REMOTE_TX_RETRY \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_RETRY
+#define REMOTE_TX_RETRY_EXHAUST \
+	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_REMOTE_TX_RETRY_EXHAUST
 /*
  * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
  * feature or not, if first bit is 1 it indictes that FW supports this
@@ -1354,8 +1358,14 @@ static int hdd_get_connected_station_info(struct hdd_context *hdd_ctx,
 	if (txrx_rate) {
 		stainfo->tx_rate = stats->peer_stats_info_ext->tx_rate;
 		stainfo->rx_rate = stats->peer_stats_info_ext->rx_rate;
+		stainfo->tx_retries_ratio =
+			stats->peer_stats_info_ext->tx_retries_ratio;
+		stainfo->tx_failed_retrylimit =
+			stats->peer_stats_info_ext->tx_failed_retrylimit;
 		nl_buf_len += (sizeof(stainfo->tx_rate) + NLA_HDRLEN) +
-			(sizeof(stainfo->rx_rate) + NLA_HDRLEN);
+			(sizeof(stainfo->rx_rate) + NLA_HDRLEN) +
+			(sizeof(stainfo->tx_retries_ratio) + NLA_HDRLEN) +
+			(sizeof(stainfo->tx_failed_retrylimit) + NLA_HDRLEN);
 		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 	}
 
@@ -1406,12 +1416,18 @@ static int hdd_get_connected_station_info(struct hdd_context *hdd_ctx,
 
 	if (txrx_rate) {
 		if (nla_put_u32(skb, REMOTE_LAST_TX_RATE, stainfo->tx_rate) ||
-		    nla_put_u32(skb, REMOTE_LAST_RX_RATE, stainfo->rx_rate)) {
+		    nla_put_u32(skb, REMOTE_LAST_RX_RATE, stainfo->rx_rate) ||
+		    nla_put_u32(skb, REMOTE_TX_RETRY,
+				stainfo->tx_retries_ratio) ||
+		    nla_put_u32(skb, REMOTE_TX_RETRY_EXHAUST,
+				stainfo->tx_failed_retrylimit)) {
 			hdd_err("put fail");
 			goto fail;
 		} else {
-			hdd_info("tx_rate %x rx_rate %x",
-				 stainfo->tx_rate, stainfo->rx_rate);
+			hdd_info("tx_rate %d rx_rate %d tx_retries_ratio %d tx_failed_retrylimit %d",
+				 stainfo->tx_rate, stainfo->rx_rate,
+				 stainfo->tx_retries_ratio,
+				 stainfo->tx_failed_retrylimit);
 		}
 	}
 

@@ -239,6 +239,10 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  * @pending_eap_frm_type: EAP frame type in tx queue without tx completion
  * @is_attached: Flag to check if the stainfo is attached/detached
  * @peer_rssi_per_chain: Average value of RSSI (dbm) per chain
+ * @tx_retries_ratio: cumulative retry counts among the last 100 packets
+ *  via ratio approximation.
+ * @tx_failed_retrylimit: failed packets due to the number of retransmission
+ *  attempts exceeding 802.11 retry limit.
  */
 struct hdd_station_info {
 	qdf_list_node_t sta_node;
@@ -303,6 +307,8 @@ struct hdd_station_info {
 	unsigned long pending_eap_frm_type;
 	bool is_attached;
 	int32_t peer_rssi_per_chain[WMI_MAX_CHAINS];
+	uint32_t tx_retries_ratio;
+	uint32_t tx_failed_retrylimit;
 };
 
 /**

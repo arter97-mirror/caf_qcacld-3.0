@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -384,6 +385,10 @@ extract_peer_stats_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			    uint32_t index,
 			    wmi_host_peer_stats_info *peer_stats_info)
 {
+	uint32_t tx_packets;
+	uint64_t tx_retries;
+	int i;
+
 	WMI_PEER_STATS_INFO_EVENTID_param_tlvs *param_buf;
 	wmi_peer_stats_info_event_fixed_param *ev_param;
 
@@ -392,10 +397,7 @@ extract_peer_stats_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 	if (index < ev_param->num_peers) {
 		wmi_peer_stats_info *ev = &param_buf->peer_stats_info[index];
-		int i;
-
 		dump_peer_stats_info(ev);
-
 		WMI_MAC_ADDR_TO_CHAR_ARRAY(&ev->peer_macaddr,
 					   peer_stats_info->peer_macaddr.bytes);
 		peer_stats_info->tx_packets = ev->tx_packets.low_32;
@@ -408,6 +410,25 @@ extract_peer_stats_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		peer_stats_info->rx_bytes += ev->rx_bytes.low_32;
 		peer_stats_info->tx_retries = ev->tx_retries;
 		peer_stats_info->tx_failed = ev->tx_failed;
+
+		/* calculate the ratio and round the result */
+		tx_packets = peer_stats_info->tx_packets;
+		wmi_debug("tx_packets %d, tx_retries %d",
+			  tx_packets, peer_stats_info->tx_retries);
+		if (tx_packets && peer_stats_info->tx_retries) {
+			tx_retries =
+				100 * (uint64_t)peer_stats_info->tx_retries +
+				(uint64_t)(tx_packets >> 1);
+			peer_stats_info->tx_retries_ratio =
+				(uint32_t)qdf_do_div(tx_retries, tx_packets);
+		} else {
+			peer_stats_info->tx_retries_ratio = 0;
+		}
+
+		/* Hard code to 0 for now,
+		 * it can be extended once firmware supports.
+		 */
+		peer_stats_info->tx_failed_retrylimit = 0;
 		peer_stats_info->tx_succeed = ev->tx_succeed;
 		peer_stats_info->peer_rssi = ev->peer_rssi;
 		peer_stats_info->last_tx_bitrate_kbps =

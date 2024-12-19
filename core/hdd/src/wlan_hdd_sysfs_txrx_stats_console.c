@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -51,6 +52,7 @@ __hdd_wlan_txrx_stats_store(struct hdd_context *hdd_ctx,
 	char *sptr, *token;
 	uint32_t stat_type_requested;
 	uint32_t mac_id;
+	uint8_t vdev_id;
 	int ret;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 
@@ -72,20 +74,35 @@ __hdd_wlan_txrx_stats_store(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 
 	sptr = buf_local;
-	/* get mac id */
-	token = strsep(&sptr, " ");
-	if (!token)
-		return -EINVAL;
-	if (kstrtou32(token, 0, &stat_type_requested))
-		return -EINVAL;
-
 	/* get stat type requested */
 	token = strsep(&sptr, " ");
-	if (!token)
+	if (!token) {
+		hdd_err("no stat type");
 		return -EINVAL;
-	if (kstrtou32(token, 0, &mac_id))
+	}
+	if (kstrtou32(token, 0, &stat_type_requested)) {
+		hdd_err("invalid stat type");
 		return -EINVAL;
-
+	}
+	/* get mac id */
+	token = strsep(&sptr, " ");
+	if (!token) {
+		hdd_err("no mac_id");
+		return -EINVAL;
+	}
+	if (kstrtou32(token, 0, &mac_id)) {
+		hdd_err("invalid mac_id");
+		return -EINVAL;
+	}
+	/* get vdev id (if exist) */
+	token = strsep(&sptr, " ");
+	/* If no vdev_id, token = NULL.
+	 * If invalid vdev_id, kstrtou8() return non zero.
+	 */
+	if (!token || kstrtou8(token, 0, &vdev_id)) {
+		hdd_err("no vdev_id or invalid vdev_id");
+		vdev_id = INVALID_VDEV_ID;
+	}
 	if (!soc->ops->cmn_drv_ops->txrx_sysfs_set_stat_type) {
 		hdd_err("txrx_sysfs_set_stat_type is NULL");
 		return -EINVAL;
@@ -93,7 +110,7 @@ __hdd_wlan_txrx_stats_store(struct hdd_context *hdd_ctx,
 
 	soc->ops->cmn_drv_ops->txrx_sysfs_set_stat_type(soc,
 							stat_type_requested,
-							mac_id);
+							mac_id, vdev_id);
 
 	return count;
 }
