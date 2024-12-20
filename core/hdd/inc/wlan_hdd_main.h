@@ -1435,11 +1435,11 @@ struct hdd_adapter {
 
 	qdf_work_t netdev_features_update_work;
 
+	bool sta_allocated;
 	qdf_nbuf_queue_t skb_queue_head;
 	atomic_t tx_enq_num;
 	qdf_spinlock_t skb_lock;
 	qdf_work_t skb_work;
-
 	qdf_nbuf_queue_t skb_hi_queue_head;
 	atomic_t tx_hi_enq_num;
 };

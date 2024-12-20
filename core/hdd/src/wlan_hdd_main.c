@@ -5244,6 +5244,7 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 	qdf_atomic_init(&adapter->tx_enq_num);
 	qdf_nbuf_queue_init(&adapter->skb_hi_queue_head);
 	qdf_atomic_init(&adapter->tx_hi_enq_num);
+	adapter->sta_allocated = true;
 
 	return adapter;
 
@@ -7079,12 +7080,13 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 		cancel_work_sync(&adapter->ipv6_notifier_work);
 #endif
 #endif
-
-		qdf_spinlock_destroy(&adapter->skb_lock);
-		qdf_nbuf_queue_free(&adapter->skb_queue_head);
-		qdf_nbuf_queue_free(&adapter->skb_hi_queue_head);
-		qdf_destroy_work(0, &adapter->skb_work);
-
+		if (adapter->sta_allocated) {
+			qdf_spinlock_destroy(&adapter->skb_lock);
+			qdf_nbuf_queue_free(&adapter->skb_queue_head);
+			qdf_nbuf_queue_free(&adapter->skb_hi_queue_head);
+			qdf_destroy_work(0, &adapter->skb_work);
+			adapter->sta_allocated = false;
+		}
 		if (adapter->device_mode == QDF_STA_MODE) {
 			struct wlan_objmgr_vdev *vdev;
 
