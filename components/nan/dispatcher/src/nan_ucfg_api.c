@@ -74,6 +74,7 @@ static void nan_cfg_init(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_STA_P2P_NDP_CONCURRENCY);
 	nan_obj->cfg_param.prefer_nan_chan_for_p2p =
 				cfg_get(psoc, CFG_PREFER_NAN_CHAN_FOR_P2P);
+	nan_obj->cfg_param.nan_config = cfg_get(psoc, CFG_NAN_CONFIG);
 }
 
 /**

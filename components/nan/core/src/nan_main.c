@@ -47,6 +47,7 @@
 bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	struct nan_psoc_priv_obj *psoc_nan_obj;
+	uint8_t pair_cfg;
 
 	if (!psoc) {
 		nan_err("psoc is null");
@@ -59,7 +60,8 @@ bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc)
 		return false;
 	}
 
-	return psoc_nan_obj->nan_caps.nan_pairing_peer_create_cap;
+	pair_cfg = psoc_nan_obj->cfg_param.nan_config & NAN_PARING_BIT;
+	return psoc_nan_obj->nan_caps.nan_pairing_peer_create_cap && pair_cfg;
 }
 
 bool nan_is_peer_exist_for_opmode(struct wlan_objmgr_psoc *psoc,
