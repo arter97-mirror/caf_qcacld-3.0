@@ -1087,7 +1087,6 @@ struct wlan_diag_btm_info {
  * @mld_addr: MLD mac address
  * @vsie_len: VSIE length
  * @vsie: VSIE
- * @discon_reason: Disconnect reason. Refer enum wlan_diag_disconnect_reason
  * @sub_reason: Sub reason for disconnect event generated from Driver/FW.
  * Refer enum wlan_diag_disconnect_int_reason.
  * @reserved: Reserved field
@@ -1114,9 +1113,8 @@ struct wlan_diag_packet_info {
 	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
 	uint8_t vsie_len;
 	uint8_t vsie[MAX_VSIE_LEN];
-	uint32_t discon_reason:8;
 	uint32_t sub_reason:8;
-	uint32_t reserved:16;
+	uint32_t reserved:24;
 } qdf_packed;
 
 #define DIAG_CONN_VERSION 1
@@ -1575,6 +1573,21 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     enum wlan_main_tag tag);
 
 /**
+ * wlan_connectivity_disconnect_event() - API to log disconnect to userspace
+ * @vdev: vdev pointer
+ * @peer_mac: Peer MAC address
+ * @reason: WLAN disconnect reason. Refer enum wlan_reason_code
+ * @rssi: Link rssi
+ * @is_peer_disconnect: flag to check whether the peer is disconnected from AP
+ *
+ * Return: None
+ */
+void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
+					uint8_t *peer_mac, uint32_t reason,
+					int rssi,
+					bool is_peer_disconnect);
+
+/**
  * wlan_populate_vsie() - Populate VSIE field for logging
  * @vdev: vdev pointer
  * @data: Diag packet info data
@@ -1845,6 +1858,21 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     enum wlan_main_tag tag);
 
 /**
+ * wlan_connectivity_disconnect_event() - API to log disconnect to userspace
+ * @vdev: vdev pointer
+ * @peer_mac: Peer MAC address
+ * @reason: WLAN disconnect reason. Refer enum wlan_reason_code
+ * @rssi: link rssi
+ * @is_peer_disconnect: flag to check whether the peer is disconnected from AP
+ *
+ * Return: None
+ */
+void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
+					uint8_t *peer_mac, uint32_t reason,
+					int rssi,
+					bool is_peer_disconnect);
+
+/**
  * wlan_connectivity_connecting_event() - API to log connecting event
  * @vdev: vdev pointer
  * @con_req: Connection request parameter
@@ -1956,6 +1984,14 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			     uint8_t auth_seq, uint16_t aid,
 			     enum wlan_main_tag tag)
 {}
+
+static inline void
+wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
+				   uint8_t *peer_mac, uint32_t reason,
+				   int rssi,
+				   bool is_peer_disconnect)
+{
+}
 
 static inline void
 wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,

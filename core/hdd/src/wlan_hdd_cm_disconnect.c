@@ -475,6 +475,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct hdd_adapter *adapter;
 	struct wlan_hdd_link_info *link_info;
+	bool is_locally_generated;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
@@ -492,6 +493,17 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_napi_serialize(0);
 	hdd_disable_and_flush_mc_addr_list(adapter, pmo_peer_disconnect);
 	__hdd_cm_disconnect_handler_pre_user_update(link_info);
+
+	if (rsp->req.req.source == CM_PEER_DISCONNECT ||
+	    rsp->req.req.source == CM_SB_DISCONNECT)
+		is_locally_generated = false;
+	else
+		is_locally_generated = true;
+
+	wlan_connectivity_disconnect_event(vdev, rsp->req.req.bssid.bytes,
+					   rsp->req.req.reason_code,
+					   link_info->rssi,
+					   is_locally_generated);
 
 	hdd_handle_disassociation_event(link_info, &rsp->req.req.bssid);
 

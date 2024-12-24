@@ -7952,6 +7952,8 @@ cm_roam_beacon_loss_disconnect_event(struct wlan_objmgr_psoc *psoc,
 	wlan_diag_event.version = DIAG_MGMT_VERSION;
 	wlan_diag_event.rssi = mlme_get_hb_ap_rssi(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+	wlan_diag_event.reason =
+			WLAN_DIAG_DISCONNECT_REASON_BEACON_LOSS;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MGMT);
 
