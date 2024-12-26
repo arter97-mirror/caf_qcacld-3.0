@@ -264,7 +264,7 @@ struct wlan_mlo_ie {
 	uint8_t mld_id_info;
 	struct ext_mld_capab_and_op ext_mld_capab_and_op_info;
 	uint16_t num_sta_profile;
-	struct wlan_mlo_sta_profile sta_profile[WLAN_MLO_MAX_VDEVS];
+	struct wlan_mlo_sta_profile sta_profile[WLAN_MAX_ML_BSS_LINKS + 1];
 	uint16_t num_data;
 	uint8_t data[WLAN_MLO_IE_COM_MAX_LEN];
 };

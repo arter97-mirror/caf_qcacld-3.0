@@ -8344,10 +8344,14 @@ void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 		      uint8_t *ie_start, uint32_t num_bytes)
 {
 	const uint8_t *ie = NULL;
-	struct wlan_mlo_ie dot11_cap;
+	struct wlan_mlo_ie *dot11_cap;
 	struct wlan_mlo_ie_info *mlo_ie_info;
 
-	populate_dot11f_mlo_caps(mac, session, &dot11_cap);
+	dot11_cap = qdf_mem_malloc(sizeof(*dot11_cap));
+	if (!dot11_cap)
+		return;
+
+	populate_dot11f_mlo_caps(mac, session, dot11_cap);
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(MLO_IE_OUI_TYPE,
 					     MLO_IE_OUI_SIZE,
@@ -8357,26 +8361,27 @@ void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 		/* convert from unpacked to packed structure */
 		mlo_ie_info = (struct wlan_mlo_ie_info *)&ie[2 + MLO_IE_OUI_SIZE];
 
-		mlo_ie_info->type = dot11_cap.type;
-		mlo_ie_info->reserved = dot11_cap.reserved;
+		mlo_ie_info->type = dot11_cap->type;
+		mlo_ie_info->reserved = dot11_cap->reserved;
 		mlo_ie_info->link_id_info_present =
-				dot11_cap.link_id_info_present;
+				dot11_cap->link_id_info_present;
 		mlo_ie_info->bss_param_change_cnt_present =
-				dot11_cap.bss_param_change_cnt_present;
+				dot11_cap->bss_param_change_cnt_present;
 		mlo_ie_info->medium_sync_delay_info_present =
-				dot11_cap.medium_sync_delay_info_present;
-		mlo_ie_info->eml_capab_present = dot11_cap.eml_capab_present;
-		mlo_ie_info->mld_capab_and_op_present = dot11_cap.mld_capab_and_op_present;
-		mlo_ie_info->mld_id_present = dot11_cap.mld_id_present;
+				dot11_cap->medium_sync_delay_info_present;
+		mlo_ie_info->eml_capab_present = dot11_cap->eml_capab_present;
+		mlo_ie_info->mld_capab_and_op_present = dot11_cap->mld_capab_and_op_present;
+		mlo_ie_info->mld_id_present = dot11_cap->mld_id_present;
 		mlo_ie_info->ext_mld_capab_and_op_present =
-				dot11_cap.ext_mld_capab_and_op_present;
-		mlo_ie_info->reserved_1 = dot11_cap.reserved_1;
-		mlo_ie_info->common_info_length = dot11_cap.common_info_length;
+				dot11_cap->ext_mld_capab_and_op_present;
+		mlo_ie_info->reserved_1 = dot11_cap->reserved_1;
+		mlo_ie_info->common_info_length = dot11_cap->common_info_length;
 		qdf_mem_copy(&mlo_ie_info->mld_mac_addr,
-			     &dot11_cap.mld_mac_addr,
+			     &dot11_cap->mld_mac_addr,
 			     QDF_MAC_ADDR_SIZE);
 		ie_start[1] += QDF_MAC_ADDR_SIZE;
 	}
+	qdf_mem_free(dot11_cap);
 }
 
 QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
@@ -8386,16 +8391,21 @@ QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
 {
 
 	QDF_STATUS status_2g, status_5g;
-	struct wlan_mlo_ie mlo_ie;
+	struct wlan_mlo_ie *mlo_ie;
 
-	populate_dot11f_mlo_ie(mac_ctx, vdev, &mlo_ie);
+	mlo_ie = qdf_mem_malloc(sizeof(*mlo_ie));
+	if (!mlo_ie)
+		return QDF_STATUS_E_NOMEM;
+
+	populate_dot11f_mlo_ie(mac_ctx, vdev, mlo_ie);
 	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_MLO_IE,
-				CDS_BAND_2GHZ, &mlo_ie.data[2],
-				mlo_ie.num_data - 2);
+				CDS_BAND_2GHZ, &mlo_ie->data[2],
+				mlo_ie->num_data - 2);
 
 	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_MLO_IE,
-				CDS_BAND_5GHZ, &mlo_ie.data[2],
-				mlo_ie.num_data - 2);
+				CDS_BAND_5GHZ, &mlo_ie->data[2],
+				mlo_ie->num_data - 2);
+	qdf_mem_free(mlo_ie);
 
 	if (QDF_IS_STATUS_SUCCESS(status_2g) &&
 	    QDF_IS_STATUS_SUCCESS(status_5g)) {

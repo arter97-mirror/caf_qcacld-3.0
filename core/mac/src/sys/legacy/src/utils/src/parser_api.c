@@ -14769,7 +14769,11 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 	/* find out number of add and del links */
 	total_sta_prof = req->add_link_info.num_links +
 			 req->del_link_info.num_links;
-
+	if (total_sta_prof > QDF_ARRAY_SIZE(mlo_ie->sta_profile)) {
+		pe_err("total_sta_prof %d overflow %lu",
+		       total_sta_prof, QDF_ARRAY_SIZE(mlo_ie->sta_profile));
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 	mlo_dev_ctx = pe_session->vdev->mlo_dev_ctx;
 	if (!mlo_dev_ctx) {
 		pe_err("mlo_dev_ctx is null");
@@ -14778,6 +14782,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 
 	for (link = 0; link < req->del_link_info.num_links; link++) {
 		struct mlo_link_info *ml_link_info;
+		struct qdf_mac_addr *self_link_addr;
 
 		sta_prof = &mlo_ie->sta_profile[num_sta_prof];
 		p_sta_prof = sta_prof->data;
@@ -14786,13 +14791,20 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 			mlo_mgr_get_ap_link_by_link_id(
 					pe_session->vdev->mlo_dev_ctx,
 					req->del_link_info.link[link].link_id);
+		if (ml_link_info) {
+			self_link_addr = &ml_link_info->link_addr;
+		} else {
+			/* in non-common link case, link info may be overwritten
+			 * before send action frame
+			 */
+			self_link_addr =
+				&req->del_link_info.link[link].self_link_addr;
+		}
 
-		if (!ml_link_info)
-			continue;
-
-		pe_debug("Del link id %d ap link addr : " QDF_MAC_ADDR_FMT,
+		pe_debug("Del link id %d ap link addr : " QDF_MAC_ADDR_FMT " self: " QDF_MAC_ADDR_FMT "",
 			 req->del_link_info.link[link].link_id,
-			 QDF_MAC_ADDR_REF(req->del_link_info.link[link].ap_link_addr.bytes));
+			 QDF_MAC_ADDR_REF(req->del_link_info.link[link].ap_link_addr.bytes),
+			 QDF_MAC_ADDR_REF(self_link_addr->bytes));
 
 		/* subelement ID 0, length(sta_prof->num_data - 2) */
 		*p_sta_prof++ = WLAN_ML_LINFO_SUBELEMID_PERSTAPROFILE;
@@ -14802,7 +14814,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 		QDF_SET_BITS(*(uint16_t *)(sta_prof->data + MIN_IE_LEN),
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS,
-			     ml_link_info->link_id);
+			     req->del_link_info.link[link].link_id);
 		QDF_SET_BITS(*(uint16_t *)(sta_prof->data + MIN_IE_LEN),
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_IDX,
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_BITS,
@@ -14844,7 +14856,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 			WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE;
 
 		/* Copying sta mac address in sta info field */
-		qdf_mem_copy(p_sta_prof, ml_link_info->link_addr.bytes,
+		qdf_mem_copy(p_sta_prof, self_link_addr->bytes,
 			     QDF_MAC_ADDR_SIZE);
 		p_sta_prof += QDF_MAC_ADDR_SIZE;
 		len_remaining -= QDF_MAC_ADDR_SIZE;
@@ -14874,9 +14886,10 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 		p_sta_prof = sta_prof->data;
 		len_remaining = sizeof(sta_prof->data);
 
-		pe_debug("Add link id %d link addr : " QDF_MAC_ADDR_FMT,
+		pe_debug("Add link id %d link addr : " QDF_MAC_ADDR_FMT " self: " QDF_MAC_ADDR_FMT "",
 			 req->add_link_info.link[link].link_id,
-			 QDF_MAC_ADDR_REF(req->add_link_info.link[link].ap_link_addr.bytes));
+			 QDF_MAC_ADDR_REF(req->add_link_info.link[link].ap_link_addr.bytes),
+			 QDF_MAC_ADDR_REF(req->add_link_info.link[link].self_link_addr.bytes));
 
 		/* subelement ID 0, length(sta_prof->num_data - 2) */
 		*p_sta_prof++ = WLAN_ML_LINFO_SUBELEMID_PERSTAPROFILE;
