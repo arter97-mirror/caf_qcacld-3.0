@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,9 +26,13 @@
 #include <qdf_types.h>
 #include "wlan_objmgr_pdev_obj.h"
 
-#define MAX_BAD_AP_LIST_SIZE               28
 #define MAX_RSSI_AVOID_BSSID_LIST          10
-#define PDEV_MAX_NUM_BSSID_DISALLOW_LIST   28
+/*
+ * Size of wmi_pdev_bssid_disallow_list_config_params is 96, total size
+ * should less than MAX_WLAN_TX_CREDIT_SIZE 2176
+ */
+#define MAX_BAD_AP_LIST_SIZE               22
+#define PDEV_MAX_NUM_BSSID_DISALLOW_LIST   22
 #define MAX_CONNECTION_TRIAL_PER_ASSOC_LINK WLAN_MAX_ML_BSS_LINKS * 2
 /**
  * enum dlm_reject_ap_source - Source of adding BSSID to DLM
