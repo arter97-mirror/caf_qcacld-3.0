@@ -29,6 +29,7 @@
 #include "wlan_mlo_mgr_peer.h"
 #include "wlan_scan_api.h"
 #include "wlan_cm_roam_api.h"
+#include "qdf_trace.h"
 
 #ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
 static struct wlan_connectivity_log_buf_data global_cl;
@@ -1223,6 +1224,29 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.rssi = rssi;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MGMT);
+}
+
+enum diag_tx_status
+wlan_diag_get_tx_status(enum wlan_diag_tx_rx_status tx_status)
+{
+	switch (tx_status) {
+	case WLAN_DIAG_TX_RX_STATUS_FW_DISCARD:
+	case WLAN_DIAG_TX_RX_STATUS_DROP:
+	case WLAN_DIAG_TX_RX_STATUS_DOWNLOAD_SUCC:
+	case WLAN_DIAG_TX_RX_TX_FILTERED:
+	case WLAN_DIAG_TX_RX_TXOP_ABORT:
+	case WLAN_DIAG_TX_RX_TX_TID_DEL:
+	case WLAN_DIAG_TX_RX_SW_ABORT:
+	case WLAN_DIAG_TX_RX_TX_MIG_DROP:
+	case WLAN_DIAG_TX_RX_MLO_TID_MIG:
+		return DIAG_TX_STATUS_FAIL;
+	case WLAN_DIAG_TX_RX_STATUS_NO_ACK:
+		return DIAG_TX_STATUS_NO_ACK;
+	case WLAN_DIAG_TX_RX_STATUS_OK:
+		return DIAG_TX_STATUS_ACK;
+	default:
+		return DIAG_TX_STATUS_FAIL;
+	}
 }
 
 void

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -549,7 +549,7 @@ wlan_diag_log_beacon_rpt_req_event(uint8_t token, uint8_t mode,
 	wlan_diag_event.diag_cmn.ktime_us =  qdf_ktime_to_us(qdf_ktime_get());
 
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BCN_RPT_REQ_EVENT;
-	wlan_diag_event.version = DIAG_BCN_RPT_VERSION_2;
+	wlan_diag_event.version = DIAG_BCN_RPT_VERSION_3;
 
 	if (mlo_is_mld_sta(pe_session->vdev))
 		wlan_diag_event.band =

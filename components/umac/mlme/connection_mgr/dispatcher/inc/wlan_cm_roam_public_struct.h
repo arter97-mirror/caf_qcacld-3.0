@@ -2352,7 +2352,7 @@ enum roam_rt_stats_type {
  * @status_code: Status code from 802.11 spec, section 9.4.1.9
  * @auth_algo: Authentication algorithm as defined in 802.11 spec,
  * 9.4.1.1 Authentication Algorithm Number field
- * @tx_status: Frame TX status defined by enum qdf_dp_tx_rx_status
+ * @tx_status: Frame TX status defined by enum wlan_diag_tx_rx_status
  * applicable only for tx frames
  * @rssi: Frame rssi
  * @retry_count: Frame retry count
@@ -2369,7 +2369,7 @@ struct roam_frame_info {
 	uint8_t type;
 	uint8_t subtype;
 	uint8_t is_rsp;
-	enum qdf_dp_tx_rx_status tx_status;
+	uint32_t tx_status;
 	uint16_t seq_num;
 	uint8_t auth_algo;
 	uint16_t status_code;

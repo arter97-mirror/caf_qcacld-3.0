@@ -6613,11 +6613,13 @@ returnAfterError:
  * @num_rpt: Number of Report element
  * @band: Tx packet band info
  * @vdev_id: vdev id
+ * @tx_status: TX status of the transmitted frame
  */
 static void
 lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 				 enum wlan_diag_wifi_band band,
-				 uint8_t vdev_id)
+				 uint8_t vdev_id,
+				 enum qdf_dp_tx_rx_status tx_status)
 {
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_bcn_rpt);
 
@@ -6627,10 +6629,13 @@ lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us =  qdf_ktime_to_us(qdf_ktime_get());
 
-	wlan_diag_event.version = DIAG_BCN_RPT_VERSION_2;
+	wlan_diag_event.version = DIAG_BCN_RPT_VERSION_3;
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT;
 	wlan_diag_event.meas_token = token;
 	wlan_diag_event.num_rpt = num_rpt;
+	wlan_diag_event.is_tx = true;
+	wlan_diag_event.tx_fail_reason = tx_status;
+	wlan_diag_event.tx_status = wlan_get_diag_tx_status(tx_status);
 
 	wlan_diag_event.band = band;
 
@@ -6640,10 +6645,14 @@ lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 static void
 lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 				 enum wlan_diag_wifi_band band,
-				 uint8_t vdev_id)
+				 uint8_t vdev_id,
+				 enum qdf_dp_tx_rx_status tx_status)
 {
 }
 #endif
+
+#define MIN_RRM_SIZE sizeof(tDot11fRadioMeasurementReport) - \
+		    (7 * sizeof(tDot11fIEMeasurementReport))
 
 static QDF_STATUS
 lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
@@ -6658,6 +6667,7 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 	uint8_t ff_offset;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	enum wlan_diag_wifi_band band;
+	enum qdf_dp_tx_rx_status qdf_tx_complete;
 
 	if (!buf) {
 		pe_err("Invalid nbuf buffer");
@@ -6677,13 +6687,20 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 		goto out;
 	}
 
+	if (tx_status == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
+		qdf_tx_complete = QDF_TX_RX_STATUS_OK;
+	else if (tx_status  == WMI_MGMT_TX_COMP_TYPE_DISCARD)
+		qdf_tx_complete = QDF_TX_RX_STATUS_FW_DISCARD;
+	else
+		qdf_tx_complete = QDF_TX_RX_STATUS_NO_ACK;
+
 	frame_ptr = qdf_nbuf_data(buf);
 	mac_hdr = (struct wlan_frame_hdr *)frame_ptr;
 	ff_offset = sizeof(*mac_hdr);
 	if (wlan_crypto_is_data_protected(frame_ptr))
 		ff_offset += IEEE80211_CCMP_MICLEN;
 
-	if (qdf_nbuf_len(buf) < (ff_offset + sizeof(*frm))) {
+	if (qdf_nbuf_len(buf) < (ff_offset + MIN_RRM_SIZE)) {
 		status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
@@ -6709,7 +6726,8 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 		lim_beacon_report_response_event(frm->DialogToken.token,
 						 frm->num_MeasurementReport,
 						 band,
-						 mgmt_params->vdev_id);
+						 mgmt_params->vdev_id,
+						 qdf_tx_complete);
 out:
 	qdf_nbuf_free(buf);
 	qdf_mem_free(frm);
