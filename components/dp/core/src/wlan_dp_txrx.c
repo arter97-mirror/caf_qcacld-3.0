@@ -132,7 +132,10 @@ static int dp_intf_is_tx_allowed(qdf_nbuf_t nbuf,
 
 	cdp_peer_get_info_by_peer_addr(soc, peer_mac, link_id,
 				       peer_info);
+	dp_set_peer_txpt_idx(nbuf, peer_info);
+
 	peer_state = peer_info->state;
+
 	if (qdf_likely(OL_TXRX_PEER_STATE_AUTH == peer_state))
 		return true;
 	if (OL_TXRX_PEER_STATE_CONN == peer_state &&

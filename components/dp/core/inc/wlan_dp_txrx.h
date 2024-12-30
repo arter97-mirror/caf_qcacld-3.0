@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -683,5 +683,23 @@ void dp_rx_pkt_da_check(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 {
 }
 #endif
+
+#ifdef CONFIG_BORON
+static inline
+void dp_set_peer_txpt_idx(qdf_nbuf_t nbuf,
+			  struct cdp_peer_output_param *peer_info)
+{
+	if (qdf_likely(peer_info->txpt_classify_idx_valid)) {
+		QDF_NBUF_CB_TXPT_CLASSIFY_INFO_VALID(nbuf) = 1;
+		QDF_NBUF_CB_TXPT_IDX_VALUE(nbuf) = peer_info->txpt_classify_idx;
+	}
+}
+#else
+static inline
+void dp_set_peer_txpt_idx(qdf_nbuf_t nbuf,
+			  struct cdp_peer_output_param *peer_info)
+{
+}
+#endif /* CONFIG_BORON */
 
 #endif

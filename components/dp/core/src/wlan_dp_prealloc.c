@@ -319,18 +319,26 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 	{TCL_DATA, 0, 0, NULL, NULL, 0, 0},
 	{TCL_DATA, 0, 0, NULL, NULL, 0, 0},
 	/* 4 WBM2SW rings */
+#ifdef CONFIG_BORON
+	{TQM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
+	{TQM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
+	{TQM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
+#else
 	{WBM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
 	{WBM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
 	{WBM2SW_RELEASE, 0, 0, NULL, NULL, 0, 0},
 	{WBM2SW_RELEASE, 0, 0, NULL, 0, 0},
+#endif
 	/* SW2WBM link descriptor return ring */
 	{SW2WBM_RELEASE, 0, 0, NULL, 0, 0},
 	/* 1 WBM idle link desc ring */
 	{WBM_IDLE_LINK, (sizeof(struct wbm_link_descriptor_ring)) *
 	WBM_IDLE_LINK_RING_SIZE, 0, NULL, NULL, 0, 0},
+#ifndef CONFIG_BORON
 	/* 2 RXDMA DST ERR rings */
 	{RXDMA_DST, 0, 0, NULL, NULL, 0, 0},
 	{RXDMA_DST, 0, 0, NULL, NULL, 0, 0},
+#endif
 	/* REFILL ring 0 */
 	{RXDMA_BUF, 0, 0, NULL, NULL, 0, 0},
 	/* 2 RXDMA buffer rings */
@@ -338,8 +346,10 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 	{RXDMA_BUF, 0, 0, NULL, NULL, 0, 0},
 	/* REO Exception ring */
 	{REO_EXCEPTION, 0, 0, NULL, NULL, 0, 0},
+#ifndef CONFIG_BORON
 	/* 1 REO status ring */
 	{REO_STATUS, 0, 0, NULL, NULL, 0, 0},
+#endif
 	/* 2 monitor status rings */
 	{RXDMA_MONITOR_STATUS, 0, 0, NULL, NULL, 0, 0},
 	{RXDMA_MONITOR_STATUS, 0, 0, NULL, NULL, 0, 0},
@@ -576,6 +586,7 @@ void dp_prealloc_deinit(void)
 }
 
 #ifdef CONFIG_BERYLLIUM
+#ifdef CONFIG_BORON
 /**
  * dp_get_tcl_data_srng_entrysize() - Get the tcl data srng entry
  *  size
@@ -584,8 +595,14 @@ void dp_prealloc_deinit(void)
  */
 static inline uint32_t dp_get_tcl_data_srng_entrysize(void)
 {
+	return sizeof(struct tcl_assist_cmd);
+}
+#else
+static inline uint32_t dp_get_tcl_data_srng_entrysize(void)
+{
 	return sizeof(struct tcl_data_cmd);
 }
+#endif
 
 #ifdef WLAN_PKT_CAPTURE_TX_2_0
 /**
@@ -684,6 +701,18 @@ dp_update_mem_size_by_ctx_type(struct wlan_dp_prealloc_cfg *cfg,
 	}
 }
 
+#ifdef CONFIG_BORON
+static inline uint32_t dp_get_tqm2sw_comp_srng_entrysize(void)
+{
+	return sizeof(struct tqm2sw_completion_ring);
+}
+#else
+static inline uint32_t dp_get_tqm2sw_comp_srng_entrysize(void)
+{
+	return 0;
+}
+#endif
+
 /**
  * dp_update_mem_size_by_ring_type() - Update srng memory size based
  *  on ring type and the corresponding ini configuration
@@ -705,6 +734,10 @@ dp_update_mem_size_by_ring_type(struct wlan_dp_prealloc_cfg *cfg,
 		return;
 	case WBM2SW_RELEASE:
 		*mem_size = (sizeof(struct wbm_release_ring)) *
+			    cfg->num_tx_comp_ring_entries;
+		return;
+	case TQM2SW_RELEASE:
+		*mem_size = dp_get_tqm2sw_comp_srng_entrysize() *
 			    cfg->num_tx_comp_ring_entries;
 		return;
 	case SW2WBM_RELEASE:

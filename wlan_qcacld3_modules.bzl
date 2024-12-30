@@ -125,6 +125,7 @@ _fixed_ipaths = [
     "cmn/dp/inc",
     "cmn/dp/wifi3.0",
     "cmn/dp/wifi3.0/be",
+    "cmn/dp/wifi3.0/bn",
     "cmn/dp/wifi3.0/monitor",
     "cmn/dp/wifi3.0/monitor/1.0",
     "cmn/dp/wifi3.0/monitor/2.0",
