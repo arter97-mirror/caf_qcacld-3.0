@@ -365,8 +365,15 @@ static void hdd_set_recovery_in_progress(void *data, uint8_t val)
 {
 	cds_set_recovery_in_progress(val);
 	/* SSR can be triggred late cleanup existing queue for kernel handshake */
-	if (!qdf_in_interrupt())
-		hdd_soc_recovery_cleanup();
+	if (!qdf_in_interrupt()) {
+		struct hdd_context *hdd_ctx;
+
+		hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+		if (!hdd_ctx)
+			return;
+
+		wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
+	}
 }
 
 /**
