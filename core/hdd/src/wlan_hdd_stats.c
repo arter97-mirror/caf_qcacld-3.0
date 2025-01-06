@@ -5031,7 +5031,8 @@ static void hdd_fill_sinfo_rate_info(struct station_info *sinfo,
 					RATE_INFO_FLAGS_MCS);
 		}
 		if (rate_flags & TX_RATE_SGI) {
-			if (!(rate_info->flags & RATE_INFO_FLAGS_VHT_MCS))
+			if (!(rate_info->flags & RATE_INFO_FLAGS_VHT_MCS) &&
+			    !(rate_info->flags & RATE_INFO_FLAGS_HE_MCS))
 				rate_info->flags |= RATE_INFO_FLAGS_MCS;
 			rate_info->flags |= RATE_INFO_FLAGS_SHORT_GI;
 		}

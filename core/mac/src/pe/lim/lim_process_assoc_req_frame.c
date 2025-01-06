@@ -2956,10 +2956,8 @@ static void fill_mlm_assoc_ind_vht(tpSirAssocReq assocreq,
 		assocind->rx_stbc = assocreq->VHTCaps.rxSTBC;
 
 		/* ch width */
-		assocind->ch_width = stads->vhtSupportedChannelWidthSet ?
-			eHT_CHANNEL_WIDTH_80MHZ :
-			stads->htSupportedChannelWidthSet ?
-			eHT_CHANNEL_WIDTH_40MHZ : eHT_CHANNEL_WIDTH_20MHZ;
+		assocind->ch_width = lim_convert_channel_width_enum(
+							stads->ch_width);
 
 		/* mode */
 		assocind->mode = SIR_SME_PHY_MODE_VHT;
@@ -2968,13 +2966,7 @@ static void fill_mlm_assoc_ind_vht(tpSirAssocReq assocreq,
 	}
 }
 
-/**
- *lim_convert_channel_width_enum() - map between two channel width enums
- *@ch_width: channel width of enum type phy_ch_width
- *
- *Return: channel width of enum type tSirMacHTChannelWidth
- */
-static tSirMacHTChannelWidth
+tSirMacHTChannelWidth
 lim_convert_channel_width_enum(enum phy_ch_width ch_width)
 {
 	switch (ch_width) {
