@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -440,12 +440,15 @@ update_bw:
 		return;
 
 	if (update_allow) {
-		wlan_cm_sta_update_bw_puncture(vdev, session->bssId,
-					       ori_punc, ori_bw,
-					       ccfs0,
-					       ccfs1,
-					       new_bw);
-		wma_send_peer_phy_mode(session->bssId, session->vdev_id, phy_mode);
+		status = wlan_cm_sta_update_bw_puncture(vdev, session->bssId,
+							ori_punc, ori_bw,
+							ccfs0,
+							ccfs1,
+							new_bw);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			wma_send_peer_phy_mode(session->bssId,
+					       session->vdev_id,
+					       phy_mode);
 	} else {
 		csa_param = qdf_mem_malloc(sizeof(*csa_param));
 		if (!csa_param) {
