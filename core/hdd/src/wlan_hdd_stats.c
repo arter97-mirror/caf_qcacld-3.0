@@ -4825,7 +4825,9 @@ static void hdd_get_max_rate_he(struct hdd_station_info *stainfo,
 			(enum data_rate_11ax_max_mcs)
 			(stainfo->tx_mcs_map & DATA_RATE_11AX_MCS_MASK);
 
-		if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_9) {
+		if (stainfo->he_mcs_12_13_map) {
+			mcsidx = 13;
+		} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_9) {
 			mcsidx = 9;
 		} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_10) {
 			mcsidx = 10;
@@ -4919,7 +4921,9 @@ static void hdd_get_max_rate_vht(struct hdd_station_info *stainfo,
 		if (rate_flags & TX_RATE_SGI)
 			flag |= 1;
 
-		if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_7) {
+		if (stainfo->vht_mcs_10_11_supp) {
+			mcsidx = 11;
+		} else if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_7) {
 			mcsidx = 7;
 		} else if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_8) {
 			mcsidx = 8;
