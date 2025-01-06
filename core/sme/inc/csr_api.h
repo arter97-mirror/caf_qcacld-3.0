@@ -546,6 +546,8 @@ struct csr_roam_info {
 #endif
 	struct switch_channel_ind *pSirSmeSwitchChInd;
 	bool is_fils_connection;
+	uint8_t vht_mcs_10_11_supp;
+	uint16_t he_mcs_12_13_map;
 };
 
 typedef struct sSirSmeAssocIndToUpperLayerCnf {
@@ -593,6 +595,8 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 #ifdef WLAN_FEATURE_11BE_MLO
 	tSirMacAddr peer_mld_addr;
 #endif
+	uint8_t vht_mcs_10_11_supp;
+	uint16_t he_mcs_12_13_map;
 } tSirSmeAssocIndToUpperLayerCnf, *tpSirSmeAssocIndToUpperLayerCnf;
 
 typedef struct tagCsrSummaryStatsInfo {

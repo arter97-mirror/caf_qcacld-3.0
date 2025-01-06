@@ -1098,6 +1098,8 @@ struct assoc_ind {
 	bool need_assoc_rsp_tx_cb;
 	tSirMacAddr peer_mld_addr;
 	bool is_fils_connection;
+	uint8_t vht_mcs_10_11_supp;
+	uint16_t he_mcs_12_13_map;
 };
 
 /**
