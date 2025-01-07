@@ -787,17 +787,24 @@ struct ieee80211_wlanconfig_ipa_wds {
 
 /* generic structure to support sub-ioctl due to limited ioctl */
 typedef enum {
-	IEEE80211_WLANCONFIG_NOP = 0,
-	IEEE80211_WLANCONFIG_HMWDS_ADD_ADDR = 18,
-	IEEE80211_WLANCONFIG_HMWDS_RESET_TABLE = 20,
-	IEEE80211_WLANCONFIG_GETCHANINFO_160 = 29,
-	IEEE80211_WLANCONFIG_NAC_ADDR_ADD = 34,
-	IEEE80211_WLANCONFIG_NAC_ADDR_DEL = 35,
-	IEEE80211_WLANCONFIG_NAC_ADDR_LIST = 36,
-	IEEE80211_WLANCONFIG_HMWDS_REMOVE_ADDR = 38,
-	IEEE80211_WLANCONFIG_SVC_CLASS_CREATE,
-	IEEE80211_WLANCONFIG_SVC_CLASS_DISABLE,
-	IEEE80211_WLANCONFIG_IPA_WDS_REMOVE_ADDR = 81,
+	IEEE80211_WLANCONFIG_NOP                           = 0,
+	IEEE80211_WLANCONFIG_HMWDS_ADD_ADDR                = 18,
+	IEEE80211_WLANCONFIG_HMWDS_RESET_TABLE             = 20,
+	IEEE80211_WLANCONFIG_GETCHANINFO_160               = 29,
+	IEEE80211_WLANCONFIG_NAC_ADDR_ADD                  = 34,
+	IEEE80211_WLANCONFIG_NAC_ADDR_DEL                  = 35,
+	IEEE80211_WLANCONFIG_NAC_ADDR_LIST                 = 36,
+	IEEE80211_WLANCONFIG_HMWDS_REMOVE_ADDR             = 38,
+	IEEE80211_WLANCONFIG_SVC_CLASS_CREATE              = 89,
+	IEEE80211_WLANCONFIG_SVC_CLASS_DISABLE             = 90,
+	IEEE80211_WLANCONFIG_T2LM_REQUEST                  = 95,
+	IEEE80211_WLANCONFIG_T2LM_RESPONSE                 = 96,
+	IEEE80211_WLANCONFIG_T2LM_TEARDOWN                 = 97,
+	IEEE80211_WLANCONFIG_T2LM_LINK_MAP_CONFIG          = 98,
+	IEEE80211_WLANCONFIG_IPA_WDS_REMOVE_ADDR           = 101,
+	IEEE80211_WLANCONFIG_SVC_CREATE                    = 106,
+	IEEE80211_WLANCONFIG_SVC_DELETE                    = 107,
+	IEEE80211_WLANCONFIG_SVC_UPDATE                    = 108,
 } IEEE80211_WLANCONFIG_CMDTYPE;
 
 typedef enum {
@@ -808,6 +815,37 @@ typedef enum {
 struct ieee80211_wlanconfig_setmaxrate {
 	u_int8_t mac[IEEE80211_ADDR_LEN];
 	u_int8_t maxrate;
+};
+
+enum {
+	WLAN_SVC_TYPE_SAWF,
+	WLAN_SVC_TYPE_SCS,
+	WLAN_SVC_TYPE_MAX,
+};
+
+enum {
+	WLAN_SVC_DIR_UL,
+	WLAN_SVC_DIR_DL,
+	WLAN_SVC_DIR_UL_DL,
+	WLAN_SVC_DIR_MAX,
+};
+
+enum {
+	WLAN_SVC_PARAM_MIN_TPUT,
+	WLAN_SVC_PARAM_MAX_TPUT,
+	WLAN_SVC_PARAM_BURST_SIZE,
+	WLAN_SVC_PARAM_SERVICE_INTERVAL,
+	WLAN_SVC_PARAM_DELAY_BOUND,
+	WLAN_SVC_PARAM_MSDU_TTL,
+	WLAN_SVC_PARAM_PRIORITY,
+	WLAN_SVC_PARAM_TID,
+	WLAN_SVC_PARAM_MSDU_RATE_LOSS,
+	WLAN_SVC_PARAM_UL_BURST_SIZE,
+	WLAN_SVC_PARAM_UL_SERVICE_INTERVAL,
+	WLAN_SVC_PARAM_DL_SCHED_DISABLE_MODES,
+	WLAN_SVC_PARAM_UL_SCHED_DISABLE_MODES,
+	WLAN_SVC_PARAM_UL_MIN_TPUT,
+	WLAN_SVC_PARAM_UL_MAX_LATENCY,
 };
 
 struct sawf_wlanconfig_create_param {
@@ -832,9 +870,149 @@ struct sawf_wlanconfig_create_param {
 	uint32_t ul_max_latency;
 };
 
+struct sawf_wlanconfig_svc_create {
+	char app_name[64];
+	uint32_t min_thruput_rate;
+	uint32_t max_thruput_rate;
+	uint32_t burst_size;
+	uint32_t service_interval;
+	uint32_t delay_bound;
+	uint32_t msdu_ttl;
+	uint32_t priority;
+	uint32_t tid;
+	uint32_t msdu_rate_loss;
+	uint32_t ul_burst_size;
+	uint32_t ul_service_interval;
+	char dl_disabled_modes[128];
+	char ul_disabled_modes[128];
+	uint32_t ul_min_tput;
+	uint32_t ul_max_latency;
+
+	uint8_t type;
+	uint8_t direction;
+	uint32_t mask;
+	uint8_t peer_mac_addr[IEEE80211_ADDR_LEN];
+};
+
+struct sawf_wlanconfig_svc_delete {
+	uint32_t svc_id;
+	uint8_t type;
+	uint8_t peer_mac_addr[IEEE80211_ADDR_LEN];
+};
+
+struct sawf_wlanconfig_svc_update {
+	uint32_t svc_id;
+	char app_name[64];
+	uint32_t min_thruput_rate;
+	uint32_t max_thruput_rate;
+	uint32_t burst_size;
+	uint32_t service_interval;
+	uint32_t delay_bound;
+	uint32_t msdu_ttl;
+	uint32_t priority;
+	uint32_t tid;
+	uint32_t msdu_rate_loss;
+	uint32_t ul_burst_size;
+	uint32_t ul_service_interval;
+	char dl_disabled_modes[128];
+	char ul_disabled_modes[128];
+	uint32_t ul_min_tput;
+	uint32_t ul_max_latency;
+
+	uint8_t type;
+	uint8_t direction;
+	uint32_t mask;
+	uint8_t peer_mac_addr[IEEE80211_ADDR_LEN];
+};
+
+struct sawf_wlanconfig_svc_rsp {
+	uint32_t svc_id;
+};
+
 struct sawf_wlanconfig_disable_param {
 	uint8_t svc_id;
 };
+
+/* Max supported TIDs */
+#define NUM_MAX_TIDS 8
+
+/**
+ * enum t2lm_dir - TID-to-link mapping direction
+ * @T2LM_DIRECTION_DL: Downlink
+ * @T2LM_DIRECTION_UL: Uplink
+ * @T2LM_DIRECTION_BIDI: Bidirectional
+ * @T2LM_DIRECTION_MAX: Max direction
+ * @T2LM_DIRECTION_INVALID: Invalid direction
+ */
+enum t2lm_dir {
+	T2LM_DIRECTION_DL,
+	T2LM_DIRECTION_UL,
+	T2LM_DIRECTION_BIDI,
+	T2LM_DIRECTION_MAX,
+	T2LM_DIRECTION_INVALID
+};
+
+/**
+ * struct tid_to_link_map - TID-to-link mapping params
+ * @tid_num: TID number
+ * @link_map: T2LM provisioned links for the given TID
+ */
+struct tid_to_link_map {
+	uint8_t tid_num;
+	uint16_t link_map;
+};
+
+/**
+ * struct t2lm_of_direction - TID-to-link mapping for a given direction
+ * @num_tids: Total number of TIDs for which mapping is given
+ * @direction: direction, DL/UL/BIDI
+ * @default_mapping: default tid-to-link mapping value
+ * @map_tid_to_links: link mappings of the TIDs
+ * @link_mapping_size: link map size for TIDn where value 0:2 bytes 1:1 byte
+ */
+struct t2lm_of_direction {
+	uint8_t num_tids;
+	uint8_t direction;
+	uint8_t default_mapping;
+	struct tid_to_link_map map_tid_to_links[NUM_MAX_TIDS];
+	uint8_t link_mapping_size;
+};
+
+/**
+ * struct ieee80211_wlanconfig_t2lm - User configured T2LM params
+ * @assoc_frm: 1 - include the T2LM frame during assoc.
+ *         0 - send T2LM action frame
+ * @peer_mld_mac: MLO peer macaddress (STA macaddr)
+ * @status: T2LM response status value
+ * @unsolicited_t2lm_resp: Unsolicited T2LM response
+ * @t2lm_direction: TID-to-link mapping params for DL/UL/BIDI
+ */
+struct ieee80211_wlanconfig_t2lm {
+	uint8_t assoc_frm;
+	uint8_t peer_mld_mac[IEEE80211_ADDR_LEN];
+	uint8_t status;
+	uint8_t unsolicited_t2lm_resp;
+	struct t2lm_of_direction t2lm_direction[T2LM_DIRECTION_MAX];
+};
+
+struct ieee80211_t2lm_link_map_value {
+	uint16_t link_map_value;
+	u_int16_t map_switch_time;
+	uint32_t expected_dur;
+	uint8_t link_mapping_size;
+};
+
+#ifdef WLAN_FEATURE_11BE
+
+/* Number of T2LM params expected per TID (params are listed in struct
+ * tid_to_link_map).
+ */
+#define T2LM_MAP_PARAMS 2
+
+/* T2LM Request rejected and preferred TID-to-link mapping is suggested */
+#define T2LM_STATUS_PREFERRED_TID_TO_LINK_MAPPING 134
+
+#endif /* WLAN_FEATURE_11BE */
 
 struct ieee80211_wlanconfig {
 	IEEE80211_WLANCONFIG_CMDTYPE cmdtype;  /* sub-command */
@@ -844,6 +1022,11 @@ struct ieee80211_wlanconfig {
 		struct ieee80211_wlanconfig_nac nac;
 		struct sawf_wlanconfig_create_param sawf_create_config;
 		struct sawf_wlanconfig_disable_param sawf_disable_config;
+		struct sawf_wlanconfig_svc_create sawf_svc_create;
+		struct sawf_wlanconfig_svc_delete sawf_svc_delete;
+		struct sawf_wlanconfig_svc_update sawf_svc_update;
+		struct ieee80211_wlanconfig_t2lm t2lm;
+		struct ieee80211_t2lm_link_map_value t2lm_link_map_config;
 		struct ieee80211_wlanconfig_ipa_wds ipa_wds;
 	} data;
 
