@@ -6195,6 +6195,23 @@ end:
 	return status;
 }
 
+static QDF_STATUS
+ml_nlink_link_recfg_completed_handler(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_vdev *vdev,
+				      enum ml_nlink_change_event_type evt,
+				      struct ml_nlink_change_event *data)
+{
+	QDF_STATUS status;
+
+	ml_nlink_clr_requested_emlsr_mode(psoc, vdev);
+
+	status = ml_nlink_state_change_handler(
+		psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT,
+		evt, data);
+
+	return status;
+}
+
 static QDF_STATUS ml_nlink_emlsr_opportunistic_timer_handler(
 		struct wlan_objmgr_psoc *psoc,
 		struct wlan_objmgr_vdev *vdev,
@@ -6549,6 +6566,11 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
 			status = ml_nlink_undo_emlsr_downgrade_handler(
 							psoc, vdev, evt, data);
+		break;
+	case ml_nlink_link_recfg_completed_evt:
+		status =
+		ml_nlink_link_recfg_completed_handler(psoc, vdev,
+						      evt, data);
 		break;
 	default:
 		break;
