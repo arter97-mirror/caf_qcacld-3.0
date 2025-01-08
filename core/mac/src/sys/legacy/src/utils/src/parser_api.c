@@ -1715,19 +1715,30 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 	band = wlan_reg_freq_to_band(pe_session->curr_op_freq);
 	band_mask = 1 << band;
 
+	if (pe_session->opmode == QDF_SAP_MODE &&
+	    lim_is_session_eht_capable(pe_session) &&
+	    pe_session->he_punc_chan_info.present) {
+		ch_params.mhz_freq_seg0 =
+				pe_session->he_punc_chan_info.center_freq_seg0;
+		ch_params.mhz_freq_seg1 =
+				pe_session->he_punc_chan_info.center_freq_seg1;
+		ch_params.ch_width = pe_session->he_punc_chan_info.chan_width;
+	} else {
+		ch_params.ch_width = pe_session->ch_width;
+		ch_params.mhz_freq_seg0 = wlan_reg_chan_band_to_freq(
+						mac->pdev,
+						pe_session->ch_center_freq_seg0,
+						band_mask);
+		if (pe_session->ch_center_freq_seg1)
+			ch_params.mhz_freq_seg1 =
+					wlan_reg_chan_band_to_freq(
+						mac->pdev,
+						pe_session->ch_center_freq_seg1,
+						band_mask);
+	}
+
 	ch_params.ch_width = wlan_dnw_update_bandwidth(pe_session->vdev,
 						       pe_session->ch_width);
-	ch_params.mhz_freq_seg0 =
-		wlan_reg_chan_band_to_freq(mac->pdev,
-					   pe_session->ch_center_freq_seg0,
-					   band_mask);
-
-	if (pe_session->ch_center_freq_seg1)
-		ch_params.mhz_freq_seg1 =
-			wlan_reg_chan_band_to_freq(mac->pdev,
-						   pe_session->ch_center_freq_seg1,
-						   band_mask);
-
 	if (band == (REG_BAND_2G) && ch_params.ch_width == CH_WIDTH_40MHZ) {
 		if (ch_params.mhz_freq_seg0 ==  pe_session->curr_op_freq + 10)
 			sec_chan_freq = pe_session->curr_op_freq + 20;
