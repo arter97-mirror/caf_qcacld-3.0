@@ -8753,6 +8753,21 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
 	 (((data_snr_weight) & 0xff) << 8) | \
 	 ((ack_snr_weight) & 0xff))
 
+#define ANT_DIV_SET_PROBE_THRESHOLD(wlan_probe_thre, bt_probe_thre) \
+	((1 << 30) | \
+	 (((wlan_probe_thre) & 0x1fff) << 13) | \
+	 ((bt_probe_thre) & 0x1fff))
+
+#define ANT_DIV_SET_PROBE_CNT(wlan_probe_cnt, bt_probe_cnt) \
+	((1 << 31) | \
+	 (((wlan_probe_cnt) & 0x1fff) << 13) | \
+	 ((bt_probe_cnt) & 0x1fff))
+
+#define ANT_DIV_SET_RSSI_DIFF(wlan_rssi_diff, bt_rssi_diff) \
+	((1 << 27) | \
+	 (((wlan_rssi_diff) & 0x1fff) << 13) | \
+	 ((bt_rssi_diff) & 0x1fff))
+
 #define RX_REORDER_TIMEOUT_VOICE \
 	QCA_WLAN_VENDOR_ATTR_CONFIG_RX_REORDER_TIMEOUT_VOICE
 #define RX_REORDER_TIMEOUT_VIDEO \
@@ -8772,6 +8787,11 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
 	QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID
 #define CONFIG_MLO_LINKS \
 	QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS
+
+#define ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD
+#define ANT_DIV_PROBE_BT_RSSI_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_BT_RSSI_THRESHOLD
 
 const struct nla_policy wlan_hdd_wifi_config_policy[
 			QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1] = {
@@ -8834,6 +8854,18 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_ACK_SNR_WEIGHT] = {
 		.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_COUNT_WLAN] = {
+		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_COUNT_BT] = {
+		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD] = {
+		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_BT_RSSI_THRESHOLD] = {
+		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SWITCH_WLAN_RSSI_DIFF] = {
+		.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SWITCH_BT_RSSI_DIFF] = {
+		.type = NLA_U16},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_RESTRICT_OFFCHANNEL] = {.type = NLA_U8},
 	[RX_REORDER_TIMEOUT_VOICE] = {.type = NLA_U32},
 	[RX_REORDER_TIMEOUT_VIDEO] = {.type = NLA_U32},
@@ -10570,6 +10602,113 @@ static int hdd_config_ant_div_snr_weight(struct wlan_hdd_link_info *link_info,
 				    ant_div_usrcfg, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set ant div weight, %d", errno);
+
+	return errno;
+}
+
+static int
+hdd_config_ant_probe_count(struct wlan_hdd_link_info *link_info,
+			   struct nlattr *tb[])
+{
+	struct nlattr *wlan_cnt_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_COUNT_WLAN];
+	struct nlattr *bt_cnt_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_COUNT_BT];
+	uint16_t wlan_cnt, bt_cnt;
+	uint32_t ant_probe_cnt;
+	int errno;
+
+	/* nothing to do if neither attribute is present */
+	if (!wlan_cnt_attr && !bt_cnt_attr)
+		return 0;
+
+	/* if one is present, both must be present */
+	if (!wlan_cnt_attr || !bt_cnt_attr) {
+		hdd_err("Missing attribute for %s",
+			bt_cnt_attr ? "WLAN" : "BT");
+		return -EINVAL;
+	}
+
+	wlan_cnt = nla_get_u16(wlan_cnt_attr);
+	bt_cnt = nla_get_u16(bt_cnt_attr);
+	ant_probe_cnt = ANT_DIV_SET_PROBE_CNT(wlan_cnt, bt_cnt);
+	hdd_debug("ant probe count: %x", ant_probe_cnt);
+	errno = wma_cli_set_command(link_info->vdev_id,
+				    wmi_pdev_param_ant_div_usrcfg,
+				    ant_probe_cnt, PDEV_CMD);
+	if (errno)
+		hdd_err("Failed to set ant probe count, %d", errno);
+
+	return errno;
+}
+
+static int
+hdd_config_ant_probe_threshold(struct wlan_hdd_link_info *link_info,
+			       struct nlattr *tb[])
+{
+	struct nlattr *wlan_thre_attr = tb[ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD];
+	struct nlattr *bt_thre_attr = tb[ANT_DIV_PROBE_BT_RSSI_THRESHOLD];
+	uint16_t wlan_threshold, bt_threshold;
+	uint32_t ant_probe_threshold;
+	int errno;
+
+	/* nothing to do if neither attribute is present */
+	if (!wlan_thre_attr && !bt_thre_attr)
+		return 0;
+
+	/* if one is present, both must be present */
+	if (!wlan_thre_attr || !bt_thre_attr) {
+		hdd_err("Missing attribute for %s",
+			bt_thre_attr ? "WLAN" : "BT");
+		return -EINVAL;
+	}
+
+	wlan_threshold = nla_get_u16(wlan_thre_attr);
+	bt_threshold = nla_get_u16(bt_thre_attr);
+	ant_probe_threshold = ANT_DIV_SET_PROBE_THRESHOLD(wlan_threshold,
+							  bt_threshold);
+	hdd_debug("ant probe threshold: %x", ant_probe_threshold);
+	errno = wma_cli_set_command(link_info->vdev_id,
+				    wmi_pdev_param_ant_div_usrcfg,
+				    ant_probe_threshold, PDEV_CMD);
+	if (errno)
+		hdd_err("Failed to set ant probe threshold, %d", errno);
+
+	return errno;
+}
+
+static int
+hdd_config_ant_div_switch_rssi_diff(struct wlan_hdd_link_info *link_info,
+				    struct nlattr *tb[])
+{
+	struct nlattr *wlan_rssi_diff_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SWITCH_WLAN_RSSI_DIFF];
+	struct nlattr *bt_rssi_diff_attr =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_SWITCH_BT_RSSI_DIFF];
+	uint16_t wlan_rssi_diff, bt_rssi_diff;
+	uint32_t ant_rssi_diff;
+	int errno;
+
+	/* nothing to do if neither attribute is present */
+	if (!wlan_rssi_diff_attr && !bt_rssi_diff_attr)
+		return 0;
+
+	/* if one is present, both must be present */
+	if (!wlan_rssi_diff_attr || !bt_rssi_diff_attr) {
+		hdd_err("Missing attribute for %s",
+			bt_rssi_diff_attr ? "WLAN" : "BT");
+		return -EINVAL;
+	}
+
+	wlan_rssi_diff = nla_get_u16(wlan_rssi_diff_attr);
+	bt_rssi_diff = nla_get_u16(bt_rssi_diff_attr);
+	ant_rssi_diff = ANT_DIV_SET_RSSI_DIFF(wlan_rssi_diff, bt_rssi_diff);
+	hdd_debug("ant probe count: %x", ant_rssi_diff);
+	errno = wma_cli_set_command(link_info->vdev_id,
+				    wmi_pdev_param_ant_div_usrcfg,
+				    ant_rssi_diff, PDEV_CMD);
+	if (errno)
+		hdd_err("Failed to set ant probe count, %d", errno);
 
 	return errno;
 }
@@ -14611,6 +14750,9 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_mpdu_aggregation,
 	hdd_config_ant_div_period,
 	hdd_config_ant_div_snr_weight,
+	hdd_config_ant_probe_count,
+	hdd_config_ant_probe_threshold,
+	hdd_config_ant_div_switch_rssi_diff,
 	wlan_hdd_cfg80211_wifi_set_reorder_timeout,
 	wlan_hdd_cfg80211_wifi_set_rx_blocksize,
 	hdd_config_msdu_aggregation,
@@ -20926,6 +21068,7 @@ static int hdd_process_peer_chain_rssi_req(struct hdd_adapter *adapter,
 
 	return retval;
 }
+
 #else
 struct chain_rssi_priv {
 	struct chain_rssi_result chain_rssi;
