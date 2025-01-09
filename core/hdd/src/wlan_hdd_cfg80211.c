@@ -926,6 +926,21 @@ static const struct ieee80211_iface_limit
 };
 #endif /* WLAN_FEATURE_NAN */
 
+/* SAP + SAP + STA combination */
+static const struct ieee80211_iface_limit
+	wlan_hdd_sap_sap_sta_iface_limit[] = {
+	{
+		/* SAP + SAP */
+		.max = 2,
+		.types = BIT(NL80211_IFTYPE_AP)
+	},
+	{
+		/* STA */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_STATION),
+	},
+};
+
 static struct ieee80211_iface_combination
 	wlan_hdd_iface_combination[] = {
 	/* STA */
@@ -1051,6 +1066,14 @@ static struct ieee80211_iface_combination
 		.beacon_int_infra_match = true,
 	},
 #endif /* WLAN_FEATURE_NAN */
+	/* SAP + SAP + STA */
+	{
+		.limits = wlan_hdd_sap_sap_sta_iface_limit,
+		.num_different_channels = 2,
+		.max_interfaces = 3,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sap_sap_sta_iface_limit),
+		.beacon_int_infra_match = true,
+	},
 };
 
 static struct cfg80211_ops wlan_hdd_cfg80211_ops;
