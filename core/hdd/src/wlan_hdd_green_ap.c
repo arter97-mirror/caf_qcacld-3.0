@@ -247,6 +247,7 @@ __wlan_hdd_enter_sap_low_pwr_mode(struct wiphy *wiphy,
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_DOZED_AP_MAX + 1];
 	struct sk_buff *skb;
 	uint8_t vdev_id;
+	uint8_t mac_id;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -285,9 +286,16 @@ __wlan_hdd_enter_sap_low_pwr_mode(struct wiphy *wiphy,
 	hdd_debug("Cookie id received : %llu", cookie_id);
 
 	vdev_id = wlan_vdev_get_id(adapter->deflink->vdev);
+	status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc, vdev_id,
+						     &mac_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("unable to get mac id");
+		return -EINVAL;
+	}
+
 	wlan_hdd_enable_disable_dcs_cmd(
 				hdd_ctx->psoc,
-				wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev),
+				mac_id,
 				vdev_id, lp_flags);
 
 	len = NLMSG_HDRLEN;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -381,6 +381,7 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 	if (eht_op->eht_op_information_present) {
 		ori_bw = wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						eht_op->channel_width);
+		lim_update_bcn_op_ch_width(session->vdev, ori_bw);
 		ccfs0 = eht_op->ccfs0;
 		ccfs1 = eht_op->ccfs1;
 		if (eht_op->disabled_sub_chan_bitmap_present) {
@@ -427,6 +428,7 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 									 chan_id,
 									 ccfs0,
 									 ccfs1);
+		lim_update_bcn_op_ch_width(session->vdev, ori_bw);
 	} else {
 		return;
 	}
@@ -440,12 +442,15 @@ update_bw:
 		return;
 
 	if (update_allow) {
-		wlan_cm_sta_update_bw_puncture(vdev, session->bssId,
-					       ori_punc, ori_bw,
-					       ccfs0,
-					       ccfs1,
-					       new_bw);
-		wma_send_peer_phy_mode(session->bssId, session->vdev_id, phy_mode);
+		status = wlan_cm_sta_update_bw_puncture(vdev, session->bssId,
+							ori_punc, ori_bw,
+							ccfs0,
+							ccfs1,
+							new_bw);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			wma_send_peer_phy_mode(session->bssId,
+					       session->vdev_id,
+					       phy_mode);
 	} else {
 		csa_param = qdf_mem_malloc(sizeof(*csa_param));
 		if (!csa_param) {

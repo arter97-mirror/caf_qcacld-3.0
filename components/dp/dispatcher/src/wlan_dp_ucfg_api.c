@@ -700,6 +700,7 @@ QDF_STATUS ucfg_dp_psoc_close(struct wlan_objmgr_psoc *psoc)
 
 	dp_rtpm_tput_policy_deinit(psoc);
 	dp_unregister_pmo_handler();
+	qdf_dp_trace_deinit();
 	wlan_dp_load_balancer_deinit(psoc);
 	dp_bus_bandwidth_deinit(psoc);
 	qdf_wake_lock_destroy(&dp_ctx->rx_wake_lock);
@@ -3329,4 +3330,17 @@ int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
 					 CDP_TIDMAP_PRTY, value);
 
 	return qdf_status_to_os_return(status);
+}
+
+void ucfg_dp_set_ipv4_addr(struct wlan_objmgr_vdev *vdev, uint8_t *ip_addr)
+{
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+
+	if (!dp_link) {
+		dp_err("Unable to get DP link");
+		return;
+	}
+
+	qdf_mem_copy(&dp_link->dp_intf->ipv4_addr, ip_addr,
+		     QDF_IPV4_ADDR_SIZE);
 }

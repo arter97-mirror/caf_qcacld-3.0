@@ -2491,3 +2491,29 @@ wlan_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 	qdf_atomic_set(&twt_psoc->twt_requestor_enable_pending,
 		       TWT_COMMAND_PENDING_FLAG_RESET);
 }
+
+QDF_STATUS
+wlan_twt_tgt_caps_get_wake_dur_and_wake_intvl(
+				struct wlan_objmgr_psoc *psoc,
+				uint32_t *min_wake_dur,
+				uint32_t *max_wake_dur,
+				uint32_t *min_wake_intvl,
+				uint32_t *max_wake_intvl)
+{
+	struct twt_psoc_priv_obj *twt_psoc;
+
+	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							 WLAN_UMAC_COMP_TWT);
+
+	if (!twt_psoc) {
+		twt_err("null twt psoc priv obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*min_wake_dur = twt_psoc->twt_caps.min_wake_dur;
+	*max_wake_dur = twt_psoc->twt_caps.max_wake_dur;
+	*min_wake_intvl = twt_psoc->twt_caps.min_wake_intvl;
+	*max_wake_intvl = twt_psoc->twt_caps.max_wake_intvl;
+
+	return QDF_STATUS_SUCCESS;
+}

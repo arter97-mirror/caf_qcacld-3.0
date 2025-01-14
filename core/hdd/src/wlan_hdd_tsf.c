@@ -3694,7 +3694,7 @@ void wlan_hdd_tsf_init(struct hdd_context *hdd_ctx)
 	status = hdd_tsf_set_gpio(hdd_ctx);
 
 	if (QDF_STATUS_SUCCESS != status) {
-		hdd_err("set tsf GPIO failed, status: %d", status);
+		hdd_debug("set tsf GPIO failed, status: %d", status);
 		goto fail;
 	}
 

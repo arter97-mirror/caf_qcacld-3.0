@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -106,6 +106,14 @@ static int wlan_hdd_listen_offload_start(struct hdd_adapter *adapter,
 
 	return qdf_status_to_os_return(status);
 }
+
+/*
+ * Complete scan duration should be less than or equal to
+ * P2P_MAX_SCAN_DURATION otherwise it will leads to a
+ * crash as FW scan module can only hold the wake lock upto
+ * 180 sec
+ */
+#define P2P_MAX_SCAN_DURATION 175
 
 /**
  * __wlan_hdd_cfg80211_p2p_lo_start () - start P2P Listen Offload
@@ -243,6 +251,11 @@ static int __wlan_hdd_cfg80211_p2p_lo_start(struct wiphy *wiphy,
 
 	hdd_debug("P2P LO params: freq=%d, period=%d, interval=%d, count=%d",
 		  params.freq, params.period, params.interval, params.count);
+
+	if (params.count * params.period > P2P_MAX_SCAN_DURATION) {
+		hdd_debug("Invalid scan duration, max: %d", P2P_MAX_SCAN_DURATION);
+		return -EINVAL;
+	}
 
 	return wlan_hdd_listen_offload_start(adapter, &params);
 }

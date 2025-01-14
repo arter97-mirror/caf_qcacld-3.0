@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -199,11 +199,30 @@ lim_get_eht_rate_info_flag(tpDphHashNode sta_ds)
 	else
 		return TX_RATE_EHT20;
 }
+
+static bool
+lim_is_validate_punc_bitmap(struct csa_offload_params *csa_params)
+{
+	if (!wlan_reg_is_punc_bitmap_valid(csa_params->new_ch_width,
+					   csa_params->new_punct_bitmap)) {
+		pe_err("invalid puncture bitmap %d",
+		       csa_params->new_punct_bitmap);
+		return false;
+	}
+
+	return true;
+}
 #else
 static enum tx_rate_info
 lim_get_eht_rate_info_flag(tpDphHashNode sta_ds)
 {
 	return TX_RATE_LEGACY;
+}
+
+static bool
+lim_is_validate_punc_bitmap(struct csa_offload_params *csa_params)
+{
+	return true;
 }
 #endif
 
@@ -1823,6 +1842,12 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 		return false;
 	}
 
+	if (IS_DOT11_MODE_EHT(session_entry->dot11mode) &&
+	    (csa_params->ies_present_flag & MLME_CSWRAP_IE_EXT_V2_PRESENT)) {
+		if (!lim_is_validate_punc_bitmap(csa_params))
+			return false;
+	}
+
 	mode = wlan_vdev_mlme_get_opmode(session_entry->vdev);
 	cnx_count = policy_mgr_get_connection_count(mac_ctx->psoc);
 	if ((cnx_count > 1) && !policy_mgr_is_hw_dbs_capable(mac_ctx->psoc) &&
@@ -2079,6 +2104,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	tLimChannelSwitchInfo *lim_ch_switch = NULL;
 	uint8_t link_id;
 	QDF_STATUS status;
+	uint8_t ht_width;
 
 	if (!csa_params) {
 		pe_err("limMsgQ body ptr is NULL");
@@ -2152,7 +2178,8 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	 */
 
 	lim_update_tdls_set_state_for_fw(session_entry, false);
-	lim_delete_tdls_peers(mac_ctx, session_entry);
+	lim_delete_tdls_peers(mac_ctx, session_entry,
+			      TDLS_PEER_DEL_REASON_NONE);
 
 	lim_ch_switch->switchMode = csa_params->switch_mode;
 	/* timer already started by firmware, switch immediately */
@@ -2176,13 +2203,15 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	channel_bonding_mode = lim_get_cb_mode_for_freq(mac_ctx, session_entry,
 						   csa_params->csa_chan_freq);
 
-	pe_debug("Session %d vdev %d: vht: %d ht: %d he %d cbmode %d",
+	pe_debug("Session %d vdev %d: vht: %d htC: %d ht: %d he %d cbmode %d",
 		 session_entry->peSessionId, session_entry->vdev_id,
 		 session_entry->vhtCapability,
+		 session_entry->htCapability,
 		 session_entry->htSupportedChannelWidthSet,
 		 lim_is_session_he_capable(session_entry),
 		 channel_bonding_mode);
 
+	ht_width = session_entry->htSupportedChannelWidthSet;
 	session_entry->htSupportedChannelWidthSet = false;
 	wlan_reg_read_current_country(mac_ctx->psoc, country_code);
 	if (!csa_params->ies_present_flag ||
@@ -2367,7 +2396,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 				lim_ch_switch->sec_ch_offset =
 					PHY_SINGLE_CHANNEL_CENTERED;
 			}
-		} else {
+		} else if (ht_width) {
 			lim_ch_switch->ch_width =
 				CH_WIDTH_40MHZ;
 			lim_ch_switch->state =

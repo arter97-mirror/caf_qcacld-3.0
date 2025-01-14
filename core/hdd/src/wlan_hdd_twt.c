@@ -66,6 +66,13 @@ QDF_STATUS hdd_get_twt_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 	return ucfg_twt_cfg_get_responder(psoc, val);
 }
 
+QDF_STATUS
+hdd_get_twt_responder_support_for_ht_vht_mode(struct wlan_objmgr_psoc *psoc,
+					      bool *val)
+{
+	return ucfg_twt_get_responder_support_for_ht_vht_mode(psoc, val);
+}
+
 void hdd_update_tgt_twt_cap(struct hdd_context *hdd_ctx,
 			    struct wma_tgt_cfg *cfg)
 {

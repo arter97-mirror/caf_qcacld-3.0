@@ -49,9 +49,9 @@
  * This function is called to extract AP's HCF/WME/WSM capability
  * from the IEs received from it in Beacon/Probe Response frames
  *
- * Return: None
+ * Return: QDF_STATUS
  */
-void
+QDF_STATUS
 lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 			  uint16_t ie_len, uint8_t *qos_cap, uint8_t *uapsd,
 			  int8_t *local_constraint, struct pe_session *session,

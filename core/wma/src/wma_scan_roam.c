@@ -754,12 +754,12 @@ wma_roam_update_vdev(tp_wma_handle wma,
 
 	is_assoc_peer = wlan_vdev_mlme_get_is_mlo_vdev(wma->psoc, vdev_id);
 	if (is_multi_link_roam(roam_synch_ind_ptr)) {
-		status = wma_create_peer(wma, mac_addr.bytes,
+		status = wma_create_peer(wma, mac_addr.bytes, NULL,
 					 WMI_PEER_TYPE_DEFAULT, vdev_id,
 					 roam_synch_ind_ptr->bssid.bytes,
 					 is_assoc_peer);
 	} else {
-		status = wma_create_peer(wma, mac_addr.bytes,
+		status = wma_create_peer(wma, mac_addr.bytes, NULL,
 					 WMI_PEER_TYPE_DEFAULT, vdev_id, NULL,
 					 is_assoc_peer);
 	}

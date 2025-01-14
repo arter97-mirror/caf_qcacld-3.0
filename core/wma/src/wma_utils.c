@@ -688,17 +688,124 @@ int wma_smps_mode_to_force_mode_param(uint8_t smps_mode)
 
 #ifdef WLAN_FEATURE_STATS_EXT
 #ifdef FEATURE_STATS_EXT_V2
+#define EXT_STATS_BUF_SIZE 500
+#define EXT_STATS_SINGLE_LINE_SIZE 100
 static void wma_stats_ext_print(wmi_stats_ext_event_vdev_ext_t *vdev_ext_stats)
 {
-	wma_debug("mpdu_enque 0x%x mpdu_requeue 0x%x rssi %d tx_bytes 0x%x rx_bytes 0x%x tx_mcs 0x%x rx_mcs 0x%x freq %d vdev_id %d",
+	uint8_t i;
+	uint8_t *buf;
+	uint16_t len = 0;
+
+	wma_debug("mpdu_enque 0x%x mpdu_requeue 0x%x rssi %d tx_bytes 0x%x rx_bytes 0x%x freq %d vdev_id %d",
 		  vdev_ext_stats->mpdu_enqueue,
 		  vdev_ext_stats->mpdu_requeued,
 		  vdev_ext_stats->beacon_rssi, vdev_ext_stats->tx_bytes,
 		  vdev_ext_stats->rx_bytes,
-		  vdev_ext_stats->tx_mcs[0],
-		  vdev_ext_stats->rx_mcs[0],
 		  vdev_ext_stats->freq,
 		  vdev_ext_stats->vdev_id);
+
+	wma_debug(
+	"BW counts: 20MHz tx %d rx %d, 40MHz tx %d rx %d, 80MHz tx %d rx %d, 160MHz tx %d rx %d, 320MHz tx %d rx %d",
+	vdev_ext_stats->tx_bw[WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_20MHz],
+	vdev_ext_stats->rx_bw[WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_20MHz],
+	vdev_ext_stats->tx_bw[WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_40MHz],
+	vdev_ext_stats->rx_bw[WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_40MHz],
+	vdev_ext_stats->tx_bw[WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_80MHz],
+	vdev_ext_stats->rx_bw[WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_80MHz],
+	vdev_ext_stats->tx_bw[WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_160MHz],
+	vdev_ext_stats->rx_bw[WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_160MHz],
+	vdev_ext_stats->tx_bw[WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_320MHz],
+	vdev_ext_stats->rx_bw[WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_320MHz]);
+
+	buf = qdf_mem_malloc(EXT_STATS_BUF_SIZE);
+	if (!buf)
+		return;
+
+	for (i = 0; i < MAX_MCS; i++) {
+		len += qdf_scnprintf(buf + len, EXT_STATS_BUF_SIZE - len,
+				     "MCS%d: tx %d rx %d, ",
+				      i, vdev_ext_stats->tx_mcs[i],
+				      vdev_ext_stats->rx_mcs[i]);
+
+		if (len > EXT_STATS_SINGLE_LINE_SIZE) {
+			wma_debug("%s", buf);
+			len = 0;
+		}
+	}
+
+	if (len)
+		wma_debug("%s", buf);
+
+	qdf_mem_free(buf);
+}
+
+static void wma_stats_vdev_ext2_print(
+			wmi_stats_ext_event_vdev_ext2_t *vdev_ext2_stats,
+			uint32_t vdev_id)
+{
+	uint8_t i;
+	uint8_t *buf;
+	uint16_t len = 0;
+
+	if (!vdev_ext2_stats) {
+		wma_err("vdev_ext2_stats is NULL");
+		return;
+	}
+
+	wma_nofl_debug(
+	"MPDU BW: 20MHz tx %d rx %d, 40MHz tx %d rx %d, 80MHz tx %d rx %d, 160MHz tx %d rx %d, 320MHz tx %d rx %d vdev_id %d",
+	vdev_ext2_stats->tx_bw_mpdu[
+			WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_20MHz],
+	vdev_ext2_stats->rx_bw_mpdu[
+			WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_20MHz],
+	vdev_ext2_stats->tx_bw_mpdu[
+			WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_40MHz],
+	vdev_ext2_stats->rx_bw_mpdu[
+			WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_40MHz],
+	vdev_ext2_stats->tx_bw_mpdu[
+			WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_80MHz],
+	vdev_ext2_stats->rx_bw_mpdu[
+			WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_80MHz],
+	vdev_ext2_stats->tx_bw_mpdu[
+			WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_160MHz],
+	vdev_ext2_stats->rx_bw_mpdu[
+			WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_160MHz],
+	vdev_ext2_stats->tx_bw_mpdu[
+			WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_320MHz],
+	vdev_ext2_stats->rx_bw_mpdu[
+			WMI_STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_320MHz],
+	vdev_id);
+
+	wma_nofl_debug("MPDU NSS0: tx %d rx %d NSS1: tx %d rx %d NSS2: tx %d rx %d NSS3: tx %d rx %d",
+		       vdev_ext2_stats->tx_nss_mpdu[0],
+		       vdev_ext2_stats->rx_nss_mpdu[0],
+		       vdev_ext2_stats->tx_nss_mpdu[1],
+		       vdev_ext2_stats->rx_nss_mpdu[1],
+		       vdev_ext2_stats->tx_nss_mpdu[2],
+		       vdev_ext2_stats->rx_nss_mpdu[2],
+		       vdev_ext2_stats->tx_nss_mpdu[3],
+		       vdev_ext2_stats->rx_nss_mpdu[3]);
+
+	buf = qdf_mem_malloc(EXT_STATS_BUF_SIZE);
+	if (!buf)
+		return;
+
+	for (i = 0; i < MAX_MCS; i++) {
+		len += qdf_scnprintf(buf + len, EXT_STATS_BUF_SIZE - len,
+				     "MPDU MCS %u: tx %u rx %u, ",
+				     i, vdev_ext2_stats->tx_mcs_mpdu[i],
+				     vdev_ext2_stats->rx_mcs_mpdu[i]);
+
+		if (len > EXT_STATS_SINGLE_LINE_SIZE) {
+			wma_nofl_debug("%s", buf);
+			len = 0;
+		}
+	}
+
+	if (len)
+		wma_nofl_debug("%s", buf);
+
+	qdf_mem_free(buf);
 }
 
 int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
@@ -715,6 +822,7 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 	struct cdp_soc_t *soc_hdl = cds_get_context(QDF_MODULE_ID_SOC);
 	wmi_partner_link_stats *link_stats;
 	wmi_stats_ext_event_vdev_ext_t *vdev_ext_stats;
+	wmi_stats_ext_event_vdev_ext2_t *vdev_ext2_stats;
 
 	wma_debug("Posting stats ext event to SME");
 
@@ -755,6 +863,15 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 			stats_ext_info->data_len, param_buf->num_data);
 		return -EINVAL;
 	}
+
+	if ((param_buf->num_partner_link_stats + 1) <
+	    param_buf->num_stats_ext2_data) {
+		wma_err("Invalid num_stats_ext2_data:%d num_partner_link_stats %d",
+			param_buf->num_stats_ext2_data,
+			param_buf->num_partner_link_stats);
+		return -EINVAL;
+	}
+
 	stats_ext_event = qdf_mem_malloc(alloc_len);
 	if (!stats_ext_event)
 		return -ENOMEM;
@@ -807,8 +924,8 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 			for (i = 0; i < param_buf->num_partner_link_stats; i++) {
 				vdev_ext_stats =
 					(wmi_stats_ext_event_vdev_ext_t *)
-					param_buf->partner_link_data +
-					link_stats->offset;
+					(param_buf->partner_link_data +
+					link_stats->offset);
 				wma_stats_ext_print(vdev_ext_stats);
 				link_stats++;
 			}
@@ -816,6 +933,25 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 
 	} else {
 		wma_debug("Legacy data structure");
+	}
+
+	if (param_buf->num_stats_ext2_data) {
+		vdev_ext2_stats =
+				(wmi_stats_ext_event_vdev_ext2_t *)
+				param_buf->stats_ext2_data;
+		wma_stats_vdev_ext2_print(vdev_ext2_stats,
+					  stats_ext_info->vdev_id);
+
+		link_stats = param_buf->partner_link_stats;
+		if (param_buf->num_partner_link_stats && link_stats) {
+			for (i = 0; i < param_buf->num_partner_link_stats;
+			     i++) {
+				vdev_ext2_stats++;
+				wma_stats_vdev_ext2_print(vdev_ext2_stats,
+							  link_stats->vdev_id);
+				link_stats++;
+			}
+		}
 	}
 
 	cds_msg.type = eWNI_SME_STATS_EXT_EVENT;

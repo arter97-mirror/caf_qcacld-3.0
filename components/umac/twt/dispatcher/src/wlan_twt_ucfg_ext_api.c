@@ -60,6 +60,13 @@ ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
 }
 
 QDF_STATUS
+ucfg_twt_get_responder_support_for_ht_vht_mode(struct wlan_objmgr_psoc *psoc,
+					       bool *val)
+{
+	return wlan_twt_get_responder_support_for_ht_vht_mode(psoc, val);
+}
+
+QDF_STATUS
 ucfg_twt_setup_req(struct wlan_objmgr_psoc *psoc,
 		   struct twt_add_dialog_param *params,
 		   void *context)
@@ -273,4 +280,18 @@ void
 ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_twt_reset_requestor_enable_cmd_in_progress(psoc);
+}
+
+QDF_STATUS
+ucfg_twt_tgt_caps_get_wake_dur_and_wake_intvl(
+				struct wlan_objmgr_psoc *psoc,
+				uint32_t *min_wake_dur,
+				uint32_t *max_wake_dur,
+				uint32_t *min_wake_intvl,
+				uint32_t *max_wake_intvl)
+{
+	return wlan_twt_tgt_caps_get_wake_dur_and_wake_intvl(psoc, min_wake_dur,
+							     max_wake_dur,
+							     min_wake_intvl,
+							     max_wake_intvl);
 }

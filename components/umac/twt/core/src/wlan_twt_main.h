@@ -382,6 +382,25 @@ wlan_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
 void
 wlan_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_twt_tgt_caps_get_wake_dur_and_wake_intvl() - get min_max_wake_dur
+ * and min_max_wake_intvl supported by firmware
+ * @psoc: psoc pointer
+ * @min_wake_dur: min wake_dur supported by firmware
+ * @max_wake_dur: max wake_dur supported by firmware
+ * @min_wake_intvl: min wake_intvl supported by firmware
+ * @max_wake_intvl: max wake_intvl supported by firmware
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_tgt_caps_get_wake_dur_and_wake_intvl(
+				struct wlan_objmgr_psoc *psoc,
+				uint32_t *min_wake_dur,
+				uint32_t *max_wake_dur,
+				uint32_t *min_wake_intvl,
+				uint32_t *max_wake_intvl);
+
 #else
 
 static inline bool
@@ -602,5 +621,21 @@ wlan_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 static inline void
 wlan_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 {
+}
+
+QDF_STATUS
+wlan_twt_tgt_caps_get_wake_dur_and_wake_intvl(
+				struct wlan_objmgr_psoc *psoc,
+				uint32_t *min_wake_dur,
+				uint32_t *max_wake_dur,
+				uint32_t *min_wake_intvl,
+				uint32_t *max_wake_intvl)
+{
+	*min_wake_dur = 0;
+	*max_wake_dur = 0;
+	*min_wake_intvl = 0;
+	*max_wake_intvl = 0;
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif

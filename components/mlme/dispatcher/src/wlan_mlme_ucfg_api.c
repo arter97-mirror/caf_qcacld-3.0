@@ -272,6 +272,15 @@ ucfg_mlme_get_dfs_master_capability(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
+ucfg_mlme_vendor_set_disable_dfs_master_capability(
+					struct wlan_objmgr_psoc *psoc,
+					bool disable)
+{
+	return wlan_mlme_vendor_set_disable_dfs_master_capability(
+				psoc, disable);
+}
+
+QDF_STATUS
 ucfg_mlme_get_oem_6g_supported(struct wlan_objmgr_psoc *psoc,
 			       bool *oem_6g_disable)
 {

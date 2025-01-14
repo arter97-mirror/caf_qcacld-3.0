@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -284,6 +284,7 @@ void csr_apply_channel_power_info_to_fw(struct mac_context *mac_ctx,
 	uint8_t num_ch = 0;
 	uint8_t tempNumChannels = 0;
 	struct csr_channel tmp_ch_lst;
+	tSirUpdateIE update_ie = {0};
 
 	if (ch_lst->numChannels) {
 		tempNumChannels = QDF_MIN(ch_lst->numChannels,
@@ -300,7 +301,12 @@ void csr_apply_channel_power_info_to_fw(struct mac_context *mac_ctx,
 	} else {
 		sme_err("11D channel list is empty");
 	}
-	sch_edca_profile_update_all(mac_ctx);
+
+	/* Schedule message to handle edca update all profiles */
+	if (sme_update_add_ie(MAC_HANDLE(mac_ctx), &update_ie,
+			      eUPDATE_IE_EDCA_ALL_PROFILE) !=
+	    QDF_STATUS_SUCCESS)
+		sme_err("Could not pass on edca update all profile");
 }
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR

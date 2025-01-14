@@ -1546,7 +1546,7 @@ bool dp_rx_is_routed_to_latency_sensitive_reo(uint32_t tlv_reo_dest_ind)
 }
 #endif
 
-#ifdef DP_OFFLOAD_FRAME_WITH_SW_EXCEPTION
+#if defined(DP_OFFLOAD_FRAME_WITH_SW_EXCEPTION)
 /*
  * dp_rx_reo_dest_honor_check() - check if packet reo destination is changed
 				  by FW offload and is valid
@@ -1573,6 +1573,21 @@ dp_rx_reo_dest_honor_check(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
 	 * the original FSE/hash selection, skip FISA.
 	 */
 	return sw_exception ? QDF_STATUS_E_FAILURE : QDF_STATUS_SUCCESS;
+}
+#elif defined(WLAN_SOFTUMAC_SUPPORT)
+static inline QDF_STATUS
+dp_rx_reo_dest_honor_check(struct dp_rx_fst *fisa_hdl, qdf_nbuf_t nbuf,
+			   uint32_t tlv_reo_dest_ind)
+{
+	/* reo_dest_ind_or_sw_excpt in nubf cb is true if the packet is routed
+	 * from the FW offloads, Skip FISA for those packets.
+	 */
+	if (qdf_nbuf_get_rx_reo_dest_ind_or_sw_excpt(nbuf) ||
+	    (fisa_hdl->rx_hash_enabled &&
+	     (tlv_reo_dest_ind < HAL_REO_DEST_IND_START_OFFSET)))
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
 }
 #else
 static inline QDF_STATUS
@@ -2205,9 +2220,10 @@ static bool dp_fisa_aggregation_should_stop(
 					   fisa_flow->hal_cumultive_ip_len;
 	uint32_t ip_csum_err = 0;
 	uint32_t tcp_udp_csum_err = 0;
+	uint32_t ip_frag;
 
 	hal_rx_tlv_csum_err_get(fisa_flow->dp_ctx->hal_soc, rx_tlv_hdr,
-				&ip_csum_err, &tcp_udp_csum_err);
+				&ip_csum_err, &tcp_udp_csum_err, &ip_frag);
 
 	hal_rx_get_l3_l4_offsets(fisa_flow->dp_ctx->hal_soc, rx_tlv_hdr,
 				 &l3_hdr_offset, &l4_hdr_offset);

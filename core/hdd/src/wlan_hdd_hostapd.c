@@ -2937,9 +2937,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		wrqu.addr.sa_family = ARPHRD_ETHER;
 		memcpy(wrqu.addr.sa_data,
 		       &event->staMac, QDF_MAC_ADDR_SIZE);
-		hdd_info("Vdev %d, STA " QDF_MAC_ADDR_FMT " associated",
+		hdd_info("Vdev %d, STA " QDF_MAC_ADDR_FMT " with mld mac " QDF_MAC_ADDR_FMT " associated",
 			 link_info->vdev_id,
-			 QDF_MAC_ADDR_REF(wrqu.addr.sa_data));
+			 QDF_MAC_ADDR_REF(wrqu.addr.sa_data),
+			 QDF_MAC_ADDR_REF(event->sta_mld.bytes));
 		hdd_place_marker(adapter, "CLIENT ASSOCIATED",
 				 wrqu.addr.sa_data);
 		we_event = IWEVREGISTERED;
@@ -3119,13 +3120,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 					     &cache_stainfo, true,
 					     STA_INFO_HOSTAPD_SAP_EVENT_CB);
 		}
-		hdd_nofl_info("SAP(%d) Peer " QDF_MAC_ADDR_FMT " disassociated %sreason %d status code %d",
-			      link_info->vdev_id,
-			      QDF_MAC_ADDR_REF(disassoc_comp->staMac.bytes),
-			      disassoc_comp->reason ==
-			      eSAP_USR_INITATED_DISASSOC ? "by user " : "",
-			      disassoc_comp->reason_code,
-			      disassoc_comp->status_code);
 		hdd_place_marker(adapter, "CLIENT DISASSOCIATED FROM SAP",
 				 wrqu.addr.sa_data);
 
@@ -3149,10 +3143,23 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 						STA_INFO_HOSTAPD_SAP_EVENT_CB,
 						STA_INFO_MATCH_STA_MAC_ONLY);
 		if (!stainfo) {
-			hdd_err("Failed to find STA info for " QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(disassoc_comp->staMac.bytes));
+			hdd_err("Failed to find STA info for " QDF_MAC_ADDR_FMT " %sreason %d sc %d",
+				QDF_MAC_ADDR_REF(disassoc_comp->staMac.bytes),
+				disassoc_comp->reason ==
+				eSAP_USR_INITATED_DISASSOC ? "by user " : "",
+				disassoc_comp->reason_code,
+				disassoc_comp->status_code);
 			return QDF_STATUS_E_INVAL;
 		}
+
+		hdd_nofl_info("SAP(%d) Peer " QDF_MAC_ADDR_FMT " with mld " QDF_MAC_ADDR_FMT " disassociated %sreason %d status code %d",
+			      link_info->vdev_id,
+			      QDF_MAC_ADDR_REF(stainfo->sta_mac.bytes),
+			      QDF_MAC_ADDR_REF(stainfo->mld_addr.bytes),
+			      disassoc_comp->reason ==
+			      eSAP_USR_INITATED_DISASSOC ? "by user " : "",
+			      disassoc_comp->reason_code,
+			      disassoc_comp->status_code);
 
 		if (wlan_vdev_mlme_is_mlo_vdev(link_info->vdev) &&
 		    !qdf_is_macaddr_zero(&stainfo->mld_addr)) {
@@ -3752,7 +3759,8 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx)
+bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx,
+					       enum QDF_OPMODE op_mode)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
@@ -3780,7 +3788,16 @@ bool hdd_is_sta_connect_or_link_switch_in_prog(struct hdd_context *hdd_ctx)
 			    wlan_hdd_is_link_switch_in_progress(link_info))
 				is_switching_link = true;
 
-			key_exchng_in_prog =
+			/* In case of P2P GO + STA/CLI concurrency, when EAPOL
+			 * is in progress for STA/CLI, the P2P GO will still be
+			 * in NOA and if CSA is allowed then CSA frames won't
+			 * go over the air as P2P GO is in NOA.
+			 * In case of SAP, it doesn't need to check the EAPOL
+			 * in progress as the STA/CLI channel will be already
+			 * decided after getting connect complete indication.
+			 */
+			if (op_mode == QDF_P2P_GO_MODE)
+				key_exchng_in_prog =
 					sme_is_sta_key_exchange_in_progress(
 							hdd_ctx->mac_handle,
 							link_info->vdev_id);
@@ -3869,7 +3886,8 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	 * cannot do CSA as it won't be able to send CSA frames during NOA
 	 * period
 	 */
-	if (hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx) ||
+	if (hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx,
+						      adapter->device_mode) ||
 	    (adapter->device_mode == QDF_P2P_GO_MODE &&
 	     ucfg_p2p_is_p2p_go_noa_in_progress(hdd_ctx->pdev,
 						link_info->vdev_id))) {
@@ -7782,6 +7800,9 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		ret = -EINVAL;
 		goto error;
 	}
+
+	/* Cancel all ongoing/pending no sap scan requests */
+	hdd_abort_non_sap_scan_all_adapters(hdd_ctx);
 
 	status = wlansap_start_bss(sap_ctx, sap_event_callback, config);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {

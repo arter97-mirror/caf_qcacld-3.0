@@ -2574,3 +2574,115 @@ struct qdf_mac_addr *nan_get_fw_addr(struct wlan_objmgr_psoc *psoc)
 
 	return &psoc_priv->fw_nan_addr;
 }
+
+QDF_STATUS nan_cache_ndp_peer_mac_addr(struct wlan_objmgr_psoc *psoc,
+				       struct qdf_mac_addr *peer_mac_addr)
+{
+	struct nan_psoc_priv_obj *nan_psoc_priv;
+	uint8_t idx;
+
+	nan_psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!nan_psoc_priv) {
+		nan_err("NAN PSOC priv obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	idx = nan_psoc_priv->num_ndp_peers++;
+	if (nan_psoc_priv->num_ndp_peers > MAX_NDP_PEERS) {
+		nan_err("num peers %d more than max NDP peers",
+			nan_psoc_priv->num_ndp_peers);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mem_copy(nan_psoc_priv->ndp_peer_mac_addr[idx].bytes,
+		     peer_mac_addr->bytes, QDF_MAC_ADDR_SIZE);
+
+	nan_debug("cached peer at index %d", idx);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * nan_remove_ndp_peer_mac_addr() - remove NDP peer address from the NAN PSOC
+ * private object.
+ * @psoc: pointer to PSOC object
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: QDF status
+ */
+QDF_STATUS nan_remove_ndp_peer_mac_addr(struct wlan_objmgr_psoc *psoc,
+					struct qdf_mac_addr *peer_mac_addr)
+{
+	struct nan_psoc_priv_obj *nan_psoc_priv;
+	uint8_t i = 0, idx;
+
+	nan_psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!nan_psoc_priv) {
+		nan_err("NAN PSOC priv obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	idx = nan_psoc_priv->num_ndp_peers;
+	if (idx > MAX_NDP_PEERS) {
+		nan_err("num peers %d more than max NDP peers",
+			nan_psoc_priv->num_ndp_peers);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!idx) {
+		nan_debug("last NDP peer removed");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	for (i = 0; i < idx; i++) {
+		if (qdf_is_macaddr_equal(
+					peer_mac_addr,
+					&nan_psoc_priv->ndp_peer_mac_addr[i])) {
+			/*
+			 * move the peer address from last position to
+			 * position i
+			 */
+			qdf_mem_copy(
+			nan_psoc_priv->ndp_peer_mac_addr[i].bytes,
+			nan_psoc_priv->ndp_peer_mac_addr[idx - 1].bytes,
+			QDF_MAC_ADDR_SIZE);
+			break;
+		}
+	}
+
+	nan_debug("peer remove from migrated list at index %d with max peer %d",
+		  i, idx);
+	nan_psoc_priv->num_ndp_peers--;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void nan_clean_up_all_ndp_peers(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	struct nan_psoc_priv_obj *nan_psoc_priv;
+	uint8_t i;
+
+	nan_psoc_priv = nan_get_psoc_priv_obj(psoc);
+	if (!nan_psoc_priv) {
+		nan_err("NAN PSOC priv obj is null");
+		return;
+	}
+
+	for (i = 0; i < nan_psoc_priv->num_ndp_peers; i++)
+		nan_psoc_priv->cb_obj.delete_peers_by_addr(
+					vdev_id,
+					nan_psoc_priv->ndp_peer_mac_addr[i]);
+}
+
+bool nan_is_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return false;
+	}
+
+	return psoc_nan_obj->cfg_param.enable;
+}

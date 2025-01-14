@@ -25,6 +25,7 @@
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
 #include "wlan_tdls_main.h"
+#include "wlan_mlo_mgr_public_structs.h"
 
 #ifdef FEATURE_WLAN_TDLS
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -242,10 +243,13 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
  * wlan_tdls_teardown_links_for_non_dbs() - notify TDLS module to teardown
  * TDLS links for non-DBS target
  * @psoc: psoc object
+ * @vdev_id: Vdev id
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc);
+QDF_STATUS
+wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id);
 
 /**
  * wlan_tdls_is_addba_request_allowed() - API to check if Add Block ack request
@@ -263,7 +267,8 @@ bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
  *
  * Return: None
  */
-void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev);
+void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev,
+				enum wlan_tdls_peer_delete_reason);
 
 /*
  * wlan_tdls_update_peer_kickout_count() - Update the TDLS peer sta kickout
@@ -367,7 +372,8 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 {}
 
 static inline
-QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc)
+QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
 }

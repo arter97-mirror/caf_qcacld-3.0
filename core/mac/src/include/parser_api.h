@@ -37,6 +37,7 @@
 #include "lim_session.h"
 #include "wlan_mlme_main.h"
 #include <wlan_mlo_mgr_public_structs.h>
+#include <wlan_mlo_link_recfg.h>
 
 #define COUNTRY_STRING_LENGTH    (3)
 #define COUNTRY_INFO_MAX_CHANNEL (84)
@@ -1866,8 +1867,47 @@ populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 				  struct wlan_objmgr_vdev *vdev,
 				  struct wlan_mlo_ie *mlo_ie);
-#endif
 
+/**
+ * populate_rv_mlo_ie() - populate Reconfig MLO IE
+ * @vdev: Pointer to vdev
+ * @session: Pointer to pe session
+ * @req: Pointer to MLO Reconfig request
+ *
+ * Populate the Reconfig Mlo IE in Link Reconfig action frame.
+ */
+QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
+			      struct pe_session *session,
+			      struct mlo_link_recfg_state_req *req);
+
+/**
+ * populate_oci_ie() - populate OCI IE
+ * @mac: Pointer to mac context
+ * @chan_freq: channel frequency
+ * @oci: Pointer to OCI IE
+ *
+ * Populate the OCI IE.
+ */
+QDF_STATUS populate_oci_ie(struct mac_context *mac,
+			   qdf_freq_t chan_freq,
+			   tDot11fIEoci *oci);
+#else
+static inline QDF_STATUS
+populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
+		   struct pe_session *session,
+		   struct mlo_link_recfg_state_req *req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+populate_oci_ie(struct mac_context *mac,
+		qdf_freq_t chan_freq,
+		tDot11fIEoci *oci)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 /**
  * populate_dot11f_btm_extended_caps() - populate btm extended capabilities
  * @mac_ctx: Global MAC context.
@@ -1881,6 +1921,20 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 QDF_STATUS populate_dot11f_btm_extended_caps(struct mac_context *mac_ctx,
 					     struct pe_session *pe_session,
 					     struct sDot11fIEExtCap *dot11f);
+
+/**
+ * populate_dot11f_reg_connectivity() - Populate Non-AP STA regulatory
+ * connectivity capabilities
+ * @mac_ctx: Global MAC context.
+ * @dot11f: Pointer to the capabilities of the session.
+ *
+ * Populate Non-AP STA's regulatory connectivity capability with Indoor, SP AP.
+ *
+ * Return: QDF_STATUS Success or Failure
+ */
+QDF_STATUS
+populate_dot11f_reg_connectivity(struct mac_context *mac_ctx,
+				 tDot11fIEreg_connect *dot11f);
 
 /**
  * lim_truncate_ppet: truncates ppet of trailing zeros

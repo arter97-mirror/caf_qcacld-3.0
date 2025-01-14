@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -29,6 +29,7 @@
 
 #include "sch_api.h"
 #include "lim_utils.h"
+#include "lim_api.h"
 #include "lim_types.h"
 #include "lim_security_utils.h"
 #include "lim_prop_exts_utils.h"
@@ -3913,7 +3914,8 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 
 		/* Before restarting vdev, delete the tdls peers */
 		lim_update_tdls_set_state_for_fw(pe_session, false);
-		lim_delete_tdls_peers(mac, pe_session);
+		lim_delete_tdls_peers(mac, pe_session,
+				      TDLS_PEER_DEL_REASON_NONE);
 
 		lim_ht_switch_chnl_req(pe_session);
 	}
@@ -4538,10 +4540,8 @@ void lim_process_add_sta_rsp(struct mac_context *mac_ctx,
 	session->csaOffloadEnable = add_sta_params->csaOffloadEnable;
 	if (LIM_IS_NDI_ROLE(session))
 		lim_ndp_add_sta_rsp(mac_ctx, session, msg->bodyptr);
-#ifdef FEATURE_WLAN_TDLS
 	else if (add_sta_params->staType == STA_ENTRY_TDLS_PEER)
 		lim_process_tdls_add_sta_rsp(mac_ctx, msg->bodyptr, session);
-#endif
 	else
 		lim_process_mlm_add_sta_rsp(mac_ctx, msg, session);
 
@@ -5984,6 +5984,11 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx, uint8_t vdev_id,
 	QDF_STATUS status_vht = QDF_STATUS_SUCCESS;
 	QDF_STATUS status_he = QDF_STATUS_SUCCESS;
 	QDF_STATUS status_eht = QDF_STATUS_SUCCESS;
+	struct pe_session *session;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (session)
+		lim_disable_ht_he_dynamic_smps(session, session->curr_op_freq);
 
 	/*
 	 * Note: Do not use Dot11f VHT structure, since 1 byte present flag in
@@ -7177,16 +7182,11 @@ void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 	if (!IS_DOT11_MODE_HE(session_entry->dot11mode))
 		goto out;
 
-	if (!assoc_rsp->he_cap.present && beacon && beacon->he_cap.present) {
-		/* Use beacon HE caps if assoc resp doesn't have he caps */
-		pe_debug("he_caps missing in assoc rsp");
-		qdf_mem_copy(&assoc_rsp->he_cap, &beacon->he_cap,
-			     sizeof(tDot11fIEhe_cap));
-	}
-
 	/* assoc resp and beacon doesn't have he caps */
-	if (!assoc_rsp->he_cap.present)
+	if (!assoc_rsp->he_cap.present) {
+		pe_err("HE cap IE is missing in assoc response");
 		goto out;
+	}
 
 	sta_ds->mlmStaContext.he_capable = assoc_rsp->he_cap.present;
 
@@ -7761,6 +7761,11 @@ void lim_update_session_he_capable(struct mac_context *mac, struct pe_session *s
 		session->he_config.rx_pream_puncturing =
 					mac->he_cap_5g.rx_pream_puncturing;
 	}
+}
+
+void lim_reset_session_he_capable(struct pe_session *session)
+{
+	session->he_capable = false;
 }
 
 void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
@@ -8618,6 +8623,8 @@ static void lim_intersect_eht_caps(tDot11fIEeht_cap *rcvd_eht,
 		peer_eht->support_320mhz_6ghz = 1;
 	else
 		peer_eht->support_320mhz_6ghz = 0;
+
+	peer_eht->mcs_15 = session_eht->mcs_15 & rcvd_eht->mcs_15;
 }
 
 void lim_update_usr_eht_cap(struct mac_context *mac_ctx,
@@ -8857,10 +8864,9 @@ void lim_intersect_sta_eht_caps(struct mac_context *mac_ctx,
 	lim_intersect_eht_caps(rcvd_eht, peer_eht, session);
 }
 
-void lim_update_session_eht_capable(struct mac_context *mac,
-				    struct pe_session *session)
+void lim_update_session_eht_capable(struct pe_session *session, bool val)
 {
-	session->eht_capable = true;
+	session->eht_capable = val;
 }
 
 void lim_add_bss_eht_cfg(struct bss_params *add_bss, struct pe_session *session)
@@ -9340,23 +9346,17 @@ QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
 
 void lim_update_stads_eht_caps(struct mac_context *mac_ctx,
 			       tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
-			       struct pe_session *session_entry,
-			       tSchBeaconStruct *beacon)
+			       struct pe_session *session_entry)
 {
 	/* If EHT is not supported, do not fill sta_ds and return */
 	if (!IS_DOT11_MODE_EHT(session_entry->dot11mode))
 		return;
 
-	if (!assoc_rsp->eht_cap.present && beacon && beacon->eht_cap.present) {
-		/* Use beacon EHT caps if assoc resp doesn't have he caps */
-		pe_debug("eht_caps missing in assoc rsp");
-		qdf_mem_copy(&assoc_rsp->eht_cap, &beacon->eht_cap,
-			     sizeof(tDot11fIEeht_cap));
-	}
-
 	/* assoc resp and beacon doesn't have eht caps */
-	if (!assoc_rsp->eht_cap.present)
+	if (!assoc_rsp->eht_cap.present) {
+		pe_err("EHT cap IE is missing in assoc response");
 		return;
+	}
 
 	sta_ds->mlmStaContext.eht_capable = assoc_rsp->eht_cap.present;
 
@@ -11154,6 +11154,15 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 			wlan_reg_chan_band_to_freq(mac->pdev,
 						   session->ch_center_freq_seg1,
 						   band_mask);
+	/* ch_params.mhz_freq_seg1 would be 0 only if the
+	 * session->ch_center_freq_seg1 is invalid/disabled. Downgrade the bw
+	 * to 160 MHz as 320 MHz can't be a valid bw for such channel.
+	 */
+	if (!ch_params.mhz_freq_seg1 &&
+	    ch_params.ch_width == CH_WIDTH_320MHZ) {
+		pe_debug("Downgrade ch_width to 160MHz");
+		ch_params.ch_width = CH_WIDTH_160MHZ;
+	}
 
 	if (band == (REG_BAND_2G) && (ch_params.ch_width == CH_WIDTH_40MHZ)) {
 		if (ch_params.mhz_freq_seg0 ==  session->curr_op_freq + 10)
@@ -11436,6 +11445,8 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 		sta_ptr->htSupportedChannelWidthSet = CH_WIDTH_20MHZ;
 	*new_ch_width = ch_width;
 
+	lim_update_bcn_op_ch_width(session->vdev, ch_width);
+
 	return lim_check_vht_op_mode_change(mac_ctx, session, *new_ch_width,
 					    sta_ptr->staAddr);
 }
@@ -11457,6 +11468,7 @@ lim_get_omn_channel_width(tDot11fIEOperatingMode *omn_ie)
 enum phy_ch_width lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
 				       tDot11fIEVHTOperation *vht_op,
 				       tDot11fIEHTInfo *ht_info,
+				       tDot11fIEHTCaps *ht_cap,
 				       tDot11fIEOperatingMode *omn_ie)
 {
 	uint8_t ccfs0, ccfs1, offset;
@@ -11473,7 +11485,8 @@ enum phy_ch_width lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
 	switch (vht_op->chanWidth) {
 	case WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ:
 		if (ht_info && ht_info->present &&
-		    ht_info->recommendedTxWidthSet)
+		    ht_info->recommendedTxWidthSet && ht_cap && ht_cap->present
+		    && ht_cap->supportedChannelWidthSet)
 			vht_ch_width = CH_WIDTH_40MHZ;
 		else
 			vht_ch_width = CH_WIDTH_20MHZ;
@@ -11616,6 +11629,9 @@ lim_update_tx_power(struct mac_context *mac_ctx, struct pe_session *sap_session,
 	if (!sta_mlme_obj || !sap_mlme_obj)
 		return QDF_STATUS_E_FAILURE;
 
+	if (wlan_is_scc_tpc_power_supp_enabled(sta_session->vdev))
+		return QDF_STATUS_SUCCESS;
+
 	if (restore_sta_power) {
 		/* SAP interface is removed, restore the STA power */
 		wlan_set_tpc_update_required_for_sta(sap_session->vdev, false);
@@ -11675,6 +11691,9 @@ lim_is_power_change_required_for_sta(struct mac_context *mac_ctx,
 		pe_err("vdev component object is NULL");
 		return false;
 	}
+
+	if (wlan_is_scc_tpc_power_supp_enabled(sap_session->vdev))
+		return false;
 
 	if (sta_session->curr_op_freq != sap_session->curr_op_freq)
 		return false;
@@ -12421,9 +12440,13 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 	uint8_t tx_pwr_info = 0U;
 	uint8_t local_psd = 0U;
 	uint8_t reg_psd = 0U;
-	uint8_t *on_entry_target = target;
+	uint8_t *on_entry_target = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint16_t idx = 0;
+
+	if (!target)
+		return QDF_STATUS_E_INVAL;
+	on_entry_target = target;
 
 	for (idx = 0; idx < num_tpe; idx++) {
 		if (!tpe_ptr[idx].present)

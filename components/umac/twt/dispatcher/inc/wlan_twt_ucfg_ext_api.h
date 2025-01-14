@@ -351,6 +351,19 @@ ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val);
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val);
+
+/**
+ * ucfg_twt_get_responder_support_for_ht_vht_mode() - Get twt_responder support
+ * for ht/vht mode
+ * @psoc: global psoc object
+ * @val: output variable to store the value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_get_responder_support_for_ht_vht_mode(struct wlan_objmgr_psoc *psoc,
+					       bool *val);
+
 /**
  * ucfg_twt_get_pmo_allowed() - Get twt allowed
  * @psoc: psoc handler
@@ -496,6 +509,15 @@ QDF_STATUS ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val)
 static inline
 QDF_STATUS ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
 {
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS
+ucfg_twt_get_responder_support_for_ht_vht_mode(struct wlan_objmgr_psoc *psoc,
+					       bool *val)
+{
+	*val = false;
 	return QDF_STATUS_SUCCESS;
 }
 

@@ -356,7 +356,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (IS_DOT11_MODE_EHT(dot11mode) && pesession &&
 	    pesession->lim_join_req &&
 	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)bssid)) {
-		lim_update_session_eht_capable(mac_ctx, pesession);
+		lim_update_session_eht_capable(pesession, true);
 
 		if (pesession->lim_join_req->bssDescription.is_ml_ap &&
 		    pesession->rsno_gen_used != RSNO_GEN_WIFI6)
@@ -364,6 +364,9 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	populate_dot11f_eht_caps(mac_ctx, pesession, &pr->eht_cap);
+
+	/* Populate Non-AP STA Regulatory connectivity element */
+	populate_dot11f_reg_connectivity(mac_ctx, &pr->reg_connect);
 
 	if (addn_ielen && additional_ie) {
 		qdf_mem_zero((uint8_t *)&extracted_ext_cap,
@@ -3355,6 +3358,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_eht_caps(mac_ctx, pe_session, &frm->eht_cap);
 		lim_strip_mlo_ie(mac_ctx, add_ie, &add_ie_len);
 	}
+
+	/* Populate Non-AP STA Regulatory connectivity element */
+	populate_dot11f_reg_connectivity(mac_ctx, &frm->reg_connect);
 
 	if (pe_session->is11Rconnection) {
 		struct bss_description *bssdescr;
@@ -6782,7 +6788,10 @@ lim_fill_oci_params(struct mac_context *mac, struct pe_session *session,
 						    session->ch_width,
 						    ch_offset);
 	oci->prim_ch_num = prim_ch_num;
-	oci->freq_seg_1_ch_num = session->ch_center_freq_seg1;
+	if (session->ch_width == CH_WIDTH_80P80MHZ)
+		oci->freq_seg_1_ch_num = session->ch_center_freq_seg1;
+	else
+		oci->freq_seg_1_ch_num = 0;
 	oci->present = 1;
 	if (tx_chan_width)
 		*tx_chan_width = ch_width_in_mhz(session->ch_width);
@@ -8186,6 +8195,250 @@ peer_release:
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 
 	return status;
+}
+
+static QDF_STATUS
+lim_mgmt_link_recfg_req_tx_complete(void *context, qdf_nbuf_t buf,
+				    uint32_t tx_status, void *params)
+{
+	struct wlan_frame_hdr *mac_hdr;
+	uint8_t *frame_ptr;
+	uint8_t ff_offset;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!params) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	frame_ptr = qdf_nbuf_data(buf);
+	mac_hdr = (struct wlan_frame_hdr *)frame_ptr;
+
+	ff_offset = sizeof(*mac_hdr);
+	if (wlan_crypto_is_data_protected(frame_ptr))
+		ff_offset += IEEE80211_CCMP_MICLEN;
+
+	if (qdf_nbuf_len(buf) < (ff_offset + sizeof(struct action_frm_hdr))) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	pe_nofl_rl_info("Link Reconfiguration TX: %s (%d)",
+			(tx_status == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK) ?
+			"success" : "fail", tx_status);
+
+out:
+	qdf_nbuf_free(buf);
+	return status;
+}
+
+static QDF_STATUS
+lim_store_link_recfg_req_frame(struct mac_context *mac_ctx,
+			       uint8_t *frame_ptr, uint32_t num_bytes,
+			       uint8_t vdev_id)
+{
+	struct pe_session *pe_session;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mlo_link_recfg_context *ctx;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!num_bytes || !frame_ptr)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	pe_session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!pe_session ||
+	    pe_session->opmode != QDF_STA_MODE ||
+	    !pe_session->vdev) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+	vdev = pe_session->vdev;
+	if (!vdev->mlo_dev_ctx) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+	ctx = vdev->mlo_dev_ctx->link_recfg_ctx;
+	if (!ctx) {
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	ctx->req_frame.len = num_bytes;
+	if (!ctx->req_frame.len) {
+		pe_err("Link Recfg Frame len is 0");
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	ctx->req_frame.ptr = qdf_mem_malloc(ctx->req_frame.len);
+	if (ctx->req_frame.ptr) {
+		qdf_mem_copy(ctx->req_frame.ptr,
+			     frame_ptr,
+			     ctx->req_frame.len);
+		pe_debug("Link Recfg Frame len is %d",
+			 ctx->req_frame.len);
+	}
+
+out:
+	return status;
+}
+
+QDF_STATUS
+lim_send_link_recfg_action_req_frame(uint8_t vdev_id,
+				     uint8_t *peer_mac,
+				     struct wlan_action_frame_args *args,
+				     struct mlo_link_recfg_state_req *req)
+{
+	tDot11flink_recfg_req frm;
+	struct mac_context *mac_ctx;
+	struct pe_session *session;
+	uint8_t session_id = 0;
+	QDF_STATUS qdf_status;
+	uint8_t tx_flag = 0;
+	uint16_t rv_mlie_len = 0;
+	tDot11fIEoci oci;
+	uint32_t num_bytes, payload_size, status;
+	uint8_t *frame_ptr;
+	tpSirMacMgmtHdr mgmt_hdr;
+	void *pkt_ptr = NULL;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	if (!req)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("session not found for given vdev_id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	session_id = session->smeSessionId;
+
+	qdf_mem_zero((uint8_t *)&frm, sizeof(frm));
+
+	session->mlo_ie_total_len = 0;
+	qdf_mem_zero(&session->mlo_ie, sizeof(session->mlo_ie));
+	qdf_status = populate_rv_mlo_ie(session->vdev,
+					session,
+					req);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		pe_err("Failed to populate Recfg MLO IE");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	rv_mlie_len = lim_caculate_mlo_ie_length(&session->mlo_ie);
+	pe_debug("Reconfig ML IE len %d", rv_mlie_len);
+
+	session->mlo_ie_total_len = rv_mlie_len;
+	frm.Category.category = args->category;
+	frm.Action.action = args->action;
+	frm.DialogToken.token = args->arg1;
+
+	if (req->add_link_info.num_links &&
+	    lim_is_self_and_peer_ocv_capable(mac_ctx, peer_mac, session)) {
+		pe_debug("Add oci ie");
+		populate_oci_ie(mac_ctx, req->add_link_info.link[0].freq, &oci);
+		if (oci.present)
+			qdf_mem_copy(&frm.oci, &oci, sizeof(tDot11fIEoci));
+	}
+
+	pe_debug("Sending a Link Reconfiguration Request frame token %d from " QDF_MAC_ADDR_FMT " to " QDF_MAC_ADDR_FMT,
+		 frm.DialogToken.token,
+		 QDF_MAC_ADDR_REF(session->self_mac_addr),
+		 QDF_MAC_ADDR_REF(peer_mac));
+
+	status = dot11f_get_packed_link_recfg_reqSize(mac_ctx, &frm,
+						      &payload_size);
+	if (DOT11F_FAILED(status)) {
+		pe_err("Failed to calculate packed size for a Link Reconfig Request frame (0x%08x).",
+		       status);
+		/* We'll fall back on the worst case scenario: */
+		payload_size = sizeof(tDot11flink_recfg_req);
+	} else if (DOT11F_WARNED(status)) {
+		pe_warn("There were warnings while calculating packed size for a Link Reconfig Request frame (0x%08x).",
+			status);
+	}
+
+	num_bytes = payload_size + sizeof(*mgmt_hdr) + rv_mlie_len;
+	qdf_status = cds_packet_alloc(num_bytes, (void **)&frame_ptr,
+				      (void **)&pkt_ptr);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status) || !pkt_ptr) {
+		pe_err("Failed to allocate %d bytes for a Link Reconfig req action frm",
+		       num_bytes);
+		return QDF_STATUS_E_FAILURE;
+	}
+	qdf_mem_zero(frame_ptr, num_bytes);
+
+	lim_populate_mac_header(mac_ctx, frame_ptr, WLAN_FC0_TYPE_MGMT,
+				SIR_MAC_MGMT_ACTION, peer_mac,
+				session->self_mac_addr);
+
+	/* Update A3 with the BSSID */
+	mgmt_hdr = (tpSirMacMgmtHdr)frame_ptr;
+	sir_copy_mac_addr(mgmt_hdr->bssId, session->bssId);
+	lim_set_protected_bit(mac_ctx, session, peer_mac, mgmt_hdr);
+
+	status = dot11f_pack_link_recfg_req(mac_ctx, &frm,
+					    frame_ptr + sizeof(tSirMacMgmtHdr),
+					    payload_size, &payload_size);
+
+	if (DOT11F_FAILED(status)) {
+		pe_err("Failed to pack a Link Reconfig action request frm (0x%08x)",
+		       status);
+		qdf_status = QDF_STATUS_E_FAILURE;
+		goto error_link_recfg_req;
+	} else if (DOT11F_WARNED(status)) {
+		pe_warn("There were warnings while packing Link Reconfig req frm (0x%08x)",
+			status);
+	}
+
+	if (rv_mlie_len) {
+		qdf_status = lim_fill_complete_mlo_ie(session, rv_mlie_len,
+						      frame_ptr + sizeof(tSirMacMgmtHdr) +
+						      payload_size);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_debug("assemble rv ml ie error");
+			rv_mlie_len = 0;
+		}
+		payload_size = payload_size + rv_mlie_len;
+	}
+
+	if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq) ||
+	    session->opmode == QDF_P2P_CLIENT_MODE ||
+	    session->opmode == QDF_P2P_GO_MODE)
+		tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+
+	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
+			 session->peSessionId, mgmt_hdr->fc.subType));
+	qdf_status = wma_tx_frameWithTxComplete(
+			mac_ctx, pkt_ptr, (uint16_t)num_bytes,
+			 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
+			 lim_tx_complete, frame_ptr,
+			 lim_mgmt_link_recfg_req_tx_complete, tx_flag,
+			 vdev_id, 0, session->curr_op_freq,
+			 RATEID_DEFAULT, 0, 0);
+	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
+			 session->peSessionId, qdf_status));
+
+	pe_debug("Link Reconfig tx dump:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, frame_ptr,
+			   num_bytes);
+
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		pe_err("wma_tx_frame FAILED! Status [%d]", qdf_status);
+		return QDF_STATUS_E_FAILURE;
+	} else {
+		lim_store_link_recfg_req_frame(mac_ctx,
+					       frame_ptr, num_bytes,
+					       vdev_id);
+		return QDF_STATUS_SUCCESS;
+	}
+
+error_link_recfg_req:
+	cds_packet_free((void *)pkt_ptr);
+	return qdf_status;
 }
 #endif
 

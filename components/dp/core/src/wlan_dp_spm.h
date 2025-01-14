@@ -15,8 +15,15 @@
 #define WLAN_DP_SPM_MAX_SERVICE_CLASS_SUPPORT 32
 #define WLAN_DP_SPM_INVALID_METADATA 0xFF
 
-/* Timeout in nano seconds */
-#define WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT 5000000000
+#define WLAN_DP_SPM_S_TBL_SIZE 256
+#define WLAN_DP_SPM_S_TBL_IDX_MASK 0xFF
+#define WLAN_DP_SPM_S_TBL_RETIRE_TIME_DELTA_NS (200 * QDF_NSEC_PER_MSEC)
+#define WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT 0
+
+/* No packets received for this flow in last 2 seconds, window did not move*/
+#define WLAN_DP_SPM_MAX_LAST_WIN_START_NS (2 * QDF_NSEC_PER_SEC)
+/* voice call tx pkt rate is very low */
+#define WLAN_DP_SPM_MIN_PKT_CNT_PER_SEC 10
 #define WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK 5
 
 /**
@@ -87,6 +94,9 @@ struct wlan_dp_spm_flow_tbl_stats {
  * @classified: Classification done
  * @reserved: unused
  * @flow_tuple_hash: flow_tuple_hash to identify bi-directional flow
+ * @win_start_ts: winidow start timestamp
+ * @win_start_num_pkts: Total number of pkts of this flow at win_start_ts
+ * @last_win_pkts: Packets in previous window
  */
 struct wlan_dp_spm_flow_info {
 	qdf_list_node_t node;
@@ -111,6 +121,34 @@ struct wlan_dp_spm_flow_info {
 	uint8_t classified;
 	uint64_t flow_tuple_hash;
 #endif
+	uint64_t win_start_ts;
+	uint64_t win_start_num_pkts;
+	uint64_t last_win_pkts;
+};
+
+/**
+ * struct wlan_dp_spm_screening_entry - Entry of screening table
+ * @flags: Entry flags. This member should always be placed first as memory
+ *         ops will be done to avoid this member.
+ * @skb_hash: Socket buffer hash
+ * @num_pkts: Number of packets
+ * @init_ts: Initialisation timestamp
+ */
+struct wlan_dp_spm_screening_entry {
+	unsigned long flags;
+	uint32_t skb_hash;
+	uint32_t num_pkts;
+	uint64_t init_ts;
+};
+
+/**
+ * struct wlan_dp_spm_screening_ctx - Flow screening context
+ * @s_tbl: Screening flow table
+ * @s_flows_active: Number of flows being screened
+ */
+struct wlan_dp_spm_screening_ctx {
+	struct wlan_dp_spm_screening_entry s_tbl[WLAN_DP_SPM_S_TBL_SIZE];
+	uint32_t s_flows_active;
 };
 
 /**
@@ -120,6 +158,7 @@ struct wlan_dp_spm_flow_info {
  * @o_flow_rec_freelist: Flow records freelist
  * @flow_list_lock: Flow list operation lock
  * @o_stats: Flow table stats for originating traffic
+ * @screen_flow_ctx: Flow screening context
  */
 struct wlan_dp_spm_intf_context {
 	struct wlan_dp_spm_flow_info *origin_aft[WLAN_DP_SPM_FLOW_REC_TBL_MAX];
@@ -127,6 +166,7 @@ struct wlan_dp_spm_intf_context {
 	qdf_list_t o_flow_rec_freelist;
 	qdf_spinlock_t flow_list_lock;
 	struct wlan_dp_spm_flow_tbl_stats o_stats;
+	struct wlan_dp_spm_screening_ctx screen_flow_ctx;
 };
 
 /**
@@ -393,6 +433,18 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf);
 void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf);
 
 /**
+ * wlan_dp_spm_flow_screening(): Check if flow has valid packet rate for
+ *                               tracking.
+ *
+ * @dp_intf: DP interface
+ * @skb: Pointer to sk_buff
+ *
+ * Return: True if flow tracking rate is met, else false.
+ */
+bool wlan_dp_spm_flow_screening(struct wlan_dp_intf *dp_intf,
+				qdf_nbuf_t skb);
+
+/**
  * wlan_dp_spm_get_flow_id_origin() - Get flow ID for a new flow
  * @dp_intf: DP interface
  * @flow_id: ID place holder.
@@ -441,6 +493,20 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 static inline
 void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
 {
+}
+
+static inline
+bool wlan_dp_spm_flow_pkt_rate_valid(struct wlan_dp_intf *dp_intf,
+				     qdf_nbuf_t skb)
+{
+	return false;
+}
+
+static inline
+bool wlan_dp_spm_flow_screening(struct wlan_dp_intf *dp_intf,
+				qdf_nbuf_t skb)
+{
+	return false;
 }
 
 static inline

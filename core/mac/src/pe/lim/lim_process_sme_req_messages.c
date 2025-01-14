@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1090,7 +1090,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		}
 
 		if (IS_DOT11_MODE_EHT(session->dot11mode)) {
-			lim_update_session_eht_capable(mac_ctx, session);
+			lim_update_session_eht_capable(session, true);
 			lim_copy_bss_eht_cap(session);
 		} else {
 			lim_strip_eht_ies_from_add_ies(mac_ctx, session);
@@ -2834,7 +2834,7 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 static bool lim_enable_twt(struct mac_context *mac_ctx, tDot11fBeaconIEs *ie)
 {
 	struct s_ext_cap *ext_cap;
-	bool twt_support_in_11n = false;
+	bool twt_req_ht_vht = false;
 	bool twt_request = false;
 
 	if (!ie) {
@@ -2851,13 +2851,13 @@ static bool lim_enable_twt(struct mac_context *mac_ctx, tDot11fBeaconIEs *ie)
 		return true;
 	}
 
-	wlan_twt_cfg_get_support_in_11n(mac_ctx->psoc,
-					&twt_support_in_11n);
+	wlan_twt_cfg_get_req_support_for_ht_vht(mac_ctx->psoc,
+						&twt_req_ht_vht);
 	ext_cap = (struct s_ext_cap *)ie->ExtCap.bytes;
-	if (twt_support_in_11n && ie->ExtCap.present &&
+	if (twt_req_ht_vht && ie->ExtCap.present &&
 	    ext_cap->twt_responder_support) {
-		pe_debug("TWT is supported for 11n, twt_support_in_11n %d, ext_cap %d, twt_responder support %d",
-			 twt_support_in_11n, ie->ExtCap.present,
+		pe_debug("TWT is supported for 11n, twt_req_ht_vht %d, ext_cap %d, twt_responder support %d",
+			 twt_req_ht_vht, ie->ExtCap.present,
 			 ext_cap->twt_responder_support);
 		return true;
 	}
@@ -3303,21 +3303,14 @@ lim_is_single_link_mlo_sta(struct pe_session *session)
 }
 #endif
 
-/**
- * lim_disable_ht_he_dynamic_smps() - disable dynamic SMPS for STA/P2P client
- *@session: pe session
- *@chan_freq: channel frequency
- *
- * When connecting with a 2.4 GHz only STA or a P2P client, disable STA HT and
- * HE dynamic SMPS capabilities.
- *
- * Return: None
- */
-static void
+void
 lim_disable_ht_he_dynamic_smps(struct pe_session *session,
 			       qdf_freq_t chan_freq)
 {
-	bool is_2g_only_sta = false;
+	bool is_non_sta_mode = false, is_2g_only_sta = false;
+
+	if (session->opmode != QDF_STA_MODE)
+		is_non_sta_mode = true;
 
 	if (session->opmode == QDF_STA_MODE &&
 	    wlan_reg_is_24ghz_ch_freq(chan_freq)) {
@@ -3328,7 +3321,7 @@ lim_disable_ht_he_dynamic_smps(struct pe_session *session,
 		}
 	}
 
-	if (is_2g_only_sta || session->opmode == QDF_P2P_CLIENT_MODE) {
+	if (is_non_sta_mode || is_2g_only_sta) {
 		lim_disable_ht_dynamic_smps(session);
 		lim_disable_he_dynamic_smps(session);
 	}
@@ -3578,7 +3571,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	}
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode)) {
-		lim_update_session_eht_capable(mac_ctx, session);
+		lim_update_session_eht_capable(session, true);
 		lim_reset_self_ocv_caps(session);
 		lim_copy_join_req_eht_cap(session);
 	}
@@ -3602,12 +3595,16 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		goto send;
 	}
 
-	lim_extract_ap_capability(mac_ctx,
+	status = lim_extract_ap_capability(mac_ctx,
 		(uint8_t *)bss_desc->ieFields,
 		lim_get_ielen_from_bss_description(bss_desc),
 		&session->limCurrentBssQosCaps,
 		&session->gLimCurrentBssUapsd,
 		&local_power_constraint, session, &is_pwr_constraint);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("extract ap caps failed %d", status);
+		goto send;
+	}
 
 	lim_disable_bformee_for_iot_ap(mac_ctx, session, bss_desc);
 
@@ -4984,6 +4981,30 @@ cm_remove_force_bss_on_join_fail(struct cm_vdev_join_req *join_req)
 	return status;
 }
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+void cm_get_pre_auth_mld_addr(struct mac_context *mac,
+			      uint8_t *peer_addr,
+			      uint8_t *mld_addr)
+{
+	struct tLimPreAuthNode *auth_node;
+
+	auth_node = lim_search_pre_auth_list(mac, peer_addr);
+	if (!auth_node) {
+		pe_err("Search pre-auth nodes failure " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(peer_addr));
+		return;
+	}
+
+	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)&auth_node->peer_mld)) {
+		pe_debug("Get mld addr from preauth list " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(auth_node->peer_mld));
+		qdf_mem_copy(mld_addr,
+			     (uint8_t *)&auth_node->peer_mld,
+			     QDF_MAC_ADDR_SIZE);
+	}
+}
+#endif
+
 static void lim_process_disconnect_sta(struct pe_session *session,
 				       struct scheduler_msg *msg)
 {
@@ -5041,7 +5062,7 @@ static void lim_prepare_and_send_disassoc(struct mac_context *mac_ctx,
 		disassoc_req.doNotSendOverTheAir = 1;
 		disassoc_req.reasonCode =
 					REASON_AUTHORIZED_ACCESS_LIMIT_REACHED;
-	} else if (req->req.reason_code == CM_MLO_LINK_SWITCH_DISCONNECT) {
+	} else if (req->req.source == CM_MLO_LINK_SWITCH_DISCONNECT) {
 		disassoc_req.doNotSendOverTheAir = 1;
 	}
 
@@ -6173,7 +6194,7 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	pe_debug("psd_index: %u non_psd_index %u addn_non_psd_index %u addn_psd_index %u",
 		 psd_index, non_psd_index, addn_non_psd_index, addn_psd_index);
 
-	if (non_psd_set) {
+	if (non_psd_set && !(psd_set && !addn_non_psd_set)) {
 		if (conn_pwr_type_sp && addn_non_psd_set)
 			single_tpe = tpe_ies[addn_non_psd_index];
 		else if (local_eirp_set || reg_eirp_set)
@@ -6219,10 +6240,11 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 							curr_op_freq, 0,
 							&ch_params,
 							REG_CURRENT_PWR_MODE);
-			if (vdev_mlme->reg_tpc_obj.tpe[i] !=
+			if (!addn_psd_set && (
+			    vdev_mlme->reg_tpc_obj.tpe[i] !=
 			    single_tpe.tx_power[i] ||
 			    vdev_mlme->reg_tpc_obj.frequency[i] !=
-			    ch_params.mhz_freq_seg0)
+			    ch_params.mhz_freq_seg0))
 				*has_tpe_updated = true;
 			vdev_mlme->reg_tpc_obj.frequency[i] =
 							ch_params.mhz_freq_seg0;
@@ -6993,7 +7015,8 @@ static void __lim_process_sme_disassoc_req(struct mac_context *mac,
 				pe_session->limSmeState;
 			pe_session->limSmeState = eLIM_SME_WT_DISASSOC_STATE;
 			/* Delete all TDLS peers connected before leaving BSS */
-			lim_delete_tdls_peers(mac, pe_session);
+			lim_delete_tdls_peers(mac, pe_session,
+					      TDLS_PEER_DEL_REASON_NONE);
 			MTRACE(mac_trace(mac, TRACE_CODE_SME_STATE,
 				pe_session->peSessionId,
 				pe_session->limSmeState));
@@ -7351,7 +7374,8 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 		case eLIM_SME_ASSOCIATED_STATE:
 		case eLIM_SME_LINK_EST_STATE:
 			/* Delete all TDLS peers connected before leaving BSS */
-			lim_delete_tdls_peers(mac_ctx, session_entry);
+			lim_delete_tdls_peers(mac_ctx, session_entry,
+					      TDLS_PEER_DEL_REASON_NONE);
 			fallthrough;
 		case eLIM_SME_WT_ASSOC_STATE:
 		case eLIM_SME_JOIN_FAILURE_STATE:
@@ -8664,6 +8688,8 @@ lim_send_vdev_restart(struct mac_context *mac,
 static void lim_handle_update_ssid_hidden(struct mac_context *mac_ctx,
 				struct pe_session *session, uint8_t ssid_hidden)
 {
+	QDF_STATUS status;
+
 	pe_debug("rcvd HIDE_SSID message old HIDE_SSID: %d new HIDE_SSID: %d",
 			session->ssidHidden, ssid_hidden);
 
@@ -8675,9 +8701,13 @@ static void lim_handle_update_ssid_hidden(struct mac_context *mac_ctx,
 	}
 
 	ap_mlme_set_hidden_ssid_restart_in_progress(session->vdev, true);
-	wlan_vdev_mlme_sm_deliver_evt(session->vdev,
-				      WLAN_VDEV_SM_EV_FW_VDEV_RESTART,
-				      sizeof(*session), session);
+	status = wlan_vdev_mlme_sm_deliver_evt(session->vdev,
+					       WLAN_VDEV_SM_EV_FW_VDEV_RESTART,
+					       sizeof(*session), session);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		ap_mlme_set_hidden_ssid_restart_in_progress(session->vdev,
+							    false);
 }
 
 /**
@@ -10580,6 +10610,12 @@ static void lim_process_update_add_ies(struct mac_context *mac_ctx,
 		pe_err("msg_buf is NULL");
 		return;
 	}
+
+	if (update_add_ies->updateType == eUPDATE_IE_EDCA_ALL_PROFILE) {
+		sch_edca_profile_update_all(mac_ctx);
+		return;
+	}
+
 	update_ie = &update_add_ies->updateIE;
 	/* incoming message has smeSession, use BSSID to find PE session */
 	session_entry = pe_find_session_by_bssid(mac_ctx,

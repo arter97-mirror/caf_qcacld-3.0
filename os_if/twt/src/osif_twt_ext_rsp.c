@@ -32,6 +32,7 @@
 #include <wlan_twt_ucfg_ext_api.h>
 #include <wlan_twt_ucfg_ext_cfg.h>
 #include <wlan_cp_stats_ucfg_api.h>
+#include <wlan_cm_roam_api.h>
 
 /**
  * osif_twt_get_setup_event_len() - Calculates the length of twt
@@ -468,6 +469,24 @@ osif_twt_setup_pack_resp_nlmsg(struct sk_buff *reply_skb,
 		}
 	}
 
+	if (event->additional_params.implicit) {
+		attr = QCA_WLAN_VENDOR_ATTR_TWT_SETUP_IMPLICIT;
+		if (nla_put_u8(reply_skb, attr,
+			       event->additional_params.implicit)) {
+			osif_err("TWT: fail to put twt setup implicit param");
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
+	if (event->additional_params.renegotiate) {
+		attr = QCA_WLAN_VENDOR_ATTR_TWT_SETUP_UPDATABLE;
+		if (nla_put_u8(reply_skb, attr,
+			       event->additional_params.renegotiate)) {
+			osif_err("TWT: fail to put twt setup updatable param");
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
 	attr = QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAC_ADDR;
 	if (nla_put(reply_skb, attr, QDF_MAC_ADDR_SIZE,
 		    event->params.peer_macaddr.bytes)) {
@@ -723,28 +742,20 @@ osif_twt_send_get_capabilities_response(struct wlan_objmgr_psoc *psoc,
 	enum band_info connected_band;
 	uint8_t peer_cap = 0, self_cap = 0;
 	bool twt_req = false, twt_bcast_req = false;
-	bool is_twt_24ghz_allowed = true, val;
+	bool is_twt_24ghz_allowed = false, val;
 	struct qdf_mac_addr peer_mac;
 	int ret;
+	bool is_sta_connected;
+	uint8_t vdev_id;
+	uint32_t min_wake_dur = 0, max_wake_dur = 0;
+	uint32_t min_wake_intvl = 0, max_wake_intvl = 0;
 
-	/*
-	 * Userspace will query the TWT get capabilities before
-	 * issuing a get capabilities request. If the STA is
-	 * connected, then check the "enable_twt_24ghz" ini
-	 * value to advertise the TWT requestor capability.
-	 */
-	connected_band = ucfg_cm_get_connected_band(vdev);
-	ucfg_twt_cfg_get_24ghz_enabled(psoc, &val);
+	vdev_id = wlan_vdev_get_id(vdev);
 
-	osif_debug("connected_band: %d val: %d", connected_band, val);
-	if (connected_band == BAND_2G && !val)
-		is_twt_24ghz_allowed = false;
-
-	/* fill the self_capability bitmap  */
+	/* fill only self_capability bitmap if sta is not connected */
 	ucfg_twt_cfg_get_requestor(psoc, &twt_req);
-	osif_debug("is_twt_24ghz_allowed: %d twt_req: %d",
-		   is_twt_24ghz_allowed, twt_req);
-	if (twt_req && is_twt_24ghz_allowed)
+	osif_debug("twt_req: %d", twt_req);
+	if (twt_req)
 		self_cap |= QCA_WLAN_TWT_CAPA_REQUESTOR;
 
 	ucfg_twt_cfg_get_bcast_requestor(psoc, &twt_bcast_req);
@@ -756,21 +767,69 @@ osif_twt_send_get_capabilities_response(struct wlan_objmgr_psoc *psoc,
 	if (val)
 		self_cap |= QCA_WLAN_TWT_CAPA_FLEXIBLE;
 
-	ret = osif_fill_peer_macaddr(vdev, peer_mac.bytes);
-	if (ret)
-		return QDF_STATUS_E_INVAL;
+	is_sta_connected = wlan_cm_is_vdev_connected(vdev);
+	osif_debug("is_sta_connected:%d self_cap: 0x%x", is_sta_connected,
+		   self_cap);
 
-	qdf_status = ucfg_twt_get_peer_capabilities(psoc, &peer_mac, &peer_cap);
-	if (QDF_IS_STATUS_ERROR(qdf_status))
-		return qdf_status;
+	if (is_sta_connected) {
+		if (wlan_cm_host_roam_in_progress(psoc, vdev_id)) {
+			osif_debug("vdev_id:%d sta connected, roam in progress",
+				   vdev_id);
+			return -EBUSY;
+		}
+		/*
+		 * Userspace will query the TWT get capabilities before
+		 * issuing a get capabilities request. If the STA is
+		 * connected, then check the "enable_twt_24ghz" ini
+		 * value to advertise the TWT requestor capability.
+		 */
+		connected_band = ucfg_cm_get_connected_band(vdev);
+		ucfg_twt_cfg_get_24ghz_enabled(psoc, &val);
 
-	osif_debug("self_cap: 0x%x peer_cap: 0x%x", self_cap, peer_cap);
+		if (connected_band == BAND_2G && val)
+			is_twt_24ghz_allowed = true;
+
+		osif_debug("connected_band:%d val:%d is_twt_24ghz_allowed:%d",
+			   connected_band, val, is_twt_24ghz_allowed);
+
+		if (twt_req && is_twt_24ghz_allowed)
+			self_cap |= QCA_WLAN_TWT_CAPA_REQUESTOR;
+
+		ret = osif_fill_peer_macaddr(vdev, peer_mac.bytes);
+		if (ret)
+			return QDF_STATUS_E_INVAL;
+
+		qdf_status = ucfg_twt_get_peer_capabilities(psoc, &peer_mac,
+							    &peer_cap);
+		if (QDF_IS_STATUS_ERROR(qdf_status))
+			return qdf_status;
+
+		osif_debug("peer_cap: 0x%x", peer_cap);
+	}
+
+	ucfg_twt_tgt_caps_get_wake_dur_and_wake_intvl(psoc, &min_wake_dur,
+						      &max_wake_dur,
+						      &min_wake_intvl,
+						      &max_wake_intvl);
+	osif_debug("min_wake_dur:%u max_wake_dur:%u min_wake_intvl:%u max_wake_intvl:%u",
+		   min_wake_dur, max_wake_dur, min_wake_intvl,
+		   max_wake_intvl);
+
 	osif_priv = wlan_vdev_get_ospriv(vdev);
+
 	/*
-	 * Length of attribute QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_SELF &
-	 * QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_PEER
+	 * Length of attribute QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_SELF +
+	 * QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_PEER +
+	 * QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_MIN_WAKE_INTVL +
+	 * QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_MAX_WAKE_INTVL +
+	 * QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_MIN_WAKE_DURATION +
+	 * QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_MAX_WAKE_INTVL if sta is
+	 * connected otherwise calculate length of attribute of remaining
+	 * one apart from peer capability.
 	 */
-	skb_len += 2 * nla_total_size(sizeof(u16)) + NLA_HDRLEN;
+	skb_len += is_sta_connected ?
+			6 * nla_total_size(sizeof(u16)) + NLA_HDRLEN :
+			5 * nla_total_size(sizeof(u16)) + NLA_HDRLEN;
 
 	reply_skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(
 							osif_priv->wdev->wiphy,
@@ -795,11 +854,56 @@ osif_twt_send_get_capabilities_response(struct wlan_objmgr_psoc *psoc,
 		goto free_skb;
 	}
 
-	if (nla_put_u16(reply_skb, QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_PEER,
-	    peer_cap)) {
+	if (is_sta_connected &&
+	    nla_put_u16(reply_skb, QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_PEER,
+			peer_cap)) {
 		osif_err("TWT: Failed to fill capabilities");
 		qdf_status = QDF_STATUS_E_FAILURE;
 		goto free_skb;
+	}
+
+	if (min_wake_intvl) {
+		if (nla_put_u32(
+			reply_skb,
+			QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_MIN_WAKE_INTVL,
+			min_wake_intvl)) {
+			osif_err("TWT: Failed to fill min_wake_intvl capabilities");
+			qdf_status = QDF_STATUS_E_FAILURE;
+			goto free_skb;
+		}
+	}
+
+	if (max_wake_intvl) {
+		if (nla_put_u32(
+			reply_skb,
+			QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_MAX_WAKE_INTVL,
+			max_wake_intvl)) {
+			osif_err("TWT: Failed to fill max_wake_intvl capabilities");
+			qdf_status = QDF_STATUS_E_FAILURE;
+			goto free_skb;
+		}
+	}
+
+	if (min_wake_dur) {
+		if (nla_put_u32(
+			reply_skb,
+			QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_MIN_WAKE_DURATION,
+			min_wake_dur)) {
+			osif_err("TWT: Failed to fill min_wake_duration capabilities");
+			qdf_status = QDF_STATUS_E_FAILURE;
+			goto free_skb;
+		}
+	}
+
+	if (max_wake_dur) {
+		if (nla_put_u32(
+			reply_skb,
+			QCA_WLAN_VENDOR_ATTR_TWT_CAPABILITIES_MAX_WAKE_DURATION,
+			max_wake_dur)) {
+			osif_err("TWT: Failed to fill max_wake_duration capabilities");
+			qdf_status = QDF_STATUS_E_FAILURE;
+			goto free_skb;
+		}
 	}
 
 	nla_nest_end(reply_skb, config_attr);
@@ -1515,6 +1619,19 @@ osif_twt_pack_get_stats_resp_nlmsg(struct wlan_objmgr_vdev *vdev,
 		    twt_get_stats_status_to_vendor_twt_status(params[i].status);
 		if (nla_put_u32(reply_skb, attr, vendor_status)) {
 			osif_err("get_params failed to put status");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		attr = QCA_WLAN_VENDOR_ATTR_TWT_STATS_AVG_EOSP_DUR_US;
+		if (nla_put_u32(reply_skb, attr,
+				params[i].avg_eosp_sp_dur_us)) {
+			osif_err("get_params failed to put avg_eosp_sp_dur_us");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		attr = QCA_WLAN_VENDOR_ATTR_TWT_STATS_EOSP_COUNT;
+		if (nla_put_u32(reply_skb, attr, params[i].eosp_sp_count)) {
+			osif_err("get_params failed to put eosp_sp_count");
 			return QDF_STATUS_E_INVAL;
 		}
 

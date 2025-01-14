@@ -2066,7 +2066,6 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 	bool arp_offload_enable;
 	bool mawc_enabled;
 #ifdef FEATURE_WLAN_TDLS
-	bool tdls_support;
 	bool tdls_off_channel;
 	bool tdls_buffer_sta;
 	uint32_t tdls_uapsd_mask;
@@ -2111,9 +2110,7 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 		ucfg_scan_set_pno_offload(hdd_ctx->psoc, true);
 #endif
 #ifdef FEATURE_WLAN_TDLS
-	cfg_tdls_get_support_enable(hdd_ctx->psoc, &tdls_support);
-	cfg_tdls_set_support_enable(hdd_ctx->psoc,
-				    tdls_support & cfg->en_tdls);
+	cfg_tdls_set_fw_support(hdd_ctx->psoc, cfg->en_tdls);
 
 	cfg_tdls_get_off_channel_enable(hdd_ctx->psoc, &tdls_off_channel);
 	cfg_tdls_set_off_channel_enable(hdd_ctx->psoc,
@@ -7624,7 +7621,7 @@ static void hdd_stop_last_active_connection(struct hdd_context *hdd_ctx,
 	     policy_mgr_mode_specific_connection_count(psoc,
 						       mode, NULL) == 1) ||
 	     (!policy_mgr_get_connection_count(psoc) &&
-	     !hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx))) {
+	     !hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx, op_mode))) {
 		policy_mgr_check_and_stop_opportunistic_timer(
 						psoc,
 						wlan_vdev_get_id(vdev));
@@ -8817,7 +8814,6 @@ static int hdd_configure_chain_mask(struct hdd_adapter *adapter)
 	return 0;
 
 error:
-	hdd_debug("WMI PDEV set param failed");
 	return -EINVAL;
 }
 
@@ -10382,9 +10378,7 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 		}
 
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
-
-		if (mode == QDF_NAN_DISC_MODE)
-			hdd_disable_nan_active_disc(adapter);
+		hdd_disable_nan_active_disc(adapter);
 
 		hdd_vdev_destroy(link_info);
 	}
@@ -12173,6 +12167,36 @@ QDF_STATUS hdd_abort_mac_scan_all_adapters(struct hdd_context *hdd_ctx)
 		    adapter->device_mode == QDF_P2P_CLIENT_MODE ||
 		    adapter->device_mode == QDF_P2P_DEVICE_MODE ||
 		    adapter->device_mode == QDF_SAP_MODE ||
+		    adapter->device_mode == QDF_P2P_GO_MODE) {
+			hdd_adapter_for_each_active_link_info(adapter,
+							      link_info) {
+				wlan_abort_scan(hdd_ctx->pdev, INVAL_PDEV_ID,
+						link_info->vdev_id,
+						INVALID_SCAN_ID, true);
+			}
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	hdd_exit();
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS hdd_abort_non_sap_scan_all_adapters(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid =
+				NET_DEV_HOLD_ABORT_MAC_SCAN_ALL_ADAPTERS;
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_enter();
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (adapter->device_mode == QDF_STA_MODE ||
+		    adapter->device_mode == QDF_P2P_CLIENT_MODE ||
+		    adapter->device_mode == QDF_P2P_DEVICE_MODE ||
 		    adapter->device_mode == QDF_P2P_GO_MODE) {
 			hdd_adapter_for_each_active_link_info(adapter,
 							      link_info) {
@@ -19627,6 +19651,67 @@ start_timer:
 }
 #endif
 
+#ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+struct hdd_adapter *
+hdd_get_con_sap_adapter(struct hdd_adapter *this_sap_adapter,
+			bool check_start_bss)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(this_sap_adapter);
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_CON_SAP_ADAPTER;
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_adapter *match_adapter = NULL;
+	struct hdd_adapter *band_match_adapter = NULL;
+	uint32_t this_band, band;
+	struct sap_config *this_sap_config, *sap_config;
+	bool match = false;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if ((adapter->device_mode != QDF_SAP_MODE &&
+		     adapter->device_mode != QDF_P2P_GO_MODE) ||
+		    adapter == this_sap_adapter) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			continue;
+		}
+
+		match = false;
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (!check_start_bss)
+				match = true;
+
+			if (test_bit(SOFTAP_BSS_STARTED,
+				     &link_info->link_flags))
+				match = true;
+
+			if (!match)
+				continue;
+
+			if (!match_adapter)
+				match_adapter = adapter;
+
+			if (this_sap_adapter->device_mode != QDF_SAP_MODE &&
+			    this_sap_adapter->device_mode != QDF_P2P_GO_MODE)
+				continue;
+
+			this_sap_config =
+			  &this_sap_adapter->deflink->session.ap.sap_config;
+			sap_config = &link_info->session.ap.sap_config;
+			if (!this_sap_config->acs_cfg.acs_mode ||
+			    !sap_config->acs_cfg.acs_mode)
+				continue;
+
+			this_band = this_sap_config->acs_cfg.band;
+			band = sap_config->acs_cfg.band;
+			if ((this_band == band) && !band_match_adapter)
+				band_match_adapter = adapter;
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	return band_match_adapter ? band_match_adapter : match_adapter;
+}
+#else
 struct hdd_adapter *
 hdd_get_con_sap_adapter(struct hdd_adapter *this_sap_adapter,
 			bool check_start_bss)
@@ -19669,6 +19754,7 @@ hdd_get_con_sap_adapter(struct hdd_adapter *this_sap_adapter,
 
 	return NULL;
 }
+#endif
 
 static inline bool hdd_adapter_is_sta(struct hdd_adapter *adapter)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -468,6 +468,17 @@ bool
 mlo_is_enable_roaming_on_connected_sta_allowed(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlo_mgr_get_link_info_by_self_addr() - get link info by self addr
+ * @vdev: vdev object
+ * @self_addr: self link addr
+ *
+ * Return: mlo link info
+ */
+struct mlo_link_info *
+mlo_mgr_get_link_info_by_self_addr(struct wlan_objmgr_vdev *vdev,
+				   struct qdf_mac_addr *self_addr);
+
+/**
  * mlo_check_is_given_vdevs_on_same_mld() - check if the 2 given vdev's are on
  * same MLD
  * @psoc: PSOC object
@@ -676,6 +687,13 @@ static inline bool
 mlo_is_enable_roaming_on_connected_sta_allowed(struct wlan_objmgr_vdev *vdev)
 {
 	return true;
+}
+
+static inline struct mlo_link_info *
+mlo_mgr_get_link_info_by_self_addr(struct wlan_objmgr_vdev *vdev,
+				   struct qdf_mac_addr *self_addr)
+{
+	return NULL;
 }
 
 static inline bool

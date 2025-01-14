@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -3142,6 +3142,14 @@
 
 #ifdef CONFIG_WLAN_SUPPORT_BCAST_TWT
 #define WLAN_SUPPORT_BCAST_TWT (1)
+#endif
+
+#ifdef CONFIG_WLAN_LOCAL_PKT_CAPTURE_SUBFILTER
+#define WLAN_LOCAL_PKT_CAPTURE_SUBFILTER (1)
+#endif
+
+#ifdef CONFIG_WLAN_BOOST_CPU_FREQ_IN_ROAM
+#define WLAN_BOOST_CPU_FREQ_IN_ROAM (1)
 #endif
 
 #endif /* CONFIG_TO_FEATURE_H */

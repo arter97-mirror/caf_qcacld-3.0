@@ -39,6 +39,7 @@
 #include "osif_psoc_sync.h"
 #include "wlan_osif_features.h"
 #include "wlan_p2p_ucfg_api.h"
+#include "wlan_mlo_mgr_public_api.h"
 
 #define REG_RULE_2412_2462    REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
 
@@ -916,6 +917,9 @@ uint32_t hdd_reg_legacy_setband_to_reg_wifi_band_bitmap(uint8_t qca_setband)
 	case QCA_SETBAND_2G:
 		band_bitmap |= BIT(REG_BAND_2G);
 		break;
+	case (QCA_SETBAND_2G | QCA_SETBAND_5G):
+		band_bitmap |= (BIT(REG_BAND_2G) | BIT(REG_BAND_5G));
+		break;
 	default:
 		hdd_err("Invalid band value %u", qca_setband);
 		return 0;
@@ -1725,6 +1729,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	struct wlan_hdd_link_info *link_info;
 	enum qca_wlan_vendor_phy_mode vendor_phy_mode =
 						QCA_WLAN_VENDOR_PHY_MODE_AUTO;
+	QDF_STATUS status;
 
 	pdev = hdd_ctx->pdev;
 
@@ -1779,10 +1784,15 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 					hdd_debug("changed: phy %d, freq %d, width %d",
 						  phy_changed, freq_changed,
 						  width_changed);
-					wlan_hdd_cm_issue_disconnect(
-							link_info,
-							REASON_UNSPEC_FAILURE,
-							false);
+					status = wlan_mlo_mgr_link_switch_defer_disconnect_req(
+							link_info->vdev,
+							CM_OSIF_DISCONNECT,
+							REASON_UNSPEC_FAILURE);
+					if (status != QDF_STATUS_E_ALREADY && QDF_IS_STATUS_ERROR(status))
+						wlan_hdd_cm_issue_disconnect(
+								link_info,
+								REASON_UNSPEC_FAILURE,
+								false);
 					hdd_set_vdev_phy_mode(adapter,
 							      vendor_phy_mode);
 					sta_ctx->reg_phymode = new_phy_mode;

@@ -3423,9 +3423,11 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 			   WMI_HOST_PEER_CHWIDTH, wmi_opmode_chwidth,
 			   update_vht_opmode->smesessionId);
 
-	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
-			   WMI_HOST_PEER_PHYMODE,
-			   fw_phymode, update_vht_opmode->smesessionId);
+	/* send phy mode only for 11ax capable targets */
+	if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
+		wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
+				   WMI_HOST_PEER_PHYMODE,
+				   fw_phymode, update_vht_opmode->smesessionId);
 }
 
 /**

@@ -39,9 +39,10 @@
  * @flex_twt_sched: flex twt scheduling enable/disable
  * @req_flag: requestor flag enable/disable
  * @res_flag: responder flag enable/disable
- * @is_twt_enabled_in_11n: Enable TWT support in 11n mode
  * @rtwt_requestor_enabled: Restricted TWT requestor enable or disable
  * @rtwt_responder_enabled: Restricted TWT responder enable or disable
+ * @twt_req_ht_vht: TWT requestor support in ht/vht mode
+ * @twt_res_ht_vht: TWT responder support in ht/vht mode
  */
 struct twt_mc_cfg_params {
 	bool enable_twt;
@@ -54,9 +55,10 @@ struct twt_mc_cfg_params {
 	bool flex_twt_sched;
 	bool req_flag;
 	bool res_flag;
-	bool is_twt_enabled_in_11n;
 	bool rtwt_requestor_enabled;
 	bool rtwt_responder_enabled;
+	bool twt_req_ht_vht;
+	bool twt_res_ht_vht;
 };
 
 #endif /* __WLAN_TWT_EXT_DEFS_H__ */

@@ -13,6 +13,24 @@
 #define DP_SPM_FLOW_FLAG_IN_USE         BIT(0)
 #define DP_SPM_FLOW_FLAG_SVC_METADATA   BIT(1)
 
+static inline bool wlan_dp_spm_flow_low_tput(struct wlan_dp_spm_flow_info *flow)
+{
+	uint64_t cur_ts = qdf_sched_clock();
+
+	/* Window did not move for last 2 seconds as pkts were not received */
+	if (cur_ts - flow->win_start_ts > WLAN_DP_SPM_MAX_LAST_WIN_START_NS)
+		return true;
+
+	/* pkt count in last window to check if pkt rate for this flow is still
+	 * being met. This check is under assumption that packets were not
+	 * irregular and window moved by 1 second constantly.
+	 */
+	if (flow->last_win_pkts < WLAN_DP_SPM_MIN_PKT_CNT_PER_SEC)
+		return true;
+
+	return false;
+}
+
 #ifdef WLAN_FEATURE_SAWFISH
 /**
  * wlan_dp_spm_get_context(): Get SPM context from DP PSOC interface
@@ -188,8 +206,7 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 		if (clear_tbl) {
 			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
 					     &cursor->node);
-		} else if ((curr_ts - cursor->active_ts) >
-				WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT) {
+		} else if (wlan_dp_spm_flow_low_tput(cursor)) {
 			wlan_dp_spm_unmap_svc_to_flow(cursor->svc_id,
 						      &cursor->info);
 			qdf_mem_zero(cursor,
@@ -770,7 +787,6 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_spm_flow_info *cursor;
-	uint64_t curr_ts = qdf_sched_clock();
 	int i;
 
 	qdf_spinlock_acquire(&spm_intf->flow_list_lock);
@@ -788,8 +804,7 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
 					     &cursor->node);
 			spm_intf->origin_aft[i] = NULL;
-		} else if ((curr_ts - cursor->active_ts) >
-				WLAN_DP_SPM_FLOW_RETIREMENT_TIMEOUT) {
+		} else if (wlan_dp_spm_flow_low_tput(cursor)) {
 			wlan_dp_stc_tx_flow_retire_ind(dp_ctx,
 						       cursor->classified,
 						       cursor->c_flow_id);
@@ -813,6 +828,9 @@ void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx)
 	uint32_t num_entries = WLAN_DP_SPM_FLOW_REC_TBL_MAX * WLAN_DP_INTF_MAX;
 	uint8_t buf[BUF_LEN_MAX];
 
+	if (!dp_ctx->gl_flow_recs)
+		return;
+
 	for (i = 0; i < num_entries; i++) {
 		flow = &dp_ctx->gl_flow_recs[i];
 		if (qdf_unlikely(!flow->is_populated))
@@ -834,6 +852,7 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 {
 	struct wlan_dp_spm_intf_context *spm_intf = dp_intf->spm_intf_ctx;
 	struct wlan_dp_spm_flow_info *flow;
+	uint64_t curr_ts;
 
 	flow = spm_intf->origin_aft[flow_id];
 	/* Flow can be NULL when evicted or retired */
@@ -846,8 +865,14 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
 	}
 
-	flow->active_ts = qdf_sched_clock();
+	curr_ts = qdf_sched_clock();
 	flow->num_pkts++;
+	flow->active_ts = curr_ts;
+	if (curr_ts - flow->win_start_ts > QDF_NSEC_PER_SEC) {
+		flow->win_start_ts = curr_ts;
+		flow->last_win_pkts = flow->num_pkts - flow->win_start_num_pkts;
+		flow->win_start_num_pkts =  flow->num_pkts;
+	}
 
 	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, nbuf,
 						   flow->track_flow_stats,
@@ -870,7 +895,7 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 	struct wlan_dp_spm_flow_info *flow_rec;
 	int i;
 
-	if (dp_intf->device_mode != QDF_STA_MODE)
+	if (!dp_ctx->gl_flow_recs || dp_intf->device_mode != QDF_STA_MODE)
 		return QDF_STATUS_E_NOSUPPORT;
 
 	if (dp_intf->spm_intf_ctx) {
@@ -885,12 +910,13 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 		goto fail_intf_alloc;
 	}
 
+	qdf_mem_zero(&spm_intf->screen_flow_ctx.s_tbl[0],
+		     sizeof(struct wlan_dp_spm_screening_entry) *
+		     WLAN_DP_SPM_S_TBL_SIZE);
+
 	qdf_list_create(&spm_intf->o_flow_rec_freelist,
 			WLAN_DP_SPM_FLOW_REC_TBL_MAX);
 	qdf_spinlock_create(&spm_intf->flow_list_lock);
-
-	if (!dp_ctx->gl_flow_recs)
-		goto fail_flow_rec_freelist;
 
 	spm_intf->flow_rec_base =
 	     &dp_ctx->gl_flow_recs[dp_intf->id * WLAN_DP_SPM_FLOW_REC_TBL_MAX];
@@ -1015,17 +1041,143 @@ void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
 void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	dp_ctx->gl_flow_recs =
-		qdf_mem_malloc(sizeof(struct wlan_dp_spm_flow_info) *
-			       WLAN_DP_SPM_FLOW_REC_TBL_MAX * WLAN_DP_INTF_MAX);
+		__qdf_mem_malloc(sizeof(struct wlan_dp_spm_flow_info) *
+				 WLAN_DP_SPM_FLOW_REC_TBL_MAX *
+				 WLAN_DP_INTF_MAX, __func__, __LINE__);
 	if (!dp_ctx->gl_flow_recs)
 		dp_err("Failed to SPM Tx flow table");
 }
 
 void wlan_dp_spm_flow_table_detach(struct wlan_dp_psoc_context *dp_ctx)
 {
-	qdf_mem_free(dp_ctx->gl_flow_recs);
+	__qdf_mem_free(dp_ctx->gl_flow_recs);
+	dp_ctx->gl_flow_recs = NULL;
 }
 #endif
+
+/**
+ * wlan_dp_spm_s_flow_retire_check() - Check flow pkt rate in smaller timespan
+ * @entry: Entry in the table obtained from masking skb hash
+ * @curr_ts: Current timestamp
+ *
+ * Return: True if current entry can be replaced with new entry, else false.
+ */
+static inline
+bool wlan_dp_spm_s_flow_retire_check(struct wlan_dp_spm_screening_entry *entry,
+				     uint64_t curr_ts)
+{
+	uint64_t time_delta_ns = (curr_ts - entry->init_ts);
+
+	/* to retire a flow, check if threshold timespan has passed and then
+	 * check if packet rate is met.
+	 */
+	if ((time_delta_ns > WLAN_DP_SPM_S_TBL_RETIRE_TIME_DELTA_NS) &&
+	    ((entry->num_pkts * QDF_NSEC_PER_SEC / time_delta_ns) <
+	      WLAN_DP_SPM_MIN_PKT_CNT_PER_SEC))
+		return true;
+
+	return false;
+}
+
+/**
+ * wlan_dp_spm_s_tbl_check_n_add_flow() - Add new flow to screening table
+ * @screen_ctx: Screening table context
+ * @entry: Entry in the table obtained from masking skb hash
+ * @hash: skb hash value
+ *
+ * If entry has null values, entry will be filled with hash but if entry already
+ * contains a flow, and its pkt rate is not met in threshold timespan, replace,
+ * that entry.
+ *
+ * Return: None
+ */
+static inline void
+wlan_dp_spm_s_tbl_check_n_add_flow(struct wlan_dp_spm_screening_ctx *screen_ctx,
+				   struct wlan_dp_spm_screening_entry *entry,
+				   uint32_t hash)
+{
+	uint64_t curr_ts = qdf_sched_clock();
+
+	if (qdf_atomic_test_and_set_bit(WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT,
+					&entry->flags))
+		return;
+
+	if (!entry->skb_hash) {
+		entry->skb_hash = hash;
+	} else if (wlan_dp_spm_s_flow_retire_check(entry, curr_ts)) {
+		screen_ctx->s_flows_active--;
+		entry->skb_hash = hash;
+	} else {
+		qdf_atomic_clear_bit(WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT,
+				     &entry->flags);
+		return;
+	}
+
+	entry->init_ts = curr_ts;
+	entry->num_pkts = 1;
+	screen_ctx->s_flows_active++;
+
+	if (entry->skb_hash == hash)
+		qdf_atomic_clear_bit(WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT,
+				     &entry->flags);
+}
+
+bool wlan_dp_spm_flow_screening(struct wlan_dp_intf *dp_intf,
+				qdf_nbuf_t skb)
+{
+	struct wlan_dp_spm_screening_ctx *screen_ctx =
+					&dp_intf->spm_intf_ctx->screen_flow_ctx;
+	struct wlan_dp_spm_screening_entry *entry;
+	uint32_t hash, idx;
+	bool rate_met = false;
+	uint64_t curr_ts;
+
+	hash = qdf_nbuf_get_hash(skb);
+	idx = hash & WLAN_DP_SPM_S_TBL_IDX_MASK;
+	entry = &screen_ctx->s_tbl[idx];
+
+	if (qdf_atomic_test_bit(WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT,
+				&entry->flags))
+		return false;
+
+	if (qdf_unlikely(!entry->skb_hash || (entry->skb_hash != hash))) {
+		wlan_dp_spm_s_tbl_check_n_add_flow(screen_ctx, entry, hash);
+		return false;
+	}
+
+	entry->num_pkts++;
+
+	/* flow pkt count reaches pkt rate count per second, check the timespan
+	 * for this flow to confirm if packet rate was met
+	 */
+	if (qdf_unlikely(entry->num_pkts >= WLAN_DP_SPM_MIN_PKT_CNT_PER_SEC)) {
+		if (qdf_atomic_test_and_set_bit(
+					WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT,
+					&entry->flags))
+			return false;
+
+		curr_ts = qdf_sched_clock();
+		rate_met = (curr_ts - entry->init_ts) <= QDF_NSEC_PER_SEC ?
+			   true : false;
+
+		if (rate_met) {
+			screen_ctx->s_flows_active--;
+			qdf_mem_zero((uint8_t *)entry + sizeof(entry->flags),
+				     sizeof(entry) - sizeof(entry->flags));
+			qdf_atomic_clear_bit(
+					WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT,
+					&entry->flags);
+		} else {
+			entry->init_ts = curr_ts;
+			entry->num_pkts = 1;
+			qdf_atomic_clear_bit(
+					WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT,
+					&entry->flags);
+		}
+	}
+
+	return rate_met;
+}
 
 QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 					  uint16_t *flow_id,

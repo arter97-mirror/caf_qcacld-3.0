@@ -7756,6 +7756,7 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	uint8_t tx_nss = 1, rx_nss = 1, tx_dcm, rx_dcm;
 	qdf_net_dev_stats stats = {0};
 	struct hdd_stats *hdd_stats;
+	uint32_t tx_packets;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ucfg_mlme_stats_get_cfg_values(hdd_ctx->psoc,
@@ -7893,8 +7894,11 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	sinfo->tx_bytes = stats.tx_bytes;
 	sinfo->rx_bytes = stats.rx_bytes;
 	sinfo->tx_packets = stats.tx_packets;
+	tx_packets = sinfo->tx_packets;
 	sinfo->rx_packets = stats.rx_packets;
 	wlan_hdd_update_mlo_peer_stats(link_info, sinfo);
+	hdd_debug("TX packets dp_intf %d mlo adjusted %d",
+		  tx_packets, sinfo->tx_packets);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 

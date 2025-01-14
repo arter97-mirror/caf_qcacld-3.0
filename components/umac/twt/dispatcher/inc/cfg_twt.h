@@ -263,26 +263,49 @@
 
 /*
  * <ini>
- * enable_twt_in_11n - Enable TWT support in 11n mode
- * @MIN: 0
- * @MAX: 1
+ * twt_req_res_ht_vht - To enable twt requestor and responder support in
+ * ht/vht mode.
+ * @Min: 0 Disable twt capability for both req/res in ht/vht mode
+ * @Max: 3
  * @Default: 0
  *
- * This ini is used to enable/disable TWT support 11n mode.
- * Generally by default TWT support present from HE capable
- * devices but if this ini is enabled then it will support
- * partially from 11n mode itself.
+ * This cfg is used to configure the TWT requestor and responder in ht/vht mode.
+ * Bitmap for enabling the twt requestor and responder in ht/vht mode.
+ * BIT 0: Enable/Disable twt requestor in ht/vht mode.
+ * BIT 1: Enable/Disable twt responder in ht/vht mode.
+ * BIT 2-31: Reserved
  *
- * Related: NA
+ * Related: CFG_ENABLE_TWT
+ * Related: CFG_TWT_RESPONDER
+ * Related: CFG_TWT_REQUESTOR
  *
  * Usage: External
  *
  * </ini>
  */
-#define CFG_TWT_ENABLE_IN_11N CFG_INI_BOOL( \
-		"enable_twt_in_11n", \
-		false, \
-		"enable twt support in 11n mode")
+/* defines to extract the requestor/responder capabilities from cfg */
+#define TWT_REQ_HT_VHT_INDEX    0
+#define TWT_REQ_HT_VHT_BITS     1
+#define TWT_RES_HT_VHT_INDEX    1
+#define TWT_RES_HT_VHT_BITS     1
+
+#define CFG_TWT_REQ_RESP_HT_VHT CFG_INI_UINT( \
+		"twt_req_res_ht_vht", \
+		0, \
+		3, \
+		0, \
+		CFG_VALUE_OR_DEFAULT, \
+		"twt req/res capability for ht/vht mode")
+
+#define CFG_GET_TWT_REQ_HT_VHT(_twt_req_res_ht_vht) \
+		QDF_GET_BITS(_twt_req_res_ht_vht, \
+		TWT_REQ_HT_VHT_INDEX, \
+		TWT_REQ_HT_VHT_BITS)
+
+#define CFG_GET_TWT_RES_HT_VHT(_twt_req_res_ht_vht) \
+		QDF_GET_BITS(_twt_req_res_ht_vht, \
+		TWT_RES_HT_VHT_INDEX, \
+		TWT_RES_HT_VHT_BITS)
 
 #define CFG_TWT_ALL \
 	CFG(CFG_ENABLE_TWT) \
@@ -292,8 +315,8 @@
 	CFG(CFG_BCAST_TWT_REQ_RESP) \
 	CFG(CFG_ENABLE_TWT_24GHZ) \
 	CFG(CFG_DISABLE_TWT_INFO_FRAME) \
-	CFG(CFG_TWT_ENABLE_IN_11N) \
-	CFG(CFG_RTWT_REQ_RESP)
+	CFG(CFG_RTWT_REQ_RESP) \
+	CFG(CFG_TWT_REQ_RESP_HT_VHT)
 #elif !defined(WLAN_SUPPORT_TWT) && !defined(WLAN_TWT_CONV_SUPPORTED)
 #define CFG_TWT_ALL
 #endif

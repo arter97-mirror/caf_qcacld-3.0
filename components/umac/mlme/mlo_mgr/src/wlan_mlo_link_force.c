@@ -955,6 +955,8 @@ ml_nlink_update_disallow_modes(struct wlan_objmgr_psoc *psoc,
 					dual_freq_lst, dual_linkid_lst,
 					force_active_bitmap);
 
+			tmp_num_of_modes =
+				QDF_MIN(tmp_num_of_modes, MAX_DISALLOW_MODE);
 			/* Combine the 3 disallowed mode bitmaps into one for 3-link */
 			for (k = 0; k < tmp_num_of_modes; k++) {
 				if (num_of_modes < MAX_DISALLOW_MODE) {
@@ -5668,6 +5670,48 @@ ml_nlink_tdls_event_handler(struct wlan_objmgr_psoc *psoc,
 }
 
 static QDF_STATUS
+ml_nlink_t2lm_event_handler(struct wlan_objmgr_psoc *psoc,
+			    struct wlan_objmgr_vdev *vdev,
+			    enum ml_nlink_change_event_type evt,
+			    struct ml_nlink_change_event *data)
+{
+	struct ml_link_force_state curr_force_state = {0};
+	QDF_STATUS status;
+	struct set_link_req vendor_req = {0};
+
+	if (!mlo_is_mld_sta(vdev))
+		return QDF_STATUS_SUCCESS;
+
+	if (!ml_is_nlink_service_supported(psoc)) {
+		mlo_debug("nlink srv not supported");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
+	ml_nlink_get_force_link_request(psoc, vdev, &vendor_req,
+					SET_LINK_FROM_VENDOR_CMD);
+	mlo_debug("t2lm mapped link_bitmap 0x%x curr inactive 0x%x vendor cmd inactive 0x%x",
+		  data->evt.t2lm.mapped_link_bitmap,
+		  curr_force_state.force_inactive_bitmap,
+		  vendor_req.force_inactive_bitmap);
+	if (!(data->evt.t2lm.mapped_link_bitmap &
+	    vendor_req.force_inactive_bitmap))
+		return QDF_STATUS_SUCCESS;
+
+	mlo_debug("t2lm mapped link_bitmap 0x%x inactive hold by vendor cmd, 0x%x",
+		  data->evt.t2lm.mapped_link_bitmap,
+		  vendor_req.force_inactive_bitmap);
+	ml_nlink_clr_force_link_request(psoc, vdev,
+					SET_LINK_FROM_VENDOR_CMD);
+	status = ml_nlink_state_change(psoc, MLO_LINK_FORCE_REASON_CONNECT,
+				       evt, data);
+	if (status == QDF_STATUS_E_PENDING)
+		status = QDF_STATUS_SUCCESS;
+
+	return status;
+}
+
+static QDF_STATUS
 ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 			    struct wlan_objmgr_vdev *vdev,
 			    enum ml_nlink_change_event_type evt,
@@ -6340,6 +6384,10 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		status = ml_nlink_tdls_event_handler(
 			psoc, vdev, evt, data);
 		break;
+	case ml_nlink_t2lm_request_evt:
+		status = ml_nlink_t2lm_event_handler(
+			psoc, vdev, evt, data);
+		break;
 	case ml_nlink_vendor_cmd_request_evt:
 		status = ml_nlink_vendor_cmd_handler(
 			psoc, vdev, evt, data);
@@ -6429,6 +6477,21 @@ ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 	return ml_nlink_conn_change_notify(
 			psoc, vdev_id,
 			ml_nlink_vendor_cmd_request_evt, &data);
+}
+
+QDF_STATUS
+ml_nlink_t2lm_link_request(struct wlan_objmgr_psoc *psoc,
+			   uint8_t vdev_id,
+			   uint16_t mapped_link_bitmap)
+{
+	struct ml_nlink_change_event data;
+
+	qdf_mem_zero(&data, sizeof(data));
+	data.evt.t2lm.mapped_link_bitmap = mapped_link_bitmap;
+
+	return ml_nlink_conn_change_notify(
+			psoc, vdev_id,
+			ml_nlink_t2lm_request_evt, &data);
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(FEATURE_DENYLIST_MGR)

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -844,7 +844,8 @@ static QDF_STATUS target_if_cp_stats_extract_vdev_chain_rssi_stats(
 		for (j = 0; j < MAX_NUM_CHAINS; j++) {
 			dat_snr = rssi_stats.rssi_avg_data[j];
 			bcn_snr = rssi_stats.rssi_avg_beacon[j];
-			cp_stats_nofl_debug("Chain %d SNR bcn: %d data: %d", j,
+			cp_stats_nofl_debug("Chain %d %s bcn: %d data: %d", j,
+					    db2dbm_enabled ? "RSSI" : "SNR",
 					    bcn_snr, dat_snr);
 			/*
 			 * Get the absolute rssi value from the current rssi

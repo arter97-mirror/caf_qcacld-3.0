@@ -914,8 +914,6 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	pmo_debug("WOW enabled successfully in fw: credits:%d pending_cmds: %d",
 		host_credits, wmi_pending_cmds);
 
-	pmo_set_wow_suspend_type(psoc, QDF_WOW_UNSUPPORTED_TYPE);
-
 	hif_latency_detect_timer_stop(pmo_core_psoc_get_hif_handle(psoc));
 
 	if (hif_rtpm_get_autosuspend_delay() == WOW_LARGE_RX_RTPM_DELAY)

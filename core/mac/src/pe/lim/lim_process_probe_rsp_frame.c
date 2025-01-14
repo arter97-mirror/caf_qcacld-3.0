@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -225,7 +225,8 @@ lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
 		return QDF_STATUS_SUCCESS;
 
 	status = lim_add_bcn_probe(mac_ctx->pdev, probe_rsp_frm, probe_rsp_len,
-				   probe_rsp->chan_freq, rssi, snr, tsf_delta);
+				   false, probe_rsp->chan_freq, rssi, snr,
+				   tsf_delta);
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("failed to add assoc link probe rsp %d freq %d", status,
 		       probe_rsp->chan_freq);

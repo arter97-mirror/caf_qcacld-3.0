@@ -1767,9 +1767,10 @@ struct sir_host_offload_req {
 };
 
 /* Packet Types. */
-#define SIR_KEEP_ALIVE_NULL_PKT              1
-#define SIR_KEEP_ALIVE_UNSOLICIT_ARP_RSP     2
-#define SIR_KEEP_ALIVE_MGMT_FRAME            5
+#define SIR_KEEP_ALIVE_NULL_PKT			1
+#define SIR_KEEP_ALIVE_UNSOLICIT_ARP_RSP	2
+#define SIR_KEEP_ALIVE_GRAT_ARP			4
+#define SIR_KEEP_ALIVE_MGMT_FRAME		5
 
 /* Keep Alive request. */
 struct keep_alive_req {
@@ -2250,6 +2251,7 @@ typedef enum tUpdateIEsType {
 	eUPDATE_IE_PROBE_RESP,
 	eUPDATE_IE_ASSOC_RESP,
 	eUPDATE_IE_EDCA_PARAMS,
+	eUPDATE_IE_EDCA_ALL_PROFILE,
 
 	/* Add type above this line */
 	/* this is used to reset all buffer */

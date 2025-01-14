@@ -480,6 +480,12 @@ static __iw_softap_setparam(struct net_device *dev,
 			return -EINVAL;
 		}
 
+		if (ucfg_mlme_is_chan_switch_in_progress(link_info->vdev)) {
+			hdd_info("vdev: %d channel switch in progress",
+				 link_info->vdev_id);
+			return -EINVAL;
+		}
+
 		/*
 		 * Disable Roaming on all adapters before start of
 		 * start of Hidden ssid connection

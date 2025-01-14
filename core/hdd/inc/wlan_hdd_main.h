@@ -3875,6 +3875,15 @@ QDF_STATUS hdd_post_cds_enable_config(struct hdd_context *hdd_ctx);
 QDF_STATUS hdd_abort_mac_scan_all_adapters(struct hdd_context *hdd_ctx);
 
 /**
+ * hdd_abort_non_sap_scan_all_adapters() - This function abort scan of all modes
+ * except SAP scan like ACS
+ * @hdd_ctx: hdd context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_abort_non_sap_scan_all_adapters(struct hdd_context *hdd_ctx);
+
+/**
  * wlan_hdd_stop_sap() - This function stops bss of SAP.
  * @link_info: pointer of hdd link info
  *

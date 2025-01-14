@@ -1354,6 +1354,19 @@ QDF_STATUS wlan_mlme_update_bss_rate_flags(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vht_present,
 					   uint8_t ht_present);
 
+/**
+ * wlan_mlme_vendor_set_disable_dfs_master_capability() - Set dfs master
+ * capability disabled
+ * @psoc: pointer to psoc object
+ * @disable:  disable or not
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_vendor_set_disable_dfs_master_capability(
+					struct wlan_objmgr_psoc *psoc,
+					bool disable);
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * mlme_update_tgt_eht_caps_in_cfg() - Update tgt eht cap in mlme component
@@ -4009,9 +4022,26 @@ wlan_mlme_get_sae_roam_auth_retry_count(struct wlan_objmgr_psoc *psoc,
  */
 bool
 wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_support_non_dbs_dual_sta_roaming  - API to get if dual station
+ * roaming is enabled on non_dbs hardware
+ * @psoc: Pointer to global psoc object
+ *
+ * Return: True if dual sta roaming is enabled on non_dbs card else return
+ * false
+ */
+bool
+wlan_mlme_support_non_dbs_dual_sta_roaming(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool
 wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+bool
+wlan_mlme_support_non_dbs_dual_sta_roaming(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -5129,16 +5159,18 @@ enum phy_ch_width wlan_mlme_get_max_bw(void);
 
 /**
  * wlan_mlme_get_sta_ch_width() - Get current operating
- * channel width for STA / P2P-CLI mode
+ * channel width and phymode for STA / P2P-CLI mode
  *
  * @vdev: STA / P2P-CLI vdev
  * @ch_width: Returned channel width
+ * @phy_mode: Returned phy mode
  *
  * Return: QDF_STATUS_SUCCESS for success otherwise QDF_STATUS_E_INVAL
  *
  */
 QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
-				      enum phy_ch_width *ch_width);
+				      enum phy_ch_width *ch_width,
+				      enum wlan_phymode *phy_mode);
 
 /**
  * wlan_mlme_set_ul_mu_config() - set ul mu config

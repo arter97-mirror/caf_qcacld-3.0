@@ -51,6 +51,7 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 	hal_ring_handle_t refill_ring;
 	qdf_dma_addr_t fw_lpass_mem_iova = 0;
 	qdf_size_t fw_lpass_mem_size;
+	uint16_t lpass_sid = 0;
 	uint8_t i;
 
 	qdf_dev = dp_ctx->qdf_dev;
@@ -224,6 +225,15 @@ dp_wfds_send_config_msg(struct dp_direct_link_wfds_context *dl_wfds)
 	} else {
 		dp_err("Direct link not supported for %d bus type",
 		       qdf_dev->bus_type);
+	}
+
+	status = pld_get_direct_link_sid(qdf_dev->dev, &lpass_sid);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		info->wfds_lpass_sid_valid = 1;
+		info->wfds_lpass_sid = lpass_sid;
+		dp_info("Direct link LPASS SID value:%u", info->wfds_lpass_sid);
+	} else {
+		dp_err("Unable to get LPASS SID value");
 	}
 
 	status = wlan_qmi_wfds_send_config_msg(dp_ctx->psoc, info);
@@ -722,9 +732,10 @@ void dp_wfds_del_server(void)
 			mp_info = &dl_wfds->mem_arena_pages[i];
 			for (page_idx = 0; page_idx < mp_info->num_pages;
 			     page_idx++)
-				pld_audio_smmu_unmap(qdf_ctx->dev,
-				       mp_info->dma_pages[page_idx].page_p_addr,
-				       mp_info->page_size);
+				if (!dl_wfds->is_audio_shared_iommu_group)
+					pld_audio_smmu_unmap(qdf_ctx->dev,
+					mp_info->dma_pages[page_idx].page_p_addr,
+					mp_info->page_size);
 
 			dp_wfds_free_mem_arena(dl_wfds, i);
 		}
@@ -738,39 +749,44 @@ void dp_wfds_del_server(void)
 								     &buf_size);
 		qdf_assert(dma_addr);
 
-		while (num_pages--)
-			pld_audio_smmu_unmap(qdf_ctx->dev, dma_addr[num_pages],
-					     buf_size);
+		if (!dl_wfds->is_audio_shared_iommu_group) {
+			while (num_pages--)
+				pld_audio_smmu_unmap(qdf_ctx->dev,
+						     dma_addr[num_pages],
+						     buf_size);
+		}
 
 		qdf_mem_free(dma_addr);
 	}
 
 	if (dl_wfds_state >= DP_WFDS_SVC_CONFIG_DONE) {
-		pld_audio_smmu_unmap(qdf_ctx->dev,
-				     dl_wfds->iommu_cfg.shadow_rdptr_paddr,
-				     dl_wfds->iommu_cfg.shadow_rdptr_map_size);
-		pld_audio_smmu_unmap(qdf_ctx->dev,
-				     dl_wfds->iommu_cfg.shadow_wrptr_paddr,
-				     dl_wfds->iommu_cfg.shadow_wrptr_map_size);
-
-		for (i = 0; i < QMI_WFDS_CE_MAX_SRNG; i++)
+		if (!dl_wfds->is_audio_shared_iommu_group) {
 			pld_audio_smmu_unmap(qdf_ctx->dev,
+				dl_wfds->iommu_cfg.shadow_rdptr_paddr,
+				dl_wfds->iommu_cfg.shadow_rdptr_map_size);
+			pld_audio_smmu_unmap(qdf_ctx->dev,
+				dl_wfds->iommu_cfg.shadow_wrptr_paddr,
+				dl_wfds->iommu_cfg.shadow_wrptr_map_size);
+
+			for (i = 0; i < QMI_WFDS_CE_MAX_SRNG; i++)
+				pld_audio_smmu_unmap(qdf_ctx->dev,
 				dl_wfds->iommu_cfg.direct_link_srng_ring_base_paddr[i],
 				dl_wfds->iommu_cfg.direct_link_srng_ring_map_size[i]);
 
-		pld_audio_smmu_unmap(qdf_ctx->dev,
+			pld_audio_smmu_unmap(qdf_ctx->dev,
 			dl_wfds->iommu_cfg.direct_link_refill_ring_base_paddr,
 			dl_wfds->iommu_cfg.direct_link_refill_ring_map_size);
 
-		if (dl_wfds->fw_lpass_shared_mem_pa)
-			pld_audio_smmu_unmap(qdf_ctx->dev,
-					     dl_wfds->fw_lpass_shared_mem_pa,
-					     dl_wfds->fw_lpass_shared_mem_size);
+			if (dl_wfds->fw_lpass_shared_mem_pa)
+				pld_audio_smmu_unmap(qdf_ctx->dev,
+				dl_wfds->fw_lpass_shared_mem_pa,
+				dl_wfds->fw_lpass_shared_mem_size);
 
-		if (dl_wfds->apss_lpass_shared_mem_pa)
-			pld_audio_smmu_unmap(qdf_ctx->dev,
-					     dl_wfds->apss_lpass_shared_mem_pa,
-					     dl_wfds->apss_lpass_shared_mem_size);
+			if (dl_wfds->apss_lpass_shared_mem_pa)
+				pld_audio_smmu_unmap(qdf_ctx->dev,
+				dl_wfds->apss_lpass_shared_mem_pa,
+				dl_wfds->apss_lpass_shared_mem_size);
+		}
 
 		if (dl_wfds->apss_lpass_shared_mem_va)
 			qdf_mem_free_consistent(qdf_ctx, qdf_ctx->dev,

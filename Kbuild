@@ -1395,6 +1395,7 @@ UMAC_MLO_MGR_OBJS := $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_main.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_epcs.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/dispatcher/src/wlan_mlo_epcs_ucfg_api.o \
 			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_link_switch.o \
+			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_link_recfg.o \
 
 $(call add-wlan-objs,umac_mlomgr,$(UMAC_MLO_MGR_OBJS))
 endif
@@ -2656,7 +2657,6 @@ endif
 
 ifeq ($(CONFIG_WLAN_TELEMETRY), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_telemetry.o \
-		$(DP_COMP_UCFG_DIR)/wlan_dp_telemetry_api.o \
 		$(DP_COMP_UCFG_DIR)/wlan_dp_telemetry_ucfg_api.o
 endif
 
@@ -4554,7 +4554,7 @@ endif
 
 ccflags-$(CONFIG_FEATURE_WLAN_SUPPORT_USD) += -DFEATURE_WLAN_SUPPORT_USD
 
-ccflags-$(CONFIG_WLAN_SUPPORT_BCAST_TWT) += -DFEATURE_WLAN_SUPPORT_BCAST_TWT
+ccflags-$(CONFIG_WLAN_SUPPORT_BCAST_TWT) += -DWLAN_SUPPORT_BCAST_TWT
 
 #Enable support to get ANI value
 ifeq ($(CONFIG_ANI_LEVEL_REQUEST), y)
@@ -5144,6 +5144,9 @@ ccflags-$(CONFIG_CNSS2_SSR_DRIVER_DUMP) += -DWLAN_FEATURE_SSR_DRIVER_DUMP
 # SMEM_MAILBOX config
 ccflags-$(CONFIG_FEATURE_SMEM_MAILBOX) += -DFEATURE_SMEM_MAILBOX
 ccflags-$(CONFIG_FEATURE_SMEM_MAILBOX) += -DCONFIG_FEATURE_SMEM_MAILBOX
+
+# CPU Boosting for roaming
+ccflags-$(CONFIG_WLAN_BOOST_CPU_FREQ_IN_ROAM) += -DWLAN_BOOST_CPU_FREQ_IN_ROAM
 
 # Currently, for versions of gcc which support it, the kernel Makefile
 # is disabling the maybe-uninitialized warning.  Re-enable it for the

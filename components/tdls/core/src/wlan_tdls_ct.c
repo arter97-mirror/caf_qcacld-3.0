@@ -1480,7 +1480,7 @@ static QDF_STATUS tdls_delete_all_tdls_peers_flush_cb(struct scheduler_msg *msg)
  * Return: QDF_STATUS
  */
 QDF_STATUS tdls_delete_all_tdls_peers(struct wlan_objmgr_vdev *vdev,
-					  struct tdls_soc_priv_obj *tdls_soc)
+				      struct tdls_soc_priv_obj *tdls_soc)
 {
 	struct wlan_objmgr_peer *peer;
 	struct tdls_del_all_tdls_peers *del_msg;

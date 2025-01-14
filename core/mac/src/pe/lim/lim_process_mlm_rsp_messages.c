@@ -23,6 +23,7 @@
 #include "sch_api.h"
 #include "utils_api.h"
 #include "lim_utils.h"
+#include "lim_api.h"
 #include "lim_assoc_utils.h"
 #include "lim_security_utils.h"
 #include "lim_ser_des_utils.h"
@@ -2136,6 +2137,10 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 
 		lim_fill_dfs_p2p_group_params(pe_session);
 
+		/* Reset HT and HE SMPS caps as it's not required for SAP */
+		lim_disable_ht_he_dynamic_smps(pe_session,
+					       pe_session->curr_op_freq);
+
 		sch_edca_profile_update(mac, pe_session, NULL);
 		/* For dual AP case, delete pre auth node if any */
 		lim_delete_pre_auth_list(mac);
@@ -3391,8 +3396,13 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	/* in the case of nested request the new request initiated from the response will take care of resetting */
 	/* the deferred flag. */
 	SET_LIM_PROCESS_DEFD_MESGS(mac, true);
-	status = rsp->status;
 
+	if (!rsp) {
+		pe_err("Vdev start response is NULL");
+		return;
+	}
+
+	status = rsp->status;
 	pe_session = pe_find_session_by_vdev_id(mac, rsp->vdev_id);
 	if (!pe_session) {
 		pe_err("session does not exist for given sessionId");

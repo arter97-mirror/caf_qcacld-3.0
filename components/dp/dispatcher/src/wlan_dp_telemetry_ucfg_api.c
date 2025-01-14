@@ -16,6 +16,7 @@
 
 #include "wlan_dp_priv.h"
 #include "wlan_dp_telemetry_priv.h"
+#include "wlan_dp_ucfg_api.h"
 
 #ifdef WLAN_DP_FEATURE_STC
 QDF_STATUS

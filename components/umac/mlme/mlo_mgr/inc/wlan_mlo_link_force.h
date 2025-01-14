@@ -52,6 +52,7 @@
  * @ml_nlink_nan_post_disable_evt: nan post disable
  * @ml_nlink_acs_start_evt: sap acs start
  * @ml_nlink_acs_completed_evt: sap acs complete
+ * @ml_nlink_t2lm_request_evt: T2LM request
  */
 enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_start_evt,
@@ -80,6 +81,7 @@ enum ml_nlink_change_event_type {
 	ml_nlink_nan_post_disable_evt,
 	ml_nlink_acs_start_evt,
 	ml_nlink_acs_completed_evt,
+	ml_nlink_t2lm_request_evt,
 };
 
 enum ml_emlsr_disable_request {
@@ -170,6 +172,9 @@ struct ml_nlink_change_event {
 			bool csa_failed;
 			bool update_target;
 		} csa_end;
+		struct {
+			uint32_t mapped_link_bitmap;
+		} t2lm;
 	} evt;
 };
 
@@ -229,6 +234,7 @@ static inline const char *link_evt_to_string(uint32_t evt)
 	CASE_RETURN_STRING(ml_nlink_nan_post_disable_evt);
 	CASE_RETURN_STRING(ml_nlink_acs_start_evt);
 	CASE_RETURN_STRING(ml_nlink_acs_completed_evt);
+	CASE_RETURN_STRING(ml_nlink_t2lm_request_evt);
 	default:
 		return "Unknown";
 	}
@@ -511,6 +517,19 @@ ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 				 uint8_t link_num,
 				 uint16_t link_bitmap,
 				 uint16_t link_bitmap2);
+
+/**
+ * ml_nlink_t2lm_link_request() - Update link enabling from t2lm
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ * @mapped_link_bitmap: mapped new link from t2lm negotiation
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ml_nlink_t2lm_link_request(struct wlan_objmgr_psoc *psoc,
+			   uint8_t vdev_id,
+			   uint16_t mapped_link_bitmap);
 
 /**
  * ml_nlink_populate_disallow_modes() - Populate disallow mlo modes

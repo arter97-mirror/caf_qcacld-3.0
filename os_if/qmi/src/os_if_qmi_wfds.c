@@ -165,6 +165,9 @@ os_if_qmi_wfds_send_config_msg(struct wlan_qmi_wfds_config_req_msg *src_info)
 	req->target_type_valid = src_info->target_type_valid;
 	req->target_type = src_info->target_type;
 
+	req->wfds_lpass_sid_valid = src_info->wfds_lpass_sid_valid;
+	req->wfds_lpass_sid = src_info->wfds_lpass_sid;
+
 	status = os_if_qmi_txn_init(&qmi_wfds, &txn, wfds_gen_resp_msg_v01_ei,
 				    resp);
 	if (QDF_IS_STATUS_ERROR(status)) {

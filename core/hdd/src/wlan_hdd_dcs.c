@@ -580,15 +580,29 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint32_t conn_idx, count;
 	struct wlan_hdd_link_info *link_info;
-	uint32_t dcs_ch = wlan_reg_freq_to_chan(hdd_ctx->pdev, dcs_ch_freq);
+	uint16_t dcs_ch_width;
 
 	/* For LL SAP switch only for LL SAP, not for all vdev on same MAC */
 	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id)) {
+		uint32_t cu, coch_intfr_threshold;
+		uint8_t pdev_id;
+
 		hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
 								hdd_ctx->psoc,
 								vdev_id);
 		count = 1;
 		list[0] = vdev_id;
+
+		cu = wlan_ll_sap_get_cu_for_freq(hdd_ctx->pdev, dcs_ch_freq);
+		pdev_id = wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev);
+		coch_intfr_threshold =
+			wlan_dcs_get_trnsprt_switch_rjt_th_cu(hdd_ctx->psoc,
+							      pdev_id);
+		if (cu && cu >= coch_intfr_threshold) {
+			hdd_info("Congested channel cu %d > coch_intfr_threshold %d, no need to do CSA",
+				cu, coch_intfr_threshold);
+			return QDF_STATUS_E_INVAL;
+		}
 	} else {
 		status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
 							     vdev_id,
@@ -636,11 +650,13 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 			continue;
 
 		hdd_ctx->acs_policy.acs_chan_freq = AUTO_CHANNEL_SELECT;
-		hdd_debug("dcs triggers old ch:%d new ch:%d",
-			  ap_ctx->operating_chan_freq, dcs_ch_freq);
+		dcs_ch_width = ap_ctx->sap_config.acs_cfg.ch_width;
+		hdd_debug("dcs triggers old ch:%d new ch:%d new BW:%d",
+			  ap_ctx->operating_chan_freq, dcs_ch_freq, dcs_ch_width);
 		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
 					    link_info->vdev_id, CSA_REASON_DCS);
-		status = hdd_switch_sap_channel(link_info, dcs_ch, true);
+		status = hdd_switch_sap_chan_freq(link_info, dcs_ch_freq,
+						  dcs_ch_width, true);
 		if (status == QDF_STATUS_SUCCESS)
 			status = QDF_STATUS_E_PENDING;
 		return status;

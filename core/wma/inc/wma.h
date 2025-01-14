@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -191,6 +191,10 @@
 #define WMA_NAN_PASN_PEER_DELETE_RESPONSE 0x0d
 
 #define WMA_DELETE_NDP_PEER_RSP 0x0e
+
+#define WMA_TDLS_PEER_CREATE_RESPONSE 0x0f
+#define WMA_TDLS_PEER_DELETE_RESPONSE 0x10
+
 /* FW response timeout values in milli seconds */
 #define WMA_VDEV_PLCY_MGR_TIMEOUT        SIR_VDEV_PLCY_MGR_TIMEOUT
 #define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT WMA_VDEV_PLCY_MGR_TIMEOUT
@@ -1723,6 +1727,7 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
  * and setup cdp peer
  * @wma: wma handle
  * @peer_addr: peer mac address
+ * @sta_param
  * @peer_type: peer type
  * @vdev_id: vdev id
  * @peer_mld_addr: peer mld address
@@ -1732,6 +1737,7 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
  */
 QDF_STATUS wma_create_peer(tp_wma_handle wma,
 			   uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
+			   tpAddStaParams sta_param,
 			   u_int32_t peer_type, u_int8_t vdev_id,
 			   uint8_t peer_mld_addr[QDF_MAC_ADDR_SIZE],
 			   bool is_assoc_peer);

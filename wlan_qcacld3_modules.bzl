@@ -1,30 +1,30 @@
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
-load("//msm-kernel:target_variants.bzl", "get_all_variants")
+load(":target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
     "seraph": [
-	"peach-v2",
+        "peach-v2",
     ],
     "neo-la": [
-	"kiwi-v2",
+        "kiwi-v2",
     ],
     "anorak": [
-	"qca6490",
-	"kiwi-v2",
+        "qca6490",
+        "kiwi-v2",
     ],
     "niobe": [
-	"kiwi-v2",
+        "kiwi-v2",
     ],
     "pineapple": [
-	"peach-v2",
-	"peach",
-	"kiwi-v2",
-	"qca6750",
-	"wcn6450",
+        "peach-v2",
+        "peach",
+        "kiwi-v2",
+        "qca6750",
+        "wcn6450",
     ],
     "sun": [
-	"peach-v2",
+        "peach-v2",
         "peach",
         "kiwi-v2",
         "qca6750",
@@ -32,7 +32,7 @@ _target_chipset_map = {
     ],
     "volcano": [
         "qca6750",
-	"peach-v2",
+        "peach-v2",
     ],
     "x1e80100": [
         "kiwi-v2",
@@ -69,11 +69,11 @@ _chipset_header_map = {
         "api/hw/kiwi/v2",
         "cmn/hal/wifi3.0/kiwi",
     ],
-    "qca6750" : [
+    "qca6750": [
         "api/hw/qca6750/v1",
         "cmn/hal/wifi3.0/qca6750",
     ],
-    "wcn7750" : [
+    "wcn7750": [
         "api/hw/wcn7750/v1",
         "cmn/hal/wifi3.0/wcn7750",
     ],
@@ -91,7 +91,7 @@ _hw_header_map = {
     "BERYLLIUM": [
         "cmn/hal/wifi3.0/be",
     ],
-    "MOSELLE" : [
+    "MOSELLE": [
         "cmn/hal/wifi3.0/li",
     ],
     "LITHIUM": [
@@ -808,17 +808,17 @@ _conditional_srcs = {
         ],
     },
     "CONFIG_QCA_TARGET_IF_MLME": {
-	True: [
-	    "components/target_if/mlme/src/target_if_mlme.c",
-	    "components/wmi/src/wmi_unified_mlme_api.c",
-	    "components/wmi/src/wmi_unified_mlme_tlv.c",
-	],
+        True: [
+            "components/target_if/mlme/src/target_if_mlme.c",
+            "components/wmi/src/wmi_unified_mlme_api.c",
+            "components/wmi/src/wmi_unified_mlme_tlv.c",
+        ],
     },
     "CONFIG_DCS": {
         True: [
             "cmn/target_if/dcs/src/target_if_dcs.c",
             "cmn/umac/dcs/core/src/wlan_dcs.c",
-	    "cmn/umac/dcs/dispatcher/src/wlan_dcs_api.c",
+            "cmn/umac/dcs/dispatcher/src/wlan_dcs_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_init_deinit_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_tgt_api.c",
             "cmn/umac/dcs/dispatcher/src/wlan_dcs_ucfg_api.c",
@@ -1427,10 +1427,10 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_prealloc.c",
             "cmn/hif/src/ce/ce_service_legacy.c",
             "cmn/hif/src/hif_main_legacy.c",
-            "cmn/hal/wifi3.0/rh/hal_rh_generic_api.c"
+            "cmn/hal/wifi3.0/rh/hal_rh_generic_api.c",
         ],
     },
-	"CONFIG_CNSS_WCN6450": {
+    "CONFIG_CNSS_WCN6450": {
         True: [
             "cmn/hal/wifi3.0/wcn6450/hal_wcn6450.c",
         ],
@@ -1674,6 +1674,7 @@ _conditional_srcs = {
             "components/umac/mlme/mlo_mgr/src/wlan_mlo_mgr_roam.c",
             "components/umac/mlme/mlo_mgr/src/wlan_t2lm_api.c",
             "components/umac/mlme/mlo_mgr/src/wlan_mlo_link_force.c",
+			"cmn/umac/mlo_mgr/src/wlan_mlo_link_recfg.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_ACTION_OUI": {
@@ -2264,24 +2265,24 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_stc.c",
             "components/dp/dispatcher/src/wlan_dp_stc_ucfg_api.c",
             "os_if/dp/src/os_if_dp_stc.c",
-	    "components/dp/core/src/wlan_dp_spm.c",
-	    "components/dp/core/src/wlan_dp_fpm.c",
-	    "components/dp/dispatcher/src/wlan_dp_flow_ucfg_api.c",
-	    "core/hdd/src/wlan_hdd_sysfs_dp_stc.c",
+            "components/dp/core/src/wlan_dp_spm.c",
+            "components/dp/core/src/wlan_dp_fpm.c",
+            "components/dp/dispatcher/src/wlan_dp_flow_ucfg_api.c",
+            "core/hdd/src/wlan_hdd_sysfs_dp_stc.c",
         ],
     },
     "CONFIG_FEATURE_MGMT_RX_OVER_SRNG": {
         True: [
             "components/mgmt_rx_srng/core/src/wlan_mgmt_rx_srng.c",
             "components/mgmt_rx_srng/dispatcher/src/wlan_mgmt_rx_srng_ucfg_api.c",
-	    "components/target_if/mgmt_rx_srng/src/target_if_mgmt_rx_srng.c",
-	    "components/mgmt_rx_srng/dispatcher/src/wlan_mgmt_rx_srng_tgt_api.c",
+            "components/target_if/mgmt_rx_srng/src/target_if_mgmt_rx_srng.c",
+            "components/mgmt_rx_srng/dispatcher/src/wlan_mgmt_rx_srng_tgt_api.c",
         ],
     },
     "CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE": {
         True: [
             "cmn/dp/wifi3.0/dp_rx_buffer_pool.c",
-	    "cmn/qdf/linux/src/qdf_page_pool.c",
+            "cmn/qdf/linux/src/qdf_page_pool.c",
         ],
     },
 }
@@ -2293,6 +2294,31 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     hw = _chipset_hw_map[chipset]
     chipset_ipaths = _chipset_header_map[chipset]
     hw_ipaths = _hw_header_map[hw]
+
+    deps = select({
+        "//build/kernel/kleaf:socrepo_true": [
+            "//soc-repo:all_headers",
+            "//soc-repo:{}/net/wireless/cfg80211".format(tv),
+            "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(tv),
+            "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
+            "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
+            "//soc-repo:{}/kernel/sched/walt/sched-walt".format(tv),
+        ],
+        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+    })
+
+    if target == "sun":
+        deps += select({
+            "//build/kernel/kleaf:socrepo_true": [
+                "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
+            ],
+            "//build/kernel/kleaf:socrepo_false": [],
+        })
+
+    kernel_build = select({
+        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+    })
 
     ipaths = chipset_ipaths + hw_ipaths + _fixed_ipaths
 
@@ -2336,22 +2362,22 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/uapi/linux/nl80211.h",
             "flag": "CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA",
         },
-	{
-		"pattern": "NL80211_CMD_SET_TID_TO_LINK_MAPPING",
-		"file": "include/uapi/linux/nl80211.h",
-		"flag": "WLAN_FEATURE_11BE_MLO_TTLM",
-	},
-	{
-		"pattern": "IEEE80211_CHANCTX_CHANGE_PUNCTURING",
-		"file": "include/net/mac80211.h",
-		"flag": "CFG80211_RU_PUNC_CHANDEF",
-	},
+        {
+            "pattern": "NL80211_CMD_SET_TID_TO_LINK_MAPPING",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "WLAN_FEATURE_11BE_MLO_TTLM",
+        },
+        {
+            "pattern": "IEEE80211_CHANCTX_CHANGE_PUNCTURING",
+            "file": "include/net/mac80211.h",
+            "flag": "CFG80211_RU_PUNC_CHANDEF",
+        },
     ]
 
     cmd = 'touch "$@"\n'
     for feature_grep in feature_grep_map:
         cmd += """
-          if grep -qF "{pattern}" $(location //msm-kernel:{file}); then
+          if grep -qF "{pattern}" $(location //common:{file}); then
             echo "#define {flag} (1)" >> "$@"
           fi
         """.format(
@@ -2362,7 +2388,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     grepSrcFiles = []
     for e in feature_grep_map:
-        grepSrcFiles.append("//msm-kernel:{}".format(e["file"]))
+        grepSrcFiles.append("//common:{}".format(e["file"]))
 
     depsetSrc = depset(grepSrcFiles)
     native.genrule(
@@ -2431,21 +2457,20 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
     if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450":
-        deps = [
+        deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
     else:
-        deps = [
+        deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
         ]
 
     deps = deps + [
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
-            "//msm-kernel:all_headers",
-            "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
-        ]
+        "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
+        "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
+        "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
+        "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+    ]
 
     if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph":
         deps = deps + [
@@ -2456,13 +2481,14 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     if target == "sdxkova":
         tgt = "target-aarch64_cortex-a53_musl"
         board = "sdx85"
-        deps = [
-            "//msm-kernel:all_headers",
+        ipa_ver = "1.0"
+        deps = deps + [
             "//build_dir/{}/linux-{}/wlan-cnss2:wlan-platform-headers".format(tgt, board),
-            "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss2".format(tgt, board, tv),
             "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_utils".format(tgt, board, tv),
             "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_prealloc".format(tgt, board, tv),
             "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_nl".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/dataipa-{}:include_headers".format(tgt, board, ipa_ver),
+            "//build_dir/{}/linux-{}/dataipa-{}:{}_{}_ipam".format(tgt, board, ipa_ver, target, variant),
         ]
 
     print("name=", name)
@@ -2485,7 +2511,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         conditional_srcs = _conditional_srcs,
         copts = copts,
         out = out,
-        kernel_build = "//msm-kernel:{}".format(tv),
+        kernel_build = kernel_build,
         deps = deps,
     )
 
@@ -2498,7 +2524,7 @@ def define_dist(target, variant, chipsets):
         dataList.append(":{}".format(name))
         copy_to_dist_dir(
             name = "{}_modules_dist".format(tvc),
-            data =  [":{}".format(name)],
+            data = [":{}".format(name)],
             dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
             flat = True,
             wipe_dist_dir = False,

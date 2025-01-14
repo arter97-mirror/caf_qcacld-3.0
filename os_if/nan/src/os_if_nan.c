@@ -2042,6 +2042,7 @@ static void os_if_new_peer_ind_handler(struct wlan_objmgr_vdev *vdev,
 
 	active_peers++;
 	ucfg_nan_set_active_peers(vdev, active_peers);
+	ucfg_nan_cache_ndp_peer_mac_addr(psoc, &peer_ind->peer_mac_addr);
 	osif_debug("num_peers: %d", active_peers);
 }
 

@@ -252,6 +252,12 @@ static inline bool pld_ipci_audio_is_direct_link_supported(struct device *dev)
 	return false;
 }
 
+static inline int pld_ipci_get_direct_link_sid(struct device *dev,
+					       uint16_t *sid)
+{
+	return -EINVAL;
+}
+
 static inline bool pld_ipci_is_audio_shared_iommu_group(struct device *dev)
 {
 	return false;
@@ -619,5 +625,20 @@ int pld_ipci_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
 	return -EINVAL;
 }
 #endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+static inline int pld_ipci_get_direct_link_sid(struct device *dev,
+					       uint16_t *sid)
+{
+	return icnss_get_direct_link_sid(dev, sid);
+}
+#else
+static inline int pld_ipci_get_direct_link_sid(struct device *dev,
+					       uint16_t *sid)
+{
+	return -EINVAL;
+}
+#endif
+
 #endif
 #endif

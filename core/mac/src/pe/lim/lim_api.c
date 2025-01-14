@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3209,7 +3209,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	roam_sync_ind_ptr->add_bss_params =
 		(struct bss_params *) ft_session_ptr->ftPEContext.pAddBssReq;
 	add_bss_params = ft_session_ptr->ftPEContext.pAddBssReq;
-	lim_delete_tdls_peers(mac_ctx, session_ptr);
+	lim_delete_tdls_peers(mac_ctx, session_ptr,
+			      TDLS_PEER_DEL_REASON_ROAMING);
 	/*
 	 * After deleting the TDLS peers notify the Firmware about TDLS STA
 	 * disconnection due to roaming
@@ -4057,7 +4058,7 @@ lim_update_cuflag_bpcc_each_link(struct mlo_mgmt_ml_info *cu_params)
 		struct pe_session *session_entry = &mac->lim.gpSession[i];
 		uint8_t index  = session_entry->vdev_id;
 		int hw_link_id = 0;
-		uint16_t cu_flag = 0;
+		unsigned long cu_flag = 0;
 		int bpcc_index = 0;
 
 		if (session_entry->valid &&
@@ -4072,7 +4073,7 @@ lim_update_cuflag_bpcc_each_link(struct mlo_mgmt_ml_info *cu_params)
 			}
 
 			cu_flag = cu_params->cu_vdev_map[hw_link_id];
-			if (qdf_test_bit(index, (unsigned long *)&cu_flag))
+			if (qdf_test_bit(index, &cu_flag))
 				session_entry->mlo_link_info.bss_param_change = true;
 			else
 				session_entry->mlo_link_info.bss_param_change = false;
@@ -4098,11 +4099,30 @@ void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
+		pe_err("vdev legacy private object is NULL");
 		return;
 	}
 
-	mlme_priv->connect_info.assoc_chan_info.omn_ie_ch_width = ch_width;
+	mlme_priv->connect_info.assoc_chan_info.cur_ch_width = ch_width;
+}
+
+void lim_update_bcn_op_ch_width(struct wlan_objmgr_vdev *vdev,
+				enum phy_ch_width ch_width)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		pe_err("vdev legacy private object is NULL");
+		return;
+	}
+
+	if (mlme_priv->connect_info.assoc_chan_info.cur_ch_width != ch_width)
+		mlme_priv->connect_info.assoc_chan_info.cur_ch_width = ch_width;
+	else
+		return;
+
+	pe_debug("update bcn eht/he/vht op chn width %d", ch_width);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -4125,8 +4145,8 @@ lim_match_link_info(uint8_t req_link_id,
 
 QDF_STATUS
 lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
-		  uint32_t len, qdf_freq_t freq, int32_t rssi,
-		  uint8_t snr, uint32_t tsf_delta)
+		  uint32_t len, bool is_gen_entry, qdf_freq_t freq,
+		  int32_t rssi, uint8_t snr, uint32_t tsf_delta)
 {
 	qdf_nbuf_t buf;
 	uint8_t *data, i;
@@ -4170,7 +4190,8 @@ lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
 	pe_debug("MLO: add prb rsp to scan db");
 	/* buf will be freed by scan module in error or success case */
 	status = wlan_scan_process_bcn_probe_rx_sync(wlan_pdev_get_psoc(pdev),
-						     buf, &rx_param, frm_type);
+						     buf, &rx_param, frm_type,
+						     is_gen_entry);
 
 	return status;
 }
@@ -4667,9 +4688,10 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 
 	ssid = util_scan_entry_ssid(cur_entry);
 	if (!util_scan_is_null_ssid(ssid)) {
+		filter->ssid_list[0].length =
+			QDF_MIN(ssid->length, WLAN_SSID_MAX_LEN);
 		qdf_mem_copy(filter->ssid_list[0].ssid,
-			     ssid->ssid, ssid->length);
-		filter->ssid_list[0].length = ssid->length;
+			     ssid->ssid, filter->ssid_list[0].length);
 
 		filter->num_of_ssid++;
 	}
@@ -4908,7 +4930,8 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 			status = lim_add_bcn_probe(mac_ctx->pdev,
 						   link_probe_rsp.ptr,
 						   link_probe_rsp.len,
-						   chan_freq, rssi, 0, 0);
+						   true, chan_freq, rssi, 0,
+						   0);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				pe_err("failed to add bcn probe %d", status);
 				lim_clear_ml_partner_info(session_entry, idx);
@@ -5053,7 +5076,8 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 		}
 
 		lim_add_bcn_probe(mac_ctx->pdev, link_probe_rsp.ptr,
-				  link_probe_rsp.len, chan_freq, rssi, snr, 0);
+				  link_probe_rsp.len,
+				  false, chan_freq, rssi, snr, 0);
 
 		partner_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
 						       WLAN_LEGACY_MAC_ID);

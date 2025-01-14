@@ -188,6 +188,7 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 					lim_get_vht_ch_width(vht_caps,
 							     vht_oper,
 							     &assoc_rsp->HTInfo,
+							     &assoc_rsp->HTCaps,
 							     &assoc_rsp->oper_mode_ntf);
 				sta_ds->vhtSupportedChannelWidthSet =
 					lim_convert_phy_width_to_vht_width(vht_ch_width);
@@ -209,8 +210,7 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	lim_update_stads_he_caps(mac_ctx, sta_ds, assoc_rsp,
 				 session_entry, beacon);
 
-	lim_update_stads_eht_caps(mac_ctx, sta_ds, assoc_rsp,
-				  session_entry, beacon);
+	lim_update_stads_eht_caps(mac_ctx, sta_ds, assoc_rsp, session_entry);
 
 	if (lim_is_sta_he_capable(sta_ds))
 		he_cap = &assoc_rsp->he_cap;
@@ -1236,7 +1236,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	int8_t rssi;
 	QDF_STATUS status;
 	enum ani_akm_type auth_type;
-	bool sha384_akm, twt_support_in_11n = false;
+	bool sha384_akm, twt_req_ht_vht = false;
 	struct s_ext_cap *ext_cap;
 
 	assoc_cnf.resultCode = eSIR_SME_SUCCESS;
@@ -1554,14 +1554,9 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			REASON_UNSPEC_FAILURE,
 			hdr->sa, session_entry, false);
 		goto assocReject;
-	} else if ((IS_DOT11_MODE_EHT(session_entry->dot11mode) &&
-		   !assoc_rsp->eht_cap.present) ||
-		   (IS_DOT11_MODE_HE(session_entry->dot11mode) &&
-		    !assoc_rsp->he_cap.present)) {
-		pe_debug("mode - %d, EHT - %d, HE - %d",
-			 session_entry->dot11mode, assoc_rsp->eht_cap.present,
-			 assoc_rsp->he_cap.present);
-		pe_err("Mandatory cap is missing in assoc response, trigger disconnection");
+	} else if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev) &&
+		   !assoc_rsp->eht_cap.present) {
+		pe_err("EHT caps is missing for ML association, trigger disconnection");
 		assoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 		assoc_cnf.protStatusCode = STATUS_DENIED_EHT_NOT_SUPPORTED;
 		lim_send_disassoc_mgmt_frame(mac_ctx, REASON_UNSPEC_FAILURE,
@@ -1606,9 +1601,9 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				&assoc_rsp->he_op);
 
 	} else {
-		wlan_twt_cfg_get_support_in_11n(mac_ctx->psoc,
-						&twt_support_in_11n);
-		if (twt_support_in_11n && session_entry->htCapability &&
+		wlan_twt_cfg_get_req_support_for_ht_vht(mac_ctx->psoc,
+							&twt_req_ht_vht);
+		if (twt_req_ht_vht && session_entry->htCapability &&
 		    assoc_rsp->HTCaps.present && assoc_rsp->ExtCap.present) {
 			ext_cap = (struct s_ext_cap *)assoc_rsp->ExtCap.bytes;
 			lim_set_twt_ext_capabilities(

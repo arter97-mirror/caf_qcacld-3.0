@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6418,7 +6418,7 @@ static void wma_update_mlme_aux_dev_caps(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlme_aux_dev_caps
 		wlan_mlme_aux0_dev_caps[WLAN_MLME_HW_MODE_MAX] = {0};
 
-	if (WMI_HOST_HW_MODE_MAX != WLAN_MLME_HW_MODE_MAX)
+	if ((int32_t)WMI_HOST_HW_MODE_MAX != (int32_t)WLAN_MLME_HW_MODE_MAX)
 		wma_err("struct define mismatch, pls fix it.");
 
 	num_aux_dev_caps =
@@ -6970,8 +6970,7 @@ int wma_rx_service_ready_event(void *handle, uint8_t *cmd_param_info,
 	wma_handle->hw_bd_info[BOARD_DATA_REV] =
 		WMI_GET_BOARD_DATA_REV(ev->hw_bd_info);
 
-	wma_info("Board id: %x, Board version: %x %x %x %x %x",
-		 wma_handle->hw_bd_id,
+	wma_info("Board version: %x %x %x %x %x",
 		 wma_handle->hw_bd_info[BDF_VERSION],
 		 wma_handle->hw_bd_info[REF_DESIGN_ID],
 		 wma_handle->hw_bd_info[CUSTOMER_ID],
@@ -10043,6 +10042,8 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		return status;
 	}
 
+	wma_debug("RSO_CFG: BandCapability:%d, band_mask:%d vdev_id:%d",
+		  band_bitmap, msg->band_mask, msg->vdev_id);
 	/*
 	 * if vdev_id is WLAN_UMAC_VDEV_ID_MAX, then roaming is enabled on
 	 * only one sta, so PDEV PCL command needs to be sent.
@@ -10053,8 +10054,6 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		return wlan_cm_roam_send_set_vdev_pcl(wma_handle->psoc, msg);
 
 
-	wma_debug("RSO_CFG: BandCapability:%d, band_mask:%d",
-		  band_bitmap, msg->band_mask);
 	for (i = 0; i < wma_handle->saved_chan.num_channels; i++) {
 		msg->chan_weights.saved_chan_list[i] =
 					wma_handle->saved_chan.ch_freq_list[i];

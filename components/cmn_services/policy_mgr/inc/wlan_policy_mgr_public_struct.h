@@ -144,6 +144,7 @@ enum sap_csa_reason_code {
  * ml_nlink_update_disallow_modes again.
  * @link_ctrl_f_dont_reschedule_workqueue: don't reschedule force scc workqueue
  * after set link response
+ * @link_ctrl_f_link_recfg: link recfg set link. It will not be serialized
  */
 enum link_control_flags {
 	link_ctrl_f_overwrite_active_bitmap =   1 << 0,
@@ -153,6 +154,7 @@ enum link_control_flags {
 	link_ctrl_f_sync_set_link =             1 << 4,
 	link_ctrl_f_dont_update_disallow_bitmap = 1 << 5,
 	link_ctrl_f_dont_reschedule_workqueue = 1 << 6,
+	link_ctrl_f_link_recfg =                1 << 7,
 };
 
 /* Define the max number of consecutive re-evaluate number. usually, we have

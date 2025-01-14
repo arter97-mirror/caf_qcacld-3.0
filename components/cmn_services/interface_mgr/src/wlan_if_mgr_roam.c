@@ -79,6 +79,11 @@ static void if_mgr_enable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)object;
 	struct change_roam_state_arg *roam_arg = arg;
 	uint8_t vdev_id, curr_vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return;
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	curr_vdev_id = roam_arg->curr_vdev_id;
@@ -94,6 +99,9 @@ static void if_mgr_enable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 	    vdev->vdev_mlme.mlme_state == WLAN_VDEV_S_UP) {
 		ifmgr_debug("Enable roaming for vdev_id %d, requestor %d",
 			    vdev_id, roam_arg->requestor);
+		mlme_set_rso_pending_disable_req_bitmap(psoc, vdev_id,
+							roam_arg->requestor,
+							true);
 		wlan_cm_enable_rso(pdev, vdev_id,
 				   roam_arg->requestor,
 				   REASON_DRIVER_ENABLED);
@@ -127,16 +135,37 @@ static void if_mgr_disable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)object;
 	struct change_roam_state_arg *roam_arg = arg;
 	uint8_t vdev_id, curr_vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return;
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	curr_vdev_id = roam_arg->curr_vdev_id;
 
 	if (curr_vdev_id == vdev_id ||
 	    wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE ||
-	    wlan_cm_is_vdev_roaming(vdev) ||
 	    vdev->vdev_mlme.mlme_state != WLAN_VDEV_S_UP)
 		return;
 
+	/*
+	 * Host can't send RSO_STOP when roaming(ROAM_START/ROAM_SYNC) is in
+	 * progress as it might cause HO_FAIL. The requestor operation(e.g. SAP
+	 * start) waits till ROAM cmd is dequeued from SER queue. The requestor
+	 * operation starts once the current roaming is done and ROAM cmd is
+	 * dequeued.
+	 * The requestor(e.g. SAP start) operation and next roaming can't run
+	 * in parallel in firmware, which means the request to disable roaming
+	 * can't be dropped. So, cache the request and send RSO_STOP to fw when
+	 * current roaming is done.
+	 */
+	if (wlan_cm_is_vdev_roaming(vdev)) {
+		mlme_set_rso_pending_disable_req_bitmap(psoc, vdev_id,
+							roam_arg->requestor,
+							false);
+		return;
+	}
 	/*
 	 * Disable roaming only for the STA vdev which is not is roam sync state
 	 * and VDEV is in UP state.

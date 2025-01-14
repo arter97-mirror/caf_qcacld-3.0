@@ -752,6 +752,9 @@ wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	uint8_t buf[BUF_LEN_MAX];
 
+	if (!dp_stc)
+		return;
+
 	switch (dir) {
 	case WLAN_DP_FLOW_DIR_TX:
 		dp_stc_debug(dp_stc->logmask, "STC: Add TX flow %s",
@@ -768,7 +771,7 @@ wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 	}
 
 	/* RCU or atomic variable?? */
-	if (dp_stc && dp_stc->periodic_work_state < WLAN_DP_STC_WORK_STARTED) {
+	if (dp_stc->periodic_work_state < WLAN_DP_STC_WORK_STARTED) {
 		qdf_periodic_work_start(&dp_stc->flow_monitor_work,
 					dp_stc->flow_monitor_interval);
 		dp_stc->periodic_work_state = WLAN_DP_STC_WORK_STARTED;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -46,10 +46,8 @@
 void hdd_update_tgt_eht_cap(struct hdd_context *hdd_ctx,
 			    struct wma_tgt_cfg *cfg)
 {
-	tDot11fIEeht_cap eht_cap_ini = {0};
-
+	sme_update_tgt_eht_cap(hdd_ctx->mac_handle, cfg);
 	ucfg_mlme_update_tgt_eht_cap(hdd_ctx->psoc, cfg);
-	sme_update_tgt_eht_cap(hdd_ctx->mac_handle, cfg, &eht_cap_ini);
 }
 
 /*

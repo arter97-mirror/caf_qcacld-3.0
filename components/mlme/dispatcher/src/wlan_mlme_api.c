@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,6 +40,7 @@
 #include "wlan_mlme_api.h"
 #include "../../core/src/wlan_cp_stats_defs.h"
 #include "wlan_reg_services_api.h"
+#include "wlan_policy_mgr_api.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -1388,6 +1389,7 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	tDot11fIEeht_cap *eht_cap = &wma_cfg->eht_cap;
 	tDot11fIEeht_cap *mlme_eht_cap;
 	bool eht_capab;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
@@ -1427,6 +1429,10 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 		mlme_eht_cap->mu_bformer_le_80mhz = 0;
 		mlme_eht_cap->mu_bformer_160mhz = 0;
 		mlme_eht_cap->mu_bformer_320mhz = 0;
+		mac_ctx->eht_cap_2g.su_beamformer = 0;
+		mac_ctx->eht_cap_5g.su_beamformer = 0;
+		mac_ctx->eht_cap_2g_orig.su_beamformer = 0;
+		mac_ctx->eht_cap_5g_orig.su_beamformer = 0;
 	}
 
 	if (mlme_obj->cfg.vht_caps.vht_cap_info.su_bformee) {
@@ -1447,6 +1453,10 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 		mlme_eht_cap->bfee_ss_le_80mhz = 0;
 		mlme_eht_cap->bfee_ss_160mhz = 0;
 		mlme_eht_cap->bfee_ss_320mhz = 0;
+		mac_ctx->eht_cap_2g.su_beamformee = 0;
+		mac_ctx->eht_cap_5g.su_beamformee = 0;
+		mac_ctx->eht_cap_2g_orig.su_beamformee = 0;
+		mac_ctx->eht_cap_5g_orig.su_beamformee = 0;
 	}
 	mlme_obj->cfg.eht_caps.eht_cap_orig =
 		mlme_obj->cfg.eht_caps.dot11_eht_cap;
@@ -1620,7 +1630,8 @@ enum phy_ch_width wlan_mlme_get_max_bw(void)
 #endif
 
 QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
-				      enum phy_ch_width *ch_width)
+				      enum phy_ch_width *ch_width,
+				      enum wlan_phymode *phy_mode)
 {
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct wlan_objmgr_peer *peer;
@@ -1637,6 +1648,8 @@ QDF_STATUS wlan_mlme_get_sta_ch_width(struct wlan_objmgr_vdev *vdev,
 		phymode = wlan_peer_get_phymode(peer);
 		wlan_peer_obj_unlock(peer);
 		*ch_width = wlan_mlme_get_ch_width_from_phymode(phymode);
+		if (phy_mode)
+			*phy_mode = phymode;
 		status = QDF_STATUS_SUCCESS;
 	}
 
@@ -5364,10 +5377,8 @@ QDF_STATUS mlme_get_peer_phymode(struct wlan_objmgr_psoc *psoc, uint8_t *mac,
 	struct wlan_objmgr_peer *peer;
 
 	peer = wlan_objmgr_get_peer_by_mac(psoc, mac, WLAN_MLME_NB_ID);
-	if (!peer) {
-		mlme_legacy_err("peer object is null");
+	if (!peer)
 		return QDF_STATUS_E_NULL_VALUE;
-	}
 
 	*peer_phymode = wlan_peer_get_phymode(peer);
 	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_NB_ID);
@@ -5683,6 +5694,16 @@ char *mlme_get_roam_fail_reason_str(enum wlan_roam_failure_reason_code result)
 		return "No Candidate AP found on final BMISS";
 	case ROAM_FAIL_REASON_CURR_AP_STILL_OK:
 		return "CURRENT AP STILL OK";
+	case ROAM_FAIL_REASON_SCAN_CANCEL:
+		return "SCAN CANCEL";
+	case ROAM_FAIL_REASON_SCREEN_ACTIVITY:
+		return "SCREEN ACTIVITY";
+	case ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN:
+		return "OTHER PRIORITY ROAM SCAN";
+	case ROAM_FAIL_REASON_REASSOC_TO_SAME_AP:
+		return "REASSOC TO SAME AP";
+	case ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED:
+		return "MLD EXTRA SCAN REQUIRED";
 	default:
 		return "UNKNOWN";
 	}
@@ -6218,6 +6239,25 @@ wlan_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc)
 			policy_mgr_is_hw_dbs_capable(psoc);
 
 	return dual_sta_roaming_enabled;
+}
+
+bool
+wlan_mlme_support_non_dbs_dual_sta_roaming(struct wlan_objmgr_psoc *psoc)
+{
+	bool support = false;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("mlme_obj is not ready");
+		return false;
+	}
+
+	if (mlme_obj->cfg.lfr.lfr3_support_single_mac_dual_sta_roaming &&
+	    !policy_mgr_is_hw_dbs_capable(psoc))
+		support = true;
+
+	return support;
 }
 #endif
 
@@ -8149,6 +8189,35 @@ wlan_mlme_cp_stats_set_rate_flags(struct wlan_objmgr_vdev *vdev,
 }
 
 QDF_STATUS
+wlan_mlme_vendor_set_disable_dfs_master_capability(
+					struct wlan_objmgr_psoc *psoc,
+					bool disable)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_legacy_debug("current dfs_master_capable %d set disable %d",
+			  mlme_obj->cfg.dfs_cfg.dfs_master_capable,
+			  disable);
+	if (disable)
+		mlme_obj->cfg.dfs_cfg.dfs_master_capable = false;
+	else
+		mlme_obj->cfg.dfs_cfg.dfs_master_capable =
+		cfg_get(psoc, CFG_ENABLE_DFS_MASTER_CAPABILITY);
+
+	mlme_legacy_debug("new dfs_master_capable %d",
+			  mlme_obj->cfg.dfs_cfg.dfs_master_capable);
+	policy_mgr_dfs_master_cfg_changed(
+			psoc,
+			mlme_obj->cfg.dfs_cfg.dfs_master_capable);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_update_bss_rate_flags(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				enum phy_ch_width cw, uint8_t eht_present,
 				uint8_t he_present, uint8_t vht_present,
@@ -8209,7 +8278,7 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status;
 	wmi_host_channel_width wmi_chan_width;
-	enum phy_ch_width associated_ch_width, omn_ie_ch_width;
+	enum phy_ch_width associated_ch_width, cur_ch_width;
 	struct wlan_channel *des_chan;
 	struct mlme_legacy_priv *mlme_priv;
 	qdf_freq_t sec_2g_freq = 0;
@@ -8222,21 +8291,22 @@ wlan_mlme_send_ch_width_update_with_notify(struct wlan_objmgr_psoc *psoc,
 	if (!des_chan)
 		return QDF_STATUS_E_INVAL;
 
-	omn_ie_ch_width =
-		mlme_priv->connect_info.assoc_chan_info.omn_ie_ch_width;
-	if (omn_ie_ch_width != CH_WIDTH_INVALID && ch_width > omn_ie_ch_width) {
-		mlme_debug("vdev %d: Invalid new chwidth:%d, omn_ie_cw:%d",
-			   vdev_id, ch_width, omn_ie_ch_width);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	associated_ch_width =
-		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
-	if (associated_ch_width == CH_WIDTH_INVALID ||
-	    ch_width > associated_ch_width) {
-		mlme_debug("vdev %d: Invalid new chwidth:%d, assoc ch_width:%d",
-			   vdev_id, ch_width, associated_ch_width);
-		return QDF_STATUS_E_INVAL;
+	cur_ch_width = mlme_priv->connect_info.assoc_chan_info.cur_ch_width;
+	if (cur_ch_width != CH_WIDTH_INVALID) {
+		if (ch_width > cur_ch_width) {
+			mlme_debug("vdev %d: Invalid new chwidth:%d, cur_ch_width:%d",
+				   vdev_id, ch_width, cur_ch_width);
+			return QDF_STATUS_E_INVAL;
+		}
+	} else {
+		associated_ch_width =
+			mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
+		if (associated_ch_width == CH_WIDTH_INVALID ||
+		    ch_width > associated_ch_width) {
+			mlme_debug("vdev %d: Invalid new chwidth:%d, assoc ch_width:%d",
+				   vdev_id, ch_width, associated_ch_width);
+			return QDF_STATUS_E_INVAL;
+		}
 	}
 
 	if (wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq)) {
@@ -8828,7 +8898,7 @@ void wlan_mlme_reset_sta_keepalive_period(struct wlan_objmgr_psoc *psoc,
 	       return;
        }
        mlme_obj->cfg.sta.sta_keep_alive_period =
-		cfg_default(CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
+		cfg_get(psoc, CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
        mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
        if (!mlme_priv) {
                mlme_err("vdev legacy private object is NULL");
@@ -8836,7 +8906,7 @@ void wlan_mlme_reset_sta_keepalive_period(struct wlan_objmgr_psoc *psoc,
        }
 
        mlme_priv->keep_alive_period =
-                       cfg_default(CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
+			cfg_get(psoc, CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
 }
 
 QDF_STATUS

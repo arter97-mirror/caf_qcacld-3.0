@@ -531,13 +531,27 @@ qdf_freq_t wlan_nan_sap_override_freq(struct wlan_objmgr_psoc *psoc,
 				      uint32_t vdev_id,
 				      qdf_freq_t chan_freq)
 {
-	qdf_freq_t nan_freq_2g = 0;
+	qdf_freq_t nan_freq_2g = 0, sta_freq = 0;
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
 		return chan_freq;
 
 	nan_freq_2g = policy_mgr_mode_specific_get_channel(psoc,
 							   PM_NAN_DISC_MODE);
+
+	/*
+	 * Override nan freq if 2 GHz legacy STA is present.
+	 * In case of 2 GHz ML STA no need to override,
+	 * As it will get disabled if not SCC
+	 */
+	if (policy_mgr_is_non_ml_sta_present(psoc) &&
+	    !policy_mgr_is_mlo_sta_present(psoc)) {
+		sta_freq = policy_mgr_mode_specific_get_channel(psoc,
+								PM_STA_MODE);
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(sta_freq))
+			nan_freq_2g = sta_freq;
+	}
+
 	if (!nan_freq_2g)
 		return chan_freq;
 	return nan_freq_2g;

@@ -23,6 +23,7 @@
 #include "wlan_reg_services_api.h"
 #include "wlan_dfs_utils_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
+#include "wlan_cp_stats_mc_ucfg_api.h"
 
 #define SET_HT_MCS3(mcs) do { \
 	mcs[0] = 0x0f;        \
@@ -86,7 +87,8 @@ wlan_ll_sap_switch_bearer_on_sta_connect_start(struct wlan_objmgr_psoc *psoc,
 
 	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
 	/* LL_LT SAP is not present, bearer switch is not required */
-	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID)
+	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID ||
+	    ll_lt_sap_vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS)
 		return status;
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, ll_lt_sap_vdev_id,
 						    WLAN_LL_SAP_ID);
@@ -458,6 +460,54 @@ uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 	return 0;
 }
 
+uint32_t
+wlan_ll_sap_get_cu_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t ch_freq)
+{
+	uint32_t cu = 0;
+	uint32_t rx_clear_count = 0;
+	struct channel_status *ch_stats = NULL;
+
+	ch_stats = ucfg_mc_cp_stats_get_channel_status(pdev, ch_freq);
+	if (!ch_stats) {
+		ll_sap_err("Stats not found for freq %d", ch_freq);
+		return cu;
+	}
+
+	if (!ch_stats->cycle_count) {
+		ll_sap_debug("Stats not valid for freq %d as cc is 0", ch_freq);
+		return cu;
+	}
+
+	/* Rx clear count - self tx - self rx) * 100 / total clear count */
+	if (ch_stats->rx_clear_count >
+	    (ch_stats->tx_frame_count + ch_stats->bss_rx_cycle_count))
+		rx_clear_count = ch_stats->rx_clear_count -
+			ch_stats->tx_frame_count - ch_stats->bss_rx_cycle_count;
+	else
+		rx_clear_count = ch_stats->rx_clear_count;
+
+	cu = rx_clear_count * 100 / ch_stats->cycle_count;
+
+	ll_sap_debug("cu: %u, rx_cc %u, tx_fc %u, bss_rx_cc %u cc %d",
+		     cu, ch_stats->rx_clear_count,
+		     ch_stats->tx_frame_count, ch_stats->bss_rx_cycle_count,
+		     ch_stats->cycle_count);
+	return cu;
+}
+uint32_t
+wlan_ll_sap_get_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id)
+{
+	return ll_sap_get_cur_freq_unused_cu(psoc, vdev_id);
+}
+
+QDF_STATUS
+wlan_ll_sap_set_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, uint32_t unused_cu)
+{
+	return ll_sap_set_cur_freq_unused_cu(psoc, vdev_id, unused_cu);
+}
+
 uint64_t
 wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev)
 {
@@ -558,6 +608,8 @@ bool wlan_ll_lt_sap_is_freq_in_avoid_list(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
+	ll_lt_sap_flush_old_entries(ll_sap_psoc_obj);
+
 	return ll_lt_sap_is_freq_in_avoid_list(ll_sap_psoc_obj, freq);
 }
 
@@ -576,4 +628,3 @@ wlan_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
 {
 	return ll_lt_sap_get_valid_freq(psoc, vdev_id, curr_freq, csa_src);
 }
-

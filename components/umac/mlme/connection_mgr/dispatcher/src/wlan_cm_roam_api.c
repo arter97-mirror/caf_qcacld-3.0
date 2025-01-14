@@ -42,6 +42,7 @@
 #include "wlan_dlm_api.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_link_force.h"
+#include "wlan_mlo_link_recfg.h"
 #endif
 #include <../../core/src/wlan_cm_roam_offload.h>
 
@@ -178,7 +179,7 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	 * If there is a failure or operating mode is not STA / P2P-CLI
 	 * then get channel width from wlan_channel.
 	 */
-	status = wlan_mlme_get_sta_ch_width(vdev, &ch_width);
+	status = wlan_mlme_get_sta_ch_width(vdev, &ch_width, NULL);
 	if (QDF_IS_STATUS_ERROR(status))
 		assoc_chan_info->assoc_ch_width = des_chan->ch_width;
 	else
@@ -270,7 +271,7 @@ QDF_STATUS wlan_cm_disable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	uint8_t disable_reason = REASON_DRIVER_DISABLED;
 
 	if (reason == REASON_DRIVER_DISABLED && requestor)
-		mlme_set_operations_bitmap(psoc, vdev_id, requestor, false);
+		mlme_set_rso_disabled_bitmap(psoc, vdev_id, requestor, false);
 
 	if (reason == REASON_VDEV_RESTART_FROM_HOST)
 		disable_reason = REASON_VDEV_RESTART_FROM_HOST;
@@ -293,7 +294,7 @@ QDF_STATUS wlan_cm_enable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	uint8_t enable_reason = REASON_DRIVER_ENABLED;
 
 	if (reason == REASON_DRIVER_ENABLED && requestor)
-		mlme_set_operations_bitmap(psoc, vdev_id, requestor, true);
+		mlme_set_rso_disabled_bitmap(psoc, vdev_id, requestor, true);
 
 	if (reason == REASON_VDEV_RESTART_FROM_HOST)
 		enable_reason = REASON_VDEV_RESTART_FROM_HOST;
@@ -539,7 +540,8 @@ wlan_cm_dual_sta_is_freq_allowed(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t i;
 
-	if (!connected_sta_freq_list || !sta_count)
+	if (!connected_sta_freq_list || !sta_count ||
+	    wlan_mlme_support_non_dbs_dual_sta_roaming(psoc))
 		return true;
 
 	for (i = 0; i < sta_count; i++) {
@@ -657,7 +659,6 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 
 	if (!wlan_mlme_get_dual_sta_roaming_enabled(psoc))
 		return;
-
 	/*
 	 * Check if primary iface is configured. If yes,
 	 * then allow further STA connection to all
@@ -4257,6 +4258,11 @@ wlan_cm_update_roam_trigger_info(struct wlan_objmgr_vdev *vdev,
 	struct enhance_roam_info *info;
 	struct mlme_legacy_priv *mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 
+	if (!mlme_priv) {
+		mlme_err("null mlme priv");
+		return;
+	}
+
 	index = mlme_priv->roam_write_index;
 	info = &mlme_priv->roam_info[index];
 
@@ -6126,6 +6132,13 @@ QDF_STATUS wlan_cm_link_switch_notif_cb(struct wlan_objmgr_vdev *vdev,
 
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return status;
+
+	/* If link switch for link recfg, no need to disable roaming */
+	if (mlo_is_link_recfg_in_progress(vdev)) {
+		mlme_debug("link recfg in progress vdev %d linksw reason %d",
+			   wlan_vdev_get_id(vdev), notify_reason);
+		return status;
+	}
 
 	/* Only send RSO stop for assoc vdev */
 	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))

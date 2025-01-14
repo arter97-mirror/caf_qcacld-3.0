@@ -5366,7 +5366,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	struct sk_buff *skb = NULL;
 	uint32_t dbs_capability = 0;
 	bool one_by_one_dbs, two_by_two_dbs;
-	bool value, twt_req, twt_res;
+	bool value, twt_req, twt_res, twt_res_supp_ht_vht;
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 	QDF_STATUS status;
 	int ret_val;
@@ -5435,11 +5435,20 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 
 	hdd_get_twt_requestor(hdd_ctx->psoc, &twt_req);
 	hdd_get_twt_responder(hdd_ctx->psoc, &twt_res);
+	hdd_get_twt_responder_support_for_ht_vht_mode(hdd_ctx->psoc,
+						      &twt_res_supp_ht_vht);
 	hdd_debug("twt_req:%d twt_res:%d", twt_req, twt_res);
 
-	if (twt_req || twt_res) {
-		wlan_cfg80211_set_feature(feature_flags,
-					  QCA_WLAN_VENDOR_FEATURE_TWT);
+	if (twt_req || twt_res || twt_res_supp_ht_vht) {
+		if (twt_req || twt_res) {
+			wlan_cfg80211_set_feature(
+						feature_flags,
+						QCA_WLAN_VENDOR_FEATURE_TWT);
+			if (twt_res_supp_ht_vht)
+				wlan_cfg80211_set_feature(
+					feature_flags,
+					QCA_WLAN_VENDOR_FEATURE_HT_VHT_TWT_RESPONDER);
+		}
 
 		wlan_cfg80211_set_feature(feature_flags,
 					  QCA_WLAN_VENDOR_FEATURE_TWT_ASYNC_SUPPORT);
@@ -8946,7 +8955,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_P2P_GO_BEACON_INTERVAL] = {
 		.type = NLA_U16},
-
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_OWNER_DISABLE] = {
+		.type = NLA_U8},
 };
 
 
@@ -12712,13 +12722,13 @@ static int hdd_test_config_emlsr_mode(struct hdd_context *hdd_ctx,
 				      bool cfg_val)
 
 {
-	hdd_debug("11be op mode setting %d", cfg_val);
-	if (cfg_val && policy_mgr_is_hw_emlsr_capable(hdd_ctx->psoc)) {
-		hdd_debug("HW supports EMLSR mode, set caps");
+	bool emlsr_hw_support = policy_mgr_is_hw_emlsr_capable(hdd_ctx->psoc);
+
+	hdd_debug("eMLSR - Config : %d,  HW support : %d", cfg_val,
+		  emlsr_hw_support);
+
+	if (emlsr_hw_support)
 		ucfg_mlme_set_emlsr_mode_enabled(hdd_ctx->psoc, cfg_val);
-	} else {
-		hdd_debug("Default mode: MLMR, no action required");
-	}
 
 	return 0;
 }
@@ -12983,6 +12993,63 @@ static int hdd_reset_btm_abridge_flag(struct wlan_hdd_link_info *link_info,
 		wlan_mlme_set_btm_abridge_flag(hdd_ctx->psoc, false);
 	else
 		wlan_mlme_set_btm_abridge_flag(hdd_ctx->psoc, true);
+
+	return 0;
+}
+
+/**
+ * hdd_set_dfs_owner_disable() - Set DFS owner disable
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_set_dfs_owner_disable(struct wlan_hdd_link_info *link_info,
+				     const struct nlattr *attr)
+{
+	uint8_t dfs_owner_disable;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	if (!hdd_ctx->wiphy || !hdd_ctx->wiphy->registered)
+		return -EINVAL;
+
+	dfs_owner_disable = nla_get_u8(attr);
+
+	hdd_debug("configure DFS owner disable %d", dfs_owner_disable);
+	ucfg_mlme_vendor_set_disable_dfs_master_capability(
+				hdd_ctx->psoc,
+				dfs_owner_disable);
+
+	hdd_send_wiphy_regd_sync_event(hdd_ctx, false);
+
+	return 0;
+}
+
+/**
+ * hdd_get_dfs_owner_disable() - Get DFS owner disable
+ * @link_info: Link info pointer in HDD adapter
+ * @skb: skb buffer
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_get_dfs_owner_disable(struct wlan_hdd_link_info *link_info,
+				     struct sk_buff *skb,
+				     const struct nlattr *attr)
+{
+	bool dfs_master_capability = true;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	ucfg_mlme_get_dfs_master_capability(
+				hdd_ctx->psoc,
+				&dfs_master_capability);
+	hdd_debug("current DFS owner capability %d", dfs_master_capability);
+
+	if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_OWNER_DISABLE,
+		       (uint8_t)!dfs_master_capability)) {
+		hdd_err("nla_put failure");
+		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -13541,6 +13608,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_reset_btm_abridge_flag},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_P2P_GO_BEACON_INTERVAL,
 	 hdd_set_p2p_go_bcn_int},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_OWNER_DISABLE,
+	 hdd_set_dfs_owner_disable},
 };
 
 #ifdef WLAN_FEATURE_ELNA
@@ -13810,9 +13879,10 @@ static int hdd_get_rx_amsdu(struct wlan_hdd_link_info *link_info,
 static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
 				 struct sk_buff *skb, const struct nlattr *attr)
 {
-	uint8_t nl80211_chwidth;
+	uint8_t chn_width, cur_ch_width, nl80211_chwidth;
 	struct wlan_channel *bss_chan;
 	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev)
@@ -13824,8 +13894,18 @@ static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
 		hdd_err("get bss_chan failed");
 		return QDF_STATUS_E_FAILURE;
 	}
+	chn_width = bss_chan->ch_width;
 
-	nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(bss_chan->ch_width);
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return -EINVAL;
+	}
+	cur_ch_width = mlme_priv->connect_info.assoc_chan_info.cur_ch_width;
+	if (chn_width != cur_ch_width)
+		chn_width = cur_ch_width;
+
+	nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(chn_width);
 	if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH, nl80211_chwidth)) {
 		hdd_err("nla_put chn width failure");
 		return -EINVAL;
@@ -13857,9 +13937,10 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	struct wlan_objmgr_vdev *link_vdev = NULL;
 	struct wlan_channel *bss_chan;
 	struct wlan_hdd_link_info *link_info_t;
+	struct mlme_legacy_priv *mlme_priv;
 	struct hdd_station_ctx *sta_ctx;
 	uint8_t nl80211_chwidth;
-	uint8_t chn_width;
+	uint8_t chn_width, cur_ch_width;
 	int8_t ret = 0;
 
 	chwidth = wma_cli_get_command(link_info->vdev_id,
@@ -13917,6 +13998,16 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 				goto end;
 			}
 			chn_width = bss_chan->ch_width;
+
+			mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+			if (!mlme_priv) {
+				mlme_legacy_err("vdev legacy private object is NULL");
+				goto end;
+			}
+			cur_ch_width =
+				mlme_priv->connect_info.assoc_chan_info.cur_ch_width;
+			if (chn_width != cur_ch_width)
+				chn_width = cur_ch_width;
 		} else if (link_info_t->vdev_id == WLAN_INVALID_VDEV_ID) {
 			chn_width = sta_ctx->user_cfg_chn_width;
 		} else {
@@ -14394,6 +14485,9 @@ static const struct config_getters config_getters[] = {
 	 {QCA_WLAN_VENDOR_ATTR_CONFIG_KEEP_ALIVE_INTERVAL,
 	  sizeof(uint16_t),
 	  hdd_get_sta_keepalive_interval},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_OWNER_DISABLE,
+	 sizeof(uint8_t),
+	 hdd_get_dfs_owner_disable},
 };
 
 /**
@@ -19945,7 +20039,10 @@ static int wlan_hdd_cfg80211_set_fast_roaming(struct hdd_context *hdd_ctx,
 		hdd_err("ROAM_CONFIG: sme_config_fast_roaming failed with status=%d",
 			qdf_status);
 
-	ret = qdf_status_to_os_return(qdf_status);
+	if (QDF_STATUS_E_ALREADY == qdf_status)
+		ret = qdf_status_to_os_return(QDF_STATUS_SUCCESS);
+	else
+		ret = qdf_status_to_os_return(qdf_status);
 
 	if (hdd_cm_is_vdev_associated(adapter->deflink) &&
 	    roaming_enabled &&
@@ -24201,8 +24298,6 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 				 | BIT(NL80211_IFTYPE_AP)
 				 | BIT(NL80211_IFTYPE_MONITOR);
 
-	wlan_hdd_set_nan_if_mode(wiphy);
-
 	/*
 	 * In case of static linked driver at the time of driver unload,
 	 * module exit doesn't happens. Module cleanup helps in cleaning
@@ -25083,6 +25178,26 @@ wlan_hdd_remove_sta_p2p_conc(struct ieee80211_iface_combination *combination,
 }
 
 /**
+ * wlan_hdd_is_iface_nan() - This API checks whether NAN interface is present
+ * in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if NAN interface is present otherwise false
+ */
+static bool wlan_hdd_is_iface_nan(uint8_t idx)
+{
+	uint8_t j;
+
+	for (j = 0; j < wlan_hdd_iface_combination[idx].n_limits; j++) {
+		if (wlan_hdd_iface_combination[idx].limits[j].types ==
+		    BIT(NL80211_IFTYPE_NAN))
+			return true;
+	}
+
+	return false;
+}
+
+/**
  * wlan_hdd_update_iface_combination() - This API updates interface combination
  * @hdd_ctx: HDD context
  * @wiphy: WIPHY structure pointer
@@ -25104,6 +25219,7 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	bool sap_sta_nan_concurrency, sap_sap_sta_concurrency;
 	uint8_t num;
 	QDF_STATUS status;
+	bool is_nan_allowed;
 
 	if (!hdd_ctx->config->advertise_concurrent_operation)
 		return;
@@ -25124,6 +25240,9 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	sta_p2p_ndp_conc = ucfg_nan_is_sta_p2p_ndp_supported(psoc);
 
 	num = ARRAY_SIZE(wlan_hdd_iface_combination);
+	is_nan_allowed = ucfg_nan_is_allowed(psoc);
+	if (is_nan_allowed)
+		wlan_hdd_set_nan_if_mode(wiphy);
 
 	for (i = 0; i < num; i++) {
 		/* Filter for non-DBS targets */
@@ -25152,6 +25271,10 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		    wlan_hdd_is_p2p_concurrency_present(sta_sap_p2p_concurrency,
 							sta_p2p_ndp_conc,
 							i))
+			continue;
+
+		/* remove NAN concurrency if NAN is not allowed */
+		if (wlan_hdd_is_iface_nan(i) && !is_nan_allowed)
 			continue;
 
 		/* remove SAP STA NAN concurrency */
@@ -28928,7 +29051,18 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 		goto fn_end;
 
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)mac)) {
-		if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+		struct wlan_objmgr_vdev *vdev;
+		uint16_t peer_count = 0;
+
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_ID);
+		if (vdev) {
+			peer_count = wlan_vdev_get_peer_count(vdev);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		}
+		/* Check if it LL SAP has peer connected, other than BSS peer */
+		if (peer_count > 1 &&
+		    policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 						 adapter->deflink->vdev_id)) {
 			wlan_ll_sap_switch_bearer_on_stop_ap(
 						hdd_ctx->psoc,
@@ -31220,14 +31354,28 @@ wlan_hdd_extauth_cache_pmkid(struct hdd_adapter *adapter,
 {
 	struct wlan_crypto_pmksa *pmk_cache;
 	QDF_STATUS result;
+	struct qdf_mac_addr mld_addr;
 
 	if (params->pmkid) {
 		pmk_cache = qdf_mem_malloc(sizeof(*pmk_cache));
 		if (!pmk_cache)
 			return;
 
-		qdf_mem_copy(pmk_cache->bssid.bytes, params->bssid,
-			     QDF_MAC_ADDR_SIZE);
+		qdf_zero_macaddr(&mld_addr);
+		sme_pmkid_get_mld_addr(adapter->hdd_ctx->mac_handle,
+				       (uint8_t *)params->bssid,
+				       (uint8_t *)&mld_addr.bytes);
+
+		if (!qdf_is_macaddr_zero(&mld_addr)) {
+			hdd_debug("bssid " QDF_MAC_ADDR_FMT " new " QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(params->bssid),
+				  QDF_MAC_ADDR_REF(mld_addr.bytes));
+			qdf_copy_macaddr(&pmk_cache->bssid, &mld_addr);
+		} else {
+			qdf_mem_copy(pmk_cache->bssid.bytes, params->bssid,
+				     QDF_MAC_ADDR_SIZE);
+		}
+
 		qdf_mem_copy(pmk_cache->pmkid, params->pmkid,
 			     PMKID_LEN);
 		result = wlan_hdd_set_pmksa_cache(adapter, pmk_cache);
@@ -33649,6 +33797,160 @@ QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && \
+defined(CFG80211_SETUP_LINK_RECONFIG_SUPPORT)
+/**
+ * wlan_hdd_cfg80211_setup_link_reconfig() - API to get add or
+ * delete link data from upper layer.
+ * @wiphy: wiphy struct
+ * @dev: net device
+ * @params: add or delete link reconfig params
+ *
+ * This API fetch add or delete link params based on link id mask
+ * and invokes target if API to send add delete link info.
+ *
+ * Return: status, 0 in case of success else negative value.
+ */
+static int
+wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
+				      struct net_device *dev,
+				      struct setup_link_reconfig_params *params)
+{
+	struct mlo_link_recfg_user_req_params *req_param = {0};
+	struct wlan_lmac_if_mlo_rx_ops *mlo_rx_ops;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t link_id, i = 0;
+	int ret;
+
+	hdd_enter();
+
+	if (hdd_validate_adapter(adapter))
+		return -EINVAL;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Vdev is null return");
+		return -ENOTCONN;
+	}
+
+	if (!wlan_cm_is_vdev_connected(vdev)) {
+		hdd_debug("Not associated!, vdev %d", wlan_vdev_get_id(vdev));
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		ret = -ENOTCONN;
+	}
+
+	if (!mlo_is_link_recfg_supported(vdev)) {
+		hdd_debug("link reconfig not supported");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EOPNOTSUPP;
+	}
+
+	if (mlo_is_link_recfg_in_progress(vdev)) {
+		hdd_debug("link reconfig already in progress");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EALREADY;
+	}
+
+	req_param = &vdev->mlo_dev_ctx->link_rcfg_req;
+	qdf_mem_set(req_param, sizeof(req_param), 0);
+	req_param->vdev_id = adapter->deflink->vdev_id;
+
+	for (link_id = 0; link_id < IEEE80211_MLD_MAX_NUM_LINKS; link_id++) {
+		if (!(params->add_valid_links & BIT(link_id)))
+			continue;
+
+		qdf_mem_copy(&req_param->add_link[i].link_addr,
+			     &params->add_link_bssid[link_id],
+			     QDF_MAC_ADDR_SIZE);
+
+		wlan_scan_get_mld_addr_by_link_addr(
+					wlan_vdev_get_pdev(vdev),
+					(struct qdf_mac_addr *)
+					&req_param->add_link[i].link_addr,
+					(struct qdf_mac_addr *)
+					&req_param->mld_addr);
+
+		req_param->add_link[i].link_id = link_id;
+
+		/* ToDo: Add vdev_id for no common link*/
+
+		hdd_debug("add[%d] link with param link_id: %d link_addr: " QDF_MAC_ADDR_FMT "mld addr: " QDF_MAC_ADDR_FMT,
+			  i, link_id,
+			  QDF_MAC_ADDR_REF(&req_param->del_link[i].link_addr),
+			  QDF_MAC_ADDR_REF(&req_param->mld_addr));
+		i++;
+	}
+	req_param->num_link_add_param = i;
+
+	/* Reset value for delete link array */
+	i = 0;
+
+	for (link_id = 0; link_id < IEEE80211_MLD_MAX_NUM_LINKS; link_id++) {
+		if (!(params->delete_valid_links & BIT(link_id)))
+			continue;
+
+		/* To fetch peer mac address from link info stored in host */
+		link_info = hdd_get_link_info_by_ieee_link_id(adapter,
+							      link_id, false);
+		if (!link_info) {
+			hdd_err("Incorrect link info");
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+			return -EINVAL;
+		}
+
+		qdf_mem_copy(&req_param->del_link[i].link_addr,
+			     (void *)&link_info->mlo_peer_info.peer_mac,
+			     QDF_MAC_ADDR_SIZE);
+
+		wlan_scan_get_mld_addr_by_link_addr(
+					wlan_vdev_get_pdev(vdev),
+					(struct qdf_mac_addr *)
+					&req_param->del_link[i].link_addr,
+					(struct qdf_mac_addr *)
+					&req_param->mld_addr);
+
+		req_param->del_link[i].link_id = link_id;
+
+		hdd_debug("del[%d] link with param link_id: %d link_addr " QDF_MAC_ADDR_FMT "mld addr " QDF_MAC_ADDR_FMT,
+			  i, link_id,
+			  QDF_MAC_ADDR_REF(&req_param->add_link[i].link_addr),
+			  QDF_MAC_ADDR_REF(&req_param->mld_addr));
+		i++;
+	}
+
+	req_param->num_link_del_param = i;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("null psoc");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mlo_rx_ops = &psoc->soc_cb.rx_ops->mlo_rx_ops;
+	if (!mlo_rx_ops) {
+		hdd_err("tx_ops is null!");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!mlo_rx_ops || !mlo_rx_ops->mlo_mgr_link_recfg_req_cmd_handler) {
+		hdd_err("mlo_tx_ops is null");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mlo_rx_ops->mlo_mgr_link_recfg_req_cmd_handler(wlan_vdev_get_psoc(vdev),
+						       req_param);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 1))
 static void __wlan_hdd_cfg80211_update_mgmt_frame_registrations(
 						struct wiphy *wiphy,
@@ -33810,5 +34112,10 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 1))
 	.update_mgmt_frame_registrations =
 			wlan_hdd_cfg80211_update_mgmt_frame_registrations,
+#endif
+#if defined(WLAN_FEATURE_11BE_MLO) && \
+defined(CFG80211_SETUP_LINK_RECONFIG_SUPPORT)
+	.setup_link_reconfig =
+		wlan_hdd_cfg80211_setup_link_reconfig,
 #endif
 };

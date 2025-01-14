@@ -109,11 +109,27 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (mlo_is_mld_disconnecting_connecting(vdev) ||
-	    cm_is_vdev_connecting(vdev) ||
-	    cm_is_vdev_disconnecting(vdev) ||
+	if (cm_is_vdev_disconnecting(vdev) ||
+	    mlo_is_any_link_disconnecting(vdev)) {
+		/*
+		 * If the VDEV is disconnecting, then:
+		 * - If the disconnect SER is active, then RSO STOP would have
+		 *   already been sent from disconnect context.
+		 * - If the ROAM SER is active, then disconnect context would
+		 *   send the RSO STOP once activated.
+		 *
+		 * Therefore, do not send RSO STOP from roam context and let
+		 * the disconnect context handle the cleanup gracefully.
+		 */
+		mlme_err("Roam sync for vdev %d is not handled, since vdev is disconnecting",
+			 vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (mlo_is_mld_connecting(vdev) || cm_is_vdev_connecting(vdev) ||
 	    cm_is_peer_preset_on_other_sta(psoc, vdev, vdev_id, event)) {
-		mlme_err("vdev %d Roam sync not handled in connecting/disconnecting state",
+		mlme_err("vdev %d Roam sync not handled in connecting state",
 			 vdev_id);
 		wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
 					  vdev_id,
@@ -1153,8 +1169,8 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct wlan_cm_connect_resp *connect_rsp;
 	bool eht_capab = false;
 	struct pe_session *session;
-	struct mac_context *mac_ctx =
-			cds_get_context(QDF_MODULE_ID_PE);
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	uint8_t rso_stop_req_bitmap;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
@@ -1251,6 +1267,15 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			cm_roam_start_init_on_connect(pdev, vdev_id);
 		}
 		wlan_cm_tgt_send_roam_sync_complete_cmd(psoc, vdev_id);
+
+		rso_stop_req_bitmap =
+			mlme_get_rso_pending_disable_req_bitmap(psoc, vdev_id);
+		if (rso_stop_req_bitmap) {
+			mlme_clear_rso_pending_disable_req_bitmap(psoc,
+								  vdev_id);
+			wlan_cm_disable_rso(pdev, vdev_id, rso_stop_req_bitmap,
+					    REASON_DRIVER_DISABLED);
+		}
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 		mlo_set_single_link_ml_roaming(psoc, vdev_id,
 					       false);
@@ -1292,7 +1317,6 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
-	policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(psoc);
 
 	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
 	if (eht_capab) {

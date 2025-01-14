@@ -128,6 +128,8 @@ struct nan_cfg_params {
 	uint32_t nan_feature_config;
 };
 
+#define MAX_NDP_PEERS 8
+
 /**
  * struct nan_psoc_priv_obj - nan private psoc obj
  * @lock: lock to be acquired before reading or writing to object
@@ -148,6 +150,8 @@ struct nan_cfg_params {
  * @nan_pairing_delete_ctx: NAN Pairing delete context
  * @nan_delete_all_peer_ctx: Delete all peer context
  * @fw_nan_addr: NAN MAC address which is randomized by target
+ * @ndp_peer_mac_addr: array of NDP peer MAC address
+ * @num_ndp_peers: Num of existing NDP peers
  */
 struct nan_psoc_priv_obj {
 	qdf_spinlock_t lock;
@@ -167,6 +171,8 @@ struct nan_psoc_priv_obj {
 	void *nan_pairing_delete_ctx;
 	void *nan_delete_all_peer_ctx;
 	struct qdf_mac_addr fw_nan_addr;
+	struct qdf_mac_addr ndp_peer_mac_addr[MAX_NDP_PEERS];
+	uint8_t num_ndp_peers;
 };
 
 #define MAX_NAN_MIGRATED_PEERS 5
@@ -465,5 +471,46 @@ ndi_add_pasn_peer_to_nan(struct wlan_objmgr_psoc *psoc,
  * Return: NAN MAC address
  */
 struct qdf_mac_addr *nan_get_fw_addr(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * nan_cache_ndp_peer_mac_addr() - cached NDP peer MAC address in NAN PSOC
+ * private object
+ * @psoc: pointer to PSOC object
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: QDF status
+ */
+QDF_STATUS nan_cache_ndp_peer_mac_addr(struct wlan_objmgr_psoc *psoc,
+				       struct qdf_mac_addr *peer_mac_addr);
+
+/**
+ * nan_remove_ndp_peer_mac_addr() - remove NDP peer address from the NAN PSOC
+ * private object.
+ * @psoc: pointer to PSOC object
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: QDF status
+ */
+QDF_STATUS nan_remove_ndp_peer_mac_addr(struct wlan_objmgr_psoc *psoc,
+					struct qdf_mac_addr *peer_mac_addr);
+
+/**
+ * nan_clean_up_all_ndp_peers() - This API will delete all NDP peers.
+ *
+ * @psoc: pointer to PSOC object
+ * @vdev_id: VDEV ID
+ *
+ * Return: QDF status
+ */
+void nan_clean_up_all_ndp_peers(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * nan_is_allowed() - This API will check for NAN enable INI
+ *
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if NAN is allowed otherwise false
+ */
+bool nan_is_allowed(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

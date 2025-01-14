@@ -82,7 +82,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_cp_stats_mc_defs.h"
 
-
+#include "wlan_pmo_wow.h"
 /**
  * WMA_SET_VDEV_IE_SOURCE_HOST - Flag to identify the source of VDEV SET IE
  * command. The value is 0x0 for the VDEV SET IE WMI commands from mobile
@@ -3027,6 +3027,24 @@ wma_wake_reason_ap_assoc_lost(t_wma_handle *wma, void *event, uint32_t len)
 	return 0;
 }
 
+static const char *wma_suspend_type_str(t_wma_handle *wma)
+{
+	enum qdf_suspend_type suspend_type =
+		pmo_get_wow_suspend_type(wma->psoc);
+
+	switch (suspend_type) {
+	case QDF_SYSTEM_SUSPEND:
+		return "System Suspend";
+	case QDF_RUNTIME_SUSPEND:
+		return "RTPM Suspend";
+	case QDF_UNIT_TEST_WOW_SUSPEND:
+		return "Unit Test Suspend";
+	case QDF_WOW_UNSUPPORTED_TYPE:
+	default:
+		return "unknown";
+	}
+}
+
 static const char *wma_vdev_type_str(uint32_t vdev_type)
 {
 	switch (vdev_type) {
@@ -3364,16 +3382,18 @@ static void wma_wake_event_log_reason(t_wma_handle *wma,
 	/* "Unspecified" means APPS triggered wake, else firmware triggered */
 	if (wake_info->wake_reason != WOW_REASON_UNSPECIFIED) {
 		vdev = &wma->interfaces[wake_info->vdev_id];
-		wma_nofl_info("WLAN triggered wakeup: %s (%d), vdev: %d (%s)",
+		wma_nofl_info("WLAN triggered wakeup: %s (%d), vdev: %d (%s) : (%s)",
 			      wma_wow_wake_reason_str(wake_info->wake_reason),
 			      wake_info->wake_reason,
 			      wake_info->vdev_id,
-			      wma_vdev_type_str(vdev->type));
+			      wma_vdev_type_str(vdev->type),
+			      wma_suspend_type_str(wma));
 		wma_debug_assert_page_fault_wakeup(wake_info->wake_reason);
 	} else if (!wmi_get_runtime_pm_inprogress(wma->wmi_handle)) {
-		wma_nofl_info("Non-WLAN triggered wakeup: %s (%d)",
+		wma_nofl_info("Non-WLAN triggered wakeup: %s (%d) (%s)",
 			      wma_wow_wake_reason_str(wake_info->wake_reason),
-			      wake_info->wake_reason);
+			      wake_info->wake_reason,
+			      wma_suspend_type_str(wma));
 	}
 
 	qdf_wow_wakeup_host_event(wake_info->wake_reason);
@@ -3847,6 +3867,8 @@ int wma_wow_wakeup_host_event(void *handle, uint8_t *event, uint32_t len)
 	wma_print_wow_stats(wma, wake_info);
 	wma_acquire_wow_wakelock(wma, wake_info->wake_reason);
 
+	/* Reset the Suspend Type here */
+	pmo_set_wow_suspend_type(wma->psoc, QDF_WOW_UNSUPPORTED_TYPE);
 	return errno;
 }
 

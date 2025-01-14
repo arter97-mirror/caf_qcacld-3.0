@@ -199,12 +199,18 @@ struct mld_capab_and_op {
  * struct ext_mld_capab_and_op - EXT MLD capability and operations info
  * @op_parameter_update_support: operation parameter update support
  * @rec_max_simultaneous_links: recommended max simultaneous links
+ * @nstr_status_update_support: NSTR status update support
+ * @emlsr_enablement_on_one_link_support: EMLSR enablement on one link support
+ * @btm_mld_rec_for_multi_ap_supp: BTM MLD recommendation multi AP support
  * @reserved: reserved
  */
 struct ext_mld_capab_and_op {
 	uint16_t op_parameter_update_support:1;
-	uint16_t rec_max_simultaneous_links:3;
-	uint16_t reserved:11;
+	uint16_t rec_max_simultaneous_links:4;
+	uint16_t nstr_status_update_support:1;
+	uint16_t emlsr_enablement_on_one_link_support:1;
+	uint16_t btm_mld_rec_for_multi_ap_supp:1;
+	uint16_t reserved:8;
 };
 
 /**
@@ -219,6 +225,7 @@ struct ext_mld_capab_and_op {
  * @mld_id_present: the present flag of MLD ID
  * @ext_mld_capab_and_op_present: Extended MLD Capabilities And
  *                                Operations Present
+ * @mld_mac_address_present: MLD MAC address Present
  * @reserved_1: reserved
  * @common_info_length: common info length
  * @mld_mac_addr: MLD mac address
@@ -245,7 +252,8 @@ struct wlan_mlo_ie {
 	uint16_t mld_capab_and_op_present: 1;
 	uint16_t mld_id_present: 1;
 	uint16_t ext_mld_capab_and_op_present: 1;
-	uint16_t reserved_1:5;
+	uint16_t mld_mac_address_present: 1;
+	uint16_t reserved_1:4;
 	uint8_t common_info_length;
 	uint8_t mld_mac_addr[6];
 	uint8_t link_id;

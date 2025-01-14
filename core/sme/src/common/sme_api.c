@@ -10989,8 +10989,7 @@ int sme_update_tx_bfee_nsts(mac_handle_t mac_handle, uint8_t session_id,
 
 #ifdef WLAN_FEATURE_11BE
 void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
-			    struct wma_tgt_cfg *cfg,
-			    tDot11fIEeht_cap *eht_cap_ini)
+			    struct wma_tgt_cfg *cfg)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
@@ -17464,3 +17463,14 @@ void sme_deregister_disconnect_cb(mac_handle_t mac_handle)
 
 	SME_EXIT();
 }
+
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
+			    uint8_t *peer_addr,
+			    uint8_t *mld_addr)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	return cm_get_pre_auth_mld_addr(mac, peer_addr, mld_addr);
+}
+#endif

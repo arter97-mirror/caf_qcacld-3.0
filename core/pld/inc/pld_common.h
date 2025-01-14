@@ -1239,6 +1239,16 @@ bool pld_audio_is_direct_link_supported(struct device *dev);
 bool pld_is_audio_shared_iommu_group(struct device *dev);
 
 /**
+ * pld_get_direct_link_sid() - get direct link use case SID value
+ * @dev: device
+ * @sid: SID value to get
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_get_direct_link_sid(struct device *dev, uint16_t *sid);
+
+/**
  * pld_is_ipa_shared_smmu_enable() - Get whether shared ctx bank is supported
  *				     by IPA or not
  * @dev: device
@@ -1488,7 +1498,8 @@ void *pld_smmu_get_mapping(struct device *dev);
 int pld_smmu_map(struct device *dev, phys_addr_t paddr,
 		 uint32_t *iova_addr, size_t size);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)) || \
+	defined(CNSS_PLAT_WIFI_KOBJ_SUPPORT))
 struct kobject *pld_get_wifi_kobj(struct device *dev);
 #else
 static inline struct kobject *pld_get_wifi_kobj(struct device *dev)

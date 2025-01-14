@@ -922,6 +922,24 @@ bool pld_audio_is_direct_link_supported(struct device *dev)
 	return ret;
 }
 
+int pld_get_direct_link_sid(struct device *dev, uint16_t *sid)
+{
+	int ret = -EINVAL;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_get_direct_link_sid(dev, sid);
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_get_direct_link_sid(dev, sid);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
 bool pld_is_audio_shared_iommu_group(struct device *dev)
 {
 	bool ret = false;
@@ -1690,7 +1708,8 @@ void *pld_smmu_get_mapping(struct device *dev)
 }
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)) || \
+	defined(CNSS_PLAT_WIFI_KOBJ_SUPPORT))
 struct kobject *pld_get_wifi_kobj(struct device *dev)
 {
 	struct kobject *wifi_kobj = NULL;

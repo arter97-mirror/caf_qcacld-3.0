@@ -1625,7 +1625,7 @@ hdd_cm_mlme_send_standby_link_chn_width(struct hdd_adapter *adapter,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ch_width = sta_ctx->user_cfg_chn_width;
 
-	wlan_mlme_get_sta_ch_width(vdev, &connection_ch_width);
+	wlan_mlme_get_sta_ch_width(vdev, &connection_ch_width, NULL);
 
 	if (ch_width == CH_WIDTH_INVALID) {
 		hdd_debug("no cached bandwidth for the link %u", link_id);

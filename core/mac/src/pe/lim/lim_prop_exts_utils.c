@@ -600,11 +600,12 @@ void lim_update_ch_width_for_p2p_client(struct mac_context *mac,
 		 session->ch_center_freq_seg0, session->ch_center_freq_seg1);
 }
 
-void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
-			       uint16_t ie_len, uint8_t *qos_cap,
-			       uint8_t *uapsd, int8_t *local_constraint,
-			       struct pe_session *session,
-			       bool *is_pwr_constraint)
+QDF_STATUS
+lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
+			  uint16_t ie_len, uint8_t *qos_cap,
+			  uint8_t *uapsd, int8_t *local_constraint,
+			  struct pe_session *session,
+			  bool *is_pwr_constraint)
 {
 	tSirProbeRespBeacon *beacon_struct;
 	uint8_t ap_bcon_ch_width;
@@ -623,7 +624,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 
 	beacon_struct = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
 	if (!beacon_struct)
-		return;
+		return QDF_STATUS_E_NOMEM;
 
 	*qos_cap = 0;
 	*uapsd = 0;
@@ -635,7 +636,7 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("sir_parse_beacon_ie failed to parse beacon");
 		qdf_mem_free(beacon_struct);
-		return;
+		return status;
 	}
 
 	mlme_vht_cap = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
@@ -888,7 +889,8 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	session->is_adaptive_11r_connection =
 			lim_extract_adaptive_11r_cap(p_ie, ie_len);
 	qdf_mem_free(beacon_struct);
-	return;
+
+	return QDF_STATUS_SUCCESS;
 } /****** end lim_extract_ap_capability() ******/
 
 /**

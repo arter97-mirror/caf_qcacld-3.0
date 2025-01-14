@@ -33,9 +33,10 @@ wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 QDF_STATUS
-wlan_twt_cfg_get_support_in_11n(struct wlan_objmgr_psoc *psoc, bool *val)
+wlan_twt_cfg_get_req_support_for_ht_vht(struct wlan_objmgr_psoc *psoc,
+					bool *val)
 {
-	return wlan_twt_cfg_get_support_in_11n_mode(psoc, val);
+	return wlan_twt_get_requestor_support_for_ht_vht_mode(psoc, val);
 }
 
 QDF_STATUS

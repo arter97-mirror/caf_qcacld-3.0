@@ -184,8 +184,8 @@ QDF_STATUS ttlm_valid_n_copy_for_rx_req(struct wlan_objmgr_vdev *vdev,
 	 * negotiation action request link id
 	 */
 	valid_map = t2lm_is_valid_t2lm_link_map(vdev, t2lm_req, &dir);
-	if (!valid_map) {
-		t2lm_err("reject t2lm conf");
+	if (!valid_map || dir >= WLAN_T2LM_MAX_DIRECTION) {
+		t2lm_err("reject t2lm conf, dir %d", dir);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -318,7 +318,7 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					     struct wlan_mlo_peer_context *ml_peer,
 					     struct wlan_t2lm_onging_negotiation_info *t2lm_rsp)
 {
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_t2lm_onging_negotiation_info *t2lm_req;
 	uint8_t dir;
 	struct wlan_t2lm_info *t2lm_info = NULL;
@@ -361,6 +361,8 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 	uint8_t dir;
 	struct wlan_t2lm_info *t2lm_info, *t2lm_nego;
 	struct wlan_objmgr_peer *peer = NULL;
+	uint16_t t2lm_ieee_link_map;
+	struct wlan_objmgr_psoc *psoc;
 
 	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLO_MGR_ID);
 	if (!peer)
@@ -373,6 +375,12 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		t2lm_err("psoc null");
+		return;
+	}
+
 	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
 		t2lm_info = &t2lm_req->t2lm_info[dir];
 		if (t2lm_info &&
@@ -380,6 +388,13 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 			if (t2lm_rsp->dialog_token == t2lm_req->dialog_token &&
 			    t2lm_rsp->t2lm_resp_type == WLAN_T2LM_RESP_TYPE_SUCCESS) {
 				wlan_t2lm_clear_peer_negotiation(peer);
+
+				t2lm_ieee_link_map =
+					t2lm_info->ieee_link_map_tid[0];
+				ml_nlink_t2lm_link_request(
+						psoc,
+						wlan_vdev_get_id(vdev),
+						t2lm_ieee_link_map);
 
 				/* Apply T2LM config to peer T2LM ctx */
 				t2lm_nego = &ml_peer->t2lm_policy.t2lm_negotiated_info.t2lm_info[dir];

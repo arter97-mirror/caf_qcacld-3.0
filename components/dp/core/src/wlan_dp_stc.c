@@ -2021,10 +2021,14 @@ wlan_dp_stc_print_classified_table_compact(struct wlan_dp_psoc_context *dp_ctx)
 void wlan_dp_stc_print_classified_table(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
-	struct wlan_dp_stc_classified_flow_table *c_table =
-						dp_stc->classified_flow_table;
+	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
 	uint16_t c_id;
+
+	if (!dp_stc)
+		return;
+
+	c_table = dp_stc->classified_flow_table;
 
 	for (c_id = 0; c_id < DP_STC_CLASSIFIED_TABLE_FLOW_MAX; c_id++) {
 		uint32_t state;
@@ -2075,13 +2079,14 @@ wlan_dp_stc_print_s_entry(struct wlan_dp_stc *dp_stc,
 void wlan_dp_stc_print_sampling_table(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
-	struct wlan_dp_stc_sampling_table *s_table =
-						dp_stc->sampling_flow_table;
+	struct wlan_dp_stc_sampling_table *s_table;
 	struct wlan_dp_stc_sampling_table_entry *s_entry;
 	int i;
 
 	if (!dp_stc)
 		return;
+
+	s_table = dp_stc->sampling_flow_table;
 
 	for (i = 0; i < DP_STC_SAMPLE_FLOWS_MAX; i++) {
 		s_entry = &s_table->entries[i];
@@ -2215,13 +2220,14 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
 		dp_info("STC: feature not enabled via cfg");
-		return QDF_STATUS_SUCCESS;
+		dp_ctx->dp_stc = NULL;
+		return QDF_STATUS_E_NOSUPPORT;
 	}
 
 	if (!wlan_dp_stc_clients_available(dp_ctx)) {
 		dp_info("STC: No clients available, skip attach");
 		dp_ctx->dp_stc = NULL;
-		return QDF_STATUS_SUCCESS;
+		return QDF_STATUS_E_NOSUPPORT;
 	}
 
 	dp_info("STC: attach");

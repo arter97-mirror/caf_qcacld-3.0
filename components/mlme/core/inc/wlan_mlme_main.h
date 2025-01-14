@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -202,7 +202,7 @@ struct sae_auth_retry {
  * @last_assoc_received_time: last assoc received time
  * @last_disassoc_deauth_received_time: last disassoc/deauth received time
  * @twt_ctx: TWT context
- * @allow_kickout: True if the peer can be kicked out. Peer can't be kicked
+ * @disallow_kickout: False if the peer can be kicked out. Peer can't be kicked
  *                 out if it is being steered
  * @nss: Peer NSS
  * @peer_set_key_wakelock: wakelock to protect peer set key op with firmware
@@ -222,7 +222,7 @@ struct peer_mlme_priv_obj {
 	struct twt_context twt_ctx;
 #endif
 #ifdef WLAN_FEATURE_SON
-	bool allow_kickout;
+	bool disallow_kickout;
 #endif
 	uint8_t nss;
 	qdf_wake_lock_t peer_set_key_wakelock;
@@ -248,12 +248,19 @@ enum vdev_assoc_type {
  * struct wlan_mlme_roam_state_info - Structure containing roaming
  * state related details
  * @state: Roaming module state.
- * @mlme_operations_bitmap: Bitmap containing what mlme operations are in
- *  progress where roaming should not be allowed.
+ * @rso_disabled_status_bitmap: Bitmap containing the mlme operations/concurrent
+ *  connections that requested for RSO_STOP as these are not supported when
+ *  roaming is enabled.
+ * @rso_pending_disable_req_bitmap: Bitmap containing the mlme
+ *  operations/concurrent connections that requested for RSO stop. Currently,
+ *  this is set only when RSO is not disabled immediately due to some
+ *  constraints (e.g. STA roaming is in progress) and needs to be disabled
+ *  once the constraints are resolved.
  */
 struct wlan_mlme_roam_state_info {
 	enum roam_offload_state state;
-	uint8_t mlme_operations_bitmap;
+	uint8_t rso_disabled_status_bitmap;
+	uint8_t rso_pending_disable_req_bitmap;
 };
 
 /**
@@ -412,13 +419,14 @@ struct ft_context {
 /**
  * struct assoc_channel_info - store channel info at the time of association
  * @assoc_ch_width: channel width at the time of initial connection
- * @omn_ie_ch_width: ch width present in operating mode notification IE of bcn
+ * @cur_ch_width: current channel width update in beacon eht/he/vht op and
+ *  ht info IE or omn ie
  * @sec_2g_freq: secondary 2 GHz freq
  * @cen320_freq: 320 MHz center freq
  */
 struct assoc_channel_info {
 	enum phy_ch_width assoc_ch_width;
-	enum phy_ch_width omn_ie_ch_width;
+	enum phy_ch_width cur_ch_width;
 	qdf_freq_t sec_2g_freq;
 	qdf_freq_t cen320_freq;
 };
@@ -1478,40 +1486,73 @@ void mlme_set_roam_state(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			 enum roam_offload_state val);
 
 /**
- * mlme_get_operations_bitmap() - Get the mlme operations bitmap which
- *  contains the bitmap of mlme operations which have disabled roaming
- *  temporarily
+ * mlme_get_rso_disabled_bitmap() - Get the RSO disabled bitmap
  * @psoc: PSOC pointer
- * @vdev_id: vdev for which the mlme operation bitmap is requested
+ * @vdev_id: vdev for which the RSO disabled bitmap is requested
  *
  * Return: bitmap value
  */
 uint8_t
-mlme_get_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+mlme_get_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 
 /**
- * mlme_set_operations_bitmap() - Set the mlme operations bitmap which
- *  indicates what mlme operations are in progress
+ * mlme_set_rso_disabled_bitmap() - Set the RSO disabled bitmap
  * @psoc: PSOC pointer
- * @vdev_id: vdev for which the mlme operation bitmap is requested
+ * @vdev_id: vdev for which the RSO disabled bitmap is requested
  * @reqs: RSO stop requestor
  * @clear: clear bit if true else set bit
  *
  * Return: None
  */
 void
-mlme_set_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			   enum wlan_cm_rso_control_requestor reqs, bool clear);
+mlme_set_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			     enum wlan_cm_rso_control_requestor reqs,
+			     bool clear);
 /**
- * mlme_clear_operations_bitmap() - Clear mlme operations bitmap which
- *  indicates what mlme operations are in progress
+ * mlme_clear_rso_disabled_bitmap() - Clear RSO disabled bitmap
  * @psoc: PSOC pointer
- * @vdev_id: vdev for which the mlme operation bitmap is requested
+ * @vdev_id: vdev for which the RSO disabled bitmap is requested
  *
  * Return: None
  */
 void
-mlme_clear_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+mlme_clear_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * mlme_get_rso_pending_disable_req_bitmap() - Get the RSO disable req bitmap
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev for which the RSO disable request bitmap is requested
+ *
+ * Return: bitmap value
+ */
+uint8_t
+mlme_get_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
+
+/**
+ * mlme_set_rso_pending_disable_req_bitmap() - Set the RSO disable req bitmap
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev for which the RSO disable request bitmap is requested
+ * @reqs: RSO stop requestor
+ * @clear: clear bit if true else set bit
+ *
+ * Return: None
+ */
+void
+mlme_set_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					enum wlan_cm_rso_control_requestor reqs,
+					bool clear);
+/**
+ * mlme_clear_rso_pending_disable_req_bitmap() - Clear RSO disable req bitmap
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev for which the RSO disable req bitmap is requested
+ *
+ * Return: None
+ */
+void
+mlme_clear_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id);
 
 /**
  * mlme_get_cfg_wlm_level() - Get the WLM level value
@@ -2117,4 +2158,13 @@ wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	return 0xFF;
 }
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+/**
+ * wlan_is_scc_tpc_power_supp_enabled() - Is FW SCC TPC support enabled
+ * @vdev: VDEV pointer
+ *
+ * Return: true if SCC TPC is supported else false
+ */
+bool
+wlan_is_scc_tpc_power_supp_enabled(struct wlan_objmgr_vdev *vdev);
 #endif

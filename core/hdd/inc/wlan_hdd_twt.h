@@ -383,6 +383,17 @@ QDF_STATUS hdd_get_twt_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
 QDF_STATUS hdd_get_twt_responder(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
+ * hdd_get_twt_responder_support_for_ht_vht_mode() - Get twt_responder support
+ * for ht/vht mode
+ * @psoc: global psoc object
+ * @val: output variable to store the value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_get_twt_responder_support_for_ht_vht_mode(
+				struct wlan_objmgr_psoc *psoc, bool *val);
+
+/**
  * wlan_hdd_resume_pmo_twt() - resume twt worker
  * @hdd_ctx: hdd context
  *
@@ -519,6 +530,14 @@ QDF_STATUS hdd_get_twt_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
 
 static inline
 QDF_STATUS hdd_get_twt_responder(struct wlan_objmgr_psoc *psoc, bool *val)
+{
+	*val = false;
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS hdd_get_twt_responder_support_for_ht_vht_mode(
+				struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	*val = false;
 	return QDF_STATUS_E_NOSUPPORT;

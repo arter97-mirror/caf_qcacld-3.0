@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -638,6 +638,20 @@ void lim_set_twt_ext_capabilities(struct mac_context *mac_ctx,
  */
 void lim_get_basic_rates(tSirMacRateSet *b_rates, uint32_t chan_freq);
 
+/**
+ * lim_disable_ht_he_dynamic_smps() - disable dynamic SMPS for STA/P2P client
+ *@session: pe session
+ *@chan_freq: channel frequency
+ *
+ * When connecting with a 2.4 GHz only STA or a P2P client, disable STA HT and
+ * HE dynamic SMPS capabilities.
+ *
+ * Return: None
+ */
+void
+lim_disable_ht_he_dynamic_smps(struct pe_session *session,
+			       qdf_freq_t chan_freq);
+
 #define FW_CTS2SELF_PROFILE 34
 
 /**
@@ -687,6 +701,17 @@ void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
 				enum phy_ch_width ch_width);
 
 /**
+ * lim_update_bcn_op_ch_width() - update beacon channel width in struct
+ * assoc_channel_info while processing bcn/probe resp
+ * @vdev: VDEV object manager
+ * @ch_width: ch_width present in beacon eht/he/vht op IE and ht info IE
+ *
+ * Return: none
+ */
+void lim_update_bcn_op_ch_width(struct wlan_objmgr_vdev *vdev,
+				enum phy_ch_width ch_width);
+
+/**
  * lim_is_he_dynamic_smps_enabled() - Check if Dynamic SMPS enabled in HE caps
  * @session: PE session
  *
@@ -708,6 +733,7 @@ bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
  * @pdev: PDEV object manager
  * @bcn_probe: Pointer to bcn/probe
  * @len: Length of frame.
+ * @is_gen_entry: is locally generated scan entry
  * @freq: Freq on frame.
  * @rssi: RSSI of the frame.
  * @snr: SNR of frame
@@ -720,8 +746,8 @@ bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
  */
 QDF_STATUS
 lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
-		  uint32_t len, qdf_freq_t freq, int32_t rssi,
-		  uint8_t snr, uint32_t tsf_delta);
+		  uint32_t len, bool is_gen_entry, qdf_freq_t freq,
+		  int32_t rssi, uint8_t snr, uint32_t tsf_delta);
 
 /**
  * lim_update_mlo_mgr_info() - API to update mlo_mgr link info
@@ -787,8 +813,8 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 #else
 static inline QDF_STATUS
 lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
-		  uint32_t len, qdf_freq_t freq, int32_t rssi,
-		  uint8_t snr, uint32_t tsf_delta)
+		  uint32_t len, bool is_gen_entry, qdf_freq_t freq,
+		  int32_t rssi, uint8_t snr, uint32_t tsf_delta)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

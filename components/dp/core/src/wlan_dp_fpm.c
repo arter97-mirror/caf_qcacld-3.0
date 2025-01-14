@@ -74,10 +74,14 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 		if (qdf_nbuf_data_is_ipv6_pkt(skb->data) ||
 		    qdf_nbuf_data_is_dns_query(skb) ||
 		    qdf_nbuf_data_is_dns_response(skb) ||
-		    qdf_nbuf_data_is_ipv4_dhcp_pkt(skb->data)) {
+		    qdf_nbuf_data_is_ipv4_dhcp_pkt(skb->data) ||
+		    !qdf_nbuf_is_ipv4_first_fragment(skb)) {
 			skb->mark = FLOW_INVALID_METADATA;
 			return QDF_STATUS_E_INVAL;
 		}
+
+		if (!wlan_dp_spm_flow_screening(dp_intf, skb))
+			return QDF_STATUS_SUCCESS;
 
 		dp_fim_parse_skb_flow_info(skb, &flow);
 		if (qdf_unlikely(!flow.flags ||

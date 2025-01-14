@@ -111,6 +111,7 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint8_t num_filters;
 	bool invalid_ptrn = false;
+	bool ptrn_exist = false;
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t vdev_id;
 
@@ -143,6 +144,7 @@ bool hdd_add_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 
 			if (strlen(g_hdd_wowl_ptrns[vdev_id][i]) == len) {
 				if (!memcmp(ptrn, g_hdd_wowl_ptrns[vdev_id][i], len)) {
+					ptrn_exist = true;
 					hdd_err("WoWL pattern '%s' already configured for vdev %d",
 						g_hdd_wowl_ptrns[vdev_id][i], vdev_id);
 					ptrn += len;
@@ -262,7 +264,7 @@ next_ptrn:
 		}
 	}
 
-	if (invalid_ptrn)
+	if (invalid_ptrn || ptrn_exist)
 		return false;
 
 	return true;

@@ -854,7 +854,6 @@ tdls_send_mgmt_serialize_callback(struct wlan_serialization_command *cmd,
 QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
 {
 	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *mlo_tdls_vdev;
 	bool is_mlo_vdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct ml_nlink_change_event data;
@@ -874,15 +873,16 @@ QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
 
 	if (req->tdls_mgmt.frame_type == TDLS_DISCOVERY_RESPONSE ||
 	    req->tdls_mgmt.frame_type == TDLS_DISCOVERY_REQUEST) {
-		mlo_tdls_vdev = wlan_mlo_get_tdls_link_vdev(req->vdev);
-		if (mlo_tdls_vdev)
-			return status;
-
 		status = policy_mgr_is_ml_links_in_mcc_allowed(
 						psoc, req->vdev,
 						ml_sta_vdev_lst,
 						&num_ml_sta);
-		if (QDF_IS_STATUS_SUCCESS(status)) {
+		/*
+		 * For non-dbs single mac hardware TDLS is enabled only on the
+		 * active link. So not required to validate if links are in MCC
+		 */
+		if (policy_mgr_is_hw_dbs_capable(psoc) &&
+		    QDF_IS_STATUS_SUCCESS(status)) {
 			tdls_err("ML STA Links in MCC, so don't send the TDLS frames");
 			return QDF_STATUS_E_FAILURE;
 		}

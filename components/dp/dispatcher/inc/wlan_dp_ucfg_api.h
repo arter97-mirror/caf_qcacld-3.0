@@ -2145,5 +2145,12 @@ ucfg_dp_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
  */
 int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
 				uint32_t pri);
-
+/**
+ * ucfg_dp_set_ipv4_addr() - Set IPv4 address
+ * @vdev: vdev
+ * @ip_addr: IPv4 address
+ *
+ * Return: void
+ */
+void ucfg_dp_set_ipv4_addr(struct wlan_objmgr_vdev *vdev, uint8_t *ip_addr);
 #endif /* _WLAN_DP_UCFG_API_H_ */

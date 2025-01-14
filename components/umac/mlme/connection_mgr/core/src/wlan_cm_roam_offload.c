@@ -1621,11 +1621,12 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 	 * Don't consider STA_SAP_MCC weight_config if:
 	 * 1. HW is DBS chip
 	 * 2. vendor_roam_score_algorithm is not set
-	 * 3. mcc_to_cc_switch is not QDF_MCC_TO_SCC_WITH_PREFERRED_BAND
+	 * 3. mcc_to_cc_switch is not QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND
 	 */
 	if (!policy_mgr_is_hw_dbs_capable(psoc) &&
 	    !score_config->vendor_roam_score_algorithm &&
-	    mcc_to_scc_switch == QDF_MCC_TO_SCC_WITH_PREFERRED_BAND)
+	    mcc_to_scc_switch ==
+		QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND)
 		req_score_params->sta_sap_mcc_weightage =
 			weight_config->sta_sap_mcc_weightage;
 	else
@@ -3692,6 +3693,7 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 
+	mlme_clear_rso_pending_disable_req_bitmap(psoc, vdev_id);
 	cm_roam_set_roam_reason_better_ap(psoc, vdev_id, false);
 	stop_req = qdf_mem_malloc(sizeof(*stop_req));
 	if (!stop_req)
@@ -4358,7 +4360,7 @@ cm_roam_switch_to_deinit(struct wlan_objmgr_pdev *pdev,
 	}
 
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_DEINIT);
-	mlme_clear_operations_bitmap(psoc, vdev_id);
+	mlme_clear_rso_disabled_bitmap(psoc, vdev_id);
 	wlan_cm_roam_activate_pcl_per_vdev(psoc, vdev_id, false);
 
 	/* In case of roaming getting disabled due to
@@ -4592,7 +4594,7 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 	wlan_mlme_get_roam_scan_offload_enabled(psoc, &rso_allowed);
 	sup_disabled_roaming = mlme_get_supplicant_disabled_roaming(psoc,
 								    vdev_id);
-	control_bitmap = mlme_get_operations_bitmap(psoc, vdev_id);
+	control_bitmap = mlme_get_rso_disabled_bitmap(psoc, vdev_id);
 
 	cur_state = mlme_get_roam_state(psoc, vdev_id);
 	mlme_debug("CM_RSO: vdev%d: cur_state : %d reason:%d control_bmap:0x%x sup_disabled_roam:%d",
@@ -4960,7 +4962,7 @@ cm_record_state_change(struct wlan_objmgr_pdev *pdev,
 		return;
 
 	new_state = mlme_get_roam_state(psoc, vdev_id);
-	control_bitmap = mlme_get_operations_bitmap(psoc, vdev_id);
+	control_bitmap = mlme_get_rso_disabled_bitmap(psoc, vdev_id);
 	supp_dis_roam = mlme_get_supplicant_disabled_roaming(psoc, vdev_id);
 	roam_progress = wlan_cm_roaming_in_progress(pdev, vdev_id);
 	wlan_rec_conn_info(vdev_id, DEBUG_CONN_RSO,
@@ -6227,7 +6229,7 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 	bool roam_offload_enabled = cm_roam_offload_enabled(psoc);
 	struct rso_config *rso_cfg;
 
-	roam_control_bitmap = mlme_get_operations_bitmap(psoc, vdev_id);
+	roam_control_bitmap = mlme_get_rso_disabled_bitmap(psoc, vdev_id);
 	if (roam_offload_enabled && (roam_control_bitmap ||
 	    !MLME_IS_ROAM_INITIALIZED(psoc, vdev_id))) {
 		mlme_debug("ROAM: RSO Disabled internally: vdev[%d] bitmap[0x%x]",

@@ -254,6 +254,32 @@ void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter)
 	adapter->mlo_adapter_info.is_ml_adapter = true;
 }
 
+/**
+ * hdd_mlo_update_vdev_active_flag() - This API update the VDEV active flag in
+ * HDD link info structure.
+ * @vdev_id: VDEV ID
+ * @is_link_active: boolean flag to determine whether link is active or not
+ *
+ * Return: None
+ */
+static void hdd_mlo_update_vdev_active_flag(uint8_t vdev_id,
+					    bool is_link_active)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("link info is null for vdev:%d", vdev_id);
+		return;
+	}
+
+	link_info->is_mlo_vdev_active = is_link_active;
+}
+
 static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_mgr_osif_update_bss_info = hdd_cm_save_connected_links_info,
 	.mlo_mgr_osif_update_mac_addr = hdd_link_switch_vdev_mac_addr_update,
@@ -261,6 +287,7 @@ static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_mgr_osif_link_rej_update_mac_addr = hdd_link_rej_mac_addr_update,
 	.mlo_mgr_osif_link_switch_notification =
 					hdd_adapter_link_switch_notification,
+	.mlo_mgr_osif_update_link_state = hdd_mlo_update_vdev_active_flag,
 };
 
 QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)

@@ -569,8 +569,8 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_dump_current_concurrency(psoc);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE ||
-	    mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE)
+	if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE ||
+	    mode == PM_STA_MODE || mode == PM_P2P_CLIENT_MODE)
 		policy_mgr_update_dfs_master_dynamic_enabled(psoc,
 							     false,
 							     NULL);
@@ -3374,7 +3374,8 @@ policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(struct wlan_objmgr_psoc *psoc)
 
 	policy_mgr_get_mcc_scc_switch(psoc, &mcc_to_scc_switch);
 
-	if (mcc_to_scc_switch != QDF_MCC_TO_SCC_WITH_PREFERRED_BAND)
+	if (mcc_to_scc_switch !=
+		QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND)
 		return;
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
@@ -3558,27 +3559,29 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 		goto end;
 	}
 
-	/* For MLO STA 5 GHz + 6 GHz(no-psc chn) and  SAP 5+6 GHz(psc chn),
-	 * prefer switch 5 GHz SAP first, select it as vdev[0] to restart
-	 * first.
+	if (cc_count > MAX_NUMBER_OF_CONC_CONNECTIONS)
+		goto end;
+
+	/* For MLO STA 5 GHz + 6 GHz(no-psc chn) and SAP 5 GHz +
+	 * 6 GHz(psc chn), prefer switch 5 GHz SAP first, select
+	 * it as vdev[0] to restart first.
 	 */
 	policy_mgr_switch_sap_vdev_table_sequence(pm_ctx,
-						  &vdev_id[0],
-						  cc_count);
+			&vdev_id[0],
+			cc_count);
 
 	is_dbs = policy_mgr_is_hw_dbs_capable(pm_ctx->psoc);
 
-	if (cc_count <= MAX_NUMBER_OF_CONC_CONNECTIONS)
-		for (i = 0; i < cc_count; i++) {
-			status = pm_ctx->hdd_cbacks.
-				wlan_hdd_get_channel_for_sap_restart
-					(pm_ctx->psoc, vdev_id[i], &ch_freq);
-			if (QDF_IS_STATUS_SUCCESS(status)) {
-				policy_mgr_debug("SAP vdev id %d restarts, old ch freq :%d new ch freq: %d",
-						 vdev_id[i],
-						 op_ch_freq_list[i], ch_freq);
-			}
+	for (i = 0; i < cc_count; i++) {
+		status = pm_ctx->hdd_cbacks.
+			wlan_hdd_get_channel_for_sap_restart
+			(pm_ctx->psoc, vdev_id[i], &ch_freq);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			policy_mgr_debug("SAP vdev id %d restarts, old ch freq :%d new ch freq: %d",
+					vdev_id[i],
+					op_ch_freq_list[i], ch_freq);
 		}
+	}
 
 end:
 	pm_ctx->last_disconn_sta_freq = 0;
@@ -3835,12 +3838,12 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 		} else {
 			/**
 			 * MCC supported for non-DBS chip only for cc_mode as
-			 * QDF_MCC_TO_SCC_WITH_PREFERRED_BAND
+			 * QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND
 			 */
 			ch_freq = 0;
 			if (con_mode == PM_SAP_MODE) {
 				if (cc_mode !=
-					QDF_MCC_TO_SCC_WITH_PREFERRED_BAND) {
+					QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND) {
 					policymgr_nofl_debug("MCC situation in non-dbs hw STA freq %d SAP freq %d not supported",
 							     *con_ch_freq,
 							     sap_ch_freq);
@@ -4991,6 +4994,11 @@ policy_mgr_get_allowed_tdls_offchannel_freq(struct wlan_objmgr_psoc *psoc,
 		/*
 		 * Allow all the 5GHz/6GHz channels when STA is in SCC
 		 */
+		if (!policy_mgr_is_hw_dbs_capable(psoc)) {
+			policy_mgr_debug("Disable TDLS Off-Channel on non-DBS solution");
+			return false;
+		}
+
 		if (policy_mgr_current_concurrency_is_scc(psoc)) {
 			*ch_freq = 0;
 			return true;

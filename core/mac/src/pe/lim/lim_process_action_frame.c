@@ -62,6 +62,7 @@
 #include "wlan_ll_sap_api.h"
 #include "wlan_dcs_api.h"
 #include "wlan_tdls_api.h"
+#include "wlan_mlo_link_recfg.h"
 
 #define SA_QUERY_REQ_MIN_LEN \
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
@@ -2493,8 +2494,13 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					WLAN_EPCS_EV_ACTION_FRAME_RX_TEARDOWN,
 					(void *)body_ptr, frame_len);
 			break;
+		case EHT_LINK_RECONFIG_RESPONSE:
+			mlo_link_recfg_rx_rsp(session->vdev,
+					      WLAN_LINK_RECFG_SM_EV_RX_RSP,
+					      (void *)body_ptr, frame_len);
+			break;
 		default:
-			pe_err("Unhandled T2LM/EPCS action frame");
+			pe_err("Unhandled T2LM/EPCS/Link recfg rsp action frame");
 			break;
 		}
 		break;
