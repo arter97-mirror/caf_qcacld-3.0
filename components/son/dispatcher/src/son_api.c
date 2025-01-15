@@ -322,7 +322,7 @@ QDF_STATUS wlan_son_peer_set_kickout_allow(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	peer_priv->allow_kickout = kickout_allow;
+	peer_priv->disallow_kickout = !kickout_allow;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -359,7 +359,7 @@ bool wlan_son_peer_is_kickout_allow(struct wlan_objmgr_vdev *vdev,
 		wlan_objmgr_peer_release_ref(peer, WLAN_SON_ID);
 		return kickout_allow;
 	}
-	kickout_allow = peer_priv->allow_kickout;
+	kickout_allow = !peer_priv->disallow_kickout;
 	wlan_objmgr_peer_release_ref(peer, WLAN_SON_ID);
 
 	return kickout_allow;

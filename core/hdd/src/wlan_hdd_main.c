@@ -15614,6 +15614,70 @@ void wlan_hdd_auto_shutdown_enable(struct hdd_context *hdd_ctx, bool enable)
 }
 #endif
 
+#ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
+struct hdd_adapter *
+hdd_get_con_sap_adapter(struct hdd_adapter *this_sap_adapter,
+			bool check_start_bss)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(this_sap_adapter);
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_CON_SAP_ADAPTER;
+	struct hdd_adapter *match_adapter = NULL;
+	struct hdd_adapter *band_match_adapter = NULL;
+	uint32_t this_band, band;
+	struct sap_config *this_sap_config, *sap_config;
+	bool match = false;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if ((adapter->device_mode != QDF_SAP_MODE &&
+		     adapter->device_mode != QDF_P2P_GO_MODE) ||
+		    adapter == this_sap_adapter) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			continue;
+		}
+
+		match = false;
+		if (!check_start_bss)
+			match = true;
+
+		if (test_bit(SOFTAP_BSS_STARTED,
+			     &adapter->event_flags))
+			match = true;
+
+		if (!match) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			continue;
+		}
+		if (!match_adapter)
+			match_adapter = adapter;
+
+		if (this_sap_adapter->device_mode != QDF_SAP_MODE &&
+		    this_sap_adapter->device_mode != QDF_P2P_GO_MODE) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			continue;
+		}
+
+		this_sap_config =
+		  &this_sap_adapter->session.ap.sap_config;
+		sap_config = &adapter->session.ap.sap_config;
+		if (!this_sap_config->acs_cfg.acs_mode ||
+		    !sap_config->acs_cfg.acs_mode) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			continue;
+		}
+
+		this_band = this_sap_config->acs_cfg.band;
+		band = sap_config->acs_cfg.band;
+		if ((this_band == band) && !band_match_adapter)
+			band_match_adapter = adapter;
+
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	return band_match_adapter ? band_match_adapter : match_adapter;
+}
+#else
 struct hdd_adapter *
 hdd_get_con_sap_adapter(struct hdd_adapter *this_sap_adapter,
 			bool check_start_bss)
@@ -15655,6 +15719,7 @@ hdd_get_con_sap_adapter(struct hdd_adapter *this_sap_adapter,
 
 	return con_sap_adapter;
 }
+#endif
 
 static inline bool hdd_adapter_is_sta(struct hdd_adapter *adapter)
 {

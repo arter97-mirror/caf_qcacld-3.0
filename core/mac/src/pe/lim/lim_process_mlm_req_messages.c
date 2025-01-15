@@ -1519,12 +1519,14 @@ lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 		pe_err("pMlmDeauthReq is not NULL, freeing");
 		qdf_mem_free(mac_ctx->lim.limDisassocDeauthCnfReq.
 			     pMlmDeauthReq);
+		mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq = NULL;
 	}
-	mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq = mlm_deauth_req;
 
 	/* Send Deauthentication frame to peer entity */
 	if (mlm_deauth_req->reasonCode != REASON_DISASSOC_DUE_TO_INACTIVITY ||
 	    wlan_son_peer_is_kickout_allow(session->vdev, sta_ds->staAddr)) {
+		mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq =
+								mlm_deauth_req;
 		lim_send_deauth_mgmt_frame(mac_ctx, mlm_deauth_req->reasonCode,
 					   mlm_deauth_req->peer_macaddr.bytes,
 					   session, true);
