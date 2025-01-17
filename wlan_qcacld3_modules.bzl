@@ -2307,13 +2307,12 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
 
-    if target == "sun":
-        deps += select({
-            "//build/kernel/kleaf:socrepo_true": [
-                "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
-            ],
-            "//build/kernel/kleaf:socrepo_false": [],
-        })
+    deps += select({
+        "//build/kernel/kleaf:socrepo_true": [
+            "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
+        ],
+        "//build/kernel/kleaf:socrepo_false": [],
+    })
 
     kernel_build = select({
         "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
