@@ -6891,6 +6891,7 @@ policy_mgr_fill_ml_inactive_link_vdev_bitmap(
  * allow link state change.
  * @psoc: psoc object
  * @reason: set link state reason
+ * @param: set active link param
  *
  * If ml sta is not "connected" state, no need to do link state handling.
  * After disconnected, target will clear the force active/inactive state
@@ -6900,8 +6901,10 @@ policy_mgr_fill_ml_inactive_link_vdev_bitmap(
  * Return: QDF_STATUS_SUCCESS if link state is allowed to change
  */
 static QDF_STATUS
-policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
-					    enum mlo_link_force_reason reason)
+policy_mgr_handle_ml_sta_link_state_allowed(
+				struct wlan_objmgr_psoc *psoc,
+				enum mlo_link_force_reason reason,
+				struct mlo_link_set_active_param *param)
 {
 	uint8_t num_ml_sta = 0, num_disabled_ml_sta = 0, num_non_ml = 0;
 	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
@@ -6910,6 +6913,8 @@ policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	bool ml_sta_is_not_connected = false;
 	bool ml_sta_is_link_removal = false;
+	uint8_t ml_removal_link_id = WLAN_INVALID_LINK_ID;
+	uint32_t force_active_bitmap = 0;
 	uint8_t i;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -6919,6 +6924,12 @@ policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if (param && param->use_ieee_link_id) {
+		if (param->force_mode == MLO_LINK_FORCE_MODE_ACTIVE ||
+		    param->force_mode == MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE)
+			force_active_bitmap =
+				param->force_cmd.ieee_link_id_bitmap;
+	}
 	policy_mgr_get_ml_sta_info(pm_ctx, &num_ml_sta, &num_disabled_ml_sta,
 				   ml_sta_vdev_lst, ml_freq_lst, &num_non_ml,
 				   NULL, NULL);
@@ -6943,8 +6954,10 @@ policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
 		}
 		if (wlan_get_vdev_link_removed_flag_by_vdev_id(
 						psoc, ml_sta_vdev_lst[i])) {
-			policy_mgr_debug("ml sta vdev %d link removed",
-					 ml_sta_vdev_lst[i]);
+			ml_removal_link_id = wlan_vdev_get_link_id(vdev);
+			policy_mgr_debug("ml sta vdev %d link id %d removed",
+					 ml_sta_vdev_lst[i],
+					 ml_removal_link_id);
 			ml_sta_is_link_removal = true;
 		}
 
@@ -6955,8 +6968,18 @@ policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
 		status = QDF_STATUS_E_FAILURE;
 	} else if (reason != MLO_LINK_FORCE_REASON_LINK_REMOVAL &&
 		   reason != MLO_LINK_FORCE_REASON_LINK_DELETE) {
-		if (ml_sta_is_link_removal)
+		/* removed link can't be active */
+		if (param && param->use_ieee_link_id &&
+		    ml_sta_is_link_removal) {
+			if (ml_removal_link_id != WLAN_INVALID_LINK_ID &&
+			    force_active_bitmap & (1 << ml_removal_link_id)) {
+				status = QDF_STATUS_E_FAILURE;
+				policy_mgr_debug("don't active rm link");
+			}
+		} else if (ml_sta_is_link_removal) {
 			status = QDF_STATUS_E_FAILURE;
+			policy_mgr_debug("reject");
+		}
 	}
 	policy_mgr_debug("set link reason %d status %d rm %d", reason, status,
 			 ml_sta_is_link_removal);
@@ -6980,7 +7003,8 @@ policy_mgr_validate_set_mlo_link_cb(struct wlan_objmgr_psoc *psoc,
 				    struct mlo_link_set_active_param *param)
 {
 	return policy_mgr_handle_ml_sta_link_state_allowed(psoc,
-							   param->reason);
+							   param->reason,
+							   param);
 }
 
 uint32_t
@@ -8787,7 +8811,7 @@ policy_mgr_handle_sap_cli_go_ml_sta_up_csa(struct wlan_objmgr_psoc *psoc,
 	}
 
 	status = policy_mgr_handle_ml_sta_link_state_allowed(
-				psoc, MLO_LINK_FORCE_REASON_CONNECT);
+				psoc, MLO_LINK_FORCE_REASON_CONNECT, NULL);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
@@ -9045,7 +9069,7 @@ policy_mgr_re_enable_ml_sta_on_p2p_sap_sta_down(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 
 	status = policy_mgr_handle_ml_sta_link_state_allowed(
-				psoc, MLO_LINK_FORCE_REASON_DISCONNECT);
+				psoc, MLO_LINK_FORCE_REASON_DISCONNECT, NULL);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
@@ -9312,7 +9336,7 @@ void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev)
 	wlan_set_vdev_link_removed_flag_by_vdev_id(psoc, vdev_id,
 						   true);
 	status = policy_mgr_handle_ml_sta_link_state_allowed(
-			psoc, MLO_LINK_FORCE_REASON_LINK_REMOVAL);
+			psoc, MLO_LINK_FORCE_REASON_LINK_REMOVAL, NULL);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_set_vdev_link_removed_flag_by_vdev_id(psoc, vdev_id,
 							   false);
