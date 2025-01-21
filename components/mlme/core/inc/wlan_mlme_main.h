@@ -205,9 +205,6 @@ struct sae_auth_retry {
  * @allow_kickout: True if the peer can be kicked out. Peer can't be kicked
  *                 out if it is being steered
  * @nss: Peer NSS
- * @peer_set_key_wakelock: wakelock to protect peer set key op with firmware
- * @peer_set_key_runtime_wakelock: runtime pm wakelock for set key
- * @is_key_wakelock_set: flag to check if key wakelock is pending to release
  * @assoc_rsp: assoc rsp IE received during connection
  * @peer_ind_bw: peer indication channel bandwidth
  */
@@ -225,9 +222,6 @@ struct peer_mlme_priv_obj {
 	bool allow_kickout;
 #endif
 	uint8_t nss;
-	qdf_wake_lock_t peer_set_key_wakelock;
-	qdf_runtime_lock_t peer_set_key_runtime_wakelock;
-	bool is_key_wakelock_set;
 	struct element_info assoc_rsp;
 	enum phy_ch_width peer_ind_bw;
 };
@@ -850,6 +844,9 @@ struct enhance_roam_info {
  * @mac_id: vdev mac_id
  * @ap_nss: AP advertised NSS
  * @keep_alive_period: KEEPALIVE period in seconds
+ * @peer_set_key_wakelock: wakelock to protect peer set key op with firmware
+ * @peer_set_key_rt_wakelock: runtime pm wakelock for set key
+ * @set_key_wakelock_counter: Counter for runtime pm wakelock
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -926,6 +923,9 @@ struct mlme_legacy_priv {
 	uint32_t mac_id;
 	uint8_t ap_nss;
 	uint16_t keep_alive_period;
+	qdf_wake_lock_t peer_set_key_wakelock;
+	qdf_runtime_lock_t peer_set_key_rt_wakelock;
+	qdf_atomic_t set_key_wakelock_counter;
 };
 
 /**
@@ -1660,7 +1660,7 @@ QDF_STATUS wlan_mlme_get_mac_vdev_id(struct wlan_objmgr_pdev *pdev,
 
 /**
  * wlan_acquire_peer_key_wakelock -api to get key wakelock
- * @pdev: pdev
+ * @vdev: pointer to vdev object
  * @mac_addr: peer mac addr
  *
  * This function acquires wakelock and prevent runtime pm during key
@@ -1668,12 +1668,12 @@ QDF_STATUS wlan_mlme_get_mac_vdev_id(struct wlan_objmgr_pdev *pdev,
  *
  * Return: None
  */
-void wlan_acquire_peer_key_wakelock(struct wlan_objmgr_pdev *pdev,
+void wlan_acquire_peer_key_wakelock(struct wlan_objmgr_vdev *vdev,
 				    uint8_t *mac_addr);
 
 /**
  * wlan_release_peer_key_wakelock -api to release key wakelock
- * @pdev: pdev
+ * @vdev: pointer to vdev object
  * @mac_addr: peer mac addr
  *
  * This function releases wakelock and allow runtime pm after key
@@ -1681,7 +1681,7 @@ void wlan_acquire_peer_key_wakelock(struct wlan_objmgr_pdev *pdev,
  *
  * Return: None
  */
-void wlan_release_peer_key_wakelock(struct wlan_objmgr_pdev *pdev,
+void wlan_release_peer_key_wakelock(struct wlan_objmgr_vdev *vdev,
 				    uint8_t *mac_addr);
 
 /**

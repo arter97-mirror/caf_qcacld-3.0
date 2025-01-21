@@ -1897,7 +1897,7 @@ peer_detach:
 	}
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
-	wlan_release_peer_key_wakelock(wma->pdev, peer_addr);
+	wlan_release_peer_key_wakelock(iface->vdev, peer_addr);
 	wma_remove_objmgr_peer(wma, iface->vdev, peer_addr);
 
 	iface->peer_count--;

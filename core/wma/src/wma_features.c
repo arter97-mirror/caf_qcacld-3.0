@@ -6376,7 +6376,7 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, const uint8_t *peer_mac,
 			     QDF_MAC_ADDR_SIZE);
 		wma_send_msg_high_priority(wma, WMA_SET_STAKEY_RSP,
 					   key_info_uc, 0);
-		wlan_release_peer_key_wakelock(wma->pdev, crypto_key->macaddr);
+		wlan_release_peer_key_wakelock(vdev, crypto_key->macaddr);
 	} else {
 		key_info_mc = qdf_mem_malloc(sizeof(*key_info_mc));
 		if (!key_info_mc)
