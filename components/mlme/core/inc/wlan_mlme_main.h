@@ -202,7 +202,7 @@ struct sae_auth_retry {
  * @last_assoc_received_time: last assoc received time
  * @last_disassoc_deauth_received_time: last disassoc/deauth received time
  * @twt_ctx: TWT context
- * @allow_kickout: True if the peer can be kicked out. Peer can't be kicked
+ * @disallow_kickout: False if the peer can be kicked out. Peer can't be kicked
  *                 out if it is being steered
  * @nss: Peer NSS
  * @peer_set_key_wakelock: wakelock to protect peer set key op with firmware
@@ -222,7 +222,7 @@ struct peer_mlme_priv_obj {
 	struct twt_context twt_ctx;
 #endif
 #ifdef WLAN_FEATURE_SON
-	bool allow_kickout;
+	bool disallow_kickout;
 #endif
 	uint8_t nss;
 	qdf_wake_lock_t peer_set_key_wakelock;

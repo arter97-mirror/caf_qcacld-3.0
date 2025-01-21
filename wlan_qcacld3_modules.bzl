@@ -2426,6 +2426,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     if target == "sdxkova":
         tgt = "target-aarch64_cortex-a53_musl"
         board = "sdx85"
+        ipa_ver = "1.0"
         deps = [
             "//msm-kernel:all_headers",
             "//build_dir/{}/linux-{}/wlan-cnss2:wlan-platform-headers".format(tgt, board),
@@ -2433,6 +2434,8 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_utils".format(tgt, board, tv),
             "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_prealloc".format(tgt, board, tv),
             "//build_dir/{}/linux-{}/wlan-cnss2:{}_cnss_nl".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/dataipa-{}:include_headers".format(tgt, board, ipa_ver),
+            "//build_dir/{}/linux-{}/dataipa-{}:{}_{}_ipam".format(tgt, board, ipa_ver, target, variant),
         ]
 
     print("name=", name)
