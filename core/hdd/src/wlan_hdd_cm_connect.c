@@ -1961,6 +1961,8 @@ void hdd_cm_connect_active_notify(uint8_t vdev_id)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct wlan_hdd_link_info *link_info;
+	struct qdf_mac_addr *intf_mac;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
@@ -1975,6 +1977,16 @@ void hdd_cm_connect_active_notify(uint8_t vdev_id)
 
 	if (hdd_adapter_restore_link_vdev_map(link_info->adapter, true))
 		hdd_adapter_update_mlo_mgr_mac_addr(link_info->adapter);
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info,
+					   WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev) {
+		hdd_err("Invalid VDEV id %d", vdev_id);
+		return;
+	}
+	intf_mac = hdd_adapter_get_netdev_mac_addr(link_info->adapter);
+	ucfg_dp_update_def_link(hdd_ctx->psoc, intf_mac, vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
 }
 #endif
 
