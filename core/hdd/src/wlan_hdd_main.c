@@ -6948,6 +6948,30 @@ static inline void hdd_dump_func_call_map(void)
 }
 #endif
 
+#ifdef CONFIG_WLAN_ICMP_REQ_DETECT
+/**
+ * hdd_icmp_detect_timer_unregister() - Delete the detect timer
+ * @adapter: adapter structure
+ *
+ * Return: None
+ */
+static void
+hdd_icmp_detect_timer_unregister(struct hdd_adapter *adapter)
+{
+	if (adapter->ps_timer_initialized == true) {
+		hdd_debug("Destroy detect timer");
+		qdf_mc_timer_stop(&adapter->ps_timer);
+		qdf_mc_timer_destroy(&adapter->ps_timer);
+		adapter->ps_timer_initialized = false;
+	}
+}
+#else
+static void
+hdd_icmp_detect_timer_unregister(struct hdd_adapter *adapter)
+{
+}
+#endif
+
 QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 			    struct hdd_adapter *adapter)
 {
@@ -7073,6 +7097,8 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 		hdd_deregister_hl_netdev_fc_timer(adapter);
 
 		hdd_deregister_tx_flow_control(adapter);
+
+		hdd_icmp_detect_timer_unregister(adapter);
 
 #ifdef WLAN_OPEN_SOURCE
 		cancel_work_sync(&adapter->ipv4_notifier_work);
