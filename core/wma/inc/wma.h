@@ -2631,6 +2631,15 @@ void wma_delete_peer_mlo(struct wlan_objmgr_psoc *psoc, uint8_t *macaddr)
 #endif
 
 /**
+ * wma_send_peer_phy_mode() - set phymode
+ * @session:
+ * @phy_mode
+ */
+void
+wma_send_peer_phy_mode(tSirMacAddr bssId, uint8_t vdev_id,
+		       enum wlan_phymode phy_mode);
+
+/**
  * wma_remove_bss_peer_on_failure() - remove the bss peers in case of
  * failure
  * @wma: wma handle.

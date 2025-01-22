@@ -15386,17 +15386,21 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 void sme_config_ba_mode_all_vdevs(mac_handle_t mac_handle, uint8_t val)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	enum QDF_OPMODE op_mode;
 	uint8_t vdev_id;
 	int ret_val = 0;
+	struct wlan_objmgr_vdev *vdev;
 
 	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
-		op_mode = wlan_get_opmode_from_vdev_id(mac->pdev, vdev_id);
-		if (op_mode == QDF_STA_MODE) {
-			ret_val = wma_cli_set_command(
-						vdev_id,
-						wmi_vdev_param_set_ba_mode,
-						val, VDEV_CMD);
+		vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev,
+					vdev_id, WLAN_LEGACY_SME_ID);
+		if (!vdev)
+			continue;
+
+		ret_val = wma_cli_set_command(vdev_id,
+					      wmi_vdev_param_set_ba_mode,
+					      val, VDEV_CMD);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 
 		if (QDF_IS_STATUS_ERROR(ret_val))
 			sme_err("BA mode set failed for vdev: %d, ret %d",
@@ -15404,7 +15408,6 @@ void sme_config_ba_mode_all_vdevs(mac_handle_t mac_handle, uint8_t val)
 		else
 			sme_debug("vdev: %d ba mode: %d param id %d",
 				  vdev_id, val, wmi_vdev_param_set_ba_mode);
-		}
 	}
 }
 #endif
@@ -17266,3 +17269,14 @@ void sme_deregister_disconnect_cb(mac_handle_t mac_handle)
 
 	SME_EXIT();
 }
+
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
+			    uint8_t *peer_addr,
+			    uint8_t *mld_addr)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	return cm_get_pre_auth_mld_addr(mac, peer_addr, mld_addr);
+}
+#endif

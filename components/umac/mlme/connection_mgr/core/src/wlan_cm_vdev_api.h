@@ -564,6 +564,20 @@ QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg);
  */
 QDF_STATUS cm_process_join_req(struct cm_vdev_join_req *join_req);
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * cm_get_pre_auth_mld_addr - Get mld address from preauth list
+ * @mac: pointer to mac object
+ * @peer_addr : input peer link address
+ * @mld_addr: output mld address
+ *
+ * Return: None
+ */
+void cm_get_pre_auth_mld_addr(struct mac_context *mac,
+			      uint8_t *peer_addr,
+			      uint8_t *mld_addr);
+#endif
+
 #ifdef WLAN_FEATURE_HOST_ROAM
 /**
  * cm_process_preauth_req() - Process preauth request

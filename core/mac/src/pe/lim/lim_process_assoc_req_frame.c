@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -223,14 +223,18 @@ static QDF_STATUS lim_check_sta_in_pe_entries(struct mac_context *mac_ctx,
 static bool lim_chk_sa_da(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
 			  struct pe_session *session, uint8_t sub_type)
 {
+	struct qdf_mac_addr zero_mac = QDF_MAC_ADDR_ZERO_INIT;
+
 	if (qdf_mem_cmp((uint8_t *) hdr->sa,
 					(uint8_t *) hdr->da,
 					(uint8_t) (sizeof(tSirMacAddr))))
 		return true;
 
 	pe_err("Assoc Req rejected: wlan.sa = wlan.da");
+	/* assoc req buffer not alloc, pass mld address as zero */
 	lim_send_assoc_rsp_mgmt_frame(mac_ctx, STATUS_UNSPECIFIED_FAILURE,
-				      1, hdr->sa, sub_type, 0, session, false);
+				      1, hdr->sa, sub_type, 0, session, false,
+				      (struct qdf_mac_addr *)&zero_mac);
 	return false;
 }
 
@@ -291,9 +295,15 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 		mld_mac = (struct qdf_mac_addr *)assoc_req->mld_mac;
 		if (!assoc_req->eht_cap.present &&
 		    !qdf_is_macaddr_zero(mld_mac)) {
-			qdf_zero_macaddr(mld_mac);
-			qdf_mem_zero(&assoc_req->mlo_info,
-				     sizeof(assoc_req->mlo_info));
+			pe_warn("Assoc Req rejected: missing ETH IE "
+				QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(sa));
+
+			lim_send_assoc_rsp_mgmt_frame(mac_ctx,
+						      STATUS_DENIED_EHT_NOT_SUPPORTED,
+						      1, sa, sub_type, 0,
+						      session, false,
+						      mld_mac);
+			return false;
 		}
 		return true;
 	}
@@ -301,7 +311,8 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 	pe_warn("Assoc Req rejected: frame parsing error. source addr:"
 			QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(sa));
 	lim_send_assoc_rsp_mgmt_frame(mac_ctx, wlan_status,
-				      1, sa, sub_type, 0, session, false);
+				      1, sa, sub_type, 0, session, false,
+				      (struct qdf_mac_addr *)assoc_req->mld_mac);
 	return false;
 }
 
@@ -345,7 +356,8 @@ static bool lim_chk_capab(struct mac_context *mac_ctx, tSirMacAddr sa,
 		 */
 		lim_send_assoc_rsp_mgmt_frame(
 			mac_ctx, STATUS_CAPS_UNSUPPORTED,
-			1, sa, sub_type, 0, session, false);
+			1, sa, sub_type, 0, session, false,
+			(struct qdf_mac_addr *)assoc_req->mld_mac);
 		return false;
 	}
 	return true;
@@ -382,7 +394,8 @@ static bool lim_chk_ssid(struct mac_context *mac_ctx, tSirMacAddr sa,
 	 * status code.
 	 */
 	lim_send_assoc_rsp_mgmt_frame(mac_ctx, STATUS_UNSPECIFIED_FAILURE,
-				      1, sa, sub_type, 0, session, false);
+				      1, sa, sub_type, 0, session, false,
+				      (struct qdf_mac_addr *)assoc_req->mld_mac);
 	return false;
 }
 
@@ -436,7 +449,8 @@ static bool lim_chk_rates(struct mac_context *mac_ctx, tSirMacAddr sa,
 	 */
 	lim_send_assoc_rsp_mgmt_frame(
 			mac_ctx, STATUS_ASSOC_DENIED_RATES, 1,
-			sa, sub_type, 0, session, false);
+			sa, sub_type, 0, session, false,
+			(struct qdf_mac_addr *)assoc_req->mld_mac);
 	return false;
 }
 
@@ -464,7 +478,8 @@ static bool lim_chk_11g_only(struct mac_context *mac_ctx, tSirMacAddr sa,
 			QDF_MAC_ADDR_REF(sa));
 		lim_send_assoc_rsp_mgmt_frame(
 			mac_ctx, STATUS_CAPS_UNSUPPORTED,
-			1, sa, sub_type, 0, session, false);
+			1, sa, sub_type, 0, session, false,
+			(struct qdf_mac_addr *)assoc_req->mld_mac);
 		return false;
 	}
 	return true;
@@ -494,7 +509,8 @@ static bool lim_chk_11n_only(struct mac_context *mac_ctx, tSirMacAddr sa,
 			QDF_MAC_ADDR_REF(sa));
 		lim_send_assoc_rsp_mgmt_frame(
 			mac_ctx, STATUS_CAPS_UNSUPPORTED,
-			1, sa, sub_type, 0, session, false);
+			1, sa, sub_type, 0, session, false,
+			(struct qdf_mac_addr *)assoc_req->mld_mac);
 		return false;
 	}
 	return true;
@@ -531,7 +547,8 @@ static bool lim_chk_11ac_only(struct mac_context *mac_ctx, tSirMacAddr sa,
 		((!vht_caps) || ((vht_caps) && (!vht_caps->present)))) {
 		lim_send_assoc_rsp_mgmt_frame(
 			mac_ctx, STATUS_CAPS_UNSUPPORTED,
-			1, sa, sub_type, 0, session, false);
+			1, sa, sub_type, 0, session, false,
+			(struct qdf_mac_addr *)assoc_req->mld_mac);
 		pe_err("SOFTAP was in 11AC only mode, reject");
 		return false;
 	}
@@ -560,7 +577,8 @@ static bool lim_chk_11ax_only(struct mac_context *mac_ctx, tSirMacAddr sa,
 		 !assoc_req->he_cap.present) {
 		lim_send_assoc_rsp_mgmt_frame(
 			mac_ctx, STATUS_CAPS_UNSUPPORTED,
-			1, sa, sub_type, 0, session, false);
+			1, sa, sub_type, 0, session, false,
+			(struct qdf_mac_addr *)assoc_req->mld_mac);
 		pe_err("SOFTAP was in 11AX only mode, reject");
 		return false;
 	}
@@ -599,7 +617,8 @@ static bool lim_check_11ax_basic_mcs(struct mac_context *mac_ctx,
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx,
 				STATUS_CAPS_UNSUPPORTED,
-				1, sa, sub_type, 0, session, false);
+				1, sa, sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 			pe_err("STA did not support basic MCS required by SAP");
 			return false;
 		}
@@ -647,7 +666,8 @@ static bool lim_chk_11be_only(struct mac_context *mac_ctx, tSirMacAddr sa,
 	    !assoc_req->eht_cap.present) {
 		lim_send_assoc_rsp_mgmt_frame(
 			mac_ctx, STATUS_CAPS_UNSUPPORTED,
-			1, sa, sub_type, 0, session, false);
+			1, sa, sub_type, 0, session, false,
+			(struct qdf_mac_addr *)assoc_req->mld_mac);
 		pe_err("SOFTAP was in 11BE only mode, reject");
 		return false;
 	}
@@ -779,7 +799,8 @@ static bool lim_chk_mcs(struct mac_context *mac_ctx, tSirMacAddr sa,
 		 */
 		lim_send_assoc_rsp_mgmt_frame(
 			mac_ctx, STATUS_ASSOC_DENIED_UNSPEC,
-			1, sa, sub_type, 0, session, false);
+			1, sa, sub_type, 0, session, false,
+			(struct qdf_mac_addr *)assoc_req->mld_mac);
 		return false;
 	}
 	return true;
@@ -817,7 +838,8 @@ static bool lim_chk_is_11b_sta_supported(struct mac_context *mac_ctx,
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx,
 				STATUS_ASSOC_DENIED_RATES,
-				1, sa, sub_type, 0, session, false);
+				1, sa, sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 
 			pe_warn("Rejecting Re/Assoc req from 11b STA: "QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(sa));
@@ -1065,7 +1087,8 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 			 */
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx, STATUS_INVALID_IE, 1,
-				sa, sub_type, 0, session, false);
+				sa, sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 			return false;
 		}
 
@@ -1078,7 +1101,8 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 			pe_err("Invalid RSN IE");
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx, STATUS_INVALID_IE, 1,
-				sa, sub_type, 0, session, false);
+				sa, sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 			return false;
 		}
 
@@ -1094,7 +1118,8 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 
 				lim_send_assoc_rsp_mgmt_frame(
 					mac_ctx, status, 1, sa, sub_type,
-					0, session, false);
+					0, session, false,
+					(struct qdf_mac_addr *)assoc_req->mld_mac);
 				return false;
 			}
 		} else {
@@ -1107,7 +1132,8 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx,
 				STATUS_UNSUPPORTED_RSN_IE_VERSION,
-				1, sa, sub_type, 0, session, false);
+				1, sa, sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 			return false;
 		}
 		*akm_type = lim_translate_rsn_oui_to_akm_type(
@@ -1121,7 +1147,8 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 				QDF_MAC_ADDR_REF(sa));
 			lim_send_assoc_rsp_mgmt_frame(mac_ctx, status,
 						      1, sa, sub_type,
-						      0, session, false);
+						      0, session, false,
+						      (struct qdf_mac_addr *)assoc_req->mld_mac);
 			return false;
 		}
 
@@ -1134,7 +1161,8 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 			/* rcvd Assoc req frame with invalid WPA IE length */
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx, STATUS_INVALID_IE, 1,
-				sa, sub_type, 0, session, false);
+				sa, sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 			return false;
 		}
 		/* Unpack the WPA IE */
@@ -1146,7 +1174,8 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 			pe_err("Invalid WPA IE");
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx, STATUS_INVALID_IE, 1,
-				sa, sub_type, 0, session, false);
+				sa, sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 			return false;
 		}
 
@@ -1163,7 +1192,8 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 			 */
 			lim_send_assoc_rsp_mgmt_frame(
 					mac_ctx, status, 1,
-					sa, sub_type, 0, session, false);
+					sa, sub_type, 0, session, false,
+					(struct qdf_mac_addr *)assoc_req->mld_mac);
 			return false;
 		}
 		*akm_type = lim_translate_rsn_oui_to_akm_type(
@@ -1175,7 +1205,8 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 			pe_warn("STA does not support RSN and WPA!");
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx, STATUS_NOT_SUPPORTED_AUTH_ALG, 1,
-				sa, sub_type, 0, session, false);
+				sa, sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 			return false;
 		}
 	}
@@ -1382,7 +1413,8 @@ static bool lim_process_assoc_req_sta_ctx(struct mac_context *mac_ctx,
 			sta_ds->pmfSaQueryRetryCount = 0;
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx, STATUS_ASSOC_REJECTED_TEMPORARILY, 1,
-				sa, sub_type, sta_ds, session, false);
+				sa, sub_type, sta_ds, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 			lim_send_sa_query_request_frame(mac_ctx,
 				(uint8_t *) &(sta_ds->pmfSaQueryCurrentTransId),
 				sa, session);
@@ -1405,7 +1437,8 @@ static bool lim_process_assoc_req_sta_ctx(struct mac_context *mac_ctx,
 		case DPH_SA_QUERY_IN_PROGRESS:
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx, STATUS_ASSOC_REJECTED_TEMPORARILY, 1,
-				sa, sub_type, 0, session, false);
+				sa, sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 			return false;
 
 		/*
@@ -1495,7 +1528,7 @@ static bool lim_chk_wmm(struct mac_context *mac_ctx, tSirMacAddr sa,
 				lim_send_assoc_rsp_mgmt_frame(
 					mac_ctx, REASON_NO_BANDWIDTH,
 					1, sa, sub_type, 0, session,
-					false);
+					false, (struct qdf_mac_addr *)assoc_req->mld_mac);
 				return false;
 			}
 		} else if (lim_admit_control_add_sta(mac_ctx, sa, false)
@@ -1503,7 +1536,8 @@ static bool lim_chk_wmm(struct mac_context *mac_ctx, tSirMacAddr sa,
 			pe_warn("AdmitControl: Sta rejected");
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx, REASON_NO_BANDWIDTH, 1,
-				sa, sub_type, 0, session, false);
+				sa, sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 			return false;
 		}
 		/* else all ok */
@@ -2185,25 +2219,95 @@ static bool lim_is_sae_akm_present(tDot11fIERSN * const rsn_ie)
 	return false;
 }
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * lim_pmkid_cache_search_partner_link() -Search pmkid in the partner link
+ * with assoc peer
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session: pe session entry
+ * @pmkid_cache: pmkid data structure
+ *
+ * Return: True if found the pmkid entry otherwise return false.
+ */
+static bool
+lim_pmkid_cache_search_partner_link(struct mac_context *mac_ctx,
+				    struct pe_session *session,
+				    struct wlan_crypto_pmksa *pmkid_cache)
+{
+	uint16_t vdev_count, link;
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint8_t vdev_id;
+	bool found =  false;
+
+	/* search pmkid under parter link */
+	lim_get_mlo_vdev_list(session, &vdev_count, wlan_vdev_list);
+	for (link = 0; link < vdev_count; link++) {
+		if (!wlan_vdev_list[link])
+			continue;
+		vdev_id = wlan_vdev_get_id(wlan_vdev_list[link]);
+
+		/* skip itself */
+		if (session->vdev_id == vdev_id)
+			continue;
+
+		if (!wlan_vdev_mlme_is_mlo_ap(wlan_vdev_list[link]))
+			continue;
+
+		found = cm_lookup_pmkid_using_bssid(mac_ctx->psoc, vdev_id,
+						    pmkid_cache);
+		if (found)
+			break;
+	}
+	/* release ref that ever claim in lim_get_mlo_vdev_list */
+	for (link = 0; link < vdev_count; link++) {
+		if (!wlan_vdev_list[link])
+			continue;
+
+		lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
+	}
+	return found;
+}
+
+#else
+static bool
+lim_pmkid_cache_search_partner_link(struct mac_context *mac_ctx,
+				    struct pe_session *session,
+				    struct wlan_crypto_pmksa *pmkid_cache)
+{
+	return false;
+}
+#endif
+
 static bool lim_is_pmkid_found_for_peer(struct mac_context *mac_ctx,
 					tSirMacAddr peer_mac_addr,
 					struct pe_session *session,
 					uint8_t *pmkid,
-					uint16_t pmkid_count)
+					uint16_t pmkid_count,
+					struct qdf_mac_addr *mld_addr)
 {
 	uint32_t i;
 	uint8_t *session_pmkid;
 	struct wlan_crypto_pmksa *pmkid_cache;
+	bool found =  false;
 
 	pmkid_cache = qdf_mem_malloc(sizeof(*pmkid_cache));
 
 	if (!pmkid_cache)
 		return false;
 
-	qdf_mem_copy(pmkid_cache->bssid.bytes, peer_mac_addr,
-		     QDF_MAC_ADDR_SIZE);
+	if (!qdf_is_macaddr_zero(mld_addr))
+		qdf_mem_copy(pmkid_cache->bssid.bytes, mld_addr->bytes,
+			     QDF_MAC_ADDR_SIZE);
+	else
+		qdf_mem_copy(pmkid_cache->bssid.bytes, peer_mac_addr,
+			     QDF_MAC_ADDR_SIZE);
 
-	if (!cm_lookup_pmkid_using_bssid(mac_ctx->psoc, session->vdev_id,
+	found = lim_pmkid_cache_search_partner_link(mac_ctx, session,
+						    pmkid_cache);
+
+	/* search pmkid under itself if not found under parter link */
+	if (!found &&
+	    !cm_lookup_pmkid_using_bssid(mac_ctx->psoc, session->vdev_id,
 					 pmkid_cache)) {
 		qdf_mem_free(pmkid_cache);
 		return false;
@@ -2282,7 +2386,8 @@ static bool lim_is_sae_peer_allowed(struct mac_context *mac_ctx,
 		pe_debug("No PMKID present in RSNIE; Tried to use SAE AKM after non-SAE authentication");
 	} else if (lim_is_pmkid_found_for_peer(mac_ctx, peer_mac_addr, session,
 					       &rsn_ie->pmkid[0][0],
-					       rsn_ie->pmkid_count)) {
+					       rsn_ie->pmkid_count,
+					       (struct qdf_mac_addr *)assoc_req->mld_mac)) {
 		pe_debug("Valid PMKID found for SAE peer");
 		is_allowed = true;
 	} else {
@@ -2319,7 +2424,8 @@ static bool lim_validate_pmkid_for_sae(struct mac_context *mac_ctx,
 
 reject_assoc:
 	lim_send_assoc_rsp_mgmt_frame(mac_ctx, code, 1, sa, sub_type, 0,
-				      session, false);
+				      session, false,
+				      (struct qdf_mac_addr *)assoc_req->mld_mac);
 	return false;
 }
 
@@ -2628,7 +2734,9 @@ static void lim_enable_4addr_flag(struct wlan_objmgr_vdev *vdev)
 }
 
 static bool lim_check_multi_ap(struct mac_context *mac_ctx, tSirMacAddr sa,
-			       struct pe_session *session, uint8_t *frm_body,
+			       struct pe_session *session,
+			       tpSirAssocReq assoc_req,
+			       uint8_t *frm_body,
 			       uint32_t frame_len, uint8_t sub_type)
 {
 	const u8 *multi_ap_ie = NULL;
@@ -2660,7 +2768,8 @@ static bool lim_check_multi_ap(struct mac_context *mac_ctx, tSirMacAddr sa,
 		lim_send_assoc_rsp_mgmt_frame(mac_ctx,
 					      STATUS_ASSOC_DENIED_UNSPEC,
 					      1, sa, sub_type, 0,
-					      session, false);
+					      session, false,
+					      (struct qdf_mac_addr *)assoc_req->mld_mac);
 		pe_err("SOFTAP send denied status assoc rsp");
 		return false;
 	}
@@ -2671,7 +2780,9 @@ static bool lim_check_multi_ap(struct mac_context *mac_ctx, tSirMacAddr sa,
 }
 #else
 static bool lim_check_multi_ap(struct mac_context *mac_ctx, tSirMacAddr sa,
-			       struct pe_session *session, uint8_t *frm_body,
+			       struct pe_session *session,
+			       tpSirAssocReq assoc_req,
+			       uint8_t *frm_body,
 			       uint32_t frame_len, uint8_t sub_type)
 {
 	return true;
@@ -2723,7 +2834,8 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 				mac_ctx,
 				STATUS_UNSPECIFIED_FAILURE,
 				1, sa,
-				sub_type, 0, session, false);
+				sub_type, 0, session, false,
+				(struct qdf_mac_addr *)assoc_req->mld_mac);
 		goto error;
 	}
 	/* check for the presence of vendor IE */
@@ -2744,7 +2856,8 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 			if (!peer_aid)
 				lim_send_assoc_rsp_mgmt_frame(
 					mac_ctx, STATUS_UNSPECIFIED_FAILURE,
-					1, sa, sub_type, 0, session, false);
+					1, sa, sub_type, 0, session, false,
+					(struct qdf_mac_addr *)assoc_req->mld_mac);
 			goto error;
 		}
 	}
@@ -2820,7 +2933,8 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 	lim_update_ap_ext_cap(session, assoc_req);
 
 	if (!lim_check_multi_ap(mac_ctx, sa, session,
-				frm_body, frame_len, sub_type)) {
+				assoc_req, frm_body,
+				frame_len, sub_type)) {
 		pe_debug("Backhal BSS reject client connect it");
 		goto error;
 	}
@@ -2986,7 +3100,8 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 			lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx, STATUS_ASSOC_DENIED_UNSPEC,
 				sta_ds->assocId, sta_ds->staAddr,
-				sub_type, sta_ds, session, false);
+				sub_type, sta_ds, session, false,
+				(struct qdf_mac_addr *)sta_ds->mld_addr);
 			pe_err("Rejecting reassoc req from STA");
 			return;
 		} else {
@@ -2999,7 +3114,8 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 				mac_ctx, QDF_STATUS_SUCCESS,
 				sta_ds->assocId, sta_ds->staAddr,
 				sub_type,
-				sta_ds, session, false);
+				sta_ds, session, false,
+				(struct qdf_mac_addr *)sta_ds->mld_addr);
 			pe_err("DUT already received an assoc request frame and STA is sending another assoc req.So, do not Process sessionid: %d sys sub_type: %d for role: %d from: "
 					QDF_MAC_ADDR_FMT,
 				session->peSessionId, sub_type,

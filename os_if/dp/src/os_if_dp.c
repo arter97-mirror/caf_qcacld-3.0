@@ -441,24 +441,24 @@ static int os_if_dp_nud_netevent_cb(struct notifier_block *nb,
 				    unsigned long event,
 				    void *data)
 {
-	struct neighbour *neighbor = data;
+	struct neighbour *neighbor;
 	struct osif_vdev_sync *vdev_sync;
-	const struct net_device *netdev = neighbor->dev;
+	struct net_device *netdev;
 	int errno;
 
-	errno = osif_vdev_sync_op_start(neighbor->dev, &vdev_sync);
+	if (event != NETEVENT_NEIGH_UPDATE)
+		return 0;
+
+	neighbor = data;
+	netdev = neighbor->dev;
+
+	errno = osif_vdev_sync_op_start(netdev, &vdev_sync);
 	if (errno)
 		return errno;
 
-	switch (event) {
-	case NETEVENT_NEIGH_UPDATE:
-		ucfg_dp_nud_event((struct qdf_mac_addr *)netdev->dev_addr,
-				  (struct qdf_mac_addr *)&neighbor->ha[0],
-				  nud_state_osif_to_dp(neighbor->nud_state));
-		break;
-	default:
-		break;
-	}
+	ucfg_dp_nud_event((struct qdf_mac_addr *)netdev->dev_addr,
+			  (struct qdf_mac_addr *)&neighbor->ha[0],
+			  nud_state_osif_to_dp(neighbor->nud_state));
 
 	osif_vdev_sync_op_stop(vdev_sync);
 

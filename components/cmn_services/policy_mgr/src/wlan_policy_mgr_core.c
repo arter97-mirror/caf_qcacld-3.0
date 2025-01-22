@@ -3183,6 +3183,8 @@ policy_mgr_add_5g_to_pcl(struct wlan_objmgr_psoc *psoc, uint32_t *pcl_freqs,
 	for (i = 0; i < chlist2_len; i++) {
 		if (is_freq_present_in_pcl(idx, pcl_freqs, chlist2[i]))
 			continue;
+		if (idx >= NUM_CHANNELS)
+			break;
 		pcl_freqs[idx] = chlist2[i];
 		pcl_weights[idx] = weight2;
 		idx++;

@@ -1637,7 +1637,7 @@ static void mlme_ext_handler_destroy(struct vdev_mlme_obj *vdev_mlme)
 	mlme_deinit_wait_for_key_timer(&vdev_mlme->ext_vdev_ptr->wait_key_timer);
 	mlme_free_fils_info(&vdev_mlme->ext_vdev_ptr->connect_info);
 	mlme_cm_free_roam_stats_info(vdev_mlme->ext_vdev_ptr);
-	qdf_mem_free(vdev_mlme->ext_vdev_ptr);
+	qdf_mem_common_free(vdev_mlme->ext_vdev_ptr);
 	vdev_mlme->ext_vdev_ptr = NULL;
 }
 
@@ -1718,7 +1718,7 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
 	vdev_mlme->ext_vdev_ptr =
-		qdf_mem_malloc(sizeof(struct mlme_legacy_priv));
+		qdf_mem_common_alloc(sizeof(struct mlme_legacy_priv));
 	if (!vdev_mlme->ext_vdev_ptr)
 		return QDF_STATUS_E_NOMEM;
 

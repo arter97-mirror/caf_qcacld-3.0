@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +30,19 @@
 
 struct hdd_context;
 struct sap_config;
+
+#ifdef FEATURE_WLAN_TDLS
+#undef  MAX_VAR_ARGS
+#define MAX_VAR_ARGS         11
+#else
+#undef  MAX_VAR_ARGS
+#define MAX_VAR_ARGS         9
+#endif
+
+#ifdef WLAN_FEATURE_MOTION_DETECTION
+#undef  MAX_VAR_ARGS
+#define MAX_VAR_ARGS                              15
+#endif /* WLAN_FEATURE_MOTION_DETECTION */
 
 /*
  * order of parameters in addTs private ioctl

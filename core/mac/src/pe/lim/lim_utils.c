@@ -10389,7 +10389,8 @@ void lim_send_beacon(struct mac_context *mac_ctx, struct pe_session *session)
 					session->vdev,
 					WLAN_VDEV_SM_EV_CHAN_SWITCH_DISABLED,
 					sizeof(*session), session);
-	else
+	else if (wlan_vdev_is_up_active_state(session->vdev) !=
+		 QDF_STATUS_SUCCESS)
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_START_SUCCESS,
 					      sizeof(*session), session);
@@ -12390,9 +12391,13 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 	uint8_t tx_pwr_info = 0U;
 	uint8_t local_psd = 0U;
 	uint8_t reg_psd = 0U;
-	uint8_t *on_entry_target = target;
+	uint8_t *on_entry_target = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint16_t idx = 0;
+
+	if (!target)
+		return QDF_STATUS_E_INVAL;
+	on_entry_target = target;
 
 	for (idx = 0; idx < num_tpe; idx++) {
 		if (!tpe_ptr[idx].present)

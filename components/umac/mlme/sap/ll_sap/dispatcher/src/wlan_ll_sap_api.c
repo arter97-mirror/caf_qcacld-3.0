@@ -86,7 +86,8 @@ wlan_ll_sap_switch_bearer_on_sta_connect_start(struct wlan_objmgr_psoc *psoc,
 
 	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
 	/* LL_LT SAP is not present, bearer switch is not required */
-	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID)
+	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID ||
+	    ll_lt_sap_vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS)
 		return status;
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, ll_lt_sap_vdev_id,
 						    WLAN_LL_SAP_ID);

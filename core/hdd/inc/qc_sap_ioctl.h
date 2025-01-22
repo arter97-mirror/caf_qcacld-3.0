@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -112,8 +113,6 @@ struct channel_list_info {
 #define QCSAP_IOCTL_PRIV_GET_RSSI       (SIOCIWFIRSTPRIV + 29)
 #define QCSAP_IOCTL_PRIV_GET_SOFTAP_LINK_SPEED (SIOCIWFIRSTPRIV + 31)
 #define QCSAP_IOCTL_GET_BA_AGEING_TIMEOUT (SIOCIWFIRSTPRIV + 32)
-
-#define MAX_VAR_ARGS         7
 
 #define QCSAP_IOCTL_MAX_STR_LEN 1024
 

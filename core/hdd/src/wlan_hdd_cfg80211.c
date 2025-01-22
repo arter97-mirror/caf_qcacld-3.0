@@ -30723,14 +30723,28 @@ wlan_hdd_extauth_cache_pmkid(struct hdd_adapter *adapter,
 {
 	struct wlan_crypto_pmksa *pmk_cache;
 	QDF_STATUS result;
+	struct qdf_mac_addr mld_addr;
 
 	if (params->pmkid) {
 		pmk_cache = qdf_mem_malloc(sizeof(*pmk_cache));
 		if (!pmk_cache)
 			return;
 
-		qdf_mem_copy(pmk_cache->bssid.bytes, params->bssid,
-			     QDF_MAC_ADDR_SIZE);
+		qdf_zero_macaddr(&mld_addr);
+		sme_pmkid_get_mld_addr(adapter->hdd_ctx->mac_handle,
+				       (uint8_t *)params->bssid,
+				       (uint8_t *)&mld_addr.bytes);
+
+		if (!qdf_is_macaddr_zero(&mld_addr)) {
+			hdd_debug("bssid " QDF_MAC_ADDR_FMT " new " QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(params->bssid),
+				  QDF_MAC_ADDR_REF(mld_addr.bytes));
+			qdf_copy_macaddr(&pmk_cache->bssid, &mld_addr);
+		} else {
+			qdf_mem_copy(pmk_cache->bssid.bytes, params->bssid,
+				     QDF_MAC_ADDR_SIZE);
+		}
+
 		qdf_mem_copy(pmk_cache->pmkid, params->pmkid,
 			     PMKID_LEN);
 		result = wlan_hdd_set_pmksa_cache(adapter, pmk_cache);

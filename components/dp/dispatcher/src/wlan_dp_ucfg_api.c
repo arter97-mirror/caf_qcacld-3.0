@@ -743,6 +743,7 @@ QDF_STATUS ucfg_dp_psoc_close(struct wlan_objmgr_psoc *psoc)
 
 	dp_rtpm_tput_policy_deinit(psoc);
 	dp_unregister_pmo_handler();
+	qdf_dp_trace_deinit();
 	wlan_dp_load_balancer_deinit(psoc);
 	dp_bus_bandwidth_deinit(psoc);
 	qdf_wake_lock_destroy(&dp_ctx->rx_wake_lock);

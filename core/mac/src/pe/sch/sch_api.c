@@ -578,6 +578,9 @@ lim_get_concurrent_ap_vdevid(struct mac_context *mac_ctx,
 
 	vdev_num = policy_mgr_get_sap_mode_info(mac_ctx->psoc, freq_list,
 						vdev_id_list);
+	if (vdev_num >= MAX_NUMBER_OF_CONC_CONNECTIONS)
+		return INVALID_VDEV_ID;
+
 	for (i = 0; i < vdev_num; i++) {
 		if (wlan_reg_is_24ghz_ch_freq(freq_list[i]) ||
 		    wlan_reg_is_5ghz_ch_freq(freq_list[i])) {
@@ -999,6 +1002,7 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	}
 
 	if (tpe_ie_buf_cons &&
+	    (tpe_ie_buf_cons <= tpe_ie_buf_max_size) &&
 	    ((prb_rsp_ie_len + tpe_ie_buf_cons) <= prb_rsp_ie_max_len)) {
 		qdf_mem_copy(prb_rsp_ie_ptr + prb_rsp_ie_len,
 			     tpe_ie_buf, tpe_ie_buf_cons);

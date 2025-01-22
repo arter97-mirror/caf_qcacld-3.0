@@ -5272,6 +5272,7 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	uint32_t *authmode_list;
 	int8_t mlo_prefer_percentage = 0;
 	wmi_ssid *ssid;
+	uint8_t num_triggers_enabled = 0;
 	int i;
 
 	len = sizeof(wmi_roam_ap_profile_fixed_param) + sizeof(wmi_ap_profile);
@@ -5279,8 +5280,13 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 
 	if (!wmi_service_enabled(wmi_handle,
 			wmi_service_configure_roam_trigger_param_support)) {
+		for (i = 0; i < ROAM_TRIGGER_REASON_MAX; i++) {
+			if (ap_profile->score_delta_param[i].roam_score_delta !=
+			    ROAM_MAX_CFG_VALUE)
+				num_triggers_enabled++;
+		}
 		len += WMI_TLV_HDR_SIZE;
-		len += ROAM_TRIGGER_REASON_MAX * sizeof(*score_delta_param);
+		len += num_triggers_enabled * sizeof(*score_delta_param);
 		len += WMI_TLV_HDR_SIZE;
 		len += NUM_OF_ROAM_MIN_RSSI * sizeof(*min_rssi_param);
 	} else {
@@ -5491,15 +5497,6 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 
 	if (!wmi_service_enabled(wmi_handle,
 			wmi_service_configure_roam_trigger_param_support)) {
-		uint8_t i;
-		uint8_t num_triggers_enabled = 0;
-
-		for (i = 0; i < ROAM_TRIGGER_REASON_MAX; i++) {
-			if (ap_profile->score_delta_param[i].roam_score_delta !=
-			    ROAM_MAX_CFG_VALUE)
-				num_triggers_enabled++;
-		}
-
 		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
 			       (num_triggers_enabled * sizeof(*score_delta_param)));
 		buf_ptr += WMI_TLV_HDR_SIZE;

@@ -2019,13 +2019,139 @@ QDF_STATUS lim_strip_eht_op_ie(struct mac_context *mac_ctx,
 }
 #endif
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * lim_pickup_correct_link_and_dest_addr() - Select assoc link to send assoc
+ * response in case if input non-assoc peer
+ * @mac_ctx: pointer to global mac
+ * @sta: peer dph node
+ * @peer_addr: peer link address
+ * @mld_addr: mld address in the assoc request
+ * @out_vdevid: output vdev id
+ *
+ * Return: return dph sta node of assoc peer if is mlo client, otherwise same
+ * as input sta node.
+ */
+static tpDphHashNode
+lim_pickup_correct_link_and_dest_addr(struct mac_context *mac_ctx,
+				      struct pe_session *in_session,
+				      tpDphHashNode sta,
+				      tSirMacAddr peer_addr,
+				      struct qdf_mac_addr *mld_addr,
+				      uint8_t *out_vdevid)
+{
+	struct wlan_mlo_peer_context *mlo_peer_ctx;
+	struct wlan_objmgr_peer *assoc_peer;
+	tpDphHashNode partner_sta = NULL;
+	uint16_t peer_idx;
+	uint16_t vdev_count, link;
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint8_t vdev_id;
+	struct pe_session *tmp_session;
+
+	*out_vdevid = in_session->vdev_id;
+
+	if (qdf_is_macaddr_zero(mld_addr))
+		return sta;
+
+	mlo_peer_ctx = wlan_mlo_get_mlpeer_by_mld_mac(in_session->vdev->mlo_dev_ctx,
+						      mld_addr);
+	if (!mlo_peer_ctx) {
+		pe_debug("mlo peer ctx not create yet");
+		/*
+		 * if assoc link or legacy peer, then come here,
+		 * mlo dev ctx not created yet, do not need update DA
+		 */
+		return sta;
+	}
+	/* non-assoc link come here */
+	assoc_peer = wlan_mlo_peer_get_assoc_peer(mlo_peer_ctx);
+	if (!assoc_peer) {
+		pe_debug("assoc peer is null");
+		/*
+		 * first assoc peer not create yet,
+		 * may assoc req parse happen error,
+		 * current is assoc peer, do not need update DA
+		 */
+		return sta;
+	}
+
+	/* assoc peer addr NOT zero and not equal with current addr */
+	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)assoc_peer->macaddr) &&
+	    !qdf_is_macaddr_equal((struct qdf_mac_addr *)peer_addr,
+				  (struct qdf_mac_addr *)assoc_peer->macaddr)) {
+		pe_debug("DA from "QDF_MAC_ADDR_FMT" to "QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(peer_addr),
+			 QDF_MAC_ADDR_REF(assoc_peer->macaddr));
+		qdf_mem_copy(peer_addr, assoc_peer->macaddr,
+			     QDF_MAC_ADDR_SIZE);
+
+		/* search sta da under partner link */
+		lim_get_mlo_vdev_list(in_session, &vdev_count, wlan_vdev_list);
+		for (link = 0; link < vdev_count; link++) {
+			if (!wlan_vdev_list[link])
+				continue;
+
+			vdev_id = wlan_vdev_get_id(wlan_vdev_list[link]);
+
+			/* skip itself */
+			if (in_session->vdev_id == vdev_id)
+				continue;
+
+			if (!wlan_vdev_mlme_is_mlo_ap(wlan_vdev_list[link]))
+				continue;
+
+			tmp_session = pe_find_session_by_vdev_id(mac_ctx,
+								 vdev_id);
+			if (!tmp_session)
+				continue;
+
+			partner_sta = dph_lookup_hash_entry(mac_ctx,
+							    peer_addr,
+							    &peer_idx,
+							    &tmp_session->dph.dphHashTable);
+			if (partner_sta) {
+				pe_debug("ds "QDF_MAC_ADDR_FMT" vdevid %d",
+					 QDF_MAC_ADDR_REF(peer_addr),
+					 tmp_session->vdev_id);
+				*out_vdevid = vdev_id;
+				break;
+			}
+		}
+		/* release ref that ever claim in lim_get_mlo_vdev_list */
+		for (link = 0; link < vdev_count; link++) {
+			if (!wlan_vdev_list[link])
+				continue;
+
+			lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
+		}
+		if (partner_sta)
+			return partner_sta;
+	}
+	return sta;
+}
+#else
+static tpDphHashNode
+lim_pickup_correct_link_and_dest_addr(struct mac_context *mac_ctx,
+				      struct pe_session *in_session,
+				      tpDphHashNode sta,
+				      tSirMacAddr peer_addr,
+				      struct qdf_mac_addr *mld_addr,
+				      uint8_t *out_vdevid)
+{
+	*out_vdevid = in_session->vdev_id;
+	return sta;
+}
+#endif
+
 void
 lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			      uint16_t status_code, uint16_t aid,
 			      tSirMacAddr peer_addr,
-			      uint8_t subtype, tpDphHashNode sta,
-			      struct pe_session *pe_session,
-			      bool tx_complete)
+			      uint8_t subtype, tpDphHashNode in_sta,
+			      struct pe_session *in_pe_session,
+			      bool tx_complete,
+			      struct qdf_mac_addr *mld_addr)
 {
 	static tDot11fAssocResponse frm;
 	uint8_t *frame;
@@ -2055,18 +2181,20 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	struct element_info ie;
 	uint32_t aes_block_size_len = 0;
 	struct pe_fils_session *fils_info;
+	tpDphHashNode sta = NULL;
+	struct pe_session *pe_session = in_pe_session;
+	uint8_t out_vdevid = 0xff;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
 		return;
 	}
-	if (sta && lim_is_mlo_conn(pe_session, sta) &&
-	    !lim_is_mlo_recv_assoc(sta)) {
-		pe_err("Do not send assoc rsp in mlo partner peer "
-		       QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(sta->staAddr));
-		return;
-	}
+
+	sta = lim_pickup_correct_link_and_dest_addr(mac_ctx, in_pe_session,
+						    in_sta, peer_addr,
+						    mld_addr, &out_vdevid);
+	pe_session = pe_find_session_by_vdev_id(mac_ctx, out_vdevid);
+
 
 	sme_session = pe_session->smeSessionId;
 

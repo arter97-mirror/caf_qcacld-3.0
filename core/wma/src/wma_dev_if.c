@@ -927,6 +927,66 @@ static void wma_handle_hidden_ssid_restart(tp_wma_handle wma,
 				      0, NULL);
 }
 
+static void wma_set_phy_mode_n_bw(tp_wma_handle wma, uint8_t vdev_id,
+				  uint8_t *peer_addr, uint32_t phymode,
+				  uint32_t max_ch_width_supported)
+{
+	wma_set_peer_param(wma, peer_addr, WMI_PEER_PHYMODE, phymode, vdev_id);
+	wma_set_peer_param(wma, peer_addr, WMI_HOST_PEER_CHWIDTH,
+			   max_ch_width_supported, vdev_id);
+}
+
+static void wma_set_bw_n_phy_mode(tp_wma_handle wma, uint8_t vdev_id,
+				  uint8_t *peer_addr, uint32_t phymode,
+				  bool is_eht, struct wlan_objmgr_vdev *vdev,
+				  struct wlan_channel *vdev_chan,
+				  uint16_t puncture_bitmap,
+				  uint32_t max_ch_width_supported)
+{
+	uint32_t bw_puncture = 0;
+	uint16_t new_puncture_bitmap = 0;
+	enum phy_ch_width new_bw;
+
+	new_bw =
+	target_if_wmi_chan_width_to_phy_ch_width(max_ch_width_supported);
+
+	if (is_eht) {
+		wlan_reg_extract_puncture_by_bw(vdev_chan->ch_width,
+						puncture_bitmap,
+						vdev_chan->ch_freq,
+						vdev_chan->ch_freq_seg2,
+						new_bw,
+						&new_puncture_bitmap);
+		QDF_SET_BITS(bw_puncture, 0, 8, new_bw);
+		QDF_SET_BITS(bw_puncture, 8, 16, new_puncture_bitmap);
+		wma_debug("new punct: 0x%x", new_puncture_bitmap);
+		wlan_util_vdev_peer_set_param_send(vdev, peer_addr,
+						   WLAN_MLME_PEER_BW_PUNCTURE,
+						   bw_puncture);
+	} else {
+		wma_set_peer_param(wma, peer_addr, WMI_HOST_PEER_CHWIDTH,
+				   max_ch_width_supported, vdev_id);
+	}
+
+	wma_set_peer_param(wma, peer_addr, WMI_PEER_PHYMODE, phymode, vdev_id);
+}
+
+void
+wma_send_peer_phy_mode(tSirMacAddr bssId, uint8_t vdev_id,
+		       enum wlan_phymode phy_mode)
+{
+	uint32_t fw_phymode;
+	tp_wma_handle wma;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma)
+		return;
+
+	fw_phymode = wmi_host_to_fw_phymode(phy_mode);
+	wma_set_peer_param(wma, bssId, WMI_HOST_PEER_PHYMODE,
+					fw_phymode, vdev_id);
+}
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * wma_get_peer_phymode() - get phy mode and eht puncture
@@ -991,9 +1051,6 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	uint8_t vdev_id;
 	bool is_eht = false;
 	uint16_t puncture_bitmap = 0;
-	uint16_t new_puncture_bitmap = 0;
-	uint32_t bw_puncture = 0;
-	enum phy_ch_width new_bw;
 
 	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_SELF)
 		return;
@@ -1035,32 +1092,19 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	max_ch_width_supported =
 		wmi_get_ch_width_from_phy_mode(wma->wmi_handle,
 					       fw_phymode);
-	new_bw =
-	target_if_wmi_chan_width_to_phy_ch_width(max_ch_width_supported);
 
-	if (is_eht) {
-		wlan_reg_extract_puncture_by_bw(vdev_chan->ch_width,
-						puncture_bitmap,
-						vdev_chan->ch_freq,
-						vdev_chan->ch_freq_seg2,
-						new_bw,
-						&new_puncture_bitmap);
-		QDF_SET_BITS(bw_puncture, 0, 8, new_bw);
-		QDF_SET_BITS(bw_puncture, 8, 16, new_puncture_bitmap);
-		wlan_util_vdev_peer_set_param_send(vdev, peer_mac_addr,
-						   WLAN_MLME_PEER_BW_PUNCTURE,
-						   bw_puncture);
-	} else {
-		wma_set_peer_param(wma, peer_mac_addr, WMI_HOST_PEER_CHWIDTH,
-				   max_ch_width_supported, vdev_id);
-	}
+	/* For non 11ax capable targets send phymode followed by width */
+	if (!IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
+		wma_set_phy_mode_n_bw(wma, vdev_id, peer_mac_addr, fw_phymode,
+				      max_ch_width_supported);
+	else
+		wma_set_bw_n_phy_mode(wma, vdev_id, peer_mac_addr, fw_phymode,
+				      is_eht, vdev, vdev_chan, puncture_bitmap,
+				      max_ch_width_supported);
 
-	wma_set_peer_param(wma, peer_mac_addr, WMI_HOST_PEER_PHYMODE,
-			   fw_phymode, vdev_id);
-	wma_debug("FW phymode %d old phymode %d new phymode %d bw %d punct: 0x%x macaddr " QDF_MAC_ADDR_FMT,
+	wma_debug("FW phymode %d old phymode %d new phymode %d bw %d macaddr " QDF_MAC_ADDR_FMT,
 		  fw_phymode, old_peer_phymode, new_phymode,
-		  max_ch_width_supported, new_puncture_bitmap,
-		  QDF_MAC_ADDR_REF(peer_mac_addr));
+		  max_ch_width_supported, QDF_MAC_ADDR_REF(peer_mac_addr));
 }
 
 static
@@ -1279,6 +1323,44 @@ static QDF_STATUS wma_get_ratemask_type(enum wlan_mlme_ratemask_type type,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * wma_set_and_update_mac_id() - set and update mac_id for vdev_id
+ * @wma: WMA context
+ * @mac_ctx: mac context
+ * @vdev_mlme: vdev mlme obj
+ * @rsp: vdev start response
+ * @dp_soc: data patch soc handle
+ * mac_id: mac id
+ *
+ * Return: None
+ */
+static void
+wma_set_and_update_mac_id(tp_wma_handle wma, struct mac_context *mac_ctx,
+			  struct vdev_mlme_obj *vdev_mlme,
+			  struct vdev_start_response *rsp,
+			  void *dp_soc, uint32_t mac_id)
+{
+	if (mac_id >= MAX_MAC) {
+		wma_err("Invalid mac_id %d", mac_id);
+		QDF_ASSERT(0);
+		return;
+	}
+
+	wlan_mlme_set_vdev_mac_id(wma->pdev, rsp->vdev_id, mac_id);
+
+	if (wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev) ||
+	    wma->interfaces[rsp->vdev_id].type ==
+	    WMI_VDEV_TYPE_MONITOR)
+		cdp_update_mac_id(dp_soc, rsp->vdev_id, mac_id);
+
+	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id)) {
+		wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
+		wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
+							    mac_id,
+							    rsp);
+	}
+}
+
 QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 				       struct vdev_start_response *rsp)
 {
@@ -1349,7 +1431,7 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 		} else {
 			mac_id = rsp->mac_id;
 		}
-		wlan_mlme_set_vdev_mac_id(wma->pdev, rsp->vdev_id, mac_id);
+
 		wma_debug("vdev:%d tx ss=%d rx ss=%d chain mask=%d mac=%d",
 			  rsp->vdev_id, rsp->cfgd_tx_streams,
 			  rsp->cfgd_rx_streams, rsp->chain_mask, mac_id);
@@ -1365,22 +1447,8 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 			     iface->vdev->vdev_mlme.des_chan,
 			     sizeof(struct wlan_channel));
 
-		if (wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev) ||
-		    wma->interfaces[rsp->vdev_id].type ==
-		    WMI_VDEV_TYPE_MONITOR)
-			cdp_update_mac_id(dp_soc, rsp->vdev_id, mac_id);
-	}
-
-	if (wma_is_vdev_in_ap_mode(wma, rsp->vdev_id)) {
-		if (mac_id < MAX_MAC) {
-			wma_dcs_clear_vdev_starting(mac_ctx, rsp->vdev_id);
-			wma_dcs_wlan_interference_mitigation_enable(mac_ctx,
-								    mac_id,
-								    rsp);
-		} else {
-			wma_err("Invalid mac_id: %u", mac_id);
-			return QDF_STATUS_E_INVAL;
-		}
+		wma_set_and_update_mac_id(wma, mac_ctx, vdev_mlme, rsp, dp_soc,
+					  mac_id);
 	}
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE

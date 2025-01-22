@@ -4947,4 +4947,25 @@ void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
  */
 void sme_deregister_disconnect_cb(mac_handle_t mac_handle);
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * sme_pmkid_get_mld_addr - Get mld address from preauth list
+ * @mac_handle: pointer to mac handle
+ * @peer_addr : input peer link address
+ * @mld_addr: output mld address
+ *
+ *
+ * Return: None
+ */
+void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
+			    uint8_t *peer_addr,
+			    uint8_t *mld_addr);
+#else
+static inline
+void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
+			    uint8_t *peer_addr,
+			    uint8_t *mld_addr)
+{
+}
+#endif
 #endif /* #if !defined( __SME_API_H ) */

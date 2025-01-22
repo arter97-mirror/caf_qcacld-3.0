@@ -924,9 +924,10 @@ void lim_send_mscs_req_action_frame(struct mac_context *mac,
  * @aid: Association ID
  * @peer_addr: Mac address of requesting peer
  * @subtype: Assoc/Reassoc
- * @sta: Pointer to station node
- * @pe_session: PE session id.
+ * @in_sta: Pointer to station node
+ * @in_pe_session: PE session id.
  * @tx_complete: Need tx complete callback or not
+ * @mld_addr: mld address
  *
  * Builds and sends association response frame to the requesting peer.
  *
@@ -936,8 +937,9 @@ void
 lim_send_assoc_rsp_mgmt_frame(
 	struct mac_context *mac_ctx,
 	uint16_t status_code, uint16_t aid, tSirMacAddr peer_addr,
-	uint8_t subtype, tpDphHashNode sta, struct pe_session *pe_session,
-	bool tx_complete);
+	uint8_t subtype, tpDphHashNode in_sta,
+	struct pe_session *in_pe_session,
+	bool tx_complete, struct qdf_mac_addr *mld_addr);
 
 void lim_send_disassoc_mgmt_frame(struct mac_context *, uint16_t, tSirMacAddr,
 				  struct pe_session *, bool waitForAck);
