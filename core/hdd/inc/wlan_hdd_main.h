@@ -1427,6 +1427,12 @@ struct hdd_adapter {
 	void *cookie;
 	bool response_expected;
 #endif
+
+#ifdef CONFIG_WLAN_ICMP_REQ_DETECT
+	qdf_mc_timer_t ps_timer;
+	bool ps_timer_initialized;
+	uint64_t icmp_pre_time;
+#endif
 	uint8_t gro_disallowed[DP_MAX_RX_THREADS];
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
 	bool handle_feature_update;

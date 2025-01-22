@@ -900,6 +900,31 @@ static int hdd_set_grat_arp_keepalive(struct hdd_adapter *adapter)
 	return 0;
 }
 
+#ifdef CONFIG_WLAN_ICMP_REQ_DETECT
+/**
+ * hdd_icmp_detect_timer_register() - initialization the detect timer
+ * @adapter: adapter whose IP address changed
+ *
+ * Return: None
+ */
+static void
+hdd_icmp_detect_timer_register(struct hdd_adapter *adapter)
+{
+	if (adapter->device_mode == QDF_STA_MODE &&
+	    !adapter->ps_timer_initialized) {
+		hdd_debug("start icmp detect timer");
+		qdf_mc_timer_init(&adapter->ps_timer, QDF_TIMER_TYPE_SW,
+				  hdd_ps_timer_expired_handler, adapter);
+		adapter->ps_timer_initialized = true;
+	}
+}
+#else
+static void
+hdd_icmp_detect_timer_register(struct hdd_adapter *adapter)
+{
+}
+#endif
+
 /**
  * __hdd_ipv4_notifier_work_queue() - IPv4 notification work function
  * @adapter: adapter whose IP address changed
@@ -950,6 +975,8 @@ static void __hdd_ipv4_notifier_work_queue(struct hdd_adapter *adapter)
 		sme_send_hlp_ie_info(hdd_ctx->mac_handle, adapter->vdev_id,
 				     roam_profile, ifa->ifa_local);
 	hdd_send_ps_config_to_fw(adapter);
+
+	hdd_icmp_detect_timer_register(adapter);
 exit:
 	hdd_exit();
 }
@@ -3098,5 +3125,157 @@ int hdd_wlan_fake_apps_resume(struct wiphy *wiphy, struct net_device *dev)
 	__hdd_wlan_fake_apps_resume(wiphy, dev);
 
 	return 0;
+}
+#endif
+
+#ifdef CONFIG_WLAN_ICMP_REQ_DETECT
+/* 2s = 2000us * 1000 */
+#define NO_ICMP_INTERVAL (2000 * 1000)
+#define ICMP_DETECT_TIME 2000
+#define ITO_TIME 2000
+
+/**
+ * hdd_pmo_convert_opm_mode() - convert pmo opm with equivalent wma opm
+ * @opm_mode: Optimized power management mode
+ *
+ * Return: enum wma_sta_ps_scheme_cfg
+ */
+static enum wma_sta_ps_scheme_cfg
+hdd_pmo_convert_opm_mode(enum powersave_mode opm_mode)
+{
+	switch (opm_mode) {
+	case PMO_PS_ADVANCED_POWER_SAVE_DISABLE:
+		return WMA_STA_PS_OPM_CONSERVATIVE;
+	case PMO_PS_ADVANCED_POWER_SAVE_ENABLE:
+		return WMA_STA_PS_OPM_AGGRESSIVE;
+	case PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED:
+		return WMA_STA_PS_USER_DEF;
+	default:
+		hdd_err("Invalid opm_mode: %d", opm_mode);
+		return WMA_STA_PS_OPM_CONSERVATIVE;
+	}
+}
+
+/**
+ * hdd_powersave_mode_change() - Change the power save mode
+ * adapter: adapter structure
+ * @ps_params: Power save parameters
+ *
+ * Return: 0 if success, otherwise error.
+ */
+static int
+hdd_powersave_mode_change(struct hdd_adapter *adapter,
+			  struct pmo_ps_params *ps_params)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_objmgr_vdev *vdev;
+	int ret;
+	QDF_STATUS status;
+
+	if (!ucfg_pmo_get_default_power_save_mode(hdd_ctx->psoc)) {
+		hdd_err_rl("OPM power save is disabled in ini");
+		return -EINVAL;
+	}
+
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
+		hdd_info("Advanced power save only allowed in STA/P2P-Client modes:%d",
+			 adapter->device_mode);
+		return -EINVAL;
+	}
+
+	if (ucfg_pmo_get_max_ps_poll(hdd_ctx->psoc)) {
+		hdd_info("Disable advanced power save since max ps poll is enabled");
+		ps_params->opm_mode = PMO_PS_ADVANCED_POWER_SAVE_DISABLE;
+	}
+
+	status = wma_set_power_config(adapter->vdev_id,
+				      hdd_pmo_convert_opm_mode(ps_params->opm_mode));
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("failed to configure power: %d", status);
+		return -EINVAL;
+	}
+
+	if (ps_params->opm_mode == PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED) {
+		ret = hdd_set_power_config_params(hdd_ctx, adapter,
+						  ps_params->ps_ito,
+						  ps_params->spec_wake);
+		if (ret)
+			return ret;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	if (vdev) {
+		ucfg_pmo_set_ps_params(vdev, ps_params);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+	}
+	return 0;
+}
+
+void hdd_ps_timer_expired_handler(void *adapter_context)
+{
+	struct hdd_adapter *adapter = (struct hdd_adapter *)adapter_context;
+	struct pmo_ps_params ps_params = {0};
+	QDF_STATUS status;
+	uint64_t delt = 0;
+
+	if (!adapter) {
+		hdd_err("NULL adapter");
+		return;
+	}
+	delt = qdf_get_time_of_the_day_us() - adapter->icmp_pre_time;
+
+	ucfg_pmo_get_ps_params(adapter->vdev, &ps_params);
+
+	if ((ps_params.opm_mode != PMO_PS_ADVANCED_POWER_SAVE_ENABLE) &&
+	    (delt > NO_ICMP_INTERVAL)) {
+		ps_params.opm_mode = PMO_PS_ADVANCED_POWER_SAVE_ENABLE;
+		hdd_powersave_mode_change(adapter, &ps_params);
+	} else {
+		status = qdf_mc_timer_start(&adapter->ps_timer,
+					    ICMP_DETECT_TIME);
+			if (!QDF_IS_STATUS_SUCCESS(status))
+				hdd_err("Failed to restart ps_timer");
+	}
+}
+
+void
+hdd_icmp_ps_change_handler(struct hdd_adapter *adapter,
+			   struct sk_buff *skb)
+{
+	struct pmo_ps_params ps_params = {0};
+	QDF_STATUS status;
+
+	if (!adapter) {
+		hdd_err("NULL adapter");
+		return;
+	}
+
+	if (adapter->device_mode != QDF_STA_MODE)
+		return;
+
+	if (qdf_nbuf_get_icmp_subtype(skb) != QDF_PROTO_ICMP_REQ &&
+	    qdf_nbuf_get_icmp_subtype(skb) != QDF_PROTO_ICMPV6_REQ)
+		return;
+
+	adapter->icmp_pre_time = qdf_get_time_of_the_day_us();
+	if (adapter->ps_timer_initialized) {
+		if (QDF_TIMER_STATE_STOPPED ==
+		    qdf_mc_timer_get_current_state(&adapter->ps_timer)) {
+			status = qdf_mc_timer_start(&adapter->ps_timer,
+						    ICMP_DETECT_TIME);
+			if (!QDF_IS_STATUS_SUCCESS(status))
+				hdd_err("Failed to start ps_timer");
+		}
+
+		ucfg_pmo_get_ps_params(adapter->vdev, &ps_params);
+
+		if (ps_params.opm_mode != PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED) {
+			ps_params.opm_mode = PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED;
+			ps_params.ps_ito = ITO_TIME;
+			ps_params.spec_wake = 0;
+			hdd_powersave_mode_change(adapter, &ps_params);
+		}
+	}
 }
 #endif

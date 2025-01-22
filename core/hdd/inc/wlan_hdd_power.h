@@ -614,4 +614,33 @@ QDF_STATUS wlan_hdd_get_ani_level(struct hdd_adapter *adapter,
 				  uint32_t *parsed_freqs,
 				  uint8_t num_freqs);
 #endif /* FEATURE_ANI_LEVEL_REQUEST */
+
+#ifdef CONFIG_WLAN_ICMP_REQ_DETECT
+/**
+ * hdd_icmp_ps_change_handler() - API to change power save mode
+ * @adapter: Adapter context
+ * @skb: skb buffer
+ *
+ * Return: None
+ */
+void
+hdd_icmp_ps_change_handler(struct hdd_adapter *adapter,
+			   struct sk_buff *skb);
+
+/**
+ * hdd_ps_timer_expired_handler() - Change power save mode expired handler
+ * @adapter_context: Adapter context
+ *
+ * Return: None
+ */
+void hdd_ps_timer_expired_handler(void *adapter_context);
+
+#else
+static inline void
+hdd_icmp_ps_change_handler(struct hdd_adapter *adapter,
+			   struct sk_buff *skb)
+{
+}
+#endif
+
 #endif /* __WLAN_HDD_POWER_H */
