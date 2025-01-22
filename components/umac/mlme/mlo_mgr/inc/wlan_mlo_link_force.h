@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -484,6 +484,19 @@ ml_nlink_get_curr_force_state(struct wlan_objmgr_psoc *psoc,
 void
 ml_nlink_clr_force_state(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ml_nlink_update_force_state_on_link_delete() - update force link
+ * bitmap when link is deleted
+ * @vdev: vdev object
+ * @delete_link_id: link id to be deleted
+ *
+ * Return: None
+ */
+void
+ml_nlink_update_force_state_on_link_delete(
+			struct wlan_objmgr_vdev *vdev,
+			uint8_t delete_link_id);
 
 /**
  * ml_nlink_clr_requested_emlsr_mode() - clear the requested emlsr mode
