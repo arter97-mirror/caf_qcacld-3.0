@@ -1583,6 +1583,12 @@ struct hdd_adapter {
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	void *set_mac_addr_req_ctx;
 #endif
+
+#ifdef CONFIG_WLAN_ICMP_REQ_DETECT
+	qdf_mc_timer_t ps_timer;
+	bool ps_timer_initialized;
+	uint64_t icmp_pre_time;
+#endif
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
