@@ -461,9 +461,7 @@ policy_mgr_dfs_master_cfg_changed(struct wlan_objmgr_psoc *psoc,
 
 	cfg->sta_sap_scc_on_dfs_chnl =
 		cfg_get(psoc, CFG_STA_SAP_SCC_ON_DFS_CHAN);
-	if (cfg->sta_sap_scc_on_dfs_chnl ==
-			PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX &&
-	    !dfs_master_capable)
+	if (!dfs_master_capable)
 		cfg->sta_sap_scc_on_dfs_chnl = 0;
 	policy_mgr_debug("sta_sap_scc_on_dfs_chnl %d, dfs_master_capable %d",
 			 cfg->sta_sap_scc_on_dfs_chnl,
