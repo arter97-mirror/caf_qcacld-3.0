@@ -131,12 +131,22 @@ enum wlan_dp_stc_burst_state {
 #define DP_STC_LONG_WINDOW_MS 30000
 #define DP_STC_TIMER_THRESH_MS 600
 
+/* Burst stat for stage 1 needs to be collected at 10.8s. Each sample state
+ * being 600ms. Collect burst stat at 18th sample (10.8s/0.6s).
+ */
+#define WLAN_DP_SAMPLING_BURST_STAT_STAGE_1_END 18
+/* Burst stat for stage 2 needs to be collected at 30s. Each sample state
+ * being 600ms. Collect burst stat at 50th sample (30s/0.6s).
+ */
+#define WLAN_DP_SAMPLING_BURST_STAT_STAGE_2_END 50
+
 /**
  * enum wlan_stc_sampling_state - Sampling state
  * @WLAN_DP_SAMPLING_STATE_INIT: init state
  * @WLAN_DP_SAMPLING_STATE_FLOW_ADDED: flow added for sampling
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_START: sampling started
- * @WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS: sampling burst stats
+ * @WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1: Sampling burst stats stage 1
+ * @WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_2: sampling burst stats stage 2
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_DONE: sampling completed
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL: sampling failed
  * @WLAN_DP_SAMPLING_STATE_SAMPLES_SENT: samples sent
@@ -146,7 +156,8 @@ enum wlan_stc_sampling_state {
 	WLAN_DP_SAMPLING_STATE_INIT,
 	WLAN_DP_SAMPLING_STATE_FLOW_ADDED,
 	WLAN_DP_SAMPLING_STATE_SAMPLING_START,
-	WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS,
+	WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1,
+	WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_2,
 	WLAN_DP_SAMPLING_STATE_SAMPLING_DONE,
 	WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL,
 	WLAN_DP_SAMPLING_STATE_SAMPLES_SENT,
@@ -207,8 +218,8 @@ struct wlan_dp_stc_sampling_candidate {
  * @id: index of this sampling table entry in the sampling table
  * @next_sample_idx: next sample index to fill min/max stats in per-packet path
  * @next_win_idx: next window index to fill min/max stats in per-packet path
- * @max_num_sample_attempts: max number of sampling_timer runs to collect
- *			     txrx and burst state
+ * @curr_sample_attempt: Current sample number which is being checked or
+ *                       collected
  * @tx_flow_id: tx flow ID
  * @rx_flow_id: rx flow ID
  * @tx_flow_metadata: tx flow metadata
@@ -228,7 +239,7 @@ struct wlan_dp_stc_sampling_table_entry {
 	uint8_t id;
 	uint8_t next_sample_idx;
 	uint8_t next_win_idx;
-	uint8_t max_num_sample_attempts;
+	uint8_t curr_sample_attempt;
 	uint8_t traffic_type;
 	uint16_t peer_id;
 	uint16_t tx_flow_id;

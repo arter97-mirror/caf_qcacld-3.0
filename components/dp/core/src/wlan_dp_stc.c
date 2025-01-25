@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1602,8 +1602,7 @@ sample:
 				     sizeof(struct wlan_dp_stc_txrx_stats));
 		}
 
-		s_entry->max_num_sample_attempts =
-				DP_STC_LONG_WINDOW_MS / DP_STC_TIMER_THRESH_MS;
+		s_entry->curr_sample_attempt = 0;
 		s_entry->state = WLAN_DP_SAMPLING_STATE_SAMPLING_START;
 		sampling_pending = true;
 		break;
@@ -1622,7 +1621,7 @@ sample:
 			txrx_samples->win_size = DP_STC_TIMER_THRESH_MS;
 		}
 
-		s_entry->max_num_sample_attempts--;
+		s_entry->curr_sample_attempt++;
 		/*
 		 * 1) wlan_dp_stc_get_txrx_stats for Tx and Rx flow
 		 * 2) Calculate delta stats
@@ -1693,20 +1692,34 @@ sample:
 		if (s_entry->next_sample_idx == DP_STC_TXRX_SAMPLES_MAX) {
 			s_entry->flags |=
 				WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY;
+			/* skip burst stats stage 1 */
 			s_entry->state =
-				WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS;
+				WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_2;
+			s_entry->flow_samples.curr_stats_stage++;
 		}
 		sampling_pending = true;
 		break;
-	case WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS:
-		s_entry->max_num_sample_attempts--;
-		if (qdf_unlikely(!s_entry->max_num_sample_attempts)) {
-			/* Burst samples are ready, push to Global */
+	case WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1:
+		s_entry->curr_sample_attempt++;
+		if (qdf_unlikely(s_entry->curr_sample_attempt ==
+				    WLAN_DP_SAMPLING_BURST_STAT_STAGE_1_END)) {
+			wlan_dp_stc_save_burst_samples(dp_stc, s_entry);
+			s_entry->flags |=
+				WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_READY;
+			s_entry->state =
+				WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_2;
+		}
+		sampling_pending = true;
+		break;
+	case WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_2:
+		s_entry->curr_sample_attempt++;
+		if (qdf_unlikely(s_entry->curr_sample_attempt ==
+				    WLAN_DP_SAMPLING_BURST_STAT_STAGE_2_END)) {
 			wlan_dp_stc_save_burst_samples(dp_stc, s_entry);
 			s_entry->flags |=
 				WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_READY;
 			s_entry->state = WLAN_DP_SAMPLING_STATE_SAMPLING_DONE;
-			/* Set some indication to periodic work */
+			/* Set indication to periodic work */
 			wlan_dp_stc_stop_flow_tracking(dp_stc, s_entry);
 			break;
 		}
