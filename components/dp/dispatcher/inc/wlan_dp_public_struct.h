@@ -752,7 +752,7 @@ struct wlan_dp_stc_flow_samples {
 	uint32_t cookie;
 	struct flow_info flow_tuple;
 	struct wlan_dp_stc_txrx_samples txrx_samples[DP_STC_TXRX_SAMPLES_MAX][DP_TXRX_SAMPLES_WINDOW_MAX];
-	struct wlan_dp_stc_burst_samples burst_sample;
+	struct wlan_dp_stc_burst_samples burst_sample[DP_STC_BURST_STAGE_MAX];
 	uint8_t curr_stats_stage;
 };
 

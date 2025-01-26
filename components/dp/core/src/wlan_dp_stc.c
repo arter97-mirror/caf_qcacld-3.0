@@ -1436,8 +1436,14 @@ wlan_dp_stc_save_burst_samples(struct wlan_dp_stc *dp_stc,
 	struct wlan_dp_stc_flow_table_entry *flow;
 	struct wlan_dp_stc_burst_samples *burst_sample;
 	uint32_t burst_dur, burst_size;
+	uint8_t burst_stage;
 
-	burst_sample = &s_entry->flow_samples.burst_sample;
+	burst_stage = s_entry->flow_samples.curr_stats_stage;
+
+	if (burst_stage == DP_STC_BURST_STAGE_MAX)
+		return;
+
+	burst_sample = &s_entry->flow_samples.burst_sample[burst_stage];
 	if (!(s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID))
 		goto save_rx_flow_samples;
 
@@ -1472,7 +1478,6 @@ save_rx_flow_samples:
 	flow = &dp_stc->rx_flow_table->entries[s_entry->rx_flow_id];
 	qdf_mem_copy(&burst_sample->txrx_samples.rx, &flow->txrx_stats,
 		     sizeof(burst_sample->txrx_samples.rx));
-	burst_sample->txrx_samples.win_size = DP_STC_LONG_WINDOW_MS;
 	qdf_mem_copy(&burst_sample->rx, &flow->burst_stats,
 		     sizeof(burst_sample->rx));
 	if (flow->burst_state == BURST_DETECTION_BURST_START) {
@@ -1494,6 +1499,16 @@ save_rx_flow_samples:
 						burst_size);
 
 	}
+
+	/* Increment burst stage and assign window duration based on stage */
+	if ((++burst_stage) == DP_STC_BURST_STAGE_MAX)
+		burst_sample->txrx_samples.win_size =
+						DP_STC_BURST_STAGE_2_WINDOW_MS;
+	else
+		burst_sample->txrx_samples.win_size =
+						DP_STC_BURST_STAGE_1_WINDOW_MS;
+
+	s_entry->flow_samples.curr_stats_stage = burst_stage;
 }
 
 static inline void
@@ -1510,6 +1525,31 @@ wlan_dp_stc_stop_flow_tracking(struct wlan_dp_stc *dp_stc,
 	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 		flow_id = s_entry->rx_flow_id;
 		wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 0, QDF_RX);
+	}
+}
+
+static inline
+void wlan_dp_stc_burst_samples_txrx_ref_store(
+			struct wlan_dp_stc_sampling_table_entry *s_entry)
+{
+	struct wlan_dp_stc_burst_samples *burst_sample;
+	uint8_t i;
+
+	/*
+	 * Push these ref stats to burst_stats->txrx_stats,
+	 * since it can be used as ref for 30-sec window
+	 */
+	for (i = 0; i < DP_STC_BURST_STAGE_MAX; i++) {
+		burst_sample = &s_entry->flow_samples.burst_sample[i];
+
+		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID)
+			qdf_mem_copy(&burst_sample->txrx_samples.tx,
+				     &s_entry->tx_stats_ref,
+				     sizeof(struct wlan_dp_stc_txrx_stats));
+		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID)
+			qdf_mem_copy(&burst_sample->txrx_samples.rx,
+				     &s_entry->rx_stats_ref,
+				     sizeof(struct wlan_dp_stc_txrx_stats));
 	}
 }
 
@@ -1532,9 +1572,6 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 		break;
 	case WLAN_DP_SAMPLING_STATE_FLOW_ADDED:
 	{
-		struct wlan_dp_stc_burst_samples *burst_sample;
-
-		burst_sample = &flow_samples->burst_sample;
 		/* Send an indication to TX and RX flow to start tracking */
 		/*
 		 * Flow is just added, so take the stats snapshot and
@@ -1562,13 +1599,6 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 			qdf_mem_copy(&s_entry->tx_stats_ref,
 				     &flow->txrx_stats,
 				     sizeof(s_entry->tx_stats_ref));
-			/*
-			 * Push these ref stats to burst_stats->txrx_stats,
-			 * since it can be used as ref for 30-sec window
-			 */
-			qdf_mem_copy(&burst_sample->txrx_samples.tx,
-				     &s_entry->tx_stats_ref,
-				     sizeof(struct wlan_dp_stc_txrx_stats));
 		}
 
 #ifdef METADATA_CHECK_NEEDED_DURING_ADD
@@ -1592,15 +1622,9 @@ sample:
 			qdf_mem_copy(&s_entry->rx_stats_ref,
 				     &flow->txrx_stats,
 				     sizeof(s_entry->rx_stats_ref));
-
-			/*
-			 * Push these ref stats to burst_stats->txrx_stats,
-			 * since it can be used as ref for 30-sec window
-			 */
-			qdf_mem_copy(&burst_sample->txrx_samples.rx,
-				     &s_entry->rx_stats_ref,
-				     sizeof(struct wlan_dp_stc_txrx_stats));
 		}
+
+		wlan_dp_stc_burst_samples_txrx_ref_store(s_entry);
 
 		s_entry->curr_sample_attempt = 0;
 		s_entry->state = WLAN_DP_SAMPLING_STATE_SAMPLING_START;

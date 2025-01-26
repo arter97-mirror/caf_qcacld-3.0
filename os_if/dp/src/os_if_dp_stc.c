@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -435,7 +435,8 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 	struct wlan_dp_stc_burst_samples *burst_sample;
 	struct wlan_dp_stc_txrx_samples *txrx_samples;
 
-	burst_sample = &flow_samples->burst_sample;
+	burst_sample =
+	   &flow_samples->burst_sample[flow_samples->cur_burst_stats_stage - 1];
 	txrx_samples = &burst_sample->txrx_samples;
 
 	osif_nofl_debug("STC: Burst TxRx Stats:");
@@ -925,7 +926,8 @@ os_if_dp_fill_burst_samples(struct sk_buff *flow_sample_event,
 	int len = 0, ret;
 	uint32_t attr_id;
 
-	burst_sample = &flow_samples->burst_sample;
+	burst_sample =
+	   &flow_samples->burst_sample[flow_samples->cur_burst_stats_stage - 1];
 	txrx_samples = &burst_sample->txrx_samples;
 
 	if (flow_sample_event) {

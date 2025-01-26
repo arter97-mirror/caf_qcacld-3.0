@@ -131,6 +131,9 @@ enum wlan_dp_stc_burst_state {
 #define DP_STC_LONG_WINDOW_MS 30000
 #define DP_STC_TIMER_THRESH_MS 600
 
+#define DP_STC_BURST_STAGE_1_WINDOW_MS 10800
+#define DP_STC_BURST_STAGE_2_WINDOW_MS DP_STC_LONG_WINDOW_MS
+
 /* Burst stat for stage 1 needs to be collected at 10.8s. Each sample state
  * being 600ms. Collect burst stat at 18th sample (10.8s/0.6s).
  */
