@@ -378,8 +378,16 @@ wlan_dp_txrx_samples_reported(struct wlan_dp_stc_sampling_table_entry *s_entry)
 static inline bool
 wlan_dp_burst_samples_ready(struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
-	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_READY)
-		return true;
+	if (s_entry->flow_samples.curr_stats_stage ==
+	    DP_STC_BURST_STAGE_MAX) {
+		if (s_entry->flags &
+		    WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_2_READY)
+			return true;
+	} else {
+		if (s_entry->flags &
+		    WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_1_READY)
+			return true;
+	}
 
 	return false;
 }
@@ -387,8 +395,16 @@ wlan_dp_burst_samples_ready(struct wlan_dp_stc_sampling_table_entry *s_entry)
 static inline bool
 wlan_dp_burst_samples_reported(struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
-	if (s_entry->flags1 & WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_SENT)
-		return true;
+	if (s_entry->flow_samples.curr_stats_stage ==
+	    DP_STC_BURST_STAGE_MAX) {
+		if (s_entry->flags1 &
+		    WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_2_SENT)
+			return true;
+	} else {
+		if (s_entry->flags1 &
+		    WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_1_SENT)
+			return true;
+	}
 
 	return false;
 }
@@ -1395,19 +1411,21 @@ other_checks:
 		if (wlan_dp_burst_samples_ready(s_entry) &&
 		    !wlan_dp_burst_samples_reported(s_entry)) {
 			/* Burst samples are ready to be sent */
-			s_entry->flags1 |=
-				WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_SENT;
 			wlan_dp_send_burst_sample(dp_stc, s_entry);
-			s_entry->burst_stats_report_ts = cur_ts;
-			/*
-			 * Set flag to indicate that the burst sample
-			 * has been reported
-			 */
+			if (s_entry->flow_samples.curr_stats_stage ==
+			    DP_STC_BURST_STAGE_MAX) {
+				s_entry->flags1 |=
+				WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_2_SENT;
+				s_entry->last_burst_stats_report_ts = cur_ts;
+			} else {
+				s_entry->flags1 |=
+				WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_1_SENT;
+			}
 		}
 
 		if (wlan_dp_burst_samples_reported(s_entry) &&
-		    s_entry->burst_stats_report_ts &&
-		    cur_ts - s_entry->burst_stats_report_ts >
+		    s_entry->last_burst_stats_report_ts &&
+		    cur_ts - s_entry->last_burst_stats_report_ts >
 						FLOW_CLASSIFY_WAIT_TIME_NS) {
 			wlan_dp_stc_remove_sampling_table_entry(dp_stc,
 								s_entry);
@@ -1804,8 +1822,7 @@ sample:
 				WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY;
 			/* skip burst stats stage 1 */
 			s_entry->state =
-				WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_2;
-			s_entry->flow_samples.curr_stats_stage++;
+				WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1;
 		}
 		sampling_pending = true;
 		break;
@@ -1815,7 +1832,7 @@ sample:
 				    WLAN_DP_SAMPLING_BURST_STAT_STAGE_1_END)) {
 			wlan_dp_stc_save_burst_samples(dp_stc, s_entry);
 			s_entry->flags |=
-				WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_READY;
+				WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_1_READY;
 			s_entry->state =
 				WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_2;
 		}
@@ -1827,7 +1844,7 @@ sample:
 				    WLAN_DP_SAMPLING_BURST_STAT_STAGE_2_END)) {
 			wlan_dp_stc_save_burst_samples(dp_stc, s_entry);
 			s_entry->flags |=
-				WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_READY;
+				WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_2_READY;
 			s_entry->state = WLAN_DP_SAMPLING_STATE_SAMPLING_DONE;
 			/* Set indication to periodic work */
 			wlan_dp_stc_stop_flow_tracking(dp_stc, s_entry);
@@ -1986,10 +2003,10 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		 * The classification result is for this flow only.
 		 */
 		s_entry->traffic_type = flow_classify_result->traffic_type;
-		dp_info("STC: sampling flow %d tuple (%s) result %d burst_reported %d",
+		dp_info("STC: sampling flow %d tuple (%s) result %d current stage %u",
 			i, dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
 			flow_classify_result->traffic_type,
-			wlan_dp_burst_samples_reported(s_entry));
+			s_entry->flow_samples.curr_stats_stage);
 		/*
 		 * 1) Indicate to TX and RX flow
 		 * 2) Change state to classified,
@@ -2004,7 +2021,7 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		 * 2) burst stats reported and flow classification attempted
 		 */
 		if (wlan_dp_stc_is_traffic_type_known(s_entry->traffic_type) ||
-		    wlan_dp_burst_samples_reported(s_entry))
+		    s_entry->last_burst_stats_report_ts)
 			s_entry->state = WLAN_DP_SAMPLING_STATE_CLASSIFIED;
 
 		break;

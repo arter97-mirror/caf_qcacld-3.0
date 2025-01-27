@@ -732,7 +732,6 @@ struct wlan_dp_stc_burst_samples {
 	struct wlan_dp_stc_txrx_samples txrx_samples;
 	struct wlan_dp_stc_burst_stats tx;
 	struct wlan_dp_stc_burst_stats rx;
-	uint64_t sample_window_ns;
 };
 
 #define WLAN_DP_TXRX_SAMPLES_READY BIT(0)

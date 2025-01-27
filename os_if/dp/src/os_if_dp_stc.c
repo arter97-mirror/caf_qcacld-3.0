@@ -436,7 +436,7 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 	struct wlan_dp_stc_txrx_samples *txrx_samples;
 
 	burst_sample =
-	   &flow_samples->burst_sample[flow_samples->cur_burst_stats_stage - 1];
+	   &flow_samples->burst_sample[flow_samples->curr_stats_stage - 1];
 	txrx_samples = &burst_sample->txrx_samples;
 
 	osif_nofl_debug("STC: Burst TxRx Stats:");
@@ -927,7 +927,7 @@ os_if_dp_fill_burst_samples(struct sk_buff *flow_sample_event,
 	uint32_t attr_id;
 
 	burst_sample =
-	   &flow_samples->burst_sample[flow_samples->cur_burst_stats_stage - 1];
+	   &flow_samples->burst_sample[flow_samples->curr_stats_stage - 1];
 	txrx_samples = &burst_sample->txrx_samples;
 
 	if (flow_sample_event) {

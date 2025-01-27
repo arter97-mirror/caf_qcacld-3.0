@@ -205,11 +205,13 @@ struct wlan_dp_stc_sampling_candidate {
 #define WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID BIT(0)
 #define WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID BIT(1)
 #define WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY BIT(2)
-#define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_READY BIT(3)
+#define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_1_READY BIT(3)
+#define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_2_READY BIT(4)
 
-#define WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT BIT(0)
-#define WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_SENT BIT(1)
-#define WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT BIT(2)
+#define WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT BIT(0)
+#define WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT BIT(1)
+#define WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_1_SENT BIT(2)
+#define WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_2_SENT BIT(3)
 
 /*
  * struct wlan_dp_stc_sampling_table_entry - Sampling table entry
@@ -236,7 +238,7 @@ struct wlan_dp_stc_sampling_candidate {
 struct wlan_dp_stc_sampling_table_entry {
 	enum wlan_stc_sampling_state state;
 	enum wlan_dp_flow_dir dir;
-	uint64_t burst_stats_report_ts;
+	uint64_t last_burst_stats_report_ts;
 	uint32_t flags;
 	uint32_t flags1;
 	uint8_t id;
