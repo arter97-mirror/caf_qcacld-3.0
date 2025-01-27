@@ -778,6 +778,14 @@ wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc *dp_stc,
 	case QCA_TRAFFIC_TYPE_VIDEO_CALL:
 		val = qdf_atomic_inc_return(&peer_tc->num_video_call);
 		break;
+	case QCA_TRAFFIC_TYPE_BROWSING:
+		dp_stc->rtpm_control_flow_cnt++;
+		val = qdf_atomic_inc_return(&peer_tc->num_browsing);
+		break;
+	case QCA_TRAFFIC_TYPE_APERIODIC_BURSTS:
+		dp_stc->rtpm_control_flow_cnt++;
+		val = qdf_atomic_inc_return(&peer_tc->num_aperiodic_bursts);
+		break;
 	default:
 		break;
 	}
@@ -809,6 +817,14 @@ wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc *dp_stc,
 		break;
 	case QCA_TRAFFIC_TYPE_VIDEO_CALL:
 		val = qdf_atomic_dec_and_test(&peer_tc->num_video_call);
+		break;
+	case QCA_TRAFFIC_TYPE_BROWSING:
+		dp_stc->rtpm_control_flow_cnt--;
+		val = qdf_atomic_dec_and_test(&peer_tc->num_browsing);
+		break;
+	case QCA_TRAFFIC_TYPE_APERIODIC_BURSTS:
+		dp_stc->rtpm_control_flow_cnt--;
+		val = qdf_atomic_dec_and_test(&peer_tc->num_aperiodic_bursts);
 		break;
 	default:
 		break;
@@ -2201,15 +2217,18 @@ wlan_dp_stc_print_peer_active_traffic_map(struct wlan_dp_stc *dp_stc,
 					  struct wlan_dp_stc_peer_traffic_context *peer_tc)
 {
 	dp_stc_info(dp_stc->logmask,
-		    "STC: peer_id %u streaming %d ping %d BK %d gaming %d voice_call %d video_call %d",
-		    peer_tc->peer_id, qdf_atomic_read(&peer_tc->num_streaming),
+		    "STC: peer_id %u bursty traffic: [%u %u %u] RT traffic: [%u %u %u] non flow traffic: [%u %u]",
+		    peer_tc->peer_id,
+		    qdf_atomic_read(&peer_tc->num_streaming),
+		    qdf_atomic_read(&peer_tc->num_browsing),
+		    qdf_atomic_read(&peer_tc->num_aperiodic_bursts),
+		    qdf_atomic_read(&peer_tc->num_gaming),
+		    qdf_atomic_read(&peer_tc->num_voice_call),
+		    qdf_atomic_read(&peer_tc->num_video_call),
 		    qdf_atomic_test_bit(WLAN_DP_STC_TRAFFIC_PING,
 					&peer_tc->non_flow_traffic),
 		    qdf_atomic_test_bit(WLAN_DP_STC_TRAFFIC_BK,
-					&peer_tc->non_flow_traffic),
-		    qdf_atomic_read(&peer_tc->num_gaming),
-		    qdf_atomic_read(&peer_tc->num_voice_call),
-		    qdf_atomic_read(&peer_tc->num_video_call));
+					&peer_tc->non_flow_traffic));
 
 	return 0;
 }
