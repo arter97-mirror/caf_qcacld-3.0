@@ -443,6 +443,7 @@ struct wlan_dp_stc_classified_flow_table {
  * @periodic_work_state: States of the periodic flow monitor work
  * @flow_sampling_timer: timer to sample all the short-listed flows
  * @sample_timer_state: sampling timer state
+ * @rtpm_control_flow_cnt: Total flows of traffic types affecting RTPM
  * @peer_tc: per peer active traffic context
  * @peer_ping_info: Ping tracking per peer
  * @sampling_flow_table: Sampling flow table
@@ -461,6 +462,7 @@ struct wlan_dp_stc {
 	enum wlan_dp_stc_periodic_work_state periodic_work_state;
 	qdf_timer_t flow_sampling_timer;
 	enum wlan_dp_stc_timer_state sample_timer_state;
+	uint32_t rtpm_control_flow_cnt;
 	struct wlan_dp_stc_peer_traffic_context peer_tc[DP_STC_MAX_PEERS];
 	struct wlan_dp_stc_sampling_table *sampling_flow_table;
 	struct wlan_dp_stc_rx_flow_table *rx_flow_table;
@@ -594,60 +596,6 @@ wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 	flow_tuple->dst_port = flow_tuple_info->dest_port;
 	flow_tuple->proto = wlan_dp_ip_proto_to_stc_proto(proto);
 	flow_tuple->flags = 0;
-}
-
-static inline void
-wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc_peer_traffic_context *peer_tc,
-			     enum qca_traffic_type traffic_type)
-{
-	uint32_t val = 0;
-
-	switch (traffic_type) {
-	case QCA_TRAFFIC_TYPE_STREAMING:
-		val = qdf_atomic_inc_return(&peer_tc->num_streaming);
-		break;
-	case QCA_TRAFFIC_TYPE_GAMING:
-		val = qdf_atomic_inc_return(&peer_tc->num_gaming);
-		break;
-	case QCA_TRAFFIC_TYPE_VOICE_CALL:
-		val = qdf_atomic_inc_return(&peer_tc->num_voice_call);
-		break;
-	case QCA_TRAFFIC_TYPE_VIDEO_CALL:
-		val = qdf_atomic_inc_return(&peer_tc->num_video_call);
-		break;
-	default:
-		break;
-	}
-
-	if (val == 1)
-		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
-}
-
-static inline void
-wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc_peer_traffic_context *peer_tc,
-			     enum qca_traffic_type traffic_type)
-{
-	uint32_t val = 0;
-
-	switch (traffic_type) {
-	case QCA_TRAFFIC_TYPE_STREAMING:
-		val = qdf_atomic_dec_and_test(&peer_tc->num_streaming);
-		break;
-	case QCA_TRAFFIC_TYPE_GAMING:
-		val = qdf_atomic_dec_and_test(&peer_tc->num_gaming);
-		break;
-	case QCA_TRAFFIC_TYPE_VOICE_CALL:
-		val = qdf_atomic_dec_and_test(&peer_tc->num_voice_call);
-		break;
-	case QCA_TRAFFIC_TYPE_VIDEO_CALL:
-		val = qdf_atomic_dec_and_test(&peer_tc->num_video_call);
-		break;
-	default:
-		break;
-	}
-
-	if (val)
-		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 }
 
 enum wlan_dp_stc_classfied_flow_state {

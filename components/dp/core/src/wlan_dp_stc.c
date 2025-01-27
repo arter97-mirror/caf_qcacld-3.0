@@ -758,6 +758,70 @@ wlan_dp_stc_check_ping_activity(struct wlan_dp_stc *dp_stc,
 }
 
 static inline void
+wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc *dp_stc,
+			     struct wlan_dp_stc_peer_traffic_context *peer_tc,
+			     enum qca_traffic_type traffic_type)
+{
+	uint32_t val = 0;
+
+	switch (traffic_type) {
+	case QCA_TRAFFIC_TYPE_STREAMING:
+		dp_stc->rtpm_control_flow_cnt++;
+		val = qdf_atomic_inc_return(&peer_tc->num_streaming);
+		break;
+	case QCA_TRAFFIC_TYPE_GAMING:
+		val = qdf_atomic_inc_return(&peer_tc->num_gaming);
+		break;
+	case QCA_TRAFFIC_TYPE_VOICE_CALL:
+		val = qdf_atomic_inc_return(&peer_tc->num_voice_call);
+		break;
+	case QCA_TRAFFIC_TYPE_VIDEO_CALL:
+		val = qdf_atomic_inc_return(&peer_tc->num_video_call);
+		break;
+	default:
+		break;
+	}
+
+	if (val == 1)
+		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
+
+	if (dp_stc->rtpm_control_flow_cnt == 1)
+		hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_DP_STC);
+}
+
+static inline void
+wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc *dp_stc,
+			     struct wlan_dp_stc_peer_traffic_context *peer_tc,
+			     enum qca_traffic_type traffic_type)
+{
+	uint32_t val = 0;
+
+	switch (traffic_type) {
+	case QCA_TRAFFIC_TYPE_STREAMING:
+		dp_stc->rtpm_control_flow_cnt--;
+		val = qdf_atomic_dec_and_test(&peer_tc->num_streaming);
+		break;
+	case QCA_TRAFFIC_TYPE_GAMING:
+		val = qdf_atomic_dec_and_test(&peer_tc->num_gaming);
+		break;
+	case QCA_TRAFFIC_TYPE_VOICE_CALL:
+		val = qdf_atomic_dec_and_test(&peer_tc->num_voice_call);
+		break;
+	case QCA_TRAFFIC_TYPE_VIDEO_CALL:
+		val = qdf_atomic_dec_and_test(&peer_tc->num_video_call);
+		break;
+	default:
+		break;
+	}
+
+	if (val)
+		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
+
+	if (!dp_stc->rtpm_control_flow_cnt)
+		hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP_STC);
+}
+
+static inline void
 wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
 				  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
@@ -797,7 +861,7 @@ wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
 
 	peer_tc = &dp_stc->peer_tc[c_entry->peer_id];
 	if (peer_tc->valid && c_entry->flow_active)
-		wlan_dp_stc_dec_traffic_type(peer_tc,
+		wlan_dp_stc_dec_traffic_type(dp_stc, peer_tc,
 					     c_entry->traffic_type);
 
 	dp_stc_info(dp_stc->logmask,
@@ -880,7 +944,7 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 	if (!peer_tc->valid)
 		return;
 
-	wlan_dp_stc_dec_traffic_type(peer_tc, c_entry->traffic_type);
+	wlan_dp_stc_dec_traffic_type(dp_stc, peer_tc, c_entry->traffic_type);
 }
 
 static inline void
@@ -934,7 +998,7 @@ flow_active:
 	if (!peer_tc->valid)
 		return;
 
-	wlan_dp_stc_inc_traffic_type(peer_tc, c_entry->traffic_type);
+	wlan_dp_stc_inc_traffic_type(dp_stc, peer_tc, c_entry->traffic_type);
 }
 
 static inline void
@@ -949,7 +1013,7 @@ wlan_dp_stc_process_add_classified_flow(struct wlan_dp_stc *dp_stc,
 	if (!peer_tc->valid)
 		return;
 
-	wlan_dp_stc_inc_traffic_type(peer_tc, traffic_type);
+	wlan_dp_stc_inc_traffic_type(dp_stc, peer_tc, traffic_type);
 }
 
 static inline QDF_STATUS
