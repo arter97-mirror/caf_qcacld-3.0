@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -129,6 +129,7 @@ struct dp_rtpm_tput_policy_context {
  * @is_load_balance_enabled: indicates whether load balance is enabled or not
  * @is_flow_balance_enabled: indicates whether flow balance is enabled or not
  * @stc_enable: indicates whether STC feature is enabled or not
+ * @stc_rtpm_control: Indicates whether STC should control RTPM suspend
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -213,6 +214,7 @@ struct wlan_dp_psoc_cfg {
 #endif
 #ifdef WLAN_DP_FEATURE_STC
 	bool stc_enable;
+	bool stc_rtpm_control;
 #endif
 };
 

@@ -785,7 +785,7 @@ wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc *dp_stc,
 	if (val == 1)
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 
-	if (dp_stc->rtpm_control_flow_cnt == 1)
+	if (dp_stc->rtpm_control && dp_stc->rtpm_control_flow_cnt == 1)
 		hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_DP_STC);
 }
 
@@ -817,7 +817,7 @@ wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc *dp_stc,
 	if (val)
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 
-	if (!dp_stc->rtpm_control_flow_cnt)
+	if (dp_stc->rtpm_control && !dp_stc->rtpm_control_flow_cnt)
 		hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP_STC);
 }
 
@@ -2304,6 +2304,7 @@ void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
 			  struct wlan_objmgr_psoc *psoc)
 {
 	config->stc_enable = cfg_get(psoc, CFG_DP_STC_ENABLE);
+	config->stc_rtpm_control = cfg_get(psoc, CFG_DP_STC_RTPM_CONTROL);
 }
 
 QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
@@ -2402,6 +2403,9 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	dp_stc->flow_monitor_interval = 100;
 	dp_stc->periodic_work_state = WLAN_DP_STC_WORK_INIT;
+
+	dp_stc->rtpm_control =
+		wlan_dp_cfg_is_stc_rtpm_control_enabled(&dp_ctx->dp_cfg);
 
 	/* Init timer */
 	status = qdf_timer_init(dp_ctx->qdf_dev, &dp_stc->flow_sampling_timer,

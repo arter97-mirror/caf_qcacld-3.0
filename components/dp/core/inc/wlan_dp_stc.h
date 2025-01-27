@@ -444,6 +444,7 @@ struct wlan_dp_stc_classified_flow_table {
  * @flow_sampling_timer: timer to sample all the short-listed flows
  * @sample_timer_state: sampling timer state
  * @rtpm_control_flow_cnt: Total flows of traffic types affecting RTPM
+ * @rtpm_control: RTPM control enable check
  * @peer_tc: per peer active traffic context
  * @peer_ping_info: Ping tracking per peer
  * @sampling_flow_table: Sampling flow table
@@ -463,6 +464,7 @@ struct wlan_dp_stc {
 	qdf_timer_t flow_sampling_timer;
 	enum wlan_dp_stc_timer_state sample_timer_state;
 	uint32_t rtpm_control_flow_cnt;
+	bool rtpm_control;
 	struct wlan_dp_stc_peer_traffic_context peer_tc[DP_STC_MAX_PEERS];
 	struct wlan_dp_stc_sampling_table *sampling_flow_table;
 	struct wlan_dp_stc_rx_flow_table *rx_flow_table;
@@ -877,6 +879,19 @@ void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
 static inline bool wlan_dp_cfg_is_stc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 {
 	return dp_cfg->stc_enable;
+}
+
+/**
+ * wlan_dp_cfg_is_stc_rtpm_control_enabled() - Helper function to check if STC
+ *                                             is enabled
+ * @dp_cfg: SoC CFG config
+ *
+ * Return: true if STC is enabled, false if STC is disabled.
+ */
+static inline bool
+wlan_dp_cfg_is_stc_rtpm_control_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->stc_rtpm_control;
 }
 
 /**
