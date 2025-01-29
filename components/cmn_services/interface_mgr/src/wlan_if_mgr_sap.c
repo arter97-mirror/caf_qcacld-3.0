@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -123,10 +123,24 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	if (cfg_p2p_is_roam_config_disabled(psoc) &&
 	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE) {
 		ifmgr_debug("p2p go mode, keep roam disabled");
+	} else if (policy_mgr_is_set_link_in_progress(psoc)) {
+		/*
+		 * In the case of ML STA + SAP concurrency, when the host
+		 * enables roaming in the firmware after BSS START completion
+		 * and the link switch fails on the STA, the host fails to
+		 * bring up the non-associated VDEV. If the firmware triggers
+		 * roaming before the host completes the disconnection for the
+		 * link switch failure, roaming with only the associated VDEV
+		 * active is not expected. This causes the non-associated VDEV
+		 * to be used while resetting the spoof MAC address as part of
+		 * the roam handoff sequence, resulting in a firmware assertion.
+		 */
+		ifmgr_debug("link switch in progress, Dont enable roaming");
 	} else {
-		/* Enable Roaming after start bss in case of failure/success */
+		ifmgr_debug("Enable Roaming after start bss complete");
 		if_mgr_enable_roaming(pdev, vdev, RSO_START_BSS);
 	}
+
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		policy_mgr_check_sap_go_force_scc(psoc, vdev,
 						  CSA_REASON_GO_BSS_STARTED);

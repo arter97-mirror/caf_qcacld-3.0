@@ -212,9 +212,9 @@ typedef struct sDphHashNode {
 	 * end of the structure.
 	 */
 	struct sDphHashNode *next;
+	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
 #ifdef WLAN_FEATURE_11BE_MLO
 	bool recv_assoc_frm;
-	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
 	struct mlo_partner_info mlo_info;
 	struct wlan_mlo_eml_cap eml_info;
 	struct wlan_mlo_mld_cap mld_info;

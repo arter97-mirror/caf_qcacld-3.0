@@ -1653,6 +1653,7 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_mlo.c",
             "core/mac/src/pe/lim/lim_mlo.c",
             "cmn/target_if/mlo_mgr/src/target_if_mlo_mgr.c",
+	    "cmn/os_if/linux/mlme/src/osif_link_reconfig.c",
             "cmn/umac/mlo_mgr/src/utils_mlo.c",
             "cmn/umac/mlo_mgr/src/wlan_mlo_mgr_aid.c",
             "cmn/umac/mlo_mgr/src/wlan_mlo_mgr_ap.c",

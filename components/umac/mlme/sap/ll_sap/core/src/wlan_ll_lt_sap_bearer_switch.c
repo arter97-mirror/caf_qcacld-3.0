@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,6 +20,7 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_dcs_ucfg_api.h"
+#include "wlan_ll_sap_api.h"
 
 #define BEARER_SWITCH_TIMEOUT 5000
 #define BEARER_SWITCH_WLAN_REQ_TIMEOUT 5000
@@ -742,6 +743,16 @@ ll_lt_sap_handle_bs_to_wlan_in_non_wlan_state(
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool is_bs_req_cached = false;
+	bool cu_greater_than_th;
+	uint8_t vdev_id = wlan_vdev_get_id(bs_ctx->vdev);
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(bs_ctx->vdev);
+	if (!psoc) {
+		ll_sap_err(BS_PREFIX_FMT "PSOC is NULL",
+			   BS_PREFIX_REF(vdev_id, bs_req->request_id));
+		return;
+	}
 
 	if (ll_lt_sap_find_bs_req_by_id(bs_ctx, bs_req->request_id))
 		is_bs_req_cached = true;
@@ -762,12 +773,19 @@ ll_lt_sap_handle_bs_to_wlan_in_non_wlan_state(
 			return;
 	}
 
+	cu_greater_than_th =
+		wlan_ll_sap_is_cur_cu_greater_than_th(psoc, vdev_id);
 	/*
-	 * If host driver did not requested for non wlan bearer then don't send
+	 * If host driver did not requested for non wlan bearer OR
+	 * if current CU is greater than threshold then don't send
 	 * a request to switch back to wlan
 	 */
-	if (!bs_ctx->sm.is_non_wlan_requested) {
-		ll_sap_debug("Non wlan is not requested, don't switch to wlan");
+	if (!bs_ctx->sm.is_non_wlan_requested ||
+	    (!is_bs_req_cached && cu_greater_than_th)) {
+		ll_sap_debug(BS_PREFIX_FMT " Non wlan requested %d or cu_greater_than_th %d (cached %d), don't switch to wlan",
+			     BS_PREFIX_REF(vdev_id, bs_req->request_id),
+			     bs_ctx->sm.is_non_wlan_requested,
+			     cu_greater_than_th, is_bs_req_cached);
 		goto invoke_requester_cb;
 	}
 

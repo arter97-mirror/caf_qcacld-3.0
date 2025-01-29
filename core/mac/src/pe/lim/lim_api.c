@@ -1654,9 +1654,6 @@ lim_enc_type_matched(struct mac_context *mac_ctx,
 	if (!bcn || !session)
 		return false;
 
-	pe_debug("Privacy bit bcn %d session Bss Caps privacy %d",
-		 bcn->capabilityInfo.privacy,
-		 SIR_MAC_GET_PRIVACY(session->limCurrentBssCaps));
 	/*
 	 * This is handled by sending probe req due to IOT issues so
 	 * return TRUE
@@ -1735,7 +1732,6 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 
 	security_caps_matched = lim_enc_type_matched(mac, pBeacon,
 						     pe_session);
-	pe_debug("security_caps_matched %d", security_caps_matched);
 
 	if ((false == pe_session->limSentCapsChangeNtf) &&
 	    (((!lim_is_null_ssid(&pBeacon->ssId)) &&
@@ -4567,29 +4563,60 @@ static void lim_gen_link_specific_rnr_ie(struct mac_context *mac_ctx,
 					 struct element_info link_probe_rsp)
 {
 	uint8_t *new_rnr_ie = NULL;
+	uint8_t *pos, *ie = NULL;
+	uint32_t ie_len;
+	uint8_t *temp_rnr_ie = NULL;
 
-	new_rnr_ie = lim_find_ie(WLAN_ELEMID_REDUCED_NEIGHBOR_REPORT,
-				 link_probe_rsp.ptr +
-				 sizeof(struct wlan_frame_hdr) +
-				 WLAN_PROBE_RESP_IES_OFFSET,
-				 link_probe_rsp.len -
-				 sizeof(struct wlan_frame_hdr) -
-				 WLAN_PROBE_RESP_IES_OFFSET);
-	if (!new_rnr_ie) {
-		pe_debug("RNR IE not present in gen link frame");
-		return;
+	ie = link_probe_rsp.ptr + sizeof(struct wlan_frame_hdr) +
+	      WLAN_PROBE_RESP_IES_OFFSET;
+	ie_len = link_probe_rsp.len - sizeof(struct wlan_frame_hdr) -
+		 WLAN_PROBE_RESP_IES_OFFSET;
+
+	pos = ie;
+	while (pos < (ie + ie_len)) {
+		new_rnr_ie = lim_find_ie(WLAN_ELEMID_REDUCED_NEIGHBOR_REPORT,
+					 pos, ie_len - (pos - ie));
+		if (!new_rnr_ie) {
+			pe_debug("RNR IE not present in gen link frame");
+			return;
+		}
+
+		if (!new_rnr_ie[TAG_LEN_POS]) {
+			pos = new_rnr_ie + MIN_IE_LEN;
+			continue;
+		}
+
+		temp_rnr_ie = qdf_mem_malloc(new_rnr_ie[TAG_LEN_POS] +
+					     MIN_IE_LEN);
+		if (!temp_rnr_ie) {
+			pos = new_rnr_ie + new_rnr_ie[TAG_LEN_POS] + MIN_IE_LEN;
+			continue;
+		}
+
+		qdf_mem_copy(temp_rnr_ie, new_rnr_ie,
+			     new_rnr_ie[TAG_LEN_POS] + MIN_IE_LEN);
+
+		pe_debug("Generated RNR IE received:");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+				   new_rnr_ie, new_rnr_ie[TAG_LEN_POS] +
+				   MIN_IE_LEN);
+
+		lim_derive_link_specific_rnr_ie(mac_ctx, session_entry,
+						link_info, new_rnr_ie);
+
+		if (qdf_mem_cmp(temp_rnr_ie, new_rnr_ie,
+				new_rnr_ie[TAG_LEN_POS] + MIN_IE_LEN)) {
+			pe_debug("Updated RNR IE: ");
+			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE,
+					   QDF_TRACE_LEVEL_DEBUG,
+					   new_rnr_ie,
+					   new_rnr_ie[TAG_LEN_POS] +
+					   MIN_IE_LEN);
+		}
+
+		qdf_mem_free(temp_rnr_ie);
+		pos = new_rnr_ie + new_rnr_ie[TAG_LEN_POS] + MIN_IE_LEN;
 	}
-
-	pe_debug("Generated RNR IE received:");
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, new_rnr_ie,
-			   new_rnr_ie[1] + MIN_IE_LEN);
-
-	lim_derive_link_specific_rnr_ie(mac_ctx, session_entry, link_info,
-					new_rnr_ie);
-
-	pe_debug("Updated RNR IE: ");
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, new_rnr_ie,
-			   new_rnr_ie[1] + MIN_IE_LEN);
 }
 
 static inline void fill_crypto_filter_params(struct scan_filter *filter,

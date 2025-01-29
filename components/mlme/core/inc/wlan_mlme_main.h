@@ -2167,4 +2167,14 @@ wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
  */
 bool
 wlan_is_scc_tpc_power_supp_enabled(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_clear_peer_private_object_data(): clear the data in MLME peer
+ * private object data
+ * @peer: peer object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
 #endif

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3231,25 +3231,45 @@ sap_acs_next_lower_bandwidth(enum phy_ch_width ch_width)
 }
 
 /*
- * Consider 4 char for Freq, 6 for weight, 1 for space and 1 for EOS.
+ * Consider 4 char for Freq, 8 for weight, 1 for space and 1 for EOS.
  */
-#define SAP_SORTED_CHANNEL_INFO_LOG_LEN 12
+#define SAP_SORTED_CHANNEL_INFO_LOG_LEN 14
+static uint8_t sap_get_bw_score_multiplier(enum phy_ch_width ch_width)
+{
+	switch (ch_width) {
+	case CH_WIDTH_320MHZ:
+		return 16;
+	case CH_WIDTH_160MHZ:
+	case CH_WIDTH_80P80MHZ:
+		return 8;
+	case CH_WIDTH_80MHZ:
+		return 4;
+	case CH_WIDTH_40MHZ:
+		return 2;
+	default:
+		return 1;
+	}
+}
 
-static void sap_dump_sorted_list(struct sap_sel_ch_info *ch_info)
+static void sap_dump_sorted_list(struct sap_sel_ch_info *ch_info,
+				 enum phy_ch_width cur_bw)
 {
 	uint32_t i;
 	struct sap_ch_info *chan_info = ch_info->ch_info;
 	uint8_t *info;
 	uint32_t len = 0;
+	uint8_t max_score_multiplyer = sap_get_bw_score_multiplier(cur_bw);
 
 	info = qdf_mem_malloc(SAP_MAX_CHANNEL_INFO_LOG);
 	if (!info)
 		return;
 
-	sap_nofl_debug("ACS sorted freq list: freq[weight]:");
+	sap_nofl_debug("ACS sorted freq list for width %d: freq[weight]:",
+		       cur_bw);
 	for (i = 0; i < ch_info->num_ch; i++) {
 		if (chan_info->valid &&
-		    chan_info->weight < SAP_ACS_WEIGHT_ADJUSTABLE) {
+		    chan_info->weight <
+		    (SAP_ACS_WEIGHT_ADJUSTABLE * max_score_multiplyer)) {
 			len += qdf_scnprintf(info + len,
 					     SAP_MAX_CHANNEL_INFO_LOG - len,
 					     "%d[%d] ",
@@ -3313,7 +3333,7 @@ sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
 	/* Sort the ch lst as per the computed weights, lesser weight first. */
 	sap_sort_chl_weight_all(mac_ctx, sap_ctx, ch_info, op_band,
 				reg_domain, &cur_bw);
-	sap_dump_sorted_list(ch_info);
+	sap_dump_sorted_list(ch_info, cur_bw);
 	sap_ctx->acs_cfg->ch_width = cur_bw;
 
 	if (domain)

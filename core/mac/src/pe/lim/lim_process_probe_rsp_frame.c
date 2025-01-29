@@ -118,7 +118,9 @@ lim_process_updated_ies_in_probe_rsp(struct mac_context *mac_ctx,
 
 		limGetQosMode(session_entry, &qos_enabled);
 		limGetWmeMode(session_entry, &wme_enabled);
-		pe_debug("wmeEdcaPresent: %d wme_enabled: %d edcaPresent: %d, qos_enabled: %d edcaParams.qosInfo.count: %d schObject.gLimEdcaParamSetCount: %d",
+		pe_debug("Vdev_id: %d mac: "QDF_MAC_ADDR_FMT" wmeEdcaPresent: %d wme_enabled: %d edcaPresent: %d, qos_enabled: %d edcaParams.qosInfo.count: %d schObject.gLimEdcaParamSetCount: %d",
+			 session_entry->vdev_id,
+			 QDF_MAC_ADDR_REF(session_entry->bssId),
 			 probe_rsp->wmeEdcaPresent, wme_enabled,
 			 probe_rsp->edcaPresent, qos_enabled,
 			 probe_rsp->edcaParams.qosInfo.count,

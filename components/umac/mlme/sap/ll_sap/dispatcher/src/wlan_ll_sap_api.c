@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include "wlan_dfs_utils_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_cp_stats_mc_ucfg_api.h"
+#include <wlan_dcs_ucfg_api.h>
 
 #define SET_HT_MCS3(mcs) do { \
 	mcs[0] = 0x0f;        \
@@ -478,7 +479,7 @@ wlan_ll_sap_get_cu_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t ch_freq)
 		return cu;
 	}
 
-	/* Rx clear count - self tx - self rx) * 100 / total clear count */
+	/* CU = Rx clear count - self tx - self rx) * 100 / total clear count */
 	if (ch_stats->rx_clear_count >
 	    (ch_stats->tx_frame_count + ch_stats->bss_rx_cycle_count))
 		rx_clear_count = ch_stats->rx_clear_count -
@@ -627,4 +628,21 @@ wlan_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
 				   enum ll_sap_csa_source csa_src)
 {
 	return ll_lt_sap_get_valid_freq(psoc, vdev_id, curr_freq, csa_src);
+}
+
+bool wlan_ll_sap_is_cur_cu_greater_than_th(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	uint32_t cu, coch_intfr_threshold;
+	uint8_t mac_id = 1;
+
+	policy_mgr_get_mac_id_by_session_id(psoc, vdev_id, &mac_id);
+
+	cu = ll_sap_get_cur_freq_unused_cu(psoc, vdev_id);
+	coch_intfr_threshold = wlan_dcs_get_trnsprt_switch_rjt_th_cu(psoc,
+								     mac_id);
+	if (cu && cu > coch_intfr_threshold)
+		return true;
+
+	return false;
 }

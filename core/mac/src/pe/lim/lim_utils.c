@@ -6089,6 +6089,13 @@ static void lim_update_ap_he_op(struct pe_session *session,
 						ch_params->center_freq_seg1;
 		session->he_op.oper_info_6g.info.ch_width =
 						ch_params->ch_width;
+	} else {
+		session->he_punc_chan_info.present = 1;
+		session->he_punc_chan_info.chan_width = ch_params->ch_width;
+		session->he_punc_chan_info.center_freq_seg0 =
+						ch_params->center_freq_seg0;
+		session->he_punc_chan_info.center_freq_seg1 =
+						ch_params->center_freq_seg1;
 	}
 }
 
@@ -9032,6 +9039,11 @@ lim_revise_eht_caps_per_band(struct mac_context *mac, enum cds_band_type band,
 
 	if (band == CDS_BAND_2GHZ)
 		return;
+
+	if (!eht_cap->support_320mhz_6ghz) {
+		pe_debug("320MHz is not set");
+		return;
+	}
 
 	country_max_allowed_bw = wlan_reg_get_country_max_allowed_bw(mac->pdev);
 	if (!country_max_allowed_bw) {

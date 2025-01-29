@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -186,6 +186,26 @@ QDF_STATUS t2lm_handle_tx_teardown(struct wlan_objmgr_vdev *vdev,
 				   void *event_data);
 
 /**
+ * t2lm_find_tid_mapped_link_id - Find t2lm tid mapped link id
+ * @t2lm_info: pointer to t2lm_info
+ * @tid_mapped_link_id: tid mapped link id
+ *
+ * Return: qdf_status
+ */
+QDF_STATUS
+t2lm_find_tid_mapped_link_id(struct wlan_t2lm_info *t2lm_info,
+			     uint16_t *tid_mapped_link_id);
+
+/**
+ * t2lm_get_tids_mapped_link_id - Get tids mapped link id
+ * @link_map_tid: link map tip
+ *
+ * Return: tid mapped link id
+ */
+uint16_t
+t2lm_get_tids_mapped_link_id(uint16_t link_map_tid);
+
+/**
  * wlan_t2lm_validate_candidate - Validate candidate based on T2LM IE
  * @scan_entry: scan entry pointer
  *
@@ -286,7 +306,25 @@ wlan_t2lm_init_default_mapping(struct wlan_t2lm_context *t2lm_ctx);
  */
 uint8_t
 t2lm_gen_dialog_token(struct wlan_mlo_peer_t2lm_policy *t2lm_policy);
+
+/**
+ * wlan_t2lm_check_concurrency_curr_force() - Check concurrency curr force links
+ * @vdev: Vdev pointer
+ * @t2lm_neg: t2lm neg pointer
+ *
+ * Return:qdf status
+ */
+QDF_STATUS
+wlan_t2lm_check_concurrency_curr_force(struct wlan_objmgr_vdev *vdev,
+				       struct wlan_t2lm_onging_negotiation_info *t2lm_neg);
 #else
+static inline QDF_STATUS
+wlan_t2lm_check_concurrency_curr_force(struct wlan_objmgr_vdev *vdev,
+				       struct wlan_t2lm_onging_negotiation_info *t2lm_neg)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline QDF_STATUS
 wlan_t2lm_init_default_mapping(struct wlan_t2lm_context *t2lm_ctx)
 {
@@ -360,6 +398,19 @@ t2lm_handle_tx_teardown(struct wlan_objmgr_vdev *vdev,
 			void *event_data)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+t2lm_find_tid_mapped_link_id(struct wlan_t2lm_info *t2lm_info,
+			     uint16_t *tid_mapped_link_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline uint16_t
+t2lm_get_tids_mapped_link_id(uint16_t link_map_tid)
+{
+	return 0;
 }
 
 static inline QDF_STATUS

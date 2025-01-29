@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -306,7 +306,7 @@ hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
 	bs_request.source = BEARER_SWITCH_REQ_ACS;
 	bs_request.requester_cb = ll_lt_sap_acs_complete_bearer_switch_req_cb;
 
-	hdd_debug("ACS completed, switch bearer back to wlan vdev %d", vdev_id);
+	hdd_debug("Vdev %d ACS completed, switch bearer back to wlan", vdev_id);
 
 	wlan_ll_lt_sap_switch_bearer_to_wlan(psoc, &bs_request);
 }
@@ -317,6 +317,7 @@ hdd_dcs_continue_csa_for_ll_lt_sap_post_bearer_switch(
 						uint8_t vdev_id)
 {
 	struct wlan_hdd_link_info *link_info;
+	uint8_t mac_id = 0;
 
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx,
 					      vdev_id);
@@ -326,10 +327,16 @@ hdd_dcs_continue_csa_for_ll_lt_sap_post_bearer_switch(
 		return;
 	}
 
-	if (wlan_hdd_cfg80211_start_acs(link_info))
+	policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc, vdev_id,
+					    &mac_id);
+
+	if (wlan_hdd_cfg80211_start_acs(link_info)) {
 		hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
 								hdd_ctx->psoc,
 								vdev_id);
+		/* enable DCS handling again */
+		ucfg_config_dcs_event_data(hdd_ctx->psoc, mac_id, true);
+	}
 }
 
 /**
@@ -354,7 +361,7 @@ hdd_ll_lt_sap_acs_start_bearer_switch_requester_cb(
 {
 	struct hdd_context *hdd_ctx = request_params;
 
-	hdd_debug("Continue ACS post bearer switch vdev %d", vdev_id);
+	hdd_debug("Vdev %d Continue ACS post bearer switch", vdev_id);
 
 	hdd_dcs_continue_csa_for_ll_lt_sap_post_bearer_switch(hdd_ctx, vdev_id);
 }
@@ -582,36 +589,40 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 	struct wlan_hdd_link_info *link_info;
 	uint16_t dcs_ch_width;
 
+	status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc, vdev_id,
+						     &mac_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("vdev %d get mac id failed", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	/* For LL SAP switch only for LL SAP, not for all vdev on same MAC */
 	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id)) {
-		uint32_t cu, coch_intfr_threshold;
-		uint8_t pdev_id;
-
 		hdd_switch_bearer_to_wlan_on_ll_lt_sap_acs_complete(
 								hdd_ctx->psoc,
 								vdev_id);
+		/* Check congestion only if there is no SCC interface present */
+		if (!policy_mgr_is_scc_with_this_vdev_id(hdd_ctx->psoc,
+							 vdev_id)) {
+			uint32_t cu, coch_intfr_threshold;
+
+			cu = wlan_ll_sap_get_cu_for_freq(hdd_ctx->pdev,
+							 dcs_ch_freq);
+			coch_intfr_threshold =
+			wlan_dcs_get_trnsprt_switch_rjt_th_cu(hdd_ctx->psoc,
+							      mac_id);
+			if (cu && cu > coch_intfr_threshold) {
+				hdd_info("Congested channel cu %d > coch_intfr_threshold %d, no need to do CSA",
+					 cu, coch_intfr_threshold);
+				/* enable DCS handling again */
+				ucfg_config_dcs_event_data(hdd_ctx->psoc,
+							   mac_id, true);
+				return QDF_STATUS_E_INVAL;
+			}
+		}
 		count = 1;
 		list[0] = vdev_id;
-
-		cu = wlan_ll_sap_get_cu_for_freq(hdd_ctx->pdev, dcs_ch_freq);
-		pdev_id = wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev);
-		coch_intfr_threshold =
-			wlan_dcs_get_trnsprt_switch_rjt_th_cu(hdd_ctx->psoc,
-							      pdev_id);
-		if (cu && cu >= coch_intfr_threshold) {
-			hdd_info("Congested channel cu %d > coch_intfr_threshold %d, no need to do CSA",
-				cu, coch_intfr_threshold);
-			return QDF_STATUS_E_INVAL;
-		}
 	} else {
-		status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
-							     vdev_id,
-							     &mac_id);
-
-			if (QDF_IS_STATUS_ERROR(status)) {
-				hdd_err("get mac id failed");
-				return QDF_STATUS_E_INVAL;
-		}
 		count = policy_mgr_get_sap_go_count_on_mac(hdd_ctx->psoc, list,
 							   mac_id);
 	}

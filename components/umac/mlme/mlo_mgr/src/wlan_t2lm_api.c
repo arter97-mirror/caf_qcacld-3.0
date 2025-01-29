@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -312,6 +312,27 @@ QDF_STATUS t2lm_handle_tx_req(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
+static QDF_STATUS
+wlan_t2lm_check_curr_force(struct wlan_objmgr_vdev *vdev,
+			   uint16_t t2lm_ieee_link_map)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		t2lm_err("psoc null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = ml_nlink_t2lm_link_request(
+				psoc,
+				wlan_vdev_get_id(vdev),
+				t2lm_ieee_link_map);
+
+	return status;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO_TTLM
 static void
 t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
@@ -323,6 +344,7 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 	uint8_t dir;
 	struct wlan_t2lm_info *t2lm_info = NULL;
 	struct ttlm_rsp_info t2lm_rsp_info;
+	uint16_t t2lm_ieee_link_map;
 
 	t2lm_req = &ml_peer->t2lm_policy.ongoing_tid_to_link_mapping;
 	if (!t2lm_req) {
@@ -336,6 +358,13 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 		    t2lm_info->direction != WLAN_T2LM_INVALID_DIRECTION) {
 			if (t2lm_rsp->dialog_token == t2lm_req->dialog_token) {
 				t2lm_rsp_info.t2lm_info = t2lm_info;
+				t2lm_ieee_link_map =
+					t2lm_info->ieee_link_map_tid[0];
+				if (QDF_IS_STATUS_ERROR(wlan_t2lm_check_curr_force(vdev,
+										   t2lm_ieee_link_map))) {
+					t2lm_err("curr force check failed");
+					break;
+				}
 				t2lm_rsp_info.t2lm_resp_type =
 							t2lm_rsp->t2lm_resp_type;
 				status = ttlm_sm_deliver_event(ml_peer,
@@ -362,7 +391,6 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 	struct wlan_t2lm_info *t2lm_info, *t2lm_nego;
 	struct wlan_objmgr_peer *peer = NULL;
 	uint16_t t2lm_ieee_link_map;
-	struct wlan_objmgr_psoc *psoc;
 
 	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLO_MGR_ID);
 	if (!peer)
@@ -372,12 +400,6 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 	if (!t2lm_req) {
 		t2lm_err("Ongoing tid neg is null");
 		wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
-		return;
-	}
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		t2lm_err("psoc null");
 		return;
 	}
 
@@ -391,10 +413,11 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 
 				t2lm_ieee_link_map =
 					t2lm_info->ieee_link_map_tid[0];
-				ml_nlink_t2lm_link_request(
-						psoc,
-						wlan_vdev_get_id(vdev),
-						t2lm_ieee_link_map);
+				if (QDF_IS_STATUS_ERROR(wlan_t2lm_check_curr_force(vdev,
+										   t2lm_ieee_link_map))) {
+					t2lm_err("curr force check failed");
+					break;
+				}
 
 				/* Apply T2LM config to peer T2LM ctx */
 				t2lm_nego = &ml_peer->t2lm_policy.t2lm_negotiated_info.t2lm_info[dir];
@@ -571,7 +594,7 @@ QDF_STATUS t2lm_deliver_event(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-static uint16_t
+uint16_t
 t2lm_get_tids_mapped_link_id(uint16_t link_map_tid)
 {
 	uint16_t all_tids_mapped_link_id = 0;
@@ -587,7 +610,7 @@ t2lm_get_tids_mapped_link_id(uint16_t link_map_tid)
 	return all_tids_mapped_link_id;
 }
 
-static QDF_STATUS
+QDF_STATUS
 t2lm_find_tid_mapped_link_id(struct wlan_t2lm_info *t2lm_info,
 			     uint16_t *tid_mapped_link_id)
 {
@@ -845,11 +868,17 @@ wlan_ttlm_populate_link_disable_in_sm(struct wlan_objmgr_vdev *vdev,
 				      struct wlan_objmgr_peer *peer,
 				      struct wlan_t2lm_onging_negotiation_info *t2lm_neg)
 {
-	return t2lm_deliver_event(vdev, peer,
-				  WLAN_T2LM_EV_ACTION_FRAME_TX_REQ,
-				  t2lm_neg,
-				  0,
-				  &t2lm_neg->dialog_token);
+	QDF_STATUS status;
+
+	status = wlan_t2lm_check_concurrency_curr_force(vdev, t2lm_neg);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+	else
+		return t2lm_deliver_event(vdev, peer,
+					  WLAN_T2LM_EV_ACTION_FRAME_TX_REQ,
+					  t2lm_neg,
+					  0,
+					  &t2lm_neg->dialog_token);
 }
 #endif
 
@@ -1159,3 +1188,42 @@ QDF_STATUS wlan_mlo_set_ttlm_mapping(struct wlan_objmgr_vdev *vdev,
 				    sizeof(*t2lm), t2lm);
 }
 #endif
+
+QDF_STATUS
+wlan_t2lm_check_concurrency_curr_force(struct wlan_objmgr_vdev *vdev,
+				       struct wlan_t2lm_onging_negotiation_info *t2lm_neg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_t2lm_info *t2lm_info;
+	uint16_t t2lm_ieee_link_map;
+	uint8_t dir;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		t2lm_err("psoc null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!t2lm_neg) {
+		t2lm_err("t2lm neg ptr is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	for (dir = 0; dir < WLAN_T2LM_MAX_DIRECTION; dir++) {
+		t2lm_info = &t2lm_neg->t2lm_info[dir];
+		if (t2lm_info &&
+		    t2lm_info->direction != WLAN_T2LM_INVALID_DIRECTION) {
+			t2lm_ieee_link_map =
+				t2lm_info->ieee_link_map_tid[0];
+			status = ml_nlink_pre_t2lm_request(psoc,
+							   wlan_vdev_get_id(vdev),
+							   t2lm_ieee_link_map);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				t2lm_err("link tid & force inactive link match");
+				break;
+			}
+		}
+	}
+	return status;
+}

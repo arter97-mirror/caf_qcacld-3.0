@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2037,7 +2037,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 				psoc,  vdev_id[i],
 				WLAN_REG_IS_24GHZ_CH_FREQ(op_ch_freq_list[i]) ?
 				POLICY_MGR_BAND_24 : POLICY_MGR_BAND_5))
-			continue;
+			goto user_freq_check;
 
 		if (sta_sap_scc_on_dfs_chan &&
 		    (sta_sap_scc_on_dfs_chnl_config_value != 2) &&
@@ -2081,6 +2081,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 			break;
 		}
 
+user_freq_check:
 		/*
 		 * STA got disconnected & SAP has previously moved to 2.4 GHz
 		 * due to concurrency, then move SAP back to user configured
@@ -3440,7 +3441,6 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	struct sta_ap_intf_check_work_ctx *work_info;
 	bool handled = false;
-	bool is_dbs;
 
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid context");
@@ -3569,8 +3569,6 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 	policy_mgr_switch_sap_vdev_table_sequence(pm_ctx,
 			&vdev_id[0],
 			cc_count);
-
-	is_dbs = policy_mgr_is_hw_dbs_capable(pm_ctx->psoc);
 
 	for (i = 0; i < cc_count; i++) {
 		status = pm_ctx->hdd_cbacks.
@@ -3733,6 +3731,8 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	if (!policy_mgr_is_force_scc(psoc))
 		return QDF_STATUS_SUCCESS;
 
+	policy_mgr_get_mcc_scc_switch(psoc, &cc_mode);
+
 	/*
 	 * If interference is 0, it could be STA/SAP SCC,
 	 * check further if SAP can start on STA home channel or
@@ -3741,8 +3741,15 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	if (!ch_freq) {
 		if (!policy_mgr_any_other_vdev_on_same_mac_as_freq(psoc,
 								   sap_ch_freq,
-								   sap_vdev_id))
+								   sap_vdev_id)) {
 			return QDF_STATUS_SUCCESS;
+		} else if (!policy_mgr_is_hw_dbs_capable(psoc) &&
+			   !policy_mgr_is_sta_sap_scc(psoc, sap_ch_freq) &&
+			   cc_mode != QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND) {
+			policymgr_nofl_debug("MCC situation in non-dbs hw STA, no SCC freq found for SAP %d",
+					     sap_ch_freq);
+			return QDF_STATUS_E_FAILURE;
+		}
 
 		ch_freq = sap_ch_freq;
 	}
@@ -3757,8 +3764,6 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	nan_2g_freq =
 		policy_mgr_mode_specific_get_channel(psoc, PM_NAN_DISC_MODE);
 	nan_5g_freq = wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
-
-	policy_mgr_get_mcc_scc_switch(psoc, &cc_mode);
 
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);

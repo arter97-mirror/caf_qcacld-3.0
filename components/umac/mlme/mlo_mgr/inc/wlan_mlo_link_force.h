@@ -53,6 +53,7 @@
  * @ml_nlink_acs_start_evt: sap acs start
  * @ml_nlink_acs_completed_evt: sap acs complete
  * @ml_nlink_t2lm_request_evt: T2LM request
+ * @ml_nlink_pre_t2lm_request_evt: Pre T2LM request
  */
 enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_start_evt,
@@ -82,6 +83,7 @@ enum ml_nlink_change_event_type {
 	ml_nlink_acs_start_evt,
 	ml_nlink_acs_completed_evt,
 	ml_nlink_t2lm_request_evt,
+	ml_nlink_pre_t2lm_request_evt
 };
 
 enum ml_emlsr_disable_request {
@@ -530,6 +532,20 @@ QDF_STATUS
 ml_nlink_t2lm_link_request(struct wlan_objmgr_psoc *psoc,
 			   uint8_t vdev_id,
 			   uint16_t mapped_link_bitmap);
+
+/**
+ * ml_nlink_pre_t2lm_request() - Check current link force due to
+ * concurrency before sending t2lm req
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ * @mapped_link_bitmap: mapped new link from t2lm negotiation
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ml_nlink_pre_t2lm_request(struct wlan_objmgr_psoc *psoc,
+			  uint8_t vdev_id,
+			  uint16_t mapped_link_bitmap);
 
 /**
  * ml_nlink_populate_disallow_modes() - Populate disallow mlo modes

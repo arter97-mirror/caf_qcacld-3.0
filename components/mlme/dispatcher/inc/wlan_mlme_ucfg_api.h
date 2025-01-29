@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1624,6 +1624,9 @@ ucfg_mlme_get_home_away_time(struct wlan_objmgr_psoc *psoc, uint16_t *val);
 QDF_STATUS
 ucfg_mlme_set_fast_roam_in_concurrency_enabled(struct wlan_objmgr_psoc *psoc,
 					       bool val);
+
+bool
+ucfg_mlme_is_roaming_offload_enabled(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_mlme_get_wmi_wq_watchdog_timeout() - Get timeout for wmi watchdog bite

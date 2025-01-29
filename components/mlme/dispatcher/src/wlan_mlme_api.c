@@ -8991,3 +8991,9 @@ wlan_mlme_get_supported_wifi_generations_info(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+wlan_mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer)
+{
+	return mlme_clear_peer_private_object_data(peer);
+}

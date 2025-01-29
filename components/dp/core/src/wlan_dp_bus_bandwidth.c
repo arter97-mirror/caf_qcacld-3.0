@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -648,6 +648,7 @@ void wlan_dp_update_tcp_rx_param(struct wlan_dp_psoc_context *dp_ctx,
 				 struct wlan_rx_tp_data *data)
 {
 	struct wlan_dp_psoc_callbacks *dp_ops = &dp_ctx->dp_ops;
+	int radio;
 
 	if (!dp_ctx) {
 		dp_err("psoc is null");
@@ -659,15 +660,21 @@ void wlan_dp_update_tcp_rx_param(struct wlan_dp_psoc_context *dp_ctx,
 		return;
 	}
 
-	if (dp_ctx->dp_cfg.enable_tcp_param_update)
+	if (dp_ctx->dp_cfg.enable_tcp_param_update) {
 		dp_ops->osif_dp_send_tcp_param_update_event(dp_ctx->psoc,
 							    (union wlan_tp_data *)data,
 							    1);
-	else
-		dp_ops->dp_send_svc_nlink_msg(cds_get_radio_index(),
-					      WLAN_SVC_WLAN_TP_IND,
-					      (void *)data,
-					      sizeof(struct wlan_rx_tp_data));
+		return;
+	}
+
+	radio = cds_get_radio_index();
+	if (radio == -EINVAL) {
+		dp_err("Invalid radio index");
+		return;
+	}
+
+	dp_ops->dp_send_svc_nlink_msg(radio, WLAN_SVC_WLAN_TP_IND, (void *)data,
+				      sizeof(struct wlan_rx_tp_data));
 }
 
 /**
@@ -680,6 +687,7 @@ void wlan_dp_update_tcp_rx_param(struct wlan_dp_psoc_context *dp_ctx,
 static void wlan_dp_update_tcp_tx_param(struct wlan_dp_psoc_context *dp_ctx,
 					struct wlan_tx_tp_data *data)
 {
+	int radio;
 	enum wlan_tp_level next_tx_level;
 	struct wlan_tx_tp_data *tx_tp_data;
 	struct wlan_dp_psoc_callbacks *dp_ops = &dp_ctx->dp_ops;
@@ -697,15 +705,21 @@ static void wlan_dp_update_tcp_tx_param(struct wlan_dp_psoc_context *dp_ctx,
 	tx_tp_data = (struct wlan_tx_tp_data *)data;
 	next_tx_level = tx_tp_data->level;
 
-	if (dp_ctx->dp_cfg.enable_tcp_param_update)
+	if (dp_ctx->dp_cfg.enable_tcp_param_update) {
 		dp_ops->osif_dp_send_tcp_param_update_event(dp_ctx->psoc,
 							    (union wlan_tp_data *)data,
 							    0);
-	else
-		dp_ops->dp_send_svc_nlink_msg(cds_get_radio_index(),
-					      WLAN_SVC_WLAN_TP_TX_IND,
-					      &next_tx_level,
-					      sizeof(next_tx_level));
+		return;
+	}
+
+	radio = cds_get_radio_index();
+	if (radio == -EINVAL) {
+		dp_err("Invalid radio index");
+		return;
+	}
+
+	dp_ops->dp_send_svc_nlink_msg(radio, WLAN_SVC_WLAN_TP_TX_IND,
+				      &next_tx_level, sizeof(next_tx_level));
 }
 
 /**

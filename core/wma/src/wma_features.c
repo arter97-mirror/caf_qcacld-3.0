@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6037,6 +6037,7 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 	wmi_cca_busy_subband_info *cca_info = NULL;
 	uint32_t num_tlvs = 0;
 	bool is_cca_busy_info;
+	uint32_t rx_clear_count, cu;
 	QDF_STATUS qdf_status;
 
 	if (wma && wma->cds_context)
@@ -6111,7 +6112,17 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 	channel_status->channel_id = cds_freq_to_chan(event->freq);
 	channel_status->cmd_flags = event->cmd_flags;
 
-	wma_debug("freq %d, nf %d, rcc %u, cc %u, tx_r %d, tx_t %d, tx_frm_cnt %u rx_frm_cnt %u my_bss_rx_cycle_count %u mac_clk_mhz %u rx_11b_mode_data_duration %d chan_id:%d, flags:%d, cap: %d, num_tlvs:%d",
+	/* CU = (Rx cc - self tx - self rx) * 100 / total cc */
+	if (event->rx_clear_count >
+	    (event->tx_frame_cnt + event->my_bss_rx_cycle_count))
+		rx_clear_count = event->rx_clear_count -
+			event->tx_frame_cnt - event->my_bss_rx_cycle_count;
+	else
+		rx_clear_count = event->rx_clear_count;
+
+	cu = rx_clear_count * 100 / event->cycle_count;
+
+	wma_debug("freq %d, nf %d, rcc %u, cc %u, tx_r %d, tx_t %d, tx_frm %u rx_frm %u my_rx_cc %u mac_clk_mhz %u rx_11b_data_dur %d chan_id:%d, flags:%d, cap: %d, cu percent %d num_tlvs:%d",
 		  event->freq, event->noise_floor,
 		  event->rx_clear_count, event->cycle_count,
 		  event->chan_tx_pwr_range, event->chan_tx_pwr_tp,
@@ -6119,7 +6130,8 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 		  event->my_bss_rx_cycle_count, event->mac_clk_mhz,
 		  event->rx_11b_mode_data_duration,
 		  channel_status->channel_id,
-		  channel_status->cmd_flags, is_cca_busy_info, num_tlvs);
+		  channel_status->cmd_flags, is_cca_busy_info,
+		  cu, num_tlvs);
 
 	sme_msg.type = eWNI_SME_CHAN_INFO_EVENT;
 	sme_msg.bodyptr = channel_status;

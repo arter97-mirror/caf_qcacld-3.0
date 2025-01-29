@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012 - 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -69,7 +69,10 @@ enum wlan_fwol_southbound_event {
  * struct wlan_fwol_coex_config - BTC config items
  * @btc_mode: Config BTC mode
  * @antenna_isolation: Antenna isolation
- * @max_tx_power_for_btc: Max wlan tx power in co-ex scenario
+ * @max_tx_power_for_btc: Max wlan tx power for both WLAN and BT in
+ *                        co-ex scenario.
+ *                        byte0 - WLAN Max Tx power. Min: 0, Max: 0x64
+ *                        byte1 -  BT  Max Tx power. Min: 0, Max: 0x64
  * @wlan_low_rssi_threshold: Wlan low rssi threshold for BTC mode switching
  * @bt_low_rssi_threshold: BT low rssi threshold for BTC mode switching
  * @bt_interference_low_ll: Lower limit of low level BT interference
@@ -91,7 +94,7 @@ enum wlan_fwol_southbound_event {
 struct wlan_fwol_coex_config {
 	uint8_t btc_mode;
 	uint8_t antenna_isolation;
-	uint8_t max_tx_power_for_btc;
+	uint16_t max_tx_power_for_btc;
 	int16_t wlan_low_rssi_threshold;
 	int16_t bt_low_rssi_threshold;
 	int16_t bt_interference_low_ll;

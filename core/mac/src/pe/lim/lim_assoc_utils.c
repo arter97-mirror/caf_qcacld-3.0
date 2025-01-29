@@ -691,6 +691,7 @@ lim_reject_association(struct mac_context *mac_ctx, tSirMacAddr peer_addr,
 			struct pe_session *session_entry)
 {
 	tpDphHashNode sta_ds;
+	struct qdf_mac_addr zero_mac = QDF_MAC_ADDR_ZERO_INIT;
 
 	pe_debug("Sessionid: %d auth_type: %d sub_type: %d add_pre_auth_context: %d sta_id: %d delete_sta: %d result_code : %d peer_addr: " QDF_MAC_ADDR_FMT,
 		session_entry->peSessionId, auth_type, sub_type,
@@ -723,7 +724,8 @@ lim_reject_association(struct mac_context *mac_ctx, tSirMacAddr peer_addr,
 				mac_ctx,
 				STATUS_AP_UNABLE_TO_HANDLE_NEW_STA,
 				1, peer_addr, sub_type, sta_ds, session_entry,
-				false);
+				false,
+				sta_ds ? (struct qdf_mac_addr *)sta_ds->mld_addr : (struct qdf_mac_addr *)&zero_mac);
 		pe_debug("Received Re/Assoc req when max associated STAs reached from " QDF_MAC_ADDR_FMT,
 			 QDF_MAC_ADDR_REF(peer_addr));
 		lim_send_sme_max_assoc_exceeded_ntf(mac_ctx, peer_addr,
@@ -750,7 +752,8 @@ lim_reject_association(struct mac_context *mac_ctx, tSirMacAddr peer_addr,
 	 * status code to requesting STA.
 	 */
 	lim_send_assoc_rsp_mgmt_frame(mac_ctx, result_code, 0, peer_addr,
-				      sub_type, sta_ds, session_entry, false);
+				      sub_type, sta_ds, session_entry,
+				      false, (struct qdf_mac_addr *)sta_ds->mld_addr);
 
 	if (session_entry->parsedAssocReq[sta_ds->assocId]) {
 		lim_free_assoc_req_frm_buf(

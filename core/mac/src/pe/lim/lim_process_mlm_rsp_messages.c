@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3092,7 +3092,7 @@ lim_process_bcn_tpe_and_set_tpc(struct mac_context *mac_ctx,
 	struct pe_session *sap_session;
 	struct wlan_lmac_if_reg_tx_ops *tx_ops;
 	struct vdev_mlme_obj *mlme_obj;
-	struct bss_description *bss;
+	struct bss_description *bss = NULL;
 	bool tpe_change = false;
 
 	sap_session = lim_get_concurrent_session(mac_ctx,
@@ -3114,8 +3114,13 @@ lim_process_bcn_tpe_and_set_tpc(struct mac_context *mac_ctx,
 	if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc) &&
 	    !session_entry->sta_follows_sap_power) {
 		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
+		if (session_entry->lim_join_req)
+			bss = &session_entry->lim_join_req->bssDescription;
+		if (!bss) {
+			pe_err("bss descriptor is NULL");
+			return;
+		}
 
-		bss = &session_entry->lim_join_req->bssDescription;
 		lim_process_tpe_ie_from_beacon(mac_ctx, session_entry, bss,
 					       &tpe_change);
 

@@ -1095,7 +1095,8 @@ OS_IF_OBJ += $(OS_IF_DIR)/linux/wlan_osif_request_manager.o \
 	     $(OS_IF_DIR)/linux/mlme/src/osif_cm_disconnect_rsp.o \
 	     $(OS_IF_DIR)/linux/mlme/src/osif_cm_req.o \
 	     $(OS_IF_DIR)/linux/mlme/src/osif_cm_roam_rsp.o \
-	     $(OS_IF_DIR)/linux/mlme/src/osif_vdev_mgr_util.o
+	     $(OS_IF_DIR)/linux/mlme/src/osif_vdev_mgr_util.o \
+	     $(OS_IF_DIR)/linux/mlme/src/osif_link_reconfig.o
 
 OS_IF_OBJ += $(OS_IF_DIR)/linux/crypto/src/wlan_cfg80211_crypto.o
 

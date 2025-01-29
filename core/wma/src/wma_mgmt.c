@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2273,7 +2273,7 @@ QDF_STATUS wma_process_update_edca_param_req(WMA_HANDLE handle,
 		ol_tx_wmm_param.ac[ac].cwmax = wmm_param[ac].cwmax;
 	}
 
-	wma_nofl_debug("WMM params: %s", debug_str);
+	wma_nofl_debug("Vdev_id: %d WMM params: %s", vdev_id, debug_str);
 	qdf_mem_free(debug_str);
 
 	status = wmi_unified_process_update_edca_param(wma_handle->wmi_handle,

@@ -1640,6 +1640,21 @@ QDF_STATUS wma_set_smps_params(tp_wma_handle wma, uint8_t vdev_id,
 	return ret;
 }
 
+void
+wma_is_both_psd_eirp_support_present_for_sp(struct reg_tpc_power_info *param,
+					    bool *value)
+{
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma_handle) {
+		*value = false;
+		return;
+	}
+
+	*value = is_both_psd_eirp_support_present_for_sp(wma_handle->wmi_handle,
+							 param);
+}
+
 #ifdef FEATURE_TX_POWER
 /**
  * wma_set_tx_power_scale() - set tx power scale

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -254,7 +254,8 @@ void lim_set_active_edca_params(struct mac_context *mac_ctx,
 		}
 	}
 
-	pe_debug("adAdmitMask: uplink 0x%x downlink 0x%x, %s",
+	pe_debug("Vdev_id: %d adAdmitMask: uplink 0x%x downlink 0x%x,  %s",
+		 pe_session->vdev_id,
 		 pe_session->gAcAdmitMask[SIR_MAC_DIRECTION_UPLINK],
 		 pe_session->gAcAdmitMask[SIR_MAC_DIRECTION_DNLINK], debug_str);
 	qdf_mem_free(debug_str);

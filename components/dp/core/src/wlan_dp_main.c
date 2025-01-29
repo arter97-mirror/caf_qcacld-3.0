@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -238,7 +238,7 @@ QDF_STATUS dp_get_hlp_peer_state(struct wlan_dp_intf *dp_intf,
 	if (hlp_node && hlp_node->is_processing)
 		return QDF_STATUS_SUCCESS;
 
-	dp_debug_rl("Failed to get peer state");
+	dp_err_rl("Failed to get peer state");
 	return QDF_STATUS_E_FAILURE;
 }
 
@@ -1807,7 +1807,7 @@ wlan_dp_intf *dp_get_interface(struct wlan_dp_psoc_context *dp_ctx,
 
 void dp_send_rps_ind(struct wlan_dp_intf *dp_intf)
 {
-	int i;
+	int i, radio;
 	uint8_t cpu_map_list_len = 0;
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	struct wlan_rps_data rps_data;
@@ -1826,6 +1826,12 @@ void dp_send_rps_ind(struct wlan_dp_intf *dp_intf)
 	/* in case no cpu map list is provided, simply return */
 	if (!strlen(dp_ctx->dp_cfg.cpu_map_list)) {
 		dp_info("no cpu map list found");
+		goto err;
+	}
+
+	radio = cds_get_radio_index();
+	if (radio == -EINVAL) {
+		dp_err("Invalid radio index");
 		goto err;
 	}
 
@@ -1849,8 +1855,7 @@ void dp_send_rps_ind(struct wlan_dp_intf *dp_intf)
 
 	strscpy(rps_data.ifname, qdf_netdev_get_devname(dp_intf->dev),
 		sizeof(rps_data.ifname));
-	dp_ctx->dp_ops.dp_send_svc_nlink_msg(cds_get_radio_index(),
-					     WLAN_SVC_RPS_ENABLE_IND,
+	dp_ctx->dp_ops.dp_send_svc_nlink_msg(radio, WLAN_SVC_RPS_ENABLE_IND,
 					     &rps_data, sizeof(rps_data));
 
 	cds_cfg->rps_enabled = true;
@@ -1879,6 +1884,7 @@ void dp_try_send_rps_ind(struct wlan_objmgr_vdev *vdev)
 
 void dp_send_rps_disable_ind(struct wlan_dp_intf *dp_intf)
 {
+	int radio;
 	struct wlan_rps_data rps_data;
 	struct cds_config_info *cds_cfg;
 
@@ -1886,6 +1892,12 @@ void dp_send_rps_disable_ind(struct wlan_dp_intf *dp_intf)
 
 	if (!cds_cfg) {
 		dp_err("cds_cfg is NULL");
+		return;
+	}
+
+	radio = cds_get_radio_index();
+	if (radio == -EINVAL) {
+		dp_err("Invalid radio index");
 		return;
 	}
 
@@ -1897,7 +1909,7 @@ void dp_send_rps_disable_ind(struct wlan_dp_intf *dp_intf)
 
 	strscpy(rps_data.ifname, qdf_netdev_get_devname(dp_intf->dev),
 		sizeof(rps_data.ifname));
-	dp_intf->dp_ctx->dp_ops.dp_send_svc_nlink_msg(cds_get_radio_index(),
+	dp_intf->dp_ctx->dp_ops.dp_send_svc_nlink_msg(radio,
 				    WLAN_SVC_RPS_ENABLE_IND,
 				    &rps_data, sizeof(rps_data));
 

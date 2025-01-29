@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1444,7 +1444,7 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		status = policy_mgr_update_connection_info(psoc, vdev_id);
 		if (status == QDF_STATUS_NOT_INITIALIZED)
 			policy_mgr_incr_active_session(psoc, QDF_STA_MODE,
-						       vdev_id);
+						       vdev_id, true);
 	}
 
 	/* Check if FW as indicated this link as disabled */

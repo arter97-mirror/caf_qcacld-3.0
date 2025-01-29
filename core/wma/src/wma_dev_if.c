@@ -952,7 +952,7 @@ static void wma_set_bw_n_phy_mode(tp_wma_handle wma, uint8_t vdev_id,
 	target_if_wmi_chan_width_to_phy_ch_width(max_ch_width_supported);
 
 	if (is_eht) {
-		wlan_reg_extract_puncture_by_bw(vdev_chan->ch_freq,
+		wlan_reg_extract_puncture_by_bw(vdev_chan->ch_width,
 						puncture_bitmap,
 						vdev_chan->ch_freq,
 						vdev_chan->ch_freq_seg2,

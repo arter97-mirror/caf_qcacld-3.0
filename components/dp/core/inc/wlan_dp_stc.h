@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,14 +37,16 @@
 	do {								\
 		if (unlikely((debug_mask) &				\
 		    WLAN_DP_STC_LOGMASK_VERBOSE_L1))			\
-			QDF_TRACE_INFO(QDF_MODULE_ID_DP, params);	\
+			__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH,	\
+				       QDF_MODULE_ID_DP, ## params);	\
 	} while (0)
 
 #define dp_stc_debug(debug_mask, params...)				\
 	do {								\
 		if (unlikely((debug_mask) &				\
 		    WLAN_DP_STC_LOGMASK_VERBOSE_L2))			\
-			QDF_TRACE_INFO(QDF_MODULE_ID_DP, params);	\
+			__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH,	\
+				       QDF_MODULE_ID_DP, ## params);	\
 	} while (0)
 
 #define DP_STC_UPDATE_MIN_MAX_STATS(__field, __val)			\

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2210,7 +2210,6 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 	case PLD_FW_DOWN:
 		hdd_debug("Received firmware down indication");
 		hdd_dump_log_buffer(NULL, NULL);
-		cds_scan_flush_on_recovery();
 		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
 		hdd_init_start_completion();

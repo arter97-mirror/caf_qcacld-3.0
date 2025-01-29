@@ -998,6 +998,10 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 		if (!device_address)
 			return ERR_PTR(-EINVAL);
 
+		if (policy_mgr_mlo_sap_concurrency_allow(hdd_ctx->psoc) &&
+		    (QDF_SAP_MODE == mode || QDF_STA_MODE == mode))
+			create_params.is_ml_adapter = true;
+
 		adapter = hdd_open_adapter(hdd_ctx, mode, name,
 					   device_address,
 					   name_assign_type, true,

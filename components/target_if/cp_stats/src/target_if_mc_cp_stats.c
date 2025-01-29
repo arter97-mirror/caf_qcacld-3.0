@@ -844,7 +844,8 @@ static QDF_STATUS target_if_cp_stats_extract_vdev_chain_rssi_stats(
 		for (j = 0; j < MAX_NUM_CHAINS; j++) {
 			dat_snr = rssi_stats.rssi_avg_data[j];
 			bcn_snr = rssi_stats.rssi_avg_beacon[j];
-			cp_stats_nofl_debug("Chain %d %s bcn: %d data: %d", j,
+			cp_stats_nofl_debug("vdev %d Chain %d %s bcn: %d data: %d",
+					    rssi_stats.vdev_id, j,
 					    db2dbm_enabled ? "RSSI" : "SNR",
 					    bcn_snr, dat_snr);
 			/*

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5404,4 +5404,14 @@ wlan_mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_mlme_get_supported_wifi_generations_info(struct wlan_objmgr_psoc *psoc,
 					      uint8_t *supp, uint8_t *cert);
+
+/**
+ * wlan_mlme_clear_peer_private_object_data(): This API is wrapper for
+ * function "mlme_clear_peer_private_object_data"
+ * @peer: peer object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
 #endif /* _WLAN_MLME_API_H_ */

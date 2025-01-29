@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -345,11 +345,22 @@ void wlan_ll_lt_store_to_avoid_list_and_flush_old(
  *
  * Return: QDF_STATUS
  */
-
 qdf_freq_t
 wlan_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
 				   uint8_t vdev_id, qdf_freq_t curr_freq,
 				   enum ll_sap_csa_source csa_src);
+
+/**
+ * wlan_ll_sap_is_cur_cu_greater_than_th() - API to get check if cu is greater
+ * than thresh
+ * @psoc: Pointer to psoc object
+ * @vdev_id: Vdev Id of ll_lt_sap
+ *
+ * Return: bool
+ */
+bool wlan_ll_sap_is_cur_cu_greater_than_th(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
+
 #else
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
@@ -535,6 +546,13 @@ wlan_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
 				   enum ll_sap_csa_source csa_src)
 {
 	return 0;
+}
+
+static inline bool
+wlan_ll_sap_is_cur_cu_greater_than_th(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id)
+{
+	return false;
 }
 
 #endif /* WLAN_FEATURE_LL_LT_SAP */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4613,7 +4613,7 @@ void policy_mgr_move_vdev_from_disabled_to_connection_tbl(
 	 * Add entry to pm_conc_connection_list if remove from disabled links
 	 * was success
 	 */
-	policy_mgr_incr_active_session(psoc, mode, vdev_id);
+	policy_mgr_incr_active_session(psoc, mode, vdev_id, false);
 }
 
 static QDF_STATUS
@@ -5610,8 +5610,8 @@ bool policy_mgr_is_mlo_sta_disconnected(struct wlan_objmgr_psoc *psoc,
 }
 
 void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
-				enum QDF_OPMODE mode,
-				uint8_t session_id)
+				    enum QDF_OPMODE mode, uint8_t session_id,
+				    bool update_flow_pool_map)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t conn_6ghz_flag = 0;
@@ -5647,8 +5647,10 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 				psoc, session_id,
 				pm_ctx->no_of_active_sessions[mode]);
 
-	if (mode != QDF_NAN_DISC_MODE && pm_ctx->dp_cbacks.hdd_v2_flow_pool_map)
+	if (mode != QDF_NAN_DISC_MODE &&
+	    pm_ctx->dp_cbacks.hdd_v2_flow_pool_map && update_flow_pool_map)
 		pm_ctx->dp_cbacks.hdd_v2_flow_pool_map(session_id);
+
 	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE)
 		policy_mgr_get_ap_6ghz_capable(psoc, session_id,
 					       &conn_6ghz_flag);
@@ -9636,6 +9638,14 @@ policy_mgr_is_link_active_allowed(struct wlan_objmgr_psoc *psoc,
 	struct wlan_channel *chan_info;
 	struct mlo_link_info *link_info;
 	unsigned long act_link_bitmap = active_link_bitmap;
+	bool is_emlsr_supp;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	status = wlan_mlme_get_emlsr_mode_enabled(psoc, &is_emlsr_supp);
+	if (!is_emlsr_supp) {
+		policy_mgr_err("eMLSR is disabled");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
@@ -9749,8 +9759,10 @@ policy_mgr_update_mlo_links_based_on_linkid_nlink(
 	if (!policy_mgr_is_hw_dbs_capable(psoc) && num_links_to_active > 1 &&
 	    policy_mgr_is_link_active_allowed(psoc, vdev,
 				active_link_bitmap,
-				num_links_to_active) != QDF_STATUS_SUCCESS)
+				num_links_to_active) != QDF_STATUS_SUCCESS) {
+		status = QDF_STATUS_E_FAILURE;
 		goto release_vdev_ref;
+	}
 
 	policy_mgr_debug("active link bitmap: %d, inactive link bitmap: %d",
 			 active_link_bitmap, inactive_link_bitmap);
@@ -14395,6 +14407,26 @@ policy_mgr_find_current_hw_mode(struct wlan_objmgr_psoc *psoc)
 end:
 	return POLICY_MGR_HW_MODE_INVALID;
 }
+
+bool
+policy_mgr_mlo_sap_concurrency_allow(struct wlan_objmgr_psoc *psoc)
+{
+	struct wmi_unified *wmi_handle;
+
+	if (!psoc) {
+		mlme_err("PSOC is NULL");
+		return false;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mlme_err("wmi_handle is null");
+		return false;
+	}
+
+	return (wmi_service_enabled(wmi_handle,
+				    wmi_service_mlo_sap_concurrency_support));
+}
 #endif
 
 bool
@@ -14447,3 +14479,35 @@ bool policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
 	return policy_mgr_is_force_scc(psoc);
 }
 #endif
+
+void policy_mgr_update_flow_pool_map(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	enum QDF_OPMODE op_mode;
+	uint8_t vdev_id;
+
+	if (!vdev)
+		return;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
+	    policy_mgr_is_set_link_in_progress(wlan_vdev_get_psoc(vdev))) {
+		policy_mgr_debug("vdev:%d Link switch/set_link is ongoing, don't update flow pool map",
+				 vdev_id);
+		return;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return;
+	}
+
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (op_mode != QDF_NAN_DISC_MODE &&
+	    pm_ctx->dp_cbacks.hdd_v2_flow_pool_map)
+		pm_ctx->dp_cbacks.hdd_v2_flow_pool_map(vdev_id);
+}
