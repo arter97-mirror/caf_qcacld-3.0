@@ -1599,7 +1599,7 @@ void pmo_core_psoc_target_suspend_acknowledge(void *context, bool wow_nack,
 
 	pmo_core_set_wow_nack(psoc_ctx, wow_nack, reason_code);
 	qdf_event_set(&psoc_ctx->wow.target_suspend);
-	if (!pmo_tgt_psoc_get_runtime_pm_in_progress(psoc)) {
+	if (!pmo_tgt_psoc_get_runtime_pm_inprogress(psoc)) {
 		if (wow_nack)
 			qdf_wake_lock_timeout_acquire(
 				&psoc_ctx->wow.wow_wake_lock,
