@@ -7708,15 +7708,13 @@ QDF_STATUS sme_set_wlm_latency_level(mac_handle_t mac_handle,
 
 	SME_ENTER();
 
-	if (!wma)
+	if (!wma) {
+		sme_err("wma is NULL");
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	if (!mac_ctx->mlme_cfg->wlm_config.latency_enable) {
 		sme_err("WLM latency level setting is disabled");
-		return QDF_STATUS_E_FAILURE;
-	}
-	if (!wma) {
-		sme_err("wma is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 

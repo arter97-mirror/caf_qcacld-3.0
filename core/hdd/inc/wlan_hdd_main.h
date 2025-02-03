@@ -1052,11 +1052,15 @@ struct hdd_context;
  * @client_id: host id for a client
  * @port_id: client id coming from upper layer
  * @in_use: set true for a client when host receives vendor cmd for that client
+ * @req_latency_level: Requested latency level
+ * @is_wfc_state: To track whether the host receives the WFC_STATE cmd or not
  */
 struct wlm_multi_client_info_table {
 	uint32_t client_id;
 	uint32_t port_id;
 	bool in_use;
+	uint16_t req_latency_level;
+	bool is_wfc_state;
 };
 #endif
 
@@ -1223,6 +1227,19 @@ struct get_station_client_info {
 };
 
 /**
+ * enum wfc_state_latency_level - value as per
+ * QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE cmd
+ * @WFC_OFF_LATENCY_LEVEL: level off
+ * @WFC_ON_LATENCY_LEVEL: level on
+ * @WFC_INVALID_LATENCY_LEVEL: Invalid level
+ */
+enum wfc_state_latency_level {
+	WFC_OFF_LATENCY_LEVEL,
+	WFC_ON_LATENCY_LEVEL,
+	WFC_INVALID_LATENCY_LEVEL,
+};
+
+/**
  * struct hdd_adapter - hdd vdev/net_device context
  * @magic: Magic cookie for adapter sanity verification.  Note that this
  *         needs to be at the beginning of the private data structure so
@@ -1300,6 +1317,7 @@ struct get_station_client_info {
  * @lfr_fw_status:
  * @active_ac:
  * @latency_level: 0 - normal, 1 - xr, 2 - low, 3 - ultralow
+ * @cached_latency_level: Cached latency level as requested by user space
  * @multi_client_ll_support: to check multi client ll support in driver
  * @client_info: To store multi client id information
  * @multi_ll_response_cookie: cookie for multi client ll command
@@ -1478,6 +1496,7 @@ struct hdd_adapter {
 	struct lfr_firmware_status lfr_fw_status;
 	uint8_t active_ac;
 	uint16_t latency_level;
+	uint16_t cached_latency_level;
 #ifdef MULTI_CLIENT_LL_SUPPORT
 	bool multi_client_ll_support;
 	struct wlm_multi_client_info_table client_info[WLM_MAX_HOST_CLIENT];

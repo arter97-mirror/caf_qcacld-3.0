@@ -931,12 +931,14 @@ QDF_STATUS wlan_hdd_set_wlm_latency_level(struct hdd_adapter *adapter,
  * @adapter: pointer to network adapter
  * @port_id: port id for which host receives set latency level vendor command
  * @client_id: client id for a given port id
+ * @latency_level: latency level requested by user space
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
 					   uint32_t port_id,
-					   uint32_t *client_id);
+					   uint32_t *client_id,
+					   uint16_t latency_level);
 
 /**
  * wlan_hdd_get_client_id_bitmap() - to calculate client id bitmap
@@ -983,7 +985,8 @@ static inline uint8_t wlan_hdd_get_client_id_bitmap(struct hdd_adapter *adapter)
 static inline
 QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
 					   uint32_t port_id,
-					   uint32_t *client_id)
+					   uint32_t *client_id,
+					   uint16_t latency_level)
 {
 	return QDF_STATUS_E_FAILURE;
 }

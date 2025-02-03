@@ -564,6 +564,8 @@ static void hdd_cm_set_default_wlm_mode(struct hdd_adapter *adapter)
 			hdd_err("reset wlm mode failed: %d", status);
 		}
 	}
+
+	adapter->cached_latency_level = WFC_INVALID_LATENCY_LEVEL;
 }
 
 /**
