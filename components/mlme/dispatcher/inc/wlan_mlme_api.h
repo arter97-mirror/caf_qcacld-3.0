@@ -5438,4 +5438,12 @@ wlan_mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
  */
 QDF_STATUS
 wlan_mlme_get_fw_optimized_power_cap(struct wlan_objmgr_psoc *psoc, bool *cap);
+
+/*
+ * wlan_mlme_get_beacon_interval() - Get beacon interval of connected bss
+ * @vdev: pointer to vdev
+ *
+ * Return: beacon interval
+ */
+uint32_t wlan_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev);
 #endif /* _WLAN_MLME_API_H_ */

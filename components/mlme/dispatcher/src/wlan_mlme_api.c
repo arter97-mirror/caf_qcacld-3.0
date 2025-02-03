@@ -9100,3 +9100,18 @@ wlan_mlme_get_fw_optimized_power_cap(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+uint32_t
+wlan_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev)
+{
+	uint32_t bcn_interval;
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_objmgr_vdev_get_comp_private_obj(vdev,
+							  WLAN_UMAC_COMP_MLME);
+
+	wlan_util_vdev_mlme_get_param(vdev_mlme,
+				      WLAN_MLME_CFG_BEACON_INTERVAL,
+				      &bcn_interval);
+	return bcn_interval;
+}
