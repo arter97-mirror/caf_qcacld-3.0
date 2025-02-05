@@ -1070,6 +1070,12 @@ wlan_dp_stc_send_active_traffic_map_ind(struct wlan_dp_stc *dp_stc,
 	if (qdf_atomic_read(&peer_tc->num_video_call))
 		wmi_active_traffic_map |=
 				WMI_PEER_ACTIVE_TRAFFIC_TYPE_VIDEO_CONF_M;
+	if (qdf_atomic_read(&peer_tc->num_browsing))
+		wmi_active_traffic_map |=
+				WMI_PEER_ACTIVE_TRAFFIC_TYPE_WEB_BROWSING_M;
+	if (qdf_atomic_read(&peer_tc->num_aperiodic_bursts))
+		wmi_active_traffic_map |=
+		      WMI_PEER_ACTIVE_TRAFFIC_TYPE_APERIODIC_BURST_TRAFFIC_1_M;
 
 	req_buf.vdev_id = peer_tc->vdev_id;
 	qdf_mem_copy(&req_buf.mac.bytes,
