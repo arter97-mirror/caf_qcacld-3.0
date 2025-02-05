@@ -1136,7 +1136,7 @@ static QDF_STATUS os_if_son_get_apcap(struct wlan_objmgr_vdev *vdev,
 	struct mlme_ht_capabilities_info ht_cap_info;
 	struct wlan_objmgr_psoc *psoc;
 	tDot11fIEhe_cap he_cap = {0};
-	bool enabled;
+	uint8_t enable_mimo;
 	QDF_STATUS status;
 	int32_t vht_caps = 0;
 
@@ -1165,8 +1165,8 @@ static QDF_STATUS os_if_son_get_apcap(struct wlan_objmgr_vdev *vdev,
 	}
 
 	/* Fetch VHT CAP */
-	status = ucfg_mlme_get_vht_enable2x2(psoc, &enabled);
-	if (enabled) {
+	status = ucfg_mlme_get_vht_mimo_cap(psoc, &enable_mimo);
+	if (enable_mimo) {
 		apcap->wlan_ap_vht_capabilities_valid = 1;
 		ucfg_mlme_cfg_get_vht_tx_mcs_map(psoc, &value);
 		apcap->vhtcap.supp_tx_mcs = value;

@@ -1315,7 +1315,7 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	rx_mcs_map = mlme_get_min_rate_cap(
 		mlme_obj->cfg.he_caps.dot11_he_cap.rx_he_mcs_map_lt_80,
 		he_cap->rx_he_mcs_map_lt_80);
-	if (!mlme_obj->cfg.vht_caps.vht_cap_info.enable2x2) {
+	if (!mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo) {
 		nss = 2;
 		tx_mcs_map = HE_SET_MCS_4_NSS(tx_mcs_map, HE_MCS_DISABLE, nss);
 		rx_mcs_map = HE_SET_MCS_4_NSS(rx_mcs_map, HE_MCS_DISABLE, nss);
@@ -1334,7 +1334,7 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	   *((uint16_t *)mlme_obj->cfg.he_caps.dot11_he_cap.rx_he_mcs_map_160),
 	   *((uint16_t *)he_cap->rx_he_mcs_map_160));
 
-	if (!mlme_obj->cfg.vht_caps.vht_cap_info.enable2x2) {
+	if (!mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo) {
 		nss = 2;
 		tx_mcs_map = HE_SET_MCS_4_NSS(tx_mcs_map, HE_MCS_DISABLE, nss);
 		rx_mcs_map = HE_SET_MCS_4_NSS(rx_mcs_map, HE_MCS_DISABLE, nss);
@@ -2047,9 +2047,8 @@ bool wlan_mlme_configure_chain_mask_supported(struct wlan_objmgr_psoc *psoc)
 	struct wma_caps_per_phy non_dbs_phy_cap = {0};
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	QDF_STATUS status;
-	bool as_enabled, enable_bt_chain_sep, enable2x2;
-	uint8_t dual_mac_feature;
-	bool hw_dbs_2x2_cap;
+	bool hw_dbs_2x2_cap, as_enabled, enable_bt_chain_sep;
+	uint8_t enable_mimo, dual_mac_feature;
 
 	if (!mlme_obj)
 		return false;
@@ -2076,13 +2075,13 @@ bool wlan_mlme_configure_chain_mask_supported(struct wlan_objmgr_psoc *psoc)
 	ucfg_policy_mgr_get_dual_mac_feature(psoc, &dual_mac_feature);
 
 	hw_dbs_2x2_cap = policy_mgr_is_hw_dbs_2x2_capable(psoc);
-	enable2x2 = mlme_obj->cfg.vht_caps.vht_cap_info.enable2x2;
+	enable_mimo = mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo;
 
-	if ((enable2x2 && !enable_bt_chain_sep) || as_enabled ||
-	   (!hw_dbs_2x2_cap && (dual_mac_feature != DISABLE_DBS_CXN_AND_SCAN) &&
-	    enable2x2)) {
-		mlme_legacy_debug("Cannot configure chainmask enable_bt_chain_sep %d as_enabled %d enable2x2 %d hw_dbs_2x2_cap %d dual_mac_feature %d",
-				  enable_bt_chain_sep, as_enabled, enable2x2,
+	if ((enable_mimo && !enable_bt_chain_sep) || as_enabled ||
+	    (!hw_dbs_2x2_cap && enable_mimo &&
+	     (dual_mac_feature != DISABLE_DBS_CXN_AND_SCAN))) {
+		mlme_legacy_debug("Cannot configure chainmask enable_bt_chain_sep %d as_enabled %d enable_mimo %d hw_dbs_2x2_cap %d dual_mac_feature %d",
+				  enable_bt_chain_sep, as_enabled, enable_mimo,
 				  hw_dbs_2x2_cap, dual_mac_feature);
 		return false;
 	}
@@ -5005,7 +5004,7 @@ wlan_mlme_cfg_set_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
-wlan_mlme_get_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool *value)
+wlan_mlme_get_vht_mimo_cap(struct wlan_objmgr_psoc *psoc, uint8_t *value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -5013,7 +5012,7 @@ wlan_mlme_get_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool *value)
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
 
-	*value = mlme_obj->cfg.vht_caps.vht_cap_info.enable2x2;
+	*value = mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -5033,7 +5032,7 @@ wlan_mlme_get_force_sap_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 QDF_STATUS
-wlan_mlme_set_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool value)
+wlan_mlme_set_vht_mimo_cap(struct wlan_objmgr_psoc *psoc, uint8_t value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -5041,7 +5040,10 @@ wlan_mlme_set_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool value)
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
 
-	mlme_obj->cfg.vht_caps.vht_cap_info.enable2x2 = value;
+	if (!cfg_in_range(CFG_VHT_MIMO_CAP_FEATURE, value))
+		value = QDF_MIN(value, WLAN_MAX_VDEV_NSS - 1);
+
+	mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo = value;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -5141,20 +5143,20 @@ mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc, struct wma_tgt_vht_cap *cfg)
 		mlme_obj->cfg.ht_caps.ht_cap_info.maximal_amsdu_size = 1;
 	value = (CFG_VHT_BASIC_MCS_SET_STADEF & VHT_MCS_1x1) |
 		vht_cap_info->basic_mcs_set;
-	if (vht_cap_info->enable2x2)
+	if (vht_cap_info->enable_mimo)
 		value = (value & VHT_MCS_2x2) | (vht_cap_info->rx_mcs2x2 << 2);
 	vht_cap_info->basic_mcs_set = value;
 
 	value = (CFG_VHT_RX_MCS_MAP_STADEF & VHT_MCS_1x1) |
 		 vht_cap_info->rx_mcs;
 
-	if (vht_cap_info->enable2x2)
+	if (vht_cap_info->enable_mimo)
 		value = (value & VHT_MCS_2x2) | (vht_cap_info->rx_mcs2x2 << 2);
 	vht_cap_info->rx_mcs_map = value;
 
 	value = (CFG_VHT_TX_MCS_MAP_STADEF & VHT_MCS_1x1) |
 		 vht_cap_info->tx_mcs;
-	if (vht_cap_info->enable2x2)
+	if (vht_cap_info->enable_mimo)
 		value = (value & VHT_MCS_2x2) | (vht_cap_info->tx_mcs2x2 << 2);
 	vht_cap_info->tx_mcs_map = value;
 
@@ -5168,7 +5170,7 @@ mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc, struct wma_tgt_vht_cap *cfg)
 		vht_cap_info->short_gi_80mhz = cfg->vht_short_gi_80;
 
 	/* Set VHT TX/RX STBC cap */
-	if (vht_cap_info->enable2x2) {
+	if (vht_cap_info->enable_mimo) {
 		if (vht_cap_info->tx_stbc && !cfg->vht_tx_stbc)
 			vht_cap_info->tx_stbc = cfg->vht_tx_stbc;
 
@@ -5236,7 +5238,7 @@ QDF_STATUS mlme_update_nss_vht_cap(struct wlan_objmgr_psoc *psoc)
 
 	temp = vht_cap_info->basic_mcs_set;
 	temp = (temp & 0xFFFC) | vht_cap_info->rx_mcs;
-	if (vht_cap_info->enable2x2)
+	if (vht_cap_info->enable_mimo)
 		temp = (temp & 0xFFF3) | (vht_cap_info->rx_mcs2x2 << 2);
 	else
 		temp |= 0x000C;
@@ -5245,7 +5247,7 @@ QDF_STATUS mlme_update_nss_vht_cap(struct wlan_objmgr_psoc *psoc)
 
 	temp = vht_cap_info->rx_mcs_map;
 	temp = (temp & 0xFFFC) | vht_cap_info->rx_mcs;
-	if (vht_cap_info->enable2x2)
+	if (vht_cap_info->enable_mimo)
 		temp = (temp & 0xFFF3) | (vht_cap_info->rx_mcs2x2 << 2);
 	else
 		temp |= 0x000C;
@@ -5254,7 +5256,7 @@ QDF_STATUS mlme_update_nss_vht_cap(struct wlan_objmgr_psoc *psoc)
 
 	temp = vht_cap_info->tx_mcs_map;
 	temp = (temp & 0xFFFC) | vht_cap_info->tx_mcs;
-	if (vht_cap_info->enable2x2)
+	if (vht_cap_info->enable_mimo)
 		temp = (temp & 0xFFF3) | (vht_cap_info->tx_mcs2x2 << 2);
 	else
 		temp |= 0x000C;
@@ -8089,7 +8091,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 	mlme_feature_set->vendor_req_2_version =
 					WMI_HOST_VENDOR1_REQ2_VERSION_3_50;
 	wlan_mlme_set_iface_combinations(psoc, mlme_feature_set);
-	wlan_mlme_get_vht_enable2x2(psoc, &mlme_feature_set->enable2x2);
+	wlan_mlme_get_vht_mimo_cap(psoc, &mlme_feature_set->enable_mimo);
 }
 #endif
 

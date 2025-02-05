@@ -2553,7 +2553,7 @@ int wlan_hdd_set_mc_rate(struct wlan_hdd_link_info *link_info, int target_rate)
 	QDF_STATUS status;
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	bool bval = false;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is null");
@@ -2568,12 +2568,12 @@ int wlan_hdd_set_mc_rate(struct wlan_hdd_link_info *link_info, int target_rate)
 		return -EINVAL;
 	}
 
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("unable to get vht_enable2x2");
 		return -EINVAL;
 	}
-	rate_update.nss = (bval == 0) ? 0 : 1;
+	rate_update.nss = enable_mimo ? 1 : 0;
 
 	rate_update.dev_mode = adapter->device_mode;
 	rate_update.mcastDataRate24GHz = target_rate;
@@ -6048,31 +6048,6 @@ static int hdd_parse_setantennamode_command(const uint8_t *value)
 }
 
 /**
- * hdd_is_supported_chain_mask_2x2() - Verify if supported chain
- * mask is 2x2 mode
- * @hdd_ctx: Pointer to hdd context
- *
- * Return: true if supported chain mask 2x2 else false
- */
-static bool hdd_is_supported_chain_mask_2x2(struct hdd_context *hdd_ctx)
-{
-	QDF_STATUS status;
-	bool bval = false;
-
-/*
-	 * Revisit and the update logic to determine the number
-	 * of TX/RX chains supported in the system when
-	 * antenna sharing per band chain mask support is
-	 * brought in
-	 */
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("unable to get vht_enable2x2");
-
-	return (bval == 0x01) ? true : false;
-}
-
-/**
  * hdd_is_supported_chain_mask_1x1() - Verify if the supported
  * chain mask is 1x1
  * @hdd_ctx: Pointer to hdd context
@@ -6082,7 +6057,7 @@ static bool hdd_is_supported_chain_mask_2x2(struct hdd_context *hdd_ctx)
 static bool hdd_is_supported_chain_mask_1x1(struct hdd_context *hdd_ctx)
 {
 	QDF_STATUS status;
-	bool bval = false;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 
 	/*
 	 * Revisit and update the logic to determine the number
@@ -6090,11 +6065,23 @@ static bool hdd_is_supported_chain_mask_1x1(struct hdd_context *hdd_ctx)
 	 * antenna sharing per band chain mask support is
 	 * brought in
 	 */
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	return (!bval) ? true : false;
+	return !enable_mimo;
+}
+
+/**
+ * hdd_is_supported_chain_mask_2x2() - Verify if supported chain
+ * mask is 2x2 mode
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: true if supported chain mask 2x2 else false
+ */
+static inline bool hdd_is_supported_chain_mask_2x2(struct hdd_context *hdd_ctx)
+{
+	return !hdd_is_supported_chain_mask_1x1(hdd_ctx);
 }
 
 QDF_STATUS hdd_update_smps_antenna_mode(struct hdd_context *hdd_ctx, int mode)

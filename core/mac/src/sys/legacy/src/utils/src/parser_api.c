@@ -1662,9 +1662,11 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			pDot11f->txMCSMap |= DISABLE_NSS2_MCS;
 			pDot11f->rxMCSMap |= DISABLE_NSS2_MCS;
 			pDot11f->txSupDataRate =
-				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
+								true);
 			pDot11f->rxHighSupDataRate =
-				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
+								true);
 			if (!pe_session->ch_width &&
 			    !vht_cap_info->enable_vht20_mcs9 &&
 			    ((pDot11f->txMCSMap & VHT_1x1_MCS_MASK) ==

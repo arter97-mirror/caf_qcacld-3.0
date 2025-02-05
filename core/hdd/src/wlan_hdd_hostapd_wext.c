@@ -367,7 +367,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	QDF_STATUS status;
 	int ret = 0;
 	struct hdd_context *hdd_ctx;
-	bool bval = false;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter_dev(dev);
@@ -510,12 +510,13 @@ static __iw_softap_setparam(struct net_device *dev,
 		hdd_debug("MC Target rate %d", set_value);
 		qdf_copy_macaddr(&rate_update.bssid,
 				 &adapter->mac_addr);
-		status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+		status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
+						    &enable_mimo);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("unable to get vht_enable2x2");
 			ret = -1;
 		}
-		rate_update.nss = (bval == 0) ? 0 : 1;
+		rate_update.nss = enable_mimo ? 1 : 0;
 
 		rate_update.dev_mode = adapter->device_mode;
 		rate_update.mcastDataRate24GHz = set_value;

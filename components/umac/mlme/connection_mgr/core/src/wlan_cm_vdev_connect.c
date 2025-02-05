@@ -820,7 +820,7 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 	conn_stats.reason_code = 0;
 	conn_stats.op_freq = freq;
 
-	max_supported_nss = mlme_obj->cfg.vht_caps.vht_cap_info.enable2x2 ?
+	max_supported_nss = mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo ?
 			    WLAN_MAX_VDEV_NSS : 1;
 	mlme_nofl_debug("+---------CONNECTION INFO START------------+");
 	mlme_nofl_debug("VDEV-ID: %d self_mac:"QDF_MAC_ADDR_FMT,

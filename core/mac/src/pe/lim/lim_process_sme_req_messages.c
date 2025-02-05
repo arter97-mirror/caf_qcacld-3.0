@@ -1062,7 +1062,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		}
 
 		session->nss = session->vdev_nss;
-		if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2 ||
+		if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo ||
 		    policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id))
 			session->nss = 1;
 
@@ -1810,7 +1810,7 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	vendor_ap_search_attr.enable_5g =
 				wlan_reg_is_5ghz_ch_freq(bss_desc->chan_freq);
 
-	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2) {
+	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo) {
 		session->nss = 1;
 		session->vdev_nss = 1;
 	}
@@ -9456,10 +9456,12 @@ static void lim_set_pdev_vht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 				sizeof(tSirMacVHTCapabilityInfo)];
 			vht_mcs->rxMcsMap |= DISABLE_NSS2_MCS;
 			vht_mcs->rxHighest =
-				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
+								true);
 			vht_mcs->txMcsMap |= DISABLE_NSS2_MCS;
 			vht_mcs->txHighest =
-				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
+								true);
 		}
 		msg.type = WMA_SET_PDEV_IE_REQ;
 		msg.bodyptr = ie_params;

@@ -1892,8 +1892,7 @@ static void mlme_init_vht_cap_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_VHT_ENABLE_TX_MCS2x2_8_9);
 	vht_cap_info->enable_vht20_mcs9 =
 			cfg_get(psoc, CFG_ENABLE_VHT20_MCS9);
-	vht_cap_info->enable2x2 =
-			cfg_get(psoc, CFG_VHT_ENABLE_2x2_CAP_FEATURE);
+	vht_cap_info->enable_mimo = cfg_get(psoc, CFG_VHT_MIMO_CAP_FEATURE);
 	vht_cap_info->enable_paid =
 			cfg_get(psoc, CFG_VHT_ENABLE_PAID_FEATURE);
 	vht_cap_info->enable_gid =
@@ -1907,11 +1906,11 @@ static void mlme_init_vht_cap_cfg(struct wlan_objmgr_psoc *psoc,
 	vht_cap_info->vendor_vhtie =
 			cfg_get(psoc, CFG_ENABLE_SUBFEE_IN_VENDOR_VHTIE);
 
-	if (vht_cap_info->enable2x2)
+	if (vht_cap_info->enable_mimo)
 		vht_cap_info->su_bformer =
 			cfg_get(psoc, CFG_VHT_ENABLE_TX_SU_BEAM_FORMER);
 
-	if (vht_cap_info->enable2x2 && vht_cap_info->su_bformer)
+	if (vht_cap_info->enable_mimo && vht_cap_info->su_bformer)
 		vht_cap_info->num_soundingdim = NUM_OF_SOUNDING_DIMENSIONS;
 
 	vht_cap_info->tx_bf_cap = cfg_default(CFG_TX_BF_CAP);

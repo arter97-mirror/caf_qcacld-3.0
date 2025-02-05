@@ -254,6 +254,7 @@
 #include "wlan_p2p_ucfg_api.h"
 #include "wifi_pos_api.h"
 #include "wlan_mgmt_rx_srng_ucfg_api.h"
+#include <cfg_mlme_vht_caps.h>
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -2172,17 +2173,18 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
  */
 static void hdd_update_vdev_nss(struct hdd_context *hdd_ctx)
 {
-	uint8_t max_supp_nss = 1;
+	uint8_t max_supp_nss = NSS_1x1_MODE;
 	mac_handle_t mac_handle;
 	QDF_STATUS status;
-	bool bval;
+	uint8_t enable_mimo;
 
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	if (bval && !cds_is_sub_20_mhz_enabled())
-		max_supp_nss = 2;
+	/* Check the INI interpretation of CFG_VHT_MIMO_CAP_FEATURE */
+	if (enable_mimo && !cds_is_sub_20_mhz_enabled())
+		max_supp_nss = enable_mimo + 1;
 
 	hdd_debug("max nss %d", max_supp_nss);
 
@@ -2288,7 +2290,7 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	uint8_t mpdu_density;
 	struct mlme_ht_capabilities_info ht_cap_info;
 	uint8_t mcs_set[SIZE_OF_SUPPORTED_MCS_SET];
-	bool b_enable1x1;
+	uint8_t enable_mimo;
 
 	/* get the MPDU density */
 	status = ucfg_mlme_get_ht_mpdu_density(hdd_ctx->psoc, &mpdu_density);
@@ -2343,20 +2345,20 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	hdd_ctx->num_rf_chains = cfg->num_rf_chains;
 	hdd_ctx->ht_tx_stbc_supported = cfg->ht_tx_stbc;
 
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &b_enable1x1);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	b_enable1x1 = b_enable1x1 && (cfg->num_rf_chains >= 2);
+	enable_mimo = enable_mimo && (cfg->num_rf_chains >= 2);
 
-	status = ucfg_mlme_set_vht_enable2x2(hdd_ctx->psoc, b_enable1x1);
+	status = ucfg_mlme_set_vht_mimo_cap(hdd_ctx->psoc, enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to set vht_enable2x2");
 
-	if (!b_enable1x1)
+	if (!enable_mimo)
 		ht_cap_info.tx_stbc = 0;
 
-	if (!(cfg->ht_tx_stbc && b_enable1x1))
+	if (!(cfg->ht_tx_stbc && enable_mimo))
 		ht_cap_info.tx_stbc = 0;
 
 	status = ucfg_mlme_set_ht_cap_info(hdd_ctx->psoc, ht_cap_info);
@@ -2371,7 +2373,7 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 		if (cfg->num_rf_chains > SIZE_OF_SUPPORTED_MCS_SET)
 			cfg->num_rf_chains = SIZE_OF_SUPPORTED_MCS_SET;
 
-		if (b_enable1x1) {
+		if (enable_mimo) {
 			for (value = 0;
 			     value < QDF_MIN(NSS_2x2_MODE, cfg->num_rf_chains);
 			     value++)
@@ -2398,7 +2400,7 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 		wiphy->bands[HDD_NL80211_BAND_5GHZ];
 	uint32_t ch_width;
 	struct wma_caps_per_phy caps_per_phy = {0};
-	bool vht_enable_2x2;
+	uint8_t num_chains_cap_mimo = WLAN_MIMO_CAP_DISABLE;
 	uint32_t tx_highest_data_rate;
 	uint32_t rx_highest_data_rate;
 
@@ -2411,20 +2413,25 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("could not update vht capabilities");
 
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &vht_enable_2x2);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
+					    &num_chains_cap_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	if (vht_enable_2x2) {
+	if (num_chains_cap_mimo) {
 		tx_highest_data_rate =
-				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE,
+								true);
 		rx_highest_data_rate =
-				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE,
+								true);
 	} else {
 		tx_highest_data_rate =
-				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
+								true);
 		rx_highest_data_rate =
-				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
+								true);
 	}
 
 	status = ucfg_mlme_cfg_set_vht_rx_supp_data_rate(hdd_ctx->psoc,
@@ -2439,16 +2446,20 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 
 	/* Update the real highest data rate to wiphy */
 	if (cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ) {
-		if (vht_enable_2x2) {
+		if (num_chains_cap_mimo) {
 			tx_highest_data_rate =
-				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE,
+								false);
 			rx_highest_data_rate =
-				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE,
+								false);
 		} else {
 			tx_highest_data_rate =
-				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
+								false);
 			rx_highest_data_rate =
-				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
+								false);
 		}
 	}
 
@@ -2500,12 +2511,12 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 	if (cfg->vht_short_gi_160 & WMI_VHT_CAP_SGI_160MHZ)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_160;
 
-	if (vht_enable_2x2 && (cfg->vht_tx_stbc & WMI_VHT_CAP_TX_STBC))
+	if (num_chains_cap_mimo && (cfg->vht_tx_stbc & WMI_VHT_CAP_TX_STBC))
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_TXSTBC;
 
 	if (cfg->vht_rx_stbc & WMI_VHT_CAP_RX_STBC_1SS)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_RXSTBC_1;
-	if (vht_enable_2x2 && (cfg->vht_rx_stbc & WMI_VHT_CAP_RX_STBC_2SS))
+	if (num_chains_cap_mimo && (cfg->vht_rx_stbc & WMI_VHT_CAP_RX_STBC_2SS))
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_RXSTBC_2;
 	if (cfg->vht_rx_stbc & WMI_VHT_CAP_RX_STBC_3SS)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_RXSTBC_3;
@@ -2964,7 +2975,7 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	uint8_t antenna_mode;
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
-	bool bval = false;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 	uint8_t value = 0;
 	uint32_t fine_time_meas_cap = 0;
 	enum nss_chains_band_info band;
@@ -3202,12 +3213,12 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	hdd_ctx->fine_time_meas_cap_target = cfg->fine_time_measurement_cap;
 	hdd_debug("fine_time_meas_cap: 0x%x", fine_time_meas_cap);
 
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	antenna_mode = (bval == 0x01) ?
-			HDD_ANTENNA_MODE_2X2 : HDD_ANTENNA_MODE_1X1;
+	antenna_mode = enable_mimo ?
+		       HDD_ANTENNA_MODE_2X2 : HDD_ANTENNA_MODE_1X1;
 	hdd_update_smps_antenna_mode(hdd_ctx, antenna_mode);
 	hdd_debug("Init current antenna mode: %d",
 		  hdd_ctx->current_antenna_mode);
@@ -8006,14 +8017,14 @@ static void hdd_vdev_set_ht_vht_ies(mac_handle_t mac_handle,
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_psoc *psoc;
-	bool bval = false;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 
 	psoc = wlan_vdev_get_psoc(vdev);
-	status = ucfg_mlme_get_vht_enable2x2(psoc, &bval);
+	status = ucfg_mlme_get_vht_mimo_cap(psoc, &enable_mimo);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	sme_set_pdev_ht_vht_ies(mac_handle, bval);
+	sme_set_pdev_ht_vht_ies(mac_handle, enable_mimo);
 	sme_set_vdev_ies_per_band(mac_handle, wlan_vdev_get_id(vdev),
 				  wlan_vdev_mlme_get_opmode(vdev));
 }
@@ -9303,7 +9314,7 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx;
 	bool is_lprx_enabled;
-	bool bval = false;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 	uint8_t enable_tx_sch_delay, dfs_chan_ageout_time;
 	uint32_t dtim_sel_diversity, enable_secondary_rate;
 	bool sap_xlna_bypass;
@@ -9434,11 +9445,11 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 			return -EINVAL;
 	}
 
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	if (bval) {
+	if (enable_mimo) {
 		hdd_debug("configuring 2x2 mode fw params");
 
 		ret = sme_set_cck_tx_fir_override(hdd_ctx->mac_handle,
@@ -18008,7 +18019,7 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 	struct policy_mgr_dp_cbacks dp_cbs = {0};
 	bool value;
 	enum pmo_auto_pwr_detect_failure_mode auto_power_fail_mode;
-	bool bval = false;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 	uint8_t max_index = MAX_PDEV_CFG_CDS_PARAMS;
 	struct dev_set_param setparam[MAX_PDEV_CFG_CDS_PARAMS] = {};
 	uint8_t index = 0;
@@ -18103,11 +18114,11 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 		goto out;
 	}
 
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	if (!bval) {
+	if (!enable_mimo) {
 		if (num_11b_tx_chains > 1)
 			num_11b_tx_chains = 1;
 		if (num_11ag_tx_chains > 1)

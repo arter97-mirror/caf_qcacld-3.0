@@ -5807,14 +5807,14 @@ static void lim_populate_mcs_set_vht_per_vdev(struct mac_context *mac_ctx,
 	/* Populate VHT MCS Information */
 		vht_mcs->txMcsMap |= DISABLE_NSS2_MCS;
 		vht_mcs->txHighest =
-				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
 	}
 
 	if (nss_chains_ini_cfg->rx_nss[band] == 1) {
 	/* Populate VHT MCS Information */
 		vht_mcs->rxMcsMap |= DISABLE_NSS2_MCS;
 		vht_mcs->rxHighest =
-				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
 	}
 
 end:

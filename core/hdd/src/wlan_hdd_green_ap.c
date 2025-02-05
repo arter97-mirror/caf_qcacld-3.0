@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,6 +35,7 @@
 #include "wlan_lmac_if_def.h"
 #include <wlan_dcs_ucfg_api.h>
 #include "wlan_hdd_dcs.h"
+#include <cfg_mlme_vht_caps.h>
 
 /**
  * hdd_green_ap_check_enable() - to check whether to enable green ap or not
@@ -103,8 +104,7 @@ int hdd_green_ap_start_state_mc(struct hdd_context *hdd_ctx,
 	bool enable_green_ap = false;
 	uint8_t num_sap_sessions = 0, num_p2p_go_sessions = 0, ret = 0;
 	QDF_STATUS status;
-	bool bval = false;
-	uint8_t ps_enable;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE, ps_enable;
 
 	cfg = hdd_ctx->config;
 	if (!cfg) {
@@ -112,15 +112,14 @@ int hdd_green_ap_start_state_mc(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("unable to get vht_enable2x2");
 		return -EINVAL;
 	}
 
-	if (!bval) {
+	if (!enable_mimo)
 		hdd_debug(" 2x2 not enabled");
-	}
 
 	if (QDF_IS_STATUS_ERROR(ucfg_green_ap_get_ps_config(hdd_ctx->pdev,
 							     &ps_enable)))

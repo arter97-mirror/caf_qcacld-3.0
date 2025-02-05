@@ -193,16 +193,19 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/*
-	 * if HW is not capable of doing 2x2 or ini config disabled 2x2, don't
-	 * allow to request FW for 2x2
+	 * if HW is not capable of doing MIMO or ini config disabled MIMO, don't
+	 * allow to request FW for MIMO
 	 */
-	if ((HW_MODE_SS_2x2 == mac0_ss) && (!pm_ctx->user_cfg.enable2x2)) {
-		policy_mgr_debug("2x2 is not allowed downgrading to 1x1 for mac0");
-		mac0_ss = HW_MODE_SS_1x1;
-	}
-	if ((HW_MODE_SS_2x2 == mac1_ss) && (!pm_ctx->user_cfg.enable2x2)) {
-		policy_mgr_debug("2x2 is not allowed downgrading to 1x1 for mac1");
-		mac1_ss = HW_MODE_SS_1x1;
+	if (!pm_ctx->user_cfg.enable_mimo) {
+		if (HW_MODE_SS_2x2 >= mac0_ss) {
+			policy_mgr_debug("MIMO is not allowed downgrading to SISO for mac0");
+			mac0_ss = HW_MODE_SS_1x1;
+		}
+
+		if (HW_MODE_SS_2x2 >= mac1_ss) {
+			policy_mgr_debug("MIMO is not allowed downgrading to SISO for mac1");
+			mac1_ss = HW_MODE_SS_1x1;
+		}
 	}
 
 	hw_mode_index = policy_mgr_get_hw_mode_idx_from_dbs_hw_list(psoc,

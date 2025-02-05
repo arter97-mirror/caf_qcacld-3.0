@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -965,9 +965,11 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 				vhtCap->txMCSMap |= DISABLE_NSS2_MCS;
 				vhtCap->rxMCSMap |= DISABLE_NSS2_MCS;
 				vhtCap->txSupDataRate =
-					VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+					VHT_GET_DATARATE_FOR_NSS_AND_GI(nss,
+									true);
 				vhtCap->rxHighSupDataRate =
-					VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+					VHT_GET_DATARATE_FOR_NSS_AND_GI(nss,
+									true);
 			}
 		} else {
 			vhtCap->present = 0;

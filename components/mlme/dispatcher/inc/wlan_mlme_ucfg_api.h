@@ -2984,9 +2984,9 @@ ucfg_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
+ * ucfg_mlme_get_vht_mimo_cap() - Enables/disables Tx/Rx MCS values for MIMO
  * @psoc: psoc context
- * @value: data to be set
+ * @value: data to be get
  *
  * Inline UCFG API to be used by HDD/OSIF callers to get the
  * ignore_peer_ht_opmode flag value
@@ -2994,9 +2994,9 @@ ucfg_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
  * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
  */
 static inline QDF_STATUS
-ucfg_mlme_get_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool *value)
+ucfg_mlme_get_vht_mimo_cap(struct wlan_objmgr_psoc *psoc, uint8_t *value)
 {
-	return wlan_mlme_get_vht_enable2x2(psoc, value);
+	return wlan_mlme_get_vht_mimo_cap(psoc, value);
 }
 
 /**
@@ -3015,7 +3015,7 @@ ucfg_mlme_get_force_sap_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 /**
- * ucfg_mlme_set_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
+ * ucfg_mlme_set_vht_mimo_cap() - Enables/disables Tx/Rx MCS values for MIMO
  * @psoc: psoc context
  * @value: data to be set
  *
@@ -3025,9 +3025,9 @@ ucfg_mlme_get_force_sap_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
  * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
  */
 static inline QDF_STATUS
-ucfg_mlme_set_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool value)
+ucfg_mlme_set_vht_mimo_cap(struct wlan_objmgr_psoc *psoc, uint8_t value)
 {
-	return wlan_mlme_set_vht_enable2x2(psoc, value);
+	return wlan_mlme_set_vht_mimo_cap(psoc, value);
 }
 
 /**

@@ -899,7 +899,7 @@ struct wlan_mlme_powersave {
  * @rx_mcs2x2: VHT Rx MCS capability for 2x2 mode
  * @tx_mcs2x2: VHT Tx MCS capability for 2x2 mode
  * @enable_vht20_mcs9: Enables VHT MCS9 in 20M BW operation
- * @enable2x2: Enables/disables VHT Tx/Rx MCS values for 2x2
+ * @enable_mimo: Enables/disables VHT Tx/Rx MCS values for SISO - 0/MIMO - 1/2
  * @enable_mu_bformee: Enables/disables multi-user (MU)
  * beam formee capability
  * @enable_paid: Enables/disables paid
@@ -949,7 +949,7 @@ struct mlme_vht_capabilities_info {
 	uint8_t rx_mcs2x2;
 	uint8_t tx_mcs2x2;
 	bool enable_vht20_mcs9;
-	bool enable2x2;
+	uint8_t enable_mimo;
 	bool enable_mu_bformee;
 	bool enable_paid;
 	bool enable_gid;
@@ -3112,7 +3112,7 @@ enum wlan_mlme_iface_combinations {
  * @roaming_ctrl_get_cu: Roaming ctrl get cu enabled or disabled
  * @vendor_req_1_version: Vendor requirement version 1
  * @vendor_req_2_version: Vendor requirement version 2
- * @enable2x2: Enable 2x2
+ * @enable_mimo: Enable SISO - 0/MIMO - 1/2
  * @iface_combinations: iface combination bitmask
  */
 struct wlan_mlme_features {
@@ -3132,7 +3132,7 @@ struct wlan_mlme_features {
 	bool roaming_ctrl_get_cu;
 	WMI_HOST_VENDOR1_REQ1_VERSION vendor_req_1_version;
 	WMI_HOST_VENDOR1_REQ2_VERSION vendor_req_2_version;
-	bool enable2x2;
+	uint8_t enable_mimo;
 	uint32_t iface_combinations;
 };
 #endif

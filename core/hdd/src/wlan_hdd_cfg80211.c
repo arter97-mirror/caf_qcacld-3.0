@@ -15775,7 +15775,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	uint16_t buff_size = 0;
 	mac_handle_t mac_handle;
 	QDF_STATUS status;
-	bool bval = false;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 	uint8_t value = 0;
 	uint8_t wmm_mode = 0;
 	uint32_t bss_max_idle_period = 0;
@@ -15990,11 +15990,11 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 						link_info->vdev_id,
 						cfg_val, ac);
 		if (cfg_val) {
-			status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc,
-							     &bval);
+			status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
+							    &enable_mimo);
 			if (!QDF_IS_STATUS_SUCCESS(status))
 				hdd_err("unable to get vht_enable2x2");
-			if (bval)
+			if (enable_mimo)
 				/*2x2 MCS 5 value*/
 				he_mcs_val = 0x45;
 			else

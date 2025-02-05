@@ -1257,7 +1257,7 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 			sta_ds->vht_160mhz_nss = nss * 2;
 			if (session->nss == WLAN_MAX_VDEV_NSS)
 				break;
-			if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2)
+			if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo)
 				break;
 			session->nss *= 2;
 		} else {
@@ -1273,7 +1273,7 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 			}
 			if (session->nss == WLAN_MAX_VDEV_NSS)
 				break;
-			if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2)
+			if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo)
 				break;
 			session->nss *= 2;
 		} else {
@@ -1328,9 +1328,9 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 		rates->vhtRxMCSMap |= VHT_MCS_1x1;
 		rates->vhtTxMCSMap |= VHT_MCS_1x1;
 		rates->vhtTxHighestDataRate =
-			VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
 		rates->vhtRxHighestDataRate =
-			VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
 		if (session_entry && !session_entry->ch_width &&
 		    !vht_cap_info->enable_vht20_mcs9 &&
 		    ((rates->vhtRxMCSMap & VHT_1x1_MCS_MASK) ==

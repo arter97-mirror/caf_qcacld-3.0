@@ -4526,8 +4526,9 @@ sme_fill_nss_chain_params(struct mac_context *mac_ctx,
 	QDF_STATUS status;
 
 	nss_chain_shift = sme_get_nss_chain_shift(device_mode);
-	max_supported_nss = mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2 ?
-			    WLAN_MAX_VDEV_NSS : 1;
+	max_supported_nss =
+			mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo ?
+			WLAN_MAX_VDEV_NSS : 1;
 
 	/*
 	 * If target supports Antenna sharing, set NSS to 1 for 2.4GHz band for
@@ -10996,7 +10997,8 @@ QDF_STATUS sme_update_nss(mac_handle_t mac_handle, uint8_t nss)
 	status = sme_acquire_global_lock(&mac_ctx->sme);
 
 	if (QDF_STATUS_SUCCESS == status) {
-		vht_cap_info->enable2x2 = (nss == 1) ? 0 : 1;
+		vht_cap_info->enable_mimo = (nss == 1) ? WLAN_MIMO_CAP_DISABLE :
+					    WLAN_MIMO_CAP_MAX;
 
 		/* get the HT capability info*/
 		ht_cap_info = &mac_ctx->mlme_cfg->ht_caps.ht_cap_info;
@@ -11212,7 +11214,7 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 			QDF_MIN(cfg->he_cap_5g.bfee_sts_gt_80,
 				he_cap_ini->bfee_sts_gt_80);
 
-	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2) {
+	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo) {
 		mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = HE_SET_MCS_4_NSS(
 				mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80,
 				HE_MCS_DISABLE, 2);

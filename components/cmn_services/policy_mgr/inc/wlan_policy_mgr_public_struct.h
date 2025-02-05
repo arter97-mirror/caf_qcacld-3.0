@@ -2009,11 +2009,11 @@ enum policy_mgr_pri_id {
 
 /**
  * struct policy_mgr_user_cfg - Policy manager user config variables
- * @enable2x2: 2x2 chain mask user config
+ * @enable_mimo: user config siso/mimo chains
  * @sub_20_mhz_enabled: Is 5 or 10 Mhz enabled
  */
 struct policy_mgr_user_cfg {
-	bool enable2x2;
+	uint8_t enable_mimo;
 	bool sub_20_mhz_enabled;
 };
 
