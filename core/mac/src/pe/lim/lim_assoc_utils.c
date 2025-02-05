@@ -1302,9 +1302,8 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 				    uint8_t nss,
 				    struct sDphHashNode *sta_ds)
 {
-	uint32_t self_sta_dot11mode = 0;
-	uint16_t mcs_map_mask = MCSMAPMASK1x1;
-	uint16_t mcs_map_mask2x2 = 0;
+	uint32_t self_sta_dot11mode;
+	uint8_t self_mcs, peer_mcs, idx;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 
 	self_sta_dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
@@ -1317,87 +1316,57 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 
 	vht_cap_info = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
 
-	rates->vhtRxMCSMap = (uint16_t)vht_cap_info->rx_mcs_map;
-	rates->vhtTxMCSMap = (uint16_t)vht_cap_info->tx_mcs_map;
-	rates->vhtRxHighestDataRate =
-			(uint16_t)vht_cap_info->rx_supp_data_rate;
-	rates->vhtTxHighestDataRate =
-			(uint16_t)vht_cap_info->tx_supp_data_rate;
+	rates->vhtRxMCSMap = (uint16_t)(vht_cap_info->rx_mcs_map |
+					VHT_DISABLE_MCS_OVER_NSS(nss));
+	rates->vhtTxMCSMap = (uint16_t)(vht_cap_info->tx_mcs_map |
+					VHT_DISABLE_MCS_OVER_NSS(nss));
 
-	if (NSS_1x1_MODE == nss) {
-		rates->vhtRxMCSMap |= VHT_MCS_1x1;
-		rates->vhtTxMCSMap |= VHT_MCS_1x1;
-		rates->vhtTxHighestDataRate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
-		rates->vhtRxHighestDataRate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
-		if (session_entry && !session_entry->ch_width &&
-		    !vht_cap_info->enable_vht20_mcs9 &&
-		    ((rates->vhtRxMCSMap & VHT_1x1_MCS_MASK) ==
-				 VHT_1x1_MCS9_MAP)) {
-			DISABLE_VHT_MCS_9(rates->vhtRxMCSMap,
-					NSS_1x1_MODE);
-			DISABLE_VHT_MCS_9(rates->vhtTxMCSMap,
-					NSS_1x1_MODE);
+	for (idx = NSS_1x1_MODE; idx <= nss; idx++) {
+		bool vht20_mcs9_unsupported =
+			(session_entry &&
+			 (session_entry->ch_width == CH_WIDTH_20MHZ) &&
+			 !vht_cap_info->enable_vht20_mcs9);
+
+		/* Unset the NSS not supported by peer */
+		if (VHT_IS_NSS_DISABLED(peer_vht_caps->txMCSMap, idx))
+			VHT_CLEAR_MCS_FOR_NSS(rates->vhtRxMCSMap, idx);
+		if (VHT_IS_NSS_DISABLED(peer_vht_caps->rxMCSMap, idx))
+			VHT_CLEAR_MCS_FOR_NSS(rates->vhtTxMCSMap, idx);
+
+		/*
+		 * Intersect the MCS value supported by peer and self
+		 * for both Tx/Rx.
+		 */
+		self_mcs = VHT_GET_MCS_FOR_NSS(rates->vhtRxMCSMap, idx);
+		peer_mcs = VHT_GET_MCS_FOR_NSS(peer_vht_caps->txMCSMap, idx);
+		if (self_mcs != VHT_MCS_DISABLE) {
+			if (vht20_mcs9_unsupported && peer_mcs == VHT_MCS_0_9)
+				peer_mcs = VHT_MCS_0_8;
+			if (peer_mcs < self_mcs)
+				VHT_SET_MCS_FOR_NSS(rates->vhtRxMCSMap,
+						    peer_mcs, idx);
 		}
-	} else {
-		if (session_entry && !session_entry->ch_width &&
-			!vht_cap_info->enable_vht20_mcs9 &&
-			((rates->vhtRxMCSMap & VHT_2x2_MCS_MASK) ==
-			VHT_2x2_MCS9_MAP)) {
-			DISABLE_VHT_MCS_9(rates->vhtRxMCSMap,
-					NSS_2x2_MODE);
-			DISABLE_VHT_MCS_9(rates->vhtTxMCSMap,
-					NSS_2x2_MODE);
+
+		self_mcs = VHT_GET_MCS_FOR_NSS(rates->vhtTxMCSMap, idx);
+		peer_mcs = VHT_GET_MCS_FOR_NSS(peer_vht_caps->rxMCSMap, idx);
+		if (self_mcs != VHT_MCS_DISABLE) {
+			if (vht20_mcs9_unsupported && peer_mcs == VHT_MCS_0_9)
+				peer_mcs = VHT_MCS_0_8;
+			if (peer_mcs < self_mcs)
+				VHT_SET_MCS_FOR_NSS(rates->vhtTxMCSMap,
+						    peer_mcs, idx);
 		}
 	}
 
+	/* Fill the supported Tx/Rx data rate based on current NSS */
 	if (peer_vht_caps->txSupDataRate)
 		rates->vhtTxHighestDataRate =
-			QDF_MIN(rates->vhtTxHighestDataRate,
+			QDF_MIN(VHT_GET_DATARATE_FOR_NSS_AND_GI(nss, true),
 				peer_vht_caps->txSupDataRate);
 	if (peer_vht_caps->rxHighSupDataRate)
 		rates->vhtRxHighestDataRate =
-			QDF_MIN(rates->vhtRxHighestDataRate,
+			QDF_MIN(VHT_GET_DATARATE_FOR_NSS_AND_GI(nss, true),
 				peer_vht_caps->rxHighSupDataRate);
-
-	if (session_entry && session_entry->nss == NSS_2x2_MODE)
-		mcs_map_mask2x2 = MCSMAPMASK2x2;
-
-	if ((peer_vht_caps->txMCSMap & mcs_map_mask) <
-	    (rates->vhtRxMCSMap & mcs_map_mask)) {
-		rates->vhtRxMCSMap &= ~(mcs_map_mask);
-		rates->vhtRxMCSMap |= (peer_vht_caps->txMCSMap & mcs_map_mask);
-	}
-	if ((peer_vht_caps->rxMCSMap & mcs_map_mask) <
-	    (rates->vhtTxMCSMap & mcs_map_mask)) {
-		rates->vhtTxMCSMap &= ~(mcs_map_mask);
-		rates->vhtTxMCSMap |= (peer_vht_caps->rxMCSMap & mcs_map_mask);
-	}
-
-	if (mcs_map_mask2x2) {
-		uint16_t peer_mcs_map, self_mcs_map;
-
-		peer_mcs_map = peer_vht_caps->txMCSMap & mcs_map_mask2x2;
-		self_mcs_map = rates->vhtRxMCSMap & mcs_map_mask2x2;
-
-		if ((self_mcs_map != mcs_map_mask2x2) &&
-		    ((peer_mcs_map == mcs_map_mask2x2) ||
-		     (peer_mcs_map < self_mcs_map))) {
-			rates->vhtRxMCSMap &= ~mcs_map_mask2x2;
-			rates->vhtRxMCSMap |= peer_mcs_map;
-		}
-
-		peer_mcs_map = (peer_vht_caps->rxMCSMap & mcs_map_mask2x2);
-		self_mcs_map = (rates->vhtTxMCSMap & mcs_map_mask2x2);
-
-		if ((self_mcs_map != mcs_map_mask2x2) &&
-		    ((peer_mcs_map == mcs_map_mask2x2) ||
-		     (peer_mcs_map < self_mcs_map))) {
-			rates->vhtTxMCSMap &= ~mcs_map_mask2x2;
-			rates->vhtTxMCSMap |= peer_mcs_map;
-		}
-	}
 
 	pe_debug("RxMCSMap %x TxMCSMap %x", rates->vhtRxMCSMap,
 		 rates->vhtTxMCSMap);

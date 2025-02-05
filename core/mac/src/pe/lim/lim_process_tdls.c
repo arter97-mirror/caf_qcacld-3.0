@@ -961,16 +961,12 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 				vht_cap_info->rx_supp_data_rate;
 			vhtCap->txMCSMap = vht_cap_info->tx_mcs_map;
 			vhtCap->txSupDataRate = vht_cap_info->tx_supp_data_rate;
-			if (nss == NSS_1x1_MODE) {
-				vhtCap->txMCSMap |= DISABLE_NSS2_MCS;
-				vhtCap->rxMCSMap |= DISABLE_NSS2_MCS;
-				vhtCap->txSupDataRate =
-					VHT_GET_DATARATE_FOR_NSS_AND_GI(nss,
-									true);
-				vhtCap->rxHighSupDataRate =
-					VHT_GET_DATARATE_FOR_NSS_AND_GI(nss,
-									true);
-			}
+			vhtCap->txMCSMap |= VHT_DISABLE_MCS_OVER_NSS(nss);
+			vhtCap->rxMCSMap |= VHT_DISABLE_MCS_OVER_NSS(nss);
+			vhtCap->txSupDataRate =
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(nss, true);
+			vhtCap->rxHighSupDataRate =
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(nss, true);
 		} else {
 			vhtCap->present = 0;
 		}

@@ -1941,11 +1941,20 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 		/*
 		 *  tx_mcs_set is intersection of self tx NSS and peer rx mcs map
 		 */
-		if (params->vhtSupportedRxNss)
+		if (params->vhtSupportedRxNss) {
 			cmd->peer_nss = params->vhtSupportedRxNss;
-		else
-			cmd->peer_nss = ((cmd->tx_mcs_set & VHT2x2MCSMASK)
-					== VHT2x2MCSMASK) ? 1 : 2;
+		} else {
+			uint8_t j;
+
+			cmd->peer_nss = NSS_1x1_MODE;
+			for (j = WLAN_MAX_VDEV_NSS; j >= NSS_2x2_MODE;
+			     j--) {
+				if (!VHT_IS_NSS_DISABLED(cmd->tx_mcs_set, j)) {
+					cmd->peer_nss = j;
+					break;
+				}
+			}
+		}
 
 		if (params->vht_mcs_10_11_supp) {
 			WMI_SET_BITS(cmd->tx_mcs_set, 16, cmd->peer_nss,

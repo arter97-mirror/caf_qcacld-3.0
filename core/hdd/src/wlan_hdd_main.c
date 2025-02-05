@@ -2414,7 +2414,8 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 		return;
 	}
 
-	status = ucfg_mlme_update_vht_cap(hdd_ctx->psoc, cfg);
+	status = ucfg_mlme_update_vht_cap(hdd_ctx->psoc, cfg,
+					  hdd_ctx->num_rf_chains);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("could not update vht capabilities");
 
@@ -2423,21 +2424,12 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	if (num_chains_cap_mimo) {
-		tx_highest_data_rate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE,
-								true);
-		rx_highest_data_rate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE,
-								true);
-	} else {
-		tx_highest_data_rate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
-								true);
-		rx_highest_data_rate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
-								true);
-	}
+	tx_highest_data_rate =
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(num_chains_cap_mimo + 1,
+							true);
+	rx_highest_data_rate =
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(num_chains_cap_mimo + 1,
+							true);
 
 	status = ucfg_mlme_cfg_set_vht_rx_supp_data_rate(hdd_ctx->psoc,
 							 rx_highest_data_rate);
@@ -2451,21 +2443,12 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 
 	/* Update the real highest data rate to wiphy */
 	if (cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ) {
-		if (num_chains_cap_mimo) {
-			tx_highest_data_rate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE,
-								false);
-			rx_highest_data_rate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE,
-								false);
-		} else {
-			tx_highest_data_rate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
-								false);
-			rx_highest_data_rate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
-								false);
-		}
+		tx_highest_data_rate =
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(num_chains_cap_mimo + 1,
+							false);
+		rx_highest_data_rate =
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(num_chains_cap_mimo + 1,
+							false);
 	}
 
 	if (WMI_VHT_CAP_MAX_MPDU_LEN_11454 == cfg->vht_max_mpdu)

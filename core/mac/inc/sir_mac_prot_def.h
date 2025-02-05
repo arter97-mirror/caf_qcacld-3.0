@@ -108,11 +108,15 @@
 static const uint32_t vht_supported_datarate_bw80_gi400ns[] = {
 	[NSS_1x1_MODE - 1] = 390,
 	[NSS_2x2_MODE - 1] = 780,
+	[NSS_3x3_MODE - 1] = 1170,
+	[NSS_4x4_MODE - 1] = 1560,
 };
 
 static const uint32_t vht_supported_datarate_bw80_gi800ns[] = {
 	[NSS_1x1_MODE - 1] = 433,
 	[NSS_2x2_MODE - 1] = 866,
+	[NSS_3x3_MODE - 1] = 1300,
+	[NSS_4x4_MODE - 1] = 1733,
 };
 
 #define VHT_GET_DATARATE_FOR_NSS_AND_GI(_nss, _is_gi400ns) \

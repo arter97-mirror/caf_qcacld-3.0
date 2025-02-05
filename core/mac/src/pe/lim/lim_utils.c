@@ -5803,19 +5803,19 @@ static void lim_populate_mcs_set_vht_per_vdev(struct mac_context *mac_ctx,
 
 	vht_mcs = (tSirVhtMcsInfo *)&vht_caps[2 +
 					sizeof(tSirMacVHTCapabilityInfo)];
-	if (nss_chains_ini_cfg->tx_nss[band] == 1) {
 	/* Populate VHT MCS Information */
-		vht_mcs->txMcsMap |= DISABLE_NSS2_MCS;
-		vht_mcs->txHighest =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
-	}
+	vht_mcs->txMcsMap |=
+		VHT_DISABLE_MCS_OVER_NSS(nss_chains_ini_cfg->tx_nss[band]);
+	vht_mcs->txHighest =
+		VHT_GET_DATARATE_FOR_NSS_AND_GI(nss_chains_ini_cfg->tx_nss[band],
+						true);
 
-	if (nss_chains_ini_cfg->rx_nss[band] == 1) {
 	/* Populate VHT MCS Information */
-		vht_mcs->rxMcsMap |= DISABLE_NSS2_MCS;
-		vht_mcs->rxHighest =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
-	}
+	vht_mcs->rxMcsMap |=
+		VHT_DISABLE_MCS_OVER_NSS(nss_chains_ini_cfg->rx_nss[band]);
+	vht_mcs->rxHighest =
+		VHT_GET_DATARATE_FOR_NSS_AND_GI(nss_chains_ini_cfg->rx_nss[band],
+						true);
 
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);

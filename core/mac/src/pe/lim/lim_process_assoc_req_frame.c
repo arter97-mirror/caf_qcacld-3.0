@@ -1923,12 +1923,20 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 			pe_err("error deleting hash entry");
 		return false;
 	}
+
 	if (assoc_req->operMode.present) {
 		sta_ds->vhtSupportedRxNss = assoc_req->operMode.rxNSS + 1;
 	} else {
-		sta_ds->vhtSupportedRxNss =
-			 ((sta_ds->supportedRates.vhtTxMCSMap & MCSMAPMASK2x2)
-			  == MCSMAPMASK2x2) ? 1 : 2;
+		uint8_t idx;
+
+		sta_ds->vhtSupportedRxNss = NSS_1x1_MODE;
+		for (idx = WLAN_MAX_VDEV_NSS; idx >= NSS_2x2_MODE; idx--) {
+			if (!VHT_IS_NSS_DISABLED(sta_ds->supportedRates.vhtTxMCSMap,
+						 idx)) {
+				sta_ds->vhtSupportedRxNss = idx;
+				break;
+			}
+		}
 	}
 
 	/* Add STA context at MAC HW (BMU, RHP & TFP) */

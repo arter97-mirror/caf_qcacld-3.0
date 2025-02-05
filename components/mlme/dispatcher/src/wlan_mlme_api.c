@@ -5118,11 +5118,13 @@ wlan_mlme_get_vendor_vht_for_24ghz(struct wlan_objmgr_psoc *psoc, bool *value)
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS
-mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc, struct wma_tgt_vht_cap *cfg)
+QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
+			       struct wma_tgt_vht_cap *cfg,
+			       uint32_t num_rf_chains)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	struct mlme_vht_capabilities_info *vht_cap_info;
+	uint8_t idx, max_nss;
 	uint32_t value = 0;
 	bool hw_rx_ldpc_enabled;
 
@@ -5141,23 +5143,39 @@ mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc, struct wma_tgt_vht_cap *cfg)
 		vht_cap_info->ampdu_len = cfg->vht_max_mpdu;
 	if (vht_cap_info->ampdu_len >= 1)
 		mlme_obj->cfg.ht_caps.ht_cap_info.maximal_amsdu_size = 1;
+
+	/*
+	 * Intersect INI with FW support for MIMO support, the INI
+	 * interpretation is in CFG_VHT_MIMO_CAP_FEATURE.
+	 */
+	max_nss = QDF_MIN(vht_cap_info->enable_mimo + 1, num_rf_chains);
+
+	/*
+	 * Prepare the MCS set for Tx/Rx till the supported NSS with atleast
+	 * 1NSS support.
+	 */
 	value = (CFG_VHT_BASIC_MCS_SET_STADEF & VHT_MCS_1x1) |
-		vht_cap_info->basic_mcs_set;
+		vht_cap_info->basic_mcs_set | VHT_DISABLE_MCS_OVER_NSS(max_nss);
 	if (vht_cap_info->enable_mimo)
-		value = (value & VHT_MCS_2x2) | (vht_cap_info->rx_mcs2x2 << 2);
+		for (idx = NSS_2x2_MODE; idx <= max_nss; idx++)
+			VHT_SET_MCS_FOR_NSS(value, vht_cap_info->rx_mcs2x2,
+					    idx);
 	vht_cap_info->basic_mcs_set = value;
 
 	value = (CFG_VHT_RX_MCS_MAP_STADEF & VHT_MCS_1x1) |
-		 vht_cap_info->rx_mcs;
-
+		vht_cap_info->rx_mcs | VHT_DISABLE_MCS_OVER_NSS(max_nss);
 	if (vht_cap_info->enable_mimo)
-		value = (value & VHT_MCS_2x2) | (vht_cap_info->rx_mcs2x2 << 2);
+		for (idx = NSS_2x2_MODE; idx <= max_nss; idx++)
+			VHT_SET_MCS_FOR_NSS(value, vht_cap_info->rx_mcs2x2,
+					    idx);
 	vht_cap_info->rx_mcs_map = value;
 
 	value = (CFG_VHT_TX_MCS_MAP_STADEF & VHT_MCS_1x1) |
-		 vht_cap_info->tx_mcs;
+		vht_cap_info->tx_mcs | VHT_DISABLE_MCS_OVER_NSS(max_nss);
 	if (vht_cap_info->enable_mimo)
-		value = (value & VHT_MCS_2x2) | (vht_cap_info->tx_mcs2x2 << 2);
+		for (idx = NSS_2x2_MODE; idx <= max_nss; idx++)
+			VHT_SET_MCS_FOR_NSS(value, vht_cap_info->tx_mcs2x2,
+					    idx);
 	vht_cap_info->tx_mcs_map = value;
 
 	 /* Set HW RX LDPC capability */

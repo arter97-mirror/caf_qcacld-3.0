@@ -2796,11 +2796,13 @@ wlan_mlme_get_vendor_vht_for_24ghz(struct wlan_objmgr_psoc *psoc, bool *value);
  * mlme_update_vht_cap() - update vht capabilities
  * @psoc: psoc context
  * @cfg: data to be set
+ * @num_rf_chains: Num of RF chains supported
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc, struct wma_tgt_vht_cap *cfg);
+QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
+			       struct wma_tgt_vht_cap *cfg,
+			       uint32_t num_rf_chains);
 
 /**
  * mlme_update_nss_vht_cap() - Update the number of spatial

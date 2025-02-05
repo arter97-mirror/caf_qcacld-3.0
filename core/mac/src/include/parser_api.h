@@ -48,15 +48,25 @@
 #define IS_24G_CH(__chNum) ((__chNum > 0) && (__chNum < 15))
 #define IS_5G_CH(__chNum) ((__chNum >= 36) && (__chNum <= 165))
 #define IS_2X2_CHAIN(__chain) ((__chain & 0x3) == 0x3)
-#define DISABLE_NSS2_MCS 0xC
-#define VHT_1x1_MCS9_MAP 0x2
-#define VHT_2x2_MCS9_MAP 0xA
-#define VHT_1x1_MCS8_VAL 0xFFFD
-#define VHT_2x2_MCS8_VAL 0xFFF5
+#define VHT_MCS_0_8 0x1
+#define VHT_MCS_0_9 0x2
+#define VHT_MCS_DISABLE 0x3
 #define VHT_1x1_MCS_MASK 0x3
-#define VHT_2x2_MCS_MASK 0xF
-#define DISABLE_VHT_MCS_9(mcs, nss) \
-	(mcs = (nss > 1) ? VHT_2x2_MCS8_VAL : VHT_1x1_MCS8_VAL)
+#define VHT_NUM_BITS_PER_NSS 0x2
+#define VHT_GET_MCS_FOR_NSS(_mcsmap, _nss) \
+	QDF_GET_BITS((_mcsmap), ((_nss) - 1) * VHT_NUM_BITS_PER_NSS, \
+		     VHT_NUM_BITS_PER_NSS)
+#define VHT_SET_MCS_FOR_NSS(_mcsmap, _mcs, _nss) \
+	QDF_SET_BITS((_mcsmap), ((_nss) - 1) * VHT_NUM_BITS_PER_NSS, \
+		     VHT_NUM_BITS_PER_NSS, (_mcs))
+#define VHT_CLEAR_MCS_FOR_NSS(_mcsmap, _nss) \
+	VHT_SET_MCS_FOR_NSS((_mcsmap), VHT_MCS_DISABLE, (_nss))
+#define VHT_IS_NSS_DISABLED(_mcsmap, _nss) \
+	(VHT_GET_MCS_FOR_NSS((_mcsmap), (_nss)) == VHT_MCS_DISABLE)
+#define VHT_DISABLE_ALL_MCS_NSS 0xFFFF
+#define VHT_DISABLE_MCS_OVER_NSS(_nss) \
+	(VHT_DISABLE_ALL_MCS_NSS ^ (BIT((_nss) * VHT_NUM_BITS_PER_NSS) - 1))
+
 
 #define MBO_IE_ASSOC_DISALLOWED_SUBATTR_ID 0x04
 

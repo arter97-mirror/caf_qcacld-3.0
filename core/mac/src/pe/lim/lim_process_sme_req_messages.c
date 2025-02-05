@@ -9454,14 +9454,12 @@ static void lim_set_pdev_vht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 			vht_mcs =
 				(tSirVhtMcsInfo *)&p_ie[2 +
 				sizeof(tSirMacVHTCapabilityInfo)];
-			vht_mcs->rxMcsMap |= DISABLE_NSS2_MCS;
+			vht_mcs->rxMcsMap |= VHT_DISABLE_MCS_OVER_NSS(i);
 			vht_mcs->rxHighest =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
-								true);
-			vht_mcs->txMcsMap |= DISABLE_NSS2_MCS;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(i, true);
+			vht_mcs->txMcsMap |= VHT_DISABLE_MCS_OVER_NSS(i);
 			vht_mcs->txHighest =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
-								true);
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(i, true);
 		}
 		msg.type = WMA_SET_PDEV_IE_REQ;
 		msg.bodyptr = ie_params;

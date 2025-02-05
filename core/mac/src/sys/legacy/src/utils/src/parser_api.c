@@ -1511,6 +1511,7 @@ QDF_STATUS
 populate_dot11f_vht_caps(struct mac_context *mac,
 			 struct pe_session *pe_session, tDot11fIEVHTCaps *pDot11f)
 {
+	uint8_t idx;
 	uint32_t nCfgValue = 0;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 
@@ -1665,36 +1666,37 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 	pDot11f->txSupDataRate = (nCfgValue & 0x00001FFF);
 
 	if (pe_session) {
-		if (pe_session->nss == NSS_1x1_MODE) {
-			pDot11f->txMCSMap |= DISABLE_NSS2_MCS;
-			pDot11f->rxMCSMap |= DISABLE_NSS2_MCS;
-			pDot11f->txSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
-								true);
-			pDot11f->rxHighSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE,
-								true);
-			if (!pe_session->ch_width &&
-			    !vht_cap_info->enable_vht20_mcs9 &&
-			    ((pDot11f->txMCSMap & VHT_1x1_MCS_MASK) ==
-			     VHT_1x1_MCS9_MAP)) {
-				DISABLE_VHT_MCS_9(pDot11f->txMCSMap,
-						NSS_1x1_MODE);
-				DISABLE_VHT_MCS_9(pDot11f->rxMCSMap,
-						NSS_1x1_MODE);
-			}
+		bool vht20_mcs9_unsupported =
+			(pe_session->ch_width == CH_WIDTH_20MHZ &&
+			 !vht_cap_info->enable_vht20_mcs9);
+
+		pDot11f->txMCSMap |= VHT_DISABLE_MCS_OVER_NSS(pe_session->nss);
+		pDot11f->rxMCSMap |= VHT_DISABLE_MCS_OVER_NSS(pe_session->nss);
+
+		if (pe_session->nss < NSS_2x2_MODE)
 			pDot11f->txSTBC = 0;
-		} else {
-			if (!pe_session->ch_width &&
-			    !vht_cap_info->enable_vht20_mcs9 &&
-			    ((pDot11f->txMCSMap & VHT_2x2_MCS_MASK) ==
-			     VHT_2x2_MCS9_MAP)) {
-				DISABLE_VHT_MCS_9(pDot11f->txMCSMap,
-						NSS_2x2_MODE);
-				DISABLE_VHT_MCS_9(pDot11f->rxMCSMap,
-						NSS_2x2_MODE);
+
+		/*
+		 * Mark MCS set above current NSS as unsupported, if MCS9 is
+		 * unsupported, set max supported MCS per NSS as 0-8.
+		 */
+		for (idx = NSS_1x1_MODE; idx <= pe_session->nss; idx++) {
+			if (vht20_mcs9_unsupported &&
+			    (VHT_GET_MCS_FOR_NSS(pDot11f->txMCSMap, idx) ==
+			     VHT_MCS_0_9)) {
+				VHT_SET_MCS_FOR_NSS(pDot11f->txMCSMap,
+						    VHT_MCS_0_8, idx);
+				VHT_SET_MCS_FOR_NSS(pDot11f->rxMCSMap,
+						    VHT_MCS_0_8, idx);
 			}
 		}
+
+		pDot11f->txSupDataRate =
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(pe_session->nss,
+								true);
+		pDot11f->rxHighSupDataRate =
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(pe_session->nss,
+								true);
 	}
 
 	lim_log_vht_cap(mac, pDot11f);
