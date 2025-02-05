@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -5971,6 +5971,7 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 {
 	struct set_link_req req = {0};
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	enum mlo_link_force_reason reason;
 
 	mlo_debug("link ctrl %d mode %d reason %d num %d 0x%x 0x%x",
 		  data->evt.vendor.link_ctrl_mode,
@@ -6018,8 +6019,13 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
-	status = ml_nlink_state_change(psoc, MLO_LINK_FORCE_REASON_CONNECT,
-				       evt, data);
+	if (data->evt.vendor.reason ==
+	    MLO_LINK_FORCE_REASON_SINGLE_LINK_EMLSR_OP)
+		reason = MLO_LINK_FORCE_REASON_SINGLE_LINK_EMLSR_OP;
+	else
+		reason = MLO_LINK_FORCE_REASON_CONNECT;
+
+	status = ml_nlink_state_change(psoc, reason, evt, data);
 
 	if (status == QDF_STATUS_E_PENDING)
 		status = QDF_STATUS_SUCCESS;

@@ -9597,9 +9597,11 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
 	return restart_required;
 }
 
-void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id, uint8_t num_links,
-					 struct qdf_mac_addr *active_link_addr)
+void
+policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id, uint8_t num_links,
+				    struct qdf_mac_addr *active_link_addr,
+				    enum mlo_link_force_reason force_reason)
 {
 	uint8_t *link_mac_addr;
 	struct wlan_objmgr_vdev *vdev;
@@ -9672,7 +9674,7 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		ml_nlink_vendor_command_set_link(
 			psoc, vdev_id,
 			LINK_CONTROL_MODE_USER,
-			MLO_LINK_FORCE_REASON_CONNECT,
+			force_reason,
 			MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
 			0, active_link_bitmap,
 			inactive_link_bitmap);
@@ -9680,7 +9682,7 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		ml_nlink_vendor_command_set_link(
 			psoc, vdev_id,
 			LINK_CONTROL_MODE_USER,
-			MLO_LINK_FORCE_REASON_CONNECT,
+			force_reason,
 			MLO_LINK_FORCE_MODE_ACTIVE,
 			0, active_link_bitmap,
 			0);

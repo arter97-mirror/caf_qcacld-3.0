@@ -231,6 +231,7 @@
 #include "wlan_psoc_mlme.h"
 #include "wlan_dnw_ucfg_api.h"
 #include "wlan_hdd_tx_powerboost.h"
+#include "wlan_mlo_link_force.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -9459,6 +9460,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_NO_WAIT_SUPPORT] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_EMLSR_LINKS] = {
+		.type = NLA_NESTED},
 };
 
 
@@ -9472,6 +9475,12 @@ qca_wlan_vendor_attr_omi_tx_policy [QCA_WLAN_VENDOR_ATTR_OMI_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_EHT_OMI_RX_NSS_EXTN] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_EHT_OMI_CH_BW_EXTN] =  {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_EHT_OMI_TX_NSS_EXTN] = {.type = NLA_U8 },
+};
+
+static const struct nla_policy
+wlan_emlsr_info_policy [QCA_WLAN_VENDOR_ATTR_EMLSR_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_EMLSR_OPERATION] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_EMLSR_LINKS_BITMAP] = {.type = NLA_U16 },
 };
 
 static const struct nla_policy
@@ -13684,7 +13693,8 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 			adapter->deflink->vdev->mlo_dev_ctx->sta_ctx->emlsr_mode_req = emlsr_mode;
 		sme_activate_mlo_links(hdd_ctx->mac_handle,
 				       adapter->deflink->vdev_id,
-				       num_links, active_link_addr);
+				       num_links, active_link_addr,
+				       MLO_LINK_FORCE_REASON_CONNECT);
 	}
 
 	return 0;
@@ -14156,6 +14166,129 @@ static int hdd_set_eht_mlo_mode(struct wlan_hdd_link_info *link_info,
 
 	return 0;
 }
+
+/**
+ * hdd_get_cfg_emlsr_mode() - Convert qca wlan EMLSR mode enum to cfg wlan
+ * EMLSR action mode
+ * @qca_wlan_emlsr_mode: qca wlan EMLSR mode
+ *
+ * Return: EMLSR mode on success, 0 on failure
+ */
+static enum wlan_emlsr_action_mode
+hdd_get_cfg_emlsr_mode(enum qca_wlan_eht_mlo_mode qca_wlan_emlsr_mode)
+{
+	switch (qca_wlan_emlsr_mode) {
+	case QCA_WLAN_EMLSR_MODE_ENTER:
+		return WLAN_EMLSR_MODE_ENTER;
+	case QCA_WLAN_EMLSR_MODE_EXIT:
+		return WLAN_EMLSR_MODE_EXIT;
+	default:
+		hdd_debug("Invalid EMLSR action mode");
+		return WLAN_EMLSR_MODE_DISABLED;
+	}
+}
+
+static int hdd_set_eht_emlsr_links(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	uint16_t i = 0, emlsr_link_bitmap = 0;
+	uint8_t j = 0, num_links = 0;
+	uint16_t vdev_count = 0;
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+	struct qdf_mac_addr active_link_addr[WLAN_MLO_MAX_VDEVS];
+	enum wlan_emlsr_action_mode emlsr_action_mode =
+					WLAN_EMLSR_MODE_DISABLED;
+	struct nlattr *curr_attr;
+	int32_t len;
+	uint8_t cfg_val = 0;
+	int rc;
+	uint32_t cmd_id;
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EMLSR_MAX + 1];
+
+	if (!(attr && adapter->device_mode == QDF_STA_MODE)) {
+		hdd_err("attr NULL or not in STA mode");
+		return -EINVAL;
+	}
+
+	nla_for_each_nested(curr_attr, &attr[0], len) {
+		rc = wlan_cfg80211_nla_parse(tb,
+					     QCA_WLAN_VENDOR_ATTR_EMLSR_MAX,
+					     curr_attr,
+					     len,
+					     wlan_emlsr_info_policy);
+		if (rc) {
+			hdd_err("Invalid attr");
+			return -EINVAL;
+		}
+
+		cmd_id = QCA_WLAN_VENDOR_ATTR_EMLSR_OPERATION;
+		if (tb[cmd_id]) {
+			cfg_val = nla_get_u8(tb[cmd_id]);
+			emlsr_action_mode = hdd_get_cfg_emlsr_mode(cfg_val);
+			hdd_debug("EMLSR operation: %d", emlsr_action_mode);
+		}
+
+		cmd_id = QCA_WLAN_VENDOR_ATTR_EMLSR_LINKS_BITMAP;
+		if (tb[cmd_id]) {
+			emlsr_link_bitmap = nla_get_u16(tb[cmd_id]);
+			hdd_debug("EMLSR link bitmap: %d", emlsr_link_bitmap);
+		}
+	}
+
+	mlo_sta_get_vdev_list(adapter->deflink->vdev, &vdev_count,
+			      wlan_vdev_list);
+
+	for (i = 0; i < 16; i++) {
+		if (!(emlsr_link_bitmap & BIT(i)))
+			continue;
+
+		for (j = 0; j < vdev_count; j++) {
+			if (!wlan_vdev_list[j])
+				continue;
+
+			if (i == wlan_vdev_get_link_id(wlan_vdev_list[j])) {
+				qdf_mem_copy(&active_link_addr[num_links],
+					     wlan_vdev_mlme_get_macaddr(wlan_vdev_list[j]),
+					     QDF_MAC_ADDR_SIZE);
+				num_links++;
+				break;
+			}
+		}
+
+		if (num_links >= WLAN_MLO_MAX_VDEVS)
+			break;
+	}
+
+	for (j = 0; j < vdev_count; j++)
+		mlo_release_vdev_ref(wlan_vdev_list[j]);
+
+	hdd_debug("number of links to force enable: %d", num_links);
+
+	if (!num_links) {
+		hdd_debug("No links to force EMLSR on");
+		return -EINVAL;
+	}
+
+	if (emlsr_action_mode == WLAN_EMLSR_MODE_ENTER)
+		sme_activate_mlo_links(
+			hdd_ctx->mac_handle,
+			adapter->deflink->vdev_id,
+			num_links, active_link_addr,
+			MLO_LINK_FORCE_REASON_SINGLE_LINK_EMLSR_OP);
+	else if (emlsr_action_mode == WLAN_EMLSR_MODE_EXIT)
+		ml_nlink_vendor_command_set_link(
+			hdd_ctx->psoc,
+			adapter->deflink->vdev_id,
+			LINK_CONTROL_MODE_DEFAULT,
+			MLO_LINK_FORCE_REASON_SINGLE_LINK_EMLSR_OP,
+			0, 0, 0, 0);
+	else
+		hdd_err("Invalid case");
+
+	return 0;
+}
 #else
 static inline int
 hdd_set_eht_emlsr_capability(struct wlan_hdd_link_info *link_info,
@@ -14181,6 +14314,13 @@ hdd_set_eht_max_num_links(struct wlan_hdd_link_info  *link_info,
 static inline int
 hdd_set_eht_mlo_mode(struct wlan_hdd_link_info *link_info,
 		     const struct nlattr *attr)
+{
+	return 0;
+}
+
+static inline int
+hdd_set_eht_emlsr_links(struct wlan_hdd_link_info *link_info,
+			const struct nlattr *attr)
 {
 	return 0;
 }
@@ -14220,32 +14360,12 @@ static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 		}
 		sme_activate_mlo_links(hdd_ctx->mac_handle,
 				       link_info->vdev_id, num_links,
-				       active_link_addr);
+				       active_link_addr,
+				       MLO_LINK_FORCE_REASON_CONNECT);
 	}
 	hdd_debug("number of links to force active: %d", num_links);
 
 	return 0;
-}
-
-/**
- * hdd_get_cfg_emlsr_mode() - Convert qca wlan EMLSR mode enum to cfg wlan
- * EMLSR action mode
- * @qca_wlan_emlsr_mode: qca wlan EMLSR mode
- *
- * Return: EMLSR mode on success, 0 on failure
- */
-static enum wlan_emlsr_action_mode
-hdd_get_cfg_emlsr_mode(enum qca_wlan_eht_mlo_mode qca_wlan_emlsr_mode)
-{
-	switch (qca_wlan_emlsr_mode) {
-	case QCA_WLAN_EMLSR_MODE_ENTER:
-		return WLAN_EMLSR_MODE_ENTER;
-	case QCA_WLAN_EMLSR_MODE_EXIT:
-		return WLAN_EMLSR_MODE_EXIT;
-	default:
-		hdd_debug("Invalid EMLSR action mode");
-		return WLAN_EMLSR_MODE_DISABLED;
-	}
 }
 
 /**
@@ -14593,6 +14713,8 @@ static const struct independent_setters independent_setters[] = {
 	hdd_set_link_reconfig_support},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_NO_WAIT_SUPPORT,
 	 hdd_config_dfs_no_wait_support},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_EMLSR_LINKS,
+	 hdd_set_eht_emlsr_links},
 };
 
 #ifdef WLAN_FEATURE_ELNA
