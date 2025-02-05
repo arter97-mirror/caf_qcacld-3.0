@@ -1438,6 +1438,11 @@ wma_populate_peer_mlo_common_info_sta(tp_wma_handle wma,
 	req->mlo_params.max_num_simultaneous_links =
 		wlan_mlme_get_sta_mlo_simultaneous_links(psoc) + 1;
 
+	req->mlo_params.ext_mld_cap_and_op_support =
+			params->ext_mld_caps_present;
+	req->mlo_params.emlsr_one_link_support =
+			params->ext_mld_cap.emlsr_one_link_support;
+
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
 }
 

@@ -2542,6 +2542,21 @@ void lim_extract_msd_caps(struct mac_context *mac_ctx,
 			  struct pe_session *session,
 			  struct bss_params *add_bss,
 			  tpSirAssocRsp assoc_rsp);
+
+/**
+ * lim_extract_ext_mld_caps() - Extract extended AP MLD capabilities and assign
+ * the same caps to ML links
+ * @mac_ctx: Global MAC context
+ * @session: pointer to PE session
+ * @add_bss: pointer to ADD BSS params
+ * @assoc_rsp: pointer to assoc response
+ *
+ * Return: None
+ */
+void lim_extract_ext_mld_caps(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      struct bss_params *add_bss,
+			      tpSirAssocRsp assoc_rsp);
 #else
 static inline void
 lim_extract_per_link_id(struct pe_session *session,
@@ -2572,6 +2587,13 @@ lim_extract_msd_caps(struct mac_context *mac_ctx,
 		     tpSirAssocRsp assoc_rsp)
 {
 }
+
+static inline
+void lim_extract_ext_mld_caps(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      struct bss_params *add_bss,
+			      tpSirAssocRsp assoc_rsp)
+{}
 #endif /* WLAN_FEATURE_11BE_MLO */
 
 #if defined(CONFIG_BAND_6GHZ) && defined(WLAN_FEATURE_11AX)

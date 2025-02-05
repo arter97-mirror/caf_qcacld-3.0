@@ -9660,6 +9660,51 @@ void lim_extract_msd_caps(struct mac_context *mac_ctx,
 		 add_bss->staContext.msd_caps.med_sync_ofdm_ed_thresh,
 		 add_bss->staContext.msd_caps.med_sync_max_txop_num);
 }
+
+void lim_extract_ext_mld_caps(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      struct bss_params *add_bss,
+			      tpSirAssocRsp assoc_rsp)
+{
+	struct wlan_objmgr_peer *peer;
+	struct wlan_mlo_peer_context *mlo_peer_ctx;
+
+	peer = wlan_objmgr_get_peer_by_mac(mac_ctx->psoc, add_bss->bssId,
+					   WLAN_LEGACY_MAC_ID);
+	if (!peer) {
+		pe_err("peer is null");
+		return;
+	}
+
+	mlo_peer_ctx = peer->mlo_peer_ctx;
+	if (!mlo_peer_ctx) {
+		pe_err("mlo peer ctx is null");
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+		return;
+	}
+
+	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev)) {
+		add_bss->staContext.ext_mld_caps_present =
+			mlo_peer_ctx->ext_mld_cap_present;
+		add_bss->staContext.ext_mld_cap.emlsr_one_link_support =
+			mlo_peer_ctx->mlpeer_ext_mldcap.emlsr_one_link_support;
+	} else {
+		add_bss->staContext.ext_mld_caps_present =
+			assoc_rsp->mlo_ie.mlo_ie.ext_mld_capab_and_op_present;
+		add_bss->staContext.ext_mld_cap.emlsr_one_link_support =
+			assoc_rsp->mlo_ie.mlo_ie.ext_mld_capab_and_op_info.emlsr_enablement_on_one_link_support;
+
+		mlo_peer_ctx->ext_mld_cap_present =
+			add_bss->staContext.ext_mld_caps_present;
+		mlo_peer_ctx->mlpeer_ext_mldcap.emlsr_one_link_support =
+			add_bss->staContext.ext_mld_cap.emlsr_one_link_support;
+	}
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+	pe_debug("Ext mld caps: %d, single link emlsr support: %d",
+		 add_bss->staContext.ext_mld_caps_present,
+		 add_bss->staContext.ext_mld_cap.emlsr_one_link_support);
+}
 #endif
 
 #if defined(CONFIG_BAND_6GHZ) && defined(WLAN_FEATURE_11AX)

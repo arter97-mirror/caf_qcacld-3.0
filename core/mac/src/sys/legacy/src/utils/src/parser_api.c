@@ -4304,9 +4304,10 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 	struct wlan_mlo_ie *ml_ie_info;
 	bool link_id_found;
 	uint8_t link_id;
-	bool eml_cap_found, msd_cap_found;
+	bool eml_cap_found, msd_cap_found, ext_mld_cap_found;
 	uint16_t eml_cap;
 	uint16_t msd_cap;
+	uint16_t ext_mld_cap;
 	struct qdf_mac_addr mld_mac_addr;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mlo_partner_info partner_info;
@@ -4382,6 +4383,18 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 				     WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_BITS);
 	}
 
+	util_get_bvmlie_ext_mld_cap_op_info(ml_ie, ml_ie_total_len,
+					    &ext_mld_cap_found,
+					    &ext_mld_cap);
+	if (ext_mld_cap_found) {
+		pe_debug("Ext mld caps found in assoc rsp");
+		ml_ie_info->ext_mld_capab_and_op_present = ext_mld_cap_found;
+		ml_ie_info->ext_mld_capab_and_op_info.emlsr_enablement_on_one_link_support =
+			QDF_GET_BITS(ext_mld_cap,
+				     WLAN_ML_BV_CINFO_EXTMLDCAPINFO_EMLSR_ENABLE_ONE_LINK_IDX,
+				     WLAN_ML_BV_CINFO_EXTMLDCAPINFO_EMLSR_ENABLE_ONE_LINK_BITS);
+	}
+
 	ml_ie_info->num_sta_profile =
 			session_entry->ml_partner_info.num_partner_links;
 	ml_ie_info->link_id_info_present = link_id_found;
@@ -4391,6 +4404,8 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 		 session_entry->vdev_id,
 		 ml_ie_info->num_sta_profile, ml_ie_info->link_id,
 		 QDF_MAC_ADDR_REF(ml_ie_info->mld_mac_addr));
+	pe_debug("Single link EMLSR: %d",
+		 ml_ie_info->ext_mld_capab_and_op_info.emlsr_enablement_on_one_link_support);
 
 	return status;
 }
