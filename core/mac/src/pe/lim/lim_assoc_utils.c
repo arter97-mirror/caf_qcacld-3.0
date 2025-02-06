@@ -1562,23 +1562,15 @@ QDF_STATUS lim_populate_own_rate_set(struct mac_context *mac_ctx,
 static bool lim_check_valid_mcs_for_nss(struct pe_session *session,
 					tDot11fIEhe_cap *he_caps)
 {
-	uint16_t mcs_map;
-	uint8_t mcs_count = 2, i;
+	uint8_t i;
 
 	if (!session->he_capable || !he_caps || !he_caps->present)
 		return true;
 
-	mcs_map = he_caps->rx_he_mcs_map_lt_80;
-
-	do {
-		for (i = 0; i < session->nss; i++) {
-			if (((mcs_map >> (i * 2)) & 0x3) == 0x3)
-				return false;
-		}
-
-		mcs_map = he_caps->tx_he_mcs_map_lt_80;
-		mcs_count--;
-	} while (mcs_count);
+	for (i = NSS_1x1_MODE; i <= session->nss; i++)
+		if (!HE_MCS_IS_NSS_ENABLED(he_caps->rx_he_mcs_map_lt_80, i) ||
+		    !HE_MCS_IS_NSS_ENABLED(he_caps->tx_he_mcs_map_lt_80, i))
+			return false;
 
 	if ((session->ch_width == CH_WIDTH_160MHZ ||
 	     lim_is_session_chwidth_320mhz(session)) &&

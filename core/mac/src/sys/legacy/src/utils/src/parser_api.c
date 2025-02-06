@@ -8263,6 +8263,17 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 		}
 	}
 
+	he_cap->rx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(session->nss);
+	he_cap->tx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(session->nss);
+	*(uint16_t *)he_cap->rx_he_mcs_map_160 |=
+					HE_DISABLE_MCS_OVER_NSS(session->nss);
+	*(uint16_t *)he_cap->tx_he_mcs_map_160 |=
+					HE_DISABLE_MCS_OVER_NSS(session->nss);
+	*(uint16_t *)he_cap->rx_he_mcs_map_80_80 |=
+					HE_DISABLE_MCS_OVER_NSS(session->nss);
+	*(uint16_t *)he_cap->tx_he_mcs_map_80_80 |=
+					HE_DISABLE_MCS_OVER_NSS(session->nss);
+
 	return QDF_STATUS_SUCCESS;
 }
 

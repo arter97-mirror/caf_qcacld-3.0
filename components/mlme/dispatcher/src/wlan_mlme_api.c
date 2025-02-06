@@ -1021,7 +1021,8 @@ static uint16_t mlme_get_min_rate_cap(uint16_t val1, uint16_t val2)
 }
 
 QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
-					  struct wma_tgt_cfg *wma_cfg)
+					  struct wma_tgt_cfg *wma_cfg,
+					  uint8_t num_rf_chains)
 {
 	uint8_t chan_width;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -1030,10 +1031,12 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	uint8_t value, twt_req, twt_resp;
 	uint16_t tx_mcs_map = 0;
 	uint16_t rx_mcs_map = 0;
-	uint8_t nss;
+	uint8_t vht_enable_mimo;
 
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
+
+	vht_enable_mimo = mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo;
 
 	mlme_obj->cfg.he_caps.dot11_he_cap.present = 1;
 	mlme_obj->cfg.he_caps.dot11_he_cap.htc_he = he_cap->htc_he;
@@ -1315,18 +1318,18 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	rx_mcs_map = mlme_get_min_rate_cap(
 		mlme_obj->cfg.he_caps.dot11_he_cap.rx_he_mcs_map_lt_80,
 		he_cap->rx_he_mcs_map_lt_80);
-	if (!mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo) {
-		nss = 2;
-		tx_mcs_map = HE_SET_MCS_4_NSS(tx_mcs_map, HE_MCS_DISABLE, nss);
-		rx_mcs_map = HE_SET_MCS_4_NSS(rx_mcs_map, HE_MCS_DISABLE, nss);
-	}
 
+	tx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(QDF_MIN(vht_enable_mimo + 1,
+						      num_rf_chains));
+	rx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(QDF_MIN(vht_enable_mimo + 1,
+						      num_rf_chains));
 	if (cfg_in_range(CFG_HE_RX_MCS_MAP_LT_80, rx_mcs_map))
 		mlme_obj->cfg.he_caps.dot11_he_cap.rx_he_mcs_map_lt_80 =
 			rx_mcs_map;
 	if (cfg_in_range(CFG_HE_TX_MCS_MAP_LT_80, tx_mcs_map))
 		mlme_obj->cfg.he_caps.dot11_he_cap.tx_he_mcs_map_lt_80 =
 			tx_mcs_map;
+
 	tx_mcs_map = mlme_get_min_rate_cap(
 	   *((uint16_t *)mlme_obj->cfg.he_caps.dot11_he_cap.tx_he_mcs_map_160),
 	   *((uint16_t *)he_cap->tx_he_mcs_map_160));
@@ -1334,11 +1337,10 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	   *((uint16_t *)mlme_obj->cfg.he_caps.dot11_he_cap.rx_he_mcs_map_160),
 	   *((uint16_t *)he_cap->rx_he_mcs_map_160));
 
-	if (!mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo) {
-		nss = 2;
-		tx_mcs_map = HE_SET_MCS_4_NSS(tx_mcs_map, HE_MCS_DISABLE, nss);
-		rx_mcs_map = HE_SET_MCS_4_NSS(rx_mcs_map, HE_MCS_DISABLE, nss);
-	}
+	tx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(QDF_MIN(vht_enable_mimo + 1,
+						      num_rf_chains));
+	rx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(QDF_MIN(vht_enable_mimo + 1,
+						      num_rf_chains));
 
 	if (cfg_in_range(CFG_HE_RX_MCS_MAP_160, rx_mcs_map))
 		qdf_mem_copy(mlme_obj->cfg.he_caps.dot11_he_cap.

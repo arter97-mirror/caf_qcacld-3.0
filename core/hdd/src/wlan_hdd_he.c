@@ -79,7 +79,7 @@ void hdd_update_tgt_he_cap(struct hdd_context *hdd_ctx,
 	he_cap_ini.bfee_sts_gt_80 = value;
 	sme_update_tgt_he_cap(hdd_ctx->mac_handle, cfg, &he_cap_ini);
 
-	ucfg_mlme_update_tgt_he_cap(hdd_ctx->psoc, cfg);
+	ucfg_mlme_update_tgt_he_cap(hdd_ctx->psoc, cfg, hdd_ctx->num_rf_chains);
 }
 
 void wlan_hdd_check_11ax_support(struct hdd_beacon_data *beacon,

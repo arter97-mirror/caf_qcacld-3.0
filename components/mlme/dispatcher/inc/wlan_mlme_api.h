@@ -1270,6 +1270,7 @@ QDF_STATUS wlan_mlme_cfg_get_enable_ul_ofdm(struct wlan_objmgr_psoc *psoc,
  * mlme_update_tgt_he_caps_in_cfg() - Update tgt he cap in mlme component
  * @psoc: pointer to psoc object
  * @cfg: pointer to config params from target
+ * @num_rf_chains: Num of RF chains supported
  *
  * This api to be used by callers to update
  * he caps in mlme.
@@ -1277,7 +1278,8 @@ QDF_STATUS wlan_mlme_cfg_get_enable_ul_ofdm(struct wlan_objmgr_psoc *psoc,
  * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
  */
 QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
-					  struct wma_tgt_cfg *cfg);
+					  struct wma_tgt_cfg *cfg,
+					  uint8_t num_rf_chains);
 #endif
 
 /**

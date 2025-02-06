@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -528,7 +528,7 @@
 				"he_rx_mcs_map_lt_80", \
 				0, \
 				0xFFFF, \
-				0xFFFA, \
+				0xFFAA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Rx Mcs Map Lt 80")
 
@@ -538,7 +538,7 @@
  * he_tx_mcs_map_lt_80 - configure Tx HE-MCS Map for ≤ 80 MHz
  * @Min: 0
  * @Max: 0xFFFF
- * @Default: 0xFFFA
+ * @Default: 0xFFAA
  *
  * This ini is used to configure Tx HE-MCS Map for ≤ 80 MHz
  * 0:1 Max HE-MCS For 1 SS
@@ -567,7 +567,7 @@
 				"he_tx_mcs_map_lt_80", \
 				0, \
 				0xFFFF, \
-				0xFFFA, \
+				0xFFAA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Tx Mcs Map Lt 80")
 /* 11AX related INI configuration */
@@ -576,7 +576,7 @@
  * he_rx_mcs_map_160 - configure Rx HE-MCS Map for 160 MHz
  * @Min: 0
  * @Max: 0xFFFF
- * @Default: 0xFFFA
+ * @Default: 0xFFAA
  *
  * This ini is used to configure Rx HE-MCS Map for 160 MHz
  * 0:1 Max HE-MCS For 1 SS
@@ -605,7 +605,7 @@
 				"he_rx_mcs_map_160", \
 				0, \
 				0xFFFF, \
-				0xFFFA, \
+				0xFFAA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Rx Mcs Map 160")
 
@@ -615,7 +615,7 @@
  * he_tx_mcs_map_160 - configure Tx HE-MCS Map for 160 MHz
  * @Min: 0
  * @Max: 0xFFFF
- * @Default: 0xFFFA
+ * @Default: 0xFFAA
  *
  * This ini is used to configure Tx HE-MCS Map for 160 MHz
  * 0:1 Max HE-MCS For 1 SS
@@ -644,7 +644,7 @@
 				"he_tx_mcs_map_160", \
 				0, \
 				0xFFFF, \
-				0xFFFA, \
+				0xFFAA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Tx Mcs Map 160")
 
@@ -652,7 +652,7 @@
 				"he_rx_mcs_map_80_80", \
 				0, \
 				0xFFFF, \
-				0xFFF0, \
+				0xFF00, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Rx Mcs Map 80 80")
 
@@ -660,7 +660,7 @@
 				"he_tx_mcs_map_80_80", \
 				0, \
 				0xFFFF, \
-				0xFFF0, \
+				0xFF00, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He tx Mcs Map 80 80")
 
