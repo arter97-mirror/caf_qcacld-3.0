@@ -69,6 +69,28 @@ enum thermal_monitor_id {
 
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 /**
+ * enum qca_wlan_ddr_bwm_thermal_level - Defines various thermal levels
+ * configured by userspace to the driver/firmware.
+ * The driver/firmware takes necessary actions requested by userspace
+ * such as throttling wifi tx etc. in order to mitigate high temperature.
+ *
+ * @HDD_DDR_BWM_THERMAL_LEVEL_NONE: Stop/clear all throttling actions.
+ * @HDD_DDR_BWM_THERMAL_LEVEL_LIGHT: Throttle tx lightly.
+ * @HDD_DDR_BWM_THERMAL_LEVEL_MODERATE: Throttle tx moderately.
+ * @HDD_DDR_BWM_THERMAL_LEVEL_SEVERE: Throttle tx severely.
+ * @HDD_DDR_BWM_THERMAL_LEVEL_CRITICAL: Critical thermal level reached.
+ * @HDD_DDR_BWM_THERMAL_LEVEL_EMERGENCY: Emergency thermal level reached.
+ */
+enum qca_wlan_ddr_bwm_thermal_level {
+	HDD_DDR_BWM_THERMAL_LEVEL_NONE = 0,
+	HDD_DDR_BWM_THERMAL_LEVEL_LIGHT = 1,
+	HDD_DDR_BWM_THERMAL_LEVEL_MODERATE = 2,
+	HDD_DDR_BWM_THERMAL_LEVEL_SEVERE = 3,
+	HDD_DDR_BWM_THERMAL_LEVEL_CRITICAL = 4,
+	HDD_DDR_BWM_THERMAL_LEVEL_EMERGENCY = 5,
+};
+
+/*
  * hdd_ddr_bw_mitigation_register() - Register the new cooling device
  * (THERMAL_MONITOR_DDR_BWM) for platform-specific DDR BW mitigation support.
  * @hdd_ctx: Pointer to Hdd context
@@ -185,6 +207,22 @@ int wlan_hdd_pld_set_thermal_mitigation(struct device *dev,
 QDF_STATUS
 hdd_send_thermal_mitigation_val(struct hdd_context *hdd_ctx, uint32_t level,
 				uint8_t mon_id);
+
+/**
+ * hdd_send_ddr_bw_mitigation_level() - send DDR BW mitigation level
+ * to the firmware
+ * @hdd_ctx: pointer to hdd context
+ * @level: Thermal mitigation level to set
+ * @mon_id: Thermal monitor id ie.. apps or wpss
+ *
+ * wrapper API for wlan_hdd_send_ddr_bw_mitigation_level()
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+hdd_send_ddr_bw_mitigation_level(struct hdd_context *hdd_ctx, uint32_t level,
+				 uint8_t mon_id);
+
 #ifdef FEATURE_WPSS_THERMAL_MITIGATION
 /**
  * hdd_thermal_fill_clientid_priority() - fill the client id/priority
@@ -289,6 +327,13 @@ hdd_thermal_unregister_callbacks(struct hdd_context *hdd_ctx)
 
 static inline QDF_STATUS
 hdd_send_thermal_mitigation_val(struct hdd_context *hdd_ctx, uint32_t level,
+				uint8_t mon_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+hdd_send_ddr_bw_mitigation_level(struct hdd_context *hdd_ctx, uint32_t level,
 				uint8_t mon_id)
 {
 	return QDF_STATUS_SUCCESS;

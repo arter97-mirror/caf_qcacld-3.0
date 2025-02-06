@@ -5483,6 +5483,14 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			hdd_send_thermal_mitigation_val(hdd_ctx, thermal_state,
 							THERMAL_MONITOR_WPSS);
 	}
+
+	if (!pld_get_thermal_state(hdd_ctx->parent_dev, &thermal_state,
+				   THERMAL_MONITOR_DDR_BWM)) {
+		if (thermal_state > QCA_WLAN_VENDOR_THERMAL_LEVEL_NONE)
+			hdd_send_ddr_bw_mitigation_level(hdd_ctx, thermal_state,
+						THERMAL_MONITOR_DDR_BWM);
+	}
+
 	hdd_register_get_port_status_notifier(hdd_ctx);
 
 	hdd_exit();
