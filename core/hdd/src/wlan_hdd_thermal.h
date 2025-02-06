@@ -134,6 +134,16 @@ bool wlan_hdd_thermal_config_support(void);
  */
 QDF_STATUS hdd_restore_thermal_mitigation_config(struct hdd_context *hdd_ctx);
 
+/**
+ * hdd_restore_ddr_bw_mitigation_config - Restore the saved bw mitigation config
+ * @hdd_ctx: HDD context
+ *
+ * wrapper API for wlan_hdd_restore_thermal_mitigation_config()
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_restore_ddr_bw_mitigation_config(struct hdd_context *hdd_ctx);
+
 extern const struct nla_policy
 	wlan_hdd_thermal_mitigation_policy
 	[QCA_WLAN_VENDOR_ATTR_THERMAL_CMD_MAX + 1];
@@ -282,6 +292,12 @@ static inline
 QDF_STATUS hdd_restore_thermal_mitigation_config(struct hdd_context *hdd_ctx)
 {
 	return false;
+}
+
+static inline
+QDF_STATUS hdd_restore_ddr_bw_mitigation_config(struct hdd_context *hdd_ctx)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline

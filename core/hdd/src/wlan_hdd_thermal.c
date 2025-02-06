@@ -262,6 +262,14 @@ wlan_hdd_send_ddr_bw_mitigation_level(struct hdd_context *hdd_ctx,
 					      &therm_cfg_params);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("Failed to set throttle configuration %d", status);
+	else
+		/*
+		 * After SSR, the bw mitigation level is lost.
+		 * As SSR is hidden from userland, this command will not come
+		 * from userspace after a SSR. To restore this configuration,
+		 * save this in hdd context and restore after re-init.
+		 */
+		hdd_ctx->bwm_dutycycle_off_percent = dc_off_percent;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -762,6 +770,69 @@ QDF_STATUS hdd_restore_thermal_mitigation_config(struct hdd_context *hdd_ctx)
 		hdd_err_rl("Failed to set throttle configuration %d", status);
 
 	return status;
+}
+
+#ifdef WLAN_DDR_BW_MITIGATION
+/**
+ * wlan_hdd_restore_ddr_bw_mitigation_config - Restore the saved thermal config
+ * @hdd_ctx: HDD context
+ *
+ * Restore the thermal mitigation config after SSR.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_hdd_restore_ddr_bw_mitigation_config(struct hdd_context *hdd_ctx)
+{
+	bool enable = true;
+	uint32_t dc, dc_off_percent = 0;
+	uint32_t prio = 0, target_temp = 0;
+	struct wlan_fwol_bwm_params thermal_temp = {0};
+	QDF_STATUS status;
+	struct thermal_mitigation_params therm_cfg_params = {0};
+
+	status = ucfg_fwol_get_ddr_bwm_config(hdd_ctx->psoc, &thermal_temp);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("Failed to get fwol thermal obj");
+		return status;
+	}
+
+	dc_off_percent = hdd_ctx->bwm_dutycycle_off_percent;
+	dc = thermal_temp.bw_sampling_time;
+
+	if (!dc_off_percent)
+		enable = false;
+
+	therm_cfg_params.enable = enable;
+	therm_cfg_params.dc = dc;
+	therm_cfg_params.levelconf[0].dcoffpercent = dc_off_percent;
+	therm_cfg_params.levelconf[0].priority = prio;
+	therm_cfg_params.levelconf[0].tmplwm = target_temp;
+	therm_cfg_params.num_thermal_conf = 1;
+	therm_cfg_params.client_id =
+	     hdd_convert_monitor_id_to_wmi_monitor_id(THERMAL_MONITOR_DDR_BWM);
+	therm_cfg_params.priority = 0;
+
+	hdd_debug("dc %d dc_off_per %d enable %d", dc, dc_off_percent, enable);
+
+	status = sme_set_thermal_throttle_cfg(hdd_ctx->mac_handle,
+					      &therm_cfg_params);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("Failed to set throttle configuration %d", status);
+
+	return status;
+}
+#else
+static inline QDF_STATUS
+wlan_hdd_restore_ddr_bw_mitigation_config(struct hdd_context *hdd_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+QDF_STATUS hdd_restore_ddr_bw_mitigation_config(struct hdd_context *hdd_ctx)
+{
+	return wlan_hdd_restore_ddr_bw_mitigation_config(hdd_ctx);
 }
 
 /**

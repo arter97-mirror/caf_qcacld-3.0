@@ -2121,6 +2121,7 @@ enum wlan_state_ctrl_str_id {
  * @max_chipset_log_size: Stores max chipset log size value
  * @dual_sta_policy: Concurrent STA policy configuration
  * @is_therm_stats_in_progress:
+ * @bwm_dutycycle_off_percent: bandwidth mitigation dutycycle off percent
  * @is_vdev_macaddr_dynamic_update_supported:
  * @power_type:
  * @is_wlan_disabled: if wlan is disabled by userspace
@@ -2406,6 +2407,9 @@ struct hdd_context {
 	struct hdd_dual_sta_policy dual_sta_policy;
 #ifdef THERMAL_STATS_SUPPORT
 	bool is_therm_stats_in_progress;
+#endif
+#ifdef WLAN_DDR_BW_MITIGATION
+	uint8_t bwm_dutycycle_off_percent;
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	bool is_vdev_macaddr_dynamic_update_supported;

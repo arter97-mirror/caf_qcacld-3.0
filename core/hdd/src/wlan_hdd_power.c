@@ -2224,6 +2224,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 				      hdd_chip_pwr_save_fail_detected_cb);
 
 	hdd_restore_thermal_mitigation_config(hdd_ctx);
+	hdd_restore_ddr_bw_mitigation_config(hdd_ctx);
 	hdd_restore_sar_config(hdd_ctx);
 
 	hdd_send_default_scan_ies(hdd_ctx);
