@@ -429,7 +429,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		}
 		is_band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(pesession->curr_op_freq);
 		lim_ieee80211_pack_ehtcap(eht_cap_ie, pr->eht_cap, pr->he_cap,
-					  is_band_2g);
+					  is_band_2g, true);
 		eht_cap_ie_len = eht_cap_ie[TAG_LEN_POS] + MIN_IE_LEN;
 		pr->eht_cap.present = false;
 	}
@@ -2568,7 +2568,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		is_band_2g =
 			WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq);
 		lim_ieee80211_pack_ehtcap(eht_cap_ie, frm.eht_cap, frm.he_cap,
-					  is_band_2g);
+					  is_band_2g, false);
 
 		eht_cap_ie_len = eht_cap_ie[TAG_LEN_POS] + MIN_IE_LEN;
 
@@ -3852,7 +3852,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq);
 
 		lim_ieee80211_pack_ehtcap(eht_cap_ie, frm->eht_cap, frm->he_cap,
-					  is_band_2g);
+					  is_band_2g, true);
 		eht_cap_ie_len = eht_cap_ie[TAG_LEN_POS] + MIN_IE_LEN;
 
 		/* Mark EHT capability as false as this the data is already

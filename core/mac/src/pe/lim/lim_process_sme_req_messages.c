@@ -1716,7 +1716,8 @@ lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 		rx_nss = dot11_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7;
 	}
 
-	if (!tx_nss || tx_nss > 2 || !rx_nss || rx_nss > 2) {
+	if (!tx_nss || tx_nss > WLAN_MAX_VDEV_NSS ||
+	    !rx_nss || rx_nss > WLAN_MAX_VDEV_NSS) {
 		pe_err("invalid Nss values tx_nss: %u rx_nss: %u",
 		       tx_nss, rx_nss);
 		return;

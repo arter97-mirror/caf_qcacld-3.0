@@ -1675,6 +1675,7 @@ QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
  * @dot11f_eht_cap: dot11f EHT capabilities IE structure
  * @dot11f_he_cap: dot11f HE capabilities IE structure
  * @is_band_2g: Flag to indicate whether operating band is 2g or not
+ * @is_sta_ie: Is IE for (non-AP) STA mode
  *
  * This API is used to encode EHT capabilities IE which is of variable in
  * length depending on the HE capabilities IE content.
@@ -1682,7 +1683,8 @@ QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
  * Return: Void
  */
 void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
-			       tDot11fIEhe_cap dot11f_he_cap, bool is_band_2g);
+			       tDot11fIEhe_cap dot11f_he_cap, bool is_band_2g,
+			       bool is_sta_ie);
 
 /**
  * lim_strip_and_decode_eht_cap() - API to decode EHT capabilities IE
@@ -1793,7 +1795,7 @@ QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
 static inline void lim_ieee80211_pack_ehtcap(uint8_t *ie,
 					     tDot11fIEeht_cap dot11f_eht_cap,
 					     tDot11fIEhe_cap dot11f_he_cap,
-					     bool is_band_2g)
+					     bool is_band_2g, bool is_sta_ie)
 {
 }
 

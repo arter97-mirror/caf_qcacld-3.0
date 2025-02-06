@@ -9822,7 +9822,8 @@ QDF_STATUS lim_strip_and_decode_eht_cap(uint8_t *ie, uint16_t ie_len,
 }
 
 void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
-			       tDot11fIEhe_cap dot11f_he_cap, bool is_band_2g)
+			       tDot11fIEhe_cap dot11f_he_cap, bool is_band_2g,
+			       bool is_sta_ie)
 {
 	struct wlan_ie_ehtcaps *ehtcap  = (struct wlan_ie_ehtcaps *)ie;
 	uint32_t ehtcaplen;
@@ -10063,9 +10064,10 @@ void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
 				     ehtcap->eht_phy_cap.phy_cap_bytes, val);
 
 	/* Fill EHT MCS and NSS set field */
-	if ((is_band_2g && !dot11f_he_cap.chan_width_0) ||
-	    (!is_band_2g && !dot11f_he_cap.chan_width_1 &&
-	     !dot11f_he_cap.chan_width_2 && !dot11f_he_cap.chan_width_3)) {
+	if (((is_band_2g && !dot11f_he_cap.chan_width_0) ||
+	     (!is_band_2g && !dot11f_he_cap.chan_width_1 &&
+	      !dot11f_he_cap.chan_width_2 &&
+	      !dot11f_he_cap.chan_width_3))) {
 		val = dot11f_eht_cap.bw_20_rx_max_nss_for_mcs_0_to_7;
 		ehtcap_ie_set(&ehtcap->mcs_nss_map_bytes[idx],
 			      EHTCAP_RX_MCS_NSS_MAP_IDX,
@@ -10075,7 +10077,8 @@ void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
 		ehtcap_ie_set(&ehtcap->mcs_nss_map_bytes[idx],
 			      EHTCAP_TX_MCS_NSS_MAP_IDX,
 			      EHTCAP_TX_MCS_NSS_MAP_BITS, val);
-		idx++;
+		if (is_sta_ie)
+			idx++;
 
 		val = dot11f_eht_cap.bw_20_rx_max_nss_for_mcs_8_and_9;
 		ehtcap_ie_set(&ehtcap->mcs_nss_map_bytes[idx],
@@ -14353,7 +14356,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 			if (eht_cap_ie) {
 				len_consumed = 0;
 				lim_ieee80211_pack_ehtcap(eht_cap_ie, eht_caps,
-							  he_caps, is_2g);
+							  he_caps, is_2g, true);
 				len_consumed = eht_cap_ie[1] + 2;
 
 				qdf_mem_copy(p_sta_prof, eht_cap_ie,
@@ -15172,7 +15175,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 			if (eht_cap_ie) {
 				len_consumed = 0;
 				lim_ieee80211_pack_ehtcap(eht_cap_ie, eht_caps,
-							  he_caps, is_2g);
+							  he_caps, is_2g, true);
 				len_consumed = eht_cap_ie[1] + 2;
 
 				qdf_mem_copy(p_sta_prof, eht_cap_ie,

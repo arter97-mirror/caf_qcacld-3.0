@@ -1596,7 +1596,7 @@ lim_ieee80211_pack_ehtcap_tdls(struct mac_context *mac,
 					NULL, pe_session);
 
 	lim_ieee80211_pack_ehtcap(eht_cap_ie, pe_session->eht_config,
-				  he_cap, is_band_2g);
+				  he_cap, is_band_2g, true);
 
 	*len = eht_cap_ie[1] + 2;
 	return eht_cap_ie;
@@ -3329,7 +3329,8 @@ lim_tdls_populate_eht_mcs(struct mac_context *mac_ctx, tpDphHashNode stads,
 {
 	lim_populate_eht_mcs_set(mac_ctx, &stads->supportedRates,
 				 &stads->eht_config, session_entry,
-				 session_entry->ch_width);
+				 session_entry->ch_width,
+				 wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq));
 }
 #else
 static void

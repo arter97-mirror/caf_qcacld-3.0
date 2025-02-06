@@ -1949,6 +1949,7 @@ QDF_STATUS lim_strip_eht_cap_ie(struct mac_context *mac_ctx,
  * @peer_eht_caps: pointer to peer EHT capabilities
  * @session_entry: pe session entry
  * @ch_width: channel width of the association
+ * @is_2g: Is 2g band params
  *
  * Populates EHT mcs rate set based on peer and self capabilities
  *
@@ -1958,7 +1959,8 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
-				    enum phy_ch_width ch_width);
+				    enum phy_ch_width ch_width,
+				    bool is_2g);
 
 /**
  * lim_update_eht_bw_cap_mcs(): Update eht mcs map per bandwidth
@@ -2327,7 +2329,8 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
-				    enum phy_ch_width ch_width)
+				    enum phy_ch_width ch_width,
+				    bool is_2g)
 {
 	return QDF_STATUS_SUCCESS;
 }

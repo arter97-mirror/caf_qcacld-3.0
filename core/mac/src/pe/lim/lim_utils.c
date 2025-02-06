@@ -8493,43 +8493,45 @@ static void lim_populate_eht_le80_mcs_set(struct mac_context *mac_ctx,
 
 static void lim_populate_eht_20only_mcs_set(struct mac_context *mac_ctx,
 					    struct supported_rates *rates,
-					    tDot11fIEeht_cap *peer_eht_caps)
+					    tDot11fIEeht_cap *peer_eht_caps,
+					    bool is_2g)
 {
-	tDot11fIEeht_cap *fw_2g_eht_cap;
+	tDot11fIEeht_cap *fw_eht_cap;
 
-	fw_2g_eht_cap = &mac_ctx->eht_cap_2g;
+	fw_eht_cap = is_2g ? &mac_ctx->eht_cap_2g : &mac_ctx->eht_cap_5g;
 
 	rates->bw_20_tx_max_nss_for_mcs_12_and_13 =
 		QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_12_and_13,
-			fw_2g_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13);
+			fw_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13);
 	rates->bw_20_rx_max_nss_for_mcs_12_and_13 =
 		QDF_MIN(peer_eht_caps->bw_20_rx_max_nss_for_mcs_12_and_13,
-			fw_2g_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13);
+			fw_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13);
 	rates->bw_20_tx_max_nss_for_mcs_10_and_11 =
 		QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_10_and_11,
-			fw_2g_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11);
+			fw_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11);
 	rates->bw_20_rx_max_nss_for_mcs_10_and_11 =
 		QDF_MIN(peer_eht_caps->bw_20_rx_max_nss_for_mcs_10_and_11,
-			fw_2g_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11);
+			fw_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11);
 	rates->bw_20_tx_max_nss_for_mcs_8_and_9 =
 		QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_8_and_9,
-			fw_2g_eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9);
+			fw_eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9);
 	rates->bw_20_rx_max_nss_for_mcs_8_and_9 =
 		QDF_MIN(peer_eht_caps->bw_20_rx_max_nss_for_mcs_8_and_9,
-			fw_2g_eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9);
+			fw_eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9);
 	rates->bw_20_tx_max_nss_for_mcs_0_to_7 =
 		QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_0_to_7,
-			fw_2g_eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7);
+			fw_eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7);
 	rates->bw_20_rx_max_nss_for_mcs_0_to_7 =
 		QDF_MIN(peer_eht_caps->bw_20_rx_max_nss_for_mcs_0_to_7,
-			fw_2g_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7);
+			fw_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7);
 }
 
 QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
-				    enum phy_ch_width ch_width)
+				    enum phy_ch_width ch_width,
+				    bool is_2g)
 {
 	if ((!peer_eht_caps) || (!peer_eht_caps->present)) {
 		pe_debug("peer not eht capable or eht_caps NULL");
@@ -8554,7 +8556,8 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 		lim_populate_eht_le80_mcs_set(mac_ctx, rates, peer_eht_caps);
 		break;
 	case CH_WIDTH_20MHZ:
-		lim_populate_eht_20only_mcs_set(mac_ctx, rates, peer_eht_caps);
+		lim_populate_eht_20only_mcs_set(mac_ctx, rates, peer_eht_caps,
+						is_2g);
 		break;
 	default:
 		break;
@@ -8739,6 +8742,8 @@ lim_revise_req_eht_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 static void lim_revise_req_eht_cap_per_mode(struct mlme_legacy_priv *mlme_priv,
 					    struct pe_session *session)
 {
+	uint8_t nss = session->nss;
+
 	if (session->opmode == QDF_SAP_MODE ||
 	    session->opmode == QDF_P2P_GO_MODE) {
 		pe_debug("Disable eht cap for SAP/GO");
@@ -8749,6 +8754,36 @@ static void lim_revise_req_eht_cap_per_mode(struct mlme_legacy_priv *mlme_priv,
 	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_le_80mhz = 0;
 	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_160mhz = 0;
 	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_320mhz = 0;
+
+	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_0_to_7 = nss;
+	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_0_to_7 = nss;
+	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_8_and_9 = nss;
+	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_8_and_9 = nss;
+	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_10_and_11 = nss;
+	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_10_and_11 = nss;
+	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_12_and_13 = nss;
+	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_12_and_13 = nss;
+
+	mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_10_and_11 = nss;
+	mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_10_and_11 = nss;
+	mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_12_and_13 = nss;
+	mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_12_and_13 = nss;
+
+	mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_10_and_11 = nss;
+	mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_10_and_11 = nss;
+	mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_12_and_13 = nss;
+	mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_12_and_13 = nss;
+
+	mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_0_to_9 = nss;
+	mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_10_and_11 = nss;
+	mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_10_and_11 = nss;
+	mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_12_and_13 = nss;
+	mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_12_and_13 = nss;
 }
 
 void lim_copy_bss_eht_cap(struct pe_session *session)
