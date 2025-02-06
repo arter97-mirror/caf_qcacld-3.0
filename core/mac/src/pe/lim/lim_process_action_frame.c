@@ -2508,7 +2508,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		case EHT_LINK_RECONFIG_RESPONSE:
 			mlo_link_recfg_rx_rsp(session->vdev,
 					      WLAN_LINK_RECFG_SM_EV_RX_RSP,
-					      (void *)body_ptr, frame_len);
+					      rx_pkt_info);
 			break;
 		default:
 			pe_err("Unhandled T2LM/EPCS/Link recfg rsp action frame");
