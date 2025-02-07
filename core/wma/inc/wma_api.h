@@ -95,6 +95,12 @@ struct wma_caps_per_phy {
 	uint32_t rx_chain_mask_5G;
 };
 
+struct wma_ps_params {
+	enum wmi_sta_ps_scheme_cfg opm_mode;
+	uint16_t ps_ito;
+	uint16_t spec_wake;
+};
+
 
 #define VDEV_CMD 1
 #define PDEV_CMD 2

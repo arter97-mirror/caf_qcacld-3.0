@@ -3414,15 +3414,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 		goto err_dbglog_init;
 	}
 
-	/*
-	 * Update Powersave mode
-	 * 1 - Legacy Powersave + Deepsleep Disabled
-	 * 2 - QPower + Deepsleep Disabled
-	 * 3 - Legacy Powersave + Deepsleep Enabled
-	 * 4 - QPower + Deepsleep Enabled
-	 */
-	wma_handle->powersave_mode =
-			ucfg_pmo_power_save_offload_enabled(wma_handle->psoc);
 	wma_handle->staMaxLIModDtim = cds_cfg->sta_maxlimod_dtim;
 	wma_handle->staModDtim = ucfg_pmo_get_sta_mod_dtim(wma_handle->psoc);
 	wma_handle->staDynamicDtim =
