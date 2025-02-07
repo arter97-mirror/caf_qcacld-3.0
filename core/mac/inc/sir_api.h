@@ -58,6 +58,7 @@ struct mac_context;
  * PS_DATA_INACTIVITY_TIMEOUT with the ini's default value.
  */
 #define PS_DATA_INACTIVITY_TIMEOUT (200)
+#define PS_DATA_SPEC_WAKE (0)
 
 #define OFFSET_OF(structType, fldName)   (&((structType *)0)->fldName)
 #define WLAN_DOT11_BASIC_RATE_MASK (0x80)
