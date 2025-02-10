@@ -1172,6 +1172,7 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		   (QDF_NBUF_CB_GET_PACKET_TYPE(skb) ==
 		   QDF_NBUF_CB_PACKET_TYPE_ICMPv6)) {
 		hdd_mark_icmp_req_to_fw(hdd_ctx, skb);
+		hdd_icmp_ps_change_handler(adapter, skb);
 	}
 
 	hdd_pkt_add_timestamp(adapter, QDF_PKT_TX_DRIVER_ENTRY,
