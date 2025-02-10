@@ -5007,6 +5007,10 @@ QDF_STATUS wma_set_apf_instructions(tp_wma_handle wma,
 		buf_ptr += WMI_TLV_HDR_SIZE;
 		qdf_mem_copy(buf_ptr, apf_set_offload->program,
 			     apf_set_offload->current_length);
+		wma_debug("vdev_id: %d", cmd->vdev_id);
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+				   apf_set_offload->program,
+				   apf_set_offload->current_length);
 	}
 
 	if (wmi_unified_cmd_send(wmi_handle, wmi_buf, len,
