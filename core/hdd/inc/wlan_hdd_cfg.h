@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -131,6 +132,7 @@ struct hdd_config {
 	bool bug_on_reinit_failure;
 	bool is_ramdump_enabled;
 	uint32_t iface_change_wait_time;
+	bool shutdown_bootskip;
 	uint8_t multicast_host_fw_msgs;
 	enum hdd_wext_control private_wext_control;
 	bool enablefwprint;
