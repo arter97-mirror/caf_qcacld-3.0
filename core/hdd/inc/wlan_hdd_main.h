@@ -3583,7 +3583,7 @@ QDF_STATUS hdd_switch_sap_channel(struct wlan_hdd_link_info *link_info,
 
 /**
  * hdd_switch_sap_chan_freq() - Move SAP to the given channel
- * @adapter: AP adapter
+ * @link_info: link info
  * @chan_freq: Channel frequency
  * @ch_width: channel bandwidth
  * @forced: Force to switch channel, ignore SCC/MCC check
@@ -3593,7 +3593,7 @@ QDF_STATUS hdd_switch_sap_channel(struct wlan_hdd_link_info *link_info,
  *
  * Return: QDF_STATUS_SUCCESS if successfully
  */
-QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
+QDF_STATUS hdd_switch_sap_chan_freq(struct wlan_hdd_link_info *link_info,
 				    qdf_freq_t chan_freq,
 				    enum phy_ch_width ch_width,
 				    bool forced);

@@ -67,17 +67,17 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 {
 	tDot11fReAssocRequest *frm;
 	uint16_t caps;
-	uint8_t *frame;
+	uint8_t *frame, *rsnxe = NULL;
 	uint32_t bytes, payload, status;
 	uint8_t qos_enabled, wme_enabled, wsm_enabled;
 	void *packet;
 	QDF_STATUS qdf_status;
 	uint8_t power_caps_populated = false;
-	uint16_t ft_ies_length = 0;
+	uint16_t ft_ies_length = 0, rsnxe_len = 0;
 	uint8_t *body;
 	uint16_t add_ie_len;
 	uint8_t *add_ie;
-	const uint8_t *wps_ie = NULL;
+	const uint8_t *wps_ie = NULL, *rsnxe_ptr = NULL;
 	uint8_t tx_flag = 0;
 	uint8_t vdev_id = 0;
 	bool vht_enabled = false;
@@ -390,6 +390,18 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 						  &frm->ExtCap);
 	}
 
+	rsnxe_ptr = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE, add_ie,
+					     add_ie_len);
+	if (add_ie_len && rsnxe_ptr) {
+		rsnxe_len = rsnxe_ptr[1] + 2;
+
+		rsnxe = qdf_mem_malloc(rsnxe_len);
+		if (!rsnxe)
+			goto end;
+
+		qdf_mem_copy(rsnxe, rsnxe_ptr, rsnxe_len);
+	}
+
 	/*
 	 * Do unpack to populate the add_ie buffer to frm structure
 	 * before packing the frm structure. In this way, the IE ordering
@@ -420,7 +432,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		pe_warn("Warnings in size calculation (0x%08x)", status);
 	}
 
-	bytes = payload + sizeof(tSirMacMgmtHdr);
+	bytes = payload + sizeof(tSirMacMgmtHdr) + rsnxe_len;
 
 	pe_debug("FT IE Reassoc Req %d",
 		 mlme_priv->connect_info.ft_info.reassoc_ie_len);
@@ -460,6 +472,11 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		pe_warn("Warnings in pack (0x%08x)", status);
 	}
 
+	if (rsnxe && rsnxe_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     rsnxe, rsnxe_len);
+		payload += rsnxe_len;
+	}
 	pe_debug("*** Sending Re-Assoc Request length: %d %d to",
 		       bytes, payload);
 
@@ -523,6 +540,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 end:
+	qdf_mem_free(rsnxe);
 	qdf_mem_free(frm);
 err:
 	/* Free up buffer allocated for mlmAssocReq */
