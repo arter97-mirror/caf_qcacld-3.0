@@ -1707,8 +1707,11 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 
 	if (!policy_mgr_is_sap_freq_allowed(mac->psoc,
 				wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
-				roam_info->chan_info_freq))
+				roam_info->chan_info_freq) ||
+	    wlan_reg_is_vlp_depriority_freq(mac->pdev,
+					    roam_info->chan_info_freq))
 		goto exit;
+
 	if (sap_ctx->acs_cfg->ch_width > CH_WIDTH_20MHZ) {
 		sap_mark_freq_as_clean(sap_ctx->clean_channel_array,
 				       roam_info->chan_info_freq);
