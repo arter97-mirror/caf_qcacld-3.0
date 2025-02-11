@@ -12707,9 +12707,7 @@ populate_dot11f_mlo_caps(struct mac_context *mac_ctx,
 
 	common_info_len += WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
 	mlo_ie->ext_mld_capab_and_op_present = 0;
-	if (target_if_get_fw_btm_multi_ap_support(mac_ctx->psoc) &&
-	    session->vdev->mlo_dev_ctx &&
-	    session->vdev->mlo_dev_ctx->link_recfg_op_support) {
+	if (target_if_get_fw_btm_multi_ap_support(mac_ctx->psoc)) {
 		mlo_ie->ext_mld_capab_and_op_present = 1;
 		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
 		common_info_len += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
@@ -13904,10 +13902,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 						eml_cap.emlsr_trans_delay;
 	}
 
-	if (partner_info->num_partner_links &&
-	    target_if_get_fw_btm_multi_ap_support(psoc) &&
-	    pe_session->vdev->mlo_dev_ctx &&
-	    pe_session->vdev->mlo_dev_ctx->link_recfg_op_support) {
+	if (target_if_get_fw_btm_multi_ap_support(psoc)) {
 		pe_debug("Set ext mld caps");
 		mlo_ie->ext_mld_capab_and_op_present = 1;
 		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P;
@@ -14462,8 +14457,7 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 						eml_cap.emlsr_trans_delay;
 	}
 
-	if (target_if_get_fw_btm_multi_ap_support(psoc) &&
-	    vdev->mlo_dev_ctx && vdev->mlo_dev_ctx->link_recfg_op_support) {
+	if (target_if_get_fw_btm_multi_ap_support(psoc)) {
 		mlo_ie->ext_mld_capab_and_op_present = 1;
 		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P;
 		mlo_ie->common_info_length += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
