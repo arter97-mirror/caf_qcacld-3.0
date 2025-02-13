@@ -17026,17 +17026,21 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			break;
 		}
 
-		if (nla_get_u8(tb2[cmd_id]) == QCA_WLAN_BTM_REQ_RESP_RECONFIG_FRAME) {
-			cmd_id = QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_RECONFIG_FRAME_INFO;
-			nla_for_each_nested(curr_attr, tb2[cmd_id], rem)
-				recfg_info.num_frame++;
-		} else {
+		if (nla_get_u8(tb2[cmd_id]) !=
+			QCA_WLAN_BTM_REQ_RESP_RECONFIG_FRAME)
 			goto BTM_REQ_RESP_DONE;
+
+		cmd_id = QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_RECONFIG_FRAME_INFO;
+		if (!tb2[cmd_id]) {
+			hdd_debug("QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_RECONFIG_FRAME_INFO not present");
+			goto RESET_LINK_RECFG_FRAME;
 		}
+		nla_for_each_nested(curr_attr, tb2[cmd_id], rem)
+			recfg_info.num_frame++;
 
 		if (!recfg_info.num_frame) {
-			hdd_err("reconfig info not found");
-			goto send_err;
+			hdd_debug("reconfig info not found");
+			goto RESET_LINK_RECFG_FRAME;
 		}
 
 		hdd_debug("number of frames to send Link reconfig request: %d",
@@ -17068,6 +17072,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			}
 			i++;
 		}
+RESET_LINK_RECFG_FRAME:
 		/* update mlo dev ctx with info */
 		ucfg_mlme_update_mlo_recfg_info(hdd_ctx->psoc,
 						link_info->vdev_id,
