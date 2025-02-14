@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1186,6 +1186,8 @@ QDF_STATUS policy_mgr_set_pcl(struct wlan_objmgr_psoc *psoc,
  * @psoc: PSOC object information
  * @mode:	Adapter mode
  * @session_id: session ID for the connection session
+ * @update_flow_pool_map: Is flow pool map update required. false for link
+ * switch.
  *
  * This function increments the number of active sessions maintained per device
  * mode. In the case of STA/P2P CLI/IBSS upon connection indication it is
@@ -1194,7 +1196,8 @@ QDF_STATUS policy_mgr_set_pcl(struct wlan_objmgr_psoc *psoc,
  * Return: None
  */
 void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
-		enum QDF_OPMODE mode, uint8_t session_id);
+				    enum QDF_OPMODE mode, uint8_t session_id,
+				    bool update_flow_pool_map);
 
 /**
  * policy_mgr_decr_active_session() - decrements the number of active sessions
@@ -6149,4 +6152,15 @@ policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif
+
+/**
+ * policy_mgr_update_flow_pool_map() - Update flow pool map for the given vdev
+ * @psoc: Pointer to PSOC object
+ * @vdev: Pointer to object manager vdev
+ *
+ * Return: None
+ */
+void policy_mgr_update_flow_pool_map(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev);
+
 #endif /* __WLAN_POLICY_MGR_API_H */

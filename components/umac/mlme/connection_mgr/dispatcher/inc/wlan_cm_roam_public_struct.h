@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2392,6 +2392,7 @@ struct roam_frame_info {
  * @RSO_SAP_CHANNEL_CHANGE: disable roaming due to SAP channel change
  * @RSO_NDP_CON_ON_NDI: disable roaming due to NDP connection on NDI
  * @RSO_SET_PCL: Disable roaming to set pcl to firmware
+ * @RSO_SET_LINK: Avoid enable roaming due to SET_LINK is in progress
  */
 enum wlan_cm_rso_control_requestor {
 	RSO_INVALID_REQUESTOR,
@@ -2401,6 +2402,7 @@ enum wlan_cm_rso_control_requestor {
 	RSO_SAP_CHANNEL_CHANGE = BIT(3),
 	RSO_NDP_CON_ON_NDI     = BIT(4),
 	RSO_SET_PCL            = BIT(5),
+	RSO_SET_LINK           = BIT(6),
 };
 #endif
 

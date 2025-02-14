@@ -69,7 +69,7 @@ QDF_STATUS wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 		goto send_rsp;
 	}
 
-	status = wma_create_peer(wma, add_sta->staMac,
+	status = wma_create_peer(wma, add_sta->staMac, NULL,
 				 WMI_PEER_TYPE_NAN_DATA, add_sta->smesessionId,
 				 NULL, false);
 	if (status != QDF_STATUS_SUCCESS) {

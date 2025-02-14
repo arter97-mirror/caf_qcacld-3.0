@@ -471,11 +471,9 @@ void policy_mgr_decr_session_set_pcl(struct wlan_objmgr_psoc *psoc,
 	    mode != QDF_STA_MODE)
 		polic_mgr_send_pcl_to_fw(psoc, mode);
 
-	/* do we need to change the HW mode */
-	if (!policy_mgr_is_hw_dbs_capable(psoc))
-		return;
+	if (policy_mgr_is_hw_dbs_capable(psoc))
+		policy_mgr_check_n_start_opportunistic_timer(psoc);
 
-	policy_mgr_check_n_start_opportunistic_timer(psoc);
 	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE)
 		ml_nlink_conn_change_notify(
 			psoc, session_id, ml_nlink_ap_stopped_evt, NULL);
@@ -1193,6 +1191,13 @@ static bool policy_mgr_channel_mcc_with_non_sap(struct wlan_objmgr_psoc *psoc,
 						psoc, &freq_list[sta_cnt],
 						vdev_id_list,
 						PM_STA_MODE);
+
+	/* For non-DBS, keep the inactive and standby SCC freq in the PCL */
+	if (sta_cnt && !policy_mgr_is_hw_dbs_capable(psoc) &&
+	    policy_mgr_is_mlo_sta_present(psoc) &&
+	    policy_mgr_if_freq_n_inactive_links_freq_same(psoc, chan_freq))
+		return false;
+
 	/* In case of ML STA + NAN concurrency consider NAN social,
 	 * As SCC channel. SAP will move to NAN social channel.
 	 * In case of legacy STA, SAP will move to legacy STA channel.
@@ -1330,11 +1335,11 @@ policy_mgr_modify_sap_pcl_filter_mcc(struct wlan_objmgr_psoc *psoc,
 
 	for (i = 0; i < *pcl_len_org; i++) {
 		/**
-		 * for non-dbs and cc_mode as QDF_MCC_TO_SCC_WITH_PREFERRED_BAND
+		 * for non-dbs and cc_mode as QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND
 		 * do not skip MCC channel
 		 */
 		if (!(!is_dbs && mcc_to_scc_switch ==
-				QDF_MCC_TO_SCC_WITH_PREFERRED_BAND) &&
+				QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND) &&
 		    policy_mgr_channel_mcc_with_non_sap(psoc, pcl_list_org[i]))
 			continue;
 

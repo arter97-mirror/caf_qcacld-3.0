@@ -847,7 +847,7 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 	struct wlan_dp_spm_flow_info *flow_rec;
 	int i;
 
-	if (dp_intf->device_mode != QDF_STA_MODE)
+	if (!dp_ctx->gl_flow_recs || dp_intf->device_mode != QDF_STA_MODE)
 		return QDF_STATUS_E_NOSUPPORT;
 
 	if (dp_intf->spm_intf_ctx) {
@@ -865,9 +865,6 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 	qdf_list_create(&spm_intf->o_flow_rec_freelist,
 			WLAN_DP_SPM_FLOW_REC_TBL_MAX);
 	qdf_spinlock_create(&spm_intf->flow_list_lock);
-
-	if (!dp_ctx->gl_flow_recs)
-		goto fail_flow_rec_freelist;
 
 	spm_intf->flow_rec_base =
 	     &dp_ctx->gl_flow_recs[dp_intf->id * WLAN_DP_SPM_FLOW_REC_TBL_MAX];
@@ -992,15 +989,17 @@ void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
 void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	dp_ctx->gl_flow_recs =
-		qdf_mem_malloc(sizeof(struct wlan_dp_spm_flow_info) *
-			       WLAN_DP_SPM_FLOW_REC_TBL_MAX * WLAN_DP_INTF_MAX);
+		__qdf_mem_malloc(sizeof(struct wlan_dp_spm_flow_info) *
+				 WLAN_DP_SPM_FLOW_REC_TBL_MAX *
+				 WLAN_DP_INTF_MAX, __func__, __LINE__);
 	if (!dp_ctx->gl_flow_recs)
 		dp_err("Failed to SPM Tx flow table");
 }
 
 void wlan_dp_spm_flow_table_detach(struct wlan_dp_psoc_context *dp_ctx)
 {
-	qdf_mem_free(dp_ctx->gl_flow_recs);
+	__qdf_mem_free(dp_ctx->gl_flow_recs);
+	dp_ctx->gl_flow_recs = NULL;
 }
 #endif
 

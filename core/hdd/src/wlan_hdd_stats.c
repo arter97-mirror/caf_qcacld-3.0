@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -626,6 +626,7 @@ wlan_hdd_copy_hdd_stats_to_sinfo(struct station_info *sinfo,
 	sinfo->tx_failed = hdd_sinfo->tx_failed;
 	sinfo->rx_mpdu_count = hdd_sinfo->rx_mpdu_count;
 	sinfo->fcs_err_count = hdd_sinfo->fcs_err_count;
+	sinfo->filled = hdd_sinfo->filled;
 }
 
 /**
@@ -5718,7 +5719,7 @@ wlan_hdd_fill_per_link_summary_stats(tCsrSummaryStatsInfo *stats,
 	status = ucfg_dp_get_per_link_peer_stats(soc, link_info->vdev_id,
 						 peer_mac, peer_stats,
 						 CDP_WILD_PEER_TYPE,
-						 WLAN_MAX_MLD);
+						 DP_STAT_NUM_SINGLE_LINK);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Unable to get per link peer stats for the peer: "
@@ -7720,7 +7721,7 @@ wlan_hdd_update_mlo_peer_stats(struct wlan_hdd_link_info *link_info,
 	ucfg_dp_get_per_link_peer_stats(soc, link_info->vdev_id,
 					peer_mac, peer_stats,
 					CDP_WILD_PEER_TYPE,
-					WLAN_MAX_MLD);
+					DP_STAT_NUM_SINGLE_LINK);
 
 	sinfo->tx_bytes = peer_stats->tx.tx_success.bytes;
 	sinfo->rx_bytes = peer_stats->rx.rcvd.bytes;
@@ -7749,6 +7750,7 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	uint8_t tx_nss = 1, rx_nss = 1, tx_dcm, rx_dcm;
 	qdf_net_dev_stats stats = {0};
 	struct hdd_stats *hdd_stats;
+	uint32_t tx_packets;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ucfg_mlme_stats_get_cfg_values(hdd_ctx->psoc,
@@ -7886,8 +7888,11 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	sinfo->tx_bytes = stats.tx_bytes;
 	sinfo->rx_bytes = stats.rx_bytes;
 	sinfo->tx_packets = stats.tx_packets;
+	tx_packets = sinfo->tx_packets;
 	sinfo->rx_packets = stats.rx_packets;
 	wlan_hdd_update_mlo_peer_stats(link_info, sinfo);
+	hdd_debug("TX packets dp_inft %d mlo adjusted %d",
+		  tx_packets, sinfo->tx_packets);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 
@@ -8262,6 +8267,7 @@ wlan_hdd_update_mlo_rate_info(struct wlan_hdd_station_stats_info *hdd_sinfo,
 
 	qdf_mem_copy(&hdd_sinfo->rxrate,
 		     &sinfo->rxrate, sizeof(sinfo->rxrate));
+	hdd_sinfo->filled = sinfo->filled;
 }
 
 /*
@@ -8321,16 +8327,17 @@ static int wlan_hdd_get_mlo_sta_stats(struct hdd_adapter *adapter,
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
 	struct wlan_hdd_station_stats_info hdd_sinfo = {0};
 	uint8_t i;
+	struct station_info link_sinfo = {0};
 
 	/* Initialize the signal value to a default RSSI of -128dBm */
 	hdd_sinfo.signal = WLAN_INVALID_RSSI_VALUE;
-
+	link_sinfo.signal = WLAN_INVALID_RSSI_VALUE;
 	ml_adapter = adapter;
 	if (hdd_adapter_is_link_adapter(ml_adapter))
 		ml_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
 
-	wlan_hdd_get_sta_stats(ml_adapter->deflink, mac, sinfo);
-	wlan_hdd_update_mlo_sinfo(ml_adapter->deflink, &hdd_sinfo, sinfo);
+	wlan_hdd_get_sta_stats(ml_adapter->deflink, mac, &link_sinfo);
+	wlan_hdd_update_mlo_sinfo(ml_adapter->deflink, &hdd_sinfo, &link_sinfo);
 
 	mlo_adapter_info = &ml_adapter->mlo_adapter_info;
 	for (i = 0; i < WLAN_MAX_MLD; i++) {
@@ -8338,10 +8345,11 @@ static int wlan_hdd_get_mlo_sta_stats(struct hdd_adapter *adapter,
 		if (!link_adapter ||
 		    hdd_adapter_is_associated_with_ml_adapter(link_adapter))
 			continue;
-
-		wlan_hdd_get_sta_stats(link_adapter->deflink, mac, sinfo);
+		qdf_mem_zero(&link_sinfo, sizeof(struct station_info));
+		link_sinfo.signal = WLAN_INVALID_RSSI_VALUE;
+		wlan_hdd_get_sta_stats(link_adapter->deflink, mac, &link_sinfo);
 		wlan_hdd_update_mlo_sinfo(link_adapter->deflink, &hdd_sinfo,
-					  sinfo);
+					  &link_sinfo);
 	}
 
 	wlan_hdd_copy_hdd_stats_to_sinfo(sinfo, &hdd_sinfo);
@@ -8359,16 +8367,20 @@ static int wlan_hdd_get_mlo_sta_stats(struct hdd_adapter *adapter,
 	struct wlan_hdd_link_info *link_info;
 	struct wlan_hdd_station_stats_info hdd_sinfo = {0};
 	struct hdd_station_ctx *sta_ctx;
+	struct station_info link_sinfo = {0};
 
 	/* Initialize the signal value to a default RSSI of -128dBm */
 	hdd_sinfo.signal = WLAN_INVALID_RSSI_VALUE;
+	link_sinfo.signal = WLAN_INVALID_RSSI_VALUE;
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 		if (sta_ctx->conn_info.ieee_link_id == WLAN_INVALID_LINK_ID)
 			continue;
-		wlan_hdd_get_sta_stats(link_info, mac, sinfo);
-		wlan_hdd_update_mlo_sinfo(link_info, &hdd_sinfo, sinfo);
+		qdf_mem_zero(&link_sinfo, sizeof(struct station_info));
+		link_sinfo.signal = WLAN_INVALID_RSSI_VALUE;
+		wlan_hdd_get_sta_stats(link_info, mac, &link_sinfo);
+		wlan_hdd_update_mlo_sinfo(link_info, &hdd_sinfo, &link_sinfo);
 	}
 
 	wlan_hdd_copy_hdd_stats_to_sinfo(sinfo, &hdd_sinfo);
@@ -9652,7 +9664,7 @@ wlan_hdd_get_per_peer_stats(struct wlan_hdd_link_info *link_info,
 	status = ucfg_dp_get_per_link_peer_stats(soc, link_info->vdev_id,
 						 peer_mac, peer_stats,
 						 CDP_WILD_PEER_TYPE,
-						 WLAN_MAX_MLD);
+						 DP_STAT_NUM_SINGLE_LINK);
 	return status;
 }
 

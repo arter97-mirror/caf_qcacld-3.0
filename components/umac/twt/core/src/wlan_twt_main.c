@@ -2088,7 +2088,8 @@ wlan_twt_handle_sta_del_dialog_event(struct wlan_objmgr_psoc *psoc,
 	    event->dialog_id != TWT_ALL_SESSIONS_DIALOG_ID &&
 	    event->status != HOST_TWT_DEL_STATUS_ROAMING &&
 	    event->status != HOST_TWT_DEL_STATUS_PEER_INIT_TEARDOWN &&
-	    event->status != HOST_TWT_DEL_STATUS_CONCURRENCY) {
+	    event->status != HOST_TWT_DEL_STATUS_CONCURRENCY &&
+	    event->status != HOST_TWT_DEL_STATUS_MULTIPLE_LINKS_ACTIVE_TERMINATE) {
 		twt_err("Drop TWT Del dialog event for dialog_id:%d status:%d active_cmd:%d",
 			event->dialog_id, event->status, active_cmd);
 
@@ -2103,7 +2104,8 @@ wlan_twt_handle_sta_del_dialog_event(struct wlan_objmgr_psoc *psoc,
 	mlme_twt_osif_teardown_complete_ind(psoc, event);
 
 	if (event->status == HOST_TWT_DEL_STATUS_ROAMING ||
-	    event->status == HOST_TWT_DEL_STATUS_CONCURRENCY)
+	    event->status == HOST_TWT_DEL_STATUS_CONCURRENCY ||
+	    event->status == HOST_TWT_DEL_STATUS_MULTIPLE_LINKS_ACTIVE_TERMINATE)
 		wlan_twt_set_wait_for_notify(psoc, event->vdev_id, true);
 
 	wlan_twt_set_command_in_progress(psoc, &event->peer_macaddr,
@@ -2488,4 +2490,30 @@ wlan_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 
 	qdf_atomic_set(&twt_psoc->twt_requestor_enable_pending,
 		       TWT_COMMAND_PENDING_FLAG_RESET);
+}
+
+QDF_STATUS
+wlan_twt_tgt_caps_get_wake_dur_and_wake_intvl(
+				struct wlan_objmgr_psoc *psoc,
+				uint32_t *min_wake_dur,
+				uint32_t *max_wake_dur,
+				uint32_t *min_wake_intvl,
+				uint32_t *max_wake_intvl)
+{
+	struct twt_psoc_priv_obj *twt_psoc;
+
+	twt_psoc = wlan_objmgr_psoc_get_comp_private_obj(psoc,
+							 WLAN_UMAC_COMP_TWT);
+
+	if (!twt_psoc) {
+		twt_err("null twt psoc priv obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*min_wake_dur = twt_psoc->twt_caps.min_wake_dur;
+	*max_wake_dur = twt_psoc->twt_caps.max_wake_dur;
+	*min_wake_intvl = twt_psoc->twt_caps.min_wake_intvl;
+	*max_wake_intvl = twt_psoc->twt_caps.max_wake_intvl;
+
+	return QDF_STATUS_SUCCESS;
 }

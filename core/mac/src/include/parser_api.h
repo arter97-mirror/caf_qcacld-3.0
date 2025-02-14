@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1890,6 +1890,20 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 QDF_STATUS populate_dot11f_btm_extended_caps(struct mac_context *mac_ctx,
 					     struct pe_session *pe_session,
 					     struct sDot11fIEExtCap *dot11f);
+
+/**
+ * populate_dot11f_reg_connectivity() - Populate Non-AP STA regulatory
+ * connectivity capabilities
+ * @mac_ctx: Global MAC context.
+ * @dot11f: Pointer to the capabilities of the session.
+ *
+ * Populate Non-AP STA's regulatory connectivity capability with Indoor, SP AP.
+ *
+ * Return: QDF_STATUS Success or Failure
+ */
+QDF_STATUS
+populate_dot11f_reg_connectivity(struct mac_context *mac_ctx,
+				 tDot11fIEreg_connect *dot11f);
 
 /**
  * lim_truncate_ppet: truncates ppet of trailing zeros

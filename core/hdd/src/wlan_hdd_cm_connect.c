@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1623,7 +1623,7 @@ hdd_cm_mlme_send_standby_link_chn_width(struct hdd_adapter *adapter,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ch_width = sta_ctx->user_cfg_chn_width;
 
-	wlan_mlme_get_sta_ch_width(vdev, &connection_ch_width);
+	wlan_mlme_get_sta_ch_width(vdev, &connection_ch_width, NULL);
 
 	if (ch_width == CH_WIDTH_INVALID) {
 		hdd_debug("no cached bandwidth for the link %u", link_id);
@@ -1714,8 +1714,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			hdd_cm_save_connect_info(assoc_link_adapter->deflink,
 						 rsp);
 	}
-	if (hdd_add_beacon_filter(adapter) != 0)
-		hdd_err("add beacon filter failed");
+
+	hdd_add_beacon_filter(hdd_ctx, link_info->vdev_id);
 
 	adapter->wapi_info.is_wapi_sta = hdd_cm_is_wapi_sta(
 						sta_ctx->conn_info.auth_type);
@@ -1799,12 +1799,16 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			       sta_ctx->conn_info.chan_freq);
 	hdd_wmm_assoc(adapter, false, uapsd_mask);
 
-	if (!rsp->is_wps_connection &&
+	/*
+	 * for vdev is_vdev_repurpose/OPEN/WEP/FILS, Set is auth required as
+	 * false, as keys are already set.
+	 */
+	if (is_vdev_repurpose || (!rsp->is_wps_connection &&
 	    !rsp->is_osen_connection &&
 	    (sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_NONE ||
 	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_OPEN_SYSTEM ||
 	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_SHARED_KEY ||
-	     hdd_cm_is_fils_connection(rsp)))
+	     hdd_cm_is_fils_connection(rsp))))
 		is_auth_required = false;
 
 	if (is_roam)
@@ -1821,8 +1825,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				wlan_acquire_peer_key_wakelock(hdd_ctx->pdev,
 							      rsp->bssid.bytes);
 		}
-		hdd_debug("is_roam_offload %d, is_roam %d, is_auth_required %d",
-			  is_roam_offload, is_roam, is_auth_required);
+		hdd_debug("is_roam_offload %d is_roam %d vdev repurpose %d is_auth_required %d",
+			  is_roam_offload, is_roam,  is_vdev_repurpose, is_auth_required);
 		hdd_roam_register_sta(link_info, &rsp->bssid, is_auth_required);
 	} else {
 		/* for host roam/LFR2 */

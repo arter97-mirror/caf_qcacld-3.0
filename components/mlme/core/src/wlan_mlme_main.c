@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,6 +40,7 @@
 #include <wmi_unified_priv.h>
 #include <target_if.h>
 #include "wlan_dp_api.h"
+#include "wlan_mlo_mgr_public_api.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
@@ -415,17 +416,63 @@ mlme_get_scan_phy_mode_for_chan_load(enum phy_ch_width scan_ch_width)
 		scan_phymode = SCAN_PHY_MODE_11BE_EHT160;
 		break;
 	default:
-		mlme_debug("Invalid scan_ch_width:%d", scan_ch_width);
+		mlme_debug("11BE: Invalid scan_ch_width:%d", scan_ch_width);
 		break;
 	}
 
 	return scan_phymode;
 }
-#else
-static inline enum scan_phy_mode
+
+#elif defined(WLAN_FEATURE_11AX)
+static enum scan_phy_mode
 mlme_get_scan_phy_mode_for_chan_load(enum phy_ch_width scan_ch_width)
 {
-	return SCAN_PHY_MODE_UNKNOWN;
+	enum scan_phy_mode scan_phymode = SCAN_PHY_MODE_UNKNOWN;
+
+	switch (scan_ch_width) {
+	case CH_WIDTH_20MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AX_HE20;
+		break;
+	case CH_WIDTH_40MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AX_HE40;
+		break;
+	case CH_WIDTH_80MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AX_HE80;
+		break;
+	case CH_WIDTH_160MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AX_HE160;
+		break;
+	default:
+		mlme_debug("11AX: Invalid scan_ch_width:%d", scan_ch_width);
+		break;
+	}
+
+	return scan_phymode;
+}
+
+#else
+static enum scan_phy_mode
+mlme_get_scan_phy_mode_for_chan_load(enum phy_ch_width scan_ch_width)
+{
+	enum scan_phy_mode scan_phymode = SCAN_PHY_MODE_11AC_VHT20;
+
+	switch (scan_ch_width) {
+	case CH_WIDTH_20MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AC_VHT20;
+		break;
+	case CH_WIDTH_40MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AC_VHT40;
+		break;
+	case CH_WIDTH_80MHZ:
+		scan_phymode = SCAN_PHY_MODE_11AC_VHT80;
+		break;
+	default:
+		mlme_debug("11AC: Invalid scan_ch_width:%d", scan_ch_width);
+		break;
+	}
+
+	return scan_phymode;
+
 }
 #endif
 
@@ -2771,6 +2818,10 @@ bool wlan_get_mlo_link_agnostic_flag(struct wlan_objmgr_vdev *vdev,
 		return mlo_link_agnostic;
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) {
+		if (!wlan_mlo_mgr_is_link_switch_in_progress(vdev) &&
+		    !mlo_is_mld_vdevs_active(vdev))
+			return mlo_link_agnostic;
+
 		bss_peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
 							    WLAN_MLME_OBJMGR_ID);
 		if (!bss_peer)
@@ -4820,7 +4871,7 @@ wlan_get_op_chan_freq_info_vdev_id(struct wlan_objmgr_pdev *pdev,
 	 * If there is a failure or operating mode is not STA / P2P-CLI
 	 * then get channel width from wlan_channel.
 	 */
-	status = wlan_mlme_get_sta_ch_width(vdev, ch_width);
+	status = wlan_mlme_get_sta_ch_width(vdev, ch_width, NULL);
 	if (QDF_IS_STATUS_ERROR(status))
 		*ch_width = chan->ch_width;
 
@@ -5165,7 +5216,7 @@ void mlme_set_roam_trigger_bitmap(struct wlan_objmgr_psoc *psoc,
 }
 
 uint8_t
-mlme_get_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+mlme_get_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *mlme_priv;
@@ -5186,20 +5237,22 @@ mlme_get_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return 0xFF;
 	}
 
-	bitmap = mlme_priv->mlme_roam.roam_sm.mlme_operations_bitmap;
+	bitmap = mlme_priv->mlme_roam.roam_sm.rso_disabled_status_bitmap;
 	mlme_legacy_debug("vdev[%d] bitmap[0x%x]", vdev_id,
-			  mlme_priv->mlme_roam.roam_sm.mlme_operations_bitmap);
+		mlme_priv->mlme_roam.roam_sm.rso_disabled_status_bitmap);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return bitmap;
 }
 
 void
-mlme_set_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			   enum wlan_cm_rso_control_requestor reqs, bool clear)
+mlme_set_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			     enum wlan_cm_rso_control_requestor reqs,
+			     bool clear)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *mlme_priv;
+	uint8_t *rso_disabled_status_bitmap;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_OBJMGR_ID);
@@ -5215,19 +5268,21 @@ mlme_set_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return;
 	}
 
+	rso_disabled_status_bitmap =
+		&mlme_priv->mlme_roam.roam_sm.rso_disabled_status_bitmap;
 	if (clear)
-		mlme_priv->mlme_roam.roam_sm.mlme_operations_bitmap &= ~reqs;
+		*rso_disabled_status_bitmap &= ~reqs;
 	else
-		mlme_priv->mlme_roam.roam_sm.mlme_operations_bitmap |= reqs;
+		*rso_disabled_status_bitmap |= reqs;
 
 	mlme_legacy_debug("vdev[%d] bitmap[0x%x], reqs: %d, clear: %d", vdev_id,
-			  mlme_priv->mlme_roam.roam_sm.mlme_operations_bitmap,
+			  *rso_disabled_status_bitmap,
 			  reqs, clear);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
 
 void
-mlme_clear_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+mlme_clear_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *mlme_priv;
@@ -5246,7 +5301,101 @@ mlme_clear_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return;
 	}
 
-	mlme_priv->mlme_roam.roam_sm.mlme_operations_bitmap = 0;
+	mlme_priv->mlme_roam.roam_sm.rso_disabled_status_bitmap = 0;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+}
+
+uint8_t
+mlme_get_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+	uint8_t bitmap;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+
+	if (!vdev) {
+		mlme_legacy_err("vdev object is NULL");
+		return 0;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return 0;
+	}
+
+	bitmap = mlme_priv->mlme_roam.roam_sm.rso_pending_disable_req_bitmap;
+	mlme_legacy_debug("vdev[%d] rso_disable req bitmap[0x%x]", vdev_id,
+			  bitmap);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+
+	return bitmap;
+}
+
+void
+mlme_set_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					enum wlan_cm_rso_control_requestor reqs,
+					bool clear)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+	uint8_t bitmap;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		mlme_legacy_err("vdev object is NULL");
+		return;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	bitmap = mlme_priv->mlme_roam.roam_sm.rso_pending_disable_req_bitmap;
+
+	if (clear)
+		bitmap &= ~reqs;
+	else
+		bitmap |= reqs;
+
+	mlme_legacy_debug("vdev[%d] req bitmap[0x%x], reqs: %d, clear: %d",
+			  vdev_id, bitmap, reqs, clear);
+
+	mlme_priv->mlme_roam.roam_sm.rso_pending_disable_req_bitmap = bitmap;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+}
+
+void
+mlme_clear_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		mlme_legacy_err("vdev object is NULL");
+		return;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	mlme_priv->mlme_roam.roam_sm.rso_pending_disable_req_bitmap = 0;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
 
@@ -6100,3 +6249,25 @@ uint8_t wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc,
 	return wfd_mode;
 }
 #endif
+
+QDF_STATUS mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer)
+{
+	struct peer_mlme_priv_obj *peer_priv;
+
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_MLME);
+	if (!peer_priv) {
+		mlme_legacy_err("peer MLME component object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/*
+	 * To allow NAN follow frames with new keys,
+	 * peer PN value need to be reset.
+	 */
+	peer_priv->last_pn_valid = 0;
+	peer_priv->last_pn = 0;
+	peer_priv->rmf_pn_replays = 0;
+
+	return QDF_STATUS_SUCCESS;
+}

@@ -1681,12 +1681,14 @@ QDF_STATUS ucfg_dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,
 				     qdf_cpu_mask *new_mask);
 
+#define DP_STAT_NUM_SINGLE_LINK 1
+#define DP_STAT_NUM_ALL_LINKS WLAN_MAX_MLD
 /**
  * ucfg_dp_get_per_link_peer_stats() - Call to get per link peer stats
  * @soc: soc handle
  * @vdev_id: vdev_id of vdev object
  * @peer_mac: mac address of the peer
- * @peer_stats: destination buffer
+ * @peer_stats: destination buffer, num_link * size of cdp_peer_stats
  * @peer_type: Peer type
  * @num_link: Number of ML links
  *
@@ -2110,5 +2112,12 @@ ucfg_dp_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
  */
 int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
 				uint32_t pri);
-
+/**
+ * ucfg_dp_set_ipv4_addr() - Set IPv4 address
+ * @vdev: vdev
+ * @ip_addr: IPv4 address
+ *
+ * Return: void
+ */
+void ucfg_dp_set_ipv4_addr(struct wlan_objmgr_vdev *vdev, uint8_t *ip_addr);
 #endif /* _WLAN_DP_UCFG_API_H_ */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -356,7 +356,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (IS_DOT11_MODE_EHT(dot11mode) && pesession &&
 	    pesession->lim_join_req &&
 	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)bssid)) {
-		lim_update_session_eht_capable(mac_ctx, pesession);
+		lim_update_session_eht_capable(pesession, true);
 
 		if (pesession->lim_join_req->bssDescription.is_ml_ap &&
 		    pesession->rsno_gen_used != RSNO_GEN_WIFI6)
@@ -364,6 +364,9 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	populate_dot11f_eht_caps(mac_ctx, pesession, &pr->eht_cap);
+
+	/* Populate Non-AP STA Regulatory connectivity element */
+	populate_dot11f_reg_connectivity(mac_ctx, &pr->reg_connect);
 
 	if (addn_ielen && additional_ie) {
 		qdf_mem_zero((uint8_t *)&extracted_ext_cap,
@@ -3268,6 +3271,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_eht_caps(mac_ctx, pe_session, &frm->eht_cap);
 		lim_strip_mlo_ie(mac_ctx, add_ie, &add_ie_len);
 	}
+
+	/* Populate Non-AP STA Regulatory connectivity element */
+	populate_dot11f_reg_connectivity(mac_ctx, &frm->reg_connect);
 
 	if (pe_session->is11Rconnection) {
 		struct bss_description *bssdescr;
@@ -6616,7 +6622,10 @@ lim_fill_oci_params(struct mac_context *mac, struct pe_session *session,
 						    session->ch_width,
 						    ch_offset);
 	oci->prim_ch_num = prim_ch_num;
-	oci->freq_seg_1_ch_num = session->ch_center_freq_seg1;
+	if (session->ch_width == CH_WIDTH_80P80MHZ)
+		oci->freq_seg_1_ch_num = session->ch_center_freq_seg1;
+	else
+		oci->freq_seg_1_ch_num = 0;
 	oci->present = 1;
 	if (tx_chan_width)
 		*tx_chan_width = ch_width_in_mhz(session->ch_width);

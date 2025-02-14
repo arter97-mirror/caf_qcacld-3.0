@@ -293,7 +293,6 @@ bool ll_lt_sap_is_freq_in_avoid_list(
 
 /* DCS database ageout time in ms to store channel */
 #define DCS_DB_AGEOUT_TIME (5 * 60 * 1000)
-static
 void ll_lt_sap_flush_old_entries(struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj)
 {
 	uint8_t i;

@@ -751,7 +751,7 @@ os_if_dp_fill_txrx_win_samples(struct sk_buff *flow_sample_event,
 		if (flow_sample_event) {
 			win_attr = nla_nest_start(flow_sample_event, i);
 			if (!win_attr) {
-				osif_err("STC: win array[%] start put failed",
+				osif_err("STC: win array[%d] start put failed",
 					 i);
 				goto fail;
 			}

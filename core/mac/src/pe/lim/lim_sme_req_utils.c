@@ -307,7 +307,7 @@ uint32_t lim_populate_rnr_entry(struct mac_context *mac_ctx,
 
 		pe_debug("chan %d, opclass %d tbtt_cnt %d, tbtt_len %d, fieldtype %d",
 			 neighbor_ap_info->channel_number,
-			 neighbor_ap_info->operting_class,
+			 neighbor_ap_info->operating_class,
 			 tbtt_count, tbtt_length, fieldtype);
 
 		if (tbtt_count) {

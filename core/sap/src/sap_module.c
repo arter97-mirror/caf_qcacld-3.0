@@ -58,6 +58,7 @@
 #include "wlan_pre_cac_api.h"
 #include "target_if.h"
 #include "wlan_hdd_regulatory.h"
+#include "wlan_ll_sap_api.h"
 
 #define SAP_DEBUG
 static struct sap_context *gp_sap_ctx[SAP_MAX_NUM_SESSION];
@@ -582,7 +583,7 @@ wlansap_set_scan_acs_channel_params(struct sap_config *config,
 	}
 
 	/* Channel selection is auto or configured */
-	wlansap_set_acs_ch_freq(psap_ctx, config->chan_freq);
+	wlansap_set_acs_ch_freq(mac, psap_ctx, config->chan_freq);
 	psap_ctx->dfs_mode = config->acs_dfs_mode;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	psap_ctx->cc_switch_mode = config->cc_switch_mode;
@@ -4400,7 +4401,23 @@ qdf_freq_t wlansap_dcs_get_freq(struct sap_context *sap_context)
 	return sap_context->dcs_ch_freq;
 }
 
-void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
+static void
+wlansap_update_current_freq_cu(struct mac_context *mac_ctx,
+			       uint8_t vdev_id,
+			       qdf_freq_t ch_freq)
+{
+	uint32_t cu;
+	QDF_STATUS status;
+
+	cu = wlan_ll_sap_get_cu_for_freq(mac_ctx->pdev, ch_freq);
+	status = wlan_ll_sap_set_cur_freq_unused_cu(mac_ctx->psoc, vdev_id, cu);
+	if (QDF_IS_STATUS_ERROR(status))
+		sap_debug("failed to update freq %d cu", ch_freq);
+
+}
+
+void wlansap_set_acs_ch_freq(struct mac_context *mac_ctx,
+			     struct sap_context *sap_context,
 			     qdf_freq_t ch_freq)
 {
 	if (!sap_context) {
@@ -4415,9 +4432,16 @@ void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
 		sap_context->chan_freq = ch_freq;
 		sap_debug("Selecting ACS freq %d", sap_context->chan_freq);
 	}
+
+	if (ch_freq && policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
+	    sap_context->vdev_id)) {
+		wlansap_update_current_freq_cu(mac_ctx, sap_context->vdev_id,
+					       ch_freq);
+	}
 }
 #else
-void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
+void wlansap_set_acs_ch_freq(struct mac_context *mac_ctx,
+			     struct sap_context *sap_context,
 			     qdf_freq_t ch_freq)
 {
 	if (!sap_context) {
@@ -4489,7 +4513,7 @@ void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
 		return;
 	}
 
-	wlansap_set_acs_ch_freq(sap_ctx, last_acs_freq);
+	wlansap_set_acs_ch_freq(mac, sap_ctx, last_acs_freq);
 	sap_ctx->acs_cfg->pri_ch_freq = last_acs_freq;
 	sap_ctx->acs_cfg->ht_sec_ch_freq = 0;
 }

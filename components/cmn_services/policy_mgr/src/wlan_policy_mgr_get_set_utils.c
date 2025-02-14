@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3180,7 +3180,8 @@ policy_mgr_is_sta_sap_mcc_weightage_required(struct wlan_objmgr_psoc *psoc,
 		return false;
 
 	mcc_to_scc_switch = policy_mgr_get_mcc_to_scc_switch_mode(psoc);
-	if (mcc_to_scc_switch != QDF_MCC_TO_SCC_WITH_PREFERRED_BAND)
+	if (mcc_to_scc_switch !=
+		QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND)
 		return false;
 
 	sap_count = policy_mgr_get_mode_specific_conn_info(psoc,
@@ -4544,7 +4545,7 @@ void policy_mgr_move_vdev_from_disabled_to_connection_tbl(
 	 * Add entry to pm_conc_connection_list if remove from disabled links
 	 * was success
 	 */
-	policy_mgr_incr_active_session(psoc, mode, vdev_id);
+	policy_mgr_incr_active_session(psoc, mode, vdev_id, false);
 }
 
 static QDF_STATUS
@@ -5404,10 +5405,12 @@ policy_mgr_handle_link_enable_disable_resp(struct wlan_objmgr_vdev *vdev,
 {
 	struct mlo_link_set_active_req *req = arg;
 	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct ml_nlink_change_event data;
 	bool reschedule_workqueue = true;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -5418,6 +5421,25 @@ policy_mgr_handle_link_enable_disable_resp(struct wlan_objmgr_vdev *vdev,
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
 		return;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		policy_mgr_debug("Pdev is NULL");
+		return;
+	}
+
+	/*
+	 * Check if any Re-enable roaming command is pending (avoided due to
+	 * the SET LINK being in progress, like during BSS START complete) as
+	 * per rso_disabled_status_bitmap. If present, process it first and
+	 * enable roaming by sending RSO START to FW.
+	 */
+	if (ucfg_mlme_check_bit_in_rso_disabled_bitmap(psoc, vdev_id,
+						       RSO_SET_LINK)) {
+		policy_mgr_debug("enable roaming for RSO_SET_LINK");
+		wlan_cm_enable_rso(pdev, vdev_id, RSO_SET_LINK,
+				   REASON_DRIVER_ENABLED);
 	}
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
@@ -5530,8 +5552,8 @@ bool policy_mgr_is_mlo_sta_disconnected(struct wlan_objmgr_psoc *psoc,
 }
 
 void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
-				enum QDF_OPMODE mode,
-				uint8_t session_id)
+				    enum QDF_OPMODE mode, uint8_t session_id,
+				    bool update_flow_pool_map)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t conn_6ghz_flag = 0;
@@ -5567,8 +5589,10 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 				psoc, session_id,
 				pm_ctx->no_of_active_sessions[mode]);
 
-	if (mode != QDF_NAN_DISC_MODE && pm_ctx->dp_cbacks.hdd_v2_flow_pool_map)
+	if (mode != QDF_NAN_DISC_MODE &&
+	    pm_ctx->dp_cbacks.hdd_v2_flow_pool_map && update_flow_pool_map)
 		pm_ctx->dp_cbacks.hdd_v2_flow_pool_map(session_id);
+
 	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE)
 		policy_mgr_get_ap_6ghz_capable(psoc, session_id,
 					       &conn_6ghz_flag);
@@ -9548,6 +9572,14 @@ policy_mgr_is_link_active_allowed(struct wlan_objmgr_psoc *psoc,
 	struct wlan_channel *chan_info;
 	struct mlo_link_info *link_info;
 	unsigned long act_link_bitmap = active_link_bitmap;
+	bool is_emlsr_supp;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	status = wlan_mlme_get_emlsr_mode_enabled(psoc, &is_emlsr_supp);
+	if (!is_emlsr_supp) {
+		policy_mgr_err("eMLSR is disabled");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
@@ -9661,8 +9693,10 @@ policy_mgr_update_mlo_links_based_on_linkid_nlink(
 	if (!policy_mgr_is_hw_dbs_capable(psoc) && num_links_to_active > 1 &&
 	    policy_mgr_is_link_active_allowed(psoc, vdev,
 				active_link_bitmap,
-				num_links_to_active) != QDF_STATUS_SUCCESS)
+				num_links_to_active) != QDF_STATUS_SUCCESS) {
+		status = QDF_STATUS_E_FAILURE;
 		goto release_vdev_ref;
+	}
 
 	policy_mgr_debug("active link bitmap: %d, inactive link bitmap: %d",
 			 active_link_bitmap, inactive_link_bitmap);
@@ -12139,7 +12173,7 @@ bool policy_mgr_is_force_scc(struct wlan_objmgr_psoc *psoc)
 		(pm_ctx->cfg.mcc_to_scc_switch ==
 		QDF_MCC_TO_SCC_SWITCH_FORCE_PREFERRED_WITHOUT_DISCONNECTION) ||
 		(pm_ctx->cfg.mcc_to_scc_switch ==
-		QDF_MCC_TO_SCC_WITH_PREFERRED_BAND));
+		QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND));
 }
 
 bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
@@ -14269,3 +14303,35 @@ bool policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
 	return policy_mgr_is_force_scc(psoc);
 }
 #endif
+
+void policy_mgr_update_flow_pool_map(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	enum QDF_OPMODE op_mode;
+	uint8_t vdev_id;
+
+	if (!vdev)
+		return;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
+	    policy_mgr_is_set_link_in_progress(wlan_vdev_get_psoc(vdev))) {
+		policy_mgr_debug("vdev:%d Link switch/set_link is ongoing, don't update flow pool map",
+				 vdev_id);
+		return;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return;
+	}
+
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (op_mode != QDF_NAN_DISC_MODE &&
+	    pm_ctx->dp_cbacks.hdd_v2_flow_pool_map)
+		pm_ctx->dp_cbacks.hdd_v2_flow_pool_map(vdev_id);
+}

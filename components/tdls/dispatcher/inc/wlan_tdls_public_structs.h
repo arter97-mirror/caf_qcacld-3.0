@@ -114,6 +114,21 @@
 #endif
 
 /**
+ * enum wlan_tdls_peer_delete_reason - reason for deletion of TDLS peers
+ * @TDLS_PEER_DEL_REASON_NONE: None
+ * @TDLS_PEER_DEL_REASON_ROAMING: Delete TDLS peers due to roaming
+ * @TDLS_PEER_DEL_REASON_VDEV_REPURPOSE: Delete TDLS peers due to vdev repurpose
+ * @TDLS_PEER_DEL_REASON_LINK_STATE_SWITCH: Delete TDLS peers due to link state
+ * switch
+ */
+enum wlan_tdls_peer_delete_reason {
+	TDLS_PEER_DEL_REASON_NONE = 0,
+	TDLS_PEER_DEL_REASON_ROAMING = 1,
+	TDLS_PEER_DEL_REASON_VDEV_REPURPOSE = 2,
+	TDLS_PEER_DEL_REASON_LINK_STATE_SWITCH = 3,
+};
+
+/**
  * enum tdls_add_oper - add peer type
  * @TDLS_OPER_NONE: none
  * @TDLS_OPER_ADD: add new peer
@@ -403,6 +418,18 @@ enum tdls_disable_sources {
 };
 
 /**
+ * enum tdls_enable_support_bit - tdls enable support bit definitation
+ * @TDLS_ENABLE_BIT_FULL: Full enable TDLS
+ * @TDLS_ENABLE_BIT_11AX: Support TDLS upto 11ax.
+ * @TDLS_ENABLE_BIT_11BE: Support TDLS upto 11be.
+ */
+enum tdls_enable_support_bit {
+	TDLS_ENABLE_BIT_FULL,
+	TDLS_ENABLE_BIT_11AX,
+	TDLS_ENABLE_BIT_11BE,
+};
+
+/**
  * struct tdls_osif_indication - tdls indication to os if layer
  * @vdev: vdev object
  * @reason: used with teardown indication
@@ -542,7 +569,7 @@ struct tdls_user_config {
 	bool tdls_implicit_trigger_enable;
 	bool tdls_scan_enable;
 	bool tdls_sleep_sta_enable;
-	bool tdls_support_enable;
+	uint8_t tdls_support_enable;
 	int tdls_link_id;
 };
 
@@ -1486,6 +1513,11 @@ struct tdls_del_sta_req {
 	uint16_t transaction_id;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peermac;
+};
+
+enum tdls_teardown_reason {
+	TDLS_TEARDOWN_REASON_DEFAULT,
+	TDLS_TEARDOWN_REASON_LINK_SWITCH,
 };
 
 /**

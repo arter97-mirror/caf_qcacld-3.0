@@ -413,7 +413,7 @@ bool hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter,
 	int i;
 	bool mapping_changed = false;
 	unsigned long link_flags;
-	uint8_t vdev_id, cur_link_idx, temp_link_idx;
+	uint8_t vdev_id, cur_link_idx, temp_link_idx = 0;
 	struct vdev_osif_priv *osif_priv;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_hdd_link_info *temp_link_info, *link_info;

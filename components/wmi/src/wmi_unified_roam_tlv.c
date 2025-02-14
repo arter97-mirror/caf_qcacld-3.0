@@ -4272,9 +4272,12 @@ extract_roam_ml_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		dst->ml_info[dst->num_links].link_band =
 				wmi_convert_mlo_to_reg_band(wmi_band);
 
-		/* is Link Accepted or rejected */
+		/* is Link Accepted or rejected
+		 * 0 - Accepted
+		 * 1 - Rejected
+		 */
 		dst->ml_info[dst->num_links].link_accepted =
-			WMI_MLO_LINK_INFO_GET_STATUS(src_link_info->link_info) ? true : false;
+			WMI_MLO_LINK_INFO_GET_STATUS(src_link_info->link_info) ? false : true;
 
 		/* Self Link mac address */
 		WMI_MAC_ADDR_TO_CHAR_ARRAY(&src_link_info->link_addr,

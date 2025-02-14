@@ -629,14 +629,16 @@ void dp_reset_tcp_delack(struct wlan_objmgr_psoc *psoc)
  */
 static void dp_reset_tcp_adv_win_scale(struct wlan_dp_psoc_context *dp_ctx)
 {
-	enum wlan_tp_level next_level = WLAN_SVC_TP_NONE;
 	struct wlan_rx_tp_data rx_tp_data = {0};
 
 	if (!dp_ctx->dp_cfg.enable_tcp_adv_win_scale)
 		return;
 
 	rx_tp_data.rx_tp_flags |= TCP_ADV_WIN_SCL;
-	rx_tp_data.level = next_level;
+	if (dp_ctx->dp_cfg.tcp_adv_win_scl_disc_lvl_low)
+		rx_tp_data.level = WLAN_SVC_TP_LOW;
+	else
+		rx_tp_data.level = WLAN_SVC_TP_NONE;
 	dp_ctx->cur_rx_level = WLAN_SVC_TP_NONE;
 	wlan_dp_update_tcp_rx_param(dp_ctx, &rx_tp_data);
 }
@@ -1199,6 +1201,7 @@ static inline void dp_pm_qos_update_cpu_mask(qdf_cpu_mask *mask,
  * @next_rx_level: pointer to next_rx_level to be filled
  * @cpu_mask: pm_qos cpu_mask needed for RX, to be filled
  * @is_rx_pm_qos_high: pointer indicating if high qos is needed, to be filled
+ * @connected: Connected state
  *
  * The function tunes various aspects of driver based on a running average
  * of RX packets received in last bus bandwidth interval.
@@ -1211,7 +1214,7 @@ bool dp_bus_bandwidth_work_tune_rx(struct wlan_dp_psoc_context *dp_ctx,
 				   uint64_t diff_us,
 				   enum wlan_tp_level *next_rx_level,
 				   qdf_cpu_mask *cpu_mask,
-				   bool *is_rx_pm_qos_high)
+				   bool *is_rx_pm_qos_high, bool connected)
 {
 	bool rx_level_change = false;
 	bool rxthread_high_tput_req;
@@ -1278,9 +1281,14 @@ bool dp_bus_bandwidth_work_tune_rx(struct wlan_dp_psoc_context *dp_ctx,
 		    ++dp_ctx->rx_high_ind_cnt == delack_timer_cnt) {
 			*next_rx_level = WLAN_SVC_TP_HIGH;
 		}
-	} else {
+	} else if (dp_ctx->dp_cfg.tcp_adv_win_scl_disc_lvl_low ||
+		   connected) {
 		dp_ctx->rx_high_ind_cnt = 0;
 		*next_rx_level = WLAN_SVC_TP_LOW;
+	} else {
+		dp_ctx->rx_high_ind_cnt = 0;
+		*next_rx_level = WLAN_SVC_TP_NONE;
+		dp_ctx->cur_rx_level = WLAN_SVC_TP_NONE;
 	}
 
 	if (dp_ctx->cur_rx_level != *next_rx_level) {
@@ -1426,6 +1434,7 @@ bool dp_sap_p2p_update_mid_high_tput(struct wlan_dp_psoc_context *dp_ctx,
  * @tx_packets: transmit packet count received in BW interval
  * @rx_packets: receive packet count received in BW interval
  * @diff_us: delta time since last invocation.
+ * @connected: Any adapter connected
  *
  * The function controls the bus bandwidth and dynamic control of
  * tcp delayed ack configuration.
@@ -1435,7 +1444,7 @@ bool dp_sap_p2p_update_mid_high_tput(struct wlan_dp_psoc_context *dp_ctx,
 static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 					 const uint64_t tx_packets,
 					 const uint64_t rx_packets,
-					 const uint64_t diff_us)
+					 const uint64_t diff_us, bool connected)
 {
 	uint16_t index;
 	bool vote_level_change = false;
@@ -1593,7 +1602,8 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 							diff_us,
 							&next_rx_level,
 							&pm_qos_cpu_mask_rx,
-							&is_rx_pm_qos_high);
+							&is_rx_pm_qos_high,
+							connected);
 
 	tx_level_change = dp_bus_bandwidth_work_tune_tx(dp_ctx,
 							tx_packets,
@@ -2031,12 +2041,14 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 	rx_packets = rx_packets * bw_interval_us;
 	rx_packets = qdf_do_div(rx_packets, (uint32_t)diff_us);
 
-	dp_pld_request_bus_bandwidth(dp_ctx, tx_packets, rx_packets, diff_us);
+	dp_pld_request_bus_bandwidth(dp_ctx, tx_packets, rx_packets,
+				     diff_us, true);
 
 	return;
 
 stop_work:
 	qdf_periodic_work_stop_async(&dp_ctx->bus_bw_work);
+	dp_reset_tcp_adv_win_scale(dp_ctx);
 }
 
 /**
@@ -2209,9 +2221,6 @@ static void __dp_bus_bw_compute_timer_stop(struct wlan_objmgr_psoc *psoc)
 
 	dp_reset_tcp_delack(psoc);
 
-	if (!is_any_adapter_conn)
-		dp_reset_tcp_adv_win_scale(dp_ctx);
-
 	cdp_pdev_reset_driver_del_ack(cds_get_context(QDF_MODULE_ID_SOC),
 				      OL_TXRX_PDEV_ID);
 	cdp_pdev_reset_bundle_require_flag(cds_get_context(QDF_MODULE_ID_SOC),
@@ -2230,7 +2239,7 @@ exit:
 		uint64_t interval_us =
 			dp_ctx->dp_cfg.bus_bw_compute_interval * 1000;
 		qdf_atomic_set(&dp_ctx->num_latency_critical_clients, 0);
-		dp_pld_request_bus_bandwidth(dp_ctx, 0, 0, interval_us);
+		dp_pld_request_bus_bandwidth(dp_ctx, 0, 0, interval_us, false);
 	}
 	param.policy = BBM_TPUT_POLICY;
 	param.policy_info.tput_level = TPUT_LEVEL_NONE;

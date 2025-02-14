@@ -2311,7 +2311,43 @@ QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t vdev_id,
 	return status;
 }
 
-static bool csr_peer_mac_match_cmd(tSmeCmd *sme_cmd,
+static bool csr_peer_match_ser_peer(eSmeCommandType cmd, bool is_active,
+				    struct qdf_mac_addr *peer_macaddr,
+				    struct qdf_mac_addr *peer_mld_addr,
+				    struct qdf_mac_addr *s_peer_macaddr,
+				    struct qdf_mac_addr *s_peer_mld_addr)
+{
+	char mld_log_str[MAC_ADDR_DUMP_LEN * 3] = {0};
+
+	if (!qdf_is_macaddr_zero(peer_mld_addr))
+		qdf_scnprintf(mld_log_str, MAC_ADDR_DUMP_LEN,
+			      " mld: " QDF_MAC_ADDR_FMT " ser_mld " QDF_MAC_ADDR_FMT,
+			      QDF_MAC_ADDR_REF(peer_mld_addr->bytes),
+			      QDF_MAC_ADDR_REF(s_peer_mld_addr->bytes));
+
+	if (qdf_is_macaddr_equal(peer_macaddr, s_peer_macaddr) ||
+	    (!qdf_is_macaddr_zero(peer_mld_addr) &&
+	     qdf_is_macaddr_equal(peer_mld_addr, s_peer_mld_addr))) {
+		sme_debug("%s cmd %d found for peer " QDF_MAC_ADDR_FMT " ser_peer " QDF_MAC_ADDR_FMT "%s",
+			  is_active ? "Act" : "Pnd", cmd,
+			  QDF_MAC_ADDR_REF(peer_macaddr->bytes),
+			  QDF_MAC_ADDR_REF(s_peer_macaddr->bytes), mld_log_str);
+		return true;
+	}
+
+	/* Add info log to check if peer and mld of ser match and vice versa */
+	if ((!qdf_is_macaddr_zero(s_peer_mld_addr) &&
+	     qdf_is_macaddr_equal(peer_macaddr, s_peer_mld_addr)) ||
+	    (!qdf_is_macaddr_zero(peer_mld_addr) &&
+	     qdf_is_macaddr_equal(peer_mld_addr, s_peer_macaddr)))
+		sme_info("cmd %d MLD and peer MAC matching!!!, peer " QDF_MAC_ADDR_FMT " ser_peer " QDF_MAC_ADDR_FMT "%s",
+			 cmd, QDF_MAC_ADDR_REF(peer_macaddr->bytes),
+			 QDF_MAC_ADDR_REF(s_peer_macaddr->bytes), mld_log_str);
+
+	return false;
+}
+
+static bool csr_peer_mac_match_cmd(tSmeCmd *sme_cmd, bool is_active,
 				   struct qdf_mac_addr *peer_macaddr,
 				   struct qdf_mac_addr *peer_mld_addr,
 				   uint8_t vdev_id)
@@ -2319,12 +2355,10 @@ static bool csr_peer_mac_match_cmd(tSmeCmd *sme_cmd,
 	if (sme_cmd->command == eSmeCommandRoam &&
 	    (sme_cmd->u.roamCmd.roamReason == eCsrForcedDisassocSta ||
 	     sme_cmd->u.roamCmd.roamReason == eCsrForcedDeauthSta) &&
-	     (qdf_is_macaddr_equal(
-			peer_macaddr,
-			(struct qdf_mac_addr *)sme_cmd->u.roamCmd.peerMac) ||
-	      (!qdf_is_macaddr_zero(peer_mld_addr) &&
-	       qdf_is_macaddr_equal(peer_mld_addr,
-				    &sme_cmd->u.roamCmd.peer_mld_addr))))
+	     csr_peer_match_ser_peer(sme_cmd->command, is_active,
+		peer_macaddr, peer_mld_addr,
+		(struct qdf_mac_addr *)sme_cmd->u.roamCmd.peerMac,
+		&sme_cmd->u.roamCmd.peer_mld_addr))
 		return true;
 
 	if (sme_cmd->command == eSmeCommandWmStatusChange) {
@@ -2332,23 +2366,17 @@ static bool csr_peer_mac_match_cmd(tSmeCmd *sme_cmd,
 
 		wms_cmd = &sme_cmd->u.wmStatusChangeCmd;
 		if (wms_cmd->Type == eCsrDisassociated &&
-		    (qdf_is_macaddr_equal(
-				peer_macaddr,
-				&wms_cmd->u.DisassocIndMsg.peer_macaddr) ||
-		     (!qdf_is_macaddr_zero(peer_mld_addr) &&
-		      qdf_is_macaddr_equal(
-				peer_mld_addr,
-				&wms_cmd->u.DisassocIndMsg.peer_mld_addr))))
+		    csr_peer_match_ser_peer(sme_cmd->command, is_active,
+			peer_macaddr, peer_mld_addr,
+			&wms_cmd->u.DisassocIndMsg.peer_macaddr,
+			&wms_cmd->u.DisassocIndMsg.peer_mld_addr))
 			return true;
 
 		if (wms_cmd->Type == eCsrDeauthenticated &&
-		    (qdf_is_macaddr_equal(
-				peer_macaddr,
-				&wms_cmd->u.DeauthIndMsg.peer_macaddr) ||
-		     (!qdf_is_macaddr_zero(peer_mld_addr) &&
-		      qdf_is_macaddr_equal(
-				peer_mld_addr,
-				&wms_cmd->u.DeauthIndMsg.peer_mld_addr))))
+		    csr_peer_match_ser_peer(sme_cmd->command, is_active,
+			peer_macaddr, peer_mld_addr,
+			&wms_cmd->u.DeauthIndMsg.peer_macaddr,
+			&wms_cmd->u.DeauthIndMsg.peer_mld_addr))
 			return true;
 	}
 
@@ -2368,7 +2396,7 @@ csr_is_deauth_disassoc_in_pending_q(struct mac_context *mac_ctx,
 	while (entry) {
 		sme_cmd = GET_BASE_ADDR(entry, tSmeCmd, Link);
 		if ((sme_cmd->vdev_id == vdev_id) &&
-		    csr_peer_mac_match_cmd(sme_cmd, peer_macaddr,
+		    csr_peer_mac_match_cmd(sme_cmd, false, peer_macaddr,
 					   peer_mld_addr, vdev_id))
 			return true;
 		entry = csr_nonscan_pending_ll_next(mac_ctx, entry,
@@ -2389,14 +2417,14 @@ csr_is_deauth_disassoc_in_active_q(struct mac_context *mac_ctx,
 	sme_cmd = wlan_serialization_get_active_cmd(mac_ctx->psoc, vdev_id,
 						WLAN_SER_CMD_FORCE_DEAUTH_STA);
 
-	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, peer_macaddr,
+	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, true, peer_macaddr,
 					      peer_mld_addr, vdev_id))
 		return true;
 
 	sme_cmd = wlan_serialization_get_active_cmd(mac_ctx->psoc, vdev_id,
 					WLAN_SER_CMD_FORCE_DISASSOC_STA);
 
-	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, peer_macaddr,
+	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, true, peer_macaddr,
 					      peer_mld_addr, vdev_id))
 		return true;
 
@@ -2406,7 +2434,7 @@ csr_is_deauth_disassoc_in_active_q(struct mac_context *mac_ctx,
 	 */
 	sme_cmd = wlan_serialization_get_active_cmd(mac_ctx->psoc, vdev_id,
 						WLAN_SER_CMD_WM_STATUS_CHANGE);
-	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, peer_macaddr,
+	if (sme_cmd && csr_peer_mac_match_cmd(sme_cmd, true, peer_macaddr,
 					      peer_mld_addr, vdev_id))
 		return true;
 
@@ -2430,8 +2458,6 @@ csr_is_deauth_disassoc_already_active(struct mac_context *mac_ctx,
 				      struct qdf_mac_addr *peer_macaddr,
 				      struct qdf_mac_addr *peer_mld_addr)
 {
-	char mld_log_str[MAC_ADDR_DUMP_LEN] = {0};
-
 	bool ret = csr_is_deauth_disassoc_in_pending_q(
 					mac_ctx, vdev_id, peer_macaddr,
 					peer_mld_addr);
@@ -2443,15 +2469,6 @@ csr_is_deauth_disassoc_already_active(struct mac_context *mac_ctx,
 		ret = csr_is_deauth_disassoc_in_active_q(
 					mac_ctx, vdev_id,
 					peer_macaddr, peer_mld_addr);
-
-	if (ret) {
-		if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)&peer_mld_addr))
-			qdf_scnprintf(mld_log_str, MAC_ADDR_DUMP_LEN,
-				      " mld: " QDF_MAC_ADDR_FMT,
-				      QDF_MAC_ADDR_REF(peer_mld_addr->bytes));
-		sme_debug("Deauth/Disassoc already in progress for " QDF_MAC_ADDR_FMT "%s",
-			  QDF_MAC_ADDR_REF(peer_macaddr->bytes), mld_log_str);
-	}
 
 	return ret;
 }
@@ -2484,10 +2501,12 @@ csr_is_deauth_disassoc_cmd_active(struct mac_context *mac_ctx,
 		return true;
 
 	if (peer_mac && peer_mld_mac) {
-		if (!qdf_is_macaddr_equal(&macaddr, &peer_mac_info.peer_mac))
-			sme_debug("Vdev %d, given mac " QDF_MAC_ADDR_FMT " found peer mac " QDF_MAC_ADDR_FMT,
-				  vdev_id, QDF_MAC_ADDR_REF(macaddr.bytes),
-				  QDF_MAC_ADDR_REF(peer_mac_info.peer_mac.bytes));
+		if (!qdf_is_macaddr_zero(&peer_mac_info.peer_mac) &&
+		    !qdf_is_macaddr_equal(&macaddr, &peer_mac_info.peer_mac))
+			sme_info("Vdev %d, given mac " QDF_MAC_ADDR_FMT " found: peer mac " QDF_MAC_ADDR_FMT " mld " QDF_MAC_ADDR_FMT,
+				 vdev_id, QDF_MAC_ADDR_REF(macaddr.bytes),
+				 QDF_MAC_ADDR_REF(peer_mac_info.peer_mac.bytes),
+				 QDF_MAC_ADDR_REF(peer_mac_info.peer_mld.bytes));
 		qdf_copy_macaddr(peer_mac, &peer_mac_info.peer_mac);
 		qdf_copy_macaddr(peer_mld_mac, &peer_mac_info.peer_mld);
 	}
@@ -2510,6 +2529,13 @@ csr_roam_issue_discon_sta_roam_cmd(struct mac_context *mac,
 					      del_sta_params->peerMacAddr,
 					      &peer_mac, &peer_mld_mac))
 		return status;
+
+	if (qdf_is_macaddr_zero(&peer_mac)) {
+		sme_debug("Vdev %d reason %d " QDF_MAC_ADDR_FMT " fails to find peer, already disconnected!!",
+			  vdev_id, discon_reason,
+			  QDF_MAC_ADDR_REF(del_sta_params->peerMacAddr.bytes));
+		return status;
+	}
 
 	cmd = csr_get_command_buffer(mac);
 	if (!cmd) {
@@ -6297,14 +6323,12 @@ void csr_send_set_ie(uint8_t type, uint8_t sub_type,
 	struct send_extcap_ie *msg;
 	QDF_STATUS status;
 
-	sme_debug("send SET IE msg to PE");
-
 	if (!(type == WLAN_VDEV_MLME_TYPE_STA ||
 	      (type == WLAN_VDEV_MLME_TYPE_AP &&
-	      sub_type == WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE))) {
-		sme_debug("Failed to send set IE req for vdev_%d", vdev_id);
+	      sub_type == WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE)))
 		return;
-	}
+
+	sme_debug("vdev %d type %d sub_type %d", vdev_id, type, sub_type);
 
 	msg = qdf_mem_malloc(sizeof(*msg));
 	if (!msg)

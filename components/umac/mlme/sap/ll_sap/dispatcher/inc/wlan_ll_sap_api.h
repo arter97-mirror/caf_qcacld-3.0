@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -255,6 +255,42 @@ QDF_STATUS wlan_ll_sap_reset_target_tsf_before_csa(
 uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 				    enum ll_sap_get_target_tsf get_tsf);
 
+
+/**
+ * wlan_ll_sap_get_cu_for_freq() - API to get the cu for the freq
+ * @pdev: pdev pointer
+ * @ch_freq: freq to get cu
+ *
+ * Return: uint32_t
+ */
+uint32_t
+wlan_ll_sap_get_cu_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t ch_freq);
+
+/**
+ * wlan_ll_sap_get_cur_freq_unused_cu() - wrapper API for
+ * ll_sap_get_cur_freq_unused_cu
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ *
+ * Return: uint32_t
+ */
+uint32_t
+wlan_ll_sap_get_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id);
+
+/**
+ * wlan_ll_sap_set_cur_freq_unused_cu() - wrapper API for
+ * ll_sap_set_cur_freq_unused_cu
+ * @psoc: psoc pointer
+ * @vdev_id: vdev_id
+ * @unused_cu: unused channel Utilization
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_ll_sap_set_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, uint32_t unused_cu);
+
 /**
  * wlan_ll_sap_get_target_tsf_for_vdev_restart() - Get target_tsf for vdev
  * restart
@@ -309,11 +345,22 @@ void wlan_ll_lt_store_to_avoid_list_and_flush_old(
  *
  * Return: QDF_STATUS
  */
-
 qdf_freq_t
 wlan_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
 				   uint8_t vdev_id, qdf_freq_t curr_freq,
 				   enum ll_sap_csa_source csa_src);
+
+/**
+ * wlan_ll_sap_is_cur_cu_greater_than_th() - API to get check if cu is greater
+ * than thresh
+ * @psoc: Pointer to psoc object
+ * @vdev_id: Vdev Id of ll_lt_sap
+ *
+ * Return: bool
+ */
+bool wlan_ll_sap_is_cur_cu_greater_than_th(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
+
 #else
 static inline wlan_bs_req_id
 wlan_ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_vdev *vdev)
@@ -444,6 +491,27 @@ uint64_t wlan_ll_sap_get_target_tsf(struct wlan_objmgr_vdev *vdev,
 	return 0;
 }
 
+static inline uint32_t
+wlan_ll_sap_get_cu_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t ch_freq)
+{
+	return 0;
+}
+
+static inline
+uint32_t wlan_ll_sap_get_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id)
+{
+	return 0;
+}
+
+static inline
+QDF_STATUS wlan_ll_sap_set_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      uint32_t unused_cu)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline uint64_t
 wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev)
 {
@@ -467,7 +535,9 @@ bool wlan_ll_lt_sap_is_freq_in_avoid_list(struct wlan_objmgr_psoc *psoc,
 static inline void
 wlan_ll_lt_store_to_avoid_list_and_flush_old(struct wlan_objmgr_psoc *psoc,
 					     qdf_freq_t freq,
-					     enum ll_sap_csa_source csa_src);
+					     enum ll_sap_csa_source csa_src)
+{
+}
 
 static inline qdf_freq_t
 wlan_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
@@ -475,6 +545,13 @@ wlan_ll_sap_get_valid_freq_for_csa(struct wlan_objmgr_psoc *psoc,
 				   enum ll_sap_csa_source csa_src)
 {
 	return 0;
+}
+
+static inline bool
+wlan_ll_sap_is_cur_cu_greater_than_th(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id)
+{
+	return false;
 }
 
 #endif /* WLAN_FEATURE_LL_LT_SAP */

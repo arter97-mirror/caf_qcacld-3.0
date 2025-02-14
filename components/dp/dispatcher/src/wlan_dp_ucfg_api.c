@@ -3373,3 +3373,16 @@ int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
 
 	return qdf_status_to_os_return(status);
 }
+
+void ucfg_dp_set_ipv4_addr(struct wlan_objmgr_vdev *vdev, uint8_t *ip_addr)
+{
+	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
+
+	if (!dp_link) {
+		dp_err("Unable to get DP link");
+		return;
+	}
+
+	qdf_mem_copy(&dp_link->dp_intf->ipv4_addr, ip_addr,
+		     QDF_IPV4_ADDR_SIZE);
+}

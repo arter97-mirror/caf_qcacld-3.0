@@ -139,6 +139,8 @@ struct wlan_qmi_wfds_ce_info {
  * @fw_shared_wrmem_size: FW shared write memory size
  * @target_type_valid: whether corresponding QMI field is valid or not
  * @target_type: whether integrated or discrete target type
+ * @wfds_lpass_sid_valid: whether corresponding QMI field is valid or not
+ * @wfds_lpass_sid: LPASS SID for memory access
  */
 struct wlan_qmi_wfds_config_req_msg {
 	uint32_t ce_info_len;
@@ -167,6 +169,8 @@ struct wlan_qmi_wfds_config_req_msg {
 	uint32_t fw_shared_wrmem_size;
 	uint8_t target_type_valid;
 	uint32_t target_type;
+	uint8_t wfds_lpass_sid_valid;
+	uint32_t wfds_lpass_sid;
 };
 
 /**

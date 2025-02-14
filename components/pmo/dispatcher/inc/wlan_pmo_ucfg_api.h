@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1349,8 +1349,24 @@ ucfg_pmo_get_active_mc_bc_apf_mode(struct wlan_objmgr_psoc *psoc);
  * Return: true if enabled, it is intersection of ini and target cap
  */
 bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_is_configure_apf_per_screen_state() - To get enable active mode apf
+ * configuration
+ * @psoc: objmgr psoc handle
+ *
+ * Return: true if enabled, else false
+ */
+bool ucfg_pmo_is_configure_apf_per_screen_state(
+					struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool ucfg_pmo_is_configure_apf_per_screen_state(
+					struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

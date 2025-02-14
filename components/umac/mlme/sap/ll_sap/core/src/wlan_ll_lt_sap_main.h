@@ -148,6 +148,15 @@ bool ll_lt_sap_is_freq_in_avoid_list(
 			qdf_freq_t freq);
 
 /**
+ * ll_lt_sap_flush_old_entries() - Flush old channels stored in DCS database
+ * by ageout time
+ * @ll_sap_psoc_obj: pointer to ll_sap_psoc object
+ *
+ * Return: True/False
+ */
+void ll_lt_sap_flush_old_entries(struct ll_sap_psoc_priv_obj *ll_sap_psoc_obj);
+
+/**
  * ll_lt_store_to_avoid_list_and_flush_old() - Store the current frequency in
  * avoid list and flush old/expired frequencies from avoid list
  * @psoc: pointer to psoc object

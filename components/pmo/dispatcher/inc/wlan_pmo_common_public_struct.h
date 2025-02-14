@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -433,6 +433,8 @@ enum pmo_page_fault_action {
  * wakeups needs to be monitored.
  * @ssr_frequency_on_pagefault: Time in ms in which SSR needs to be triggered
  * on max pagefault
+ * @is_apf_configure_per_screen_state: Configure APF mode enable/disable
+ * per screen off/on state
  */
 struct pmo_psoc_cfg {
 	bool ptrn_match_enable_all_vdev;
@@ -523,6 +525,7 @@ struct pmo_psoc_cfg {
 	uint8_t min_pagefault_wakeups_for_action;
 	uint32_t interval_for_pagefault_wakeup_counts;
 	uint32_t ssr_frequency_on_pagefault;
+	bool is_apf_configure_per_screen_state;
 };
 
 /**

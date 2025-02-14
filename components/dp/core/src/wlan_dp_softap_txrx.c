@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -537,14 +537,14 @@ dp_softap_validate_peer_state(struct wlan_dp_link *dp_link,
 
 	if (peer_state != OL_TXRX_PEER_STATE_CONN &&
 	    peer_state != OL_TXRX_PEER_STATE_AUTH) {
-		dp_debug_rl("Station not connected yet");
+		dp_err_rl("Station not connected yet");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (peer_state == OL_TXRX_PEER_STATE_CONN) {
 		if (qdf_ntohs(qdf_nbuf_get_protocol(nbuf)) != ETHERTYPE_PAE &&
 		    qdf_ntohs(qdf_nbuf_get_protocol(nbuf)) != ETHERTYPE_WAI) {
-			dp_debug_rl("NON-EAPOL/WAPI pkt in non-Auth state");
+			dp_err_rl("NON-EAPOL/WAPI pkt in non-Auth state");
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
@@ -892,7 +892,7 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 
 	if (qdf_likely(!except)) {
 		if (dp_intf->txrx_ops.tx.tx(soc, dp_link->link_id, nbuf)) {
-			dp_debug("Failed to send packet to txrx for sta: "
+			dp_err_rl("Failed to send packet to txrx for sta: "
 				 QDF_MAC_ADDR_FMT,
 				 QDF_MAC_ADDR_REF(dest_mac_addr->bytes));
 			goto drop_pkt_and_release_skb;

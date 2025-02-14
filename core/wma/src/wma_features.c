@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1111,7 +1111,7 @@ QDF_STATUS wma_add_beacon_filter(WMA_HANDLE handle,
 	for (i = 0; i < BCN_FLT_MAX_ELEMS_IE_LIST; i++)
 		ie_map[i] = filter_params->ie_map[i];
 
-	wma_debug("Beacon filter ie map Hex dump:");
+	wma_debug("vdev_id %d, Beacon filter ie map:", filter_params->vdev_id);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
 			   (uint8_t *)ie_map,
 			   BCN_FLT_MAX_ELEMS_IE_LIST * sizeof(u_int32_t));
@@ -1126,7 +1126,7 @@ QDF_STATUS wma_add_beacon_filter(WMA_HANDLE handle,
 	for (i = 0; i < BCN_FLT_MAX_ELEMS_IE_LIST; i++)
 		ie_map[i] = filter_params->ie_map[i + 8];
 
-	wma_debug("Beacon filter ext ie map Hex dump:");
+	wma_debug("ext ie map:");
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
 			   (uint8_t *)ie_map,
 			   BCN_FLT_MAX_ELEMS_IE_LIST * sizeof(u_int32_t));
@@ -1171,6 +1171,7 @@ QDF_STATUS wma_remove_beacon_filter(WMA_HANDLE handle,
 
 	cmd = (wmi_rmv_bcn_filter_cmd_fixed_param *)wmi_buf_data(buf);
 	cmd->vdev_id = filter_params->vdev_id;
+	wma_debug("vdev %d remove bcn filter", cmd->vdev_id);
 
 	WMITLV_SET_HDR(&cmd->tlv_header,
 			WMITLV_TAG_STRUC_wmi_rmv_bcn_filter_cmd_fixed_param,
@@ -1515,7 +1516,8 @@ static bool handle_csa_standby_link(wmi_csa_event_fixed_param *csa_event,
 			(struct qdf_mac_addr *)&mld_addr[0],
 			&mldev);
 	if (!mldev) {
-		wma_err("NULL ml dev ctx");
+		wma_err("NULL ml dev ctx, link id %d peer mld addr " QDF_MAC_ADDR_FMT,
+			csa_event->link_id, QDF_MAC_ADDR_REF(&mld_addr[0]));
 		return is_csa_standby;
 	}
 
@@ -1523,13 +1525,14 @@ static bool handle_csa_standby_link(wmi_csa_event_fixed_param *csa_event,
 	link_info = mlo_mgr_get_ap_link_by_link_id(mldev,
 						   link_id);
 	if (!link_info) {
-		wma_err("NULL link info ");
+		wma_err("NULL link info link id %d peer mld addr " QDF_MAC_ADDR_FMT,
+			csa_event->link_id, QDF_MAC_ADDR_REF(&mld_addr[0]));
 		return is_csa_standby;
 	}
 
 	if (link_info->vdev_id != WLAN_INVALID_VDEV_ID) {
-		wma_debug("vdev id %d link id %d ", link_info->vdev_id,
-			  link_id);
+		wma_err("vdev id %d link id %d ", link_info->vdev_id,
+			link_id);
 		return is_csa_standby;
 	}
 
@@ -1602,11 +1605,15 @@ static int fill_peer_mac_addr(wmi_csa_event_fixed_param *csa_event,
 				   &mld_addr[0]);
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&csa_event->link_mac_address,
 				   &link_addr[0]);
+
 	wlan_mlo_get_mlpeer_by_peer_mladdr(
 				(struct qdf_mac_addr *)&mld_addr[0],
 				&mldev);
 	if (!mldev) {
-		wma_err("NULL ml dev ctx");
+		wma_err("NULL ml dev ctx, link id %d peer mld addr " QDF_MAC_ADDR_FMT " peer link addr " QDF_MAC_ADDR_FMT,
+			csa_event->link_id,
+			QDF_MAC_ADDR_REF(&mld_addr[0]),
+			QDF_MAC_ADDR_REF(&link_addr[0]));
 		return -EINVAL;
 	}
 
@@ -1614,13 +1621,16 @@ static int fill_peer_mac_addr(wmi_csa_event_fixed_param *csa_event,
 	link_info = mlo_mgr_get_ap_link_by_link_id(mldev,
 						   link_id);
 	if (!link_info) {
-		wma_err("NULL link info ");
+		wma_err("NULL link info, link id %d peer mld addr " QDF_MAC_ADDR_FMT " peer link addr " QDF_MAC_ADDR_FMT,
+			csa_event->link_id,
+			QDF_MAC_ADDR_REF(&mld_addr[0]),
+			QDF_MAC_ADDR_REF(&link_addr[0]));
 		return -EINVAL;
 	}
 
 	qdf_copy_macaddr((struct qdf_mac_addr *)&bssid[0],
 			 &link_info->ap_link_addr);
-	wma_debug("csa event link id %d vdev id %d peer mld addr" QDF_MAC_ADDR_FMT "peer link addr" QDF_MAC_ADDR_FMT "host link info ap_link_addr" QDF_MAC_ADDR_FMT,
+	wma_debug("csa event link id %d vdev id %d peer mld addr " QDF_MAC_ADDR_FMT " peer link addr " QDF_MAC_ADDR_FMT " host link info ap_link_addr " QDF_MAC_ADDR_FMT,
 		  link_id, link_info->vdev_id,
 		  QDF_MAC_ADDR_REF(&mld_addr[0]),
 		  QDF_MAC_ADDR_REF(&link_addr[0]),
@@ -1697,7 +1707,8 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	peer = wlan_objmgr_get_peer_by_mac(wma->psoc,
 					   bssid, WLAN_LEGACY_WMA_ID);
 	if (!peer) {
-		wma_err("Invalid peer");
+		wma_err("Invalid peer, peer mac addr " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(&bssid[0]));
 		return -EINVAL;
 	}
 
@@ -1706,8 +1717,12 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
 						    vdev_id,
 						    WLAN_LEGACY_WMA_ID);
-	if (!vdev)
+	if (!vdev) {
+		wma_err("NULL vdev, vdev_id %d peer mac addr " QDF_MAC_ADDR_FMT,
+			vdev_id,
+			QDF_MAC_ADDR_REF(&bssid[0]));
 		return -EINVAL;
+	}
 
 	csa_offload_event = qdf_mem_malloc(sizeof(*csa_offload_event));
 	if (!csa_offload_event) {
@@ -6000,6 +6015,7 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 	wmi_cca_busy_subband_info *cca_info = NULL;
 	uint32_t num_tlvs = 0;
 	bool is_cca_busy_info;
+	uint32_t rx_clear_count, cu;
 	QDF_STATUS qdf_status;
 
 	if (wma && wma->cds_context)
@@ -6074,7 +6090,17 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 	channel_status->channel_id = cds_freq_to_chan(event->freq);
 	channel_status->cmd_flags = event->cmd_flags;
 
-	wma_debug("freq %d, nf %d, rcc %u, cc %u, tx_r %d, tx_t %d, tx_frm_cnt %u rx_frm_cnt %u my_bss_rx_cycle_count %u mac_clk_mhz %u rx_11b_mode_data_duration %d chan_id:%d, flags:%d, cap: %d, num_tlvs:%d",
+	/* CU = (Rx cc - self tx - self rx) * 100 / total cc */
+	if (event->rx_clear_count >
+	    (event->tx_frame_cnt + event->my_bss_rx_cycle_count))
+		rx_clear_count = event->rx_clear_count -
+			event->tx_frame_cnt - event->my_bss_rx_cycle_count;
+	else
+		rx_clear_count = event->rx_clear_count;
+
+	cu = rx_clear_count * 100 / event->cycle_count;
+
+	wma_debug("freq %d, nf %d, rcc %u, cc %u, tx_r %d, tx_t %d, tx_frm %u rx_frm %u my_rx_cc %u mac_clk_mhz %u rx_11b_data_dur %d chan_id:%d, flags:%d, cap: %d, cu percent %d num_tlvs:%d",
 		  event->freq, event->noise_floor,
 		  event->rx_clear_count, event->cycle_count,
 		  event->chan_tx_pwr_range, event->chan_tx_pwr_tp,
@@ -6082,7 +6108,8 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf, uint32_t len)
 		  event->my_bss_rx_cycle_count, event->mac_clk_mhz,
 		  event->rx_11b_mode_data_duration,
 		  channel_status->channel_id,
-		  channel_status->cmd_flags, is_cca_busy_info, num_tlvs);
+		  channel_status->cmd_flags, is_cca_busy_info,
+		  cu, num_tlvs);
 
 	sme_msg.type = eWNI_SME_CHAN_INFO_EVENT;
 	sme_msg.bodyptr = channel_status;

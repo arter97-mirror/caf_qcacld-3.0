@@ -1315,6 +1315,13 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 	ucfg_nan_clear_peer_mc_list(hdd_ctx->psoc, link_info->vdev,
 				    peer_mac_addr);
 
+	if (!hdd_ctx->psoc) {
+		hdd_err("psoc is null");
+		return;
+	}
+
+	ucfg_nan_remove_ndp_peer_mac_addr(hdd_ctx->psoc, peer_mac_addr);
+
 	if (last_peer) {
 		hdd_debug("No more ndp peers.");
 		hdd_cleanup_ndi(link_info);

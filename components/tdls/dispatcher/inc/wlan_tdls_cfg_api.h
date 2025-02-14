@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -41,15 +41,14 @@ cfg_tdls_get_support_enable(struct wlan_objmgr_psoc *psoc,
 			    bool *val);
 
 /**
- * cfg_tdls_set_support_enable() - set tdls support enable
+ * cfg_tdls_set_fw_support() - Set fw tdls support
  * @psoc:        pointer to psoc object
- * @val:         set tdls support enable/disable
+ * @val:         FW support tdls or not
  *
- * This function sets tdls support enable
+ * This function sets fw tdls support.
  */
 QDF_STATUS
-cfg_tdls_set_support_enable(struct wlan_objmgr_psoc *psoc,
-			    bool val);
+cfg_tdls_set_fw_support(struct wlan_objmgr_psoc *psoc, bool val);
 
 /**
  * cfg_tdls_get_external_control() - get tdls external control
@@ -293,8 +292,7 @@ cfg_tdls_get_support_enable(struct wlan_objmgr_psoc *psoc,
 }
 
 static inline QDF_STATUS
-cfg_tdls_set_support_enable(struct wlan_objmgr_psoc *psoc,
-			    bool val)
+cfg_tdls_set_fw_support(struct wlan_objmgr_psoc *psoc, bool val)
 {
 	return QDF_STATUS_SUCCESS;
 }

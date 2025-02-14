@@ -168,7 +168,8 @@ static void lim_delete_sta_util(struct mac_context *mac_ctx, tpDeleteStaContext 
 
 #ifdef FEATURE_WLAN_TDLS
 		/* Delete all TDLS peers connected before leaving BSS */
-		lim_delete_tdls_peers(mac_ctx, session_entry);
+		lim_delete_tdls_peers(mac_ctx, session_entry,
+				      TDLS_PEER_DEL_REASON_NONE);
 #endif
 		if (LIM_IS_STA_ROLE(session_entry))
 			lim_post_sme_message(mac_ctx, LIM_MLM_DEAUTH_IND,
@@ -410,7 +411,7 @@ lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 	pe_session->pmmOffloadInfo.bcnmiss = false;
 
 	/* Delete all TDLS peers connected before leaving BSS */
-	lim_delete_tdls_peers(mac, pe_session);
+	lim_delete_tdls_peers(mac, pe_session, TDLS_PEER_DEL_REASON_NONE);
 
 	/* Announce loss of link to Roaming algorithm */
 	/* and cleanup by sending SME_DISASSOC_REQ to SME */

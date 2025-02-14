@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,9 +34,10 @@
 #include <lim_utils.h>
 #include <utils_mlo.h>
 
-QDF_STATUS lim_cu_info_from_rnr_per_link_id(const uint8_t *rnr,
-					    uint8_t linkid, uint8_t *bpcc,
-					    uint8_t *aui)
+QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
+					      uint8_t linkid, uint8_t *bpcc,
+					      uint8_t *opclass, uint8_t *chan)
+
 {
 	const uint8_t *data, *rnr_end;
 	struct neighbor_ap_info_field *neighbor_ap_info;
@@ -53,6 +54,8 @@ QDF_STATUS lim_cu_info_from_rnr_per_link_id(const uint8_t *rnr,
 	data = rnr + PAYLOAD_START_POS;
 	while ((data + sizeof(struct neighbor_ap_info_field)) <= rnr_end) {
 		neighbor_ap_info = (struct neighbor_ap_info_field *)data;
+		*opclass = neighbor_ap_info->operating_class;
+		*chan = neighbor_ap_info->channel_number;
 		tbtt_count = neighbor_ap_info->tbtt_header.tbtt_info_count;
 		tbtt_len = neighbor_ap_info->tbtt_header.tbtt_info_length;
 		tbtt_type = neighbor_ap_info->tbtt_header.tbbt_info_fieldtype;
@@ -82,9 +85,9 @@ QDF_STATUS lim_cu_info_from_rnr_per_link_id(const uint8_t *rnr,
 				link_id = mld_param->link_id;
 				if (linkid == link_id) {
 					*bpcc = mld_param->bss_param_change_cnt;
-					*aui = mld_param->all_updates_included;
-					pe_debug("rnr bpcc %d, aui %d, linkid %d",
-						 *bpcc, *aui, linkid);
+					pe_debug("rnr bpcc %d, chan %d, opclass %d, linkid %d",
+						 *bpcc, *chan, *opclass,
+						 linkid);
 					return QDF_STATUS_SUCCESS;
 				}
 			}
@@ -116,30 +119,35 @@ QDF_STATUS lim_get_bpcc_from_mlo_ie(tSchBeaconStruct *bcn, uint8_t *bpcc)
 	return status;
 }
 
-bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev, uint8_t new_bpcc)
+bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev,
+			  uint8_t link_id, uint8_t new_bpcc)
 {
 	uint8_t bpcc;
-	uint8_t vdev_id;
 	QDF_STATUS status;
 
 	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return false;
 
-	vdev_id = wlan_vdev_get_id(vdev);
-
-	status = wlan_mlo_get_cu_bpcc(vdev, &bpcc);
+	status = wlan_mlo_get_cu_bpcc(vdev, link_id, &bpcc);
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
 
-	if (new_bpcc == 0 && bpcc == 0)
+	/*
+	 * If old and new BPCC are non-zero and if new BPCC is greater than
+	 * old BPCC then treat it as CU and process the rest of the beacon
+	 * contents. If the new and old BPCC are zero, then ignore the CU
+	 * processing.
+	 */
+	if (!new_bpcc && !bpcc)
 		return false;
 
-	pe_debug_rl("vdev id %d new bpcc %d, old bpcc %d",
-		    vdev_id, new_bpcc, bpcc);
+	pe_debug_rl("link id %d new bpcc %d, old bpcc %d",
+		    link_id, new_bpcc, bpcc);
+
 	if (new_bpcc && new_bpcc < bpcc)
 		return false;
 
-	wlan_mlo_set_cu_bpcc(vdev, new_bpcc);
+	wlan_mlo_set_cu_bpcc(vdev, link_id, new_bpcc);
 
 	return true;
 }
@@ -1300,7 +1308,7 @@ QDF_STATUS lim_store_mlo_ie_raw_info(uint8_t *ie, uint8_t *sta_prof_ie,
 			}
 
 			for (i = 0; i < pfrm[TAG_LEN_POS]; i++) {
-				if (copied > ml_ie_len) {
+				if (copied >= ml_ie_len) {
 					pe_debug("Buf length exceeded, copied %d ml_ie_len %d",
 						 copied, ml_ie_len);
 					qdf_mem_free(buf);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2937,9 +2937,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		wrqu.addr.sa_family = ARPHRD_ETHER;
 		memcpy(wrqu.addr.sa_data,
 		       &event->staMac, QDF_MAC_ADDR_SIZE);
-		hdd_info("Vdev %d, STA " QDF_MAC_ADDR_FMT " associated",
+		hdd_info("Vdev %d, STA " QDF_MAC_ADDR_FMT " with mld mac " QDF_MAC_ADDR_FMT " associated",
 			 link_info->vdev_id,
-			 QDF_MAC_ADDR_REF(wrqu.addr.sa_data));
+			 QDF_MAC_ADDR_REF(wrqu.addr.sa_data),
+			 QDF_MAC_ADDR_REF(event->sta_mld.bytes));
 		hdd_place_marker(adapter, "CLIENT ASSOCIATED",
 				 wrqu.addr.sa_data);
 		we_event = IWEVREGISTERED;
@@ -3119,13 +3120,6 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 					     &cache_stainfo, true,
 					     STA_INFO_HOSTAPD_SAP_EVENT_CB);
 		}
-		hdd_nofl_info("SAP(%d) Peer " QDF_MAC_ADDR_FMT " disassociated %sreason %d status code %d",
-			      link_info->vdev_id,
-			      QDF_MAC_ADDR_REF(disassoc_comp->staMac.bytes),
-			      disassoc_comp->reason ==
-			      eSAP_USR_INITATED_DISASSOC ? "by user " : "",
-			      disassoc_comp->reason_code,
-			      disassoc_comp->status_code);
 		hdd_place_marker(adapter, "CLIENT DISASSOCIATED FROM SAP",
 				 wrqu.addr.sa_data);
 
@@ -3149,10 +3143,23 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 						STA_INFO_HOSTAPD_SAP_EVENT_CB,
 						STA_INFO_MATCH_STA_MAC_ONLY);
 		if (!stainfo) {
-			hdd_err("Failed to find STA info for " QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(disassoc_comp->staMac.bytes));
+			hdd_err("Failed to find STA info for " QDF_MAC_ADDR_FMT " %sreason %d sc %d",
+				QDF_MAC_ADDR_REF(disassoc_comp->staMac.bytes),
+				disassoc_comp->reason ==
+				eSAP_USR_INITATED_DISASSOC ? "by user " : "",
+				disassoc_comp->reason_code,
+				disassoc_comp->status_code);
 			return QDF_STATUS_E_INVAL;
 		}
+
+		hdd_nofl_info("SAP(%d) Peer " QDF_MAC_ADDR_FMT " with mld " QDF_MAC_ADDR_FMT " disassociated %sreason %d status code %d",
+			      link_info->vdev_id,
+			      QDF_MAC_ADDR_REF(stainfo->sta_mac.bytes),
+			      QDF_MAC_ADDR_REF(stainfo->mld_addr.bytes),
+			      disassoc_comp->reason ==
+			      eSAP_USR_INITATED_DISASSOC ? "by user " : "",
+			      disassoc_comp->reason_code,
+			      disassoc_comp->status_code);
 
 		if (wlan_vdev_mlme_is_mlo_vdev(link_info->vdev) &&
 		    !qdf_is_macaddr_zero(&stainfo->mld_addr)) {
@@ -7766,6 +7773,9 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		goto error;
 	}
 
+	/* Cancel all ongoing/pending no sap scan requests */
+	hdd_abort_non_sap_scan_all_adapters(hdd_ctx);
+
 	status = wlansap_start_bss(sap_ctx, sap_event_callback, config);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		mutex_unlock(&hdd_ctx->sap_lock);
@@ -7810,7 +7820,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	if (hostapd_state->bss_state == BSS_START) {
 		policy_mgr_incr_active_session(hdd_ctx->psoc,
 					adapter->device_mode,
-					link_info->vdev_id);
+					link_info->vdev_id, true);
 
 		hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode,
 					    true);

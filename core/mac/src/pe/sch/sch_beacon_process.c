@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -394,8 +394,14 @@ sch_bcn_update_he_ies(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 {
 	uint8_t session_bss_col_disabled_flag;
 	bool anything_changed = false;
+	struct wlan_channel *des_chan;
 
-	if (session->is_session_obss_color_collision_det_enabled)
+	if (session->is_session_obss_color_collision_det_enabled ||
+	    !session->vdev)
+		return;
+
+	des_chan = wlan_vdev_mlme_get_des_chan(session->vdev);
+	if (!des_chan || !IS_WLAN_PHYMODE_HE(des_chan->ch_phymode))
 		return;
 
 	if (session->he_op.present && bcn->he_op.present) {
@@ -443,7 +449,6 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	tDot11fIEVHTOperation *vht_op = NULL;
 	uint8_t bcn_vht_chwidth = 0;
-	bool is_40 = false;
 
 	/*
 	 * Ignore opmode change during channel change The opmode will be updated
@@ -469,9 +474,6 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	    !(vht_op && vht_op->present && vht_caps))
 		return;
 
-	is_40 = bcn->HTInfo.present ?
-			bcn->HTInfo.recommendedTxWidthSet : false;
-
 	if (bcn->OperatingMode.present) {
 		lim_update_nss(mac_ctx, sta_ds, bcn->OperatingMode.rxNSS,
 			       session);
@@ -484,6 +486,7 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 
 	bcn_vht_chwidth = lim_get_vht_ch_width(vht_caps, vht_op,
 					       &bcn->HTInfo,
+					       &bcn->HTCaps,
 					       &bcn->OperatingMode);
 	lim_update_channel_width(mac_ctx, sta_ds, session,
 				 bcn_vht_chwidth, &ch_bw);
@@ -616,8 +619,12 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	if (mlo_is_mld_sta(session->vdev)) {
 		cu_flag = false;
 		status = lim_get_bpcc_from_mlo_ie(bcn, &bpcc);
-		if (QDF_IS_STATUS_SUCCESS(status))
-			cu_flag = lim_check_cu_happens(session->vdev, bpcc);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			uint8_t link_id = wlan_vdev_get_link_id(session->vdev);
+
+			cu_flag = lim_check_cu_happens(session->vdev, link_id,
+						       bpcc);
+		}
 		lim_process_ml_reconfig(mac_ctx, session, rx_pkt_info);
 	}
 

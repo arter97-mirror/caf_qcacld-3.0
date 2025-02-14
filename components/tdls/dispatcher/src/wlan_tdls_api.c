@@ -579,14 +579,28 @@ struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
 	return tdls_find_peer(vdev_obj, macaddr);
 }
 
-QDF_STATUS wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc)
+#define WLAN_MLO_SINGLE_LINK 1
+QDF_STATUS
+wlan_tdls_teardown_links_for_non_dbs(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id)
 {
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *vdev;
+	enum wlan_tdls_peer_delete_reason reason =
+			TDLS_PEER_DEL_REASON_LINK_STATE_SWITCH;
 
-	if (!policy_mgr_is_hw_dbs_capable(psoc))
-		status = wlan_tdls_teardown_links(psoc);
+	if (policy_mgr_is_hw_dbs_capable(psoc))
+		return QDF_STATUS_SUCCESS;
 
-	return status;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_TDLS_NB_ID);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	wlan_tdls_delete_all_peers(vdev, reason);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
@@ -614,7 +628,8 @@ bool wlan_tdls_is_addba_request_allowed(struct wlan_objmgr_vdev *vdev,
 	return false;
 }
 
-void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev)
+void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev,
+				enum wlan_tdls_peer_delete_reason reason)
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct tdls_soc_priv_obj *soc_obj;
@@ -631,7 +646,7 @@ void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev)
 	}
 
 	if (soc_obj->tdls_cb.delete_all_tdls_peers)
-		soc_obj->tdls_cb.delete_all_tdls_peers(vdev);
+		soc_obj->tdls_cb.delete_all_tdls_peers(vdev, reason);
 }
 
 QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,

@@ -12711,13 +12711,13 @@ static int hdd_test_config_emlsr_mode(struct hdd_context *hdd_ctx,
 				      bool cfg_val)
 
 {
-	hdd_debug("11be op mode setting %d", cfg_val);
-	if (cfg_val && policy_mgr_is_hw_emlsr_capable(hdd_ctx->psoc)) {
-		hdd_debug("HW supports EMLSR mode, set caps");
+	bool emlsr_hw_support = policy_mgr_is_hw_emlsr_capable(hdd_ctx->psoc);
+
+	hdd_debug("eMLSR - Config : %d,  HW support : %d", cfg_val,
+		  emlsr_hw_support);
+
+	if (emlsr_hw_support)
 		ucfg_mlme_set_emlsr_mode_enabled(hdd_ctx->psoc, cfg_val);
-	} else {
-		hdd_debug("Default mode: MLMR, no action required");
-	}
 
 	return 0;
 }
@@ -24167,8 +24167,6 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 				 | BIT(NL80211_IFTYPE_AP)
 				 | BIT(NL80211_IFTYPE_MONITOR);
 
-	wlan_hdd_set_nan_if_mode(wiphy);
-
 	/*
 	 * In case of static linked driver at the time of driver unload,
 	 * module exit doesn't happens. Module cleanup helps in cleaning
@@ -25049,6 +25047,26 @@ wlan_hdd_remove_sta_p2p_conc(struct ieee80211_iface_combination *combination,
 }
 
 /**
+ * wlan_hdd_is_iface_nan() - This API checks whether NAN interface is present
+ * in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if NAN interface is present otherwise false
+ */
+static bool wlan_hdd_is_iface_nan(uint8_t idx)
+{
+	uint8_t j;
+
+	for (j = 0; j < wlan_hdd_iface_combination[idx].n_limits; j++) {
+		if (wlan_hdd_iface_combination[idx].limits[j].types ==
+		    BIT(NL80211_IFTYPE_NAN))
+			return true;
+	}
+
+	return false;
+}
+
+/**
  * wlan_hdd_update_iface_combination() - This API updates interface combination
  * @hdd_ctx: HDD context
  * @wiphy: WIPHY structure pointer
@@ -25070,6 +25088,7 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	bool sap_sta_nan_concurrency, sap_sap_sta_concurrency;
 	uint8_t num;
 	QDF_STATUS status;
+	bool is_nan_allowed;
 
 	if (!hdd_ctx->config->advertise_concurrent_operation)
 		return;
@@ -25090,6 +25109,9 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	sta_p2p_ndp_conc = ucfg_nan_is_sta_p2p_ndp_supported(psoc);
 
 	num = ARRAY_SIZE(wlan_hdd_iface_combination);
+	is_nan_allowed = ucfg_nan_is_allowed(psoc);
+	if (is_nan_allowed)
+		wlan_hdd_set_nan_if_mode(wiphy);
 
 	for (i = 0; i < num; i++) {
 		/* Filter for non-DBS targets */
@@ -25118,6 +25140,10 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		    wlan_hdd_is_p2p_concurrency_present(sta_sap_p2p_concurrency,
 							sta_p2p_ndp_conc,
 							i))
+			continue;
+
+		/* remove NAN concurrency if NAN is not allowed */
+		if (wlan_hdd_is_iface_nan(i) && !is_nan_allowed)
 			continue;
 
 		/* remove SAP STA NAN concurrency */
@@ -28882,7 +28908,18 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 		goto fn_end;
 
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)mac)) {
-		if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+		struct wlan_objmgr_vdev *vdev;
+		uint16_t peer_count = 0;
+
+		vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+						   WLAN_OSIF_ID);
+		if (vdev) {
+			peer_count = wlan_vdev_get_peer_count(vdev);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		}
+		/* Check if it LL SAP has peer connected, other than BSS peer */
+		if (peer_count > 1 &&
+		    policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 						 adapter->deflink->vdev_id)) {
 			wlan_ll_sap_switch_bearer_on_stop_ap(
 						hdd_ctx->psoc,

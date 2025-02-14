@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1622,6 +1622,20 @@ ucfg_mlme_get_restart_beaconing_on_ch_avoid(struct wlan_objmgr_psoc *psoc,
 	*value = mlme_obj->cfg.reg.restart_beaconing_on_ch_avoid;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+bool
+ucfg_mlme_check_bit_in_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id,
+				enum wlan_cm_rso_control_requestor reqs)
+{
+	uint8_t rso_disabled_bitmap;
+
+	rso_disabled_bitmap = mlme_get_rso_disabled_bitmap(psoc, vdev_id);
+	if (rso_disabled_bitmap & reqs)
+		return true;
+
+	return false;
 }
 
 QDF_STATUS

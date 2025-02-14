@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -560,7 +560,7 @@ QDF_STATUS t2lm_deliver_event(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-static uint16_t
+uint16_t
 t2lm_get_tids_mapped_link_id(uint16_t link_map_tid)
 {
 	uint16_t all_tids_mapped_link_id = 0;
@@ -576,7 +576,7 @@ t2lm_get_tids_mapped_link_id(uint16_t link_map_tid)
 	return all_tids_mapped_link_id;
 }
 
-static QDF_STATUS
+QDF_STATUS
 t2lm_find_tid_mapped_link_id(struct wlan_t2lm_info *t2lm_info,
 			     uint16_t *tid_mapped_link_id)
 {

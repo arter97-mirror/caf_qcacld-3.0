@@ -505,6 +505,12 @@ static inline bool pld_pcie_audio_is_direct_link_supported(struct device *dev)
 	return false;
 }
 
+static inline int pld_pcie_get_direct_link_sid(struct device *dev,
+					       uint16_t *sid)
+{
+	return 0;
+}
+
 static inline bool pld_pcie_is_audio_shared_iommu_group(struct device *dev)
 {
 	return false;
@@ -665,7 +671,8 @@ pld_pcie_qmi_send(struct device *dev, int type, void *cmd,
 }
 
 #if defined(WLAN_CHIPSET_STATS) && \
-	(LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+	((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)) || \
+	 defined(CNSS_QMI_ASYNC_EVENT_SUPPORT))
 static inline int
 pld_pcie_register_qmi_ind(struct device *dev, void *cb_ctx,
 			  int (*cb)(void *ctx, uint16_t type,
@@ -891,7 +898,8 @@ static inline int pld_pcie_get_pci_slot(struct device *dev)
 }
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)) || \
+	defined(CNSS_PLAT_WIFI_KOBJ_SUPPORT))
 static inline struct kobject *pld_pcie_get_wifi_kobj(struct device *dev)
 {
 	return cnss_get_wifi_kobj(dev);
@@ -1068,6 +1076,20 @@ void pld_pcie_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
 static inline
 int pld_pcie_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
 				     size_t *size)
+{
+	return -EINVAL;
+}
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0))
+static inline int pld_pcie_get_direct_link_sid(struct device *dev,
+						uint16_t *sid)
+{
+	return cnss_get_direct_link_sid(dev, sid);
+}
+#else
+static inline int pld_pcie_get_direct_link_sid(struct device *dev,
+						uint16_t *sid)
 {
 	return -EINVAL;
 }

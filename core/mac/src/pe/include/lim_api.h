@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -705,9 +705,10 @@ bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
 #ifdef WLAN_FEATURE_11BE_MLO
 /*
  * lim_add_bcn_probe() - Add the probe resp to scan DB
- * @vdev: VDEV object manager
+ * @pdev: PDEV object manager
  * @bcn_probe: Pointer to bcn/probe
  * @len: Length of frame.
+ * @is_gen_entry: is locally generated scan entry
  * @freq: Freq on frame.
  * @rssi: RSSI of the frame.
  * @snr: SNR of frame
@@ -719,9 +720,9 @@ bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
  * Return: QDF_STATUS
  */
 QDF_STATUS
-lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
-		  uint32_t len, qdf_freq_t freq, int32_t rssi,
-		  uint8_t snr, uint32_t tsf_delta);
+lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
+		  uint32_t len, bool is_gen_entry, qdf_freq_t freq,
+		  int32_t rssi, uint8_t snr, uint32_t tsf_delta);
 
 /**
  * lim_update_mlo_mgr_info() - API to update mlo_mgr link info
@@ -773,25 +774,22 @@ QDF_STATUS lim_check_for_ml_probe_req(struct pe_session *session);
  * lim_process_cu_for_probe_rsp() - process critical update for probe response
  * @mac_ctx: Pointer to mac context
  * @session: pe session
- * @probe_rsp: ptr to probe response
- * @probe_rsp_len: length of probe response
+ * @rx_packet_info: Received Rx packet
  *
  * This api will generate link specific probe response and invoke function
  * to process critical update IEs
  *
  * Return: qdf status
  */
-QDF_STATUS
-lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
-			     struct pe_session *session,
-			     uint8_t *probe_rsp,
-			     uint32_t probe_rsp_len);
+QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
+					struct pe_session *session,
+					uint8_t *rx_packet_info);
 
 #else
 static inline QDF_STATUS
-lim_add_bcn_probe(struct wlan_objmgr_vdev *vdev, uint8_t *bcn_probe,
-		  uint32_t len, qdf_freq_t freq, int32_t rssi,
-		  uint8_t snr, uint32_t tsf_delta)
+lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
+		  uint32_t len, bool is_gen_entry, qdf_freq_t freq,
+		  int32_t rssi, uint8_t snr, uint32_t tsf_delta)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -825,8 +823,7 @@ lim_check_for_ml_probe_req(struct pe_session *session)
 static inline QDF_STATUS
 lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 			     struct pe_session *session,
-			     uint8_t *probe_rsp,
-			     uint32_t probe_rsp_len)
+			     uint8_t *rx_packet_info)
 {
 	return QDF_STATUS_SUCCESS;
 }

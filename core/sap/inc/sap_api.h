@@ -1836,6 +1836,7 @@ bool wlansap_filter_vendor_unsafe_ch_freq(
 
 /**
  * wlansap_set_acs_ch_freq() - set acs channel frequency
+ * @mac_ctx: mac ctx
  * @sap_context: sap context
  * @ch_freq: ch_freq to be set
  *
@@ -1843,7 +1844,8 @@ bool wlansap_filter_vendor_unsafe_ch_freq(
  *
  * Return: None
  */
-void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
+void wlansap_set_acs_ch_freq(struct mac_context *mac_ctx,
+			     struct sap_context *sap_context,
 			     qdf_freq_t ch_freq);
 
 /**

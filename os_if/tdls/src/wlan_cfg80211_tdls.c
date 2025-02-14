@@ -178,9 +178,18 @@ int wlan_cfg80211_tdls_add_peer_mlo(struct hdd_adapter *adapter,
 		return -EINVAL;
 
 	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS) {
-		osif_debug("sta is not connected or disconnecting");
+		osif_debug("vdev %d sta is not connected or disconnecting",
+			   wlan_vdev_get_id(vdev));
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
 		return -EINVAL;
+	}
+
+	if (wlan_cm_roaming_in_progress(wlan_vdev_get_pdev(vdev),
+					wlan_vdev_get_id(vdev))) {
+		osif_debug("vdev %d Roaming is in progress",
+			   wlan_vdev_get_id(vdev));
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
+		return -EAGAIN;
 	}
 
 	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -941,6 +941,63 @@ uint32_t tdls_get_6g_pwr_for_power_type(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * tdls_check_support_upto_11be() - Check TDLS enable support if upto 11be
+ * If configured upto 11be, check current phy mode is big than EHT320 or not
+ * @tdls_support_enable: vdev object
+ * @bss_chan: pointer to bss channel
+ *
+ * Return: true if tdls support
+ */
+static bool
+tdls_check_support_upto_11be(uint8_t tdls_support_enable,
+			     struct wlan_channel *bss_chan)
+{
+	if (TDLS_IS_ENABLE_UPTO_11BE(tdls_support_enable) &&
+	    bss_chan && (bss_chan->ch_phymode > WLAN_PHYMODE_11BEA_EHT320))
+		return false;
+	else
+		return true;
+}
+#else
+static bool
+tdls_check_support_upto_11be(uint8_t tdls_support_enable,
+			     struct wlan_channel *bss_chan)
+{
+	return true;
+}
+#endif
+
+/**
+ * tdls_check_support_bit() - Check TDLS enable support bits
+ * @vdev: vdev object
+ * @tdls_soc_obj: tdls psoc object
+ *
+ * Return: true if support enabled
+ */
+static bool
+tdls_check_support_bit(struct wlan_objmgr_vdev *vdev,
+		       struct tdls_soc_priv_obj *tdls_soc_obj)
+{
+	struct wlan_channel *bss_chan;
+	uint8_t support_enable;
+
+	support_enable = tdls_soc_obj->tdls_configs.tdls_support_enable;
+	if (TDLS_IS_ENABLE_FULL(support_enable))
+		return true;
+
+	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
+	if (TDLS_IS_ENABLE_UPTO_11AX(support_enable) &&
+	    bss_chan && (bss_chan->ch_phymode > WLAN_PHYMODE_11AXA_HE80_80))
+		return false;
+
+	if (!tdls_check_support_upto_11be(support_enable, bss_chan))
+		return false;
+
+	return true;
+}
+
 bool tdls_check_is_user_tdls_enable(struct tdls_soc_priv_obj *tdls_soc_obj)
 {
 	return tdls_soc_obj->is_user_tdls_enable;
@@ -967,6 +1024,12 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 	status = tdls_get_vdev_objects(vdev, &tdls_vdev_obj, &tdls_soc_obj);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		tdls_err("Failed to get TDLS objects");
+		goto exit;
+	}
+
+	if (!tdls_check_support_bit(vdev, tdls_soc_obj)) {
+		tdls_debug("tdls not enabled %d",
+			   tdls_soc_obj->tdls_configs.tdls_support_enable);
 		goto exit;
 	}
 
@@ -2294,13 +2357,20 @@ static uint8_t tdls_find_opclass_frm_freq(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	uint8_t channel, opclass;
+	bool global_tbl_lookup = false;
 
 	if (!pdev) {
 		tdls_err("pdev is NULL");
 		return 0;
 	}
 
-	wlan_reg_freq_width_to_chan_op_class(pdev, ch_freq, bw_offset, false,
+	if (wlan_reg_is_6ghz_chan_freq(ch_freq)) {
+		tdls_debug_rl("allow to set op class with global_op_class");
+		global_tbl_lookup = true;
+	}
+
+	wlan_reg_freq_width_to_chan_op_class(pdev, ch_freq, bw_offset,
+					     global_tbl_lookup,
 					     BIT(behav_limit), &opclass,
 					     &channel);
 

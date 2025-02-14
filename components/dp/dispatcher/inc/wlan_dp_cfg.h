@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -335,13 +335,24 @@
 		true, \
 		"Control to enable TCP limit output byte")
 
+#define WLAN_CFG_TCP_ADV_WIN_SCALE_MIN		0
+#define WLAN_CFG_TCP_ADV_WIN_SCALE_MAX		3
+#define WLAN_CFG_TCP_ADV_WIN_SCALE_DEFAULT	1
+#define DP_TCP_ADV_WIN_SCL_BIT			BIT(0)
+#define DP_TCP_ADV_WIN_SCALE_DISC_LOW		BIT(1)
+
 /*
  * <ini>
  * gTcpAdvWinScaleEnable - Control to enable  TCP adv window scaling
- * @Default: false
+ * @Min: 0
+ * @Max: 3
+ * @Default: 1
  *
  * This ini is used to enable dynamic configuration of TCP adv window scaling
  * system parameter.
+ * Value 0: TCP Advanced WIN scale control disable.
+ * Value 1: Enable TCP Advanced WIN scale control.
+ * Value 3: Enable feature to set WIN Adv scale level low on disconnect.
  *
  * Supported Feature: Tcp Advance Window Scaling
  *
@@ -350,9 +361,12 @@
  * </ini>
  */
 #define CFG_DP_ENABLE_TCP_ADV_WIN_SCALE \
-		CFG_INI_BOOL( \
+		CFG_INI_UINT( \
 		"gTcpAdvWinScaleEnable", \
-		false, \
+		WLAN_CFG_TCP_ADV_WIN_SCALE_MIN, \
+		WLAN_CFG_TCP_ADV_WIN_SCALE_MAX, \
+		WLAN_CFG_TCP_ADV_WIN_SCALE_DEFAULT, \
+		CFG_VALUE_OR_DEFAULT, \
 		"Control to enable  TCP adv window scaling")
 
 /*
@@ -1093,7 +1107,7 @@
  * gEnableNUDTracking - Will enable or disable NUD tracking within driver
  * @Min: 0
  * @Max: 3
- * @Default: 2
+ * @Default: 0
  *
  * This ini is used to specify the behaviour of the driver for NUD tracking.
  * If the ini value is:-
@@ -1115,7 +1129,7 @@
 		CFG_INI_UINT("gEnableNUDTracking", \
 		 0, \
 		 3, \
-		 2, \
+		 0, \
 		 CFG_VALUE_OR_DEFAULT, "Driver NUD tracking behaviour")
 
 #define CFG_DP_ENABLE_NUD_TRACKING_ALL \

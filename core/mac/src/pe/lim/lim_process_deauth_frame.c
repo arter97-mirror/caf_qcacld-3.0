@@ -509,13 +509,14 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 							rc);
 			return;
 			} else {
-
-			/*
-			 * Delete all the TDLS peers only if Deauth
-			 * is received from the AP
-			 */
+				/*
+				 * Delete all the TDLS peers only if Deauth
+				 * is received from the AP
+				 */
 				if (IS_CURRENT_BSSID(mac_ctx, addr, pe_session))
-					lim_delete_tdls_peers(mac_ctx, pe_session);
+					lim_delete_tdls_peers(mac_ctx,
+							      pe_session,
+							      TDLS_PEER_DEL_REASON_NONE);
 #endif
 			/**
 			 * This could be Deauthentication frame from

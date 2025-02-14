@@ -372,7 +372,8 @@ void lim_disassoc_tdls_peers(struct mac_context *mac_ctx,
 	     (sta_ds->mlmStaContext.mlmState ==
 	      eLIM_MLM_IDLE_STATE)) &&
 	    (IS_CURRENT_BSSID(mac_ctx, addr, pe_session)))
-		lim_delete_tdls_peers(mac_ctx, pe_session);
+		lim_delete_tdls_peers(mac_ctx, pe_session,
+				      TDLS_PEER_DEL_REASON_NONE);
 }
 #endif
 

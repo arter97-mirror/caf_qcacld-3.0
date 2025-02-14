@@ -175,6 +175,8 @@ struct wifi_drv_qmi_ce_information_v01 {
  * @fw_shared_wrmem_size: FW shared write memory size
  * @target_type_valid: whether corresponding QMI field is valid or not
  * @target_type: wifi target type
+ * @wfds_lpass_sid_valid: whether corresponding WMI field is valid or not
+ * @wfds_lpass_sid: LPASS memory access SID value
  */
 struct wfds_config_req_msg_v01 {
 	u32 ce_info_len;
@@ -203,9 +205,11 @@ struct wfds_config_req_msg_v01 {
 	u32 fw_shared_wrmem_size;
 	u8 target_type_valid;
 	enum wifi_drv_qmi_wifi_target_type_v01 target_type;
+	u8 wfds_lpass_sid_valid;
+	u32 wfds_lpass_sid;
 };
 
-#define WFDS_CONFIG_REQ_MSG_V01_MAX_MSG_LEN 314
+#define WFDS_CONFIG_REQ_MSG_V01_MAX_MSG_LEN 321
 extern struct qmi_elem_info wfds_config_req_msg_v01_ei[];
 
 /**

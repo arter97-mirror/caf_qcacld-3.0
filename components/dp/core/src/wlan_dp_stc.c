@@ -2040,13 +2040,14 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
 		dp_info("STC: feature not enabled via cfg");
-		return QDF_STATUS_SUCCESS;
+		dp_ctx->dp_stc = NULL;
+		return QDF_STATUS_E_NOSUPPORT;
 	}
 
 	if (!wlan_dp_stc_clients_available(dp_ctx)) {
 		dp_info("STC: No clients available, skip attach");
 		dp_ctx->dp_stc = NULL;
-		return QDF_STATUS_SUCCESS;
+		return QDF_STATUS_E_NOSUPPORT;
 	}
 
 	dp_info("STC: attach");

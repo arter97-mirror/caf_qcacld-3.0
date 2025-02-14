@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -248,12 +248,19 @@ enum vdev_assoc_type {
  * struct wlan_mlme_roam_state_info - Structure containing roaming
  * state related details
  * @state: Roaming module state.
- * @mlme_operations_bitmap: Bitmap containing what mlme operations are in
- *  progress where roaming should not be allowed.
+ * @rso_disabled_status_bitmap: Bitmap containing the mlme operations/concurrent
+ *  connections that requested for RSO_STOP as these are not supported when
+ *  roaming is enabled.
+ * @rso_pending_disable_req_bitmap: Bitmap containing the mlme
+ *  operations/concurrent connections that requested for RSO stop. Currently,
+ *  this is set only when RSO is not disabled immediately due to some
+ *  constraints (e.g. STA roaming is in progress) and needs to be disabled
+ *  once the constraints are resolved.
  */
 struct wlan_mlme_roam_state_info {
 	enum roam_offload_state state;
-	uint8_t mlme_operations_bitmap;
+	uint8_t rso_disabled_status_bitmap;
+	uint8_t rso_pending_disable_req_bitmap;
 };
 
 /**
@@ -1478,40 +1485,73 @@ void mlme_set_roam_state(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			 enum roam_offload_state val);
 
 /**
- * mlme_get_operations_bitmap() - Get the mlme operations bitmap which
- *  contains the bitmap of mlme operations which have disabled roaming
- *  temporarily
+ * mlme_get_rso_disabled_bitmap() - Get the RSO disabled bitmap
  * @psoc: PSOC pointer
- * @vdev_id: vdev for which the mlme operation bitmap is requested
+ * @vdev_id: vdev for which the RSO disabled bitmap is requested
  *
  * Return: bitmap value
  */
 uint8_t
-mlme_get_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+mlme_get_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 
 /**
- * mlme_set_operations_bitmap() - Set the mlme operations bitmap which
- *  indicates what mlme operations are in progress
+ * mlme_set_rso_disabled_bitmap() - Set the RSO disabled bitmap
  * @psoc: PSOC pointer
- * @vdev_id: vdev for which the mlme operation bitmap is requested
+ * @vdev_id: vdev for which the RSO disabled bitmap is requested
  * @reqs: RSO stop requestor
  * @clear: clear bit if true else set bit
  *
  * Return: None
  */
 void
-mlme_set_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			   enum wlan_cm_rso_control_requestor reqs, bool clear);
+mlme_set_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			     enum wlan_cm_rso_control_requestor reqs,
+			     bool clear);
 /**
- * mlme_clear_operations_bitmap() - Clear mlme operations bitmap which
- *  indicates what mlme operations are in progress
+ * mlme_clear_rso_disabled_bitmap() - Clear RSO disabled bitmap
  * @psoc: PSOC pointer
- * @vdev_id: vdev for which the mlme operation bitmap is requested
+ * @vdev_id: vdev for which the RSO disabled bitmap is requested
  *
  * Return: None
  */
 void
-mlme_clear_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+mlme_clear_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * mlme_get_rso_pending_disable_req_bitmap() - Get the RSO disable req bitmap
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev for which the RSO disable request bitmap is requested
+ *
+ * Return: bitmap value
+ */
+uint8_t
+mlme_get_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
+
+/**
+ * mlme_set_rso_pending_disable_req_bitmap() - Set the RSO disable req bitmap
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev for which the RSO disable request bitmap is requested
+ * @reqs: RSO stop requestor
+ * @clear: clear bit if true else set bit
+ *
+ * Return: None
+ */
+void
+mlme_set_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					enum wlan_cm_rso_control_requestor reqs,
+					bool clear);
+/**
+ * mlme_clear_rso_pending_disable_req_bitmap() - Clear RSO disable req bitmap
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev for which the RSO disable req bitmap is requested
+ *
+ * Return: None
+ */
+void
+mlme_clear_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id);
 
 /**
  * mlme_get_cfg_wlm_level() - Get the WLM level value
@@ -2117,4 +2157,14 @@ wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	return 0xFF;
 }
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+/**
+ * mlme_clear_peer_private_object_data(): clear the data in MLME peer
+ * private object data
+ * @peer: peer object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
 #endif

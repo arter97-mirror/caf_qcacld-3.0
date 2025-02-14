@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1090,7 +1090,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		}
 
 		if (IS_DOT11_MODE_EHT(session->dot11mode)) {
-			lim_update_session_eht_capable(mac_ctx, session);
+			lim_update_session_eht_capable(session, true);
 			lim_copy_bss_eht_cap(session);
 		} else {
 			lim_strip_eht_ies_from_add_ies(mac_ctx, session);
@@ -3578,7 +3578,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	}
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode)) {
-		lim_update_session_eht_capable(mac_ctx, session);
+		lim_update_session_eht_capable(session, true);
 		lim_reset_self_ocv_caps(session);
 		lim_copy_join_req_eht_cap(session);
 	}
@@ -4891,7 +4891,8 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 	lim_dump_he_info(mac_ctx, pe_session);
 	lim_dump_eht_info(pe_session);
 
-	if (lim_connect_skip_join_for_gc(pe_session)) {
+	if (lim_connect_skip_join_for_gc(pe_session) ||
+	    wlan_vdev_mlme_is_mlo_link_switch_in_progress(pe_session->vdev)) {
 		pe_session->beacon =
 			qdf_mem_malloc(util_scan_entry_frame_len(req->entry));
 		if (!pe_session->beacon)
@@ -6996,7 +6997,8 @@ static void __lim_process_sme_disassoc_req(struct mac_context *mac,
 				pe_session->limSmeState;
 			pe_session->limSmeState = eLIM_SME_WT_DISASSOC_STATE;
 			/* Delete all TDLS peers connected before leaving BSS */
-			lim_delete_tdls_peers(mac, pe_session);
+			lim_delete_tdls_peers(mac, pe_session,
+					      TDLS_PEER_DEL_REASON_NONE);
 			MTRACE(mac_trace(mac, TRACE_CODE_SME_STATE,
 				pe_session->peSessionId,
 				pe_session->limSmeState));
@@ -7354,7 +7356,8 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 		case eLIM_SME_ASSOCIATED_STATE:
 		case eLIM_SME_LINK_EST_STATE:
 			/* Delete all TDLS peers connected before leaving BSS */
-			lim_delete_tdls_peers(mac_ctx, session_entry);
+			lim_delete_tdls_peers(mac_ctx, session_entry,
+					      TDLS_PEER_DEL_REASON_NONE);
 			fallthrough;
 		case eLIM_SME_WT_ASSOC_STATE:
 		case eLIM_SME_JOIN_FAILURE_STATE:

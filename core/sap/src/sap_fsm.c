@@ -1698,10 +1698,11 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 				 qdf_ret_status, sap_context->chan_freq);
 			default_op_freq = sap_select_default_oper_chan(
 						mac_ctx, sap_context);
-			wlansap_set_acs_ch_freq(sap_context, default_op_freq);
+			wlansap_set_acs_ch_freq(mac_ctx, sap_context,
+						default_op_freq);
 
 			if (sap_context->freq_list) {
-				wlansap_set_acs_ch_freq(
+				wlansap_set_acs_ch_freq(mac_ctx,
 					sap_context, sap_context->freq_list[0]);
 				qdf_mem_free(sap_context->freq_list);
 				sap_context->freq_list = NULL;
@@ -3559,12 +3560,6 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	sap_ctx->sap_radar_found_status = false;
 
 	sap_debug("session: %d", sap_ctx->sessionId);
-
-	/* Cancel all ongoing/pending scan requests */
-	if (wlan_get_pdev_status(mac_ctx->pdev) != SCAN_NOT_IN_PROGRESS)
-		wlan_abort_scan(mac_ctx->pdev,
-				wlan_objmgr_pdev_get_pdev_id(mac_ctx->pdev),
-				INVAL_VDEV_ID, INVAL_SCAN_ID, false);
 
 	qdf_status = sme_start_bss(mac_handle, sap_ctx->sessionId,
 				   &sap_ctx->sap_bss_cfg);

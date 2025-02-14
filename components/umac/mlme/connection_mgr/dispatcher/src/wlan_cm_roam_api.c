@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -178,7 +178,7 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	 * If there is a failure or operating mode is not STA / P2P-CLI
 	 * then get channel width from wlan_channel.
 	 */
-	status = wlan_mlme_get_sta_ch_width(vdev, &ch_width);
+	status = wlan_mlme_get_sta_ch_width(vdev, &ch_width, NULL);
 	if (QDF_IS_STATUS_ERROR(status))
 		assoc_chan_info->assoc_ch_width = des_chan->ch_width;
 	else
@@ -230,6 +230,8 @@ char *cm_roam_get_requestor_string(enum wlan_cm_rso_control_requestor requestor)
 		return "NDP connection";
 	case RSO_SET_PCL:
 		return "Set PCL";
+	case RSO_SET_LINK:
+		return "Set Link";
 	}
 }
 
@@ -270,7 +272,7 @@ QDF_STATUS wlan_cm_disable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	uint8_t disable_reason = REASON_DRIVER_DISABLED;
 
 	if (reason == REASON_DRIVER_DISABLED && requestor)
-		mlme_set_operations_bitmap(psoc, vdev_id, requestor, false);
+		mlme_set_rso_disabled_bitmap(psoc, vdev_id, requestor, false);
 
 	if (reason == REASON_VDEV_RESTART_FROM_HOST)
 		disable_reason = REASON_VDEV_RESTART_FROM_HOST;
@@ -293,7 +295,7 @@ QDF_STATUS wlan_cm_enable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	uint8_t enable_reason = REASON_DRIVER_ENABLED;
 
 	if (reason == REASON_DRIVER_ENABLED && requestor)
-		mlme_set_operations_bitmap(psoc, vdev_id, requestor, true);
+		mlme_set_rso_disabled_bitmap(psoc, vdev_id, requestor, true);
 
 	if (reason == REASON_VDEV_RESTART_FROM_HOST)
 		enable_reason = REASON_VDEV_RESTART_FROM_HOST;
