@@ -3152,6 +3152,9 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 	if (false == lim_chk_sa_da(mac_ctx, hdr, session, sub_type))
 		return;
 
+	if (lim_mismatch_bssid_da(hdr))
+		return;
+
 	/* Allocate memory for the Assoc Request frame */
 	assoc_req = qdf_mem_malloc(sizeof(*assoc_req));
 	if (!assoc_req)

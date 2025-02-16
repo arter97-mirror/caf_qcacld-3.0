@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2182,19 +2182,17 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	uint32_t aes_block_size_len = 0;
 	struct pe_fils_session *fils_info;
 	tpDphHashNode sta = NULL;
-	struct pe_session *pe_session = in_pe_session;
+	struct pe_session *pe_session;
 	uint8_t out_vdevid = 0xff;
-
-	if (!pe_session) {
-		pe_err("pe_session is NULL");
-		return;
-	}
 
 	sta = lim_pickup_correct_link_and_dest_addr(mac_ctx, in_pe_session,
 						    in_sta, peer_addr,
 						    mld_addr, &out_vdevid);
 	pe_session = pe_find_session_by_vdev_id(mac_ctx, out_vdevid);
-
+	if (!pe_session) {
+		pe_err("pe_session is NULL");
+		return;
+	}
 
 	sme_session = pe_session->smeSessionId;
 

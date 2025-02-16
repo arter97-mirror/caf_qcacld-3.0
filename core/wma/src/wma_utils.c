@@ -4335,6 +4335,11 @@ int wma_roam_scan_stats_event_handler(void *handle, uint8_t *event,
 	status = wmi_extract_roam_scan_stats_res_evt(wmi_handle, event,
 						     &vdev_id,
 						     &res);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("fail to get vdev_id");
+		ret  = -EINVAL;
+		goto free_res;
+	}
 
 	/* vdev_id can be invalid though status is success, hence validate */
 	if (vdev_id >= wma_handle->max_bssid) {

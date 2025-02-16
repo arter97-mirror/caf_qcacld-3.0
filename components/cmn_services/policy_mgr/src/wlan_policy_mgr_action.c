@@ -2029,7 +2029,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 				psoc,  vdev_id[i],
 				WLAN_REG_IS_24GHZ_CH_FREQ(op_ch_freq_list[i]) ?
 				POLICY_MGR_BAND_24 : POLICY_MGR_BAND_5))
-			continue;
+			goto user_freq_check;
 
 		if (sta_sap_scc_on_dfs_chan &&
 		    (sta_sap_scc_on_dfs_chnl_config_value != 2) &&
@@ -2073,6 +2073,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 			break;
 		}
 
+user_freq_check:
 		/*
 		 * STA got disconnected & SAP has previously moved to 2.4 GHz
 		 * due to concurrency, then move SAP back to user configured

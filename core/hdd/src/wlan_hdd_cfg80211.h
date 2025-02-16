@@ -637,7 +637,7 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
  */
 int wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info);
 
-int wlan_hdd_sap_cfg_dfs_override(struct hdd_adapter *adapter);
+int wlan_hdd_sap_cfg_dfs_override(struct wlan_hdd_link_info *link_info);
 
 int wlan_hdd_enable_dfs_chan_scan(struct hdd_context *hdd_ctx,
 				  bool enable_dfs_channels);

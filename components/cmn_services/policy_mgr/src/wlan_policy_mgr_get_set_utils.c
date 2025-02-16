@@ -3523,6 +3523,22 @@ uint32_t policy_mgr_mode_specific_vdev_id(struct wlan_objmgr_psoc *psoc,
 	return vdev_id;
 }
 
+bool policy_mgr_is_mlo_ap(struct wlan_objmgr_psoc *psoc,
+			  uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool ml_sap_vdev = false;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (vdev) {
+		ml_sap_vdev = wlan_vdev_mlme_is_mlo_ap(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	}
+
+	return ml_sap_vdev;
+}
+
 uint32_t policy_mgr_mode_get_macid_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 					      uint32_t vdev_id)
 {
@@ -11090,11 +11106,13 @@ bool policy_mgr_is_sta_active_connection_exists(
 }
 
 bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
-					   uint32_t *ch_freq)
+					   uint32_t *ch_freq,
+					   bool exclude_mlo_sap_link)
 {
 	bool status = false;
 	uint32_t conn_index = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t vdev_id;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -11104,9 +11122,13 @@ bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
 			conn_index++) {
+		vdev_id = pm_conc_connection_list[conn_index].vdev_id;
 		if (pm_conc_connection_list[conn_index].in_use &&
 		    !wlan_reg_is_dfs_for_freq(pm_ctx->pdev,
 		    pm_conc_connection_list[conn_index].freq)) {
+			if (exclude_mlo_sap_link &&
+			    policy_mgr_is_mlo_ap(psoc, vdev_id))
+				continue;
 			*ch_freq = pm_conc_connection_list[conn_index].freq;
 			status = true;
 		}
@@ -12812,6 +12834,7 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	uint8_t num_mcc_conn = 0;
 	uint8_t num_scc_conn = 0;
 	uint8_t num_5_or_6_conn = 0;
+	bool ml_sap_vdev = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -12830,6 +12853,7 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
+	ml_sap_vdev = policy_mgr_is_mlo_ap(psoc, vdev_id);
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	connection = pm_conc_connection_list;
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
@@ -12870,7 +12894,19 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 				 vdev_id, freq, num_mcc_conn);
 		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 		return true;
+	} else if (ml_sap_vdev && WLAN_REG_IS_24GHZ_CH_FREQ(freq) &&
+		   (num_5_or_6_conn > 2)) {
+		policy_mgr_debug("%d connections present in 5/6g band, move 2g sap",
+				 num_5_or_6_conn);
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+		return true;
+	} else if (ml_sap_vdev && num_scc_conn) {
+		policy_mgr_debug("%d number of SCC on freq:%d",
+				 num_scc_conn, freq);
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+		return false;
 	}
+
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
 
@@ -13144,10 +13180,12 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	enum QDF_OPMODE mode;
 	enum policy_mgr_con_mode con_mode;
 	union conc_ext_flag conc_ext_flags;
-	uint32_t cc_count, i, j, ap_index;
+	uint32_t cc_count, i, j, ap_index, sta_cnt, sta_index;
 	bool found = false;
 	uint32_t op_freq[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
+	uint32_t sta_freq[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
+	uint8_t sta_vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
 	QDF_STATUS status;
 	struct policy_mgr_pcl_list pcl;
 
@@ -13212,22 +13250,70 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	/* For fourth connect check, if SAP setup freq not found in
-	 * pcl.pcl_list, set ap_index 0 avoid return true, then
-	 * SAP can start on ap_index's home channel instead of
-	 * start failure.
-	 */
-	if (policy_mgr_get_connection_count(psoc) >= 3 && !found)
-		ap_index = 0;
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		if (ap_index >= cc_count)
+			ap_index = 0;
 
-	/* If same band MCC SAP/GO not present, return true,
-	 * no AP to AP channel override
-	 */
-	if (ap_index >= cc_count)
-		return true;
+		sta_cnt = policy_mgr_get_mode_specific_conn_info(
+							psoc,
+							&sta_freq[0],
+							&sta_vdev_id[0],
+							PM_STA_MODE);
 
-	*con_freq = op_freq[ap_index];
-	*con_vdev_id = vdev_id[ap_index];
+		if (!sta_cnt)
+			return true;
+
+		sta_index = sta_cnt;
+		for (i = 0 ; i < pcl.pcl_len; i++) {
+			for (j = 0; j < sta_cnt; j++) {
+				if (sta_freq[j] == pcl.pcl_list[i])
+					break;
+			}
+
+			if (j >= sta_cnt)
+				continue;
+
+			if (wlan_reg_is_same_band_freqs(sta_freq[j],
+							op_freq[ap_index])) {
+				continue;
+			} else {
+				*con_freq = sta_freq[j];
+				*con_vdev_id = sta_vdev_id[j];
+				sta_index = j;
+				break;
+			}
+		}
+
+		if (sta_index >= sta_cnt)
+			return true;
+
+	} else {
+		/* Multi-SAP case, SAP on same mac found, override to
+		 * same channel.
+		 */
+		if (cc_count >= 5 && ap_index < cc_count) {
+			*con_freq = op_freq[ap_index];
+			*con_vdev_id = vdev_id[ap_index];
+			policy_mgr_debug("con freq %d con vdev %d",
+					 *con_freq, *con_vdev_id);
+			return false;
+		}
+
+		/* For fourth connect check, if SAP setup freq not found in
+		 * pcl.pcl_list, set ap_index 0 avoid return true, then
+		 * SAP can start on ap_index's home channel instead of
+		 * start failure.
+		 */
+		if (policy_mgr_get_connection_count(psoc) >= 3 && !found)
+			ap_index = 0;
+
+		if (ap_index >= cc_count)
+			return true;
+
+		*con_freq = op_freq[ap_index];
+		*con_vdev_id = vdev_id[ap_index];
+	}
+
 	/*
 	 * For 3Vif concurrency we only support SCC in same MAC
 	 * in below combination:
@@ -13940,6 +14026,26 @@ policy_mgr_find_current_hw_mode(struct wlan_objmgr_psoc *psoc)
 		return new_hw_index;
 end:
 	return POLICY_MGR_HW_MODE_INVALID;
+}
+
+bool
+policy_mgr_mlo_sap_concurrency_allow(struct wlan_objmgr_psoc *psoc)
+{
+	struct wmi_unified *wmi_handle;
+
+	if (!psoc) {
+		mlme_err("PSOC is NULL");
+		return false;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mlme_err("wmi_handle is null");
+		return false;
+	}
+
+	return (wmi_service_enabled(wmi_handle,
+				    wmi_service_mlo_sap_concurrency_support));
 }
 #endif
 

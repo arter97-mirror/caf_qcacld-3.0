@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3819,4 +3819,14 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width ch_width,
 				    uint16_t tpe_ie_len,
 				    tDot11fIEtransmit_power_env *tpe_ptr,
 				    uint16_t num_tpe, uint8_t *target);
+
+/**
+ * lim_mismatch_bssid_da() - checks destination addr and bssid if match
+ * @hdr: pointer to the MAC head
+ *
+ * check if da match with bssid or not.
+ *
+ * Return: true if bssid and destination address are different
+ */
+bool lim_mismatch_bssid_da(tpSirMacMgmtHdr hdr);
 #endif /* __LIM_UTILS_H */

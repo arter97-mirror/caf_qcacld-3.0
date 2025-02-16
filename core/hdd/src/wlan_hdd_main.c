@@ -7261,9 +7261,13 @@ static void hdd_set_multi_client_ll_support(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	bool multi_client_ll_ini_support, multi_client_ll_caps;
+	QDF_STATUS status;
 
-	ucfg_mlme_cfg_get_multi_client_ll_ini_support(hdd_ctx->psoc,
+	status = ucfg_mlme_cfg_get_multi_client_ll_ini_support(hdd_ctx->psoc,
 						&multi_client_ll_ini_support);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
 	multi_client_ll_caps =
 		ucfg_mlme_get_wlm_multi_client_ll_caps(hdd_ctx->psoc);
 
