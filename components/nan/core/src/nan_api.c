@@ -32,6 +32,7 @@
 #include "wlan_objmgr_vdev_obj.h"
 #include "nan_ucfg_api.h"
 #include <wlan_mlme_api.h>
+#include "cfg_ucfg_api.h"
 
 static QDF_STATUS nan_psoc_obj_created_notification(
 		struct wlan_objmgr_psoc *psoc, void *arg_list)
@@ -491,6 +492,18 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 	}
 
 	return nan_allowed;
+}
+
+bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
+
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return cfg_default(CFG_DISABLE_6G_NAN);
+	}
+
+	return nan_obj->cfg_param.disable_6g_nan;
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO

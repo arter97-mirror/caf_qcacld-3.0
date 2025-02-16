@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -251,6 +251,15 @@ bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
 bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq);
 
 /**
+ * wlan_get_disable_6g_nan() - Check if NAN is disabled on 6Ghz
+ * @psoc: psoc context
+ *
+ * Return: True if NAN is disabled on 6Ghz, else false.
+ */
+
+bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc);
+
+/**
  * nan_handle_emlsr_concurrency()- Handle NAN+eMLSR concurrency
  * @psoc: pointer to psoc object
  * @nan_enable: Carries true if NAN is getting enabled.
@@ -355,6 +364,12 @@ bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 
 static inline
 bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
+{
+	return false;
+}
+
+static inline
+bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
