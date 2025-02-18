@@ -145,6 +145,11 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 		pe_debug("EMLSR not supported with D2.0 AP");
 	}
 
+	/* Peer link reconfig operation support */
+	mlo_ctx->link_recfg_op_support =
+		bcn_ptr->mlo_ie.mlo_ie.mld_capab_and_op_info.link_reconfig_operation_support;
+	pe_debug("AP link recfg op supp: %d", mlo_ctx->link_recfg_op_support);
+
 	/** max num of active links recommended by AP */
 	tmp_rec_value =
 	bcn_ptr->mlo_ie.mlo_ie.ext_mld_capab_and_op_info.rec_max_simultaneous_links;

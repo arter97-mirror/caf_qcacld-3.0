@@ -199,12 +199,18 @@ struct mld_capab_and_op {
  * struct ext_mld_capab_and_op - EXT MLD capability and operations info
  * @op_parameter_update_support: operation parameter update support
  * @rec_max_simultaneous_links: recommended max simultaneous links
+ * @nstr_status_update_support: NSTR status update support
+ * @emlsr_enablement_on_one_link_support: EMLSR enablement on one link support
+ * @btm_mld_rec_for_multi_ap_supp: BTM MLD recommendation multi AP support
  * @reserved: reserved
  */
 struct ext_mld_capab_and_op {
 	uint16_t op_parameter_update_support:1;
-	uint16_t rec_max_simultaneous_links:3;
-	uint16_t reserved:11;
+	uint16_t rec_max_simultaneous_links:4;
+	uint16_t nstr_status_update_support:1;
+	uint16_t emlsr_enablement_on_one_link_support:1;
+	uint16_t btm_mld_rec_for_multi_ap_supp:1;
+	uint16_t reserved:8;
 };
 
 /**

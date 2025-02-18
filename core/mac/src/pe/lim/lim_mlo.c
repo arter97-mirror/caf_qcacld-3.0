@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -132,7 +132,13 @@ bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev,
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
 
-	if (new_bpcc == bpcc)
+	/*
+	 * If old and new BPCC are non-zero and if new BPCC is greater than
+	 * old BPCC then treat it as CU and process the rest of the beacon
+	 * contents. If the new and old BPCC are zero, then ignore the CU
+	 * processing.
+	 */
+	if (!new_bpcc && !bpcc)
 		return false;
 
 	pe_debug_rl("link id %d new bpcc %d, old bpcc %d",

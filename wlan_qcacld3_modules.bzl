@@ -1121,6 +1121,11 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_ipa.c",
         ],
     },
+    "CONFIG_IPA_OPT_WIFI_DP_LOGGING": {
+	    True: [
+		"cmn/ipa/core/src/wlan_ipa_logging.c"
+	    ],
+    },
     "CONFIG_IPCIE_FW_SIM": {
         True: [
             "core/pld/src/pld_pcie_fw_sim.c",

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -113,6 +113,18 @@ struct beacon_interval_arg {
 QDF_STATUS if_mgr_enable_roaming(struct wlan_objmgr_pdev *pdev,
 				 struct wlan_objmgr_vdev *vdev,
 				 enum wlan_cm_rso_control_requestor requestor);
+
+/**
+ * if_mgr_is_assoc_link_of_vdev() - to check given vdev id is for assoc link
+ * @pdev: pdev object
+ * @vdev: vdev object
+ * @cur_vdev_id: vdev id to check assoc link
+ *
+ * Return: true/false
+ */
+bool if_mgr_is_assoc_link_of_vdev(struct wlan_objmgr_pdev *pdev,
+				  struct wlan_objmgr_vdev *vdev,
+				  uint8_t cur_vdev_id);
 
 /**
  * if_mgr_disable_roaming() - interface manager disable roaming

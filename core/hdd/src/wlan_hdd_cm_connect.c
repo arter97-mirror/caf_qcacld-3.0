@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1071,7 +1071,8 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 	 * If connect failure is due to link switch, do not disable the
 	 * netdev queues as it will lead to data stall/NUD failure.
 	 */
-	if (!(rsp->cm_id & CM_ID_LSWITCH_BIT)) {
+	if (!wlan_cm_is_link_switch_connect_resp(rsp) &&
+	    !wlan_cm_is_link_add_connect_resp(rsp)) {
 		hdd_debug("vdev %d Disabling queues", link_info->vdev_id);
 		wlan_hdd_netif_queue_control(adapter,
 					     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -1716,8 +1717,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			hdd_cm_save_connect_info(assoc_link_adapter->deflink,
 						 rsp);
 	}
-	if (hdd_add_beacon_filter(adapter) != 0)
-		hdd_err("add beacon filter failed");
+
+	hdd_add_beacon_filter(hdd_ctx, link_info->vdev_id);
 
 	adapter->wapi_info.is_wapi_sta = hdd_cm_is_wapi_sta(
 						sta_ctx->conn_info.auth_type);

@@ -89,6 +89,63 @@ QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+static void
+if_mgr_defer_rso_enable_for_set_link_on_vdev(struct wlan_objmgr_pdev *pdev,
+					     void *object, void *arg)
+{
+	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)object;
+	struct change_roam_state_arg *roam_arg = arg;
+	uint8_t vdev_id, curr_vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	curr_vdev_id = roam_arg->curr_vdev_id;
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+		return;
+
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+	    if_mgr_is_assoc_link_of_vdev(pdev, vdev, curr_vdev_id))
+		return;
+
+	ifmgr_debug("vdev_id %d, curr_vdev_id: %d, mlme_state: %d",
+		    vdev_id, curr_vdev_id, vdev->vdev_mlme.mlme_state);
+
+	if (curr_vdev_id != vdev_id &&
+	    vdev->vdev_mlme.mlme_state == WLAN_VDEV_S_UP) {
+		mlme_set_rso_disabled_bitmap(psoc, vdev_id,
+					     roam_arg->requestor, true);
+		mlme_set_rso_disabled_bitmap(psoc, vdev_id,
+					     RSO_SET_LINK, false);
+	}
+}
+
+static QDF_STATUS
+if_mgr_defer_rso_enable_for_set_link(struct wlan_objmgr_pdev *pdev,
+				struct wlan_objmgr_vdev *vdev,
+				enum wlan_cm_rso_control_requestor requestor)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct change_roam_state_arg roam_arg;
+	uint8_t vdev_id;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	roam_arg.requestor = requestor;
+	roam_arg.curr_vdev_id = vdev_id;
+
+	/* update rso disabled status bitmap for each sta(s) vdev */
+	status = wlan_objmgr_pdev_iterate_obj_list(pdev, WLAN_VDEV_OP,
+			if_mgr_defer_rso_enable_for_set_link_on_vdev,
+			&roam_arg, 0, WLAN_IF_MGR_ID);
+
+	return status;
+}
+
 QDF_STATUS
 if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 			     struct if_mgr_event_data *event_data)
@@ -135,7 +192,20 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 		 * to be used while resetting the spoof MAC address as part of
 		 * the roam handoff sequence, resulting in a firmware assertion.
 		 */
-		ifmgr_debug("link switch in progress, Dont enable roaming");
+		ifmgr_debug("vdev: %d link switch in progress, Dont enable roaming",
+			    wlan_vdev_get_id(vdev));
+		/*
+		 * After START_BSS completes, the host avoids enabling roaming
+		 * in the firmware if a link switch is in progress. It is the
+		 * host's responsibility to re-enable roaming after the link
+		 * switch is completed. Therefore, cache the request and send
+		 * RSO_START to the firmware when SET_LINK is done.
+		 * First, reset RSO_START_BSS and set the newly introduced
+		 * request ID: RSO_SET_LINK. Upon receiving the SET LINK
+		 * response, the host needs to re-enable roaming based on
+		 * RSO_SET_LINK.
+		 */
+		if_mgr_defer_rso_enable_for_set_link(pdev, vdev, RSO_START_BSS);
 	} else {
 		ifmgr_debug("Enable Roaming after start bss complete");
 		if_mgr_enable_roaming(pdev, vdev, RSO_START_BSS);

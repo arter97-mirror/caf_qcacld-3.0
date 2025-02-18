@@ -8375,14 +8375,16 @@ populate_dot11f_he_6ghz_cap(struct mac_context *mac_ctx,
 	he_6g_cap->present = 1;
 	he_6g_cap->min_mpdu_start_spacing =
 		mac_ctx->mlme_cfg->ht_caps.ampdu_params.mpdu_density;
-	if (session)
+	if (session) {
+		he_6g_cap->sm_pow_save = session->ht_config.mimo_power_save;
 		he_6g_cap->max_ampdu_len_exp =
 			session->vht_config.max_ampdu_lenexp;
-	else
+	} else {
+		he_6g_cap->sm_pow_save = ht_cap_info->mimo_power_save;
 		he_6g_cap->max_ampdu_len_exp =
 			vht_cap_info->ampdu_len_exponent & 0x7;
+	}
 	he_6g_cap->max_mpdu_len = vht_cap_info->ampdu_len;
-	he_6g_cap->sm_pow_save = ht_cap_info->mimo_power_save;
 	he_6g_cap->rd_responder = 0;
 	he_6g_cap->rx_ant_pattern_consistency = 0;
 	he_6g_cap->tx_ant_pattern_consistency = 0;
@@ -12710,6 +12712,14 @@ populate_dot11f_mlo_caps(struct mac_context *mac_ctx,
 
 	common_info_len += WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
 	mlo_ie->ext_mld_capab_and_op_present = 0;
+	if (target_if_get_fw_btm_multi_ap_support(mac_ctx->psoc) &&
+	    session->vdev->mlo_dev_ctx &&
+	    session->vdev->mlo_dev_ctx->link_recfg_op_support) {
+		mlo_ie->ext_mld_capab_and_op_present = 1;
+		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
+		common_info_len += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
+	}
+
 	mlo_ie->mld_id_present = 0;
 	mlo_ie->mld_capab_and_op_present = 1;
 	mlo_ie->mld_capab_and_op_info.tid_link_map_supported =
@@ -13899,6 +13909,17 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 						eml_cap.emlsr_trans_delay;
 	}
 
+	if (partner_info->num_partner_links &&
+	    target_if_get_fw_btm_multi_ap_support(psoc) &&
+	    pe_session->vdev->mlo_dev_ctx &&
+	    pe_session->vdev->mlo_dev_ctx->link_recfg_op_support) {
+		pe_debug("Set ext mld caps");
+		mlo_ie->ext_mld_capab_and_op_present = 1;
+		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P;
+		mlo_ie->common_info_length += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
+		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
+	}
+
 	p_ml_ie = mlo_ie->data;
 	len_remaining = sizeof(mlo_ie->data);
 
@@ -13979,6 +14000,15 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 
 	pe_debug("link_reconfig_operation_support %d",
 		 mlo_ie->mld_capab_and_op_info.link_reconfig_operation_support);
+
+	if (mlo_ie->ext_mld_capab_and_op_present) {
+		QDF_SET_BITS(*(uint16_t *)p_ml_ie,
+			     WLAN_ML_BV_CINFO_EXTMLDCAPINFO_BTM_MLD_RECOM_MULTI_AP_IDX,
+			     WLAN_ML_BV_CINFO_EXTMLDCAPINFO_BTM_MLD_RECOM_MULTI_AP_BITS,
+			     mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp);
+		p_ml_ie += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
+		len_remaining -= WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
+	}
 
 	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
 
@@ -14214,8 +14244,14 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		/* Fill VHT for 5 GHz or 2 GHz with b24ghz_band enabled */
 		if ((is_2g &&
 		     mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band) ||
-		    WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq))
+		    WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq)) {
 			populate_dot11f_vht_caps(mac_ctx, NULL, &vht_caps);
+			if (is_2g) {
+				vht_caps.supportedChannelWidthSet = 0;
+				vht_caps.shortGI80MHz = 0;
+				vht_caps.shortGI160and80plus80MHz = 0;
+			}
+		}
 		if ((vht_caps.present && frm->VHTCaps.present &&
 		     qdf_mem_cmp(&vht_caps, &frm->VHTCaps, sizeof(vht_caps))) ||
 		     (vht_caps.present && !frm->VHTCaps.present)) {
@@ -14431,6 +14467,14 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 						eml_cap.emlsr_trans_delay;
 	}
 
+	if (target_if_get_fw_btm_multi_ap_support(psoc) &&
+	    vdev->mlo_dev_ctx && vdev->mlo_dev_ctx->link_recfg_op_support) {
+		mlo_ie->ext_mld_capab_and_op_present = 1;
+		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P;
+		mlo_ie->common_info_length += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
+		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
+	}
+
 	p_ml_ie = mlo_ie->data;
 	len_remaining = sizeof(mlo_ie->data);
 
@@ -14502,6 +14546,15 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 			     mlo_ie->mld_capab_and_op_info.link_reconfig_operation_support);
 		p_ml_ie += WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
 		len_remaining -= WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
+	}
+
+	if (mlo_ie->ext_mld_capab_and_op_present) {
+		QDF_SET_BITS(*(uint16_t *)p_ml_ie,
+			     WLAN_ML_BV_CINFO_EXTMLDCAPINFO_BTM_MLD_RECOM_MULTI_AP_IDX,
+			     WLAN_ML_BV_CINFO_EXTMLDCAPINFO_BTM_MLD_RECOM_MULTI_AP_BITS,
+			     mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp);
+		p_ml_ie += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
+		len_remaining -= WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
 	}
 
 	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
@@ -14621,6 +14674,13 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 						eml_cap.emlsr_trans_delay;
 	}
 
+	if (target_if_get_fw_btm_multi_ap_support(psoc)) {
+		mlo_ie->ext_mld_capab_and_op_present = 1;
+		presence_bitmap |= WLAN_ML_RV_CTRL_PBM_EXT_MLDCAPANDOP_P;
+		mlo_ie->common_info_length += WLAN_ML_RV_CINFO_EXT_MLDCAPANDOP_SIZE;
+		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
+	}
+
 	p_ml_ie = mlo_ie->data;
 	len_remaining = sizeof(mlo_ie->data);
 
@@ -14694,6 +14754,15 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 		len_remaining -= WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
 	}
 
+	if (mlo_ie->ext_mld_capab_and_op_present) {
+		QDF_SET_BITS(*(uint16_t *)p_ml_ie,
+			WLAN_ML_BV_CINFO_EXTMLDCAPINFO_BTM_MLD_RECOM_MULTI_AP_IDX,
+			WLAN_ML_BV_CINFO_EXTMLDCAPINFO_BTM_MLD_RECOM_MULTI_AP_BITS,
+			mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp);
+		p_ml_ie += WLAN_ML_RV_CINFO_EXT_MLDCAPANDOP_SIZE;
+		len_remaining -= WLAN_ML_RV_CINFO_EXT_MLDCAPANDOP_SIZE;
+	}
+
 	mlo_ie->num_data = p_ml_ie - mlo_ie->data;
 	pe_debug("EMLSR support: %d, padding delay: %d, transition delay: %d",
 		 mlo_ie->eml_capabilities_info.emlsr_support,
@@ -14703,6 +14772,9 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 	pe_debug("Num add links %d Num del links %d",
 		 req->add_link_info.num_links,
 		 req->del_link_info.num_links);
+
+	pe_debug("Ext ML Caps, BTM MLD Recom for Multi AP support: %d",
+		 mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp);
 
 	/* find out number of add and del links */
 	total_sta_prof = req->add_link_info.num_links +

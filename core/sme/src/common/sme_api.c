@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -10992,6 +10992,9 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 			    struct wma_tgt_cfg *cfg)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	uint8_t value = MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF;
+
+	ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(mac_ctx->psoc, &value);
 
 	qdf_mem_copy(&mac_ctx->eht_cap_2g,
 		     &cfg->eht_cap_2g,
@@ -11000,6 +11003,18 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 	qdf_mem_copy(&mac_ctx->eht_cap_5g,
 		     &cfg->eht_cap_5g,
 		     sizeof(tDot11fIEeht_cap));
+
+	/* modify HE Caps field according to INI setting */
+	mac_ctx->eht_cap_2g.bfee_ss_le_80mhz =
+			QDF_MIN(cfg->eht_cap_2g.bfee_ss_le_80mhz,
+				value);
+
+	mac_ctx->eht_cap_5g.bfee_ss_le_80mhz =
+			QDF_MIN(cfg->eht_cap_5g.bfee_ss_le_80mhz, value);
+	mac_ctx->eht_cap_5g.bfee_ss_160mhz =
+			QDF_MIN(cfg->eht_cap_5g.bfee_ss_160mhz, value);
+	mac_ctx->eht_cap_5g.bfee_ss_320mhz =
+			QDF_MIN(cfg->eht_cap_5g.bfee_ss_320mhz, value);
 
 	qdf_mem_copy(&mac_ctx->eht_cap_2g_orig,
 		     &mac_ctx->eht_cap_2g,
@@ -11116,10 +11131,14 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 	mac_ctx->he_cap_2g.bfee_sts_lt_80 =
 			QDF_MIN(cfg->he_cap_2g.bfee_sts_lt_80,
 				he_cap_ini->bfee_sts_lt_80);
+	mac_ctx->he_cap_2g.bfee_sts_gt_80 = 0;
 
 	mac_ctx->he_cap_5g.bfee_sts_lt_80 =
 			QDF_MIN(cfg->he_cap_5g.bfee_sts_lt_80,
 				he_cap_ini->bfee_sts_lt_80);
+	mac_ctx->he_cap_5g.bfee_sts_gt_80 =
+			QDF_MIN(cfg->he_cap_5g.bfee_sts_gt_80,
+				he_cap_ini->bfee_sts_gt_80);
 
 	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2) {
 		mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = HE_SET_MCS_4_NSS(
@@ -11388,8 +11407,14 @@ int sme_update_he_capabilities(mac_handle_t mac_handle, uint8_t session_id,
 		if (cfg_val) {
 			mac_ctx->mlme_cfg->twt_cfg.disable_btwt_usr_cfg = false;
 			cfg_he_cap->broadcast_twt = he_cap_orig->broadcast_twt;
+			mac_ctx->he_cap_2g.broadcast_twt =
+					mac_ctx->he_cap_2g_orig.broadcast_twt;
+			mac_ctx->he_cap_5g.broadcast_twt =
+					mac_ctx->he_cap_5g_orig.broadcast_twt;
 		} else {
 			cfg_he_cap->broadcast_twt = 0;
+			mac_ctx->he_cap_2g.broadcast_twt = 0;
+			mac_ctx->he_cap_5g.broadcast_twt = 0;
 			mac_ctx->mlme_cfg->twt_cfg.disable_btwt_usr_cfg = true;
 		}
 		break;
@@ -11899,7 +11924,18 @@ int sme_update_he_twt_req_support(mac_handle_t mac_handle, uint8_t session_id,
 		sme_err("No session for id %d", session_id);
 		return -EINVAL;
 	}
-	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request = cfg_val;
+	if (cfg_val) {
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request =
+			mac_ctx->mlme_cfg->he_caps.he_cap_orig.twt_request;
+		mac_ctx->he_cap_2g.twt_request =
+			mac_ctx->he_cap_2g_orig.twt_request;
+		mac_ctx->he_cap_5g.twt_request =
+			mac_ctx->he_cap_5g_orig.twt_request;
+	} else {
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request = 0;
+		mac_ctx->he_cap_2g.twt_request = 0;
+		mac_ctx->he_cap_5g.twt_request = 0;
+	}
 
 	ucfg_twt_cfg_set_requestor(mac_ctx->psoc, cfg_val);
 	csr_update_session_he_cap(mac_ctx, session);
@@ -12698,25 +12734,16 @@ bool sme_is_beacon_reporting_do_not_resume(mac_handle_t mac_handle,
 }
 #endif
 
-/**
- * sme_add_beacon_filter() - set the beacon filter configuration
- * @mac_handle: The handle returned by macOpen
- * @session_id: session id
- * @ie_map: bitwise array of IEs
- *
- * Return: Return QDF_STATUS, otherwise appropriate failure code
- */
 QDF_STATUS sme_add_beacon_filter(mac_handle_t mac_handle,
-				 uint32_t session_id,
-				 uint32_t *ie_map)
+				 uint8_t vdev_id, uint32_t *ie_map)
 {
 	struct scheduler_msg message = {0};
 	QDF_STATUS qdf_status;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct beacon_filter_param *filter_param;
 
-	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
-		sme_err("CSR session not valid: %d", session_id);
+	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
+		sme_err("vdev %d not valid", vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -12724,7 +12751,7 @@ QDF_STATUS sme_add_beacon_filter(mac_handle_t mac_handle,
 	if (!filter_param)
 		return QDF_STATUS_E_FAILURE;
 
-	filter_param->vdev_id = session_id;
+	filter_param->vdev_id = vdev_id;
 
 	qdf_mem_copy(filter_param->ie_map, ie_map,
 			SIR_BCN_FLT_MAX_ELEMS_IE_LIST * sizeof(uint32_t));
@@ -12735,31 +12762,23 @@ QDF_STATUS sme_add_beacon_filter(mac_handle_t mac_handle,
 					    QDF_MODULE_ID_WMA,
 					    QDF_MODULE_ID_WMA,
 					    &message);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		sme_err("Not able to post msg to WDA!");
-
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		sme_err("vdev %d Not able to post msg to WDA!", vdev_id);
 		qdf_mem_free(filter_param);
 	}
 	return qdf_status;
 }
 
-/**
- * sme_remove_beacon_filter() - set the beacon filter configuration
- * @mac_handle: The handle returned by macOpen
- * @session_id: session id
- *
- * Return: Return QDF_STATUS, otherwise appropriate failure code
- */
 QDF_STATUS sme_remove_beacon_filter(mac_handle_t mac_handle,
-				    uint32_t session_id)
+				    uint8_t vdev_id)
 {
 	struct scheduler_msg message = {0};
 	QDF_STATUS qdf_status;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct beacon_filter_param *filter_param;
 
-	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
-		sme_err("CSR session not valid: %d", session_id);
+	if (!CSR_IS_SESSION_VALID(mac_ctx, vdev_id)) {
+		sme_err("vdev %d not valid", vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -12767,7 +12786,7 @@ QDF_STATUS sme_remove_beacon_filter(mac_handle_t mac_handle,
 	if (!filter_param)
 		return QDF_STATUS_E_FAILURE;
 
-	filter_param->vdev_id = session_id;
+	filter_param->vdev_id = vdev_id;
 
 	message.type = WMA_REMOVE_BCN_FILTER_CMDID;
 	message.bodyptr = filter_param;
@@ -12775,9 +12794,8 @@ QDF_STATUS sme_remove_beacon_filter(mac_handle_t mac_handle,
 					    QDF_MODULE_ID_WMA,
 					    QDF_MODULE_ID_WMA,
 					    &message);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		sme_err("Not able to post msg to WDA!");
-
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		sme_err("vdev %d Not able to post msg to WDA!", vdev_id);
 		qdf_mem_free(filter_param);
 	}
 	return qdf_status;
@@ -15988,6 +16006,12 @@ int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
 		break;
 	case EHT_TX_BFEE_SOUNDING_FEEDBACK_RATELIMIT:
 		cfg_eht_cap->tb_sounding_feedback_rl = cfg_val;
+		break;
+	case EHT_TX_TRIG_SU_BFORMING_FEEDBACK:
+		cfg_eht_cap->trig_su_bforming_feedback = cfg_val;
+		break;
+	case EHT_RX_EXTRA_ETH_LTF:
+		cfg_eht_cap->max_num_eht_ltf = cfg_val;
 		break;
 	default:
 		sme_debug("default: Unhandled cap type %d", cap_type);

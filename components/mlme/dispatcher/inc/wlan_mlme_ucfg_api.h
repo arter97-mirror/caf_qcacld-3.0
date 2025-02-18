@@ -4670,6 +4670,20 @@ ucfg_mlme_get_indoor_channel_support(struct wlan_objmgr_psoc *psoc,
 				     bool *value);
 
 /**
+ * ucfg_mlme_check_bit_in_rso_disabled_bitmap() - To check whether a
+ * particular bit is set in the RSO disable request bitmap
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev for which the RSO disable request bitmap is requested
+ * @reqs: RSO start/stop requestor
+ *
+ * Return: true or flase
+ */
+bool
+ucfg_mlme_check_bit_in_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id,
+				enum wlan_cm_rso_control_requestor reqs);
+
+/**
  * ucfg_mlme_get_scan_11d_interval() - get scan 11d interval
  * @psoc: pointer to psoc object
  * @value:  Pointer to the value which will be filled for the caller
@@ -5659,6 +5673,17 @@ uint16_t ucfg_mlme_get_keepalive_period(struct wlan_objmgr_vdev *vdev)
 QDF_STATUS
 ucfg_mlme_get_dfs_discard_mode(struct wlan_objmgr_psoc *psoc,
 			       uint8_t *val);
+
+/*
+ * ucfg_mlme_get_passive_discard_mode() - Get the passive discard mode
+ * @psoc: pointer to psoc object
+ * @val:  bit mask of mode for which passive channel need to discard
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_passive_discard_mode(struct wlan_objmgr_psoc *psoc,
+				   uint8_t *val);
 
 /**
  * ucfg_mlme_set_p2p_device_mac_addr - set p2p device interface mac

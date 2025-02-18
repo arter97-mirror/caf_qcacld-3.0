@@ -1231,6 +1231,22 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 			mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_gt_80 =
 						he_cap->bfee_sts_gt_80;
 
+		if ((mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_lt_80 >
+		     MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
+		     !wma_cfg->tx_bfee_8ss_enabled) {
+			mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_lt_80 =
+				QDF_MIN(mlme_obj->cfg.he_caps.dot11_he_cap.
+				bfee_sts_lt_80,
+				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF);
+		}
+		if ((mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_gt_80 >
+		     MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
+		     !wma_cfg->tx_bfee_8ss_enabled) {
+			mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_gt_80 =
+				QDF_MIN(mlme_obj->cfg.he_caps.dot11_he_cap.
+				bfee_sts_gt_80,
+				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF);
+		}
 	} else {
 		mlme_obj->cfg.he_caps.dot11_he_cap.su_beamformee = 0;
 		mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_lt_80 = 0;
@@ -1447,6 +1463,28 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 		if (cfg_in_range(CFG_EHT_BFEE_SS_320MHZ,
 				 eht_cap->bfee_ss_320mhz))
 			mlme_eht_cap->bfee_ss_320mhz = eht_cap->bfee_ss_320mhz;
+
+		if ((mlme_eht_cap->bfee_ss_le_80mhz >
+		     MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
+		     !wma_cfg->tx_bfee_8ss_enabled) {
+			mlme_eht_cap->bfee_ss_le_80mhz =
+			   QDF_MIN(mlme_eht_cap->bfee_ss_le_80mhz,
+				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF);
+		}
+		if ((mlme_eht_cap->bfee_ss_160mhz >
+		     MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
+		     !wma_cfg->tx_bfee_8ss_enabled) {
+			mlme_eht_cap->bfee_ss_160mhz =
+			   QDF_MIN(mlme_eht_cap->bfee_ss_160mhz,
+				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF);
+		}
+		if ((mlme_eht_cap->bfee_ss_320mhz >
+		     MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
+		     !wma_cfg->tx_bfee_8ss_enabled) {
+			mlme_eht_cap->bfee_ss_320mhz =
+			   QDF_MIN(mlme_eht_cap->bfee_ss_320mhz,
+				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF);
+		}
 
 	} else {
 		mlme_eht_cap->su_beamformee = 0;
@@ -8996,4 +9034,21 @@ QDF_STATUS
 wlan_mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer)
 {
 	return mlme_clear_peer_private_object_data(peer);
+}
+
+QDF_STATUS
+wlan_mlme_get_fw_optimized_power_cap(struct wlan_objmgr_psoc *psoc,
+				     bool *cap)
+{
+	struct target_psoc_info *tgt_hdl;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		mlme_err("target psoc info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*cap = target_psoc_get_fw_optimize_power_cap(tgt_hdl);
+
+	return QDF_STATUS_SUCCESS;
 }

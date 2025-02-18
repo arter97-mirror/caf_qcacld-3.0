@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -572,6 +572,25 @@ pld_ipci_populate_shadow_v3_cfg(struct icnss_wlan_enable_cfg *cfg,
 }
 #endif
 
+#ifdef CE_CMN_REG_CFG_QMI
+static inline void
+pld_ipci_populate_ce_cmn_reg_cfg(struct icnss_wlan_enable_cfg *cfg,
+				 struct pld_wlan_enable_cfg *config)
+{
+	if (config->num_ce_cmn_reg_config) {
+		cfg->num_ce_cmn_reg_config = config->num_ce_cmn_reg_config;
+		cfg->ce_cmn_reg_cfg = (struct icnss_ce_cmn_register_config *)
+				       config->ce_cmn_reg_cfg;
+	}
+}
+#else
+static inline void
+pld_ipci_populate_ce_cmn_reg_cfg(struct icnss_wlan_enable_cfg *cfg,
+				 struct pld_wlan_enable_cfg *config)
+{
+}
+#endif
+
 int pld_ipci_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 			 enum pld_driver_mode mode, const char *host_version)
 {
@@ -602,6 +621,7 @@ int pld_ipci_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 	}
 
 	pld_ipci_populate_shadow_v3_cfg(&cfg, config);
+	pld_ipci_populate_ce_cmn_reg_cfg(&cfg, config);
 
 	switch (mode) {
 	case PLD_FTM:

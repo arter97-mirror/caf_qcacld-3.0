@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1006,6 +1006,11 @@ ucfg_pmo_get_active_mc_bc_apf_mode(struct wlan_objmgr_psoc *psoc)
 	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
 
 	return pmo_psoc_ctx->psoc_cfg.active_mc_bc_apf_mode;
+}
+
+bool ucfg_pmo_is_configure_apf_per_screen_state(struct wlan_objmgr_psoc *psoc)
+{
+	return pmo_core_is_configure_apf_per_screen_state(psoc);
 }
 
 #ifdef WLAN_ENABLE_GPIO_WAKEUP

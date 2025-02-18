@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2913,6 +2913,7 @@ struct wlan_mlme_iot {
  * @dynamic_nss_chains_support : intersection of host and fw capability of
  *				 dynamic NSS chain support
  * @reduce_pwr_scan_mode : reduce power scan mode enable/disable
+ * @passive_chan_discard_mode: discard passive channels
  */
 struct wlan_mlme_cfg {
 	struct wlan_mlme_chainmask chainmask_cfg;
@@ -2965,6 +2966,7 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_eml_cap eml_cap;
 	bool dynamic_nss_chains_support;
 	bool reduce_pwr_scan_mode;
+	uint8_t passive_chan_discard_mode;
 };
 
 /**

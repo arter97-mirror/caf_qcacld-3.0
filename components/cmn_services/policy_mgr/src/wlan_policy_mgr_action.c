@@ -322,12 +322,15 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_get_mode_specific_conn_info(psoc, &freq_list[0],
 					       &vdev_id_list[0], PM_SAP_MODE);
 	if (cur_bw == CH_WIDTH_320MHZ && ch_freq &&
-	    policy_mgr_is_conn_lead_to_dbs_sbs(psoc, vdev_id, ch_freq))
+	    policy_mgr_is_conn_lead_to_bw_downgrade(psoc, vdev_id, ch_freq,
+						    cur_bw))
 		*next_action = PM_DOWNGRADE_BW;
 	else if (cur_bw == CH_WIDTH_160MHZ &&
 		 !ch_freq &&
-		 !policy_mgr_is_conn_lead_to_dbs_sbs(psoc,
-					vdev_id_list[0], freq_list[0]) &&
+		 !policy_mgr_is_conn_lead_to_bw_downgrade(psoc,
+							  vdev_id_list[0],
+							  freq_list[0],
+							  cur_bw) &&
 		 (reason &&
 		  (*reason == POLICY_MGR_UPDATE_REASON_TIMER_START ||
 		   *reason == POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC)))
@@ -1069,6 +1072,26 @@ policy_mgr_is_conn_lead_to_dbs_sbs(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
+bool
+policy_mgr_is_conn_lead_to_bw_downgrade(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, qdf_freq_t freq,
+					enum phy_ch_width ch_width)
+{
+	struct dbs_bw bw_dbs;
+	enum hw_mode_bandwidth cur_bw;
+
+	cur_bw = policy_mgr_get_bw(ch_width);
+	if (policy_mgr_is_conn_lead_to_dbs_sbs(psoc, vdev_id, freq)) {
+		policy_mgr_get_hw_dbs_max_bw(psoc, &bw_dbs);
+		if (cur_bw <= bw_dbs.mac1_bw || cur_bw <= bw_dbs.mac0_bw)
+			return false;
+		else
+			return true;
+	}
+
+	return false;
+}
+
 static QDF_STATUS
 policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 			   uint32_t session_id,
@@ -1222,8 +1245,12 @@ policy_mgr_is_ch_width_downgrade_required(struct wlan_objmgr_psoc *psoc,
 					  qdf_list_t *scan_list)
 
 {
-	if (policy_mgr_is_conn_lead_to_dbs_sbs(psoc, vdev_id,
-					       entry->channel.chan_freq) ||
+	enum phy_ch_width ch_width;
+
+	ch_width = wlan_mlme_get_ch_width_from_phymode(entry->phy_mode);
+	if (policy_mgr_is_conn_lead_to_bw_downgrade(psoc, vdev_id,
+						    entry->channel.chan_freq,
+						    ch_width) ||
 	    wlan_cm_bss_mlo_type(psoc, entry, scan_list))
 		return true;
 
@@ -3732,6 +3759,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_SUCCESS;
 
 	policy_mgr_get_mcc_scc_switch(psoc, &cc_mode);
+	con_mode = policy_mgr_con_mode_by_vdev_id(psoc, sap_vdev_id);
 
 	/*
 	 * If interference is 0, it could be STA/SAP SCC,
@@ -3743,11 +3771,12 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 								   sap_ch_freq,
 								   sap_vdev_id)) {
 			return QDF_STATUS_SUCCESS;
-		} else if (!policy_mgr_is_hw_dbs_capable(psoc) &&
+		} else if (con_mode == PM_SAP_MODE &&
+			   !policy_mgr_is_hw_dbs_capable(psoc) &&
 			   !policy_mgr_is_sta_sap_scc(psoc, sap_ch_freq) &&
 			   cc_mode != QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND) {
-			policymgr_nofl_debug("MCC situation in non-dbs hw STA, no SCC freq found for SAP %d",
-					     sap_ch_freq);
+			policymgr_nofl_debug("Mode %d MCC situation in non-dbs hw STA, no SCC freq found %d",
+					     con_mode, sap_ch_freq);
 			return QDF_STATUS_E_FAILURE;
 		}
 
@@ -3756,8 +3785,6 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 
 	if (!ch_freq)
 		return QDF_STATUS_SUCCESS;
-
-	con_mode = policy_mgr_con_mode_by_vdev_id(psoc, sap_vdev_id);
 
 	is_sta_sap_scc = policy_mgr_is_sta_sap_scc(psoc, ch_freq);
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -450,11 +450,12 @@ void hdd_copy_ht_caps(struct ieee80211_ht_cap *hdd_ht_cap,
 
 /**
  * hdd_add_beacon_filter() - add beacon filter
- * @adapter: Pointer to the hdd adapter
+ * @hdd_ctx: hdd ctx
+ * @vdev_id: vdev to set it on
  *
  * Return: 0 on success and errno on failure
  */
-int hdd_add_beacon_filter(struct hdd_adapter *adapter);
+int hdd_add_beacon_filter(struct hdd_context *hdd_ctx, uint8_t vdev_id);
 
 /**
  * hdd_copy_vht_caps()- copy vht caps info from roam vht caps
@@ -525,13 +526,15 @@ void hdd_conn_remove_connect_info(struct hdd_station_ctx *sta_ctx);
  */
 void hdd_clear_roam_profile_ie(struct hdd_adapter *adapter);
 
+
 /**
  * hdd_remove_beacon_filter() - remove beacon filter
- * @adapter: Pointer to the hdd adapter
+ * @hdd_ctx: Pointer to the hdd ctx
+ * @vdev_id: vdve id
  *
  * Return: 0 on success and errno on failure
  */
-int hdd_remove_beacon_filter(struct hdd_adapter *adapter);
+int hdd_remove_beacon_filter(struct hdd_context *hdd_ctx, uint8_t vdev_id);
 
 /**
  * hdd_copy_ht_operation()- copy HT operation element to

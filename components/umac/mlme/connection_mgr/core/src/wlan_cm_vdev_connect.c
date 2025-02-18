@@ -1108,7 +1108,8 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 	wlan_cm_roam_cfg_set_value(wlan_vdev_get_psoc(vdev),
 				   wlan_vdev_get_id(vdev),
 				   HS_20_AP, &src_cfg);
-	if (req->source != CM_MLO_LINK_SWITCH_CONNECT)
+	if (req->source != CM_MLO_LINK_SWITCH_CONNECT &&
+	    req->source != CM_MLO_LINK_ADD_CONNECT)
 		ml_nlink_conn_change_notify(
 			psoc, wlan_vdev_get_id(vdev),
 			ml_nlink_connect_start_evt, NULL);
@@ -1855,7 +1856,7 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (QDF_IS_STATUS_ERROR(rsp->connect_status) &&
-	    !(rsp->cm_id & CM_ID_LSWITCH_BIT))
+	    !(rsp->cm_id & (CM_ID_LSWITCH_BIT | CM_ID_LINKADD_BIT)))
 		ucfg_policy_mgr_post_sta_p2p_start_failed(wlan_vdev_get_psoc(vdev),
 							  wlan_vdev_get_id(vdev));
 

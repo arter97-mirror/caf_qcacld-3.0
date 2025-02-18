@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -612,6 +612,8 @@ struct hdd_peer_stats {
  * @tx_failed: Number of failed transmissions (MPDUs)
  * @rx_mpdu_count: Number of MPDUs received from this station
  * @fcs_err_count: Number of MPDUs received from this station with an FCS error
+ * @filled: bitflag of flags using the bits of &enum nl80211_sta_info to
+ *  indicate the relevant values in this struct for them
  */
 struct wlan_hdd_station_stats_info {
 	int8_t signal;
@@ -627,6 +629,7 @@ struct wlan_hdd_station_stats_info {
 	uint32_t tx_failed;
 	uint32_t rx_mpdu_count;
 	uint32_t fcs_err_count;
+	uint64_t filled;
 };
 
 /**
@@ -813,6 +816,8 @@ enum bss_stop_reason {
  * @nss: number of streams
  * @mcs: mcs index for HT/VHT mode
  * @rate_flags: rate flags for last tx/rx
+ * @gi: Guard interval used
+ * @dcm: dual carrier modulation enabled
  *
  * rate info in HDD
  */
@@ -822,6 +827,8 @@ struct hdd_rate_info {
 	uint8_t nss;
 	uint8_t mcs;
 	enum tx_rate_info rate_flags;
+	enum txrate_gi gi;
+	uint8_t dcm;
 };
 
 enum hdd_work_status {

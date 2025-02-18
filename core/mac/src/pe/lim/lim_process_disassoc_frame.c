@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -100,6 +100,9 @@ lim_process_disassoc_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		pe_err("rx frame doesn't have valid a1 address, drop it");
 		return;
 	}
+
+	if (LIM_IS_AP_ROLE(pe_session) && lim_mismatch_bssid_da(pHdr))
+		return;
 
 	if (LIM_IS_STA_ROLE(pe_session) &&
 	    wlan_drop_mgmt_frame_on_link_removal(pe_session->vdev)) {

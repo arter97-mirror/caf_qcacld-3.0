@@ -5367,7 +5367,6 @@ wlan_mlme_get_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS
 wlan_mlme_set_sap_dfs_puncture(struct wlan_objmgr_psoc *psoc,
 			       bool enable_sap_dfs_puncture);
-
 /**
  * wlan_mlme_set_p2p_device_mac_addr() - set p2p device interface mac
  * address in sta vdev mlme object
@@ -5390,7 +5389,6 @@ wlan_mlme_set_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
 				  struct qdf_mac_addr *mac_addr);
-
 /**
  * wlan_mlme_get_supported_wifi_generations_info - Get supported wifi
  * generations information of the target
@@ -5404,7 +5402,6 @@ wlan_mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_mlme_get_supported_wifi_generations_info(struct wlan_objmgr_psoc *psoc,
 					      uint8_t *supp, uint8_t *cert);
-
 /**
  * wlan_mlme_clear_peer_private_object_data(): This API is wrapper for
  * function "mlme_clear_peer_private_object_data"
@@ -5414,4 +5411,14 @@ wlan_mlme_get_supported_wifi_generations_info(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS
 wlan_mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
+/**
+ * wlan_mlme_get_fw_optimized_power_cap - Get fw optimized power capability
+ *
+ * @psoc: pointer to psoc object
+ * @cap: intersected Optimized power capability of FW and INI
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_fw_optimized_power_cap(struct wlan_objmgr_psoc *psoc, bool *cap);
 #endif /* _WLAN_MLME_API_H_ */

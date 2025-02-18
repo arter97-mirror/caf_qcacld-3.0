@@ -2889,8 +2889,13 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("MLO ROAM: link_id:%d vdev:%d Reassoc generation failed %d",
 			       link_id, link_vdev_id, status);
+			mlo_free_cache_link_assoc_rsp(session_entry->vdev,
+						      link_id);
 			goto end;
 		}
+
+		mlo_update_cache_link_assoc_rsp(session_entry->vdev,
+						link_id, &link_reassoc_rsp);
 
 		mgmt_txrx_frame_hex_dump(link_reassoc_rsp.ptr,
 					 link_reassoc_rsp.len, false);

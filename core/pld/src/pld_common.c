@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -892,6 +892,21 @@ bool pld_is_direct_link_supported(struct device *dev)
 		ret = pld_ipci_is_direct_link_supported(dev);
 		break;
 	case PLD_BUS_TYPE_SDIO:
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+bool pld_ce_cmn_cfg_supported(struct device *dev)
+{
+	bool ret = false;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_ce_cmn_cfg_supported(dev);
+		break;
 	default:
 		break;
 	}

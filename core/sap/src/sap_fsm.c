@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2958,6 +2958,10 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 						csr_roaminfo->capability_info;
 		reassoc_complete->is_fils_connection =
 					csr_roaminfo->is_fils_connection;
+		reassoc_complete->vht_mcs_10_11_supp =
+					csr_roaminfo->vht_mcs_10_11_supp;
+		reassoc_complete->he_mcs_12_13_map =
+					csr_roaminfo->he_mcs_12_13_map;
 		break;
 
 	case eSAP_STA_DISASSOC_EVENT:

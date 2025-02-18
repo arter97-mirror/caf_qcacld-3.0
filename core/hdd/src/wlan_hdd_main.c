@@ -3121,6 +3121,18 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	sme_update_bfer_caps_as_per_nss_chains(hdd_ctx->mac_handle, cfg);
 
 	hdd_update_tgt_vht_cap(hdd_ctx, &cfg->vht_cap);
+
+	ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(hdd_ctx->psoc, &value);
+	if ((value > MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
+	    !cfg->tx_bfee_8ss_enabled) {
+		value = MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF;
+		status = ucfg_mlme_cfg_set_vht_tx_bfee_ant_supp(hdd_ctx->psoc,
+								value);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("set tx_bfee_ant_supp failed");
+	}
+	hdd_debug("txBFCsnValue %d 8ss %d", value, cfg->tx_bfee_8ss_enabled);
+
 	if (cfg->services.en_11ax  &&
 	    (hdd_ctx->config->dot11Mode == eHDD_DOT11_MODE_AUTO ||
 	     hdd_ctx->config->dot11Mode == eHDD_DOT11_MODE_11ax ||
@@ -3197,28 +3209,13 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 
 	hdd_ctx->rcpi_enabled = cfg->rcpi_enabled;
 
-	status = ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(hdd_ctx->psoc,
-							&value);
-	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err("set tx_bfee_ant_supp failed");
-
 	status = ucfg_mlme_set_restricted_80p80_bw_supp(hdd_ctx->psoc,
 							cfg->restricted_80p80_bw_supp);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to set MLME restircted 80p80 BW support");
 
-	if ((value > MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
-	    !cfg->tx_bfee_8ss_enabled) {
-		status = ucfg_mlme_cfg_set_vht_tx_bfee_ant_supp(hdd_ctx->psoc,
-				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF);
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_err("set tx_bfee_ant_supp failed");
-	}
-
 	hdd_update_tid_to_link_supported(hdd_ctx, &cfg->services);
 	mac_handle = hdd_ctx->mac_handle;
-
-	hdd_debug("txBFCsnValue %d", value);
 
 	/*
 	 * Update txBFCsnValue and NumSoundingDim values to vhtcap in wiphy
@@ -12339,6 +12336,10 @@ hdd_shutdown_wlan_is_applicable(struct hdd_context *hdd_ctx, unsigned long evt)
 	enum pmo_suspend_mode mode;
 
 	if (evt == PM_HIBERNATION_PREPARE)
+		return true;
+
+	/* Check if the Suspend notifier triggers Deep Sleep mode */
+	if (pm_suspend_via_firmware())
 		return true;
 
 	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);

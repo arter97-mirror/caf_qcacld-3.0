@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -193,6 +193,11 @@ static inline int pld_ipci_get_thermal_state(struct device *dev,
 					     int mon_id)
 {
 	return 0;
+}
+
+static inline bool pld_ipci_ce_cmn_cfg_supported(struct device *dev)
+{
+	return false;
 }
 
 static inline int pld_ipci_exit_power_save(struct device *dev)
@@ -495,6 +500,18 @@ static inline int pld_ipci_get_thermal_state(struct device *dev,
 {
 	return icnss_get_curr_therm_cdev_state(dev, thermal_state, mon_id);
 }
+
+#ifdef CE_CMN_REG_CFG_QMI
+static inline bool pld_ipci_ce_cmn_cfg_supported(struct device *dev)
+{
+	return icnss_get_fw_cap(dev, ICNSS_FW_CAP_CE_CMN_CFG_SUPPORT);
+}
+#else
+static inline bool pld_ipci_ce_cmn_cfg_supported(struct device *dev)
+{
+	return false;
+}
+#endif
 
 static inline int pld_ipci_exit_power_save(struct device *dev)
 {

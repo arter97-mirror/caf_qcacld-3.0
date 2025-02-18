@@ -1419,6 +1419,8 @@ wma_populate_peer_mlo_common_info_sta(tp_wma_handle wma,
 			params->msd_caps.med_sync_max_txop_num;
 	req->mlo_params.link_switch_in_progress =
 		wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
+	req->mlo_params.link_add_in_progress =
+		wlan_cm_is_link_add_connecting(vdev);
 	/*
 	 * Set max simultaneous links = 1 for MLSR, 2 for MLMR. The +1
 	 * is added as per the agreement with FW for backward

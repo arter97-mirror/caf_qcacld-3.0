@@ -150,7 +150,8 @@ static QDF_STATUS lim_check_sta_in_pe_entries(struct mac_context *mac_ctx,
 					      tSirMacAddr sa,
 					      tSirMacAddr mld_mac,
 					       uint16_t sessionid,
-					       bool *dup_entry)
+					       bool *dup_entry,
+					       uint16_t peer_aid)
 {
 	uint8_t i;
 	uint16_t assoc_id = 0;
@@ -165,10 +166,10 @@ static QDF_STATUS lim_check_sta_in_pe_entries(struct mac_context *mac_ctx,
 			sta_ds = lim_get_sta_ds(
 					mac_ctx, sa, mld_mac,
 					&assoc_id, session);
-			if (sta_ds
-				&& (!sta_ds->rmfEnabled ||
-				    (sessionid != session->peSessionId))
-			    ) {
+			if (sta_ds &&
+			    (!sta_ds->rmfEnabled ||
+			     (sessionid != session->peSessionId)) &&
+			    peer_aid != assoc_id) {
 				if (sta_ds->mlmStaContext.mlmState ==
 				    eLIM_MLM_WT_DEL_STA_RSP_STATE ||
 				    sta_ds->mlmStaContext.mlmState ==
@@ -2850,7 +2851,7 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 
 	status = lim_check_sta_in_pe_entries(mac_ctx, sa, assoc_req->mld_mac,
 					     session->peSessionId,
-					     &dup_entry);
+					     &dup_entry, peer_aid);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Reject assoc as duplicate entry is present and is already being deleted, assoc will be accepted once deletion is completed");
 		/*
@@ -3180,6 +3181,9 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 	}
 
 	if (false == lim_chk_sa_da(mac_ctx, hdr, session, sub_type))
+		return;
+
+	if (lim_mismatch_bssid_da(hdr))
 		return;
 
 	/* Allocate memory for the Assoc Request frame */

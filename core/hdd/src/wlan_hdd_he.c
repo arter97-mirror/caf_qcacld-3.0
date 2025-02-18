@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -76,6 +76,7 @@ void hdd_update_tgt_he_cap(struct hdd_context *hdd_ctx,
 		hdd_err("unable to get tx_bfee_ant_supp");
 
 	he_cap_ini.bfee_sts_lt_80 = value;
+	he_cap_ini.bfee_sts_gt_80 = value;
 	sme_update_tgt_he_cap(hdd_ctx->mac_handle, cfg, &he_cap_ini);
 
 	ucfg_mlme_update_tgt_he_cap(hdd_ctx->psoc, cfg);

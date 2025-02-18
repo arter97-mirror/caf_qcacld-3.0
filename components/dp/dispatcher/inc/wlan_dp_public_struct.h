@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -653,6 +653,7 @@ struct wlan_dp_stc_flow_classify_result {
 
 #define DP_STC_TXRX_SAMPLES_MAX 5
 #define DP_TXRX_SAMPLES_WINDOW_MAX 2
+#define DP_STC_BURST_STAGE_MAX 2
 
 /**
  * struct wlan_dp_stc_txrx_min_max_stats - MIN/MAX stats
@@ -725,11 +726,13 @@ struct wlan_dp_stc_burst_stats {
  * @txrx_samples: TxRx samples for the burst window
  * @tx: Uplink/Tx burst samples
  * @rx: downlink/Rx burst samples
+ * @sample_window_ns: Window duration in which sample was collected
  */
 struct wlan_dp_stc_burst_samples {
 	struct wlan_dp_stc_txrx_samples txrx_samples;
 	struct wlan_dp_stc_burst_stats tx;
 	struct wlan_dp_stc_burst_stats rx;
+	uint64_t sample_window_ns;
 };
 
 #define WLAN_DP_TXRX_SAMPLES_READY BIT(0)
@@ -743,12 +746,14 @@ struct wlan_dp_stc_burst_samples {
  * @flow_tuple: tuple of the flow
  * @txrx_samples: TxRx samples for this flow
  * @burst_sample: Burst samples for this flow
+ * @cur_burst_stats_stage: Current burst stats stage
  */
 struct wlan_dp_stc_flow_samples {
 	uint32_t cookie;
 	struct flow_info flow_tuple;
 	struct wlan_dp_stc_txrx_samples txrx_samples[DP_STC_TXRX_SAMPLES_MAX][DP_TXRX_SAMPLES_WINDOW_MAX];
 	struct wlan_dp_stc_burst_samples burst_sample;
+	uint8_t cur_burst_stats_stage;
 };
 
 /**

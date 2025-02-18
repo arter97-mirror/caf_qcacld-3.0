@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1810,6 +1810,9 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			QDF_MAC_ADDR_REF(mac_hdr->sa));
 		return;
 	}
+
+	if (LIM_IS_AP_ROLE(pe_session) && lim_mismatch_bssid_da(mac_hdr))
+		return;
 
 	if (qdf_atomic_read(&pe_session->vdev->is_ap_suspend)) {
 		pe_err("SAP is suspended, reject peer auth");

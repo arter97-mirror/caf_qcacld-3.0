@@ -2234,8 +2234,22 @@ ccflags-$(CONFIG_WLAN_TX_MON_2_0) += -DWLAN_PKT_CAPTURE_TX_2_0
 ccflags-y += -DWLAN_TX_PKT_CAPTURE_ENH_BE
 ccflags-y += -DQDF_FRAG_CACHE_SUPPORT
 endif
+
+ifeq ($(CONFIG_WIFI_MONITOR_SUPPORT_Y_WLAN_TX_MON_2_0), y)
+DP_OBJS += $(DP_SRC)/monitor/2.0/dp_mon_2.0.o \
+		$(DP_SRC)/monitor/2.0/dp_mon_filter_2.0.o \
+		$(DP_SRC)/monitor/2.0/dp_tx_mon_2.0.o \
+		$(DP_SRC)/monitor/2.0/dp_tx_mon_status_2.0.o
+ccflags-y += -DWLAN_TX_PKT_CAPTURE_ENH_BE
+ccflags-y += -DQDF_FRAG_CACHE_SUPPORT
+ccflags-y += -DWLAN_PKT_CAPTURE_TX_2_0
 endif
+
+ifeq ($(CONFIG_FEATURE_ML_LOCAL_PKT_CAPTURE), y)
+ccflags-y += -DFEATURE_ML_LOCAL_PKT_CAPTURE
 endif
+endif #CONFIG_WIFI_MONITOR_SUPPORT
+endif #CONFIG_BERYLLIUM
 
 ifeq ($(CONFIG_LITHIUM), y)
 DP_OBJS += $(DP_SRC)/li/dp_li.o
@@ -2685,6 +2699,10 @@ endif
 
 ifeq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM) $(CONFIG_RHINE)))
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_prealloc.o
+
+ifeq ($(CONFIG_WLAN_TX_MON_2_0_Y_WLAN_DP_LOCAL_PKT_CAPTURE), y)
+WLAN_DP_COMP_OBJS += $(DP_COMP_OS_IF_DIR)/os_if_dp_local_pkt_capture.o
+endif
 
 ifeq ($(CONFIG_WLAN_TX_MON_2_0), y)
 ifeq ($(CONFIG_WLAN_DP_LOCAL_PKT_CAPTURE), y)

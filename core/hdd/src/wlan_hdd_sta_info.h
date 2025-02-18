@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -276,6 +276,8 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  *  via ratio approximation.
  * @tx_failed_retrylimit: failed packets due to the number of retransmission
  *  attempts exceeding 802.11 retry limit.
+ * @vht_mcs_10_11_supp: VHT MCS 10 and 11 supported
+ * @he_mcs_12_13_map: HE MCS 12 and 13 supported
  */
 struct hdd_station_info {
 	qdf_list_node_t sta_node;
@@ -349,6 +351,8 @@ struct hdd_station_info {
 	uint16_t vlan_id;
 	uint32_t tx_retries_ratio;
 	uint32_t tx_failed_retrylimit;
+	uint8_t vht_mcs_10_11_supp;
+	uint16_t he_mcs_12_13_map;
 };
 
 /**

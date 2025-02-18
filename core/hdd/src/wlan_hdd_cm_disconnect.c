@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -303,7 +303,7 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	if (adapter->device_mode == QDF_STA_MODE)
 		wlan_crypto_reset_vdev_params(vdev);
 
-	hdd_remove_beacon_filter(adapter);
+	hdd_remove_beacon_filter(hdd_ctx, link_info->vdev_id);
 	if (sme_is_beacon_report_started(mac_handle, link_info->vdev_id)) {
 		hdd_debug("Sending beacon pause indication to userspace");
 		hdd_beacon_recv_pause_indication((hdd_handle_t)hdd_ctx,

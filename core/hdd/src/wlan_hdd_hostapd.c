@@ -1368,12 +1368,14 @@ static QDF_STATUS hdd_handle_acs_scan_event(struct sap_event *sap_event,
  * @ch_width: channel width
  * @sgi: short gi
  * @vht_mcs_map: vht mcs map
+ * @vht_mcs_10_11_supp: vht_mcs_10_11_supp support present
  *
  * This function calculate max rate for VHT mode
  *
  * Return: max rate
  */
-static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map)
+static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map,
+			    int vht_mcs_10_11_supp)
 {
 	const struct index_vht_data_rate_type *supported_vht_mcs_rate;
 	enum data_rate_11ac_max_mcs vht_max_mcs;
@@ -1393,8 +1395,9 @@ static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map)
 	vht_max_mcs =
 		(enum data_rate_11ac_max_mcs)
 		(vht_mcs_map & DATA_RATE_11AC_MCS_MASK);
-
-	if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_7) {
+	if (vht_mcs_10_11_supp) {
+		maxidx = 11;
+	} else if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_7) {
 		maxidx = 7;
 	} else if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_8) {
 		maxidx = 8;
@@ -1428,26 +1431,96 @@ static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map)
 }
 
 /**
- * calculate_max_phy_rate() - calculate maximum phy rate (100kbps)
- * @mode: phymode: Legacy, 11a/b/g, HT, VHT
- * @nss: num of stream (maximum num is 2)
+ * get_max_rate_he() - calculate max rate for HE mode
+ * @nss: num of streams
  * @ch_width: channel width
- * @sgi: short gi enabled or not
- * @supp_idx: max supported idx
- * @ext_idx: max extended idx
- * @ht_mcs_idx: max mcs index for HT
- * @vht_mcs_map: mcs map for VHT
+ * @sgi_enable: short gi
+ * @he_mcs_map: he mcs map
+ * @he_mcs_12_13_map: he_mcs_12_13_map support present
+ *
+ * This function calculate max rate for HE mode
+ *
+ * Return: max rate
+ */
+static int get_max_rate_he(int nss, int ch_width, int sgi_enable,
+			   int he_mcs_map, int he_mcs_12_13_map)
+{
+	const struct index_he_data_rate_type *supported_he_mcs_rate;
+	enum data_rate_11ax_max_mcs he_max_mcs;
+	int maxrate = 0;
+	int maxidx;
+	int sgi;
+
+	if (nss == 1) {
+		supported_he_mcs_rate = supported_he_mcs_rate_nss1;
+	} else if (nss == 2) {
+		supported_he_mcs_rate = supported_he_mcs_rate_nss2;
+	} else {
+		/* Not Supported */
+		hdd_debug("nss %d not supported", nss);
+		return maxrate;
+	}
+	sgi = sgi_enable ? 0 : 2;
+
+	he_max_mcs =
+		(enum data_rate_11ax_max_mcs)
+		(he_mcs_map & DATA_RATE_11AX_MCS_MASK);
+
+	if (he_mcs_12_13_map) {
+		maxidx = 13;
+	} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_9) {
+		maxidx = 9;
+	} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_10) {
+		maxidx = 10;
+	} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_11) {
+		maxidx = 11;
+	} else {
+		hdd_err("HE mcs map %x not supported",
+			he_mcs_map & DATA_RATE_11AX_MCS_MASK);
+		return maxrate;
+	}
+
+	if (ch_width == eHT_CHANNEL_WIDTH_20MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE20_rate[0][sgi];
+	} else if (ch_width == eHT_CHANNEL_WIDTH_40MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE40_rate[0][sgi];
+	} else if (ch_width == eHT_CHANNEL_WIDTH_80MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE80_rate[0][sgi];
+	} else if ((ch_width == eHT_CHANNEL_WIDTH_160MHZ) ||
+			ch_width == eHT_CHANNEL_WIDTH_80P80MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE160_rate[0][sgi];
+	} else {
+		hdd_err("ch_width %d not supported", ch_width);
+		return maxrate;
+	}
+
+	return maxrate;
+}
+
+/**
+ * calculate_max_phy_rate() - calculate maximum phy rate (100kbps)
+ * @stainfo: Station info
  *
  * return: maximum phy rate in 100kbps
  */
-static int calculate_max_phy_rate(int mode, int nss, int ch_width,
-				 int sgi, int supp_idx, int ext_idx,
-				 int ht_mcs_idx, int vht_mcs_map)
+static int calculate_max_phy_rate(struct hdd_station_info *stainfo)
 {
 	const struct index_data_rate_type *supported_mcs_rate;
 	int maxidx = 12; /*default 6M mode*/
 	int maxrate = 0, tmprate;
 	int i;
+	int mode = stainfo->mode;
+	int nss = stainfo->nss;
+	int ch_width = stainfo->ch_width;
+	int sgi = stainfo->sgi_enable;
+	int supp_idx = stainfo->max_supp_idx;
+	int ext_idx = stainfo->max_ext_idx;
+	int ht_mcs_idx = stainfo->max_mcs_idx;
+	int mcs_map = stainfo->rx_mcs_map;
 
 	/* check supported rates */
 	if (supp_idx != 0xff && maxidx < supp_idx)
@@ -1499,10 +1572,19 @@ static int calculate_max_phy_rate(int mode, int nss, int ch_width,
 
 	if (mode == SIR_SME_PHY_MODE_VHT) {
 		/* check for VHT Mode */
-		tmprate = get_max_rate_vht(nss, ch_width, sgi, vht_mcs_map);
+		tmprate = get_max_rate_vht(nss, ch_width, sgi, mcs_map,
+					   stainfo->vht_mcs_10_11_supp);
 		if (maxrate < tmprate)
 			maxrate = tmprate;
 	}
+	if (mode == SIR_SME_PHY_MODE_HE) {
+		/* check for HE Mode */
+		tmprate = get_max_rate_he(nss, ch_width, sgi, mcs_map,
+					  stainfo->he_mcs_12_13_map);
+		if (maxrate < tmprate)
+			maxrate = tmprate;
+	}
+
 
 	return maxrate;
 }
@@ -1628,15 +1710,7 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 	stainfo->rx_mcs_map = event->rx_mcs_map;
 	stainfo->tx_mcs_map = event->tx_mcs_map;
 	stainfo->assoc_ts = qdf_system_ticks();
-	stainfo->max_phy_rate =
-		calculate_max_phy_rate(stainfo->mode,
-				       stainfo->nss,
-				       stainfo->ch_width,
-				       stainfo->sgi_enable,
-				       stainfo->max_supp_idx,
-				       stainfo->max_ext_idx,
-				       stainfo->max_mcs_idx,
-				       stainfo->rx_mcs_map);
+	stainfo->max_phy_rate = calculate_max_phy_rate(stainfo);
 	/* expect max_phy_rate report in kbps */
 	stainfo->max_phy_rate *= 100;
 
@@ -1761,6 +1835,9 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 				     &cache_sta_info, true,
 				     STA_INFO_FILL_STATION_INFO);
 	}
+
+	stainfo->vht_mcs_10_11_supp = event->vht_mcs_10_11_supp;
+	stainfo->he_mcs_12_13_map = event->he_mcs_12_13_map;
 
 	hdd_debug("cap %d %d %d %d %d %d %d %d %d %x %d",
 		  stainfo->ampdu,
@@ -8596,9 +8673,21 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 {
 	bool twt_res_svc_cap, enable_twt, twt_res_cfg;
 	uint32_t reason;
+	enum QDF_OPMODE mode;
 
 	enable_twt = ucfg_twt_cfg_is_twt_enabled(hdd_ctx->psoc);
 	ucfg_twt_get_responder(hdd_ctx->psoc, &twt_res_svc_cap);
+
+	/* This is a temporary fix to disable twt_responder for sap
+	 * interface. Later the changes will come to enable/disable
+	 * twt_responder by sending WMI CMDin vdev level
+	 */
+	mode = wlan_get_opmode_from_vdev_id(hdd_ctx->pdev, vdev_id);
+	if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
+	    mode == QDF_SAP_MODE &&
+	    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id))
+		ucfg_twt_cfg_set_responder(hdd_ctx->psoc, false);
+
 	ucfg_twt_cfg_get_responder(hdd_ctx->psoc, &twt_res_cfg);
 	if (!twt_res_cfg && !twt_responder) {
 		hdd_debug("TWT responder already disable, skip");
@@ -8607,9 +8696,11 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 	ucfg_twt_cfg_set_responder(hdd_ctx->psoc,
 				   QDF_MIN(twt_res_svc_cap,
 					   (enable_twt &&
-					    twt_responder)));
+					    twt_responder &&
+					    twt_res_cfg)));
+
 	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
-	if (enable_twt && twt_responder) {
+	if (enable_twt && twt_responder && twt_res_cfg) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;

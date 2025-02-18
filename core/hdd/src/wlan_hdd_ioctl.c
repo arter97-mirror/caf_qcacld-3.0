@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3300,11 +3300,15 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	hdd_debug("idle_monitor:%d", idle_monitor);
-	if (idle_monitor == 0)
-		hdd_disable_active_apf_mode(link_info);
-	else if (idle_monitor == 1)
-		hdd_enable_active_apf_mode(link_info);
+	hdd_debug("idle_monitor:%d, configure apf per screen state = %d",
+		  idle_monitor,
+		  ucfg_pmo_is_configure_apf_per_screen_state(hdd_ctx->psoc));
+	if (ucfg_pmo_is_configure_apf_per_screen_state(hdd_ctx->psoc)) {
+		if (idle_monitor == 0)
+			hdd_disable_active_apf_mode(link_info);
+		else if (idle_monitor == 1)
+			hdd_enable_active_apf_mode(link_info);
+	}
 
 	if (sme_get_dhcp_status(hdd_ctx->mac_handle, link_info->vdev_id)) {
 		hdd_nofl_debug("DHCP in progress. Ignore SETSUSPEND command");

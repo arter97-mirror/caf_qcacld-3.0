@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -113,7 +113,7 @@ static int wlan_hdd_listen_offload_start(struct hdd_adapter *adapter,
  * crash as FW scan module can only hold the wake lock upto
  * 180 sec
  */
-#define P2P_MAX_SCAN_DURATION 175
+#define P2P_MAX_SCAN_DURATION 175000
 
 /**
  * __wlan_hdd_cfg80211_p2p_lo_start () - start P2P Listen Offload

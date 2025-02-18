@@ -7330,6 +7330,26 @@ void lim_update_usr_he_cap(struct mac_context *mac_ctx, struct pe_session *sessi
 			       he_cap->su_beamformee, he_cap->mu_beamformer);
 }
 
+#define AUX_RTS_THRESHOLD 1
+
+static void
+lim_refill_rts_threshold(struct mac_context *mac, tDot11fIEhe_op *he_ops)
+{
+	QDF_STATUS status;
+	bool cap = false;
+
+	status = wlan_mlme_get_fw_optimized_power_cap(mac->psoc, &cap);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err_rl("Unable to get optimized power capability info");
+		return;
+	}
+
+	if (cap) {
+		pe_debug_rl("Overriding the rts_threshold value");
+		he_ops->txop_rts_threshold = AUX_RTS_THRESHOLD;
+	}
+}
+
 void lim_decide_he_op(struct mac_context *mac_ctx, uint32_t *mlme_he_ops,
 		      struct pe_session *session)
 {
@@ -7364,6 +7384,7 @@ void lim_decide_he_op(struct mac_context *mac_ctx, uint32_t *mlme_he_ops,
 	he_ops.default_pe = he_ops_from_ie->default_pe;
 	he_ops.twt_required = he_ops_from_ie->twt_required;
 	he_ops.txop_rts_threshold = he_ops_from_ie->txop_rts_threshold;
+	lim_refill_rts_threshold(mac_ctx, &he_ops);
 	he_ops.partial_bss_col = he_ops_from_ie->partial_bss_col;
 
 	val = mac_ctx->mlme_cfg->he_caps.he_ops_basic_mcs_nss;
@@ -9450,8 +9471,28 @@ void lim_extract_ml_info(struct pe_session *session,
 	qdf_mem_copy(&ml_link->self_mac_addr, &link_info->link_addr,
 		     QDF_MAC_ADDR_SIZE);
 
-	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev))
+	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev)) {
+		if (!wlan_cm_is_link_add_connecting(session->vdev))
+			return;
+		ml_link->partner_info[partner_idx].vdev_id =
+					link_info->vdev_id;
+		ml_link->partner_info[partner_idx].link_id =
+					link_info->link_id;
+		qdf_mem_copy(&ml_link->partner_info[partner_idx].channel_info,
+			     link_info->link_chan_info,
+			     sizeof(ml_link->partner_info[partner_idx].
+			     channel_info));
+		qdf_mem_copy(&ml_link->partner_info[partner_idx].link_addr,
+			     &link_info->ap_link_addr, QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(&ml_link->partner_info[partner_idx].self_mac_addr,
+			     &link_info->link_addr, QDF_MAC_ADDR_SIZE);
+		partner_idx++;
+		ml_link->num_links = partner_idx;
+		pe_debug("vdev:%d link_add Num of partner: %d ",
+			 session->vdev_id,
+			 ml_link->num_links);
 		return;
+	}
 
 	for (i = 0; i < ml_partner_info->num_partner_links; i++) {
 		link_id = ml_partner_info->partner_link_info[i].link_id;
@@ -11251,9 +11292,10 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 		wlan_mlme_set_ap_oper_ch_width(session->vdev,
 					       session->ch_width);
 		if (session->ch_width == CH_WIDTH_320MHZ &&
-		    policy_mgr_is_conn_lead_to_dbs_sbs(mac->psoc,
-						       session->vdev_id,
-						       session->curr_op_freq))
+		    policy_mgr_is_conn_lead_to_bw_downgrade(mac->psoc,
+							    session->vdev_id,
+							    session->curr_op_freq,
+							    session->ch_width))
 			wlan_mlme_set_ap_oper_ch_width(session->vdev,
 						       CH_WIDTH_160MHZ);
 	}
@@ -12555,4 +12597,17 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 			   on_entry_target, total_consumed);
 
 	return status;
+}
+
+bool lim_mismatch_bssid_da(tpSirMacMgmtHdr hdr)
+{
+	if (qdf_mem_cmp((uint8_t *)hdr->bssId,
+			(uint8_t *)hdr->da,
+			(uint8_t)(sizeof(tSirMacAddr)))) {
+		pe_debug("DA: " QDF_MAC_ADDR_FMT " mismatch bssid" QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(hdr->da),
+			 QDF_MAC_ADDR_REF(hdr->bssId));
+		return true;
+	}
+	return false;
 }

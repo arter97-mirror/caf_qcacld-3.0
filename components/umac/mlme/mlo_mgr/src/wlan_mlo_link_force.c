@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,7 @@
 #include "target_if.h"
 #include "wlan_nan_api.h"
 #include "wlan_nan_api_i.h"
+#include "wlan_mlo_link_recfg.h"
 
 /* Exclude AP removed link */
 #define NLINK_EXCLUDE_REMOVED_LINK      0x01
@@ -1133,6 +1134,9 @@ ml_nlink_init_disallow_modes(struct wlan_objmgr_psoc *psoc,
 		return;
 
 	if (mlo_mgr_is_link_switch_in_progress(vdev))
+		return;
+
+	if (mlo_is_link_recfg_in_progress(vdev))
 		return;
 
 	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_STANDBY_LINK,
@@ -4931,6 +4935,13 @@ ml_nlink_all_links_ready_for_state_change(struct wlan_objmgr_psoc *psoc,
 			  wlan_vdev_get_id(vdev));
 		return false;
 	}
+
+	if (mlo_is_link_recfg_in_progress(vdev)) {
+		mlo_debug("mlo vdev %d link recfg in progress!",
+			  wlan_vdev_get_id(vdev));
+		return false;
+	}
+
 	if (policy_mgr_is_set_link_in_progress(psoc)) {
 		mlo_debug("mlo vdev %d not ready due to set link in progress",
 			  wlan_vdev_get_id(vdev));
