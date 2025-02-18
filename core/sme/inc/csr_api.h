@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -618,7 +618,9 @@ typedef struct tagCsrSummaryStatsInfo {
 typedef struct tagCsrGlobalClassAStatsInfo {
 	uint8_t tx_nss;
 	uint8_t rx_nss;
+	uint8_t tx_preamble;
 	uint8_t rx_preamble;
+	uint8_t tx_bw;
 	uint8_t rx_bw;
 	uint32_t max_pwr;
 	uint32_t tx_rate;
@@ -634,7 +636,8 @@ typedef struct tagCsrGlobalClassAStatsInfo {
 	enum txrate_gi  rx_gi;
 	/* to diff between HT20 & HT40 rates;short & long guard interval */
 	enum tx_rate_info tx_rx_rate_flags;
-
+	uint8_t tx_rate_version;
+	uint8_t is_tx_rate_version_checked;
 } tCsrGlobalClassAStatsInfo;
 
 typedef struct tagCsrGlobalClassDStatsInfo {

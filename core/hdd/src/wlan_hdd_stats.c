@@ -6857,29 +6857,18 @@ static uint32_t hdd_get_rate_flags(uint32_t rate,
 {
 	uint32_t flags = 0;
 
-	if (mode == SIR_SME_PHY_MODE_HT)
+	if (mode == DOT11_N)
 		flags = hdd_get_rate_flags_ht(rate, nss, mcs);
-	else if (mode == SIR_SME_PHY_MODE_VHT)
+	else if (mode == DOT11_AC)
 		flags = hdd_get_rate_flags_vht(rate, nss, mcs);
-	else if (mode == SIR_SME_PHY_MODE_HE)
+	else if (mode == DOT11_AX)
 		flags = hdd_get_rate_flags_he(rate, nss, mcs, gi, dcm);
-	else
-		hdd_debug("invalid mode param %d", mode);
 
 	return flags;
 }
 
-/**
- * wlan_hdd_fill_rate_info() - fill HDD rate info from peer info
- * @txrx_stats: pointer to txrx stats to be filled with rate info
- * @peer_info: peer info pointer
- *
- * This function is used to fill HDD rate info from peer info
- *
- * Return: None
- */
-static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
-				    struct peer_stats_info_ext_event *peer_info)
+void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
+			     struct peer_stats_info_ext_event *peer_info)
 {
 	uint32_t flags;
 	uint32_t rate_code;
@@ -6888,20 +6877,13 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 	txrx_stats->tx_rate.rate = peer_info->tx_rate;
 	rate_code = peer_info->tx_rate_code;
 
-	if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
-			WMI_RATE_PREAMBLE_HT)
-		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_HT;
-	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
-			WMI_RATE_PREAMBLE_VHT)
-		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_VHT;
-	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
-			WMI_RATE_PREAMBLE_HE)
-		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_HE;
-	else
-		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_LEGACY;
+	txrx_stats->tx_rate.version = WMI_GET_HW_RATECODE_VERSION(rate_code);
 
+	txrx_stats->tx_rate.mode = WMI_GET_HW_RATECODE_PREAM_V1(rate_code);
 	txrx_stats->tx_rate.nss = WMI_GET_HW_RATECODE_NSS_V1(rate_code) + 1;
 	txrx_stats->tx_rate.mcs = WMI_GET_HW_RATECODE_RATE_V1(rate_code);
+	txrx_stats->tx_rate.bw = WMI_GET_HW_RATECODE_BW_V1(rate_code);
+	txrx_stats->tx_rate.gi = WMI_GET_HW_RATECODE_GI_V1(rate_code);
 
 	flags = hdd_get_rate_flags(txrx_stats->tx_rate.rate / 100,
 				   txrx_stats->tx_rate.mode,
@@ -6912,32 +6894,19 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 
 	txrx_stats->tx_rate.rate_flags = flags;
 
-	hdd_debug("tx: mode %d nss %d mcs %d rate_flags %x flags %x",
+	hdd_debug("tx bw %d mode %d nss %d mcs %d flags %x ver %d",
+		  txrx_stats->tx_rate.bw,
 		  txrx_stats->tx_rate.mode,
 		  txrx_stats->tx_rate.nss,
 		  txrx_stats->tx_rate.mcs,
-		  txrx_stats->tx_rate.rate_flags,
-		  flags);
+		  flags,
+		  txrx_stats->tx_rate.version);
 
 	/* rx rate info */
 	txrx_stats->rx_rate.rate = peer_info->rx_rate;
 	rate_code = peer_info->rx_rate_code;
 
-	if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
-			WMI_RATE_PREAMBLE_HT)
-		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_HT;
-	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
-			WMI_RATE_PREAMBLE_VHT)
-		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_VHT;
-	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
-			WMI_RATE_PREAMBLE_HE)
-		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_HE;
-	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
-			WMI_RATE_PREAMBLE_EHT)
-		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_EHT;
-	else
-		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_LEGACY;
-
+	txrx_stats->rx_rate.mode = WMI_GET_HW_RATECODE_PREAM_V1(rate_code);
 	txrx_stats->rx_rate.nss = WMI_GET_HW_RATECODE_NSS_V1(rate_code) + 1;
 	txrx_stats->rx_rate.mcs = WMI_GET_HW_RATECODE_RATE_V1(rate_code);
 
@@ -7703,7 +7672,6 @@ void hdd_check_and_update_nss(struct hdd_context *hdd_ctx,
 	}
 }
 
-#ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 static void
 wlan_hdd_refill_os_bw(struct rate_info *os_rate, enum rx_tlv_bw bw)
 {
@@ -7732,6 +7700,57 @@ wlan_hdd_refill_os_rateflags(struct rate_info *os_rate, uint8_t preamble)
 		wlan_hdd_refill_os_eht_rateflags(os_rate, preamble);
 }
 
+/**
+ * wlan_hdd_refill_actual_tx_rate() - Refill actual tx rates info stats
+ * @sinfo: kernel station_info struct to populate
+ * @link_info: pointer to link_info struct in adapter,
+ *             where hdd_stats is located in this struct
+ *
+ * This function is to replace TX rates which was previously filled by fw.
+ *
+ * Return: None
+ */
+static void
+wlan_hdd_refill_actual_tx_rate(struct station_info *sinfo,
+			       struct wlan_hdd_link_info *link_info)
+{
+	uint8_t preamble = link_info->hdd_stats.class_a_stat.tx_preamble;
+
+	sinfo->txrate.nss = link_info->hdd_stats.class_a_stat.tx_nss;
+	if (preamble == DOT11_A || preamble == DOT11_B) {
+		/* Clear txrate which may have been set previously */
+		qdf_mem_zero(&sinfo->txrate, sizeof(sinfo->txrate));
+		sinfo->txrate.legacy =
+			link_info->hdd_stats.class_a_stat.tx_rate;
+		hdd_debug("Reporting legacy rate %d", sinfo->txrate.legacy);
+		return;
+	} else if (qdf_unlikely(preamble == INVALID_PREAMBLE)) {
+		hdd_debug("Driver failed to get rate");
+	}
+
+	wlan_hdd_refill_os_rateflags(&sinfo->txrate, preamble);
+
+	sinfo->txrate.mcs = link_info->hdd_stats.class_a_stat.tx_mcs_index;
+
+	wlan_hdd_refill_os_bw(&sinfo->txrate,
+			      link_info->hdd_stats.class_a_stat.tx_bw);
+	/* Fill out gi and dcm in HE mode */
+	sinfo->txrate.he_gi =
+		hdd_map_he_gi_to_os(link_info->hdd_stats.class_a_stat.tx_gi);
+	sinfo->txrate.he_dcm = 0;
+
+	if (link_info->hdd_stats.class_a_stat.tx_gi == TXRATE_GI_0_4_US)
+		sinfo->txrate.flags |= RATE_INFO_FLAGS_SHORT_GI;
+
+	hdd_debug("sgi=%d, preamble=%d, bw=%d, mcs=%d, nss=%d, rate_flag=0x%x",
+		  link_info->hdd_stats.class_a_stat.tx_gi, preamble,
+		  link_info->hdd_stats.class_a_stat.tx_bw,
+		  link_info->hdd_stats.class_a_stat.tx_mcs_index,
+		  link_info->hdd_stats.class_a_stat.tx_nss,
+		  sinfo->txrate.flags);
+}
+
+#ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 /**
  * wlan_hdd_refill_actual_rate() - Refill actual rates info stats
  * @sinfo: kernel station_info struct to populate
@@ -8011,9 +8030,12 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 		}
 	} else {
 		/* Fill TX stats */
-		hdd_report_actual_rate(tx_rate_flags, my_tx_rate,
-				       &sinfo->txrate, tx_mcs_index,
-				       tx_nss, tx_dcm, tx_gi);
+		if (hdd_stats->class_a_stat.tx_rate_version)
+			wlan_hdd_refill_actual_tx_rate(sinfo, link_info);
+		else
+			hdd_report_actual_rate(tx_rate_flags, my_tx_rate,
+					       &sinfo->txrate, tx_mcs_index,
+					       tx_nss, tx_dcm, tx_gi);
 
 		/* Fill RX stats */
 		hdd_report_actual_rate(rx_rate_flags, my_rx_rate,
@@ -8301,6 +8323,47 @@ fail:
 }
 
 /**
+ * wlan_hdd_get_sta_tx_rate_stats() - get sta tx rate from peer stats
+ * @link_info: Link info pointer of STA adapter to get stats
+ *
+ * Return: errno
+ */
+
+static void
+wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
+{
+	struct stats_event *stats;
+	struct hdd_fw_txrx_stats txrx_stats = {0};
+	struct hdd_stats *hdd_stats = &link_info->hdd_stats;
+	int errno = 0;
+	uint8_t *peer_addr;
+
+	if (hdd_stats->class_a_stat.is_tx_rate_version_checked &&
+	    !hdd_stats->class_a_stat.tx_rate_version)
+		return;
+
+	peer_addr = link_info->session.station.conn_info.bssid.bytes;
+	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(link_info->vdev,
+							     peer_addr,
+							     &errno);
+	if (!errno) {
+		wlan_hdd_fill_rate_info(&txrx_stats, stats->peer_stats_info_ext);
+		if (txrx_stats.tx_rate.version) {
+			hdd_stats->class_a_stat.tx_rate_version = txrx_stats.tx_rate.version;
+			hdd_stats->class_a_stat.tx_preamble = txrx_stats.tx_rate.mode;
+			hdd_stats->class_a_stat.tx_bw = txrx_stats.tx_rate.bw;
+			hdd_stats->class_a_stat.tx_nss = txrx_stats.tx_rate.nss;
+			hdd_stats->class_a_stat.tx_mcs_index = txrx_stats.tx_rate.mcs;
+			hdd_stats->class_a_stat.tx_gi = txrx_stats.tx_rate.gi;
+			hdd_stats->class_a_stat.tx_dcm = txrx_stats.tx_rate.dcm;
+			hdd_stats->class_a_stat.tx_mcs_rate_flags = txrx_stats.tx_rate.rate_flags;
+		}
+		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+		hdd_stats->class_a_stat.is_tx_rate_version_checked = true;
+	}
+}
+
+/**
  * wlan_hdd_get_sta_stats() - get aggregate STA stats
  * @link_info: Link info pointer of STA adapter to get stats for
  * @mac: mac address of sta
@@ -8357,6 +8420,7 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 	wlan_hdd_get_station_stats(link_info);
 
 	wlan_hdd_get_peer_rx_rate_stats(link_info);
+	wlan_hdd_get_sta_tx_rate_stats(link_info);
 
 	wlan_hdd_update_rssi(link_info, sinfo);
 
