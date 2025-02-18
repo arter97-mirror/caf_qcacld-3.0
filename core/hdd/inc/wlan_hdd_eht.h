@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023,2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -140,8 +140,7 @@ void wlan_hdd_fill_os_eht_rateflags(struct rate_info *os_rate,
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC) && \
-	defined(FEATURE_RX_LINKSPEED_ROAM_TRIGGER)
+#if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC)
 /**
  * wlan_hdd_refill_os_eht_rateflags() - Refill EHT rate flag
  * @os_rate: rate info for os
