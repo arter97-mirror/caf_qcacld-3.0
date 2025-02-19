@@ -25220,7 +25220,17 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		    wlan_hdd_is_sap_sta_nan_concurrency_present(i))
 			continue;
 
-		if (sap_sta_nan_concurrency) {
+		/**
+		 * Enabling sap_sta_nan_concurrency will remove existing
+		 * STA + NAN and SAP + NAN configurations.
+		 * For non-DBS cases, it will not add STA + SAP + NAN
+		 * as the interface count exceeds two.
+		 * However, it will still remove STA + NAN and SAP + NAN.
+		 * Below check is to prevent removing STA + NAN and SAP + NAN
+		 * if non-DBS is present.
+		 */
+		if (sap_sta_nan_concurrency &&
+		    ucfg_policy_mgr_is_fw_supports_dbs(psoc)) {
 			/* remove STA NAN concurrency */
 			if (wlan_hdd_is_sta_nan_concurrency_present(
 					wlan_hdd_iface_combination, i))
