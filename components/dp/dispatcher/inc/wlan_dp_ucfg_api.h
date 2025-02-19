@@ -35,6 +35,7 @@
 #include <cdp_txrx_misc.h>
 #include "wlan_dp_objmgr.h"
 #include "wlan_qmi_public_struct.h"
+#include <cdp_txrx_stats_struct.h>
 
 #define DP_IGNORE_NUD_FAIL                      0
 #define DP_DISCONNECT_AFTER_NUD_FAIL            1
@@ -2170,4 +2171,26 @@ bool ucfg_dp_is_ndp_bw_flow_ctrl_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif
+
+/**
+ * ucfg_dp_qos_latency_stats_request() - latency stats request
+ * @vdev: vdev handle
+ * @req: request pointer
+ *
+ * Return: QDF_STATUS
+ *
+ */
+QDF_STATUS ucfg_dp_qos_latency_stats_request(struct wlan_objmgr_vdev *vdev,
+					     struct cdp_qos_latency_stats *req);
+
+/**
+ * ucfg_dp_qos_latency_get_stats() - Get QoS latency stats
+ * @vdev: vdev handle
+ * @stats: Latency stats pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_dp_qos_latency_get_stats(struct wlan_objmgr_vdev *vdev,
+			      struct cdp_qos_latency_stats_req *stats);
 #endif /* _WLAN_DP_UCFG_API_H_ */

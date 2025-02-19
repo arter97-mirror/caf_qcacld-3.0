@@ -3363,3 +3363,43 @@ bool ucfg_dp_is_ndp_bw_flow_ctrl_enabled(struct wlan_objmgr_psoc *psoc)
 	return dp_ctx->dp_cfg.is_ndp_bw_flow_ctrl_enabled;
 }
 #endif
+
+QDF_STATUS ucfg_dp_qos_latency_stats_request(struct wlan_objmgr_vdev *vdev,
+					     struct cdp_qos_latency_stats *req)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link, *def_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err_rl("DP link not found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	def_link = dp_intf->def_link;
+
+	return cdp_qos_latency_stats_request(dp_intf->dp_ctx->cdp_soc,
+					     def_link->link_id, req);
+}
+
+QDF_STATUS
+ucfg_dp_qos_latency_get_stats(struct wlan_objmgr_vdev *vdev,
+			      struct cdp_qos_latency_stats_req *stats)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link, *def_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err_rl("DP link not found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	def_link = dp_intf->def_link;
+
+	return cdp_qos_latency_get_stats(dp_intf->dp_ctx->cdp_soc,
+					  def_link->link_id, stats);
+}
+
