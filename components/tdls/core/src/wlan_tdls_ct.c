@@ -550,7 +550,7 @@ tdls_implicit_send_discovery_request(struct tdls_vdev_priv_obj *tdls_vdev_obj)
 		goto done;
 	}
 
-	if (TDLS_CAP_UNKNOWN != curr_peer->tdls_support)
+	if (TDLS_CAP_NOT_SUPPORTED != curr_peer->tdls_support)
 		tdls_set_peer_link_status(curr_peer,
 					  TDLS_LINK_DISCOVERING,
 					  TDLS_LINK_SUCCESS);
