@@ -3168,6 +3168,19 @@ static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
 	lfr->beaconloss_timeout_onsleep =
 		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP) / 2;
 }
+
+/**
+ * mlme_init_roam_periodic_scan_interval() - Init roam_periodic_scan_interval
+ * @psoc: Pointer to psoc
+ * @lfr: Pointer to lfr config
+ *
+ * Return: None
+ */
+static void mlme_init_roam_periodic_scan_interval(struct wlan_objmgr_psoc *psoc,
+						  struct wlan_mlme_lfr_cfg *lfr)
+{
+	lfr->roam_periodic_scan_interval = cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
+}
 #else
 static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_mlme_lfr_cfg *lfr)
@@ -3176,6 +3189,11 @@ static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP);
 	lfr->beaconloss_timeout_onsleep =
 		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP);
+}
+
+static void mlme_init_roam_periodic_scan_interval(struct wlan_objmgr_psoc *psoc,
+						  struct wlan_mlme_lfr_cfg *lfr)
+{
 }
 #endif
 
@@ -3377,6 +3395,7 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_bmiss_timeout(psoc, lfr);
 	lfr->hs20_btm_offload_disable = cfg_get(psoc,
 						CFG_HS_20_BTM_OFFLOAD_DISABLE);
+	mlme_init_roam_periodic_scan_interval(psoc, lfr);
 }
 
 static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,

@@ -2163,6 +2163,9 @@ struct fw_scan_channels {
  * @roam_aggre_scan_step_rssi: Roam scan step RSSI in aggressive mode
  * @roam_aggre_threshold: Roam threshold in aggressive mode
  * @mrsno_support: FW support for Multi RSNO feature
+ * @roam_periodic_scan_interval: the interval in seconds after which STA
+ * performs periodic partial scans till roaming succeeds or RSSI recovers
+ * above threshold.
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2296,6 +2299,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_aggre_scan_step_rssi;
 	uint8_t roam_aggre_threshold;
 	bool mrsno_support;
+	uint32_t roam_periodic_scan_interval;
 };
 
 /**
