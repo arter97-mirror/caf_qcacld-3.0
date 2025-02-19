@@ -290,7 +290,7 @@
 /* PCIe gen speed change idle shutdown timer 100 milliseconds */
 #define HDD_PCIE_GEN_SPEED_CHANGE_TIMEOUT_MS (100)
 
-#define MAX_NET_DEV_REF_LEAK_ITERATIONS 10
+#define MAX_NET_DEV_REF_LEAK_ITERATIONS 50
 #define NET_DEV_REF_LEAK_ITERATION_SLEEP_TIME_MS 10
 
 #ifdef FEATURE_TSO
