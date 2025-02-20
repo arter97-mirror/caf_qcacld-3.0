@@ -27623,15 +27623,15 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 		if (qdf_is_macaddr_zero(&mlo_link_info->ap_link_addr) ||
 		    mlo_link_info->link_id == 0xFF)
 			continue;
-			hdd_debug(" Add pairwise key link id  %d ",
-				  mlo_link_info->link_id);
-			wlan_cfg80211_store_link_key(
-				hdd_ctx->psoc, key_index,
-				(pairwise ? WLAN_CRYPTO_KEY_TYPE_UNICAST :
-				WLAN_CRYPTO_KEY_TYPE_GROUP),
-				(uint8_t *)mlo_link_info->ap_link_addr.bytes,
-				params, &mlo_link_info->link_addr,
-				mlo_link_info->link_id);
+		hdd_debug(" Add pairwise key link id  %d ",
+			  mlo_link_info->link_id);
+		wlan_cfg80211_store_link_key(
+			hdd_ctx->psoc, key_index,
+			(pairwise ? WLAN_CRYPTO_KEY_TYPE_UNICAST :
+			WLAN_CRYPTO_KEY_TYPE_GROUP),
+			(uint8_t *)mlo_link_info->ap_link_addr.bytes,
+			params, &mlo_link_info->link_addr,
+			mlo_link_info->link_id);
 	}
 }
 
