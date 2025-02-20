@@ -26954,11 +26954,12 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 		    mlo_link_info->link_id == 0xFF)
 			continue;
 		hdd_debug("Add key link id %d", mlo_link_info->link_id);
-		wlan_cfg80211_store_link_key(hdd_ctx->psoc, key_index,
-					     WLAN_CRYPTO_KEY_TYPE_UNICAST,
-					     (uint8_t *)&mlo_link_info->ap_link_addr,
-					     params, &mlo_link_info->link_addr,
-					     mlo_link_info->link_id);
+		wlan_cfg80211_store_link_key(
+			hdd_ctx->psoc, key_index,
+			WLAN_CRYPTO_KEY_TYPE_UNICAST,
+			(uint8_t *)&mlo_link_info->ap_link_addr,
+			params, &mlo_link_info->link_addr,
+			mlo_link_info->link_id);
 	}
 }
 
