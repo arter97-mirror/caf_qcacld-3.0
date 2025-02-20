@@ -4860,6 +4860,8 @@ wlan_mlme_get_srd_master_mode_for_vdev(struct wlan_objmgr_psoc *psoc,
 		mlme_legacy_err("Failed to get MLME Obj");
 		return QDF_STATUS_E_INVAL;
 	}
+	mlme_legacy_debug("opmode %d, INI 0x%x", vdev_opmode,
+			  mlme_obj->cfg.reg.etsi_srd_chan_in_master_mode);
 
 	switch (vdev_opmode) {
 	case QDF_SAP_MODE:
