@@ -467,7 +467,7 @@ struct wlan_dp_stc {
 	uint32_t flow_monitor_interval;
 	uint32_t logmask;
 	enum wlan_dp_stc_periodic_work_state periodic_work_state;
-	qdf_timer_t flow_sampling_timer;
+	qdf_hrtimer_data_t flow_sampling_timer;
 	enum wlan_dp_stc_timer_state sample_timer_state;
 	uint32_t rtpm_control_flow_cnt;
 	bool rtpm_control;

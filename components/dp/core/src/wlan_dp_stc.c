@@ -1380,8 +1380,11 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 
 	if (start_timer &&
 	    dp_stc->sample_timer_state < WLAN_DP_STC_TIMER_STARTED) {
-		qdf_timer_mod(&dp_stc->flow_sampling_timer,
-			      DP_STC_TIMER_THRESH_MS);
+		qdf_hrtimer_start(&dp_stc->flow_sampling_timer,
+				  qdf_time_ms_to_ktime(DP_STC_TIMER_THRESH_MS),
+				  QDF_HRTIMER_MODE_REL);
+		dp_stc->sample_timer_state = WLAN_DP_STC_TIMER_STARTED;
+		dp_stc_info(dp_stc->logmask, "STC: Sampling timer started!");
 	}
 
 other_checks:
@@ -1691,8 +1694,7 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1,
 						     QDF_TX);
 #ifdef METADATA_CHECK_NEEDED_DURING_ADD
-			if (s_entry->tx_flow_metadata !=
-							flow->guid) {
+			if (s_entry->tx_flow_metadata != flow->guid) {
 				qdf_assert_always(0);
 				goto rx_flow_sample;
 			}
@@ -1880,25 +1882,32 @@ sample:
 	return sampling_pending;
 }
 
-static void wlan_dp_stc_flow_sampling_timer(void *arg)
+static enum qdf_hrtimer_restart_status
+wlan_dp_stc_flow_sampling_timer(qdf_hrtimer_data_t *arg)
 {
-	struct wlan_dp_stc *dp_stc = (struct wlan_dp_stc *)arg;
+	struct wlan_dp_stc *dp_stc;
 	struct wlan_dp_stc_sampling_table_entry *s_entry;
 	bool sampling_pending = false;
 	int i;
+
+	dp_stc = qdf_container_of(arg, struct wlan_dp_stc, flow_sampling_timer);
 
 	for (i = 0; i < DP_STC_SAMPLE_FLOWS_MAX; i++) {
 		s_entry = &dp_stc->sampling_flow_table->entries[i];
 		sampling_pending |= wlan_dp_stc_sample_flow(dp_stc, s_entry);
 	}
 
-	if (sampling_pending)
-		qdf_timer_mod(&dp_stc->flow_sampling_timer,
-			      DP_STC_TIMER_THRESH_MS);
-	else
-		dp_stc->sample_timer_state = WLAN_DP_STC_TIMER_STOPPED;
+	if (sampling_pending) {
+		qdf_hrtimer_forward(&dp_stc->flow_sampling_timer,
+				qdf_ktime_get(),
+				qdf_time_ms_to_ktime(DP_STC_TIMER_THRESH_MS));
+		return QDF_HRTIMER_RESTART;
+	}
 
-	return;
+	dp_stc->sample_timer_state = WLAN_DP_STC_TIMER_STOPPED;
+	dp_stc_info(dp_stc->logmask, "STC: Sampling timer stopped!");
+
+	return QDF_HRTIMER_NORESTART;
 }
 
 QDF_STATUS
@@ -2454,13 +2463,9 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 		wlan_dp_cfg_is_stc_rtpm_control_enabled(&dp_ctx->dp_cfg);
 
 	/* Init timer */
-	status = qdf_timer_init(dp_ctx->qdf_dev, &dp_stc->flow_sampling_timer,
-				wlan_dp_stc_flow_sampling_timer, dp_stc,
-				QDF_TIMER_TYPE_SW);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_info("STC flow sampling timer init failed");
-		goto timer_init_fail;
-	}
+	qdf_hrtimer_init(&dp_stc->flow_sampling_timer,
+			 wlan_dp_stc_flow_sampling_timer, QDF_CLOCK_MONOTONIC,
+			 QDF_HRTIMER_MODE_REL, QDF_CONTEXT_HARDWARE);
 
 	dp_stc->sample_timer_state = WLAN_DP_STC_TIMER_INIT;
 	dp_fisa_rx_add_tcp_flow_to_fst(dp_ctx);
@@ -2468,9 +2473,6 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 	dp_stc->logmask = WLAN_DP_STC_LOGMASK_VERBOSE_L1;
 
 	return QDF_STATUS_SUCCESS;
-
-timer_init_fail:
-	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
 
 periodic_work_creation_fail:
 	dp_context_free_mem(soc, DP_STC_CLASSIFIED_FLOW_TABLE_TYPE, c_table);
@@ -2498,7 +2500,7 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 	}
 
 	dp_info("STC: detach");
-	qdf_timer_sync_cancel(&dp_stc->flow_sampling_timer);
+	qdf_hrtimer_cancel(&dp_stc->flow_sampling_timer);
 	qdf_periodic_work_stop_sync(&dp_stc->flow_monitor_work);
 	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
 	dp_context_free_mem(soc, DP_STC_CLASSIFIED_FLOW_TABLE_TYPE,
