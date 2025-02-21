@@ -251,7 +251,7 @@ void dp_fisa_calc_flow_stats_avg(struct wlan_dp_psoc_context *dp_ctx)
 		if ((flow_init_time_ns < LONG_LIVED_FLOW_TIME_THRESH) ||
 		    (last_pkt_rcvd_time_ns > ACTIVE_FLOW_TIME_THRESH)) {
 			sw_ft_entry->elig_for_balance = false;
-			sw_ft_entry->num_pkts = sw_ft_entry->num_pkts_prev;
+			sw_ft_entry->num_pkts_prev = sw_ft_entry->num_pkts;
 			sw_ft_entry->last_avg_cal_time = cur_time_ns;
 			continue;
 		}
