@@ -1686,8 +1686,10 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 
 		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 			flow_id = s_entry->tx_flow_id;
-			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1, QDF_TX);
 			flow = &dp_stc->tx_flow_table->entries[flow_id];
+			qdf_mem_zero(flow, sizeof(*flow));
+			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1,
+						     QDF_TX);
 #ifdef METADATA_CHECK_NEEDED_DURING_ADD
 			if (s_entry->tx_flow_metadata !=
 							flow->guid) {
@@ -1710,8 +1712,10 @@ sample:
 #endif
 		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 			flow_id = s_entry->rx_flow_id;
-			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1, QDF_RX);
 			flow = &dp_stc->rx_flow_table->entries[flow_id];
+			qdf_mem_zero(flow, sizeof(*flow));
+			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1,
+						     QDF_RX);
 #ifdef METADATA_CHECK_NEEDED_DURING_ADD
 			if (s_entry->rx_flow_metadata != flow->metadata) {
 				qdf_assert_always(0);
