@@ -1134,7 +1134,7 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 	adapter = link_info->adapter;
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	hdd_delete_peer(sta_ctx, &bc_mac_addr);
+	hdd_delete_peer(adapter, sta_ctx, &bc_mac_addr);
 
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -1327,7 +1327,7 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 	adapter = link_info->adapter;
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
-	hdd_delete_peer(sta_ctx, peer_mac_addr);
+	hdd_delete_peer(adapter, sta_ctx, peer_mac_addr);
 
 	ucfg_nan_clear_peer_mc_list(hdd_ctx->psoc, link_info->vdev,
 				    peer_mac_addr);
@@ -1352,3 +1352,37 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 		hdd_send_obss_scan_req(hdd_ctx, false);
 	}
 }
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+uint8_t hdd_ndp_get_peer_bw(struct hdd_adapter *adapter, uint8_t *peer_mac,
+			    uint8_t *out_peer_idx)
+{
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	struct hdd_station_ctx *sta_ctx;
+	enum cdp_peer_bw peer_bw = CDP_PEER_BW_MAX;
+	uint8_t i;
+
+	if (qdf_unlikely(!link_info))
+		return CDP_PEER_BW_20MHZ;
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	for (i = 0; i < MAX_PEERS; i++) {
+		if (!qdf_mem_cmp(&sta_ctx->conn_info.peer_macaddr[i].bytes,
+				 peer_mac, QDF_MAC_ADDR_SIZE)) {
+			peer_bw =
+				hdd_convert_ch_width_to_cdp_peer_bw(sta_ctx->conn_info.peer_bw[i]);
+			/*
+			 * Broadcast peer is always added first in the list of
+			 * NDP peers.
+			 */
+			*out_peer_idx = i - 1;
+			break;
+		}
+	}
+
+	if (peer_bw >= CDP_PEER_BW_MAX)
+		return CDP_PEER_BW_20MHZ;
+
+	return peer_bw;
+}
+#endif

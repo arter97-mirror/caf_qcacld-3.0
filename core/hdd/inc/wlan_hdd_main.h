@@ -1323,6 +1323,7 @@ enum wfc_state_latency_level {
  * @history_index:
  * @queue_oper_history:
  * @queue_oper_stats:
+ * @ndp_peer_bitmap: NDP peer bitmap
  * @debugfs_phy: debugfs entry
  * @lfr_fw_status:
  * @active_ac:
@@ -1502,6 +1503,9 @@ struct hdd_adapter {
 	struct hdd_netif_queue_history
 		 queue_oper_history[WLAN_HDD_MAX_HISTORY_ENTRY];
 	struct hdd_netif_queue_stats queue_oper_stats[WLAN_REASON_TYPE_MAX];
+#ifdef NDP_TX_BW_FLOW_CTRL
+	uint8_t ndp_peer_bitmap[CDP_PEER_BW_MAX];
+#endif
 
 	struct dentry *debugfs_phy;
 	struct lfr_firmware_status lfr_fw_status;

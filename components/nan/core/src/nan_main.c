@@ -821,10 +821,12 @@ QDF_STATUS nan_scheduled_msg_handler(struct scheduler_msg *msg)
 static QDF_STATUS
 nan_increment_ndp_sessions(struct wlan_objmgr_psoc *psoc,
 			   struct qdf_mac_addr *peer_ndi_mac,
-			   struct nan_datapath_channel_info *ndp_chan_info)
+			   struct nan_datapath_channel_info *ndp_chan_info,
+			   uint32_t ndp_instance_id)
 {
 	struct wlan_objmgr_peer *peer;
 	struct nan_peer_priv_obj *peer_nan_obj;
+	uint32_t active_ndp_sessions;
 
 	peer = wlan_objmgr_get_peer_by_mac(psoc,
 					   peer_ndi_mac->bytes,
@@ -843,13 +845,18 @@ nan_increment_ndp_sessions(struct wlan_objmgr_psoc *psoc,
 	}
 	qdf_spin_lock_bh(&peer_nan_obj->lock);
 
+	active_ndp_sessions = peer_nan_obj->active_ndp_sessions;
 	/*
 	 * Store the first channel info in NDP Confirm as the home channel info
 	 * and store it in the peer private object.
 	 */
-	if (!peer_nan_obj->active_ndp_sessions)
+	if (!active_ndp_sessions)
 		qdf_mem_copy(&peer_nan_obj->home_chan_info, ndp_chan_info,
 			     sizeof(struct nan_datapath_channel_info));
+
+	if (active_ndp_sessions < MAX_NDP_SESSIONS)
+		peer_nan_obj->ndp_instance_id[active_ndp_sessions] =
+								ndp_instance_id;
 
 	peer_nan_obj->active_ndp_sessions++;
 	nan_debug("Number of active session = %d for peer:"QDF_MAC_ADDR_FMT,
@@ -862,10 +869,12 @@ nan_increment_ndp_sessions(struct wlan_objmgr_psoc *psoc,
 }
 
 static QDF_STATUS nan_decrement_ndp_sessions(struct wlan_objmgr_psoc *psoc,
-					     struct qdf_mac_addr *peer_ndi_mac)
+					     struct qdf_mac_addr *peer_ndi_mac,
+					     uint32_t ndp_instance_id)
 {
 	struct wlan_objmgr_peer *peer;
 	struct nan_peer_priv_obj *peer_nan_obj;
+	uint32_t ndp_session_idx;
 
 	peer = wlan_objmgr_get_peer_by_mac(psoc,
 					   peer_ndi_mac->bytes,
@@ -890,6 +899,28 @@ static QDF_STATUS nan_decrement_ndp_sessions(struct wlan_objmgr_psoc *psoc,
 		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	for (ndp_session_idx = 0;
+	     ndp_session_idx < peer_nan_obj->active_ndp_sessions;
+	     ndp_session_idx++) {
+		if (peer_nan_obj->ndp_instance_id[ndp_session_idx] ==
+		    ndp_instance_id) {
+			if (peer_nan_obj->active_ndp_sessions <=
+			    MAX_NDP_SESSIONS)
+				peer_nan_obj->ndp_instance_id[ndp_session_idx] =
+					peer_nan_obj->ndp_instance_id[peer_nan_obj->active_ndp_sessions - 1];
+			else
+				peer_nan_obj->ndp_instance_id[ndp_session_idx] =
+					peer_nan_obj->ndp_instance_id[MAX_NDP_SESSIONS - 1];
+
+			break;
+		}
+	}
+
+	if (ndp_session_idx == peer_nan_obj->active_ndp_sessions)
+		nan_err("NDP instance id:%d not found in peer active sessions",
+			ndp_instance_id);
+
 	peer_nan_obj->active_ndp_sessions--;
 	nan_debug("Number of active session = %d for peer:"QDF_MAC_ADDR_FMT,
 		  peer_nan_obj->active_ndp_sessions,
@@ -1112,7 +1143,8 @@ static QDF_STATUS nan_handle_confirm(struct nan_datapath_confirm_event *confirm)
 	/* Increment NDP sessions for the Peer */
 	if (confirm->rsp_code == NAN_DATAPATH_RESPONSE_ACCEPT)
 		nan_increment_ndp_sessions(psoc, &confirm->peer_ndi_mac_addr,
-					   &confirm->ch[0]);
+					   &confirm->ch[0],
+					   confirm->ndp_instance_id);
 
 	psoc_nan_obj->cb_obj.os_if_ndp_event_handler(psoc, confirm->vdev,
 						     NDP_CONFIRM, confirm);
@@ -1339,7 +1371,8 @@ static QDF_STATUS nan_handle_end_ind(
 	/* Decrement NDP sessions for all Peers in the event */
 	for (i = 0; i < ind->num_ndp_ids; i++)
 		nan_decrement_ndp_sessions(psoc,
-					   &ind->ndp_map[i].peer_ndi_mac_addr);
+					   &ind->ndp_map[i].peer_ndi_mac_addr,
+					   ind->ndp_map[i].ndp_instance_id);
 
 	for (i = 0; i < ind->num_ndp_ids; i++) {
 		vdev_itr = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
@@ -2727,3 +2760,51 @@ bool nan_is_allowed(struct wlan_objmgr_psoc *psoc)
 
 	return psoc_nan_obj->cfg_param.enable;
 }
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+QDF_STATUS nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
+				       uint32_t ndp_instance_id,
+				       struct qdf_mac_addr *peer_ndi_addr)
+{
+	struct nan_peer_priv_obj *peer_nan_obj;
+	struct wlan_objmgr_peer *peer, *peer_next;
+	qdf_list_t *peer_list;
+	uint8_t idx;
+
+	peer_list = &vdev->vdev_objmgr.wlan_peer_list;
+	if (!peer_list) {
+		nan_err("Peer list for vdev obj is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	peer = wlan_vdev_peer_list_peek_active_head(vdev, peer_list,
+						    WLAN_NAN_ID);
+
+	while (peer) {
+		peer_nan_obj = nan_get_peer_priv_obj(peer);
+		if (peer_nan_obj) {
+			for (idx = 0; idx < peer_nan_obj->active_ndp_sessions;
+			     idx++) {
+				if (peer_nan_obj->ndp_instance_id[idx] ==
+				    ndp_instance_id) {
+					qdf_mem_copy(peer_ndi_addr->bytes,
+						     peer->macaddr,
+						     QDF_MAC_ADDR_SIZE);
+					wlan_objmgr_peer_release_ref(peer,
+								WLAN_NAN_ID);
+					return QDF_STATUS_SUCCESS;
+				}
+			}
+		}
+
+		peer_next = wlan_peer_get_next_active_peer_of_vdev(vdev,
+								   peer_list,
+								   peer,
+								   WLAN_NAN_ID);
+		wlan_objmgr_peer_release_ref(peer, WLAN_NAN_ID);
+		peer = peer_next;
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif

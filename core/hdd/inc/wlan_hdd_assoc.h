@@ -124,6 +124,7 @@ struct hdd_conn_flag {
  * @bssid: BSSID
  * @ssid: SSID Info
  * @peer_macaddr:Peer Mac Address of the IBSS Stations
+ * @peer_bw: Bandwidth of connected peers
  * @auth_type: Auth Type
  * @uc_encrypt_type: Unicast Encryption Type
  * @is_authenticated: Remembers authenticated state
@@ -168,6 +169,9 @@ struct hdd_connection_info {
 	struct qdf_mac_addr bssid;
 	tCsrSSIDInfo ssid;
 	struct qdf_mac_addr peer_macaddr[MAX_PEERS];
+#ifdef NDP_TX_BW_FLOW_CTRL
+	enum phy_ch_width peer_bw[MAX_PEERS];
+#endif
 	enum csr_akm_type auth_type;
 	eCsrEncryptionType uc_encrypt_type;
 	uint8_t is_authenticated;
@@ -428,12 +432,14 @@ bool hdd_save_peer(struct hdd_station_ctx *sta_ctx,
 
 /**
  * hdd_delete_peer() - removes peer from hdd station context peer table
+ * @adapter: pointer to adapter
  * @sta_ctx: pointer to hdd station context
  * @peer_mac_addr: mac address of peer to be deleted
  *
  * Return: None
  */
-void hdd_delete_peer(struct hdd_station_ctx *sta_ctx,
+void hdd_delete_peer(struct hdd_adapter *adapter,
+		     struct hdd_station_ctx *sta_ctx,
 		     struct qdf_mac_addr *peer_mac_addr);
 
 /**

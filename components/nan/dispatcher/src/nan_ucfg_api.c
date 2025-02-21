@@ -644,6 +644,21 @@ nan_register_sr_concurrency_callback(struct nan_psoc_priv_obj *psoc_obj,
 {}
 #endif
 
+#ifdef NDP_TX_BW_FLOW_CTRL
+static inline
+void nan_regiser_ndp_update_peer_bw_cb(struct nan_psoc_priv_obj *psoc_obj,
+				       struct nan_callbacks *cb_obj)
+{
+	psoc_obj->cb_obj.ndp_update_peer_bw = cb_obj->ndp_update_peer_bw;
+}
+#else
+static inline
+void nan_regiser_ndp_update_peer_bw_cb(struct nan_psoc_priv_obj *psoc_obj,
+				       struct nan_callbacks *cb_obj)
+{
+}
+#endif
+
 int ucfg_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				    struct nan_callbacks *cb_obj)
 {
@@ -677,6 +692,8 @@ int ucfg_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	psoc_obj->cb_obj.set_mc_list = cb_obj->set_mc_list;
 
 	nan_register_sr_concurrency_callback(psoc_obj, cb_obj);
+	nan_regiser_ndp_update_peer_bw_cb(psoc_obj, cb_obj);
+
 	return 0;
 }
 
@@ -1829,3 +1846,13 @@ bool ucfg_nan_is_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return nan_is_allowed(psoc);
 }
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+QDF_STATUS ucfg_nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
+					    uint32_t ndp_instance_id,
+					    struct qdf_mac_addr *peer_ndi_addr)
+{
+	return nan_get_peer_ndi_addr_by_id(vdev, ndp_instance_id,
+					   peer_ndi_addr);
+}
+#endif

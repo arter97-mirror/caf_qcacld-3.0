@@ -220,12 +220,14 @@ struct nan_vdev_priv_obj {
  * struct nan_peer_priv_obj - nan private peer obj
  * @lock: lock to be acquired before reading or writing to object
  * @active_ndp_sessions: number of active ndp sessions for this peer
+ * @ndp_instance_id: NDP instance identifiers
  * @home_chan_info: Home channel info for the NDP associated with the Peer
  * @ndi_vdev_id: NDI vdev ID
  */
 struct nan_peer_priv_obj {
 	qdf_spinlock_t lock;
 	uint32_t active_ndp_sessions;
+	uint32_t ndp_instance_id[MAX_NDP_SESSIONS];
 	struct nan_datapath_channel_info home_chan_info;
 	uint8_t ndi_vdev_id;
 };
@@ -514,5 +516,28 @@ void nan_clean_up_all_ndp_peers(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
  * Return: true if NAN is allowed otherwise false
  */
 bool nan_is_allowed(struct wlan_objmgr_psoc *psoc);
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+/**
+ * nan_get_peer_ndi_addr_by_id() - Get peer ndi mac address using ndp
+ *  instance id
+ * @vdev: ndp vdev
+ * @ndp_instance_id: NDP instance identifier
+ * @peer_ndi_addr: peer NDI address to be filled
+ *
+ * Return: QDF status
+ */
+QDF_STATUS nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
+				       uint32_t ndp_instance_id,
+				       struct qdf_mac_addr *peer_ndi_addr);
+#else
+static inline
+QDF_STATUS nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
+				       uint32_t ndp_instance_id,
+				       struct qdf_mac_addr *peer_ndi_addr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

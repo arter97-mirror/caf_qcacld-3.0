@@ -4416,6 +4416,19 @@ static void hdd_register_sr_concurrency_cb(struct nan_callbacks *cb_obj)
 static void hdd_register_sr_concurrency_cb(struct nan_callbacks *cb_obj)
 {}
 #endif
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+static void hdd_register_ndp_update_peer_bw_cb(struct nan_callbacks *cb_obj)
+{
+	cb_obj->ndp_update_peer_bw = hdd_ndp_update_peer_bw;
+}
+#else
+static inline
+void hdd_register_ndp_update_peer_bw_cb(struct nan_callbacks *cb_obj)
+{
+}
+#endif
+
 static void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
 {
 	struct nan_callbacks cb_obj = {0};
@@ -4435,6 +4448,7 @@ static void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.set_mc_list = hdd_update_multicast_list;
 
 	hdd_register_sr_concurrency_cb(&cb_obj);
+	hdd_register_ndp_update_peer_bw_cb(&cb_obj);
 
 	os_if_nan_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }

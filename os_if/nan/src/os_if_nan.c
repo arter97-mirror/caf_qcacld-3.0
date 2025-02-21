@@ -1797,6 +1797,47 @@ static QDF_STATUS os_if_ndp_confirm_pack_ch_info(struct sk_buff *event,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef NDP_TX_BW_FLOW_CTRL
+static void os_if_ndp_update_peer_bw(struct wlan_objmgr_vdev *vdev,
+				     struct qdf_mac_addr *peer_mac,
+				     struct nan_datapath_channel_info *ch,
+				     uint32_t num_channels)
+{
+	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	struct nan_callbacks cb_obj;
+	enum phy_ch_width max_peer_bw;
+	QDF_STATUS status;
+	uint32_t i;
+
+	if (!num_channels)
+		return;
+
+	status = ucfg_nan_get_callbacks(psoc, &cb_obj);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to get NAN callbacks");
+		return;
+	}
+
+	max_peer_bw = ch[0].ch_width;
+	for (i = 1; i < num_channels; i++) {
+		if (ch[i].ch_width > max_peer_bw)
+			max_peer_bw = ch[i].ch_width;
+	}
+
+	if (cb_obj.ndp_update_peer_bw)
+		cb_obj.ndp_update_peer_bw(vdev_id, peer_mac, max_peer_bw);
+}
+#else
+static inline
+void os_if_ndp_update_peer_bw(struct wlan_objmgr_vdev *vdev,
+			      struct qdf_mac_addr *peer_mac,
+			      struct nan_datapath_channel_info *ch,
+			      uint32_t num_channels)
+{
+}
+#endif
+
 /**
  * os_if_ndp_confirm_ind_handler() - NDP confirm indication handler
  * @vdev: pointer to vdev object
@@ -1835,6 +1876,9 @@ os_if_ndp_confirm_ind_handler(struct wlan_objmgr_vdev *vdev,
 		osif_err("Invalid NDP Initiator response");
 		return;
 	}
+
+	os_if_ndp_update_peer_bw(vdev, &ndp_confirm->peer_ndi_mac_addr,
+				 ndp_confirm->ch, ndp_confirm->num_channels);
 
 	ifname = os_if_ndi_get_if_name(vdev);
 	if (!ifname) {
@@ -2472,10 +2516,23 @@ static void os_if_ndp_sch_update_ind_handler(struct wlan_objmgr_vdev *vdev,
 	struct pdev_osif_priv *os_priv = wlan_pdev_get_ospriv(pdev);
 	enum qca_nl80211_vendor_subcmds_index index =
 		QCA_NL80211_VENDOR_SUBCMD_NDP_INDEX;
+	struct qdf_mac_addr peer_ndi_addr;
 
 	if (!sch_update) {
 		osif_err("Invalid sch update params");
 		return;
+	}
+
+	for (idx = 0; idx < sch_update->num_ndp_instances; idx++) {
+		status = ucfg_nan_get_peer_ndi_addr_by_id(vdev,
+						 sch_update->ndp_instances[idx],
+						 &peer_ndi_addr);
+		if (status != QDF_STATUS_SUCCESS)
+			continue;
+
+		os_if_ndp_update_peer_bw(vdev, &peer_ndi_addr,
+					 sch_update->ch,
+					 sch_update->num_channels);
 	}
 
 	ifname = os_if_ndi_get_if_name(vdev);
