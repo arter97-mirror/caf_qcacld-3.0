@@ -29279,6 +29279,8 @@ QDF_STATUS hdd_softap_deauth_current_sta(struct wlan_hdd_link_info *link_info,
 		hdd_debug("Vdev %d STA removal failed for " QDF_MAC_ADDR_FMT,
 			  link_info->vdev_id,
 			  QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
+		if (qdf_status == QDF_STATUS_E_ALREADY)
+			return QDF_STATUS_SUCCESS;
 		return QDF_STATUS_E_NOENT;
 	}
 	return QDF_STATUS_SUCCESS;
