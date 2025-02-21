@@ -2603,6 +2603,10 @@ config CFG_MAX_STA_VDEVS
 	default 2
 endif
 
+config NDP_TX_BW_FLOW_CTRL
+	bool "Enable NDP_TX_BW_FLOW_CTRL"
+	default n
+
 if CNSS_KIWI_V2
 config CFG_BMISS_OFFLOAD_MAX_VDEV
 	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"

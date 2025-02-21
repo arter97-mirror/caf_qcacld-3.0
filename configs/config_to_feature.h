@@ -3215,4 +3215,9 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 #define IPA_WDI3_VLAN_SUPPORT (1)
 #endif
 
+#if defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2) && \
+	defined(CONFIG_NDP_TX_BW_FLOW_CTRL)
+#define NDP_TX_BW_FLOW_CTRL (1)
+#endif
+
 #endif /* CONFIG_TO_FEATURE_H */
