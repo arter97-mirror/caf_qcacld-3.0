@@ -6223,31 +6223,33 @@ uint32_t policy_mgr_get_beaconing_mode_info(struct wlan_objmgr_psoc *psoc,
 	return count;
 }
 
-void policy_mgr_get_ml_and_non_ml_sta_count(struct wlan_objmgr_psoc *psoc,
-					    uint8_t *num_ml, uint8_t *ml_idx,
-					    uint8_t *num_non_ml,
-					    uint8_t *non_ml_idx,
-					    qdf_freq_t *freq_list,
-					    uint8_t *vdev_id_list)
+void policy_mgr_get_ml_and_non_ml_mode_count(struct wlan_objmgr_psoc *psoc,
+					     uint8_t *num_ml, uint8_t *ml_idx,
+					     uint8_t *num_non_ml,
+					     uint8_t *non_ml_idx,
+					     qdf_freq_t *freq_list,
+					     uint8_t *vdev_id_list,
+					     enum policy_mgr_con_mode mode)
 {
-	uint32_t sta_num = 0;
+	uint32_t conn_num = 0;
 	uint8_t i;
 	struct wlan_objmgr_vdev *temp_vdev;
 
 	*num_ml = 0;
 	*num_non_ml = 0;
 
-	sta_num = policy_mgr_get_mode_specific_conn_info(psoc, freq_list,
-							 vdev_id_list,
-							 PM_STA_MODE);
-	if (!sta_num)
+	conn_num = policy_mgr_get_mode_specific_conn_info(psoc, freq_list,
+							  vdev_id_list,
+							  mode);
+	if (!conn_num)
 		return;
 
-	for (i = 0; i < sta_num; i++) {
+	for (i = 0; i < conn_num; i++) {
 		temp_vdev =
-			wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-							    vdev_id_list[i],
-							    WLAN_POLICY_MGR_ID);
+			wlan_objmgr_get_vdev_by_id_from_psoc(
+							psoc,
+							vdev_id_list[i],
+							WLAN_POLICY_MGR_ID);
 		if (!temp_vdev) {
 			policy_mgr_err("invalid vdev for id %d",
 				       vdev_id_list[i]);
@@ -6294,9 +6296,10 @@ bool policy_mgr_concurrent_sta_on_different_mac(struct wlan_objmgr_psoc *psoc)
 	}
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml, ml_idx,
-					       &num_non_ml, non_ml_idx,
-					       freq_list, vdev_id_list);
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml, ml_idx,
+						&num_non_ml, non_ml_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
 	if (num_ml + num_non_ml < 2 || !num_non_ml)
 		goto out;
 
@@ -8338,9 +8341,10 @@ policy_mgr_handle_ml_sta_link_concurrency(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml, ml_idx,
-					       &num_non_ml, non_ml_idx,
-					       freq_list, vdev_id_list);
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml, ml_idx,
+						&num_non_ml, non_ml_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
 	/* Skip non STA+STA cases */
 	if (!num_ml || !num_non_ml)
 		return QDF_STATUS_E_INVAL;

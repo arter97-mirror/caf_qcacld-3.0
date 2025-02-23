@@ -2420,9 +2420,10 @@ policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 				psoc, &list_sta[sta_cnt],
 				&vdev_id[sta_cnt], PM_STA_MODE);
 
-	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml_sta, ml_sta_idx,
-					       &num_non_ml_sta, non_ml_sta_idx,
-					       freq_list, vdev_id_list);
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sta, ml_sta_idx,
+						&num_non_ml_sta, non_ml_sta_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
 
 	if (!sap_info)
 		goto end;

@@ -198,9 +198,10 @@ policy_mgr_get_pcl_concurrent_connetions(struct wlan_objmgr_psoc *psoc,
 	is_ml_sta = wlan_vdev_mlme_is_mlo_vdev(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
-	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml, ml_idx,
-					       &num_non_ml, non_ml_idx,
-					       freq_list, vdev_id_list);
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml, ml_idx,
+						&num_non_ml, non_ml_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
 	for (i = 0;
 	     i < num_non_ml + num_ml && num_related < vdev_ids_size; i++) {
 		if (vdev_id_list[i] == vdev_id) {
@@ -4036,9 +4037,10 @@ enum policy_mgr_three_connection_mode
 	count_sap += count_p2p;
 	count_sta = policy_mgr_mode_specific_connection_count(
 				psoc, PM_STA_MODE, list_sta);
-	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml_sta, ml_sta_idx,
-					       &num_non_ml_sta, non_ml_sta_idx,
-					       freq_list, vdev_id_list);
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sta, ml_sta_idx,
+						&num_non_ml_sta, non_ml_sta_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
 
 	count_ndi = policy_mgr_mode_specific_connection_count(
 				psoc, PM_NDI_MODE, list_ndi);
@@ -4507,9 +4509,10 @@ enum policy_mgr_four_connection_mode
 		}
 	}
 
-	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml_sta, ml_sta_idx,
-					       &num_non_ml_sta, non_ml_sta_idx,
-					       freq_list, vdev_id_list);
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sta, ml_sta_idx,
+						&num_non_ml_sta, non_ml_sta_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
 
 	count_ndi = policy_mgr_mode_specific_connection_count(
 					psoc, PM_NDI_MODE, list_ndi);
@@ -4986,9 +4989,10 @@ policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
 	}
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml, ml_idx,
-					       &num_non_ml, non_ml_idx,
-					       freq_list, vdev_id_list);
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml, ml_idx,
+						&num_non_ml, non_ml_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 	/*
 	 * No need to modify the PCL for below as NDP is not supported
