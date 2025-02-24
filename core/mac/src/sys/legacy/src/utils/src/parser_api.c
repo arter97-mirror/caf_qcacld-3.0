@@ -69,6 +69,8 @@
 #endif
 
 #include <wlan_vdev_mgr_utils_api.h>
+#include "cfg_mlme_he_caps.h"
+#include "cfg_ucfg_api.h"
 
 #define BW_160 160
 
@@ -8326,6 +8328,9 @@ populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 				tDot11fIEhe_cap *he_cap,
 				struct pe_session *session)
 {
+	uint8_t *ppet;
+	uint32_t ppet_value = 0;
+
 	if (is_2g) {
 		qdf_mem_copy(he_cap, &mac_ctx->he_cap_2g, sizeof(*he_cap));
 		if (session) {
@@ -8340,6 +8345,23 @@ populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 
 	if (session)
 		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
+
+	if (he_cap->ppet_present) {
+		ppet_value = WNI_CFG_HE_PPET_LEN;
+		if (!is_2g)
+			qdf_mem_copy(he_cap->ppet.ppe_threshold.ppe_th,
+				     mac_ctx->mlme_cfg->he_caps.he_ppet_5g,
+				     ppet_value);
+		else
+			qdf_mem_copy(he_cap->ppet.ppe_threshold.ppe_th,
+				     mac_ctx->mlme_cfg->he_caps.he_ppet_2g,
+				     ppet_value);
+		ppet = he_cap->ppet.ppe_threshold.ppe_th;
+		he_cap->ppet.ppe_threshold.num_ppe_th =
+					lim_truncate_ppet(ppet, ppet_value);
+	} else {
+		he_cap->ppet.ppe_threshold.num_ppe_th = 0;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -13903,8 +13925,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	struct wlan_mlo_eml_cap eml_cap = {0};
 	uint16_t presence_bitmap = 0;
 	bool is_2g;
-	uint32_t value = 0;
-	uint8_t *ppet, cb_mode;
+	uint8_t cb_mode;
 	uint8_t *eht_cap_ie = NULL;
 	bool sta_prof_he_ie = false;
 
@@ -14322,23 +14343,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 
 		populate_dot11f_he_caps_by_band(mac_ctx, is_2g, &he_caps,
 						pe_session);
-		if (he_caps.ppet_present) {
-			value = WNI_CFG_HE_PPET_LEN;
-			if (!is_2g)
-				qdf_mem_copy(he_caps.ppet.ppe_threshold.ppe_th,
-					mac_ctx->mlme_cfg->he_caps.he_ppet_5g,
-					value);
-			else
-				qdf_mem_copy(he_caps.ppet.ppe_threshold.ppe_th,
-					mac_ctx->mlme_cfg->he_caps.he_ppet_2g,
-					value);
 
-			ppet = he_caps.ppet.ppe_threshold.ppe_th;
-			he_caps.ppet.ppe_threshold.num_ppe_th =
-				lim_truncate_ppet(ppet, value);
-		} else {
-			he_caps.ppet.ppe_threshold.num_ppe_th = 0;
-		}
 		if ((he_caps.present && frm->he_cap.present &&
 		     qdf_mem_cmp(&he_caps, &frm->he_cap, sizeof(he_caps))) ||
 		     (he_caps.present && !frm->he_cap.present)) {

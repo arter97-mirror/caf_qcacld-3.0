@@ -11238,6 +11238,21 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80,
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80);
 
+	/* Reset below params to default */
+	mac_ctx->he_cap_5g.bfee_sts_gt_80 = 0;
+
+	mac_ctx->he_cap_2g.num_sounding_gt_80 = 0;
+	mac_ctx->he_cap_5g.num_sounding_gt_80 = 0;
+
+	mac_ctx->he_cap_2g.he_ppdu_20_in_40Mhz_2G = 0;
+	mac_ctx->he_cap_5g.he_ppdu_20_in_40Mhz_2G = 0;
+
+	mac_ctx->he_cap_2g.he_ppdu_20_in_160_80p80Mhz = 0;
+	mac_ctx->he_cap_5g.he_ppdu_20_in_160_80p80Mhz = 0;
+
+	mac_ctx->he_cap_2g.he_ppdu_80_in_160_80p80Mhz = 0;
+	mac_ctx->he_cap_5g.he_ppdu_80_in_160_80p80Mhz = 0;
+
 	qdf_mem_copy(&mac_ctx->he_cap_2g_orig,
 		     &mac_ctx->he_cap_2g,
 		     sizeof(tDot11fIEhe_cap));
