@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4855,6 +4855,13 @@ const enum policy_mgr_pcl_type
 fourth_connection_pcl_dbs_sbs_table
 	[PM_MAX_THREE_CONNECTION_MODE][PM_MAX_NUM_OF_MODE]
 	[PM_MAX_CONC_PRIORITY_MODE] = {
+
+	[PM_STA_SAP_SCC_24_SAP_5_DBS] = {
+	[PM_STA_MODE] = { PM_5G, PM_5G, PM_5G } },
+
+	[PM_STA_SAP_SCC_5_SAP_24_DBS] = {
+	[PM_STA_MODE] = { PM_24G, PM_24G, PM_24G } },
+
 	[PM_NAN_DISC_NDI_24_STA_5_DBS] = {
 	[PM_NDI_MODE] = { PM_NONE, PM_NONE, PM_NONE },
 	[PM_SAP_MODE] = { PM_SCC_ON_5_5G_24G, PM_SCC_ON_5_5G_24G,
