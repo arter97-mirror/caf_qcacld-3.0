@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1965,32 +1965,6 @@
  * </ioctl>
  */
 #define WE_GET_SUSPEND_RESUME_STATS 7
-#ifdef FEATURE_WLAN_TDLS
-/*
- * <ioctl>
- * getTdlsPeers - Get all TDLS peers.
- *
- * @INPUT: None
- *
- * @OUTPUT: Returns the MAC address of all the TDLS peers
- * wlan0     getTdlsPeers:
- * MAC               Id cap up RSSI
- * ---------------------------------
- * 00:0a:f5:0e:bd:18  2   Y  Y  -44
- * 00:0a:f5:bf:0e:12  0   N  N    0
- *
- * This IOCTL is used to get all TDLS peers.
- *
- * @E.g: iwpriv wlan0 getTdlsPeers
- *
- * Supported Feature: TDLS
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_TDLS_PEERS    8
-#endif
 /*
  * <ioctl>
  * getPMFInfo - get the PMF info of the connected session
@@ -6241,15 +6215,7 @@ static int __iw_get_char_setnone(struct net_device *dev,
 			return -EINVAL;
 		break;
 	}
-#ifdef FEATURE_WLAN_TDLS
-	case WE_GET_TDLS_PEERS:
-	{
-		wrqu->data.length =
-			wlan_hdd_tdls_get_all_peers(adapter, extra,
-						    WE_MAX_STR_LEN) + 1;
-		break;
-	}
-#endif
+
 	case WE_GET_11W_INFO:
 	{
 		struct qdf_mac_addr connected_bssid;
@@ -9533,12 +9499,7 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
 	 "getChannelList"},
-#ifdef FEATURE_WLAN_TDLS
-	{WE_GET_TDLS_PEERS,
-	 0,
-	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
-	 "getTdlsPeers"},
-#endif
+
 	{WE_GET_11W_INFO,
 	 0,
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
