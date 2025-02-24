@@ -144,6 +144,10 @@ check_burst:
 			flow_entry->burst_stats.burst_count++;
 			flow_entry->cur_burst_bytes +=
 					flow_entry->burst_start_detect_bytes;
+			dp_stc_burst_debug(dp_stc->logmask,
+			    "STC: Flow mdata 0x%x Burst start detected: %u B",
+			    flow_entry->metadata,
+			    flow_entry->cur_burst_bytes);
 		} else {
 			/*
 			 * (time_delta > BURST_START_TIME_THRESHOLD_NS &&
@@ -183,6 +187,10 @@ check_burst:
 			flow_entry->burst_start_detect_bytes = 0;
 			flow_entry->cur_burst_bytes = 0;
 			pkt_iat = 0;
+			dp_stc_burst_debug(dp_stc->logmask,
+			   "STC: Flow mdata 0x%x Burst end with size %u dur %u",
+			   flow_entry->metadata,
+			   burst_size, burst_dur);
 			goto check_burst;
 		}
 
@@ -512,6 +520,11 @@ wlan_dp_stc_remove_sampling_table_entry(struct wlan_dp_stc *dp_stc,
 					dp_stc->sampling_flow_table;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint16_t id;
+	uint8_t buf[BUF_LEN_MAX];
+
+	dp_stc_info(dp_stc->logmask, "STC: Evicting sample entry tuple: (%s)",
+		    dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
+					  buf, BUF_LEN_MAX));
 
 	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 		struct wlan_dp_spm_flow_info *tx_flow;
@@ -1826,7 +1839,6 @@ sample:
 		if (s_entry->next_sample_idx == DP_STC_TXRX_SAMPLES_MAX) {
 			s_entry->flags |=
 				WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY;
-			/* skip burst stats stage 1 */
 			s_entry->state =
 				WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1;
 		}

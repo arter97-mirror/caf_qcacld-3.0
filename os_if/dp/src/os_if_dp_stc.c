@@ -440,6 +440,7 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 	txrx_samples = &burst_sample->txrx_samples;
 
 	osif_nofl_debug("STC: Burst TxRx Stats:");
+	osif_nofl_debug("STC: Window duration: %u", txrx_samples->win_size);
 	osif_nofl_debug("STC: %20s %15s %15s", "", "UL", "DL");
 
 	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
@@ -478,7 +479,7 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 			"burst_duration_sum: ",
 			burst_sample->tx.burst_duration_sum,
 			burst_sample->rx.burst_duration_sum);
-	osif_nofl_debug("STC: %20s %15u\t\t\t15%d",
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
 			"burst_size_min: ",
 			burst_sample->tx.burst_size_min,
 			burst_sample->rx.burst_size_min);
