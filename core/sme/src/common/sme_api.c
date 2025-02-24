@@ -11175,6 +11175,7 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 			   struct wma_tgt_cfg *cfg,
 			   tDot11fIEhe_cap *he_cap_ini)
 {
+	uint8_t value;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	uint8_t vht_enable_mimo =
 			mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo;
@@ -11252,6 +11253,18 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 
 	mac_ctx->he_cap_2g.he_ppdu_80_in_160_80p80Mhz = 0;
 	mac_ctx->he_cap_5g.he_ppdu_80_in_160_80p80Mhz = 0;
+
+	value = QDF_MIN(mac_ctx->he_cap_2g.fragmentation,
+			mac_ctx->mlme_cfg->he_caps.he_dynamic_fragmentation);
+
+	if (cfg_in_range(CFG_HE_FRAGMENTATION, value))
+		mac_ctx->he_cap_2g.fragmentation = value;
+
+	value = QDF_MIN(mac_ctx->he_cap_5g.fragmentation,
+			mac_ctx->mlme_cfg->he_caps.he_dynamic_fragmentation);
+
+	if (cfg_in_range(CFG_HE_FRAGMENTATION, value))
+		mac_ctx->he_cap_5g.fragmentation = value;
 
 	qdf_mem_copy(&mac_ctx->he_cap_2g_orig,
 		     &mac_ctx->he_cap_2g,
