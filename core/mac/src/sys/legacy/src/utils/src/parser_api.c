@@ -10861,7 +10861,10 @@ populate_dot11f_probe_req_mlo_ie(struct mac_context *mac,
 
 no_sta_prof:
 	mlo_ie->num_sta_profile = num_sta_pro;
-	session->lim_join_req->is_ml_probe_req_sent = true;
+	if (session->limMlmState == eLIM_MLM_WT_JOIN_BEACON_STATE)
+		session->lim_join_req->is_ml_probe_req_sent = true;
+	else
+		session->lim_join_req->is_ml_probe_req_sent = false;
 
 	return QDF_STATUS_SUCCESS;
 }
