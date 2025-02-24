@@ -2689,6 +2689,14 @@ abort_roam:
 	return status;
 }
 
+/*
+ * RSSI=0 indicates best RSSI AP and userspace might get confused.
+ * So mark it as -80 to indicate as bad RSSI so that userspace
+ * doesn't prefer this link over associated link for roaming. There is
+ * no concern even if current frame is from assoc link.
+ */
+#define UNKNOWN_RSSI_OF_LINK (-80)
+
 /**
  * extract_roam_sync_frame_event_tlv() - Extract the roam sync frame event
  * from the wmi_roam_synch_event_id
@@ -2754,12 +2762,17 @@ extract_roam_sync_frame_event_tlv(wmi_unified_t wmi_handle, void *event,
 
 	frame_ind = frame_ptr;
 	frame_ind->vdev_id = frame_evt->vdev_id;
+	frame_ind->rssi = frame_evt->bcn_probe_resp_rssi;
+	if (!frame_ind->rssi)
+		frame_ind->rssi = UNKNOWN_RSSI_OF_LINK;
 
-	wmi_debug("synch frame payload: LEN %s bcn:%d, req:%d, rsp:%d",
+	wmi_debug("synch frame payload: vdev %d LEN %s bcn:%d, req:%d, rsp:%d RSSI: %d",
+		  frame_evt->vdev_id,
 		  frame_evt->reassoc_rsp_len ? "Assoc" : "Link",
 		  frame_evt->bcn_probe_rsp_len,
 		  frame_evt->reassoc_req_len,
-		  frame_evt->reassoc_rsp_len);
+		  frame_evt->reassoc_rsp_len,
+		  frame_evt->bcn_probe_resp_rssi);
 
 	if (frame_evt->bcn_probe_rsp_len &&
 	    frame_evt->reassoc_rsp_len) {
@@ -3527,11 +3540,13 @@ extract_roam_candidate_frame_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	}
 
 	data->vdev_id = frame_params->vdev_id;
+	data->rssi = frame_params->rssi;
 	data->frame_length = frame_params->frame_length;
 	data->frame = (uint8_t *)param_buf->frame;
 	data->roam_offload_candidate_frm = true;
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
-			   data->frame, data->frame_length);
+	wmi_debug("Frame: vdev %d, rssi: %d, frame_length: %d", data->vdev_id,
+		  data->rssi, data->frame_length);
+	mgmt_txrx_frame_hex_dump(data->frame, data->frame_length, false);
 
 	return QDF_STATUS_SUCCESS;
 }

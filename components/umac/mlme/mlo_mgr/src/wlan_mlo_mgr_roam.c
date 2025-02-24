@@ -1580,6 +1580,8 @@ end:
 	return is_roaming_in_progress;
 }
 
+#define RSSI_OF_SCAN_ENTRY_FROM_PER_STA_PROFILE (-80)
+
 QDF_STATUS
 mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 			struct roam_scan_candidate_frame *rcvd_frame)
@@ -1660,7 +1662,7 @@ mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 		entry.vdev_id = rcvd_frame->vdev_id;
 		entry.frame = gen_probe_rsp.ptr;
 		entry.frame_length = gen_probe_rsp.len;
-		entry.rssi = rcvd_frame->rssi;
+		entry.rssi = RSSI_OF_SCAN_ENTRY_FROM_PER_STA_PROFILE;
 
 		wlan_cm_add_frame_to_scan_db(psoc, &entry);
 	}
