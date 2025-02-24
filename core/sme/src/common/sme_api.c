@@ -11090,6 +11090,14 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 	mac_ctx->eht_cap_5g.bfee_ss_320mhz =
 			QDF_MIN(cfg->eht_cap_5g.bfee_ss_320mhz, value);
 
+	if (wlan_mlme_get_epcs_capability(mac_ctx->psoc)) {
+		mac_ctx->eht_cap_2g.epcs_pri_access = 1;
+		mac_ctx->eht_cap_5g.epcs_pri_access = 1;
+	} else {
+		mac_ctx->eht_cap_2g.epcs_pri_access = 0;
+		mac_ctx->eht_cap_5g.epcs_pri_access = 0;
+	}
+
 	qdf_mem_copy(&mac_ctx->eht_cap_2g_orig,
 		     &mac_ctx->eht_cap_2g,
 		     sizeof(tDot11fIEeht_cap));

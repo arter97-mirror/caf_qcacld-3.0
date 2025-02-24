@@ -14380,8 +14380,13 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		}
 		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps,
 						 NULL);
-		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
+		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq)) {
 			eht_caps.support_320mhz_6ghz = 0;
+			eht_caps.bfee_ss_320mhz = 0;
+		}
+
+		if (!eht_caps.support_320mhz_6ghz || !eht_caps.su_beamformer)
+			eht_caps.num_sounding_dim_320mhz = 0;
 
 		if ((eht_caps.present && frm->eht_cap.present &&
 		     qdf_mem_cmp(&eht_caps, &frm->eht_cap, sizeof(eht_caps))) ||
