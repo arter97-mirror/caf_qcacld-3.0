@@ -4314,7 +4314,8 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 					    &partner_info,
 					    WLAN_FC0_STYPE_ASSOC_RESP);
 
-	if (!wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev) &&
+	if (p_assoc_rsp->status_code == STATUS_SUCCESS &&
+	    !wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev) &&
 	    session_entry->ml_partner_info.num_partner_links &&
 	    !wlan_cm_is_roam_sync_in_progress(mac->psoc,
 					      session_entry->vdev_id)) {
