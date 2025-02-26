@@ -907,6 +907,11 @@ wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 	if (!vdev->mlo_dev_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
+	if (mlo_is_link_recfg_in_progress(vdev)) {
+		t2lm_err("Link Recfg in progress, ignore load balancing req");
+		return QDF_STATUS_E_BUSY;
+	}
+
 	t2lm_policy = &peer->mlo_peer_ctx->t2lm_policy;
 	t2lm_neg = t2lm_policy->ongoing_tid_to_link_mapping;
 
@@ -1182,6 +1187,11 @@ QDF_STATUS wlan_mlo_set_ttlm_mapping(struct wlan_objmgr_vdev *vdev,
 	bss_peer = wlan_vdev_get_bsspeer(vdev);
 	if (!bss_peer || !bss_peer->mlo_peer_ctx)
 		return QDF_STATUS_E_INVAL;
+
+	if (mlo_is_link_recfg_in_progress(vdev)) {
+		t2lm_err("failed due to link recfg in progress");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	return ttlm_sm_deliver_event(bss_peer->mlo_peer_ctx,
 				    WLAN_TTLM_SM_EV_TX_ACTION_REQ,

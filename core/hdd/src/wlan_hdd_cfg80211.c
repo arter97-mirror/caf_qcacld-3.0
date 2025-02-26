@@ -227,6 +227,7 @@
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_cfg80211_p2p.h"
 #include "wlan_ll_sap_api.h"
+#include "wlan_mlo_link_recfg.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -34428,6 +34429,12 @@ __wlan_hdd_cfg80211_set_ttlm_mapping(struct wiphy *wiphy,
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		hdd_err("failed due to non-ML connection");
 		ret = -EOPNOTSUPP;
+		goto vdev_release;
+	}
+
+	if (mlo_is_link_recfg_in_progress(vdev)) {
+		hdd_err("failed due to link recfg in progress");
+		ret = -EBUSY;
 		goto vdev_release;
 	}
 
