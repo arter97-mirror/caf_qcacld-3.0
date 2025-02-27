@@ -34495,7 +34495,8 @@ defined(CFG80211_SETUP_LINK_RECONFIG_SUPPORT)
  * delete link data from upper layer.
  * @wiphy: wiphy struct
  * @dev: net device
- * @params: add or delete link reconfig params
+ * @add_links: added link reconfig params
+ * @rem_links: removed link id bitmap
  *
  * This API fetch add or delete link params based on link id mask
  * and invokes target if API to send add delete link info.
@@ -34505,7 +34506,8 @@ defined(CFG80211_SETUP_LINK_RECONFIG_SUPPORT)
 static int
 wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 				      struct net_device *dev,
-				      struct setup_link_reconfig_params *params)
+				      struct cfg80211_assoc_link *add_links,
+				      u16 rem_links)
 {
 	struct mlo_link_recfg_user_req_params *req_param = {0};
 	struct wlan_lmac_if_mlo_rx_ops *mlo_rx_ops;
@@ -34549,12 +34551,13 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 	qdf_mem_set(req_param, sizeof(req_param), 0);
 	req_param->vdev_id = adapter->deflink->vdev_id;
 
-	for (link_id = 0; link_id < IEEE80211_MLD_MAX_NUM_LINKS; link_id++) {
-		if (!(params->add_valid_links & BIT(link_id)))
+	for (link_id = 0; add_links &&
+			link_id < IEEE80211_MLD_MAX_NUM_LINKS; link_id++) {
+		if (!add_links[link_id].bss)
 			continue;
 
 		qdf_mem_copy(&req_param->add_link[i].link_addr,
-			     params->add_link_bssid[link_id],
+			     add_links[link_id].bss->bssid,
 			     QDF_MAC_ADDR_SIZE);
 		/**
 		 * This link will not be present in scan list.
@@ -34573,7 +34576,6 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 
 		req_param->add_link[i].link_id = link_id;
 
-
 		hdd_debug("add[%d] link with param link_id: %d link_addr: " QDF_MAC_ADDR_FMT "mld addr: " QDF_MAC_ADDR_FMT,
 			  i, link_id,
 			  QDF_MAC_ADDR_REF(req_param->add_link[i].link_addr),
@@ -34586,7 +34588,7 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 	i = 0;
 
 	for (link_id = 0; link_id < IEEE80211_MLD_MAX_NUM_LINKS; link_id++) {
-		if (!(params->delete_valid_links & BIT(link_id)))
+		if (!(rem_links & BIT(link_id)))
 			continue;
 
 		/* To fetch peer mac address from link info stored in host */
@@ -34816,7 +34818,7 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && \
 defined(CFG80211_SETUP_LINK_RECONFIG_SUPPORT)
-	.setup_link_reconfig =
+	.assoc_ml_reconf =
 		wlan_hdd_cfg80211_setup_link_reconfig,
 #endif
 };
