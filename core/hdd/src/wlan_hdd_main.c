@@ -18359,6 +18359,9 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 		goto done;
 	}
 
+	cdp_display_stats(cds_get_context(QDF_MODULE_ID_SOC),
+			  CDP_TXRX_SOC_STATS,
+			  QDF_STATS_VERBOSITY_LEVEL_LOW);
 	hdd_destroy_sysfs_files();
 	hdd_debug("Closing CDS modules!");
 
