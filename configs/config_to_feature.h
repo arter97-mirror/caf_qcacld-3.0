@@ -3166,4 +3166,12 @@
 #define WLAN_BOOST_CPU_FREQ_IN_ROAM (1)
 #endif
 
+#ifdef CONFIG_IPA_WDS_EASYMESH
+#define IPA_WDS_EASYMESH_FEATURE (1)
+#endif
+
+#ifdef CONFIG_IPA_WDI3_VLAN_SUPPORT
+#define IPA_WDI3_VLAN_SUPPORT (1)
+#endif
+
 #endif /* CONFIG_TO_FEATURE_H */
