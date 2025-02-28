@@ -597,6 +597,7 @@ wlan_hdd_copy_sinfo_to_link_info(struct wlan_hdd_link_info *link_info,
 	hdd_sinfo->signal_avg = sinfo->signal_avg;
 	for (i = 0; i < IEEE80211_MAX_CHAINS; i++)
 		hdd_sinfo->chain_signal_avg[i] = sinfo->chain_signal_avg[i];
+	hdd_sinfo->chains = sinfo->chains;
 
 	qdf_mem_copy(&hdd_sinfo->txrate,
 		     &sinfo->txrate, sizeof(sinfo->txrate));
@@ -634,6 +635,7 @@ wlan_hdd_copy_hdd_stats_to_sinfo(struct station_info *sinfo,
 	sinfo->signal_avg = hdd_sinfo->signal_avg;
 	for (i = 0; i < IEEE80211_MAX_CHAINS; i++)
 		sinfo->chain_signal_avg[i] = hdd_sinfo->chain_signal_avg[i];
+	sinfo->chains = hdd_sinfo->chains;
 
 	if (!hdd_sinfo->signal) {
 		sinfo->signal = WLAN_INVALID_RSSI_VALUE;
@@ -8500,6 +8502,7 @@ wlan_hdd_update_mlo_rate_info(struct wlan_hdd_station_stats_info *hdd_sinfo,
 	hdd_sinfo->signal_avg = sinfo->signal_avg;
 	for (i = 0; i < IEEE80211_MAX_CHAINS; i++)
 		hdd_sinfo->chain_signal_avg[i] = sinfo->chain_signal_avg[i];
+	hdd_sinfo->chains = sinfo->chains;
 
 	qdf_mem_copy(&hdd_sinfo->txrate,
 		     &sinfo->txrate, sizeof(sinfo->txrate));
