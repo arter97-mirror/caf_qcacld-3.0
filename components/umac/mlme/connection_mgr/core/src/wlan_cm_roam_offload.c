@@ -3348,7 +3348,7 @@ cm_roam_scan_btm_offload(struct wlan_objmgr_psoc *psoc,
  *
  * Return: None
  */
-static void
+void
 cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
 		   struct wlan_objmgr_vdev *vdev,
 		   struct wlan_roam_start_config *start_req)
@@ -3376,13 +3376,7 @@ cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
 
 	roam_mlo_params->support_link_band &=
 					rso_cfg->roam_band_bitmask;
-}
-#else
-static void
-cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
-		   struct wlan_objmgr_vdev *vdev,
-		   struct wlan_roam_start_config *start_req)
-{
+	mlme_debug("max num links: %d", roam_mlo_params->support_link_num);
 }
 #endif
 

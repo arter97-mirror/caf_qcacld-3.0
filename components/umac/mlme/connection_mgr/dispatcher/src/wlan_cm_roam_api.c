@@ -599,6 +599,14 @@ wlan_cm_get_disable_ml_sta_for_roam_check(struct wlan_objmgr_psoc *psoc,
 
 	return disabled_count;
 }
+
+void
+wlan_cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
+			struct wlan_objmgr_vdev *vdev,
+			struct wlan_roam_start_config *start_req)
+{
+	cm_roam_mlo_config(psoc, vdev, start_req);
+}
 #else
 static uint8_t
 wlan_cm_get_disable_ml_sta_for_roam_check(struct wlan_objmgr_psoc *psoc,

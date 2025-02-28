@@ -15652,6 +15652,8 @@ void sme_set_mlo_max_links(mac_handle_t mac_handle, uint8_t vdev_id,
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_roam_start_config *roam_param;
 
 	session = CSR_GET_SESSION(mac_ctx, vdev_id);
 
@@ -15659,8 +15661,27 @@ void sme_set_mlo_max_links(mac_handle_t mac_handle, uint8_t vdev_id,
 		sme_err("No session for id %d", vdev_id);
 		return;
 	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev)
+		return;
+
+	roam_param = qdf_mem_malloc(sizeof(*roam_param));
+	if (!roam_param)
+		goto rel_vdev_ref;
+
 	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, val);
 	wlan_mlme_set_user_set_link_num(mac_ctx->psoc, val);
+	wlan_cm_roam_mlo_config(mac_ctx->psoc, vdev, roam_param);
+	if (QDF_IS_STATUS_ERROR(wlan_cm_tgt_send_roam_mlo_config(
+					mac_ctx->psoc, vdev_id,
+					&roam_param->roam_mlo_params)))
+		sme_err("fail to send roam mlo config");
+
+	qdf_mem_free(roam_param);
+rel_vdev_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 }
 
 void sme_set_mlo_max_simultaneous_links(mac_handle_t mac_handle,
