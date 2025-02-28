@@ -656,7 +656,8 @@ void policy_mgr_update_with_safe_channel_list(struct wlan_objmgr_psoc *psoc,
 	nan_2g_freq =
 		policy_mgr_mode_specific_get_channel(pm_ctx->psoc,
 						     PM_NAN_DISC_MODE);
-	nan_5g_freq = wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
+	if (wlan_nan_is_disc_active(psoc))
+		nan_5g_freq = wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
 
 	for (i = 0; i < current_channel_count; i++) {
 		is_unsafe = 0;
