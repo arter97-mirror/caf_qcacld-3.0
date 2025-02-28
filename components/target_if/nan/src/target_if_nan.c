@@ -603,6 +603,39 @@ static int target_if_ndp_end_rsp_handler(ol_scn_t scn, uint8_t *data,
 	return 0;
 }
 
+static QDF_STATUS target_if_nan_ndp_update_config(
+				struct nan_datapath_update_config *config)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wmi_unified *wmi_handle;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!config) {
+		target_if_err("Invalid config.");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev = config->vdev;
+	if (!vdev) {
+		target_if_err("vdev object is NULL!");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		target_if_err("psoc is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return wmi_unified_ndp_update_config_cmd_send(wmi_handle, config);
+}
+
 static int target_if_ndp_end_ind_handler(ol_scn_t scn, uint8_t *data,
 					 uint32_t data_len)
 {
@@ -801,6 +834,9 @@ static QDF_STATUS target_if_nan_datapath_req(void *req, uint32_t req_type)
 		break;
 	case NDP_END_ALL:
 		target_if_nan_end_all_ndps_req(req);
+		break;
+	case NDP_UPDATE_CONFIG:
+		target_if_nan_ndp_update_config(req);
 		break;
 	default:
 		target_if_err("invalid req type");
