@@ -11371,6 +11371,7 @@ QDF_STATUS populate_dot11f_assoc_rsp_mlo_ie(struct mac_context *mac_ctx,
 	struct wlan_mlo_eml_cap eml_cap = {0};
 	bool emlsr;
 	uint16_t tmp_count;
+	int64_t tsfoffset = 0;
 
 	if (!mac_ctx || !session || !frm)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -11653,13 +11654,19 @@ release_ref:
 		sta_data += WLAN_BEACONINTERVAL_LEN;
 		sta_len_left -= WLAN_BEACONINTERVAL_LEN;
 
-		/* TSF offset is zero if fw support TSF sync */
-		if (mlo_get_tsf_sync_support()) {
-			/* TSF offset */
-			*(u64 *)sta_data = 0;
-			sta_data += WLAN_TIMESTAMP_LEN;
-			sta_len_left -= WLAN_TIMESTAMP_LEN;
+		if (mlo_get_tsf_sync_support() &&
+		    link_session->mlo_link_info.link_ie.tsf_valid &&
+		    session->mlo_link_info.link_ie.tsf_valid) {
+			/* TSF offset = Floor(TSF link A -TSF link B)/2 */
+			tsfoffset =
+			  (int64_t)(link_session->mlo_link_info.link_ie.tsf_host
+			  - session->mlo_link_info.link_ie.tsf_host) >> 1;
 		}
+
+		*(int64_t *)sta_data = tsfoffset;
+		pe_debug("tsf offset %lld", tsfoffset);
+		sta_data += WLAN_TIMESTAMP_LEN;
+		sta_len_left -= WLAN_TIMESTAMP_LEN;
 
 		/* DTIM count always set 0, host is not aware of DTIM counter */
 		*(uint8_t *)sta_data = 0;
