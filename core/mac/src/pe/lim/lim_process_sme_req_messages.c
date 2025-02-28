@@ -2831,6 +2831,46 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 	return status;
 }
 
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * lim_set_wfd_mode_for_p2p_cli() - set WFD mode for P2P CLIENT when P2P GO
+ * supports twt responder.
+ * @session: pe session
+ * @ie: pointer to IE structure
+ *
+ * Return: None
+ */
+static void lim_set_wfd_mode_for_p2p_cli(struct pe_session *session,
+					 tDot11fBeaconIEs *ie)
+{
+	enum QDF_OPMODE op_mode;
+	bool twt_resp;
+
+	if (!ie) {
+		pe_debug("ie is null");
+		return;
+	}
+
+	op_mode = wlan_vdev_mlme_get_opmode(session->vdev);
+	if (op_mode != QDF_P2P_CLIENT_MODE)
+		return;
+
+	twt_resp = ie->he_cap.twt_responder;
+	if (twt_resp) {
+		pe_debug("set P2P CLI in WFD R2 mode for id %d",
+			 session->vdev_id);
+		wlan_vdev_set_wfd_mode(session->vdev, P2P_MODE_WFD_R2);
+	} else {
+		wlan_vdev_set_wfd_mode(session->vdev, P2P_MODE_WFD_INVALID);
+	}
+}
+#else
+static inline void lim_set_wfd_mode_for_p2p_cli(struct pe_session *session,
+						tDot11fBeaconIEs *ie)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 static bool lim_enable_twt(struct mac_context *mac_ctx, tDot11fBeaconIEs *ie)
 {
@@ -3401,6 +3441,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 
 	session->enable_session_twt_support =
 					lim_enable_twt(mac_ctx, ie_struct);
+	lim_set_wfd_mode_for_p2p_cli(session, ie_struct);
 	status = lim_fill_dot11_mode(mac_ctx, session, ie_struct, phy_mode);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		status = QDF_STATUS_E_FAILURE;

@@ -8161,15 +8161,21 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 	he_cap->twt_request = 0;
 	he_cap->twt_responder = 0;
 	switch (session->opmode) {
-	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
+		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, session->vdev_id))
+			break;
+		fallthrough;
+	case QDF_STA_MODE:
 		wlan_twt_get_requestor_cfg(mac->psoc, &twt_requestor);
 		he_cap->twt_request =
 			twt_requestor && twt_get_requestor_flag(mac);
 		he_cap->broadcast_twt = bcast_requestor;
 		break;
-	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
+		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, session->vdev_id))
+			break;
+		fallthrough;
+	case QDF_SAP_MODE:
 		wlan_twt_get_responder_cfg(mac->psoc, &twt_responder);
 		he_cap->twt_responder =
 			twt_responder && twt_get_responder_flag(mac);

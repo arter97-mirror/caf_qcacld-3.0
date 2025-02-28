@@ -8691,6 +8691,12 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 	 * twt_responder by sending WMI CMDin vdev level
 	 */
 	mode = wlan_get_opmode_from_vdev_id(hdd_ctx->pdev, vdev_id);
+	if (mode == QDF_P2P_GO_MODE &&
+	    !wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, vdev_id)) {
+		hdd_debug(" P2P GO is in R1 mode");
+		return;
+	}
+
 	if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
 	    mode == QDF_SAP_MODE &&
 	    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id))
@@ -8735,6 +8741,14 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 {
 	bool twt_res_svc_cap, enable_twt;
 	uint32_t reason;
+	enum QDF_OPMODE mode;
+
+	mode = wlan_get_opmode_from_vdev_id(hdd_ctx->pdev, vdev_id);
+	if (mode == QDF_P2P_GO_MODE &&
+	    !wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, vdev_id)) {
+		hdd_debug(" P2P GO is in R1 mode");
+		return;
+	}
 
 	enable_twt = ucfg_mlme_is_twt_enabled(hdd_ctx->psoc);
 	ucfg_mlme_get_twt_res_service_cap(hdd_ctx->psoc, &twt_res_svc_cap);
