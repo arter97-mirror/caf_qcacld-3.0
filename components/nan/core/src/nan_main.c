@@ -603,6 +603,12 @@ void nan_release_cmd(void *in_req, uint32_t cmdtype)
 		vdev = req->vdev;
 		break;
 	}
+	case WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ: {
+		struct nan_datapath_update_config *req = in_req;
+
+		vdev = req->vdev;
+		break;
+	}
 	default:
 		nan_err("invalid req type: %d", cmdtype);
 		break;
@@ -656,6 +662,13 @@ static void nan_req_activated(void *in_req, uint32_t cmdtype)
 
 		vdev = req->vdev;
 		req_type = NDP_END_ALL;
+		break;
+	}
+	case WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ: {
+		struct nan_datapath_update_config *req = in_req;
+
+		vdev = req->vdev;
+		req_type = NDP_UPDATE_CONFIG;
 		break;
 	}
 	default:
@@ -756,6 +769,13 @@ QDF_STATUS nan_scheduled_msg_handler(struct scheduler_msg *msg)
 		struct nan_datapath_end_all_ndps *req = msg->bodyptr;
 
 		cmd.cmd_type = WLAN_SER_CMD_NDP_END_ALL_REQ;
+		cmd.vdev = req->vdev;
+		break;
+	}
+	case NDP_UPDATE_CONFIG: {
+	struct nan_datapath_update_config *req = msg->bodyptr;
+
+		cmd.cmd_type = WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ;
 		cmd.vdev = req->vdev;
 		break;
 	}

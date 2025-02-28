@@ -106,6 +106,7 @@ enum nan_pasn_msg_type {
  * @NDP_SCHEDULE_UPDATE: ndp schedule update
  * @NDP_END_ALL: end all NDPs request
  * @NDP_HOST_UPDATE: update host about ndp status
+ * @NDP_UPDATE_CONFIG: ndp update config
  */
 enum nan_datapath_msg_type {
 	NAN_DATAPATH_INF_CREATE_REQ  = 0,
@@ -126,6 +127,7 @@ enum nan_datapath_msg_type {
 	NDP_SCHEDULE_UPDATE          = 15,
 	NDP_END_ALL                  = 16,
 	NDP_HOST_UPDATE              = 17,
+	NDP_UPDATE_CONFIG            = 18,
 };
 
 /**
@@ -535,6 +537,21 @@ struct nan_datapath_end_req {
  */
 struct nan_datapath_end_all_ndps {
 	struct wlan_objmgr_vdev *vdev;
+};
+
+/**
+ * struct nan_datapath_update_config - Datapath request to update config
+ * @vdev: pointer to vdev object
+ * @ndp_instance_id: locally created NDP instance ID
+ * @latency_ms: latency in ms
+ * @tput_mbps: throughput
+ */
+
+struct nan_datapath_update_config {
+	struct wlan_objmgr_vdev *vdev;
+	uint32_t ndp_instance_id;
+	uint32_t latency_ms;
+	uint32_t tput_mbps;
 };
 
 /**
