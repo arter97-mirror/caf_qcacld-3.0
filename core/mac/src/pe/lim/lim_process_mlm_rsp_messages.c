@@ -2906,7 +2906,8 @@ gen_link_assoc_rsp:
 		mlo_free_cache_link_assoc_rsp(session_entry->vdev, link_id);
 process_assoc_rsp:
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		pe_debug("MLO: process assoc rsp for link vdev");
+		pe_debug("MLO vdev %d: process assoc rsp for link %d",
+			 session_entry->vdev_id, link_id);
 		mgmt_txrx_frame_hex_dump(link_assoc_rsp.ptr,
 					 link_assoc_rsp.len, false);
 		lim_process_assoc_rsp_frame(mac_ctx, link_assoc_rsp.ptr,
@@ -2916,7 +2917,8 @@ process_assoc_rsp:
 	}
 
 rsp_gen_fail:
-	pe_debug("MLO: link vdev assoc rsp generation failed");
+	pe_debug("MLO vdev %d link %d vdev assoc rsp generation failed",
+		 session_entry->vdev_id, link_id);
 	assoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 	assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
 	/* Update PE sessionId */
@@ -3016,7 +3018,6 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 
 		return status;
 	}
-	pe_debug("MLO_ROAM: process reassoc rsp for link vdev");
 	mlo_update_cache_link_assoc_rsp(session_entry->vdev,
 					link_id, &link_assoc_rsp);
 	mgmt_txrx_frame_hex_dump(link_assoc_rsp.ptr, link_assoc_rsp.len, false);
