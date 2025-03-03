@@ -332,6 +332,9 @@ typedef enum {
 /* Support MLO SoftAp */
 #define WIFI_FEATURE_MLO_SAP            0x4000000000
 
+/* Dual SL SAP supported */
+#define WIFI_FEATURE_MULTIPLE_MLD_ON_SAP 0x8000000000
+
 #define WIFI_FEATURE_MAX_BIT_POS 64
 
 /* Add more features here */

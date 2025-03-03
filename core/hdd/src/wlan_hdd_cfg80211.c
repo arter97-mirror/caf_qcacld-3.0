@@ -5116,6 +5116,11 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 		wlan_hdd_set_supported_features_extn(fset_extn,
 						     WIFI_FEATURE_MLO_SAP);
 
+	if (ucfg_mlme_is_dual_sap_sta_supported(hdd_ctx->psoc))
+		wlan_hdd_set_supported_features_extn(
+					fset_extn,
+					WIFI_FEATURE_MULTIPLE_MLD_ON_SAP);
+
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(fset) +
 						       NLMSG_HDRLEN);
 	if (!skb) {
