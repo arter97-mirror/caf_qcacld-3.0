@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -313,6 +313,27 @@ QDF_STATUS sme_ps_process_command(struct mac_context *mac_ctx, uint32_t session_
 	return status;
 }
 
+#ifdef QCA_WIFI_EMULATION
+static QDF_STATUS sme_ps_enable_user_check(bool usr_cfg_ps_enable,
+					   enum sme_ps_cmd command,
+					   uint32_t session_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS sme_ps_enable_user_check(bool usr_cfg_ps_enable,
+					   enum sme_ps_cmd command,
+					   uint32_t session_id)
+{
+	if (command == SME_PS_ENABLE && !usr_cfg_ps_enable) {
+		sme_debug("vdev:%d Cannot initiate PS. PS is disabled by usr(ioctl)",
+			  session_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * sme_enable_sta_ps_check(): Checks if it is ok to enable power save or not.
  * @mac_ctx: global mac context
@@ -339,11 +360,9 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 	}
 
 	usr_cfg_ps_enable = mlme_get_user_ps(mac_ctx->psoc, vdev_id);
-	if (command == SME_PS_ENABLE && !usr_cfg_ps_enable) {
-		sme_debug("vdev:%d power save mode is disabled by usr(ioctl)",
-			  vdev_id);
+	if (sme_ps_enable_user_check(usr_cfg_ps_enable, command, vdev_id)
+	    != QDF_STATUS_SUCCESS)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	/*
 	 * If command is power save disable there is not need to check for
