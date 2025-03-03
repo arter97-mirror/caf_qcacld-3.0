@@ -5267,15 +5267,19 @@ QDF_STATUS cm_process_peer_create(struct scheduler_msg *msg)
 	peer = wlan_objmgr_get_peer_by_mac(mac_ctx->psoc, req->peer_mac.bytes,
 					   WLAN_MLME_CM_ID);
 	if (peer) {
-		if (wlan_peer_get_peer_type(peer) != WLAN_PEER_RTT_PASN)
+		if (wlan_peer_get_peer_type(peer) != WLAN_PEER_RTT_PASN) {
+			wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
 			goto continue_peer_create;
+		}
 
 		mlme_info("vdev:%d Ranging peer exists with same mac: " QDF_MAC_ADDR_FMT " resume after deleting it",
 			  req->vdev_id, QDF_MAC_ADDR_REF(req->peer_mac.bytes));
 
 		status = wma_remove_existing_pasn_peer(mac_ctx->psoc, req);
-		if (QDF_IS_STATUS_ERROR(status))
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
 			goto continue_peer_create;
+		}
 
 		wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
 
@@ -5283,8 +5287,6 @@ QDF_STATUS cm_process_peer_create(struct scheduler_msg *msg)
 	}
 
 continue_peer_create:
-	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
-
 	lim_get_mld_info_sta(req, &peer_mld_addr, &is_assoc_peer);
 	status = wma_add_bss_peer_sta(req->vdev_id, req->peer_mac.bytes, true,
 				      peer_mld_addr, is_assoc_peer);
