@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -137,7 +137,8 @@ enum hdd_tsf_get_state hdd_tsf_check_conn_state(struct hdd_adapter *adapter)
 
 	mode = adapter->device_mode;
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags) &&
+	if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+				 adapter->deflink->link_flags) &&
 	    (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE)) {
 		hdd_err("Soft AP / P2p GO not beaconing");
 		ret = TSF_SAP_NOT_STARTED_NO_TSF;

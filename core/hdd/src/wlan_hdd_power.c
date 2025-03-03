@@ -1885,11 +1885,13 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 restart_post_cac_links:
 		restart_due_to_cac_pending = false;
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
-			if (!test_bit(SOFTAP_INIT_DONE, &link_info->link_flags))
+			if (!qdf_atomic_test_bit(
+						SOFTAP_INIT_DONE,
+						link_info->link_flags))
 				continue;
 
-			if (test_bit(SOFTAP_BSS_STARTED,
-				     &link_info->link_flags))
+			if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+						link_info->link_flags))
 				continue;
 
 			if (!ignore_cac_updated) {
@@ -1903,7 +1905,7 @@ restart_post_cac_links:
 			hdd_debug("Restart prev SAP session(vdev %d), event_flags 0x%lx, link_flags 0x%lx(%s)",
 				  link_info->vdev_id,
 				  adapter->event_flags,
-				  link_info->link_flags,
+				  link_info->link_flags[0],
 				  adapter->dev->name);
 			wlan_hdd_set_twt_responder(hdd_ctx, adapter);
 			wlan_hdd_start_sap(link_info, true);
@@ -3439,8 +3441,8 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		if (!test_bit(SOFTAP_BSS_STARTED,
-			      &adapter->deflink->link_flags)) {
+		if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+					 adapter->deflink->link_flags)) {
 			hdd_debug("SAP is not started yet");
 			return 0;
 		}

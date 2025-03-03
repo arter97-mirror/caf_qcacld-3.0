@@ -3288,7 +3288,8 @@ static int hdd_create_acs_timer(struct hdd_adapter *adapter)
 
 	timer_context->adapter = adapter;
 
-	set_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->deflink->link_flags);
+	qdf_atomic_set_bit(VENDOR_ACS_RESPONSE_PENDING,
+			   adapter->deflink->link_flags);
 	status = qdf_mc_timer_init(
 		  &adapter->deflink->session.ap.vendor_acs_timer,
 		  QDF_TIMER_TYPE_SW,
@@ -4173,7 +4174,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		hdd_err("ignore do_acs because sap is started, vdev %d",
 			link_info->vdev_id);
 		return -EINVAL;
@@ -19422,7 +19423,8 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 	}
 
 	if (chan_freq_present) {
-		if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+					 link_info->link_flags)) {
 			hdd_err("SAP is not started yet. Restart sap will be invalid");
 			return -EINVAL;
 		}
@@ -20438,8 +20440,10 @@ static int __wlan_hdd_cfg80211_update_vendor_channel(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (test_bit(VENDOR_ACS_RESPONSE_PENDING, &link_info->link_flags)) {
-		clear_bit(VENDOR_ACS_RESPONSE_PENDING, &link_info->link_flags);
+	if (qdf_atomic_test_bit(VENDOR_ACS_RESPONSE_PENDING,
+				link_info->link_flags)) {
+		qdf_atomic_clear_bit(VENDOR_ACS_RESPONSE_PENDING,
+				     link_info->link_flags);
 	} else {
 		hdd_err("already timeout happened for acs");
 		return -EINVAL;
@@ -32887,7 +32891,7 @@ wlan_hdd_cfg80211_get_channel_sap(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags))
+	if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags))
 		return -EINVAL;
 
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
@@ -33720,7 +33724,8 @@ hdd_get_link_info_for_add_intf_link(struct hdd_adapter *adapter)
 	struct wlan_hdd_link_info *link_info;
 
 	hdd_adapter_for_each_link_info(adapter, link_info) {
-		if (!test_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags))
+		if (!qdf_atomic_test_bit(SOFTAP_ADD_INTF_LINK,
+					 link_info->link_flags))
 			return link_info;
 	}
 
@@ -33817,7 +33822,7 @@ __wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy,
 		goto stop_ap_link;
 	}
 
-	set_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags);
+	qdf_atomic_set_bit(SOFTAP_ADD_INTF_LINK, link_info->link_flags);
 	return 0;
 
 stop_ap_link:
@@ -33864,7 +33869,7 @@ __wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy,
 		qdf_atomic_clear_bit(link_idx, &adapter->active_links);
 	}
 
-	clear_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags);
+	qdf_atomic_clear_bit(SOFTAP_ADD_INTF_LINK, link_info->link_flags);
 }
 
 /**

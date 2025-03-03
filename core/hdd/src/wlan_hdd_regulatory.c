@@ -1838,7 +1838,7 @@ hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+	if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 		sap_config->SapHw_mode = csr_phy_mode;
 		hdd_err("Can't restart AP because it is not started");
@@ -1919,8 +1919,9 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 							     link_info->vdev_id);
 				break;
 			case QDF_SAP_MODE:
-				if (!test_bit(SOFTAP_INIT_DONE,
-					      &link_info->link_flags)) {
+				if (!qdf_atomic_test_bit(
+						SOFTAP_INIT_DONE,
+						link_info->link_flags)) {
 					hdd_info("AP is not started yet");
 					break;
 				}

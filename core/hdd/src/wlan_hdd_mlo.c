@@ -507,9 +507,9 @@ bool hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter,
 		}
 
 		/* Swap link flags */
-		link_flags = temp_link_info->link_flags;
-		temp_link_info->link_flags = link_info->link_flags;
-		link_info->link_flags = link_flags;
+		link_flags = temp_link_info->link_flags[0];
+		temp_link_info->link_flags[0] = link_info->link_flags[0];
+		link_info->link_flags[0] = link_flags;
 
 		/* Update the mapping, current link info's mapping will be
 		 * set to be proper.

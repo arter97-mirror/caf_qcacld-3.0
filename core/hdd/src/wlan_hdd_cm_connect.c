@@ -622,8 +622,8 @@ hdd_get_sap_link_info_of_dfs(struct hdd_context *hdd_ctx)
 			 * sap is not in started state and also not under doing
 			 * CAC, so it is fine to go ahead with sta.
 			 */
-			if (!test_bit(SOFTAP_BSS_STARTED,
-				      &link_info->link_flags) &&
+			if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+						 link_info->link_flags) &&
 			    hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS)
 				continue;
 

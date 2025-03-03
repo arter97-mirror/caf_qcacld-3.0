@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2389,7 +2389,8 @@ QDF_STATUS os_if_son_get_node_datarate_info(struct wlan_objmgr_vdev *vdev,
 
 		link_info = hdd_get_link_info_by_vdev(hdd_ctx,
 						      vdev->vdev_objmgr.vdev_id);
-		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+					link_info->link_flags)) {
 			ucfg_mc_cp_stats_get_tx_power(vdev, &dbm);
 			node_info->max_txpower = (uint8_t)dbm;
 		} else {

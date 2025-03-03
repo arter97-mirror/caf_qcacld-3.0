@@ -943,7 +943,8 @@ uint32_t hdd_get_link_info_home_channel(struct wlan_hdd_link_info *link_info)
 	switch (opmode) {
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+					link_info->link_flags)) {
 			home_chan_freq =
 				link_info->session.ap.operating_chan_freq;
 		}
@@ -970,7 +971,8 @@ enum phy_ch_width hdd_get_link_info_width(struct wlan_hdd_link_info *link_info)
 	switch (opmode) {
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+					link_info->link_flags)) {
 			struct hdd_ap_ctx *ap_ctx =
 					WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
@@ -3417,8 +3419,8 @@ static int __hdd_mon_open(struct net_device *dev)
 		}
 		hdd_err("hdd_wlan_start_modules() successful !");
 
-		if ((!test_bit(SME_SESSION_OPENED,
-			       &adapter->deflink->link_flags)) ||
+		if ((!qdf_atomic_test_bit(SME_SESSION_OPENED,
+					  adapter->deflink->link_flags)) ||
 		    (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))) {
 			ret = hdd_start_adapter(adapter, true);
 			if (ret) {
@@ -5682,7 +5684,8 @@ static int __hdd_open(struct net_device *dev)
 		return ret;
 	}
 
-	if (!test_bit(SME_SESSION_OPENED, &link_info->link_flags)) {
+	if (!qdf_atomic_test_bit(SME_SESSION_OPENED,
+				 link_info->link_flags)) {
 		ret = hdd_start_adapter(adapter, true);
 		if (ret) {
 			hdd_err("Vdev %d Failed to start adapter :%d",
@@ -6094,8 +6097,8 @@ bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
 	case QDF_P2P_DEVICE_MODE:
 		return ucfg_is_p2p_device_dynamic_set_mac_addr_supported(adapter->hdd_ctx->psoc);
 	case QDF_SAP_MODE:
-		if (test_bit(SOFTAP_BSS_STARTED,
-			     &adapter->deflink->link_flags)) {
+		if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+					adapter->deflink->link_flags)) {
 			hdd_info_rl("SAP is in up state, set mac address isn't supported");
 			return false;
 		} else {
@@ -6323,9 +6326,9 @@ hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info
 	qdf_atomic_set_bit(new_link_idx, &adapter->active_links);
 
 	/* Move the link flags between current and new link info */
-	link_flags = new_link_info->link_flags;
-	new_link_info->link_flags = cur_link_info->link_flags;
-	cur_link_info->link_flags = link_flags;
+	link_flags = new_link_info->link_flags[0];
+	new_link_info->link_flags[0] = cur_link_info->link_flags[0];
+	cur_link_info->link_flags[0] = link_flags;
 
 	/* Update VDEV-OSIF priv pointer to new link info */
 	vdev_priv = wlan_vdev_get_ospriv(new_link_info->vdev);
@@ -6587,9 +6590,9 @@ hdd_adapter_update_rejected_links_info(struct wlan_hdd_link_info *rej_link_info,
 	qdf_atomic_set_bit(acc_link_idx, &adapter->active_links);
 
 	/* Move the link flags between current and new link info */
-	link_flags = acc_link_info->link_flags;
-	acc_link_info->link_flags = rej_link_info->link_flags;
-	rej_link_info->link_flags = link_flags;
+	link_flags = acc_link_info->link_flags[0];
+	acc_link_info->link_flags[0] = rej_link_info->link_flags[0];
+	rej_link_info->link_flags[0] = link_flags;
 
 	/* Update VDEV-OSIF priv pointer to new link info */
 	vdev_priv = wlan_vdev_get_ospriv(acc_link_info->vdev);
@@ -7597,7 +7600,7 @@ QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id)
 		return QDF_STATUS_NOT_INITIALIZED;
 	}
 
-	clear_bit(SME_SESSION_OPENED, &link_info->link_flags);
+	qdf_atomic_clear_bit(SME_SESSION_OPENED, link_info->link_flags);
 	qdf_spin_lock_bh(&link_info->vdev_lock);
 	link_info->vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 	qdf_spin_unlock_bh(&link_info->vdev_lock);
@@ -7738,7 +7741,7 @@ static int hdd_vdev_destroy_event_wait(struct hdd_context *hdd_ctx,
 			msecs_to_jiffies(SME_CMD_VDEV_CREATE_DELETE_TIMEOUT));
 	if (!rc) {
 		hdd_err("vdev %d: timed out waiting for delete", vdev_id);
-		clear_bit(SME_SESSION_OPENED, &link_info->link_flags);
+		qdf_atomic_clear_bit(SME_SESSION_OPENED, link_info->link_flags);
 		sme_cleanup_session(hdd_ctx->mac_handle, vdev_id);
 		cds_flush_logs(WLAN_LOG_TYPE_FATAL,
 			       WLAN_LOG_INDICATOR_HOST_DRIVER,
@@ -7805,7 +7808,7 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 	vdev_id = link_info->vdev_id;
 	hdd_nofl_debug("destroying vdev %d", vdev_id);
 	/* vdev created sanity check */
-	if (!test_bit(SME_SESSION_OPENED, &link_info->link_flags)) {
+	if (!qdf_atomic_test_bit(SME_SESSION_OPENED, link_info->link_flags)) {
 		hdd_nofl_debug("vdev %u does not exist", vdev_id);
 		return -EINVAL;
 	}
@@ -7875,8 +7878,8 @@ bool hdd_is_vdev_in_conn_state(struct wlan_hdd_link_info *link_info)
 		return hdd_cm_is_vdev_associated(link_info);
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		return (test_bit(SOFTAP_BSS_STARTED,
-				 &link_info->link_flags));
+		return (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+					    link_info->link_flags));
 	default:
 		hdd_err("Device mode %d invalid",
 			link_info->adapter->device_mode);
@@ -8362,7 +8365,7 @@ hdd_use_sta_vdev_for_p2p_dev_upon_vdev_exhaust(struct hdd_context *hdd_ctx)
 		link_info->vdev_id = sta_adapter->deflink->vdev_id;
 		link_info->vdev = sta_vdev;
 		qdf_spin_unlock_bh(&link_info->vdev_lock);
-		set_bit(SME_SESSION_OPENED, &link_info->link_flags);
+		qdf_atomic_set_bit(SME_SESSION_OPENED, link_info->link_flags);
 		return true;
 	}
 
@@ -8409,7 +8412,7 @@ int hdd_vdev_create(struct wlan_hdd_link_info *link_info)
 	if (hdd_adapter_is_ml_adapter(adapter))
 		hdd_mlo_t2lm_register_callback(vdev);
 
-	set_bit(SME_SESSION_OPENED, &link_info->link_flags);
+	qdf_atomic_set_bit(SME_SESSION_OPENED, link_info->link_flags);
 	status = sme_vdev_post_vdev_create_setup(hdd_ctx->mac_handle, vdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to setup the vdev");
@@ -10552,7 +10555,8 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 		wlan_hdd_scan_abort(link_info);
 		hdd_abort_ongoing_sta_connection(hdd_ctx);
 		/* Diassociate with all the peers before stop ap post */
-		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+					link_info->link_flags)) {
 			if (wlan_hdd_del_station(adapter, NULL))
 				hdd_sap_indicate_disconnect_for_sta(adapter);
 		}
@@ -10581,7 +10585,7 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 	hdd_destroy_acs_timer(adapter);
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		status = wlansap_stop_bss(ap_ctx->sap_context);
@@ -10597,7 +10601,7 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 			hdd_err("failure in wlansap_stop_bss");
 		}
 
-		clear_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
+		qdf_atomic_clear_bit(SOFTAP_BSS_STARTED, link_info->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 						adapter->device_mode,
 						link_info->vdev_id);
@@ -10612,7 +10616,7 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 	 * and is not cleared/freed on purpose in case of SAP SSR
 	 */
 	if (!cds_is_driver_recovering() || cds_is_driver_unloading()) {
-		clear_bit(SOFTAP_INIT_DONE, &link_info->link_flags);
+		qdf_atomic_clear_bit(SOFTAP_INIT_DONE, link_info->link_flags);
 		qdf_mem_free(ap_ctx->beacon);
 		ap_ctx->beacon = NULL;
 
@@ -10780,7 +10784,8 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(hdd_ctx->psoc)) {
 		ucfg_p2p_set_sta_vdev_for_p2p_dev_operations(hdd_ctx->psoc,
 							     false);
-		clear_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags);
+		qdf_atomic_clear_bit(SME_SESSION_OPENED,
+				     adapter->deflink->link_flags);
 		qdf_spin_lock_bh(&adapter->deflink->vdev_lock);
 		adapter->deflink->vdev_id = WLAN_INVALID_VDEV_ID;
 		adapter->deflink->vdev = NULL;
@@ -11024,7 +11029,8 @@ static bool hdd_is_any_link_opened(struct hdd_adapter *adapter)
 	struct wlan_hdd_link_info *link_info;
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
-		if (test_bit(SME_SESSION_OPENED, &link_info->link_flags))
+		if (qdf_atomic_test_bit(SME_SESSION_OPENED,
+					link_info->link_flags))
 			return true;
 	}
 	return false;
@@ -14417,7 +14423,8 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason)
 	QDF_STATUS qdf_status;
 	qdf_mc_timer_t *vendor_acs_timer;
 
-	set_bit(VENDOR_ACS_RESPONSE_PENDING, &adapter->deflink->link_flags);
+	qdf_atomic_set_bit(VENDOR_ACS_RESPONSE_PENDING,
+			   adapter->deflink->link_flags);
 
 	vendor_acs_timer = &adapter->deflink->session.ap.vendor_acs_timer;
 	if (QDF_TIMER_STATE_RUNNING ==
@@ -15006,10 +15013,12 @@ void hdd_acs_response_timeout_handler(void *context)
 		return;
 
 	link_info = adapter->deflink;
-	if (!test_bit(VENDOR_ACS_RESPONSE_PENDING, &link_info->link_flags))
+	if (!qdf_atomic_test_bit(VENDOR_ACS_RESPONSE_PENDING,
+				 link_info->link_flags))
 		return;
 
-	clear_bit(VENDOR_ACS_RESPONSE_PENDING, &link_info->link_flags);
+	qdf_atomic_clear_bit(VENDOR_ACS_RESPONSE_PENDING,
+			     link_info->link_flags);
 
 	hdd_err("ACS timeout happened for %s reason %d",
 		adapter->dev->name, reason);
@@ -16237,7 +16246,8 @@ hdd_get_link_info_by_link_id(struct hdd_adapter *adapter, int link_id)
 	hdd_debug("link_id %d, %ps", link_id, __builtin_return_address(0));
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
-		if (test_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags) &&
+		if (qdf_atomic_test_bit(SOFTAP_ADD_INTF_LINK,
+					link_info->link_flags) &&
 		    wlan_vdev_get_link_id(link_info->vdev) == link_id)
 			return link_info;
 	}
@@ -16343,7 +16353,8 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter_dev(adapter->dev);
-	if (test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
+	if (qdf_atomic_test_bit(SME_SESSION_OPENED,
+				adapter->deflink->link_flags)) {
 		hdd_err("session is already opened, %d",
 			adapter->deflink->vdev_id);
 		return qdf_status_to_os_return(QDF_STATUS_SUCCESS);
@@ -16467,7 +16478,8 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 
 	hdd_enter();
 
-	if (test_bit(SME_SESSION_OPENED, &adapter->deflink->link_flags)) {
+	if (qdf_atomic_test_bit(SME_SESSION_OPENED,
+				adapter->deflink->link_flags)) {
 		hdd_err("session is already opened, %d",
 			adapter->deflink->vdev_id);
 		return qdf_status_to_os_return(QDF_STATUS_SUCCESS);
@@ -19756,8 +19768,8 @@ hdd_get_con_sap_adapter(struct hdd_adapter *this_sap_adapter,
 			if (!check_start_bss)
 				match = true;
 
-			if (test_bit(SOFTAP_BSS_STARTED,
-				     &link_info->link_flags))
+			if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+						link_info->link_flags))
 				match = true;
 
 			if (!match)
@@ -19813,8 +19825,9 @@ hdd_get_con_sap_adapter(struct hdd_adapter *this_sap_adapter,
 								dbgid);
 					return adapter;
 				}
-				if (test_bit(SOFTAP_BSS_STARTED,
-					     &link_info->link_flags)) {
+				if (qdf_atomic_test_bit(
+						SOFTAP_BSS_STARTED,
+						link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)
@@ -19925,7 +19938,7 @@ void wlan_hdd_stop_sap(struct wlan_hdd_link_info *link_info)
 		return;
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		wlan_hdd_del_station(ap_adapter, NULL);
 		hostapd_state =
 			WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
@@ -19942,7 +19955,7 @@ void wlan_hdd_stop_sap(struct wlan_hdd_link_info *link_info)
 				return;
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
+		qdf_atomic_clear_bit(SOFTAP_BSS_STARTED, link_info->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 						ap_adapter->device_mode,
 						link_info->vdev_id);
@@ -20072,7 +20085,7 @@ void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit)
 	sap_config = &ap_ctx->sap_config;
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags))
+	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags))
 		goto end;
 
 	if (wlan_hdd_cfg80211_update_apies(link_info)) {
@@ -20107,7 +20120,7 @@ void wlan_hdd_start_sap(struct wlan_hdd_link_info *link_info, bool reinit)
 	hdd_info("SAP Start Success");
 
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
-	set_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
+	qdf_atomic_set_bit(SOFTAP_BSS_STARTED, link_info->link_flags);
 	if (hostapd_state->bss_state == BSS_START) {
 		policy_mgr_incr_active_session(hdd_ctx->psoc,
 					ap_adapter->device_mode,
@@ -22743,8 +22756,8 @@ bool hdd_is_roaming_in_progress(struct hdd_context *hdd_ctx)
 
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			vdev_id = link_info->vdev_id;
-			if (test_bit(SME_SESSION_OPENED,
-				     &link_info->link_flags) &&
+			if (qdf_atomic_test_bit(SME_SESSION_OPENED,
+						link_info->link_flags) &&
 			    sme_roaming_in_progress(hdd_ctx->mac_handle,
 						    vdev_id)) {
 				hdd_debug("Roaming is in progress on:vdev_id:%d",
@@ -22806,7 +22819,7 @@ hdd_is_connection_in_progress_iterator(struct wlan_hdd_link_info *link_info,
 
 	mac_handle = hdd_ctx->mac_handle;
 
-	if (!test_bit(SME_SESSION_OPENED, &link_info->link_flags) &&
+	if (!qdf_atomic_test_bit(SME_SESSION_OPENED, link_info->link_flags) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE ||
 	     adapter->device_mode == QDF_P2P_DEVICE_MODE ||
@@ -22949,7 +22962,7 @@ void hdd_restart_sap(struct wlan_hdd_link_info *link_info)
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		wlan_hdd_del_station(ap_adapter, NULL);
 		hapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 		qdf_event_reset(&hapd_state->qdf_stop_bss_event);
@@ -22962,7 +22975,7 @@ void hdd_restart_sap(struct wlan_hdd_link_info *link_info)
 				goto end;
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
+		qdf_atomic_clear_bit(SOFTAP_BSS_STARTED, link_info->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 			ap_adapter->device_mode, link_info->vdev_id);
 		hdd_green_ap_start_state_mc(hdd_ctx, ap_adapter->device_mode,
@@ -22997,7 +23010,7 @@ void hdd_restart_sap(struct wlan_hdd_link_info *link_info)
 		}
 		wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 		hdd_err("SAP Start Success");
-		set_bit(SOFTAP_BSS_STARTED, &link_info->link_flags);
+		qdf_atomic_set_bit(SOFTAP_BSS_STARTED, link_info->link_flags);
 		if (hapd_state->bss_state == BSS_START) {
 			policy_mgr_incr_active_session(hdd_ctx->psoc,
 						ap_adapter->device_mode,

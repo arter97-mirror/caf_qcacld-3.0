@@ -277,6 +277,7 @@ enum hdd_adapter_flags {
  * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
  * @SOFTAP_ADD_INTF_LINK: add_intf_link is set for multi link SAP
+ * @WLAN_LINK_FLAG_BITS_MAX: Max bit size of this enum
  */
 enum hdd_link_flags {
 	SME_SESSION_OPENED,
@@ -284,6 +285,7 @@ enum hdd_link_flags {
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
 	SOFTAP_ADD_INTF_LINK,
+	WLAN_LINK_FLAG_BITS_MAX,
 };
 
 /**
@@ -1201,7 +1203,7 @@ struct wlan_hdd_link_info {
 	uint32_t mscs_counter;
 #endif /* WLAN_FEATURE_MSCS */
 
-	unsigned long link_flags;
+	qdf_bitmap(link_flags, WLAN_LINK_FLAG_BITS_MAX);
 	struct freq_change_info ch_chng_info;
 	struct work_struct  sap_stop_bss_work;
 };

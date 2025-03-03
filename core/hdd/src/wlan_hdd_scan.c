@@ -854,8 +854,8 @@ static void hdd_process_vendor_acs_response(struct hdd_adapter *adapter)
 {
 	qdf_mc_timer_t *vendor_acs_timer;
 
-	if (!test_bit(VENDOR_ACS_RESPONSE_PENDING,
-		      &adapter->deflink->link_flags)) {
+	if (!qdf_atomic_test_bit(VENDOR_ACS_RESPONSE_PENDING,
+				 adapter->deflink->link_flags)) {
 		return;
 	}
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -152,8 +152,9 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 			switch (adapter->device_mode) {
 			case QDF_P2P_GO_MODE:
 				if (!ucfg_nan_is_sta_p2p_ndp_supported(psoc) &&
-				    test_bit(SOFTAP_BSS_STARTED,
-					     &link_info->link_flags)) {
+				    qdf_atomic_test_bit(
+						SOFTAP_BSS_STARTED,
+						link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)
@@ -200,8 +201,9 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 			case QDF_SAP_MODE:
 				if (!wlan_nan_is_sta_sap_nan_allowed(
 							hdd_ctx->psoc) &&
-				    test_bit(SOFTAP_BSS_STARTED,
-					     &link_info->link_flags)) {
+				    qdf_atomic_test_bit(
+						SOFTAP_BSS_STARTED,
+						link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)
@@ -213,8 +215,9 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 				break;
 			case QDF_P2P_GO_MODE:
 				if (!ucfg_nan_is_sta_p2p_ndp_supported(psoc) &&
-				    test_bit(SOFTAP_BSS_STARTED,
-					     &link_info->link_flags)) {
+				    qdf_atomic_test_bit(
+						SOFTAP_BSS_STARTED,
+						link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)

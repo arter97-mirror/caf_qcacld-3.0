@@ -6660,7 +6660,7 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+	if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		hdd_err("SAP not started");
 		return -EINVAL;
 	}
