@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -766,6 +766,8 @@ enum bss_stop_reason {
  * @nss: number of streams
  * @mcs: mcs index for HT/VHT mode
  * @rate_flags: rate flags for last tx/rx
+ * @gi: Guard interval used
+ * @dcm: dual carrier modulation enabled
  *
  * rate info in HDD
  */
@@ -775,6 +777,8 @@ struct hdd_rate_info {
 	uint8_t nss;
 	uint8_t mcs;
 	enum tx_rate_info rate_flags;
+	enum txrate_gi gi;
+	uint8_t dcm;
 };
 
 enum hdd_work_status {
@@ -1033,6 +1037,7 @@ enum udp_qos_upgrade {
  * @ctw: stores CT Window value once we receive Opps command from
  *       wpa_supplicant then using CT Window value we need to Enable
  *       Opportunistic Power Save
+ * @allow_power_save: STA/CLI powersave enable/disable from userspace
  * @mac_addr: Current MAC Address for the adapter
  * @mld_addr: MLD address for adapter
  * @event_flags: a bitmap of hdd_adapter_flags
@@ -1182,6 +1187,7 @@ struct hdd_adapter {
 
 	uint8_t ops;
 	uint32_t ctw;
+	bool allow_power_save;
 
 	struct qdf_mac_addr mac_addr;
 	struct qdf_mac_addr mld_addr;

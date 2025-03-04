@@ -38,6 +38,7 @@
 #include "wlan_vdev_mgr_tgt_if_tx_api.h"
 #include "wmi_unified_vdev_api.h"
 #include "wlan_mlme_api.h"
+#include "wlan_reg_services_api.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -221,7 +222,7 @@ bool wlan_mlme_get_wlm_multi_client_ll_caps(struct wlan_objmgr_psoc *psoc)
 #endif
 
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
-bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
+uint32_t wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
 		struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -231,7 +232,22 @@ bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(
 		mlme_legacy_err("Failed to get MLME Obj");
 		return cfg_default(CFG_COEX_UNSAFE_CHAN_NB_USER_PREFER);
 	}
+
 	return mlme_obj->cfg.reg.coex_unsafe_chan_nb_user_prefer;
+}
+
+bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_sap(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return !!(wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(psoc) &
+					IGNORE_FW_COEX_INFO_ON_SAP_MODE);
+}
+
+bool wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_p2p_go(
+		struct wlan_objmgr_psoc *psoc)
+{
+	return !!(wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(psoc) &
+					IGNORE_FW_COEX_INFO_ON_P2P_GO_MODE);
 }
 #endif
 
@@ -1325,6 +1341,22 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 	mlme_legacy_debug("mlo_support_link_conn band %d", value);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void
+wlan_mlme_get_mlo_prefer_percentage(struct wlan_objmgr_psoc *psoc,
+				    int8_t *mlo_prefer_percentage)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("invalid mlo object");
+		return;
+	}
+
+	*mlo_prefer_percentage = mlme_obj->cfg.sta.mlo_prefer_percentage;
+	mlme_legacy_debug("mlo_prefer_percentage %d", *mlo_prefer_percentage);
 }
 #endif
 
@@ -2985,12 +3017,12 @@ int wlan_mlme_get_mcc_duty_cycle_percentage(struct wlan_objmgr_pdev *pdev)
 	for (i = 0; i < count; i++) {
 		if (vdev_id_list[i] == dual_sta_policy->primary_vdev_id) {
 			primary_sta_freq = op_ch_freq_list[i];
-			mlme_debug("primary sta vdev:%d at inxex:%d, freq:%d",
-				   i, vdev_id_list[i], op_ch_freq_list[i]);
+			mlme_debug("primary sta vdev:%d at index:%d, freq:%d",
+				   vdev_id_list[i], i, op_ch_freq_list[i]);
 		} else {
 			secondary_sta_freq = op_ch_freq_list[i];
-			mlme_debug("secondary sta vdev:%d at inxex:%d, freq:%d",
-				   i, vdev_id_list[i], op_ch_freq_list[i]);
+			mlme_debug("secondary sta vdev:%d at index:%d, freq:%d",
+				   vdev_id_list[i], i, op_ch_freq_list[i]);
 		}
 	}
 
@@ -2999,17 +3031,17 @@ int wlan_mlme_get_mcc_duty_cycle_percentage(struct wlan_objmgr_pdev *pdev)
 		return -EINVAL;
 	}
 
-	operating_channel = wlan_freq_to_chan(primary_sta_freq);
+	operating_channel = wlan_reg_freq_to_chan(pdev, primary_sta_freq);
 
 	/*
 	 * The channel numbers for both adapters and the time
 	 * quota for the 1st adapter, i.e., one specified in cmd
 	 * are formatted as a bit vector
-	 * ******************************************************
-	 * |bit 31-24  | bit 23-16 |  bits 15-8  |bits 7-0   |
-	 * |  Unused   | Quota for | chan. # for |chan. # for|
-	 * |           |  1st chan | 1st chan.   |2nd chan.  |
-	 * ******************************************************
+	 * *********************************************************************
+	 * |bit 31-28 |bit 27-26 |bit 25-24 |bit 23-16 |bits 15-8  |bits 7-0   |
+	 * |  Unused  |band mask |band mask |Quota for |chan. # for|chan. # for|
+	 * |          | 2nd chan |1st chan  | 1st chan | 1st chan. |2nd chan.  |
+	 * *********************************************************************
 	 */
 	mlme_debug("First connection channel No.:%d and quota:%dms",
 		   operating_channel, quota_value);
@@ -3021,7 +3053,7 @@ int wlan_mlme_get_mcc_duty_cycle_percentage(struct wlan_objmgr_pdev *pdev)
 	 */
 	quota_value |= operating_channel;
 		/* Second STA Connection */
-	operating_channel = wlan_freq_to_chan(secondary_sta_freq);
+	operating_channel = wlan_reg_freq_to_chan(pdev, secondary_sta_freq);
 	if (!operating_channel)
 		mlme_debug("Secondary adapter op channel is invalid");
 	/*
@@ -3035,7 +3067,15 @@ int wlan_mlme_get_mcc_duty_cycle_percentage(struct wlan_objmgr_pdev *pdev)
 	 * 7-0 of set_value
 	 */
 	quota_value |= operating_channel;
-	mlme_debug("quota value:%x", quota_value);
+	/*
+	 * Band mask for 1st chan 24-25 bits
+	 * Band mask for 2nd chan 26-27 bits
+	 */
+	quota_value |= ((wlan_reg_freq_to_band(primary_sta_freq) << 24) &
+			BAND_MASK_FIRST_FREQ);
+	quota_value |= ((wlan_reg_freq_to_band(secondary_sta_freq) << 26) &
+			BAND_MASK_SECOND_FREQ);
+	mlme_debug("quota value: 0x%x", quota_value);
 
 	return quota_value;
 }
@@ -3432,22 +3472,6 @@ wlan_mlme_is_standard_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 
 	*value = mlme_obj->cfg.gen.std_6ghz_conn_policy;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-wlan_mlme_is_disable_vlp_sta_conn_to_sp_ap_enabled(
-						struct wlan_objmgr_psoc *psoc,
-						bool *value)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj)
-		return QDF_STATUS_E_FAILURE;
-
-	*value = mlme_obj->cfg.gen.disable_vlp_sta_conn_to_sp_ap;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -6392,6 +6416,7 @@ wlan_mlme_get_user_mcc_duty_cycle_percentage(struct wlan_objmgr_psoc *psoc)
 	struct wlan_user_mcc_quota quota;
 	uint8_t operating_channel;
 	int status;
+	struct wlan_objmgr_pdev *pdev;
 
 	quota.vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 	quota.quota = 0;
@@ -6415,20 +6440,27 @@ wlan_mlme_get_user_mcc_duty_cycle_percentage(struct wlan_objmgr_psoc *psoc)
 	if (mcc_freq == INVALID_CHANNEL_ID)
 		return 0;
 
-	operating_channel = wlan_freq_to_chan(ch_freq);
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0,
+					  WLAN_MLME_NB_ID);
+	if (!pdev) {
+		sme_err("pdev is NULL");
+		return 0;
+	}
+	operating_channel = wlan_reg_freq_to_chan(pdev, ch_freq);
 	if (!operating_channel) {
 		mlme_debug("Primary op channel is invalid");
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
 		return 0;
 	}
 	/*
 	 * The channel numbers for both adapters and the time
 	 * quota for the 1st adapter, i.e., one specified in cmd
 	 * are formatted as a bit vector
-	 * ******************************************************
-	 * |bit 31-24  | bit 23-16 |  bits 15-8  |bits 7-0   |
-	 * |  Unused   | Quota for | chan. # for |chan. # for|
-	 * |           |  1st chan | 1st chan.   |2nd chan.  |
-	 * ******************************************************
+	 * *********************************************************************
+	 * |bit 31-28 |bit 27-26 |bit 25-24 |bit 23-16 |bits 15-8  |bits 7-0   |
+	 * |  Unused  |band mask |band mask |Quota for |chan. # for|chan. # for|
+	 * |          | 2nd chan |1st chan  | 1st chan | 1st chan. |2nd chan.  |
+	 * *********************************************************************
 	 */
 	mlme_debug("Opmode (%d) vdev (%u) channel %u and quota %u",
 		   quota.op_mode, quota.vdev_id,
@@ -6442,9 +6474,10 @@ wlan_mlme_get_user_mcc_duty_cycle_percentage(struct wlan_objmgr_psoc *psoc)
 	 */
 	quota_value |= operating_channel;
 
-	operating_channel = wlan_freq_to_chan(mcc_freq);
+	operating_channel = wlan_reg_freq_to_chan(pdev, mcc_freq);
 	if (!operating_channel) {
 		mlme_debug("Secondary op channel is invalid");
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
 		return 0;
 	}
 
@@ -6459,7 +6492,16 @@ wlan_mlme_get_user_mcc_duty_cycle_percentage(struct wlan_objmgr_psoc *psoc)
 	 * 7-0 of set_value
 	 */
 	quota_value |= operating_channel;
-	mlme_debug("quota value:%x", quota_value);
+	/*
+	 * Set band mask for 1st chan 24-25 bits.
+	 * Set band mask for 2nd chan 26-27 bits.
+	 */
+	quota_value |= ((wlan_reg_freq_to_band(ch_freq) << 24) &
+			BAND_MASK_FIRST_FREQ);
+	quota_value |= ((wlan_reg_freq_to_band(mcc_freq) << 26) &
+			BAND_MASK_SECOND_FREQ);
+	mlme_debug("quota value: 0x%x", quota_value);
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
 
 	return quota_value;
 }
@@ -7195,3 +7237,100 @@ wlan_mlme_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate)
 
 	return set_value;
 }
+
+QDF_STATUS
+wlan_mlme_send_csa_event_status_ind(struct wlan_objmgr_vdev *vdev,
+				    uint8_t csa_status)
+{
+	return wlan_mlme_send_csa_event_status_ind_cmd(vdev, csa_status);
+}
+
+#ifdef WLAN_FEATURE_11BE
+QDF_STATUS
+wlan_mlme_get_bw_no_punct(struct wlan_objmgr_psoc *psoc,
+			  struct wlan_objmgr_vdev *vdev,
+			  struct wlan_channel *bss_chan,
+			  enum phy_ch_width *new_ch_width)
+{
+	uint16_t new_punct_bitmap = 0;
+	enum phy_ch_width ch_width;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	uint8_t country[REG_ALPHA2_LEN + 1];
+
+	wlan_reg_read_current_country(psoc, country);
+
+	if (!wlan_reg_is_6ghz_chan_freq(bss_chan->ch_freq) ||
+	    !bss_chan->puncture_bitmap ||
+	    qdf_mem_cmp(country, "US", REG_ALPHA2_LEN) ||
+	    mlme_get_best_6g_power_type(vdev) != REG_INDOOR_AP ||
+	    !IS_WLAN_PHYMODE_EHT(bss_chan->ch_phymode))
+		goto err;
+
+	ch_width = bss_chan->ch_width;
+
+	while (ch_width != CH_WIDTH_INVALID) {
+		status = wlan_reg_extract_puncture_by_bw(bss_chan->ch_width,
+							 bss_chan->puncture_bitmap,
+							 bss_chan->ch_freq,
+							 bss_chan->ch_cfreq2,
+							 ch_width,
+							 &new_punct_bitmap);
+		if (QDF_IS_STATUS_SUCCESS(status) && new_punct_bitmap)
+			ch_width = wlan_get_next_lower_bandwidth(ch_width);
+		else
+			break;
+	}
+
+	if (ch_width == bss_chan->ch_width)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_debug("freq %d ccfs2 %d punct 0x%x BW old %d, new %d",
+		   bss_chan->ch_freq, bss_chan->ch_cfreq2, bss_chan->puncture_bitmap,
+		   bss_chan->ch_width, ch_width);
+
+	*new_ch_width = ch_width;
+	bss_chan->puncture_bitmap = 0;
+err:
+	return status;
+}
+
+QDF_STATUS
+wlan_mlme_update_bw_no_punct(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	enum phy_ch_width new_ch_width;
+	struct wlan_objmgr_pdev *pdev;
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0,
+					  WLAN_MLME_NB_ID);
+	if (!pdev) {
+		sme_err("pdev is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_MLME_NB_ID);
+	if (!vdev) {
+		mlme_err("VDEV not found for vdev id : %d", vdev_id);
+		goto rel_pdev;
+	}
+
+	status = wlan_mlme_get_bw_no_punct(psoc, vdev,
+					   wlan_vdev_mlme_get_des_chan(vdev),
+					   &new_ch_width);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto rel_vdev;
+
+	status = wlan_mlme_send_ch_width_update_with_notify(psoc,
+							    vdev,
+							    vdev_id,
+							    new_ch_width);
+rel_vdev:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+rel_pdev:
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
+
+	return status;
+}
+#endif

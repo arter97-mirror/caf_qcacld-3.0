@@ -49,12 +49,6 @@
 
 #define WMA_WMM_EXPO_TO_VAL(val)        ((1 << (val)) - 1)
 
-#define MAX_HT_MCS_IDX 8
-#define MAX_VHT_MCS_IDX 10
-#ifdef WLAN_FEATURE_11AX
-#define MAX_HE_MCS_IDX 12
-#define MAX_HE_MCS12_13_IDX 14
-#endif
 #define INVALID_MCS_IDX 255
 
 #define IS_MCS_HAS_DCM_RATE(val)  \
@@ -965,7 +959,8 @@ QDF_STATUS wma_set_mcc_channel_time_latency
 QDF_STATUS wma_set_mcc_channel_time_quota
 	(tp_wma_handle wma,
 	uint32_t adapter_1_chan_number,
-	uint32_t adapter_1_quota, uint32_t adapter_2_chan_number);
+	uint32_t adapter_1_quota, uint32_t adapter_2_chan_number,
+	uint8_t band_1, uint8_t band_2);
 
 /**
  * wma_process_rate_update_indate() - rate update indication

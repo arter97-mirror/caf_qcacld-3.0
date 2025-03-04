@@ -47,6 +47,8 @@
 #include <wlan_lmac_if_def.h>
 #include "wlan_cp_stats_mc_tgt_api.h"
 #include "wlan_objmgr_pdev_obj.h"
+#include <wlan_lmac_if_def.h>
+#include "target_if_mlme.h"
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -1329,6 +1331,8 @@ QDF_STATUS mlme_set_mbssid_info(struct wlan_objmgr_vdev *vdev,
 	mbss_11ax->profile_num = mbssid_info->profile_count;
 	qdf_mem_copy(mbss_11ax->trans_bssid,
 		     mbssid_info->trans_bssid, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(mbss_11ax->non_trans_bssid,
+		     mbssid_info->non_trans_bssid, QDF_MAC_ADDR_SIZE);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1935,6 +1939,9 @@ QDF_STATUS psoc_mlme_ext_hdl_create(struct psoc_mlme_obj *psoc_mlme)
 			&psoc_mlme->ext_psoc_ptr->wfa_testcmd.tx_ops);
 	target_if_cm_roam_register_rx_ops(
 			&psoc_mlme->ext_psoc_ptr->rso_rx_ops);
+
+	target_if_mlme_register_tx_ops(
+			&psoc_mlme->ext_psoc_ptr->mlme_tx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }

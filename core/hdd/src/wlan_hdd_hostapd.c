@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1212,12 +1212,14 @@ static QDF_STATUS hdd_handle_acs_scan_event(struct sap_event *sap_event,
  * @ch_width: channel width
  * @sgi: short gi
  * @vht_mcs_map: vht mcs map
+ * @vht_mcs_10_11_supp: vht_mcs_10_11_supp support present
  *
  * This function calculate max rate for VHT mode
  *
  * Return: max rate
  */
-static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map)
+static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map,
+			    int vht_mcs_10_11_supp)
 {
 	const struct index_vht_data_rate_type *supported_vht_mcs_rate;
 	enum data_rate_11ac_max_mcs vht_max_mcs;
@@ -1237,8 +1239,9 @@ static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map)
 	vht_max_mcs =
 		(enum data_rate_11ac_max_mcs)
 		(vht_mcs_map & DATA_RATE_11AC_MCS_MASK);
-
-	if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_7) {
+	if (vht_mcs_10_11_supp) {
+		maxidx = 11;
+	} else if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_7) {
 		maxidx = 7;
 	} else if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_8) {
 		maxidx = 8;
@@ -1272,26 +1275,96 @@ static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map)
 }
 
 /**
- * calculate_max_phy_rate() - calculate maximum phy rate (100kbps)
- * @mode: phymode: Legacy, 11a/b/g, HT, VHT
- * @nss: num of stream (maximum num is 2)
+ * get_max_rate_he() - calculate max rate for HE mode
+ * @nss: num of streams
  * @ch_width: channel width
- * @sgi: short gi enabled or not
- * @supp_idx: max supported idx
- * @ext_idx: max extended idx
- * @ht_mcs_idx: max mcs index for HT
- * @vht_mcs_map: mcs map for VHT
+ * @sgi_enable: short gi
+ * @he_mcs_map: he mcs map
+ * @he_mcs_12_13_map: he_mcs_12_13_map support present
+ *
+ * This function calculate max rate for HE mode
+ *
+ * Return: max rate
+ */
+static int get_max_rate_he(int nss, int ch_width, int sgi_enable,
+			   int he_mcs_map, int he_mcs_12_13_map)
+{
+	const struct index_he_data_rate_type *supported_he_mcs_rate;
+	enum data_rate_11ax_max_mcs he_max_mcs;
+	int maxrate = 0;
+	int maxidx;
+	int sgi;
+
+	if (nss == 1) {
+		supported_he_mcs_rate = supported_he_mcs_rate_nss1;
+	} else if (nss == 2) {
+		supported_he_mcs_rate = supported_he_mcs_rate_nss2;
+	} else {
+		/* Not Supported */
+		hdd_debug("nss %d not supported", nss);
+		return maxrate;
+	}
+	sgi = sgi_enable ? 0 : 2;
+
+	he_max_mcs =
+		(enum data_rate_11ax_max_mcs)
+		(he_mcs_map & DATA_RATE_11AX_MCS_MASK);
+
+	if (he_mcs_12_13_map) {
+		maxidx = 13;
+	} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_9) {
+		maxidx = 9;
+	} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_10) {
+		maxidx = 10;
+	} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_11) {
+		maxidx = 11;
+	} else {
+		hdd_err("HE mcs map %x not supported",
+			he_mcs_map & DATA_RATE_11AX_MCS_MASK);
+		return maxrate;
+	}
+
+	if (ch_width == eHT_CHANNEL_WIDTH_20MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE20_rate[0][sgi];
+	} else if (ch_width == eHT_CHANNEL_WIDTH_40MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE40_rate[0][sgi];
+	} else if (ch_width == eHT_CHANNEL_WIDTH_80MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE80_rate[0][sgi];
+	} else if ((ch_width == eHT_CHANNEL_WIDTH_160MHZ) ||
+			ch_width == eHT_CHANNEL_WIDTH_80P80MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE160_rate[0][sgi];
+	} else {
+		hdd_err("ch_width %d not supported", ch_width);
+		return maxrate;
+	}
+
+	return maxrate;
+}
+
+/**
+ * calculate_max_phy_rate() - calculate maximum phy rate (100kbps)
+ * @stainfo: Station info
  *
  * return: maximum phy rate in 100kbps
  */
-static int calculate_max_phy_rate(int mode, int nss, int ch_width,
-				 int sgi, int supp_idx, int ext_idx,
-				 int ht_mcs_idx, int vht_mcs_map)
+static int calculate_max_phy_rate(struct hdd_station_info *stainfo)
 {
 	const struct index_data_rate_type *supported_mcs_rate;
 	int maxidx = 12; /*default 6M mode*/
 	int maxrate = 0, tmprate;
 	int i;
+	int mode = stainfo->mode;
+	int nss = stainfo->nss;
+	int ch_width = stainfo->ch_width;
+	int sgi = stainfo->sgi_enable;
+	int supp_idx = stainfo->max_supp_idx;
+	int ext_idx = stainfo->max_ext_idx;
+	int ht_mcs_idx = stainfo->max_mcs_idx;
+	int mcs_map = stainfo->rx_mcs_map;
 
 	/* check supported rates */
 	if (supp_idx != 0xff && maxidx < supp_idx)
@@ -1343,10 +1416,19 @@ static int calculate_max_phy_rate(int mode, int nss, int ch_width,
 
 	if (mode == SIR_SME_PHY_MODE_VHT) {
 		/* check for VHT Mode */
-		tmprate = get_max_rate_vht(nss, ch_width, sgi, vht_mcs_map);
+		tmprate = get_max_rate_vht(nss, ch_width, sgi, mcs_map,
+					   stainfo->vht_mcs_10_11_supp);
 		if (maxrate < tmprate)
 			maxrate = tmprate;
 	}
+	if (mode == SIR_SME_PHY_MODE_HE) {
+		/* check for HE Mode */
+		tmprate = get_max_rate_he(nss, ch_width, sgi, mcs_map,
+					  stainfo->he_mcs_12_13_map);
+		if (maxrate < tmprate)
+			maxrate = tmprate;
+	}
+
 
 	return maxrate;
 }
@@ -1471,15 +1553,7 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 	stainfo->rx_mcs_map = event->rx_mcs_map;
 	stainfo->tx_mcs_map = event->tx_mcs_map;
 	stainfo->assoc_ts = qdf_system_ticks();
-	stainfo->max_phy_rate =
-		calculate_max_phy_rate(stainfo->mode,
-				       stainfo->nss,
-				       stainfo->ch_width,
-				       stainfo->sgi_enable,
-				       stainfo->max_supp_idx,
-				       stainfo->max_ext_idx,
-				       stainfo->max_mcs_idx,
-				       stainfo->rx_mcs_map);
+	stainfo->max_phy_rate = calculate_max_phy_rate(stainfo);
 	/* expect max_phy_rate report in kbps */
 	stainfo->max_phy_rate *= 100;
 
@@ -1601,6 +1675,9 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 				     &cache_sta_info, true,
 				     STA_INFO_FILL_STATION_INFO);
 	}
+
+	stainfo->vht_mcs_10_11_supp = event->vht_mcs_10_11_supp;
+	stainfo->he_mcs_12_13_map = event->he_mcs_12_13_map;
 
 	hdd_debug("cap %d %d %d %d %d %d %d %d %d %x %d",
 		  stainfo->ampdu,
@@ -1990,7 +2067,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	struct hdd_context *hdd_ctx;
 	struct iw_michaelmicfailure msg;
 	uint8_t ignoreCAC = 0;
-	eSapDfsCACState_t cac_state = eSAP_DFS_DO_NOT_SKIP_CAC;
+	bool cac_state = false;
 	struct hdd_config *cfg = NULL;
 	struct wlan_dfs_info dfs_info;
 	struct hdd_adapter *con_sap_adapter;
@@ -2092,7 +2169,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				hdd_ctx->psoc, adapter->vdev_id))
 			ignoreCAC = true;
 
-		wlansap_get_dfs_cac_state(mac_handle, &cac_state);
+		wlansap_get_dfs_cac_state(mac_handle,
+					  WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+					  &cac_state);
 
 		/* DFS requirement: DO NOT transmit during CAC. */
 
@@ -2104,7 +2183,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 					      ap_ctx->operating_chan_freq) ||
 		    ignoreCAC ||
 		    hdd_ctx->dev_dfs_cac_status == DFS_CAC_ALREADY_DONE ||
-		    eSAP_DFS_SKIP_CAC == cac_state)
+		    !cac_state)
 			ap_ctx->dfs_cac_block_tx = false;
 		else
 			ap_ctx->dfs_cac_block_tx = true;
@@ -6809,7 +6888,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		hdd_set_connection_in_progress(false);
 		sme_get_command_q_status(mac_handle);
 		wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
-		if (!cds_is_driver_recovering())
+		if (!cds_is_driver_recovering() &&
+		    QDF_IS_STATUS_ERROR(qdf_status))
 			QDF_ASSERT(0);
 		ret = -EINVAL;
 		goto error;
