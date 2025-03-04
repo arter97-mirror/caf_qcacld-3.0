@@ -666,6 +666,10 @@ config QCACLD_FEATURE_SON
 	bool "Enable easymesh for QCACLD"
 	default n
 
+config WLAN_FEATURE_MC_BC_4_ADDR
+	bool "Enable TX MC/BC with 4 address"
+	default n
+
 config IPA_OFFLOAD
 	bool "Enable IPA_OFFLOAD"
 	default n
