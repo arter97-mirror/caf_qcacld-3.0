@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -12821,11 +12821,6 @@ populate_dot11f_mlo_caps(struct mac_context *mac_ctx,
 		     sizeof(mlo_ie->mld_mac_addr));
 	common_info_len += QDF_MAC_ADDR_SIZE;
 	mlo_ie->link_id_info_present = 0;
-	if (target_if_get_fw_btm_multi_ap_support(mac_ctx->psoc)) {
-		mlo_ie->ext_mld_capab_and_op_present = 1;
-		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
-		common_info_len += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
-	}
 
 	mlo_ie->bss_param_change_cnt_present = 0;
 	mlo_ie->medium_sync_delay_info_present = 0;
@@ -12841,6 +12836,11 @@ populate_dot11f_mlo_caps(struct mac_context *mac_ctx,
 
 	common_info_len += WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
 	mlo_ie->ext_mld_capab_and_op_present = 0;
+	if (target_if_get_fw_btm_multi_ap_support(mac_ctx->psoc)) {
+		mlo_ie->ext_mld_capab_and_op_present = 1;
+		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
+		common_info_len += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
+	}
 
 	mlo_ie->mld_id_present = 0;
 	mlo_ie->mld_capab_and_op_present = 1;
@@ -13962,6 +13962,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	uint8_t cb_mode;
 	uint8_t *eht_cap_ie = NULL;
 	bool sta_prof_he_ie = false;
+	bool set_ext_mld_cap = false;
 
 	if (!mac_ctx || !pe_session || !frm)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -14030,7 +14031,25 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 						eml_cap.emlsr_trans_delay;
 	}
 
-	if (target_if_get_fw_btm_multi_ap_support(psoc)) {
+	pe_debug("num partner links: %d", partner_info->num_partner_links);
+
+	/*
+	 * Include Ext MLD caps if AP advertises it in beacons. Else, check
+	 * if connection is 3 or more links. If neither, then do not include
+	 * the Ext MLD caps in assoc request.
+	 */
+	if (pe_session->vdev->mlo_dev_ctx &&
+	    pe_session->vdev->mlo_dev_ctx->mlo_extmld_cap_advertisement) {
+		pe_debug("AP advertises ext mld caps");
+		set_ext_mld_cap = true;
+	} else if (partner_info->num_partner_links > 1) {
+		pe_debug("STA is connecting in 3 or more links");
+		set_ext_mld_cap = true;
+	} else {
+		pe_debug("Do not advertise ext mld caps");
+	}
+
+	if (target_if_get_fw_btm_multi_ap_support(psoc) && set_ext_mld_cap) {
 		pe_debug("Set ext mld caps");
 		mlo_ie->ext_mld_capab_and_op_present = 1;
 		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P;

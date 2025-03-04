@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -144,6 +144,12 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 		wlan_vdev_mlme_cap_clear(vdev, WLAN_VDEV_C_EMLSR_CAP);
 		pe_debug("EMLSR not supported with D2.0 AP");
 	}
+
+	/* Check if AP beacons contain Extended MLD cap and op field */
+	mlo_ctx->mlo_extmld_cap_advertisement =
+		bcn_ptr->mlo_ie.mlo_ie.ext_mld_capab_and_op_present;
+
+	pe_debug("AP ext mld caps: %d", mlo_ctx->mlo_extmld_cap_advertisement);
 
 	/** max num of active links recommended by AP */
 	tmp_rec_value =
