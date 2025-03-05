@@ -3685,6 +3685,44 @@ policy_mgr_mode_specific_connection_count_with_mlo(
 	return count;
 }
 
+bool
+policy_mgr_link_reconfig_is_concurrency_present(struct wlan_objmgr_psoc *psoc)
+{
+	uint8_t total_con_count = 0, total_sta_count = 0;
+	uint8_t total_ml_con_count = 0, total_ml_sta_count = 0;
+
+	total_con_count = policy_mgr_get_connection_count(psoc);
+	total_sta_count = policy_mgr_mode_specific_connection_count(psoc,
+								    PM_STA_MODE,
+								    NULL);
+
+	if (!total_con_count || !total_sta_count) {
+		policy_mgr_debug("station not present reject link reconfig req");
+		return true;
+	}
+
+	if (total_con_count != total_sta_count) {
+		policy_mgr_debug("concurrency present, reject link reconfig req");
+		return true;
+	}
+
+	total_ml_con_count = policy_mgr_get_connection_count_with_mlo(psoc);
+	total_ml_sta_count = policy_mgr_mode_specific_connection_count_with_mlo
+							(psoc, PM_STA_MODE);
+
+	if (!total_ml_con_count || !total_ml_sta_count) {
+		policy_mgr_debug("ML station not present reject link reconfig req");
+		return true;
+	}
+
+	if (total_ml_con_count != total_ml_sta_count) {
+		policy_mgr_debug("ML concurrency present, reject link reconfig req");
+		return true;
+	}
+
+	return false;
+}
+
 uint32_t policy_mgr_mode_specific_vdev_id(struct wlan_objmgr_psoc *psoc,
 					  enum policy_mgr_con_mode mode)
 {

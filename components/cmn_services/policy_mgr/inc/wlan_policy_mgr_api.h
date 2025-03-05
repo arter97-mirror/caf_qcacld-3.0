@@ -708,6 +708,18 @@ policy_mgr_mode_specific_connection_count_with_mlo(
 				enum policy_mgr_con_mode mode);
 
 /**
+ * policy_mgr_link_reconfig_is_concurrency_present() - provide whether
+ * any concurrency is present or not
+ * @psoc: PSOC object information
+ *
+ * This function provides whether concurrency is present or not.
+ *
+ * Return: bool
+ */
+bool
+policy_mgr_link_reconfig_is_concurrency_present(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_get_concurrency_mode() - return concurrency mode
  * @psoc: PSOC object information
  *
