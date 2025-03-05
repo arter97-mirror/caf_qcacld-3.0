@@ -42,8 +42,8 @@
 #include "wlan_dlm_api.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_link_force.h"
-#include "wlan_mlo_link_recfg.h"
 #endif
+#include "wlan_mlo_link_recfg.h"
 #include <../../core/src/wlan_cm_roam_offload.h>
 
 /* Support for "Fast roaming" (i.e., ESE, LFR, or 802.11r.) */
@@ -1981,6 +1981,11 @@ wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 
 	mlme_debug("vdev: %d source: %d freq: %d bssid: " QDF_MAC_ADDR_FMT,
 		   vdev_id, source, chan_freq, QDF_MAC_ADDR_REF(bssid->bytes));
+	status = mlo_link_recfg_validate_roam_invoke(psoc, vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return status;
+	}
 
 	status = cm_start_roam_invoke(psoc, vdev, bssid, chan_freq, source);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
