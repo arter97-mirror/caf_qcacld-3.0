@@ -2965,8 +2965,12 @@ config ALLOC_CONTIGUOUS_MULTI_PAGE
     bool "alloc contiguous multi page"
     default n
 
-config AR6320_IPA_OFFLOAD
-    bool "Flag for ROME IPA"
+config LEGACY_IPA_OFFLOAD
+    bool "Flag for ROME and GENOA IPA"
+    default n
+
+config DP_IPA_OFFLOAD
+    bool "Flag to enable IPA for chips go dp path"
     default n
 
 config AR6320_TX_THROTTLE

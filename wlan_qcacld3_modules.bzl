@@ -1210,7 +1210,6 @@ _conditional_srcs = {
     },
     "CONFIG_IPA_OFFLOAD": {
         True: [
-            "cmn/dp/wifi3.0/dp_ipa.c",
             "cmn/qdf/linux/src/qdf_ipa.c",
             "cmn/ipa/core/src/wlan_ipa_core.c",
             "cmn/ipa/core/src/wlan_ipa_main.c",
@@ -1229,6 +1228,16 @@ _conditional_srcs = {
 	    True: [
 		"cmn/ipa/core/src/wlan_ipa_logging.c"
 	    ],
+    },
+    "CONFIG_LEGACY_IPA_OFFLOAD": {
+        True: [
+            "core/dp/txrx/ol_txrx_ipa.c",
+        ],
+    },
+    "CONFIG_DP_IPA_OFFLOAD": {
+        True: [
+            "cmn/dp/wifi3.0/dp_ipa.c",
+        ],
     },
     "CONFIG_IPCIE_FW_SIM": {
         True: [
@@ -1287,11 +1296,6 @@ _conditional_srcs = {
                 "cmn/dp/wifi3.0/dp_tx_desc.c",
                 "components/mlme/core/src/wlan_mlme_twt_api.c",
         ],
-    },
-    "CONFIG_AR6320_IPA_OFFLOAD": {
-        True: [
-            "core/dp/txrx/ol_txrx_ipa.c",
-        ]
     },
     "CONFIG_AR6320_TX_THROTTLE": {
         True: [
@@ -2710,7 +2714,13 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
                 "//msm-kernel:all_headers_arm",
                 "//wlan/platform:wlan-platform-headers",
             ]
-    if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "sa510m":
+
+    if target == "sa510m":
+        deps = deps + [
+            "//dataipa:include_headers",
+            "//dataipa:{}_{}_ipam".format(target, variant),
+        ]
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
