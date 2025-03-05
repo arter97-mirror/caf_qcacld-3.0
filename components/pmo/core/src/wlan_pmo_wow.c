@@ -396,6 +396,10 @@ void pmo_set_sta_wow_bitmask(struct pmo_psoc_cfg *pmo_cfg, uint32_t *bitmask,
 		pmo_set_wow_event_bitmap(WOW_PATTERN_MATCH_EVENT,
 					 wow_bitmap_size,
 					 bitmask);
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_MAGIC_PKT_RECVD_EVENT))
+		pmo_set_wow_event_bitmap(WOW_MAGIC_PKT_RECVD_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
 	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_DEAUTH_RECVD_EVENT))
 		pmo_set_wow_event_bitmap(WOW_DEAUTH_RECVD_EVENT,
 					 wow_bitmap_size,
@@ -406,6 +410,10 @@ void pmo_set_sta_wow_bitmask(struct pmo_psoc_cfg *pmo_cfg, uint32_t *bitmask,
 					 bitmask);
 	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_BMISS_EVENT))
 		pmo_set_wow_event_bitmap(WOW_BMISS_EVENT,
+					 wow_bitmap_size,
+					 bitmask);
+	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_BEACON_EVENT))
+		pmo_set_wow_event_bitmap(WOW_BEACON_EVENT,
 					 wow_bitmap_size,
 					 bitmask);
 	if (pmo_wow_wakeup_event_enabled(pmo_cfg, WOW_GTK_ERR_EVENT))
