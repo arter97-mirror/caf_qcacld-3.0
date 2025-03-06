@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3344,3 +3344,18 @@ void ucfg_dp_set_ipv4_addr(struct wlan_objmgr_vdev *vdev, uint8_t *ip_addr)
 	qdf_mem_copy(&dp_link->dp_intf->ipv4_addr, ip_addr,
 		     QDF_IPV4_ADDR_SIZE);
 }
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+bool ucfg_dp_is_ndp_bw_flow_ctrl_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+	if (!dp_ctx) {
+		dp_err("DP context not found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return dp_ctx->dp_cfg.is_ndp_bw_flow_ctrl_enabled;
+}
+#endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -137,6 +137,8 @@ struct dp_rtpm_tput_policy_context {
  * @stc_rtpm_control: Indicates whether STC should control RTPM suspend
  * @dp_irq_affinity_mask: DP IRQ affinity mask (0 for disable)
  * @dp_rx_thread_affinity_mask: DP rx thread affinity mask (o for disable)
+ * @is_ndp_bw_flow_ctrl_enabled: Indicates whether NDP bw flow ctrl is enabled
+ *  or not
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -225,6 +227,9 @@ struct wlan_dp_psoc_cfg {
 #endif
 	uint32_t dp_irq_affinity_mask;
 	uint32_t dp_rx_thread_affinity_mask;
+#ifdef NDP_TX_BW_FLOW_CTRL
+	bool is_ndp_bw_flow_ctrl_enabled;
+#endif
 };
 
 /**
