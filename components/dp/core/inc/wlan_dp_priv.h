@@ -130,6 +130,7 @@ struct dp_rtpm_tput_policy_context {
  * @is_flow_balance_enabled: indicates whether flow balance is enabled or not
  * @stc_enable: indicates whether STC feature is enabled or not
  * @stc_rtpm_control: Indicates whether STC should control RTPM suspend
+ * @dp_irq_affinity_mask: DP IRQ affinity mask (0 for disable)
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -216,6 +217,7 @@ struct wlan_dp_psoc_cfg {
 	bool stc_enable;
 	bool stc_rtpm_control;
 #endif
+	uint32_t dp_irq_affinity_mask;
 };
 
 /**

@@ -930,6 +930,8 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	dp_fisa_cfg_init(config, psoc);
 	dp_direct_link_cfg_init(config, psoc);
 	wlan_dp_stc_cfg_init(config, psoc);
+
+	config->dp_irq_affinity_mask = cfg_get(psoc, CFG_DP_IRQ_AFFINITY_MASK);
 }
 
 /**
