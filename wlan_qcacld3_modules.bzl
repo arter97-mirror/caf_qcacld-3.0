@@ -34,6 +34,7 @@ _target_chipset_map = {
         "qca6750",
         "wcn7750",
         "wcn7760",
+        "fig",
     ],
     "volcano": [
         "qca6750",
@@ -46,6 +47,7 @@ _target_chipset_map = {
         "peach-v2",
         "kiwi-v2",
         "wcn7750",
+        "fig",
     ],
     "sdxkova": [
         "kiwi-v2",
@@ -793,6 +795,12 @@ _conditional_srcs = {
             "cmn/wlan_cfg/wlan_cfg.c",
             "components/dp/core/src/wlan_dp_prealloc.c",
         ],
+    },
+    "CONFIG_BORON": {
+        True: [
+            "cmn/dp/wifi3.0/bn/dp_bn_tx.c",
+            "cmn/dp/wifi3.0/bn/dp_bn_rx.c",
+	],
     },
     "CONFIG_BUS_AUTO_SUSPEND": {
         True: [
