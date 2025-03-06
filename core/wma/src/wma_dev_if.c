@@ -1154,9 +1154,8 @@ QDF_STATUS wma_handle_channel_switch_resp(tp_wma_handle wma,
 	struct wma_txrx_node *iface;
 
 	iface = &wma->interfaces[rsp->vdev_id];
-	wma_debug("Send channel switch resp vdev %d status %d",
-		 rsp->vdev_id, rsp->status);
-
+	wma_debug("Send channel switch resp vdev %d, status %d, resp type %d",
+		 rsp->vdev_id, rsp->status, rsp->resp_type);
 	/* Indicate channel switch failure to LIM */
 	if (QDF_IS_STATUS_ERROR(rsp->status) &&
 	    (iface->type == WMI_VDEV_TYPE_MONITOR ||

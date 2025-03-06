@@ -3694,6 +3694,8 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	default:
 		break;
 	}
+
+	pe_debug("updated session bandwidth: %d", pe_session->ch_width);
 }
 
 QDF_STATUS lim_send_beacon_ind(struct mac_context *mac,

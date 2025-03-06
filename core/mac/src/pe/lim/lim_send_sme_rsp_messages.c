@@ -2010,6 +2010,8 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 			       tLimChannelSwitchInfo *lim_ch_switch,
 			       struct ch_params ch_params)
 {
+	pe_debug("session chan width: %d, CSA req chan width: %d",
+		 session_entry->ch_width, ch_params.ch_width);
 	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
 	    session_entry->ch_width == ch_params.ch_width &&
 	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
@@ -2155,11 +2157,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 					     REG_CURRENT_PWR_MODE);
 	lim_set_chan_sw_puncture(lim_ch_switch, &ch_params);
 
-	if (!lim_sta_follow_csa(session_entry, csa_params,
-				lim_ch_switch, ch_params))
-		goto send_event;
-	else
-		qdf_mem_zero(&ch_params, sizeof(struct ch_params));
+	qdf_mem_zero(&ch_params, sizeof(struct ch_params));
 
 	if (!lim_is_csa_channel_allowed(mac_ctx, session_entry,
 					session_entry->curr_op_freq,
