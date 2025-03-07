@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -420,7 +420,7 @@ static void os_if_dp_nud_stats_info(struct wlan_objmgr_vdev *vdev)
 	}
 	dp_info("carrier state: %d", netif_carrier_ok(net_dev));
 
-	for (i = 0; i < NUM_TX_QUEUES; i++) {
+	for (i = 0; i < net_dev->num_tx_queues; i++) {
 		txq = netdev_get_tx_queue(net_dev, i);
 		dp_info("Queue: %d status: %d txq->trans_start: %lu",
 			i, netif_tx_queue_stopped(txq), txq->trans_start);

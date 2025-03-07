@@ -158,22 +158,63 @@ struct hdd_apf_context {
 #endif /* FEATURE_WLAN_APF */
 
 #ifdef TX_MULTIQ_PER_AC
-#define TX_GET_QUEUE_IDX(ac, off) (((ac) * TX_QUEUES_PER_AC) + (off))
 #define TX_QUEUES_PER_AC 4
 #else
-#define TX_GET_QUEUE_IDX(ac, off) (ac)
 #define TX_QUEUES_PER_AC 1
 #endif
 
-/** Number of Tx Queues */
+#define TX_HI_PRIO_QUEUE_IDX  0
+
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || \
 	defined(QCA_HL_NETDEV_FLOW_CONTROL) || \
 	defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
 /* Only one HI_PRIO queue */
-#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC + 1)
+#define NUM_HI_PRIO_TX_QUEUES 1
 #else
-#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC)
+#define NUM_HI_PRIO_TX_QUEUES 0
 #endif
+
+/** Number of Tx Queues */
+#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC + NUM_HI_PRIO_TX_QUEUES)
+#define NDP_NUM_TX_QUEUES_BK_VO_VI_PRIO (3 * TX_QUEUES_PER_AC + \
+					 NUM_HI_PRIO_TX_QUEUES)
+
+/* Get the tx queue index based on access category and flow hash */
+#define TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, flowq_idx) \
+	(((ac) - HDD_LINUX_AC_VO) * \
+	 TX_QUEUES_PER_AC + (flowq_idx) + \
+	 NUM_HI_PRIO_TX_QUEUES)
+
+#define TX_BE_BASE_QUEUE_IDX \
+	TX_GET_NON_HI_PRIO_QUEUE_IDX(HDD_LINUX_AC_BE, 0)
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+#define NDP_MAX_NUM_PEERS 8
+#define NDP_NUM_TX_QUEUES_PER_PEER TX_QUEUES_PER_AC
+/* One default queue for traffic not classifiable into the peer queues */
+#define NDP_NUM_TX_QUEUES_BE NDP_MAX_NUM_PEERS * NDP_NUM_TX_QUEUES_PER_PEER + 1
+/*
+ * Get the tx queue index for NDP peers based on access category,
+ * flow hash and peer index
+ */
+#define NDP_TX_GET_BE_QUEUE_IDX(ac, flowq_idx, peer_idx) \
+	(TX_BE_BASE_QUEUE_IDX + 1 + \
+	 (peer_idx) * NDP_NUM_TX_QUEUES_PER_PEER + \
+	 (flowq_idx))
+#else /* NDP_TX_BW_FLOW_CTRL */
+#define NDP_NUM_TX_QUEUES_BE TX_QUEUES_PER_AC
+#define NDP_TX_GET_BE_QUEUE_IDX(ac, flowq_idx, peer_idx) \
+	TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, flowq_idx)
+#endif /* NDP_TX_BW_FLOW_CTRL */
+
+#define NDP_NUM_TX_QUEUES           (NDP_NUM_TX_QUEUES_BE + \
+				     NDP_NUM_TX_QUEUES_BK_VO_VI_PRIO)
+
+#define NDP_TX_QUEUE_INDEX_PEER_BW_SHIFT   8
+#define NDP_TX_QUEUE_INDEX_PEER_BW_MASK    0xF00
+#define NDP_TX_QUEUE_INDEX_MASK            0xFF
+
+#define MAX_NUM_TX_QUEUES  QDF_MAX(NDP_NUM_TX_QUEUES, NUM_TX_QUEUES)
 
 #define NUM_RX_QUEUES 5
 
@@ -977,7 +1018,7 @@ struct hdd_netif_queue_history {
 	uint16_t netif_action;
 	uint16_t netif_reason;
 	uint32_t pause_map;
-	unsigned long tx_q_state[NUM_TX_QUEUES];
+	unsigned long tx_q_state[MAX_NUM_TX_QUEUES];
 };
 
 /**
@@ -1324,6 +1365,7 @@ enum wfc_state_latency_level {
  * @queue_oper_history:
  * @queue_oper_stats:
  * @ndp_peer_bitmap: NDP peer bitmap
+ * @ndp_peer_pause_bitmap: bitmap of paused NDP peers
  * @debugfs_phy: debugfs entry
  * @lfr_fw_status:
  * @active_ac:
@@ -1505,6 +1547,7 @@ struct hdd_adapter {
 	struct hdd_netif_queue_stats queue_oper_stats[WLAN_REASON_TYPE_MAX];
 #ifdef NDP_TX_BW_FLOW_CTRL
 	uint8_t ndp_peer_bitmap[CDP_PEER_BW_MAX];
+	uint8_t ndp_peer_pause_bitmap[CDP_PEER_BW_MAX];
 #endif
 
 	struct dentry *debugfs_phy;

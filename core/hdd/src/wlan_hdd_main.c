@@ -7454,7 +7454,9 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 			      ((cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE ||
 			       wlan_hdd_is_session_type_monitor(session_type)) ?
 			       hdd_mon_mode_ether_setup : ether_setup),
-			      NUM_TX_QUEUES, NUM_RX_QUEUES);
+			      ((session_type == QDF_STA_MODE) ?
+			       NDP_NUM_TX_QUEUES : NUM_TX_QUEUES),
+			      NUM_RX_QUEUES);
 
 	if (!dev) {
 		hdd_err("Failed to allocate new net_device '%s'", name);
@@ -14106,7 +14108,16 @@ wlan_hdd_display_adapter_netif_queue_stats(struct hdd_adapter *adapter)
 	int i;
 	qdf_time_t total, pause, unpause, curr_time, delta;
 	struct hdd_netif_queue_history *q_hist_ptr;
-	char q_status_buf[NUM_TX_QUEUES * HDD_NETDEV_TX_Q_STATE_STRLEN] = {0};
+	uint8_t num_tx_queues = adapter->dev->num_tx_queues;
+	char *q_status_buf;
+
+	q_status_buf = qdf_mem_malloc(sizeof(*q_status_buf) * num_tx_queues *
+				      HDD_NETDEV_TX_Q_STATE_STRLEN);
+	if (!q_status_buf) {
+		hdd_err("Mem alloc failure for queue status buffer - num_queues:%d mode:%d",
+			num_tx_queues, adapter->device_mode);
+		return;
+	}
 
 	hdd_nofl_debug("Netif queue operation statistics:");
 	hdd_nofl_debug("vdev_id %d device mode %d",
@@ -14160,7 +14171,7 @@ wlan_hdd_display_adapter_netif_queue_stats(struct hdd_adapter *adapter)
 			continue;
 		q_hist_ptr = &adapter->queue_oper_history[i];
 		wlan_hdd_dump_queue_history_state(q_hist_ptr,
-						  q_status_buf,
+						  num_tx_queues, q_status_buf,
 						  sizeof(q_status_buf));
 		hdd_nofl_debug("%2d%20u%50s%30s%10x  %s",
 			       i, qdf_system_ticks_to_msecs(
@@ -14174,6 +14185,8 @@ wlan_hdd_display_adapter_netif_queue_stats(struct hdd_adapter *adapter)
 				   adapter->queue_oper_history[i].pause_map,
 				   q_status_buf);
 	}
+
+	qdf_mem_free(q_status_buf);
 }
 
 void
