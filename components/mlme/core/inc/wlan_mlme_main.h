@@ -486,6 +486,53 @@ struct wait_for_key_timer {
 };
 
 /**
+ * struct sap_ch_switch_info - sap channel switch info
+ * @target_chan_freq: target channel frequency
+ * @user_provided_target_chan_freq: user provided target channel frequency
+ * @csa_ie_required: csa ie required
+ * @orig_chan_width: original channel width
+ * @new_chan_width: new channel width
+ * @new_ch_params: new channel params
+ * @tx_leakage_threshold: tx leakage threshold
+ * @sap_ch_switch_beacon_cnt: channel switch beacon count
+ * @sap_ch_switch_mode: sap channel switch mode
+ * @reduced_beacon_interval: reduced beacon interval
+ */
+
+struct sap_ch_switch_info {
+	/*
+	 * New channel frequency to move to when a  Radar is
+	 * detected on current Channel
+	 */
+	uint32_t target_chan_freq;
+	uint32_t user_provided_target_chan_freq;
+
+	/*
+	 * Requests for Channel Switch Announcement IE
+	 * generation and transmission
+	 */
+	uint8_t csa_ie_required;
+	/*
+	 * New channel width and new channel bonding mode
+	 * will only be updated via channel fallback mechanism
+	 */
+	enum phy_ch_width orig_chan_width;
+	enum phy_ch_width new_chan_width;
+	struct ch_params new_ch_params;
+
+	/*
+	 * Flag to indicate if DFS test mode is enabled and
+	 * channel switch is disabled.
+	 */
+	uint16_t tx_leakage_threshold;
+
+	/* beacon count before channel switch */
+	int8_t sap_ch_switch_beacon_cnt;
+	uint8_t sap_ch_switch_mode;
+	uint16_t reduced_beacon_interval;
+};
+
+/**
  * struct mlme_ap_config - VDEV MLME legacy private SAP
  * related configurations
  * @user_config_sap_ch_freq : Frequency from userspace to start SAP
@@ -494,6 +541,7 @@ struct wait_for_key_timer {
  * @ap_policy: Concurrent ap policy config
  * @oper_ch_width: SAP current operating ch_width
  * @psd_20mhz: PSD power(dBm/MHz) of SAP operating in 20 MHz
+ * @ch_switch_info: channel switch info
  */
 struct mlme_ap_config {
 	qdf_freq_t user_config_sap_ch_freq;
@@ -503,6 +551,8 @@ struct mlme_ap_config {
 	enum host_concurrent_ap_policy ap_policy;
 	enum phy_ch_width oper_ch_width;
 	uint8_t psd_20mhz;
+	struct sap_ch_switch_info ch_switch_info;
+
 };
 
 /**
@@ -1706,6 +1756,15 @@ wlan_get_sap_user_config_freq(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS
 wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 			      qdf_freq_t freq);
+
+/**
+ * wlan_get_sap_ch_sw_info() - get sap channel switch info
+ * @vdev: vdev ctx
+ *
+ * Return: sap new channel switch info
+ */
+struct sap_ch_switch_info
+*wlan_get_sap_ch_sw_info(struct wlan_objmgr_vdev *vdev);
 
 #if defined(WLAN_FEATURE_11BE_MLO)
 /**
