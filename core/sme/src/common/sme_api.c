@@ -8885,7 +8885,9 @@ QDF_STATUS sme_roam_csa_ie_request(mac_handle_t mac_handle,
 				   struct qdf_mac_addr bssid,
 				   uint32_t target_chan_freq, uint8_t csaIeReqd,
 				   struct ch_params *ch_params,
-				   uint32_t new_cac_ms)
+				   uint32_t new_cac_ms,
+				   uint8_t beacon_cnt,
+				   uint8_t mode)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
@@ -8895,7 +8897,9 @@ QDF_STATUS sme_roam_csa_ie_request(mac_handle_t mac_handle,
 		status = csr_roam_send_chan_sw_ie_request(mac, bssid,
 							  target_chan_freq,
 							  csaIeReqd, ch_params,
-							  new_cac_ms);
+							  new_cac_ms,
+							  beacon_cnt,
+							  mode);
 		sme_release_global_lock(&mac->sme);
 	}
 	return status;

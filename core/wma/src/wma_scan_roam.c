@@ -1,6 +1,6 @@
  /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -975,9 +975,10 @@ QDF_STATUS wma_pre_chan_switch_setup(uint8_t vdev_id)
 	struct wma_txrx_node *intr;
 	uint16_t beacon_interval_ori;
 	bool restart;
-	uint16_t reduced_beacon_interval;
+	uint16_t reduced_beacon_interval = 0;
 	struct vdev_mlme_obj *mlme_obj;
 	struct wlan_objmgr_vdev *vdev;
+	struct sap_ch_switch_info *ch_switch_info;
 
 	if (!wma) {
 		pe_err("wma is NULL");
@@ -999,9 +1000,15 @@ QDF_STATUS wma_pre_chan_switch_setup(uint8_t vdev_id)
 		wma_get_channel_switch_in_progress(intr);
 	if (restart && intr->beacon_filter_enabled)
 		wma_remove_beacon_filter(wma, &intr->beacon_filter);
-
-	reduced_beacon_interval =
-		wma->mac_context->sap.SapDfsInfo.reduced_beacon_interval;
+	if (wma_is_vdev_in_ap_mode(wma, vdev_id)) {
+		ch_switch_info = wlan_get_sap_ch_sw_info(vdev);
+		if (!ch_switch_info) {
+			pe_err("Invalid channel info");
+			return QDF_STATUS_E_FAILURE;
+		}
+		reduced_beacon_interval =
+		ch_switch_info->reduced_beacon_interval;
+	}
 	if (wma_is_vdev_in_ap_mode(wma, vdev_id) && reduced_beacon_interval) {
 
 
