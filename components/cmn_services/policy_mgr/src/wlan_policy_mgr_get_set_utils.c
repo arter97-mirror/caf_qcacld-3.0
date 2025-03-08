@@ -6345,6 +6345,22 @@ out:
 	return is_different_mac;
 }
 
+bool policy_mgr_is_dual_sap_active(struct wlan_objmgr_psoc *psoc)
+{
+	uint8_t num_ml_sap = 0, num_non_ml_sap = 0;
+	uint8_t ml_sap_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t non_ml_sap_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t sap_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t sap_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sap, ml_sap_idx,
+						&num_non_ml_sap, non_ml_sap_idx,
+						sap_freq_list, sap_vdev_id_list,
+						PM_SAP_MODE);
+
+	return (num_ml_sap + num_non_ml_sap) == 2;
+}
+
 bool policy_mgr_max_concurrent_connections_reached(
 		struct wlan_objmgr_psoc *psoc)
 {

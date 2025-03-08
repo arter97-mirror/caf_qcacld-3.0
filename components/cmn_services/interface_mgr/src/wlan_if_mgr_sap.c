@@ -241,6 +241,13 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 				wlan_p2p_psoc_priv_get_sta_vdev_id(psoc),
 				policy_mgr_mode_specific_get_channel(psoc,
 						PM_P2P_GO_MODE), 0, 0);
+	if (policy_mgr_is_dual_sap_active(psoc) &&
+	    wlan_mlme_is_aux_emlsr_support(psoc)) {
+		ml_nlink_conn_change_notify(
+				psoc, wlan_vdev_get_id(vdev),
+				ml_nlink_dual_sap_active_evt,
+				NULL);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -304,6 +311,13 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 		status = wlan_p2p_del_random_mac(psoc,
 				wlan_p2p_psoc_priv_get_sta_vdev_id(psoc),
 						 0);
+	if (!policy_mgr_is_dual_sap_active(psoc) &&
+	    wlan_mlme_is_aux_emlsr_support(psoc)) {
+		ml_nlink_conn_change_notify(
+				psoc, wlan_vdev_get_id(vdev),
+				ml_nlink_dual_sap_inactive_evt,
+				NULL);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }

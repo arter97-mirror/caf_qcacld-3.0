@@ -5626,6 +5626,8 @@ ml_nlink_undo_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 	} else if (evt == ml_nlink_connect_completion_evt ||
 		   evt == ml_nlink_connect_failed_evt) {
 		request = ML_EMLSR_DOWNGRADE_BY_STA_START;
+	} else if (evt == ml_nlink_dual_sap_inactive_evt) {
+		request = ML_EMLSR_DOWNGRADE_BY_DUAL_SAP_ACTIVE;
 	} else {
 		mlo_debug("not handled for evt %d", evt);
 		goto end;
@@ -6317,6 +6319,8 @@ static void ml_nlink_check_stop_start_emlsr_timer(
 	case ml_nlink_nan_post_disable_evt:
 	case ml_nlink_acs_start_evt:
 	case ml_nlink_acs_completed_evt:
+	case ml_nlink_dual_sap_active_evt:
+	case ml_nlink_dual_sap_inactive_evt:
 		break;
 	default:
 		return;
@@ -6572,6 +6576,21 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		ml_nlink_link_recfg_completed_handler(psoc, vdev,
 						      evt, data);
 		break;
+	case ml_nlink_dual_sap_active_evt:
+		/*
+		 * Disable eMLSR as eMLSR + DUAL SAP can not be supported.
+		 */
+			status = ml_nlink_emlsr_downgrade_handler(psoc, vdev,
+								  evt, data);
+		break;
+	case ml_nlink_dual_sap_inactive_evt:
+		/*
+		 * re-enable eMLSR, when DUAL SAP in inactive,
+		 */
+			status = ml_nlink_undo_emlsr_downgrade_handler(
+							psoc, vdev, evt, data);
+		break;
+
 	default:
 		break;
 	}

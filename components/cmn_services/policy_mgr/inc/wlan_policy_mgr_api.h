@@ -4961,6 +4961,14 @@ void policy_mgr_get_ml_and_non_ml_mode_count(struct wlan_objmgr_psoc *psoc,
 					     enum policy_mgr_con_mode mode);
 
 /**
+ * policy_mgr_is_dual_sap_active() - check if dual sap active
+ * @psoc: PSOC object information
+ *
+ * Return: true or false
+ */
+bool policy_mgr_is_dual_sap_active(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_is_sap_go_on_2g() - check if sap/go is on 2g
  * @psoc: PSOC object information
  *
