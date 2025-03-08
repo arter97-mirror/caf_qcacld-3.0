@@ -2882,8 +2882,9 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 				  void *event)
 {
 	struct pe_session *session;
-	struct wlan_objmgr_vdev *vdev;
 	bool csa_tx_offload, is_sap_go_moved_before_sta = false;
+	struct sap_ch_switch_info *ch_switch_info;
+
 	tpSirFirstBeaconTxCompleteInd bcn_ind =
 		(tSirFirstBeaconTxCompleteInd *) event;
 
@@ -2893,15 +2894,10 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		return;
 	}
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
-						    session->vdev_id,
-						    WLAN_LEGACY_MAC_ID);
-	if (vdev) {
-		is_sap_go_moved_before_sta =
-			wlan_vdev_mlme_is_sap_go_move_before_sta(vdev);
-		wlan_vdev_mlme_set_sap_go_move_before_sta(vdev, false);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-	}
+	is_sap_go_moved_before_sta =
+		wlan_vdev_mlme_is_sap_go_move_before_sta(session->vdev);
+	wlan_vdev_mlme_set_sap_go_move_before_sta(session->vdev, false);
+
 	pe_debug("Vdev %d role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
 		 session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
 		 session->dfsIncludeChanSwIe,
@@ -2909,13 +2905,20 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		 session->gLimChannelSwitch.switchCount,
 		 is_sap_go_moved_before_sta);
 
-	if (!LIM_IS_AP_ROLE(session))
+	if (!LIM_IS_AP_ROLE(session)) {
 		return;
+	}
 	csa_tx_offload = wlan_psoc_nif_fw_ext_cap_get(mac_ctx->psoc,
 						WLAN_SOC_CEXT_CSA_TX_OFFLOAD);
+	ch_switch_info = wlan_get_sap_ch_sw_info(session->vdev);
+	if (!ch_switch_info) {
+		pe_err("Invalid channel info");
+		return;
+	}
+
 	if ((session->dfsIncludeChanSwIe && !csa_tx_offload &&
 	     ((session->gLimChannelSwitch.switchCount ==
-	       mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
+	       ch_switch_info->sap_ch_switch_beacon_cnt) ||
 	      (session->gLimChannelSwitch.switchCount == 1) ||
 	      is_sap_go_moved_before_sta)) ||
 	     session->bw_update_include_ch_sw_ie)

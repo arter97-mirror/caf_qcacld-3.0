@@ -863,8 +863,10 @@ static __iw_softap_setparam(struct net_device *dev,
 			return -EINVAL;
 
 		ret = wlansap_set_dfs_target_chnl(mac_handle,
-						  wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
-									       set_value));
+						  wlan_reg_legacy_chan_to_freq(
+							hdd_ctx->pdev,
+							set_value),
+						  link_info->vdev_id);
 		break;
 	}
 

@@ -10072,6 +10072,7 @@ bool lim_is_csa_tx_pending(uint8_t vdev_id)
 	struct pe_session *session;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	bool csa_tx_offload;
+	struct sap_ch_switch_info *ch_switch_info;
 
 	if (!mac_ctx) {
 		mlme_err("Invalid mac context");
@@ -10086,11 +10087,19 @@ bool lim_is_csa_tx_pending(uint8_t vdev_id)
 
 	csa_tx_offload = wlan_psoc_nif_fw_ext_cap_get(mac_ctx->psoc,
 						  WLAN_SOC_CEXT_CSA_TX_OFFLOAD);
+
+	ch_switch_info = wlan_get_sap_ch_sw_info(session->vdev);
+	if (!ch_switch_info) {
+		pe_err("Invalid channel info");
+		return false;
+	}
+
 	if (session->dfsIncludeChanSwIe &&
 	    (session->gLimChannelSwitch.switchCount ==
-	     mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) &&
-	     csa_tx_offload)
+	     ch_switch_info->sap_ch_switch_beacon_cnt) &&
+	     csa_tx_offload) {
 		return true;
+	}
 
 	return false;
 }

@@ -10292,6 +10292,8 @@ static void lim_abort_channel_change(struct mac_context *mac_ctx,
 	QDF_STATUS status;
 	struct scheduler_msg sch_msg = {0};
 	struct sSirChanChangeResponse *chan_change_rsp;
+	struct ch_params *ch_params;
+	struct sap_ch_switch_info *ch_switch_info;
 
 	status = wlan_mlme_get_mac_vdev_id(mac_ctx->pdev, vdev_id, &bssid);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -10308,11 +10310,17 @@ static void lim_abort_channel_change(struct mac_context *mac_ctx,
 	}
 
 	session_entry->channelChangeReasonCode = LIM_SWITCH_CHANNEL_SAP_DFS;
-	mac_ctx->sap.SapDfsInfo.target_chan_freq =
-					session_entry->curr_op_freq;
-	mac_ctx->sap.SapDfsInfo.new_chanWidth = session_entry->ch_width;
-	mac_ctx->sap.SapDfsInfo.new_ch_params.ch_width =
-						session_entry->ch_width;
+
+	ch_switch_info = wlan_get_sap_ch_sw_info(session_entry->vdev);
+	if (!ch_switch_info) {
+		pe_err("Invalid channel info");
+		return;
+	}
+
+	ch_switch_info->target_chan_freq =  session_entry->curr_op_freq;
+	ch_switch_info->new_chan_width = session_entry->ch_width;
+	ch_params = &ch_switch_info->new_ch_params;
+	ch_params->ch_width = session_entry->ch_width;
 
 	wlan_vdev_mlme_sm_deliver_evt(session_entry->vdev,
 				      WLAN_VDEV_SM_EV_CHAN_SWITCH_DISABLED,
