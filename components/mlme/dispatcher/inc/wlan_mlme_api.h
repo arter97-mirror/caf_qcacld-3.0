@@ -4694,6 +4694,15 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
  * Return: bool to check if the mld/link use same mac address
  */
 bool wlan_mlme_get_sta_same_link_mld_addr(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_is_dual_sap_sta_enabled() - check if dual sap + sta is enable
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if dual sap + sta supported otherwise false
+ */
+bool wlan_mlme_is_dual_sap_sta_enabled(struct wlan_objmgr_psoc *psoc);
+
 #else
 static inline
 void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
@@ -4757,6 +4766,13 @@ wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline bool
+wlan_mlme_is_dual_sap_sta_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
 #endif
 
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP
@@ -4792,6 +4808,15 @@ wlan_mlme_set_mlo_sap_support_link(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * wlan_mlme_update_dual_sap_sta_cap() - update dual sap + sta in cfg
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wlan_mlme_update_dual_sap_sta_cap(struct wlan_objmgr_psoc *psoc);
+
 
 /**
  * wlan_mlme_set_ba_2k_jump_iot_ap() - Set a flag if ba 2k jump IOT AP is found

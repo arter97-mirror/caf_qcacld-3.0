@@ -4031,6 +4031,12 @@ void ucfg_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 {
 	wlan_mlme_set_usr_disable_sta_eht(psoc, disable);
 }
+
+static inline QDF_STATUS
+ucfg_mlme_update_dual_sap_sta_support(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_update_dual_sap_sta_cap(psoc);
+}
 #else
 static inline QDF_STATUS
 ucfg_mlme_update_tgt_mlo_cap(struct wlan_objmgr_psoc *psoc)
@@ -4048,6 +4054,12 @@ static inline
 void ucfg_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 				       bool disable)
 {
+}
+
+static inline QDF_STATUS
+ucfg_mlme_update_dual_sap_sta_support(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -5773,5 +5785,17 @@ static inline uint32_t
 ucfg_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev)
 {
 	return wlan_mlme_get_beacon_interval(vdev);
+}
+
+/**
+ * ucfg_mlme_is_dual_sap_sta_supported() - Get is dual sap supported
+ * @psoc: psoc ctx
+ *
+ * Return: return is sap supported
+ */
+static inline bool ucfg_mlme_is_dual_sap_sta_supported(
+				struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_is_dual_sap_sta_enabled(psoc);
 }
 #endif /* _WLAN_MLME_UCFG_API_H_ */

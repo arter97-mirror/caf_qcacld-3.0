@@ -1959,6 +1959,35 @@ bool wlan_mlme_get_sta_same_link_mld_addr(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
+QDF_STATUS wlan_mlme_update_dual_sap_sta_cap(struct wlan_objmgr_psoc *psoc)
+{
+	struct target_psoc_info *tgt_hdl;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	uint16_t dual_sap_sta_value, dual_sap_value;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		mlme_debug("target psoc info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	dual_sap_value =
+	target_psoc_get_max_ml_sap_num_bss(tgt_hdl) == 2 ? true : false;
+
+	dual_sap_sta_value = dual_sap_value &&
+			wlan_mlme_is_dual_sap_sta_enabled(psoc);
+	mlme_obj->cfg.sap_cfg.is_dual_sap_sta_enable = dual_sap_sta_value;
+
+	mlme_debug("Dual SAP supported intersect value : %d",
+		   dual_sap_sta_value);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS wlan_mlme_get_num_11b_tx_chains(struct wlan_objmgr_psoc *psoc,
 					   uint16_t *value)
 {
@@ -4437,6 +4466,19 @@ wlan_mlme_update_mlo_recfg_info(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+bool
+wlan_mlme_is_dual_sap_sta_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return 0;
+
+	return mlme_obj->cfg.sap_cfg.is_dual_sap_sta_enable;
+}
+
 #endif
 
 QDF_STATUS

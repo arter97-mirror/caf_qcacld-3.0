@@ -2453,6 +2453,8 @@ static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 	sap_cfg->sap_ps_with_twt_enable =
 		cfg_get(psoc, CFG_SAP_PS_WITH_TWT);
 	mlme_init_sap_mlo_cfg(psoc, sap_cfg);
+	sap_cfg->is_dual_sap_sta_enable =
+		cfg_get(psoc, CFG_SAP_SAP_STA_CONCURRENCY);
 }
 
 static void mlme_init_obss_ht40_cfg(struct wlan_objmgr_psoc *psoc,

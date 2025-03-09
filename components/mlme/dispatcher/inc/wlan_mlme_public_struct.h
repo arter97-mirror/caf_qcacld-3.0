@@ -764,6 +764,7 @@ struct wlan_mlme_wps_params {
  * @disable_bcn_prot: disable beacon protection for sap
  * @sap_ps_with_twt_enable: SAP power save with TWT
  * @mlo_sap_support_link_num: sap support link num
+ * @is_dual_sap_sta_enable: Dual SAP + STA support
  */
 struct wlan_mlme_cfg_sap {
 	uint16_t beacon_interval;
@@ -802,6 +803,7 @@ struct wlan_mlme_cfg_sap {
 	bool disable_bcn_prot;
 	bool sap_ps_with_twt_enable;
 	uint8_t mlo_sap_support_link_num;
+	bool is_dual_sap_sta_enable;
 };
 
 /**
