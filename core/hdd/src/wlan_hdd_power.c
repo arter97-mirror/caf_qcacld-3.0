@@ -377,6 +377,23 @@ put_vdev:
 }
 
 #ifdef WLAN_NS_OFFLOAD
+#ifdef MDM_PLATFORM
+static void
+hdd_dhcp_v6_done_ind(mac_handle_t mac_handle,
+			  uint8_t vdev_id)
+{
+	return;
+}
+#else
+static void
+hdd_dhcp_v6_done_ind(mac_handle_t mac_handle,
+			  uint8_t vdev_id)
+{
+	hdd_debug("invoking sme_dhcp_done_ind");
+	sme_dhcp_done_ind(mac_handle,
+			vdev_id);
+}
+#endif
 /**
  * __wlan_hdd_ipv6_changed() - IPv6 notifier callback function
  * @net_dev: net_device whose IP address changed
@@ -412,8 +429,7 @@ static void __wlan_hdd_ipv6_changed(struct net_device *net_dev,
 	if (event == NETDEV_UP &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-		hdd_debug("invoking sme_dhcp_done_ind");
-		sme_dhcp_done_ind(hdd_ctx->mac_handle, adapter->vdev_id);
+		hdd_dhcp_v6_done_ind(hdd_ctx->mac_handle, adapter->vdev_id);
 		schedule_work(&adapter->ipv6_notifier_work);
 	}
 
@@ -1117,6 +1133,32 @@ void hdd_ipv4_notifier_work_queue(struct work_struct *work)
 	osif_vdev_sync_op_stop(vdev_sync);
 }
 
+#ifdef MDM_PLATFORM
+static void
+hdd_dhcp_v4_done_ind(mac_handle_t mac_handle,
+			  struct hdd_adapter *adapter)
+{
+	hdd_debug("invoking sme_dhcp_stop_ind");
+	/* send dhcp prot stop ind when ip address is obtained */
+	sme_dhcp_done_ind(mac_handle, adapter->vdev_id);
+	if (hdd_cm_is_vdev_associated(adapter)) {
+		hdd_debug("associated, sending stop ind");
+		sme_dhcp_stop_ind(mac_handle,
+			  	  adapter->device_mode,
+			  	  adapter->mac_addr.bytes,
+			  	  adapter->vdev_id);
+	}
+}
+#else
+static void
+hdd_dhcp_v4_done_ind(mac_handle_t mac_handle,
+			   struct hdd_adapter *adapter)
+{
+	hdd_debug("invoking sme_dhcp_done_ind");
+	sme_dhcp_done_ind(mac_handle, adapter->vdev_id);
+}
+
+#endif
 /**
  * __wlan_hdd_ipv4_changed() - IPv4 notifier callback function
  * @net_dev: the net_device whose IP address changed
@@ -1135,7 +1177,6 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 	int errno;
 
 	hdd_enter_dev(net_dev);
-
 	errno = hdd_validate_adapter(adapter);
 	if (errno || adapter->dev != net_dev)
 		goto exit;
@@ -1147,8 +1188,7 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		hdd_debug("invoking sme_dhcp_done_ind");
-		sme_dhcp_done_ind(hdd_ctx->mac_handle, adapter->vdev_id);
+		hdd_dhcp_v4_done_ind(hdd_ctx->mac_handle, adapter);
 
 		if (!ucfg_pmo_is_arp_offload_enabled(hdd_ctx->psoc)) {
 			hdd_debug("Offload not enabled");
