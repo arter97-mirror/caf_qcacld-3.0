@@ -3785,6 +3785,23 @@ QDF_STATUS sme_generic_change_country_code(mac_handle_t mac_handle,
 	return status;
 }
 
+#ifdef MDM_PLATFORM
+static QDF_STATUS
+sme_start_ind_check(struct csr_roam_session *pSession)
+{
+	if(pSession->dhcp_done) {
+		sme_debug("dhcp done, no need to protect");
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+sme_start_ind_check(struct csr_roam_session *pSession)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 /*
  * sme_dhcp_start_ind() -
  * API to signal the FW about the DHCP Start event.
@@ -3816,6 +3833,13 @@ QDF_STATUS sme_dhcp_start_ind(mac_handle_t mac_handle,
 			sme_release_global_lock(&mac->sme);
 			return QDF_STATUS_E_FAILURE;
 		}
+
+		/*If DHCP is completed, no need to protect*/
+		if (QDF_STATUS_SUCCESS != sme_start_ind_check(pSession)) {
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_FAILURE;
+		}
+
 		pSession->dhcp_done = false;
 
 		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
@@ -3882,8 +3906,8 @@ QDF_STATUS sme_dhcp_stop_ind(mac_handle_t mac_handle,
 			sme_release_global_lock(&mac->sme);
 			return QDF_STATUS_E_FAILURE;
 		}
-		pSession->dhcp_done = true;
 
+		pSession->dhcp_done = true;
 		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
 		if (!pMsg) {
 			sme_release_global_lock(&mac->sme);
