@@ -2024,6 +2024,22 @@ QDF_STATUS wlan_mlme_get_num_11ag_tx_chains(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+uint8_t wlan_mlme_get_num_max_sap_bss(struct wlan_objmgr_psoc *psoc)
+{
+	struct target_psoc_info *tgt_hdl;
+	uint8_t num_max_sap_bss;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		mlme_debug("target psoc info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	num_max_sap_bss =
+		target_psoc_get_max_ml_sap_num_bss(tgt_hdl);
+
+	return num_max_sap_bss;
+}
 
 static
 bool wlan_mlme_configure_chain_mask_supported(struct wlan_objmgr_psoc *psoc)

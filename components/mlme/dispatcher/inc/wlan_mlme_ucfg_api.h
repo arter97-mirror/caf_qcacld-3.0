@@ -985,6 +985,18 @@ QDF_STATUS ucfg_mlme_get_num_11ag_tx_chains(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_get_num_max_sap_bss() - get max sap bss supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: max sap bss supported
+ */
+static inline uint8_t
+ucfg_mlme_get_num_max_sap_bss(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_get_num_max_sap_bss(psoc);
+}
+
+/**
  * ucfg_mlme_get_bt_chain_separation_flag() - bt chain separation enable/disable
  * @psoc: pointer to psoc object
  * @value: Value that needs to be got for the caller

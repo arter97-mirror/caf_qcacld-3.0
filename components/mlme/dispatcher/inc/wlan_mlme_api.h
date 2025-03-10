@@ -771,6 +771,13 @@ QDF_STATUS wlan_mlme_get_num_11b_tx_chains(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS wlan_mlme_get_num_11ag_tx_chains(struct wlan_objmgr_psoc *psoc,
 					    uint16_t *value);
+/**
+ * wlan_mlme_get_num_max_sap_bss() - get max sap bss
+ * @psoc: pointer to psoc object
+ *
+ * Return: Max SAP bss supported
+ */
+uint8_t wlan_mlme_get_num_max_sap_bss(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_mlme_get_bt_chain_separation_flag() - get the enable_bt_chain_separation

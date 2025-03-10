@@ -7504,6 +7504,11 @@ policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 	uint32_t vdev_id;
 	uint8_t mlo_sap_support_link_num;
 	uint8_t started_mlo_sap_vdev_num = 0;
+	struct qdf_mac_addr *addr;
+	struct qdf_mac_addr existing_mld[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t num_existing_mld = 0;
+	struct qdf_mac_addr new_mld_addr;
+	bool dual_sl_sap = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -7529,12 +7534,51 @@ policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 			return ret;
 		}
 
-		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 			started_mlo_sap_vdev_num++;
+			addr =
+			(struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+			qdf_mem_copy(&existing_mld[num_existing_mld], addr, QDF_MAC_ADDR_SIZE);
+			num_existing_mld++;
+			addr = NULL;
+		}
 
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	/* check if Dual SAP is supported and only one existing
+	 * ml vdev is present
+	 */
+	if (is_new_vdev_mlo &&
+	    ucfg_mlme_is_dual_sap_sta_supported(psoc) &&
+	    started_mlo_sap_vdev_num < ucfg_mlme_get_num_max_sap_bss(psoc)) {
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+					psoc, new_vdev_id,
+					WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("vdev for vdev_id:%d is NULL",
+				       new_vdev_id);
+			return ret;
+		}
+		addr =
+		(struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+		qdf_mem_copy(&new_mld_addr, addr, QDF_MAC_ADDR_SIZE);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+		/* Retrieve MLD of new ML SAP vdev
+		 * If the old and new MLD MAC addresses are different,
+		 * it's a two SL SAP.
+		 * Otherwise, it's a two-link ML SAP.
+		 */
+		if (!qdf_is_macaddr_equal(&new_mld_addr,
+					  &existing_mld[num_existing_mld])) {
+			policy_mgr_debug("Dual Sl SAP is present");
+			dual_sl_sap = true;
+		}
+	}
 
 	mlo_sap_support_link_num =
 		wlan_mlme_get_mlo_sap_support_link(psoc);
@@ -7543,7 +7587,7 @@ policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 			 is_new_vdev_mlo,
 			 started_mlo_sap_vdev_num,
 			 mlo_sap_support_link_num);
-	if (is_new_vdev_mlo &&
+	if (is_new_vdev_mlo && !dual_sl_sap &&
 	    started_mlo_sap_vdev_num >= mlo_sap_support_link_num)
 		ret = false;
 	else
