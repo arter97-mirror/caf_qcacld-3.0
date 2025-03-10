@@ -3893,7 +3893,9 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 						    beacon->tail,
 						    beacon->tail_len);
 		if (rsn_ie)
-			wlan_crypto_rsnie_check(&crypto_params, rsn_ie);
+			wlan_crypto_rsnie_check(&crypto_params,
+						rsn_ie,
+						NULL);
 
 		keymgmt = wlan_crypto_get_param(sap_ctx->vdev,
 						WLAN_CRYPTO_PARAM_KEY_MGMT);
