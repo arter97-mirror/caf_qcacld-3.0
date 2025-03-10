@@ -2657,7 +2657,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 			goto next_action;
 
 		status = wlan_get_crypto_params_from_rsn_ie(peer_crypto_params,
-							    ies, length);
+							    ies, length, NULL);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("vdev:%d Failed to extract crypto_params",
 			       session_entry->vdev_id);
