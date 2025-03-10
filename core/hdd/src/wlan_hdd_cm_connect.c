@@ -1656,6 +1656,36 @@ hdd_cm_mlme_send_standby_link_chn_width(struct hdd_adapter *adapter,
 }
 #endif
 
+#ifdef MDM_PLATFORM
+static void
+hdd_cm_prot_dhcp_after_connect(struct hdd_adapter *adapter,
+			       uint8_t vdev_id)
+{
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return;
+	}
+
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		/* inform FW to start DHCP prot */
+		sme_dhcp_start_ind(hdd_ctx->mac_handle,
+				   adapter->device_mode,
+				   adapter->mac_addr.bytes,
+				   vdev_id);
+	}
+}
+#else
+static void
+hdd_cm_prot_dhcp_after_connect(struct hdd_adapter *adapter,
+			       uint8_t vdev_id)
+{}
+
+#endif
+
 static void
 hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				       struct wlan_cm_connect_resp *rsp)
@@ -1886,6 +1916,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	if (is_roam)
 		ucfg_dp_nud_indicate_roam(vdev);
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
+
+	hdd_cm_prot_dhcp_after_connect(adapter, link_info->vdev_id);
 }
 
 static void

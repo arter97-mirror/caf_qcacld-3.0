@@ -4044,6 +4044,24 @@ QDF_STATUS sme_disable_active_apf_mode_ind(mac_handle_t mac_handle,
 }
 #endif
 
+#ifdef MDM_PLATFORM
+static QDF_STATUS
+sme_start_ind_check(struct csr_roam_session *session)
+{
+	if (session->dhcp_done) {
+		sme_debug("dhcp done, no need to protect");
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+sme_start_ind_check(struct csr_roam_session *session)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /*
  * sme_dhcp_start_ind() -
  * API to signal the FW about the DHCP Start event.
@@ -4064,19 +4082,26 @@ QDF_STATUS sme_dhcp_start_ind(mac_handle_t mac_handle,
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct scheduler_msg message = {0};
 	tAniDHCPInd *pMsg;
-	struct csr_roam_session *pSession;
+	struct csr_roam_session *session;
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_STATUS_SUCCESS == status) {
-		pSession = CSR_GET_SESSION(mac, sessionId);
+		session = CSR_GET_SESSION(mac, sessionId);
 
-		if (!pSession) {
+		if (!session) {
 			sme_err("Session: %d not found", sessionId);
 			sme_release_global_lock(&mac->sme);
 			return QDF_STATUS_E_FAILURE;
 		}
-		pSession->dhcp_done = false;
-		pSession->dhcp_in_progress = true;
+
+		/*If DHCP is completed, no need to protect*/
+		if (QDF_STATUS_SUCCESS != sme_start_ind_check(session)) {
+			sme_release_global_lock(&mac->sme);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		session->dhcp_done = false;
+		session->dhcp_in_progress = true;
 
 		pMsg = qdf_mem_malloc(sizeof(tAniDHCPInd));
 		if (!pMsg) {
@@ -4104,7 +4129,7 @@ QDF_STATUS sme_dhcp_start_ind(mac_handle_t mac_handle,
 			sme_err("Post DHCP Start MSG fail");
 			qdf_mem_free(pMsg);
 			status = QDF_STATUS_E_FAILURE;
-			pSession->dhcp_in_progress = false;
+			session->dhcp_in_progress = false;
 		}
 		sme_release_global_lock(&mac->sme);
 	}
