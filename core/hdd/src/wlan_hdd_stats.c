@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -209,6 +209,35 @@ static bool wlan_hdd_is_he_mcs_12_13_supported(uint16_t he_mcs_12_13_map)
 #endif
 
 static bool get_station_fw_request_needed = true;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
+	defined(WLAN_FEATURE_11AX)
+/**
+ * hdd_map_he_gi_to_os() - map txrate_gi to os guard interval
+ * @guard_interval: guard interval get from fw rate
+ *
+ * Return: os guard interval value
+ */
+static inline uint8_t hdd_map_he_gi_to_os(enum txrate_gi guard_interval)
+{
+	switch (guard_interval) {
+	case TXRATE_GI_0_8_US:
+		return NL80211_RATE_INFO_HE_GI_0_8;
+	case TXRATE_GI_1_6_US:
+		return NL80211_RATE_INFO_HE_GI_1_6;
+	case TXRATE_GI_3_2_US:
+		return NL80211_RATE_INFO_HE_GI_3_2;
+	default:
+		return NL80211_RATE_INFO_HE_GI_0_8;
+	}
+}
+
+#else
+static inline uint8_t hdd_map_he_gi_to_os(enum txrate_gi guard_interval)
+{
+	return 0;
+}
+#endif
 
 /*
  * copy_station_stats_to_adapter() - Copy station stats to adapter
@@ -4757,6 +4786,91 @@ static void hdd_get_max_rate_ht(struct hdd_station_info *stainfo,
 	*max_mcs_idx = mcsidx;
 }
 
+static void hdd_get_max_rate_he(struct hdd_station_info *stainfo,
+				 struct hdd_fw_txrx_stats *stats,
+				 uint32_t rate_flags,
+				 uint8_t nss,
+				 uint32_t *maxrate,
+				 uint8_t *max_mcs_idx,
+				 bool report_max)
+{
+	struct index_he_data_rate_type *supported_he_mcs_rate;
+	uint32_t tmprate = 0;
+	uint32_t he_max_mcs;
+	uint8_t dcm = 0, mcsidx = INVALID_MCS_IDX;
+	int8_t rssi = stats->rssi;
+	int mode;
+	int i;
+	int sgi;
+
+	supported_he_mcs_rate = (struct index_he_data_rate_type *)
+		((nss == 1) ?
+		 supported_he_mcs_rate_nss1 :
+		 supported_he_mcs_rate_nss2);
+
+	if (rate_flags & TX_RATE_HE160)
+		mode = 3;
+	else if (rate_flags & TX_RATE_HE80)
+		mode = 2;
+	else if (rate_flags & TX_RATE_HE40)
+		mode = 1;
+	else
+		mode = 0;
+
+	sgi = (rate_flags & TX_RATE_SGI) ? 0 : 2;
+	if (rate_flags &
+	    (TX_RATE_HE160 | TX_RATE_HE80 | TX_RATE_HE40 |
+	    TX_RATE_HE20)) {
+		he_max_mcs =
+			(enum data_rate_11ax_max_mcs)
+			(stainfo->tx_mcs_map & DATA_RATE_11AX_MCS_MASK);
+
+		if (stainfo->he_mcs_12_13_map) {
+			mcsidx = 13;
+		} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_9) {
+			mcsidx = 9;
+		} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_10) {
+			mcsidx = 10;
+		} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_11) {
+			mcsidx = 11;
+		} else {
+			hdd_err("invalid he_max_mcs");
+			/* report real mcs idx */
+			mcsidx = stats->tx_rate.mcs;
+		}
+
+		if (!report_max) {
+			for (i = 0; i <= mcsidx; i++) {
+				if (rssi <= rssi_mcs_tbl[mode][i]) {
+					mcsidx = i;
+					break;
+				}
+			}
+			if (mcsidx < stats->tx_rate.mcs)
+				mcsidx = stats->tx_rate.mcs;
+		}
+
+		if (rate_flags & TX_RATE_HE160)
+			tmprate =
+		   supported_he_mcs_rate[mcsidx].supported_HE160_rate[dcm][sgi];
+		else if (rate_flags & TX_RATE_HE80)
+			tmprate =
+		   supported_he_mcs_rate[mcsidx].supported_HE80_rate[dcm][sgi];
+		else if (rate_flags & TX_RATE_HE40)
+			tmprate =
+		   supported_he_mcs_rate[mcsidx].supported_HE40_rate[dcm][sgi];
+		else if (rate_flags & TX_RATE_HE20)
+			tmprate =
+		   supported_he_mcs_rate[mcsidx].supported_HE20_rate[dcm][sgi];
+	}
+
+	hdd_debug("tmprate %d mcsidx %d", tmprate, mcsidx);
+
+	*maxrate = tmprate;
+	*max_mcs_idx = mcsidx;
+}
+
+
 /**
  * hdd_get_max_rate_vht() - get max rate for vht mode
  * @stainfo: stainfo pointer
@@ -4807,7 +4921,9 @@ static void hdd_get_max_rate_vht(struct hdd_station_info *stainfo,
 		if (rate_flags & TX_RATE_SGI)
 			flag |= 1;
 
-		if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_7) {
+		if (stainfo->vht_mcs_10_11_supp) {
+			mcsidx = 11;
+		} else if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_7) {
 			mcsidx = 7;
 		} else if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_8) {
 			mcsidx = 8;
@@ -4863,7 +4979,7 @@ static void hdd_get_max_rate_vht(struct hdd_station_info *stainfo,
  * @rate_flags: HDD rate flags
  * @mcsidx: mcs index
  * @nss: number of streams
- * @vht: vht mode or not
+ * @rate_info_flag: rate info flags
  *
  * This function will fill ch width and mcs flags
  *
@@ -4873,18 +4989,32 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 			    enum tx_rate_info rate_flags,
 			    uint8_t mcsidx,
 			    uint8_t nss,
-			    bool vht)
+			    uint8_t rate_info_flag)
 {
-	if (vht) {
+	if (rate_info_flag == RATE_INFO_FLAGS_HE_MCS) {
+		rate_info->nss = nss;
+		rate_info->mcs = mcsidx;
+		rate_info->flags |= RATE_INFO_FLAGS_HE_MCS;
+		if (rate_flags & TX_RATE_HE160)
+			rate_info->bw = RATE_INFO_BW_160;
+		else if (rate_flags & TX_RATE_HE80)
+			rate_info->bw = RATE_INFO_BW_80;
+		else if (rate_flags & TX_RATE_HE40)
+			rate_info->bw = RATE_INFO_BW_40;
+		else if (rate_flags & TX_RATE_HE20)
+			rate_info->bw = RATE_INFO_BW_20;
+	} else if (rate_info_flag == RATE_INFO_FLAGS_VHT_MCS) {
 		rate_info->nss = nss;
 		rate_info->mcs = mcsidx;
 		rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
-		if (rate_flags & TX_RATE_VHT80)
+		if (rate_flags & TX_RATE_VHT160)
+			rate_info->bw = RATE_INFO_BW_160;
+		else if (rate_flags & TX_RATE_VHT80)
 			rate_info->bw = RATE_INFO_BW_80;
 		else if (rate_flags & TX_RATE_VHT40)
 			rate_info->bw = RATE_INFO_BW_40;
 		else if (rate_flags & TX_RATE_VHT20)
-			rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
+			rate_info->bw = RATE_INFO_BW_20;
 	} else {
 		rate_info->mcs = (nss - 1) << 3;
 		rate_info->mcs |= mcsidx;
@@ -4900,7 +5030,7 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
  * @rate_flags: HDD rate flags
  * @mcsidx: mcs index
  * @nss: number of streams
- * @vht: vht mode or not
+ * @rate_info_flag: rate info flags
  *
  * This function will fill ch width and mcs flags
  *
@@ -4910,9 +5040,9 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 			    enum tx_rate_info rate_flags,
 			    uint8_t mcsidx,
 			    uint8_t nss,
-			    bool vht)
+			    uint8_t rate_info_flag)
 {
-	if (vht) {
+	if (rate_info_flag == RATE_INFO_FLAGS_VHT_MCS) {
 		rate_info->nss = nss;
 		rate_info->mcs = mcsidx;
 		rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
@@ -4921,7 +5051,7 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 		else if (rate_flags & TX_RATE_VHT40)
 			rate_info->flags |= RATE_INFO_FLAGS_40_MHZ_WIDTH;
 		else if (rate_flags & TX_RATE_VHT20)
-			rate_info->flags |= RATE_INFO_FLAGS_VHT_MCS;
+			rate_info->bw = RATE_INFO_BW_20;
 	} else {
 		rate_info->mcs = (nss - 1) << 3;
 		rate_info->mcs |= mcsidx;
@@ -4933,25 +5063,6 @@ static void hdd_fill_bw_mcs(struct rate_info *rate_info,
 #endif
 
 /**
- * hdd_fill_bw_mcs_vht() - fill ch width and mcs flags for VHT mode
- * @rate_info: pointer to struct rate_info
- * @rate_flags: HDD rate flags
- * @mcsidx: mcs index
- * @nss: number of streams
- *
- * This function will fill ch width and mcs flags for VHT mode
- *
- * Return: None
- */
-static void hdd_fill_bw_mcs_vht(struct rate_info *rate_info,
-				enum tx_rate_info rate_flags,
-				uint8_t mcsidx,
-				uint8_t nss)
-{
-	hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss, true);
-}
-
-/**
  * hdd_fill_sinfo_rate_info() - fill rate info of sinfo struct
  * @sinfo: pointer to struct station_info
  * @rate_flags: HDD rate flags
@@ -4959,6 +5070,7 @@ static void hdd_fill_bw_mcs_vht(struct rate_info *rate_info,
  * @nss: number of streams
  * @rate: data rate (kbps)
  * @is_tx: flag to indicate whether it is tx or rx
+ * @gi: Guard interval used
  *
  * This function will fill rate info of sinfo struct
  *
@@ -4969,7 +5081,8 @@ static void hdd_fill_sinfo_rate_info(struct station_info *sinfo,
 				     uint8_t mcsidx,
 				     uint8_t nss,
 				     uint32_t rate,
-				     bool is_tx)
+				     bool is_tx,
+				     enum txrate_gi gi)
 {
 	struct rate_info *rate_info;
 
@@ -4984,17 +5097,29 @@ static void hdd_fill_sinfo_rate_info(struct station_info *sinfo,
 	} else {
 		/* must be MCS */
 		if (rate_flags &
-				(TX_RATE_VHT80 |
-				 TX_RATE_VHT40 |
-				 TX_RATE_VHT20))
-			hdd_fill_bw_mcs_vht(rate_info, rate_flags, mcsidx, nss);
-
-		if (rate_flags & (TX_RATE_HT20 | TX_RATE_HT40))
+				(TX_RATE_HE160 |
+				 TX_RATE_HE80 |
+				 TX_RATE_HE40 |
+				 TX_RATE_HE20)) {
 			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
-					false);
-
+					RATE_INFO_FLAGS_HE_MCS);
+			rate_info->he_gi = hdd_map_he_gi_to_os(gi);
+		}
+		if (rate_flags &
+				(TX_RATE_VHT160 |
+				 TX_RATE_VHT80 |
+				 TX_RATE_VHT40 |
+				 TX_RATE_VHT20)) {
+			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+					RATE_INFO_FLAGS_VHT_MCS);
+		}
+		if (rate_flags & (TX_RATE_HT20 | TX_RATE_HT40)) {
+			hdd_fill_bw_mcs(rate_info, rate_flags, mcsidx, nss,
+					RATE_INFO_FLAGS_MCS);
+		}
 		if (rate_flags & TX_RATE_SGI) {
-			if (!(rate_info->flags & RATE_INFO_FLAGS_VHT_MCS))
+			if (!(rate_info->flags & RATE_INFO_FLAGS_VHT_MCS) &&
+			    !(rate_info->flags & RATE_INFO_FLAGS_HE_MCS))
 				rate_info->flags |= RATE_INFO_FLAGS_MCS;
 			rate_info->flags |= RATE_INFO_FLAGS_SHORT_GI;
 		}
@@ -5155,13 +5280,20 @@ static void hdd_fill_rate_info(struct wlan_objmgr_psoc *psoc,
 		 */
 		if ((rssidx != 3) &&
 		    !(rate_flags & TX_RATE_LEGACY)) {
-			hdd_get_max_rate_vht(stainfo,
-					     stats,
-					     rate_flags,
-					     nss,
-					     &tmprate,
-					     &mcsidx,
-					     rssidx == 0);
+			hdd_get_max_rate_he(stainfo, stats, rate_flags, nss,
+					&tmprate, &mcsidx, rssidx == 0);
+			if (maxrate < tmprate &&
+			    mcsidx != INVALID_MCS_IDX)
+				maxrate = tmprate;
+
+			if (mcsidx == INVALID_MCS_IDX)
+				hdd_get_max_rate_vht(stainfo,
+						     stats,
+						     rate_flags,
+						     nss,
+						     &tmprate,
+						     &mcsidx,
+						     rssidx == 0);
 
 			if (maxrate < tmprate &&
 			    mcsidx != INVALID_MCS_IDX)
@@ -5213,7 +5345,7 @@ static void hdd_fill_rate_info(struct wlan_objmgr_psoc *psoc,
 	}
 
 	hdd_fill_sinfo_rate_info(sinfo, rate_flags, mcsidx, nss,
-				 maxrate, true);
+				 maxrate, true, stats->tx_rate.gi);
 
 	/* convert to 100kbps expected in rate table */
 	rx_rate = stats->rx_rate.rate / 100;
@@ -5221,17 +5353,49 @@ static void hdd_fill_rate_info(struct wlan_objmgr_psoc *psoc,
 	/* report current rx rate*/
 	rate_flags = stainfo->rate_flags;
 	if (!(rate_flags & TX_RATE_LEGACY)) {
-		if (stats->rx_rate.rate_flags)
-			rate_flags = stats->rx_rate.rate_flags;
-		nss = stats->rx_rate.nss;
+		nss = stainfo->nss;
+		if (ucfg_mlme_stats_is_link_speed_report_actual(psoc)) {
+			/* Get current rate flags if report actual */
+			if (stats->rx_rate.rate_flags)
+				rate_flags = stats->rx_rate.rate_flags;
+			nss = stats->rx_rate.nss;
+		}
 		if (stats->rx_rate.mcs == INVALID_MCS_IDX)
 			rate_flags = TX_RATE_LEGACY;
 	}
-	if (!(rate_flags & TX_RATE_LEGACY))
-		mcsidx = stats->rx_rate.mcs;
+
+	if (!ucfg_mlme_stats_is_link_speed_report_actual(psoc) &&
+	    (rssidx != 3)) {
+		/*
+		 * make sure we report a value at least as big as our
+		 * current rate
+		 */
+		if (maxrate < rx_rate || maxrate == 0) {
+			maxrate = rx_rate;
+			if (!(rate_flags & TX_RATE_LEGACY)) {
+				mcsidx = stats->rx_rate.mcs;
+				/*
+				 * 'IEEE_P802.11ac_2013.pdf' page 325, 326
+				 * - MCS9 is valid for VHT20 when Nss = 3 or
+				 *   Nss = 6
+				 * - MCS9 is not valid for VHT20 when
+				 *   Nss = 1,2,4,5,7,8
+				 */
+				if ((rate_flags & TX_RATE_VHT20) &&
+				    (mcsidx > 8) &&
+				    (nss != 3 && nss != 6))
+					mcsidx = 8;
+			}
+		}
+	} else {
+		/* report current rate instead of max rate */
+		maxrate = rx_rate;
+		if (!(rate_flags & TX_RATE_LEGACY))
+			mcsidx = stats->rx_rate.mcs;
+	}
 
 	hdd_fill_sinfo_rate_info(sinfo, rate_flags, mcsidx, nss,
-				 rx_rate, false);
+				 maxrate, false, stats->rx_rate.gi);
 
 	sinfo->expected_throughput = stainfo->max_phy_rate;
 	sinfo->filled |= HDD_INFO_EXPECTED_THROUGHPUT;
@@ -5342,12 +5506,12 @@ static void wlan_hdd_fill_station_info(struct wlan_objmgr_psoc *psoc,
  *
  * Return: rate flags for success, 0 on failure.
  */
-static uint8_t hdd_get_rate_flags_ht(uint32_t rate,
-				     uint8_t nss,
-				     uint8_t mcs)
+static uint32_t hdd_get_rate_flags_ht(uint32_t rate,
+				      uint8_t nss,
+				      uint8_t mcs)
 {
 	struct index_data_rate_type *mcs_rate;
-	uint8_t flags = 0;
+	uint32_t flags = 0;
 
 	mcs_rate = (struct index_data_rate_type *)
 		((nss == 1) ? &supported_mcs_rate_nss1 :
@@ -5381,12 +5545,12 @@ static uint8_t hdd_get_rate_flags_ht(uint32_t rate,
  *
  * Return: rate flags for success, 0 on failure.
  */
-static uint8_t hdd_get_rate_flags_vht(uint32_t rate,
-				      uint8_t nss,
-				      uint8_t mcs)
+static uint32_t hdd_get_rate_flags_vht(uint32_t rate,
+				       uint8_t nss,
+				       uint8_t mcs)
 {
 	struct index_vht_data_rate_type *mcs_rate;
-	uint8_t flags = 0;
+	uint32_t flags = 0;
 
 	if (mcs >= ARRAY_SIZE(supported_vht_mcs_rate_nss1)) {
 		hdd_err("Invalid mcs index %d", mcs);
@@ -5422,27 +5586,117 @@ static uint8_t hdd_get_rate_flags_vht(uint32_t rate,
 }
 
 /**
+ * hdd_get_rate_flags_he() - get HE rate flags based on rate, nss and mcs
+ * @rate: Data rate (100 kbps)
+ * @nss: Number of streams
+ * @mcs: HE mcs index
+ * @guard_interval: Guard interval used
+ * @dcm_enabled: dual carrier modulation is enabled or not
+ *
+ * This function is used to construct HE rate flag with rate, nss and mcs
+ *
+ * Return: rate flags for success, 0 on failure.
+ */
+static uint32_t hdd_get_rate_flags_he(uint32_t rate,
+				      uint8_t nss,
+				      uint8_t mcs,
+				      enum txrate_gi *guard_interval,
+				      uint8_t *dcm_enabled)
+{
+	struct index_he_data_rate_type *mcs_rate;
+	uint32_t flags = 0;
+	uint8_t dcm_index_max = 1;
+	uint8_t dcm = 0;
+	uint8_t gi;
+	uint8_t gi_index_max = 3;
+	uint32_t he_rate;
+
+	if (mcs >= ARRAY_SIZE(supported_he_mcs_rate_nss1)) {
+		hdd_err("Invalid mcs index %d", mcs);
+		return flags;
+	}
+	mcs_rate = (struct index_he_data_rate_type *)
+		((nss == 1) ?
+		 &supported_he_mcs_rate_nss1 :
+		 &supported_he_mcs_rate_nss2);
+
+	if (mcs == 0 || mcs == 1 || mcs == 3 || mcs == 4)
+		dcm_index_max = 2;
+
+	for (dcm = 0; dcm < dcm_index_max; dcm++) {
+		for (gi = 0; gi < gi_index_max; gi++) {
+			he_rate = mcs_rate[mcs].supported_HE160_rate[dcm][gi];
+			if (rate == he_rate) {
+				flags |= TX_RATE_HE160;
+				*guard_interval = gi ? (gi + 1) : gi;
+				goto rate_found;
+			}
+		}
+		for (gi = 0; gi < gi_index_max; gi++) {
+			he_rate = mcs_rate[mcs].supported_HE80_rate[dcm][gi];
+			if (rate == he_rate) {
+				flags |= TX_RATE_HE80;
+				*guard_interval = gi ? (gi + 1) : gi;
+				goto rate_found;
+			}
+		}
+		for (gi = 0; gi < gi_index_max; gi++) {
+			he_rate = mcs_rate[mcs].supported_HE40_rate[dcm][gi];
+			if (rate == he_rate) {
+				flags |= TX_RATE_HE40;
+				*guard_interval = gi ? (gi + 1) : gi;
+				goto rate_found;
+			}
+		}
+		for (gi = 0; gi < gi_index_max; gi++) {
+			he_rate = mcs_rate[mcs].supported_HE20_rate[dcm][gi];
+			if (rate == he_rate) {
+				flags |= TX_RATE_HE20;
+				*guard_interval = gi ? (gi + 1) : gi;
+				goto rate_found;
+			}
+		}
+	}
+	hdd_err("invalid params rate %d nss %d mcs %d", rate, nss, mcs);
+	return flags;
+
+rate_found:
+
+	if (dcm == 1)
+		*dcm_enabled = 1;
+
+	return flags;
+}
+
+/**
  * hdd_get_rate_flags() - get HT/VHT rate flags based on rate, nss and mcs
  * @rate: Data rate (100 kbps)
  * @mode: Tx/Rx mode
  * @nss: Number of streams
  * @mcs: Mcs index
+ * @gi: Guard interval used
+ * @dcm: dual carrier modulation is enabled or not
  *
  * This function is used to construct rate flag with rate, nss and mcs
  *
  * Return: rate flags for success, 0 on failure.
  */
-static uint8_t hdd_get_rate_flags(uint32_t rate,
+static uint32_t hdd_get_rate_flags(uint32_t rate,
 				  uint8_t mode,
 				  uint8_t nss,
-				  uint8_t mcs)
+				  uint8_t mcs,
+				  enum txrate_gi *gi,
+				  uint8_t *dcm)
 {
-	uint8_t flags = 0;
+	uint32_t flags = 0;
 
 	if (mode == SIR_SME_PHY_MODE_HT)
 		flags = hdd_get_rate_flags_ht(rate, nss, mcs);
 	else if (mode == SIR_SME_PHY_MODE_VHT)
 		flags = hdd_get_rate_flags_vht(rate, nss, mcs);
+	else if (mode == SIR_SME_PHY_MODE_HE)
+		flags = hdd_get_rate_flags_he(rate, nss, mcs, gi, dcm);
+
 	else
 		hdd_debug("invalid mode param %d", mode);
 
@@ -5461,7 +5715,7 @@ static uint8_t hdd_get_rate_flags(uint32_t rate,
 static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 				    struct peer_stats_info_ext_event *peer_info)
 {
-	uint8_t flags;
+	uint32_t flags;
 	uint32_t rate_code;
 
 	/* tx rate info */
@@ -5474,6 +5728,9 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
 			WMI_RATE_PREAMBLE_VHT)
 		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_VHT;
+	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
+			WMI_RATE_PREAMBLE_HE)
+		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_HE;
 	else
 		txrx_stats->tx_rate.mode = SIR_SME_PHY_MODE_LEGACY;
 
@@ -5483,7 +5740,9 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 	flags = hdd_get_rate_flags(txrx_stats->tx_rate.rate / 100,
 				   txrx_stats->tx_rate.mode,
 				   txrx_stats->tx_rate.nss,
-				   txrx_stats->tx_rate.mcs);
+				   txrx_stats->tx_rate.mcs,
+				   &txrx_stats->tx_rate.gi,
+				   &txrx_stats->tx_rate.dcm);
 
 	txrx_stats->tx_rate.rate_flags = flags;
 
@@ -5504,6 +5763,9 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
 			WMI_RATE_PREAMBLE_VHT)
 		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_VHT;
+	else if ((WMI_GET_HW_RATECODE_PREAM_V1(rate_code)) ==
+			WMI_RATE_PREAMBLE_HE)
+		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_HE;
 	else
 		txrx_stats->rx_rate.mode = SIR_SME_PHY_MODE_LEGACY;
 
@@ -5513,7 +5775,9 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 	flags = hdd_get_rate_flags(txrx_stats->rx_rate.rate / 100,
 				   txrx_stats->rx_rate.mode,
 				   txrx_stats->rx_rate.nss,
-				   txrx_stats->rx_rate.mcs);
+				   txrx_stats->rx_rate.mcs,
+				   &txrx_stats->rx_rate.gi,
+				   &txrx_stats->rx_rate.dcm);
 
 	txrx_stats->rx_rate.rate_flags = flags;
 
@@ -5578,26 +5842,6 @@ static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
 	defined(WLAN_FEATURE_11AX)
-/**
- * hdd_map_he_gi_to_os() - map txrate_gi to os guard interval
- * @guard_interval: guard interval get from fw rate
- *
- * Return: os guard interval value
- */
-static inline uint8_t hdd_map_he_gi_to_os(enum txrate_gi guard_interval)
-{
-	switch (guard_interval) {
-	case TXRATE_GI_0_8_US:
-		return NL80211_RATE_INFO_HE_GI_0_8;
-	case TXRATE_GI_1_6_US:
-		return NL80211_RATE_INFO_HE_GI_1_6;
-	case TXRATE_GI_3_2_US:
-		return NL80211_RATE_INFO_HE_GI_3_2;
-	default:
-		return NL80211_RATE_INFO_HE_GI_0_8;
-	}
-}
-
 /**
  * wlan_hdd_fill_os_he_rateflags() - Fill HE related rate_info
  * @os_rate: rate info for os

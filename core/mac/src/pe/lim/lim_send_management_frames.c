@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1333,6 +1333,20 @@ void lim_send_mscs_req_action_frame(struct mac_context *mac,
 } /* End lim_send_mscs_req_action_frame */
 #endif
 
+#ifdef WLAN_FEATURE_11AX
+static inline uint8_t lim_get_he_mcs_12_13_supported(tpDphHashNode sta_ds)
+{
+	if (sta_ds)
+		return sta_ds->he_mcs_12_13_map;
+	return 0;
+}
+#else
+static inline uint8_t lim_get_he_mcs_12_13_supported(tpDphHashNode sta_ds)
+{
+	return 0;
+}
+#endif
+
 /**
  * lim_assoc_rsp_tx_complete() - Confirmation for assoc rsp OTA
  * @context: pointer to global mac
@@ -1434,6 +1448,9 @@ static QDF_STATUS lim_assoc_rsp_tx_complete(
 				mac_ctx, lim_assoc_ind,
 				sme_assoc_ind,
 				session_entry, true);
+	sme_assoc_ind->vht_mcs_10_11_supp = sta_ds->vht_mcs_10_11_supp;
+	sme_assoc_ind->he_mcs_12_13_map =
+		lim_get_he_mcs_12_13_supported(sta_ds);
 
 	qdf_mem_zero(&msg, sizeof(struct scheduler_msg));
 	msg.type = eWNI_SME_ASSOC_IND_UPPER_LAYER;
