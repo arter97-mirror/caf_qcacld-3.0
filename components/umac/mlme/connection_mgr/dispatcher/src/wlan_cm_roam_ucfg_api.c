@@ -33,11 +33,6 @@ bool ucfg_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 	return wlan_is_rso_enabled(pdev, vdev_id);
 }
 
-bool ucfg_is_rso_disabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
-{
-	return wlan_is_rso_disabled(pdev, vdev_id);
-}
-
 QDF_STATUS
 ucfg_user_space_enable_disable_rso(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id,

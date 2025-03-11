@@ -20801,7 +20801,6 @@ static int __wlan_hdd_cfg80211_set_roam_policy(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_MAX + 1];
 	uint32_t roam_policy;
-	bool is_rso_enabled, is_rso_disabled;
 	int ret;
 
 	hdd_enter_dev(dev);
@@ -20836,27 +20835,19 @@ static int __wlan_hdd_cfg80211_set_roam_policy(struct wiphy *wiphy,
 	}
 
 	roam_policy = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_ROAMING_POLICY]);
-	is_rso_enabled = ucfg_is_rso_enabled(hdd_ctx->pdev,
-					     adapter->deflink->vdev_id);
-	is_rso_disabled = ucfg_is_rso_disabled(hdd_ctx->pdev,
-					       adapter->deflink->vdev_id);
+	hdd_debug("ROAM_CONFIG: roam_policy %d", roam_policy);
 
-	hdd_debug("ROAM_CONFIG: roam_policy %d is_roam_state_enable: %d is_roam_state_diabled: %d",
-		  roam_policy, is_rso_enabled, is_rso_disabled);
 	if (sme_roaming_in_progress(hdd_ctx->mac_handle,
 				    adapter->deflink->vdev_id)) {
 		hdd_err_rl("Roaming in progress for vdev %d",
 			   adapter->deflink->vdev_id);
 		return -EAGAIN;
 	}
-	if (roam_policy == 0 && is_rso_disabled) {
-		hdd_debug("roam policy %d already disabled", roam_policy);
-			return -EALREADY;
-		}
 
-	if (is_rso_enabled) {
-		hdd_debug("New roam policy %d is already in use", roam_policy);
-		return 0;
+	if (roam_policy == ucfg_get_roam_policy(hdd_ctx->psoc,
+						adapter->deflink->vdev_id)) {
+		hdd_debug("New roam policy is already in use");
+		return ret;
 	}
 
 	ucfg_set_roam_policy(hdd_ctx->psoc, adapter->deflink->vdev_id,
