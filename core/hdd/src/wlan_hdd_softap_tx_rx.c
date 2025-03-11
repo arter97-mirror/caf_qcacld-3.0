@@ -1615,7 +1615,7 @@ QDF_STATUS hdd_softap_change_sta_state(struct hdd_adapter *adapter,
 					   WLAN_LEGACY_MAC_ID);
 
 	if (!peer) {
-		hdd_err("peer is null");
+		hdd_debug("peer is null");
 		return status;
 	}
 	mldaddr = (struct qdf_mac_addr *)wlan_peer_mlme_get_mldaddr(peer);
