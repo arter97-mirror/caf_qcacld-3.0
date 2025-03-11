@@ -2393,6 +2393,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/net/mac80211.h",
             "flag": "CFG80211_RU_PUNC_CHANDEF",
         },
+        {
+            "pattern": "Indicates whether the MLO reconfiguration request is initiated",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_SETUP_LINK_RECONFIG_SUPPORT",
+        },
     ]
 
     cmd = 'touch "$@"\n'
