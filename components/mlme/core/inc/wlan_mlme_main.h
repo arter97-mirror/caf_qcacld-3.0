@@ -542,6 +542,7 @@ struct sap_ch_switch_info {
  * @oper_ch_width: SAP current operating ch_width
  * @psd_20mhz: PSD power(dBm/MHz) of SAP operating in 20 MHz
  * @ch_switch_info: channel switch info
+ * @is_owe_conn: is owe connection
  */
 struct mlme_ap_config {
 	qdf_freq_t user_config_sap_ch_freq;
@@ -552,7 +553,7 @@ struct mlme_ap_config {
 	enum phy_ch_width oper_ch_width;
 	uint8_t psd_20mhz;
 	struct sap_ch_switch_info ch_switch_info;
-
+	bool is_owe_conn;
 };
 
 /**
@@ -1744,6 +1745,25 @@ void wlan_release_peer_key_wakelock(struct wlan_objmgr_vdev *vdev,
  */
 qdf_freq_t
 wlan_get_sap_user_config_freq(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_sap_is_owe_connection_present() - Is owe connection
+ * @vdev: vdev
+ *
+ * Return: true if owe connection present
+ */
+bool wlan_sap_is_owe_connection_present(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_sap_set_owe_connection_support() - set owe connection present
+ * @vdev: vdev ctx
+ * @is_present: is owe present
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sap_set_owe_connection_support(
+				struct wlan_objmgr_vdev *vdev,
+				bool is_present);
 
 /**
  * wlan_set_sap_user_config_freq() - Set the user configured frequency

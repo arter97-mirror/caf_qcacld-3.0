@@ -5610,6 +5610,50 @@ struct sap_ch_switch_info *wlan_get_sap_ch_sw_info(
 	return &mlme_priv->mlme_ap.ch_switch_info;
 }
 
+bool wlan_sap_is_owe_connection_present(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_debug("Invalid mode %d", opmode);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return mlme_priv->mlme_ap.is_owe_conn;
+}
+
+QDF_STATUS wlan_sap_set_owe_connection_support(
+				struct wlan_objmgr_vdev *vdev,
+				bool is_present)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_debug("Invalid mode %d", opmode);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->mlme_ap.is_owe_conn = is_present;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 qdf_freq_t
 wlan_get_sap_user_config_freq(struct wlan_objmgr_vdev *vdev)
 {

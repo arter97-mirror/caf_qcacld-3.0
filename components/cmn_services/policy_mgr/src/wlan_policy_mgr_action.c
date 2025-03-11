@@ -3900,6 +3900,17 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 				     old_ch_width);
 	}
 
+	if (*con_ch_freq != 0 &&
+	    con_mode == QDF_SAP_MODE &&
+	    !policy_mgr_is_multi_sap_allowed_on_same_band(
+					pm_ctx->pdev,
+					PM_SAP_MODE, *con_ch_freq,
+					sap_vdev_id)) {
+		policymgr_nofl_debug("Terminating multi sap on same band, con_ch_freq %d sap_ch_freq %d",
+				     ch_freq, sap_ch_freq);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (*con_ch_freq &&
 	    pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params)
 		pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params(

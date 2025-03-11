@@ -4551,6 +4551,7 @@ bool policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
  * @pdev: id of objmgr pdev
  * @mode: operating mode of interface to be checked
  * @ch_freq: channel freq
+ * @vdev_id: vdev id
  * This function is used to check if multi sap can be started on the same band
  *
  * Return: true if multi sap is allowed on same band, otherwise false
@@ -4558,7 +4559,17 @@ bool policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
 bool policy_mgr_is_multi_sap_allowed_on_same_band(
 					struct wlan_objmgr_pdev *pdev,
 					enum policy_mgr_con_mode mode,
-					qdf_freq_t ch_freq);
+					qdf_freq_t ch_freq,
+					uint8_t vdev_id);
+/**
+ * policy_mgr_is_owe_connection_present() - TO check if owe conn present
+ * @pdev: pdev handle
+ * @vdev_id: vdev id
+ *
+ * Return: true if owe is present
+ */
+bool policy_mgr_is_owe_connection_present(struct wlan_objmgr_pdev *pdev,
+					  uint8_t vdev_id);
 
 /**
  * policy_mgr_is_special_mode_active_5g() - check if given mode active in 5g
