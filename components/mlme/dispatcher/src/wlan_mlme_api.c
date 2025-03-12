@@ -3583,7 +3583,6 @@ mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc, struct wma_tgt_vht_cap *cfg)
 			vht_cap_info->rx_stbc = cfg->vht_rx_stbc;
 	} else {
 		vht_cap_info->tx_stbc = 0;
-		vht_cap_info->rx_stbc = 0;
 	}
 
 	/* Set VHT SU Beamformer cap */
