@@ -6083,38 +6083,4 @@ static inline void hdd_release_rtnl_lock(void)
 static inline bool hdd_hold_rtnl_lock(void) { return false; }
 static inline void hdd_release_rtnl_lock(void) { }
 #endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
-static inline void hdd_wiphy_lock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
-{
-	if (wiphy)
-		wiphy_lock(wiphy);
-	else if (dev_ptr)
-		mutex_lock(&dev_ptr->mtx);
-}
-
-static inline void hdd_wiphy_unlock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
-{
-	if (wiphy)
-		wiphy_unlock(wiphy);
-	else if (dev_ptr)
-		mutex_unlock(&dev_ptr->mtx);
-}
-#else
-static inline void hdd_wiphy_lock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
-{
-	if (wiphy)
-		wiphy_lock(wiphy);
-	else if (dev_ptr)
-		mutex_lock(&dev_ptr->wiphy->mtx);
-}
-
-static inline void hdd_wiphy_unlock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
-{
-	if (wiphy)
-		wiphy_unlock(wiphy);
-	else if (dev_ptr)
-		mutex_unlock(&dev_ptr->wiphy->mtx);
-}
-#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

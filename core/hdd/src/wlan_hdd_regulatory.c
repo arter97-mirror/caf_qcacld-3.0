@@ -40,6 +40,7 @@
 #include "wlan_osif_features.h"
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_mlo_mgr_public_api.h"
+#include <wlan_cfg80211.h>
 
 #define REG_RULE_2412_2462    REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
 
@@ -1560,9 +1561,9 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx,
 	}
 
 	if (send_sync_event && hdd_hold_rtnl_lock()) {
-		hdd_wiphy_lock(hdd_ctx->wiphy, NULL);
+		osif_wiphy_lock(hdd_ctx->wiphy, NULL);
 		hdd_regulatory_set_wiphy_regd_sync(hdd_ctx->wiphy, regd);
-		hdd_wiphy_unlock(hdd_ctx->wiphy, NULL);
+		osif_wiphy_unlock(hdd_ctx->wiphy, NULL);
 		hdd_release_rtnl_lock();
 	} else {
 		regulatory_set_wiphy_regd(hdd_ctx->wiphy, regd);

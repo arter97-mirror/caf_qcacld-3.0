@@ -125,6 +125,7 @@
 #include "wlan_ll_sap_ucfg_api.h"
 #include "wlan_nan_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include <wlan_cfg80211.h>
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -1189,7 +1190,7 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
-		hdd_wiphy_lock(NULL, dev->ieee80211_ptr);
+		osif_wiphy_lock(NULL, dev->ieee80211_ptr);
 		link_id = wlan_hdd_get_link_id_from_sta_ctx(link_info);
 
 		/* Update chan info for standby link to user space*/
@@ -1215,7 +1216,7 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 		dev = assoc_adapter->dev;
 	}
 
-	hdd_wiphy_lock(NULL, dev->ieee80211_ptr);
+	osif_wiphy_lock(NULL, dev->ieee80211_ptr);
 	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS) {
 		hdd_debug("Vdev %d mode %d not UP", vdev_id,
 			  adapter->device_mode);
@@ -1252,7 +1253,7 @@ notify:
 
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id, puncture_bitmap);
 exit:
-	hdd_wiphy_unlock(NULL, dev->ieee80211_ptr);
+	osif_wiphy_unlock(NULL, dev->ieee80211_ptr);
 	if (vdev)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
@@ -2442,7 +2443,7 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 	dev = adapter->dev;
 	vdev_id = wlan_vdev_get_id(vdev);
 
-	hdd_wiphy_lock(NULL, dev->ieee80211_ptr);
+	osif_wiphy_lock(NULL, dev->ieee80211_ptr);
 	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS &&
 	    wlan_vdev_is_restart_progress(vdev) != QDF_STATUS_SUCCESS) {
 		hdd_debug("Vdev %d mode %d not UP", vdev_id,
@@ -2475,7 +2476,7 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 					       input_punc_bitmap);
 
 exit:
-	hdd_wiphy_unlock(NULL, dev->ieee80211_ptr);
+	osif_wiphy_unlock(NULL, dev->ieee80211_ptr);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
