@@ -3117,6 +3117,7 @@ QDF_STATUS
 wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 					 uint8_t value);
 
+#ifdef CFG80211_SETUP_LINK_RECONFIG_SUPPORT
 /**
  * wlan_mlme_is_link_recfg_support() - Check if Link
  * reconfiguration feature is supported
@@ -3126,6 +3127,13 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
  */
 bool
 wlan_mlme_is_link_recfg_support(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+wlan_mlme_is_link_recfg_support(struct wlan_objmgr_psoc *psoc)
+{
+       return 0;
+}
+#endif
 
 /**
  * wlan_mlme_get_link_recfg_support() - Get the Link

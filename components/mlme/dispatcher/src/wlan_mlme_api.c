@@ -4375,12 +4375,14 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef CFG80211_SETUP_LINK_RECONFIG_SUPPORT
 bool
 wlan_mlme_is_link_recfg_support(struct wlan_objmgr_psoc *psoc)
 {
 	return target_if_get_fw_link_reconfig_support(psoc) &&
 		wlan_mlme_get_link_recfg_support(psoc);
 }
+#endif
 
 bool
 wlan_mlme_get_link_recfg_support(struct wlan_objmgr_psoc *psoc)
