@@ -583,6 +583,8 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	uint32_t conc_sap_freq = 0;
 	uint8_t num_5_or_6_conn = 0;
 	bool ml_sap_vdev = false;
+	uint8_t conc_sta1_vdev_id = WLAN_INVALID_VDEV_ID;
+	uint8_t conc_sta2_vdev_id = WLAN_INVALID_VDEV_ID;
 
 	if (mac_ctx->roam.configParam.cc_switch_mode ==
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
@@ -664,10 +666,13 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			/*
 			 *Identify concurrent STA freq for STA+STA+ML SAP case
 			 */
-			if (!conc_sta1_freq)
+			if (!conc_sta1_freq) {
 				conc_sta1_freq = intf_ch_freq;
-			else
+				conc_sta1_vdev_id = session->vdev_id;
+			} else {
 				conc_sta2_freq = intf_ch_freq;
+				conc_sta2_vdev_id = session->vdev_id;
+			}
 
 			sme_debug("%d: intf_ch:%d intf_cfreq:%d intf_hbw:%d ch_width %d",
 				  i, intf_ch_freq, intf_cfreq, intf_hbw,
@@ -685,7 +690,13 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 					&sap_cfreq, &intf_ch_freq, &intf_hbw,
 					&intf_cfreq, op_mode,
 					cc_switch_mode);
-			if (intf_ch_freq && (intf_ch_freq != sap_ch_freq))
+			/*
+			 *If op_chan_freq is same as sap_chan_freq, check for
+			 *vdev_id and copy only if they are not same.
+			 */
+			if (ml_sap_vdev && i != vdev_id && !intf_ch_freq)
+				intf_ch_freq = sap_ch_freq;
+			if (intf_ch_freq)
 				conc_sap_freq = intf_ch_freq;
 		}
 
@@ -705,6 +716,8 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 
 		if (ml_sap_vdev) {
 			if (intf_ch_freq &&
+			    !policy_mgr_is_scc_with_this_vdev_id(mac_ctx->psoc,
+								 i) &&
 			    policy_mgr_are_2_freq_on_same_mac(mac_ctx->psoc,
 							      intf_ch_freq,
 							      sap_ch_freq))
@@ -719,6 +732,27 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 		if (ml_sap_vdev)
 			intf_ch_freq = 0;
 	}
+	/*
+	 * In case of ML STA 2 link (2G + 5G) Where only one link is
+	 * active in fw, current hw mode would be SMM. If a SAP is
+	 * coming on 6G which is different band from existing STA
+	 * connections, Then SAP link will not find any interference
+	 * as the current hw mode is SMM. In such case, AP link
+	 * will be brought up on user given 6G channel itself
+	 * leading to MCC.
+	 * To force SCC, pick one frequency of existing
+	 * STA links based on the mode of ML STA
+	 *
+	 */
+	if (!intf_ch_freq && conc_sta1_freq && conc_sta2_freq &&
+	    policy_mgr_is_ml_vdev_id(mac_ctx->psoc, conc_sta1_vdev_id) &&
+	    policy_mgr_is_ml_vdev_id(mac_ctx->psoc, conc_sta2_vdev_id))
+		intf_ch_freq = policy_mgr_get_conc_freq_if_ml_sta_in_smm(
+							mac_ctx->psoc,
+							sap_ch_freq,
+							conc_sta1_freq,
+							conc_sta2_freq);
+
 
 	if (!WLAN_REG_IS_24GHZ_CH_FREQ(sap_ch_freq))
 		num_5_or_6_conn++;
@@ -733,7 +767,8 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	 * the concurrent ML SAP link vdev. This is to ensure
 	 * ML SAP vdev links comes up on 2 different frequency bands.
 	 */
-		if (conc_sap_freq && conc_sta1_freq && conc_sta2_freq) {
+		if (policy_mgr_is_sta_sap_scc(mac_ctx->psoc, conc_sap_freq) &&
+		    conc_sta1_freq && conc_sta2_freq) {
 			if (conc_sap_freq != conc_sta1_freq)
 				intf_ch_freq = conc_sta1_freq;
 			else if (conc_sap_freq != conc_sta2_freq)

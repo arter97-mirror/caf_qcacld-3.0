@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5883,7 +5883,7 @@ static void ol_txrx_wrapper_flush_rx_frames(struct cdp_soc_t *soc_hdl,
 						   PEER_DEBUG_ID_OL_INTERNAL);
 	if (!peer) {
 		ol_txrx_err("peer "QDF_MAC_ADDR_FMT" not found",
-			    QDF_MAC_ADDR_REF(peer_mac));
+			    QDF_MAC_ADDR_REF((uint8_t *)peer_mac));
 		return;
 	}
 

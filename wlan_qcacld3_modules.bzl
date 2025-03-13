@@ -3,6 +3,9 @@ load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("//msm-kernel:target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
+    "sa510m": [
+    "qca6574",
+    ],
     "anorak": [
 	"qca6490",
 	"kiwi-v2",
@@ -41,6 +44,7 @@ _chipset_hw_map = {
     "qca6750": "MOSELLE",
     "wcn7750": "BERYLLIUM",
     "qca6490": "LITHIUM",
+    "qca6574": "ROME",
 }
 
 _chipset_header_map = {
@@ -68,6 +72,8 @@ _chipset_header_map = {
         "api/hw/qca6490/v1",
         "cmn/hal/wifi3.0/qca6490",
     ],
+    "qca6574": [
+    ],
 }
 
 _hw_header_map = {
@@ -79,6 +85,8 @@ _hw_header_map = {
     ],
     "LITHIUM": [
         "cmn/hal/wifi3.0/li",
+    ],
+    "ROME": [
     ],
 }
 
@@ -301,6 +309,7 @@ _fixed_ipaths = [
     "components/wmi/inc",
     "components/wmi/src",
     "core/bmi/inc",
+    "core/bmi/src",
     "core/cds/inc",
     "core/cds/src",
     "core/dp/htt",
@@ -358,16 +367,6 @@ _private_ipaths = [
 
 _fixed_srcs = [
     "cmn/cfg/src/cfg.c",
-    "cmn/dp/wifi3.0/dp_arch_ops.c",
-    "cmn/dp/wifi3.0/dp_htt.c",
-    "cmn/dp/wifi3.0/dp_main.c",
-    "cmn/dp/wifi3.0/dp_peer.c",
-    "cmn/dp/wifi3.0/dp_rx.c",
-    "cmn/dp/wifi3.0/dp_rx_defrag.c",
-    "cmn/dp/wifi3.0/dp_rx_desc.c",
-    "cmn/dp/wifi3.0/dp_stats.c",
-    "cmn/dp/wifi3.0/dp_tx.c",
-    "cmn/dp/wifi3.0/dp_tx_desc.c",
     "cmn/global_lmac_if/src/wlan_global_lmac_if.c",
     "cmn/hif/src/ath_procfs.c",
     "cmn/hif/src/ce/ce_diag.c",
@@ -548,7 +547,6 @@ _fixed_srcs = [
     "components/dsc/src/wlan_dsc_vdev.c",
     "components/mlme/core/src/wlan_mlme_main.c",
     "components/mlme/core/src/wlan_mlme_vdev_mgr_interface.c",
-    "components/mlme/core/src/wlan_mlme_twt_api.c",
     "components/mlme/dispatcher/src/wlan_mlme_api.c",
     "components/mlme/dispatcher/src/wlan_mlme_ucfg_api.c",
     "components/p2p/core/src/wlan_p2p_main.c",
@@ -1118,6 +1116,65 @@ _conditional_srcs = {
             "cmn/os_if/linux/ftm/src/wlan_ioctl_ftm.c",
         ],
     },
+    "CONFIG_AR6320_SUPPORT": {
+        True: [
+            "cmn/hif/src/ce/ce_service_legacy.c",
+            "core/dp/txrx/ol_cfg.c",
+            "core/dp/txrx/ol_rx.c",
+            "core/dp/txrx/ol_rx_defrag.c",
+            "core/dp/txrx/ol_rx_fwd.c",
+            "core/dp/txrx/ol_rx_pn.c",
+            "core/dp/txrx/ol_rx_reorder.c",
+            "core/dp/txrx/ol_rx_reorder_timeout.c",
+            "core/dp/txrx/ol_tx.c",
+            "core/dp/txrx/ol_txrx.c",
+            "core/dp/txrx/ol_txrx_encap.c",
+            "core/dp/txrx/ol_txrx_peer_find.c",
+            "core/dp/txrx/ol_tx_desc.c",
+            "core/dp/txrx/ol_tx_send.c",
+            "core/dp/htt/htt.c",
+            "core/dp/htt/htt_fw_stats.c",
+            "core/dp/htt/htt_h2t.c",
+            "core/dp/htt/htt_rx.c",
+            "core/dp/htt/htt_t2h.c",
+            "core/dp/htt/htt_tx.c",
+        ],
+        False: [
+                "cmn/dp/wifi3.0/dp_arch_ops.c",
+                "cmn/dp/wifi3.0/dp_htt.c",
+                "cmn/dp/wifi3.0/dp_main.c",
+                "cmn/dp/wifi3.0/dp_peer.c",
+                "cmn/dp/wifi3.0/dp_rx.c",
+                "cmn/dp/wifi3.0/dp_rx_defrag.c",
+                "cmn/dp/wifi3.0/dp_rx_desc.c",
+                "cmn/dp/wifi3.0/dp_stats.c",
+                "cmn/dp/wifi3.0/dp_tx.c",
+                "cmn/dp/wifi3.0/dp_tx_desc.c",
+                "components/mlme/core/src/wlan_mlme_twt_api.c",
+        ],
+    },
+    "CONFIG_AR6320_IPA_OFFLOAD": {
+        True: [
+            "core/dp/txrx/ol_txrx_ipa.c",
+        ]
+    },
+    "CONFIG_AR6320_TX_THROTTLE": {
+        True: [
+            "core/dp/txrx/ol_txrx_ipa.c",
+        ]
+    },
+    "CONFIG_AR6320_LL_DP_SUPPORT": {
+        True: [
+            "core/dp/htt/htt_rx_ll.c",
+            "core/dp/txrx/ol_tx_ll.c",
+            "core/dp/txrx/ol_tx_ll_legacy.c",
+        ]
+    },
+    "CONFIG_AR6320_MONITOR_MODE": {
+        True: [
+            "core/dp/htt/htt_monitor_rx.c",
+        ]
+    },
     "CONFIG_LITHIUM": {
         True: [
             # TODO: how to handle Kbuild logic
@@ -1165,10 +1222,10 @@ _conditional_srcs = {
             "cmn/utils/pktlog/pktlog_wifi3.c",
         ],
     },
-    "CONFIG_PKT_LOG": {
+    "CONFIG_REMOVE_PKT_LOG": {
         #TODO: Currently this is CONFIG_REMOVE_PKT_LOG but expect it to change
         #      Also need a separate config for sysfs
-        True: [
+        False: [
             "cmn/utils/pktlog/linux_ac.c",
             "cmn/utils/pktlog/pktlog_ac.c",
             "cmn/utils/pktlog/pktlog_internal.c",
@@ -1595,15 +1652,6 @@ _conditional_srcs = {
             "cmn/target_if/cfr/src/target_if_cfr_enh.c",
         ],
     },
-    #"LEGACY_CONFIG_WLAN_FASTPATH": {
-    #True: [
-    #    "core/dp/txrx/ol_tx_ll_fastpath.c",
-    #],
-    #TODO: Will need to create a separate flag to handle false case
-    #False: [
-    #    "core/dp/txrx/ol_tx_ll_legacy.c",
-    #],
-    #},
     "CONFIG_WLAN_FEATURE_11AX": {
         True: [
             "core/hdd/src/wlan_hdd_he.c",
@@ -1657,7 +1705,6 @@ _conditional_srcs = {
     "CONFIG_WLAN_FEATURE_BMI": {
         True: [
             "cmn/hif/src/ce/ce_bmi.c",
-            "cmn/hif/src/sdio/hif_bmi_reg_access.c",
             "core/bmi/src/bmi.c",
             "core/bmi/src/bmi_1.c",
             "core/bmi/src/ol_fw.c",
@@ -2120,7 +2167,7 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_txrx_stats.c",
         ],
     },
-    "LEGACY_CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY": {
+    "CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY": {
         True: [
             "core/dp/txrx/ol_txrx_legacy_flow_control.c",
         ],
@@ -2357,7 +2404,14 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         ],
         cmd = "cat $(SRCS) > $@",
     )
-
+    native.genrule(
+        name = "configs/{}_defconfig_generate_debug".format(tvc),
+        outs = ["configs/{}_defconfig_generate_debug-defconfig".format(tvc)],
+        srcs = [
+            "configs/{}_debug_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
@@ -2369,20 +2423,33 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         deps = [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
-    else:
+    elif target != "sa510m":
         deps = [
             "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
         ]
-
-    deps = deps + [
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
-            "//msm-kernel:all_headers",
-            "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+    else:
+        deps = [
+            "//wlan/platform:{}_cnss2".format(tv),
         ]
 
-    if target != "x1e80100" and target != "anorak":
+    if target != "sa510m":
+        deps = deps + [
+                "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
+                "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
+                "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
+                "//msm-kernel:all_headers_arm",
+                "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+            ]
+    else:
+        deps = deps + [
+                "//wlan/platform:{}_cnss_prealloc".format(tv),
+                "//wlan/platform:{}_cnss_utils".format(tv),
+                "//wlan/platform:{}_cnss_nl".format(tv),
+                "//msm-kernel:all_headers_arm",
+                "//wlan/platform:wlan-platform-headers",
+            ]
+
+    if target != "x1e80100" and target != "anorak" and target != "sa510m":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
@@ -2429,16 +2496,17 @@ def define_dist(target, variant, chipsets):
             mode_overrides = {"**/*": "644"},
             log = "info",
         )
-    copy_to_dist_dir(
-        name = "{}_all_modules_dist".format(tv),
-        data = dataList,
-        dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
-        flat = True,
-        wipe_dist_dir = False,
-        allow_duplicate_filenames = False,
-        mode_overrides = {"**/*": "644"},
-        log = "info",
-    )
+    if target != "sa510m":
+        copy_to_dist_dir(
+            name = "{}_all_modules_dist".format(tv),
+            data = dataList,
+            dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
+            flat = True,
+            wipe_dist_dir = False,
+            allow_duplicate_filenames = False,
+            mode_overrides = {"**/*": "644"},
+            log = "info",
+        )
 
 def define_modules():
     for (t, v) in get_all_variants():

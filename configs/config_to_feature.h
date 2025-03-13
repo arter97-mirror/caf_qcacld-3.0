@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2933,6 +2933,14 @@
 #define MULTI_IF_NAME CONFIG_MULTI_IF_NAME
 #endif
 
+#ifdef CONFIG_DYNAMIC_SINGLE_CHIP
+#define DYNAMIC_SINGLE_CHIP CONFIG_DYNAMIC_SINGLE_CHIP
+#endif
+
+#ifdef CONFIG_WLAN_FEATURE_BMI
+#define WLAN_FEATURE_BMI (1)
+#endif
+
 #ifdef CONFIG_FEATURE_HIF_DELAYED_REG_WRITE
 #define FEATURE_HIF_DELAYED_REG_WRITE (1)
 #endif
@@ -3128,4 +3136,7 @@
 #define FEATURE_WLAN_SUPPORT_USD (1)
 #endif
 
+#ifdef CONFIG_ALLOC_CONTIGUOUS_MULTI_PAGE
+#define ALLOC_CONTIGUOUS_MULTI_PAGE (1)
+#endif
 #endif /* CONFIG_TO_FEATURE_H */
