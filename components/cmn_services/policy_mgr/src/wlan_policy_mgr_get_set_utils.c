@@ -9331,7 +9331,7 @@ policy_mgr_is_link_active_allowed(struct wlan_objmgr_psoc *psoc,
 
 	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
-		if (link_info->link_id == WLAN_INVALID_LINK_ID) {
+		if (link_info->link_id >= MAX_MLO_LINK_ID) {
 			link_info++;
 			continue;
 		}

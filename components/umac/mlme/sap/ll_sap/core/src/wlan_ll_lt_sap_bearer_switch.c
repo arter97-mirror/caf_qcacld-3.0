@@ -35,7 +35,7 @@ wlan_bs_req_id ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_psoc *psoc)
 	uint8_t vdev_id;
 
 	vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
-	if (vdev_id == WLAN_INVALID_VDEV_ID)
+	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS)
 		return request_id;
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_LL_SAP_ID);
@@ -87,6 +87,11 @@ bool __ll_lt_sap_is_bs_req_valid(struct wlan_bearer_switch_request *bs_req,
 		return false;
 	}
 
+	if (bs_req->source >= BEARER_SWITCH_REQ_MAX) {
+		ll_sap_nofl_err("Invalid source %d in BS_SM request",
+				bs_req->source);
+		return false;
+	}
 	return true;
 }
 
@@ -1848,7 +1853,7 @@ QDF_STATUS bs_sm_deliver_event(struct wlan_objmgr_psoc *psoc,
 	uint8_t vdev_id;
 
 	vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
-	if (vdev_id == WLAN_INVALID_VDEV_ID)
+	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS)
 		return QDF_STATUS_E_INVAL;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
@@ -2189,7 +2194,7 @@ void ll_lt_sap_switch_bearer_for_p2p_go_start(struct wlan_objmgr_psoc *psoc,
 		return;
 
 	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
-	if (ll_lt_sap_vdev_id == WLAN_INVALID_VDEV_ID)
+	if (ll_lt_sap_vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS)
 		return;
 
 	ll_lt_sap_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
