@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1255,7 +1255,7 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 				break;
 			}
 			sta_ds->vht_160mhz_nss = nss * 2;
-			if (session->nss == MAX_VDEV_NSS)
+			if (session->nss == WLAN_MAX_VDEV_NSS)
 				break;
 			if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2)
 				break;
@@ -1271,7 +1271,7 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 				pe_debug("Invalid extnd nss bw support val");
 				break;
 			}
-			if (session->nss == MAX_VDEV_NSS)
+			if (session->nss == WLAN_MAX_VDEV_NSS)
 				break;
 			if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2)
 				break;

@@ -10281,13 +10281,13 @@ static int hdd_config_tx_rx_nss_per_band(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	if (tx_nss_2g > MAX_VDEV_NSS || rx_nss_2g > MAX_VDEV_NSS) {
+	if (tx_nss_2g > WLAN_MAX_VDEV_NSS || rx_nss_2g > WLAN_MAX_VDEV_NSS) {
 		hdd_debug("Cannot support tx_rx_nss: (%d,%d) for 2.4GHz band",
 			  tx_nss_2g, rx_nss_2g);
 		return -EINVAL;
 	}
 
-	if (tx_nss_5g > MAX_VDEV_NSS || rx_nss_5g > MAX_VDEV_NSS) {
+	if (tx_nss_5g > WLAN_MAX_VDEV_NSS || rx_nss_5g > WLAN_MAX_VDEV_NSS) {
 		hdd_debug("Cannot support tx_rx_nss: (%d,%d) for 5/6GHz band",
 			  tx_nss_5g, rx_nss_5g);
 		return -EINVAL;

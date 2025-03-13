@@ -3150,14 +3150,21 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
 					      QDF_SAP_MODE, band);
 		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_TDLS_MODE, band);
+					      QDF_P2P_CLIENT_MODE, band);
 		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_P2P_DEVICE_MODE,
-					      band);
+					      QDF_P2P_GO_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_P2P_DEVICE_MODE, band);
 		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
 					      QDF_OCB_MODE, band);
 		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
 					      QDF_TDLS_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_IBSS_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_NAN_DISC_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_NDI_MODE, band);
 	}
 
 	hdd_update_vdev_nss(hdd_ctx);

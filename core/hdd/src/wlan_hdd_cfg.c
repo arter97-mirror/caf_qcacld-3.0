@@ -1150,7 +1150,7 @@ static void hdd_update_nss_in_vdev(struct wlan_hdd_link_info *link_info,
 				   mac_handle_t mac_handle, uint8_t tx_nss,
 				   uint8_t rx_nss)
 {
-	uint8_t band, max_supp_nss = MAX_VDEV_NSS;
+	uint8_t band, max_supp_nss = WLAN_MAX_VDEV_NSS;
 	struct wlan_objmgr_vdev *vdev;
 	struct hdd_adapter *adapter = link_info->adapter;
 
@@ -1348,7 +1348,7 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (tx_nss > MAX_VDEV_NSS || rx_nss > MAX_VDEV_NSS) {
+	if (tx_nss > WLAN_MAX_VDEV_NSS || rx_nss > WLAN_MAX_VDEV_NSS) {
 		hdd_debug("Cannot support tx_nss: %d rx_nss: %d", tx_nss,
 			  rx_nss);
 		return QDF_STATUS_E_INVAL;

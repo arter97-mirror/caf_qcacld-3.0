@@ -2393,6 +2393,14 @@ config WLAN_TSF_UPLINK_DELAY
 	bool "Enable WLAN_TSF_UPLINK_DELAY"
 	default n
 
+config WLAN_MAX_VDEV_CHAINS
+	int "Max VDEV Chains supported"
+	default 2
+
+config WLAN_MAX_VDEV_NSS
+	int "Max VDEV NSS supported"
+	default 2
+
 if CNSS_KIWI_V2
 config CFG_BMISS_OFFLOAD_MAX_VDEV
 	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"

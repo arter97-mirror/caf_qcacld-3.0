@@ -4478,7 +4478,9 @@ static uint8_t sme_get_nss_chain_shift(enum QDF_OPMODE device_mode)
 		return OCB_NSS_CHAINS_SHIFT;
 	case QDF_TDLS_MODE:
 		return TDLS_NSS_CHAINS_SHIFT;
-
+	case QDF_NAN_DISC_MODE:
+	case QDF_NDI_MODE:
+		return NAN_NSS_CHAIN_SHIFT;
 	default:
 		sme_err("Device mode %d invalid", device_mode);
 		return STA_NSS_CHAINS_SHIFT;
@@ -4525,7 +4527,7 @@ sme_fill_nss_chain_params(struct mac_context *mac_ctx,
 
 	nss_chain_shift = sme_get_nss_chain_shift(device_mode);
 	max_supported_nss = mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2 ?
-			    MAX_VDEV_NSS : 1;
+			    WLAN_MAX_VDEV_NSS : 1;
 
 	/*
 	 * If target supports Antenna sharing, set NSS to 1 for 2.4GHz band for
@@ -4849,11 +4851,11 @@ static void sme_modify_chains_in_mlme_cfg(mac_handle_t mac_handle,
 	mac_ctx->mlme_cfg->nss_chains_ini_cfg.num_rx_chains[band] &=
 						~(nss_mask << nss_shift);
 	mac_ctx->mlme_cfg->nss_chains_ini_cfg.num_rx_chains[band] |=
-						 (rx_chains << nss_shift);
+		 (QDF_MIN(rx_chains, WLAN_MAX_VDEV_CHAINS) << nss_shift);
 	mac_ctx->mlme_cfg->nss_chains_ini_cfg.num_tx_chains[band] &=
 						~(nss_mask << nss_shift);
 	mac_ctx->mlme_cfg->nss_chains_ini_cfg.num_tx_chains[band] |=
-						 (tx_chains << nss_shift);
+		 (QDF_MIN(tx_chains, WLAN_MAX_VDEV_CHAINS) << nss_shift);
 	sme_debug("rx chains %d tx chains %d changed for vdev mode %d for band %d",
 		  rx_chains, tx_chains, vdev_op_mode, band);
 }
@@ -4880,11 +4882,11 @@ sme_modify_nss_in_mlme_cfg(mac_handle_t mac_handle,
 	mac_ctx->mlme_cfg->nss_chains_ini_cfg.rx_nss[band] &=
 						~(nss_mask << nss_shift);
 	mac_ctx->mlme_cfg->nss_chains_ini_cfg.rx_nss[band] |=
-						 (rx_nss << nss_shift);
+			 (QDF_MIN(rx_nss, WLAN_MAX_VDEV_NSS) << nss_shift);
 	mac_ctx->mlme_cfg->nss_chains_ini_cfg.tx_nss[band] &=
 						~(nss_mask << nss_shift);
 	mac_ctx->mlme_cfg->nss_chains_ini_cfg.tx_nss[band] |=
-						 (tx_nss << nss_shift);
+			 (QDF_MIN(tx_nss, WLAN_MAX_VDEV_NSS) << nss_shift);
 	sme_debug("rx nss %d tx nss %d changed for vdev mode %d for band %d",
 		  rx_nss, tx_nss, vdev_op_mode, band);
 }
@@ -4896,12 +4898,12 @@ sme_modify_nss_chains_tgt_cfg(mac_handle_t mac_handle,
 {
 	uint8_t ini_rx_nss;
 	uint8_t ini_tx_nss;
-	uint8_t max_supported_rx_nss = MAX_VDEV_NSS;
-	uint8_t max_supported_tx_nss = MAX_VDEV_NSS;
+	uint8_t max_supported_rx_nss = WLAN_MAX_VDEV_NSS;
+	uint8_t max_supported_tx_nss = WLAN_MAX_VDEV_NSS;
 	uint8_t ini_rx_chains;
 	uint8_t ini_tx_chains;
-	uint8_t max_supported_rx_chains = MAX_VDEV_CHAINS;
-	uint8_t max_supported_tx_chains = MAX_VDEV_CHAINS;
+	uint8_t max_supported_rx_chains = WLAN_MAX_VDEV_CHAINS;
+	uint8_t max_supported_tx_chains = WLAN_MAX_VDEV_CHAINS;
 
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct wlan_mlme_nss_chains *nss_chains_ini_cfg =
@@ -5119,7 +5121,7 @@ static void sme_update_bfer_eht_cap(struct wma_tgt_cfg *cfg)
 void sme_update_bfer_caps_as_per_nss_chains(mac_handle_t mac_handle,
 					    struct wma_tgt_cfg *cfg)
 {
-	uint8_t max_supported_tx_chains = MAX_VDEV_CHAINS;
+	uint8_t max_supported_tx_chains = WLAN_MAX_VDEV_CHAINS;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct wlan_mlme_nss_chains *nss_chains_ini_cfg =
 					&mac_ctx->mlme_cfg->nss_chains_ini_cfg;

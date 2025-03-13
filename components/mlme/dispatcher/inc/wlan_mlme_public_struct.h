@@ -1788,8 +1788,12 @@ enum dot11p_mode {
 	CFG_11P_CONCURRENT,
 };
 
-#define MAX_VDEV_NSS                2
-#define MAX_VDEV_CHAINS             2
+#ifndef WLAN_MAX_VDEV_NSS
+#define WLAN_MAX_VDEV_NSS                2
+#endif
+#ifndef WLAN_MAX_VDEV_CHAINS
+#define WLAN_MAX_VDEV_CHAINS             2
+#endif
 
 /**
  * struct wlan_mlme_nss_chains -     MLME vdev config of nss, and chains
