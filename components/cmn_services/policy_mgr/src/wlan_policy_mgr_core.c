@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4771,10 +4771,11 @@ policy_mgr_handle_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * policy_mgr_check_scc_channel_non_dbs() - Check if SAP/GO freq need to be
+ * policy_mgr_check_scc_channel_non_dbs_sap_sap() - Check if SAP/GO freq need to be
  * updated as per existing concurrency for non-dbs chip
  * @psoc: PSOC object information
  * @intf_ch_freq: Channel frequency of existing concurrency
+ * @sap_ch_freq: Given SAP/GO channel frequency
  * @vdev_id: Vdev id of the SAP/GO
  *
  * When SAP/GO is starting or re-starting, check SAP/GO freq need to be
@@ -4783,10 +4784,11 @@ policy_mgr_handle_sap_fav_channel(struct wlan_objmgr_psoc *psoc,
  *
  * Return: Void
  */
-static
-void policy_mgr_check_scc_channel_non_dbs(struct wlan_objmgr_psoc *psoc,
-					  qdf_freq_t *intf_ch_freq,
-					  uint8_t vdev_id)
+static void
+policy_mgr_check_scc_channel_non_dbs_sap_sap(struct wlan_objmgr_psoc *psoc,
+					     qdf_freq_t *intf_ch_freq,
+					     qdf_freq_t sap_ch_freq,
+					     uint8_t vdev_id)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	QDF_STATUS status;
@@ -4794,6 +4796,7 @@ void policy_mgr_check_scc_channel_non_dbs(struct wlan_objmgr_psoc *psoc,
 			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
 	uint8_t num_cxn_del = 0;
 	uint32_t org_ch_freq;
+	uint32_t i;
 	enum policy_mgr_con_mode mode;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -4826,10 +4829,20 @@ void policy_mgr_check_scc_channel_non_dbs(struct wlan_objmgr_psoc *psoc,
 							      vdev_id, info,
 							      &num_cxn_del);
 
-	if (policy_mgr_get_connection_count(psoc) == 0) {
-		/* use sap channel */
-		*intf_ch_freq = 0;
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		policy_mgr_debug("vdev_%d: mode=%d, freq=%d",
+				 pm_conc_connection_list[i].vdev_id,
+				 pm_conc_connection_list[i].mode,
+				 pm_conc_connection_list[i].freq);
+		/* check if sap channel break scc with existing ap */
+		if (pm_conc_connection_list[i].in_use &&
+		    pm_conc_connection_list[i].freq != sap_ch_freq) {
+			*intf_ch_freq = pm_conc_connection_list[i].freq;
+			break;
+		}
 	}
+	if (i == MAX_NUMBER_OF_CONC_CONNECTIONS)
+		*intf_ch_freq = 0;
 
 	/* Restore the connection entry */
 	if (num_cxn_del > 0)
@@ -4857,6 +4870,7 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 	uint8_t num_cxn_del_go = 0;
 	bool allow_6ghz = true;
 	uint8_t sta_count;
+	bool is_dbs = policy_mgr_is_hw_dbs_capable(psoc);
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -4864,15 +4878,21 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	/* Always do force SCC on non-DBS platforms */
-	if (!policy_mgr_is_hw_dbs_capable(psoc)) {
-		policy_mgr_check_scc_channel_non_dbs(psoc,
-						     intf_ch_freq, vdev_id);
-		return;
-	}
-
 	sta_count = policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
 							      NULL);
+
+	if (!is_dbs) {
+		if (!sta_count) {
+			policy_mgr_check_scc_channel_non_dbs_sap_sap(
+								psoc,
+								intf_ch_freq,
+								sap_ch_freq,
+								vdev_id);
+			return;
+		}
+
+	}
+
 	if (pm_ctx->hdd_cbacks.wlan_get_sap_acs_band) {
 		status = pm_ctx->hdd_cbacks.wlan_get_sap_acs_band(psoc,
 								  vdev_id,
@@ -4890,7 +4910,7 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 			return;
 		policy_mgr_debug("no mandatory channels (%d, %d)", sap_ch_freq,
 				 *intf_ch_freq);
-	} else if (sta_count && policy_mgr_is_hw_dbs_capable(psoc)) {
+	} else if (sta_count && is_dbs) {
 		policy_mgr_sap_on_non_psc_channel(psoc, intf_ch_freq, vdev_id);
 	}
 
