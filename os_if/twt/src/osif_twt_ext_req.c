@@ -35,6 +35,7 @@
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_cp_stats_ucfg_api.h"
 #include "osif_vdev_sync.h"
+#include "wlan_wfa_tgt_if_tx_api.h"
 
 #define TWT_ACK_COMPLETE_TIMEOUT 1000
 
@@ -438,6 +439,7 @@ osif_twt_parse_add_dialog_attrs(struct nlattr **tb,
 /**
  * osif_twt_parse_del_dialog_attrs() - Parse TWT del dialog parameters
  * values from QCA_WLAN_VENDOR_ATTR_CONFIG_TWT_PARAMS
+ * @psoc: Pointer to PSOC object
  * @tb: nl attributes
  * @params: twt del dialog parameters
  *
@@ -446,7 +448,8 @@ osif_twt_parse_add_dialog_attrs(struct nlattr **tb,
  * Return: 0 or -EINVAL.
  */
 static int
-osif_twt_parse_del_dialog_attrs(struct nlattr **tb,
+osif_twt_parse_del_dialog_attrs(struct wlan_objmgr_psoc *psoc,
+				struct nlattr **tb,
 				struct twt_del_dialog_param *params)
 {
 	int cmd_id;
@@ -463,6 +466,9 @@ osif_twt_parse_del_dialog_attrs(struct nlattr **tb,
 	if (tb[cmd_id]) {
 		params->dialog_id = nla_get_u8(tb[cmd_id]);
 		osif_debug("TWT_SETUP_BCAST_ID %d", params->dialog_id);
+		if (wlan_wfa_get_test_feature_flags(psoc,
+					WFA_TEST_IGNORE_DEL_TWT_BCAST_ID))
+			params->dialog_id = 0;
 	}
 
 	osif_debug("twt: dialog_id %d vdev %d peer mac_addr "QDF_MAC_ADDR_FMT,
@@ -1365,7 +1371,7 @@ int osif_twt_sta_teardown_req(struct wlan_objmgr_vdev *vdev,
 	params.vdev_id = vdev_id;
 	pdev_id = wlan_get_pdev_id_from_vdev_id(psoc, vdev_id, WLAN_TWT_ID);
 
-	ret = osif_twt_parse_del_dialog_attrs(tb2, &params);
+	ret = osif_twt_parse_del_dialog_attrs(psoc, tb2, &params);
 	if (ret)
 		return ret;
 

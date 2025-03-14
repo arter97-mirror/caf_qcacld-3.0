@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -43,9 +44,12 @@ struct wlan_wfa_cmd_tx_ops {
  * enum wlan_wfa_test_feature_flags - WFA test feature flags
  * @WFA_TEST_IGNORE_RSNXE: Ignore the H2E RSNXE mismatch for 6g connection when
  *                         this flag is set
+ * @WFA_TEST_IGNORE_DEL_TWT_BCAST_ID: Ignore the broadcast TWT ID in the TWT
+ *                                    delete if this flag is set
  */
 enum wlan_wfa_test_feature_flags {
 	WFA_TEST_IGNORE_RSNXE = 0x1,
+	WFA_TEST_IGNORE_DEL_TWT_BCAST_ID = 0x2,
 };
 
 /**

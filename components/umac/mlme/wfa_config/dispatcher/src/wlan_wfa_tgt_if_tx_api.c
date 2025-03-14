@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -78,6 +79,14 @@ wlan_wfa_set_test_feature_flags(struct wlan_objmgr_psoc *psoc,
 		else
 			mlme_priv->wfa_testcmd.flags &= ~WFA_TEST_IGNORE_RSNXE;
 		break;
+	case WFA_TEST_IGNORE_DEL_TWT_BCAST_ID:
+		if (value)
+			mlme_priv->wfa_testcmd.flags |=
+					WFA_TEST_IGNORE_DEL_TWT_BCAST_ID;
+		else
+			mlme_priv->wfa_testcmd.flags &=
+					~WFA_TEST_IGNORE_DEL_TWT_BCAST_ID;
+		break;
 	default:
 		mlme_legacy_debug("Invalid feature flag: 0x%x", feature);
 		break;
@@ -108,6 +117,12 @@ bool wlan_wfa_get_test_feature_flags(struct wlan_objmgr_psoc *psoc,
 		set = !!(mlme_priv->wfa_testcmd.flags & WFA_TEST_IGNORE_RSNXE);
 		if (set)
 			mlme_legacy_debug("IGNORE_RSNXE is set");
+		break;
+	case WFA_TEST_IGNORE_DEL_TWT_BCAST_ID:
+		set = !!(mlme_priv->wfa_testcmd.flags &
+				WFA_TEST_IGNORE_DEL_TWT_BCAST_ID);
+		if (set)
+			mlme_legacy_debug("IGNORE_DEL_TWT_BCAST_ID is set");
 		break;
 	default:
 		mlme_legacy_debug("Invalid feature flag: 0x%x", feature);
@@ -147,6 +162,10 @@ wlan_send_wfatest_cmd(struct wlan_objmgr_vdev *vdev,
 		return wlan_wfa_set_test_feature_flags(wlan_vdev_get_psoc(vdev),
 						       WFA_TEST_IGNORE_RSNXE,
 						       wmi_wfatest->value);
+	} else if (wmi_wfatest->cmd == WFA_IGNORE_TWT_BCAST_ID) {
+		return wlan_wfa_set_test_feature_flags(wlan_vdev_get_psoc(vdev),
+					WFA_TEST_IGNORE_DEL_TWT_BCAST_ID,
+					wmi_wfatest->value);
 	}
 
 	tx_ops = wlan_wfatest_get_tx_ops_from_vdev(vdev);

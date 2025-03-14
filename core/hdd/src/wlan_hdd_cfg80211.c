@@ -17432,6 +17432,13 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_SET_HE_TESTBED_DEFAULTS;
 	if (tb[cmd_id]) {
 		hdd_disable_runtime_pm_for_user(hdd_ctx);
+		wfa_param.vdev_id = link_info->vdev_id;
+		wfa_param.value = 1;
+		wfa_param.cmd = WFA_IGNORE_TWT_BCAST_ID;
+		hdd_info("send wfa WFA_IGNORE_TWT_BCAST_ID config %d",
+			 wfa_param.value);
+		ret_val = ucfg_send_wfatest_cmd(link_info->vdev,
+						&wfa_param);
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("Configure HE testbed defaults %d", cfg_val);
 		if (!cfg_val)
