@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -360,7 +360,8 @@ next_link:
 		    nla_put_flag(reply_skb,
 				 QCA_WLAN_VENDOR_ATTR_TPC_PSD_POWER)) {
 			osif_err("failed to put psd flag");
-			return QDF_STATUS_E_INVAL;
+			status = QDF_STATUS_E_INVAL;
+			goto free_skb;
 		}
 
 		if (nla_put_s8(reply_skb,
