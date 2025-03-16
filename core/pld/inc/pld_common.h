@@ -1728,6 +1728,18 @@ int pld_qmi_indication(struct device *dev, void *cb_ctx,
 				 void *event, int event_len));
 
 /**
+ * pld_get_dump_inprogress() - Get dump_inprogress sysfs value
+ * @dev: device pointer
+ * @val: address to store the value
+ *
+ * This API can be used to get dump_inprogress sysfs value
+ *
+ * Return: 0 if successful
+ *         Non zero failure code for errors
+ */
+int pld_get_dump_inprogress(struct device *dev, uint8_t *val);
+
+/**
  * pld_is_fw_dump_skipped() - get fw dump skipped status.
  * @dev: device
  *

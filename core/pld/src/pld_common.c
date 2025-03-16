@@ -2445,6 +2445,25 @@ int pld_qmi_indication(struct device *dev, void *cb_ctx,
 	}
 }
 
+int pld_get_dump_inprogress(struct device *dev, uint8_t *val)
+{
+	enum pld_bus_type bus_type = pld_get_bus_type(dev);
+
+	switch (bus_type) {
+	case PLD_BUS_TYPE_PCIE:
+		return pld_pcie_get_dump_inprogress(dev, val);
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		return -EINVAL;
+	case PLD_BUS_TYPE_IPCI:
+		return pld_ipci_get_dump_inprogress(dev, val);
+	default:
+		pr_err("Invalid device type %d\n", bus_type);
+		return -EINVAL;
+	}
+}
+
 bool pld_is_fw_dump_skipped(struct device *dev)
 {
 	bool ret = false;
