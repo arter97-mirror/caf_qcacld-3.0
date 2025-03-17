@@ -2063,20 +2063,6 @@ policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
 			  uint32_t vdev_id);
 
 /**
- * policy_mgr_is_vdev_ll_ht_sap() - Check whether given vdev is HT LL SAP or not
- * @psoc: psoc object
- * @vdev_id: vdev id
- *
- * Based on vdev id ap profile set via vendor command is get and compared with
- * ll_ht_type AP type and is return true if profile set is throghput sensitive.
- *
- * Return: true if it's present otherwise false
- */
-bool
-policy_mgr_is_vdev_ll_ht_sap(struct wlan_objmgr_psoc *psoc,
-			     uint32_t vdev_id);
-
-/**
  * policy_mgr_is_vdev_ll_lt_sap() - Check whether given vdev is LL_LT_SAP or not
  * @psoc: psoc object
  * @vdev_id: vdev id
