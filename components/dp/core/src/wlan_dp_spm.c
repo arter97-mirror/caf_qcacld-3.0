@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: ISC
  */
 
@@ -13,19 +13,34 @@
 #define DP_SPM_FLOW_FLAG_IN_USE         BIT(0)
 #define DP_SPM_FLOW_FLAG_SVC_METADATA   BIT(1)
 
-static inline bool wlan_dp_spm_flow_low_tput(struct wlan_dp_spm_flow_info *flow)
+#define WLAN_DP_SPM_FLOW_CLASSIFICATION_END_NS (40 * QDF_NSEC_PER_SEC)
+#define WLAN_DP_SPM_FLOW_LONG_LIVE_MIN_NS  (3 * QDF_NSEC_PER_SEC)
+#define WLAN_DP_SPM_FLOW_LAST_ACTIVE_NS  (1 * QDF_NSEC_PER_SEC)
+#define WLAN_DP_SPM_FLOW_AGING_PKT_CNT 10
+
+/**
+ * wlan_dp_spm_flow_evict_check() - check for evicting Tx flow from tracking
+ * @flow: Tx flow entry
+ *
+ * Return: True if flow can be evicted, else false.
+ */
+static inline
+bool wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 {
 	uint64_t cur_ts = qdf_sched_clock();
 
-	/* Window did not move for last 2 seconds as pkts were not received */
-	if (cur_ts - flow->win_start_ts > WLAN_DP_SPM_MAX_LAST_WIN_START_NS)
+	if ((flow->selected_to_sample || flow->classified) &&
+	    ((cur_ts - flow->flow_add_ts) <
+	     WLAN_DP_SPM_FLOW_CLASSIFICATION_END_NS))
+		return false;
+
+	if ((cur_ts - flow->active_ts) >
+	    WLAN_DP_SPM_FLOW_LAST_ACTIVE_NS)
 		return true;
 
-	/* pkt count in last window to check if pkt rate for this flow is still
-	 * being met. This check is under assumption that packets were not
-	 * irregular and window moved by 1 second constantly.
-	 */
-	if (flow->last_win_pkts < WLAN_DP_SPM_MIN_PKT_CNT_PER_SEC)
+	if (((cur_ts - flow->flow_add_ts) >
+	     WLAN_DP_SPM_FLOW_LONG_LIVE_MIN_NS) &&
+	    flow->num_pkts < WLAN_DP_SPM_FLOW_AGING_PKT_CNT)
 		return true;
 
 	return false;
@@ -786,36 +801,35 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 				    bool clear_tbl)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
-	struct wlan_dp_spm_flow_info *cursor;
+	struct qdf_ht *ht_node;
+	struct qdf_ht_entry *tmp;
+	struct wlan_dp_spm_flow_info *flow_rec;
+	uint16_t flow_id;
 	int i;
 
-	qdf_spinlock_acquire(&spm_intf->flow_list_lock);
-	for (i = 0; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++, cursor++) {
-		cursor = spm_intf->origin_aft[i];
-		if (!cursor)
-			continue;
+	dp_info_rl("records freelist size: %u",
+		   spm_intf->o_flow_rec_freelist.count);
 
-		if (clear_tbl) {
-			wlan_dp_stc_tx_flow_retire_ind(dp_ctx,
-						       cursor->classified,
-						       cursor->c_flow_id);
-			qdf_mem_zero(cursor,
-				     sizeof(struct wlan_dp_spm_flow_info));
-			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
-					     &cursor->node);
-			spm_intf->origin_aft[i] = NULL;
-		} else if (wlan_dp_spm_flow_low_tput(cursor)) {
-			wlan_dp_stc_tx_flow_retire_ind(dp_ctx,
-						       cursor->classified,
-						       cursor->c_flow_id);
-			qdf_mem_zero(cursor,
-				     sizeof(struct wlan_dp_spm_flow_info));
-			cursor->id = i;
-			qdf_list_insert_back(&spm_intf->o_flow_rec_freelist,
-					     &cursor->node);
-			spm_intf->o_stats.active--;
-			spm_intf->o_stats.deleted++;
-			spm_intf->origin_aft[i] = NULL;
+	qdf_spinlock_acquire(&spm_intf->flow_list_lock);
+	for (i = 0; i < WLAN_DP_SPM_HASH_TBL_MAX; i++) {
+		ht_node = &spm_intf->origin_aft_hlist[i];
+		qdf_hl_for_each_entry_safe(flow_rec, tmp, ht_node, hnode) {
+			if (clear_tbl ||
+			    wlan_dp_spm_flow_evict_check(flow_rec)) {
+				wlan_dp_stc_tx_flow_retire_ind(dp_ctx,
+							flow_rec->classified,
+							flow_rec->c_flow_id);
+				qdf_hl_del_rcu(&flow_rec->hnode);
+				flow_id = flow_rec->id;
+				qdf_mem_zero(flow_rec,
+					sizeof(struct wlan_dp_spm_flow_info));
+				flow_rec->id = flow_id;
+				qdf_list_insert_back(
+						&spm_intf->o_flow_rec_freelist,
+						&flow_rec->node);
+				spm_intf->o_stats.active--;
+				spm_intf->o_stats.deleted++;
+			}
 		}
 	}
 	qdf_spinlock_release(&spm_intf->flow_list_lock);
@@ -846,41 +860,42 @@ void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx)
 	dp_info("Printed %d flow entries of TX AFT", count);
 }
 
+static inline
+void wlan_dp_spm_update_flow_features(struct wlan_dp_intf *dp_intf,
+				      struct wlan_dp_spm_flow_info *flow,
+				      qdf_nbuf_t skb)
+{
+	uint64_t curr_ts = qdf_sched_clock();
+
+	flow->num_pkts++;
+	flow->active_ts = curr_ts;
+
+	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, skb,
+						   flow->track_flow_stats,
+						   flow->id,
+						   dp_intf->def_link->link_id,
+						   flow->peer_id, flow->guid);
+}
+
 uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 				      qdf_nbuf_t nbuf, uint16_t flow_id,
 				      uint64_t cookie)
 {
 	struct wlan_dp_spm_intf_context *spm_intf = dp_intf->spm_intf_ctx;
+	struct qdf_ht *ht_node = &spm_intf->origin_aft_hlist[flow_id];
 	struct wlan_dp_spm_flow_info *flow;
-	uint64_t curr_ts;
 
-	flow = spm_intf->origin_aft[flow_id];
-	/* Flow can be NULL when evicted or retired */
-	if (qdf_unlikely(!flow))
-		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
-
-	if (qdf_unlikely(flow->cookie != cookie)) {
-		dp_info("Flow cookie %llu mismatch against table %llu", cookie,
-			flow->cookie);
-		return WLAN_DP_SPM_FLOW_REC_TBL_MAX;
+	qdf_rcu_read_lock_bh();
+	qdf_hl_for_each_entry_rcu(flow, ht_node, hnode) {
+		if (flow->cookie == cookie) {
+			qdf_rcu_read_unlock_bh();
+			wlan_dp_spm_update_flow_features(dp_intf, flow, nbuf);
+			return QDF_STATUS_SUCCESS;
+		}
 	}
+	qdf_rcu_read_unlock_bh();
 
-	curr_ts = qdf_sched_clock();
-	flow->num_pkts++;
-	flow->active_ts = curr_ts;
-	if (curr_ts - flow->win_start_ts > QDF_NSEC_PER_SEC) {
-		flow->win_start_ts = curr_ts;
-		flow->last_win_pkts = flow->num_pkts - flow->win_start_num_pkts;
-		flow->win_start_num_pkts =  flow->num_pkts;
-	}
-
-	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, nbuf,
-						   flow->track_flow_stats,
-						   flow->id,
-						   dp_intf->def_link->link_id,
-						   flow->peer_id, flow->guid);
-
-	return QDF_STATUS_SUCCESS;
+	return QDF_STATUS_E_FAILURE;
 }
 #endif
 
@@ -892,6 +907,7 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 	struct wlan_dp_spm_context *spm_ctx = wlan_dp_spm_get_context();
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	struct wlan_dp_spm_intf_context *spm_intf;
+	struct qdf_ht *hl_head;
 	struct wlan_dp_spm_flow_info *flow_rec;
 	int i;
 
@@ -907,7 +923,7 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 					qdf_mem_malloc(sizeof(*spm_intf));
 	if (!spm_intf) {
 		dp_err("Unable to allocate spm interface");
-		goto fail_intf_alloc;
+		return QDF_STATUS_E_NOMEM;
 	}
 
 	qdf_mem_zero(&spm_intf->screen_flow_ctx.s_tbl[0],
@@ -918,14 +934,7 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 			WLAN_DP_SPM_FLOW_REC_TBL_MAX);
 	qdf_spinlock_create(&spm_intf->flow_list_lock);
 
-	spm_intf->flow_rec_base =
-	     &dp_ctx->gl_flow_recs[dp_intf->id * WLAN_DP_SPM_FLOW_REC_TBL_MAX];
-	if (!spm_intf->flow_rec_base) {
-		dp_err("Unable to allocate origin freelist");
-		goto fail_flow_rec_freelist;
-	}
-
-	flow_rec = spm_intf->flow_rec_base;
+	flow_rec = &dp_ctx->gl_flow_recs[0];
 	for (i = 0; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++) {
 		qdf_mem_zero(flow_rec, sizeof(struct wlan_dp_spm_flow_info));
 		flow_rec->id = i;
@@ -941,19 +950,16 @@ QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 		flow_rec++;
 	}
 
+	hl_head = &spm_intf->origin_aft_hlist[0];
+	for (i = 0; i < WLAN_DP_SPM_HASH_TBL_MAX; i++)
+		qdf_hl_init(hl_head);
+
 	dp_intf->spm_intf_ctx = spm_intf;
 	if (spm_ctx)
 		spm_ctx->spm_intf = spm_intf;
 	dp_info("SPM interface created");
 
 	return QDF_STATUS_SUCCESS;
-
-fail_flow_rec_freelist:
-	qdf_mem_free(spm_intf);
-	spm_intf = NULL;
-
-fail_intf_alloc:
-	return QDF_STATUS_E_FAILURE;
 }
 
 void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
@@ -974,7 +980,8 @@ void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
 	wlan_dp_spm_flow_retire(spm_intf, true);
 
 	qdf_spinlock_destroy(&spm_intf->flow_list_lock);
-	qdf_mem_zero(spm_intf->flow_rec_base, WLAN_DP_SPM_FLOW_REC_TBL_MAX *
+	qdf_mem_zero(dp_intf->dp_ctx->gl_flow_recs,
+		     WLAN_DP_SPM_FLOW_REC_TBL_MAX *
 					sizeof(struct wlan_dp_spm_flow_info));
 
 	qdf_mem_free(spm_intf);
@@ -1042,8 +1049,8 @@ void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	dp_ctx->gl_flow_recs =
 		__qdf_mem_malloc(sizeof(struct wlan_dp_spm_flow_info) *
-				 WLAN_DP_SPM_FLOW_REC_TBL_MAX *
-				 WLAN_DP_INTF_MAX, __func__, __LINE__);
+				 WLAN_DP_SPM_FLOW_REC_TBL_MAX,
+				 __func__, __LINE__);
 	if (!dp_ctx->gl_flow_recs)
 		dp_err("Failed to SPM Tx flow table");
 }
@@ -1187,6 +1194,7 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	struct wlan_dp_spm_intf_context *spm_intf;
 	struct wlan_dp_spm_flow_info *flow_rec = NULL;
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
+	uint16_t ht_idx;
 
 	if (!dp_intf->spm_intf_ctx) {
 		dp_info("Feature not supported");
@@ -1198,15 +1206,20 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	qdf_spinlock_acquire(&spm_intf->flow_list_lock);
 	qdf_list_remove_front(&spm_intf->o_flow_rec_freelist,
 			      (qdf_list_node_t **)&flow_rec);
-	qdf_spinlock_release(&spm_intf->flow_list_lock);
-
 	if (!flow_rec) {
-		*flow_id = WLAN_DP_SPM_INVALID_FLOW_ID;
-		dp_info_rl("records freelist size: %u, Active flow table full!",
-			   spm_intf->o_flow_rec_freelist.count);
+		qdf_spinlock_release(&spm_intf->flow_list_lock);
+		*flow_id = SAWFISH_INVALID_FLOW_ID;
 		wlan_dp_spm_flow_retire(dp_intf->spm_intf_ctx, false);
 		return QDF_STATUS_E_EMPTY;
 	}
+
+	ht_idx = flow_rec->id & SAWFISH_FLOW_ID_MAX;
+	qdf_hl_add_head_rcu(&flow_rec->hnode,
+			    &spm_intf->origin_aft_hlist[ht_idx]);
+	flow_rec->flags |= DP_SPM_FLOW_FLAG_IN_USE;
+	flow_rec->cookie = cookie_sk;
+	*flow_id = ht_idx;
+	qdf_spinlock_release(&spm_intf->flow_list_lock);
 
 	/* Copy data to flow record */
 	flow_rec->flow_add_ts = qdf_sched_clock();
@@ -1216,20 +1229,15 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	qdf_mem_copy(&flow_rec->info, flow_info, sizeof(struct flow_info));
 	flow_rec->svc_id = WLAN_DP_SPM_INVALID_METADATA;
 	flow_rec->svc_metadata = WLAN_DP_SPM_INVALID_METADATA;
-	flow_rec->flags |= DP_SPM_FLOW_FLAG_IN_USE;
-	flow_rec->cookie = cookie_sk;
-
-	wlan_dp_spm_update_tx_flow_hash(dp_ctx, flow_rec);
-	wlan_dp_indicate_flow_add(dp_ctx, WLAN_DP_FLOW_DIR_TX,
-				  &flow_rec->info);
-
-	/* put the flow record in table and fill stats */
-	spm_intf->origin_aft[flow_rec->id] = flow_rec;
-	spm_intf->o_stats.active++;
-
-	*flow_id = flow_rec->id;
 	flow_rec->is_populated = 1;
 	flow_rec->active_ts = qdf_sched_clock();
+
+	wlan_dp_spm_update_tx_flow_hash(dp_ctx, flow_rec);
+
+	spm_intf->o_stats.active++;
+
+	wlan_dp_indicate_flow_add(dp_ctx, WLAN_DP_FLOW_DIR_TX,
+				  &flow_rec->info);
 
 	/* Trigger flow retiring event at threshold */
 	if (qdf_unlikely(spm_intf->o_flow_rec_freelist.count <
@@ -1243,20 +1251,4 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	}
 
 	return QDF_STATUS_SUCCESS;
-}
-
-void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
-				 uint16_t flow_id, uint64_t flow_guid)
-{
-	struct wlan_dp_spm_flow_info *flow_rec = NULL;
-
-	if (flow_id >= WLAN_DP_SPM_FLOW_REC_TBL_MAX)
-		return;
-
-	flow_rec = spm_intf->origin_aft[flow_id];
-
-	if (flow_rec && flow_rec->guid == flow_guid)
-		flow_rec->active_ts = qdf_sched_clock();
-	else
-		dp_info("Flow %u with guid %llu not found", flow_id, flow_guid);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,7 +19,6 @@
 #include <qdf_status.h>
 #include "wlan_dp_priv.h"
 #include "wlan_dp_metadata.h"
-
 #ifdef WLAN_DP_FEATURE_STC
 #include <wlan_dp_spm.h>
 #include <wlan_dp_fim.h>
@@ -33,9 +32,6 @@
 #endif
 
 #ifdef WLAN_DP_FEATURE_STC
-#define SAWFISH_FLOW_ID_MAX 0x3F
-#define SAWFISH_INVALID_FLOW_ID 0xFFFF
-
 /**
  * wlan_dp_sawfish_update_metadata() - Parse flow info from skb and update svc
  *				       data
@@ -79,9 +75,6 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 			skb->mark = FLOW_INVALID_METADATA;
 			return QDF_STATUS_E_INVAL;
 		}
-
-		if (!wlan_dp_spm_flow_screening(dp_intf, skb))
-			return QDF_STATUS_SUCCESS;
 
 		dp_fim_parse_skb_flow_info(skb, &flow);
 		if (qdf_unlikely(!flow.flags ||
