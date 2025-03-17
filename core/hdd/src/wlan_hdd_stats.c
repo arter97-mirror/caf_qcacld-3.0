@@ -3543,7 +3543,7 @@ int wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
 			  uint32_t req_id, uint32_t req_mask)
 {
 	int errno;
-	tSirLLStatsGetReq get_req;
+	tSirLLStatsGetReq get_req = {0};
 	struct hdd_adapter *adapter = link_info->adapter;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
