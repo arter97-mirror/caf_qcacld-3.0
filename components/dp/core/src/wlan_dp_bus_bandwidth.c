@@ -566,6 +566,30 @@ void dp_rtpm_tput_policy_deinit(struct wlan_objmgr_psoc *psoc)
 	qdf_runtime_lock_deinit(&dp_ctx->rtpm_tput_policy_ctx.rtpm_lock);
 }
 
+#ifdef WLAN_DP_FEATURE_STC
+static inline
+void dp_rtpm_tput_spm_policy_update(struct dp_rtpm_tput_policy_context *ctx,
+				    enum tput_level tput_level)
+{
+	if ((tput_level >= WLAN_DP_POLICY_SPM_TPUT_THRESH) &&
+	    !qdf_atomic_test_bit(WLAN_DP_POLICY_SPM_DISABLE_BIT,
+				&ctx->high_tput_vote))
+		qdf_atomic_set_bit(WLAN_DP_POLICY_SPM_DISABLE_BIT,
+				   &ctx->high_tput_vote);
+	else if ((tput_level < WLAN_DP_POLICY_SPM_TPUT_THRESH) &&
+		 qdf_atomic_test_bit(WLAN_DP_POLICY_SPM_DISABLE_BIT,
+				     &ctx->high_tput_vote))
+		qdf_atomic_clear_bit(WLAN_DP_POLICY_SPM_DISABLE_BIT,
+				     &ctx->high_tput_vote);
+}
+#else
+static inline
+void dp_rtpm_tput_spm_policy_update(struct dp_rtpm_tput_policy_context *ctx,
+				    enum tput_level tput_level)
+{
+}
+#endif
+
 void dp_rtpm_tput_policy_apply(struct wlan_dp_psoc_context *dp_ctx,
 			       enum tput_level tput_level)
 {
@@ -586,6 +610,8 @@ void dp_rtpm_tput_policy_apply(struct wlan_dp_psoc_context *dp_ctx,
 		cdp_set_rtpm_tput_policy_requirement(soc, false);
 		qdf_runtime_pm_allow_suspend(&ctx->rtpm_lock);
 	}
+
+	dp_rtpm_tput_spm_policy_update(ctx, tput_level);
 }
 
 unsigned long dp_rtpm_tput_policy_get_vote(struct wlan_dp_psoc_context *dp_ctx)

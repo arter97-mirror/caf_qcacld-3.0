@@ -19,6 +19,7 @@
 #include <qdf_status.h>
 #include "wlan_dp_priv.h"
 #include "wlan_dp_metadata.h"
+#include "wlan_dp_bus_bandwidth.h"
 #ifdef WLAN_DP_FEATURE_STC
 #include <wlan_dp_spm.h>
 #include <wlan_dp_fim.h>
@@ -53,6 +54,10 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 
 	if (!dp_intf->spm_intf_ctx)
 		return QDF_STATUS_E_NOSUPPORT;
+
+	if (dp_rtpm_tput_policy_get_vote(dp_intf->dp_ctx) &
+	    BIT(WLAN_DP_POLICY_SPM_DISABLE_BIT))
+		return QDF_STATUS_E_ABORTED;
 
 	sk = skb->sk;
 	if (qdf_unlikely(!qdf_nbuf_sock_is_valid_fullsock(skb))) {

@@ -48,6 +48,11 @@
 
 #define NUM_TX_RX_HISTOGRAM_MASK (NUM_TX_RX_HISTOGRAM - 1)
 
+#ifdef WLAN_DP_FEATURE_STC
+#define WLAN_DP_POLICY_SPM_TPUT_THRESH TPUT_LEVEL_HIGH
+#define WLAN_DP_POLICY_SPM_DISABLE_BIT 1
+#endif
+
 #if defined(WLAN_FEATURE_DP_BUS_BANDWIDTH) && defined(FEATURE_RUNTIME_PM)
 /**
  * struct dp_rtpm_tput_policy_context - RTPM throughput policy context
