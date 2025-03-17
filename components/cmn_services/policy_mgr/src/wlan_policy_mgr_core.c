@@ -4571,6 +4571,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	bool ml_sap_vdev = false;
 	bool is_dbs, ml_sta_present;
 	uint32_t conc_ml_sap_freq = 0;
+	uint32_t nan_scc_freq = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -4614,6 +4615,9 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	ll_lt_sap_freq = policy_mgr_get_ll_sap_freq(psoc);
 	is_dbs = policy_mgr_is_hw_dbs_capable(psoc);
 
+	if (wlan_nan_is_disc_active(psoc))
+		nan_scc_freq = policy_mgr_get_sap_scc_freq_nan_present(psoc);
+
 	/*
 	 * The preferred force SCC channel is SAP original channel,
 	 * and then the SCC channel on the same mac, and then the SCC
@@ -4631,6 +4635,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 		if (allow_2ghz_only && !WLAN_REG_IS_24GHZ_CH_FREQ(pcl_freq))
 			continue;
 		if (ml_sap_vdev && (conc_ml_sap_freq == pcl_freq))
+			continue;
+		if (nan_scc_freq && pcl_freq != nan_scc_freq)
 			continue;
 
 		/**

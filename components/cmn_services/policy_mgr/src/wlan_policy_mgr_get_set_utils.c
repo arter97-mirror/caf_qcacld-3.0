@@ -13413,6 +13413,40 @@ policy_mgr_is_chan_eligible_for_sap(struct policy_mgr_psoc_priv_obj *pm_ctx,
 	return is_eligible;
 }
 
+uint32_t policy_mgr_get_sap_scc_freq_nan_present(struct wlan_objmgr_psoc *psoc)
+{
+	uint8_t num_ml_sta = 0, num_non_ml_sta = 0;
+	uint8_t ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t non_ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t i;
+	uint32_t sta_freq = 0;
+	uint32_t nan_2g_frq;
+
+	nan_2g_frq = wlan_nan_get_disc_24g_ch_freq(psoc);
+
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sta, ml_sta_idx,
+						&num_non_ml_sta, non_ml_sta_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
+
+	if (!(num_ml_sta + num_non_ml_sta) || num_ml_sta > 1)
+		return nan_2g_frq;
+
+	for (i = 0; i < num_ml_sta + num_non_ml_sta; i++)
+		if (wlan_reg_is_24ghz_ch_freq(freq_list[i]))
+			sta_freq = freq_list[i];
+
+	/* check if legacy STA is preent
+	 * present then move to STA SCC channel
+	 */
+	if (sta_freq)
+		return sta_freq;
+
+	return nan_2g_frq;
+}
+
 bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id,
 					qdf_freq_t freq,
@@ -13431,6 +13465,7 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	uint8_t num_scc_conn = 0;
 	uint8_t num_5_or_6_conn = 0;
 	bool ml_sap_vdev = false;
+	uint32_t nan_scc_freq = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -13453,9 +13488,10 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	 * SAP restart not required if NAN is active
 	 * and SAP is already present on NAN social channel.
 	 */
-	if (wlan_nan_is_disc_active(psoc) &&
-	    freq == wlan_nan_get_disc_24g_ch_freq(psoc))
-		return false;
+	if (wlan_nan_is_disc_active(psoc)) {
+		nan_scc_freq = policy_mgr_get_sap_scc_freq_nan_present(psoc);
+		return freq == nan_scc_freq ? false : true;
+	}
 
 	ml_sap_vdev = policy_mgr_is_mlo_ap(psoc, vdev_id);
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);

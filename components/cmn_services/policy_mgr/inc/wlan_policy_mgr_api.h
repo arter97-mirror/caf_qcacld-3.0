@@ -5011,6 +5011,14 @@ QDF_STATUS policy_mgr_filter_passive_ch(struct wlan_objmgr_pdev *pdev,
 					uint32_t *ch_cnt);
 
 /**
+ * policy_mgr_get_sap_scc_freq_nan_present() - Get NAN SCC freq
+ * @psoc: psoc ctx
+ *
+ * Return: NAN SCC freq
+ */
+uint32_t policy_mgr_get_sap_scc_freq_nan_present(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_is_restart_sap_required() - check whether sap need restart
  * @psoc: psoc pointer
  * @vdev_id: vdev id
