@@ -1110,6 +1110,55 @@ static void dp_fisa_rx_fst_del(struct dp_rx_fst *fisa_hdl,
 	}
 }
 
+#ifdef WLAN_DP_FEATURE_STC
+#define FISA_FT_ENTRY_CLASSIFICATION_END_NS (40 * QDF_NSEC_PER_SEC)
+#define FISA_FT_ENTRY_LONG_LIVE_MIN_NS  (3 * QDF_NSEC_PER_SEC)
+#define FISA_FT_ENTRY_AGING_PKT_CNT 10
+
+/**
+ * dp_fisa_flow_evict_check() - Check if flow is eligible for eviction
+ * @sw_ft_entry: SW flow table entry
+ *
+ * Return: True if its been more than 1second since the flow was last accessed.
+ *         False if it is selected to sampling or it is active in past second.
+ */
+static inline bool
+dp_fisa_flow_evict_check(struct dp_fisa_rx_sw_ft *sw_ft_entry)
+{
+	uint64_t sw_timestamp = qdf_sched_clock();
+
+	if ((sw_ft_entry->selected_to_sample || sw_ft_entry->classified) &&
+	    ((sw_timestamp - sw_ft_entry->flow_init_ts) <
+	     FISA_FT_ENTRY_CLASSIFICATION_END_NS))
+		return false;
+
+	if ((sw_timestamp - sw_ft_entry->last_accessed_ts) >
+	    FISA_FT_ENTRY_LONG_LIVE_MIN_NS)
+		return true;
+
+	if (((sw_timestamp - sw_ft_entry->flow_init_ts) >
+	     FISA_FT_ENTRY_LONG_LIVE_MIN_NS) &&
+	    sw_ft_entry->num_pkts < FISA_FT_ENTRY_AGING_PKT_CNT)
+		return true;
+
+	return false;
+}
+#else
+#define FISA_FT_ENTRY_LAST_ACTIVE_NS 1000000000
+
+static inline bool
+dp_fisa_flow_evict_check(struct dp_fisa_rx_sw_ft *sw_ft_entry)
+{
+	uint64_t sw_timestamp = qdf_sched_clock();
+
+	if ((sw_timestamp - sw_ft_entry->last_accessed_ts) >
+	    FISA_FT_ENTRY_LAST_ACTIVE_NS)
+		return true;
+
+	return false;
+}
+#endif
+
 /**
  * dp_fisa_rx_fst_update() - Core logic which helps in Addition/Deletion
  * of flows
@@ -1135,7 +1184,6 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	uint32_t lru_ft_entry_idx = 0;
 	uint32_t timestamp;
 	uint32_t reo_dest_indication;
-	uint64_t sw_timestamp;
 
 	/* Get the hash from TLV
 	 * FSE FT Toeplitz hash is same Common parser hash available in TLV
@@ -1220,11 +1268,8 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 
 		sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
 				fisa_hdl->base)[lru_ft_entry_idx]);
-		sw_timestamp = qdf_get_log_timestamp();
 
-		if (qdf_log_timestamp_to_usecs(sw_timestamp -
-			sw_ft_entry->add_timestamp) >
-			FISA_FT_ENTRY_AGING_US) {
+		if (dp_fisa_flow_evict_check(sw_ft_entry)) {
 			qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
 			dp_fisa_rx_delete_flow(fisa_hdl, elem, lru_ft_entry_idx);
 			qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);

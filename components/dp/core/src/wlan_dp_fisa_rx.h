@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -67,8 +67,6 @@
 #define DNS_SERVER_PORT 53
 
 #define DP_FT_LOCK_MAX_RECORDS 32
-
-#define FISA_FT_ENTRY_AGING_US	1000000
 
 enum dp_ft_action {
 	DP_FT_ADD,
