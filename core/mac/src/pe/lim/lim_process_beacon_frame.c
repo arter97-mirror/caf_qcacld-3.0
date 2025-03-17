@@ -248,6 +248,31 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 		}
 	}
 }
+
+bool lim_is_same_mld_addr(struct mac_context *mac_ctx,
+			  struct pe_session *session,
+			  struct sSirProbeRespBeacon *bcn_ptr)
+{
+	struct qdf_mac_addr mld_mac = {0};
+	QDF_STATUS status;
+
+	if (!mlo_is_mld_sta(session->vdev) && !bcn_ptr->mlo_ie.mlo_ie_present)
+		return true;
+	else if (!mlo_is_mld_sta(session->vdev) || !bcn_ptr->mlo_ie.mlo_ie_present)
+		return false;
+
+	status = wlan_vdev_get_bss_peer_mld_mac(session->vdev, &mld_mac);
+	if (QDF_IS_STATUS_SUCCESS(status) &&
+	    qdf_is_macaddr_equal(&mld_mac,
+				 (struct qdf_mac_addr *)bcn_ptr->mlo_ie.mlo_ie.mld_mac_addr))
+		return true;
+
+	pe_debug_rl("mld addr mismatch, bss peer " QDF_MAC_ADDR_FMT " bcn "
+		    QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mld_mac.bytes),
+		    QDF_MAC_ADDR_REF(bcn_ptr->mlo_ie.mlo_ie.mld_mac_addr));
+
+	return false;
+}
 #endif
 
 static QDF_STATUS

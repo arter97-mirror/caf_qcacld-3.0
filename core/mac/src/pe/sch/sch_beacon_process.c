@@ -54,6 +54,7 @@
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_mlme_main.h"
 #include <wlan_mlo_mgr_link_switch.h>
+#include "wlan_mlo_mgr_roam.h"
 
 static void
 ap_beacon_process_5_ghz(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
@@ -1055,7 +1056,7 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 {
 	static tSchBeaconStruct bcn;
 
-	if (!session)
+	if (!session || !LIM_IS_STA_ROLE(session))
 		return;
 
 	/*
@@ -1065,11 +1066,13 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	 * 1. vdev is not in connected state: vdev might be transitioning
 	 * 2. Link switch is in progress: Current link or one of the partner
 	 *                                links are getting replaced.
+	 * 3. Beacon with same bssid but different ssid.
+	 * 4. Beacon with same bssid and ssid but different mld addr.
+	 * 5. Not all active link peers are authenticated for MLO connection.
 	 *
 	 * New beacons/probe rsps can be considered once post these operations.
 	 */
-	if (LIM_IS_STA_ROLE(session) &&
-	    (!wlan_cm_is_vdev_connected(session->vdev) ||
+	if ((!wlan_cm_is_vdev_connected(session->vdev) ||
 	     mlo_mgr_is_link_switch_in_progress(session->vdev))) {
 		pe_debug_rl("vdev %d, drop beacon", session->vdev_id);
 		return;
@@ -1081,6 +1084,22 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		pe_err_rl("beacon parsing failed");
 		return;
 	}
+
+	if (lim_cmp_ssid(&bcn.ssId, session)) {
+		pe_debug_rl("ssid mismatch, current " QDF_SSID_FMT "Rcvd "
+			    QDF_SSID_FMT " from " QDF_MAC_ADDR_FMT,
+			    QDF_SSID_REF(session->ssId.length, session->ssId.ssId),
+			    QDF_SSID_REF(bcn.ssId.length, bcn.ssId.ssId),
+			    QDF_MAC_ADDR_REF(session->bssId));
+		return;
+	}
+
+	if (!lim_is_same_mld_addr(mac_ctx, session, &bcn))
+		return;
+
+	if (mlo_is_mld_sta(session->vdev) &&
+	    !mlo_check_if_all_peer_authenticated(session->vdev))
+		return;
 
 	session->dtimPeriod = bcn.tim.dtimPeriod;
 
