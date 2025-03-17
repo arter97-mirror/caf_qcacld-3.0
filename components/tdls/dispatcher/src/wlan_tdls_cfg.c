@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -147,24 +147,6 @@ cfg_tdls_get_uapsd_inactivity_time(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*val = soc_obj->tdls_configs.tdls_uapsd_inactivity_time;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-cfg_tdls_get_rx_pkt_threshold(struct wlan_objmgr_psoc *psoc,
-			      uint32_t *val)
-{
-	struct tdls_soc_priv_obj *soc_obj;
-
-	soc_obj = wlan_psoc_get_tdls_soc_obj(psoc);
-	if (!soc_obj) {
-		*val = 0;
-		tdls_err("tdls soc null");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*val = soc_obj->tdls_configs.tdls_rx_pkt_threshold;
 
 	return QDF_STATUS_SUCCESS;
 }
