@@ -5504,4 +5504,27 @@ wlan_mlme_get_fw_optimized_power_cap(struct wlan_objmgr_psoc *psoc, bool *cap);
  * Return: beacon interval
  */
 uint32_t wlan_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev);
+
+/* wlan_mlme_get_min_he_mcs_map() - get intersected HE MCS MAP between 2 HE MCS MAP
+ * @he_mcs_map1: HE MCS MAP 1
+ * @he_mcs_map2: HE MCS MAP 2
+ *
+ * Rx HE-MCS Map and Tx HE-MCS Map subfields format where 2-bit indicates
+ * 0 indicates support for HE-MCS 0-7 for n spatial streams
+ * 1 indicates support for HE-MCS 0-9 for n spatial streams
+ * 2 indicates support for HE-MCS 0-11 for n spatial streams
+ * 3 indicates that n spatial streams is not supported for HE PPDUs
+ *
+ */
+uint16_t
+wlan_mlme_get_min_he_mcs_map(uint16_t he_mcs_map1, uint16_t he_mcs_map2);
+
+/**
+ * wlan_mlme_get_sap_he_rx_mcs_map_160 - Get sap rx mcs map 160 of he cap
+ *
+ * @psoc: pointer to psoc object
+ *
+ * Return: sap rx mcs map 160 of he cap
+ */
+uint16_t wlan_mlme_get_sap_he_rx_mcs_map_160(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_MLME_API_H_ */

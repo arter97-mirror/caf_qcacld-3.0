@@ -2453,6 +2453,8 @@ static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_DISABLE_SAP_BCN_PROT);
 	sap_cfg->sap_ps_with_twt_enable =
 		cfg_get(psoc, CFG_SAP_PS_WITH_TWT);
+	sap_cfg->sap_he_rx_mcs_map_160 =
+		cfg_get(psoc, CFG_SAP_HE_RX_MCS_MAP_160);
 	mlme_init_sap_mlo_cfg(psoc, sap_cfg);
 	sap_cfg->is_dual_sap_sta_enable =
 		cfg_get(psoc, CFG_SAP_SAP_STA_CONCURRENCY);

@@ -765,6 +765,7 @@ struct wlan_mlme_wps_params {
  * @sap_ps_with_twt_enable: SAP power save with TWT
  * @mlo_sap_support_link_num: sap support link num
  * @is_dual_sap_sta_enable: Dual SAP + STA support
+ * @sap_he_rx_mcs_map_160: SAP HE rx mcs map 160 config
  */
 struct wlan_mlme_cfg_sap {
 	uint16_t beacon_interval;
@@ -804,6 +805,7 @@ struct wlan_mlme_cfg_sap {
 	bool sap_ps_with_twt_enable;
 	uint8_t mlo_sap_support_link_num;
 	bool is_dual_sap_sta_enable;
+	uint16_t sap_he_rx_mcs_map_160;
 };
 
 /**
