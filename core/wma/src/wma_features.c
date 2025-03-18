@@ -2156,6 +2156,8 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 #endif
 	case WOW_REASON_PF_BLOCKING_LAST_TIME:
 		return "PF_BLOCKING_LAST_TIME";
+	case WOW_REASON_VDEV_REPURPOSE:
+		return "VDEV_REPURPOSE";
 	default:
 		return "unknown";
 	}
