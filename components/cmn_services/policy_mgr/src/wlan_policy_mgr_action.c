@@ -3929,7 +3929,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (*con_ch_freq != 0 &&
-	    con_mode == QDF_SAP_MODE &&
+	    con_mode == PM_SAP_MODE &&
 	    !policy_mgr_is_multi_sap_allowed_on_same_band(
 					pm_ctx->pdev,
 					PM_SAP_MODE, *con_ch_freq,
