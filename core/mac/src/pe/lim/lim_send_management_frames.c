@@ -8604,6 +8604,11 @@ lim_send_link_recfg_action_req_frame(uint8_t vdev_id,
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 session->peSessionId, mgmt_hdr->fc.subType));
+	pe_debug("Link Reconfig tx dump:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, frame_ptr,
+			   num_bytes);
+	lim_store_link_recfg_req_frame(mac_ctx, frame_ptr, num_bytes,
+				       vdev_id);
 	qdf_status = wma_tx_frameWithTxComplete(
 			mac_ctx, pkt_ptr, (uint16_t)num_bytes,
 			 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
@@ -8614,17 +8619,10 @@ lim_send_link_recfg_action_req_frame(uint8_t vdev_id,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 session->peSessionId, qdf_status));
 
-	pe_debug("Link Reconfig tx dump:");
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, frame_ptr,
-			   num_bytes);
-
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		pe_err("wma_tx_frame FAILED! Status [%d]", qdf_status);
 		return QDF_STATUS_E_FAILURE;
 	} else {
-		lim_store_link_recfg_req_frame(mac_ctx,
-					       frame_ptr, num_bytes,
-					       vdev_id);
 		return QDF_STATUS_SUCCESS;
 	}
 
