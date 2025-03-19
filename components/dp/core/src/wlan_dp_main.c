@@ -932,6 +932,8 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	wlan_dp_stc_cfg_init(config, psoc);
 
 	config->dp_irq_affinity_mask = cfg_get(psoc, CFG_DP_IRQ_AFFINITY_MASK);
+	config->dp_rx_thread_affinity_mask =
+				cfg_get(psoc, CFG_DP_RX_THREAD_AFFINITY_MASK);
 }
 
 /**

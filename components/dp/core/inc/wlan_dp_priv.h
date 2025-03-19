@@ -136,6 +136,7 @@ struct dp_rtpm_tput_policy_context {
  * @stc_enable: indicates whether STC feature is enabled or not
  * @stc_rtpm_control: Indicates whether STC should control RTPM suspend
  * @dp_irq_affinity_mask: DP IRQ affinity mask (0 for disable)
+ * @dp_rx_thread_affinity_mask: DP rx thread affinity mask (o for disable)
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -223,6 +224,7 @@ struct wlan_dp_psoc_cfg {
 	bool stc_rtpm_control;
 #endif
 	uint32_t dp_irq_affinity_mask;
+	uint32_t dp_rx_thread_affinity_mask;
 };
 
 /**
@@ -936,6 +938,7 @@ struct wlan_dp_stc;
  * @flow_list_lock: Flow list operation lock
  * @rsrc_mgr_ctx: DP resource manager context reference
  * @monitor_flag: Monitor interface flags configured when add Mon interface
+ * @rx_thread_cpu_mask: current affinity mask for RX threads
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1060,6 +1063,7 @@ struct wlan_dp_psoc_context {
 #endif
 	struct wlan_dp_resource_mgr_ctx *rsrc_mgr_ctx;
 	uint32_t monitor_flag;
+	qdf_cpu_mask rx_thread_cpu_mask;
 };
 
 /**
