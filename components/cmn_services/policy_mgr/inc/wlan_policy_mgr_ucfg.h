@@ -309,32 +309,6 @@ ucfg_policy_mgr_get_sta_sap_scc_lte_coex_chnl(struct wlan_objmgr_psoc *psoc,
 					      uint8_t *sta_sap_scc_lte_coex);
 
 /**
- * ucfg_policy_mgr_get_dfs_master_dynamic_enabled() - support dfs master or not
- *  AP interface when STA+SAP(GO) concurrency
- * @psoc: pointer to psoc
- * @vdev_id: sap vdev id
- *
- * This API is used to check SAP (GO) dfs master functionality enabled or not
- * when STA+SAP(GO) concurrency.
- * If g_sta_sap_scc_on_dfs_chan is non-zero, the STA+SAP(GO) is allowed on DFS
- * channel SCC and the SAP's DFS master functionality should be enable/disable
- * according to:
- * 1. g_sta_sap_scc_on_dfs_chan is 0: function return true - dfs master
- *     capability enabled.
- * 2. g_sta_sap_scc_on_dfs_chan is 1: function return false - dfs master
- *     capability disabled.
- * 3. g_sta_sap_scc_on_dfs_chan is 2: dfs master capability based on STA on
- *     5G or not:
- *      a. 5G STA active - return false
- *      b. no 5G STA active -return true
- *
- * Return: true if dfs master functionality should be enabled.
- */
-bool
-ucfg_policy_mgr_get_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
-					       uint8_t vdev_id);
-
-/**
  * ucfg_policy_mgr_init_chan_avoidance() - init channel avoidance in policy
  *					   manager
  * @psoc: pointer to psoc
