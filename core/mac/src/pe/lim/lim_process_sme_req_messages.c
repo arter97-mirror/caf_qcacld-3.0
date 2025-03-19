@@ -8479,7 +8479,7 @@ static void lim_parse_and_update_wmm_params(struct mac_context *mac_ctx,
 					    struct pe_session *pe_session,
 					    const uint8_t *ie, uint16_t ie_len)
 {
-	tDot11fIEWMMParams wmm_params;
+	tDot11fIEWMMParams wmm_params = {0};
 	uint32_t *ac_params;
 	uint32_t params[QCA_WLAN_AC_ALL][CFG_EDCA_DATA_LEN];
 	QDF_STATUS status;
