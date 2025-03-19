@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,12 +33,6 @@ static inline struct wlan_lmac_if_tdls_tx_ops *
 wlan_psoc_get_tdls_txops(struct wlan_objmgr_psoc *psoc)
 {
 	return &psoc->soc_cb.tx_ops->tdls_tx_ops;
-}
-
-static inline struct wlan_lmac_if_tdls_rx_ops *
-wlan_psoc_get_tdls_rxops(struct wlan_objmgr_psoc *psoc)
-{
-	return &psoc->soc_cb.rx_ops->tdls_rx_ops;
 }
 
 QDF_STATUS tgt_tdls_set_fw_state(struct wlan_objmgr_psoc *psoc,
