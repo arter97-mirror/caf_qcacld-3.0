@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018,2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -536,6 +536,199 @@
 					CFG_VALUE_OR_DEFAULT, \
 					"Thermal Stats Temperature Offset")
 
+/* <ini>
+ *ddr_bwm_sampling_time - Configure the ddr bw mitigation sampling time in ms.
+ *
+ * @Min: 10
+ * @Max: 100
+ * @Default: 100
+ *
+ * This INI controls the sampling time that the DDR BW mitigation in the
+ * firmware considers while applying the duty cycle.
+ *
+ * Usage: External
+ *
+ * Supported features: Bandwidth Mitigation
+ *
+ * </ini>
+ */
+#define CFG_DDR_BWM_SAMPLING_TIME CFG_INI_UINT( \
+				"ddr_bwm_sampling_time", \
+				10, \
+				100, \
+				100, \
+				CFG_VALUE_OR_DEFAULT, \
+				"ddr bw mitigation sampling time")
+
+/*
+ * <ini>
+ * ddr_bw_mitigation_enable - To control DDR BW mitigation feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Usage: External
+ *
+ * Supported features: Bandwidth Mitigation
+ *
+ * </ini>
+ */
+#define CFG_DDR_BW_MITIGATION_ENABLE CFG_INI_BOOL( \
+			"ddr_bw_mitigation_enable", \
+			0, \
+			"DDR BW mitigation feature control")
+
+/* <ini>
+ * ddr_bwm_priority - Configure the BW mitigation priority
+ *
+ * @Min: 1
+ * @Max: 10
+ * @Default: 1
+ *
+ * This INI controls the priority of DDR BW mitigation in the firmware.
+ * The firmware considers this priority when applying the duty cycle from
+ * multiple clients, with 1 being the lowest priority and 10 being the highest.
+ *
+ * Usage: External
+ *
+ * Supported features: BW Mitigation
+ *
+ * </ini>
+ */
+#define CFG_DDR_BWM_PRIORITY CFG_INI_UINT( \
+				"ddr_bwm_priority", \
+				1, \
+				10, \
+				1, \
+				CFG_VALUE_OR_DEFAULT, \
+				"ddr bw mitigation priority")
+
+/*
+ * <ini>
+ * bwm_throttle_duty_cycle_level_0 - BW mitigation throttle duty cycle level0
+ * @Min: 0
+ * @Max: 0
+ * @Default: 0
+ *
+ * Usage: External
+ *
+ * Supported features: BW Mitigation
+ *
+ * </ini>
+ */
+#define CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL0 CFG_INI_UINT( \
+			"bwm_throttle_duty_cycle_level_0", \
+			0, \
+			0, \
+			0, \
+			CFG_VALUE_OR_DEFAULT, \
+			"BW mitigation throttle duty cycle level0")
+
+/*
+ * <ini>
+ * bwm_throttle_duty_cycle_level_1 - BW mitigation throttle duty cycle level1
+ * @Min: 0
+ * @Max: 100
+ * @Default: 10
+ *
+ * Usage: External
+ *
+ * Supported features: BW Mitigation
+ *
+ * </ini>
+ */
+#define CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL1 CFG_INI_UINT( \
+			"bwm_throttle_duty_cycle_level_1", \
+			0, \
+			100, \
+			10, \
+			CFG_VALUE_OR_DEFAULT, \
+			"BW mitigation throttle duty cycle level1")
+
+/*
+ * <ini>
+ * bwm_throttle_duty_cycle_level_2 - BW mitigation throttle duty cycle level2
+ * @Min: 0
+ * @Max: 100
+ * @Default: 30
+ *
+ * Usage: External
+ *
+ * Supported features: BW Mitigation
+ *
+ * </ini>
+ */
+#define CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL2 CFG_INI_UINT( \
+			"bwm_throttle_duty_cycle_level_2", \
+			0, \
+			100, \
+			30, \
+			CFG_VALUE_OR_DEFAULT, \
+			"BW mitigation throttle duty cycle level2")
+
+/*
+ * <ini>
+ * bwm_throttle_duty_cycle_level_3 - BW mitigation throttle duty cycle level3
+ * @Min: 0
+ * @Max: 100
+ * @Default: 50
+ *
+ * Usage: External
+ *
+ * Supported features: BW Mitigation
+ *
+ * </ini>
+ */
+#define CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL3 CFG_INI_UINT( \
+			"bwm_throttle_duty_cycle_level_3", \
+			0, \
+			100, \
+			50, \
+			CFG_VALUE_OR_DEFAULT, \
+			"BW mitigation throttle duty cycle level3")
+
+/*
+ * <ini>
+ * bwm_throttle_duty_cycle_level_4 - BW mitigation throttle duty cycle level4
+ * @Min: 0
+ * @Max: 100
+ * @Default: 70
+ *
+ * Usage: External
+ *
+ * Supported features: BW Mitigation
+ *
+ * </ini>
+ */
+#define CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL4 CFG_INI_UINT( \
+			"bwm_throttle_duty_cycle_level_4", \
+			0, \
+			100, \
+			70, \
+			CFG_VALUE_OR_DEFAULT, \
+			"BW mitigation throttle duty cycle level4")
+
+/*
+ * <ini>
+ * bwm_throttle_duty_cycle_level_5 - BW mitigation throttle duty cycle level5
+ * @Min: 0
+ * @Max: 100
+ * @Default: 90
+ *
+ * Usage: External
+ *
+ * Supported features: BW Mitigation
+ *
+ * </ini>
+ */
+#define CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL5 CFG_INI_UINT( \
+			"bwm_throttle_duty_cycle_level_5", \
+			0, \
+			100, \
+			90, \
+			CFG_VALUE_OR_DEFAULT, \
+			"BW mitigation throttle duty cycle level5")
+
 #define CFG_THERMAL_TEMP_ALL \
 	CFG(CFG_THERMAL_TEMP_MIN_LEVEL0) \
 	CFG(CFG_THERMAL_TEMP_MAX_LEVEL0) \
@@ -561,6 +754,14 @@
 	CFG(CFG_THERMAL_APPS_PRIORITY) \
 	CFG(CFG_THERMAL_WPPS_PRIOITY) \
 	CFG(CFG_THERMAL_MGMT_ACTION) \
-	CFG(CFG_THERMAL_STATS_TEMP_OFFSET)\
-
+	CFG(CFG_THERMAL_STATS_TEMP_OFFSET) \
+	CFG(CFG_DDR_BWM_SAMPLING_TIME) \
+	CFG(CFG_DDR_BW_MITIGATION_ENABLE) \
+	CFG(CFG_DDR_BWM_PRIORITY) \
+	CFG(CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL0) \
+	CFG(CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL1) \
+	CFG(CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL2) \
+	CFG(CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL3) \
+	CFG(CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL4) \
+	CFG(CFG_DDR_BWM_THROTTLE_DUTY_CYCLE_LEVEL5)
 #endif

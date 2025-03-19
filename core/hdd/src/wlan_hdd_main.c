@@ -290,7 +290,7 @@
 /* PCIe gen speed change idle shutdown timer 100 milliseconds */
 #define HDD_PCIE_GEN_SPEED_CHANGE_TIMEOUT_MS (100)
 
-#define MAX_NET_DEV_REF_LEAK_ITERATIONS 10
+#define MAX_NET_DEV_REF_LEAK_ITERATIONS 50
 #define NET_DEV_REF_LEAK_ITERATION_SLEEP_TIME_MS 10
 
 #ifdef FEATURE_TSO
@@ -2345,7 +2345,7 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	b_enable1x1 = b_enable1x1 && (cfg->num_rf_chains == 2);
+	b_enable1x1 = b_enable1x1 && (cfg->num_rf_chains >= 2);
 
 	status = ucfg_mlme_set_vht_enable2x2(hdd_ctx->psoc, b_enable1x1);
 	if (!QDF_IS_STATUS_SUCCESS(status))
@@ -2370,7 +2370,9 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 			cfg->num_rf_chains = SIZE_OF_SUPPORTED_MCS_SET;
 
 		if (b_enable1x1) {
-			for (value = 0; value < cfg->num_rf_chains; value++)
+			for (value = 0;
+			     value < QDF_MIN(NSS_2x2_MODE, cfg->num_rf_chains);
+			     value++)
 				mcs_set[value] =
 					WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES;
 
@@ -2846,7 +2848,6 @@ static uint32_t hdd_update_band_cap_from_dot11mode(
 	return band_capability;
 }
 
-#ifdef FEATURE_WPSS_THERMAL_MITIGATION
 static inline
 void hdd_update_multi_client_thermal_support(struct hdd_context *hdd_ctx)
 {
@@ -2860,12 +2861,6 @@ void hdd_update_multi_client_thermal_support(struct hdd_context *hdd_ctx)
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_thermal_multi_client_support);
 }
-#else
-static inline
-void hdd_update_multi_client_thermal_support(struct hdd_context *hdd_ctx)
-{
-}
-#endif
 
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 static void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
@@ -5488,6 +5483,14 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			hdd_send_thermal_mitigation_val(hdd_ctx, thermal_state,
 							THERMAL_MONITOR_WPSS);
 	}
+
+	if (!pld_get_thermal_state(hdd_ctx->parent_dev, &thermal_state,
+				   THERMAL_MONITOR_DDR_BWM)) {
+		if (thermal_state > QCA_WLAN_VENDOR_THERMAL_LEVEL_NONE)
+			hdd_send_ddr_bw_mitigation_level(hdd_ctx, thermal_state,
+						THERMAL_MONITOR_DDR_BWM);
+	}
+
 	hdd_register_get_port_status_notifier(hdd_ctx);
 
 	hdd_exit();
@@ -6473,6 +6476,64 @@ QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 			status);
 
 	hdd_adapter_update_mlo_mgr_mac_addr(cur_link_info->adapter);
+
+	return status;
+}
+
+QDF_STATUS hdd_link_recfg_mac_addr_update(struct wlan_objmgr_vdev *vdev,
+					  struct qdf_mac_addr *old_self_mac,
+					  struct qdf_mac_addr *new_self_mac)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *cur_link_info, *new_link_info;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	uint8_t vdev_id;
+
+	cur_link_info = hdd_get_link_info_by_link_addr(hdd_ctx, old_self_mac);
+	if (!cur_link_info) {
+		hdd_err("no hdd link with mac " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(old_self_mac->bytes));
+		cds_trigger_recovery(QDF_VDEV_LINK_MISMATCH);
+		return status;
+	}
+	vdev_id = wlan_vdev_get_id(vdev);
+	if (cur_link_info->vdev_id != vdev_id) {
+		hdd_err("vdev id mismatch %d %d", cur_link_info->vdev_id,
+			vdev_id);
+		cds_trigger_recovery(QDF_VDEV_LINK_MISMATCH);
+		return status;
+	}
+
+	new_link_info = hdd_get_link_info_by_link_addr(hdd_ctx, new_self_mac);
+	if (!new_link_info) {
+		hdd_err("no hdd link with mac " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(new_self_mac->bytes));
+		cds_trigger_recovery(QDF_VDEV_LINK_MISMATCH);
+		return status;
+	}
+
+	if (cur_link_info == cur_link_info->adapter->deflink ||
+	    new_link_info == new_link_info->adapter->deflink) {
+		hdd_err("deflink switched");
+		cds_trigger_recovery(QDF_VDEV_LINK_MISMATCH);
+		return status;
+	}
+
+	status = ucfg_dp_update_link_mac_addr(vdev,
+					      new_self_mac,
+					      true);
+
+	hdd_debug("vdev id %d change self mac " QDF_MAC_ADDR_FMT " to " QDF_MAC_ADDR_FMT "",
+		  vdev_id, QDF_MAC_ADDR_REF(old_self_mac->bytes),
+		  QDF_MAC_ADDR_REF(new_self_mac->bytes));
+
+	status = hdd_adapter_update_links_on_link_switch(cur_link_info,
+							 new_link_info);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to update adapter link info, status %d",
+			status);
+
+	hdd_adapter_update_mlo_mgr_mac_addr(cur_link_info->adapter);
 	return status;
 }
 
@@ -7424,6 +7485,7 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 			QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_NORMAL;
 	}
 	adapter->latency_level = latency_level;
+	adapter->cached_latency_level = WFC_INVALID_LATENCY_LEVEL;
 	hdd_set_multi_client_ll_support(adapter);
 
 	/* set dev's parent to underlying device */
@@ -14532,7 +14594,7 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 			 * no need to move SAP.
 			 */
 			if ((policy_mgr_is_sta_sap_scc(hdd_ctx->psoc,
-						       ap_chan_freq) &&
+						       ap_chan_freq, false) &&
 			     scc_on_lte_coex) ||
 			    policy_mgr_nan_sap_scc_on_unsafe_ch_chk(hdd_ctx->psoc,
 								    ap_chan_freq))
@@ -15717,6 +15779,9 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 	config->iface_change_wait_time = cfg_get(psoc,
 						 CFG_INTERFACE_CHANGE_WAIT);
 
+	config->shutdown_bootskip = cfg_get(psoc,
+					    CFG_INTERFACE_CHANGE_WAIT_BOOT_SKIP);
+
 	config->multicast_host_fw_msgs = cfg_get(psoc,
 						 CFG_MULTICAST_HOST_FW_MSGS);
 
@@ -15928,6 +15993,8 @@ wlan_hdd_init_multi_client_info_table(struct hdd_adapter *adapter)
 		adapter->client_info[i].client_id = i;
 		adapter->client_info[i].port_id = 0;
 		adapter->client_info[i].in_use = false;
+		adapter->client_info[i].req_latency_level = 0;
+		adapter->client_info[i].is_wfc_state = false;
 	}
 }
 
@@ -15942,6 +16009,8 @@ void wlan_hdd_deinit_multi_client_info_table(struct hdd_adapter *adapter)
 			adapter->client_info[i].port_id = 0;
 			adapter->client_info[i].client_id = i;
 			adapter->client_info[i].in_use = false;
+			adapter->client_info[i].req_latency_level = 0;
+			adapter->client_info[i].is_wfc_state = false;
 		}
 	}
 }
@@ -19003,7 +19072,8 @@ QDF_STATUS hdd_psoc_create_vdevs(struct hdd_context *hdd_ctx)
 	ucfg_dp_try_set_rps_cpu_mask(hdd_ctx->psoc);
 
 	if (driver_mode != QDF_GLOBAL_FTM_MODE &&
-	    driver_mode != QDF_GLOBAL_EPPING_MODE)
+	    driver_mode != QDF_GLOBAL_EPPING_MODE &&
+	    !hdd_ctx->config->shutdown_bootskip)
 		hdd_psoc_idle_timer_start(hdd_ctx);
 
 	return QDF_STATUS_SUCCESS;
@@ -20230,6 +20300,9 @@ static void hdd_set_adapter_wlm_def_level(struct hdd_context *hdd_ctx)
 			       QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_NORMAL;
 		else
 			adapter->latency_level = latency_level;
+
+		adapter->cached_latency_level = WFC_INVALID_LATENCY_LEVEL;
+
 		qdf_status = ucfg_mlme_cfg_get_wlm_reset(hdd_ctx->psoc, &reset);
 		if (QDF_IS_STATUS_ERROR(qdf_status)) {
 			hdd_err("could not get the wlm reset flag");

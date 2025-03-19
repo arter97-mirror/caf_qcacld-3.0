@@ -4382,22 +4382,24 @@ struct wow_enable_params {
 #define HE_LTF_1X	0
 #define HE_LTF_2X	1
 #define HE_LTF_4X	2
-
 #define HE_LTF_ALL	0x7
-#define HE_SGI_MASK	0xFF00
 
 #define AUTO_RATE_GI_400NS	8
 #define AUTO_RATE_GI_800NS	9
 #define AUTO_RATE_GI_1600NS	10
 #define AUTO_RATE_GI_3200NS	11
 
-#define AUTO_RATE_LDPC_DIS_BIT	16
+#define HE_LTF_INDEX	0
+#define HE_LTF_NUM_BITS	3
 
-#define SET_AUTO_RATE_SGI_VAL(set_val, bit_mask) \
-	(set_val = (set_val & HE_LTF_ALL) | bit_mask)
+#define HE_SGI_INDEX	8
+#define HE_SGI_NUM_BITS	8
 
-#define SET_AUTO_RATE_HE_LTF_VAL(set_val, bit_mask) \
-	(set_val = (set_val & HE_SGI_MASK) | bit_mask)
+#define AUTO_RATE_LDPC_DIS_BIT		16
+#define AUTO_RATE_LDPC_DIS_NUM_BITS	1
+
+#define AUTO_RATE_STBC_DIS_BIT		17
+#define AUTO_RATE_STBC_DIS_NUM_BITS	1
 
 #define MSCS_OUI_TYPE "\x58"
 #define MSCS_OUI_SIZE 1

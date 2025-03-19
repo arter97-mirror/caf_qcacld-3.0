@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023,2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -310,18 +310,23 @@ wma_update_eht_cap_support_for_320mhz(struct target_psoc_info *tgt_hdl,
 				      tDot11fIEeht_cap *eht_cap)
 {
 	struct wlan_psoc_host_mac_phy_caps_ext2 *cap;
+	uint8_t mac_phy_idx;
+	bool support_320mhz_6ghz = false;
+	uint8_t max_num_eht_ltf = 0;
 
-	cap = target_psoc_get_mac_phy_cap_ext2_for_mode(
-			tgt_hdl, WMI_HOST_HW_MODE_SINGLE);
-	if (!cap) {
-		wma_debug("HW_MODE_SINGLE does not exist");
-		return;
+	for (mac_phy_idx = 0; mac_phy_idx < PSOC_MAX_MAC_PHY_CAP;
+	     mac_phy_idx++) {
+		cap = &tgt_hdl->info.mac_phy_caps_ext2[mac_phy_idx];
+		support_320mhz_6ghz =
+			WMI_EHTCAP_PHY_320MHZIN6GHZ_GET(cap->eht_cap_phy_info_5G);
+		eht_cap->support_320mhz_6ghz = eht_cap->support_320mhz_6ghz ||
+					       support_320mhz_6ghz;
+		max_num_eht_ltf =
+		     WMI_EHTCAP_PHY_MAXNUMEHTLTF_GET(cap->eht_cap_phy_info_5G);
+		if (max_num_eht_ltf > eht_cap->max_num_eht_ltf)
+			eht_cap->max_num_eht_ltf = max_num_eht_ltf;
 	}
 
-	eht_cap->support_320mhz_6ghz = WMI_EHTCAP_PHY_320MHZIN6GHZ_GET(
-			cap->eht_cap_phy_info_5G);
-	eht_cap->max_num_eht_ltf =
-		     WMI_EHTCAP_PHY_MAXNUMEHTLTF_GET(cap->eht_cap_phy_info_5G);
 	wma_debug("Support for 320MHz 0x%01x, max_num_eht_ltf %d",
 		  eht_cap->support_320mhz_6ghz, eht_cap->max_num_eht_ltf);
 }

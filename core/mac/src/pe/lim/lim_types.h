@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1862,6 +1862,15 @@ lim_pasn_peer_del_all_resp_vdev_delete_resume(struct mac_context *mac,
 					      struct wlan_objmgr_vdev *vdev)
 {}
 #endif
+
+/**
+ * lim_continue_bss_peer_create() - Continue bss peer create after
+ * deleting the existing ranging peer.
+ * @req: Peer create request pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_continue_bss_peer_create(struct cm_peer_create_req *req);
 
 /**
  * lim_send_peer_create_resp() -  Send peer create response

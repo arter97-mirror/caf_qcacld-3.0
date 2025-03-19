@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -391,6 +391,18 @@ bool lim_is_emlsr_band_supported(struct pe_session *session);
 QDF_STATUS lim_get_partner_link_info_from_rnr(const uint8_t *rnr,
 					      uint8_t linkid, uint8_t *bpcc,
 					      uint8_t *opclass, uint8_t *chan);
+
+/**
+ * lim_mlo_link_add_join_continue() - link add continue after link recfg
+ * response received
+ * @psoc: psoc object
+ * @vdev: vdev id
+ * @recfg_rsp_status: recfg status
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_mlo_link_add_join_continue(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id,
+					  QDF_STATUS recfg_rsp_status);
 
 /**
  * lim_get_bpcc_from_mlo_ie() - get the bpcc from mlo_ie info

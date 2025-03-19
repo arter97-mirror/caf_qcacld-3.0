@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -435,10 +435,12 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 	struct wlan_dp_stc_burst_samples *burst_sample;
 	struct wlan_dp_stc_txrx_samples *txrx_samples;
 
-	burst_sample = &flow_samples->burst_sample;
+	burst_sample =
+	   &flow_samples->burst_sample[flow_samples->curr_stats_stage - 1];
 	txrx_samples = &burst_sample->txrx_samples;
 
 	osif_nofl_debug("STC: Burst TxRx Stats:");
+	osif_nofl_debug("STC: Window duration: %u", txrx_samples->win_size);
 	osif_nofl_debug("STC: %20s %15s %15s", "", "UL", "DL");
 
 	osif_nofl_debug("STC: %20s %15llu\t\t\t%15llu",
@@ -477,7 +479,7 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 			"burst_duration_sum: ",
 			burst_sample->tx.burst_duration_sum,
 			burst_sample->rx.burst_duration_sum);
-	osif_nofl_debug("STC: %20s %15u\t\t\t15%d",
+	osif_nofl_debug("STC: %20s %15u\t\t\t%15u",
 			"burst_size_min: ",
 			burst_sample->tx.burst_size_min,
 			burst_sample->rx.burst_size_min);
@@ -925,7 +927,8 @@ os_if_dp_fill_burst_samples(struct sk_buff *flow_sample_event,
 	int len = 0, ret;
 	uint32_t attr_id;
 
-	burst_sample = &flow_samples->burst_sample;
+	burst_sample =
+	   &flow_samples->burst_sample[flow_samples->curr_stats_stage - 1];
 	txrx_samples = &burst_sample->txrx_samples;
 
 	if (flow_sample_event) {

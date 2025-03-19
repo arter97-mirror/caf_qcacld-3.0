@@ -282,6 +282,21 @@ struct pld_ce_tgt_pipe_cfg {
 	u32 reserved;
 };
 
+#ifdef CONFIG_CE_CMN_REG_CFG_QMI
+/**
+ * struct pld_ce_cmn_register_config - CE common register configuration
+ * structure
+ * @offset: offset of common register from base address of CE register.
+ * @mask: bit mask for values which are going to be set.
+ * @value: final value of the ce common register
+ */
+struct pld_ce_cmn_register_config {
+	u32 offset;
+	u32 mask;
+	u32 value;
+};
+#endif
+
 /**
  * struct pld_ce_svc_pipe_cfg - copy engine service pipe configuration
  * @service_id: service ID
@@ -353,6 +368,8 @@ struct pld_rri_over_ddr_cfg {
  * @rri_over_ddr_cfg: rri over ddr config
  * @num_shadow_reg_v3_cfg: number of shadow register version 3 configuration
  * @shadow_reg_v3_cfg: shadow register version 3 configuration
+ * @num_ce_cmn_reg_config: Number of common CE register configurations
+ * @ce_cmn_reg_cfg: CE common registers configuration
  *
  * pld_wlan_enable_cfg stores WLAN FW configurations. It will be
  * passed to WLAN FW when WLAN host driver calls wlan_enable.
@@ -371,6 +388,10 @@ struct pld_wlan_enable_cfg {
 #ifdef CONFIG_SHADOW_V3
 	u32 num_shadow_reg_v3_cfg;
 	struct pld_shadow_reg_v3_cfg *shadow_reg_v3_cfg;
+#endif
+#ifdef CONFIG_CE_CMN_REG_CFG_QMI
+	u32 num_ce_cmn_reg_config;
+	struct pld_ce_cmn_register_config *ce_cmn_reg_cfg;
 #endif
 };
 
@@ -511,10 +532,12 @@ struct pld_soc_info {
  * enum pld_recovery_reason - WLAN host driver recovery reason
  * @PLD_REASON_DEFAULT: default
  * @PLD_REASON_LINK_DOWN: PCIe link down
+ * @PLD_REASON_FW_ASSERTION_FAIL: FW assertion fail
  */
 enum pld_recovery_reason {
 	PLD_REASON_DEFAULT,
-	PLD_REASON_LINK_DOWN
+	PLD_REASON_LINK_DOWN,
+	PLD_REASON_FW_ASSERTION_FAIL
 };
 
 #ifdef FEATURE_WLAN_TIME_SYNC_FTM

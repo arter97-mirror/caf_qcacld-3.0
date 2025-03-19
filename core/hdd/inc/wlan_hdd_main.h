@@ -601,6 +601,7 @@ struct hdd_peer_stats {
  * struct wlan_hdd_station_stats_info - Station stats info
  * @signal: Signal strength of last received PPDU
  * @signal_avg: Average signal strength
+ * @chains: valid chains bitmap
  * @chain_signal_avg: Per-chain signal strength average
  * @rxrate: Last unicast data frame rx rate
  * @txrate: Current unicasr tx rate
@@ -618,6 +619,7 @@ struct hdd_peer_stats {
 struct wlan_hdd_station_stats_info {
 	int8_t signal;
 	int8_t signal_avg;
+	uint8_t chains;
 	int8_t chain_signal_avg[IEEE80211_MAX_CHAINS];
 	struct rate_info txrate;
 	struct rate_info rxrate;
@@ -1052,11 +1054,15 @@ struct hdd_context;
  * @client_id: host id for a client
  * @port_id: client id coming from upper layer
  * @in_use: set true for a client when host receives vendor cmd for that client
+ * @req_latency_level: Requested latency level
+ * @is_wfc_state: To track whether the host receives the WFC_STATE cmd or not
  */
 struct wlm_multi_client_info_table {
 	uint32_t client_id;
 	uint32_t port_id;
 	bool in_use;
+	uint16_t req_latency_level;
+	bool is_wfc_state;
 };
 #endif
 
@@ -1223,6 +1229,19 @@ struct get_station_client_info {
 };
 
 /**
+ * enum wfc_state_latency_level - value as per
+ * QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE cmd
+ * @WFC_OFF_LATENCY_LEVEL: level off
+ * @WFC_ON_LATENCY_LEVEL: level on
+ * @WFC_INVALID_LATENCY_LEVEL: Invalid level
+ */
+enum wfc_state_latency_level {
+	WFC_OFF_LATENCY_LEVEL,
+	WFC_ON_LATENCY_LEVEL,
+	WFC_INVALID_LATENCY_LEVEL,
+};
+
+/**
  * struct hdd_adapter - hdd vdev/net_device context
  * @magic: Magic cookie for adapter sanity verification.  Note that this
  *         needs to be at the beginning of the private data structure so
@@ -1300,6 +1319,7 @@ struct get_station_client_info {
  * @lfr_fw_status:
  * @active_ac:
  * @latency_level: 0 - normal, 1 - xr, 2 - low, 3 - ultralow
+ * @cached_latency_level: Cached latency level as requested by user space
  * @multi_client_ll_support: to check multi client ll support in driver
  * @client_info: To store multi client id information
  * @multi_ll_response_cookie: cookie for multi client ll command
@@ -1478,6 +1498,7 @@ struct hdd_adapter {
 	struct lfr_firmware_status lfr_fw_status;
 	uint8_t active_ac;
 	uint16_t latency_level;
+	uint16_t cached_latency_level;
 #ifdef MULTI_CLIENT_LL_SUPPORT
 	bool multi_client_ll_support;
 	struct wlm_multi_client_info_table client_info[WLM_MAX_HOST_CLIENT];
@@ -2121,6 +2142,7 @@ enum wlan_state_ctrl_str_id {
  * @max_chipset_log_size: Stores max chipset log size value
  * @dual_sta_policy: Concurrent STA policy configuration
  * @is_therm_stats_in_progress:
+ * @bwm_dutycycle_off_percent: bandwidth mitigation dutycycle off percent
  * @is_vdev_macaddr_dynamic_update_supported:
  * @power_type:
  * @is_wlan_disabled: if wlan is disabled by userspace
@@ -2390,9 +2412,7 @@ struct hdd_context {
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
 	bool is_get_station_clubbed_in_ll_stats_req;
 #endif
-#ifdef FEATURE_WPSS_THERMAL_MITIGATION
 	bool multi_client_thermal_mitigation;
-#endif
 	bool is_dual_mac_cfg_updated;
 	bool is_regulatory_update_in_progress;
 	qdf_event_t regulatory_update_event;
@@ -2408,6 +2428,9 @@ struct hdd_context {
 	struct hdd_dual_sta_policy dual_sta_policy;
 #ifdef THERMAL_STATS_SUPPORT
 	bool is_therm_stats_in_progress;
+#endif
+#ifdef WLAN_DDR_BW_MITIGATION
+	uint8_t bwm_dutycycle_off_percent;
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	bool is_vdev_macaddr_dynamic_update_supported;
@@ -5650,6 +5673,23 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 					 struct qdf_mac_addr *old_self_mac,
 					 struct qdf_mac_addr *new_self_mac);
+
+/**
+ * hdd_link_recfg_mac_addr_update() - API to update OSIF/HDD on VDEV
+ * mac addr update due to link rejection in link recfg.
+ * @vdev: vdev pointer
+ * @old_self_mac: Current self link mac of VDEV
+ * @new_self_mac: New self link mac of VDEV
+ *
+ * Check if both @old_self_mac and @new_self_mac are part of adapter
+ * corresponding to @vdev_id. Then take necessary actions to support
+ * MAC update and update DP to change link MAC address to new link's address.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_link_recfg_mac_addr_update(struct wlan_objmgr_vdev *vdev,
+					  struct qdf_mac_addr *old_self_mac,
+					  struct qdf_mac_addr *new_self_mac);
 
 /**
  * hdd_get_link_info_by_ieee_link_id() - Find link info pointer matching with

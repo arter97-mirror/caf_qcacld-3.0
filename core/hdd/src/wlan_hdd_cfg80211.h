@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -329,6 +329,8 @@ typedef enum {
 #define WIFI_FEATURE_ROAMING_MODE_CONTROL 0x800000000
 
 #define WIFI_FEATURE_CACHED_SCAN_RESULTS 0x2000000000
+/* Support MLO SoftAp */
+#define WIFI_FEATURE_MLO_SAP            0x4000000000
 
 #define WIFI_FEATURE_MAX_BIT_POS 64
 
@@ -929,12 +931,14 @@ QDF_STATUS wlan_hdd_set_wlm_latency_level(struct hdd_adapter *adapter,
  * @adapter: pointer to network adapter
  * @port_id: port id for which host receives set latency level vendor command
  * @client_id: client id for a given port id
+ * @latency_level: latency level requested by user space
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
 					   uint32_t port_id,
-					   uint32_t *client_id);
+					   uint32_t *client_id,
+					   uint16_t latency_level);
 
 /**
  * wlan_hdd_get_client_id_bitmap() - to calculate client id bitmap
@@ -981,7 +985,8 @@ static inline uint8_t wlan_hdd_get_client_id_bitmap(struct hdd_adapter *adapter)
 static inline
 QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
 					   uint32_t port_id,
-					   uint32_t *client_id)
+					   uint32_t *client_id,
+					   uint16_t latency_level)
 {
 	return QDF_STATUS_E_FAILURE;
 }

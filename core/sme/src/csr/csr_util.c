@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -767,7 +767,8 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	 * the concurrent ML SAP link vdev. This is to ensure
 	 * ML SAP vdev links comes up on 2 different frequency bands.
 	 */
-		if (policy_mgr_is_sta_sap_scc(mac_ctx->psoc, conc_sap_freq) &&
+		if (policy_mgr_is_sta_sap_scc(mac_ctx->psoc, conc_sap_freq,
+					      false) &&
 		    conc_sta1_freq && conc_sta2_freq) {
 			if (conc_sap_freq != conc_sta1_freq)
 				intf_ch_freq = conc_sta1_freq;

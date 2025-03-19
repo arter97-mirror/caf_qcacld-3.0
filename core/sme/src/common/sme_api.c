@@ -7708,15 +7708,13 @@ QDF_STATUS sme_set_wlm_latency_level(mac_handle_t mac_handle,
 
 	SME_ENTER();
 
-	if (!wma)
+	if (!wma) {
+		sme_err("wma is NULL");
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	if (!mac_ctx->mlme_cfg->wlm_config.latency_enable) {
 		sme_err("WLM latency level setting is disabled");
-		return QDF_STATUS_E_FAILURE;
-	}
-	if (!wma) {
-		sme_err("wma is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -8300,8 +8298,7 @@ int sme_set_auto_rate_he_ltf(mac_handle_t mac_handle, uint8_t session_id,
 		bit_mask = (1 << (cfg_val - 1));
 
 	set_val = mac_ctx->he_sgi_ltf_cfg_bit_mask;
-
-	SET_AUTO_RATE_HE_LTF_VAL(set_val, bit_mask);
+	WMI_SET_BITS(set_val, HE_LTF_INDEX, HE_LTF_NUM_BITS, bit_mask);
 
 	mac_ctx->he_sgi_ltf_cfg_bit_mask = set_val;
 	status = wma_cli_set_command(session_id,
@@ -8332,10 +8329,10 @@ int sme_set_auto_rate_he_sgi(mac_handle_t mac_handle, uint8_t session_id,
 		return -EINVAL;
 	}
 
-	sgi_bit_mask = (1 << cfg_val);
+	sgi_bit_mask = (1 << (cfg_val - AUTO_RATE_GI_400NS));
 
 	set_val = mac_ctx->he_sgi_ltf_cfg_bit_mask;
-	SET_AUTO_RATE_SGI_VAL(set_val, sgi_bit_mask);
+	WMI_SET_BITS(set_val, HE_SGI_INDEX, HE_SGI_NUM_BITS, sgi_bit_mask);
 
 	mac_ctx->he_sgi_ltf_cfg_bit_mask = set_val;
 	status = wma_cli_set_command(session_id,
@@ -8360,14 +8357,38 @@ int sme_set_auto_rate_ldpc(mac_handle_t mac_handle, uint8_t session_id,
 	int status;
 
 	set_val = mac_ctx->he_sgi_ltf_cfg_bit_mask;
-
-	set_val |= (ldpc_disable << AUTO_RATE_LDPC_DIS_BIT);
-
+	WMI_SET_BITS(set_val, AUTO_RATE_LDPC_DIS_BIT,
+		     AUTO_RATE_LDPC_DIS_NUM_BITS, ldpc_disable);
+	mac_ctx->he_sgi_ltf_cfg_bit_mask = set_val;
 	status = wma_cli_set_command(session_id,
 				     wmi_vdev_param_autorate_misc_cfg,
 				     set_val, VDEV_CMD);
 	if (status) {
 		sme_err("failed to set auto rate LDPC cfg");
+		return status;
+	}
+
+	sme_debug("auto rate misc cfg set to 0x%08X", set_val);
+
+	return 0;
+}
+
+int sme_set_auto_rate_stbc(mac_handle_t mac_handle, uint8_t session_id,
+			   uint8_t stbc_disable)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	uint32_t set_val;
+	int status;
+
+	set_val = mac_ctx->he_sgi_ltf_cfg_bit_mask;
+	WMI_SET_BITS(set_val, AUTO_RATE_STBC_DIS_BIT,
+		     AUTO_RATE_STBC_DIS_NUM_BITS, stbc_disable);
+	mac_ctx->he_sgi_ltf_cfg_bit_mask = set_val;
+	status = wma_cli_set_command(session_id,
+				     wmi_vdev_param_autorate_misc_cfg,
+				     set_val, VDEV_CMD);
+	if (status) {
+		sme_err("failed to set auto rate STBC cfg");
 		return status;
 	}
 
@@ -8661,6 +8682,26 @@ QDF_STATUS sme_set_p2p_go_bcn_int(mac_handle_t mac_handle, uint8_t vdev_id,
 		status = csr_send_chng_mcc_beacon_interval(mac, vdev_id);
 		sme_release_global_lock(&mac->sme);
 	}
+	return status;
+}
+
+QDF_STATUS sme_set_btm_req_reject(mac_handle_t mac_handle, uint8_t vdev_id,
+				  uint8_t btm_reject)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (btm_reject)
+		status = cm_roam_send_disable_config(
+				mac->psoc, vdev_id,
+				WMI_VDEV_PARAM_ROAM_11KV_BTM_REJECT);
+	else
+		status = cm_roam_send_disable_config(mac->psoc, vdev_id,
+						     btm_reject);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		sme_err("Unable to send BTM request reject config");
+
 	return status;
 }
 
@@ -15562,6 +15603,10 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	if (mac_ctx->usr_cfg_disable_rsp_tx)
 		sme_set_cfg_disable_tx(mac_handle, vdev_id, 0);
 	mac_ctx->is_usr_cfg_amsdu_enabled = true;
+
+	/* reset the BTM request reject config */
+	cm_roam_send_disable_config(mac_ctx->psoc, vdev_id, 0);
+
 	status = wlan_scan_cfg_set_scan_mode_6g(mac_ctx->psoc,
 						SCAN_MODE_6G_ALL_CHANNEL);
 	if (QDF_IS_STATUS_ERROR(status))

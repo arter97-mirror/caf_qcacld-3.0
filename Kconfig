@@ -578,6 +578,10 @@ config FW_THERMAL_THROTTLE
 	bool "Enable FW_THERMAL_THROTTLE"
 	default n
 
+config WLAN_DDR_BW_MITIGATION
+	bool "enable WLAN_DDR_BW_MITIGATION"
+	default n
+
 config GET_DRIVER_MODE
 	bool "Enable GET_DRIVER_MODE"
 	default n
@@ -1316,6 +1320,10 @@ config WLAN_FEATURE_DP_EVENT_HISTORY
 
 config WLAN_FEATURE_DP_MON_STATUS_RING_HISTORY
 	bool "Enable WLAN_FEATURE_DP_MON_STATUS_RING_HISTORY"
+	default n
+
+config DP_TX_MON_BUF_RING_HISTORY
+	bool "Enable DP_TX_MON_BUF_RING_HISTORY"
 	default n
 
 config WLAN_FEATURE_DP_RX_RING_HISTORY
@@ -2136,6 +2144,16 @@ config PLD_IPCI_ICNSS_FLAG
 config SHADOW_V2
 	bool "Enable SHADOW_V2"
 	default n
+
+config CE_CMN_REG_CFG_QMI
+	bool "Enable CE_CMN_REG_CFG_QMI"
+	default n
+	help
+	This option enables support for copy engine common registers
+	configuration over QMI, host sends its configuration for the copy engine to
+	fw.
+
+	choose y to enable the support.
 
 config WLAN_DP_PROFILE_SUPPORT
 	bool "Enable WLAN_DP_PROFILE_SUPPORT"

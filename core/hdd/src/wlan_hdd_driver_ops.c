@@ -364,8 +364,15 @@ static void hdd_set_recovery_in_progress(void *data, uint8_t val)
 {
 	cds_set_recovery_in_progress(val);
 	/* SSR can be triggred late cleanup existing queue for kernel handshake */
-	if (!qdf_in_interrupt())
-		hdd_soc_recovery_cleanup();
+	if (!qdf_in_interrupt()) {
+		struct hdd_context *hdd_ctx;
+
+		hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+		if (!hdd_ctx)
+			return;
+
+		wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, NULL);
+	}
 }
 
 /**
@@ -824,6 +831,7 @@ static int __hdd_soc_probe(struct device *dev,
 	cds_set_load_in_progress(false);
 	hdd_start_complete(0);
 	hdd_thermal_mitigation_register(hdd_ctx, dev);
+	hdd_ddr_bw_mitigation_register(hdd_ctx, dev);
 
 	hdd_set_sar_init_index(hdd_ctx);
 	hdd_soc_load_unlock(dev);
@@ -1029,6 +1037,7 @@ static void __hdd_soc_remove(struct device *dev)
 		qdf_nbuf_deinit_replenish_timer();
 	} else {
 		hdd_thermal_mitigation_unregister(hdd_ctx, dev);
+		hdd_ddr_bw_mitigation_unregister(hdd_ctx, dev);
 		hdd_wlan_exit(hdd_ctx);
 	}
 

@@ -855,12 +855,12 @@ static const struct ieee80211_iface_limit
 
 #if defined(WLAN_FEATURE_NAN) && \
 	   (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
-/* STA + STA + SAP + NAN */
+/* STA + SAP + NAN. NAN represents NAN disc+NDI support */
 static const struct ieee80211_iface_limit
 	wlan_hdd_sta_sta_sap_nan_iface_limit[] = {
 	{
 		/* STA */
-		.max = 2,
+		.max = 1,
 		.types = BIT(NL80211_IFTYPE_STATION)
 	},
 	{
@@ -889,12 +889,12 @@ static const struct ieee80211_iface_limit
 	},
 };
 
-/* STA + NAN disc + P2P combination */
+/* STA + NAN + P2P. NAN represents NAN disc+NDI support */
 static const struct ieee80211_iface_limit
 	wlan_hdd_sta_nan_p2p_iface_limit[] = {
 	{
-		/* STA + NDI */
-		.max = 2,
+		/* STA */
+		.max = 1,
 		.types = BIT(NL80211_IFTYPE_STATION)
 	},
 	{
@@ -1020,11 +1020,11 @@ static struct ieee80211_iface_combination
 	},
 #if defined(WLAN_FEATURE_NAN) && \
 	   (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
-	/* STA + STA + SAP + NAN*/
+	/* STA + SAP + NAN. NAN represents NAN disc+NDI support */
 	{
 		.limits = wlan_hdd_sta_sta_sap_nan_iface_limit,
 		.num_different_channels = 3,
-		.max_interfaces = 4,
+		.max_interfaces = 3,
 		.n_limits = ARRAY_SIZE(wlan_hdd_sta_sta_sap_nan_iface_limit),
 		.beacon_int_infra_match = true,
 	},
@@ -1035,10 +1035,10 @@ static struct ieee80211_iface_combination
 		.num_different_channels = 2,
 		.n_limits = ARRAY_SIZE(wlan_hdd_sta_nan_iface_limit),
 	},
-	/* NAN + STA + P2P */
+	/* NAN + STA + P2P. NAN represents NAN disc+NDI support */
 	{
 		.limits = wlan_hdd_sta_nan_p2p_iface_limit,
-		.max_interfaces = 4,
+		.max_interfaces = 3,
 		.num_different_channels = 3,
 		.n_limits = ARRAY_SIZE(wlan_hdd_sta_nan_p2p_iface_limit),
 	},
@@ -5088,6 +5088,10 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 		wlan_hdd_set_supported_features_extn(fset_extn,
 						     WIFI_FEATURE_CACHED_SCAN_RESULTS);
 
+	if (hdd_mlosap_check_support_multi_link(hdd_ctx))
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_MLO_SAP);
+
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(fset) +
 						       NLMSG_HDRLEN);
 	if (!skb) {
@@ -8989,6 +8993,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U16},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_OWNER_DISABLE] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_SETUP_LINK_RECONFIG_SUPPORT] = {
+		.type = NLA_U8},
 };
 
 
@@ -9153,6 +9159,10 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_EXTRA_LTF] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_BTM_REQ_REJECT] = {
+			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_BTM_REQ_RESP] = {
+			.type = NLA_NESTED},
 };
 
 /**
@@ -11558,7 +11568,8 @@ uint8_t wlan_hdd_get_client_id_bitmap(struct hdd_adapter *adapter)
 
 QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
 					   uint32_t port_id,
-					   uint32_t *client_id)
+					   uint32_t *client_id,
+					   uint16_t latency_level)
 {
 	uint8_t i;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
@@ -11568,6 +11579,8 @@ QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
 			/* Receives set latency cmd for an existing port id */
 			if (port_id == adapter->client_info[i].port_id) {
 				*client_id = adapter->client_info[i].client_id;
+				adapter->client_info[i].req_latency_level =
+								latency_level;
 				status = QDF_STATUS_SUCCESS;
 				break;
 			}
@@ -11577,6 +11590,9 @@ QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
 			adapter->client_info[i].in_use = true;
 			adapter->client_info[i].port_id = port_id;
 			*client_id = adapter->client_info[i].client_id;
+			adapter->client_info[i].req_latency_level =
+								latency_level;
+			adapter->client_info[i].is_wfc_state = false;
 			status = QDF_STATUS_SUCCESS;
 			break;
 		}
@@ -11672,6 +11688,8 @@ static void wlan_hdd_reset_client_info(struct hdd_adapter *adapter,
 	adapter->client_info[client_id].in_use = false;
 	adapter->client_info[client_id].port_id = 0;
 	adapter->client_info[client_id].client_id = client_id;
+	adapter->client_info[client_id].req_latency_level = 0;
+	adapter->client_info[client_id].is_wfc_state = false;
 }
 
 QDF_STATUS wlan_hdd_set_wlm_client_latency_level(struct hdd_adapter *adapter,
@@ -11682,7 +11700,7 @@ QDF_STATUS wlan_hdd_set_wlm_client_latency_level(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 
 	status = wlan_hdd_get_set_client_info_id(adapter, port_id,
-						 &client_id);
+						 &client_id, latency_level);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
@@ -11737,6 +11755,48 @@ hdd_get_netlink_sender_portid(struct hdd_context *hdd_ctx, uint32_t *port_id)
 }
 #endif
 
+#ifdef MULTI_CLIENT_LL_SUPPORT
+/**
+ * hdd_update_cache_latency_level() - Cache the latency level to the client
+ * info table upon receiving the set latency legacy command, based on the
+ * is_wfc_state flag for the given client ID
+ *
+ * @adapter: adapter context
+ * @port_id: port id
+ * @latency_level: latency level coming from userspace
+ *
+ * Return: true if host needs to send WMI_WLM_CONFIG_CMDID to FW
+ */
+static bool hdd_update_cache_latency_level(struct hdd_adapter *adapter,
+					   uint32_t port_id,
+					   uint16_t latency_level)
+{
+	uint8_t i;
+
+	for (i = 0; i < WLM_MAX_HOST_CLIENT; i++) {
+		if (!adapter->client_info[i].in_use)
+			continue;
+		if (port_id == adapter->client_info[i].port_id &&
+		    adapter->client_info[i].is_wfc_state) {
+			adapter->cached_latency_level = latency_level;
+			hdd_debug("Cache level: %d at [%d] for port_id: %u",
+				  adapter->cached_latency_level, i,
+				  port_id);
+			return false;
+		}
+	}
+
+	return true;
+}
+#else
+static inline bool
+hdd_update_cache_latency_level(struct hdd_adapter *adapter, uint32_t port_id,
+			       uint16_t latency_level)
+{
+	return true;
+}
+#endif
+
 static int hdd_config_latency_level(struct wlan_hdd_link_info *link_info,
 				    const struct nlattr *attr)
 {
@@ -11778,6 +11838,22 @@ static int hdd_config_latency_level(struct wlan_hdd_link_info *link_info,
 		status = hdd_get_netlink_sender_portid(hdd_ctx, &port_id);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto error;
+
+		hdd_debug("port_id: %u, latency_level: %d", port_id,
+			  latency_level);
+
+		/* When the command QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE = 1
+		 * comes before the generic command
+		 * QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL for the same
+		 * client ID, host don't need to send the WMI_WLM_CONFIG_CMDID
+		 * for the generic command. Instead, host cache this value so
+		 * that when QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE = 0 comes,
+		 * we use this cached value to send to FW.
+		 */
+		if (!hdd_update_cache_latency_level(adapter, port_id,
+						    host_latency_level))
+			return 0;
+
 		status = wlan_hdd_set_wlm_client_latency_level(adapter, port_id,
 							host_latency_level);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -12507,6 +12583,238 @@ hdd_set_beamformer_periodic_sounding(struct wlan_hdd_link_info *link_info,
 				   set_val, PDEV_CMD);
 }
 
+#ifdef MULTI_CLIENT_LL_SUPPORT
+/**
+ * wlan_hdd_get_set_client_info_for_wfc_on_req() - update client_info table for
+ * request set wfc state = 1
+ * @adapter: HDD adapter
+ * @port_id: port id
+ * @client_id: client id as per host
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_hdd_get_set_client_info_for_wfc_on_req(struct hdd_adapter *adapter,
+					    uint32_t port_id,
+					    uint32_t *client_id)
+{
+	uint8_t i;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+
+	for (i = 0; i < WLM_MAX_HOST_CLIENT; i++) {
+		if (adapter->client_info[i].in_use) {
+			if (port_id == adapter->client_info[i].port_id) {
+				*client_id = adapter->client_info[i].client_id;
+				/* save old entry */
+				adapter->cached_latency_level =
+				    adapter->client_info[i].req_latency_level;
+				/* update entry with 1 */
+				adapter->client_info[i].req_latency_level =
+							WFC_ON_LATENCY_LEVEL;
+				adapter->client_info[i].is_wfc_state = true;
+				hdd_debug("cached ll: %d, current ll: %d at index: %d for port_id: %u",
+					  adapter->cached_latency_level,
+				     adapter->client_info[i].req_latency_level,
+				     i, port_id);
+				status = QDF_STATUS_SUCCESS;
+				break;
+			}
+			continue;
+		} else {
+			hdd_debug("Add new entry at index: %d, port_id: %u",
+				  i, port_id);
+			adapter->client_info[i].in_use = true;
+			adapter->client_info[i].port_id = port_id;
+			*client_id = adapter->client_info[i].client_id;
+			adapter->client_info[i].req_latency_level =
+							WFC_ON_LATENCY_LEVEL;
+			adapter->cached_latency_level =
+						WFC_INVALID_LATENCY_LEVEL;
+			adapter->client_info[i].is_wfc_state = true;
+			status = QDF_STATUS_SUCCESS;
+			break;
+		}
+	}
+
+	return status;
+}
+
+/**
+ * wlan_hdd_get_set_client_info_for_wfc_off_req() - Update client info
+ * table upon receiving WFC STATE = 0.
+ * @adapter: HDD adapter
+ * @port_id: port id
+ * @client_id: client id as per host
+ * @cached_latency_level: latency_level to cache
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_hdd_get_set_client_info_for_wfc_off_req(struct hdd_adapter *adapter,
+					     uint32_t port_id,
+					     uint32_t *client_id,
+					     uint16_t *cached_latency_level)
+{
+	uint8_t i;
+
+	/* First try to find cached latency level */
+	for (i = 0; i < WLM_MAX_HOST_CLIENT; i++) {
+		if (!adapter->client_info[i].in_use)
+			continue;
+
+		/* Received set WFC = 0 for an existing port id */
+		if (port_id == adapter->client_info[i].port_id) {
+			hdd_debug("reset latency level at: %d for port_id: %u",
+				  i, port_id);
+			*client_id = adapter->client_info[i].client_id;
+			/* reset client info table */
+			adapter->client_info[i].req_latency_level =
+					adapter->cached_latency_level;
+			*cached_latency_level =
+					adapter->cached_latency_level;
+			adapter->cached_latency_level =
+						WFC_INVALID_LATENCY_LEVEL;
+			adapter->client_info[i].is_wfc_state = false;
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
+	/* Received set WFC_STATE = 0 cmd for the first time */
+	hdd_debug("received set WFC = 0 for first time for port_id: %u, i: %d",
+		  port_id, i);
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+/**
+ * wlan_hdd_set_wfc_wlm_client_latency_level() - Set the latency level upon
+ * receiving the WFC state on/off request.
+ * @adapter: HDD adapter
+ * @port_id: port id
+ * @wfc_state: wfc_state as per value of
+ * QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_hdd_set_wfc_wlm_client_latency_level(struct hdd_adapter *adapter,
+					  uint32_t port_id, uint16_t wfc_state)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	uint32_t client_id, client_id_bitmap, latency_host_flags = 0;
+	QDF_STATUS status;
+	uint16_t cached_latency_level = 0;
+
+	if (!wfc_state) { /* WFC = 0 */
+		status = wlan_hdd_get_set_client_info_for_wfc_off_req(
+					adapter, port_id, &client_id,
+					&cached_latency_level);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			/**
+			 * Status is an error only if set WFC = 0 for the first
+			 * time, which means there is no need to send
+			 * WMI_WLM_CONFIG_CMDID to the FW. Simply return
+			 * success to user space.
+			 */
+			return QDF_STATUS_SUCCESS;
+		}
+
+		/**
+		 * Send the cached latency level, if any, if the host receives
+		 * set WFC = 0 for a port ID for which the host has already
+		 * received WFC = 1.
+		 **/
+		wfc_state = cached_latency_level;
+	} else { /* WFC = 1 */
+		status = wlan_hdd_get_set_client_info_for_wfc_on_req(adapter,
+					port_id, &client_id);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
+	}
+
+	client_id_bitmap = BIT(client_id);
+
+	hdd_debug("port_id: %u, client_id: %d, wfc_state: %d",
+		  port_id, client_id, wfc_state);
+
+	status = wlan_hdd_set_wlm_latency_level(adapter, wfc_state,
+						client_id_bitmap, false);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("Fail to set latency level for client_id:%d",
+			  client_id);
+		wlan_hdd_reset_client_info(adapter, client_id);
+		return status;
+	}
+
+	/**
+	 * By this time, adapter->latency_level has been updated upon receiving
+	 * the WMI_VDEV_LATENCY_LEVEL_EVENTID from the FW. So, update the
+	 * WLM mode and host latency flag according to the latency level
+	 * returned from the FW.
+	 */
+	wlan_hdd_set_wlm_mode(hdd_ctx, adapter->latency_level);
+
+	status = ucfg_mlme_get_latency_host_flags(hdd_ctx->psoc,
+						  adapter->latency_level,
+						  &latency_host_flags);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("failed to get latency host flags");
+	else
+		hdd_set_wlm_host_latency_level(hdd_ctx, adapter,
+					       latency_host_flags);
+
+	return status;
+}
+
+/**
+ * wlan_hdd_process_wfc_state() - Set the wlm latency level upon receiving the
+ * WFC state on/off request.
+ * @adapter: HDD adapter
+ * @wfc_state: wfc state receives via QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int
+wlan_hdd_process_wfc_state(struct hdd_adapter *adapter, uint8_t wfc_state)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t port_id;
+
+	if (!hdd_get_multi_client_ll_support(adapter)) {
+		hdd_debug("multi_client_ll_support feature is disabled");
+		return -ENOTSUPP;
+	}
+
+	if (wlan_hdd_get_multi_ll_req_in_progress(adapter)) {
+		hdd_debug("multi ll request already in progress");
+		return -EBUSY;
+	}
+
+	/* get netlink portid of sender */
+	status = hdd_get_netlink_sender_portid(hdd_ctx, &port_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		return qdf_status_to_os_return(status);
+
+	hdd_debug("Received set WFC_STATE for port_id: %u, wfc_state: %d",
+		  port_id, wfc_state);
+
+	status = wlan_hdd_set_wfc_wlm_client_latency_level(adapter, port_id,
+							   wfc_state);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("Fail to set latency level");
+		return qdf_status_to_os_return(status);
+	}
+
+	return 0;
+}
+#else
+static inline int
+wlan_hdd_process_wfc_state(struct hdd_adapter *adapter, uint8_t latency_level)
+{
+	return 0;
+}
+#endif
+
 /**
  * hdd_set_wfc_state() - Set wfc state
  * @link_info: Link info pointer in HDD adapter
@@ -12536,8 +12844,11 @@ static int hdd_set_wfc_state(struct wlan_hdd_link_info *link_info,
 	else
 		return -EINVAL;
 
-	return pld_set_wfc_mode(hdd_ctx->parent_dev, set_val);
+	errno = pld_set_wfc_mode(hdd_ctx->parent_dev, set_val);
+	if (errno)
+		hdd_debug_rl("pld_set_wfc_mode failed");
 
+	return wlan_hdd_process_wfc_state(link_info->adapter, cfg_val);
 }
 
 /**
@@ -13508,6 +13819,26 @@ static int hdd_set_t2lm_negotiation_support(struct wlan_hdd_link_info *link_info
 
 	return 0;
 }
+
+static int hdd_set_link_reconfig_support(struct wlan_hdd_link_info *link_info,
+					 const struct nlattr *attr)
+{
+	struct hdd_context *hdd_ctx = NULL;
+	uint8_t cfg_val;
+
+	if (!attr)
+		return -EINVAL;
+
+	cfg_val = nla_get_u8(attr);
+
+	hdd_debug("Multi-link reconfiguration support: %d", cfg_val);
+
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	wlan_mlme_set_link_recfg_support(hdd_ctx->psoc, cfg_val);
+
+	return 0;
+}
 #else
 static inline int
 hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
@@ -13540,6 +13871,13 @@ hdd_set_epcs_capability(struct wlan_hdd_link_info *link_info,
 static inline int
 hdd_trigger_epcs_function(struct wlan_hdd_link_info *link_info,
 			  const struct nlattr *attr)
+{
+	return 0;
+}
+
+static inline int
+hdd_set_link_reconfig_support(struct wlan_hdd_link_info *link_info,
+			      const struct nlattr *attr)
 {
 	return 0;
 }
@@ -13753,6 +14091,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_p2p_go_bcn_int},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_OWNER_DISABLE,
 	 hdd_set_dfs_owner_disable},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_SETUP_LINK_RECONFIG_SUPPORT,
+	hdd_set_link_reconfig_support},
 };
 
 #ifdef WLAN_FEATURE_ELNA
@@ -15359,6 +15699,22 @@ static inline void wlan_hdd_set_listen_interval(struct hdd_context *hdd_ctx,
 }
 #endif
 
+static const struct nla_policy
+wlan_btm_req_resp_policy [QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_TYPE] = {
+			.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_RECONFIG_FRAME_INFO] = {
+			.type = NLA_NESTED},
+};
+
+static const struct nla_policy
+wlan_reconfig_frame_info_policy[QCA_WLAN_VENDOR_ATTR_RECONFIG_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_RECONFIG_ADD_LINKS_BITMASK] = {
+			.type = NLA_U16},
+	[QCA_WLAN_VENDOR_ATTR_RECONFIG_DELETE_LINKS_BITMASK] = {
+			.type = NLA_U16},
+};
+
 /**
  * __wlan_hdd_cfg80211_set_wifi_test_config() - Wifi test configuration
  * vendor command
@@ -16606,6 +16962,123 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 					      adapter->device_mode);
 		if (ret_val)
 			sme_err("Failed to update extra EHT-LTF");
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_BTM_REQ_REJECT;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("BTM request reject: %d", cfg_val);
+		ret_val = sme_set_btm_req_reject(hdd_ctx->mac_handle,
+						 link_info->vdev_id,
+						 cfg_val);
+
+		if (ret_val)
+			hdd_err("Failed to set BTM reject config");
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_BTM_REQ_RESP;
+	if (tb[cmd_id]) {
+		int rem;
+		uint8_t i = 0;
+		struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_MAX + 1];
+		struct nlattr *tb3[QCA_WLAN_VENDOR_ATTR_RECONFIG_MAX + 1];
+		struct nlattr *curr_attr;
+		struct wlan_link_recfg_info recfg_info;
+
+		qdf_mem_zero(&recfg_info, sizeof(struct wlan_link_recfg_info));
+
+		if (wlan_cfg80211_nla_parse_nested(
+					tb2,
+					QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_MAX,
+					tb[cmd_id], wlan_btm_req_resp_policy)) {
+			hdd_debug("Failed to parse btm request response");
+			goto send_err;
+		}
+
+		if (!tb2[QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_TYPE]) {
+			hdd_debug("Response type not found");
+			goto send_err;
+		}
+
+		cmd_id = QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_TYPE;
+		switch (nla_get_u8(tb2[cmd_id])) {
+		case QCA_WLAN_BTM_REQ_RESP_RECONFIG_FRAME:
+			hdd_debug("link reconfig response requested");
+			/* Reset abridge flag and T2LM support */
+			wlan_mlme_set_btm_abridge_flag(hdd_ctx->psoc, false);
+			wlan_mlme_set_t2lm_negotiation_supported(
+							hdd_ctx->psoc,
+							WLAN_T2LM_DISABLE);
+			break;
+		case QCA_WLAN_BTM_REQ_RESP_DEFAULT:
+			/* Clear wlan_link_recfg_info structure */
+			qdf_mem_zero(&recfg_info,
+				     sizeof(struct wlan_link_recfg_info));
+			ucfg_mlme_update_mlo_recfg_info(hdd_ctx->psoc,
+							link_info->vdev_id,
+							&recfg_info);
+			break;
+		case QCA_WLAN_BTM_REQ_RESP_REASSOC_FRAME:
+		case QCA_WLAN_BTM_REQ_RESP_TTLM_FRAME:
+			break;
+		default:
+			hdd_err("Invalid response type");
+			break;
+		}
+
+		if (nla_get_u8(tb2[cmd_id]) !=
+			QCA_WLAN_BTM_REQ_RESP_RECONFIG_FRAME)
+			goto BTM_REQ_RESP_DONE;
+
+		cmd_id = QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_RECONFIG_FRAME_INFO;
+		if (!tb2[cmd_id]) {
+			hdd_debug("QCA_WLAN_VENDOR_ATTR_BTM_REQ_RESP_RECONFIG_FRAME_INFO not present");
+			goto RESET_LINK_RECFG_FRAME;
+		}
+		nla_for_each_nested(curr_attr, tb2[cmd_id], rem)
+			recfg_info.num_frame++;
+
+		if (!recfg_info.num_frame) {
+			hdd_debug("reconfig info not found");
+			goto RESET_LINK_RECFG_FRAME;
+		}
+
+		hdd_debug("number of frames to send Link reconfig request: %d",
+			  recfg_info.num_frame);
+		nla_for_each_nested(curr_attr, tb2[cmd_id], rem) {
+			if (wlan_cfg80211_nla_parse_nested(
+					tb3,
+					QCA_WLAN_VENDOR_ATTR_RECONFIG_MAX,
+					curr_attr,
+					wlan_reconfig_frame_info_policy)) {
+				hdd_err("nla_parse failed");
+				goto send_err;
+			}
+			recfg_info.add_link_bm[i] = 0;
+			recfg_info.delete_link_bm[i] = 0;
+
+			if (tb3[QCA_WLAN_VENDOR_ATTR_RECONFIG_ADD_LINKS_BITMASK]) {
+				recfg_info.add_link_bm[i] =
+				nla_get_u16(tb3[QCA_WLAN_VENDOR_ATTR_RECONFIG_ADD_LINKS_BITMASK]);
+				hdd_debug("add_link_bm[%d]: %d",
+					  i, recfg_info.add_link_bm[i]);
+			}
+
+			if (tb3[QCA_WLAN_VENDOR_ATTR_RECONFIG_DELETE_LINKS_BITMASK]) {
+				recfg_info.delete_link_bm[i] =
+				nla_get_u16(tb3[QCA_WLAN_VENDOR_ATTR_RECONFIG_DELETE_LINKS_BITMASK]);
+				hdd_debug("delete_link_bm[%d]: %d",
+					  i, recfg_info.delete_link_bm[i]);
+			}
+			i++;
+		}
+RESET_LINK_RECFG_FRAME:
+		/* update mlo dev ctx with info */
+		ucfg_mlme_update_mlo_recfg_info(hdd_ctx->psoc,
+						link_info->vdev_id,
+						&recfg_info);
+BTM_REQ_RESP_DONE:
+		hdd_debug("BTM_REQ_RESP_DONE");
 	}
 
 	if (update_sme_cfg)
@@ -20295,6 +20768,7 @@ static int __wlan_hdd_cfg80211_set_roam_policy(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_MAX + 1];
 	uint32_t roam_policy;
+	bool is_rso_enabled, is_rso_disabled;
 	int ret;
 
 	hdd_enter_dev(dev);
@@ -20329,19 +20803,27 @@ static int __wlan_hdd_cfg80211_set_roam_policy(struct wiphy *wiphy,
 	}
 
 	roam_policy = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_ROAMING_POLICY]);
-	hdd_debug("ROAM_CONFIG: roam_policy %d", roam_policy);
+	is_rso_enabled = ucfg_is_rso_enabled(hdd_ctx->pdev,
+					     adapter->deflink->vdev_id);
+	is_rso_disabled = ucfg_is_rso_disabled(hdd_ctx->pdev,
+					       adapter->deflink->vdev_id);
 
+	hdd_debug("ROAM_CONFIG: roam_policy %d is_roam_state_enable: %d is_roam_state_diabled: %d",
+		  roam_policy, is_rso_enabled, is_rso_disabled);
 	if (sme_roaming_in_progress(hdd_ctx->mac_handle,
 				    adapter->deflink->vdev_id)) {
 		hdd_err_rl("Roaming in progress for vdev %d",
 			   adapter->deflink->vdev_id);
 		return -EAGAIN;
 	}
+	if (roam_policy == 0 && is_rso_disabled) {
+		hdd_debug("roam policy %d already disabled", roam_policy);
+			return -EALREADY;
+		}
 
-	if (roam_policy == ucfg_get_roam_policy(hdd_ctx->psoc,
-						adapter->deflink->vdev_id)) {
-		hdd_debug("New roam policy is already in use");
-		return ret;
+	if (is_rso_enabled) {
+		hdd_debug("New roam policy %d is already in use", roam_policy);
+		return 0;
 	}
 
 	ucfg_set_roam_policy(hdd_ctx->psoc, adapter->deflink->vdev_id,
@@ -29107,6 +29589,8 @@ QDF_STATUS hdd_softap_deauth_current_sta(struct wlan_hdd_link_info *link_info,
 		hdd_debug("Vdev %d STA removal failed for " QDF_MAC_ADDR_FMT,
 			  link_info->vdev_id,
 			  QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
+		if (qdf_status == QDF_STATUS_E_ALREADY)
+			return QDF_STATUS_SUCCESS;
 		return QDF_STATUS_E_NOENT;
 	}
 	return QDF_STATUS_SUCCESS;

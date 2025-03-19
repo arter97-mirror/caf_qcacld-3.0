@@ -1704,6 +1704,103 @@ static uint32_t cm_crpto_cipher_wmi_cipher(int32_t cipherset)
 	return WMI_CIPHER_NONE;
 }
 
+uint32_t
+cm_wmi_auth_type_to_crypto_key_mgmt(uint32_t akm)
+{
+	switch (akm) {
+	case WMI_AUTH_FT_RSNA_FILS_SHA384:
+		return WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384;
+	case WMI_AUTH_FT_RSNA_FILS_SHA256:
+		return WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256;
+	case WMI_AUTH_RSNA_FILS_SHA384:
+		return WLAN_CRYPTO_KEY_MGMT_FILS_SHA384;
+	case WMI_AUTH_RSNA_FILS_SHA256:
+		return WLAN_CRYPTO_KEY_MGMT_FILS_SHA256;
+	case WMI_AUTH_FT_RSNA_SAE_SHA384:
+		return WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY;
+	case WMI_AUTH_WPA3_SAE_SHA384:
+		return WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY;
+	case WMI_AUTH_FT_RSNA_SAE:
+		return WLAN_CRYPTO_KEY_MGMT_FT_SAE;
+	case WMI_AUTH_WPA3_SAE:
+		return WLAN_CRYPTO_KEY_MGMT_SAE;
+	case WMI_AUTH_WPA3_OWE:
+		return WLAN_CRYPTO_KEY_MGMT_OWE;
+	case WMI_AUTH_FT_RSNA:
+		return WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X;
+	case WMI_AUTH_FT_RSNA_PSK:
+		return WLAN_CRYPTO_KEY_MGMT_FT_PSK;
+	case WMI_AUTH_RSNA:
+		return WLAN_CRYPTO_KEY_MGMT_IEEE8021X;
+	case WMI_AUTH_RSNA_PSK:
+		return WLAN_CRYPTO_KEY_MGMT_PSK;
+	case WMI_AUTH_CCKM_RSNA:
+		return WLAN_CRYPTO_KEY_MGMT_CCKM;
+	case WMI_AUTH_RSNA_PSK_SHA256:
+		return WLAN_CRYPTO_KEY_MGMT_PSK_SHA256;
+	case WMI_AUTH_RSNA_8021X_SHA256:
+		return WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256;
+	case WMI_AUTH_RSNA_SUITE_B_8021X_SHA256:
+		return WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B;
+	case WMI_AUTH_RSNA_SUITE_B_8021X_SHA384:
+		return WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192;
+	case WMI_AUTH_FT_RSNA_SUITE_B_8021X_SHA384:
+		return WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384;
+	case WMI_AUTH_PASN:
+		return WLAN_CRYPTO_KEY_MGMT_PASN;
+	}
+
+	return WLAN_CRYPTO_KEY_MGMT_NONE;
+}
+
+uint32_t cm_get_wmi_auth_type(uint32_t akm)
+{
+	switch (akm) {
+	case WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384:
+		return WMI_AUTH_FT_RSNA_FILS_SHA384;
+	case WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256:
+		return WMI_AUTH_FT_RSNA_FILS_SHA256;
+	case WLAN_CRYPTO_KEY_MGMT_FILS_SHA384:
+		return WMI_AUTH_RSNA_FILS_SHA384;
+	case WLAN_CRYPTO_KEY_MGMT_FILS_SHA256:
+		return WMI_AUTH_RSNA_FILS_SHA256;
+	case WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY:
+		return WMI_AUTH_FT_RSNA_SAE_SHA384;
+	case WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY:
+		return WMI_AUTH_WPA3_SAE_SHA384;
+	case WLAN_CRYPTO_KEY_MGMT_FT_SAE:
+		return WMI_AUTH_FT_RSNA_SAE;
+	case WLAN_CRYPTO_KEY_MGMT_SAE:
+		return WMI_AUTH_WPA3_SAE;
+	case WLAN_CRYPTO_KEY_MGMT_OWE:
+		return WMI_AUTH_WPA3_OWE;
+	case WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X:
+		return WMI_AUTH_FT_RSNA;
+	case WLAN_CRYPTO_KEY_MGMT_FT_PSK:
+		return WMI_AUTH_FT_RSNA_PSK;
+	case WLAN_CRYPTO_KEY_MGMT_IEEE8021X:
+		return WMI_AUTH_RSNA;
+	case WLAN_CRYPTO_KEY_MGMT_PSK:
+		return WMI_AUTH_RSNA_PSK;
+	case WLAN_CRYPTO_KEY_MGMT_CCKM:
+		return WMI_AUTH_CCKM_RSNA;
+	case WLAN_CRYPTO_KEY_MGMT_PSK_SHA256:
+		return WMI_AUTH_RSNA_PSK_SHA256;
+	case WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256:
+		return WMI_AUTH_RSNA_8021X_SHA256;
+	case WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B:
+		return WMI_AUTH_RSNA_SUITE_B_8021X_SHA256;
+	case WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192:
+		return WMI_AUTH_RSNA_SUITE_B_8021X_SHA384;
+	case WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384:
+		return WMI_AUTH_FT_RSNA_SUITE_B_8021X_SHA384;
+	case WLAN_CRYPTO_KEY_MGMT_PASN:
+		return WMI_AUTH_PASN;
+	}
+
+	return WMI_AUTH_NONE;
+}
+
 static uint32_t cm_get_rsn_wmi_auth_type(int32_t akm)
 {
 	/* Try the more preferred ones first. */
@@ -3764,7 +3861,9 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	    stop_req->reason == REASON_ROAM_STOP_ALL) {
 		mlme_info("vdev_id:%d : Drop RSO stop during roam sync",
 			  vdev_id);
-		goto rel_vdev_ref;
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		qdf_mem_free(stop_req);
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	wlan_mlme_defer_pmk_set_in_roaming(psoc, vdev_id, false);
@@ -7796,7 +7895,7 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
-	    wlan_diag_event.subtype < WLAN_CONN_DIAG_BMISS_EVENT)
+	    wlan_diag_event.subtype < WLAN_CONN_DIAG_DISCONNECT_EVENT)
 		wlan_diag_event.reason = frame_data->status_code;
 
 	if (wlan_diag_event.subtype == WLAN_CONN_DIAG_DEAUTH_RX_EVENT ||
@@ -7849,10 +7948,12 @@ cm_roam_beacon_loss_disconnect_event(struct wlan_objmgr_psoc *psoc,
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
 			  0, &bssid);
 
-	wlan_diag_event.subtype = WLAN_CONN_DIAG_BMISS_EVENT;
+	wlan_diag_event.subtype = WLAN_CONN_DIAG_DISCONNECT_EVENT;
 	wlan_diag_event.version = DIAG_MGMT_VERSION;
 	wlan_diag_event.rssi = mlme_get_hb_ap_rssi(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+	wlan_diag_event.reason =
+			WLAN_DIAG_DISCONNECT_REASON_BEACON_LOSS;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MGMT);
 

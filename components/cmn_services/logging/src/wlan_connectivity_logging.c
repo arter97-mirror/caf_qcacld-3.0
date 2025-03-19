@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,7 @@
 #include "cdp_txrx_ctrl.h"
 #include "wlan_mlo_mgr_peer.h"
 #include "wlan_scan_api.h"
+#include "wlan_cm_roam_api.h"
 
 #ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
 static struct wlan_connectivity_log_buf_data global_cl;
@@ -1065,7 +1066,7 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 		wlan_populate_vsie(vdev, &wlan_diag_event, false);
 
 	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
-	    wlan_diag_event.subtype < WLAN_CONN_DIAG_BMISS_EVENT)
+	    wlan_diag_event.subtype < WLAN_DIAG_DISCONNECT_REASON_BEACON_LOSS)
 		wlan_diag_event.reason = status_code;
 
 	wlan_diag_event.is_retry_frame =
@@ -1092,6 +1093,136 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 
 out:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+}
+
+static enum wlan_diag_disconnect_reason
+wlan_connectivity_discon_reason_to_diag_reason(uint32_t reason,
+					       uint8_t *int_reason,
+					       bool is_peer_disconnect)
+{
+	enum wlan_diag_disconnect_reason discon_reason;
+
+	if (reason < REASON_PROP_START) {
+		if (!is_peer_disconnect)
+			return WLAN_DIAG_DISCONNECT_REASON_AP_REQUEST;
+		else
+			return WLAN_DIAG_DISCONNECT_REASON_USERSPACE;
+	}
+
+	switch (reason) {
+	case REASON_FW_TRIGGERED_ROAM_FAILURE:
+		*int_reason = WLAN_DIAG_DISCONNECT_REASON_ROAM_FAILURE;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_USER_TRIGGERED_ROAM_FAILURE:
+		*int_reason = WLAN_DIAG_DISCONNECT_REASON_EXT_ROAM_FAILURE;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_GATEWAY_REACHABILITY_FAILURE:
+		*int_reason =
+		WLAN_DIAG_DISCONNECT_REASON_GATEWAY_REACHABILITY_FAILURE;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_UNSUPPORTED_CHANNEL_CSA:
+		*int_reason =
+		WLAN_DIAG_DISCONNECT_REASON_UNSUPPORTED_CHANNEL_CSA;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_OPER_CHANNEL_DISABLED_INDOOR:
+		*int_reason =
+		WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_DISABLED_INDOOR;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_OPER_CHANNEL_USER_DISABLED:
+		*int_reason =
+		WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_USER_DISABLED;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_DEVICE_RECOVERY:
+		*int_reason = WLAN_DIAG_DISCONNECT_REASON_DEVICE_RECOVERY;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_KEY_TIMEOUT:
+		*int_reason = WLAN_DIAG_DISCONNECT_REASON_KEY_TIMEOUT;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_OPER_CHANNEL_BAND_CHANGE:
+		*int_reason =
+		WLAN_DIAG_DISCONNECT_REASON_OPER_CHANNEL_BAND_CHANGE;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_PEER_XRETRY_FAIL:
+		*int_reason = WLAN_DIAG_DISCONNECT_REASON_PEER_XRETRY_FAIL;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_PEER_INACTIVITY:
+		*int_reason = WLAN_DIAG_DISCONNECT_REASON_PEER_INACTIVITY;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_SA_QUERY_TIMEOUT:
+		*int_reason = WLAN_DIAG_DISCONNECT_REASON_SA_QUERY_TIMEOUT;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_CHANNEL_SWITCH_FAILED:
+		*int_reason =
+		WLAN_DIAG_DISCONNECT_REASON_CHANNEL_SWITCH_FAILURE;
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_INTERNAL;
+		break;
+	case REASON_IFACE_DOWN:
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_USERSPACE;
+		break;
+	default:
+		logging_err("No diag code for the qca reason code: %d", reason);
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_OTHER;
+	}
+
+	return discon_reason;
+}
+
+void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
+					uint8_t *peer_mac, uint32_t reason,
+					int rssi,
+					bool is_peer_disconnect)
+{
+	uint8_t int_reason;
+	uint32_t diag_reason;
+	struct qdf_mac_addr peer_mac_addr;
+	struct wlan_objmgr_pdev *pdev;
+
+	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_packet_info);
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+		return;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		logging_err("Pdev not found");
+		return;
+	}
+
+	qdf_mem_copy(peer_mac_addr.bytes, peer_mac, QDF_MAC_ADDR_SIZE);
+
+	diag_reason =
+	wlan_connectivity_discon_reason_to_diag_reason(reason, &int_reason,
+						       is_peer_disconnect);
+
+	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
+	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
+	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
+	wlan_diag_event.subtype = WLAN_CONN_DIAG_DISCONNECT_EVENT;
+	wlan_diag_event.version = DIAG_MGMT_VERSION_V4;
+
+	wlan_diag_event.rssi = rssi;
+
+	wlan_diag_event.reason = diag_reason;
+	wlan_diag_event.sub_reason = int_reason;
+	wlan_diag_event.rssi = rssi;
+
+	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MGMT);
 }
 
 void

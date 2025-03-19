@@ -2928,6 +2928,9 @@ wlan_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
 QDF_STATUS
 wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
+#define RF_MODE_FORCE_PWR_TYPE_MIN -1
+#define RF_MODE_FORCE_PWR_TYPE_MAX 2
+
 /**
  * wlan_mlme_set_rf_mode_force_pwr_type() - Set RF mode force power type
  * @psoc: psoc context
@@ -3166,6 +3169,23 @@ void
 wlan_mlme_get_mlo_prefer_percentage(
 				struct wlan_objmgr_psoc *psoc,
 				int8_t *mlo_prefer_percentage);
+
+/**
+ * wlan_mlme_update_mlo_recfg_info() - Update ML reconfiguration request
+ * information
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev ID
+ * @recfg_info: Link reconfiguration request information
+ *
+ * This API updates the ML reconfiguration request information onto MLO
+ * dev context.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_update_mlo_recfg_info(struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id,
+				struct wlan_link_recfg_info *recfg_info);
 #else
 static inline bool
 wlan_mlme_is_link_recfg_support(struct wlan_objmgr_psoc *psoc)
@@ -5421,4 +5441,12 @@ wlan_mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
  */
 QDF_STATUS
 wlan_mlme_get_fw_optimized_power_cap(struct wlan_objmgr_psoc *psoc, bool *cap);
+
+/*
+ * wlan_mlme_get_beacon_interval() - Get beacon interval of connected bss
+ * @vdev: pointer to vdev
+ *
+ * Return: beacon interval
+ */
+uint32_t wlan_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev);
 #endif /* _WLAN_MLME_API_H_ */

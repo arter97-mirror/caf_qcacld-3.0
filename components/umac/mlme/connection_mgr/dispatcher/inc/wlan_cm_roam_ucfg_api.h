@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -83,6 +83,15 @@ enum wlan_roam_policy ucfg_get_roam_policy(struct wlan_objmgr_psoc *psoc,
  * Return: Wrapper for wlan_is_rso_enabled.
  */
 bool ucfg_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
+
+/**
+ * ucfg_is_rso_disabled() - Check if rso is disabled
+ * @pdev: Pointer to pdev
+ * @vdev_id: vdev id
+ *
+ * Return: Wrapper for wlan_is_rso_disabled.
+ */
+bool ucfg_is_rso_disabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /*
  * ucfg_cm_abort_roam_scan() -abort current roam scan cycle by roam scan

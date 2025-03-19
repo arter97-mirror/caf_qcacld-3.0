@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -352,6 +352,10 @@ static void pmo_core_set_suspend_dtim(struct wlan_objmgr_psoc *psoc)
 							    WLAN_PMO_ID);
 		if (!vdev)
 			continue;
+		else if (QDF_IS_STATUS_ERROR(wlan_vdev_is_up(vdev))) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
+			continue;
+		}
 
 		vdev_ctx = pmo_vdev_get_priv(vdev);
 		if (!pmo_is_listen_interval_user_set(vdev_ctx)
@@ -1595,7 +1599,7 @@ void pmo_core_psoc_target_suspend_acknowledge(void *context, bool wow_nack,
 
 	pmo_core_set_wow_nack(psoc_ctx, wow_nack, reason_code);
 	qdf_event_set(&psoc_ctx->wow.target_suspend);
-	if (!pmo_tgt_psoc_get_runtime_pm_in_progress(psoc)) {
+	if (!pmo_tgt_psoc_get_runtime_pm_inprogress(psoc)) {
 		if (wow_nack)
 			qdf_wake_lock_timeout_acquire(
 				&psoc_ctx->wow.wow_wake_lock,

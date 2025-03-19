@@ -1118,6 +1118,26 @@ void
 lim_update_connect_rsn_ie(struct pe_session *session, uint8_t *rsn_ie_buf,
 			  struct wlan_crypto_pmksa *pmksa);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_get_mld_info_sta() - get peer_mld_addr and assoc peer flag for sta
+ * @req: cm_peer_create_req
+ * @peer_mld_addr: peer mld mac addr
+ * @is_assoc_peer: is assoc peer
+ *
+ * Return: None
+ */
+void lim_get_mld_info_sta(struct cm_peer_create_req *req,
+			  uint8_t **peer_mld_addr,
+			  bool *is_assoc_peer);
+#else
+static inline void
+lim_get_mld_info_sta(struct cm_peer_create_req *req,
+		     uint8_t **peer_mld_addr,
+		     bool *is_assoc_peer)
+{}
+#endif
+
 /**
  * lim_send_action_frm_tb_ppdu_cfg() - sets action frame in TB PPDU cfg to FW
  * @mac_ctx: global MAC context

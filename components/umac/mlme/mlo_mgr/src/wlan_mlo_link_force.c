@@ -1779,6 +1779,50 @@ ml_nlink_get_dynamic_inactive_links(struct wlan_objmgr_psoc *psoc,
 	mlo_dev_lock_release(mlo_dev_ctx);
 }
 
+void
+ml_nlink_update_force_state_on_link_delete(
+			struct wlan_objmgr_vdev *vdev,
+			uint8_t delete_link_id)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct ml_link_force_state *force_state;
+	struct set_link_req *req;
+	uint32_t delete_link_bitmap;
+	uint8_t source;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
+		mlo_err("mlo_ctx or sta_ctx null");
+		return;
+	}
+	if (delete_link_id == WLAN_INVALID_LINK_ID) {
+		mlo_err("invalid link id");
+		return;
+	}
+	mlo_dev_lock_acquire(mlo_dev_ctx);
+	force_state = &mlo_dev_ctx->sta_ctx->link_force_ctx.force_state;
+	delete_link_bitmap = 1 << delete_link_id;
+	ml_nlink_dump_force_state(force_state, "cur, del bitmap 0x%x",
+				  delete_link_bitmap);
+
+	force_state->curr_active_bitmap &= ~delete_link_bitmap;
+	force_state->curr_dynamic_inactive_bitmap &= ~delete_link_bitmap;
+	force_state->curr_inactive_bitmap &= ~delete_link_bitmap;
+	force_state->force_active_bitmap &= ~delete_link_bitmap;
+	force_state->force_inactive_bitmap &= ~delete_link_bitmap;
+	ml_nlink_dump_force_state(force_state, "updated");
+
+	for (source = 0; source < SET_LINK_SOURCE_MAX; source++) {
+		req = &mlo_dev_ctx->sta_ctx->link_force_ctx.reqs[source];
+		req->force_active_bitmap &= ~delete_link_bitmap;
+		req->force_inactive_bitmap &= ~delete_link_bitmap;
+		mlo_debug("source %d act 0x%x inact 0x%x",
+			  source, req->force_active_bitmap,
+			  req->force_inactive_bitmap);
+	}
+	mlo_dev_lock_release(mlo_dev_ctx);
+}
+
 /**
  * ml_nlink_get_affect_ml_sta() - Get ML STA whose link can be
  * force inactive
@@ -2863,6 +2907,7 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS];
 	uint8_t i;
 	bool force_link_required = false;
+	uint32_t mcc_to_scc_switch;
 
 	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
@@ -2878,7 +2923,11 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 	case PM_STA_MODE:
 		goto force_inactive_num;
 	case PM_SAP_MODE:
-		force_link_required = true;
+		mcc_to_scc_switch = policy_mgr_get_mcc_to_scc_switch_mode(psoc);
+
+		if (mcc_to_scc_switch !=
+			QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND)
+			force_link_required = true;
 		break;
 	default:
 		/* unexpected legacy connection mode */
@@ -2922,7 +2971,7 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	if (force_inactive_link_bitmap)
+	if (force_inactive_link_bitmap && force_link_required)
 		force_cmd->force_inactive_bitmap = force_inactive_link_bitmap;
 
 	return;
@@ -6146,6 +6195,23 @@ end:
 	return status;
 }
 
+static QDF_STATUS
+ml_nlink_link_recfg_completed_handler(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_vdev *vdev,
+				      enum ml_nlink_change_event_type evt,
+				      struct ml_nlink_change_event *data)
+{
+	QDF_STATUS status;
+
+	ml_nlink_clr_requested_emlsr_mode(psoc, vdev);
+
+	status = ml_nlink_state_change_handler(
+		psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT,
+		evt, data);
+
+	return status;
+}
+
 static QDF_STATUS ml_nlink_emlsr_opportunistic_timer_handler(
 		struct wlan_objmgr_psoc *psoc,
 		struct wlan_objmgr_vdev *vdev,
@@ -6298,14 +6364,22 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 	switch (evt) {
 	case ml_nlink_link_switch_start_evt:
 		if (data->evt.link_switch.reason ==
+		    MLO_LINK_SWITCH_REASON_HOST_ADD_LINK) {
+			mlo_debug("REASON_HOST_ADD_LINK target link %d",
+				  data->evt.link_switch.new_ieee_link_id);
+			break;
+		}
+
+		if (data->evt.link_switch.reason ==
 		    MLO_LINK_SWITCH_REASON_HOST_FORCE) {
 			is_host_force = true;
 		} else {
 			is_host_force = false;
 		}
 
-		mlo_debug("set_link_in_prog %d reason %d",
+		mlo_debug("set_link_in_prog %d link_recfg_in_prog %d reason %d",
 			  is_set_link_in_progress,
+			  mlo_is_link_recfg_in_progress(vdev),
 			  data->evt.link_switch.reason);
 
 		if (is_set_link_in_progress) {
@@ -6322,6 +6396,11 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			 * force then reject the link switch
 			 */
 			status = QDF_STATUS_E_INVAL;
+			break;
+		} else if (data->evt.link_switch.reason ==
+			   MLO_LINK_SWITCH_REASON_HOST_FORCE_FOLLOWUP &&
+			   mlo_is_link_recfg_in_progress(vdev)) {
+			status = QDF_STATUS_SUCCESS;
 			break;
 		}
 
@@ -6487,6 +6566,11 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
 			status = ml_nlink_undo_emlsr_downgrade_handler(
 							psoc, vdev, evt, data);
+		break;
+	case ml_nlink_link_recfg_completed_evt:
+		status =
+		ml_nlink_link_recfg_completed_handler(psoc, vdev,
+						      evt, data);
 		break;
 	default:
 		break;

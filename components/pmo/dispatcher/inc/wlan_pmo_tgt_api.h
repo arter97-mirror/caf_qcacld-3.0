@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -454,12 +454,12 @@ QDF_STATUS pmo_tgt_psoc_set_runtime_pm_inprogress(struct wlan_objmgr_psoc *psoc,
 						  bool value);
 
 /**
- * pmo_tgt_psoc_get_runtime_pm_in_progress() -get runtime status
+ * pmo_tgt_psoc_get_runtime_pm_inprogress() -get runtime status
  * @psoc: objmgr psoc
  *
  * Return: true if runtime pm is in progress else false
  */
-bool pmo_tgt_psoc_get_runtime_pm_in_progress(struct wlan_objmgr_psoc *psoc);
+bool pmo_tgt_psoc_get_runtime_pm_inprogress(struct wlan_objmgr_psoc *psoc);
 
 /**
  * pmo_tgt_psoc_send_host_wakeup_ind() -Send host wake up indication to fwr

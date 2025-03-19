@@ -5567,6 +5567,19 @@ bool wlan_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 	return false;
 }
 
+bool wlan_is_rso_disabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
+{
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+	enum roam_offload_state cur_state;
+
+	cur_state = mlme_get_roam_state(psoc, vdev_id);
+	if (cur_state == WLAN_ROAM_DEINIT ||
+	    cur_state == WLAN_ROAM_RSO_STOPPED)
+		return true;
+
+	return false;
+}
+
 bool wlan_is_roaming_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);

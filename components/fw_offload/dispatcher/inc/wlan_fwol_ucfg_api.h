@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -165,6 +165,19 @@ ucfg_fwol_get_coex_config_params(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_fwol_get_thermal_temp(struct wlan_objmgr_psoc *psoc,
 			   struct wlan_fwol_thermal_temp *thermal_temp);
+
+#ifdef WLAN_DDR_BW_MITIGATION
+/**
+ * ucfg_fwol_get_ddr_bwm_config() - Get bw mitigation config params
+ * @psoc: Pointer to psoc object
+ * @ddr_bwm_info: Pointer to struct wlan_fwol_bwm_params
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_fwol_get_ddr_bwm_config(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_fwol_bwm_params *ddr_bwm_info);
+#endif
 
 /**
  * ucfg_fwol_is_neighbor_report_req_supported() - Get neighbor report request

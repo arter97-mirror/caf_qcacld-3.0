@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -443,6 +443,23 @@ end:
 	 */
 	if (eSIR_SME_SUCCESS != mlm_start_cnf.resultCode)
 		lim_send_start_bss_confirm(mac_ctx, &mlm_start_cnf);
+}
+
+QDF_STATUS
+lim_continue_bss_peer_create(struct cm_peer_create_req *req)
+{
+	uint8_t *peer_mld_addr = NULL;
+	bool is_assoc_peer = false;
+	QDF_STATUS status;
+
+	if (!req)
+		return QDF_STATUS_E_INVAL;
+
+	lim_get_mld_info_sta(req, &peer_mld_addr, &is_assoc_peer);
+	status = wma_add_bss_peer_sta(req->vdev_id, req->peer_mac.bytes, true,
+				      peer_mld_addr, is_assoc_peer);
+
+	return status;
 }
 
 #if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)

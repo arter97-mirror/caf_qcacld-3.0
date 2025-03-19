@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1465,8 +1465,29 @@
 	CFG_INI_BOOL("dp_stc_enable", false, \
 		     "Enable/Disable DP Smart Traffic Classifier")
 
+/*
+ * <ini>
+ * dp_stc_rtpm_control - control RTPM when stc detects bursty traffic
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable STC module to control RTPM suspend when
+ * bursty traffic types are detected.
+ *
+ * Supported Feature: STA (pre 802.11BE)
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_STC_RTPM_CONTROL \
+	CFG_INI_BOOL("dp_stc_rtpm_control", false, \
+		     "Enable/Disable RTPM control by STC module")
+
 #define CFG_DP_STC \
-	CFG(CFG_DP_STC_ENABLE)
+	CFG(CFG_DP_STC_ENABLE) \
+	CFG(CFG_DP_STC_RTPM_CONTROL)
 #else
 #define CFG_DP_STC
 #endif

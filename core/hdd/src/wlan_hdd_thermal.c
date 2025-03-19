@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -56,6 +56,28 @@ const struct nla_policy
 		[QCA_WLAN_VENDOR_ATTR_THERMAL_STATS] = {.type = NLA_NESTED},
 };
 
+/**
+ * hdd_convert_monitor_id_to_wmi_monitor_id() - convert thermal_monitor_id
+ *  to wmi_thermal_monitor_id
+ * @monitor_id: monitor id of type thermal_monitor_id
+ *
+ * Return: wmi_thermal_monitor_id
+ */
+static enum wmi_thermal_monitor_id
+hdd_convert_monitor_id_to_wmi_monitor_id(enum thermal_monitor_id monitor_id)
+{
+	switch (monitor_id) {
+	case THERMAL_MONITOR_APPS:
+		return WMI_HOST_THERMAL_MONITOR_APPS;
+	case THERMAL_MONITOR_WPSS:
+		return WMI_HOST_THERMAL_MONITOR_WPSS;
+	case THERMAL_MONITOR_DDR_BWM:
+		return WMI_HOST_THERMAL_MONITOR_DDR_BWM;
+	default:
+		return WMI_HOST_THERMAL_MONITOR_INVALID;
+	}
+}
+
 #ifdef FEATURE_WPSS_THERMAL_MITIGATION
 void
 hdd_thermal_fill_clientid_priority(struct hdd_context *hdd_ctx, uint8_t mon_id,
@@ -65,12 +87,16 @@ hdd_thermal_fill_clientid_priority(struct hdd_context *hdd_ctx, uint8_t mon_id,
 	if (hdd_ctx->multi_client_thermal_mitigation) {
 		if (mon_id == THERMAL_MONITOR_APPS) {
 			params->priority  = priority_apps;
-			params->client_id = mon_id;
+			params->client_id =
+				hdd_convert_monitor_id_to_wmi_monitor_id(
+							THERMAL_MONITOR_APPS);
 			hdd_debug("Thermal client:%d priority_apps: %d", mon_id,
 				  priority_apps);
 		} else if (mon_id == THERMAL_MONITOR_WPSS) {
 			params->priority = priority_wpps;
-			params->client_id = mon_id;
+			params->client_id =
+				hdd_convert_monitor_id_to_wmi_monitor_id(
+						THERMAL_MONITOR_WPSS);
 			/* currently hardcoded,
 			 * can be changed based on requirement.
 			 */
@@ -89,7 +115,7 @@ hdd_send_thermal_mitigation_val(struct hdd_context *hdd_ctx, uint32_t level,
 	uint32_t dc, dc_off_percent;
 	uint32_t prio = 0, target_temp = 0;
 	struct wlan_fwol_thermal_temp thermal_temp = {0};
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool enable = true;
 	struct thermal_mitigation_params therm_cfg_params = {0};
 
@@ -154,7 +180,114 @@ hdd_send_thermal_mitigation_val(struct hdd_context *hdd_ctx, uint32_t level,
 		 */
 		hdd_ctx->dutycycle_off_percent = dc_off_percent;
 
+	return status;
+}
+
+#ifdef WLAN_DDR_BW_MITIGATION
+/**
+ * wlan_hdd_send_ddr_bw_mitigation_level() - send DDR BW mitigation level
+ * to the firmware
+ * @hdd_ctx: pointer to hdd context
+ * @level: Thermal mitigation level to set
+ * @mon_id: Thermal monitor id ie.. apps or wpss
+ *
+ * Send the requested bw mitigation value to the firmware for the
+ * requested BW mitigation monitor id.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_hdd_send_ddr_bw_mitigation_level(struct hdd_context *hdd_ctx,
+				      uint32_t level, uint8_t mon_id)
+{
+	uint32_t dc_off_percent;
+	uint32_t prio = 0, target_temp = 0;
+	struct wlan_fwol_bwm_params bwm_config = {0};
+	QDF_STATUS status;
+	bool enable = true;
+	struct thermal_mitigation_params therm_cfg_params = {0};
+
+	status = ucfg_fwol_get_ddr_bwm_config(hdd_ctx->psoc, &bwm_config);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("Failed to get fwol thermal obj");
+		return status;
+	}
+
+	if (!bwm_config.bw_mitigation_enable) {
+		hdd_debug("BW Mitigation feature is disabled via INI");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	switch (level) {
+	case HDD_DDR_BWM_THERMAL_LEVEL_EMERGENCY:
+		dc_off_percent = bwm_config.throttle_dutycycle_level[5];
+		break;
+	case HDD_DDR_BWM_THERMAL_LEVEL_CRITICAL:
+		dc_off_percent = bwm_config.throttle_dutycycle_level[4];
+		break;
+	case HDD_DDR_BWM_THERMAL_LEVEL_SEVERE:
+		dc_off_percent = bwm_config.throttle_dutycycle_level[3];
+		break;
+	case HDD_DDR_BWM_THERMAL_LEVEL_MODERATE:
+		dc_off_percent = bwm_config.throttle_dutycycle_level[2];
+		break;
+	case HDD_DDR_BWM_THERMAL_LEVEL_LIGHT:
+		dc_off_percent = bwm_config.throttle_dutycycle_level[1];
+		break;
+	case HDD_DDR_BWM_THERMAL_LEVEL_NONE:
+		enable = false;
+		dc_off_percent = bwm_config.throttle_dutycycle_level[0];
+		break;
+	default:
+		hdd_debug("Invalid bw mitigation state");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	therm_cfg_params.enable = enable;
+	therm_cfg_params.dc = bwm_config.bw_sampling_time;
+	therm_cfg_params.levelconf[0].dcoffpercent = dc_off_percent;
+	therm_cfg_params.levelconf[0].priority = prio;
+	therm_cfg_params.levelconf[0].tmplwm = target_temp;
+	therm_cfg_params.num_thermal_conf = 1;
+	therm_cfg_params.pdev_id = 0;
+
+	therm_cfg_params.priority  = bwm_config.priority_bwm;
+	therm_cfg_params.client_id =
+	      hdd_convert_monitor_id_to_wmi_monitor_id(THERMAL_MONITOR_DDR_BWM);
+
+	hdd_debug("sampling_time %d dc_off_per %d", bwm_config.bw_sampling_time,
+		  dc_off_percent);
+
+	status = sme_set_thermal_throttle_cfg(hdd_ctx->mac_handle,
+					      &therm_cfg_params);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("Failed to set throttle configuration %d", status);
+	else
+		/*
+		 * After SSR, the bw mitigation level is lost.
+		 * As SSR is hidden from userland, this command will not come
+		 * from userspace after a SSR. To restore this configuration,
+		 * save this in hdd context and restore after re-init.
+		 */
+		hdd_ctx->bwm_dutycycle_off_percent = dc_off_percent;
+
 	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline QDF_STATUS
+wlan_hdd_send_ddr_bw_mitigation_level(struct hdd_context *hdd_ctx,
+				      uint32_t level, uint8_t mon_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+QDF_STATUS
+hdd_send_ddr_bw_mitigation_level(struct hdd_context *hdd_ctx, uint32_t level,
+				 uint8_t mon_id)
+{
+	return wlan_hdd_send_ddr_bw_mitigation_level(hdd_ctx, level, mon_id);
+
 }
 
 /**
@@ -625,7 +758,8 @@ QDF_STATUS hdd_restore_thermal_mitigation_config(struct hdd_context *hdd_ctx)
 	therm_cfg_params.levelconf[0].priority = prio;
 	therm_cfg_params.levelconf[0].tmplwm = target_temp;
 	therm_cfg_params.num_thermal_conf = 1;
-	therm_cfg_params.client_id = THERMAL_MONITOR_APPS;
+	therm_cfg_params.client_id =
+		hdd_convert_monitor_id_to_wmi_monitor_id(THERMAL_MONITOR_APPS);
 	therm_cfg_params.priority = 0;
 
 	hdd_debug("dc %d dc_off_per %d enable %d", dc, dc_off_percent, enable);
@@ -638,12 +772,84 @@ QDF_STATUS hdd_restore_thermal_mitigation_config(struct hdd_context *hdd_ctx)
 	return status;
 }
 
+#ifdef WLAN_DDR_BW_MITIGATION
+/**
+ * wlan_hdd_restore_ddr_bw_mitigation_config - Restore the saved thermal config
+ * @hdd_ctx: HDD context
+ *
+ * Restore the thermal mitigation config after SSR.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_hdd_restore_ddr_bw_mitigation_config(struct hdd_context *hdd_ctx)
+{
+	bool enable = true;
+	uint32_t dc, dc_off_percent = 0;
+	uint32_t prio = 0, target_temp = 0;
+	struct wlan_fwol_bwm_params thermal_temp = {0};
+	QDF_STATUS status;
+	struct thermal_mitigation_params therm_cfg_params = {0};
+
+	status = ucfg_fwol_get_ddr_bwm_config(hdd_ctx->psoc, &thermal_temp);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("Failed to get fwol thermal obj");
+		return status;
+	}
+
+	dc_off_percent = hdd_ctx->bwm_dutycycle_off_percent;
+	dc = thermal_temp.bw_sampling_time;
+
+	if (!dc_off_percent)
+		enable = false;
+
+	therm_cfg_params.enable = enable;
+	therm_cfg_params.dc = dc;
+	therm_cfg_params.levelconf[0].dcoffpercent = dc_off_percent;
+	therm_cfg_params.levelconf[0].priority = prio;
+	therm_cfg_params.levelconf[0].tmplwm = target_temp;
+	therm_cfg_params.num_thermal_conf = 1;
+	therm_cfg_params.client_id =
+	     hdd_convert_monitor_id_to_wmi_monitor_id(THERMAL_MONITOR_DDR_BWM);
+	therm_cfg_params.priority = 0;
+
+	hdd_debug("dc %d dc_off_per %d enable %d", dc, dc_off_percent, enable);
+
+	status = sme_set_thermal_throttle_cfg(hdd_ctx->mac_handle,
+					      &therm_cfg_params);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err_rl("Failed to set throttle configuration %d", status);
+
+	return status;
+}
+#else
+static inline QDF_STATUS
+wlan_hdd_restore_ddr_bw_mitigation_config(struct hdd_context *hdd_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+QDF_STATUS hdd_restore_ddr_bw_mitigation_config(struct hdd_context *hdd_ctx)
+{
+	return wlan_hdd_restore_ddr_bw_mitigation_config(hdd_ctx);
+}
+
+/**
+ * __wlan_hdd_pld_set_thermal_mitigation() - set thermal/bw mitigation policy
+ * @dev: wiphy pointer
+ * @state: mitigation level
+ * @monitor_id: requester monitor id as per enum thermal_monitor_id
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+
 static int
 __wlan_hdd_pld_set_thermal_mitigation(struct device *dev, unsigned long state,
-				      int mon_id)
+				      int monitor_id)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	int ret;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -653,13 +859,27 @@ __wlan_hdd_pld_set_thermal_mitigation(struct device *dev, unsigned long state,
 	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED)
 		return -EINVAL;
 
-	status = hdd_send_thermal_mitigation_val(hdd_ctx, state, mon_id);
+	hdd_debug("PDL_SET for monitor_id: %d, state: %lu", monitor_id, state);
+	switch (monitor_id) {
+	case THERMAL_MONITOR_APPS:
+	case THERMAL_MONITOR_WPSS:
+		status = hdd_send_thermal_mitigation_val(hdd_ctx, state,
+							 monitor_id);
+		break;
+	case THERMAL_MONITOR_DDR_BWM:
+		status = hdd_send_ddr_bw_mitigation_level(hdd_ctx, state,
+							  monitor_id);
+		break;
+	default:
+		hdd_debug("Invalid monitor ID");
+		return -EINVAL;
+	}
 
 	return qdf_status_to_os_return(status);
 }
 
 int wlan_hdd_pld_set_thermal_mitigation(struct device *dev, unsigned long state,
-					int mon_id)
+					int monitor_id)
 {
 	struct osif_psoc_sync *psoc_sync;
 	int ret;
@@ -670,7 +890,7 @@ int wlan_hdd_pld_set_thermal_mitigation(struct device *dev, unsigned long state,
 	if (ret)
 		return ret;
 
-	ret =  __wlan_hdd_pld_set_thermal_mitigation(dev, state, mon_id);
+	ret =  __wlan_hdd_pld_set_thermal_mitigation(dev, state, monitor_id);
 
 	osif_psoc_sync_op_stop(psoc_sync);
 	hdd_exit();
@@ -706,6 +926,7 @@ void hdd_thermal_mitigation_unregister_wpps(struct hdd_context *hdd_ctx,
 {
 }
 #endif
+
 void hdd_thermal_mitigation_register(struct hdd_context *hdd_ctx,
 				     struct device *dev)
 {
@@ -719,6 +940,63 @@ void hdd_thermal_mitigation_unregister(struct hdd_context *hdd_ctx,
 {
 	hdd_thermal_mitigation_unregister_wpps(hdd_ctx, dev);
 	pld_thermal_unregister(dev, THERMAL_MONITOR_APPS);
+}
+
+#ifdef WLAN_DDR_BW_MITIGATION
+/**
+ * hdd_ddr_bw_mitigation_register_bwm() - Register the new cooling device
+ * (THERMAL_MONITOR_DDR_BWM) for platform-specific DDR BW mitigation support.
+ * @hdd_ctx: Pointer to Hdd context
+ * @dev: Pointer to the device
+ *
+ * Return: None
+ */
+static void hdd_ddr_bw_mitigation_register_bwm(struct hdd_context *hdd_ctx,
+					       struct device *dev)
+{
+	if (hdd_ctx->multi_client_thermal_mitigation)
+		pld_thermal_register(dev, HDD_THERMAL_STATE_EMERGENCY,
+				     THERMAL_MONITOR_DDR_BWM);
+}
+
+/**
+ * hdd_ddr_bw_mitigation_unregister_bwm() - Un-register the new cooling device
+ * (THERMAL_MONITOR_DDR_BWM) for platform-specific DDR BW mitigation support.
+ * @hdd_ctx: Pointer to Hdd context
+ * @dev: Pointer to the device
+ *
+ * Return: None
+ */
+static void hdd_ddr_bw_mitigation_unregister_bwm(struct hdd_context *hdd_ctx,
+						 struct device *dev)
+{
+	if (hdd_ctx->multi_client_thermal_mitigation)
+		pld_thermal_unregister(dev, THERMAL_MONITOR_DDR_BWM);
+}
+#else
+static inline void
+hdd_ddr_bw_mitigation_register_bwm(struct hdd_context *hdd_ctx,
+				   struct device *dev)
+{
+}
+
+static inline void
+hdd_ddr_bw_mitigation_unregister_bwm(struct hdd_context *hdd_ctx,
+				     struct device *dev)
+{
+}
+#endif
+
+void hdd_ddr_bw_mitigation_register(struct hdd_context *hdd_ctx,
+				     struct device *dev)
+{
+	hdd_ddr_bw_mitigation_register_bwm(hdd_ctx, dev);
+}
+
+void hdd_ddr_bw_mitigation_unregister(struct hdd_context *hdd_ctx,
+				       struct device *dev)
+{
+	hdd_ddr_bw_mitigation_unregister_bwm(hdd_ctx, dev);
 }
 
 #ifdef FW_THERMAL_THROTTLE_SUPPORT

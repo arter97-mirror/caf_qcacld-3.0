@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -243,6 +243,10 @@ static struct dp_prealloc_context g_dp_context_allocs[] = {
 #endif
 #ifdef WLAN_FEATURE_DP_MON_STATUS_RING_HISTORY
 	{DP_MON_STATUS_BUF_HIST_TYPE, sizeof(struct dp_mon_status_ring_history),
+	 false, false, NULL},
+#endif
+#ifdef DP_TX_MON_BUF_RING_HISTORY
+	{DP_TX_MON_BUF_HIST_TYPE, sizeof(struct dp_tx_mon_buf_ring_history),
 	 false, false, NULL},
 #endif
 #ifdef WIFI_MONITOR_SUPPORT

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -251,6 +251,25 @@ ucfg_fwol_get_thermal_temp(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_DDR_BW_MITIGATION
+QDF_STATUS
+ucfg_fwol_get_ddr_bwm_config(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_fwol_bwm_params *ddr_bwm_info)
+{
+	struct wlan_fwol_psoc_obj *fwol_obj;
+
+	fwol_obj = fwol_get_psoc_obj(psoc);
+	if (!fwol_obj) {
+		fwol_err("Failed to get fwol obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*ddr_bwm_info = fwol_obj->cfg.bwm_params_cfg;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 QDF_STATUS
 ucfg_fwol_is_neighbor_report_req_supported(struct wlan_objmgr_psoc *psoc,

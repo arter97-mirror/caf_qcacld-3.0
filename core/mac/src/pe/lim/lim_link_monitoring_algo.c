@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -231,6 +231,11 @@ void lim_delete_sta_context(struct mac_context *mac_ctx,
 				qdf_mem_free(msg);
 				return;
 			}
+
+			if (qdf_is_macaddr_zero((struct qdf_mac_addr *)&msg->addr2))
+				qdf_mem_copy(msg->addr2, session_entry->bssId,
+					     QDF_MAC_ADDR_SIZE);
+
 			lim_send_deauth_mgmt_frame(mac_ctx,
 				REASON_DISASSOC_DUE_TO_INACTIVITY,
 				msg->addr2, session_entry, false);

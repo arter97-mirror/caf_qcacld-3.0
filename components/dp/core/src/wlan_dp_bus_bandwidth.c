@@ -1905,6 +1905,7 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 	uint64_t curr_time_us;
 	uint32_t bw_interval_us;
 	hdd_cb_handle ctx = dp_ctx->dp_ops.callback_ctx;
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	if (wlan_dp_validate_context(dp_ctx))
 		goto stop_work;
@@ -1962,6 +1963,8 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 			if (dp_intf->link_monitoring.enabled)
 				dp_link_monitoring(dp_ctx, dp_intf);
 		}
+
+		cdp_process_ul_delay(soc, dp_intf->def_link->link_id);
 
 		ret = A_ERROR;
 		fwd_tx_packets = 0;

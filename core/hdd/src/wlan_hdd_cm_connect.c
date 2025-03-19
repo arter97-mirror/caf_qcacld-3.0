@@ -718,7 +718,7 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	}
 
 	if (policy_mgr_is_sta_sap_scc(hdd_ctx->psoc,
-				      hdd_ap_ctx->operating_chan_freq)) {
+				      hdd_ap_ctx->operating_chan_freq, false)) {
 		hdd_debug("DFS SAP is already in SCC with STA");
 		return true;
 	}
@@ -1825,8 +1825,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 			is_auth_required =
 				hdd_cm_is_roam_auth_required(sta_ctx, rsp);
 			if (is_auth_required)
-				wlan_acquire_peer_key_wakelock(hdd_ctx->pdev,
-							      rsp->bssid.bytes);
+				wlan_acquire_peer_key_wakelock(vdev,
+							       rsp->bssid.bytes);
 		}
 		hdd_debug("is_roam_offload %d is_roam %d vdev repurpose %d is_auth_required %d",
 			  is_roam_offload, is_roam,  is_vdev_repurpose, is_auth_required);
@@ -1961,6 +1961,8 @@ void hdd_cm_connect_active_notify(uint8_t vdev_id)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	struct wlan_hdd_link_info *link_info;
+	struct qdf_mac_addr *intf_mac;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
@@ -1975,6 +1977,16 @@ void hdd_cm_connect_active_notify(uint8_t vdev_id)
 
 	if (hdd_adapter_restore_link_vdev_map(link_info->adapter, true))
 		hdd_adapter_update_mlo_mgr_mac_addr(link_info->adapter);
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info,
+					   WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev) {
+		hdd_err("Invalid VDEV id %d", vdev_id);
+		return;
+	}
+	intf_mac = hdd_adapter_get_netdev_mac_addr(link_info->adapter);
+	ucfg_dp_update_def_link(hdd_ctx->psoc, intf_mac, vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
 }
 #endif
 

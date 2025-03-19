@@ -1128,6 +1128,9 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 
 	dev = adapter->dev;
 	vdev_id = wlan_vdev_get_id(vdev);
+
+	wlan_twt_concurrency_update(adapter->hdd_ctx);
+
 	if (hdd_adapter_is_link_adapter(adapter)) {
 		hdd_debug("replace link adapter dev with ml adapter dev");
 		assoc_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
@@ -9651,6 +9654,21 @@ bool hdd_mlosap_check_support_link_num(struct hdd_adapter *adapter)
 		return true;
 
 	return false;
+}
+
+bool hdd_mlosap_check_support_multi_link(struct hdd_context *hdd_ctx)
+{
+	bool status = false;
+	uint16_t  link_num;
+
+	link_num = wlan_mlme_get_mlo_sap_support_link(hdd_ctx->psoc);
+
+	if (link_num > 1)
+		status = true;
+
+	mlme_debug("ML SAP supported link:  %u", link_num);
+
+	return status;
 }
 #endif
 

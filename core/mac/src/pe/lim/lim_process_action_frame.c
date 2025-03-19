@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -300,6 +300,7 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 	tpDphHashNode sta_ptr;
 	uint16_t aid;
 	enum phy_ch_width ch_bw = 0;
+	enum phy_ch_width omn_ch_width = CH_WIDTH_INVALID;
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
@@ -342,11 +343,20 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 	lim_update_nss(mac_ctx, sta_ptr,
 		       operating_mode_frm->OperatingMode.rxNSS, session);
 
-	if (lim_update_channel_width(mac_ctx, sta_ptr, session,
-				   operating_mode_frm->OperatingMode.chanWidth,
-				   &ch_bw))
-		wlan_son_deliver_opmode(session->vdev,
-					ch_bw,
+
+	omn_ch_width = operating_mode_frm->OperatingMode.chanWidth;
+	/*
+	 * STA doesn't support 80 + 80 operation.
+	 * In lim_set_session_channel_params() the session->ch_width
+	 * is restrictd to 80 MHz if AP advertises 80 + 80.
+	 * Add similar logic here.
+	 */
+	if (omn_ch_width == CH_WIDTH_80P80MHZ)
+		omn_ch_width = CH_WIDTH_80MHZ;
+
+	if (lim_update_channel_width(mac_ctx, sta_ptr, session, omn_ch_width,
+				     &ch_bw))
+		wlan_son_deliver_opmode(session->vdev, ch_bw,
 					sta_ptr->vhtSupportedRxNss,
 					mac_hdr->sa);
 

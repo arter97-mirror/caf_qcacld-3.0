@@ -461,9 +461,7 @@ policy_mgr_dfs_master_cfg_changed(struct wlan_objmgr_psoc *psoc,
 
 	cfg->sta_sap_scc_on_dfs_chnl =
 		cfg_get(psoc, CFG_STA_SAP_SCC_ON_DFS_CHAN);
-	if (cfg->sta_sap_scc_on_dfs_chnl ==
-			PM_STA_SAP_ON_DFS_MASTER_MODE_FLEX &&
-	    !dfs_master_capable)
+	if (!dfs_master_capable)
 		cfg->sta_sap_scc_on_dfs_chnl = 0;
 	policy_mgr_debug("sta_sap_scc_on_dfs_chnl %d, dfs_master_capable %d",
 			 cfg->sta_sap_scc_on_dfs_chnl,
@@ -6891,6 +6889,7 @@ policy_mgr_fill_ml_inactive_link_vdev_bitmap(
  * allow link state change.
  * @psoc: psoc object
  * @reason: set link state reason
+ * @param: set active link param
  *
  * If ml sta is not "connected" state, no need to do link state handling.
  * After disconnected, target will clear the force active/inactive state
@@ -6900,8 +6899,10 @@ policy_mgr_fill_ml_inactive_link_vdev_bitmap(
  * Return: QDF_STATUS_SUCCESS if link state is allowed to change
  */
 static QDF_STATUS
-policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
-					    enum mlo_link_force_reason reason)
+policy_mgr_handle_ml_sta_link_state_allowed(
+				struct wlan_objmgr_psoc *psoc,
+				enum mlo_link_force_reason reason,
+				struct mlo_link_set_active_param *param)
 {
 	uint8_t num_ml_sta = 0, num_disabled_ml_sta = 0, num_non_ml = 0;
 	uint8_t ml_sta_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
@@ -6910,6 +6911,8 @@ policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	bool ml_sta_is_not_connected = false;
 	bool ml_sta_is_link_removal = false;
+	uint8_t ml_removal_link_id = WLAN_INVALID_LINK_ID;
+	uint32_t force_active_bitmap = 0;
 	uint8_t i;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -6919,6 +6922,12 @@ policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if (param && param->use_ieee_link_id) {
+		if (param->force_mode == MLO_LINK_FORCE_MODE_ACTIVE ||
+		    param->force_mode == MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE)
+			force_active_bitmap =
+				param->force_cmd.ieee_link_id_bitmap;
+	}
 	policy_mgr_get_ml_sta_info(pm_ctx, &num_ml_sta, &num_disabled_ml_sta,
 				   ml_sta_vdev_lst, ml_freq_lst, &num_non_ml,
 				   NULL, NULL);
@@ -6943,8 +6952,10 @@ policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
 		}
 		if (wlan_get_vdev_link_removed_flag_by_vdev_id(
 						psoc, ml_sta_vdev_lst[i])) {
-			policy_mgr_debug("ml sta vdev %d link removed",
-					 ml_sta_vdev_lst[i]);
+			ml_removal_link_id = wlan_vdev_get_link_id(vdev);
+			policy_mgr_debug("ml sta vdev %d link id %d removed",
+					 ml_sta_vdev_lst[i],
+					 ml_removal_link_id);
 			ml_sta_is_link_removal = true;
 		}
 
@@ -6955,8 +6966,18 @@ policy_mgr_handle_ml_sta_link_state_allowed(struct wlan_objmgr_psoc *psoc,
 		status = QDF_STATUS_E_FAILURE;
 	} else if (reason != MLO_LINK_FORCE_REASON_LINK_REMOVAL &&
 		   reason != MLO_LINK_FORCE_REASON_LINK_DELETE) {
-		if (ml_sta_is_link_removal)
+		/* removed link can't be active */
+		if (param && param->use_ieee_link_id &&
+		    ml_sta_is_link_removal) {
+			if (ml_removal_link_id != WLAN_INVALID_LINK_ID &&
+			    force_active_bitmap & (1 << ml_removal_link_id)) {
+				status = QDF_STATUS_E_FAILURE;
+				policy_mgr_debug("don't active rm link");
+			}
+		} else if (ml_sta_is_link_removal) {
 			status = QDF_STATUS_E_FAILURE;
+			policy_mgr_debug("reject");
+		}
 	}
 	policy_mgr_debug("set link reason %d status %d rm %d", reason, status,
 			 ml_sta_is_link_removal);
@@ -6980,7 +7001,8 @@ policy_mgr_validate_set_mlo_link_cb(struct wlan_objmgr_psoc *psoc,
 				    struct mlo_link_set_active_param *param)
 {
 	return policy_mgr_handle_ml_sta_link_state_allowed(psoc,
-							   param->reason);
+							   param->reason,
+							   param);
 }
 
 uint32_t
@@ -7568,6 +7590,19 @@ policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 
 	policy_mgr_store_and_del_conn_info_by_vdev_id(
 		psoc, vdev_id, info, &num_del);
+
+	if (!num_del && !policy_mgr_is_hw_dbs_capable(psoc)) {
+		/**
+		 * In non DBS, case if the vdev id is inactive it won't be
+		 * deleted from policy mgr, thus try get the active vdev_id,
+		 * to avoid 3 home channel check to kick in, active link,
+		 * existing concurrency and new freq for the inactive link.
+		 */
+		vdev_id = ucfg_mlo_get_active_vdev_id(vdev);
+		policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, vdev_id,
+							      info, &num_del);
+	}
+
 	conc_ext_flags.value =
 	policy_mgr_get_conc_ext_flags(vdev, true);
 	ml_nlink_get_dynamic_inactive_links(psoc, vdev, &dyn_inact_bmap,
@@ -8774,7 +8809,7 @@ policy_mgr_handle_sap_cli_go_ml_sta_up_csa(struct wlan_objmgr_psoc *psoc,
 	}
 
 	status = policy_mgr_handle_ml_sta_link_state_allowed(
-				psoc, MLO_LINK_FORCE_REASON_CONNECT);
+				psoc, MLO_LINK_FORCE_REASON_CONNECT, NULL);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
@@ -9032,7 +9067,7 @@ policy_mgr_re_enable_ml_sta_on_p2p_sap_sta_down(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 
 	status = policy_mgr_handle_ml_sta_link_state_allowed(
-				psoc, MLO_LINK_FORCE_REASON_DISCONNECT);
+				psoc, MLO_LINK_FORCE_REASON_DISCONNECT, NULL);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
@@ -9299,7 +9334,7 @@ void policy_mgr_handle_link_removal_on_vdev(struct wlan_objmgr_vdev *vdev)
 	wlan_set_vdev_link_removed_flag_by_vdev_id(psoc, vdev_id,
 						   true);
 	status = policy_mgr_handle_ml_sta_link_state_allowed(
-			psoc, MLO_LINK_FORCE_REASON_LINK_REMOVAL);
+			psoc, MLO_LINK_FORCE_REASON_LINK_REMOVAL, NULL);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wlan_set_vdev_link_removed_flag_by_vdev_id(psoc, vdev_id,
 							   false);
@@ -10650,7 +10685,7 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 		go_force_scc = policy_mgr_go_scc_enforced(psoc);
 		if ((mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE) &&
 		    (!sta_sap_scc_on_dfs_chan ||
-		     !policy_mgr_is_sta_sap_scc(psoc, ch_freq) ||
+		     !policy_mgr_is_sta_sap_scc(psoc, ch_freq, false) ||
 		     (!go_force_scc && mode == PM_P2P_GO_MODE))) {
 			if (is_dfs_ch)
 				match = policy_mgr_disallow_mcc(psoc,
@@ -12496,7 +12531,7 @@ policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 	if (!wlan_reg_is_freq_indoor(pdev, ch_freq))
 		return true;
 
-	is_scc = policy_mgr_is_sta_sap_scc(psoc, ch_freq);
+	is_scc = policy_mgr_is_sta_sap_scc(psoc, ch_freq, true);
 	mode = wlan_get_opmode_from_vdev_id(pdev, vdev_id);
 	ucfg_mlme_get_indoor_channel_support(psoc, &indoor_support);
 
@@ -12981,7 +13016,7 @@ bool policy_mgr_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc,
 #endif
 
 bool policy_mgr_is_sta_sap_scc(struct wlan_objmgr_psoc *psoc,
-			       uint32_t sap_freq)
+			       uint32_t sap_freq, bool check_for_inactive_links)
 {
 	uint32_t conn_index;
 	bool is_scc = false;
@@ -13007,6 +13042,14 @@ bool policy_mgr_is_sta_sap_scc(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	if (!is_scc && check_for_inactive_links &&
+	    !policy_mgr_is_hw_dbs_capable(psoc) &&
+	    policy_mgr_if_freq_n_inactive_links_freq_same(psoc, sap_freq)) {
+		policy_mgr_debug("Standby/inactive link present for freq %d",
+				 sap_freq);
+		is_scc = true;
+	}
 
 	return is_scc;
 }
@@ -13571,9 +13614,18 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	uint8_t sta_vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
 	QDF_STATUS status;
 	struct policy_mgr_pcl_list pcl;
+	bool ml_sap_vdev = false;
+	uint32_t conc_ml_sap_freq;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
 	if (!psoc || !vdev || !pdev) {
 		policy_mgr_debug("psoc or vdev or pdev is NULL");
+		return false;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
 		return false;
 	}
 
@@ -13717,6 +13769,21 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	 * primary channel are same.
 	 */
 	if (*con_freq == ch_freq && wlan_reg_get_bw_value(ch_width) > 20)
+		return false;
+
+	/*
+	 * In case of MLO SAP if the existing link freq is
+	 * same as ch_freq, don't allow. Instead override it.
+	 */
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	conc_ml_sap_freq = policy_mgr_get_conc_ml_sap_link_freq(
+							psoc,
+							wlan_vdev_get_id(vdev),
+							&ml_sap_vdev);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	if (conc_ml_sap_freq == ch_freq)
 		return false;
 
 	return true;

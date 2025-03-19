@@ -51,6 +51,7 @@
 #include "wlan_lmac_if_def.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlo_mgr_roam.h"
 #include "wlan_mlme_main.h"
 #include <wlan_mlo_mgr_link_switch.h>
 
@@ -488,6 +489,15 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 					       &bcn->HTInfo,
 					       &bcn->HTCaps,
 					       &bcn->OperatingMode);
+	/*
+	 * STA doesn't support 80 + 80 operation.
+	 * In lim_set_session_channel_params() the session->ch_width
+	 * is restrictd to 80 MHz if AP advertises 80 + 80.
+	 * Add similar logic here.
+	 */
+	if (bcn_vht_chwidth == CH_WIDTH_80P80MHZ)
+		bcn_vht_chwidth = CH_WIDTH_80MHZ;
+
 	lim_update_channel_width(mac_ctx, sta_ds, session,
 				 bcn_vht_chwidth, &ch_bw);
 }
@@ -614,9 +624,13 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	uint8_t bpcc;
 	bool cu_flag = true;
 	bool is_power_constraint_abs = false;
-	int8_t rf_mode_force_pwr_type;
 
 	if (mlo_is_mld_sta(session->vdev)) {
+		if (!mlo_check_if_all_vdev_up(session->vdev)) {
+			pe_debug_rl("Ignore beacon processing, not all VDEVs are UP");
+			return;
+		}
+
 		cu_flag = false;
 		status = lim_get_bpcc_from_mlo_ie(bcn, &bpcc);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -687,18 +701,10 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						REG_CURRENT_MAX_AP_TYPE;
 		}
 
-		status = wlan_mlme_get_rf_mode_force_pwr_type(
-						mac_ctx->psoc,
-						&rf_mode_force_pwr_type);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			pe_err("Failed to get RF test mode for power type value");
-			return;
-		}
-
 		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev, &pwr_type_6g,
 				session->ap_defined_power_type_6g,
-				bcn->chan_freq, rf_mode_force_pwr_type);
+				bcn->chan_freq);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 

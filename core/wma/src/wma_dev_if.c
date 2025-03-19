@@ -1796,9 +1796,70 @@ void wma_peer_tbl_trans_add_entry(struct wlan_objmgr_peer *peer, bool is_create,
 }
 #endif
 
+#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+QDF_STATUS
+wma_remove_existing_pasn_peer(struct wlan_objmgr_psoc *psoc,
+			      struct cm_peer_create_req *req)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct peer_delete_cmd_params param = {0};
+	struct wma_target_req *del_req;
+	uint8_t vdev_id = req->vdev_id;
+	uint8_t req_type;
+
+	if (!wma) {
+		wma_err("wma_handle is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wma_acquire_wakelock(&wma->wmi_cmd_rsp_wake_lock,
+			     WMA_PEER_DELETE_RESPONSE_TIMEOUT);
+
+	param.vdev_id = vdev_id;
+	qdf_status = wmi_unified_peer_delete_send(wma->wmi_handle,
+						  req->peer_mac.bytes,
+						  &param);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		wma_err("Peer delete could not be sent to firmware %d",
+			qdf_status);
+		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+		/* Clear default bit and set to NOT_START_UNMAP */
+		qdf_status = QDF_STATUS_E_FAILURE;
+
+		return qdf_status;
+	}
+	wma_remove_objmgr_peer(wma, wma->interfaces[vdev_id].vdev,
+			       req->peer_mac.bytes);
+
+	if (!wmi_service_enabled(wma->wmi_handle,
+				 wmi_service_sync_delete_cmds)) {
+		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+		lim_continue_bss_peer_create(req);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	req_type = WMA_DELETE_STA_EXISTING_PASN_PEER_RSP;
+
+	wma_debug("vdev:%d Wait for the peer delete response", vdev_id);
+	del_req = wma_fill_hold_req(wma, vdev_id,
+				    WMA_DELETE_STA_REQ, req_type,
+				    req->peer_mac.bytes,
+				    req, WMA_DELETE_STA_TIMEOUT);
+	if (!del_req) {
+		wma_err("vdev:%d Failed to allocate request", vdev_id);
+		qdf_status = QDF_STATUS_E_FAILURE;
+		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+		return qdf_status;
+	}
+
+	return qdf_status;
+}
+#endif
+
 /**
- * wma_remove_peer() - remove peer information from host driver and fw
- * @wma: wma handle
+* wma_remove_peer() - remove peer information from host driver and fw
+* @wma: wma handle
  * @mac_addr: peer mac address, to be removed
  * @vdev_id: vdev id
  * @no_fw_peer_delete: If true dont send peer delete to firmware
@@ -1925,7 +1986,7 @@ peer_detach:
 	}
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
-	wlan_release_peer_key_wakelock(wma->pdev, peer_addr);
+	wlan_release_peer_key_wakelock(iface->vdev, peer_addr);
 	wma_remove_objmgr_peer(wma, iface->vdev, peer_addr);
 
 	iface->peer_count--;
@@ -3249,6 +3310,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	tp_wma_handle wma_handle;
 	uint8_t enable_sifs_burst = 0;
 	uint32_t sta_keep_alive;
+	enum wmi_host_active_apf_mode uc_mode, mcbc_mode;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -3323,6 +3385,22 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 		}
 	} else {
 		wma_err("Failed to get value for WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED, leaving unchanged");
+	}
+
+	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
+	    ucfg_pmo_is_apf_enabled(wma_handle->psoc) &&
+	    !ucfg_pmo_is_configure_apf_per_screen_state(wma_handle->psoc)) {
+		uc_mode = wma_get_fw_active_apf_mode(
+					wma_handle->active_uc_apf_mode);
+		mcbc_mode = wma_get_fw_active_apf_mode(
+					wma_handle->active_mc_bc_apf_mode);
+		wma_debug("Configuring Active APF Mode UC:%d MC/BC:%d for vdev %u",
+			  uc_mode, mcbc_mode, vdev_id);
+		ret = wmi_unified_set_active_apf_mode_cmd(
+						wma_handle->wmi_handle,
+						vdev_id, uc_mode, mcbc_mode);
+		if (QDF_IS_STATUS_ERROR(ret))
+			wma_err("Failed to configure active APF mode");
 	}
 
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
@@ -3913,6 +3991,10 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 		wma_send_msg_high_priority(wma, WMA_DELETE_STA_RSP,
 					   req_msg->user_data, 0);
 		break;
+	case WMA_DELETE_STA_EXISTING_PASN_PEER_RSP:
+		wma_debug("Delete PASN peer completed. Resume BSS peer create");
+		lim_continue_bss_peer_create(req_msg->user_data);
+		break;
 	default:
 		break;
 	}
@@ -4068,6 +4150,19 @@ void wma_hold_req_timer(void *data)
 					CM_GENERIC_FAILURE,
 					QDF_STATUS_E_FAILURE, 0, false);
 		cm_free_join_req(tgt_req->user_data);
+	} else if (tgt_req->msg_type == WMA_DELETE_STA_REQ &&
+		   tgt_req->type == WMA_DELETE_STA_EXISTING_PASN_PEER_RSP) {
+		if (wma_crash_on_fw_timeout(wma->fw_timeout_crash))
+			wma_trigger_recovery_assert_on_fw_timeout(
+					WMA_DELETE_STA_REQ,
+					QDF_PEER_DELETION_TIMEDOUT);
+		if (!mac) {
+			wma_err("mac: Null Pointer Error");
+			goto timer_destroy;
+		}
+
+		lim_continue_bss_peer_create(tgt_req->user_data);
+
 	} else if ((tgt_req->msg_type == SIR_HAL_PDEV_SET_HW_MODE) &&
 			(tgt_req->type == WMA_PDEV_SET_HW_MODE_RESP)) {
 		struct sir_set_hw_mode_resp *params =

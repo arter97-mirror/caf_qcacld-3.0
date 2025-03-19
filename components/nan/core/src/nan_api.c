@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,6 +32,7 @@
 #include "wlan_objmgr_vdev_obj.h"
 #include "nan_ucfg_api.h"
 #include <wlan_mlme_api.h>
+#include "cfg_ucfg_api.h"
 
 static QDF_STATUS nan_psoc_obj_created_notification(
 		struct wlan_objmgr_psoc *psoc, void *arg_list)
@@ -481,20 +482,28 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 		wlan_mlme_get_srd_master_mode_for_vdev(wlan_pdev_get_psoc(pdev),
 						       QDF_NAN_DISC_MODE,
 						       &nan_allowed);
-
-	/* Check for Indoor channels */
-	if (wlan_reg_is_freq_indoor(pdev, freq))
+	if (wlan_reg_is_dfs_for_freq(pdev, freq)) {
+		return false;
+	} else if (wlan_reg_is_freq_indoor(pdev, freq)) {
 		wlan_mlme_get_indoor_support_for_nan(wlan_pdev_get_psoc(pdev),
 						     &nan_allowed);
-	/*
-	 * Check for dfs only if channel is not indoor,
-	 * Check for passive channels as well
-	 */
-	else if (wlan_reg_is_dfs_for_freq(pdev, freq) ||
-		 wlan_reg_is_passive_for_freq(pdev, freq))
-		nan_allowed = false;
+	} else if (wlan_reg_is_passive_for_freq(pdev, freq)) {
+		return false;
+	}
 
 	return nan_allowed;
+}
+
+bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
+
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return cfg_default(CFG_DISABLE_6G_NAN);
+	}
+
+	return nan_obj->cfg_param.disable_6g_nan;
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO

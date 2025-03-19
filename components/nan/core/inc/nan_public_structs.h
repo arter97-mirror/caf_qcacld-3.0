@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -59,6 +59,8 @@ struct wlan_objmgr_vdev;
 #define NAN_5GHZ_SOCIAL_CH_149_FREQ 5745
 #define NAN_5GHZ_SOCIAL_CH_44_FREQ 5220
 #define NAN_2GHZ_SOCIAL_CH_FREQ 2437
+
+#define NAN_PARING_BIT 1
 
 /**
  * enum nan_discovery_msg_type - NAN msg type

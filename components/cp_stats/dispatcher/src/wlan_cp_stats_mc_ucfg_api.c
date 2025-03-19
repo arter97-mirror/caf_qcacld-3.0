@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -461,6 +461,10 @@ QDF_STATUS ucfg_mc_cp_stats_inc_wake_lock_stats_by_protocol(
 		stats->icmpv6_count++;
 		stats->ipv6_mcast_na_stats++;
 		break;
+	case QDF_PROTO_ICMPV6_MLQ:
+		stats->icmpv6_count++;
+		stats->ipv6_mcast_mlq_stats++;
+		break;
 	default:
 		break;
 	}
@@ -581,6 +585,7 @@ static void vdev_iterator(struct wlan_objmgr_psoc *psoc, void *vdev, void *arg)
 	stats->ipv6_mcast_ra_stats += vdev_stats->ipv6_mcast_ra_stats;
 	stats->ipv6_mcast_ns_stats += vdev_stats->ipv6_mcast_ns_stats;
 	stats->ipv6_mcast_na_stats += vdev_stats->ipv6_mcast_na_stats;
+	stats->ipv6_mcast_mlq_stats += vdev_stats->ipv6_mcast_mlq_stats;
 	stats->icmpv4_count += vdev_stats->icmpv4_count;
 	stats->icmpv6_count += vdev_stats->icmpv6_count;
 	stats->rssi_breach_wake_up_count +=
@@ -698,6 +703,7 @@ QDF_STATUS ucfg_mc_cp_stats_write_wow_stats(
 			     "\tIPv6 multicast RA: %u\n"
 			     "\tIPv6 multicast NS: %u\n"
 			     "\tIPv6 multicast NA: %u\n"
+			     "\tIPv6 multicast MLQ: %u\n"
 			     "\tICMPv4: %u\n"
 			     "\tICMPv6: %u\n"
 			     "\tRSSI Breach: %u\n"
@@ -718,6 +724,7 @@ QDF_STATUS ucfg_mc_cp_stats_write_wow_stats(
 			     wow_stats.ipv6_mcast_ra_stats,
 			     wow_stats.ipv6_mcast_ns_stats,
 			     wow_stats.ipv6_mcast_na_stats,
+			     wow_stats.ipv6_mcast_mlq_stats,
 			     wow_stats.icmpv4_count,
 			     wow_stats.icmpv6_count,
 			     wow_stats.rssi_breach_wake_up_count,

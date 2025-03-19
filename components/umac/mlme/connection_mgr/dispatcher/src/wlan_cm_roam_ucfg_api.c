@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,6 +31,11 @@
 bool ucfg_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 {
 	return wlan_is_rso_enabled(pdev, vdev_id);
+}
+
+bool ucfg_is_rso_disabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
+{
+	return wlan_is_rso_disabled(pdev, vdev_id);
 }
 
 QDF_STATUS

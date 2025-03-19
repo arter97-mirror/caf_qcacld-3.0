@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -285,6 +285,7 @@ static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_mgr_osif_update_mac_addr = hdd_link_switch_vdev_mac_addr_update,
 	.mlo_roam_osif_update_mac_addr = hdd_roam_vdev_mac_addr_update,
 	.mlo_mgr_osif_link_rej_update_mac_addr = hdd_link_rej_mac_addr_update,
+	.mlo_link_recfg_osif_update_mac_addr = hdd_link_recfg_mac_addr_update,
 	.mlo_mgr_osif_link_switch_notification =
 					hdd_adapter_link_switch_notification,
 	.mlo_mgr_osif_update_link_state = hdd_mlo_update_vdev_active_flag,

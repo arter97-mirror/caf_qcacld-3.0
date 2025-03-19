@@ -732,7 +732,6 @@ struct wlan_dp_stc_burst_samples {
 	struct wlan_dp_stc_txrx_samples txrx_samples;
 	struct wlan_dp_stc_burst_stats tx;
 	struct wlan_dp_stc_burst_stats rx;
-	uint64_t sample_window_ns;
 };
 
 #define WLAN_DP_TXRX_SAMPLES_READY BIT(0)
@@ -746,14 +745,14 @@ struct wlan_dp_stc_burst_samples {
  * @flow_tuple: tuple of the flow
  * @txrx_samples: TxRx samples for this flow
  * @burst_sample: Burst samples for this flow
- * @cur_burst_stats_stage: Current burst stats stage
+ * @curr_stats_stage: Current stats collection stage
  */
 struct wlan_dp_stc_flow_samples {
 	uint32_t cookie;
 	struct flow_info flow_tuple;
 	struct wlan_dp_stc_txrx_samples txrx_samples[DP_STC_TXRX_SAMPLES_MAX][DP_TXRX_SAMPLES_WINDOW_MAX];
-	struct wlan_dp_stc_burst_samples burst_sample;
-	uint8_t cur_burst_stats_stage;
+	struct wlan_dp_stc_burst_samples burst_sample[DP_STC_BURST_STAGE_MAX];
+	uint8_t curr_stats_stage;
 };
 
 /**

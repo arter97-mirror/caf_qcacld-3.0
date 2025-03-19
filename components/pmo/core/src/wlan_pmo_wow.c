@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -61,6 +61,7 @@ QDF_STATUS pmo_core_del_wow_pattern(struct wlan_objmgr_vdev *vdev)
 	/* clear all default patterns configured by pmo */
 	for (id = 0; id < pattern_count; id++)
 		status = pmo_tgt_del_wow_pattern(vdev, id, false);
+	pmo_set_wow_default_ptrn(vdev_ctx, 0);
 
 	/* clear all user patterns configured by pmo */
 	pattern_count = pmo_get_wow_user_ptrn(vdev_ctx);

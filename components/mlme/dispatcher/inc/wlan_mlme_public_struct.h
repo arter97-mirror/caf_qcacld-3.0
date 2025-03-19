@@ -139,6 +139,20 @@ struct mlme_cfg_str {
 	uint8_t data[CFG_STR_DATA_LEN];
 };
 
+#define MAX_NUM_FRAMES 4
+/**
+ * struct wlan_link_recfg_info - ML reconfig info
+ *
+ * @num_frame: Number of frames used to send link reconfig request
+ * @add_link_bm: Bitmap of link IDs of links to be added
+ * @delete_link_bm: Bitmap of link IDs of links to be removed
+ */
+struct wlan_link_recfg_info {
+	uint8_t num_frame;
+	uint16_t add_link_bm[MAX_NUM_FRAMES];
+	uint16_t delete_link_bm[MAX_NUM_FRAMES];
+};
+
 /**
  * enum e_edca_type - to index edca params for edca profile
  *			 EDCA profile   AC   unicast/bcast

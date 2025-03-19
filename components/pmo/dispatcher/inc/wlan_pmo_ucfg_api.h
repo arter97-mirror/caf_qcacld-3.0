@@ -583,6 +583,15 @@ ucfg_pmo_enhanced_mc_filter_disable(struct wlan_objmgr_vdev *vdev)
 	return pmo_core_enhanced_mc_filter_disable(vdev);
 }
 
+/**
+ * ucfg_pmo_tgt_psoc_get_runtime_pm_in_progress() - get runtime status
+ * @psoc: objmgr psoc
+ *
+ * Return: true if runtime pm is in progress else false
+ */
+bool
+ucfg_pmo_tgt_psoc_get_runtime_pm_in_progress(struct wlan_objmgr_psoc *psoc);
+
 #ifdef FEATURE_WLAN_DYNAMIC_ARP_NS_OFFLOAD
 /**
  * ucfg_pmo_dynamic_arp_ns_offload_enable() - enable arp/ns offload

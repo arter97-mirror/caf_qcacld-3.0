@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -984,6 +984,9 @@ void pld_pcie_schedule_recovery_work(struct device *dev,
 	switch (reason) {
 	case PLD_REASON_LINK_DOWN:
 		cnss_reason = CNSS_REASON_LINK_DOWN;
+		break;
+	case PLD_REASON_FW_ASSERTION_FAIL:
+		cnss_reason = CNSS_REASON_FW_ASSERTION_FAIL;
 		break;
 	default:
 		cnss_reason = CNSS_REASON_DEFAULT;

@@ -40,6 +40,7 @@ _target_chipset_map = {
     "canoe": [
         "peach-v2",
         "kiwi-v2",
+        "wcn7750",
     ],
     "sdxkova": [
         "kiwi-v2",

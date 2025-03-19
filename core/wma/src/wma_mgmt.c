@@ -1417,10 +1417,18 @@ wma_populate_peer_mlo_common_info_sta(tp_wma_handle wma,
 			params->msd_caps.med_sync_ofdm_ed_thresh;
 	req->mlo_params.medium_sync_max_txop_num =
 			params->msd_caps.med_sync_max_txop_num;
+	/* If host trigger link switch, not need to set link_switch_in_progress
+	 * flag.
+	 */
 	req->mlo_params.link_switch_in_progress =
-		wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
+		wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) &&
+		!mlo_mgr_is_link_add_link_switch(vdev);
+	/* If peer assoc for link add connecting or link add by link switch,
+	 * set link_add_in_progress.
+	 */
 	req->mlo_params.link_add_in_progress =
-		wlan_cm_is_link_add_connecting(vdev);
+		wlan_cm_is_link_add_connecting(vdev) ||
+		mlo_mgr_is_link_add_link_switch(vdev);
 	/*
 	 * Set max simultaneous links = 1 for MLSR, 2 for MLMR. The +1
 	 * is added as per the agreement with FW for backward
@@ -1865,7 +1873,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	    ) {
 		if (!params->no_ptk_4_way) {
 			cmd->need_ptk_4_way = 1;
-			wlan_acquire_peer_key_wakelock(wma->pdev,
+			wlan_acquire_peer_key_wakelock(intr->vdev,
 						       cmd->peer_mac);
 		}
 	}

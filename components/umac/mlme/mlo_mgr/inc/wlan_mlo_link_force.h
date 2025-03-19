@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -54,6 +54,7 @@
  * @ml_nlink_acs_completed_evt: sap acs complete
  * @ml_nlink_t2lm_request_evt: T2LM request
  * @ml_nlink_pre_t2lm_request_evt: Pre T2LM request
+ * @ml_nlink_link_recfg_completed_evt: link recfg complete
  */
 enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_start_evt,
@@ -83,7 +84,8 @@ enum ml_nlink_change_event_type {
 	ml_nlink_acs_start_evt,
 	ml_nlink_acs_completed_evt,
 	ml_nlink_t2lm_request_evt,
-	ml_nlink_pre_t2lm_request_evt
+	ml_nlink_pre_t2lm_request_evt,
+	ml_nlink_link_recfg_completed_evt,
 };
 
 enum ml_emlsr_disable_request {
@@ -237,6 +239,7 @@ static inline const char *link_evt_to_string(uint32_t evt)
 	CASE_RETURN_STRING(ml_nlink_acs_start_evt);
 	CASE_RETURN_STRING(ml_nlink_acs_completed_evt);
 	CASE_RETURN_STRING(ml_nlink_t2lm_request_evt);
+	CASE_RETURN_STRING(ml_nlink_link_recfg_completed_evt);
 	default:
 		return "Unknown";
 	}
@@ -484,6 +487,19 @@ ml_nlink_get_curr_force_state(struct wlan_objmgr_psoc *psoc,
 void
 ml_nlink_clr_force_state(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ml_nlink_update_force_state_on_link_delete() - update force link
+ * bitmap when link is deleted
+ * @vdev: vdev object
+ * @delete_link_id: link id to be deleted
+ *
+ * Return: None
+ */
+void
+ml_nlink_update_force_state_on_link_delete(
+			struct wlan_objmgr_vdev *vdev,
+			uint8_t delete_link_id);
 
 /**
  * ml_nlink_clr_requested_emlsr_mode() - clear the requested emlsr mode

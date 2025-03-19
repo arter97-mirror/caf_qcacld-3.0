@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -251,6 +251,15 @@ bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
 bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq);
 
 /**
+ * wlan_get_disable_6g_nan() - Check if NAN is disabled on 6Ghz
+ * @psoc: psoc context
+ *
+ * Return: True if NAN is disabled on 6Ghz, else false.
+ */
+
+bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc);
+
+/**
  * nan_handle_emlsr_concurrency()- Handle NAN+eMLSR concurrency
  * @psoc: pointer to psoc object
  * @nan_enable: Carries true if NAN is getting enabled.
@@ -289,6 +298,23 @@ qdf_freq_t wlan_nan_sap_override_freq(struct wlan_objmgr_psoc *psoc,
  */
 bool wlan_nan_is_disc_active(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_get_nan_config: NAN capability configuration
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: NAN capability bitmap
+ */
+static inline uint32_t wlan_get_nan_config(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
+
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return 0;
+	}
+
+	return nan_obj->cfg_param.nan_config;
+}
 #else /* WLAN_FEATURE_NAN */
 static inline QDF_STATUS nan_init(void)
 {
@@ -359,6 +385,12 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 	return false;
 }
 
+static inline
+bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
 static inline void
 nan_handle_emlsr_concurrency(struct wlan_objmgr_psoc *psoc, bool nan_enable)
 {}
@@ -381,6 +413,11 @@ static inline
 bool wlan_nan_is_disc_active(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
+}
+
+static inline uint32_t wlan_get_nan_config(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
 }
 #endif /* WLAN_FEATURE_NAN */
 

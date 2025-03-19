@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -454,6 +454,24 @@ void wlan_cm_init_occupied_ch_freq_list(struct wlan_objmgr_pdev *pdev,
 uint32_t cm_crypto_authmode_to_wmi_authmode(int32_t authmodeset,
 					    int32_t akm,
 					    int32_t ucastcipherset);
+
+/**
+ * cm_wmi_auth_type_to_crypto_key_mgmt() - API to convert akm wmi
+ * auth type to crypto key mgmt type
+ * @akm: akm wmi auth type
+ *
+ * Return: crypto key management type
+ */
+uint32_t cm_wmi_auth_type_to_crypto_key_mgmt(uint32_t akm);
+
+/**
+ * cm_get_wmi_auth_type() - API to get wmi auth type
+ * @akm: akm
+ *
+ * Return: WMI auth type
+ */
+uint32_t cm_get_wmi_auth_type(uint32_t akm);
+
 uint8_t *wlan_cm_get_rrm_cap_ie_data(void);
 
 /**
@@ -2172,6 +2190,20 @@ bool wlan_is_roaming_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
  * Return: True if RSO state is any of the above mentioned states.
  */
 bool wlan_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
+
+/**
+ * wlan_is_rso_disabled() - Check if RSO state is disabled
+ *
+ * @pdev: pointer to pdev object
+ * @vdev_id : Vdev id
+ *
+ * Check if the ROAM SCAN OFFLOAD disable is sent to firmware. Host driver
+ * tracks this through RSO state machine and the states can be WLAN_ROAM_DEINIT
+ * and WLAN_ROAM_RSO_STOPPED.
+ *
+ * Return: True if RSO state is any of the above mentioned states.
+ */
+bool wlan_is_rso_disabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
  * wlan_cm_set_sae_auth_ta() - Set SAE auth tx address

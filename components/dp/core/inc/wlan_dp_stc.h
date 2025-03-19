@@ -32,6 +32,7 @@
 /* L1 is the lowest verbosity level */
 #define WLAN_DP_STC_LOGMASK_VERBOSE_L1 BIT(2)
 #define WLAN_DP_STC_LOGMASK_VERBOSE_L2 BIT(3)
+#define WLAN_DP_STC_LOGMASK_VERBOSE_L3 BIT(4)
 
 #define dp_stc_info(debug_mask, params...)				\
 	do {								\
@@ -45,6 +46,14 @@
 	do {								\
 		if (unlikely((debug_mask) &				\
 		    WLAN_DP_STC_LOGMASK_VERBOSE_L2))			\
+			__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH,	\
+				       QDF_MODULE_ID_DP, ## params);	\
+	} while (0)
+
+#define dp_stc_burst_debug(debug_mask, params...)			\
+	do {								\
+		if (unlikely((debug_mask) &				\
+		    WLAN_DP_STC_LOGMASK_VERBOSE_L3))			\
 			__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH,	\
 				       QDF_MODULE_ID_DP, ## params);	\
 	} while (0)
@@ -131,12 +140,25 @@ enum wlan_dp_stc_burst_state {
 #define DP_STC_LONG_WINDOW_MS 30000
 #define DP_STC_TIMER_THRESH_MS 600
 
+#define DP_STC_BURST_STAGE_1_WINDOW_MS 10800
+#define DP_STC_BURST_STAGE_2_WINDOW_MS DP_STC_LONG_WINDOW_MS
+
+/* Burst stat for stage 1 needs to be collected at 10.8s. Each sample state
+ * being 600ms. Collect burst stat at 18th sample (10.8s/0.6s).
+ */
+#define WLAN_DP_SAMPLING_BURST_STAT_STAGE_1_END 18
+/* Burst stat for stage 2 needs to be collected at 30s. Each sample state
+ * being 600ms. Collect burst stat at 50th sample (30s/0.6s).
+ */
+#define WLAN_DP_SAMPLING_BURST_STAT_STAGE_2_END 50
+
 /**
  * enum wlan_stc_sampling_state - Sampling state
  * @WLAN_DP_SAMPLING_STATE_INIT: init state
  * @WLAN_DP_SAMPLING_STATE_FLOW_ADDED: flow added for sampling
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_START: sampling started
- * @WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS: sampling burst stats
+ * @WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1: Sampling burst stats stage 1
+ * @WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_2: sampling burst stats stage 2
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_DONE: sampling completed
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL: sampling failed
  * @WLAN_DP_SAMPLING_STATE_SAMPLES_SENT: samples sent
@@ -146,7 +168,8 @@ enum wlan_stc_sampling_state {
 	WLAN_DP_SAMPLING_STATE_INIT,
 	WLAN_DP_SAMPLING_STATE_FLOW_ADDED,
 	WLAN_DP_SAMPLING_STATE_SAMPLING_START,
-	WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS,
+	WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1,
+	WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_2,
 	WLAN_DP_SAMPLING_STATE_SAMPLING_DONE,
 	WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL,
 	WLAN_DP_SAMPLING_STATE_SAMPLES_SENT,
@@ -191,11 +214,13 @@ struct wlan_dp_stc_sampling_candidate {
 #define WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID BIT(0)
 #define WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID BIT(1)
 #define WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY BIT(2)
-#define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_READY BIT(3)
+#define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_1_READY BIT(3)
+#define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_2_READY BIT(4)
 
-#define WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT BIT(0)
-#define WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_SENT BIT(1)
-#define WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT BIT(2)
+#define WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT BIT(0)
+#define WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT BIT(1)
+#define WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_1_SENT BIT(2)
+#define WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_2_SENT BIT(3)
 
 /*
  * struct wlan_dp_stc_sampling_table_entry - Sampling table entry
@@ -207,8 +232,8 @@ struct wlan_dp_stc_sampling_candidate {
  * @id: index of this sampling table entry in the sampling table
  * @next_sample_idx: next sample index to fill min/max stats in per-packet path
  * @next_win_idx: next window index to fill min/max stats in per-packet path
- * @max_num_sample_attempts: max number of sampling_timer runs to collect
- *			     txrx and burst state
+ * @curr_sample_attempt: Current sample number which is being checked or
+ *                       collected
  * @tx_flow_id: tx flow ID
  * @rx_flow_id: rx flow ID
  * @tx_flow_metadata: tx flow metadata
@@ -222,13 +247,13 @@ struct wlan_dp_stc_sampling_candidate {
 struct wlan_dp_stc_sampling_table_entry {
 	enum wlan_stc_sampling_state state;
 	enum wlan_dp_flow_dir dir;
-	uint64_t burst_stats_report_ts;
+	uint64_t last_burst_stats_report_ts;
 	uint32_t flags;
 	uint32_t flags1;
 	uint8_t id;
 	uint8_t next_sample_idx;
 	uint8_t next_win_idx;
-	uint8_t max_num_sample_attempts;
+	uint8_t curr_sample_attempt;
 	uint8_t traffic_type;
 	uint16_t peer_id;
 	uint16_t tx_flow_id;
@@ -347,6 +372,8 @@ enum wlan_dp_stc_timer_state {
  * @num_gaming: Number of gaming flows on this peer
  * @num_voice_call: Number of voice call flows on this peer
  * @num_video_call: Number of video call flows on this peer
+ * @num_browsing: Number of web browsing flows on this peer
+ * @num_aperiodic_bursts: Number of aperiodic bursty traffic flows on this peer
  * @non_flow_traffic: BITMAP to indicate active non-TCP/UDP traffic on the peer
  * @send_fw_ind: Flag to mark if traffic_map indication is to be sent to FW
  */
@@ -364,6 +391,8 @@ struct wlan_dp_stc_peer_traffic_context {
 	qdf_atomic_t num_gaming;
 	qdf_atomic_t num_voice_call;
 	qdf_atomic_t num_video_call;
+	qdf_atomic_t num_browsing;
+	qdf_atomic_t num_aperiodic_bursts;
 	unsigned long non_flow_traffic;
 	qdf_atomic_t send_fw_ind;
 };
@@ -429,6 +458,8 @@ struct wlan_dp_stc_classified_flow_table {
  * @periodic_work_state: States of the periodic flow monitor work
  * @flow_sampling_timer: timer to sample all the short-listed flows
  * @sample_timer_state: sampling timer state
+ * @rtpm_control_flow_cnt: Total flows of traffic types affecting RTPM
+ * @rtpm_control: RTPM control enable check
  * @peer_tc: per peer active traffic context
  * @peer_ping_info: Ping tracking per peer
  * @sampling_flow_table: Sampling flow table
@@ -445,8 +476,10 @@ struct wlan_dp_stc {
 	uint32_t flow_monitor_interval;
 	uint32_t logmask;
 	enum wlan_dp_stc_periodic_work_state periodic_work_state;
-	qdf_timer_t flow_sampling_timer;
+	qdf_hrtimer_data_t flow_sampling_timer;
 	enum wlan_dp_stc_timer_state sample_timer_state;
+	uint32_t rtpm_control_flow_cnt;
+	bool rtpm_control;
 	struct wlan_dp_stc_peer_traffic_context peer_tc[DP_STC_MAX_PEERS];
 	struct wlan_dp_stc_sampling_table *sampling_flow_table;
 	struct wlan_dp_stc_rx_flow_table *rx_flow_table;
@@ -580,60 +613,6 @@ wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 	flow_tuple->dst_port = flow_tuple_info->dest_port;
 	flow_tuple->proto = wlan_dp_ip_proto_to_stc_proto(proto);
 	flow_tuple->flags = 0;
-}
-
-static inline void
-wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc_peer_traffic_context *peer_tc,
-			     enum qca_traffic_type traffic_type)
-{
-	uint32_t val = 0;
-
-	switch (traffic_type) {
-	case QCA_TRAFFIC_TYPE_STREAMING:
-		val = qdf_atomic_inc_return(&peer_tc->num_streaming);
-		break;
-	case QCA_TRAFFIC_TYPE_GAMING:
-		val = qdf_atomic_inc_return(&peer_tc->num_gaming);
-		break;
-	case QCA_TRAFFIC_TYPE_VOICE_CALL:
-		val = qdf_atomic_inc_return(&peer_tc->num_voice_call);
-		break;
-	case QCA_TRAFFIC_TYPE_VIDEO_CALL:
-		val = qdf_atomic_inc_return(&peer_tc->num_video_call);
-		break;
-	default:
-		break;
-	}
-
-	if (val == 1)
-		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
-}
-
-static inline void
-wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc_peer_traffic_context *peer_tc,
-			     enum qca_traffic_type traffic_type)
-{
-	uint32_t val = 0;
-
-	switch (traffic_type) {
-	case QCA_TRAFFIC_TYPE_STREAMING:
-		val = qdf_atomic_dec_and_test(&peer_tc->num_streaming);
-		break;
-	case QCA_TRAFFIC_TYPE_GAMING:
-		val = qdf_atomic_dec_and_test(&peer_tc->num_gaming);
-		break;
-	case QCA_TRAFFIC_TYPE_VOICE_CALL:
-		val = qdf_atomic_dec_and_test(&peer_tc->num_voice_call);
-		break;
-	case QCA_TRAFFIC_TYPE_VIDEO_CALL:
-		val = qdf_atomic_dec_and_test(&peer_tc->num_video_call);
-		break;
-	default:
-		break;
-	}
-
-	if (val)
-		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 }
 
 enum wlan_dp_stc_classfied_flow_state {
@@ -915,6 +894,19 @@ void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
 static inline bool wlan_dp_cfg_is_stc_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 {
 	return dp_cfg->stc_enable;
+}
+
+/**
+ * wlan_dp_cfg_is_stc_rtpm_control_enabled() - Helper function to check if STC
+ *                                             is enabled
+ * @dp_cfg: SoC CFG config
+ *
+ * Return: true if STC is enabled, false if STC is disabled.
+ */
+static inline bool
+wlan_dp_cfg_is_stc_rtpm_control_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->stc_rtpm_control;
 }
 
 /**
