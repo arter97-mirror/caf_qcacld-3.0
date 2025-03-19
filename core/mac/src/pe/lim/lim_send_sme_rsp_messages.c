@@ -2433,13 +2433,13 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
 		link_id = wlan_vdev_get_link_id(session_entry->vdev);
 		update_csa_link_info(session_entry->vdev, link_id, csa_params);
-	} else {
-		mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
-		if (!mlme_priv)
-			goto send_event;
-		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
-						csa_params->new_ch_width;
 	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
+	if (!mlme_priv)
+		goto send_event;
+	mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
+						csa_params->new_ch_width;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_params->csa_chan_freq) &&
 	    session_entry->dot11mode == MLME_DOT11_MODE_11A)
