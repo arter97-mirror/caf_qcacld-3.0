@@ -34525,7 +34525,6 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t link_id, i = 0;
-	int ret;
 
 	hdd_enter();
 
@@ -34541,7 +34540,7 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 	if (!wlan_cm_is_vdev_connected(vdev)) {
 		hdd_debug("Not associated!, vdev %d", wlan_vdev_get_id(vdev));
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		ret = -ENOTCONN;
+		return -ENOTCONN;
 	}
 
 	if (!mlo_is_link_recfg_supported(vdev)) {
