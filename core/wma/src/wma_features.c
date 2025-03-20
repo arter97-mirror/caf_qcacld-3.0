@@ -6247,8 +6247,8 @@ int wma_wlan_bt_activity_evt_handler(void *handle, uint8_t *event, uint32_t len)
 		return -EINVAL;
 	}
 
-	wma_info("Received BT activity event %u",
-		fixed_param->coex_profile_evt);
+	wma_debug("Received BT activity event %u",
+		  fixed_param->coex_profile_evt);
 
 	sme_msg.type = eWNI_SME_BT_ACTIVITY_INFO_IND;
 	sme_msg.bodyptr = NULL;
