@@ -7613,6 +7613,43 @@ wlan_mlme_get_peer_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t *mac)
 	return wlan_mlme_get_ch_width_from_phymode(phy_mode);
 }
 
+static enum phy_ch_width
+wlan_mlme_get_max_ch_width_from_phymode(enum wlan_phymode phy_mode)
+{
+	enum phy_ch_width ch_width;
+
+	if (IS_WLAN_PHYMODE_EHT(phy_mode))
+		ch_width = CH_WIDTH_320MHZ;
+	else if (IS_WLAN_PHYMODE_HE(phy_mode) || IS_WLAN_PHYMODE_VHT(phy_mode))
+		ch_width = CH_WIDTH_160MHZ;
+	else if (IS_WLAN_PHYMODE_HT(phy_mode))
+		ch_width = CH_WIDTH_40MHZ;
+	else
+		ch_width = CH_WIDTH_20MHZ;
+
+	mlme_legacy_debug("phymode: %d, Max allowed ch_width: %d ", phy_mode,
+			  ch_width);
+
+	return ch_width;
+}
+
+enum phy_ch_width
+wlan_mlme_get_max_peer_ch_width(struct wlan_objmgr_psoc *psoc,
+					 uint8_t *mac)
+{
+	enum wlan_phymode phy_mode;
+	QDF_STATUS status;
+
+	status = mlme_get_peer_phymode(psoc, mac, &phy_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_legacy_err("failed to fetch phy_mode status: %d for mac: " QDF_MAC_ADDR_FMT,
+				status, QDF_MAC_ADDR_REF(mac));
+		return CH_WIDTH_20MHZ;
+	}
+
+	return wlan_mlme_get_max_ch_width_from_phymode(phy_mode);
+}
+
 #ifdef FEATURE_SET
 
 /**
