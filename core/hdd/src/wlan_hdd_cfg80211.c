@@ -34625,6 +34625,8 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 		qdf_mem_copy(&req_param->add_link[i].link_addr,
 			     add_links[link_id].bss->bssid,
 			     QDF_MAC_ADDR_SIZE);
+
+		req_param->add_link[i].bss = add_links[link_id].bss;
 		/**
 		 * This link will not be present in scan list.
 		 * Instead of getting mld address from scan entry,
