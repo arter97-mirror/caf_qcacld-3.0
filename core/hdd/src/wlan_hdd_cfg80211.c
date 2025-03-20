@@ -34544,26 +34544,13 @@ QDF_STATUS hdd_mlo_dev_t2lm_notify_link_update(struct wlan_objmgr_vdev *vdev,
 
 #if defined(WLAN_FEATURE_11BE_MLO) && \
 defined(CFG80211_SETUP_LINK_RECONFIG_SUPPORT)
-/**
- * wlan_hdd_cfg80211_setup_link_reconfig() - API to get add or
- * delete link data from upper layer.
- * @wiphy: wiphy struct
- * @dev: net device
- * @add_links: added link reconfig params
- * @rem_links: removed link id bitmap
- *
- * This API fetch add or delete link params based on link id mask
- * and invokes target if API to send add delete link info.
- *
- * Return: status, 0 in case of success else negative value.
- */
 static int
-wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
-				      struct net_device *dev,
-				      struct cfg80211_assoc_link *add_links,
-				      u16 rem_links)
+__wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
+					struct net_device *dev,
+					struct cfg80211_assoc_link *add_links,
+					u16 rem_links)
 {
-	struct mlo_link_recfg_user_req_params *req_param = {0};
+	struct mlo_link_recfg_user_req_params *req_param = NULL;
 	struct wlan_lmac_if_mlo_rx_ops *mlo_rx_ops;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct wlan_hdd_link_info *link_info;
@@ -34712,6 +34699,41 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_hdd_cfg80211_setup_link_reconfig() - API to get add or
+ * delete link data from upper layer.
+ * @wiphy: wiphy struct
+ * @dev: net device
+ * @add_links: added link reconfig params
+ * @rem_links: removed link id bitmap
+ *
+ * This API fetch add or delete link params based on link id mask
+ * and invokes target if API to send add delete link info.
+ *
+ * Return: status, 0 in case of success else negative value.
+ */
+static int
+wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
+				      struct net_device *dev,
+				      struct cfg80211_assoc_link *add_links,
+				      u16 rem_links)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_setup_link_reconfig(wiphy, dev,
+							add_links,
+							rem_links);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
 }
 #endif
 
