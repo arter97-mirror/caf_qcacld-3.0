@@ -2515,7 +2515,8 @@ static bool dp_is_nbuf_bypass_fisa(qdf_nbuf_t nbuf, struct dp_vdev *vdev,
 	      vdev->opmode == wlan_op_mode_ap)) ||
 	    qdf_nbuf_is_exc_frame(nbuf) ||
 	    qdf_nbuf_is_ipv4_dhcp_pkt(nbuf) ||
-	    qdf_nbuf_is_da_mcbc(nbuf))
+	    qdf_nbuf_is_da_mcbc(nbuf) ||
+	    qdf_unlikely(vdev->multipass_en))
 		return true;
 
 	return false;
