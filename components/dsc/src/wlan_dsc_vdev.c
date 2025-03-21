@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -372,7 +372,7 @@ static void __dsc_vdev_op_stop(struct dsc_vdev *vdev, const char *func)
 
 	__dsc_driver_lock(vdev);
 	if (__dsc_ops_remove(&vdev->ops, func))
-		qdf_event_set(&vdev->ops.event);
+		qdf_event_set_all(&vdev->ops.event);
 	__dsc_driver_unlock(vdev);
 }
 
