@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -445,6 +445,7 @@ pre_cac_adapter_created:
 		goto stop_close_pre_cac_adapter;
 	}
 
+	ucfg_pre_cac_clear_work(hdd_ctx->psoc);
 	ucfg_pre_cac_set_freq_before_pre_cac(link_info->vdev,
 					     hdd_ap_ctx->operating_chan_freq);
 	ucfg_pre_cac_set_freq(link_info->vdev, pre_cac_chan_freq);
