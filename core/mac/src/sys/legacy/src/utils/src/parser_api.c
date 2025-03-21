@@ -12742,11 +12742,6 @@ populate_dot11f_mlo_caps(struct mac_context *mac_ctx,
 
 	common_info_len += WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
 	mlo_ie->ext_mld_capab_and_op_present = 0;
-	if (target_if_get_fw_btm_multi_ap_support(mac_ctx->psoc)) {
-		mlo_ie->ext_mld_capab_and_op_present = 1;
-		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
-		common_info_len += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
-	}
 
 	mlo_ie->mld_id_present = 0;
 	mlo_ie->mld_capab_and_op_present = 1;
@@ -13937,14 +13932,6 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 						eml_cap.emlsr_trans_delay;
 	}
 
-	if (target_if_get_fw_btm_multi_ap_support(psoc)) {
-		pe_debug("Set ext mld caps");
-		mlo_ie->ext_mld_capab_and_op_present = 1;
-		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P;
-		mlo_ie->common_info_length += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
-		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
-	}
-
 	p_ml_ie = mlo_ie->data;
 	len_remaining = sizeof(mlo_ie->data);
 
@@ -14492,13 +14479,6 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 						eml_cap.emlsr_trans_delay;
 	}
 
-	if (target_if_get_fw_btm_multi_ap_support(psoc)) {
-		mlo_ie->ext_mld_capab_and_op_present = 1;
-		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P;
-		mlo_ie->common_info_length += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
-		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
-	}
-
 	p_ml_ie = mlo_ie->data;
 	len_remaining = sizeof(mlo_ie->data);
 
@@ -14697,13 +14677,6 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 						eml_cap.emlsr_pad_delay;
 		mlo_ie->eml_capabilities_info.emlsr_transition_delay =
 						eml_cap.emlsr_trans_delay;
-	}
-
-	if (target_if_get_fw_btm_multi_ap_support(psoc)) {
-		mlo_ie->ext_mld_capab_and_op_present = 1;
-		presence_bitmap |= WLAN_ML_RV_CTRL_PBM_EXT_MLDCAPANDOP_P;
-		mlo_ie->common_info_length += WLAN_ML_RV_CINFO_EXT_MLDCAPANDOP_SIZE;
-		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
 	}
 
 	p_ml_ie = mlo_ie->data;
