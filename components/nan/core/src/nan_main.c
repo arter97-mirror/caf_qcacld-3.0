@@ -701,6 +701,18 @@ static void nan_req_activated(void *in_req, uint32_t cmdtype)
 
 	/* send ndp_intiator_req/responder_req/end_req to FW */
 	tx_ops->nan_datapath_req_tx(in_req, req_type);
+
+	if (cmdtype == WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ) {
+		struct wlan_serialization_queued_cmd_info cmd;
+
+		cmd.requestor = WLAN_UMAC_COMP_NAN;
+		cmd.cmd_id = 0;
+		cmd.req_type = WLAN_SER_CANCEL_NON_SCAN_CMD;
+		cmd.queue_type = WLAN_SERIALIZATION_ACTIVE_QUEUE;
+		cmd.cmd_type = WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ;
+		cmd.vdev = vdev;
+		wlan_serialization_remove_cmd(&cmd);
+	}
 }
 
 static QDF_STATUS nan_serialized_cb(struct wlan_serialization_command *ser_cmd,
@@ -773,7 +785,7 @@ QDF_STATUS nan_scheduled_msg_handler(struct scheduler_msg *msg)
 		break;
 	}
 	case NDP_UPDATE_CONFIG: {
-	struct nan_datapath_update_config *req = msg->bodyptr;
+		struct nan_datapath_update_config *req = msg->bodyptr;
 
 		cmd.cmd_type = WLAN_SER_CMD_NDP_UPDATE_CONFIG_REQ;
 		cmd.vdev = req->vdev;

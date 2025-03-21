@@ -1183,8 +1183,7 @@ static int __os_if_nan_process_ndp_update_config(struct wlan_objmgr_psoc *psoc,
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_NDP_INSTANCE_ID]) {
 		osif_err("Instance ID is unavailable");
-		ret = -EINVAL;
-		goto update_config_failed;
+		return -EINVAL;
 	}
 	config.ndp_instance_id =
 		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NDP_INSTANCE_ID]);
@@ -1192,8 +1191,7 @@ static int __os_if_nan_process_ndp_update_config(struct wlan_objmgr_psoc *psoc,
 	if (!tb[QCA_WLAN_VENDOR_ATTR_NDP_MAX_LATENCY_MS] &&
 	    !tb[QCA_WLAN_VENDOR_ATTR_NDP_TPUT]) {
 		osif_err("Max latency and throughput are unavailable");
-		ret = -EINVAL;
-		goto update_config_failed;
+		return -EINVAL;
 	}
 	if (tb[QCA_WLAN_VENDOR_ATTR_NDP_MAX_LATENCY_MS])
 		config.latency_ms =
@@ -1213,9 +1211,9 @@ static int __os_if_nan_process_ndp_update_config(struct wlan_objmgr_psoc *psoc,
 
 	status = ucfg_nan_req_processor(ndi_vdev, &config, NDP_UPDATE_CONFIG);
 	ret = qdf_status_to_os_return(status);
-	wlan_objmgr_vdev_release_ref(ndi_vdev, WLAN_NAN_ID);
 
-update_config_failed:
+	if (ret)
+		wlan_objmgr_vdev_release_ref(ndi_vdev, WLAN_NAN_ID);
 	return ret;
 }
 
