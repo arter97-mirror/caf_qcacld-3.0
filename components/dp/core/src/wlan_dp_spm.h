@@ -159,15 +159,11 @@ struct wlan_dp_spm_screening_ctx {
 /**
  * struct wlan_dp_spm_intf_context - SPM context per dp interface
  * @origin_aft_hlist: Active flow table for originating traffic
- * @o_flow_rec_freelist: Flow records freelist
- * @flow_list_lock: Flow list operation lock
  * @o_stats: Flow table stats for originating traffic
  * @screen_flow_ctx: Flow screening context
  */
 struct wlan_dp_spm_intf_context {
 	struct hlist_head origin_aft_hlist[WLAN_DP_SPM_HASH_TBL_MAX];
-	qdf_list_t o_flow_rec_freelist;
-	qdf_spinlock_t flow_list_lock;
 	struct wlan_dp_spm_flow_tbl_stats o_stats;
 	struct wlan_dp_spm_screening_ctx screen_flow_ctx;
 };

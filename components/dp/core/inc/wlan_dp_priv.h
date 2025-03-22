@@ -932,6 +932,8 @@ struct wlan_dp_stc;
  * @dp_stc: STC context
  * @spm_ctx: Servicy policy manager context
  * @gl_flow_recs: Global Tx flow table for all dp_interfaces
+ * @o_flow_rec_freelist: Flow records freelist
+ * @flow_list_lock: Flow list operation lock
  * @rsrc_mgr_ctx: DP resource manager context reference
  * @monitor_flag: Monitor interface flags configured when add Mon interface
  */
@@ -1053,6 +1055,8 @@ struct wlan_dp_psoc_context {
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 	struct wlan_dp_spm_context *spm_ctx;
 	struct wlan_dp_spm_flow_info *gl_flow_recs;
+	qdf_list_t o_flow_rec_freelist;
+	qdf_spinlock_t flow_list_lock;
 #endif
 	struct wlan_dp_resource_mgr_ctx *rsrc_mgr_ctx;
 	uint32_t monitor_flag;
