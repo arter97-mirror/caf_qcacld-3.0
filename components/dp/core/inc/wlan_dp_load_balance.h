@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -102,7 +102,7 @@ struct wlan_dp_lb_data {
 	uint8_t num_wlan_used_rx_rings;
 	bool in_default_affinity;
 	bool preferred_mask_change_by_cpuhp;
-	uint8_t reo_cpu_map[8];
+	uint8_t reo_cpu_map[MAX_REO_DEST_RINGS];
 };
 
 #ifdef WLAN_DP_LOAD_BALANCE_SUPPORT
