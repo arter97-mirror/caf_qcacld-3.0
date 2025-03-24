@@ -45,6 +45,12 @@ _target_chipset_map = {
     "sdxkova": [
         "kiwi-v2",
     ],
+    "autogvm": [
+        "qcn7605",
+        "qca6390",
+        "qca6490",
+        "kiwi-v2",
+    ],
 }
 
 _chipset_hw_map = {
@@ -53,7 +59,9 @@ _chipset_hw_map = {
     "peach-v2": "BERYLLIUM",
     "qca6750": "MOSELLE",
     "wcn7750": "BERYLLIUM",
+    "qca6390": "LITHIUM",
     "qca6490": "LITHIUM",
+    "qcn7605": "HELIUMPLUS",
     "wcn6450": "RHINE",
     "fig": "BORON",
 }
@@ -83,6 +91,10 @@ _chipset_header_map = {
         "api/hw/wcn7750/v1",
         "cmn/hal/wifi3.0/wcn7750",
     ],
+    "qca6390": [
+        "api/hw/qca6390/v1",
+        "cmn/hal/wifi3.0/qca6390",
+    ],
     "qca6490": [
         "api/hw/qca6490/v1",
         "cmn/hal/wifi3.0/qca6490",
@@ -90,6 +102,8 @@ _chipset_header_map = {
     "wcn6450": [
         "api/hw/wcn6450/v1",
         "cmn/hal/wifi3.0/wcn6450",
+    ],
+    "qcn7605": [
     ],
 }
 
@@ -109,6 +123,8 @@ _hw_header_map = {
     ],
     "RHINE": [
         "cmn/hal/wifi3.0/rh",
+    ],
+    "HELIUMPLUS": [
     ],
 }
 
@@ -323,6 +339,7 @@ _fixed_ipaths = [
     "components/tdls/core/inc",
     "components/tdls/core/src",
     "components/umac",
+    "components/umac/mlme/connection_mgr/core/src",
     "components/umac/mlme/connection_mgr/dispatcher/inc",
     "components/umac/mlme/connection_mgr/utf/inc",
     "components/umac/mlme/mlo_mgr/inc",
@@ -392,17 +409,6 @@ _private_ipaths = [
 
 _fixed_srcs = [
     "cmn/cfg/src/cfg.c",
-    "cmn/dp/wifi3.0/dp_arch_ops.c",
-    "cmn/dp/wifi3.0/dp_htt.c",
-    "cmn/dp/wifi3.0/dp_main.c",
-    "cmn/dp/wifi3.0/dp_hist.c",
-    "cmn/dp/wifi3.0/dp_peer.c",
-    "cmn/dp/wifi3.0/dp_rx.c",
-    "cmn/dp/wifi3.0/dp_rx_defrag.c",
-    "cmn/dp/wifi3.0/dp_rx_desc.c",
-    "cmn/dp/wifi3.0/dp_stats.c",
-    "cmn/dp/wifi3.0/dp_tx.c",
-    "cmn/dp/wifi3.0/dp_tx_desc.c",
     "cmn/global_lmac_if/src/wlan_global_lmac_if.c",
     "cmn/hif/src/ath_procfs.c",
     "cmn/hif/src/ce/ce_diag.c",
@@ -459,7 +465,6 @@ _fixed_srcs = [
     "cmn/scheduler/src/scheduler_core.c",
     "cmn/target_if/core/src/target_if_main.c",
     "cmn/target_if/crypto/src/target_if_crypto.c",
-    "cmn/target_if/dp/src/target_if_dp.c",
     "cmn/target_if/init_deinit/src/init_cmd_api.c",
     "cmn/target_if/init_deinit/src/init_deinit_lmac.c",
     "cmn/target_if/init_deinit/src/init_event_handler.c",
@@ -583,7 +588,6 @@ _fixed_srcs = [
     "components/dsc/src/wlan_dsc_vdev.c",
     "components/mlme/core/src/wlan_mlme_main.c",
     "components/mlme/core/src/wlan_mlme_vdev_mgr_interface.c",
-    "components/mlme/core/src/wlan_mlme_twt_api.c",
     "components/mlme/dispatcher/src/wlan_mlme_api.c",
     "components/mlme/dispatcher/src/wlan_mlme_ucfg_api.c",
     "components/p2p/core/src/wlan_p2p_main.c",
@@ -731,15 +735,27 @@ _conditional_srcs = {
             "cmn/dp/wifi3.0/be/dp_be.c",
             "cmn/dp/wifi3.0/be/dp_be_rx.c",
             "cmn/dp/wifi3.0/be/dp_be_tx.c",
+            "cmn/dp/wifi3.0/dp_arch_ops.c",
+            "cmn/dp/wifi3.0/dp_hist.c",
+            "cmn/dp/wifi3.0/dp_htt.c",
+            "cmn/dp/wifi3.0/dp_main.c",
+            "cmn/dp/wifi3.0/dp_peer.c",
             "cmn/dp/wifi3.0/dp_reo.c",
             "cmn/dp/wifi3.0/dp_rings_main.c",
+            "cmn/dp/wifi3.0/dp_rx.c",
             "cmn/dp/wifi3.0/dp_rx_err.c",
+            "cmn/dp/wifi3.0/dp_rx_defrag.c",
+            "cmn/dp/wifi3.0/dp_rx_desc.c",
             "cmn/dp/wifi3.0/dp_rx_tid.c",
+            "cmn/dp/wifi3.0/dp_stats.c",
+            "cmn/dp/wifi3.0/dp_tx.c",
+            "cmn/dp/wifi3.0/dp_tx_desc.c",
             "cmn/hal/wifi3.0/be/hal_be_generic_api.c",
             "cmn/hal/wifi3.0/be/hal_be_reo.c",
             "cmn/hal/wifi3.0/hal_reo.c",
             "cmn/hal/wifi3.0/hal_srng.c",
             "cmn/hif/src/ce/ce_service_srng.c",
+            "cmn/target_if/dp/src/target_if_dp.c",
             "cmn/wlan_cfg/wlan_cfg.c",
             "components/dp/core/src/wlan_dp_prealloc.c",
         ],
@@ -780,6 +796,12 @@ _conditional_srcs = {
     "CONFIG_INCLUDE_HAL_FIG": {
         True: [
             "cmn/hal/wifi3.0/fig/hal_fig.c",
+        ],
+    },
+    "CONFIG_QCA6390_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/qca6390/hal_6390.c",
+            "cmn/hif/src/qca6390def.c",
         ],
     },
     "CONFIG_QCA6490_HEADERS_DEF": {
@@ -973,6 +995,11 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_memdump.c",
         ],
     },
+    "CONFIG_FEATURE_MONITOR_LEGACY_MODE_SUPPORT": {
+        True: [
+            "core/dp/htt/htt_monitor_rx.c",
+        ],
+    },
     "CONFIG_FEATURE_MONITOR_MODE_SUPPORT": {
         True: [
             "core/hdd/src/wlan_hdd_rx_monitor.c",
@@ -1078,6 +1105,31 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_thermal.c",
         ],
     },
+    "CONFIG_HELIUMPLUS": {
+        True: [
+            "cmn/hif/src/ce/ce_service_legacy.c",
+            "cmn/hif/src/hif_main_legacy.c",
+            "core/dp/htt/htt.c",
+            "core/dp/htt/htt_fw_stats.c",
+            "core/dp/htt/htt_h2t.c",
+            "core/dp/htt/htt_t2h.c",
+            "core/dp/htt/htt_tx.c",
+            "core/dp/htt/htt_rx.c",
+            "core/dp/txrx/ol_txrx.c",
+            "core/dp/txrx/ol_cfg.c",
+            "core/dp/txrx/ol_rx.c",
+            "core/dp/txrx/ol_rx_fwd.c",
+            "core/dp/txrx/ol_rx_defrag.c",
+            "core/dp/txrx/ol_tx_desc.c",
+            "core/dp/txrx/ol_tx.c",
+            "core/dp/txrx/ol_rx_reorder_timeout.c",
+            "core/dp/txrx/ol_rx_reorder.c",
+            "core/dp/txrx/ol_rx_pn.c",
+            "core/dp/txrx/ol_txrx_peer_find.c",
+            "core/dp/txrx/ol_txrx_encap.c",
+            "core/dp/txrx/ol_tx_send.c",
+        ],
+    },
     "CONFIG_HIF_IPCI": {
         True: [
             "cmn/hif/src/dispatcher/multibus_ipci.c",
@@ -1107,7 +1159,7 @@ _conditional_srcs = {
             "core/pld/src/pld_usb.c",
         ],
     },
-    "LEGACY_CONFIG_HL_DP_SUPPORT": {
+    "CONFIG_HL_DP_SUPPORT": {
         True: [
             "core/dp/txrx/ol_tx_classify.c",
             "core/dp/txrx/ol_tx_hl.c",
@@ -1172,21 +1224,34 @@ _conditional_srcs = {
             "cmn/dp/wifi3.0/li/dp_li.c",
             "cmn/dp/wifi3.0/li/dp_li_rx.c",
             "cmn/dp/wifi3.0/li/dp_li_tx.c",
+            "cmn/dp/wifi3.0/dp_arch_ops.c",
+            "cmn/dp/wifi3.0/dp_hist.c",
+            "cmn/dp/wifi3.0/dp_htt.c",
+            "cmn/dp/wifi3.0/dp_main.c",
+            "cmn/dp/wifi3.0/dp_peer.c",
             "cmn/dp/wifi3.0/dp_reo.c",
             "cmn/dp/wifi3.0/dp_rings_main.c",
+            "cmn/dp/wifi3.0/dp_rx.c",
             "cmn/dp/wifi3.0/dp_rx_err.c",
+            "cmn/dp/wifi3.0/dp_rx_defrag.c",
+            "cmn/dp/wifi3.0/dp_rx_desc.c",
             "cmn/dp/wifi3.0/dp_rx_tid.c",
+            "cmn/dp/wifi3.0/dp_stats.c",
+            "cmn/dp/wifi3.0/dp_tx.c",
+            "cmn/dp/wifi3.0/dp_tx_desc.c",
             "cmn/hal/wifi3.0/hal_reo.c",
             "cmn/hal/wifi3.0/hal_srng.c",
             "cmn/hal/wifi3.0/li/hal_li_generic_api.c",
             "cmn/hal/wifi3.0/li/hal_li_reo.c",
             "cmn/hif/src/ce/ce_service_srng.c",
+            "cmn/target_if/dp/src/target_if_dp.c",
             "cmn/wlan_cfg/wlan_cfg.c",
             "components/dp/core/src/wlan_dp_prealloc.c",
         ],
     },
-    "LEGACY_CONFIG_LL_DP_SUPPORT": {
+    "CONFIG_LL_DP_LEGACY_SUPPORT": {
         True: [
+            "core/dp/htt/htt_rx_ll.c",
             "core/dp/txrx/ol_tx_ll.c",
         ],
     },
@@ -1365,7 +1430,7 @@ _conditional_srcs = {
             "components/umac/mlme/connection_mgr/core/src/wlan_cm_roam_offload_event.c",
         ],
     },
-    "LEGACY_CONFIG_QCA_SUPPORT_TX_THROTTLE": {
+    "CONFIG_QCA_SUPPORT_TX_THROTTLE_LEGACY": {
         True: [
             "core/dp/txrx/ol_tx_throttle.c",
         ],
@@ -1438,12 +1503,24 @@ _conditional_srcs = {
             #ifneq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM) $(CONFIG_RHINE)))
             #ifeq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM) $(CONFIG_RHINE)))
             "cmn/dp/cmn_dp_api/dp_ratetable.c",
+            "cmn/dp/wifi3.0/dp_arch_ops.c",
+            "cmn/dp/wifi3.0/dp_hist.c",
+            "cmn/dp/wifi3.0/dp_htt.c",
+            "cmn/dp/wifi3.0/dp_main.c",
+            "cmn/dp/wifi3.0/dp_peer.c",
+            "cmn/dp/wifi3.0/dp_rx.c",
+            "cmn/dp/wifi3.0/dp_rx_defrag.c",
+            "cmn/dp/wifi3.0/dp_rx_desc.c",
+            "cmn/dp/wifi3.0/dp_stats.c",
+            "cmn/dp/wifi3.0/dp_tx.c",
+            "cmn/dp/wifi3.0/dp_tx_desc.c",
             "cmn/dp/wifi3.0/rh/dp_rh.c",
             "cmn/dp/wifi3.0/rh/dp_rh_htt.c",
             "cmn/dp/wifi3.0/rh/dp_rh_rx.c",
             "cmn/dp/wifi3.0/rh/dp_rh_tx.c",
             "cmn/hal/wifi3.0/hal_reo.c",
             "cmn/hal/wifi3.0/hal_srng.c",
+            "cmn/target_if/dp/src/target_if_dp.c",
             "cmn/wlan_cfg/wlan_cfg.c",
             "components/dp/core/src/wlan_dp_prealloc.c",
             "cmn/hif/src/ce/ce_service_legacy.c",
@@ -1648,15 +1725,16 @@ _conditional_srcs = {
             "cmn/target_if/cfr/src/target_if_cfr_enh.c",
         ],
     },
-    #"LEGACY_CONFIG_WLAN_FASTPATH": {
-    #True: [
-    #    "core/dp/txrx/ol_tx_ll_fastpath.c",
-    #],
-    #TODO: Will need to create a separate flag to handle false case
-    #False: [
-    #    "core/dp/txrx/ol_tx_ll_legacy.c",
-    #],
-    #},
+    "CONFIG_WLAN_FASTPATH": {
+        True: [
+            "core/dp/txrx/ol_tx_ll_fastpath.c",
+        ],
+    },
+    "CONFIG_TX_LL_LEGACY": {
+        True: [
+             "core/dp/txrx/ol_tx_ll_legacy.c",
+        ],
+    },
     "CONFIG_WLAN_FEATURE_11AX": {
         True: [
             "core/hdd/src/wlan_hdd_he.c",
@@ -1918,7 +1996,7 @@ _conditional_srcs = {
             "os_if/twt/src/osif_twt_ext_rsp.c",
             "os_if/twt/src/osif_twt_ext_util.c",
             # TODO: rest being removed by David's TWT change
-            #            "components/mlme/core/src/wlan_mlme_twt_api.c",
+            "components/mlme/core/src/wlan_mlme_twt_api.c",
             # TODO: to be removed by David's TWT change
             "components/mlme/dispatcher/src/wlan_mlme_twt_ucfg_api.c",
             "core/wma/src/wma_twt.c",
@@ -2178,6 +2256,11 @@ _conditional_srcs = {
     "LEGACY_CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY": {
         True: [
             "core/dp/txrx/ol_txrx_legacy_flow_control.c",
+        ],
+    },
+    "CONFIG_WLAN_TX_FLOW_CONTROL": {
+        True: [
+            "core/dp/txrx/ol_txrx_flow_control.c",
         ],
     },
     "CONFIG_WLAN_TX_FLOW_CONTROL_V2": {
@@ -2498,7 +2581,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
     ]
 
-    if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph":
+    if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),

@@ -85,6 +85,36 @@ config CE_DISABLE_SRNG_TIMER_IRQ
 	bool "Enable CE_DISABLE_SRNG_TIMER_IRQ"
 	default n
 
+config HL_DP_SUPPORT
+	bool "Enable HL_DP_SUPPORT"
+	default n
+
+config CFG_GTK_OFFLOAD_MAX_VDEV
+	int "GTK offload max vdev counts"
+	default 2 if HL_DP_SUPPORT
+	default 3
+
+config CFG_MAX_PERIODIC_TX_PTRNS
+	int "Max periodix tx patterns"
+	default 6
+
+config CFG_NUM_OF_ADDITIONAL_FW_PEERS
+	int "number of additional firmware peers"
+	default 2
+
+config CFG_NUM_OF_TDLS_CONN_TABLE_ENTRIES
+	int "number of TDLS connection table entries"
+	default 8
+
+config CFG_PMO_WOW_FILTERS_MAX
+	int "Enable CFG_PMO_WOW_FILTERS_MAX"
+	default 32
+
+config CFG_ROAM_OFFLOAD_MAX_VDEV
+	int "ROAM offload max vdev counts"
+	default 2 if HL_DP_SUPPORT
+	default 3
+
 config CHECKSUM_OFFLOAD
 	bool "Enable CHECKSUM_OFFLOAD"
 	default n
@@ -159,6 +189,10 @@ config DDP_MON_RSSI_IN_DBM
 
 config DEBUG_RX_RING_BUFFER
 	bool "Enable DEBUG_RX_RING_BUFFER"
+	default n
+
+config ENABLE_DEBUG_ADDRESS_MARKING
+	bool "Enable ENABLE_DEBUG_ADDRESS_MARKING"
 	default n
 
 config WLAN_DP_LOAD_BALANCE_SUPPORT
@@ -314,6 +348,10 @@ config DUP_RX_DESC_WAR
 	bool "Enable DUP_RX_DESC_WAR"
 	default n
 
+config RX_PERFORMANCE
+	bool "Enable RX_PERFORMANCE"
+	default n
+
 config DYNAMIC_RX_AGGREGATION
 	bool "Enable DYNAMIC_RX_AGGREGATION"
 	default n
@@ -426,6 +464,10 @@ config FEATURE_MEMDUMP_ENABLE
 	bool "Enable FEATURE_MEMDUMP_ENABLE"
 	default n
 
+config FEATURE_MONITOR_LEGACY_MODE_SUPPORT
+	bool "Enable FEATURE_MONITOR_LEGACY_MODE_SUPPORT"
+	default n
+
 config FEATURE_MONITOR_MODE_SUPPORT
 	bool "Enable FEATURE_MONITOR_MODE_SUPPORT"
 	default n
@@ -522,6 +564,10 @@ config FEATURE_TSO_STATS
 	bool "Enable FEATURE_TSO_STATS"
 	default n
 
+config TSOSEG_DEBUG
+	bool "Enable TSOSEG_DEBUG"
+	default n
+
 config FEATURE_TX_POWER
 	bool "Enable FEATURE_TX_POWER"
 	default n
@@ -536,6 +582,14 @@ config FEATURE_VDEV_OPS_WAKELOCK
 
 config FEATURE_WLAN_D0WOW
 	bool "Enable FEATURE_WLAN_D0WOW"
+	default n
+
+config FEATURE_WLAN_FT_IEEE8021X
+	bool "Enable FEATURE_WLAN_FT_IEEE8021X"
+	default n
+
+config FEATURE_WLAN_FT_PSK
+	bool "Enable FEATURE_WLAN_FT_PSK"
 	default n
 
 config FEATURE_WLAN_LPHB
@@ -584,6 +638,10 @@ config FIFTH_CONNECTION
 
 config FOURTH_CONNECTION
 	bool "Enable FOURTH_CONNECTION"
+	default n
+
+config FOURTH_CONNECTION_AUTO
+	bool "Enable FOURTH_CONNECTION_AUTO"
 	default n
 
 config FW_THERMAL_THROTTLE
@@ -693,8 +751,16 @@ config IPA_WDS_EASYMESH
 	depends on FEATURE_WDS
 	default n
 
+config IPA_DISABLE_OVERRIDE
+	bool "Enable IPA_DISABLE_OVERRIDE"
+	default n
+
 config KIWI_HEADERS_DEF
 	bool "Enable KIWI_HEADERS_DEF"
+	default n
+
+config QCA6390_HEADERS_DEF
+	bool "Enable QCA6390_HEADERS_DEF"
 	default n
 
 config QCA6490_HEADERS_DEF
@@ -723,6 +789,14 @@ config LITTLE_ENDIAN
 
 config LL_DP_SUPPORT
 	bool "Enable LL_DP_SUPPORT"
+	default n
+
+config LL_DP_LEGACY_SUPPORT
+	bool "Enable LL_DP_LEGACY_SUPPORT"
+	default n
+
+config QCA_LL_TX_FLOW_CONTROL_RESIZE
+	bool "Enable QCA_LL_TX_FLOW_CONTROL_RESIZE"
 	default n
 
 config LOCK_STATS_ON
@@ -853,6 +927,10 @@ config QCA_SUPPORT_TX_THROTTLE
 	bool "Enable QCA_SUPPORT_TX_THROTTLE"
 	default n
 
+config QCA_SUPPORT_TX_THROTTLE_LEGACY
+	bool "Enable QCA_SUPPORT_TX_THROTTLE_LEGACY"
+	default n
+
 config QCA_WIFI_FTM
 	bool "Enable QCA_WIFI_FTM"
 	default n
@@ -868,6 +946,14 @@ config QCA_WIFI_KIWI
 
 config QCA_WIFI_QCA6490
 	bool "Enable QCA_WIFI_QCA6490"
+	default n
+
+config QCA_WIFI_QCA6390
+	bool "Enable QCA_WIFI_QCA6390"
+	default n
+
+config QCN7605_SUPPORT
+	bool "Enable QCN7605_SUPPORT"
 	default n
 
 config QCA_WIFI_MONITOR_MODE_NO_MSDU_START_TLV_SUPPORT
@@ -886,6 +972,10 @@ config QCACLD_FEATURE_APF
 	bool "Enable QCACLD_FEATURE_APF"
 	default n
 
+config QCACLD_FEATURE_BTC_CHAIN_MODE
+	bool "enable BTC Chain mode feature"
+	default n
+
 config QCACLD_FEATURE_FW_STATE
 	bool "Enable QCACLD_FEATURE_FW_STATE"
 	default n
@@ -900,6 +990,10 @@ config QCACLD_FEATURE_GREEN_AP
 
 config QCACLD_FEATURE_NAN
 	bool "Enable NAN feature"
+	default n
+
+config NDP_SAP_CONCURRENCY_ENABLE
+	bool "Enable NDP_SAP_CONCURRENCY_ENABLE"
 	default n
 
 config QCACLD_RX_DESC_MULTI_PAGE_ALLOC
@@ -951,8 +1045,16 @@ config REG_CLIENT
 	bool "Enable REG_CLIENT"
 	default n
 
+config WLAN_REG_AUTO
+	bool "Enable WLAN_REG_AUTO"
+	default n
+
 config REGISTER_OP_DEBUG
 	bool "Enable REGISTER_OP_DEBUG"
+	default n
+
+config PKT_LOG
+	bool "Enable PKT_LOG"
 	default n
 
 config REMOVE_PKT_LOG
@@ -1036,6 +1138,14 @@ config SHADOW_V3
 	bool "Enable SHADOW_V3"
 	default n
 
+config SHADOW_WRITE_DELAY
+	bool "Enable SHADOW_WRITE_DELAY"
+	default n
+
+config SIR_SAP_MAX_NUM_PEERS
+	int "Max peers number of sif SAP"
+	default 32
+
 config SMMU_S1_UNMAP
 	bool "Enable SMMU_S1_UNMAP"
 	default n
@@ -1056,6 +1166,10 @@ config SOFTAP_CHANNEL_RANGE
 	bool "Enable SOFTAP_CHANNEL_RANGE"
 	default n
 
+config WLAN_TX_LL_LEGACY
+	bool "Enable WLAN_TX_LL_LEGACY"
+	default n
+
 config SUPPORT_11AX
 	bool "Enable SUPPORT_11AX"
 	default n
@@ -1066,6 +1180,10 @@ config SYSTEM_PM_CHECK
 
 config TALLOC_DEBUG
 	bool "Enable TALLOC_DEBUG"
+	default n
+
+config HOST_11D_SCAN
+	bool "Enable HOST_11D_SCAN"
 	default n
 
 config TARGET_11D_SCAN
@@ -1106,6 +1224,10 @@ config TX_PER_PDEV_DESC_POOL
 
 config TX_TID_OVERRIDE
 	bool "Enable TX_TID_OVERRIDE"
+	default n
+
+config TX_AGGREGATION_SIZE_ENABLE
+	bool "Enable TX_AGGREGATION_SIZE_ENABLE"
 	default n
 
 config UNIT_TEST
@@ -1213,6 +1335,10 @@ config WLAN_DIAG_VERSION
 	bool "Enable WLAN_DIAG_VERSION"
 	default n
 
+config ATH_PROCFS_DIAG_SUPPORT
+	bool "Enable ATH_PROCFS_DIAG_SUPPORT"
+	default n
+
 config WLAN_DISABLE_EXPORT_SYMBOL
 	bool "Enable WLAN_DISABLE_EXPORT_SYMBOL"
 	default n
@@ -1260,6 +1386,10 @@ config WLAN_ENH_CFR_ENABLE
 
 config WLAN_FASTPATH
 	bool "Enable fastpath for datapackets"
+	default n
+
+config WLAN_FASTPATH_LEGACY
+	bool "WLAN_FASTPATH_LEGACY"
 	default n
 
 config WLAN_FEATURE_11AX
@@ -1352,6 +1482,14 @@ config WLAN_FEATURE_DP_RX_RING_HISTORY
 
 config WLAN_FEATURE_DP_RX_THREADS
 	bool "Enable WLAN_FEATURE_DP_RX_THREADS"
+	default n
+
+config WLAN_DP_LEGACY_OL_RX_THREAD
+	bool "Enable WLAN_DP_LEGACY_OL_RX_THREAD"
+	default n
+
+config OL_RX_INDICATION_RECORD
+	bool "Enable OL_RX_INDICATION_RECORD"
 	default n
 
 config WLAN_FEATURE_DP_TX_DESC_HISTORY
@@ -1544,11 +1682,19 @@ config WLAN_LOGGING_SOCK_SVC
 	bool "Enable WLAN_LOGGING_SOCK_SVC"
 	default n
 
+config WLAN_LOGGING_BUFFERS_DYNAMICALLY
+	bool "Enable WLAN_LOGGING_BUFFERS_DYNAMICALLY"
+	default n
+
 config WLAN_LRO
 	bool "Enable Large Receive Offload"
 	depends on HELIUMPLUS
 	depends on INET_LRO
 	default n
+
+config WLAN_MAX_VDEVS
+	int "Max wlan vdevs"
+	default 6
 
 config WLAN_MWS_INFO_DEBUGFS
 	bool "Enable WLAN_MWS_INFO_DEBUGFS"
@@ -1588,6 +1734,10 @@ config WLAN_OPEN_P2P_INTERFACE
 	bool "Enable WLAN_OPEN_P2P_INTERFACE"
 	default n
 
+config WLAN_PDEV_MAX_VDEVS
+	int "Max vdevs of pdev"
+	default 6
+
 config WLAN_PDEV_VDEV_SEND_MULTI_PARAM
 	bool "Enable WLAN_PDEV_VDEV_SEND_MULTI_PARAM"
 	default n
@@ -1603,6 +1753,14 @@ config WLAN_POLICY_MGR_ENABLE
 config WLAN_POWER_DEBUG
 	bool "Enable WLAN_POWER_DEBUG"
 	default n
+
+config WLAN_PSOC_MAX_VDEVS
+	int "Max vdevs of psoc"
+	default 6
+
+config WLAN_SER_MAX_PENDING_CMDS_AP
+	int "Max wlan serialize pending commands for AP"
+	default 32
 
 config WLAN_REASSOC
 	bool "Enable WLAN_REASSOC"
@@ -1647,6 +1805,10 @@ config WLAN_SYNC_TSF_PLUS
 
 config WLAN_SYNC_TSF_TIMER
 	bool "Enable WLAN_SYNC_TSF_TIMER"
+	default n
+
+config WLAN_SYNC_TSF_PLUS_DISABLE_SOCK_TS
+	bool "Enable WLAN_SYNC_TSF_PLUS_DISABLE_SOCK_TS"
 	default n
 
 config WLAN_SYSFS
@@ -1811,6 +1973,14 @@ config WLAN_TWT_SAP_PDEV_COUNT
 
 config WLAN_TWT_SAP_STA_COUNT
 	bool "Enable WLAN_TWT_SAP_STA_COUNT"
+	default n
+
+config WLAN_TX_FLOW_CONTROL
+	bool "Enable WLAN_TX_FLOW_CONTROL"
+	default n
+
+config WLAN_TX_FLOW_CONTROL_LEGACY
+	bool "enable WLAN_TX_FLOW_CONTROL_LEGACY"
 	default n
 
 config WLAN_TX_FLOW_CONTROL_V2
@@ -2273,6 +2443,10 @@ config DP_RX_PEEK_MSDU_DONE_WAR
         bool "Enable DP_RX_PEEK_MSDU_DONE_WAR"
         default n
 
+config WLAN_ALLOCATE_GLOBAL_BUFFERS_DYNAMICALLY
+	bool "Enable WLAN_ALLOCATE_GLOBAL_BUFFERS_DYNAMICALLY"
+	default n
+
 config WLAN_AUX_SUPPORT
         bool "Enable WLAN_AUX_SUPPORT"
         default n
@@ -2408,6 +2582,22 @@ config WLAN_MAX_VDEV_CHAINS
 config WLAN_MAX_VDEV_NSS
 	int "Max VDEV NSS supported"
 	default 2
+
+if QCN7605_SUPPORT
+config WLAN_CE4_SZ_QCN7605
+	int "Enable WLAN_CE4_SZ_QCN7605"
+	default 4096
+endif
+
+if QCN7605_SUPPORT || QCA_WIFI_QCA6390 || QCA_WIFI_QCA6490
+config CFG_BMISS_OFFLOAD_MAX_VDEV
+	int "Enable CFG_BMISS_OFFLOAD_MAX_VDEV"
+	default 3
+
+config CFG_MAX_STA_VDEVS
+	int "Enable CFG_MAX_STA_VDEVS"
+	default 2
+endif
 
 if CNSS_KIWI_V2
 config CFG_BMISS_OFFLOAD_MAX_VDEV
