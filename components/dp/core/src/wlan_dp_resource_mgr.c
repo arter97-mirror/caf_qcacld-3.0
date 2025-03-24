@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: ISC
  */
 
@@ -953,7 +953,7 @@ void wlan_dp_resource_mgr_notify_vdev_mac_id_migration(
 	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
 	struct wlan_dp_resource_vote_node *vote_node;
 	struct wlan_dp_peer_priv_context *priv_ctx;
-	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_peer *peer, *next;
 	bool list_update = false;
 
 	if (!rsrc_ctx)
@@ -964,7 +964,7 @@ void wlan_dp_resource_mgr_notify_vdev_mac_id_migration(
 		return;
 
 	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
-	wlan_objmgr_for_each_vdev_peer(vdev, peer) {
+	wlan_objmgr_for_each_vdev_peer(vdev, peer, next) {
 		wlan_objmgr_peer_get_ref(peer, WLAN_DP_ID);
 		/*If vote node is present then no active connection*/
 		priv_ctx = dp_get_peer_priv_obj(peer);
