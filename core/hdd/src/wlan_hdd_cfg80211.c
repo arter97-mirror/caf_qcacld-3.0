@@ -34573,7 +34573,14 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("Vdev is null return");
-		return -ENOTCONN;
+		return -EINVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("null psoc");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EINVAL;
 	}
 
 	if (!wlan_cm_is_vdev_connected(vdev)) {
@@ -34586,6 +34593,12 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 		hdd_debug("link reconfig not supported");
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return -EOPNOTSUPP;
+	}
+
+	if (policy_mgr_link_reconfig_is_concurrency_present(psoc)) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EOPNOTSUPP;
+
 	}
 
 	if (mlo_is_link_recfg_in_progress(vdev)) {
@@ -34671,13 +34684,6 @@ wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 	}
 
 	req_param->num_link_del_param = i;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		hdd_err("null psoc");
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		return QDF_STATUS_E_NULL_VALUE;
-	}
 
 	mlo_rx_ops = &psoc->soc_cb.rx_ops->mlo_rx_ops;
 	if (!mlo_rx_ops) {
