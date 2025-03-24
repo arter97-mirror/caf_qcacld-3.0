@@ -1844,8 +1844,16 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (auth_node && (auth_node->seq_num == curr_seq_num)) {
 		pe_err("Received an already processed auth frame with seq_num : %d",
 		       curr_seq_num);
+		if (LIM_IS_AP_ROLE(pe_session))
+			lim_del_stale_auth_node_assoc_req_timeout(mac_ctx,
+								  auth_node);
 		return;
 	}
+
+	/* allow new auth if previous one was too old */
+	if (auth_node && LIM_IS_AP_ROLE(pe_session))
+		lim_del_stale_auth_node_assoc_req_timeout(mac_ctx,
+							  auth_node);
 
 	/* save seq number and mac_addr in pe_session */
 	pe_session->prev_auth_seq_num = curr_seq_num;
