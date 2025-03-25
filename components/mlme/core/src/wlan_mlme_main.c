@@ -3347,6 +3347,8 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_bmiss_timeout(psoc, lfr);
 	lfr->hs20_btm_offload_disable = cfg_get(psoc,
 						CFG_HS_20_BTM_OFFLOAD_DISABLE);
+	lfr->mlo_roam_partner_bringup_offload =
+			cfg_get(psoc, CFG_PARTNER_BRINGUP_OFFLOAD_TO_HOST);
 }
 
 static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,

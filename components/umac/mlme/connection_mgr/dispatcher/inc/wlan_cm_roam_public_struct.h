@@ -1671,6 +1671,8 @@ struct wlan_roam_scan_mode_params {
  * @disable_self_roam: Disable roaming to current connected BSS.
  * @rct_validity_timer: duration value for which the entries in
  * roam candidate table(rct) are valid
+ * @mlo_roam_partner_bringup_offload: MLO roaming partner bringup offloaded to
+ * host
  */
 struct wlan_rso_lfr3_params {
 	uint8_t roam_rssi_cat_gap;
@@ -1682,6 +1684,7 @@ struct wlan_rso_lfr3_params {
 	uint32_t roam_preauth_no_ack_timeout;
 	bool disable_self_roam;
 	uint32_t rct_validity_timer;
+	bool mlo_roam_partner_bringup_offload;
 };
 
 #define WLAN_ROAM_OFFLOAD_NUM_MCS_SET     (16)
