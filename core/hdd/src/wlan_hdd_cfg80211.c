@@ -28265,6 +28265,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	struct wlan_objmgr_vdev *vdev;
 	int errno;
+	struct qdf_mac_addr mac = QDF_MAC_ADDR_BCAST_INIT;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -28282,11 +28283,14 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno)
 		return errno;
+	if (mac_addr)
+		qdf_mem_copy(mac.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
 
-	hdd_debug("vdev %d mode %s(%d) index %d, pairwise %d link_id %d",
+	hdd_debug("vdev %d mode %s(%d) index %d, pairwise %d mac: " QDF_MAC_ADDR_FMT " link_id %d",
 		  adapter->deflink->vdev_id,
 		  qdf_opmode_str(adapter->device_mode),
-		  adapter->device_mode, key_index, pairwise, link_id);
+		  adapter->device_mode, key_index, pairwise,
+		  QDF_MAC_ADDR_REF(mac.bytes), link_id);
 	mac_handle = hdd_ctx->mac_handle;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
