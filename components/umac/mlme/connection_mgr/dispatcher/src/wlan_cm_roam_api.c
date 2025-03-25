@@ -3018,9 +3018,7 @@ cm_handle_roam_offload_events(struct roam_offload_roam_event *roam_event)
 	}
 	break;
 	case ROAM_REASON_INVALID:
-		cm_invalid_roam_reason_handler(roam_event->vdev_id,
-					       roam_event->notif,
-					       roam_event->notif_params);
+		cm_invalid_roam_reason_handler(roam_event);
 		break;
 	default:
 		break;

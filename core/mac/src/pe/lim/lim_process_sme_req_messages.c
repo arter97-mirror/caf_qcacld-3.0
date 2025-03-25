@@ -5173,6 +5173,7 @@ lim_cm_handle_disconnect_req(struct wlan_cm_vdev_discon_req *req)
 {
 	struct mac_context *mac_ctx;
 	struct pe_session *pe_session;
+	bool is_link_switch_disconn = false;
 
 	if (!req)
 		return QDF_STATUS_E_INVAL;
@@ -5190,9 +5191,12 @@ lim_cm_handle_disconnect_req(struct wlan_cm_vdev_discon_req *req)
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if (req->req.source == CM_MLO_LINK_SWITCH_DISCONNECT &&
+	    req->req.reason_code != REASON_FW_TRIGGERED_ROAM_FAILURE)
+		is_link_switch_disconn = true;
+
 	if (req->req.source == CM_PEER_DISCONNECT ||
-	    req->req.source == CM_SB_DISCONNECT ||
-	    req->req.source == CM_MLO_LINK_SWITCH_DISCONNECT)
+	    req->req.source == CM_SB_DISCONNECT || is_link_switch_disconn)
 		lim_process_sb_disconnect_req(mac_ctx, pe_session, req);
 	else
 		lim_process_nb_disconnect_req(mac_ctx, pe_session, req);

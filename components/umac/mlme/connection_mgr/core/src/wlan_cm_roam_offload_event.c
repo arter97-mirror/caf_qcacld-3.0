@@ -310,6 +310,42 @@ error:
 	return status;
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+void
+cm_roam_handle_mlo_roam_abort(struct wlan_objmgr_vdev *vdev,
+			      uint32_t aborted_link_id)
+{
+	struct wlan_objmgr_vdev *abort_vdev = NULL;
+	struct mlo_link_info *link_info;
+
+	abort_vdev = mlo_get_vdev_by_link_id(vdev, aborted_link_id,
+					     WLAN_LEGACY_MAC_ID);
+	if (!abort_vdev) {
+		mlme_err("VDEV not found for link id %d", aborted_link_id);
+		return;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(abort_vdev)) {
+		mlme_err("Roam is aborted on invalid vdev %d",
+			 wlan_vdev_get_id(abort_vdev));
+		goto end;
+	}
+
+	link_info = mlo_mgr_get_ap_link_by_link_id(abort_vdev->mlo_dev_ctx,
+						   aborted_link_id);
+	if (!link_info) {
+		mlme_err("Link info not found for link %d", aborted_link_id);
+		goto end;
+	}
+
+	mlo_mgr_link_switch_for_roam_abort(abort_vdev, aborted_link_id,
+					   link_info->link_chan_info->ch_freq);
+
+end:
+	wlan_objmgr_vdev_release_ref(abort_vdev, WLAN_LEGACY_MAC_ID);
+}
+#endif
+
 QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	struct wlan_objmgr_pdev *pdev;
