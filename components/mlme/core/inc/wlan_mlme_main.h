@@ -484,6 +484,16 @@ struct wait_for_key_timer {
 	qdf_mc_timer_t timer;
 };
 
+/*
+ * struct roam_key_event_wait_timer - Roam key WMI event wait timer object
+ * @vdev: Pointer to the assoc vdev
+ * @timer: timer object
+ */
+struct roam_key_event_wait_timer {
+	struct wlan_objmgr_vdev *vdev;
+	qdf_mc_timer_t timer;
+};
+
 /**
  * struct mlme_ap_config - VDEV MLME legacy private SAP
  * related configurations
@@ -847,6 +857,7 @@ struct enhance_roam_info {
  * @peer_set_key_wakelock: wakelock to protect peer set key op with firmware
  * @peer_set_key_rt_wakelock: runtime pm wakelock for set key
  * @set_key_wakelock_counter: Counter for runtime pm wakelock
+ * @mlo_key_timer: Roam key event wait timer
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -926,6 +937,7 @@ struct mlme_legacy_priv {
 	qdf_wake_lock_t peer_set_key_wakelock;
 	qdf_runtime_lock_t peer_set_key_rt_wakelock;
 	qdf_atomic_t set_key_wakelock_counter;
+	struct roam_key_event_wait_timer mlo_key_timer;
 };
 
 /**

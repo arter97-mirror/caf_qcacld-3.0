@@ -798,5 +798,45 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 QDF_STATUS
 cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 		       struct cm_connect_req *conn_req);
+
+/**
+ * cm_roam_key_event_timeout_handler() - Roam key time out handler API
+ * @data: Pointer to wait key timer data
+ *
+ * Return: none
+ */
+void cm_roam_key_event_timeout_handler(void *data);
+
+/**
+ * cm_start_roam_key_wait_timer() - Wait for roam key start API
+ * @vdev: Pointer to vdev
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS cm_start_roam_key_wait_timer(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * cm_stop_roam_key_wait_timer() - Roam key wait stop API
+ * @vdev: Pointer to vdev
+ *
+ * Return: none
+ */
+void cm_stop_roam_key_wait_timer(struct wlan_objmgr_vdev *vdev);
+#else
+static inline void cm_roam_key_event_timeout_handler(void *data)
+{
+}
+
+static inline  QDF_STATUS
+cm_start_roam_key_wait_timer(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+cm_stop_roam_key_wait_timer(struct wlan_objmgr_vdev *vdev)
+{
+}
 #endif
 #endif /* __WLAN_CM_VDEV_API_H__ */
