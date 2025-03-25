@@ -1662,6 +1662,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 	link_id = wlan_vdev_get_link_id(vdev);
 
 	if (!mlo_is_set_key_defered(vdev, link_id) &&
+	    !mlo_is_offload_roam_in_progress(vdev) &&
 	    !mlo_mgr_is_link_switch_in_progress(vdev)) {
 		mlme_debug("keys are not deferred for link_id %d", link_id);
 		return;
