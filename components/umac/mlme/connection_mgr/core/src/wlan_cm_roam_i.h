@@ -98,6 +98,17 @@ cm_update_scan_mlme_on_roam(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS cm_abort_fw_roam(struct cnx_mgr *cm_ctx,
 			    wlan_cm_id cm_id);
 
+/*
+ * cm_roam_handle_mlo_roam_abort() - API to handle the MLO roam abort when
+ * roam partner bringup is offloaded to host
+ * @vdev: pointer to vdev object
+ * @aborted_link_id: Link deleted by the firmware
+ *
+ * Return: None
+ */
+void
+cm_roam_handle_mlo_roam_abort(struct wlan_objmgr_vdev *vdev,
+			      uint32_t aborted_link_id);
 /**
  * cm_fw_roam_sync_req() - Post roam sync to CM SM
  * @psoc: psoc pointer

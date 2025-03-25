@@ -2621,6 +2621,8 @@ enum roam_dispatcher_events {
  * @hw_mode_trans_ind: HW mode transition indication
  * @deauth_disassoc_frame: Deauth/disassoc frame received from AP
  * @rso_timer_stopped: RSO timer stopped
+ * @is_mlo_roam_aborted: Is MLO roam aborted by firmware
+ * @roam_abort_link_bitmap: Link bitmap of the partner deleted by firmware
  */
 struct roam_offload_roam_event {
 	uint8_t vdev_id;
@@ -2633,6 +2635,8 @@ struct roam_offload_roam_event {
 	struct cm_hw_mode_trans_ind *hw_mode_trans_ind;
 	uint8_t *deauth_disassoc_frame;
 	bool rso_timer_stopped;
+	bool is_mlo_roam_aborted;
+	uint32_t roam_abort_link_bitmap;
 };
 
 /**

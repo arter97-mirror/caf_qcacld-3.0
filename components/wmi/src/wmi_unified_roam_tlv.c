@@ -1029,6 +1029,7 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 	WMI_ROAM_EVENTID_param_tlvs *param_buf = NULL;
 	struct cm_hw_mode_trans_ind *hw_mode_trans_ind;
 	wmi_pdev_hw_mode_transition_event_fixed_param *hw_mode_trans_param;
+	wmi_roam_partner_link_param *roam_abort_info;
 
 	if (!evt_buf) {
 		wmi_debug("Empty roam_sync_event param buf");
@@ -1064,6 +1065,17 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 			  hw_mode_trans_param->num_vdev_mac_entries,
 			  param_buf->num_wmi_pdev_set_hw_mode_response_vdev_mac_mapping);
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	roam_abort_info = param_buf->partner_link_param;
+	if (roam_abort_info) {
+		roam_event->is_mlo_roam_aborted = true;
+		roam_event->roam_abort_link_bitmap =
+				roam_abort_info->deleted_ieee_link_id_bmap;
+		wmi_debug("Received roam abort link bitmap %x",
+			  roam_event->roam_abort_link_bitmap);
+	} else {
+		roam_event->is_mlo_roam_aborted = false;
 	}
 
 	roam_event->reason =
