@@ -1,6 +1,6 @@
  /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -90,6 +90,7 @@
 #include <../../core/src/wlan_cm_roam_i.h>
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_mlo_mgr_sta.h"
 #include "lim_mlo.h"
 #include "wlan_dp_api.h"
 #ifdef FEATURE_WLAN_EXTSCAN
@@ -735,7 +736,8 @@ wma_roam_update_vdev(tp_wma_handle wma,
 	 */
 	if (!is_multi_link_roam(roam_synch_ind_ptr) ||
 	    wlan_vdev_mlme_get_is_mlo_link(wma->psoc, vdev_id) ||
-	    mlo_get_single_link_ml_roaming(wma->psoc, vdev_id)) {
+	    mlo_get_single_link_ml_roaming(wma->psoc, vdev_id) ||
+	    mlo_is_offload_roam_in_progress(wma->interfaces[vdev_id].vdev)) {
 		status = wma_delete_all_peers(wma, vdev_id);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto end;

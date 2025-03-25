@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -311,9 +311,11 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				void *event, uint32_t event_data_len)
 {
 	struct roam_offload_synch_ind *sync_ind;
+	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 	uint8_t i;
 	bool is_non_mlo_ap = false;
+	uint32_t is_partner_bringup_offloaded = 0;
 
 	sync_ind = (struct roam_offload_synch_ind *)event;
 	if (!sync_ind)
@@ -323,6 +325,15 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlo_update_for_multi_link_roam(psoc, vdev_id,
 					       sync_ind->ml_link[i].vdev_id);
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	is_partner_bringup_offloaded =
+			wlan_mlme_get_tgt_mlo_roam_partner_bringup_offload(psoc);
+	mlo_set_offload_roam_in_progress(vdev, false);
+
 	if (!sync_ind->num_setup_links) {
 		mlo_debug("MLO_ROAM: Roamed to Legacy");
 		is_non_mlo_ap = true;
@@ -331,6 +342,10 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED) {
 		mlo_debug("MLO_ROAM: Roamed to single link MLO");
 		mlo_set_single_link_ml_roaming(psoc, vdev_id, true);
+	} else if (is_partner_bringup_offloaded) {
+		mlo_err("MLO_ROAM: Partner link bringup offloaded to host");
+		mlo_set_offload_roam_in_progress(vdev, true);
+		mlo_set_single_link_ml_roaming(psoc, vdev_id, false);
 	} else {
 		mlo_debug("MLO_ROAM: Roamed to MLO with %d links",
 			  sync_ind->num_setup_links);
@@ -345,6 +360,8 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	if (QDF_IS_STATUS_ERROR(status))
 		mlo_clear_link_bmap(psoc, vdev_id);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 
 	return status;
 }
@@ -435,29 +452,36 @@ QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_vdev *link_vdev = NULL;
 	uint8_t i;
 	uint8_t vdev_id;
+	bool is_ml_roam, defer_partner_bringup = false;
 
 	sync_ind = (struct roam_offload_synch_ind *)event;
 	vdev_id = wlan_vdev_get_id(vdev);
 	psoc = wlan_vdev_get_psoc(vdev);
 
+	is_ml_roam = sync_ind->num_setup_links > 1 ? true : false;
+	if (sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED ||
+	    (is_ml_roam && mlo_is_offload_roam_in_progress(vdev)))
+		defer_partner_bringup =  true;
+
 	/* Clean up link vdev in following cases
 	 * 1. When roamed to legacy, num_setup_links = 0
 	 * 2. When roamed to single link, num_setup_links = 1
 	 * 3. Roamed to AP with auth_status = ROAMED_AUTH_STATUS_CONNECTED
+	 * 4. MLO roam with partner link bringup offloaded to host
 	 */
-	if (sync_ind->num_setup_links < 2 ||
-	    sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED) {
-		mlme_debug("Roam auth status %d", sync_ind->auth_status);
+	if (!is_ml_roam) {
+		mlme_debug("MLO_ROAM: SL/Legacy roaming, cleanup partners");
 		mlo_update_vdev_after_roam(psoc, vdev_id,
 					   sync_ind->num_setup_links);
 	}
 
-	/* If EAPOL is offloaded to supplicant, link vdev/s are not up
-	 * at FW, in that case complete roam sync on assoc vdev
-	 * link vdev will be initialized after set key is complete.
-	 */
-	if (sync_ind->auth_status == ROAM_AUTH_STATUS_CONNECTED)
+	if (defer_partner_bringup) {
+		mlme_err("MLO_ROAM: Do not process roam sync on partners auth status %d",
+			 sync_ind->auth_status);
+		mlo_update_vdev_after_roam(psoc, vdev_id,
+					   sync_ind->num_setup_links);
 		return QDF_STATUS_SUCCESS;
+	}
 
 	for (i = 0; i < sync_ind->num_setup_links; i++) {
 		if (vdev_id == sync_ind->ml_link[i].vdev_id)
@@ -749,7 +773,8 @@ mlo_roam_update_connected_links(struct wlan_objmgr_vdev *vdev,
 {
 	mlo_clear_connected_links_bmap(vdev);
 	if (mlo_get_single_link_ml_roaming(wlan_vdev_get_psoc(vdev),
-					   wlan_vdev_get_id(vdev)))
+					   wlan_vdev_get_id(vdev)) ||
+	    mlo_is_offload_roam_in_progress(vdev))
 		mlo_update_connected_links(vdev, 1);
 	else
 		mlo_update_connected_links_bmap(vdev->mlo_dev_ctx,
@@ -1006,7 +1031,8 @@ mlo_get_link_mac_addr_from_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 	}
 
 	rsp = sta_ctx->copied_reassoc_rsp;
-	if (rsp->roaming_info->auth_status != ROAM_AUTH_STATUS_CONNECTED) {
+	if (rsp->roaming_info->auth_status != ROAM_AUTH_STATUS_CONNECTED &&
+	    !mlo_is_offload_roam_in_progress(vdev)) {
 		mlo_debug("Roam auth status is not connected");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1074,7 +1100,8 @@ mlo_roam_copy_reassoc_rsp(struct wlan_objmgr_vdev *vdev,
 
 	sta_ctx->ml_partner_info = reassoc_rsp->ml_parnter_info;
 
-	if (auth_status != ROAM_AUTH_STATUS_CONNECTED)
+	if (auth_status != ROAM_AUTH_STATUS_CONNECTED &&
+	    !mlo_is_offload_roam_in_progress(vdev))
 		return QDF_STATUS_SUCCESS;
 
 	/* Store reassoc rsp only if roamed to 2 link AP */
@@ -1408,7 +1435,8 @@ void mlo_roam_connect_complete(struct wlan_objmgr_vdev *vdev)
 
 	auth_status = sta_ctx->copied_reassoc_rsp->roaming_info->auth_status;
 	if (!mlo_check_connect_req_bmap(vdev) &&
-	    auth_status == ROAM_AUTH_STATUS_CONNECTED) {
+	    (auth_status == ROAM_AUTH_STATUS_CONNECTED ||
+	     mlo_is_offload_roam_in_progress(vdev))) {
 		wlan_cm_free_connect_resp(sta_ctx->copied_reassoc_rsp);
 		sta_ctx->copied_reassoc_rsp = NULL;
 	}

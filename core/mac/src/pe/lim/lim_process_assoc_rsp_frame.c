@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -50,6 +50,7 @@
 #include "parser_api.h"
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_mlo_mgr_sta.h"
 
 /**
  * lim_update_stads_htcap() - Updates station Descriptor HT capability
@@ -1744,7 +1745,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			}
 		}
 		if (!mlo_roam_is_auth_status_connected(mac_ctx->psoc,
-						       wlan_vdev_get_id(session_entry->vdev))) {
+						       wlan_vdev_get_id(session_entry->vdev)) &&
+		    !mlo_is_offload_roam_in_progress(session_entry->vdev)) {
 			return;
 		}
 	}

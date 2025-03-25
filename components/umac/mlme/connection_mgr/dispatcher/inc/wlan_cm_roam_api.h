@@ -1822,6 +1822,15 @@ wlan_cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
 QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  struct wlan_crypto_key_entry *keys,
 					  uint8_t num_keys);
+
+/*
+ * cm_roam_partner_bringup_handler() - Handle the partner link bringup for MLO
+ * roaming
+ * @ml_ctx: Pointer to MLO dev context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_roam_partner_bringup_handler(struct wlan_mlo_dev_context *ml_ctx);
 #else
 static inline
 QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
@@ -1829,6 +1838,12 @@ QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  uint8_t num_keys)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS cm_roam_partner_bringup_handler(struct wlan_mlo_dev_context *ml_ctx)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

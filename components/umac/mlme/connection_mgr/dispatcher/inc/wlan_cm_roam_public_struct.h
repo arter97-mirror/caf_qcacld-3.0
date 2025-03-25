@@ -3108,5 +3108,9 @@ struct wlan_cm_roam_rx_ops {
 	(*roam_vendor_handoff_event)(struct wlan_objmgr_psoc *psoc,
 				     struct roam_vendor_handoff_params *data);
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	QDF_STATUS
+	(*roam_partner_bringup_event)(struct wlan_mlo_dev_context *ml_ctx);
+#endif
 };
 #endif
