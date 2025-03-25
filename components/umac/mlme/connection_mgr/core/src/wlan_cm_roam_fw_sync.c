@@ -1266,6 +1266,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			cm_roam_start_init_on_connect(pdev, vdev_id);
 		}
 		wlan_cm_tgt_send_roam_sync_complete_cmd(psoc, vdev_id);
+		cm_start_roam_key_wait_timer(vdev);
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 		mlo_set_single_link_ml_roaming(psoc, vdev_id,
 					       false);
