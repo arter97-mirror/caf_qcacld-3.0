@@ -6670,6 +6670,21 @@ static void wma_set_pmo_caps(struct wlan_objmgr_psoc *psoc)
 		wma_err("Failed to set PMO capabilities; status:%d", status);
 }
 
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_11BE_MLO)
+static void wma_set_roam_partner_bringup_offload(tp_wma_handle wma)
+{
+	bool tgt_cap;
+
+	tgt_cap = wmi_service_enabled(wma->wmi_handle,
+				wmi_service_mlo_roam_partner_bringup_from_host);
+	wma_debug("wmi_service_mlo_roam_partner_bringup_from_host %d", tgt_cap);
+	wlan_mlme_set_tgt_mlo_roam_partner_bringup_offload(wma->psoc, tgt_cap);
+}
+#else
+static void wma_set_roam_partner_bringup_offload(tp_wma_handle wma)
+{
+}
+#endif
 /**
  * wma_set_mlme_caps() - Populate the MLME related target capabilities to the
  * mlme component
@@ -6737,6 +6752,8 @@ static void wma_set_mlme_caps(struct wlan_objmgr_psoc *psoc)
 	tgt_cap = wmi_service_enabled(wma->wmi_handle,
 				      wmi_service_mrsno_support);
 	ucfg_mlme_set_mrsno_support(psoc, tgt_cap);
+
+	wma_set_roam_partner_bringup_offload(wma);
 }
 
 #ifdef WLAN_FEATURE_BIG_DATA_STATS

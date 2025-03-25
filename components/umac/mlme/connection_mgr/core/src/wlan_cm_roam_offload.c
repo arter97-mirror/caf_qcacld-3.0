@@ -545,6 +545,8 @@ cm_roam_scan_offload_fill_lfr3_config(struct wlan_objmgr_vdev *vdev,
 		mlme_obj->cfg.btm.rct_validity_timer;
 	rso_config->rso_lfr3_params.disable_self_roam =
 		!mlme_obj->cfg.lfr.enable_self_bss_roam;
+	rso_config->rso_lfr3_params.mlo_roam_partner_bringup_offload =
+			mlme_obj->cfg.lfr.mlo_roam_partner_bringup_offload;
 	if (!rso_cfg->roam_control_enable &&
 	    mlme_obj->cfg.lfr.roam_force_rssi_trigger)
 		*mode |= WMI_ROAM_SCAN_MODE_RSSI_CHANGE;

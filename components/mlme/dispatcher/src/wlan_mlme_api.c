@@ -9012,3 +9012,32 @@ wlan_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev)
 				      &bcn_interval);
 	return bcn_interval;
 }
+
+QDF_STATUS
+wlan_mlme_set_tgt_mlo_roam_partner_bringup_offload(struct wlan_objmgr_psoc *psoc,
+						   bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.lfr.mlo_roam_partner_bringup_offload &= value;
+	mlme_debug("MLO_ROAM: Partner bringup offload %d",
+		   mlme_obj->cfg.lfr.mlo_roam_partner_bringup_offload);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool
+wlan_mlme_get_tgt_mlo_roam_partner_bringup_offload(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.lfr.mlo_roam_partner_bringup_offload;
+}

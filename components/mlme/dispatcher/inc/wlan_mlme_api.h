@@ -5349,4 +5349,25 @@ wlan_mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
  * Return: beacon interval
  */
 uint32_t wlan_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * wlan_mlme_set_tgt_mlo_roam_partner_bringup_offload() - Set the MLO roaming
+ * support to offload the partner bringup to host.
+ * @psoc: pointer to psoc object
+ * @value: partner bringup offload support
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_tgt_mlo_roam_partner_bringup_offload(struct wlan_objmgr_psoc *psoc,
+						   bool value);
+/*
+ * wlan_mlme_get_tgt_mlo_roam_partner_bringup_offload() - Get the MLO roaming
+ * support to offload the partner bringup to host.
+ * @psoc: pointer to psoc object
+ *
+ * Return: partner bringup offload support
+ */
+bool
+wlan_mlme_get_tgt_mlo_roam_partner_bringup_offload(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_MLME_API_H_ */

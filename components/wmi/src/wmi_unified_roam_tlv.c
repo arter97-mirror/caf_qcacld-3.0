@@ -4750,6 +4750,8 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 			src_lfr3_params->rct_validity_timer;
 	roam_offload_params->roam_to_current_bss_disable =
 			src_lfr3_params->disable_self_roam;
+	roam_offload_params->mlo_roam_partner_bringup_by_host =
+			src_lfr3_params->mlo_roam_partner_bringup_offload;
 	wmi_debug("RSO_CFG: prefer_5g:%d rssi_cat_gap:%d select_5g_margin:%d ho_delay:%d max_sw_retry:%d no_ack_timeout:%d",
 		  roam_offload_params->prefer_5g,
 		  roam_offload_params->rssi_cat_gap,
@@ -4757,10 +4759,11 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 		  roam_offload_params->handoff_delay_for_rx,
 		  roam_offload_params->max_mlme_sw_retries,
 		  roam_offload_params->no_ack_timeout);
-	wmi_debug("RSO_CFG: reassoc_fail_timeout:%d rct_validity_time:%d disable_self_roam:%d",
+	wmi_debug("RSO_CFG: reassoc_fail_timeout:%d rct_validity_time:%d disable_self_roam:%d mlo_partner_bringup_offload:%d",
 		  roam_offload_params->reassoc_failure_timeout,
 		  roam_offload_params->roam_candidate_validity_time,
-		  roam_offload_params->roam_to_current_bss_disable);
+		  roam_offload_params->roam_to_current_bss_disable,
+		  roam_offload_params->mlo_roam_partner_bringup_by_host);
 
 	/* Fill the capabilities */
 	roam_offload_params->capability = src_lfr3_caps->capability;
