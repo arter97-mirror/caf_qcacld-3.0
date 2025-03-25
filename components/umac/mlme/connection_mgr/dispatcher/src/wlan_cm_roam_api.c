@@ -1682,6 +1682,15 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		mlme_debug("[ROAM BAND] Set roam band:%d",
 			   rso_cfg->roam_band_bitmask);
 		break;
+	case ROAM_2P4GHZ_BAND_WEIGHTAGE:
+		dst_cfg->band_2g_weightage = src_config->uint_value;
+		break;
+	case ROAM_5GHZ_BAND_WEIGHTAGE:
+		dst_cfg->band_5g_weightage = src_config->uint_value;
+		break;
+	case ROAM_6GHZ_BAND_WEIGHTAGE:
+		dst_cfg->band_6g_weightage = src_config->uint_value;
+		break;
 	default:
 		mlme_err("Invalid roam config requested:%d", roam_cfg_type);
 		status = QDF_STATUS_E_FAILURE;

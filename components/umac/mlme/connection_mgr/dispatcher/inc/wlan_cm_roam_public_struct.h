@@ -324,6 +324,12 @@ struct rso_chan_info {
  * @roam_scan_n_probes:
  * @roam_scan_inactivity_time:
  * @roam_inactive_data_packet_count:
+ * @band_2g_weightage: 2.4 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 2.4 GHz band
+ * @band_5g_weightage: 5 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 5 GHz band
+ * @band_6g_weightage: 6 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 6 GHz band
  */
 struct rso_cfg_params {
 	uint32_t neighbor_scan_period;
@@ -355,6 +361,9 @@ struct rso_cfg_params {
 	uint8_t roam_scan_n_probes;
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
+	uint32_t band_2g_weightage;
+	uint32_t band_5g_weightage;
+	uint32_t band_6g_weightage;
 };
 
 /**
@@ -796,6 +805,9 @@ struct rso_config_params {
  * @ROAM_AGGRESSIVE_SCAN_STEP_RSSI: Roam scan step rssi in aggressive mode
  * @ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD: Roam neighbour lookup
  *                                                  threshold in aggressive mode
+ * @ROAM_2P4GHZ_BAND_WEIGHTAGE: 2.4 GHz band weight value for roaming
+ * @ROAM_5GHZ_BAND_WEIGHTAGE: 5 GHz band weight value for roaming
+ * @ROAM_6GHZ_BAND_WEIGHTAGE: 6 GHz band weight value for roaming
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -834,6 +846,9 @@ enum roam_cfg_param {
 	ROAM_AGGRESSIVE_SCORE_DELTA,
 	ROAM_AGGRESSIVE_SCAN_STEP_RSSI,
 	ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD,
+	ROAM_2P4GHZ_BAND_WEIGHTAGE,
+	ROAM_5GHZ_BAND_WEIGHTAGE,
+	ROAM_6GHZ_BAND_WEIGHTAGE,
 };
 
 /**
@@ -984,6 +999,12 @@ struct ap_profile {
  *                BITS 24-31 :- reserved
  *                The value of each index must be 0-100
  * @sta_sap_mcc_weightage: STA + SAP MCC weightage
+ * @band_2g_weightage: 2.4 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 2.4 GHz band
+ * @band_5g_weightage: 5 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 5 GHz band
+ * @band_6g_weightage: 6 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 6 GHz band
  */
 struct scoring_param {
 	uint32_t disable_bitmap;
@@ -1018,6 +1039,9 @@ struct scoring_param {
 	int32_t security_weightage;
 	uint32_t security_index_score;
 	uint32_t sta_sap_mcc_weightage;
+	uint32_t band_2g_weightage;
+	uint32_t band_5g_weightage;
+	uint32_t band_6g_weightage;
 };
 
 /**

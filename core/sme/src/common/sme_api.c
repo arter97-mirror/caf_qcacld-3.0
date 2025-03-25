@@ -17631,3 +17631,51 @@ void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
 	return cm_get_pre_auth_mld_addr(mac, peer_addr, mld_addr);
 }
 #endif
+
+QDF_STATUS sme_update_2g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_2g_weightage)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = band_2g_weightage;
+	mac->mlme_cfg->roam_scoring.band_2g_weightage =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_2P4GHZ_BAND_WEIGHTAGE,
+					  &src_config);
+}
+
+QDF_STATUS sme_update_5g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_5g_weightage)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = band_5g_weightage;
+	mac->mlme_cfg->roam_scoring.band_5g_weightage =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_5GHZ_BAND_WEIGHTAGE,
+					  &src_config);
+}
+
+QDF_STATUS sme_update_6g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_6g_weightage)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = band_6g_weightage;
+	mac->mlme_cfg->roam_scoring.band_6g_weightage =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_6GHZ_BAND_WEIGHTAGE,
+					  &src_config);
+}

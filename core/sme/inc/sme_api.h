@@ -5080,4 +5080,45 @@ void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
 {
 }
 #endif
+
+/**
+ * sme_update_2g_band_weight_value()-Send 2.4 GHz band weight value to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @band_2g_weightage: 2.4 GHz band weightage in percentage
+ *
+ * Updated 2.4 GHz band weightage in roam info and a roam_offload_scan request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_2g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_2g_weightage);
+/**
+ * sme_update_5g_band_weight_value()-Send 5 GHz band weight value to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @band_5g_weightage: 5 GHz band weightage in percentage
+ *
+ * Updated 5 GHz band weightage in roam info and a roam_offload_scan request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_5g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_5g_weightage);
+
+/**
+ * sme_update_6g_band_weight_value()-Send 6 GHz band weight value to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @band_6g_weightage: 6 GHz band weightage in percentage
+ *
+ * Updated 6 GHz band weightage in roam info and a roam_offload_scan request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_6g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_6g_weightage);
 #endif /* #if !defined( __SME_API_H ) */

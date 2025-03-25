@@ -6102,6 +6102,12 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 	[QCA_ATTR_ROAM_CONTROL_FULL_SCAN_6GHZ_ONLY_ON_PRIOR_DISCOVERY] = {
 			.type = NLA_U8},
 	[QCA_ATTR_ROAM_CONTROL_CONNECTED_HIGH_RSSI_OFFSET] = {.type = NLA_U8},
+	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_2P4GHZ] = {
+			.type = NLA_U8},
+	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_5GHZ] = {
+			.type = NLA_U8},
+	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_6GHZ] = {
+			.type = NLA_U8},
 };
 
 /**
@@ -6601,6 +6607,92 @@ hdd_get_handoff_param(struct hdd_context *hdd_ctx, uint8_t vdev_id)
 #endif
 
 /**
+ * hdd_send_roam_2P4G_band_weight_to_sme() - Set 2.4 GHz band weight
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @band_2g_weightage: 2.4 GHz band weightage in percentage
+ *
+ * Send 2.4 GHz band weightage to firmware.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_send_roam_2P4G_band_weight_to_sme(struct hdd_context *hdd_ctx,
+				      uint8_t vdev_id,
+				      uint32_t band_2g_weightage)
+{
+	return sme_update_2g_band_weight_value(hdd_ctx->mac_handle, vdev_id,
+					       band_2g_weightage);
+}
+
+/**
+ * hdd_send_roam_5G_band_weight_to_sme() - Set 5 GHz band weight
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @band_5g_weightage: 5 GHz band weightage in percentage
+ *
+ * Send 5 GHz band weightage to firmware.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_send_roam_5G_band_weight_to_sme(struct hdd_context *hdd_ctx,
+				    uint8_t vdev_id,
+				    uint32_t band_5g_weightage)
+{
+	return sme_update_5g_band_weight_value(hdd_ctx->mac_handle, vdev_id,
+					       band_5g_weightage);
+}
+
+/**
+ * hdd_send_roam_6G_band_weight_to_sme() - Set 6 GHz band weight
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @band_6g_weightage: 6 GHz band weightage in percentage
+ *
+ * Send 6 GHz band weightage to firmware.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_send_roam_6G_band_weight_to_sme(struct hdd_context *hdd_ctx,
+				    uint8_t vdev_id,
+				    uint32_t band_6g_weightage)
+{
+	return sme_update_6g_band_weight_value(hdd_ctx->mac_handle, vdev_id,
+					       band_6g_weightage);
+}
+
+#ifdef CONNECTION_ROAMING_CFG
+/**
+ * is_band_weight_valid() - validate band weightage value
+ * @tb2: List of attributes carrying roam subcmd data
+ * @value: band weightage value in percentage
+ *
+ * Return: bool
+ */
+static bool is_band_weight_valid(struct nlattr **tb2, uint32_t value)
+{
+	if (tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_2P4GHZ]) {
+		if (cfg_in_range(CFG_SCORING_2G_BAND_WEIGHTAGE, value))
+			return true;
+	} else if (tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_5GHZ]) {
+		if (cfg_in_range(CFG_SCORING_5G_BAND_WEIGHTAGE, value))
+			return = true;
+	} else if (tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_6GHZ]) {
+		if (cfg_in_range(CFG_SCORING_6G_BAND_WEIGHTAGE, value))
+			return = true;
+	}
+
+	return false;
+}
+#else
+static bool is_band_weight_valid(struct nlattr **tb2, uint32_t value)
+{
+	return false;
+}
+#endif
+/**
  * hdd_set_roam_with_control_config() - Set roam control configuration
  * @hdd_ctx: HDD context
  * @tb: List of attributes carrying roam subcmd data
@@ -6625,6 +6717,7 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 	uint16_t threshold;
 	struct wlan_hdd_link_info *link_info;
 	uint8_t roam_control_enable = false;
+	bool is_rso_update_required = false;
 
 	hdd_enter();
 
@@ -6936,6 +7029,67 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 			hdd_err("Fail to set roam scan high RSSI offset for vdev %d",
 				vdev_id);
 	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_2P4GHZ];
+	if (attr) {
+		value = nla_get_u8(attr);
+		if (!is_band_weight_valid(tb2, value)) {
+			hdd_err("2.4GHz band weight value %d is out of range",
+				value);
+			return -EINVAL;
+		}
+
+		hdd_debug("Received 2.4GHz band weight value: %d", value);
+		is_rso_update_required = true;
+
+		status = hdd_send_roam_2P4G_band_weight_to_sme(hdd_ctx, vdev_id,
+							       value);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set 2.4GHz band weight value");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_5GHZ];
+	if (attr) {
+		value = nla_get_u8(attr);
+		if (!is_band_weight_valid(tb2, value)) {
+			hdd_err("5GHz band weight value %d is out of range",
+				value);
+			return -EINVAL;
+		}
+
+		hdd_debug("Received 5GHz band weight value: %d", value);
+		is_rso_update_required = true;
+
+		status = hdd_send_roam_5G_band_weight_to_sme(hdd_ctx, vdev_id,
+							     value);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set 5GHz band weight value");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_6GHZ];
+	if (attr) {
+		value = nla_get_u8(attr);
+		if (!is_band_weight_valid(tb2, value)) {
+			hdd_err("6GHz band weight value %d is out of range",
+				value);
+			return -EINVAL;
+		}
+
+		hdd_debug("Received 6GHz band weight value: %d", value);
+		is_rso_update_required = true;
+
+		status = hdd_send_roam_6G_band_weight_to_sme(hdd_ctx, vdev_id,
+							     value);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set 6GHz band weight value");
+	}
+
+	/* send RSO update if required */
+	if (is_rso_update_required)
+		wlan_roam_update_cfg(hdd_ctx->psoc, vdev_id,
+				     ROAM_SCAN_OFFLOAD_UPDATE_CFG);
 
 	return qdf_status_to_os_return(status);
 }

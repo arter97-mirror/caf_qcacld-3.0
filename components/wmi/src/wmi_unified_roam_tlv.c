@@ -5385,6 +5385,8 @@ void update_mlo_prefer_percentage(struct wlan_objmgr_psoc *psoc,
 {}
 #endif
 
+#define BAND_IDX_MAX 0xFFFFFFFF
+
 /**
  * send_roam_scan_offload_ap_profile_cmd_tlv() - set roam ap profile in fw
  * @wmi_handle: wmi handle
@@ -5408,6 +5410,7 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_roam_score_delta_param *score_delta_param;
 	wmi_roam_cnd_min_rssi_param *min_rssi_param;
 	wmi_owe_ap_profile *owe_ap_profile;
+	wmi_roam_cnd_vendor_scoring_param *vendor_score_param;
 	enum roam_trigger_reason trig_reason;
 	uint32_t *authmode_list;
 	int8_t mlo_prefer_percentage = 0;
@@ -5432,6 +5435,9 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	} else {
 		len += 2 * WMI_TLV_HDR_SIZE;
 	}
+
+	if (ap_profile->param.vendor_roam_score_algorithm)
+		len += sizeof(*vendor_score_param);
 
 	if (ap_profile->owe_ap_profile.is_owe_transition_conn) {
 		len += WMI_TLV_HDR_SIZE;
@@ -5713,10 +5719,34 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 		buf_ptr += WMI_TLV_HDR_SIZE;
 	}
 
-	/* set zero TLV's for roam_cnd_vendor_scoring_param */
-	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
-		       WMITLV_GET_STRUCT_TLVLEN(0));
-	buf_ptr += WMI_TLV_HDR_SIZE;
+	if (ap_profile->param.vendor_roam_score_algorithm) {
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+			       sizeof(*vendor_score_param));
+		buf_ptr += WMI_TLV_HDR_SIZE;
+
+		vendor_score_param = (wmi_roam_cnd_vendor_scoring_param *)buf_ptr;
+		WMITLV_SET_HDR(&vendor_score_param->tlv_header,
+			       WMITLV_TAG_STRUC_wmi_roam_cnd_vendor_scoring_param,
+			       WMITLV_GET_STRUCT_TLVLEN(wmi_roam_cnd_vendor_scoring_param));
+		vendor_score_param->band_idx = BAND_IDX_MAX;
+		vendor_score_param->band_weight_2GHz =
+			ap_profile->param.band_2g_weightage;
+		vendor_score_param->band_weight_5GHz =
+			ap_profile->param.band_5g_weightage;
+		vendor_score_param->band_weight_6GHz =
+			ap_profile->param.band_6g_weightage;
+
+		wmi_debug("Band weight 2 GHz:%d Band weight 5 GHz:%d, Band weight 6 GHz:%d",
+			  vendor_score_param->band_weight_2GHz,
+			  vendor_score_param->band_weight_5GHz,
+			  vendor_score_param->band_weight_6GHz);
+		buf_ptr += sizeof(*vendor_score_param);
+	} else {
+		/* set zero TLV's for roam_cnd_vendor_scoring_param */
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+			       WMITLV_GET_STRUCT_TLVLEN(0));
+		buf_ptr += WMI_TLV_HDR_SIZE;
+	}
 
 	if (ap_profile->owe_ap_profile.is_owe_transition_conn) {
 		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,

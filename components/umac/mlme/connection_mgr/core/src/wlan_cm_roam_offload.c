@@ -1567,6 +1567,7 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 	struct scoring_cfg *score_config;
 	struct dual_sta_policy *dual_sta_policy;
 	uint32_t mcc_to_scc_switch;
+	struct rso_cfg_params *cfg_params;
 
 	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(psoc);
 	if (!mlme_psoc_obj)
@@ -1577,6 +1578,7 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 	score_config = &mlme_psoc_obj->psoc_cfg.score_config;
 	roam_score_params = &mlme_obj->cfg.roam_scoring;
 	weight_config = &score_config->weight_config;
+	cfg_params = &rso_cfg->cfg_param;
 
 	if (!rso_cfg->cfg_param.enable_scoring_for_roam)
 		req_score_params->disable_bitmap =
@@ -1670,6 +1672,9 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 		req_score_params->cand_min_roam_score_delta =
 					roam_score_params->min_roam_score_delta;
 	}
+	req_score_params->band_2g_weightage = cfg_params->band_2g_weightage;
+	req_score_params->band_5g_weightage = cfg_params->band_5g_weightage;
+	req_score_params->band_6g_weightage = cfg_params->band_6g_weightage;
 }
 
 static uint32_t cm_crpto_cipher_wmi_cipher(int32_t cipherset)
@@ -5679,6 +5684,12 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.lfr.roam_scan_inactivity_time;
 	cfg_params->roam_inactive_data_packet_count =
 			mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
+	cfg_params->band_2g_weightage =
+			mlme_obj->cfg.roam_scoring.band_2g_weightage;
+	cfg_params->band_5g_weightage =
+			mlme_obj->cfg.roam_scoring.band_5g_weightage;
+	cfg_params->band_6g_weightage =
+			mlme_obj->cfg.roam_scoring.band_6g_weightage;
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 }
@@ -6205,6 +6216,19 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 
 	if (!mlme_obj->cfg.lfr.roam_scan_offload_enabled)
 		return;
+
+	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.band_2g_weightage;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_2P4GHZ_BAND_WEIGHTAGE, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.band_5g_weightage;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_5GHZ_BAND_WEIGHTAGE, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.band_6g_weightage;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_6GHZ_BAND_WEIGHTAGE, &src_cfg);
+
 	/*
 	 * Store the current PMK info of the AP
 	 * to the single pmk global cache if the BSS allows
