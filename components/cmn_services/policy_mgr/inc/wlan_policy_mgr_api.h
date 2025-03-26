@@ -6305,4 +6305,15 @@ uint32_t policy_mgr_get_conc_ml_sap_link_freq(struct wlan_objmgr_psoc *psoc,
 					      uint8_t vdev_id,
 					      bool *ml_sap_vdev);
 
+/**
+ * policy_mgr_fetch_scc_vdev_id() - Fetch scc vdev id for specific connection
+ * @psoc: Pointer to PSOC object
+ * @vdev_id: vdev id for the specific connection
+ * @freq: freq for the specific connection
+ *
+ * Return: scc vdev id of specific connection
+ */
+uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, uint32_t freq);
+
 #endif /* __WLAN_POLICY_MGR_API_H */
