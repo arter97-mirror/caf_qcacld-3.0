@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -68,9 +68,12 @@ static inline bool __dsc_assert(const bool cond, const char *cond_str,
 #define dsc_assert_success(status) dsc_assert(QDF_IS_STATUS_SUCCESS(status))
 
 #ifdef WLAN_DSC_DEBUG
-#define DSC_OP_TIMEOUT_MS		(1 * 60 * 1000) /* 1 minute */
-#define DSC_TRANS_TIMEOUT_MS		(1 * 60 * 1000) /* 1 minute */
-#define DSC_TRANS_WAIT_TIMEOUT_MS	(2 * 60 * 1000) /* 2 minutes */
+/* All DSC timers multiplied times 10 as each FW download request can take
+ * 60 seconds and there are 7 FW files to download.
+ */
+#define DSC_OP_TIMEOUT_MS		(10 * 60 * 1000) /* 10 minute */
+#define DSC_TRANS_TIMEOUT_MS		(10 * 60 * 1000) /* 10 minute */
+#define DSC_TRANS_WAIT_TIMEOUT_MS	(20 * 60 * 1000) /* 20 minutes */
 
 /**
  * struct dsc_op - list node for operation tracking information
