@@ -3181,6 +3181,24 @@ static void mlme_init_roam_periodic_scan_interval(struct wlan_objmgr_psoc *psoc,
 {
 	lfr->roam_periodic_scan_interval = cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
 }
+
+/**
+ * mlme_init_band_weightage() -Init band_weightage
+ * @psoc: Pointer to psoc
+ * @scoring_cfg: Pointer to scoring_cfg
+ *
+ * Return: None
+ */
+static void mlme_init_band_weightage(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_mlme_roam_scoring_cfg *scoring_cfg)
+{
+	scoring_cfg->band_2g_weightage =
+			cfg_get(psoc, CFG_SCORING_2G_BAND_WEIGHTAGE);
+	scoring_cfg->band_5g_weightage =
+			cfg_get(psoc, CFG_SCORING_5G_BAND_WEIGHTAGE);
+	scoring_cfg->band_6g_weightage =
+			cfg_get(psoc, CFG_SCORING_6G_BAND_WEIGHTAGE);
+}
 #else
 static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_mlme_lfr_cfg *lfr)
@@ -3193,6 +3211,11 @@ static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
 
 static void mlme_init_roam_periodic_scan_interval(struct wlan_objmgr_psoc *psoc,
 						  struct wlan_mlme_lfr_cfg *lfr)
+{
+}
+
+static void mlme_init_band_weightage(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_mlme_roam_scoring_cfg *scoring_cfg)
 {
 }
 #endif
@@ -3452,6 +3475,8 @@ static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA);
 	scoring_cfg->roam_aggre_score_delta =
 			cfg_get(psoc, CFG_AGGRESSIVE_ROAM_SCORE_DELTA);
+
+	mlme_init_band_weightage(psoc, scoring_cfg);
 }
 
 static void mlme_init_oce_cfg(struct wlan_objmgr_psoc *psoc,

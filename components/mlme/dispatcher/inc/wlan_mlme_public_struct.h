@@ -2516,6 +2516,9 @@ struct wlan_mlme_rssi_cfg_score  {
  *			candidate AP's roam score to start roaming in Aggressive
  *			roaming mode.
  * @roam_aggre_score_delta: percentage delta in roam score in Aggressive mode
+ * @band_2g_weightage: 2 GHz band weightage in percentage
+ * @band_5g_weightage: 5 GHz band weightage in percentage
+ * @band_6g_weightage: 6 GHz band weightage in percentage
  */
 struct wlan_mlme_roam_scoring_cfg {
 	bool enable_scoring_for_roam;
@@ -2525,6 +2528,9 @@ struct wlan_mlme_roam_scoring_cfg {
 	uint32_t min_roam_score_delta;
 	uint32_t aggre_min_roam_score_delta;
 	uint32_t roam_aggre_score_delta;
+	uint32_t band_2g_weightage;
+	uint32_t band_5g_weightage;
+	uint32_t band_6g_weightage;
 };
 
 /* struct wlan_mlme_threshold - Threshold related config items
