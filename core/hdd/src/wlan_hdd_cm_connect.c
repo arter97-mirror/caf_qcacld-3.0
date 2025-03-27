@@ -57,6 +57,7 @@
 #include <wlan_dp_ucfg_api.h>
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "wlan_action_oui_ucfg_api.h"
+#include "wlan_hdd_ioctl.h"
 
 #define MAX_ROAM_COUNT_VALUE (999)
 
@@ -1926,6 +1927,9 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
 
 	hdd_cm_prot_dhcp_after_connect(adapter, link_info->vdev_id);
+
+	if (adapter->enable_active_apf_mode)
+		hdd_enable_active_apf_mode(link_info);
 }
 
 static void

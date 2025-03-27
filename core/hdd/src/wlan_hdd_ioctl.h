@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2014, 2017-2019, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -163,6 +163,33 @@ static inline
 void hdd_dump_log_buffer(void *print_ctx, qdf_abstract_print *custom_print)
 {
 }
+#endif
 
+#ifdef FEATURE_WLAN_APF
+/**
+ * hdd_enable_active_apf_mode() - Enable active mode APF
+ * @link_info: Pointer to link info
+ *
+ * Return: None
+ */
+void hdd_enable_active_apf_mode(struct wlan_hdd_link_info *link_info);
+
+/**
+ * hdd_disable_active_apf_mode() - Disable active mode apf
+ * @link_info: Pointer to link info
+ *
+ * Return: None
+ */
+void hdd_disable_active_apf_mode(struct wlan_hdd_link_info *link_info);
+#else
+static inline void
+hdd_enable_active_apf_mode(struct wlan_hdd_link_info *link_info)
+{
+}
+
+static inline void
+hdd_disable_active_apf_mode(struct wlan_hdd_link_info *link_info)
+{
+}
 #endif
 #endif /* end #if !defined(WLAN_HDD_IOCTL_H) */

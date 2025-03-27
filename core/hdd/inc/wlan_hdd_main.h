@@ -1382,6 +1382,7 @@ enum wfc_state_latency_level {
  * @discon_link_info: link_info pointer on which post disconnect stats to be
  *                    fetched
  * @wfd_mode: WFD mode for P2P interface
+ * @enable_active_apf_mode: Enable active APF mode flag
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1584,6 +1585,7 @@ struct hdd_adapter {
 #ifdef FEATURE_WLAN_SUPPORT_USD
 	uint8_t wfd_mode;
 #endif
+	bool enable_active_apf_mode;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
