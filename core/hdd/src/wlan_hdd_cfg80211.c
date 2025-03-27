@@ -27734,7 +27734,6 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct sap_context *sap_ctx;
 	struct hdd_adapter *adapter = link_info->adapter;
-	uint8_t *bss_mac;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
@@ -27798,11 +27797,16 @@ done:
 	wlan_hdd_mlo_link_free_keys(hdd_ctx->psoc, adapter, vdev, pairwise);
 	if (pairwise && adapter->device_mode == QDF_STA_MODE &&
 	    wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		bss_mac = osif_get_bss_mac_addr(vdev);
-		if (bss_mac)
-			qdf_mem_copy(peer_mac.bytes,
-				     bss_mac,
-				     QDF_MAC_ADDR_SIZE);
+		peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
+							WLAN_OSIF_ID);
+		if (!peer) {
+			hdd_err("Peer is null return");
+			return -EINVAL;
+		}
+		qdf_mem_copy(peer_mac.bytes,
+			     wlan_peer_get_macaddr(peer),
+			     QDF_MAC_ADDR_SIZE);
+		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
 		/*
 		 * when keys are for non-bss peer, current usecase is that
 		 * the peer could only be TDLS on STA iface
