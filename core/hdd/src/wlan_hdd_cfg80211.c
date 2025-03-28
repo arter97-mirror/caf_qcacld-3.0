@@ -229,6 +229,7 @@
 #include "wlan_ll_sap_api.h"
 #include "wlan_mlo_link_recfg.h"
 #include "wlan_psoc_mlme.h"
+#include "wlan_dnw_ucfg_api.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -9434,6 +9435,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_SETUP_LINK_RECONFIG_SUPPORT] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_NO_WAIT_SUPPORT] = {
+		.type = NLA_U8},
 };
 
 
@@ -13974,6 +13977,40 @@ static int hdd_set_p2p_go_bcn_int(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_DNW
+/**
+ * hdd_config_dfs_no_wait_support() - Config DFS No Wait support
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_config_dfs_no_wait_support(struct wlan_hdd_link_info *link_info,
+					  const struct nlattr *attr)
+{
+	uint8_t support_dnw;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	int errno;
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+	support_dnw = nla_get_u8(attr);
+
+	hdd_debug("configure dnw %d", support_dnw);
+	ucfg_set_dfs_no_wait_support(hdd_ctx->psoc, support_dnw);
+
+	return 0;
+}
+#else
+static inline int
+hdd_config_dfs_no_wait_support(struct wlan_hdd_link_info *link_info,
+			       const struct nlattr *attr)
+{
+	return 0;
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * hdd_set_eht_emlsr_capability() - Set EMLSR capability for EHT STA
@@ -14532,6 +14569,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_dfs_owner_disable},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_SETUP_LINK_RECONFIG_SUPPORT,
 	hdd_set_link_reconfig_support},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_NO_WAIT_SUPPORT,
+	 hdd_config_dfs_no_wait_support},
 };
 
 #ifdef WLAN_FEATURE_ELNA
