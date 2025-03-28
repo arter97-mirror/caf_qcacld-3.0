@@ -5860,6 +5860,7 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 	bool bpcc_found;
 	bool ext_mld_cap_found = false;
 	uint16_t ext_mld_cap = 0;
+	uint8_t *mld_mac;
 
 	if (bcn_frm->mlo_ie.present) {
 		status = util_find_mlie(pframe + WLAN_BEACON_IES_OFFSET,
@@ -5875,14 +5876,23 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 				return status;
 			bcn_struct->mlo_ie.mlo_ie.num_sta_profile =
 						partner_info.num_partner_links;
-			util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
-						      &common_info_len);
+			status = util_get_mlie_common_info_len(ml_ie,
+							       ml_ie_total_len,
+							       &common_info_len);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
+
 			sta_prof = ml_ie + sizeof(struct wlan_ie_multilink) +
 				   common_info_len;
 
 			lim_store_mlo_ie_raw_info(ml_ie, sta_prof,
 						  ml_ie_total_len,
 						  &bcn_struct->mlo_ie.mlo_ie);
+
+			mld_mac = ml_ie + sizeof(struct wlan_ie_multilink) +
+				  WLAN_ML_BV_CINFO_LENGTH_SIZE;
+			qdf_mem_copy(bcn_struct->mlo_ie.mlo_ie.mld_mac_addr,
+				     mld_mac, QDF_MAC_ADDR_SIZE);
 
 			util_get_bvmlie_ext_mld_cap_op_info(ml_ie,
 							    ml_ie_total_len,
