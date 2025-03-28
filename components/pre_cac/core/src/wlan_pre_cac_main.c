@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,8 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_mlme_api.h"
+#include <cfg_ucfg_api.h>
+#include "wlan_pre_cac_cfg.h"
 
 struct pre_cac_ops *glbl_pre_cac_ops;
 
@@ -524,6 +526,21 @@ exit:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_DNW
+static void dnw_cfg_init(struct wlan_objmgr_psoc *psoc,
+			 struct pre_cac_psoc_priv *psoc_priv)
+{
+	psoc_priv->dnw_psoc_info.enabled = cfg_get(
+				psoc, CFG_ENABLE_DFS_NO_WAIT);
+	pre_cac_debug("DNW enable %d", psoc_priv->dnw_psoc_info.enabled);
+}
+#else
+static inline void dnw_cfg_init(struct wlan_objmgr_psoc *psoc,
+				struct pre_cac_psoc_priv *psoc_priv)
+{
+}
+#endif /* WLAN_FEATURE_DNW */
+
 QDF_STATUS
 pre_cac_psoc_create_notification(struct wlan_objmgr_psoc *psoc, void *arg)
 {
@@ -541,6 +558,8 @@ pre_cac_psoc_create_notification(struct wlan_objmgr_psoc *psoc, void *arg)
 		pre_cac_err("Failed to attach psoc component obj");
 		goto free_psoc_priv;
 	}
+
+	dnw_cfg_init(psoc, psoc_priv);
 
 	return status;
 
