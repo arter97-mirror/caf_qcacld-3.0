@@ -1781,6 +1781,12 @@ WLAN_PRE_CAC_OBJS := $(HDD_SRC_DIR)/wlan_hdd_pre_cac.o \
 		$(PRE_CAC_OSIF_DIR)/src/osif_pre_cac.o
 endif
 
+ifeq ($(CONFIG_FEATURE_WLAN_DNW), y)
+WLAN_PRE_CAC_OBJS += $(WLAN_PRE_CAC_DIR)/core/src/wlan_dfs_no_wait.o \
+		$(WLAN_PRE_CAC_DIR)/dispatcher/src/wlan_dnw_ucfg_api.o \
+		$(WLAN_PRE_CAC_DIR)/dispatcher/src/wlan_dnw_api.o
+endif
+
 $(call add-wlan-objs,wlan_pre_cac,$(WLAN_PRE_CAC_OBJS))
 
 ########## CLD TARGET_IF #######
@@ -3582,6 +3588,9 @@ ccflags-$(CONFIG_WLAN_HANG_EVENT) += -DWLAN_HANG_EVENT
 
 #Flag to enable pre_cac
 ccflags-$(CONFIG_FEATURE_WLAN_PRE_CAC)  += -DPRE_CAC_SUPPORT
+
+#Flag to enable DFS No Wait
+ccflags-$(CONFIG_FEATURE_WLAN_DNW) += -DWLAN_FEATURE_DNW
 
 ccflags-$(CONFIG_WIFI_POS_PASN) += -DWLAN_FEATURE_RTT_11AZ_SUPPORT
 

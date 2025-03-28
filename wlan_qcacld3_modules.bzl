@@ -1111,6 +1111,13 @@ _conditional_srcs = {
             "os_if/pre_cac/src/osif_pre_cac.c",
         ],
     },
+    "CONFIG_FEATURE_WLAN_DNW": {
+        True: [
+            "components/pre_cac/core/src/wlan_dfs_no_wait.c",
+            "components/pre_cac/dispatcher/src/wlan_dnw_ucfg_api.c",
+            "components/pre_cac/dispatcher/src/wlan_dnw_api.c",
+        ],
+    },
     "CONFIG_FEATURE_WLAN_TIME_SYNC_FTM": {
         True: [
             "components/ftm_time_sync/core/src/ftm_time_sync_main.c",
