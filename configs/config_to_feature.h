@@ -129,6 +129,10 @@
 #define PRE_CAC_SUPPORT (1)
 #endif
 
+#ifdef CONFIG_FEATURE_WLAN_DNW
+#define WLAN_FEATURE_DNW (1)
+#endif
+
 #ifdef CONFIG_WIFI_POS_PASN
 #define WLAN_FEATURE_RTT_11AZ_SUPPORT (1)
 #endif
