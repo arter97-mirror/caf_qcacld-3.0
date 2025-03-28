@@ -1509,6 +1509,7 @@ struct wlan_mlme_aux_dev_caps {
  * @wlan_mlme_aux0_dev_caps: capability for aux0
  * @bt_profile_con: Bluetooth connection profile
  * @relaxed_lpi_conn_policy: Relaxed LPI connection policy flag
+ * @local_packet_capture_concurrency: LPC mode concurrency support
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1582,6 +1583,7 @@ struct wlan_mlme_generic {
 		wlan_mlme_aux0_dev_caps[WLAN_MLME_HW_MODE_MAX];
 	bool bt_profile_con;
 	bool relaxed_lpi_conn_policy;
+	bool local_packet_capture_concurrency;
 };
 
 /**

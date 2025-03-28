@@ -6849,6 +6849,24 @@ wlan_mlme_get_monitor_mode_concurrency(struct wlan_objmgr_psoc *psoc)
 	return mlme_obj->cfg.gen.monitor_mode_concurrency;
 }
 
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+bool wlan_mlme_get_lpc_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return cfg_get(psoc, CFG_DP_LOCAL_PKT_CAPTURE);
+}
+
+bool wlan_mlme_get_lpc_concurrency(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return cfg_default(CFG_LOCAL_PKT_CAPTURE_CONCURRENCY);
+
+	return mlme_obj->cfg.gen.local_packet_capture_concurrency;
+}
+#endif
+
 #ifdef FEATURE_WDS
 enum wlan_wds_mode
 wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc)

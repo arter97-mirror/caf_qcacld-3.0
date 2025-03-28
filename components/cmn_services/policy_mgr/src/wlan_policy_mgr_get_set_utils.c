@@ -14582,3 +14582,14 @@ policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(struct wlan_objmgr_psoc *psoc)
 
 	return false;
 }
+
+bool policy_mgr_is_lpc_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	if (wlan_mlme_get_lpc_supported(psoc) &&
+	    wlan_mlme_get_lpc_concurrency(psoc)) {
+		policy_mgr_debug("LPC concurrency enabled");
+		return true;
+	}
+
+	return false;
+}
