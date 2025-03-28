@@ -689,7 +689,8 @@ wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx,
 void wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
 				     bool is_virtual_iface)
 {
-	wlan_hdd_lpc_del_monitor_interface(hdd_ctx, is_virtual_iface);
+	if (!policy_mgr_is_lpc_concurrency_allowed(hdd_ctx->psoc))
+		wlan_hdd_lpc_del_monitor_interface(hdd_ctx, is_virtual_iface);
 }
 
 bool hdd_lpc_is_work_scheduled(struct hdd_context *hdd_ctx)
@@ -16297,8 +16298,9 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 		return qdf_status_to_os_return(QDF_STATUS_SUCCESS);
 	}
 
-	if ((adapter->device_mode == QDF_P2P_DEVICE_MODE) ||
-	    (adapter->device_mode == QDF_NAN_DISC_MODE))
+	if ((adapter->device_mode == QDF_P2P_DEVICE_MODE ||
+	     adapter->device_mode == QDF_NAN_DISC_MODE) &&
+	     !policy_mgr_is_lpc_concurrency_allowed(adapter->hdd_ctx->psoc))
 		wlan_hdd_lpc_del_monitor_interface(adapter->hdd_ctx, false);
 
 	status = hdd_adapter_fill_link_address(adapter);
@@ -23140,7 +23142,7 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	status = policy_mgr_check_mon_concurrency(hdd_ctx->psoc);
+	status = policy_mgr_check_mon_concurrency(hdd_ctx->psoc, is_rx_mon);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		return -EINVAL;
