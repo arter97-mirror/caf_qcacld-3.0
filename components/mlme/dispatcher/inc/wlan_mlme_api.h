@@ -4346,6 +4346,38 @@ QDF_STATUS mlme_clear_mcs_rate(struct wlan_objmgr_vdev *vdev);
  */
 bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc);
 
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * wlan_mlme_get_lpc_supported() - Check if local packet capture mode
+ * is supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if supported
+ */
+bool wlan_mlme_get_lpc_supported(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_lpc_concurrency() - Check if local packet capture
+ * concurrency is supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if supported
+ */
+bool wlan_mlme_get_lpc_concurrency(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+wlan_mlme_get_lpc_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+wlan_mlme_get_lpc_concurrency(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
+
 /**
  * wlan_mlme_get_phy_max_freq_range() - Get phy supported max channel
  * frequency range
