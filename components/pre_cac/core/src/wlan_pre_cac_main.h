@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,7 @@
 #include <qdf_types.h>
 #include "wlan_objmgr_vdev_obj.h"
 #include "wlan_pre_cac_public_struct.h"
+#include "wlan_dfs_no_wait.h"
 
 #define pre_cac_log(level, args...) \
 	QDF_TRACE(QDF_MODULE_ID_WLAN_PRE_CAC, level, ## args)
@@ -65,6 +66,7 @@
  * @is_pre_cac_adapter: pre cac adapter status
  * @freq_before_pre_cac: frequency before pre cac
  * @pre_cac_freq: pre cac frequency
+ * @dnw_vdev_info: DFS No Wait vdev information
  */
 struct pre_cac_vdev_priv {
 	bool is_pre_cac_on;
@@ -72,16 +74,23 @@ struct pre_cac_vdev_priv {
 	bool is_pre_cac_adapter;
 	qdf_freq_t freq_before_pre_cac;
 	qdf_freq_t pre_cac_freq;
+#ifdef WLAN_FEATURE_DNW
+	struct wlan_dnw_vdev_info dnw_vdev_info;
+#endif
 };
 
 /**
  * struct pre_cac_psoc_priv - Private object to be stored in psoc
  * @pre_cac_work: pre cac work handler
  * @pre_cac_vdev_id: pre cac vdev id
+ * @dnw_psoc_info: DFS NO Wait psoc information
  */
 struct pre_cac_psoc_priv {
 	qdf_work_t pre_cac_work;
 	uint8_t pre_cac_vdev_id;
+#ifdef WLAN_FEATURE_DNW
+	struct wlan_dnw_psoc_info dnw_psoc_info;
+#endif
 };
 
 /**
