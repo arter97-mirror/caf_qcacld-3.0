@@ -10004,12 +10004,7 @@ void wlan_hdd_get_peer_rx_rate_stats(struct wlan_hdd_link_info *link_info)
 		hdd_debug_rl("Failed to get rx rates, rx mcs=%d, status=%d",
 			     hdd_stats->class_a_stat.rx_mcs_index, status);
 		hdd_stats->class_a_stat.rx_preamble = INVALID_PREAMBLE;
-		if (hdd_stats->class_a_stat.rx_mcs_index == INVALID_MCS_IDX) {
-			hdd_stats->class_a_stat.rx_rate =
-				hdd_stats->class_a_stat.tx_rate;
-			hdd_stats->class_a_stat.rx_mcs_index =
-				hdd_stats->class_a_stat.tx_mcs_index;
-		}
+
 		qdf_mem_free(peer_stats);
 		return;
 	}
