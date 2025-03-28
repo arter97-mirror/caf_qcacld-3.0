@@ -37,6 +37,7 @@
 #include "cfg_nan_api.h"
 #include "wlan_tdls_ucfg_api.h"
 #include "wlan_nan_api_i.h"
+#include "wlan_dp_ucfg_api.h"
 
 struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
@@ -796,6 +797,7 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 	};
 	int err = 0;
 	bool recovery;
+	bool is_mon_other_bss;
 
 	if (!in_req) {
 		nan_alert("NAN Discovery req is null");
@@ -813,8 +815,16 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 				return QDF_STATUS_E_INVAL;
 			}
 
-			if (policy_mgr_is_sta_mon_concurrency(psoc))
-				return QDF_STATUS_E_INVAL;
+			if (policy_mgr_is_sta_mon_concurrency(psoc)) {
+				is_mon_other_bss =
+					ucfg_dp_get_mon_conf_flags(psoc) &
+					QDF_MONITOR_FLAG_OTHER_BSS;
+
+				if (is_mon_other_bss ||
+				    !policy_mgr_is_lpc_concurrency_allowed(psoc)) {
+					return QDF_STATUS_E_INVAL;
+				}
+			}
 
 			/*
 			 * Take a psoc reference while it is being used by the

@@ -2006,6 +2006,14 @@ void ucfg_dp_set_mon_conf_flags(struct wlan_objmgr_psoc *psoc, uint32_t flags);
  */
 void ucfg_dp_recover_mon_conf_flags(struct wlan_objmgr_psoc *psoc);
 
+/*
+ * ucfg_dp_get_mon_conf_flags() Get monitor configuration flags
+ * @psoc: psoc handle
+ *
+ * Return: monitor interface flags
+ */
+uint8_t ucfg_dp_get_mon_conf_flags(struct wlan_objmgr_psoc *psoc);
+
 /**
  * ucfg_dp_rx_aggr_dis_req() -  Request Rx aggregation  disable
  * @vdev: vdev mapped to DP interface

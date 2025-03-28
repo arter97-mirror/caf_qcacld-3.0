@@ -7215,6 +7215,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	struct hdd_ap_ctx *ap_ctx;
 	enum policy_mgr_con_mode pm_con_mode;
 	struct qdf_mac_addr *link_mac;
+	bool is_mon_other_bss;
 
 	hdd_enter();
 
@@ -7222,8 +7223,15 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	if (ret != 0)
 		return ret;
 
-	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
-		return -EINVAL;
+	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc)) {
+		is_mon_other_bss = ucfg_dp_get_mon_conf_flags(hdd_ctx->psoc) &
+				   QDF_MONITOR_FLAG_OTHER_BSS;
+
+		if (is_mon_other_bss ||
+		    !policy_mgr_is_lpc_concurrency_allowed(hdd_ctx->psoc)) {
+			return -EINVAL;
+		}
+	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_HDD_ID_OBJ_MGR);
 	if (!vdev)

@@ -185,6 +185,7 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 	enum QDF_OPMODE opmode = QDF_STA_MODE;
 	struct wlan_objmgr_psoc *psoc;
+	bool is_mon_other_bss;
 
 	hdd_enter();
 
@@ -200,9 +201,17 @@ static int __wlan_hdd_cfg80211_remain_on_channel(struct wiphy *wiphy,
 	psoc = hdd_ctx->psoc;
 
 	wlan_hdd_lpc_handle_concurrency(hdd_ctx, false);
+
 	if (policy_mgr_is_sta_mon_concurrency(psoc) &&
-	    !hdd_lpc_is_work_scheduled(hdd_ctx))
-		return -EINVAL;
+	    !hdd_lpc_is_work_scheduled(hdd_ctx)) {
+		is_mon_other_bss = ucfg_dp_get_mon_conf_flags(hdd_ctx->psoc) &
+				   QDF_MONITOR_FLAG_OTHER_BSS;
+
+		if (is_mon_other_bss ||
+		    !policy_mgr_is_lpc_concurrency_allowed(hdd_ctx->psoc)) {
+			return -EINVAL;
+		}
+	}
 
 	if (adapter->device_mode == QDF_P2P_DEVICE_MODE &&
 	    ucfg_p2p_is_sta_vdev_usage_allowed_for_p2p_dev(psoc)) {
@@ -864,6 +873,7 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	int ret;
 	struct hdd_adapter_create_param create_params = {0};
 	uint8_t *device_address = NULL;
+	bool is_mon_other_bss;
 
 	hdd_enter();
 
@@ -893,8 +903,15 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	wlan_hdd_lpc_handle_concurrency(hdd_ctx, true);
 
 	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc) &&
-	    !hdd_lpc_is_work_scheduled(hdd_ctx))
-		return ERR_PTR(-EINVAL);
+	    !hdd_lpc_is_work_scheduled(hdd_ctx)) {
+		is_mon_other_bss = ucfg_dp_get_mon_conf_flags(hdd_ctx->psoc) &
+				   QDF_MONITOR_FLAG_OTHER_BSS;
+
+		if (is_mon_other_bss ||
+		    !policy_mgr_is_lpc_concurrency_allowed(hdd_ctx->psoc)) {
+			return ERR_PTR(-EINVAL);
+		}
+	}
 
 	if (wlan_hdd_is_mon_concurrency())
 		return ERR_PTR(-EINVAL);

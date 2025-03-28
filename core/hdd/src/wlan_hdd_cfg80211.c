@@ -21621,17 +21621,26 @@ QDF_STATUS os_if_monitor_mode_configure(struct hdd_adapter *adapter,
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	int num_active_adapter;
+	bool lpc_conc_supported;
+	struct wlan_objmgr_psoc *psoc;
 
+	psoc = adapter->hdd_ctx->psoc;
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
-	if (!vdev)
+
+	if (!vdev || !psoc)
 		return QDF_STATUS_E_INVAL;
 
+	/* Check if local packet capture concurrency is supported.
+	 * If supported, local packet capture configuration is allowed
+	 * regardless of number of active adapters. Otherwise, allow
+	 * local packet capture configuration only if there is exactly
+	 * one active adapter.
+	 */
+
+	lpc_conc_supported = policy_mgr_is_lpc_concurrency_allowed(psoc);
 	num_active_adapter = hdd_lpc_find_num_non_mon_active_adapters();
 
-	/* Currently Local Packet capture is only supported on STA
-	 * interface and if any 2 port concurrency exists, return failure
-	 */
-	if (num_active_adapter == 1) {
+	if (lpc_conc_supported || num_active_adapter == 1) {
 		status = os_if_dp_set_lpc_configure(vdev, data, data_len);
 	} else {
 		status = QDF_STATUS_E_NOSUPPORT;
@@ -25988,6 +25997,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 	int errno;
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	bool is_mon_other_bss;
 
 	hdd_enter();
 
@@ -26006,9 +26016,15 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 
 	wlan_hdd_lpc_handle_concurrency(hdd_ctx, false);
 
+	is_mon_other_bss = ucfg_dp_get_mon_conf_flags(hdd_ctx->psoc) &
+			   QDF_MONITOR_FLAG_OTHER_BSS;
 	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc) &&
-	    !hdd_lpc_is_work_scheduled(hdd_ctx))
-		return -EINVAL;
+	    !hdd_lpc_is_work_scheduled(hdd_ctx)) {
+		if (is_mon_other_bss ||
+		    !policy_mgr_is_lpc_concurrency_allowed(hdd_ctx->psoc)) {
+			return -EINVAL;
+		}
+	}
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_CHANGE_IFACE,

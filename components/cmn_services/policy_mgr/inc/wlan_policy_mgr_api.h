@@ -5000,11 +5000,14 @@ bool policy_mgr_is_sta_mon_concurrency(struct wlan_objmgr_psoc *psoc);
 /**
  * policy_mgr_check_mon_concurrency() - Checks if monitor intf can be added.
  * @psoc: pointer to psoc object
+ * @is_other_bss: True if the monitor interface's other BSS flags are set
+ * otherwise, False
  *
  * Return: QDF_STATUS_SUCCESS if allowed, else send failure
  *
  */
-QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc);
+QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc,
+					    bool is_other_bss);
 
 /**
  * policy_mgr_is_lpc_concurrency_allowed() - Checks if local packet capture

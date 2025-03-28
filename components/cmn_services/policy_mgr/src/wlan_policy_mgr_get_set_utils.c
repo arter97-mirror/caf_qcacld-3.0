@@ -13555,7 +13555,8 @@ bool policy_mgr_is_sta_mon_concurrency(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
-QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc)
+QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc,
+					    bool is_other_bss)
 {
 	uint8_t num_open_session = 0;
 
@@ -13569,6 +13570,9 @@ QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_err("monitor mode already exists, only one is possible");
 		return QDF_STATUS_E_BUSY;
 	}
+
+	if (!is_other_bss && policy_mgr_is_lpc_concurrency_allowed(psoc))
+		return QDF_STATUS_SUCCESS;
 
 	num_open_session = policy_mgr_get_sap_mode_count(psoc, NULL);
 
