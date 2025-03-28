@@ -808,6 +808,7 @@ struct rso_config_params {
  * @ROAM_2P4GHZ_BAND_WEIGHTAGE: 2.4 GHz band weight value for roaming
  * @ROAM_5GHZ_BAND_WEIGHTAGE: 5 GHz band weight value for roaming
  * @ROAM_6GHZ_BAND_WEIGHTAGE: 6 GHz band weight value for roaming
+ * @ROAM_RESCAN_RSSI_DIFF : Roam rescan rssi difference value
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -849,6 +850,7 @@ enum roam_cfg_param {
 	ROAM_2P4GHZ_BAND_WEIGHTAGE,
 	ROAM_5GHZ_BAND_WEIGHTAGE,
 	ROAM_6GHZ_BAND_WEIGHTAGE,
+	ROAM_RESCAN_RSSI_DIFF,
 };
 
 /**

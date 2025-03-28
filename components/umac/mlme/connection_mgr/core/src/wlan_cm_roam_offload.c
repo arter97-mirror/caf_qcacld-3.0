@@ -5690,6 +5690,8 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.roam_scoring.band_5g_weightage;
 	cfg_params->band_6g_weightage =
 			mlme_obj->cfg.roam_scoring.band_6g_weightage;
+	cfg_params->roam_rescan_rssi_diff =
+			mlme_obj->cfg.lfr.roam_rescan_rssi_diff;
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 }
@@ -6228,6 +6230,10 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.band_6g_weightage;
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
 				   ROAM_6GHZ_BAND_WEIGHTAGE, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.lfr.roam_rescan_rssi_diff;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_RESCAN_RSSI_DIFF, &src_cfg);
 
 	/*
 	 * Store the current PMK info of the AP

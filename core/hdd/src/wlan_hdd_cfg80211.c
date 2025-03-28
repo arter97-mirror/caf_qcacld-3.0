@@ -6108,6 +6108,8 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U8},
 	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_6GHZ] = {
 			.type = NLA_U8},
+	[QCA_ATTR_ROAM_CONTROL_CONNECTED_LOW_RSSI_THRESHOLD_DECREMENT] = {
+			.type = NLA_U8},
 };
 
 /**
@@ -7084,6 +7086,26 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("Failed to set 6GHz band weight value");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CONNECTED_LOW_RSSI_THRESHOLD_DECREMENT];
+	if (attr) {
+		value = nla_get_u8(attr);
+		if (!cfg_in_range(CFG_LFR_ROAM_RESCAN_RSSI_DIFF, value)) {
+			hdd_err("Roam rescan rssi diff value %d out of range",
+				value);
+			return -EINVAL;
+		}
+
+		hdd_debug("Received roam rescan rssi diff value: %d",
+			  value);
+		is_rso_update_required = true;
+
+		status = sme_set_roam_rescan_rssi_diff(hdd_ctx->mac_handle,
+						       vdev_id, value);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set roam rescan rssi diff value");
 	}
 
 	/* send RSO update if required */
