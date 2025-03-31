@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -139,11 +139,13 @@ static void dp_rx_tm_thread_dump_stats(struct dp_rx_thread *rx_thread)
 {
 	uint8_t reo_ring_num;
 	uint32_t off = 0;
-	char nbuf_queued_string[100];
+	char nbuf_pkt_string[100];
 	uint32_t total_queued = 0;
 	uint32_t temp = 0;
+	int cpu_index = 0;
+	uint32_t total_all_cpu = 0;
 
-	qdf_mem_zero(nbuf_queued_string, sizeof(nbuf_queued_string));
+	qdf_mem_zero(nbuf_pkt_string, sizeof(nbuf_pkt_string));
 
 	for (reo_ring_num = 0; reo_ring_num < DP_RX_TM_MAX_REO_RINGS;
 	     reo_ring_num++) {
@@ -151,10 +153,10 @@ static void dp_rx_tm_thread_dump_stats(struct dp_rx_thread *rx_thread)
 		if (!temp)
 			continue;
 		total_queued += temp;
-		if (off >= sizeof(nbuf_queued_string))
+		if (off >= sizeof(nbuf_pkt_string))
 			continue;
-		off += qdf_scnprintf(&nbuf_queued_string[off],
-				     sizeof(nbuf_queued_string) - off,
+		off += qdf_scnprintf(&nbuf_pkt_string[off],
+				     sizeof(nbuf_pkt_string) - off,
 				     "reo[%u]:%u ", reo_ring_num, temp);
 	}
 
@@ -165,7 +167,7 @@ static void dp_rx_tm_thread_dump_stats(struct dp_rx_thread *rx_thread)
 		rx_thread->id,
 		qdf_nbuf_queue_head_qlen(&rx_thread->nbuf_queue),
 		total_queued,
-		nbuf_queued_string,
+		nbuf_pkt_string,
 		rx_thread->stats.nbuf_dequeued,
 		rx_thread->stats.nbuf_sent_to_stack,
 		rx_thread->stats.gro_flushes,
@@ -177,6 +179,24 @@ static void dp_rx_tm_thread_dump_stats(struct dp_rx_thread *rx_thread)
 		rx_thread->stats.dropped_invalid_os_rx_handles,
 		rx_thread->stats.dropped_others,
 		rx_thread->stats.dropped_enq_fail);
+
+	qdf_mem_zero(nbuf_pkt_string, sizeof(nbuf_pkt_string));
+	off = 0;
+	for (cpu_index = 0; cpu_index < QDF_MAX_AVAILABLE_CPU; cpu_index++) {
+		temp = rx_thread->stats.nbuf_per_cpu[cpu_index];
+		if (!temp)
+			continue;
+		total_all_cpu += temp;
+		if (off >= sizeof(nbuf_pkt_string))
+			continue;
+		off += qdf_scnprintf(&nbuf_pkt_string[off],
+				     sizeof(nbuf_pkt_string) - off,
+				     "cpu[%u]:%u ", cpu_index, temp);
+	}
+
+	if (total_all_cpu)
+		dp_info("total:%u %s",
+			total_all_cpu, nbuf_pkt_string);
 }
 
 QDF_STATUS dp_rx_tm_dump_stats(struct dp_rx_tm_handle *rx_tm_hdl)
@@ -481,6 +501,7 @@ static int dp_rx_thread_process_nbufq(struct dp_rx_thread *rx_thread)
 	ol_txrx_soc_handle soc;
 	uint32_t num_list_elements = 0;
 	uint32_t iterates = 0;
+	int cpu_index;
 
 	struct dp_txrx_handle_cmn *txrx_handle_cmn;
 
@@ -505,6 +526,8 @@ static int dp_rx_thread_process_nbufq(struct dp_rx_thread *rx_thread)
 		num_list_elements += qdf_nbuf_get_gso_segs(nbuf_list);
 		rx_thread->stats.nbuf_dequeued += num_list_elements;
 		iterates += num_list_elements;
+		cpu_index = qdf_get_smp_processor_id();
+		rx_thread->stats.nbuf_per_cpu[cpu_index] += num_list_elements;
 
 		vdev_id = QDF_NBUF_CB_RX_VDEV_ID(nbuf_list);
 		cdp_get_os_rx_handles_from_vdev(soc, vdev_id, &stack_fn,
