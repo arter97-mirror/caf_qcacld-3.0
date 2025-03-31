@@ -5121,4 +5121,38 @@ QDF_STATUS sme_update_5g_band_weight_value(mac_handle_t mac_handle,
 QDF_STATUS sme_update_6g_band_weight_value(mac_handle_t mac_handle,
 					   uint8_t vdev_id,
 					   uint32_t band_6g_weightage);
+
+/**
+ * sme_set_roam_periodic_scan_interval_value()- Send roam periodic scan interval
+ * to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @roam_periodic_scan_interval
+ *
+ * Updated roam periodic scan interval in roam info and a roam_offload_scan
+ * request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_set_roam_periodic_scan_interval_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_periodic_scan_interval);
+
+/**
+ * sme_get_roam_periodic_scan_interval() - Get roam periodic scan interval
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @roam_periodic_scan_interval: Pointer of a buffer to fill the
+ * roam_periodic_scan_interval
+ *
+ * Get the roam_periodic_scan_interval and fill in the given
+ * buffer roam_periodic_scan_interval.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_get_roam_periodic_scan_interval(mac_handle_t mac_handle,
+				    uint8_t vdev_id,
+				    uint32_t *roam_periodic_scan_interval);
 #endif /* #if !defined( __SME_API_H ) */

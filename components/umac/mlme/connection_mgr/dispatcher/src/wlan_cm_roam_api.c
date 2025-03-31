@@ -1022,6 +1022,9 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 	case ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD:
 		dst_config->uint_value = mlme_obj->cfg.lfr.roam_aggre_threshold;
 		break;
+	case ROAM_PERIODIC_SCAN_INTERVAL:
+		dst_config->uint_value = src_cfg->roam_periodic_scan_interval;
+		break;
 	default:
 		mlme_err("Invalid roam config requested:%d", roam_cfg_type);
 		status = QDF_STATUS_E_FAILURE;
@@ -1693,6 +1696,9 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		break;
 	case ROAM_RESCAN_RSSI_DIFF:
 		dst_cfg->roam_rescan_rssi_diff = src_config->uint_value;
+		break;
+	case ROAM_PERIODIC_SCAN_INTERVAL:
+		dst_cfg->roam_periodic_scan_interval = src_config->uint_value;
 		break;
 	default:
 		mlme_err("Invalid roam config requested:%d", roam_cfg_type);

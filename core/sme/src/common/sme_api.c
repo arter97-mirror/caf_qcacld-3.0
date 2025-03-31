@@ -17679,3 +17679,36 @@ QDF_STATUS sme_update_6g_band_weight_value(mac_handle_t mac_handle,
 					  ROAM_6GHZ_BAND_WEIGHTAGE,
 					  &src_config);
 }
+
+QDF_STATUS
+sme_set_roam_periodic_scan_interval_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_periodic_scan_interval)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = roam_periodic_scan_interval;
+	mac->mlme_cfg->lfr.roam_periodic_scan_interval =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_PERIODIC_SCAN_INTERVAL,
+					  &src_config);
+}
+
+QDF_STATUS
+sme_get_roam_periodic_scan_interval(mac_handle_t mac_handle,
+				    uint8_t vdev_id,
+				    uint32_t *roam_periodic_scan_interval)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy temp;
+
+	wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id,
+				   ROAM_PERIODIC_SCAN_INTERVAL, &temp);
+
+	*roam_periodic_scan_interval = temp.uint_value;
+
+	return QDF_STATUS_SUCCESS;
+}

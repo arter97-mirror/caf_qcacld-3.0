@@ -385,11 +385,14 @@ send_roam_scan_offload_scan_period_cmd_tlv(
 	 * Convert it to msec and send to firmware
 	 */
 	scan_period_fp->roam_full_scan_period = param->full_scan_period * 1000;
+	scan_period_fp->roam_periodic_scan_interval =
+			param->roam_periodic_scan_interval;
 
-	wmi_debug("roam_scan_period=%d, roam_scan_age=%d, full_scan_period= %u",
+	wmi_debug("roam_scan_period=%d, roam_scan_age=%d, full_scan_period= %u, roam periodic scan interval= %u",
 		  scan_period_fp->roam_scan_period,
 		  scan_period_fp->roam_scan_age,
-		  scan_period_fp->roam_full_scan_period);
+		  scan_period_fp->roam_full_scan_period,
+		  scan_period_fp->roam_periodic_scan_interval);
 
 	wmi_debug("inactiviy time:%d inactive cnt:%d",
 		  scan_period_fp->inactivity_time_period,

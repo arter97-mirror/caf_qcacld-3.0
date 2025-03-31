@@ -6110,6 +6110,8 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U8},
 	[QCA_ATTR_ROAM_CONTROL_CONNECTED_LOW_RSSI_THRESHOLD_DECREMENT] = {
 			.type = NLA_U8},
+	[QCA_ATTR_ROAM_CONTROL_PERIODIC_ROAM_SCAN_INTERVAL] = {
+			.type = NLA_U32},
 };
 
 /**
@@ -6688,12 +6690,53 @@ static bool is_band_weight_valid(struct nlattr **tb2, uint32_t value)
 
 	return false;
 }
+
+/**
+ * is_roam_periodic_scan_interval_valid() - Check if roam_periodic_scan_interval
+ * value received is valid.
+ * @value : roam periodic scan interval value in seconds
+ *
+ * Return : bool
+ */
+static bool is_roam_periodic_scan_interval_valid(uint32_t value)
+{
+	if (cfg_in_range(CFG_ROAM_SCAN_PERIOD, value))
+		return true;
+
+	return false;
+}
 #else
 static bool is_band_weight_valid(struct nlattr **tb2, uint32_t value)
 {
 	return false;
 }
+
+static bool is_roam_periodic_scan_interval_valid(uint32_t value)
+{
+	return false;
+}
 #endif
+
+/**
+ * hdd_send_roam_periodic_scan_interval_to_sme() - Set roam periodic scan
+ * interval
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @roam_periodic_scan_interval: roam periodic scan interval value in seconds.
+ *
+ * Send roam periodic scan interval value to FW.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_send_roam_periodic_scan_interval_to_sme(struct hdd_context *hdd_ctx,
+					    uint8_t vdev_id,
+					    uint32_t roam_periodic_scan_interval)
+{
+	return sme_set_roam_periodic_scan_interval_value(hdd_ctx->mac_handle,
+							 vdev_id, roam_periodic_scan_interval);
+}
+
 /**
  * hdd_set_roam_with_control_config() - Set roam control configuration
  * @hdd_ctx: HDD context
@@ -7108,6 +7151,26 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 			hdd_err("Failed to set roam rescan rssi diff value");
 	}
 
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_PERIODIC_ROAM_SCAN_INTERVAL];
+	if (attr) {
+		value = nla_get_u32(attr);
+		if (!is_roam_periodic_scan_interval_valid(value)) {
+			hdd_err("Roam scan period value %d out of range",
+				value);
+			return -EINVAL;
+		}
+
+		hdd_debug("Received roam scan period value: %d", value);
+		is_rso_update_required = true;
+
+		status = hdd_send_roam_periodic_scan_interval_to_sme(hdd_ctx,
+								     vdev_id,
+								     value);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set roam scan period value");
+	}
+
 	/* send RSO update if required */
 	if (is_rso_update_required)
 		wlan_roam_update_cfg(hdd_ctx->psoc, vdev_id,
@@ -7218,6 +7281,9 @@ hdd_roam_control_config_buf_size(struct hdd_context *hdd_ctx,
 	if (tb[QCA_ATTR_ROAM_CONTROL_BAND_MASK])
 		skb_len += NLA_HDRLEN + sizeof(uint32_t);
 
+	if (tb[QCA_ATTR_ROAM_CONTROL_PERIODIC_ROAM_SCAN_INTERVAL])
+		skb_len += NLA_HDRLEN + sizeof(uint32_t);
+
 	return skb_len;
 }
 
@@ -7266,6 +7332,7 @@ hdd_roam_control_config_fill_data(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 	uint8_t num_channels = 0;
 	uint32_t i = 0, freq_list[NUM_CHANNELS] = { 0 };
 	struct wlan_hdd_link_info *link_info;
+	uint32_t roam_periodic_scan_interval;
 
 	config = nla_nest_start(skb, PARAM_ROAM_CONTROL_CONFIG);
 	if (!config) {
@@ -7364,6 +7431,22 @@ hdd_roam_control_config_fill_data(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 		}
 		hdd_debug("sending vendor_band_mask: %d reg band:%d",
 			  vendor_band_mask, roam_band);
+	}
+
+	if (tb[QCA_ATTR_ROAM_CONTROL_PERIODIC_ROAM_SCAN_INTERVAL]) {
+		status = sme_get_roam_periodic_scan_interval(hdd_ctx->mac_handle,
+							     vdev_id,
+							     &roam_periodic_scan_interval);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto out;
+		hdd_debug("roam_periodic_scan_interval: %u",
+			  roam_periodic_scan_interval);
+
+		if (nla_put_u32(skb, QCA_ATTR_ROAM_CONTROL_PERIODIC_ROAM_SCAN_INTERVAL,
+				roam_periodic_scan_interval)) {
+			hdd_info("failed to put roam_periodic_scan_interval");
+			return -EINVAL;
+		}
 	}
 
 	nla_nest_end(skb, config);

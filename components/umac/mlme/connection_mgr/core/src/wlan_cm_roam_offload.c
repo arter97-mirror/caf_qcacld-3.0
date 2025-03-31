@@ -131,6 +131,7 @@ cm_roam_fill_rssi_change_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct wlan_objmgr_vdev *vdev;
 	struct rso_config *rso_cfg;
 	enum roam_cfg_param reason;
+	struct cm_roam_values_copy roam_periodic_scan_interval;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_CM_ID);
@@ -157,6 +158,14 @@ cm_roam_fill_rssi_change_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
 				   reason, &temp);
 	params->rssi_change_thresh = temp.int_value;
+
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
+				   ROAM_PERIODIC_SCAN_INTERVAL,
+				   &roam_periodic_scan_interval);
+
+	if (roam_periodic_scan_interval.uint_value)
+		params->rssi_change_thresh = 0;
+
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
@@ -1391,8 +1400,11 @@ cm_roam_scan_offload_scan_period(uint8_t vdev_id,
 			cfg_params->roam_inactive_data_packet_count;
 	params->full_scan_period =
 			cfg_params->full_roam_scan_period;
-	mlme_debug("full_scan_period:%d, empty_scan_refresh_period:%d",
-		   params->full_scan_period, params->empty_scan_refresh_period);
+	params->roam_periodic_scan_interval =
+			cfg_params->roam_periodic_scan_interval;
+	mlme_debug("full_scan_period:%d, empty_scan_refresh_period:%d, roam_periodic_scan_interval %d",
+		   params->full_scan_period, params->empty_scan_refresh_period,
+		   params->roam_periodic_scan_interval);
 }
 
 static void
@@ -5692,6 +5704,8 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.roam_scoring.band_6g_weightage;
 	cfg_params->roam_rescan_rssi_diff =
 			mlme_obj->cfg.lfr.roam_rescan_rssi_diff;
+	cfg_params->roam_periodic_scan_interval =
+			mlme_obj->cfg.lfr.roam_periodic_scan_interval;
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 }
@@ -6235,6 +6249,9 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
 				   ROAM_RESCAN_RSSI_DIFF, &src_cfg);
 
+	src_cfg.uint_value = mlme_obj->cfg.lfr.roam_periodic_scan_interval;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_PERIODIC_SCAN_INTERVAL, &src_cfg);
 	/*
 	 * Store the current PMK info of the AP
 	 * to the single pmk global cache if the BSS allows

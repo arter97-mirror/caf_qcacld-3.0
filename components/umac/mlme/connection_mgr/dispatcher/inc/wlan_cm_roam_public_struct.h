@@ -330,6 +330,9 @@ struct rso_chan_info {
  * individually manage the calculated scores for candidates in 5 GHz band
  * @band_6g_weightage: 6 GHz band weight value in percentage used to
  * individually manage the calculated scores for candidates in 6 GHz band
+ * @roam_periodic_scan_interval: the interval in seconds after which STA
+ * performs periodic partial scans till roaming succeeds or RSSI recovers
+ * above threshold
  */
 struct rso_cfg_params {
 	uint32_t neighbor_scan_period;
@@ -364,6 +367,7 @@ struct rso_cfg_params {
 	uint32_t band_2g_weightage;
 	uint32_t band_5g_weightage;
 	uint32_t band_6g_weightage;
+	uint32_t roam_periodic_scan_interval;
 };
 
 /**
@@ -809,6 +813,7 @@ struct rso_config_params {
  * @ROAM_5GHZ_BAND_WEIGHTAGE: 5 GHz band weight value for roaming
  * @ROAM_6GHZ_BAND_WEIGHTAGE: 6 GHz band weight value for roaming
  * @ROAM_RESCAN_RSSI_DIFF : Roam rescan rssi difference value
+ * @ROAM_PERIODIC_SCAN_INTERVAL: Roam periodic scan interval value
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -851,6 +856,7 @@ enum roam_cfg_param {
 	ROAM_5GHZ_BAND_WEIGHTAGE,
 	ROAM_6GHZ_BAND_WEIGHTAGE,
 	ROAM_RESCAN_RSSI_DIFF,
+	ROAM_PERIODIC_SCAN_INTERVAL,
 };
 
 /**
@@ -1989,6 +1995,9 @@ struct wlan_roam_reason_vsie_enable {
  * roam_scan_inactivity_time.
  * @full_scan_period: Full scan period is the idle period in seconds
  * between two successive full channel roam scans.
+ * @roam_periodic_scan_interval: the interval in seconds after which STA
+ * performs periodic partial scans till roaming succeeds or RSSI recovers
+ * above threshold.
  */
 struct wlan_roam_scan_period_params {
 	uint32_t vdev_id;
@@ -1998,6 +2007,7 @@ struct wlan_roam_scan_period_params {
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
 	uint32_t full_scan_period;
+	uint32_t roam_periodic_scan_interval;
 };
 
 /**
