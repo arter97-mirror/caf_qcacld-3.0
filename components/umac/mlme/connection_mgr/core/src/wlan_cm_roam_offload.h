@@ -695,4 +695,13 @@ cm_roam_neigh_rpt_resp_event(struct wmi_neighbor_report_data *neigh_rpt,
 {
 }
 #endif /* FEATURE_CONNECTIVITY_LOGGING */
+
+/**
+ * cm_is_mbo_ap_without_pmf() - Check if the connected AP is MBO without PMF
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev id
+ *
+ * Return: True if connected AP is MBO capable without PMF
+ */
+bool cm_is_mbo_ap_without_pmf(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 #endif /* _WLAN_CM_ROAM_OFFLOAD_H_ */

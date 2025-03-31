@@ -1080,4 +1080,26 @@ wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mld)
 	return NULL;
 }
 #endif /* WLAN_FEATURE_11BE_MLO && CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT */
+
+/**
+ * hdd_vdev_send_sta_keep_alive_interval - Send sta keep alive interval to fw
+ * @adapter: HDD adapter pointer
+ * @hdd_ctx: HDD context pointer
+ * @keep_alive_interval: STA keep alive interval
+ *
+ * Return: 0 on success, negative on failure
+ */
+int hdd_vdev_send_sta_keep_alive_interval(struct hdd_adapter *adapter,
+					  struct hdd_context *hdd_ctx,
+					  uint16_t keep_alive_interval);
+
+/**
+ * wlan_hdd_save_sta_keep_alive_interval() - Save STA keep alive interval
+ * @adapter: HDD adapter pointer
+ * @sta_alive_interval: STA keep alive interval
+ *
+ * Return: None.
+ */
+void wlan_hdd_save_sta_keep_alive_interval(struct hdd_adapter *adapter,
+					   uint16_t sta_alive_interval);
 #endif

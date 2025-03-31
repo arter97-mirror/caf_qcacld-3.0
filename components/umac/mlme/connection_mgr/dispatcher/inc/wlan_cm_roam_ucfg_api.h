@@ -191,6 +191,21 @@ ucfg_cm_set_roam_band_mask(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	return wlan_cm_set_roam_band_bitmask(psoc, vdev_id, roam_band_mask);
 }
 
+/**
+ * ucfg_cm_set_btm_config() - Inline ucfg api to set btm roaming disable flag
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ * @is_disable_btm: btm config flag that needs to be set from the caller
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS ucfg_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						bool is_disable_btm)
+{
+	return wlan_cm_set_btm_config(psoc, vdev_id, is_disable_btm);
+}
+
 static inline QDF_STATUS
 ucfg_cm_set_roam_band_update(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
@@ -229,6 +244,13 @@ ucfg_cm_update_roam_scan_scheme_bitmap(struct wlan_objmgr_psoc *psoc,
 static inline QDF_STATUS
 ucfg_cm_set_roam_band_mask(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			   uint32_t roam_band_mask)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS ucfg_cm_set_btm_config(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						bool is_disable_btm)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -98,6 +98,7 @@ struct dp_rtpm_tput_policy_context {
  * @enable_tcp_delack: enable Dynamic Configuration of Tcp Delayed Ack
  * @enable_tcp_limit_output: enable TCP limit output
  * @enable_tcp_adv_win_scale: enable  TCP adv window scaling
+ * @tcp_adv_win_scl_disc_lvl_low: Set TCP adv win scale level LOW on disconnect
  * @tcp_delack_thres_high: High Threshold inorder to trigger TCP Del Ack
  * indication
  * @tcp_delack_thres_low: Low Threshold inorder to trigger TCP Del Ack
@@ -160,6 +161,7 @@ struct wlan_dp_psoc_cfg {
 	uint32_t enable_tcp_delack;
 	bool     enable_tcp_limit_output;
 	uint32_t enable_tcp_adv_win_scale;
+	bool tcp_adv_win_scl_disc_lvl_low;
 	uint32_t tcp_delack_thres_high;
 	uint32_t tcp_delack_thres_low;
 	uint32_t tcp_tx_high_tput_thres;

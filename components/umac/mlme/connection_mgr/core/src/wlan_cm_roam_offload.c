@@ -49,7 +49,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlme_api.h"
 #include "wlan_policy_mgr_api.h"
-
+#include "wlan_vdev_mgr_api.h"
 
 #ifdef WLAN_FEATURE_SAE
 #define CM_IS_FW_FT_SAE_SUPPORTED(fw_akm_bitmap) \
@@ -2737,6 +2737,44 @@ cm_roam_scan_offload_fill_rso_configs(struct wlan_objmgr_psoc *psoc,
 	cm_roam_scan_offload_add_fils_params(psoc, rso_mode_cfg, vdev_id);
 }
 
+bool cm_is_mbo_ap_without_pmf(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	struct wlan_objmgr_peer *peer;
+	uint8_t bssid[QDF_MAC_ADDR_SIZE];
+	struct cm_roam_values_copy temp;
+	bool is_pmf_enabled, mbo_oce_enabled_ap, is_open_connection;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL for vdev %d", vdev_id);
+		return false;
+	}
+	is_open_connection = cm_is_open_mode(vdev);
+	wlan_vdev_mgr_get_param_bssid(vdev, bssid);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, bssid, WLAN_MLME_CM_ID);
+	if (!peer) {
+		mlme_debug("Peer of peer_mac "QDF_MAC_ADDR_FMT" not found",
+			   QDF_MAC_ADDR_REF(bssid));
+		return false;
+	}
+	is_pmf_enabled = mlme_get_peer_pmf_status(peer);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
+
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id, MBO_OCE_ENABLED_AP, &temp);
+	mbo_oce_enabled_ap = !!temp.uint_value;
+
+	mlme_debug("vdev %d, is_pmf_enabled %d mbo_oce_enabled_ap:%d is_open_connection: %d for "QDF_MAC_ADDR_FMT,
+		   vdev_id, is_pmf_enabled, mbo_oce_enabled_ap,
+		   is_open_connection, QDF_MAC_ADDR_REF(bssid));
+
+	return !is_pmf_enabled && mbo_oce_enabled_ap && !is_open_connection;
+}
+
 /**
  * cm_update_btm_offload_config() - Update btm config param to fw
  * @psoc: psoc
@@ -2754,13 +2792,10 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	struct wlan_mlme_btm *btm_cfg;
-	struct wlan_objmgr_peer *peer;
-	uint8_t bssid[QDF_MAC_ADDR_SIZE];
 	struct cm_roam_values_copy temp;
-	bool is_hs_20_ap, is_pmf_enabled, is_open_connection = false;
-	uint8_t vdev_id;
-	uint32_t mbo_oce_enabled_ap;
-	bool abridge_flag;
+	bool is_hs_20_ap;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	bool abridge_flag, is_disable_btm, assoc_btm_cap;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -2768,18 +2803,20 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 
 	btm_cfg = &mlme_obj->cfg.btm;
 	*btm_offload_config = btm_cfg->btm_offload_config;
-
 	/* Return if INI is disabled */
 	if (!(*btm_offload_config))
 		return;
 
-	if (!wlan_cm_get_assoc_btm_cap(vdev)) {
-		mlme_debug("BTM not supported, disable BTM offload");
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id, IS_DISABLE_BTM, &temp);
+	is_disable_btm = temp.bool_value;
+	assoc_btm_cap = wlan_cm_get_assoc_btm_cap(vdev);
+	if (!assoc_btm_cap || is_disable_btm) {
+		mlme_debug("disable btm offload vdev:%d btm_cap: %d is_btm: %d",
+			   vdev_id, assoc_btm_cap, is_disable_btm);
 		*btm_offload_config = 0;
 		return;
 	}
 
-	vdev_id = wlan_vdev_get_id(vdev);
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id, HS_20_AP, &temp);
 	is_hs_20_ap = temp.bool_value;
 
@@ -2794,45 +2831,19 @@ cm_update_btm_offload_config(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	ucfg_wlan_vdev_mgr_get_param_bssid(vdev, bssid);
-	peer = wlan_objmgr_get_peer(psoc,
-				    wlan_objmgr_pdev_get_pdev_id(
-					wlan_vdev_get_pdev(vdev)),
-				    bssid,
-				    WLAN_MLME_CM_ID);
-	if (!peer) {
-		mlme_debug("Peer of peer_mac "QDF_MAC_ADDR_FMT" not found",
-			   QDF_MAC_ADDR_REF(bssid));
-		return;
-	}
-
-	is_pmf_enabled = mlme_get_peer_pmf_status(peer);
-
-	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
-
-	if (cm_is_open_mode(vdev))
-		is_open_connection = true;
-
-	wlan_cm_roam_cfg_get_value(psoc, vdev_id, MBO_OCE_ENABLED_AP, &temp);
-	mbo_oce_enabled_ap = temp.uint_value;
-
 	abridge_flag = wlan_mlme_get_btm_abridge_flag(psoc);
 	if (!abridge_flag)
 		MLME_CLEAR_BIT(*btm_offload_config,
 			       BTM_OFFLOAD_CONFIG_BIT_7);
-	mlme_debug("Abridge flag: %d, btm offload: %u", abridge_flag,
-		   *btm_offload_config);
-
 	/*
 	 * If peer does not support PMF in case of OCE/MBO
 	 * Connection, Disable BTM offload to firmware.
 	 */
-	if (mbo_oce_enabled_ap && (!is_pmf_enabled && !is_open_connection))
+	if (cm_is_mbo_ap_without_pmf(psoc, vdev_id))
 		*btm_offload_config = 0;
 
-	mlme_debug("is_open:%d is_pmf_enabled %d btm_offload_cfg:%d for "QDF_MAC_ADDR_FMT,
-		   is_open_connection, is_pmf_enabled, *btm_offload_config,
-		   QDF_MAC_ADDR_REF(bssid));
+	mlme_debug("Abridge flag: %d, btm offload: %u", abridge_flag,
+		   *btm_offload_config);
 }
 
 /**
@@ -5203,6 +5214,41 @@ bool cm_lookup_pmkid_using_bssid(struct wlan_objmgr_psoc *psoc,
 	return true;
 }
 
+/**
+ * cm_roam_clear_is_disable_btm_flag - API to clear is_disable_btm flag
+ * @pdev: pdev pointer
+ * @vdev_id: dvev ID
+ *
+ * Return: None
+ */
+static void cm_roam_clear_is_disable_btm_flag(struct wlan_objmgr_pdev *pdev,
+					      uint8_t vdev_id)
+{
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL for vdev %d", vdev_id);
+		return;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		mlme_debug("vdev: %d rso_cfg is NULL", vdev_id);
+		goto release_ref;
+	}
+
+	if (rso_cfg->is_disable_btm) {
+		mlme_debug("vdev: %d clear is_disable_btm flag", vdev_id);
+		rso_cfg->is_disable_btm = false;
+	}
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+}
+
 void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 				    uint8_t vdev_id)
 {
@@ -5218,6 +5264,8 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
 		return;
+
+	cm_roam_clear_is_disable_btm_flag(pdev, vdev_id);
 
 	if (mlme_obj->cfg.lfr.roam_scan_offload_enabled) {
 		/*

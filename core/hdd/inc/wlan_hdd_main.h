@@ -1157,6 +1157,7 @@ enum udp_qos_upgrade {
  * @delta_qtime: delta between host qtime and monotonic time
  * @traffic_end_ind_en: traffic end indication feature enable/disable
  * @is_dbam_configured:
+ * @keep_alive_interval: user configured STA keep alive interval
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1369,6 +1370,7 @@ struct hdd_adapter {
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	bool is_dbam_configured;
 #endif
+	uint16_t keep_alive_interval;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)

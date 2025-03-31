@@ -513,6 +513,7 @@ struct mlme_ap_config {
  * @country_ie_for_all_band: take all band channel info in country ie
  * @mlme_ap: SAP related vdev private configurations
  * @is_single_link_mlo_roam: Single link mlo roam flag
+ * @keep_alive_period: KEEPALIVE period in seconds
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -574,6 +575,7 @@ struct mlme_legacy_priv {
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 	bool is_single_link_mlo_roam;
 #endif
+	uint16_t keep_alive_period;
 };
 
 /**
