@@ -4140,10 +4140,11 @@ enum policy_mgr_three_connection_mode
 	} else if (num_ml_sta == 2 && count_nan_disc == 1) {
 		/* ML STA + SAP */
 		index = PM_NAN_DISC_24_STA_STA_SCC_MCC_DBS;
-	} else if (count_sap == 1 && count_sta == 2 && !num_ml_sta) {
+	} else if (count_sap == 1 && count_sta == 2 && num_ml_sta <= 1) {
 		/* This covers the below combinations,
 		 * 1. SAP + non-ML STA + non-ML STA
-		 * 2. P2P GO/CLI + non-ML STA + non-ML STA
+		 * 2. SAP + non-ML STA + ML STA
+		 * 3. P2P GO/CLI + non-ML STA + non-ML STA
 		 */
 		policy_mgr_debug(
 			"channel: sap0: %d, sta0: %d, sta1: %d",
