@@ -4893,6 +4893,15 @@ bool hdd_is_wlm_latency_manager_supported(struct hdd_context *hdd_ctx)
 		return false;
 }
 
+static void wlan_hdd_set_supported_features_extn(uint8_t *feature_bitmap,
+						 uint64_t feature)
+{
+	if (!feature)
+		return;
+
+	wlan_cfg80211_set_feature(feature_bitmap, qdf_ffs64(feature) - 1);
+}
+
 static int
 __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 					 struct wireless_dev *wdev,
@@ -4907,6 +4916,7 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 	bool bvalue;
 #endif
 	uint32_t fine_time_meas_cap;
+	uint8_t fset_extn[WIFI_FEATURE_MAX_BIT_POS / 8] = {0};
 
 	/* ENTER_DEV() intentionally not used in a frequently invoked API */
 
@@ -4922,31 +4932,45 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 	if (wiphy->interface_modes & BIT(NL80211_IFTYPE_STATION)) {
 		hdd_debug("Infra Station mode is supported by driver");
 		fset |= WIFI_FEATURE_INFRA;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_INFRA);
 	}
 	if (true == hdd_is_5g_supported(hdd_ctx)) {
 		hdd_debug("INFRA_5G is supported by firmware");
 		fset |= WIFI_FEATURE_INFRA_5G;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_INFRA_5G);
 	}
 #ifdef WLAN_FEATURE_P2P
 	if ((wiphy->interface_modes & BIT(NL80211_IFTYPE_P2P_CLIENT)) &&
 	    (wiphy->interface_modes & BIT(NL80211_IFTYPE_P2P_GO))) {
 		hdd_debug("WiFi-Direct is supported by driver");
 		fset |= WIFI_FEATURE_P2P;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_P2P);
 	}
 #endif
 	fset |= WIFI_FEATURE_SOFT_AP;
+	wlan_hdd_set_supported_features_extn(fset_extn, WIFI_FEATURE_SOFT_AP);
 
 	/* HOTSPOT is a supplicant feature, enable it by default */
 	fset |= WIFI_FEATURE_HOTSPOT;
+	wlan_hdd_set_supported_features_extn(fset_extn, WIFI_FEATURE_HOTSPOT);
 
 	if (ucfg_extscan_get_enable(hdd_ctx->psoc) &&
 	    sme_is_feature_supported_by_fw(EXTENDED_SCAN)) {
 		hdd_debug("EXTScan is supported by firmware");
 		fset |= WIFI_FEATURE_EXTSCAN | WIFI_FEATURE_HAL_EPNO;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_EXTSCAN);
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_HAL_EPNO);
 	}
 	if (wlan_hdd_nan_is_supported(hdd_ctx)) {
 		hdd_debug("NAN is supported by firmware");
 		fset |= WIFI_FEATURE_NAN;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_NAN);
 	}
 
 	ucfg_mlme_get_fine_time_meas_cap(hdd_ctx->psoc, &fine_time_meas_cap);
@@ -4957,22 +4981,33 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 			  fine_time_meas_cap);
 		fset |= WIFI_FEATURE_D2D_RTT;
 		fset |= WIFI_FEATURE_D2AP_RTT;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_D2D_RTT);
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_D2AP_RTT);
 	}
 #ifdef FEATURE_WLAN_SCAN_PNO
 	if (ucfg_scan_get_pno_scan_support(hdd_ctx->psoc) &&
 	    sme_is_feature_supported_by_fw(PNO)) {
 		hdd_debug("PNO is supported by firmware");
 		fset |= WIFI_FEATURE_PNO;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_PNO);
 	}
 #endif
-	if (ucfg_policy_mgr_get_dual_sta_feature(hdd_ctx->psoc))
+	if (ucfg_policy_mgr_get_dual_sta_feature(hdd_ctx->psoc)) {
 		fset |= WIFI_FEATURE_ADDITIONAL_STA;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_ADDITIONAL_STA);
+	}
 
 #ifdef FEATURE_WLAN_TDLS
 	cfg_tdls_get_support_enable(hdd_ctx->psoc, &bvalue);
 	if ((bvalue) && sme_is_feature_supported_by_fw(TDLS)) {
 		hdd_debug("TDLS is supported by firmware");
 		fset |= WIFI_FEATURE_TDLS;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_TDLS);
 	}
 
 	cfg_tdls_get_off_channel_enable(hdd_ctx->psoc, &bvalue);
@@ -4980,28 +5015,58 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 	    bvalue && sme_is_feature_supported_by_fw(TDLS_OFF_CHANNEL)) {
 		hdd_debug("TDLS off-channel is supported by firmware");
 		fset |= WIFI_FEATURE_TDLS_OFFCHANNEL;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_TDLS_OFFCHANNEL);
 	}
 #endif
 	fset |= WIFI_FEATURE_AP_STA;
+	wlan_hdd_set_supported_features_extn(fset_extn, WIFI_FEATURE_AP_STA);
 	fset |= WIFI_FEATURE_RSSI_MONITOR;
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_RSSI_MONITOR);
 	fset |= WIFI_FEATURE_TX_TRANSMIT_POWER;
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_TX_TRANSMIT_POWER);
 	fset |= WIFI_FEATURE_SET_TX_POWER_LIMIT;
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_SET_TX_POWER_LIMIT);
 	fset |= WIFI_FEATURE_CONFIG_NDO;
+	wlan_hdd_set_supported_features_extn(fset_extn,
+					     WIFI_FEATURE_CONFIG_NDO);
 
-	if (hdd_link_layer_stats_supported())
+	if (hdd_link_layer_stats_supported()) {
 		fset |= WIFI_FEATURE_LINK_LAYER_STATS;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_LINK_LAYER_STATS);
+	}
 
-	if (hdd_roaming_supported(hdd_ctx))
+	if (hdd_roaming_supported(hdd_ctx)) {
 		fset |= WIFI_FEATURE_CONTROL_ROAMING;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_CONTROL_ROAMING);
+	}
 
-	if (hdd_scan_random_mac_addr_supported())
+	if (hdd_scan_random_mac_addr_supported()) {
 		fset |= WIFI_FEATURE_SCAN_RAND;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_SCAN_RAND);
+	}
 
-	if (hdd_is_wlm_latency_manager_supported(hdd_ctx))
+	if (hdd_is_wlm_latency_manager_supported(hdd_ctx)) {
 		fset |= WIFI_FEATURE_SET_LATENCY_MODE;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_SET_LATENCY_MODE);
+	}
 
-	if (hdd_dynamic_mac_addr_supported(hdd_ctx))
+	if (hdd_dynamic_mac_addr_supported(hdd_ctx)) {
 		fset |= WIFI_FEATURE_DYNAMIC_SET_MAC;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_DYNAMIC_SET_MAC);
+	}
+
+	if (hdd_mlosap_check_support_multi_link(hdd_ctx))
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_MLO_SAP);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(fset) +
 						       NLMSG_HDRLEN);
@@ -5010,7 +5075,9 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 	hdd_debug("Supported Features : 0x%x", fset);
-	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_FEATURE_SET, fset)) {
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_FEATURE_SET, fset) ||
+	    nla_put(skb, QCA_WLAN_VENDOR_ATTR_FEATURE_SET_EXT,
+		    sizeof(fset_extn), fset_extn)) {
 		hdd_err("nla put fail");
 		goto nla_put_failure;
 	}

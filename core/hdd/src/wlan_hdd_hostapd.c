@@ -9523,6 +9523,21 @@ bool hdd_mlosap_check_support_link_num(struct hdd_adapter *adapter)
 
 	return false;
 }
+
+bool hdd_mlosap_check_support_multi_link(struct hdd_context *hdd_ctx)
+{
+	bool status = false;
+	uint16_t  link_num;
+
+	link_num = wlan_mlme_get_mlo_sap_support_link(hdd_ctx->psoc);
+
+	if (link_num > 1)
+		status = true;
+
+	mlme_debug("ML SAP supported link:  %u", link_num);
+
+	return status;
+}
 #endif
 
 #ifdef WLAN_CHIPSET_STATS

@@ -2405,10 +2405,19 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         cmd = "cat $(SRCS) > $@",
     )
     native.genrule(
-        name = "configs/{}_defconfig_generate_debug".format(tvc),
-        outs = ["configs/{}_defconfig_generate_debug-defconfig".format(tvc)],
+        name = "configs/{}_defconfig_generate_perf-defconfig".format(tvc),
+        outs = ["configs/{}_defconfig.generated_perf-defconfig".format(tvc)],
         srcs = [
-            "configs/{}_debug_{}_defconfig".format(target, chipset),
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
+        name = "configs/{}_defconfig_generate_debug-defconfig".format(tvc),
+        outs = ["configs/{}_defconfig.generated_debug-defconfig".format(tvc)],
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+            "configs/{}_consolidate_{}_defconfig".format(target, chipset),
         ],
         cmd = "cat $(SRCS) > $@",
     )

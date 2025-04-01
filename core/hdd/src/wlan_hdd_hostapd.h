@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -580,6 +580,20 @@ bool hdd_sap_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
  * Return: true if not exceed max support num.
  */
 bool hdd_mlosap_check_support_link_num(struct hdd_adapter *adapter);
+
+/**
+ * hdd_mlosap_check_support_multi_link() - check if support multi-link
+ * @hdd_ctx: @hdd_ctx: Pointer to hdd context
+ *
+ * Return: true if support multi link.
+ */
+bool hdd_mlosap_check_support_multi_link(struct hdd_context *hdd_ctx);
+#else
+static inline
+bool hdd_mlosap_check_support_multi_link(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
 #endif
 
 #ifdef WLAN_CHIPSET_STATS
