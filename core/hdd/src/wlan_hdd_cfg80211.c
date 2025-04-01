@@ -7933,7 +7933,7 @@ void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
 	vendor_event = wlan_cfg80211_vendor_event_alloc(
 			hdd_ctx->wiphy, &adapter->wdev, len,
 			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
-			GFP_KERNEL);
+			qdf_mem_malloc_flags());
 
 	if (!vendor_event) {
 		hdd_err("wlan_cfg80211_vendor_event_alloc failed vdev id %d, data len %d",
@@ -7958,7 +7958,7 @@ void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
 			hdd_err_rl("nlhdr is null");
 	}
 
-	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
 }
 #endif
 
