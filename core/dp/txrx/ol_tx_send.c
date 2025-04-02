@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -338,17 +338,19 @@ ol_tx_download_done_hl_free(void *txrx_pdev,
 	struct ol_tx_desc_t *tx_desc;
 	bool is_frame_freed;
 	uint8_t dp_status;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
 
 	tx_desc = ol_tx_desc_find(pdev, msdu_id);
 	qdf_assert(tx_desc);
 	dp_status = qdf_dp_get_status_from_a_status(status);
+	if (qdf_likely(tx_desc->vdev))
+		opmode = tx_desc->vdev->qdf_opmode;
 	DPTRACE(qdf_dp_trace_ptr(msdu,
 				 QDF_DP_TRACE_FREE_PACKET_PTR_RECORD,
 				 QDF_TRACE_DEFAULT_PDEV_ID,
 				 qdf_nbuf_data_addr(msdu),
 				 sizeof(qdf_nbuf_data(msdu)), tx_desc->id,
-				 dp_status, 0,
-				 tx_desc->vdev->qdf_opmode
+				 dp_status, 0, opmode
 				 ));
 
 	is_frame_freed = ol_tx_download_done_base(pdev, status, msdu, msdu_id);
@@ -1043,6 +1045,7 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 	uint64_t tx_tsf64;
 	uint8_t tid;
 	uint8_t dp_status;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
 
 	TAILQ_INIT(&tx_descs);
 
@@ -1114,14 +1117,14 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 				  QDF_TX_DATA_PKT);
 
 		dp_status = ol_tx_comp_hw_to_qdf_status(status);
-
+		if (qdf_likely(tx_desc->vdev))
+			opmode = tx_desc->vdev->qdf_opmode;
 		DPTRACE(qdf_dp_trace_ptr(netbuf,
 			QDF_DP_TRACE_FREE_PACKET_PTR_RECORD,
 			QDF_TRACE_DEFAULT_PDEV_ID,
 			qdf_nbuf_data_addr(netbuf),
 			sizeof(qdf_nbuf_data(netbuf)), tx_desc->id, status,
-			dp_status,
-			tx_desc->vdev->qdf_opmode));
+			dp_status, opmode));
 
 		/*
 		 * If credits are reported through credit_update_ind then do not

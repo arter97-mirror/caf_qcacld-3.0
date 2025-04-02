@@ -9282,6 +9282,30 @@ static void lim_abort_channel_change(struct mac_context *mac_ctx,
 	lim_sys_process_mmh_msg_api(mac_ctx, &sch_msg);
 }
 
+#ifdef WLAN_FEATURE_11AX
+static inline void
+lim_update_he_capable(struct pe_session *session, uint8_t dot11mode)
+{
+	session->he_capable = IS_DOT11_MODE_HE(dot11mode);
+}
+#else
+static inline void
+lim_update_he_capable(struct pe_session *session, uint8_t dot11mode)
+{}
+#endif
+#ifdef WLAN_FEATURE_11BE
+static inline void
+lim_update_eht_capable(struct pe_session *session, uint8_t dot11mode)
+{
+	session->eht_capable = IS_DOT11_MODE_EHT(dot11mode);
+}
+#else
+static inline void
+lim_update_eht_capable(struct pe_session *session, uint8_t dot11mode)
+{}
+#endif
+
+
 /**
  * lim_process_sme_channel_change_request() - process sme ch change req
  *
@@ -9363,10 +9387,20 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		session_entry->channelChangeReasonCode =
 			LIM_SWITCH_CHANNEL_MONITOR;
 
-	pe_nofl_debug("SAP CSA: %d ---> %d, ch_bw %d, nw_type %d, dot11mode %d",
+	pe_nofl_debug("SAP CSA: %d ---> %d, ch_bw %d, nw_type %d, dot11mode %d, old dot11mode %d",
 		      session_entry->curr_op_freq, target_freq,
 		      ch_change_req->ch_width, ch_change_req->nw_type,
-		      ch_change_req->dot11mode);
+		      ch_change_req->dot11mode, session_entry->dot11mode);
+
+	/* Update ht/vht/he/eht capability as per the new dot11mode */
+	if (ch_change_req->dot11mode != session_entry->dot11mode) {
+		session_entry->htCapability =
+			IS_DOT11_MODE_HT(ch_change_req->dot11mode);
+		session_entry->vhtCapability =
+			IS_DOT11_MODE_VHT(ch_change_req->dot11mode);
+		lim_update_he_capable(session_entry, ch_change_req->dot11mode);
+		lim_update_eht_capable(session_entry, ch_change_req->dot11mode);
+	}
 
 	if (IS_DOT11_MODE_HE(ch_change_req->dot11mode) &&
 		((QDF_MONITOR_MODE == session_entry->opmode) ||
@@ -9671,6 +9705,12 @@ static void lim_process_update_add_ies(struct mac_context *mac_ctx,
 		pe_err("msg_buf is NULL");
 		return;
 	}
+
+	if (update_add_ies->updateType == eUPDATE_IE_EDCA_ALL_PROFILE) {
+		sch_edca_profile_update_all(mac_ctx);
+		return;
+	}
+
 	update_ie = &update_add_ies->updateIE;
 	/* incoming message has smeSession, use BSSID to find PE session */
 	session_entry = pe_find_session_by_bssid(mac_ctx,

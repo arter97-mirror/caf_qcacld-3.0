@@ -12927,7 +12927,7 @@ QDF_STATUS hdd_switch_sap_channel(struct wlan_hdd_link_info *link_info,
 						      forced);
 }
 
-QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
+QDF_STATUS hdd_switch_sap_chan_freq(struct wlan_hdd_link_info *link_info,
 				    qdf_freq_t chan_freq,
 				    enum phy_ch_width ch_width,
 				    bool forced)
@@ -12935,21 +12935,21 @@ QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct hdd_context *hdd_ctx;
 
-	if (hdd_validate_adapter(adapter))
+	if (hdd_validate_adapter(link_info->adapter))
 		return QDF_STATUS_E_INVAL;
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
 	if(wlan_hdd_validate_context(hdd_ctx))
 		return QDF_STATUS_E_INVAL;
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
 	hdd_debug("chan freq:%d width:%d org bw %d",
 		  chan_freq, ch_width, hdd_ap_ctx->sap_config.ch_width_orig);
 
 	return policy_mgr_change_sap_channel_with_csa(hdd_ctx->psoc,
-						      adapter->deflink->vdev_id,
+						      link_info->vdev_id,
 						      chan_freq,
 						      ch_width,
 						      forced);
@@ -13216,7 +13216,7 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 				wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
 						    link_info->vdev_id,
 						    CSA_REASON_UNSAFE_CHANNEL);
-				status = hdd_switch_sap_chan_freq(adapter,
+				status = hdd_switch_sap_chan_freq(link_info,
 								  restart_freq,
 								  ch_width,
 								  true);

@@ -559,6 +559,8 @@ static QDF_STATUS tdls_process_rx_mgmt(
 				tdls_vdev =
 				     wlan_objmgr_vdev_get_comp_private_obj(vdev,
 							   WLAN_UMAC_COMP_TDLS);
+				if (!tdls_vdev)
+					return QDF_STATUS_E_EXISTS;
 				rx_mgmt = tdls_vdev->rx_mgmt;
 				tdls_vdev_select = true;
 				tdls_debug("choice vdev %d as tdls vdev",

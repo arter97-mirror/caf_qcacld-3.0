@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -255,13 +255,16 @@ void lim_perform_ft_pre_auth(struct mac_context *mac, QDF_STATUS status,
 		pe_err("pe_session is not in STA mode");
 		return;
 	}
-	if (cm_is_auth_type_sae(pe_session->vdev)) {
+
+	if (cm_is_auth_type_sae(pe_session->vdev) &&
+	    !pe_session->is11Rconnection) {
 		struct qdf_mac_addr *pre_auth_bssid = (struct qdf_mac_addr *)
 			pe_session->ftPEContext.pFTPreAuthReq->preAuthbssId;
 
 		lim_trigger_auth_req_sae(mac, pe_session, pre_auth_bssid);
 		return;
 	}
+
 	pe_debug("Entered wait auth2 state for FT (old session %pK)",
 			pe_session);
 	if (pe_session->is11Rconnection) {

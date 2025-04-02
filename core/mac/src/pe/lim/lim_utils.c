@@ -10296,7 +10296,8 @@ void lim_send_beacon(struct mac_context *mac_ctx, struct pe_session *session)
 					session->vdev,
 					WLAN_VDEV_SM_EV_CHAN_SWITCH_DISABLED,
 					sizeof(*session), session);
-	else
+	else if (wlan_vdev_is_up_active_state(session->vdev) !=
+		 QDF_STATUS_SUCCESS)
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_START_SUCCESS,
 					      sizeof(*session), session);
