@@ -4101,28 +4101,28 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[1]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_SAP_5_HIGH_SBS;
 		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[1]].freq) &&
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[0]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_SAP_5_HIGH_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[1]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[1]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -4199,28 +4199,28 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[1]].freq)) {
-			index = PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS;
+			index = PM_STA_SAP_5_HIGH_STA_5_LOW_SBS;
 		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[1]].freq) &&
 			wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq)) {
-			index = PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS;
+			index = PM_STA_SAP_5_HIGH_STA_5_LOW_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 			 WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[1]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_STA_5_HIGH_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[1]].freq) &&
 			 WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_STA_5_HIGH_SBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
