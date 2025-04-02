@@ -4260,7 +4260,8 @@ policy_mgr_sta_sap_dfs_scc_conc_check(struct wlan_objmgr_psoc *psoc,
 	 * and receives the very first beacon, then it will enforece SCC
 	 */
 	if (wlan_reg_is_dfs_for_freq(pdev, new_freq) ||
-	    wlan_reg_is_freq_indoor(pdev, new_freq)) {
+	    wlan_reg_is_freq_indoor(pdev, new_freq) ||
+	    !wlan_reg_is_freq_enabled(pdev, new_freq, REG_CURRENT_PWR_MODE)) {
 		if (wlan_reg_is_24ghz_ch_freq(new_freq)) {
 			new_freq = wlan_reg_min_24ghz_chan_freq();
 		} else if (wlan_reg_is_5ghz_ch_freq(new_freq)) {
