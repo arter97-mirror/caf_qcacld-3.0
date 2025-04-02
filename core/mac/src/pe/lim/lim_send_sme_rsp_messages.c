@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2010,13 +2010,30 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 			       tLimChannelSwitchInfo *lim_ch_switch,
 			       struct ch_params ch_params)
 {
-	pe_debug("session chan width: %d, CSA req chan width: %d",
-		 session_entry->ch_width, ch_params.ch_width);
+	enum phy_ch_width max_ch_width, assoc_ch_width;
+	struct mlme_legacy_priv *mlme_priv;
+
 	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
 	    session_entry->ch_width == ch_params.ch_width &&
 	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
-		pe_debug("Ignore CSA, no change in ch, bw and puncture");
-		return false;
+		mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
+		if (!mlme_priv) {
+			pe_err("null mlme priv");
+			return false;
+		}
+		assoc_ch_width =
+			mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
+		max_ch_width = wlan_mlme_get_max_bw();
+		if (assoc_ch_width == CH_WIDTH_80MHZ &&
+		    ch_params.ch_width == CH_WIDTH_160MHZ &&
+		    max_ch_width >= CH_WIDTH_160MHZ) {
+			pe_debug("BW upgrade %d->%d",
+				 assoc_ch_width,
+				 ch_params.ch_width);
+		} else {
+			pe_debug("Ignore CSA, no change in ch, bw and puncture");
+			return false;
+		}
 	}
 	return true;
 }
