@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -118,6 +118,9 @@ QDF_STATUS lim_send_switch_chnl_params(struct mac_context *mac,
 	}
 
 	session->ch_switch_in_progress = true;
+
+	/* Clean post csa ocv sa query state */
+	lim_post_csa_ocv_sa_query_check(mac, session, false);
 	status = lim_pre_vdev_start(mac, mlme_obj, session);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto send_resp;

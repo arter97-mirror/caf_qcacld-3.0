@@ -3458,6 +3458,12 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		policy_mgr_update_connection_info(mac->psoc,
 						pe_session->smeSessionId);
 		lim_check_conc_power_for_csa(mac, pe_session);
+
+		/* Channel Switch completed, prepare timer to wait for
+		 * OCV Check SA Query request from stations.
+		 */
+		lim_post_csa_ocv_sa_query_check(mac, pe_session,
+						QDF_IS_STATUS_SUCCESS(status));
 		break;
 	case LIM_SWITCH_CHANNEL_MONITOR:
 		lim_handle_mon_switch_channel_rsp(pe_session, status);

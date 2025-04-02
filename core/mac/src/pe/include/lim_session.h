@@ -675,6 +675,7 @@ struct dfs_p2p_group_info {
  * @ht_client_cnt:
  * @ch_switch_in_progress:
  * @post_csa_notify_cap: Send notify capability pending post CSA
+ * @post_csa_ocv_sa_query_timer: Timer to check peer STA CSA OCV SA Query
  * @he_with_wep_tkip:
  * @fils_info:
  * @prev_auth_seq_num: Sequence number of previously received auth frame to
@@ -1003,6 +1004,9 @@ struct pe_session {
 	uint8_t ht_client_cnt;
 	bool ch_switch_in_progress;
 	bool post_csa_notify_cap;
+#ifdef CFG80211_SA_QUERY_OFFLOAD_SUPPORT
+	qdf_mc_timer_t post_csa_ocv_sa_query_timer;
+#endif
 	bool he_with_wep_tkip;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct pe_fils_session *fils_info;
