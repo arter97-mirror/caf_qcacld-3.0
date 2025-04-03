@@ -1535,9 +1535,9 @@ __hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 		 * frame with BCST as destination,
 		 * we are dropping action frame
 		 */
-		hdd_err("No adapter found for type %d subtype %d len %d freq %d, dest addr: "
-			QDF_MAC_ADDR_FMT, frame_type, sub_type, frm_len,
-			rx_freq, QDF_MAC_ADDR_REF(dest_addr));
+		hdd_err_rl("No adapter found for type %d subtype %d len %d freq %d, dest addr "
+			   QDF_MAC_ADDR_FMT, frame_type, sub_type, frm_len,
+			   rx_freq, QDF_MAC_ADDR_REF(dest_addr));
 
 		/*
 		 * We will receive broadcast management frames
@@ -1591,9 +1591,9 @@ check_adapter:
 		}
 
 		/* Indicate Frame Over Normal Interface */
-		hdd_debug("vdev %d (if_idx %d): Indicate Frame type %d len %d freq %d over NL80211",
-			  link_info->vdev_id, assoc_adapter->dev->ifindex,
-			  frame_type, frm_len, rx_freq);
+		hdd_debug_rl("vdev %d (if_idx %d): Indicate Frame type %d len %d freq %d over NL80211",
+			     link_info->vdev_id, assoc_adapter->dev->ifindex,
+			     frame_type, frm_len, rx_freq);
 
 		wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
