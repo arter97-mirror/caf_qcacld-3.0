@@ -1382,12 +1382,16 @@ void update_fils_data(struct sir_fils_indication *fils_ind,
  *                             in beacon/probe response structure
  * @mac_context: pointer to mac context
  * @pe_session: pointer to pe session
+ * @opmode: OP mode for which caps to be filled
+ * @freq: Freq to fill caps for
+ * @ch_width: Chan width to fill he caps for
  * @he_cap: he capability IE
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS populate_dot11f_he_caps(struct mac_context *, struct pe_session *,
-				   tDot11fIEhe_cap *);
+				   enum QDF_OPMODE, qdf_freq_t,
+				   enum phy_ch_width, tDot11fIEhe_cap *);
 
 /**
  * populate_dot11f_he_caps_by_band() - pouldate HE Capability IE by band
@@ -1456,7 +1460,11 @@ static inline QDF_STATUS populate_dot11f_he_bss_color_change(
 #endif
 #else
 static inline QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
-			struct pe_session *session, tDot11fIEhe_cap *he_cap)
+						 struct pe_session *session,
+						 enum QDF_OPMODE opmode,
+						 qdf_freq_t freq,
+						 enum phy_ch_width ch_width,
+						 tDot11fIEhe_cap *he_cap)
 {
 	return QDF_STATUS_SUCCESS;
 }

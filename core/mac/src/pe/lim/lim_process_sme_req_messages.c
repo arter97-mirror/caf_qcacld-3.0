@@ -818,7 +818,9 @@ lim_save_max_mcs_idx(struct mac_context *mac_ctx, struct pe_session *session)
 
 	if (IS_DOT11_MODE_HE(session->dot11mode)) {
 		qdf_mem_zero(&he_cap, sizeof(tDot11fIEhe_cap));
-		populate_dot11f_he_caps(mac_ctx, session, &he_cap);
+		populate_dot11f_he_caps(mac_ctx, session, session->opmode,
+					session->curr_op_freq,
+					session->ch_width, &he_cap);
 		session_max_mcs_idx = lim_get_he_max_mcs_idx(session->ch_width,
 							     &he_cap);
 	}

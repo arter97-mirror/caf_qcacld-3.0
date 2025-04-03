@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -346,8 +346,9 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 
 	if (lim_is_session_he_capable(pe_session)) {
 		pe_debug("Populate HE IEs");
-		populate_dot11f_he_caps(mac_ctx, pe_session,
-					&frm->he_cap);
+		populate_dot11f_he_caps(mac_ctx, pe_session, pe_session->opmode,
+					pe_session->curr_op_freq,
+					pe_session->ch_width, &frm->he_cap);
 		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
 					    &frm->he_6ghz_band_cap);
 	}
@@ -810,8 +811,9 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 
 	if (lim_is_session_he_capable(pe_session)) {
 		pe_debug("Populate HE IEs");
-		populate_dot11f_he_caps(mac, pe_session,
-					&frm->he_cap);
+		populate_dot11f_he_caps(mac, pe_session, pe_session->opmode,
+					pe_session->curr_op_freq,
+					pe_session->ch_width, &frm->he_cap);
 		populate_dot11f_he_6ghz_cap(mac, pe_session,
 					    &frm->he_6ghz_band_cap);
 	}

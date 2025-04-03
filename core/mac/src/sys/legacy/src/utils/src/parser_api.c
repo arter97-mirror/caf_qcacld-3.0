@@ -8247,26 +8247,33 @@ populate_dot11f_twt_he_cap(struct mac_context *mac_ctx,
  *
  * Populdate the HE capability IE based on the session.
  */
-QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_session *session,
+QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
+				   struct pe_session *session,
+				   enum QDF_OPMODE opmode, qdf_freq_t freq,
+				   enum phy_ch_width ch_width,
 				   tDot11fIEhe_cap *he_cap)
 {
-	uint8_t *ppet;
+	uint8_t *ppet, nss;
 	uint32_t value = 0;
 
 	he_cap->present = 1;
+	nss = session ? session->nss : WLAN_MAX_VDEV_NSS;
 
 	if (!session) {
 		qdf_mem_copy(he_cap, &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
 			     sizeof(tDot11fIEhe_cap));
-		return QDF_STATUS_SUCCESS;
+		if (!freq)
+			goto fill_nss;
+	} else {
+		/** TODO: String items needs attention. **/
+		qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
+		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
 	}
 
-	/** TODO: String items needs attention. **/
-	qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
 	if (he_cap->ppet_present) {
 		value = WNI_CFG_HE_PPET_LEN;
 		/* if session is present, populate PPET based on band */
-		if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
+		if (!wlan_reg_is_24ghz_ch_freq(freq))
 			qdf_mem_copy(he_cap->ppet.ppe_threshold.ppe_th,
 				     mac_ctx->mlme_cfg->he_caps.he_ppet_5g,
 				     value);
@@ -8281,28 +8288,34 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 	} else {
 		he_cap->ppet.ppe_threshold.num_ppe_th = 0;
 	}
-	populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
 
-	if (wlan_reg_is_5ghz_ch_freq(session->curr_op_freq) ||
-	    wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
-		if (session->ch_width <= CH_WIDTH_80MHZ) {
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(freq)) {
+		he_cap->chan_width_1 = 0;
+		he_cap->chan_width_2 = 0;
+		he_cap->chan_width_3 = 0;
+		he_cap->chan_width_5 = 0;
+		he_cap->chan_width_6 = 0;
+	} else {
+		he_cap->chan_width_0 = 0;
+		he_cap->chan_width_4 = 0;
+		he_cap->chan_width_6 = 0;
+		if (ch_width <= CH_WIDTH_80MHZ) {
 			he_cap->chan_width_2 = 0;
 			he_cap->chan_width_3 = 0;
-		} else if (session->ch_width == CH_WIDTH_160MHZ) {
+		} else if (ch_width == CH_WIDTH_160MHZ) {
 			he_cap->chan_width_3 = 0;
 		}
 	}
 
-	he_cap->rx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(session->nss);
-	he_cap->tx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(session->nss);
-	*(uint16_t *)he_cap->rx_he_mcs_map_160 |=
-					HE_DISABLE_MCS_OVER_NSS(session->nss);
-	*(uint16_t *)he_cap->tx_he_mcs_map_160 |=
-					HE_DISABLE_MCS_OVER_NSS(session->nss);
+fill_nss:
+	he_cap->rx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	he_cap->tx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	*(uint16_t *)he_cap->rx_he_mcs_map_160 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	*(uint16_t *)he_cap->tx_he_mcs_map_160 |= HE_DISABLE_MCS_OVER_NSS(nss);
 	*(uint16_t *)he_cap->rx_he_mcs_map_80_80 |=
-					HE_DISABLE_MCS_OVER_NSS(session->nss);
+					HE_DISABLE_MCS_OVER_NSS(nss);
 	*(uint16_t *)he_cap->tx_he_mcs_map_80_80 |=
-					HE_DISABLE_MCS_OVER_NSS(session->nss);
+					HE_DISABLE_MCS_OVER_NSS(nss);
 
 	return QDF_STATUS_SUCCESS;
 }
