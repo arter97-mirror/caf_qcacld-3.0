@@ -33065,16 +33065,12 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 		is_legacy_phymode = true;
 
 	link_vdev = wlan_key_get_link_vdev(adapter, WLAN_OSIF_ID, link_id);
-	if (!link_vdev || !ucfg_cm_is_vdev_active(link_vdev)) {
-		/*
-		 * Request path for:
-		 *     a) Standby link which doesn't have VDEV
-		 *     b) Any other link whose VDEV is not yet UP
-		 */
+	if (!link_vdev) {
+		/* request is for standby link */
 		ret =  wlan_hdd_get_standby_link_chan_info(adapter, link_id,
 							   &chan_info);
 		if (ret)
-			goto exit;
+			return ret;
 
 		ch_params.ch_width = chan_info.ch_width;
 		ch_params.center_freq_seg1 = chan_info.ch_cfreq2;
@@ -33103,8 +33099,9 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 	} else {
 		ret = wlan_hdd_cfg80211_get_vdev_chan_info(hdd_ctx, link_vdev,
 							   link_id, &chan_info);
+		wlan_key_put_link_vdev(link_vdev, WLAN_OSIF_ID);
 		if (ret)
-			goto exit;
+			return ret;
 	}
 
 	chandef->chan = ieee80211_get_channel(wiphy, chan_info.ch_freq);
@@ -33120,9 +33117,6 @@ wlan_hdd_cfg80211_get_channel_sta(struct wiphy *wiphy,
 		  chan_info.ch_freq, chandef->width, chandef->center_freq1,
 		  chandef->center_freq2);
 
-exit:
-	if (link_vdev)
-		wlan_key_put_link_vdev(link_vdev, WLAN_OSIF_ID);
 	return ret;
 }
 
