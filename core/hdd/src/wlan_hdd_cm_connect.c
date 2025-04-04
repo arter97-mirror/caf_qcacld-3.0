@@ -622,8 +622,8 @@ hdd_get_sap_link_info_of_dfs(struct hdd_context *hdd_ctx)
 			 * sap is not in started state and also not under doing
 			 * CAC, so it is fine to go ahead with sta.
 			 */
-			if (!test_bit(SOFTAP_BSS_STARTED,
-				      &link_info->link_flags) &&
+			if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+						 link_info->link_flags) &&
 			    hdd_ctx->dev_dfs_cac_status != DFS_CAC_IN_PROGRESS)
 				continue;
 
@@ -782,6 +782,14 @@ def_chan:
 				    hdd_ap_ctx->operating_chan_freq)) {
 		hdd_debug("sta freq %d sap freq %d in sbs mode is allowed",
 			  ch_freq, hdd_ap_ctx->operating_chan_freq);
+		return true;
+	}
+
+	if (ch_freq &&
+	    policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(hdd_ctx->psoc) &&
+	    wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) &&
+	    ch_freq == hdd_ap_ctx->operating_chan_freq) {
+		hdd_debug("sta freq allow with running dfs sap %d", ch_freq);
 		return true;
 	}
 
@@ -1656,6 +1664,36 @@ hdd_cm_mlme_send_standby_link_chn_width(struct hdd_adapter *adapter,
 }
 #endif
 
+#ifdef MDM_PLATFORM
+static void
+hdd_cm_prot_dhcp_after_connect(struct hdd_adapter *adapter,
+			       uint8_t vdev_id)
+{
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return;
+	}
+
+	if (adapter->device_mode == QDF_STA_MODE ||
+	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		/* inform FW to start DHCP prot */
+		sme_dhcp_start_ind(hdd_ctx->mac_handle,
+				   adapter->device_mode,
+				   adapter->mac_addr.bytes,
+				   vdev_id);
+	}
+}
+#else
+static void
+hdd_cm_prot_dhcp_after_connect(struct hdd_adapter *adapter,
+			       uint8_t vdev_id)
+{}
+
+#endif
+
 static void
 hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				       struct wlan_cm_connect_resp *rsp)
@@ -1886,6 +1924,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	if (is_roam)
 		ucfg_dp_nud_indicate_roam(vdev);
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
+
+	hdd_cm_prot_dhcp_after_connect(adapter, link_info->vdev_id);
 }
 
 static void
@@ -1918,7 +1958,8 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_cm_clear_pmf_stats(adapter);
 
 	if (adapter->device_mode == QDF_STA_MODE ||
-	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+	    (adapter->device_mode == QDF_P2P_CLIENT_MODE &&
+	     wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, rsp->vdev_id))) {
 		/* Inform FTM TIME SYNC about the connection with AP */
 		if (adapter->device_mode == QDF_STA_MODE)
 			hdd_ftm_time_sync_sta_state_notify(adapter,

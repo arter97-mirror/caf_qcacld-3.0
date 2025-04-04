@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -537,7 +537,9 @@ QDF_STATUS csr_roam_send_chan_sw_ie_request(struct mac_context *mac,
 					    uint32_t target_chan_freq,
 					    uint8_t csaIeReqd,
 					    struct ch_params *ch_params,
-					    uint32_t new_cac_ms);
+					    uint32_t new_cac_ms,
+					    uint8_t beacon_cnt,
+					    uint8_t mode);
 
 QDF_STATUS csr_roam_modify_add_ies(struct mac_context *mac,
 					tSirModifyIE *pModifyIE,

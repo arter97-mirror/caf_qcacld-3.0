@@ -4143,6 +4143,15 @@ QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
 
 		status = QDF_STATUS_SUCCESS;
 		break;
+	case PM_SCC_STA_ON_24_OR_5:
+		policy_mgr_get_connection_channels(
+					psoc, mode,
+					POLICY_MGR_PCL_ORDER_NONE,
+					false,
+					POLICY_MGR_PCL_GROUP_ID1_ID2,
+					pcl_channels, pcl_weights, pcl_sz, len);
+		status = QDF_STATUS_SUCCESS;
+		break;
 	default:
 		policy_mgr_err("unknown pcl value %d", pcl);
 		break;
@@ -4562,6 +4571,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	bool ml_sap_vdev = false;
 	bool is_dbs, ml_sta_present;
 	uint32_t conc_ml_sap_freq = 0;
+	uint32_t nan_scc_freq = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -4605,6 +4615,9 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	ll_lt_sap_freq = policy_mgr_get_ll_sap_freq(psoc);
 	is_dbs = policy_mgr_is_hw_dbs_capable(psoc);
 
+	if (wlan_nan_is_disc_active(psoc))
+		nan_scc_freq = policy_mgr_get_sap_scc_freq_nan_present(psoc);
+
 	/*
 	 * The preferred force SCC channel is SAP original channel,
 	 * and then the SCC channel on the same mac, and then the SCC
@@ -4623,21 +4636,21 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 			continue;
 		if (ml_sap_vdev && (conc_ml_sap_freq == pcl_freq))
 			continue;
+		if (nan_scc_freq && pcl_freq != nan_scc_freq)
+			continue;
 
 		/**
 		 * Skip indoor/DFS channels for non-DBS chip, if STA+SAP
 		 * indoor/DFS SCC INI are disabled.
 		 */
 		if (!is_dbs &&
-		    ((wlan_reg_is_dfs_for_freq(pm_ctx->pdev, pcl_freq) &&
-		      !policy_mgr_is_sap_allowed_on_dfs_freq(pm_ctx->pdev,
+		    (!policy_mgr_is_sap_allowed_on_dfs_freq(pm_ctx->pdev,
 							     vdev_id,
-							     pcl_freq)) ||
-		     (wlan_reg_is_freq_indoor(pm_ctx->pdev, pcl_freq) &&
-		      !policy_mgr_is_sap_go_interface_allowed_on_indoor(
+							     pcl_freq) ||
+		     !policy_mgr_is_sap_go_interface_allowed_on_indoor(
 							pm_ctx->pdev,
 							vdev_id,
-							pcl_freq))))
+							pcl_freq)))
 			continue;
 
 		/* Skip LL LT SAP freq and for SAP skip same mac freq */

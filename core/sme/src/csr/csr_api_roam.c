@@ -5775,7 +5775,7 @@ cm_update_rsn_ocv_cap(int32_t *rsn_cap,
 			     offsetof(struct wlan_bcn_frame, ie));
 
 	status = wlan_get_crypto_params_from_rsn_ie(&crypto_params, ie_ptr,
-						    ie_len);
+						    ie_len, NULL);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
@@ -7387,7 +7387,9 @@ QDF_STATUS csr_roam_send_chan_sw_ie_request(struct mac_context *mac_ctx,
 					    uint32_t target_chan_freq,
 					    uint8_t csa_ie_reqd,
 					    struct ch_params *ch_params,
-					    uint32_t new_cac_ms)
+					    uint32_t new_cac_ms,
+					    uint8_t beacon_cnt,
+					    uint8_t mode)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tSirDfsCsaIeRequest *msg;
@@ -7402,12 +7404,12 @@ QDF_STATUS csr_roam_send_chan_sw_ie_request(struct mac_context *mac_ctx,
 	msg->target_chan_freq = target_chan_freq;
 	msg->csaIeRequired = csa_ie_reqd;
 	msg->ch_switch_beacon_cnt =
-		 mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt;
+		 beacon_cnt;
 	if (mac_ctx->sap.one_time_csa_count) {
 		msg->ch_switch_beacon_cnt = mac_ctx->sap.one_time_csa_count;
 		mac_ctx->sap.one_time_csa_count = 0;
 	}
-	msg->ch_switch_mode = mac_ctx->sap.SapDfsInfo.sap_ch_switch_mode;
+	msg->ch_switch_mode = mode;
 	msg->dfs_ch_switch_disable =
 		mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch;
 	msg->new_chan_cac_ms = new_cac_ms;

@@ -749,10 +749,10 @@ QDF_STATUS hdd_set_policy_mgr_user_cfg(struct hdd_context *hdd_ctx)
 	if (!user_cfg)
 		return QDF_STATUS_E_NOMEM;
 
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc,
-					     &user_cfg->enable2x2);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
+					    &user_cfg->enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("unable to get vht_enable2x2");
+		hdd_err("unable to get vht_enable_mimo");
 
 	user_cfg->sub_20_mhz_enabled = cds_is_sub_20_mhz_enabled();
 	status = policy_mgr_set_user_cfg(hdd_ctx->psoc, user_cfg);
@@ -1150,7 +1150,7 @@ static void hdd_update_nss_in_vdev(struct wlan_hdd_link_info *link_info,
 				   mac_handle_t mac_handle, uint8_t tx_nss,
 				   uint8_t rx_nss)
 {
-	uint8_t band, max_supp_nss = MAX_VDEV_NSS;
+	uint8_t band, max_supp_nss = WLAN_MAX_VDEV_NSS;
 	struct wlan_objmgr_vdev *vdev;
 	struct hdd_adapter *adapter = link_info->adapter;
 
@@ -1333,7 +1333,7 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t rx_supp_data_rate, tx_supp_data_rate;
-	bool status = true;
+	bool bval = false, status = true, restart_sap = false;
 	QDF_STATUS qdf_status;
 	qdf_size_t val_len;
 	struct mlme_ht_capabilities_info ht_cap_info;
@@ -1341,20 +1341,21 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 	uint8_t mcs_set_temp[SIZE_OF_SUPPORTED_MCS_SET];
 	uint8_t enable2x2;
 	mac_handle_t mac_handle;
-	bool bval = 0, restart_sap = 0;
+	uint8_t vht_enable_mimo = WLAN_MIMO_CAP_DISABLE;
 
 	if ((tx_nss == 2 || rx_nss == 2) && (hdd_ctx->num_rf_chains != 2)) {
 		hdd_err("No support for 2 spatial streams");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (tx_nss > MAX_VDEV_NSS || rx_nss > MAX_VDEV_NSS) {
+	if (tx_nss > WLAN_MAX_VDEV_NSS || rx_nss > WLAN_MAX_VDEV_NSS) {
 		hdd_debug("Cannot support tx_nss: %d rx_nss: %d", tx_nss,
 			  rx_nss);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	qdf_status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+	qdf_status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
+						&vht_enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("unable to get vht_enable2x2");
 		return QDF_STATUS_E_FAILURE;
@@ -1398,7 +1399,7 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 		}
 		hdd_debug("Vdev %d in disconnect state, changing ini nss params",
 			  link_info->vdev_id);
-		if (!bval) {
+		if (!vht_enable_mimo) {
 			hdd_err("Nss in 1x1, no change required, 2x2 mode disabled");
 			return QDF_STATUS_SUCCESS;
 		}
@@ -1415,9 +1416,8 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 	 * update of nss and chains per vdev feature, for the upcoming
 	 * connection
 	 */
-	enable2x2 = (rx_nss == 2) ? 1 : 0;
-
-	if (bval == enable2x2) {
+	enable2x2 = (rx_nss >= 2) ? WLAN_MIMO_CAP_MAX : WLAN_MIMO_CAP_DISABLE;
+	if (vht_enable_mimo == enable2x2) {
 		hdd_debug("NSS same as requested");
 		return QDF_STATUS_SUCCESS;
 	}
@@ -1427,7 +1427,7 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	qdf_status = ucfg_mlme_set_vht_enable2x2(hdd_ctx->psoc, enable2x2);
+	qdf_status = ucfg_mlme_set_vht_mimo_cap(hdd_ctx->psoc, enable2x2);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_err("Failed to set vht_enable2x2");
 		return QDF_STATUS_E_FAILURE;
@@ -1435,16 +1435,22 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 
 	if (tx_nss == 1 && rx_nss == 2) {
 		/* 1x2 */
-		rx_supp_data_rate = VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
-		tx_supp_data_rate = VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+		rx_supp_data_rate =
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE, true);
+		tx_supp_data_rate =
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
 	} else if (enable2x2) {
 		/* 2x2 */
-		rx_supp_data_rate = VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
-		tx_supp_data_rate = VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
+		rx_supp_data_rate =
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE, true);
+		tx_supp_data_rate =
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_2x2_MODE, true);
 	} else {
 		/* 1x1 */
-		rx_supp_data_rate = VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
-		tx_supp_data_rate = VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+		rx_supp_data_rate =
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
+		tx_supp_data_rate =
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(NSS_1x1_MODE, true);
 	}
 
 	/* Update Rx Highest Long GI data Rate */
@@ -1529,7 +1535,7 @@ skip_ht_cap_update:
 QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	bool bval;
+	uint8_t enable_mimo;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	/*
@@ -1544,13 +1550,14 @@ QDF_STATUS hdd_get_nss(struct hdd_adapter *adapter, uint8_t *nss)
 		/* Different settings in 2G and 5G is not supported */
 		*nss = nss_2g;
 	} else {
-		status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+		status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
+						    &enable_mimo);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("unable to get vht_enable2x2");
 			return status;
 		}
 
-		*nss = (bval) ? 2 : 1;
+		*nss = enable_mimo ? 2 : 1;
 		if (!policy_mgr_is_hw_dbs_2x2_capable(hdd_ctx->psoc) &&
 		    policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc))
 			*nss = *nss - 1;

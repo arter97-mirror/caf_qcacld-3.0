@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: ISC
  */
 
@@ -12,7 +12,7 @@
 #include <wlan_mgmt_rx_srng_public_structs.h>
 #include <hal_internal.h>
 
-#define MGMT_RX_SRNG_ENTRIES 64
+#define MGMT_RX_SRNG_ENTRIES 128
 #define MGMT_RX_BUF_SIZE 3520
 
 #if defined(IPA_OFFLOAD) && defined(FEATURE_DIRECT_LINK)

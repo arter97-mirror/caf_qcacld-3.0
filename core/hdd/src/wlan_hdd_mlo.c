@@ -289,6 +289,8 @@ static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_mgr_osif_link_switch_notification =
 					hdd_adapter_link_switch_notification,
 	.mlo_mgr_osif_update_link_state = hdd_mlo_update_vdev_active_flag,
+	.mlo_mgr_osif_chan_switch_notification =
+					hdd_mlo_channel_switch_notify,
 };
 
 QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)
@@ -369,6 +371,66 @@ QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 	return found ? QDF_STATUS_SUCCESS : QDF_STATUS_E_FAILURE;
 }
 #endif
+
+static struct wlan_hdd_link_info *
+hdd_get_link_info_by_bssid(struct hdd_context *hdd_ctx,
+			   struct qdf_mac_addr *bssid)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	struct hdd_station_ctx *sta_ctx;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER_BY_BSSID;
+	struct wlan_hdd_link_info *link_info;
+
+	if (qdf_is_macaddr_zero(bssid)) {
+		hdd_debug("Invalid bssid");
+		return NULL;
+	}
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		hdd_adapter_for_each_link_info(adapter, link_info) {
+			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+			if (qdf_is_macaddr_equal(bssid,
+						 &sta_ctx->conn_info.bssid)) {
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
+				return link_info;
+			}
+		}
+
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	return NULL;
+}
+
+QDF_STATUS
+hdd_mlo_channel_switch_notify(struct qdf_mac_addr *link_mac_address)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	hdd_debug("Standby Link CSA: BSSID " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(link_mac_address->bytes));
+
+	link_info = hdd_get_link_info_by_bssid(hdd_ctx, link_mac_address);
+	if (!link_info) {
+		hdd_debug("hdd link info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Notify channel switch complete for standby link to HDD */
+	link_info->ch_chng_info.ch_chng_type = CHAN_SWITCH_COMPLETE_NOTIFY;
+	qdf_sched_work(0, &link_info->ch_chng_info.chan_change_notify_work);
+
+	return QDF_STATUS_SUCCESS;
+}
 
 void hdd_mlo_t2lm_register_callback(struct wlan_objmgr_vdev *vdev)
 {
@@ -507,9 +569,9 @@ bool hdd_adapter_restore_link_vdev_map(struct hdd_adapter *adapter,
 		}
 
 		/* Swap link flags */
-		link_flags = temp_link_info->link_flags;
-		temp_link_info->link_flags = link_info->link_flags;
-		link_info->link_flags = link_flags;
+		link_flags = temp_link_info->link_flags[0];
+		temp_link_info->link_flags[0] = link_info->link_flags[0];
+		link_info->link_flags[0] = link_flags;
 
 		/* Update the mapping, current link info's mapping will be
 		 * set to be proper.

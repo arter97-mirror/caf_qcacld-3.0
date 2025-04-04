@@ -344,6 +344,12 @@ enum wlan_diag_btm_block_reason {
  * @WLAN_DIAG_TX_RX_STATUS_NO_ACK: packet sent but no ack received
  * @WLAN_DIAG_TX_RX_STATUS_DROP: packet dropped due to congestion
  * @WLAN_DIAG_TX_RX_STATUS_DOWNLOAD_SUCC: packet delivered to target
+ * @WLAN_DIAG_TX_RX_TX_FILTERED: Packet dropped due TX filter
+ * @WLAN_DIAG_TX_RX_TXOP_ABORT: TX operation is aborted
+ * @WLAN_DIAG_TX_RX_TX_TID_DEL: TX TID deleted
+ * @WLAN_DIAG_TX_RX_SW_ABORT: operation aborted by FW
+ * @WLAN_DIAG_TX_RX_TX_MIG_DROP: Packet Dropped to TX Migration
+ * @WLAN_DIAG_TX_RX_MLO_TID_MIG: Packet Dropped due to TX TID Migration
  * @WLAN_DIAG_TX_RX_STATUS_MAX: Max status value
  */
 enum wlan_diag_tx_rx_status {
@@ -353,6 +359,12 @@ enum wlan_diag_tx_rx_status {
 	WLAN_DIAG_TX_RX_STATUS_NO_ACK,
 	WLAN_DIAG_TX_RX_STATUS_DROP,
 	WLAN_DIAG_TX_RX_STATUS_DOWNLOAD_SUCC,
+	WLAN_DIAG_TX_RX_TX_FILTERED,
+	WLAN_DIAG_TX_RX_TXOP_ABORT,
+	WLAN_DIAG_TX_RX_TX_TID_DEL,
+	WLAN_DIAG_TX_RX_SW_ABORT,
+	WLAN_DIAG_TX_RX_TX_MIG_DROP,
+	WLAN_DIAG_TX_RX_MLO_TID_MIG,
 	WLAN_DIAG_TX_RX_STATUS_MAX
 };
 
@@ -1205,7 +1217,7 @@ struct wlan_roam_scan_info {
  * @is_roam_successful: True if roamed successfully or false if roaming failed
  */
 struct wlan_roam_result_info {
-	enum wlan_roam_failure_reason_code roam_fail_reason;
+	enum wlan_diag_roam_failure_reason_code roam_fail_reason;
 	bool is_roam_successful;
 };
 
@@ -1612,6 +1624,15 @@ void
 wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
 		       uint32_t freq, uint8_t vdev_id);
 
+/**
+ * wlan_diag_get_tx_status() -  Gives the diag logging specific tx status
+ * @tx_status: fw specific TX status
+ *
+ * Returns TX status specified in enum diag_tx_status
+ */
+enum diag_tx_status
+wlan_diag_get_tx_status(enum wlan_diag_tx_rx_status tx_status);
+
 #ifdef WLAN_FEATURE_11BE_MLO
 
 /**
@@ -1661,6 +1682,15 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
  * Return: None
  */
 void wlan_connectivity_t2lm_status_event(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_diag_get_tx_status() - API to convert TX status to diag TX status
+ * @tx_status: TX status of the packet. Refer enum wlan_diag_tx_rx_status
+ *
+ * Return : Valid enum  diag_tx_status value
+ */
+enum diag_tx_status
+wlan_diag_get_tx_status(enum wlan_diag_tx_rx_status tx_status);
 
 /**
  * wlan_populate_mlo_mgmt_event_param() - API to populate MLO management frame
@@ -1752,16 +1782,6 @@ wlan_populate_vsie(struct wlan_objmgr_vdev *vdev,
 enum wlan_diag_wifi_band
 wlan_convert_freq_to_diag_band(qdf_freq_t ch_freq);
 
-/**
- * wlan_get_qdf_to_diag_txrx_status() - API to convert qdf_dp_tx_rx_status
- * to wlan_diag_tx_rx_status
- * @tx_status: TX status of the frame
- *
- * Return: Converted QDF TX status value of Diag TX status of frame
- */
-enum wlan_diag_tx_rx_status
-wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status);
-
 static inline void wlan_connectivity_logging_stop(void)
 {}
 
@@ -1787,6 +1807,16 @@ wlan_connectivity_sta_info_event(struct wlan_objmgr_psoc *psoc,
 void
 wlan_connectivity_connecting_event(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_cm_connect_req *con_req);
+
+/**
+ * wlan_get_qdf_to_diag_txrx_status() - API to convert qdf_dp_tx_rx_status
+ * to wlan_diag_tx_rx_status
+ * @tx_status: TX status of outgoing frame. Refer enum qdf_dp_tx_rx_status
+ *
+ * Return: TX status of the frame.
+ */
+enum wlan_diag_tx_rx_status
+wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status);
 
 #elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
 /**
@@ -1922,11 +1952,8 @@ wlan_convert_freq_to_diag_band(qdf_freq_t ch_freq);
  *
  * Return: TX status of the frame.
  */
-static inline enum wlan_diag_tx_rx_status
-wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status)
-{
-	return WLAN_DIAG_TX_RX_STATUS_INVALID;
-}
+enum wlan_diag_tx_rx_status
+wlan_get_qdf_to_diag_txrx_status(enum qdf_dp_tx_rx_status tx_status);
 
 /**
  * wlan_populate_vsie() - Populate VSIE field for logging

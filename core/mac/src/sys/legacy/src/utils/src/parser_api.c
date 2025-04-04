@@ -1172,9 +1172,8 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 {
 	qdf_size_t ncfglen;
 	QDF_STATUS nSirStatus;
-	uint8_t disable_high_ht_mcs_2x2 = 0;
+	uint8_t i, max_nss, cb_mode, disable_high_ht_mcs_2x2 = 0;
 	struct ch_params ch_params = {0};
-	uint8_t cb_mode;
 
 	tSirMacTxBFCapabilityInfo *pTxBFCapabilityInfo;
 	tSirMacASCapabilityInfo *pASCapabilityInfo;
@@ -1235,9 +1234,8 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 
 	/* Ensure that shortGI40MHz is Disabled if supportedChannelWidthSet is
 	   eHT_CHANNEL_WIDTH_20MHZ */
-	if (pDot11f->supportedChannelWidthSet == eHT_CHANNEL_WIDTH_20MHZ) {
+	if (pDot11f->supportedChannelWidthSet == eHT_CHANNEL_WIDTH_20MHZ)
 		pDot11f->shortGI40MHz = 0;
-	}
 
 	pDot11f->maxRxAMPDUFactor =
 		mac->mlme_cfg->ht_caps.ampdu_params.max_rx_ampdu_factor;
@@ -1246,32 +1244,41 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 	pDot11f->reserved1 = mac->mlme_cfg->ht_caps.ampdu_params.reserved;
 
 	ncfglen = SIZE_OF_SUPPORTED_MCS_SET;
-	nSirStatus = wlan_mlme_get_cfg_str(
-		pDot11f->supportedMCSSet,
-		&mac->mlme_cfg->rates.supported_mcs_set,
-		&ncfglen);
+	nSirStatus =
+		wlan_mlme_get_cfg_str(pDot11f->supportedMCSSet,
+				      &mac->mlme_cfg->rates.supported_mcs_set,
+				      &ncfglen);
 	if (QDF_IS_STATUS_ERROR(nSirStatus)) {
 		pe_err("Failed to retrieve nItem from CFG status: %d",
 		       (nSirStatus));
-			return nSirStatus;
+		return nSirStatus;
 	}
 
 	if (pe_session) {
-		disable_high_ht_mcs_2x2 =
-				mac->mlme_cfg->rates.disable_high_ht_mcs_2x2;
-		if (pe_session->nss == NSS_1x1_MODE) {
-			pDot11f->supportedMCSSet[1] = 0;
+		if (pe_session->nss < NSS_2x2_MODE) {
 			pDot11f->txSTBC = 0;
-		} else if (wlan_reg_is_24ghz_ch_freq(
-			   pe_session->curr_op_freq) &&
-			   disable_high_ht_mcs_2x2 &&
-			   (pe_session->opmode == QDF_STA_MODE)) {
+		} else {
+			disable_high_ht_mcs_2x2 =
+				mac->mlme_cfg->rates.disable_high_ht_mcs_2x2;
+		}
+
+		if (disable_high_ht_mcs_2x2 &&
+		    pe_session->opmode == QDF_STA_MODE &&
+		    wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
 			pe_debug("Disabling high HT MCS [%d]",
 				 disable_high_ht_mcs_2x2);
 			pDot11f->supportedMCSSet[1] =
-					(pDot11f->supportedMCSSet[1] >>
-						disable_high_ht_mcs_2x2);
+				pDot11f->supportedMCSSet[1] >>
+							disable_high_ht_mcs_2x2;
+
+			/* Reset all higher MCS, means NSS3 and NSS4 */
+			max_nss = QDF_MIN(NSS_2x2_MODE, pe_session->nss);
+		} else {
+			max_nss = pe_session->nss;
 		}
+
+		for (i = max_nss; i < WLAN_MAX_VDEV_NSS; i++)
+			pDot11f->supportedMCSSet[i] = 0x0;
 
 		wlan_ll_lt_sap_get_mcs(mac->psoc, pe_session->vdev_id,
 				       pDot11f->supportedMCSSet);
@@ -1504,6 +1511,7 @@ QDF_STATUS
 populate_dot11f_vht_caps(struct mac_context *mac,
 			 struct pe_session *pe_session, tDot11fIEVHTCaps *pDot11f)
 {
+	uint8_t idx;
 	uint32_t nCfgValue = 0;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 
@@ -1658,34 +1666,37 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 	pDot11f->txSupDataRate = (nCfgValue & 0x00001FFF);
 
 	if (pe_session) {
-		if (pe_session->nss == NSS_1x1_MODE) {
-			pDot11f->txMCSMap |= DISABLE_NSS2_MCS;
-			pDot11f->rxMCSMap |= DISABLE_NSS2_MCS;
-			pDot11f->txSupDataRate =
-				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
-			pDot11f->rxHighSupDataRate =
-				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
-			if (!pe_session->ch_width &&
-			    !vht_cap_info->enable_vht20_mcs9 &&
-			    ((pDot11f->txMCSMap & VHT_1x1_MCS_MASK) ==
-			     VHT_1x1_MCS9_MAP)) {
-				DISABLE_VHT_MCS_9(pDot11f->txMCSMap,
-						NSS_1x1_MODE);
-				DISABLE_VHT_MCS_9(pDot11f->rxMCSMap,
-						NSS_1x1_MODE);
-			}
+		bool vht20_mcs9_unsupported =
+			(pe_session->ch_width == CH_WIDTH_20MHZ &&
+			 !vht_cap_info->enable_vht20_mcs9);
+
+		pDot11f->txMCSMap |= VHT_DISABLE_MCS_OVER_NSS(pe_session->nss);
+		pDot11f->rxMCSMap |= VHT_DISABLE_MCS_OVER_NSS(pe_session->nss);
+
+		if (pe_session->nss < NSS_2x2_MODE)
 			pDot11f->txSTBC = 0;
-		} else {
-			if (!pe_session->ch_width &&
-			    !vht_cap_info->enable_vht20_mcs9 &&
-			    ((pDot11f->txMCSMap & VHT_2x2_MCS_MASK) ==
-			     VHT_2x2_MCS9_MAP)) {
-				DISABLE_VHT_MCS_9(pDot11f->txMCSMap,
-						NSS_2x2_MODE);
-				DISABLE_VHT_MCS_9(pDot11f->rxMCSMap,
-						NSS_2x2_MODE);
+
+		/*
+		 * Mark MCS set above current NSS as unsupported, if MCS9 is
+		 * unsupported, set max supported MCS per NSS as 0-8.
+		 */
+		for (idx = NSS_1x1_MODE; idx <= pe_session->nss; idx++) {
+			if (vht20_mcs9_unsupported &&
+			    (VHT_GET_MCS_FOR_NSS(pDot11f->txMCSMap, idx) ==
+			     VHT_MCS_0_9)) {
+				VHT_SET_MCS_FOR_NSS(pDot11f->txMCSMap,
+						    VHT_MCS_0_8, idx);
+				VHT_SET_MCS_FOR_NSS(pDot11f->rxMCSMap,
+						    VHT_MCS_0_8, idx);
 			}
 		}
+
+		pDot11f->txSupDataRate =
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(pe_session->nss,
+								true);
+		pDot11f->rxHighSupDataRate =
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(pe_session->nss,
+								true);
 	}
 
 	lim_log_vht_cap(mac, pDot11f);
@@ -4293,9 +4304,10 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 	struct wlan_mlo_ie *ml_ie_info;
 	bool link_id_found;
 	uint8_t link_id;
-	bool eml_cap_found, msd_cap_found;
+	bool eml_cap_found, msd_cap_found, ext_mld_cap_found;
 	uint16_t eml_cap;
 	uint16_t msd_cap;
+	uint16_t ext_mld_cap;
 	struct qdf_mac_addr mld_mac_addr;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mlo_partner_info partner_info;
@@ -4314,7 +4326,8 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 					    &partner_info,
 					    WLAN_FC0_STYPE_ASSOC_RESP);
 
-	if (!wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev) &&
+	if (p_assoc_rsp->status_code == STATUS_SUCCESS &&
+	    !wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev) &&
 	    session_entry->ml_partner_info.num_partner_links &&
 	    !wlan_cm_is_roam_sync_in_progress(mac->psoc,
 					      session_entry->vdev_id)) {
@@ -4370,6 +4383,18 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 				     WLAN_ML_BV_CINFO_EMLCAP_TRANSTIMEOUT_BITS);
 	}
 
+	util_get_bvmlie_ext_mld_cap_op_info(ml_ie, ml_ie_total_len,
+					    &ext_mld_cap_found,
+					    &ext_mld_cap);
+	if (ext_mld_cap_found) {
+		pe_debug("Ext mld caps found in assoc rsp");
+		ml_ie_info->ext_mld_capab_and_op_present = ext_mld_cap_found;
+		ml_ie_info->ext_mld_capab_and_op_info.emlsr_enablement_on_one_link_support =
+			QDF_GET_BITS(ext_mld_cap,
+				     WLAN_ML_BV_CINFO_EXTMLDCAPINFO_EMLSR_ENABLE_ONE_LINK_IDX,
+				     WLAN_ML_BV_CINFO_EXTMLDCAPINFO_EMLSR_ENABLE_ONE_LINK_BITS);
+	}
+
 	ml_ie_info->num_sta_profile =
 			session_entry->ml_partner_info.num_partner_links;
 	ml_ie_info->link_id_info_present = link_id_found;
@@ -4379,6 +4404,8 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 		 session_entry->vdev_id,
 		 ml_ie_info->num_sta_profile, ml_ie_info->link_id,
 		 QDF_MAC_ADDR_REF(ml_ie_info->mld_mac_addr));
+	pe_debug("Single link EMLSR: %d",
+		 ml_ie_info->ext_mld_capab_and_op_info.emlsr_enablement_on_one_link_support);
 
 	return status;
 }
@@ -5848,6 +5875,7 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 	bool bpcc_found;
 	bool ext_mld_cap_found = false;
 	uint16_t ext_mld_cap = 0;
+	uint8_t *mld_mac;
 
 	if (bcn_frm->mlo_ie.present) {
 		status = util_find_mlie(pframe + WLAN_BEACON_IES_OFFSET,
@@ -5863,14 +5891,23 @@ sir_convert_beacon_frame2_mlo_struct(uint8_t *pframe, uint32_t nframe,
 				return status;
 			bcn_struct->mlo_ie.mlo_ie.num_sta_profile =
 						partner_info.num_partner_links;
-			util_get_mlie_common_info_len(ml_ie, ml_ie_total_len,
-						      &common_info_len);
+			status = util_get_mlie_common_info_len(ml_ie,
+							       ml_ie_total_len,
+							       &common_info_len);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
+
 			sta_prof = ml_ie + sizeof(struct wlan_ie_multilink) +
 				   common_info_len;
 
 			lim_store_mlo_ie_raw_info(ml_ie, sta_prof,
 						  ml_ie_total_len,
 						  &bcn_struct->mlo_ie.mlo_ie);
+
+			mld_mac = ml_ie + sizeof(struct wlan_ie_multilink) +
+				  WLAN_ML_BV_CINFO_LENGTH_SIZE;
+			qdf_mem_copy(bcn_struct->mlo_ie.mlo_ie.mld_mac_addr,
+				     mld_mac, QDF_MAC_ADDR_SIZE);
 
 			util_get_bvmlie_ext_mld_cap_op_info(ml_ie,
 							    ml_ie_total_len,
@@ -8160,15 +8197,21 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 	he_cap->twt_request = 0;
 	he_cap->twt_responder = 0;
 	switch (session->opmode) {
-	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
+		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, session->vdev_id))
+			break;
+		fallthrough;
+	case QDF_STA_MODE:
 		wlan_twt_get_requestor_cfg(mac->psoc, &twt_requestor);
 		he_cap->twt_request =
 			twt_requestor && twt_get_requestor_flag(mac);
 		he_cap->broadcast_twt = bcast_requestor;
 		break;
-	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
+		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, session->vdev_id))
+			break;
+		fallthrough;
+	case QDF_SAP_MODE:
 		wlan_twt_get_responder_cfg(mac->psoc, &twt_responder);
 		he_cap->twt_responder =
 			twt_responder && twt_get_responder_flag(mac);
@@ -8244,6 +8287,17 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 			he_cap->chan_width_3 = 0;
 		}
 	}
+
+	he_cap->rx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(session->nss);
+	he_cap->tx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(session->nss);
+	*(uint16_t *)he_cap->rx_he_mcs_map_160 |=
+					HE_DISABLE_MCS_OVER_NSS(session->nss);
+	*(uint16_t *)he_cap->tx_he_mcs_map_160 |=
+					HE_DISABLE_MCS_OVER_NSS(session->nss);
+	*(uint16_t *)he_cap->rx_he_mcs_map_80_80 |=
+					HE_DISABLE_MCS_OVER_NSS(session->nss);
+	*(uint16_t *)he_cap->tx_he_mcs_map_80_80 |=
+					HE_DISABLE_MCS_OVER_NSS(session->nss);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -9793,7 +9847,8 @@ QDF_STATUS lim_strip_and_decode_eht_cap(uint8_t *ie, uint16_t ie_len,
 }
 
 void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
-			       tDot11fIEhe_cap dot11f_he_cap, bool is_band_2g)
+			       tDot11fIEhe_cap dot11f_he_cap, bool is_band_2g,
+			       bool is_sta_ie)
 {
 	struct wlan_ie_ehtcaps *ehtcap  = (struct wlan_ie_ehtcaps *)ie;
 	uint32_t ehtcaplen;
@@ -10034,9 +10089,10 @@ void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
 				     ehtcap->eht_phy_cap.phy_cap_bytes, val);
 
 	/* Fill EHT MCS and NSS set field */
-	if ((is_band_2g && !dot11f_he_cap.chan_width_0) ||
-	    (!is_band_2g && !dot11f_he_cap.chan_width_1 &&
-	     !dot11f_he_cap.chan_width_2 && !dot11f_he_cap.chan_width_3)) {
+	if (((is_band_2g && !dot11f_he_cap.chan_width_0) ||
+	     (!is_band_2g && !dot11f_he_cap.chan_width_1 &&
+	      !dot11f_he_cap.chan_width_2 &&
+	      !dot11f_he_cap.chan_width_3))) {
 		val = dot11f_eht_cap.bw_20_rx_max_nss_for_mcs_0_to_7;
 		ehtcap_ie_set(&ehtcap->mcs_nss_map_bytes[idx],
 			      EHTCAP_RX_MCS_NSS_MAP_IDX,
@@ -10046,7 +10102,8 @@ void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
 		ehtcap_ie_set(&ehtcap->mcs_nss_map_bytes[idx],
 			      EHTCAP_TX_MCS_NSS_MAP_IDX,
 			      EHTCAP_TX_MCS_NSS_MAP_BITS, val);
-		idx++;
+		if (is_sta_ie)
+			idx++;
 
 		val = dot11f_eht_cap.bw_20_rx_max_nss_for_mcs_8_and_9;
 		ehtcap_ie_set(&ehtcap->mcs_nss_map_bytes[idx],
@@ -12710,11 +12767,6 @@ populate_dot11f_mlo_caps(struct mac_context *mac_ctx,
 
 	common_info_len += WLAN_ML_BV_CINFO_MLDCAPANDOP_SIZE;
 	mlo_ie->ext_mld_capab_and_op_present = 0;
-	if (target_if_get_fw_btm_multi_ap_support(mac_ctx->psoc)) {
-		mlo_ie->ext_mld_capab_and_op_present = 1;
-		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
-		common_info_len += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
-	}
 
 	mlo_ie->mld_id_present = 0;
 	mlo_ie->mld_capab_and_op_present = 1;
@@ -13905,14 +13957,6 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 						eml_cap.emlsr_trans_delay;
 	}
 
-	if (target_if_get_fw_btm_multi_ap_support(psoc)) {
-		pe_debug("Set ext mld caps");
-		mlo_ie->ext_mld_capab_and_op_present = 1;
-		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P;
-		mlo_ie->common_info_length += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
-		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
-	}
-
 	p_ml_ie = mlo_ie->data;
 	len_remaining = sizeof(mlo_ie->data);
 
@@ -14324,7 +14368,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 			if (eht_cap_ie) {
 				len_consumed = 0;
 				lim_ieee80211_pack_ehtcap(eht_cap_ie, eht_caps,
-							  he_caps, is_2g);
+							  he_caps, is_2g, true);
 				len_consumed = eht_cap_ie[1] + 2;
 
 				qdf_mem_copy(p_sta_prof, eht_cap_ie,
@@ -14458,13 +14502,6 @@ QDF_STATUS populate_dot11f_mlo_ie(struct mac_context *mac_ctx,
 						eml_cap.emlsr_pad_delay;
 		mlo_ie->eml_capabilities_info.emlsr_transition_delay =
 						eml_cap.emlsr_trans_delay;
-	}
-
-	if (target_if_get_fw_btm_multi_ap_support(psoc)) {
-		mlo_ie->ext_mld_capab_and_op_present = 1;
-		presence_bitmap |= WLAN_ML_BV_CTRL_PBM_EXT_MLDCAPANDOP_P;
-		mlo_ie->common_info_length += WLAN_ML_BV_CINFO_EXT_MLDCAPANDOP_SIZE;
-		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
 	}
 
 	p_ml_ie = mlo_ie->data;
@@ -14665,13 +14702,6 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 						eml_cap.emlsr_pad_delay;
 		mlo_ie->eml_capabilities_info.emlsr_transition_delay =
 						eml_cap.emlsr_trans_delay;
-	}
-
-	if (target_if_get_fw_btm_multi_ap_support(psoc)) {
-		mlo_ie->ext_mld_capab_and_op_present = 1;
-		presence_bitmap |= WLAN_ML_RV_CTRL_PBM_EXT_MLDCAPANDOP_P;
-		mlo_ie->common_info_length += WLAN_ML_RV_CINFO_EXT_MLDCAPANDOP_SIZE;
-		mlo_ie->ext_mld_capab_and_op_info.btm_mld_rec_for_multi_ap_supp = 1;
 	}
 
 	p_ml_ie = mlo_ie->data;
@@ -15143,7 +15173,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 			if (eht_cap_ie) {
 				len_consumed = 0;
 				lim_ieee80211_pack_ehtcap(eht_cap_ie, eht_caps,
-							  he_caps, is_2g);
+							  he_caps, is_2g, true);
 				len_consumed = eht_cap_ie[1] + 2;
 
 				qdf_mem_copy(p_sta_prof, eht_cap_ie,

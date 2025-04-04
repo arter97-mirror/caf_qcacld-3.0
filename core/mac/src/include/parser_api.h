@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,20 +48,26 @@
 #define IS_24G_CH(__chNum) ((__chNum > 0) && (__chNum < 15))
 #define IS_5G_CH(__chNum) ((__chNum >= 36) && (__chNum <= 165))
 #define IS_2X2_CHAIN(__chain) ((__chain & 0x3) == 0x3)
-#define DISABLE_NSS2_MCS 0xC
-#define VHT_1x1_MCS9_MAP 0x2
-#define VHT_2x2_MCS9_MAP 0xA
-#define VHT_1x1_MCS8_VAL 0xFFFD
-#define VHT_2x2_MCS8_VAL 0xFFF5
+#define VHT_MCS_0_8 0x1
+#define VHT_MCS_0_9 0x2
+#define VHT_MCS_DISABLE 0x3
 #define VHT_1x1_MCS_MASK 0x3
-#define VHT_2x2_MCS_MASK 0xF
-#define DISABLE_VHT_MCS_9(mcs, nss) \
-	(mcs = (nss > 1) ? VHT_2x2_MCS8_VAL : VHT_1x1_MCS8_VAL)
+#define VHT_NUM_BITS_PER_NSS 0x2
+#define VHT_GET_MCS_FOR_NSS(_mcsmap, _nss) \
+	QDF_GET_BITS((_mcsmap), ((_nss) - 1) * VHT_NUM_BITS_PER_NSS, \
+		     VHT_NUM_BITS_PER_NSS)
+#define VHT_SET_MCS_FOR_NSS(_mcsmap, _mcs, _nss) \
+	QDF_SET_BITS((_mcsmap), ((_nss) - 1) * VHT_NUM_BITS_PER_NSS, \
+		     VHT_NUM_BITS_PER_NSS, (_mcs))
+#define VHT_CLEAR_MCS_FOR_NSS(_mcsmap, _nss) \
+	VHT_SET_MCS_FOR_NSS((_mcsmap), VHT_MCS_DISABLE, (_nss))
+#define VHT_IS_NSS_DISABLED(_mcsmap, _nss) \
+	(VHT_GET_MCS_FOR_NSS((_mcsmap), (_nss)) == VHT_MCS_DISABLE)
+#define VHT_DISABLE_ALL_MCS_NSS 0xFFFF
+#define VHT_DISABLE_MCS_OVER_NSS(_nss) \
+	(VHT_DISABLE_ALL_MCS_NSS ^ (BIT((_nss) * VHT_NUM_BITS_PER_NSS) - 1))
 
-#define NSS_1x1_MODE 1
-#define NSS_2x2_MODE 2
-#define NSS_3x3_MODE 3
-#define NSS_4x4_MODE 4
+
 #define MBO_IE_ASSOC_DISALLOWED_SUBATTR_ID 0x04
 
 #define SIZE_OF_FIXED_PARAM 12
@@ -1669,6 +1675,7 @@ QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
  * @dot11f_eht_cap: dot11f EHT capabilities IE structure
  * @dot11f_he_cap: dot11f HE capabilities IE structure
  * @is_band_2g: Flag to indicate whether operating band is 2g or not
+ * @is_sta_ie: Is IE for (non-AP) STA mode
  *
  * This API is used to encode EHT capabilities IE which is of variable in
  * length depending on the HE capabilities IE content.
@@ -1676,7 +1683,8 @@ QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
  * Return: Void
  */
 void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
-			       tDot11fIEhe_cap dot11f_he_cap, bool is_band_2g);
+			       tDot11fIEhe_cap dot11f_he_cap, bool is_band_2g,
+			       bool is_sta_ie);
 
 /**
  * lim_strip_and_decode_eht_cap() - API to decode EHT capabilities IE
@@ -1787,7 +1795,7 @@ QDF_STATUS populate_dot11f_bw_ind_element(struct mac_context *mac_ctx,
 static inline void lim_ieee80211_pack_ehtcap(uint8_t *ie,
 					     tDot11fIEeht_cap dot11f_eht_cap,
 					     tDot11fIEhe_cap dot11f_he_cap,
-					     bool is_band_2g)
+					     bool is_band_2g, bool is_sta_ie)
 {
 }
 

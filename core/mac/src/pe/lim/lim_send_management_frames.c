@@ -429,7 +429,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		}
 		is_band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(pesession->curr_op_freq);
 		lim_ieee80211_pack_ehtcap(eht_cap_ie, pr->eht_cap, pr->he_cap,
-					  is_band_2g);
+					  is_band_2g, true);
 		eht_cap_ie_len = eht_cap_ie[TAG_LEN_POS] + MIN_IE_LEN;
 		pr->eht_cap.present = false;
 	}
@@ -1223,7 +1223,9 @@ void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
 
 	tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
 
-	mgmt_txrx_frame_hex_dump(frame_ptr, num_bytes, true);
+	pe_debug("vdev %d seq num %d to " QDF_MAC_ADDR_FMT " len %d",
+		 vdev_id, mac_ctx->mgmtSeqNum,
+		 QDF_MAC_ADDR_REF(mac_hdr->bssId), (int)num_bytes);
 
 	qdf_status = wma_tx_frame(mac, pkt_ptr, (uint16_t)num_bytes,
 				  TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
@@ -1387,8 +1389,9 @@ pack_frame:
 	 * the timer will be started on receivng tx completion from FW.
 	 */
 	tx_timer_deactivate(&mac_ctx->lim.lim_timers.channel_vacate_timer);
-
-	mgmt_txrx_frame_hex_dump(frame_ptr, num_bytes, true);
+	pe_debug("vdev %d seq num %d to " QDF_MAC_ADDR_FMT " len %d",
+		 session->vdev_id, mac_ctx->mgmtSeqNum,
+		 QDF_MAC_ADDR_REF(mac_hdr->bssId), (int)num_bytes);
 
 	qdf_status = wma_tx_frameWithTxComplete(mac_ctx, pkt_ptr,
 						(uint16_t)num_bytes,
@@ -2345,6 +2348,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			is_vht = true;
 		} else if (sta->mlmStaContext.force_1x1 &&
 			   frm.HTCaps.present) {
+			uint8_t idx;
+
 			/*
 			 * WAR: In P2P GO mode, if the P2P client device
 			 * is only HT capable and not VHT capable, but the P2P
@@ -2357,8 +2362,11 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			 * peer device is only HT capable and will not
 			 * understand OMN IE.
 			 */
-			frm.HTInfo.basicMCSSet[1] = 0;
-			frm.HTCaps.supportedMCSSet[1] = 0;
+			for (idx = NSS_2x2_MODE; idx <= WLAN_MAX_VDEV_NSS;
+			     idx++) {
+				frm.HTInfo.basicMCSSet[idx - 1] = 0;
+				frm.HTCaps.supportedMCSSet[idx - 1] = 0;
+			}
 		}
 
 		if (pe_session->vhtCapability &&
@@ -2560,7 +2568,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		is_band_2g =
 			WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq);
 		lim_ieee80211_pack_ehtcap(eht_cap_ie, frm.eht_cap, frm.he_cap,
-					  is_band_2g);
+					  is_band_2g, false);
 
 		eht_cap_ie_len = eht_cap_ie[TAG_LEN_POS] + MIN_IE_LEN;
 
@@ -3844,7 +3852,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq);
 
 		lim_ieee80211_pack_ehtcap(eht_cap_ie, frm->eht_cap, frm->he_cap,
-					  is_band_2g);
+					  is_band_2g, true);
 		eht_cap_ie_len = eht_cap_ie[TAG_LEN_POS] + MIN_IE_LEN;
 
 		/* Mark EHT capability as false as this the data is already
@@ -6605,11 +6613,13 @@ returnAfterError:
  * @num_rpt: Number of Report element
  * @band: Tx packet band info
  * @vdev_id: vdev id
+ * @tx_status: TX status of the transmitted frame
  */
 static void
 lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 				 enum wlan_diag_wifi_band band,
-				 uint8_t vdev_id)
+				 uint8_t vdev_id,
+				 enum qdf_dp_tx_rx_status tx_status)
 {
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_bcn_rpt);
 
@@ -6619,10 +6629,13 @@ lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 	wlan_diag_event.diag_cmn.timestamp_us = qdf_get_time_of_the_day_us();
 	wlan_diag_event.diag_cmn.ktime_us =  qdf_ktime_to_us(qdf_ktime_get());
 
-	wlan_diag_event.version = DIAG_BCN_RPT_VERSION_2;
+	wlan_diag_event.version = DIAG_BCN_RPT_VERSION_3;
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_BCN_RPT_RESP_EVENT;
 	wlan_diag_event.meas_token = token;
 	wlan_diag_event.num_rpt = num_rpt;
+	wlan_diag_event.is_tx = true;
+	wlan_diag_event.tx_fail_reason = tx_status;
+	wlan_diag_event.tx_status = wlan_get_diag_tx_status(tx_status);
 
 	wlan_diag_event.band = band;
 
@@ -6632,10 +6645,14 @@ lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 static void
 lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 				 enum wlan_diag_wifi_band band,
-				 uint8_t vdev_id)
+				 uint8_t vdev_id,
+				 enum qdf_dp_tx_rx_status tx_status)
 {
 }
 #endif
+
+#define MIN_RRM_SIZE sizeof(tDot11fRadioMeasurementReport) - \
+		    (7 * sizeof(tDot11fIEMeasurementReport))
 
 static QDF_STATUS
 lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
@@ -6650,6 +6667,7 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 	uint8_t ff_offset;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	enum wlan_diag_wifi_band band;
+	enum qdf_dp_tx_rx_status qdf_tx_complete;
 
 	if (!buf) {
 		pe_err("Invalid nbuf buffer");
@@ -6669,13 +6687,20 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 		goto out;
 	}
 
+	if (tx_status == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
+		qdf_tx_complete = QDF_TX_RX_STATUS_OK;
+	else if (tx_status  == WMI_MGMT_TX_COMP_TYPE_DISCARD)
+		qdf_tx_complete = QDF_TX_RX_STATUS_FW_DISCARD;
+	else
+		qdf_tx_complete = QDF_TX_RX_STATUS_NO_ACK;
+
 	frame_ptr = qdf_nbuf_data(buf);
 	mac_hdr = (struct wlan_frame_hdr *)frame_ptr;
 	ff_offset = sizeof(*mac_hdr);
 	if (wlan_crypto_is_data_protected(frame_ptr))
 		ff_offset += IEEE80211_CCMP_MICLEN;
 
-	if (qdf_nbuf_len(buf) < (ff_offset + sizeof(*frm))) {
+	if (qdf_nbuf_len(buf) < (ff_offset + MIN_RRM_SIZE)) {
 		status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
@@ -6701,7 +6726,8 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 		lim_beacon_report_response_event(frm->DialogToken.token,
 						 frm->num_MeasurementReport,
 						 band,
-						 mgmt_params->vdev_id);
+						 mgmt_params->vdev_id,
+						 qdf_tx_complete);
 out:
 	qdf_nbuf_free(buf);
 	qdf_mem_free(frm);
@@ -7652,6 +7678,7 @@ lim_send_epcs_action_rsp_frame(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	qdf_mem_zero(frame_ptr, num_bytes);
 	lim_populate_mac_header(mac_ctx, frame_ptr, WLAN_FC0_TYPE_MGMT,
 				SIR_MAC_MGMT_ACTION, peer_mac,
 				session->self_mac_addr);
@@ -7764,6 +7791,7 @@ lim_send_epcs_action_req_frame(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	qdf_mem_zero(frame_ptr, num_bytes);
 	lim_populate_mac_header(mac_ctx, frame_ptr, WLAN_FC0_TYPE_MGMT,
 				SIR_MAC_MGMT_ACTION, peer_mac,
 				session->self_mac_addr);
@@ -8576,6 +8604,11 @@ lim_send_link_recfg_action_req_frame(uint8_t vdev_id,
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 session->peSessionId, mgmt_hdr->fc.subType));
+	pe_debug("Link Reconfig tx dump:");
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, frame_ptr,
+			   num_bytes);
+	lim_store_link_recfg_req_frame(mac_ctx, frame_ptr, num_bytes,
+				       vdev_id);
 	qdf_status = wma_tx_frameWithTxComplete(
 			mac_ctx, pkt_ptr, (uint16_t)num_bytes,
 			 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
@@ -8586,17 +8619,10 @@ lim_send_link_recfg_action_req_frame(uint8_t vdev_id,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			 session->peSessionId, qdf_status));
 
-	pe_debug("Link Reconfig tx dump:");
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG, frame_ptr,
-			   num_bytes);
-
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		pe_err("wma_tx_frame FAILED! Status [%d]", qdf_status);
 		return QDF_STATUS_E_FAILURE;
 	} else {
-		lim_store_link_recfg_req_frame(mac_ctx,
-					       frame_ptr, num_bytes,
-					       vdev_id);
 		return QDF_STATUS_SUCCESS;
 	}
 

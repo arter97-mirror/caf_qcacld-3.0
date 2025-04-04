@@ -635,28 +635,9 @@ typedef struct sSapDfsNolInfo {
 
 typedef struct sSapDfsInfo {
 	qdf_mc_timer_t sap_dfs_cac_timer;
-	/*
-	 * New channel frequency to move to when a  Radar is
-	 * detected on current Channel
-	 */
-	uint32_t target_chan_freq;
 	uint8_t ignore_cac;
-	uint32_t user_provided_target_chan_freq;
 
-	/*
-	 * Requests for Channel Switch Announcement IE
-	 * generation and transmission
-	 */
-	uint8_t csaIERequired;
 	uint8_t is_dfs_cac_timer_running;
-	/*
-	 * New channel width and new channel bonding mode
-	 * will only be updated via channel fallback mechanism
-	 */
-	enum phy_ch_width orig_chanWidth;
-	enum phy_ch_width new_chanWidth;
-	struct ch_params new_ch_params;
-
 	/*
 	 * sap_operating_channel_location holds SAP indoor,
 	 * outdoor location information. Currently, if this
@@ -678,17 +659,11 @@ typedef struct sSapDfsInfo {
 	 * operating DFS channel.
 	 */
 	uint8_t sap_operating_chan_preferred_location;
-
 	/*
 	 * Flag to indicate if DFS test mode is enabled and
 	 * channel switch is disabled.
 	 */
 	uint8_t disable_dfs_ch_switch;
-	uint16_t tx_leakage_threshold;
-	/* beacon count before channel switch */
-	uint8_t sap_ch_switch_beacon_cnt;
-	uint8_t sap_ch_switch_mode;
-	uint16_t reduced_beacon_interval;
 } tSapDfsInfo;
 
 /* MAX number of CAC channels to be recorded */
@@ -1283,7 +1258,8 @@ QDF_STATUS wlansap_set_dfs_preferred_channel_location(mac_handle_t mac_handle);
  * Return: The QDF_STATUS code associated with performing the operation
  */
 QDF_STATUS wlansap_set_dfs_target_chnl(mac_handle_t mac_handle,
-				       uint32_t target_chan_freq);
+				       uint32_t target_chan_freq,
+				       uint8_t vdev_id);
 
 /**
  * wlan_sap_get_phymode() - Returns sap phymode.

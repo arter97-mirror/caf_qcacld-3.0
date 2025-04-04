@@ -48,6 +48,11 @@
 
 #define NUM_TX_RX_HISTOGRAM_MASK (NUM_TX_RX_HISTOGRAM - 1)
 
+#ifdef WLAN_DP_FEATURE_STC
+#define WLAN_DP_POLICY_SPM_TPUT_THRESH TPUT_LEVEL_HIGH
+#define WLAN_DP_POLICY_SPM_DISABLE_BIT 1
+#endif
+
 #if defined(WLAN_FEATURE_DP_BUS_BANDWIDTH) && defined(FEATURE_RUNTIME_PM)
 /**
  * struct dp_rtpm_tput_policy_context - RTPM throughput policy context
@@ -130,6 +135,7 @@ struct dp_rtpm_tput_policy_context {
  * @is_flow_balance_enabled: indicates whether flow balance is enabled or not
  * @stc_enable: indicates whether STC feature is enabled or not
  * @stc_rtpm_control: Indicates whether STC should control RTPM suspend
+ * @dp_irq_affinity_mask: DP IRQ affinity mask (0 for disable)
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -216,6 +222,7 @@ struct wlan_dp_psoc_cfg {
 	bool stc_enable;
 	bool stc_rtpm_control;
 #endif
+	uint32_t dp_irq_affinity_mask;
 };
 
 /**
@@ -925,6 +932,8 @@ struct wlan_dp_stc;
  * @dp_stc: STC context
  * @spm_ctx: Servicy policy manager context
  * @gl_flow_recs: Global Tx flow table for all dp_interfaces
+ * @o_flow_rec_freelist: Flow records freelist
+ * @flow_list_lock: Flow list operation lock
  * @rsrc_mgr_ctx: DP resource manager context reference
  * @monitor_flag: Monitor interface flags configured when add Mon interface
  */
@@ -1046,6 +1055,8 @@ struct wlan_dp_psoc_context {
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 	struct wlan_dp_spm_context *spm_ctx;
 	struct wlan_dp_spm_flow_info *gl_flow_recs;
+	qdf_list_t o_flow_rec_freelist;
+	qdf_spinlock_t flow_list_lock;
 #endif
 	struct wlan_dp_resource_mgr_ctx *rsrc_mgr_ctx;
 	uint32_t monitor_flag;

@@ -423,14 +423,12 @@ wlan_dp_stc_find_ul_flow(struct wlan_dp_stc *dp_stc, uint16_t rx_flow_id,
 			 uint64_t *tx_flow_metadata)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
-	uint16_t max_tx_flow = WLAN_DP_INTF_MAX *
-				WLAN_DP_SPM_FLOW_REC_TBL_MAX;
 	uint16_t flow_id;
 
 	if (!dp_ctx->gl_flow_recs)
 		return QDF_STATUS_E_INVAL;
 
-	for (flow_id = 0; flow_id < max_tx_flow; flow_id++) {
+	for (flow_id = 0; flow_id < WLAN_DP_SPM_FLOW_REC_TBL_MAX; flow_id++) {
 		struct wlan_dp_spm_flow_info *flow;
 
 		flow = wlan_dp_get_tx_flow_hdl(dp_ctx, flow_id);

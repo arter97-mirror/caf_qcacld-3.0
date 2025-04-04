@@ -497,6 +497,10 @@ void
 lim_process_ml_reconfig(struct mac_context *mac_ctx,
 			struct pe_session *session,
 			uint8_t *rx_pkt_info);
+
+bool lim_is_same_mld_addr(struct mac_context *mac_ctx,
+			  struct pe_session *session,
+			  struct sSirProbeRespBeacon *bcn_ptr);
 #else
 static inline
 void lim_process_beacon_mlo(struct mac_context *mac_ctx,
@@ -517,6 +521,14 @@ lim_process_ml_reconfig(struct mac_context *mac_ctx,
 			struct pe_session *session,
 			uint8_t *rx_pkt_info)
 {
+}
+
+static inline
+bool lim_is_same_mld_addr(struct mac_context *mac_ctx,
+			  struct pe_session *session,
+			  struct sSirProbeRespBeacon *bcn_ptr)
+{
+	return true;
 }
 #endif
 

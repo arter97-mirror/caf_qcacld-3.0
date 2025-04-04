@@ -1378,17 +1378,6 @@ void lim_add_bss_he_cfg(struct bss_params *add_bss, struct pe_session *session);
 void lim_copy_bss_he_cap(struct pe_session *session);
 
 /**
- * lim_update_he_caps_mcs() - Update he caps MCS
- * @mac: MAC context
- * @session: pointer to PE session
- *
- * Return: None
- */
-void lim_update_he_caps_mcs(struct mac_context *mac,
-			    struct pe_session *session);
-
-
-/**
  * lim_update_he_6gop_assoc_resp() - Update HE 6GHz op info to BSS params
  * @add_bss: pointer to add bss params
  * @he_op: Pointer to HE operation info IE
@@ -1784,11 +1773,6 @@ void lim_copy_bss_he_cap(struct pe_session *session)
 {
 }
 
-static inline
-void lim_update_he_caps_mcs(struct mac_context *mac, struct pe_session *session)
-{
-}
-
 static inline void lim_copy_join_req_he_cap(struct pe_session *session)
 {
 }
@@ -1965,6 +1949,7 @@ QDF_STATUS lim_strip_eht_cap_ie(struct mac_context *mac_ctx,
  * @peer_eht_caps: pointer to peer EHT capabilities
  * @session_entry: pe session entry
  * @ch_width: channel width of the association
+ * @is_2g: Is 2g band params
  *
  * Populates EHT mcs rate set based on peer and self capabilities
  *
@@ -1974,7 +1959,8 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
-				    enum phy_ch_width ch_width);
+				    enum phy_ch_width ch_width,
+				    bool is_2g);
 
 /**
  * lim_update_eht_bw_cap_mcs(): Update eht mcs map per bandwidth
@@ -2343,7 +2329,8 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
-				    enum phy_ch_width ch_width)
+				    enum phy_ch_width ch_width,
+				    bool is_2g)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -2555,6 +2542,21 @@ void lim_extract_msd_caps(struct mac_context *mac_ctx,
 			  struct pe_session *session,
 			  struct bss_params *add_bss,
 			  tpSirAssocRsp assoc_rsp);
+
+/**
+ * lim_extract_ext_mld_caps() - Extract extended AP MLD capabilities and assign
+ * the same caps to ML links
+ * @mac_ctx: Global MAC context
+ * @session: pointer to PE session
+ * @add_bss: pointer to ADD BSS params
+ * @assoc_rsp: pointer to assoc response
+ *
+ * Return: None
+ */
+void lim_extract_ext_mld_caps(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      struct bss_params *add_bss,
+			      tpSirAssocRsp assoc_rsp);
 #else
 static inline void
 lim_extract_per_link_id(struct pe_session *session,
@@ -2585,6 +2587,13 @@ lim_extract_msd_caps(struct mac_context *mac_ctx,
 		     tpSirAssocRsp assoc_rsp)
 {
 }
+
+static inline
+void lim_extract_ext_mld_caps(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      struct bss_params *add_bss,
+			      tpSirAssocRsp assoc_rsp)
+{}
 #endif /* WLAN_FEATURE_11BE_MLO */
 
 #if defined(CONFIG_BAND_6GHZ) && defined(WLAN_FEATURE_11AX)

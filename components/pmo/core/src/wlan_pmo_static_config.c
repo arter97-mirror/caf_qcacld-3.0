@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -72,26 +72,10 @@ void pmo_register_wow_wakeup_events(struct wlan_objmgr_vdev *vdev)
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_OCB_MODE:
 	case QDF_MONITOR_MODE:
-		pmo_set_sta_wow_bitmask(&psoc_ctx->psoc_cfg, event_bitmap,
-					PMO_WOW_MAX_EVENT_BM_LEN);
-		if (vdev_ctx->magic_ptrn_enable)
-			pmo_set_wow_event_bitmap(WOW_MAGIC_PKT_RECVD_EVENT,
-						 PMO_WOW_MAX_EVENT_BM_LEN,
-						 event_bitmap);
-		break;
-
 	case QDF_IBSS_MODE:
 		pmo_set_sta_wow_bitmask(&psoc_ctx->psoc_cfg, event_bitmap,
 					PMO_WOW_MAX_EVENT_BM_LEN);
-		if (vdev_ctx->magic_ptrn_enable)
-			pmo_set_wow_event_bitmap(WOW_MAGIC_PKT_RECVD_EVENT,
-						 PMO_WOW_MAX_EVENT_BM_LEN,
-						 event_bitmap);
-		pmo_set_wow_event_bitmap(WOW_BEACON_EVENT,
-					 PMO_WOW_MAX_EVENT_BM_LEN,
-					 event_bitmap);
 		break;
-
 	case QDF_P2P_GO_MODE:
 	case QDF_SAP_MODE:
 		pmo_set_sap_wow_bitmask(event_bitmap, PMO_WOW_MAX_EVENT_BM_LEN);

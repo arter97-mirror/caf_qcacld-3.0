@@ -566,6 +566,30 @@ void dp_rtpm_tput_policy_deinit(struct wlan_objmgr_psoc *psoc)
 	qdf_runtime_lock_deinit(&dp_ctx->rtpm_tput_policy_ctx.rtpm_lock);
 }
 
+#ifdef WLAN_DP_FEATURE_STC
+static inline
+void dp_rtpm_tput_spm_policy_update(struct dp_rtpm_tput_policy_context *ctx,
+				    enum tput_level tput_level)
+{
+	if ((tput_level >= WLAN_DP_POLICY_SPM_TPUT_THRESH) &&
+	    !qdf_atomic_test_bit(WLAN_DP_POLICY_SPM_DISABLE_BIT,
+				&ctx->high_tput_vote))
+		qdf_atomic_set_bit(WLAN_DP_POLICY_SPM_DISABLE_BIT,
+				   &ctx->high_tput_vote);
+	else if ((tput_level < WLAN_DP_POLICY_SPM_TPUT_THRESH) &&
+		 qdf_atomic_test_bit(WLAN_DP_POLICY_SPM_DISABLE_BIT,
+				     &ctx->high_tput_vote))
+		qdf_atomic_clear_bit(WLAN_DP_POLICY_SPM_DISABLE_BIT,
+				     &ctx->high_tput_vote);
+}
+#else
+static inline
+void dp_rtpm_tput_spm_policy_update(struct dp_rtpm_tput_policy_context *ctx,
+				    enum tput_level tput_level)
+{
+}
+#endif
+
 void dp_rtpm_tput_policy_apply(struct wlan_dp_psoc_context *dp_ctx,
 			       enum tput_level tput_level)
 {
@@ -586,6 +610,8 @@ void dp_rtpm_tput_policy_apply(struct wlan_dp_psoc_context *dp_ctx,
 		cdp_set_rtpm_tput_policy_requirement(soc, false);
 		qdf_runtime_pm_allow_suspend(&ctx->rtpm_lock);
 	}
+
+	dp_rtpm_tput_spm_policy_update(ctx, tput_level);
 }
 
 unsigned long dp_rtpm_tput_policy_get_vote(struct wlan_dp_psoc_context *dp_ctx)
@@ -1444,6 +1470,33 @@ bool dp_sap_p2p_update_mid_high_tput(struct wlan_dp_psoc_context *dp_ctx,
 	return false;
 }
 
+static inline void dp_set_tx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
+					  enum tput_level tput_level,
+					  enum tput_level prev_tput_level)
+{
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	void *hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
+	struct device *dev = dp_ctx->qdf_dev->dev;
+	uint32_t cpumask = 0;
+
+	if (tput_level >= TPUT_LEVEL_VERY_HIGH &&
+	    prev_tput_level < TPUT_LEVEL_VERY_HIGH) {
+		if (qdf_unlikely(dp_ctx->dp_cfg.dp_irq_affinity_mask))
+			cpumask = dp_ctx->dp_cfg.dp_irq_affinity_mask;
+		else
+			pld_get_cpumask_for_wlan_tx_comp_interrupts(dev,
+								    &cpumask);
+		hif_set_grp_intr_affinity(hif_ctx,
+					  cdp_get_tx_rings_grp_bitmap(soc),
+					  cpumask, true);
+	} else if (tput_level < TPUT_LEVEL_VERY_HIGH &&
+		   prev_tput_level >= TPUT_LEVEL_VERY_HIGH) {
+		hif_set_grp_intr_affinity(hif_ctx,
+					  cdp_get_tx_rings_grp_bitmap(soc),
+					  cpumask, false);
+	}
+}
+
 /**
  * dp_pld_request_bus_bandwidth() - Function to control bus bandwidth
  * @dp_ctx: handle to DP context
@@ -1484,7 +1537,6 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	static enum tput_level prev_tput_level = TPUT_LEVEL_NONE;
 	struct wlan_dp_psoc_callbacks *dp_ops = &dp_ctx->dp_ops;
 	hdd_cb_handle ctx = dp_ops->callback_ctx;
-	uint32_t cpumask = 0;
 
 	if (!soc)
 		return;
@@ -1549,20 +1601,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 
 	if (dp_ctx->cur_vote_level != next_vote_level) {
 		/* Set affinity for tx completion grp interrupts */
-		if (tput_level >= TPUT_LEVEL_VERY_HIGH &&
-		    prev_tput_level < TPUT_LEVEL_VERY_HIGH) {
-			pld_get_cpumask_for_wlan_tx_comp_interrupts(dp_ctx->qdf_dev->dev,
-								    &cpumask);
-			hif_set_grp_intr_affinity(hif_ctx,
-				cdp_get_tx_rings_grp_bitmap(soc),
-				cpumask, true);
-		} else if (tput_level < TPUT_LEVEL_VERY_HIGH &&
-			 prev_tput_level >= TPUT_LEVEL_VERY_HIGH) {
-			hif_set_grp_intr_affinity(hif_ctx,
-				cdp_get_tx_rings_grp_bitmap(soc),
-				cpumask, false);
-		}
-
+		dp_set_tx_irq_affinity(dp_ctx, tput_level, prev_tput_level);
 		prev_tput_level = tput_level;
 		dp_ctx->cur_vote_level = next_vote_level;
 		vote_level_change = true;

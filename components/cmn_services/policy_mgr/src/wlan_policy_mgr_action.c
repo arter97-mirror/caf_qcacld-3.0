@@ -193,16 +193,19 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/*
-	 * if HW is not capable of doing 2x2 or ini config disabled 2x2, don't
-	 * allow to request FW for 2x2
+	 * if HW is not capable of doing MIMO or ini config disabled MIMO, don't
+	 * allow to request FW for MIMO
 	 */
-	if ((HW_MODE_SS_2x2 == mac0_ss) && (!pm_ctx->user_cfg.enable2x2)) {
-		policy_mgr_debug("2x2 is not allowed downgrading to 1x1 for mac0");
-		mac0_ss = HW_MODE_SS_1x1;
-	}
-	if ((HW_MODE_SS_2x2 == mac1_ss) && (!pm_ctx->user_cfg.enable2x2)) {
-		policy_mgr_debug("2x2 is not allowed downgrading to 1x1 for mac1");
-		mac1_ss = HW_MODE_SS_1x1;
+	if (!pm_ctx->user_cfg.enable_mimo) {
+		if (HW_MODE_SS_2x2 >= mac0_ss) {
+			policy_mgr_debug("MIMO is not allowed downgrading to SISO for mac0");
+			mac0_ss = HW_MODE_SS_1x1;
+		}
+
+		if (HW_MODE_SS_2x2 >= mac1_ss) {
+			policy_mgr_debug("MIMO is not allowed downgrading to SISO for mac1");
+			mac1_ss = HW_MODE_SS_1x1;
+		}
 	}
 
 	hw_mode_index = policy_mgr_get_hw_mode_idx_from_dbs_hw_list(psoc,
@@ -2420,9 +2423,10 @@ policy_mgr_nan_sap_post_enable_conc_check(struct wlan_objmgr_psoc *psoc)
 				psoc, &list_sta[sta_cnt],
 				&vdev_id[sta_cnt], PM_STA_MODE);
 
-	policy_mgr_get_ml_and_non_ml_sta_count(psoc, &num_ml_sta, ml_sta_idx,
-					       &num_non_ml_sta, non_ml_sta_idx,
-					       freq_list, vdev_id_list);
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sta, ml_sta_idx,
+						&num_non_ml_sta, non_ml_sta_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
 
 	if (!sap_info)
 		goto end;
@@ -3897,6 +3901,17 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 		policymgr_nofl_debug("sap conc result con freq %d bw %d org freq %d bw %d",
 				     ch_freq, ch_params->ch_width, sap_ch_freq,
 				     old_ch_width);
+	}
+
+	if (*con_ch_freq != 0 &&
+	    con_mode == QDF_SAP_MODE &&
+	    !policy_mgr_is_multi_sap_allowed_on_same_band(
+					pm_ctx->pdev,
+					PM_SAP_MODE, *con_ch_freq,
+					sap_vdev_id)) {
+		policymgr_nofl_debug("Terminating multi sap on same band, con_ch_freq %d sap_ch_freq %d",
+				     ch_freq, sap_ch_freq);
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (*con_ch_freq &&

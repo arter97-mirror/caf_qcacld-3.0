@@ -31,6 +31,7 @@
 #if defined(FEATURE_DENYLIST_MGR) && defined(WLAN_FEATURE_11BE_MLO)
 #include "wlan_dlm_api.h"
 #endif
+#include "wlan_connectivity_logging.h"
 
 #define WMI_MAC_TO_PDEV_MAP(x) ((x) + (1))
 #define WMI_PDEV_TO_MAC_MAP(x) ((x) - (1))
@@ -1966,22 +1967,33 @@ wmi_get_converted_roam_eapol_subtype(
 	return 0;
 }
 
-static enum qdf_dp_tx_rx_status
-wmi_get_converted_tx_status(
-		WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS roam_tx_status)
+static enum wlan_diag_tx_rx_status
+wmi_get_diag_tx_status(WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS tx_status)
 {
-	switch (roam_tx_status) {
+	switch (tx_status) {
 	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK:
-		return QDF_TX_RX_STATUS_OK;
+		return WLAN_DIAG_TX_RX_STATUS_OK;
 	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK:
-		return QDF_TX_RX_STATUS_NO_ACK;
+		return WLAN_DIAG_TX_RX_STATUS_NO_ACK;
 	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FAIL:
-		return QDF_TX_RX_STATUS_DROP;
+		return WLAN_DIAG_TX_RX_STATUS_DROP;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FILTERED:
+		return WLAN_DIAG_TX_RX_TX_FILTERED;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TXOP_ABORT:
+		return WLAN_DIAG_TX_RX_TXOP_ABORT;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_TID_DEL:
+		return WLAN_DIAG_TX_RX_TX_TID_DEL;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_SW_ABORT:
+		return WLAN_DIAG_TX_RX_SW_ABORT;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MIG_DROP:
+		return WLAN_DIAG_TX_RX_TX_MIG_DROP;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MLO_TID_MIG:
+		return WLAN_DIAG_TX_RX_MLO_TID_MIG;
 	default:
 		break;
 	}
 
-	return QDF_TX_RX_STATUS_INVALID;
+	return WLAN_DIAG_TX_RX_STATUS_INVALID;
 }
 
 #define WLAN_FC0_SUBTYPE_SHIFT              4
@@ -2070,7 +2082,7 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		    dst_buf->subtype == MGMT_SUBTYPE_ASSOC_REQ ||
 		    dst_buf->subtype == MGMT_SUBTYPE_REASSOC_REQ ||
 		    dst_buf->type == ROAM_FRAME_INFO_FRAME_TYPE_EXT) {
-			dst_buf->tx_status = wmi_get_converted_tx_status(
+			dst_buf->tx_status = wmi_get_diag_tx_status(
 							src_data->status_code);
 			dst_buf->status_code = 0;
 		}

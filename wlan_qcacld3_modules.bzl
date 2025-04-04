@@ -55,6 +55,7 @@ _chipset_hw_map = {
     "wcn7750": "BERYLLIUM",
     "qca6490": "LITHIUM",
     "wcn6450": "RHINE",
+    "fig": "BORON",
 }
 
 _chipset_header_map = {
@@ -65,6 +66,10 @@ _chipset_header_map = {
     "peach": [
         "api/hw/peach/v1",
         "cmn/hal/wifi3.0/peach",
+    ],
+    "fig": [
+	"api/hw/fig/v1",
+	"cmn/hal/wifi3.0/fig",
     ],
     "kiwi-v2": [
         "api/hw/kiwi/v2",
@@ -89,6 +94,10 @@ _chipset_header_map = {
 }
 
 _hw_header_map = {
+    "BORON": [
+	"cmn/hal/wifi3.0/be",
+	"cmn/hal/wifi3.0/bn",
+    ],
     "BERYLLIUM": [
         "cmn/hal/wifi3.0/be",
     ],
@@ -116,6 +125,7 @@ _fixed_ipaths = [
     "cmn/dp/inc",
     "cmn/dp/wifi3.0",
     "cmn/dp/wifi3.0/be",
+    "cmn/dp/wifi3.0/bn",
     "cmn/dp/wifi3.0/monitor",
     "cmn/dp/wifi3.0/monitor/1.0",
     "cmn/dp/wifi3.0/monitor/2.0",
@@ -765,6 +775,11 @@ _conditional_srcs = {
     "CONFIG_INCLUDE_HAL_PEACH": {
         True: [
             "cmn/hal/wifi3.0/peach/hal_peach.c",
+        ],
+    },
+    "CONFIG_INCLUDE_HAL_FIG": {
+        True: [
+            "cmn/hal/wifi3.0/fig/hal_fig.c",
         ],
     },
     "CONFIG_QCA6490_HEADERS_DEF": {
@@ -2377,6 +2392,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "pattern": "IEEE80211_CHANCTX_CHANGE_PUNCTURING",
             "file": "include/net/mac80211.h",
             "flag": "CFG80211_RU_PUNC_CHANDEF",
+        },
+        {
+            "pattern": "Indicates whether the MLO reconfiguration request is initiated",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_SETUP_LINK_RECONFIG_SUPPORT",
         },
     ]
 

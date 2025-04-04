@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -367,7 +367,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	QDF_STATUS status;
 	int ret = 0;
 	struct hdd_context *hdd_ctx;
-	bool bval = false;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter_dev(dev);
@@ -510,12 +510,13 @@ static __iw_softap_setparam(struct net_device *dev,
 		hdd_debug("MC Target rate %d", set_value);
 		qdf_copy_macaddr(&rate_update.bssid,
 				 &adapter->mac_addr);
-		status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+		status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
+						    &enable_mimo);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("unable to get vht_enable2x2");
 			ret = -1;
 		}
-		rate_update.nss = (bval == 0) ? 0 : 1;
+		rate_update.nss = enable_mimo ? 1 : 0;
 
 		rate_update.dev_mode = adapter->device_mode;
 		rate_update.mcastDataRate24GHz = set_value;
@@ -863,8 +864,10 @@ static __iw_softap_setparam(struct net_device *dev,
 			return -EINVAL;
 
 		ret = wlansap_set_dfs_target_chnl(mac_handle,
-						  wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
-									       set_value));
+						  wlan_reg_legacy_chan_to_freq(
+							hdd_ctx->pdev,
+							set_value),
+						  link_info->vdev_id);
 		break;
 	}
 
@@ -1529,7 +1532,8 @@ static __iw_softap_getchannel(struct net_device *dev,
 
 	*value = 0;
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags))
+	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+				adapter->deflink->link_flags))
 		*value = wlan_reg_freq_to_chan(
 				hdd_ctx->pdev,
 				ap_ctx->operating_chan_freq);
@@ -2181,7 +2185,8 @@ __iw_softap_stopbss(struct net_device *dev,
 	if (0 != ret)
 		return ret;
 
-	if (test_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags)) {
+	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+				adapter->deflink->link_flags)) {
 		struct hdd_hostapd_state *hostapd_state =
 			WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
 
@@ -2198,7 +2203,8 @@ __iw_softap_stopbss(struct net_device *dev,
 				QDF_ASSERT(0);
 			}
 		}
-		clear_bit(SOFTAP_BSS_STARTED, &adapter->deflink->link_flags);
+		qdf_atomic_clear_bit(SOFTAP_BSS_STARTED,
+				     adapter->deflink->link_flags);
 		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc,
 					     adapter->device_mode,
 					     adapter->deflink->vdev_id);

@@ -712,8 +712,8 @@ wlan_hdd_get_mlo_links_count(struct hdd_adapter *adapter, uint32_t *count)
 			}
 		} else if (link_info->adapter->device_mode == QDF_SAP_MODE ||
 			   link_info->adapter->device_mode == QDF_P2P_GO_MODE) {
-			if (test_bit(SOFTAP_BSS_STARTED,
-				     &link_info->link_flags)) {
+			if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+						link_info->link_flags)) {
 				num_links++;
 			}
 		}
@@ -954,7 +954,8 @@ wlan_hdd_get_connected_link_info(struct wlan_hdd_link_info *link_info,
 		info->freq = sta_ctx->conn_info.chan_freq;
 	} else if ((link_info->adapter->device_mode == QDF_SAP_MODE ||
 		    link_info->adapter->device_mode == QDF_P2P_GO_MODE) &&
-		   test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+		   qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+				       link_info->link_flags)) {
 		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 		info->link_id = ap_ctx->sap_config.link_id;
 		info->freq = ap_ctx->sap_config.chan_freq;
@@ -1306,7 +1307,7 @@ bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 
 	if ((adapter->device_mode == QDF_SAP_MODE ||
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
-	    test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+	    qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		config = &link_info->session.ap.sap_config;
 		qdf_copy_macaddr(&info->bssid, &config->self_macaddr);
 	}
@@ -6469,7 +6470,7 @@ static void hdd_fill_rate_info(struct wlan_objmgr_psoc *psoc,
 	enum tx_rate_info rate_flags;
 	uint8_t mcsidx = 0xff;
 	uint32_t tx_rate, rx_rate, maxrate, tmprate;
-	int rssidx;
+	int rssidx = 0;
 	int nss = 1;
 	int link_speed_rssi_high = 0;
 	int link_speed_rssi_mid = 0;
@@ -9253,8 +9254,8 @@ static bool hdd_is_rcpi_applicable(struct hdd_adapter *adapter,
 		}
 	} else if (adapter->device_mode == QDF_SAP_MODE ||
 		   adapter->device_mode == QDF_P2P_GO_MODE) {
-		if (!test_bit(SOFTAP_BSS_STARTED,
-			      &adapter->deflink->link_flags)) {
+		if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+					 adapter->deflink->link_flags)) {
 			hdd_err("Invalid rcpi request, softap not started");
 			return false;
 		}

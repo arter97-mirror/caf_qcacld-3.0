@@ -708,6 +708,18 @@ policy_mgr_mode_specific_connection_count_with_mlo(
 				enum policy_mgr_con_mode mode);
 
 /**
+ * policy_mgr_link_reconfig_is_concurrency_present() - provide whether
+ * any concurrency is present or not
+ * @psoc: PSOC object information
+ *
+ * This function provides whether concurrency is present or not.
+ *
+ * Return: bool
+ */
+bool
+policy_mgr_link_reconfig_is_concurrency_present(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_get_concurrency_mode() - return concurrency mode
  * @psoc: PSOC object information
  *
@@ -2061,20 +2073,6 @@ bool policy_mgr_is_dbs_allowed_for_concurrency(
 bool
 policy_mgr_is_vdev_ll_sap(struct wlan_objmgr_psoc *psoc,
 			  uint32_t vdev_id);
-
-/**
- * policy_mgr_is_vdev_ll_ht_sap() - Check whether given vdev is HT LL SAP or not
- * @psoc: psoc object
- * @vdev_id: vdev id
- *
- * Based on vdev id ap profile set via vendor command is get and compared with
- * ll_ht_type AP type and is return true if profile set is throghput sensitive.
- *
- * Return: true if it's present otherwise false
- */
-bool
-policy_mgr_is_vdev_ll_ht_sap(struct wlan_objmgr_psoc *psoc,
-			     uint32_t vdev_id);
 
 /**
  * policy_mgr_is_vdev_ll_lt_sap() - Check whether given vdev is LL_LT_SAP or not
@@ -4551,6 +4549,7 @@ bool policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
  * @pdev: id of objmgr pdev
  * @mode: operating mode of interface to be checked
  * @ch_freq: channel freq
+ * @vdev_id: vdev id
  * This function is used to check if multi sap can be started on the same band
  *
  * Return: true if multi sap is allowed on same band, otherwise false
@@ -4558,7 +4557,17 @@ bool policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
 bool policy_mgr_is_multi_sap_allowed_on_same_band(
 					struct wlan_objmgr_pdev *pdev,
 					enum policy_mgr_con_mode mode,
-					qdf_freq_t ch_freq);
+					qdf_freq_t ch_freq,
+					uint8_t vdev_id);
+/**
+ * policy_mgr_is_owe_connection_present() - TO check if owe conn present
+ * @pdev: pdev handle
+ * @vdev_id: vdev id
+ *
+ * Return: true if owe is present
+ */
+bool policy_mgr_is_owe_connection_present(struct wlan_objmgr_pdev *pdev,
+					  uint8_t vdev_id);
 
 /**
  * policy_mgr_is_special_mode_active_5g() - check if given mode active in 5g
@@ -4939,7 +4948,7 @@ uint32_t policy_mgr_get_mode_specific_conn_info(struct wlan_objmgr_psoc *psoc,
 						enum policy_mgr_con_mode mode);
 
 /*
- * policy_mgr_get_ml_and_non_ml_sta_count() - get ML and non ML STA count
+ * policy_mgr_get_ml_and_non_ml_mode_count() - get ML and non ML mode count
  * also fills the freq and non ML/ML list
  * @psoc: Objmgr psoc
  * @num_ml: num ML as output
@@ -4948,15 +4957,25 @@ uint32_t policy_mgr_get_mode_specific_conn_info(struct wlan_objmgr_psoc *psoc,
  * @non_ml_idx: non ML vdev index as output
  * @freq_list: freq list of each sta vdev
  * @vdev_id_list: vdev id list
+ * @mode: connection mode
  *
  * Return: void
  */
-void policy_mgr_get_ml_and_non_ml_sta_count(struct wlan_objmgr_psoc *psoc,
-					    uint8_t *num_ml, uint8_t *ml_idx,
-					    uint8_t *num_non_ml,
-					    uint8_t *non_ml_idx,
-					    qdf_freq_t *freq_list,
-					    uint8_t *vdev_id_list);
+void policy_mgr_get_ml_and_non_ml_mode_count(struct wlan_objmgr_psoc *psoc,
+					     uint8_t *num_ml, uint8_t *ml_idx,
+					     uint8_t *num_non_ml,
+					     uint8_t *non_ml_idx,
+					     qdf_freq_t *freq_list,
+					     uint8_t *vdev_id_list,
+					     enum policy_mgr_con_mode mode);
+
+/**
+ * policy_mgr_is_dual_sap_active() - check if dual sap active
+ * @psoc: PSOC object information
+ *
+ * Return: true or false
+ */
+bool policy_mgr_is_dual_sap_active(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_is_sap_go_on_2g() - check if sap/go is on 2g
@@ -4990,6 +5009,14 @@ bool policy_mgr_dump_channel_list(uint32_t len,
 QDF_STATUS policy_mgr_filter_passive_ch(struct wlan_objmgr_pdev *pdev,
 					uint32_t *ch_freq_list,
 					uint32_t *ch_cnt);
+
+/**
+ * policy_mgr_get_sap_scc_freq_nan_present() - Get NAN SCC freq
+ * @psoc: psoc ctx
+ *
+ * Return: NAN SCC freq
+ */
+uint32_t policy_mgr_get_sap_scc_freq_nan_present(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_is_restart_sap_required() - check whether sap need restart

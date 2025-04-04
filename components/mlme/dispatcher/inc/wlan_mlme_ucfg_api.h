@@ -985,6 +985,18 @@ QDF_STATUS ucfg_mlme_get_num_11ag_tx_chains(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_get_num_max_sap_bss() - get max sap bss supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: max sap bss supported
+ */
+static inline uint8_t
+ucfg_mlme_get_num_max_sap_bss(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_get_num_max_sap_bss(psoc);
+}
+
+/**
  * ucfg_mlme_get_bt_chain_separation_flag() - bt chain separation enable/disable
  * @psoc: pointer to psoc object
  * @value: Value that needs to be got for the caller
@@ -2972,9 +2984,9 @@ ucfg_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
+ * ucfg_mlme_get_vht_mimo_cap() - Enables/disables Tx/Rx MCS values for MIMO
  * @psoc: psoc context
- * @value: data to be set
+ * @value: data to be get
  *
  * Inline UCFG API to be used by HDD/OSIF callers to get the
  * ignore_peer_ht_opmode flag value
@@ -2982,9 +2994,9 @@ ucfg_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
  * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
  */
 static inline QDF_STATUS
-ucfg_mlme_get_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool *value)
+ucfg_mlme_get_vht_mimo_cap(struct wlan_objmgr_psoc *psoc, uint8_t *value)
 {
-	return wlan_mlme_get_vht_enable2x2(psoc, value);
+	return wlan_mlme_get_vht_mimo_cap(psoc, value);
 }
 
 /**
@@ -3003,7 +3015,7 @@ ucfg_mlme_get_force_sap_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 /**
- * ucfg_mlme_set_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
+ * ucfg_mlme_set_vht_mimo_cap() - Enables/disables Tx/Rx MCS values for MIMO
  * @psoc: psoc context
  * @value: data to be set
  *
@@ -3013,9 +3025,9 @@ ucfg_mlme_get_force_sap_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
  * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
  */
 static inline QDF_STATUS
-ucfg_mlme_set_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool value)
+ucfg_mlme_set_vht_mimo_cap(struct wlan_objmgr_psoc *psoc, uint8_t value)
 {
-	return wlan_mlme_set_vht_enable2x2(psoc, value);
+	return wlan_mlme_set_vht_mimo_cap(psoc, value);
 }
 
 /**
@@ -3093,6 +3105,7 @@ ucfg_mlme_get_vendor_vht_for_24ghz(struct wlan_objmgr_psoc *psoc, bool *value)
  * ucfg_mlme_update_vht_cap() - Update vht capabilities
  * @psoc: psoc context
  * @cfg: data to be set
+ * @num_rf_chains: Num of RF chains supported
  *
  * Inline UCFG API to be used by HDD/OSIF callers to get the
  * ignore_peer_ht_opmode flag value
@@ -3101,9 +3114,10 @@ ucfg_mlme_get_vendor_vht_for_24ghz(struct wlan_objmgr_psoc *psoc, bool *value)
  */
 static inline
 QDF_STATUS ucfg_mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
-				    struct wma_tgt_vht_cap *cfg)
+				    struct wma_tgt_vht_cap *cfg,
+				    uint32_t num_rf_chains)
 {
-	return mlme_update_vht_cap(psoc, cfg);
+	return mlme_update_vht_cap(psoc, cfg, num_rf_chains);
 }
 
 /**
@@ -3897,6 +3911,7 @@ QDF_STATUS ucfg_mlme_cfg_get_wlm_reset(struct wlan_objmgr_psoc *psoc,
  *
  * @psoc: pointer to psoc object
  * @cfg: pointer to config params from target
+ * @num_rf_chains: Num of RF chains supported
  *
  * Inline UCFG API to be used by HDD/OSIF callers to update
  * he caps in mlme.
@@ -3905,9 +3920,9 @@ QDF_STATUS ucfg_mlme_cfg_get_wlm_reset(struct wlan_objmgr_psoc *psoc,
  */
 static inline QDF_STATUS
 ucfg_mlme_update_tgt_he_cap(struct wlan_objmgr_psoc *psoc,
-			    struct wma_tgt_cfg *cfg)
+			    struct wma_tgt_cfg *cfg, uint8_t num_rf_chains)
 {
-	return mlme_update_tgt_he_caps_in_cfg(psoc, cfg);
+	return mlme_update_tgt_he_caps_in_cfg(psoc, cfg, num_rf_chains);
 }
 
 /**
@@ -4031,6 +4046,12 @@ void ucfg_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 {
 	wlan_mlme_set_usr_disable_sta_eht(psoc, disable);
 }
+
+static inline QDF_STATUS
+ucfg_mlme_update_dual_sap_sta_support(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_update_dual_sap_sta_cap(psoc);
+}
 #else
 static inline QDF_STATUS
 ucfg_mlme_update_tgt_mlo_cap(struct wlan_objmgr_psoc *psoc)
@@ -4048,6 +4069,12 @@ static inline
 void ucfg_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
 				       bool disable)
 {
+}
+
+static inline QDF_STATUS
+ucfg_mlme_update_dual_sap_sta_support(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -5773,5 +5800,17 @@ static inline uint32_t
 ucfg_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev)
 {
 	return wlan_mlme_get_beacon_interval(vdev);
+}
+
+/**
+ * ucfg_mlme_is_dual_sap_sta_supported() - Get is dual sap supported
+ * @psoc: psoc ctx
+ *
+ * Return: return is sap supported
+ */
+static inline bool ucfg_mlme_is_dual_sap_sta_supported(
+				struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_is_dual_sap_sta_enabled(psoc);
 }
 #endif /* _WLAN_MLME_UCFG_API_H_ */

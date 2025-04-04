@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1276,6 +1276,40 @@ lim_is_mgmt_frame_loggable(uint8_t type, uint8_t subtype)
 }
 #endif
 
+static struct pe_session *
+lim_get_preauth_vdev_session(struct mac_context *mac,
+			     struct wlan_objmgr_vdev *vdev,
+			     tpSirMacMgmtHdr hdr)
+{
+	struct wlan_objmgr_vdev *preauth_vdev;
+	struct pe_session *pe_session = NULL;
+	uint8_t pdev_id;
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(mac->pdev);
+	/*
+	 * In MLO roaming scenario when we try to initiate preauth to BSSID
+	 * that already exists on the other vdev, then wrong vdev id is fetch
+	 * resulting in preauth failure.
+	 * So fetch the correct vdev in such scenario by looking up the vdev
+	 * based on the DA address.
+	 */
+	preauth_vdev = wlan_objmgr_get_vdev_by_macaddr_from_psoc(
+					mac->psoc, pdev_id,
+					hdr->da, WLAN_LEGACY_MAC_ID);
+	if (!cm_is_vdev_connecting(vdev) &&
+	    wlan_vdev_mlme_is_mlo_vdev(vdev) && preauth_vdev) {
+		pe_session = pe_find_session_by_vdev_id(
+					mac, wlan_vdev_get_id(preauth_vdev));
+		pe_debug("SAE: given vdev_id:%d lookup vdev_id:%d",
+			 wlan_vdev_get_id(vdev),
+			 wlan_vdev_get_id(preauth_vdev));
+	}
+
+	wlan_objmgr_vdev_release_ref(preauth_vdev, WLAN_LEGACY_MAC_ID);
+
+	return pe_session;
+}
+
 /**
  * lim_handle80211_frames()
  *
@@ -1305,6 +1339,7 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 	tSirMacFrameCtl fc;
 	tpSirMacMgmtHdr pHdr = NULL;
 	struct pe_session *pe_session = NULL;
+	struct pe_session *preauth_pe_session = NULL;
 	uint8_t sessionId;
 	bool isFrmFt = false;
 	uint32_t frequency;
@@ -1494,6 +1529,11 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 			break;
 
 		case SIR_MAC_MGMT_AUTH:
+			preauth_pe_session = lim_get_preauth_vdev_session(
+						mac, pe_session->vdev, pHdr);
+			if (preauth_pe_session)
+				pe_session = preauth_pe_session;
+
 			lim_process_auth_frame(mac, pRxPacketInfo,
 					       pe_session);
 			break;

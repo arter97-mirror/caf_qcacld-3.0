@@ -3396,6 +3396,156 @@ ml_nlink_handle_legacy_nan_intf(struct wlan_objmgr_psoc *psoc,
 			mlo_get_num_5gh_links(ml_freq_lst, ml_num_link) - 1;
 }
 
+static bool policy_mgr_is_dual_sap_mcc_with_ml_sta(
+		qdf_freq_t sap_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS],
+		qdf_freq_t sta_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS])
+{
+	uint8_t i, j;
+
+	/* for dual SAP mcc all four frequency should be diff*/
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		for (j = 0; j < MAX_NUMBER_OF_CONC_CONNECTIONS; j++) {
+			if (sap_freq_list[i] &&
+			    sap_freq_list[i] == sta_freq_list[j]) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+static bool ml_nlink_is_dual_sap_mcc(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t num_ml_sta = 0, num_non_ml_sta = 0;
+	uint8_t num_ml_sap = 0, num_non_ml_sap = 0;
+	uint8_t ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t non_ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t sta_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t sta_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t ml_sap_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t non_ml_sap_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t sap_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t sap_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	bool dual_sap_mcc = false;
+
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sta, ml_sta_idx,
+						&num_non_ml_sta, non_ml_sta_idx,
+						sta_freq_list, sta_vdev_id_list,
+						PM_STA_MODE);
+
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sap, ml_sap_idx,
+						&num_non_ml_sap, non_ml_sap_idx,
+						sap_freq_list, sap_vdev_id_list,
+						PM_SAP_MODE);
+	/* num ML STA less than 2 or num SAP/ ML SAP less than 2
+	 */
+	if (num_ml_sta < 2 || (num_non_ml_sap + num_ml_sap) < 2)
+		return false;
+
+	dual_sap_mcc = policy_mgr_is_dual_sap_mcc_with_ml_sta(sta_freq_list,
+							      sap_freq_list);
+
+	if (dual_sap_mcc)
+		return true;
+
+	return false;
+}
+
+static bool
+ml_nlink_handle_dual_sap_intf(struct wlan_objmgr_psoc *psoc,
+			      struct ml_link_force_state *force_cmd,
+			      struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_sap_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t non_ml_sap_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t sap_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t sap_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t num_ml_sap = 0, num_non_ml_sap = 0;
+	uint8_t i;
+	bool is_5ghz_only_sap = false;
+	uint32_t affected_link_bitmap = 0;
+	uint8_t count = 0;
+
+	if (!policy_mgr_is_dual_sap_active(psoc))
+		return false;
+
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+	/* No need to send FORCE INACTIVE/INACTIVE_NUM in case of one link */
+	if (ml_num_link < 2)
+		return false;
+
+	policy_mgr_get_ml_and_non_ml_mode_count(
+				psoc, &num_ml_sap, ml_sap_idx,
+				&num_non_ml_sap, non_ml_sap_idx,
+				sap_freq_list, sap_vdev_id_list,
+				PM_SAP_MODE);
+	for (i = 0; i < num_ml_sap + num_non_ml_sap; i++) {
+		/* if none of the frequency is 6 GHz and it not 6 GHz capable
+		 * its a 5 GHz only SAP
+		 */
+		if (sap_freq_list[i] &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(sap_freq_list[i]) &&
+		    !policy_mgr_get_ap_6ghz_capable(
+			    psoc,
+			    sap_vdev_id_list[i],
+			    NULL))
+			is_5ghz_only_sap = true;
+	}
+
+	/*
+	 * Check if the 5 GHz only SAP is present
+	 * In case of 5 GHz only SAP disable 6 GHz ML STA
+	 */
+	for (i = 0; i < ml_num_link; i++) {
+		if (wlan_reg_is_6ghz_chan_freq(ml_freq_lst[i]) &&
+		    is_5ghz_only_sap) {
+			force_cmd->force_inactive_bitmap |=
+						1 << ml_linkid_lst[i];
+			count++;
+		}
+	}
+
+	/* No need to set force inactive further as it has reached max limit */
+	if ((ml_num_link - count) < 2)
+		return true;
+
+	/* force inactive one of the link if dual sap mcc is present*/
+	if (ml_nlink_is_dual_sap_mcc(psoc, vdev))
+		for (i = 0; i < ml_num_link; i++)
+			affected_link_bitmap |= 1 << ml_linkid_lst[i];
+
+	if (affected_link_bitmap) {
+		force_cmd->force_inactive_num =
+			convert_link_bitmap_to_link_ids(
+				affected_link_bitmap, 0, NULL);
+		if (force_cmd->force_inactive_num > 1) {
+			force_cmd->force_inactive_num--;
+			force_cmd->force_inactive_num_bitmap =
+					affected_link_bitmap;
+		} else {
+			force_cmd->force_inactive_num = 0;
+		}
+	}
+
+	/* No need check force inactive further as num link is set */
+	if (force_cmd->force_inactive_num != 0)
+		return true;
+
+	return false;
+}
+
 static void
 ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
@@ -3462,6 +3612,9 @@ ml_nlink_handle_legacy_intf_3_ports(struct wlan_objmgr_psoc *psoc,
 		disallow_mcc = true;
 		break;
 	case PM_SAP_MODE:
+		if (ml_nlink_handle_dual_sap_intf(psoc, force_cmd, vdev))
+			return;
+		fallthrough;
 	case PM_NAN_DISC_MODE:
 		ml_nlink_handle_legacy_nan_intf(psoc, force_cmd, vdev);
 		break;
@@ -5626,6 +5779,8 @@ ml_nlink_undo_emlsr_downgrade_handler(struct wlan_objmgr_psoc *psoc,
 	} else if (evt == ml_nlink_connect_completion_evt ||
 		   evt == ml_nlink_connect_failed_evt) {
 		request = ML_EMLSR_DOWNGRADE_BY_STA_START;
+	} else if (evt == ml_nlink_dual_sap_inactive_evt) {
+		request = ML_EMLSR_DOWNGRADE_BY_DUAL_SAP_ACTIVE;
 	} else {
 		mlo_debug("not handled for evt %d", evt);
 		goto end;
@@ -6317,6 +6472,8 @@ static void ml_nlink_check_stop_start_emlsr_timer(
 	case ml_nlink_nan_post_disable_evt:
 	case ml_nlink_acs_start_evt:
 	case ml_nlink_acs_completed_evt:
+	case ml_nlink_dual_sap_active_evt:
+	case ml_nlink_dual_sap_inactive_evt:
 		break;
 	default:
 		return;
@@ -6488,6 +6645,15 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 			psoc, vdev, evt, data);
 		break;
 	case ml_nlink_ap_csa_end_evt:
+		/* if dual sap is active re evaluate force mode after csa
+		 * as due to dual sap mcc force num inactive would be set
+		 * before csa.
+		 */
+		if (policy_mgr_is_dual_sap_active(psoc)) {
+			status = ml_nlink_state_change_handler(
+				psoc, vdev, MLO_LINK_FORCE_REASON_CONNECT,
+				evt, data);
+		}
 		status = ml_nlink_ap_csa_end_handler(
 			psoc, vdev, evt, data);
 		break;
@@ -6572,6 +6738,21 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 		ml_nlink_link_recfg_completed_handler(psoc, vdev,
 						      evt, data);
 		break;
+	case ml_nlink_dual_sap_active_evt:
+		/*
+		 * Disable eMLSR as eMLSR + DUAL SAP can not be supported.
+		 */
+			status = ml_nlink_emlsr_downgrade_handler(psoc, vdev,
+								  evt, data);
+		break;
+	case ml_nlink_dual_sap_inactive_evt:
+		/*
+		 * re-enable eMLSR, when DUAL SAP in inactive,
+		 */
+			status = ml_nlink_undo_emlsr_downgrade_handler(
+							psoc, vdev, evt, data);
+		break;
+
 	default:
 		break;
 	}

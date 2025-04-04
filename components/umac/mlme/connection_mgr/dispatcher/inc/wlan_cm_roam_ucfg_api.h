@@ -84,15 +84,6 @@ enum wlan_roam_policy ucfg_get_roam_policy(struct wlan_objmgr_psoc *psoc,
  */
 bool ucfg_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
-/**
- * ucfg_is_rso_disabled() - Check if rso is disabled
- * @pdev: Pointer to pdev
- * @vdev_id: vdev id
- *
- * Return: Wrapper for wlan_is_rso_disabled.
- */
-bool ucfg_is_rso_disabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
-
 /*
  * ucfg_cm_abort_roam_scan() -abort current roam scan cycle by roam scan
  * offload module.

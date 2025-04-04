@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -259,8 +259,7 @@ static pm_dbs_pcl_third_connection_table_type
 pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_STA_SAP_SCC_24_1x1] = {
 	[PM_STA_MODE] = {PM_5G_SCC_CH, PM_5G_SCC_CH, PM_5G_SCC_CH},
-	[PM_SAP_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_CLIENT_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_GO_MODE] = {PM_5G_SCC_CH, PM_5G_SCC_CH, PM_5G_SCC_CH},
 	[PM_NAN_DISC_MODE] = {
@@ -270,8 +269,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 
 	[PM_STA_SAP_SCC_24_2x2] = {
 	[PM_STA_MODE] = {PM_5G_SCC_CH, PM_5G_SCC_CH, PM_5G_SCC_CH},
-	[PM_SAP_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_CLIENT_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_GO_MODE] = {PM_5G_SCC_CH, PM_5G_SCC_CH, PM_5G_SCC_CH},
 	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE },
@@ -280,8 +278,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 
 	[PM_STA_SAP_MCC_24_1x1] = {
 	[PM_STA_MODE] = {PM_5G, PM_5G, PM_5G},
-	[PM_SAP_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_CLIENT_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_GO_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_NAN_DISC_MODE] = {
@@ -291,7 +288,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 
 	[PM_STA_SAP_MCC_24_2x2] = {
 	[PM_STA_MODE] = {PM_5G, PM_5G, PM_5G},
-	[PM_SAP_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_CLIENT_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_GO_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE },
@@ -301,8 +298,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_STA_SAP_SCC_5_1x1] = {
 	[PM_STA_MODE] = {PM_24G_SCC_CH_SBS_CH_5G, PM_24G_SCC_CH,
 		PM_24G_SCC_CH_SBS_CH},
-	[PM_SAP_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_24G, PM_24G, PM_24G},
 	[PM_P2P_CLIENT_MODE] = {PM_SBS_CH_2G, PM_SBS_CH_2G, PM_SBS_CH_2G},
 	[PM_P2P_GO_MODE] = {PM_SBS_CH_24G_SCC_CH, PM_SBS_CH_24G_SCC_CH,
 			    PM_SBS_CH_24G_SCC_CH},
@@ -314,8 +310,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_STA_SAP_SCC_5_2x2] = {
 	[PM_STA_MODE] = {PM_24G_SCC_CH_SBS_CH_5G, PM_24G_SCC_CH,
 		PM_24G_SCC_CH_SBS_CH},
-	[PM_SAP_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_24G, PM_24G, PM_24G},
 	[PM_P2P_CLIENT_MODE] = {PM_SBS_CH_2G, PM_SBS_CH_2G, PM_SBS_CH_2G},
 	[PM_P2P_GO_MODE] = {PM_SBS_CH_24G_SCC_CH, PM_SBS_CH_24G_SCC_CH,
 			    PM_SBS_CH_24G_SCC_CH},
@@ -325,8 +320,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 
 	[PM_STA_SAP_MCC_5_1x1] = {
 	[PM_STA_MODE] = {PM_24G_SBS_CH_MCC_CH, PM_24G, PM_24G_MCC_CH},
-	[PM_SAP_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_24G, PM_24G, PM_24G},
 	[PM_P2P_CLIENT_MODE] = {PM_SBS_CH_2G, PM_SBS_CH_2G, PM_SBS_CH_2G},
 	[PM_P2P_GO_MODE] = {PM_SBS_CH_2G, PM_SBS_CH_2G, PM_SBS_CH_2G},
 	[PM_NAN_DISC_MODE] = {
@@ -337,8 +331,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 
 	[PM_STA_SAP_MCC_5_2x2] = {
 	[PM_STA_MODE] = {PM_24G_SBS_CH_MCC_CH, PM_24G, PM_24G_MCC_CH},
-	[PM_SAP_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-		PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_24G, PM_24G, PM_24G},
 	[PM_P2P_CLIENT_MODE] = {PM_SBS_CH_2G, PM_SBS_CH_2G, PM_SBS_CH_2G},
 	[PM_P2P_GO_MODE] = {PM_SBS_CH_2G, PM_SBS_CH_2G, PM_SBS_CH_2G},
 	[PM_NAN_DISC_MODE] = { PM_NONE, PM_NONE, PM_NONE },
@@ -348,8 +341,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 
 	[PM_STA_SAP_MCC_24_5_1x1] = {
 	[PM_STA_MODE] = {PM_5G, PM_5G, PM_5G},
-	[PM_SAP_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_SCC_ON_5_SCC_ON_24_5G_24G, PM_SCC_ON_5_SCC_ON_24_5G_24G, PM_SCC_ON_5_SCC_ON_24_5G_24G},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
 	[PM_P2P_GO_MODE] = {
@@ -362,8 +354,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 
 	[PM_STA_SAP_MCC_24_5_2x2] = {
 	[PM_STA_MODE] = {PM_5G, PM_5G, PM_5G},
-	[PM_SAP_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_SCC_ON_5_SCC_ON_24_5G_24G, PM_SCC_ON_5_SCC_ON_24_5G_24G, PM_SCC_ON_5_SCC_ON_24_5G_24G},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
 	[PM_P2P_GO_MODE] = {
@@ -376,8 +367,8 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_STA_SAP_DBS_1x1] = {
 	[PM_STA_MODE] = { PM_SCC_ON_5_SCC_ON_24_5G, PM_SCC_ON_5_SCC_ON_24,
 		PM_SCC_ON_5_SCC_ON_24},
-	[PM_SAP_MODE] = { PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-		PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = { PM_SCC_STA_ON_24_OR_5, PM_SCC_STA_ON_24_OR_5,
+			PM_SCC_STA_ON_24_OR_5},
 	[PM_P2P_CLIENT_MODE] = { PM_SCC_ON_5_5G_SCC_ON_24G, PM_SCC_ON_5_SCC_ON_24,
 		PM_SCC_ON_5_SCC_ON_24},
 	[PM_P2P_GO_MODE] = { PM_SCC_ON_5_5G_SCC_ON_24G, PM_SCC_ON_5_SCC_ON_24,
@@ -391,8 +382,8 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_STA_SAP_DBS_2x2] = {
 	[PM_STA_MODE] = { PM_SCC_ON_5_SCC_ON_24_5G, PM_SCC_ON_5_SCC_ON_24,
 		PM_SCC_ON_5_SCC_ON_24},
-	[PM_SAP_MODE] = { PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-		PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = { PM_SCC_STA_ON_24_OR_5, PM_SCC_STA_ON_24_OR_5,
+			PM_SCC_STA_ON_24_OR_5},
 	[PM_P2P_CLIENT_MODE] = { PM_SCC_ON_5_5G_SCC_ON_24G, PM_SCC_ON_5_SCC_ON_24,
 		PM_SCC_ON_5_SCC_ON_24},
 	[PM_P2P_GO_MODE] = { PM_SCC_ON_5_5G_SCC_ON_24G, PM_SCC_ON_5_SCC_ON_24,
@@ -405,8 +396,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_STA_SAP_SBS_5_2x2] = {
 	[PM_STA_MODE] = {
 		PM_SBS_CH_5G, PM_SBS_CH, PM_SBS_CH},
-	[PM_SAP_MODE] = {
-		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
+	[PM_SAP_MODE] = {PM_24G, PM_24G, PM_24G},
 	[PM_P2P_CLIENT_MODE] = {PM_SBS_CH_SCC_CH_5G_24G, PM_SBS_CH, PM_SBS_CH},
 	[PM_P2P_GO_MODE] = {
 		PM_SBS_CH_SCC_CH_5G_24G, PM_SBS_CH, PM_SBS_CH},
@@ -415,7 +405,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_5G, PM_5G, PM_5G} },
 
 	[PM_SAP_SAP_SCC_24_1x1] = {
-	[PM_STA_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = {PM_5G_SCC_CH, PM_5G_SCC_CH, PM_5G_SCC_CH},
 	[PM_SAP_MODE] = {PM_5G_SCC_CH, PM_5G_SCC_CH, PM_5G_SCC_CH},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
@@ -426,8 +416,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_5G, PM_5G, PM_5G} },
 
 	[PM_SAP_SAP_SCC_24_2x2] = {
-	[PM_STA_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = {PM_5G_SCC_CH, PM_5G_SCC_CH, PM_5G_SCC_CH},
 	[PM_SAP_MODE] = {PM_5G_SCC_CH, PM_5G_SCC_CH, PM_5G_SCC_CH},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
@@ -437,8 +426,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_5G, PM_5G, PM_5G} },
 
 	[PM_SAP_SAP_MCC_24_1x1] = {
-	[PM_STA_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_SAP_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
@@ -450,8 +438,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_5G, PM_5G, PM_5G} },
 
 	[PM_SAP_SAP_MCC_24_2x2] = {
-	[PM_STA_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-			 PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_SAP_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
@@ -462,8 +449,8 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_5G, PM_5G, PM_5G} },
 
 	[PM_SAP_SAP_SCC_5_1x1] = {
-	[PM_STA_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-		PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = {PM_24G_SCC_CH_SBS_CH_5G, PM_24G_SCC_CH,
+			PM_24G_SCC_CH_SBS_CH},
 	[PM_SAP_MODE] = {PM_24G_SBS_CH_MCC_CH, PM_24G, PM_24G_SBS_CH_MCC_CH},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
@@ -473,8 +460,8 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_SBS_CH, PM_SBS_CH, PM_SBS_CH} },
 
 	[PM_SAP_SAP_SCC_5_2x2] = {
-	[PM_STA_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-		PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = {PM_24G_SCC_CH_SBS_CH_5G, PM_24G_SCC_CH,
+			PM_24G_SCC_CH_SBS_CH},
 	[PM_SAP_MODE] = {PM_24G_SBS_CH_MCC_CH, PM_24G, PM_24G_SBS_CH_MCC_CH},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
@@ -484,7 +471,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_SBS_CH, PM_SBS_CH, PM_SBS_CH} },
 
 	[PM_SAP_SAP_MCC_5_1x1] = {
-	[PM_STA_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = {PM_24G_SBS_CH_MCC_CH, PM_24G, PM_24G_MCC_CH},
 	[PM_SAP_MODE] = {PM_24G_SBS_CH_MCC_CH, PM_24G, PM_24G_MCC_CH},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
@@ -496,7 +483,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_SBS_CH, PM_SBS_CH, PM_SBS_CH} },
 
 	[PM_SAP_SAP_MCC_5_2x2] = {
-	[PM_STA_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = {PM_24G_SBS_CH_MCC_CH, PM_24G, PM_24G_MCC_CH},
 	[PM_SAP_MODE] = {PM_24G_SBS_CH_MCC_CH, PM_24G, PM_24G_MCC_CH},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
@@ -507,7 +494,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_SBS_CH, PM_SBS_CH, PM_SBS_CH} },
 
 	[PM_SAP_SAP_MCC_24_5_1x1] = {
-	[PM_STA_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_SAP_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
@@ -520,7 +507,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 			       PM_MAX_PCL_TYPE} },
 
 	[PM_SAP_SAP_MCC_24_5_2x2] = {
-	[PM_STA_MODE] = {PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_SAP_MODE] = {PM_5G, PM_5G, PM_5G},
 	[PM_P2P_CLIENT_MODE] = {
 		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
@@ -532,8 +519,8 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 			       PM_MAX_PCL_TYPE} },
 
 	[PM_SAP_SAP_DBS_1x1] = {
-	[PM_STA_MODE] = { PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-		PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = { PM_SCC_ON_5_SCC_ON_24_5G, PM_SCC_ON_5_SCC_ON_24,
+			PM_SCC_ON_5_SCC_ON_24},
 	[PM_SAP_MODE] = { PM_SCC_ON_5_SCC_ON_24, PM_SCC_ON_5_SCC_ON_24,
 		PM_SCC_ON_5_SCC_ON_24},
 	[PM_P2P_CLIENT_MODE] = {PM_SCC_ON_5_SCC_ON_24, PM_SCC_ON_5_SCC_ON_24,
@@ -545,8 +532,8 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_5G, PM_5G, PM_5G} },
 
 	[PM_SAP_SAP_DBS_2x2] = {
-	[PM_STA_MODE] = { PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE,
-		PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = { PM_SCC_ON_5_SCC_ON_24_5G, PM_SCC_ON_5_SCC_ON_24,
+			PM_SCC_ON_5_SCC_ON_24},
 	[PM_SAP_MODE] = { PM_SCC_ON_5_SCC_ON_24, PM_SCC_ON_5_SCC_ON_24,
 		PM_SCC_ON_5_SCC_ON_24},
 	[PM_P2P_CLIENT_MODE] = { PM_SCC_ON_5_SCC_ON_24, PM_SCC_ON_5_SCC_ON_24,
@@ -558,8 +545,7 @@ pm_third_connection_pcl_dbs_sbs_2x2_table = {
 	[PM_LL_LT_SAP_MODE] = {PM_5G, PM_5G, PM_5G} },
 
 	[PM_SAP_SAP_SBS_5_2x2] = {
-	[PM_STA_MODE] = {
-		PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE, PM_MAX_PCL_TYPE},
+	[PM_STA_MODE] = { PM_SBS_CH_5G, PM_SBS_CH, PM_SBS_CH},
 	[PM_SAP_MODE] = {
 		PM_SBS_CH_5G, PM_SBS_CH, PM_SBS_CH},
 	[PM_P2P_CLIENT_MODE] = {

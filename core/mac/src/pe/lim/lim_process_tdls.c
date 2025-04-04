@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -961,14 +961,12 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 				vht_cap_info->rx_supp_data_rate;
 			vhtCap->txMCSMap = vht_cap_info->tx_mcs_map;
 			vhtCap->txSupDataRate = vht_cap_info->tx_supp_data_rate;
-			if (nss == NSS_1x1_MODE) {
-				vhtCap->txMCSMap |= DISABLE_NSS2_MCS;
-				vhtCap->rxMCSMap |= DISABLE_NSS2_MCS;
-				vhtCap->txSupDataRate =
-					VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
-				vhtCap->rxHighSupDataRate =
-					VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
-			}
+			vhtCap->txMCSMap |= VHT_DISABLE_MCS_OVER_NSS(nss);
+			vhtCap->rxMCSMap |= VHT_DISABLE_MCS_OVER_NSS(nss);
+			vhtCap->txSupDataRate =
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(nss, true);
+			vhtCap->rxHighSupDataRate =
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(nss, true);
 		} else {
 			vhtCap->present = 0;
 		}
@@ -1598,7 +1596,7 @@ lim_ieee80211_pack_ehtcap_tdls(struct mac_context *mac,
 					NULL, pe_session);
 
 	lim_ieee80211_pack_ehtcap(eht_cap_ie, pe_session->eht_config,
-				  he_cap, is_band_2g);
+				  he_cap, is_band_2g, true);
 
 	*len = eht_cap_ie[1] + 2;
 	return eht_cap_ie;
@@ -3331,7 +3329,8 @@ lim_tdls_populate_eht_mcs(struct mac_context *mac_ctx, tpDphHashNode stads,
 {
 	lim_populate_eht_mcs_set(mac_ctx, &stads->supportedRates,
 				 &stads->eht_config, session_entry,
-				 session_entry->ch_width);
+				 session_entry->ch_width,
+				 wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq));
 }
 #else
 static void

@@ -3530,6 +3530,11 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_RU_PUNC_CHANDEF
 endif
 
+found = $(shell if grep -qF "Indicates whether the MLO reconfiguration request is initiated" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+ccflags-y += -DCFG80211_SETUP_LINK_RECONFIG_SUPPORT
+endif
+
 ifeq ($(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP), y)
 CONFIG_WLAN_DP_MLO_DEV_CTX := y
 CONFIG_QCA_DP_TX_FW_METADATA_V2 := y
@@ -3985,6 +3990,7 @@ ccflags-$(WLAN_OPEN_SOURCE) += -DWLAN_OPEN_SOURCE
 ccflags-$(CONFIG_FEATURE_STATS_EXT) += -DWLAN_FEATURE_STATS_EXT
 ccflags-$(CONFIG_QCACLD_FEATURE_NAN) += -DWLAN_FEATURE_NAN
 ccflags-$(CONFIG_QCACLD_FEATURE_SON) += -DWLAN_FEATURE_SON
+ccflags-$(CONFIG_WLAN_FEATURE_MC_BC_4_ADDR) += -DWLAN_FEATURE_MC_BC_4_ADDR
 ccflags-$(CONFIG_NDP_SAP_CONCURRENCY_ENABLE) += -DNDP_SAP_CONCURRENCY_ENABLE
 ccflags-$(CONFIG_ENFORCE_PLD_REMOVE) += -DENFORCE_PLD_REMOVE
 
@@ -4240,6 +4246,9 @@ ccflags-$(CONFIG_WLAN_FEATURE_VDEV_DCS) += -DWLAN_FEATURE_VDEV_DCS
 
 #Enable 4address scheme
 ccflags-$(CONFIG_FEATURE_WLAN_STA_4ADDR_SCHEME) += -DFEATURE_WLAN_STA_4ADDR_SCHEME
+
+#Enable check RSN/BIP IE for SAP
+ccflags-$(CONFIG_WLAN_FEATURE_CHECK_RSN_BIP) += -DWLAN_FEATURE_CHECK_RSN_BIP
 
 #Optimize GC connection speed by skipping JOIN
 ccflags-$(CONFIG_FEATURE_WLAN_GC_SKIP_JOIN) += -DFEATURE_WLAN_GC_SKIP_JOIN
@@ -4982,6 +4991,12 @@ endif
 ifdef CONFIG_LIMIT_IPA_TX_BUFFER
 ccflags-y += -DLIMIT_IPA_TX_BUFFER=$(CONFIG_LIMIT_IPA_TX_BUFFER)
 endif
+
+CONFIG_WLAN_MAX_VDEV_NSS ?= 2
+ccflags-y += -DWLAN_MAX_VDEV_NSS=$(CONFIG_WLAN_MAX_VDEV_NSS)
+
+CONFIG_WLAN_MAX_VDEV_CHAINS ?= 2
+ccflags-y += -DWLAN_MAX_VDEV_CHAINS=$(CONFIG_WLAN_MAX_VDEV_CHAINS)
 
 ifdef CONFIG_LOCK_STATS_ON
 ccflags-y += -DQDF_LOCK_STATS=1

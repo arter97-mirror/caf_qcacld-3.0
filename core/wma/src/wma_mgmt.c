@@ -1438,6 +1438,11 @@ wma_populate_peer_mlo_common_info_sta(tp_wma_handle wma,
 	req->mlo_params.max_num_simultaneous_links =
 		wlan_mlme_get_sta_mlo_simultaneous_links(psoc) + 1;
 
+	req->mlo_params.ext_mld_cap_and_op_support =
+			params->ext_mld_caps_present;
+	req->mlo_params.emlsr_one_link_support =
+			params->ext_mld_cap.emlsr_one_link_support;
+
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
 }
 
@@ -1732,10 +1737,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 		if (params->supportedRates.supportedMCSSet[i / 8] &
 		    (1 << (i % 8))) {
 			rate_pos[peer_ht_rates.num_rates++] = i;
-			if (i >= 8) {
-				/* MCS8 or higher rate is present, must be 2x2 */
-				peer_nss = 2;
-			}
+			if (((i / 8) + 1) <= WLAN_MAX_VDEV_NSS)
+				peer_nss = (i / 8) + 1;
 		}
 		if (peer_ht_rates.num_rates == max_rates)
 			break;
@@ -1943,11 +1946,20 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 		/*
 		 *  tx_mcs_set is intersection of self tx NSS and peer rx mcs map
 		 */
-		if (params->vhtSupportedRxNss)
+		if (params->vhtSupportedRxNss) {
 			cmd->peer_nss = params->vhtSupportedRxNss;
-		else
-			cmd->peer_nss = ((cmd->tx_mcs_set & VHT2x2MCSMASK)
-					== VHT2x2MCSMASK) ? 1 : 2;
+		} else {
+			uint8_t j;
+
+			cmd->peer_nss = NSS_1x1_MODE;
+			for (j = WLAN_MAX_VDEV_NSS; j >= NSS_2x2_MODE;
+			     j--) {
+				if (!VHT_IS_NSS_DISABLED(cmd->tx_mcs_set, j)) {
+					cmd->peer_nss = j;
+					break;
+				}
+			}
+		}
 
 		if (params->vht_mcs_10_11_supp) {
 			WMI_SET_BITS(cmd->tx_mcs_set, 16, cmd->peer_nss,

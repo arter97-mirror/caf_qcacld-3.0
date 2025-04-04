@@ -29,6 +29,8 @@
 #define SET_HT_MCS3(mcs) do { \
 	mcs[0] = 0x0f;        \
 	mcs[1] = 0x00;        \
+	mcs[2] = 0x00;        \
+	mcs[3] = 0x00;        \
 	} while(0)
 
 wlan_bs_req_id

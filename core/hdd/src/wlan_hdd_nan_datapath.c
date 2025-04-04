@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -152,8 +152,9 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 			switch (adapter->device_mode) {
 			case QDF_P2P_GO_MODE:
 				if (!ucfg_nan_is_sta_p2p_ndp_supported(psoc) &&
-				    test_bit(SOFTAP_BSS_STARTED,
-					     &link_info->link_flags)) {
+				    qdf_atomic_test_bit(
+						SOFTAP_BSS_STARTED,
+						link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)
@@ -200,8 +201,9 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 			case QDF_SAP_MODE:
 				if (!wlan_nan_is_sta_sap_nan_allowed(
 							hdd_ctx->psoc) &&
-				    test_bit(SOFTAP_BSS_STARTED,
-					     &link_info->link_flags)) {
+				    qdf_atomic_test_bit(
+						SOFTAP_BSS_STARTED,
+						link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)
@@ -213,8 +215,9 @@ static bool hdd_is_ndp_allowed(struct hdd_context *hdd_ctx)
 				break;
 			case QDF_P2P_GO_MODE:
 				if (!ucfg_nan_is_sta_p2p_ndp_supported(psoc) &&
-				    test_bit(SOFTAP_BSS_STARTED,
-					     &link_info->link_flags)) {
+				    qdf_atomic_test_bit(
+						SOFTAP_BSS_STARTED,
+						link_info->link_flags)) {
 					hdd_adapter_dev_put_debug(adapter,
 								  dbgid);
 					if (next_adapter)
@@ -616,7 +619,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	QDF_STATUS status;
 	int32_t ret_val;
 	mac_handle_t mac_handle;
-	bool bval = false;
+	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 	uint8_t enable_sifs_burst = 0;
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t rts_profile = 0;
@@ -642,11 +645,11 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 	mac_handle = hdd_ctx->mac_handle;
 
 	/* Configure self HT/VHT capabilities */
-	status = ucfg_mlme_get_vht_enable2x2(hdd_ctx->psoc, &bval);
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("unable to get vht_enable2x2");
 
-	sme_set_pdev_ht_vht_ies(mac_handle, bval);
+	sme_set_pdev_ht_vht_ies(mac_handle, enable_mimo);
 	sme_set_vdev_ies_per_band(mac_handle, adapter->deflink->vdev_id,
 				  adapter->device_mode);
 

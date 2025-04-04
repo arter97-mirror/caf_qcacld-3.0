@@ -277,6 +277,7 @@ enum hdd_adapter_flags {
  * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
  * @SOFTAP_ADD_INTF_LINK: add_intf_link is set for multi link SAP
+ * @WLAN_LINK_FLAG_BITS_MAX: Max bit size of this enum
  */
 enum hdd_link_flags {
 	SME_SESSION_OPENED,
@@ -284,6 +285,7 @@ enum hdd_link_flags {
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
 	SOFTAP_ADD_INTF_LINK,
+	WLAN_LINK_FLAG_BITS_MAX,
 };
 
 /**
@@ -359,6 +361,8 @@ enum hdd_nb_cmd_id {
 #define wlan_hdd_get_wps_ie_ptr(ie, ie_len) \
 	wlan_get_vendor_ie_ptr_from_oui(WPS_OUI_TYPE, WPS_OUI_TYPE_SIZE, \
 	ie, ie_len)
+
+#define BITS_IN_A_BYTE 8
 
 #define hdd_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_HDD, params)
 #define hdd_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_HDD, params)
@@ -1201,7 +1205,7 @@ struct wlan_hdd_link_info {
 	uint32_t mscs_counter;
 #endif /* WLAN_FEATURE_MSCS */
 
-	unsigned long link_flags;
+	qdf_bitmap(link_flags, WLAN_LINK_FLAG_BITS_MAX);
 	struct freq_change_info ch_chng_info;
 	struct work_struct  sap_stop_bss_work;
 };
@@ -6080,39 +6084,5 @@ static inline void hdd_release_rtnl_lock(void)
 #else
 static inline bool hdd_hold_rtnl_lock(void) { return false; }
 static inline void hdd_release_rtnl_lock(void) { }
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
-static inline void hdd_wiphy_lock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
-{
-	if (wiphy)
-		wiphy_lock(wiphy);
-	else if (dev_ptr)
-		mutex_lock(&dev_ptr->mtx);
-}
-
-static inline void hdd_wiphy_unlock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
-{
-	if (wiphy)
-		wiphy_unlock(wiphy);
-	else if (dev_ptr)
-		mutex_unlock(&dev_ptr->mtx);
-}
-#else
-static inline void hdd_wiphy_lock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
-{
-	if (wiphy)
-		wiphy_lock(wiphy);
-	else if (dev_ptr)
-		mutex_lock(&dev_ptr->wiphy->mtx);
-}
-
-static inline void hdd_wiphy_unlock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
-{
-	if (wiphy)
-		wiphy_unlock(wiphy);
-	else if (dev_ptr)
-		mutex_unlock(&dev_ptr->wiphy->mtx);
-}
 #endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

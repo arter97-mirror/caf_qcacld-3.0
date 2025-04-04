@@ -333,6 +333,22 @@ static void hdd_disable_gtk_offload(struct hdd_adapter *adapter,
 }
 
 #ifdef WLAN_NS_OFFLOAD
+#ifdef MDM_PLATFORM
+static void
+hdd_dhcp_v6_done_ind(mac_handle_t mac_handle,
+		     uint8_t vdev_id)
+{}
+#else
+static void
+hdd_dhcp_v6_done_ind(mac_handle_t mac_handle,
+		     uint8_t vdev_id)
+{
+	hdd_debug("invoking sme_dhcp_done_ind");
+	sme_dhcp_done_ind(mac_handle,
+			  vdev_id);
+}
+#endif
+
 /**
  * __wlan_hdd_ipv6_changed() - IPv6 notifier callback function
  * @net_dev: net_device whose IP address changed
@@ -368,9 +384,8 @@ static void __wlan_hdd_ipv6_changed(struct net_device *net_dev,
 	if (event == NETDEV_UP &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-		hdd_debug("invoking sme_dhcp_done_ind");
-		sme_dhcp_done_ind(hdd_ctx->mac_handle,
-				  adapter->deflink->vdev_id);
+		hdd_dhcp_v6_done_ind(hdd_ctx->mac_handle,
+				     adapter->deflink->vdev_id);
 		schedule_work(&adapter->ipv6_notifier_work);
 	}
 
@@ -1091,6 +1106,32 @@ void hdd_ipv4_notifier_work_queue(struct work_struct *work)
 	osif_vdev_sync_op_stop(vdev_sync);
 }
 
+#ifdef MDM_PLATFORM
+static void
+hdd_dhcp_v4_done_ind(mac_handle_t mac_handle,
+		     struct hdd_adapter *adapter)
+{
+	hdd_debug("invoking sme_dhcp_stop_ind");
+	/* send dhcp prot stop ind when ip address is obtained */
+	sme_dhcp_done_ind(mac_handle, adapter->deflink->vdev_id);
+	if (hdd_cm_is_vdev_associated(adapter)) {
+		hdd_debug("associated, sending stop ind");
+		sme_dhcp_stop_ind(mac_handle,
+				  adapter->device_mode,
+				  adapter->mac_addr.bytes,
+				  adapter->deflink->vdev_id);
+	}
+}
+#else
+static void
+hdd_dhcp_v4_done_ind(mac_handle_t mac_handle,
+		     struct hdd_adapter *adapter)
+{
+	hdd_debug("invoking sme_dhcp_done_ind");
+	sme_dhcp_done_ind(mac_handle, adapter->deflink->vdev_id);
+}
+#endif
+
 /**
  * __wlan_hdd_ipv4_changed() - IPv4 notifier callback function
  * @net_dev: the net_device whose IP address changed
@@ -1121,9 +1162,7 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		hdd_debug("invoking sme_dhcp_done_ind");
-		sme_dhcp_done_ind(hdd_ctx->mac_handle,
-				  adapter->deflink->vdev_id);
+		hdd_dhcp_v4_done_ind(hdd_ctx->mac_handle, adapter);
 
 		if (!ucfg_pmo_is_arp_offload_enabled(hdd_ctx->psoc)) {
 			hdd_debug("Offload not enabled");
@@ -1885,11 +1924,13 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 restart_post_cac_links:
 		restart_due_to_cac_pending = false;
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
-			if (!test_bit(SOFTAP_INIT_DONE, &link_info->link_flags))
+			if (!qdf_atomic_test_bit(
+						SOFTAP_INIT_DONE,
+						link_info->link_flags))
 				continue;
 
-			if (test_bit(SOFTAP_BSS_STARTED,
-				     &link_info->link_flags))
+			if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+						link_info->link_flags))
 				continue;
 
 			if (!ignore_cac_updated) {
@@ -1903,7 +1944,7 @@ restart_post_cac_links:
 			hdd_debug("Restart prev SAP session(vdev %d), event_flags 0x%lx, link_flags 0x%lx(%s)",
 				  link_info->vdev_id,
 				  adapter->event_flags,
-				  link_info->link_flags,
+				  link_info->link_flags[0],
 				  adapter->dev->name);
 			wlan_hdd_set_twt_responder(hdd_ctx, adapter);
 			wlan_hdd_start_sap(link_info, true);
@@ -3439,8 +3480,8 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
-		if (!test_bit(SOFTAP_BSS_STARTED,
-			      &adapter->deflink->link_flags)) {
+		if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
+					 adapter->deflink->link_flags)) {
 			hdd_debug("SAP is not started yet");
 			return 0;
 		}

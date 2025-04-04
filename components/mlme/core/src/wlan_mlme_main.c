@@ -1672,6 +1672,8 @@ static void mlme_init_timeout_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_AUTH_FAILURE_TIMEOUT);
 	timeouts->auth_rsp_timeout =
 			cfg_get(psoc, CFG_AUTH_RSP_TIMEOUT);
+	timeouts->assoc_req_timeout =
+			cfg_get(psoc, CFG_ASSOC_REQ_TIMEOUT);
 	timeouts->assoc_failure_timeout =
 			cfg_get(psoc, CFG_ASSOC_FAILURE_TIMEOUT);
 	timeouts->reassoc_failure_timeout =
@@ -1890,8 +1892,7 @@ static void mlme_init_vht_cap_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_VHT_ENABLE_TX_MCS2x2_8_9);
 	vht_cap_info->enable_vht20_mcs9 =
 			cfg_get(psoc, CFG_ENABLE_VHT20_MCS9);
-	vht_cap_info->enable2x2 =
-			cfg_get(psoc, CFG_VHT_ENABLE_2x2_CAP_FEATURE);
+	vht_cap_info->enable_mimo = cfg_get(psoc, CFG_VHT_MIMO_CAP_FEATURE);
 	vht_cap_info->enable_paid =
 			cfg_get(psoc, CFG_VHT_ENABLE_PAID_FEATURE);
 	vht_cap_info->enable_gid =
@@ -1905,11 +1906,11 @@ static void mlme_init_vht_cap_cfg(struct wlan_objmgr_psoc *psoc,
 	vht_cap_info->vendor_vhtie =
 			cfg_get(psoc, CFG_ENABLE_SUBFEE_IN_VENDOR_VHTIE);
 
-	if (vht_cap_info->enable2x2)
+	if (vht_cap_info->enable_mimo)
 		vht_cap_info->su_bformer =
 			cfg_get(psoc, CFG_VHT_ENABLE_TX_SU_BEAM_FORMER);
 
-	if (vht_cap_info->enable2x2 && vht_cap_info->su_bformer)
+	if (vht_cap_info->enable_mimo && vht_cap_info->su_bformer)
 		vht_cap_info->num_soundingdim = NUM_OF_SOUNDING_DIMENSIONS;
 
 	vht_cap_info->tx_bf_cap = cfg_default(CFG_TX_BF_CAP);
@@ -2453,6 +2454,8 @@ static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 	sap_cfg->sap_ps_with_twt_enable =
 		cfg_get(psoc, CFG_SAP_PS_WITH_TWT);
 	mlme_init_sap_mlo_cfg(psoc, sap_cfg);
+	sap_cfg->is_dual_sap_sta_enable =
+		cfg_get(psoc, CFG_SAP_SAP_STA_CONCURRENCY);
 }
 
 static void mlme_init_obss_ht40_cfg(struct wlan_objmgr_psoc *psoc,
@@ -5582,6 +5585,72 @@ QDF_STATUS wlan_mlme_get_mac_vdev_id(struct wlan_objmgr_pdev *pdev,
 	qdf_mem_copy(self_mac->bytes,
 		     wlan_vdev_mlme_get_macaddr(vdev), QDF_MAC_ADDR_SIZE);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+struct sap_ch_switch_info *wlan_get_sap_ch_sw_info(
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return NULL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_err("Cannot get ch_sw_info for mode %d",
+			 opmode);
+		return NULL;
+	}
+
+	return &mlme_priv->mlme_ap.ch_switch_info;
+}
+
+bool wlan_sap_is_owe_connection_present(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_debug("Invalid mode %d", opmode);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return mlme_priv->mlme_ap.is_owe_conn;
+}
+
+QDF_STATUS wlan_sap_set_owe_connection_support(
+				struct wlan_objmgr_vdev *vdev,
+				bool is_present)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_debug("Invalid mode %d", opmode);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->mlme_ap.is_owe_conn = is_present;
 
 	return QDF_STATUS_SUCCESS;
 }

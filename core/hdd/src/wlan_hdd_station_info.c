@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -306,12 +306,14 @@ static int hdd_convert_auth_type(uint32_t auth_type)
 	case eCSR_AUTH_TYPE_RSN_8021X_SHA256:
 		ret_val = QCA_WLAN_AUTH_TYPE_SHA256;
 		break;
+	case eCSR_AUTH_TYPE_FT_SAE_EXT_KEY:
 	case eCSR_AUTH_TYPE_FT_SAE:
 		ret_val = QCA_WLAN_AUTH_TYPE_FT_SAE;
 		break;
 	case eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384:
 		ret_val = QCA_WLAN_AUTH_TYPE_FT_SUITEB_EAP_SHA384;
 		break;
+	case eCSR_AUTH_TYPE_SAE_EXT_KEY:
 	case eCSR_AUTH_TYPE_SAE:
 		ret_val = QCA_WLAN_AUTH_TYPE_SAE;
 		break;
@@ -2567,6 +2569,7 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	int ret;
 	struct hdd_station_info *stainfo = NULL;
 	struct qdf_mac_addr *peer_mac_addr;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ucfg_mc_cp_get_big_data_fw_support(hdd_ctx->psoc, &big_data_fw_support);
@@ -2574,11 +2577,29 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	if (hdd_cm_is_disconnected(link_info) && big_data_fw_support)
 		big_data_stats_req = true;
 
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
+	/*
+	 * Don't process stats request if link reconfig is
+	 * in progress, as link can be deleted or link switch
+	 * may happen.
+	 */
+	if (mlo_is_link_recfg_in_progress(vdev)) {
+		hdd_debug("link reconfig already in progress");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EBUSY;
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+
 	if (wlan_hdd_get_station_stats(link_info))
 		hdd_err_rl("wlan_hdd_get_station_stats fail");
 
 	wlan_hdd_get_peer_rx_rate_stats(link_info);
-
 	if (hdd_cm_is_vdev_connected(link_info)) {
 		peer_mac_addr = &link_info->session.station.conn_info.bssid;
 		stainfo = qdf_mem_malloc(sizeof(*stainfo));

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2016,2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -81,5 +82,10 @@ typedef struct opaque_hdd_handle *hdd_handle_t;
  */
 #define HAL_NUM_STA (WLAN_MAX_CLIENTS_ALLOWED + 1 + 1 + 1)
 #endif
+
+#define NSS_1x1_MODE 1
+#define NSS_2x2_MODE 2
+#define NSS_3x3_MODE 3
+#define NSS_4x4_MODE 4
 
 #endif /* __SIR_TYPES_H */

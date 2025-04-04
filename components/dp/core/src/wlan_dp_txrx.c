@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -132,7 +132,10 @@ static int dp_intf_is_tx_allowed(qdf_nbuf_t nbuf,
 
 	cdp_peer_get_info_by_peer_addr(soc, peer_mac, link_id,
 				       peer_info);
+	dp_set_peer_txpt_idx(nbuf, peer_info);
+
 	peer_state = peer_info->state;
+
 	if (qdf_likely(OL_TXRX_PEER_STATE_AUTH == peer_state))
 		return true;
 	if (OL_TXRX_PEER_STATE_CONN == peer_state &&
@@ -899,6 +902,9 @@ QDF_STATUS dp_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 		 * it to stack
 		 */
 		qdf_net_buf_debug_release_skb(nbuf);
+
+		/* Reset skb->mac_header field */
+		skb_reset_mac_header(nbuf);
 
 		/*
 		 * If this is not a last packet on the chain

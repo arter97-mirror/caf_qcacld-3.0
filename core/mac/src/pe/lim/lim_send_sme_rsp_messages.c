@@ -2010,6 +2010,8 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 			       tLimChannelSwitchInfo *lim_ch_switch,
 			       struct ch_params ch_params)
 {
+	pe_debug("session chan width: %d, CSA req chan width: %d",
+		 session_entry->ch_width, ch_params.ch_width);
 	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
 	    session_entry->ch_width == ch_params.ch_width &&
 	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
@@ -2155,11 +2157,7 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 					     REG_CURRENT_PWR_MODE);
 	lim_set_chan_sw_puncture(lim_ch_switch, &ch_params);
 
-	if (!lim_sta_follow_csa(session_entry, csa_params,
-				lim_ch_switch, ch_params))
-		goto send_event;
-	else
-		qdf_mem_zero(&ch_params, sizeof(struct ch_params));
+	qdf_mem_zero(&ch_params, sizeof(struct ch_params));
 
 	if (!lim_is_csa_channel_allowed(mac_ctx, session_entry,
 					session_entry->curr_op_freq,
@@ -2435,13 +2433,13 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
 		link_id = wlan_vdev_get_link_id(session_entry->vdev);
 		update_csa_link_info(session_entry->vdev, link_id, csa_params);
-	} else {
-		mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
-		if (!mlme_priv)
-			goto send_event;
-		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
-						csa_params->new_ch_width;
 	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
+	if (!mlme_priv)
+		goto send_event;
+	mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
+						csa_params->new_ch_width;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_params->csa_chan_freq) &&
 	    session_entry->dot11mode == MLME_DOT11_MODE_11A)
@@ -2884,8 +2882,9 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 				  void *event)
 {
 	struct pe_session *session;
-	struct wlan_objmgr_vdev *vdev;
 	bool csa_tx_offload, is_sap_go_moved_before_sta = false;
+	struct sap_ch_switch_info *ch_switch_info;
+
 	tpSirFirstBeaconTxCompleteInd bcn_ind =
 		(tSirFirstBeaconTxCompleteInd *) event;
 
@@ -2895,15 +2894,10 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		return;
 	}
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
-						    session->vdev_id,
-						    WLAN_LEGACY_MAC_ID);
-	if (vdev) {
-		is_sap_go_moved_before_sta =
-			wlan_vdev_mlme_is_sap_go_move_before_sta(vdev);
-		wlan_vdev_mlme_set_sap_go_move_before_sta(vdev, false);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-	}
+	is_sap_go_moved_before_sta =
+		wlan_vdev_mlme_is_sap_go_move_before_sta(session->vdev);
+	wlan_vdev_mlme_set_sap_go_move_before_sta(session->vdev, false);
+
 	pe_debug("Vdev %d role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
 		 session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
 		 session->dfsIncludeChanSwIe,
@@ -2911,13 +2905,20 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 		 session->gLimChannelSwitch.switchCount,
 		 is_sap_go_moved_before_sta);
 
-	if (!LIM_IS_AP_ROLE(session))
+	if (!LIM_IS_AP_ROLE(session)) {
 		return;
+	}
 	csa_tx_offload = wlan_psoc_nif_fw_ext_cap_get(mac_ctx->psoc,
 						WLAN_SOC_CEXT_CSA_TX_OFFLOAD);
+	ch_switch_info = wlan_get_sap_ch_sw_info(session->vdev);
+	if (!ch_switch_info) {
+		pe_err("Invalid channel info");
+		return;
+	}
+
 	if ((session->dfsIncludeChanSwIe && !csa_tx_offload &&
 	     ((session->gLimChannelSwitch.switchCount ==
-	       mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) ||
+	       ch_switch_info->sap_ch_switch_beacon_cnt) ||
 	      (session->gLimChannelSwitch.switchCount == 1) ||
 	      is_sap_go_moved_before_sta)) ||
 	     session->bw_update_include_ch_sw_ie)

@@ -771,6 +771,13 @@ QDF_STATUS wlan_mlme_get_num_11b_tx_chains(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS wlan_mlme_get_num_11ag_tx_chains(struct wlan_objmgr_psoc *psoc,
 					    uint16_t *value);
+/**
+ * wlan_mlme_get_num_max_sap_bss() - get max sap bss
+ * @psoc: pointer to psoc object
+ *
+ * Return: Max SAP bss supported
+ */
+uint8_t wlan_mlme_get_num_max_sap_bss(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_mlme_get_bt_chain_separation_flag() - get the enable_bt_chain_separation
@@ -1263,6 +1270,7 @@ QDF_STATUS wlan_mlme_cfg_get_enable_ul_ofdm(struct wlan_objmgr_psoc *psoc,
  * mlme_update_tgt_he_caps_in_cfg() - Update tgt he cap in mlme component
  * @psoc: pointer to psoc object
  * @cfg: pointer to config params from target
+ * @num_rf_chains: Num of RF chains supported
  *
  * This api to be used by callers to update
  * he caps in mlme.
@@ -1270,7 +1278,8 @@ QDF_STATUS wlan_mlme_cfg_get_enable_ul_ofdm(struct wlan_objmgr_psoc *psoc,
  * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
  */
 QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
-					  struct wma_tgt_cfg *cfg);
+					  struct wma_tgt_cfg *cfg,
+					  uint8_t num_rf_chains);
 #endif
 
 /**
@@ -2716,24 +2725,24 @@ wlan_mlme_cfg_get_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
 					     bool *value);
 
 /**
- * wlan_mlme_get_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
+ * wlan_mlme_get_vht_mimo_cap() - Enables/disables Tx/Rx MCS values for MIMO
  * @psoc: psoc context
- * @value: data to be set
+ * @value: data to be get
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mlme_get_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool *value);
+wlan_mlme_get_vht_mimo_cap(struct wlan_objmgr_psoc *psoc, uint8_t *value);
 
 /**
- * wlan_mlme_set_vht_enable2x2() - Enables/disables VHT Tx/Rx MCS values for 2x2
+ * wlan_mlme_set_vht_mimo_cap() - Enables/disables Tx/Rx MCS values for MIMO
  * @psoc: psoc context
  * @value: data to be set
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mlme_set_vht_enable2x2(struct wlan_objmgr_psoc *psoc, bool value);
+wlan_mlme_set_vht_mimo_cap(struct wlan_objmgr_psoc *psoc, uint8_t value);
 
 /**
  * wlan_mlme_get_vht_enable_paid() - Enables/disables paid feature
@@ -2789,11 +2798,13 @@ wlan_mlme_get_vendor_vht_for_24ghz(struct wlan_objmgr_psoc *psoc, bool *value);
  * mlme_update_vht_cap() - update vht capabilities
  * @psoc: psoc context
  * @cfg: data to be set
+ * @num_rf_chains: Num of RF chains supported
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc, struct wma_tgt_vht_cap *cfg);
+QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
+			       struct wma_tgt_vht_cap *cfg,
+			       uint32_t num_rf_chains);
 
 /**
  * mlme_update_nss_vht_cap() - Update the number of spatial
@@ -3106,6 +3117,7 @@ QDF_STATUS
 wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
 					 uint8_t value);
 
+#ifdef CFG80211_SETUP_LINK_RECONFIG_SUPPORT
 /**
  * wlan_mlme_is_link_recfg_support() - Check if Link
  * reconfiguration feature is supported
@@ -3115,6 +3127,13 @@ wlan_mlme_set_t2lm_negotiation_supported(struct wlan_objmgr_psoc *psoc,
  */
 bool
 wlan_mlme_is_link_recfg_support(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+wlan_mlme_is_link_recfg_support(struct wlan_objmgr_psoc *psoc)
+{
+       return 0;
+}
+#endif
 
 /**
  * wlan_mlme_get_link_recfg_support() - Get the Link
@@ -4694,6 +4713,15 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
  * Return: bool to check if the mld/link use same mac address
  */
 bool wlan_mlme_get_sta_same_link_mld_addr(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_is_dual_sap_sta_enabled() - check if dual sap + sta is enable
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if dual sap + sta supported otherwise false
+ */
+bool wlan_mlme_is_dual_sap_sta_enabled(struct wlan_objmgr_psoc *psoc);
+
 #else
 static inline
 void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
@@ -4757,6 +4785,13 @@ wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline bool
+wlan_mlme_is_dual_sap_sta_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
 #endif
 
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP
@@ -4792,6 +4827,15 @@ wlan_mlme_set_mlo_sap_support_link(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+/**
+ * wlan_mlme_update_dual_sap_sta_cap() - update dual sap + sta in cfg
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wlan_mlme_update_dual_sap_sta_cap(struct wlan_objmgr_psoc *psoc);
+
 
 /**
  * wlan_mlme_set_ba_2k_jump_iot_ap() - Set a flag if ba 2k jump IOT AP is found

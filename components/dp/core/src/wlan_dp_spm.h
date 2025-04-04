@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: ISC
  */
 
@@ -10,8 +10,12 @@
 #include <qdf_nbuf.h>
 #include "wlan_dp_main.h"
 
-#define WLAN_DP_SPM_FLOW_REC_TBL_MAX 64
-#define WLAN_DP_SPM_INVALID_FLOW_ID 0xFF
+#define WLAN_DP_SPM_FLOW_REC_TBL_MAX 256
+#define WLAN_DP_SPM_HASH_TBL_MAX 64
+
+#define SAWFISH_FLOW_ID_MAX 0x3F
+#define SAWFISH_INVALID_FLOW_ID 0xFFFF
+
 #define WLAN_DP_SPM_MAX_SERVICE_CLASS_SUPPORT 32
 #define WLAN_DP_SPM_INVALID_METADATA 0xFF
 
@@ -74,6 +78,8 @@ struct wlan_dp_spm_flow_tbl_stats {
 /**
  * struct wlan_dp_spm_flow_info - Record of flow which will be tracked
  * @node: List node
+ * @hnode: hash list node
+ * @rcu: internal rcu lock for the structure
  * @id: Flow ID
  * @is_populated: Is flow valid
  * @info: Flow details
@@ -100,11 +106,13 @@ struct wlan_dp_spm_flow_tbl_stats {
  */
 struct wlan_dp_spm_flow_info {
 	qdf_list_node_t node;
+	struct qdf_ht_entry hnode;
+	qdf_rcu_head_t rcu;
 	uint16_t id;
 	bool is_populated;
 	struct flow_info info;
 	bool is_ipv4;
-	uint64_t guid;
+	uint32_t guid;
 	uint16_t peer_id;
 	uint8_t vdev_id;
 	uint16_t svc_id;
@@ -121,9 +129,6 @@ struct wlan_dp_spm_flow_info {
 	uint8_t classified;
 	uint64_t flow_tuple_hash;
 #endif
-	uint64_t win_start_ts;
-	uint64_t win_start_num_pkts;
-	uint64_t last_win_pkts;
 };
 
 /**
@@ -153,18 +158,12 @@ struct wlan_dp_spm_screening_ctx {
 
 /**
  * struct wlan_dp_spm_intf_context - SPM context per dp interface
- * @origin_aft: Active flow table for originating traffic
- * @flow_rec_base: Flow records base address
- * @o_flow_rec_freelist: Flow records freelist
- * @flow_list_lock: Flow list operation lock
+ * @origin_aft_hlist: Active flow table for originating traffic
  * @o_stats: Flow table stats for originating traffic
  * @screen_flow_ctx: Flow screening context
  */
 struct wlan_dp_spm_intf_context {
-	struct wlan_dp_spm_flow_info *origin_aft[WLAN_DP_SPM_FLOW_REC_TBL_MAX];
-	struct wlan_dp_spm_flow_info *flow_rec_base;
-	qdf_list_t o_flow_rec_freelist;
-	qdf_spinlock_t flow_list_lock;
+	struct hlist_head origin_aft_hlist[WLAN_DP_SPM_HASH_TBL_MAX];
 	struct wlan_dp_spm_flow_tbl_stats o_stats;
 	struct wlan_dp_spm_screening_ctx screen_flow_ctx;
 };
@@ -459,16 +458,6 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 					  struct flow_info *flow_info,
 					  uint64_t cookie_sk, uint16_t peer_id);
 
-/**
- * wlan_dp_spm_set_flow_active(): Set active ts for a flow
- * @spm_intf: SPM interface
- * @flow_id: Flow ID
- * @flow_guid: Flow Unique ID
- *
- * Return: None
- */
-void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
-				 uint16_t flow_id, uint64_t flow_guid);
 #else
 static inline void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx)
 {
@@ -516,12 +505,6 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 					  uint64_t cookie_sk, uint16_t peer_id)
 {
 	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-void wlan_dp_spm_set_flow_active(struct wlan_dp_spm_intf_context *spm_intf,
-				 uint16_t flow_id, uint64_t flow_guid)
-{
 }
 #endif
 #endif

@@ -456,7 +456,7 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 			mlme_feature_set.vendor_req_2_version;
 	feature_set->iface_combinations = mlme_feature_set.iface_combinations;
 
-	if (mlme_feature_set.enable2x2)
+	if (mlme_feature_set.enable_mimo)
 		feature_set->num_antennas = WMI_HOST_MIMO_2X2;
 	else
 		feature_set->num_antennas = WMI_HOST_SISO;
@@ -5878,9 +5878,9 @@ static void wma_update_target_ext_ht_cap(struct target_psoc_info *tgt_hdl,
 					mac_phy_cap[i].rx_chain_mask_2G);
 		if (ht_5g)
 			wma_derive_ext_ht_cap(&tmp_ht_cap,
-					ht_5g,
-					mac_phy_cap[i].tx_chain_mask_5G,
-					mac_phy_cap[i].rx_chain_mask_5G);
+					      ht_5g,
+					      mac_phy_cap[i].tx_chain_mask_5G,
+					      mac_phy_cap[i].rx_chain_mask_5G);
 	}
 
 	if (qdf_mem_cmp(&tmp_cap, &tmp_ht_cap,

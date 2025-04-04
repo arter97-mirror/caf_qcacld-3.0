@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -503,6 +503,8 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 	if (ucfg_ipa_is_enabled()) {
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				      adapter->device_mode,
+				      sta->link_info ?
+				      sta->link_info->vdev_id :
 				      adapter->deflink->vdev_id,
 				      WLAN_IPA_CLIENT_DISCONNECT,
 				      mac_addr->bytes,
@@ -700,12 +702,13 @@ hdd_softap_register_bc_sta(struct wlan_hdd_link_info *link_info,
 	return qdf_status;
 }
 
-QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter)
+QDF_STATUS hdd_softap_stop_bss(struct wlan_hdd_link_info *link_info)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint8_t indoor_chnl_marking = 0;
 	struct hdd_context *hdd_ctx;
 	struct hdd_station_info *sta_info, *tmp = NULL;
+	struct hdd_adapter *adapter = link_info->adapter;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
@@ -739,7 +742,7 @@ QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter)
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev,
 				      adapter->dev,
 				      adapter->device_mode,
-				      adapter->deflink->vdev_id,
+				      link_info->vdev_id,
 				      WLAN_IPA_AP_DISCONNECT,
 				      adapter->dev->dev_addr,
 				      false) != QDF_STATUS_SUCCESS)

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -292,8 +292,8 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 							SAP_PRE_CAC_IFNAME);
 	if (pre_cac_adapter) {
 		hdd_debug("pre cac SAP adapter is present");
-		if (test_bit(SME_SESSION_OPENED,
-			     &pre_cac_adapter->deflink->link_flags)) {
+		if (qdf_atomic_test_bit(SME_SESSION_OPENED,
+					pre_cac_adapter->deflink->link_flags)) {
 			hdd_debug("pre cac is on-going");
 			return 0;
 		}

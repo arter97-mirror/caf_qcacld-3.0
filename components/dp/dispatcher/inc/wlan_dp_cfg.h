@@ -1519,6 +1519,36 @@
 #define CFG_DP_DYNAMIC_RESOURCE_MGMT
 #endif
 
+#define WLAN_CFG_DP_IRQ_AFFINITY_MASK 0
+#define WLAN_CFG_DP_IRQ_AFFINITY_MASK_MIN 0
+#define WLAN_CFG_DP_IRQ_AFFINITY_MASK_MAX 0x3FF
+
+/*
+ * <ini>
+ * dp_irq_affinity_ctrl - Affinity control for Datapath interrupts
+ * @Min: 0
+ * @Max: 0x3FF
+ * @Default: 0
+ *
+ * This ini is used to control Datapath interrupt affinity.
+ * The value 0 is used to disable the cusotm control of DP interrupts.
+ * The value 0-0x3FF are used to indicate a CPU bitmask used to affine the DP
+ * interrupts when system-wide throughput crosses a certain threshold.
+ *
+ * Supported modes: All modes
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DP_IRQ_AFFINITY_MASK \
+	CFG_INI_UINT("dp_irq_affinity_mask", \
+		     WLAN_CFG_DP_IRQ_AFFINITY_MASK_MIN, \
+		     WLAN_CFG_DP_IRQ_AFFINITY_MASK_MAX, \
+		     WLAN_CFG_DP_IRQ_AFFINITY_MASK, \
+		     CFG_VALUE_OR_DEFAULT, \
+		     "DP interrupt affinity control")
+
 /*
  * <ini>
  * dp_ipa_debug_enable - support IPA debugging
@@ -1573,6 +1603,7 @@
 	CFG_DP_FLOW_BALANCE \
 	CFG_DP_STC \
 	CFG_DP_DYNAMIC_RESOURCE_MGMT \
-	CFG(CFG_DP_IPA_DEBUG_ENABLE)
+	CFG(CFG_DP_IPA_DEBUG_ENABLE) \
+	CFG(CFG_DP_IRQ_AFFINITY_MASK)
 
 #endif /* WLAN_DP_CFG_H__ */

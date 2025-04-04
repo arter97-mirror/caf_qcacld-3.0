@@ -1506,7 +1506,7 @@ enum host_log_level {
  * g_sap_sap_sta_concurrency  - enable SAP-SAP-STA concurrency
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini will not allow SAP-SAP-STA concurrency to be included in the
  * iface combinations.
@@ -1523,7 +1523,7 @@ enum host_log_level {
  */
 #define CFG_SAP_SAP_STA_CONCURRENCY CFG_INI_BOOL( \
 		"g_sap_sap_sta_concurrency", \
-		0, \
+		1, \
 		"This ini is used to enable SAP-SAP-STA concurrency")
 
 /*

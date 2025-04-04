@@ -829,7 +829,6 @@ static int __hdd_soc_probe(struct device *dev,
 	probe_fail_cnt = 0;
 	cds_set_driver_loaded(true);
 	cds_set_load_in_progress(false);
-	hdd_start_complete(0);
 	hdd_thermal_mitigation_register(hdd_ctx, dev);
 	hdd_ddr_bw_mitigation_register(hdd_ctx, dev);
 
@@ -892,9 +891,12 @@ static int hdd_soc_probe(struct device *dev,
 
 	osif_psoc_sync_trans_stop(psoc_sync);
 
+	hdd_start_complete(0);
+
 	return 0;
 
 destroy_sync:
+	hdd_start_complete(errno);
 	osif_psoc_sync_unregister(dev);
 	osif_psoc_sync_wait_for_ops(psoc_sync);
 

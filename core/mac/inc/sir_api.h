@@ -4447,18 +4447,20 @@ struct ppet_hdr {
  * | 15-14 | 13-12 | 11-10 | 9-8 | 7-6 | 5-4 | 3-2 | 1-0 |
  * +-----------------------------------------------------+
  */
+#define HE_MCS_ALL_DISABLED                   0xFFFF
 #define HE_MCS_NSS_SHIFT(nss)                 (((nss) - 1) << 1)
-#define HE_MCS_MSK_4_NSS(nss)                 (3 << HE_MCS_NSS_SHIFT(nss))
-#define HE_MCS_INV_MSK_4_NSS(nss)             (~HE_MCS_MSK_4_NSS(nss))
-#define HE_GET_MCS_4_NSS(mcs_set, nss)             \
+#define HE_MCS_BITS_PER_NSS                   0x2
+#define HE_MCS_MSK_FOR_NSS(nss)               (3 << HE_MCS_NSS_SHIFT(nss))
+#define HE_MCS_INV_MSK_FOR_NSS(nss)             (~HE_MCS_MSK_FOR_NSS(nss))
+#define HE_DISABLE_MCS_OVER_NSS(_nss) \
+	(HE_MCS_ALL_DISABLED ^ (BIT((_nss) * HE_MCS_BITS_PER_NSS) - 1))
+#define HE_GET_MCS_FOR_NSS(mcs_set, nss)             \
 	(((mcs_set) >> HE_MCS_NSS_SHIFT(nss)) & 3)
-#define HE_SET_MCS_4_NSS(mcs_set, mcs, nss)        \
-	(((mcs_set) & HE_MCS_INV_MSK_4_NSS(nss)) | \
+#define HE_SET_MCS_FOR_NSS(mcs_set, mcs, nss)        \
+	(((mcs_set) & HE_MCS_INV_MSK_FOR_NSS(nss)) | \
 	((mcs) << HE_MCS_NSS_SHIFT(nss)))
 #define HE_MCS_IS_NSS_ENABLED(mcs_set, nss)        \
-	((HE_MCS_MSK_4_NSS(nss) & (mcs_set)) != HE_MCS_MSK_4_NSS(nss))
-
-#define HE_MCS_ALL_DISABLED                   0xFFFF
+	((HE_MCS_MSK_FOR_NSS(nss) & (mcs_set)) != HE_MCS_MSK_FOR_NSS(nss))
 
 #define HE_MCS_0_7     0x0
 #define HE_MCS_0_9     0x1
@@ -4503,22 +4505,69 @@ struct ppet_hdr {
 
 /* following takes MCS as 16 bits */
 #define HE_INTERSECT_MCS(mcs_1, mcs_2)                             ( \
-	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 1),         \
-		HE_GET_MCS_4_NSS(mcs_2, 1)) << HE_MCS_NSS_SHIFT(1) | \
-	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 2),         \
-		HE_GET_MCS_4_NSS(mcs_2, 2)) << HE_MCS_NSS_SHIFT(2) | \
-	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 3),         \
-		HE_GET_MCS_4_NSS(mcs_2, 3)) << HE_MCS_NSS_SHIFT(3) | \
-	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 4),         \
-		HE_GET_MCS_4_NSS(mcs_2, 4)) << HE_MCS_NSS_SHIFT(4) | \
-	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 5),         \
-		HE_GET_MCS_4_NSS(mcs_2, 5)) << HE_MCS_NSS_SHIFT(5) | \
-	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 6),         \
-		HE_GET_MCS_4_NSS(mcs_2, 6)) << HE_MCS_NSS_SHIFT(6) | \
-	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 7),         \
-		HE_GET_MCS_4_NSS(mcs_2, 7)) << HE_MCS_NSS_SHIFT(7) | \
-	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_4_NSS(mcs_1, 8),         \
-		HE_GET_MCS_4_NSS(mcs_2, 8)) << HE_MCS_NSS_SHIFT(8))
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_FOR_NSS(mcs_1, 1),         \
+		HE_GET_MCS_FOR_NSS(mcs_2, 1)) << HE_MCS_NSS_SHIFT(1) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_FOR_NSS(mcs_1, 2),         \
+		HE_GET_MCS_FOR_NSS(mcs_2, 2)) << HE_MCS_NSS_SHIFT(2) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_FOR_NSS(mcs_1, 3),         \
+		HE_GET_MCS_FOR_NSS(mcs_2, 3)) << HE_MCS_NSS_SHIFT(3) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_FOR_NSS(mcs_1, 4),         \
+		HE_GET_MCS_FOR_NSS(mcs_2, 4)) << HE_MCS_NSS_SHIFT(4) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_FOR_NSS(mcs_1, 5),         \
+		HE_GET_MCS_FOR_NSS(mcs_2, 5)) << HE_MCS_NSS_SHIFT(5) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_FOR_NSS(mcs_1, 6),         \
+		HE_GET_MCS_FOR_NSS(mcs_2, 6)) << HE_MCS_NSS_SHIFT(6) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_FOR_NSS(mcs_1, 7),         \
+		HE_GET_MCS_FOR_NSS(mcs_2, 7)) << HE_MCS_NSS_SHIFT(7) | \
+	HE_INTERSECT_MCS_PER_NSS(HE_GET_MCS_FOR_NSS(mcs_1, 8),         \
+		HE_GET_MCS_FOR_NSS(mcs_2, 8)) << HE_MCS_NSS_SHIFT(8))
+
+/*
+ * Following formuala has been arrived at using karnaugh map and unit tested
+ * with sample code. Take MCS for each NSS as 2 bit value first and solve for
+ * 2 bit intersection of NSS. Use following table/Matrix as guide for solving
+ * K-Maps
+ * m1m0\n1n0
+ * MCS 1\MCS 2    00         01         10         11
+ *    00          00         01         10         00
+ *    01          01         01         10         01
+ *    10          10         10         10         10
+ *    11          00         01         10         11
+ * if output MCS is o1o0, then as per K-map reduction:
+ * o0 = m0.n0 | (~m1).m0.(~n1) | (~m1).(~n1).n0
+ * 01 = m1.(~m0) | n1.(~n0) | m1.n1
+ *
+ * Please note: Calculating MCS intersection is 80211 protocol specific and
+ * should be implemented in PE. WMA can use this macro rather than calling any
+ * lim API to do the intersection.
+ */
+#define HE_INTERSECT_MCS_BITS_PER_NSS_MAX_ENAB(m1, m0, n1, n0)     \
+	(((m0 & n0) | ((~m1) & m0 & (~n1)) | ((~m1) & (~n1) & n0)) | \
+	 ((m1 & (~m0)) | (n1 & (~n0)) | (m1 & n1)) << 1)
+
+/* following takes MCS as 2 bits */
+#define HE_INTERSECT_MCS_PER_NSS_MAX_ENAB(mcs_1, mcs_2)                  \
+	HE_INTERSECT_MCS_BITS_PER_NSS_MAX_ENAB((mcs_1 >> 1), (mcs_1 & 1),\
+				      (mcs_2 >> 1), (mcs_2 & 1))
+
+/* following takes MCS as 16 bits */
+#define HE_INTERSECT_MCS_MAX_ENAB(mcs_1, mcs_2)                      ( \
+	HE_INTERSECT_MCS_PER_NSS_MAX_ENAB(HE_GET_MCS_FOR_NSS(mcs_1, 1),  \
+		HE_GET_MCS_FOR_NSS(mcs_2, 1)) << HE_MCS_NSS_SHIFT(1) |   \
+	HE_INTERSECT_MCS_PER_NSS_MAX_ENAB(HE_GET_MCS_FOR_NSS(mcs_1, 2),  \
+		HE_GET_MCS_FOR_NSS(mcs_2, 2)) << HE_MCS_NSS_SHIFT(2) |   \
+	HE_INTERSECT_MCS_PER_NSS_MAX_ENAB(HE_GET_MCS_FOR_NSS(mcs_1, 3),  \
+		HE_GET_MCS_FOR_NSS(mcs_2, 3)) << HE_MCS_NSS_SHIFT(3) |   \
+	HE_INTERSECT_MCS_PER_NSS_MAX_ENAB(HE_GET_MCS_FOR_NSS(mcs_1, 4),  \
+		HE_GET_MCS_FOR_NSS(mcs_2, 4)) << HE_MCS_NSS_SHIFT(4) |   \
+	HE_INTERSECT_MCS_PER_NSS_MAX_ENAB(HE_GET_MCS_FOR_NSS(mcs_1, 5),  \
+		HE_GET_MCS_FOR_NSS(mcs_2, 5)) << HE_MCS_NSS_SHIFT(5) |   \
+	HE_INTERSECT_MCS_PER_NSS_MAX_ENAB(HE_GET_MCS_FOR_NSS(mcs_1, 6),  \
+		HE_GET_MCS_FOR_NSS(mcs_2, 6)) << HE_MCS_NSS_SHIFT(6) |   \
+	HE_INTERSECT_MCS_PER_NSS_MAX_ENAB(HE_GET_MCS_FOR_NSS(mcs_1, 7),  \
+		HE_GET_MCS_FOR_NSS(mcs_2, 7)) << HE_MCS_NSS_SHIFT(7) |   \
+	HE_INTERSECT_MCS_PER_NSS_MAX_ENAB(HE_GET_MCS_FOR_NSS(mcs_1, 8),  \
+		HE_GET_MCS_FOR_NSS(mcs_2, 8)) << HE_MCS_NSS_SHIFT(8))
 
 /**
  * struct he_capability - to store 11ax HE capabilities

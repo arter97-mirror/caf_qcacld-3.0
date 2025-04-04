@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -105,15 +105,26 @@
 
 #define SIR_MAC_MAX_SUPPORTED_MCS_SET    16
 
-#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1       390
-#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1       390
-#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
-#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2       780
+static const uint32_t vht_supported_datarate_bw80_gi400ns[] = {
+	[NSS_1x1_MODE - 1] = 390,
+	[NSS_2x2_MODE - 1] = 780,
+	[NSS_3x3_MODE - 1] = 1170,
+	[NSS_4x4_MODE - 1] = 1560,
+};
 
-#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80 433
-#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80 433
-#define VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80 866
-#define VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80 866
+static const uint32_t vht_supported_datarate_bw80_gi800ns[] = {
+	[NSS_1x1_MODE - 1] = 433,
+	[NSS_2x2_MODE - 1] = 866,
+	[NSS_3x3_MODE - 1] = 1300,
+	[NSS_4x4_MODE - 1] = 1733,
+};
+
+#define VHT_GET_DATARATE_FOR_NSS_AND_GI(_nss, _is_gi400ns) \
+	(_is_gi400ns) ? \
+	vht_supported_datarate_bw80_gi400ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
+						    (_nss)) - 1] : \
+	vht_supported_datarate_bw80_gi800ns[QDF_MIN(WLAN_MAX_VDEV_NSS, \
+						    (_nss)) - 1]
 
 #define VHT_CAP_NO_160M_SUPP 0
 #define VHT_CAP_160_SUPP 1
@@ -976,6 +987,7 @@ typedef struct sHtCaps {
 #define SIZE_OF_BASIC_MCS_SET                              16
 #define VALID_MCS_SIZE                                     77   /* 0-76 */
 #define MCS_RX_HIGHEST_SUPPORTED_RATE_BYTE_OFFSET          10
+#define WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS                 96
 #define VALID_MAX_MCS_INDEX                                8
 
 /* */

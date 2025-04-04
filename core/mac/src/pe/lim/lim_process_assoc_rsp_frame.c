@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -139,6 +139,7 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
 	struct pe_session *session_entry, tSchBeaconStruct *beacon)
 {
+	uint8_t idx;
 	uint32_t phy_mode;
 	bool qos_mode;
 	tDot11fIEVHTCaps *vht_caps = NULL;
@@ -230,9 +231,15 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 		pe_err("could not get rateset and extended rate set");
 		return;
 	}
-	sta_ds->vhtSupportedRxNss =
-		((sta_ds->supportedRates.vhtTxMCSMap & MCSMAPMASK2x2)
-		 == MCSMAPMASK2x2) ? 1 : 2;
+
+	sta_ds->vhtSupportedRxNss = NSS_1x1_MODE;
+	for (idx = WLAN_MAX_VDEV_NSS; idx >= NSS_2x2_MODE; idx--) {
+		if (!VHT_IS_NSS_DISABLED(sta_ds->supportedRates.vhtTxMCSMap,
+					 idx)) {
+			sta_ds->vhtSupportedRxNss = idx;
+			break;
+		}
+	}
 
 	/* If one of the rates is 11g rates, set the ERP mode. */
 	if ((phy_mode == WNI_CFG_PHY_MODE_11G) &&

@@ -764,6 +764,7 @@ struct wlan_mlme_wps_params {
  * @disable_bcn_prot: disable beacon protection for sap
  * @sap_ps_with_twt_enable: SAP power save with TWT
  * @mlo_sap_support_link_num: sap support link num
+ * @is_dual_sap_sta_enable: Dual SAP + STA support
  */
 struct wlan_mlme_cfg_sap {
 	uint16_t beacon_interval;
@@ -802,6 +803,7 @@ struct wlan_mlme_cfg_sap {
 	bool disable_bcn_prot;
 	bool sap_ps_with_twt_enable;
 	uint8_t mlo_sap_support_link_num;
+	bool is_dual_sap_sta_enable;
 };
 
 /**
@@ -897,7 +899,7 @@ struct wlan_mlme_powersave {
  * @rx_mcs2x2: VHT Rx MCS capability for 2x2 mode
  * @tx_mcs2x2: VHT Tx MCS capability for 2x2 mode
  * @enable_vht20_mcs9: Enables VHT MCS9 in 20M BW operation
- * @enable2x2: Enables/disables VHT Tx/Rx MCS values for 2x2
+ * @enable_mimo: Enables/disables VHT Tx/Rx MCS values for SISO - 0/MIMO - 1/2
  * @enable_mu_bformee: Enables/disables multi-user (MU)
  * beam formee capability
  * @enable_paid: Enables/disables paid
@@ -947,7 +949,7 @@ struct mlme_vht_capabilities_info {
 	uint8_t rx_mcs2x2;
 	uint8_t tx_mcs2x2;
 	bool enable_vht20_mcs9;
-	bool enable2x2;
+	uint8_t enable_mimo;
 	bool enable_mu_bformee;
 	bool enable_paid;
 	bool enable_gid;
@@ -1786,8 +1788,12 @@ enum dot11p_mode {
 	CFG_11P_CONCURRENT,
 };
 
-#define MAX_VDEV_NSS                2
-#define MAX_VDEV_CHAINS             2
+#ifndef WLAN_MAX_VDEV_NSS
+#define WLAN_MAX_VDEV_NSS                2
+#endif
+#ifndef WLAN_MAX_VDEV_CHAINS
+#define WLAN_MAX_VDEV_CHAINS             2
+#endif
 
 /**
  * struct wlan_mlme_nss_chains -     MLME vdev config of nss, and chains
@@ -2598,6 +2604,7 @@ struct wlan_mlme_power {
  * @join_failure_timeout_ori: original value of above join timeout
  * @auth_failure_timeout: authenticate failure timeout
  * @auth_rsp_timeout: authenticate response timeout
+ * @assoc_req_timeout: assoc req wait time
  * @assoc_failure_timeout: assoc failure timeout
  * @reassoc_failure_timeout: re-assoc failure timeout
  * @olbc_detect_timeout: OLBC detect timeout
@@ -2614,6 +2621,7 @@ struct wlan_mlme_timeout {
 	uint32_t join_failure_timeout_ori;
 	uint32_t auth_failure_timeout;
 	uint32_t auth_rsp_timeout;
+	uint32_t assoc_req_timeout;
 	uint32_t assoc_failure_timeout;
 	uint32_t reassoc_failure_timeout;
 	uint32_t olbc_detect_timeout;
@@ -3104,7 +3112,7 @@ enum wlan_mlme_iface_combinations {
  * @roaming_ctrl_get_cu: Roaming ctrl get cu enabled or disabled
  * @vendor_req_1_version: Vendor requirement version 1
  * @vendor_req_2_version: Vendor requirement version 2
- * @enable2x2: Enable 2x2
+ * @enable_mimo: Enable SISO - 0/MIMO - 1/2
  * @iface_combinations: iface combination bitmask
  */
 struct wlan_mlme_features {
@@ -3124,7 +3132,7 @@ struct wlan_mlme_features {
 	bool roaming_ctrl_get_cu;
 	WMI_HOST_VENDOR1_REQ1_VERSION vendor_req_1_version;
 	WMI_HOST_VENDOR1_REQ2_VERSION vendor_req_2_version;
-	bool enable2x2;
+	uint8_t enable_mimo;
 	uint32_t iface_combinations;
 };
 #endif

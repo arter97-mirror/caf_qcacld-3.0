@@ -945,6 +945,71 @@ mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 
+bool
+mlo_check_if_all_peer_authenticated(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_mlo_sta *sta_ctx;
+	uint8_t i;
+	struct wlan_objmgr_vdev *link_vdev;
+	struct wlan_objmgr_peer *peer;
+	bool is_authenticated = false;
+
+	if (!vdev || !vdev->mlo_dev_ctx) {
+		mlo_err("Vdev is null");
+		return false;
+	}
+
+	if (QDF_IS_STATUS_ERROR(wlan_vdev_is_up(vdev))) {
+		mlo_debug("Vdev id %d is not in up state",
+			  wlan_vdev_get_id(vdev));
+			return false;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx->sta_ctx) {
+		mlo_err("mlo sta ctx is null");
+		return false;
+	}
+	sta_ctx = mlo_dev_ctx->sta_ctx;
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		link_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!link_vdev)
+			continue;
+		if (qdf_test_bit(i, sta_ctx->wlan_connected_links) ||
+		    qdf_test_bit(i, sta_ctx->wlan_connect_req_links)) {
+			if (!wlan_cm_is_vdev_connected(link_vdev)) {
+				mlo_debug_rl("vdev %d not connected",
+					     wlan_vdev_get_id(link_vdev));
+				return false;
+			}
+			peer = wlan_objmgr_vdev_try_get_bsspeer(link_vdev,
+								WLAN_MLO_MGR_ID);
+			if (!peer) {
+				mlo_debug_rl("BSS peer for vdev %d is null",
+					     wlan_vdev_get_id(link_vdev));
+				return false;
+			}
+			is_authenticated = wlan_peer_mlme_get_auth_state(peer);
+			if (!is_authenticated) {
+				mlo_debug_rl("Vdev%d bss peer not authenticated",
+					     wlan_vdev_get_id(link_vdev));
+				wlan_objmgr_peer_release_ref(peer,
+							     WLAN_MLO_MGR_ID);
+				return false;
+			}
+			wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
+		}
+	}
+
+	if (i == WLAN_UMAC_MLO_MAX_VDEVS) {
+		mlo_debug_rl("all peers are authenticated");
+		return true;
+	}
+
+	return false;
+}
+
 void
 mlo_roam_set_link_id(struct wlan_objmgr_vdev *vdev,
 		     struct roam_offload_synch_ind *sync_ind)

@@ -2192,20 +2192,6 @@ bool wlan_is_roaming_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 bool wlan_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
- * wlan_is_rso_disabled() - Check if RSO state is disabled
- *
- * @pdev: pointer to pdev object
- * @vdev_id : Vdev id
- *
- * Check if the ROAM SCAN OFFLOAD disable is sent to firmware. Host driver
- * tracks this through RSO state machine and the states can be WLAN_ROAM_DEINIT
- * and WLAN_ROAM_RSO_STOPPED.
- *
- * Return: True if RSO state is any of the above mentioned states.
- */
-bool wlan_is_rso_disabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
-
-/**
  * wlan_cm_set_sae_auth_ta() - Set SAE auth tx address
  * @pdev: pdev object
  * @vdev_id : Vdev id
@@ -2317,12 +2303,23 @@ cm_send_ies_for_roam_invoke(struct wlan_objmgr_vdev *vdev, uint16_t dot11_mode);
  */
 bool
 wlan_cm_is_sae_auth_addr_conversion_required(struct wlan_objmgr_vdev *vdev);
+
+void
+wlan_cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
+			struct wlan_objmgr_vdev *vdev,
+			struct wlan_roam_start_config *start_req);
 #else
 static inline bool
 wlan_cm_is_sae_auth_addr_conversion_required(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
 }
+
+static inline void
+wlan_cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
+			struct wlan_objmgr_vdev *vdev,
+			struct wlan_roam_start_config *start_req)
+{}
 #endif /* WLAN_FEATURE_11BE_MLO */
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)

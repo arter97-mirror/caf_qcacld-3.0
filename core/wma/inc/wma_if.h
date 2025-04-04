@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -218,6 +218,7 @@ struct peer_ml_info {
  * @is_assoc_peer: is assoc peer or not
  * @emlsr_support: is EMLSR mode supported or not
  * @msd_caps_present: is MSD capability present in MLO IE or not
+ * @ext_mld_caps_present: if Extended MLD capability present in MLO IE
  * @link_id: per link id
  * @emlsr_trans_timeout: EMLSR transition timeout value
  * @eml_info: EMLSR capability info for sta peer under mlo sap mode
@@ -314,12 +315,14 @@ typedef struct {
 	bool is_assoc_peer;
 	bool emlsr_support;
 	bool msd_caps_present;
+	bool ext_mld_caps_present;
 	uint8_t link_id;
 	uint16_t emlsr_trans_timeout;
 	struct wlan_mlo_eml_cap eml_info;
 	struct wlan_mlo_mld_cap mld_info;
 	struct ml_partner_link_info ml_partner_info[MLD_MAX_LINKS - 1];
 	struct peer_ml_info ml_info;
+	struct wlan_mlo_ext_mld_cap ext_mld_cap;
 #endif
 	struct security_info sec_info;
 } tAddStaParams, *tpAddStaParams;

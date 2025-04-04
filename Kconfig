@@ -65,6 +65,10 @@ config BERYLLIUM
 	bool "Enable BERYLLIUM"
 	default n
 
+config BORON
+	bool "Enable BORON"
+	default n
+
 config BUILD_TAG
 	bool "Embed tags and timestamp in wlan version"
 	default n
@@ -105,12 +109,20 @@ config CNSS_PEACH_V2
 	bool "Enable CNSS_PEACH_V2"
 	default n
 
+config CNSS_FIG
+	bool "Enable CNSS_FIG"
+	default n
+
 config INCLUDE_HAL_KIWI
 	bool "Enable INCLUDE_HAL_KIWI"
 	default n
 
 config INCLUDE_HAL_PEACH
 	bool "Enable INCLUDE_HAL_PEACH"
+	default n
+
+config INCLUDE_HAL_FIG
+	bool "Enable INCLUDE_HAL_FIG"
 	default n
 
 config CNSS_UTILS_MODULE
@@ -652,6 +664,10 @@ config ICMP_DISABLE_PS
 
 config QCACLD_FEATURE_SON
 	bool "Enable easymesh for QCACLD"
+	default n
+
+config WLAN_FEATURE_MC_BC_4_ADDR
+	bool "Enable TX MC/BC with 4 address"
 	default n
 
 config IPA_OFFLOAD
@@ -1258,6 +1274,10 @@ config WLAN_FEATURE_11BE_MLO_TTLM
 	bool "Enable CONFIG_WLAN_FEATURE_11BE_MLO_TTLM"
 	default n
 
+config CFG80211_SETUP_LINK_RECONFIG_SUPPORT
+	bool "Enable CONFIG_CFG80211_SETUP_LINK_RECONFIG_SUPPORT"
+	default n
+
 config WLAN_FEATURE_11BE_MLO
 	bool "Enable WLAN_FEATURE_11BE_MLO"
 	default n
@@ -1446,6 +1466,10 @@ config WLAN_FEATURE_SAE
 
 config WLAN_FEATURE_SAP_ACS_OPTIMIZE
 	bool "Enable WLAN_FEATURE_SAP_ACS_OPTIMIZE"
+	default n
+
+config WLAN_FEATURE_CHECK_RSN_BIP
+	bool "Enable CONFIG_WLAN_FEATURE_CHECK_RSN_BIP"
 	default n
 
 config FEATURE_WLAN_GC_SKIP_JOIN
@@ -2069,6 +2093,10 @@ config QCA_WIFI_PEACH
 	bool "enable QCA_WIFI_PEACH"
 	default n
 
+config QCA_WIFI_FIG
+	bool "enable QCA_WIFI_FIG"
+	default n
+
 config BCN_RATECODE_ENABLE
 	bool "enable CONFIG_BCN_RATECODE_ENABLE"
 	default n
@@ -2372,6 +2400,14 @@ config WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG
 config WLAN_TSF_UPLINK_DELAY
 	bool "Enable WLAN_TSF_UPLINK_DELAY"
 	default n
+
+config WLAN_MAX_VDEV_CHAINS
+	int "Max VDEV Chains supported"
+	default 2
+
+config WLAN_MAX_VDEV_NSS
+	int "Max VDEV NSS supported"
+	default 2
 
 if CNSS_KIWI_V2
 config CFG_BMISS_OFFLOAD_MAX_VDEV

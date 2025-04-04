@@ -1529,8 +1529,9 @@ static bool handle_csa_standby_link(wmi_csa_event_fixed_param *csa_event,
 	}
 
 	if (link_info->vdev_id != WLAN_INVALID_VDEV_ID) {
-		wma_err("vdev id %d link id %d ", link_info->vdev_id,
-			link_id);
+		wma_debug("vdev id %d link id %d Active link CSA event: BSSID "
+			  QDF_MAC_ADDR_FMT, link_info->vdev_id, link_id,
+			  QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes));
 		return is_csa_standby;
 	}
 
@@ -1546,6 +1547,9 @@ static bool handle_csa_standby_link(wmi_csa_event_fixed_param *csa_event,
 	}
 
 	mlo_mgr_update_csa_link_info(pdev, mldev, &csa_param, link_id);
+
+	/* sending csa event notification to userspace for standby link */
+	status = mlo_mgr_standby_link_csa_notify(&link_info->ap_link_addr);
 
 	params.link_id = link_info->link_id;
 	params.chan = qdf_mem_malloc(sizeof(struct wlan_channel));
@@ -2152,6 +2156,8 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 #endif
 	case WOW_REASON_PF_BLOCKING_LAST_TIME:
 		return "PF_BLOCKING_LAST_TIME";
+	case WOW_REASON_VDEV_REPURPOSE:
+		return "VDEV_REPURPOSE";
 	default:
 		return "unknown";
 	}

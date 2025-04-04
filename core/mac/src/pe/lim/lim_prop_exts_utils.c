@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -182,15 +182,8 @@ static bool lim_validate_he160_mcs_map(struct mac_context *mac_ctx,
 				rx_he_mcs_map_160);
 	tx_he_mcs_map = HE_INTERSECT_MCS(peer_tx, he_mcs_map);
 
-	if (nss == NSS_1x1_MODE) {
-		rx_he_mcs_map |= HE_MCS_INV_MSK_4_NSS(1);
-		tx_he_mcs_map |= HE_MCS_INV_MSK_4_NSS(1);
-	} else if (nss == NSS_2x2_MODE) {
-		rx_he_mcs_map |= (HE_MCS_INV_MSK_4_NSS(1) &
-				HE_MCS_INV_MSK_4_NSS(2));
-		tx_he_mcs_map |= (HE_MCS_INV_MSK_4_NSS(1) &
-				HE_MCS_INV_MSK_4_NSS(2));
-	}
+	rx_he_mcs_map |= HE_DISABLE_MCS_OVER_NSS(nss);
+	tx_he_mcs_map |= HE_DISABLE_MCS_OVER_NSS(nss);
 
 	return ((rx_he_mcs_map != HE_MCS_ALL_DISABLED) &&
 		(tx_he_mcs_map != HE_MCS_ALL_DISABLED));

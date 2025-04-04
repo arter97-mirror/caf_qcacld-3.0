@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,9 +30,11 @@
 /**
  * struct twt_conc_context: TWT concurrency args
  * @psoc: pointer to psoc
+ * @p2p_r2_mode: flag to check P2P R2 mode present in concurrency
  */
 struct twt_conc_context {
 	struct wlan_objmgr_psoc *psoc;
+	bool p2p_r2_mode;
 };
 
 /**

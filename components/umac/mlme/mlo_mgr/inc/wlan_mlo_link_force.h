@@ -55,6 +55,8 @@
  * @ml_nlink_t2lm_request_evt: T2LM request
  * @ml_nlink_pre_t2lm_request_evt: Pre T2LM request
  * @ml_nlink_link_recfg_completed_evt: link recfg complete
+ * @ml_nlink_dual_sap_active_evt: Dual SAP active
+ * @ml_nlink_dual_sap_inactive_evt: Dual SAp inactive
  */
 enum ml_nlink_change_event_type {
 	ml_nlink_link_switch_start_evt,
@@ -86,6 +88,8 @@ enum ml_nlink_change_event_type {
 	ml_nlink_t2lm_request_evt,
 	ml_nlink_pre_t2lm_request_evt,
 	ml_nlink_link_recfg_completed_evt,
+	ml_nlink_dual_sap_active_evt,
+	ml_nlink_dual_sap_inactive_evt
 };
 
 enum ml_emlsr_disable_request {
@@ -98,18 +102,20 @@ enum ml_emlsr_disable_request {
 	ML_EMLSR_DOWNGRADE_BY_OPP_TIMER = 1 << 6,
 	ML_EMLSR_DISALLOW_BY_NAN_DISC = 1 << 7,
 	ML_EMLSR_DOWNGRADE_BY_ACS_START = 1 << 8,
+	ML_EMLSR_DOWNGRADE_BY_DUAL_SAP_ACTIVE = 1 << 9,
 };
 
 #define ML_EMLSR_DISALLOW_MASK_ALL (ML_EMLSR_DISALLOW_BY_CONCURENCY | \
-				    ML_EMLSR_DISALLOW_BY_AP_CSA | \
-				    ML_EMLSR_DISALLOW_BY_OPP_TIMER | \
+				    ML_EMLSR_DISALLOW_BY_AP_CSA |     \
+				    ML_EMLSR_DISALLOW_BY_OPP_TIMER |  \
 				    ML_EMLSR_DISALLOW_BY_NAN_DISC)
 
-#define ML_EMLSR_DOWNGRADE_MASK_ALL (ML_EMLSR_DOWNGRADE_BY_AP_CSA | \
-				     ML_EMLSR_DOWNGRADE_BY_AP_START | \
+#define ML_EMLSR_DOWNGRADE_MASK_ALL (ML_EMLSR_DOWNGRADE_BY_AP_CSA |    \
+				     ML_EMLSR_DOWNGRADE_BY_AP_START |  \
 				     ML_EMLSR_DOWNGRADE_BY_STA_START | \
 				     ML_EMLSR_DOWNGRADE_BY_OPP_TIMER | \
-				     ML_EMLSR_DOWNGRADE_BY_ACS_START)
+				     ML_EMLSR_DOWNGRADE_BY_ACS_START | \
+				     ML_EMLSR_DOWNGRADE_BY_DUAL_SAP_ACTIVE)
 
 #define ML_EMLSR_DISABLE_MASK_ALL (ML_EMLSR_DISALLOW_MASK_ALL | \
 				   ML_EMLSR_DOWNGRADE_MASK_ALL)
@@ -240,6 +246,8 @@ static inline const char *link_evt_to_string(uint32_t evt)
 	CASE_RETURN_STRING(ml_nlink_acs_completed_evt);
 	CASE_RETURN_STRING(ml_nlink_t2lm_request_evt);
 	CASE_RETURN_STRING(ml_nlink_link_recfg_completed_evt);
+	CASE_RETURN_STRING(ml_nlink_dual_sap_active_evt);
+	CASE_RETURN_STRING(ml_nlink_dual_sap_inactive_evt);
 	default:
 		return "Unknown";
 	}

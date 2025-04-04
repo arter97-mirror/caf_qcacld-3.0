@@ -204,9 +204,10 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 {
 	uint8_t ch_wd;
 	uint16_t pri_freq_puncture = 0;
-	struct ch_params *ch_params;
 	QDF_STATUS status;
 	struct mac_context *mac_ctx;
+	struct sap_ch_switch_info *ch_switch_info;
+	struct ch_params *ch_params;
 
 	if (!sap_phymode_is_eht(sap_ctx->phyMode)) {
 		sap_debug("phy mode: 0x%x", sap_ctx->phyMode);
@@ -224,12 +225,18 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 		return true;
 	}
 
-	ch_params = &mac_ctx->sap.SapDfsInfo.new_ch_params;
-	if (mac_ctx->sap.SapDfsInfo.orig_chanWidth == 0) {
+	ch_switch_info = wlan_get_sap_ch_sw_info(sap_ctx->vdev);
+	if (!ch_switch_info) {
+		sap_err("Invalid channel info");
+		return true;
+	}
+	ch_params = &ch_switch_info->new_ch_params;
+
+	if (ch_switch_info->orig_chan_width == 0) {
 		ch_wd = sap_ctx->ch_width_orig;
-		mac_ctx->sap.SapDfsInfo.orig_chanWidth = ch_wd;
+		ch_switch_info->orig_chan_width = ch_wd;
 	} else {
-		ch_wd = mac_ctx->sap.SapDfsInfo.orig_chanWidth;
+		ch_wd = ch_switch_info->orig_chan_width;
 	}
 
 	ch_params->ch_width = ch_wd;
@@ -246,8 +253,8 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 			sap_debug("No CSA needed, same freq %d, bw %d and puncture",
 				  sap_ctx->chan_freq,
 				  ch_params->ch_width);
-			mac_ctx->sap.SapDfsInfo.new_chanWidth =
-						ch_params->ch_width;
+			ch_switch_info->new_chan_width =
+				ch_params->ch_width;
 			*freq = 0;
 			return false;
 		}
@@ -264,13 +271,12 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 				  ch_params->ch_width,
 				  ch_params->mhz_freq_seg0,
 				  ch_params->mhz_freq_seg1);
-			mac_ctx->sap.SapDfsInfo.new_chanWidth =
-						ch_params->ch_width;
+			ch_switch_info->new_chan_width =
+				ch_params->ch_width;
 			*freq = sap_ctx->chan_freq;
 			return false;
 		}
 	}
-
 	return true;
 }
 #endif
@@ -291,10 +297,11 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 	uint16_t chan_freq;
 	uint8_t ch_wd;
 	struct wlan_objmgr_pdev *pdev = NULL;
-	struct ch_params *ch_params;
 	uint32_t hw_mode, flag  = 0;
 	struct mac_context *mac_ctx;
 	struct dfs_acs_info acs_info = {0};
+	struct sap_ch_switch_info *ch_switch_info;
+	struct ch_params *ch_params;
 
 	mac_ctx = sap_get_mac_context();
 	if (!mac_ctx) {
@@ -308,12 +315,18 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 		return 0;
 	}
 
-	ch_params = &mac_ctx->sap.SapDfsInfo.new_ch_params;
-	if (mac_ctx->sap.SapDfsInfo.orig_chanWidth == 0) {
+	ch_switch_info = wlan_get_sap_ch_sw_info(sap_ctx->vdev);
+	if (!ch_switch_info) {
+		sap_err("Invalid channel info");
+		return 0;
+	}
+
+	ch_params = &ch_switch_info->new_ch_params;
+	if (ch_switch_info->orig_chan_width == 0) {
 		ch_wd = sap_ctx->ch_width_orig;
-		mac_ctx->sap.SapDfsInfo.orig_chanWidth = ch_wd;
+		ch_switch_info->orig_chan_width = ch_wd;
 	} else {
-		ch_wd = mac_ctx->sap.SapDfsInfo.orig_chanWidth;
+		ch_wd = ch_switch_info->orig_chan_width;
 	}
 
 	ch_params->ch_width = ch_wd;
@@ -384,7 +397,7 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 	}
 
 update_params:
-	mac_ctx->sap.SapDfsInfo.new_chanWidth = ch_params->ch_width;
+	ch_switch_info->new_chan_width = ch_params->ch_width;
 	sap_ctx->ch_params.ch_width = ch_params->ch_width;
 	sap_ctx->ch_params.sec_ch_offset = ch_params->sec_ch_offset;
 	sap_ctx->ch_params.center_freq_seg0 = ch_params->center_freq_seg0;
@@ -3842,17 +3855,25 @@ static QDF_STATUS sap_fsm_handle_radar_during_cac(struct sap_context *sap_ctx,
 						  struct mac_context *mac_ctx)
 {
 	uint8_t intf;
+	struct sap_ch_switch_info *ch_switch_info;
 
-	if (mac_ctx->sap.SapDfsInfo.target_chan_freq) {
+	ch_switch_info = wlan_get_sap_ch_sw_info(sap_ctx->vdev);
+	if (!ch_switch_info) {
+		sap_err("Invalid channel info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (ch_switch_info->target_chan_freq) {
 		if (sap_phymode_is_eht(sap_ctx->phyMode))
 			wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params,
 							true);
-		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
-				    mac_ctx->sap.SapDfsInfo.target_chan_freq, 0,
-				    &sap_ctx->ch_params, REG_CURRENT_PWR_MODE);
+		wlan_reg_set_channel_params_for_pwrmode(
+				mac_ctx->pdev,
+				ch_switch_info->target_chan_freq, 0,
+				&sap_ctx->ch_params, REG_CURRENT_PWR_MODE);
 	} else {
 		sap_err("Invalid target channel freq %d",
-			 mac_ctx->sap.SapDfsInfo.target_chan_freq);
+			 ch_switch_info->target_chan_freq);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -3876,11 +3897,11 @@ static QDF_STATUS sap_fsm_handle_radar_during_cac(struct sap_context *sap_ctx,
 			 * Send the Channel change message to SME/PE.
 			 * sap_radar_found_status is set to 1
 			 */
-			wlansap_channel_change_request(t_sap_ctx,
-				mac_ctx->sap.SapDfsInfo.target_chan_freq);
+			wlansap_channel_change_request(
+				t_sap_ctx,
+				ch_switch_info->target_chan_freq);
 		}
 	}
-
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -4009,10 +4030,17 @@ sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
 			     struct sap_context *sap_ctx)
 {
 	QDF_STATUS status;
+	struct sap_ch_switch_info *ch_switch_info;
+
+	ch_switch_info = wlan_get_sap_ch_sw_info(sap_ctx->vdev);
+	if (!ch_switch_info) {
+		sap_err("Invalid channel info");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	status = policy_mgr_check_and_set_hw_mode_for_channel_switch(
 				mac_ctx->psoc, sap_ctx->sessionId,
-				mac_ctx->sap.SapDfsInfo.target_chan_freq,
+				ch_switch_info->target_chan_freq,
 				POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP);
 
 	/*
@@ -4087,6 +4115,7 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 	enum reg_wifi_band band;
 	eSapDfsCACState_t cac_state = eSAP_DFS_DO_NOT_SKIP_CAC;
 	bool is_valid_ap_assist = false, is_dfs_owner = false;
+	struct sap_ch_switch_info *ch_switch_info;
 
 	if (msg == eSAP_MAC_START_BSS_SUCCESS) {
 		/*
@@ -4222,8 +4251,14 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 			qdf_status = sap_fsm_handle_start_failure(sap_ctx, msg,
 								  mac_handle);
 	} else if (msg == eSAP_OPERATING_CHANNEL_CHANGED) {
+		ch_switch_info = wlan_get_sap_ch_sw_info(sap_ctx->vdev);
+		if (!ch_switch_info) {
+			sap_err("Invalid channel info");
+			return QDF_STATUS_E_FAILURE;
+		}
+
 		/* The operating channel has changed, update hostapd */
-		sap_ctx->chan_freq = mac_ctx->sap.SapDfsInfo.target_chan_freq;
+		sap_ctx->chan_freq = ch_switch_info->target_chan_freq;
 
 		sap_ctx->fsm_state = SAP_STARTED;
 		sap_debug("sap_fsm: vdev %d: SAP_STARTING => SAP_STARTED",
@@ -4277,7 +4312,13 @@ static QDF_STATUS sap_fsm_state_started(struct sap_context *sap_ctx,
 {
 	uint32_t msg = sap_event->event;
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
+	struct sap_ch_switch_info *ch_switch_info;
 
+	ch_switch_info = wlan_get_sap_ch_sw_info(sap_ctx->vdev);
+	if (!ch_switch_info) {
+		sap_err("Invalid channel info");
+		return QDF_STATUS_E_FAILURE;
+	}
 	if (msg == eSAP_HDD_STOP_INFRA_BSS) {
 		/*
 		 * Transition from SAP_STARTED to SAP_STOPPING
@@ -4289,9 +4330,9 @@ static QDF_STATUS sap_fsm_state_started(struct sap_context *sap_ctx,
 		qdf_status = sap_goto_stopping(sap_ctx);
 	} else if (eSAP_DFS_CHNL_SWITCH_ANNOUNCEMENT_START == msg) {
 		uint8_t intf;
-		if (!mac_ctx->sap.SapDfsInfo.target_chan_freq) {
+		if (!ch_switch_info->target_chan_freq) {
 			sap_err("Invalid target channel freq %d",
-				mac_ctx->sap.SapDfsInfo.target_chan_freq);
+				ch_switch_info->target_chan_freq);
 			return qdf_status;
 		}
 
@@ -4326,9 +4367,9 @@ static QDF_STATUS sap_fsm_state_started(struct sap_context *sap_ctx,
 					continue;
 				}
 				sap_debug("vdev %d switch freq %d -> %d",
-					  temp_sap_ctx->sessionId,
-					  temp_sap_ctx->chan_freq,
-					  mac_ctx->sap.SapDfsInfo.target_chan_freq);
+				temp_sap_ctx->sessionId,
+				temp_sap_ctx->chan_freq,
+				ch_switch_info->target_chan_freq);
 				qdf_status =
 				   sap_fsm_send_csa_restart_req(mac_ctx,
 								temp_sap_ctx);
@@ -4973,6 +5014,7 @@ qdf_freq_t sap_indicate_radar(struct sap_context *sap_ctx)
 {
 	qdf_freq_t chan_freq = 0;
 	struct mac_context *mac;
+	struct sap_ch_switch_info *ch_switch_info;
 
 	if (!sap_ctx) {
 		sap_err("null sap_ctx");
@@ -4985,16 +5027,21 @@ qdf_freq_t sap_indicate_radar(struct sap_context *sap_ctx)
 		return 0;
 	}
 
+	ch_switch_info = wlan_get_sap_ch_sw_info(sap_ctx->vdev);
+	if (!ch_switch_info) {
+		sap_err("Invalid channel info");
+		return 0;
+	}
+
 	/*
 	 * SAP needs to generate Channel Switch IE
 	 * if the radar is found in the STARTED state
 	 */
 	if (sap_ctx->fsm_state == SAP_STARTED)
-		mac->sap.SapDfsInfo.csaIERequired = true;
+		ch_switch_info->csa_ie_required = true;
 
 	if (mac->mlme_cfg->dfs_cfg.dfs_disable_channel_switch) {
-		mac->sap.SapDfsInfo.new_chanWidth =
-					sap_ctx->ch_params.ch_width;
+		ch_switch_info->new_chan_width = sap_ctx->ch_params.ch_width;
 		sap_debug("DFS channel switch disabled, CSA to same ch %d wd %d",
 			  sap_ctx->chan_freq, sap_ctx->ch_params.ch_width);
 		return sap_ctx->chan_freq;

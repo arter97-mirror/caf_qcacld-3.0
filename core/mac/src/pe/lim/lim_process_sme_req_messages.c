@@ -1062,7 +1062,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		}
 
 		session->nss = session->vdev_nss;
-		if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2 ||
+		if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo ||
 		    policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id))
 			session->nss = 1;
 
@@ -1716,7 +1716,8 @@ lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 		rx_nss = dot11_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7;
 	}
 
-	if (!tx_nss || tx_nss > 2 || !rx_nss || rx_nss > 2) {
+	if (!tx_nss || tx_nss > WLAN_MAX_VDEV_NSS ||
+	    !rx_nss || rx_nss > WLAN_MAX_VDEV_NSS) {
 		pe_err("invalid Nss values tx_nss: %u rx_nss: %u",
 		       tx_nss, rx_nss);
 		return;
@@ -1810,7 +1811,7 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	vendor_ap_search_attr.enable_5g =
 				wlan_reg_is_5ghz_ch_freq(bss_desc->chan_freq);
 
-	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2) {
+	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo) {
 		session->nss = 1;
 		session->vdev_nss = 1;
 	}
@@ -1916,7 +1917,6 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	}
 
 	lim_handle_iot_ap_no_common_he_rates(mac_ctx, session, ie_struct);
-	lim_update_he_caps_mcs(mac_ctx, session);
 	lim_update_eht_caps_mcs(mac_ctx, session);
 
 	is_vendor_ap_present = wlan_get_vendor_ie_ptr_from_oui(
@@ -2831,6 +2831,46 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 	return status;
 }
 
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * lim_set_wfd_mode_for_p2p_cli() - set WFD mode for P2P CLIENT when P2P GO
+ * supports twt responder.
+ * @session: pe session
+ * @ie: pointer to IE structure
+ *
+ * Return: None
+ */
+static void lim_set_wfd_mode_for_p2p_cli(struct pe_session *session,
+					 tDot11fBeaconIEs *ie)
+{
+	enum QDF_OPMODE op_mode;
+	bool twt_resp;
+
+	if (!ie) {
+		pe_debug("ie is null");
+		return;
+	}
+
+	op_mode = wlan_vdev_mlme_get_opmode(session->vdev);
+	if (op_mode != QDF_P2P_CLIENT_MODE)
+		return;
+
+	twt_resp = ie->he_cap.twt_responder;
+	if (twt_resp) {
+		pe_debug("set P2P CLI in WFD R2 mode for id %d",
+			 session->vdev_id);
+		wlan_vdev_set_wfd_mode(session->vdev, P2P_MODE_WFD_R2);
+	} else {
+		wlan_vdev_set_wfd_mode(session->vdev, P2P_MODE_WFD_INVALID);
+	}
+}
+#else
+static inline void lim_set_wfd_mode_for_p2p_cli(struct pe_session *session,
+						tDot11fBeaconIEs *ie)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 static bool lim_enable_twt(struct mac_context *mac_ctx, tDot11fBeaconIEs *ie)
 {
@@ -3401,6 +3441,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 
 	session->enable_session_twt_support =
 					lim_enable_twt(mac_ctx, ie_struct);
+	lim_set_wfd_mode_for_p2p_cli(session, ie_struct);
 	status = lim_fill_dot11_mode(mac_ctx, session, ie_struct, phy_mode);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		status = QDF_STATUS_E_FAILURE;
@@ -5267,15 +5308,19 @@ QDF_STATUS cm_process_peer_create(struct scheduler_msg *msg)
 	peer = wlan_objmgr_get_peer_by_mac(mac_ctx->psoc, req->peer_mac.bytes,
 					   WLAN_MLME_CM_ID);
 	if (peer) {
-		if (wlan_peer_get_peer_type(peer) != WLAN_PEER_RTT_PASN)
+		if (wlan_peer_get_peer_type(peer) != WLAN_PEER_RTT_PASN) {
+			wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
 			goto continue_peer_create;
+		}
 
 		mlme_info("vdev:%d Ranging peer exists with same mac: " QDF_MAC_ADDR_FMT " resume after deleting it",
 			  req->vdev_id, QDF_MAC_ADDR_REF(req->peer_mac.bytes));
 
 		status = wma_remove_existing_pasn_peer(mac_ctx->psoc, req);
-		if (QDF_IS_STATUS_ERROR(status))
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
 			goto continue_peer_create;
+		}
 
 		wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
 
@@ -5283,8 +5328,6 @@ QDF_STATUS cm_process_peer_create(struct scheduler_msg *msg)
 	}
 
 continue_peer_create:
-	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_CM_ID);
-
 	lim_get_mld_info_sta(req, &peer_mld_addr, &is_assoc_peer);
 	status = wma_add_bss_peer_sta(req->vdev_id, req->peer_mac.bytes, true,
 				      peer_mld_addr, is_assoc_peer);
@@ -9411,12 +9454,12 @@ static void lim_set_pdev_vht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 			vht_mcs =
 				(tSirVhtMcsInfo *)&p_ie[2 +
 				sizeof(tSirMacVHTCapabilityInfo)];
-			vht_mcs->rxMcsMap |= DISABLE_NSS2_MCS;
+			vht_mcs->rxMcsMap |= VHT_DISABLE_MCS_OVER_NSS(i);
 			vht_mcs->rxHighest =
-				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
-			vht_mcs->txMcsMap |= DISABLE_NSS2_MCS;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(i, true);
+			vht_mcs->txMcsMap |= VHT_DISABLE_MCS_OVER_NSS(i);
 			vht_mcs->txHighest =
-				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(i, true);
 		}
 		msg.type = WMA_SET_PDEV_IE_REQ;
 		msg.bodyptr = ie_params;
@@ -10249,6 +10292,8 @@ static void lim_abort_channel_change(struct mac_context *mac_ctx,
 	QDF_STATUS status;
 	struct scheduler_msg sch_msg = {0};
 	struct sSirChanChangeResponse *chan_change_rsp;
+	struct ch_params *ch_params;
+	struct sap_ch_switch_info *ch_switch_info;
 
 	status = wlan_mlme_get_mac_vdev_id(mac_ctx->pdev, vdev_id, &bssid);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -10265,11 +10310,17 @@ static void lim_abort_channel_change(struct mac_context *mac_ctx,
 	}
 
 	session_entry->channelChangeReasonCode = LIM_SWITCH_CHANNEL_SAP_DFS;
-	mac_ctx->sap.SapDfsInfo.target_chan_freq =
-					session_entry->curr_op_freq;
-	mac_ctx->sap.SapDfsInfo.new_chanWidth = session_entry->ch_width;
-	mac_ctx->sap.SapDfsInfo.new_ch_params.ch_width =
-						session_entry->ch_width;
+
+	ch_switch_info = wlan_get_sap_ch_sw_info(session_entry->vdev);
+	if (!ch_switch_info) {
+		pe_err("Invalid channel info");
+		return;
+	}
+
+	ch_switch_info->target_chan_freq =  session_entry->curr_op_freq;
+	ch_switch_info->new_chan_width = session_entry->ch_width;
+	ch_params = &ch_switch_info->new_ch_params;
+	ch_params->ch_width = session_entry->ch_width;
 
 	wlan_vdev_mlme_sm_deliver_evt(session_entry->vdev,
 				      WLAN_VDEV_SM_EV_CHAN_SWITCH_DISABLED,

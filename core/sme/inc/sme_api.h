@@ -1410,7 +1410,9 @@ QDF_STATUS sme_roam_csa_ie_request(mac_handle_t mac_handle,
 				   struct qdf_mac_addr bssid,
 				   uint32_t target_chan_freq, uint8_t csaIeReqd,
 				   struct ch_params *ch_params,
-				   uint32_t new_cac_ms);
+				   uint32_t new_cac_ms,
+				   uint8_t beacon_cnt,
+				   uint8_t mode);
 
 /**
  * sme_set_addba_accept() - Allow/Reject the ADDBA req session

@@ -42,8 +42,8 @@
 #include "wlan_dlm_api.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_link_force.h"
-#include "wlan_mlo_link_recfg.h"
 #endif
+#include "wlan_mlo_link_recfg.h"
 #include <../../core/src/wlan_cm_roam_offload.h>
 
 /* Support for "Fast roaming" (i.e., ESE, LFR, or 802.11r.) */
@@ -598,6 +598,14 @@ wlan_cm_get_disable_ml_sta_for_roam_check(struct wlan_objmgr_psoc *psoc,
 		disabled_count = 0;
 
 	return disabled_count;
+}
+
+void
+wlan_cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
+			struct wlan_objmgr_vdev *vdev,
+			struct wlan_roam_start_config *start_req)
+{
+	cm_roam_mlo_config(psoc, vdev, start_req);
 }
 #else
 static uint8_t
@@ -1973,6 +1981,11 @@ wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 
 	mlme_debug("vdev: %d source: %d freq: %d bssid: " QDF_MAC_ADDR_FMT,
 		   vdev_id, source, chan_freq, QDF_MAC_ADDR_REF(bssid->bytes));
+	status = mlo_link_recfg_validate_roam_invoke(psoc, vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return status;
+	}
 
 	status = cm_start_roam_invoke(psoc, vdev, bssid, chan_freq, source);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
@@ -3094,6 +3107,10 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
+	status = cm_roam_update_vendor_handoff_config(psoc, data);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_debug("Failed to update params in rso_config struct");
+
 	status = mlme_cm_osif_get_vendor_handoff_params(psoc,
 							vendor_handoff_context);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -3104,10 +3121,6 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
 	mlme_debug("Reset vendor handoff req in progress context");
 	mlme_priv->cm_roam.vendor_handoff_param.req_in_progress = false;
 	mlme_priv->cm_roam.vendor_handoff_param.vendor_handoff_context = NULL;
-
-	status = cm_roam_update_vendor_handoff_config(psoc, data);
-	if (QDF_IS_STATUS_ERROR(status))
-		mlme_debug("Failed to update params in rso_config struct");
 }
 #endif
 
@@ -5562,19 +5575,6 @@ bool wlan_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 	    cur_state == WLAN_ROAMING_IN_PROG ||
 	    cur_state == WLAN_ROAM_SYNCH_IN_PROG ||
 	    cur_state == WLAN_MLO_ROAM_SYNCH_IN_PROG)
-		return true;
-
-	return false;
-}
-
-bool wlan_is_rso_disabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
-{
-	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
-	enum roam_offload_state cur_state;
-
-	cur_state = mlme_get_roam_state(psoc, vdev_id);
-	if (cur_state == WLAN_ROAM_DEINIT ||
-	    cur_state == WLAN_ROAM_RSO_STOPPED)
 		return true;
 
 	return false;

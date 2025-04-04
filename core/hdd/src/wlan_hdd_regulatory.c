@@ -40,6 +40,7 @@
 #include "wlan_osif_features.h"
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_mlo_mgr_public_api.h"
+#include <wlan_cfg80211.h>
 
 #define REG_RULE_2412_2462    REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
 
@@ -1560,9 +1561,9 @@ void hdd_send_wiphy_regd_sync_event(struct hdd_context *hdd_ctx,
 	}
 
 	if (send_sync_event && hdd_hold_rtnl_lock()) {
-		hdd_wiphy_lock(hdd_ctx->wiphy, NULL);
+		osif_wiphy_lock(hdd_ctx->wiphy, NULL);
 		hdd_regulatory_set_wiphy_regd_sync(hdd_ctx->wiphy, regd);
-		hdd_wiphy_unlock(hdd_ctx->wiphy, NULL);
+		osif_wiphy_unlock(hdd_ctx->wiphy, NULL);
 		hdd_release_rtnl_lock();
 	} else {
 		regulatory_set_wiphy_regd(hdd_ctx->wiphy, regd);
@@ -1838,7 +1839,7 @@ hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
 	mutex_lock(&hdd_ctx->sap_lock);
-	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
+	if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 		sap_config->SapHw_mode = csr_phy_mode;
 		hdd_err("Can't restart AP because it is not started");
@@ -1919,8 +1920,9 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 							     link_info->vdev_id);
 				break;
 			case QDF_SAP_MODE:
-				if (!test_bit(SOFTAP_INIT_DONE,
-					      &link_info->link_flags)) {
+				if (!qdf_atomic_test_bit(
+						SOFTAP_INIT_DONE,
+						link_info->link_flags)) {
 					hdd_info("AP is not started yet");
 					break;
 				}
