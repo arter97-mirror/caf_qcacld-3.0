@@ -1125,15 +1125,51 @@ bool wlan_cm_is_roam_sync_in_progress(struct wlan_objmgr_psoc *psoc,
 				      uint8_t vdev_id);
 
 /**
- * wlan_cm_set_roam_offload_ssid() - Set the roam offload candidate ssid
- *
+ * wlan_cm_set_roam_offload_bssid() - Set the roam offload bssid of the sae
+ * roam candidate
  * @vdev: pointer to vdev
- * @ssid_ie: ssid ie of the candidate
+ * @bssid: bssid
  *
  * Return: None
  */
 void
-wlan_cm_set_roam_offload_ssid(struct wlan_objmgr_vdev *vdev, uint8_t *ssid_ie);
+wlan_cm_set_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
+			       struct qdf_mac_addr *bssid);
+
+/**
+ * wlan_cm_get_roam_offload_bssid() - Get the roam offload bssid of the sae
+ * roam candidate
+ * @vdev: pointer to vdev
+ * @bssid: bssid
+ *
+ * Return: None
+ */
+void
+wlan_cm_get_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
+			       struct qdf_mac_addr *bssid);
+
+/**
+ * wlan_cm_clear_roam_offload_bssid() - Clear the roam offload bssid of the sae
+ * roam candidate
+ * @vdev: pointer to vdevs
+ *
+ * Return: None
+ */
+void
+wlan_cm_clear_roam_offload_bssid(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_cm_set_roam_offload_ssid() - Set the roam offload candidate ssid
+ *
+ * @vdev: pointer to vdev
+ * @ssid: ssid of candidate
+ * @len: length of ssid
+ *
+ * Return: None
+ */
+void
+wlan_cm_set_roam_offload_ssid(struct wlan_objmgr_vdev *vdev,
+			      uint8_t *ssid, uint8_t len);
 
 /**
  * wlan_cm_get_roam_offload_ssid() - Get the roam offload candidate ssid
@@ -1149,6 +1185,23 @@ void
 wlan_cm_get_roam_offload_ssid(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			      uint8_t *ssid, uint8_t *len);
 
+/**
+ * wlan_cm_update_offload_ssid_from_candidate() - Set the roam offload ssid of
+ * the roam candidate into the mlme priv
+ *
+ * @pdev: pointer to pdev
+ * @vdev_id: vdev id
+ * @ap_bssid: roam candidate bssid
+ *
+ * Get the scan entry corresponding to the bssid and save the ssid
+ * in the mlme priv of the STA vdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_update_offload_ssid_from_candidate(struct wlan_objmgr_pdev *pdev,
+					   uint8_t vdev_id,
+					   struct qdf_mac_addr *ap_bssid);
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1339,7 +1392,25 @@ wlan_cm_is_roam_sync_in_progress(struct wlan_objmgr_psoc *psoc,
 }
 
 static inline void
-wlan_cm_set_roam_offload_ssid(struct wlan_objmgr_vdev *vdev, uint8_t *ssid_ie)
+wlan_cm_set_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
+			       struct qdf_mac_addr *bssid)
+{
+}
+
+static inline void
+wlan_cm_get_roam_offload_bssid(struct wlan_objmgr_vdev *vdev,
+			       struct qdf_mac_addr *bssid)
+{
+}
+
+static inline void
+wlan_cm_clear_roam_offload_bssid(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline void
+wlan_cm_set_roam_offload_ssid(struct wlan_objmgr_vdev *vdev,
+			      uint8_t *ssid, uint8_t len)
 {
 }
 
@@ -1349,6 +1420,13 @@ wlan_cm_get_roam_offload_ssid(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 {
 }
 
+static inline QDF_STATUS
+wlan_cm_update_offload_ssid_from_candidate(struct wlan_objmgr_pdev *pdev,
+					   uint8_t vdev_id,
+					   struct qdf_mac_addr *ap_bssid)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
 #ifdef WLAN_FEATURE_FIPS

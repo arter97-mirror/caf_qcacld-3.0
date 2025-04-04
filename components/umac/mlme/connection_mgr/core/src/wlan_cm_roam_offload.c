@@ -521,7 +521,8 @@ cm_roam_scan_offload_fill_lfr3_config(struct wlan_objmgr_vdev *vdev,
 	 * Instead of making another infra, send the RSN-CAPS in MSB of
 	 * beacon Caps.
 	 */
-	rsn_caps = rso_cfg->orig_sec_info.rsn_caps;
+	/* RSN caps with global user MFP which can be used for cross-AKM roam */
+	rsn_caps = rso_cfg->rso_rsn_caps;
 
 	/* Fill LFR3 specific self capabilities for roam scan mode TLV */
 	self_caps.ess = 1;
@@ -3241,6 +3242,27 @@ static void cm_fill_stop_reason(struct wlan_roam_stop_config *stop_req,
 		stop_req->reason = REASON_SME_ISSUED;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void
+cm_roam_enable_btm_offload(struct wlan_objmgr_psoc *psoc,
+			   struct wlan_roam_stop_config *stop_req,
+			   uint8_t reason)
+{
+	if (!stop_req)
+		return;
+
+	if (reason == REASON_SUPPLICANT_DISABLED_ROAMING)
+		MLME_SET_BIT(stop_req->btm_config.btm_offload_config,
+			     BTM_OFFLOAD_CONFIG_BIT_0);
+}
+#else
+static inline void
+cm_roam_enable_btm_offload(struct wlan_objmgr_psoc *psoc,
+			   struct wlan_roam_stop_config *stop_req,
+			   uint8_t reason)
+{}
+#endif
+
 QDF_STATUS
 cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		 uint8_t reason, bool *send_resp, bool start_timer)
@@ -3277,6 +3299,8 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		goto rel_vdev_ref;
 
 	stop_req->btm_config.vdev_id = vdev_id;
+	cm_roam_enable_btm_offload(psoc, stop_req, reason);
+
 	stop_req->disconnect_params.vdev_id = vdev_id;
 	stop_req->idle_params.vdev_id = vdev_id;
 	stop_req->roam_triggers.vdev_id = vdev_id;
@@ -3795,6 +3819,7 @@ cm_roam_switch_to_deinit(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	enum roam_offload_state cur_state = mlme_get_roam_state(psoc, vdev_id);
 	bool sup_disabled_roam;
+	struct wlan_objmgr_vdev *vdev = NULL;
 
 	switch (cur_state) {
 	/*
@@ -3851,6 +3876,13 @@ cm_roam_switch_to_deinit(struct wlan_objmgr_pdev *pdev,
 	status = cm_roam_init_req(psoc, vdev_id, false);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_NB_ID);
+	if (vdev) {
+		wlan_cm_clear_roam_offload_bssid(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+	}
 
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_DEINIT);
 	mlme_clear_operations_bitmap(psoc, vdev_id);

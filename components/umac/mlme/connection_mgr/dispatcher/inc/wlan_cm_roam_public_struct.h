@@ -509,6 +509,8 @@ struct owe_transition_mode_info {
  * @lost_link_rssi: lost link RSSI
  * @roam_sync_frame_ind: roam sync frame ind
  * @roam_band_bitmask: This allows the driver to roam within this band
+ * @rso_rsn_caps: rsn caps with global user MFP which can be used for
+ *                cross-AKM roaming
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -555,6 +557,7 @@ struct rso_config {
 	int32_t lost_link_rssi;
 	struct roam_synch_frame_ind roam_sync_frame_ind;
 	uint32_t roam_band_bitmask;
+	uint16_t rso_rsn_caps;
 };
 
 /**
@@ -2298,11 +2301,13 @@ struct roam_stats_event {
  * @vdev_id: vdev id
  * @ap_bssid: SAE authentication offload AP MAC Address
  * @ta: SAE authentication offload Tx MAC Address
+ * @akm: SAE AKM type
  */
 struct auth_offload_event {
 	uint8_t vdev_id;
 	struct qdf_mac_addr ap_bssid;
 	struct qdf_mac_addr ta;
+	uint32_t akm;
 };
 
 /*
@@ -2409,19 +2414,29 @@ struct wlan_cm_vendor_handoff_param {
 #endif
 
 /**
+ * struct sae_offload_params - SAE roam auth offload related params
+ * @ssid: SSID of the roam candidate
+ * @bssid: BSSID of the roam candidate
+ */
+struct sae_offload_params {
+	struct wlan_ssid ssid;
+	struct qdf_mac_addr bssid;
+};
+
+/**
  * struct wlan_cm_roam  - Connection manager roam configs, state and roam
  * data related structure
  * @pcl_vdev_cmd_active:  Flag to check if vdev level pcl command needs to be
  * sent or PDEV level PCL command needs to be sent
  * @vendor_handoff_param: vendor handoff params
- * @sae_offload_ssid: SSID of the roam auth offload bssid
+ * @sae_offload: SAE roam offload related params
  */
 struct wlan_cm_roam {
 	bool pcl_vdev_cmd_active;
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 	struct wlan_cm_vendor_handoff_param vendor_handoff_param;
 #endif
-	struct wlan_ssid sae_offload_ssid;
+	struct sae_offload_params sae_offload;
 };
 
 /**
