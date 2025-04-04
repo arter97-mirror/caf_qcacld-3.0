@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -446,10 +446,17 @@ static void dp_ini_bus_bandwidth(struct wlan_dp_psoc_cfg *config,
 static void dp_ini_tcp_settings(struct wlan_dp_psoc_cfg *config,
 				struct wlan_objmgr_psoc *psoc)
 {
+	uint32_t adv_win_scl_bit_set;
+
 	config->enable_tcp_limit_output =
 		cfg_get(psoc, CFG_DP_ENABLE_TCP_LIMIT_OUTPUT);
-	config->enable_tcp_adv_win_scale =
-		cfg_get(psoc, CFG_DP_ENABLE_TCP_ADV_WIN_SCALE);
+	adv_win_scl_bit_set = cfg_get(psoc, CFG_DP_ENABLE_TCP_ADV_WIN_SCALE);
+	if (DP_TCP_ADV_WIN_SCL_BIT & adv_win_scl_bit_set) {
+		config->enable_tcp_adv_win_scale = true;
+		if (DP_TCP_ADV_WIN_SCALE_DISC_LOW & adv_win_scl_bit_set)
+			config->tcp_adv_win_scl_disc_lvl_low = true;
+	}
+
 	config->enable_tcp_delack =
 		cfg_get(psoc, CFG_DP_ENABLE_TCP_DELACK);
 	config->tcp_delack_thres_high =
