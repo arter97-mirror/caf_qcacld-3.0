@@ -6160,11 +6160,16 @@ hdd_send_roam_full_scan_period_to_sme(struct hdd_context *hdd_ctx,
  * wlan_hdd_convert_control_roam_trigger_bitmap  - Convert the
  * vendor specific reason code to internal reason code.
  * @trigger_reason_bitmap: Vendor specific roam trigger bitmap
+ * @roam_control_enable: Carries a non-zero value if the current set request is
+ *		         for enable, otherwise carries a 0.
+ * @score_config: pointer to score config structure
  *
  * Return: Internal roam trigger bitmap
  */
 static uint32_t
-wlan_hdd_convert_control_roam_trigger_bitmap(uint32_t trigger_reason_bitmap)
+wlan_hdd_convert_control_roam_trigger_bitmap(uint32_t trigger_reason_bitmap,
+					     uint8_t roam_control_enable,
+					     struct scoring_cfg *score_config)
 {
 	uint32_t drv_trigger_bitmap = 0, all_bitmap;
 
@@ -6213,6 +6218,18 @@ wlan_hdd_convert_control_roam_trigger_bitmap(uint32_t trigger_reason_bitmap)
 
 	if (trigger_reason_bitmap & QCA_ROAM_TRIGGER_REASON_EXTERNAL_SCAN)
 		drv_trigger_bitmap |= BIT(ROAM_TRIGGER_REASON_BACKGROUND);
+
+	if (trigger_reason_bitmap & QCA_ROAM_TRIGGER_REASON_WTC)
+		drv_trigger_bitmap |= BIT(ROAM_TRIGGER_REASON_WTC_BTM);
+
+	if (trigger_reason_bitmap & QCA_ROAM_TRIGGER_REASON_BT_ACTIVITY)
+		drv_trigger_bitmap |= BIT(ROAM_TRIGGER_REASON_BTC);
+
+	if (score_config->vendor_roam_score_algorithm && !roam_control_enable) {
+		drv_trigger_bitmap |= BIT(ROAM_TRIGGER_REASON_FORCED);
+		drv_trigger_bitmap |= BIT(ROAM_TRIGGER_REASON_STA_KICKOUT);
+		drv_trigger_bitmap |= BIT(ROAM_TRIGGER_REASON_PMK_TIMEOUT);
+	}
 
 	return drv_trigger_bitmap;
 }
@@ -6273,6 +6290,8 @@ wlan_hdd_convert_control_roam_scan_scheme_bitmap(uint32_t trigger_reason_bitmap)
  * @vdev_id: vdev id
  * @roam_trigger_bitmap: Vendor configured roam trigger bitmap to be configured
  *			 to firmware
+ * @roam_control_enable: Carries a non-zero value if the current set request is
+ *			 for enable, otherwise carries a 0.
  *
  * Send the roam trigger bitmap received to SME
  *
@@ -6281,11 +6300,14 @@ wlan_hdd_convert_control_roam_scan_scheme_bitmap(uint32_t trigger_reason_bitmap)
 static QDF_STATUS
 hdd_send_roam_triggers_to_sme(struct hdd_context *hdd_ctx,
 			      uint8_t vdev_id,
-			      uint32_t roam_trigger_bitmap)
+			      uint32_t roam_trigger_bitmap,
+			      uint8_t roam_control_enable)
 {
 	QDF_STATUS status;
 	struct wlan_roam_triggers triggers;
 	struct wlan_hdd_link_info *link_info;
+	struct psoc_mlme_obj *mlme_psoc_obj;
+	struct scoring_cfg *score_config;
 
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
 	if (!link_info) {
@@ -6298,9 +6320,15 @@ hdd_send_roam_triggers_to_sme(struct hdd_context *hdd_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(hdd_ctx->psoc);
+	score_config = &mlme_psoc_obj->psoc_cfg.score_config;
+
 	triggers.vdev_id = vdev_id;
 	triggers.trigger_bitmap =
-	    wlan_hdd_convert_control_roam_trigger_bitmap(roam_trigger_bitmap);
+	    wlan_hdd_convert_control_roam_trigger_bitmap(roam_trigger_bitmap,
+							 roam_control_enable,
+							 score_config);
+
 	hdd_debug("trigger bitmap: 0x%x converted trigger_bitmap: 0x%x",
 		  roam_trigger_bitmap, triggers.trigger_bitmap);
 	/*
@@ -6626,12 +6654,17 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 			hdd_err("failed to config roam control");
 	}
 
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_ENABLE];
+	if (attr)
+		roam_control_enable = nla_get_u8(attr);
+
 	if (tb2[QCA_ATTR_ROAM_CONTROL_TRIGGERS]) {
 		value = nla_get_u32(tb2[QCA_ATTR_ROAM_CONTROL_TRIGGERS]);
 		hdd_debug("Received roam trigger bitmap: 0x%x", value);
 		status = hdd_send_roam_triggers_to_sme(hdd_ctx,
 						       vdev_id,
-						       value);
+						       value,
+						       roam_control_enable);
 		if (status)
 			hdd_err("failed to config roam triggers");
 	}
@@ -6956,7 +6989,8 @@ hdd_clear_roam_control_config(struct hdd_context *hdd_ctx,
 
 		value = ENABLE_ROAM_TRIGGERS_ALL;
 		hdd_debug("Reset roam trigger bitmap to 0x%x", value);
-		status = hdd_send_roam_triggers_to_sme(hdd_ctx, vdev_id, value);
+		status = hdd_send_roam_triggers_to_sme(hdd_ctx, vdev_id, value,
+						       0);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("failed to restore roam trigger bitmap");
 			return qdf_status_to_os_return(status);
