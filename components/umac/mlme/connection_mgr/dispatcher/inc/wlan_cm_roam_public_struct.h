@@ -333,6 +333,8 @@ struct rso_chan_info {
  * @roam_periodic_scan_interval: the interval in seconds after which STA
  * performs periodic partial scans till roaming succeeds or RSSI recovers
  * above threshold
+ * @roam_score_delta: delta value expected over the roam score of the candidate
+ * ap over the roam score of the current AP
  */
 struct rso_cfg_params {
 	uint32_t neighbor_scan_period;
@@ -368,6 +370,7 @@ struct rso_cfg_params {
 	uint32_t band_5g_weightage;
 	uint32_t band_6g_weightage;
 	uint32_t roam_periodic_scan_interval;
+	uint32_t roam_score_delta;
 };
 
 /**
@@ -814,6 +817,7 @@ struct rso_config_params {
  * @ROAM_6GHZ_BAND_WEIGHTAGE: 6 GHz band weight value for roaming
  * @ROAM_RESCAN_RSSI_DIFF : Roam rescan rssi difference value
  * @ROAM_PERIODIC_SCAN_INTERVAL: Roam periodic scan interval value
+ * @ROAM_SCORE_DELTA: Roam score delta value
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -857,6 +861,7 @@ enum roam_cfg_param {
 	ROAM_6GHZ_BAND_WEIGHTAGE,
 	ROAM_RESCAN_RSSI_DIFF,
 	ROAM_PERIODIC_SCAN_INTERVAL,
+	ROAM_SCORE_DELTA,
 };
 
 /**

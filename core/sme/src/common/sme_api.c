@@ -17712,3 +17712,32 @@ sme_get_roam_periodic_scan_interval(mac_handle_t mac_handle,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS sme_set_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_score_delta)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = roam_score_delta;
+	mac->mlme_cfg->roam_scoring.roam_score_delta =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_SCORE_DELTA, &src_config);
+}
+
+QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t *roam_score_delta)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy temp;
+
+	wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id, ROAM_SCORE_DELTA, &temp);
+
+	*roam_score_delta = temp.uint_value;
+
+	return QDF_STATUS_SUCCESS;
+}

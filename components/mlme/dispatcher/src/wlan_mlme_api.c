@@ -9236,3 +9236,26 @@ uint16_t wlan_mlme_get_sap_he_rx_mcs_map_160(struct wlan_objmgr_psoc *psoc)
 	return mlme_obj->cfg.sap_cfg.sap_he_rx_mcs_map_160;
 }
 
+#ifdef CONNECTION_ROAMING_CFG
+void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
+					   struct rso_cfg_params *cfg_params)
+{
+	cfg_params->band_2g_weightage =
+			cfg_get(psoc, CFG_SCORING_2G_BAND_WEIGHTAGE);
+	cfg_params->band_5g_weightage =
+			cfg_get(psoc, CFG_SCORING_5G_BAND_WEIGHTAGE);
+	cfg_params->band_6g_weightage =
+			cfg_get(psoc, CFG_SCORING_6G_BAND_WEIGHTAGE);
+	cfg_params->roam_rescan_rssi_diff =
+			cfg_get(psoc, CFG_LFR_ROAM_RESCAN_RSSI_DIFF);
+	cfg_params->roam_periodic_scan_interval =
+			cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
+	cfg_params->roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
+}
+#else
+void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
+					   struct rso_cfg_params *cfg_params)
+{
+}
+#endif

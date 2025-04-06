@@ -1680,7 +1680,7 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 				roam_score_params->aggre_min_roam_score_delta;
 	} else {
 		req_score_params->roam_score_delta =
-				roam_score_params->roam_score_delta;
+					cfg_params->roam_score_delta;
 		req_score_params->cand_min_roam_score_delta =
 					roam_score_params->min_roam_score_delta;
 	}
@@ -5696,16 +5696,8 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.lfr.roam_scan_inactivity_time;
 	cfg_params->roam_inactive_data_packet_count =
 			mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
-	cfg_params->band_2g_weightage =
-			mlme_obj->cfg.roam_scoring.band_2g_weightage;
-	cfg_params->band_5g_weightage =
-			mlme_obj->cfg.roam_scoring.band_5g_weightage;
-	cfg_params->band_6g_weightage =
-			mlme_obj->cfg.roam_scoring.band_6g_weightage;
-	cfg_params->roam_rescan_rssi_diff =
-			mlme_obj->cfg.lfr.roam_rescan_rssi_diff;
-	cfg_params->roam_periodic_scan_interval =
-			mlme_obj->cfg.lfr.roam_periodic_scan_interval;
+	wlan_mlme_reinit_real_time_roam_parms(wlan_vdev_get_psoc(vdev),
+					      cfg_params);
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 }
@@ -6252,6 +6244,9 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	src_cfg.uint_value = mlme_obj->cfg.lfr.roam_periodic_scan_interval;
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
 				   ROAM_PERIODIC_SCAN_INTERVAL, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.roam_score_delta;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id, ROAM_SCORE_DELTA, &src_cfg);
 	/*
 	 * Store the current PMK info of the AP
 	 * to the single pmk global cache if the BSS allows

@@ -6112,6 +6112,8 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U8},
 	[QCA_ATTR_ROAM_CONTROL_PERIODIC_ROAM_SCAN_INTERVAL] = {
 			.type = NLA_U32},
+	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_THRESHOLD_PERCENTAGE] = {
+			.type = NLA_U8},
 };
 
 /**
@@ -6738,6 +6740,24 @@ hdd_send_roam_periodic_scan_interval_to_sme(struct hdd_context *hdd_ctx,
 }
 
 /**
+ * hdd_send_roam_score_delta_to_sme() - Set roam score delta value in percentage
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @roam_score_delta: Roam score delta value in percentage.
+ *
+ * Send roam score delta value to FW.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_send_roam_score_delta_to_sme(struct hdd_context *hdd_ctx,
+				 uint8_t vdev_id, uint32_t roam_score_delta)
+{
+	return sme_set_roam_score_delta_value(hdd_ctx->mac_handle, vdev_id,
+					      roam_score_delta);
+}
+
+/**
  * hdd_set_roam_with_control_config() - Set roam control configuration
  * @hdd_ctx: HDD context
  * @tb: List of attributes carrying roam subcmd data
@@ -7171,6 +7191,25 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 			hdd_err("Failed to set roam scan period value");
 	}
 
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_THRESHOLD_PERCENTAGE];
+	if (attr) {
+		value = nla_get_u8(attr);
+		if (!cfg_in_range(CFG_ROAM_SCORE_DELTA, value)) {
+			hdd_err("Roam score delta value %d out of range",
+				value);
+			return -EINVAL;
+		}
+
+		hdd_debug("Received roam score delta value: %d", value);
+		is_rso_update_required = true;
+
+		status = hdd_send_roam_score_delta_to_sme(hdd_ctx, vdev_id,
+							  value);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set roam score delta value");
+	}
+
 	/* send RSO update if required */
 	if (is_rso_update_required)
 		wlan_roam_update_cfg(hdd_ctx->psoc, vdev_id,
@@ -7284,6 +7323,9 @@ hdd_roam_control_config_buf_size(struct hdd_context *hdd_ctx,
 	if (tb[QCA_ATTR_ROAM_CONTROL_PERIODIC_ROAM_SCAN_INTERVAL])
 		skb_len += NLA_HDRLEN + sizeof(uint32_t);
 
+	if (tb[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_THRESHOLD_PERCENTAGE])
+		skb_len += NLA_HDRLEN + sizeof(uint32_t);
+
 	return skb_len;
 }
 
@@ -7332,7 +7374,7 @@ hdd_roam_control_config_fill_data(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 	uint8_t num_channels = 0;
 	uint32_t i = 0, freq_list[NUM_CHANNELS] = { 0 };
 	struct wlan_hdd_link_info *link_info;
-	uint32_t roam_periodic_scan_interval;
+	uint32_t roam_periodic_scan_interval, roam_score_delta;
 
 	config = nla_nest_start(skb, PARAM_ROAM_CONTROL_CONFIG);
 	if (!config) {
@@ -7445,6 +7487,21 @@ hdd_roam_control_config_fill_data(struct hdd_context *hdd_ctx, uint8_t vdev_id,
 		if (nla_put_u32(skb, QCA_ATTR_ROAM_CONTROL_PERIODIC_ROAM_SCAN_INTERVAL,
 				roam_periodic_scan_interval)) {
 			hdd_info("failed to put roam_periodic_scan_interval");
+			return -EINVAL;
+		}
+	}
+
+	if (tb[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_THRESHOLD_PERCENTAGE]) {
+		status = sme_get_roam_score_delta_value(hdd_ctx->mac_handle,
+							vdev_id,
+							&roam_score_delta);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto out;
+		hdd_debug("roam_score_delta: %u", roam_score_delta);
+
+		if (nla_put_u32(skb, QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_THRESHOLD_PERCENTAGE,
+				roam_score_delta)) {
+			hdd_info("failed to put roam_score_delta value");
 			return -EINVAL;
 		}
 	}

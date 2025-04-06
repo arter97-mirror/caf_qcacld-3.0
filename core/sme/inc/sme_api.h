@@ -5155,4 +5155,33 @@ QDF_STATUS
 sme_get_roam_periodic_scan_interval(mac_handle_t mac_handle,
 				    uint8_t vdev_id,
 				    uint32_t *roam_periodic_scan_interval);
+
+/**
+ * sme_set_roam_score_delta_value() - Send roam score delta value to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @roam_score_delta: Roam score delta value in percentage
+ *
+ * Updated Roam score delta in roam info and a roam_offload_scan request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_score_delta);
+
+/**
+ * sme_get_roam_score_delta_value() - Get roam score delta value
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @roam_score_delta: Pointer of a buffer to fill the roam score delta value
+ *
+ * Get the roam_score_delta and fill in the given
+ * buffer roam_score_delta.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t *roam_score_delta);
 #endif /* #if !defined( __SME_API_H ) */

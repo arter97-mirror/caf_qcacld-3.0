@@ -5527,4 +5527,12 @@ wlan_mlme_get_min_he_mcs_map(uint16_t he_mcs_map1, uint16_t he_mcs_map2);
  * Return: sap rx mcs map 160 of he cap
  */
 uint16_t wlan_mlme_get_sap_he_rx_mcs_map_160(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * wlan_mlme_reinit_real_time_roam_parms() - Reinit real time roaming params
+ * @psoc: pointer to psoc object
+ * @cfg_params: cfg_params
+ */
+void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
+					   struct rso_cfg_params *cfg_params);
 #endif /* _WLAN_MLME_API_H_ */
