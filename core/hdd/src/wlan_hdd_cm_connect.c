@@ -783,6 +783,14 @@ def_chan:
 		return true;
 	}
 
+	if (ch_freq &&
+	    policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(hdd_ctx->psoc) &&
+	    wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) &&
+	    ch_freq == hdd_ap_ctx->operating_chan_freq) {
+		hdd_debug("sta freq allow with running dfs sap %d", ch_freq);
+		return true;
+	}
+
 	/*
 	 * If channel is 0 or DFS or LTE unsafe then better to call pcl and
 	 * find out the best channel. If channel is non-dfs 5 GHz then

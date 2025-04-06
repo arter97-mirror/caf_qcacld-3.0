@@ -491,6 +491,10 @@ cm_roam_scan_offload_fill_lfr3_config(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_INVAL;
 
+	if (!rso_cfg->roam_control_enable &&
+	    mlme_obj->cfg.lfr.roam_force_rssi_trigger)
+		*mode |= WMI_ROAM_SCAN_MODE_RSSI_CHANGE;
+
 	rso_config->roam_offload_enabled =
 		mlme_obj->cfg.lfr.lfr3_roaming_offload;
 	if (!rso_config->roam_offload_enabled)
@@ -515,9 +519,6 @@ cm_roam_scan_offload_fill_lfr3_config(struct wlan_objmgr_vdev *vdev,
 		mlme_obj->cfg.btm.rct_validity_timer;
 	rso_config->rso_lfr3_params.disable_self_roam =
 		!mlme_obj->cfg.lfr.enable_self_bss_roam;
-	if (!rso_cfg->roam_control_enable &&
-	    mlme_obj->cfg.lfr.roam_force_rssi_trigger)
-		*mode |= WMI_ROAM_SCAN_MODE_RSSI_CHANGE;
 	/*
 	 * Self rsn caps aren't sent to firmware, so in case of PMF required,
 	 * the firmware connects to a non PMF AP advertising PMF not required
