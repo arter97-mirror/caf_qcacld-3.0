@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -934,8 +934,9 @@ dp_is_low_tput_gro_enable(struct wlan_dp_psoc_context *dp_ctx)
 #define DP_HOST_STA_TX_TIMEOUT    BIT(16)
 #define DP_HOST_SAP_TX_TIMEOUT    BIT(17)
 #define DP_HOST_NUD_FAILURE       BIT(18)
+#define DP_MAC_PHY_RESET          BIT(30)
 #define DP_TIMEOUT_WLM_MODE       BIT(31)
-#define FW_DATA_STALL_EVT_MASK     0x8000FFFF
+#define FW_DATA_STALL_EVT_MASK     0xC000FFFF
 
 /**
  * dp_is_data_stall_event_enabled() - Check if data stall detection is enabled
