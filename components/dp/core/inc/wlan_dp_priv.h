@@ -138,6 +138,7 @@ struct dp_rtpm_tput_policy_context {
  * @dp_irq_affinity_mask: DP IRQ affinity mask (0 for disable)
  * @dp_rx_thread_affinity_mask: DP rx thread affinity mask (o for disable)
  * @is_ndp_bw_flow_ctrl_enabled: Indicates whether NDP bw flow ctrl is enabled
+ * @haps_config: Store the HAPS power save config
  *  or not
  */
 struct wlan_dp_psoc_cfg {
@@ -229,6 +230,10 @@ struct wlan_dp_psoc_cfg {
 	uint32_t dp_rx_thread_affinity_mask;
 #ifdef NDP_TX_BW_FLOW_CTRL
 	bool is_ndp_bw_flow_ctrl_enabled;
+#endif
+
+#ifdef WLAN_HAPS_ENABLE
+	uint32_t haps_config;
 #endif
 };
 
@@ -702,6 +707,7 @@ struct dp_rx_fst {
  * @spm_intf_ctx: SPM interface context
  * @opm_stats_work: OPM stats work
  * @ipv4_addr: IPv4 address
+ * @haps_ctx: HAPS context
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -793,6 +799,9 @@ struct wlan_dp_intf {
 	struct qdf_periodic_work opm_stats_work;
 #endif
 	uint8_t ipv4_addr[QDF_IPV4_ADDR_SIZE];
+#ifdef WLAN_HAPS_ENABLE
+	struct dp_haps haps_ctx;
+#endif
 };
 
 #define WLAN_DP_LINK_MAGIC 0x5F44505F4C494E4B	/* "_DP_LINK" in ASCII */

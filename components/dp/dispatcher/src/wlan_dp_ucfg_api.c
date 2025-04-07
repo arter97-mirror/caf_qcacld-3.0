@@ -51,6 +51,8 @@
 #include <wlan_dp_fisa_rx.h>
 #endif
 #include "cdp_txrx_ctrl.h"
+#include "wlan_dp_haps.h"
+#include "cdp_txrx_ctrl.h"
 #include "wlan_dp_load_balance.h"
 #include "wlan_dp_flow_balance.h"
 
@@ -683,6 +685,7 @@ QDF_STATUS ucfg_dp_psoc_open(struct wlan_objmgr_psoc *psoc)
 	dp_trace_init(psoc);
 	dp_bus_bandwidth_init(psoc);
 	wlan_dp_load_balancer_init(psoc);
+	dp_haps_init(psoc);
 	qdf_wake_lock_create(&dp_ctx->rx_wake_lock, "qcom_rx_wakelock");
 
 	return QDF_STATUS_SUCCESS;
@@ -2454,6 +2457,8 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	ucfg_dp_register_direct_link_hdd_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_ipa_wds_hdd_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_stc_hdd_cbs(dp_ctx, cb_obj);
+	dp_ctx->dp_ops.wlan_dp_haps_update_qtime_sync_period =
+				cb_obj->wlan_dp_haps_update_qtime_sync_period;
 }
 
 void ucfg_dp_register_event_handler(struct wlan_objmgr_psoc *psoc,
