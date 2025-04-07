@@ -4711,7 +4711,7 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
 		 */
 		if (true == policy_mgr_is_any_nondfs_chnl_present(
 			psoc, &non_dfs_freq,
-			policy_mgr_is_mlo_ap(psoc, vdev_id)))
+			policy_mgr_is_mlo_ap(psoc, vdev_id), vdev_id))
 			return non_dfs_freq;
 
 		if (QDF_STATUS_SUCCESS !=
