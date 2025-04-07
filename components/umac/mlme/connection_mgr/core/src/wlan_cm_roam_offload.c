@@ -55,6 +55,8 @@
 #include "wlan_cm_public_struct.h"
 #include "wlan_policy_mgr_i.h"
 
+#define MIN_FIRST_BMISS_CNT 2
+#define MIN_FINAL_BMISS_CNT 5
 
 #ifdef WLAN_FEATURE_SAE
 #define CM_IS_FW_FT_SAE_SUPPORTED(fw_akm_bitmap) \
@@ -74,6 +76,33 @@
 #endif
 
 /**
+ * cm_roam_scan_update_bmiss_cnt_for_dfs() - Update beacon miss count
+ * for dfs sap concurrency case
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @first_val: input first beacon miss count
+ * @final_val: input final beacon miss count
+ *
+ * This function is used to update beacon miss count parameters
+ *
+ * Return: None
+ */
+static void
+cm_roam_scan_update_bmiss_cnt_for_dfs(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      uint8_t *first_val,
+				      uint8_t *final_val)
+{
+	if (policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(psoc, vdev_id)) {
+		if (*first_val > MIN_FIRST_BMISS_CNT)
+			*first_val = MIN_FIRST_BMISS_CNT;
+
+		if (*final_val > MIN_FINAL_BMISS_CNT)
+			*final_val = MIN_FINAL_BMISS_CNT;
+	}
+}
+
+/**
  * cm_roam_scan_bmiss_cnt() - set roam beacon miss count
  * @psoc: psoc pointer
  * @vdev_id: vdev id
@@ -87,15 +116,20 @@ static void
 cm_roam_scan_bmiss_cnt(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		       struct wlan_roam_beacon_miss_cnt *params)
 {
-	uint8_t beacon_miss_count;
+	uint8_t beacon_first_miss_count;
+	uint8_t beacon_final_miss_count;
 
 	params->vdev_id = vdev_id;
 
-	wlan_mlme_get_roam_bmiss_first_bcnt(psoc, &beacon_miss_count);
-	params->roam_bmiss_first_bcnt = beacon_miss_count;
+	wlan_mlme_get_roam_bmiss_first_bcnt(psoc, &beacon_first_miss_count);
+	wlan_mlme_get_roam_bmiss_final_bcnt(psoc, &beacon_final_miss_count);
 
-	wlan_mlme_get_roam_bmiss_final_bcnt(psoc, &beacon_miss_count);
-	params->roam_bmiss_final_bcnt = beacon_miss_count;
+	cm_roam_scan_update_bmiss_cnt_for_dfs(psoc, vdev_id,
+					      &beacon_first_miss_count,
+					      &beacon_final_miss_count);
+
+	params->roam_bmiss_first_bcnt = beacon_first_miss_count;
+	params->roam_bmiss_final_bcnt = beacon_final_miss_count;
 }
 
 /**

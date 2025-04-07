@@ -6294,6 +6294,19 @@ QDF_STATUS policy_mgr_modify_pcl_for_vlp_channels(struct wlan_objmgr_psoc *psoc,
 						  struct weighed_pcl *pcl,
 						  uint32_t num_pcl);
 
+/**
+ * policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id() - Check if any STA/P2P ClI
+ * + SAP SCC present on DFS channel with specific STA/P2P CLI vdev id
+ * @psoc: psoc pointer
+ * @vdev_id: STA/P2P CLI vdev id
+ *
+ * Return: true if specific STA/P2P CLI + SAP SCC present on DFS channel,
+ * otherwise false.
+ */
+bool
+policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id);
+
 #ifdef AUTO_PLATFORM
 /**
  * policy_mgr_is_3vifs_mcc_to_scc_enabled() - Check if 3vifs mcc to scc is
