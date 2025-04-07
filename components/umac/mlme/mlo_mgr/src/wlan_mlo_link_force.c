@@ -6776,11 +6776,29 @@ ml_nlink_vendor_command_set_link(struct wlan_objmgr_psoc *psoc,
 				 uint16_t link_bitmap2)
 {
 	struct ml_nlink_change_event data;
+	struct wlan_objmgr_pdev *pdev;
+	bool cac_in_progress = false;
 
 	if (policy_mgr_is_emlsr_sta_concurrency_present(psoc) &&
 	    !wlan_mlme_is_aux_emlsr_support(psoc)) {
 		mlo_debug("eMLSR concurrency not allow to set link");
 		return QDF_STATUS_E_INVAL;
+	}
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_POLICY_MGR_ID);
+	if (!pdev) {
+		mlo_debug("null pdev");
+		return QDF_STATUS_E_INVAL;
+	}
+	cac_in_progress =
+		wlan_util_is_vdev_in_cac_wait(pdev, WLAN_POLICY_MGR_ID);
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_POLICY_MGR_ID);
+	if (cac_in_progress) {
+		mlo_debug("reject due to cac in progress");
+		return QDF_STATUS_E_BUSY;
+	}
+	if (policy_mgr_is_chan_switch_in_progress(psoc)) {
+		mlo_debug("reject due to ch switch in progress");
+		return QDF_STATUS_E_BUSY;
 	}
 
 	qdf_mem_zero(&data, sizeof(data));
