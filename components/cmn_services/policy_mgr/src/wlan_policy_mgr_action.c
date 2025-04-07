@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1984,6 +1984,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	uint32_t sta_gc_present = 0;
 	qdf_freq_t user_config_freq = 0;
 	enum reg_wifi_band user_band, op_band;
+	qdf_freq_t ll_sap_freq;
 
 	if (intf_ch_freq)
 		*intf_ch_freq = 0;
@@ -1994,6 +1995,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		return false;
 	}
 
+	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
 	policy_mgr_get_sta_sap_scc_on_dfs_chnl(psoc, &sta_sap_scc_on_dfs_chnl_config_value);
 
 	if (!policy_mgr_is_hw_dbs_capable(psoc))
@@ -2083,7 +2085,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		op_band = wlan_reg_freq_to_band(op_ch_freq_list[i]);
 		user_band = wlan_reg_freq_to_band(user_config_freq);
 
-		if (!sta_gc_present && user_config_freq &&
+		if (!ll_sap_freq && !sta_gc_present && user_config_freq &&
 		    op_band < user_band) {
 			curr_sap_freq = op_ch_freq_list[i];
 			policy_mgr_debug("Move sap to user configured freq: %d",
@@ -2117,6 +2119,12 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 
 	for (i = 0; i < pcl_len; i++) {
 		if (pcl_channels[i] == curr_sap_freq)
+			continue;
+
+		if (wlan_get_opmode_from_vdev_id(pm_ctx->pdev,
+		    sap_vdev_id) == QDF_SAP_MODE &&
+		    policy_mgr_are_2_freq_on_same_mac(psoc, pcl_channels[i],
+						      ll_sap_freq))
 			continue;
 
 		if (!policy_mgr_is_safe_channel(psoc, pcl_channels[i]) ||
