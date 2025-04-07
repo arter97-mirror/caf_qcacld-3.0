@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -219,4 +219,15 @@ wlan_dp_notify_ndp_channel_info(struct wlan_objmgr_peer *peer,
 }
 #endif
 #endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */
+
+/**
+ * wlan_dp_get_vdev_stats() -  API to get vdev stats
+ * @soc: dp soc object
+ * @vdev_id: Vdev ID of vdev for which stats is requested
+ * @buf: Pointer to buffer in which stats need to be updated
+ *
+ * Return: QDF_STATUS_SUCCESS on success else error code
+ */
+QDF_STATUS wlan_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				  struct cdp_vdev_stats *buf);
 #endif
