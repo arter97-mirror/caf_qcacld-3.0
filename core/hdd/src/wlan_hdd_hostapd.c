@@ -6130,7 +6130,8 @@ static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 		wlan_hdd_get_mlo_link_id(beacon, &link_id, &num_link);
 		hdd_debug("MLO SAP vdev id %d, link id %d total link %d",
 			  link_info->vdev_id, link_id, num_link);
-		if (!num_link) {
+		if (!num_link || !link_info->vdev->mlo_dev_ctx ||
+		    !link_info->vdev->mlo_dev_ctx->ap_ctx) {
 			hdd_debug("start 11be AP without mlo");
 			return QDF_STATUS_SUCCESS;
 		}
