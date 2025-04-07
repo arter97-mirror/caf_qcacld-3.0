@@ -47,6 +47,7 @@
 #include "wlan_dp_lapb_flow.h"
 #endif
 #include "cdp_txrx_ctrl.h"
+#include "wlan_dp_haps.h"
 
 #ifdef FEATURE_DIRECT_LINK
 /**
@@ -667,6 +668,7 @@ QDF_STATUS ucfg_dp_psoc_open(struct wlan_objmgr_psoc *psoc)
 	dp_register_pmo_handler();
 	dp_trace_init(psoc);
 	dp_bus_bandwidth_init(psoc);
+	dp_haps_init(psoc);
 	qdf_wake_lock_create(&dp_ctx->rx_wake_lock, "qcom_rx_wakelock");
 
 	return QDF_STATUS_SUCCESS;
@@ -2306,7 +2308,9 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 	dp_ctx->dp_ops.link_monitoring_cb = cb_obj->link_monitoring_cb;
 	dp_ctx->dp_ops.osif_dp_get_net_dev_from_vdev =
 		cb_obj->osif_dp_get_net_dev_from_vdev;
-	}
+	dp_ctx->dp_ops.wlan_dp_haps_update_qtime_sync_period =
+				cb_obj->wlan_dp_haps_update_qtime_sync_period;
+}
 
 void ucfg_dp_register_event_handler(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_dp_psoc_nb_ops *cb_obj)

@@ -138,6 +138,7 @@ struct dp_rtpm_tput_policy_context {
  * @gro_enable: Enable/Disable gro
  * @is_rx_fisa_enabled: flag to enable/disable FISA Rx
  * @is_rx_fisa_lru_del_enabled: flag to enable/disable FST entry delete
+ * @haps_config: Store the HAPS power save config
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -208,6 +209,9 @@ struct wlan_dp_psoc_cfg {
 #ifdef WLAN_SUPPORT_RX_FISA
 	bool is_rx_fisa_enabled;
 	bool is_rx_fisa_lru_del_enabled;
+#endif
+#ifdef WLAN_HAPS_ENABLE
+	uint32_t haps_config;
 #endif
 };
 
@@ -628,6 +632,7 @@ struct dp_rx_fst {
  * @dp_link_list: List of dp_links for this DP interface
  * @fpm_ctx: Flow policy manager context
  * @fim_ctx: Flow identification manager context
+ * @haps_ctx: HAPS context
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -699,6 +704,9 @@ struct wlan_dp_intf {
 #ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
 	struct fpm_table *fpm_ctx;
 	struct fim_vdev_ctx *fim_ctx;
+#endif
+#ifdef WLAN_HAPS_ENABLE
+	struct dp_haps haps_ctx;
 #endif
 };
 
