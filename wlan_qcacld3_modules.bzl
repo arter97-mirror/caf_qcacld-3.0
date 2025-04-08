@@ -46,6 +46,12 @@ _target_chipset_map = {
     "sdxkova": [
         "kiwi-v2",
     ],
+    "autoghgvm": [
+        "qcn7605",
+        "qca6390",
+        "qca6490",
+        "kiwi-v2",
+    ],
     "autogvm": [
         "qcn7605",
         "qca6390",
@@ -2602,7 +2608,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
     ]
 
-    if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm":
+    if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
