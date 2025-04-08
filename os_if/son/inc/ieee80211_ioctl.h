@@ -724,6 +724,7 @@ struct ieee80211req_sta_stats {
  * @IEEE80211_DBGREQ_SENDBCNRPT: beacon report request
  * @IEEE80211_DBGREQ_GETACSREPORT: GET the ACS report
  * @IEEE80211_DBGREQ_SETACSUSERCHANLIST: SET ch list for acs reporting
+ * @IEEE80211_DBGREQ_BLOCK_ACS_CHANNEL: Block ACS for these channels
  * @IEEE80211_DBGREQ_SENDBSTMREQ_TARGET: bss transition management request,
  *                                       targeted to a particular
  *                                       AP (or set of APs)
@@ -737,12 +738,14 @@ struct ieee80211req_sta_stats {
  * @IEEE80211_DBGREQ_MESH_SET_GET_CONFIG: Mesh config set and get
  * @IEEE80211_DBGREQ_ADD_DSCPACTION_POLICY: Add DSCP Action policy
  * @IEEE80211_DBGREQ_SEND_DSCPACTION_POLICY: Send DSCP Action request
+ * @IEEE80211_DBGREQ_UNBLOCK_ACS_CHANNEL: Unblock ACS channel from block list
  * @IEEE80211_DBGREQ_DISALLOW_MSCS:Disallow MSCS feature for selected STA/s
  */
 enum wlan_son_dbg_req {
 	IEEE80211_DBGREQ_SENDBCNRPT    =	4,
 	IEEE80211_DBGREQ_GETACSREPORT  =	20,
 	IEEE80211_DBGREQ_SETACSUSERCHANLIST  =    21,
+	IEEE80211_DBGREQ_BLOCK_ACS_CHANNEL            = 23,
 	IEEE80211_DBGREQ_SENDBSTMREQ_TARGET           = 44,
 	IEEE80211_DBGREQ_BSTEERING_SETINNETWORK_2G    = 90,
 	IEEE80211_DBGREQ_BSTEERING_GETINNETWORK_2G    = 91,
@@ -751,6 +754,7 @@ enum wlan_son_dbg_req {
 	IEEE80211_DBGREQ_MESH_SET_GET_CONFIG          = 117,
 	IEEE80211_DBGREQ_ADD_DSCPACTION_POLICY        = 124,
 	IEEE80211_DBGREQ_SEND_DSCPACTION_POLICY       = 126,
+	IEEE80211_DBGREQ_UNBLOCK_ACS_CHANNEL          = 130,
 	IEEE80211_DBGREQ_DISALLOW_MSCS                = 139,
 };
 
