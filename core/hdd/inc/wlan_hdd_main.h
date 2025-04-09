@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -333,7 +333,12 @@ enum hdd_nb_cmd_id {
 /* Mac Address string length */
 #define MAC_ADDRESS_STR_LEN 18  /* Including null terminator */
 /* Max and min IEs length in bytes */
+#ifdef WLAN_LARGE_MGMT_FRAMES_SUPPORT
+#define MAX_GENIE_LEN (1280)
+#else
 #define MAX_GENIE_LEN (512)
+#endif
+
 #define MIN_GENIE_LEN (2)
 
 #define WPS_OUI_TYPE   "\x00\x50\xf2\x04"

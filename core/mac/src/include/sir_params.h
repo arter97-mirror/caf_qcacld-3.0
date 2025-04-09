@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -50,7 +50,12 @@
 
 /* Firmware wide constants */
 
+#ifdef WLAN_LARGE_MGMT_FRAMES_SUPPORT
+#define SIR_MAX_PACKET_SIZE     1280
+#else
 #define SIR_MAX_PACKET_SIZE     512
+#endif
+
 #define SIR_MAX_NUM_CHANNELS    64
 #define SIR_MAX_NUM_STA_IN_IBSS 16
 #define SIR_ESE_MAX_MEAS_IE_REQS   8

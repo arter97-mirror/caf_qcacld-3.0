@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,11 +26,17 @@
 
 #define WNI_CFG_VALID_CHANNEL_LIST_LEN    100
 #define WNI_CFG_COUNTRY_CODE_LEN    3
-#define WNI_CFG_PROBE_RSP_ADDNIE_DATA1_LEN    255
 #define WNI_CFG_ASSOC_RSP_ADDNIE_DATA_LEN    255
-#define WNI_CFG_PROBE_RSP_BCN_ADDNIE_DATA_LEN    255
 #define WNI_CFG_WPS_UUID_LEN    16
 #define WNI_CFG_HE_PPET_LEN     25
+
+#ifdef WLAN_LARGE_MGMT_FRAMES_SUPPORT
+#define WNI_CFG_PROBE_RSP_ADDNIE_DATA1_LEN    800
+#define WNI_CFG_PROBE_RSP_BCN_ADDNIE_DATA_LEN    800
+#else
+#define WNI_CFG_PROBE_RSP_ADDNIE_DATA1_LEN    255
+#define WNI_CFG_PROBE_RSP_BCN_ADDNIE_DATA_LEN    255
+#endif
 
 /*
  * Integer parameter min/max/default values
