@@ -8312,6 +8312,13 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 
 	wlan_hdd_cleanup_actionframe(link_info);
 	wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
+
+	/* Restore cfg TWT responder */
+	if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
+	    adapter->device_mode == QDF_SAP_MODE &&
+	    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, link_info->vdev_id))
+		ucfg_twt_cfg_reset_responder(hdd_ctx->psoc);
+
 	mutex_lock(&hdd_ctx->sap_lock);
 	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		struct hdd_hostapd_state *hostapd_state =
@@ -8388,6 +8395,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 			      eUPDATE_IE_ASSOC_RESP) == QDF_STATUS_E_FAILURE) {
 		hdd_err("Could not pass on ASSOC_RSP data to PE");
 	}
+
 	/* Reset WNI_CFG_PROBE_RSP Flags */
 	wlan_hdd_reset_prob_rspies(link_info);
 	hdd_destroy_acs_timer(adapter);
@@ -8821,7 +8829,8 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 					    twt_responder &&
 					    twt_res_cfg)));
 
-	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
+	hdd_debug("cfg80211 TWT responder: %d, enable twt: %d, twt_res_cfg: %d",
+		  twt_responder, enable_twt, twt_res_cfg);
 	if (enable_twt && twt_responder && twt_res_cfg) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {
