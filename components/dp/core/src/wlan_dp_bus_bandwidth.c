@@ -1199,6 +1199,7 @@ static void dp_display_periodic_stats(struct wlan_dp_psoc_context *dp_ctx,
 			cdp_display_txrx_hw_info(soc);
 			qdf_dp_trace_dump_stats();
 			wlan_dp_stc_dump_periodic_stats(dp_ctx);
+			ucfg_ipa_dump_logging_stats();
 		}
 		counter = 0;
 		data_in_time_period = false;
