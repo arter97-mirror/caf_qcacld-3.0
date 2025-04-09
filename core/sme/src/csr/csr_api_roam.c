@@ -6328,9 +6328,6 @@ static QDF_STATUS csr_roam_save_params(struct mac_context *mac_ctx,
 			nIeLen = 8 + 2 + 2
 				+ (rsnie->pwise_cipher_suite_count * 4)
 				+ (rsnie->akm_suite_cnt * 4);
-			if (rsnie->pmkid_count)
-				/* pmkid */
-				nIeLen += 2 + rsnie->pmkid_count * 4;
 
 			/* nIeLen doesn't count EID and length fields */
 			session_ptr->pWpaRsnRspIE = qdf_mem_malloc(nIeLen + 2);
@@ -6364,10 +6361,6 @@ static QDF_STATUS csr_roam_save_params(struct mac_context *mac_ctx,
 					rsnie->akm_suite_cnt * 4);
 				pIeBuf += rsnie->akm_suite_cnt * 4;
 			}
-			/* copy the rest */
-			qdf_mem_copy(pIeBuf, rsnie->akm_suite +
-				rsnie->akm_suite_cnt * 4,
-				2 + rsnie->pmkid_count * 4);
 			session_ptr->nWpaRsnRspIeLength = nIeLen + 2;
 		}
 	} else if ((eCSR_AUTH_TYPE_WPA == auth_type) ||
