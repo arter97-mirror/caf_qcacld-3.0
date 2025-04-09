@@ -239,7 +239,6 @@ struct wlan_dp_stc_sampling_candidate {
  * @tx_flow_metadata: tx flow metadata
  * @rx_flow_metadata: rx flow metadata
  * @tuple_hash: Flow tuple hash
- * @flow_tuple: Flow tuple info
  * @tx_stats_ref: tx window stats reference
  * @rx_stats_ref: rx window stats reference
  * @flow_samples: flow samples
@@ -261,7 +260,6 @@ struct wlan_dp_stc_sampling_table_entry {
 	uint32_t tx_flow_metadata;
 	uint32_t rx_flow_metadata;
 	uint64_t tuple_hash;
-	struct flow_info flow_tuple;
 	struct wlan_dp_stc_txrx_stats tx_stats_ref;
 	struct wlan_dp_stc_txrx_stats rx_stats_ref;
 	struct wlan_dp_stc_flow_samples flow_samples;
@@ -323,7 +321,7 @@ struct wlan_dp_stc_flow_table_entry {
 	struct wlan_dp_stc_burst_stats burst_stats;
 };
 
-#define DP_STC_FLOW_TABLE_ENTRIES_MAX 384
+#define DP_STC_FLOW_TABLE_ENTRIES_MAX 256
 /**
  * struct wlan_dp_stc_rx_flow_table - RX flow table
  * @entries: RX flow table records

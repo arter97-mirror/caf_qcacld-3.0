@@ -2233,8 +2233,8 @@ wlan_dp_stc_print_s_entry(struct wlan_dp_stc *dp_stc,
 		    s_entry->id, s_entry->state,  s_entry->dir,
 		    s_entry->peer_id, tx_flow_valid ? tx_flow_str : empty_str,
 		    rx_flow_valid ? rx_flow_str : empty_str,
-		    dp_print_tuple_to_str(&s_entry->flow_tuple, flow_tuple_str,
-					  BUF_LEN_MAX));
+		    dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
+					  flow_tuple_str, BUF_LEN_MAX));
 
 	return 0;
 }
