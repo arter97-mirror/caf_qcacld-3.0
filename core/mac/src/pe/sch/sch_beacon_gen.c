@@ -525,7 +525,7 @@ sch_append_addn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 		   uint32_t *num_bytes, uint8_t *addn_ie, uint16_t addn_ielen)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	uint8_t add_ie[WNI_CFG_PROBE_RSP_BCN_ADDNIE_DATA_LEN];
+	uint8_t *add_ie;
 	uint8_t *p2p_ie = NULL;
 	uint8_t noa_len = 0;
 	uint8_t noa_strm[SIR_MAX_NOA_ATTR_LEN + SIR_P2P_IE_HEADER_LEN];
@@ -540,6 +540,7 @@ sch_append_addn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 		return status;
 	}
 
+	add_ie = qdf_mem_malloc(addn_ielen);
 	qdf_mem_zero(&ext_p2p_ie[0], DOT11F_IE_P2PBEACON_MAX_LEN + 2);
 	/*
 	 * P2P IE extracted in wlan_hdd_add_hostapd_conf_vsie may not
@@ -585,6 +586,7 @@ sch_append_addn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 		pe_warn("Not able to insert because of len constraint %d",
 			addn_ielen);
 	}
+	qdf_mem_free(add_ie);
 	return status;
 }
 

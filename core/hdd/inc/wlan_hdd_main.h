@@ -333,7 +333,12 @@ enum hdd_nb_cmd_id {
 /* Mac Address string length */
 #define MAC_ADDRESS_STR_LEN 18  /* Including null terminator */
 /* Max and min IEs length in bytes */
+#ifdef WLAN_LARGE_MGMT_FRAMES_SUPPORT
+#define MAX_GENIE_LEN (1280)
+#else
 #define MAX_GENIE_LEN (512)
+#endif
+
 #define MIN_GENIE_LEN (2)
 
 #define WPS_OUI_TYPE   "\x00\x50\xf2\x04"
