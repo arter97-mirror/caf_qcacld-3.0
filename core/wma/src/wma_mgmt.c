@@ -97,6 +97,8 @@
 #include "wlan_mlo_mgr_peer.h"
 #endif
 
+#include <wlan_dnw_api.h>
+
 /* Max debug string size for WMM in bytes */
 #define WMA_WMM_DEBUG_STRING_SIZE    512
 
@@ -3445,6 +3447,57 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle, uint8_t *buf,
 	return 0;
 }
 
+static QDF_STATUS
+wma_update_peer_phymode(struct wlan_objmgr_peer *peer,
+			enum phy_ch_width old_ch_width,
+			enum phy_ch_width new_ch_width,
+			enum wlan_phymode *peer_phymode)
+{
+	struct wlan_channel *des_chan;
+	tSirNwType nw_type;
+	enum wlan_phymode old_phymode;
+	enum wlan_peer_type peer_type;
+
+	if (!peer || !peer_phymode) {
+		wma_err("null param");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	peer_type = wlan_peer_get_peer_type(peer);
+	wma_debug("peer type %d bw old %d new %d", peer_type, old_ch_width,
+		  new_ch_width);
+	if ((peer_type != WLAN_PEER_STA) &&
+	    (peer_type != WLAN_PEER_P2P_CLI))
+		return QDF_STATUS_E_NOSUPPORT;
+
+	des_chan = wlan_vdev_mlme_get_des_chan(wlan_peer_get_vdev(peer));
+	if (!wlan_is_valid_dnw(wlan_peer_get_vdev(peer), des_chan->ch_freq,
+			       old_ch_width, new_ch_width))
+		return QDF_STATUS_E_NOSUPPORT;
+
+	wlan_peer_obj_lock(peer);
+	old_phymode = wlan_peer_get_phymode(peer);
+	wlan_peer_obj_unlock(peer);
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq)) {
+		if (des_chan->ch_phymode == WLAN_PHYMODE_11B ||
+		    old_phymode == WLAN_PHYMODE_11B)
+			nw_type = eSIR_11B_NW_TYPE;
+		else
+			nw_type = eSIR_11G_NW_TYPE;
+	} else {
+		nw_type = eSIR_11A_NW_TYPE;
+	}
+
+	*peer_phymode = wma_peer_phymode(nw_type, STA_ENTRY_PEER,
+					 IS_WLAN_PHYMODE_HT(old_phymode),
+					 new_ch_width,
+					 IS_WLAN_PHYMODE_VHT(old_phymode),
+					 IS_WLAN_PHYMODE_HE(old_phymode),
+					 IS_WLAN_PHYMODE_EHT(old_phymode));
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * wma_process_update_opmode() - process update VHT opmode cmd from UMAC
  * @wma_handle: wma handle
@@ -3462,6 +3515,8 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 	enum wlan_phymode peer_phymode;
 	uint32_t fw_phymode;
 	enum wlan_peer_type peer_type;
+	QDF_STATUS status;
+	enum phy_ch_width peer_chwidth;
 
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(wma_handle->pdev);
 	peer = wlan_objmgr_get_peer(psoc, pdev_id,
@@ -3496,9 +3551,25 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 		  update_vht_opmode->chwidth, wmi_opmode_chwidth);
 
 	if (ch_width < wmi_opmode_chwidth) {
-		wma_err("Invalid peer bw update %d, self bw %d",
-			update_vht_opmode->chwidth, ch_width);
-		return;
+		peer_chwidth =
+			target_if_wmi_chan_width_to_phy_ch_width(ch_width);
+		status = wma_update_peer_phymode(peer, peer_chwidth,
+						 update_vht_opmode->chwidth,
+						 &peer_phymode);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			/*
+			 * Allow channel bandwidth upgrade if it's
+			 * valid DFS No Wait case. This is only for
+			 * SAP/P2P GO with DFS No Wait enabled case.
+			 */
+			fw_phymode = wmi_host_to_fw_phymode(peer_phymode);
+			wma_debug("BW update from 80 to 160MHz, fw_phymode %d",
+				  fw_phymode);
+		} else {
+			wma_err("Invalid peer bw update %d, self bw %d",
+				update_vht_opmode->chwidth, ch_width);
+			return;
+		}
 	}
 
 	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
