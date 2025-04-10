@@ -1463,7 +1463,7 @@ _conditional_srcs = {
             "cmn/target_if/ftm/src/target_if_ftm.c",
         ],
     },
-    "CONFIG_QCA_WIFI_FTM_NL80211": {
+    "CONFIG_NL80211_TESTMODE": {
         True: [
             "cmn/os_if/linux/ftm/src/wlan_cfg80211_ftm.c",
         ],
