@@ -777,6 +777,21 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 				uint8_t vdev_id, uint16_t peer_id,
 				uint16_t pkt_len, uint32_t metadata);
 
+static inline
+bool wlan_dp_stc_rx_nbuf_is_tcp_ack(qdf_nbuf_t nbuf)
+{
+	bool is_pure_ack;
+
+	if (QDF_NBUF_CB_RX_TCP_PROTO(nbuf))
+		return false;
+
+	qdf_nbuf_push_head(nbuf, QDF_ETH_HDR_LEN);
+	is_pure_ack = qdf_nbuf_is_ipv4_v6_pure_tcp_ack(nbuf);
+	qdf_nbuf_pull_head(nbuf, QDF_ETH_HDR_LEN);
+
+	return is_pure_ack;
+}
+
 static inline QDF_STATUS
 wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 					   qdf_nbuf_t nbuf)
@@ -793,7 +808,8 @@ wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 		return QDF_STATUS_SUCCESS;
 
 	/* Do not update flow feature stats for TCP pure acks */
-	if (qdf_unlikely(QDF_NBUF_CB_RX_TCP_PURE_ACK(nbuf)))
+	if (qdf_unlikely(QDF_NBUF_CB_RX_TCP_PURE_ACK(nbuf) ||
+			 wlan_dp_stc_rx_nbuf_is_tcp_ack(nbuf)))
 		return QDF_STATUS_SUCCESS;
 
 	dp_stc = dp_ctx->dp_stc;
