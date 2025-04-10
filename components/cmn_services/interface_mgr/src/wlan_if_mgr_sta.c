@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -126,6 +126,9 @@ QDF_STATUS if_mgr_connect_active(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+		/* Check STA+SAP+SAP support by PCL */
+		if (!policy_mgr_validate_sta_start(vdev))
+			return QDF_STATUS_E_INVAL;
 		/*
 		 * In case of STA+STA concurrency, firmware might try to roam
 		 * to same AP where host is trying to do association on the other
