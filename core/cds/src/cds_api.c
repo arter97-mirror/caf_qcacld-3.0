@@ -2988,6 +2988,13 @@ cds_dp_get_vdev_stats(uint8_t vdev_id, struct cds_vdev_dp_stats *stats)
 
 #ifdef ENABLE_SMMU_S1_TRANSLATION
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#ifdef IPA_SIM
+QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
+{
+	osdev->smmu_s1_enabled = true;
+	return QDF_STATUS_SUCCESS;
+}
+#else
 QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
 {
 	struct iommu_domain *domain;
@@ -3034,6 +3041,7 @@ exit_with_success:
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
 
 #else
 QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)

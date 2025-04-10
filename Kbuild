@@ -1493,7 +1493,8 @@ IPA_OBJS :=	$(IPA_DIR)/dispatcher/src/wlan_ipa_ucfg_api.o \
 		$(IPA_DIR)/core/src/wlan_ipa_main.o \
 		$(IPA_DIR)/core/src/wlan_ipa_core.o \
 		$(IPA_DIR)/core/src/wlan_ipa_stats.o \
-		$(IPA_DIR)/core/src/wlan_ipa_rm.o
+		$(IPA_DIR)/core/src/wlan_ipa_rm.o \
+		$(IPA_DIR)/core/src/wlan_ipa_logging.o
 endif
 
 $(call add-wlan-objs,ipa,$(IPA_OBJS))
@@ -3754,6 +3755,10 @@ ccflags-y += -DCONFIG_PLD_PCIE_CNSS
 endif
 endif
 
+ifeq ($(CONFIG_IPA_SIM), y)
+ccflags-y += -DIPA_SIM
+endif
+
 ccflags-$(CONFIG_PLD_PCIE_INIT_FLAG) += -DCONFIG_PLD_PCIE_INIT
 ccflags-$(CONFIG_WLAN_FEATURE_DP_RX_THREADS) += -DFEATURE_WLAN_DP_RX_THREADS
 ccflags-$(CONFIG_WLAN_DP_LOCAL_PKT_CAPTURE) += -DWLAN_FEATURE_LOCAL_PKT_CAPTURE
@@ -4246,6 +4251,8 @@ endif
 ifeq ($(CONFIG_IPA_OPT_WIFI_DP), y)
 ifeq ($(CONFIG_IPA_OFFLOAD), y)
 ccflags-$(CONFIG_IPA_OPT_WIFI_DP) += -DIPA_OPT_WIFI_DP
+ccflags-$(CONFIG_IPA_OPT_WIFI_DP_CTRL) += -DIPA_OPT_WIFI_DP_CTRL
+ccflags-$(CONFIG_IPA_OPT_WIFI_DP_LOGGING) += -DIPA_OPT_WIFI_DP_LOGGING
 endif
 endif
 

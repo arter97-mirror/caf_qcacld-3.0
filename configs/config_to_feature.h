@@ -475,6 +475,10 @@
 #define CONFIG_PLD_PCIE_INIT (1)
 #endif
 
+#ifdef CONFIG_IPA_SIM
+#define IPA_SIM (1)
+#endif
+
 #ifdef CONFIG_WLAN_FEATURE_DP_RX_THREADS
 #define FEATURE_WLAN_DP_RX_THREADS (1)
 #endif
