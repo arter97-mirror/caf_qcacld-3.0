@@ -17749,6 +17749,8 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct nlattr *tb
 		[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_MAX + 1];
+	enum log_event_host_reason_code reason_code;
+	uint8_t final_dump_in_progress_val = 0;
 
 	hdd_enter();
 
@@ -17788,10 +17790,25 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 		 */
 		hdd_debug("Bug report triggered by framework");
 
+		if (hdd_ctx->is_drv_dump_in_progress_valid) {
+			final_dump_in_progress_val = hdd_ctx->dump_in_progress;
+		} else {
+			status = qdf_get_dump_inprogress(
+						&final_dump_in_progress_val);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				qdf_err("Failed to get dump_inprogress val");
+				return -EINVAL;
+			}
+		}
+
+		if (final_dump_in_progress_val == 1)
+			reason_code = WLAN_LOG_REASON_DUMP_IN_PROGRESS;
+		else
+			reason_code = WLAN_LOG_REASON_CODE_UNUSED;
+
 		status = cds_flush_logs(WLAN_LOG_TYPE_NON_FATAL,
 				WLAN_LOG_INDICATOR_FRAMEWORK,
-				WLAN_LOG_REASON_CODE_UNUSED,
-				false, false);
+				reason_code, false, false);
 		if (QDF_STATUS_SUCCESS != status) {
 			hdd_err("Failed to trigger bug report");
 			return -EINVAL;
