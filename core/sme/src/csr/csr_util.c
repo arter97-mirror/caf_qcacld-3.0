@@ -585,6 +585,7 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	bool ml_sap_vdev = false;
 	uint8_t conc_sta1_vdev_id = WLAN_INVALID_VDEV_ID;
 	uint8_t conc_sta2_vdev_id = WLAN_INVALID_VDEV_ID;
+	struct wlan_objmgr_vdev *vdev = NULL;
 
 	if (mac_ctx->roam.configParam.cc_switch_mode ==
 			QDF_MCC_TO_SCC_SWITCH_DISABLE)
@@ -657,6 +658,23 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 				sme_debug("skip inactive ml sta vdev %d",
 					  session->vdev_id);
 				continue;
+			}
+			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+							mac_ctx->psoc,
+							session->vdev_id,
+							WLAN_LEGACY_SME_ID);
+			if (vdev &&
+			    wlan_vdev_mlme_is_sap_go_move_before_sta(vdev)) {
+				wlan_objmgr_vdev_release_ref(
+							vdev,
+							WLAN_LEGACY_SME_ID);
+				sme_debug("Skip STA vdev:%d which received CSA",
+					  session->vdev_id);
+				continue;
+			} else if (vdev) {
+				wlan_objmgr_vdev_release_ref(
+							vdev,
+							WLAN_LEGACY_SME_ID);
 			}
 			wlan_get_op_chan_freq_info_vdev_id(mac_ctx->pdev,
 					   session->vdev_id,
