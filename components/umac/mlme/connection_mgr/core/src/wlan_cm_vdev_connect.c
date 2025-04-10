@@ -1169,12 +1169,10 @@ set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
 #endif
 
 QDF_STATUS
-cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
-		       struct cm_connect_req *conn_req)
+cm_get_ml_partner_info(struct cm_connect_req *conn_req,
+		       uint8_t mlo_support_link_num)
 {
 	uint8_t i, j = 0;
-	uint8_t mlo_support_link_num;
-	struct wlan_objmgr_psoc *psoc;
 	struct scan_cache_entry *scan_entry = conn_req->cur_candidate->entry;
 	struct mlo_partner_info *partner_info = &conn_req->req.ml_parnter_info;
 
@@ -1189,13 +1187,6 @@ cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
 	if (!scan_entry->ml_info.num_links)
 		return QDF_STATUS_SUCCESS;
 
-	psoc = wlan_pdev_get_psoc(pdev);
-	if (!psoc) {
-		mlme_err("psoc is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	mlo_support_link_num = wlan_mlme_get_sta_mlo_conn_max_num(psoc);
 	mlme_debug("sta mlo support link num: %d", mlo_support_link_num);
 
 	/* TODO: Make sure that scan_entry->ml_info->link_info is a sorted

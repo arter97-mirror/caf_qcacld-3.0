@@ -863,8 +863,6 @@ static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
 {
 	struct scan_cache_entry *scan_entry = candidate_info->scan_entry;
 	struct action_oui_search_attr attr = {0};
-	int8_t i, allowed_partner_links = 0;
-	uint8_t mlo_support_link_num;
 
 	if (!(scan_entry->ie_list.multi_link_bv || scan_entry->ie_list.ehtcap ||
 	      scan_entry->ie_list.ehtop))
@@ -884,30 +882,6 @@ static void if_mgr_update_candidate(struct wlan_objmgr_psoc *psoc,
 		candidate_info->is_mlo = false;
 		return;
 	}
-
-	mlo_support_link_num = wlan_mlme_get_sta_mlo_conn_max_num(psoc);
-
-	if (mlo_support_link_num <= WLAN_MAX_ML_DEFAULT_LINK)
-		return;
-
-	if (!wlan_action_oui_search(psoc, &attr,
-				    ACTION_OUI_RESTRICT_MAX_MLO_LINKS))
-		return;
-
-	for (i = 0; i < scan_entry->ml_info.num_links; i++) {
-		if (i < WLAN_MAX_ML_DEFAULT_LINK - 1) {
-			allowed_partner_links++;
-			continue;
-		}
-
-		scan_entry->ml_info.link_info[i].is_valid_link = false;
-	}
-
-	if (allowed_partner_links != scan_entry->ml_info.num_links)
-		ifmgr_nofl_debug("Downgrade " QDF_MAC_ADDR_FMT " partner links from %d to %d",
-				 QDF_MAC_ADDR_REF(scan_entry->ml_info.mld_mac_addr.bytes),
-				 scan_entry->ml_info.num_links,
-				 allowed_partner_links);
 }
 #else
 static inline QDF_STATUS
