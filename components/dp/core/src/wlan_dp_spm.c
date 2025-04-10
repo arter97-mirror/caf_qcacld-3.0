@@ -797,6 +797,22 @@ void wlan_dp_spm_event_post(enum wlan_dp_spm_event_type type, void *data)
 {
 }
 
+static void dp_spm_add_flow_to_freelist(qdf_rcu_head_t *rp)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_spm_flow_info *flow_rec =
+			container_of(rp, struct wlan_dp_spm_flow_info, rcu);
+	uint16_t flow_id;
+
+	if (!dp_ctx)
+		return;
+
+	flow_id = flow_rec->id;
+	qdf_mem_zero(flow_rec, sizeof(struct wlan_dp_spm_flow_info));
+	flow_rec->id = flow_id;
+	qdf_list_insert_back(&dp_ctx->o_flow_rec_freelist, &flow_rec->node);
+}
+
 static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 				    bool clear_tbl)
 {
@@ -804,7 +820,6 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 	struct qdf_ht *ht_node;
 	struct qdf_ht_entry *tmp;
 	struct wlan_dp_spm_flow_info *flow_rec;
-	uint16_t flow_id;
 	int i;
 
 	qdf_spinlock_acquire(&dp_ctx->flow_list_lock);
@@ -817,13 +832,8 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 							flow_rec->classified,
 							flow_rec->c_flow_id);
 				qdf_hl_del_rcu(&flow_rec->hnode);
-				flow_id = flow_rec->id;
-				qdf_mem_zero(flow_rec,
-					sizeof(struct wlan_dp_spm_flow_info));
-				flow_rec->id = flow_id;
-				qdf_list_insert_back(
-						&dp_ctx->o_flow_rec_freelist,
-						&flow_rec->node);
+				qdf_call_rcu(&flow_rec->rcu,
+					     dp_spm_add_flow_to_freelist);
 				spm_intf->o_stats.active--;
 				spm_intf->o_stats.deleted++;
 			}
