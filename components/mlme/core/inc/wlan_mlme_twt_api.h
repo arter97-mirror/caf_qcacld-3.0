@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -308,6 +308,14 @@ bool mlme_is_max_twt_sessions_reached(struct wlan_objmgr_psoc *psoc,
  */
 bool mlme_is_24ghz_twt_enabled(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * mlme_is_twt_disabled_on_scan() - Check whether TWT is disabled on scan
+ * @psoc: psoc pointer
+ *
+ * Return: True is twt is disabled on scan
+ */
+bool mlme_is_twt_disabled_on_scan(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_TWT_CONV_SUPPORTED
 /**
  * mlme_is_twt_disable_info_frame() - Get if TWT info frame enabled/disabled
@@ -351,6 +359,11 @@ mlme_is_24ghz_twt_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
+static inline
+bool mlme_is_twt_disabled_on_scan(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 static inline bool
 mlme_is_twt_disable_info_frame(struct wlan_objmgr_psoc *psoc)
 {

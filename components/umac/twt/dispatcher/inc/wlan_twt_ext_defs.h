@@ -37,6 +37,7 @@
  * @bcast_responder_enabled: bcast responder enable/disable
  * @enable_twt_24ghz: Enable/disable host TWT when STA is connected in
  * 2.4Ghz
+ * @disable_twt_on_scan: Enable/Disable twt on scan
  * @flex_twt_sched: flex twt scheduling enable/disable
  * @req_flag: requestor flag enable/disable
  * @res_flag: responder flag enable/disable
@@ -54,6 +55,7 @@ struct twt_mc_cfg_params {
 	bool bcast_requestor_enabled;
 	bool bcast_responder_enabled;
 	bool enable_twt_24ghz;
+	bool disable_twt_on_scan;
 	bool flex_twt_sched;
 	bool req_flag;
 	bool res_flag;

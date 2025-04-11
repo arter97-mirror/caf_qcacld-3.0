@@ -1703,6 +1703,7 @@ struct wlan_mlme_acs {
  * @disable_btwt_usr_cfg: User config param to enable/disable the BTWT support
  * @enable_twt_24ghz: Enable/disable host TWT when STA is connected in
  * 2.4Ghz
+ * @disable_twt_on_scan: Enable/Disable TWT on scan
  * @disable_twt_info_frame: Enable/disable TWT info frame
  * @req_flag: requestor flag enable/disable
  * @res_flag: responder flag enable/disable
@@ -1721,6 +1722,7 @@ struct wlan_mlme_cfg_twt {
 	uint32_t twt_congestion_timeout;
 	bool disable_btwt_usr_cfg;
 	bool enable_twt_24ghz;
+	bool disable_twt_on_scan;
 	bool disable_twt_info_frame;
 	bool req_flag;
 	bool res_flag;
