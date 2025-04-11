@@ -2857,6 +2857,10 @@ int wma_tbttoffset_update_event_handler(void *handle, uint8_t *event,
 			wma_err("Invalid beacon buffer");
 			return -EINVAL;
 		}
+		if (bcn->len > SIR_MAX_BEACON_SIZE) {
+			wma_err("Invalid beacon len");
+			return -EINVAL;
+		}
 		/* Save the adjusted TSF */
 		intf[if_id].tsfadjust = adjusted_tsf[if_id];
 
