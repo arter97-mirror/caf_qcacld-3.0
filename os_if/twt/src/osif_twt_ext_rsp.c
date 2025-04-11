@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -196,11 +196,16 @@ twt_del_status_to_vendor_twt_status(enum HOST_TWT_DEL_STATUS status)
 	case HOST_TWT_DEL_STATUS_CHAN_SW_IN_PROGRESS:
 		return QCA_WLAN_VENDOR_TWT_STATUS_CHANNEL_SWITCH_IN_PROGRESS;
 	case HOST_TWT_DEL_STATUS_SCAN_IN_PROGRESS:
+	case HOST_DEL_TWT_STATUS_SCAN_STARTED:
 		return QCA_WLAN_VENDOR_TWT_STATUS_SCAN_IN_PROGRESS;
 	case HOST_TWT_DEL_STATUS_PS_DISABLE_TEARDOWN:
 		return QCA_WLAN_VENDOR_TWT_STATUS_POWER_SAVE_EXIT_TERMINATE;
 	case HOST_TWT_DEL_STATUS_MULTIPLE_LINKS_ACTIVE_TERMINATE:
 		return QCA_WLAN_VENDOR_TWT_STATUS_MULTIPLE_LINKS_ACTIVE_TERMINATE;
+	case HOST_DEL_TWT_STATUS_MLO_LINK_INACTIVE:
+		return QCA_WLAN_VENDOR_TWT_STATUS_MLSR_LINK_INACTIVE;
+	case HOST_DEL_TWT_STATUS_2G_TWT_NOT_ENABLED:
+		return QCA_WLAN_VENDOR_TWT_STATUS_CHAN_SWITCH_24GHZ;
 	default:
 		return QCA_WLAN_VENDOR_TWT_STATUS_UNKNOWN_ERROR;
 	}
