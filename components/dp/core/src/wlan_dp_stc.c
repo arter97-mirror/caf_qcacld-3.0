@@ -80,7 +80,9 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 		struct wlan_dp_stc_txrx_min_max_stats *txrx_min_max_stats;
 
 		/* Copy win-1 min-max to win-2 */
-		if (w != 0 && !flow_entry->win_transition_complete) {
+		if (w != 0 &&
+		    qdf_atomic_test_and_clear_bit(WLAN_DP_STC_TRANSITION_FLAG_WIN,
+						  &flow_entry->transition_flags)) {
 			struct wlan_dp_stc_txrx_min_max_stats *win_1;
 			struct wlan_dp_stc_txrx_min_max_stats *win_2;
 
@@ -91,16 +93,15 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 			win_2->pkt_size_max = win_1->pkt_size_max;
 			win_2->pkt_iat_min = win_1->pkt_iat_min;
 			win_2->pkt_iat_max = win_1->pkt_iat_max;
-			flow_entry->win_transition_complete = 1;
-		} else {
-			flow_entry->win_transition_complete = 0;
 		}
 
 		txrx_min_max_stats = &flow_entry->txrx_min_max_stats[s][w];
 		DP_STC_UPDATE_WIN_MIN_MAX_STATS(txrx_min_max_stats->pkt_size,
 						pkt_len);
-		DP_STC_UPDATE_WIN_MIN_MAX_STATS(txrx_min_max_stats->pkt_iat,
-						pkt_iat);
+		if (!qdf_atomic_test_and_clear_bit(WLAN_DP_STC_TRANSITION_FLAG_SAMPLE,
+						   &flow_entry->transition_flags))
+			DP_STC_UPDATE_WIN_MIN_MAX_STATS(txrx_min_max_stats->pkt_iat,
+							pkt_iat);
 	}
 	/* TxRx Stats - End */
 
@@ -1527,7 +1528,7 @@ wlan_dp_stc_trigger_sampling(struct wlan_dp_stc *dp_stc, uint16_t flow_id,
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline void
+static inline uint32_t
 wlan_dp_stc_save_delta_stats(struct wlan_dp_stc_txrx_stats *dst,
 			     struct wlan_dp_stc_txrx_stats *cur,
 			     struct wlan_dp_stc_txrx_stats *ref)
@@ -1535,12 +1536,28 @@ wlan_dp_stc_save_delta_stats(struct wlan_dp_stc_txrx_stats *dst,
 	dst->bytes = cur->bytes - ref->bytes;
 	dst->pkts = cur->pkts - ref->pkts;
 	dst->pkt_iat_sum = cur->pkt_iat_sum - ref->pkt_iat_sum;
+
+	return dst->pkts;
 }
 
 static inline void
 wlan_dp_stc_save_min_max_state(struct wlan_dp_stc_txrx_stats *dst,
-			       struct wlan_dp_stc_txrx_min_max_stats *src)
+			       struct wlan_dp_stc_flow_table_entry *flow,
+			       uint32_t cur_win_pkts, uint8_t sample_idx,
+			       uint8_t win_idx)
 {
+	struct wlan_dp_stc_txrx_min_max_stats *prev_win;
+	struct wlan_dp_stc_txrx_min_max_stats *cur_win =
+				&flow->txrx_min_max_stats[sample_idx][win_idx];
+	struct wlan_dp_stc_txrx_min_max_stats *src = cur_win;
+
+	if ((win_idx + 1) == DP_TXRX_SAMPLES_WINDOW_MAX) {
+		prev_win = &flow->txrx_min_max_stats[sample_idx][win_idx - 1];
+		if (cur_win_pkts == 0 ||
+		    (cur_win->pkt_size_min == 0 && prev_win->pkt_size_min != 0))
+			src = prev_win;
+	}
+
 	dst->pkt_size_min = src->pkt_size_min;
 	dst->pkt_size_max = src->pkt_size_max;
 	dst->pkt_iat_min = src->pkt_iat_min;
@@ -1780,6 +1797,7 @@ sample:
 		 */
 
 		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
+			uint32_t cur_win_pkts;
 			flow_id = s_entry->tx_flow_id;
 			flow = &dp_stc->tx_flow_table->entries[flow_id];
 			if (s_entry->tx_flow_metadata != flow->metadata) {
@@ -1792,17 +1810,28 @@ sample:
 			flow->idx.sample_win_idx =
 					((s_entry->next_sample_idx) << 16) |
 					(s_entry->next_win_idx);
+
+			if ((win_idx + 1) == DP_TXRX_SAMPLES_WINDOW_MAX) {
+				qdf_atomic_set_bit(WLAN_DP_STC_TRANSITION_FLAG_SAMPLE,
+						   &flow->transition_flags);
+			} else {
+				qdf_atomic_set_bit(WLAN_DP_STC_TRANSITION_FLAG_WIN,
+						   &flow->transition_flags);
+			}
 			qdf_mem_copy(&tx_stats,
 				     &flow->txrx_stats,
 				     sizeof(tx_stats));
-			wlan_dp_stc_save_delta_stats(&txrx_samples->tx,
-						     &tx_stats,
-						     &s_entry->tx_stats_ref);
-			wlan_dp_stc_save_min_max_state(&txrx_samples->tx,
-						       &flow->txrx_min_max_stats[sample_idx][win_idx]);
+			cur_win_pkts = wlan_dp_stc_save_delta_stats(
+							&txrx_samples->tx,
+							&tx_stats,
+							&s_entry->tx_stats_ref);
+			wlan_dp_stc_save_min_max_state(&txrx_samples->tx, flow,
+						       cur_win_pkts,
+						       sample_idx, win_idx);
 		}
 
 		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
+			uint32_t cur_win_pkts;
 			flow_id = s_entry->rx_flow_id;
 			flow = &dp_stc->rx_flow_table->entries[flow_id];
 			if (s_entry->rx_flow_metadata != flow->metadata) {
@@ -1815,14 +1844,23 @@ sample:
 			flow->idx.sample_win_idx =
 					((s_entry->next_sample_idx) << 16) |
 					(s_entry->next_win_idx);
+			if ((win_idx + 1) == DP_TXRX_SAMPLES_WINDOW_MAX) {
+				qdf_atomic_set_bit(WLAN_DP_STC_TRANSITION_FLAG_SAMPLE,
+						   &flow->transition_flags);
+			} else {
+				qdf_atomic_set_bit(WLAN_DP_STC_TRANSITION_FLAG_WIN,
+						   &flow->transition_flags);
+			}
 			qdf_mem_copy(&rx_stats,
 				     &flow->txrx_stats,
 				     sizeof(rx_stats));
-			wlan_dp_stc_save_delta_stats(&txrx_samples->rx,
-						     &rx_stats,
-						     &s_entry->rx_stats_ref);
-			wlan_dp_stc_save_min_max_state(&txrx_samples->rx,
-						       &flow->txrx_min_max_stats[sample_idx][win_idx]);
+			cur_win_pkts = wlan_dp_stc_save_delta_stats(
+							&txrx_samples->rx,
+							&rx_stats,
+							&s_entry->rx_stats_ref);
+			wlan_dp_stc_save_min_max_state(&txrx_samples->rx, flow,
+						       cur_win_pkts,
+						       sample_idx, win_idx);
 		}
 
 		if (s_entry->next_win_idx == 0) {

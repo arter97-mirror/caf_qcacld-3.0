@@ -281,16 +281,20 @@ struct wlan_dp_stc_sampling_table {
 	struct wlan_dp_stc_sampling_table_entry entries[DP_STC_SAMPLE_FLOWS_MAX];
 };
 
+#define WLAN_DP_STC_TRANSITION_FLAG_SAMPLE 0
+#define WLAN_DP_STC_TRANSITION_FLAG_WIN 1
+
 /**
  * struct wlan_dp_stc_flow_table_entry - Flow table maintained in per pkt path
  * @prev_pkt_arrival_ts: previous packet arrival time
- * @win_transition_complete: Window transition completion flag.
  * @metadata: flow metadata
  * @burst_state: burst state
  * @burst_start_time: burst start time
  * @burst_start_detect_bytes: current snapshot of total bytes during burst
  *			      start detection phase
  * @cur_burst_bytes: total bytes accumulated in current burst
+ * @transition_flags: transition flags to indicate sample or a window change
+ *		      for flow stats collection
  * @idx: union for storing sample & window index
  * @idx.sample_win_idx: sample and window index
  * @idx.s.win_idx: window index
@@ -302,12 +306,12 @@ struct wlan_dp_stc_sampling_table {
  */
 struct wlan_dp_stc_flow_table_entry {
 	uint64_t prev_pkt_arrival_ts;
-	uint8_t win_transition_complete;
 	uint32_t metadata;
 	enum wlan_dp_stc_burst_state burst_state;
 	uint64_t burst_start_time;
 	uint32_t burst_start_detect_bytes;
 	uint32_t cur_burst_bytes;
+	unsigned long transition_flags;
 	/* Can be atomic.! Decide based on the accuracy during test */
 	union {
 		uint32_t sample_win_idx;
