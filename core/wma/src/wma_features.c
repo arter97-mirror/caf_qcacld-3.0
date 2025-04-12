@@ -1269,6 +1269,12 @@ QDF_STATUS wma_parse_bw_indication_ie(uint8_t *ie,
 	enum phy_ch_width ch_width;
 	QDF_STATUS status;
 
+	if (!ie || tlv_len < SIR_MAC_MIN_IE_LEN) {
+		wma_debug("Invalid WMI_CSWRAP_IE len %d",
+			  tlv_len);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	ie_head = (struct ie_header *)ie;
 	if (ie_head->ie_len + sizeof(struct ie_header) > tlv_len) {
 		wma_err("Invalid ie len: %d, buffer len: %d",
@@ -1335,7 +1341,6 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	struct ieee80211_ie_wide_bw_switch *wb_ie;
 	struct wma_txrx_node *intr = wma->interfaces;
 	QDF_STATUS status;
-	uint8_t tlv_len;
 
 	param_buf = (WMI_CSA_HANDLING_EVENTID_param_tlvs *) event;
 
@@ -1402,9 +1407,8 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 
 	if (csa_event->ies_present_flag & WMI_CSWRAP_IE_EXT_VER_2_PRESENT) {
 		wma_debug("WMI_CSWRAP_IE_EXT_VER_2 received");
-		tlv_len = csa_event->num_bytes_valid_in_cswrap_ie_ext_ver2;
 		status = wma_parse_bw_indication_ie(param_buf->cs_wrap_ie,
-						    tlv_len,
+						    param_buf->num_cs_wrap_ie,
 						    csa_offload_event);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			csa_offload_event->ies_present_flag |=
