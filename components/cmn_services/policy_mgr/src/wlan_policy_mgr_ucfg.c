@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -130,13 +130,7 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 	if (cfg_get(psoc, CFG_INDOOR_CHANNEL_SUPPORT))
 		cfg->sta_sap_scc_on_indoor_channel = true;
 
-	/*
-	 * Force set sta_sap_scc_on_dfs_chnl on Non-DBS HW so that standalone
-	 * SAP is not allowed on DFS channel on non-DBS HW, Also, force SCC in
-	 * case of STA+SAP
-	 */
-	if (cfg->sta_sap_scc_on_dfs_chnl == 2 &&
-	    !cfg_get(psoc, CFG_ENABLE_DFS_MASTER_CAPABILITY))
+	if (!cfg_get(psoc, CFG_ENABLE_DFS_MASTER_CAPABILITY))
 		cfg->sta_sap_scc_on_dfs_chnl = 0;
 	cfg->nan_sap_scc_on_lte_coex_chnl =
 		cfg_get(psoc, CFG_NAN_SAP_SCC_ON_LTE_COEX_CHAN);

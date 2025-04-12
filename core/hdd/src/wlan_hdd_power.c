@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -834,7 +834,6 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 	}
 
 	hdd_debug("enable offloads");
-	hdd_enable_gtk_offload(vdev);
 	hdd_enable_arp_offload(adapter, vdev, trigger);
 	hdd_enable_ns_offload(adapter, vdev, trigger);
 	hdd_enable_mc_addr_filtering(adapter, trigger);
@@ -1583,20 +1582,6 @@ void hdd_disable_and_flush_mc_addr_list(struct hdd_adapter *adapter,
 }
 
 /**
- * hdd_update_conn_state_mask() - record info needed by wma_suspend_req
- * @adapter: adapter to get info from
- * @conn_state_mask: mask of connection info
- *
- * currently only need to send connection info.
- */
-static void hdd_update_conn_state_mask(struct hdd_adapter *adapter,
-				       uint32_t *conn_state_mask)
-{
-	if (hdd_cm_is_vdev_associated(adapter->deflink))
-		*conn_state_mask |= (1 << adapter->deflink->vdev_id);
-}
-
-/**
  * hdd_suspend_wlan() - Driver suspend function
  *
  * Return: 0 on success else error code.
@@ -1607,7 +1592,6 @@ hdd_suspend_wlan(void)
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
-	uint32_t conn_state_mask = 0;
 	struct wlan_hdd_link_info *link_info;
 
 	hdd_info("WLAN being suspended by OS");
@@ -1625,17 +1609,20 @@ hdd_suspend_wlan(void)
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_SUSPEND_WLAN) {
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
-			if (wlan_hdd_validate_vdev_id(link_info->vdev_id))
+			if (wlan_hdd_validate_vdev_id(link_info->vdev_id) ||
+			    !link_info->vdev ||
+			    !ucfg_pmo_is_vdev_connected(link_info->vdev))
 				continue;
 
 			if (adapter->device_mode == QDF_STA_MODE)
 				status = hdd_enable_default_pkt_filters(
 						hdd_ctx, link_info->vdev_id);
 
-			/* Configure supported OffLoads */
-			hdd_enable_host_offloads(adapter, pmo_apps_suspend);
-			hdd_update_conn_state_mask(adapter, &conn_state_mask);
+			hdd_enable_gtk_offload(link_info->vdev);
+
 		}
+		/* Configure supported OffLoads */
+		hdd_enable_host_offloads(adapter, pmo_apps_suspend);
 		hdd_adapter_dev_put_debug(adapter, NET_DEV_HOLD_SUSPEND_WLAN);
 	}
 
@@ -2237,6 +2224,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 				      hdd_chip_pwr_save_fail_detected_cb);
 
 	hdd_restore_thermal_mitigation_config(hdd_ctx);
+	hdd_restore_ddr_bw_mitigation_config(hdd_ctx);
 	hdd_restore_sar_config(hdd_ctx);
 
 	hdd_send_default_scan_ies(hdd_ctx);

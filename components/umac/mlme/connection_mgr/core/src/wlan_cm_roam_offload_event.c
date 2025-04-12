@@ -497,22 +497,7 @@ QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  struct wlan_crypto_key_entry *keys,
 					  uint8_t num_keys)
 {
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint8_t i;
-
-	for (i = 0; i < num_keys; i++) {
-		status = wlan_crypto_add_key_entry(psoc, &keys[i]);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			mlme_err("Failed to add key entry for link:%d",
-				 keys[i].link_id);
-			wlan_crypto_free_key(&keys[i].keys);
-			qdf_mem_zero(&keys[i],
-				     sizeof(struct wlan_crypto_key_entry));
-			qdf_mem_free(&keys[i]);
-		}
-	}
-
-	return status;
+	return wlan_crypto_key_event_handler(psoc, keys, num_keys);
 }
 #endif
 

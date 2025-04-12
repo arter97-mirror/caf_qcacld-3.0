@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -281,6 +281,23 @@ qdf_freq_t wlan_nan_sap_override_freq(struct wlan_objmgr_psoc *psoc,
 				      uint32_t vdev_id,
 				      qdf_freq_t chan_freq);
 
+/**
+ * wlan_get_nan_config: NAN capability configuration
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: NAN capability bitmap
+ */
+static inline uint32_t wlan_get_nan_config(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *nan_obj = nan_get_psoc_priv_obj(psoc);
+
+	if (!nan_obj) {
+		nan_err("nan psoc priv object is NULL");
+		return 0;
+	}
+
+	return nan_obj->cfg_param.nan_config;
+}
 #else /* WLAN_FEATURE_NAN */
 static inline QDF_STATUS nan_init(void)
 {
@@ -369,6 +386,10 @@ qdf_freq_t wlan_nan_sap_override_freq(struct wlan_objmgr_psoc *psoc,
 	return chan_freq;
 }
 
+static inline uint32_t wlan_get_nan_config(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
 #endif /* WLAN_FEATURE_NAN */
 
 #if defined(WLAN_FEATURE_NAN) && defined(WLAN_FEATURE_11BE_MLO)

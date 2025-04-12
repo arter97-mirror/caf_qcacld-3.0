@@ -290,7 +290,7 @@
 /* PCIe gen speed change idle shutdown timer 100 milliseconds */
 #define HDD_PCIE_GEN_SPEED_CHANGE_TIMEOUT_MS (100)
 
-#define MAX_NET_DEV_REF_LEAK_ITERATIONS 10
+#define MAX_NET_DEV_REF_LEAK_ITERATIONS 50
 #define NET_DEV_REF_LEAK_ITERATION_SLEEP_TIME_MS 10
 
 #ifdef FEATURE_TSO
@@ -2846,7 +2846,6 @@ static uint32_t hdd_update_band_cap_from_dot11mode(
 	return band_capability;
 }
 
-#ifdef FEATURE_WPSS_THERMAL_MITIGATION
 static inline
 void hdd_update_multi_client_thermal_support(struct hdd_context *hdd_ctx)
 {
@@ -2860,12 +2859,6 @@ void hdd_update_multi_client_thermal_support(struct hdd_context *hdd_ctx)
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_thermal_multi_client_support);
 }
-#else
-static inline
-void hdd_update_multi_client_thermal_support(struct hdd_context *hdd_ctx)
-{
-}
-#endif
 
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 static void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
@@ -3121,6 +3114,18 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	sme_update_bfer_caps_as_per_nss_chains(hdd_ctx->mac_handle, cfg);
 
 	hdd_update_tgt_vht_cap(hdd_ctx, &cfg->vht_cap);
+
+	ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(hdd_ctx->psoc, &value);
+	if ((value > MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
+	    !cfg->tx_bfee_8ss_enabled) {
+		value = MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF;
+		status = ucfg_mlme_cfg_set_vht_tx_bfee_ant_supp(hdd_ctx->psoc,
+								value);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("set tx_bfee_ant_supp failed");
+	}
+	hdd_debug("txBFCsnValue %d 8ss %d", value, cfg->tx_bfee_8ss_enabled);
+
 	if (cfg->services.en_11ax  &&
 	    (hdd_ctx->config->dot11Mode == eHDD_DOT11_MODE_AUTO ||
 	     hdd_ctx->config->dot11Mode == eHDD_DOT11_MODE_11ax ||
@@ -3197,28 +3202,13 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 
 	hdd_ctx->rcpi_enabled = cfg->rcpi_enabled;
 
-	status = ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(hdd_ctx->psoc,
-							&value);
-	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err("set tx_bfee_ant_supp failed");
-
 	status = ucfg_mlme_set_restricted_80p80_bw_supp(hdd_ctx->psoc,
 							cfg->restricted_80p80_bw_supp);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to set MLME restircted 80p80 BW support");
 
-	if ((value > MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
-	    !cfg->tx_bfee_8ss_enabled) {
-		status = ucfg_mlme_cfg_set_vht_tx_bfee_ant_supp(hdd_ctx->psoc,
-				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF);
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_err("set tx_bfee_ant_supp failed");
-	}
-
 	hdd_update_tid_to_link_supported(hdd_ctx, &cfg->services);
 	mac_handle = hdd_ctx->mac_handle;
-
-	hdd_debug("txBFCsnValue %d", value);
 
 	/*
 	 * Update txBFCsnValue and NumSoundingDim values to vhtcap in wiphy
@@ -5491,6 +5481,14 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			hdd_send_thermal_mitigation_val(hdd_ctx, thermal_state,
 							THERMAL_MONITOR_WPSS);
 	}
+
+	if (!pld_get_thermal_state(hdd_ctx->parent_dev, &thermal_state,
+				   THERMAL_MONITOR_DDR_BWM)) {
+		if (thermal_state > QCA_WLAN_VENDOR_THERMAL_LEVEL_NONE)
+			hdd_send_ddr_bw_mitigation_level(hdd_ctx, thermal_state,
+						THERMAL_MONITOR_DDR_BWM);
+	}
+
 	hdd_register_get_port_status_notifier(hdd_ctx);
 
 	hdd_exit();
@@ -14546,7 +14544,7 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 			 * no need to move SAP.
 			 */
 			if ((policy_mgr_is_sta_sap_scc(hdd_ctx->psoc,
-						       ap_chan_freq) &&
+						       ap_chan_freq, false) &&
 			     scc_on_lte_coex) ||
 			    policy_mgr_nan_sap_scc_on_unsafe_ch_chk(hdd_ctx->psoc,
 								    ap_chan_freq))

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -173,14 +173,11 @@ void dp_fim_parse_skb_flow_info(struct sk_buff *skb, struct flow_info *flow)
 {
 	struct qdf_flow_info flow_info;
 
-	if (qdf_nbuf_sock_is_ipv4_pkt(skb)) {
+	if (!qdf_nbuf_get_ipv4_flow_info(skb, &flow_info)) {
 		if (!qdf_nbuf_is_ipv4_first_fragment(skb)) {
 			flow->flags |= FLOW_INFO_PRESENT_IP_FRAGMENT;
 			return;
 		}
-
-		if (qdf_nbuf_get_ipv4_flow_info(skb, &flow_info))
-			return;
 
 		flow->src_port = flow_info.src_port;
 		flow->dst_port = flow_info.dst_port;
@@ -189,9 +186,7 @@ void dp_fim_parse_skb_flow_info(struct sk_buff *skb, struct flow_info *flow)
 		flow->proto = flow_info.proto;
 		flow->flags |= FLOW_INFO_IPV4_PARSE_SUCCESS;
 
-	} else if (qdf_nbuf_sock_is_ipv6_pkt(skb)) {
-		if (qdf_nbuf_get_ipv6_flow_info(skb, &flow_info))
-			return;
+	} else if (!qdf_nbuf_get_ipv6_flow_info(skb, &flow_info)) {
 
 		flow->src_port = flow_info.src_port;
 		flow->dst_port = flow_info.dst_port;

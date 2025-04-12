@@ -5041,7 +5041,7 @@ static void lim_prepare_and_send_disassoc(struct mac_context *mac_ctx,
 		disassoc_req.doNotSendOverTheAir = 1;
 		disassoc_req.reasonCode =
 					REASON_AUTHORIZED_ACCESS_LIMIT_REACHED;
-	} else if (req->req.reason_code == CM_MLO_LINK_SWITCH_DISCONNECT) {
+	} else if (req->req.source == CM_MLO_LINK_SWITCH_DISCONNECT) {
 		disassoc_req.doNotSendOverTheAir = 1;
 	}
 

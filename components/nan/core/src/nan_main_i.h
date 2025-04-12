@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -108,6 +108,7 @@ enum nan_disc_state {
  * @nan_feature_config: Bitmap to enable/disable a particular NAN feature
  *                      configuration in firmware. It's sent to firmware through
  *                      wmi_vdev_param_enable_disable_nan_config_features
+ * @nan_config: NAN config to enable/disable capabilities
  */
 struct nan_cfg_params {
 	uint32_t enable:1;
@@ -126,6 +127,7 @@ struct nan_cfg_params {
 	uint32_t max_ndp_sessions;
 	uint32_t max_ndi;
 	uint32_t nan_feature_config;
+	uint32_t nan_config;
 };
 
 #define MAX_NDP_PEERS 8

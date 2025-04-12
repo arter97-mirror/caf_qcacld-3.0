@@ -8266,8 +8266,7 @@ int sme_set_auto_rate_he_ltf(mac_handle_t mac_handle, uint8_t session_id,
 		bit_mask = (1 << (cfg_val - 1));
 
 	set_val = mac_ctx->he_sgi_ltf_cfg_bit_mask;
-
-	SET_AUTO_RATE_HE_LTF_VAL(set_val, bit_mask);
+	WMI_SET_BITS(set_val, HE_LTF_INDEX, HE_LTF_NUM_BITS, bit_mask);
 
 	mac_ctx->he_sgi_ltf_cfg_bit_mask = set_val;
 	status = wma_cli_set_command(session_id,
@@ -8298,10 +8297,10 @@ int sme_set_auto_rate_he_sgi(mac_handle_t mac_handle, uint8_t session_id,
 		return -EINVAL;
 	}
 
-	sgi_bit_mask = (1 << cfg_val);
+	sgi_bit_mask = (1 << (cfg_val - AUTO_RATE_GI_400NS));
 
 	set_val = mac_ctx->he_sgi_ltf_cfg_bit_mask;
-	SET_AUTO_RATE_SGI_VAL(set_val, sgi_bit_mask);
+	WMI_SET_BITS(set_val, HE_SGI_INDEX, HE_SGI_NUM_BITS, sgi_bit_mask);
 
 	mac_ctx->he_sgi_ltf_cfg_bit_mask = set_val;
 	status = wma_cli_set_command(session_id,
@@ -8326,14 +8325,38 @@ int sme_set_auto_rate_ldpc(mac_handle_t mac_handle, uint8_t session_id,
 	int status;
 
 	set_val = mac_ctx->he_sgi_ltf_cfg_bit_mask;
-
-	set_val |= (ldpc_disable << AUTO_RATE_LDPC_DIS_BIT);
-
+	WMI_SET_BITS(set_val, AUTO_RATE_LDPC_DIS_BIT,
+		     AUTO_RATE_LDPC_DIS_NUM_BITS, ldpc_disable);
+	mac_ctx->he_sgi_ltf_cfg_bit_mask = set_val;
 	status = wma_cli_set_command(session_id,
 				     wmi_vdev_param_autorate_misc_cfg,
 				     set_val, VDEV_CMD);
 	if (status) {
 		sme_err("failed to set auto rate LDPC cfg");
+		return status;
+	}
+
+	sme_debug("auto rate misc cfg set to 0x%08X", set_val);
+
+	return 0;
+}
+
+int sme_set_auto_rate_stbc(mac_handle_t mac_handle, uint8_t session_id,
+			   uint8_t stbc_disable)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	uint32_t set_val;
+	int status;
+
+	set_val = mac_ctx->he_sgi_ltf_cfg_bit_mask;
+	WMI_SET_BITS(set_val, AUTO_RATE_STBC_DIS_BIT,
+		     AUTO_RATE_STBC_DIS_NUM_BITS, stbc_disable);
+	mac_ctx->he_sgi_ltf_cfg_bit_mask = set_val;
+	status = wma_cli_set_command(session_id,
+				     wmi_vdev_param_autorate_misc_cfg,
+				     set_val, VDEV_CMD);
+	if (status) {
+		sme_err("failed to set auto rate STBC cfg");
 		return status;
 	}
 
@@ -10935,6 +10958,9 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 			    struct wma_tgt_cfg *cfg)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	uint8_t value = MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF;
+
+	ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(mac_ctx->psoc, &value);
 
 	qdf_mem_copy(&mac_ctx->eht_cap_2g,
 		     &cfg->eht_cap_2g,
@@ -10943,6 +10969,18 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 	qdf_mem_copy(&mac_ctx->eht_cap_5g,
 		     &cfg->eht_cap_5g,
 		     sizeof(tDot11fIEeht_cap));
+
+	/* modify HE Caps field according to INI setting */
+	mac_ctx->eht_cap_2g.bfee_ss_le_80mhz =
+			QDF_MIN(cfg->eht_cap_2g.bfee_ss_le_80mhz,
+				value);
+
+	mac_ctx->eht_cap_5g.bfee_ss_le_80mhz =
+			QDF_MIN(cfg->eht_cap_5g.bfee_ss_le_80mhz, value);
+	mac_ctx->eht_cap_5g.bfee_ss_160mhz =
+			QDF_MIN(cfg->eht_cap_5g.bfee_ss_160mhz, value);
+	mac_ctx->eht_cap_5g.bfee_ss_320mhz =
+			QDF_MIN(cfg->eht_cap_5g.bfee_ss_320mhz, value);
 
 	qdf_mem_copy(&mac_ctx->eht_cap_2g_orig,
 		     &mac_ctx->eht_cap_2g,
@@ -11059,10 +11097,14 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 	mac_ctx->he_cap_2g.bfee_sts_lt_80 =
 			QDF_MIN(cfg->he_cap_2g.bfee_sts_lt_80,
 				he_cap_ini->bfee_sts_lt_80);
+	mac_ctx->he_cap_2g.bfee_sts_gt_80 = 0;
 
 	mac_ctx->he_cap_5g.bfee_sts_lt_80 =
 			QDF_MIN(cfg->he_cap_5g.bfee_sts_lt_80,
 				he_cap_ini->bfee_sts_lt_80);
+	mac_ctx->he_cap_5g.bfee_sts_gt_80 =
+			QDF_MIN(cfg->he_cap_5g.bfee_sts_gt_80,
+				he_cap_ini->bfee_sts_gt_80);
 
 	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2) {
 		mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = HE_SET_MCS_4_NSS(

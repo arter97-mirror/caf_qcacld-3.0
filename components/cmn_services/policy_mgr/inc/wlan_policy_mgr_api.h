@@ -1530,6 +1530,21 @@ policy_mgr_is_emlsr_sta_concurrency_present(struct wlan_objmgr_psoc *psoc)
 #endif
 
 /**
+ * policy_mgr_dfs_master_cfg_changed() - dfs master changed notify
+ * event
+ * @psoc: PSOC object information
+ * @dfs_master_capable: dfs master enable or disable
+ *
+ * Change the "sta_sap_scc_on_dfs_chnl" flag as well when dfs master
+ * capability is changed by vendor command.
+ *
+ * Return: void
+ */
+void
+policy_mgr_dfs_master_cfg_changed(struct wlan_objmgr_psoc *psoc,
+				  bool dfs_master_capable);
+
+/**
  * policy_mgr_skip_dfs_ch() - skip dfs channel or not
  * @psoc: pointer to soc
  * @skip_dfs_channel: pointer to result
@@ -4713,12 +4728,15 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
  * STA
  * @psoc: pointer to psoc
  * @sap_ch_freq: operating channel frequency of SAP interface
+ * @check_for_inactive_links: Check for SCC freq in inactive links for non DBS,
+ * need to be set to true while selecting new channel not while checking for
+ * existing channel.
  * This function checks whether SAP is doing SCC with STA
  *
  * Return: true or false
  */
 bool policy_mgr_is_sta_sap_scc(struct wlan_objmgr_psoc *psoc,
-			       uint32_t sap_ch_freq);
+			       uint32_t sap_ch_freq, bool check_for_inactive_links);
 
 /**
  * policy_mgr_nan_sap_scc_on_unsafe_ch_chk() - check whether SAP is doing SCC

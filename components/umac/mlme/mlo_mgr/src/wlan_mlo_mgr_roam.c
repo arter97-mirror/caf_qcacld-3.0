@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -912,14 +912,14 @@ mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
 	}
 
 	if (QDF_IS_STATUS_ERROR(wlan_vdev_is_up(vdev))) {
-		mlo_debug("Vdev id %d is not in up state",
-			  wlan_vdev_get_id(vdev));
+		mlo_debug_rl("Vdev id %d is not in up state",
+			     wlan_vdev_get_id(vdev));
 			return false;
 	}
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	if (!mlo_dev_ctx->sta_ctx) {
-		mlo_err("mlo sta ctx is null");
+		mlo_err_rl("mlo sta ctx is null");
 		return false;
 	}
 	sta_ctx = mlo_dev_ctx->sta_ctx;
@@ -931,14 +931,14 @@ mlo_check_if_all_vdev_up(struct wlan_objmgr_vdev *vdev)
 		     qdf_test_bit(i, sta_ctx->wlan_connect_req_links)) &&
 		    (!QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(mlo_dev_ctx->wlan_vdev_list[i])) ||
 		    wlan_cm_is_vdev_disconnecting(mlo_dev_ctx->wlan_vdev_list[i]))) {
-			mlo_debug("Vdev id %d is not in up state",
-				  wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]));
+			mlo_debug_rl("Vdev id %d is not in up state",
+				     wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]));
 			return false;
 		}
 	}
 
 	if (i == WLAN_UMAC_MLO_MAX_VDEVS) {
-		mlo_debug("all links are up");
+		mlo_debug_rl("all links are up");
 		return true;
 	}
 
@@ -1580,6 +1580,8 @@ end:
 	return is_roaming_in_progress;
 }
 
+#define RSSI_OF_SCAN_ENTRY_FROM_PER_STA_PROFILE (-80)
+
 QDF_STATUS
 mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 			struct roam_scan_candidate_frame *rcvd_frame)
@@ -1660,7 +1662,7 @@ mlo_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 		entry.vdev_id = rcvd_frame->vdev_id;
 		entry.frame = gen_probe_rsp.ptr;
 		entry.frame_length = gen_probe_rsp.len;
-		entry.rssi = rcvd_frame->rssi;
+		entry.rssi = RSSI_OF_SCAN_ENTRY_FROM_PER_STA_PROFILE;
 
 		wlan_cm_add_frame_to_scan_db(psoc, &entry);
 	}

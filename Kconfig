@@ -574,6 +574,10 @@ config FW_THERMAL_THROTTLE
 	bool "Enable FW_THERMAL_THROTTLE"
 	default n
 
+config WLAN_DDR_BW_MITIGATION
+	bool "enable WLAN_DDR_BW_MITIGATION"
+	default n
+
 config GET_DRIVER_MODE
 	bool "Enable GET_DRIVER_MODE"
 	default n

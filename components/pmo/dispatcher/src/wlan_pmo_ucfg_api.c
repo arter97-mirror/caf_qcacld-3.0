@@ -196,6 +196,12 @@ ucfg_pmo_disable_ns_offload_in_fwr(struct wlan_objmgr_vdev *vdev,
 }
 #endif /* WLAN_NS_OFFLOAD */
 
+bool
+ucfg_pmo_tgt_psoc_get_runtime_pm_in_progress(struct wlan_objmgr_psoc *psoc)
+{
+	return pmo_tgt_psoc_get_runtime_pm_inprogress(psoc);
+}
+
 #ifdef FEATURE_WLAN_DYNAMIC_ARP_NS_OFFLOAD
 QDF_STATUS
 ucfg_pmo_dynamic_arp_ns_offload_enable(struct wlan_objmgr_vdev *vdev)

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -462,6 +462,8 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 	bool enable_connected_scan;
 	enum phy_ch_width con_dfs_ch_width;
 	uint8_t sta_vdev_id = WLAN_INVALID_VDEV_ID;
+	uint8_t dfs_sta_vdev_id;
+	enum hw_mode_bandwidth dfs_sta_ch_width;
 
 	if (cds_is_fw_down()) {
 		hdd_err("firmware is down, scan cmd cannot be processed");
@@ -529,8 +531,9 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 			con_dfs_ch_freq = ap_ctx->operating_chan_freq;
 
 		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
-		    !policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
-		    hdd_ctx->psoc) &&
+		    !policy_mgr_is_sta_present_on_freq(
+					hdd_ctx->psoc, &dfs_sta_vdev_id,
+					con_dfs_ch_freq, &dfs_sta_ch_width) &&
 		    (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, con_dfs_ch_freq) ||
 		    (wlan_reg_is_5ghz_ch_freq(con_dfs_ch_freq) &&
 		     con_dfs_ch_width == CH_WIDTH_160MHZ))) {

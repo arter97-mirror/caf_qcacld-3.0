@@ -3764,7 +3764,9 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	    stop_req->reason == REASON_ROAM_STOP_ALL) {
 		mlme_info("vdev_id:%d : Drop RSO stop during roam sync",
 			  vdev_id);
-		goto rel_vdev_ref;
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		qdf_mem_free(stop_req);
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	wlan_mlme_defer_pmk_set_in_roaming(psoc, vdev_id, false);

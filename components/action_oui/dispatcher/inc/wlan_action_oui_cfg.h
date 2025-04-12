@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -567,7 +567,7 @@
 	"gActionOUIDisableTWT", \
 	0, \
 	ACTION_OUI_MAX_STR_LEN, \
-	"001018 00 01 000986 00 01 000ce7 00 01 00e0fc 00 01", \
+	"001018 00 01 000986 00 01 000ce7 00 01 00e0fc 00 01 000b86 04 01040817 F0 01", \
 	"Used to specify action OUIs to control TWT configuration")
 
 /*

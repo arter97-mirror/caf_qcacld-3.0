@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2534,7 +2534,7 @@ csr_roam_issue_discon_sta_roam_cmd(struct mac_context *mac,
 		sme_debug("Vdev %d reason %d " QDF_MAC_ADDR_FMT " fails to find peer, already disconnected!!",
 			  vdev_id, discon_reason,
 			  QDF_MAC_ADDR_REF(del_sta_params->peerMacAddr.bytes));
-		return status;
+		return QDF_STATUS_E_ALREADY;
 	}
 
 	cmd = csr_get_command_buffer(mac);

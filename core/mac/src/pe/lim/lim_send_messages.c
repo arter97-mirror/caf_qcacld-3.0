@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,6 +37,7 @@
 #include "lim_utils.h"
 #include "wma.h"
 #include "../../core/src/vdev_mgr_ops.h"
+#include "wlan_scan_api.h"
 
 /* Max debug string size in bytes  */
 #define LIM_DEBUG_STRING_SIZE    512
@@ -438,7 +439,7 @@ QDF_STATUS lim_set_user_pos(struct mac_context *mac,
  * Return: status of operation
  */
 QDF_STATUS lim_send_ht40_obss_scanind(struct mac_context *mac_ctx,
-						struct pe_session *session)
+				      struct pe_session *session)
 {
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct obss_ht40_scanind *ht40_obss_scanind;
@@ -507,6 +508,8 @@ QDF_STATUS lim_send_ht40_obss_scanind(struct mac_context *mac_ctx,
 			ret);
 		qdf_mem_free(ht40_obss_scanind);
 	}
+
+	wlan_scan_set_obss_scan_enable(session->vdev);
 	return ret;
 }
 

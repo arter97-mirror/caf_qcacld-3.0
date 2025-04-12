@@ -1354,6 +1354,19 @@ QDF_STATUS wlan_mlme_update_bss_rate_flags(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vht_present,
 					   uint8_t ht_present);
 
+/**
+ * wlan_mlme_vendor_set_disable_dfs_master_capability() - Set dfs master
+ * capability disabled
+ * @psoc: pointer to psoc object
+ * @disable:  disable or not
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_vendor_set_disable_dfs_master_capability(
+					struct wlan_objmgr_psoc *psoc,
+					bool disable);
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * mlme_update_tgt_eht_caps_in_cfg() - Update tgt eht cap in mlme component
@@ -5317,4 +5330,12 @@ wlan_mlme_get_p2p_device_mac_addr(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS
 wlan_mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
+
+/*
+ * wlan_mlme_get_beacon_interval() - Get beacon interval of connected bss
+ * @vdev: pointer to vdev
+ *
+ * Return: beacon interval
+ */
+uint32_t wlan_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev);
 #endif /* _WLAN_MLME_API_H_ */

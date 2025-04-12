@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3061,7 +3061,7 @@ set_src:
 	else
 		qdf_atomic_clear_bit(source, &adapter->tsf.auto_rpt_src);
 	if (log_enabled)
-		hdd_info(" enable %d, tsf autoreport status %d",
+		hdd_info(" enable %d, tsf autoreport status %lu",
 			 ena, adapter->tsf.auto_rpt_src);
 
 out:
@@ -3313,7 +3313,7 @@ QDF_STATUS hdd_get_txrx_nss(struct hdd_adapter *adapter,
 			    QCA_WLAN_VENDOR_ATTR_NSS_PKT_RX_PACKET_COUNT,
 			    (u64)aggr_nss_stats[i][RX_NSS_CNT_IDX]);
 		if (log_enabled)
-			hdd_info("nss val %d tx_pkt %d rx_pkt %d",
+			hdd_info("nss val %d tx_pkt %llu rx_pkt %llu",
 				 i + 1, (u64)aggr_nss_stats[i][TX_NSS_CNT_IDX],
 				 (u64)aggr_nss_stats[i][RX_NSS_CNT_IDX]);
 		nla_nest_end(skb, nss);

@@ -49,6 +49,7 @@
 #include "wlan_connectivity_logging.h"
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_nan_api_i.h"
+#include "cfg_ucfg_api.h"
 
 /* invalid channel id. */
 #define INVALID_CHANNEL_ID 0
@@ -442,6 +443,29 @@ policy_mgr_get_dfs_master_dynamic_enabled(
 				 !pm_ctx->dynamic_dfs_master_disabled);
 
 	return !pm_ctx->dynamic_dfs_master_disabled;
+}
+
+void
+policy_mgr_dfs_master_cfg_changed(struct wlan_objmgr_psoc *psoc,
+				  bool dfs_master_capable)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_cfg *cfg;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return;
+	}
+	cfg = &pm_ctx->cfg;
+
+	cfg->sta_sap_scc_on_dfs_chnl =
+		cfg_get(psoc, CFG_STA_SAP_SCC_ON_DFS_CHAN);
+	if (!dfs_master_capable)
+		cfg->sta_sap_scc_on_dfs_chnl = 0;
+	policy_mgr_debug("sta_sap_scc_on_dfs_chnl %d, dfs_master_capable %d",
+			 cfg->sta_sap_scc_on_dfs_chnl,
+			 dfs_master_capable);
 }
 
 bool
@@ -7483,6 +7507,19 @@ policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 
 	policy_mgr_store_and_del_conn_info_by_vdev_id(
 		psoc, vdev_id, info, &num_del);
+
+	if (!num_del && !policy_mgr_is_hw_dbs_capable(psoc)) {
+		/**
+		 * In non DBS, case if the vdev id is inactive it won't be
+		 * deleted from policy mgr, thus try get the active vdev_id,
+		 * to avoid 3 home channel check to kick in, active link,
+		 * existing concurrency and new freq for the inactive link.
+		 */
+		vdev_id = ucfg_mlo_get_active_vdev_id(vdev);
+		policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, vdev_id,
+							      info, &num_del);
+	}
+
 	conc_ext_flags.value =
 	policy_mgr_get_conc_ext_flags(vdev, true);
 	ml_nlink_get_dynamic_inactive_links(psoc, vdev, &dyn_inact_bmap,
@@ -9583,7 +9620,7 @@ policy_mgr_is_link_active_allowed(struct wlan_objmgr_psoc *psoc,
 
 	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
-		if (link_info->link_id == WLAN_INVALID_LINK_ID) {
+		if (link_info->link_id >= MAX_MLO_LINK_ID) {
 			link_info++;
 			continue;
 		}
@@ -10563,7 +10600,7 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 		go_force_scc = policy_mgr_go_scc_enforced(psoc);
 		if ((mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE) &&
 		    (!sta_sap_scc_on_dfs_chan ||
-		     !policy_mgr_is_sta_sap_scc(psoc, ch_freq) ||
+		     !policy_mgr_is_sta_sap_scc(psoc, ch_freq, false) ||
 		     (!go_force_scc && mode == PM_P2P_GO_MODE))) {
 			if (is_dfs_ch)
 				match = policy_mgr_disallow_mcc(psoc,
@@ -10685,7 +10722,7 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 	if (allowed && policy_mgr_get_connection_count(psoc) == 4 &&
 	    (wlan_nan_is_sta_sap_nan_allowed(psoc) ||
 	     wlan_nan_is_sta_p2p_ndp_supported(psoc))) {
-		if (mode == QDF_NDI_MODE) {
+		if (mode == PM_NDI_MODE) {
 			return true;
 		} else if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE) {
 			for (i = 0; i < pcl.pcl_len; i++)
@@ -12401,7 +12438,7 @@ policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 	if (!wlan_reg_is_freq_indoor(pdev, ch_freq))
 		return true;
 
-	is_scc = policy_mgr_is_sta_sap_scc(psoc, ch_freq);
+	is_scc = policy_mgr_is_sta_sap_scc(psoc, ch_freq, true);
 	mode = wlan_get_opmode_from_vdev_id(pdev, vdev_id);
 	ucfg_mlme_get_indoor_channel_support(psoc, &indoor_support);
 
@@ -12886,7 +12923,7 @@ bool policy_mgr_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc,
 #endif
 
 bool policy_mgr_is_sta_sap_scc(struct wlan_objmgr_psoc *psoc,
-			       uint32_t sap_freq)
+			       uint32_t sap_freq, bool check_for_inactive_links)
 {
 	uint32_t conn_index;
 	bool is_scc = false;
@@ -12912,6 +12949,14 @@ bool policy_mgr_is_sta_sap_scc(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	if (!is_scc && check_for_inactive_links &&
+	    !policy_mgr_is_hw_dbs_capable(psoc) &&
+	    policy_mgr_if_freq_n_inactive_links_freq_same(psoc, sap_freq)) {
+		policy_mgr_debug("Standby/inactive link present for freq %d",
+				 sap_freq);
+		is_scc = true;
+	}
 
 	return is_scc;
 }

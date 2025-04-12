@@ -1992,7 +1992,7 @@ QDF_STATUS
 cm_send_force_bss_peer_delete_req(struct wlan_objmgr_vdev *vdev)
 {
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
-	struct wlan_cm_vdev_connect_req req;
+	struct wlan_cm_vdev_connect_req req = {0};
 	struct cm_vdev_join_req *join_req;
 	QDF_STATUS status;
 

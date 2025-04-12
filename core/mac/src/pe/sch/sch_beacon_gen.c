@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1050,6 +1050,15 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 						true);
 			populate_dot11f_bcn_prot_extcaps(mac_ctx, session,
 							 &bcn_2->ExtCap);
+
+			/*
+			 * TWT extended capabilities should be populated after
+			 * the intersection of beacon caps and self caps is done
+			 * because the bits for TWT are unique to STA and AP and
+			 * cannot be intersected.
+			 */
+			populate_dot11f_twt_extended_caps(mac_ctx, session,
+							  &bcn_2->ExtCap);
 		}
 	}
 

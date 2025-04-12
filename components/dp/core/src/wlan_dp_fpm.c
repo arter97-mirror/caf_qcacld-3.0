@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -347,7 +347,8 @@ QDF_STATUS fpm_policy_update(struct fpm_table *fpm, struct dp_policy *policy)
 	ret = fpm_policy_update_with_policyid(fpm, policy);
 	switch (ret) {
 	case QDF_STATUS_E_NOENT:
-		dp_err("no policy found with policy_id:%lx", policy->policy_id);
+		dp_err("no policy found with policy_id:%llx",
+		       policy->policy_id);
 		break;
 	case QDF_STATUS_E_INVAL:
 		dp_err("new svc_id:%u is not valid", policy->svc_id);
@@ -453,7 +454,7 @@ QDF_STATUS fpm_policy_add(struct fpm_table *fpm, struct dp_policy *policy)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	dp_info("new_policy:[flags:0x%x][prio:%u][policy_id:0x%lx]"
+	dp_info("new_policy:[flags:0x%x][prio:%u][policy_id:0x%llx]"
 		"[src_ip:%x][dst_ip:%x][src_port:%u][dst_port:%u][proto:%u]"
 		"[tid:%u][svc:%u]",
 		policy->flags, policy->prio, policy->policy_id,
@@ -615,7 +616,7 @@ fpm_policy_flow_match(struct wlan_dp_intf *dp_intf, qdf_nbuf_t skb,
 
 		qdf_hl_for_each_entry_rcu(policy, lhead, node) {
 			if (fpm_flow_regex_match(&policy->flow, flow)) {
-				dp_info("flow matched policy_id:%d",
+				dp_info("flow matched policy_id:%llu",
 					policy->policy_id);
 				*policy_id = policy->policy_id;
 				found = fpm_get_metadata(policy, skb, metadata);

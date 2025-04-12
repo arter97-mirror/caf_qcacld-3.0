@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -513,7 +513,7 @@ static bool sap_chan_sel_init(struct mac_context *mac,
 		    (sta_sap_scc_on_dfs_chnl_config_value ==
 				PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED &&
 		     !policy_mgr_is_sta_sap_scc(mac->psoc,
-						ch_info->chan_freq))) {
+						ch_info->chan_freq, true))) {
 			if (wlan_reg_is_dfs_for_freq(mac->pdev,
 						     ch_info->chan_freq)) {
 				len += qdf_scnprintf(

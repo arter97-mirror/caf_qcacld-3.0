@@ -51,6 +51,7 @@
 #include "wlan_lmac_if_def.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_mlo_mgr_roam.h"
 #include "wlan_mlme_main.h"
 #include <wlan_mlo_mgr_link_switch.h>
 
@@ -617,6 +618,11 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	int8_t rf_mode_force_pwr_type;
 
 	if (mlo_is_mld_sta(session->vdev)) {
+		if (!mlo_check_if_all_vdev_up(session->vdev)) {
+			pe_debug_rl("Ignore beacon processing, not all VDEVs are UP");
+			return;
+		}
+
 		cu_flag = false;
 		status = lim_get_bpcc_from_mlo_ie(bcn, &bpcc);
 		if (QDF_IS_STATUS_SUCCESS(status)) {

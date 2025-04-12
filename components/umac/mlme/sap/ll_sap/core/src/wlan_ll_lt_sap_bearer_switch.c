@@ -399,6 +399,20 @@ ll_lt_sap_cache_bs_request(struct bearer_switch_info *bs_ctx,
 	uint8_t i;
 
 	for (i = 0; i < MAX_BEARER_SWITCH_REQUESTERS; i++) {
+
+		/* Check if duplicate CB is present, no need to add again */
+		if (bs_ctx->requests[i].requester_cb == bs_req->requester_cb &&
+		    bs_ctx->requests[i].vdev_id == bs_req->vdev_id &&
+		    bs_ctx->requests[i].req_type == bs_req->req_type &&
+		    bs_ctx->requests[i].arg_value == bs_req->arg_value &&
+		    bs_ctx->requests[i].arg == bs_req->arg &&
+		    bs_ctx->requests[i].source == bs_req->source) {
+			ll_sap_info(BS_PREFIX_FMT "req_vdev %d have already cached request %d at %d",
+			     BS_PREFIX_REF(wlan_vdev_get_id(bs_ctx->vdev),
+					   bs_req->request_id),
+			     bs_req->vdev_id, bs_req->req_type, i);
+			break;
+		}
 		/*
 		 * Find the empty slot in the requests array to cache the
 		 * current request

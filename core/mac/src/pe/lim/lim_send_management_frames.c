@@ -941,9 +941,19 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	 * may change the frame size. Therefore, MUST merge ExtCap IE before
 	 * dot11f get packed payload size.
 	 */
-	if (extracted_ext_cap_flag)
+	if (extracted_ext_cap_flag) {
 		lim_merge_extcap_struct(&frm->ExtCap, &extracted_ext_cap,
 					true);
+		/*
+		 * TWT extended capabilities should be populated after the
+		 * intersection of beacon caps and self caps is done because
+		 * the bits for TWT are unique to STA and AP and cannot be
+		 * intersected.
+		 */
+		populate_dot11f_twt_extended_caps(mac_ctx, pe_session,
+						  &frm->ExtCap);
+	}
+
 	populate_dot11f_bcn_prot_extcaps(mac_ctx, pe_session, &frm->ExtCap);
 
 	status = dot11f_get_packed_probe_response_size(mac_ctx, frm, &payload);
@@ -2342,9 +2352,20 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	 * may change the frame size. Therefore, MUST merge ExtCap IE before
 	 * dot11f get packed payload size.
 	 */
-	if (extracted_flag)
+	if (extracted_flag) {
 		lim_merge_extcap_struct(&(frm.ExtCap), &extracted_ext_cap,
 					true);
+
+		/*
+		 * TWT extended capabilities should be populated after the
+		 * intersection of beacon caps and self caps is done because
+		 * the bits for TWT are unique to STA and AP and cannot be
+		 * intersected.
+		 */
+		populate_dot11f_twt_extended_caps(mac_ctx, pe_session,
+						  &frm.ExtCap);
+	}
+
 	populate_dot11f_bcn_prot_extcaps(mac_ctx, pe_session, &(frm.ExtCap));
 	if (sta && lim_is_sta_eht_capable(sta) &&
 	    lim_is_mlo_conn(pe_session, sta) &&

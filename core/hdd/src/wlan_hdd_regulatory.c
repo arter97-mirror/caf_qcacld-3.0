@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1802,10 +1802,12 @@ hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 
+	mutex_lock(&hdd_ctx->sap_lock);
 	if (!test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags)) {
 		sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 		sap_config->SapHw_mode = csr_phy_mode;
 		hdd_err("Can't restart AP because it is not started");
+		mutex_unlock(&hdd_ctx->sap_lock);
 		return;
 	}
 
@@ -1813,12 +1815,14 @@ hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
 	status = wlansap_stop_bss(sap_ctx);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("SAP Stop Bss fail");
+		mutex_unlock(&hdd_ctx->sap_lock);
 		return;
 	}
 	status = qdf_wait_single_event(&hostapd_state->qdf_stop_bss_event,
 				       SME_CMD_STOP_BSS_TIMEOUT);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("SAP Stop timeout");
+		mutex_unlock(&hdd_ctx->sap_lock);
 		return;
 	}
 
@@ -1828,7 +1832,6 @@ hdd_restart_sap_with_new_phymode(struct wlan_hdd_link_info *link_info,
 	sap_config->sap_orig_hw_mode = sap_config->SapHw_mode;
 	sap_config->SapHw_mode = csr_phy_mode;
 
-	mutex_lock(&hdd_ctx->sap_lock);
 	qdf_event_reset(&hostapd_state->qdf_event);
 	status = wlansap_start_bss(sap_ctx, hdd_hostapd_sap_event_cb,
 				   sap_config);

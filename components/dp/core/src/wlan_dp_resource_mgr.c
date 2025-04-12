@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: ISC
  */
 
@@ -194,7 +194,7 @@ wlan_dp_resource_mgr_timer_handler(void *arg)
 	req_rx_buff_descs = rsrc_ctx->cur_rsrc_map[rsrc_level].num_rx_buffers;
 
 	if (cur_req_rx_buff_descs > req_rx_buff_descs) {
-		dp_info("Downscale required cur_rx_buf:%u to req_rx_buf:%u",
+		dp_info("Downscale required cur_rx_buf:%llu to req_rx_buf:%llu",
 			cur_req_rx_buff_descs, req_rx_buff_descs);
 		wlan_dp_resource_mgr_post_downscale_resource_req(rsrc_ctx,
 								 false);
@@ -232,7 +232,7 @@ void wlan_dp_resource_mgr_downscale_resources(void)
 			  in_use_rx_buff_descs, req_rx_buff_descs);
 
 	if (cur_req_rx_buff_descs > req_rx_buff_descs) {
-		dp_info("Downscaling cur_rx_buf:%u to req_rx_buf:%u",
+		dp_info("Downscaling cur_rx_buf:%llu to req_rx_buf:%llu",
 			cur_req_rx_buff_descs, req_rx_buff_descs);
 		status = cdp_set_req_buff_descs(cdp_soc, req_rx_buff_descs, 0);
 		if (QDF_IS_STATUS_ERROR(status))
@@ -281,7 +281,7 @@ void wlan_dp_resource_mgr_upscale_resources(
 			additional_rx_buffers = (req_rx_buff_descs -
 				in_use_rx_buff_descs);
 
-		dp_info("Upscaling cur_rx_buf:%u req_rx_buf:%u additional:%u",
+		dp_info("Upscaling cur_rx_buf:%llu req_rx_buf:%llu additional:%llu",
 			cur_req_rx_buff_descs, req_rx_buff_descs,
 			additional_rx_buffers);
 	}
@@ -296,7 +296,7 @@ void wlan_dp_resource_mgr_upscale_resources(
 		num_alloc_buff = cdp_buffers_replenish_on_demand(cdp_soc,
 							 batch_count, 0);
 		if (!num_alloc_buff) {
-			dp_err("failed to allocate rx buffers, count:%u",
+			dp_err("failed to allocate rx buffers, count:%llu",
 			       batch_count);
 			break;
 		}
@@ -311,7 +311,7 @@ void wlan_dp_resource_mgr_upscale_resources(
 	}
 
 	if (additional_rx_buffers)
-		dp_err("Upscale request deficit:%u", additional_rx_buffers);
+		dp_err("Upscale request deficit:%llu", additional_rx_buffers);
 }
 
 static uint32_t
@@ -566,7 +566,7 @@ wlan_dp_resource_mgr_select_resource_level(
 	else
 		dp_info("Resource level change not required");
 
-	dp_info("Resource level:%u selected for tput:%u req_tput:%u",
+	dp_info("Resource level:%u selected for tput:%llu req_tput:%llu",
 		rsrc_ctx->cur_resource_level, rsrc_ctx->cur_max_tput,
 		total_tput);
 }
@@ -790,7 +790,7 @@ wlan_dp_resource_mgr_notify_ndp_channel_info(
 	vote_node->tput1 = mac1_tput;
 	wlan_dp_resource_mgr_list_insert_vote_node(&rsrc_ctx->nan_list,
 						   vote_node, opmode);
-	dp_info("NDP new node phymode0:%u tput0:%u phymode1:%u tput1:%u list_len:%u",
+	dp_info("NDP new node phymode0:%u tput0:%llu phymode1:%u tput1:%llu list_len:%u",
 		vote_node->phymode0, vote_node->tput0,
 		vote_node->phymode1, vote_node->tput1,
 		qdf_list_size(&rsrc_ctx->nan_list));

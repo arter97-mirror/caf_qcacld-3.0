@@ -1048,6 +1048,19 @@ QDF_STATUS
 ucfg_mlme_get_dfs_master_capability(struct wlan_objmgr_psoc *psoc,
 				    bool *val);
 
+/**
+ * ucfg_mlme_vendor_set_disable_dfs_master_capability() - Set dfs master
+ * capability disabled
+ * @psoc: pointer to psoc object
+ * @disable:  disable or not
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_vendor_set_disable_dfs_master_capability(
+					struct wlan_objmgr_psoc *psoc,
+					bool disable);
+
 /*
  * ucfg_mlme_get_dfs_disable_channel_switch() - Get the dfs channel switch
  * @psoc: pointer to psoc object
@@ -5706,4 +5719,16 @@ ucfg_mlme_set_mrsno_support(struct wlan_objmgr_psoc *psoc, bool val);
  */
 QDF_STATUS
 ucfg_mlme_get_mrsno_support(struct wlan_objmgr_psoc *psoc, bool *val);
+
+/*
+ * ucfg_mlme_get_beacon_interval() - Get beacon interval of connected bss
+ * @vdev: pointer to vdev
+ *
+ * Return: beacon interval
+ */
+static inline uint32_t
+ucfg_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_mlme_get_beacon_interval(vdev);
+}
 #endif /* _WLAN_MLME_UCFG_API_H_ */

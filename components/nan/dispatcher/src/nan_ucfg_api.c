@@ -74,6 +74,7 @@ static void nan_cfg_init(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_STA_P2P_NDP_CONCURRENCY);
 	nan_obj->cfg_param.prefer_nan_chan_for_p2p =
 				cfg_get(psoc, CFG_PREFER_NAN_CHAN_FOR_P2P);
+	nan_obj->cfg_param.nan_config = cfg_get(psoc, CFG_NAN_CONFIG);
 }
 
 /**
@@ -1791,11 +1792,7 @@ QDF_STATUS ucfg_nan_send_delete_pasn_peer(struct wlan_objmgr_psoc *psoc,
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_NAN_ID);
-
-	nan_update_pasn_peer_count(vdev, false);
-
 	nan_debug("peer deleted successfully");
-
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 
 end:

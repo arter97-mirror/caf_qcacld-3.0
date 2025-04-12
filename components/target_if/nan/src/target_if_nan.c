@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023,2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -928,7 +928,7 @@ int target_if_nan_rsp_handler(ol_scn_t scn, uint8_t *data, uint32_t len)
 	}
 
 	status = wmi_extract_nan_event_rsp(wmi_handle, data, &temp_evt_params,
-					   &buf_ptr);
+					   &buf_ptr, wlan_get_nan_config(psoc));
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("parsing of event failed, %d", status);
 		return -EINVAL;

@@ -569,8 +569,8 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_dump_current_concurrency(psoc);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE ||
-	    mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE)
+	if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE ||
+	    mode == PM_STA_MODE || mode == PM_P2P_CLIENT_MODE)
 		policy_mgr_update_dfs_master_dynamic_enabled(psoc,
 							     false,
 							     NULL);
@@ -1939,7 +1939,7 @@ bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 	 * STA+SAP SCC on LTE coex channel is allowed.
 	 */
 	if (policy_mgr_sta_sap_scc_on_lte_coex_chan(psoc) &&
-	    policy_mgr_is_sta_sap_scc(psoc, sap_freq)) {
+	    policy_mgr_is_sta_sap_scc(psoc, sap_freq, false)) {
 		policy_mgr_debug("unsafe freq %d for sap is allowed", sap_freq);
 		return true;
 	}
@@ -3736,7 +3736,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 			return QDF_STATUS_SUCCESS;
 		} else if (con_mode == PM_SAP_MODE &&
 			   !policy_mgr_is_hw_dbs_capable(psoc) &&
-			   !policy_mgr_is_sta_sap_scc(psoc, sap_ch_freq) &&
+			   !policy_mgr_is_sta_sap_scc(psoc, sap_ch_freq, true) &&
 			   cc_mode != QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND) {
 			policymgr_nofl_debug("Mode %d MCC situation in non-dbs hw STA, no SCC freq found %d",
 					     con_mode, sap_ch_freq);
@@ -3749,7 +3749,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	if (!ch_freq)
 		return QDF_STATUS_SUCCESS;
 
-	is_sta_sap_scc = policy_mgr_is_sta_sap_scc(psoc, ch_freq);
+	is_sta_sap_scc = policy_mgr_is_sta_sap_scc(psoc, ch_freq, true);
 
 	nan_2g_freq =
 		policy_mgr_mode_specific_get_channel(psoc, PM_NAN_DISC_MODE);

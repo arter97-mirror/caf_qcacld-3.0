@@ -3221,6 +3221,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	tp_wma_handle wma_handle;
 	uint8_t enable_sifs_burst = 0;
 	uint32_t sta_keep_alive;
+	enum wmi_host_active_apf_mode uc_mode, mcbc_mode;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -3295,6 +3296,22 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 		}
 	} else {
 		wma_err("Failed to get value for WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED, leaving unchanged");
+	}
+
+	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
+	    ucfg_pmo_is_apf_enabled(wma_handle->psoc) &&
+	    !ucfg_pmo_is_configure_apf_per_screen_state(wma_handle->psoc)) {
+		uc_mode = wma_get_fw_active_apf_mode(
+					wma_handle->active_uc_apf_mode);
+		mcbc_mode = wma_get_fw_active_apf_mode(
+					wma_handle->active_mc_bc_apf_mode);
+		wma_debug("Configuring Active APF Mode UC:%d MC/BC:%d for vdev %u",
+			  uc_mode, mcbc_mode, vdev_id);
+		ret = wmi_unified_set_active_apf_mode_cmd(
+						wma_handle->wmi_handle,
+						vdev_id, uc_mode, mcbc_mode);
+		if (QDF_IS_STATUS_ERROR(ret))
+			wma_err("Failed to configure active APF mode");
 	}
 
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&

@@ -203,7 +203,8 @@ lim_get_eht_rate_info_flag(tpDphHashNode sta_ds)
 static bool
 lim_is_validate_punc_bitmap(struct csa_offload_params *csa_params)
 {
-	if (!wlan_reg_is_punc_bitmap_valid(csa_params->new_ch_width,
+	if (csa_params->new_punct_bitmap &&
+	    !wlan_reg_is_punc_bitmap_valid(csa_params->new_ch_width,
 					   csa_params->new_punct_bitmap)) {
 		pe_err("invalid puncture bitmap %d",
 		       csa_params->new_punct_bitmap);

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2006-2007, 2014-2018, 2020-2021 The Linux Foundation.
  * All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2657,7 +2657,7 @@ IE bw_ind_element (EID_EXTN_ID_ELEMENT) OUI (0x87)
 IE ChannelSwitchWrapper (EID_CHANNEL_SWITCH_WRAPPER)
 {
     OPTIE IE  WiderBWChanSwitchAnn;
-    OPTIE IE  transmit_power_env;
+    OPTIE transmit_power_env[0..8];
     OPTIE IE  bw_ind_element;
 }
 
@@ -4101,7 +4101,7 @@ FRAME Beacon                              // C.f. Sec. 7.2.3.1
     OPTIE  TPCReport;
     OPTIE  ERPInfo;
     OPTIE  ExtSuppRates;
-    OPTIE  RSN;
+    OPTIE  RSNOpaque;
     OPTIE  QBSSLoad;
     OPTIE  EDCAParamSet;
     OPTIE  QOSCapsAp;
@@ -4287,7 +4287,7 @@ FRAME BeaconIEs
     OPTIE  TPCReport;
     OPTIE  ERPInfo;
     OPTIE  ExtSuppRates;
-    OPTIE  RSN;
+    OPTIE  RSNOpaque;
     OPTIE  QBSSLoad;
     OPTIE  EDCAParamSet;
     OPTIE  QOSCapsAp;
