@@ -9238,16 +9238,25 @@ uint16_t wlan_mlme_get_sap_he_rx_mcs_map_160(struct wlan_objmgr_psoc *psoc)
 
 #ifdef CONNECTION_ROAMING_CFG
 void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
-					   struct rso_cfg_params *cfg_params)
+					   struct rso_cfg_params *cfg_params,
+					   struct wlan_mlme_psoc_ext_obj *mlme_obj)
 {
-	cfg_params->band_2g_weightage =
+	mlme_obj->cfg.roam_scoring.band_2g_weightage =
 			cfg_get(psoc, CFG_SCORING_2G_BAND_WEIGHTAGE);
-	cfg_params->band_5g_weightage =
+	mlme_obj->cfg.roam_scoring.band_5g_weightage =
 			cfg_get(psoc, CFG_SCORING_5G_BAND_WEIGHTAGE);
-	cfg_params->band_6g_weightage =
+	mlme_obj->cfg.roam_scoring.band_6g_weightage =
 			cfg_get(psoc, CFG_SCORING_6G_BAND_WEIGHTAGE);
-	cfg_params->roam_rescan_rssi_diff =
+	mlme_obj->cfg.lfr.roam_rescan_rssi_diff =
 			cfg_get(psoc, CFG_LFR_ROAM_RESCAN_RSSI_DIFF);
+	mlme_obj->cfg.lfr.roam_periodic_scan_interval =
+			cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
+	mlme_obj->cfg.roam_scoring.roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
+	mlme_obj->cfg.roam_scoring.roam_aggre_score_delta =
+			cfg_get(psoc, CFG_AGGRESSIVE_ROAM_SCORE_DELTA);
+	mlme_obj->cfg.lfr.roam_aggre_scan_step_rssi =
+			cfg_get(psoc, CFG_ROAM_AGGRESSIVE_SCAN_STEP_RSSI);
 	cfg_params->roam_periodic_scan_interval =
 			cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
 	cfg_params->roam_score_delta =
@@ -9255,7 +9264,8 @@ void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
 }
 #else
 void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
-					   struct rso_cfg_params *cfg_params)
+					   struct rso_cfg_params *cfg_params,
+					   struct wlan_mlme_psoc_ext_obj *mlme_obj)
 {
 }
 #endif

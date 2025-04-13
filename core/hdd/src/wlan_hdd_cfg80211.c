@@ -6707,6 +6707,41 @@ static bool is_roam_periodic_scan_interval_valid(uint32_t value)
 
 	return false;
 }
+
+/*
+ * hdd_reset_dynamic_roam_control_params() - reset dynamic roam control params
+ * to default values when roam control is enabled.
+ * @psoc: Pointer to psoc
+ * @vdev: vdev
+ *
+ * Return: null
+ */
+static void
+hdd_reset_dynamic_roam_control_params(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_vdev *vdev)
+{
+	struct rso_config *rso_cfg;
+	struct rso_cfg_params *cfg_params;
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg)
+		return;
+	cfg_params = &rso_cfg->cfg_param;
+
+	cfg_params->band_2g_weightage =
+			cfg_get(psoc, CFG_SCORING_2G_BAND_WEIGHTAGE);
+	cfg_params->band_5g_weightage =
+			cfg_get(psoc, CFG_SCORING_5G_BAND_WEIGHTAGE);
+	cfg_params->band_6g_weightage =
+			cfg_get(psoc, CFG_SCORING_6G_BAND_WEIGHTAGE);
+	cfg_params->roam_rescan_rssi_diff =
+			cfg_get(psoc, CFG_LFR_ROAM_RESCAN_RSSI_DIFF);
+	cfg_params->roam_periodic_scan_interval =
+			cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
+	cfg_params->roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
+	rso_cfg->roam_band_bitmask = REG_BAND_MASK_ALL;
+}
 #else
 static bool is_band_weight_valid(struct nlattr **tb2, uint32_t value)
 {
@@ -6716,6 +6751,12 @@ static bool is_band_weight_valid(struct nlattr **tb2, uint32_t value)
 static bool is_roam_periodic_scan_interval_valid(uint32_t value)
 {
 	return false;
+}
+
+static void
+hdd_reset_dynamic_roam_control_params(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_objmgr_vdev *vdev)
+{
 }
 #endif
 
@@ -6818,6 +6859,16 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 
 	if (tb2[QCA_ATTR_ROAM_CONTROL_TRIGGERS]) {
 		value = nla_get_u32(tb2[QCA_ATTR_ROAM_CONTROL_TRIGGERS]);
+
+		if (!roam_control_enable) {
+			status = sme_set_roam_cfg_rt_params_enabled(hdd_ctx->mac_handle,
+								    vdev_id,
+								    true);
+
+			if (QDF_IS_STATUS_ERROR(status))
+				 hdd_err("failed to set roam_cfg_rt_params_enabled");
+		}
+
 		hdd_debug("Received roam trigger bitmap: 0x%x", value);
 		status = hdd_send_roam_triggers_to_sme(hdd_ctx,
 						       vdev_id,
@@ -6842,6 +6893,13 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 
 		hdd_debug("Parse and send roam control to FW: %s",
 			  roam_control_enable ? "Enable" : "Disable");
+
+		/* Reset the roam control parameter values configured by user
+		 * before roam control is enabled to default values.
+		 */
+		if (roam_control_enable)
+			hdd_reset_dynamic_roam_control_params(hdd_ctx->psoc,
+							      link_info->vdev);
 
 		status = sme_set_roam_config_enable(hdd_ctx->mac_handle,
 						    vdev_id,

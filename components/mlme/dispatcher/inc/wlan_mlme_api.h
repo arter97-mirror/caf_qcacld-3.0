@@ -5532,7 +5532,9 @@ uint16_t wlan_mlme_get_sap_he_rx_mcs_map_160(struct wlan_objmgr_psoc *psoc);
  * wlan_mlme_reinit_real_time_roam_parms() - Reinit real time roaming params
  * @psoc: pointer to psoc object
  * @cfg_params: cfg_params
+ * @mlme_obj: pointer to mlme_obj
  */
 void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
-					   struct rso_cfg_params *cfg_params);
+					   struct rso_cfg_params *cfg_params,
+					   struct wlan_mlme_psoc_ext_obj *mlme_obj);
 #endif /* _WLAN_MLME_API_H_ */

@@ -6956,6 +6956,36 @@ QDF_STATUS sme_set_roam_rescan_rssi_diff(mac_handle_t mac_handle,
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.int_value = nRoamRescanRssiDiff;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev, sessionId,
+						    WLAN_LEGACY_SME_ID);
+
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", sessionId);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* If roaming mode is aggressive and the user configured
+	 * roam scan step RSSI value is received (roam_rescan_rssi_diff),
+	 * update this value to roam_aggre_scan_step_rssi.
+	 */
+	if (rso_cfg->is_aggressive_roaming_mode &&
+	    !rso_cfg->roam_control_enable)
+		wlan_cm_roam_cfg_set_value(mac->psoc, sessionId,
+					   ROAM_AGGRESSIVE_SCAN_STEP_RSSI,
+					   &src_config);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -17719,8 +17749,36 @@ QDF_STATUS sme_set_roam_score_delta_value(mac_handle_t mac_handle,
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct cm_roam_values_copy src_config = {};
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
 
 	src_config.uint_value = roam_score_delta;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* If roaming mode is aggressive and the user configured
+	 * roam_score_delta is received, update this value to
+	 * roam_aggre_scan_step_rssi.
+	 */
+	if (rso_cfg->is_aggressive_roaming_mode &&
+	    !rso_cfg->roam_control_enable)
+		wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					   ROAM_AGGRESSIVE_SCORE_DELTA,
+					   &src_config);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
 	mac->mlme_cfg->roam_scoring.roam_score_delta =
 						src_config.uint_value;
 
@@ -17740,4 +17798,18 @@ QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
 	*roam_score_delta = temp.uint_value;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS sme_set_roam_cfg_rt_params_enabled(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      bool roam_cfg_rt_params_enabled)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.bool_value = roam_cfg_rt_params_enabled;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_CONFIG_RT_PARAMS_ENABLED,
+					  &src_config);
 }

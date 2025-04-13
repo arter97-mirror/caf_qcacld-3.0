@@ -5697,7 +5697,7 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 	cfg_params->roam_inactive_data_packet_count =
 			mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
 	wlan_mlme_reinit_real_time_roam_parms(wlan_vdev_get_psoc(vdev),
-					      cfg_params);
+					      cfg_params, mlme_obj);
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 }
@@ -5919,6 +5919,27 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 		src_config.bool_value = 0;
 		wlan_cm_roam_cfg_set_value(psoc, vdev_id, ROAM_CONFIG_ENABLE,
 					   &src_config);
+		/*
+		 * When realtime roam control values are set by vendor commands
+		 * and disconnection is received, then restore the roam
+		 * trigger bitmap from the ini configuration
+		 */
+		wlan_cm_roam_cfg_get_value(psoc, vdev_id,
+					   ROAM_CONFIG_RT_PARAMS_ENABLED,
+					   &src_config);
+
+		if (src_config.bool_value) {
+			roam_trigger_bitmap =
+					wlan_mlme_get_roaming_triggers(psoc);
+			mlme_set_roam_trigger_bitmap(psoc, vdev_id,
+						     roam_trigger_bitmap);
+		}
+
+		src_config.bool_value = 0;
+		wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+					   ROAM_CONFIG_RT_PARAMS_ENABLED,
+					   &src_config);
+
 	}
 
 	cm_roam_control_restore_default_config(pdev, vdev_id);

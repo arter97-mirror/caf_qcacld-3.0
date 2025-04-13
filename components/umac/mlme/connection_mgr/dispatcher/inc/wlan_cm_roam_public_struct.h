@@ -633,6 +633,9 @@ struct sae_roam_auth_map {
  *                cross-AKM roaming
  * @is_disable_btm: btm roaming disabled or not from userspace
  * @is_aggressive_roaming_mode: Aggressive roaming is set or not
+ * @roam_cfg_rt_params_enabled: Flag used to cache the status of if real time
+ * roam control param values changed by vendor commands.The same shall be
+ * returned whenever queried for roam_cfg_rt_params_enabled status.
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -689,6 +692,7 @@ struct rso_config {
 	uint16_t rso_rsn_caps;
 	bool is_disable_btm;
 	bool is_aggressive_roaming_mode;
+	bool roam_cfg_rt_params_enabled;
 };
 
 /**
@@ -818,6 +822,7 @@ struct rso_config_params {
  * @ROAM_RESCAN_RSSI_DIFF : Roam rescan rssi difference value
  * @ROAM_PERIODIC_SCAN_INTERVAL: Roam periodic scan interval value
  * @ROAM_SCORE_DELTA: Roam score delta value
+ * @ROAM_CONFIG_RT_PARAMS_ENABLED: Roam config RT params enabled
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -862,6 +867,7 @@ enum roam_cfg_param {
 	ROAM_RESCAN_RSSI_DIFF,
 	ROAM_PERIODIC_SCAN_INTERVAL,
 	ROAM_SCORE_DELTA,
+	ROAM_CONFIG_RT_PARAMS_ENABLED,
 };
 
 /**

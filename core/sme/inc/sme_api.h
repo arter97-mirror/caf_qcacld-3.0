@@ -5184,4 +5184,17 @@ QDF_STATUS sme_set_roam_score_delta_value(mac_handle_t mac_handle,
 QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
 					  uint8_t vdev_id,
 					  uint32_t *roam_score_delta);
+
+/**
+ * sme_set_roam_cfg_rt_params_enabled() -
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @roam_cfg_rt_params_enabled: bool value to set the status of
+ * roam_cfg_rt_params_enabled flag in vdev rso config.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_roam_cfg_rt_params_enabled(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      bool roam_cfg_rt_params_enabled);
 #endif /* #if !defined( __SME_API_H ) */
