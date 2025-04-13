@@ -28219,21 +28219,34 @@ done:
 		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
 		/*
 		 * when keys are for non-bss peer, current usecase is that
-		 * the peer could only be TDLS on STA iface
+		 * the peer could be TDLS or Ranging PASN peer on STA iface
 		 */
 		if (mac_addr &&
 		    !qdf_is_macaddr_equal(&mac_address, &peer_mac)) {
+			peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc,
+							   mac_address.bytes,
+							   WLAN_OSIF_ID);
+			if (!peer) {
+				hdd_err("Invalid peer " QDF_MAC_ADDR_FMT,
+					QDF_MAC_ADDR_REF(mac_address.bytes));
+				return -EINVAL;
+			};
+
 			/* Install keys only if TDLS peer is active */
-			if (ucfg_tdls_is_key_install_allowed(vdev,
-							     &mac_address))
+			if (wlan_peer_get_peer_type(peer) != WLAN_PEER_TDLS ||
+			    ucfg_tdls_is_key_install_allowed(vdev,
+							     &mac_address)) {
 				errno = wlan_cfg80211_store_key(
 					vdev, key_index,
 					(pairwise ?
 					WLAN_CRYPTO_KEY_TYPE_UNICAST :
 					WLAN_CRYPTO_KEY_TYPE_GROUP),
 					mac_address.bytes, params);
-			else
+			} else {
+				wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
 				return 0;
+			}
+			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
 		} else {
 			wlan_hdd_mlo_link_add_pairwise_key(vdev, hdd_ctx,
 							   key_index,
