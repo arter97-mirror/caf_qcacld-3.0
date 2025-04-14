@@ -7033,7 +7033,9 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 		ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT ||
 	    res->fail_reason ==
 		ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT ||
-	    res->fail_reason == ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED)
+	    res->fail_reason == ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED ||
+	    res->fail_reason == ROAM_FAIL_REASON_TTLM_REQUIRED ||
+	    res->fail_reason == ROAM_FAIL_REASON_LINKRECONFIG_REQUIRED)
 		wlan_diag_event.is_roam_successful = false;
 
 	for (i = 0; i < scan_data->num_ap; i++) {

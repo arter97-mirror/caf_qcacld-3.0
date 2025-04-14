@@ -5862,6 +5862,10 @@ char *mlme_get_roam_fail_reason_str(enum wlan_roam_failure_reason_code result)
 		return "REASSOC TO SAME AP";
 	case ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED:
 		return "MLD EXTRA SCAN REQUIRED";
+	case ROAM_FAIL_REASON_TTLM_REQUIRED:
+		return "TTLM triggered instead of Roam";
+	case ROAM_FAIL_REASON_LINKRECONFIG_REQUIRED:
+		return "Linkreconfig triggered instead of Roam";
 	default:
 		return "UNKNOWN";
 	}

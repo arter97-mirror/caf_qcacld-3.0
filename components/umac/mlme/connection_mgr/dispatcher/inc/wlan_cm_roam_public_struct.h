@@ -454,6 +454,9 @@ enum roam_fail_params {
  * command rejected due to reassociation request received for same AP.
  * @ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED: Roaming is not triggered as part
  * of the first roam scan as additional scan is required to scan all MLD links
+ * @ROAM_FAIL_REASON_TTLM_REQUIRED: Roaming is not triggered as TTLM is required
+ * @ROAM_FAIL_REASON_LINKRECONFIG_REQUIRED: Roaming is not triggered as
+ * linkreconfig is required.
  * @ROAM_FAIL_REASON_UNKNOWN: Default reason
  */
 enum wlan_roam_failure_reason_code {
@@ -499,6 +502,8 @@ enum wlan_roam_failure_reason_code {
 	ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN,
 	ROAM_FAIL_REASON_REASSOC_TO_SAME_AP,
 	ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED,
+	ROAM_FAIL_REASON_TTLM_REQUIRED,
+	ROAM_FAIL_REASON_LINKRECONFIG_REQUIRED,
 	ROAM_FAIL_REASON_UNKNOWN = 255,
 };
 
