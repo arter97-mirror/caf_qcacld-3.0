@@ -3,6 +3,7 @@ targets = [
     "autogvm",
     "canoe",
     "gen3auto",
+    "neo-la",
     "sun",
     "vienna",
     "pineapple",
