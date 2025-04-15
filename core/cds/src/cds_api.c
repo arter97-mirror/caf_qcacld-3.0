@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -182,6 +182,7 @@ static struct ol_if_ops dp_ol_if_ops = {
 #ifdef WLAN_DP_FEATURE_STC
 	.dp_peer_event_notify = wlan_dp_stc_peer_event_notify,
 #endif
+	.peer_sta_kickout = wma_peer_sta_kickout,
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 #else /* !QCA_WIFI_QCA8074 */
