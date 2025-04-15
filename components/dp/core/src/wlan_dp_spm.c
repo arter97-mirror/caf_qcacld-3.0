@@ -1249,7 +1249,7 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 	spm_intf->o_stats.active++;
 
 	wlan_dp_indicate_flow_add(dp_ctx, WLAN_DP_FLOW_DIR_TX,
-				  &flow_rec->info);
+				  &flow_rec->info, flow_rec->id);
 
 	/* Trigger flow retiring event at threshold */
 	if (qdf_unlikely(dp_ctx->o_flow_rec_freelist.count <

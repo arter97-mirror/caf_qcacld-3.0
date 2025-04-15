@@ -727,13 +727,14 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
  * @dp_ctx: Global DP psoc context
  * @dir: direction of flow (RX/TX)
  * @flow_tuple: Tuple of the flow which got added
+ * @flow_id: Flow id of flow
  *
  * Return: None
  */
 static inline void
 wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 			  enum wlan_dp_flow_dir dir,
-			  struct flow_info *flow_tuple)
+			  struct flow_info *flow_tuple, uint32_t flow_id)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	uint8_t buf[BUF_LEN_MAX];
@@ -743,14 +744,14 @@ wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 
 	switch (dir) {
 	case WLAN_DP_FLOW_DIR_TX:
-		dp_stc_debug(dp_stc->logmask, "STC: Add TX flow %s",
-			     dp_print_tuple_to_str(flow_tuple, buf,
-						   BUF_LEN_MAX));
+		dp_stc_debug(dp_stc->logmask, "STC: Add TX flow [%u] %s",
+			     flow_id, dp_print_tuple_to_str(flow_tuple, buf,
+							    BUF_LEN_MAX));
 		break;
 	case WLAN_DP_FLOW_DIR_RX:
-		dp_stc_debug(dp_stc->logmask, "STC: Add RX flow %s",
-			     dp_print_tuple_to_str(flow_tuple, buf,
-						   BUF_LEN_MAX));
+		dp_stc_debug(dp_stc->logmask, "STC: Add RX flow [%u] %s",
+			     flow_id, dp_print_tuple_to_str(flow_tuple, buf,
+							    BUF_LEN_MAX));
 		break;
 	default:
 		break;
@@ -1006,7 +1007,7 @@ wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 static inline void
 wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 			  enum wlan_dp_flow_dir dir,
-			  struct flow_info *flow_tuple)
+			  struct flow_info *flow_tuple, uint32_t flow_id)
 {
 }
 

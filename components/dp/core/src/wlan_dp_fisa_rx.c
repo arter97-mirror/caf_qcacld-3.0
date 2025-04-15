@@ -1059,7 +1059,7 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 	fisa_hdl->add_flow_count++;
 	fisa_hdl->del_flow_count++;
 	wlan_dp_indicate_flow_add(fisa_hdl->dp_ctx, WLAN_DP_FLOW_DIR_RX,
-				  &flow_tuple);
+				  &flow_tuple, sw_ft_entry->flow_id);
 	dp_rx_fisa_release_ft_lock(fisa_hdl, reo_id);
 }
 
@@ -1236,7 +1236,8 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			is_fst_updated = true;
 			wlan_dp_indicate_flow_add(fisa_hdl->dp_ctx,
 						  WLAN_DP_FLOW_DIR_RX,
-						  &flow_tuple);
+						  &flow_tuple,
+						  sw_ft_entry->flow_id);
 			fisa_hdl->add_flow_count++;
 			break;
 		}
