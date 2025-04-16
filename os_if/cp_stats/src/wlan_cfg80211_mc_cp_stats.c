@@ -1573,11 +1573,19 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
 	struct stats_event *priv, *out;
 	struct osif_request *request;
 	struct request_info info = {0};
+	bool pending;
+	struct wlan_objmgr_psoc *psoc = NULL;
 	static const struct osif_request_params params = {
 		.priv_size = sizeof(*priv),
 		.timeout_ms = 2 * CP_STATS_WAIT_TIME_STAT,
 		.dealloc = wlan_cfg80211_mc_cp_stats_dealloc,
 	};
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("Failed to get psoc");
+		return NULL;
+	}
 
 	out = qdf_mem_malloc(sizeof(*out));
 	if (!out) {
@@ -1611,6 +1619,8 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
 	*errno = osif_request_wait_for_response(request);
 	if (*errno) {
 		osif_err("wait failed or timed out ret: %d", *errno);
+		ucfg_mc_cp_stats_reset_pending_req(psoc, TYPE_PEER_STATS_INFO_EXT,
+						   &info, &pending);
 		goto get_peer_stats_fail;
 	}
 
