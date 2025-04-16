@@ -2437,6 +2437,11 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_tx_powerboost.c",
         ],
     },
+    "CONFIG_WLAN_HAPS_ENABLE": {
+        True: [
+            "components/dp/core/src/wlan_dp_haps.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
