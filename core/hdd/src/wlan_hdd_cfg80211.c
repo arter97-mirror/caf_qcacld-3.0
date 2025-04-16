@@ -6684,10 +6684,10 @@ static bool is_band_weight_valid(struct nlattr **tb2, uint32_t value)
 			return true;
 	} else if (tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_5GHZ]) {
 		if (cfg_in_range(CFG_SCORING_5G_BAND_WEIGHTAGE, value))
-			return = true;
+			return true;
 	} else if (tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_WEIGHTAGE_6GHZ]) {
 		if (cfg_in_range(CFG_SCORING_6G_BAND_WEIGHTAGE, value))
-			return = true;
+			return true;
 	}
 
 	return false;
