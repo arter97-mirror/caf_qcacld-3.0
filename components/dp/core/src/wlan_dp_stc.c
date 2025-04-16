@@ -312,13 +312,18 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 
 	s_entry->peer_id = candidate->peer_id;
 	if (candidate->flags & WLAN_DP_SAMPLING_CANDIDATE_TX_FLOW_VALID) {
+		struct wlan_dp_spm_flow_info *tx_flow;
+
+		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx,
+						  candidate->tx_flow_id);
 		s_entry->flags |= WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID;
 		s_entry->tx_flow_id = candidate->tx_flow_id;
 		s_entry->tx_flow_metadata = candidate->tx_flow_metadata;
 		tx_flow_valid = true;
 		scnprintf(tx_flow_str, FLOW_STR_LEN,
-			  "tx: flow_id %hu mdata 0x%x",
-			  s_entry->tx_flow_id, s_entry->tx_flow_metadata);
+			  "tx: flow_id %hu mdata 0x%x add_ts %llu",
+			  s_entry->tx_flow_id, s_entry->tx_flow_metadata,
+			  tx_flow->flow_add_ts);
 	}
 
 	if (candidate->flags & WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID) {
@@ -339,13 +344,13 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 			  rx_flow->flow_init_ts);
 	}
 
-	dp_stc_info(dp_stc->logmask, "STC: Sample %s flow (tuple: %s) %s %s cur_ts %llu",
-		    flow_dir_str,
-		    dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
-					  flow_tuple_str, BUF_LEN_MAX),
-		    tx_flow_valid ? tx_flow_str : empty_str,
-		    rx_flow_valid ? rx_flow_str : empty_str,
-		    qdf_sched_clock());
+	dp_info("STC: Sample %s flow (tuple: %s) %s %s cur_ts %llu",
+		flow_dir_str,
+		dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
+				      flow_tuple_str, BUF_LEN_MAX),
+		tx_flow_valid ? tx_flow_str : empty_str,
+		rx_flow_valid ? rx_flow_str : empty_str,
+		qdf_sched_clock());
 
 	s_entry->state = WLAN_DP_SAMPLING_STATE_FLOW_ADDED;
 	candidate->flags = 0;
@@ -1709,6 +1714,7 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 		break;
 	case WLAN_DP_SAMPLING_STATE_FLOW_ADDED:
 	{
+		s_entry->sampling_start_ts = dp_stc_get_timestamp();
 		/* Send an indication to TX and RX flow to start tracking */
 		/*
 		 * Flow is just added, so take the stats snapshot and
@@ -2066,9 +2072,10 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		 * The classification result is for this flow only.
 		 */
 		s_entry->traffic_type = flow_classify_result->traffic_type;
-		dp_info("STC: sampling flow %d tuple (%s) result %d current stage %u",
+		dp_info("STC: sampling flow %d tuple (%s) result %d sample_start_ts %llu current stage %u",
 			i, dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
 			flow_classify_result->traffic_type,
+			s_entry->sampling_start_ts,
 			s_entry->flow_samples.curr_stats_stage);
 		/*
 		 * 1) Indicate to TX and RX flow

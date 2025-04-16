@@ -260,6 +260,7 @@ struct wlan_dp_stc_sampling_table_entry {
 	uint32_t tx_flow_metadata;
 	uint32_t rx_flow_metadata;
 	uint64_t tuple_hash;
+	uint64_t sampling_start_ts;
 	struct wlan_dp_stc_txrx_stats tx_stats_ref;
 	struct wlan_dp_stc_txrx_stats rx_stats_ref;
 	struct wlan_dp_stc_flow_samples flow_samples;
