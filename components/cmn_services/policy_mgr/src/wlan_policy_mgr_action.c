@@ -2043,6 +2043,8 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	qdf_freq_t user_config_freq = 0;
 	enum reg_wifi_band user_band, op_band;
 	qdf_freq_t ll_sap_freq;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
 
 	if (intf_ch_freq)
 		*intf_ch_freq = 0;
@@ -2174,6 +2176,14 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	else
 		pcl_len = 1;
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, sap_vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev is NULL");
+		goto out;
+	}
+	pdev = wlan_vdev_get_pdev(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	for (i = 0; i < pcl_len; i++) {
 		if (pcl_channels[i] == curr_sap_freq)
@@ -2186,7 +2196,9 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 						      ll_sap_freq))
 			continue;
 
-		if (!policy_mgr_is_safe_channel(psoc, pcl_channels[i]) ||
+		if (!wlan_reg_is_freq_enabled(pdev, pcl_channels[i],
+					      REG_CURRENT_PWR_MODE) ||
+		    !policy_mgr_is_safe_channel(psoc, pcl_channels[i]) ||
 		    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, pcl_channels[i]))
 			continue;
 
@@ -2209,7 +2221,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		new_sap_freq = pcl_channels[i];
 		break;
 	}
-
+out:
 	/* Restore the connection entry */
 	if (num_cxn_del > 0)
 		policy_mgr_restore_deleted_conn_info(psoc, &info, num_cxn_del);
