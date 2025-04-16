@@ -5730,8 +5730,10 @@ static int hdd_open(struct net_device *net_dev)
 	struct osif_vdev_sync *vdev_sync;
 
 	errno = osif_vdev_sync_trans_start(net_dev, &vdev_sync);
-	if (errno)
+	if (errno) {
+		hdd_err("VDEV SYNC TRANS start fails %d", errno);
 		return errno;
+	}
 
 	errno = __hdd_open(net_dev);
 	if (!errno)

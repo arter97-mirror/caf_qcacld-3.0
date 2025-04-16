@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -899,6 +899,9 @@ QDF_STATUS dp_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 		 * it to stack
 		 */
 		qdf_net_buf_debug_release_skb(nbuf);
+
+		/* Reset skb->mac_header field */
+		skb_reset_mac_header(nbuf);
 
 		/*
 		 * If this is not a last packet on the chain

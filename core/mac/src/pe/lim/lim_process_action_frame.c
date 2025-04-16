@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -62,6 +62,7 @@
 #include "wlan_ll_sap_api.h"
 #include "wlan_dcs_api.h"
 #include "wlan_tdls_api.h"
+#include "wlan_nan_api_i.h"
 
 #define SA_QUERY_REQ_MIN_LEN \
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
@@ -2534,6 +2535,7 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 	uint8_t *pBody = WMA_GET_RX_MPDU_DATA(pBd);
 	tpSirMacActionFrameHdr action_hdr = (tpSirMacActionFrameHdr) pBody;
 	tpSirMacVendorSpecificPublicActionFrameHdr vendor_specific;
+	uint8_t vdev_id;
 
 	pe_debug("Received an action frame category: %d action_id: %d",
 		 action_hdr->category, (action_hdr->category ==
@@ -2576,6 +2578,13 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 			}
 		}
 
+		vdev_id = wlan_nan_get_vdev_id_from_bssid(mac->pdev,
+							  mac_hdr->bssId,
+							  WLAN_ACTION_OUI_ID);
+
+		if (vdev_id == INVALID_VDEV_ID)
+			vdev_id = 0;
+
 		/*
 		 * Forward all public action frame with no session to
 		 * wpa_supplicant
@@ -2583,7 +2592,7 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 		lim_send_sme_mgmt_frame_ind(mac, mac_hdr->fc.subType,
 					    (uint8_t *)mac_hdr,
 					    frame_len + sizeof(tSirMacMgmtHdr),
-					    0, WMA_GET_RX_FREQ(pBd),
+					    vdev_id, WMA_GET_RX_FREQ(pBd),
 					    WMA_GET_RX_RSSI_NORMALIZED(pBd),
 					    RXMGMT_FLAG_NONE);
 

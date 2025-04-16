@@ -26954,7 +26954,7 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 	QDF_STATUS status;
 	struct wlan_objmgr_peer *peer;
 	struct hdd_context *hdd_ctx;
-	struct qdf_mac_addr mac_address = {0};
+	struct qdf_mac_addr mac_address = {0}, peer_mac = {0};
 	int32_t cipher_cap, ucast_cipher = 0;
 	int errno = 0;
 	enum wlan_crypto_cipher_type cipher;
@@ -27025,10 +27025,39 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 done:
 	wlan_hdd_mlo_link_free_keys(hdd_ctx->psoc, adapter, vdev, pairwise);
 	if (pairwise && adapter->device_mode == QDF_STA_MODE &&
-	    wlan_vdev_mlme_is_mlo_vdev(vdev) &&
-	    !wlan_vdev_mlme_is_tdls_vdev(vdev)) {
-		wlan_hdd_mlo_link_add_pairwise_key(vdev, hdd_ctx, key_index,
-						   pairwise, params);
+	    wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
+							WLAN_OSIF_ID);
+		if (!peer) {
+			hdd_err("Peer is null return");
+			return -EINVAL;
+		}
+		qdf_mem_copy(peer_mac.bytes,
+			     wlan_peer_get_macaddr(peer),
+			     QDF_MAC_ADDR_SIZE);
+		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+		/*
+		 * when keys are for non-bss peer, current usecase is that
+		 * the peer could only be TDLS on STA iface
+		 */
+		if (mac_addr &&
+		    !qdf_is_macaddr_equal(&mac_address, &peer_mac)) {
+			/* Install keys only if TDLS peer is active */
+			if (ucfg_tdls_is_key_install_allowed(vdev,
+							     &mac_address))
+				errno = wlan_cfg80211_store_key(
+					vdev, key_index,
+					(pairwise ?
+					WLAN_CRYPTO_KEY_TYPE_UNICAST :
+					WLAN_CRYPTO_KEY_TYPE_GROUP),
+					mac_address.bytes, params);
+			else
+				return 0;
+		} else {
+			wlan_hdd_mlo_link_add_pairwise_key(vdev, hdd_ctx,
+							   key_index,
+							   pairwise, params);
+		}
 
 	} else {
 		errno = wlan_cfg80211_store_key(

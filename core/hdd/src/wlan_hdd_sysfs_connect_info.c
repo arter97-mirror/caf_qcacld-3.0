@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -198,6 +198,8 @@ uint8_t *hdd_auth_type_str(uint32_t auth_type)
 		return "OPEN SYSTEM";
 	case eCSR_AUTH_TYPE_SHARED_KEY:
 		return "SHARED KEY";
+	case eCSR_AUTH_TYPE_SAE_EXT_KEY:
+		return "SAE EXT";
 	case eCSR_AUTH_TYPE_SAE:
 		return "SAE";
 	case eCSR_AUTH_TYPE_AUTOSWITCH:
@@ -249,6 +251,8 @@ uint8_t *hdd_auth_type_str(uint32_t auth_type)
 		return "SUITEB EAP SHA384";
 	case eCSR_AUTH_TYPE_OSEN:
 		return "OSEN";
+	case eCSR_AUTH_TYPE_FT_SAE_EXT_KEY:
+		return "FT SAE EXT";
 	case eCSR_AUTH_TYPE_FT_SAE:
 		return "FT SAE";
 	case eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384:

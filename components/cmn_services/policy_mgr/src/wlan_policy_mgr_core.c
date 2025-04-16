@@ -4581,15 +4581,13 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 		 * indoor/DFS SCC INI are disabled.
 		 */
 		if (!is_dbs &&
-		    ((wlan_reg_is_dfs_for_freq(pm_ctx->pdev, pcl_freq) &&
-		      !policy_mgr_is_sap_allowed_on_dfs_freq(pm_ctx->pdev,
+		    (!policy_mgr_is_sap_allowed_on_dfs_freq(pm_ctx->pdev,
 							     vdev_id,
-							     pcl_freq)) ||
-		     (wlan_reg_is_freq_indoor(pm_ctx->pdev, pcl_freq) &&
-		      !policy_mgr_is_sap_go_interface_allowed_on_indoor(
+							     pcl_freq) ||
+		     !policy_mgr_is_sap_go_interface_allowed_on_indoor(
 							pm_ctx->pdev,
 							vdev_id,
-							pcl_freq))))
+							pcl_freq)))
 			continue;
 
 		/* Skip LL LT SAP freq and for SAP skip same mac freq */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -874,6 +874,7 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 			 policy_mgr_is_2x2_2G_1x1_5G_dbs_capable(psoc));
 	policy_mgr_init_5g_low_high_cut_freq(psoc);
 	policy_mgr_init_rd_type(psoc);
+	policy_mgr_update_dfs_master_dynamic_enabled(psoc, true, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }

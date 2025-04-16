@@ -3093,6 +3093,10 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
+	status = cm_roam_update_vendor_handoff_config(psoc, data);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_debug("Failed to update params in rso_config struct");
+
 	status = mlme_cm_osif_get_vendor_handoff_params(psoc,
 							vendor_handoff_context);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -3103,10 +3107,6 @@ cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
 	mlme_debug("Reset vendor handoff req in progress context");
 	mlme_priv->cm_roam.vendor_handoff_param.req_in_progress = false;
 	mlme_priv->cm_roam.vendor_handoff_param.vendor_handoff_context = NULL;
-
-	status = cm_roam_update_vendor_handoff_config(psoc, data);
-	if (QDF_IS_STATUS_ERROR(status))
-		mlme_debug("Failed to update params in rso_config struct");
 }
 #endif
 

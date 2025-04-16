@@ -632,6 +632,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						       bpcc);
 		}
 		lim_process_ml_reconfig(mac_ctx, session, rx_pkt_info);
+		lim_process_beacon_eht_op(session, bcn);
 	}
 
 	if (!cu_flag)
