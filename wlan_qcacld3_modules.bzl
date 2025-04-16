@@ -2419,10 +2419,17 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//build/kernel/kleaf:socrepo_false": [],
     })
 
-    kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
-    })
+    if target == "neo-la":
+        kernel_build = select({
+            "//build/kernel/kleaf:microxr_kernel_build_true": "//:target_kernel_build",
+            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//conditions:default": "//msm-kernel:{}".format(tv),
+        })
+    else:
+        kernel_build = select({
+            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        })
 
     ipaths = chipset_ipaths + hw_ipaths + _fixed_ipaths
 
