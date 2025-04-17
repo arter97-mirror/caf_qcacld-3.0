@@ -54,6 +54,7 @@
 #include "wmi_unified.h"
 #include "wlan_cm_public_struct.h"
 #include "wlan_policy_mgr_i.h"
+#include <wlan_mlo_link_recfg.h>
 
 #define MIN_FIRST_BMISS_CNT 2
 #define MIN_FINAL_BMISS_CNT 5
@@ -3924,17 +3925,27 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 
-	mlme_clear_rso_pending_disable_req_bitmap(psoc, vdev_id);
-	cm_roam_set_roam_reason_better_ap(psoc, vdev_id, false);
-	stop_req = qdf_mem_malloc(sizeof(*stop_req));
-	if (!stop_req)
-		return QDF_STATUS_E_NOMEM;
-
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_CM_ID);
 	if (!vdev) {
 		mlme_err("vdev object is NULL for vdev %d", vdev_id);
-		goto free_mem;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (mlo_is_link_recfg_in_progress(vdev)) {
+		mlme_debug("skip RSO cmd for vdev %d due to link recfg is in progress",
+			   vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_clear_rso_pending_disable_req_bitmap(psoc, vdev_id);
+	cm_roam_set_roam_reason_better_ap(psoc, vdev_id, false);
+
+	stop_req = qdf_mem_malloc(sizeof(*stop_req));
+	if (!stop_req) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return QDF_STATUS_E_NOMEM;
 	}
 
 	if (wlan_vdev_mlme_get_is_mlo_link(psoc, vdev_id)) {
@@ -4013,7 +4024,6 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 rel_vdev_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
-free_mem:
 	qdf_mem_free(stop_req);
 
 	return QDF_STATUS_SUCCESS;
