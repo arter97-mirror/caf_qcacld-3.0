@@ -363,6 +363,7 @@ enum wlan_dp_stc_timer_state {
  * struct wlan_dp_stc_peer_traffic_context - peer traffic context
  * @mac_addr: peer mac address
  * @valid: context valid flag
+ * @is_mld: flag to indicate if the peer is MLD peer
  * @vdev_id: vdev_id for the peer
  * @peer_id: peer_id assigned to this peer
  * @last_ping_ts: Last seen ping pkt timestamp
@@ -382,6 +383,7 @@ enum wlan_dp_stc_timer_state {
 struct wlan_dp_stc_peer_traffic_context {
 	struct qdf_mac_addr mac_addr;
 	uint8_t valid;
+	uint8_t is_mld;
 	uint8_t vdev_id;
 	uint16_t peer_id;
 	uint64_t last_ping_ts;

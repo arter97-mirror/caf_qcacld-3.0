@@ -1072,8 +1072,10 @@ wlan_dp_stc_send_active_traffic_map_ind(struct wlan_dp_stc *dp_stc,
 	QDF_STATUS status;
 
 	peer_tc = &dp_stc->peer_tc[peer_id];
-	if (!peer_tc->valid)
+	if (!peer_tc->valid || peer_tc->is_mld) {
+		qdf_atomic_set(&peer_tc->send_fw_ind, 0);
 		return QDF_STATUS_SUCCESS;
+	}
 
 	if (qdf_atomic_read(&peer_tc->send_fw_ind) == 0)
 		return QDF_STATUS_SUCCESS;
@@ -2106,6 +2108,7 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	struct wlan_dp_stc_peer_traffic_context *peer_tc;
+	uint8_t is_mld = 0;
 
 	if (!dp_stc)
 		return QDF_STATUS_E_NOSUPPORT;
@@ -2118,6 +2121,9 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 	dp_info("STC: notify for peer %d, event %d, valid %d",
 		peer_id, event, peer_tc->valid);
 	switch (event) {
+	case CDP_PEER_EVENT_MLO_MAP:
+		is_mld = 1;
+		fallthrough;
 	case CDP_PEER_EVENT_MAP:
 		if (peer_tc->valid) {
 			dp_info("STC: Peer map notify for active peer");
@@ -2125,6 +2131,7 @@ QDF_STATUS wlan_dp_stc_peer_event_notify(ol_txrx_soc_handle soc,
 			return QDF_STATUS_E_BUSY;
 		}
 
+		peer_tc->is_mld = is_mld;
 		peer_tc->vdev_id = vdev_id;
 		peer_tc->peer_id = peer_id;
 		qdf_mem_copy(peer_tc->mac_addr.bytes,
