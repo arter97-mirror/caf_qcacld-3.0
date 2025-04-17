@@ -1222,6 +1222,14 @@ QDF_STATUS sme_get_roam_scan_channel_list(mac_handle_t mac_handle,
 					  uint8_t *pNumChannels,
 					  uint8_t sessionId);
 
+int sme_update_handoff_crypto_info(mac_handle_t mac_handle,
+				    struct csr_roam_profile *profile,
+				    uint8_t session_id);
+
+void sme_update_roam_supported_akm_list(mac_handle_t mac_handle,
+				struct csr_roam_profile *profile,
+				uint8_t session_id);
+
 /**
  * sme_dump_freq_list() - Dump the frequencies from given chan info
  * @chan_info: Contains the frequency list and number of frequencies

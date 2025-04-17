@@ -227,14 +227,24 @@ void lim_perform_ft_pre_auth(struct mac_context *mac, QDF_STATUS status,
 	tSirMacAuthFrameBody authFrame;
 	unsigned int session_id;
 	enum csr_akm_type auth_type;
+	tpCsrNeighborRoamControlInfo neighbor_roam_info = NULL;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
 		return;
 	}
+
 	session_id = pe_session->smeSessionId;
-	auth_type =
-		mac->roam.roamSession[session_id].connectedProfile.AuthType;
+	neighbor_roam_info = &mac->roam.neighborRoamInfo[session_id];
+
+	if (neighbor_roam_info &&
+	    (neighbor_roam_info->handoffReqInfo.src == REASSOC ||
+	    neighbor_roam_info->handoffReqInfo.src == CONNECT_CMD_USERSPACE))
+		auth_type =
+			neighbor_roam_info->handoff_crypto_info.negotiatedAuthType;
+	else
+		auth_type =
+			mac->roam.roamSession[session_id].connectedProfile.AuthType;
 
 	if (pe_session->is11Rconnection &&
 	    pe_session->ftPEContext.pFTPreAuthReq) {
@@ -257,6 +267,16 @@ void lim_perform_ft_pre_auth(struct mac_context *mac, QDF_STATUS status,
 		pe_err("pe_session is not in STA mode");
 		return;
 	}
+
+	if (auth_type == eCSR_AUTH_TYPE_FT_SAE ||
+	    auth_type == eCSR_AUTH_TYPE_SAE) {
+		struct qdf_mac_addr *pre_auth_bssid = (struct qdf_mac_addr *)
+			pe_session->ftPEContext.pFTPreAuthReq->preAuthbssId;
+
+		lim_trigger_auth_req_sae(mac, pe_session, pre_auth_bssid);
+		return;
+	}
+
 	pe_debug("Entered wait auth2 state for FT (old session %pK)",
 			pe_session);
 	if (pe_session->is11Rconnection) {
@@ -719,8 +739,8 @@ QDF_STATUS lim_send_preauth_scan_offload(struct mac_context *mac_ctx,
 	req->scan_req.chan_list.chan[0].freq =
 			ft_preauth_req->pre_auth_channel_freq;
 
-	req->scan_req.dwell_time_active = LIM_FT_PREAUTH_SCAN_TIME;
-	req->scan_req.dwell_time_passive = LIM_FT_PREAUTH_SCAN_TIME;
+	req->scan_req.dwell_time_active = LIM_FT_PREAUTH_ACTIVE_SCAN_TIME;
+	req->scan_req.dwell_time_passive = LIM_FT_PREAUTH_PASSIVE_SCAN_TIME;
 
 	status = ucfg_scan_start(req);
 	if (status != QDF_STATUS_SUCCESS)
