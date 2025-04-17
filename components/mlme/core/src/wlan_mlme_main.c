@@ -248,6 +248,8 @@ wlan_scan_get_11be_scan_phy_mode(enum wlan_phymode ch_phymode)
 	case WLAN_PHYMODE_11BEA_EHT40:
 		scan_phymode = SCAN_PHY_MODE_11BE_EHT40;
 		break;
+	case WLAN_PHYMODE_11BEG_EHT40PLUS:
+	case WLAN_PHYMODE_11BEG_EHT40MINUS:
 	case WLAN_PHYMODE_11BEG_EHT40:
 		scan_phymode = SCAN_PHY_MODE_11BE_EHT40_2G;
 		break;
@@ -583,7 +585,9 @@ mlme_update_freq_from_link_ctx(struct mlo_link_info *links_info,
 	op_freq = link_chan_info->ch_freq;
 	phymode = wlan_scan_get_11be_scan_phy_mode(link_chan_info->ch_phymode);
 	if (phymode == SCAN_PHY_MODE_UNKNOWN) {
-		mlme_err("invalid scan phymode for freq %d", op_freq);
+		mlme_err("invalid scan phymode for freq %d phymode %d link_id %d",
+			 op_freq, link_chan_info->ch_phymode,
+			 links_info->link_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
