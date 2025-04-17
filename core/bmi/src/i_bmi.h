@@ -165,6 +165,7 @@ struct ol_context {
 	qdf_device_t qdf_dev;
 	qdf_work_t ramdump_work;
 	qdf_work_t fw_indication_work;
+	qdf_wake_lock_t fw_dl_wakelock;
 	struct hif_opaque_softc *scn;
 	struct targetdef_t {
 		struct targetdef_s *targetdef;

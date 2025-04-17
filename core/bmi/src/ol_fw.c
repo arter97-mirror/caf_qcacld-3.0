@@ -518,15 +518,15 @@ static int
 ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 		     uint32_t address, bool compressed)
 {
+	#define MAX_WAKELOCK_FOR_FW_DOWNLOAD 1000	//1s
 	int ret;
-	qdf_device_t qdf_dev = ol_ctx->qdf_dev;
 
-	/* Wait until suspend and resume are completed before loading FW */
-	pld_lock_pm_sem(qdf_dev->dev);
+	qdf_wake_lock_timeout_acquire(&ol_ctx->fw_dl_wakelock,
+					MAX_WAKELOCK_FOR_FW_DOWNLOAD);
 
 	ret = __ol_transfer_bin_file(ol_ctx, file, address, compressed);
 
-	pld_release_pm_sem(qdf_dev->dev);
+	qdf_wake_lock_release(&ol_ctx->fw_dl_wakelock, 0);
 
 	return ret;
 }
@@ -1072,7 +1072,6 @@ static QDF_STATUS ol_patch_pll_switch(struct ol_context *ol_ctx)
 	uint32_t cmnos_cpu_speed_addr = 0;
 	struct hif_target_info *tgt_info = hif_get_target_info_handle(hif);
 	uint32_t target_version = tgt_info->target_version;
-	struct targetdef_t *scn = &ol_ctx->tgt_def;
 
 	switch (target_version) {
 	case AR6320_REV1_1_VERSION:

@@ -1595,7 +1595,7 @@ void infra_cp_stats_bmiss_response_cb(struct infra_cp_stats_event *ev,
 
 struct infra_cp_stats_event *
 wlan_cfg80211_mc_bmiss_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
-					  uint8_t *bmiss_peer_mac, int *errno)
+				 uint8_t bmiss_peer_mac[QDF_MAC_ADDR_SIZE], int *errno)
 {
 	void *cookie;
 	int idx = 0;
