@@ -169,6 +169,11 @@ static struct ol_if_ops dp_ol_if_ops = {
 	.dp_prealloc_put_consistent = dp_prealloc_put_coherent,
 	.dp_get_multi_pages = dp_prealloc_get_multi_pages,
 	.dp_put_multi_pages = dp_prealloc_put_multi_pages,
+#if defined(DP_FEATURE_TX_PAGE_POOL) || defined(DP_FEATURE_RX_BUFFER_RECYCLE)
+	.dp_get_page_pool = dp_prealloc_get_page_pool,
+	.dp_put_page_pool = dp_prealloc_put_page_pool,
+	.dp_page_pool_init = dp_prealloc_page_pool_init,
+#endif
 #endif
 	.dp_get_tx_inqueue = dp_get_tx_inqueue,
 	.dp_send_unit_test_cmd = wma_form_unit_test_cmd_and_send,
