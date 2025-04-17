@@ -180,6 +180,11 @@ void csr_neighbor_roam_reset_preauth_control_info(struct mac_context *mac_ctx,
 	neigh_roam_info->uOsRequestedHandoff = 0;
 	qdf_mem_zero(&neigh_roam_info->handoffReqInfo,
 		     sizeof(tCsrHandoffRequest));
+	qdf_mem_zero(&neigh_roam_info->handoff_crypto_info,
+		     sizeof(t_handoff_crypto_info));
+	neigh_roam_info->num_allowed_authmode = 0;
+	qdf_mem_zero(neigh_roam_info->allowed_authmode,
+		     sizeof(neigh_roam_info->allowed_authmode));
 }
 
 /**
@@ -739,7 +744,7 @@ QDF_STATUS csr_neighbor_roam_issue_preauth_req(struct mac_context *mac_ctx,
 		&mac_ctx->roam.neighborRoamInfo[session_id];
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tpCsrNeighborRoamBSSInfo neighbor_bss_node;
-
+	tp_handoff_crypto_info p_handoff_crypto = NULL;
 
 	if (false != neighbor_roam_info->FTRoamInfo.preauthRspPending) {
 		/* This must not be true here */
@@ -761,6 +766,18 @@ QDF_STATUS csr_neighbor_roam_issue_preauth_req(struct mac_context *mac_ctx,
 	if (!neighbor_bss_node) {
 		sme_err("Roamable AP list is empty");
 		return QDF_STATUS_E_FAILURE;
+	}
+	p_handoff_crypto = &neighbor_roam_info->handoff_crypto_info;
+
+	if (neighbor_roam_info->handoffReqInfo.src == REASSOC ||
+		neighbor_roam_info->handoffReqInfo.src ==
+		CONNECT_CMD_USERSPACE) {
+		p_handoff_crypto->negotiatedAuthType =
+				neighbor_bss_node->negotiatedAuthType;
+		p_handoff_crypto->negotiatedUCEncryptionType =
+				neighbor_bss_node->negotiatedUCEncryptionType;
+		p_handoff_crypto->negotiatedMCEncryptionType =
+				neighbor_bss_node->negotiatedMCEncryptionType;
 	}
 	csr_neighbor_roam_send_lfr_metric_event(mac_ctx, session_id,
 			neighbor_bss_node->pBssDescription->bssId,

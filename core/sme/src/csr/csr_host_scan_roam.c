@@ -161,11 +161,14 @@ void csr_neighbor_roam_process_scan_results(struct mac_context *mac_ctx,
 	do {
 		while (true) {
 			struct bss_description *descr;
+			struct tag_csrscan_result *pResult = NULL;
 
 			scan_result = csr_scan_result_get_next(
 						mac_ctx, *scan_results_list);
 			if (!scan_result)
 				break;
+			pResult = GET_BASE_ADDR(scan_result, struct tag_csrscan_result,
+						Result);
 			descr = &scan_result->BssDescriptor;
 			bss_chan_freq = descr->chan_freq;
 			QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
@@ -311,6 +314,17 @@ void csr_neighbor_roam_process_scan_results(struct mac_context *mac_ctx,
 			 */
 			bss_info->apPreferenceVal = 10;
 			num_candidates++;
+			if (pResult) {
+				bss_info->negotiatedAuthType =
+					pResult->authType;
+				bss_info->negotiatedUCEncryptionType =
+					pResult->ucEncryptionType;
+				bss_info->negotiatedMCEncryptionType =
+					pResult->mcEncryptionType;
+			} else
+				QDF_TRACE(QDF_MODULE_ID_SME,
+					  QDF_TRACE_LEVEL_INFO,
+					  "pResult is NULL from the scan_result!");
 			csr_ll_insert_tail(&n_roam_info->roamableAPList,
 				&bss_info->List, LL_ACCESS_LOCK);
 		} /* end of while (csr_scan_result_get_next) */

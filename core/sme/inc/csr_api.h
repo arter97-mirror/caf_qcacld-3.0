@@ -723,6 +723,8 @@ struct csr_roam_profile {
 	struct wlan_fils_connection_info *fils_con_info;
 #endif
 	bool force_rsne_override;
+	uint32_t num_allowed_authmode;
+	uint32_t allowed_authmode[WLAN_NUM_OF_SUPPORT_AUTH_TYPE];
 };
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH

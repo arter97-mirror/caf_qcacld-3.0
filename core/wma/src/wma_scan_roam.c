@@ -1055,6 +1055,8 @@ wma_roam_scan_fill_ap_profile(struct roam_offload_scan_req *roam_req,
 			      struct ap_profile *profile)
 {
 	uint32_t rsn_authmode;
+	int32_t num_allowed_authmode = 0;
+	int i;
 
 	qdf_mem_zero(profile, sizeof(*profile));
 	if (!roam_req) {
@@ -1108,6 +1110,20 @@ wma_roam_scan_fill_ap_profile(struct roam_offload_scan_req *roam_req,
 	if (roam_req->ConnectedNetwork.mfp_enabled)
 		profile->flags |= WMI_AP_PROFILE_FLAG_PMF;
 #endif
+
+	for (i = 0; i < eCSR_NUM_OF_SUPPORT_AUTH_TYPE; i++) {
+		/*
+		 * Send AKM in allowed list which are not present in connected
+		 * akm
+		 */
+		if (roam_req->allowed_authmode[i] &&
+		    num_allowed_authmode < WLAN_NUM_OF_SUPPORT_AUTH_TYPE)
+			profile->allowed_authmode[num_allowed_authmode++] =
+				e_csr_auth_type_to_rsn_authmode(
+					roam_req->allowed_authmode[i],
+					roam_req->ConnectedNetwork.encryption);
+	}
+	profile->num_allowed_authmode = num_allowed_authmode;
 }
 #endif
 /**

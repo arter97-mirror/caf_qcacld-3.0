@@ -3029,6 +3029,8 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_roam_score_delta_param *score_delta_param;
 	wmi_roam_cnd_min_rssi_param *min_rssi_param;
 	enum roam_trigger_reason trig_reason;
+	uint32_t *authmode_list;
+	int i;
 
 	len = sizeof(wmi_roam_ap_profile_fixed_param) + sizeof(wmi_ap_profile);
 	len += sizeof(*score_param);
@@ -3036,6 +3038,18 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	len += NUM_OF_ROAM_TRIGGERS * sizeof(*score_delta_param);
 	len += WMI_TLV_HDR_SIZE;
 	len += NUM_OF_ROAM_TRIGGERS * sizeof(*min_rssi_param);
+
+	/* for wmi_roam_cnd_vendor_scoring_param */
+	len += WMI_TLV_HDR_SIZE;
+	/* wmi_owe_ap_profile */
+	len += WMI_TLV_HDR_SIZE;
+	if (ap_profile->profile.num_allowed_authmode) {
+		len += WMI_TLV_HDR_SIZE;
+		len += ap_profile->profile.num_allowed_authmode * sizeof(uint32_t);
+	} else {
+		len += WMI_TLV_HDR_SIZE;
+	}
+
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf)
 		return QDF_STATUS_E_NOMEM;
@@ -3264,6 +3278,43 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 		convert_roam_trigger_reason(trig_reason);
 	min_rssi_param->candidate_min_rssi =
 		ap_profile->min_rssi_params[BMISS_MIN_RSSI].min_rssi;
+
+	buf_ptr += sizeof(*min_rssi_param);
+	/* set zero TLV's for roam_cnd_vendor_scoring_param */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       WMITLV_GET_STRUCT_TLVLEN(0));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	/* set zero TLV's for owe_ap_profile */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       WMITLV_GET_STRUCT_TLVLEN(0));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	/* List of Allowed authmode other than the connected akm */
+	if (ap_profile->profile.num_allowed_authmode) {
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
+			       (ap_profile->profile.num_allowed_authmode *
+			       sizeof(uint32_t)));
+		buf_ptr += WMI_TLV_HDR_SIZE;
+
+		authmode_list = (uint32_t *)buf_ptr;
+		for (i = 0; i < ap_profile->profile.num_allowed_authmode; i++) {
+			authmode_list[i] =
+				ap_profile->profile.allowed_authmode[i];
+		}
+
+		WMI_LOGD("[Allowed Authmode]: num_allowed_authmode: %d",
+			 ap_profile->profile.num_allowed_authmode);
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
+				   authmode_list,
+				   ap_profile->profile.num_allowed_authmode *
+				   sizeof(uint32_t));
+	} else {
+		/* set zero TLV's for allowed_authmode */
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
+			       WMITLV_GET_STRUCT_TLVLEN(0));
+		buf_ptr += WMI_TLV_HDR_SIZE;
+	}
 
 	wmi_mtrace(WMI_ROAM_AP_PROFILE, NO_SESSION, 0);
 	status = wmi_unified_cmd_send(wmi_handle, buf,
