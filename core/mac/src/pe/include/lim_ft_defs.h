@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,7 +35,8 @@
 #define MAX_FTIE_SIZE             384   /* Max size limited to 384, on acct. of IW custom events */
 
 /* Time to dwell on preauth channel during roaming, in milliseconds */
-#define LIM_FT_PREAUTH_SCAN_TIME 50
+#define LIM_FT_PREAUTH_ACTIVE_SCAN_TIME 50
+#define LIM_FT_PREAUTH_PASSIVE_SCAN_TIME 150
 
 /*--------------------------------------------------------------------------
    Type declarations

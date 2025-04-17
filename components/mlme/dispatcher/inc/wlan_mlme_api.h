@@ -2646,6 +2646,9 @@ wlan_mlme_get_roaming_offload(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+QDF_STATUS mlme_set_host_sae_roam_cap(struct wlan_objmgr_psoc *psoc,
+				      uint32_t akm_bitmap);
+
 /**
  * wlan_mlme_get_dfs_chan_ageout_time() - Get the DFS Channel ageout time
  * @psoc: pointer to psoc object

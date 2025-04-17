@@ -5672,7 +5672,11 @@ static void wma_set_mlme_caps(struct wlan_objmgr_psoc *psoc)
 
 	status = mlme_set_tgt_wpa3_roam_cap(psoc, akm_bitmap);
 	if (QDF_IS_STATUS_ERROR(status))
-		wma_err("Failed to set sae roam support");
+		wma_err("Failed to set target sae roam support");
+
+	status = mlme_set_host_sae_roam_cap(psoc, (1 << AKM_SAE));
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to set host sae roam support");
 }
 
 static void wma_set_component_caps(struct wlan_objmgr_psoc *psoc)

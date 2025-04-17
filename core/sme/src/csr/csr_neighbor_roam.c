@@ -1372,6 +1372,24 @@ static QDF_STATUS csr_neighbor_roam_process_handoff_req(
 
 	profile->ChannelInfo.freq_list[0] =
 				      roam_ctrl_info->handoffReqInfo.ch_freq;
+	if (roam_ctrl_info->handoffReqInfo.src == REASSOC ||
+		roam_ctrl_info->handoffReqInfo.src ==
+		CONNECT_CMD_USERSPACE) {
+		profile->AuthType =
+			roam_ctrl_info->handoff_crypto_info.AuthType;
+		profile->EncryptionType =
+			roam_ctrl_info->handoff_crypto_info.EncryptionType;
+		profile->mcEncryptionType =
+			roam_ctrl_info->handoff_crypto_info.mcEncryptionType;
+#ifdef WLAN_FEATURE_11W
+		profile->MFPEnabled =
+			roam_ctrl_info->handoff_crypto_info.MFPEnabled;
+		profile->MFPRequired =
+			roam_ctrl_info->handoff_crypto_info.MFPRequired;
+		profile->MFPCapable =
+			roam_ctrl_info->handoff_crypto_info.MFPCapable;
+#endif
+	}
 
 	/*
 	 * For User space connect requests, the scan has already been done.

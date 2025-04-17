@@ -127,6 +127,8 @@
  * received from firmware
  */
 #define ROAM_REASON_MASK 0x0F
+
+#define CSR_SET_BIT(__param, __val)    ((__param) |= (1 << (__val)))
 /**
  * csr_get_ielen_from_bss_description() - to get IE length
  *             from struct bss_description structure
@@ -4024,10 +4026,13 @@ QDF_STATUS csr_roam_prepare_bss_config(struct mac_context *mac,
 				       struct csr_roam_profile *pProfile,
 				       struct bss_description *bss_desc,
 				       struct bss_config_param *pBssConfig,
-				       tDot11fBeaconIEs *pIes)
+				       tDot11fBeaconIEs *pIes,
+				       uint32_t sessionId)
 {
 	enum csr_cfgdot11mode cfgDot11Mode;
 	uint32_t join_timeout;
+	struct wlan_objmgr_vdev *vdev;
+	uint32_t set_val = 0;
 
 	QDF_ASSERT(pIes);
 	if (!pIes)
@@ -4099,6 +4104,20 @@ QDF_STATUS csr_roam_prepare_bss_config(struct mac_context *mac,
 	sme_debug("phyMode=%d, uCfgDot11Mode=%d negotiatedAuthType %d",
 		   pProfile->phyMode, pBssConfig->uCfgDot11Mode,
 		   pProfile->negotiatedAuthType);
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, sessionId,
+						    WLAN_LEGACY_SME_ID);
+	if (vdev) {
+		if (pProfile->negotiatedAuthType == eCSR_AUTH_TYPE_SAE)
+			CSR_SET_BIT(set_val, WLAN_CRYPTO_KEY_MGMT_SAE);
+		if (pProfile->negotiatedAuthType == eCSR_AUTH_TYPE_RSN_PSK)
+			CSR_SET_BIT(set_val, WLAN_CRYPTO_KEY_MGMT_PSK);
+		wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT,
+			   set_val);
+	} else
+		sme_err("Invalid vdev");
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 
 	/* Qos */
 	if ((pBssConfig->uCfgDot11Mode != eCSR_CFG_DOT11_MODE_11N) &&
@@ -5095,7 +5114,7 @@ QDF_STATUS csr_roam_stop_network(struct mac_context *mac, uint32_t sessionId,
 	sme_debug("session id: %d", sessionId);
 
 	status = csr_roam_prepare_bss_config(mac, roam_profile, bss_desc,
-					     pBssConfig, pIes);
+					     pBssConfig, pIes, sessionId);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		enum csr_roam_substate substate;
 
@@ -5185,7 +5204,7 @@ static enum csr_join_state csr_roam_state_for_same_profile(
 	/* The key changes */
 	qdf_mem_zero(&bssConfig, sizeof(bssConfig));
 	status = csr_roam_prepare_bss_config(mac_ctx, profile, bss_descr,
-				&bssConfig, ies_local);
+				&bssConfig, ies_local, session_id);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		session->bssParams.uCfgDot11Mode =
 				bssConfig.uCfgDot11Mode;
@@ -10036,6 +10055,7 @@ void csr_handle_disassoc_ho(struct mac_context *mac, uint32_t session_id)
 	struct scan_result_list *scan_handle_roam_ap;
 	struct sCsrNeighborRoamBSSInfo *bss_node;
 	QDF_STATUS status;
+	tp_handoff_crypto_info p_handoff_crypto = NULL;
 
 	csr_dequeue_command(mac);
 	roam_info = qdf_mem_malloc(sizeof(*roam_info));
@@ -10044,6 +10064,31 @@ void csr_handle_disassoc_ho(struct mac_context *mac, uint32_t session_id)
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 		 "CSR SmeDisassocReq due to HO on session %d", session_id);
 	neighbor_roam_info = &mac->roam.neighborRoamInfo[session_id];
+
+	/**
+	 * previous connected AP is disconencted and update
+	 * csrNeighborRoamProfile cyrpto info with handoff
+	 * crypto info to get new connected AP from scan list
+	 */
+	if (neighbor_roam_info->handoffReqInfo.src ==
+	    CONNECT_CMD_USERSPACE) {
+		p_handoff_crypto =
+			&neighbor_roam_info->handoff_crypto_info;
+		neighbor_roam_info->csrNeighborRoamProfile.AuthType =
+				p_handoff_crypto->AuthType;
+		neighbor_roam_info->csrNeighborRoamProfile.EncryptionType =
+				p_handoff_crypto->EncryptionType;
+		neighbor_roam_info->csrNeighborRoamProfile.mcEncryptionType =
+				p_handoff_crypto->mcEncryptionType;
+#ifdef WLAN_FEATURE_11W
+		neighbor_roam_info->csrNeighborRoamProfile.MFPEnabled =
+				p_handoff_crypto->MFPEnabled;
+		neighbor_roam_info->csrNeighborRoamProfile.MFPRequired =
+				p_handoff_crypto->MFPRequired;
+		neighbor_roam_info->csrNeighborRoamProfile.MFPCapable =
+				p_handoff_crypto->MFPCapable;
+#endif
+	}
 
 	/*
 	 * First ensure if the roam profile is in the scan cache.
@@ -10519,6 +10564,10 @@ void csr_roam_joined_state_msg_processor(struct mac_context *mac, void *msg_buf)
 		qdf_mem_free(roam_info);
 	}
 	break;
+	case eWNI_SME_TRIGGER_SAE:
+		sme_debug("Invoke SAE callback");
+		csr_sae_callback(mac, pSirMsg);
+		break;
 	default:
 		csr_roam_check_for_link_status_change(mac, pSirMsg);
 		break;
@@ -11027,6 +11076,8 @@ QDF_STATUS csr_fill_filter_from_vdev_crypto(struct mac_context *mac_ctx,
 		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_UCAST_CIPHER);
 	filter->key_mgmt =
 		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+	wlan_crypto_get_allowed_key_mgmt_info(vdev,
+		&filter->num_allowed_key_mgmt, &filter->allowed_key_mgmt);
 	filter->mgmtcipherset =
 		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_MGMT_CIPHER);
 
@@ -17724,6 +17775,14 @@ csr_create_roam_scan_offload_request(struct mac_context *mac_ctx,
 			  req_buf->middle_of_roaming, ese_neighbor_list_recvd,
 			  curr_ch_lst_info->numOfChannels);
 #endif
+
+	req_buf->num_allowed_authmode = 0;
+	qdf_mem_zero(req_buf->allowed_authmode,
+		     sizeof(req_buf->allowed_authmode));
+	req_buf->num_allowed_authmode = roam_info->num_allowed_authmode;
+	qdf_mem_copy(req_buf->allowed_authmode, roam_info->allowed_authmode,
+	       roam_info->num_allowed_authmode * sizeof(uint32_t));
+	sme_debug("num_allowed_authmode is %d", roam_info->num_allowed_authmode);
 
 	if (ese_neighbor_list_recvd ||
 	    curr_ch_lst_info->numOfChannels == 0) {

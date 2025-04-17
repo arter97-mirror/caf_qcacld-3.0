@@ -19352,6 +19352,89 @@ static bool wlan_hdd_is_conn_type_fils(struct cfg80211_connect_params *req)
 #endif
 
 /**
+ * wlan_hdd_get_auth_mode_from_akm() - Convert kernel AKM suits to
+ * CSR supported AUTH mode
+ * @adapter: Pointer to adapter
+ * @key_mgmt: key management type
+ *
+ * This function is used to convert kernel req AKM suites to
+ * CSR supported AUTH mode.
+ *
+ * Return: CSR supported auth mode
+ */
+static enum csr_akm_type
+wlan_hdd_get_auth_mode_from_akm(struct hdd_adapter *adapter,
+			       uint32_t key_mgmt)
+{
+	struct hdd_station_ctx *hdd_sta_ctx = NULL;
+	uint8_t auth_suite[4];
+	enum csr_akm_type auth_mode = eCSR_AUTH_TYPE_UNKNOWN;
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	if (!hdd_sta_ctx) {
+		hdd_err("hdd_sta_ctx is NULL");
+		return auth_mode;
+	}
+
+	auth_suite[0] = (key_mgmt >> 24) & 0xFF;
+	auth_suite[1] = (key_mgmt >> 16) & 0xFF;
+	auth_suite[2] = (key_mgmt >> 8) & 0xFF;
+	auth_suite[3] = key_mgmt & 0xFF;
+
+	if (hdd_sta_ctx->wpa_versions & NL80211_WPA_VERSION_2)
+		auth_mode = hdd_translate_rsn_to_csr_auth_type(auth_suite);
+	else if (hdd_sta_ctx->wpa_versions & NL80211_WPA_VERSION_1)
+		auth_mode = hdd_translate_wpa_to_csr_auth_type(auth_suite);
+	else
+		auth_mode = eCSR_AUTH_TYPE_OPEN_SYSTEM;
+
+	return auth_mode;
+}
+
+/**
+ * wlan_hdd_store_allowed_akm_suite() - store all supported allowed akm
+ * @adapter: Pointer to adapter
+ * @key_mgmt: Key management type
+ *
+ * This function is used to store all key mgmt type.
+ *
+ * Return: NULL
+ */
+static void
+wlan_hdd_store_allowed_akm_suite(struct hdd_adapter *adapter,
+				 struct cfg80211_connect_params *req)
+{
+	struct csr_roam_profile *roam_profile;
+	uint32_t key_mgmt;
+	enum csr_akm_type auth_mode;
+	int i;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL, failed to store akm info");
+		return;
+	}
+
+	roam_profile = hdd_roam_profile(adapter);
+
+	roam_profile->num_allowed_authmode = 0;
+	qdf_mem_zero(roam_profile->allowed_authmode,
+		     sizeof(roam_profile->allowed_authmode));
+
+	for (i = 0; i < req->crypto.n_akm_suites; i++) {
+		key_mgmt = req->crypto.akm_suites[i];
+		auth_mode = wlan_hdd_get_auth_mode_from_akm(adapter, key_mgmt);
+		roam_profile->num_allowed_authmode++;
+		roam_profile->allowed_authmode[i] = auth_mode;
+		hdd_debug("i:%d, auth_mode:%d", i, auth_mode);
+	}
+
+	sme_update_roam_supported_akm_list(hdd_ctx->mac_handle,
+					   roam_profile,
+					   adapter->vdev_id);
+}
+
+/**
  * wlan_hdd_set_akm_suite() - set key management type
  * @adapter: Pointer to adapter
  * @key_mgmt: Key management type
@@ -19742,9 +19825,14 @@ static void hdd_populate_crypto_params(struct wlan_objmgr_vdev *vdev,
 				       struct cfg80211_connect_params *req)
 {
 	uint32_t set_val = 0;
+	uint32_t key_mgmt;
+	int i;
 
 	if (req->crypto.n_akm_suites) {
-		hdd_populate_crypto_akm_type(vdev, req->crypto.akm_suites[0]);
+		for (i = 0; i < req->crypto.n_akm_suites; i++) {
+			key_mgmt = req->crypto.akm_suites[i];
+			hdd_populate_crypto_akm_type(vdev, key_mgmt);
+		}
 	} else {
 		/* Reset to none */
 		HDD_SET_BIT(set_val, WLAN_CRYPTO_KEY_MGMT_NONE);
@@ -20237,6 +20325,7 @@ static int wlan_hdd_cfg80211_set_privacy(struct hdd_adapter *adapter,
 	struct wlan_objmgr_vdev *vdev;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx->auth_key_mgmt = 0;
 	sta_ctx->wpa_versions = req->crypto.wpa_versions;
 	roam_profile = hdd_roam_profile(adapter);
 
@@ -20540,6 +20629,93 @@ int wlan_hdd_try_disconnect(struct hdd_adapter *adapter,
  */
 #if defined(CFG80211_CONNECT_PREV_BSSID) || \
 	(LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
+/**
+ * wlan_hdd_update_reassoc_profile() - Update reassoc profile
+ * @adapter: Pointer to the HDD adapter
+ * @req: Pointer to the structure cfg_connect_params receieved from user space
+ *
+ * This function will update reassoc profile, especially when userspace reassoc
+ * is triggered for wpa2 to wpa3 roaming, or wpa3 to wpa2 roaming, privacy
+ * related parameters need be updated.
+ *
+ * Return: 0 if successfully update profile, non-zero error code otherwise
+ */
+static int
+wlan_hdd_update_reassoc_profile(struct hdd_adapter *adapter,
+				struct cfg80211_connect_params *req)
+{
+	enum csr_akm_type rsn_auth_type;
+	struct csr_roam_profile *roam_profile;
+	int status = 0;
+
+	status = wlan_hdd_cfg80211_set_privacy(adapter, req);
+	if (status < 0) {
+		hdd_err("Failed to set security params");
+		return status;
+	}
+
+	roam_profile = hdd_roam_profile(adapter);
+	if (roam_profile) {
+		/* cleanup bssid hint */
+		qdf_mem_zero(roam_profile->bssid_hint.bytes,
+			     QDF_MAC_ADDR_SIZE);
+		qdf_mem_zero((void *)(roam_profile->BSSIDs.bssid),
+			     QDF_MAC_ADDR_SIZE);
+
+		if (req->bssid) {
+			roam_profile->BSSIDs.numOfBSSIDs = 1;
+			qdf_mem_copy((void *)(roam_profile->BSSIDs.bssid),
+				     req->bssid, QDF_MAC_ADDR_SIZE);
+		} else if (req->bssid_hint) {
+			qdf_mem_copy(roam_profile->bssid_hint.bytes,
+				     req->bssid_hint, QDF_MAC_ADDR_SIZE);
+		}
+
+		if (req->crypto.wpa_versions) {
+			hdd_set_genie_to_csr(adapter, &rsn_auth_type);
+			hdd_set_csr_auth_type(adapter, rsn_auth_type);
+		}
+
+#ifdef FEATURE_WLAN_WAPI
+		if (adapter->wapi_info.wapi_mode) {
+			switch (adapter->wapi_info.wapi_auth_mode) {
+			case WAPI_AUTH_MODE_PSK:
+			{
+				roam_profile->AuthType.authType[0] =
+					eCSR_AUTH_TYPE_WAPI_WAI_PSK;
+				break;
+			}
+			case WAPI_AUTH_MODE_CERT:
+			{
+				roam_profile->AuthType.authType[0] =
+					eCSR_AUTH_TYPE_WAPI_WAI_CERTIFICATE;
+				break;
+			}
+			default:
+				break;
+			} /* End of switch */
+
+			if (adapter->wapi_info.wapi_auth_mode ==
+			    WAPI_AUTH_MODE_PSK ||
+			    adapter->wapi_info.wapi_auth_mode ==
+			    WAPI_AUTH_MODE_CERT) {
+				roam_profile->AuthType.numEntries = 1;
+				roam_profile->EncryptionType.numEntries = 1;
+				roam_profile->EncryptionType.
+					encryptionType[0] =
+						eCSR_ENCRYPT_TYPE_WPI;
+				roam_profile->mcEncryptionType.numEntries = 1;
+				roam_profile->mcEncryptionType.
+					encryptionType[0] =
+						eCSR_ENCRYPT_TYPE_WPI;
+			}
+		}
+#endif
+	}
+
+	return status;
+}
+
 static int wlan_hdd_reassoc_bssid_hint(struct hdd_adapter *adapter,
 					struct cfg80211_connect_params *req)
 {
@@ -20547,6 +20723,15 @@ static int wlan_hdd_reassoc_bssid_hint(struct hdd_adapter *adapter,
 	const uint8_t *bssid = NULL;
 	uint32_t ch_freq = 0;
 	struct hdd_station_ctx *sta_ctx;
+	struct csr_roam_profile *roam_profile;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (!hdd_ctx)
+		return status;
+
+	roam_profile = hdd_roam_profile(adapter);
+	if (!roam_profile)
+		return status;
 
 	if (req->bssid)
 		bssid = req->bssid;
@@ -20570,6 +20755,20 @@ static int wlan_hdd_reassoc_bssid_hint(struct hdd_adapter *adapter,
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 		qdf_mem_copy(sta_ctx->requested_bssid.bytes, bssid,
 			     QDF_MAC_ADDR_SIZE);
+
+		status = wlan_hdd_update_reassoc_profile(adapter, req);
+		if (status) {
+			hdd_err("Failed to update reassoc profile");
+			return status;
+		}
+
+		status = sme_update_handoff_crypto_info(hdd_ctx->mac_handle,
+					       roam_profile,
+					       adapter->vdev_id);
+		if (status) {
+			hdd_err("Failed to update handoff crypto info");
+			return status;
+		}
 
 		status = hdd_reassoc(adapter, bssid, ch_freq,
 				     CONNECT_CMD_USERSPACE);
@@ -20839,6 +21038,8 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 		hdd_err("Failed to set security params");
 		return status;
 	}
+
+	wlan_hdd_store_allowed_akm_suite(adapter, req);
 
 	if (req->channel)
 		ch_freq = req->channel->center_freq;

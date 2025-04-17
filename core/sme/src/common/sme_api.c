@@ -16684,3 +16684,69 @@ sme_set_beacon_latency_event_cb(mac_handle_t mac_handle,
 	return qdf_status;
 }
 #endif
+
+int sme_update_handoff_crypto_info(mac_handle_t mac_handle,
+				    struct csr_roam_profile *profile,
+				    uint8_t session_id)
+{
+	struct mac_context *mac;
+	tpCsrNeighborRoamControlInfo pNeighborRoamInfo = NULL;
+	tp_handoff_crypto_info p_handoff_crypto = NULL;
+
+	if (!mac_handle) {
+		sme_err("mac_handle is not valid");
+		return -EINVAL;
+	}
+
+	mac = MAC_CONTEXT(mac_handle);
+	pNeighborRoamInfo = &mac->roam.neighborRoamInfo[session_id];
+	if (!pNeighborRoamInfo) {
+		sme_err("neighbor roam info is not valid");
+		return -EINVAL;
+	}
+
+	p_handoff_crypto = &pNeighborRoamInfo->handoff_crypto_info;
+	qdf_mem_zero(p_handoff_crypto, sizeof(t_handoff_crypto_info));
+	p_handoff_crypto->AuthType.numEntries = 1;
+	p_handoff_crypto->AuthType.authType[0] =
+			profile->AuthType.authType[0];
+	p_handoff_crypto->EncryptionType.numEntries = 1;
+	p_handoff_crypto->EncryptionType.encryptionType[0] =
+			profile->EncryptionType.encryptionType[0];
+	p_handoff_crypto->mcEncryptionType.numEntries = 1;
+	p_handoff_crypto->mcEncryptionType.encryptionType[0] =
+			profile->mcEncryptionType.encryptionType[0];
+#ifdef WLAN_FEATURE_11W
+	p_handoff_crypto->MFPEnabled = profile->MFPEnabled;
+	p_handoff_crypto->MFPRequired = profile->MFPRequired;
+	p_handoff_crypto->MFPCapable = profile->MFPCapable;
+#endif
+
+	return 0;
+}
+
+void sme_update_roam_supported_akm_list(mac_handle_t mac_handle,
+					struct csr_roam_profile *profile,
+					uint8_t session_id)
+{
+	struct mac_context *mac = NULL;
+	tpCsrNeighborRoamControlInfo pNeighborRoamInfo = NULL;
+
+	if (!mac_handle) {
+		sme_err("mac_handle is not valid");
+		return;
+	}
+
+	mac = MAC_CONTEXT(mac_handle);
+	pNeighborRoamInfo = &mac->roam.neighborRoamInfo[session_id];
+	if (!pNeighborRoamInfo) {
+		sme_err("neighbor roam info is not valid");
+		return;
+	}
+
+	pNeighborRoamInfo->num_allowed_authmode =
+				profile->num_allowed_authmode;
+	qdf_mem_copy(pNeighborRoamInfo->allowed_authmode,
+		     profile->allowed_authmode,
+		     profile->num_allowed_authmode * sizeof(uint32_t));
+}

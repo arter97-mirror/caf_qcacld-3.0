@@ -88,6 +88,11 @@ typedef struct sCsrNeighborRoamChannelInfo {
 typedef struct sCsrNeighborRoamBSSInfo {
 	tListElem List;
 	uint8_t apPreferenceVal;
+	/* Preferred Encryption type that matched with profile. */
+	eCsrEncryptionType negotiatedUCEncryptionType;
+	eCsrEncryptionType negotiatedMCEncryptionType;
+	/* Preferred auth type that matched with the profile. */
+	enum csr_akm_type negotiatedAuthType;
 	struct bss_description *pBssDescription;
 } tCsrNeighborRoamBSSInfo, *tpCsrNeighborRoamBSSInfo;
 
@@ -111,6 +116,21 @@ typedef struct sCsr11rAssocNeighborInfo {
 	uint8_t numPreAuthRetries;
 	tDblLinkList preAuthDoneList;   /* llist which consists/preauth nodes */
 } tCsr11rAssocNeighborInfo, *tpCsr11rAssocNeighborInfo;
+
+typedef struct handoff_crypto_info {
+	tCsrAuthList AuthType;
+	tCsrAuthList akm_list;
+	tCsrEncryptionList EncryptionType;
+	tCsrEncryptionList mcEncryptionType;
+	enum csr_akm_type negotiatedAuthType;
+	eCsrEncryptionType negotiatedUCEncryptionType;
+	eCsrEncryptionType negotiatedMCEncryptionType;
+#ifdef WLAN_FEATURE_11W
+	bool MFPEnabled;
+	uint8_t MFPRequired;
+	uint8_t MFPCapable;
+#endif
+} t_handoff_crypto_info, *tp_handoff_crypto_info;
 
 /**
  * struct sCsr11rAssocNeighborInfo - Control info for neighbor roam algorithm
@@ -155,6 +175,10 @@ typedef struct sCsrNeighborRoamControlInfo {
 	uint8_t last_sent_cmd;
 	struct scan_result_list *scan_res_lfr2_roam_ap;
 	bool roam_control_enable;
+	/* for host wpa2/wpa3 mix roaming */
+	uint32_t num_allowed_authmode;
+	uint32_t allowed_authmode[WLAN_NUM_OF_SUPPORT_AUTH_TYPE];
+	t_handoff_crypto_info handoff_crypto_info;
 } tCsrNeighborRoamControlInfo, *tpCsrNeighborRoamControlInfo;
 
 /* All the necessary Function declarations are here */

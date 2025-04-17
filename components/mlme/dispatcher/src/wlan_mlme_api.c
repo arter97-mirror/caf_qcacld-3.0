@@ -4206,6 +4206,26 @@ wlan_mlme_get_sae_roam_auth_retry_count(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS mlme_set_host_sae_roam_cap(struct wlan_objmgr_psoc *psoc,
+				      uint32_t akm_bitmap)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.lfr.fw_akm_bitmap |= akm_bitmap;
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+QDF_STATUS mlme_set_host_sae_roam_cap(struct wlan_objmgr_psoc *psoc,
+				      uint32_t akm_bitmap)
+{
+	mlme_legacy_info("the sae feature is not supported!");
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
