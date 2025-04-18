@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,6 +38,15 @@
 #define RoamEmergency_TargetMinRSSI_min -127
 #define RoamEmergency_TargetMinRSSI_max -70
 #define RoamEmergency_TargetMinRSSI_default -70
+#define RoamAPScore_2G_Weight_min 50
+#define RoamAPScore_2G_Weight_max 100
+#define RoamAPScore_2G_Weight_default 100
+#define RoamAPScore_5G_Weight_min 50
+#define RoamAPScore_5G_Weight_max 100
+#define RoamAPScore_5G_Weight_default 100
+#define RoamAPScore_6G_Weight_min 50
+#define RoamAPScore_6G_Weight_max 100
+#define RoamAPScore_6G_Weight_default 100
 #else
 #define RoamCommon_Delta_min 0
 #define RoamCommon_Delta_max 100
@@ -550,6 +559,123 @@
 	"10,0,14,0", \
 	"candidate AP's percentage roam score delta")
 
+#ifdef CONNECTION_ROAMING_CFG
+/*
+ * <ini>
+ * RoamAPScore_2G_Weight - Band weight value given for 2 GHz band in percentage.
+ *
+ * @Min: 50
+ * @Max: 100
+ * @Default: 100
+ *
+ * This ini is used to increase/decrease the weightage given for the roaming
+ * candidates found in 2.4 GHz band.
+ *
+ * The band weight is used to individually manage the calculated scores for
+ * each frequency band. This is used to calculate the AP score.
+ *
+ * AP Score = (RSSI factor * RSSI weight (0.70))+(CU factor * CU weight (0.30))
+ *             *Band weight (1.0)
+ *
+ * For example: A 2.4 GHz link can be penalized by setting the band weight for
+ * 2.4 GHz to 0.5 (50%)
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SCORING_2G_BAND_WEIGHTAGE CFG_INI_UINT( \
+	"RoamAPScore_2G_Weight ", \
+	RoamAPScore_2G_Weight_min, \
+	RoamAPScore_2G_Weight_max, \
+	RoamAPScore_2G_Weight_default, \
+	CFG_VALUE_OR_DEFAULT, \
+	"2G Band Weightage")
+
+/*
+ * <ini>
+ * RoamAPScore_5G_Weight - Band weight value given for 5 GHz band in percentage.
+ *
+ * @Min: 50
+ * @Max: 100
+ * @Default: 100
+ *
+ * This ini is used to increase/decrease the weightage given for the roaming
+ * candidates found in 5 GHz band.
+ *
+ * The band weight is used to individually manage the calculated scores for
+ * each frequency band. This is used to calculate the AP score.
+ *
+ * AP Score = (RSSI factor * RSSI weight (0.70))+(CU factor * CU weight (0.30))
+ *             *Band weight (1.0)
+ *
+ * For example: A 5 GHz link can be penalized by setting the band weight for
+ * 5 GHz to 0.5 (50%)
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SCORING_5G_BAND_WEIGHTAGE CFG_INI_UINT( \
+	"RoamAPScore_5G_Weight ", \
+	RoamAPScore_5G_Weight_min, \
+	RoamAPScore_5G_Weight_max, \
+	RoamAPScore_5G_Weight_default, \
+	CFG_VALUE_OR_DEFAULT, \
+	"5G Band Weightage")
+
+/*
+ * <ini>
+ * RoamAPScore_6G_Weight - Band weight value given for 6 GHz band in percentage.
+ *
+ * @Min: 50
+ * @Max: 100
+ * @Default: 100
+ *
+ * This ini is used to increase/decrease the weightage given for the roaming
+ * candidates found in 6 GHz band.
+ *
+ * The band weight is used to individually manage the calculated scores for
+ * each frequency band. This is used to calculate the AP score.
+ *
+ * AP Score = (RSSI factor * RSSI weight (0.70))+(CU factor * CU weight (0.30))
+ *             *Band weight (1.0)
+ *
+ * For example: A 6 GHz link can be penalized by setting the band weight for
+ * 6 GHz to 0.5 (50%)
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SCORING_6G_BAND_WEIGHTAGE CFG_INI_UINT( \
+	"RoamAPScore_6G_Weight ", \
+	RoamAPScore_6G_Weight_min, \
+	RoamAPScore_6G_Weight_max, \
+	RoamAPScore_6G_Weight_default, \
+	CFG_VALUE_OR_DEFAULT, \
+	"6G Band Weightage")
+
+#define CFG_SCORING_BAND_WEIGHTAGE \
+	CFG(CFG_SCORING_2G_BAND_WEIGHTAGE) \
+	CFG(CFG_SCORING_5G_BAND_WEIGHTAGE) \
+	CFG(CFG_SCORING_6G_BAND_WEIGHTAGE)
+#else
+#define CFG_SCORING_BAND_WEIGHTAGE
+#endif
+
 #define CFG_ROAM_SCORING_ALL \
 	CFG(CFG_ROAM_SCORE_DELTA_TRIGGER_BITMAP) \
 	CFG(CFG_ROAM_SCORE_DELTA) \
@@ -565,6 +691,7 @@
 	CFG(CFG_ROAM_TRIGGER_SCORE_DELTA) \
 	CFG(CFG_AGGRESSIVE_ROAM_SCORE_DELTA) \
 	CFG(CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA) \
-	CFG(CFG_ROAM_AGGRESSIVE_SCAN_STEP_RSSI)
+	CFG(CFG_ROAM_AGGRESSIVE_SCAN_STEP_RSSI) \
+	CFG_SCORING_BAND_WEIGHTAGE
 
 #endif /* __CFG_MLME_ROAM_SCORING_H */

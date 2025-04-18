@@ -69,6 +69,8 @@
 #endif
 
 #include <wlan_vdev_mgr_utils_api.h>
+#include "cfg_mlme_he_caps.h"
+#include "cfg_ucfg_api.h"
 
 #define BW_160 160
 
@@ -2144,18 +2146,23 @@ populate_dot11f_power_caps(struct mac_context *mac,
 
 	pCaps->minTxPower = pe_session->min_11h_pwr;
 	pCaps->maxTxPower = pe_session->maxTxPower;
+	pCaps->present = 1;
 
 	/* Use firmware updated max tx power if non zero */
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
-	if (mlme_obj && mlme_obj->mgmt.generic.tx_pwrlimit)
+	if (!mlme_obj) {
+		pe_err("mlme_obj invalid");
+		return;
+	}
+
+	if (mlme_obj->mgmt.generic.tx_pwrlimit)
 		pCaps->maxTxPower = mlme_obj->mgmt.generic.tx_pwrlimit;
 
 	min_power = populate_decimal_min_power(mlme_obj->mgmt.generic.minpower);
 
-	if (mlme_obj && mlme_obj->mgmt.generic.minpower)
+	if (mlme_obj->mgmt.generic.minpower)
 		pCaps->minTxPower = QDF_MIN(pCaps->minTxPower, min_power);
 
-	pCaps->present = 1;
 } /* End populate_dot11f_power_caps. */
 
 QDF_STATUS
@@ -8242,26 +8249,33 @@ populate_dot11f_twt_he_cap(struct mac_context *mac_ctx,
  *
  * Populdate the HE capability IE based on the session.
  */
-QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_session *session,
+QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
+				   struct pe_session *session,
+				   enum QDF_OPMODE opmode, qdf_freq_t freq,
+				   enum phy_ch_width ch_width,
 				   tDot11fIEhe_cap *he_cap)
 {
-	uint8_t *ppet;
+	uint8_t *ppet, nss;
 	uint32_t value = 0;
 
 	he_cap->present = 1;
+	nss = session ? session->nss : WLAN_MAX_VDEV_NSS;
 
 	if (!session) {
 		qdf_mem_copy(he_cap, &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
 			     sizeof(tDot11fIEhe_cap));
-		return QDF_STATUS_SUCCESS;
+		if (!freq)
+			goto fill_nss;
+	} else {
+		/** TODO: String items needs attention. **/
+		qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
+		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
 	}
 
-	/** TODO: String items needs attention. **/
-	qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
 	if (he_cap->ppet_present) {
 		value = WNI_CFG_HE_PPET_LEN;
 		/* if session is present, populate PPET based on band */
-		if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
+		if (!wlan_reg_is_24ghz_ch_freq(freq))
 			qdf_mem_copy(he_cap->ppet.ppe_threshold.ppe_th,
 				     mac_ctx->mlme_cfg->he_caps.he_ppet_5g,
 				     value);
@@ -8276,28 +8290,34 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 	} else {
 		he_cap->ppet.ppe_threshold.num_ppe_th = 0;
 	}
-	populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
 
-	if (wlan_reg_is_5ghz_ch_freq(session->curr_op_freq) ||
-	    wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
-		if (session->ch_width <= CH_WIDTH_80MHZ) {
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(freq)) {
+		he_cap->chan_width_1 = 0;
+		he_cap->chan_width_2 = 0;
+		he_cap->chan_width_3 = 0;
+		he_cap->chan_width_5 = 0;
+		he_cap->chan_width_6 = 0;
+	} else {
+		he_cap->chan_width_0 = 0;
+		he_cap->chan_width_4 = 0;
+		he_cap->chan_width_6 = 0;
+		if (ch_width <= CH_WIDTH_80MHZ) {
 			he_cap->chan_width_2 = 0;
 			he_cap->chan_width_3 = 0;
-		} else if (session->ch_width == CH_WIDTH_160MHZ) {
+		} else if (ch_width == CH_WIDTH_160MHZ) {
 			he_cap->chan_width_3 = 0;
 		}
 	}
 
-	he_cap->rx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(session->nss);
-	he_cap->tx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(session->nss);
-	*(uint16_t *)he_cap->rx_he_mcs_map_160 |=
-					HE_DISABLE_MCS_OVER_NSS(session->nss);
-	*(uint16_t *)he_cap->tx_he_mcs_map_160 |=
-					HE_DISABLE_MCS_OVER_NSS(session->nss);
+fill_nss:
+	he_cap->rx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	he_cap->tx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	*(uint16_t *)he_cap->rx_he_mcs_map_160 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	*(uint16_t *)he_cap->tx_he_mcs_map_160 |= HE_DISABLE_MCS_OVER_NSS(nss);
 	*(uint16_t *)he_cap->rx_he_mcs_map_80_80 |=
-					HE_DISABLE_MCS_OVER_NSS(session->nss);
+					HE_DISABLE_MCS_OVER_NSS(nss);
 	*(uint16_t *)he_cap->tx_he_mcs_map_80_80 |=
-					HE_DISABLE_MCS_OVER_NSS(session->nss);
+					HE_DISABLE_MCS_OVER_NSS(nss);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -8308,6 +8328,9 @@ populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 				tDot11fIEhe_cap *he_cap,
 				struct pe_session *session)
 {
+	uint8_t *ppet;
+	uint32_t ppet_value = 0;
+
 	if (is_2g) {
 		qdf_mem_copy(he_cap, &mac_ctx->he_cap_2g, sizeof(*he_cap));
 		if (session) {
@@ -8322,6 +8345,23 @@ populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 
 	if (session)
 		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
+
+	if (he_cap->ppet_present) {
+		ppet_value = WNI_CFG_HE_PPET_LEN;
+		if (!is_2g)
+			qdf_mem_copy(he_cap->ppet.ppe_threshold.ppe_th,
+				     mac_ctx->mlme_cfg->he_caps.he_ppet_5g,
+				     ppet_value);
+		else
+			qdf_mem_copy(he_cap->ppet.ppe_threshold.ppe_th,
+				     mac_ctx->mlme_cfg->he_caps.he_ppet_2g,
+				     ppet_value);
+		ppet = he_cap->ppet.ppe_threshold.ppe_th;
+		he_cap->ppet.ppe_threshold.num_ppe_th =
+					lim_truncate_ppet(ppet, ppet_value);
+	} else {
+		he_cap->ppet.ppe_threshold.num_ppe_th = 0;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -13885,8 +13925,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	struct wlan_mlo_eml_cap eml_cap = {0};
 	uint16_t presence_bitmap = 0;
 	bool is_2g;
-	uint32_t value = 0;
-	uint8_t *ppet, cb_mode;
+	uint8_t cb_mode;
 	uint8_t *eht_cap_ie = NULL;
 	bool sta_prof_he_ie = false;
 
@@ -14304,23 +14343,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 
 		populate_dot11f_he_caps_by_band(mac_ctx, is_2g, &he_caps,
 						pe_session);
-		if (he_caps.ppet_present) {
-			value = WNI_CFG_HE_PPET_LEN;
-			if (!is_2g)
-				qdf_mem_copy(he_caps.ppet.ppe_threshold.ppe_th,
-					mac_ctx->mlme_cfg->he_caps.he_ppet_5g,
-					value);
-			else
-				qdf_mem_copy(he_caps.ppet.ppe_threshold.ppe_th,
-					mac_ctx->mlme_cfg->he_caps.he_ppet_2g,
-					value);
 
-			ppet = he_caps.ppet.ppe_threshold.ppe_th;
-			he_caps.ppet.ppe_threshold.num_ppe_th =
-				lim_truncate_ppet(ppet, value);
-		} else {
-			he_caps.ppet.ppe_threshold.num_ppe_th = 0;
-		}
 		if ((he_caps.present && frm->he_cap.present &&
 		     qdf_mem_cmp(&he_caps, &frm->he_cap, sizeof(he_caps))) ||
 		     (he_caps.present && !frm->he_cap.present)) {
@@ -14357,8 +14380,13 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		}
 		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps,
 						 NULL);
-		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
+		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq)) {
 			eht_caps.support_320mhz_6ghz = 0;
+			eht_caps.bfee_ss_320mhz = 0;
+		}
+
+		if (!eht_caps.support_320mhz_6ghz || !eht_caps.su_beamformer)
+			eht_caps.num_sounding_dim_320mhz = 0;
 
 		if ((eht_caps.present && frm->eht_cap.present &&
 		     qdf_mem_cmp(&eht_caps, &frm->eht_cap, sizeof(eht_caps))) ||

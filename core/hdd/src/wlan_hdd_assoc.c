@@ -1625,8 +1625,14 @@ QDF_STATUS hdd_roam_register_sta(struct wlan_hdd_link_info *link_info,
 	}
 	txrx_desc.bw = hdd_convert_ch_width_to_cdp_peer_bw(ch_width);
 
-	if (adapter->device_mode == QDF_STA_MODE)
+#ifdef WLAN_LOCAL_PKT_CAPTURE_SUBFILTER
+	if (adapter->device_mode == QDF_STA_MODE) {
 		txrx_desc.beacon_interval = ucfg_mlme_get_beacon_interval(vdev);
+		qdf_mem_copy(txrx_desc.self_link_addr.bytes,
+			     hdd_adapter_get_link_mac_addr(link_info),
+			     QDF_MAC_ADDR_SIZE);
+	}
+#endif
 
 	qdf_status = cdp_peer_register(soc, OL_TXRX_PDEV_ID, &txrx_desc);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {

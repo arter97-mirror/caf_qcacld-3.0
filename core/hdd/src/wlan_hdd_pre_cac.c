@@ -445,6 +445,7 @@ pre_cac_adapter_created:
 		goto stop_close_pre_cac_adapter;
 	}
 
+	ucfg_pre_cac_clear_work(hdd_ctx->psoc);
 	ucfg_pre_cac_set_freq_before_pre_cac(link_info->vdev,
 					     hdd_ap_ctx->operating_chan_freq);
 	ucfg_pre_cac_set_freq(link_info->vdev, pre_cac_chan_freq);

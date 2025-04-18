@@ -88,6 +88,7 @@
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_epcs_api.h"
 #include "wlan_nan_api_i.h"
+#include "wlan_mlme_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -8165,6 +8166,7 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 {
 	bool support_2x2 = false;
 	uint32_t self_sta_dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
+	uint16_t sap_rx_he_mcs_map_160;
 
 	if (!IS_DOT11_MODE_HE(self_sta_dot11mode))
 		return QDF_STATUS_SUCCESS;
@@ -8229,6 +8231,15 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 			nss,
 			*((uint16_t *)mac_ctx->he_cap_5g.rx_he_mcs_map_160),
 			*((uint16_t *)mac_ctx->he_cap_5g.tx_he_mcs_map_160));
+
+		if (LIM_IS_AP_ROLE(session_entry)) {
+			sap_rx_he_mcs_map_160 =
+				wlan_mlme_get_sap_he_rx_mcs_map_160(mac_ctx->psoc);
+			rates->rx_he_mcs_map_160 =
+				wlan_mlme_get_min_he_mcs_map(sap_rx_he_mcs_map_160,
+							     rates->rx_he_mcs_map_160);
+		}
+
 	} else {
 		rates->tx_he_mcs_map_160 = HE_MCS_ALL_DISABLED;
 		rates->rx_he_mcs_map_160 = HE_MCS_ALL_DISABLED;

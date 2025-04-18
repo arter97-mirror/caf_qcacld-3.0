@@ -6792,7 +6792,7 @@ void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 		wlan_diag_event.subtype =
 					WLAN_CONN_DIAG_ROAM_SCORE_CAND_AP_EVENT;
 
-	wlan_diag_event.version = DIAG_ROAM_CAND_VERSION_V2;
+	wlan_diag_event.version = DIAG_ROAM_CAND_VERSION_V3;
 	wlan_diag_event.rssi = (-1) * ap->rssi;
 	wlan_diag_event.cu_load = ap->cu_load;
 	wlan_diag_event.total_score = ap->total_score;
@@ -7093,6 +7093,7 @@ cm_find_roam_candidate(struct wlan_objmgr_pdev *pdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
 
 #if (defined(CONNECTIVITY_DIAG_EVENT) && defined(WLAN_FEATURE_ROAM_OFFLOAD))
 void
@@ -7221,6 +7222,7 @@ bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS
 cm_send_roam_invoke_req(struct cnx_mgr *cm_ctx, struct cm_req *req)
 {

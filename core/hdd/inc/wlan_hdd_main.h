@@ -823,7 +823,9 @@ enum bss_stop_reason {
  * @mcs: mcs index for HT/VHT mode
  * @rate_flags: rate flags for last tx/rx
  * @gi: Guard interval used
+ * @bw: band width
  * @dcm: dual carrier modulation enabled
+ * @version: version of rate_info
  *
  * rate info in HDD
  */
@@ -834,7 +836,9 @@ struct hdd_rate_info {
 	uint8_t mcs;
 	enum tx_rate_info rate_flags;
 	enum txrate_gi gi;
+	uint8_t bw;
 	uint8_t dcm;
+	uint8_t version;
 };
 
 enum hdd_work_status {
@@ -1378,6 +1382,7 @@ enum wfc_state_latency_level {
  * @discon_link_info: link_info pointer on which post disconnect stats to be
  *                    fetched
  * @wfd_mode: WFD mode for P2P interface
+ * @enable_active_apf_mode: Enable active APF mode flag
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1580,6 +1585,7 @@ struct hdd_adapter {
 #ifdef FEATURE_WLAN_SUPPORT_USD
 	uint8_t wfd_mode;
 #endif
+	bool enable_active_apf_mode;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
@@ -2142,6 +2148,7 @@ enum wlan_state_ctrl_str_id {
  * @twt_en_dis_work: work to send twt enable/disable cmd on MCC/SCC concurrency
  * @is_wifi3_0_target:
  * @dump_in_progress: Stores value of dump in progress
+ * @is_drv_dump_in_progress_valid: Is dump_inprogress sysfs node is valid
  * @max_chipset_log_size_enable: ini flag to enable/disable max_chipset_log_size
  * @max_chipset_log_size: Stores max chipset log size value
  * @dual_sta_policy: Concurrent STA policy configuration
@@ -2427,6 +2434,7 @@ struct hdd_context {
 #endif
 	bool is_wifi3_0_target;
 	bool dump_in_progress;
+	bool is_drv_dump_in_progress_valid;
 	bool max_chipset_log_size_enable;
 	uint16_t max_chipset_log_size;
 	struct hdd_dual_sta_policy dual_sta_policy;

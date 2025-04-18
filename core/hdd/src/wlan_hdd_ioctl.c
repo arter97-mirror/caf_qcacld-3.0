@@ -3243,7 +3243,7 @@ exit:
 }
 
 #ifdef FEATURE_WLAN_APF
-static void hdd_enable_active_apf_mode(struct wlan_hdd_link_info *link_info)
+void hdd_enable_active_apf_mode(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
@@ -3252,23 +3252,13 @@ static void hdd_enable_active_apf_mode(struct wlan_hdd_link_info *link_info)
 				       adapter->mac_addr.bytes, link_info->vdev_id);
 }
 
-static void hdd_disable_active_apf_mode(struct wlan_hdd_link_info *link_info)
+void hdd_disable_active_apf_mode(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	sme_disable_active_apf_mode_ind(hdd_ctx->mac_handle, adapter->device_mode,
 					adapter->mac_addr.bytes, link_info->vdev_id);
-}
-#else
-static void
-hdd_enable_active_apf_mode(struct wlan_hdd_link_info *link_info)
-{
-}
-
-static void
-hdd_disable_active_apf_mode(struct wlan_hdd_link_info *link_info)
-{
 }
 #endif
 
@@ -3283,6 +3273,7 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 	uint8_t *value = command;
 	QDF_STATUS status;
 	uint8_t idle_monitor;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (QDF_STA_MODE != adapter->device_mode) {
 		hdd_debug("Non-STA interface");
@@ -3313,10 +3304,28 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 	}
 
 	if (ucfg_pmo_is_configure_apf_per_screen_state(hdd_ctx->psoc)) {
-		if (idle_monitor == 0)
+		if (idle_monitor == 0) {
 			hdd_disable_active_apf_mode(link_info);
-		else if (idle_monitor == 1)
-			hdd_enable_active_apf_mode(link_info);
+			adapter->enable_active_apf_mode = false;
+		} else if (idle_monitor == 1) {
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
+							   WLAN_OSIF_ID);
+			if (!vdev) {
+				hdd_err("vdev is NULL");
+				return -EINVAL;
+			}
+
+			if (ucfg_cm_is_vdev_connected(vdev)) {
+				hdd_enable_active_apf_mode(link_info);
+				adapter->enable_active_apf_mode = false;
+			} else {
+				hdd_debug("vdev:%d not in connected state",
+					  link_info->vdev_id);
+				adapter->enable_active_apf_mode = true;
+			}
+
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		}
 	}
 
 	status = ucfg_pmo_tgt_psoc_send_idle_roam_suspend_mode(hdd_ctx->psoc,

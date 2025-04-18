@@ -1,5 +1,6 @@
 targets = [
     # keep sorted
+    "autogvm",
     "canoe",
     "gen3auto",
     "sun",

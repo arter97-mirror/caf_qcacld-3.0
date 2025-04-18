@@ -882,6 +882,9 @@ struct wlan_diag_bcn_rpt {
 #define DIAG_ROAM_CAND_VERSION 1
 #define DIAG_ROAM_CAND_VERSION_V2 2
 
+/* Version 3 includes the etp value of Current AP */
+#define DIAG_ROAM_CAND_VERSION_V3 3
+
 /**
  * struct wlan_diag_roam_candidate_info  - Roam candidate information for
  * logging

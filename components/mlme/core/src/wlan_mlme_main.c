@@ -2453,6 +2453,8 @@ static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_DISABLE_SAP_BCN_PROT);
 	sap_cfg->sap_ps_with_twt_enable =
 		cfg_get(psoc, CFG_SAP_PS_WITH_TWT);
+	sap_cfg->sap_he_rx_mcs_map_160 =
+		cfg_get(psoc, CFG_SAP_HE_RX_MCS_MAP_160);
 	mlme_init_sap_mlo_cfg(psoc, sap_cfg);
 	sap_cfg->is_dual_sap_sta_enable =
 		cfg_get(psoc, CFG_SAP_SAP_STA_CONCURRENCY);
@@ -3166,6 +3168,37 @@ static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
 	lfr->beaconloss_timeout_onsleep =
 		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP) / 2;
 }
+
+/**
+ * mlme_init_roam_periodic_scan_interval() - Init roam_periodic_scan_interval
+ * @psoc: Pointer to psoc
+ * @lfr: Pointer to lfr config
+ *
+ * Return: None
+ */
+static void mlme_init_roam_periodic_scan_interval(struct wlan_objmgr_psoc *psoc,
+						  struct wlan_mlme_lfr_cfg *lfr)
+{
+	lfr->roam_periodic_scan_interval = cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
+}
+
+/**
+ * mlme_init_band_weightage() -Init band_weightage
+ * @psoc: Pointer to psoc
+ * @scoring_cfg: Pointer to scoring_cfg
+ *
+ * Return: None
+ */
+static void mlme_init_band_weightage(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_mlme_roam_scoring_cfg *scoring_cfg)
+{
+	scoring_cfg->band_2g_weightage =
+			cfg_get(psoc, CFG_SCORING_2G_BAND_WEIGHTAGE);
+	scoring_cfg->band_5g_weightage =
+			cfg_get(psoc, CFG_SCORING_5G_BAND_WEIGHTAGE);
+	scoring_cfg->band_6g_weightage =
+			cfg_get(psoc, CFG_SCORING_6G_BAND_WEIGHTAGE);
+}
 #else
 static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_mlme_lfr_cfg *lfr)
@@ -3174,6 +3207,16 @@ static void mlme_init_bmiss_timeout(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP);
 	lfr->beaconloss_timeout_onsleep =
 		cfg_get(psoc, CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP);
+}
+
+static void mlme_init_roam_periodic_scan_interval(struct wlan_objmgr_psoc *psoc,
+						  struct wlan_mlme_lfr_cfg *lfr)
+{
+}
+
+static void mlme_init_band_weightage(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_mlme_roam_scoring_cfg *scoring_cfg)
+{
 }
 #endif
 
@@ -3375,6 +3418,7 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_bmiss_timeout(psoc, lfr);
 	lfr->hs20_btm_offload_disable = cfg_get(psoc,
 						CFG_HS_20_BTM_OFFLOAD_DISABLE);
+	mlme_init_roam_periodic_scan_interval(psoc, lfr);
 }
 
 static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,
@@ -3431,6 +3475,8 @@ static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA);
 	scoring_cfg->roam_aggre_score_delta =
 			cfg_get(psoc, CFG_AGGRESSIVE_ROAM_SCORE_DELTA);
+
+	mlme_init_band_weightage(psoc, scoring_cfg);
 }
 
 static void mlme_init_oce_cfg(struct wlan_objmgr_psoc *psoc,

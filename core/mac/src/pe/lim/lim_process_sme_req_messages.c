@@ -818,7 +818,9 @@ lim_save_max_mcs_idx(struct mac_context *mac_ctx, struct pe_session *session)
 
 	if (IS_DOT11_MODE_HE(session->dot11mode)) {
 		qdf_mem_zero(&he_cap, sizeof(tDot11fIEhe_cap));
-		populate_dot11f_he_caps(mac_ctx, session, &he_cap);
+		populate_dot11f_he_caps(mac_ctx, session, session->opmode,
+					session->curr_op_freq,
+					session->ch_width, &he_cap);
 		session_max_mcs_idx = lim_get_he_max_mcs_idx(session->ch_width,
 							     &he_cap);
 	}
@@ -8653,7 +8655,7 @@ static void lim_parse_and_update_wmm_params(struct mac_context *mac_ctx,
 					    struct pe_session *pe_session,
 					    const uint8_t *ie, uint16_t ie_len)
 {
-	tDot11fIEWMMParams wmm_params;
+	tDot11fIEWMMParams wmm_params = {0};
 	uint32_t *ac_params;
 	uint32_t params[QCA_WLAN_AC_ALL][CFG_EDCA_DATA_LEN];
 	QDF_STATUS status;
@@ -9772,11 +9774,11 @@ lim_calculate_peer_ch_width(struct pe_session *session,
 			    uint8_t *mac_addr,
 			    enum phy_ch_width new_ch_width)
 {
-	enum phy_ch_width peer_org_bw, updated_bw;
+	enum phy_ch_width peer_max_bw, updated_bw;
 	struct peer_oper_mode_event data = {0};
 	QDF_STATUS status;
 
-	peer_org_bw = wlan_mlme_get_peer_ch_width(
+	peer_max_bw = wlan_mlme_get_max_peer_ch_width(
 				wlan_vdev_get_psoc(session->vdev), mac_addr);
 
 	updated_bw = new_ch_width;
@@ -9787,11 +9789,11 @@ lim_calculate_peer_ch_width(struct pe_session *session,
 	if (QDF_IS_STATUS_SUCCESS(status))
 		updated_bw = data.new_bw;
 
-	pe_debug("Peer: " QDF_MAC_ADDR_FMT " original bw: %d, updated bw: %d, new bw: %d",
-		 QDF_MAC_ADDR_REF(mac_addr), peer_org_bw, updated_bw,
+	pe_debug("Peer: " QDF_MAC_ADDR_FMT " dot11 max bw %d, peer updated bw %d, new target bw %d",
+		 QDF_MAC_ADDR_REF(mac_addr), peer_max_bw, updated_bw,
 		 new_ch_width);
 
-	return qdf_min(peer_org_bw, qdf_min(updated_bw, new_ch_width));
+	return qdf_min(peer_max_bw, qdf_min(updated_bw, new_ch_width));
 }
 
 static void

@@ -1049,4 +1049,16 @@ hdd_cstats_log_ndi_create_req_evt(struct wlan_objmgr_vdev *vdev,
 {
 }
 #endif /* WLAN_CHIPSET_STATS */
+
+/**
+ * wlan_hdd_fill_rate_info() - fill HDD rate info from peer info
+ * @txrx_stats: pointer to txrx stats to be filled with rate info
+ * @peer_info: peer info pointer
+ *
+ * This function is used to fill HDD rate info from peer info
+ *
+ * Return: None
+ */
+void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
+			     struct peer_stats_info_ext_event *peer_info);
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */

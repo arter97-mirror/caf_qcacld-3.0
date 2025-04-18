@@ -622,7 +622,9 @@ typedef struct tagCsrSummaryStatsInfo {
 typedef struct tagCsrGlobalClassAStatsInfo {
 	uint8_t tx_nss;
 	uint8_t rx_nss;
+	uint8_t tx_preamble;
 	uint8_t rx_preamble;
+	uint8_t tx_bw;
 	uint8_t rx_bw;
 	uint32_t max_pwr;
 	uint32_t tx_rate;
@@ -638,7 +640,8 @@ typedef struct tagCsrGlobalClassAStatsInfo {
 	enum txrate_gi  rx_gi;
 	/* to diff between HT20 & HT40 rates;short & long guard interval */
 	enum tx_rate_info tx_rx_rate_flags;
-
+	uint8_t tx_rate_version;
+	uint8_t is_tx_rate_version_checked;
 } tCsrGlobalClassAStatsInfo;
 
 typedef struct tagCsrGlobalClassDStatsInfo {

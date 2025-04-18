@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -74,6 +74,9 @@
 # define ROAMCU_6GRSSIRANGE_MAX -50
 # define ROAMCU_6GRSSIRANGE_DEFAULT -70
 # define RoamIdle_InactiveTime_default 5
+# define RoamScan_Period_min 0
+# define RoamScan_Period_max 20
+# define RoamScan_Period_default 0
 #else
 # define RoamScan_ActiveCH_DwellTime_min 3
 # define RoamScan_ActiveCH_DwellTime_max 300
@@ -3395,6 +3398,42 @@
 		true, \
 		"To Enable/disable BTM offload for hotspot 2.0")
 
+#ifdef CONNECTION_ROAMING_CFG
+/*
+ * <ini>
+ * RoamScan_Period - To configure the periodic roam scan period (in secs)
+ * to firmware.
+ * @Min: 0
+ * @Max: 20
+ * @Default: 0
+ *
+ * After low RSSI roaming is triggered, the STA performs periodic partial
+ * scans every RoamScan_Period interval until either either roaming is
+ * successful or RSSI recovers above the threshold. When this value is 0,
+ * we use gEmptyScanRefreshPeriod value which is not periodic.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_SCAN_PERIOD CFG_INI_UINT( \
+	"RoamScan_Period", \
+	RoamScan_Period_min, \
+	RoamScan_Period_max, \
+	RoamScan_Period_default, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Roam Scan Period")
+
+#define CFG_CONNECTION_ROAMING_CFG \
+	CFG(CFG_ROAM_SCAN_PERIOD)
+#else
+#define CFG_CONNECTION_ROAMING_CFG
+#endif
+
 #define CFG_LFR_ALL \
 	CFG(CFG_LFR_MAWC_ROAM_ENABLED) \
 	CFG(CFG_LFR_MAWC_ROAM_TRAFFIC_THRESHOLD) \
@@ -3499,6 +3538,7 @@
 	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP) \
 	CFG(CFG_LFR3_ROAM_INFO_STATS_NUM) \
 	CFG(CFG_HS_20_BTM_OFFLOAD_DISABLE) \
-	CFG(CFG_LFR_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD)
+	CFG(CFG_LFR_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD) \
+	CFG_CONNECTION_ROAMING_CFG
 
 #endif /* CFG_MLME_LFR_H__ */

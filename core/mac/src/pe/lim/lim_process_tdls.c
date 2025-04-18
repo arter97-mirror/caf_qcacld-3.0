@@ -1141,7 +1141,8 @@ static void populate_dot11f_set_tdls_he_cap(struct mac_context *mac,
 					    struct pe_session *session)
 {
 	if (IS_DOT11_MODE_HE(selfDot11Mode)) {
-		populate_dot11f_he_caps(mac, NULL, heCap);
+		populate_dot11f_he_caps(mac, NULL, session->opmode,
+					0, CH_WIDTH_20MHZ, heCap);
 		lim_tdls_set_he_chan_width(mac, heCap, session,
 		      wlan_cfg80211_tdls_is_fw_wideband_capable(session->vdev));
 		lim_tdls_populate_ppe_caps(mac, session, heCap);

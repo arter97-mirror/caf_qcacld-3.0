@@ -1044,6 +1044,39 @@ static inline bool dp_nbuf_dst_addr_is_mld_addr(struct wlan_dp_intf *dp_intf,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void dp_softap_update_eapol_da_non_mld_peer(struct wlan_dp_link *dp_link,
+						   qdf_nbuf_t nbuf)
+{
+	struct qdf_mac_addr *src_mac;
+	struct cdp_peer_output_param peer_info = {0};
+	struct wlan_dp_intf *dp_intf = NULL;
+	struct wlan_dp_psoc_context *dp_ctx = NULL;
+
+	src_mac = (struct qdf_mac_addr *)qdf_nbuf_data(nbuf) +
+		   QDF_NBUF_SRC_MAC_OFFSET;
+	dp_intf = dp_link->dp_intf;
+	dp_ctx = dp_intf->dp_ctx;
+
+	cdp_peer_get_info_by_peer_addr(dp_ctx->cdp_soc,
+				       src_mac->bytes,
+				       dp_link->link_id,
+				       &peer_info);
+	if (peer_info.mld_peer)
+		return;
+
+	qdf_mem_copy(qdf_nbuf_data(nbuf) + QDF_NBUF_DEST_MAC_OFFSET,
+		     &dp_intf->mac_addr, QDF_MAC_ADDR_SIZE);
+	dp_debug_rl("update DA to " QDF_MAC_ADDR_FMT,
+		    QDF_MAC_ADDR_REF(dp_intf->mac_addr.bytes));
+}
+#else
+static void dp_softap_update_eapol_da_non_mld_peer(struct wlan_dp_link *dp_link,
+						   qdf_nbuf_t nbuf)
+{
+}
+#endif
+
 QDF_STATUS dp_softap_rx_packet_cbk(void *link_ctx, qdf_nbuf_t rx_buf)
 {
 	struct wlan_dp_intf *dp_intf = NULL;
@@ -1102,6 +1135,9 @@ QDF_STATUS dp_softap_rx_packet_cbk(void *link_ctx, qdf_nbuf_t rx_buf)
 			qdf_nbuf_free(nbuf);
 			continue;
 		}
+
+		if (qdf_unlikely(is_eapol))
+			dp_softap_update_eapol_da_non_mld_peer(dp_link, nbuf);
 
 		wlan_dp_pkt_add_timestamp(dp_intf,
 					  QDF_PKT_RX_DRIVER_EXIT, nbuf);

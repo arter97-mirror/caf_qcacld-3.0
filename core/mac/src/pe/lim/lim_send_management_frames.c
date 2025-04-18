@@ -349,7 +349,9 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (IS_DOT11_MODE_HE(dot11mode) && pesession)
 		lim_update_session_he_capable(mac_ctx, pesession);
 
-	populate_dot11f_he_caps(mac_ctx, pesession, &pr->he_cap);
+	populate_dot11f_he_caps(mac_ctx, pesession, pesession->opmode,
+				pesession->curr_op_freq, pesession->ch_width,
+				&pr->he_cap);
 	populate_dot11f_he_6ghz_cap(mac_ctx, pesession,
 				    &pr->he_6ghz_band_cap);
 
@@ -830,8 +832,9 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 	if (lim_is_session_he_capable(pe_session)) {
 		pe_debug("Populate HE IEs");
-		populate_dot11f_he_caps(mac_ctx, pe_session,
-					&frm->he_cap);
+		populate_dot11f_he_caps(mac_ctx, pe_session, pe_session->opmode,
+					pe_session->curr_op_freq,
+					pe_session->ch_width, &frm->he_cap);
 		populate_dot11f_he_operation(mac_ctx, pe_session,
 					     &frm->he_op);
 		populate_dot11f_sr_info(mac_ctx, pe_session,
@@ -1167,13 +1170,15 @@ void lim_send_channel_usage_req_notif_cap_action_frame(uint8_t vdev_id)
 	if (wlan_reg_is_5ghz_ch_freq(freq) ||
 	    (wlan_reg_is_24ghz_ch_freq(freq) &&
 	     mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band)) {
-		populate_dot11f_vht_caps(mac_ctx, NULL, &frm.VHTCaps);
+		populate_dot11f_vht_caps(mac_ctx, session, &frm.VHTCaps);
 	}
 
 	if (lim_is_session_he_capable(session)) {
-		populate_dot11f_he_caps(mac_ctx, NULL, &frm.he_cap);
+		populate_dot11f_he_caps(mac_ctx, NULL, session->opmode,
+					session->curr_op_freq,
+					session->ch_width, &frm.he_cap);
 		if (wlan_reg_is_6ghz_chan_freq(freq)) {
-			populate_dot11f_he_6ghz_cap(mac_ctx, NULL,
+			populate_dot11f_he_6ghz_cap(mac_ctx, session,
 						    &frm.he_6ghz_band_cap);
 		}
 	}
@@ -1255,6 +1260,9 @@ void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
 	void *pkt_ptr = NULL;
 	uint8_t *frame_ptr;
 	uint8_t tx_flag = 0;
+	uint16_t bw;
+	enum phy_ch_width ch_width;
+	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
 	tpSirMacMgmtHdr mac_hdr;
 	uint32_t status, num_bytes, payload;
 	struct policy_mgr_pcl_list pcl = {0};
@@ -1304,6 +1312,8 @@ void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
 		} else {
 			freq = wlan_reg_legacy_chan_to_freq(pdev, req_chan);
 		}
+		opclass = req_op_class;
+		chan_num = req_chan;
 	} else if (pcl.pcl_len) {
 		wlan_reg_freq_to_chan_op_class(pdev, pcl.pcl_list[0], true,
 					       BIT(BEHAV_NONE), &opclass,
@@ -1324,6 +1334,11 @@ void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
 	if (!freq)
 		goto pack_frame;
 
+	wlan_reg_read_current_country(mac_ctx->psoc, country_code);
+	bw = wlan_reg_dmn_get_chanwidth_from_opclass_auto(country_code,
+							  chan_num, opclass);
+	ch_width = wlan_reg_find_chwidth_from_bw(bw);
+
 	populate_dot11f_ht_caps(mac_ctx, session, &frm->HTCaps);
 
 	if (wlan_reg_is_5ghz_ch_freq(freq) ||
@@ -1333,7 +1348,8 @@ void lim_send_channel_usage_req_action_frame(struct mac_context *mac_ctx,
 	}
 
 	if (lim_is_session_he_capable(session)) {
-		populate_dot11f_he_caps(mac_ctx, NULL, &frm->he_cap);
+		populate_dot11f_he_caps(mac_ctx, NULL, session->opmode,
+					freq, ch_width, &frm->he_cap);
 		if (wlan_reg_is_6ghz_chan_freq(freq)) {
 			populate_dot11f_he_6ghz_cap(mac_ctx, NULL,
 						    &frm->he_6ghz_band_cap);
@@ -2392,6 +2408,9 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		if (lim_is_sta_he_capable(sta) &&
 		    lim_is_session_he_capable(pe_session)) {
 			populate_dot11f_he_caps(mac_ctx, pe_session,
+						pe_session->opmode,
+						pe_session->curr_op_freq,
+						pe_session->ch_width,
 						&frm.he_cap);
 			populate_dot11f_sr_info(mac_ctx, pe_session,
 						&frm.spatial_reuse);
@@ -3516,12 +3535,14 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		lim_update_session_he_capable(mac_ctx, pe_session);
 
 	if (lim_is_session_he_capable(pe_session)) {
-		populate_dot11f_he_caps(mac_ctx, pe_session,
-					&frm->he_cap);
+		populate_dot11f_he_caps(mac_ctx, pe_session, pe_session->opmode,
+					pe_session->curr_op_freq,
+					pe_session->ch_width, &frm->he_cap);
 		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
 					    &frm->he_6ghz_band_cap);
 	} else if (pe_session->he_with_wep_tkip) {
-		populate_dot11f_he_caps(mac_ctx, NULL, &frm->he_cap);
+		populate_dot11f_he_caps(mac_ctx, NULL, pe_session->opmode,
+					0, CH_WIDTH_20MHZ, &frm->he_cap);
 		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
 					    &frm->he_6ghz_band_cap);
 	}
