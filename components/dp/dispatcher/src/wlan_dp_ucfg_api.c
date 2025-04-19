@@ -2488,6 +2488,10 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 		cb_obj->osif_dp_process_mic_error;
 	dp_ctx->dp_ops.link_monitoring_cb = cb_obj->link_monitoring_cb;
 	dp_ctx->dp_ops.dp_get_ndev_by_vdev_id = cb_obj->dp_get_ndev_by_vdev_id;
+	dp_ctx->dp_ops.dp_lpc_acquire_wakelock =
+					cb_obj->dp_lpc_acquire_wakelock;
+	dp_ctx->dp_ops.dp_lpc_release_wakelock =
+					cb_obj->dp_lpc_release_wakelock;
 	ucfg_dp_register_direct_link_hdd_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_ipa_wds_hdd_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_stc_hdd_cbs(dp_ctx, cb_obj);
@@ -3216,6 +3220,28 @@ bool ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
+}
+
+QDF_STATUS ucfg_dp_lpc_acquire_wakelock(void)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx) {
+		dp_err("Failed to get flag dp_ctx NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	return dp_ctx->dp_ops.dp_lpc_acquire_wakelock();
+}
+
+QDF_STATUS ucfg_dp_lpc_release_wakelock(void)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx) {
+		dp_err("Failed to get flag dp_ctx NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	return dp_ctx->dp_ops.dp_lpc_release_wakelock();
 }
 #endif
 

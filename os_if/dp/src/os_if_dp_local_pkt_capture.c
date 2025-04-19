@@ -295,6 +295,16 @@ error:
 	return status;
 }
 #else
+static QDF_STATUS
+os_if_dp_set_pkt_capture_filters(struct cdp_monitor_filter *filter,
+				 struct wlan_objmgr_psoc *psoc)
+{
+	if (!ucfg_dp_is_lpc_full_pkt_enabled(psoc))
+		return QDF_STATUS_SUCCESS;
+
+	return ucfg_pkt_capture_set_filter(filter, psoc);
+}
+
 static
 QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 					    struct nlattr **tb)
@@ -302,6 +312,7 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	struct cdp_monitor_filter filter = {0};
 	uint32_t pkt_type = 0, val;
+	static bool is_lpc_suspended;
 	void *soc;
 
 	status = os_if_start_capture_allowed(vdev);
@@ -314,68 +325,80 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 
 	if (tb[SET_MONITOR_MODE_MGMT_TX_FRAME_TYPE]) {
 		val = nla_get_u32(tb[SET_MONITOR_MODE_MGMT_TX_FRAME_TYPE]);
-		if (!val && val > MGMT_MAX_FILTER) {
+		if (val > MGMT_MAX_FILTER) {
 			osif_err("Invalid value Mgmt filter");
 			status = QDF_STATUS_E_INVAL;
 			goto error;
 		}
-		filter.fp_subfilter.mgmt_tx_frame_filter = val;
-		pkt_type |= BIT(MGMT_FRAME_TYPE);
+		if (val) {
+			filter.fp_subfilter.mgmt_tx_frame_filter = val;
+			pkt_type |= BIT(MGMT_FRAME_TYPE);
+		}
 	}
 
 	if (tb[SET_MONITOR_MODE_MGMT_RX_FRAME_TYPE]) {
 		val = nla_get_u32(tb[SET_MONITOR_MODE_MGMT_RX_FRAME_TYPE]);
-		if (!val && val > MGMT_MAX_FILTER) {
+		if (val > MGMT_MAX_FILTER) {
 			osif_err("Invalid value Mgmt filter");
 			status = QDF_STATUS_E_INVAL;
 			goto error;
 		}
-		filter.fp_subfilter.mgmt_rx_frame_filter = val;
-		pkt_type |= BIT(MGMT_FRAME_TYPE);
+		if (val) {
+			filter.fp_subfilter.mgmt_rx_frame_filter = val;
+			pkt_type |= BIT(MGMT_FRAME_TYPE);
+		}
 	}
 
 	if (tb[SET_MONITOR_MODE_DATA_TX_FRAME_TYPE]) {
 		val = nla_get_u32(tb[SET_MONITOR_MODE_DATA_TX_FRAME_TYPE]);
-		if (!val && val > DATA_MAX_FILTER) {
+		if (val > DATA_MAX_FILTER) {
 			osif_err("Invalid value Data filter");
 			status = QDF_STATUS_E_INVAL;
 			goto error;
 		}
-		filter.fp_subfilter.data_tx_frame_filter = val;
-		pkt_type |= BIT(DATA_FRAME_TYPE);
+		if (val) {
+			filter.fp_subfilter.data_tx_frame_filter = val;
+			pkt_type |= BIT(DATA_FRAME_TYPE);
+		}
 	}
 
 	if (tb[SET_MONITOR_MODE_DATA_RX_FRAME_TYPE]) {
 		val = nla_get_u32(tb[SET_MONITOR_MODE_DATA_RX_FRAME_TYPE]);
-		if (!val && val > DATA_MAX_FILTER) {
+		if (val > DATA_MAX_FILTER) {
 			osif_err("Invalid value Data filter");
 			status = QDF_STATUS_E_INVAL;
 			goto error;
 		}
-		filter.fp_subfilter.data_rx_frame_filter = val;
-		pkt_type |= BIT(DATA_FRAME_TYPE);
+		if (val) {
+			filter.fp_subfilter.data_rx_frame_filter = val;
+			pkt_type |= BIT(DATA_FRAME_TYPE);
+		}
 	}
 
 	if (tb[SET_MONITOR_MODE_CTRL_TX_FRAME_TYPE]) {
 		val = nla_get_u32(tb[SET_MONITOR_MODE_CTRL_TX_FRAME_TYPE]);
-		if (!val && val > CTRL_MAX_FILTER) {
+		if (val > CTRL_MAX_FILTER) {
 			osif_err("Invalid value Ctrl filter");
 			status = QDF_STATUS_E_INVAL;
 			goto error;
 		}
-		filter.fp_subfilter.ctrl_tx_frame_filter = val;
-		pkt_type |= BIT(CTRL_FRAME_TYPE);
+		if (val) {
+			filter.fp_subfilter.ctrl_tx_frame_filter = val;
+			pkt_type |= BIT(CTRL_FRAME_TYPE);
+		}
 	}
 
 	if (tb[SET_MONITOR_MODE_CTRL_RX_FRAME_TYPE]) {
 		val = nla_get_u32(tb[SET_MONITOR_MODE_CTRL_RX_FRAME_TYPE]);
-		if (!val && val > CTRL_MAX_FILTER) {
+		if (val > CTRL_MAX_FILTER) {
 			osif_err("Invalid value Ctrl filter");
 			status = QDF_STATUS_E_INVAL;
 			goto error;
 		}
-		filter.fp_subfilter.ctrl_rx_frame_filter = val;
-		pkt_type |= BIT(CTRL_FRAME_TYPE);
+		if (val) {
+			filter.fp_subfilter.ctrl_rx_frame_filter = val;
+			pkt_type |= BIT(CTRL_FRAME_TYPE);
+		}
 	}
 
 	if (tb[SET_MONITOR_MODE_CONNECTED_BEACON_INTERVAL]) {
@@ -383,10 +406,31 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 		nla_get_u32(tb[SET_MONITOR_MODE_CONNECTED_BEACON_INTERVAL]);
 	}
 
-	if (pkt_type == 0) {
-		osif_err("Invalid config, pkt_type: %d", pkt_type);
-		status = QDF_STATUS_E_INVAL;
-		goto error;
+	if (pkt_type == 0 &&
+	    cdp_is_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID)) {
+		if (ucfg_dp_is_lpc_full_pkt_enabled(psoc))
+			ucfg_pkt_capture_suspend_mon_thread(psoc);
+
+		status = ucfg_dp_lpc_release_wakelock();
+
+		if (status != QDF_STATUS_SUCCESS) {
+			osif_err("failed to release monitor mode wakelock");
+			goto error;
+		}
+		is_lpc_suspended = true;
+		return status;
+	} else if (!cdp_is_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID) &&
+		   is_lpc_suspended) {
+		status = ucfg_dp_lpc_acquire_wakelock();
+
+		if (ucfg_dp_is_lpc_full_pkt_enabled(psoc))
+			ucfg_pkt_capture_resume_mon_thread(psoc);
+
+		if (status != QDF_STATUS_SUCCESS) {
+			osif_err("failed to acquire monitor mode wakelock");
+			goto error;
+		}
+		is_lpc_suspended = false;
 	}
 	osif_debug("start capture config pkt_type:0x%x", pkt_type);
 
@@ -394,6 +438,12 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 	filter.fp_mgmt = pkt_type & BIT(MGMT_FRAME_TYPE) ? FILTER_MGMT_ALL : 0;
 	filter.fp_data = pkt_type & BIT(DATA_FRAME_TYPE) ? FILTER_DATA_ALL : 0;
 	filter.fp_ctrl = pkt_type & BIT(CTRL_FRAME_TYPE) ? FILTER_CTRL_ALL : 0;
+
+	status = os_if_dp_set_pkt_capture_filters(&filter, psoc);
+	if (status != QDF_STATUS_SUCCESS) {
+		qdf_err("failed to enable full rx_mgmt_frames");
+		goto error;
+	}
 
 	status = cdp_start_local_pkt_capture(soc, OL_TXRX_PDEV_ID, &filter);
 

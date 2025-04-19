@@ -806,6 +806,8 @@ struct wlan_dp_stc_flow_samples {
  * @send_flow_stats_event: Callback to send flow stats vendor command
  * @send_flow_report_event: Callback to send flow report vendor command
  * @dp_get_ndev_by_vdev_id: Callback API to get net device reference by vdev id
+ * @dp_lpc_acquire_wakelock: Callback API to acquire monitor mode wakelock
+ * @dp_lpc_release_wakelock: Callback API to release monitor mode wakelock
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
@@ -914,6 +916,8 @@ struct wlan_dp_psoc_callbacks {
 #endif
 	QDF_STATUS (*dp_get_ndev_by_vdev_id)(uint32_t vdev_id,
 					     qdf_netdev_t *netdev);
+	QDF_STATUS (*dp_lpc_acquire_wakelock)(void);
+	QDF_STATUS (*dp_lpc_release_wakelock)(void);
 };
 
 /**

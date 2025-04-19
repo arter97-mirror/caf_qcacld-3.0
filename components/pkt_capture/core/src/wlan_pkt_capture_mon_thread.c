@@ -26,6 +26,9 @@
 #include "wlan_mgmt_txrx_utils_api.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_mgmt_txrx_utils_api.h"
+#ifdef WLAN_FEATURE_PKT_CAPTURE_V3
+#include "wlan_pkt_capture_tgt_api.h"
+#endif
 
 /*
  * The following commit was introduced in v5.17:
@@ -433,6 +436,14 @@ int pkt_capture_suspend_mon_thread(struct wlan_objmgr_vdev *vdev)
 		pkt_capture_err("packet capture mon context is NULL");
 		return -EINVAL;
 	}
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE_V3
+       status = tgt_pkt_capture_send_mode(vdev, PACKET_CAPTURE_MODE_DISABLE);
+       if (QDF_IS_STATUS_ERROR(status)) {
+		pkt_capture_err("Unable to send packet capture mode to fw");
+		goto release_vdev_ref;
+	}
+#endif
 
 	set_bit(PKT_CAPTURE_RX_SUSPEND_EVENT,
 		&mon_ctx->mon_event_flag);

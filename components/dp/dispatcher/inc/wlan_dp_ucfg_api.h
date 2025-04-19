@@ -1732,11 +1732,37 @@ enum wlan_ipa_debug_value {
  */
 bool
 ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_lpc_acquire_wakelock() - Acquire monitor mode wake lock to start
+ * local packet capture
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error qdf status on failure
+ */
+QDF_STATUS ucfg_dp_lpc_acquire_wakelock(void);
+
+/**
+ * ucfg_dp_lpc_release_wakelock() - Release monitor mode wakelock acquired
+ * as part of local packet capture stop
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error qdf status on failure
+ */
+QDF_STATUS ucfg_dp_lpc_release_wakelock(void);
 #else
 static inline bool
 ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
+}
+
+static inline QDF_STATUS ucfg_dp_lpc_acquire_wakelock(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS ucfg_dp_lpc_release_wakelock(void)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 

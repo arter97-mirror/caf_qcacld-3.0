@@ -5877,6 +5877,20 @@ wlan_hdd_is_lpc_powersave_disabled(struct hdd_context *hdd_ctx)
 {
 	return hdd_ctx->is_lpc_ps_disabled;
 }
+
+/*
+ * wlan_hdd_lpc_acquire_wakelock() - Acquire wakelock of local packet capture
+ *
+ * Return: 0 on success, else error number
+ */
+QDF_STATUS wlan_hdd_lpc_acquire_wakelock(void);
+
+/*
+ * wlan_hdd_lpc_release_wakelock() - Release wakelock of local packet capture
+ *
+ * Return: 0 on success, else error number
+ */
+QDF_STATUS wlan_hdd_lpc_release_wakelock(void);
 #else
 static inline void
 wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
@@ -5899,6 +5913,16 @@ static inline bool
 wlan_hdd_is_lpc_powersave_disabled(struct hdd_context *hdd_ctx)
 {
 	return false;
+}
+
+static inline QDF_STATUS wlan_hdd_lpc_acquire_wakelock(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS wlan_hdd_lpc_release_wakelock(void)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

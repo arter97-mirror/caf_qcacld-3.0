@@ -483,6 +483,7 @@ static void wlan_hdd_auto_shutdown_cb(void);
 #endif
 
 static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx);
+static void hdd_monitor_mode_release_wakelock(struct hdd_adapter *adapter);
 
 /**
  * wlan_hdd_deinit_port_id_info()- Initialize/deinitialize
@@ -2976,6 +2977,45 @@ static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 	wlan_hdd_lpc_set_bmps(sta_adapter, false, 0);
 
 	wlan_hdd_set_lpc_powersave_disabled(hdd_ctx, true);
+}
+
+QDF_STATUS wlan_hdd_lpc_acquire_wakelock(void)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		hdd_debug("HDD CTX is NUll");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if ((ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
+	     ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))) {
+		if (!wlan_hdd_is_lpc_powersave_disabled(hdd_ctx)) {
+			hdd_info("Acquire wakelock for Local Packet Capture mode");
+			qdf_wake_lock_acquire(&hdd_ctx->monitor_mode_wakelock,
+					      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+			hdd_lpc_disable_powersave(hdd_ctx);
+			qdf_runtime_pm_prevent_suspend(
+				&hdd_ctx->runtime_context.monitor_mode);
+		}
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_hdd_lpc_release_wakelock(void)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct hdd_adapter *mon_adapter;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD CTX is NUll");
+		return QDF_STATUS_E_FAILURE;
+	}
+	mon_adapter = hdd_get_adapter(hdd_ctx, QDF_MONITOR_MODE);
+	os_if_dp_local_pkt_capture_stop(hdd_ctx->psoc, QDF_MONITOR_MODE);
+	hdd_monitor_mode_release_wakelock(mon_adapter);
+
+	return QDF_STATUS_SUCCESS;
 }
 #else
 static inline void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
@@ -13769,6 +13809,8 @@ static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.link_monitoring_cb = wlan_hdd_link_speed_update;
 	cb_obj.dp_fils_hlp_rx = hdd_fils_hlp_rx;
 	cb_obj.dp_get_ndev_by_vdev_id = wlan_hdd_get_netdev_by_vdev_id;
+	cb_obj.dp_lpc_acquire_wakelock = wlan_hdd_lpc_acquire_wakelock;
+	cb_obj.dp_lpc_release_wakelock = wlan_hdd_lpc_release_wakelock;
 	hdd_dp_register_ipa_wds_callbacks(&cb_obj);
 	os_if_dp_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }
