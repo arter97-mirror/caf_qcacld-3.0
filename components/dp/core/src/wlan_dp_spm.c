@@ -870,6 +870,94 @@ void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx)
 	dp_info("Printed %d flow entries of TX AFT", count);
 }
 
+#ifdef WLAN_DP_FEATURE_STC
+static inline
+void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
+				     struct wlan_dp_spm_flow_info *flow_rec)
+{
+	struct flow_info flow_info_reverse = {0};
+	struct flow_info *flow_info = &flow_rec->info;
+
+	/* Switching direction to match Rx flow hash for bi-di flows*/
+	if (flow_info->flags & FLOW_INFO_PRESENT_IPV4_SRC_IP) {
+		flow_info_reverse.src_ip.ipv4_addr =
+						flow_info->dst_ip.ipv4_addr;
+		flow_info_reverse.dst_ip.ipv4_addr =
+						flow_info->src_ip.ipv4_addr;
+		flow_rec->is_ipv4 = true;
+	} else if (flow_info->flags & FLOW_INFO_PRESENT_IPV6_SRC_IP) {
+		flow_info_reverse.src_ip.ipv6_addr[0] =
+						flow_info->dst_ip.ipv6_addr[0];
+		flow_info_reverse.src_ip.ipv6_addr[1] =
+						flow_info->dst_ip.ipv6_addr[1];
+		flow_info_reverse.src_ip.ipv6_addr[2] =
+						flow_info->dst_ip.ipv6_addr[2];
+		flow_info_reverse.src_ip.ipv6_addr[3] =
+						flow_info->dst_ip.ipv6_addr[3];
+
+		flow_info_reverse.dst_ip.ipv6_addr[0] =
+						flow_info->src_ip.ipv6_addr[0];
+		flow_info_reverse.dst_ip.ipv6_addr[1] =
+						flow_info->src_ip.ipv6_addr[1];
+		flow_info_reverse.dst_ip.ipv6_addr[2] =
+						flow_info->src_ip.ipv6_addr[2];
+		flow_info_reverse.dst_ip.ipv6_addr[3] =
+						flow_info->src_ip.ipv6_addr[3];
+	}
+
+	flow_info_reverse.src_port = flow_info->dst_port;
+	flow_info_reverse.dst_port = flow_info->src_port;
+	flow_info_reverse.proto =
+				wlan_dp_ip_proto_to_stc_proto(flow_info->proto);
+	flow_info_reverse.flags = 0;
+
+	flow_rec->flow_tuple_hash = wlan_dp_get_flow_hash(dp_ctx,
+							  &flow_info_reverse);
+}
+#else
+static inline
+void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
+				     struct wlan_dp_spm_flow_info *flow_rec);
+{
+}
+#endif
+
+#define DP_SPM_FLOW_TUPLE_CHECK_NUM_PKTS 8
+#define DP_SPM_FLOW_TUPLE_CHECK_TIME_MAX (1 * QDF_NSEC_PER_SEC)
+static inline void
+dp_spm_check_n_update_flow_info(struct wlan_dp_spm_flow_info *flow,
+				qdf_nbuf_t skb, uint64_t curr_ts)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct flow_info flow_tuple = {0};
+	struct sock *sk;
+
+	sk = skb->sk;
+	if (sk->sk_type != SOCK_DGRAM && sk->sk_type != SOCK_RAW)
+		return;
+
+	if (!((flow->num_pkts & (DP_SPM_FLOW_TUPLE_CHECK_NUM_PKTS - 1)) == 0 ||
+	      curr_ts - flow->active_ts > DP_SPM_FLOW_TUPLE_CHECK_TIME_MAX))
+		return;
+
+	dp_fim_parse_skb_flow_info(skb, &flow_tuple);
+
+	if (!dp_flow_info_exact_match(&flow->info, &flow_tuple)) {
+		uint8_t old_tuple_str[BUF_LEN_MAX];
+		uint8_t new_tuple_str[BUF_LEN_MAX];
+
+		dp_info("Flow %d mdata 0x%x old_tuple %s new_tuple %s",
+			flow->id, flow->guid,
+			dp_print_tuple_to_str(&flow->info, old_tuple_str,
+					      BUF_LEN_MAX),
+			dp_print_tuple_to_str(&flow_tuple, new_tuple_str,
+					      BUF_LEN_MAX));
+		qdf_mem_copy(&flow->info, &flow_tuple, sizeof(flow->info));
+		flow->flow_add_ts = curr_ts;
+		wlan_dp_spm_update_tx_flow_hash(dp_ctx, flow);
+	}
+}
+
 static inline
 void wlan_dp_spm_update_flow_features(struct wlan_dp_intf *dp_intf,
 				      struct wlan_dp_spm_flow_info *flow,
@@ -878,8 +966,10 @@ void wlan_dp_spm_update_flow_features(struct wlan_dp_intf *dp_intf,
 	uint64_t curr_ts = qdf_sched_clock();
 
 	flow->num_pkts++;
-	flow->active_ts = curr_ts;
 
+	dp_spm_check_n_update_flow_info(flow, skb, curr_ts);
+
+	flow->active_ts = curr_ts;
 	wlan_dp_stc_check_n_track_tx_flow_features(dp_intf->dp_ctx, skb,
 						   flow->track_flow_stats,
 						   flow->id,
@@ -975,58 +1065,6 @@ void wlan_dp_spm_intf_ctx_deinit(struct wlan_dp_intf *dp_intf)
 		spm_ctx->spm_intf = NULL;
 	dp_info("SPM interface deinitialized!");
 }
-
-#ifdef WLAN_DP_FEATURE_STC
-static inline
-void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
-				     struct wlan_dp_spm_flow_info *flow_rec)
-{
-	struct flow_info flow_info_reverse = {0};
-	struct flow_info *flow_info = &flow_rec->info;
-
-	/* Switching direction to match Rx flow hash for bi-di flows*/
-	if (flow_info->flags & FLOW_INFO_PRESENT_IPV4_SRC_IP) {
-		flow_info_reverse.src_ip.ipv4_addr =
-						flow_info->dst_ip.ipv4_addr;
-		flow_info_reverse.dst_ip.ipv4_addr =
-						flow_info->src_ip.ipv4_addr;
-		flow_rec->is_ipv4 = true;
-	} else if (flow_info->flags & FLOW_INFO_PRESENT_IPV6_SRC_IP) {
-		flow_info_reverse.src_ip.ipv6_addr[0] =
-						flow_info->dst_ip.ipv6_addr[0];
-		flow_info_reverse.src_ip.ipv6_addr[1] =
-						flow_info->dst_ip.ipv6_addr[1];
-		flow_info_reverse.src_ip.ipv6_addr[2] =
-						flow_info->dst_ip.ipv6_addr[2];
-		flow_info_reverse.src_ip.ipv6_addr[3] =
-						flow_info->dst_ip.ipv6_addr[3];
-
-		flow_info_reverse.dst_ip.ipv6_addr[0] =
-						flow_info->src_ip.ipv6_addr[0];
-		flow_info_reverse.dst_ip.ipv6_addr[1] =
-						flow_info->src_ip.ipv6_addr[1];
-		flow_info_reverse.dst_ip.ipv6_addr[2] =
-						flow_info->src_ip.ipv6_addr[2];
-		flow_info_reverse.dst_ip.ipv6_addr[3] =
-						flow_info->src_ip.ipv6_addr[3];
-	}
-
-	flow_info_reverse.src_port = flow_info->dst_port;
-	flow_info_reverse.dst_port = flow_info->src_port;
-	flow_info_reverse.proto =
-				wlan_dp_ip_proto_to_stc_proto(flow_info->proto);
-	flow_info_reverse.flags = 0;
-
-	flow_rec->flow_tuple_hash = wlan_dp_get_flow_hash(dp_ctx,
-							  &flow_info_reverse);
-}
-#else
-static inline
-void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
-				     struct wlan_dp_spm_flow_info *flow_rec);
-{
-}
-#endif
 
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)

@@ -1288,4 +1288,50 @@ static inline bool wlan_dp_link_check_cdp_vdev(struct wlan_dp_link *dp_link,
 	return false;
 }
 
+#ifndef WLAN_SUPPORT_FLOW_PRIORTIZATION
+/* Change in the below macros, will need to updated in wlan_dp_fim.h as well */
+#define FLOW_INFO_PRESENT_PROTO			BIT(0)
+#define FLOW_INFO_PRESENT_SRC_PORT		BIT(1)
+#define FLOW_INFO_PRESENT_DST_PORT		BIT(2)
+#define FLOW_INFO_PRESENT_IPV4_SRC_IP		BIT(3)
+#define FLOW_INFO_PRESENT_IPV4_DST_IP		BIT(4)
+#define FLOW_INFO_PRESENT_IPV6_SRC_IP		BIT(5)
+#define FLOW_INFO_PRESENT_IPV6_DST_IP		BIT(6)
+#define FLOW_INFO_PRESENT_IP_FRAGMENT		BIT(7)
+#define FLOW_INFO_IPV4_PARSE_SUCCESS		(FLOW_INFO_PRESENT_PROTO |\
+						FLOW_INFO_PRESENT_SRC_PORT |\
+						FLOW_INFO_PRESENT_DST_PORT |\
+						FLOW_INFO_PRESENT_IPV4_SRC_IP |\
+						FLOW_INFO_PRESENT_IPV4_DST_IP)
+#define FLOW_INFO_IPV6_PARSE_SUCCESS		(FLOW_INFO_PRESENT_PROTO |\
+						FLOW_INFO_PRESENT_SRC_PORT |\
+						FLOW_INFO_PRESENT_DST_PORT |\
+						FLOW_INFO_PRESENT_IPV6_SRC_IP |\
+						FLOW_INFO_PRESENT_IPV6_DST_IP)
+#endif
+
+static inline
+bool dp_flow_info_exact_match(struct flow_info *fi, struct flow_info *flow)
+{
+	if (fi->flags & FLOW_INFO_IPV4_PARSE_SUCCESS) {
+		if (flow->src_ip.ipv4_addr == fi->src_ip.ipv4_addr &&
+		    flow->dst_ip.ipv4_addr == fi->dst_ip.ipv4_addr &&
+		    flow->src_port == fi->src_port &&
+		    flow->dst_port == fi->dst_port &&
+		    flow->proto == fi->proto) {
+			return true;
+		}
+	} else if (fi->flags & FLOW_INFO_IPV6_PARSE_SUCCESS) {
+		if (qdf_mem_cmp(&flow->dst_ip.ipv6_addr, &fi->dst_ip.ipv6_addr,
+				sizeof(struct in6_addr)) == 0 &&
+		    qdf_mem_cmp(&flow->dst_ip.ipv6_addr, &fi->dst_ip.ipv6_addr,
+				sizeof(struct in6_addr)) == 0 &&
+		    flow->flow_label == fi->flow_label) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 #endif
