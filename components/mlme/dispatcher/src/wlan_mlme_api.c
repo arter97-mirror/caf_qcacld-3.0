@@ -891,17 +891,7 @@ QDF_STATUS wlan_mlme_cfg_get_enable_ul_ofdm(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-/* mlme_get_min_rate_cap() - get minimum capability for HE-MCS between
- *                           ini value and fw capability.
- *
- * Rx HE-MCS Map and Tx HE-MCS Map subfields format where 2-bit indicates
- * 0 indicates support for HE-MCS 0-7 for n spatial streams
- * 1 indicates support for HE-MCS 0-9 for n spatial streams
- * 2 indicates support for HE-MCS 0-11 for n spatial streams
- * 3 indicates that n spatial streams is not supported for HE PPDUs
- *
- */
-static uint16_t mlme_get_min_rate_cap(uint16_t val1, uint16_t val2)
+uint16_t wlan_mlme_get_min_he_mcs_map(uint16_t val1, uint16_t val2)
 {
 	uint16_t ret = 0, i;
 
@@ -1184,10 +1174,10 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.he_caps.dot11_he_cap.rx_full_bw_su_he_mu_non_cmpr_sigb =
 				he_cap->rx_full_bw_su_he_mu_non_cmpr_sigb;
 
-	tx_mcs_map = mlme_get_min_rate_cap(
+	tx_mcs_map = wlan_mlme_get_min_he_mcs_map(
 		mlme_obj->cfg.he_caps.dot11_he_cap.tx_he_mcs_map_lt_80,
 		he_cap->tx_he_mcs_map_lt_80);
-	rx_mcs_map = mlme_get_min_rate_cap(
+	rx_mcs_map = wlan_mlme_get_min_he_mcs_map(
 		mlme_obj->cfg.he_caps.dot11_he_cap.rx_he_mcs_map_lt_80,
 		he_cap->rx_he_mcs_map_lt_80);
 	if (!mlme_obj->cfg.vht_caps.vht_cap_info.enable2x2) {
@@ -1202,10 +1192,11 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	if (cfg_in_range(CFG_HE_TX_MCS_MAP_LT_80, tx_mcs_map))
 		mlme_obj->cfg.he_caps.dot11_he_cap.tx_he_mcs_map_lt_80 =
 			tx_mcs_map;
-	tx_mcs_map = mlme_get_min_rate_cap(
+
+	tx_mcs_map = wlan_mlme_get_min_he_mcs_map(
 	   *((uint16_t *)mlme_obj->cfg.he_caps.dot11_he_cap.tx_he_mcs_map_160),
 	   *((uint16_t *)he_cap->tx_he_mcs_map_160));
-	rx_mcs_map = mlme_get_min_rate_cap(
+	rx_mcs_map = wlan_mlme_get_min_he_mcs_map(
 	   *((uint16_t *)mlme_obj->cfg.he_caps.dot11_he_cap.rx_he_mcs_map_160),
 	   *((uint16_t *)he_cap->rx_he_mcs_map_160));
 
@@ -8474,7 +8465,7 @@ void wlan_mlme_reset_sta_keepalive_period(struct wlan_objmgr_psoc *psoc,
 	       return;
        }
        mlme_obj->cfg.sta.sta_keep_alive_period =
-		cfg_default(CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
+		cfg_get(psoc, CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
        mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
        if (!mlme_priv) {
                mlme_err("vdev legacy private object is NULL");
@@ -8482,7 +8473,7 @@ void wlan_mlme_reset_sta_keepalive_period(struct wlan_objmgr_psoc *psoc,
        }
 
        mlme_priv->keep_alive_period =
-                       cfg_default(CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
+			cfg_get(psoc, CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
 }
 
 QDF_STATUS
@@ -8501,4 +8492,15 @@ wlan_mlme_get_sta_keep_alive_period(struct wlan_objmgr_psoc *psoc,
 	*keep_alive_period = mlme_obj->cfg.sta.sta_keep_alive_period;
 
         return QDF_STATUS_SUCCESS;
+}
+
+uint16_t wlan_mlme_get_sap_he_rx_mcs_map_160(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return cfg_get(psoc, CFG_SAP_HE_RX_MCS_MAP_160);
+
+	return mlme_obj->cfg.sap_cfg.sap_he_rx_mcs_map_160;
 }

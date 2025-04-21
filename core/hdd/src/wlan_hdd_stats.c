@@ -3517,9 +3517,8 @@ int wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
 	get_req.paramIdMask = req_mask;
 	get_req.staId = link_info->vdev_id;
 
-	rtnl_lock();
 	errno = wlan_hdd_send_ll_stats_req(link_info, &get_req);
-	rtnl_unlock();
+
 	if (errno)
 		hdd_err("Send LL stats req failed, id:%u, mask:%d, session:%d",
 			req_id, req_mask, link_info->vdev_id);

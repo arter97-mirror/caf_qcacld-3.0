@@ -1847,6 +1847,7 @@ void csr_update_session_he_cap(struct mac_context *mac_ctx,
 	tDot11fIEhe_cap *he_cap;
 	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *mlme_priv;
+	uint16_t sap_rx_mcs_map;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 						    session->vdev_id,
@@ -1868,11 +1869,21 @@ void csr_update_session_he_cap(struct mac_context *mac_ctx,
 	 * for STA
 	 */
 	persona = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (persona == QDF_SAP_MODE) {
+		sap_rx_mcs_map =
+			wlan_mlme_get_sap_he_rx_mcs_map_160(mac_ctx->psoc);
+		sap_rx_mcs_map =
+			wlan_mlme_get_min_he_mcs_map(sap_rx_mcs_map,
+						     *((uint16_t *)he_cap->rx_he_mcs_map_160));
+		qdf_mem_copy(&he_cap->rx_he_mcs_map_160, &sap_rx_mcs_map,
+			     sizeof(sap_rx_mcs_map));
+	}
+
 	if (persona == QDF_SAP_MODE || persona == QDF_P2P_GO_MODE) {
 		he_cap->twt_request = false;
 		if (!he_cap->twt_responder)
 			he_cap->flex_twt_sched = false;
-
 	} else if (persona == QDF_STA_MODE || persona == QDF_P2P_CLIENT_MODE) {
 		he_cap->twt_responder = false;
 		if (!he_cap->twt_request)
