@@ -2062,7 +2062,7 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 	he_caps->dot11_he_cap.twt_request =
 			cfg_get(psoc, CFG_TWT_REQUESTOR);
 	he_caps->dot11_he_cap.twt_responder =
-			cfg_get(psoc, CFG_TWT_RESPONDER);
+			!!cfg_get(psoc, CFG_TWT_RESPONDER);
 	/*
 	 * Broadcast TWT capability will be filled in
 	 * populate_dot11f_he_caps() based on STA/SAP

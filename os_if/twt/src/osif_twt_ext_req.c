@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2726,6 +2726,7 @@ static int osif_twt_add_ac_config(struct wlan_objmgr_vdev *vdev,
 	int ret = 0;
 	struct wlan_objmgr_psoc *psoc;
 	enum QDF_OPMODE device_mode;
+	uint8_t twt_resp_cfg;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc)
@@ -2738,7 +2739,8 @@ static int osif_twt_add_ac_config(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
-	ucfg_twt_cfg_get_responder(psoc, &is_responder_en);
+	ucfg_twt_cfg_get_responder(psoc, &twt_resp_cfg);
+	is_responder_en = ucfg_twt_resp_check_bit(device_mode, twt_resp_cfg);
 
 	if (device_mode == QDF_SAP_MODE && is_responder_en) {
 		ret = ucfg_twt_ac_pdev_param_send(psoc,

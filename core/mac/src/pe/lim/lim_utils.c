@@ -90,6 +90,7 @@
 #include "wlan_nan_api_i.h"
 #include "wlan_mlme_api.h"
 #include "wlan_tdls_api.h"
+#include "wlan_twt_cfg_ext_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -8132,6 +8133,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	uint8_t num_ppe_th = 0;
 	bool nan_beamforming_supported;
 	bool disable_nan_tx_bf = false, value = false;
+	uint8_t twt_resp_cfg;
 
 	/* Sending only minimal info(no PPET) to FW now, update if required */
 	qdf_mem_zero(he_caps, he_cap_total_len);
@@ -8187,8 +8189,8 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	} else if ((device_mode == QDF_SAP_MODE) ||
 		    (device_mode == QDF_P2P_GO_MODE &&
 		     wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id))) {
-		ucfg_twt_cfg_get_responder(mac_ctx->psoc, &value);
-		if (!value) {
+		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_resp_cfg);
+		if (!TWT_RESP_CHECK_BIT(device_mode, twt_resp_cfg)) {
 			he_cap->twt_responder = false;
 			he_cap->flex_twt_sched = false;
 		}

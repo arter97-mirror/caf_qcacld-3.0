@@ -8799,9 +8799,10 @@ hdd_sap_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 				      bool twt_responder, uint8_t vdev_id)
 {
-	bool twt_res_svc_cap, enable_twt, twt_res_cfg;
+	bool twt_res_svc_cap, enable_twt;
 	uint32_t reason;
 	enum QDF_OPMODE mode;
+	uint8_t twt_res_cfg;
 
 	enable_twt = ucfg_twt_cfg_is_twt_enabled(hdd_ctx->psoc);
 	ucfg_twt_get_responder(hdd_ctx->psoc, &twt_res_svc_cap);
@@ -8827,11 +8828,9 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 		hdd_debug("TWT responder already disable, skip");
 		return;
 	}
-	ucfg_twt_cfg_set_responder(hdd_ctx->psoc,
-				   QDF_MIN(twt_res_svc_cap,
-					   (enable_twt &&
-					    twt_responder &&
-					    twt_res_cfg)));
+
+	if (!twt_res_svc_cap || !enable_twt || !twt_responder)
+		ucfg_twt_cfg_set_responder(hdd_ctx->psoc, 0);
 
 	hdd_debug("cfg80211 TWT responder: %d, enable twt: %d, twt_res_cfg: %d",
 		  twt_responder, enable_twt, twt_res_cfg);

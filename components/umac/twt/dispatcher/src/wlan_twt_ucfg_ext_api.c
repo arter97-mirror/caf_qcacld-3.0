@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -19,6 +19,8 @@
 #include <wlan_twt_ucfg_ext_cfg.h>
 #include "twt/core/src/wlan_twt_cfg.h"
 #include "twt/core/src/wlan_twt_main.h"
+#include "cfg_twt.h"
+#include <wlan_twt_cfg_ext_api.h>
 
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
 {
@@ -48,13 +50,13 @@ ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val)
 }
 
 QDF_STATUS
-ucfg_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
+ucfg_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, uint8_t *val)
 {
 	return wlan_twt_cfg_get_responder(psoc, val);
 }
 
 QDF_STATUS
-ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
+ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, uint8_t val)
 {
 	return wlan_twt_cfg_set_responder(psoc, val);
 }
@@ -300,4 +302,9 @@ ucfg_twt_tgt_caps_get_wake_dur_and_wake_intvl(
 							     max_wake_dur,
 							     min_wake_intvl,
 							     max_wake_intvl);
+}
+
+bool ucfg_twt_resp_check_bit(enum QDF_OPMODE mode, uint8_t twt_resp_cfg)
+{
+	return TWT_RESP_CHECK_BIT(mode, twt_resp_cfg);
 }

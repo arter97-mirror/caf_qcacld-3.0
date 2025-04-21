@@ -182,7 +182,7 @@ wlan_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val)
 }
 
 QDF_STATUS
-wlan_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
+wlan_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, uint8_t *val)
 {
 	struct twt_psoc_priv_obj *twt_psoc_obj;
 
@@ -216,7 +216,7 @@ wlan_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS
-wlan_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
+wlan_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, uint8_t val)
 {
 	struct twt_psoc_priv_obj *twt_psoc_obj;
 

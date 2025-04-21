@@ -8214,9 +8214,10 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 			   tDot11fIEhe_cap *he_cap)
 {
 	bool twt_requestor = false;
-	bool twt_responder = false;
+	bool twt_responder;
 	bool bcast_requestor = false;
 	bool bcast_responder = false;
+	uint8_t twt_resp_cfg;
 
 	wlan_twt_get_bcast_requestor_cfg(mac->psoc, &bcast_requestor);
 	bcast_requestor = bcast_requestor &&
@@ -8242,7 +8243,9 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 			break;
 		fallthrough;
 	case QDF_SAP_MODE:
-		wlan_twt_get_responder_cfg(mac->psoc, &twt_responder);
+		wlan_twt_get_responder_cfg(mac->psoc, &twt_resp_cfg);
+		twt_responder = TWT_RESP_CHECK_BIT(session->opmode,
+						   twt_resp_cfg);
 		he_cap->twt_responder =
 			twt_responder && twt_get_responder_flag(mac);
 		he_cap->broadcast_twt = bcast_responder;
@@ -12927,8 +12930,9 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 					     tDot11fIEExtCap *dot11f)
 {
 	struct s_ext_cap *p_ext_cap;
-	bool twt_responder = false;
+	bool twt_responder;
 	bool twt_requestor = false;
+	uint8_t twt_resp_cfg;
 
 	if (pe_session->opmode == QDF_STA_MODE &&
 	    !pe_session->enable_session_twt_support) {
@@ -12948,7 +12952,9 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 
 	if (pe_session->opmode == QDF_SAP_MODE ||
 	    pe_session->opmode == QDF_P2P_GO_MODE) {
-		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_responder);
+		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_resp_cfg);
+		twt_responder = TWT_RESP_CHECK_BIT(pe_session->opmode,
+						   twt_resp_cfg);
 		p_ext_cap->twt_responder_support =
 			twt_responder && twt_get_responder_flag(mac_ctx);
 	}

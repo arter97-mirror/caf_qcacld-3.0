@@ -5425,12 +5425,13 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	struct sk_buff *skb = NULL;
 	uint32_t dbs_capability = 0;
 	bool one_by_one_dbs, two_by_two_dbs;
-	bool value, twt_req, twt_res, twt_res_supp_ht_vht;
+	bool value, twt_req, twt_res_supp_ht_vht;
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 	QDF_STATUS status;
 	int ret_val;
 	uint8_t max_assoc_cnt = 0;
 	uint8_t max_str_link_count = 0;
+	uint8_t twt_res;
 
 	uint8_t feature_flags[(NUM_QCA_WLAN_VENDOR_FEATURES + 7) / 8] = {0};
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
