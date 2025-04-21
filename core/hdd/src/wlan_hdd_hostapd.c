@@ -2964,7 +2964,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 
 		sta_id = event->staId;
 
-		if (ucfg_ipa_is_enabled()) {
+		if (ucfg_ipa_is_enabled() &&
+		    hdd_sap_is_recv_assoc_link(hdd_ctx->psoc,
+					       event->staMac.bytes)) {
 			vdev = link_info->vdev;
 
 			if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
@@ -3543,7 +3545,7 @@ stopbss:
 					WLAN_CONTROL_PATH);
 
 		/* reclaim all resources allocated to the BSS */
-		qdf_status = hdd_softap_stop_bss(adapter);
+		qdf_status = hdd_softap_stop_bss(link_info);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			hdd_debug("hdd_softap_stop_bss failed %d",
 				  qdf_status);
@@ -3893,7 +3895,9 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 						    beacon->tail,
 						    beacon->tail_len);
 		if (rsn_ie)
-			wlan_crypto_rsnie_check(&crypto_params, rsn_ie);
+			wlan_crypto_rsnie_check(&crypto_params,
+						rsn_ie,
+						NULL);
 
 		keymgmt = wlan_crypto_get_param(sap_ctx->vdev,
 						WLAN_CRYPTO_PARAM_KEY_MGMT);
