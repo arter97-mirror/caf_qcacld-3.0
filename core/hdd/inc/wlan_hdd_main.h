@@ -119,6 +119,7 @@
 #include "wlan_hdd_mlo.h"
 #include "wlan_osif_features.h"
 #include "wlan_dp_public_struct.h"
+#include "cdp_txrx_cmn_struct.h"
 
 /*
  * Preprocessor definitions and constants
@@ -5891,6 +5892,18 @@ QDF_STATUS wlan_hdd_lpc_acquire_wakelock(void);
  * Return: 0 on success, else error number
  */
 QDF_STATUS wlan_hdd_lpc_release_wakelock(void);
+
+/*
+ * wlan_hdd_lpc_get_link_info() - Update link info to DP
+ *
+ * @adapter: Pointer to HDD adapter
+ * This function update the link information of a specific interface to DP.
+ * So only packets of that interface would  be filtered in when LPC concurrency
+ * is active.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_hdd_lpc_get_link_info(struct cdp_link_info *dp_link_info);
 #else
 static inline void
 wlan_hdd_lpc_handle_concurrency(struct hdd_context *hdd_ctx,
@@ -5921,6 +5934,12 @@ static inline QDF_STATUS wlan_hdd_lpc_acquire_wakelock(void)
 }
 
 static inline QDF_STATUS wlan_hdd_lpc_release_wakelock(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_hdd_lpc_get_link_info(struct cdp_link_info *dp_link_info)
 {
 	return QDF_STATUS_SUCCESS;
 }

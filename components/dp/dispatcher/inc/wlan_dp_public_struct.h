@@ -808,6 +808,7 @@ struct wlan_dp_stc_flow_samples {
  * @dp_get_ndev_by_vdev_id: Callback API to get net device reference by vdev id
  * @dp_lpc_acquire_wakelock: Callback API to acquire monitor mode wakelock
  * @dp_lpc_release_wakelock: Callback API to release monitor mode wakelock
+ * @dp_lpc_get_link_info: Callback API to get link info of STA
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
@@ -918,6 +919,7 @@ struct wlan_dp_psoc_callbacks {
 					     qdf_netdev_t *netdev);
 	QDF_STATUS (*dp_lpc_acquire_wakelock)(void);
 	QDF_STATUS (*dp_lpc_release_wakelock)(void);
+	QDF_STATUS (*dp_lpc_get_link_info)(struct cdp_link_info *dp_link_info);
 };
 
 /**

@@ -753,6 +753,22 @@ void hdd_lpc_delete_work(struct hdd_context *hdd_ctx)
 	qdf_destroy_work(NULL, &hdd_ctx->lpc_info.lpc_wk);
 }
 
+static
+void hdd_lpc_update_link_info(struct wlan_objmgr_psoc *psoc)
+{
+	void *soc;
+	bool running;
+	QDF_STATUS status;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	running = cdp_is_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID);
+
+	if (running) {
+		status = os_if_dp_update_link_info(psoc);
+		if (status != QDF_STATUS_SUCCESS)
+			osif_err("failed to update link info");
+	}
+}
 #else
 static inline
 void hdd_lp_create_work(struct hdd_context *hdd_ctx)
@@ -767,6 +783,11 @@ void hdd_lpc_delete_work(struct hdd_context *hdd_ctx)
 static inline
 void wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx,
 					bool is_virtual_iface)
+{
+}
+
+static inline
+void hdd_lpc_update_link_info(struct wlan_objmgr_psoc *psoc)
 {
 }
 #endif
@@ -3015,6 +3036,37 @@ QDF_STATUS wlan_hdd_lpc_release_wakelock(void)
 	os_if_dp_local_pkt_capture_stop(hdd_ctx->psoc, QDF_MONITOR_MODE);
 	hdd_monitor_mode_release_wakelock(mon_adapter);
 
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_hdd_lpc_get_link_info(struct cdp_link_info *dp_link_info)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
+	int i = 0;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		hdd_err("HDD CTX is NUll");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	link_info = adapter->deflink;
+
+	qdf_copy_macaddr(&dp_link_info->mac_addr, &adapter->mac_addr);
+
+	if (!hdd_adapter_is_ml_adapter(adapter)) {
+		dp_link_info->mlo_enabled = false;
+	} else {
+		dp_link_info->mlo_enabled = true;
+		hdd_adapter_for_each_link_info(adapter, link_info) {
+			qdf_copy_macaddr(&dp_link_info->link_addr[i++],
+					 &link_info->link_addr);
+		}
+	}
 	return QDF_STATUS_SUCCESS;
 }
 #else
@@ -6777,6 +6829,7 @@ static int __hdd_set_mac_address(struct net_device *dev, void *addr)
 	ucfg_dp_update_intf_mac(hdd_ctx->psoc, &adapter->mac_addr, &mac_addr,
 				adapter->deflink->vdev);
 	memcpy(&adapter->mac_addr, psta_mac_addr->sa_data, ETH_ALEN);
+	hdd_lpc_update_link_info(hdd_ctx->psoc);
 	qdf_net_update_net_device_dev_addr(dev, psta_mac_addr->sa_data,
 					   ETH_ALEN);
 
@@ -13811,6 +13864,7 @@ static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.dp_get_ndev_by_vdev_id = wlan_hdd_get_netdev_by_vdev_id;
 	cb_obj.dp_lpc_acquire_wakelock = wlan_hdd_lpc_acquire_wakelock;
 	cb_obj.dp_lpc_release_wakelock = wlan_hdd_lpc_release_wakelock;
+	cb_obj.dp_lpc_get_link_info = wlan_hdd_lpc_get_link_info;
 	hdd_dp_register_ipa_wds_callbacks(&cb_obj);
 	os_if_dp_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }

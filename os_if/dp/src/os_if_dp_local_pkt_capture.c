@@ -181,6 +181,43 @@ os_if_stop_capture_allowed(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS os_if_dp_update_link_info(struct wlan_objmgr_psoc *psoc)
+{
+	void *soc;
+	struct cdp_link_info dp_link_info;
+	QDF_STATUS status;
+
+	if (!psoc) {
+		osif_err("NULL psoc");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc) {
+		osif_err("NULL soc");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!policy_mgr_is_lpc_concurrency_allowed(psoc))
+		return QDF_STATUS_SUCCESS;
+
+	status = ucfg_dp_lpc_get_link_info(&dp_link_info);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		osif_err("failed to get link info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = cdp_lpc_update_link_info(soc, OL_TXRX_PDEV_ID, &dp_link_info);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		osif_err("failed to update link info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifndef WLAN_LOCAL_PKT_CAPTURE_SUBFILTER
 static
 QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
@@ -432,6 +469,13 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 		}
 		is_lpc_suspended = false;
 	}
+
+	status = os_if_dp_update_link_info(wlan_vdev_get_psoc(vdev));
+	if (status != QDF_STATUS_SUCCESS) {
+		osif_err("failed to update link info");
+		goto error;
+	}
+
 	osif_debug("start capture config pkt_type:0x%x", pkt_type);
 
 	filter.mode = MON_FILTER_PASS;
