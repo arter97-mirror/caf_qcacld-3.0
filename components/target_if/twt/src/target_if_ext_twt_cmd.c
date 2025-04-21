@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -167,6 +167,27 @@ target_if_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
 	return wmi_unified_vdev_set_param_send(wmi_handle, &vdev_param);
 }
 
+#define TWT_RESPONDER_DISABLE 1
+QDF_STATUS
+target_if_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id)
+{
+	struct wmi_unified *wmi_handle;
+	struct vdev_set_params vdev_param = {0};
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev_param.param_id = wmi_vdev_param_twt_resp_disable;
+	vdev_param.vdev_id = vdev_id;
+	vdev_param.param_value = TWT_RESPONDER_DISABLE;
+
+	return wmi_unified_vdev_set_param_send(wmi_handle, &vdev_param);
+}
+
 QDF_STATUS
 target_if_twt_register_ext_tx_ops(struct wlan_lmac_if_twt_tx_ops *twt_tx_ops)
 {
@@ -181,4 +202,3 @@ target_if_twt_register_ext_tx_ops(struct wlan_lmac_if_twt_tx_ops *twt_tx_ops)
 
 	return QDF_STATUS_SUCCESS;
 }
-

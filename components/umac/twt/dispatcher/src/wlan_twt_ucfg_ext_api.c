@@ -308,3 +308,10 @@ bool ucfg_twt_resp_check_bit(enum QDF_OPMODE mode, uint8_t twt_resp_cfg)
 {
 	return TWT_RESP_CHECK_BIT(mode, twt_resp_cfg);
 }
+
+QDF_STATUS
+ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id)
+{
+	return wlan_twt_send_responder_disable_per_vdev(psoc, vdev_id);
+}

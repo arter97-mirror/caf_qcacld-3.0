@@ -410,6 +410,18 @@ ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
  * otherwise false
  */
 bool ucfg_twt_resp_check_bit(enum QDF_OPMODE mode, uint8_t twt_resp_cfg);
+
+/**
+ * ucfg_twt_send_responder_disable_per_vdev() - This API is wrapper for
+ * function "wlan_twt_send_responder_disable_per_vdev"
+ * @psoc: Pointer to psoc object
+ * @vdev_id: VDEV ID
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id);
 #else
 static inline
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -572,6 +584,13 @@ static inline bool
 ucfg_twt_resp_check_bit(enum QDF_OPMODE mode, uint8_t twt_resp_cfg)
 {
 	return false;
+}
+
+static inline QDF_STATUS
+ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2516,4 +2516,11 @@ wlan_twt_tgt_caps_get_wake_dur_and_wake_intvl(
 	*max_wake_intvl = twt_psoc->twt_caps.max_wake_intvl;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id)
+{
+	return tgt_twt_send_responder_disable_per_vdev(psoc, vdev_id);
 }
