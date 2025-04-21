@@ -1626,7 +1626,10 @@ endif
 
 ifeq ($(CONFIG_QCACLD_WLAN_LFR2), y)
 # Add LFR2/host roam specific connection manager files here
-MLME_OBJS +=    $(CM_DIR)/core/src/wlan_cm_host_roam_preauth.o \
+MLME_OBJS +=    $(CM_TGT_IF_DIR)/src/target_if_cm_roam_event.o \
+		$(CM_DIR)/core/src/wlan_cm_roam_fw_sync.o \
+		$(CM_DIR)/core/src/wlan_cm_roam_offload_event.o \
+		$(CM_DIR)/core/src/wlan_cm_host_roam_preauth.o \
 		$(CM_DIR)/core/src/wlan_cm_host_util.o
 endif
 
@@ -3856,7 +3859,9 @@ ifeq ($(CONFIG_CM_UTF_ENABLE), y)
 ccflags-y += -DFEATURE_CM_UTF_ENABLE
 endif
 
+ccflags-$(CONFIG_QCACLD_WLAN_LFR2) += -DWLAN_FEATURE_ROAM_OFFLOAD
 ccflags-$(CONFIG_QCACLD_WLAN_LFR3) += -DWLAN_FEATURE_ROAM_OFFLOAD
+ccflags-$(CONFIG_QCACLD_WLAN_LFR3) += -DWLAN_FEATURE_LFR3
 ccflags-$(CONFIG_WLAN_FEATURE_ROAM_INFO_STATS) += -DWLAN_FEATURE_ROAM_INFO_STATS
 ccflags-$(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING) += -DWLAN_FEATURE_CONNECTIVITY_LOGGING
 ccflags-$(CONFIG_QCACLD_WLAN_CONNECTIVITY_DIAG_EVENT) += -DCONNECTIVITY_DIAG_EVENT

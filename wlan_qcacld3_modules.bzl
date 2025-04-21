@@ -1080,7 +1080,6 @@ _conditional_srcs = {
     },
     "CONFIG_IPA_OFFLOAD": {
         True: [
-            "cmn/dp/wifi3.0/dp_ipa.c",
             "cmn/qdf/linux/src/qdf_ipa.c",
             "cmn/ipa/core/src/wlan_ipa_core.c",
             "cmn/ipa/core/src/wlan_ipa_main.c",
@@ -1093,6 +1092,16 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_ipa.c",
             # TODO: need a separate flag for sysfs
             "core/hdd/src/wlan_hdd_sysfs_ipa.c",
+        ],
+    },
+    "CONFIG_LEGACY_IPA_OFFLOAD": {
+        True: [
+            "core/dp/txrx/ol_txrx_ipa.c",
+        ],
+    },
+    "CONFIG_DP_IPA_OFFLOAD": {
+        True: [
+            "cmn/dp/wifi3.0/dp_ipa.c",
         ],
     },
     "CONFIG_IPCIE_FW_SIM": {
@@ -1152,11 +1161,6 @@ _conditional_srcs = {
                 "cmn/dp/wifi3.0/dp_tx_desc.c",
                 "components/mlme/core/src/wlan_mlme_twt_api.c",
         ],
-    },
-    "CONFIG_AR6320_IPA_OFFLOAD": {
-        True: [
-            "core/dp/txrx/ol_txrx_ipa.c",
-        ]
     },
     "CONFIG_AR6320_TX_THROTTLE": {
         True: [
@@ -2423,8 +2427,10 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     )
 
     srcs = native.glob(iglobs) + _fixed_srcs
-
-    out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
+    if target == "sa510m":
+        out = "{}.ko".format(chipset)
+    else:
+        out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
@@ -2458,7 +2464,12 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
                 "//wlan/platform:wlan-platform-headers",
             ]
 
-    if target != "x1e80100" and target != "anorak" and target != "sa510m":
+    if target == "sa510m":
+        deps = deps + [
+            "//dataipa:include_headers",
+            "//dataipa:{}_{}_ipam".format(target, variant),
+        ]
+    elif target != "x1e80100" and target != "anorak":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),

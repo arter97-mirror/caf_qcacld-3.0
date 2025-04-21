@@ -2568,6 +2568,7 @@ struct wlan_mlme_power {
  * @join_failure_timeout_ori: original value of above join timeout
  * @auth_failure_timeout: authenticate failure timeout
  * @auth_rsp_timeout: authenticate response timeout
+ * @assoc_req_timeout: assoc req wait time
  * @assoc_failure_timeout: assoc failure timeout
  * @reassoc_failure_timeout: re-assoc failure timeout
  * @olbc_detect_timeout: OLBC detect timeout
@@ -2584,6 +2585,7 @@ struct wlan_mlme_timeout {
 	uint32_t join_failure_timeout_ori;
 	uint32_t auth_failure_timeout;
 	uint32_t auth_rsp_timeout;
+	uint32_t assoc_req_timeout;
 	uint32_t assoc_failure_timeout;
 	uint32_t reassoc_failure_timeout;
 	uint32_t olbc_detect_timeout;

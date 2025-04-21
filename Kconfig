@@ -2392,7 +2392,7 @@ config AR6320_SUPPORT
 
 config DYNAMIC_SINGLE_CHIP
     string "dynamic single chip name"
-    default "qca_cld3_qca6574"
+    default "qca6574"
 
 config DFS_FCC_TYPE4_DURATION_CHECK
     bool "check DFS FCC TYPE4 duration"
@@ -2434,8 +2434,12 @@ config ALLOC_CONTIGUOUS_MULTI_PAGE
     bool "alloc contiguous multi page"
     default n
 
-config AR6320_IPA_OFFLOAD
-    bool "Flag for ROME IPA"
+config LEGACY_IPA_OFFLOAD
+    bool "Flag for ROME and GENOA IPA"
+    default n
+
+config DP_IPA_OFFLOAD
+    bool "Flag to enable IPA for chips go dp path"
     default n
 
 config AR6320_TX_THROTTLE
