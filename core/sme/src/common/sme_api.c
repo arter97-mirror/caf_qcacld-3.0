@@ -11342,8 +11342,8 @@ void sme_update_he_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
 	rx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(nss);
 
 	for (idx = NSS_1x1_MODE; idx <= nss; idx++) {
-		HE_SET_MCS_FOR_NSS(tx_mcs_map, mcs_map, idx);
-		HE_SET_MCS_FOR_NSS(rx_mcs_map, mcs_map, idx);
+		tx_mcs_map = HE_SET_MCS_FOR_NSS(tx_mcs_map, mcs_map, idx);
+		rx_mcs_map = HE_SET_MCS_FOR_NSS(rx_mcs_map, mcs_map, idx);
 	}
 
 	sme_debug("new HE Nss MCS MAP: Rx 0x%0X, Tx: 0x%0X",
