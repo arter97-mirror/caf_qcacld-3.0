@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -92,6 +92,14 @@ QDF_STATUS os_if_dp_get_lpc_state(struct wlan_objmgr_vdev *vdev,
  *         false, Otherwise
  */
 bool os_if_lpc_mon_intf_creation_allowed(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * os_if_dp_update_link_info() - Update STA link info to DP
+ * @psoc: psoc object handle
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS os_if_dp_update_link_info(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 QDF_STATUS os_if_dp_set_lpc_configure(struct wlan_objmgr_vdev *vdev,
@@ -120,5 +128,10 @@ bool os_if_lpc_mon_intf_creation_allowed(struct wlan_objmgr_psoc *psoc)
 	return true;
 }
 
+static inline
+QDF_STATUS os_if_dp_update_link_info(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 #endif
