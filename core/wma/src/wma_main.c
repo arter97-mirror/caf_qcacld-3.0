@@ -6493,6 +6493,8 @@ wma_is_dbs_mandatory(struct wlan_objmgr_psoc *psoc,
 	return true;
 }
 
+#define WMI_MAX_BUS_SIZE 2048
+
 /**
  * wma_update_hdd_cfg() - update HDD config
  * @wma_handle: wma handle
@@ -6592,8 +6594,12 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	wma_update_sar_flag(service_ext2_param, &tgt_cfg);
 	tgt_cfg.fine_time_measurement_cap =
 		target_if_get_wmi_fw_sub_feat_caps(tgt_hdl);
-	tgt_cfg.wmi_max_len = wmi_get_max_msg_len(wma_handle->wmi_handle)
-			      - WMI_TLV_HEADROOM;
+	/*
+	 * Copy engine buffer is limited to 2K and maximum APF data send in a
+	 * WMI command depends on max bus size.
+	 * So, WMI MAX bus size is hardcoded to 2K.
+	 */
+	tgt_cfg.wmi_max_len = WMI_MAX_BUS_SIZE - WMI_TLV_HEADROOM;
 	tgt_cfg.tx_bfee_8ss_enabled = wma_handle->tx_bfee_8ss_enabled;
 	tgt_cfg.dynamic_nss_chains_support =
 				wma_handle->dynamic_nss_chains_support;
