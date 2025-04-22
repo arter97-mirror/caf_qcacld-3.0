@@ -283,8 +283,6 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *sta_ctx;
 	mac_handle_t mac_handle;
-	struct hdd_adapter *link_adapter;
-	struct hdd_station_ctx *link_sta_ctx;
 	bool is_link_switch =
 			wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev);
 
@@ -309,17 +307,6 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		hdd_beacon_recv_pause_indication((hdd_handle_t)hdd_ctx,
 						 link_info->vdev_id,
 						 SCAN_EVENT_TYPE_MAX, true);
-	}
-
-	if (adapter->device_mode == QDF_STA_MODE &&
-	    hdd_adapter_is_ml_adapter(adapter)) {
-		/* Clear connection info in assoc link adapter as well */
-		link_adapter = hdd_get_assoc_link_adapter(adapter);
-		if (link_adapter) {
-			link_sta_ctx =
-				WLAN_HDD_GET_STATION_CTX_PTR(link_adapter->deflink);
-			hdd_conn_remove_connect_info(link_sta_ctx);
-		}
 	}
 
 	if (!is_link_switch) {

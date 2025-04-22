@@ -1532,31 +1532,6 @@ static bool hdd_cm_is_roam_auth_required(struct hdd_station_ctx *sta_ctx,
 #endif
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
-#ifndef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
-struct hdd_adapter *hdd_get_assoc_link_adapter(struct hdd_adapter *ml_adapter)
-{
-	int i;
-	bool eht_capab;
-	struct hdd_adapter *link_adapter;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(ml_adapter);
-
-	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (!eht_capab || hdd_adapter_is_sl_ml_adapter(ml_adapter))
-		return ml_adapter;
-
-	for (i = 0; i < WLAN_MAX_MLD; i++) {
-		link_adapter = ml_adapter->mlo_adapter_info.link_adapter[i];
-		if (link_adapter) {
-			if (hdd_adapter_is_associated_with_ml_adapter(
-								link_adapter))
-				return link_adapter;
-		}
-	}
-
-	return NULL;
-}
-#endif
-
 #ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 static void hdd_set_immediate_power_save(struct hdd_adapter *adapter,
 					 bool is_immediate_powersave)
@@ -1713,7 +1688,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint8_t uapsd_mask = 0;
 	uint32_t time_buffer_size;
-	struct hdd_adapter *assoc_link_adapter;
 	bool is_immediate_power_save;
 	struct wlan_hdd_link_info *link_info;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
@@ -1748,14 +1722,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_cm_rec_connect_info(rsp);
 
 	hdd_cm_save_connect_info(link_info, rsp);
-	if (adapter->device_mode == QDF_STA_MODE &&
-	    hdd_adapter_is_ml_adapter(adapter)) {
-		/* Save connection info in assoc link adapter as well */
-		assoc_link_adapter = hdd_get_assoc_link_adapter(adapter);
-		if (assoc_link_adapter)
-			hdd_cm_save_connect_info(assoc_link_adapter->deflink,
-						 rsp);
-	}
 
 	hdd_add_beacon_filter(hdd_ctx, link_info->vdev_id);
 

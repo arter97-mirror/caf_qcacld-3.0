@@ -8260,53 +8260,6 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 
 	return 0;
 }
-#elif defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
-static int
-hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
-				struct wlan_vdev_create_params *vdev_params)
-{
-	struct hdd_adapter *adapter = link_info->adapter;
-	struct hdd_mlo_adapter_info *mlo_adapter_info;
-	struct hdd_adapter *link_adapter;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	bool eht_capab;
-
-	hdd_enter_dev(adapter->dev);
-	mlo_adapter_info = &adapter->mlo_adapter_info;
-	hdd_vdev_populate_wfd_mode(adapter, vdev_params);
-
-	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (mlo_adapter_info->is_ml_adapter && eht_capab &&
-	    adapter->device_mode == QDF_STA_MODE) {
-		link_adapter = hdd_get_assoc_link_adapter(adapter);
-		if (link_adapter) {
-			qdf_ether_addr_copy(vdev_params->macaddr,
-					    link_adapter->mac_addr.bytes);
-		} else {
-			return -EINVAL;
-		}
-	} else {
-		qdf_ether_addr_copy(vdev_params->macaddr,
-				    adapter->mac_addr.bytes);
-	}
-
-	vdev_params->opmode = adapter->device_mode;
-
-	if (eht_capab) {
-		qdf_ether_addr_copy(vdev_params->mldaddr,
-				    adapter->mld_addr.bytes);
-	}
-
-	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)vdev_params->macaddr)) {
-		hdd_err_rl("invalid mac addr");
-		return -EINVAL;
-	}
-
-	vdev_params->size_vdev_priv = sizeof(struct vdev_osif_priv);
-	hdd_exit();
-
-	return 0;
-}
 #else
 static int
 hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
