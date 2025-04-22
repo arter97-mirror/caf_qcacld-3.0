@@ -1529,6 +1529,49 @@ osif_twt_iterate_all_concurrency_vdev(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
+#define TWT_RESPONDER_SAP_MODE       0
+#define TWT_RESPONDER_LL_LT_SAP_MODE 1
+#define TWT_RESPONDER_P2P_GO_MODE    2
+
+QDF_STATUS
+osif_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint8_t mode,
+					 uint8_t twt_resp_cfg)
+{
+	bool sap_resp_enable = true;
+	bool ll_lt_sap_resp_enable = true;
+	bool p2p_go_resp_enable = true;
+	bool twt_rsp_disable_svc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	ucfg_twt_tgt_caps_get_resp_disable_per_vdev(psoc, &twt_rsp_disable_svc);
+	if (!twt_rsp_disable_svc && !twt_resp_cfg)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	switch (mode) {
+	case QDF_SAP_MODE:
+		if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+			ll_lt_sap_resp_enable =
+			twt_resp_cfg & BIT(TWT_RESPONDER_LL_LT_SAP_MODE);
+		else
+			sap_resp_enable =
+				twt_resp_cfg & BIT(TWT_RESPONDER_SAP_MODE);
+		break;
+	case QDF_P2P_GO_MODE:
+		p2p_go_resp_enable =
+				twt_resp_cfg & BIT(TWT_RESPONDER_P2P_GO_MODE);
+		break;
+	default:
+		osif_err("TWT responder is not supported for mode %d", mode);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!sap_resp_enable || !ll_lt_sap_resp_enable || !p2p_go_resp_enable)
+		status = ucfg_twt_send_responder_disable_per_vdev(psoc,
+								  vdev_id);
+	return status;
+}
+
 /**
  * osif_twt_concurrency_update_on_scc_mcc() - This function updates TWT for SCC
  * or MCC concurrency.
@@ -1552,6 +1595,8 @@ osif_twt_concurrency_update_on_scc_mcc(struct wlan_objmgr_pdev *pdev,
 	enum QDF_OPMODE opmode;
 	enum wlan_vdev_state vdev_state;
 	struct wlan_objmgr_psoc *psoc;
+	uint8_t twt_res_cfg;
+	bool twt_rsp_disable_svc;
 
 	if (!vdev) {
 		osif_err("vdev is null");
@@ -1571,6 +1616,7 @@ osif_twt_concurrency_update_on_scc_mcc(struct wlan_objmgr_pdev *pdev,
 	vdev_id = wlan_vdev_get_id(vdev);
 	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, vdev_id);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	ucfg_twt_tgt_caps_get_resp_disable_per_vdev(psoc, &twt_rsp_disable_svc);
 
 	switch (opmode) {
 	case QDF_P2P_GO_MODE:
@@ -1578,13 +1624,30 @@ osif_twt_concurrency_update_on_scc_mcc(struct wlan_objmgr_pdev *pdev,
 			return;
 		fallthrough;
 	case QDF_SAP_MODE:
-		if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+		if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id) &&
+		    !twt_rsp_disable_svc)
 			return;
 
 		osif_debug("Concurrency exist on SAP/P2P GO vdev");
-		if (twt_arg->p2p_r2_mode) {
+		if (twt_arg->p2p_r2_mode || twt_rsp_disable_svc) {
 			status = osif_twt_send_responder_enable_cmd(psoc,
 								    mac_id);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				osif_err("TWT responder enable cmd to fw failed %d",
+					 status);
+				return;
+			}
+			ucfg_twt_cfg_get_responder(psoc, &twt_res_cfg);
+			status = osif_twt_send_responder_disable_per_vdev(
+								psoc, vdev_id,
+								opmode,
+								twt_res_cfg);
+			if (QDF_IS_STATUS_ERROR(status) &&
+			    status != QDF_STATUS_E_NOSUPPORT) {
+				osif_err("TWT responder VDEV disable cmd fails %d",
+					 status);
+				return;
+			}
 		} else {
 			if (policy_mgr_current_concurrency_is_mcc(psoc))
 				reason =
@@ -1596,10 +1659,11 @@ osif_twt_concurrency_update_on_scc_mcc(struct wlan_objmgr_pdev *pdev,
 			status = osif_twt_send_responder_disable_cmd(psoc,
 								     mac_id,
 								     reason);
-		}
-		if (QDF_IS_STATUS_ERROR(status)) {
-			osif_err("TWT responder cmd to fw failed");
-			return;
+			if (QDF_IS_STATUS_ERROR(status)) {
+				osif_err("TWT disable responder cmd to fw failed %d",
+					 status);
+				return;
+			}
 		}
 		ucfg_twt_update_beacon_template();
 		break;
@@ -1656,6 +1720,7 @@ osif_twt_concurrency_update_on_dbs(struct wlan_objmgr_pdev *pdev,
 	enum QDF_OPMODE opmode;
 	enum wlan_vdev_state vdev_state;
 	struct wlan_objmgr_psoc *psoc;
+	uint8_t twt_res_cfg;
 
 	if (!vdev) {
 		osif_err("vdev is null");
@@ -1686,6 +1751,18 @@ osif_twt_concurrency_update_on_dbs(struct wlan_objmgr_pdev *pdev,
 		status = osif_twt_send_responder_enable_cmd(psoc, mac_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			osif_err("TWT responder enable cmd to fw failed");
+			return;
+		}
+
+		ucfg_twt_cfg_get_responder(psoc, &twt_res_cfg);
+		status = osif_twt_send_responder_disable_per_vdev(
+								psoc, vdev_id,
+								opmode,
+								twt_res_cfg);
+		if (QDF_IS_STATUS_ERROR(status) &&
+		    status != QDF_STATUS_E_NOSUPPORT) {
+			osif_err("TWT responder disable per vdev cmd to fw failed %d",
+				 status);
 			return;
 		}
 		ucfg_twt_update_beacon_template();
@@ -1719,6 +1796,8 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t mac_id;
+	uint8_t twt_res_cfg;
+	enum QDF_OPMODE opmode;
 
 	num_connections = policy_mgr_get_connection_count(psoc);
 	sta_count = policy_mgr_mode_specific_connection_count(psoc,
@@ -1761,14 +1840,17 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 			osif_twt_send_requestor_enable_cmd(psoc, mac_id);
 		} else if (sap_count || (p2p_go_count &&
 			   osif_twt_is_p2p_go_wfd_r2_mode(psoc))) {
-			if (sap_count)
+			if (sap_count) {
 				policy_mgr_get_sap_mode_info(psoc, freq_list,
 							     vdev_id_list);
-			else
+				opmode = QDF_SAP_MODE;
+			} else {
 				policy_mgr_get_mode_specific_conn_info(
 							psoc, freq_list,
 							vdev_id_list,
 							PM_P2P_GO_MODE);
+				opmode = QDF_P2P_GO_MODE;
+			}
 
 			mac_id = policy_mgr_mode_get_macid_by_vdev_id(
 					pdev->pdev_objmgr.wlan_psoc,
@@ -1778,6 +1860,19 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 			reason = HOST_TWT_DISABLE_REASON_NONE;
 			osif_twt_send_requestor_disable_cmd(psoc, mac_id,
 							    reason);
+			ucfg_twt_cfg_get_responder(psoc, &twt_res_cfg);
+			status = osif_twt_send_responder_disable_per_vdev(
+								psoc,
+								vdev_id_list[0],
+								opmode,
+								twt_res_cfg);
+			if (QDF_IS_STATUS_ERROR(status) &&
+			    status != QDF_STATUS_E_NOSUPPORT) {
+				osif_err("TWT responder VDEV disable cmd fails %d",
+					 status);
+				return;
+			}
+
 			ucfg_twt_update_beacon_template();
 		}
 		break;

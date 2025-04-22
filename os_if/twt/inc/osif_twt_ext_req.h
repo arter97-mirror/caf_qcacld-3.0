@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -252,6 +252,24 @@ QDF_STATUS osif_twt_create_work(struct wlan_objmgr_vdev *vdev);
  * Return: QDF_STATUS
  */
 QDF_STATUS osif_twt_destroy_work(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * osif_twt_send_responder_disable_per_vdev() - send TWT responder disable
+ * command for given VDEV ID.
+ * @psoc: pointer to PSOC object
+ * @vdev_id: VDEV ID
+ * @mode: OP mode of the given VDEV ID
+ * @twt_resp_cfg: TWT responder INI configuration
+ *
+ * This function reads the TWT INI configuration and send the TWT responder
+ * disable command for given VDEV ID if bit in TWT responder INI parameter is 0.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+osif_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint8_t mode,
+					 uint8_t twt_resp_cfg);
 #else
 static inline
 int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
@@ -337,6 +355,14 @@ void __osif_twt_work_handler(struct wlan_objmgr_vdev *vdev)
 static inline
 void osif_twt_work_handler(void *data)
 {
+}
+
+static inline QDF_STATUS
+osif_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id, uint8_t mode,
+					 uint8_t twt_resp_cfg)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 #endif /* _OSIF_TWT_EXT_REQ_H_ */
