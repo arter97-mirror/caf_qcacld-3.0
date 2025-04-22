@@ -7,6 +7,10 @@ CONFIG_MOBILE_ROUTER := y
 CONFIG_WLAN_SYSFS := y
 endif
 
+ifeq ($(CONFIG_ARCH_SA525), y)
+CONFIG_MOBILE_ROUTER := y
+endif
+
 include $(WLAN_ROOT)/configs/default_defconfig
 
 #Enable 11BE EHT
