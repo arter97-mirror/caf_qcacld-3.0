@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: ISC
  */
 
@@ -808,9 +808,11 @@ static void dp_spm_add_flow_to_freelist(qdf_rcu_head_t *rp)
 		return;
 
 	flow_id = flow_rec->id;
+	qdf_spinlock_acquire(&dp_ctx->flow_list_lock);
 	qdf_mem_zero(flow_rec, sizeof(struct wlan_dp_spm_flow_info));
 	flow_rec->id = flow_id;
 	qdf_list_insert_back(&dp_ctx->o_flow_rec_freelist, &flow_rec->node);
+	qdf_spinlock_release(&dp_ctx->flow_list_lock);
 }
 
 static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
