@@ -54,6 +54,23 @@ QDF_STATUS hdd_tx_powerboost_init(struct hdd_context *hdd_ctx);
  */
 void hdd_tx_powerboost_deinit(struct hdd_context *hdd_ctx);
 
+/*
+ * wlan_hdd_cfg80211_tx_power_boost_config() - Tx power boost configuration
+ * vendor command
+ * @wiphy: wiphy device pointer
+ * @wdev: wireless device pointer
+ * @data: Vendor command data buffer
+ * @data_len: Buffer length
+ *
+ * Handles QCA_NL80211_VENDOR_SUBCMD_IQ_DATA_INFERENCE
+ *
+ * Return: 0 for success, negative errno for failure.
+ */
+int wlan_hdd_cfg80211_tx_power_boost_config(struct wiphy *wiphy,
+					    struct wireless_dev *wdev,
+					    const void *data,
+					    int data_len);
+
 extern const struct nla_policy
 qca_wlan_vendor_power_boost_policy[QCA_WLAN_VENDOR_ATTR_IQ_DATA_INFERENCE_MAX + 1];
 
@@ -62,6 +79,19 @@ qca_wlan_vendor_power_boost_policy[QCA_WLAN_VENDOR_ATTR_IQ_DATA_INFERENCE_MAX + 
 		.vendor_id = QCA_NL80211_VENDOR_ID,                   \
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_IQ_DATA_INFERENCE,\
 	},                                                            \
+
+#define FEATURE_VENDOR_SUBCMD_CONFIG_TX_POWER_BOOST                      \
+{                                                                        \
+	.info.vendor_id = QCA_NL80211_VENDOR_ID,                         \
+	.info.subcmd =                                                   \
+		QCA_NL80211_VENDOR_SUBCMD_IQ_DATA_INFERENCE,             \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                            \
+		WIPHY_VENDOR_CMD_NEED_NETDEV |                           \
+		WIPHY_VENDOR_CMD_NEED_RUNNING,                           \
+	.doit = wlan_hdd_cfg80211_tx_power_boost_config,                 \
+	vendor_command_policy(qca_wlan_vendor_power_boost_policy,        \
+			      QCA_WLAN_VENDOR_ATTR_IQ_DATA_INFERENCE_MAX)\
+},
 
 /**
  * wlan_hdd_cfg80211_tx_pb_callback() - Callback for Tx Powerboost
@@ -75,7 +105,19 @@ qca_wlan_vendor_power_boost_policy[QCA_WLAN_VENDOR_ATTR_IQ_DATA_INFERENCE_MAX + 
  */
 void wlan_hdd_cfg80211_tx_pb_callback(void *arg,
 				      struct reg_txpb_evt_params *params);
+
+/**
+ * hdd_tx_powerboost_reinit() - Tx powerboost reinit after SSR
+ * @hdd_ctx: HDD context
+ *
+ * This function is called after the SSR reinit to send the boost ready
+ * WMI command to the firmware if before SSR user space app was launched
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_tx_powerboost_reinit(struct hdd_context *hdd_ctx);
 #else
+#define FEATURE_VENDOR_SUBCMD_CONFIG_TX_POWER_BOOST
 #define FEATURE_TX_POWER_BOOST_EVENTS
 
 static inline
@@ -99,6 +141,12 @@ static inline
 void wlan_hdd_cfg80211_tx_pb_callback(void *arg,
 				      struct reg_txpb_evt_params *params)
 {
+}
+
+static inline
+QDF_STATUS hdd_tx_powerboost_reinit(struct hdd_context *hdd_ctx)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* FEATURE_WLAN_TX_POWERBOOST */
 #endif /* __WLAN_HDD_TX_POWERBOOST_H */

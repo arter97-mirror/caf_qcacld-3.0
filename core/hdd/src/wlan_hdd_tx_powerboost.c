@@ -168,41 +168,14 @@ hdd_txpb_req_queue_init(struct hdd_context *hdd_ctx)
 static QDF_STATUS
 hdd_txpb_req_queue_cleanup(struct hdd_context *hdd_ctx)
 {
-	struct reg_txpb_cmn_params *params;
-	qdf_list_node_t *node = NULL, *next_node = NULL;
-	QDF_STATUS status;
+	struct reg_txpb_cmn_params *entry, *next;
 
 	qdf_mutex_acquire(&hdd_ctx->tx_pb.txpb_req_q_lock);
-	if (qdf_list_empty(&hdd_ctx->tx_pb.txpb_req_q)) {
-		qdf_mutex_release(&hdd_ctx->tx_pb.txpb_req_q_lock);
-		return QDF_STATUS_SUCCESS;
-	}
 
-	if (QDF_STATUS_SUCCESS !=
-		qdf_list_peek_front(&hdd_ctx->tx_pb.txpb_req_q, &next_node)) {
-		qdf_mutex_release(&hdd_ctx->tx_pb.txpb_req_q_lock);
-		hdd_err("TPB: Failed to remove txpb req from queue");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	do {
-		node = next_node;
-		params = qdf_container_of(node, struct reg_txpb_cmn_params, node);
-
-		status = qdf_list_remove_node(&hdd_ctx->tx_pb.txpb_req_q,
-						node);
-		if (status == QDF_STATUS_SUCCESS) {
-			hdd_debug("TPB: Removed req_id: %d pending_reqs: %d",
-				  params->req_id,
-				  qdf_list_size(&hdd_ctx->tx_pb.txpb_req_q));
-			qdf_mem_free(params);
-		} else {
-			hdd_debug("TPB: Failed to remove req_id: %d pending_reqs: %d",
-				  params->req_id,
-				  qdf_list_size(&hdd_ctx->tx_pb.txpb_req_q));
+	qdf_list_for_each_del(&hdd_ctx->tx_pb.txpb_req_q, entry, next, node) {
+		qdf_list_remove_node(&hdd_ctx->tx_pb.txpb_req_q, &entry->node);
+		qdf_mem_free(entry);
 		}
-	} while (QDF_STATUS_SUCCESS ==
-		qdf_list_peek_next(&hdd_ctx->tx_pb.txpb_req_q, node, &next_node));
 
 	qdf_mutex_release(&hdd_ctx->tx_pb.txpb_req_q_lock);
 	return QDF_STATUS_SUCCESS;
@@ -249,7 +222,6 @@ hdd_txpb_req_enqueue(struct hdd_context *hdd_ctx,
 	if (size < TXPB_MAX_REQ_COUNT) {
 		qdf_list_insert_back(&hdd_ctx->tx_pb.txpb_req_q,
 				     &req->node);
-		hdd_debug("TPB: req_id: %d enqueued", req->req_id);
 	} else {
 		status = QDF_STATUS_E_RESOURCES;
 	}
@@ -259,11 +231,80 @@ hdd_txpb_req_enqueue(struct hdd_context *hdd_ctx,
 		hdd_err("TPB: Failed to enqueue req_id: %d, already max %d reached",
 			req->req_id, size);
 		qdf_mem_free(req);
+		return status;
 	}
 
 	*cookie = (uintptr_t)req;
-	hdd_debug("TPB: sgirigow: cookie: %llx enqueued", *cookie);
+	hdd_debug("TPB: enqueue req_id: %u cookie: %llx",
+			req->req_id, *cookie);
 	return status;
+}
+
+static QDF_STATUS
+hdd_txpb_req_dequeue(struct hdd_context *hdd_ctx,
+		     struct reg_txpb_cmn_params *params,
+		     uint64_t cookie)
+{
+	struct reg_txpb_cmn_params *req;
+	qdf_list_node_t *node = NULL, *ptr_node = NULL;
+	QDF_STATUS status;
+
+	qdf_mutex_acquire(&hdd_ctx->tx_pb.txpb_req_q_lock);
+	if (qdf_list_empty(&hdd_ctx->tx_pb.txpb_req_q)) {
+		qdf_mutex_release(&hdd_ctx->tx_pb.txpb_req_q_lock);
+		hdd_err("TPB: Failed to find req id");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (QDF_STATUS_SUCCESS !=
+		qdf_list_peek_front(&hdd_ctx->tx_pb.txpb_req_q,
+					&ptr_node)) {
+		qdf_mutex_release(&hdd_ctx->tx_pb.txpb_req_q_lock);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	do {
+		node = ptr_node;
+		req = qdf_container_of(node, struct reg_txpb_cmn_params, node);
+		if (cookie == (uintptr_t)(req)) {
+			status = qdf_list_remove_node(&hdd_ctx->tx_pb.txpb_req_q,
+							node);
+			if (status == QDF_STATUS_SUCCESS) {
+				hdd_debug("TPB: Cookie match, req_id: %d", req->req_id);
+				params->pdev_id = req->pdev_id;
+				params->req_id = req->req_id;
+				params->status = req->status;
+				params->inference_stage = req->inference_stage;
+				params->mcs = req->mcs;
+				params->bandwidth = req->bandwidth;
+				params->temperature_degreeC = req->temperature_degreeC;
+				params->primary_chan_mhz = req->primary_chan_mhz;
+				params->center_freq1 = req->center_freq1;
+				params->center_freq2 = req->center_freq2;
+				params->phy_mode = req->phy_mode;
+
+				qdf_mem_free(req);
+
+				qdf_mutex_release(&hdd_ctx->tx_pb.txpb_req_q_lock);
+				hdd_err("Removed req_id: %d pending_reqs: %d",
+					params->req_id,
+					qdf_list_size(&hdd_ctx->tx_pb.txpb_req_q));
+				return status;
+			} else {
+				qdf_mutex_release(&hdd_ctx->tx_pb.txpb_req_q_lock);
+				hdd_err("Failed to remove req_id: %d pending_reqs: %d",
+					req->req_id,
+					qdf_list_size(&hdd_ctx->tx_pb.txpb_req_q));
+				return status;
+			}
+		}
+	} while (QDF_STATUS_SUCCESS ==
+		 qdf_list_peek_next(&hdd_ctx->tx_pb.txpb_req_q,
+		 node, &ptr_node));
+
+	qdf_mutex_release(&hdd_ctx->tx_pb.txpb_req_q_lock);
+	hdd_err("TPB: Failed to find matching cookie: %llx", cookie);
+	return QDF_STATUS_E_INVAL;
 }
 
 /**
@@ -504,6 +545,351 @@ void wlan_hdd_cfg80211_tx_pb_callback(void *arg,
 	hdd_debug("TPB: NL event sent to userspace");
 }
 
+static QDF_STATUS
+hdd_txpb_inference_cmd(struct hdd_context *hdd_ctx, struct nlattr **tb)
+{
+	int id;
+	QDF_STATUS status;
+	uint64_t cookie;
+	struct reg_txpb_cmd_params params = {0};
+
+	id = COOKIE;
+	if (!tb[id]) {
+		hdd_err_rl("TPB: IQ_DATA_INFERENCE_COOKIE is not set");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	cookie = nla_get_u64(tb[id]);
+	status = hdd_txpb_req_dequeue(hdd_ctx, &params.cmn_params, cookie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("TPB: Cookie: %llx didn't match", cookie);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	id = EVM;
+	if (!tb[id]) {
+		hdd_err_rl("TPB: IQ_DATA_INFERENCE_EVM is not set");
+		return QDF_STATUS_E_INVAL;
+	}
+	params.tx_evm = nla_get_s32(tb[id]);
+
+	id = MASK_MARGIN;
+	if (!tb[id]) {
+		hdd_err_rl("TPB: IQ_DATA_INFERENCE_MASK_MARGIN is not set");
+		return QDF_STATUS_E_INVAL;
+	}
+	params.mask_margin = nla_get_s32(tb[id]);
+
+	params.cmn_params.status = REG_HOST_PDEV_POWER_BOOST_CMD_STATUS_ESTIMATED_DATA;
+	status = ucfg_reg_txpb_send_inference_cmd(hdd_ctx->pdev, &params);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("TPB: sme_txpb_send_inference_cmd failed: %d",
+			status);
+
+	return status;
+}
+
+static QDF_STATUS
+hdd_txpb_inference_cmd_result(struct hdd_context *hdd_ctx,
+			      struct nlattr **tb)
+{
+	return hdd_txpb_inference_cmd(hdd_ctx, tb);
+}
+
+static QDF_STATUS
+hdd_txpb_inference_send_abort(struct hdd_context *hdd_ctx,
+			      struct reg_txpb_cmn_params *pb_metadata)
+{
+	struct reg_txpb_cmd_params params = {0};
+
+	qdf_mem_copy(&params, pb_metadata,
+		     sizeof(struct reg_txpb_cmn_params));
+	params.cmn_params.status = REG_HOST_PDEV_POWER_BOOST_CMD_STATUS_ABORT;
+
+	return ucfg_reg_txpb_send_inference_cmd(hdd_ctx->pdev, &params);
+}
+
+static QDF_STATUS
+hdd_txpb_inference_app_stop(struct hdd_context *hdd_ctx,
+			    struct reg_txpb_cmn_params *pb_metadata)
+{
+	QDF_STATUS status;
+
+	status = hdd_txpb_inference_send_abort(hdd_ctx, pb_metadata);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("TPB: hdd_txpb_inference_send_abort failed: %d",
+			status);
+		return status;
+	}
+
+	hdd_txpb_req_queue_cleanup(hdd_ctx);
+	hdd_ctx->tx_pb.txpb_app_launched = false;
+	return status;
+}
+
+static
+QDF_STATUS hdd_txpb_issue_boost_ready(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	struct reg_txpb_cmd_params params = {0};
+
+	params.cmn_params.status = REG_HOST_PDEV_POWER_BOOST_CMD_STATUS_READY;
+	status = ucfg_reg_txpb_send_inference_cmd(hdd_ctx->pdev, &params);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("TPB: sme_txpb_send_inference_cmd failed: %d",
+			status);
+
+	return status;
+}
+
+static QDF_STATUS
+hdd_txpb_issue_app_stop_ready(struct hdd_context *hdd_ctx,
+			      struct reg_txpb_cmn_params *pb_metadata,
+			      const char *stage, const char *cmd)
+{
+	QDF_STATUS status;
+
+	/* Send Abort first and then Ready as per FW request */
+	status = hdd_txpb_inference_app_stop(hdd_ctx, pb_metadata);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("TPB: %s: Failed to send CMD_ABORT for %s",
+			stage, cmd);
+		return QDF_STATUS_E_FAILURE;
+	}
+	hdd_debug("TPB: %s: Send CMD_ABORT for %s successful", stage, cmd);
+
+	status = hdd_txpb_issue_boost_ready(hdd_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("TPB: %s: Failed to send CMD_READY for %s",
+			stage, cmd);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	hdd_debug("TPB: %s: Send CMD_READY for %s successful", stage, cmd);
+	hdd_ctx->tx_pb.txpb_app_launched = true;
+
+	return status;
+}
+
+static QDF_STATUS
+hdd_txpb_inference_cmd_failure(struct hdd_context *hdd_ctx,
+			       struct nlattr **tb)
+{
+	QDF_STATUS status;
+	uint64_t cookie;
+	uint32_t id;
+	struct reg_txpb_cmn_params params = {0};
+
+	id = COOKIE;
+	if (!tb[id]) {
+		hdd_err_rl("TPB: IQ_DATA_INFERENCE_COOKIE is not set");
+		return QDF_STATUS_E_INVAL;
+	}
+	cookie = nla_get_u64(tb[id]);
+	status = hdd_txpb_req_dequeue(hdd_ctx, &params, cookie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("TPB: Cookie: %llx didn't match", cookie);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/*
+	 * The difference between CMD_FAILURE and CMD_APP_STOP is,
+	 * CMD_FAILURE is when inference failure happens and CMD_APP_STOP
+	 * is when user space app exits, in both the case FW behaviour
+	 * is to Abort the ANN Sampling, but from host driver perspective
+	 * in case of CMD_FAILURE, Issue Abort to firmware and
+	 * send CMD_STATUS_READY again
+	 */
+	status = hdd_txpb_issue_app_stop_ready(hdd_ctx, &params,
+					       "Fail_Init",
+					       "CMD_FAILURE");
+	return status;
+}
+
+static QDF_STATUS
+hdd_txpb_inference_app_start(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	struct reg_txpb_cmn_params params = {0};
+
+	if (hdd_ctx->tx_pb.txpb_app_launched) {
+		hdd_warn("TPB: Boost ready already sent, no need to send again");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	status = hdd_txpb_issue_app_stop_ready(hdd_ctx, &params, "Init",
+					       "APP_START");
+
+	return status;
+}
+
+QDF_STATUS hdd_tx_powerboost_reinit(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	struct reg_txpb_cmn_params params = {0};
+
+	if (!hdd_ctx->tx_pb.txpb_app_launched)
+		return QDF_STATUS_SUCCESS;
+
+	hdd_debug("TPB: Issue boost ready after SSR reinit");
+
+	status = hdd_txpb_issue_app_stop_ready(hdd_ctx, &params, "Reinit",
+					       "APP_START");
+
+	return status;
+}
+
+/**
+ * hdd_tx_pb_configure - Process the Tx Power boost config
+ * operation in the received vendor command
+ * @hdd_ctx: HDD context
+ * @tb: nl attributes
+ *
+ * Handles QCA_NL80211_VENDOR_SUBCMD_IQ_DATA_INFERENCE
+ *
+ * Return: 0 for Success and negative value for failure
+ */
+static int hdd_tx_pb_configure(struct hdd_context *hdd_ctx,
+			       struct nlattr **tb)
+{
+	enum qca_wlan_vendor_iq_inference_cmd_type oper;
+	struct nlattr *oper_attr;
+	uint32_t id;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct reg_txpb_cmn_params params = {0};
+
+	if (!hdd_ctx->tx_pb.tx_powerboost_enabled) {
+		hdd_warn("TPB: feature is not enabled");
+		return -EINVAL;
+	}
+
+	id = CMD_TYPE;
+	oper_attr = tb[id];
+
+	if (!oper_attr) {
+		hdd_err("TPB: Inference cmd type NOT specified");
+		status = QDF_STATUS_E_INVAL;
+		goto end;
+	}
+
+	oper = nla_get_u32(oper_attr);
+	hdd_debug("TPB: Inference cmd type: %d", oper);
+
+	if ((oper == CMD_FAILURE) || (oper == CMD_RESULT) ||
+		(oper == CMD_APP_STOP)) {
+		qdf_runtime_pm_allow_suspend(&hdd_ctx->tx_pb.txpb_runtime_lock);
+		qdf_wake_lock_release(&hdd_ctx->tx_pb.txpb_wake_lock,
+				WIFI_POWER_EVENT_WAKELOCK_TX_POWER_BOOST);
+
+		qdf_mem_set(hdd_ctx->tx_pb.dma.vaddr,
+			    hdd_ctx->tx_pb.dma.size, 0);
+	}
+
+	switch (oper) {
+	case CMD_APP_START:
+		status = hdd_txpb_inference_app_start(hdd_ctx);
+		if (QDF_IS_STATUS_ERROR(status))
+			goto end;
+
+		break;
+
+	case CMD_FAILURE:
+		status = hdd_txpb_inference_cmd_failure(hdd_ctx, tb);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("TPB: Failed to send CMD_FAILURE");
+			goto end;
+		}
+		hdd_debug("TPB: Send CMD_FAILURE successful");
+		break;
+
+	case CMD_RESULT:
+		status = hdd_txpb_inference_cmd_result(hdd_ctx, tb);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("TPB: Failed to send CMD_ESTIMATED_DATA");
+			goto end;
+		}
+		hdd_debug("TPB: Send CMD_ESTIMATED_DATA successful");
+		break;
+
+	case CMD_APP_STOP:
+		status = hdd_txpb_inference_app_stop(hdd_ctx, &params);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("TPB: Failed to send CMD_ABORT for APP_STOP");
+			goto end;
+		}
+		hdd_debug("TPB: Send CMD_ABORT for APP_STOP successful");
+		break;
+	default:
+		hdd_err("TPB: Invalid Inference cmd type: %d", oper);
+		status = QDF_STATUS_E_INVAL;
+		goto end;
+	}
+
+end:
+	return qdf_status_to_os_return(status);
+}
+
+/**
+ * __wlan_hdd_cfg80211_tx_power_boost_config() - Tx power boost config
+ * vendor command
+ * @wiphy: wiphy device pointer
+ * @wdev: wireless device pointer
+ * @data: Vendor command data buffer
+ * @data_len: Buffer length
+ *
+ * Handles QCA_NL80211_VENDOR_SUBCMD_IQ_DATA_INFERENCE.
+ *
+ * Return: 0 for Success and negative value for failure
+ */
+static int
+__wlan_hdd_cfg80211_tx_power_boost_config(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  const void *data, int data_len)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_context *hdd_ctx  = wiphy_priv(wiphy);
+	struct nlattr *tb[ATTR_INFERENCE_MAX + 1];
+	int errno;
+
+	hdd_enter_dev(dev);
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	if (wlan_cfg80211_nla_parse(tb,
+			ATTR_INFERENCE_MAX,
+			data, data_len,
+			qca_wlan_vendor_power_boost_policy)) {
+		hdd_err("TPB: nla_parse failed for IQ DATA Inference");
+		return -EINVAL;
+	}
+
+	errno = hdd_tx_pb_configure(hdd_ctx, tb);
+
+	return errno;
+}
+
+int wlan_hdd_cfg80211_tx_power_boost_config(struct wiphy *wiphy,
+					    struct wireless_dev *wdev,
+					    const void *data,
+					    int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_tx_power_boost_config(wiphy, wdev,
+							  data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 QDF_STATUS hdd_tx_powerboost_init(struct hdd_context *hdd_ctx)
 {
 	QDF_STATUS status;
@@ -525,6 +911,7 @@ QDF_STATUS hdd_tx_powerboost_init(struct hdd_context *hdd_ctx)
 					wlan_hdd_cfg80211_tx_pb_callback,
 					hdd_ctx);
 
+	hdd_debug("TPB: init done");
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -540,6 +927,7 @@ void hdd_tx_powerboost_deinit(struct hdd_context *hdd_ctx)
 	qdf_runtime_lock_deinit(&hdd_ctx->tx_pb.txpb_runtime_lock);
 	qdf_wake_lock_destroy(&hdd_ctx->tx_pb.txpb_wake_lock);
 	hdd_tx_powerboost_deinit_dma(hdd_ctx);
+	hdd_debug("TPB: deinit done");
 }
 
 #undef ATTR_INFERENCE_MAX

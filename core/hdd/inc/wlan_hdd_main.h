@@ -2040,6 +2040,7 @@ struct hdd_tx_pb_dma_buf {
  *
  * @tx_powerboost_enabled: Feature enabled or not
  * @pb_metadata: Powerboost meta data
+ * @txpb_app_launched: Userspace app launched or not
  * @dma: DMA info
  * @txpb_wake_lock: Tx power boost wake lock
  * @txpb_runtime_lock: Tx power boost runtime lock
@@ -2049,6 +2050,7 @@ struct hdd_tx_pb_dma_buf {
 struct hdd_tx_powerboost {
 	bool tx_powerboost_enabled;
 	struct reg_txpb_cmn_params pb_metadata;
+	bool txpb_app_launched;
 	struct hdd_tx_pb_dma_buf dma;
 	qdf_wake_lock_t txpb_wake_lock;
 	qdf_runtime_lock_t txpb_runtime_lock;

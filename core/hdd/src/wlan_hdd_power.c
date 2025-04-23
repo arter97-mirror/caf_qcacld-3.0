@@ -92,6 +92,8 @@
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include "wlan_dp_ucfg_api.h"
 #include "son_api.h"
+#include "wlan_hdd_tx_powerboost.h"
+
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
 #define HDD_SSR_BRING_UP_TIME 3000000
@@ -2276,6 +2278,9 @@ QDF_STATUS hdd_wlan_re_init(void)
 	ucfg_mlme_get_sap_internal_restart(hdd_ctx->psoc, &value);
 	if (value)
 		hdd_ssr_restart_sap(hdd_ctx);
+
+	hdd_tx_powerboost_reinit(hdd_ctx);
+
 	hdd_wlan_ssr_reinit_event();
 
 	if (hdd_ctx->is_wiphy_suspended)

@@ -24808,6 +24808,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 		vendor_command_policy(wlan_hdd_connect_ext_attr,
 				      QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX)
 	},
+	FEATURE_VENDOR_SUBCMD_CONFIG_TX_POWER_BOOST
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)
