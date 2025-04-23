@@ -116,6 +116,25 @@ void wlan_hdd_cfg80211_tx_pb_callback(void *arg,
  * Return: QDF_STATUS
  */
 QDF_STATUS hdd_tx_powerboost_reinit(struct hdd_context *hdd_ctx);
+
+/**
+ * wlan_hdd_tx_power_boost_dev_create() - Create tx powerboost dev entry
+ *
+ * This function creates the /dev/txpb entry which is used for mmap to
+ * copy the IQ samples from kernel to user space app
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_hdd_tx_power_boost_dev_create(void);
+
+/**
+ * wlan_hdd_tx_power_boost_dev_destroy() - Destroy tx powerboost dev entry
+ *
+ * This function deletes the /dev/txpb entry
+ *
+ * Return: void
+ */
+void wlan_hdd_tx_power_boost_dev_destroy(void);
 #else
 #define FEATURE_VENDOR_SUBCMD_CONFIG_TX_POWER_BOOST
 #define FEATURE_TX_POWER_BOOST_EVENTS
@@ -147,6 +166,17 @@ static inline
 QDF_STATUS hdd_tx_powerboost_reinit(struct hdd_context *hdd_ctx)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_hdd_tx_power_boost_dev_create(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void wlan_hdd_tx_power_boost_dev_destroy(void)
+{
 }
 #endif /* FEATURE_WLAN_TX_POWERBOOST */
 #endif /* __WLAN_HDD_TX_POWERBOOST_H */

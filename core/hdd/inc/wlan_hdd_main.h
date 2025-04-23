@@ -6186,4 +6186,19 @@ static inline void hdd_release_rtnl_lock(void)
 static inline bool hdd_hold_rtnl_lock(void) { return false; }
 static inline void hdd_release_rtnl_lock(void) { }
 #endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
+static inline
+struct class *wlan_hdd_class_create(const char *name)
+{
+	return class_create(THIS_MODULE, name);
+}
+#else
+static inline
+struct class *wlan_hdd_class_create(const char *name)
+{
+	return class_create(name);
+}
+#endif
+
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

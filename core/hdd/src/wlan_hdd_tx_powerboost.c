@@ -35,6 +35,7 @@
 #define TXPB_MAX_REQ_COUNT 5
 #define MEMORY_ALIGN      8
 #define TX_PB_WAKE_LOCK_DURATION     1000
+#define TXPB_DEVICE_NAME      "txpb"
 
 #define ATTR_INFERENCE_MAX    QCA_WLAN_VENDOR_ATTR_IQ_DATA_INFERENCE_MAX
 #define CMD_TYPE              QCA_WLAN_VENDOR_ATTR_IQ_DATA_INFERENCE_CMD_TYPE
@@ -306,6 +307,148 @@ hdd_txpb_req_dequeue(struct hdd_context *hdd_ctx,
 	hdd_err("TPB: Failed to find matching cookie: %llx", cookie);
 	return QDF_STATUS_E_INVAL;
 }
+
+static int
+tx_power_boost_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	int ret = 0;
+	struct page *page = NULL;
+	unsigned long size = (unsigned long)(vma->vm_end - vma->vm_start);
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	if (size > hdd_ctx->tx_pb.dma.size) {
+		hdd_err("TPB: mmap size check failed (%lu %u)",
+			size, hdd_ctx->tx_pb.dma.size);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	page = virt_to_page((unsigned long)hdd_ctx->tx_pb.dma.vaddr +
+				(vma->vm_pgoff << PAGE_SHIFT));
+	ret = remap_pfn_range(vma, vma->vm_start, page_to_pfn(page),
+			      size, vma->vm_page_prot);
+	hdd_debug("TPB: mmap for %zu bytes success", size);
+	if (ret != 0)
+		goto out;
+
+out:
+	return ret;
+}
+
+static ssize_t
+tx_power_boost_read(struct file *filep, char *buffer, size_t len,
+		    loff_t *offset)
+{
+	int ret;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	if (len > hdd_ctx->tx_pb.dma.size) {
+		hdd_err("TPB: Read overflow! (%zu %u)", len,
+			hdd_ctx->tx_pb.dma.size);
+		ret = -EFAULT;
+		goto out;
+	}
+
+	if (copy_to_user(buffer, hdd_ctx->tx_pb.dma.vaddr,
+			 len) == 0) {
+		hdd_debug("TPB: copy %zu bytes to the app", len);
+		ret = len;
+	} else {
+		ret = -EFAULT;
+	}
+
+out:
+	return ret;
+}
+
+static int
+tx_power_boost_open(struct inode *inodep, struct file *filep)
+{
+	int ret = 0;
+
+	hdd_debug("TPB: Device opened");
+	return ret;
+}
+
+static int
+tx_power_boost_release(struct inode *inodep, struct file *filep)
+{
+	hdd_debug("TPB: Device successfully closed");
+
+	return 0;
+}
+
+static const struct file_operations tx_power_boost_fops = {
+	.open = tx_power_boost_open,
+	.read = tx_power_boost_read,
+	.write = NULL,
+	.release = tx_power_boost_release,
+	.mmap = tx_power_boost_mmap,
+	.owner = THIS_MODULE,
+};
+
+#ifdef WLAN_CTRL_NAME
+extern struct class *class;
+extern dev_t device;
+static struct cdev tx_pb_cdev;
+unsigned int major, minor;
+
+void wlan_hdd_tx_power_boost_dev_destroy(void)
+{
+	cdev_del(&tx_pb_cdev);
+	device_destroy(class, MKDEV(major, minor));
+}
+
+QDF_STATUS wlan_hdd_tx_power_boost_dev_create(void)
+{
+	int ret;
+	struct device  *device_txpb;
+
+	major = MAJOR(device);
+	minor = MINOR(device) + 1;
+
+	device_txpb = device_create(class, NULL, MKDEV(major, minor),
+			       NULL, TXPB_DEVICE_NAME);
+	if (IS_ERR(device_txpb)) {
+		hdd_err("TPB: device_create (%s) failed", TXPB_DEVICE_NAME);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cdev_init(&tx_pb_cdev, &tx_power_boost_fops);
+	tx_pb_cdev.owner = THIS_MODULE;
+	ret = cdev_add(&tx_pb_cdev, MKDEV(major, minor), 1);
+	if (ret) {
+		pr_err("Failed to add cdev error");
+		goto cdev_add_err;
+	}
+
+	hdd_debug("TPB: device '%s' major: %d minor: %d initialized",
+		  TXPB_DEVICE_NAME, major, minor);
+	return QDF_STATUS_SUCCESS;
+
+cdev_add_err:
+	device_destroy(class, MKDEV(major, minor));
+	return QDF_STATUS_E_FAILURE;
+}
+#else
+void wlan_hdd_tx_power_boost_dev_destroy(void)
+{
+}
+
+QDF_STATUS wlan_hdd_tx_power_boost_dev_create(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+#endif
 
 /**
  * hdd_get_tx_pb_event_len() - calculate length of skb

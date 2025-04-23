@@ -20279,10 +20279,10 @@ void hdd_init_start_completion(void)
 }
 
 #ifdef WLAN_CTRL_NAME
-static unsigned int dev_num = 1;
+static unsigned int dev_num;
 static struct cdev wlan_hdd_state_cdev;
-static struct class *class;
-static dev_t device;
+struct class *class;
+dev_t device;
 
 static void hdd_set_adapter_wlm_def_level(struct hdd_context *hdd_ctx)
 {
@@ -20689,15 +20689,17 @@ const struct file_operations wlan_hdd_state_fops = {
 	.release = wlan_hdd_state_ctrl_param_release,
 };
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
-static struct class *wlan_hdd_class_create(const char *name)
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+static inline
+unsigned int wlan_hdd_number_of_devs(void)
 {
-	return class_create(THIS_MODULE, name);
+	return 2;
 }
 #else
-static struct class *wlan_hdd_class_create(const char *name)
+static inline
+unsigned int wlan_hdd_number_of_devs(void)
 {
-	return class_create(name);
+	return 1;
 }
 #endif
 
@@ -20706,11 +20708,12 @@ static int  wlan_hdd_state_ctrl_param_create(void)
 	unsigned int wlan_hdd_state_major = 0;
 	int ret;
 	struct device *dev;
+	unsigned int minor;
 
 	init_completion(&wlan_start_comp);
 	qdf_atomic_init(&wlan_hdd_state_fops_ref);
 
-	device = MKDEV(wlan_hdd_state_major, 0);
+	dev_num = wlan_hdd_number_of_devs();
 
 	ret = alloc_chrdev_region(&device, 0, dev_num, "qcwlanstate");
 	if (ret) {
@@ -20718,6 +20721,7 @@ static int  wlan_hdd_state_ctrl_param_create(void)
 		goto dev_alloc_err;
 	}
 	wlan_hdd_state_major = MAJOR(device);
+	minor = MINOR(device);
 	class = wlan_hdd_class_create(WLAN_CTRL_NAME);
 	if (IS_ERR(class)) {
 		pr_err("wlan_hdd_state class_create error");
@@ -20734,14 +20738,14 @@ static int  wlan_hdd_state_ctrl_param_create(void)
 
 	wlan_hdd_state_cdev.owner = THIS_MODULE;
 
-	ret = cdev_add(&wlan_hdd_state_cdev, device, dev_num);
+	ret = cdev_add(&wlan_hdd_state_cdev, MKDEV(wlan_hdd_state_major, minor), 1);
 	if (ret) {
 		pr_err("Failed to add cdev error");
 		goto cdev_add_err;
 	}
 
-	pr_info("wlan_hdd_state %s major(%d) initialized",
-		WLAN_CTRL_NAME, wlan_hdd_state_major);
+	pr_info("wlan_hdd_state %s major: %d minor: %d initialized",
+		WLAN_CTRL_NAME, wlan_hdd_state_major, minor);
 
 	return 0;
 
@@ -21898,6 +21902,12 @@ int hdd_driver_load(void)
 		hdd_err("Failed to create ctrl param; errno:%d", errno);
 		goto unregister_driver;
 	}
+
+	errno = wlan_hdd_tx_power_boost_dev_create();
+	if (errno) {
+		hdd_err("Failed to create dev txpb; errno:%d", errno);
+		goto unregister_driver;
+	}
 	hdd_create_wifi_root_obj_sysfs_files();
 out:
 	hdd_debug("%s: driver loaded", WLAN_MODULE_NAME);
@@ -22026,8 +22036,10 @@ void hdd_driver_unload(void)
 		osif_driver_sync_trans_stop(driver_sync);
 
 	hdd_distroy_wifi_root_obj_sysfs_files();
-	if (!soft_unload)
+	if (!soft_unload) {
+		wlan_hdd_tx_power_boost_dev_destroy();
 		wlan_hdd_state_ctrl_param_destroy();
+	}
 
 	/* trigger SoC remove */
 	wlan_hdd_unregister_driver();
