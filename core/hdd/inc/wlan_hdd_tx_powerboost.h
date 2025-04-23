@@ -53,7 +53,31 @@ QDF_STATUS hdd_tx_powerboost_init(struct hdd_context *hdd_ctx);
  * Return: void
  */
 void hdd_tx_powerboost_deinit(struct hdd_context *hdd_ctx);
+
+extern const struct nla_policy
+qca_wlan_vendor_power_boost_policy[QCA_WLAN_VENDOR_ATTR_IQ_DATA_INFERENCE_MAX + 1];
+
+#define FEATURE_TX_POWER_BOOST_EVENTS                                 \
+	[QCA_NL80211_VENDOR_SUBCMD_TX_POWER_BOOST_INDEX] = {          \
+		.vendor_id = QCA_NL80211_VENDOR_ID,                   \
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_IQ_DATA_INFERENCE,\
+	},                                                            \
+
+/**
+ * wlan_hdd_cfg80211_tx_pb_callback() - Callback for Tx Powerboost
+ * @arg: HDD context
+ * @params: event params
+ *
+ * This function extracts the Tx Powerboost metadata params and
+ * constructs the NL event to the kernel/upper layers
+ *
+ * Return: None
+ */
+void wlan_hdd_cfg80211_tx_pb_callback(void *arg,
+				      struct reg_txpb_evt_params *params);
 #else
+#define FEATURE_TX_POWER_BOOST_EVENTS
+
 static inline
 void hdd_tx_powerboost_target_config(struct hdd_context *hdd_ctx,
 				     struct wma_tgt_cfg *tgt_cfg)
@@ -68,6 +92,12 @@ QDF_STATUS hdd_tx_powerboost_init(struct hdd_context *hdd_ctx)
 
 static inline
 void hdd_tx_powerboost_deinit(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline
+void wlan_hdd_cfg80211_tx_pb_callback(void *arg,
+				      struct reg_txpb_evt_params *params)
 {
 }
 #endif /* FEATURE_WLAN_TX_POWERBOOST */

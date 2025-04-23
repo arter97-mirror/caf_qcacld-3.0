@@ -230,6 +230,7 @@
 #include "wlan_mlo_link_recfg.h"
 #include "wlan_psoc_mlme.h"
 #include "wlan_dnw_ucfg_api.h"
+#include "wlan_hdd_tx_powerboost.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -2140,6 +2141,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_IDLE_SHUTDOWN,
 	},
+	FEATURE_TX_POWER_BOOST_EVENTS
 };
 
 /**

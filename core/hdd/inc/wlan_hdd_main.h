@@ -2039,12 +2039,21 @@ struct hdd_tx_pb_dma_buf {
  * struct hdd_tx_powerboost - HDD Tx powerboost
  *
  * @tx_powerboost_enabled: Feature enabled or not
+ * @pb_metadata: Powerboost meta data
  * @dma: DMA info
+ * @txpb_wake_lock: Tx power boost wake lock
+ * @txpb_runtime_lock: Tx power boost runtime lock
+ * @txpb_req_q: Tx powerboost request queue
+ * @txpb_req_q_lock: Protect Tx powerboost request queue
  */
 struct hdd_tx_powerboost {
 	bool tx_powerboost_enabled;
+	struct reg_txpb_cmn_params pb_metadata;
 	struct hdd_tx_pb_dma_buf dma;
-
+	qdf_wake_lock_t txpb_wake_lock;
+	qdf_runtime_lock_t txpb_runtime_lock;
+	qdf_list_t txpb_req_q;
+	qdf_mutex_t txpb_req_q_lock;
 };
 #endif
 
