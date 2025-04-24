@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2524,6 +2524,9 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 	dp_stc->rtpm_control =
 		wlan_dp_cfg_is_stc_rtpm_control_enabled(&dp_ctx->dp_cfg);
 
+	if (dp_stc->rtpm_control)
+		hif_rtpm_register(HIF_RTPM_ID_DP_STC, NULL);
+
 	/* Init timer */
 	qdf_hrtimer_init(&dp_stc->flow_sampling_timer,
 			 wlan_dp_stc_flow_sampling_timer, QDF_CLOCK_MONOTONIC,
@@ -2563,6 +2566,10 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 
 	dp_info("STC: detach");
 	qdf_hrtimer_cancel(&dp_stc->flow_sampling_timer);
+
+	if (dp_stc->rtpm_control)
+		hif_rtpm_deregister(HIF_RTPM_ID_DP_STC);
+
 	qdf_periodic_work_stop_sync(&dp_stc->flow_monitor_work);
 	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
 	dp_context_free_mem(soc, DP_STC_CLASSIFIED_FLOW_TABLE_TYPE,
