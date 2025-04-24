@@ -2883,9 +2883,14 @@ policy_mgr_check_sap_go_force_scc(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct sta_ap_intf_check_work_ctx *work_info;
 	enum QDF_OPMODE opmode;
+	bool force;
+
+	/* Always trigger scc for 2nd ap if dbs is not supported */
+	force = policy_mgr_is_force_scc(psoc) &&
+		!policy_mgr_is_hw_dbs_capable(psoc);
 
 	if (reason_code != CSA_REASON_GO_BSS_STARTED &&
-	    reason_code != CSA_REASON_USER_INITIATED)
+	    reason_code != CSA_REASON_USER_INITIATED && !force)
 		return QDF_STATUS_SUCCESS;
 
 	pm_ctx = policy_mgr_get_context(psoc);
