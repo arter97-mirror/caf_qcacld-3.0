@@ -522,6 +522,26 @@ wlan_dp_send_burst_sample(struct wlan_dp_stc *dp_stc,
 }
 
 static inline QDF_STATUS
+wlan_dp_stc_send_flow_status(struct wlan_dp_stc *dp_stc,
+			     struct wlan_dp_stc_classified_flow_entry *c_entry,
+			     enum qca_flow_status_update_type status)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_objmgr_psoc *psoc = dp_ctx->psoc;
+	struct wlan_dp_stc_flow_status flow_status;
+
+	qdf_mem_copy(&flow_status.flow_tuple, &c_entry->flow_tuple,
+		     sizeof(struct flow_info));
+	flow_status.traffic_type = c_entry->traffic_type;
+	flow_status.status = status;
+	if (dp_ctx->dp_ops.send_flow_status_event)
+		return dp_ctx->dp_ops.send_flow_status_event(psoc, &flow_status,
+							WLAN_DP_LOG_ENABLE);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
 wlan_dp_stc_remove_sampling_table_entry(struct wlan_dp_stc *dp_stc,
 					struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
@@ -919,6 +939,9 @@ wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
 		wlan_dp_stc_dec_traffic_type(dp_stc, peer_tc,
 					     c_entry->traffic_type);
 
+	wlan_dp_stc_send_flow_status(dp_stc, c_entry,
+				     QCA_FLOW_STATUS_UPDATE_DELETE);
+
 	dp_stc_info(dp_stc->logmask,
 		    "STC: Purge flow c_id %u del_flags 0x%lx for peer %u vdev %u",
 		    c_entry->id, c_entry->del_flags, c_entry->peer_id,
@@ -1000,6 +1023,8 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 		return;
 
 	wlan_dp_stc_dec_traffic_type(dp_stc, peer_tc, c_entry->traffic_type);
+	wlan_dp_stc_send_flow_status(dp_stc, c_entry,
+				     QCA_FLOW_STATUS_UPDATE_PAUSE);
 }
 
 static inline void
@@ -1054,6 +1079,8 @@ flow_active:
 		return;
 
 	wlan_dp_stc_inc_traffic_type(dp_stc, peer_tc, c_entry->traffic_type);
+	wlan_dp_stc_send_flow_status(dp_stc, c_entry,
+				     QCA_FLOW_STATUS_UPDATE_RESUME);
 }
 
 static inline void
@@ -1239,6 +1266,9 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 		/* Got a free entry */
 		qdf_atomic_set(&c_entry->state,
 			       WLAN_DP_STC_CLASSIFIED_FLOW_STATE_ADDED);
+		qdf_mem_copy(&c_entry->flow_tuple,
+			     &s_entry->flow_samples.flow_tuple,
+			     sizeof(struct flow_info));
 		c_entry->traffic_type = s_entry->traffic_type;
 		c_entry->peer_id = s_entry->peer_id;
 		qdf_atomic_inc(&c_table->num_valid_entries);

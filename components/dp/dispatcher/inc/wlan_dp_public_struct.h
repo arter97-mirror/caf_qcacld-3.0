@@ -804,6 +804,18 @@ struct wlan_dp_stc_flow_samples {
 	uint8_t curr_stats_stage;
 };
 
+/*
+ * struct wlan_dp_stc_flow_status - Flow status
+ * @flow_tuple: tuple of the flow
+ * @traffic type: type of flow
+ * @status: Current status of flow
+ */
+struct wlan_dp_stc_flow_status {
+	struct flow_info flow_tuple;
+	uint8_t traffic_type;
+	enum qca_flow_status_update_type status;
+};
+
 /**
  * struct wlan_dp_psoc_callbacks - struct containing callback
  * to non-converged driver
@@ -858,6 +870,7 @@ struct wlan_dp_stc_flow_samples {
  * @wlan_dp_ipa_wds_peer_cb: Callback to handle IPA WDS peer events
  * @send_flow_stats_event: Callback to send flow stats vendor command
  * @send_flow_report_event: Callback to send flow report vendor command
+ * @send_flow_status_event: Callback to sed flow status vendor command
  * @dp_get_ndev_by_vdev_id: Callback API to get net device reference by vdev id
  */
 struct wlan_dp_psoc_callbacks {
@@ -963,6 +976,9 @@ struct wlan_dp_psoc_callbacks {
 				     uint32_t flags);
 	int (*send_flow_report_event)(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_dp_stc_flow_samples *flow_samples,
+				      uint32_t flags);
+	int (*send_flow_status_event)(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_dp_stc_flow_status *status,
 				      uint32_t flags);
 #endif
 	QDF_STATUS (*dp_get_ndev_by_vdev_id)(uint32_t vdev_id,

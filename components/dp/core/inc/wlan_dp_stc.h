@@ -417,6 +417,7 @@ struct wlan_dp_stc_peer_traffic_context {
  * @id: index of this classified flow entry in the classified flow table
  * @prev_tx_pkts: Last snapshot for TX pkts count
  * @prev_rx_pkts: Last snapshot for RX pkts count
+ * @flow_tuple: Flow tuple info
  * @flags: flags bitmap
  * @del_flags: delete flags bitmap
  * @traffic_type: Traffic type identified
@@ -435,6 +436,7 @@ struct wlan_dp_stc_classified_flow_entry {
 	uint16_t id;
 	uint32_t prev_tx_pkts;
 	uint32_t prev_rx_pkts;
+	struct flow_info flow_tuple;
 	unsigned long flags;
 	unsigned long del_flags;
 	enum qca_traffic_type traffic_type;

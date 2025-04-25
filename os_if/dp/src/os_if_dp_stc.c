@@ -516,14 +516,17 @@ os_if_dp_print_flow_burst_stats(struct wlan_dp_stc_flow_samples *flow_samples)
 
 static inline int
 os_if_dp_fill_flow_tuple(struct sk_buff *flow_sample_event,
-			 struct flow_info *flow_tuple)
+			 struct flow_info *flow_tuple, bool is_flow_status)
 {
 	struct nlattr *nla_attr;
 	int len = 0;
 	uint32_t attr_id;
 
 	if (flow_sample_event) {
-		attr_id = QCA_WLAN_VENDOR_ATTR_FLOW_STATS_FLOW_TUPLE;
+		if (is_flow_status)
+			attr_id = QCA_WLAN_VENDOR_ATTR_FLOW_STATUS_TUPLE;
+		else
+			attr_id = QCA_WLAN_VENDOR_ATTR_FLOW_STATS_FLOW_TUPLE;
 		nla_attr = nla_nest_start(flow_sample_event, attr_id);
 		if (!nla_attr) {
 			osif_err("STC: Flow tuple nest start failed");
@@ -1027,7 +1030,7 @@ os_if_dp_flow_stats_update_or_get_len(struct sk_buff *flow_sample_event,
 	int ret;
 
 	ret = os_if_dp_fill_flow_tuple(flow_sample_event,
-				       &flow_samples->flow_tuple);
+				       &flow_samples->flow_tuple, false);
 	if (ret < 0)
 		goto fail;
 	len += ret;
@@ -1158,8 +1161,86 @@ os_if_dp_send_flow_report_event(struct wlan_objmgr_psoc *psoc,
 	return os_if_dp_send_flow_stats(psoc, flow_samples, index, flags);
 }
 
+static int
+os_if_dp_send_flow_status_event(struct wlan_objmgr_psoc *psoc,
+				struct wlan_dp_stc_flow_status *status,
+				uint32_t flags)
+{
+	enum qca_nl80211_vendor_subcmds_index index =
+			QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_STATUS_INDEX;
+	struct sk_buff *flow_status_event;
+	struct wlan_objmgr_pdev *pdev;
+	struct pdev_osif_priv *os_priv;
+	uint32_t event_len = 0;
+	int ret;
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_DP_ID);
+	if (!pdev)
+		return -EINVAL;
+
+	os_priv = wlan_pdev_get_ospriv(pdev);
+	if (!os_priv) {
+		osif_err("PDEV OS private structure is NULL");
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
+		return -EINVAL;
+	}
+
+	/* length for flow tuple */
+	event_len = os_if_dp_fill_flow_tuple(NULL, &status->flow_tuple, true);
+	/* length for traffic type*/
+	event_len += nla_total_size(sizeof(u8));
+	/* length for status type*/
+	event_len += nla_total_size(sizeof(u8));
+
+	flow_status_event = wlan_cfg80211_vendor_event_alloc(os_priv->wiphy,
+							     NULL, event_len,
+							     index, GFP_KERNEL);
+	if (!flow_status_event) {
+		osif_err("STC: vendor event alloc failed for flow sample");
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
+		return -EINVAL;
+	}
+
+	if (flags & WLAN_DP_LOG_ENABLE) {
+		os_if_dp_print_tuple(&status->flow_tuple);
+		osif_nofl_debug("STC: traffic type: %u status: %u",
+				status->traffic_type,
+				status->status);
+	}
+
+	ret = os_if_dp_fill_flow_tuple(flow_status_event,
+				       &status->flow_tuple, true);
+	if (ret < 0)
+		goto fail;
+
+	if (nla_put_u8(flow_status_event,
+		       QCA_WLAN_VENDOR_ATTR_FLOW_STATUS_TRAFFIC_TYPE,
+		       status->traffic_type)) {
+		osif_err("STC: traffic type put failed");
+		goto fail;
+	}
+
+	if (nla_put_u8(flow_status_event,
+		       QCA_WLAN_VENDOR_ATTR_FLOW_STATUS_UPDATE_TYPE,
+		       status->status)) {
+		osif_err("STC: traffic type put failed");
+		goto fail;
+	}
+
+	wlan_cfg80211_vendor_event(flow_status_event, GFP_KERNEL);
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
+	return event_len;
+
+fail:
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_DP_ID);
+	osif_err("STC: flow status nla_put api failed");
+	wlan_cfg80211_vendor_free_skb(flow_status_event);
+	return -EINVAL;
+}
+
 void osif_dp_register_stc_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
 {
 	cb_obj->send_flow_stats_event = os_if_dp_send_flow_stats_event;
 	cb_obj->send_flow_report_event = os_if_dp_send_flow_report_event;
+	cb_obj->send_flow_status_event = os_if_dp_send_flow_status_event;
 }
