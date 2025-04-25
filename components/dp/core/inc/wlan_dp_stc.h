@@ -132,10 +132,10 @@ enum wlan_dp_stc_burst_state {
 	BURST_DETECTION_BURST_START,
 };
 
-#define DP_STC_SAMPLE_FLOWS_MAX 32
-#define DP_STC_SAMPLE_BIDI_FLOW_MAX 16
-#define DP_STC_SAMPLE_RX_FLOW_MAX 8
-#define DP_STC_SAMPLE_TX_FLOW_MAX 8
+#define DP_STC_SAMPLE_FLOWS_MAX 128
+#define DP_STC_SAMPLE_BIDI_FLOW_MAX 96
+#define DP_STC_SAMPLE_RX_FLOW_MAX 32
+#define DP_STC_SAMPLE_TX_FLOW_MAX 0
 
 #define DP_STC_LONG_WINDOW_MS 30000
 #define DP_STC_TIMER_THRESH_MS 600
@@ -180,6 +180,8 @@ enum wlan_stc_sampling_state {
 #define WLAN_DP_SAMPLING_CANDIDATE_VALID BIT(0)
 #define WLAN_DP_SAMPLING_CANDIDATE_TX_FLOW_VALID BIT(1)
 #define WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID BIT(2)
+/* Sample this candidate for TxRx stage only */
+#define WLAN_DP_SAMPLING_CANDIDATE_ONLY_TXRX_STAGE BIT(3)
 
 enum wlan_dp_flow_dir {
 	WLAN_DP_FLOW_DIR_INVALID,
@@ -216,6 +218,8 @@ struct wlan_dp_stc_sampling_candidate {
 #define WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY BIT(2)
 #define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_1_READY BIT(3)
 #define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_2_READY BIT(4)
+/* Sample this flow for TxRx stage only */
+#define WLAN_DP_SAMPLING_FLAGS_ONLY_TXRX_STAGE BIT(5)
 
 #define WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT BIT(0)
 #define WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT BIT(1)
@@ -226,7 +230,7 @@ struct wlan_dp_stc_sampling_candidate {
  * struct wlan_dp_stc_sampling_table_entry - Sampling table entry
  * @state: State of sampling for this flow
  * @dir: direction of flow
- * @burst_stats_report_ts: Burst stats reported timestamp
+ * @last_stats_report_ts: Timestamp of last stats reported for this flow
  * @flags: flags set by timer
  * @flags1: flags set by periodic work
  * @id: index of this sampling table entry in the sampling table
@@ -249,7 +253,7 @@ struct wlan_dp_stc_sampling_candidate {
 struct wlan_dp_stc_sampling_table_entry {
 	enum wlan_stc_sampling_state state;
 	enum wlan_dp_flow_dir dir;
-	uint64_t last_burst_stats_report_ts;
+	uint64_t last_stats_report_ts;
 	uint32_t flags;
 	uint32_t flags1;
 	uint8_t id;

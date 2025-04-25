@@ -34,7 +34,8 @@
 #define WLAN_DP_STC_PING_INACTIVE_TIMEOUT_NS 3000000000
 #define FLOW_INACTIVE_TIME_THRESH_NS 20000000000
 #define FLOW_RESUME_TIME_THRESH_NS 500000000
-#define FLOW_SHORTLIST_PKT_RATE_PER_SEC_THRESH 15
+#define FLOW_SHORTLIST_BURST_PKT_RATE_PER_SEC_THRESH 15
+#define FLOW_SHORTLIST_TXRX_PKT_RATE_PER_SEC_THRESH 2
 #define WLAN_DP_STC_BK_TPUT_TEST_THRESH_NS 1000000000
 /*
  * Value of WLAN_DP_STC_BK_PKT_THRESH is dependent on the value of
@@ -317,6 +318,10 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 	}
 
 	s_entry->peer_id = candidate->peer_id;
+
+	if (candidate->flags & WLAN_DP_SAMPLING_CANDIDATE_ONLY_TXRX_STAGE)
+		s_entry->flags |= WLAN_DP_SAMPLING_FLAGS_ONLY_TXRX_STAGE;
+
 	if (candidate->flags & WLAN_DP_SAMPLING_CANDIDATE_TX_FLOW_VALID) {
 		struct wlan_dp_spm_flow_info *tx_flow;
 
@@ -350,13 +355,13 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 			  rx_flow->flow_init_ts);
 	}
 
-	dp_info("STC: Sample %s flow (tuple: %s) %s %s cur_ts %llu",
+	dp_info("STC: Sample %s flow (tuple: %s) %s %s flags:0x%x cur_ts %llu",
 		flow_dir_str,
 		dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
 				      flow_tuple_str, BUF_LEN_MAX),
 		tx_flow_valid ? tx_flow_str : empty_str,
 		rx_flow_valid ? rx_flow_str : empty_str,
-		qdf_sched_clock());
+		s_entry->flags, dp_stc_get_timestamp());
 
 	s_entry->state = WLAN_DP_SAMPLING_STATE_FLOW_ADDED;
 	candidate->flags = 0;
@@ -1332,6 +1337,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 
 	for (rx_flow_id = 0; rx_flow_id < fst->max_entries; rx_flow_id++) {
 		uint64_t pkt_rate;
+		bool only_txrx_stage = true;
 
 		if (!rx && !bidi)
 			break;
@@ -1348,8 +1354,11 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 
 		pkt_rate = (rx_flow->num_pkts * QDF_NSEC_PER_SEC) /
 				(cur_ts - rx_flow->flow_init_ts);
-		if (pkt_rate < FLOW_SHORTLIST_PKT_RATE_PER_SEC_THRESH)
+		if (pkt_rate < FLOW_SHORTLIST_TXRX_PKT_RATE_PER_SEC_THRESH)
 			continue;
+		else if (pkt_rate >
+			 FLOW_SHORTLIST_BURST_PKT_RATE_PER_SEC_THRESH)
+			only_txrx_stage = false;
 
 		rx_flow_tuple_hash = wlan_dp_fisa_get_flow_tuple_hash(rx_flow);
 		/*
@@ -1371,25 +1380,25 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 				candidates[candidate_idx].peer_id =
 							rx_flow->peer_id;
 				candidates[candidate_idx].dir = WLAN_DP_FLOW_DIR_RX;
-				candidate_idx++;
 				rx--;
 				candidate_selected = true;
 			}
-			continue;
-		}
-
-		if (bidi) {
+		} else if (bidi) {
 			wlan_dp_stc_fill_bidi_flow_candidate(dp_stc,
 					&candidates[candidate_idx],
 					tx_flow_id, tx_flow_metadata,
 					rx_flow_id, rx_flow->metadata);
 			candidates[candidate_idx].peer_id = rx_flow->peer_id;
 			candidates[candidate_idx].dir = WLAN_DP_FLOW_DIR_BIDI;
-			candidate_idx++;
 			bidi--;
 			candidate_selected = true;
-			continue;
 		}
+
+		if (candidates[candidate_idx].flags &
+		    WLAN_DP_SAMPLING_CANDIDATE_VALID)
+			candidates[candidate_idx].flags |= only_txrx_stage ?
+				WLAN_DP_SAMPLING_CANDIDATE_ONLY_TXRX_STAGE : 0;
+		candidate_idx++;
 	}
 
 	if (!candidate_selected)
@@ -1465,6 +1474,9 @@ other_checks:
 			 * Set flag to indicate that the txrx samples
 			 * have been reported
 			 */
+			if (s_entry->flags &
+			    WLAN_DP_SAMPLING_FLAGS_ONLY_TXRX_STAGE)
+				s_entry->last_stats_report_ts = cur_ts;
 		}
 
 		if (wlan_dp_burst_samples_ready(s_entry) &&
@@ -1475,16 +1487,15 @@ other_checks:
 			    DP_STC_BURST_STAGE_MAX) {
 				s_entry->flags1 |=
 				WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_2_SENT;
-				s_entry->last_burst_stats_report_ts = cur_ts;
+				s_entry->last_stats_report_ts = cur_ts;
 			} else {
 				s_entry->flags1 |=
 				WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_1_SENT;
 			}
 		}
 
-		if (wlan_dp_burst_samples_reported(s_entry) &&
-		    s_entry->last_burst_stats_report_ts &&
-		    cur_ts - s_entry->last_burst_stats_report_ts >
+		if (s_entry->last_stats_report_ts &&
+		    cur_ts - s_entry->last_stats_report_ts >
 						FLOW_CLASSIFY_WAIT_TIME_NS) {
 			wlan_dp_stc_remove_sampling_table_entry(dp_stc,
 								s_entry);
@@ -1920,8 +1931,15 @@ sample:
 		if (s_entry->next_sample_idx == DP_STC_TXRX_SAMPLES_MAX) {
 			s_entry->flags |=
 				WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY;
-			s_entry->state =
+			if (s_entry->flags &
+			    WLAN_DP_SAMPLING_FLAGS_ONLY_TXRX_STAGE) {
+				s_entry->state =
+				WLAN_DP_SAMPLING_STATE_SAMPLING_DONE;
+				wlan_dp_stc_stop_flow_tracking(dp_stc, s_entry);
+			} else {
+				s_entry->state =
 				WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1;
+			}
 		}
 		sampling_pending = true;
 		break;
@@ -2089,7 +2107,8 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 
 	for (i = 0; i < DP_STC_SAMPLE_FLOWS_MAX; i++) {
 		s_entry = &s_table->entries[i];
-		if (s_entry->state == WLAN_DP_SAMPLING_STATE_INIT)
+		if (s_entry->state == WLAN_DP_SAMPLING_STATE_INIT ||
+		    s_entry->state == WLAN_DP_SAMPLING_STATE_CLASSIFIED)
 			continue;
 
 		/* Neither samples have been reported, so skip this flow */
@@ -2128,8 +2147,11 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		 * 1) txrx stats reported and flow classified as valid type
 		 * 2) burst stats reported and flow classification attempted
 		 */
-		if (wlan_dp_stc_is_traffic_type_known(s_entry->traffic_type) ||
-		    s_entry->last_burst_stats_report_ts) {
+		if (wlan_dp_stc_is_traffic_type_known(
+					flow_classify_result->traffic_type) ||
+		    s_entry->last_stats_report_ts) {
+			s_entry->traffic_type =
+					flow_classify_result->traffic_type;
 			s_entry->ul_tid = flow_classify_result->ul_tid;
 			s_entry->state = WLAN_DP_SAMPLING_STATE_CLASSIFIED;
 		}
