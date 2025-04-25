@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -811,7 +811,7 @@ static void dp_ipa_set_perf_level(struct wlan_dp_psoc_context *dp_ctx,
 				  uint64_t *tx_pkts, uint64_t *rx_pkts,
 				  uint32_t *ipa_tx_pkts, uint32_t *ipa_rx_pkts)
 {
-	if (ucfg_ipa_is_fw_wdi_activated(dp_ctx->pdev)) {
+	if (ucfg_ipa_is_fw_wdi_activated(dp_ctx->psoc)) {
 		ucfg_ipa_uc_stat_query(dp_ctx->pdev, ipa_tx_pkts,
 				       ipa_rx_pkts);
 		*tx_pkts += *ipa_tx_pkts;
@@ -1613,7 +1613,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	 * only when TPUT can reach VHT80 KPI and IPA is disabled,
 	 * for other cases, follow general voting logic
 	 */
-	if (!ucfg_ipa_is_fw_wdi_activated(dp_ctx->pdev) &&
+	if (!ucfg_ipa_is_fw_wdi_activated(dp_ctx->psoc) &&
 	    policy_mgr_is_current_hwmode_dbs(dp_ctx->psoc) &&
 	    (total_pkts > dp_ctx->dp_cfg.bus_bw_dbs_threshold) &&
 	    (tput_level < TPUT_LEVEL_SUPER_HIGH)) {
