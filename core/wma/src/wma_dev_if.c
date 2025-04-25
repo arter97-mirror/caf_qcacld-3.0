@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -119,6 +119,7 @@
 #include "target_if.h"
 #include <wlan_psoc_mlme_api.h>
 #include "wlan_objmgr_vdev_obj.h"
+#include "wlan_twt_cfg_ext_api.h"
 
 /*
  * FW only supports 8 clients in SAP/GO mode for D3 WoW feature
@@ -7384,7 +7385,7 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 		goto error;
 	}
 
-	is_twt_disabled_on_scan = mlme_is_twt_disabled_on_scan(mac->psoc);
+	wlan_twt_cfg_get_twt_dis_on_scan(mac->psoc, &is_twt_disabled_on_scan);
 	status = mlme_check_index_setparam(setparam,
 					   wmi_vdev_param_disable_scan_start_twt,
 					   is_twt_disabled_on_scan,
