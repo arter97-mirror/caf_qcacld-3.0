@@ -13767,6 +13767,11 @@ bool policy_mgr_any_other_vdev_on_same_mac_as_freq(
 		if (pm_conc_connection_list[conn_index].vdev_id == vdev_id)
 			continue;
 
+		if (pm_conc_connection_list[conn_index].mode == PM_NDI_MODE ||
+		    pm_conc_connection_list[conn_index].mode ==
+			PM_NAN_DISC_MODE)
+			continue;
+
 		if (policy_mgr_are_2_freq_on_same_mac(
 				psoc,
 				pm_conc_connection_list[conn_index].freq,
