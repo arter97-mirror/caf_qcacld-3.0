@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1482,7 +1482,7 @@
  * </ini>
  */
 #define CFG_DP_STC_RTPM_CONTROL \
-	CFG_INI_BOOL("dp_stc_rtpm_control", true, \
+	CFG_INI_BOOL("dp_stc_rtpm_control", false, \
 		     "Enable/Disable RTPM control by STC module")
 
 #define CFG_DP_STC \
