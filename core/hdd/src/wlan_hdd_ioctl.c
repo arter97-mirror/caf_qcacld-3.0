@@ -312,7 +312,11 @@ static bool hdd_check_and_fill_freq(uint32_t in_chan, qdf_freq_t *freq,
 	else
 		return false;
 
-	if (!wlan_reg_is_freq_enabled(pdev, *freq, REG_CURRENT_PWR_MODE))
+	hdd_debug("channel num: %d, freq: %d", in_chan, *freq);
+
+	/* freq = 0 is a valid input, so return true */
+	if (*freq &&
+	    !wlan_reg_is_freq_enabled(pdev, *freq, REG_CURRENT_PWR_MODE))
 		return false;
 
 	return true;
