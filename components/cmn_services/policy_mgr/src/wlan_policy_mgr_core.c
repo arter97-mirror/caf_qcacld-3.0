@@ -5711,7 +5711,7 @@ void  policy_mgr_add_sap_mandatory_6ghz_chan(struct wlan_objmgr_psoc *psoc)
 		if (WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(ch_freq_list[i])) {
 			status = wlan_reg_get_6g_chan_ap_power(
 				pm_ctx->pdev, ch_freq_list[i], &is_psd,
-				&tx_power, &eirp_psd_power);
+				&tx_power, &eirp_psd_power, false);
 			if (status != QDF_STATUS_SUCCESS || !tx_power)
 				continue;
 			pm_ctx->sap_mandatory_channels[
