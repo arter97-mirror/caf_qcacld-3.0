@@ -827,10 +827,11 @@ wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc *dp_stc,
 			     enum qca_traffic_type traffic_type)
 {
 	uint32_t val = 0;
+	bool is_rtpm_flow = false;
 
 	switch (traffic_type) {
 	case QCA_TRAFFIC_TYPE_STREAMING:
-		dp_stc->rtpm_control_flow_cnt++;
+		is_rtpm_flow = true;
 		val = qdf_atomic_inc_return(&peer_tc->num_streaming);
 		break;
 	case QCA_TRAFFIC_TYPE_GAMING:
@@ -843,11 +844,11 @@ wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc *dp_stc,
 		val = qdf_atomic_inc_return(&peer_tc->num_video_call);
 		break;
 	case QCA_TRAFFIC_TYPE_BROWSING:
-		dp_stc->rtpm_control_flow_cnt++;
+		is_rtpm_flow = true;
 		val = qdf_atomic_inc_return(&peer_tc->num_browsing);
 		break;
 	case QCA_TRAFFIC_TYPE_APERIODIC_BURSTS:
-		dp_stc->rtpm_control_flow_cnt++;
+		is_rtpm_flow = true;
 		val = qdf_atomic_inc_return(&peer_tc->num_aperiodic_bursts);
 		break;
 	default:
@@ -857,7 +858,8 @@ wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc *dp_stc,
 	if (val == 1)
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 
-	if (dp_stc->rtpm_control && dp_stc->rtpm_control_flow_cnt == 1)
+	if (dp_stc->rtpm_control && is_rtpm_flow &&
+	    (++dp_stc->rtpm_control_flow_cnt == 1))
 		hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_DP_STC);
 }
 
@@ -867,10 +869,11 @@ wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc *dp_stc,
 			     enum qca_traffic_type traffic_type)
 {
 	uint32_t val = 0;
+	bool is_rtpm_flow = false;
 
 	switch (traffic_type) {
 	case QCA_TRAFFIC_TYPE_STREAMING:
-		dp_stc->rtpm_control_flow_cnt--;
+		is_rtpm_flow = true;
 		val = qdf_atomic_dec_and_test(&peer_tc->num_streaming);
 		break;
 	case QCA_TRAFFIC_TYPE_GAMING:
@@ -883,11 +886,11 @@ wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc *dp_stc,
 		val = qdf_atomic_dec_and_test(&peer_tc->num_video_call);
 		break;
 	case QCA_TRAFFIC_TYPE_BROWSING:
-		dp_stc->rtpm_control_flow_cnt--;
+		is_rtpm_flow = true;
 		val = qdf_atomic_dec_and_test(&peer_tc->num_browsing);
 		break;
 	case QCA_TRAFFIC_TYPE_APERIODIC_BURSTS:
-		dp_stc->rtpm_control_flow_cnt--;
+		is_rtpm_flow = true;
 		val = qdf_atomic_dec_and_test(&peer_tc->num_aperiodic_bursts);
 		break;
 	default:
@@ -897,7 +900,8 @@ wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc *dp_stc,
 	if (val)
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 
-	if (dp_stc->rtpm_control && !dp_stc->rtpm_control_flow_cnt)
+	if (dp_stc->rtpm_control && is_rtpm_flow &&
+	    !(--dp_stc->rtpm_control_flow_cnt))
 		hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP_STC);
 }
 
@@ -2628,12 +2632,15 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 
 	dp_info("STC: detach");
 	qdf_hrtimer_cancel(&dp_stc->flow_sampling_timer);
-
-	if (dp_stc->rtpm_control)
-		hif_rtpm_deregister(HIF_RTPM_ID_DP_STC);
-
 	qdf_periodic_work_stop_sync(&dp_stc->flow_monitor_work);
 	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
+
+	if (dp_stc->rtpm_control) {
+		if (dp_stc->rtpm_control_flow_cnt)
+			hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP_STC);
+		hif_rtpm_deregister(HIF_RTPM_ID_DP_STC);
+	}
+
 	dp_context_free_mem(soc, DP_STC_CLASSIFIED_FLOW_TABLE_TYPE,
 			    dp_stc->classified_flow_table);
 	dp_context_free_mem(soc, DP_STC_TX_FLOW_TABLE_TYPE,
