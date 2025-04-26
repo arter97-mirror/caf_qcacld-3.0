@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,7 +32,8 @@
 /* L1 is the lowest verbosity level */
 #define WLAN_DP_STC_LOGMASK_VERBOSE_L1 BIT(2)
 #define WLAN_DP_STC_LOGMASK_VERBOSE_L2 BIT(3)
-#define WLAN_DP_STC_LOGMASK_VERBOSE_L3 BIT(4)
+#define WLAN_DP_STC_LOGMASK_BURST BIT(4)
+#define WLAN_DP_STC_LOGMASK_TXRX_PKT BIT(5)
 
 #define dp_stc_info(debug_mask, params...)				\
 	do {								\
@@ -50,10 +51,9 @@
 				       QDF_MODULE_ID_DP, ## params);	\
 	} while (0)
 
-#define dp_stc_burst_debug(debug_mask, params...)			\
+#define dp_stc_log(debug_mask, log_level, params...)			\
 	do {								\
-		if (unlikely((debug_mask) &				\
-		    WLAN_DP_STC_LOGMASK_VERBOSE_L3))			\
+		if (unlikely((debug_mask) & (log_level)))		\
 			__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH,	\
 				       QDF_MODULE_ID_DP, ## params);	\
 	} while (0)

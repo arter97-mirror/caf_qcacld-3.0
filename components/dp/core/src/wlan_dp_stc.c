@@ -102,6 +102,13 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 						   &flow_entry->transition_flags))
 			DP_STC_UPDATE_WIN_MIN_MAX_STATS(txrx_min_max_stats->pkt_iat,
 							pkt_iat);
+		dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_TXRX_PKT,
+			   "STC: [%hu:%hu] mdata 0x%x len %u [%u - %u] iat %llu [%llu - %llu]",
+			   s, w, flow_entry->metadata,
+			   pkt_len, txrx_min_max_stats->pkt_size_min,
+			   txrx_min_max_stats->pkt_size_max,
+			   pkt_iat, txrx_min_max_stats->pkt_iat_min,
+			   txrx_min_max_stats->pkt_iat_max);
 	}
 	/* TxRx Stats - End */
 
@@ -145,10 +152,10 @@ check_burst:
 			flow_entry->burst_stats.burst_count++;
 			flow_entry->cur_burst_bytes +=
 					flow_entry->burst_start_detect_bytes;
-			dp_stc_burst_debug(dp_stc->logmask,
-			    "STC: Flow mdata 0x%x Burst start detected: %u B",
-			    flow_entry->metadata,
-			    flow_entry->cur_burst_bytes);
+			dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
+				   "STC: Flow mdata 0x%x Burst start: %u B",
+				   flow_entry->metadata,
+				   flow_entry->cur_burst_bytes);
 		} else {
 			/*
 			 * (time_delta > BURST_START_TIME_THRESHOLD_NS &&
@@ -188,10 +195,9 @@ check_burst:
 			flow_entry->burst_start_detect_bytes = 0;
 			flow_entry->cur_burst_bytes = 0;
 			pkt_iat = 0;
-			dp_stc_burst_debug(dp_stc->logmask,
-			   "STC: Flow mdata 0x%x Burst end with size %u dur %u",
-			   flow_entry->metadata,
-			   burst_size, burst_dur);
+			dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
+				   "STC: Flow mdata 0x%x Burst end with size %u dur %u",
+				   flow_entry->metadata, burst_size, burst_dur);
 			goto check_burst;
 		}
 
