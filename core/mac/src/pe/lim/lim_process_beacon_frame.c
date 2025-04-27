@@ -261,7 +261,7 @@ lim_validate_rsn_ie(const uint8_t *ie_ptr, uint16_t ie_len)
 		return QDF_STATUS_SUCCESS;
 
 	qdf_mem_zero(&crypto_params, sizeof(struct wlan_crypto_params));
-	status = wlan_crypto_rsnie_check(&crypto_params, rsn_ie);
+	status = wlan_crypto_rsnie_check(&crypto_params, rsn_ie, NULL);
 	if (status != QDF_STATUS_SUCCESS) {
 		pe_debug_rl("RSN IE check failed %d", status);
 		return QDF_STATUS_E_INVAL;

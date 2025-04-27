@@ -221,6 +221,13 @@ enum {
 	IEEE80211_ELEMID_TCLAS_PROCESS = 44,
 	IEEE80211_ELEMID_INT_ACC_CAT_PRIORITY = 184,
 	IEEE80211_ELEMID_VENDOR           = 221,  /* vendor private */
+	IEEE80211_ELEMID_EXTN             = 255,
+};
+
+/* Element ID extensions
+ */
+enum {
+	IEEE80211_ELEMID_EXT_QOS_ATTR             = 113, /* QoS Characteristics IE */
 };
 
 /*
@@ -649,5 +656,17 @@ struct intra_access_priority_category_elem {
 	uint8_t ie_len;
 	uint8_t intra_access_priority;
 } __packed;
+
+/* WME stream classes */
+#define WME_AC_BE                          0    /* best effort */
+#define WME_AC_BK                          1    /* background */
+#define WME_AC_VI                          2    /* video */
+#define WME_AC_VO                          3    /* voice */
+
+#define TID_TO_WME_AC(_tid) (      \
+    (((_tid) == 0) || ((_tid) == 3)) ? WME_AC_BE : \
+    (((_tid) == 1) || ((_tid) == 2)) ? WME_AC_BK : \
+    (((_tid) == 4) || ((_tid) == 5)) ? WME_AC_VI : \
+    WME_AC_VO)
 
 #endif //_IEEE80211_H_
