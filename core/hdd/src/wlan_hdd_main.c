@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -11362,6 +11362,12 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 			hdd_err("Failed to change hw mode");
 			return -EINVAL;
 		}
+
+		if (ucfg_scan_get_pdev_status(hdd_ctx->pdev) !=
+		    SCAN_NOT_IN_PROGRESS)
+			wlan_abort_scan(hdd_ctx->pdev,
+					wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev),
+					INVAL_VDEV_ID, INVAL_SCAN_ID, true);
 
 		status =
 		  qdf_event_reset(&adapter->qdf_monitor_mode_vdev_up_event);
