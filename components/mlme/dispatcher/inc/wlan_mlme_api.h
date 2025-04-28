@@ -5010,6 +5010,17 @@ wlan_mlme_get_ch_width_from_phymode(enum wlan_phymode phy_mode);
 enum phy_ch_width
 wlan_mlme_get_peer_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t *mac);
 
+/**
+ * wlan_mlme_get_max_peer_ch_width() - get max ch_width of the given
+ * peer
+ * @psoc: psoc context
+ * @mac: peer mac
+ *
+ * Return: enum phy_ch_width
+ */
+enum phy_ch_width
+wlan_mlme_get_max_peer_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t *mac);
+
 #if defined(WLAN_FEATURE_SR)
 /**
  * wlan_mlme_get_sr_enable_modes() - get mode for which SR is enabled
