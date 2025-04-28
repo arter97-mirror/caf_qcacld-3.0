@@ -3706,6 +3706,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_con_mode con_mode;
 	uint32_t nan_2g_freq, nan_5g_freq;
 	uint8_t cc_mode;
+	uint8_t scc_vdev_id;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3730,12 +3731,16 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	 * select other band channel if not.
 	 */
 	if (!ch_freq) {
+		scc_vdev_id =
+			policy_mgr_fetch_scc_vdev_id(psoc, sap_vdev_id,
+						     sap_ch_freq);
 		if (!policy_mgr_any_other_vdev_on_same_mac_as_freq(psoc,
 								   sap_ch_freq,
 								   sap_vdev_id)) {
 			return QDF_STATUS_SUCCESS;
 		} else if (con_mode == PM_SAP_MODE &&
 			   !policy_mgr_is_hw_dbs_capable(psoc) &&
+			   scc_vdev_id == WLAN_UMAC_VDEV_ID_MAX &&
 			   !policy_mgr_is_sta_sap_scc(psoc, sap_ch_freq, true) &&
 			   cc_mode != QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND) {
 			policymgr_nofl_debug("Mode %d MCC situation in non-dbs hw STA, no SCC freq found %d",
