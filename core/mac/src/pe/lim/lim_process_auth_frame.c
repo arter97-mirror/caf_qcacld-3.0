@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2387,7 +2387,8 @@ lim_get_vdev_id_from_macaddr(struct wlan_objmgr_pdev *pdev, uint8_t *mac_addr)
 			return WLAN_UMAC_VDEV_ID_MAX;
 		}
 
-		wlan_objmgr_vdev_get_ref(vdev, WLAN_MGMT_RX_ID);
+		vdev_id =  wlan_vdev_get_id(vdev);
+		return vdev_id;
 	}
 
 	vdev_id =  wlan_vdev_get_id(vdev);
