@@ -3419,6 +3419,7 @@ static void lim_fill_assoc_ind_he_bw_info(tpLimMlmAssocInd assoc_ind,
 		assoc_ind->chan_info.rate_flags =
 		    lim_convert_rate_flags_enum(assoc_ind->chan_info.rate_flags,
 						sta_ds->ch_width);
+		assoc_ind->mode = SIR_SME_PHY_MODE_HE;
 	}
 }
 
