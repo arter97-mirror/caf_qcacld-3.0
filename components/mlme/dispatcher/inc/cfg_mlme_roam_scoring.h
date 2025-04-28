@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -589,7 +589,7 @@
  * </ini>
  */
 #define CFG_SCORING_2G_BAND_WEIGHTAGE CFG_INI_UINT( \
-	"RoamAPScore_2G_Weight ", \
+	"RoamAPScore_2G_Weight", \
 	RoamAPScore_2G_Weight_min, \
 	RoamAPScore_2G_Weight_max, \
 	RoamAPScore_2G_Weight_default, \
@@ -625,7 +625,7 @@
  * </ini>
  */
 #define CFG_SCORING_5G_BAND_WEIGHTAGE CFG_INI_UINT( \
-	"RoamAPScore_5G_Weight ", \
+	"RoamAPScore_5G_Weight", \
 	RoamAPScore_5G_Weight_min, \
 	RoamAPScore_5G_Weight_max, \
 	RoamAPScore_5G_Weight_default, \
@@ -661,7 +661,7 @@
  * </ini>
  */
 #define CFG_SCORING_6G_BAND_WEIGHTAGE CFG_INI_UINT( \
-	"RoamAPScore_6G_Weight ", \
+	"RoamAPScore_6G_Weight", \
 	RoamAPScore_6G_Weight_min, \
 	RoamAPScore_6G_Weight_max, \
 	RoamAPScore_6G_Weight_default, \
