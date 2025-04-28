@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -367,7 +367,8 @@ static void dump_peer_stats_info(wmi_peer_stats_info *stats)
 		 stats->last_rx_bitrate_kbps,
 		 stats->peer_rssi, stats->tx_succeed);
 	for (i = 0; i < WMI_MAX_CHAINS; i++)
-		wmi_debug("chain%d_rssi %d", i, stats->peer_rssi_per_chain[i]);
+		if (stats->peer_rssi_per_chain[i])
+			wmi_debug("chain%d_rssi %d", i, stats->peer_rssi_per_chain[i]);
 }
 
 /**
@@ -398,13 +399,10 @@ extract_peer_tx_pkt_per_mcs_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 		if (!peer_stats_info->tx_pkt_per_mcs)
 			return QDF_STATUS_E_NOMEM;
-		wmi_debug("Tx rate counts");
 		for (j = 0, i = index; j < peer_stats_info->num_tx_rate_counts;
 		     j++, i++) {
 			peer_stats_info->tx_pkt_per_mcs[j] =
 						param_buf->tx_rate_counts[i];
-			wmi_nofl_debug("MCS [%d] %d", j,
-				       peer_stats_info->tx_pkt_per_mcs[j]);
 		}
 	} else {
 		wmi_err("invalid idx %d curr peer tx_rate_counts %d total tx_rate_count %d",
@@ -442,13 +440,10 @@ extract_peer_rx_pkt_per_mcs_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 
 		if (!peer_stats_info->rx_pkt_per_mcs)
 			return QDF_STATUS_E_NOMEM;
-		wmi_debug("Rx rate counts");
 		for (j = 0, i = index; j < peer_stats_info->num_rx_rate_counts;
 		     j++, i++) {
 			peer_stats_info->rx_pkt_per_mcs[j] =
 						param_buf->rx_rate_counts[i];
-			wmi_nofl_debug("MCS [%d] %d", j,
-				       peer_stats_info->rx_pkt_per_mcs[j]);
 		}
 	} else {
 		wmi_err("invalid idx %d curr peer rx_rate_counts %d total rx_rate_count %d",
