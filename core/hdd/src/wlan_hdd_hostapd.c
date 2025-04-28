@@ -3239,6 +3239,11 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		}
 
 		hdd_green_ap_add_sta(hdd_ctx);
+
+		if (!bAuthRequired)
+			hdd_son_deliver_peer_authorize_event(link_info,
+							     event->staMac.bytes);
+
 		hdd_son_deliver_assoc_disassoc_event(adapter,
 						     event->staMac,
 						     event->status,
