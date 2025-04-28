@@ -71,6 +71,20 @@ target_if_cm_roam_register_vendor_handoff_rx_ops(
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+static void target_if_cm_roam_register_partner_bringup_event_rx_ops(
+					struct wlan_cm_roam_rx_ops *rx_ops)
+{
+	rx_ops->roam_partner_bringup_event = cm_roam_partner_bringup_handler;
+}
+#else
+static inline void
+target_if_cm_roam_register_partner_bringup_event_rx_ops(
+					struct wlan_cm_roam_rx_ops *rx_ops)
+{
+}
+#endif
+
 void
 target_if_cm_roam_register_rx_ops(struct wlan_cm_roam_rx_ops *rx_ops)
 {
@@ -86,6 +100,7 @@ target_if_cm_roam_register_rx_ops(struct wlan_cm_roam_rx_ops *rx_ops)
 	rx_ops->roam_pmkid_request_event_rx = cm_roam_pmkid_request_handler;
 	rx_ops->roam_candidate_frame_event = cm_roam_candidate_event_handler;
 	target_if_cm_roam_register_vendor_handoff_rx_ops(rx_ops);
+	target_if_cm_roam_register_partner_bringup_event_rx_ops(rx_ops);
 }
 
 int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
@@ -870,6 +885,18 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		target_if_err("Add keys failed");
 		ret = 0;
+	}
+
+	if (!roam_rx_ops->roam_partner_bringup_event) {
+		target_if_err("MLO partner bringup failed");
+		ret = -EINVAL;
+		goto done;
+	}
+
+	status = roam_rx_ops->roam_partner_bringup_event(ml_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("MLO partner bringup failed");
+		ret = -EINVAL;
 	}
 done:
 	qdf_mem_zero(keys, WLAN_MAX_ML_BSS_LINKS * sizeof(*keys));

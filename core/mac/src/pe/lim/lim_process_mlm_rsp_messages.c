@@ -3072,6 +3072,27 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 {}
 #endif
 
+/*
+ * lim_process_join_req_on_partner() - Process the join request for the partner
+ * vdev
+ * @mac_ctx: A pointer to Global MAC structure
+ * @session: session related information
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+lim_process_join_req_on_partner(struct mac_context *mac_ctx,
+				struct pe_session *session)
+{
+	if (mlo_roam_is_auth_status_connected(mac_ctx->psoc,
+					      session->vdev_id) ||
+	    mlo_is_offload_roam_in_progress(session->vdev))
+		return lim_process_switch_channel_join_mlo_roam(session,
+								mac_ctx);
+	else
+		return lim_process_switch_channel_join_mlo(session, mac_ctx);
+}
+
 /**
  * lim_process_switch_channel_join_req() -Initiates probe request
  *
@@ -3129,15 +3150,9 @@ static void lim_process_switch_channel_join_req(
 	lim_apply_configuration(mac_ctx, session_entry);
 
 	if (wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
-		if (mlo_roam_is_auth_status_connected(mac_ctx->psoc,
-						      session_entry->vdev_id))
-			mlo_status = lim_process_switch_channel_join_mlo_roam(session_entry,
-									      mac_ctx);
-		else
-			mlo_status = lim_process_switch_channel_join_mlo(session_entry,
-									 mac_ctx);
-
-		if (mlo_status == QDF_STATUS_E_INVAL)
+		mlo_status = lim_process_join_req_on_partner(mac_ctx,
+							     session_entry);
+		if (QDF_IS_STATUS_ERROR(mlo_status))
 			goto error;
 		else
 			return;

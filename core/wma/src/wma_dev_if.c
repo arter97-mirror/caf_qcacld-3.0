@@ -119,6 +119,7 @@
 #include "target_if.h"
 #include <wlan_psoc_mlme_api.h>
 #include "wlan_objmgr_vdev_obj.h"
+#include "wlan_mlo_mgr_sta.h"
 
 /*
  * FW only supports 8 clients in SAP/GO mode for D3 WoW feature
@@ -2310,7 +2311,8 @@ static void wma_peer_setup_fill_info(struct wlan_objmgr_psoc *psoc,
 		peer_info->is_primary_link = false;
 	} else if (wlan_cm_is_roam_sync_in_progress(psoc, vdev_id) &&
 		   wlan_vdev_mlme_get_is_mlo_vdev(psoc, vdev_id)) {
-		if (mlo_get_single_link_ml_roaming(psoc, vdev_id)) {
+		if (mlo_get_single_link_ml_roaming(psoc, vdev_id) ||
+		    mlo_is_offload_roam_in_progress(wlan_peer_get_vdev(peer))) {
 			peer_info->is_first_link = true;
 			peer_info->is_primary_link = true;
 		} else {
