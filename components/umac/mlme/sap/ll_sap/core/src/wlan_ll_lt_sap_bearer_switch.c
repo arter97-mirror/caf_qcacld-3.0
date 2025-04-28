@@ -37,7 +37,7 @@ wlan_bs_req_id ll_lt_sap_bearer_switch_get_id(struct wlan_objmgr_psoc *psoc)
 	uint8_t vdev_id;
 
 	vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
-	if (vdev_id == WLAN_INVALID_VDEV_ID)
+	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS)
 		return request_id;
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_LL_SAP_ID);

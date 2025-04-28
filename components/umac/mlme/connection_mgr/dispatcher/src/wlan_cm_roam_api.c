@@ -4262,6 +4262,11 @@ wlan_cm_update_roam_trigger_info(struct wlan_objmgr_vdev *vdev,
 	struct enhance_roam_info *info;
 	struct mlme_legacy_priv *mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 
+	if (!mlme_priv) {
+		mlme_err("null mlme priv");
+		return;
+	}
+
 	index = mlme_priv->roam_write_index;
 	info = &mlme_priv->roam_info[index];
 
