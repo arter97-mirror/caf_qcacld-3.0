@@ -1608,6 +1608,33 @@ void mlme_deinit_wait_for_key_timer(struct wait_for_key_timer *wait_key_timer)
 	qdf_mc_timer_destroy(&wait_key_timer->timer);
 }
 
+static
+void mlme_init_roam_key_event_wait_timer(struct wlan_objmgr_vdev *vdev,
+					 struct roam_key_event_wait_timer *timer)
+{
+	QDF_STATUS status;
+
+	if (!vdev || !timer) {
+		mlme_err("vdev or timer is NULL");
+		return;
+	}
+
+	timer->vdev = vdev;
+	status = qdf_mc_timer_init(&timer->timer, QDF_TIMER_TYPE_SW,
+				   cm_roam_key_event_timeout_handler,
+				   timer);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_err("Could not initialize roam key event wait timer");
+}
+
+static
+void mlme_deinit_roam_key_event_wait_timer(struct roam_key_event_wait_timer *timer)
+{
+	qdf_mc_timer_stop(&timer->timer);
+	qdf_mc_timer_destroy(&timer->timer);
+}
+
 static void mlme_ext_handler_destroy(struct vdev_mlme_obj *vdev_mlme)
 {
 	if (!vdev_mlme || !vdev_mlme->ext_vdev_ptr)
@@ -1628,6 +1655,7 @@ static void mlme_ext_handler_destroy(struct vdev_mlme_obj *vdev_mlme)
 	mlme_deinit_wait_for_key_timer(&vdev_mlme->ext_vdev_ptr->wait_key_timer);
 	mlme_free_fils_info(&vdev_mlme->ext_vdev_ptr->connect_info);
 	mlme_cm_free_roam_stats_info(vdev_mlme->ext_vdev_ptr);
+	mlme_deinit_roam_key_event_wait_timer(&vdev_mlme->ext_vdev_ptr->mlo_key_timer);
 	qdf_mem_free(vdev_mlme->ext_vdev_ptr);
 	vdev_mlme->ext_vdev_ptr = NULL;
 }
@@ -1746,6 +1774,8 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 			     "peer_set_key");
 	qdf_runtime_lock_init(
 			&vdev_mlme->ext_vdev_ptr->peer_set_key_rt_wakelock);
+	mlme_init_roam_key_event_wait_timer(vdev_mlme->vdev,
+					    &vdev_mlme->ext_vdev_ptr->mlo_key_timer);
 
 	status = vdev_mgr_create_send(vdev_mlme);
 	if (QDF_IS_STATUS_ERROR(status)) {

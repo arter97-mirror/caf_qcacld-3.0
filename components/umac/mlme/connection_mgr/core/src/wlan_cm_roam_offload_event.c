@@ -39,6 +39,7 @@
 #include "wlan_roam_debug.h"
 #include "wlan_mlo_mgr_roam.h"
 #include "wlan_mlo_mgr_sta.h"
+#include "wlan_cm_vdev_api.h"
 
 static QDF_STATUS
 cm_fw_roam_ser_cb(struct wlan_serialization_command *cmd,
@@ -552,6 +553,8 @@ QDF_STATUS cm_roam_partner_bringup_handler(struct wlan_mlo_dev_context *ml_ctx)
 
 	if (!mlo_is_offload_roam_in_progress(vdev))
 		return QDF_STATUS_SUCCESS;
+
+	cm_stop_roam_key_wait_timer(vdev);
 
 	status = mlo_roam_link_connect_notify(psoc, wlan_vdev_get_id(vdev));
 
