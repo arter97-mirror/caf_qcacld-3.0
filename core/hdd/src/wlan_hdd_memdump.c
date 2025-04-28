@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -146,6 +146,12 @@ static ssize_t __hdd_driver_memdump_read(struct file *file, char __user *buf,
 			hdd_err("Error in dump driver information, status %d",
 				qdf_status);
 		hdd_debug("driver_dump_size: %d", hdd_ctx->driver_dump_size);
+	}
+
+	if (*pos >= hdd_ctx->driver_dump_size) {
+		mutex_unlock(&hdd_ctx->memdump_lock);
+		hdd_err("Invalid POS pointer");
+		return -EFAULT;
 	}
 
 	if (count > hdd_ctx->driver_dump_size - *pos)
