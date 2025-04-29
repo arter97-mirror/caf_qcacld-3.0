@@ -22,8 +22,8 @@
 #include "wlan_dnw_ucfg_api.h"
 #include "wlan_dfs_no_wait.h"
 
-QDF_STATUS ucfg_set_dfs_no_wait_support(struct wlan_objmgr_psoc *psoc,
+QDF_STATUS ucfg_set_dfs_no_wait_support(struct wlan_objmgr_pdev *pdev,
 					bool enable)
 {
-	return set_dfs_no_wait_support(psoc, enable);
+	return set_dfs_no_wait_support(pdev, enable);
 }

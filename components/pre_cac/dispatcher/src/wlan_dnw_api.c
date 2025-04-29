@@ -21,41 +21,44 @@
 #include "wlan_dfs_no_wait.h"
 #include "wlan_dnw_api.h"
 
-bool wlan_is_dnw_in_progress(struct wlan_objmgr_vdev *vdev)
+bool wlan_is_dnw_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 {
-	return is_dnw_in_progress(vdev);
+	return is_dnw_in_progress(pdev, vdev_id);
 }
 
-bool wlan_is_valid_dnw(struct wlan_objmgr_vdev *vdev, uint32_t ch_freq,
+bool wlan_is_valid_dnw(struct wlan_objmgr_pdev *pdev, uint32_t ch_freq,
 		       enum phy_ch_width old_ch_width,
 		       enum phy_ch_width new_ch_width)
 {
-	return is_valid_dnw(vdev, ch_freq, old_ch_width, new_ch_width);
+	return is_valid_dnw(pdev, ch_freq, old_ch_width, new_ch_width);
 }
 
 QDF_STATUS
-wlan_dnw_set_info(struct wlan_objmgr_vdev *vdev, uint32_t chan_freq,
-		  uint8_t ch_width, uint32_t cac_duration, bool ignore_cac,
+wlan_dnw_set_info(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+		  uint32_t chan_freq, uint8_t ch_width,
+		  uint32_t cac_duration, bool ignore_cac,
 		  dnw_request_handler request_handler, void *ctx)
 {
-	return dnw_set_info(vdev, chan_freq, ch_width, cac_duration,
+	return dnw_set_info(pdev, vdev_id, chan_freq, ch_width, cac_duration,
 			    ignore_cac, request_handler, ctx);
 }
 
-QDF_STATUS wlan_dnw_handle_bss_start(struct wlan_objmgr_vdev *vdev,
-				     bool is_success)
+QDF_STATUS wlan_dnw_handle_bss_start(struct wlan_objmgr_pdev *pdev,
+				     uint8_t vdev_id, bool is_success)
 {
-	return dnw_handle_bss_start(vdev, is_success);
+	return dnw_handle_bss_start(pdev, vdev_id, is_success);
 }
 
-QDF_STATUS wlan_dnw_handle_radar_found(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS wlan_dnw_handle_radar_found(struct wlan_objmgr_pdev *pdev,
+				       uint8_t vdev_id)
 {
-	return dnw_handle_radar_found(vdev);
+	return dnw_handle_radar_found(pdev, vdev_id);
 }
 
-QDF_STATUS wlan_dnw_handle_bss_stop(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS wlan_dnw_handle_bss_stop(struct wlan_objmgr_pdev *pdev,
+				    uint8_t vdev_id)
 {
-	return dnw_handle_bss_stop(vdev);
+	return dnw_handle_bss_stop(pdev, vdev_id);
 }
 
 enum phy_ch_width
