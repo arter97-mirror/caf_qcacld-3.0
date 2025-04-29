@@ -6951,12 +6951,28 @@ QDF_STATUS sme_stop_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
+	struct wlan_objmgr_vdev *vdev;
 
 	session = CSR_GET_SESSION(mac, vdev_id);
 	if (!session) {
 		sme_err("ROAM: incorrect vdev ID %d", vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	if (wlan_cm_is_vdev_roaming(vdev)) {
+		mlme_set_rso_pending_disable_req_bitmap(mac->psoc, vdev_id,
+							requestor,
+							false);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return QDF_STATUS_SUCCESS;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	return wlan_cm_disable_rso(mac->pdev, vdev_id, requestor, reason);
 }
@@ -6966,6 +6982,27 @@ QDF_STATUS sme_start_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
 			     enum wlan_cm_rso_control_requestor requestor)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t pending_rso_bitmap;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	pending_rso_bitmap = mlme_get_rso_pending_disable_req_bitmap(mac->psoc,
+								     vdev_id);
+	if (pending_rso_bitmap & requestor) {
+		mlme_set_rso_pending_disable_req_bitmap(mac->psoc, vdev_id,
+							requestor,
+							true);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	return wlan_cm_enable_rso(mac->pdev, vdev_id, requestor, reason);
 }
