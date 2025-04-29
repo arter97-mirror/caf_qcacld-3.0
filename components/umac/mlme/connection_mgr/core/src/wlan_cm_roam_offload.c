@@ -286,6 +286,28 @@ release:
 }
 
 /**
+ * cm_roam_update_trigger_bitmap() - update roam triggers based on
+ * dfs concurrency
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @params: roam triggers parameters
+ *
+ * This function is used to update roam triggers parameters
+ *
+ * Return: None
+ */
+static void
+cm_roam_update_trigger_bitmap(struct wlan_objmgr_psoc *psoc,
+			      uint8_t vdev_id,
+			      struct wlan_roam_triggers *params)
+{
+	if (policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(psoc, vdev_id)) {
+		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_DEAUTH);
+		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_BMISS);
+	}
+}
+
+/**
  * cm_roam_triggers() - set roam triggers
  * @psoc: psoc pointer
  * @vdev_id: vdev id
@@ -322,6 +344,8 @@ cm_roam_triggers(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_IDLE);
 		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_BTC);
 	}
+
+	cm_roam_update_trigger_bitmap(psoc, vdev_id, params);
 
 	mlme_debug("[ROAM_TRIGGER] trigger_bitmap:%d", params->trigger_bitmap);
 
