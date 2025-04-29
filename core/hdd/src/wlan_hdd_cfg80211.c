@@ -14001,7 +14001,7 @@ static int hdd_config_dfs_no_wait_support(struct wlan_hdd_link_info *link_info,
 	support_dnw = nla_get_u8(attr);
 
 	hdd_debug("configure dnw %d", support_dnw);
-	ucfg_set_dfs_no_wait_support(hdd_ctx->psoc, support_dnw);
+	ucfg_set_dfs_no_wait_support(hdd_ctx->pdev, support_dnw);
 
 	return 0;
 }

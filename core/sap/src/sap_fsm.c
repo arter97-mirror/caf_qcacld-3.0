@@ -3741,7 +3741,8 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 				   &sap_ctx->ch_params);
 
 	/* Verify if DFS No Wait is applicable */
-	qdf_status = wlan_dnw_set_info(sap_ctx->vdev, sap_ctx->chan_freq,
+	qdf_status = wlan_dnw_set_info(mac_ctx->pdev, sap_ctx->vdev_id,
+				       sap_ctx->chan_freq,
 				       sap_ctx->ch_params.ch_width,
 				       sap_ctx->sap_bss_cfg.cac_duration_ms,
 				       mac_ctx->sap.SapDfsInfo.ignore_cac,
@@ -4207,7 +4208,8 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 		}
 
 		/* DFS No Wait handle bss start success event*/
-		wlan_dnw_handle_bss_start(sap_ctx->vdev, true);
+		wlan_dnw_handle_bss_start(mac_ctx->pdev, sap_ctx->vdev_id,
+					  true);
 
 		sap_chan_freq = sap_ctx->chan_freq;
 		band = wlan_reg_freq_to_band(sap_ctx->chan_freq);
@@ -4279,7 +4281,8 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 			if ((false == sap_dfs_info->ignore_cac) &&
 			    (cac_state == eSAP_DFS_DO_NOT_SKIP_CAC) &&
 			    !wlan_pre_cac_complete_get(sap_ctx->vdev) &&
-			    !wlan_is_dnw_in_progress(sap_ctx->vdev) &&
+			    !wlan_is_dnw_in_progress(mac_ctx->pdev,
+						     sap_ctx->vdev_id) &&
 			    policy_mgr_get_dfs_master_dynamic_enabled(
 					mac_ctx->psoc,
 					sap_ctx->sessionId)) {
@@ -4307,7 +4310,8 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 		}
 	} else if (msg == eSAP_MAC_START_FAILS ||
 		   msg == eSAP_HDD_STOP_INFRA_BSS) {
-			wlan_dnw_handle_bss_stop(sap_ctx->vdev);
+			wlan_dnw_handle_bss_stop(mac_ctx->pdev,
+						 sap_ctx->vdev_id);
 			qdf_status = sap_fsm_handle_start_failure(sap_ctx, msg,
 								  mac_handle);
 	} else if (msg == eSAP_OPERATING_CHANNEL_CHANGED) {
@@ -4329,9 +4333,10 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 				  eSAP_START_BSS_EVENT,
 				  (void *)eSAP_STATUS_SUCCESS);
 	} else if (msg == eSAP_DFS_CHANNEL_CAC_RADAR_FOUND) {
-		if (wlan_is_dnw_in_progress(sap_ctx->vdev))
+		if (wlan_is_dnw_in_progress(mac_ctx->pdev, sap_ctx->vdev_id))
 			qdf_status = wlan_dnw_handle_radar_found(
-							sap_ctx->vdev);
+							mac_ctx->pdev,
+							sap_ctx->vdev_id);
 		else
 			qdf_status = sap_fsm_handle_radar_during_cac(
 							sap_ctx, mac_ctx);
@@ -4394,7 +4399,7 @@ static QDF_STATUS sap_fsm_state_started(struct sap_context *sap_ctx,
 			  sap_ctx->vdev_id);
 
 		/* DFS No Wait handle bss stop event */
-		wlan_dnw_handle_bss_stop(sap_ctx->vdev);
+		wlan_dnw_handle_bss_stop(mac_ctx->pdev, sap_ctx->vdev_id);
 
 		qdf_status = sap_goto_stopping(sap_ctx);
 	} else if (eSAP_DFS_CHNL_SWITCH_ANNOUNCEMENT_START == msg) {
@@ -4423,9 +4428,11 @@ static QDF_STATUS sap_fsm_state_started(struct sap_context *sap_ctx,
 				/*
 				 * Handle DFS No Wait in progress
 				 */
-				if (wlan_is_dnw_in_progress(sap_ctx->vdev)) {
+				if (wlan_is_dnw_in_progress(mac_ctx->pdev,
+							    sap_ctx->vdev_id)) {
 					wlan_dnw_handle_radar_found(
-							sap_ctx->vdev);
+							mac_ctx->pdev,
+							sap_ctx->vdev_id);
 					continue;
 				}
 				/*
