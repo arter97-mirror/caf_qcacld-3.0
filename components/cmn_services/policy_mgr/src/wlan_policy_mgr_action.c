@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2179,8 +2179,9 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		if (pcl_channels[i] == curr_sap_freq)
 			continue;
 
-		if (wlan_get_opmode_from_vdev_id(pm_ctx->pdev,
-		    sap_vdev_id) == QDF_SAP_MODE &&
+		if (ll_sap_freq &&
+		    wlan_get_opmode_from_vdev_id(pm_ctx->pdev,
+						 sap_vdev_id) == QDF_SAP_MODE &&
 		    policy_mgr_are_2_freq_on_same_mac(psoc, pcl_channels[i],
 						      ll_sap_freq))
 			continue;
