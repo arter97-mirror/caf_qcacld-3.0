@@ -2019,12 +2019,32 @@ enum wlan_state_ctrl_str_id {
 
 #ifdef FEATURE_WLAN_TX_POWERBOOST
 /**
+ * struct hdd_tx_pb_dma_buf - HDD Power boost DMA buffer
+ *
+ * @vaddr: Aligned virtual address of the buffer
+ * @vaddr_unaligned: Unaligned virtual address of the buffer
+ * @paddr: Aligned physical address of the buffer
+ * @paddr_unaligned: Unaligned physical address of the buffer
+ * @size: Size of the buffer
+ */
+struct hdd_tx_pb_dma_buf {
+	void *vaddr;
+	void *vaddr_unaligned;
+	qdf_dma_addr_t paddr;
+	qdf_dma_addr_t paddr_unaligned;
+	uint32_t size;
+};
+
+/**
  * struct hdd_tx_powerboost - HDD Tx powerboost
  *
  * @tx_powerboost_enabled: Feature enabled or not
+ * @dma: DMA info
  */
 struct hdd_tx_powerboost {
 	bool tx_powerboost_enabled;
+	struct hdd_tx_pb_dma_buf dma;
+
 };
 #endif
 

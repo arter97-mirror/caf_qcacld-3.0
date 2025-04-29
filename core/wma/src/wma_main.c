@@ -3337,6 +3337,21 @@ static void wma_register_wlm_latency_level_event(tp_wma_handle wma_handle)
 }
 #endif
 
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+static void
+wma_update_tx_powerboost(struct wlan_psoc_host_service_ext2_param *param,
+			 struct wma_tgt_cfg *cfg)
+{
+	cfg->tx_powerboost = param->tx_powerboost;
+}
+#else
+static void
+wma_update_tx_powerboost(struct wlan_psoc_host_service_ext2_param *param,
+			 struct wma_tgt_cfg *cfg)
+{
+}
+#endif
+
 struct wlan_objmgr_psoc *wma_get_psoc_from_scn_handle(void *scn_handle)
 {
 	tp_wma_handle wma_handle;
@@ -6095,21 +6110,6 @@ wma_update_sar_flag(struct wlan_psoc_host_service_ext2_param *param,
 {
 	cfg->sar_flag = param ? param->sar_flag : SAR_SET_CTL_GROUPING_DISABLE;
 }
-
-#ifdef FEATURE_WLAN_TX_POWERBOOST
-static void
-wma_update_tx_powerboost(struct wlan_psoc_host_service_ext2_param *param,
-			 struct wma_tgt_cfg *cfg)
-{
-	cfg->tx_powerboost = param->tx_powerboost;
-}
-#else
-static void
-wma_update_tx_powerboost(struct wlan_psoc_host_service_ext2_param *param,
-			 struct wma_tgt_cfg *cfg)
-{
-}
-#endif
 
 /**
  * wma_update_hdd_band_cap() - update band cap which hdd understands

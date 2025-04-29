@@ -5413,6 +5413,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		hdd_register_policy_manager_callback(
 			hdd_ctx->psoc);
 
+		hdd_tx_powerboost_init(hdd_ctx);
 		/*
 		 * Call this function before hdd_enable_power_management. Since
 		 * it is required to trigger WMI_PDEV_DMA_RING_CFG_REQ_CMDID
@@ -18331,6 +18332,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 			ucfg_ipa_uc_shutdown_opt_dp_ctrl_cleanup(hdd_ctx->pdev);
 
 		hdd_son_send_module_status_event(HDD_WLAN_STATUS_EVT_DOWN);
+		hdd_tx_powerboost_deinit(hdd_ctx);
 		if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
 			hdd_disable_power_management(hdd_ctx);
 			break;

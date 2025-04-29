@@ -37,12 +37,38 @@
  */
 void hdd_tx_powerboost_target_config(struct hdd_context *hdd_ctx,
 				     struct wma_tgt_cfg *tgt_cfg);
+
+/**
+ * hdd_tx_powerboost_init() - HDD Tx powerboost initialization
+ * @hdd_ctx: Pointer to HDD context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_tx_powerboost_init(struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_tx_powerboost_deinit() - HDD Tx powerboost de-initialization
+ * @hdd_ctx: Pointer to HDD context
+ *
+ * Return: void
+ */
+void hdd_tx_powerboost_deinit(struct hdd_context *hdd_ctx);
 #else
 static inline
 void hdd_tx_powerboost_target_config(struct hdd_context *hdd_ctx,
 				     struct wma_tgt_cfg *tgt_cfg)
 {
 }
-#endif
 
+static inline
+QDF_STATUS hdd_tx_powerboost_init(struct hdd_context *hdd_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void hdd_tx_powerboost_deinit(struct hdd_context *hdd_ctx)
+{
+}
+#endif /* FEATURE_WLAN_TX_POWERBOOST */
 #endif /* __WLAN_HDD_TX_POWERBOOST_H */
