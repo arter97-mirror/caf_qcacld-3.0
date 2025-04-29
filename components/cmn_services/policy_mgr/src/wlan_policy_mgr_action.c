@@ -2121,8 +2121,9 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		if (pcl_channels[i] == curr_sap_freq)
 			continue;
 
-		if (wlan_get_opmode_from_vdev_id(pm_ctx->pdev,
-		    sap_vdev_id) == QDF_SAP_MODE &&
+		if (ll_sap_freq &&
+		    wlan_get_opmode_from_vdev_id(pm_ctx->pdev,
+						 sap_vdev_id) == QDF_SAP_MODE &&
 		    policy_mgr_are_2_freq_on_same_mac(psoc, pcl_channels[i],
 						      ll_sap_freq))
 			continue;
