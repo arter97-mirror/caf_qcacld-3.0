@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,17 +19,16 @@
 #include "wlan_dp_ucfg_api.h"
 
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
-static inline void ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
-						qdf_nbuf_t nbuf)
+static inline int ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
+					       qdf_nbuf_t nbuf)
 {
-	wlan_dp_sawfish_update_metadata(dp_intf, nbuf);
-
-	return;
+	return wlan_dp_sawfish_update_metadata(dp_intf, nbuf);
 }
 #else
-static inline void ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
-						qdf_nbuf_t nbuf)
+static inline int ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
+					       qdf_nbuf_t nbuf)
 {
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 
@@ -79,7 +78,8 @@ void ucfg_dp_fim_update_metadata(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 		return;
 	}
 
-	ucfg_dp_update_sawf_metadata(dp_intf, nbuf);
+	if (QDF_IS_STATUS_SUCCESS(ucfg_dp_update_sawf_metadata(dp_intf, nbuf)))
+		return;
 	ucfg_dp_update_lapb_metadata(dp_intf, nbuf);
 }
 #endif

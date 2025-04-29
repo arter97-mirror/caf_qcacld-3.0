@@ -1249,6 +1249,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 					   &c_entry->flags);
 			tx_flow->classified = 1;
 			tx_flow->c_flow_id = c_id;
+			tx_flow->ul_tid = s_entry->ul_tid;
 		}
 
 		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
@@ -2078,9 +2079,10 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		 * The classification result is for this flow only.
 		 */
 		s_entry->traffic_type = flow_classify_result->traffic_type;
-		dp_info("STC: sampling flow %d tuple (%s) result %d sample_start_ts %llu current stage %u",
+		dp_info("STC: sampling flow %d tuple (%s) result %d ul_tid %u sample_start_ts %llu current stage %u",
 			i, dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
 			flow_classify_result->traffic_type,
+			flow_classify_result->ul_tid,
 			s_entry->sampling_start_ts,
 			s_entry->flow_samples.curr_stats_stage);
 		/*
@@ -2097,8 +2099,10 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		 * 2) burst stats reported and flow classification attempted
 		 */
 		if (wlan_dp_stc_is_traffic_type_known(s_entry->traffic_type) ||
-		    s_entry->last_burst_stats_report_ts)
+		    s_entry->last_burst_stats_report_ts) {
+			s_entry->ul_tid = flow_classify_result->ul_tid;
 			s_entry->state = WLAN_DP_SAMPLING_STATE_CLASSIFIED;
+		}
 
 		break;
 	}

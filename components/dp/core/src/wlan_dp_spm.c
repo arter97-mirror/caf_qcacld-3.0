@@ -992,12 +992,18 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 		if (flow->cookie == cookie) {
 			qdf_rcu_read_unlock_bh();
 			wlan_dp_spm_update_flow_features(dp_intf, flow, nbuf);
-			return QDF_STATUS_SUCCESS;
+			if (flow->classified &&
+			    flow->ul_tid != WLAN_DP_STC_UL_TID_INVALID) {
+				nbuf->mark =
+				      WLAN_DP_STC_ENCRYPT_UL_TID(flow->ul_tid);
+				return QDF_STATUS_SUCCESS;
+			}
+			return QDF_STATUS_E_CANCELED;
 		}
 	}
 	qdf_rcu_read_unlock_bh();
 
-	return QDF_STATUS_E_FAILURE;
+	return QDF_STATUS_E_NOENT;
 }
 #endif
 

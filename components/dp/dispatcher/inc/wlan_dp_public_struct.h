@@ -641,6 +641,12 @@ union wlan_tp_data {
 	struct wlan_rx_tp_data rx_tp_data;
 };
 
+#define WLAN_DP_STC_UL_TID_INVALID 31
+#define WLAN_DP_STC_UL_TID_MASK 0xFF
+#define WLAN_DP_STC_CLASSIFIED_TAG  0xCAFD0000
+#define WLAN_DP_STC_ENCRYPT_UL_TID(ul_tid) \
+	WLAN_DP_STC_CLASSIFIED_TAG | ((ul_tid) & WLAN_DP_STC_UL_TID_MASK)
+
 /*
  * Flow tuple related flags
  */
@@ -685,11 +691,13 @@ struct flow_info {
  * @flow_tuple: tuple of the flow which is classified
  * @cookie: cookie/identifier
  * @traffic_type: traffic type classified
+ * @ul_tid: Uplink TID id for the flow
  */
 struct wlan_dp_stc_flow_classify_result {
 	struct flow_info flow_tuple;
 	uint32_t cookie;
 	uint8_t traffic_type;
+	uint8_t ul_tid;
 };
 
 #define DP_STC_TXRX_SAMPLES_MAX 5

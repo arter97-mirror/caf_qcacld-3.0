@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,8 @@
 		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_FLOW_TUPLE
 #define FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE	\
 		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE
+#define FLOW_CLASSIFY_RESULT_UL_TID		\
+		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_UL_TID
 
 const struct nla_policy
 flow_tuple_policy[QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_MAX + 1] = {
@@ -43,6 +45,7 @@ const struct nla_policy
 flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1] = {
 	[FLOW_CLASSIFY_RESULT_FLOW_TUPLE] = {.type = NLA_NESTED },
 	[FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE] = {.type = NLA_U8},
+	[FLOW_CLASSIFY_RESULT_UL_TID] = {.type = NLA_U8},
 };
 
 #define NS_PER_MS 1000000
@@ -145,6 +148,15 @@ QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,
 	}
 	flow_classify_result.traffic_type = nla_get_u8(tb[attr_id]);
 
+	attr_id = FLOW_CLASSIFY_RESULT_UL_TID;
+	if (tb[attr_id]) {
+		flow_classify_result.ul_tid = nla_get_u8(tb[attr_id]);
+		if (flow_classify_result.ul_tid > DP_MAX_TIDS)
+			flow_classify_result.ul_tid =
+						WLAN_DP_STC_UL_TID_INVALID;
+	} else {
+		flow_classify_result.ul_tid = WLAN_DP_STC_UL_TID_INVALID;
+	}
 	ucfg_dp_flow_classify_result(&flow_classify_result);
 
 	return QDF_STATUS_SUCCESS;

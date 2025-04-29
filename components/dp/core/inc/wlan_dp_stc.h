@@ -234,6 +234,9 @@ struct wlan_dp_stc_sampling_candidate {
  * @next_win_idx: next window index to fill min/max stats in per-packet path
  * @curr_sample_attempt: Current sample number which is being checked or
  *                       collected
+ * @traffic_type: traffic type classified
+ * @ul_tid: Uplink TID id for the flow
+ * @peer_id: Peer ID
  * @tx_flow_id: tx flow ID
  * @rx_flow_id: rx flow ID
  * @tx_flow_metadata: tx flow metadata
@@ -254,6 +257,7 @@ struct wlan_dp_stc_sampling_table_entry {
 	uint8_t next_win_idx;
 	uint8_t curr_sample_attempt;
 	uint8_t traffic_type;
+	uint8_t ul_tid;
 	uint16_t peer_id;
 	uint16_t tx_flow_id;
 	uint16_t rx_flow_id;
