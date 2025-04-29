@@ -56,8 +56,8 @@ struct pre_dnw_info {
 };
 
 /**
- * struct wlan_dnw_psoc_info - DNW information in psoc private structure
- * @psoc: Pointer to psoc object
+ * struct wlan_dnw_pdev_info - DNW information in pdev private structure
+ * @pdev: Pointer to pdev object
  * @enabled: DNW feature is enabled
  * @dnw_in_progress: DFS no wait feature is in progress
  * @is_dnw_cac_timer_running: dnw_cac_timer is running
@@ -72,8 +72,8 @@ struct pre_dnw_info {
  * @pre_dnw_info: Previous DFS no wait information
  * @request_handler: Handle DFS No Wait request
  */
-struct wlan_dnw_psoc_info {
-	struct wlan_objmgr_psoc *psoc;
+struct wlan_dnw_pdev_info {
+	struct wlan_objmgr_pdev *pdev;
 	bool enabled;
 	bool dnw_in_progress;
 	bool is_dnw_cac_timer_running;
@@ -102,37 +102,38 @@ struct wlan_dnw_vdev_info {
 
 /**
  * start_dnw_timer() - Start timer to lisen radar in DFS No Wait
- * @dnw_psoc_info: Pointer to DFS No Wait psoc object
+ * @dnw_pdev_info: Pointer to DFS No Wait pdev object
  *
  * This function gets called when handle start BSS success events.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
-QDF_STATUS start_dnw_timer(struct wlan_dnw_psoc_info *dnw_psoc_info);
+QDF_STATUS start_dnw_timer(struct wlan_dnw_pdev_info *dnw_pdev_info);
 
 /**
  * stop_dnw_timer() - Stop timer to lisen radar in DFS No Wait
- * @dnw_psoc_info: Pointer to DFS No Wait psoc object
+ * @dnw_pdev_info: Pointer to DFS No Wait pdev object
  *
  * This function gets called when handle start bss fail or stop BSS events.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
-QDF_STATUS stop_dnw_timer(struct wlan_dnw_psoc_info *dnw_psoc_info);
+QDF_STATUS stop_dnw_timer(struct wlan_dnw_pdev_info *dnw_pdev_info);
 
 /**
  * is_dnw_in_progress() - Check DFS No Wait is in progress or not
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
+ * @vdev_id: Vdev id
  *
  * This function gets called when handle BSS events in sap component.
  *
  * Return: true - in case of DNW in progress
  */
-bool is_dnw_in_progress(struct wlan_objmgr_vdev *vdev);
+bool is_dnw_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
  * is_valid_dnw() - Check it's valid DFS No Wait or not
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
  * @ch_freq: Channel frequency
  * @old_ch_width: Old channel width
  * @new_ch_width: New channel width
@@ -141,12 +142,13 @@ bool is_dnw_in_progress(struct wlan_objmgr_vdev *vdev);
  *
  * Return: true - in case of it's valid DNW case
  */
-bool is_valid_dnw(struct wlan_objmgr_vdev *vdev, uint32_t ch_freq,
+bool is_valid_dnw(struct wlan_objmgr_pdev *pdev, uint32_t ch_freq,
 		  enum phy_ch_width old_ch_width,
 		  enum phy_ch_width new_ch_width);
 /**
  * dnw_set_info() - Set information for DFS No Wait
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
+ * @vdev_id: Vdev id
  * @chan_freq: Channel frequency
  * @ch_width: Channel width
  * @cac_duration: CAC duration
@@ -159,42 +161,46 @@ bool is_valid_dnw(struct wlan_objmgr_vdev *vdev, uint32_t ch_freq,
  * Return: QDF_STATUS_SUCCESS - in case of valid DNW case
  */
 QDF_STATUS
-dnw_set_info(struct wlan_objmgr_vdev *vdev, uint32_t chan_freq,
+dnw_set_info(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id, uint32_t chan_freq,
 	     uint8_t ch_width, uint32_t cac_duration, bool ignore_cac,
 	     dnw_request_handler request_handler, void *ctx);
 
 /**
  * dnw_handle_bss_start() - Handle BSS start event in DFS No Wait
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
+ * @vdev_id: Vdev id
  * @is_success: Start BSS successful
  *
  * This function gets called when handle BSS start event in sap component.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
-QDF_STATUS dnw_handle_bss_start(struct wlan_objmgr_vdev *vdev,
-				bool is_success);
+QDF_STATUS dnw_handle_bss_start(struct wlan_objmgr_pdev *pdev,
+				uint8_t vdev_id, bool is_success);
 
 /**
  * dnw_handle_radar_found() - Handle radar found event in DFS No Wait
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
+ * @vdev_id: Vdev id
  *
  * This function gets called when handle radar found event in sap component.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
-QDF_STATUS dnw_handle_radar_found(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS dnw_handle_radar_found(struct wlan_objmgr_pdev *pdev,
+				  uint8_t vdev_id);
 
 /**
  * dnw_handle_bss_stop() - Handle bss stop or start fail event in DFS No Wait
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
+ * @vdev_id: Vdev id
  *
  * This function gets called when handle bss stop or start fail event in
  * sap component.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
-QDF_STATUS dnw_handle_bss_stop(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS dnw_handle_bss_stop(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
  * dnw_update_bandwidth() - Update channel width base on DFS No Wait state
@@ -212,7 +218,7 @@ dnw_update_bandwidth(struct wlan_objmgr_vdev *vdev,
 
 /**
  * set_dfs_no_wait_support() - Configure DFS No Wait support
- * @psoc: Pointer to psoc object
+ * @pdev: Pointer to pdev object
  * @enable: Enable DFS No Wait support
  *
  * This function gets called When enable or disable DFS No Wait support
@@ -220,7 +226,7 @@ dnw_update_bandwidth(struct wlan_objmgr_vdev *vdev,
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
-QDF_STATUS set_dfs_no_wait_support(struct wlan_objmgr_psoc *psoc,
+QDF_STATUS set_dfs_no_wait_support(struct wlan_objmgr_pdev *pdev,
 				   bool enable);
 #endif /* WLAN_FEATURE_DNW */
 #endif /* _WLAN_DFS_NO_WAIT_H_ */

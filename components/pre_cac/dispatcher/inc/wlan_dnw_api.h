@@ -27,17 +27,18 @@
 
 /**
  * wlan_is_dnw_in_progress() - Check DFS No Wait is in progress or not
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
+ * @vdev_id: Vdev id
  *
  * This function gets called when handle BSS events in sap component.
  *
  * Return: true - in case of DNW in progress
  */
-bool wlan_is_dnw_in_progress(struct wlan_objmgr_vdev *vdev);
+bool wlan_is_dnw_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
  * wlan_is_valid_dnw() - Check it's valid DFS No Wait or not
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
  * @ch_freq: Channel frequency
  * @old_ch_width: Old channel width
  * @new_ch_width: New channel width
@@ -46,12 +47,13 @@ bool wlan_is_dnw_in_progress(struct wlan_objmgr_vdev *vdev);
  *
  * Return: true - in case of it's valid DNW case
  */
-bool wlan_is_valid_dnw(struct wlan_objmgr_vdev *vdev, uint32_t ch_freq,
+bool wlan_is_valid_dnw(struct wlan_objmgr_pdev *pdev, uint32_t ch_freq,
 		       enum phy_ch_width old_ch_width,
 		       enum phy_ch_width new_ch_width);
 /**
  * wlan_dnw_set_info() - Set information for DFS No Wait
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
+ * @vdev_id: Vdev id
  * @chan_freq: Channel frequency
  * @ch_width: Channel width
  * @cac_duration: CAC duration
@@ -64,43 +66,49 @@ bool wlan_is_valid_dnw(struct wlan_objmgr_vdev *vdev, uint32_t ch_freq,
  * Return: QDF_STATUS_SUCCESS - in case of valid DNW case
  */
 QDF_STATUS
-wlan_dnw_set_info(struct wlan_objmgr_vdev *vdev, uint32_t chan_freq,
-		  uint8_t ch_width, uint32_t cac_duration, bool ignore_cac,
+wlan_dnw_set_info(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+		  uint32_t chan_freq, uint8_t ch_width,
+		  uint32_t cac_duration, bool ignore_cac,
 		  dnw_request_handler request_handler, void *ctx);
 
 /**
  * wlan_dnw_handle_bss_start() - Handle BSS start event in DFS No Wait
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
+ * @vdev_id: Vdev id
  * @is_success: Start BSS successful
  *
  * This function gets called when handle BSS start event in sap component.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
-QDF_STATUS wlan_dnw_handle_bss_start(struct wlan_objmgr_vdev *vdev,
-				     bool is_success);
+QDF_STATUS wlan_dnw_handle_bss_start(struct wlan_objmgr_pdev *pdev,
+				     uint8_t vdev_id, bool is_success);
 
 /**
  * wlan_dnw_handle_radar_found() - Handle radar found event in DFS No Wait
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
+ * @vdev_id: Vdev id
  *
  * This function gets called when handle radar found event in sap component.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
-QDF_STATUS wlan_dnw_handle_radar_found(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS wlan_dnw_handle_radar_found(struct wlan_objmgr_pdev *pdev,
+				       uint8_t vdev_id);
 
 /**
  * wlan_dnw_handle_bss_stop() - Handle bss stop or start fail event in
  * DFS No Wait
- * @vdev: Pointer to vdev object
+ * @pdev: Pointer to pdev object
+ * @vdev_id: Vdev id
  *
  * This function gets called when handle bss stop or start fail event in
  * sap component.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
-QDF_STATUS wlan_dnw_handle_bss_stop(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS wlan_dnw_handle_bss_stop(struct wlan_objmgr_pdev *pdev,
+				    uint8_t vdev_id);
 
 /**
  * wlan_dnw_update_bandwidth() - Update channel width base on state of
@@ -118,13 +126,13 @@ wlan_dnw_update_bandwidth(struct wlan_objmgr_vdev *vdev,
 			  enum phy_ch_width ch_width);
 #else
 static inline bool
-wlan_is_dnw_in_progress(struct wlan_objmgr_vdev *vdev)
+wlan_is_dnw_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 {
 	return false;
 }
 
 static inline bool
-wlan_is_valid_dnw(struct wlan_objmgr_vdev *vdev, uint32_t ch_freq,
+wlan_is_valid_dnw(struct wlan_objmgr_pdev *pdev, uint32_t ch_freq,
 		  enum phy_ch_width old_ch_width,
 		  enum phy_ch_width new_ch_width)
 {
@@ -132,28 +140,29 @@ wlan_is_valid_dnw(struct wlan_objmgr_vdev *vdev, uint32_t ch_freq,
 }
 
 static inline QDF_STATUS
-wlan_dnw_set_info(struct wlan_objmgr_vdev *vdev, uint32_t chan_freq,
-		  uint8_t ch_width, uint32_t cac_duration, bool ignore_cac,
+wlan_dnw_set_info(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+		  uint32_t chan_freq, uint8_t ch_width,
+		  uint32_t cac_duration, bool ignore_cac,
 		  dnw_request_handler request_handler, void *ctx)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
 static inline QDF_STATUS
-wlan_dnw_handle_bss_start(struct wlan_objmgr_vdev *vdev,
+wlan_dnw_handle_bss_start(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			  bool is_success)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
 static inline QDF_STATUS
-wlan_dnw_handle_radar_found(struct wlan_objmgr_vdev *vdev)
+wlan_dnw_handle_radar_found(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
 static inline QDF_STATUS
-wlan_dnw_handle_bss_stop(struct wlan_objmgr_vdev *vdev)
+wlan_dnw_handle_bss_stop(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 {
 	return QDF_STATUS_E_FAILURE;
 }
