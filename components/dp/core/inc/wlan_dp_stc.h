@@ -198,7 +198,6 @@ enum wlan_dp_flow_dir {
  * @rx_flow_id: RX flow ID
  * @tx_flow_metadata: TX flow metadata
  * @rx_flow_metadata: RX flow metadata
- * @flow_tuple: flow tuple
  * @dir: flow direction
  */
 struct wlan_dp_stc_sampling_candidate {
@@ -208,7 +207,6 @@ struct wlan_dp_stc_sampling_candidate {
 	uint16_t rx_flow_id;
 	uint32_t tx_flow_metadata;
 	uint32_t rx_flow_metadata;
-	struct flow_info flow_tuple;
 	enum wlan_dp_flow_dir dir;
 };
 
