@@ -847,7 +847,7 @@ wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc *dp_stc,
 		break;
 	}
 
-	if (val == 1)
+	if (dp_stc->tcam_client_available && (val == 1))
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 
 	if (dp_stc->rtpm_control && is_rtpm_flow &&
@@ -889,7 +889,7 @@ wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc *dp_stc,
 		break;
 	}
 
-	if (val)
+	if (dp_stc->tcam_client_available && (val == 1))
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 
 	if (dp_stc->rtpm_control && is_rtpm_flow &&
@@ -1529,6 +1529,9 @@ other_checks:
 	}
 
 skip_classified_table_check:
+	if (!dp_stc->tcam_client_available)
+		return;
+
 	for (peer_id = 0; peer_id < DP_STC_MAX_PEERS; peer_id++) {
 		struct wlan_dp_stc_peer_traffic_context *peer_tc;
 
@@ -2451,7 +2454,7 @@ void wlan_dp_stc_dump_periodic_stats(struct wlan_dp_psoc_context *dp_ctx)
 }
 
 static bool
-wlan_dp_stc_is_traffic_conext_supported(struct wlan_objmgr_psoc *psoc)
+wlan_dp_stc_is_traffic_context_supported(struct wlan_objmgr_psoc *psoc)
 {
 	struct wmi_unified *wmi_handle;
 
@@ -2463,16 +2466,6 @@ wlan_dp_stc_is_traffic_conext_supported(struct wlan_objmgr_psoc *psoc)
 
 	return wmi_service_enabled(wmi_handle,
 				   wmi_service_traffic_context_support);
-}
-
-static bool wlan_dp_stc_clients_available(struct wlan_dp_psoc_context *dp_ctx)
-{
-	if (wlan_dp_stc_is_traffic_conext_supported(dp_ctx->psoc)) {
-		dp_info("STC: TCAM client available");
-		return true;
-	}
-
-	return false;
 }
 
 void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
@@ -2497,12 +2490,6 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
 		dp_info("STC: feature not enabled via cfg");
-		dp_ctx->dp_stc = NULL;
-		return QDF_STATUS_E_NOSUPPORT;
-	}
-
-	if (!wlan_dp_stc_clients_available(dp_ctx)) {
-		dp_info("STC: No clients available, skip attach");
 		dp_ctx->dp_stc = NULL;
 		return QDF_STATUS_E_NOSUPPORT;
 	}
@@ -2578,6 +2565,10 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	dp_stc->flow_monitor_interval = 100;
 	dp_stc->periodic_work_state = WLAN_DP_STC_WORK_INIT;
+
+	dp_stc->tcam_client_available =
+			wlan_dp_stc_is_traffic_context_supported(dp_ctx->psoc);
+	dp_info("STC: TCAM client support: %u", dp_stc->tcam_client_available);
 
 	dp_stc->rtpm_control =
 		wlan_dp_cfg_is_stc_rtpm_control_enabled(&dp_ctx->dp_cfg);
