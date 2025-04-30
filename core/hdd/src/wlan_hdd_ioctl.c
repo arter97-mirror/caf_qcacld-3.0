@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6550,7 +6550,7 @@ static int drv_cmd_set_fcc_channel(struct wlan_hdd_link_info *link_info,
 		if (ucfg_reg_is_fcc_constraint_set(hdd_ctx->pdev) ==
 		    fcc_constraint &&
 		    ucfg_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev) ==
-		    dis_6g_keep_sta_cli_conn) {
+		    dis_6g_keep_sta_cli_conn && !modify_band) {
 			hdd_debug("Same FCC constraint and band bitmap value");
 			return 0;
 		} else if (modify_band) {
