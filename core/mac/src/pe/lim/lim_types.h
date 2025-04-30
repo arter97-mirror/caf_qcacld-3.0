@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -737,9 +737,31 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pRxMe
 
 void lim_populate_mac_header(struct mac_context *, uint8_t *, uint8_t, uint8_t,
 				      tSirMacAddr, tSirMacAddr);
-QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *, tSirMacSSid *,
-					 tSirMacAddr, qdf_freq_t, tSirMacAddr,
-					 uint32_t, uint16_t *, uint8_t *);
+
+/**
+ * lim_send_probe_req_mgmt_frame() - send probe request management frame
+ * @mac_ctx: Pointer to Global MAC structure
+ * @pesession: Pointer to session
+ * @additional_ielen: if non-zero, include additional_ie in the Probe Request
+ *                   frame
+ * @additional_ie: if additional_ielen is non zero, include this field in the
+ *                Probe Request frame
+ *
+ * This function is called by various LIM modules to send Probe Request frame
+ * during active scan/learn phase.
+ * Probe request is sent out in the following scenarios:
+ * --heartbeat failure:  session needed
+ * --join req:           session needed
+ * --foreground scan:    no session
+ * --background scan:    no session
+ * --sch_beacon_processing:  to get EDCA parameters:  session needed
+ *
+ * Return: QDF_STATUS (QDF_STATUS_SUCCESS on success and error codes otherwise)
+ */
+QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
+					 struct pe_session *pesession,
+					 uint16_t *additional_ielen,
+					 uint8_t *additional_ie);
 
 /**
  * lim_send_probe_rsp_mgmt_frame() - Send probe response
