@@ -2132,18 +2132,23 @@ populate_dot11f_power_caps(struct mac_context *mac,
 
 	pCaps->minTxPower = pe_session->min_11h_pwr;
 	pCaps->maxTxPower = pe_session->maxTxPower;
+	pCaps->present = 1;
 
 	/* Use firmware updated max tx power if non zero */
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
-	if (mlme_obj && mlme_obj->mgmt.generic.tx_pwrlimit)
+	if (!mlme_obj) {
+		pe_err("mlme_obj invalid");
+		return;
+	}
+
+	if (mlme_obj->mgmt.generic.tx_pwrlimit)
 		pCaps->maxTxPower = mlme_obj->mgmt.generic.tx_pwrlimit;
 
 	min_power = populate_decimal_min_power(mlme_obj->mgmt.generic.minpower);
 
-	if (mlme_obj && mlme_obj->mgmt.generic.minpower)
+	if (mlme_obj->mgmt.generic.minpower)
 		pCaps->minTxPower = QDF_MIN(pCaps->minTxPower, min_power);
 
-	pCaps->present = 1;
 } /* End populate_dot11f_power_caps. */
 
 QDF_STATUS

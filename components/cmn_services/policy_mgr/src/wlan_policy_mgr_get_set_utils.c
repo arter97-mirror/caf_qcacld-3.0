@@ -12222,6 +12222,9 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	struct wlan_objmgr_vdev *vdev;
 
+	if (!wlan_reg_is_dfs_for_freq(pdev, ch_freq))
+		return true;
+
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
 		return false;
@@ -14379,4 +14382,44 @@ void policy_mgr_update_flow_pool_map(struct wlan_objmgr_psoc *psoc,
 	if (op_mode != QDF_NAN_DISC_MODE &&
 	    pm_ctx->dp_cbacks.hdd_v2_flow_pool_map)
 		pm_ctx->dp_cbacks.hdd_v2_flow_pool_map(vdev_id);
+}
+
+uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, uint32_t freq)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t conn_index;
+	uint8_t scc_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return WLAN_UMAC_VDEV_ID_MAX;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if ((policy_mgr_is_beaconing_mode(
+			pm_conc_connection_list[conn_index].mode) ||
+		    pm_conc_connection_list[conn_index].mode ==
+		    PM_P2P_CLIENT_MODE ||
+		    pm_conc_connection_list[conn_index].mode ==
+		    PM_STA_MODE) &&
+		    pm_conc_connection_list[conn_index].in_use &&
+		    freq == pm_conc_connection_list[conn_index].freq &&
+		    vdev_id != pm_conc_connection_list[conn_index].vdev_id) {
+			policy_mgr_debug(
+				"Found a SCC vdev %d freq %d mode %d",
+				pm_conc_connection_list[conn_index].vdev_id,
+				freq,
+				pm_conc_connection_list[conn_index].mode);
+			scc_vdev_id =
+				pm_conc_connection_list[conn_index].vdev_id;
+			break;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return scc_vdev_id;
 }

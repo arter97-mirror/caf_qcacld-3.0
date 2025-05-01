@@ -1431,6 +1431,74 @@ static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map)
 }
 
 /**
+ * get_max_rate_he() - calculate max rate for HE mode
+ * @nss: num of streams
+ * @ch_width: channel width
+ * @sgi_enable: short gi
+ * @he_mcs_map: he mcs map
+ *
+ * This function calculate max rate for HE mode
+ *
+ * Return: max rate
+ */
+static int get_max_rate_he(int nss, int ch_width, int sgi_enable,
+			   int he_mcs_map)
+{
+	const struct index_he_data_rate_type *supported_he_mcs_rate;
+	enum data_rate_11ax_max_mcs he_max_mcs;
+	int maxrate = 0;
+	int maxidx;
+	int sgi;
+
+	if (nss == 1) {
+		supported_he_mcs_rate = supported_he_mcs_rate_nss1;
+	} else if (nss == 2) {
+		supported_he_mcs_rate = supported_he_mcs_rate_nss2;
+	} else {
+		/* Not Supported */
+		hdd_debug("nss %d not supported", nss);
+		return maxrate;
+	}
+	sgi = sgi_enable ? 0 : 2;
+
+	he_max_mcs =
+		(enum data_rate_11ax_max_mcs)
+		(he_mcs_map & DATA_RATE_11AX_MCS_MASK);
+
+	if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_9) {
+		maxidx = 9;
+	} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_10) {
+		maxidx = 10;
+	} else if (he_max_mcs == DATA_RATE_11AX_MAX_MCS_11) {
+		maxidx = 11;
+	} else {
+		hdd_err("HE mcs map %x not supported",
+			he_mcs_map & DATA_RATE_11AX_MCS_MASK);
+		return maxrate;
+	}
+
+	if (ch_width == eHT_CHANNEL_WIDTH_20MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE20_rate[0][sgi];
+	} else if (ch_width == eHT_CHANNEL_WIDTH_40MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE40_rate[0][sgi];
+	} else if (ch_width == eHT_CHANNEL_WIDTH_80MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE80_rate[0][sgi];
+	} else if ((ch_width == eHT_CHANNEL_WIDTH_160MHZ) ||
+			ch_width == eHT_CHANNEL_WIDTH_80P80MHZ) {
+		maxrate =
+		supported_he_mcs_rate[maxidx].supported_HE160_rate[0][sgi];
+	} else {
+		hdd_err("ch_width %d not supported", ch_width);
+		return maxrate;
+	}
+
+	return maxrate;
+}
+
+/**
  * calculate_max_phy_rate() - calculate maximum phy rate (100kbps)
  * @mode: phymode: Legacy, 11a/b/g, HT, VHT
  * @nss: num of stream (maximum num is 2)
@@ -1506,6 +1574,13 @@ static int calculate_max_phy_rate(int mode, int nss, int ch_width,
 		if (maxrate < tmprate)
 			maxrate = tmprate;
 	}
+	if (mode == SIR_SME_PHY_MODE_HE) {
+		/* check for HE Mode */
+		tmprate = get_max_rate_he(nss, ch_width, sgi, vht_mcs_map);
+		if (maxrate < tmprate)
+			maxrate = tmprate;
+	}
+
 
 	return maxrate;
 }
@@ -4402,9 +4477,9 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
 		if (!policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
-			wlansap_context_put(sap_context);
 			hdd_debug("vdev %d freq %d, LL LT SAP dont need Channel change",
 				  vdev_id, sap_context->chan_freq);
+			wlansap_context_put(sap_context);
 			return QDF_STATUS_E_FAILURE;
 		}
 		sap_context->csa_reason = CSA_REASON_LL_LT_SAP_EVENT;

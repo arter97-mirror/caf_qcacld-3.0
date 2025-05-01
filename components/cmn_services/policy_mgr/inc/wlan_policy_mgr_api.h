@@ -6181,4 +6181,15 @@ policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
 void policy_mgr_update_flow_pool_map(struct wlan_objmgr_psoc *psoc,
 				     struct wlan_objmgr_vdev *vdev);
 
+/**
+ * policy_mgr_fetch_scc_vdev_id() - Fetch scc vdev id for specific connection
+ * @psoc: Pointer to PSOC object
+ * @vdev_id: vdev id for the specific connection
+ * @freq: freq for the specific connection
+ *
+ * Return: scc vdev id of specific connection
+ */
+uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, uint32_t freq);
+
 #endif /* __WLAN_POLICY_MGR_API_H */

@@ -4700,9 +4700,10 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 
 	ssid = util_scan_entry_ssid(cur_entry);
 	if (!util_scan_is_null_ssid(ssid)) {
+		filter->ssid_list[0].length =
+			QDF_MIN(ssid->length, WLAN_SSID_MAX_LEN);
 		qdf_mem_copy(filter->ssid_list[0].ssid,
-			     ssid->ssid, ssid->length);
-		filter->ssid_list[0].length = ssid->length;
+			     ssid->ssid, filter->ssid_list[0].length);
 
 		filter->num_of_ssid++;
 	}

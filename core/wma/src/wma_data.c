@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1223,10 +1223,10 @@ QDF_STATUS wma_set_mcc_channel_time_quota(tp_wma_handle wma,
 
 	chan1_freq = wlan_reg_chan_band_to_freq(wma->pdev,
 						adapter_1_chan_number,
-						band_1);
+						BIT(band_1));
 	chan2_freq = wlan_reg_chan_band_to_freq(wma->pdev,
 						adapter_2_chan_number,
-						band_2);
+						BIT(band_2));
 
 	/* Confirm MCC adaptive scheduler feature is disabled */
 	if (policy_mgr_get_dynamic_mcc_adaptive_sch(mac->psoc,

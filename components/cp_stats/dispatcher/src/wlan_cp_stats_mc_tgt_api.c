@@ -895,9 +895,10 @@ static void tgt_mc_cp_stats_extract_vdev_summary_stats(
 		return;
 	}
 
-	if (vdev_id == WLAN_INVALID_VDEV_ID)
+	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
+		cp_stats_err("invalid vdev id %d", vdev_id);
 		return;
-
+	}
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_CP_STATS_ID);
 	if (!vdev) {

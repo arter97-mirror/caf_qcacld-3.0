@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -895,6 +895,8 @@ static void sme_rrm_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 
 #define RRM_CHAN_WEIGHT_CHAR_LEN 5
 #define RRM_MAX_CHAN_TO_PRINT 39
+#define RRM_SCAN_IDLE_TIME 25
+#define RRM_SCAN_REST_TIME 2 * RRM_SCAN_IDLE_TIME
 
 QDF_STATUS sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 {
@@ -1019,6 +1021,13 @@ QDF_STATUS sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 		}
 
 		req->scan_req.adaptive_dwell_time_mode = SCAN_DWELL_MODE_STATIC;
+
+		req->scan_req.max_rest_time = RRM_SCAN_REST_TIME;
+		req->scan_req.min_rest_time = RRM_SCAN_REST_TIME;
+		req->scan_req.idle_time = RRM_SCAN_IDLE_TIME;
+		req->scan_req.burst_duration = BURST_SCAN_MAX_NUM_OFFCHANNELS *
+					       RRM_SCAN_REST_TIME;
+
 		/*
 		 * For RRM scans timing is very important especially when the
 		 * request is for limited channels. There is no need for

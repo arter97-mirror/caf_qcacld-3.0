@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -367,7 +367,7 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 #define DIRECT_LINK_CE_RX_BUF_SIZE  256
 #define DIRECT_LINK_DEFAULT_BUF_SZ  2048
 #define TX_DIRECT_LINK_BUF_NUM      380
-#define TX_DIRECT_LINK_CE_BUF_NUM   8
+#define TX_DIRECT_LINK_CE_BUF_NUM   32
 #define RX_DIRECT_LINK_CE_BUF_NUM   30
 
 static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
@@ -461,7 +461,7 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 static struct dp_consistent_prealloc_unaligned
 		g_dp_consistent_unaligned_allocs[] = {
 	/* CE-0 */
-	{CE_SRC, (sizeof(struct ce_srng_src_desc) * 16 + CE_DESC_RING_ALIGN),
+	{CE_SRC, (sizeof(struct ce_srng_src_desc) * 32 + CE_DESC_RING_ALIGN),
 	 false, NULL, 0},
 	/* CE-1 */
 	{CE_DST, (sizeof(struct ce_srng_dest_desc) * 512 + CE_DESC_RING_ALIGN),

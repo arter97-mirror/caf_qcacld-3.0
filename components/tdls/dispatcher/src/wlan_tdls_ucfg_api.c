@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1310,4 +1310,10 @@ void ucfg_tdls_set_user_tdls_enable(struct wlan_objmgr_vdev *vdev,
 bool ucfg_tdls_is_vdev_allowed_to_tx(struct wlan_objmgr_vdev *vdev)
 {
 	return tdls_is_vdev_allowed_to_tx(vdev);
+}
+
+bool ucfg_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
+				      struct qdf_mac_addr *mac_addr)
+{
+	return wlan_tdls_is_key_install_allowed(vdev, mac_addr);
 }

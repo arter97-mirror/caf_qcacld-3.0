@@ -184,8 +184,8 @@ QDF_STATUS ttlm_valid_n_copy_for_rx_req(struct wlan_objmgr_vdev *vdev,
 	 * negotiation action request link id
 	 */
 	valid_map = t2lm_is_valid_t2lm_link_map(vdev, t2lm_req, &dir);
-	if (!valid_map) {
-		t2lm_err("reject t2lm conf");
+	if (!valid_map || dir >= WLAN_T2LM_MAX_DIRECTION) {
+		t2lm_err("reject t2lm conf, dir %d", dir);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -318,7 +318,7 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					     struct wlan_mlo_peer_context *ml_peer,
 					     struct wlan_t2lm_onging_negotiation_info *t2lm_rsp)
 {
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_t2lm_onging_negotiation_info *t2lm_req;
 	uint8_t dir;
 	struct wlan_t2lm_info *t2lm_info = NULL;

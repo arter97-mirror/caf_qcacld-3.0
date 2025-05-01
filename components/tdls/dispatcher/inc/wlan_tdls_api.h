@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -280,6 +280,17 @@ void wlan_tdls_delete_all_peers(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
 					       uint8_t *macaddr);
+
+/**
+ * wlan_tdls_is_key_install_allowed() - API to check if key_install request
+ * is allowed for TDLS peer in current state.
+ * @vdev: Vdev object pointer
+ * @mac_addr: Mac address of the peer
+ *
+ * Return: True if key_install can be allowed
+ */
+bool wlan_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
+				      struct qdf_mac_addr *mac_addr);
 #else
 static inline
 void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
@@ -394,6 +405,12 @@ QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
 					       uint8_t *macaddr)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+bool wlan_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
+				      struct qdf_mac_addr *mac_addr)
+{
+	return false;
 }
 #endif
 #endif

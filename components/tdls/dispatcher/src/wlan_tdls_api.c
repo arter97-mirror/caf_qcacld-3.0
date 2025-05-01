@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -653,4 +653,30 @@ QDF_STATUS wlan_tdls_update_peer_kickout_count(struct wlan_objmgr_vdev *vdev,
 					       uint8_t *macaddr)
 {
 	return tdls_update_peer_kickout_count(vdev, macaddr);
+}
+
+bool wlan_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
+				      struct qdf_mac_addr *mac_addr)
+{
+	struct tdls_vdev_priv_obj *vdev_obj;
+	struct tdls_peer *curr_peer;
+
+	vdev_obj = wlan_vdev_get_tdls_vdev_obj(vdev);
+	if (!vdev_obj) {
+		tdls_err("vdev_obj: %pK is null", vdev_obj);
+		return false;
+	}
+
+	curr_peer = wlan_tdls_find_peer(vdev_obj, mac_addr->bytes);
+	if (!curr_peer) {
+		tdls_err("tdls peer is null");
+		return false;
+	}
+
+	if (curr_peer->valid_entry &&
+	    (curr_peer->link_status == TDLS_LINK_CONNECTING ||
+	     curr_peer->link_status == TDLS_LINK_CONNECTED))
+		return true;
+
+	return false;
 }
