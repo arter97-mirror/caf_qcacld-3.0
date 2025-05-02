@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -974,6 +974,12 @@
 		1, \
 		"enable pci gen")
 
+#ifdef FEATURE_ETM_TRACE_SUPPORT
+#define PCIE_CONFIG 1
+#else
+#define PCIE_CONFIG 0
+#endif
+
 /*
  * <ini>
  * pcie_config - Ini to control pcie gen and lane params
@@ -1001,7 +1007,7 @@
 				"pcie_config", \
 				0, \
 				4, \
-				0, \
+				PCIE_CONFIG, \
 				CFG_VALUE_OR_DEFAULT, \
 				"to control pcie gen and lane")
 

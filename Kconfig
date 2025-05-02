@@ -2851,4 +2851,8 @@ config WLAN_TX_POWERBOOST
 	bool "Enable WLAN_TX_POWERBOOST"
 	default n
 
+config CNSS_ETM_TRACE
+	bool "Enable CNSS_ETM_TRACE"
+	default n
+
 endif # QCA_CLD_WLAN
