@@ -2093,11 +2093,25 @@ QDF_STATUS cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
 			       struct roam_offload_synch_ind *sync_ind);
 
 /**
+ * cm_roam_delete_session_for_sl_to_ml_failure() - Delete newly added pe
+ * session in case of sl to ml switch failure
+ * @vdev_id: vdev id
+ *
+ * This function will deleted the newly created pe session for failure in
+ * in sl to ml switch
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_roam_delete_session_for_sl_to_ml_failure(uint8_t vdev_id);
+
+/**
  * cm_roam_pe_sync_callback() - Callback registered at pe, gets invoked when
  * ROAM SYNCH event is received from firmware
  * @sync_ind: Structure with roam synch parameters
  * @vdev_id: vdev id
  * @len: length for bss_description
+ * @new_link_session: bool for whether new pe session was created
  *
  * This is a PE level callback called from CM to complete the roam synch
  * propagation at PE level and also fill the BSS descriptor which will be
@@ -2107,7 +2121,8 @@ QDF_STATUS cm_roam_update_vdev(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS
 cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
-			 uint8_t vdev_id, uint16_t len);
+			 uint8_t vdev_id, uint16_t len,
+			 bool *new_link_session);
 
 /**
  * cm_update_phymode_on_roam() - Update new phymode after

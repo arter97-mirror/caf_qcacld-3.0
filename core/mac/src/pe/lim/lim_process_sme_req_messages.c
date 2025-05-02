@@ -3865,10 +3865,14 @@ lim_cm_create_session(struct mac_context *mac_ctx, struct cm_vdev_join_req *req)
 	pe_session = pe_find_session_by_bssid(mac_ctx, req->entry->bssid.bytes,
 					      &session_id);
 
+	/* check if session exists for the same vdev id */
+	if (!pe_session)
+		pe_session = pe_find_session_by_vdev_id(mac_ctx, req->vdev_id);
+
 	if (pe_session) {
 		pe_err("vdev_id: %d cm_id 0x%x :pe-session(%d (vdev %d)) already exists for BSSID: "
 		       QDF_MAC_ADDR_FMT " in lim_sme_state = %X",
-		       req->vdev_id, req->cm_id, session_id,
+		       req->vdev_id, req->cm_id, pe_session->peSessionId,
 		       pe_session->vdev_id,
 		       QDF_MAC_ADDR_REF(req->entry->bssid.bytes),
 		       pe_session->limSmeState);

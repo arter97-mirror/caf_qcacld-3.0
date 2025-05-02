@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -511,6 +511,7 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 	struct rso_config *rso_cfg;
 	uint16_t ie_len = 0;
 	uint8_t vdev_id;
+	bool new_link_session = false;
 
 	sync_ind = (struct roam_offload_synch_ind *)event;
 	if (!sync_ind) {
@@ -597,15 +598,16 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (QDF_IS_STATUS_ERROR(cm_roam_pe_sync_callback(sync_ind, vdev_id,
-							 ie_len))) {
+	status = cm_roam_pe_sync_callback(sync_ind, vdev_id, ie_len,
+					  &new_link_session);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("LFR3: vdev:%d PE roam synch cb failed", vdev_id);
-		return QDF_STATUS_E_BUSY;
+		goto err;
 	}
 
 	status = cm_roam_update_vdev(vdev, sync_ind);
 	if (QDF_IS_STATUS_ERROR(status))
-		return status;
+		goto err;
 
 	/*
 	 * update phy_mode in wma to avoid mismatch in phymode between host and
@@ -620,6 +622,10 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 	status = cm_fw_roam_sync_propagation(psoc,
 					     vdev_id,
 					     sync_ind);
+err:
+	/* delete newly added pe session in case of failure */
+	if (new_link_session && QDF_IS_STATUS_ERROR(status))
+		status = cm_roam_delete_session_for_sl_to_ml_failure(vdev_id);
 
 	return status;
 }
