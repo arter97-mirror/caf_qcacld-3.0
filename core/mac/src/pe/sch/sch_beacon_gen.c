@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1351,6 +1351,16 @@ void lim_update_probe_rsp_template_ie_bitmap_beacon2(struct mac_context *mac,
 			     (void *)&beacon2->max_chan_switch_time,
 			     sizeof(beacon2->max_chan_switch_time));
 	}
+
+	/* RRM Enable Cap */
+	if (beacon2->RRMEnabledCap.present) {
+		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap,
+					WLAN_ELEMID_RRM);
+		qdf_mem_copy((void *)&prb_rsp->RRMEnabledCap,
+			     (void *)&beacon2->RRMEnabledCap,
+			     sizeof(beacon2->RRMEnabledCap));
+	}
+
 	/* Supported operating class */
 	if (beacon2->SuppOperatingClasses.present) {
 		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap,
