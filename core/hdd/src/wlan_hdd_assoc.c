@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1604,8 +1604,10 @@ static inline
 void hdd_reset_peer_bw(struct hdd_adapter *adapter,
 		       struct hdd_connection_info *conn_info, int peer_idx)
 {
-	adapter->ndp_peer_bitmap[conn_info->peer_bw[peer_idx]] &=
-					~BIT(peer_idx ? peer_idx - 1 : 0);
+	enum cdp_peer_bw bw;
+
+	bw = hdd_convert_ch_width_to_cdp_peer_bw(conn_info->peer_bw[peer_idx]);
+	adapter->ndp_peer_bitmap[bw] &= ~BIT(peer_idx ? peer_idx - 1 : 0);
 	conn_info->peer_bw[peer_idx] = CH_WIDTH_20MHZ;
 }
 #else
