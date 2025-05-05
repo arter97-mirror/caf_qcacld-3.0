@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -356,6 +356,11 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 
 	hdd_cm_print_bss_info(sta_ctx);
 	hdd_clear_conn_info_roam_count(adapter);
+	/*
+	 * Clear user/wpa_supplicant disabled_roaming flag of current
+	 * connection.
+	 */
+	ucfg_clear_user_disabled_roaming(hdd_ctx->psoc, link_info->vdev_id);
 }
 
 #ifdef WLAN_FEATURE_MSCS
