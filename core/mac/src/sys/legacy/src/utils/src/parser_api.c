@@ -11479,19 +11479,21 @@ release_ref:
 		sta_data += WLAN_BEACONINTERVAL_LEN;
 		sta_len_left -= WLAN_BEACONINTERVAL_LEN;
 
-		if (mlo_get_tsf_sync_support() &&
-		    link_session->mlo_link_info.link_ie.tsf_valid &&
-		    session->mlo_link_info.link_ie.tsf_valid) {
-			/* TSF offset = Floor(TSF link A -TSF link B)/2 */
-			tsfoffset =
-			  (int64_t)(link_session->mlo_link_info.link_ie.tsf_host
-			  - session->mlo_link_info.link_ie.tsf_host) >> 1;
-		}
+		if (mlo_get_tsf_sync_support()) {
+			if (link_session->mlo_link_info.link_ie.tsf_valid &&
+			    session->mlo_link_info.link_ie.tsf_valid)
+				/*
+				 * TSF offset = Floor(TSF link A -TSF link B)/2
+				 */
+				tsfoffset =
+				  (int64_t)(link_session->mlo_link_info.link_ie.tsf_host
+				  - session->mlo_link_info.link_ie.tsf_host) >> 1;
 
-		*(int64_t *)sta_data = tsfoffset;
-		pe_debug("tsf offset %lld", tsfoffset);
-		sta_data += WLAN_TIMESTAMP_LEN;
-		sta_len_left -= WLAN_TIMESTAMP_LEN;
+			*(int64_t *)sta_data = tsfoffset;
+			pe_debug("tsf offset %lld", tsfoffset);
+			sta_data += WLAN_TIMESTAMP_LEN;
+			sta_len_left -= WLAN_TIMESTAMP_LEN;
+		}
 
 		/* DTIM count always set 0, host is not aware of DTIM counter */
 		*(uint8_t *)sta_data = 0;
