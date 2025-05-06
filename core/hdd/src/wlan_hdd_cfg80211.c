@@ -4121,6 +4121,18 @@ static void hdd_remove_6ghz_freq_from_acs_list(uint32_t *org_freq_list,
 	*org_ch_list_count = ch_list_count;
 }
 
+static uint32_t hdd_convert_freq_to_band_bitmap(qdf_freq_t freq)
+{
+	if (WLAN_REG_IS_24GHZ_CH_FREQ((freq)))
+		return BIT(REG_BAND_2G);
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(freq))
+		return BIT(REG_BAND_5G);
+	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(freq))
+		return BIT(REG_BAND_6G);
+
+	return BIT(REG_BAND_UNKNOWN);
+}
+
 /**
  * __wlan_hdd_cfg80211_do_acs(): CFG80211 handler function for DO_ACS Vendor CMD
  * @wiphy:  Linux wiphy struct pointer
@@ -4162,7 +4174,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	bool sap_11ac_override = 0;
 	uint8_t vht_ch_width;
 	uint32_t channel_bonding_mode_2g;
-	uint32_t last_scan_ageout_time;
+	uint32_t last_scan_ageout_time, band_mask = 0;
 	struct wlan_hdd_link_info *link_info;
 	int link_id = -1;
 
@@ -4369,6 +4381,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 				sap_config->acs_cfg.master_freq_list[i] =
 									freq[i];
 				sap_config->acs_cfg.freq_list[i] = freq[i];
+				band_mask |=
+					hdd_convert_freq_to_band_bitmap(freq[i]);
 			}
 			sap_config->acs_cfg.master_ch_list_count =
 					sap_config->acs_cfg.ch_list_count;
@@ -4400,6 +4414,9 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 								tmp[i]);
 				sap_config->acs_cfg.master_freq_list[i] =
 					sap_config->acs_cfg.freq_list[i];
+				band_mask |=
+					hdd_convert_freq_to_band_bitmap(
+						sap_config->acs_cfg.freq_list[i]);
 			}
 			sap_config->acs_cfg.master_ch_list_count =
 					sap_config->acs_cfg.ch_list_count;
@@ -4415,6 +4432,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		sap_dump_acs_channel(&sap_config->acs_cfg);
 	}
 
+	wlan_sap_set_acs_band_mask(link_info->vdev,
+				   band_mask & REG_BAND_MASK_ALL);
 	hdd_handle_acs_2g_preferred_sap_conc(hdd_ctx->psoc, adapter,
 					     sap_config);
 	hdd_avoid_acs_channels(hdd_ctx, sap_config);

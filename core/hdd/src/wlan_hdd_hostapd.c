@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -7457,7 +7457,10 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 			config->chan_freq = hdd_ctx->acs_policy.acs_chan_freq;
 		mode = hdd_ctx->acs_policy.acs_dfs_mode;
 		config->acs_dfs_mode = wlan_hdd_get_dfs_mode(mode);
+	} else {
+		wlan_sap_set_acs_band_mask(link_info->vdev, REG_BAND_MASK_ALL);
 	}
+
 	ucfg_util_vdev_mgr_set_acs_mode_for_vdev(vdev,
 						 config->acs_cfg.acs_mode);
 
@@ -8351,6 +8354,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 					    false);
 		wlan_twt_concurrency_update(hdd_ctx);
 		wlan_set_sap_user_config_freq(link_info->vdev, 0);
+		wlan_sap_set_acs_band_mask(link_info->vdev, REG_BAND_MASK_ALL);
 		status = ucfg_if_mgr_deliver_event(
 				link_info->vdev,
 				WLAN_IF_MGR_EV_AP_STOP_BSS_COMPLETE, NULL);

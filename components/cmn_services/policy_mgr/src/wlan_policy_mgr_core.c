@@ -4525,6 +4525,72 @@ policy_mgr_if_freq_n_inactive_links_freq_same(struct wlan_objmgr_psoc *psoc,
 	return is_same;
 }
 
+static QDF_STATUS
+policy_mgr_filter_non_acs_channels(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id,
+				   struct policy_mgr_pcl_list *pcl)
+{
+	uint32_t i, pcl_len = 0;
+	uint32_t pcl_list[NUM_CHANNELS];
+	uint8_t weight_list[NUM_CHANNELS];
+	struct wlan_objmgr_vdev *vdev;
+	uint32_t band, band_mask;
+	bool pcl_changed = false;
+
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc) || !pcl->pcl_len)
+		return QDF_STATUS_E_INVAL;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	band_mask = wlan_sap_get_acs_band_mask(vdev);
+
+	/* In case of zero band mask, retain all the PCL channels */
+	if (!band_mask || band_mask == REG_BAND_MASK_ALL) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 0; i < pcl->pcl_len; i++) {
+		band = wlan_reg_freq_to_band(pcl->pcl_list[i]);
+		if (BIT(band) & band_mask) {
+			pcl_list[pcl_len] = pcl->pcl_list[i];
+			weight_list[pcl_len++] = pcl->weight_list[i];
+		}
+	}
+
+	if (!pcl_len) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return QDF_STATUS_E_EMPTY;
+	}
+
+	if (pcl->pcl_len != pcl_len)
+		pcl_changed = true;
+
+	qdf_mem_zero(pcl, sizeof(*pcl));
+	qdf_mem_copy(pcl->pcl_list, pcl_list,
+		     pcl_len * sizeof(pcl->pcl_list[0]));
+	qdf_mem_copy(pcl->weight_list, weight_list,
+		     pcl_len * sizeof(pcl->weight_list[0]));
+	pcl->pcl_len = pcl_len;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	if (pcl_changed) {
+		policy_mgr_debug("PCL list after PCL-ACS intersection with band mask 0x%x",
+				 band_mask);
+		policy_mgr_dump_channel_list(pcl->pcl_len, pcl->pcl_list,
+					     pcl->weight_list);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * policy_mgr_get_pref_force_scc_freq() - Get preferred force SCC
  * channel frequency
@@ -4555,7 +4621,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_con_mode mode;
 	QDF_STATUS status;
 	uint32_t i;
-	struct policy_mgr_pcl_list pcl;
+	struct policy_mgr_pcl_list pcl, intersect_pcl;
 	bool allow_2ghz_only = false;
 	qdf_freq_t scc_ch_freq_on_same_mac = 0;
 	qdf_freq_t scc_ch_freq_on_diff_mac = 0;
@@ -4605,6 +4671,21 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("get pcl failed for mode: %d, pcl len %d", mode,
 			       pcl.pcl_len);
 		return QDF_STATUS_E_INVAL;
+	}
+
+	/*
+	 * Only the channels of the bands which are present in the ACS list
+	 * has to be used for restart channel selection.
+	 * This prevents CSA of the SAP/GO to bands which were not
+	 * intended by the user during SAP start.
+	 */
+	intersect_pcl = pcl;
+	status = policy_mgr_filter_non_acs_channels(psoc, vdev_id,
+						    &intersect_pcl);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		/* Override the PCL list with the intersected list */
+		qdf_mem_zero(&pcl, sizeof(pcl));
+		pcl = intersect_pcl;
 	}
 
 	if ((acs_band == QCA_ACS_MODE_IEEE80211B ||

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -543,6 +543,7 @@ struct sap_ch_switch_info {
  * @psd_20mhz: PSD power(dBm/MHz) of SAP operating in 20 MHz
  * @ch_switch_info: channel switch info
  * @is_owe_conn: is owe connection
+ * @acs_bandmask: Bitmap of the bands on which ACS is performed
  */
 struct mlme_ap_config {
 	qdf_freq_t user_config_sap_ch_freq;
@@ -554,6 +555,7 @@ struct mlme_ap_config {
 	uint8_t psd_20mhz;
 	struct sap_ch_switch_info ch_switch_info;
 	bool is_owe_conn;
+	uint32_t acs_bandmask;
 };
 
 /**
@@ -2275,4 +2277,22 @@ mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+/*
+ * wlan_sap_get_acs_band_mask() - Get the reg band bitmap of the ACS channels
+ * @vdev: pointer to vdev object
+ *
+ * Return: REG BAND bitmap
+ */
+uint32_t wlan_sap_get_acs_band_mask(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * wlan_sap_set_acs_band_mask()- Set the band bitmap of the ACS channels list
+ * @vdev: pointer to vdev object
+ * @bitmap: bitmap of the acs list
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sap_set_acs_band_mask(struct wlan_objmgr_vdev *vdev,
+				      uint32_t bitmap);
 #endif
