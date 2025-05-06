@@ -234,8 +234,8 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 
 	sta_ds->vhtSupportedRxNss = NSS_1x1_MODE;
 	for (idx = WLAN_MAX_VDEV_NSS; idx >= NSS_2x2_MODE; idx--) {
-		if (!VHT_IS_NSS_DISABLED(sta_ds->supportedRates.vhtTxMCSMap,
-					 idx)) {
+		if (VHT_MCS_IS_NSS_ENABLED(sta_ds->supportedRates.vhtTxMCSMap,
+					   idx)) {
 			sta_ds->vhtSupportedRxNss = idx;
 			break;
 		}

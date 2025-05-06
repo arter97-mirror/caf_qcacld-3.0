@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -988,6 +988,7 @@ typedef struct sHtCaps {
 #define VALID_MCS_SIZE                                     77   /* 0-76 */
 #define MCS_RX_HIGHEST_SUPPORTED_RATE_BYTE_OFFSET          10
 #define WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS                 96
+#define WLAN_HT_CAP_TX_MAX_NSS_POS                         98
 #define VALID_MAX_MCS_INDEX                                8
 
 /* */

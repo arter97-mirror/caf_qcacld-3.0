@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1905,8 +1905,8 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 
 		sta_ds->vhtSupportedRxNss = NSS_1x1_MODE;
 		for (idx = WLAN_MAX_VDEV_NSS; idx >= NSS_2x2_MODE; idx--) {
-			if (!VHT_IS_NSS_DISABLED(sta_ds->supportedRates.vhtTxMCSMap,
-						 idx)) {
+			if (VHT_MCS_IS_NSS_ENABLED(sta_ds->supportedRates.vhtTxMCSMap,
+						   idx)) {
 				sta_ds->vhtSupportedRxNss = idx;
 				break;
 			}

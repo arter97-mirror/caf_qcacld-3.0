@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -109,8 +109,6 @@
 
 /* GAS initial request action frame identifier */
 #define IEEE80211_ACTION_GAS_INITIAL_REQUEST 10
-
-#define BITS_IN_A_BYTE 8
 
 #define IEEE80211_IS_BROADCAST(_a)	          \
 	((_a)[0] == 0xff &&                         \

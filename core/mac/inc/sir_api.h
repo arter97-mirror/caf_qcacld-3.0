@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4582,6 +4582,8 @@ struct he_capability {
 	uint32_t mcs;
 	struct wlan_psoc_host_ppe_threshold ppet;
 };
+#else
+#define HE_MCS_IS_NSS_ENABLED(mcs_set, nss) (false)
 #endif
 
 #define HE_GET_NSS(mcs, nss)                                         \

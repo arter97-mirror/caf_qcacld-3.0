@@ -1328,9 +1328,9 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 			 !vht_cap_info->enable_vht20_mcs9);
 
 		/* Unset the NSS not supported by peer */
-		if (VHT_IS_NSS_DISABLED(peer_vht_caps->txMCSMap, idx))
+		if (!VHT_MCS_IS_NSS_ENABLED(peer_vht_caps->txMCSMap, idx))
 			VHT_CLEAR_MCS_FOR_NSS(rates->vhtRxMCSMap, idx);
-		if (VHT_IS_NSS_DISABLED(peer_vht_caps->rxMCSMap, idx))
+		if (!VHT_MCS_IS_NSS_ENABLED(peer_vht_caps->rxMCSMap, idx))
 			VHT_CLEAR_MCS_FOR_NSS(rates->vhtTxMCSMap, idx);
 
 		/*
@@ -3736,6 +3736,45 @@ lim_limit_bw_for_iot_ap(struct mac_context *mac_ctx,
 	}
 }
 
+static uint8_t lim_get_peer_supported_tx_nss(tpSchBeaconStruct beacon)
+{
+	uint8_t idx, tx_mcs_def_pos, tx_mcs_pos, *ht_mcs;
+
+	if (beacon->eht_cap.present) {
+		if (beacon->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9)
+			return beacon->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9;
+		if (beacon->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7)
+			return beacon->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7;
+	} else if (beacon->he_cap.present) {
+		for (idx = NSS_8x8_MODE; idx >= NSS_1x1_MODE; idx--)
+			if (HE_MCS_IS_NSS_ENABLED(beacon->he_cap.tx_he_mcs_map_lt_80,
+						  idx))
+				return idx;
+	} else if (beacon->VHTCaps.present) {
+		for (idx = NSS_8x8_MODE; idx >= NSS_1x1_MODE; idx--)
+			if (VHT_MCS_IS_NSS_ENABLED(beacon->VHTCaps.txMCSMap,
+						   idx))
+				return idx;
+	} else if (beacon->HTCaps.present) {
+		ht_mcs = beacon->HTCaps.supportedMCSSet;
+		tx_mcs_pos = WLAN_HT_CAP_TX_MAX_NSS_POS;
+		tx_mcs_def_pos = WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS;
+
+		if ((QDF_GET_BITS(ht_mcs[tx_mcs_def_pos / BITS_IN_A_BYTE],
+				  tx_mcs_def_pos % BITS_IN_A_BYTE, 2) == 0x3) &&
+		    QDF_GET_BITS(ht_mcs[tx_mcs_pos / BITS_IN_A_BYTE],
+				 tx_mcs_pos % BITS_IN_A_BYTE, 2))
+			return QDF_GET_BITS(ht_mcs[tx_mcs_pos / BITS_IN_A_BYTE],
+					    tx_mcs_pos % BITS_IN_A_BYTE, 2);
+
+		for (idx = NSS_4x4_MODE; idx >= NSS_1x1_MODE; idx--)
+			if (ht_mcs[idx - 1])
+				return idx;
+	}
+
+	return NSS_1x1_MODE;
+}
+
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp,
 				   tpSchBeaconStruct pBeaconStruct,
 				   struct bss_description *bssDescription,
@@ -4101,6 +4140,8 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		}
 	}
 
+	pAddBssParams->staContext.bcn_tx_nss =
+				lim_get_peer_supported_tx_nss(pBeaconStruct);
 	lim_extract_per_link_id(pe_session, pAddBssParams, pAssocRsp);
 	lim_extract_ml_info(pe_session, pAddBssParams, pAssocRsp);
 	lim_intersect_ap_emlsr_caps(mac, pe_session, pAddBssParams, pAssocRsp);
