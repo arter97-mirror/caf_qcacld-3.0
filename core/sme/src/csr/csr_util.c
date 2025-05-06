@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -721,6 +721,11 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			    policy_mgr_are_2_freq_on_same_mac(mac_ctx->psoc,
 							      intf_ch_freq,
 							      sap_ch_freq))
+				break;
+			if (intf_ch_freq && intf_ch_freq != sap_ch_freq &&
+			    policy_mgr_2_freq_always_on_same_mac(
+					mac_ctx->psoc,
+					intf_ch_freq, sap_ch_freq))
 				break;
 		} else if (intf_ch_freq &&
 			   policy_mgr_2_freq_always_on_same_mac(mac_ctx->psoc,
