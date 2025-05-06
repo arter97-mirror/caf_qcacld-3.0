@@ -10217,6 +10217,8 @@ void lim_process_ap_ecsa_timeout(void *data)
 		else
 			bcn_int = MLME_CFG_BEACON_INTERVAL_DEF;
 
+		bcn_int = SYS_TU_TO_MS(bcn_int);
+
 		status = qdf_mc_timer_start(&session->ap_ecsa_timer,
 					    bcn_int);
 		if (QDF_IS_STATUS_ERROR(status)) {
