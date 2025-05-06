@@ -17920,3 +17920,54 @@ QDF_STATUS sme_set_roam_cfg_rt_params_enabled(mac_handle_t mac_handle,
 					  ROAM_CONFIG_RT_PARAMS_ENABLED,
 					  &src_config);
 }
+
+QDF_STATUS sme_set_min_roam_score_delta_value(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      uint32_t min_roam_score_delta)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+
+	src_config.uint_value = min_roam_score_delta;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/*
+	 * If roaming mode is aggressive and the user configured
+	 * min_roam_score_delta is received, update this value to
+	 * aggre_min_roam_score_delta.
+	 */
+	if (rso_cfg->is_aggressive_roaming_mode &&
+	    !rso_cfg->roam_control_enable)
+		wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					   ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA,
+					   &src_config);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
+	/*
+	 * To retain the min roam score delta value across roaming and to cache
+	 * the value when command to set the min roam score delta value
+	 * is received in disconnected state, update the value to the global
+	 * mlme_obj.
+	 */
+	mac->mlme_cfg->roam_scoring.min_roam_score_delta =
+							src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  MIN_ROAM_SCORE_DELTA,
+					  &src_config);
+}

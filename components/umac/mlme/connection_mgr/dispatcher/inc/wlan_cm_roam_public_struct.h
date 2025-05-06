@@ -337,6 +337,8 @@ struct rso_chan_info {
  * ap over the roam score of the current AP
  * @roam_rssi_delta_6ghz_to_non_6ghz: RSSI Delta value to be used for roaming
  * from 6 GHz to Non 6GHz AP.
+ * @min_roam_score_delta: Minimum difference between connected AP's and
+ * candidate AP's roam score to start roaming.
  */
 struct rso_cfg_params {
 	uint32_t neighbor_scan_period;
@@ -374,6 +376,7 @@ struct rso_cfg_params {
 	uint32_t roam_periodic_scan_interval;
 	uint32_t roam_score_delta;
 	uint8_t roam_rssi_delta_6ghz_to_non_6ghz;
+	uint32_t min_roam_score_delta;
 };
 
 /**
@@ -832,6 +835,7 @@ struct rso_config_params {
  * @ROAM_PERIODIC_SCAN_INTERVAL: Roam periodic scan interval value
  * @ROAM_SCORE_DELTA: Roam score delta value
  * @ROAM_CONFIG_RT_PARAMS_ENABLED: Roam config RT params enabled
+ * @MIN_ROAM_SCORE_DELTA: Min roam score delta value
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -878,6 +882,7 @@ enum roam_cfg_param {
 	ROAM_PERIODIC_SCAN_INTERVAL,
 	ROAM_SCORE_DELTA,
 	ROAM_CONFIG_RT_PARAMS_ENABLED,
+	MIN_ROAM_SCORE_DELTA,
 };
 
 /**

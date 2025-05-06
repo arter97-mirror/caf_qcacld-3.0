@@ -1716,7 +1716,7 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 		req_score_params->roam_score_delta =
 					cfg_params->roam_score_delta;
 		req_score_params->cand_min_roam_score_delta =
-					roam_score_params->min_roam_score_delta;
+					cfg_params->min_roam_score_delta;
 	}
 	req_score_params->band_2g_weightage = cfg_params->band_2g_weightage;
 	req_score_params->band_5g_weightage = cfg_params->band_5g_weightage;
@@ -6317,6 +6317,10 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 
 	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.roam_score_delta;
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id, ROAM_SCORE_DELTA, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.min_roam_score_delta;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   MIN_ROAM_SCORE_DELTA, &src_cfg);
 	/*
 	 * Store the current PMK info of the AP
 	 * to the single pmk global cache if the BSS allows

@@ -9305,6 +9305,12 @@ void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
 	cfg_params->roam_score_delta =
 			cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
+	mlme_obj->cfg.roam_scoring.min_roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA);
+	mlme_obj->cfg.roam_scoring.aggre_min_roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA);
+	cfg_params->min_roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA);
 }
 #else
 void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,

@@ -6140,6 +6140,8 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U32},
 	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_THRESHOLD_PERCENTAGE] = {
 			.type = NLA_U8},
+	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_MIN_DELTA_THRESHOLD] = {
+			.type = NLA_U32},
 };
 
 /**
@@ -6825,6 +6827,25 @@ hdd_send_roam_score_delta_to_sme(struct hdd_context *hdd_ctx,
 }
 
 /**
+ * hdd_send_min_roam_score_delta_to_sme() - Set min roam score delta
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @min_roam_score_delta: Min roam score delta value in percentage.
+ *
+ * Send min_roam score delta value to FW.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_send_min_roam_score_delta_to_sme(struct hdd_context *hdd_ctx,
+				     uint8_t vdev_id,
+				     uint32_t min_roam_score_delta)
+{
+	return sme_set_min_roam_score_delta_value(hdd_ctx->mac_handle, vdev_id,
+						  min_roam_score_delta);
+}
+
+/**
  * hdd_set_roam_with_control_config() - Set roam control configuration
  * @hdd_ctx: HDD context
  * @tb: List of attributes carrying roam subcmd data
@@ -7292,6 +7313,24 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("Failed to set roam score delta value");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_MIN_DELTA_THRESHOLD];
+	if (attr) {
+		value = nla_get_u32(attr);
+		if (!cfg_in_range(CFG_ROAM_COMMON_MIN_ROAM_DELTA, value)) {
+			hdd_err("Min roam score delta value %d out of range",
+				value);
+			return -EINVAL;
+		}
+
+		hdd_debug("Received min roam score delta value: %d", value);
+		status = hdd_send_min_roam_score_delta_to_sme(hdd_ctx, vdev_id,
+							      value);
+
+		is_rso_update_required = true;
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set min roam score delta value");
 	}
 
 	/* send RSO update if required */
