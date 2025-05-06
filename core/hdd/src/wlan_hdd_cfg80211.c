@@ -14862,7 +14862,7 @@ static int hdd_get_rx_amsdu(struct wlan_hdd_link_info *link_info,
 static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
 				 struct sk_buff *skb, const struct nlattr *attr)
 {
-	uint8_t chn_width, cur_ch_width, nl80211_chwidth;
+	uint8_t chn_width, nl80211_chwidth;
 	struct wlan_channel *bss_chan;
 	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *mlme_priv;
@@ -14884,9 +14884,11 @@ static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
 		mlme_legacy_err("vdev legacy private object is NULL");
 		return -EINVAL;
 	}
-	cur_ch_width = mlme_priv->connect_info.assoc_chan_info.cur_ch_width;
-	if (chn_width != cur_ch_width)
-		chn_width = cur_ch_width;
+
+	if (mlme_priv->connect_info.assoc_chan_info.update_from_ap)
+		chn_width = mlme_priv->connect_info.assoc_chan_info.cur_ch_width;
+	else
+		chn_width = bss_chan->ch_width;
 
 	nl80211_chwidth = hdd_phy_chwidth_to_nl80211_chwidth(chn_width);
 	if (nla_put_u8(skb, CONFIG_CHANNEL_WIDTH, nl80211_chwidth)) {
@@ -14923,7 +14925,7 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	struct mlme_legacy_priv *mlme_priv;
 	struct hdd_station_ctx *sta_ctx;
 	uint8_t nl80211_chwidth;
-	uint8_t chn_width, cur_ch_width;
+	uint8_t chn_width;
 	int8_t ret = 0;
 
 	chwidth = wma_cli_get_command(link_info->vdev_id,
@@ -14980,17 +14982,16 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 				ret = -EINVAL;
 				goto end;
 			}
-			chn_width = bss_chan->ch_width;
 
-			mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+			mlme_priv = wlan_vdev_mlme_get_ext_hdl(link_vdev);
 			if (!mlme_priv) {
 				mlme_legacy_err("vdev legacy private object is NULL");
 				goto end;
 			}
-			cur_ch_width =
-				mlme_priv->connect_info.assoc_chan_info.cur_ch_width;
-			if (chn_width != cur_ch_width)
-				chn_width = cur_ch_width;
+			if (mlme_priv->connect_info.assoc_chan_info.update_from_ap)
+				chn_width = mlme_priv->connect_info.assoc_chan_info.cur_ch_width;
+			else
+				chn_width = bss_chan->ch_width;
 		} else if (link_info_t->vdev_id == WLAN_INVALID_VDEV_ID) {
 			chn_width = sta_ctx->user_cfg_chn_width;
 		} else {

@@ -412,6 +412,7 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 	if (eht_op->eht_op_information_present) {
 		ori_bw = wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						eht_op->channel_width);
+		pe_debug("update bcn ch width from eht op");
 		lim_update_bcn_op_ch_width(session->vdev, ori_bw);
 		ccfs0 = eht_op->ccfs0;
 		ccfs1 = eht_op->ccfs1;
@@ -459,6 +460,7 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 									 chan_id,
 									 ccfs0,
 									 ccfs1);
+		pe_debug("update bcn ch width from 6g he op");
 		lim_update_bcn_op_ch_width(session->vdev, ori_bw);
 	} else {
 		return;

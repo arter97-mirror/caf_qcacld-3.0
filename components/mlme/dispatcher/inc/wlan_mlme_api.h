@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5556,4 +5556,16 @@ wlan_mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+/**
+ * wlan_mlme_update_ch_width_from_ap() - Set flag of channel bandwidth changed
+ * by beacon ie update or user space config
+ *
+ * @mlme_priv: Pointer to Pointer to vdev mlme legacy priv struct
+ * @value:init value is false, user space config will set false,
+ *        update from bcn will set true.
+ * Return: None
+ */
+void wlan_mlme_update_ch_width_from_ap(struct mlme_legacy_priv *mlme_priv,
+				       bool value);
+
 #endif /* _WLAN_MLME_API_H_ */

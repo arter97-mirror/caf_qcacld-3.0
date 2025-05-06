@@ -413,14 +413,21 @@ struct ft_context {
 /**
  * struct assoc_channel_info - store channel info at the time of association
  * @assoc_ch_width: channel width at the time of initial connection
- * @cur_ch_width: current channel width update in beacon eht/he/vht op and
- *  ht info IE or omn ie
+ * @cur_ch_width: current channel width update in beacon eht_op/he_op/vht_op
+ *  ht_info_IE/omn_ie or after csa
+ * @update_from_ap: before get max bandwidth, user space maybe set bandwidth
+ *  or beacon bw update or csa. we don't know which action occur first,
+ *  when this flag is true, it means bcn update bw in op ie or CSA occur, get
+ *  max bandwidth will from cur_ch_width;
+ *  when this flag is false, it means, no csa or bcn bw update occur and get
+ *  bandwidth from bss_chan->ch_width.
  * @sec_2g_freq: secondary 2 GHz freq
  * @cen320_freq: 320 MHz center freq
  */
 struct assoc_channel_info {
 	enum phy_ch_width assoc_ch_width;
 	enum phy_ch_width cur_ch_width;
+	bool update_from_ap;
 	qdf_freq_t sec_2g_freq;
 	qdf_freq_t cen320_freq;
 };

@@ -918,6 +918,7 @@ QDF_STATUS mlme_init_connect_chan_info_config(struct vdev_mlme_obj *vdev_mlme)
 							CH_WIDTH_INVALID;
 	mlme_priv->connect_info.assoc_chan_info.cur_ch_width =
 							CH_WIDTH_INVALID;
+	wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
 	mlme_priv->connect_info.assoc_chan_info.sec_2g_freq = 0;
 	mlme_priv->connect_info.assoc_chan_info.cen320_freq = 0;
 

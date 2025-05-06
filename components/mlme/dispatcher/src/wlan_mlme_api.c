@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -8197,6 +8197,12 @@ void wlan_mlme_set_puncture(struct wlan_channel *des_chan,
 }
 #endif
 
+void wlan_mlme_update_ch_width_from_ap(struct mlme_legacy_priv *mlme_priv,
+				       bool value)
+{
+	mlme_priv->connect_info.assoc_chan_info.update_from_ap = value;
+}
+
 static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 					    uint8_t vdev_id,
 					    enum phy_ch_width ch_width,
@@ -8209,6 +8215,11 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 	struct ch_params ch_params = {0};
 	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status;
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return QDF_STATUS_E_INVAL;
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
@@ -8243,6 +8254,8 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 		mlme_err("Failed to update phymode");
 		return QDF_STATUS_E_INVAL;
 	}
+
+	wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
 
 	qdf_mem_copy(bss_chan, des_chan, sizeof(struct wlan_channel));
 

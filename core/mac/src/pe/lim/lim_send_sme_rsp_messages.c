@@ -2455,8 +2455,10 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
 	if (!mlme_priv)
 		goto send_event;
-	mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
-						csa_params->new_ch_width;
+	mlme_priv->connect_info.assoc_chan_info.cur_ch_width =
+					csa_params->new_ch_width;
+
+	wlan_mlme_update_ch_width_from_ap(mlme_priv, true);
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_params->csa_chan_freq) &&
 	    session_entry->dot11mode == MLME_DOT11_MODE_11A)
