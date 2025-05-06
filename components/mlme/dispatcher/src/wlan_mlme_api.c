@@ -8142,7 +8142,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 	mlme_feature_set->roaming_ctrl_get_cu = true;
 
 	mlme_feature_set->vendor_req_2_version =
-					WMI_HOST_VENDOR1_REQ2_VERSION_3_50;
+					WMI_HOST_VENDOR1_REQ2_VERSION_3_61;
 	wlan_mlme_set_iface_combinations(psoc, mlme_feature_set);
 	wlan_mlme_get_vht_mimo_cap(psoc, &mlme_feature_set->enable_mimo);
 }
