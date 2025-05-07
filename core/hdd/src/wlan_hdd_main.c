@@ -4510,7 +4510,7 @@ static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
 			int ref_id;
 			int32_t refs;
 
-			ref_id_dbg = vdev->vdev_objmgr.ref_id_dbg;
+			ref_id_dbg = peer->peer_objmgr.ref_id_dbg;
 			wlan_objmgr_for_each_refs(ref_id_dbg, ref_id, refs)
 				wlan_objmgr_peer_release_ref(peer, ref_id);
 		}
