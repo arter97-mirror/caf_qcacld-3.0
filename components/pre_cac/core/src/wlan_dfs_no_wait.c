@@ -445,7 +445,7 @@ dnw_set_info(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id, uint32_t ch_freq,
 		goto release_vdev_ref;
 	}
 
-	/* */
+	/* Don't support DFS channel */
 	if (wlan_reg_is_dfs_for_freq(pdev, ch_freq)) {
 		pre_cac_debug("dfs ch freq %d", ch_freq);
 		status = QDF_STATUS_E_INVAL;
@@ -679,6 +679,9 @@ dnw_update_bandwidth(struct wlan_objmgr_vdev *vdev,
 		goto release_vdev_ref;
 
 	if (!dnw_pdev_info->dnw_in_progress)
+		goto release_vdev_ref;
+
+	if (!dnw_vdev_info->dnw_in_progress)
 		goto release_vdev_ref;
 
 	if (dnw_pdev_info->ori_ch_width != ch_width)
