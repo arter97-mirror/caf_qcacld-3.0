@@ -12092,7 +12092,7 @@ lim_recompute_sta_cli_tpc(struct mac_context *mac,
 	enum reg_6g_ap_type power_type_6g;
 	QDF_STATUS status;
 
-	if (wlan_is_tdls_session_present(session->vdev))
+	if (QDF_IS_STATUS_SUCCESS(wlan_is_tdls_session_present(session->vdev)))
 		wlan_tdls_recompute_offchannel_mode(mac->psoc,
 						    session->vdev);
 
