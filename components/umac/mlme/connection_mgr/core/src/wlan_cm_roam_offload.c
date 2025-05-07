@@ -409,8 +409,37 @@ static void
 cm_roam_disconnect_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			  struct wlan_roam_disconnect_params *params)
 {
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+	struct rso_cfg_params *cfg_params;
+	uint32_t trigger_bitmap;
+
 	params->vdev_id = vdev_id;
 	wlan_mlme_get_enable_disconnect_roam_offload(psoc, &params->enable);
+	trigger_bitmap = mlme_get_roam_trigger_bitmap(psoc, vdev_id);
+
+	if (!(params->enable && (trigger_bitmap &
+				 BIT(ROAM_TRIGGER_REASON_DEAUTH))))
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_NB_ID);
+	if (!vdev) {
+		mlme_err("vdev is NULL");
+		return;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return;
+	}
+
+	cfg_params = &rso_cfg->cfg_param;
+	params->reconnect_disallow_period =
+				cfg_params->reconnect_disallow_period;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 }
 
 /**
@@ -6321,6 +6350,11 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.min_roam_score_delta;
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
 				   MIN_ROAM_SCORE_DELTA, &src_cfg);
+
+	src_cfg.uint_value =
+		mlme_obj->cfg.lfr.reconnect_disallow_period;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   RECONNECT_DISALLOW_PERIOD, &src_cfg);
 	/*
 	 * Store the current PMK info of the AP
 	 * to the single pmk global cache if the BSS allows

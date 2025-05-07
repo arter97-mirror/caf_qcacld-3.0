@@ -2172,6 +2172,8 @@ struct fw_scan_channels {
  * @roam_periodic_scan_interval: the interval in seconds after which STA
  * performs periodic partial scans till roaming succeeds or RSSI recovers
  * above threshold.
+ * @reconnect_disallow_period: duration after which STA is allowed
+ * to reconnect to the same BSSID sending DEAUTH/DISASSOC frames.
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2195,6 +2197,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t sta_roam_disable;
 	uint32_t roam_info_stats_num;
 	uint8_t roam_high_rssi_delta;
+	uint32_t reconnect_disallow_period;
 #endif
 	bool early_stop_scan_enable;
 	bool enable_5g_band_pref;

@@ -3427,6 +3427,7 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	lfr->hs20_btm_offload_disable = cfg_get(psoc,
 						CFG_HS_20_BTM_OFFLOAD_DISABLE);
 	mlme_init_roam_periodic_scan_interval(psoc, lfr);
+	lfr->reconnect_disallow_period = DEFAULT_RECONNECT_DISALLOW_PERIOD;
 }
 
 static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,

@@ -6142,6 +6142,8 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U8},
 	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_MIN_DELTA_THRESHOLD] = {
 			.type = NLA_U32},
+	[QCA_ATTR_ROAM_CONTROL_CONNECTED_BSS_RECONNECT_DISALLOW_PERIOD] = {
+			.type = NLA_U32},
 };
 
 /**
@@ -6845,6 +6847,28 @@ hdd_send_min_roam_score_delta_to_sme(struct hdd_context *hdd_ctx,
 						  min_roam_score_delta);
 }
 
+/*
+ * hdd_send_reconnect_disallow_period_to_sme() - Set time to reconnect
+ * disallow period value
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @reconnect_disallow_period: reconnect disallow period value
+ * in seconds.
+ *
+ * Send reconnect_disallow_period value to FW.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_send_reconnect_disallow_period_to_sme(struct hdd_context *hdd_ctx,
+					  uint8_t vdev_id,
+					  uint32_t reconnect_disallow_period)
+{
+	return sme_set_reconnect_disallow_period_value(hdd_ctx->mac_handle,
+						       vdev_id,
+						       reconnect_disallow_period);
+}
+
 /**
  * hdd_set_roam_with_control_config() - Set roam control configuration
  * @hdd_ctx: HDD context
@@ -7331,6 +7355,20 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 		is_rso_update_required = true;
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("Failed to set min roam score delta value");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CONNECTED_BSS_RECONNECT_DISALLOW_PERIOD];
+	if (attr) {
+		value = nla_get_u32(attr);
+
+		hdd_debug("Received reconnect_disallow_period value: %d",
+			  value);
+		status = hdd_send_reconnect_disallow_period_to_sme(hdd_ctx,
+								   vdev_id,
+								   value);
+		is_rso_update_required = true;
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set reconnect_disallow_period");
 	}
 
 	/* send RSO update if required */

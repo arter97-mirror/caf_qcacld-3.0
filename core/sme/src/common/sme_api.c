@@ -17971,3 +17971,26 @@ QDF_STATUS sme_set_min_roam_score_delta_value(mac_handle_t mac_handle,
 					  MIN_ROAM_SCORE_DELTA,
 					  &src_config);
 }
+
+QDF_STATUS
+sme_set_reconnect_disallow_period_value(mac_handle_t mac_handle,
+					uint8_t vdev_id,
+					uint32_t reconnect_disallow_period)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = reconnect_disallow_period;
+	/*
+	 * To retain the reconnect disallow period value across roaming and to
+	 * cache the value when command to set the reconnect disallow period
+	 * value is received in disconnected state, update the value to the
+	 * global mlme_obj.
+	 */
+	mac->mlme_cfg->lfr.reconnect_disallow_period =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  RECONNECT_DISALLOW_PERIOD,
+					  &src_config);
+}

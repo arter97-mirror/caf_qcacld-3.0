@@ -339,6 +339,8 @@ struct rso_chan_info {
  * from 6 GHz to Non 6GHz AP.
  * @min_roam_score_delta: Minimum difference between connected AP's and
  * candidate AP's roam score to start roaming.
+ * @reconnect_disallow_period: duration after which STA is allowed
+ * to reconnect to the same BSSID sending DEAUTH/DISASSOC frames.
  */
 struct rso_cfg_params {
 	uint32_t neighbor_scan_period;
@@ -377,6 +379,7 @@ struct rso_cfg_params {
 	uint32_t roam_score_delta;
 	uint8_t roam_rssi_delta_6ghz_to_non_6ghz;
 	uint32_t min_roam_score_delta;
+	uint32_t reconnect_disallow_period;
 };
 
 /**
@@ -748,6 +751,14 @@ struct rso_roam_policy_params {
 #define DEFAULT_RSSI_DB_GAP     30  /* every 30 dbm for one category */
 #define ENABLE_FT_OVER_DS      1   /* enable ft_over_ds */
 
+/*
+ * Default value for the reconnect disallow period. This parameter is
+ * used to configure the duration in seconds for which FW disallows to select
+ * a target AP that has transmitted a deauthentication frame or disassociation
+ * frame to avoid repeated roaming and disconnections.
+ */
+#define DEFAULT_RECONNECT_DISALLOW_PERIOD 0
+
 /**
  * struct rso_config_params - global RSO params
  * @num_bssid_favored: Number of BSSID's which have a preference over others
@@ -836,6 +847,7 @@ struct rso_config_params {
  * @ROAM_SCORE_DELTA: Roam score delta value
  * @ROAM_CONFIG_RT_PARAMS_ENABLED: Roam config RT params enabled
  * @MIN_ROAM_SCORE_DELTA: Min roam score delta value
+ * @RECONNECT_DISALLOW_PERIOD: Reconnect disallow period value.
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -883,6 +895,7 @@ enum roam_cfg_param {
 	ROAM_SCORE_DELTA,
 	ROAM_CONFIG_RT_PARAMS_ENABLED,
 	MIN_ROAM_SCORE_DELTA,
+	RECONNECT_DISALLOW_PERIOD,
 };
 
 /**
@@ -1523,10 +1536,13 @@ struct vendor_handoff_cfg {
  * struct wlan_roam_disconnect_params - Emergency deauth/disconnect roam params
  * @vdev_id: VDEV on which the parameters should be applied
  * @enable: Enable or disable disconnect roaming.
+ * @reconnect_disallow_period: duration after which STA is allowed
+ * to reconnect to the same BSSID sending DEAUTH/DISASSOC frames
  */
 struct wlan_roam_disconnect_params {
 	uint32_t vdev_id;
 	bool enable;
+	uint32_t reconnect_disallow_period;
 };
 
 /**
