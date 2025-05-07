@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3034,18 +3034,7 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("MLO_ROAM: link vdev:%d link_id:%d assoc rsp generation failed",
 		       session_entry->vdev_id, link_id);
-		mlo_free_cache_link_assoc_rsp(session_entry->vdev,
-					      link_id);
-		assoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
-		assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
-		/* Update PE sessionId */
-		assoc_cnf.sessionId = session_entry->peSessionId;
-		lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
-				     (uint32_t *)&assoc_cnf);
-
-		qdf_mem_free(link_assoc_rsp.ptr);
-
-		return status;
+		goto assoc_fail;
 	}
 	mlo_update_cache_link_assoc_rsp(session_entry->vdev,
 					link_id, &link_assoc_rsp);
@@ -3053,9 +3042,30 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 	lim_process_assoc_rsp_frame(mac_ctx, link_assoc_rsp.ptr,
 				    link_assoc_rsp.len, LIM_REASSOC,
 				    session_entry);
+	if (session_entry->is_unexpected_peer_error) {
+		pe_err("MLO_ROAM: link vdev:%d link_id:%d assoc rsp process failed",
+		       session_entry->vdev_id, link_id);
+		status = QDF_STATUS_E_INVAL;
+		goto assoc_fail;
+	}
+
 	qdf_mem_free(link_assoc_rsp.ptr);
 
 	return QDF_STATUS_SUCCESS;
+
+assoc_fail:
+	mlo_free_cache_link_assoc_rsp(session_entry->vdev,
+				      link_id);
+	assoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
+	assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
+	/* Update PE sessionId */
+	assoc_cnf.sessionId = session_entry->peSessionId;
+	lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
+			     (uint32_t *)&assoc_cnf);
+
+	qdf_mem_free(link_assoc_rsp.ptr);
+
+	return status;
 }
 #else /* (WLAN_FEATURE_ROAM_OFFLOAD) && (WLAN_FEATURE_11BE_MLO) */
 static QDF_STATUS
