@@ -7913,7 +7913,7 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 			  (uint64_t)frame_data->timestamp,
 			  &frame_data->bssid);
 
-	wlan_diag_event.version = DIAG_MGMT_VERSION_V2;
+	wlan_diag_event.version = DIAG_MGMT_VERSION_V5;
 	wlan_diag_event.sn = frame_data->seq_num;
 	wlan_diag_event.auth_algo = frame_data->auth_algo;
 	wlan_diag_event.rssi = frame_data->rssi;

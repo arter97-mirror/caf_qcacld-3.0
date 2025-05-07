@@ -1072,6 +1072,13 @@ struct wlan_diag_btm_info {
 #define MAX_VSIE_LEN 255
 #define DIAG_MGMT_VERSION_V4 4
 
+/*
+ * This version mandates to print the RSSI for Authentication,
+ * (Re)Association request/response, Deauthentication &
+ * Disassociation frames.
+ */
+#define DIAG_MGMT_VERSION_V5 5
+
 /**
  * struct wlan_diag_packet_info - Data packets related info
  * @diag_cmn: Common diag info
