@@ -346,12 +346,13 @@ wma_get_concurrency_support(struct wlan_objmgr_psoc *psoc)
  * Version 7 - NAN standard plus feature support updated
  * Version 8 - INI based NAN EHT capability support updated
  * Version 9 - MHS power save feature support updated
+ * Version 10- Collaborative Cluster Merging and 11KV enhancement
  *
  * Return: None
  */
 static void wma_update_set_feature_version(struct target_feature_set *fs)
 {
-	fs->feature_set_version = 9;
+	fs->feature_set_version = 10;
 }
 
 /**
