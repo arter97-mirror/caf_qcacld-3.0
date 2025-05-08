@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -92,9 +93,32 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"Control MC/BC active APF mode")
 
+/*
+ * <ini>
+ * gConfigureAPFperScreenState - Configure active mode APF enable/disable
+ * as per screen off/on state
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * When set to 1 host will set active mode APF to FW on screen off and
+ * disable active mode APF on screen on.
+ *
+ * Supported Feature: Android packet filter
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_CONFIGURE_APF_PER_SCREEN_STATE CFG_INI_BOOL( \
+		"gConfigureAPFperScreenState", \
+		1, \
+		"Enable APF Support")
+
 #define CFG_PMO_APF_ALL \
 	CFG(CFG_PMO_APF_ENABLE) \
 	CFG(CFG_ACTIVE_UC_APF_MODE) \
-	CFG(CFG_ACTIVE_MC_BC_APF_MODE)
+	CFG(CFG_ACTIVE_MC_BC_APF_MODE) \
+	CFG(CFG_CONFIGURE_APF_PER_SCREEN_STATE)
 
 #endif /* WLAN_PMO_APF_CFG_H__ */

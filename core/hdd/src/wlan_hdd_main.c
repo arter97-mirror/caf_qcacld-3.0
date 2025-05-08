@@ -251,6 +251,7 @@
 #include "os_if_ll_sap.h"
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_crypto_obj_mgr_i.h"
+#include "wifi_pos_api.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -7375,6 +7376,7 @@ hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
 	struct dev_set_param vdevsetparam[MAX_VDEV_RTT_PARAMS] = {};
 	uint8_t index = 0;
 	WMI_FW_SUB_FEAT_CAPS wmi_fw_rtt_respr, wmi_fw_rtt_initr;
+	uint32_t responder_bits = 0, initiator_bits = 0, rsta_11az_support;
 
 	switch (wlan_vdev_mlme_get_opmode(vdev)) {
 	case QDF_STA_MODE:
@@ -7392,18 +7394,33 @@ hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
 	psoc = wlan_vdev_get_psoc(vdev);
 
 	ucfg_mlme_get_fine_time_meas_cap(psoc, &fine_time_meas_cap);
+	rsta_11az_support = wifi_pos_get_rsta_11az_ranging_cap();
+
+	if (fine_time_meas_cap & wmi_fw_rtt_respr)
+		responder_bits |= BIT(RESPONDER_RTT_11MC_SUPPORTED);
+
+	if (rsta_11az_support & CFG_RESPONDER_11AZ_NTB_SUPPORT)
+		responder_bits |= RESPONDER_RTT_11AZ_NTB_RANGING_SUPPORTED;
+
+	if (rsta_11az_support & CFG_RESPONDER_11AZ_TB_SUPPORT)
+		responder_bits |=
+			RESPONDER_RTT_11AZ_TB_RANGING_SUPPORTED;
+
 	status = mlme_check_index_setparam(
 			vdevsetparam,
 			wmi_vdev_param_enable_disable_rtt_responder_role,
-			(fine_time_meas_cap & wmi_fw_rtt_respr), index++,
+			responder_bits, index++,
 			MAX_VDEV_RTT_PARAMS);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
+	if (fine_time_meas_cap & wmi_fw_rtt_initr)
+		initiator_bits = wmi_fw_rtt_initr;
+
 	status = mlme_check_index_setparam(
 			vdevsetparam,
 			wmi_vdev_param_enable_disable_rtt_initiator_role,
-			(fine_time_meas_cap & wmi_fw_rtt_initr), index++,
+			initiator_bits, index++,
 			MAX_VDEV_RTT_PARAMS);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;

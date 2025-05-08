@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -541,6 +541,15 @@ QDF_STATUS sme_roam_ndi_stop(mac_handle_t mac_handle, uint8_t vdev_id);
 
 void sme_dhcp_done_ind(mac_handle_t mac_handle, uint8_t session_id);
 
+/**
+ * sme_get_dhcp_status() - API to check if dhcp is in progress
+ * @mac_handle: Opaque handle to the global MAC context
+ * @session_id: session id
+ *
+ * Return: True if dhcp in progress, else False
+ */
+bool sme_get_dhcp_status(mac_handle_t mac_handle, uint8_t session_id);
+
 /*
  * sme_roam_stop_bss() - To stop BSS for Soft AP. This is an asynchronous API.
  * @mac_handle - Global structure
@@ -760,6 +769,52 @@ QDF_STATUS sme_neighbor_report_request(mac_handle_t mac_handle,
 		 uint8_t sessionId,
 		tpRrmNeighborReq pRrmNeighborReq,
 		tpRrmNeighborRspCallbackInfo callbackInfo);
+
+#ifdef FEATURE_WLAN_APF
+
+/*
+ * sme_enable_active_apf_mode_ind() -
+ * API to signal the FW about active APF enablement.
+ *
+ * mac_handle: Opaque handle to the global MAC context.
+ * device_mode - mode(AP,SAP etc) of the device.
+ * macAddr - MAC address of the adapter.
+ * sessionId - session ID.
+ * Return QDF_STATUS  SUCCESS.
+ * FAILURE or RESOURCES  The API finished and failed.
+ */
+
+QDF_STATUS sme_enable_active_apf_mode_ind(mac_handle_t mac_handle,
+					  uint8_t device_mode,
+					  uint8_t *macAddr, uint8_t sessionId);
+
+/*
+ * sme_disable_active_apf_mode_ind() -
+ * API to signal the FW about active APF disablement.
+ *
+ * mac_handle: Opaque handle to the global MAC context.
+ * device_mode - mode(AP,SAP etc) of the device.
+ * macAddr - MAC address of the adapter.
+ * sessionId - session ID.
+ * Return QDF_STATUS  SUCCESS.
+ * FAILURE or RESOURCES  The API finished and failed.
+ */
+QDF_STATUS sme_disable_active_apf_mode_ind(mac_handle_t mac_handle,
+					   uint8_t device_mode,
+					   uint8_t *macAddr, uint8_t sessionId);
+#else
+QDF_STATUS sme_enable_active_apf_mode_ind(mac_handle_t mac_handle,
+					  uint8_t device_mode,
+					  uint8_t *macAddr, uint8_t sessionId)
+{
+}
+
+QDF_STATUS sme_disable_active_apf_mode_ind(mac_handle_t mac_handle,
+					   uint8_t device_mode,
+					   uint8_t *macAddr, uint8_t sessionId)
+{
+}
+#endif
 
 /**
  * sme_register_pagefault_cb() - Register cb to handle host action on pagefault

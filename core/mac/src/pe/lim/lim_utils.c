@@ -87,6 +87,7 @@
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_epcs_api.h"
 #include "wlan_nan_api_i.h"
+#include "wlan_mlme_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -7439,12 +7440,14 @@ void lim_decide_he_op(struct mac_context *mac_ctx, uint32_t *mlme_he_ops,
 
 void lim_update_he_caps_mcs(struct mac_context *mac, struct pe_session *session)
 {
-	uint32_t tx_mcs_map = 0;
-	uint32_t rx_mcs_map = 0;
-	uint32_t mcs_map = 0;
+	uint16_t tx_mcs_map = 0;
+	uint16_t rx_mcs_map = 0;
+	uint16_t mcs_map = 0;
 	struct wlan_objmgr_vdev *vdev = session->vdev;
 	struct mlme_legacy_priv *mlme_priv;
 	struct wlan_mlme_cfg *mlme_cfg = mac->mlme_cfg;
+	enum QDF_OPMODE persona;
+	uint16_t sap_rx_mcs_map;
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
@@ -7464,12 +7467,32 @@ void lim_update_he_caps_mcs(struct mac_context *mac, struct pe_session *session)
 
 	mlme_priv->he_config.tx_he_mcs_map_lt_80 = tx_mcs_map;
 	mlme_priv->he_config.rx_he_mcs_map_lt_80 = rx_mcs_map;
-	*((uint16_t *)mlme_priv->he_config.tx_he_mcs_map_160) = tx_mcs_map;
-	*((uint16_t *)mlme_priv->he_config.rx_he_mcs_map_160) = rx_mcs_map;
+
+	rx_mcs_map = *(uint16_t *)mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_160;
+	tx_mcs_map = *(uint16_t *)mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_160;
+	mcs_map = rx_mcs_map & 0x3;
+
+	if (session->nss == 1) {
+		tx_mcs_map = HE_SET_MCS_4_NSS(tx_mcs_map, HE_MCS_DISABLE, 2);
+		rx_mcs_map = HE_SET_MCS_4_NSS(rx_mcs_map, HE_MCS_DISABLE, 2);
+	} else {
+		tx_mcs_map = HE_SET_MCS_4_NSS(tx_mcs_map, mcs_map, 2);
+		rx_mcs_map = HE_SET_MCS_4_NSS(rx_mcs_map, mcs_map, 2);
+	}
+
+	persona = wlan_vdev_mlme_get_opmode(vdev);
+	if (persona == QDF_SAP_MODE) {
+		sap_rx_mcs_map =
+			wlan_mlme_get_sap_he_rx_mcs_map_160(mac->psoc);
+		rx_mcs_map =
+			wlan_mlme_get_min_he_mcs_map(sap_rx_mcs_map,
+						     rx_mcs_map);
+	}
+
 	qdf_mem_copy(mlme_priv->he_config.tx_he_mcs_map_160, &tx_mcs_map,
-		     sizeof(u_int16_t));
+		     sizeof(uint16_t));
 	qdf_mem_copy(mlme_priv->he_config.rx_he_mcs_map_160, &rx_mcs_map,
-		     sizeof(u_int16_t));
+		     sizeof(uint16_t));
 }
 
 static void
@@ -8209,6 +8232,7 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 {
 	bool support_2x2 = false;
 	uint32_t self_sta_dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
+	uint16_t sap_rx_he_mcs_map_160;
 
 	if (!IS_DOT11_MODE_HE(self_sta_dot11mode))
 		return QDF_STATUS_SUCCESS;
@@ -8275,6 +8299,15 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 				rx_he_mcs_map_160),
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 					tx_he_mcs_map_160));
+
+		if (LIM_IS_AP_ROLE(session_entry)) {
+			sap_rx_he_mcs_map_160 =
+				wlan_mlme_get_sap_he_rx_mcs_map_160(mac_ctx->psoc);
+			rates->rx_he_mcs_map_160 =
+				wlan_mlme_get_min_he_mcs_map(sap_rx_he_mcs_map_160,
+							     rates->rx_he_mcs_map_160);
+		}
+
 	} else {
 		rates->tx_he_mcs_map_160 = HE_MCS_ALL_DISABLED;
 		rates->rx_he_mcs_map_160 = HE_MCS_ALL_DISABLED;

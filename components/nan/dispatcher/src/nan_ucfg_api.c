@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023,2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1006,9 +1006,6 @@ ucfg_nan_disable_ndi(struct wlan_objmgr_psoc *psoc, uint32_t ndi_vdev_id)
 		.timeout_ms = 2000,
 	};
 
-	if (!ucfg_is_ndi_dbs_supported(psoc))
-		return QDF_STATUS_SUCCESS;
-
 	ndi_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, ndi_vdev_id,
 							WLAN_NAN_ID);
 	if (!ndi_vdev) {
@@ -1086,9 +1083,6 @@ ucfg_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 		nan_err("psoc object is NULL, no action will be taken");
 		return QDF_STATUS_E_INVAL;
 	}
-
-	if (!ucfg_is_ndi_dbs_supported(psoc))
-		return QDF_STATUS_SUCCESS;
 
 	ndi_count = policy_mgr_mode_specific_connection_count(psoc, PM_NDI_MODE,
 							      NULL);
