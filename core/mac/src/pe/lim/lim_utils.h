@@ -3449,12 +3449,13 @@ lim_get_omn_channel_width(tDot11fIEOperatingMode *omn_ie);
  * @mac_ctx:    Pointer to Global MAC structure
  * @pe_session: Pointer to session
  * @bss_desc: Pointer to bss description
+ * @force_vlp: Flag to force use VLP power
  *
  * Return: TPC status
  */
 bool
 lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
-		  struct bss_description *bss_desc);
+		  struct bss_description *bss_desc, bool force_vlp);
 
 /**
  * lim_update_tx_power() - Function to update the TX power for

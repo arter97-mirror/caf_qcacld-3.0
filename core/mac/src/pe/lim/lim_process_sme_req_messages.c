@@ -6803,7 +6803,7 @@ lim_update_both_eirp_psd(struct wlan_objmgr_vdev *vdev, int8_t max_tx_power,
 
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
-		       bool force_ap_vlp_pwr)
+		       bool force_vlp_pwr)
 {
 	bool is_psd_power = false;
 	bool is_tpe_present = false, is_6ghz_freq = false;
@@ -6859,6 +6859,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 			ap_power_type_6g = session->best_6g_power_type;
 			if (ap_power_type_6g == REG_INDOOR_ENABLED_AP)
 				skip_tpe = true;
+			if  (force_vlp_pwr)
+				ap_power_type_6g = REG_VERY_LOW_POWER_AP;
 		}
 	}
 
@@ -6916,7 +6918,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 					 is_psd_power, &reg_max,
 					 &reg_psd_pwr_max);
 				} else {
-					if (!force_ap_vlp_pwr &&
+					if (!force_vlp_pwr &&
 					    wlan_reg_decide_6ghz_power_within_bw_for_freq(
 							mac->pdev, oper_freq,
 							session->ch_width,
@@ -6932,7 +6934,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 						reg_psd_pwr_max =
 							psd_power_within_bw;
 					} else {
-						if (force_ap_vlp_pwr)
+						if (force_vlp_pwr)
 							ap_power_type_6g =
 								REG_VERY_LOW_POWER_AP;
 						else
@@ -6947,7 +6949,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 							&is_psd_power,
 							&reg_max,
 							&reg_psd_pwr_max,
-							force_ap_vlp_pwr);
+							force_vlp_pwr);
 					}
 				}
 			}
