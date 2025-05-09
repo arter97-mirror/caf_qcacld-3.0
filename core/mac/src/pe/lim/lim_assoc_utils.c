@@ -3839,16 +3839,19 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		 * width has been taken into account for calculating
 		 * pe_session->ch_width
 		 */
-		if ((chan_width_support &&
-		     ((pAssocRsp->HTCaps.supportedChannelWidthSet) ||
-		      (pBeaconStruct->HTCaps.present &&
-		       pBeaconStruct->HTCaps.supportedChannelWidthSet))) ||
-		    lim_is_eht_connection_op_info_present(pe_session,
+		if (lim_is_eht_connection_op_info_present(pe_session,
 							  pAssocRsp)) {
 			pAddBssParams->ch_width =
 					pe_session->ch_width;
 			pAddBssParams->staContext.ch_width =
-						pe_session->ch_width;
+					pe_session->ch_width;
+		} else if ((chan_width_support &&
+		     ((pAssocRsp->HTCaps.supportedChannelWidthSet) ||
+		      (pBeaconStruct->HTCaps.present &&
+		       pBeaconStruct->HTCaps.supportedChannelWidthSet))) &&
+		       !pAssocRsp->VHTCaps.present) {
+			pAddBssParams->ch_width = CH_WIDTH_40MHZ;
+			pAddBssParams->staContext.ch_width = CH_WIDTH_40MHZ;
 		} else {
 			pAddBssParams->ch_width = CH_WIDTH_20MHZ;
 			pAddBssParams->staContext.ch_width = CH_WIDTH_20MHZ;
