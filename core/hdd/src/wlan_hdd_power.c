@@ -3157,6 +3157,20 @@ int wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 }
 
 /**
+ * wlan_hdd_set_cached_txpower_valid() - Set if tx power cache is valid
+ * @hdd_ctx: hdd_ctx
+ * @is_valid: Is tx power cache valid
+ *
+ * Return: None
+ */
+static inline void
+wlan_hdd_set_cached_txpower_valid(struct hdd_context *hdd_ctx,
+				  bool is_valid)
+{
+	hdd_ctx->cached_txpower_valid = is_valid;
+}
+
+/**
  * __wlan_hdd_cfg80211_set_txpower() - set TX power
  * @wiphy: Pointer to wiphy
  * @wdev: Pointer to network device
@@ -3240,6 +3254,7 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 			dbm, status);
 		return -EIO;
 	}
+	wlan_hdd_set_cached_txpower_valid(hdd_ctx, false);
 
 	hdd_debug("Set tx power level %d dbm", dbm);
 
@@ -3505,12 +3520,17 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		hdd_err("vdev is NULL");
 		return -EINVAL;
 	}
-	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED ||
-	    is_rate_limited) {
-		/* Send cached data to upperlayer*/
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		/* Send cached data to upperlayer */
 		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
-		hdd_debug("Modules not enabled/rate limited, cached tx power = %d",
-			  *dbm);
+		hdd_debug("Modules not enabled, cached tx power = %d", *dbm);
+		goto deliver_son;
+	}
+
+	if (is_rate_limited && hdd_ctx->cached_txpower_valid) {
+		/* Send cached data to upperlayer */
+		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
+		hdd_debug("Rate limited, cached tx power = %d", *dbm);
 		goto deliver_son;
 	}
 
@@ -3530,6 +3550,7 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		   adapter->deflink->vdev_id, adapter->device_mode);
 
 	ret = wlan_hdd_get_tx_power(adapter, dbm);
+	wlan_hdd_set_cached_txpower_valid(hdd_ctx, true);
 deliver_son:
 	if (adapter->device_mode == QDF_SAP_MODE)
 		wlan_son_deliver_tx_power(vdev, *dbm);

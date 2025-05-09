@@ -2258,6 +2258,7 @@ struct hdd_tx_powerboost {
  * @more_peer_data: more mlo peer data in peer stats
  * @lpc_info: Local packet capture info
  * @is_lpc_ps_disabled: Indicate if LPC has disabled power save
+ * @cached_txpower_valid: Indicate if tx power in driver cache is valid
  * @combination: interface combination register to wiphy
  * @wlan_hdd_akm_suites: Supported AKM suites for various interfaces
  * @sta_akms: Station mode supported AKMs
@@ -2559,6 +2560,8 @@ struct hdd_context {
 	struct hdd_lpc_info lpc_info;
 	bool is_lpc_ps_disabled;
 #endif
+
+	bool cached_txpower_valid;
 
 	struct ieee80211_iface_combination *combination;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)) || \
