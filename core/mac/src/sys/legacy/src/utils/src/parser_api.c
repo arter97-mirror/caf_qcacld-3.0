@@ -8645,6 +8645,16 @@ const uint8_t *lim_get_ext_ie_ptr_from_ext_id(const uint8_t *ie,
 				     EHTOP_GRP_ADDRESSED_BU_IND_EXPONENT_BITS, \
 				     __value)
 
+#define EHTOP_PARAMS_MCS15_DISABLE_GET_FROM_IE(__eht_op_params) \
+			ehtop_ie_get(__eht_op_params, \
+				     EHTOP_MCS15_DISABLE_IDX, \
+				     EHTOP_MCS15_DISABLE_BITS)
+#define EHTOP_PARAMS_MCS15_DISABLE_SET_TO_IE(__eht_op_params, __value) \
+			ehtop_ie_set(&__eht_op_params, \
+				     EHTOP_MCS15_DISABLE_IDX, \
+				     EHTOP_MCS15_DISABLE_BITS, \
+				     __value)
+
 #define EHTOP_INFO_CHANWIDTH_GET_FROM_IE(__eht_op_control) \
 			ehtop_ie_get(__eht_op_control, \
 				     EHTOP_INFO_CHANWIDTH_IDX, \
@@ -9343,6 +9353,8 @@ QDF_STATUS lim_ieee80211_unpack_ehtop(const uint8_t *eht_op_ie,
 	dot11f_eht_op->group_addr_bu_indication_exponent =
 		EHTOP_PARAMS_GROUP_ADDR_BU_IND_EXPONENT_GET_FROM_IE(
 							ehtop->ehtop_param);
+	dot11f_eht_op->mcs15_disable =
+		EHTOP_PARAMS_MCS15_DISABLE_GET_FROM_IE(ehtop->ehtop_param);
 
 	dot11f_eht_op->basic_rx_max_nss_for_mcs_0_to_7 =
 		ehtop_ie_get(ehtop->basic_mcs_nss_set.max_nss_mcs_0_7,
@@ -10572,6 +10584,8 @@ void lim_ieee80211_pack_ehtop(uint8_t *ie, tDot11fIEeht_op dot11f_eht_op,
 
 	val = dot11f_eht_op.group_addr_bu_indication_exponent;
 	EHTOP_PARAMS_GROUP_ADDR_BU_IND_EXPONENT_SET_TO_IE(ehtop->ehtop_param,
+							  val);
+	EHTOP_PARAMS_MCS15_DISABLE_SET_TO_IE(ehtop->ehtop_param,
 							  val);
 
 	val = dot11f_eht_op.basic_rx_max_nss_for_mcs_0_to_7;
