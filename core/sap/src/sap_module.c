@@ -59,6 +59,7 @@
 #include "target_if.h"
 #include "wlan_hdd_regulatory.h"
 #include "wlan_ll_sap_api.h"
+#include <wlan_dnw_api.h>
 
 #define SAP_DEBUG
 static struct sap_context *gp_sap_ctx[SAP_MAX_NUM_SESSION];
@@ -1816,6 +1817,12 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 		 * state.
 		 */
 		if (sap_ctx->fsm_state == SAP_STARTED) {
+			/* Stop DFS No Wait if it's in progress */
+			if (wlan_is_dnw_in_progress(mac->pdev,
+						    sap_ctx->vdev_id))
+				wlan_dnw_handle_bss_stop(mac->pdev,
+							 sap_ctx->vdev_id);
+
 			status = wlansap_set_chan_params_for_csa(
 					mac, sap_ctx, target_chan_freq, ccfs1,
 					target_bw, punct_bitmap);
@@ -1903,6 +1910,69 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_DNW
+QDF_STATUS sap_dnw_downgrade_channel_width(struct sap_context *sap_ctx,
+					   enum phy_ch_width target_bw) {
+	QDF_STATUS status, hw_mode_status;
+	struct sap_ch_switch_info *ch_switch_info;
+	struct mac_context *mac;
+
+	if (!sap_ctx) {
+		sap_err("Invalid SAP pointer");
+
+		return QDF_STATUS_E_FAULT;
+	}
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	if (sap_ctx->fsm_state != SAP_STARTED) {
+		sap_debug("sap isn't started, %d", sap_ctx->fsm_state);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = wlansap_set_chan_params_for_csa(mac, sap_ctx,
+						 sap_ctx->chan_freq, 0,
+						 target_bw,
+						 NO_SCHANS_PUNC);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	hw_mode_status = policy_mgr_check_and_set_hw_mode_for_channel_switch(
+				   mac->psoc, sap_ctx->sessionId,
+				   sap_ctx->chan_freq,
+				   POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP);
+
+	if (hw_mode_status == QDF_STATUS_E_FAILURE) {
+		sap_err("HW change required but failed to set hw mode");
+		return hw_mode_status;
+	}
+
+	status = policy_mgr_reset_chan_switch_complete_evt(mac->psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_debug("Reset channel switch evt fail");
+		return status;
+	}
+
+	ch_switch_info = wlan_get_sap_ch_sw_info(sap_ctx->vdev);
+	if (!ch_switch_info) {
+		sap_err("Invalid channel info");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	ch_switch_info->csa_ie_required = true;
+	sap_ctx->sap_radar_found_status = true;
+	sap_cac_reset_current_notify(sap_ctx);
+
+	sap_start_csa_restart(mac, sap_ctx);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 QDF_STATUS wlan_sap_getstation_ie_information(struct sap_context *sap_ctx,
 					      uint32_t *len, uint8_t *buf)

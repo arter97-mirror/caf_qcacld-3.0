@@ -3637,16 +3637,14 @@ sap_dnw_request_handler(void *ctx, enum phy_ch_width ori_ch_width,
 
 	vdev_id = wlan_vdev_get_id(sap_ctx->vdev);
 	sap_debug("dnw request vdev %d bw ori %d down %d, request %d",
-		  vdev_id, dg_ch_width, ori_ch_width, dnw_request);
+		  vdev_id, ori_ch_width, dg_ch_width, dnw_request);
 
 	if (dnw_request == DNW_REQ_UPGRADE_BW) {
 		reason = POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP;
 		sme_sap_update_ch_width(wlan_vdev_get_psoc(sap_ctx->vdev),
 					vdev_id, ori_ch_width, reason, 0, 0);
 	} else if (dnw_request == DNW_REQ_DOWNGRADE_BW) {
-		wlansap_set_channel_change_with_csa(
-				sap_ctx, sap_ctx->chan_freq,
-				0, dg_ch_width, NO_SCHANS_PUNC, true);
+		sap_dnw_downgrade_channel_width(sap_ctx, dg_ch_width);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -4428,11 +4426,12 @@ static QDF_STATUS sap_fsm_state_started(struct sap_context *sap_ctx,
 				/*
 				 * Handle DFS No Wait in progress
 				 */
-				if (wlan_is_dnw_in_progress(mac_ctx->pdev,
-							    sap_ctx->vdev_id)) {
+				if (wlan_is_dnw_in_progress(
+						mac_ctx->pdev,
+						temp_sap_ctx->vdev_id)) {
 					wlan_dnw_handle_radar_found(
 							mac_ctx->pdev,
-							sap_ctx->vdev_id);
+							temp_sap_ctx->vdev_id);
 					continue;
 				}
 				/*
