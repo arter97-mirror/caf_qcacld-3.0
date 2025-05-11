@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -833,9 +833,9 @@ target_if_cm_roam_scan_get_cckm_mode(struct wlan_objmgr_vdev *vdev,
  * @command: rso command
  * @req: disconnect roam parameters
  *
- * Return: void
+ * Return: QDF status
  */
-static void
+static QDF_STATUS
 target_if_cm_roam_disconnect_params(wmi_unified_t wmi_handle, uint8_t command,
 				    struct wlan_roam_disconnect_params *req)
 {
@@ -845,7 +845,7 @@ target_if_cm_roam_disconnect_params(wmi_unified_t wmi_handle, uint8_t command,
 	case ROAM_SCAN_OFFLOAD_START:
 	case ROAM_SCAN_OFFLOAD_UPDATE_CFG:
 		if (!req->enable)
-			return;
+			return QDF_STATUS_SUCCESS;
 		break;
 	case ROAM_SCAN_OFFLOAD_STOP:
 		req->enable = false;
@@ -856,7 +856,10 @@ target_if_cm_roam_disconnect_params(wmi_unified_t wmi_handle, uint8_t command,
 
 	status = wmi_unified_send_disconnect_roam_params(wmi_handle, req);
 	if (QDF_IS_STATUS_ERROR(status))
-		target_if_err("failed to send disconnect roam parameters");
+		target_if_err("failed to send disconnect roam parameters for vdev_id %d",
+			      req->vdev_id);
+
+	return status;
 }
 
 /* target_if_cm_roam_idle_params(): Send the roam idle parameters to wmi
@@ -2340,6 +2343,8 @@ target_if_cm_roam_register_rso_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 	tx_ops->send_roam_idle_trigger =  target_if_cm_roam_idle_params;
 	tx_ops->send_roam_frequencies = target_if_cm_roam_update_freqs;
 	target_if_cm_roam_register_mlo_req_ops(tx_ops);
+	tx_ops->send_roam_disconnect_params =
+					target_if_cm_roam_disconnect_params;
 }
 
 QDF_STATUS target_if_cm_roam_register_tx_ops(struct wlan_cm_roam_tx_ops *tx_ops)

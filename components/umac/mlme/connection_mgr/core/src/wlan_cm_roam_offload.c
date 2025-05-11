@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1177,7 +1177,9 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 	uint8_t reason = REASON_SUPPLICANT_DE_INIT_ROAMING;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	struct wlan_roam_idle_params idle_params;
-	bool send_idle_config = false;
+	struct wlan_roam_disconnect_params disconnect_params;
+	bool send_triggered_config = false;
+	uint32_t prev_trigger_bitmap, changed_trigger_bitmap;
 
 	if (!psoc)
 		return QDF_STATUS_E_INVAL;
@@ -1187,8 +1189,17 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	prev_trigger_bitmap = mlme_get_roam_trigger_bitmap(psoc, vdev_id);
+
 	mlme_set_roam_trigger_bitmap(psoc, trigger->vdev_id,
 				     trigger->trigger_bitmap);
+
+	/*
+	 * Changed trigger bitmap will capture the triggers whose states are
+	 * changed. This will be used to issue the commands to send the params
+	 * for those particular triggers whose states are changed.
+	 */
+	changed_trigger_bitmap = trigger->trigger_bitmap ^ prev_trigger_bitmap;
 
 	if (trigger->trigger_bitmap)
 		reason = REASON_SUPPLICANT_INIT_ROAMING;
@@ -1198,11 +1209,15 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 	 * is expected due to the new trigger bitmap.
 	 */
 	if (wlan_is_rso_enabled(pdev, vdev_id) && trigger->trigger_bitmap) {
-		send_idle_config = true;
+		send_triggered_config = true;
 		cm_roam_triggers(psoc, vdev_id, trigger);
 		cm_roam_idle_params(psoc, vdev_id, &idle_params);
+		cm_roam_disconnect_params(psoc, vdev_id, &disconnect_params);
 		if (!(trigger->trigger_bitmap & BIT(ROAM_TRIGGER_REASON_IDLE)))
 			idle_params.enable = false;
+		if (!(trigger->trigger_bitmap &
+			BIT(ROAM_TRIGGER_REASON_DEAUTH)))
+			disconnect_params.enable = false;
 		goto send_trigger;
 	}
 
@@ -1215,10 +1230,18 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 
 send_trigger:
 	status = wlan_cm_tgt_send_roam_triggers(psoc, vdev_id, trigger);
-	if (!send_idle_config)
-		return status;
+	if (!send_triggered_config)
+		goto end;
 
-	return wlan_cm_tgt_send_idle_params(psoc, vdev_id, &idle_params);
+	if (changed_trigger_bitmap & BIT(ROAM_TRIGGER_REASON_DEAUTH))
+		wlan_cm_tgt_send_disconnect_roam_params(psoc, vdev_id,
+							&disconnect_params);
+
+	if (changed_trigger_bitmap & BIT(ROAM_TRIGGER_REASON_IDLE))
+		wlan_cm_tgt_send_idle_params(psoc, vdev_id, &idle_params);
+
+end:
+	return status;
 }
 
 static void cm_roam_set_roam_reason_better_ap(struct wlan_objmgr_psoc *psoc,
