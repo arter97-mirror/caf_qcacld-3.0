@@ -497,7 +497,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 	wlan_connectivity_disconnect_event(vdev, rsp->req.req.bssid.bytes,
 					   rsp->req.req.reason_code,
-					   link_info->rssi,
+					   link_info->rssi_on_disconnect,
 					   is_locally_generated);
 
 	hdd_handle_disassociation_event(link_info, &rsp->req.req.bssid);
