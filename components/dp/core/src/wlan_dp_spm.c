@@ -16,6 +16,7 @@
 #define WLAN_DP_SPM_FLOW_CLASSIFICATION_END_NS (40 * QDF_NSEC_PER_SEC)
 #define WLAN_DP_SPM_FLOW_LONG_LIVE_MIN_NS  (3 * QDF_NSEC_PER_SEC)
 #define WLAN_DP_SPM_FLOW_LAST_ACTIVE_NS  (1 * QDF_NSEC_PER_SEC)
+#define WLAN_DP_SPM_FLOW_LAST_ACTIVE_CEILING_NS  (20 * QDF_NSEC_PER_SEC)
 #define WLAN_DP_SPM_FLOW_AGING_PKT_CNT 10
 
 /**
@@ -27,6 +28,7 @@
 static inline
 bool wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 {
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	uint64_t cur_ts = qdf_sched_clock();
 
 	if ((flow->selected_to_sample || flow->classified) &&
@@ -34,16 +36,27 @@ bool wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 	     WLAN_DP_SPM_FLOW_CLASSIFICATION_END_NS))
 		return false;
 
-	if ((cur_ts - flow->active_ts) >
+	if ((cur_ts - flow->active_ts) <
 	    WLAN_DP_SPM_FLOW_LAST_ACTIVE_NS)
-		return true;
+		return false;
 
-	if (((cur_ts - flow->flow_add_ts) >
-	     WLAN_DP_SPM_FLOW_LONG_LIVE_MIN_NS) &&
-	    flow->num_pkts < WLAN_DP_SPM_FLOW_AGING_PKT_CNT)
-		return true;
+	if (((cur_ts - flow->flow_add_ts) <
+	     WLAN_DP_SPM_FLOW_LONG_LIVE_MIN_NS) ||
+	    flow->num_pkts > WLAN_DP_SPM_FLOW_AGING_PKT_CNT)
+		return false;
 
-	return false;
+	/*
+	 * If the TX flow was active within certain duration specified by
+	 * WLAN_DP_SPM_FLOW_LAST_ACTIVE_CEILING_NS,
+	 * do not remove the TX flow if there is a corresponding RX flow,
+	 * since it will be used for classification by STC
+	 */
+	if (cur_ts - flow->active_ts <
+				WLAN_DP_SPM_FLOW_LAST_ACTIVE_CEILING_NS &&
+	    wlan_dp_find_dl_flow(dp_ctx, flow->flow_tuple_hash))
+		return false;
+
+	return true;
 }
 
 #ifdef WLAN_FEATURE_SAWFISH

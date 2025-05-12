@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1333,5 +1333,45 @@ bool dp_flow_info_exact_match(struct flow_info *fi, struct flow_info *flow)
 
 	return false;
 }
+
+#if defined(WLAN_SUPPORT_RX_FISA) && defined(WLAN_DP_FEATURE_STC)
+static inline struct dp_fisa_rx_sw_ft *
+wlan_dp_get_rx_flow_hdl(struct wlan_dp_psoc_context *dp_ctx, uint8_t flow_id)
+{
+	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
+
+	return (&(((struct dp_fisa_rx_sw_ft *)fisa_hdl->base)[flow_id]));
+}
+
+static inline struct dp_fisa_rx_sw_ft *
+wlan_dp_find_dl_flow(struct wlan_dp_psoc_context *dp_ctx,
+		     uint32_t tx_flow_tuple_hash)
+{
+	struct dp_rx_fst *fst = dp_ctx->rx_fst;
+	uint16_t flow_id;
+
+	for (flow_id = 0; flow_id < fst->max_entries; flow_id++) {
+		struct dp_fisa_rx_sw_ft *rx_flow;
+
+		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, flow_id);
+		if (!rx_flow->is_populated)
+			continue;
+
+		if (rx_flow->flow_tuple_hash != tx_flow_tuple_hash)
+			continue;
+
+		return rx_flow;
+	}
+
+	return NULL;
+}
+#else
+static inline struct dp_fisa_rx_sw_ft *
+wlan_dp_find_dl_flow(struct wlan_dp_psoc_context *dp_ctx,
+		     uint32_t flow_tuple_hash)
+{
+	return NULL;
+}
+#endif
 
 #endif

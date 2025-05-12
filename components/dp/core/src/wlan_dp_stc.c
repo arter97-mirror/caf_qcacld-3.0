@@ -248,14 +248,6 @@ wlan_dp_stc_fill_rx_flow_candidate(struct wlan_dp_stc *dp_stc,
 	candidate->flags |= WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID;
 }
 
-static inline struct dp_fisa_rx_sw_ft *
-wlan_dp_get_rx_flow_hdl(struct wlan_dp_psoc_context *dp_ctx, uint8_t flow_id)
-{
-	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
-
-	return (&(((struct dp_fisa_rx_sw_ft *)fisa_hdl->base)[flow_id]));
-}
-
 static inline struct wlan_dp_spm_flow_info *
 wlan_dp_get_tx_flow_hdl(struct wlan_dp_psoc_context *dp_ctx, uint8_t flow_id)
 {
