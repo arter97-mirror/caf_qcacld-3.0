@@ -3720,6 +3720,11 @@ policy_mgr_link_reconfig_is_concurrency_present(struct wlan_objmgr_psoc *psoc)
 		return true;
 	}
 
+	if (total_ml_con_count > 1) {
+		policy_mgr_debug("Another interface present with ML station ");
+		return true;
+	}
+
 	return false;
 }
 
