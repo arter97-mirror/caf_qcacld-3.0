@@ -14084,12 +14084,16 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	pe_debug("num partner links: %d", partner_info->num_partner_links);
 
 	/*
-	 * Include Ext MLD caps if AP advertises it in beacons. Else, check
-	 * if connection is 3 or more links. If neither, then do not include
-	 * the Ext MLD caps in assoc request.
+	 * Include Ext MLD caps if the support is set in MLME or if the AP
+	 * advertises the caps in beacons. Else, check if connection is 3 or
+	 * more links. If above conditions aren't met, then do not include
+	 * Ext MLD caps in assoc request.
 	 */
-	if (pe_session->vdev->mlo_dev_ctx &&
-	    pe_session->vdev->mlo_dev_ctx->mlo_extmld_cap_advertisement) {
+	if (wlan_mlme_get_ext_mld_cap_supp(psoc)) {
+		pe_debug("ext mld capability support is set");
+		set_ext_mld_cap = true;
+	} else if (pe_session->vdev->mlo_dev_ctx &&
+		   pe_session->vdev->mlo_dev_ctx->mlo_extmld_cap_advertisement) {
 		pe_debug("AP advertises ext mld caps");
 		set_ext_mld_cap = true;
 	} else if (partner_info->num_partner_links > 1) {
