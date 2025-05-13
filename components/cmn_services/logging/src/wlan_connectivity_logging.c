@@ -447,7 +447,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type t2lm_status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      qdf_freq_t freq,
+				      enum wlan_diag_wifi_band band,
 				      bool is_rx, uint8_t subtype)
 {
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
@@ -466,7 +466,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.tx_status = wlan_get_diag_tx_status(tx_status);
 	wlan_diag_event.is_rx = is_rx;
 
-	wlan_diag_event.band = wlan_convert_freq_to_diag_band(freq);
+	wlan_diag_event.band = band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
 				    EVENT_WLAN_MLO_T2LM_REQ_RESP);

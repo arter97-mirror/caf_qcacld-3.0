@@ -1664,7 +1664,7 @@ void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
  * @token: dialog Token
  * @t2lm_status: T2LM response status code. Refer enum wlan_t2lm_resp_frm_type
  * @tx_status: TX status
- * @freq: frequency on which frame was transmitted/received
+ * @band: diag band on which frame was transmitted/received
  * @is_rx: Flag to inidcate packet being received
  * @subtype: Determine whether the evnt sent is for t2lm request
  * or t2lm response
@@ -1676,7 +1676,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type t2lm_status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      qdf_freq_t freq,
+				      enum wlan_diag_wifi_band band,
 				      bool is_rx, uint8_t subtype);
 /**
  * wlan_connectivity_t2lm_status_event() - Fill and send T2LM data
@@ -1738,7 +1738,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      qdf_freq_t freq,
+				      enum wlan_diag_wifi_band band,
 				      bool is_rx, uint8_t subtype)
 {}
 
@@ -2063,7 +2063,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      qdf_freq_t freq,
+				      enum wlan_diag_wifi_band band,
 				      bool is_rx, uint8_t subtype)
 {}
 

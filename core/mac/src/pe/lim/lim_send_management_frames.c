@@ -8018,8 +8018,7 @@ lim_mgmt_t2lm_rsp_tx_complete(void *context, qdf_nbuf_t buf,
 					      rsp.DialogToken.token,
 					      rsp.Status.status,
 					      qdf_tx_complete,
-					      (qdf_freq_t)mgmt_params->chanfreq,
-					      false,
+					      mgmt_params->band, false,
 					      WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
 out:
 	qdf_nbuf_free(buf);
@@ -8088,7 +8087,7 @@ lim_mgmt_t2lm_req_tx_complete(void *context, qdf_nbuf_t buf,
 					      req.DialogToken.token,
 					      false,
 					      qdf_tx_complete,
-					      (qdf_freq_t)mgmt_params->chanfreq,
+					      mgmt_params->band,
 					      false,
 					      WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
 out:

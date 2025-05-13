@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -177,6 +177,8 @@ QDF_STATUS ttlm_valid_n_copy_for_rx_req(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_mlo_peer_context *ml_peer;
 	struct wlan_t2lm_info *t2lm;
+	enum wlan_diag_wifi_band band;
+	struct wlan_channel *bss_chan;
 
 	ml_peer = peer->mlo_peer_ctx;
 	if (!ml_peer)
@@ -202,10 +204,18 @@ QDF_STATUS ttlm_valid_n_copy_for_rx_req(struct wlan_objmgr_vdev *vdev,
 			     sizeof(struct wlan_t2lm_info));
 	}
 
+	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
+	if (!bss_chan) {
+		t2lm_err("vdev: %d channel info not found",
+			 wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	band = wlan_convert_freq_to_diag_band(bss_chan->ch_freq);
+
 	wlan_connectivity_t2lm_req_resp_event(
-				vdev, t2lm_req->dialog_token, 0, 0,
-				wlan_vdev_mlme_get_bss_chan(vdev)->ch_freq,
-				true, WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
+				vdev, t2lm_req->dialog_token, 0, 0, band, true,
+				WLAN_CONN_DIAG_MLO_T2LM_REQ_EVENT);
 
 	return status;
 }
@@ -495,6 +505,7 @@ QDF_STATUS t2lm_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	struct wlan_mlo_peer_context *ml_peer;
 	struct wlan_channel *channel;
+	enum wlan_diag_wifi_band band;
 
 	if (!peer) {
 		t2lm_err("peer is null");
@@ -537,10 +548,10 @@ QDF_STATUS t2lm_handle_rx_resp(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	band = wlan_convert_freq_to_diag_band(channel->ch_freq);
+
 	wlan_connectivity_t2lm_req_resp_event(vdev, t2lm_rsp.dialog_token, 0,
-					      false,
-					      channel->ch_freq,
-					      true,
+					      false, band, true,
 					      WLAN_CONN_DIAG_MLO_T2LM_RESP_EVENT);
 
 	return status;
