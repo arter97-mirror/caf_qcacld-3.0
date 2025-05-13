@@ -357,7 +357,8 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)bssid)) {
 		lim_update_session_eht_capable(mac_ctx, pesession);
 
-		if (pesession->lim_join_req->bssDescription.is_ml_ap)
+		if (pesession->lim_join_req->bssDescription.is_ml_ap &&
+		    pesession->rsno_gen_used != RSNO_GEN_WIFI6)
 			mlo_ie_len = lim_send_probe_req_frame_mlo(mac_ctx, pesession);
 	}
 
@@ -3067,6 +3068,16 @@ QDF_STATUS lim_fill_adaptive_11r_ie(struct pe_session *pe_session,
 }
 #endif
 
+static inline void
+lim_strip_rsno_ie(struct mac_context *mac_ctx, uint8_t *add_ie,
+		  uint16_t *add_ie_len, uint8_t mrsno_gen)
+{
+	if (*add_ie_len != 0)
+		lim_strip_ie(mac_ctx, add_ie, add_ie_len, WLAN_ELEMID_VENDOR,
+			     ONE_BYTE, RSNO_OUI_SELECTION, RSNO_OUI_SIZE,
+			     NULL, 0);
+}
+
 /**
  * lim_send_assoc_req_mgmt_frame() - Send association request
  * @mac_ctx: Handle to MAC context
@@ -3115,10 +3126,11 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
 	bool bss_mfp_capable, frag_ie_present = false;
 	int8_t peer_rssi = 0;
-	bool is_band_2g, is_ml_ap;
-	uint16_t mlo_ie_len = 0, fils_hlp_ie_len = 0;
+	bool is_band_2g, is_ml_ap = false;
+	uint16_t mlo_ie_len = 0, fils_hlp_ie_len = 0, rsn_sel_ie_len = 0;
 	uint8_t *fils_hlp_ie = NULL;
 	struct cm_roam_values_copy mdie_cfg = {0};
+	uint8_t rsn_sel_ie[] = {0xdd, 0x5, 0x50, 0x6f, 0x9a, 0x2c, 0x00};
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -3357,7 +3369,10 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		lim_strip_mlo_ie(mac_ctx, add_ie, &add_ie_len);
 	}
 
-	is_ml_ap = !!pe_session->lim_join_req->bssDescription.is_ml_ap;
+	if (pe_session->lim_join_req->bssDescription.is_ml_ap &&
+	    pe_session->rsno_gen_used != RSNO_GEN_WIFI6)
+		is_ml_ap = true;
+
 	if (is_ml_ap)
 		mlo_ie_len = lim_fill_assoc_req_mlo_ie(mac_ctx, pe_session, frm);
 
@@ -3595,6 +3610,22 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * Append the IEs just before MBO IEs as MBO IEs have to be at the
 	 * end of the frame.
 	 */
+	lim_strip_rsno_ie(mac_ctx, add_ie, &add_ie_len,
+			  pe_session->rsno_gen_used);
+	if (pe_session->rsno_gen_used) {
+		/*
+		 * Append the RSN selector IE to the assoc request if RSN(O)
+		 * support is enabled by the userspace
+		 *
+		 * Indication of the RSNE variant chosen for association:
+		 * 0 = RSNE
+		 * 1 = RSNE Override element
+		 * 2 = RSNE Override 2 element
+		 */
+		rsn_sel_ie_len = QDF_ARRAY_SIZE(rsn_sel_ie);
+		rsn_sel_ie[rsn_sel_ie_len - 1] = pe_session->rsno_gen_used - 1;
+	}
+
 	if (add_ie_len &&
 	    wlan_get_ie_ptr_from_eid(WLAN_ELEMID_VENDOR, add_ie, add_ie_len)) {
 		vendor_ies = qdf_mem_malloc(MAX_VENDOR_IES_LEN + 2);
@@ -3671,8 +3702,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
 		rsnx_ie_len + mbo_ie_len + adaptive_11r_ie_len +
 		mscs_ext_ie_len + vendor_ie_len + mlo_ie_len + fils_hlp_ie_len +
-		eht_cap_ie_len;
-
+		eht_cap_ie_len + rsn_sel_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -3734,6 +3764,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     mscs_ext_ie, mscs_ext_ie_len);
 		payload = payload + mscs_ext_ie_len;
+	}
+
+	if (rsn_sel_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     rsn_sel_ie, rsn_sel_ie_len);
+		payload = payload + rsn_sel_ie_len;
 	}
 
 	/* Copy the vendor IEs to the end of the frame */

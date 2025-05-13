@@ -2127,6 +2127,7 @@ struct fw_scan_channels {
  * for Hotspot 2.0
  * @roam_aggre_scan_step_rssi: Roam scan step RSSI in aggressive mode
  * @roam_aggre_threshold: Roam threshold in aggressive mode
+ * @mrsno_support: FW support for Multi RSNO feature
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2258,6 +2259,7 @@ struct wlan_mlme_lfr_cfg {
 	bool hs20_btm_offload_disable;
 	uint32_t roam_aggre_scan_step_rssi;
 	uint32_t roam_aggre_threshold;
+	bool mrsno_support;
 };
 
 /**
