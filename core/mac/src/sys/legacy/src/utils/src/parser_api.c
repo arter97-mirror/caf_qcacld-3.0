@@ -12959,20 +12959,31 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 	p_ext_cap = (struct s_ext_cap *)dot11f->bytes;
 	dot11f->present = 1;
 
-	if (pe_session->opmode == QDF_STA_MODE ||
-	    pe_session->opmode == QDF_P2P_CLIENT_MODE) {
+	switch (pe_session->opmode) {
+	case QDF_P2P_CLIENT_MODE:
+		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc,
+						  pe_session->vdev_id))
+			break;
+		fallthrough;
+	case QDF_STA_MODE:
 		wlan_twt_get_requestor_cfg(mac_ctx->psoc, &twt_requestor);
 		p_ext_cap->twt_requestor_support =
 			twt_requestor && twt_get_requestor_flag(mac_ctx);
-	}
-
-	if (pe_session->opmode == QDF_SAP_MODE ||
-	    pe_session->opmode == QDF_P2P_GO_MODE) {
+		break;
+	case QDF_P2P_GO_MODE:
+		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc,
+						  pe_session->vdev_id))
+			break;
+		fallthrough;
+	case QDF_SAP_MODE:
 		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_resp_cfg);
 		twt_responder = TWT_RESP_CHECK_BIT(pe_session->opmode,
 						   twt_resp_cfg);
 		p_ext_cap->twt_responder_support =
 			twt_responder && twt_get_responder_flag(mac_ctx);
+		break;
+	default:
+		break;
 	}
 
 	dot11f->num_bytes = lim_compute_ext_cap_ie_length(dot11f);
