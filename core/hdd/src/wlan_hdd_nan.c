@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,7 +35,6 @@
 #include <qca_vendor.h>
 #include "cfg_nan_api.h"
 #include "os_if_nan.h"
-#include "../../core/src/nan_main_i.h"
 #include "spatial_reuse_api.h"
 #include "wlan_nan_api.h"
 #include "spatial_reuse_ucfg_api.h"
@@ -152,16 +151,10 @@ void hdd_nan_sr_concurrency_update(struct nan_event_params *nan_evt)
 	uint8_t non_srg_max_pd_offset = 0;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {
 							WLAN_INVALID_VDEV_ID};
-	struct nan_psoc_priv_obj *psoc_obj =
-				nan_get_psoc_priv_obj(nan_evt->psoc);
 	struct connection_info info[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint8_t mac_id;
 	QDF_STATUS status;
 
-	if (!psoc_obj) {
-		nan_err("nan psoc priv object is NULL");
-		return;
-	}
 	conn_count = policy_mgr_get_connection_info(nan_evt->psoc, info);
 	if (!conn_count)
 		return;
