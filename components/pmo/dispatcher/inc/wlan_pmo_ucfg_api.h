@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -173,15 +173,6 @@ ucfg_pmo_set_igmp_offload_enabled(struct wlan_objmgr_psoc *psoc,
 void
 ucfg_pmo_set_arp_offload_enabled(struct wlan_objmgr_psoc *psoc,
 				 bool val);
-
-/**
- * ucfg_pmo_is_ssdp_enabled() - Get ssdp enable or not
- * @psoc: pointer to psoc object
- *
- * Return: enable/disable ssdp
- */
-bool
-ucfg_pmo_is_ssdp_enabled(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_pmo_is_ns_offloaded() - Get ns offload support or not
@@ -2121,11 +2112,6 @@ ucfg_pmo_get_auto_power_fail_mode(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
-static inline bool ucfg_pmo_is_ssdp_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
