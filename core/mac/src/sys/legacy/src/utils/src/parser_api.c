@@ -745,6 +745,8 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	qdf_freq_t target_freq;
 	uint8_t ccfs0, ccfs1;
 	enum phy_ch_width ch_width;
+	uint8_t vht_ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+
 	/*
 	 * The new country subelement is present only when
 	 * 1. AP performs Extended Channel switching to new country.
@@ -776,10 +778,10 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	 * comes between 80 MHz and 160 MHz by presence of CCFS1 incase of
 	 * 160 MHz which is set to zero incase of 80 MHz.
 	 */
-	if (ch_width == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
-		ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+	if (ch_width == CH_WIDTH_160MHZ)
+		vht_ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
 
-	pDot11f->WiderBWChanSwitchAnn.newChanWidth = ch_width;
+	pDot11f->WiderBWChanSwitchAnn.newChanWidth = vht_ch_width;
 	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq0 = ccfs0;
 	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq1 = ccfs1;
 	pDot11f->WiderBWChanSwitchAnn.present = 1;
