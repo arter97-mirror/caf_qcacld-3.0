@@ -152,7 +152,13 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 	mlo_ctx->mlo_extmld_cap_advertisement =
 		bcn_ptr->mlo_ie.mlo_ie.ext_mld_capab_and_op_present;
 
-	pe_debug("AP ext mld caps: %d", mlo_ctx->mlo_extmld_cap_advertisement);
+	/* Peer link reconfig operation support */
+	mlo_ctx->link_recfg_op_support =
+		bcn_ptr->mlo_ie.mlo_ie.mld_capab_and_op_info.link_reconfig_operation_support;
+
+	pe_debug("AP caps: ext mld: %d, link reconfig oper support: %d",
+		 mlo_ctx->mlo_extmld_cap_advertisement,
+		 mlo_ctx->link_recfg_op_support);
 
 	/** max num of active links recommended by AP */
 	tmp_rec_value =

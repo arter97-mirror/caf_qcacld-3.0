@@ -133,6 +133,7 @@
  * specified AP
  * @ACTION_OUI_ENABLE_CTS2SELF: enable cts to self for specified AP's
  * @ACTION_OUI_LIMIT_BW: Limit BW if vendor OUI is received in beacon.
+ * @ACTION_OUI_EXT_MLD_CAP_OP: Exclude Extended MLD cap and op for specified AP
  * @ACTION_OUI_MAXIMUM_ID: maximum number of action oui types
  */
 enum action_oui_id {
@@ -163,6 +164,7 @@ enum action_oui_id {
 	ACTION_OUI_ENABLE_CTS2SELF,
 
 	ACTION_OUI_LIMIT_BW,
+	ACTION_OUI_EXT_MLD_CAP_OP,
 	ACTION_OUI_MAXIMUM_ID
 };
 

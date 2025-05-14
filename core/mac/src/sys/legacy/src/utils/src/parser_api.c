@@ -71,6 +71,8 @@
 #include <wlan_vdev_mgr_utils_api.h>
 #include <wlan_dnw_api.h>
 #include "cfg_ucfg_api.h"
+#include "wlan_action_oui_main.h"
+
 #define BW_160 160
 
 #define WMM_OUI_TYPE   "\x00\x50\xf2\x02\x01"
@@ -14005,6 +14007,10 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	uint8_t *eht_cap_ie = NULL;
 	bool sta_prof_he_ie = false;
 	bool set_ext_mld_cap = false;
+	struct bss_description *bss_desc =
+			&pe_session->lim_join_req->bssDescription;
+	struct action_oui_search_attr attr = {0};
+	uint16_t ie_len;
 
 	if (!mac_ctx || !pe_session || !frm)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -14075,11 +14081,16 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 
 	pe_debug("num partner links: %d", partner_info->num_partner_links);
 
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+	attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	attr.ie_length = ie_len;
+
 	/*
 	 * Include Ext MLD caps if the support is set in MLME or if the AP
 	 * advertises the caps in beacons. Else, check if connection is 3 or
-	 * more links. If above conditions aren't met, then do not include
-	 * Ext MLD caps in assoc request.
+	 * more links. If so, also check for AP link reconfig operation support
+	 * in case of MTK AP. If above conditions aren't met, then do not
+	 * include Ext MLD caps in assoc request.
 	 */
 	if (wlan_mlme_get_ext_mld_cap_supp(psoc)) {
 		pe_debug("ext mld capability support is set");
@@ -14088,8 +14099,14 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 		   pe_session->vdev->mlo_dev_ctx->mlo_extmld_cap_advertisement) {
 		pe_debug("AP advertises ext mld caps");
 		set_ext_mld_cap = true;
-	} else if (partner_info->num_partner_links > 1) {
-		pe_debug("STA is connecting in 3 or more links");
+	} else if ((partner_info->num_partner_links > 1) &&
+		   (!wlan_action_oui_search(psoc, &attr,
+					    ACTION_OUI_EXT_MLD_CAP_OP) ||
+		    (pe_session->vdev->mlo_dev_ctx &&
+		     pe_session->vdev->mlo_dev_ctx->link_recfg_op_support &&
+		     wlan_action_oui_search(psoc, &attr,
+					    ACTION_OUI_EXT_MLD_CAP_OP)))) {
+		pe_debug("STA is connecting with >= 3 links");
 		set_ext_mld_cap = true;
 	} else {
 		pe_debug("Do not advertise ext mld caps");

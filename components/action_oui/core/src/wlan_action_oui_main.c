@@ -215,6 +215,10 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 	qdf_str_lcopy(psoc_priv->action_oui_str[ACTION_OUI_DISABLE_AUX_LISTEN],
 		      cfg_get(psoc, CFG_ACTION_OUI_DISABLE_AUX_LISTEN),
 		      ACTION_OUI_MAX_STR_LEN);
+	qdf_str_lcopy(psoc_priv->action_oui_str
+		      [ACTION_OUI_EXT_MLD_CAP_OP],
+		      cfg_get(psoc, CFG_ACTION_OUI_EXT_MLD_CAP_OP),
+		      ACTION_OUI_MAX_STR_LEN);
 
 	if (psoc_priv->is_action_oui_v2_enabled) {
 		qdf_str_lcopy(psoc_priv->action_oui_str
