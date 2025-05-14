@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2828,6 +2828,7 @@ enum mlme_reg_srd_master_modes {
  * @enable_pending_chan_list_req: enables/disables scan channel
  * list command to FW till the current scan is complete.
  * @retain_nol_across_regdmn_update: Retain the NOL list across the regdomain.
+ * @enable_nan_on_dfs_channels: Enable nan on DFS channels
  * @enable_nan_on_indoor_channels: Enable nan on Indoor channels
  * @enable_6ghz_sp_pwrmode_supp: Enable 6 GHz SP mode support
  * @afc_disable_timer_check: Disable AFC timer check
@@ -2857,6 +2858,7 @@ struct wlan_mlme_reg {
 	bool ignore_fw_reg_offload_ind;
 	bool enable_pending_chan_list_req;
 	bool retain_nol_across_regdmn_update;
+	bool enable_nan_on_dfs_channels;
 	bool enable_nan_on_indoor_channels;
 #if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
 	bool enable_6ghz_sp_pwrmode_supp;

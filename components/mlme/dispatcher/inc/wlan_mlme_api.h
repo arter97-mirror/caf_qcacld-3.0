@@ -276,6 +276,17 @@ QDF_STATUS wlan_mlme_get_max_amsdu_num(struct wlan_objmgr_psoc *psoc,
 				       uint8_t *value);
 
 /**
+ * wlan_mlme_get_support_for_nan_dfs_channel - support for NAN dfs channel
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value where channel list is present
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_support_for_nan_dfs_channel(struct wlan_objmgr_psoc *psoc,
+					  bool *value);
+
+/**
  * wlan_mlme_set_max_amsdu_num() - set the max amsdu num
  * @psoc: pointer to psoc object
  * @value: value to be set for max_amsdu_num
