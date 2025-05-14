@@ -4191,6 +4191,81 @@ static void wma_get_mld_info_ap(tpAddStaParams add_sta,
 }
 #endif
 
+#ifdef WLAN_FEATURE_SON
+#ifdef WLAN_FEATURE_MC_BC_4_ADDR
+/**
+ * wma_set_self_peer_4_addr() - function to set AP self peer 4 addr flag
+ * @wma: WMA handler
+ * @add_sta: pointer to add STA params structure
+ *
+ * Return: void
+ */
+static void wma_set_self_peer_4_addr(tp_wma_handle wma, tpAddStaParams add_sta)
+{
+	QDF_STATUS status;
+
+	status = wma_set_peer_param(wma, add_sta->bssId,
+				    WMI_HOST_PEER_USE_4ADDR,
+				    true, add_sta->smesessionId);
+
+	if (status != QDF_STATUS_SUCCESS)
+		wma_err("Failed to set 4 addr for " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(add_sta->bssId));
+}
+#else
+static inline void
+wma_set_self_peer_4_addr(tp_wma_handle wma, tpAddStaParams add_sta)
+{
+}
+#endif
+/**
+ * wma_set_peer_use_4addr() - function to set peer 4 addr flags
+ * @wma: WMA handler
+ * @add_sta: pointer to add STA params structure
+ *
+ * Return: void
+ */
+static void wma_set_peer_use_4addr(tp_wma_handle wma,
+				   tpAddStaParams add_sta)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
+						    add_sta->smesessionId,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev) {
+		wma_debug("Invalid vdev");
+		return;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		wma_err("vdev legacy private object is NULL");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+		return;
+	}
+
+	if (mlme_priv->mac_4_addr) {
+		status = wma_set_peer_param(wma, add_sta->staMac,
+					    WMI_HOST_PEER_USE_4ADDR,
+					    true, add_sta->smesessionId);
+		if (status != QDF_STATUS_SUCCESS) {
+			wma_err("Failed to set 4 addr for " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(add_sta->staMac));
+		}
+		wma_set_self_peer_4_addr(wma, add_sta);
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+}
+#else
+static void wma_set_peer_use_4addr(tp_wma_handle wma,
+				   tpAddStaParams add_sta)
+{
+}
+#endif
+
 /**
  * wma_add_sta_req_ap_mode() - process add sta request in ap mode
  * @wma: wma handle
@@ -4263,6 +4338,8 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 		add_sta->status = status;
 		goto send_rsp;
 	}
+
+	wma_set_peer_use_4addr(wma, add_sta);
 
 	if (!cdp_find_peer_exist_on_vdev(soc, add_sta->smesessionId,
 					 add_sta->staMac)) {

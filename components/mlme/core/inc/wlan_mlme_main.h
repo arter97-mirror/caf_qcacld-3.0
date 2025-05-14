@@ -431,6 +431,7 @@ struct wait_for_key_timer {
  * @is_usr_ps_enabled: Is Power save enabled
  * @notify_co_located_ap_upt_rnr: Notify co located AP to update RNR or not
  * @max_mcs_index: Max supported mcs index of vdev
+ * @mac_4_addr: flag of mac 4 address
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -474,6 +475,7 @@ struct mlme_legacy_priv {
 	bool notify_co_located_ap_upt_rnr;
 #ifdef WLAN_FEATURE_SON
 	uint8_t max_mcs_index;
+	bool mac_4_addr;
 #endif
 };
 
