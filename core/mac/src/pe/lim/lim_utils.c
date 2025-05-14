@@ -8894,6 +8894,8 @@ void lim_decide_eht_op(struct mac_context *mac_ctx, uint32_t *mlme_eht_ops,
 		 ori_puncture_bitmap, session->eht_op.channel_width,
 		 session->eht_op.ccfs0, session->eht_op.ccfs1);
 
+	session->puncture_bitmap = ori_puncture_bitmap;
+
 	wma_update_vdev_eht_ops(mlme_eht_ops, &session->eht_op);
 }
 
@@ -10625,11 +10627,7 @@ void lim_apply_puncture(struct mac_context *mac,
 {
 	uint16_t puncture_bitmap;
 
-	if (mlme_is_chan_switch_in_progress(session->vdev))
-		puncture_bitmap = session->gLimChannelSwitch.puncture_bitmap;
-	else
-		puncture_bitmap =
-			*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
+	puncture_bitmap = session->puncture_bitmap;
 
 	if (puncture_bitmap) {
 		pe_debug("Apply puncture to reg: bitmap 0x%x, freq: %d, bw %d, mhz_freq_seg1: %d",
@@ -10648,13 +10646,9 @@ void lim_apply_puncture(struct mac_context *mac,
 void lim_remove_puncture(struct mac_context *mac,
 			 struct pe_session *session)
 {
-	uint16_t puncture_bitmap;
-
-	puncture_bitmap =
-		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
-	if (puncture_bitmap) {
+	if (session->puncture_bitmap) {
 		pe_debug("Remove puncture from reg: bitmap 0x%x",
-			 puncture_bitmap);
+			 session->puncture_bitmap);
 		wlan_reg_remove_puncture(mac->pdev);
 	}
 }
@@ -11081,27 +11075,6 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 }
 
 #ifdef WLAN_FEATURE_11BE
-/**
- * lim_update_ap_puncture() - set puncture_bitmap for ap session
- * @session: session
- * @ch_params: pointer to ch_params
- *
- * Return: void
- */
-static void lim_update_ap_puncture(struct pe_session *session,
-				   struct ch_params *ch_params)
-{
-	if (ch_params->reg_punc_bitmap) {
-		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap =
-					ch_params->reg_punc_bitmap;
-		session->eht_op.disabled_sub_chan_bitmap_present = true;
-		pe_debug("vdev %d, puncture %d", session->vdev_id,
-			 ch_params->reg_punc_bitmap);
-	} else if (session->eht_op.disabled_sub_chan_bitmap_present) {
-		session->eht_op.disabled_sub_chan_bitmap_present = false;
-	}
-}
-
 void lim_update_des_chan_puncture(struct wlan_channel *des_chan,
 				  struct ch_params *ch_params)
 {
@@ -11124,21 +11097,17 @@ void lim_overwrite_sta_puncture(struct pe_session *session,
 	session->puncture_bitmap = new_punc;
 }
 #else
-static void lim_update_ap_puncture(struct pe_session *session,
-				   struct ch_params *ch_params)
-{
-}
 #endif
 
-QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
-			      struct vdev_mlme_obj *mlme_obj,
-			      struct pe_session *session)
+QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
+					  struct pe_session *session)
 {
 	struct wlan_channel *des_chan;
 	enum reg_wifi_band band;
 	uint8_t band_mask;
 	struct ch_params ch_params = {0};
 	qdf_freq_t sec_chan_freq = 0;
+	struct vdev_mlme_obj *mlme_obj;
 
 	band = wlan_reg_freq_to_band(session->curr_op_freq);
 	band_mask = 1 << band;
@@ -11164,11 +11133,6 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 
 	if (LIM_IS_AP_ROLE(session))
 		lim_apply_puncture(mac, session, ch_params.mhz_freq_seg1);
-
-	if (LIM_IS_STA_ROLE(session))
-		wlan_cdp_set_peer_freq(mac->psoc, session->bssId,
-				       session->curr_op_freq,
-				       wlan_vdev_get_id(session->vdev));
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode) &&
 	    !(LIM_IS_STA_ROLE(session) && !lim_get_punc_chan_bit_map(session)))
@@ -11199,8 +11163,17 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (LIM_IS_STA_ROLE(session))
-		lim_overwrite_sta_puncture(session, &ch_params);
+	lim_overwrite_sta_puncture(session, &ch_params);
+
+	session->ch_width = ch_params.ch_width;
+	session->ch_center_freq_seg0 = ch_params.center_freq_seg0;
+	session->ch_center_freq_seg1 = ch_params.center_freq_seg1;
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+	if (!mlme_obj) {
+		pe_err("vdev component object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	des_chan = mlme_obj->vdev->vdev_mlme.des_chan;
 	des_chan->ch_freq = session->curr_op_freq;
@@ -11209,11 +11182,7 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 	des_chan->ch_freq_seg2 = ch_params.center_freq_seg1;
 	des_chan->ch_ieee = wlan_reg_freq_to_chan(mac->pdev, des_chan->ch_freq);
 	lim_update_des_chan_puncture(des_chan, &ch_params);
-	if (LIM_IS_AP_ROLE(session))
-		lim_update_ap_puncture(session, &ch_params);
-	session->ch_width = ch_params.ch_width;
-	session->ch_center_freq_seg0 = ch_params.center_freq_seg0;
-	session->ch_center_freq_seg1 = ch_params.center_freq_seg1;
+
 	if (LIM_IS_AP_ROLE(session)) {
 		/* Update he ops for puncture */
 		wlan_reg_set_create_punc_bitmap(&ch_params, false);
@@ -11236,6 +11205,25 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 			wlan_mlme_set_ap_oper_ch_width(session->vdev,
 						       CH_WIDTH_160MHZ);
 	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
+			      struct vdev_mlme_obj *mlme_obj,
+			      struct pe_session *session)
+{
+	QDF_STATUS status;
+
+	status = lim_set_session_channel_params(mac, session);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	if (LIM_IS_STA_ROLE(session))
+		wlan_cdp_set_peer_freq(mac->psoc, session->bssId,
+				       session->curr_op_freq,
+				       wlan_vdev_get_id(session->vdev));
+
 	mlme_obj->mgmt.generic.maxregpower = session->maxTxPower;
 	mlme_obj->proto.generic.beacon_interval =
 				session->beaconParams.beaconInterval;
@@ -12360,20 +12348,26 @@ uint16_t lim_get_tpe_ie_length(enum phy_ch_width chan_width,
 		total_ie_len += 1;
 		total_ie_len += tpe_ie[idx].num_tx_power;
 
-		if (!(chan_width == CH_WIDTH_320MHZ &&
-		      tpe_ie[idx].max_tx_pwr_interpret))
-			continue;
-
-		if (tpe_ie[idx].max_tx_pwr_interpret == LOCAL_EIRP ||
-		    tpe_ie[idx].max_tx_pwr_interpret == REGULATORY_CLIENT_EIRP) {
+		switch (tpe_ie[idx].max_tx_pwr_interpret) {
+		case LOCAL_EIRP:
+		case REGULATORY_CLIENT_EIRP:
 			/* Maximum Transmit Power For 320 MHz */
-			total_ie_len += 1;
-		} else if (tpe_ie[idx].max_tx_pwr_interpret == LOCAL_EIRP_PSD ||
-			   tpe_ie[idx].max_tx_pwr_interpret == REGULATORY_CLIENT_EIRP_PSD) {
+			if (tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320)
+				total_ie_len += 1;
+			break;
+		case LOCAL_EIRP_PSD:
+		case REGULATORY_CLIENT_EIRP_PSD:
+			if (!tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count)
+				break;
+
 			/* Extension Transmit PSD Information */
 			total_ie_len += 1;
 			/* Maximum Transmit PSD power */
-			total_ie_len += EXT_TX_PSD_POWER;
+			total_ie_len +=
+				tpe_ie[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count;
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -12424,12 +12418,11 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 		consumed += tpe_ptr[idx].num_tx_power;
 		target += tpe_ptr[idx].num_tx_power;
 
-		if (!(chan_width == CH_WIDTH_320MHZ &&
-		      tpe_ptr[idx].max_tx_pwr_interpret))
-			goto end;
-
 		switch (tpe_ptr[idx].max_tx_pwr_interpret) {
 		case LOCAL_EIRP:
+			if (!tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320)
+				break;
+
 			/* Maximum Local EIRP Transmit Power For 320 MHz */
 			*target = tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_eirp.max_tx_power_for_320;
 			target += 1;
@@ -12439,16 +12432,24 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 			local_psd = 0U;
 			local_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.ext_count << 0);
 			local_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.reserved << 4);
+
+			if (!local_psd)
+				break;
+
 			/* Extension Transmit Local PSD Information */
 			*target = local_psd;
 			target += 1;
 			consumed += 1;
 			/* Maximum Transmit Local PSD power */
-			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power, EXT_TX_PSD_POWER);
-			target += EXT_TX_PSD_POWER;
-			consumed += EXT_TX_PSD_POWER;
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_local_psd.max_tx_psd_power,
+				     QDF_GET_BITS(local_psd, 0, 4));
+			target += QDF_GET_BITS(local_psd, 0, 4);
+			consumed += QDF_GET_BITS(local_psd, 0, 4);
 			break;
 		case REGULATORY_CLIENT_EIRP:
+			if (!tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320)
+				break;
+
 			/* Maximum Regulatory EIRP Transmit Power For 320 MHz */
 			*target = tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_eirp.max_tx_power_for_320;
 			target += 1;
@@ -12458,17 +12459,22 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width chan_width,
 			reg_psd = 0U;
 			reg_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.ext_count << 0);
 			reg_psd |= (tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.reserved << 4);
+
+			if (!reg_psd)
+				break;
+
 			/* Extension Transmit Regulatory PSD Information */
 			*target = reg_psd;
 			consumed += 1;
 			target += 1;
 			/* Maximum Transmit Regulatory PSD power */
-			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power, EXT_TX_PSD_POWER);
-			target += EXT_TX_PSD_POWER;
-			consumed += EXT_TX_PSD_POWER;
+			qdf_mem_copy(target, tpe_ptr[idx].ext_max_tx_power.ext_max_tx_power_reg_psd.max_tx_psd_power,
+				     QDF_GET_BITS(reg_psd, 0, 4));
+			target += QDF_GET_BITS(reg_psd, 0, 4);
+			consumed += QDF_GET_BITS(reg_psd, 0, 4);
 			break;
 		}
-end:
+
 		if (ie_len && consumed >= 2) {
 			total_consumed += consumed;
 			/* -2 for element id and length */

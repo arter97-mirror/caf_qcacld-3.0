@@ -239,6 +239,7 @@ static inline void lim_set_chan_switch_puncture(struct pe_session *session,
 	if (!session)
 		return;
 
+	pe_debug("0x%x", punct_bitmap);
 	session->gLimChannelSwitch.puncture_bitmap = punct_bitmap;
 }
 #else
@@ -3829,4 +3830,18 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width ch_width,
  * Return: true if bssid and destination address are different
  */
 bool lim_mismatch_bssid_da(tpSirMacMgmtHdr hdr);
+
+/**
+ * lim_set_session_channel_params() : set session channel params
+ * @mac: pointer to MAC
+ * @session: pointer to session
+ *
+ * check and update channel params of pe session by regulatory
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
+					  struct pe_session *session);
+
 #endif /* __LIM_UTILS_H */
