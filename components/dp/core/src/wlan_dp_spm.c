@@ -1097,8 +1097,10 @@ void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
 		__qdf_mem_malloc(sizeof(struct wlan_dp_spm_flow_info) *
 				 WLAN_DP_SPM_FLOW_REC_TBL_MAX,
 				 __func__, __LINE__);
-	if (!dp_ctx->gl_flow_recs)
+	if (!dp_ctx->gl_flow_recs) {
 		dp_err("Failed to SPM Tx flow table");
+		return;
+	}
 
 	qdf_list_create(&dp_ctx->o_flow_rec_freelist,
 			WLAN_DP_SPM_FLOW_REC_TBL_MAX);

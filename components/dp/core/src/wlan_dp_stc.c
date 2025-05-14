@@ -249,12 +249,19 @@ wlan_dp_stc_fill_rx_flow_candidate(struct wlan_dp_stc *dp_stc,
 	candidate->flags |= WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID;
 }
 
+/**
+ * wlan_dp_get_tx_flow_hdl() - Retrieve TX flow handle from flow ID
+ * @dp_ctx: Pointer to the DP (Data Path) context structure
+ * @flow_id: Flow ID used to index into the flow records
+ *
+ * This API is only call if the tx_flow_id is valid. STC takes care
+ * of checking gl_flow_recs when trying to find the tx flow.
+ *
+ * Return: Pointer to the corresponding struct wlan_dp_spm_flow_info
+ */
 static inline struct wlan_dp_spm_flow_info *
 wlan_dp_get_tx_flow_hdl(struct wlan_dp_psoc_context *dp_ctx, uint8_t flow_id)
 {
-	if (!dp_ctx->gl_flow_recs)
-		return NULL;
-
 	return &dp_ctx->gl_flow_recs[flow_id];
 }
 
@@ -286,7 +293,7 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 	struct wlan_dp_stc_sampling_table *s_table =
 					dp_stc->sampling_flow_table;
 	bool rx_flow_valid = false, tx_flow_valid = false;
-	uint8_t flow_dir_str[FLOW_DIR_STR_LEN];
+	uint8_t flow_dir_str[FLOW_DIR_STR_LEN] = {0};
 	uint8_t rx_flow_str[FLOW_STR_LEN], tx_flow_str[FLOW_STR_LEN];
 	uint8_t flow_tuple_str[BUF_LEN_MAX];
 	uint8_t empty_str[2] = "";
@@ -2277,8 +2284,8 @@ wlan_dp_stc_print_classified_table_compact(struct wlan_dp_psoc_context *dp_ctx)
 	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
 	uint16_t c_id, i, len = 0;
-	uint64_t valid_bitmap[NUM_QWORDS];
-	uint64_t active_bitmap[NUM_QWORDS];
+	uint64_t valid_bitmap[NUM_QWORDS] = {0};
+	uint64_t active_bitmap[NUM_QWORDS] = {0};
 	uint8_t valid_bitmap_str[WLAN_DP_STC_BITMAP_PRINT_STR_LEN];
 	uint8_t active_bitmap_str[WLAN_DP_STC_BITMAP_PRINT_STR_LEN];
 
