@@ -7916,10 +7916,11 @@ bool hdd_is_vdev_in_conn_state(struct wlan_hdd_link_info *link_info)
 	}
 }
 
-#define MAX_VDEV_RTT_PARAMS 2
+#define MAX_VDEV_RTT_PARAMS 3
 /* params being sent:
  * wmi_vdev_param_enable_disable_rtt_responder_role
  * wmi_vdev_param_enable_disable_rtt_initiator_role
+ * wmi_vdev_param_enable_disable_rtt_bw_downgrade
  */
 QDF_STATUS
 hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
@@ -7932,6 +7933,7 @@ hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
 	uint8_t index = 0;
 	WMI_FW_SUB_FEAT_CAPS wmi_fw_rtt_respr, wmi_fw_rtt_initr;
 	uint32_t responder_bits = 0, initiator_bits = 0, rsta_11az_support;
+	bool enable_rtt_bw_downgrade;
 
 	switch (wlan_vdev_mlme_get_opmode(vdev)) {
 	case QDF_STA_MODE:
@@ -7979,6 +7981,19 @@ hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
 			MAX_VDEV_RTT_PARAMS);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+
+	hdd_debug("vdev: %d initiator: %d responder: %d",
+		  wlan_vdev_get_id(vdev), initiator_bits, responder_bits);
+
+	ucfg_mlme_is_rtt_bw_downgrade_enabled(psoc, &enable_rtt_bw_downgrade);
+	hdd_debug("vdev: %d enable dynamic downgrade RTT packet bandwidth: %d",
+		  wlan_vdev_get_id(vdev), enable_rtt_bw_downgrade);
+
+	status = mlme_check_index_setparam(
+			vdevsetparam,
+			wmi_vdev_param_enable_disable_rtt_bw_downgrade,
+			enable_rtt_bw_downgrade, index++,
+			MAX_VDEV_RTT_PARAMS);
 
 	status = sme_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
 						     vdev_id, vdevsetparam,

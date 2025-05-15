@@ -3616,6 +3616,8 @@ static void mlme_init_wifi_pos_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_FINE_TIME_MEAS_CAPABILITY);
 	wifi_pos_cfg->oem_6g_support_disable =
 		cfg_get(psoc, CFG_OEM_SIXG_SUPPORT_DISABLE);
+	wifi_pos_cfg->is_rtt_bw_downgrade_enabled =
+		cfg_get(psoc, CFG_ENABLE_RTT_BW_DOWNGRADE);
 
 	mlme_init_wifi_pos_11az_config(psoc, wifi_pos_cfg);
 }

@@ -2703,10 +2703,12 @@ struct wlan_mlme_wep_cfg {
  * struct wlan_mlme_wifi_pos_cfg - WIFI POS configs
  * @fine_time_meas_cap: fine timing measurement capability information
  * @oem_6g_support_disable: oem is 6Ghz disabled if set
+ * @is_rtt_bw_downgrade_enabled: RTT Bandwidth downgrade is enabled if set
  */
 struct wlan_mlme_wifi_pos_cfg {
 	uint32_t fine_time_meas_cap;
 	bool oem_6g_support_disable;
+	bool is_rtt_bw_downgrade_enabled;
 };
 
 #define MLME_SET_BIT(value, bit_offset) ((value) |= (1 << (bit_offset)))

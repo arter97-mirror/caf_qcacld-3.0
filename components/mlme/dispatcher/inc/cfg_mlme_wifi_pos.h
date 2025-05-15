@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -151,10 +151,33 @@
 		CFG_VALUE_OR_DEFAULT, \
 		"enable Responder 11az support")
 
+/*
+ * <ini>
+ * enable_rtt_bw_downgrade - Enable RTT Bandwidth downgrade
+ * @Min: false
+ * @Max: True
+ * @default: 0
+ *
+ * This ini is used to enable RTT Bandwidth downgrade
+ *
+ * Related: None
+ *
+ * Supported Feature: WIFI POS
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_RTT_BW_DOWNGRADE CFG_INI_BOOL( \
+		"enable_rtt_bw_downgrade", \
+		false, \
+		"enable rtt bw downgrade")
+
 #define CFG_WIFI_POS_ALL \
 	CFG(CFG_FINE_TIME_MEAS_CAPABILITY) \
 	CFG(CFG_OEM_SIXG_SUPPORT_DISABLE) \
 	CFG(CFG_RESPONDER_SECURE_LTF_SUPPORT) \
+	CFG(CFG_ENABLE_RTT_BW_DOWNGRADE) \
 	CFG(CFG_RESPONDER_11AZ_SUPPORT)
 
 #endif /* __CFG_MLME_WIFI_POS_H */
