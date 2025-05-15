@@ -35288,6 +35288,13 @@ __wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 		return -EOPNOTSUPP;
 	}
 
+	if (mlo_is_roaming_in_progress(psoc,
+				       adapter->deflink->vdev_id)) {
+		hdd_debug("Roaming in progress, reject link reconfig");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EBUSY;
+	}
+
 	if (policy_mgr_link_reconfig_is_concurrency_present(psoc)) {
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return -EOPNOTSUPP;
