@@ -1339,8 +1339,10 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 		uint64_t pkt_rate;
 		bool only_txrx_stage = true;
 
-		if (!rx && !bidi)
+		if (candidate_idx >= DP_STC_SAMPLE_FLOWS_MAX ||
+		    (!rx && !bidi))
 			break;
+
 		/* loop through entire FISA table */
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
 		if (!rx_flow->is_populated ||
@@ -1395,10 +1397,11 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 		}
 
 		if (candidates[candidate_idx].flags &
-		    WLAN_DP_SAMPLING_CANDIDATE_VALID)
+		    WLAN_DP_SAMPLING_CANDIDATE_VALID) {
 			candidates[candidate_idx].flags |= only_txrx_stage ?
 				WLAN_DP_SAMPLING_CANDIDATE_ONLY_TXRX_STAGE : 0;
-		candidate_idx++;
+			candidate_idx++;
+		}
 	}
 
 	if (!candidate_selected)
