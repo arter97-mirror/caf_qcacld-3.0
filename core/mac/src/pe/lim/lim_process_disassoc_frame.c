@@ -43,6 +43,41 @@
 #include "sch_api.h"
 #include "wlan_blm_api.h"
 
+void
+lim_process_reassoc_pmf_comback(struct mac_context *mac_ctx,
+					   struct pe_session *session_entry)
+{
+	tLimMlmAuthReq *pMlmAuthReq;
+
+	pMlmAuthReq = qdf_mem_malloc(sizeof(tLimMlmAuthReq));
+	if (!pMlmAuthReq) {
+		pe_err("Allocate mlmAuthReq Memory failed for reassoc pmf comback!");
+		return;
+	}
+
+	session_entry->limMlmState = eLIM_MLM_JOINED_STATE;
+	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE,
+		session_entry->peSessionId, eLIM_MLM_JOINED_STATE));
+	sir_copy_mac_addr(pMlmAuthReq->peerMacAddr,
+		session_entry->bssId);
+	pMlmAuthReq->authType = session_entry->authType;
+	pMlmAuthReq->sessionId = session_entry->peSessionId;
+	session_entry->limPrevSmeState = session_entry->limSmeState;
+	session_entry->limSmeState = eLIM_SME_WT_AUTH_STATE;
+	MTRACE(mac_trace(mac_ctx, TRACE_CODE_SME_STATE,
+		session_entry->peSessionId,
+		session_entry->limSmeState));
+
+	pe_debug("trigger re-auth for the pmf comeback reassoc for "
+		  QDF_MAC_ADDR_FMT "authType = %d mlm state = %d, sme state = %d "
+		  "sessionId = %d", QDF_MAC_ADDR_REF(session_entry->bssId),
+		  pMlmAuthReq->authType, session_entry->limMlmState,
+		  session_entry->limSmeState, session_entry->peSessionId);
+
+	lim_post_mlm_message(mac_ctx, LIM_MLM_AUTH_REQ,
+		(uint32_t *) pMlmAuthReq);
+}
+
 /**
  * lim_process_disassoc_frame
  *
@@ -268,7 +303,13 @@ lim_process_disassoc_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 				"%d in sme state: %d from " QDF_MAC_ADDR_FMT, reasonCode,
 			GET_LIM_SYSTEM_ROLE(pe_session), pe_session->limSmeState,
 			QDF_MAC_ADDR_REF(pHdr->sa));
-
+		if(LIM_IS_STA_ROLE(pe_session) &&
+			pe_session->limMlmState == eLIM_MLM_WT_FT_REASSOC_RSP_STATE &&
+			pe_session->limSmeState == eLIM_SME_WT_REASSOC_STATE &&
+			pe_session->reassoc_pmf_comeback_flag) {
+			pe_debug("trigger auth again for the pmf comback case");
+			lim_process_reassoc_pmf_comback(mac, pe_session);
+		}
 		return;
 	}
 

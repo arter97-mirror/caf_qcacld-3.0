@@ -698,11 +698,17 @@ static void lim_process_mlm_auth_req(struct mac_context *mac_ctx, uint32_t *msg)
 	 * requested auth type is same as the one used before.
 	 */
 	if (lim_is_preauth_ctx_exists(mac_ctx, session, &preauth_node)) {
-		pe_debug("Already have pre-auth context with peer: "
-		    QDF_MAC_ADDR_FMT,
-		    QDF_MAC_ADDR_REF(mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr));
-		mlm_auth_cnf.resultCode = (tSirResultCodes)STATUS_SUCCESS;
-		goto end;
+		if (session->reassoc_pmf_comeback_flag) {
+			pe_debug("continue to do the auth for the reassoc pmf comeback for peer"
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr));
+		} else {
+			pe_debug("Already have pre-auth context with peer: "
+			    QDF_MAC_ADDR_FMT,
+			    QDF_MAC_ADDR_REF(mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr));
+			mlm_auth_cnf.resultCode = (tSirResultCodes)STATUS_SUCCESS;
+			goto end;
+		}
 	} else {
 		num_preauth_ctx = mac_ctx->mlme_cfg->lfr.max_num_pre_auth;
 		if (mac_ctx->lim.gLimNumPreAuthContexts == num_preauth_ctx) {
