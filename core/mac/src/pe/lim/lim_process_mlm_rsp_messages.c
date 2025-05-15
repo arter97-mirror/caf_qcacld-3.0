@@ -443,6 +443,14 @@ void lim_pmf_comeback_timer_callback(void *context)
 		return;
 	}
 
+	if (session->limMlmState == eLIM_MLM_WT_FT_REASSOC_RSP_STATE &&
+	    session->limSmeState == eLIM_SME_WT_REASSOC_STATE &&
+	    session->reassoc_pmf_comeback_flag) {
+		pe_debug("trigger auth again for the pmf comback case");
+		lim_process_reassoc_pmf_comback(mac_ctx, session);
+		return;
+	}
+
 	if (session->limMlmState != eLIM_MLM_WT_ASSOC_RSP_STATE) {
 		pe_debug("Don't send assoc req, timer expire when limMlmState %d vdev id %d",
 			 session->limMlmState, session->vdev_id);
@@ -504,7 +512,16 @@ void lim_process_mlm_auth_cnf(struct mac_context *mac_ctx, uint32_t *msg)
 
 	if (auth_cnf->resultCode == eSIR_SME_SUCCESS) {
 		if (session_entry->limSmeState == eLIM_SME_WT_AUTH_STATE) {
-			lim_send_mlm_assoc_req(mac_ctx, session_entry);
+			if (session_entry->reassoc_pmf_comeback_flag) {
+				session_entry->limMlmState = eLIM_MLM_WT_FT_REASSOC_RSP_STATE;
+				session_entry->limSmeState = eLIM_SME_WT_REASSOC_STATE;
+				pe_debug("send retry reassoc req frame for the pmf comeback reassoc");
+				lim_send_retry_reassoc_req_frame(mac_ctx,
+					session_entry->pLimMlmReassocRetryReq, session_entry);
+			} else {
+				pe_debug("lim send assoc request after auth completed");
+				lim_send_mlm_assoc_req(mac_ctx, session_entry);
+			}
 		} else {
 			/*
 			 * Successful Pre-authentication. Send

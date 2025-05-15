@@ -479,6 +479,7 @@ struct pe_session {
 #ifdef WLAN_FEATURE_11W
 	qdf_mc_timer_t pmf_retry_timer;
 	struct comeback_timer_info pmf_retry_timer_info;
+	bool reassoc_pmf_comeback_flag;
 #endif /* WLAN_FEATURE_11W */
 	uint8_t  is_key_installed;
 	/* timer for resetting protection fileds at regular intervals */
