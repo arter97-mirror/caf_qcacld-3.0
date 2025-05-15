@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -60,6 +60,7 @@ int hdd_update_cds_config_ftm(struct hdd_context *hdd_ctx)
 	struct cds_config_info *cds_cfg;
 	QDF_STATUS status;
 	bool self_recovery;
+	int value;
 
 	cds_cfg = qdf_mem_malloc(sizeof(*cds_cfg));
 	if (!cds_cfg)
@@ -76,6 +77,8 @@ int hdd_update_cds_config_ftm(struct hdd_context *hdd_ctx)
 	cds_cfg->sub_20_channel_width = WLAN_SUB_20_CH_WIDTH_NONE;
 	cds_cfg->self_recovery_enabled = self_recovery;
 	cds_cfg->num_vdevs = hdd_ctx->config->num_vdevs;
+	ucfg_mlme_get_sap_max_peers(hdd_ctx->psoc, &value);
+	cds_cfg->max_station = value;
 	cds_init_ini_config(cds_cfg);
 
 	return 0;
