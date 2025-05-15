@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1567,3 +1567,39 @@ QDF_STATUS p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+#define SINGLE_SHOT_NOA 1
+bool p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct p2p_vdev_priv_obj *p2p_vdev_obj;
+	bool noa_in_prog = false;
+	uint8_t index;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_P2P_ID);
+	if (!vdev) {
+		p2p_debug("Invalid vdev");
+		return noa_in_prog;
+	}
+
+	p2p_vdev_obj = wlan_objmgr_vdev_get_comp_private_obj(
+							vdev,
+							WLAN_UMAC_COMP_P2P);
+	if (!p2p_vdev_obj || !p2p_vdev_obj->noa_info) {
+		p2p_debug("null noa info");
+		goto end;
+	}
+
+	for (index = 0; index < p2p_vdev_obj->noa_info->num_desc; index++) {
+		if (p2p_vdev_obj->noa_info->noa_desc[index].type_count ==
+							SINGLE_SHOT_NOA) {
+			noa_in_prog = true;
+			goto end;
+		}
+	}
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+	return noa_in_prog;
+}

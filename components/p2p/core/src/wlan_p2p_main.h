@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -625,4 +625,15 @@ QDF_STATUS
 p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_objmgr_vdev *vdev);
 #endif /* WLAN_FEATURE_P2P_P2P_STA */
+
+/**
+ * p2p_is_p2p_go_noa_in_progress() - Check whether P2P GO single shot noa
+ * is in progress or not
+ * @pdev: PDEV object manager for P2P GO
+ * @vdev_id: vdev id
+ *
+ * Return: True/False
+ */
+bool p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id);
 #endif /* _WLAN_P2P_MAIN_H_ */

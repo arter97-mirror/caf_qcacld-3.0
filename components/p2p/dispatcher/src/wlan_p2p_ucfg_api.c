@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -660,4 +660,10 @@ bool ucfg_p2p_get_indoor_ch_support(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return p2p_soc_obj->param.indoor_channel_support;
+}
+
+bool ucfg_p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id)
+{
+	return p2p_is_p2p_go_noa_in_progress(pdev, vdev_id);
 }

@@ -364,7 +364,8 @@ static void pre_cac_is_active_vdev_handler(struct wlan_objmgr_psoc *psoc,
 	if (!vdev_priv)
 		return;
 
-	*is_pre_cac_on = vdev_priv->is_pre_cac_on;
+	if (vdev_priv->is_pre_cac_on)
+		*is_pre_cac_on = vdev_priv->is_pre_cac_on;
 }
 
 bool pre_cac_is_active(struct wlan_objmgr_psoc *psoc)

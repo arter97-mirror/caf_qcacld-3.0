@@ -349,7 +349,7 @@ static void __dsc_psoc_op_stop(struct dsc_psoc *psoc, const char *func)
 
 	__dsc_driver_lock(psoc);
 	if (__dsc_ops_remove(&psoc->ops, func))
-		qdf_event_set(&psoc->ops.event);
+		qdf_event_set_all(&psoc->ops.event);
 	__dsc_driver_unlock(psoc);
 }
 

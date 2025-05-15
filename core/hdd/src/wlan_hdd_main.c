@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6524,18 +6524,19 @@ static void hdd_stop_last_active_connection(struct hdd_context *hdd_ctx,
 {
 	enum policy_mgr_con_mode mode;
 	struct wlan_objmgr_psoc *psoc;
+	enum QDF_OPMODE op_mode;
 
 	/* If this is the last active connection check
 	 * and stop the opportunistic timer.
 	 */
 	psoc = wlan_vdev_get_psoc(vdev);
-	mode = policy_mgr_convert_device_mode_to_qdf_type(
-					wlan_vdev_mlme_get_opmode(vdev));
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+	mode = policy_mgr_convert_device_mode_to_qdf_type(op_mode);
 	if ((policy_mgr_get_connection_count(psoc) == 1 &&
 	     policy_mgr_mode_specific_connection_count(psoc,
 						       mode, NULL) == 1) ||
 	     (!policy_mgr_get_connection_count(psoc) &&
-	     !hdd_is_any_sta_connecting(hdd_ctx))) {
+	     !hdd_is_any_sta_connecting(hdd_ctx, op_mode))) {
 		policy_mgr_check_and_stop_opportunistic_timer(
 						psoc,
 						wlan_vdev_get_id(vdev));
