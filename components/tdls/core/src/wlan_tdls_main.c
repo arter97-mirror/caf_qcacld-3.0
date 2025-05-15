@@ -1868,6 +1868,12 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 	tdls_allow_suspend(tdls_soc_obj);
 
 	/*
+	 * Release TDLS wakelock during disconnection if its not already
+	 * released
+	 */
+	tdls_allow_suspend(tdls_soc_obj);
+
+	/*
 	 * If concurrency is not marked, then we have to
 	 * check, whether TDLS could be enabled in the
 	 * system after this disassoc event.

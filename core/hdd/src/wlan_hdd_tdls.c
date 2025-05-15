@@ -1145,11 +1145,22 @@ static int __wlan_hdd_cfg80211_tdls_oper(struct wiphy *wiphy,
 	if (!vdev)
 		return -EINVAL;
 
+	/*
+	 * Allow TDLS teardown & disable link operation when CSA is in progress
+	 * or disconnection is in progress this facilitates that the TDLS
+	 * wakelock is released in these cases which was acquired during
+	 * TDLS setup.
+	 */
+	if ((oper == NL80211_TDLS_TEARDOWN ||
+	     oper == NL80211_TDLS_DISABLE_LINK))
+		goto tdls_oper;
+
 	if (!wlan_hdd_is_tdls_allowed(hdd_ctx, vdev)) {
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
 		return -EINVAL;
 	}
 
+tdls_oper:
 	status = wlan_cfg80211_tdls_oper(vdev, peer, oper);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_TDLS_ID);
 

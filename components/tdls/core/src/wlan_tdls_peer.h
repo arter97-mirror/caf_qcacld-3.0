@@ -305,5 +305,5 @@ void tdls_allow_suspend(struct tdls_soc_priv_obj *tdls_soc);
 static inline
 void tdls_allow_suspend(struct tdls_soc_priv_obj *tdls_soc)
 {}
-#endif
+#endif /* TDLS WoW Enabled */
 #endif
