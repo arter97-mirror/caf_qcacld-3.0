@@ -2453,4 +2453,8 @@ config AR6320_LL_DP_SUPPORT
 config AR6320_MONITOR_MODE
     bool "Flag for ROME MONITOR MODE"
     default y
+
+config SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+	bool "Enable SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND"
+	default n
 endif # QCA_CLD_WLAN
