@@ -836,6 +836,8 @@ void lim_pmf_comeback_timer_callback(void *context);
 void lim_set_protected_bit(struct mac_context *mac,
 	struct pe_session *pe_session,
 	tSirMacAddr peer, tpSirMacMgmtHdr pMacHdr);
+void lim_process_reassoc_pmf_comback(struct mac_context *mac_ctx,
+					   struct pe_session *session_entry);
 #else
 static inline void lim_set_protected_bit(struct mac_context *mac,
 	struct pe_session *pe_session,

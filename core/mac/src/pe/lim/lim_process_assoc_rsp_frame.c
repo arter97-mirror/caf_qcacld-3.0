@@ -525,8 +525,8 @@ static inline void lim_process_he_info(tpSirProbeRespBeacon beacon,
 #endif
 
 #ifdef WLAN_FEATURE_11W
-
 #define MAX_RETRY_TIMER 1500
+#define PMF_COMEBACK_TIMEOUT_EXTEND 200
 static QDF_STATUS
 lim_handle_pmfcomeback_timer(struct pe_session *session_entry,
 			     tpSirAssocRsp assoc_rsp)
@@ -565,6 +565,7 @@ lim_handle_pmfcomeback_timer(struct pe_session *session_entry,
 		 */
 		timeout_value = 10;
 	}
+	timeout_value += PMF_COMEBACK_TIMEOUT_EXTEND;
 	timeout_value = QDF_MIN(MAX_RETRY_TIMER, timeout_value);
 	pe_debug("ASSOC res with eSIR_MAC_TRY_AGAIN_LATER recvd.Starting timer to wait timeout: %d",
 		 timeout_value);
@@ -841,6 +842,15 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	status = lim_handle_pmfcomeback_timer(session_entry, assoc_rsp);
 	/* return if retry again timer is started and ignore this assoc resp */
 	if (QDF_IS_STATUS_SUCCESS(status)) {
+		if (subtype == LIM_REASSOC) {
+			pe_debug("set reassoc pmf comeback flag for pmf reassoc");
+			session_entry->reassoc_pmf_comeback_flag = true;
+			if (tx_timer_deactivate
+				(&mac_ctx->lim.lim_timers.gLimReassocFailureTimer) !=
+					TX_SUCCESS)
+				pe_warn("unable to deactivate Reassoc fail timer");
+
+		}
 		qdf_mem_free(beacon);
 		clean_up_ft_sha384(assoc_rsp, sha384_akm);
 		qdf_mem_free(assoc_rsp);
@@ -1028,6 +1038,10 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	}
 	pe_debug("Successfully Associated with BSS " QDF_MAC_ADDR_FMT,
 		 QDF_MAC_ADDR_REF(hdr->sa));
+
+	if (subtype == LIM_REASSOC)
+		session_entry->reassoc_pmf_comeback_flag = false;
+
 #ifdef FEATURE_WLAN_ESE
 	if (session_entry->eseContext.tsm.tsmInfo.state)
 		session_entry->eseContext.tsm.tsmMetrics.RoamingCount = 0;
