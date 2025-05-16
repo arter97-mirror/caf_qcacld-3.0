@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -464,6 +464,11 @@ wlan_cfg80211_coap_offload_cache_deliver(struct wiphy *wiphy,
 	}
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, skb_len);
+	if (!skb) {
+		hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
+		return -ENOMEM;
+	}
+
 	attr = nla_nest_start(skb, COAP_ATTR(CACHES));
 	if (!attr) {
 		hdd_err("nla_nest_start failed");
