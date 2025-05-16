@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -617,7 +617,8 @@ enum hdd_runtime_pm_cfg {
  * @Max: 2
  * @Default: 0
  *
- * This ini is used to enable runtime PM
+ * This ini is used to enable runtime PM, but it doesn't take effect
+ * in single MSI mode, RTPM is always off in single MSI mode.
  *
  * 0: RTPM disabled, so CxPC aware RTPM will be disabled as well
  * 1: RTPM enabled, but CxPC aware RTPM disabled
