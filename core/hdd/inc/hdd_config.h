@@ -644,7 +644,8 @@ enum hdd_runtime_pm_cfg {
  * @Max: 2
  * @Default: 0
  *
- * This ini is used to enable runtime PM
+ * This ini is used to enable runtime PM, but it doesn't take effect
+ * in single MSI mode, RTPM is always off in single MSI mode.
  *
  * 0: RTPM disabled, so CxPC aware RTPM will be disabled as well
  * 1: RTPM enabled, but CxPC aware RTPM disabled
