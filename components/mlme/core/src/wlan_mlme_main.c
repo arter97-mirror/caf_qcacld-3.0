@@ -1654,6 +1654,8 @@ static void mlme_init_timeout_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_AUTH_FAILURE_TIMEOUT);
 	timeouts->auth_rsp_timeout =
 			cfg_get(psoc, CFG_AUTH_RSP_TIMEOUT);
+	timeouts->assoc_req_timeout =
+			cfg_get(psoc, CFG_ASSOC_REQ_TIMEOUT);
 	timeouts->assoc_failure_timeout =
 			cfg_get(psoc, CFG_ASSOC_FAILURE_TIMEOUT);
 	timeouts->reassoc_failure_timeout =

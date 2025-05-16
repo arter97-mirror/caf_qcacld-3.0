@@ -527,6 +527,7 @@ lim_configure_ap_start_bss_session(struct mac_context *mac_ctx,
 }
 
 static void lim_set_privacy(struct mac_context *mac_ctx,
+			    struct pe_session *session,
 			    int32_t ucast_cipher,
 			    int32_t auth_mode, int32_t akm, bool ap_privacy)
 {
@@ -546,10 +547,11 @@ static void lim_set_privacy(struct mac_context *mac_ctx,
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE_EXT_KEY))
 		mac_ctx->mlme_cfg->wep_params.auth_type = eSIR_AUTH_TYPE_SAE;
-	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256) ||
-		 QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384))
+	else if ((QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256) ||
+		  QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384)) &&
+		 session->opmode == QDF_SAP_MODE)
 		mac_ctx->mlme_cfg->wep_params.auth_type =
-							SIR_FILS_SK_WITHOUT_PFS;
+						SIR_FILS_SK_WITHOUT_PFS;
 
 	if (QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP) ||
 	     QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP_40) ||
@@ -1015,7 +1017,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		akm = wlan_crypto_get_param(session->vdev,
 					    WLAN_CRYPTO_PARAM_KEY_MGMT);
 
-		lim_set_privacy(mac_ctx, ucast_cipher, auth_mode, akm,
+		lim_set_privacy(mac_ctx, session, ucast_cipher, auth_mode, akm,
 				sme_start_bss_req->privacy);
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 		lim_fill_cc_mode(mac_ctx, session);
@@ -4450,7 +4452,7 @@ static QDF_STATUS lim_fill_crypto_params(struct mac_context *mac_ctx,
 	ap_cap_info = (tSirMacCapabilityInfo *)
 			&session->lim_join_req->bssDescription.capabilityInfo;
 
-	lim_set_privacy(mac_ctx, ucast_cipher, auth_mode, akm,
+	lim_set_privacy(mac_ctx, session, ucast_cipher, auth_mode, akm,
 			ap_cap_info->privacy);
 	session->encryptType = lim_get_encrypt_ed_type(ucast_cipher);
 	session->connected_akm = lim_get_connected_akm(session, ucast_cipher,
@@ -5257,7 +5259,7 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 				    WLAN_CRYPTO_PARAM_KEY_MGMT);
 	ap_cap_info = (tSirMacCapabilityInfo *)&req->entry->cap_info.value;
 
-	lim_set_privacy(mac_ctx, ucast_cipher, auth_mode, akm,
+	lim_set_privacy(mac_ctx, session_entry, ucast_cipher, auth_mode, akm,
 			ap_cap_info->privacy);
 
 	if (session_entry->vhtCapability) {

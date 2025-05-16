@@ -716,6 +716,19 @@ bool policy_mgr_is_chnl_in_diff_band(struct wlan_objmgr_psoc *psoc,
 				     uint32_t ch_freq);
 
 /**
+ * policy_mgr_is_mlo_ap() - to check that given vdev id
+ * belongs to an mlo ap vdev or not
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev_id
+ *
+ * This API will check that if the given vdev_id belongs to mlo ap vdev or not.
+ *
+ * Return: true if vdev id belongs to an mlo sap
+ */
+bool policy_mgr_is_mlo_ap(struct wlan_objmgr_psoc *psoc,
+			  uint8_t vdev_id);
+
+/**
  * policy_mgr_is_pcl_weightage_required() - to check that PCL weightage req or
  * not
  * @psoc: pointer to psoc
@@ -1596,6 +1609,7 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
  * channel from conc table
  * @psoc: PSOC object information
  * @ch_freq: pointer to channel frequency which needs to be filled
+ * @exclude_mlo_sap_link: exclude freq of existing SAP link
  *
  * In-case if any connection is already present whose channel is none dfs then
  * return that channel
@@ -1603,7 +1617,8 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
  * Return: true up-on finding non-dfs channel else false
  */
 bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
-					   uint32_t *ch_freq);
+					   uint32_t *ch_freq,
+					   bool exclude_mlo_sap_link);
 
 /**
  * policy_mgr_get_dfs_beaconing_session_id() - to find the
@@ -3480,6 +3495,24 @@ bool
 policy_mgr_are_3_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t freq_1, qdf_freq_t freq_2,
 				  qdf_freq_t freq_3);
+
+/**
+ * policy_mgr_get_conc_freq_if_ml_sta_in_smm() - Function to get concurrent
+ * frequency for SAP if ML STA is in SMM
+ * @psoc: Pointer to psoc
+ * @sap_ch_freq: User given SAP channel frequency
+ * @ml_sta1_freq: ML STA link 1 frequency
+ * @ml_sta2_freq: ML STA link2 freq
+ *
+ * Return: Interference freq for given SAP channel
+ */
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+qdf_freq_t
+policy_mgr_get_conc_freq_if_ml_sta_in_smm(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t sap_ch_freq,
+					  qdf_freq_t ml_sta1_freq,
+					  qdf_freq_t ml_sta2_freq);
+#endif
 
 /**
  * policy_mgr_allow_4th_new_freq() - Function to check whether 4th freq can
@@ -5477,6 +5510,17 @@ policy_mgr_update_active_mlo_num_nlink(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id,
 				       uint8_t force_active_cnt);
 
+/**
+ * policy_mgr_mlo_sap_concurrency_allow() - Check if fw support mlo sap
+ * concurrency.
+ * @psoc: objmgr psoc
+ *
+ * This API is used to check if wlan firmware support mlo sap
+ * concurrency or not.
+ *
+ * Return: True if mlo sap concurrency support from fw, otherwise false.
+ */
+bool policy_mgr_mlo_sap_concurrency_allow(struct wlan_objmgr_psoc *psoc);
 #else
 static inline QDF_STATUS
 policy_mgr_ap_csa_request(struct wlan_objmgr_psoc *psoc,
@@ -5578,6 +5622,12 @@ void policy_mgr_handle_ml_sta_links_on_vdev_down(struct wlan_objmgr_psoc *psoc,
 						 enum QDF_OPMODE mode,
 						 uint8_t vdev_id)
 {
+}
+
+static inline
+bool policy_mgr_mlo_sap_concurrency_allow(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 #endif
 
@@ -6083,4 +6133,19 @@ policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif
+/**
+ * policy_mgr_get_conc_ml_sap_link_freq()- Get concurrent ML SAP link frequency
+ * @psoc: Pointer to Psoc
+ * @vdev_id: vdev id
+ * @ml_sap_vdev: ml sap vdev or not
+ *
+ * This API returns concurrent ml sap freq if there are any.
+ * This function can only call when locked by qdf_conc_list_lock.
+ *
+ * Return: Concurrent ml sap freq if present. Otherwise 0.
+ */
+uint32_t policy_mgr_get_conc_ml_sap_link_freq(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      bool *ml_sap_vdev);
+
 #endif /* __WLAN_POLICY_MGR_API_H */

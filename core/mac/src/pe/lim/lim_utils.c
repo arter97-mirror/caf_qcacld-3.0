@@ -12483,3 +12483,16 @@ end:
 
 	return status;
 }
+
+bool lim_mismatch_bssid_da(tpSirMacMgmtHdr hdr)
+{
+	if (qdf_mem_cmp((uint8_t *)hdr->bssId,
+			(uint8_t *)hdr->da,
+			(uint8_t)(sizeof(tSirMacAddr)))) {
+		pe_debug("DA: " QDF_MAC_ADDR_FMT " mismatch bssid" QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(hdr->da),
+			 QDF_MAC_ADDR_REF(hdr->bssId));
+		return true;
+	}
+	return false;
+}

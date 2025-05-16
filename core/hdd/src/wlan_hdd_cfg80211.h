@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -317,13 +317,18 @@ typedef enum {
 #define WIFI_FEATURE_IE_ALLOWLIST       0x1000000 /* Support Probe IE allow
 						   * listing
 						   */
-#define WIFI_FEATURE_SCAN_RAND          0x2000000 /* Support MAC & Probe Sequence Number randomization */
-#define WIFI_FEATURE_SET_LATENCY_MODE   0x40000000 /* Set latency mode */
-/* Support changing MAC address without iface reset(down and up) */
-#define WIFI_FEATURE_DYNAMIC_SET_MAC    0x10000000
-
+/* Support MAC & Probe Sequence Number randomization */
+#define WIFI_FEATURE_SCAN_RAND          0x2000000
 /* Support Tx Power Limit setting */
 #define WIFI_FEATURE_SET_TX_POWER_LIMIT 0x4000000
+/* Support changing MAC address without iface reset(down and up) */
+#define WIFI_FEATURE_DYNAMIC_SET_MAC    0x10000000
+#define WIFI_FEATURE_SET_LATENCY_MODE   0x40000000 /* Set latency mode */
+
+#define WIFI_FEATURE_MAX_BIT_POS 64
+
+/* Support MLO SoftAp */
+#define WIFI_FEATURE_MLO_SAP            0x4000000000
 
 /* Add more features here */
 #define WIFI_TDLS_SUPPORT			BIT(0)
@@ -637,7 +642,7 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
  */
 int wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info);
 
-int wlan_hdd_sap_cfg_dfs_override(struct hdd_adapter *adapter);
+int wlan_hdd_sap_cfg_dfs_override(struct wlan_hdd_link_info *link_info);
 
 int wlan_hdd_enable_dfs_chan_scan(struct hdd_context *hdd_ctx,
 				  bool enable_dfs_channels);

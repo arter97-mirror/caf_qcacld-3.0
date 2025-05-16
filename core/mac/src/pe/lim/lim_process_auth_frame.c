@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1811,6 +1811,9 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
+	if (LIM_IS_AP_ROLE(pe_session) && lim_mismatch_bssid_da(mac_hdr))
+		return;
+
 	if (qdf_atomic_read(&pe_session->vdev->is_ap_suspend)) {
 		pe_err("SAP is suspended, reject peer auth");
 		return;
@@ -1841,8 +1844,16 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (auth_node && (auth_node->seq_num == curr_seq_num)) {
 		pe_err("Received an already processed auth frame with seq_num : %d",
 		       curr_seq_num);
+		if (LIM_IS_AP_ROLE(pe_session))
+			lim_del_stale_auth_node_assoc_req_timeout(mac_ctx,
+								  auth_node);
 		return;
 	}
+
+	/* allow new auth if previous one was too old */
+	if (auth_node && LIM_IS_AP_ROLE(pe_session))
+		lim_del_stale_auth_node_assoc_req_timeout(mac_ctx,
+							  auth_node);
 
 	/* save seq number and mac_addr in pe_session */
 	pe_session->prev_auth_seq_num = curr_seq_num;
@@ -2301,7 +2312,7 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 
 #define WLAN_MIN_AUTH_FRM_ALGO_FIELD_LEN 2
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifdef WLAN_FEATURE_LFR3
 static void lim_process_ft_sae_auth_frame(struct mac_context *mac,
 					  struct pe_session *pe_session,
 					  uint8_t *body, uint16_t frame_len)
