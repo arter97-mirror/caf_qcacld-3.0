@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -11767,54 +11767,42 @@ hdd_tx_latency_fill_link_stats(struct sk_buff *skb,
 {
 	struct nlattr *link, *link_stat_buckets, *link_stat_bucket;
 	uint32_t type;
-	int ret = 0;
 
 	link = nla_nest_start(skb, idx);
-	if (!link) {
-		ret = -ENOMEM;
-		goto err;
-	}
+	if (!link)
+		goto nla_put_failure;
 
 	if (nla_put(skb, TX_LATENCY_ATTR(LINK_MAC_REMOTE),
-		    QDF_MAC_ADDR_SIZE, latency->mac_remote.bytes)) {
-		ret = -ENOMEM;
-		goto err;
-	}
+		    QDF_MAC_ADDR_SIZE, latency->mac_remote.bytes))
+		goto nla_put_failure;
 
 	hdd_debug_rl("idx %d link mac " QDF_MAC_ADDR_FMT,
 		     idx, QDF_MAC_ADDR_REF(latency->mac_remote.bytes));
 	link_stat_buckets =
 		nla_nest_start(skb, TX_LATENCY_ATTR(LINK_STAT_BUCKETS));
+	if (!link_stat_buckets)
+		goto nla_put_failure;
+
 	for (type = 0; type < CDP_TX_LATENCY_TYPE_MAX; type++) {
 		link_stat_bucket = nla_nest_start(skb, type);
-		if (!link_stat_bucket) {
-			ret = -ENOMEM;
-			goto err;
-		}
+		if (!link_stat_bucket)
+			goto nla_put_failure;
 
-		if (nla_put_u8(skb, TX_LATENCY_ATTR(BUCKET_TYPE), type)) {
-			ret = -ENOMEM;
-			goto err;
-		}
+		if (nla_put_u8(skb, TX_LATENCY_ATTR(BUCKET_TYPE), type))
+			goto nla_put_failure;
 
 		if (nla_put_u32(skb, TX_LATENCY_ATTR(BUCKET_GRANULARITY),
-				latency->stats[type].granularity)) {
-			ret = -ENOMEM;
-			goto err;
-		}
+				latency->stats[type].granularity))
+			goto nla_put_failure;
 
 		if (nla_put_u32(skb, TX_LATENCY_ATTR(BUCKET_AVERAGE),
-				latency->stats[type].average)) {
-			ret = -ENOMEM;
-			goto err;
-		}
+				latency->stats[type].average))
+			goto nla_put_failure;
 
 		if (nla_put(skb, TX_LATENCY_ATTR(BUCKET_DISTRIBUTION),
 			    TX_LATENCY_BUCKET_DISTRIBUTION_LEN,
-			    latency->stats[type].distribution)) {
-			ret = -ENOMEM;
-			goto err;
-		}
+			    latency->stats[type].distribution))
+			goto nla_put_failure;
 
 		nla_nest_end(skb, link_stat_bucket);
 		hdd_debug_rl("	type %u granularity %u average %u",
@@ -11824,12 +11812,12 @@ hdd_tx_latency_fill_link_stats(struct sk_buff *skb,
 
 	nla_nest_end(skb, link_stat_buckets);
 	nla_nest_end(skb, link);
+	return 0;
 
-err:
-	if (ret)
-		hdd_err("failed for link " QDF_MAC_ADDR_FMT " ret: %d",
-			QDF_MAC_ADDR_REF(latency->mac_remote.bytes), ret);
-	return ret;
+nla_put_failure:
+	hdd_err("failed for link " QDF_MAC_ADDR_FMT,
+		QDF_MAC_ADDR_REF(latency->mac_remote.bytes));
+	return -EMSGSIZE;
 }
 
 /**
