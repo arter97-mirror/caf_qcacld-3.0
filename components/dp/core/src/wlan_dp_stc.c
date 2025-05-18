@@ -32,7 +32,8 @@
 
 #define FLOW_TRACK_ELIGIBLE_THRESH_NS 3000000000
 #define WLAN_DP_STC_PING_INACTIVE_TIMEOUT_NS 3000000000
-#define FLOW_INACTIVE_TIME_THRESH_NS 20000000000
+#define RT_FLOW_INACTIVE_TIME_THRESH_NS (5 * QDF_NSEC_PER_SEC)
+#define FLOW_INACTIVE_TIME_THRESH_NS (20 * QDF_NSEC_PER_SEC)
 #define FLOW_RESUME_TIME_THRESH_NS 500000000
 #define FLOW_SHORTLIST_BURST_PKT_RATE_PER_SEC_THRESH 15
 #define FLOW_SHORTLIST_TXRX_PKT_RATE_PER_SEC_THRESH 2
@@ -976,12 +977,18 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint64_t cur_ts = dp_stc_get_timestamp();
-	int tx_flow_valid, rx_flow_valid;
+	int is_rt_flow, tx_flow_valid, rx_flow_valid;
+	uint64_t inactivity_timer_ts;
 
+	is_rt_flow = qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_FLAGS_RT_FLOW_BIT,
+					 &c_entry->flags);
 	tx_flow_valid = qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_FLAGS_TX_FLOW_VALID,
 					    &c_entry->flags);
 	rx_flow_valid = qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_FLAGS_RX_FLOW_VALID,
 					    &c_entry->flags);
+
+	inactivity_timer_ts = is_rt_flow ? RT_FLOW_INACTIVE_TIME_THRESH_NS :
+					   FLOW_INACTIVE_TIME_THRESH_NS;
 
 	if (tx_flow_valid) {
 		uint64_t flow_active_ts;
@@ -989,7 +996,7 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, c_entry->tx_flow_id);
 		flow_active_ts = tx_flow->active_ts;
 		cur_ts = dp_stc_get_timestamp();
-		if (cur_ts - flow_active_ts < FLOW_INACTIVE_TIME_THRESH_NS)
+		if (cur_ts - flow_active_ts < inactivity_timer_ts)
 			return;
 	}
 
@@ -999,7 +1006,7 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, c_entry->rx_flow_id);
 		flow_active_ts = rx_flow->last_accessed_ts;
 		cur_ts = dp_stc_get_timestamp();
-		if (cur_ts - flow_active_ts < FLOW_INACTIVE_TIME_THRESH_NS)
+		if (cur_ts - flow_active_ts < inactivity_timer_ts)
 			return;
 	}
 
@@ -1203,6 +1210,17 @@ wlan_dp_stc_is_traffic_type_known(enum qca_traffic_type traffic_type)
 	return true;
 }
 
+static inline void
+wlan_dp_stc_check_n_mark_rt_flow(struct wlan_dp_stc_classified_flow_entry *flow)
+{
+	if (flow->traffic_type == QCA_TRAFFIC_TYPE_GAMING ||
+	    flow->traffic_type == QCA_TRAFFIC_TYPE_VIDEO_CALL ||
+	    flow->traffic_type == QCA_TRAFFIC_TYPE_VOICE_CALL)
+		qdf_atomic_set_bit(
+			WLAN_DP_CLASSIFIED_FLAGS_RT_FLOW_BIT,
+			&flow->flags);
+}
+
 /*
  * This function should just mark something in the sampling entry.
  * The periodic work can take care of moving this entry to classified table
@@ -1270,7 +1288,10 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 		qdf_mem_copy(&c_entry->flow_tuple,
 			     &s_entry->flow_samples.flow_tuple,
 			     sizeof(struct flow_info));
+
 		c_entry->traffic_type = s_entry->traffic_type;
+		wlan_dp_stc_check_n_mark_rt_flow(c_entry);
+
 		c_entry->peer_id = s_entry->peer_id;
 		qdf_atomic_inc(&c_table->num_valid_entries);
 
