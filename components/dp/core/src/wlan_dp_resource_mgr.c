@@ -720,7 +720,8 @@ wlan_dp_resource_mgr_notify_ndp_channel_info(
 {
 	struct wlan_dp_peer_priv_context *priv_ctx;
 	struct wlan_dp_resource_vote_node *vote_node;
-	enum QDF_OPMODE opmode = QDF_NDI_MODE;
+	struct  wlan_objmgr_vdev *vdev;
+	enum QDF_OPMODE opmode;
 	enum wlan_phymode mac0_phymode = 0, mac1_phymode = 0;
 	uint64_t mac0_tput = 0, mac1_tput = 0;
 	enum wlan_phymode host_phymode;
@@ -728,6 +729,20 @@ wlan_dp_resource_mgr_notify_ndp_channel_info(
 
 	if (!rsrc_ctx)
 		return;
+
+	vdev = wlan_peer_get_vdev(peer);
+	if (!vdev) {
+		dp_err("unable to get vdev ref from peer");
+		return;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_NDI_MODE) {
+		/*NDP_CONFIRM came on peer but vdev maps to different opmode*/
+		dp_err("NDP channel notify came for peer/vdev opmode not proper");
+		QDF_BUG(0);
+		return;
+	}
 
 	dp_rsrc_mgr_debug("NDP notify channel info called");
 	for (i = 0; i < num_channels; i++) {
@@ -788,6 +803,7 @@ wlan_dp_resource_mgr_notify_ndp_channel_info(
 	vote_node->tput0 = mac0_tput;
 	vote_node->phymode1 = mac1_phymode;
 	vote_node->tput1 = mac1_tput;
+	vote_node->nan_vote = true;
 	wlan_dp_resource_mgr_list_insert_vote_node(&rsrc_ctx->nan_list,
 						   vote_node, opmode);
 	dp_info("NDP new node phymode0:%u tput0:%llu phymode1:%u tput1:%llu list_len:%u",
@@ -919,6 +935,10 @@ wlan_dp_resource_mgr_vote_node_free(struct wlan_objmgr_peer *peer)
 	priv_ctx = dp_get_peer_priv_obj(vote_peer);
 	if (priv_ctx->vote_node) {
 		vote_node = priv_ctx->vote_node;
+		if (opmode != QDF_NDI_MODE && vote_node->nan_vote) {
+			dp_err("opmode not proper for nan vote resource");
+			QDF_BUG(0);
+		}
 		if (opmode == QDF_NDI_MODE)
 			qdf_list_remove_node(&rsrc_ctx->nan_list,
 					     &vote_node->node);
@@ -927,9 +947,10 @@ wlan_dp_resource_mgr_vote_node_free(struct wlan_objmgr_peer *peer)
 				&rsrc_ctx->mac_list[vote_node->mac_id],
 				&vote_node->node);
 
-		dp_info("vote node freed on vdev_id:%u mac_id:%u list_len:%u",
+		dp_info("vote node freed on vdev_id:%u mac_id:%u list_len:%u nan_vote:%u",
 			wlan_vdev_get_id(vdev), vote_node->mac_id,
-			qdf_list_size(&rsrc_ctx->mac_list[vote_node->mac_id]));
+			qdf_list_size(&rsrc_ctx->mac_list[vote_node->mac_id]),
+			vote_node->nan_vote);
 		qdf_mem_free(vote_node);
 		priv_ctx->vote_node = NULL;
 		wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +30,7 @@
  * struct twt_mc_cfg_params - All twt related cfg items
  * @enable_twt: global twt configuration
  * @twt_responder: twt responder enable/disable
+ * @twt_responder_orig: Original twt responder enable/disable
  * @twt_requestor: twt requestor enable/disable
  * @twt_congestion_timeout: congestion timeout value
  * @bcast_requestor_enabled: bcast requestor enable/disable
@@ -46,6 +47,7 @@
 struct twt_mc_cfg_params {
 	bool enable_twt;
 	bool twt_responder;
+	bool twt_responder_orig;
 	bool twt_requestor;
 	uint32_t twt_congestion_timeout;
 	bool bcast_requestor_enabled;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,10 +28,12 @@
  * hdd_sysfs_create_dump_in_progress_interface() - API to create
  * dump_in_progress sysfs file
  * @wifi_kobject: sysfs wifi kobject
+ * @hdd_ctx: ptr to hdd_ctx
  *
  * Return: None
  */
-void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject);
+void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject,
+						 struct hdd_context *hdd_ctx);
 
 /**
  * hdd_sysfs_destroy_dump_in_progress_interface() - API to destroy
@@ -44,7 +46,8 @@ void hdd_sysfs_destroy_dump_in_progress_interface(struct kobject *wifi_kobject);
 
 #else
 static inline void
-hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject)
+hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject,
+					    struct hdd_context *hdd_ctx)
 {
 }
 static inline void

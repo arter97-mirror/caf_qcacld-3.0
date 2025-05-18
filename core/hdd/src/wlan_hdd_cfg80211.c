@@ -16648,7 +16648,9 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 			return -EINVAL;
 		}
 
-		wlan_set_chipset_stats_bit();
+		wlan_set_chipset_stats_bit(
+				hdd_ctx->is_drv_dump_in_progress_valid,
+				hdd_ctx->dump_in_progress);
 
 		status = wlan_logging_wait_for_flush_log_completion();
 		if (!QDF_IS_STATUS_SUCCESS(status)) {

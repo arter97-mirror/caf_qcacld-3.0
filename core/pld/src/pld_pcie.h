@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -459,6 +459,12 @@ pld_pcie_register_qmi_ind(struct device *dev, void *cb_ctx,
 	return -EINVAL;
 }
 
+static inline int
+pld_pcie_get_dump_inprogress(struct device *dev, uint8_t *val)
+{
+	return -EINVAL;
+}
+
 static inline int pld_pcie_get_user_msi_assignment(struct device *dev,
 						   char *user_name,
 						   int *num_vectors,
@@ -680,6 +686,20 @@ pld_pcie_register_qmi_ind(struct device *dev, void *cb_ctx,
 {
 	return cnss_register_driver_async_data_cb(dev, cb_ctx, cb);
 }
+
+#if defined(CONFIG_SEC_SS_CNSS_FEATURE_SYSFS)
+static inline int
+pld_pcie_get_dump_inprogress(struct device *dev, uint8_t *val)
+{
+	return cnss_get_dump_inprogress(dev, val);
+}
+#else
+static inline int
+pld_pcie_get_dump_inprogress(struct device *dev, uint8_t *val)
+{
+	return -EPERM;
+}
+#endif
 #else
 static inline int
 pld_pcie_register_qmi_ind(struct device *dev, void *cb_ctx,
@@ -687,6 +707,12 @@ pld_pcie_register_qmi_ind(struct device *dev, void *cb_ctx,
 				    void *event, int event_len))
 {
 	return 0;
+}
+
+static inline int
+pld_pcie_get_dump_inprogress(struct device *dev, uint8_t *val)
+{
+	return -EINVAL;
 }
 #endif
 

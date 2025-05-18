@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -309,6 +309,20 @@ static QDF_STATUS cds_qmi_indication(void *cb_ctx, qdf_qmi_ind_cb qmi_ind_cb)
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS cds_get_dump_inprogress(uint8_t *val)
+{
+	qdf_device_t qdf_ctx;
+
+	qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	if (!qdf_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	if (pld_get_dump_inprogress(qdf_ctx->dev, val))
+		return QDF_STATUS_E_INVAL;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * cds_update_recovery_reason() - update the recovery reason code
  * @recovery_reason: recovery reason
@@ -350,6 +364,7 @@ QDF_STATUS cds_init(void)
 	qdf_register_drv_connected_callback(cds_is_drv_connected);
 	qdf_register_drv_supported_callback(cds_is_drv_supported);
 	qdf_register_wmi_send_recv_qmi_callback(cds_wmi_send_recv_qmi);
+	qdf_register_get_dump_inprogress_cb(cds_get_dump_inprogress);
 	qdf_register_qmi_indication_callback(cds_qmi_indication);
 	qdf_register_recovery_reason_update(cds_update_recovery_reason);
 	qdf_register_get_bus_reg_dump(pld_get_bus_reg_dump);
@@ -383,6 +398,7 @@ void cds_deinit(void)
 	qdf_register_self_recovery_callback(NULL);
 	qdf_register_wmi_send_recv_qmi_callback(NULL);
 	qdf_register_qmi_indication_callback(NULL);
+	qdf_register_get_dump_inprogress_cb(NULL);
 
 	gp_cds_context->qdf_ctx = NULL;
 	qdf_mem_zero(&g_qdf_ctx, sizeof(g_qdf_ctx));

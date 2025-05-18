@@ -10982,6 +10982,14 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 	mac_ctx->eht_cap_5g.bfee_ss_320mhz =
 			QDF_MIN(cfg->eht_cap_5g.bfee_ss_320mhz, value);
 
+	if (wlan_mlme_get_epcs_capability(mac_ctx->psoc)) {
+		mac_ctx->eht_cap_2g.epcs_pri_access = 1;
+		mac_ctx->eht_cap_5g.epcs_pri_access = 1;
+	} else {
+		mac_ctx->eht_cap_2g.epcs_pri_access = 0;
+		mac_ctx->eht_cap_5g.epcs_pri_access = 0;
+	}
+
 	qdf_mem_copy(&mac_ctx->eht_cap_2g_orig,
 		     &mac_ctx->eht_cap_2g,
 		     sizeof(tDot11fIEeht_cap));
@@ -11067,6 +11075,7 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 			   struct wma_tgt_cfg *cfg,
 			   tDot11fIEhe_cap *he_cap_ini)
 {
+	uint8_t value;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
 	qdf_mem_copy(&mac_ctx->he_cap_2g,
@@ -11132,6 +11141,33 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 	mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(
 		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80,
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80);
+
+	/* Reset below params to default */
+	mac_ctx->he_cap_5g.bfee_sts_gt_80 = 0;
+
+	mac_ctx->he_cap_2g.num_sounding_gt_80 = 0;
+	mac_ctx->he_cap_5g.num_sounding_gt_80 = 0;
+
+	mac_ctx->he_cap_2g.he_ppdu_20_in_40Mhz_2G = 0;
+	mac_ctx->he_cap_5g.he_ppdu_20_in_40Mhz_2G = 0;
+
+	mac_ctx->he_cap_2g.he_ppdu_20_in_160_80p80Mhz = 0;
+	mac_ctx->he_cap_5g.he_ppdu_20_in_160_80p80Mhz = 0;
+
+	mac_ctx->he_cap_2g.he_ppdu_80_in_160_80p80Mhz = 0;
+	mac_ctx->he_cap_5g.he_ppdu_80_in_160_80p80Mhz = 0;
+
+	value = QDF_MIN(mac_ctx->he_cap_2g.fragmentation,
+			mac_ctx->mlme_cfg->he_caps.he_dynamic_fragmentation);
+
+	if (cfg_in_range(CFG_HE_FRAGMENTATION, value))
+		mac_ctx->he_cap_2g.fragmentation = value;
+
+	value = QDF_MIN(mac_ctx->he_cap_5g.fragmentation,
+			mac_ctx->mlme_cfg->he_caps.he_dynamic_fragmentation);
+
+	if (cfg_in_range(CFG_HE_FRAGMENTATION, value))
+		mac_ctx->he_cap_5g.fragmentation = value;
 
 	qdf_mem_copy(&mac_ctx->he_cap_2g_orig,
 		     &mac_ctx->he_cap_2g,

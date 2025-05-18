@@ -3540,7 +3540,7 @@ int wlan_hdd_ll_stats_get(struct wlan_hdd_link_info *link_info,
 			  uint32_t req_id, uint32_t req_mask)
 {
 	int errno;
-	tSirLLStatsGetReq get_req;
+	tSirLLStatsGetReq get_req = {0};
 	struct hdd_adapter *adapter = link_info->adapter;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
@@ -8342,6 +8342,11 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 	    !hdd_stats->class_a_stat.tx_rate_version)
 		return;
 
+	if (hdd_cm_is_vdev_roaming(link_info)) {
+		hdd_debug("Roaming in progress");
+		return;
+	}
+
 	peer_addr = link_info->session.station.conn_info.bssid.bytes;
 	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(link_info->vdev,
 							     peer_addr,
@@ -9907,12 +9912,7 @@ void wlan_hdd_get_peer_rx_rate_stats(struct wlan_hdd_link_info *link_info)
 		hdd_debug_rl("Failed to get rx rates, rx mcs=%d, status=%d",
 			     hdd_stats->class_a_stat.rx_mcs_index, status);
 		hdd_stats->class_a_stat.rx_preamble = INVALID_PREAMBLE;
-		if (hdd_stats->class_a_stat.rx_mcs_index == INVALID_MCS_IDX) {
-			hdd_stats->class_a_stat.rx_rate =
-				hdd_stats->class_a_stat.tx_rate;
-			hdd_stats->class_a_stat.rx_mcs_index =
-				hdd_stats->class_a_stat.tx_mcs_index;
-		}
+
 		qdf_mem_free(peer_stats);
 		return;
 	}

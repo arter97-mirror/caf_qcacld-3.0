@@ -10405,6 +10405,85 @@ release_vdev_ref:
 	return status;
 }
 
+bool policy_mgr_validate_sta_start(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *link_vdev;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	bool allow = true;
+	struct policy_mgr_conc_connection_info
+			info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct wlan_objmgr_vdev *ml_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {0};
+	uint16_t ml_vdev_cnt = 0;
+	uint8_t i;
+	uint8_t num_cxn_del = 0;
+	uint8_t total_num_cxn_del = 0;
+	uint8_t vdev_id;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		policy_mgr_err("Invalid psoc");
+		return false;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid pm_ctx");
+		return false;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE ||
+	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return true;
+
+	if (policy_mgr_get_connection_count(psoc) < 2)
+		return true;
+
+	mlo_get_ml_vdev_list(vdev, &ml_vdev_cnt, ml_vdev_list);
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	vdev_id = wlan_vdev_get_id(vdev);
+	num_cxn_del = 0;
+	policy_mgr_store_and_del_conn_info_by_vdev_id(
+			psoc, vdev_id, info, &num_cxn_del);
+	total_num_cxn_del += num_cxn_del;
+
+	for (i = 0; i < ml_vdev_cnt; i++) {
+		link_vdev = ml_vdev_list[i];
+		if (link_vdev &&
+		    link_vdev != vdev &&
+		    total_num_cxn_del < QDF_ARRAY_SIZE(info)) {
+			vdev_id = wlan_vdev_get_id(link_vdev);
+			num_cxn_del = 0;
+			policy_mgr_store_and_del_conn_info_by_vdev_id(
+				psoc, vdev_id, &info[total_num_cxn_del],
+				&num_cxn_del);
+			total_num_cxn_del += num_cxn_del;
+		}
+	}
+
+	if (policy_mgr_get_connection_count(psoc) > 1 &&
+	    !policy_mgr_allow_concurrency(psoc, PM_STA_MODE,
+				      0, HW_MODE_BW_NONE,
+				      0, wlan_vdev_get_id(vdev))) {
+		allow = false;
+		policy_mgr_err("sta 3 port conc check fail, can't allow sta");
+	}
+
+	/* Restore the connection entry */
+	if (total_num_cxn_del > 0)
+		policy_mgr_restore_deleted_conn_info(
+			psoc, info, total_num_cxn_del);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	for (i = 0; i < ml_vdev_cnt; i++) {
+		if (ml_vdev_list[i])
+			mlo_release_vdev_ref(ml_vdev_list[i]);
+	}
+
+	return allow;
+}
 #else
 static bool
 policy_mgr_allow_sta_concurrency(struct wlan_objmgr_psoc *psoc,
@@ -10437,6 +10516,60 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
 						qdf_freq_t sap_ch_freq)
 {
 	return false;
+}
+
+bool policy_mgr_validate_sta_start(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	bool allow = true;
+	struct policy_mgr_conc_connection_info
+			info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t num_cxn_del = 0;
+	uint8_t total_num_cxn_del = 0;
+	uint8_t vdev_id;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		policy_mgr_err("Invalid psoc");
+		return false;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid pm_ctx");
+		return false;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+		return true;
+
+	if (policy_mgr_get_connection_count(psoc) < 2)
+		return true;
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	vdev_id = wlan_vdev_get_id(vdev);
+	num_cxn_del = 0;
+	policy_mgr_store_and_del_conn_info_by_vdev_id(
+			psoc, vdev_id, info, &num_cxn_del);
+	total_num_cxn_del += num_cxn_del;
+
+	if (policy_mgr_get_connection_count(psoc) > 1 &&
+	    !policy_mgr_allow_concurrency(psoc, PM_STA_MODE,
+				      0, HW_MODE_BW_NONE,
+				      0, wlan_vdev_get_id(vdev))) {
+		allow = false;
+		policy_mgr_err("sta 3 port conc check fail, can't allow sta");
+	}
+
+	/* Restore the connection entry */
+	if (total_num_cxn_del > 0)
+		policy_mgr_restore_deleted_conn_info(
+			psoc, info, total_num_cxn_del);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return allow;
 }
 #endif
 

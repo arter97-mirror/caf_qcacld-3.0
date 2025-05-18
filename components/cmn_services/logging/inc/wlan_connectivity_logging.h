@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -762,6 +762,9 @@ struct wlan_diag_bcn_rpt {
 
 #define DIAG_ROAM_CAND_VERSION 1
 #define DIAG_ROAM_CAND_VERSION_V2 2
+
+/* Version 3 includes the etp value of Current AP */
+#define DIAG_ROAM_CAND_VERSION_V3 3
 
 /**
  * struct wlan_diag_roam_candidate_info  - Roam candidate information for

@@ -3,6 +3,9 @@ load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load(":target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
+    "neo-la": [
+	"kiwi-v2",
+    ],
     "anorak": [
         "qca6490",
         "kiwi-v2",
@@ -2299,10 +2302,17 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//build/kernel/kleaf:socrepo_false": [],
         })
 
-    kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
-    })
+    if target == "neo-la":
+        kernel_build = select({
+            "//build/kernel/kleaf:microxr_kernel_build_true": "//:target_kernel_build",
+            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//conditions:default": "//msm-kernel:{}".format(tv),
+        })
+    else:
+        kernel_build = select({
+            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        })
 
     ipaths = chipset_ipaths + hw_ipaths + _fixed_ipaths
 
@@ -2435,7 +2445,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
     ]
 
-    if target != "x1e80100" and target != "anorak":
+    if target != "x1e80100" and target != "anorak" and target != "neo-la":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),

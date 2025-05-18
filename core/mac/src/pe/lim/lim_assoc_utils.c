@@ -3875,8 +3875,11 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 
 	if (lim_is_session_he_capable(pe_session) &&
 			(pAssocRsp->he_cap.present)) {
-		/* Use STA SMPS capability as AP's SMPS value is not valid */
-		pAssocRsp->he_cap.he_dynamic_smps =
+		/* Use STA SMPS capability as AP's SMPS value is not valid,
+		 * and use p2p GO's assoc response value to avoid IOT issue.
+		 */
+		if (pe_session->opmode != QDF_P2P_CLIENT_MODE)
+			pAssocRsp->he_cap.he_dynamic_smps =
 				lim_is_he_dynamic_smps_enabled(pe_session);
 		lim_add_bss_he_cap(pAddBssParams, pAssocRsp);
 		lim_add_bss_he_cfg(pAddBssParams, pe_session);
@@ -4017,10 +4020,12 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 						  pBeaconStruct,
 						  pAssocRsp);
 		}
-
-		/* Use STA SMPS capability as AP's SMPS value is not valid */
-		pAssocRsp->HTCaps.mimoPowerSave =
-			pe_session->ht_config.mimo_power_save;
+		/* Use STA SMPS capability as AP's SMPS value is not valid,
+		 * and use p2p GO's assoc response value to avoid IOT issue.
+		 */
+		if (pe_session->opmode != QDF_P2P_CLIENT_MODE)
+			pAssocRsp->HTCaps.mimoPowerSave =
+				pe_session->ht_config.mimo_power_save;
 		pAddBssParams->staContext.mimoPS =
 			(tSirMacHTMIMOPowerSaveState)
 			pAssocRsp->HTCaps.mimoPowerSave;
@@ -4104,8 +4109,11 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 				lim_update_he_6gop_assoc_resp(pAddBssParams,
 							      &pAssocRsp->he_op,
 							      pe_session);
-			/* Use STA SMPS cap as AP's SMPS value is not valid */
-			pAssocRsp->he_6ghz_band_cap.sm_pow_save =
+			/* Use STA SMPS cap as AP's SMPS value is not valid,
+			 * and use p2p GO's assoc response value to avoid IOT issue.
+			 */
+			if (pe_session->opmode != QDF_P2P_CLIENT_MODE)
+				pAssocRsp->he_6ghz_band_cap.sm_pow_save =
 					pe_session->ht_config.mimo_power_save;
 			lim_update_he_6ghz_band_caps(mac,
 						&pAssocRsp->he_6ghz_band_cap,
