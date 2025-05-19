@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -39,5 +40,14 @@
  */
 void
 target_if_action_oui_register_tx_ops(struct action_oui_tx_ops *tx_ops);
+
+/**
+ * target_if_get_action_oui_v2_cap() - Get action oui v2 cap
+ * @psoc: psoc
+ *
+ * Return: bool, true: action_oui_v2 supported by target
+ */
+bool
+target_if_get_action_oui_v2_cap(struct wlan_objmgr_psoc *psoc);
 
 #endif /* _TARGET_IF_ACTION_OUI_H_ */

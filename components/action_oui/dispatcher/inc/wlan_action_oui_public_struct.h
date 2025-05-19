@@ -94,6 +94,9 @@
 /* Invalid OUI ID action */
 #define ACTION_OUI_INVALID "ffffff 00 01"
 
+#define ACTION_OUI_OPERATOR_AND "&&"
+#define ACTION_OUI_OPERATOR_OR  "||"
+
 /**
  * enum action_oui_id - to identify type of action oui
  * @ACTION_OUI_CONNECT_1X1: for 1x1 connection only
@@ -205,6 +208,8 @@ enum action_oui_info {
  * @mac_addr: mac addr
  * @mac_mask: mac mask
  * @capability: capability buffer
+ * @and_oui_index: and oui index, 0 means first of and oui,
+ * OUI0 || OUI1 && OUI2, and_oui_index of OUI0, OUI1 and OUI2 are 0, 0, 1
  */
 struct action_oui_extension {
 	uint32_t info_mask;
@@ -220,11 +225,13 @@ struct action_oui_extension {
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
 	uint8_t mac_mask[ACTION_OUI_MAC_MASK_LENGTH];
 	uint8_t capability[ACTION_OUI_MAX_CAPABILITY_LENGTH];
+	uint8_t and_oui_index;
 };
 
 /**
  * struct action_oui_request - Contains specific action oui information
  * @action_id: type of action from enum action_oui_info
+ * @is_action_oui_v2_enabled: Is action oui v2 enabled
  * @no_oui_extensions: number of action oui extensions of type @action_id
  * @total_no_oui_extensions: total no of oui extensions from all
  * action oui types, this is just a total count needed by firmware
@@ -234,6 +241,7 @@ struct action_oui_extension {
  */
 struct action_oui_request {
 	enum action_oui_id action_id;
+	bool is_action_oui_v2_enabled;
 	uint32_t no_oui_extensions;
 	uint32_t total_no_oui_extensions;
 	struct action_oui_extension extension[];

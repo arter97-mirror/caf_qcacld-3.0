@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -130,13 +130,14 @@
 
 /*
  * <ini>
- * gEnableActionOUI - Enable/Disable action oui feature
+ * gEnableActionOUI - Enable/Disable action oui feature and version
  * @Min: 0 (disable)
- * @Max: 1 (enable)
- * @Default: 1 (enable)
+ * @Max: 2 (enable action oui v2)
+ * @Default: 1
  *
  * This ini is used to enable the action oui feature to control
  * mode of connection, connected AP's in-activity time, Tx rate etc.,
+ * it also set action oui version: 2 means V2, 1 means legacy V1.
  *
  * Related: If gEnableActionOUI is set, then at least one of the following inis
  * must be set with the proper action oui extensions:
@@ -148,11 +149,10 @@
  *
  * </ini>
  */
-#define CFG_ENABLE_ACTION_OUI CFG_INI_BOOL( \
+#define CFG_ENABLE_ACTION_OUI CFG_INI_UINT( \
 	"gEnableActionOUI", \
-	1, \
-	"Enable/Disable action oui feature")
-
+	0, 2, 1, \
+	CFG_VALUE_OR_DEFAULT, "Configure action oui feature")
 /*
  * <ini>
  * gActionOUIConnect1x1 - Used to specify action OUIs for 1x1 connection
@@ -943,6 +943,33 @@
 	"F832E4 00 01", \
 	"disable dynamic SMPS capability for specified AP")
 
+/*
+ * <ini>
+ * CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2 - Used to disable Dynamic SMPS
+ * capability for specified AP.
+ *
+ * Default OUIs: (All values in Hex)
+ * OUI 1: f832e4
+ *   OUI data Len: 00
+ *   Info Mask : 01 - only OUI present in Info mask
+ *
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2 CFG_INI_STRING( \
+	"gActionOUIDisableDynamicSMPS_V2", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"F832E4 00 01", \
+	"disable dynamic SMPS capability for specified AP")
+
 #define CFG_ACTION_OUI \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1) \
@@ -968,4 +995,17 @@
 	CFG(CFG_ACTION_OUI_DISABLE_AUX_LISTEN) \
 	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS) \
 	CFG(CFG_ENABLE_ACTION_OUI)
+
+/* Action OUI V2 ini use different name format XXX_V2, support operator
+ * "&&" or "||" between different OUI, "&&" priority is higher than "||",
+ * such as: XXX_V2=OUI1 && OUI2 || OUI3 && OUI4
+ *
+ * For V2 ini name XXX_V2, if both host and F/W enabled action oui V2,  can be
+ * parsed, otherwise, can't be parsed.
+ *
+ * For legacy ini name without V2, only support legacy operator, can't support
+ * operator "&&", use space instead of "||".
+ */
+#define CFG_ACTION_OUI_V2 \
+	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2)
 #endif

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -132,8 +132,8 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 {
 	struct wlan_objmgr_psoc *psoc = psoc_priv->psoc;
 
-	psoc_priv->action_oui_enable =
-		cfg_get(psoc, CFG_ENABLE_ACTION_OUI);
+	psoc_priv->is_action_oui_v2_enabled =
+		wlan_action_oui_v2_enabled(psoc_priv->psoc);
 
 	qdf_str_lcopy(psoc_priv->action_oui_str[ACTION_OUI_CONNECT_1X1],
 		      cfg_get(psoc, CFG_ACTION_OUI_CONNECT_1X1),
@@ -215,10 +215,19 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 	qdf_str_lcopy(psoc_priv->action_oui_str[ACTION_OUI_DISABLE_AUX_LISTEN],
 		      cfg_get(psoc, CFG_ACTION_OUI_DISABLE_AUX_LISTEN),
 		      ACTION_OUI_MAX_STR_LEN);
-	qdf_str_lcopy(psoc_priv->action_oui_str
-		      [ACTION_OUI_DISABLE_DYNAMIC_SMPS],
-		      cfg_get(psoc, CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS),
-		      ACTION_OUI_MAX_STR_LEN);
+
+	if (psoc_priv->is_action_oui_v2_enabled) {
+		qdf_str_lcopy(psoc_priv->action_oui_str
+			      [ACTION_OUI_DISABLE_DYNAMIC_SMPS],
+			      cfg_get(psoc, CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2),
+			      ACTION_OUI_MAX_STR_LEN);
+		psoc_priv->is_action_oui_v2_used[ACTION_OUI_DISABLE_DYNAMIC_SMPS] = true;
+	} else {
+		qdf_str_lcopy(psoc_priv->action_oui_str
+			      [ACTION_OUI_DISABLE_DYNAMIC_SMPS],
+			      cfg_get(psoc, CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS),
+			      ACTION_OUI_MAX_STR_LEN);
+	}
 }
 
 static void action_oui_parse_config(struct wlan_objmgr_psoc *psoc)
@@ -327,7 +336,7 @@ action_oui_psoc_create_notification(struct wlan_objmgr_psoc *psoc, void *arg)
 
 	target_if_action_oui_register_tx_ops(&psoc_priv->tx_ops);
 	psoc_priv->psoc = psoc;
-	action_oui_load_config(psoc_priv);
+	psoc_priv->action_oui_enable = cfg_get(psoc, CFG_ENABLE_ACTION_OUI);
 	action_oui_debug("psoc priv attached");
 	goto exit;
 free_psoc_priv:
@@ -377,6 +386,8 @@ void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		action_oui_err("psoc priv is NULL");
 		goto exit;
 	}
+
+	action_oui_load_config(psoc_priv);
 
 	status = action_oui_allocate(psoc_priv);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -510,5 +521,27 @@ bool wlan_action_oui_is_empty(struct wlan_objmgr_psoc *psoc,
 
 exit:
 	return empty;
+}
+
+bool wlan_action_oui_v2_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct action_oui_psoc_priv *psoc_priv;
+	bool v2_enabled = false;
+
+	if (!psoc) {
+		action_oui_err("Invalid psoc");
+		return false;
+	}
+
+	psoc_priv = action_oui_psoc_get_priv(psoc);
+	if (!psoc_priv) {
+		action_oui_err("psoc priv is NULL");
+		return false;
+	}
+
+	v2_enabled = psoc_priv->action_oui_enable == 2 &&
+		     target_if_get_action_oui_v2_cap(psoc_priv->psoc);
+
+	return v2_enabled;
 }
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -88,23 +88,27 @@ struct action_oui_priv {
 /**
  * struct action_oui_psoc_priv - Private object to be stored in psoc
  * @psoc: pointer to psoc object
- * @action_oui_enable: action oui enable
+ * @action_oui_enable: action oui enable config
  * @action_oui_str: oui configuration strings
  * @total_extensions: total count of extensions from all actions
  * @host_only_extensions: total host only only extensions from all actions
  * @max_extensions: Max no. of extensions that can be configured to the firmware
  * @oui_priv: array of pointers used to refer each action info
  * @tx_ops: call-back functions to send OUIs to firmware
+ * @is_action_oui_v2_enabled: Is action oui v2 enabled
+ * @is_action_oui_v2_used: Is action oui v2 used per action id
  */
 struct action_oui_psoc_priv {
 	struct wlan_objmgr_psoc *psoc;
-	bool action_oui_enable;
+	uint8_t action_oui_enable;
 	uint8_t action_oui_str[ACTION_OUI_MAXIMUM_ID][ACTION_OUI_MAX_STR_LEN];
 	uint32_t total_extensions;
 	uint32_t host_only_extensions;
 	uint32_t max_extensions;
 	struct action_oui_priv *oui_priv[ACTION_OUI_MAXIMUM_ID];
 	struct action_oui_tx_ops tx_ops;
+	bool is_action_oui_v2_enabled;
+	bool is_action_oui_v2_used[ACTION_OUI_MAXIMUM_ID];
 };
 
 /**

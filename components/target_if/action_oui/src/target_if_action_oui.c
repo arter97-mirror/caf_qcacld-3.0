@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -49,3 +50,17 @@ target_if_action_oui_register_tx_ops(struct action_oui_tx_ops *tx_ops)
 
 	tx_ops->send_req = target_if_action_oui_send_req;
 }
+
+bool
+target_if_get_action_oui_v2_cap(struct wlan_objmgr_psoc *psoc)
+{
+	void *wmi_hdl;
+
+	wmi_hdl = GET_WMI_HDL_FROM_PSOC(psoc);
+	if (!wmi_hdl)
+		return false;
+
+	return wmi_service_enabled(wmi_hdl,
+				   wmi_service_vendor_oui_action_v2);
+}
+
