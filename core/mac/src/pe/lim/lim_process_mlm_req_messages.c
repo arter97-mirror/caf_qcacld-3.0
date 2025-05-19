@@ -299,7 +299,12 @@ void lim_process_mlm_req_messages(struct mac_context *mac_ctx,
 static void update_rmfEnabled(struct bss_params *addbss_param,
 			      struct pe_session *session)
 {
-	addbss_param->rmfEnabled = session->limRmfEnabled;
+	if (wlan_crypto_vdev_is_pmf_enabled(session->vdev, 0) ||
+	    wlan_crypto_vdev_is_pmf_enabled(session->vdev, RSNO_GEN_WIFI6) ||
+	    wlan_crypto_vdev_is_pmf_enabled(session->vdev, RSNO_GEN_WIFI7)) {
+		pe_debug("Enable rmf");
+		addbss_param->rmfEnabled = true;
+	}
 }
 
 /**

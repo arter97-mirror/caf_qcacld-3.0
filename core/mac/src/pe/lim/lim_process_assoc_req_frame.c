@@ -962,7 +962,7 @@ enum wlan_status_code lim_check_rsn_ie(struct pe_session *session,
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		if ((peer_crypto_params.rsn_caps &
 		    WLAN_CRYPTO_RSN_CAP_MFP_ENABLED) &&
-		    wlan_crypto_vdev_is_pmf_enabled(vdev))
+		    wlan_crypto_vdev_is_pmf_enabled(vdev, rsno_sel_id))
 			*pmf_connection = true;
 
 		qdf_mem_free(rsn_ie);
@@ -1027,6 +1027,7 @@ static enum wlan_status_code lim_check_wpa_ie(struct pe_session *session,
   * @session: pointer to pe session entry
   * @rsn: pointer to RSN
   * @akm_type: AKM type
+  * @rsno_gen: RSN(O) generation
   *
   * This function checks if SAE STA is pmf capable when SAE SAP is pmf
   * capable. Reject with eSIR_MAC_ROBUST_MGMT_FRAMES_POLICY_VIOLATION
@@ -1037,13 +1038,13 @@ static enum wlan_status_code lim_check_wpa_ie(struct pe_session *session,
 #if defined(WLAN_FEATURE_SAE)
 static enum wlan_status_code lim_check_sae_pmf_cap(struct pe_session *session,
 						  tDot11fIERSN *rsn,
-						  enum ani_akm_type akm_type)
+						  uint8_t rsno_gen)
 {
 	enum wlan_status_code status = STATUS_SUCCESS;
 
-	if (session->limRmfEnabled &&
-	    (rsn->RSN_Cap[0] & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED) == 0 &&
-	    akm_type == ANI_AKM_TYPE_SAE)
+	pe_debug("RSN generation is %d", rsno_gen);
+	if (wlan_crypto_vdev_is_pmf_enabled(session->vdev, rsno_gen) &&
+	    ((rsn->RSN_Cap[0] & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED) == 0))
 		status = STATUS_ROBUST_MGMT_FRAME_POLICY_VIOLATION;
 
 	return status;
@@ -1159,8 +1160,12 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 		*akm_type = lim_translate_rsn_oui_to_akm_type(
 						    dot11f_ie_rsn.akm_suite[0]);
 
-		status = lim_check_sae_pmf_cap(session, &dot11f_ie_rsn,
-					       *akm_type);
+		if (*akm_type == ANI_AKM_TYPE_SAE_EXT_KEY ||
+		    *akm_type == ANI_AKM_TYPE_FT_SAE_EXT_KEY ||
+		    *akm_type == ANI_AKM_TYPE_SAE ||
+		    *akm_type == ANI_AKM_TYPE_FT_SAE)
+			status = lim_check_sae_pmf_cap(session, &dot11f_ie_rsn,
+						       assoc_req->rsno_gen);
 		if (status != STATUS_SUCCESS) {
 			/* Reject pmf disable SAE STA */
 			pe_warn("Re/Assoc rejected from: " QDF_MAC_ADDR_FMT,
