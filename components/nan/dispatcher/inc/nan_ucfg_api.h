@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -637,6 +637,15 @@ ucfg_nan_remove_ndp_peer_mac_addr(struct wlan_objmgr_psoc *psoc,
  */
 bool ucfg_nan_is_allowed(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * ucfg_nan_cache_disable_req_info() - This API cache disable request info
+ * @psoc: pointer to PSOC object
+ * @value: parameter to determine NB or internal request
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value);
 #ifdef NDP_TX_BW_FLOW_CTRL
 /**
  * ucfg_nan_get_peer_ndi_addr_by_id() - Get peer ndi mac address using ndp
@@ -850,6 +859,12 @@ static inline
 QDF_STATUS ucfg_nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
 					    uint32_t ndp_instance_id,
 					    struct qdf_mac_addr *peer_ndi_addr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
