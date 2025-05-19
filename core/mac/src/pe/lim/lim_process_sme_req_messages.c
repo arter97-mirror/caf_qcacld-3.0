@@ -882,7 +882,6 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 	int32_t ucast_cipher;
 	int32_t auth_mode;
 	int32_t akm;
-	int32_t rsn_caps;
 	enum QDF_OPMODE opmode;
 	ePhyChanBondState cb_mode;
 	enum bss_type bss_type;
@@ -1101,10 +1100,6 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 
 		session->txLdpcIniFeatureEnabled =
 				mac_ctx->mlme_cfg->ht_caps.tx_ldpc_enable;
-		rsn_caps = wlan_crypto_get_param(session->vdev,
-						 WLAN_CRYPTO_PARAM_RSN_CAP);
-		session->limRmfEnabled =
-			rsn_caps & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED ? 1 : 0;
 
 		qdf_mem_copy((void *)&session->rateSet,
 			     (void *)&sme_start_bss_req->operationalRateSet,
