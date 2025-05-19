@@ -1461,6 +1461,10 @@ static bool fill_csa_offload_params(
 	struct ieee80211_channelswitch_ie *csa_ie;
 	struct ieee80211_extendedchannelswitch_ie *xcsa_ie;
 	uint8_t is_csa_ie_present = false;
+	uint16_t chan_space;
+	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
+
+	wlan_reg_read_current_country(wlan_pdev_get_psoc(pdev), country_code);
 
 	if (csa_event->ies_present_flag & WMI_CSA_IE_PRESENT) {
 		csa_ie = (struct ieee80211_channelswitch_ie *)
@@ -1483,11 +1487,21 @@ static bool fill_csa_offload_params(
 				wlan_reg_chan_band_to_freq
 					(pdev, xcsa_ie->newchannel,
 					 BIT(REG_BAND_6G));
+			chan_space =
+				wlan_reg_get_op_class_width(pdev,
+							    xcsa_ie->newClass,
+							    true);
 		} else {
 			csa_offload_event->csa_chan_freq =
 				wlan_reg_legacy_chan_to_freq
 					(pdev, xcsa_ie->newchannel);
+			chan_space =
+				wlan_reg_dmn_get_chanwidth_from_opclass_auto(country_code,
+									     xcsa_ie->newchannel,
+									     xcsa_ie->newClass);
 		}
+		csa_offload_event->new_ch_width =
+				wlan_reg_find_chwidth_from_bw(chan_space);
 		csa_offload_event->ies_present_flag |= MLME_XCSA_IE_PRESENT;
 		is_csa_ie_present = true;
 	}

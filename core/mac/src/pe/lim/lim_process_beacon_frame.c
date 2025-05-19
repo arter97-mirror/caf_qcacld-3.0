@@ -110,7 +110,7 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 	uint32_t per_sta_pro_len;
 	uint8_t *sta_pro;
 	uint32_t sta_pro_len;
-	uint16_t stacontrol;
+	uint16_t stacontrol, chan_space;
 	struct ieee80211_channelswitch_ie *csa_ie;
 	struct ieee80211_extendedchannelswitch_ie *xcsa_ie;
 	struct wlan_objmgr_vdev *vdev;
@@ -120,6 +120,7 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 	struct mlo_link_info *link_info;
 	uint8_t sta_info_len = 0;
 	uint8_t tmp_rec_value;
+	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
 
 	if (!session || !bcn_ptr || !mac_ctx) {
 		pe_err("invalid input parameters");
@@ -144,6 +145,8 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 		wlan_vdev_mlme_cap_clear(vdev, WLAN_VDEV_C_EMLSR_CAP);
 		pe_debug("EMLSR not supported with D2.0 AP");
 	}
+
+	wlan_reg_read_current_country(mac_ctx->psoc, country_code);
 
 	/* Check if AP beacons contain Extended MLD cap and op field */
 	mlo_ctx->mlo_extmld_cap_advertisement =
@@ -196,15 +199,27 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 			csa_param.channel = xcsa_ie->newchannel;
 			csa_param.switch_mode = xcsa_ie->switchmode;
 			csa_param.new_op_class = xcsa_ie->newClass;
-			if (wlan_reg_is_6ghz_op_class(pdev, xcsa_ie->newClass))
+			if (wlan_reg_is_6ghz_op_class(pdev, xcsa_ie->newClass)) {
 				csa_param.csa_chan_freq =
 					wlan_reg_chan_band_to_freq(
 						pdev, xcsa_ie->newchannel,
 						BIT(REG_BAND_6G));
-			else
+				chan_space =
+					wlan_reg_get_op_class_width(pdev,
+								    xcsa_ie->newClass,
+								    true);
+			} else {
 				csa_param.csa_chan_freq =
 					wlan_reg_legacy_chan_to_freq(
 						pdev, xcsa_ie->newchannel);
+				chan_space =
+					wlan_reg_dmn_get_chanwidth_from_opclass_auto(country_code,
+						csa_param.channel, xcsa_ie->newClass);
+			}
+
+			csa_param.new_ch_width =
+					wlan_reg_find_chwidth_from_bw(chan_space);
+
 			if (!csa_param.csa_chan_freq) {
 				pe_nofl_rl_debug("invalid freq from xcsa ie newchannel %d link %d",
 						 xcsa_ie->newchannel,
