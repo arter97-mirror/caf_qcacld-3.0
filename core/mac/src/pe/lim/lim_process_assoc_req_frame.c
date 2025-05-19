@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1062,7 +1062,7 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 				 tpSirAssocReq assoc_req, bool *pmf_connection,
 				 enum ani_akm_type *akm_type)
 {
-	uint32_t ret;
+	uint32_t ret, akm;
 	tDot11fIEWPA dot11f_ie_wpa = {0};
 	tDot11fIERSN dot11f_ie_rsn = {0};
 	enum wlan_status_code status = STATUS_SUCCESS;
@@ -1203,8 +1203,9 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 		*akm_type = lim_translate_rsn_oui_to_akm_type(
 						  dot11f_ie_wpa.auth_suites[0]);
 	} else {
-		if ((session->gStartBssRSNIe.present ||
-		    session->gStartBssWPAIe.present) &&
+		akm = wlan_crypto_get_param(session->vdev,
+					    WLAN_CRYPTO_PARAM_KEY_MGMT);
+		if (akm && !(akm & (1 << WLAN_CRYPTO_KEY_MGMT_NONE)) &&
 		    session->opmode == QDF_SAP_MODE) {
 			pe_warn("STA does not support RSN and WPA!");
 			lim_send_assoc_rsp_mgmt_frame(

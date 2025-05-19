@@ -1161,13 +1161,6 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		/* Delete pre-auth list if any */
 		lim_delete_pre_auth_list(mac_ctx);
 
-		/*
-		 * keep the RSN/WPA IE information in PE Session Entry
-		 * later will be using this to check when received (Re)Assoc req
-		 */
-		lim_set_rs_nie_wp_aiefrom_sme_start_bss_req_message(mac_ctx,
-				&sme_start_bss_req->rsnIE, session);
-
 		if (LIM_IS_AP_ROLE(session) || LIM_IS_NDI_ROLE(session)) {
 			/* Initialize WPS PBC session link list */
 			session->pAPWPSPBCSession = NULL;

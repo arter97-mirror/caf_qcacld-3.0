@@ -2114,6 +2114,7 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 	tLimMlmStartCnf mlmStartCnf;
 	struct pe_session *pe_session;
 	uint8_t isWepEnabled = false;
+	uint32_t akm;
 
 	if (!add_bss_rsp) {
 		pe_err("Encountered NULL Pointer");
@@ -2152,9 +2153,10 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 		 * WEP then max clients supported is 16
 		 */
 		if (pe_session->privacy) {
-			if ((pe_session->gStartBssRSNIe.present)
-			    || (pe_session->gStartBssWPAIe.present))
-				pe_debug("WPA/WPA2 SAP configuration");
+			akm = wlan_crypto_get_param(pe_session->vdev,
+						    WLAN_CRYPTO_PARAM_KEY_MGMT);
+			if (akm && !(akm & (1 << WLAN_CRYPTO_KEY_MGMT_NONE)))
+				pe_debug("WPA/RSN SAP configuration");
 			else {
 				if (mac->mlme_cfg->sap_cfg.assoc_sta_limit >
 				    MAX_SUPPORTED_PEERS_WEP) {
