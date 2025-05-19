@@ -2057,7 +2057,8 @@ void hdd_wmm_classify_pkt(struct hdd_adapter *adapter,
 		ucfg_dp_fim_update_metadata((qdf_nbuf_t)skb,
 					    adapter->deflink->vdev);
 
-		if (skb->mark ^ WLAN_DP_STC_CLASSIFIED_TAG) {
+		if ((skb->mark & WLAN_DP_STC_CLASSIFIED_TAG) ==
+		    WLAN_DP_STC_CLASSIFIED_TAG) {
 			*user_pri = skb->mark & WLAN_DP_STC_UL_TID_MASK;
 			return;
 		}
