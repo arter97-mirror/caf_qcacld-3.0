@@ -1932,7 +1932,7 @@ static QDF_STATUS cds_force_assert_target_via_wmi(qdf_device_t qdf)
 	if (!wma)
 		return QDF_STATUS_E_INVAL;
 
-	status = wma_crash_inject(wma, RECOVERY_SIM_SELF_RECOVERY, 0);
+	status = wma_crash_inject(wma, RECOVERY_SIM_ASSERT, 0);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_err("Failed target force assert; status %d", status);
 		return status;

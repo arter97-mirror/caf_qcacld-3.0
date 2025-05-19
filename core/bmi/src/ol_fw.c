@@ -51,6 +51,13 @@
 static struct hash_fw fw_hash;
 #endif
 
+#ifdef TARGET_DUMP_FOR_NON_QC_PLATFORM
+#include <linux/fs.h>
+#include <linux/uaccess.h>
+#include <linux/timekeeping.h>
+#include <linux/slab.h>
+#endif
+
 static uint32_t refclk_speed_to_hz[] = {
 	48000000,               /* SOC_REFCLK_48_MHZ */
 	19200000,               /* SOC_REFCLK_19_2_MHZ */
@@ -309,7 +316,7 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 			if (bd_id_filename[i]) {
 				BMI_DBG("%s: Trying to load %s",
 					 __func__, bd_id_filename[i]);
-				status = request_firmware(&fw_entry,
+				status = request_firmware_direct(&fw_entry,
 							  bd_id_filename[i],
 							  qdf_dev->dev);
 				if (!status)
@@ -322,7 +329,7 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 			/* bd.board_id not exits, using bd.bin */
 			BMI_DBG("%s: Trying to load default %s",
 				 __func__, bd_filename[i]);
-			status = request_firmware(&fw_entry, bd_filename[i],
+			status = request_firmware_direct(&fw_entry, bd_filename[i],
 						  qdf_dev->dev);
 			if (!status)
 				break;
@@ -330,7 +337,7 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 				__func__, bd_filename[i], status);
 		}
 	} else {
-		status = request_firmware(&fw_entry, filename, qdf_dev->dev);
+		status = request_firmware_direct(&fw_entry, filename, qdf_dev->dev);
 	}
 
 	if (status) {
@@ -577,6 +584,85 @@ static inline void ol_get_ramdump_mem(struct device *dev,
 static inline void ol_release_ramdump_mem(struct device *dev,
 					  struct ramdump_info *info) { }
 #endif
+
+#ifdef TARGET_DUMP_FOR_NON_QC_PLATFORM
+int ol_write_ramdump_to_file(uint32_t file_no, int8_t *buf, uint32_t size)
+{
+	int ret = 0;
+	struct file *fp;
+	mm_segment_t old_fs;
+	loff_t pos = 0;
+	struct timespec64 ts;
+	char filename[128];
+	struct rtc_time tm;
+
+	pr_err("%s: ENTER\n", __func__);
+
+	/* Get current time */
+	ktime_get_real_ts64(&ts);
+
+	/* Create filename with timestamp */
+	snprintf(filename, sizeof(filename), "/home/root/");
+
+	/* Convert rtc to local time */
+	ts.tv_sec -= sys_tz.tz_minuteswest * 60;
+
+	rtc_time64_to_tm(ts.tv_sec, &tm);
+
+	if (file_no == 0) {
+		strlcat(filename, "ramdump_ar6320_",
+			sizeof(filename) - strlen(filename) - 1);
+	} else if (file_no == 1) {
+		strlcat(filename, "axi_ar6320_",
+			sizeof(filename) - strlen(filename) - 1);
+	} else if (file_no == 2) {
+		strlcat(filename, "register_ar6320_",
+			sizeof(filename) - strlen(filename) - 1);
+	} else if (file_no == 3) {
+		strlcat(filename, "iram1_ar6320_",
+			sizeof(filename) - strlen(filename) - 1);
+	} else if (file_no == 4) {
+		strlcat(filename, "iram2_ar6320_",
+			sizeof(filename) - strlen(filename) - 1);
+	} else {
+		pr_err("%s: invalid file_no\n", __func__);
+		return -EINVAL;
+	}
+
+	scnprintf(filename + strlen(filename),
+		sizeof(filename) - strlen(filename),
+		"%04d-%02d-%02d-%02d-%02d-%02d.bin",
+		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+		tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+	/* change to KERNEL_DS address limit */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	/* open file to write */
+	fp = filp_open(filename, O_WRONLY | O_CREAT | O_DSYNC, 0640);
+	if (IS_ERR(fp)) {
+		pr_err("%s: open file error\n", __func__);
+		ret = PTR_ERR(fp);
+		goto exit;
+	}
+
+	/* Write buf to file */
+	kernel_write(fp, buf, size, &pos);
+
+exit:
+	/* close file before return */
+	if (!IS_ERR(fp))
+		filp_close(fp, current->files);
+
+	/* restore previous address limit */
+	set_fs(old_fs);
+
+	pr_err("%s: EXIT\n", __func__);
+
+	return ret;
+}
+#endif
+
 
 int ol_copy_ramdump(struct hif_opaque_softc *scn)
 {
@@ -1922,6 +2008,10 @@ static int ol_target_coredump(void *inst, void *memory_block,
 
 		if (result == -EIO)
 			return ol_dump_ce_register(scn, memory_block);
+		
+#ifdef TARGET_DUMP_FOR_NON_QC_PLATFORM
+				ol_write_ramdump_to_file(section_count, buffer_loc, result);
+#endif
 
 		BMI_INFO("%s: Section:%d Bytes Read:%0x", __func__,
 			 section_count, result);

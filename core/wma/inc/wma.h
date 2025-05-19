@@ -1919,12 +1919,22 @@ void wma_mgmt_nbuf_unmap_cb(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,
 				       qdf_nbuf_t buf);
+
+QDF_STATUS
+wma_update_edca_pifs_param(WMA_HANDLE handle,
+			   struct edca_pifs_vparam *edca_pifs_param);
 #else
 static inline void wma_mgmt_nbuf_unmap_cb(struct wlan_objmgr_pdev *pdev,
 					  qdf_nbuf_t buf)
 {}
 static inline QDF_STATUS wma_mgmt_frame_fill_peer_cb(struct wlan_objmgr_peer *peer,
 						     qdf_nbuf_t buf)
+{
+	return QDF_STATUS_SUCCESS;
+}
+static inline QDF_STATUS
+wma_update_edca_pifs_param(WMA_HANDLE handle,
+			   struct edca_pifs_vparam *edca_pifs_param)
 {
 	return QDF_STATUS_SUCCESS;
 }
