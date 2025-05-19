@@ -15790,6 +15790,9 @@ static void hdd_init_epm_value_cfg(struct hdd_config *config,
 {
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 
+	if (!wma_handle)
+		return;
+
 	if (wma_is_epm_supported_cfg(wma_handle) &&
 	    wma_is_epm_supported_fw(wma_handle))
 		config->cpu_cxpc_threshold = cfg_get(psoc, CFG_EPM_VALUE);

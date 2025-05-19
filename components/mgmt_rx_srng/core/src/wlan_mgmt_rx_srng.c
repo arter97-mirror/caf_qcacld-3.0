@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: ISC
  */
 
@@ -247,6 +247,9 @@ wlan_mgmt_rx_srng_htt_setup_send(struct wlan_objmgr_pdev *pdev)
 	struct mgmt_rx_srng_pdev_priv *pdev_priv;
 	struct mgmt_srng_cfg *mgmt_ring_cfg;
 	QDF_STATUS status;
+
+	if (!soc)
+		return QDF_STATUS_E_INVAL;
 
 	pdev_priv = wlan_objmgr_pdev_get_comp_private_obj(
 					pdev, WLAN_UMAC_COMP_MGMT_RX_SRNG);

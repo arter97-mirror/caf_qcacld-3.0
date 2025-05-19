@@ -1179,6 +1179,9 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct pe_session *session;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
