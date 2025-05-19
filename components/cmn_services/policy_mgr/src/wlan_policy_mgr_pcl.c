@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5594,7 +5594,9 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 			}
 		}
 	}
-
+	policy_mgr_promote_best_sap_channel_in_pcl(psoc, vdev_id,
+						   pcl.pcl_list,
+						   &pcl.pcl_len);
 	sap_new_freq = pcl.pcl_list[0];
 	/*
 	 * pcl_list carries multiple channel in ML-STA case depending on

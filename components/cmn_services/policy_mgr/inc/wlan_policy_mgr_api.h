@@ -1788,6 +1788,21 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id, uint8_t cc_mode);
 
 /**
+ * policy_mgr_promote_best_sap_channel_in_pcl() - promote best channel
+ * from STA scan
+ * @psoc: psoc ctx
+ * @vdev_id: vdev id
+ * @pcl_channels: pcl channels
+ * @len: length
+ *
+ * Return: void
+ */
+void policy_mgr_promote_best_sap_channel_in_pcl(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id, uint32_t *pcl_channels,
+				uint32_t *len);
+
+/**
  * policy_mgr_handle_go_sap_fav_channel() - Get preferred force SCC
  * channel frequency using favorite mandatory channel list for GO+SAP
  * concurrency

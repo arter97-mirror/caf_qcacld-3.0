@@ -1999,6 +1999,10 @@ void wlansap_process_chan_info_event(struct sap_context *sap_ctx,
 {
 }
 #endif
+QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
+			     uint32_t **freq_list,
+			     uint16_t *num_ch);
+
 
 /**
  * wlansap_update_ll_lt_sap_acs_result() - Update acs result of LL_LT_SAP
@@ -2024,15 +2028,35 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 				 qdf_freq_t *freq_list, uint16_t count);
 
 /**
+ * wlan_sap_get_acs_weight_adjustable() - get channel weight
+ * @cur_bw: bandwidth
+ *
+ * Return: channel weight
+ */
+uint32_t wlan_sap_get_acs_weight_adjustable(enum phy_ch_width cur_bw);
+
+/**
+ * wlan_sap_is_ch_non_overlap() - check if channel is overlapping
+ * @vdev_id: vdev id
+ * @freq: freq
+ *
+ * Return: true if channel is non overlapping
+ */
+bool
+wlan_sap_is_ch_non_overlap(uint8_t vdev_id, qdf_freq_t freq);
+
+/**
  * wlansap_sort_channel_list() - Sort channel list
  * @vdev_id: Vdev Id
  * @list: List of channels which needs to sort
  * @ch_info: Fill sorted channels list in ch_info
+ * @only_2g_freq: only 2 GHz freq
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
-				     struct sap_sel_ch_info *ch_info);
+				     struct sap_sel_ch_info *ch_info,
+				     bool only_2g_freq);
 
 /**
  * wlansap_free_chan_info() - API to free allocated memory

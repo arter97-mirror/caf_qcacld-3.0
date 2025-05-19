@@ -92,9 +92,9 @@
  * Static Function Declarations and Definitions
  * -------------------------------------------------------------------------*/
 #ifdef SOFTAP_CHANNEL_RANGE
-static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
-				    uint32_t **freq_list,
-				    uint8_t *num_ch);
+QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
+			     uint32_t **freq_list,
+			     uint16_t *num_ch);
 #endif
 
 /*==========================================================================
@@ -1604,7 +1604,7 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 	struct wlan_objmgr_vdev *vdev = NULL;
 	uint8_t i, j;
 	uint32_t *freq_list = NULL;
-	uint8_t num_of_channels = 0;
+	uint16_t num_of_channels = 0;
 	mac_handle_t mac_handle;
 	uint32_t con_ch_freq;
 	uint8_t vdev_id;
@@ -4808,9 +4808,9 @@ void sap_dump_acs_channel(struct sap_acs_cfg *acs_cfg)
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
-				    uint32_t **freq_list,
-				    uint8_t *num_ch)
+QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
+			     uint32_t **freq_list,
+			     uint16_t *num_ch)
 {
 	uint8_t loop_count;
 	uint32_t *list;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2383,7 +2383,7 @@ QDF_STATUS
 wlan_ll_sap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
 			      struct sap_sel_ch_info *ch_info)
 {
-	return wlansap_sort_channel_list(vdev_id, list, ch_info);
+	return wlansap_sort_channel_list(vdev_id, list, ch_info, false);
 }
 
 void wlan_ll_sap_free_chan_info(struct sap_sel_ch_info *ch_param)

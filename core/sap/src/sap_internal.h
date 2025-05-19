@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -334,6 +334,7 @@ void sap_chan_sel_exit(struct sap_sel_ch_info *ch_info_params);
  * @ch_info: Pointer to sap_sel_ch_info structure
  * @domain: Regulatory Domain
  * @operating_band: Operating band
+ * @only_2g_freq: only 2 GHz
  *
  * Return: QDF_STATUS
  *
@@ -341,7 +342,8 @@ void sap_chan_sel_exit(struct sap_sel_ch_info *ch_info_params);
 QDF_STATUS
 sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
 		      qdf_list_t *ch_list, struct sap_sel_ch_info *ch_info,
-		      v_REGDOMAIN_t *domain, uint32_t *operating_band);
+		      v_REGDOMAIN_t *domain, uint32_t *operating_band,
+		      bool only_2g_freq);
 
 /**
  * sap_select_channel() - select SAP channel
@@ -577,6 +579,14 @@ sap_build_start_bss_config(struct start_bss_config *sap_bss_cfg,
  * Returns: true if non-overlapping (1, 6, 11) channel, false otherwise
  */
 bool sap_is_ch_non_overlap(struct sap_context *sap_ctx, uint16_t ch);
+
+/**
+ * sap_get_bw_score_multiplier() - get bw score multiplier
+ * @ch_width: channel width
+ *
+ * Return: multiplier
+ */
+uint8_t sap_get_bw_score_multiplier(enum phy_ch_width ch_width);
 
 #ifdef QCA_DFS_BW_PUNCTURE
 /**

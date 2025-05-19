@@ -4633,6 +4633,65 @@ policy_mgr_filter_non_acs_channels(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+void policy_mgr_promote_best_sap_channel_in_pcl(
+			struct wlan_objmgr_psoc *psoc,
+			uint8_t vdev_id, uint32_t *pcl_channels,
+			uint32_t *len)
+{
+	uint32_t tmp_freq;
+	struct wlan_objmgr_vdev *vdev;
+	enum QDF_OPMODE device_mode;
+	uint32_t *chan_list = NULL;
+	int8_t index_2ghz = -1;
+	uint8_t num_chan = 0, j, i;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    vdev_id,
+						    WLAN_LEGACY_SAP_ID);
+	if (!vdev)
+		return;
+
+	device_mode = wlan_vdev_mlme_get_opmode(vdev);
+	if (device_mode != QDF_SAP_MODE)
+		goto rel_ref;
+
+	/* retrieve the best channel list based on STA scan results */
+	wlan_get_sap_best_channel_2ghz(vdev, &chan_list, &num_chan);
+	if (!chan_list || !num_chan)
+		goto rel_ref;
+
+	/* find the first 2.4 GHz channel in the PCL */
+	for (i = 0; i < *len; i++) {
+		if (wlan_reg_is_24ghz_ch_freq(pcl_channels[i])) {
+			index_2ghz = i;
+			break;
+		}
+	}
+	/* exit if no 2.4 GHz channel is found in the PCL */
+	if (index_2ghz < 0)
+		goto rel_ref;
+
+	for (j = 0 ; j < num_chan; j++) {
+		if (!chan_list[j])
+			continue;
+		for (i = index_2ghz; i < *len; i++) {
+			/* skip non-matching or non-2.4 GHz channels */
+			if (chan_list[j] != pcl_channels[i] ||
+			    !wlan_reg_is_24ghz_ch_freq(pcl_channels[i]))
+				continue;
+			/* swap the best 2.4 GHz channel to the
+			 * front of the PCL
+			 */
+			tmp_freq = pcl_channels[index_2ghz];
+			pcl_channels[index_2ghz] = pcl_channels[i];
+			pcl_channels[i] = tmp_freq;
+			goto rel_ref;
+		}
+	}
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SAP_ID);
+}
+
 /**
  * policy_mgr_get_pref_force_scc_freq() - Get preferred force SCC
  * channel frequency
@@ -4750,6 +4809,11 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	 * If none of channels are available, we have to keep SAP channel
 	 * unchanged, and that may cause SAP MCC.
 	 */
+
+	policy_mgr_promote_best_sap_channel_in_pcl(psoc, vdev_id,
+						   pcl.pcl_list,
+						   &pcl.pcl_len);
+
 	for (i = 0; i < pcl.pcl_len; i++) {
 		pcl_freq = pcl.pcl_list[i];
 

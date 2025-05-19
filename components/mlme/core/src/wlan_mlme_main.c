@@ -41,6 +41,7 @@
 #include <target_if.h>
 #include "wlan_dp_api.h"
 #include "wlan_mlo_mgr_public_api.h"
+#include "sap_api.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
@@ -5662,6 +5663,94 @@ QDF_STATUS wlan_mlme_get_mac_vdev_id(struct wlan_objmgr_pdev *pdev,
 	qdf_mem_copy(self_mac->bytes,
 		     wlan_vdev_mlme_get_macaddr(vdev), QDF_MAC_ADDR_SIZE);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_get_sap_best_channel_2ghz(struct wlan_objmgr_vdev *vdev,
+					  uint32_t **chan_list,
+					  uint8_t *num_chan)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*chan_list = mlme_priv->mlme_ap.best_chan_info.channel_24ghz;
+	*num_chan = mlme_priv->mlme_ap.best_chan_info.num_chan;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_set_sap_best_channel_2ghz(struct wlan_objmgr_vdev *vdev,
+					  struct sap_sel_ch_info *ch_info)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+	uint8_t i, num_chan = 0;
+	struct sap_ch_info *chan_info = NULL;
+	struct sap_chan_info *best_chan_info = NULL;
+	uint8_t vdev_id;
+
+	if (!ch_info) {
+		mlme_err("Invalid channel list");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	chan_info = ch_info->ch_info;
+	best_chan_info = &mlme_priv->mlme_ap.best_chan_info;
+
+	qdf_mem_zero(&mlme_priv->mlme_ap.best_chan_info,
+		     sizeof(mlme_priv->mlme_ap.best_chan_info));
+
+	for (i = 0; i < ch_info->num_ch &&
+	     num_chan < MAX_24GHZ_CHANNEL; i++, chan_info++) {
+		/* remove non 2 GHz freq */
+		if (!wlan_reg_is_24ghz_ch_freq(chan_info->chan_freq))
+			continue;
+
+		/* remove overlapping channel*/
+		if (!wlan_sap_is_ch_non_overlap(vdev_id, chan_info->chan_freq))
+			continue;
+
+		/* check channel weight
+		 * Here driver currently considers only 20 MHz bandwidth
+		 * for chaninfo->weight.
+		 * For bandwidths greater than 20 MHz, a multiplier needs to
+		 * be applied.
+		 */
+		if (!(chan_info->weight < wlan_sap_get_acs_weight_adjustable(
+		    CH_WIDTH_20MHZ)))
+			continue;
+
+		if (chan_info->valid) {
+			best_chan_info->channel_24ghz[num_chan] =
+				chan_info->chan_freq;
+			num_chan++;
+		}
+	}
+
+	mlme_priv->mlme_ap.best_chan_info.num_chan = num_chan;
 
 	return QDF_STATUS_SUCCESS;
 }

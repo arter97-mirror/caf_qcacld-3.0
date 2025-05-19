@@ -540,6 +540,16 @@ struct sap_ch_switch_info {
 };
 
 /**
+ * struct sap_chan_info - sap best channel
+ * @channel_24ghz: 2.4 GHz best channel
+ * @num_chan: number of channels
+ */
+struct sap_chan_info {
+	uint32_t channel_24ghz[MAX_24GHZ_CHANNEL];
+	uint8_t num_chan;
+};
+
+/**
  * struct mlme_ap_config - VDEV MLME legacy private SAP
  * related configurations
  * @user_config_sap_ch_freq : Frequency from userspace to start SAP
@@ -551,6 +561,7 @@ struct sap_ch_switch_info {
  * @ch_switch_info: channel switch info
  * @is_owe_conn: is owe connection
  * @acs_bandmask: Bitmap of the bands on which ACS is performed
+ * @best_chan_info: best 2ghz channel
  */
 struct mlme_ap_config {
 	qdf_freq_t user_config_sap_ch_freq;
@@ -563,6 +574,7 @@ struct mlme_ap_config {
 	struct sap_ch_switch_info ch_switch_info;
 	bool is_owe_conn;
 	uint32_t acs_bandmask;
+	struct sap_chan_info best_chan_info;
 };
 
 /**
@@ -1785,6 +1797,28 @@ QDF_STATUS wlan_sap_set_owe_connection_support(
 QDF_STATUS
 wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 			      qdf_freq_t freq);
+
+/**
+ * wlan_set_sap_best_channel_2ghz() - set sap best channel
+ * @vdev: vdev ctx
+ * @ch_info: channel info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_set_sap_best_channel_2ghz(struct wlan_objmgr_vdev *vdev,
+					  struct sap_sel_ch_info *ch_info);
+
+/**
+ * wlan_get_sap_best_channel_2ghz() - get sap best channel
+ * @vdev: vdev ctx
+ * @chan_list: channel list
+ * @num_chan: number of channel
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_get_sap_best_channel_2ghz(struct wlan_objmgr_vdev *vdev,
+					  uint32_t **chan_list,
+					  uint8_t *num_chan);
 
 /**
  * wlan_get_sap_ch_sw_info() - get sap channel switch info

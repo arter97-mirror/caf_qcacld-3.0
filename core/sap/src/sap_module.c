@@ -360,6 +360,166 @@ static void wlansap_ft_deinit(struct sap_context *sap_ctx)
 	qdf_event_destroy(&sap_ctx->ft_pending_event);
 }
 
+static void wlansap_filter_non_2ghz_freq(uint32_t *ch_freq_list,
+					 uint16_t *ch_cnt)
+{
+	size_t ch_index;
+	size_t target_ch_cnt = 0;
+
+	if (!ch_freq_list || !ch_cnt) {
+		sap_err("NULL parameters");
+		return;
+	}
+
+	for (ch_index = 0; ch_index < *ch_cnt; ch_index++) {
+		if (wlan_reg_is_24ghz_ch_freq(ch_freq_list[ch_index]))
+			ch_freq_list[target_ch_cnt++] = ch_freq_list[ch_index];
+	}
+
+	*ch_cnt = target_ch_cnt;
+}
+
+static bool wlansap_is_all_2ghz_channel_scanned(struct scan_event *event)
+{
+	uint16_t scanned_2ghz_channels = 0;
+	uint16_t total_channels, i;
+	struct chan_info *chan_list = NULL;
+
+	if (!event || !event->scan_start_req)
+		return false;
+
+	total_channels = event->scan_start_req->scan_req.chan_list.num_chan;
+
+	/* let's consider only channel 1 to 11 */
+	if (total_channels < NUM_24GHZ_CHANNELS - 3)
+		return false;
+
+	chan_list = event->scan_start_req->scan_req.chan_list.chan;
+
+	for (i = 0; i < total_channels; i++) {
+		if (wlan_reg_is_24ghz_ch_freq(chan_list[i].freq))
+			scanned_2ghz_channels++;
+	}
+
+	return scanned_2ghz_channels >= NUM_24GHZ_CHANNELS - 3;
+}
+
+static void
+wlansap_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
+				    struct scan_event *event,
+				    void *arg)
+{
+	struct sap_context *sap_ctx;
+	mac_handle_t mac_handle;
+	struct wlan_objmgr_vdev *tvdev = NULL;
+	bool success = false;
+	struct scan_filter *filter = NULL;
+	qdf_list_t *list = NULL;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct sap_sel_ch_info ch_info = { NULL, 0 };
+	enum QDF_OPMODE device_mode;
+	uint32_t *freq_list = NULL;
+	uint16_t num_of_channels = 0;
+	struct mac_context *mac_ctx = NULL;
+
+	if (!vdev || !event || !arg)
+		return;
+
+	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
+	if (!mac_handle)
+		return;
+
+	mac_ctx = MAC_CONTEXT(mac_handle);
+
+	device_mode = wlan_vdev_mlme_get_opmode(vdev);
+	if (device_mode != QDF_STA_MODE)
+		return;
+
+	sap_ctx = (struct sap_context *)arg;
+
+	if (!util_is_scan_completed(event, &success))
+		return;
+
+	if (!success)
+		return;
+
+	/* check if all 2 GHz channel scan got completed */
+	if (!wlansap_is_all_2ghz_channel_scanned(event))
+		return;
+
+	/* Take sap vdev as a ref there may be a scenario where in sap is
+	 * not present while sta scan got completed.
+	 */
+	tvdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac_ctx->pdev,
+						     sap_ctx->vdev_id,
+						    WLAN_LEGACY_SAP_ID);
+
+	if (!tvdev) {
+		sap_err("Unable to get vdev ref vdev_id:%d", sap_ctx->vdev_id);
+		goto cleanup;
+	}
+
+	if (sap_ctx->freq_list) {
+		sap_debug("SAP ACS is in progress let's not override vdev id %d",
+			  sap_ctx->vdev_id);
+		goto cleanup;
+	}
+
+	sap_get_freq_list(sap_ctx, &freq_list, &num_of_channels);
+	if (!num_of_channels || !freq_list)
+		goto cleanup;
+
+	wlansap_filter_non_2ghz_freq(freq_list, &num_of_channels);
+
+	sap_ctx->freq_list = freq_list;
+	sap_ctx->num_of_channel = num_of_channels;
+
+	filter = qdf_mem_malloc(sizeof(*filter));
+	if (!filter)
+		goto cleanup;
+
+	filter->num_of_channels = num_of_channels;
+	qdf_mem_copy(filter->chan_freq_list, &freq_list,
+		     filter->num_of_channels *
+		     sizeof(filter->chan_freq_list[0]));
+
+	list = wlan_scan_get_result(mac_ctx->pdev, filter);
+
+	qdf_mem_free(filter);
+
+	if (!list || !qdf_list_size(list))
+		goto cleanup;
+
+	status = wlansap_sort_channel_list(sap_ctx->vdev_id,
+					   list, &ch_info, true);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_err("error vdev %d failed to sort sap channel list",
+			sap_ctx->vdev_id);
+		goto cleanup;
+	}
+
+	wlan_set_sap_best_channel_2ghz(tvdev, &ch_info);
+
+	wlan_scan_purge_results(list);
+	list = NULL;
+
+cleanup:
+	if (tvdev)
+		wlan_objmgr_vdev_release_ref(tvdev, WLAN_LEGACY_SAP_ID);
+
+	if (ch_info.ch_info)
+		qdf_mem_free(ch_info.ch_info);
+
+	if (sap_ctx->freq_list) {
+		qdf_mem_free(sap_ctx->freq_list);
+		sap_ctx->freq_list = NULL;
+		sap_ctx->num_of_channel = 0;
+	}
+
+	if (list)
+		wlan_scan_purge_results(list);
+}
+
 QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
 			enum QDF_OPMODE mode,
 			uint8_t *addr, uint32_t session_id,
@@ -391,23 +551,35 @@ QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
 		sap_err("Calling sap_set_session_param status = %d", status);
 		return QDF_STATUS_E_FAILURE;
 	}
-	/* Register with scan component only during init */
-	if (!reinit)
-		sap_ctx->req_id =
-			wlan_scan_register_requester(mac->psoc, "SAP",
-					sap_scan_event_callback, sap_ctx);
 
-	if (!reinit) {
-		status = wlansap_owe_init(sap_ctx);
-		if (QDF_STATUS_SUCCESS != status) {
-			sap_err("OWE init failed");
-			return QDF_STATUS_E_FAILURE;
-		}
-		status = wlansap_ft_init(sap_ctx);
-		if (QDF_STATUS_SUCCESS != status) {
-			sap_err("FT init failed");
-			return QDF_STATUS_E_FAILURE;
-		}
+	if (reinit)
+		return QDF_STATUS_SUCCESS;
+
+	/* Register with scan component only during init */
+	sap_ctx->req_id =
+		wlan_scan_register_requester(mac->psoc, "SAP",
+					     sap_scan_event_callback,
+					     sap_ctx);
+
+	status = wlansap_owe_init(sap_ctx);
+	if (QDF_STATUS_SUCCESS != status) {
+		sap_err("OWE init failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+	status = wlansap_ft_init(sap_ctx);
+	if (QDF_STATUS_SUCCESS != status) {
+		sap_err("FT init failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = ucfg_scan_register_event_handler(
+			mac->pdev,
+			wlansap_scan_complete_event_handler,
+			sap_ctx);
+
+	if (QDF_STATUS_SUCCESS != status) {
+		sap_err("scan event register failed ");
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -425,15 +597,21 @@ QDF_STATUS sap_deinit_ctx(struct sap_context *sap_ctx)
 		return QDF_STATUS_E_FAULT;
 	}
 
-	wlansap_ft_cleanup(sap_ctx);
-	wlansap_ft_deinit(sap_ctx);
-	wlansap_owe_cleanup(sap_ctx);
-	wlansap_owe_deinit(sap_ctx);
 	mac = sap_get_mac_context();
 	if (!mac) {
 		sap_err("Invalid MAC context");
 		return QDF_STATUS_E_FAULT;
 	}
+
+	ucfg_scan_unregister_event_handler(
+		mac->pdev,
+		wlansap_scan_complete_event_handler,
+		sap_ctx);
+	wlansap_ft_cleanup(sap_ctx);
+	wlansap_ft_deinit(sap_ctx);
+	wlansap_owe_cleanup(sap_ctx);
+	wlansap_owe_deinit(sap_ctx);
+
 	wlan_scan_unregister_requester(mac->psoc, sap_ctx->req_id);
 
 	if (sap_ctx->freq_list) {
@@ -4652,8 +4830,39 @@ void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
 	sap_ctx->acs_cfg->ht_sec_ch_freq = 0;
 }
 
+uint32_t wlan_sap_get_acs_weight_adjustable(enum phy_ch_width cur_bw)
+{
+	uint8_t max_score_multiplyer = sap_get_bw_score_multiplier(cur_bw);
+
+	return SAP_ACS_WEIGHT_ADJUSTABLE * max_score_multiplyer;
+}
+
+bool
+wlan_sap_is_ch_non_overlap(uint8_t vdev_id, qdf_freq_t freq)
+{
+	struct mac_context *mac_ctx;
+	struct sap_context *sap_ctx;
+	uint8_t chan;
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return false;
+	}
+
+	sap_ctx = mac_ctx->sap.sapCtxList[vdev_id].sap_context;
+	if (!sap_ctx) {
+		sap_err("Invalid sap context");
+		return false;
+	}
+
+	chan = wlan_reg_freq_to_chan(mac_ctx->pdev, freq);
+	return sap_is_ch_non_overlap(sap_ctx, chan);
+}
+
 QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
-				     struct sap_sel_ch_info *ch_info)
+				     struct sap_sel_ch_info *ch_info,
+				     bool only_2ghz_freq)
 {
 	struct mac_context *mac_ctx;
 	QDF_STATUS status;
@@ -4665,7 +4874,8 @@ QDF_STATUS wlansap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,
 	}
 
 	status = sap_sort_channel_list(mac_ctx, vdev_id, list,
-				       ch_info, NULL, NULL);
+				       ch_info, NULL, NULL,
+				       only_2ghz_freq);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sap_err("vdev %d failed to sort sap channel list",
 			vdev_id);
