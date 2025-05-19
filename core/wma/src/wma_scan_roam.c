@@ -86,6 +86,12 @@
 #include "host_diag_core_log.h"
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 
+#include "wlan_ipa_ucfg_api.h"
+#include "wlan_osif_priv.h"
+#include <net/cfg80211.h>
+
+#include "wlan_mlme_ucfg_api.h"
+
 #ifdef FEATURE_WLAN_EXTSCAN
 #define WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION WAKELOCK_DURATION_RECOMMENDED
 
@@ -6061,6 +6067,51 @@ QDF_STATUS wma_scan_probe_setoui(tp_wma_handle wma,
 	return wmi_unified_scan_probe_setoui_cmd(wma->wmi_handle, set_oui);
 }
 
+static QDF_STATUS
+wma_roam_ipa_sw_routing_set(tp_wma_handle wma_handle,
+					uint32_t vdev_id,
+					bool is_enable)
+{
+	struct vdev_osif_priv *osif_priv;
+	struct net_device *dev;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	psoc = wma_handle->psoc;
+	if (psoc) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+					WLAN_VDEV_TARGET_IF_ID);
+		if (vdev) {
+			osif_priv = wlan_vdev_get_ospriv(vdev);
+			if (osif_priv && osif_priv->wdev) {
+				dev = osif_priv->wdev->netdev;
+				if (is_enable)
+					wma_info("enbale sw routing for low data path!");
+				else
+					wma_info("disable sw routing disable for high data path!");
+
+					status = ucfg_ipa_sw_routing_set(wlan_vdev_get_pdev(vdev),
+								 dev, QDF_STA_MODE, vdev_id, NULL, is_enable);
+				if (status != QDF_STATUS_SUCCESS)
+					wma_err("set sw routing enable failed!");
+			} else {
+				wma_err("osif_priv is null");
+				status = QDF_STATUS_E_FAILURE;
+			}
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_VDEV_TARGET_IF_ID);
+		} else {
+			wma_err("vdev object is NULL");
+			status = QDF_STATUS_E_FAILURE;
+		}
+	} else {
+		wma_err("wma_handle->psoc is NULL");
+		status = QDF_STATUS_E_FAILURE;
+	}
+
+	return status;
+}
+
 /**
  * wma_roam_better_ap_handler() - better ap event handler
  * @wma: wma handle
@@ -6083,6 +6134,11 @@ void wma_roam_better_ap_handler(tp_wma_handle wma, uint32_t vdev_id)
 		return;
 
 	wma->interfaces[vdev_id].roaming_in_progress = true;
+
+	status = wma_roam_ipa_sw_routing_set(wma, vdev_id, true);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_info("Failed to change to sw path from IPA path!");
+
 	candidate_ind->messageType = eWNI_SME_CANDIDATE_FOUND_IND;
 	candidate_ind->sessionId = vdev_id;
 	candidate_ind->length = sizeof(tSirSmeCandidateFoundInd);
@@ -6094,8 +6150,11 @@ void wma_roam_better_ap_handler(tp_wma_handle wma, uint32_t vdev_id)
 
 	status = scheduler_post_message(QDF_MODULE_ID_WMA, QDF_MODULE_ID_SME,
 					QDF_MODULE_ID_SCAN,  &cds_msg);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_info("restore the IPA path!");
+		wma_roam_ipa_sw_routing_set(wma, vdev_id, false);
 		qdf_mem_free(candidate_ind);
+	}
 }
 
 /**

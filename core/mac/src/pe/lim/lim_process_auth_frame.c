@@ -1678,7 +1678,7 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 	if (auth_alg != eSIR_AUTH_TYPE_SAE)
 		return false;
 
-	pe_debug("LFR3: SAE auth frame: seq_ctrl:0x%X auth_transaction_num:%d",
+	pe_debug("LFR: SAE auth frame: seq_ctrl:0x%X auth_transaction_num:%d",
 		 ((dot11_hdr->seqControl.seqNumHi << 8) |
 		  (dot11_hdr->seqControl.seqNumLo << 4) |
 		  (dot11_hdr->seqControl.fragNum)), *(uint16_t *)(frm_body + 2));
