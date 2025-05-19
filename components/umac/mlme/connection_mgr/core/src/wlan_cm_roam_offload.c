@@ -131,6 +131,7 @@ cm_roam_fill_rssi_change_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct wlan_objmgr_vdev *vdev;
 	struct rso_config *rso_cfg;
 	enum roam_cfg_param reason;
+	struct cm_roam_values_copy roam_periodic_scan_interval;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_CM_ID);
@@ -157,6 +158,14 @@ cm_roam_fill_rssi_change_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
 				   reason, &temp);
 	params->rssi_change_thresh = temp.int_value;
+
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
+				   ROAM_PERIODIC_SCAN_INTERVAL,
+				   &roam_periodic_scan_interval);
+
+	if (roam_periodic_scan_interval.uint_value)
+		params->rssi_change_thresh = 0;
+
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
@@ -1391,8 +1400,11 @@ cm_roam_scan_offload_scan_period(uint8_t vdev_id,
 			cfg_params->roam_inactive_data_packet_count;
 	params->full_scan_period =
 			cfg_params->full_roam_scan_period;
-	mlme_debug("full_scan_period:%d, empty_scan_refresh_period:%d",
-		   params->full_scan_period, params->empty_scan_refresh_period);
+	params->roam_periodic_scan_interval =
+			cfg_params->roam_periodic_scan_interval;
+	mlme_debug("full_scan_period:%d, empty_scan_refresh_period:%d, roam_periodic_scan_interval %d",
+		   params->full_scan_period, params->empty_scan_refresh_period,
+		   params->roam_periodic_scan_interval);
 }
 
 static void
@@ -1567,6 +1579,7 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 	struct scoring_cfg *score_config;
 	struct dual_sta_policy *dual_sta_policy;
 	uint32_t mcc_to_scc_switch;
+	struct rso_cfg_params *cfg_params;
 
 	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(psoc);
 	if (!mlme_psoc_obj)
@@ -1577,6 +1590,7 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 	score_config = &mlme_psoc_obj->psoc_cfg.score_config;
 	roam_score_params = &mlme_obj->cfg.roam_scoring;
 	weight_config = &score_config->weight_config;
+	cfg_params = &rso_cfg->cfg_param;
 
 	if (!rso_cfg->cfg_param.enable_scoring_for_roam)
 		req_score_params->disable_bitmap =
@@ -1666,10 +1680,13 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 				roam_score_params->aggre_min_roam_score_delta;
 	} else {
 		req_score_params->roam_score_delta =
-				roam_score_params->roam_score_delta;
+					cfg_params->roam_score_delta;
 		req_score_params->cand_min_roam_score_delta =
 					roam_score_params->min_roam_score_delta;
 	}
+	req_score_params->band_2g_weightage = cfg_params->band_2g_weightage;
+	req_score_params->band_5g_weightage = cfg_params->band_5g_weightage;
+	req_score_params->band_6g_weightage = cfg_params->band_6g_weightage;
 }
 
 static uint32_t cm_crpto_cipher_wmi_cipher(int32_t cipherset)
@@ -5679,6 +5696,8 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.lfr.roam_scan_inactivity_time;
 	cfg_params->roam_inactive_data_packet_count =
 			mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
+	wlan_mlme_reinit_real_time_roam_parms(wlan_vdev_get_psoc(vdev),
+					      cfg_params, mlme_obj);
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 }
@@ -5900,6 +5919,27 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 		src_config.bool_value = 0;
 		wlan_cm_roam_cfg_set_value(psoc, vdev_id, ROAM_CONFIG_ENABLE,
 					   &src_config);
+		/*
+		 * When realtime roam control values are set by vendor commands
+		 * and disconnection is received, then restore the roam
+		 * trigger bitmap from the ini configuration
+		 */
+		wlan_cm_roam_cfg_get_value(psoc, vdev_id,
+					   ROAM_CONFIG_RT_PARAMS_ENABLED,
+					   &src_config);
+
+		if (src_config.bool_value) {
+			roam_trigger_bitmap =
+					wlan_mlme_get_roaming_triggers(psoc);
+			mlme_set_roam_trigger_bitmap(psoc, vdev_id,
+						     roam_trigger_bitmap);
+		}
+
+		src_config.bool_value = 0;
+		wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+					   ROAM_CONFIG_RT_PARAMS_ENABLED,
+					   &src_config);
+
 	}
 
 	cm_roam_control_restore_default_config(pdev, vdev_id);
@@ -6205,6 +6245,29 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 
 	if (!mlme_obj->cfg.lfr.roam_scan_offload_enabled)
 		return;
+
+	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.band_2g_weightage;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_2P4GHZ_BAND_WEIGHTAGE, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.band_5g_weightage;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_5GHZ_BAND_WEIGHTAGE, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.band_6g_weightage;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_6GHZ_BAND_WEIGHTAGE, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.lfr.roam_rescan_rssi_diff;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_RESCAN_RSSI_DIFF, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.lfr.roam_periodic_scan_interval;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   ROAM_PERIODIC_SCAN_INTERVAL, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.roam_score_delta;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id, ROAM_SCORE_DELTA, &src_cfg);
 	/*
 	 * Store the current PMK info of the AP
 	 * to the single pmk global cache if the BSS allows
@@ -6970,7 +7033,9 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 		ROAM_FAIL_REASON_NO_CAND_AP_FOUND_AND_FINAL_BMISS_SENT ||
 	    res->fail_reason ==
 		ROAM_FAIL_REASON_NO_AP_FOUND_AND_FINAL_BMISS_SENT ||
-	    res->fail_reason == ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED)
+	    res->fail_reason == ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED ||
+	    res->fail_reason == ROAM_FAIL_REASON_TTLM_REQUIRED ||
+	    res->fail_reason == ROAM_FAIL_REASON_LINKRECONFIG_REQUIRED)
 		wlan_diag_event.is_roam_successful = false;
 
 	for (i = 0; i < scan_data->num_ap; i++) {
@@ -7690,10 +7755,11 @@ wlan_convert_bitmap_to_band(uint8_t bitmap)
 {
 	uint8_t i;
 	enum wlan_diag_wifi_band band = WLAN_INVALID_BAND;
+	unsigned long band_bitmap = bitmap;
 
 	for (i = WLAN_24GHZ_BAND; i <= WLAN_6GHZ_BAND; i++) {
 		/* 2.4 GHz band will be populated at 0th bit in the bitmap*/
-		if (qdf_test_bit((i - 1), (unsigned long *)&bitmap)) {
+		if (qdf_test_bit((i - 1), &band_bitmap)) {
 			band = i;
 			break;
 		}

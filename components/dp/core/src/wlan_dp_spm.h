@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: ISC
  */
 
@@ -100,9 +100,7 @@ struct wlan_dp_spm_flow_tbl_stats {
  * @classified: Classification done
  * @reserved: unused
  * @flow_tuple_hash: flow_tuple_hash to identify bi-directional flow
- * @win_start_ts: winidow start timestamp
- * @win_start_num_pkts: Total number of pkts of this flow at win_start_ts
- * @last_win_pkts: Packets in previous window
+ * @ul_tid: Uplink TID id for the flow
  */
 struct wlan_dp_spm_flow_info {
 	qdf_list_node_t node;
@@ -128,6 +126,7 @@ struct wlan_dp_spm_flow_info {
 	uint8_t selected_to_sample;
 	uint8_t classified;
 	uint64_t flow_tuple_hash;
+	uint8_t ul_tid;
 #endif
 };
 

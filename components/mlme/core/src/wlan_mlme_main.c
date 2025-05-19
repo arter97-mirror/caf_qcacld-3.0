@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -248,6 +248,8 @@ wlan_scan_get_11be_scan_phy_mode(enum wlan_phymode ch_phymode)
 	case WLAN_PHYMODE_11BEA_EHT40:
 		scan_phymode = SCAN_PHY_MODE_11BE_EHT40;
 		break;
+	case WLAN_PHYMODE_11BEG_EHT40PLUS:
+	case WLAN_PHYMODE_11BEG_EHT40MINUS:
 	case WLAN_PHYMODE_11BEG_EHT40:
 		scan_phymode = SCAN_PHY_MODE_11BE_EHT40_2G;
 		break;
@@ -583,7 +585,9 @@ mlme_update_freq_from_link_ctx(struct mlo_link_info *links_info,
 	op_freq = link_chan_info->ch_freq;
 	phymode = wlan_scan_get_11be_scan_phy_mode(link_chan_info->ch_phymode);
 	if (phymode == SCAN_PHY_MODE_UNKNOWN) {
-		mlme_err("invalid scan phymode for freq %d", op_freq);
+		mlme_err("invalid scan phymode for freq %d phymode %d link_id %d",
+			 op_freq, link_chan_info->ch_phymode,
+			 links_info->link_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -914,6 +918,7 @@ QDF_STATUS mlme_init_connect_chan_info_config(struct vdev_mlme_obj *vdev_mlme)
 							CH_WIDTH_INVALID;
 	mlme_priv->connect_info.assoc_chan_info.cur_ch_width =
 							CH_WIDTH_INVALID;
+	wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
 	mlme_priv->connect_info.assoc_chan_info.sec_2g_freq = 0;
 	mlme_priv->connect_info.assoc_chan_info.cen320_freq = 0;
 
@@ -4082,6 +4087,27 @@ static void mlme_init_coex_unsafe_chan_reg_disable_cfg(
 }
 #endif
 
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * mlme_init_enable_c2c_support() - Populate enable_c2c_support INI in mlme
+ * regulatory sturct
+ * @psoc: Pointer to psoc
+ * @reg: Pointer to mlme regulatory struct
+ *
+ * Return: None
+ */
+static void mlme_init_enable_c2c_support(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_mlme_reg *reg)
+{
+	reg->enable_c2c_support = cfg_get(psoc, CFG_ENABLE_C2C_SUPPORT);
+}
+#else
+static inline void mlme_init_enable_c2c_support(struct wlan_objmgr_psoc *psoc,
+						struct wlan_mlme_reg *reg)
+{
+}
+#endif
+
 static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_reg *reg)
 {
@@ -4111,6 +4137,7 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 	mlme_init_coex_unsafe_chan_cfg(psoc, reg);
 	mlme_init_coex_unsafe_chan_reg_disable_cfg(psoc, reg);
+	mlme_init_enable_c2c_support(psoc, reg);
 }
 
 static void
@@ -6383,6 +6410,67 @@ QDF_STATUS mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer)
 	peer_priv->last_pn_valid = 0;
 	peer_priv->last_pn = 0;
 	peer_priv->rmf_pn_replays = 0;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#ifdef CONFIG_BAND_6GHZ
+QDF_STATUS
+mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = cfg_default(CFG_ENABLE_C2C_SUPPORT);
+		mlme_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*value = mlme_obj->cfg.reg.enable_c2c_support;
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+uint32_t wlan_sap_get_acs_band_mask(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return 0;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_debug("Invalid mode %d", opmode);
+		return 0;
+	}
+
+	return mlme_priv->mlme_ap.acs_bandmask;
+}
+
+QDF_STATUS wlan_sap_set_acs_band_mask(struct wlan_objmgr_vdev *vdev,
+				      uint32_t bitmap)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_debug("Invalid mode %d", opmode);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->mlme_ap.acs_bandmask = bitmap;
 
 	return QDF_STATUS_SUCCESS;
 }

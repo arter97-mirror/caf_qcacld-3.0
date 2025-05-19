@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -105,17 +105,17 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 
 	status = wlan_dp_spm_svc_get_metadata(dp_intf, skb, sk_tx_flow_id,
 					      (uint64_t)sk);
-	if (qdf_unlikely(status != QDF_STATUS_SUCCESS)) {
+	if (qdf_unlikely(status == QDF_STATUS_E_NOENT)) {
 		/*
 		 * Flow is possibly evicted, so mark for invalid flow.
 		 * Subsequent packets of flow will have new flow allocated.
 		 */
 		sk->sk_txtime_unused = 0;
 
-		return QDF_STATUS_E_INVAL;
+		return QDF_STATUS_E_NOENT;
 	}
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 #endif
 

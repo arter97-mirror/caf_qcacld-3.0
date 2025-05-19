@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4008,7 +4008,7 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 	acs_cfg_freq_list = qdf_mem_malloc(count * sizeof(uint32_t));
 	if (!acs_cfg_freq_list)
 		return -ENOMEM;
-	if (sap_config->acs_cfg.ch_list_count) {
+	if (sap_config->acs_cfg.freq_list) {
 		qdf_mem_free(sap_config->acs_cfg.freq_list);
 		sap_config->acs_cfg.freq_list = NULL;
 		sap_config->acs_cfg.ch_list_count = 0;
@@ -4019,7 +4019,7 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 	if (!master_freq_list)
 		return -ENOMEM;
 
-	if (sap_config->acs_cfg.master_ch_list_count) {
+	if (sap_config->acs_cfg.master_freq_list) {
 		old_acs_2g_only = true;
 		for (i = 0; i < sap_config->acs_cfg.master_ch_list_count; i++)
 			if (sap_config->acs_cfg.master_freq_list &&

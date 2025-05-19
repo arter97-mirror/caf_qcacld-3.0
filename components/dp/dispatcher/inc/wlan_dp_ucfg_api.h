@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2153,4 +2153,21 @@ int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
  * Return: void
  */
 void ucfg_dp_set_ipv4_addr(struct wlan_objmgr_vdev *vdev, uint8_t *ip_addr);
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+/**
+ * ucfg_dp_is_ndp_bw_flow_ctrl_enabled() - Get NDP bw flow control
+ *  enable/disable info
+ * @psoc: Objmgr psoc handle
+ *
+ * Return: true if ndp bw flow control is enabled else falses
+ */
+bool ucfg_dp_is_ndp_bw_flow_ctrl_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline
+bool ucfg_dp_is_ndp_bw_flow_ctrl_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
 #endif /* _WLAN_DP_UCFG_API_H_ */

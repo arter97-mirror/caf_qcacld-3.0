@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -119,6 +119,7 @@
 #include "target_if.h"
 #include <wlan_psoc_mlme_api.h>
 #include "wlan_objmgr_vdev_obj.h"
+#include "wlan_twt_cfg_ext_api.h"
 
 /*
  * FW only supports 8 clients in SAP/GO mode for D3 WoW feature
@@ -3310,6 +3311,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	uint8_t enable_sifs_burst = 0;
 	uint32_t sta_keep_alive;
 	enum wmi_host_active_apf_mode uc_mode, mcbc_mode;
+	uint32_t offload_bitmap;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -3400,6 +3402,20 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 						vdev_id, uc_mode, mcbc_mode);
 		if (QDF_IS_STATUS_ERROR(ret))
 			wma_err("Failed to configure active APF mode");
+	}
+
+	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
+	    ucfg_pmo_is_apf_enabled(wma_handle->psoc) &&
+	    wmi_service_enabled(wma_handle->wmi_handle,
+				wmi_service_apf_data_offload_support_enabled)) {
+		offload_bitmap = ucfg_pmo_get_apfv6_offload_bitmap(
+							wma_handle->psoc);
+		ret = wmi_unified_set_apf_supported_offload_bitmap_cmd(
+							wma_handle->wmi_handle,
+							vdev_id,
+							offload_bitmap);
+		if (QDF_IS_STATUS_ERROR(ret))
+			wma_err("Failed to configure APF supported offload bitmap");
 	}
 
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
@@ -7054,7 +7070,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
 	return QDF_STATUS_SUCCESS;
 }
 
-#define MAX_VDEV_CREATE_PARAMS 22
+#define MAX_VDEV_CREATE_PARAMS 23
 /* params being sent:
  * 1.wmi_vdev_param_wmm_txop_enable
  * 2.wmi_vdev_param_disconnect_th
@@ -7078,6 +7094,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
  * 20.wmi_vdev_param_set_sap_ps_with_twt
  * 21.wmi_vdev_param_disable_2g_twt
  * 22.wmi_vdev_param_disable_twt_info_frame
+ * 23.wmi_vdev_param_disable_scan_start_twt
  */
 
 QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
@@ -7095,6 +7112,7 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 	uint8_t index = 0;
 	bool is_24ghz_twt_enabled;
 	bool disable_twt_info_frame;
+	bool is_twt_disabled_on_scan;
 	enum QDF_OPMODE opmode;
 
 	if (!mac)
@@ -7364,6 +7382,16 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 					index++, MAX_VDEV_CREATE_PARAMS);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_debug("failed to set wmi_vdev_param_disable_twt_info_frame");
+		goto error;
+	}
+
+	wlan_twt_cfg_get_twt_dis_on_scan(mac->psoc, &is_twt_disabled_on_scan);
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_disable_scan_start_twt,
+					   is_twt_disabled_on_scan,
+					   index++, MAX_VDEV_CREATE_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_debug("failed to set wmi_vdev_param_disable_scan_start_twt");
 		goto error;
 	}
 

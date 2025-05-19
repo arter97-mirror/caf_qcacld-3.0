@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -241,6 +241,7 @@ struct board_info {
  * @twt_nudge_enabled: twt nudge enable
  * @all_twt_enabled: all twt enabled
  * @twt_stats_enabled: twt stats enabled
+ * @tx_powerboost: tx powerboost enabled
  *
  */
 struct wma_tgt_cfg {
@@ -299,5 +300,8 @@ struct wma_tgt_cfg {
 	tDot11fIEeht_cap eht_cap_5g;
 #endif
 	struct wma_tgt_aux_dev_caps wma_aux0_dev_caps[WMI_HOST_HW_MODE_MAX];
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+	bool tx_powerboost;
+#endif
 };
 #endif /* WMA_TGT_CFG_H */

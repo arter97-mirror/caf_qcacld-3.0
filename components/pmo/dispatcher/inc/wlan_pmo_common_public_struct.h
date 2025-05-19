@@ -437,6 +437,7 @@ enum pmo_page_fault_action {
  * on max pagefault
  * @is_apf_configure_per_screen_state: Configure APF mode enable/disable
  * per screen off/on state
+ * @apfv6_disable_offload_bitmap: Offload bitmap in APFv6
  */
 struct pmo_psoc_cfg {
 	bool ptrn_match_enable_all_vdev;
@@ -530,6 +531,7 @@ struct pmo_psoc_cfg {
 	uint32_t interval_for_pagefault_wakeup_counts;
 	uint32_t ssr_frequency_on_pagefault;
 	bool is_apf_configure_per_screen_state;
+	uint32_t apfv6_disable_offload_bitmap;
 };
 
 /**
@@ -542,6 +544,7 @@ struct pmo_psoc_cfg {
  *	This allows both D0-WoW (bus up) and Non-D0-WoW (bus down) to use one
  *	unified command
  * @li_offload: Firmware has listen interval offload support
+ * @apf_offload_enabled: Firmware has apf data offload enabled
  */
 struct pmo_device_caps {
 	bool apf;
@@ -549,6 +552,7 @@ struct pmo_device_caps {
 	bool packet_filter;
 	bool unified_wow;
 	bool li_offload;
+	bool apf_offload_enabled;
 };
 
 /**

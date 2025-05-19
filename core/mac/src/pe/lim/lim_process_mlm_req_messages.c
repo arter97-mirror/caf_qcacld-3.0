@@ -458,6 +458,11 @@ lim_continue_bss_peer_create(struct cm_peer_create_req *req)
 	lim_get_mld_info_sta(req, &peer_mld_addr, &is_assoc_peer);
 	status = wma_add_bss_peer_sta(req->vdev_id, req->peer_mac.bytes, true,
 				      peer_mld_addr, is_assoc_peer);
+	/*
+	 * Deletion of randing peer is successful, so free the request
+	 * here
+	 */
+	qdf_mem_free(req);
 
 	return status;
 }

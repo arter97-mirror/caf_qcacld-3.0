@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -277,7 +277,7 @@ static void __hdd_softap_tx_timeout(struct net_device *dev)
 
 	TX_TIMEOUT_TRACE(dev, QDF_MODULE_ID_HDD_SAP_DATA);
 
-	for (i = 0; i < NUM_TX_QUEUES; i++) {
+	for (i = 0; i < dev->num_tx_queues; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 		QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
 			  QDF_TRACE_LEVEL_DEBUG,

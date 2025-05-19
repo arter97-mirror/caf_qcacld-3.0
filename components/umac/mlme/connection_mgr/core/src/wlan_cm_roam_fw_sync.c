@@ -603,6 +603,14 @@ cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
 		 * address and self link address for each vdev
 		 */
 		mlo_mgr_roam_update_ap_link_info(vdev, ml_link, &channel);
+
+		/*
+		 * Above roam_update_ap_link_info doesn't update the phymode to
+		 * the link context, so call the dedicated channel update API
+		 * to update all the channel related info properly
+		 */
+		cm_update_link_channel_info(vdev, &ml_link->link_addr,
+					    ml_link->channel.mhz);
 	}
 }
 

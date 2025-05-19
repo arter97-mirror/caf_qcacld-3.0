@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -872,6 +872,22 @@ void dp_direct_link_cfg_init(struct wlan_dp_psoc_cfg *config,
 }
 #endif
 
+#ifdef NDP_TX_BW_FLOW_CTRL
+static inline
+void dp_ndp_bw_flow_ctrl_cfg_init(struct wlan_dp_psoc_cfg *config,
+				  struct wlan_objmgr_psoc *psoc)
+{
+	config->is_ndp_bw_flow_ctrl_enabled =
+				cfg_get(psoc, CFG_DP_NDP_BW_FLOW_CTRL_ENABLE);
+}
+#else
+static inline
+void dp_ndp_bw_flow_ctrl_cfg_init(struct wlan_dp_psoc_cfg *config,
+				  struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 /**
  * dp_cfg_init() - initialize target specific configuration
  * @ctx: dp context handle
@@ -930,8 +946,11 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	dp_fisa_cfg_init(config, psoc);
 	dp_direct_link_cfg_init(config, psoc);
 	wlan_dp_stc_cfg_init(config, psoc);
+	dp_ndp_bw_flow_ctrl_cfg_init(config, psoc);
 
 	config->dp_irq_affinity_mask = cfg_get(psoc, CFG_DP_IRQ_AFFINITY_MASK);
+	config->dp_rx_thread_affinity_mask =
+				cfg_get(psoc, CFG_DP_RX_THREAD_AFFINITY_MASK);
 }
 
 /**

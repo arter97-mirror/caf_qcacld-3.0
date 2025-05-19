@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -811,7 +811,7 @@ static void dp_ipa_set_perf_level(struct wlan_dp_psoc_context *dp_ctx,
 				  uint64_t *tx_pkts, uint64_t *rx_pkts,
 				  uint32_t *ipa_tx_pkts, uint32_t *ipa_rx_pkts)
 {
-	if (ucfg_ipa_is_fw_wdi_activated(dp_ctx->pdev)) {
+	if (ucfg_ipa_is_fw_wdi_activated(dp_ctx->psoc)) {
 		ucfg_ipa_uc_stat_query(dp_ctx->pdev, ipa_tx_pkts,
 				       ipa_rx_pkts);
 		*tx_pkts += *ipa_tx_pkts;
@@ -1199,6 +1199,7 @@ static void dp_display_periodic_stats(struct wlan_dp_psoc_context *dp_ctx,
 			cdp_display_txrx_hw_info(soc);
 			qdf_dp_trace_dump_stats();
 			wlan_dp_stc_dump_periodic_stats(dp_ctx);
+			ucfg_ipa_dump_logging_stats();
 		}
 		counter = 0;
 		data_in_time_period = false;
@@ -1313,7 +1314,8 @@ bool dp_bus_bandwidth_work_tune_rx(struct wlan_dp_psoc_context *dp_ctx,
 	 * 2)when rx_ol is disabled in cases like concurrency etc
 	 * 3)For UDP cases
 	 */
-	if (cds_sched_handle_throughput_req(rxthread_high_tput_req))
+	if (!dp_ctx->dp_cfg.dp_rx_thread_affinity_mask &&
+	    cds_sched_handle_throughput_req(rxthread_high_tput_req))
 		dp_warn("Rx thread high_tput(%d) affinity request failed",
 			rxthread_high_tput_req);
 
@@ -1470,6 +1472,41 @@ bool dp_sap_p2p_update_mid_high_tput(struct wlan_dp_psoc_context *dp_ctx,
 	return false;
 }
 
+static inline
+void dp_set_rx_thread_affinity(struct wlan_dp_psoc_context *dp_ctx,
+			       enum tput_level tput_level,
+			       enum tput_level prev_tput_level)
+{
+	bool try_cpu_affinity;
+	qdf_cpu_mask new_cpu_mask;
+	unsigned int cpus;
+
+	if (!dp_ctx->dp_cfg.dp_rx_thread_affinity_mask)
+		return;
+
+	try_cpu_affinity = false;
+	qdf_cpumask_clear(&new_cpu_mask);
+	if (tput_level >= TPUT_LEVEL_VERY_HIGH &&
+	    prev_tput_level < TPUT_LEVEL_VERY_HIGH) {
+		qdf_for_each_online_cpu(cpus) {
+			if (BIT(cpus) &
+			    dp_ctx->dp_cfg.dp_rx_thread_affinity_mask)
+				qdf_cpumask_set_cpu(cpus, &new_cpu_mask);
+		}
+		try_cpu_affinity = true;
+	} else if (tput_level < TPUT_LEVEL_VERY_HIGH &&
+		   prev_tput_level >= TPUT_LEVEL_VERY_HIGH) {
+		qdf_cpumask_setall(&new_cpu_mask);
+		try_cpu_affinity = true;
+	}
+
+	if (try_cpu_affinity &&
+	    !qdf_cpumask_equal(&dp_ctx->rx_thread_cpu_mask, &new_cpu_mask)) {
+		qdf_cpumask_copy(&dp_ctx->rx_thread_cpu_mask, &new_cpu_mask);
+		dp_txrx_set_cpu_mask(dp_ctx->cdp_soc, &new_cpu_mask);
+	}
+}
+
 static inline void dp_set_tx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 					  enum tput_level tput_level,
 					  enum tput_level prev_tput_level)
@@ -1576,7 +1613,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	 * only when TPUT can reach VHT80 KPI and IPA is disabled,
 	 * for other cases, follow general voting logic
 	 */
-	if (!ucfg_ipa_is_fw_wdi_activated(dp_ctx->pdev) &&
+	if (!ucfg_ipa_is_fw_wdi_activated(dp_ctx->psoc) &&
 	    policy_mgr_is_current_hwmode_dbs(dp_ctx->psoc) &&
 	    (total_pkts > dp_ctx->dp_cfg.bus_bw_dbs_threshold) &&
 	    (tput_level < TPUT_LEVEL_SUPER_HIGH)) {
@@ -1602,6 +1639,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	if (dp_ctx->cur_vote_level != next_vote_level) {
 		/* Set affinity for tx completion grp interrupts */
 		dp_set_tx_irq_affinity(dp_ctx, tput_level, prev_tput_level);
+		dp_set_rx_thread_affinity(dp_ctx, tput_level, prev_tput_level);
 		prev_tput_level = tput_level;
 		dp_ctx->cur_vote_level = next_vote_level;
 		vote_level_change = true;

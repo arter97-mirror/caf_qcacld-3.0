@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,7 +32,8 @@
 /* L1 is the lowest verbosity level */
 #define WLAN_DP_STC_LOGMASK_VERBOSE_L1 BIT(2)
 #define WLAN_DP_STC_LOGMASK_VERBOSE_L2 BIT(3)
-#define WLAN_DP_STC_LOGMASK_VERBOSE_L3 BIT(4)
+#define WLAN_DP_STC_LOGMASK_BURST BIT(4)
+#define WLAN_DP_STC_LOGMASK_TXRX_PKT BIT(5)
 
 #define dp_stc_info(debug_mask, params...)				\
 	do {								\
@@ -50,10 +51,9 @@
 				       QDF_MODULE_ID_DP, ## params);	\
 	} while (0)
 
-#define dp_stc_burst_debug(debug_mask, params...)			\
+#define dp_stc_log(debug_mask, log_level, params...)			\
 	do {								\
-		if (unlikely((debug_mask) &				\
-		    WLAN_DP_STC_LOGMASK_VERBOSE_L3))			\
+		if (unlikely((debug_mask) & (log_level)))		\
 			__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH,	\
 				       QDF_MODULE_ID_DP, ## params);	\
 	} while (0)
@@ -132,10 +132,10 @@ enum wlan_dp_stc_burst_state {
 	BURST_DETECTION_BURST_START,
 };
 
-#define DP_STC_SAMPLE_FLOWS_MAX 32
-#define DP_STC_SAMPLE_BIDI_FLOW_MAX 16
-#define DP_STC_SAMPLE_RX_FLOW_MAX 8
-#define DP_STC_SAMPLE_TX_FLOW_MAX 8
+#define DP_STC_SAMPLE_FLOWS_MAX 128
+#define DP_STC_SAMPLE_BIDI_FLOW_MAX 96
+#define DP_STC_SAMPLE_RX_FLOW_MAX 32
+#define DP_STC_SAMPLE_TX_FLOW_MAX 0
 
 #define DP_STC_LONG_WINDOW_MS 30000
 #define DP_STC_TIMER_THRESH_MS 600
@@ -180,6 +180,8 @@ enum wlan_stc_sampling_state {
 #define WLAN_DP_SAMPLING_CANDIDATE_VALID BIT(0)
 #define WLAN_DP_SAMPLING_CANDIDATE_TX_FLOW_VALID BIT(1)
 #define WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID BIT(2)
+/* Sample this candidate for TxRx stage only */
+#define WLAN_DP_SAMPLING_CANDIDATE_ONLY_TXRX_STAGE BIT(3)
 
 enum wlan_dp_flow_dir {
 	WLAN_DP_FLOW_DIR_INVALID,
@@ -196,7 +198,6 @@ enum wlan_dp_flow_dir {
  * @rx_flow_id: RX flow ID
  * @tx_flow_metadata: TX flow metadata
  * @rx_flow_metadata: RX flow metadata
- * @flow_tuple: flow tuple
  * @dir: flow direction
  */
 struct wlan_dp_stc_sampling_candidate {
@@ -206,7 +207,6 @@ struct wlan_dp_stc_sampling_candidate {
 	uint16_t rx_flow_id;
 	uint32_t tx_flow_metadata;
 	uint32_t rx_flow_metadata;
-	struct flow_info flow_tuple;
 	enum wlan_dp_flow_dir dir;
 };
 
@@ -216,6 +216,8 @@ struct wlan_dp_stc_sampling_candidate {
 #define WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY BIT(2)
 #define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_1_READY BIT(3)
 #define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_2_READY BIT(4)
+/* Sample this flow for TxRx stage only */
+#define WLAN_DP_SAMPLING_FLAGS_ONLY_TXRX_STAGE BIT(5)
 
 #define WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT BIT(0)
 #define WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT BIT(1)
@@ -226,7 +228,7 @@ struct wlan_dp_stc_sampling_candidate {
  * struct wlan_dp_stc_sampling_table_entry - Sampling table entry
  * @state: State of sampling for this flow
  * @dir: direction of flow
- * @burst_stats_report_ts: Burst stats reported timestamp
+ * @last_stats_report_ts: Timestamp of last stats reported for this flow
  * @flags: flags set by timer
  * @flags1: flags set by periodic work
  * @id: index of this sampling table entry in the sampling table
@@ -234,12 +236,14 @@ struct wlan_dp_stc_sampling_candidate {
  * @next_win_idx: next window index to fill min/max stats in per-packet path
  * @curr_sample_attempt: Current sample number which is being checked or
  *                       collected
+ * @traffic_type: traffic type classified
+ * @ul_tid: Uplink TID id for the flow
+ * @peer_id: Peer ID
  * @tx_flow_id: tx flow ID
  * @rx_flow_id: rx flow ID
  * @tx_flow_metadata: tx flow metadata
  * @rx_flow_metadata: rx flow metadata
  * @tuple_hash: Flow tuple hash
- * @flow_tuple: Flow tuple info
  * @tx_stats_ref: tx window stats reference
  * @rx_stats_ref: rx window stats reference
  * @flow_samples: flow samples
@@ -247,7 +251,7 @@ struct wlan_dp_stc_sampling_candidate {
 struct wlan_dp_stc_sampling_table_entry {
 	enum wlan_stc_sampling_state state;
 	enum wlan_dp_flow_dir dir;
-	uint64_t last_burst_stats_report_ts;
+	uint64_t last_stats_report_ts;
 	uint32_t flags;
 	uint32_t flags1;
 	uint8_t id;
@@ -255,13 +259,14 @@ struct wlan_dp_stc_sampling_table_entry {
 	uint8_t next_win_idx;
 	uint8_t curr_sample_attempt;
 	uint8_t traffic_type;
+	uint8_t ul_tid;
 	uint16_t peer_id;
 	uint16_t tx_flow_id;
 	uint16_t rx_flow_id;
 	uint32_t tx_flow_metadata;
 	uint32_t rx_flow_metadata;
 	uint64_t tuple_hash;
-	struct flow_info flow_tuple;
+	uint64_t sampling_start_ts;
 	struct wlan_dp_stc_txrx_stats tx_stats_ref;
 	struct wlan_dp_stc_txrx_stats rx_stats_ref;
 	struct wlan_dp_stc_flow_samples flow_samples;
@@ -283,16 +288,20 @@ struct wlan_dp_stc_sampling_table {
 	struct wlan_dp_stc_sampling_table_entry entries[DP_STC_SAMPLE_FLOWS_MAX];
 };
 
+#define WLAN_DP_STC_TRANSITION_FLAG_SAMPLE 0
+#define WLAN_DP_STC_TRANSITION_FLAG_WIN 1
+
 /**
  * struct wlan_dp_stc_flow_table_entry - Flow table maintained in per pkt path
  * @prev_pkt_arrival_ts: previous packet arrival time
- * @win_transition_complete: Window transition completion flag.
  * @metadata: flow metadata
  * @burst_state: burst state
  * @burst_start_time: burst start time
  * @burst_start_detect_bytes: current snapshot of total bytes during burst
  *			      start detection phase
  * @cur_burst_bytes: total bytes accumulated in current burst
+ * @transition_flags: transition flags to indicate sample or a window change
+ *		      for flow stats collection
  * @idx: union for storing sample & window index
  * @idx.sample_win_idx: sample and window index
  * @idx.s.win_idx: window index
@@ -304,12 +313,12 @@ struct wlan_dp_stc_sampling_table {
  */
 struct wlan_dp_stc_flow_table_entry {
 	uint64_t prev_pkt_arrival_ts;
-	uint8_t win_transition_complete;
 	uint32_t metadata;
 	enum wlan_dp_stc_burst_state burst_state;
 	uint64_t burst_start_time;
 	uint32_t burst_start_detect_bytes;
 	uint32_t cur_burst_bytes;
+	unsigned long transition_flags;
 	/* Can be atomic.! Decide based on the accuracy during test */
 	union {
 		uint32_t sample_win_idx;
@@ -323,7 +332,7 @@ struct wlan_dp_stc_flow_table_entry {
 	struct wlan_dp_stc_burst_stats burst_stats;
 };
 
-#define DP_STC_FLOW_TABLE_ENTRIES_MAX 384
+#define DP_STC_FLOW_TABLE_ENTRIES_MAX 256
 /**
  * struct wlan_dp_stc_rx_flow_table - RX flow table
  * @entries: RX flow table records
@@ -361,6 +370,7 @@ enum wlan_dp_stc_timer_state {
  * struct wlan_dp_stc_peer_traffic_context - peer traffic context
  * @mac_addr: peer mac address
  * @valid: context valid flag
+ * @is_mld: flag to indicate if the peer is MLD peer
  * @vdev_id: vdev_id for the peer
  * @peer_id: peer_id assigned to this peer
  * @last_ping_ts: Last seen ping pkt timestamp
@@ -380,6 +390,7 @@ enum wlan_dp_stc_timer_state {
 struct wlan_dp_stc_peer_traffic_context {
 	struct qdf_mac_addr mac_addr;
 	uint8_t valid;
+	uint8_t is_mld;
 	uint8_t vdev_id;
 	uint16_t peer_id;
 	uint64_t last_ping_ts;
@@ -408,6 +419,7 @@ struct wlan_dp_stc_peer_traffic_context {
  * @id: index of this classified flow entry in the classified flow table
  * @prev_tx_pkts: Last snapshot for TX pkts count
  * @prev_rx_pkts: Last snapshot for RX pkts count
+ * @flow_tuple: Flow tuple info
  * @flags: flags bitmap
  * @del_flags: delete flags bitmap
  * @traffic_type: Traffic type identified
@@ -426,6 +438,7 @@ struct wlan_dp_stc_classified_flow_entry {
 	uint16_t id;
 	uint32_t prev_tx_pkts;
 	uint32_t prev_rx_pkts;
+	struct flow_info flow_tuple;
 	unsigned long flags;
 	unsigned long del_flags;
 	enum qca_traffic_type traffic_type;
@@ -722,13 +735,14 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
  * @dp_ctx: Global DP psoc context
  * @dir: direction of flow (RX/TX)
  * @flow_tuple: Tuple of the flow which got added
+ * @flow_id: Flow id of flow
  *
  * Return: None
  */
 static inline void
 wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 			  enum wlan_dp_flow_dir dir,
-			  struct flow_info *flow_tuple)
+			  struct flow_info *flow_tuple, uint32_t flow_id)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	uint8_t buf[BUF_LEN_MAX];
@@ -738,14 +752,14 @@ wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 
 	switch (dir) {
 	case WLAN_DP_FLOW_DIR_TX:
-		dp_stc_debug(dp_stc->logmask, "STC: Add TX flow %s",
-			     dp_print_tuple_to_str(flow_tuple, buf,
-						   BUF_LEN_MAX));
+		dp_stc_debug(dp_stc->logmask, "STC: Add TX flow [%u] %s",
+			     flow_id, dp_print_tuple_to_str(flow_tuple, buf,
+							    BUF_LEN_MAX));
 		break;
 	case WLAN_DP_FLOW_DIR_RX:
-		dp_stc_debug(dp_stc->logmask, "STC: Add RX flow %s",
-			     dp_print_tuple_to_str(flow_tuple, buf,
-						   BUF_LEN_MAX));
+		dp_stc_debug(dp_stc->logmask, "STC: Add RX flow [%u] %s",
+			     flow_id, dp_print_tuple_to_str(flow_tuple, buf,
+							    BUF_LEN_MAX));
 		break;
 	default:
 		break;
@@ -777,6 +791,21 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 				uint8_t vdev_id, uint16_t peer_id,
 				uint16_t pkt_len, uint32_t metadata);
 
+static inline
+bool wlan_dp_stc_rx_nbuf_is_tcp_ack(qdf_nbuf_t nbuf)
+{
+	bool is_pure_ack;
+
+	if (QDF_NBUF_CB_RX_TCP_PROTO(nbuf))
+		return false;
+
+	qdf_nbuf_push_head(nbuf, QDF_ETH_HDR_LEN);
+	is_pure_ack = qdf_nbuf_is_ipv4_v6_pure_tcp_ack(nbuf);
+	qdf_nbuf_pull_head(nbuf, QDF_ETH_HDR_LEN);
+
+	return is_pure_ack;
+}
+
 static inline QDF_STATUS
 wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 					   qdf_nbuf_t nbuf)
@@ -793,7 +822,8 @@ wlan_dp_stc_check_n_track_rx_flow_features(struct wlan_dp_psoc_context *dp_ctx,
 		return QDF_STATUS_SUCCESS;
 
 	/* Do not update flow feature stats for TCP pure acks */
-	if (qdf_unlikely(QDF_NBUF_CB_RX_TCP_PURE_ACK(nbuf)))
+	if (qdf_unlikely(QDF_NBUF_CB_RX_TCP_PURE_ACK(nbuf) ||
+			 wlan_dp_stc_rx_nbuf_is_tcp_ack(nbuf)))
 		return QDF_STATUS_SUCCESS;
 
 	dp_stc = dp_ctx->dp_stc;
@@ -985,7 +1015,7 @@ wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 static inline void
 wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 			  enum wlan_dp_flow_dir dir,
-			  struct flow_info *flow_tuple)
+			  struct flow_info *flow_tuple, uint32_t flow_id)
 {
 }
 

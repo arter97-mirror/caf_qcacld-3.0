@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -96,6 +96,8 @@
 #include <wmi_unified_11be_api.h>
 #include "wlan_mlo_mgr_peer.h"
 #endif
+
+#include <wlan_dnw_api.h>
 
 /* Max debug string size for WMM in bytes */
 #define WMA_WMM_DEBUG_STRING_SIZE    512
@@ -480,6 +482,59 @@ int wma_peer_sta_kickout_event_handler(void *handle, uint8_t *event,
 	wma_lost_link_info_handler(wma, vdev_id, del_sta_ctx->rssi);
 
 exit_handler:
+	return 0;
+}
+
+int wma_peer_sta_kickout(struct cdp_ctrl_objmgr_psoc *cpsoc,
+			 uint16_t pdev_id, uint8_t *macaddr)
+{
+	tp_wma_handle wma;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
+	tpDeleteStaContext del_sta_ctx;
+	uint8_t vdev_id;
+	uint8_t *addr;
+	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)cpsoc;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma || !psoc) {
+		wma_err("null wma or psoc");
+		return -EINVAL;
+	}
+
+	peer = wlan_objmgr_get_peer(psoc, pdev_id, macaddr,
+				    WLAN_LEGACY_WMA_ID);
+	if (!peer) {
+		wma_err("Failed to get peer");
+		return -EINVAL;
+	}
+	del_sta_ctx =
+		(tDeleteStaContext *)qdf_mem_malloc(sizeof(tDeleteStaContext));
+	if (!del_sta_ctx) {
+		wma_err("QDF MEM Alloc Failed for struct del_sta_context");
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+		return -ENOMEM;
+	}
+	vdev = wlan_peer_get_vdev(peer);
+	vdev_id = wlan_vdev_get_id(vdev);
+	del_sta_ctx->is_tdls = false;
+	del_sta_ctx->vdev_id = vdev_id;
+	del_sta_ctx->rssi = WMA_TGT_NOISE_FLOOR_DBM;
+	del_sta_ctx->reasonCode = HAL_DEL_STA_REASON_CODE_KEEP_ALIVE;
+	addr = wlan_vdev_mlme_get_macaddr(vdev);
+	qdf_mem_copy(del_sta_ctx->addr2, macaddr, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(del_sta_ctx->bssId, addr, QDF_MAC_ADDR_SIZE);
+
+	wma_info("STA kickout for "QDF_MAC_ADDR_FMT", on mac "QDF_MAC_ADDR_FMT", vdev %d, reason:%d",
+		 QDF_MAC_ADDR_REF(macaddr), QDF_MAC_ADDR_REF(addr),
+		 vdev_id, del_sta_ctx->reasonCode);
+
+	wma_sta_kickout_event(del_sta_ctx->reasonCode, vdev_id, macaddr);
+	wma_send_msg(wma, SIR_LIM_DELETE_STA_CONTEXT_IND,
+		     (void *)del_sta_ctx, 0);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+
 	return 0;
 }
 
@@ -2804,6 +2859,10 @@ int wma_tbttoffset_update_event_handler(void *handle, uint8_t *event,
 			wma_err("Invalid beacon buffer");
 			return -EINVAL;
 		}
+		if (bcn->len > SIR_MAX_BEACON_SIZE) {
+			wma_err("Invalid beacon len");
+			return -EINVAL;
+		}
 		/* Save the adjusted TSF */
 		intf[if_id].tsfadjust = adjusted_tsf[if_id];
 
@@ -2912,6 +2971,9 @@ QDF_STATUS wma_set_ap_vdev_up(tp_wma_handle wma, uint8_t vdev_id)
 	wma_set_vdev_mgmt_rate(wma, vdev_id);
 	wma_vdev_set_he_bss_params(wma, vdev_id, &mlme_obj->proto.he_ops_info);
 	mlme_sr_update(vdev, true);
+	if (wlan_vdev_mlme_is_mlo_ap(vdev))
+		wmi_unified_send_vdev_tsf_tstamp_action_cmd(wma->wmi_handle,
+							    vdev_id);
 
 	return status;
 }
@@ -3385,6 +3447,58 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle, uint8_t *buf,
 	return 0;
 }
 
+static QDF_STATUS
+wma_update_peer_phymode(struct wlan_objmgr_pdev *pdev,
+			struct wlan_objmgr_peer *peer,
+			enum phy_ch_width old_ch_width,
+			enum phy_ch_width new_ch_width,
+			enum wlan_phymode *peer_phymode)
+{
+	struct wlan_channel *des_chan;
+	tSirNwType nw_type;
+	enum wlan_phymode old_phymode;
+	enum wlan_peer_type peer_type;
+
+	if (!pdev || !peer || !peer_phymode) {
+		wma_err("null param");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	peer_type = wlan_peer_get_peer_type(peer);
+	wma_debug("peer type %d bw old %d new %d", peer_type, old_ch_width,
+		  new_ch_width);
+	if ((peer_type != WLAN_PEER_STA) &&
+	    (peer_type != WLAN_PEER_P2P_CLI))
+		return QDF_STATUS_E_NOSUPPORT;
+
+	des_chan = wlan_vdev_mlme_get_des_chan(wlan_peer_get_vdev(peer));
+	if (!wlan_is_valid_dnw(pdev, des_chan->ch_freq,
+			       old_ch_width, new_ch_width))
+		return QDF_STATUS_E_NOSUPPORT;
+
+	wlan_peer_obj_lock(peer);
+	old_phymode = wlan_peer_get_phymode(peer);
+	wlan_peer_obj_unlock(peer);
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq)) {
+		if (des_chan->ch_phymode == WLAN_PHYMODE_11B ||
+		    old_phymode == WLAN_PHYMODE_11B)
+			nw_type = eSIR_11B_NW_TYPE;
+		else
+			nw_type = eSIR_11G_NW_TYPE;
+	} else {
+		nw_type = eSIR_11A_NW_TYPE;
+	}
+
+	*peer_phymode = wma_peer_phymode(nw_type, STA_ENTRY_PEER,
+					 IS_WLAN_PHYMODE_HT(old_phymode),
+					 new_ch_width,
+					 IS_WLAN_PHYMODE_VHT(old_phymode),
+					 IS_WLAN_PHYMODE_HE(old_phymode),
+					 IS_WLAN_PHYMODE_EHT(old_phymode));
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * wma_process_update_opmode() - process update VHT opmode cmd from UMAC
  * @wma_handle: wma handle
@@ -3402,6 +3516,8 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 	enum wlan_phymode peer_phymode;
 	uint32_t fw_phymode;
 	enum wlan_peer_type peer_type;
+	QDF_STATUS status;
+	enum phy_ch_width peer_chwidth;
 
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(wma_handle->pdev);
 	peer = wlan_objmgr_get_peer(psoc, pdev_id,
@@ -3436,9 +3552,26 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 		  update_vht_opmode->chwidth, wmi_opmode_chwidth);
 
 	if (ch_width < wmi_opmode_chwidth) {
-		wma_err("Invalid peer bw update %d, self bw %d",
-			update_vht_opmode->chwidth, ch_width);
-		return;
+		peer_chwidth =
+			target_if_wmi_chan_width_to_phy_ch_width(ch_width);
+		status = wma_update_peer_phymode(wma_handle->pdev, peer,
+						 peer_chwidth,
+						 update_vht_opmode->chwidth,
+						 &peer_phymode);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			/*
+			 * Allow channel bandwidth upgrade if it's
+			 * valid DFS No Wait case. This is only for
+			 * SAP/P2P GO with DFS No Wait enabled case.
+			 */
+			fw_phymode = wmi_host_to_fw_phymode(peer_phymode);
+			wma_debug("BW update from 80 to 160MHz, fw_phymode %d",
+				  fw_phymode);
+		} else {
+			wma_err("Invalid peer bw update %d, self bw %d",
+				update_vht_opmode->chwidth, ch_width);
+			return;
+		}
 	}
 
 	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
@@ -3790,6 +3923,7 @@ int wma_process_rmf_frame(tp_wma_handle wma_handle,
 	uint8_t *ccmp;
 	uint8_t mic_len, hdr_len, pdev_id;
 	QDF_STATUS status;
+	struct wlan_crypto_key *key;
 
 	if ((wh)->i_fc[1] & IEEE80211_FC1_WEP) {
 		if (QDF_IS_ADDR_BROADCAST(wh->i_addr1) ||
@@ -3801,8 +3935,13 @@ int wma_process_rmf_frame(tp_wma_handle wma_handle,
 
 		if (iface->type == WMI_VDEV_TYPE_NDI ||
 		    iface->type == WMI_VDEV_TYPE_NAN) {
+			key = wlan_crypto_get_key(iface->vdev, wh->i_addr2, 0);
 			hdr_len = IEEE80211_CCMP_HEADERLEN;
-			mic_len = IEEE80211_CCMP_MICLEN;
+			if (key &&
+			    (key->keylen == WLAN_CRYPTO_KEY_GCMP_256_LEN))
+				mic_len = WLAN_IEEE80211_GCMP_MICLEN;
+			else
+				mic_len = IEEE80211_CCMP_MICLEN;
 		} else {
 			pdev_id =
 				wlan_objmgr_pdev_get_pdev_id(wma_handle->pdev);

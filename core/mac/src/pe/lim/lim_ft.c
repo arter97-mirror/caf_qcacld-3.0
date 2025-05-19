@@ -551,6 +551,10 @@ static QDF_STATUS lim_fill_session_power_info(
 	mlme_obj->reg_tpc_obj.is_power_constraint_abs = !is_pwr_constraint;
 
 	if (wlan_reg_is_6ghz_chan_freq(pbssDescription->chan_freq)) {
+		if (ft_session->ap_defined_power_type_6g == REG_VERY_LOW_POWER_AP &&
+		    wlan_reg_is_indoor_ap_detected(mac->pdev))
+			ft_session->ap_defined_power_type_6g = REG_INDOOR_ENABLED_AP;
+
 		status = wlan_reg_get_best_6g_power_type(
 				mac->psoc, mac->pdev,
 				&power_type_6g,

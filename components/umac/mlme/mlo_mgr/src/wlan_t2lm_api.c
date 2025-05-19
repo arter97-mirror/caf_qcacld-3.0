@@ -401,6 +401,7 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					t2lm_info->ieee_link_map_tid[0];
 				if (QDF_IS_STATUS_ERROR(wlan_t2lm_check_curr_force(vdev,
 										   t2lm_ieee_link_map))) {
+					wlan_mlo_send_ttlm_complete(vdev, ml_peer, false);
 					t2lm_err("curr force check failed");
 					break;
 				}
@@ -454,6 +455,7 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					t2lm_info->ieee_link_map_tid[0];
 				if (QDF_IS_STATUS_ERROR(wlan_t2lm_check_curr_force(vdev,
 										   t2lm_ieee_link_map))) {
+					wlan_mlo_send_ttlm_complete(vdev, ml_peer, false);
 					t2lm_err("curr force check failed");
 					break;
 				}
@@ -469,10 +471,12 @@ t2lm_populate_peer_level_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 					t2lm_err("sending t2lm wmi failed");
 					break;
 				}
+				wlan_mlo_send_ttlm_complete(vdev, ml_peer, true);
 			} else if (t2lm_rsp->dialog_token == t2lm_req->dialog_token &&
 				   t2lm_rsp->t2lm_resp_type != WLAN_T2LM_RESP_TYPE_PREFERRED_TID_TO_LINK_MAPPING) {
 				t2lm_debug("T2LM rsp status denied, clear ongoing tid mapping");
 				wlan_t2lm_clear_ongoing_negotiation(peer);
+				wlan_mlo_send_ttlm_complete(vdev, ml_peer, false);
 			}
 		}
 	}
@@ -1054,14 +1058,16 @@ wlan_ttlm_populate_link_disable_in_sm(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 
 	status = wlan_t2lm_check_concurrency_curr_force(vdev, t2lm_neg);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_mlo_send_ttlm_complete(vdev, peer->mlo_peer_ctx, false);
 		return status;
-	else
+	} else {
 		return t2lm_deliver_event(vdev, peer,
 					  WLAN_T2LM_EV_ACTION_FRAME_TX_REQ,
 					  t2lm_neg,
 					  0,
 					  &t2lm_neg->dialog_token);
+	}
 }
 #endif
 
@@ -1137,6 +1143,7 @@ wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 		link_info++;
 	}
 
+	t2lm_policy->is_fw_btm_ind = true;
 	status = wlan_ttlm_populate_link_disable_in_sm(vdev, peer, &t2lm_neg);
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);

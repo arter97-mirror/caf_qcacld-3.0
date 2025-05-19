@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -50,11 +50,13 @@ QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 	twt_cfg->enable_twt = cfg_get(psoc, CFG_ENABLE_TWT);
 	twt_cfg->twt_requestor = cfg_get(psoc, CFG_TWT_REQUESTOR);
 	twt_cfg->twt_responder = cfg_get(psoc, CFG_TWT_RESPONDER);
+	twt_cfg->twt_responder_orig = cfg_get(psoc, CFG_TWT_RESPONDER);
 	twt_cfg->twt_congestion_timeout =
 				cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
 	twt_cfg->bcast_requestor_enabled = CFG_TWT_GET_BCAST_REQ(bcast_conf);
 	twt_cfg->bcast_responder_enabled = CFG_TWT_GET_BCAST_RES(bcast_conf);
 	twt_cfg->enable_twt_24ghz = cfg_get(psoc, CFG_ENABLE_TWT_24GHZ);
+	twt_cfg->disable_twt_on_scan = cfg_get(psoc, CFG_DISABLE_TWT_ON_SCAN);
 	twt_cfg->flex_twt_sched = cfg_default(CFG_HE_FLEX_TWT_SCHED);
 	twt_cfg->req_flag = false;
 	twt_cfg->res_flag = false;
@@ -124,6 +126,7 @@ QDF_STATUS wlan_twt_cfg_update(struct wlan_objmgr_psoc *psoc)
 					(enable_twt && twt_cfg->twt_requestor));
 	twt_cfg->twt_responder = QDF_MIN(tgt_caps->twt_responder,
 					(enable_twt && twt_cfg->twt_responder));
+	twt_cfg->twt_responder_orig = twt_cfg->twt_responder;
 	twt_cfg->bcast_requestor_enabled =
 			QDF_MIN((tgt_caps->twt_bcast_req_support ||
 				tgt_caps->legacy_bcast_twt_support),
@@ -190,6 +193,24 @@ wlan_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 	}
 
 	*val = twt_psoc_obj->cfg_params.twt_responder;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj) {
+		twt_psoc_obj->cfg_params.twt_responder  =
+					cfg_default(CFG_TWT_RESPONDER);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	twt_psoc_obj->cfg_params.twt_responder =
+			twt_psoc_obj->cfg_params.twt_responder_orig;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -290,6 +311,23 @@ wlan_twt_cfg_get_responder_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 		return QDF_STATUS_E_INVAL;
 
 	*val = twt_psoc_obj->cfg_params.res_flag;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_get_twt_disabled_on_scan(struct wlan_objmgr_psoc *psoc,
+				      bool *val)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj) {
+		*val = cfg_default(CFG_DISABLE_TWT_ON_SCAN);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = twt_psoc_obj->cfg_params.disable_twt_on_scan;
 
 	return QDF_STATUS_SUCCESS;
 }

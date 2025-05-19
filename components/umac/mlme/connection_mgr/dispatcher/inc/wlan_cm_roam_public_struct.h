@@ -324,6 +324,17 @@ struct rso_chan_info {
  * @roam_scan_n_probes:
  * @roam_scan_inactivity_time:
  * @roam_inactive_data_packet_count:
+ * @band_2g_weightage: 2.4 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 2.4 GHz band
+ * @band_5g_weightage: 5 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 5 GHz band
+ * @band_6g_weightage: 6 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 6 GHz band
+ * @roam_periodic_scan_interval: the interval in seconds after which STA
+ * performs periodic partial scans till roaming succeeds or RSSI recovers
+ * above threshold
+ * @roam_score_delta: delta value expected over the roam score of the candidate
+ * ap over the roam score of the current AP
  */
 struct rso_cfg_params {
 	uint32_t neighbor_scan_period;
@@ -355,6 +366,11 @@ struct rso_cfg_params {
 	uint8_t roam_scan_n_probes;
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
+	uint32_t band_2g_weightage;
+	uint32_t band_5g_weightage;
+	uint32_t band_6g_weightage;
+	uint32_t roam_periodic_scan_interval;
+	uint32_t roam_score_delta;
 };
 
 /**
@@ -438,6 +454,9 @@ enum roam_fail_params {
  * command rejected due to reassociation request received for same AP.
  * @ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED: Roaming is not triggered as part
  * of the first roam scan as additional scan is required to scan all MLD links
+ * @ROAM_FAIL_REASON_TTLM_REQUIRED: Roaming is not triggered as TTLM is required
+ * @ROAM_FAIL_REASON_LINKRECONFIG_REQUIRED: Roaming is not triggered as
+ * linkreconfig is required.
  * @ROAM_FAIL_REASON_UNKNOWN: Default reason
  */
 enum wlan_roam_failure_reason_code {
@@ -483,6 +502,8 @@ enum wlan_roam_failure_reason_code {
 	ROAM_FAIL_REASON_OTHER_PRIORITY_ROAM_SCAN,
 	ROAM_FAIL_REASON_REASSOC_TO_SAME_AP,
 	ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED,
+	ROAM_FAIL_REASON_TTLM_REQUIRED,
+	ROAM_FAIL_REASON_LINKRECONFIG_REQUIRED,
 	ROAM_FAIL_REASON_UNKNOWN = 255,
 };
 
@@ -617,6 +638,9 @@ struct sae_roam_auth_map {
  *                cross-AKM roaming
  * @is_disable_btm: btm roaming disabled or not from userspace
  * @is_aggressive_roaming_mode: Aggressive roaming is set or not
+ * @roam_cfg_rt_params_enabled: Flag used to cache the status of if real time
+ * roam control param values changed by vendor commands.The same shall be
+ * returned whenever queried for roam_cfg_rt_params_enabled status.
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -673,6 +697,7 @@ struct rso_config {
 	uint16_t rso_rsn_caps;
 	bool is_disable_btm;
 	bool is_aggressive_roaming_mode;
+	bool roam_cfg_rt_params_enabled;
 };
 
 /**
@@ -796,6 +821,13 @@ struct rso_config_params {
  * @ROAM_AGGRESSIVE_SCAN_STEP_RSSI: Roam scan step rssi in aggressive mode
  * @ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD: Roam neighbour lookup
  *                                                  threshold in aggressive mode
+ * @ROAM_2P4GHZ_BAND_WEIGHTAGE: 2.4 GHz band weight value for roaming
+ * @ROAM_5GHZ_BAND_WEIGHTAGE: 5 GHz band weight value for roaming
+ * @ROAM_6GHZ_BAND_WEIGHTAGE: 6 GHz band weight value for roaming
+ * @ROAM_RESCAN_RSSI_DIFF : Roam rescan rssi difference value
+ * @ROAM_PERIODIC_SCAN_INTERVAL: Roam periodic scan interval value
+ * @ROAM_SCORE_DELTA: Roam score delta value
+ * @ROAM_CONFIG_RT_PARAMS_ENABLED: Roam config RT params enabled
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -834,6 +866,13 @@ enum roam_cfg_param {
 	ROAM_AGGRESSIVE_SCORE_DELTA,
 	ROAM_AGGRESSIVE_SCAN_STEP_RSSI,
 	ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD,
+	ROAM_2P4GHZ_BAND_WEIGHTAGE,
+	ROAM_5GHZ_BAND_WEIGHTAGE,
+	ROAM_6GHZ_BAND_WEIGHTAGE,
+	ROAM_RESCAN_RSSI_DIFF,
+	ROAM_PERIODIC_SCAN_INTERVAL,
+	ROAM_SCORE_DELTA,
+	ROAM_CONFIG_RT_PARAMS_ENABLED,
 };
 
 /**
@@ -984,6 +1023,12 @@ struct ap_profile {
  *                BITS 24-31 :- reserved
  *                The value of each index must be 0-100
  * @sta_sap_mcc_weightage: STA + SAP MCC weightage
+ * @band_2g_weightage: 2.4 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 2.4 GHz band
+ * @band_5g_weightage: 5 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 5 GHz band
+ * @band_6g_weightage: 6 GHz band weight value in percentage used to
+ * individually manage the calculated scores for candidates in 6 GHz band
  */
 struct scoring_param {
 	uint32_t disable_bitmap;
@@ -1018,6 +1063,9 @@ struct scoring_param {
 	int32_t security_weightage;
 	uint32_t security_index_score;
 	uint32_t sta_sap_mcc_weightage;
+	uint32_t band_2g_weightage;
+	uint32_t band_5g_weightage;
+	uint32_t band_6g_weightage;
 };
 
 /**
@@ -1963,6 +2011,9 @@ struct wlan_roam_reason_vsie_enable {
  * roam_scan_inactivity_time.
  * @full_scan_period: Full scan period is the idle period in seconds
  * between two successive full channel roam scans.
+ * @roam_periodic_scan_interval: the interval in seconds after which STA
+ * performs periodic partial scans till roaming succeeds or RSSI recovers
+ * above threshold.
  */
 struct wlan_roam_scan_period_params {
 	uint32_t vdev_id;
@@ -1972,6 +2023,7 @@ struct wlan_roam_scan_period_params {
 	uint32_t roam_scan_inactivity_time;
 	uint32_t roam_inactive_data_packet_count;
 	uint32_t full_scan_period;
+	uint32_t roam_periodic_scan_interval;
 };
 
 /**

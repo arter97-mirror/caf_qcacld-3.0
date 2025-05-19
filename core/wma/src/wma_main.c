@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -345,12 +345,13 @@ wma_get_concurrency_support(struct wlan_objmgr_psoc *psoc)
  * Version 6 - sta dump info updated
  * Version 7 - NAN standard plus feature support updated
  * Version 8 - INI based NAN EHT capability support updated
+ * Version 9 - MHS power save feature support updated
  *
  * Return: None
  */
 static void wma_update_set_feature_version(struct target_feature_set *fs)
 {
-	fs->feature_set_version = 8;
+	fs->feature_set_version = 9;
 }
 
 /**
@@ -742,6 +743,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 		wlan_mlme_get_sta_mlo_conn_max_num(wma_handle->psoc);
 	cfg_nan_get_max_ndi(wma_handle->psoc,
 			    &tgt_cfg->max_ndi);
+	tgt_cfg->apfv6_offload_disabled = cfg_get(wma_handle->psoc,
+						  CFG_OFFLOAD_APFV6_MODE);
 
 	con_mode = cds_get_conparam();
 	if (con_mode == QDF_GLOBAL_MONITOR_MODE)
@@ -3330,6 +3333,21 @@ static void wma_register_wlm_latency_level_event(tp_wma_handle wma_handle)
 }
 #else
 static void wma_register_wlm_latency_level_event(tp_wma_handle wma_handle)
+{
+}
+#endif
+
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+static void
+wma_update_tx_powerboost(struct wlan_psoc_host_service_ext2_param *param,
+			 struct wma_tgt_cfg *cfg)
+{
+	cfg->tx_powerboost = param->tx_powerboost;
+}
+#else
+static void
+wma_update_tx_powerboost(struct wlan_psoc_host_service_ext2_param *param,
+			 struct wma_tgt_cfg *cfg)
 {
 }
 #endif
@@ -6487,6 +6505,8 @@ wma_is_dbs_mandatory(struct wlan_objmgr_psoc *psoc,
 	return true;
 }
 
+#define WMI_MAX_BUS_SIZE 2048
+
 /**
  * wma_update_hdd_cfg() - update HDD config
  * @wma_handle: wma handle
@@ -6586,8 +6606,12 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	wma_update_sar_flag(service_ext2_param, &tgt_cfg);
 	tgt_cfg.fine_time_measurement_cap =
 		target_if_get_wmi_fw_sub_feat_caps(tgt_hdl);
-	tgt_cfg.wmi_max_len = wmi_get_max_msg_len(wma_handle->wmi_handle)
-			      - WMI_TLV_HEADROOM;
+	/*
+	 * Copy engine buffer is limited to 2K and maximum APF data send in a
+	 * WMI command depends on max bus size.
+	 * So, WMI MAX bus size is hardcoded to 2K.
+	 */
+	tgt_cfg.wmi_max_len = WMI_MAX_BUS_SIZE - WMI_TLV_HEADROOM;
 	tgt_cfg.tx_bfee_8ss_enabled = wma_handle->tx_bfee_8ss_enabled;
 	tgt_cfg.dynamic_nss_chains_support =
 				wma_handle->dynamic_nss_chains_support;
@@ -6599,6 +6623,7 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	wma_update_twt_tgt_cap(wma_handle, &tgt_cfg);
 	wma_update_restricted_80p80_bw_support(wma_handle, &tgt_cfg);
 	wma_update_aux_dev_caps(tgt_hdl, &tgt_cfg);
+	wma_update_tx_powerboost(service_ext2_param, &tgt_cfg);
 	/* Take the max of chains supported by FW, which will limit nss */
 	for (i = 0; i < tgt_hdl->info.total_mac_phy_cnt; i++)
 		wma_fill_chain_cfg(tgt_hdl, i);
@@ -6664,6 +6689,11 @@ static void wma_set_pmo_caps(struct wlan_objmgr_psoc *psoc)
 		wmi_service_enabled(wma->wmi_handle,
 				    wmi_service_listen_interval_offload_support
 				    );
+	caps.apf_offload_enabled =
+		wmi_service_enabled(wma->wmi_handle,
+				    wmi_service_apf_data_offload_support_enabled
+				    );
+
 
 	status = ucfg_pmo_psoc_set_caps(psoc, &caps);
 	if (QDF_IS_STATUS_ERROR(status))

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -92,6 +92,8 @@
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include "wlan_dp_ucfg_api.h"
 #include "son_api.h"
+#include "wlan_hdd_tx_powerboost.h"
+
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
 #define HDD_SSR_BRING_UP_TIME 3000000
@@ -2276,6 +2278,9 @@ QDF_STATUS hdd_wlan_re_init(void)
 	ucfg_mlme_get_sap_internal_restart(hdd_ctx->psoc, &value);
 	if (value)
 		hdd_ssr_restart_sap(hdd_ctx);
+
+	hdd_tx_powerboost_reinit(hdd_ctx);
+
 	hdd_wlan_ssr_reinit_event();
 
 	if (hdd_ctx->is_wiphy_suspended)
@@ -3533,9 +3538,16 @@ end:
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
 int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
-					 struct wireless_dev *wdev,
-					 int *dbm)
+				  struct wireless_dev *wdev,
+				  unsigned int link_id,
+				  int *dbm)
+#else
+int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  int *dbm)
+#endif
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;

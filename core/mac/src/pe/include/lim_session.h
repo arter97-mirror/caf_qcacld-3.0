@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -296,6 +296,10 @@ struct wlan_mlo_ie {
  * @link_eht_op: eht op IE
  * @max_chan_swt_time: MLOTD
  * @bss_param_change_cnt: bss param change count
+ * @tsf_fw: tsf reported from fw
+ * @qtimer_fw: qtimer reported from fw
+ * @tsf_host: calculated tsf
+ * @tsf_valid: whether tsf_host is valid or not
  */
 struct mlo_link_ie {
 	tDot11fIEDSParams                    link_ds;
@@ -323,6 +327,10 @@ struct mlo_link_ie {
 	tDot11fIEeht_op                      link_eht_op;
 	uint32_t                             max_chan_swt_time;
 	uint8_t                              bss_param_change_cnt;
+	uint64_t                             tsf_fw;
+	uint64_t                             qtimer_fw;
+	uint64_t                             tsf_host;
+	bool                                 tsf_valid;
 };
 
 /**

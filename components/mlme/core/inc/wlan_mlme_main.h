@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -413,14 +413,21 @@ struct ft_context {
 /**
  * struct assoc_channel_info - store channel info at the time of association
  * @assoc_ch_width: channel width at the time of initial connection
- * @cur_ch_width: current channel width update in beacon eht/he/vht op and
- *  ht info IE or omn ie
+ * @cur_ch_width: current channel width update in beacon eht_op/he_op/vht_op
+ *  ht_info_IE/omn_ie or after csa
+ * @update_from_ap: before get max bandwidth, user space maybe set bandwidth
+ *  or beacon bw update or csa. we don't know which action occur first,
+ *  when this flag is true, it means bcn update bw in op ie or CSA occur, get
+ *  max bandwidth will from cur_ch_width;
+ *  when this flag is false, it means, no csa or bcn bw update occur and get
+ *  bandwidth from bss_chan->ch_width.
  * @sec_2g_freq: secondary 2 GHz freq
  * @cen320_freq: 320 MHz center freq
  */
 struct assoc_channel_info {
 	enum phy_ch_width assoc_ch_width;
 	enum phy_ch_width cur_ch_width;
+	bool update_from_ap;
 	qdf_freq_t sec_2g_freq;
 	qdf_freq_t cen320_freq;
 };
@@ -543,6 +550,7 @@ struct sap_ch_switch_info {
  * @psd_20mhz: PSD power(dBm/MHz) of SAP operating in 20 MHz
  * @ch_switch_info: channel switch info
  * @is_owe_conn: is owe connection
+ * @acs_bandmask: Bitmap of the bands on which ACS is performed
  */
 struct mlme_ap_config {
 	qdf_freq_t user_config_sap_ch_freq;
@@ -554,6 +562,7 @@ struct mlme_ap_config {
 	uint8_t psd_20mhz;
 	struct sap_ch_switch_info ch_switch_info;
 	bool is_owe_conn;
+	uint32_t acs_bandmask;
 };
 
 /**
@@ -2256,4 +2265,41 @@ wlan_is_scc_tpc_power_supp_enabled(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS
 mlme_clear_peer_private_object_data(struct wlan_objmgr_peer *peer);
+
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * mlme_get_c2c_support () - Get C2C support info
+ * @psoc: psoc ctx
+ * @value: c2c support flag pointer
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value);
+#else
+static inline QDF_STATUS
+mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	*value = false;
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+/*
+ * wlan_sap_get_acs_band_mask() - Get the reg band bitmap of the ACS channels
+ * @vdev: pointer to vdev object
+ *
+ * Return: REG BAND bitmap
+ */
+uint32_t wlan_sap_get_acs_band_mask(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * wlan_sap_set_acs_band_mask()- Set the band bitmap of the ACS channels list
+ * @vdev: pointer to vdev object
+ * @bitmap: bitmap of the acs list
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sap_set_acs_band_mask(struct wlan_objmgr_vdev *vdev,
+				      uint32_t bitmap);
 #endif

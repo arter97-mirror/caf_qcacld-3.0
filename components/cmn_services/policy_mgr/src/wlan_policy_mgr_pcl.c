@@ -626,7 +626,7 @@ void policy_mgr_update_with_safe_channel_list(struct wlan_objmgr_psoc *psoc,
 	uint32_t safe_channel_count = 0, current_channel_count = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint8_t scc_on_lte_coex = 0;
-	uint32_t nan_2g_freq, nan_5g_freq;
+	uint32_t nan_2g_freq, nan_5g_freq = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1094,7 +1094,7 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	uint32_t vdev_id = 0, pcl_len = 0, i;
 	struct wlan_objmgr_vdev *vdev;
 	qdf_freq_t sta_gc_6ghz_freq = 0;
-	uint32_t ap_pwr_type_6g = 0;
+	uint32_t sta_pwr_type_6g = 0;
 	bool indoor_ch_support = false;
 	bool keep_6ghz_sta_cli_conn;
 
@@ -1140,8 +1140,8 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 	 * LPI STA + SAP - Allowed with VLP power if channel supports VLP.
 	 * LPI STA + SAP - Allowed with LPI power if gindoor_channel_support=1
 	 */
-	ap_pwr_type_6g = wlan_mlme_get_6g_ap_power_type(vdev);
-	policy_mgr_debug("STA power type : %d", ap_pwr_type_6g);
+	sta_pwr_type_6g = wlan_mlme_get_curr_6g_power_type(vdev);
+	policy_mgr_debug("STA power type : %d", sta_pwr_type_6g);
 
 	ucfg_mlme_get_indoor_channel_support(psoc, &indoor_ch_support);
 	keep_6ghz_sta_cli_conn = wlan_reg_get_keep_6ghz_sta_cli_connection(
@@ -1151,9 +1151,10 @@ policy_mgr_modify_sap_pcl_for_6G_channels(struct wlan_objmgr_psoc *psoc,
 			if (!WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(pcl_list_org[i]) ||
 			    keep_6ghz_sta_cli_conn)
 				continue;
-			if (ap_pwr_type_6g == REG_VERY_LOW_POWER_AP)
+			if (sta_pwr_type_6g == REG_VERY_LOW_POWER_AP ||
+			    sta_pwr_type_6g == REG_INDOOR_ENABLED_AP)
 				goto add_freq;
-			else if (ap_pwr_type_6g == REG_INDOOR_AP &&
+			else if (sta_pwr_type_6g == REG_INDOOR_AP &&
 				 (!wlan_reg_is_freq_indoor(pm_ctx->pdev,
 							   pcl_list_org[i]) ||
 				  indoor_ch_support))
@@ -4206,28 +4207,28 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[1]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_SAP_5_HIGH_SBS;
 		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[1]].freq) &&
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[0]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_SAP_5_HIGH_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[1]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[1]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -4242,10 +4243,11 @@ enum policy_mgr_three_connection_mode
 	} else if (num_ml_sta == 2 && count_nan_disc == 1) {
 		/* ML STA + SAP */
 		index = PM_NAN_DISC_24_STA_STA_SCC_MCC_DBS;
-	} else if (count_sap == 1 && count_sta == 2 && !num_ml_sta) {
+	} else if (count_sap == 1 && count_sta == 2 && num_ml_sta <= 1) {
 		/* This covers the below combinations,
 		 * 1. SAP + non-ML STA + non-ML STA
-		 * 2. P2P GO/CLI + non-ML STA + non-ML STA
+		 * 2. SAP + non-ML STA + ML STA
+		 * 3. P2P GO/CLI + non-ML STA + non-ML STA
 		 */
 		policy_mgr_debug(
 			"channel: sap0: %d, sta0: %d, sta1: %d",
@@ -4304,28 +4306,28 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[1]].freq)) {
-			index = PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS;
+			index = PM_STA_SAP_5_HIGH_STA_5_LOW_SBS;
 		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[1]].freq) &&
 			wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq)) {
-			index = PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS;
+			index = PM_STA_SAP_5_HIGH_STA_5_LOW_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 			 WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[1]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_STA_5_HIGH_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[1]].freq) &&
 			 WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_STA_5_HIGH_SBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -5444,7 +5446,7 @@ policy_mgr_sap_on_non_psc_channel(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	ap_pwr_type_6g = wlan_mlme_get_6g_ap_power_type(vdev);
+	ap_pwr_type_6g = wlan_mlme_get_curr_6g_power_type(vdev);
 	qdf_mem_zero(&pcl, sizeof(pcl));
 
 	/* PCL list is filtered with Non-PSC channels during
@@ -5465,8 +5467,9 @@ policy_mgr_sap_on_non_psc_channel(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < pcl.pcl_len; i++) {
 		if ((WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl.pcl_list[i])) &&
 		    pcl.pcl_list[i] == *intf_ch_freq &&
-		    ap_pwr_type_6g == REG_VERY_LOW_POWER_AP) {
-			policy_mgr_debug("STA is in PSC channel %d in VLP mode, Hence SAP + STA allowed in PSC",
+		    (ap_pwr_type_6g == REG_VERY_LOW_POWER_AP ||
+		     ap_pwr_type_6g == REG_INDOOR_ENABLED_AP)) {
+			policy_mgr_debug("STA is in PSC channel %d in VLP/C2C mode, Hence SAP + STA allowed in PSC",
 					 *intf_ch_freq);
 			*intf_ch_freq = 0;
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);

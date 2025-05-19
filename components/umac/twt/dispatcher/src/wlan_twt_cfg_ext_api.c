@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +30,12 @@ QDF_STATUS
 wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return wlan_twt_cfg_get_responder_flag(psoc, val);
+}
+
+QDF_STATUS
+wlan_twt_cfg_get_twt_dis_on_scan(struct wlan_objmgr_psoc *psoc, bool *val)
+{
+	return wlan_twt_cfg_get_twt_disabled_on_scan(psoc, val);
 }
 
 QDF_STATUS

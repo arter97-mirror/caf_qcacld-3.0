@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2773,6 +2773,86 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 	return QDF_STATUS_SUCCESS;
 }
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP)
+static int sme_get_tsf_header_time(struct pe_session *session)
+{
+	if (!session)
+		return 0;
+
+	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
+		return TSF_MAC_HEADER_TIME_2GHZ + TSF_PHY_HEADER_TIME_2GHZ;
+	else if (wlan_reg_is_5ghz_ch_freq(session->curr_op_freq))
+		return TSF_MAC_HEADER_TIME_5GHZ + TSF_PHY_HEADER_TIME_5GHZ;
+
+	return TSF_MAC_HEADER_TIME_6GHZ + TSF_PHY_HEADER_TIME_6GHZ;
+}
+
+/**
+ * sme_process_tsf_each_link() - Calculate tsf for each link when TSF event
+ * is received.
+ * @mac: Global MAC pointer
+ * @tsfmsg: pointer to struct stsf which contains tsf information
+ *
+ * Calculate tsf for each link for MLO SAP case when received TSF event.
+ */
+static void
+sme_process_tsf_each_link(struct mac_context *mac, struct stsf *tsfmsg)
+{
+	uint8_t vdev_id;
+	int i;
+	uint64_t host_timer, timer_delta, header_time;
+	struct pe_session *session = NULL;
+
+	if (!tsfmsg) {
+		sme_err("Empty tsf msg!");
+		return;
+	}
+
+	vdev_id = tsfmsg->vdev_id;
+	session = pe_find_session_by_vdev_id(mac, vdev_id);
+	if (!session) {
+		sme_err("No session for vdev %d", vdev_id);
+		return;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_ap(session->vdev)) {
+		sme_debug("vdev_id %d is not an MLO vdev", vdev_id);
+		return;
+	}
+
+	session->mlo_link_info.link_ie.tsf_fw = tsfmsg->tsf_low
+				+ ((uint64_t)tsfmsg->tsf_high << 32);
+	session->mlo_link_info.link_ie.qtimer_fw = tsfmsg->soc_timer_low
+				+ ((uint64_t)tsfmsg->soc_timer_high << 32);
+
+	host_timer = qdf_get_time_of_the_day_us();
+
+	for (i = 0; i < mac->lim.maxBssId; i++) {
+		struct pe_session *session_entry = &mac->lim.gpSession[i];
+
+		if (session_entry->valid &&
+		    wlan_vdev_mlme_is_mlo_ap(session_entry->vdev)) {
+			timer_delta = host_timer -
+				session_entry->mlo_link_info.link_ie.qtimer_fw;
+			header_time = sme_get_tsf_header_time(session_entry);
+			session_entry->mlo_link_info.link_ie.tsf_host =
+				session_entry->mlo_link_info.link_ie.tsf_fw
+				+ timer_delta - header_time;
+			session_entry->mlo_link_info.link_ie.tsf_valid = true;
+			sme_debug("i=%d: timer_delta=%llu, tsf_fw=%llu, tsf_host=%llu",
+				  i, timer_delta,
+				  session_entry->mlo_link_info.link_ie.tsf_fw,
+				  session_entry->mlo_link_info.link_ie.tsf_host);
+		}
+	}
+}
+#else /* WLAN_FEATURE_MULTI_LINK_SAP */
+static void
+sme_process_tsf_each_link(struct mac_context *mac, struct stsf *tsfmsg)
+{
+}
+#endif /* WLAN_FEATURE_MULTI_LINK_SAP */
+
 QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -2900,6 +2980,7 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 			mac->sme.get_tsf_cb(mac->sme.get_tsf_cxt,
 					(struct stsf *)pMsg->bodyptr);
 		}
+		sme_process_tsf_each_link(mac, (struct stsf *)pMsg->bodyptr);
 		if (pMsg->bodyptr)
 			qdf_mem_free(pMsg->bodyptr);
 		break;
@@ -6956,6 +7037,36 @@ QDF_STATUS sme_set_roam_rescan_rssi_diff(mac_handle_t mac_handle,
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.int_value = nRoamRescanRssiDiff;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev, sessionId,
+						    WLAN_LEGACY_SME_ID);
+
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", sessionId);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* If roaming mode is aggressive and the user configured
+	 * roam scan step RSSI value is received (roam_rescan_rssi_diff),
+	 * update this value to roam_aggre_scan_step_rssi.
+	 */
+	if (rso_cfg->is_aggressive_roaming_mode &&
+	    !rso_cfg->roam_control_enable)
+		wlan_cm_roam_cfg_set_value(mac->psoc, sessionId,
+					   ROAM_AGGRESSIVE_SCAN_STEP_RSSI,
+					   &src_config);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -11312,8 +11423,8 @@ void sme_update_he_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
 	rx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(nss);
 
 	for (idx = NSS_1x1_MODE; idx <= nss; idx++) {
-		HE_SET_MCS_FOR_NSS(tx_mcs_map, mcs_map, idx);
-		HE_SET_MCS_FOR_NSS(rx_mcs_map, mcs_map, idx);
+		tx_mcs_map = HE_SET_MCS_FOR_NSS(tx_mcs_map, mcs_map, idx);
+		rx_mcs_map = HE_SET_MCS_FOR_NSS(rx_mcs_map, mcs_map, idx);
 	}
 
 	sme_debug("new HE Nss MCS MAP: Rx 0x%0X, Tx: 0x%0X",
@@ -17631,3 +17742,155 @@ void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
 	return cm_get_pre_auth_mld_addr(mac, peer_addr, mld_addr);
 }
 #endif
+
+QDF_STATUS sme_update_2g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_2g_weightage)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = band_2g_weightage;
+	mac->mlme_cfg->roam_scoring.band_2g_weightage =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_2P4GHZ_BAND_WEIGHTAGE,
+					  &src_config);
+}
+
+QDF_STATUS sme_update_5g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_5g_weightage)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = band_5g_weightage;
+	mac->mlme_cfg->roam_scoring.band_5g_weightage =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_5GHZ_BAND_WEIGHTAGE,
+					  &src_config);
+}
+
+QDF_STATUS sme_update_6g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_6g_weightage)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = band_6g_weightage;
+	mac->mlme_cfg->roam_scoring.band_6g_weightage =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_6GHZ_BAND_WEIGHTAGE,
+					  &src_config);
+}
+
+QDF_STATUS
+sme_set_roam_periodic_scan_interval_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_periodic_scan_interval)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = roam_periodic_scan_interval;
+	mac->mlme_cfg->lfr.roam_periodic_scan_interval =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_PERIODIC_SCAN_INTERVAL,
+					  &src_config);
+}
+
+QDF_STATUS
+sme_get_roam_periodic_scan_interval(mac_handle_t mac_handle,
+				    uint8_t vdev_id,
+				    uint32_t *roam_periodic_scan_interval)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy temp;
+
+	wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id,
+				   ROAM_PERIODIC_SCAN_INTERVAL, &temp);
+
+	*roam_periodic_scan_interval = temp.uint_value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS sme_set_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_score_delta)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+
+	src_config.uint_value = roam_score_delta;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* If roaming mode is aggressive and the user configured
+	 * roam_score_delta is received, update this value to
+	 * roam_aggre_scan_step_rssi.
+	 */
+	if (rso_cfg->is_aggressive_roaming_mode &&
+	    !rso_cfg->roam_control_enable)
+		wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					   ROAM_AGGRESSIVE_SCORE_DELTA,
+					   &src_config);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
+	mac->mlme_cfg->roam_scoring.roam_score_delta =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_SCORE_DELTA, &src_config);
+}
+
+QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t *roam_score_delta)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy temp;
+
+	wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id, ROAM_SCORE_DELTA, &temp);
+
+	*roam_score_delta = temp.uint_value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS sme_set_roam_cfg_rt_params_enabled(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      bool roam_cfg_rt_params_enabled)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.bool_value = roam_cfg_rt_params_enabled;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_CONFIG_RT_PARAMS_ENABLED,
+					  &src_config);
+}

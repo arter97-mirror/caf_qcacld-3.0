@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -255,6 +255,7 @@
 #include "wifi_pos_api.h"
 #include "wlan_mgmt_rx_srng_ucfg_api.h"
 #include <cfg_mlme_vht_caps.h>
+#include "wlan_hdd_tx_powerboost.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -3238,6 +3239,7 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	hdd_runtime_suspend_context_init(hdd_ctx);
 
 	/* Configure NAN datapath features */
+	hdd_tx_powerboost_target_config(hdd_ctx, cfg);
 	hdd_nan_datapath_target_config(hdd_ctx, cfg);
 	ucfg_nan_set_tgt_caps(hdd_ctx->psoc, &cfg->nan_caps);
 	hdd_ctx->dfs_cac_offload = cfg->dfs_cac_offload;
@@ -4416,6 +4418,19 @@ static void hdd_register_sr_concurrency_cb(struct nan_callbacks *cb_obj)
 static void hdd_register_sr_concurrency_cb(struct nan_callbacks *cb_obj)
 {}
 #endif
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+static void hdd_register_ndp_update_peer_bw_cb(struct nan_callbacks *cb_obj)
+{
+	cb_obj->ndp_update_peer_bw = hdd_ndp_update_peer_bw;
+}
+#else
+static inline
+void hdd_register_ndp_update_peer_bw_cb(struct nan_callbacks *cb_obj)
+{
+}
+#endif
+
 static void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
 {
 	struct nan_callbacks cb_obj = {0};
@@ -4435,6 +4450,7 @@ static void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.set_mc_list = hdd_update_multicast_list;
 
 	hdd_register_sr_concurrency_cb(&cb_obj);
+	hdd_register_ndp_update_peer_bw_cb(&cb_obj);
 
 	os_if_nan_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }
@@ -4485,11 +4501,11 @@ static void hdd_check_for_objmgr_peer_leaks(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t vdev_id;
 	struct wlan_objmgr_vdev *vdev;
-	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_peer *peer, *next;
 
 	/* get module id which cause the leak and release ref */
 	wlan_objmgr_for_each_psoc_vdev(psoc, vdev_id, vdev) {
-		wlan_objmgr_for_each_vdev_peer(vdev, peer) {
+		wlan_objmgr_for_each_vdev_peer(vdev, peer, next) {
 			qdf_atomic_t *ref_id_dbg;
 			int ref_id;
 			int32_t refs;
@@ -5397,6 +5413,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		hdd_register_policy_manager_callback(
 			hdd_ctx->psoc);
 
+		hdd_tx_powerboost_init(hdd_ctx);
 		/*
 		 * Call this function before hdd_enable_power_management. Since
 		 * it is required to trigger WMI_PDEV_DMA_RING_CFG_REQ_CMDID
@@ -7438,7 +7455,9 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 			      ((cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE ||
 			       wlan_hdd_is_session_type_monitor(session_type)) ?
 			       hdd_mon_mode_ether_setup : ether_setup),
-			      NUM_TX_QUEUES, NUM_RX_QUEUES);
+			      ((session_type == QDF_STA_MODE) ?
+			       NDP_NUM_TX_QUEUES : NUM_TX_QUEUES),
+			      NUM_RX_QUEUES);
 
 	if (!dev) {
 		hdd_err("Failed to allocate new net_device '%s'", name);
@@ -8239,53 +8258,6 @@ hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
 		hdd_err_rl("invalid mac addr");
 		return -EINVAL;
 	}
-
-	return 0;
-}
-#elif defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
-static int
-hdd_populate_vdev_create_params(struct wlan_hdd_link_info *link_info,
-				struct wlan_vdev_create_params *vdev_params)
-{
-	struct hdd_adapter *adapter = link_info->adapter;
-	struct hdd_mlo_adapter_info *mlo_adapter_info;
-	struct hdd_adapter *link_adapter;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	bool eht_capab;
-
-	hdd_enter_dev(adapter->dev);
-	mlo_adapter_info = &adapter->mlo_adapter_info;
-	hdd_vdev_populate_wfd_mode(adapter, vdev_params);
-
-	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (mlo_adapter_info->is_ml_adapter && eht_capab &&
-	    adapter->device_mode == QDF_STA_MODE) {
-		link_adapter = hdd_get_assoc_link_adapter(adapter);
-		if (link_adapter) {
-			qdf_ether_addr_copy(vdev_params->macaddr,
-					    link_adapter->mac_addr.bytes);
-		} else {
-			return -EINVAL;
-		}
-	} else {
-		qdf_ether_addr_copy(vdev_params->macaddr,
-				    adapter->mac_addr.bytes);
-	}
-
-	vdev_params->opmode = adapter->device_mode;
-
-	if (eht_capab) {
-		qdf_ether_addr_copy(vdev_params->mldaddr,
-				    adapter->mld_addr.bytes);
-	}
-
-	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)vdev_params->macaddr)) {
-		hdd_err_rl("invalid mac addr");
-		return -EINVAL;
-	}
-
-	vdev_params->size_vdev_priv = sizeof(struct vdev_osif_priv);
-	hdd_exit();
 
 	return 0;
 }
@@ -14090,7 +14062,16 @@ wlan_hdd_display_adapter_netif_queue_stats(struct hdd_adapter *adapter)
 	int i;
 	qdf_time_t total, pause, unpause, curr_time, delta;
 	struct hdd_netif_queue_history *q_hist_ptr;
-	char q_status_buf[NUM_TX_QUEUES * HDD_NETDEV_TX_Q_STATE_STRLEN] = {0};
+	uint8_t num_tx_queues = adapter->dev->num_tx_queues;
+	char *q_status_buf;
+
+	q_status_buf = qdf_mem_malloc(sizeof(*q_status_buf) * num_tx_queues *
+				      HDD_NETDEV_TX_Q_STATE_STRLEN);
+	if (!q_status_buf) {
+		hdd_err("Mem alloc failure for queue status buffer - num_queues:%d mode:%d",
+			num_tx_queues, adapter->device_mode);
+		return;
+	}
 
 	hdd_nofl_debug("Netif queue operation statistics:");
 	hdd_nofl_debug("vdev_id %d device mode %d",
@@ -14144,7 +14125,7 @@ wlan_hdd_display_adapter_netif_queue_stats(struct hdd_adapter *adapter)
 			continue;
 		q_hist_ptr = &adapter->queue_oper_history[i];
 		wlan_hdd_dump_queue_history_state(q_hist_ptr,
-						  q_status_buf,
+						  num_tx_queues, q_status_buf,
 						  sizeof(q_status_buf));
 		hdd_nofl_debug("%2d%20u%50s%30s%10x  %s",
 			       i, qdf_system_ticks_to_msecs(
@@ -14158,6 +14139,8 @@ wlan_hdd_display_adapter_netif_queue_stats(struct hdd_adapter *adapter)
 				   adapter->queue_oper_history[i].pause_map,
 				   q_status_buf);
 	}
+
+	qdf_mem_free(q_status_buf);
 }
 
 void
@@ -18349,6 +18332,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 			ucfg_ipa_uc_shutdown_opt_dp_ctrl_cleanup(hdd_ctx->pdev);
 
 		hdd_son_send_module_status_event(HDD_WLAN_STATUS_EVT_DOWN);
+		hdd_tx_powerboost_deinit(hdd_ctx);
 		if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
 			hdd_disable_power_management(hdd_ctx);
 			break;
@@ -20295,10 +20279,10 @@ void hdd_init_start_completion(void)
 }
 
 #ifdef WLAN_CTRL_NAME
-static unsigned int dev_num = 1;
+static unsigned int dev_num;
 static struct cdev wlan_hdd_state_cdev;
-static struct class *class;
-static dev_t device;
+struct class *class;
+dev_t device;
 
 static void hdd_set_adapter_wlm_def_level(struct hdd_context *hdd_ctx)
 {
@@ -20705,15 +20689,17 @@ const struct file_operations wlan_hdd_state_fops = {
 	.release = wlan_hdd_state_ctrl_param_release,
 };
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
-static struct class *wlan_hdd_class_create(const char *name)
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+static inline
+unsigned int wlan_hdd_number_of_devs(void)
 {
-	return class_create(THIS_MODULE, name);
+	return 2;
 }
 #else
-static struct class *wlan_hdd_class_create(const char *name)
+static inline
+unsigned int wlan_hdd_number_of_devs(void)
 {
-	return class_create(name);
+	return 1;
 }
 #endif
 
@@ -20722,11 +20708,12 @@ static int  wlan_hdd_state_ctrl_param_create(void)
 	unsigned int wlan_hdd_state_major = 0;
 	int ret;
 	struct device *dev;
+	unsigned int minor;
 
 	init_completion(&wlan_start_comp);
 	qdf_atomic_init(&wlan_hdd_state_fops_ref);
 
-	device = MKDEV(wlan_hdd_state_major, 0);
+	dev_num = wlan_hdd_number_of_devs();
 
 	ret = alloc_chrdev_region(&device, 0, dev_num, "qcwlanstate");
 	if (ret) {
@@ -20734,6 +20721,7 @@ static int  wlan_hdd_state_ctrl_param_create(void)
 		goto dev_alloc_err;
 	}
 	wlan_hdd_state_major = MAJOR(device);
+	minor = MINOR(device);
 	class = wlan_hdd_class_create(WLAN_CTRL_NAME);
 	if (IS_ERR(class)) {
 		pr_err("wlan_hdd_state class_create error");
@@ -20750,14 +20738,14 @@ static int  wlan_hdd_state_ctrl_param_create(void)
 
 	wlan_hdd_state_cdev.owner = THIS_MODULE;
 
-	ret = cdev_add(&wlan_hdd_state_cdev, device, dev_num);
+	ret = cdev_add(&wlan_hdd_state_cdev, MKDEV(wlan_hdd_state_major, minor), 1);
 	if (ret) {
 		pr_err("Failed to add cdev error");
 		goto cdev_add_err;
 	}
 
-	pr_info("wlan_hdd_state %s major(%d) initialized",
-		WLAN_CTRL_NAME, wlan_hdd_state_major);
+	pr_info("wlan_hdd_state %s major: %d minor: %d initialized",
+		WLAN_CTRL_NAME, wlan_hdd_state_major, minor);
 
 	return 0;
 
@@ -21914,6 +21902,12 @@ int hdd_driver_load(void)
 		hdd_err("Failed to create ctrl param; errno:%d", errno);
 		goto unregister_driver;
 	}
+
+	errno = wlan_hdd_tx_power_boost_dev_create();
+	if (errno) {
+		hdd_err("Failed to create dev txpb; errno:%d", errno);
+		goto unregister_driver;
+	}
 	hdd_create_wifi_root_obj_sysfs_files();
 out:
 	hdd_debug("%s: driver loaded", WLAN_MODULE_NAME);
@@ -22042,8 +22036,10 @@ void hdd_driver_unload(void)
 		osif_driver_sync_trans_stop(driver_sync);
 
 	hdd_distroy_wifi_root_obj_sysfs_files();
-	if (!soft_unload)
+	if (!soft_unload) {
+		wlan_hdd_tx_power_boost_dev_destroy();
 		wlan_hdd_state_ctrl_param_destroy();
+	}
 
 	/* trigger SoC remove */
 	wlan_hdd_unregister_driver();

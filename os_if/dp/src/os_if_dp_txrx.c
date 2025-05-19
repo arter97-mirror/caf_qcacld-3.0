@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -178,7 +178,7 @@ void osif_dp_mark_pkt_type(struct sk_buff *skb)
 	 * TX Packets in the HI_PRIO queue are assumed to be critical and
 	 * marked accordingly.
 	 */
-	if (skb->queue_mapping == TX_GET_QUEUE_IDX(HDD_LINUX_AC_HI_PRIO, 0))
+	if (skb->queue_mapping == TX_HI_PRIO_QUEUE_IDX)
 		osif_dp_mark_critical_pkt(skb);
 	else
 		osif_dp_mark_non_critical_pkt(skb);

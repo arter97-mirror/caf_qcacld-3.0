@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -65,6 +65,7 @@ struct dp_rx_tm_handle_cmn;
  * @rx_nbufq_loop_yield: rx loop yield counter
  * @num_ndev_hold: number of netdevice references hold
  * @num_ndev_release: number of netdevice references released
+ * @nbuf_per_cpu: packets processed in the thread per CPU core
  */
 struct dp_rx_thread_stats {
 	unsigned int nbuf_queued[DP_RX_TM_MAX_REO_RINGS];
@@ -83,6 +84,7 @@ struct dp_rx_thread_stats {
 	unsigned int rx_nbufq_loop_yield;
 	unsigned int num_ndev_hold;
 	unsigned int num_ndev_release;
+	unsigned int nbuf_per_cpu[QDF_MAX_AVAILABLE_CPU];
 };
 
 /**

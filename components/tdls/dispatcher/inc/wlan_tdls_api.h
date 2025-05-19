@@ -209,6 +209,17 @@ void wlan_tdls_notify_channel_switch_start(struct wlan_objmgr_psoc *psoc,
  */
 void wlan_tdls_handle_p2p_client_connect(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_tdls_recompute_offchannel_mode() - Recompute TDLS offchannel mode
+ * related parameters
+ * @psoc: Pointer to PSOC object
+ * @vdev: Pointer to vdev
+ *
+ * Return: None
+ */
+void wlan_tdls_recompute_offchannel_mode(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
@@ -412,5 +423,10 @@ bool wlan_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
 {
 	return false;
 }
+
+static inline void
+wlan_tdls_recompute_offchannel_mode(struct wlan_objmgr_psoc *psoc,
+				    struct wlan_objmgr_vdev *vdev)
+{}
 #endif
 #endif

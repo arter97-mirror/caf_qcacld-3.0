@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -636,6 +636,29 @@ ucfg_nan_remove_ndp_peer_mac_addr(struct wlan_objmgr_psoc *psoc,
  * Return: true if nan  is allowed otherwise false
  */
 bool ucfg_nan_is_allowed(struct wlan_objmgr_psoc *psoc);
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+/**
+ * ucfg_nan_get_peer_ndi_addr_by_id() - Get peer ndi mac address using ndp
+ *  instance id
+ * @vdev: ndp vdev
+ * @ndp_instance_id: NDP instance identifier
+ * @peer_ndi_addr: peer NDI address to be filled
+ *
+ * Return: QDF status
+ */
+QDF_STATUS ucfg_nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
+					    uint32_t ndp_instance_id,
+					    struct qdf_mac_addr *peer_ndi_addr);
+#else
+static inline
+QDF_STATUS ucfg_nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
+					    uint32_t ndp_instance_id,
+					    struct qdf_mac_addr *peer_ndi_addr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #else /* WLAN_FEATURE_NAN */
 
 static inline
@@ -821,6 +844,14 @@ ucfg_nan_get_fw_addr(struct wlan_objmgr_psoc *psoc)
 static inline bool ucfg_nan_is_allowed(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
+}
+
+static inline
+QDF_STATUS ucfg_nan_get_peer_ndi_addr_by_id(struct wlan_objmgr_vdev *vdev,
+					    uint32_t ndp_instance_id,
+					    struct qdf_mac_addr *peer_ndi_addr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* WLAN_FEATURE_NAN */
 #endif /* _NAN_UCFG_API_H_ */

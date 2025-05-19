@@ -1022,6 +1022,15 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 	case ROAM_AGGRESSIVE_NEIGHBOR_LOOKUP_RSSI_THRESHOLD:
 		dst_config->uint_value = mlme_obj->cfg.lfr.roam_aggre_threshold;
 		break;
+	case ROAM_PERIODIC_SCAN_INTERVAL:
+		dst_config->uint_value = src_cfg->roam_periodic_scan_interval;
+		break;
+	case ROAM_SCORE_DELTA:
+		dst_config->uint_value = src_cfg->roam_score_delta;
+		break;
+	case ROAM_CONFIG_RT_PARAMS_ENABLED:
+		dst_config->bool_value = rso_cfg->roam_cfg_rt_params_enabled;
+		break;
 	default:
 		mlme_err("Invalid roam config requested:%d", roam_cfg_type);
 		status = QDF_STATUS_E_FAILURE;
@@ -1681,6 +1690,27 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		rso_cfg->roam_band_bitmask = src_config->uint_value;
 		mlme_debug("[ROAM BAND] Set roam band:%d",
 			   rso_cfg->roam_band_bitmask);
+		break;
+	case ROAM_2P4GHZ_BAND_WEIGHTAGE:
+		dst_cfg->band_2g_weightage = src_config->uint_value;
+		break;
+	case ROAM_5GHZ_BAND_WEIGHTAGE:
+		dst_cfg->band_5g_weightage = src_config->uint_value;
+		break;
+	case ROAM_6GHZ_BAND_WEIGHTAGE:
+		dst_cfg->band_6g_weightage = src_config->uint_value;
+		break;
+	case ROAM_RESCAN_RSSI_DIFF:
+		dst_cfg->roam_rescan_rssi_diff = src_config->uint_value;
+		break;
+	case ROAM_PERIODIC_SCAN_INTERVAL:
+		dst_cfg->roam_periodic_scan_interval = src_config->uint_value;
+		break;
+	case ROAM_SCORE_DELTA:
+		dst_cfg->roam_score_delta = src_config->uint_value;
+		break;
+	case ROAM_CONFIG_RT_PARAMS_ENABLED:
+		rso_cfg->roam_cfg_rt_params_enabled = src_config->bool_value;
 		break;
 	default:
 		mlme_err("Invalid roam config requested:%d", roam_cfg_type);
@@ -5910,16 +5940,22 @@ wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 		wlan_cm_set_roam_offload_bssid(vdev, &bssid);
 	}
 
-	/* For 2.4GHz,5GHz get channel from DS IE */
-	extracted_ie = (uint8_t *)wlan_get_ie_ptr_from_eid(WLAN_ELEMID_DSPARMS,
-							   ie_ptr, ie_len);
-	if (extracted_ie && extracted_ie[0] == WLAN_ELEMID_DSPARMS &&
-	    extracted_ie[1] == WLAN_DS_PARAM_IE_MAX_LEN) {
-		band = BIT(REG_BAND_2G) | BIT(REG_BAND_5G);
-		primary_channel = *(extracted_ie + 2);
-		mlme_debug("Extracted primary channel from DS : %d",
-			   primary_channel);
-		goto update_beacon;
+	/* For 6GHz, get channel from HE OP IE */
+	extracted_ie = (uint8_t *)
+		wlan_get_ext_ie_ptr_from_ext_id(WLAN_HEOP_OUI_TYPE,
+						(uint8_t)
+						WLAN_HEOP_OUI_SIZE,
+						ie_ptr, ie_len);
+	if (extracted_ie && !qdf_mem_cmp(&extracted_ie[2], WLAN_HEOP_OUI_TYPE,
+					 WLAN_HEOP_OUI_SIZE) &&
+	   extracted_ie[1] <= WLAN_MAX_HEOP_IE_LEN) {
+		band = BIT(REG_BAND_6G);
+		primary_channel = util_scan_get_6g_oper_channel(extracted_ie);
+		if (primary_channel) {
+			mlme_debug("Extracted primary channel from HE OP : %d",
+				   primary_channel);
+			goto update_beacon;
+		}
 	}
 
 	/* For HT, VHT and non-6GHz HE, get channel from HTINFO IE */
@@ -5931,26 +5967,26 @@ wlan_cm_add_frame_to_scan_db(struct wlan_objmgr_psoc *psoc,
 		band = BIT(REG_BAND_2G) | BIT(REG_BAND_5G);
 		primary_channel =
 			((struct wlan_ie_htinfo *)extracted_ie)->
-						hi_ie.hi_ctrlchannel;
-		mlme_debug("Extracted primary channel from HT INFO : %d",
-			   primary_channel);
-		goto update_beacon;
-	}
-	/* For 6GHz, get channel from HE OP IE */
-	extracted_ie = (uint8_t *)
-			wlan_get_ext_ie_ptr_from_ext_id(WLAN_HEOP_OUI_TYPE,
-							(uint8_t)
-							WLAN_HEOP_OUI_SIZE,
-							ie_ptr, ie_len);
-	if (extracted_ie && !qdf_mem_cmp(&extracted_ie[2], WLAN_HEOP_OUI_TYPE,
-					 WLAN_HEOP_OUI_SIZE) &&
-	    extracted_ie[1] <= WLAN_MAX_HEOP_IE_LEN) {
-		band = BIT(REG_BAND_6G);
-		primary_channel = util_scan_get_6g_oper_channel(extracted_ie);
-		mlme_debug("Extracted primary channel from HE OP : %d",
-			   primary_channel);
-		if (primary_channel)
+							hi_ie.hi_ctrlchannel;
+		if (primary_channel) {
+			mlme_debug("Extracted primary channel from HT INFO : %d",
+				   primary_channel);
 			goto update_beacon;
+		}
+	}
+
+	/* For 2.4GHz,5GHz get channel from DS IE */
+	extracted_ie = (uint8_t *)wlan_get_ie_ptr_from_eid(WLAN_ELEMID_DSPARMS,
+							   ie_ptr, ie_len);
+	if (extracted_ie && extracted_ie[0] == WLAN_ELEMID_DSPARMS &&
+	    extracted_ie[1] == WLAN_DS_PARAM_IE_MAX_LEN) {
+		band = BIT(REG_BAND_2G) | BIT(REG_BAND_5G);
+		primary_channel = *(extracted_ie + 2);
+		if (primary_channel) {
+			mlme_debug("Extracted primary channel from DS : %d",
+				   primary_channel);
+			goto update_beacon;
+		}
 	}
 
 	mlme_err("Ignore beacon, Primary channel was not found in the candidate frame");

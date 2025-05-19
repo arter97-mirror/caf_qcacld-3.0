@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5110,14 +5110,14 @@ void wlan_mlme_get_safe_mode_enable(struct wlan_objmgr_psoc *psoc,
 				    bool *safe_mode_enable);
 
 /**
- * wlan_mlme_get_6g_ap_power_type() - get the power type of the
+ * wlan_mlme_get_curr_6g_power_type() - get the current 6ghz power type of the
  * vdev operating on 6GHz.
  *
  * @vdev: vdev context
  *
  * Return: 6g_power_type
  */
-uint32_t wlan_mlme_get_6g_ap_power_type(struct wlan_objmgr_vdev *vdev);
+uint32_t wlan_mlme_get_curr_6g_power_type(struct wlan_objmgr_vdev *vdev);
 
 QDF_STATUS wlan_connect_hw_mode_change_resp(struct wlan_objmgr_pdev *pdev,
 					    uint8_t vdev_id,
@@ -5527,4 +5527,45 @@ wlan_mlme_get_min_he_mcs_map(uint16_t he_mcs_map1, uint16_t he_mcs_map2);
  * Return: sap rx mcs map 160 of he cap
  */
 uint16_t wlan_mlme_get_sap_he_rx_mcs_map_160(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * wlan_mlme_reinit_real_time_roam_parms() - Reinit real time roaming params
+ * @psoc: pointer to psoc object
+ * @cfg_params: cfg_params
+ * @mlme_obj: pointer to mlme_obj
+ */
+void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
+					   struct rso_cfg_params *cfg_params,
+					   struct wlan_mlme_psoc_ext_obj *mlme_obj);
+
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * wlan_mlme_get_c2c_support () - Get C2C support info
+ * @psoc: psoc ctx
+ * @value: c2c support flag pointer
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value);
+#else
+static inline QDF_STATUS
+wlan_mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	*value = false;
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+/**
+ * wlan_mlme_update_ch_width_from_ap() - Set flag of channel bandwidth changed
+ * by beacon ie update or user space config
+ *
+ * @mlme_priv: Pointer to Pointer to vdev mlme legacy priv struct
+ * @value:init value is false, user space config will set false,
+ *        update from bcn will set true.
+ * Return: None
+ */
+void wlan_mlme_update_ch_width_from_ap(struct mlme_legacy_priv *mlme_priv,
+				       bool value);
+
 #endif /* _WLAN_MLME_API_H_ */

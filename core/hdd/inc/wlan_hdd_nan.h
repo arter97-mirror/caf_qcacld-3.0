@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -60,6 +60,20 @@ int wlan_hdd_cfg80211_nan_ext_request(struct wiphy *wiphy,
  */
 void hdd_nan_sr_concurrency_update(struct nan_event_params *nan_evt);
 #endif
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+/**
+ * hdd_ndp_update_peer_bw() - Update NDP peer bandwidth
+ * @vdev_id: vdev id
+ * @peer_mac: NDP peer mac address
+ * @peer_bw: NDP peer max bandwidth
+ *
+ * Return: None
+ */
+void hdd_ndp_update_peer_bw(uint8_t vdev_id, struct qdf_mac_addr *peer_mac,
+			    enum phy_ch_width peer_bw);
+#endif
+
 #define FEATURE_NAN_VENDOR_COMMANDS					\
 	{                                                               \
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,                \

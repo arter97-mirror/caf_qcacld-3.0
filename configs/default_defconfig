@@ -447,6 +447,9 @@ CONFIG_QCACLD_FEATURE_GREEN_AP := y
 #Flag to enable pre cac feature
 CONFIG_FEATURE_WLAN_PRE_CAC := y
 
+#Flag to enable DFS No Wait
+CONFIG_FEATURE_WLAN_DNW := y
+
 #Flag to enable Android Packet Filtering
 CONFIG_QCACLD_FEATURE_APF := y
 

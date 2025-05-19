@@ -60,6 +60,18 @@ LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
 endif
 
+# Auto Gen4 Target DDK support
+ifeq ($(TARGET_BOARD_PLATFORM), gen4)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+endif
+
+# Auto Gen5 Target DDK support
+ifeq ($(TARGET_BOARD_PLATFORM), gen5)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+endif
+
 LOCAL_PATH := $(call my-dir)
 $(call wlog,LOCAL_PATH=$(LOCAL_PATH))
 BOARD_OPENSOURCE_DIR ?= vendor/qcom/opensource

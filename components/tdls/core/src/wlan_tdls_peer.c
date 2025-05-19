@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -699,7 +699,7 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 
 		ch_state = wlan_reg_get_channel_state_for_pwrmode(
 							pdev, ch_freq,
-							REG_CURRENT_PWR_MODE);
+							REG_CLI_DEF_VLP);
 
 		if (CHANNEL_STATE_INVALID != ch_state &&
 		    !wlan_reg_is_dfs_for_freq(pdev, ch_freq) &&
@@ -710,10 +710,18 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 				wlan_reg_get_channel_reg_power_for_freq(pdev,
 								       ch_freq);
 			} else {
-				tx_power =
-				tdls_get_6g_pwr_for_power_type(vdev_obj->vdev,
-							       ch_freq,
-							       REG_CLI_DEF_VLP);
+				if (wlan_reg_is_indoor_ap_detected(pdev))
+					tx_power =
+					tdls_get_6g_pwr_for_power_type(
+							vdev_obj->vdev,
+							ch_freq,
+							REG_CLI_DEF_C2C);
+				else
+					tx_power =
+					tdls_get_6g_pwr_for_power_type(
+							vdev_obj->vdev,
+							ch_freq,
+							REG_CLI_DEF_VLP);
 			}
 			peer_param->peer_cap.peer_chan[num].pwr = tx_power;
 			peer_param->peer_cap.peer_chan[num].dfs_set = false;

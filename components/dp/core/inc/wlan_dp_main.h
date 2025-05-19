@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -934,8 +934,9 @@ dp_is_low_tput_gro_enable(struct wlan_dp_psoc_context *dp_ctx)
 #define DP_HOST_STA_TX_TIMEOUT    BIT(16)
 #define DP_HOST_SAP_TX_TIMEOUT    BIT(17)
 #define DP_HOST_NUD_FAILURE       BIT(18)
+#define DP_MAC_PHY_RESET          BIT(30)
 #define DP_TIMEOUT_WLM_MODE       BIT(31)
-#define FW_DATA_STALL_EVT_MASK     0x8000FFFF
+#define FW_DATA_STALL_EVT_MASK     0xC000FFFF
 
 /**
  * dp_is_data_stall_event_enabled() - Check if data stall detection is enabled
@@ -1282,6 +1283,52 @@ static inline bool wlan_dp_link_check_cdp_vdev(struct wlan_dp_link *dp_link,
 		      cdp_vdev_list_elem) {
 		if (temp_cdp_vdev == cdp_vdev)
 			return true;
+	}
+
+	return false;
+}
+
+#ifndef WLAN_SUPPORT_FLOW_PRIORTIZATION
+/* Change in the below macros, will need to updated in wlan_dp_fim.h as well */
+#define FLOW_INFO_PRESENT_PROTO			BIT(0)
+#define FLOW_INFO_PRESENT_SRC_PORT		BIT(1)
+#define FLOW_INFO_PRESENT_DST_PORT		BIT(2)
+#define FLOW_INFO_PRESENT_IPV4_SRC_IP		BIT(3)
+#define FLOW_INFO_PRESENT_IPV4_DST_IP		BIT(4)
+#define FLOW_INFO_PRESENT_IPV6_SRC_IP		BIT(5)
+#define FLOW_INFO_PRESENT_IPV6_DST_IP		BIT(6)
+#define FLOW_INFO_PRESENT_IP_FRAGMENT		BIT(7)
+#define FLOW_INFO_IPV4_PARSE_SUCCESS		(FLOW_INFO_PRESENT_PROTO |\
+						FLOW_INFO_PRESENT_SRC_PORT |\
+						FLOW_INFO_PRESENT_DST_PORT |\
+						FLOW_INFO_PRESENT_IPV4_SRC_IP |\
+						FLOW_INFO_PRESENT_IPV4_DST_IP)
+#define FLOW_INFO_IPV6_PARSE_SUCCESS		(FLOW_INFO_PRESENT_PROTO |\
+						FLOW_INFO_PRESENT_SRC_PORT |\
+						FLOW_INFO_PRESENT_DST_PORT |\
+						FLOW_INFO_PRESENT_IPV6_SRC_IP |\
+						FLOW_INFO_PRESENT_IPV6_DST_IP)
+#endif
+
+static inline
+bool dp_flow_info_exact_match(struct flow_info *fi, struct flow_info *flow)
+{
+	if (fi->flags & FLOW_INFO_IPV4_PARSE_SUCCESS) {
+		if (flow->src_ip.ipv4_addr == fi->src_ip.ipv4_addr &&
+		    flow->dst_ip.ipv4_addr == fi->dst_ip.ipv4_addr &&
+		    flow->src_port == fi->src_port &&
+		    flow->dst_port == fi->dst_port &&
+		    flow->proto == fi->proto) {
+			return true;
+		}
+	} else if (fi->flags & FLOW_INFO_IPV6_PARSE_SUCCESS) {
+		if (qdf_mem_cmp(&flow->dst_ip.ipv6_addr, &fi->dst_ip.ipv6_addr,
+				sizeof(struct in6_addr)) == 0 &&
+		    qdf_mem_cmp(&flow->dst_ip.ipv6_addr, &fi->dst_ip.ipv6_addr,
+				sizeof(struct in6_addr)) == 0 &&
+		    flow->flow_label == fi->flow_label) {
+			return true;
+		}
 	}
 
 	return false;

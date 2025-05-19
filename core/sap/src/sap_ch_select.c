@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2375,7 +2375,7 @@ sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 				all_ch_safe = false;
 
 			is_acs_channel = wlansap_is_channel_present_in_acs_list(
-					chan_info[j].chan_freq,
+					chan_info[j + i].chan_freq,
 					sap_ctx->acs_cfg->freq_list,
 					sap_ctx->acs_cfg->ch_list_count);
 			if (is_acs_channel)
@@ -2676,7 +2676,7 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 				all_ch_safe = false;
 
 			is_acs_channel = wlansap_is_channel_present_in_acs_list(
-						chan_info[j].chan_freq,
+						chan_info[j + i].chan_freq,
 						sap_ctx->acs_cfg->freq_list,
 						sap_ctx->acs_cfg->ch_list_count);
 
@@ -3064,7 +3064,7 @@ sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 				all_ch_safe = false;
 
 			is_acs_channel = wlansap_is_channel_present_in_acs_list(
-					chan_info[j].chan_freq,
+					chan_info[j + i].chan_freq,
 					sap_ctx->acs_cfg->freq_list,
 					sap_ctx->acs_cfg->ch_list_count);
 			if (is_acs_channel)

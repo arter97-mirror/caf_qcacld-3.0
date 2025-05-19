@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,7 @@
 #include "wlan_fpm_table.h"
 #endif
 #include <cdp_txrx_ctrl.h>
+#include <cdp_txrx_host_stats.h>
 
 void wlan_dp_update_peer_map_unmap_version(uint8_t *version)
 {
@@ -196,3 +197,9 @@ wlan_dp_notify_ndp_channel_info(struct wlan_objmgr_peer *peer,
 						     num_channels);
 }
 #endif /* WLAN_DP_DYNAMIC_RESOURCE_MGMT */
+
+QDF_STATUS wlan_dp_get_vdev_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+				  struct cdp_vdev_stats *buf)
+{
+	return cdp_host_get_vdev_stats(soc, vdev_id, buf, true);
+}

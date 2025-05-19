@@ -160,18 +160,6 @@ QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
 void hdd_wlan_register_mlo_interfaces(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_get_assoc_link_adapter() - get assoc link adapter
- * @ml_adapter: ML adapter
- *
- * This function returns assoc link adapter.
- * For single link ML adapter, function returns
- * same adapter pointer.
- *
- * Return: adapter or NULL
- */
-struct hdd_adapter *hdd_get_assoc_link_adapter(struct hdd_adapter *ml_adapter);
-
-/**
  * hdd_adapter_set_sl_ml_adapter() - Set adapter as sl ml adapter
  * @adapter: HDD adapter
  *
@@ -216,12 +204,6 @@ void hdd_register_wdev(struct hdd_adapter *sta_adapter,
 		       struct hdd_adapter *link_adapter,
 		       struct hdd_adapter_create_param *adapter_params)
 {
-}
-
-static inline
-struct hdd_adapter *hdd_get_assoc_link_adapter(struct hdd_adapter *ml_adapter)
-{
-	return NULL;
 }
 
 static inline void

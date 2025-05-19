@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -64,6 +64,60 @@
 
 #ifdef TX_MULTIQ_PER_AC
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
+#ifdef NDP_TX_BW_FLOW_CTRL
+/*
+ * One Hi prio queue, 4 queues per VO, VI and BK AC
+ * and 33 queues for BE (1 queue dedicated for MC/BC)
+ */
+const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
+	SME_AC_VO,
+	SME_AC_VO,
+	SME_AC_VO,
+	SME_AC_VO,
+	SME_AC_VO,
+	SME_AC_VI,
+	SME_AC_VI,
+	SME_AC_VI,
+	SME_AC_VI,
+	SME_AC_BK,
+	SME_AC_BK,
+	SME_AC_BK,
+	SME_AC_BK,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+};
+#else
 /*
  * Mapping Linux AC interpretation to SME AC.
  * Host has 4 queues per access category (4 AC) and 1 high priority queue.
@@ -76,21 +130,21 @@ const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
 	SME_AC_VO,
 	SME_AC_VO,
 	SME_AC_VO,
-	SME_AC_VI,
-	SME_AC_VI,
-	SME_AC_VI,
-	SME_AC_VI,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BK,
-	SME_AC_BK,
-	SME_AC_BK,
-	SME_AC_BK,
 	SME_AC_VO,
+	SME_AC_VI,
+	SME_AC_VI,
+	SME_AC_VI,
+	SME_AC_VI,
+	SME_AC_BK,
+	SME_AC_BK,
+	SME_AC_BK,
+	SME_AC_BK,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
 };
-
+#endif
 #else
 const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
 	SME_AC_VO,
@@ -101,19 +155,35 @@ const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
 	SME_AC_VI,
 	SME_AC_VI,
 	SME_AC_VI,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
-	SME_AC_BE,
 	SME_AC_BK,
 	SME_AC_BK,
 	SME_AC_BK,
 	SME_AC_BK,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
 };
-
 #endif
 #else
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
+#ifdef NDP_TX_BW_FLOW_CTRL
+const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
+	SME_AC_VO,
+	SME_AC_VO,
+	SME_AC_VI,
+	SME_AC_BK,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+	SME_AC_BE,
+};
+#else
 /*
  * Mapping Linux AC interpretation to SME AC.
  * Host has 5 tx queues, 4 flow-controlled queues for regular traffic and
@@ -122,18 +192,18 @@ const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
  */
 const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
 	SME_AC_VO,
-	SME_AC_VI,
-	SME_AC_BE,
-	SME_AC_BK,
 	SME_AC_VO,
+	SME_AC_VI,
+	SME_AC_BK,
+	SME_AC_BE,
 };
-
+#endif
 #else
 const uint8_t hdd_qdisc_ac_to_tl_ac[] = {
 	SME_AC_VO,
 	SME_AC_VI,
-	SME_AC_BE,
 	SME_AC_BK,
+	SME_AC_BE,
 };
 
 #endif
@@ -522,6 +592,10 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	osif_dp_mark_pkt_type(skb);
 	hdd_tx_latency_record_ingress_ts(adapter, skb);
 
+	if (adapter->device_mode == QDF_NDI_MODE &&
+	    ucfg_dp_is_ndp_bw_flow_ctrl_enabled(adapter->hdd_ctx->psoc))
+		osif_dp_ndp_set_peer_bw(skb);
+
 	/* Get TL AC corresponding to Qdisc queue index/AC. */
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
 
@@ -671,7 +745,7 @@ static void __hdd_tx_timeout(struct net_device *dev)
 	 * recovery here
 	 */
 
-	for (i = 0; i < NUM_TX_QUEUES; i++) {
+	for (i = 0; i < dev->num_tx_queues; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 		hdd_debug("Queue: %d status: %d txq->trans_start: %lu",
 			  i, netif_tx_queue_stopped(txq), txq->trans_start);
@@ -876,7 +950,7 @@ static void wlan_hdd_update_txq_timestamp(struct net_device *dev)
 	struct netdev_queue *txq;
 	int i;
 
-	for (i = 0; i < NUM_TX_QUEUES; i++) {
+	for (i = 0; i < dev->num_tx_queues; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 
 		/*
@@ -913,11 +987,14 @@ static void wlan_hdd_update_unpause_time(struct hdd_adapter *adapter)
  * wlan_hdd_update_pause_time() - update pause time
  * @adapter: adapter handle
  * @temp_map: pause map
+ * @is_update_for_single_reason: whether pause time update is for single or
+ *  multiple reasons
  *
  * Return: none
  */
 static void wlan_hdd_update_pause_time(struct hdd_adapter *adapter,
-				       uint32_t temp_map)
+				       uint32_t temp_map,
+				       bool is_update_for_single_reason)
 {
 	qdf_time_t curr_time = qdf_system_ticks();
 	uint8_t i;
@@ -931,20 +1008,22 @@ static void wlan_hdd_update_pause_time(struct hdd_adapter *adapter,
 		if (temp_map & (1 << i)) {
 			adapter->queue_oper_stats[i].total_pause_time +=
 								 pause_time;
-			break;
+
+			if (is_update_for_single_reason)
+				break;
 		}
 	}
-
 }
 
 uint32_t
 wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *queue_history,
-				  char *buf, uint32_t size)
+				  uint8_t num_tx_queues, char *buf,
+				  uint32_t size)
 {
 	unsigned int i;
 	unsigned int index = 0;
 
-	for (i = 0; i < NUM_TX_QUEUES; i++) {
+	for (i = 0; i < num_tx_queues; i++) {
 		index += qdf_scnprintf(buf + index,
 				       size - index,
 				       "%u:0x%lx ",
@@ -968,16 +1047,152 @@ wlan_hdd_update_queue_history_state(struct net_device *dev,
 				    struct hdd_netif_queue_history *q_hist)
 {
 	unsigned int i = 0;
-	uint32_t num_tx_queues = 0;
 	struct netdev_queue *txq = NULL;
 
-	num_tx_queues = qdf_min(dev->num_tx_queues, (uint32_t)NUM_TX_QUEUES);
-
-	for (i = 0; i < num_tx_queues; i++) {
+	for (i = 0; i < dev->num_tx_queues; i++) {
 		txq = netdev_get_tx_queue(dev, i);
 		q_hist->tx_q_state[i] = txq->state;
 	}
 }
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+void wlan_hdd_get_txq_info_for_ac(struct hdd_adapter *adapter,
+				  enum hdd_wmm_linuxac ac,
+				  uint8_t *txq_base_idx, uint8_t *num_queues)
+{
+	if (adapter->device_mode == QDF_NDI_MODE) {
+		if (ac == HDD_LINUX_AC_BE) {
+			*num_queues = NDP_NUM_TX_QUEUES_BE;
+			*txq_base_idx = TX_BE_BASE_QUEUE_IDX;
+		} else {
+			*num_queues = TX_QUEUES_PER_AC;
+			*txq_base_idx = TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, 0);
+		}
+	} else {
+		*num_queues = TX_QUEUES_PER_AC;
+		*txq_base_idx = TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, 0);
+	}
+}
+
+static
+void wlan_hdd_ndp_handle_bw_queue_control(struct hdd_adapter *adapter,
+					  enum netif_action_type action,
+					  enum netif_reason_type reason)
+{
+	enum cdp_peer_bw peer_bw;
+	bool is_queue_pause = false;
+	uint8_t bw_queue_base_index;
+	uint8_t peer_bitmap;
+	uint8_t peer_idx = -1;
+	uint8_t iter;
+
+	switch (action) {
+	case WLAN_NETIF_BE_20MHZ_QUEUE_OFF:
+		is_queue_pause = true;
+		fallthrough;
+	case WLAN_NETIF_BE_20MHZ_QUEUE_ON:
+		peer_bw = CDP_PEER_BW_20MHZ;
+		break;
+	case WLAN_NETIF_BE_40MHZ_QUEUE_OFF:
+		is_queue_pause = true;
+		fallthrough;
+	case WLAN_NETIF_BE_40MHZ_QUEUE_ON:
+		peer_bw = CDP_PEER_BW_40MHZ;
+		break;
+	case WLAN_NETIF_BE_80MHZ_QUEUE_OFF:
+		is_queue_pause = true;
+		fallthrough;
+	case WLAN_NETIF_BE_80MHZ_QUEUE_ON:
+		peer_bw = CDP_PEER_BW_80MHZ;
+		break;
+	case WLAN_NETIF_BE_160MHZ_QUEUE_OFF:
+		is_queue_pause = true;
+		fallthrough;
+	case WLAN_NETIF_BE_160MHZ_QUEUE_ON:
+		peer_bw = CDP_PEER_BW_160MHZ;
+		break;
+	case WLAN_NETIF_BE_320MHZ_QUEUE_OFF:
+		is_queue_pause = true;
+		fallthrough;
+	case WLAN_NETIF_BE_320MHZ_QUEUE_ON:
+		peer_bw = CDP_PEER_BW_320MHZ;
+		break;
+	default:
+		hdd_err("unsupported action for NDP interface %d", action);
+		return;
+	}
+
+	if (is_queue_pause) {
+		if (adapter->subqueue_pause_map)
+			wlan_hdd_update_pause_time(adapter,
+						   adapter->subqueue_pause_map,
+						   false);
+		else
+			wlan_hdd_update_unpause_time(adapter);
+
+		adapter->queue_oper_stats[reason].pause_count++;
+		adapter->subqueue_pause_map |= BIT(reason);
+		peer_bitmap = adapter->ndp_peer_bitmap[peer_bw];
+		adapter->ndp_peer_pause_bitmap[peer_bw] = peer_bitmap;
+	} else {
+		wlan_hdd_update_pause_time(adapter, adapter->subqueue_pause_map,
+					   false);
+		adapter->queue_oper_stats[reason].unpause_count++;
+		adapter->subqueue_pause_map &= ~BIT(reason);
+		peer_bitmap = adapter->ndp_peer_pause_bitmap[peer_bw];
+		adapter->ndp_peer_pause_bitmap[peer_bw] = 0;
+	}
+
+	for (; peer_bitmap != 0; peer_bitmap >>= 1) {
+		peer_idx++;
+		if (!(peer_bitmap & 0x1))
+			continue;
+
+		bw_queue_base_index = NDP_TX_GET_BE_QUEUE_IDX(HDD_LINUX_AC_BE,
+							      0, peer_idx);
+
+		if (is_queue_pause) {
+			for (iter = 0; iter < NDP_NUM_TX_QUEUES_PER_PEER;
+			     iter++)
+				netif_stop_subqueue(adapter->dev,
+						    bw_queue_base_index++);
+		} else {
+			for (iter = 0; iter < NDP_NUM_TX_QUEUES_PER_PEER;
+			     iter++)
+				netif_wake_subqueue(adapter->dev,
+						    bw_queue_base_index++);
+		}
+	}
+}
+
+static
+void wlan_hdd_ndp_reset_subq_map_n_stats(struct hdd_adapter *adapter)
+{
+	uint8_t i;
+
+	for (i = WLAN_DATA_FLOW_CTRL_BE_20MHZ;
+	     i <= WLAN_DATA_FLOW_CTRL_BE_320MHZ; i++) {
+		if (!(adapter->subqueue_pause_map & BIT(i)))
+			continue;
+
+		adapter->queue_oper_stats[i].unpause_count++;
+		adapter->subqueue_pause_map &= ~BIT(i);
+	}
+}
+
+#else
+static inline
+void wlan_hdd_ndp_handle_bw_queue_control(struct hdd_adapter *adapter,
+					  enum netif_action_type action,
+					  enum netif_reason_type reason)
+{
+}
+
+static inline
+void wlan_hdd_ndp_reset_subq_map_n_stats(struct hdd_adapter *adapter)
+{
+}
+#endif
 
 /**
  * wlan_hdd_stop_non_priority_queue() - stop non priority queues
@@ -987,17 +1202,17 @@ wlan_hdd_update_queue_history_state(struct net_device *dev,
  */
 static inline void wlan_hdd_stop_non_priority_queue(struct hdd_adapter *adapter)
 {
+	enum hdd_wmm_linuxac ac;
+	uint8_t num_queues_for_ac;
+	uint8_t ac_txq_idx;
 	uint8_t i;
 
-	for (i = 0; i < TX_QUEUES_PER_AC; i++) {
-		netif_stop_subqueue(adapter->dev,
-				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_VO, i));
-		netif_stop_subqueue(adapter->dev,
-				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_VI, i));
-		netif_stop_subqueue(adapter->dev,
-				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_BE, i));
-		netif_stop_subqueue(adapter->dev,
-				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_BK, i));
+	for (ac = HDD_LINUX_AC_VO; ac < HDD_LINUX_AC_MAX; ac++) {
+		wlan_hdd_get_txq_info_for_ac(adapter, ac, &ac_txq_idx,
+					     &num_queues_for_ac);
+
+		for (i = 0; i < num_queues_for_ac; i++)
+			netif_stop_subqueue(adapter->dev, ac_txq_idx++);
 	}
 }
 
@@ -1009,36 +1224,46 @@ static inline void wlan_hdd_stop_non_priority_queue(struct hdd_adapter *adapter)
  */
 static inline void wlan_hdd_wake_non_priority_queue(struct hdd_adapter *adapter)
 {
+	enum hdd_wmm_linuxac ac;
+	uint8_t num_queues_for_ac;
+	uint8_t ac_txq_idx;
 	uint8_t i;
 
-	for (i = 0; i < TX_QUEUES_PER_AC; i++) {
-		netif_wake_subqueue(adapter->dev,
-				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_VO, i));
-		netif_wake_subqueue(adapter->dev,
-				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_VI, i));
-		netif_wake_subqueue(adapter->dev,
-				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_BE, i));
-		netif_wake_subqueue(adapter->dev,
-				    TX_GET_QUEUE_IDX(HDD_LINUX_AC_BK, i));
+	for (ac = HDD_LINUX_AC_VO; ac < HDD_LINUX_AC_MAX; ac++) {
+		wlan_hdd_get_txq_info_for_ac(adapter, ac, &ac_txq_idx,
+					     &num_queues_for_ac);
+
+		for (i = 0; i < num_queues_for_ac; i++)
+			netif_wake_subqueue(adapter->dev, ac_txq_idx++);
 	}
 }
 
 static inline
 void hdd_wake_queues_for_ac(struct net_device *dev, enum hdd_wmm_linuxac ac)
 {
+	uint8_t num_queues_for_ac;
+	uint8_t ac_txq_idx;
 	uint8_t i;
 
-	for (i = 0; i < TX_QUEUES_PER_AC; i++)
-		netif_wake_subqueue(dev, TX_GET_QUEUE_IDX(ac, i));
+	wlan_hdd_get_txq_info_for_ac(WLAN_HDD_GET_PRIV_PTR(dev), ac,
+				     &ac_txq_idx, &num_queues_for_ac);
+
+	for (i = 0; i < num_queues_for_ac; i++)
+		netif_wake_subqueue(dev, ac_txq_idx++);
 }
 
 static inline
 void hdd_stop_queues_for_ac(struct net_device *dev, enum hdd_wmm_linuxac ac)
 {
+	uint8_t num_queues_for_ac;
+	uint8_t ac_txq_idx;
 	uint8_t i;
 
-	for (i = 0; i < TX_QUEUES_PER_AC; i++)
-		netif_stop_subqueue(dev, TX_GET_QUEUE_IDX(ac, i));
+	wlan_hdd_get_txq_info_for_ac(WLAN_HDD_GET_PRIV_PTR(dev), ac,
+				     &ac_txq_idx, &num_queues_for_ac);
+
+	for (i = 0; i < num_queues_for_ac; i++)
+		netif_stop_subqueue(dev, ac_txq_idx++);
 }
 
 /**
@@ -1109,14 +1334,15 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		if (reason == WLAN_DATA_FLOW_CTRL_PRI) {
 			temp_map = adapter->subqueue_pause_map;
 			adapter->subqueue_pause_map &= ~(1 << reason);
+			wlan_hdd_update_pause_time(adapter, temp_map, false);
 		} else {
 			temp_map = adapter->pause_map;
 			adapter->pause_map &= ~(1 << reason);
+			wlan_hdd_update_pause_time(adapter, temp_map, true);
 		}
 		if (!adapter->pause_map) {
 			netif_wake_subqueue(adapter->dev,
-				HDD_LINUX_AC_HI_PRIO * TX_QUEUES_PER_AC);
-			wlan_hdd_update_pause_time(adapter, temp_map);
+				TX_HI_PRIO_QUEUE_IDX);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1125,14 +1351,18 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		spin_lock_bh(&adapter->pause_map_lock);
 		if (!adapter->pause_map) {
 			netif_stop_subqueue(adapter->dev,
-				    HDD_LINUX_AC_HI_PRIO * TX_QUEUES_PER_AC);
+				    TX_HI_PRIO_QUEUE_IDX);
 			wlan_hdd_update_txq_timestamp(adapter->dev);
-			wlan_hdd_update_unpause_time(adapter);
 		}
-		if (reason == WLAN_DATA_FLOW_CTRL_PRI)
+		if (reason == WLAN_DATA_FLOW_CTRL_PRI) {
+			wlan_hdd_update_pause_time(adapter,
+						   adapter->subqueue_pause_map,
+						   false);
 			adapter->subqueue_pause_map |= (1 << reason);
-		else
+		} else {
+			wlan_hdd_update_unpause_time(adapter);
 			adapter->pause_map |= (1 << reason);
+		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
 
@@ -1142,7 +1372,12 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 			hdd_stop_queues_for_ac(adapter->dev, HDD_LINUX_AC_BK);
 			hdd_stop_queues_for_ac(adapter->dev, HDD_LINUX_AC_BE);
 			wlan_hdd_update_txq_timestamp(adapter->dev);
-			wlan_hdd_update_unpause_time(adapter);
+			if (adapter->subqueue_pause_map)
+				wlan_hdd_update_pause_time(adapter,
+						adapter->subqueue_pause_map,
+						false);
+			else
+				wlan_hdd_update_unpause_time(adapter);
 		}
 		adapter->subqueue_pause_map |= (1 << reason);
 		spin_unlock_bh(&adapter->pause_map_lock);
@@ -1155,7 +1390,10 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		if (!adapter->pause_map) {
 			hdd_wake_queues_for_ac(adapter->dev, HDD_LINUX_AC_BK);
 			hdd_wake_queues_for_ac(adapter->dev, HDD_LINUX_AC_BE);
-			wlan_hdd_update_pause_time(adapter, temp_map);
+			wlan_hdd_update_pause_time(adapter, temp_map, false);
+			if (adapter->device_mode == QDF_NDI_MODE &&
+			    ucfg_dp_is_ndp_bw_flow_ctrl_enabled(adapter->hdd_ctx->psoc))
+				wlan_hdd_ndp_reset_subq_map_n_stats(adapter);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1165,7 +1403,9 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		if (!adapter->pause_map) {
 			hdd_stop_queues_for_ac(adapter->dev, HDD_LINUX_AC_VI);
 			wlan_hdd_update_txq_timestamp(adapter->dev);
-			wlan_hdd_update_unpause_time(adapter);
+			wlan_hdd_update_pause_time(adapter,
+						   adapter->subqueue_pause_map,
+						   false);
 		}
 		adapter->subqueue_pause_map |= (1 << reason);
 		spin_unlock_bh(&adapter->pause_map_lock);
@@ -1177,7 +1417,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->subqueue_pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			hdd_wake_queues_for_ac(adapter->dev, HDD_LINUX_AC_VI);
-			wlan_hdd_update_pause_time(adapter, temp_map);
+			wlan_hdd_update_pause_time(adapter, temp_map, false);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1187,7 +1427,9 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		if (!adapter->pause_map) {
 			hdd_stop_queues_for_ac(adapter->dev, HDD_LINUX_AC_VO);
 			wlan_hdd_update_txq_timestamp(adapter->dev);
-			wlan_hdd_update_unpause_time(adapter);
+			wlan_hdd_update_pause_time(adapter,
+						   adapter->subqueue_pause_map,
+						   false);
 		}
 		adapter->subqueue_pause_map |= (1 << reason);
 		spin_unlock_bh(&adapter->pause_map_lock);
@@ -1199,7 +1441,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->subqueue_pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			hdd_wake_queues_for_ac(adapter->dev, HDD_LINUX_AC_VO);
-			wlan_hdd_update_pause_time(adapter, temp_map);
+			wlan_hdd_update_pause_time(adapter, temp_map, false);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1210,7 +1452,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			netif_tx_start_all_queues(adapter->dev);
-			wlan_hdd_update_pause_time(adapter, temp_map);
+			wlan_hdd_update_pause_time(adapter, temp_map, true);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1221,7 +1463,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			netif_tx_wake_all_queues(adapter->dev);
-			wlan_hdd_update_pause_time(adapter, temp_map);
+			wlan_hdd_update_pause_time(adapter, temp_map, true);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1232,7 +1474,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			wlan_hdd_wake_non_priority_queue(adapter);
-			wlan_hdd_update_pause_time(adapter, temp_map);
+			wlan_hdd_update_pause_time(adapter, temp_map, true);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1256,7 +1498,7 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		adapter->pause_map &= ~(1 << reason);
 		if (!adapter->pause_map) {
 			netif_tx_start_all_queues(adapter->dev);
-			wlan_hdd_update_pause_time(adapter, temp_map);
+			wlan_hdd_update_pause_time(adapter, temp_map, true);
 		}
 		spin_unlock_bh(&adapter->pause_map_lock);
 		break;
@@ -1265,7 +1507,17 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 		break;
 
 	default:
-		hdd_err("unsupported action %d", action);
+		if (adapter->device_mode == QDF_NDI_MODE &&
+		    ucfg_dp_is_ndp_bw_flow_ctrl_enabled(adapter->hdd_ctx->psoc)) {
+			spin_lock_bh(&adapter->pause_map_lock);
+			if (!adapter->pause_map)
+				wlan_hdd_ndp_handle_bw_queue_control(adapter,
+								     action,
+								     reason);
+			spin_unlock_bh(&adapter->pause_map_lock);
+		} else {
+			hdd_err("unsupported action %d", action);
+		}
 	}
 
 	spin_lock_bh(&adapter->pause_map_lock);

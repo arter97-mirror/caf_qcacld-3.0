@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4006,6 +4006,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	bool capable, is_wps;
 	int32_t keymgmt;
 	enum policy_mgr_con_mode pm_con_mode;
+	qdf_freq_t ll_sap_freq;
 
 	if (!link_info)
 		return -EINVAL;
@@ -4071,6 +4072,19 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 				wlan_vdev_get_id(sap_ctx->vdev),
 				LL_SAP_CSA_CONCURENCY);
 		return ret;
+	}
+
+	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(hdd_ctx->psoc);
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+							   adapter->device_mode,
+							   link_info->vdev_id);
+
+	if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
+	    policy_mgr_are_2_freq_on_same_mac(hdd_ctx->psoc, target_chan_freq,
+					      ll_sap_freq)) {
+		hdd_err("ll_sap freq %d and sap freq %d are on same mac",
+			ll_sap_freq, target_chan_freq);
+		return -EINVAL;
 	}
 
 	if (wlan_reg_is_6ghz_chan_freq(target_chan_freq) &&
@@ -7443,7 +7457,10 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 			config->chan_freq = hdd_ctx->acs_policy.acs_chan_freq;
 		mode = hdd_ctx->acs_policy.acs_dfs_mode;
 		config->acs_dfs_mode = wlan_hdd_get_dfs_mode(mode);
+	} else {
+		wlan_sap_set_acs_band_mask(link_info->vdev, REG_BAND_MASK_ALL);
 	}
+
 	ucfg_util_vdev_mgr_set_acs_mode_for_vdev(vdev,
 						 config->acs_cfg.acs_mode);
 
@@ -8298,6 +8315,13 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 
 	wlan_hdd_cleanup_actionframe(link_info);
 	wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
+
+	/* Restore cfg TWT responder */
+	if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
+	    adapter->device_mode == QDF_SAP_MODE &&
+	    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, link_info->vdev_id))
+		ucfg_twt_cfg_reset_responder(hdd_ctx->psoc);
+
 	mutex_lock(&hdd_ctx->sap_lock);
 	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		struct hdd_hostapd_state *hostapd_state =
@@ -8330,6 +8354,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 					    false);
 		wlan_twt_concurrency_update(hdd_ctx);
 		wlan_set_sap_user_config_freq(link_info->vdev, 0);
+		wlan_sap_set_acs_band_mask(link_info->vdev, REG_BAND_MASK_ALL);
 		status = ucfg_if_mgr_deliver_event(
 				link_info->vdev,
 				WLAN_IF_MGR_EV_AP_STOP_BSS_COMPLETE, NULL);
@@ -8374,6 +8399,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 			      eUPDATE_IE_ASSOC_RESP) == QDF_STATUS_E_FAILURE) {
 		hdd_err("Could not pass on ASSOC_RSP data to PE");
 	}
+
 	/* Reset WNI_CFG_PROBE_RSP Flags */
 	wlan_hdd_reset_prob_rspies(link_info);
 	hdd_destroy_acs_timer(adapter);
@@ -8807,7 +8833,8 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 					    twt_responder &&
 					    twt_res_cfg)));
 
-	hdd_debug("cfg80211 TWT responder:%d", twt_responder);
+	hdd_debug("cfg80211 TWT responder: %d, enable twt: %d, twt_res_cfg: %d",
+		  twt_responder, enable_twt, twt_res_cfg);
 	if (enable_twt && twt_responder && twt_res_cfg) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {

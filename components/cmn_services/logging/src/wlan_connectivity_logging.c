@@ -1185,7 +1185,7 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 					int rssi,
 					bool is_peer_disconnect)
 {
-	uint8_t int_reason;
+	uint8_t int_reason = 0;
 	uint32_t diag_reason;
 	struct qdf_mac_addr peer_mac_addr;
 	struct wlan_objmgr_pdev *pdev;

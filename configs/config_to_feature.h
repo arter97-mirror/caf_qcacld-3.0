@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -131,6 +131,10 @@
 
 #ifdef CONFIG_FEATURE_WLAN_PRE_CAC
 #define PRE_CAC_SUPPORT (1)
+#endif
+
+#ifdef CONFIG_FEATURE_WLAN_DNW
+#define WLAN_FEATURE_DNW (1)
 #endif
 
 #ifdef CONFIG_WIFI_POS_PASN
@@ -3183,6 +3187,11 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 #define DP_FEATURE_RX_BUFFER_RECYCLE (1)
 #endif
 
+#if defined(CONFIG_PAGE_POOL) && defined(CONFIG_DP_FEATURE_TX_PAGE_POOL)
+#define DP_FEATURE_TX_PAGE_POOL (1)
+#define WLAN_DP_ENABLE_SW_TSO (1)
+#endif
+
 #ifdef CONFIG_DP_FTM_MODE_SKIP_WBM_RING_INIT
 #define DP_FTM_MODE_SKIP_WBM_RING_INIT (1)
 #endif
@@ -3195,8 +3204,16 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 #define WLAN_SUPPORT_BCAST_TWT (1)
 #endif
 
+#ifdef CONFIG_WLAN_TX_POWERBOOST
+#define FEATURE_WLAN_TX_POWERBOOST (1)
+#endif
+
 #ifdef CONFIG_WLAN_LOCAL_PKT_CAPTURE_SUBFILTER
 #define WLAN_LOCAL_PKT_CAPTURE_SUBFILTER (1)
+#endif
+
+#ifdef CONFIG_IPA_WDI3_PENDING_BUFF_REPORT
+#define IPA_WDI3_PENDING_BUFF_REPORT (1)
 #endif
 
 #ifdef CONFIG_WLAN_BOOST_CPU_FREQ_IN_ROAM
@@ -3209,6 +3226,11 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 
 #ifdef CONFIG_IPA_WDI3_VLAN_SUPPORT
 #define IPA_WDI3_VLAN_SUPPORT (1)
+#endif
+
+#if defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2) && \
+	defined(CONFIG_NDP_TX_BW_FLOW_CTRL)
+#define NDP_TX_BW_FLOW_CTRL (1)
 #endif
 
 #endif /* CONFIG_TO_FEATURE_H */

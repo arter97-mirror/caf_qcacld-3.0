@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5862,6 +5862,10 @@ char *mlme_get_roam_fail_reason_str(enum wlan_roam_failure_reason_code result)
 		return "REASSOC TO SAME AP";
 	case ROAM_FAIL_REASON_MLD_EXTRA_SCAN_REQUIRED:
 		return "MLD EXTRA SCAN REQUIRED";
+	case ROAM_FAIL_REASON_TTLM_REQUIRED:
+		return "TTLM triggered instead of Roam";
+	case ROAM_FAIL_REASON_LINKRECONFIG_REQUIRED:
+		return "Linkreconfig triggered instead of Roam";
 	default:
 		return "UNKNOWN";
 	}
@@ -7730,7 +7734,7 @@ void wlan_mlme_set_safe_mode_enable(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.gen.safe_mode_enable = safe_mode_enable;
 }
 
-uint32_t wlan_mlme_get_6g_ap_power_type(struct wlan_objmgr_vdev *vdev)
+uint32_t wlan_mlme_get_curr_6g_power_type(struct wlan_objmgr_vdev *vdev)
 {
 	struct vdev_mlme_obj *mlme_obj;
 
@@ -8105,7 +8109,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 	wlan_mlme_get_sap_max_peers(psoc, &sap_max_num_clients);
 	mlme_feature_set->sap_max_num_clients = sap_max_num_clients;
 	mlme_feature_set->vendor_req_1_version =
-					WMI_HOST_VENDOR1_REQ1_VERSION_4_20;
+					WMI_HOST_VENDOR1_REQ1_VERSION_4_40;
 	roam_triggers = wlan_mlme_get_roaming_triggers(psoc);
 
 	wlan_mlme_get_bss_load_enabled(psoc, &is_bss_load_enabled);
@@ -8193,6 +8197,12 @@ void wlan_mlme_set_puncture(struct wlan_channel *des_chan,
 }
 #endif
 
+void wlan_mlme_update_ch_width_from_ap(struct mlme_legacy_priv *mlme_priv,
+				       bool value)
+{
+	mlme_priv->connect_info.assoc_chan_info.update_from_ap = value;
+}
+
 static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 					    uint8_t vdev_id,
 					    enum phy_ch_width ch_width,
@@ -8205,6 +8215,11 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 	struct ch_params ch_params = {0};
 	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status;
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return QDF_STATUS_E_INVAL;
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
@@ -8239,6 +8254,8 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 		mlme_err("Failed to update phymode");
 		return QDF_STATUS_E_INVAL;
 	}
+
+	wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
 
 	qdf_mem_copy(bss_chan, des_chan, sizeof(struct wlan_channel));
 
@@ -9236,3 +9253,44 @@ uint16_t wlan_mlme_get_sap_he_rx_mcs_map_160(struct wlan_objmgr_psoc *psoc)
 	return mlme_obj->cfg.sap_cfg.sap_he_rx_mcs_map_160;
 }
 
+#ifdef CONNECTION_ROAMING_CFG
+void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
+					   struct rso_cfg_params *cfg_params,
+					   struct wlan_mlme_psoc_ext_obj *mlme_obj)
+{
+	mlme_obj->cfg.roam_scoring.band_2g_weightage =
+			cfg_get(psoc, CFG_SCORING_2G_BAND_WEIGHTAGE);
+	mlme_obj->cfg.roam_scoring.band_5g_weightage =
+			cfg_get(psoc, CFG_SCORING_5G_BAND_WEIGHTAGE);
+	mlme_obj->cfg.roam_scoring.band_6g_weightage =
+			cfg_get(psoc, CFG_SCORING_6G_BAND_WEIGHTAGE);
+	mlme_obj->cfg.lfr.roam_rescan_rssi_diff =
+			cfg_get(psoc, CFG_LFR_ROAM_RESCAN_RSSI_DIFF);
+	mlme_obj->cfg.lfr.roam_periodic_scan_interval =
+			cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
+	mlme_obj->cfg.roam_scoring.roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
+	mlme_obj->cfg.roam_scoring.roam_aggre_score_delta =
+			cfg_get(psoc, CFG_AGGRESSIVE_ROAM_SCORE_DELTA);
+	mlme_obj->cfg.lfr.roam_aggre_scan_step_rssi =
+			cfg_get(psoc, CFG_ROAM_AGGRESSIVE_SCAN_STEP_RSSI);
+	cfg_params->roam_periodic_scan_interval =
+			cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
+	cfg_params->roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
+}
+#else
+void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
+					   struct rso_cfg_params *cfg_params,
+					   struct wlan_mlme_psoc_ext_obj *mlme_obj)
+{
+}
+#endif
+
+#ifdef CONFIG_BAND_6GHZ
+QDF_STATUS
+wlan_mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	return mlme_get_c2c_support(psoc, value);
+}
+#endif

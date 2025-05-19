@@ -185,6 +185,7 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * lim_calculate_tpc() - Utility to get maximum tx power
  * @mac: mac handle
  * @session: PE Session Entry
+ * @force_ap_vlp_pwr: Use VLP power for SAP and Go
  *
  * This function is used to get the maximum possible tx power from the list
  * of tx powers mentioned in @attr.
@@ -192,7 +193,8 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * Return: None
  */
 void lim_calculate_tpc(struct mac_context *mac,
-		       struct pe_session *session);
+		       struct pe_session *session,
+		       bool force_ap_vlp_pwr);
 
 /* AID pool management functions */
 
@@ -3538,6 +3540,20 @@ lim_is_power_change_required_for_sta(struct mac_context *mac_ctx,
  */
 void
 lim_update_tx_pwr_on_ctry_change_cb(uint8_t vdev_id);
+
+/**
+ * lim_update_tpc_bcn_on_c2c_detect_cb() - Callback to be invoked by regulatory
+ * module when c2c detect event is received.
+ * @psoc: Pointer to psoc.
+ *
+ * This API calls TPC calculation for each active 6 GHz vdev operating in
+ * VLP/indoor enable AP power. Also for SAP/P2P GO it'll update the beacon
+ * and fils discovery frame to FW.
+ *
+ * Return: None
+ */
+void
+lim_update_tpc_bcn_on_c2c_detect_cb(struct wlan_objmgr_psoc *psoc);
 
 /*
  * lim_get_connected_chan_for_mode() - Get connected channel for given opmode

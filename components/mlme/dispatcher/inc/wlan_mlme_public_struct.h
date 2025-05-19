@@ -1703,6 +1703,7 @@ struct wlan_mlme_acs {
  * @disable_btwt_usr_cfg: User config param to enable/disable the BTWT support
  * @enable_twt_24ghz: Enable/disable host TWT when STA is connected in
  * 2.4Ghz
+ * @disable_twt_on_scan: Enable/Disable TWT on scan
  * @disable_twt_info_frame: Enable/disable TWT info frame
  * @req_flag: requestor flag enable/disable
  * @res_flag: responder flag enable/disable
@@ -1721,6 +1722,7 @@ struct wlan_mlme_cfg_twt {
 	uint32_t twt_congestion_timeout;
 	bool disable_btwt_usr_cfg;
 	bool enable_twt_24ghz;
+	bool disable_twt_on_scan;
 	bool disable_twt_info_frame;
 	bool req_flag;
 	bool res_flag;
@@ -2835,6 +2837,7 @@ enum mlme_reg_srd_master_modes {
  * or not
  * @coex_unsafe_chan_reg_disable: To disable reg channels for received coex
  * unsafe channels list
+ * @enable_c2c_support: Enable C2C support flag
  */
 struct wlan_mlme_reg {
 	uint32_t self_gen_frm_pwr;
@@ -2864,6 +2867,9 @@ struct wlan_mlme_reg {
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
 	uint32_t coex_unsafe_chan_nb_user_prefer;
 	bool coex_unsafe_chan_reg_disable;
+#endif
+#ifdef CONFIG_BAND_6GHZ
+	bool enable_c2c_support;
 #endif
 };
 

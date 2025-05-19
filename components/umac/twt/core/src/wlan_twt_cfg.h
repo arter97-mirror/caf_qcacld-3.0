@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -82,6 +82,15 @@ wlan_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val);
  */
 QDF_STATUS
 wlan_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val);
+
+/**
+ * wlan_twt_cfg_reset_responder() - Reset cfg responder
+ * @psoc: psoc
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_twt_cfg_set_responder() - set cfg responder
@@ -226,6 +235,17 @@ QDF_STATUS
 wlan_twt_cfg_get_rtwt_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
+ * wlan_twt_cfg_get_twt_disabled_on_scan() - get wt_disabled_on_scan vlue
+ * @psoc: Pointer to global psoc
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_get_twt_disabled_on_scan(struct wlan_objmgr_psoc *psoc,
+				      bool *val);
+
+/**
  * wlan_twt_cfg_get_rtwt_responder() - get rtwt responder
  * @psoc: Pointer to global psoc
  * @val: pointer to output variable
@@ -289,6 +309,12 @@ wlan_twt_cfg_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
 
 static inline QDF_STATUS
 wlan_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
 }

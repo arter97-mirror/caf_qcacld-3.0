@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -156,6 +156,7 @@ enum log_event_indicator {
  * @WLAN_LOG_REASON_ROAM_HO_FAILURE: Handover failed during LFR3 roaming
  * @WLAN_LOG_REASON_DISCONNECT: Disconnect because of some failure
  * @WLAN_LOG_REASON_VDEV_DELETE_RSP_TIMED_OUT: vdev delete rsp time out
+ * @WLAN_LOG_REASON_DUMP_IN_PROGRESS: dump in progress
  */
 enum log_event_host_reason_code {
 	WLAN_LOG_REASON_CODE_UNUSED,
@@ -173,7 +174,8 @@ enum log_event_host_reason_code {
 	WLAN_LOG_REASON_HB_FAILURE,
 	WLAN_LOG_REASON_ROAM_HO_FAILURE,
 	WLAN_LOG_REASON_DISCONNECT,
-	WLAN_LOG_REASON_VDEV_DELETE_RSP_TIMED_OUT
+	WLAN_LOG_REASON_VDEV_DELETE_RSP_TIMED_OUT,
+	WLAN_LOG_REASON_DUMP_IN_PROGRESS
 };
 
 

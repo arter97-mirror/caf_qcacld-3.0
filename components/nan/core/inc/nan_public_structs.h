@@ -36,6 +36,10 @@
 struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
 
+#ifdef NDP_TX_BW_FLOW_CTRL
+enum phy_ch_width;
+#endif
+
 #define IFACE_NAME_SIZE 64
 #define NDP_QOS_INFO_LEN 255
 #define NDP_APP_INFO_LEN 255
@@ -898,6 +902,7 @@ struct nan_pasn_peer_ops {
  * @nan_sr_concurrency_update: Callback to handle nan SR(Spatial Reuse)
  * @pasn_peer_ops: structure contains the callbacks for pasn peer
  * concurrency
+ * @ndp_update_peer_bw: HDD callback to update peer bandwidth
  */
 struct nan_callbacks {
 	/* callback to os_if layer from umac */
@@ -929,6 +934,10 @@ struct nan_callbacks {
 	void (*nan_sr_concurrency_update)(struct nan_event_params *nan_evt);
 #endif
 	struct nan_pasn_peer_ops pasn_peer_ops;
+#ifdef NDP_TX_BW_FLOW_CTRL
+	void (*ndp_update_peer_bw)(uint8_t, struct qdf_mac_addr *,
+				   enum phy_ch_width);
+#endif
 };
 
 /**

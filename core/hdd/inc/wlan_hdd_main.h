@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -158,22 +158,63 @@ struct hdd_apf_context {
 #endif /* FEATURE_WLAN_APF */
 
 #ifdef TX_MULTIQ_PER_AC
-#define TX_GET_QUEUE_IDX(ac, off) (((ac) * TX_QUEUES_PER_AC) + (off))
 #define TX_QUEUES_PER_AC 4
 #else
-#define TX_GET_QUEUE_IDX(ac, off) (ac)
 #define TX_QUEUES_PER_AC 1
 #endif
 
-/** Number of Tx Queues */
+#define TX_HI_PRIO_QUEUE_IDX  0
+
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || \
 	defined(QCA_HL_NETDEV_FLOW_CONTROL) || \
 	defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
 /* Only one HI_PRIO queue */
-#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC + 1)
+#define NUM_HI_PRIO_TX_QUEUES 1
 #else
-#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC)
+#define NUM_HI_PRIO_TX_QUEUES 0
 #endif
+
+/** Number of Tx Queues */
+#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC + NUM_HI_PRIO_TX_QUEUES)
+#define NDP_NUM_TX_QUEUES_BK_VO_VI_PRIO (3 * TX_QUEUES_PER_AC + \
+					 NUM_HI_PRIO_TX_QUEUES)
+
+/* Get the tx queue index based on access category and flow hash */
+#define TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, flowq_idx) \
+	(((ac) - HDD_LINUX_AC_VO) * \
+	 TX_QUEUES_PER_AC + (flowq_idx) + \
+	 NUM_HI_PRIO_TX_QUEUES)
+
+#define TX_BE_BASE_QUEUE_IDX \
+	TX_GET_NON_HI_PRIO_QUEUE_IDX(HDD_LINUX_AC_BE, 0)
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+#define NDP_MAX_NUM_PEERS 8
+#define NDP_NUM_TX_QUEUES_PER_PEER TX_QUEUES_PER_AC
+/* One default queue for traffic not classifiable into the peer queues */
+#define NDP_NUM_TX_QUEUES_BE NDP_MAX_NUM_PEERS * NDP_NUM_TX_QUEUES_PER_PEER + 1
+/*
+ * Get the tx queue index for NDP peers based on access category,
+ * flow hash and peer index
+ */
+#define NDP_TX_GET_BE_QUEUE_IDX(ac, flowq_idx, peer_idx) \
+	(TX_BE_BASE_QUEUE_IDX + 1 + \
+	 (peer_idx) * NDP_NUM_TX_QUEUES_PER_PEER + \
+	 (flowq_idx))
+#else /* NDP_TX_BW_FLOW_CTRL */
+#define NDP_NUM_TX_QUEUES_BE TX_QUEUES_PER_AC
+#define NDP_TX_GET_BE_QUEUE_IDX(ac, flowq_idx, peer_idx) \
+	TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, flowq_idx)
+#endif /* NDP_TX_BW_FLOW_CTRL */
+
+#define NDP_NUM_TX_QUEUES           (NDP_NUM_TX_QUEUES_BE + \
+				     NDP_NUM_TX_QUEUES_BK_VO_VI_PRIO)
+
+#define NDP_TX_QUEUE_INDEX_PEER_BW_SHIFT   8
+#define NDP_TX_QUEUE_INDEX_PEER_BW_MASK    0xF00
+#define NDP_TX_QUEUE_INDEX_MASK            0xFF
+
+#define MAX_NUM_TX_QUEUES  QDF_MAX(NDP_NUM_TX_QUEUES, NUM_TX_QUEUES)
 
 #define NUM_RX_QUEUES 5
 
@@ -977,7 +1018,7 @@ struct hdd_netif_queue_history {
 	uint16_t netif_action;
 	uint16_t netif_reason;
 	uint32_t pause_map;
-	unsigned long tx_q_state[NUM_TX_QUEUES];
+	unsigned long tx_q_state[MAX_NUM_TX_QUEUES];
 };
 
 /**
@@ -1323,6 +1364,8 @@ enum wfc_state_latency_level {
  * @history_index:
  * @queue_oper_history:
  * @queue_oper_stats:
+ * @ndp_peer_bitmap: NDP peer bitmap
+ * @ndp_peer_pause_bitmap: bitmap of paused NDP peers
  * @debugfs_phy: debugfs entry
  * @lfr_fw_status:
  * @active_ac:
@@ -1502,6 +1545,10 @@ struct hdd_adapter {
 	struct hdd_netif_queue_history
 		 queue_oper_history[WLAN_HDD_MAX_HISTORY_ENTRY];
 	struct hdd_netif_queue_stats queue_oper_stats[WLAN_REASON_TYPE_MAX];
+#ifdef NDP_TX_BW_FLOW_CTRL
+	uint8_t ndp_peer_bitmap[CDP_PEER_BW_MAX];
+	uint8_t ndp_peer_pause_bitmap[CDP_PEER_BW_MAX];
+#endif
 
 	struct dentry *debugfs_phy;
 	struct lfr_firmware_status lfr_fw_status;
@@ -1970,6 +2017,48 @@ enum wlan_state_ctrl_str_id {
 #define MAX_TGT_HW_NAME_LEN 32
 #define HDD_MAX_IFACE_TYPE 2
 
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+/**
+ * struct hdd_tx_pb_dma_buf - HDD Power boost DMA buffer
+ *
+ * @vaddr: Aligned virtual address of the buffer
+ * @vaddr_unaligned: Unaligned virtual address of the buffer
+ * @paddr: Aligned physical address of the buffer
+ * @paddr_unaligned: Unaligned physical address of the buffer
+ * @size: Size of the buffer
+ */
+struct hdd_tx_pb_dma_buf {
+	void *vaddr;
+	void *vaddr_unaligned;
+	qdf_dma_addr_t paddr;
+	qdf_dma_addr_t paddr_unaligned;
+	uint32_t size;
+};
+
+/**
+ * struct hdd_tx_powerboost - HDD Tx powerboost
+ *
+ * @tx_powerboost_enabled: Feature enabled or not
+ * @pb_metadata: Powerboost meta data
+ * @txpb_app_launched: Userspace app launched or not
+ * @dma: DMA info
+ * @txpb_wake_lock: Tx power boost wake lock
+ * @txpb_runtime_lock: Tx power boost runtime lock
+ * @txpb_req_q: Tx powerboost request queue
+ * @txpb_req_q_lock: Protect Tx powerboost request queue
+ */
+struct hdd_tx_powerboost {
+	bool tx_powerboost_enabled;
+	struct reg_txpb_cmn_params pb_metadata;
+	bool txpb_app_launched;
+	struct hdd_tx_pb_dma_buf dma;
+	qdf_wake_lock_t txpb_wake_lock;
+	qdf_runtime_lock_t txpb_runtime_lock;
+	qdf_list_t txpb_req_q;
+	qdf_mutex_t txpb_req_q_lock;
+};
+#endif
+
 /**
  * struct hdd_context - hdd shared driver and psoc/device context
  * @psoc: object manager psoc context
@@ -2179,6 +2268,7 @@ enum wlan_state_ctrl_str_id {
  * @get_sta_user_notif: Get station notifier callback to handle port_id on
  *			userspace application close/abort
  * @usd_adapter: adapter on which USD frames to be forwarded to userspace
+ * @tx_pb: Tx powerboost context
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2483,6 +2573,9 @@ struct hdd_context {
 	struct notifier_block get_sta_user_notif;
 #ifdef FEATURE_WLAN_SUPPORT_USD
 	struct hdd_adapter *usd_adapter;
+#endif
+#ifdef FEATURE_WLAN_TX_POWERBOOST
+	struct hdd_tx_powerboost tx_pb;
 #endif
 };
 
@@ -6093,4 +6186,19 @@ static inline void hdd_release_rtnl_lock(void)
 static inline bool hdd_hold_rtnl_lock(void) { return false; }
 static inline void hdd_release_rtnl_lock(void) { }
 #endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
+static inline
+struct class *wlan_hdd_class_create(const char *name)
+{
+	return class_create(THIS_MODULE, name);
+}
+#else
+static inline
+struct class *wlan_hdd_class_create(const char *name)
+{
+	return class_create(name);
+}
+#endif
+
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

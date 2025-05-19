@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1568,6 +1568,63 @@ QDF_STATUS hdd_update_dp_vdev_flags(void *cbk_data,
 	return status;
 }
 
+#ifdef NDP_TX_BW_FLOW_CTRL
+static
+void hdd_ndp_set_peer_bw(struct wlan_hdd_link_info *link_info,
+			 struct qdf_mac_addr *peer_mac,
+			 enum phy_ch_width peer_bw)
+{
+	struct hdd_station_ctx *sta_ctx;
+	enum cdp_peer_bw cdp_bw;
+	uint8_t idx;
+
+	if (qdf_is_macaddr_broadcast(peer_mac))
+		return;
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	for (idx = 0; idx < MAX_PEERS; idx++) {
+		if (qdf_is_macaddr_zero(&sta_ctx->conn_info.peer_macaddr[idx]))
+			break;
+
+		if (qdf_is_macaddr_equal(&sta_ctx->conn_info.peer_macaddr[idx],
+					 peer_mac)) {
+			hdd_debug("Set NDP peer " QDF_MAC_ADDR_FMT " bandwidth:%u",
+				  QDF_MAC_ADDR_REF(peer_mac->bytes), peer_bw);
+			sta_ctx->conn_info.peer_bw[idx] = peer_bw;
+			cdp_bw = hdd_convert_ch_width_to_cdp_peer_bw(peer_bw);
+			link_info->adapter->ndp_peer_bitmap[cdp_bw] |=
+							BIT(idx ? idx - 1 : 0);
+			break;
+		}
+	}
+}
+
+static inline
+void hdd_reset_peer_bw(struct hdd_adapter *adapter,
+		       struct hdd_connection_info *conn_info, int peer_idx)
+{
+	enum cdp_peer_bw bw;
+
+	bw = hdd_convert_ch_width_to_cdp_peer_bw(conn_info->peer_bw[peer_idx]);
+	adapter->ndp_peer_bitmap[bw] &= ~BIT(peer_idx ? peer_idx - 1 : 0);
+	conn_info->peer_bw[peer_idx] = CH_WIDTH_20MHZ;
+}
+#else
+static inline
+void hdd_ndp_set_peer_bw(struct wlan_hdd_link_info *link_info,
+			 struct qdf_mac_addr *peer_mac,
+			 enum phy_ch_width peer_bw)
+{
+}
+
+static inline
+void hdd_reset_peer_bw(struct hdd_adapter *adapter,
+		       struct hdd_connection_info *conn_info, int peer_idx)
+{
+}
+#endif
+
 QDF_STATUS hdd_roam_register_sta(struct wlan_hdd_link_info *link_info,
 				 struct qdf_mac_addr *bssid,
 				 bool is_auth_required)
@@ -1619,6 +1676,7 @@ QDF_STATUS hdd_roam_register_sta(struct wlan_hdd_link_info *link_info,
 						adapter->hdd_ctx->psoc,
 						link_info->vdev_id);
 		ch_width = ucfg_mlme_get_ch_width_from_phymode(phymode);
+		hdd_ndp_set_peer_bw(link_info, &txrx_desc.peer_addr, ch_width);
 	} else {
 		ch_width = ucfg_mlme_get_peer_ch_width(adapter->hdd_ctx->psoc,
 						txrx_desc.peer_addr.bytes);
@@ -1887,7 +1945,8 @@ bool hdd_save_peer(struct hdd_station_ctx *sta_ctx,
 	return false;
 }
 
-void hdd_delete_peer(struct hdd_station_ctx *sta_ctx,
+void hdd_delete_peer(struct hdd_adapter *adapter,
+		     struct hdd_station_ctx *sta_ctx,
 		     struct qdf_mac_addr *peer_mac_addr)
 {
 	int i;
@@ -1896,6 +1955,7 @@ void hdd_delete_peer(struct hdd_station_ctx *sta_ctx,
 	for (i = 0; i < MAX_PEERS; i++) {
 		mac_addr = &sta_ctx->conn_info.peer_macaddr[i];
 		if (qdf_is_macaddr_equal(mac_addr, peer_mac_addr)) {
+			hdd_reset_peer_bw(adapter, &sta_ctx->conn_info, i);
 			qdf_zero_macaddr(mac_addr);
 			return;
 		}
@@ -2885,26 +2945,19 @@ hdd_convert_ch_width_to_cdp_peer_bw(enum phy_ch_width ch_width)
 {
 	switch (ch_width) {
 	case CH_WIDTH_20MHZ:
-		return CDP_20_MHZ;
+		return CDP_PEER_BW_20MHZ;
 	case CH_WIDTH_40MHZ:
-		return CDP_40_MHZ;
+		return CDP_PEER_BW_40MHZ;
 	case CH_WIDTH_80MHZ:
-		return CDP_80_MHZ;
+		return CDP_PEER_BW_80MHZ;
 	case CH_WIDTH_160MHZ:
-		return CDP_160_MHZ;
 	case CH_WIDTH_80P80MHZ:
-		return CDP_80P80_MHZ;
-	case CH_WIDTH_5MHZ:
-		return CDP_5_MHZ;
-	case CH_WIDTH_10MHZ:
-		return CDP_10_MHZ;
+		return CDP_PEER_BW_160MHZ;
 	case CH_WIDTH_320MHZ:
-		return CDP_320_MHZ;
+		return CDP_PEER_BW_320MHZ;
 	default:
-		return CDP_BW_INVALID;
+		return CDP_PEER_BW_20MHZ;
 	}
-
-	return CDP_BW_INVALID;
 }
 
 #ifdef WLAN_FEATURE_FILS_SK

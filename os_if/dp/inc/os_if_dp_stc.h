@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,6 +49,12 @@ flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1];
 	[QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_REPORT_INDEX] = {		\
 		.vendor_id = QCA_NL80211_VENDOR_ID,				\
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_REPORT,	\
+	},
+
+#define FEATURE_FLOW_STATUS_EVENTS					      \
+	[QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_STATUS_INDEX] = {	      \
+		.vendor_id = QCA_NL80211_VENDOR_ID,			      \
+		.subcmd = QCA_NL80211_VENDOR_SUBCMD_CLASSIFIED_FLOW_STATUS,   \
 	},
 
 /**

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1076,6 +1076,10 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 					mac->psoc,
 					lim_update_tx_pwr_on_ctry_change_cb);
 
+	wlan_reg_register_c2c_detect_callback(
+					mac->psoc,
+					lim_update_tpc_bcn_on_c2c_detect_cb);
+
 	wlan_reg_register_is_chan_connected_callback(mac->psoc,
 					lim_get_connected_chan_for_mode);
 
@@ -1125,6 +1129,10 @@ QDF_STATUS pe_close(struct mac_context *mac)
 	wlan_reg_unregister_ctry_change_callback(
 					mac->psoc,
 					lim_update_tx_pwr_on_ctry_change_cb);
+
+	wlan_reg_unregister_c2c_detect_callback(
+					mac->psoc,
+					lim_update_tpc_bcn_on_c2c_detect_cb);
 
 	wlan_reg_unregister_is_chan_connected_callback(mac->psoc,
 					lim_get_connected_chan_for_mode);
@@ -4105,6 +4113,7 @@ void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
 	}
 
 	mlme_priv->connect_info.assoc_chan_info.cur_ch_width = ch_width;
+	wlan_mlme_update_ch_width_from_ap(mlme_priv, true);
 }
 
 void lim_update_bcn_op_ch_width(struct wlan_objmgr_vdev *vdev,
@@ -4118,12 +4127,15 @@ void lim_update_bcn_op_ch_width(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	if (mlme_priv->connect_info.assoc_chan_info.cur_ch_width != ch_width)
+	if (mlme_priv->connect_info.assoc_chan_info.cur_ch_width != ch_width) {
 		mlme_priv->connect_info.assoc_chan_info.cur_ch_width = ch_width;
-	else
+		wlan_mlme_update_ch_width_from_ap(mlme_priv, true);
+	} else {
 		return;
+	}
 
-	pe_debug("update bcn eht/he/vht op chn width %d", ch_width);
+	pe_debug("update vdev %d bcn eht/he/vht op chn width %d",
+		 wlan_vdev_get_id(vdev), ch_width);
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO

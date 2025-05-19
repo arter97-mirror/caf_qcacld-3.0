@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -803,13 +803,13 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * cm_get_ml_partner_info() - Fill ML partner info from scan entry
- * @pdev: PDEV object
  * @conn_req: Connect request pointer
+ * @mlo_support_link_num: Supported Link Count
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-cm_get_ml_partner_info(struct wlan_objmgr_pdev *pdev,
-		       struct cm_connect_req *conn_req);
+cm_get_ml_partner_info(struct cm_connect_req *conn_req,
+		       uint8_t mlo_support_link_num);
 #endif
 #endif /* __WLAN_CM_VDEV_API_H__ */

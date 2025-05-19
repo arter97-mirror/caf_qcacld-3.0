@@ -625,6 +625,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	uint8_t bpcc;
 	bool cu_flag = true;
 	bool is_power_constraint_abs = false;
+	bool change_in_sta_pwr_type = false;
 
 	if (mlo_is_mld_sta(session->vdev)) {
 		if (!mlo_check_if_all_vdev_up(session->vdev)) {
@@ -703,12 +704,19 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						REG_CURRENT_MAX_AP_TYPE;
 		}
 
+		if (session->ap_defined_power_type_6g == REG_VERY_LOW_POWER_AP &&
+		    wlan_reg_is_indoor_ap_detected(mac_ctx->pdev))
+			session->ap_defined_power_type_6g = REG_INDOOR_ENABLED_AP;
+
 		status = wlan_reg_get_best_6g_power_type(
 				mac_ctx->psoc, mac_ctx->pdev, &pwr_type_6g,
 				session->ap_defined_power_type_6g,
 				bcn->chan_freq);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
+
+		if (session->best_6g_power_type != pwr_type_6g)
+			change_in_sta_pwr_type = true;
 
 		session->best_6g_power_type = pwr_type_6g;
 		mlme_set_best_6g_power_type(session->vdev, pwr_type_6g);
@@ -751,8 +759,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		}
 
 		if (ap_constraint_change || (tpe_change && !skip_tpe) ||
-		    session->cal_tpc_post_csa) {
-			lim_calculate_tpc(mac_ctx, session);
+		    session->cal_tpc_post_csa || change_in_sta_pwr_type) {
+			lim_calculate_tpc(mac_ctx, session, false);
 			session->cal_tpc_post_csa = false;
 
 			if (tx_ops->set_tpc_power)

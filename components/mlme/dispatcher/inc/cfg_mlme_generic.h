@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -240,7 +240,8 @@ enum wlan_epcs_frame {
  * options using bitmap based on following ENUM (Name of ENUM to be added)
  * @Min: 0x0
  * @Max: 0xFFFFFFFF
- * @Default: 0x20008 - To allow MLO WPA2-PMF cap APs and WPA3-SAE w/o H2E cap
+ * @Default: 0x3000f - To allow APs of MLO/non-MLO WPA2 PMF/non-PMF cap,
+ * MLO/non-MLO WPA3-SAE w/o H2E cap
  *
  * This INI is used to control the driver candidate selection and EHT
  * connection choice based on OEM configuration. The bitmap follows the
@@ -250,7 +251,7 @@ enum wlan_epcs_frame {
 		"oem_eht_mlo_crypto_bitmap", \
 		0x0, \
 		0xFFFFFFFF, \
-		0x20008, \
+		0x3000f, \
 		CFG_VALUE_OR_DEFAULT, \
 		"OEM control to allow/disallow crypto to EHT configuration")
 

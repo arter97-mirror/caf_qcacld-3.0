@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -234,6 +234,29 @@
 		"enable_twt_24ghz", \
 		true, \
 		"enable twt in 2.4Ghz band")
+
+/*
+ * <ini>
+ * disable_twt_on_scan - Disable target Wake Time during scan
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable the TWT during scan
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AX
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DISABLE_TWT_ON_SCAN CFG_INI_BOOL( \
+		"disable_twt_on_scan", \
+		false, \
+		"disable twt on scan")
+
 /*
  * <ini>
  * twt_disable_info - Enable/Disable TWT info frame.
@@ -314,6 +337,7 @@
 	CFG(CFG_TWT_CONGESTION_TIMEOUT) \
 	CFG(CFG_BCAST_TWT_REQ_RESP) \
 	CFG(CFG_ENABLE_TWT_24GHZ) \
+	CFG(CFG_DISABLE_TWT_ON_SCAN) \
 	CFG(CFG_DISABLE_TWT_INFO_FRAME) \
 	CFG(CFG_RTWT_REQ_RESP) \
 	CFG(CFG_TWT_REQ_RESP_HT_VHT)

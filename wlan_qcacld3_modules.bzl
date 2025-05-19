@@ -29,6 +29,7 @@ _target_chipset_map = {
         "kiwi-v2",
         "qca6750",
         "wcn7750",
+        "wcn7760",
     ],
     "volcano": [
         "qca6750",
@@ -43,6 +44,12 @@ _target_chipset_map = {
         "wcn7750",
     ],
     "sdxkova": [
+        "kiwi-v2",
+    ],
+    "autoghgvm": [
+        "qcn7605",
+        "qca6390",
+        "qca6490",
         "kiwi-v2",
     ],
     "autogvm": [
@@ -64,6 +71,7 @@ _chipset_hw_map = {
     "qcn7605": "HELIUMPLUS",
     "wcn6450": "RHINE",
     "fig": "BORON",
+    "wcn7760": "BERYLLIUM",
 }
 
 _chipset_header_map = {
@@ -105,6 +113,10 @@ _chipset_header_map = {
     ],
     "qcn7605": [
     ],
+    "wcn7760": [
+        "api/hw/qcc2072/v1",
+        "cmn/hal/wifi3.0/qcc2072",
+    ]
 }
 
 _hw_header_map = {
@@ -822,6 +834,14 @@ _conditional_srcs = {
             "cmn/hif/src/wcn7750def.c",
         ],
     },
+
+    "CONFIG_QCC2072_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/qcc2072/hal_qcc2072.c",
+            "cmn/hif/src/qcc2072def.c",
+        ],
+    },
+
     "CONFIG_CP_STATS": {
         True: [
             "cmn/target_if/cp_stats/src/target_if_cp_stats.c",
@@ -1089,6 +1109,13 @@ _conditional_srcs = {
             "components/pre_cac/dispatcher/src/wlan_pre_cac_ucfg_api.c",
             "core/hdd/src/wlan_hdd_pre_cac.c",
             "os_if/pre_cac/src/osif_pre_cac.c",
+        ],
+    },
+    "CONFIG_FEATURE_WLAN_DNW": {
+        True: [
+            "components/pre_cac/core/src/wlan_dfs_no_wait.c",
+            "components/pre_cac/dispatcher/src/wlan_dnw_ucfg_api.c",
+            "components/pre_cac/dispatcher/src/wlan_dnw_api.c",
         ],
     },
     "CONFIG_FEATURE_WLAN_TIME_SYNC_FTM": {
@@ -1443,7 +1470,7 @@ _conditional_srcs = {
             "cmn/target_if/ftm/src/target_if_ftm.c",
         ],
     },
-    "CONFIG_QCA_WIFI_FTM_NL80211": {
+    "CONFIG_NL80211_TESTMODE": {
         True: [
             "cmn/os_if/linux/ftm/src/wlan_cfg80211_ftm.c",
         ],
@@ -2390,6 +2417,16 @@ _conditional_srcs = {
             "cmn/qdf/linux/src/qdf_page_pool.c",
         ],
     },
+    "CONFIG_DP_FEATURE_TX_PAGE_POOL": {
+        True: [
+            "cmn/qdf/linux/src/qdf_page_pool.c",
+        ],
+    },
+    "CONFIG_WLAN_TX_POWERBOOST": {
+        True: [
+            "core/hdd/src/wlan_hdd_tx_powerboost.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
@@ -2419,10 +2456,17 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//build/kernel/kleaf:socrepo_false": [],
     })
 
-    kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
-    })
+    if target == "neo-la":
+        kernel_build = select({
+            "//build/kernel/kleaf:microxr_kernel_build_true": "//:target_kernel_build",
+            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//conditions:default": "//msm-kernel:{}".format(tv),
+        })
+    else:
+        kernel_build = select({
+            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        })
 
     ipaths = chipset_ipaths + hw_ipaths + _fixed_ipaths
 
@@ -2581,7 +2625,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
     ]
 
-    if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm":
+    if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),

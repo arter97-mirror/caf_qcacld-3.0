@@ -289,6 +289,10 @@ ifeq ($(CONFIG_FEATURE_OTA_TEST), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_ota_test.o
 endif
 
+ifeq ($(CONFIG_WLAN_TX_POWERBOOST), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_tx_powerboost.o
+endif
+
 ifeq ($(CONFIG_FEATURE_ACTIVE_TOS), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_active_tos.o
 endif
@@ -991,7 +995,7 @@ QDF_OBJS := \
 	$(QDF_OBJ_DIR)/qdf_talloc.o \
 	$(QDF_OBJ_DIR)/qdf_types.o \
 
-ifeq ($(CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE), y)
+ifneq (,$(filter y,$(CONFIG_DP_FEATURE_TX_PAGE_POOL) $(CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE)))
 QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_page_pool.o
 endif
 
@@ -1777,6 +1781,12 @@ WLAN_PRE_CAC_OBJS := $(HDD_SRC_DIR)/wlan_hdd_pre_cac.o \
 		$(PRE_CAC_OSIF_DIR)/src/osif_pre_cac.o
 endif
 
+ifeq ($(CONFIG_FEATURE_WLAN_DNW), y)
+WLAN_PRE_CAC_OBJS += $(WLAN_PRE_CAC_DIR)/core/src/wlan_dfs_no_wait.o \
+		$(WLAN_PRE_CAC_DIR)/dispatcher/src/wlan_dnw_ucfg_api.o \
+		$(WLAN_PRE_CAC_DIR)/dispatcher/src/wlan_dnw_api.o
+endif
+
 $(call add-wlan-objs,wlan_pre_cac,$(WLAN_PRE_CAC_OBJS))
 
 ########## CLD TARGET_IF #######
@@ -2268,7 +2278,7 @@ ifeq ($(CONFIG_WLAN_TX_FLOW_CONTROL_V2), y)
 DP_OBJS += $(DP_SRC)/dp_tx_flow_control.o
 endif
 
-ifeq ($(CONFIG_WLAN_FEATURE_RX_BUFFER_POOL), y)
+ifneq (,$(filter y,$(CONFIG_WLAN_FEATURE_RX_BUFFER_POOL) $(CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE)))
 DP_OBJS += $(DP_SRC)/dp_rx_buffer_pool.o
 endif
 
@@ -3579,6 +3589,9 @@ ccflags-$(CONFIG_WLAN_HANG_EVENT) += -DWLAN_HANG_EVENT
 #Flag to enable pre_cac
 ccflags-$(CONFIG_FEATURE_WLAN_PRE_CAC)  += -DPRE_CAC_SUPPORT
 
+#Flag to enable DFS No Wait
+ccflags-$(CONFIG_FEATURE_WLAN_DNW) += -DWLAN_FEATURE_DNW
+
 ccflags-$(CONFIG_WIFI_POS_PASN) += -DWLAN_FEATURE_RTT_11AZ_SUPPORT
 
 ifeq ($(CONFIG_DIRECT_BUF_RX_ENABLE), y)
@@ -3793,6 +3806,7 @@ ccflags-$(CONFIG_IPA_OUT_OF_TREE) += -I$(DATA_IPA_UAPI_INC)
 
 ccflags-$(CONFIG_WLAN_FEATURE_DP_BUS_BANDWIDTH) += -DWLAN_FEATURE_DP_BUS_BANDWIDTH
 ccflags-$(CONFIG_WLAN_FEATURE_PERIODIC_STA_STATS) += -DWLAN_FEATURE_PERIODIC_STA_STATS
+ccflags-$(CONFIG_WLAN_TX_POWERBOOST) += -DFEATURE_WLAN_TX_POWERBOOST
 
 ccflags-$(CONFIG_WLAN_TX_FLOW_CONTROL_V2) += -DQCA_LL_TX_FLOW_CONTROL_V2
 ccflags-$(CONFIG_WLAN_TX_FLOW_CONTROL_V2) += -DQCA_LL_TX_FLOW_GLOBAL_MGMT_POOL
@@ -4590,6 +4604,11 @@ ifeq ($(CONFIG_ANI_LEVEL_REQUEST), y)
 ccflags-y += -DFEATURE_ANI_LEVEL_REQUEST
 endif
 
+ifeq ($(CONFIG_DP_FEATURE_TX_PAGE_POOL), y)
+ccflags-y += -DDP_FEATURE_TX_PAGE_POOL
+ccflags-y += -DWLAN_DP_ENABLE_SW_TSO
+endif
+
 #Flags to enable/disable WMI APIs
 ccflags-$(CONFIG_WMI_ROAM_SUPPORT) += -DWMI_ROAM_SUPPORT
 ccflags-$(CONFIG_WMI_CONCURRENCY_SUPPORT) += -DWMI_CONCURRENCY_SUPPORT
@@ -4738,6 +4757,7 @@ ccflags-$(CONFIG_WLAN_TRACEPOINTS) += -DWLAN_TRACEPOINTS
 ccflags-$(CONFIG_QCACLD_FEATURE_SON) += -DFEATURE_PERPKT_INFO
 ccflags-$(CONFIG_QCACLD_FEATURE_SON) += -DQCA_ENHANCED_STATS_SUPPORT
 ccflags-$(CONFIG_WLAN_FEATURE_CE_RX_BUFFER_REUSE) += -DWLAN_FEATURE_CE_RX_BUFFER_REUSE
+ccflags-$(CONFIG_NDP_TX_BW_FLOW_CTRL) += -DNDP_TX_BW_FLOW_CTRL
 
 CONFIG_NUM_SOC_PERF_CLUSTER ?= 1
 ccflags-y += -DNUM_SOC_PERF_CLUSTER=$(CONFIG_NUM_SOC_PERF_CLUSTER)

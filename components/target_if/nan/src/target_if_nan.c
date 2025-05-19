@@ -369,6 +369,7 @@ static int target_if_ndp_confirm_handler(ol_scn_t scn, uint8_t *data,
 	struct wmi_unified *wmi_handle;
 	struct scheduler_msg msg = {0};
 	struct nan_datapath_confirm_event *rsp;
+	uint8_t i;
 
 	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
@@ -392,6 +393,10 @@ static int target_if_ndp_confirm_handler(ol_scn_t scn, uint8_t *data,
 		qdf_mem_free(rsp);
 		return -EINVAL;
 	}
+
+	for (i = 0; i < rsp->num_channels; i++)
+		rsp->ch[i].ch_width =
+		  target_if_wmi_chan_width_to_phy_ch_width(rsp->ch[i].ch_width);
 
 	msg.bodyptr = rsp;
 	msg.type = NDP_CONFIRM;
@@ -695,6 +700,7 @@ static int target_if_ndp_sch_update_handler(ol_scn_t scn, uint8_t *data,
 	struct wmi_unified *wmi_handle;
 	struct scheduler_msg msg = {0};
 	struct nan_datapath_sch_update_event *rsp;
+	uint8_t i;
 
 	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
@@ -718,6 +724,10 @@ static int target_if_ndp_sch_update_handler(ol_scn_t scn, uint8_t *data,
 		qdf_mem_free(rsp);
 		return -EINVAL;
 	}
+
+	for (i = 0; i < rsp->num_channels; i++)
+		rsp->ch[i].ch_width =
+		  target_if_wmi_chan_width_to_phy_ch_width(rsp->ch[i].ch_width);
 
 	msg.bodyptr = rsp;
 	msg.type = NDP_SCHEDULE_UPDATE;

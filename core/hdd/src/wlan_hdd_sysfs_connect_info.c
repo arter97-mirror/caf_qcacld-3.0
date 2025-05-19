@@ -637,15 +637,98 @@ wlan_hdd_current_time_info(uint8_t *buf, ssize_t buf_avail_len)
 	return length;
 }
 
+static ssize_t
+wlan_hdd_p2p_connection_info(struct hdd_adapter *adapter,
+			     uint8_t *buf, ssize_t buf_avail_len)
+{
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
+	struct hdd_station_ctx *sta_ctx;
+	struct hdd_connection_info *conn_info;
+	uint32_t tx_bit_rate, rx_bit_rate;
+	ssize_t length = 0;
+	int ret_val;
+
+	if (!link_info)
+		return length;
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	if (!sta_ctx) {
+		hdd_err("Invalid STA_CTX");
+		return length;
+	}
+
+	if (!hdd_cm_is_vdev_associated(link_info)) {
+		ret_val = scnprintf(buf, buf_avail_len,
+				    "P2P_Client is not connected\n");
+		if (ret_val >= 0)
+			return length;
+	}
+
+	ret_val = scnprintf(buf, buf_avail_len,
+			    "\nP2P_CLIENT CONNECTION DETAILS\n");
+	if (ret_val <= 0)
+		return length;
+
+	length += ret_val;
+	if (length >= buf_avail_len) {
+		hdd_err("No sufficient buf_avail_len");
+		return buf_avail_len;
+	}
+
+	conn_info = &sta_ctx->conn_info;
+	tx_bit_rate = cfg80211_calculate_bitrate(&conn_info->txrate);
+	rx_bit_rate = cfg80211_calculate_bitrate(&conn_info->rxrate);
+
+	ret_val = scnprintf(buf + length, buf_avail_len - length,
+			    "ssid = " QDF_SSID_FMT "\n"
+			    "bssid = " QDF_MAC_ADDR_FMT "\n"
+			    "connect_time = %s\n"
+			    "auth_time = %s\n"
+			    "freq = %u\n"
+			    "ch_width = %s\n"
+			    "signal = %ddBm\n"
+			    "tx_bit_rate = %u\n"
+			    "rx_bit_rate = %u\n"
+			    "last_auth_type = %s\n"
+			    "dot11mode = %s\n",
+			    QDF_SSID_REF(conn_info->ssid.SSID.length,
+					 conn_info->ssid.SSID.ssId),
+			    QDF_MAC_ADDR_REF(conn_info->bssid.bytes),
+			    conn_info->connect_time,
+			    conn_info->auth_time,
+			    conn_info->chan_freq,
+			    hdd_ch_width_str(conn_info->ch_width),
+			    conn_info->signal,
+			    tx_bit_rate,
+			    rx_bit_rate,
+			    hdd_auth_type_str(conn_info->last_auth_type),
+			    hdd_dot11_mode_str(conn_info->dot11mode));
+
+	if (ret_val < 0)
+		return length;
+
+	length += ret_val;
+
+	return length;
+}
+
 static ssize_t __show_connect_info(struct net_device *net_dev, char *buf,
 				   ssize_t buf_avail_len)
 {
 	struct hdd_adapter *adapter = netdev_priv(net_dev);
 	struct hdd_context *hdd_ctx;
-	ssize_t len;
-	int ret_val;
+	ssize_t len = 0;
+	int ret_val = 0;
+	enum QDF_OPMODE opmode;
 
 	hdd_enter_dev(net_dev);
+
+	if (hdd_validate_adapter(adapter))
+		goto exit;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (wlan_hdd_validate_context(hdd_ctx))
+		goto exit;
 
 	len = wlan_hdd_current_time_info(buf, buf_avail_len);
 	if (len >= buf_avail_len) {
@@ -654,13 +737,18 @@ static ssize_t __show_connect_info(struct net_device *net_dev, char *buf,
 		goto exit;
 	}
 
-	ret_val = hdd_validate_adapter(adapter);
-	if (0 != ret_val)
-		return len;
+	len += wlan_hdd_version_info(hdd_ctx, buf + len, buf_avail_len - len);
+	if (len >= buf_avail_len) {
+		hdd_err("No sufficient buf_avail_len");
+		len = buf_avail_len;
+		goto exit;
+	}
 
-	if (adapter->device_mode != QDF_STA_MODE) {
+	opmode = adapter->device_mode;
+
+	if ((opmode != QDF_STA_MODE) && (opmode != QDF_P2P_CLIENT_MODE)) {
 		ret_val = scnprintf(buf + len, buf_avail_len - len,
-				    "Interface is not operating STA Mode\n");
+				    "Not in STA or P2P_CLIENT Mode\n");
 		if (ret_val <= 0)
 			goto exit;
 
@@ -668,25 +756,22 @@ static ssize_t __show_connect_info(struct net_device *net_dev, char *buf,
 		goto exit;
 	}
 
-	if (len >= buf_avail_len) {
-		hdd_err("No sufficient buf_avail_len");
-		len = buf_avail_len;
+	if (opmode == QDF_STA_MODE) {
+		len += wlan_hdd_connect_info(adapter, buf + len,
+					     buf_avail_len - len);
+		if (len >= buf_avail_len) {
+			hdd_err("No sufficient buf_avail_len");
+			len = buf_avail_len;
+		}
 		goto exit;
 	}
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	ret_val = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret_val)
-		goto exit;
-
-	len += wlan_hdd_version_info(hdd_ctx, buf + len, buf_avail_len - len);
-
+	len += wlan_hdd_p2p_connection_info(adapter, buf + len,
+					    buf_avail_len - len);
 	if (len >= buf_avail_len) {
 		hdd_err("No sufficient buf_avail_len");
 		len = buf_avail_len;
-		goto exit;
 	}
-	len += wlan_hdd_connect_info(adapter, buf + len, buf_avail_len - len);
 
 exit:
 	hdd_exit();

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,6 +33,9 @@
 #include <qdf_tracepoint.h>
 #include <qdf_pkt_add_timestamp.h>
 #include "wlan_dp_public_struct.h"
+#ifdef NDP_TX_BW_FLOW_CTRL
+#include "wlan_hdd_nan_datapath.h"
+#endif
 
 struct hdd_netif_queue_history;
 struct hdd_context;
@@ -372,6 +375,7 @@ void hdd_print_netdev_txq_status(struct net_device *dev);
 /**
  * wlan_hdd_dump_queue_history_state() - Dump hdd queue history states
  * @q_hist: pointer to hdd queue history structure
+ * @num_tx_queues: number of tx queues
  * @buf: buffer where the queue history string is dumped
  * @size: size of the buffer
  *
@@ -381,7 +385,8 @@ void hdd_print_netdev_txq_status(struct net_device *dev);
  */
 uint32_t
 wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *q_hist,
-				  char *buf, uint32_t size);
+				  uint8_t num_tx_queues, char *buf,
+				  uint32_t size);
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
 /**
@@ -395,6 +400,30 @@ void wlan_hdd_set_tx_flow_info(void);
 #else
 static inline void wlan_hdd_set_tx_flow_info(void)
 {
+}
+#endif
+
+#ifdef NDP_TX_BW_FLOW_CTRL
+/**
+ * wlan_hdd_get_txq_info_for_ac() - Get tx queue information for access category
+ * @adapter: pointer to hdd adapter
+ * @ac: access category
+ * @txq_base_idx: tx queue base index for ac
+ * @num_queues: num of tx queues
+ *
+ * Return: None
+ */
+void wlan_hdd_get_txq_info_for_ac(struct hdd_adapter *adapter,
+				  enum hdd_wmm_linuxac ac,
+				  uint8_t *txq_base_idx, uint8_t *num_queues);
+#else
+static inline
+void wlan_hdd_get_txq_info_for_ac(struct hdd_adapter *adapter,
+				  enum hdd_wmm_linuxac ac,
+				  uint8_t *txq_base_idx, uint8_t *num_queues)
+{
+	*num_queues = TX_QUEUES_PER_AC;
+	*txq_base_idx = TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, 0);
 }
 #endif
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */
