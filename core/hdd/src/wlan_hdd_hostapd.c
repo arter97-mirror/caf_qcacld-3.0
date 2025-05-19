@@ -3811,15 +3811,23 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		QDF_MAX(DOT11F_IE_RSN_MAX_LEN, DOT11F_IE_WPA_MAX_LEN)))
 		return -EINVAL;
 	/* Type check */
-	if (gen_ie[0] == DOT11F_EID_RSN) {
+	if (gen_ie[0] == DOT11F_EID_RSN || gen_ie[0] == DOT11F_EID_VENDOR1IE) {
 		/* Validity checks */
 		if ((gen_ie_len < DOT11F_IE_RSN_MIN_LEN) ||
 		    (gen_ie_len > DOT11F_IE_RSN_MAX_LEN)) {
 			return QDF_STATUS_E_FAILURE;
 		}
 		/* Skip past the EID byte and length byte */
-		rsn_ie = gen_ie + 2;
-		rsn_ie_len = gen_ie_len - 2;
+		if (gen_ie[0] == DOT11F_EID_RSN) {
+			rsn_ie = gen_ie + 2;
+			rsn_ie_len = gen_ie_len - 2;
+		} else if (gen_ie[0] == DOT11F_EID_VENDOR1IE) {
+			rsn_ie = gen_ie + 6;
+			rsn_ie_len = gen_ie_len - 6;
+		} else {
+			return -EINVAL;
+		}
+
 		/* Unpack the RSN IE */
 		memset(&dot11_rsn_ie, 0, sizeof(tDot11fIERSN));
 		ret = sme_unpack_rsn_ie(mac_handle, rsn_ie, rsn_ie_len,
@@ -5900,6 +5908,47 @@ static int hdd_update_11be_apies(struct wlan_hdd_link_info *link_info,
 }
 #endif
 
+static void wlan_hdd_add_mrsno_ies(struct wlan_hdd_link_info *link_info,
+				   uint8_t *genie, uint16_t *total_ielen)
+{
+	struct hdd_beacon_data *beacon = link_info->session.ap.beacon;
+	int left = beacon->tail_len;
+	uint8_t *ptr = beacon->tail;
+	uint8_t elem_id, elem_len;
+	uint16_t ielen = 0;
+
+	if (!ptr || 0 == left)
+		return;
+
+	while (left >= 2) {
+		elem_id = ptr[0];
+		elem_len = ptr[1];
+		left -= 2;
+		if (elem_len > left) {
+			hdd_err("**Invalid IEs eid: %d elem_len: %d left: %d**",
+				elem_id, elem_len, left);
+			return;
+		}
+
+		if (elem_id == WLAN_EID_VENDOR_SPECIFIC &&
+		    (!qdf_mem_cmp(&ptr[2], RSNO_OUI_WIFI6_RSN, RSNO_OUI_SIZE) ||
+		     !qdf_mem_cmp(&ptr[2], RSNO_OUI_WIFI7_RSN, RSNO_OUI_SIZE) ||
+		     !qdf_mem_cmp(&ptr[2], RSNO_OUI_RSNXE, RSNO_OUI_SIZE))) {
+			ielen = ptr[1] + 2;
+			if ((*total_ielen + ielen) <= MAX_GENIE_LEN) {
+				qdf_mem_copy(&genie[*total_ielen], ptr, ielen);
+				*total_ielen += ielen;
+			} else {
+				hdd_err("IE Length is too big IEs eid: %d elem_len: %d total_ie_len: %d",
+					elem_id, elem_len, *total_ielen);
+			}
+		}
+
+		left -= elem_len;
+		ptr += (elem_len + 2);
+	}
+}
+
 int
 wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info)
 {
@@ -5993,6 +6042,7 @@ wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info)
 			      &proberesp_ies_len, WLAN_ELEMID_RSNXE);
 	wlan_hdd_add_extra_ie(link_info, proberesp_ies,
 			      &proberesp_ies_len, WLAN_ELEMID_MOBILITY_DOMAIN);
+	wlan_hdd_add_mrsno_ies(link_info, proberesp_ies, &proberesp_ies_len);
 
 	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		update_ie.ieBufferlength = proberesp_ies_len;
@@ -7841,6 +7891,65 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 			hdd_softap_update_pasn_vdev_params(
 					hdd_ctx, link_info->vdev_id,
 					beacon, mfp_capable, mfp_required);
+		}
+	}
+
+	config->mrsno_ie_len = 0;
+	memset(&config->mrsno_ie[0], 0, sizeof(config->mrsno_ie));
+	ie = wlan_get_vendor_ie_ptr_from_oui(RSNO_OUI_WIFI6_RSN, RSNO_OUI_SIZE,
+					     beacon->tail, beacon->tail_len);
+	if (ie && ie[1] && config->RSNWPAReqIELength &&
+	    (config->RSNWPAReqIE[0] == WLAN_EID_RSN)) {
+		config->mrsno_ie_len = ie[1] + 2;
+		if (config->mrsno_ie_len < sizeof(config->mrsno_ie)) {
+			memcpy(&config->mrsno_ie, ie, config->mrsno_ie_len);
+		} else {
+			ret = -EINVAL;
+			hdd_err("Unable to save wifi-6 RSNO in the buffer");
+			goto error;
+		}
+		status =
+			 hdd_softap_unpack_ie(cds_get_context(QDF_MODULE_ID_SME),
+					      &rsn_encrypt_type,
+					      &mc_rsn_encrypt_type,
+					      &config->akm_list,
+					      &mfp_capable, &mfp_required,
+					      config->mrsno_ie_len,
+					      config->mrsno_ie);
+		if (status != QDF_STATUS_SUCCESS) {
+			ret = -EINVAL;
+			hdd_err("Parsing of RSNO1 failed");
+			goto error;
+		}
+	}
+
+	ie = wlan_get_vendor_ie_ptr_from_oui(RSNO_OUI_WIFI7_RSN, RSNO_OUI_SIZE,
+					     beacon->tail, beacon->tail_len);
+	if (ie && ie[1] && config->RSNWPAReqIELength &&
+	    (config->RSNWPAReqIE[0] == WLAN_EID_RSN)) {
+		if (config->mrsno_ie_len + ie[1] + 2 < sizeof(config->mrsno_ie)) {
+			prev_rsn_length = config->mrsno_ie_len;
+			config->mrsno_ie_len += ie[1] + 2;
+			memcpy(&config->mrsno_ie[0] + prev_rsn_length,
+			       ie, ie[1] + 2);
+		} else {
+			ret = -EINVAL;
+			hdd_err("Unable to save wifi-7 RSNO in the buffer");
+			goto error;
+		}
+		status =
+			hdd_softap_unpack_ie(cds_get_context(QDF_MODULE_ID_SME),
+					     &rsn_encrypt_type,
+					     &mc_rsn_encrypt_type,
+					     &config->akm_list,
+					     &mfp_capable, &mfp_required,
+					     config->mrsno_ie_len -
+					     prev_rsn_length,
+					     &config->mrsno_ie[prev_rsn_length]);
+		if (status != QDF_STATUS_SUCCESS) {
+			ret = -EINVAL;
+			hdd_err("Parsing of RSNO2 failed");
+			goto error;
 		}
 	}
 

@@ -1051,6 +1051,16 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		sap_debug("Failed to set crypto params from IE");
 
+	if (config->mrsno_ie_len) {
+		sap_debug("Configure the crypto params for RSNO");
+		qdf_status =
+			wlan_set_crypto_params_from_mrsno(sap_ctx->vdev,
+							  config->mrsno_ie,
+							  config->mrsno_ie_len);
+		if (QDF_IS_STATUS_ERROR(qdf_status))
+			sap_err("Failed to set MRSNO crypto params");
+	}
+
 	/* Channel selection is auto or configured */
 	sap_ctx->chan_freq = config->chan_freq;
 	sap_ctx->dfs_mode = config->acs_dfs_mode;

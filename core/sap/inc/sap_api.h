@@ -606,6 +606,9 @@ struct sap_config {
 #endif
 	qdf_freq_t last_acs_freq;
 	qdf_time_t last_acs_complete_time;
+	/* RSNO MAX *2 + 2(EID size + LEN size) */
+	uint8_t mrsno_ie[(WLAN_MAX_IE_LEN * 2) + 4];
+	uint16_t mrsno_ie_len;
 };
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
