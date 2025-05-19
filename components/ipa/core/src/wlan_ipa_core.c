@@ -2129,6 +2129,7 @@ QDF_STATUS wlan_ipa_sw_routing_set(qdf_netdev_t net_dev, uint8_t device_mode,
 {
 	struct wlan_ipa_priv *ipa_ctx = gp_ipa;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t *macaddr;
 
 	if (ipa_ctx->roaming && is_enable) {
 		ipa_err("IPA SW Routing has already been Enabled, return!");
@@ -2139,26 +2140,33 @@ QDF_STATUS wlan_ipa_sw_routing_set(qdf_netdev_t net_dev, uint8_t device_mode,
 		return status;
 	}
 
+	if (mac_addr == NULL)
+		macaddr = ipa_ctx->iface_context[wlan_ipa_get_ifaceid(ipa_ctx, session_id)].bssid.bytes;
+	else
+		macaddr = mac_addr;
+
 	if (device_mode == QDF_STA_MODE) {
+		ipa_debug("session_id: %u", session_id);
 		if (is_enable) {
-			ipa_ctx->roaming = true;
 			status = wlan_ipa_send_msg(net_dev,
 						   QDF_IPA_SW_ROUTING_ENABLE,
 						   ipa_ctx->iface_context[wlan_ipa_get_ifaceid(ipa_ctx, session_id)].bssid.bytes);
-			if (status != QDF_STATUS_SUCCESS)
+			if (status != QDF_STATUS_SUCCESS) {
 				ipa_err("QDF_IPA_SW_ROUTING_ENABLE send failed %u", status);
-			else
+			} else {
 				ipa_debug("Roaming Started: QDF_IPA_SW_ROUTING_ENABLE send successfully");
+				ipa_ctx->roaming = true;
+			}
 		} else {
 			status = wlan_ipa_send_msg(net_dev,
 						   QDF_IPA_SW_ROUTING_DISABLE,
 						   mac_addr);
-			if (status != QDF_STATUS_SUCCESS)
+			if (status != QDF_STATUS_SUCCESS) {
 				ipa_err("QDF_IPA_SW_ROUTING_DISABLE send failed %u", status);
-			else
+			} else {
 				ipa_debug("Roaming End: QDF_IPA_SW_ROUTING_DISABLE send successfully");
-
-			ipa_ctx->roaming = false;
+				ipa_ctx->roaming = false;
+			}
 		}
 	}
 	return status;
@@ -2341,14 +2349,15 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 			ipa_ctx->vdev_to_iface[session_id] =
 					wlan_ipa_get_ifaceid(ipa_ctx, session_id);
 
-			wlan_ipa_save_bssid_iface_ctx(ipa_ctx,
-						      ipa_ctx->vdev_to_iface[session_id],
-						      mac_addr);
 			ipa_info("IPA Roaming event detected from BSSID: "QDF_MAC_ADDR_FMT
 				 " -> BSSID: "QDF_MAC_ADDR_FMT,
 				 QDF_MAC_ADDR_REF(ipa_ctx->iface_context[wlan_ipa_get_ifaceid(
 						  ipa_ctx, session_id)].bssid.bytes),
 				 QDF_MAC_ADDR_REF(mac_addr));
+
+			wlan_ipa_save_bssid_iface_ctx(ipa_ctx,
+						      ipa_ctx->vdev_to_iface[session_id],
+						      mac_addr);
 			qdf_mutex_release(&ipa_ctx->event_lock);
 			return QDF_STATUS_SUCCESS;
 		}
