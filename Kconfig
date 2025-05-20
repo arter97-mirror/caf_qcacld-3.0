@@ -2855,4 +2855,8 @@ config CNSS_ETM_TRACE
 	bool "Enable CNSS_ETM_TRACE"
 	default n
 
+config DELAYED_REG_FORCE_WRITE
+	bool "Enable Delayed Reg force write"
+	default n
+
 endif # QCA_CLD_WLAN
