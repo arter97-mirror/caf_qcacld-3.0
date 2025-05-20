@@ -4913,12 +4913,28 @@ QDF_STATUS policy_mgr_get_valid_chans_from_range(
 	uint32_t ch_weight_len;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	size_t chan_index = 0;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_conc_connection_info
+			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	qdf_freq_t vdev_freq;
+	uint8_t num_del = 0;
 
 	if (!ch_freq_list || !ch_cnt) {
 		policy_mgr_err("NULL parameters");
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = policy_mgr_get_chan_by_session_id(psoc, vdev_id, &vdev_freq);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Fail to get channel by vdev id %d", vdev_id);
+		return status;
+	}
 	for (chan_index = 0; chan_index < *ch_cnt; chan_index++)
 		ch_weight_list[chan_index] = WEIGHT_OF_GROUP1_PCL_CHANNELS;
 
@@ -4930,9 +4946,19 @@ QDF_STATUS policy_mgr_get_valid_chans_from_range(
 			psoc, ch_freq_list, ch_cnt, ch_weight_list,
 			ch_weight_len);
 
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	policy_mgr_store_and_del_conn_info_by_chan_and_mode(psoc,
+							    vdev_freq,
+							    mode,
+							    info,
+							    &num_del);
 	status = policy_mgr_mode_specific_modification_on_pcl(
 			psoc, ch_freq_list, ch_weight_list, ch_cnt,
 			ch_weight_len, mode, vdev_id);
+
+	if (num_del > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, info, num_del);
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get modified pcl for mode %d", mode);
