@@ -5206,6 +5206,7 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 	uint8_t txFlag = 0;
 	uint32_t val = 0;
 	uint8_t smeSessionId = 0;
+	int32_t rssi = 0;
 
 	if (!pe_session) {
 		return;
@@ -5360,11 +5361,13 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 					      pe_session,
 					      QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
 
+		wlan_get_rssi_by_bssid(mac->pdev, pMacHdr->bssId, &rssi);
+
 		wlan_connectivity_mgmt_event(mac->psoc,
 					     (struct wlan_frame_hdr *)pMacHdr,
 					     pe_session->vdev_id, nReason,
 					     QDF_TX_RX_STATUS_OK,
-					     mac->lim.bss_rssi, 0, 0, 0, 0,
+					     rssi, 0, 0, 0, 0,
 					     WLAN_DISASSOC_TX);
 
 		lim_cp_stats_cstats_log_disassoc_evt(pe_session, CSTATS_DIR_TX,
@@ -5416,6 +5419,7 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 	QDF_STATUS qdf_status;
 	uint8_t txFlag = 0;
 	uint32_t val = 0;
+	int32_t rssi = 0;
 #ifdef FEATURE_WLAN_TDLS
 	uint16_t aid;
 	tpDphHashNode sta;
@@ -5616,11 +5620,13 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 					      QDF_STATUS_SUCCESS,
 					      QDF_STATUS_SUCCESS);
 
+		wlan_get_rssi_by_bssid(mac->pdev, pMacHdr->bssId, &rssi);
+
 		wlan_connectivity_mgmt_event(mac->psoc,
 					     (struct wlan_frame_hdr *)pMacHdr,
 					     pe_session->vdev_id, nReason,
 					     QDF_TX_RX_STATUS_OK,
-					     mac->lim.bss_rssi, 0, 0, 0, 0,
+					     rssi, 0, 0, 0, 0,
 					     WLAN_DEAUTH_TX);
 
 		lim_cp_stats_cstats_log_deauth_evt(pe_session, CSTATS_DIR_TX,
