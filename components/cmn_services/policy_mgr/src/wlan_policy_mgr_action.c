@@ -2126,6 +2126,8 @@ user_freq_check:
 		user_band = wlan_reg_freq_to_band(user_config_freq);
 
 		if (!ll_sap_freq && !sta_gc_present && user_config_freq &&
+		    wlan_reg_is_enable_in_secondary_list_for_freq(pm_ctx->pdev,
+							user_config_freq) &&
 		    op_band < user_band) {
 			curr_sap_freq = op_ch_freq_list[i];
 			policy_mgr_debug("Move sap to user configured freq: %d",
