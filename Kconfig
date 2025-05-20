@@ -2480,4 +2480,8 @@ config WLAN_UMAC_MLO_MAX_DEV
         int "Enable WLAN_UMAC_MLO_MAX_DEV"
         default 3
 endif
+
+config DELAYED_REG_FORCE_WRITE
+	bool "Enable Delayed Reg force write"
+	default n
 endif # QCA_CLD_WLAN
