@@ -6093,7 +6093,7 @@ wma_roam_ipa_sw_routing_set(tp_wma_handle wma_handle,
 
 					status = ucfg_ipa_sw_routing_set(wlan_vdev_get_pdev(vdev),
 								 dev, QDF_STA_MODE, vdev_id, NULL, is_enable);
-				if (status != QDF_STATUS_SUCCESS)
+				if (status != QDF_STATUS_SUCCESS && status != QDF_STATUS_E_INVAL)
 					wma_err("set sw routing enable failed!");
 			} else {
 				wma_err("osif_priv is null");

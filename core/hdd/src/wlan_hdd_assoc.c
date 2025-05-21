@@ -4378,6 +4378,7 @@ wlan_hdd_ft_set_key_delay(mac_handle_t mac_handle, struct hdd_adapter *adapter)
 }
 #endif
 
+#define DELAY_FOR_SW_PATH_SWITCH_FINISH 200
 /**
  * hdd_sme_roam_callback() - hdd sme roam callback
  * @context: pointer to adapter context
@@ -4459,8 +4460,14 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 							 adapter->device_mode,
 							 adapter->vdev_id,
 							 roam_info->bssid.bytes, true);
-		if (qdf_ret_status != QDF_STATUS_SUCCESS)
+		if (qdf_ret_status == QDF_STATUS_E_INVAL) {
+			hdd_info("IPA SW Routing has already been Enabled");
+		} else if (qdf_ret_status == QDF_STATUS_SUCCESS) {
+			hdd_info("Add delay to make IPA switch to sw path completed.");
+			qdf_sleep(DELAY_FOR_SW_PATH_SWITCH_FINISH);
+		} else {
 			hdd_info("ucfg_ipa_sw_routing_set sw routing failed!");
+		}
 
 		break;
 	case eCSR_ROAM_NAPI_OFF:
@@ -4572,7 +4579,7 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 								 adapter->device_mode,
 								 adapter->vdev_id,
 								 roam_info->bssid.bytes, false);
-			if (qdf_ret_status != QDF_STATUS_SUCCESS)
+			if (qdf_ret_status != QDF_STATUS_SUCCESS && qdf_ret_status != QDF_STATUS_E_INVAL)
 				hdd_info("ucfg_ipa_sw_routing_set sw routing disable failed!");
 
 			tx_enq_num = qdf_atomic_read(&adapter->tx_enq_num);

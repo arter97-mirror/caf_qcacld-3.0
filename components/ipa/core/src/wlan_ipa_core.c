@@ -2133,11 +2133,11 @@ QDF_STATUS wlan_ipa_sw_routing_set(qdf_netdev_t net_dev, uint8_t device_mode,
 
 	if (ipa_ctx->roaming && is_enable) {
 		ipa_err("IPA SW Routing has already been Enabled, return!");
-		return status;
+		return QDF_STATUS_E_INVAL;
 	}
 	if (!ipa_ctx->roaming && !is_enable) {
 		ipa_err("IPA SW Routing has already been Disabled, return!");
-		return status;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	if (mac_addr == NULL)
