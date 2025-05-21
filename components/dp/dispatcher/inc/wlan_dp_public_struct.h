@@ -1083,6 +1083,8 @@ struct dp_traffic_end_indication {
 #define DP_SVC_FLAGS_SVC_ID			BIT(3)
 #define DP_SVC_FLAGS_TID                        BIT(4)
 #define DP_SVC_FLAGS_MSDU_LOSS_RATE             BIT(5)
+#define DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END     BIT(6)
+
 
 
 /* struct dp_svc_data - service class node
@@ -1092,6 +1094,7 @@ struct dp_traffic_end_indication {
  * @buffer_latency_tolerance: buffer latency tolarence in ms
  * @app_ind_default_dscp: default dscp
  * @app_ind_special_dscp: special dscp to override with default dscp
+ * @en_twt_end_indication: Enable TWT end indication flag
  */
 struct dp_svc_data {
 	qdf_list_node_t node;
@@ -1105,7 +1108,7 @@ struct dp_svc_data {
 	uint8_t tid;
 	uint32_t msdu_loss_rate;
 #endif
-
+	bool en_twt_end_indication;
 };
 
 #define DP_FLOW_PRIO_MAX 8

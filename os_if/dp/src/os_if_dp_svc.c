@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -69,13 +69,13 @@ static QDF_STATUS svc_validate_data(struct dp_svc_data *svc_data)
 {
 	if (!(svc_data->flags & (DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE |
 				 DP_SVC_FLAGS_APP_IND_DEF_DSCP |
-				 DP_SVC_FLAGS_APP_IND_SPL_DSCP)))
+				 DP_SVC_FLAGS_APP_IND_SPL_DSCP |
+				 DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END)))
 		return QDF_STATUS_E_INVAL;
 
 	if (svc_data->flags & DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE) {
 		if (!is_lapb_enabled())
 			return QDF_STATUS_E_INVAL;
-
 		if ((svc_data->buffer_latency_tolerance < MIN_BUF_LAT_TOLERENCE) ||
 		    (svc_data->buffer_latency_tolerance > MAX_BUF_LAT_TOLERENCE))
 			return QDF_STATUS_E_INVAL;
@@ -85,7 +85,9 @@ static QDF_STATUS svc_validate_data(struct dp_svc_data *svc_data)
 		if (!is_lapb_enabled())
 			return QDF_STATUS_E_INVAL;
 		if (!(svc_data->flags & DP_SVC_FLAGS_APP_IND_SPL_DSCP) ||
-		    !(svc_data->flags & DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE))
+		    (!(svc_data->flags &
+		       DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE) &&
+		     !(svc_data->flags & DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END)))
 			return QDF_STATUS_E_INVAL;
 		if (svc_data->app_ind_default_dscp >= 64)
 			return QDF_STATUS_E_INVAL;
@@ -94,12 +96,21 @@ static QDF_STATUS svc_validate_data(struct dp_svc_data *svc_data)
 	if (svc_data->flags & DP_SVC_FLAGS_APP_IND_SPL_DSCP) {
 		if (!is_lapb_enabled())
 			return QDF_STATUS_E_INVAL;
-
 		if (!(svc_data->flags & DP_SVC_FLAGS_APP_IND_DEF_DSCP) ||
-		    !(svc_data->flags & DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE))
+		    (!(svc_data->flags &
+		       DP_SVC_FLAGS_BUFFER_LATENCY_TOLERANCE) &&
+		     !(svc_data->flags & DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END)))
 			return QDF_STATUS_E_INVAL;
 
 		if (svc_data->app_ind_special_dscp >= 64)
+			return QDF_STATUS_E_INVAL;
+	}
+
+	if (svc_data->flags & DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END) {
+		if (!is_lapb_enabled())
+			return QDF_STATUS_E_INVAL;
+		if (!(svc_data->flags & DP_SVC_FLAGS_APP_IND_DEF_DSCP) ||
+		    !(svc_data->flags & DP_SVC_FLAGS_APP_IND_SPL_DSCP))
 			return QDF_STATUS_E_INVAL;
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -178,6 +178,36 @@ QDF_STATUS dp_svc_get_app_ind_special_dscp_by_id(uint8_t svc_id,
 		    svc_data->flags & DP_SVC_FLAGS_APP_IND_SPL_DSCP) {
 			*app_ind_special_dscp =
 			    svc_data->app_ind_special_dscp;
+			status = QDF_STATUS_SUCCESS;
+		}
+	}
+	qdf_rcu_read_unlock_bh();
+
+	return status;
+}
+
+/**
+ * dp_svc_get_twt_end_indication_by_id() - Get TWT end indication value of svc
+ * @svc_id: service class id
+ * @twt_end_indication_en: buffer to store TWT end indication enable
+ *
+ * Returns: QDF_STATUS
+ */
+static inline
+QDF_STATUS dp_svc_get_twt_end_indication_by_id(uint8_t svc_id,
+					       bool *twt_end_indication_en)
+{
+	struct dp_svc_ctx *svc_ctx = dp_get_svc_ctx();
+	struct dp_svc_data *svc_data;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+
+	qdf_rcu_read_lock_bh();
+	if (svc_ctx && svc_id < DP_SVC_ARRAY_SIZE) {
+		svc_data = qdf_rcu_dereference(svc_ctx->svc_table[svc_id]);
+		if (svc_data &&
+		    svc_data->flags & DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END) {
+			*twt_end_indication_en =
+			    svc_data->en_twt_end_indication;
 			status = QDF_STATUS_SUCCESS;
 		}
 	}

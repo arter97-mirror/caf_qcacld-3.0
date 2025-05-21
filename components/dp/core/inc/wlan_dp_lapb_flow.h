@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -86,6 +86,20 @@ void wlan_dp_lapb_clear_stats(struct dp_soc *soc);
 static inline bool wlan_dp_is_lapb_frame(struct dp_soc *soc, qdf_nbuf_t nbuf)
 {
 	return IS_LAPB_FRAME(nbuf->mark);
+}
+
+/**
+ * wlan_dp_is_lapb_flush_ind_set() - Check if lapb flush indication is set
+ * @soc: Datapath global soc handle
+ * @nbuf: sk_buff abstraction
+ *
+ * Returns: QDF_STATUS
+ */
+static inline bool
+wlan_dp_is_lapb_flush_ind_set(struct dp_soc *soc, qdf_nbuf_t nbuf)
+{
+	return IS_LAPB_FRAME(nbuf->mark) &&
+	       GET_FLAGS_LAPB_FLUSH_IND(nbuf->mark);
 }
 #endif /* WLAN_SUPPORT_LAPB */
 #endif

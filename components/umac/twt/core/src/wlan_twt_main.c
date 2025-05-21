@@ -29,6 +29,7 @@
 #include "wlan_twt_main.h"
 #include "cfg_twt.h"
 #include "wlan_twt_cfg_ext_api.h"
+#include "wlan_dp_ucfg_api.h"
 
 #define TWT_COMMAND_PENDING_FLAG_SET	1
 #define TWT_COMMAND_PENDING_FLAG_RESET	0
@@ -1976,6 +1977,36 @@ wlan_twt_set_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 	wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
 }
 
+#ifdef DP_TRAFFIC_END_INDICATION
+static QDF_STATUS
+wlan_twt_setup_config(struct wlan_objmgr_pdev *pdev, uint32_t vdev_id,
+		      bool enable)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct dp_traffic_end_indication info;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_TWT_ID);
+	if (!vdev)
+		return QDF_STATUS_SUCCESS;
+
+	info.enabled = enable;
+	info.def_dscp = 0;
+	info.spl_dscp = 0;
+	ucfg_dp_traffic_end_indication_set(vdev, info);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+wlan_twt_setup_config(struct wlan_objmgr_pdev *pdev, uint32_t vdev_id,
+		      bool enable)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS
 wlan_twt_setup_complete_event_handler(struct wlan_objmgr_psoc *psoc,
 				    struct twt_add_dialog_complete_event *event)
@@ -2051,6 +2082,9 @@ wlan_twt_setup_complete_event_handler(struct wlan_objmgr_psoc *psoc,
 			  qdf_opmode_str(opmode));
 		break;
 	}
+
+	if (qdf_status == QDF_STATUS_SUCCESS)
+		wlan_twt_setup_config(pdev, vdev_id, true);
 
 cleanup:
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_TWT_ID);
@@ -2166,9 +2200,12 @@ wlan_twt_teardown_complete_event_handler(struct wlan_objmgr_psoc *psoc,
 			wlan_twt_sap_init_context(psoc, event->vdev_id,
 				&event->peer_macaddr, event->dialog_id);
 		}
+		wlan_twt_setup_config(pdev, vdev_id, false);
 		break;
 	case QDF_STA_MODE:
 		wlan_twt_handle_sta_del_dialog_event(psoc, event);
+		if (!wlan_is_twt_teardown_failed(event->status))
+			wlan_twt_setup_config(pdev, vdev_id, false);
 		break;
 	default:
 		twt_debug("TWT Teardown is not supported on %s",

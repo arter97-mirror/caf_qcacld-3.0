@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -74,9 +74,11 @@ QDF_STATUS dp_svc_add(struct dp_svc_data *data)
 
 	dp_info("service class add: svc_id:%u "
 		"buffer_latency_tolerance:%u "
-		"app_ind_default_dscp:%u app_ind_special_dscp:%u",
+		"app_ind_default_dscp:%u app_ind_special_dscp:%u"
+		"en_twt_end_indication: %u",
 		data->svc_id, data->buffer_latency_tolerance,
-		data->app_ind_default_dscp, data->app_ind_special_dscp);
+		data->app_ind_default_dscp, data->app_ind_special_dscp,
+		data->en_twt_end_indication);
 
 	if (data->svc_id >= DP_MAX_SVC) {
 		dp_err("invalid svc_id");
@@ -103,6 +105,7 @@ QDF_STATUS dp_svc_add(struct dp_svc_data *data)
 	svc_data->buffer_latency_tolerance = data->buffer_latency_tolerance;
 	svc_data->app_ind_default_dscp = data->app_ind_default_dscp;
 	svc_data->app_ind_special_dscp = data->app_ind_special_dscp;
+	svc_data->en_twt_end_indication = data->en_twt_end_indication;
 	svc_data->flags = data->flags;
 	svc_data->policy_ref_count = 0;
 
@@ -262,6 +265,8 @@ dp_svc_copy(struct dp_svc_data *dst_svc, struct dp_svc_data *src_svc)
 		 src_svc->app_ind_default_dscp;
 	dst_svc->app_ind_special_dscp =
 		 src_svc->app_ind_special_dscp;
+	dst_svc->en_twt_end_indication =
+		src_svc->en_twt_end_indication;
 	dst_svc->flags = src_svc->flags;
 }
 
