@@ -2240,10 +2240,6 @@ config DP_MLO_LINK_STATS_SUPPORT
 	bool "enable CONFIG_DP_MLO_LINK_STATS_SUPPORT"
 	default n
 
-config MULTI_IF_NAME
-	string "set MULTI_IF_NAME"
-	default "wlan"
-
 config CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA
 	bool "enable CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA"
 	default n
