@@ -1267,7 +1267,7 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
 				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
-	if (!txrx_ops.tx.tx) {
+	if (!(txrx_ops.tx.tx && cdp_vdev)) {
 		dp_err("vdev register fail");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1322,7 +1322,7 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
 				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
-	if (!txrx_ops.tx.tx) {
+	if (!(txrx_ops.tx.tx && cdp_vdev)) {
 		dp_err("vdev register fail");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1357,7 +1357,7 @@ QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 
 	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
 				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
-	if (!txrx_ops.tx.tx) {
+	if (!(txrx_ops.tx.tx && cdp_vdev)) {
 		dp_err("vdev register fail");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1393,6 +1393,10 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
 				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
+	if (!cdp_vdev) {
+		dp_err("vdev register fail");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	wlan_dp_add_cdp_vdev(dp_link, cdp_vdev);
 	dp_intf->txrx_ops = txrx_ops;
@@ -1444,7 +1448,7 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 	txrx_ops->vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
 				     (ol_osif_vdev_handle)dp_link, txrx_ops);
-	if (!txrx_ops->tx.tx) {
+	if (!(txrx_ops->tx.tx && cdp_vdev)) {
 		dp_err("vdev register fail");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -2669,9 +2673,8 @@ void ucfg_dp_runtime_disable_rx_thread(struct wlan_objmgr_vdev *vdev,
 }
 
 #ifdef WLAN_FEATURE_LATENCY_SENSITIVE_REO
-static void dp_flush_fisa_entries_by_vdev(struct wlan_objmgr_vdev *vdev)
+static void dp_flush_fisa_entries_by_link(struct wlan_dp_link *dp_link)
 {
-	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
 	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -2720,7 +2723,7 @@ void ucfg_dp_fisa_route_to_latency_sensitive_reo(struct wlan_objmgr_vdev *vdev,
 		}
 
 		dp_intf->route_to_latency_sensitive_reo = value;
-		dp_flush_fisa_entries_by_vdev(vdev);
+		dp_flush_fisa_entries_by_link(dp_link);
 	}
 }
 
