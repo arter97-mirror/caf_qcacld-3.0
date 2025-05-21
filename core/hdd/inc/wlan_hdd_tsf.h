@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -269,7 +269,7 @@ static inline QDF_STATUS hdd_add_uplink_jitter(struct hdd_adapter *adapter,
 }
 #endif /* WLAN_FEATURE_UL_JITTER */
 
-#ifdef WLAN_FEATURE_TSF
+#ifdef WLAN_FEATURE_TSF_PLUS
 /**
  * wlan_hdd_tsf_init() - set gpio and callbacks for
  *     capturing tsf and init tsf_plus
@@ -337,55 +337,6 @@ int wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 
 int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf);
 
-extern const struct nla_policy tsf_policy[QCA_WLAN_VENDOR_ATTR_TSF_MAX + 1];
-
-#define FEATURE_HANDLE_TSF_VENDOR_COMMANDS \
-{ \
-	.info.vendor_id = QCA_NL80211_VENDOR_ID, \
-	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TSF, \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV | \
-		WIPHY_VENDOR_CMD_NEED_NETDEV | \
-		WIPHY_VENDOR_CMD_NEED_RUNNING, \
-	.doit = wlan_hdd_cfg80211_handle_tsf_cmd, \
-	vendor_command_policy(tsf_policy, QCA_WLAN_VENDOR_ATTR_TSF_MAX)\
-},
-#else
-static inline void wlan_hdd_tsf_init(struct hdd_context *hdd_ctx)
-{
-}
-
-static inline void wlan_hdd_tsf_deinit(struct hdd_context *hdd_ctx)
-{
-}
-
-static inline int hdd_indicate_tsf(struct hdd_adapter *adapter,
-				   struct hdd_tsf_op_response *tsf_op_resp)
-{
-	return -ENOTSUPP;
-}
-
-static inline int
-hdd_capture_tsf(struct hdd_adapter *adapter, uint32_t *buf, int len)
-{
-	return -ENOTSUPP;
-}
-
-static inline int wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
-					struct wireless_dev *wdev,
-					const void *data,
-					int data_len)
-{
-	return -ENOTSUPP;
-}
-static inline int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
-{
-	return -ENOTSUPP;
-}
-
-#define FEATURE_HANDLE_TSF_VENDOR_COMMANDS
-#endif
-
-#if defined(WLAN_FEATURE_TSF_PLUS) && defined(WLAN_FEATURE_TSF)
 /**
  * hdd_tsf_is_tx_set() - check ini configuration
  * @hdd: pointer to hdd context
@@ -519,15 +470,64 @@ int hdd_rx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time);
  */
 QDF_STATUS hdd_get_tsf_time(void *adapter_ctx, uint64_t input_time,
 			    uint64_t *tsf_time);
+
+#ifdef WLAN_FEATURE_TSF_PTP
+/**
+ * wlan_get_ts_info() - return ts info to uplayer
+ * @dev: pointer to net_device
+ * @info: pointer to ethtool_ts_info
+ *
+ * Return: Describe the execute result of this routine
+ */
+int wlan_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info);
+#endif
+
+extern const struct nla_policy tsf_policy[QCA_WLAN_VENDOR_ATTR_TSF_MAX + 1];
+
+#define FEATURE_HANDLE_TSF_VENDOR_COMMANDS \
+{ \
+	.info.vendor_id = QCA_NL80211_VENDOR_ID, \
+	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_TSF, \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV | \
+		WIPHY_VENDOR_CMD_NEED_NETDEV | \
+		WIPHY_VENDOR_CMD_NEED_RUNNING, \
+	.doit = wlan_hdd_cfg80211_handle_tsf_cmd, \
+	vendor_command_policy(tsf_policy, QCA_WLAN_VENDOR_ATTR_TSF_MAX)\
+},
 #else
+static inline void wlan_hdd_tsf_init(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline void wlan_hdd_tsf_deinit(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline int hdd_indicate_tsf(struct hdd_adapter *adapter,
+				   struct hdd_tsf_op_response *tsf_op_resp)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int
+hdd_capture_tsf(struct hdd_adapter *adapter, uint32_t *buf, int len)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
+{
+	return -EOPNOTSUPP;
+}
+
 static inline int hdd_start_tsf_sync(struct hdd_adapter *adapter)
 {
-	return -ENOTSUPP;
+	return -EOPNOTSUPP;
 }
 
 static inline int hdd_stop_tsf_sync(struct hdd_adapter *adapter)
 {
-	return -ENOTSUPP;
+	return -EOPNOTSUPP;
 }
 
 static inline
@@ -564,17 +564,8 @@ QDF_STATUS hdd_get_tsf_time(void *adapter_ctx, uint64_t input_time,
 	*tsf_time = 0;
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+#define FEATURE_HANDLE_TSF_VENDOR_COMMANDS
 #endif
 
-#ifdef WLAN_FEATURE_TSF_PTP
-/**
- * wlan_get_ts_info() - return ts info to uplayer
- * @dev: pointer to net_device
- * @info: pointer to ethtool_ts_info
- *
- * Return: Describe the execute result of this routine
- */
-int wlan_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info);
-
-#endif
 #endif

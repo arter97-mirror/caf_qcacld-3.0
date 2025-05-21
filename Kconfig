@@ -920,8 +920,59 @@ config QCA_DFS_BW_PUNCTURE
 config QCA_DMA_PADDR_CHECK
 	bool "Enable dma memory addr check"
 
+config WLAN_SYNC_TSF
+	bool "Enable QCOM sync multi devices tsf feature"
+	default n
+
+config WLAN_SYNC_TSF_PLUS
+	bool "Enable WLAN_SYNC_TSF_PLUS"
+	default n
+
+config WLAN_SYNC_TSF_TIMER
+	bool "Enable WLAN_SYNC_TSF_TIMER"
+	default n
+
+config WLAN_SYNC_TSF_PLUS_EXT_GPIO_SYNC
+	bool "Enable WLAN_SYNC_TSF_PLUS_EXT_GPIO_SYNC"
+	default n
+
+config WLAN_SYNC_TSF_PLUS_NOIRQ
+	bool "Enable WLAN_SYNC_TSF_PLUS_NOIRQ"
+	default n
+
+config WLAN_SYNC_TSF_PLUS_EXT_GPIO_IRQ
+	bool "Enable WLAN_SYNC_TSF_PLUS_EXT_GPIO_IRQ"
+	default n
+
+config WLAN_SYNC_TSF_PLUS_DISABLE_SOCK_TS
+	bool "Enable WLAN_SYNC_TSF_PLUS_DISABLE_SOCK_TS"
+	default n
+
 config QCA_GET_TSF_VIA_REG
 	bool "Enable QCA_GET_TSF_VIA_REG"
+	default n
+
+config WLAN_TSF_AUTO_REPORT
+	bool "Enable WLAN_TSF_AUTO_REPORT"
+	default n
+
+config WLAN_TSF_UPLINK_DELAY
+	bool "Enable WLAN_TSF_UPLINK_DELAY"
+	depends on WLAN_TSF_AUTO_REPORT
+	default n
+
+config WLAN_TX_LATENCY_STATS
+	bool "Enable WLAN_TX_LATENCY_STATS"
+	depends on WLAN_TSF_AUTO_REPORT
+	default n
+
+config WLAN_FEATURE_UL_JITTER
+	bool "Enable WLAN_FEATURE_UL_JITTER"
+	depends on WLAN_TSF_UPLINK_DELAY
+	default n
+
+config WLAN_TSF_UPLINK_DELAY
+	bool "Enable WLAN_TSF_UPLINK_DELAY"
 	default n
 
 config QCA_MONITOR_PKT_SUPPORT
@@ -1804,22 +1855,6 @@ config WLAN_SUPPORT_DATA_STALL
 	bool "Enable WLAN_SUPPORT_DATA_STALL"
 	default n
 
-config WLAN_SYNC_TSF
-	bool "Enable QCOM sync multi devices tsf feature"
-	default n
-
-config WLAN_SYNC_TSF_PLUS
-	bool "Enable WLAN_SYNC_TSF_PLUS"
-	default n
-
-config WLAN_SYNC_TSF_TIMER
-	bool "Enable WLAN_SYNC_TSF_TIMER"
-	default n
-
-config WLAN_SYNC_TSF_PLUS_DISABLE_SOCK_TS
-	bool "Enable WLAN_SYNC_TSF_PLUS_DISABLE_SOCK_TS"
-	default n
-
 config WLAN_SYSFS
 	bool "Enable WLAN_SYSFS"
 	depends on SYSFS
@@ -1951,25 +1986,6 @@ config WLAN_THERMAL_MULTI_CLIENT_SUPPORT
 
 config WLAN_TRACEPOINTS
 	bool "Enable WLAN_TRACEPOINTS"
-	default n
-
-config WLAN_TSF_AUTO_REPORT
-	bool "Enable WLAN_TSF_AUTO_REPORT"
-	default n
-
-config WLAN_TSF_UPLINK_DELAY
-	bool "Enable WLAN_TSF_UPLINK_DELAY"
-	depends on WLAN_TSF_AUTO_REPORT
-	default n
-
-config WLAN_TX_LATENCY_STATS
-	bool "Enable WLAN_TX_LATENCY_STATS"
-	depends on WLAN_TSF_AUTO_REPORT
-	default n
-
-config WLAN_FEATURE_UL_JITTER
-	bool "Enable WLAN_FEATURE_UL_JITTER"
-	depends on WLAN_TSF_UPLINK_DELAY
 	default n
 
 config WLAN_TWT_CONVERGED
@@ -2594,10 +2610,6 @@ config WLAN_FEATURE_AFC_DCS_SKIP_ACS_RANGE
 
 config WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG
 	bool "Enable WLAN_FEATURE_MULTI_LINK_SAP_TEST_CONFIG"
-	default n
-
-config WLAN_TSF_UPLINK_DELAY
-	bool "Enable WLAN_TSF_UPLINK_DELAY"
 	default n
 
 config WLAN_MAX_VDEV_CHAINS

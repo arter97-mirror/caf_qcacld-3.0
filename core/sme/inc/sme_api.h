@@ -2066,7 +2066,8 @@ QDF_STATUS sme_set_tsfcb(mac_handle_t mac_handle,
 
 QDF_STATUS sme_reset_tsfcb(mac_handle_t mac_handle);
 
-#if defined(WLAN_FEATURE_TSF) && !defined(WLAN_FEATURE_TSF_PLUS_NOIRQ)
+#if defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ) || \
+	defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC)
 QDF_STATUS sme_set_tsf_gpio(mac_handle_t mac_handle, uint32_t pinvalue);
 #endif
 

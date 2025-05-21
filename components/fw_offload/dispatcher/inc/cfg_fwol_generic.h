@@ -603,7 +603,7 @@
 #define __CFG_SET_TSF_SYNC_HOST_GPIO_PIN
 #endif
 
-#if defined(WLAN_FEATURE_TSF) && defined(WLAN_FEATURE_TSF_PLUS)
+#ifdef WLAN_FEATURE_TSF_PLUS
 /* <ini>
  * g_enable_tsf_sync: Enable TSF sync feature
  * @Min: 0

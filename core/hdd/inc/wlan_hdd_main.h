@@ -1490,7 +1490,7 @@ struct hdd_adapter {
 	struct hdd_wapi_info wapi_info;
 #endif
 
-#ifdef WLAN_FEATURE_TSF
+#ifdef WLAN_FEATURE_TSF_PLUS
 	struct hdd_vdev_tsf tsf;
 #endif
 	struct hdd_multicast_addr_list mc_addr_list;
@@ -2432,7 +2432,7 @@ struct hdd_context {
 	/* Lock to control access to dnbs and coex avoid freq list */
 	struct mutex avoid_freq_lock;
 #endif
-#ifdef WLAN_FEATURE_TSF
+#ifdef WLAN_FEATURE_TSF_PLUS
 	struct hdd_ctx_tsf tsf;
 #endif
 

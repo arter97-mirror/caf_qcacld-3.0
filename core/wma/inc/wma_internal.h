@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1228,7 +1228,7 @@ wma_set_auto_shutdown_timer_req(tp_wma_handle wma_handle,
 				struct auto_shutdown_cmd *auto_sh_cmd);
 #endif
 
-#ifdef WLAN_FEATURE_TSF
+#ifdef WLAN_FEATURE_TSF_PLUS
 int wma_vdev_tsf_handler(void *handle, uint8_t *data, uint32_t data_len);
 QDF_STATUS wma_capture_tsf(tp_wma_handle wma_handle, uint32_t vdev_id);
 QDF_STATUS wma_reset_tsf_gpio(tp_wma_handle wma_handle, uint32_t vdev_id);
@@ -1277,6 +1277,13 @@ static inline int wma_vdev_tsf_handler(void *handle, uint8_t *data,
 static inline QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
 {
 	return QDF_STATUS_E_INVAL;
+}
+
+static inline QDF_STATUS wma_set_tsf_auto_report(WMA_HANDLE handle,
+						 uint32_t vdev_id,
+						 uint32_t param_id, bool ena)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 
