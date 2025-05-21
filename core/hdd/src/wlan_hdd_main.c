@@ -5533,6 +5533,7 @@ sched_disable:
 	 */
 	dispatcher_disable();
 	hdd_destroy_sysfs_files();
+	hdd_tx_powerboost_deinit(hdd_ctx);
 	cds_post_disable();
 unregister_notifiers:
 	hdd_unregister_notifiers(hdd_ctx);
