@@ -452,6 +452,33 @@ void lim_pmf_comeback_timer_callback(void *context)
 }
 #endif /* WLAN_FEATURE_11W */
 
+static QDF_STATUS
+lim_handle_pmf_comeback_reassoc_result(tSirResultCodes result_code,
+				       uint16_t prot_status_code,
+				       struct pe_session *session)
+{
+	struct reassoc_params param;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	param.result_code = result_code;
+	param.prot_status_code = prot_status_code;
+	param.session = session;
+
+	mlme_set_connection_fail(session->vdev, true);
+
+	if (wlan_vdev_mlme_get_substate(session->vdev) ==
+	    WLAN_VDEV_SS_START_START_PROGRESS)
+		status = wlan_vdev_mlme_sm_deliver_evt(session->vdev,
+					WLAN_VDEV_SM_EV_START_REQ_FAIL,
+					sizeof(param), &param);
+	else
+		status = wlan_vdev_mlme_sm_deliver_evt(session->vdev,
+					WLAN_VDEV_SM_EV_CONNECTION_FAIL,
+					sizeof(param), &param);
+
+	return status;
+}
+
 /**
  * lim_process_mlm_auth_cnf()-Process Auth confirmation
  * @mac_ctx:  Pointer to Global MAC structure
@@ -468,6 +495,7 @@ void lim_process_mlm_auth_cnf(struct mac_context *mac_ctx, uint32_t *msg)
 	tLimMlmAuthReq *auth_req;
 	tLimMlmAuthCnf *auth_cnf;
 	struct pe_session *session_entry;
+	QDF_STATUS status;
 
 	if (!msg) {
 		pe_err("Buffer is Pointing to NULL");
@@ -581,6 +609,17 @@ void lim_process_mlm_auth_cnf(struct mac_context *mac_ctx, uint32_t *msg)
 						       auth_cnf->protStatusCode,
 						       auth_cnf->peerMacAddr,
 						       session_entry, false);
+			}
+
+			if (session_entry->reassoc_pmf_comeback_flag) {
+				pe_info("handle auth fail for pmf comeback reassoc case.");
+				status = lim_handle_pmf_comeback_reassoc_result(
+					auth_cnf->resultCode,
+					auth_cnf->protStatusCode,
+					session_entry);
+				if (QDF_IS_STATUS_ERROR(status))
+					pe_info("Fail to handle auth fail for pmf comeback reassoc.");
+				return;
 			}
 
 			/*
