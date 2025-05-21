@@ -212,7 +212,6 @@ CONFIG_FEATURE_EPPING := y
 CONFIG_WLAN_OFFLOAD_PACKETS := y
 
 #enable TSF get feature
-CONFIG_WLAN_SYNC_TSF := y
 #Enable DSRC feature
 ifeq ($(CONFIG_QCA_WIFI_SDIO), y)
 	#Enable DSRC feature

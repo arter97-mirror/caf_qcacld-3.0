@@ -920,16 +920,8 @@ config QCA_DFS_BW_PUNCTURE
 config QCA_DMA_PADDR_CHECK
 	bool "Enable dma memory addr check"
 
-config WLAN_SYNC_TSF
-	bool "Enable QCOM sync multi devices tsf feature"
-	default n
-
 config WLAN_SYNC_TSF_PLUS
 	bool "Enable WLAN_SYNC_TSF_PLUS"
-	default n
-
-config WLAN_SYNC_TSF_TIMER
-	bool "Enable WLAN_SYNC_TSF_TIMER"
 	default n
 
 config WLAN_SYNC_TSF_PLUS_EXT_GPIO_SYNC
