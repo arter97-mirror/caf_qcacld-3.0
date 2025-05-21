@@ -6014,6 +6014,29 @@ lim_send_channel_switch_mgmt_frame(struct mac_context *mac,
 } /* End lim_send_channel_switch_mgmt_frame. */
 
 /**
+ * lim_ecsa_confirm_tx_complete_cnf()- Confirmation for ecas action frame
+ * sent over the air
+ *
+ * @context: pointer to global mac
+ * @buf: buffer
+ * @tx_complete : Sent status
+ * @params: tx completion params
+ *
+ * Return: This returns QDF_STATUS
+ */
+static QDF_STATUS
+lim_ecsa_confirm_tx_complete_cnf(void *context,
+				 qdf_nbuf_t buf,
+				 uint32_t tx_complete,
+				 void *params)
+{
+	pe_debug("tx_complete: %d", tx_complete);
+	if (buf)
+		qdf_nbuf_free(buf);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * lim_send_extended_chan_switch_action_frame()- function to send ECSA
  * action frame over the air .
  * @mac_ctx: pointer to global mac structure
@@ -6044,6 +6067,7 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	uint8_t                  ch_spacing;
 	tLimWiderBWChannelSwitchInfo *wide_bw_ie;
 	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
+	uint16_t action = 0;
 
 	if (!session_entry) {
 		pe_err("Session entry is NULL!!!");
@@ -6152,13 +6176,17 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			session_entry->peSessionId, mac_hdr->fc.subType));
-	qdf_status = wma_tx_frame(mac_ctx, packet, (uint16_t) num_bytes,
-						 TXRX_FRM_802_11_MGMT,
-						 ANI_TXDIR_TODS,
-						 7,
-						 lim_tx_complete, frame,
-						 txFlag, vdev_id, 0,
-						 RATEID_DEFAULT, 0);
+
+	action = ACTION_CATEGORY_PUBLIC << 8 | PUB_ACTION_EXT_CHANNEL_SWITCH_ID;
+	qdf_status = wma_tx_frameWithTxComplete(mac_ctx, packet,
+						(uint16_t)num_bytes,
+						TXRX_FRM_802_11_MGMT,
+						ANI_TXDIR_TODS, 7,
+						lim_tx_complete, frame,
+						lim_ecsa_confirm_tx_complete_cnf,
+						txFlag, vdev_id,
+						false, 0, RATEID_DEFAULT, 0,
+						action);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 			session_entry->peSessionId, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
