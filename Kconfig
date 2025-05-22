@@ -2859,4 +2859,8 @@ config DELAYED_REG_FORCE_WRITE
 	bool "Enable Delayed Reg force write"
 	default n
 
+config DP_COMP_FW_REINJECT_WAR
+	bool "enable DP_COMP_FW_REINJECT_WAR"
+	default n
+
 endif # QCA_CLD_WLAN
