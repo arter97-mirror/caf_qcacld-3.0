@@ -235,6 +235,7 @@ struct wlan_dp_stc_sampling_candidate {
 #define WLAN_DP_SAMPLING_FLAGS_STAGE_1 BIT(5)
 #define WLAN_DP_SAMPLING_FLAGS_STAGE_2 BIT(6)
 #define WLAN_DP_SAMPLING_FLAGS_STAGE_3 BIT(7)
+#define WLAN_DP_SAMPLING_FLAGS_PEER_DEL BIT(8)
 
 #define WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT BIT(0)
 #define WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT BIT(1)
@@ -659,6 +660,7 @@ enum wlan_dp_stc_classfied_flow_state {
 
 #define WLAN_DP_CLASSIFIED_DEL_FLAGS_TX_DEL 0
 #define WLAN_DP_CLASSIFIED_DEL_FLAGS_RX_DEL 1
+#define WLAN_DP_CLASSIFIED_DEL_FLAGS_PEER 2
 
 static inline void
 wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
