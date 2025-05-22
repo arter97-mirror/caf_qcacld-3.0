@@ -27,6 +27,8 @@
 #include <wlan_twt_tgt_if_ext_tx_api.h>
 #include <wlan_serialization_api.h>
 #include "wlan_twt_main.h"
+#include "cfg_twt.h"
+#include "wlan_twt_cfg_ext_api.h"
 
 #define TWT_COMMAND_PENDING_FLAG_SET	1
 #define TWT_COMMAND_PENDING_FLAG_RESET	0
@@ -2523,4 +2525,22 @@ wlan_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id)
 {
 	return tgt_twt_send_responder_disable_per_vdev(psoc, vdev_id);
+}
+
+bool wlan_twt_check_responder_bit(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id, enum QDF_OPMODE device_mode,
+				  uint8_t cfg)
+{
+	switch (device_mode) {
+	case QDF_SAP_MODE:
+		if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+			return TWT_RESPONDER_IS_LL_LT_SAP_PRESENT(cfg);
+		return TWT_RESPONDER_IS_SAP_PRESENT(cfg);
+	case QDF_P2P_GO_MODE:
+		return TWT_RESPONDER_IS_P2P_GO_PRESENT(cfg);
+	default:
+		break;
+	}
+
+	return false;
 }

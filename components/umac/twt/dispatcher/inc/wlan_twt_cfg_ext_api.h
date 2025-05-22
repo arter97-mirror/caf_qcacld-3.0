@@ -30,11 +30,6 @@
 				((cfg) & BIT(CFG_TWT_RESPONDER_BIT_LL_LT_SAP))
 #define TWT_RESPONDER_IS_P2P_GO_PRESENT(cfg) \
 				((cfg) & BIT(CFG_TWT_RESPONDER_BIT_P2P_GO))
-#define TWT_RESP_CHECK_BIT(mode, cfg) (((mode) == QDF_SAP_MODE) ?\
-					TWT_RESPONDER_IS_SAP_PRESENT(cfg) :\
-					((mode) == QDF_P2P_GO_MODE) ?\
-					TWT_RESPONDER_IS_P2P_GO_PRESENT(cfg) :\
-					0)
 /**
  * wlan_twt_cfg_get_req_flag() - Get TWT requestor flag
  * @psoc: Pointer to global psoc object
@@ -184,8 +179,20 @@ wlan_twt_get_wake_dur_and_interval(struct wlan_objmgr_psoc *psoc,
 bool
 wlan_is_twt_session_present(struct wlan_objmgr_psoc *psoc,
 			    uint8_t *peer_macaddr);
+/**
+ * wlan_twt_check_responder_bit: This API check TWT INI configuration for
+ * provide opmode.
+ * @psoc: Pointer to PSOC object
+ * @vdev_id: VDEV ID
+ * @device_mode: device OP mode
+ * @cfg: TWT responder INI configuration
+ *
+ * Return: true if TWT responder is enable for given opmode, otherwise disablw
+ */
+bool wlan_twt_check_responder_bit(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id, enum QDF_OPMODE device_mode,
+				  uint8_t cfg);
 #else
-#define TWT_RESP_CHECK_BIT(mode, cfg) 0
 
 static inline QDF_STATUS
 wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val)
@@ -267,5 +274,13 @@ wlan_twt_get_feature_info(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+
+static inline
+bool wlan_twt_check_responder_bit(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id, enum QDF_OPMODE device_mode,
+				  uint8_t cfg)
+{
+	return false;
+}
 #endif
 #endif

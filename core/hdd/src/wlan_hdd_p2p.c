@@ -1673,7 +1673,8 @@ static bool wlan_hdd_p2p_is_wfd_r2_twt_enable(struct hdd_adapter *adapter,
 		uint8_t twt_resp_cfg;
 
 		ucfg_twt_cfg_get_responder(psoc, &twt_resp_cfg);
-		if (!ucfg_twt_resp_check_bit(QDF_P2P_GO_MODE, twt_resp_cfg))
+		if (!ucfg_twt_resp_check_bit(psoc, vdev_id, QDF_P2P_GO_MODE,
+					     twt_resp_cfg))
 			return false;
 	} else if (adapter->device_mode == QDF_P2P_CLIENT_MODE) {
 		bool twt_req;
