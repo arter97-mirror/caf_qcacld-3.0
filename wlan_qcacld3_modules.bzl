@@ -11,6 +11,7 @@ _target_chipset_map = {
     ],
     "sa510m": [
     "qca6574",
+    "qca6490",
     ],
     "anorak": [
         "qca6490",

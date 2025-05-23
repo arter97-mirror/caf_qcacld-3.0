@@ -2925,10 +2925,6 @@ config DFS_FCC_TYPE4_DURATION_CHECK
     bool "check DFS FCC TYPE4 duration"
     default n
 
-config WLAN_OPEN_SOURCE
-    bool "set wlan as open source"
-    default n
-
 config QCACLD_WLAN_LFR2
     bool "wlan LFR2"
     default n
@@ -2980,4 +2976,32 @@ config AR6320_LL_DP_SUPPORT
 config AR6320_MONITOR_MODE
     bool "Flag for ROME MONITOR MODE"
     default n
+
+config AUTO_PLATFORM
+	bool "enable AUTO_PLATFORM"
+	default n
+
+config QCACLD_FEATURE_BTC_CHAIN_MODE
+	bool "enable QCACLD_FEATURE_BTC_CHAIN_MODE"
+	default n
+
+config SUPPORT_P2P_BY_ONE_INTF_WLAN
+	bool "support p2p by one interface"
+	default n
+
+config WLAN_IPA_TX_FLOW_CONTROL
+	bool "enable IPA tx flow control"
+	default n
+
+config QCACLD_FEATURE_COEX_CONFIG
+	bool "bt coex config"
+	default n
+
+config SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+	bool "shutdown wlan in system suspend"
+	default n
+
+config IPA_P2P_SUPPORT
+	bool "support p2p when IPA is enabled"
+	default n
 endif # QCA_CLD_WLAN
