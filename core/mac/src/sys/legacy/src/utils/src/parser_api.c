@@ -8194,6 +8194,7 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 {
 	uint8_t *ppet;
 	uint32_t value = 0;
+	enum phy_ch_width max_ch_width, ch_width;
 
 	he_cap->present = 1;
 
@@ -8201,6 +8202,19 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 		qdf_mem_copy(he_cap, &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
 			     sizeof(tDot11fIEhe_cap));
 		return QDF_STATUS_SUCCESS;
+	}
+	/*
+	 * If the AP or P2P GO initially starts with an 80 MHz
+	 * bandwidth and later upgrades to 160 MHz, set the HE
+	 * capabilities to reflect a 160 MHz bandwidth.
+	 */
+	ch_width = session->ch_width;
+	if (session->opmode == QDF_STA_MODE ||
+	    session->opmode == QDF_P2P_CLIENT_MODE) {
+		max_ch_width = wlan_mlme_get_max_bw();
+		if ((ch_width == CH_WIDTH_80MHZ) &&
+		    (max_ch_width >= CH_WIDTH_160MHZ))
+			ch_width = CH_WIDTH_160MHZ;
 	}
 
 	/** TODO: String items needs attention. **/
@@ -8227,10 +8241,10 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 
 	if (wlan_reg_is_5ghz_ch_freq(session->curr_op_freq) ||
 	    wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
-		if (session->ch_width <= CH_WIDTH_80MHZ) {
+		if (ch_width <= CH_WIDTH_80MHZ) {
 			he_cap->chan_width_2 = 0;
 			he_cap->chan_width_3 = 0;
-		} else if (session->ch_width == CH_WIDTH_160MHZ) {
+		} else if (ch_width == CH_WIDTH_160MHZ) {
 			he_cap->chan_width_3 = 0;
 		}
 	}
