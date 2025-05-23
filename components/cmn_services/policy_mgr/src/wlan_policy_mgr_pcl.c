@@ -1780,6 +1780,41 @@ static bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 
 	return false;
 }
+#ifdef WLAN_FEATURE_11BE_MLO
+static bool
+policy_mgr_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+					qdf_freq_t freq, uint8_t vdev_id)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t i;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_DISABLE_LINK; i++) {
+		if (pm_disabled_ml_links[i].in_use &&
+		    (pm_disabled_ml_links[i].vdev_id != vdev_id) &&
+		    (pm_disabled_ml_links[i].freq == freq)) {
+			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+			return true;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return false;
+}
+#else
+static inline bool
+policy_mgr_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+					qdf_freq_t freq, uint8_t vdev_id)
+{
+	return false;
+}
+#endif
 
 static bool
 policy_mgr_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
@@ -1796,8 +1831,8 @@ policy_mgr_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-		if ((pm_conc_connection_list[i].vdev_id != vdev_id) &&
-		    (pm_conc_connection_list[i].in_use) &&
+		if (pm_conc_connection_list[i].in_use &&
+		    (pm_conc_connection_list[i].vdev_id != vdev_id) &&
 		    (pm_conc_connection_list[i].freq == freq)) {
 			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 			return true;
@@ -1831,6 +1866,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	bool modified_pcl_6_ghz = false;
 	bool avoid_list_modified_pcl = false;
 	bool skip_scc_modified_pcl = false;
+	bool skip_inactive_scc_modified_pcl = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1870,6 +1906,12 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			continue;
 		}
 
+		if (policy_mgr_inact_vdev_present_with_freq(psoc,
+							    pcl_channels[i],
+							    vdev_id)) {
+			skip_inactive_scc_modified_pcl = true;
+			continue;
+		}
 		pcl_list[pcl_len] = pcl_channels[i];
 		weight_list[pcl_len++] = pcl_weight[i];
 	}
@@ -1883,9 +1925,9 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
 	*len = pcl_len;
 
-	policy_mgr_debug("Modified PCL: 6Ghz %d avoid_list %d skip scc %d",
+	policy_mgr_debug("Modified PCL: 6Ghz %d avoid_list %d scc %d inact scc %d",
 			 modified_pcl_6_ghz, avoid_list_modified_pcl,
-			 skip_scc_modified_pcl);
+			 skip_scc_modified_pcl, skip_inactive_scc_modified_pcl);
 
 	return QDF_STATUS_SUCCESS;
 }
