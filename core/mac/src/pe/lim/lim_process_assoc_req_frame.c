@@ -2373,6 +2373,19 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_SON
+static void lim_enable_4addr_flag(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		pe_err("vdev legacy private object is NULL");
+		return;
+	}
+	mlme_priv->mac_4_addr = true;
+}
+
 static bool lim_check_multi_ap(struct mac_context *mac_ctx, tSirMacAddr sa,
 			       struct pe_session *session, uint8_t *frm_body,
 			       uint32_t frame_len, uint8_t sub_type)
@@ -2410,8 +2423,19 @@ static bool lim_check_multi_ap(struct mac_context *mac_ctx, tSirMacAddr sa,
 		pe_err("SOFTAP send denied status assoc rsp");
 		return false;
 	}
+
+	lim_enable_4addr_flag(session->vdev);
+
 	return true;
 }
+#else
+static bool lim_check_multi_ap(struct mac_context *mac_ctx, tSirMacAddr sa,
+			       struct pe_session *session, uint8_t *frm_body,
+			       uint32_t frame_len, uint8_t sub_type)
+{
+	return true;
+}
+#endif
 
 QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 				      uint8_t *frm_body, uint32_t frame_len,

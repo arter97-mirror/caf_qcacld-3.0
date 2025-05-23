@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -468,6 +469,59 @@ int wma_peer_sta_kickout_event_handler(void *handle, uint8_t *event,
 	wma_lost_link_info_handler(wma, vdev_id, del_sta_ctx->rssi);
 
 exit_handler:
+	return 0;
+}
+
+int wma_peer_sta_kickout(struct cdp_ctrl_objmgr_psoc *cpsoc,
+			 uint16_t pdev_id, uint8_t *macaddr)
+{
+	tp_wma_handle wma;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
+	tpDeleteStaContext del_sta_ctx;
+	uint8_t vdev_id;
+	uint8_t *addr;
+	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)cpsoc;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma || !psoc) {
+		wma_err("null wma or psoc");
+		return -EINVAL;
+	}
+
+	peer = wlan_objmgr_get_peer(psoc, pdev_id, macaddr,
+				    WLAN_LEGACY_WMA_ID);
+	if (!peer) {
+		wma_err("Failed to get peer");
+		return -EINVAL;
+	}
+	del_sta_ctx =
+		(tDeleteStaContext *)qdf_mem_malloc(sizeof(tDeleteStaContext));
+	if (!del_sta_ctx) {
+		wma_err("QDF MEM Alloc Failed for struct del_sta_context");
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+		return -ENOMEM;
+	}
+	vdev = wlan_peer_get_vdev(peer);
+	vdev_id = wlan_vdev_get_id(vdev);
+	del_sta_ctx->is_tdls = false;
+	del_sta_ctx->vdev_id = vdev_id;
+	del_sta_ctx->rssi = WMA_TGT_NOISE_FLOOR_DBM;
+	del_sta_ctx->reasonCode = HAL_DEL_STA_REASON_CODE_KEEP_ALIVE;
+	addr = wlan_vdev_mlme_get_macaddr(vdev);
+	qdf_mem_copy(del_sta_ctx->addr2, macaddr, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(del_sta_ctx->bssId, addr, QDF_MAC_ADDR_SIZE);
+
+	wma_info("STA kickout for "QDF_MAC_ADDR_FMT", on mac "QDF_MAC_ADDR_FMT", vdev %d, reason:%d",
+		 QDF_MAC_ADDR_REF(macaddr), QDF_MAC_ADDR_REF(addr),
+		 vdev_id, del_sta_ctx->reasonCode);
+
+	wma_sta_kickout_event(del_sta_ctx->reasonCode, vdev_id, macaddr);
+	wma_send_msg(wma, SIR_LIM_DELETE_STA_CONTEXT_IND,
+		     (void *)del_sta_ctx, 0);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+
 	return 0;
 }
 

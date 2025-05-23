@@ -19,6 +19,11 @@
 
 #include "_ieee80211.h"
 
+/* For same define of ieee80211req_sta_info in driver and ezmesh */
+#ifndef ATH_SUPPORT_EXT_STAT
+#define ATH_SUPPORT_EXT_STAT 1
+#endif
+
 #define RRM_CAPS_LEN 5
 
 #define HE_PPET16_PPET8_SIZE                            (8)
