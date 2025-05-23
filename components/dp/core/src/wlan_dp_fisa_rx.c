@@ -2698,6 +2698,7 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 						head_nbuf);
 		if (fisa_flow) {
 			fisa_flow->num_pkts++;
+			fisa_flow->last_accessed_ts = qdf_sched_clock();
 			wlan_dp_fisa_nbuf_mark_flow_info(fisa_flow, head_nbuf);
 			dp_fisa_update_flow_balance_stats(fisa_flow, dp_ctx);
 		}
@@ -2705,7 +2706,6 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		/* Do not FISA aggregate IPSec packets */
 		if (fisa_flow &&
 		    fisa_flow->rx_flow_tuple_info.is_exception) {
-			fisa_flow->last_accessed_ts = qdf_sched_clock();
 			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
 			goto pull_nbuf;
 		}

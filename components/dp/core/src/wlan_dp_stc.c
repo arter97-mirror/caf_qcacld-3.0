@@ -1047,7 +1047,8 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, c_entry->tx_flow_id);
 		flow_active_ts = tx_flow->active_ts;
 		cur_ts = dp_stc_get_timestamp();
-		if (cur_ts - flow_active_ts < inactivity_timer_ts)
+		if (cur_ts > flow_active_ts &&
+		    (cur_ts - flow_active_ts < inactivity_timer_ts))
 			return;
 	}
 
@@ -1057,7 +1058,8 @@ wlan_dp_stc_check_flow_inactivity(struct wlan_dp_stc *dp_stc,
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, c_entry->rx_flow_id);
 		flow_active_ts = rx_flow->last_accessed_ts;
 		cur_ts = dp_stc_get_timestamp();
-		if (cur_ts - flow_active_ts < inactivity_timer_ts)
+		if (cur_ts > flow_active_ts &&
+		    (cur_ts - flow_active_ts < inactivity_timer_ts))
 			return;
 	}
 
@@ -1097,6 +1099,7 @@ wlan_dp_stc_check_flow_resumption(struct wlan_dp_stc *dp_stc,
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint64_t cur_ts = dp_stc_get_timestamp();
 	int tx_flow_valid, rx_flow_valid;
+	uint64_t active_ts;
 
 	tx_flow_valid = qdf_atomic_test_bit(WLAN_DP_CLASSIFIED_FLAGS_TX_FLOW_VALID,
 					    &c_entry->flags);
@@ -1105,14 +1108,17 @@ wlan_dp_stc_check_flow_resumption(struct wlan_dp_stc *dp_stc,
 
 	if (tx_flow_valid) {
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, c_entry->tx_flow_id);
-		if (cur_ts - tx_flow->active_ts < FLOW_RESUME_TIME_THRESH_NS)
+		active_ts = tx_flow->active_ts;
+		if (cur_ts > active_ts &&
+		    (cur_ts - active_ts < FLOW_RESUME_TIME_THRESH_NS))
 			goto flow_active;
 	}
 
 	if (rx_flow_valid) {
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, c_entry->rx_flow_id);
-		if (cur_ts - rx_flow->last_accessed_ts <
-						FLOW_RESUME_TIME_THRESH_NS)
+		active_ts = rx_flow->last_accessed_ts;
+		if (cur_ts > active_ts && (cur_ts - active_ts <
+						FLOW_RESUME_TIME_THRESH_NS))
 			goto flow_active;
 	}
 
