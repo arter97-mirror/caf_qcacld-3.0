@@ -9761,9 +9761,12 @@ lim_update_bcn_with_new_ch_width(struct mac_context *mac_ctx,
 
 	session->gLimOperatingMode.present = 1;
 	session->gLimOperatingMode.chanWidth = ch_width;
+	if (session->nss)
+		session->gLimOperatingMode.rxNSS = session->nss - 1;
 
-	pe_debug("ch width %d",
-		 session->gLimOperatingMode.chanWidth);
+	pe_debug("ch width %d nss %d",
+		 session->gLimOperatingMode.chanWidth,
+		 session->gLimOperatingMode.rxNSS);
 
 	session->bw_update_include_ch_sw_ie = true;
 	status = qdf_mc_timer_start(&session->ap_ecsa_timer,

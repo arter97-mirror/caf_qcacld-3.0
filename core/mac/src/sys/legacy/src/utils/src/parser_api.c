@@ -8283,6 +8283,7 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 {
 	uint8_t *ppet, nss;
 	uint32_t value = 0;
+	enum phy_ch_width max_ch_width;
 
 	he_cap->present = 1;
 	nss = session ? session->nss : WLAN_MAX_VDEV_NSS;
@@ -8296,6 +8297,18 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		/** TODO: String items needs attention. **/
 		qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
 		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
+		/*
+		 * If the AP or P2P GO initially starts with an 80 MHz
+		 * bandwidth and later upgrades to 160 MHz, set the HE
+		 * capabilities to reflect a 160 MHz bandwidth.
+		 */
+		if (session->opmode == QDF_STA_MODE ||
+		    session->opmode == QDF_P2P_CLIENT_MODE) {
+			max_ch_width = wlan_mlme_get_max_bw();
+			if ((ch_width == CH_WIDTH_80MHZ) &&
+			    (max_ch_width >= CH_WIDTH_160MHZ))
+				ch_width = CH_WIDTH_160MHZ;
+		}
 	}
 
 	if (he_cap->ppet_present) {

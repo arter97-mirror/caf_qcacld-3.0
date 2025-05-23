@@ -91,6 +91,7 @@
 #include "wlan_mlme_api.h"
 #include "wlan_tdls_api.h"
 #include "wlan_twt_cfg_ext_api.h"
+#include "wlan_dnw_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -8673,6 +8674,8 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    enum phy_ch_width ch_width,
 				    bool is_2g)
 {
+	enum phy_ch_width max_ch_width;
+
 	if ((!peer_eht_caps) || (!peer_eht_caps->present)) {
 		pe_debug("peer not eht capable or eht_caps NULL");
 		return QDF_STATUS_SUCCESS;
@@ -8682,6 +8685,29 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	max_ch_width = wlan_mlme_get_max_bw();
+	/*
+	 * If the session is in STA or P2P Client mode, and the current channel
+	 * width is 80 MHz, while the maximum supported channel width is
+	 * greater than 160 MHz, then upgrade the channel width to 160 MHz in
+	 * case the AP or P2P GO also upgrades to 160 MHz.
+	 *
+	 * If the session is in SAP or P2P GO mode and a DFS No-Wait operation
+	 * is in progress, then populate the EHT MCS set based on the session's
+	 * current channel width.
+	 */
+	if ((session_entry->opmode == QDF_STA_MODE ||
+	     session_entry->opmode == QDF_P2P_CLIENT_MODE) &&
+	    (ch_width == CH_WIDTH_80MHZ) &&
+	    (max_ch_width >= CH_WIDTH_160MHZ)) {
+		ch_width = CH_WIDTH_160MHZ;
+	} else if ((session_entry->opmode == QDF_SAP_MODE ||
+		session_entry->opmode == QDF_P2P_GO_MODE) &&
+		(ch_width != session_entry->ch_width) &&
+		wlan_is_dnw_in_progress(mac_ctx->pdev,
+					session_entry->vdev_id)) {
+		ch_width = session_entry->ch_width;
+	}
 	pe_debug("bw is %d", ch_width);
 
 	switch (ch_width) {
