@@ -31,7 +31,8 @@ bool wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	uint64_t cur_ts = qdf_sched_clock();
 
-	if ((flow->selected_to_sample || flow->classified) &&
+	if ((flow->selected_to_sample ||
+	     DP_STC_IS_CLASSIFIED_KNOWN(flow->classified)) &&
 	    ((cur_ts - flow->flow_add_ts) <
 	     WLAN_DP_SPM_FLOW_CLASSIFICATION_END_NS))
 		return false;
@@ -1005,7 +1006,7 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 		if (flow->cookie == cookie) {
 			qdf_rcu_read_unlock_bh();
 			wlan_dp_spm_update_flow_features(dp_intf, flow, nbuf);
-			if (flow->classified &&
+			if (DP_STC_IS_CLASSIFIED_KNOWN(flow->classified) &&
 			    flow->ul_tid != WLAN_DP_STC_UL_TID_INVALID) {
 				nbuf->mark =
 				      WLAN_DP_STC_ENCRYPT_UL_TID(flow->ul_tid);

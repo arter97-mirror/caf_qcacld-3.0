@@ -1127,7 +1127,8 @@ dp_fisa_flow_evict_check(struct dp_fisa_rx_sw_ft *sw_ft_entry)
 {
 	uint64_t sw_timestamp = qdf_sched_clock();
 
-	if ((sw_ft_entry->selected_to_sample || sw_ft_entry->classified) &&
+	if ((sw_ft_entry->selected_to_sample ||
+	     DP_STC_IS_CLASSIFIED_KNOWN(sw_ft_entry->classified)) &&
 	    ((sw_timestamp - sw_ft_entry->flow_init_ts) <
 	     FISA_FT_ENTRY_CLASSIFICATION_END_NS))
 		return false;

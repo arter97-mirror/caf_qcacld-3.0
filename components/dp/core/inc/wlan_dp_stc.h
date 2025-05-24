@@ -152,6 +152,21 @@ enum wlan_dp_stc_burst_state {
  */
 #define WLAN_DP_SAMPLING_BURST_STAT_STAGE_2_END 50
 
+#define DP_STC_IS_CLASSIFIED_KNOWN(classified_state) \
+			((classified_state) == DP_STC_CLASSIFIED_KNOWN)
+
+enum dp_stc_classified_state {
+	DP_STC_CLASSIFIED_INIT,
+	DP_STC_CLASSIFIED_UNKNOWN,
+	DP_STC_CLASSIFIED_KNOWN,
+
+	/*
+	 * Max value of classified state, based on the
+	 * size of the variable holding this state.
+	 */
+	DP_STC_CLASSIFIED_MAX = 255,
+};
+
 /**
  * enum wlan_stc_sampling_state - Sampling state
  * @WLAN_DP_SAMPLING_STATE_INIT: init state
@@ -657,7 +672,7 @@ wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 	if (!dp_stc)
 		return;
 
-	if (!classified)
+	if (!DP_STC_IS_CLASSIFIED_KNOWN(classified))
 		return;
 
 	c_table = dp_stc->classified_flow_table;
@@ -684,7 +699,7 @@ wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 	if (!dp_stc)
 		return;
 
-	if (!classified)
+	if (!DP_STC_IS_CLASSIFIED_KNOWN(classified))
 		return;
 
 	c_table = dp_stc->classified_flow_table;

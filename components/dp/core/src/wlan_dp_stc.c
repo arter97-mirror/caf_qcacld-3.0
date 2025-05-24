@@ -929,7 +929,7 @@ wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
 				&c_entry->flags)) {
 		/* TX flow retired, mark corresponding rx flow as inactive */
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, c_entry->rx_flow_id);
-		rx_flow->classified = 0;
+		rx_flow->classified = DP_STC_CLASSIFIED_INIT;
 		/*
 		 * Classified flow entry is cleared at the end,
 		 * so no need to clear the del_flags
@@ -942,7 +942,7 @@ wlan_dp_stc_purge_classified_flow(struct wlan_dp_stc *dp_stc,
 				&c_entry->flags)) {
 		/* RX flow retired, mark corresponding tx flow as inactive */
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, c_entry->tx_flow_id);
-		tx_flow->classified = 0;
+		tx_flow->classified = DP_STC_CLASSIFIED_INIT;
 		/*
 		 * Classified flow entry is cleared at the end,
 		 * so no need to clear the del_flags
@@ -1267,13 +1267,13 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 	/* Should this indication be done from flow classify handler ? */
 	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, s_entry->tx_flow_id);
-		tx_flow->classified = 1;
+		tx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
 		tx_flow->selected_to_sample = 0;
 	}
 
 	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, s_entry->rx_flow_id);
-		rx_flow->classified = 1;
+		rx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
 		rx_flow->selected_to_sample = 0;
 	}
 
@@ -1312,7 +1312,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 			c_entry->tx_flow_id = s_entry->tx_flow_id;
 			qdf_atomic_set_bit(WLAN_DP_CLASSIFIED_FLAGS_TX_FLOW_VALID,
 					   &c_entry->flags);
-			tx_flow->classified = 1;
+			tx_flow->classified = DP_STC_CLASSIFIED_KNOWN;
 			tx_flow->c_flow_id = c_id;
 			tx_flow->ul_tid = s_entry->ul_tid;
 		}
@@ -1321,7 +1321,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 			c_entry->rx_flow_id = s_entry->rx_flow_id;
 			qdf_atomic_set_bit(WLAN_DP_CLASSIFIED_FLAGS_RX_FLOW_VALID,
 					   &c_entry->flags);
-			rx_flow->classified = 1;
+			rx_flow->classified = DP_STC_CLASSIFIED_KNOWN;
 			rx_flow->c_flow_id = c_id;
 		}
 
