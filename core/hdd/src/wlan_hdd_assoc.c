@@ -1136,7 +1136,6 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 		    WLAN_WDS_MODE_REPEATER))
 			hdd_config_wds_repeater_mode(adapter, peer_mac);
 
-		hdd_son_deliver_peer_authorize_event(adapter, peer_mac);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -1168,7 +1167,6 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 		    WLAN_WDS_MODE_REPEATER))
 			hdd_config_wds_repeater_mode(adapter, peer_mac);
 
-		hdd_son_deliver_peer_authorize_event(adapter, peer_mac);
 	}
 	return QDF_STATUS_SUCCESS;
 }
