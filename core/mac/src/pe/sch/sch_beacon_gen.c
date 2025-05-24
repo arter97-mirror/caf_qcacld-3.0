@@ -355,13 +355,7 @@ static void lim_update_link_info(struct mac_context *mac_ctx,
 	 */
 
 	if (session->mlo_link_info.bcn_tmpl_exist) {
-		if (bcn_2->ChanSwitchAnn.present ||
-		    bcn_2->ext_chan_switch_ann.present ||
-		    bcn_2->Quiet.present ||
-		    bcn_2->WiderBWChanSwitchAnn.present ||
-		    bcn_2->ChannelSwitchWrapper.present ||
-		    bcn_2->OperatingMode.present ||
-		    bcn_2->bss_color_change.present)
+		if (session->mlo_link_info.upt_bcn_mlo_ie)
 			bss_param_change = true;
 
 		if (bss_param_change) {
