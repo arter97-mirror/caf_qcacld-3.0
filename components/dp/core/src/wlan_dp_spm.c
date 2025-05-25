@@ -31,10 +31,11 @@ bool wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	uint64_t cur_ts = qdf_sched_clock();
 
-	if ((flow->selected_to_sample ||
-	     DP_STC_IS_CLASSIFIED_KNOWN(flow->classified)) &&
-	    ((cur_ts - flow->flow_add_ts) <
-	     WLAN_DP_SPM_FLOW_CLASSIFICATION_END_NS))
+	if (!dp_stc_is_remove_flow_allowed(flow->classified,
+					   flow->selected_to_sample,
+					   flow->inactivity_timeout,
+					   flow->active_ts,
+					   cur_ts))
 		return false;
 
 	if ((cur_ts - flow->active_ts) <

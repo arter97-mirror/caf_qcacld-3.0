@@ -100,6 +100,7 @@ struct wlan_dp_spm_flow_tbl_stats {
  * @classified: Classification done
  * @reserved: unused
  * @flow_tuple_hash: flow_tuple_hash to identify bi-directional flow
+ * @inactivity_timeout: inactivity timeout to be tested for STC interested flows
  * @ul_tid: Uplink TID id for the flow
  */
 struct wlan_dp_spm_flow_info {
@@ -126,6 +127,7 @@ struct wlan_dp_spm_flow_info {
 	uint8_t selected_to_sample;
 	uint8_t classified;
 	uint64_t flow_tuple_hash;
+	uint64_t inactivity_timeout;
 	uint8_t ul_tid;
 #endif
 };

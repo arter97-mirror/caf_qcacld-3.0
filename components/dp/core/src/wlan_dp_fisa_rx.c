@@ -1127,12 +1127,6 @@ dp_fisa_flow_evict_check(struct dp_fisa_rx_sw_ft *sw_ft_entry)
 {
 	uint64_t sw_timestamp = qdf_sched_clock();
 
-	if ((sw_ft_entry->selected_to_sample ||
-	     DP_STC_IS_CLASSIFIED_KNOWN(sw_ft_entry->classified)) &&
-	    ((sw_timestamp - sw_ft_entry->flow_init_ts) <
-	     FISA_FT_ENTRY_CLASSIFICATION_END_NS))
-		return false;
-
 	if ((sw_timestamp - sw_ft_entry->last_accessed_ts) >
 	    FISA_FT_ENTRY_LONG_LIVE_MIN_NS)
 		return true;
@@ -1263,11 +1257,19 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			      fisa_hdl->hash_collision_cnt);
 		fisa_hdl->hash_collision_cnt++;
 
-		timestamp = dp_fisa_rx_get_hw_ft_timestamp(fisa_hdl,
-							   hashed_flow_idx);
-		if (timestamp < lru_ft_entry_time) {
-			lru_ft_entry_time = timestamp;
-			lru_ft_entry_idx = hashed_flow_idx;
+		if (dp_stc_is_remove_flow_allowed(
+					sw_ft_entry->classified,
+					sw_ft_entry->selected_to_sample,
+					sw_ft_entry->inactivity_timeout,
+					sw_ft_entry->last_accessed_ts,
+					qdf_sched_clock())) {
+			timestamp = dp_fisa_rx_get_hw_ft_timestamp(
+							fisa_hdl,
+							hashed_flow_idx);
+			if (timestamp < lru_ft_entry_time) {
+				lru_ft_entry_time = timestamp;
+				lru_ft_entry_idx = hashed_flow_idx;
+			}
 		}
 		skid_count++;
 		hashed_flow_idx++;

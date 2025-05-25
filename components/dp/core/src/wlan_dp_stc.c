@@ -38,6 +38,12 @@
 #define FLOW_SHORTLIST_BURST_PKT_RATE_PER_SEC_THRESH 15
 #define FLOW_SHORTLIST_TXRX_PKT_RATE_PER_SEC_THRESH 2
 #define WLAN_DP_STC_BK_TPUT_TEST_THRESH_NS 1000000000
+
+/* The below values are dependent on the STC FLOW inactive threshold */
+#define DP_STC_CLASSIFIED_FLOW_RM_INACTIVE_TIME_NS (30 * QDF_NSEC_PER_SEC)
+#define DP_STC_CLASSIFIED_RT_FLOW_RM_INACTIVE_TIME_NS (7 * QDF_NSEC_PER_SEC)
+#define DP_STC_SAMPLING_FLOW_RM_INACTIVE_TIME_NS (10 * QDF_NSEC_PER_SEC)
+
 /*
  * Value of WLAN_DP_STC_BK_PKT_THRESH is dependent on the value of
  * WLAN_DP_STC_BK_TPUT_TEST_THRESH_NS.
@@ -356,7 +362,7 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 		s_entry->tuple_hash = rx_flow->flow_tuple_hash;
 		rx_flow_valid = true;
 		scnprintf(rx_flow_str, FLOW_STR_LEN,
-			  "rx: flow_id %hu mdata 0x%x num_pkts:%llu add_ts %lu",
+			  "rx: flow_id %hu mdata 0x%x num_pkt:%llu add_ts %llu",
 			  s_entry->rx_flow_id, s_entry->rx_flow_metadata,
 			  rx_flow->num_pkts, rx_flow->flow_init_ts);
 	}
@@ -1223,15 +1229,19 @@ wlan_dp_stc_is_traffic_type_known(enum qca_traffic_type traffic_type)
 	return true;
 }
 
-static inline void
+static inline bool
 wlan_dp_stc_check_n_mark_rt_flow(struct wlan_dp_stc_classified_flow_entry *flow)
 {
 	if (flow->traffic_type == QCA_TRAFFIC_TYPE_GAMING ||
 	    flow->traffic_type == QCA_TRAFFIC_TYPE_VIDEO_CALL ||
-	    flow->traffic_type == QCA_TRAFFIC_TYPE_VOICE_CALL)
+	    flow->traffic_type == QCA_TRAFFIC_TYPE_VOICE_CALL) {
 		qdf_atomic_set_bit(
 			WLAN_DP_CLASSIFIED_FLAGS_RT_FLOW_BIT,
 			&flow->flags);
+		return true;
+	}
+
+	return false;
 }
 
 /*
@@ -1284,7 +1294,9 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 
 	/* Move to classified flow table if its not unknown traffic type */
 	for (c_id = 0; c_id < DP_STC_CLASSIFIED_TABLE_FLOW_MAX; c_id++) {
+		uint64_t flow_rm_inactivity_time;
 		uint32_t state;
+		bool rt_flow;
 
 		c_entry = &c_table->entries[c_id];
 		state = qdf_atomic_read(&c_entry->state);
@@ -1303,7 +1315,10 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 			     sizeof(struct flow_info));
 
 		c_entry->traffic_type = s_entry->traffic_type;
-		wlan_dp_stc_check_n_mark_rt_flow(c_entry);
+		rt_flow = wlan_dp_stc_check_n_mark_rt_flow(c_entry);
+		flow_rm_inactivity_time = rt_flow ?
+				DP_STC_CLASSIFIED_RT_FLOW_RM_INACTIVE_TIME_NS :
+				DP_STC_CLASSIFIED_FLOW_RM_INACTIVE_TIME_NS;
 
 		c_entry->peer_id = s_entry->peer_id;
 		qdf_atomic_inc(&c_table->num_valid_entries);
@@ -1313,6 +1328,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 			qdf_atomic_set_bit(WLAN_DP_CLASSIFIED_FLAGS_TX_FLOW_VALID,
 					   &c_entry->flags);
 			tx_flow->classified = DP_STC_CLASSIFIED_KNOWN;
+			tx_flow->inactivity_timeout = flow_rm_inactivity_time;
 			tx_flow->c_flow_id = c_id;
 			tx_flow->ul_tid = s_entry->ul_tid;
 		}
@@ -1322,6 +1338,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 			qdf_atomic_set_bit(WLAN_DP_CLASSIFIED_FLAGS_RX_FLOW_VALID,
 					   &c_entry->flags);
 			rx_flow->classified = DP_STC_CLASSIFIED_KNOWN;
+			rx_flow->inactivity_timeout = flow_rm_inactivity_time;
 			rx_flow->c_flow_id = c_id;
 		}
 
@@ -1488,6 +1505,8 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 			uint16_t tx_flow_id = s_entry->tx_flow_id;
 
 			tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, tx_flow_id);
+			tx_flow->inactivity_timeout =
+				DP_STC_SAMPLING_FLOW_RM_INACTIVE_TIME_NS;
 			tx_flow->selected_to_sample = 1;
 		}
 
@@ -1495,6 +1514,8 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 			uint16_t rx_flow_id = s_entry->rx_flow_id;
 
 			rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
+			rx_flow->inactivity_timeout =
+				DP_STC_SAMPLING_FLOW_RM_INACTIVE_TIME_NS;
 			rx_flow->selected_to_sample = 1;
 		}
 

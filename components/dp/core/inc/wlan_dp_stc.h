@@ -750,6 +750,19 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 }
 
+static inline bool
+dp_stc_is_remove_flow_allowed(uint8_t classified, uint8_t selected_to_sample,
+			      uint64_t inactivity_timeout, uint64_t active_ts,
+			      uint64_t cur_ts)
+{
+	if ((DP_STC_IS_CLASSIFIED_KNOWN(classified) || selected_to_sample) &&
+	    cur_ts > active_ts && inactivity_timeout &&
+	    (cur_ts - active_ts < inactivity_timeout))
+		return false;
+
+	return true;
+}
+
 /**
  * wlan_dp_indicate_flow_add() - Indication to STC when flow is added
  * @dp_ctx: Global DP psoc context
@@ -1030,6 +1043,14 @@ static inline void
 wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 				struct cdp_rx_flow_tuple_info *flow_tuple_info)
 {
+}
+
+static inline bool
+dp_stc_is_remove_flow_allowed(uint8_t classified, uint8_t selected_to_sample,
+			      uint64_t inactivity_timeout, uint64_t active_ts,
+			      uint64_t cur_ts)
+{
+	return true;
 }
 
 static inline void
