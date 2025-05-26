@@ -2028,22 +2028,22 @@ int wlansap_update_sap_chan_list(struct sap_config *sap_config,
 				 qdf_freq_t *freq_list, uint16_t count);
 
 /**
- * wlan_sap_get_acs_weight_adjustable() - get channel weight
+ * wlansap_get_acs_weight_adjustable() - get channel weight
  * @cur_bw: bandwidth
  *
  * Return: channel weight
  */
-uint32_t wlan_sap_get_acs_weight_adjustable(enum phy_ch_width cur_bw);
+uint32_t wlansap_get_acs_weight_adjustable(enum phy_ch_width cur_bw);
 
 /**
- * wlan_sap_is_ch_non_overlap() - check if channel is overlapping
+ * wlansap_is_ch_non_overlap() - check if channel is overlapping
  * @vdev_id: vdev id
  * @freq: freq
  *
  * Return: true if channel is non overlapping
  */
 bool
-wlan_sap_is_ch_non_overlap(uint8_t vdev_id, qdf_freq_t freq);
+wlansap_is_ch_non_overlap(uint8_t vdev_id, qdf_freq_t freq);
 
 /**
  * wlansap_sort_channel_list() - Sort channel list

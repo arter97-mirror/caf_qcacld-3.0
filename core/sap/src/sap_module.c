@@ -4830,7 +4830,7 @@ void wlansap_update_ll_lt_sap_acs_result(struct sap_context *sap_ctx,
 	sap_ctx->acs_cfg->ht_sec_ch_freq = 0;
 }
 
-uint32_t wlan_sap_get_acs_weight_adjustable(enum phy_ch_width cur_bw)
+uint32_t wlansap_get_acs_weight_adjustable(enum phy_ch_width cur_bw)
 {
 	uint8_t max_score_multiplyer = sap_get_bw_score_multiplier(cur_bw);
 
@@ -4838,7 +4838,7 @@ uint32_t wlan_sap_get_acs_weight_adjustable(enum phy_ch_width cur_bw)
 }
 
 bool
-wlan_sap_is_ch_non_overlap(uint8_t vdev_id, qdf_freq_t freq)
+wlansap_is_ch_non_overlap(uint8_t vdev_id, qdf_freq_t freq)
 {
 	struct mac_context *mac_ctx;
 	struct sap_context *sap_ctx;

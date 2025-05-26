@@ -41,7 +41,6 @@
 #include <target_if.h>
 #include "wlan_dp_api.h"
 #include "wlan_mlo_mgr_public_api.h"
-#include "sap_api.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
