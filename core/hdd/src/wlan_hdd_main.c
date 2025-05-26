@@ -15087,12 +15087,15 @@ static void hdd_set_mtrace_for_each(struct hdd_context *hdd_ctx)
 	uint8_t module_id = 0;
 	int qdf_print_idx = -1;
 
+	if (!hdd_ctx->config->enable_mtrace)
+		return;
+
 	qdf_print_idx = qdf_get_pidx();
 	for (module_id = 0; module_id < QDF_MODULE_ID_MAX; module_id++)
 		qdf_print_set_category_verbose(
 					qdf_print_idx,
 					module_id, QDF_TRACE_LEVEL_TRACE,
-					hdd_ctx->config->enable_mtrace);
+					true);
 }
 #else
 static void hdd_set_mtrace_for_each(struct hdd_context *hdd_ctx)
