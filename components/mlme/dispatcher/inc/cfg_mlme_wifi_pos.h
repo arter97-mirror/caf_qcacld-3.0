@@ -156,7 +156,7 @@
  * enable_rtt_bw_downgrade - Enable RTT Bandwidth downgrade
  * @Min: false
  * @Max: True
- * @default: 0
+ * @default: True
  *
  * This ini is used to enable RTT Bandwidth downgrade
  *
@@ -170,7 +170,7 @@
  */
 #define CFG_ENABLE_RTT_BW_DOWNGRADE CFG_INI_BOOL( \
 		"enable_rtt_bw_downgrade", \
-		false, \
+		true, \
 		"enable rtt bw downgrade")
 
 #define CFG_WIFI_POS_ALL \
