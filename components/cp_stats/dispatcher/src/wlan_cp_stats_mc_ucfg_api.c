@@ -745,17 +745,30 @@ QDF_STATUS ucfg_mc_cp_stats_send_stats_request(struct wlan_objmgr_vdev *vdev,
 					       enum stats_req_type type,
 					       struct request_info *info)
 {
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	bool pending = false;
+	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
 
-	status = ucfg_mc_cp_stats_set_pending_req(wlan_vdev_get_psoc(vdev),
-						  type, info);
+	if (!psoc) {
+		cp_stats_err("psoc is null");
+		return status;
+	}
+
+	status = ucfg_mc_cp_stats_set_pending_req(psoc, type, info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cp_stats_err("ucfg_mc_cp_stats_set_pending_req pdev failed: %d",
 			     status);
 		return status;
 	}
 
-	return tgt_send_mc_cp_stats_req(wlan_vdev_get_psoc(vdev), type, info);
+	status = tgt_send_mc_cp_stats_req(psoc, type, info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("send cp stats req type %d failed %d",
+			     type, status);
+		ucfg_mc_cp_stats_reset_pending_req(psoc, type, info, &pending);
+	}
+
+	return status;
 }
 
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
