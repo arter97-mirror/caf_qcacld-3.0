@@ -9869,6 +9869,7 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	struct scheduler_msg msg_return = {0};
 	uint8_t primary_channel;
 	struct ch_params ch_params = {0};
+	enum phy_ch_width non_eht_ch_width;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -9905,6 +9906,13 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 						ch_params.center_freq_seg0;
 	session->gLimChannelSwitch.ch_center_freq_seg1 =
 						ch_params.center_freq_seg1;
+
+	non_eht_ch_width = req->ch_width;
+	if (non_eht_ch_width >= CH_WIDTH_160MHZ &&
+	    wma_get_vht_ch_width() < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
+		non_eht_ch_width = CH_WIDTH_80MHZ;
+	}
+	session->gLimChannelSwitch.legacy_ch_width = non_eht_ch_width;
 
 	wlan_mlme_set_ap_oper_ch_width(session->vdev, req->ch_width);
 
