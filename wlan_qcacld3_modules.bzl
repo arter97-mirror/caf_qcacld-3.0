@@ -19,12 +19,17 @@ _target_chipset_map = {
                 "qca6750",
                 "adrastea",
         ],
+	"lahaina":[
+                "qca6490",
+                "qca6750",
+        ],
 }
 
 _chipset_hw_map = {
         "wlan"   : "ADRASTEA",
         "adrastea" : "ADRASTEA",
         "qca6750": "MOSELLE",
+	"qca6490": "LITHIUM",
 }
 
 _chipset_header_map = {
@@ -36,12 +41,19 @@ _chipset_header_map = {
         "api/hw/qca6750/v1",
         "cmn/hal/wifi3.0/qca6750",
     ],
+    "qca6490": [
+        "api/hw/qca6490/v1",
+        "cmn/hal/wifi3.0/qca6490",
+    ],
 }
 
 _hw_header_map = {
-        "ADRASTEA" : [
-        ],
-        "MOSELLE" : [
+    "ADRASTEA" : [
+    ],
+    "MOSELLE" : [
+        "cmn/hal/wifi3.0/li",
+    ],
+    "LITHIUM": [
         "cmn/hal/wifi3.0/li",
     ],
 }
@@ -1047,6 +1059,12 @@ _conditional_srcs = {
         True: [
             "cmn/hal/wifi3.0/qca6750/hal_6750.c",
             "cmn/hif/src/qca6750def.c",
+        ],
+    },
+    "CONFIG_QCA6490_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/qca6490/hal_6490.c",
+            "cmn/hif/src/qca6490def.c",
         ],
     },
     "CONFIG_OCB_UT_FRAMEWORK": {
@@ -2063,12 +2081,24 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
 
-    deps += [
+    if chipset == "qca6750":
+        deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+        ]
+    else:
+        deps += [
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
+        ]
+
+    deps = deps + [
+        "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
+        "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
+        "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
+        "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+    ]
+
+    if target != "lahaina":
+        deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
         ]
