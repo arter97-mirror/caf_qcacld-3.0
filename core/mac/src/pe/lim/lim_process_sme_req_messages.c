@@ -9570,7 +9570,8 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 		goto fail;
 	}
 
-	if (session->opmode != QDF_SAP_MODE) {
+	if ((session->opmode != QDF_SAP_MODE) &&
+	    (session->opmode != QDF_P2P_GO_MODE)) {
 		pe_err("Invalid opmode %d", session->opmode);
 		goto fail;
 	}
