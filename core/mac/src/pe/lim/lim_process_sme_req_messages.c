@@ -10515,10 +10515,8 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		else
 			update_he_cap = false;
 		if (!update_he_cap) {
-			if ((session_entry->ch_width !=
-			     ch_change_req->ch_width) &&
-			    (session_entry->ch_width > CH_WIDTH_80MHZ ||
-			     ch_change_req->ch_width > CH_WIDTH_80MHZ))
+			if (session_entry->ch_width !=
+			    ch_change_req->ch_width)
 				update_he_cap = true;
 		}
 		if (update_he_cap) {
