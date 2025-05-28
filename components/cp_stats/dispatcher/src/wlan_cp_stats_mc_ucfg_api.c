@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -851,7 +851,7 @@ QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc,
 						vdev->vdev_objmgr.vdev_id);
 	if (mac_id >= MAX_MAC) {
-		cp_stats_err("invalid mac_id %d", mac_id);
+		cp_stats_rl_err("invalid mac_id %d", mac_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
