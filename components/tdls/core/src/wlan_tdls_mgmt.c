@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -365,8 +365,8 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 	tdls_vdev = tdls_get_correct_vdev(tdls_vdev, rx_mgmt);
 	status = QDF_STATUS_TDLS_MLO_SYNC;
 	if (!tdls_vdev || tdls_vdev->rx_mgmt) {
-		tdls_err("rx dup tdls discovery resp on same vdev:%d",
-			 wlan_vdev_get_id(tdls_vdev->vdev));
+		tdls_err("Received duplicate tdls discovery resp on same vdev %d",
+			 tdls_vdev ? wlan_vdev_get_id(tdls_vdev->vdev) : WLAN_INVALID_VDEV_ID);
 		return status;
 	}
 
