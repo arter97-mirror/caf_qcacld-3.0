@@ -783,6 +783,35 @@ void wmi_ese_attach_tlv(wmi_unified_t wmi_handle)
 }
 #endif /* FEATURE_WLAN_ESE */
 
+enum wlan_roam_frame_tx_status
+wmi_get_host_roam_frame_tx_status(WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS tx_status)
+{
+	switch (tx_status) {
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK:
+		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK:
+		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FAIL:
+		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FAIL;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FILTERED:
+		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FILTERED;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TXOP_ABORT:
+		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TXOP_ABORT;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_TID_DEL:
+		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_TID_DEL;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_SW_ABORT:
+		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_SW_ABORT;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MIG_DROP:
+		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MIG_DROP;
+	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MLO_TID_MIG:
+		return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MLO_TID_MIG;
+	default:
+		break;
+	}
+
+	return ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_INVALID;
+}
+
 /**
  * convert_roam_trigger_reason() - Function to convert unified Roam trigger
  * enum to TLV specific WMI_ROAM_TRIGGER_REASON_ID
@@ -1970,35 +1999,6 @@ wmi_get_converted_roam_eapol_subtype(
 	return 0;
 }
 
-static enum wlan_diag_tx_rx_status
-wmi_get_diag_tx_status(WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS tx_status)
-{
-	switch (tx_status) {
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK:
-		return WLAN_DIAG_TX_RX_STATUS_OK;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK:
-		return WLAN_DIAG_TX_RX_STATUS_NO_ACK;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FAIL:
-		return WLAN_DIAG_TX_RX_STATUS_DROP;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FILTERED:
-		return WLAN_DIAG_TX_RX_TX_FILTERED;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TXOP_ABORT:
-		return WLAN_DIAG_TX_RX_TXOP_ABORT;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_TID_DEL:
-		return WLAN_DIAG_TX_RX_TX_TID_DEL;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_SW_ABORT:
-		return WLAN_DIAG_TX_RX_SW_ABORT;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MIG_DROP:
-		return WLAN_DIAG_TX_RX_TX_MIG_DROP;
-	case WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MLO_TID_MIG:
-		return WLAN_DIAG_TX_RX_MLO_TID_MIG;
-	default:
-		break;
-	}
-
-	return WLAN_DIAG_TX_RX_STATUS_INVALID;
-}
-
 #define WLAN_FC0_SUBTYPE_SHIFT              4
 #define WLAN_FRAME_INFO_TYPE_OFFSET         0
 #define WLAN_FRAME_INFO_SUBTYPE_OFFSET      2
@@ -2085,7 +2085,7 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		    dst_buf->subtype == MGMT_SUBTYPE_ASSOC_REQ ||
 		    dst_buf->subtype == MGMT_SUBTYPE_REASSOC_REQ ||
 		    dst_buf->type == ROAM_FRAME_INFO_FRAME_TYPE_EXT) {
-			dst_buf->tx_status = wmi_get_diag_tx_status(
+			dst_buf->tx_status = wmi_get_host_roam_frame_tx_status(
 							src_data->status_code);
 			dst_buf->status_code = 0;
 		}

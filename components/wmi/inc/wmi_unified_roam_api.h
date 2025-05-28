@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -231,6 +231,16 @@ QDF_STATUS wmi_unified_set_ric_req_cmd(wmi_unified_t wmi_handle, void *msg,
  */
 QDF_STATUS wmi_unified_roam_synch_complete_cmd(wmi_unified_t wmi_handle,
 					       uint8_t vdev_id);
+
+/**
+ * wmi_get_host_roam_frame_tx_status() - API to convert FW TX status code to
+ * Host reason code
+ * @tx_status: FW TX status. Refer WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS
+ *
+ * Return: Returns enum wlan_roam_frame_tx_status value
+ */
+enum wlan_roam_frame_tx_status
+wmi_get_host_roam_frame_tx_status(WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS tx_status);
 
 /**
  * wmi_unified_roam_invoke_cmd() - send roam invoke command to fw.

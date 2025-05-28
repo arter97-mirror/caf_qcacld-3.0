@@ -7664,9 +7664,10 @@ cm_roam_neigh_rpt_req_event(struct wmi_neighbor_report_data *neigh_rpt,
 	wlan_diag_event.token = neigh_rpt->req_token;
 	wlan_diag_event.band = neigh_rpt->band;
 	wlan_diag_event.is_tx = true;
+	wlan_diag_event.tx_fail_reason =
+	wlan_convert_host_to_diag_tx_fail_reason(neigh_rpt->tx_status);
 	wlan_diag_event.tx_status =
 		wlan_diag_get_tx_status(neigh_rpt->tx_status);
-	wlan_diag_event.tx_fail_reason = neigh_rpt->tx_status;
 
 	wlan_vdev_mlme_get_ssid(vdev, wlan_diag_event.ssid,
 				(uint8_t *)&wlan_diag_event.ssid_len);
@@ -8036,7 +8037,8 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.sn = frame_data->seq_num;
 	wlan_diag_event.auth_algo = frame_data->auth_algo;
 	wlan_diag_event.rssi = frame_data->rssi;
-	wlan_diag_event.tx_fail_reason = frame_data->tx_status;
+	wlan_diag_event.tx_fail_reason =
+		wlan_convert_host_to_diag_tx_fail_reason(frame_data->tx_status);
 	wlan_diag_event.tx_status =
 				wlan_diag_get_tx_status(frame_data->tx_status);
 	wlan_diag_event.status = frame_data->status_code;
