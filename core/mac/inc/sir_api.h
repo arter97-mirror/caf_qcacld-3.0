@@ -2948,16 +2948,6 @@ struct wifi_interface_info {
 	/* country string for this association */
 	uint8_t countryStr[REG_ALPHA2_LEN + 1];
 	uint8_t time_slice_duty_cycle;
-	/* link stats valid*/
-	bool link_stats_valid;
-	/* TX success counter */
-	uint32_t link_tx_success;
-	/* TX retries counter */
-	uint32_t link_tx_retries;
-	/* TX failed counter */
-	uint32_t link_tx_failed;
-	/* Overall TX drop counter */
-	uint32_t tx_dropped;
 };
 
 /**
@@ -3103,6 +3093,26 @@ struct wifi_peer_info {
 };
 
 /**
+ * struct wifi_host_link_stats - host side per link statistics
+ * @valid: indicates whether the stats are valid.
+ * @msdu_tx_retry: The number of MSDUs sent by the driver that were
+ *  retransmitted and eventually transmitted successfully.
+ * @msdu_tx_succ: The number of MSDUs that were successfully transmitted by the
+ *  driver, including those that were retransmitted and eventually succeeded.
+ * @msdu_tx_fw_drop: The number of MSDUs that were handed off by the driver for
+ *  transmission but were ultimately dropped by the firmware.
+ * @msdu_tx_driver_drop: The number of MSDUs that were intended for transmission
+ *  but were dropped by the driver before being handed off to the firmware.
+ */
+struct wifi_host_link_stats {
+	bool valid;
+	uint32_t msdu_tx_retry;
+	uint32_t msdu_tx_succ;
+	uint32_t msdu_tx_fw_drop;
+	uint32_t msdu_tx_driver_drop;
+};
+
+/**
  * struct wifi_interface_stats - Interface statistics
  * @info: struct containing the current state of the interface
  * @rts_succ_cnt: number of RTS/CTS sequence success
@@ -3115,6 +3125,7 @@ struct wifi_peer_info {
  * @offload_stats: per-offload statistics
  * @powersave_stats: powersave statistics
  * @vdev_id: vdev id
+ * @host_link_stats: host side per link statistics
  *
  * Statistics corresponding to 2nd most LSB in wifi statistics bitmap
  * for getting statistics
@@ -3131,6 +3142,7 @@ struct wifi_interface_stats {
 	wmi_iface_offload_stats offload_stats[WMI_OFFLOAD_STATS_TYPE_MAX];
 	wmi_iface_powersave_stats powersave_stats;
 	uint8_t vdev_id;
+	struct wifi_host_link_stats host_link_stats;
 };
 
 /**

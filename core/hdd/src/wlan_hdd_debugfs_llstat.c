@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,6 +48,7 @@ void hdd_debugfs_process_iface_stats(struct wlan_hdd_link_info *link_info,
 	wmi_wmm_ac_stats *ac_stats;
 	wmi_iface_offload_stats *offload_stats;
 	wmi_iface_powersave_stats *powersave_stats;
+	struct wifi_host_link_stats *host_link_stats;
 	uint64_t average_tsf_offset;
 	int i;
 	ssize_t len = 0;
@@ -168,7 +169,22 @@ void hdd_debugfs_process_iface_stats(struct wlan_hdd_link_info *link_info,
 			powersave_stats->tot_tim_bcn,
 			powersave_stats->tot_err_tim_bcn);
 
+	buffer += len;
 	ll_stats.len += len;
+
+	host_link_stats = &iface_stat->host_link_stats;
+	hdd_get_host_link_stats(link_info, host_link_stats);
+	if (host_link_stats->valid) {
+		len = scnprintf(buffer, DEBUGFS_LLSTATS_BUF_SIZE - ll_stats.len,
+				"\n\nMSDU TX stats(Sent by HOST): retry: %u, success: %u, fw drop: %u, driver drop: %u",
+				host_link_stats->msdu_tx_retry,
+				host_link_stats->msdu_tx_succ,
+				host_link_stats->msdu_tx_fw_drop,
+				host_link_stats->msdu_tx_driver_drop);
+		buffer += len;
+		ll_stats.len += len;
+	}
+
 	mutex_unlock(&llstats_mutex);
 	hdd_exit();
 }

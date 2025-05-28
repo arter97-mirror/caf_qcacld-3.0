@@ -420,6 +420,8 @@ void wlan_hdd_cfg80211_link_layer_stats_ext_callback(hdd_handle_t ctx,
 void hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 			   struct sir_lost_link_info *lost_link_info);
 
+void hdd_get_host_link_stats(struct wlan_hdd_link_info *link_info,
+			     struct wifi_host_link_stats *stats);
 #else /* WLAN_FEATURE_LINK_LAYER_STATS */
 
 static inline bool hdd_link_layer_stats_supported(void)
@@ -467,7 +469,6 @@ hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 		      struct sir_lost_link_info *lost_link_info)
 {
 }
-
 #endif /* End of WLAN_FEATURE_LINK_LAYER_STATS */
 
 #ifdef WLAN_FEATURE_STATS_EXT
