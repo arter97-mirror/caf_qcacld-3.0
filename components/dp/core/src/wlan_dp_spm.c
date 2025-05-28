@@ -31,6 +31,13 @@ bool wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	uint64_t cur_ts = qdf_sched_clock();
 
+	/*
+	 * flow_entry with id=0 is an invalid entry and hence marked as
+	 * is_populated=1. This entry should never be retired.
+	 */
+	if (flow->is_reserved)
+		return false;
+
 	if (!dp_stc_is_remove_flow_allowed(flow->classified,
 					   flow->selected_to_sample,
 					   flow->inactivity_timeout,
@@ -1108,8 +1115,8 @@ void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
 			WLAN_DP_SPM_FLOW_REC_TBL_MAX);
 	qdf_spinlock_create(&dp_ctx->flow_list_lock);
 
-	flow_rec = &dp_ctx->gl_flow_recs[0];
 	for (i = 0; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++) {
+		flow_rec = &dp_ctx->gl_flow_recs[i];
 		qdf_mem_zero(flow_rec, sizeof(struct wlan_dp_spm_flow_info));
 		flow_rec->id = i;
 		/* flow_id 0 is invalid and hence do not add it to freelist.
@@ -1118,10 +1125,12 @@ void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
 		 *
 		 * Global Tx flow table index will be (intf_id << 6 | idx)
 		 */
-		if (i)
-			qdf_list_insert_back(&dp_ctx->o_flow_rec_freelist,
-					     &flow_rec->node);
-		flow_rec++;
+		if (!(i & SAWFISH_FLOW_ID_MAX)) {
+			flow_rec->is_reserved = 1;
+			continue;
+		}
+		qdf_list_insert_back(&dp_ctx->o_flow_rec_freelist,
+				     &flow_rec->node);
 	}
 
 }

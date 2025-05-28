@@ -82,6 +82,7 @@ struct wlan_dp_spm_flow_tbl_stats {
  * @rcu: internal rcu lock for the structure
  * @id: Flow ID
  * @is_populated: Is flow valid
+ * @is_reserved: Is flow already reserved
  * @info: Flow details
  * @is_ipv4: Is flow IPV4
  * @guid: Global unique identifier
@@ -108,7 +109,8 @@ struct wlan_dp_spm_flow_info {
 	struct qdf_ht_entry hnode;
 	qdf_rcu_head_t rcu;
 	uint16_t id;
-	bool is_populated;
+	uint8_t is_populated;
+	uint8_t is_reserved;
 	struct flow_info info;
 	bool is_ipv4;
 	uint32_t guid;
