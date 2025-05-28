@@ -55,6 +55,7 @@
 #include "wlan_nan_api_i.h"
 #include "wlan_tdls_api.h"
 #include <wlan_p2p_api.h>
+#include "wlan_mlme_api.h"
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -2045,6 +2046,7 @@ QDF_STATUS psoc_mlme_ext_hdl_create(struct psoc_mlme_obj *psoc_mlme)
 
 	target_if_mlme_register_tx_ops(
 			&psoc_mlme->ext_psoc_ptr->mlme_tx_ops);
+	wlan_mlme_init_miracast_opt(psoc_mlme->ext_psoc_ptr);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2064,6 +2066,7 @@ QDF_STATUS psoc_mlme_ext_hdl_destroy(struct psoc_mlme_obj *psoc_mlme)
 	}
 
 	if (psoc_mlme->ext_psoc_ptr) {
+		wlan_mlme_deinit_miracast_opt(psoc_mlme->ext_psoc_ptr);
 		qdf_mem_free(psoc_mlme->ext_psoc_ptr);
 		psoc_mlme->ext_psoc_ptr = NULL;
 	}

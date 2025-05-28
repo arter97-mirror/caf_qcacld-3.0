@@ -5632,4 +5632,38 @@ wlan_mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
 void wlan_mlme_update_ch_width_from_ap(struct mlme_legacy_priv *mlme_priv,
 				       bool value);
 
+/**
+ * wlan_mlme_init_miracast_opt() - Init timer and wakelock for miracast
+ * optimization
+ * @mlme_obj: MLME ext psoc priv object
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_init_miracast_opt(struct wlan_mlme_psoc_ext_obj *mlme_obj);
+
+/**
+ * wlan_mlme_deinit_miracast_opt() - Deinit timer and wakelock for miracast
+ * optimization
+ * @mlme_obj: MLME ext psoc priv object
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_deinit_miracast_opt(struct wlan_mlme_psoc_ext_obj *mlme_obj);
+
+/**
+ * wlan_mlme_start_miracast_opt() - Start timer and wakelock for miracast
+ * optimization
+ * @psoc: psoc
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_start_miracast_opt(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_stop_miracast_opt() - Stop timer and wakelock for miracast
+ * optimization
+ * @psoc: psoc
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_stop_miracast_opt(struct wlan_objmgr_psoc *psoc);
+
 #endif /* _WLAN_MLME_API_H_ */

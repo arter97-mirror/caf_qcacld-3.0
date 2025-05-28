@@ -162,6 +162,8 @@ struct wlan_mlme_tx_ops {
  * @wfa_testcmd: WFA config tx ops to send to FW
  * @disconnect_stats_param: Peer disconnect stats related params for SAP case
  * @scan_requester_id: mlme scan requester id
+ * @miracast_opt_wakelock: wakelock to allow to stop miracast_opt in time
+ * @miracast_opt_timer: timer to stop miracast_opt in time to avoid F/W assert
  */
 struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
@@ -172,6 +174,8 @@ struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_wfa_cmd wfa_testcmd;
 	struct peer_disconnect_stats_param disconnect_stats_param;
 	wlan_scan_requester scan_requester_id;
+	qdf_wake_lock_t miracast_opt_wakelock;
+	qdf_timer_t miracast_opt_timer;
 };
 
 /**

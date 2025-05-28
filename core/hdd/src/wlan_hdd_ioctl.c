@@ -4898,15 +4898,15 @@ static int drv_cmd_miracast(struct wlan_hdd_link_info *link_info,
 	case MIRACAST_SINK:
 		break;
 	case MIRACAST_CONN_OPT_ENABLED:
+		ucfg_mlme_start_miracast_opt(hdd_ctx->psoc);
+		wma_cli_set_command(0, wmi_pdev_param_power_collapse_enable, 0,
+				    PDEV_CMD);
+		return 0;
 	case MIRACAST_CONN_OPT_DISABLED:
-		{
-			wma_cli_set_command(
-				link_info->vdev_id,
-				wmi_pdev_param_power_collapse_enable,
-				(filter_type == MIRACAST_CONN_OPT_ENABLED ?
-				 0 : 1), PDEV_CMD);
-			return 0;
-		}
+		wma_cli_set_command(0, wmi_pdev_param_power_collapse_enable, 1,
+				    PDEV_CMD);
+		ucfg_mlme_stop_miracast_opt(hdd_ctx->psoc);
+		return 0;
 	default:
 		hdd_err("accepted Values: 0-Disabled, 1-Source, 2-Sink, 128,129");
 		ret = -EINVAL;
