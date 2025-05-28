@@ -1198,6 +1198,12 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		return;
 
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_mac)) {
+		logging_debug("vdev:%d reason:%d , bssid is zero",
+			      wlan_vdev_get_id(vdev), reason);
+		return;
+	}
+
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
 		logging_err("Pdev not found");
