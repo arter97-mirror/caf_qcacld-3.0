@@ -1977,16 +1977,16 @@ void hdd_cm_connect_active_notify(uint8_t vdev_id)
 		hdd_err("Link info not found for vdev %d", vdev_id);
 		return;
 	}
-
-	if (hdd_adapter_restore_link_vdev_map(link_info->adapter, true))
-		hdd_adapter_update_mlo_mgr_mac_addr(link_info->adapter);
-
 	vdev = hdd_objmgr_get_vdev_by_user(link_info,
 					   WLAN_HDD_ID_OBJ_MGR);
 	if (!vdev) {
 		hdd_err("Invalid VDEV id %d", vdev_id);
 		return;
 	}
+
+	if (hdd_adapter_restore_link_vdev_map(link_info->adapter, true))
+		hdd_adapter_update_mlo_mgr_mac_addr(link_info->adapter);
+
 	intf_mac = hdd_adapter_get_netdev_mac_addr(link_info->adapter);
 	ucfg_dp_update_def_link(hdd_ctx->psoc, intf_mac, vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
