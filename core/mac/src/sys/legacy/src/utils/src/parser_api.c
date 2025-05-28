@@ -8175,7 +8175,6 @@ populate_dot11f_timing_advert_frame(struct mac_context *mac_ctx,
 }
 
 #if defined(WLAN_SUPPORT_TWT) && defined(WLAN_FEATURE_11AX)
-#ifdef WLAN_TWT_CONV_SUPPORTED
 static bool
 twt_get_requestor_flag(struct mac_context *mac)
 {
@@ -8185,27 +8184,22 @@ twt_get_requestor_flag(struct mac_context *mac)
 	return req_flag;
 }
 
+/**
+ * twt_get_responder_flag() - get responder flag
+ * @mac: Pointer to global MAC context
+ * @vdev_id: VDEV ID
+ *
+ * Return: responder flag
+ */
 static bool
-twt_get_responder_flag(struct mac_context *mac)
+twt_get_responder_flag(struct mac_context *mac, uint8_t vdev_id)
 {
 	bool res_flag = false;
 
-	wlan_twt_cfg_get_res_flag(mac->psoc, &res_flag);
+	wlan_twt_cfg_get_res_flag(mac->psoc, vdev_id, &res_flag);
+
 	return res_flag;
 }
-#else
-static bool
-twt_get_requestor_flag(struct mac_context *mac)
-{
-	return mac->mlme_cfg->twt_cfg.req_flag;
-}
-
-static bool
-twt_get_responder_flag(struct mac_context *mac)
-{
-	return mac->mlme_cfg->twt_cfg.res_flag;
-}
-#endif
 #endif
 
 #ifdef WLAN_FEATURE_11AX
@@ -8251,7 +8245,9 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 							     session->opmode,
 							     twt_resp_cfg);
 		he_cap->twt_responder =
-			twt_responder && twt_get_responder_flag(mac);
+			twt_responder && twt_get_responder_flag(
+							mac,
+							session->vdev_id);
 		he_cap->broadcast_twt = bcast_responder;
 		pe_debug("vdev:%d bcast_responder:%d twt_responder:%d",
 			 session->vdev_id, he_cap->broadcast_twt,
@@ -12978,7 +12974,9 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 							pe_session->opmode,
 							twt_resp_cfg);
 		p_ext_cap->twt_responder_support =
-			twt_responder && twt_get_responder_flag(mac_ctx);
+			twt_responder && twt_get_responder_flag(
+							mac_ctx,
+							pe_session->vdev_id);
 		break;
 	default:
 		break;
