@@ -5,6 +5,7 @@ load("//msm-kernel:target_variants.bzl", "get_all_variants")
 _target_chipset_map = {
     "sa510m": [
     "qca6574",
+    "qca6490",
     ],
     "anorak": [
 	"qca6490",
@@ -1914,7 +1915,7 @@ _conditional_srcs = {
             "os_if/twt/src/osif_twt_ext_rsp.c",
             "os_if/twt/src/osif_twt_ext_util.c",
             # TODO: rest being removed by David's TWT change
-            #            "components/mlme/core/src/wlan_mlme_twt_api.c",
+            "components/mlme/core/src/wlan_mlme_twt_api.c",
             # TODO: to be removed by David's TWT change
             "components/mlme/dispatcher/src/wlan_mlme_twt_ucfg_api.c",
             "core/wma/src/wma_twt.c",
