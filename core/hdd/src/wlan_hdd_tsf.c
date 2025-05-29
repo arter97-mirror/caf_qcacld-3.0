@@ -440,7 +440,7 @@ int32_t hdd_get_soctime_from_tsf64time(struct hdd_adapter *adapter,
  *
  * Return: 0 for success or non-zero negative failure code
  */
-static inline int32_t
+int32_t
 hdd_get_tsftime_from_qtime(struct hdd_adapter *adapter, uint64_t qtime,
 			   uint64_t *tsf_time)
 {
@@ -448,6 +448,18 @@ hdd_get_tsftime_from_qtime(struct hdd_adapter *adapter, uint64_t qtime,
 	int32_t ret = -EINVAL;
 	uint64_t delta64_tsf64time, tsf_sync_qtime;
 	bool in_cap_state;
+
+	/* Sanity check on inputs */
+	if (unlikely(!adapter || !qtime || !tsf_time)) {
+		hdd_err("Invalid param passed");
+		return ret;
+	}
+
+	if (unlikely(adapter->magic != WLAN_HDD_ADAPTER_MAGIC)) {
+		hdd_err("Magic cookie(%x) for adapter sanity verification is invalid",
+			adapter->magic);
+		return ret;
+	}
 
 	in_cap_state = hdd_tsf_is_in_cap(adapter);
 	tsf = &adapter->tsf;
@@ -476,30 +488,6 @@ hdd_get_tsftime_from_qtime(struct hdd_adapter *adapter, uint64_t qtime,
 		qdf_spin_unlock_bh(&tsf->host_target_sync_lock);
 
 	return ret;
-}
-
-QDF_STATUS hdd_get_tsf_time(void *adapter_ctx, uint64_t input_time,
-			    uint64_t *tsf_time)
-{
-	struct hdd_adapter *adapter;
-	uint64_t qtime;
-
-	/* Sanity check on inputs */
-	if (unlikely(!adapter_ctx || !input_time)) {
-		hdd_err("Invalid param passed");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	adapter = (struct hdd_adapter *)adapter_ctx;
-	if (unlikely(adapter->magic != WLAN_HDD_ADAPTER_MAGIC)) {
-		hdd_err("Magic cookie(%x) for adapter sanity verification is invalid",
-			adapter->magic);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	qtime = qdf_log_timestamp_to_usecs(input_time);
-	hdd_get_tsftime_from_qtime(adapter, qtime, tsf_time);
-	return QDF_STATUS_SUCCESS;
 }
 
 static inline void hdd_reset_timestamps(struct hdd_adapter *adapter)
