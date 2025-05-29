@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -260,8 +260,7 @@ static QDF_STATUS
 dp_wfds_req_mem_msg(struct dp_direct_link_wfds_context *dl_wfds)
 {
 	struct wlan_qmi_wfds_mem_req_msg *info;
-	struct dp_soc *dp_soc =
-		wlan_psoc_get_dp_handle(dl_wfds->direct_link_ctx->dp_ctx->psoc);
+	struct dp_soc *dp_soc;
 	struct hif_opaque_softc *hif_ctx;
 	qdf_device_t qdf_dev;
 	QDF_STATUS status;
@@ -269,10 +268,15 @@ dp_wfds_req_mem_msg(struct dp_direct_link_wfds_context *dl_wfds)
 	uint16_t num_pages;
 	uint8_t i;
 
+	if (!dl_wfds)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	dp_soc =
+		wlan_psoc_get_dp_handle(dl_wfds->direct_link_ctx->dp_ctx->psoc);
 	qdf_dev = dl_wfds->direct_link_ctx->dp_ctx->qdf_dev;
 
-	if (!dl_wfds || !dp_soc || !dp_soc->hif_handle || !qdf_dev)
-		return QDF_STATUS_E_NOSUPPORT;
+	if (!dp_soc || !dp_soc->hif_handle || !qdf_dev)
+		return QDF_STATUS_E_INVAL;
 
 	hif_ctx = dp_soc->hif_handle;
 
