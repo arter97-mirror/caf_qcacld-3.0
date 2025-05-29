@@ -640,20 +640,15 @@ void wlan_dp_pkt_add_timestamp(struct wlan_dp_intf *dp_intf,
 			       qdf_nbuf_t nbuf)
 {
 	struct wlan_dp_psoc_callbacks *dp_ops;
-	qdf_nbuf_rx_cksum_t cksum = {0};
 
 	if (qdf_unlikely(qdf_is_dp_pkt_timestamp_enabled())) {
 		uint64_t tsf_time;
 
 		dp_ops = &dp_intf->dp_ctx->dp_ops;
 		dp_ops->dp_get_tsf_time(dp_intf->dev,
-					qdf_get_log_timestamp(),
+					qdf_get_log_timestamp_usecs(),
 					&tsf_time);
 		qdf_add_dp_pkt_timestamp(nbuf, index, tsf_time);
-		if (index == QDF_PKT_RX_DRIVER_EXIT) {
-			cksum.l4_result = QDF_NBUF_RX_CKSUM_TCP_UDP_UNNECESSARY;
-			qdf_nbuf_set_rx_cksum(nbuf, &cksum);
-		}
 	}
 }
 #endif

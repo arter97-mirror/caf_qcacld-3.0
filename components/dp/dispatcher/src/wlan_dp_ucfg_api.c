@@ -1195,7 +1195,7 @@ dp_rx_register_fisa_ops(struct ol_txrx_ops *txrx_ops)
 
 #ifdef CONFIG_DP_PKT_ADD_TIMESTAMP
 static QDF_STATUS wlan_dp_get_tsf_time(void *dp_link_ctx,
-				       uint64_t input_time,
+				       uint64_t qtime,
 				       uint64_t *tsf_time)
 {
 	struct wlan_dp_link *dp_link = (struct wlan_dp_link *)dp_link_ctx;
@@ -1203,13 +1203,13 @@ static QDF_STATUS wlan_dp_get_tsf_time(void *dp_link_ctx,
 	struct wlan_dp_psoc_callbacks *dp_ops = &dp_intf->dp_ctx->dp_ops;
 
 	dp_ops->dp_get_tsf_time(dp_intf->dev,
-				input_time,
+				qtime,
 				tsf_time);
 	return QDF_STATUS_SUCCESS;
 }
 #else
 static QDF_STATUS wlan_dp_get_tsf_time(void *dp_link_ctx,
-				       uint64_t input_time,
+				       uint64_t qtime,
 				       uint64_t *tsf_time)
 {
 	*tsf_time = 0;

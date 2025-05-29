@@ -462,16 +462,20 @@ int hdd_rx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time);
 #endif
 
 /**
- * hdd_get_tsf_time() - get tsf time for system time
+ * hdd_get_tsftime_from_qtime()
  *
- * @adapter_ctx: adapter context
- * @input_time: input system time
- * @tsf_time: tsf time for system time
+ * @adapter: Adapter pointer
+ * @qtime: current qtime, us
+ * @tsf_time: current tsf time(qtime), us
  *
- * Return: qdf status
+ * This function determines current tsf time
+ * using current qtime
+ *
+ * Return: 0 for success or non-zero negative failure code
  */
-QDF_STATUS hdd_get_tsf_time(void *adapter_ctx, uint64_t input_time,
-			    uint64_t *tsf_time);
+int32_t
+hdd_get_tsftime_from_qtime(struct hdd_adapter *adapter, uint64_t qtime,
+			   uint64_t *tsf_time);
 
 #ifdef WLAN_FEATURE_TSF_PTP
 /**
@@ -559,12 +563,12 @@ void hdd_restart_tsf_sync_post_wlan_resume(struct hdd_adapter *adapter)
 {
 }
 
-static inline
-QDF_STATUS hdd_get_tsf_time(void *adapter_ctx, uint64_t input_time,
-			    uint64_t *tsf_time)
+static inline int32_t
+hdd_get_tsftime_from_qtime(struct hdd_adapter *adapter, uint64_t qtime,
+			   uint64_t *tsf_time)
 {
 	*tsf_time = 0;
-	return QDF_STATUS_E_NOSUPPORT;
+	return -EOPNOTSUPP;
 }
 
 #define FEATURE_HANDLE_TSF_VENDOR_COMMANDS

@@ -906,7 +906,7 @@ struct wlan_dp_psoc_callbacks {
 						     qdf_netdev_t netdev);
 	void (*dp_get_tx_resource)(uint8_t link_id_id,
 				   struct qdf_mac_addr *mac_addr);
-	void (*dp_get_tsf_time)(qdf_netdev_t netdev, uint64_t input_time,
+	void (*dp_get_tsf_time)(qdf_netdev_t netdev, uint64_t qtime,
 				uint64_t *tsf_time);
 	void (*dp_tsf_timestamp_rx)(hdd_cb_handle ctx, qdf_nbuf_t nbuf);
 

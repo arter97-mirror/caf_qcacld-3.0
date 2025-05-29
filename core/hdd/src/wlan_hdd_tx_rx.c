@@ -835,19 +835,17 @@ void hdd_tsf_timestamp_rx(hdd_cb_handle ctx, qdf_nbuf_t netbuf)
 
 	hdd_rx_timestamp(netbuf, ktime_to_us(netbuf->tstamp));
 }
+#endif
 
-void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t input_time,
+void hdd_get_tsf_time_cb(qdf_netdev_t netdev, uint64_t qtime,
 			 uint64_t *tsf_time)
 {
 	struct hdd_adapter *adapter;
 
 	adapter = WLAN_HDD_GET_PRIV_PTR(netdev);
-	if (!adapter)
-		return;
 
-	hdd_get_tsf_time(adapter, input_time, tsf_time);
+	hdd_get_tsftime_from_qtime(adapter, qtime, tsf_time);
 }
-#endif
 
 /**
  * hdd_reason_type_to_string() - return string conversion of reason type
