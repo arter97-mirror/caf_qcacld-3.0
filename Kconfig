@@ -987,6 +987,10 @@ config WLAN_TSF_UPLINK_DELAY
 	bool "Enable WLAN_TSF_UPLINK_DELAY"
 	default n
 
+config WLAN_SYNC_TSF_ACCURACY
+	bool "Enable WLAN_SYNC_TSF_ACCURACY"
+	default n
+
 config QCA_MONITOR_PKT_SUPPORT
 	bool "Enable QCA_MONITOR_PKT_SUPPORT"
 	default n

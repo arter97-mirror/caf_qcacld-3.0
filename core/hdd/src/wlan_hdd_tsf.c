@@ -916,7 +916,7 @@ hdd_tsf_gpio_timer_expired_handler(qdf_hrtimer_data_t *arg)
 		return QDF_HRTIMER_NORESTART;
 
 	/* Get current System and TSF mapping */
-	qtime = qdf_log_timestamp_to_usecs(qdf_get_log_timestamp());
+	qtime = qdf_get_log_timestamp_usecs();
 	hdd_get_tsftime_from_qtime(adapter, qtime, &tsf_time_us);
 	elapsed_time_us = (uint32_t)
 		(tsf_time_us % (configs->pulse_interval_ms * USEC_PER_MSEC));
@@ -946,7 +946,7 @@ hdd_tsf_gpio_timer_expired_handler(qdf_hrtimer_data_t *arg)
 				   qdf_ns_to_ktime(remaining_time_us *
 				    NSEC_PER_USEC));
 	do {
-		qtime = qdf_log_timestamp_to_usecs(qdf_get_log_timestamp());
+		qtime = qdf_get_log_timestamp_usecs();
 		cur_qtime = qdf_ns_to_ktime(qtime * NSEC_PER_USEC);
 	} while (ktime_compare(cur_qtime, spin_until) < 0);
 
@@ -1010,7 +1010,7 @@ static void hdd_tsf_setup_gpio_toggle(struct hdd_adapter *adapter)
 
 	/* Get current System and TSF mapping */
 	cur_ktime = qdf_ktime_get();
-	qtime = qdf_log_timestamp_to_usecs(qdf_get_log_timestamp());
+	qtime = qdf_get_log_timestamp_usecs();
 	hdd_get_tsftime_from_qtime(adapter, qtime, &tsf_time_us);
 
 	if (configs->sync_gpio != TSF_GPIO_PIN_INVALID) {
@@ -1946,10 +1946,11 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter)
 	}
 	qdf_spin_unlock_bh(&tsf->host_target_sync_lock);
 
-	hdd_tsf_setup_gpio_toggle(adapter);
-
-	if (interval > 0)
+	if (interval > 0) {
+		if (sync_status == HDD_TS_STATUS_READY)
+			hdd_tsf_setup_gpio_toggle(adapter);
 		qdf_mc_timer_start(&tsf->host_target_sync_timer, interval);
+	}
 }
 
 static inline void hdd_update_tsf(struct hdd_adapter *adapter)
