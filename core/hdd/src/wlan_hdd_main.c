@@ -12379,6 +12379,29 @@ out:
 }
 
 #ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+
+#ifdef AUTO_PLATFORM
+static bool
+hdd_shutdown_wlan_is_applicable(struct hdd_context *hdd_ctx, unsigned long evt)
+{
+	enum pmo_suspend_mode mode;
+
+	if (evt == PM_HIBERNATION_PREPARE)
+		return true;
+
+	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
+	hdd_debug("suspend mode is %d", mode);
+
+	if (mode == PMO_SUSPEND_SHUTDOWN)
+		return true;
+
+	if (mode == PMO_SUSPEND_WOW && !hdd_is_any_interface_open(hdd_ctx))
+		return true;
+
+	return false;
+}
+
+#else
 static bool
 hdd_shutdown_wlan_is_applicable(struct hdd_context *hdd_ctx, unsigned long evt)
 {
@@ -12402,6 +12425,7 @@ hdd_shutdown_wlan_is_applicable(struct hdd_context *hdd_ctx, unsigned long evt)
 
 	return false;
 }
+#endif
 
 static QDF_STATUS
 hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx,
