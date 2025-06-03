@@ -682,6 +682,8 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 	if (!mlme_priv)
 		return;
 
+	wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
+
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)
 		return;
