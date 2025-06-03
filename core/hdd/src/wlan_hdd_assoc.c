@@ -1293,6 +1293,492 @@ void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
      defined(WLAN_FEATURE_11AX)
+
+#define HE_MAC_CAP_HTC_HE_POS		0
+#define HE_MAC_CAP_HTC_HE_BITS		1
+#define HE_MAC_CAP_TWT_REQ_POS		1
+#define HE_MAC_CAP_TWT_REQ_BITS		1
+#define HE_MAC_CAP_TWT_RES_POS		2
+#define HE_MAC_CAP_TWT_RES_BITS		1
+#define HE_MAC_CAP_FRAGMEN_POS		3
+#define HE_MAC_CAP_FRAGMEN_BITS		2
+#define HE_MAC_CAP_AMSDU_EXP_POS	5
+#define HE_MAC_CAP_AMSDU_EXP_BITS	3
+
+#define HE_MAC_CAP_MIN_FRAG_POS		0
+#define HE_MAC_CAP_MIN_FRAG_BITS	2
+#define HE_MAC_CAP_TRIG_FRM_POS		2
+#define HE_MAC_CAP_TRIG_FRM_BITS	2
+#define HE_MAC_CAP_AGGR_RX_POS		4
+#define HE_MAC_CAP_AGGR_RX_BITS		3
+#define HE_MAC_CAP_HE_LINK_0_POS	7
+#define HE_MAC_CAP_HE_LINK_0_BITS	1
+#define HE_MAC_CAP_HE_LINK_0_MASK	0x1
+
+#define HE_MAC_CAP_HE_LINK_1_MASK	0x2
+#define HE_MAC_CAP_HE_LINK_1_POS	0
+#define HE_MAC_CAP_HE_LINK_1_BITS	1
+#define HE_MAC_CAP_ALL_ACK_POS		1
+#define HE_MAC_CAP_ALL_ACK_BITS		1
+#define HE_MAC_CAP_TRIGD_RSP_POS	2
+#define HE_MAC_CAP_TRIGD_RSP_BITS	1
+#define HE_MAC_CAP_A_BSR_POS		3
+#define HE_MAC_CAP_A_BSR_BITS		1
+#define HE_MAC_CAP_BCAST_TWT_POS	4
+#define HE_MAC_CAP_BCAST_TWT_BITS	1
+#define HE_MAC_CAP_BA_BITMAP_POS	5
+#define HE_MAC_CAP_BA_BITMAP_BITS	1
+#define HE_MAC_CAP_MU_CASC_POS		6
+#define HE_MAC_CAP_MU_CASC_BITS		1
+#define HE_MAC_CAP_ACK_ENBD_POS		7
+#define HE_MAC_CAP_ACK_ENBD_BITS	1
+
+#define HE_MAC_CAP_OMI_A_POS		1
+#define HE_MAC_CAP_OMI_A_BITS		1
+#define HE_MAC_CAP_OFDMA_RA_POS		2
+#define HE_MAC_CAP_OFDMA_RA_BITS	1
+#define HE_MAC_CAP_MAX_AMPDU_POS	3
+#define HE_MAC_CAP_MAX_AMPDU_BITS	2
+#define HE_MAC_CAP_AMSDU_FLAG_POS	5
+#define HE_MAC_CAP_AMSDU_FLAG_BITS	1
+#define HE_MAC_CAP_FLEX_TWT_POS		6
+#define HE_MAC_CAP_FLEX_TWT_BITS	1
+#define HE_MAC_CAP_RX_CTRL_POS		7
+#define HE_MAC_CAP_RX_CTRL_BITS		1
+
+#define HE_MAC_CAP_BSRP_AMPDU_POS	0
+#define HE_MAC_CAP_BSRP_AMPDU_BITS	1
+#define HE_MAC_CAP_QTP_POS		1
+#define HE_MAC_CAP_QTP_BITS		1
+#define HE_MAC_CAP_A_BQR_POS		2
+#define HE_MAC_CAP_A_BQR_BITS		1
+#define HE_MAC_CAP_SRP_RSPDER_POS	3
+#define HE_MAC_CAP_SRP_RSPDER_BITS	1
+#define HE_MAC_CAP_NDP_SUPP_POS		4
+#define HE_MAC_CAP_NDP_SUPP_BITS	1
+#define HE_MAC_CAP_OPS_SUPP_POS		5
+#define HE_MAC_CAP_OPS_SUPP_BITS	1
+#define HE_MAC_CAP_AMSDU_IN_AMPDU_POS	6
+#define HE_MAC_CAP_AMSDU_IN_AMPDU_BITS	1
+#define HE_MAC_CAP_MULTI_TID_0_POS	7
+#define HE_MAC_CAP_MULTI_TID_0_BITS	1
+#define HE_MAC_CAP_MULTI_TID_0_MASK	0x1
+
+#define HE_MAC_CAP_MULTI_TID_1_MASK	0x6
+#define HE_MAC_CAP_MULTI_TID_1_POS	0
+#define HE_MAC_CAP_MULTI_TID_1_BITS	2
+#define HE_MAC_CAP_SUB_CH_SEL_POS	2
+#define HE_MAC_CAP_SUB_CH_SEL_BITS	1
+#define HE_MAC_CAP_RU_SUPP_POS		3
+#define HE_MAC_CAP_RU_SUPP_BITS		1
+#define HE_MAC_CAP_UL_MU_DATA_RX_POS	4
+#define HE_MAC_CAP_UL_MU_DATA_RX_BITS	1
+#define HE_MAC_CAP_DYNAMIC_SMPS_POS	5
+#define HE_MAC_CAP_DYNAMIC_SMPS_BITS	1
+#define HE_MAC_CAP_PUNCT_SOUNDING_POS	6
+#define HE_MAC_CAP_PUNCT_SOUNDING_BITS	1
+#define HE_MAC_CAP_VHT_TRG_FRM_RX_POS	7
+#define HE_MAC_CAP_VHT_TRG_FRM_RX_BITS	1
+
+#define HE_PHY_CAP_CH_WIDTH_0_POS	1
+#define HE_PHY_CAP_CH_WIDTH_0_BITS	1
+#define HE_PHY_CAP_CH_WIDTH_1_POS	2
+#define HE_PHY_CAP_CH_WIDTH_1_BITS	1
+#define HE_PHY_CAP_CH_WIDTH_2_POS	3
+#define HE_PHY_CAP_CH_WIDTH_2_BITS	1
+#define HE_PHY_CAP_CH_WIDTH_3_POS	4
+#define HE_PHY_CAP_CH_WIDTH_3_BITS	1
+#define HE_PHY_CAP_CH_WIDTH_4_POS	5
+#define HE_PHY_CAP_CH_WIDTH_4_BITS	1
+#define HE_PHY_CAP_CH_WIDTH_5_POS	6
+#define HE_PHY_CAP_CH_WIDTH_5_BITS	1
+#define HE_PHY_CAP_CH_WIDTH_6_POS	7
+#define HE_PHY_CAP_CH_WIDTH_6_BITS	1
+
+#define HE_PHY_CAP_RX_PREM_PUNC_POS	0
+#define HE_PHY_CAP_RX_PREM_PUNC_BITS	4
+#define HE_PHY_CAP_DEVICE_CLASS_POS	4
+#define HE_PHY_CAP_DEVICE_CLASS_BITS	1
+#define HE_PHY_CAP_LDPC_CODING_POS	5
+#define HE_PHY_CAP_LDPC_CODING_BITS	1
+#define HE_PHY_CAP_LTF_800_GI_PPDU_POS	6
+#define HE_PHY_CAP_LTF_800_GI_PPDU_BITS	1
+#define HE_PHY_CAP_MAX_NSTS0_POS	7
+#define HE_PHY_CAP_MAX_NSTS0_BITS	1
+#define HE_PHY_CAP_MAX_NSTS0_MASK	0x1
+
+#define HE_PHY_CAP_MAX_NSTS1_POS	0
+#define HE_PHY_CAP_MAX_NSTS1_BITS	1
+#define HE_PHY_CAP_MAX_NSTS1_MASK	0x2
+#define HE_PHY_CAP_LTF_3200_GI_POS	1
+#define HE_PHY_CAP_LTF_3200_GI_BITS	1
+#define HE_PHY_CAP_TX_STBC_LT_80_POS	3
+#define HE_PHY_CAP_TX_STBC_LT_80_BITS	1
+#define HE_PHY_CAP_RX_STBC_LT_80_POS	4
+#define HE_PHY_CAP_RX_STBC_LT_80_BITS	1
+#define HE_PHY_CAP_DOPPLER_POS		5
+#define HE_PHY_CAP_DOPPLER_BITS		2
+#define HE_PHY_CAP_UL_MU_POS		6
+#define HE_PHY_CAP_UL_MU_BITS		2
+
+#define HE_PHY_CAP_DCM_ENC_TX_POS	0
+#define HE_PHY_CAP_DCM_ENC_TX_BITS	3
+#define HE_PHY_CAP_DCM_ENC_RX_POS	3
+#define HE_PHY_CAP_DCM_ENC_RX_BITS	3
+#define HE_PHY_CAP_UL_HE_MU_POS		6
+#define HE_PHY_CAP_UL_HE_MU_BITS	1
+#define HE_PHY_CAP_SU_BEAMFORMER_POS	7
+#define HE_PHY_CAP_SU_BEAM_FORMER_BITS	1
+
+#define HE_PHY_CAP_SU_BEAMFORMEE_POS	0
+#define HE_PHY_CAP_SU_BEAM_FORMEE_BITS	1
+#define HE_PHY_CAP_MU_BEAMFORMER_POS	1
+#define HE_PHY_CAP_MU_BEAM_FORMER_BITS	1
+#define HE_PHY_CAP_BFEE_STS_LT80_POS	2
+#define HE_PHY_CAP_BFEE_STS_LT80_BITS	3
+#define HE_PHY_CAP_BFEE_STS_GT80_POS	5
+#define HE_PHY_CAP_BFEE_STS_GT80_BITS	3
+
+#define HE_PHY_CAP_SOUNDING_LT80_POS	0
+#define HE_PHY_CAP_SOUNDING_LT80_BITS	3
+#define HE_PHY_CAP_SOUNDING_GT80_POS	3
+#define HE_PHY_CAP_SOUNDING_GT80_BITS	3
+#define HE_PHY_CAP_SU_TONE16_POS	6
+#define HE_PHY_CAP_SU_TONE_16_BITS	1
+#define HE_PHY_CAP_MU_TONE16_POS	7
+#define HE_PHY_CAP_MU_TONE_16_BITS	1
+
+#define HE_PHY_CAP_CODEBOOK_SU_POS	0
+#define HE_PHY_CAP_CODEBOOK_SU_BITS	1
+#define HE_PHY_CAP_CODEBOOK_MU_POS	1
+#define HE_PHY_CAP_CODEBOOK_MU_BITS	1
+#define HE_PHY_CAP_BEAMFORMING_FB_POS	2
+#define HE_PHY_CAP_BEAMFORMING_FB_BITS	3
+#define HE_PHY_CAP_HE_ER_SU_PPDU_POS	5
+#define HE_PHY_CAP_HE_ER_SU_PPDU_BITS	1
+#define HE_PHY_CAP_MU_MIMO_PART_BW_POS	6
+#define HE_PHY_CAP_MU_MIMO_PART_BW_BITS	1
+#define HE_PHY_CAP_PPET_PRESENT_POS	7
+#define HE_PHY_CAP_PPET_PRESENT_BITS	1
+
+#define HE_PHY_CAP_SRP_POS		0
+#define HE_PHY_CAP_SRP_BITS		1
+#define HE_PHY_CAP_POWER_BOOST_POS	1
+#define HE_PHY_CAP_POWER_BOOST_BITS	1
+#define HE_PHY_CAP_LTF_800_GI_POS	2
+#define HE_PHY_CAP_LTF_800_GI_BITS	1
+#define HE_PHY_CAP_MAX_NC_POS		3
+#define HE_PHY_CAP_MAX_NC_BITS		3
+#define HE_PHY_CAP_TX_STBC_GT_80_POS	6
+#define HE_PHY_CAP_TX_STBC_GT_80_BITS	1
+#define HE_PHY_CAP_RX_STBC_GT_80_POS	7
+#define HE_PHY_CAP_RX_STBC_GT_80_BITS	1
+
+#define HE_PHY_CAP_LTF_800_GI_4X_POS	0
+#define HE_PHY_CAP_LTF_800_GI_4X_BITS	1
+#define HE_PHY_CAP_PPDU_20_40MHZ_POS	1
+#define HE_PHY_CAP_PPDU_20_40MHZ_BITS	1
+#define HE_PHY_CAP_PPDU_20_160MHZ_POS	2
+#define HE_PHY_CAP_PPDU_20_160MHZ_BITS	1
+#define HE_PHY_CAP_PPDU_80_160MHZ_POS	3
+#define HE_PHY_CAP_PPDU_80_160MHZ_BITS	1
+#define HE_PHY_CAP_LTF_HE_GI_POS	4
+#define HE_PHY_CAP_LTF_HE_GI_BITS	1
+#define HE_PHY_CAP_MIDAMBLE_TXRX_POS	5
+#define HE_PHY_CAP_MIDAMBLE_TXRX_BITS	1
+#define HE_PHY_CAP_DCM_MAX_BW_POS	6
+#define HE_PHY_CAP_DCM_MAX_BW_BITS	2
+
+#define HE_PHY_CAP_SIGB_OFDM_SYM_POS	0
+#define HE_PHY_CAP_SIGB_OFDM_SUM_BITS	1
+#define HE_PHY_CAP_NON_TRIG_CQI_POS	1
+#define HE_PHY_CAP_NON_TRIG_CQI_BITS	1
+#define HE_PHY_CAP_TX_1024_QAM_POS	2
+#define HE_PHY_CAP_TX_1024_QAM_BITS	1
+#define HE_PHY_CAP_RX_1024_QAM_POS	3
+#define HE_PHY_CAP_RX_1024_QAM_BITS	1
+#define HE_PHY_CAP_COMPRESS_SIGB_POS	4
+#define HE_PHY_CAP_COMPRESS_SGIB_BITS	1
+#define HE_PHY_CAP_NON_CMPR_SIGB_POS	5
+#define HE_PHY_CAP_NON_CMPR_SGIB_BITS	1
+
+void hdd_copy_he_caps(struct hdd_station_ctx *hdd_sta_ctx,
+		      tDot11fIEhe_cap *he_caps)
+{
+	struct ieee80211_he_cap_elem *he_cap_elem =
+		&hdd_sta_ctx->conn_info.he_cap_elem;
+
+	qdf_mem_zero(he_cap_elem, sizeof(struct ieee80211_he_cap_elem));
+
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[0], HE_MAC_CAP_HTC_HE_POS,
+		     HE_MAC_CAP_HTC_HE_BITS, he_caps->htc_he);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[0], HE_MAC_CAP_TWT_REQ_POS,
+		     HE_MAC_CAP_TWT_REQ_BITS, he_caps->twt_request);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[0], HE_MAC_CAP_TWT_RES_POS,
+		     HE_MAC_CAP_TWT_RES_BITS, he_caps->twt_responder);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[0], HE_MAC_CAP_FRAGMEN_POS,
+		     HE_MAC_CAP_FRAGMEN_BITS, he_caps->fragmentation);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[0], HE_MAC_CAP_AMSDU_EXP_POS,
+		     HE_MAC_CAP_AMSDU_EXP_BITS,
+		     he_caps->max_num_frag_msdu_amsdu_exp);
+
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[1], HE_MAC_CAP_MIN_FRAG_POS,
+		     HE_MAC_CAP_MIN_FRAG_BITS, he_caps->min_frag_size);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[1], HE_MAC_CAP_TRIG_FRM_POS,
+		     HE_MAC_CAP_TRIG_FRM_BITS, he_caps->trigger_frm_mac_pad);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[1], HE_MAC_CAP_AGGR_RX_POS,
+		     HE_MAC_CAP_AGGR_RX_BITS, he_caps->multi_tid_aggr_rx_supp);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[1], HE_MAC_CAP_HE_LINK_0_POS,
+		     HE_MAC_CAP_HE_LINK_0_BITS,
+		     (he_caps->he_link_adaptation &&
+		      HE_MAC_CAP_HE_LINK_0_MASK));
+
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[2], HE_MAC_CAP_HE_LINK_1_POS,
+		     HE_MAC_CAP_HE_LINK_1_BITS,
+		     (he_caps->he_link_adaptation &&
+		      HE_MAC_CAP_HE_LINK_1_MASK));
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[2], HE_MAC_CAP_ALL_ACK_POS,
+		     HE_MAC_CAP_ALL_ACK_BITS, he_caps->all_ack);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[2], HE_MAC_CAP_TRIGD_RSP_POS,
+		     HE_MAC_CAP_TRIGD_RSP_BITS, he_caps->trigd_rsp_sched);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[2], HE_MAC_CAP_A_BSR_POS,
+		     HE_MAC_CAP_A_BSR_BITS, he_caps->a_bsr);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[2], HE_MAC_CAP_BCAST_TWT_POS,
+		     HE_MAC_CAP_BCAST_TWT_BITS, he_caps->broadcast_twt);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[2], HE_MAC_CAP_BA_BITMAP_POS,
+		     HE_MAC_CAP_BA_BITMAP_BITS, he_caps->ba_32bit_bitmap);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[2], HE_MAC_CAP_MU_CASC_POS,
+		     HE_MAC_CAP_MU_CASC_BITS, he_caps->mu_cascade);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[2], HE_MAC_CAP_ACK_ENBD_POS,
+		     HE_MAC_CAP_ACK_ENBD_BITS, he_caps->ack_enabled_multitid);
+
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[3], HE_MAC_CAP_OMI_A_POS,
+		     HE_MAC_CAP_OMI_A_BITS, he_caps->omi_a_ctrl);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[3], HE_MAC_CAP_OFDMA_RA_POS,
+		     HE_MAC_CAP_OFDMA_RA_BITS, he_caps->ofdma_ra);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[3], HE_MAC_CAP_MAX_AMPDU_POS,
+		     HE_MAC_CAP_MAX_AMPDU_BITS,
+		     he_caps->max_ampdu_len_exp_ext);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[3], HE_MAC_CAP_AMSDU_FLAG_POS,
+		     HE_MAC_CAP_AMSDU_FLAG_BITS, he_caps->amsdu_frag);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[3], HE_MAC_CAP_FLEX_TWT_POS,
+		     HE_MAC_CAP_FLEX_TWT_BITS, he_caps->flex_twt_sched);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[3], HE_MAC_CAP_RX_CTRL_POS,
+		     HE_MAC_CAP_RX_CTRL_BITS, he_caps->rx_ctrl_frame);
+
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[4], HE_MAC_CAP_BSRP_AMPDU_POS,
+		     HE_MAC_CAP_BSRP_AMPDU_BITS, he_caps->bsrp_ampdu_aggr);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[4], HE_MAC_CAP_QTP_POS,
+		     HE_MAC_CAP_QTP_BITS, he_caps->qtp);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[4], HE_MAC_CAP_A_BQR_POS,
+		     HE_MAC_CAP_A_BQR_BITS, he_caps->a_bqr);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[4], HE_MAC_CAP_SRP_RSPDER_POS,
+		     HE_MAC_CAP_SRP_RSPDER_BITS,
+		     he_caps->spatial_reuse_param_rspder);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[4], HE_MAC_CAP_NDP_SUPP_POS,
+		     HE_MAC_CAP_NDP_SUPP_BITS, he_caps->ndp_feedback_supp);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[4], HE_MAC_CAP_OPS_SUPP_POS,
+		     HE_MAC_CAP_OPS_SUPP_BITS, he_caps->ops_supp);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[4],
+		     HE_MAC_CAP_AMSDU_IN_AMPDU_POS,
+		     HE_MAC_CAP_AMSDU_IN_AMPDU_BITS, he_caps->amsdu_in_ampdu);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[4], HE_MAC_CAP_MULTI_TID_0_POS,
+		     HE_MAC_CAP_MULTI_TID_0_BITS,
+		     (he_caps->multi_tid_aggr_tx_supp &&
+		      HE_MAC_CAP_MULTI_TID_0_MASK));
+
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[5], HE_MAC_CAP_MULTI_TID_1_POS,
+		     HE_MAC_CAP_MULTI_TID_1_BITS,
+		     (he_caps->multi_tid_aggr_tx_supp &&
+		      HE_MAC_CAP_MULTI_TID_1_MASK));
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[5], HE_MAC_CAP_SUB_CH_SEL_POS,
+		     HE_MAC_CAP_SUB_CH_SEL_BITS,
+		     he_caps->he_sub_ch_sel_tx_supp);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[5], HE_MAC_CAP_RU_SUPP_POS,
+		     HE_MAC_CAP_RU_SUPP_BITS, he_caps->ul_2x996_tone_ru_supp);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[5],
+		     HE_MAC_CAP_UL_MU_DATA_RX_POS,
+		     HE_MAC_CAP_UL_MU_DATA_RX_BITS,
+		     he_caps->om_ctrl_ul_mu_data_dis_rx);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[5], HE_MAC_CAP_DYNAMIC_SMPS_POS,
+		     HE_MAC_CAP_DYNAMIC_SMPS_BITS, he_caps->he_dynamic_smps);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[5],
+		     HE_MAC_CAP_PUNCT_SOUNDING_POS,
+		     HE_MAC_CAP_PUNCT_SOUNDING_BITS,
+		     he_caps->punctured_sounding_supp);
+	QDF_SET_BITS(he_cap_elem->mac_cap_info[5],
+		     HE_MAC_CAP_VHT_TRG_FRM_RX_POS,
+		     HE_MAC_CAP_VHT_TRG_FRM_RX_BITS,
+		     he_caps->ht_vht_trg_frm_rx_supp);
+
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[0], HE_PHY_CAP_CH_WIDTH_0_POS,
+		     HE_PHY_CAP_CH_WIDTH_0_BITS, he_caps->chan_width_0);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[0], HE_PHY_CAP_CH_WIDTH_1_POS,
+		     HE_PHY_CAP_CH_WIDTH_1_BITS, he_caps->chan_width_1);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[0], HE_PHY_CAP_CH_WIDTH_2_POS,
+		     HE_PHY_CAP_CH_WIDTH_2_BITS, he_caps->chan_width_2);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[0], HE_PHY_CAP_CH_WIDTH_3_POS,
+		     HE_PHY_CAP_CH_WIDTH_3_BITS, he_caps->chan_width_3);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[0], HE_PHY_CAP_CH_WIDTH_4_POS,
+		     HE_PHY_CAP_CH_WIDTH_4_BITS, he_caps->chan_width_4);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[0], HE_PHY_CAP_CH_WIDTH_5_POS,
+		     HE_PHY_CAP_CH_WIDTH_5_BITS, he_caps->chan_width_5);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[0], HE_PHY_CAP_CH_WIDTH_6_POS,
+		     HE_PHY_CAP_CH_WIDTH_6_BITS, he_caps->chan_width_6);
+
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[1], HE_PHY_CAP_RX_PREM_PUNC_POS,
+		     HE_PHY_CAP_RX_PREM_PUNC_BITS,
+		     he_caps->rx_pream_puncturing);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[1], HE_PHY_CAP_DEVICE_CLASS_POS,
+		     HE_PHY_CAP_DEVICE_CLASS_BITS, he_caps->device_class);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[1], HE_PHY_CAP_LDPC_CODING_POS,
+		     HE_PHY_CAP_LDPC_CODING_BITS, he_caps->ldpc_coding);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[1],
+		     HE_PHY_CAP_LTF_800_GI_PPDU_POS,
+		     HE_PHY_CAP_LTF_800_GI_PPDU_BITS,
+		     he_caps->he_1x_ltf_800_gi_ppdu);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[1], HE_PHY_CAP_MAX_NSTS0_POS,
+		     HE_PHY_CAP_MAX_NSTS0_BITS,
+		     (he_caps->midamble_tx_rx_max_nsts &&
+		     HE_PHY_CAP_MAX_NSTS0_MASK));
+
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[2], HE_PHY_CAP_MAX_NSTS1_POS,
+		     HE_PHY_CAP_MAX_NSTS1_BITS,
+		     (he_caps->midamble_tx_rx_max_nsts &&
+		     HE_PHY_CAP_MAX_NSTS1_MASK));
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[2], HE_PHY_CAP_LTF_3200_GI_POS,
+		     HE_PHY_CAP_LTF_3200_GI_BITS,
+		     he_caps->he_4x_ltf_3200_gi_ndp);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[2],
+		     HE_PHY_CAP_TX_STBC_LT_80_POS,
+		     HE_PHY_CAP_TX_STBC_LT_80_BITS,
+		     he_caps->tb_ppdu_tx_stbc_lt_80mhz);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[2],
+		     HE_PHY_CAP_RX_STBC_LT_80_POS,
+		     HE_PHY_CAP_RX_STBC_LT_80_BITS, he_caps->rx_stbc_lt_80mhz);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[2], HE_PHY_CAP_DOPPLER_POS,
+		     HE_PHY_CAP_DOPPLER_BITS, he_caps->doppler);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[2], HE_PHY_CAP_UL_MU_POS,
+		     HE_PHY_CAP_UL_MU_BITS, he_caps->ul_mu);
+
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[3], HE_PHY_CAP_DCM_ENC_TX_POS,
+		     HE_PHY_CAP_DCM_ENC_TX_BITS, he_caps->dcm_enc_tx);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[3], HE_PHY_CAP_DCM_ENC_RX_POS,
+		     HE_PHY_CAP_DCM_ENC_RX_BITS, he_caps->dcm_enc_rx);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[3], HE_PHY_CAP_UL_HE_MU_POS,
+		     HE_PHY_CAP_UL_HE_MU_BITS, he_caps->ul_he_mu);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[3],
+		     HE_PHY_CAP_SU_BEAMFORMER_POS,
+		     HE_PHY_CAP_SU_BEAM_FORMER_BITS, he_caps->su_beamformer);
+
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[4],
+		     HE_PHY_CAP_SU_BEAMFORMEE_POS,
+		     HE_PHY_CAP_SU_BEAM_FORMEE_BITS, he_caps->su_beamformee);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[4],
+		     HE_PHY_CAP_MU_BEAMFORMER_POS,
+		     HE_PHY_CAP_MU_BEAM_FORMER_BITS, he_caps->mu_beamformer);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[4],
+		     HE_PHY_CAP_BFEE_STS_LT80_POS,
+		     HE_PHY_CAP_BFEE_STS_LT80_BITS, he_caps->bfee_sts_lt_80);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[4],
+		     HE_PHY_CAP_BFEE_STS_GT80_POS,
+		     HE_PHY_CAP_BFEE_STS_GT80_BITS, he_caps->bfee_sts_gt_80);
+
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[5],
+		     HE_PHY_CAP_SOUNDING_LT80_POS,
+		     HE_PHY_CAP_SOUNDING_LT80_BITS,
+		     he_caps->num_sounding_lt_80);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[5],
+		     HE_PHY_CAP_SOUNDING_GT80_POS,
+		     HE_PHY_CAP_SOUNDING_GT80_BITS,
+		     he_caps->num_sounding_gt_80);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[5], HE_PHY_CAP_SU_TONE16_POS,
+		     HE_PHY_CAP_SU_TONE_16_BITS, he_caps->su_feedback_tone16);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[5], HE_PHY_CAP_MU_TONE16_POS,
+		     HE_PHY_CAP_MU_TONE_16_BITS, he_caps->mu_feedback_tone16);
+
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[6], HE_PHY_CAP_CODEBOOK_SU_POS,
+		     HE_PHY_CAP_CODEBOOK_SU_BITS, he_caps->codebook_su);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[6], HE_PHY_CAP_CODEBOOK_MU_POS,
+		     HE_PHY_CAP_CODEBOOK_MU_BITS, he_caps->codebook_mu);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[6],
+		     HE_PHY_CAP_BEAMFORMING_FB_POS,
+		     HE_PHY_CAP_BEAMFORMING_FB_BITS,
+		     he_caps->beamforming_feedback);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[6],
+		     HE_PHY_CAP_HE_ER_SU_PPDU_POS,
+		     HE_PHY_CAP_HE_ER_SU_PPDU_BITS, he_caps->he_er_su_ppdu);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[6],
+		     HE_PHY_CAP_MU_MIMO_PART_BW_POS,
+		     HE_PHY_CAP_MU_MIMO_PART_BW_BITS,
+		     he_caps->dl_mu_mimo_part_bw);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[6], HE_PHY_CAP_PPET_PRESENT_POS,
+		     HE_PHY_CAP_PPET_PRESENT_BITS, he_caps->ppet_present);
+
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[7], HE_PHY_CAP_SRP_POS,
+		     HE_PHY_CAP_SRP_BITS, he_caps->srp);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[7], HE_PHY_CAP_POWER_BOOST_POS,
+		     HE_PHY_CAP_POWER_BOOST_BITS, he_caps->power_boost);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[7], HE_PHY_CAP_LTF_800_GI_POS,
+		     HE_PHY_CAP_LTF_800_GI_BITS, he_caps->he_ltf_800_gi_4x);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[7], HE_PHY_CAP_MAX_NC_POS,
+		     HE_PHY_CAP_MAX_NC_BITS, he_caps->max_nc);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[7],
+		     HE_PHY_CAP_TX_STBC_GT_80_POS,
+		     HE_PHY_CAP_TX_STBC_GT_80_BITS,
+		     he_caps->tb_ppdu_tx_stbc_gt_80mhz);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[7],
+		     HE_PHY_CAP_RX_STBC_GT_80_POS,
+		     HE_PHY_CAP_RX_STBC_GT_80_BITS, he_caps->rx_stbc_gt_80mhz);
+
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[8],
+		     HE_PHY_CAP_LTF_800_GI_4X_POS,
+		     HE_PHY_CAP_LTF_800_GI_4X_BITS,
+		     he_caps->er_he_ltf_800_gi_4x);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[8],
+		     HE_PHY_CAP_PPDU_20_40MHZ_POS,
+		     HE_PHY_CAP_PPDU_20_40MHZ_BITS,
+		     he_caps->he_ppdu_20_in_40Mhz_2G);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[8],
+		     HE_PHY_CAP_PPDU_20_160MHZ_POS,
+		     HE_PHY_CAP_PPDU_20_160MHZ_BITS,
+		     he_caps->he_ppdu_20_in_160_80p80Mhz);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[8],
+		     HE_PHY_CAP_PPDU_80_160MHZ_POS,
+		     HE_PHY_CAP_PPDU_80_160MHZ_BITS,
+		     he_caps->he_ppdu_80_in_160_80p80Mhz);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[8], HE_PHY_CAP_LTF_HE_GI_POS,
+		     HE_PHY_CAP_LTF_HE_GI_BITS, he_caps->er_1x_he_ltf_gi);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[8],
+		     HE_PHY_CAP_MIDAMBLE_TXRX_POS,
+		     HE_PHY_CAP_MIDAMBLE_TXRX_BITS,
+		     he_caps->midamble_tx_rx_1x_he_ltf);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[8], HE_PHY_CAP_DCM_MAX_BW_POS,
+		     HE_PHY_CAP_DCM_MAX_BW_BITS, he_caps->dcm_max_bw);
+
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[9],
+		     HE_PHY_CAP_SIGB_OFDM_SYM_POS,
+		     HE_PHY_CAP_SIGB_OFDM_SUM_BITS,
+		     he_caps->longer_than_16_he_sigb_ofdm_sym);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[9], HE_PHY_CAP_NON_TRIG_CQI_POS,
+		     HE_PHY_CAP_NON_TRIG_CQI_BITS,
+		     he_caps->non_trig_cqi_feedback);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[9], HE_PHY_CAP_TX_1024_QAM_POS,
+		     HE_PHY_CAP_TX_1024_QAM_BITS,
+		     he_caps->tx_1024_qam_lt_242_tone_ru);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[9], HE_PHY_CAP_RX_1024_QAM_POS,
+		     HE_PHY_CAP_RX_1024_QAM_BITS,
+		     he_caps->rx_1024_qam_lt_242_tone_ru);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[9],
+		     HE_PHY_CAP_COMPRESS_SIGB_POS,
+		     HE_PHY_CAP_COMPRESS_SGIB_BITS,
+		     he_caps->rx_full_bw_su_he_mu_compress_sigb);
+	QDF_SET_BITS(he_cap_elem->phy_cap_info[9],
+		     HE_PHY_CAP_NON_CMPR_SIGB_POS,
+		     HE_PHY_CAP_NON_CMPR_SGIB_BITS,
+		     he_caps->rx_full_bw_su_he_mu_non_cmpr_sigb);
+}
+
 void hdd_copy_he_operation(struct hdd_station_ctx *hdd_sta_ctx,
 			   tDot11fIEhe_op *he_operation)
 {

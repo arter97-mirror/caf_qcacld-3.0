@@ -1222,10 +1222,13 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 		hdd_sta_ctx->conn_info.conn_flag.vht_op_present = false;
 	}
 
-	if (assoc_resp->he_cap.present)
+	if (assoc_resp->he_cap.present) {
 		hdd_sta_ctx->conn_info.conn_flag.he_present = true;
-	else
+		hdd_copy_he_caps(hdd_sta_ctx,
+				 &assoc_resp->he_cap);
+	} else {
 		hdd_sta_ctx->conn_info.conn_flag.he_present = false;
+	}
 
 	if (assoc_resp->eht_cap.present)
 		hdd_sta_ctx->conn_info.conn_flag.eht_present = true;
