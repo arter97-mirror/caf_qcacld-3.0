@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -832,7 +832,7 @@ def_chan:
 
 	ret = hdd_softap_set_channel_change(ap_adapter->deflink, ch_freq, 0,
 					    ch_bw, NO_SCHANS_PUNC, false, true);
-	if (ret) {
+	if (ret && qdf_atomic_read(&hdd_ap_ctx->ch_switch_in_progress) <= 1) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");
 		return false;
 	}
