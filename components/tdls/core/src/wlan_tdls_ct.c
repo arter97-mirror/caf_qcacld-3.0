@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -134,12 +134,17 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 		tdls_process_mlo_cal_tdls_link_score(vdev);
 		select_vdev = tdls_process_mlo_choice_tdls_vdev(vdev);
 		tdls_link_vdev = tdls_mlo_get_tdls_link_vdev(vdev);
+		if (!tdls_link_vdev) {
+			tdls_err("tdls link vdev is null");
+			return;
+		}
+
 		if (select_vdev) {
 			tdls_vdev = wlan_vdev_get_tdls_vdev_obj(select_vdev);
 			if (!tdls_vdev)
 				return;
 
-			if (tdls_link_vdev && tdls_link_vdev != select_vdev) {
+			if (tdls_link_vdev != select_vdev) {
 				tdls_debug("tdls link created on vdev %d",
 					   wlan_vdev_get_id(tdls_link_vdev));
 				goto exit;
