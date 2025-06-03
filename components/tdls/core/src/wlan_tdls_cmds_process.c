@@ -1273,6 +1273,18 @@ QDF_STATUS tdls_process_update_peer(struct tdls_update_peer_request *req)
 	}
 
 	vdev = req->vdev;
+	if (!tdls_check_is_tdls_allowed(vdev)) {
+		tdls_err("TDLS not allowed, reject update station for vdev: %d",
+			 wlan_vdev_get_id(vdev));
+		goto error;
+	}
+
+	if (mlo_mgr_is_link_switch_in_progress(vdev)) {
+		tdls_err("Link Switch in progress, reject update sta for vdev: %d",
+			 wlan_vdev_get_id(vdev));
+		goto error;
+	}
+
 	cmd.cmd_type = WLAN_SER_CMD_TDLS_ADD_PEER;
 	cmd.cmd_id = 0;
 	cmd.cmd_cb = tdls_update_peer_serialize_callback;
