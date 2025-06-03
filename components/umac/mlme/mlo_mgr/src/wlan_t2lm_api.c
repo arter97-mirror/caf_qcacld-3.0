@@ -1082,6 +1082,24 @@ wlan_ttlm_populate_link_disable_in_sm(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+static bool
+wlan_is_standby_link_enabled(struct mlo_link_info *link_info)
+{
+	if (!link_info)
+		return false;
+
+	return (link_info->vdev_id == WLAN_INVALID_VDEV_ID);
+}
+
+static bool
+wlan_is_active_link_disabled(struct mlo_link_info *link_info)
+{
+	if (!link_info)
+		return false;
+
+	return (link_info->vdev_id != WLAN_INVALID_VDEV_ID);
+}
+
 QDF_STATUS
 wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 				      struct mlo_link_disable_request_evt_params *params)
@@ -1092,9 +1110,11 @@ wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 	uint8_t dir = WLAN_T2LM_BIDI_DIRECTION;
 	struct mlo_link_info *link_info;
 	uint8_t link_info_iter;
-	uint8_t i = 0;
+	uint8_t i = 0, idx = 0;
 	QDF_STATUS status;
 	uint8_t link_id;
+	bool standby_link_enabled = false;
+	bool active_links_disabled[2] = { false, false };
 
 	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
 						WLAN_MLO_MGR_ID);
@@ -1145,16 +1165,29 @@ wlan_populate_link_disable_t2lm_frame(struct wlan_objmgr_vdev *vdev,
 						&t2lm_neg.t2lm_info[dir],
 						0);
 			t2lm_debug("Disabled link id %d", link_id);
+			if (idx < 2) {
+				active_links_disabled[idx] = wlan_is_active_link_disabled(link_info);
+				idx++;
+			}
 		} else {
 			wlan_t2lm_set_link_mapping_of_tids(link_id,
 						&t2lm_neg.t2lm_info[dir],
 						1);
 			t2lm_debug("Enabled link id %d", link_id);
+			standby_link_enabled = wlan_is_standby_link_enabled(link_info);
 		}
 		link_info++;
 	}
 
 	t2lm_policy->is_fw_btm_ind = true;
+	t2lm_policy->is_standby_link_enabled = true;
+	if (standby_link_enabled && active_links_disabled[0] &&
+	    active_links_disabled[1]) {
+		t2lm_debug("Standby link id enabled %d", standby_link_enabled);
+		t2lm_debug("Active link id disabled %d %d", active_links_disabled[0],
+			   active_links_disabled[1]);
+		mlme_cm_osif_roam_start_ind(vdev);
+	}
 	status = wlan_ttlm_populate_link_disable_in_sm(vdev, peer, &t2lm_neg);
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
