@@ -108,6 +108,7 @@ QDF_STATUS dp_svc_add(struct dp_svc_data *data)
 	svc_data->en_twt_end_indication = data->en_twt_end_indication;
 	svc_data->flags = data->flags;
 	svc_data->policy_ref_count = 0;
+	svc_data->override_tid = data->override_tid;
 
 	lock = &svc_ctx->dp_svc_lock;
 	qdf_spin_lock_bh(lock);
@@ -268,6 +269,8 @@ dp_svc_copy(struct dp_svc_data *dst_svc, struct dp_svc_data *src_svc)
 	dst_svc->en_twt_end_indication =
 		src_svc->en_twt_end_indication;
 	dst_svc->flags = src_svc->flags;
+	dst_svc->override_tid =
+		src_svc->override_tid;
 }
 
 uint8_t dp_svc_get(uint8_t svc_id, struct dp_svc_data *svc_table,
@@ -325,7 +328,16 @@ dp_svc_get_meta_data_by_id(uint8_t svc_id, qdf_nbuf_t nbuf, uint32_t *metadata)
 		svc_data = qdf_rcu_dereference(svc_ctx->svc_table[svc_id]);
 		if (svc_data) {
 			/* currently only LAPB metadata supported */
-			*metadata = PREPARE_METADATA(LAPB_VALID_TAG, svc_id);
+			if (svc_data->flags & DP_SVC_FLAGS_SVC_TID)
+				*metadata =
+					PREPARE_METADATA(LAPB_VALID_TAG, svc_id,
+							 METADATA_TID_OVERRIDE,
+							svc_data->override_tid);
+			else
+				*metadata =
+					PREPARE_METADATA(LAPB_VALID_TAG,
+							 svc_id, 0,
+							svc_data->override_tid);
 			status = QDF_STATUS_SUCCESS;
 		}
 	}

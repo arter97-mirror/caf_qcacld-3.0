@@ -150,6 +150,11 @@ bool fpm_is_tid_override(qdf_nbuf_t nbuf, uint8_t *tid)
 		return true;
 	}
 
+	if (DP_IS_SVC_TID_OVERRIDE_TAG(nbuf->mark)) {
+		*tid = DP_SVC_EXTRACT_TID(nbuf->mark);
+		return true;
+	}
+
 	return false;
 }
 

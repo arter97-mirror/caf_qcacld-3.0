@@ -1084,6 +1084,8 @@ struct dp_traffic_end_indication {
 #define DP_SVC_FLAGS_TID                        BIT(4)
 #define DP_SVC_FLAGS_MSDU_LOSS_RATE             BIT(5)
 #define DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END     BIT(6)
+#define DP_SVC_FLAGS_SVC_TID			BIT(7)
+
 
 
 
@@ -1108,6 +1110,7 @@ struct dp_svc_data {
 	uint8_t tid;
 	uint32_t msdu_loss_rate;
 #endif
+	uint8_t override_tid;
 	bool en_twt_end_indication;
 };
 

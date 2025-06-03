@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -44,17 +44,22 @@
 
 /* 24-bit TAG Value for LAPB_VALID_TAG.
  *
- * |23    16|         0|
- * +--------+----------+
- * | svc_id | Reserved |
- * +--------+----------+
+ * |23    16|         4|   1| 0|
+ * +--------+----------+----+---
+ * | svc_id | Reserved |TID |En|
+ * +--------+----------+----+--+
  *
  * bit 23-16: service_class_id
- * bit 15-0 : reserved
+ * bit 15-4 : reserved
+ * bit 3-1: TID to overridden
+ * bit 0: TID override flag
  */
 
 #define METADATA_SERVICE_CLASS_ID_SHIFT	(16)
 #define METADATA_SERVICE_CLASS_ID_SIZE	(0xFF)
+#define METADATA_TID_SHIFT	(1)
+#define METADATA_TID_ID_MASK	(0x7)
+#define METADATA_TID_OVERRIDE	(1)
 #define METADATA_SERVICE_CLASS_ID_MASK \
 	(METADATA_SERVICE_CLASS_ID_SIZE << METADATA_SERVICE_CLASS_ID_SHIFT)
 
@@ -72,10 +77,20 @@
 #define SET_FLAGS_LAPB_FLUSH_IND(x) \
 	((x) |= (1 << METADATA_FLAGS_LAPB_FLUSH_IND_SHIFT))
 
-#define PREPARE_METADATA(tag, svc_id) \
+#define PREPARE_METADATA(tag, svc_id, override_tid_en, tid) \
 	(((tag) << METADATA_TAG_SHIFT) | \
 	(((svc_id) & METADATA_SERVICE_CLASS_ID_SIZE) << \
-		METADATA_SERVICE_CLASS_ID_SHIFT))
+		METADATA_SERVICE_CLASS_ID_SHIFT) | \
+		(((tid) & METADATA_TID_ID_MASK) << \
+		METADATA_TID_SHIFT) | \
+		(override_tid_en))
+
+#define DP_IS_SVC_TID_OVERRIDE_TAG(x) \
+	IS_LAPB_FRAME(x) & ((x) & METADATA_TID_OVERRIDE)
+
+#define DP_SVC_EXTRACT_TID(x) \
+	(((x) >> METADATA_TID_OVERRIDE) & METADATA_TID_ID_MASK)
+
 
 /* 24-bit TAG Value for TID_OVERRIDE_TAG.
  *

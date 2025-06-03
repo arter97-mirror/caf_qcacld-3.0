@@ -114,6 +114,11 @@ static QDF_STATUS svc_validate_data(struct dp_svc_data *svc_data)
 			return QDF_STATUS_E_INVAL;
 	}
 
+	if (svc_data->flags & DP_SVC_FLAGS_SVC_TID) {
+		if (svc_data->override_tid > 7)
+			return QDF_STATUS_E_INVAL;
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -166,6 +171,12 @@ os_if_dp_service_class_set_cmd(struct nlattr *svc_params[])
 	if (tb[cmd_id]) {
 		svc_data.app_ind_special_dscp =	nla_get_u8(tb[cmd_id]);
 		svc_data.flags |= DP_SVC_FLAGS_APP_IND_SPL_DSCP;
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TID;
+	if (tb[cmd_id]) {
+		svc_data.override_tid = nla_get_u8(tb[cmd_id]);
+		svc_data.flags |= DP_SVC_FLAGS_SVC_TID;
 	}
 
 	status = svc_validate_data(&svc_data);
@@ -274,6 +285,9 @@ os_if_dp_service_class_get_cmd(struct wiphy *wiphy, struct nlattr *svc_params[])
 		if (svc_table[i].flags & DP_SVC_FLAGS_APP_IND_SPL_DSCP)
 			nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TX_REPLACE_DSCP,
 				   svc_table[i].app_ind_special_dscp);
+		if (svc_table[i].flags & DP_SVC_FLAGS_SVC_TID)
+			nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TID,
+				   svc_table[i].override_tid);
 
 		nla_nest_end(skb, svc_info);
 	}
