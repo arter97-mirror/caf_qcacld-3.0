@@ -11340,6 +11340,12 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 			return -EINVAL;
 		}
 
+		if (ucfg_scan_get_pdev_status(hdd_ctx->pdev) !=
+		    SCAN_NOT_IN_PROGRESS)
+			wlan_abort_scan(hdd_ctx->pdev,
+					wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev),
+					INVAL_VDEV_ID, INVAL_SCAN_ID, true);
+
 		status =
 		  qdf_event_reset(&adapter->qdf_monitor_mode_vdev_up_event);
 		if (QDF_IS_STATUS_ERROR(status)) {
