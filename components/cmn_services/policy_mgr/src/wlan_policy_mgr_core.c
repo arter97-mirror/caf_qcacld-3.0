@@ -4722,7 +4722,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_con_mode mode;
 	QDF_STATUS status;
 	uint32_t i;
-	struct policy_mgr_pcl_list pcl, intersect_pcl;
+	struct policy_mgr_pcl_list pcl, *intersect_pcl;
 	bool allow_2ghz_only = false;
 	qdf_freq_t scc_ch_freq_on_same_mac = 0;
 	qdf_freq_t scc_ch_freq_on_diff_mac = 0;
@@ -4780,14 +4780,20 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	 * This prevents CSA of the SAP/GO to bands which were not
 	 * intended by the user during SAP start.
 	 */
-	intersect_pcl = pcl;
+	intersect_pcl = qdf_mem_malloc(sizeof(struct policy_mgr_pcl_list));
+	if (!intersect_pcl)
+		return QDF_STATUS_E_INVAL;
+
+	*intersect_pcl = pcl;
 	status = policy_mgr_filter_non_acs_channels(psoc, vdev_id,
-						    &intersect_pcl);
+						    intersect_pcl);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		/* Override the PCL list with the intersected list */
 		qdf_mem_zero(&pcl, sizeof(pcl));
-		pcl = intersect_pcl;
+		pcl = *intersect_pcl;
 	}
+
+	qdf_mem_free(intersect_pcl);
 
 	if ((acs_band == QCA_ACS_MODE_IEEE80211B ||
 	     acs_band == QCA_ACS_MODE_IEEE80211G) &&
