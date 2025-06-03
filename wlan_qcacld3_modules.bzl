@@ -2556,13 +2556,28 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 
+    if target == "canoe" and variant == "consolidate" and chipset == "peach-v2":
+        etm = select({
+            "//build/kernel/kleaf:etm_true": [
+            "configs/canoe_etm_peach-v2",
+            "configs/canoe_gki_peach-v2_defconfig",
+            "configs/canoe_consolidate_peach-v2_defconfig",
+            ],
+            "//build/kernel/kleaf:etm_false": [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+            "configs/{}_consolidate_{}_defconfig".format(target, chipset),
+            ],
+        })
+    else:
+        etm = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+            "configs/{}_consolidate_{}_defconfig".format(target, chipset),
+        ]
+
     native.genrule(
         name = "configs/{}_defconfig_generate_consolidate".format(tvc),
         outs = ["configs/{}_defconfig.generated_consolidate".format(tvc)],
-        srcs = [
-            "configs/{}_gki_{}_defconfig".format(target, chipset),
-            "configs/{}_consolidate_{}_defconfig".format(target, chipset),
-        ],
+        srcs = etm,
         cmd = "cat $(SRCS) > $@",
     )
     native.genrule(
