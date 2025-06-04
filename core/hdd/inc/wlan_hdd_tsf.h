@@ -125,6 +125,7 @@ static inline void hdd_tsf_auto_report_init(struct hdd_adapter *adapter)
  * @cur_target_global_tsf_time: Global Fw TSF time.
  * @last_target_global_tsf_time: Last reported global Fw TSF time.
  * @host_capture_req_timer: Host timer to capture TSF time.
+ * @tsf_capture_initialized: Capture initialized.
  * @tsf_id: TSF id as obtained from FW report.
  * @tsf_mac_id: mac_id as obtained from FW report.
  * @tsf_details_valid: flag indicating whether tsf details are valid.
@@ -151,6 +152,7 @@ struct hdd_vdev_tsf {
 	uint64_t cur_target_global_tsf_time;
 	uint64_t last_target_global_tsf_time;
 	qdf_mc_timer_t host_capture_req_timer;
+	bool tsf_capture_initialized;
 #ifdef QCA_GET_TSF_VIA_REG
 	int tsf_id;
 	int tsf_mac_id;
@@ -376,24 +378,24 @@ bool hdd_tsf_is_raw_set(struct hdd_context *hdd);
 bool hdd_tsf_is_dbg_fs_set(struct hdd_context *hdd);
 
 /**
- * hdd_start_tsf_sync() - start tsf sync
+ * hdd_setup_tsf_sync() - start tsf sync
  * @adapter: pointer to adapter
  *
  * This function initialize and start TSF synchronization
  *
  * Return: Describe the execute result of this routine
  */
-int hdd_start_tsf_sync(struct hdd_adapter *adapter);
+int hdd_setup_tsf_sync(struct hdd_adapter *adapter);
 
 /**
- * hdd_stop_tsf_sync() - stop tsf sync
+ * hdd_reset_tsf_sync() - stop tsf sync
  * @adapter: pointer to adapter
  *
  * This function stop and de-initialize TSF synchronization
  *
  * Return: Describe the execute result of this routine
  */
-int hdd_stop_tsf_sync(struct hdd_adapter *adapter);
+int hdd_reset_tsf_sync(struct hdd_adapter *adapter);
 
 /**
  * hdd_restart_tsf_sync_post_wlan_resume() - restart host TSF sync
@@ -520,12 +522,12 @@ static inline int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 	return -EOPNOTSUPP;
 }
 
-static inline int hdd_start_tsf_sync(struct hdd_adapter *adapter)
+static inline int hdd_setup_tsf_sync(struct hdd_adapter *adapter)
 {
 	return -EOPNOTSUPP;
 }
 
-static inline int hdd_stop_tsf_sync(struct hdd_adapter *adapter)
+static inline int hdd_reset_tsf_sync(struct hdd_adapter *adapter)
 {
 	return -EOPNOTSUPP;
 }

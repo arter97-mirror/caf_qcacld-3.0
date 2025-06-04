@@ -1713,7 +1713,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	qdf_mem_zero(sta_ctx->conn_info.connect_time, time_buffer_size);
 	qdf_get_time_of_the_day_in_hr_min_sec_usec(sta_ctx->conn_info.connect_time,
 						   time_buffer_size);
-	hdd_start_tsf_sync(adapter);
+	hdd_setup_tsf_sync(adapter);
 	hdd_cm_rec_connect_info(rsp);
 
 	hdd_cm_save_connect_info(link_info, rsp);

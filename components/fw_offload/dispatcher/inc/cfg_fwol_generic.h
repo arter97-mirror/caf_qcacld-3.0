@@ -545,8 +545,8 @@
 /* <ini>
  * gtsf_irq_host_gpio_pin
  * @Min: 0
- * @Max: 254
- * @Default: 255
+ * @Max: 512
+ * @Default: 512
  *
  * TSF irq GPIO pin of host platform
  *
@@ -559,8 +559,8 @@
 #define CFG_SET_TSF_IRQ_HOST_GPIO_PIN CFG_INI_INT( \
 		"gtsf_irq_host_gpio_pin", \
 		0, \
-		255, \
-		255, \
+		512, \
+		512, \
 		CFG_VALUE_OR_DEFAULT, \
 		"TSF irq GPIO pin of host platform")
 

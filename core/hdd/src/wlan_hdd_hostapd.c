@@ -2793,7 +2793,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			ucfg_dp_set_bss_state_start(vdev, true);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		}
-		hdd_start_tsf_sync(adapter);
+		hdd_setup_tsf_sync(adapter);
 
 		hdd_hostapd_set_sap_key(adapter);
 
@@ -2919,7 +2919,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		}
 
 		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
-		hdd_stop_tsf_sync(adapter);
+		hdd_reset_tsf_sync(adapter);
 		break;
 	case eSAP_DFS_CAC_INTERRUPTED:
 		/*
@@ -3706,7 +3706,7 @@ stopbss:
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		}
 
-		hdd_stop_tsf_sync(adapter);
+		hdd_reset_tsf_sync(adapter);
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 		wlan_hdd_auto_shutdown_enable(hdd_ctx, true);

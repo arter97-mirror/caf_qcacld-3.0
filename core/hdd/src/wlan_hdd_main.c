@@ -10698,7 +10698,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	if (link_info->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
 		wlan_hdd_cfg80211_deregister_frames(adapter);
 
-	hdd_stop_tsf_sync(adapter);
+	hdd_reset_tsf_sync(adapter);
 	hdd_flush_scan_block_work(adapter);
 	wlan_hdd_cfg80211_scan_block(adapter);
 	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
