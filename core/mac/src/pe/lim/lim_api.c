@@ -3946,6 +3946,8 @@ lim_create_and_fill_link_session(struct mac_context *mac_ctx,
 	if (!pe_session)
 		goto fail;
 
+	pe_update_crypto_params(mac_ctx, pe_session, sync_ind);
+
 	status = lim_cm_fill_link_session(mac_ctx, vdev_id,
 					  pe_session, sync_ind, ie_len);
 	if (QDF_IS_STATUS_ERROR(status))
