@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -711,6 +711,47 @@ QDF_STATUS wlan_cm_tgt_send_idle_params(struct wlan_objmgr_psoc *psoc,
 
 release_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+	return status;
+}
+
+QDF_STATUS
+wlan_cm_tgt_send_disconnect_roam_params(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id,
+					struct  wlan_roam_disconnect_params *params)
+{
+	struct wlan_cm_roam_tx_ops *roam_tx_ops;
+	struct wlan_objmgr_vdev *vdev;
+	struct wmi_unified *wmi_handle;
+	QDF_STATUS status;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_NB_ID);
+
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	roam_tx_ops = wlan_cm_roam_get_tx_ops_from_vdev(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+	if (!roam_tx_ops || !roam_tx_ops->send_roam_disconnect_params) {
+		mlme_err("CM_RSO: vdev %d send_roam_disconnect_params is NULL",
+			 vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mlme_debug("Invalid WMI handle");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = roam_tx_ops->send_roam_disconnect_params(wmi_handle,
+							  0,
+							  params);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_err("CM_RSO: vdev %d failed to send disconnect params",
+			 vdev_id);
+
 	return status;
 }
 #endif
