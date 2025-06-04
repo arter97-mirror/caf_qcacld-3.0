@@ -6667,33 +6667,31 @@ lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 }
 #endif
 
-#define MIN_RRM_SIZE sizeof(tDot11fRadioMeasurementReport) - \
-		    (7 * sizeof(tDot11fIEMeasurementReport))
+#define ACTION_CODE_POS		 1
+#define DIALOG_POS		 2
+#define ACTION_HDR_LEN		 3
+#define MIN_MEASUREMENT_TAG_LEN	 3
+#define MEASUREMENT_RPT_TYPE_POS 4
 
 static QDF_STATUS
 lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 					  uint32_t tx_status, void *params)
 {
-	struct mac_context *mac_ctx = (struct mac_context *)context;
 	struct wlan_frame_hdr *mac_hdr;
 	struct wmi_mgmt_params *mgmt_params;
-	tDot11fRadioMeasurementReport *frm = NULL;
-	uint32_t extract_status;
 	uint8_t *frame_ptr;
 	uint8_t ff_offset;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	enum wlan_diag_wifi_band band;
 	enum qdf_dp_tx_rx_status qdf_tx_complete;
+	uint8_t num_measurements = 0;
+	uint16_t rem_len = 0;
+	uint8_t *frm;
+	const uint8_t *pos, *end, *ie;
+	uint8_t dialog_token;
 
 	if (!buf) {
 		pe_err("Invalid nbuf buffer");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	frm = qdf_mem_malloc(sizeof(*frm));
-	if (!frm) {
-		pe_err("Radio measurement buffer allocation failed");
-		qdf_nbuf_free(buf);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -6711,42 +6709,62 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 		qdf_tx_complete = QDF_TX_RX_STATUS_NO_ACK;
 
 	frame_ptr = qdf_nbuf_data(buf);
+	rem_len = qdf_nbuf_len(buf);
+
 	mac_hdr = (struct wlan_frame_hdr *)frame_ptr;
 	ff_offset = sizeof(*mac_hdr);
 	if (wlan_crypto_is_data_protected(frame_ptr))
 		ff_offset += IEEE80211_CCMP_MICLEN;
 
-	if (qdf_nbuf_len(buf) < (ff_offset + MIN_RRM_SIZE)) {
+	if (!rem_len || rem_len <= (ff_offset + ACTION_HDR_LEN)) {
+		pe_err("Invalid buffer length %d", rem_len);
 		status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
 
 	mgmt_params = params;
+	band = mgmt_params->band;
 
-	extract_status =
-		dot11f_unpack_radio_measurement_report(mac_ctx,
-						       frame_ptr + ff_offset,
-						       sizeof(*frm), frm,
-						       false);
+	//frm pointing to the fixed parameters
+	frm = frame_ptr + ff_offset;
+	rem_len -= ff_offset;
 
-	if (DOT11F_FAILED(extract_status)) {
-		pe_err("Failed to unpack Beacon Report response (0x%08x)",
-		       extract_status);
-		status = QDF_STATUS_E_FAILURE;
+	if (*frm != ACTION_CATEGORY_RRM ||
+	    frm[ACTION_CODE_POS] != RRM_RADIO_MEASURE_RPT) {
+		pe_debug("Not a beacon report frame type:%d", *frm);
 		goto out;
 	}
 
-	band = mgmt_params->band;
+	dialog_token = frm[DIALOG_POS];
 
-	if (frm->MeasurementReport[0].type == SIR_MAC_RRM_BEACON_TYPE)
-		lim_beacon_report_response_event(frm->DialogToken.token,
-						 frm->num_MeasurementReport,
-						 band,
-						 mgmt_params->vdev_id,
-						 qdf_tx_complete);
+	pos = frm + ACTION_HDR_LEN;
+	rem_len -= ACTION_HDR_LEN;
+	end = pos + rem_len;
+
+	while ((ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_MEASREP,
+					      pos, end - pos))) {
+		/* Tag length should have minimum of three octets,
+		 * i.e., Measurement Token, Measurement Report Mode
+		 * and Measurement Report Type.
+		 */
+		if (ie[TAG_LEN_POS] < MIN_MEASUREMENT_TAG_LEN) {
+			pe_debug("Bad Measurement Report element");
+			pos = ie + ie[TAG_LEN_POS] + MIN_IE_LEN;
+			continue;
+		}
+		if (ie[MEASUREMENT_RPT_TYPE_POS] == SIR_MAC_RRM_BEACON_TYPE)
+			++num_measurements;
+		pos = ie + ie[TAG_LEN_POS] + MIN_IE_LEN;
+	}
+
+	pe_debug("vdev_id %d dialog_token %d num_measuremt %d",
+		 mgmt_params->vdev_id, dialog_token, num_measurements);
+
+	lim_beacon_report_response_event(dialog_token, num_measurements, band,
+					 mgmt_params->vdev_id, qdf_tx_complete);
+
 out:
 	qdf_nbuf_free(buf);
-	qdf_mem_free(frm);
 
 	return status;
 }
