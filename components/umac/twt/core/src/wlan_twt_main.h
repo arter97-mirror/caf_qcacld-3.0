@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -401,6 +401,17 @@ wlan_twt_tgt_caps_get_wake_dur_and_wake_intvl(
 				uint32_t *min_wake_intvl,
 				uint32_t *max_wake_intvl);
 
+/**
+ * wlan_twt_send_responder_disable_per_vdev - send TWT responder disable command
+ * per VDEV to tFW.
+ * @psoc: Pointer to PSOC object
+ * @vdev_id: VDEV ID
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+wlan_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id);
 #else
 
 static inline bool
@@ -475,10 +486,9 @@ QDF_STATUS wlan_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
-static inline
-QDF_STATUS wlan_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
-					     struct wlan_objmgr_vdev *vdev,
-					     bool unavailability_mode)
+static inline QDF_STATUS
+wlan_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

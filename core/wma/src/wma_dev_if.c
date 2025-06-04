@@ -5062,7 +5062,7 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 send_resp:
 	wma_send_add_bss_resp(wma, vdev_id, status);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO

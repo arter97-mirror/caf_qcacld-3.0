@@ -6951,12 +6951,28 @@ QDF_STATUS sme_stop_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
+	struct wlan_objmgr_vdev *vdev;
 
 	session = CSR_GET_SESSION(mac, vdev_id);
 	if (!session) {
 		sme_err("ROAM: incorrect vdev ID %d", vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	if (wlan_cm_is_vdev_roaming(vdev)) {
+		mlme_set_rso_pending_disable_req_bitmap(mac->psoc, vdev_id,
+							requestor,
+							false);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return QDF_STATUS_SUCCESS;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	return wlan_cm_disable_rso(mac->pdev, vdev_id, requestor, reason);
 }
@@ -6966,6 +6982,27 @@ QDF_STATUS sme_start_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
 			     enum wlan_cm_rso_control_requestor requestor)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t pending_rso_bitmap;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	pending_rso_bitmap = mlme_get_rso_pending_disable_req_bitmap(mac->psoc,
+								     vdev_id);
+	if (pending_rso_bitmap & requestor) {
+		mlme_set_rso_pending_disable_req_bitmap(mac->psoc, vdev_id,
+							requestor,
+							true);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	return wlan_cm_enable_rso(mac->pdev, vdev_id, requestor, reason);
 }
@@ -16197,7 +16234,8 @@ void sme_update_eht_cap_mcs(mac_handle_t mac_handle, uint8_t vdev_id,
 
 void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t num_links,
-			    struct qdf_mac_addr *active_link_addr)
+			    struct qdf_mac_addr *active_link_addr,
+			    enum mlo_link_force_reason force_reason)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
@@ -16212,7 +16250,8 @@ void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 	if (ml_is_nlink_service_supported(mac_ctx->psoc)) {
 		policy_mgr_activate_mlo_links_nlink(mac_ctx->psoc, session_id,
 						    num_links,
-						    active_link_addr);
+						    active_link_addr,
+						    force_reason);
 	} else {
 		policy_mgr_activate_mlo_links(mac_ctx->psoc, session_id,
 					      num_links, active_link_addr);

@@ -126,6 +126,7 @@
 #include "wlan_nan_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
 #include <wlan_cfg80211.h>
+#include "osif_twt_ext_req.h"
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -8799,12 +8800,11 @@ hdd_sap_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 				      bool twt_responder, uint8_t vdev_id)
 {
-	bool twt_res_svc_cap, enable_twt, twt_res_cfg;
+	bool twt_res_svc_cap, enable_twt;
 	uint32_t reason;
 	enum QDF_OPMODE mode;
-
-	enable_twt = ucfg_twt_cfg_is_twt_enabled(hdd_ctx->psoc);
-	ucfg_twt_get_responder(hdd_ctx->psoc, &twt_res_svc_cap);
+	uint8_t twt_res_cfg;
+	bool twt_rsp_disable_svc;
 
 	/* This is a temporary fix to disable twt_responder for sap
 	 * interface. Later the changes will come to enable/disable
@@ -8817,7 +8817,13 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 		return;
 	}
 
-	if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
+	enable_twt = ucfg_twt_cfg_is_twt_enabled(hdd_ctx->psoc);
+	ucfg_twt_get_responder(hdd_ctx->psoc, &twt_res_svc_cap);
+	ucfg_twt_tgt_caps_get_resp_disable_per_vdev(hdd_ctx->psoc,
+						    &twt_rsp_disable_svc);
+
+	if (!twt_rsp_disable_svc &&
+	    !policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
 	    mode == QDF_SAP_MODE &&
 	    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id))
 		ucfg_twt_cfg_set_responder(hdd_ctx->psoc, false);
@@ -8827,11 +8833,9 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 		hdd_debug("TWT responder already disable, skip");
 		return;
 	}
-	ucfg_twt_cfg_set_responder(hdd_ctx->psoc,
-				   QDF_MIN(twt_res_svc_cap,
-					   (enable_twt &&
-					    twt_responder &&
-					    twt_res_cfg)));
+
+	if (!twt_res_svc_cap || !enable_twt || !twt_responder)
+		ucfg_twt_cfg_set_responder(hdd_ctx->psoc, 0);
 
 	hdd_debug("cfg80211 TWT responder: %d, enable twt: %d, twt_res_cfg: %d",
 		  twt_responder, enable_twt, twt_res_cfg);
@@ -8842,6 +8846,8 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason, vdev_id);
 	}
 
+	osif_twt_send_responder_disable_per_vdev(hdd_ctx->psoc, vdev_id, mode,
+						 twt_res_cfg);
 }
 
 static void

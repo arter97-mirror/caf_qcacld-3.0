@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -838,8 +838,28 @@ policy_mgr_allow_non_force_link_bitmap(
 		uint16_t no_forced_bitmap,
 		uint16_t force_inactive_bitmap);
 
+/*
+ * policy_mgr_get_ml_sta_info() - Get number of ML STA vdev ids and freq list
+ * @pm_ctx: pm_ctx ctx
+ * @num_ml_sta: Return number of ML STA present
+ * @num_disabled_ml_sta: Return number of disabled ML STA links
+ * @ml_vdev_lst: Return ML STA vdev id list
+ * @ml_freq_lst: Return ML STA freq list
+ * @num_non_ml: Return number of non-ML STA present
+ * @non_ml_vdev_lst: Return non-ML STA vdev id list
+ * @non_ml_freq_lst: Return non-ML STA freq list
+ *
+ * Return: void
+ */
 void
-policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx);
+policy_mgr_get_ml_sta_info(struct policy_mgr_psoc_priv_obj *pm_ctx,
+			   uint8_t *num_ml_sta,
+			   uint8_t *num_disabled_ml_sta,
+			   uint8_t *ml_vdev_lst,
+			   qdf_freq_t *ml_freq_lst,
+			   uint8_t *num_non_ml,
+			   uint8_t *non_ml_vdev_lst,
+			   qdf_freq_t *non_ml_freq_lst);
 
 /**
  * policy_mgr_link_switch_notifier_cb() - link switch notifier callback
@@ -856,9 +876,6 @@ QDF_STATUS
 policy_mgr_link_switch_notifier_cb(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_mlo_link_switch_req *req,
 				   enum wlan_mlo_link_switch_notify_reason notify_reason);
-#else
-static inline void
-policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx) {}
 #endif
 
 /**

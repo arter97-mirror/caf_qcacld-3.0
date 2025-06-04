@@ -670,12 +670,16 @@ void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
 	uint32_t *mac_cap = peer->peer_eht_cap_macinfo;
 	struct supported_rates *rates;
 	enum phy_ch_width ch_width, max_ch_width;
+	uint8_t ehtop_param;
 
 	if (!params->eht_capable)
 		return;
 
 	peer->eht_flag = 1;
 	peer->qos_flag = 1;
+
+	ehtop_param = ((uint8_t *)(&params->eht_op))[1];
+	peer->peer_eht_ops = ehtop_param;
 
 	/* EHT MAC Capabilities */
 	WMI_EHTCAP_MAC_EPCSPRIACCESS_SET(mac_cap, eht_cap->epcs_pri_access);

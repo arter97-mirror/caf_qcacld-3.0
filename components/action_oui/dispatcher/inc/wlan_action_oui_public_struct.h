@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -118,6 +118,7 @@
  * @ACTION_OUI_DISABLE_AUX_LISTEN: disable Aux Listen for specified IoT APs
  * @ACTION_OUI_RESTRICT_MAX_MLO_LINKS: Downgrade MLO if particular AP
  *                                     build present.
+ * @ACTION_OUI_DISABLE_DYNAMIC_SMPS: Disable Dynamic SMPS for specified AP
  * @ACTION_OUI_HOST_ONLY: host only action id start - placeholder.
  * New Firmware related "ACTION" needs to be added before this placeholder.
  * @ACTION_OUI_HOST_RECONN: reconnect to the same BSSID when wait for
@@ -129,7 +130,6 @@
  * specified AP
  * @ACTION_OUI_ENABLE_CTS2SELF: enable cts to self for specified AP's
  * @ACTION_OUI_LIMIT_BW: Limit BW if vendor OUI is received in beacon.
- * @ACTION_OUI_DISABLE_DYNAMIC_SMPS: Disable Dynamic SMPS for specified AP
  * @ACTION_OUI_MAXIMUM_ID: maximum number of action oui types
  */
 enum action_oui_id {
@@ -149,6 +149,7 @@ enum action_oui_id {
 	ACTION_OUI_DISABLE_AUX_LISTEN = 13,
 	ACTION_OUI_RESTRICT_MAX_MLO_LINKS = 16,
 	ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ = 17,
+	ACTION_OUI_DISABLE_DYNAMIC_SMPS = 18,
 
 	/* host&fw interface add above here */
 	ACTION_OUI_HOST_ONLY,
@@ -159,7 +160,6 @@ enum action_oui_id {
 	ACTION_OUI_ENABLE_CTS2SELF,
 
 	ACTION_OUI_LIMIT_BW,
-	ACTION_OUI_DISABLE_DYNAMIC_SMPS,
 	ACTION_OUI_MAXIMUM_ID
 };
 

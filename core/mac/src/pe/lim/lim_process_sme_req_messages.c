@@ -4793,7 +4793,8 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	}
 
 	/* Reset the SPMK global cache for non-SAE connection */
-	if (session->connected_akm != ANI_AKM_TYPE_SAE) {
+	if (session->connected_akm != ANI_AKM_TYPE_SAE &&
+	    session->connected_akm != ANI_AKM_TYPE_SAE_EXT_KEY) {
 		wlan_mlme_set_sae_single_pmk_bss_cap(mac_ctx->psoc,
 						     session->vdev_id,
 						     false);

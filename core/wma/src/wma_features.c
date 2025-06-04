@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3407,10 +3407,10 @@ static void wma_wake_event_log_reason(t_wma_handle *wma,
 			      wma_suspend_type_str(wma));
 		wma_debug_assert_page_fault_wakeup(wake_info->wake_reason);
 	} else if (!wmi_get_runtime_pm_inprogress(wma->wmi_handle)) {
-		wma_nofl_info("Non-WLAN triggered wakeup: %s (%d) (%s)",
-			      wma_wow_wake_reason_str(wake_info->wake_reason),
-			      wake_info->wake_reason,
-			      wma_suspend_type_str(wma));
+		wma_nofl_debug("Non-WLAN triggered wakeup: %s (%d) (%s)",
+			       wma_wow_wake_reason_str(wake_info->wake_reason),
+			       wake_info->wake_reason,
+			       wma_suspend_type_str(wma));
 	}
 
 	qdf_wow_wakeup_host_event(wake_info->wake_reason);

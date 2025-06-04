@@ -124,9 +124,11 @@ QDF_STATUS wlan_twt_cfg_update(struct wlan_objmgr_psoc *psoc)
 
 	twt_cfg->twt_requestor = QDF_MIN(tgt_caps->twt_requestor,
 					(enable_twt && twt_cfg->twt_requestor));
-	twt_cfg->twt_responder = QDF_MIN(tgt_caps->twt_responder,
-					(enable_twt && twt_cfg->twt_responder));
 	twt_cfg->twt_responder_orig = twt_cfg->twt_responder;
+
+	if (!tgt_caps->twt_responder || !enable_twt)
+		twt_cfg->twt_responder = 0;
+
 	twt_cfg->bcast_requestor_enabled =
 			QDF_MIN((tgt_caps->twt_bcast_req_support ||
 				tgt_caps->legacy_bcast_twt_support),
@@ -182,7 +184,7 @@ wlan_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val)
 }
 
 QDF_STATUS
-wlan_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
+wlan_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, uint8_t *val)
 {
 	struct twt_psoc_priv_obj *twt_psoc_obj;
 
@@ -216,7 +218,7 @@ wlan_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS
-wlan_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
+wlan_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, uint8_t val)
 {
 	struct twt_psoc_priv_obj *twt_psoc_obj;
 

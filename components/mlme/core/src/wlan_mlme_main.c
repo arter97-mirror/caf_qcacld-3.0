@@ -2062,7 +2062,7 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 	he_caps->dot11_he_cap.twt_request =
 			cfg_get(psoc, CFG_TWT_REQUESTOR);
 	he_caps->dot11_he_cap.twt_responder =
-			cfg_get(psoc, CFG_TWT_RESPONDER);
+			!!cfg_get(psoc, CFG_TWT_RESPONDER);
 	/*
 	 * Broadcast TWT capability will be filled in
 	 * populate_dot11f_he_caps() based on STA/SAP
@@ -3324,6 +3324,8 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR3_ROAM_PREAUTH_RETRY_COUNT);
 	lfr->roam_rssi_diff = cfg_get(psoc, CFG_LFR_ROAM_RSSI_DIFF);
 	lfr->roam_rssi_diff_6ghz = cfg_get(psoc, CFG_LFR_ROAM_RSSI_DIFF_6GHZ);
+	lfr->roam_rssi_delta_6ghz_to_non_6ghz =
+		cfg_get(psoc, CFG_LFR_ROAM_RSSI_DELTA_6GHZ_TO_NON_6GHZ);
 	lfr->bg_rssi_threshold = cfg_get(psoc, CFG_LFR_ROAM_BG_RSSI_TH);
 	lfr->roam_scan_offload_enabled =
 		cfg_get(psoc, CFG_LFR_ROAM_SCAN_OFFLOAD_ENABLED);

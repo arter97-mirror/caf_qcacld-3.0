@@ -745,6 +745,8 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	qdf_freq_t target_freq;
 	uint8_t ccfs0, ccfs1;
 	enum phy_ch_width ch_width;
+	uint8_t vht_ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+
 	/*
 	 * The new country subelement is present only when
 	 * 1. AP performs Extended Channel switching to new country.
@@ -776,10 +778,10 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	 * comes between 80 MHz and 160 MHz by presence of CCFS1 incase of
 	 * 160 MHz which is set to zero incase of 80 MHz.
 	 */
-	if (ch_width == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
-		ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+	if (ch_width == CH_WIDTH_160MHZ)
+		vht_ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
 
-	pDot11f->WiderBWChanSwitchAnn.newChanWidth = ch_width;
+	pDot11f->WiderBWChanSwitchAnn.newChanWidth = vht_ch_width;
 	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq0 = ccfs0;
 	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq1 = ccfs1;
 	pDot11f->WiderBWChanSwitchAnn.present = 1;
@@ -8214,9 +8216,10 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 			   tDot11fIEhe_cap *he_cap)
 {
 	bool twt_requestor = false;
-	bool twt_responder = false;
+	bool twt_responder;
 	bool bcast_requestor = false;
 	bool bcast_responder = false;
+	uint8_t twt_resp_cfg;
 
 	wlan_twt_get_bcast_requestor_cfg(mac->psoc, &bcast_requestor);
 	bcast_requestor = bcast_requestor &&
@@ -8242,7 +8245,9 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 			break;
 		fallthrough;
 	case QDF_SAP_MODE:
-		wlan_twt_get_responder_cfg(mac->psoc, &twt_responder);
+		wlan_twt_get_responder_cfg(mac->psoc, &twt_resp_cfg);
+		twt_responder = TWT_RESP_CHECK_BIT(session->opmode,
+						   twt_resp_cfg);
 		he_cap->twt_responder =
 			twt_responder && twt_get_responder_flag(mac);
 		he_cap->broadcast_twt = bcast_responder;
@@ -8640,6 +8645,16 @@ const uint8_t *lim_get_ext_ie_ptr_from_ext_id(const uint8_t *ie,
 			ehtop_ie_set(&__eht_op_params, \
 				     EHTOP_GRP_ADDRESSED_BU_IND_EXPONENT_IDX, \
 				     EHTOP_GRP_ADDRESSED_BU_IND_EXPONENT_BITS, \
+				     __value)
+
+#define EHTOP_PARAMS_MCS15_DISABLE_GET_FROM_IE(__eht_op_params) \
+			ehtop_ie_get(__eht_op_params, \
+				     EHTOP_MCS15_DISABLE_IDX, \
+				     EHTOP_MCS15_DISABLE_BITS)
+#define EHTOP_PARAMS_MCS15_DISABLE_SET_TO_IE(__eht_op_params, __value) \
+			ehtop_ie_set(&__eht_op_params, \
+				     EHTOP_MCS15_DISABLE_IDX, \
+				     EHTOP_MCS15_DISABLE_BITS, \
 				     __value)
 
 #define EHTOP_INFO_CHANWIDTH_GET_FROM_IE(__eht_op_control) \
@@ -9340,6 +9355,8 @@ QDF_STATUS lim_ieee80211_unpack_ehtop(const uint8_t *eht_op_ie,
 	dot11f_eht_op->group_addr_bu_indication_exponent =
 		EHTOP_PARAMS_GROUP_ADDR_BU_IND_EXPONENT_GET_FROM_IE(
 							ehtop->ehtop_param);
+	dot11f_eht_op->mcs15_disable =
+		EHTOP_PARAMS_MCS15_DISABLE_GET_FROM_IE(ehtop->ehtop_param);
 
 	dot11f_eht_op->basic_rx_max_nss_for_mcs_0_to_7 =
 		ehtop_ie_get(ehtop->basic_mcs_nss_set.max_nss_mcs_0_7,
@@ -10569,6 +10586,8 @@ void lim_ieee80211_pack_ehtop(uint8_t *ie, tDot11fIEeht_op dot11f_eht_op,
 
 	val = dot11f_eht_op.group_addr_bu_indication_exponent;
 	EHTOP_PARAMS_GROUP_ADDR_BU_IND_EXPONENT_SET_TO_IE(ehtop->ehtop_param,
+							  val);
+	EHTOP_PARAMS_MCS15_DISABLE_SET_TO_IE(ehtop->ehtop_param,
 							  val);
 
 	val = dot11f_eht_op.basic_rx_max_nss_for_mcs_0_to_7;
@@ -12927,8 +12946,9 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 					     tDot11fIEExtCap *dot11f)
 {
 	struct s_ext_cap *p_ext_cap;
-	bool twt_responder = false;
+	bool twt_responder;
 	bool twt_requestor = false;
+	uint8_t twt_resp_cfg;
 
 	if (pe_session->opmode == QDF_STA_MODE &&
 	    !pe_session->enable_session_twt_support) {
@@ -12939,18 +12959,31 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 	p_ext_cap = (struct s_ext_cap *)dot11f->bytes;
 	dot11f->present = 1;
 
-	if (pe_session->opmode == QDF_STA_MODE ||
-	    pe_session->opmode == QDF_P2P_CLIENT_MODE) {
+	switch (pe_session->opmode) {
+	case QDF_P2P_CLIENT_MODE:
+		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc,
+						  pe_session->vdev_id))
+			break;
+		fallthrough;
+	case QDF_STA_MODE:
 		wlan_twt_get_requestor_cfg(mac_ctx->psoc, &twt_requestor);
 		p_ext_cap->twt_requestor_support =
 			twt_requestor && twt_get_requestor_flag(mac_ctx);
-	}
-
-	if (pe_session->opmode == QDF_SAP_MODE ||
-	    pe_session->opmode == QDF_P2P_GO_MODE) {
-		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_responder);
+		break;
+	case QDF_P2P_GO_MODE:
+		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc,
+						  pe_session->vdev_id))
+			break;
+		fallthrough;
+	case QDF_SAP_MODE:
+		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_resp_cfg);
+		twt_responder = TWT_RESP_CHECK_BIT(pe_session->opmode,
+						   twt_resp_cfg);
 		p_ext_cap->twt_responder_support =
 			twt_responder && twt_get_responder_flag(mac_ctx);
+		break;
+	default:
+		break;
 	}
 
 	dot11f->num_bytes = lim_compute_ext_cap_ie_length(dot11f);

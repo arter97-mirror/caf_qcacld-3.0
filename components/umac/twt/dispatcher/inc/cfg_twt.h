@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -45,14 +45,23 @@
 		"twt_requestor", \
 		1, \
 		"TWT requestor")
+
+#define CFG_TWT_RESPONDER_BIT_SAP       0
+#define CFG_TWT_RESPONDER_BIT_LL_LT_SAP 1
+#define CFG_TWT_RESPONDER_BIT_P2P_GO    2
 /*
  * <ini>
- * twt_responder - twt responder.
+ * twt_responder - TWT responder enable/disable per VDEV
  * @Min: 0
- * @Max: 1
- * @Default: false
+ * @Max: 0xFF
+ * @Default: 0x06
  *
- * This cfg is used to store twt responder config.
+ * This cfg is used to configure the TWT responder.
+ * Bitmap for enabling the TWT responder per VDEV
+ * BIT 0: SAP
+ * BIT 1: LL_LT_SAP
+ * BIT 2: P2P GO
+ * BIT 3-31: Reserved
  *
  * Related: NA
  *
@@ -62,9 +71,12 @@
  *
  * </ini>
  */
-#define CFG_TWT_RESPONDER CFG_INI_BOOL( \
+#define CFG_TWT_RESPONDER CFG_INI_UINT( \
 		"twt_responder", \
-		true, \
+		0, \
+		0xFF, \
+		0x06, \
+		CFG_VALUE_OR_DEFAULT, \
 		"TWT responder")
 
 /*

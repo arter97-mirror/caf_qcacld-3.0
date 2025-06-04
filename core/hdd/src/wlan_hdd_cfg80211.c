@@ -231,6 +231,7 @@
 #include "wlan_psoc_mlme.h"
 #include "wlan_dnw_ucfg_api.h"
 #include "wlan_hdd_tx_powerboost.h"
+#include "wlan_mlo_link_force.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -5424,12 +5425,13 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	struct sk_buff *skb = NULL;
 	uint32_t dbs_capability = 0;
 	bool one_by_one_dbs, two_by_two_dbs;
-	bool value, twt_req, twt_res, twt_res_supp_ht_vht;
+	bool value, twt_req, twt_res_supp_ht_vht;
 	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 	QDF_STATUS status;
 	int ret_val;
 	uint8_t max_assoc_cnt = 0;
 	uint8_t max_str_link_count = 0;
+	uint8_t twt_res;
 
 	uint8_t feature_flags[(NUM_QCA_WLAN_VENDOR_FEATURES + 7) / 8] = {0};
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
@@ -9459,6 +9461,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_NO_WAIT_SUPPORT] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_EMLSR_LINKS] = {
+		.type = NLA_NESTED},
 };
 
 
@@ -9472,6 +9476,12 @@ qca_wlan_vendor_attr_omi_tx_policy [QCA_WLAN_VENDOR_ATTR_OMI_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_EHT_OMI_RX_NSS_EXTN] = {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_EHT_OMI_CH_BW_EXTN] =  {.type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_EHT_OMI_TX_NSS_EXTN] = {.type = NLA_U8 },
+};
+
+static const struct nla_policy
+wlan_emlsr_info_policy [QCA_WLAN_VENDOR_ATTR_EMLSR_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_EMLSR_OPERATION] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_EMLSR_LINKS_BITMAP] = {.type = NLA_U16 },
 };
 
 static const struct nla_policy
@@ -13684,7 +13694,8 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 			adapter->deflink->vdev->mlo_dev_ctx->sta_ctx->emlsr_mode_req = emlsr_mode;
 		sme_activate_mlo_links(hdd_ctx->mac_handle,
 				       adapter->deflink->vdev_id,
-				       num_links, active_link_addr);
+				       num_links, active_link_addr,
+				       MLO_LINK_FORCE_REASON_CONNECT);
 	}
 
 	return 0;
@@ -14156,6 +14167,129 @@ static int hdd_set_eht_mlo_mode(struct wlan_hdd_link_info *link_info,
 
 	return 0;
 }
+
+/**
+ * hdd_get_cfg_emlsr_mode() - Convert qca wlan EMLSR mode enum to cfg wlan
+ * EMLSR action mode
+ * @qca_wlan_emlsr_mode: qca wlan EMLSR mode
+ *
+ * Return: EMLSR mode on success, 0 on failure
+ */
+static enum wlan_emlsr_action_mode
+hdd_get_cfg_emlsr_mode(enum qca_wlan_eht_mlo_mode qca_wlan_emlsr_mode)
+{
+	switch (qca_wlan_emlsr_mode) {
+	case QCA_WLAN_EMLSR_MODE_ENTER:
+		return WLAN_EMLSR_MODE_ENTER;
+	case QCA_WLAN_EMLSR_MODE_EXIT:
+		return WLAN_EMLSR_MODE_EXIT;
+	default:
+		hdd_debug("Invalid EMLSR action mode");
+		return WLAN_EMLSR_MODE_DISABLED;
+	}
+}
+
+static int hdd_set_eht_emlsr_links(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
+{
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	uint16_t i = 0, emlsr_link_bitmap = 0;
+	uint8_t j = 0, num_links = 0;
+	uint16_t vdev_count = 0;
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+	struct qdf_mac_addr active_link_addr[WLAN_MLO_MAX_VDEVS];
+	enum wlan_emlsr_action_mode emlsr_action_mode =
+					WLAN_EMLSR_MODE_DISABLED;
+	struct nlattr *curr_attr;
+	int32_t len;
+	uint8_t cfg_val = 0;
+	int rc;
+	uint32_t cmd_id;
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_EMLSR_MAX + 1];
+
+	if (!(attr && adapter->device_mode == QDF_STA_MODE)) {
+		hdd_err("attr NULL or not in STA mode");
+		return -EINVAL;
+	}
+
+	nla_for_each_nested(curr_attr, &attr[0], len) {
+		rc = wlan_cfg80211_nla_parse(tb,
+					     QCA_WLAN_VENDOR_ATTR_EMLSR_MAX,
+					     curr_attr,
+					     len,
+					     wlan_emlsr_info_policy);
+		if (rc) {
+			hdd_err("Invalid attr");
+			return -EINVAL;
+		}
+
+		cmd_id = QCA_WLAN_VENDOR_ATTR_EMLSR_OPERATION;
+		if (tb[cmd_id]) {
+			cfg_val = nla_get_u8(tb[cmd_id]);
+			emlsr_action_mode = hdd_get_cfg_emlsr_mode(cfg_val);
+			hdd_debug("EMLSR operation: %d", emlsr_action_mode);
+		}
+
+		cmd_id = QCA_WLAN_VENDOR_ATTR_EMLSR_LINKS_BITMAP;
+		if (tb[cmd_id]) {
+			emlsr_link_bitmap = nla_get_u16(tb[cmd_id]);
+			hdd_debug("EMLSR link bitmap: %d", emlsr_link_bitmap);
+		}
+	}
+
+	mlo_sta_get_vdev_list(adapter->deflink->vdev, &vdev_count,
+			      wlan_vdev_list);
+
+	for (i = 0; i < 16; i++) {
+		if (!(emlsr_link_bitmap & BIT(i)))
+			continue;
+
+		for (j = 0; j < vdev_count; j++) {
+			if (!wlan_vdev_list[j])
+				continue;
+
+			if (i == wlan_vdev_get_link_id(wlan_vdev_list[j])) {
+				qdf_mem_copy(&active_link_addr[num_links],
+					     wlan_vdev_mlme_get_macaddr(wlan_vdev_list[j]),
+					     QDF_MAC_ADDR_SIZE);
+				num_links++;
+				break;
+			}
+		}
+
+		if (num_links >= WLAN_MLO_MAX_VDEVS)
+			break;
+	}
+
+	for (j = 0; j < vdev_count; j++)
+		mlo_release_vdev_ref(wlan_vdev_list[j]);
+
+	hdd_debug("number of links to force enable: %d", num_links);
+
+	if (!num_links) {
+		hdd_debug("No links to force EMLSR on");
+		return -EINVAL;
+	}
+
+	if (emlsr_action_mode == WLAN_EMLSR_MODE_ENTER)
+		sme_activate_mlo_links(
+			hdd_ctx->mac_handle,
+			adapter->deflink->vdev_id,
+			num_links, active_link_addr,
+			MLO_LINK_FORCE_REASON_SINGLE_LINK_EMLSR_OP);
+	else if (emlsr_action_mode == WLAN_EMLSR_MODE_EXIT)
+		ml_nlink_vendor_command_set_link(
+			hdd_ctx->psoc,
+			adapter->deflink->vdev_id,
+			LINK_CONTROL_MODE_DEFAULT,
+			MLO_LINK_FORCE_REASON_SINGLE_LINK_EMLSR_OP,
+			0, 0, 0, 0);
+	else
+		hdd_err("Invalid case");
+
+	return 0;
+}
 #else
 static inline int
 hdd_set_eht_emlsr_capability(struct wlan_hdd_link_info *link_info,
@@ -14181,6 +14315,13 @@ hdd_set_eht_max_num_links(struct wlan_hdd_link_info  *link_info,
 static inline int
 hdd_set_eht_mlo_mode(struct wlan_hdd_link_info *link_info,
 		     const struct nlattr *attr)
+{
+	return 0;
+}
+
+static inline int
+hdd_set_eht_emlsr_links(struct wlan_hdd_link_info *link_info,
+			const struct nlattr *attr)
 {
 	return 0;
 }
@@ -14220,32 +14361,12 @@ static int hdd_set_link_force_active(struct wlan_hdd_link_info *link_info,
 		}
 		sme_activate_mlo_links(hdd_ctx->mac_handle,
 				       link_info->vdev_id, num_links,
-				       active_link_addr);
+				       active_link_addr,
+				       MLO_LINK_FORCE_REASON_CONNECT);
 	}
 	hdd_debug("number of links to force active: %d", num_links);
 
 	return 0;
-}
-
-/**
- * hdd_get_cfg_emlsr_mode() - Convert qca wlan EMLSR mode enum to cfg wlan
- * EMLSR action mode
- * @qca_wlan_emlsr_mode: qca wlan EMLSR mode
- *
- * Return: EMLSR mode on success, 0 on failure
- */
-static enum wlan_emlsr_action_mode
-hdd_get_cfg_emlsr_mode(enum qca_wlan_eht_mlo_mode qca_wlan_emlsr_mode)
-{
-	switch (qca_wlan_emlsr_mode) {
-	case QCA_WLAN_EMLSR_MODE_ENTER:
-		return WLAN_EMLSR_MODE_ENTER;
-	case QCA_WLAN_EMLSR_MODE_EXIT:
-		return WLAN_EMLSR_MODE_EXIT;
-	default:
-		hdd_debug("Invalid EMLSR action mode");
-		return WLAN_EMLSR_MODE_DISABLED;
-	}
 }
 
 /**
@@ -14593,6 +14714,8 @@ static const struct independent_setters independent_setters[] = {
 	hdd_set_link_reconfig_support},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_NO_WAIT_SUPPORT,
 	 hdd_config_dfs_no_wait_support},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_EMLSR_LINKS,
+	 hdd_set_eht_emlsr_links},
 };
 
 #ifdef WLAN_FEATURE_ELNA
@@ -28166,7 +28289,7 @@ wlan_hdd_add_vlan(struct wlan_objmgr_vdev *vdev, struct sap_context *sap_ctx,
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 					       struct hdd_context *hdd_ctx,
-					       u8 key_index, bool pairwise,
+					       u8 key_index,
 					       struct key_params *params)
 {
 	struct mlo_link_info *mlo_link_info;
@@ -28178,15 +28301,12 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 		if (qdf_is_macaddr_zero(&mlo_link_info->ap_link_addr) ||
 		    mlo_link_info->link_id == 0xFF)
 			continue;
-		hdd_debug(" Add pairwise key link id  %d ",
-			  mlo_link_info->link_id);
-		wlan_cfg80211_store_link_key(
-			hdd_ctx->psoc, key_index,
-			(pairwise ? WLAN_CRYPTO_KEY_TYPE_UNICAST :
-			WLAN_CRYPTO_KEY_TYPE_GROUP),
-			(uint8_t *)mlo_link_info->ap_link_addr.bytes,
-			params, &mlo_link_info->link_addr,
-			mlo_link_info->link_id);
+		hdd_debug("Add key link id %d", mlo_link_info->link_id);
+		wlan_cfg80211_store_link_key(hdd_ctx->psoc, key_index,
+					     WLAN_CRYPTO_KEY_TYPE_UNICAST,
+					     (uint8_t *)&mlo_link_info->ap_link_addr,
+					     params, &mlo_link_info->link_addr,
+					     mlo_link_info->link_id);
 	}
 }
 
@@ -28222,7 +28342,7 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 
 static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 					       struct hdd_context *hdd_ctx,
-					       u8 key_index, bool pairwise,
+					       u8 key_index,
 					       struct key_params *params)
 {
 }
@@ -28237,6 +28357,52 @@ wlan_hdd_mlo_defer_set_keys(struct hdd_adapter *adapter,
 
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static
+bool hdd_mlo_vdev_allow_pairwise_without_peer(struct wlan_objmgr_vdev *vdev,
+					      struct qdf_mac_addr *peer_mac,
+					      enum wlan_peer_type *peer_type)
+{
+	uint8_t link_id;
+	struct mlo_link_info *mlo_info;
+
+	/*
+	 * If peer is not found, then it may be due to either peer is
+	 * deleted or is not yet created.
+	 *
+	 * Peer not found is handled gracefully only for BSS peer type
+	 * of link VDEV. For any other peer types or for assoc VDEV,
+	 * peer needs to be present to proceed for key install.
+	 */
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		return false;
+
+	link_id = wlan_vdev_get_link_id(vdev);
+	mlo_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx, link_id);
+	if (!mlo_info) {
+		hdd_debug("MLO link info not found for link id %d", link_id);
+		return false;
+	} else if (!qdf_is_macaddr_equal(&mlo_info->ap_link_addr, peer_mac)) {
+		hdd_err(QDF_MAC_ADDR_FMT " non BSS peer is not found",
+			QDF_MAC_ADDR_REF(peer_mac->bytes));
+		return false;
+	}
+
+	hdd_debug("UC key install for partner VDEV BSS peer");
+	*peer_type = WLAN_PEER_AP;
+
+	return true;
+}
+#else
+static inline
+bool hdd_mlo_vdev_allow_pairwise_without_peer(struct wlan_objmgr_vdev *vdev,
+					      struct qdf_mac_addr *peer_mac,
+					      enum wlan_peer_type *peer_type)
+{
+	return false;
+}
+#endif
+
 static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 				 struct wlan_objmgr_vdev *vdev, u8 key_index,
 				 bool pairwise, const u8 *mac_addr,
@@ -28246,7 +28412,7 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 	QDF_STATUS status;
 	struct wlan_objmgr_peer *peer;
 	struct hdd_context *hdd_ctx;
-	struct qdf_mac_addr mac_address = {0}, peer_mac = {0};
+	struct qdf_mac_addr mac_address = {0};
 	int32_t cipher_cap, ucast_cipher = 0;
 	int errno = 0;
 	enum wlan_crypto_cipher_type cipher;
@@ -28304,73 +28470,58 @@ static int wlan_hdd_add_key_vdev(mac_handle_t mac_handle,
 				return -EINVAL;
 			}
 			qdf_mem_copy(mac_address.bytes,
-				     wlan_peer_get_macaddr(peer), QDF_MAC_ADDR_SIZE);
+				     wlan_peer_get_macaddr(peer),
+				     QDF_MAC_ADDR_SIZE);
 			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
 		}
-	} else {
-		if (mac_addr)
-			qdf_mem_copy(mac_address.bytes,
-				     mac_addr,
-				     QDF_MAC_ADDR_SIZE);
+	} else if (mac_addr) {
+		qdf_mem_copy(mac_address.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
 	}
 
 done:
 	wlan_hdd_mlo_link_free_keys(hdd_ctx->psoc, adapter, vdev, pairwise);
 	if (pairwise && adapter->device_mode == QDF_STA_MODE &&
 	    wlan_vdev_mlme_is_mlo_vdev(vdev)) {
-		peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
-							WLAN_OSIF_ID);
-		if (!peer) {
-			hdd_err("Peer is null return");
+		enum wlan_peer_type peer_type;
+
+		peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc,
+						   mac_address.bytes,
+						   WLAN_OSIF_ID);
+		if (peer) {
+			peer_type = wlan_peer_get_peer_type(peer);
+			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+		} else if (!hdd_mlo_vdev_allow_pairwise_without_peer(vdev,
+								     &mac_address,
+								     &peer_type)) {
 			return -EINVAL;
 		}
-		qdf_mem_copy(peer_mac.bytes,
-			     wlan_peer_get_macaddr(peer),
-			     QDF_MAC_ADDR_SIZE);
-		wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
-		/*
-		 * when keys are for non-bss peer, current usecase is that
-		 * the peer could be TDLS or Ranging PASN peer on STA iface
-		 */
-		if (mac_addr &&
-		    !qdf_is_macaddr_equal(&mac_address, &peer_mac)) {
-			peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc,
-							   mac_address.bytes,
-							   WLAN_OSIF_ID);
-			if (!peer) {
-				hdd_err("Invalid peer " QDF_MAC_ADDR_FMT,
-					QDF_MAC_ADDR_REF(mac_address.bytes));
-				return -EINVAL;
-			};
 
-			/* Install keys only if TDLS peer is active */
-			if (wlan_peer_get_peer_type(peer) != WLAN_PEER_TDLS ||
-			    ucfg_tdls_is_key_install_allowed(vdev,
-							     &mac_address)) {
-				errno = wlan_cfg80211_store_key(
-					vdev, key_index,
-					(pairwise ?
-					WLAN_CRYPTO_KEY_TYPE_UNICAST :
-					WLAN_CRYPTO_KEY_TYPE_GROUP),
-					mac_address.bytes, params);
-			} else {
-				wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+		hdd_debug("Peer type %d", peer_type);
+		switch (peer_type) {
+		case WLAN_PEER_AP:
+			wlan_hdd_mlo_link_add_pairwise_key(vdev, hdd_ctx,
+							   key_index, params);
+			break;
+		case WLAN_PEER_TDLS:
+			if (!ucfg_tdls_is_key_install_allowed(vdev,
+							      &mac_address)) {
+				hdd_debug("TDLS peer's key install disallowed");
 				return 0;
 			}
-			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
-		} else {
-			wlan_hdd_mlo_link_add_pairwise_key(vdev, hdd_ctx,
-							   key_index,
-							   pairwise, params);
+			fallthrough;
+		default:
+			errno = wlan_cfg80211_store_key(vdev, key_index,
+							WLAN_CRYPTO_KEY_TYPE_UNICAST,
+							mac_address.bytes,
+							params);
+			break;
 		}
-
 	} else {
-		errno = wlan_cfg80211_store_key(
-					vdev, key_index,
-					(pairwise ?
-					WLAN_CRYPTO_KEY_TYPE_UNICAST :
-					WLAN_CRYPTO_KEY_TYPE_GROUP),
-					mac_address.bytes, params);
+		errno = wlan_cfg80211_store_key(vdev, key_index,
+						(pairwise ?
+						 WLAN_CRYPTO_KEY_TYPE_UNICAST :
+						 WLAN_CRYPTO_KEY_TYPE_GROUP),
+						mac_address.bytes, params);
 	}
 
 	if (wlan_hdd_mlo_defer_set_keys(adapter, vdev, &mac_address))

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -131,11 +131,15 @@ static void wlan_p2p_abort_vdev_scan(struct wlan_objmgr_pdev *pdev,
 		   req->cancel_req.req_type,
 		   req->cancel_req.vdev_id,
 		   req->cancel_req.scan_id);
+
+	p2p_debug("abort scan, scan req id:%d, scan id:%d",
+		  req->cancel_req.requester,
+		  req->cancel_req.scan_id);
+
 	status = wlan_scan_cancel(req);
 
-	p2p_debug("abort scan, scan req id:%d, scan id:%d, status:%d",
-		  req->cancel_req.requester,
-		  req->cancel_req.scan_id, status);
+	if (QDF_IS_STATUS_ERROR(status))
+		p2p_debug("abort scan failed: %d", status);
 }
 
 QDF_STATUS wlan_p2p_abort_scan(struct wlan_objmgr_pdev *pdev)

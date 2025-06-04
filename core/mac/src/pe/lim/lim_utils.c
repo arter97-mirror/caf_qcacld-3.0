@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -90,6 +90,7 @@
 #include "wlan_nan_api_i.h"
 #include "wlan_mlme_api.h"
 #include "wlan_tdls_api.h"
+#include "wlan_twt_cfg_ext_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -4854,6 +4855,132 @@ bool lim_isconnected_on_dfs_freq(struct mac_context *mac_ctx,
 		return false;
 }
 
+#ifdef CFG80211_SA_QUERY_OFFLOAD_SUPPORT
+static void lim_post_csa_ocv_sa_query_timer_handler(void *session_ptr)
+{
+	struct pe_session *pe_session = (struct pe_session *)session_ptr;
+	struct mac_context *mac_ctx;
+	tLimMlmStates state;
+	tpDphHashNode sta;
+	uint16_t index;
+
+	pe_debug("CSA Post OCV SA Query timer fires");
+
+	if (!pe_session || !pe_session->valid || !LIM_IS_AP_ROLE(pe_session)) {
+		pe_err("Session is not valid");
+		return;
+	}
+
+	mac_ctx = pe_session->mac_ctx;
+
+	for (index = 0; index < pe_session->dph.dphHashTable.size; index++) {
+		sta = dph_get_hash_entry(mac_ctx, index,
+					 &pe_session->dph.dphHashTable);
+		if (!sta)
+			continue;
+
+		state = sta->mlmStaContext.mlmState;
+		if (state != eLIM_MLM_LINK_ESTABLISHED_STATE &&
+		    state != eLIM_MLM_WT_ASSOC_CNF_STATE &&
+		    state != eLIM_MLM_ASSOCIATED_STATE) {
+			pe_err("Invalid STA state %d", state);
+			sta->post_csa_sa_query = 0;
+			continue;
+		}
+
+		/* Check if OCVC STA did SA Query after CSA */
+		if (sta->post_csa_sa_query) {
+			pe_info("No STA SA Query after CSA, Deauth "
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(sta->staAddr));
+			lim_send_deauth_mgmt_frame(mac_ctx,
+						   REASON_PREV_AUTH_NOT_VALID,
+						   sta->staAddr, pe_session,
+						   true);
+			sta->is_disassoc_deauth_in_progress = 1;
+		}
+	}
+
+	qdf_mc_timer_stop(&pe_session->post_csa_ocv_sa_query_timer);
+}
+
+QDF_STATUS lim_post_csa_ocv_sa_query_timer_init(struct pe_session *pe_session)
+{
+	QDF_STATUS status;
+
+	if (!pe_session)
+		return QDF_STATUS_E_FAULT;
+
+	status = qdf_mc_timer_init(&pe_session->post_csa_ocv_sa_query_timer,
+				   QDF_TIMER_TYPE_SW,
+				   lim_post_csa_ocv_sa_query_timer_handler,
+				   (void *)pe_session);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("Fail to init post csa ocv sa query timer");
+
+	return status;
+}
+
+void lim_post_csa_ocv_sa_query_timer_destroy(struct pe_session *pe_session)
+{
+	if (!pe_session)
+		return;
+
+	qdf_mc_timer_stop(&pe_session->post_csa_ocv_sa_query_timer);
+	qdf_mc_timer_destroy(&pe_session->post_csa_ocv_sa_query_timer);
+}
+
+void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
+				     struct pe_session *pe_session,
+				     bool csa_done)
+{
+	uint16_t index;
+	tpDphHashNode sta;
+	QDF_STATUS status;
+	bool ocv_check_csa_sa_query;
+
+	if (!pe_session || !pe_session->valid || !LIM_IS_AP_ROLE(pe_session))
+		return;
+
+	/* Stop csa ocv sa query timer if it is running */
+	if (QDF_TIMER_STATE_RUNNING ==
+		qdf_mc_timer_get_current_state(
+			&pe_session->post_csa_ocv_sa_query_timer)) {
+		pe_debug("Post CSA OCV Sa Query timer already started");
+		qdf_mc_timer_stop(&pe_session->post_csa_ocv_sa_query_timer);
+	}
+
+	if (!csa_done)
+		return;
+
+	ocv_check_csa_sa_query = false;
+	for (index = 0; index < pe_session->dph.dphHashTable.size; index++) {
+		sta = dph_get_hash_entry(mac, index,
+					 &pe_session->dph.dphHashTable);
+		if (!sta)
+			continue;
+
+		sta->post_csa_sa_query = 0;
+		if (sta->rmfEnabled && sta->ocv_enabled) {
+			sta->post_csa_sa_query = 1;
+			ocv_check_csa_sa_query = true;
+		}
+	}
+
+	if (ocv_check_csa_sa_query) {
+		status = qdf_mc_timer_start(
+				&pe_session->post_csa_ocv_sa_query_timer,
+				POST_CSA_CHECK_OCV_SA_QUERY_TIME);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("cannot start post csa ocv sa query timer");
+			return;
+		}
+
+		pe_debug("Post CSA OCV SA Query waiting timer started");
+	}
+}
+#endif /* CFG80211_SA_QUERY_OFFLOAD_SUPPORT */
+
 void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param)
 {
 	struct mac_context *mac = (struct mac_context *) pMacGlobal;
@@ -8006,6 +8133,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	uint8_t num_ppe_th = 0;
 	bool nan_beamforming_supported;
 	bool disable_nan_tx_bf = false, value = false;
+	uint8_t twt_resp_cfg;
 
 	/* Sending only minimal info(no PPET) to FW now, update if required */
 	qdf_mem_zero(he_caps, he_cap_total_len);
@@ -8061,8 +8189,8 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	} else if ((device_mode == QDF_SAP_MODE) ||
 		    (device_mode == QDF_P2P_GO_MODE &&
 		     wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id))) {
-		ucfg_twt_cfg_get_responder(mac_ctx->psoc, &value);
-		if (!value) {
+		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_resp_cfg);
+		if (!TWT_RESP_CHECK_BIT(device_mode, twt_resp_cfg)) {
 			he_cap->twt_responder = false;
 			he_cap->flex_twt_sched = false;
 		}

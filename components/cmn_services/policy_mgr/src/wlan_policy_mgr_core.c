@@ -38,6 +38,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_cmn.h"
 #include "wlan_mlo_mgr_public_structs.h"
+#include <wlan_mlo_mgr_sta.h>
 #endif
 #include "wlan_cm_ucfg_api.h"
 #include "target_if.h"
@@ -45,7 +46,7 @@
 #include "wlan_nan_api_i.h"
 #include "wlan_mlo_mgr_link_switch.h"
 
-#define POLICY_MGR_MAX_CON_STRING_LEN   230
+#define POLICY_MGR_MAX_CON_STRING_LEN   300
 #define LOWER_END_FREQ_5GHZ 4900
 
 static const uint16_t sap_mand_5g_freq_list[] = {5745, 5765, 5785, 5805};
@@ -1064,8 +1065,9 @@ set_done_event:
 		policy_mgr_err("ERROR: set opportunistic_update event failed");
 }
 
-static char *
-ml_sta_prefix(struct wlan_objmgr_psoc *psoc, uint32_t vdev_id)
+#ifdef WLAN_FEATURE_11BE_MLO
+static bool
+policy_mgr_is_ml_vdev(struct wlan_objmgr_psoc *psoc, uint32_t vdev_id)
 {
 	struct wlan_objmgr_vdev *vdev;
 
@@ -1075,27 +1077,104 @@ ml_sta_prefix(struct wlan_objmgr_psoc *psoc, uint32_t vdev_id)
 	if (!vdev) {
 		policy_mgr_err("invalid vdev for id %d",
 			       vdev_id);
-		return "STA";
+		return false;
 	}
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
-		return "ML STA";
+		return true;
 	}
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
-	return "STA";
+	return false;
+}
+
+static bool
+policy_mgr_is_vdev_link_disabled(uint8_t vdev_id, uint8_t num_mlo,
+				 uint8_t num_disabled_ml_sta,
+				 uint8_t *mlo_vdev_lst)
+{
+	uint8_t k;
+
+	for (k = (num_mlo - num_disabled_ml_sta); k < num_mlo; k++) {
+		/* check if its disabled link */
+		if (mlo_vdev_lst[k] == vdev_id)
+			return true;
+	}
+
+	return false;
+}
+
+static uint32_t
+policy_mgr_dump_ml_info(struct wlan_objmgr_psoc *psoc,
+			char *cc_mode, uint32_t length,
+			uint8_t num_mlo, uint8_t num_disabled_ml_sta,
+			uint8_t *mlo_vdev_lst)
+{
+	uint8_t ml_num_link = 0, i, j, k;
+	uint32_t count = 0;
+	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS + 1];
+	char buf[30] = {0};
+	bool link_disabled;
+	bool link_standby;
+	uint8_t vdev_id;
+
+	for (i = 0; i < num_mlo; i++) {
+		if (mlo_vdev_lst[i] == WLAN_INVALID_VDEV_ID)
+			continue;
+		ml_num_link = mlo_get_ml_links_info(psoc, mlo_vdev_lst[i],
+						    ml_link_info);
+		if (!ml_num_link)
+			return count;
+
+		count = strlcat(cc_mode, "ML STA(", length);
+		for (j = 0; j < ml_num_link; j++) {
+			link_disabled = false;
+			link_standby = false;
+			vdev_id = ml_link_info[j].vdev_id;
+			if (j)
+				count += strlcat(cc_mode, " + ", length);
+
+			if (vdev_id == WLAN_INVALID_VDEV_ID)
+				link_standby = true;
+			else
+				link_disabled =
+				   policy_mgr_is_vdev_link_disabled(vdev_id,
+							num_mlo,
+							num_disabled_ml_sta,
+							mlo_vdev_lst);
+
+			qdf_scnprintf(buf, sizeof(buf), "vdev %d freq %d(%s)",
+				      ml_link_info[j].vdev_id,
+				      ml_link_info[j].chan_freq,
+				      link_standby ? "S" :
+				      (link_disabled ? "D" : "A"));
+
+			/* Reset same MLD STA vdev ids */
+			for (k = i; k < num_mlo && !link_standby; k++) {
+				if (mlo_vdev_lst[k] == vdev_id)
+					mlo_vdev_lst[k] = WLAN_INVALID_VDEV_ID;
+			}
+			count += strlcat(cc_mode, buf, length);
+		}
+		count += strlcat(cc_mode, ")", length);
+	}
+
+	return count;
 }
 
 static void
-policy_mgr_dump_ml_sta_conc(struct wlan_objmgr_psoc *psoc,
-			    uint8_t *num_mlo_sta)
+policy_mgr_get_ml_info(struct wlan_objmgr_psoc *psoc, uint8_t *num_mlo_sta,
+		       char *cc_mode, uint32_t length)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t num_mlo = 0;
+	uint8_t mlo_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t num_disabled_ml_sta = 0;
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 
 	if (!num_mlo_sta)
 		return;
-
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
@@ -1103,20 +1182,35 @@ policy_mgr_dump_ml_sta_conc(struct wlan_objmgr_psoc *psoc,
 	}
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	policy_mgr_get_ml_sta_info(pm_ctx, &num_mlo, &num_disabled_ml_sta,
+				   mlo_vdev_lst, ml_freq_lst,
+				   NULL, NULL, NULL);
+	*num_mlo_sta = num_mlo - num_disabled_ml_sta;
+	policy_mgr_dump_ml_info(psoc, cc_mode, length, num_mlo,
+				num_disabled_ml_sta, mlo_vdev_lst);
 
-	if (policy_mgr_is_mlo_in_mode_dbs(psoc, PM_STA_MODE, NULL,
-					  num_mlo_sta))
-		policy_mgr_debug("ML STA %d links in DBS band", *num_mlo_sta);
-	else if (policy_mgr_is_mlo_in_mode_sbs(psoc, PM_STA_MODE, NULL,
-					       num_mlo_sta))
-		policy_mgr_debug("ML STA %d links in SBS band", *num_mlo_sta);
-	else if (*num_mlo_sta > 1)
-		policy_mgr_debug("ML STA %d links in same mac MLSR",
-				 *num_mlo_sta);
+	/*
+	 * If 1st connection is not ML STA, add '+' as it will be printed after
+	 * ML STA info if present.
+	 */
+	if (*num_mlo_sta &&
+	    !(pm_conc_connection_list[0].mode == PM_STA_MODE &&
+	      policy_mgr_is_ml_vdev(psoc, pm_conc_connection_list[0].vdev_id)))
+		strlcat(cc_mode, "+", length);
 
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 }
+#else
+static inline bool
+policy_mgr_is_ml_vdev(struct wlan_objmgr_psoc *psoc, uint32_t vdev_id)
+{
+	return false;
+}
 
+static inline void
+policy_mgr_get_ml_info(struct wlan_objmgr_psoc *psoc, uint8_t *num_mlo_sta,
+		       char *cc_mode, uint32_t length) {}
+#endif
 /**
  * policy_mgr_dump_current_concurrency_one_connection() - To dump the
  * current concurrency info with one connection
@@ -1142,22 +1236,19 @@ static uint32_t policy_mgr_dump_current_concurrency_one_connection(
 
 	switch (mode) {
 	case PM_STA_MODE:
-		count = strlcat(cc_mode,
-				ml_sta_prefix(
-				psoc, pm_conc_connection_list[0].vdev_id),
-				length);
+		if (policy_mgr_is_ml_vdev(psoc,
+					  pm_conc_connection_list[0].vdev_id))
+			return 0;
+		count = strlcat(cc_mode, "STA", length);
 		break;
 	case PM_SAP_MODE:
-		count = strlcat(cc_mode, "SAP",
-					length);
+		count = strlcat(cc_mode, "SAP", length);
 		break;
 	case PM_P2P_CLIENT_MODE:
-		count = strlcat(cc_mode, "P2P CLI",
-					length);
+		count = strlcat(cc_mode, "P2P CLI", length);
 		break;
 	case PM_P2P_GO_MODE:
-		count = strlcat(cc_mode, "P2P GO",
-					length);
+		count = strlcat(cc_mode, "P2P GO", length);
 		break;
 	case PM_NAN_DISC_MODE:
 		count = strlcat(cc_mode, "NAN DISC", length);
@@ -1204,35 +1295,30 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+", length);
-		count += strlcat(cc_mode,
-				 ml_sta_prefix(
-				 psoc, pm_conc_connection_list[1].vdev_id),
-				 length);
+		if (policy_mgr_is_ml_vdev(psoc,
+					  pm_conc_connection_list[1].vdev_id))
+			return 0;
+		count += strlcat(cc_mode, "+STA", length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+SAP",
-					length);
+		count += strlcat(cc_mode, "+SAP", length);
 		break;
 	case PM_P2P_CLIENT_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+P2P CLI",
-					length);
+		count += strlcat(cc_mode, "+P2P CLI", length);
 		break;
 	case PM_P2P_GO_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+P2P GO",
-					length);
+		count += strlcat(cc_mode, "+P2P GO", length);
 		break;
 	case PM_NDI_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+NDI",
-					length);
+		count += strlcat(cc_mode, "+NDI", length);
 		break;
 	case PM_NAN_DISC_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
@@ -1242,8 +1328,7 @@ static uint32_t policy_mgr_dump_current_concurrency_two_connection(
 	case PM_LL_LT_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_one_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+LT_SAP",
-					length);
+		count += strlcat(cc_mode, "+LT_SAP", length);
 		break;
 	default:
 		policy_mgr_err("unexpected mode %d", mode);
@@ -1281,11 +1366,10 @@ static uint32_t policy_mgr_dump_current_concurrency_three_connection(
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+", length);
-		count += strlcat(cc_mode,
-				 ml_sta_prefix(
-				 psoc, pm_conc_connection_list[2].vdev_id),
-				 length);
+		if (policy_mgr_is_ml_vdev(psoc,
+					  pm_conc_connection_list[2].vdev_id))
+			return 0;
+		count += strlcat(cc_mode, "+STA", length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_two_connection(
@@ -1446,31 +1530,6 @@ static void policy_mgr_dump_sbs_concurrency(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_dump_dual_mac_concurrency(pm_ctx, cc_mode, length);
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO
-void
-policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx)
-{
-	uint8_t buf[POLICY_MGR_MAX_CON_STRING_LEN] = {0};
-	uint32_t len = 0, count = 0, i;
-
-	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	for (i = 0; i < MAX_NUMBER_OF_DISABLE_LINK; i++) {
-		if (pm_disabled_ml_links[i].in_use) {
-			len += qdf_scnprintf(buf + len,
-					    POLICY_MGR_MAX_CON_STRING_LEN - len,
-					    "vdev %d :Mode %d freq %d, ",
-					    pm_disabled_ml_links[i].vdev_id,
-					    pm_disabled_ml_links[i].mode,
-					    pm_disabled_ml_links[i].freq);
-			count++;
-		}
-	}
-	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-	if (count)
-		policy_mgr_debug("Disabled links(%d): %s", count, buf);
-}
-#endif
-
 #ifdef FEATURE_FOURTH_CONNECTION
 /**
  * policy_mgr_dump_current_concurrency_4_connection() - To dump the
@@ -1498,47 +1557,40 @@ static uint32_t policy_mgr_dump_current_concurrency_4_connection(
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+", length);
-		count += strlcat(cc_mode,
-				 ml_sta_prefix(
-				 psoc, pm_conc_connection_list[3].vdev_id),
-				 length);
+		if (policy_mgr_is_ml_vdev(psoc,
+					  pm_conc_connection_list[3].vdev_id))
+			return count;
+		count += strlcat(cc_mode, "+STA", length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+SAP",
-					length);
+		count += strlcat(cc_mode, "+SAP", length);
 		break;
 	case PM_P2P_CLIENT_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+P2P CLI",
-					length);
+		count += strlcat(cc_mode, "+P2P CLI", length);
 		break;
 	case PM_P2P_GO_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+P2P GO",
-					length);
+		count += strlcat(cc_mode, "+P2P GO", length);
 		break;
 	case PM_NAN_DISC_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+NAN Disc",
-					length);
+		count += strlcat(cc_mode, "+NAN Disc", length);
 		break;
 	case PM_NDI_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+NDI",
-					length);
+		count += strlcat(cc_mode, "+NDI", length);
 		break;
 	case PM_LL_LT_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_three_connection(
 				psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+LT_SAP",
-					length);
+		count += strlcat(cc_mode, "+LT_SAP", length);
 		break;
 
 	default:
@@ -1605,48 +1657,40 @@ static uint32_t policy_mgr_dump_current_concurrency_5_connection(
 	case PM_STA_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
 					pm_ctx->psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+", length);
-		count += strlcat(
-			cc_mode,
-			ml_sta_prefix(
-			pm_ctx->psoc, pm_conc_connection_list[4].vdev_id),
-			length);
+		if (policy_mgr_is_ml_vdev(pm_ctx->psoc,
+					  pm_conc_connection_list[4].vdev_id))
+			return count;
+		count += strlcat(cc_mode, "+STA", length);
 		break;
 	case PM_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
 					pm_ctx->psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+SAP",
-				 length);
+		count += strlcat(cc_mode, "+SAP", length);
 		break;
 	case PM_P2P_CLIENT_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
 					pm_ctx->psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+P2P CLI",
-				 length);
+		count += strlcat(cc_mode, "+P2P CLI", length);
 		break;
 	case PM_P2P_GO_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
 					pm_ctx->psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+P2P GO",
-				 length);
+		count += strlcat(cc_mode, "+P2P GO", length);
 		break;
 	case PM_NAN_DISC_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
 					pm_ctx->psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+NAN Disc",
-				 length);
+		count += strlcat(cc_mode, "+NAN Disc", length);
 		break;
 	case PM_NDI_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
 					pm_ctx->psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+NDI",
-				 length);
+		count += strlcat(cc_mode, "+NDI", length);
 		break;
 	case PM_LL_LT_SAP_MODE:
 		count = policy_mgr_dump_current_concurrency_4_connection(
 					pm_ctx->psoc, cc_mode, length);
-		count += strlcat(cc_mode, "+LT_SAP",
-				 length);
+		count += strlcat(cc_mode, "+LT_SAP", length);
 		break;
 
 	default:
@@ -1719,7 +1763,7 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 		return;
 
 	policy_mgr_dump_connection_status_info(psoc);
-	policy_mgr_dump_ml_sta_conc(psoc, &num_mlo_sta);
+	policy_mgr_get_ml_info(psoc, &num_mlo_sta, cc_mode, len);
 	switch (num_connections) {
 	case 1:
 		policy_mgr_dump_current_concurrency_one_connection(psoc,
@@ -1814,8 +1858,6 @@ void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc)
 		break;
 	}
 	qdf_mem_free(cc_mode);
-
-	policy_mgr_dump_disabled_ml_links(pm_ctx);
 
 	return;
 }

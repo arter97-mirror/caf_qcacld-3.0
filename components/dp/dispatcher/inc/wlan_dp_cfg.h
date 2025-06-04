@@ -1482,7 +1482,7 @@
  * </ini>
  */
 #define CFG_DP_STC_RTPM_CONTROL \
-	CFG_INI_BOOL("dp_stc_rtpm_control", false, \
+	CFG_INI_BOOL("dp_stc_rtpm_control", true, \
 		     "Enable/Disable RTPM control by STC module")
 
 #define CFG_DP_STC \

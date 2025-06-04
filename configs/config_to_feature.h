@@ -3233,4 +3233,8 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 #define NDP_TX_BW_FLOW_CTRL (1)
 #endif
 
+#ifdef CONFIG_CNSS_ETM_TRACE
+#define FEATURE_ETM_TRACE_SUPPORT (1)
+#endif
+
 #endif /* CONFIG_TO_FEATURE_H */

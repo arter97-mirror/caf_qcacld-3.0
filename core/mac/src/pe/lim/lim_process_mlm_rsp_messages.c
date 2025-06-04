@@ -3388,7 +3388,6 @@ static void lim_process_switch_channel_join_req(
 	struct mac_context *mac_ctx, struct pe_session *session_entry,
 	QDF_STATUS status)
 {
-	tSirMacSSid ssId;
 	tLimMlmJoinCnf join_cnf;
 	uint8_t nontx_bss_id = 0;
 	struct bss_description *bss;
@@ -3501,10 +3500,6 @@ static void lim_process_switch_channel_join_req(
 	}
 
 	/* Wait for Beacon to announce join success */
-	qdf_mem_copy(ssId.ssId,
-		session_entry->ssId.ssId, session_entry->ssId.length);
-	ssId.length = session_entry->ssId.length;
-
 	lim_deactivate_and_change_timer(mac_ctx,
 		eLIM_PERIODIC_JOIN_PROBE_REQ_TIMER);
 
@@ -3512,9 +3507,9 @@ static void lim_process_switch_channel_join_req(
 	mac_ctx->lim.lim_timers.gLimPeriodicJoinProbeReqTimer.sessionId =
 		session_entry->peSessionId;
 	pe_debug("vdev %d Send Probe req on freq %d " QDF_SSID_FMT " " QDF_MAC_ADDR_FMT,
-		 session_entry->vdev_id,
-		 session_entry->curr_op_freq,
-		 QDF_SSID_REF(ssId.length, ssId.ssId),
+		 session_entry->vdev_id, session_entry->curr_op_freq,
+		 QDF_SSID_REF(session_entry->ssId.length,
+			      session_entry->ssId.ssId),
 		 QDF_MAC_ADDR_REF(
 		 session_entry->pLimMlmJoinReq->bssDescription.bssId));
 
@@ -3538,11 +3533,7 @@ static void lim_process_switch_channel_join_req(
 	lim_process_bcn_tpe_and_set_tpc(mac_ctx, session_entry);
 
 	/* include additional IE if there is */
-	lim_send_probe_req_mgmt_frame(mac_ctx, &ssId,
-		session_entry->pLimMlmJoinReq->bssDescription.bssId,
-		session_entry->curr_op_freq,
-		session_entry->self_mac_addr,
-		session_entry->dot11mode,
+	lim_send_probe_req_mgmt_frame(mac_ctx, session_entry,
 		&session_entry->lim_join_req->addIEScan.length,
 		session_entry->lim_join_req->addIEScan.addIEdata);
 
@@ -3736,6 +3727,12 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		policy_mgr_update_connection_info(mac->psoc,
 						pe_session->smeSessionId);
 		lim_check_conc_power_for_csa(mac, pe_session);
+
+		/* Channel Switch completed, prepare timer to wait for
+		 * OCV Check SA Query request from stations.
+		 */
+		lim_post_csa_ocv_sa_query_check(mac, pe_session,
+						QDF_IS_STATUS_SUCCESS(status));
 		break;
 	case LIM_SWITCH_CHANNEL_MONITOR:
 		lim_handle_mon_switch_channel_rsp(pe_session, status);

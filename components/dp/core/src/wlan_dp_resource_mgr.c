@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: ISC
  */
 
@@ -770,6 +770,11 @@ wlan_dp_resource_mgr_notify_ndp_channel_info(
 
 	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
 	priv_ctx = dp_get_peer_priv_obj(peer);
+	if (!priv_ctx) {
+		qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
+		dp_err("DP peer priv ctx not present");
+		return;
+	}
 	if (priv_ctx->vote_node) {
 		vote_node = priv_ctx->vote_node;
 		if (vote_node->phymode0 == mac0_phymode &&
@@ -860,6 +865,11 @@ wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 
 	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
 	priv_ctx = dp_get_peer_priv_obj(vote_peer);
+	if (!priv_ctx) {
+		qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
+		dp_err("DP peer priv ctx not present");
+		return;
+	}
 	if (priv_ctx->vote_node) {
 		vote_node = priv_ctx->vote_node;
 		if (vote_node->phymode == vote_phymode) {
@@ -939,6 +949,11 @@ wlan_dp_resource_mgr_vote_node_free(struct wlan_objmgr_peer *peer)
 
 	qdf_spin_lock_bh(&rsrc_ctx->rsrc_mgr_lock);
 	priv_ctx = dp_get_peer_priv_obj(vote_peer);
+	if (!priv_ctx) {
+		qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
+		dp_err("DP peer priv ctx not present");
+		return;
+	}
 	if (priv_ctx->vote_node) {
 		vote_node = priv_ctx->vote_node;
 		if (opmode != QDF_NDI_MODE && vote_node->nan_vote) {
@@ -989,7 +1004,7 @@ void wlan_dp_resource_mgr_notify_vdev_mac_id_migration(
 		wlan_objmgr_peer_get_ref(peer, WLAN_DP_ID);
 		/*If vote node is present then no active connection*/
 		priv_ctx = dp_get_peer_priv_obj(peer);
-		if (priv_ctx->vote_node) {
+		if (priv_ctx && priv_ctx->vote_node) {
 			dp_info("vote_node found for vdev_id:%u migration prev:%u new:%u",
 				wlan_vdev_get_id(vdev), old_mac_id, new_mac_id);
 			vote_node = priv_ctx->vote_node;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4000,12 +4000,14 @@ void sme_set_mlo_assoc_link_band(mac_handle_t mac_handle, uint8_t vdev_id,
  * @num_links: number of links to be forced active
  * @active_link_addr: link mac address of (up to WLAN_MAX_ML_BSS_LINKS) links to
  * be forced active
+ * @force_reason: reason to force the link(s)
  *
  * Return: void
  */
 void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t num_links,
-			    struct qdf_mac_addr *active_link_addr);
+			    struct qdf_mac_addr *active_link_addr,
+			    enum mlo_link_force_reason force_reason);
 
 /**
  * sme_update_eht_caps() - Update the session EHT caps
@@ -4080,7 +4082,8 @@ int sme_send_vdev_pause_for_bcn_period(mac_handle_t mac_handle,
 static inline
 void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t num_links,
-			    struct qdf_mac_addr *active_link_addr)
+			    struct qdf_mac_addr *active_link_addr,
+			    enum mlo_link_force_reason force_reason)
 {
 }
 #endif

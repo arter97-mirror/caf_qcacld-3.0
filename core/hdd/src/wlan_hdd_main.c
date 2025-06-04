@@ -256,6 +256,7 @@
 #include "wlan_mgmt_rx_srng_ucfg_api.h"
 #include <cfg_mlme_vht_caps.h>
 #include "wlan_hdd_tx_powerboost.h"
+#include "wifi_pos_pasn_api.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -8059,18 +8060,20 @@ hdd_vdev_configure_rtt_mac_randomization(struct wlan_objmgr_psoc *psoc,
 }
 
 static void
-hdd_vdev_configure_max_tdls_params(struct wlan_objmgr_psoc *psoc,
-				   struct wlan_objmgr_vdev *vdev)
+hdd_vdev_configure_max_sta_params(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev)
 {
 	uint16_t max_peer_count;
 	bool target_bigtk_support = false;
 
 	/*
-	 * Max peer can be tdls peers + self peer + bss peer +
+	 * Max peer can be tdls peers + self peer + bss peer + pasn peer +
 	 * temp bss peer for roaming create/delete peer at same time
 	 */
 	max_peer_count = cfg_tdls_get_max_peer_count(psoc);
 	max_peer_count += 3;
+	max_peer_count +=
+		wifi_pos_get_pasn_peer_max_num_per_vdev();
 	wlan_vdev_set_max_peer_count(vdev, max_peer_count);
 
 	ucfg_mlme_get_bigtk_support(psoc, &target_bigtk_support);
@@ -8160,12 +8163,12 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 	switch (opmode) {
 	case QDF_STA_MODE:
 		hdd_vdev_configure_rtt_mac_randomization(psoc, vdev);
-		hdd_vdev_configure_max_tdls_params(psoc, vdev);
+		hdd_vdev_configure_max_sta_params(psoc, vdev);
 		hdd_vdev_configure_usr_ps_params(psoc, vdev, link_info);
 		hdd_set_default_mrsno_gen_support(vdev);
 		break;
 	case QDF_P2P_CLIENT_MODE:
-		hdd_vdev_configure_max_tdls_params(psoc, vdev);
+		hdd_vdev_configure_max_sta_params(psoc, vdev);
 		hdd_vdev_configure_usr_ps_params(psoc, vdev, link_info);
 		hdd_set_default_mrsno_gen_support(vdev);
 		break;

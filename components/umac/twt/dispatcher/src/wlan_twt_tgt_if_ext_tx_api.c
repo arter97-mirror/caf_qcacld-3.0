@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,6 +27,7 @@
 #include <wlan_twt_api.h>
 #include <wlan_twt_tgt_if_ext_tx_api.h>
 #include <wlan_lmac_if_def.h>
+#include "target_if_ext_twt.h"
 
 QDF_STATUS
 tgt_twt_setup_req_send(struct wlan_objmgr_psoc *psoc,
@@ -210,4 +211,11 @@ tgt_twt_send_unavailability_mode(struct wlan_objmgr_psoc *psoc,
 	status = tx_ops->unavailability_mode(psoc, vdev, unavailability_mode);
 
 	return status;
+}
+
+QDF_STATUS
+tgt_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id)
+{
+	return target_if_twt_send_responder_disable_per_vdev(psoc, vdev_id);
 }

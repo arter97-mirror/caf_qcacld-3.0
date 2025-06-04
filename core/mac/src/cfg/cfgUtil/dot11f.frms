@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2006-2007, 2014-2018, 2020-2021 The Linux Foundation.
  * All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3628,7 +3628,8 @@ IE eht_op (EID_EXTN_ID_ELEMENT) OUI (0x6A)
 	eht_default_pe_duration: 1;
 	group_addr_bu_indication_limit: 1;
 	group_addr_bu_indication_exponent: 2;
-	reserved: 2;
+	mcs15_disable: 1;
+	reserved: 1;
     }
     {
 	basic_rx_max_nss_for_mcs_0_to_7: 4;

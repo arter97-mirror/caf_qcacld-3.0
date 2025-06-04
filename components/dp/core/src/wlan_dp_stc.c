@@ -248,14 +248,6 @@ wlan_dp_stc_fill_rx_flow_candidate(struct wlan_dp_stc *dp_stc,
 	candidate->flags |= WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID;
 }
 
-static inline struct dp_fisa_rx_sw_ft *
-wlan_dp_get_rx_flow_hdl(struct wlan_dp_psoc_context *dp_ctx, uint8_t flow_id)
-{
-	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
-
-	return (&(((struct dp_fisa_rx_sw_ft *)fisa_hdl->base)[flow_id]));
-}
-
 static inline struct wlan_dp_spm_flow_info *
 wlan_dp_get_tx_flow_hdl(struct wlan_dp_psoc_context *dp_ctx, uint8_t flow_id)
 {
@@ -827,10 +819,11 @@ wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc *dp_stc,
 			     enum qca_traffic_type traffic_type)
 {
 	uint32_t val = 0;
+	bool is_rtpm_flow = false;
 
 	switch (traffic_type) {
 	case QCA_TRAFFIC_TYPE_STREAMING:
-		dp_stc->rtpm_control_flow_cnt++;
+		is_rtpm_flow = true;
 		val = qdf_atomic_inc_return(&peer_tc->num_streaming);
 		break;
 	case QCA_TRAFFIC_TYPE_GAMING:
@@ -843,21 +836,22 @@ wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc *dp_stc,
 		val = qdf_atomic_inc_return(&peer_tc->num_video_call);
 		break;
 	case QCA_TRAFFIC_TYPE_BROWSING:
-		dp_stc->rtpm_control_flow_cnt++;
+		is_rtpm_flow = true;
 		val = qdf_atomic_inc_return(&peer_tc->num_browsing);
 		break;
 	case QCA_TRAFFIC_TYPE_APERIODIC_BURSTS:
-		dp_stc->rtpm_control_flow_cnt++;
+		is_rtpm_flow = true;
 		val = qdf_atomic_inc_return(&peer_tc->num_aperiodic_bursts);
 		break;
 	default:
 		break;
 	}
 
-	if (val == 1)
+	if (dp_stc->tcam_client_available && (val == 1))
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 
-	if (dp_stc->rtpm_control && dp_stc->rtpm_control_flow_cnt == 1)
+	if (dp_stc->rtpm_control && is_rtpm_flow &&
+	    (++dp_stc->rtpm_control_flow_cnt == 1))
 		hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_DP_STC);
 }
 
@@ -867,10 +861,11 @@ wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc *dp_stc,
 			     enum qca_traffic_type traffic_type)
 {
 	uint32_t val = 0;
+	bool is_rtpm_flow = false;
 
 	switch (traffic_type) {
 	case QCA_TRAFFIC_TYPE_STREAMING:
-		dp_stc->rtpm_control_flow_cnt--;
+		is_rtpm_flow = true;
 		val = qdf_atomic_dec_and_test(&peer_tc->num_streaming);
 		break;
 	case QCA_TRAFFIC_TYPE_GAMING:
@@ -883,21 +878,22 @@ wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc *dp_stc,
 		val = qdf_atomic_dec_and_test(&peer_tc->num_video_call);
 		break;
 	case QCA_TRAFFIC_TYPE_BROWSING:
-		dp_stc->rtpm_control_flow_cnt--;
+		is_rtpm_flow = true;
 		val = qdf_atomic_dec_and_test(&peer_tc->num_browsing);
 		break;
 	case QCA_TRAFFIC_TYPE_APERIODIC_BURSTS:
-		dp_stc->rtpm_control_flow_cnt--;
+		is_rtpm_flow = true;
 		val = qdf_atomic_dec_and_test(&peer_tc->num_aperiodic_bursts);
 		break;
 	default:
 		break;
 	}
 
-	if (val)
+	if (dp_stc->tcam_client_available && (val == 1))
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
 
-	if (dp_stc->rtpm_control && !dp_stc->rtpm_control_flow_cnt)
+	if (dp_stc->rtpm_control && is_rtpm_flow &&
+	    !(--dp_stc->rtpm_control_flow_cnt))
 		hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP_STC);
 }
 
@@ -1339,8 +1335,10 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 		uint64_t pkt_rate;
 		bool only_txrx_stage = true;
 
-		if (!rx && !bidi)
+		if (candidate_idx >= DP_STC_SAMPLE_FLOWS_MAX ||
+		    (!rx && !bidi))
 			break;
+
 		/* loop through entire FISA table */
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
 		if (!rx_flow->is_populated ||
@@ -1395,10 +1393,11 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 		}
 
 		if (candidates[candidate_idx].flags &
-		    WLAN_DP_SAMPLING_CANDIDATE_VALID)
+		    WLAN_DP_SAMPLING_CANDIDATE_VALID) {
 			candidates[candidate_idx].flags |= only_txrx_stage ?
 				WLAN_DP_SAMPLING_CANDIDATE_ONLY_TXRX_STAGE : 0;
-		candidate_idx++;
+			candidate_idx++;
+		}
 	}
 
 	if (!candidate_selected)
@@ -1533,6 +1532,9 @@ other_checks:
 	}
 
 skip_classified_table_check:
+	if (!dp_stc->tcam_client_available)
+		return;
+
 	for (peer_id = 0; peer_id < DP_STC_MAX_PEERS; peer_id++) {
 		struct wlan_dp_stc_peer_traffic_context *peer_tc;
 
@@ -2455,7 +2457,7 @@ void wlan_dp_stc_dump_periodic_stats(struct wlan_dp_psoc_context *dp_ctx)
 }
 
 static bool
-wlan_dp_stc_is_traffic_conext_supported(struct wlan_objmgr_psoc *psoc)
+wlan_dp_stc_is_traffic_context_supported(struct wlan_objmgr_psoc *psoc)
 {
 	struct wmi_unified *wmi_handle;
 
@@ -2467,16 +2469,6 @@ wlan_dp_stc_is_traffic_conext_supported(struct wlan_objmgr_psoc *psoc)
 
 	return wmi_service_enabled(wmi_handle,
 				   wmi_service_traffic_context_support);
-}
-
-static bool wlan_dp_stc_clients_available(struct wlan_dp_psoc_context *dp_ctx)
-{
-	if (wlan_dp_stc_is_traffic_conext_supported(dp_ctx->psoc)) {
-		dp_info("STC: TCAM client available");
-		return true;
-	}
-
-	return false;
 }
 
 void wlan_dp_stc_cfg_init(struct wlan_dp_psoc_cfg *config,
@@ -2501,12 +2493,6 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 
 	if (!wlan_dp_cfg_is_stc_enabled(&dp_ctx->dp_cfg)) {
 		dp_info("STC: feature not enabled via cfg");
-		dp_ctx->dp_stc = NULL;
-		return QDF_STATUS_E_NOSUPPORT;
-	}
-
-	if (!wlan_dp_stc_clients_available(dp_ctx)) {
-		dp_info("STC: No clients available, skip attach");
 		dp_ctx->dp_stc = NULL;
 		return QDF_STATUS_E_NOSUPPORT;
 	}
@@ -2583,6 +2569,10 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 	dp_stc->flow_monitor_interval = 100;
 	dp_stc->periodic_work_state = WLAN_DP_STC_WORK_INIT;
 
+	dp_stc->tcam_client_available =
+			wlan_dp_stc_is_traffic_context_supported(dp_ctx->psoc);
+	dp_info("STC: TCAM client support: %u", dp_stc->tcam_client_available);
+
 	dp_stc->rtpm_control =
 		wlan_dp_cfg_is_stc_rtpm_control_enabled(&dp_ctx->dp_cfg);
 
@@ -2628,12 +2618,15 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 
 	dp_info("STC: detach");
 	qdf_hrtimer_cancel(&dp_stc->flow_sampling_timer);
-
-	if (dp_stc->rtpm_control)
-		hif_rtpm_deregister(HIF_RTPM_ID_DP_STC);
-
 	qdf_periodic_work_stop_sync(&dp_stc->flow_monitor_work);
 	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
+
+	if (dp_stc->rtpm_control) {
+		if (dp_stc->rtpm_control_flow_cnt)
+			hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP_STC);
+		hif_rtpm_deregister(HIF_RTPM_ID_DP_STC);
+	}
+
 	dp_context_free_mem(soc, DP_STC_CLASSIFIED_FLOW_TABLE_TYPE,
 			    dp_stc->classified_flow_table);
 	dp_context_free_mem(soc, DP_STC_TX_FLOW_TABLE_TYPE,

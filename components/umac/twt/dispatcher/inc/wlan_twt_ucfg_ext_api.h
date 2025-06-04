@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -350,7 +350,8 @@ ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val);
+QDF_STATUS
+ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, uint8_t val);
 
 /**
  * ucfg_twt_cfg_reset_responder() - Reset cfg responder
@@ -400,6 +401,27 @@ ucfg_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
 void
 ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * ucfg_twt_resp_check_bit() - check TWT responder INI bit for provided mode.
+ * @mode: device mode
+ * @twt_resp_cfg: TWT responder INI parameter
+ *
+ * Return: true if TWT responder INI bit is set for provided device mode,
+ * otherwise false
+ */
+bool ucfg_twt_resp_check_bit(enum QDF_OPMODE mode, uint8_t twt_resp_cfg);
+
+/**
+ * ucfg_twt_send_responder_disable_per_vdev() - This API is wrapper for
+ * function "wlan_twt_send_responder_disable_per_vdev"
+ * @psoc: Pointer to psoc object
+ * @vdev_id: VDEV ID
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id);
 #else
 static inline
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -514,8 +536,8 @@ QDF_STATUS ucfg_twt_cfg_set_requestor(struct wlan_objmgr_psoc *psoc, bool val)
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline
-QDF_STATUS ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
+static inline QDF_STATUS
+ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, uint8_t val)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -556,6 +578,19 @@ ucfg_twt_set_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 static inline void
 ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 {
+}
+
+static inline bool
+ucfg_twt_resp_check_bit(enum QDF_OPMODE mode, uint8_t twt_resp_cfg)
+{
+	return false;
+}
+
+static inline QDF_STATUS
+ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 #endif

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -151,47 +151,21 @@ lim_populate_mac_header(struct mac_context *mac_ctx, uint8_t *buf,
 		 mac_ctx->mgmtSeqNum, mac_hdr->seqControl.fragNum);
 }
 
-/**
- * lim_send_probe_req_mgmt_frame() - send probe request management frame
- * @mac_ctx: Pointer to Global MAC structure
- * @ssid: SSID to be sent in Probe Request frame
- * @bssid: BSSID to be sent in Probe Request frame
- * @chan_freq: Channel frequency on which the Probe Request is going out
- * @self_macaddr: self MAC address
- * @dot11mode: self dotllmode
- * @additional_ielen: if non-zero, include additional_ie in the Probe Request
- *                   frame
- * @additional_ie: if additional_ielen is non zero, include this field in the
- *                Probe Request frame
- *
- * This function is called by various LIM modules to send Probe Request frame
- * during active scan/learn phase.
- * Probe request is sent out in the following scenarios:
- * --heartbeat failure:  session needed
- * --join req:           session needed
- * --foreground scan:    no session
- * --background scan:    no session
- * --sch_beacon_processing:  to get EDCA parameters:  session needed
- *
- * Return: QDF_STATUS (QDF_STATUS_SUCCESS on success and error codes otherwise)
- */
-QDF_STATUS
-lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
-			      tSirMacSSid *ssid,
-			      tSirMacAddr bssid,
-			      qdf_freq_t chan_freq,
-			      tSirMacAddr self_macaddr,
-			      uint32_t dot11mode,
-			      uint16_t *additional_ielen,
-			      uint8_t *additional_ie)
+QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
+					 struct pe_session *pesession,
+					 uint16_t *additional_ielen,
+					 uint8_t *additional_ie)
 {
 	tDot11fProbeRequest *pr;
 	uint32_t status, bytes, payload;
 	uint8_t *frame;
 	void *packet;
 	QDF_STATUS qdf_status;
-	struct pe_session *pesession = NULL;
-	uint8_t sessionid;
+	tSirMacSSid *ssid;
+	tSirMacAddr *bssid;
+	qdf_freq_t chan_freq;
+	tSirMacAddr *self_macaddr;
+	uint32_t dot11mode;
 	const uint8_t *p2pie = NULL;
 	uint8_t txflag = 0;
 	uint8_t vdev_id = 0;
@@ -208,8 +182,17 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint16_t mlo_ie_len = 0;
 	tSirMacAddr bcast_mac = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
+	if (!pesession)
+		return QDF_STATUS_E_NULL_VALUE;
+
 	if (additional_ielen)
 		addn_ielen = *additional_ielen;
+
+	ssid = &pesession->ssId;
+	bssid = &pesession->bssId;
+	chan_freq = pesession->curr_op_freq;
+	self_macaddr = &pesession->self_mac_addr;
+	dot11mode = pesession->dot11mode;
 
 	channel = wlan_reg_freq_to_chan(mac_ctx->pdev, chan_freq);
 	/*
@@ -234,10 +217,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * If session context does not exist, some IEs will be populated from
 	 * CFGs, e.g. Supported and Extended rate set IEs
 	 */
-	pesession = pe_find_session_by_bssid(mac_ctx, bssid, &sessionid);
-
-	if (pesession)
-		vdev_id = pesession->vdev_id;
+	vdev_id = pesession->vdev_id;
 
 	pr = qdf_mem_malloc(sizeof(*pr));
 	if (!pr) {
@@ -251,9 +231,9 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * Therefore for hidden ssid connections, after 3 unicast probe
 	 * requests, try the pending probes with broadcast mac.
 	 */
-	if (pesession && !WLAN_REG_IS_6GHZ_CHAN_FREQ(pesession->curr_op_freq) &&
+	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq) &&
 	    pesession->join_probe_cnt > 2)
-		sir_copy_mac_addr(bssid, bcast_mac);
+		sir_copy_mac_addr(*bssid, bcast_mac);
 
 	/* The scheme here is to fill out a 'tDot11fProbeRequest' structure */
 	/* and then hand it off to 'dot11f_pack_probe_request' (for */
@@ -269,8 +249,8 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * Don't include 11b rate if it is a P2P search or probe request is
 	 * sent by P2P Client
 	 */
-	if ((MLME_DOT11_MODE_11B != dot11mode) && (p2pie) &&
-	    ((pesession) && (QDF_P2P_CLIENT_MODE == pesession->opmode))) {
+	if ((MLME_DOT11_MODE_11B != dot11mode) && p2pie &&
+	    (QDF_P2P_CLIENT_MODE == pesession->opmode)) {
 		/*
 		 * In the below API pass channel number > 14, do that it fills
 		 * only 11a rates in supported rates
@@ -293,23 +273,14 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * RRM is enabled. It should be ok even if we add it into probe req when
 	 * RRM is not enabled.
 	 */
-	populate_dot11f_ds_params(mac_ctx, &pr->DSParams,
-				  chan_freq);
+	populate_dot11f_ds_params(mac_ctx, &pr->DSParams, chan_freq);
 	/* Call RRM module to get the tx power for management used. */
 	txPower = (uint8_t) rrm_get_mgmt_tx_power(mac_ctx, pesession);
 	populate_dot11f_wfatpc(mac_ctx, &pr->WFATPC, txPower, 0);
 
-	if (pesession) {
-		/* Include HT Capability IE */
-		if (pesession->htCapability &&
-		    !(WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq)))
-			populate_dot11f_ht_caps(mac_ctx, pesession,
-						&pr->HTCaps);
-	} else {                /* !pesession */
-		if (IS_DOT11_MODE_HT(dot11mode) &&
-		    !(WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq)))
-			populate_dot11f_ht_caps(mac_ctx, NULL, &pr->HTCaps);
-	}
+	/* Include HT Capability IE */
+	if (pesession->htCapability && !(WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq)))
+		populate_dot11f_ht_caps(mac_ctx, pesession, &pr->HTCaps);
 
 	/*
 	 * Set channelbonding information as "disabled" when tuned to a
@@ -326,49 +297,38 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 				eHT_CHANNEL_WIDTH_40MHZ;
 		}
 	}
-	if (pesession) {
-		/* Include VHT Capability IE */
-		if (pesession->vhtCapability &&
-		    !(WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))) {
-			populate_dot11f_vht_caps(mac_ctx, pesession,
-						 &pr->VHTCaps);
-			is_vht_enabled = true;
-		}
-	} else {
-		if (IS_DOT11_MODE_VHT(dot11mode) &&
-		    !(WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))) {
-			populate_dot11f_vht_caps(mac_ctx, pesession,
-						 &pr->VHTCaps);
-			is_vht_enabled = true;
-		}
+
+	if (pesession->vhtCapability &&
+	    !(WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))) {
+		populate_dot11f_vht_caps(mac_ctx, pesession, &pr->VHTCaps);
+		is_vht_enabled = true;
 	}
-	if (pesession)
-		populate_dot11f_ext_cap(mac_ctx, is_vht_enabled, &pr->ExtCap,
-					pesession);
+	populate_dot11f_ext_cap(mac_ctx, is_vht_enabled, &pr->ExtCap,
+				pesession);
 
-	if (IS_DOT11_MODE_HE(dot11mode) && pesession)
+	if (IS_DOT11_MODE_HE(dot11mode)) {
 		lim_update_session_he_capable(mac_ctx, pesession);
+		populate_dot11f_he_caps(mac_ctx, pesession, pesession->opmode,
+					chan_freq, pesession->ch_width,
+					&pr->he_cap);
+		populate_dot11f_he_6ghz_cap(mac_ctx, pesession,
+					    &pr->he_6ghz_band_cap);
+	}
 
-	populate_dot11f_he_caps(mac_ctx, pesession, pesession->opmode,
-				pesession->curr_op_freq, pesession->ch_width,
-				&pr->he_cap);
-	populate_dot11f_he_6ghz_cap(mac_ctx, pesession,
-				    &pr->he_6ghz_band_cap);
-
-	if (IS_DOT11_MODE_EHT(dot11mode) && pesession &&
-	    pesession->lim_join_req &&
+	if (IS_DOT11_MODE_EHT(dot11mode) && pesession->lim_join_req &&
 	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)bssid)) {
 		lim_update_session_eht_capable(pesession, true);
+		populate_dot11f_eht_caps(mac_ctx, pesession, &pr->eht_cap);
 
 		if (pesession->lim_join_req->bssDescription.is_ml_ap &&
 		    pesession->rsno_gen_used != RSNO_GEN_WIFI6)
-			mlo_ie_len = lim_send_probe_req_frame_mlo(mac_ctx, pesession);
+			mlo_ie_len = lim_send_probe_req_frame_mlo(mac_ctx,
+								  pesession);
 	}
 
-	populate_dot11f_eht_caps(mac_ctx, pesession, &pr->eht_cap);
-
 	/* Populate Non-AP STA Regulatory connectivity element */
-	populate_dot11f_reg_connectivity(mac_ctx, &pr->reg_connect);
+	if (IS_DOT11_MODE_HE(dot11mode))
+		populate_dot11f_reg_connectivity(mac_ctx, &pr->reg_connect);
 
 	if (addn_ielen && additional_ie) {
 		qdf_mem_zero((uint8_t *)&extracted_ext_cap,
@@ -399,16 +359,12 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	/* Add qcn_ie only if qcn ie is not present in additional_ie */
-	if (pesession) {
-		if (!qcn_ie)
-			populate_dot11f_qcn_ie(mac_ctx, pesession,
-					       &pr->qcn_ie,
-					       QCN_IE_ATTR_ID_ALL);
-		else
-			populate_dot11f_qcn_ie(mac_ctx, pesession,
-					       &pr->qcn_ie,
-					       QCN_IE_ATTR_ID_VHT_MCS11);
-	}
+	if (!qcn_ie)
+		populate_dot11f_qcn_ie(mac_ctx, pesession, &pr->qcn_ie,
+				       QCN_IE_ATTR_ID_ALL);
+	else
+		populate_dot11f_qcn_ie(mac_ctx, pesession, &pr->qcn_ie,
+				       QCN_IE_ATTR_ID_VHT_MCS11);
 
 	/*
 	 * Extcap IE now support variable length, merge Extcap IE from addn_ie
@@ -418,9 +374,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (extracted_ext_cap_flag)
 		lim_merge_extcap_struct(&pr->ExtCap, &extracted_ext_cap, true);
 
-	if (pesession)
-		populate_dot11f_btm_extended_caps(mac_ctx, pesession,
-						  &pr->ExtCap);
+	populate_dot11f_btm_extended_caps(mac_ctx, pesession, &pr->ExtCap);
 
 	if (lim_is_session_eht_capable(pesession)) {
 		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + MIN_IE_LEN);
@@ -429,7 +383,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 			qdf_status = QDF_STATUS_E_NOMEM;
 			goto mem_free;
 		}
-		is_band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(pesession->curr_op_freq);
+		is_band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq);
 		lim_ieee80211_pack_ehtcap(eht_cap_ie, pr->eht_cap, pr->he_cap,
 					  is_band_2g, true);
 		eht_cap_ie_len = eht_cap_ie[TAG_LEN_POS] + MIN_IE_LEN;
@@ -464,7 +418,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	/* Next, we fill out the buffer descriptor: */
 	lim_populate_mac_header(mac_ctx, frame, WLAN_FC0_TYPE_MGMT,
-				SIR_MAC_MGMT_PROBE_REQ, bssid, self_macaddr);
+				SIR_MAC_MGMT_PROBE_REQ, *bssid, *self_macaddr);
 
 	/* That done, pack the Probe Request: */
 	status = dot11f_pack_probe_request(mac_ctx, pr, frame +
@@ -505,7 +459,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	pe_nofl_debug("Probe req TX: vdev %d seq num %d to " QDF_MAC_ADDR_FMT " len %d",
 		      vdev_id, mac_ctx->mgmtSeqNum,
-		      QDF_MAC_ADDR_REF(bssid),
+		      QDF_MAC_ADDR_REF(*bssid),
 		      (int)sizeof(tSirMacMgmtHdr) + payload);
 	mgmt_txrx_frame_hex_dump(frame, sizeof(tSirMacMgmtHdr) + payload, true);
 
@@ -518,7 +472,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		 * above variables. So we need to add one more check whether it
 		 * is opmode is P2P_CLIENT or not
 		 */
-	    ((pesession) && (QDF_P2P_CLIENT_MODE == pesession->opmode)))
+	    (QDF_P2P_CLIENT_MODE == pesession->opmode))
 		txflag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
 
 	qdf_status =
@@ -3553,7 +3507,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	/* Populate Non-AP STA Regulatory connectivity element */
-	populate_dot11f_reg_connectivity(mac_ctx, &frm->reg_connect);
+	if (IS_DOT11_MODE_HE(pe_session->dot11mode))
+		populate_dot11f_reg_connectivity(mac_ctx, &frm->reg_connect);
 
 	if (pe_session->is11Rconnection) {
 		struct bss_description *bssdescr;
@@ -4043,12 +3998,18 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
 
-	pe_debug("extr_ext_flag %d mbo ie len %d is open auth %d stripped vendor len %d he with tkip %d ht %d vht %d opmode %d vendor vht %d he %d eht %d",
-		 extr_ext_flag, mbo_ie_len, is_open_auth, current_len,
-		 pe_session->he_with_wep_tkip,
-		 frm->HTCaps.present, frm->VHTCaps.present,
-		 frm->OperatingMode.present, frm->vendor_vht_ie.present,
-		 frm->he_cap.present, frm->eht_cap.present);
+	pe_debug("Assoc Req IEs: dot11mode %d, extcap %d, open %d, IE len:: mbo %d vendor %d, rsnx %d, mscs %d, rsn_sel %d, ft11r %d, wfa %d, mlo %d, eht %d, fils %d",
+		 pe_session->dot11mode, extr_ext_flag,
+		 is_open_auth, mbo_ie_len,
+		 vendor_ie_len, rsnx_ie_len,
+		 mscs_ext_ie_len,
+		 rsn_sel_ie_len,
+		 adaptive_11r_ie_len,
+		 wfa_gen_cap_ie_len,
+		 mlo_ie_len,
+		 eht_cap_ie_len,
+		 fils_hlp_ie_len);
+
 	pe_nofl_info("Assoc req TX: vdev %d to "QDF_MAC_ADDR_FMT" seq num %d",
 		     pe_session->vdev_id, QDF_MAC_ADDR_REF(pe_session->bssId),
 		     mac_ctx->mgmtSeqNum);

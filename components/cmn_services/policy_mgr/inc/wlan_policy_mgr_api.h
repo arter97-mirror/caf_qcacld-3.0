@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5562,14 +5562,17 @@ policy_mgr_clear_ml_links_settings_in_fw_nlink(struct wlan_objmgr_psoc *psoc,
  * @session_id: session id
  * @num_links: number of links to be forced active
  * @active_link_addr: link mac address of links to be forced active
+ * @force_reason: reason to force link(s)
  *
  * This API is used if nlink service is enabled.
  *
  * Return: void
  */
-void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
-					 uint8_t session_id, uint8_t num_links,
-					 struct qdf_mac_addr *active_link_addr);
+void
+policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
+				    uint8_t session_id, uint8_t num_links,
+				    struct qdf_mac_addr *active_link_addr,
+				    enum mlo_link_force_reason force_reason);
 
 /**
  * policy_mgr_activate_mlo_links() - Force active ML links based on user

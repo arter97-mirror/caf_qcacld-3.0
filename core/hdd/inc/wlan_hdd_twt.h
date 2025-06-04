@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -380,7 +380,7 @@ QDF_STATUS hdd_get_twt_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_get_twt_responder(struct wlan_objmgr_psoc *psoc, bool *val);
+QDF_STATUS hdd_get_twt_responder(struct wlan_objmgr_psoc *psoc, uint8_t *val);
 
 /**
  * hdd_get_twt_responder_support_for_ht_vht_mode() - Get twt_responder support
@@ -529,9 +529,9 @@ QDF_STATUS hdd_get_twt_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 static inline
-QDF_STATUS hdd_get_twt_responder(struct wlan_objmgr_psoc *psoc, bool *val)
+QDF_STATUS hdd_get_twt_responder(struct wlan_objmgr_psoc *psoc, uint8_t *val)
 {
-	*val = false;
+	*val = 0xFF;
 	return QDF_STATUS_E_NOSUPPORT;
 }
 

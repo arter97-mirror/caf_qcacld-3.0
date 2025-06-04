@@ -3720,6 +3720,11 @@ policy_mgr_link_reconfig_is_concurrency_present(struct wlan_objmgr_psoc *psoc)
 		return true;
 	}
 
+	if (total_ml_con_count > 1) {
+		policy_mgr_debug("Another interface present with ML station ");
+		return true;
+	}
+
 	return false;
 }
 
@@ -4441,20 +4446,7 @@ bool policy_mgr_is_ml_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	return is_mlo;
 }
 
-/*
- * policy_mgr_get_ml_sta_info() - Get number of ML STA vdev ids and freq list
- * @pm_ctx: pm_ctx ctx
- * @num_ml_sta: Return number of ML STA present
- * @num_disabled_ml_sta: Return number of disabled ML STA links
- * @ml_vdev_lst: Return ML STA vdev id list
- * @ml_freq_lst: Return ML STA freq list
- * @num_non_ml: Return number of non-ML STA present
- * @non_ml_vdev_lst: Return non-ML STA vdev id list
- * @non_ml_freq_lst: Return non-ML STA freq list
- *
- * Return: void
- */
-static void
+void
 policy_mgr_get_ml_sta_info(struct policy_mgr_psoc_priv_obj *pm_ctx,
 			   uint8_t *num_ml_sta,
 			   uint8_t *num_disabled_ml_sta,
@@ -9597,9 +9589,11 @@ policy_mgr_is_restart_sap_required_with_mlo_sta(struct wlan_objmgr_psoc *psoc,
 	return restart_required;
 }
 
-void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id, uint8_t num_links,
-					 struct qdf_mac_addr *active_link_addr)
+void
+policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id, uint8_t num_links,
+				    struct qdf_mac_addr *active_link_addr,
+				    enum mlo_link_force_reason force_reason)
 {
 	uint8_t *link_mac_addr;
 	struct wlan_objmgr_vdev *vdev;
@@ -9672,7 +9666,7 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		ml_nlink_vendor_command_set_link(
 			psoc, vdev_id,
 			LINK_CONTROL_MODE_USER,
-			MLO_LINK_FORCE_REASON_CONNECT,
+			force_reason,
 			MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE,
 			0, active_link_bitmap,
 			inactive_link_bitmap);
@@ -9680,7 +9674,7 @@ void policy_mgr_activate_mlo_links_nlink(struct wlan_objmgr_psoc *psoc,
 		ml_nlink_vendor_command_set_link(
 			psoc, vdev_id,
 			LINK_CONTROL_MODE_USER,
-			MLO_LINK_FORCE_REASON_CONNECT,
+			force_reason,
 			MLO_LINK_FORCE_MODE_ACTIVE,
 			0, active_link_bitmap,
 			0);

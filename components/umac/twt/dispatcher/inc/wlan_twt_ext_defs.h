@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,7 +48,7 @@
  */
 struct twt_mc_cfg_params {
 	bool enable_twt;
-	bool twt_responder;
+	uint8_t twt_responder;
 	bool twt_responder_orig;
 	bool twt_requestor;
 	uint32_t twt_congestion_timeout;

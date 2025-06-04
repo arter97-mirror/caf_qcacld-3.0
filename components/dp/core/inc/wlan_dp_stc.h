@@ -473,6 +473,7 @@ struct wlan_dp_stc_classified_flow_table {
  * @sample_timer_state: sampling timer state
  * @rtpm_control_flow_cnt: Total flows of traffic types affecting RTPM
  * @rtpm_control: RTPM control enable check
+ * @tcam_client_available: TCAM client available check
  * @peer_tc: per peer active traffic context
  * @peer_ping_info: Ping tracking per peer
  * @sampling_flow_table: Sampling flow table
@@ -491,8 +492,9 @@ struct wlan_dp_stc {
 	enum wlan_dp_stc_periodic_work_state periodic_work_state;
 	qdf_hrtimer_data_t flow_sampling_timer;
 	enum wlan_dp_stc_timer_state sample_timer_state;
-	uint32_t rtpm_control_flow_cnt;
+	uint16_t rtpm_control_flow_cnt;
 	bool rtpm_control;
+	bool tcam_client_available;
 	struct wlan_dp_stc_peer_traffic_context peer_tc[DP_STC_MAX_PEERS];
 	struct wlan_dp_stc_sampling_table *sampling_flow_table;
 	struct wlan_dp_stc_rx_flow_table *rx_flow_table;
