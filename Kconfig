@@ -2492,6 +2492,10 @@ config FEATURE_WLAN_SUPPORT_USD
 	bool "enable FEATURE_WLAN_SUPPORT_USD"
 	default n
 
+config FEATURE_WLAN_SUPPORT_P2P_R2
+	bool "enable FEATURE_WLAN_SUPPORT_P2P_R2"
+	default n
+
 config WLAN_SUPPORT_BCAST_TWT
 	bool "enable WLAN_SUPPORT_BCAST_TWT"
 	default n

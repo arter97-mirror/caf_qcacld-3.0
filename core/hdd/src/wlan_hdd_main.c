@@ -8185,7 +8185,7 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 	hdd_vdev_configure_rtscts_enable(hdd_ctx, vdev);
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * hdd_vdev_populate_wfd_mode - populate WFD mode in VDEV create params for
  * P2P GO only.
@@ -8210,7 +8210,7 @@ hdd_vdev_populate_wfd_mode(struct hdd_adapter *adapter,
 			   struct wlan_vdev_create_params *vdev_params)
 {
 }
-#endif
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
 	defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
@@ -9962,7 +9962,7 @@ static void __hdd_close_adapter(struct hdd_context *hdd_ctx,
 	ucfg_dp_destroy_intf(hdd_ctx->psoc, &adapter_mac);
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 /**
  * hdd_clear_usd_adapter() - set USD adapter to NULL, so that USD frames
  * can not be forwarded on USD adapter.
@@ -9982,7 +9982,7 @@ static inline void hdd_clear_usd_adapter(struct hdd_context *hdd_ctx,
 					 struct hdd_adapter *adapter)
 {
 }
-#endif
+#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 void hdd_close_adapter(struct hdd_context *hdd_ctx,
 		       struct hdd_adapter *adapter,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -120,7 +120,7 @@ int wlan_cfg80211_mgmt_tx(struct wlan_objmgr_vdev *vdev,
 int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
 				 uint64_t cookie, enum QDF_OPMODE opmode);
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 /**
  * osif_p2p_send_usd_params() - This function parse USD vendor command and
  * send the USD params to P2P module.
@@ -177,5 +177,5 @@ int osif_p2p_parse_wfd_params(struct hdd_adapter *adapter, const void *data,
 
 #else
 #define FEATURE_P2P_SECURE_USD_VENDOR_COMMANDS
-#endif /* FEATURE_WLAN_SUPPORT_USD */
+#endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */
 #endif /* _WLAN_CFG80211_P2P_H_ */

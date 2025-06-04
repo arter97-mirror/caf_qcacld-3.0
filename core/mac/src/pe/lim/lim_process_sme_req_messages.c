@@ -2826,7 +2826,7 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 	return status;
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * lim_set_wfd_mode_for_p2p_cli() - set WFD mode for P2P CLIENT when P2P GO
  * supports twt responder.
@@ -2864,7 +2864,7 @@ static inline void lim_set_wfd_mode_for_p2p_cli(struct pe_session *session,
 						tDot11fBeaconIEs *ie)
 {
 }
-#endif
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 #ifdef WLAN_FEATURE_11AX
 static bool lim_enable_twt(struct mac_context *mac_ctx, tDot11fBeaconIEs *ie)

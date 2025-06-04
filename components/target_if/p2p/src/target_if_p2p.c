@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -605,7 +605,7 @@ void target_if_p2p_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	target_if_p2p_register_ap_assist_dfs_tx_ops(p2p_tx_ops);
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 QDF_STATUS target_if_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 					 struct p2p_usd_attr_params *param)
 {
@@ -630,4 +630,4 @@ bool target_if_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
 
 	return wmi_service_enabled(wmi_handle, wmi_service_usd_support);
 }
-#endif /* FEATURE_WLAN_SUPPORT_USD */
+#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
