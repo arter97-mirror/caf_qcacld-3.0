@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3941,6 +3941,8 @@ lim_create_and_fill_link_session(struct mac_context *mac_ctx,
 	pe_session = lim_cm_roam_create_session(mac_ctx, vdev_id, sync_ind);
 	if (!pe_session)
 		goto fail;
+
+	pe_update_crypto_params(mac_ctx, pe_session, sync_ind);
 
 	status = lim_cm_fill_link_session(mac_ctx, vdev_id,
 					  pe_session, sync_ind, ie_len);
