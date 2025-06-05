@@ -1303,15 +1303,17 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 	uint16_t mcs_map_mask = MCSMAPMASK1x1;
 	uint16_t mcs_map_mask2x2 = 0;
 	struct mlme_vht_capabilities_info *vht_cap_info;
+	enum phy_ch_width ch_width;
 
 	self_sta_dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
-
 	if (!IS_DOT11_MODE_VHT(self_sta_dot11mode))
 		return QDF_STATUS_SUCCESS;
 
 	if (!peer_vht_caps || !peer_vht_caps->present)
 		return QDF_STATUS_SUCCESS;
 
+	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry,
+					  session_entry->ch_width);
 	vht_cap_info = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
 
 	rates->vhtRxMCSMap = (uint16_t)vht_cap_info->rx_mcs_map;
@@ -1328,7 +1330,7 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 			VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
 		rates->vhtRxHighestDataRate =
 			VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
-		if (session_entry && !session_entry->ch_width &&
+		if (session_entry && !ch_width &&
 		    !vht_cap_info->enable_vht20_mcs9 &&
 		    ((rates->vhtRxMCSMap & VHT_1x1_MCS_MASK) ==
 				 VHT_1x1_MCS9_MAP)) {
@@ -1338,7 +1340,7 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 					NSS_1x1_MODE);
 		}
 	} else {
-		if (session_entry && !session_entry->ch_width &&
+		if (session_entry && !ch_width &&
 			!vht_cap_info->enable_vht20_mcs9 &&
 			((rates->vhtRxMCSMap & VHT_2x2_MCS_MASK) ==
 			VHT_2x2_MCS9_MAP)) {
@@ -1406,7 +1408,7 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 		((rates->vhtTxMCSMap & VHT_MCS_1x1) == VHT_MCS_1x1) ?
 		true : false;
 
-	if (!sta_ds || CH_WIDTH_80MHZ >= session_entry->ch_width)
+	if (!sta_ds || CH_WIDTH_80MHZ >= ch_width)
 		return QDF_STATUS_SUCCESS;
 
 	sta_ds->vht_extended_nss_bw_cap =
