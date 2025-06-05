@@ -5053,6 +5053,7 @@ uint32_t policy_mgr_get_sap_scc_freq_nan_present(struct wlan_objmgr_psoc *psoc);
  * @vdev_id: vdev id
  * @freq: sap current freq
  * @scc_mode: mcc to scc switch mode
+ * @mhz_freq_seg1: center frequency for segment 1
  *
  * If there is no STA/P2P CLI on same MAC of SAP/P2P GO,
  * SAP/P2P Go needn't switch channel to force scc.
@@ -5062,7 +5063,8 @@ uint32_t policy_mgr_get_sap_scc_freq_nan_present(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id,
 					qdf_freq_t freq,
-					tQDF_MCC_TO_SCC_SWITCH_MODE scc_mode);
+					tQDF_MCC_TO_SCC_SWITCH_MODE scc_mode,
+					qdf_freq_t mhz_freq_seg1);
 
 /**
  * policy_mgr_get_roam_enabled_sta_session_id() - get the session id of the sta

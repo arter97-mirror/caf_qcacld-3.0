@@ -33905,6 +33905,7 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	chan_info->ch_width =
 			wlan_mlme_get_ch_width_from_phymode(peer_phymode);
 	ch_params.ch_width = chan_info->ch_width;
+	ch_params.mhz_freq_seg1 = chan_info->ch_cfreq2;
 
 	sec_2g_freq = hdd_get_sec_2ghz_freq(chan_info->ch_freq,
 					    chan_info->ch_width,

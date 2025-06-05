@@ -1228,6 +1228,22 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 				       uint32_t chan_freq,
 				       struct ch_params *tgt_ch_params);
 
+/**
+ * wlan_sap_check_n_update_ccfs2_for_320() - check for any concurrent
+ * interface with 320 and update ccfs2
+ * @psoc: psoc
+ * @sap_vdev_id: sap vdev id
+ * @sap_pri_freq: sap primary frequency (MHz)
+ * @ccfs2: center frequency for segment 2
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_sap_check_n_update_ccfs2_for_320(struct wlan_objmgr_psoc *psoc,
+				      uint8_t sap_vdev_id,
+				      qdf_freq_t sap_pri_freq,
+				      qdf_freq_t *ccfs2);
+
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 QDF_STATUS
 wlan_sap_set_channel_avoidance(mac_handle_t mac_handle,

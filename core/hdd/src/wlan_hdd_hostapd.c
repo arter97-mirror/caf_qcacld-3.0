@@ -4200,6 +4200,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	wlan_reg_set_input_punc_bitmap(&ch_params, punct_bitmap);
 	target_bw = wlansap_get_csa_chanwidth_from_phymode(
 			sap_ctx, target_chan_freq, &ch_params);
+	ccfs1 = ch_params.mhz_freq_seg1;
 	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
 							   adapter->device_mode,
 							   link_info->vdev_id);
@@ -4669,7 +4670,8 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_get_chan_by_session_id(psoc, vdev_id, &sap_ch_freq);
 	if (!policy_mgr_is_restart_sap_required(hdd_ctx->psoc, vdev_id,
 						sap_ch_freq,
-						mcc_to_scc_switch)) {
+						mcc_to_scc_switch,
+						sap_context->ch_params.mhz_freq_seg1)) {
 		wlansap_context_put(sap_context);
 		hdd_debug("SAP needn't restart");
 		return QDF_STATUS_E_FAILURE;
@@ -4699,6 +4701,13 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
+	/* If primary frequency and bandwidth are same, intf_ch_freq is 0 here,
+	 * but for 6 GHz 320M case, if CCFS2 is different, CSA to force scc is
+	 * needed
+	 */
+	if (!intf_ch_freq && ch_params.ch_width == CH_WIDTH_320MHZ &&
+	    sap_context->ch_params.mhz_freq_seg1 != ch_params.mhz_freq_seg1)
+		intf_ch_freq = sap_ch_freq;
 sap_restart:
 	if (!intf_ch_freq) {
 		if (csa_reason == CSA_REASON_UNSAFE_CHANNEL) {
@@ -4712,6 +4721,7 @@ sap_restart:
 		wlansap_context_put(sap_context);
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	wlan_hdd_set_sap_csa_reason(psoc, vdev_id, csa_reason);
 
 	if (ch_params.ch_width == CH_WIDTH_MAX)

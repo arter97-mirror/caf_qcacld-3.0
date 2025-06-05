@@ -3778,6 +3778,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	uint32_t nan_2g_freq, nan_5g_freq;
 	uint8_t cc_mode;
 	uint8_t scc_vdev_id;
+	qdf_freq_t old_mhz_freq_seg1;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3837,6 +3838,8 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	sta_sap_scc_on_indoor_channel =
 		policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc);
 	old_ch_width = ch_params->ch_width;
+	old_mhz_freq_seg1 = ch_params->mhz_freq_seg1;
+
 	if (pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params)
 		pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params(
 			psoc, sap_vdev_id, ch_freq, ch_params);
@@ -3931,11 +3934,14 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	if (ch_freq != sap_ch_freq || old_ch_width != ch_params->ch_width) {
+	if (ch_freq != sap_ch_freq || old_ch_width != ch_params->ch_width ||
+	    old_mhz_freq_seg1 != ch_params->mhz_freq_seg1) {
 		*con_ch_freq = ch_freq;
-		policymgr_nofl_debug("sap conc result con freq %d bw %d org freq %d bw %d",
-				     ch_freq, ch_params->ch_width, sap_ch_freq,
-				     old_ch_width);
+		policymgr_nofl_debug("sap conc result con freq %d bw %d ccfs1 %d org freq %d bw %d ccfs1 %d",
+				     ch_freq, ch_params->ch_width,
+				     ch_params->mhz_freq_seg1,
+				     sap_ch_freq, old_ch_width,
+				     old_mhz_freq_seg1);
 	}
 
 	if (*con_ch_freq != 0 &&

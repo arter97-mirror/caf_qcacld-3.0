@@ -2015,6 +2015,7 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 
 	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
 	    session_entry->ch_width == ch_params.ch_width &&
+	    session_entry->ch_center_freq_seg1 == ch_params.center_freq_seg1 &&
 	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
 		mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
 		if (!mlme_priv) {

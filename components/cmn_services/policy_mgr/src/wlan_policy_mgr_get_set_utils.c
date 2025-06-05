@@ -13590,7 +13590,8 @@ uint32_t policy_mgr_get_sap_scc_freq_nan_present(struct wlan_objmgr_psoc *psoc)
 bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id,
 					qdf_freq_t freq,
-					tQDF_MCC_TO_SCC_SWITCH_MODE scc_mode)
+					tQDF_MCC_TO_SCC_SWITCH_MODE scc_mode,
+					qdf_freq_t mhz_freq_seg1)
 {
 	uint8_t i;
 	bool restart_required = false;
@@ -13606,6 +13607,8 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	uint8_t num_5_or_6_conn = 0;
 	bool ml_sap_vdev = false;
 	uint32_t nan_scc_freq = 0;
+	struct wlan_channel sta_ch_info = {0};
+	QDF_STATUS status;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -13722,6 +13725,17 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 			restart_required = true;
 			break;
 		}
+
+		status = wlan_get_chan_by_vdev_id(psoc, connection[i].vdev_id, &sta_ch_info);
+		if (QDF_IS_STATUS_SUCCESS(status) &&
+		    sta_ch_info.ch_width == CH_WIDTH_320MHZ &&
+		    mhz_freq_seg1 != sta_ch_info.ch_cfreq2) {
+			policy_mgr_debug("320M CCFS2 %d conc %d", mhz_freq_seg1,
+					 sta_ch_info.ch_cfreq2);
+			restart_required = true;
+			break;
+		}
+
 		if (connection[i].freq == freq &&
 		    !sta_sap_scc_on_dfs_chan && sap_on_dfs) {
 			policy_mgr_debug("Move SAP out of DFS ch:%d", freq);

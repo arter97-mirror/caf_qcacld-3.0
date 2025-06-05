@@ -10458,8 +10458,10 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 						   target_freq)) {
 		lim_abort_channel_change(mac_ctx, ch_change_req->vdev_id);
 		return;
-	} else if ((session_entry->curr_op_freq == target_freq &&
-		    session_entry->ch_width == ch_change_req->ch_width) &&
+	} else if (session_entry->curr_op_freq == target_freq &&
+		    session_entry->ch_width == ch_change_req->ch_width &&
+		    session_entry->ch_center_freq_seg1 ==
+		    ch_change_req->center_freq_seg1 &&
 		   (!IS_DOT11_MODE_EHT(session_entry->dot11mode) ||
 		    !lim_is_puncture_bitmap_changed(session_entry,
 						    ch_change_req))) {
