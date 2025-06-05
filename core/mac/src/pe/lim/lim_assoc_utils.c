@@ -1305,15 +1305,17 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 	uint32_t self_sta_dot11mode;
 	uint8_t self_mcs, peer_mcs, idx;
 	struct mlme_vht_capabilities_info *vht_cap_info;
+	enum phy_ch_width ch_width;
 
 	self_sta_dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
-
 	if (!IS_DOT11_MODE_VHT(self_sta_dot11mode))
 		return QDF_STATUS_SUCCESS;
 
 	if (!peer_vht_caps || !peer_vht_caps->present)
 		return QDF_STATUS_SUCCESS;
 
+	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry,
+					  session_entry->ch_width);
 	vht_cap_info = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
 
 	rates->vhtRxMCSMap = (uint16_t)(vht_cap_info->rx_mcs_map |
@@ -1324,7 +1326,7 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 	for (idx = NSS_1x1_MODE; idx <= nss; idx++) {
 		bool vht20_mcs9_unsupported =
 			(session_entry &&
-			 (session_entry->ch_width == CH_WIDTH_20MHZ) &&
+			 (ch_width == CH_WIDTH_20MHZ) &&
 			 !vht_cap_info->enable_vht20_mcs9);
 
 		/* Unset the NSS not supported by peer */
@@ -1378,7 +1380,7 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 		((rates->vhtTxMCSMap & VHT_MCS_1x1) == VHT_MCS_1x1) ?
 		true : false;
 
-	if (!sta_ds || CH_WIDTH_80MHZ >= session_entry->ch_width)
+	if (!sta_ds || CH_WIDTH_80MHZ >= ch_width)
 		return QDF_STATUS_SUCCESS;
 
 	sta_ds->vht_extended_nss_bw_cap =
