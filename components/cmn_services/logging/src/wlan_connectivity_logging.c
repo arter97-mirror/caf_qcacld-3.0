@@ -1187,7 +1187,6 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 {
 	uint8_t int_reason = 0;
 	uint32_t diag_reason;
-	struct qdf_mac_addr peer_mac_addr;
 	struct wlan_objmgr_pdev *pdev;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_packet_info);
@@ -1205,7 +1204,14 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	qdf_mem_copy(peer_mac_addr.bytes, peer_mac, QDF_MAC_ADDR_SIZE);
+	if (!peer_mac) {
+		logging_err("vdev:%d peer mac not found",
+			    wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
+		     peer_mac, QDF_MAC_ADDR_SIZE);
 
 	diag_reason =
 	wlan_connectivity_discon_reason_to_diag_reason(reason, &int_reason,
