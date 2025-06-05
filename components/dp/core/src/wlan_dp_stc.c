@@ -73,8 +73,10 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 	/* TxRx Stats - Start */
 	if (flow_entry->prev_pkt_arrival_ts) {
 		pkt_iat = curr_pkt_ts - flow_entry->prev_pkt_arrival_ts;
-		DP_STC_UPDATE_MIN_MAX_SUM_STATS(flow_entry->txrx_stats.pkt_iat,
-						pkt_iat);
+		DP_STC_UPDATE_MIN_MAX_STATS(flow_entry->txrx_stats.pkt_iat,
+					    pkt_iat);
+		DP_STC_UPDATE_SUM_STATS(flow_entry->txrx_stats.pkt_iat_burst,
+					pkt_iat);
 	}
 
 	flow_entry->txrx_stats.bytes += pkt_len;
@@ -107,9 +109,12 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 		DP_STC_UPDATE_WIN_MIN_MAX_STATS(txrx_min_max_stats->pkt_size,
 						pkt_len);
 		if (!qdf_atomic_test_and_clear_bit(WLAN_DP_STC_TRANSITION_FLAG_SAMPLE,
-						   &flow_entry->transition_flags))
+						   &flow_entry->transition_flags)) {
 			DP_STC_UPDATE_WIN_MIN_MAX_STATS(txrx_min_max_stats->pkt_iat,
 							pkt_iat);
+			DP_STC_UPDATE_SUM_STATS(flow_entry->txrx_stats.pkt_iat_txrx,
+						pkt_iat);
+		}
 		dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_TXRX_PKT,
 			   "STC: [%hu:%hu] mdata 0x%x len %u [%u - %u] iat %llu [%llu - %llu]",
 			   s, w, flow_entry->metadata,
@@ -1708,7 +1713,7 @@ wlan_dp_stc_save_delta_stats(struct wlan_dp_stc_txrx_stats *dst,
 {
 	dst->bytes = cur->bytes - ref->bytes;
 	dst->pkts = cur->pkts - ref->pkts;
-	dst->pkt_iat_sum = cur->pkt_iat_sum - ref->pkt_iat_sum;
+	dst->pkt_iat_sum = cur->pkt_iat_txrx_sum - ref->pkt_iat_txrx_sum;
 
 	return dst->pkts;
 }
@@ -1758,6 +1763,8 @@ wlan_dp_stc_save_burst_samples(struct wlan_dp_stc *dp_stc,
 	flow = &dp_stc->tx_flow_table->entries[s_entry->tx_flow_id];
 	qdf_mem_copy(&burst_sample->txrx_samples.tx, &flow->txrx_stats,
 		     sizeof(burst_sample->txrx_samples.tx));
+	burst_sample->txrx_samples.tx.pkt_iat_sum =
+					flow->txrx_stats.pkt_iat_burst_sum;
 	qdf_mem_copy(&burst_sample->tx, &flow->burst_stats,
 		     sizeof(burst_sample->tx));
 	if (flow->burst_state == BURST_DETECTION_BURST_START) {
@@ -1790,6 +1797,8 @@ save_rx_flow_samples:
 	flow = &dp_stc->rx_flow_table->entries[s_entry->rx_flow_id];
 	qdf_mem_copy(&burst_sample->txrx_samples.rx, &flow->txrx_stats,
 		     sizeof(burst_sample->txrx_samples.rx));
+	burst_sample->txrx_samples.rx.pkt_iat_sum =
+					flow->txrx_stats.pkt_iat_burst_sum;
 	qdf_mem_copy(&burst_sample->rx, &flow->burst_stats,
 		     sizeof(burst_sample->rx));
 	if (flow->burst_state == BURST_DETECTION_BURST_START) {

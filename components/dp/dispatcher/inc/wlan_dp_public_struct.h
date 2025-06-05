@@ -735,7 +735,13 @@ struct wlan_dp_stc_txrx_stats {
 	uint32_t pkt_size_max;
 	uint64_t pkt_iat_min;
 	uint64_t pkt_iat_max;
-	uint64_t pkt_iat_sum;
+	union {
+		struct {
+			uint64_t pkt_iat_txrx_sum;
+			uint64_t pkt_iat_burst_sum;
+		};
+		uint64_t pkt_iat_sum;
+	};
 };
 
 /*

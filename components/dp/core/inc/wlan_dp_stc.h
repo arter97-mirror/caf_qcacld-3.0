@@ -75,6 +75,11 @@
 			__field##_max = __val;				\
 	} while (0)
 
+#define DP_STC_UPDATE_SUM_STATS(__field, __val)			\
+	do {								\
+		__field##_sum += __val;					\
+	} while (0)
+
 #define DP_STC_UPDATE_WIN_MIN_MAX_STATS(__field, __val)			\
 	do {								\
 		if (__field##_min == 0 || __field##_min > __val)	\
