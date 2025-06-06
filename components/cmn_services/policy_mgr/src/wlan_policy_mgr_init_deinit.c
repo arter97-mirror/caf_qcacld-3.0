@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -192,20 +192,21 @@ static void pm_deinit_trace_set_link_mem(void)
 static void pm_emlsr_opportunistic_timer_handler(void *ctx)
 {
 	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)ctx;
-	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
+	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t sta_cnt;
 
 	if (!psoc) {
 		policy_mgr_err("Invalid Context");
 		return;
 	}
-	policy_mgr_get_mode_specific_conn_info(psoc, NULL, &vdev_id,
-					       PM_STA_MODE);
-	if (vdev_id == WLAN_INVALID_VDEV_ID) {
+	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL, vdev_id,
+							 PM_STA_MODE);
+	if (!sta_cnt) {
 		policymgr_nofl_debug("emlsr timeout, no sta active");
 		return;
 	}
 
-	ml_nlink_conn_change_notify(psoc, vdev_id,
+	ml_nlink_conn_change_notify(psoc, vdev_id[0],
 				    ml_nlink_emlsr_timeout_evt,
 				    NULL);
 }
