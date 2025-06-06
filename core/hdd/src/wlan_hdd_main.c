@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -18827,8 +18827,7 @@ const struct file_operations wlan_hdd_state_fops = {
 	.release = wlan_hdd_state_ctrl_param_release,
 };
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0) && \
-	LINUX_VERSION_CODE > KERNEL_VERSION(5, 14, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
 static struct class *wlan_hdd_class_create(const char *name)
 {
 	return class_create(THIS_MODULE, name);
