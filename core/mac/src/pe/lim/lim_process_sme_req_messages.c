@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -8936,6 +8936,7 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 		break;
 
 	case eWNI_SME_ASSOC_CNF:
+		if (pMsg->type == eWNI_SME_ASSOC_CNF)
 			pe_debug("Received ASSOC_CNF message");
 			__lim_process_sme_assoc_cnf_new(mac, pMsg->type,
 							msg_buf);
