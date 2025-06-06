@@ -1610,6 +1610,7 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
  * @psoc: PSOC object information
  * @ch_freq: pointer to channel frequency which needs to be filled
  * @exclude_mlo_sap_link: exclude freq of existing SAP link
+ * @sap_vdev_id: SAP vdev_id
  *
  * In-case if any connection is already present whose channel is none dfs then
  * return that channel
@@ -1618,7 +1619,8 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
  */
 bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
 					   uint32_t *ch_freq,
-					   bool exclude_mlo_sap_link);
+					   bool exclude_mlo_sap_link,
+					   uint8_t sap_vdev_id);
 
 /**
  * policy_mgr_get_dfs_beaconing_session_id() - to find the
