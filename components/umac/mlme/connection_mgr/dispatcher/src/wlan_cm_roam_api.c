@@ -2003,6 +2003,36 @@ QDF_STATUS cm_roam_release_lock(struct wlan_objmgr_vdev *vdev)
 	return qdf_mutex_release(&rso_cfg->cm_rso_lock);
 }
 
+/**
+ * is_freq_allowed_for_roam() - Determines whether a given
+ * frequency is permitted based on the configured roam band mask.
+ * @vdev: VDEV common object
+ * @chan_freq: Frequency received through the REASSOC driver command.
+ *
+ * Return: true if freq is allowed as per the currently configured roam bands
+ */
+static bool is_freq_allowed_for_roam(struct wlan_objmgr_vdev *vdev,
+				     qdf_freq_t chan_freq)
+{
+	struct wlan_objmgr_psoc *psoc;
+	enum reg_wifi_band reg_band;
+	uint32_t current_band;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlme_err("Invalid PSOC");
+		return false;
+	}
+
+	current_band = wlan_cm_get_roam_band_value(psoc, vdev);
+
+	reg_band = wlan_reg_freq_to_band(chan_freq);
+	if (reg_band == REG_BAND_UNKNOWN)
+		return false;
+
+	return QDF_HAS_PARAM(current_band, reg_band);
+}
+
 QDF_STATUS
 wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		    struct qdf_mac_addr *bssid, qdf_freq_t chan_freq,
@@ -2023,6 +2053,15 @@ wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	if (!vdev) {
 		mlme_err("vdev object is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (chan_freq && !is_freq_allowed_for_roam(vdev, chan_freq)) {
+		mlme_rl_debug("vdev:%d, source:%d, allowed_bands:0x%x, freq:%d NOT allowed to roam",
+			      vdev_id, source,
+			      wlan_cm_get_roam_band_value(psoc, vdev),
+			      chan_freq);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	mlme_debug("vdev: %d source: %d freq: %d bssid: " QDF_MAC_ADDR_FMT,
