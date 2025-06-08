@@ -846,7 +846,7 @@ def_chan:
 
 	ret = hdd_softap_set_channel_change(link_info, ch_freq, 0,
 					    ch_bw, NO_SCHANS_PUNC, false, true);
-	if (ret) {
+	if (ret && qdf_atomic_read(&hdd_ap_ctx->ch_switch_in_progress) <= 1) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");
 		return false;
 	}
