@@ -574,28 +574,29 @@ mlme_update_freq_from_link_ctx(struct mlo_link_info *links_info,
 	uint8_t num_chan;
 	qdf_freq_t op_freq, center_20_freq, start_freq, end_freq;
 	enum scan_phy_mode phymode;
-	enum phy_ch_width scan_ch_width;
-	struct wlan_channel *link_chan_info = links_info->link_chan_info;
+	struct wlan_channel *link_chan_info;
 
+	link_chan_info = links_info->link_chan_info;
 	if (!link_chan_info) {
-		mlme_err("link chan info is null");
+		mlme_err("link chan info is null for link_id: %d",
+			 links_info->link_id);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	op_freq = link_chan_info->ch_freq;
 	phymode = wlan_scan_get_11be_scan_phy_mode(link_chan_info->ch_phymode);
-	if (phymode == SCAN_PHY_MODE_UNKNOWN) {
-		mlme_err("invalid scan phymode for freq %d phymode %d link_id %d",
-			 op_freq, link_chan_info->ch_phymode,
-			 links_info->link_id);
+
+	mlme_debug("link_id: %d, op_freq: %d, scan_ch_width: %d, ch_phymode: %d, scan_phy_mode: %d, ch_cfreq2: %d",
+		   links_info->link_id, link_chan_info->ch_freq,
+		   link_chan_info->ch_width, link_chan_info->ch_phymode,
+		   phymode, link_chan_info->ch_cfreq2);
+
+	if (phymode == SCAN_PHY_MODE_UNKNOWN)
 		return QDF_STATUS_E_INVAL;
-	}
 
-	scan_ch_width = wlan_mlme_get_ch_width_from_phymode(
-						link_chan_info->ch_phymode);
-
-	if (scan_ch_width == CH_WIDTH_320MHZ) {
-		range = wlan_reg_get_bonded_chan_entry(op_freq, scan_ch_width,
+	if (link_chan_info->ch_width == CH_WIDTH_320MHZ) {
+		range = wlan_reg_get_bonded_chan_entry(op_freq,
+						link_chan_info->ch_width,
 						link_chan_info->ch_cfreq2);
 		if (!range) {
 			mlme_err("range is null for freq %d center freq %d",
