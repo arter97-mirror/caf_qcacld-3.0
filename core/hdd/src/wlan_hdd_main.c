@@ -8568,6 +8568,7 @@ static char *net_dev_ref_debug_string_from_id(wlan_net_dev_ref_dbgid dbgid)
 		"NET_DEV_HOLD_ALLOW_NEW_INTF",
 		"NET_DEV_HOLD_GET_STA_CONNECTIONS",
 		"NET_DEV_HOLD_LOCAL_PKT_CAPTURE",
+		"NET_DEV_HOLD_SYSFS_APFMODE_STORE",
 		"NET_DEV_HOLD_ID_MAX"};
 	int32_t num_dbg_strings = QDF_ARRAY_SIZE(strings);
 
@@ -21860,6 +21861,7 @@ static void hdd_create_wifi_root_obj_sysfs_files(void)
 	hdd_sysfs_create_wifi_root_obj();
 	hdd_create_wifi_feature_interface_sysfs_file();
 	hdd_create_rtpm_interface_sysfs_file();
+	hdd_create_apfmode_interface_sysfs_file();
 }
 
 int hdd_driver_load(void)
@@ -22017,6 +22019,7 @@ EXPORT_SYMBOL(hdd_driver_load);
  */
 static void hdd_distroy_wifi_root_obj_sysfs_files(void)
 {
+	hdd_destroy_apfmode_interface_sysfs_file();
 	hdd_destroy_rtpm_interface_sysfs_file();
 	hdd_destroy_wifi_feature_interface_sysfs_file();
 	hdd_sysfs_destroy_wifi_root_obj();
