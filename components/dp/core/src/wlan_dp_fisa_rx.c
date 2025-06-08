@@ -1222,6 +1222,8 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			sw_ft_entry->flow_tuple_hash =
 				wlan_dp_get_flow_hash(dp_ctx, &flow_tuple);
 			sw_ft_entry->flow_init_ts = qdf_sched_clock();
+			sw_ft_entry->last_accessed_ts =
+						sw_ft_entry->flow_init_ts;
 			sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 			sw_ft_entry->is_flow_udp = elem->is_udp_flow;
 			sw_ft_entry->peer_id = elem->peer_id;
