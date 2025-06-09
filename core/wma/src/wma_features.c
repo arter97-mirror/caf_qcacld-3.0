@@ -6380,6 +6380,76 @@ int wma_wlan_bt_activity_evt_handler(void *handle, uint8_t *event, uint32_t len)
 	return 0;
 }
 
+/**
+ * wma_parse_div_states_report() - Parse diversity states report event
+ * @wma: Pointer to WMA handle
+ * @event: Pointer to PDEV diversity RSSI antenna ID event fixed parameters
+ *         from firmware
+ * @chain_rssi_result: Pointer to chain RSSI result structure to be populated
+ *
+ * This function parses the diversity states report event received from
+ * firmware and populates the chain RSSI result structure with antenna
+ * statistics including antenna count, duration, and RSSI values.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, others on failure
+ */
+static QDF_STATUS
+wma_parse_div_states_report(tp_wma_handle wma,
+			    wmi_pdev_div_rssi_antid_event_fixed_param *event,
+			    struct chain_rssi_result *chain_rssi_result)
+{
+	uint32_t row, col_size;
+
+	if (!wma || !event || !chain_rssi_result)
+		return QDF_STATUS_E_INVAL;
+
+	if (!wmi_service_enabled(wma->wmi_handle,
+				 wmi_service_pdev_div_states_report))
+		return QDF_STATUS_E_NOSUPPORT;
+
+	if (event->num_antennas_valid > ANT_MAX_TYPE ||
+	    event->num_chains_valid > CHAIN_MAX_NUM) {
+		wma_err("Invalid num of chains/antennas: chains=%d, antennas=%d",
+			event->num_chains_valid, event->num_antennas_valid);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (sizeof(chain_rssi_result->ant_cnt) < sizeof(event->ant_cnt) ||
+	    sizeof(chain_rssi_result->ant_duration) < sizeof(event->ant_dur) ||
+	    sizeof(chain_rssi_result->ant_rssi) < sizeof(event->ant_rssi)) {
+		wma_err("chain_rssi_result arrays too small to hold event data");
+		return QDF_STATUS_E_RANGE;
+	}
+
+	chain_rssi_result->num_antennas_valid = event->num_antennas_valid;
+	chain_rssi_result->num_chains_valid   = event->num_chains_valid;
+	wma_debug("num_antennas_valid: %d", event->num_antennas_valid);
+	col_size = event->num_antennas_valid *
+		   sizeof(chain_rssi_result->ant_cnt[0][0]);
+	for (row = 0; row < event->num_chains_valid; row++) {
+		qdf_mem_copy(chain_rssi_result->ant_cnt[row],
+			     event->ant_cnt[row], col_size);
+		qdf_mem_copy(chain_rssi_result->ant_duration[row],
+			     event->ant_dur[row], col_size);
+		qdf_mem_copy(chain_rssi_result->ant_rssi[row],
+			     event->ant_rssi[row], col_size);
+
+		wma_debug("chain %d ant_cnt:", row);
+		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+				   event->ant_cnt[row], col_size);
+
+		wma_debug("chain %d ant_duration:", row);
+		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+				   event->ant_dur[row], col_size);
+
+		wma_debug("chain %d ant_rssi:", row);
+		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+				   event->ant_rssi[row], col_size);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 int wma_pdev_div_info_evt_handler(void *handle, u_int8_t *event_buf,
 	u_int32_t len)
 {
@@ -6452,6 +6522,8 @@ int wma_pdev_div_info_evt_handler(void *handle, u_int8_t *event_buf,
 						WMA_INVALID_PER_CHAIN_RSSI;
 		}
 	}
+
+	wma_parse_div_states_report(wma, event, &chain_rssi_result);
 
 	pmac->sme.get_chain_rssi_cb(pmac->sme.get_chain_rssi_context,
 				&chain_rssi_result);

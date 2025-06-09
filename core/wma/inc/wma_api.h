@@ -299,6 +299,14 @@ bool wma_is_csa_offload_enabled(void);
  */
 bool wma_is_mbssid_enabled(void);
 
+/**
+ * wma_is_pdev_div_states_report_enabled - Checks support for antenna
+ * diversity state reporting
+ *
+ * Return: true or false
+ */
+bool wma_is_pdev_div_states_report_enabled(void);
+
 #ifdef FEATURE_P2P_LISTEN_OFFLOAD
 bool wma_is_p2p_lo_capable(void);
 #else

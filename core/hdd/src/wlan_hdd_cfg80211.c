@@ -22925,6 +22925,7 @@ static int hdd_post_chain_rssi_rsp(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct sk_buff *skb;
 	int len = NLMSG_HDRLEN;
+	bool div_stats_report_enabled;
 
 	len += update_chain_rssi ?
 		nla_total_size(sizeof(result->chain_rssi)) : 0;
@@ -22932,6 +22933,13 @@ static int hdd_post_chain_rssi_rsp(struct hdd_adapter *adapter,
 		nla_total_size(sizeof(result->chain_evm)) : 0;
 	len += update_ant_id ?
 		nla_total_size(sizeof(result->ant_id)) : 0;
+
+	div_stats_report_enabled = wma_is_pdev_div_states_report_enabled();
+	if (div_stats_report_enabled) {
+		len += nla_total_size(sizeof(result->ant_cnt));
+		len += nla_total_size(sizeof(result->ant_duration));
+		len += nla_total_size(sizeof(result->ant_rssi));
+	}
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, len);
 	if (!skb) {
@@ -22958,6 +22966,26 @@ static int hdd_post_chain_rssi_rsp(struct hdd_adapter *adapter,
 		    sizeof(result->ant_id),
 		    result->ant_id)) {
 		goto nla_put_failure;
+	}
+
+	if (div_stats_report_enabled) {
+		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ANT_SWITCH_COUNT,
+			    sizeof(result->ant_cnt),
+			    result->ant_cnt)) {
+			goto nla_put_failure;
+		}
+
+		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ANT_DURATION,
+			    sizeof(result->ant_duration),
+			    result->ant_duration)) {
+			goto nla_put_failure;
+		}
+
+		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_ANT_RSSI,
+			    sizeof(result->ant_rssi),
+			    result->ant_rssi)) {
+			goto nla_put_failure;
+		}
 	}
 
 	wlan_cfg80211_vendor_cmd_reply(skb);

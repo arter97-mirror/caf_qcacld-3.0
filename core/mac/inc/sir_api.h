@@ -4817,13 +4817,22 @@ struct sir_rssi_disallow_lst {
  * @chain_rssi: chain rssi result as dBm unit
  * @chain_evm: error vector magnitude
  * @ant_id: antenna id
+ * @ant_cnt: switch count on each antenna attached to each chain
+ * @ant_duration: stay duration on each antenna attached to each
+ * chain (units: ms)
+ * @ant_rssi: RSSI on each antenna attached to each chain in dbm
  */
 #define CHAIN_MAX_NUM 8
+#define ANT_MAX_TYPE  4
 struct chain_rssi_result {
 	uint32_t num_chains_valid;
+	uint32_t num_antennas_valid;
 	uint32_t chain_rssi[CHAIN_MAX_NUM];
 	int32_t chain_evm[CHAIN_MAX_NUM];
 	uint32_t ant_id[CHAIN_MAX_NUM];
+	uint32_t ant_cnt[CHAIN_MAX_NUM][ANT_MAX_TYPE];
+	uint32_t ant_duration[CHAIN_MAX_NUM][ANT_MAX_TYPE];
+	int32_t ant_rssi[CHAIN_MAX_NUM][ANT_MAX_TYPE];
 };
 
 /**

@@ -4277,6 +4277,17 @@ bool wma_is_mbssid_enabled(void)
 				   wmi_service_infra_mbssid);
 }
 
+bool wma_is_pdev_div_states_report_enabled(void)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma)
+		return false;
+
+	return wmi_service_enabled(wma->wmi_handle,
+				   wmi_service_pdev_div_states_report);
+}
+
 #ifdef FEATURE_FW_LOG_PARSING
 /**
  * wma_config_debug_module_cmd - set debug log config
