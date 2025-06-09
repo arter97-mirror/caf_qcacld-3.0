@@ -36,7 +36,8 @@
 #include "cfg_ucfg_api.h"
 #include "wlan_hdd_object_manager.h"
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
+#if defined(WLAN_FEATURE_PKT_CAPTURE) && \
+	!defined(WLAN_FEATURE_LOCAL_PKT_CAPTURE)
 
 const struct nla_policy
 set_monitor_mode_policy[SET_MONITOR_MODE_CONFIG_MAX + 1] = {
@@ -161,7 +162,8 @@ QDF_STATUS os_if_monitor_mode_configure(struct hdd_adapter *adapter,
 		   frame_filter.ctrl_rx_frame_filter,
 		   frame_filter.connected_beacon_interval);
 
-	status = ucfg_pkt_capture_set_filter(frame_filter, vdev);
+	status = ucfg_pkt_capture_set_filter(&frame_filter,
+					     wlan_vdev_get_psoc(vdev));
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_PKT_CAPTURE_ID);
 
 	return status;

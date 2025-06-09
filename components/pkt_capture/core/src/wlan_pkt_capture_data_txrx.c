@@ -205,6 +205,7 @@ static void pkt_capture_tx_get_phy_info(
 		tx_status->he_data5 |=
 			(pktcapture_hdr->bw | (pktcapture_hdr->sgi << 0x4));
 		tx_status->he_data6 |= pktcapture_hdr->nss;
+		break;
 	default:
 		break;
 	}
@@ -752,6 +753,7 @@ static void pkt_capture_rx_get_phy_info(void *context, void *psoc,
 
 		rx_status->he_data5 |= (bw | (sgi << 0x4));
 		rx_status->he_data6 |= nss;
+		break;
 	default:
 		break;
 	}
