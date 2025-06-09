@@ -2889,7 +2889,7 @@ static void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
 	wlan_hdd_set_lpc_powersave_disabled(hdd_ctx, false);
 }
 
-static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
+void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *sta_adapter;
 
@@ -2913,10 +2913,6 @@ static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 }
 #else
 static inline void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
-{
-}
-
-static inline void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 {
 }
 #endif
@@ -3442,18 +3438,6 @@ static int __hdd_mon_open(struct net_device *dev)
 		}
 		hdd_mon_turn_off_ps_and_wow(hdd_ctx);
 		set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
-	}
-
-	if (con_mode != QDF_GLOBAL_MONITOR_MODE &&
-	    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
-	     ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))) {
-		hdd_info("Acquire wakelock for STA + monitor mode");
-
-		qdf_wake_lock_acquire(&hdd_ctx->monitor_mode_wakelock,
-				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
-		hdd_lpc_disable_powersave(hdd_ctx);
-		qdf_runtime_pm_prevent_suspend(
-			&hdd_ctx->runtime_context.monitor_mode);
 	}
 
 	ret = hdd_set_mon_rx_cb(dev);

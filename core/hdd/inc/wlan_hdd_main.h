@@ -6203,4 +6203,17 @@ struct class *wlan_hdd_class_create(const char *name)
 }
 #endif
 
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * hdd_lpc_disable_powersave() - Disable LPC power save
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: None
+ */
+void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx);
+#else
+static inline void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
+{
+}
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
