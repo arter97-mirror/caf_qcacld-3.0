@@ -3224,6 +3224,13 @@ bool ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture);
 }
 
+bool ucfg_dp_is_lpc_full_pkt_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	return cdp_cfg_get(soc, cfg_dp_local_pkt_capture_full_pkt);
+}
+
 QDF_STATUS ucfg_dp_lpc_acquire_wakelock(void)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();

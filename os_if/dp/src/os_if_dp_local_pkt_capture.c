@@ -27,6 +27,7 @@
 #include "wlan_policy_mgr_api.h"
 #include <ol_defines.h>
 #include "wlan_osif_priv.h"
+#include "wlan_pkt_capture_ucfg_api.h"
 
 /* Short name for QCA_NL80211_VENDOR_SUBCMD_SET_MONITOR_MODE command */
 #define SET_MONITOR_MODE_CONFIG_MAX \
@@ -347,6 +348,7 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 					    struct nlattr **tb)
 {
 	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
 	struct cdp_monitor_filter filter = {0};
 	uint32_t pkt_type = 0, val;
 	static bool is_lpc_suspended;
@@ -359,6 +361,14 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 	soc = cds_get_context(QDF_MODULE_ID_SOC);
 	if (!soc)
 		return QDF_STATUS_E_INVAL;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+
+	if (!psoc) {
+		osif_err("psoc is NULL");
+		status = QDF_STATUS_E_FAILURE;
+		goto error;
+	}
 
 	if (tb[SET_MONITOR_MODE_MGMT_TX_FRAME_TYPE]) {
 		val = nla_get_u32(tb[SET_MONITOR_MODE_MGMT_TX_FRAME_TYPE]);
@@ -449,7 +459,6 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 			ucfg_pkt_capture_suspend_mon_thread(psoc);
 
 		status = ucfg_dp_lpc_release_wakelock();
-
 		if (status != QDF_STATUS_SUCCESS) {
 			osif_err("failed to release monitor mode wakelock");
 			goto error;
@@ -459,14 +468,13 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 	} else if (!cdp_is_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID) &&
 		   is_lpc_suspended) {
 		status = ucfg_dp_lpc_acquire_wakelock();
-
-		if (ucfg_dp_is_lpc_full_pkt_enabled(psoc))
-			ucfg_pkt_capture_resume_mon_thread(psoc);
-
 		if (status != QDF_STATUS_SUCCESS) {
 			osif_err("failed to acquire monitor mode wakelock");
 			goto error;
 		}
+
+		if (ucfg_dp_is_lpc_full_pkt_enabled(psoc))
+			ucfg_pkt_capture_resume_mon_thread(psoc);
 		is_lpc_suspended = false;
 	}
 

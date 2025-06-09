@@ -415,36 +415,46 @@ void pkt_capture_drop_monpkt(struct pkt_capture_mon_context *mon_ctx)
 	}
 }
 
-int pkt_capture_suspend_mon_thread(struct wlan_objmgr_vdev *vdev)
+int pkt_capture_suspend_mon_thread(struct wlan_objmgr_psoc *psoc)
 {
+	struct wlan_objmgr_vdev *vdev;
 	struct pkt_capture_vdev_priv *vdev_priv;
 	struct pkt_capture_mon_context *mon_ctx;
 	int rc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
+	if (!psoc) {
+		pkt_capture_err("psoc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc,
+							QDF_STA_MODE,
+							WLAN_PKT_CAPTURE_ID);
 	if (!vdev) {
 		pkt_capture_err("vdev is NULL");
-		return -EINVAL;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	vdev_priv = pkt_capture_vdev_get_priv(vdev);
 	if (!vdev_priv) {
 		pkt_capture_err("packet capture vdev priv is NULL");
-		return -EINVAL;
+		status = QDF_STATUS_E_INVAL;
+		goto release_vdev_ref;
 	}
 	mon_ctx = vdev_priv->mon_ctx;
 	if (!mon_ctx) {
 		pkt_capture_err("packet capture mon context is NULL");
-		return -EINVAL;
+		status = QDF_STATUS_E_INVAL;
+		goto release_vdev_ref;
 	}
-
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V3
-       status = tgt_pkt_capture_send_mode(vdev, PACKET_CAPTURE_MODE_DISABLE);
-       if (QDF_IS_STATUS_ERROR(status)) {
+	status = tgt_pkt_capture_send_mode(vdev, PACKET_CAPTURE_MODE_DISABLE);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		pkt_capture_err("Unable to send packet capture mode to fw");
 		goto release_vdev_ref;
 	}
 #endif
-
 	set_bit(PKT_CAPTURE_RX_SUSPEND_EVENT,
 		&mon_ctx->mon_event_flag);
 	wake_up_interruptible(&mon_ctx->mon_wait_queue);
@@ -455,18 +465,36 @@ int pkt_capture_suspend_mon_thread(struct wlan_objmgr_vdev *vdev)
 		clear_bit(PKT_CAPTURE_RX_SUSPEND_EVENT,
 			  &mon_ctx->mon_event_flag);
 		pkt_capture_err("Failed to suspend packet capture mon thread");
-		return -EINVAL;
+		status = QDF_STATUS_E_INVAL;
+		goto release_vdev_ref;
 	}
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE_V3
+	qdf_wake_lock_release(&vdev_priv->wake_lock,
+			      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+	qdf_runtime_pm_allow_suspend(&vdev_priv->runtime_lock);
+#endif
 	mon_ctx->is_mon_thread_suspended = true;
 
-	return 0;
+release_vdev_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_PKT_CAPTURE_ID);
+	return status;
 }
 
-void pkt_capture_resume_mon_thread(struct wlan_objmgr_vdev *vdev)
+void pkt_capture_resume_mon_thread(struct wlan_objmgr_psoc *psoc)
 {
+	struct wlan_objmgr_vdev *vdev;
 	struct pkt_capture_vdev_priv *vdev_priv;
 	struct pkt_capture_mon_context *mon_ctx;
 
+	if (!psoc) {
+		pkt_capture_err("psoc is NULL");
+		return;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc,
+							QDF_STA_MODE,
+							WLAN_PKT_CAPTURE_ID);
 	if (!vdev) {
 		pkt_capture_err("vdev is NULL");
 		return;
@@ -475,16 +503,26 @@ void pkt_capture_resume_mon_thread(struct wlan_objmgr_vdev *vdev)
 	vdev_priv = pkt_capture_vdev_get_priv(vdev);
 	if (!vdev_priv) {
 		pkt_capture_err("packet capture vdev priv is NULL");
-		return;
+		goto release_vdev_ref;
 	}
 	mon_ctx = vdev_priv->mon_ctx;
 	if (!mon_ctx) {
 		pkt_capture_err("packet capture mon context is NULL");
-		return;
+		goto release_vdev_ref;
 	}
 
-	if (mon_ctx->is_mon_thread_suspended)
+	if (mon_ctx->is_mon_thread_suspended) {
+#ifdef WLAN_FEATURE_PKT_CAPTURE_V3
+		qdf_wake_lock_acquire(&vdev_priv->wake_lock,
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+		qdf_runtime_pm_prevent_suspend(&vdev_priv->runtime_lock);
+#endif
 		complete(&mon_ctx->resume_mon_event);
+	}
+
+release_vdev_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_PKT_CAPTURE_ID);
+	return;
 }
 
 QDF_STATUS

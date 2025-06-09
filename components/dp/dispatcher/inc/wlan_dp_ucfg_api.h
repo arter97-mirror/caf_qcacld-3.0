@@ -1734,6 +1734,16 @@ bool
 ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_dp_is_lpc_full_pkt_enabled() - Get local packet capture full pkt config
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if local packet capture is enabled from ini
+ *         false otherwise
+ */
+bool
+ucfg_dp_is_lpc_full_pkt_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_dp_lpc_acquire_wakelock() - Acquire monitor mode wake lock to start
  * local packet capture
  *
@@ -1751,6 +1761,12 @@ QDF_STATUS ucfg_dp_lpc_release_wakelock(void);
 #else
 static inline bool
 ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+ucfg_dp_is_lpc_full_pkt_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

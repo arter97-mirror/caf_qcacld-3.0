@@ -232,12 +232,12 @@ void pkt_capture_mon(struct pkt_capture_cb_context *cb_ctx, qdf_nbuf_t msdu,
 /**
  * pkt_capture_set_filter - Set packet capture frame filter
  * @frame_filter: pkt capture frame filter data
- * @vdev: pointer to vdev
+ * @psoc: pointer to psoc
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS pkt_capture_set_filter(struct pkt_capture_frame_filter frame_filter,
-				  struct wlan_objmgr_vdev *vdev);
+QDF_STATUS pkt_capture_set_filter(void *frame_filter,
+				  struct wlan_objmgr_psoc *psoc);
 
 /**
  * pkt_capture_is_tx_mgmt_enable - Check if tx mgmt frames enabled

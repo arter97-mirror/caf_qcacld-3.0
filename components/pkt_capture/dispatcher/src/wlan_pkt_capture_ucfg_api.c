@@ -158,14 +158,14 @@ void ucfg_pkt_capture_deinit(void)
 		pkt_capture_err("Failed to unregister psoc create handler");
 }
 
-int ucfg_pkt_capture_suspend_mon_thread(struct wlan_objmgr_vdev *vdev)
+int ucfg_pkt_capture_suspend_mon_thread(struct wlan_objmgr_psoc *psoc)
 {
-	return pkt_capture_suspend_mon_thread(vdev);
+	return pkt_capture_suspend_mon_thread(psoc);
 }
 
-void ucfg_pkt_capture_resume_mon_thread(struct wlan_objmgr_vdev *vdev)
+void ucfg_pkt_capture_resume_mon_thread(struct wlan_objmgr_psoc *psoc)
 {
-	pkt_capture_resume_mon_thread(vdev);
+	pkt_capture_resume_mon_thread(psoc);
 }
 
 QDF_STATUS
@@ -271,8 +271,7 @@ ucfg_pkt_capture_register_wma_callbacks(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
-ucfg_pkt_capture_set_filter(struct pkt_capture_frame_filter frame_filter,
-			    struct wlan_objmgr_vdev *vdev)
+ucfg_pkt_capture_set_filter(void *frame_filter, struct wlan_objmgr_psoc *psoc)
 {
-	return pkt_capture_set_filter(frame_filter, vdev);
+	return pkt_capture_set_filter(frame_filter, psoc);
 }

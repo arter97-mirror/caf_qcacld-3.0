@@ -1965,7 +1965,7 @@ QDF_STATUS hdd_wlan_shutdown(void)
 			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 							   WLAN_OSIF_POWER_ID);
 			if (vdev) {
-				ucfg_pkt_capture_resume_mon_thread(vdev);
+				ucfg_pkt_capture_resume_mon_thread(hdd_ctx->psoc);
 				hdd_objmgr_put_vdev_by_user(
 					vdev, WLAN_OSIF_POWER_ID);
 			} else {
@@ -2427,7 +2427,7 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 							   WLAN_OSIF_POWER_ID);
 			if (vdev) {
-				ucfg_pkt_capture_resume_mon_thread(vdev);
+				ucfg_pkt_capture_resume_mon_thread(hdd_ctx->psoc);
 				hdd_objmgr_put_vdev_by_user(
 					vdev, WLAN_OSIF_POWER_ID);
 			} else {
@@ -2749,7 +2749,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 				hdd_err("vdev is NULL");
 				goto resume_dp_thread;
 			}
-			if (ucfg_pkt_capture_suspend_mon_thread(vdev)) {
+			if (ucfg_pkt_capture_suspend_mon_thread(hdd_ctx->psoc)) {
 				hdd_objmgr_put_vdev_by_user(
 					vdev, WLAN_OSIF_POWER_ID);
 				goto resume_dp_thread;
@@ -2781,7 +2781,7 @@ resume_dp_thread:
 			vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
 							   WLAN_OSIF_POWER_ID);
 			if (vdev) {
-				ucfg_pkt_capture_resume_mon_thread(vdev);
+				ucfg_pkt_capture_resume_mon_thread(hdd_ctx->psoc);
 				hdd_objmgr_put_vdev_by_user(
 					vdev, WLAN_OSIF_POWER_ID);
 			} else {

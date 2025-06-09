@@ -622,6 +622,36 @@ pkt_capture_is_beacon_forward_enable(struct wlan_objmgr_vdev *vdev,
 ((rx_params)->snr)
 #endif
 
+#ifdef WLAN_FEATURE_PKT_CAPTURE_V3
+/**
+ * pkt_capture_conc_filter() -  Filter management rx packets of conc interfaces
+ * @vdev: vdev object
+ * @wh: 802.11 header
+ *
+ * Return: True if the packet is of STA interface otherwise false
+ */
+static bool pkt_capture_conc_filter(struct wlan_objmgr_vdev *vdev,
+				    struct ieee80211_frame *wh)
+{
+	if (QDF_IS_ADDR_BROADCAST(wh->i_addr1))
+		return true;
+
+	if (qdf_mem_cmp(wh->i_addr1,
+			wlan_vdev_mlme_get_macaddr(vdev),
+			QDF_MAC_ADDR_SIZE) == 0)
+		return true;
+
+	return false;
+}
+#else
+static inline
+bool pkt_capture_conc_filter(struct wlan_objmgr_vdev *vdev,
+			     struct ieee80211_frame *wh)
+{
+	return true;
+}
+#endif
+
 /**
  * pkt_capture_mgmt_rx_data_cb() -  process management rx packets
  * @psoc: psoc object
@@ -666,6 +696,13 @@ pkt_capture_mgmt_rx_data_cb(struct wlan_objmgr_psoc *psoc,
 	}
 
 	pfc = (tpSirMacFrameCtl)(qdf_nbuf_data(wbuf));
+	wh = (struct ieee80211_frame *)qdf_nbuf_data(wbuf);
+
+	if (!pkt_capture_conc_filter(vdev, wh)) {
+		pkt_capture_vdev_put_ref(vdev);
+		qdf_nbuf_free(wbuf);
+		return QDF_STATUS_SUCCESS;
+	}
 
 	if (pfc->type == WLAN_FC0_TYPE_CTRL  &&
 	    !vdev_priv->frame_filter.ctrl_rx_frame_filter)
@@ -704,7 +741,6 @@ pkt_capture_mgmt_rx_data_cb(struct wlan_objmgr_psoc *psoc,
 	qdf_nbuf_free(wbuf);
 
 	pfc = (tpSirMacFrameCtl)(qdf_nbuf_data(nbuf));
-	wh = (struct ieee80211_frame *)qdf_nbuf_data(nbuf);
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	pkt_capture_vdev_put_ref(vdev);
@@ -712,7 +748,8 @@ pkt_capture_mgmt_rx_data_cb(struct wlan_objmgr_psoc *psoc,
 	if ((pfc->type == IEEE80211_FC0_TYPE_MGT) &&
 	    (pfc->subType == SIR_MAC_MGMT_DISASSOC ||
 	     pfc->subType == SIR_MAC_MGMT_DEAUTH ||
-	     pfc->subType == SIR_MAC_MGMT_ACTION)) {
+	     pfc->subType == SIR_MAC_MGMT_ACTION) &&
+	     !QDF_IS_ADDR_BROADCAST(wh->i_addr1)) {
 		if (pkt_capture_is_rmf_enabled(pdev, psoc, wh->i_addr1)) {
 			QDF_STATUS status;
 
