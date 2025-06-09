@@ -2855,4 +2855,10 @@ config CNSS_ETM_TRACE
 	bool "Enable CNSS_ETM_TRACE"
 	default n
 
+config AUTO_PLATFORM
+	bool "Enable Auto platform"
+	default n
+	help
+	Add support for the Qualcomm automotive platform
+
 endif # QCA_CLD_WLAN
