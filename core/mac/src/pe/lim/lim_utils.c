@@ -4847,6 +4847,34 @@ bool lim_isconnected_on_dfs_freq(struct mac_context *mac_ctx,
 }
 
 #ifdef CFG80211_SA_QUERY_OFFLOAD_SUPPORT
+static void lim_get_ap_ocv_cap(struct pe_session *session,
+			       bool *is_ap_ovc_enabled)
+{
+	struct mac_context *mac_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	int32_t self_rsn_caps;
+
+	if (!session || !session->valid || !LIM_IS_AP_ROLE(session)) {
+		pe_err("Session is not valid");
+		return;
+	}
+
+	mac_ctx = session->mac_ctx;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    session->vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_err("Vdev is NULL");
+		return;
+	}
+
+	self_rsn_caps = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP);
+	if (self_rsn_caps & WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED)
+		*is_ap_ovc_enabled = true;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+}
+
 static void lim_post_csa_ocv_sa_query_timer_handler(void *session_ptr)
 {
 	struct pe_session *pe_session = (struct pe_session *)session_ptr;
@@ -4929,6 +4957,7 @@ void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
 	tpDphHashNode sta;
 	QDF_STATUS status;
 	bool ocv_check_csa_sa_query;
+	bool is_ap_ocv_enabled = false;
 
 	if (!pe_session || !pe_session->valid || !LIM_IS_AP_ROLE(pe_session))
 		return;
@@ -4943,6 +4972,12 @@ void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
 
 	if (!csa_done)
 		return;
+
+	lim_get_ap_ocv_cap(pe_session, &is_ap_ocv_enabled);
+	if (!is_ap_ocv_enabled) {
+		pe_debug("AP OCV caps not enabled,do not start post CSA timer");
+		return;
+	}
 
 	ocv_check_csa_sa_query = false;
 	for (index = 0; index < pe_session->dph.dphHashTable.size; index++) {
