@@ -1126,7 +1126,79 @@ void hdd_copy_vht_operation(struct hdd_station_ctx *hdd_sta_ctx,
 	hdd_vht_ops->basic_mcs_set = vht_ops->basicMCSSet;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) && \
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)) && \
+	defined(WLAN_FEATURE_11BE)
+void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
+			    tDot11fIEeht_op *eht_ops)
+{
+	struct ieee80211_eht_operation *hdd_eht_ops =
+		&hdd_sta_ctx->conn_info.eht_operation;
+	struct ieee80211_eht_mcs_nss_supp_20mhz_only  mcs_param;
+	uint32_t filled = 0, len = 0;
+
+	qdf_mem_zero(hdd_eht_ops, sizeof(struct ieee80211_eht_operation));
+
+	if (!eht_ops->eht_op_information_present)
+		return;
+
+	/* Min length if op_info_present */
+	len += 3;
+
+	hdd_eht_ops->params |= IEEE80211_EHT_OPER_INFO_PRESENT;
+
+	if (eht_ops->eht_default_pe_duration)
+		hdd_eht_ops->params |=
+			IEEE80211_EHT_OPER_EHT_DEF_PE_DURATION;
+	if (eht_ops->group_addr_bu_indication_limit)
+		hdd_eht_ops->params |=
+			IEEE80211_EHT_OPER_GROUP_ADDRESSED_BU_IND_LIMIT;
+	if (eht_ops->group_addr_bu_indication_exponent)
+		hdd_eht_ops->params |=
+			IEEE80211_EHT_OPER_GROUP_ADDRESSED_BU_IND_EXP_MASK;
+
+	mcs_param.rx_tx_mcs7_max_nss =
+		eht_ops->basic_rx_max_nss_for_mcs_0_to_7 <<
+					EHT_OPER_BASIC_RX_NSS_MCS_0_TO_7_POS;
+	mcs_param.rx_tx_mcs7_max_nss |=
+		eht_ops->basic_tx_max_nss_for_mcs_0_to_7 <<
+					EHT_OPER_BASIC_TX_NSS_MCS_0_TO_7_POS;
+	mcs_param.rx_tx_mcs9_max_nss =
+		eht_ops->basic_rx_max_nss_for_mcs_8_and_9 <<
+					EHT_OPER_BASIC_RX_NSS_MCS_8_AND_9_POS;
+	mcs_param.rx_tx_mcs9_max_nss |=
+		eht_ops->basic_tx_max_nss_for_mcs_8_and_9 <<
+					EHT_OPER_BASIC_TX_NSS_MCS_8_AND_9_POS;
+	mcs_param.rx_tx_mcs11_max_nss =
+		eht_ops->basic_rx_max_nss_for_mcs_10_and_11 <<
+					EHT_OPER_BASIC_RX_NSS_MCS_10_AND_11_POS;
+	mcs_param.rx_tx_mcs11_max_nss |=
+		eht_ops->basic_tx_max_nss_for_mcs_10_and_11 <<
+					EHT_OPER_BASIC_TX_NSS_MCS_10_AND_11_POS;
+	mcs_param.rx_tx_mcs13_max_nss =
+		eht_ops->basic_rx_max_nss_for_mcs_12_and_13 <<
+					EHT_OPER_BASIC_RX_NSS_MCS_12_AND_13_POS;
+	mcs_param.rx_tx_mcs13_max_nss |=
+		eht_ops->basic_tx_max_nss_for_mcs_12_and_13 <<
+					EHT_OPER_BASIC_TX_NSS_MCS_12_AND_13_POS;
+
+	hdd_eht_ops->basic_mcs_nss = mcs_param;
+	hdd_eht_ops->optional[filled++] = eht_ops->channel_width;
+	hdd_eht_ops->optional[filled++] = eht_ops->ccfs0;
+	hdd_eht_ops->optional[filled++] = eht_ops->ccfs1;
+
+	if (eht_ops->disabled_sub_chan_bitmap_present) {
+		hdd_eht_ops->params |=
+			IEEE80211_EHT_OPER_DISABLED_SUBCHANNEL_BITMAP_PRESENT;
+		len += 2;
+		hdd_eht_ops->optional[filled++] =
+				eht_ops->disabled_sub_chan_bitmap[0][0];
+		hdd_eht_ops->optional[filled++] =
+				eht_ops->disabled_sub_chan_bitmap[0][1];
+	}
+	hdd_sta_ctx->conn_info.eht_oper_len =
+				sizeof(struct ieee80211_eht_operation) + len;
+}
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) && \
 	defined(WLAN_FEATURE_11BE)
 void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
 			    tDot11fIEeht_op *eht_ops)
