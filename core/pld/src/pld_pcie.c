@@ -1029,6 +1029,17 @@ void pld_pcie_device_self_recovery(struct device *dev,
 	cnss_self_recovery(dev, cnss_reason);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0))
+int pld_pcie_set_host_param(struct device *dev, const char *chip_name)
+{
+	struct cnss_wlan_host_param param;
+
+	param.chip_name = chip_name;
+
+	return cnss_set_host_param(dev, &param);
+}
+#endif
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 int pld_pcie_set_wfc_mode(struct device *dev,
 			  enum pld_wfc_mode wfc_mode)

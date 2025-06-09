@@ -101,6 +101,11 @@ static inline int pld_pcie_wlan_hw_enable(void)
 	return 0;
 }
 
+static inline int pld_pcie_set_host_param(struct device *dev,
+					  const char *chip_name)
+{
+	return 0;
+}
 #else
 
 /**
@@ -130,6 +135,25 @@ int pld_pcie_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
  *         Non zero failure code for errors
  */
 int pld_pcie_wlan_disable(struct device *dev, enum pld_driver_mode mode);
+
+/**
+ * pld_pcie_set_host_param() - set host param
+ * @dev: device
+ * @chip_name: chip name
+ *
+ * This function passes host param chipname.
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0))
+int pld_pcie_set_host_param(struct device *dev, const char *chip_name);
+#else
+static inline int pld_pcie_set_host_param(struct device *dev,
+					  const char *chip_name)
+{
+	return 0;
+}
+#endif
 
 #ifdef FEATURE_CNSS_HW_SECURE_DISABLE
 static inline int pld_pcie_wlan_hw_enable(void)

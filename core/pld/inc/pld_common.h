@@ -761,6 +761,18 @@ int pld_set_fw_log_mode(struct device *dev, u8 fw_log_mode);
 void pld_get_default_fw_files(struct pld_fw_files *pfw_files);
 
 /**
+ * pld_set_host_param() - Set host param
+ * @dev: device
+ * @chip_name: chipname
+ *
+ * This function sets host params.
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_set_host_param(struct device *dev, const char *chip_name);
+
+/**
  * pld_get_fw_files_for_target() - Get FW file names
  * @dev: device
  * @pfw_files: buffer for FW file names

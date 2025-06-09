@@ -437,6 +437,30 @@ int pld_wlan_disable(struct device *dev, enum pld_driver_mode mode)
 	return ret;
 }
 
+int pld_set_host_param(struct device *dev, const char *chip_name)
+{
+	int ret = 0;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_set_host_param(dev, chip_name);
+		break;
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+	case PLD_BUS_TYPE_IPCI:
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
 int pld_wlan_hw_enable(void)
 {
 	return pld_pcie_wlan_hw_enable();
