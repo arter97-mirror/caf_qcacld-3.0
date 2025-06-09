@@ -14112,7 +14112,7 @@ hdd_store_sap_restart_channel(qdf_freq_t restart_chan, qdf_freq_t *restart_chan_
 /**
  * hdd_check_chn_bw_boundary_unsafe() - check channel range unsafe
  * @hdd_ctxt: hdd context pointer
- * @adapter:  hdd adapter pointer
+ * @ap_ctx:  hdd ap context pointer
  *
  * hdd_check_chn_bw_boundary_unsafe check SAP channel range with certain
  * bandwidth whether cover all unsafe channel list.
@@ -14121,7 +14121,7 @@ hdd_store_sap_restart_channel(qdf_freq_t restart_chan, qdf_freq_t *restart_chan_
  */
 static bool
 hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
-				 struct hdd_adapter *adapter)
+				 struct hdd_ap_ctx *ap_ctx)
 {
 	uint32_t freq;
 	uint32_t start_freq = 0;
@@ -14130,8 +14130,8 @@ hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
 	uint8_t ch_width;
 	const struct bonded_channel_freq *bonded_chan_ptr_ptr = NULL;
 
-	freq = adapter->deflink->session.ap.operating_chan_freq;
-	ch_width = adapter->deflink->session.ap.sap_config.acs_cfg.ch_width;
+	freq = ap_ctx->operating_chan_freq;
+	ch_width = ap_ctx->sap_config.acs_cfg.ch_width;
 
 	if (ch_width > CH_WIDTH_20MHZ)
 		bonded_chan_ptr_ptr =
@@ -14221,7 +14221,7 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 				hdd_debug("SAP allowed in unsafe SCC channel");
 			else
 				found = hdd_check_chn_bw_boundary_unsafe(hdd_ctx,
-									 adapter);
+									 ap_ctx);
 			if (!found) {
 				hdd_store_sap_restart_channel(ap_chan_freq,
 							      restart_chan_store);
