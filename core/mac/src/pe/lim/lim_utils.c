@@ -5600,7 +5600,7 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 			lim_update_sta_edca_params(mac,
 						   sta_session);
 		}
-	} else {
+	} else if (sap_session) {
 	/*
 	 * For STA+SAP/GO DBS, STA+SAP/GO MCC or standalone SAP/GO
 	 */
@@ -5610,9 +5610,8 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 				    cfg_get(mac->psoc,
 					    CFG_ENABLE_FW_RTS_PROFILE),
 				    VDEV_CMD);
-		if (sta_session) {
+		if (sta_session)
 			check_and_send_vendor_oui(mac, sta_session);
-		}
 
 		for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++) {
 			if (qdf_mem_cmp(&sap_session->gLimEdcaParamsActive[i],
@@ -5625,10 +5624,10 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 		}
 
 		if (params_update_required) {
-			for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++) {
+			for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++)
 				sap_session->gLimEdcaParamsActive[i] =
 					sap_session->gLimEdcaParams[i];
-			}
+
 			lim_send_edca_params(mac,
 					     sap_session->gLimEdcaParamsActive,
 					     sap_session->vdev_id, false);
@@ -5638,10 +5637,8 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 	 * In case of mcc, where cb can come from scc to mcc switch where we
 	 * need to restore the default parameters
 	 */
-			if (sta_session) {
-				lim_update_sta_edca_params(mac,
-							   sta_session);
-				}
+			if (sta_session)
+				lim_update_sta_edca_params(mac, sta_session);
 		}
 	}
 }
