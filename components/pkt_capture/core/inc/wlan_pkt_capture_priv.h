@@ -36,10 +36,12 @@
  * struct pkt_capture_cfg - struct to store config values
  * @pkt_capture_mode: packet capture mode
  * @pkt_capture_config: config for trigger, qos and beacon frames
+ * @pkt_capture_full_rx_mgmt_frames: config for full rx mgmt frames
  */
 struct pkt_capture_cfg {
 	enum pkt_capture_mode pkt_capture_mode;
 	enum pkt_capture_config pkt_capture_config;
+	bool pkt_capture_full_rx_mgmt_frames;
 };
 
 /**

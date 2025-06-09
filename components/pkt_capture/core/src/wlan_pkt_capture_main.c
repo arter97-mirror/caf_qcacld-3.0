@@ -662,6 +662,24 @@ enum pkt_capture_mode pkt_capture_get_mode(struct wlan_objmgr_psoc *psoc)
 	return psoc_priv->cfg_param.pkt_capture_mode;
 }
 
+bool  pkt_capture_get_full_rx_mgmt_frames(struct wlan_objmgr_psoc *psoc)
+{
+	struct pkt_psoc_priv *psoc_priv;
+
+	if (!psoc) {
+		pkt_capture_err("psoc is NULL");
+		return PACKET_CAPTURE_MODE_DISABLE;
+	}
+
+	psoc_priv = pkt_capture_psoc_get_priv(psoc);
+	if (!psoc_priv) {
+		pkt_capture_err("psoc_priv is NULL");
+		return PACKET_CAPTURE_MODE_DISABLE;
+	}
+
+	return psoc_priv->cfg_param.pkt_capture_full_rx_mgmt_frames;
+}
+
 bool pkt_capture_is_tx_mgmt_enable(struct wlan_objmgr_pdev *pdev)
 {
 	struct pkt_capture_vdev_priv *vdev_priv;
@@ -758,7 +776,8 @@ pkt_capture_register_callbacks(struct wlan_objmgr_vdev *vdev,
 	set_bit(PKT_CAPTURE_REGISTER_EVENT,
 		&vdev_priv->mon_ctx->mon_event_flag);
 
-	mode = pkt_capture_get_mode(psoc);
+	mode = pkt_capture_get_mode(psoc) |
+		pkt_capture_get_full_rx_mgmt_frames(psoc);
 	status = tgt_pkt_capture_send_mode(vdev, mode);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pkt_capture_err("Unable to send packet capture mode to fw");
@@ -886,7 +905,8 @@ pkt_capture_get_pktcap_mode(struct wlan_objmgr_psoc *psoc)
 		return 0;
 	}
 
-	if (!pkt_capture_get_mode(psoc))
+	if (!pkt_capture_get_mode(psoc) &&
+	    !pkt_capture_get_full_rx_mgmt_frames(psoc))
 		return 0;
 
 	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc,
@@ -1039,6 +1059,12 @@ pkt_capture_cfg_init(struct pkt_psoc_priv *psoc_priv)
 
 	cfg_param->pkt_capture_mode = cfg_get(psoc_priv->psoc,
 					      CFG_PKT_CAPTURE_MODE);
+	cfg_param->pkt_capture_full_rx_mgmt_frames =
+		cfg_get(psoc_priv->psoc, CFG_DP_LOCAL_PKT_CAPTURE_FULL_PKT);
+
+	pkt_capture_debug("Packet capture config mode %d %d",
+			  cfg_param->pkt_capture_mode,
+			  cfg_param->pkt_capture_full_rx_mgmt_frames);
 }
 
 QDF_STATUS
@@ -1049,7 +1075,9 @@ pkt_capture_vdev_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	QDF_STATUS status;
 
 	if ((wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) ||
-	    !pkt_capture_get_mode(wlan_vdev_get_psoc(vdev)))
+	    (!pkt_capture_get_mode(wlan_vdev_get_psoc(vdev)) &&
+	     !pkt_capture_get_full_rx_mgmt_frames(wlan_vdev_get_psoc(vdev))) ||
+	     vdev->vdev_objmgr.vdev_id != 0)
 		return QDF_STATUS_SUCCESS;
 
 	vdev_priv = qdf_mem_malloc(sizeof(*vdev_priv));
@@ -1124,7 +1152,9 @@ pkt_capture_vdev_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	QDF_STATUS status;
 
 	if ((wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) ||
-	    !pkt_capture_get_mode(wlan_vdev_get_psoc(vdev)))
+	    (!pkt_capture_get_mode(wlan_vdev_get_psoc(vdev)) &&
+	     !pkt_capture_get_full_rx_mgmt_frames(wlan_vdev_get_psoc(vdev))) ||
+	     vdev->vdev_objmgr.vdev_id != 0)
 		return QDF_STATUS_SUCCESS;
 
 	vdev_priv = pkt_capture_vdev_get_priv(vdev);
@@ -1223,7 +1253,8 @@ void pkt_capture_record_channel(struct wlan_objmgr_vdev *vdev)
 
 	psoc = wlan_vdev_get_psoc(vdev);
 
-	if (!pkt_capture_get_mode(psoc))
+	if (!pkt_capture_get_mode(psoc) &&
+	    !pkt_capture_get_full_rx_mgmt_frames(psoc))
 		return;
 	/*
 	 * Record packet capture channel here
