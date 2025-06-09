@@ -1852,6 +1852,19 @@ _conditional_srcs = {
             "os_if/pkt_capture/src/os_if_pkt_capture.c",
         ],
     },
+    "CONFIG_WLAN_FEATURE_PKT_CAPTURE_V3": {
+        True: [
+            "components/pkt_capture/core/src/wlan_pkt_capture_data_txrx.c",
+            "components/pkt_capture/core/src/wlan_pkt_capture_main.c",
+            "components/pkt_capture/core/src/wlan_pkt_capture_mgmt_txrx.c",
+            "components/pkt_capture/core/src/wlan_pkt_capture_mon_thread.c",
+            "components/pkt_capture/dispatcher/src/wlan_pkt_capture_api.c",
+            "components/pkt_capture/dispatcher/src/wlan_pkt_capture_tgt_api.c",
+            "components/pkt_capture/dispatcher/src/wlan_pkt_capture_ucfg_api.c",
+            "components/target_if/pkt_capture/src/target_if_pkt_capture.c",
+            "os_if/pkt_capture/src/os_if_pkt_capture.c",
+        ],
+    },
     "CONFIG_WLAN_FEATURE_RX_BUFFER_POOL": {
         True: [
             "cmn/dp/wifi3.0/dp_rx_buffer_pool.c",
