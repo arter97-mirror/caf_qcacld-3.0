@@ -6040,7 +6040,19 @@ static inline bool hdd_hold_rtnl_lock(void) { return false; }
 static inline void hdd_release_rtnl_lock(void) { }
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 12, 0)
+static inline void hdd_wiphy_lock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
+{
+	if (dev_ptr)
+		mutex_lock(&dev_ptr->mtx);
+}
+
+static inline void hdd_wiphy_unlock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
+{
+	if (dev_ptr)
+		mutex_unlock(&dev_ptr->mtx);
+}
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
 static inline void hdd_wiphy_lock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
 {
 	if (wiphy)
