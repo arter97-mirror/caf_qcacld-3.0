@@ -131,21 +131,21 @@ struct radiotap_header {
 
 /**
  * pkt_capture_suspend_mon_thread() - suspend packet capture mon thread
- * @vdev: pointer to vdev object manager
+ * @psoc: pointer to psoc object
  *
  * Return: 0 on success, -EINVAL on failure
  */
-int pkt_capture_suspend_mon_thread(struct wlan_objmgr_vdev *vdev);
+int pkt_capture_suspend_mon_thread(struct wlan_objmgr_psoc *psoc);
 
 /**
  * pkt_capture_resume_mon_thread() - resume packet capture mon thread
- * @vdev: pointer to vdev object manager
+ * @psoc: pointer to psoc object
  *
  * Resume packet capture MON thread by completing RX thread resume event.
  *
  * Return: None
  */
-void pkt_capture_resume_mon_thread(struct wlan_objmgr_vdev *vdev);
+void pkt_capture_resume_mon_thread(struct wlan_objmgr_psoc *psoc);
 
 /**
  * pkt_capture_drop_monpkt() - API to drop pending mon packets
