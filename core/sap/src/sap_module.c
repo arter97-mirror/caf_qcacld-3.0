@@ -436,6 +436,9 @@ wlansap_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 		return;
 
 	sap_ctx = (struct sap_context *)arg;
+	if (!sap_ctx || sap_ctx->fsm_state != SAP_STARTED ||
+	    !sap_ctx->acs_cfg || !sap_ctx->acs_cfg->acs_mode)
+		return;
 
 	if (!util_is_scan_completed(event, &success))
 		return;
