@@ -117,6 +117,11 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 			   txrx_min_max_stats->pkt_size_max,
 			   pkt_iat, txrx_min_max_stats->pkt_iat_min,
 			   txrx_min_max_stats->pkt_iat_max);
+	} else {
+		dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
+			   "STC: mdata 0x%x len %u iat %llu burst_state %u",
+			   flow_entry->metadata, pkt_len, pkt_iat,
+			   flow_entry->burst_state);
 	}
 	/* TxRx Stats - End */
 
@@ -161,8 +166,9 @@ check_burst:
 			flow_entry->cur_burst_bytes +=
 					flow_entry->burst_start_detect_bytes;
 			dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
-				   "STC: Flow mdata 0x%x Burst start: %u B",
+				   "STC: Flow mdata 0x%x ts %llu Burst start: %u B",
 				   flow_entry->metadata,
+				   flow_entry->burst_start_time,
 				   flow_entry->cur_burst_bytes);
 		} else {
 			/*
@@ -204,8 +210,11 @@ check_burst:
 			flow_entry->cur_burst_bytes = 0;
 			pkt_iat = 0;
 			dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
-				   "STC: Flow mdata 0x%x Burst end with size %u dur %u",
-				   flow_entry->metadata, burst_size, burst_dur);
+				   "STC: Flow mdata 0x%x ts: start %llu end: %llu Burst end with size %u dur %u",
+				   flow_entry->metadata,
+				   flow_entry->burst_start_time,
+				   flow_entry->prev_pkt_arrival_ts,
+				   burst_size, burst_dur);
 			goto check_burst;
 		}
 
@@ -1858,6 +1867,30 @@ void wlan_dp_stc_burst_samples_txrx_ref_store(
 }
 
 static inline bool
+dp_stc_is_s_entry_flow_valid(struct wlan_dp_stc *dp_stc,
+			     struct wlan_dp_stc_sampling_table_entry *s_entry)
+{
+	struct wlan_dp_stc_flow_table_entry *flow;
+	uint32_t flow_id;
+
+	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
+		flow_id = s_entry->tx_flow_id;
+		flow = &dp_stc->tx_flow_table->entries[flow_id];
+		if (s_entry->tx_flow_metadata != flow->metadata)
+			return false;
+	}
+
+	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
+		flow_id = s_entry->rx_flow_id;
+		flow = &dp_stc->rx_flow_table->entries[flow_id];
+		if (s_entry->rx_flow_metadata != flow->metadata)
+			return false;
+	}
+
+	return true;
+}
+
+static inline bool
 wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 			struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
@@ -2063,6 +2096,14 @@ sample:
 		break;
 	case WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1:
 		s_entry->curr_sample_attempt++;
+
+		if (!dp_stc_is_s_entry_flow_valid(dp_stc, s_entry)) {
+			s_entry->state =
+				WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL;
+			/* continue to next flow */
+			break;
+		}
+
 		if (qdf_unlikely(s_entry->curr_sample_attempt ==
 				    WLAN_DP_SAMPLING_BURST_STAT_STAGE_1_END)) {
 			wlan_dp_stc_save_burst_samples(dp_stc, s_entry);
@@ -2081,6 +2122,14 @@ sample:
 		break;
 	case WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_2:
 		s_entry->curr_sample_attempt++;
+
+		if (!dp_stc_is_s_entry_flow_valid(dp_stc, s_entry)) {
+			s_entry->state =
+				WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL;
+			/* continue to next flow */
+			break;
+		}
+
 		if (qdf_unlikely(s_entry->curr_sample_attempt ==
 				    WLAN_DP_SAMPLING_BURST_STAT_STAGE_2_END)) {
 			wlan_dp_stc_save_burst_samples(dp_stc, s_entry);

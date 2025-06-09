@@ -132,6 +132,20 @@ enum wlan_dp_stc_burst_state {
 	BURST_DETECTION_BURST_START,
 };
 
+/**
+ * enum wlan_dp_stc_evict_code - Flow evicting success code
+ * @DP_EVICT_DENIED: Abort evicting flow
+ * @DP_EVICT_SUCCESS_CODE_1: Evicting flow with success code 1
+ * @DP_EVICT_SUCCESS_CODE_2: Evicting flow with success code 2
+ * @DP_EVICT_SUCCESS_CODE_3: Evicting flow with success code 3
+ */
+enum wlan_dp_stc_evict_code {
+	DP_EVICT_DENIED,
+	DP_EVICT_SUCCESS_CODE_1,
+	DP_EVICT_SUCCESS_CODE_2,
+	DP_EVICT_SUCCESS_CODE_3,
+};
+
 #define DP_STC_SAMPLE_FLOWS_MAX 128
 #define DP_STC_SAMPLE_BIDI_FLOW_MAX 96
 #define DP_STC_SAMPLE_RX_FLOW_MAX 32
@@ -665,11 +679,14 @@ enum wlan_dp_stc_classfied_flow_state {
 static inline void
 wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 			       uint8_t classified,
-			       uint8_t c_flow_id)
+			       uint8_t c_flow_id,
+			       uint8_t flow_evict_success_code)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
+	struct flow_info *flow_tuple;
+	uint8_t buf[BUF_LEN_MAX];
 
 	if (!dp_stc)
 		return;
@@ -679,6 +696,14 @@ wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 
 	c_table = dp_stc->classified_flow_table;
 	c_entry = &c_table->entries[c_flow_id];
+	flow_tuple = &c_entry->flow_tuple;
+	dp_stc_debug(dp_stc->logmask,
+		     "STC: c_state: [%u], c_flags: [%lu], Remove TX flow [%u] reason:[%u], tuple: %s",
+		     qdf_atomic_read(&c_entry->state),
+		     c_entry->flags, c_flow_id, flow_evict_success_code,
+		     dp_print_tuple_to_str(flow_tuple, buf,
+					   BUF_LEN_MAX));
+
 	if (qdf_atomic_read(&c_entry->state) ==
 					WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
 		return;
@@ -692,11 +717,14 @@ wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 static inline void
 wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 			       uint8_t classified,
-			       uint8_t c_flow_id)
+			       uint8_t c_flow_id,
+			       uint8_t flow_evict_success_code)
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	struct wlan_dp_stc_classified_flow_table *c_table;
 	struct wlan_dp_stc_classified_flow_entry *c_entry;
+	struct flow_info *flow_tuple;
+	uint8_t buf[BUF_LEN_MAX];
 
 	if (!dp_stc)
 		return;
@@ -706,6 +734,14 @@ wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 
 	c_table = dp_stc->classified_flow_table;
 	c_entry = &c_table->entries[c_flow_id];
+	flow_tuple = &c_entry->flow_tuple;
+	dp_stc_debug(dp_stc->logmask,
+		     "STC: c_state: [%u], c_flags: [%lu], Remove RX flow [%u] reason:[%u], tuple: %s",
+		     qdf_atomic_read(&c_entry->state),
+		     c_entry->flags, c_flow_id, flow_evict_success_code,
+		     dp_print_tuple_to_str(flow_tuple, buf,
+					   BUF_LEN_MAX));
+
 	if (qdf_atomic_read(&c_entry->state) ==
 					WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
 		return;
@@ -1065,14 +1101,16 @@ wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 static inline void
 wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 			       uint8_t classified,
-			       uint8_t c_flow_id)
+			       uint8_t c_flow_id,
+			       uint8_t flow_evict_success_code)
 {
 }
 
 static inline void
 wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 			       uint8_t classified,
-			       uint8_t c_flow_id)
+			       uint8_t c_flow_id,
+			       uint8_t flow_evict_success_code)
 {
 }
 

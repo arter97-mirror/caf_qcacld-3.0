@@ -992,13 +992,15 @@ dp_rx_fisa_restore_pkt_hist(struct dp_fisa_rx_sw_ft *ft_entry,
  * @fisa_hdl: handle to FISA context
  * @elem: details of the flow which is being added
  * @hashed_flow_idx: hashed flow idx of the deleting flow
+ * @flow_evict_success_code: success code of evicting flow
  *
  * Return: None
  */
 static void
 dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 		       struct dp_fisa_rx_fst_update_elem *elem,
-		       uint32_t hashed_flow_idx)
+		       uint32_t hashed_flow_idx,
+		       uint8_t flow_evict_success_code)
 {
 	struct wlan_dp_psoc_context *dp_ctx = fisa_hdl->dp_ctx;
 	struct dp_fisa_rx_sw_ft *sw_ft_entry;
@@ -1017,7 +1019,8 @@ dp_fisa_rx_delete_flow(struct dp_rx_fst *fisa_hdl,
 
 	dp_rx_fisa_save_pkt_hist(sw_ft_entry, &pkt_hist);
 	wlan_dp_stc_rx_flow_retire_ind(dp_ctx, sw_ft_entry->classified,
-				       sw_ft_entry->c_flow_id);
+				       sw_ft_entry->c_flow_id,
+				       flow_evict_success_code);
 	/* Clear the sw_ft_entry */
 	qdf_mem_zero(sw_ft_entry, sizeof(*sw_ft_entry));
 	dp_rx_fisa_restore_pkt_hist(sw_ft_entry, &pkt_hist);
@@ -1097,7 +1100,8 @@ static void dp_fisa_rx_fst_del(struct dp_rx_fst *fisa_hdl,
 	hashed_flow_idx = flow_hash & fisa_hdl->hash_mask;
 
 	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
-	dp_fisa_rx_delete_flow(fisa_hdl, NULL, hashed_flow_idx);
+	dp_fisa_rx_delete_flow(fisa_hdl, NULL, hashed_flow_idx,
+			       DP_EVICT_SUCCESS_CODE_3);
 	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
 
 	if (fisa_hdl->fse_cache_flush_allow &&
@@ -1122,21 +1126,21 @@ static void dp_fisa_rx_fst_del(struct dp_rx_fst *fisa_hdl,
  * Return: True if its been more than 1second since the flow was last accessed.
  *         False if it is selected to sampling or it is active in past second.
  */
-static inline bool
+static inline uint8_t
 dp_fisa_flow_evict_check(struct dp_fisa_rx_sw_ft *sw_ft_entry)
 {
 	uint64_t sw_timestamp = qdf_sched_clock();
 
 	if ((sw_timestamp - sw_ft_entry->last_accessed_ts) >
 	    FISA_FT_ENTRY_LONG_LIVE_MIN_NS)
-		return true;
+		return DP_EVICT_SUCCESS_CODE_1;
 
 	if (((sw_timestamp - sw_ft_entry->flow_init_ts) >
 	     FISA_FT_ENTRY_LONG_LIVE_MIN_NS) &&
 	    sw_ft_entry->num_pkts < FISA_FT_ENTRY_AGING_PKT_CNT)
-		return true;
+		return DP_EVICT_SUCCESS_CODE_2;
 
-	return false;
+	return DP_EVICT_DENIED;
 }
 #else
 #define FISA_FT_ENTRY_LAST_ACTIVE_NS 1000000000
@@ -1285,14 +1289,18 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	 */
 	if ((skid_count > max_skid_length) &&
 	    wlan_dp_cfg_is_rx_fisa_lru_del_enabled(dp_cfg)) {
+		uint8_t flow_evict_success_code;
 		dp_fisa_debug("Max skid length reached flow cannot be added, evict existing flow");
 
 		sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
 				fisa_hdl->base)[lru_ft_entry_idx]);
 
-		if (dp_fisa_flow_evict_check(sw_ft_entry)) {
+		flow_evict_success_code =
+				dp_fisa_flow_evict_check(sw_ft_entry);
+		if (flow_evict_success_code) {
 			qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
-			dp_fisa_rx_delete_flow(fisa_hdl, elem, lru_ft_entry_idx);
+			dp_fisa_rx_delete_flow(fisa_hdl, elem, lru_ft_entry_idx,
+					       flow_evict_success_code);
 			qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
 			is_fst_updated = true;
 		} else {

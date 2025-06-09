@@ -26,7 +26,7 @@
  * Return: True if flow can be evicted, else false.
  */
 static inline
-bool wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
+uint8_t wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	uint64_t cur_ts = qdf_sched_clock();
@@ -36,24 +36,24 @@ bool wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 	 * is_populated=1. This entry should never be retired.
 	 */
 	if (flow->is_reserved)
-		return false;
+		return DP_EVICT_DENIED;
 
 	if (!dp_stc_is_remove_flow_allowed(flow->classified,
 					   flow->selected_to_sample,
 					   flow->inactivity_timeout,
 					   flow->active_ts,
 					   cur_ts))
-		return false;
+		return DP_EVICT_DENIED;
 
 	if ((cur_ts - flow->active_ts) <
 	    WLAN_DP_SPM_FLOW_LAST_ACTIVE_NS)
-		return false;
+		return DP_EVICT_DENIED;
 
 	/* This is a positive condition to allow eviction */
 	if (((cur_ts - flow->flow_add_ts) >
 	     WLAN_DP_SPM_FLOW_LONG_LIVE_MIN_NS) &&
 	    flow->num_pkts < WLAN_DP_SPM_FLOW_AGING_PKT_CNT)
-		return true;
+		return DP_EVICT_SUCCESS_CODE_2;
 
 	/*
 	 * If the TX flow was active within certain duration specified by
@@ -64,9 +64,9 @@ bool wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 	if (cur_ts - flow->active_ts <
 				WLAN_DP_SPM_FLOW_LAST_ACTIVE_CEILING_NS &&
 	    wlan_dp_find_dl_flow(dp_ctx, flow->flow_tuple_hash))
-		return false;
+		return DP_EVICT_DENIED;
 
-	return true;
+	return DP_EVICT_SUCCESS_CODE_1;
 }
 
 #ifdef WLAN_FEATURE_SAWFISH
@@ -845,17 +845,20 @@ static void wlan_dp_spm_flow_retire(struct wlan_dp_spm_intf_context *spm_intf,
 	struct qdf_ht *ht_node;
 	struct qdf_ht_entry *tmp;
 	struct wlan_dp_spm_flow_info *flow_rec;
+	uint8_t flow_evict_success_code;
 	int i;
 
 	qdf_spinlock_acquire(&dp_ctx->flow_list_lock);
 	for (i = 0; i < WLAN_DP_SPM_HASH_TBL_MAX; i++) {
 		ht_node = &spm_intf->origin_aft_hlist[i];
 		qdf_hl_for_each_entry_safe(flow_rec, tmp, ht_node, hnode) {
-			if (clear_tbl ||
-			    wlan_dp_spm_flow_evict_check(flow_rec)) {
+			flow_evict_success_code =
+					wlan_dp_spm_flow_evict_check(flow_rec);
+			if (clear_tbl || flow_evict_success_code) {
 				wlan_dp_stc_tx_flow_retire_ind(dp_ctx,
-							flow_rec->classified,
-							flow_rec->c_flow_id);
+						flow_rec->classified,
+						flow_rec->c_flow_id,
+						flow_evict_success_code);
 				qdf_hl_del_rcu(&flow_rec->hnode);
 				qdf_call_rcu(&flow_rec->rcu,
 					     dp_spm_add_flow_to_freelist);
