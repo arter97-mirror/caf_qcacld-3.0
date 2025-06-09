@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -60,6 +60,7 @@
 #endif
 #endif
 #include "wlan_nan_api.h"
+#include "wlan_pmo_tgt_api.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
 #define HDD_INFO_SIGNAL                 STATION_INFO_SIGNAL
@@ -319,6 +320,12 @@ static int copy_station_stats_to_adapter(struct wlan_hdd_link_info *link_info,
 		link_info->is_mlo_vdev_active =
 			stats->vdev_extd_stats[0].is_mlo_vdev_active;
 
+	/* save per chain rssi to legacy location */
+	qdf_mem_copy(hdd_stats->per_chain_rssi_stats.rssi,
+		     stats->vdev_chain_rssi[0].chain_rssi,
+		     sizeof(stats->vdev_chain_rssi[0].chain_rssi));
+	hdd_stats->bcn_protect_stats = stats->bcn_protect_stats;
+
 	dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
 	if (!dynamic_cfg) {
 		hdd_err("nss chain dynamic config NULL");
@@ -341,29 +348,18 @@ static int copy_station_stats_to_adapter(struct wlan_hdd_link_info *link_info,
 	}
 
 	/* Intersection of self and AP's NSS capability */
-	if (tx_nss > wlan_vdev_mlme_get_nss(vdev))
-		tx_nss = wlan_vdev_mlme_get_nss(vdev);
-
 	if (rx_nss > wlan_vdev_mlme_get_nss(vdev))
 		rx_nss = wlan_vdev_mlme_get_nss(vdev);
 
 	/* save class a stats to legacy location */
-	hdd_stats->class_a_stat.tx_nss = tx_nss;
 	hdd_stats->class_a_stat.rx_nss = rx_nss;
-	hdd_stats->class_a_stat.tx_rate = stats->tx_rate;
 	hdd_stats->class_a_stat.rx_rate = stats->rx_rate;
 	hdd_stats->class_a_stat.tx_rx_rate_flags = stats->tx_rate_flags;
 
 	he_mcs_12_13_map = wlan_vdev_mlme_get_he_mcs_12_13_map(vdev);
 	is_he_mcs_12_13_supported =
 			wlan_hdd_is_he_mcs_12_13_supported(he_mcs_12_13_map);
-	hdd_stats->class_a_stat.tx_mcs_index =
-		sme_get_mcs_idx(stats->tx_rate, stats->tx_rate_flags,
-				is_he_mcs_12_13_supported,
-				&hdd_stats->class_a_stat.tx_nss,
-				&hdd_stats->class_a_stat.tx_dcm,
-				&hdd_stats->class_a_stat.tx_gi,
-				&hdd_stats->class_a_stat.tx_mcs_rate_flags);
+
 	hdd_stats->class_a_stat.rx_mcs_index =
 		sme_get_mcs_idx(stats->rx_rate, stats->tx_rate_flags,
 				is_he_mcs_12_13_supported,
@@ -372,11 +368,27 @@ static int copy_station_stats_to_adapter(struct wlan_hdd_link_info *link_info,
 				&hdd_stats->class_a_stat.rx_gi,
 				&hdd_stats->class_a_stat.rx_mcs_rate_flags);
 
-	/* save per chain rssi to legacy location */
-	qdf_mem_copy(hdd_stats->per_chain_rssi_stats.rssi,
-		     stats->vdev_chain_rssi[0].chain_rssi,
-		     sizeof(stats->vdev_chain_rssi[0].chain_rssi));
-	hdd_stats->bcn_protect_stats = stats->bcn_protect_stats;
+	/*
+	 * If tx_rate_version not 0, get last tx rate code from firmware
+	 * directly, and get last rx rate code from host DP, don't look up rate
+	 * table to get tx bw/mcs/nss.
+	 */
+	if (hdd_stats->class_a_stat.tx_rate_version ||
+	    !hdd_stats->class_a_stat.is_tx_rate_version_checked)
+		goto out;
+
+	if (tx_nss > wlan_vdev_mlme_get_nss(vdev))
+		tx_nss = wlan_vdev_mlme_get_nss(vdev);
+	hdd_stats->class_a_stat.tx_nss = tx_nss;
+	hdd_stats->class_a_stat.tx_rate = stats->tx_rate;
+	hdd_stats->class_a_stat.tx_mcs_index =
+		sme_get_mcs_idx(stats->tx_rate, stats->tx_rate_flags,
+				is_he_mcs_12_13_supported,
+				&hdd_stats->class_a_stat.tx_nss,
+				&hdd_stats->class_a_stat.tx_dcm,
+				&hdd_stats->class_a_stat.tx_gi,
+				&hdd_stats->class_a_stat.tx_mcs_rate_flags);
+
 out:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	return ret;
@@ -6894,7 +6906,8 @@ void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
 
 	txrx_stats->tx_rate.rate_flags = flags;
 
-	hdd_debug("tx bw %d mode %d nss %d mcs %d flags %x ver %d",
+	hdd_debug("tx rate %d bw %d mode %d nss %d mcs %d flags %x ver %d",
+		  txrx_stats->tx_rate.rate,
 		  txrx_stats->tx_rate.bw,
 		  txrx_stats->tx_rate.mode,
 		  txrx_stats->tx_rate.nss,
@@ -8322,13 +8335,24 @@ fail:
 	return -EINVAL;
 }
 
+/* 11n lowest rate: HT NSS1 MCS0 rate(kbps) */
+#define HT_NSS1_MCS0_RATE 6500
 /**
  * wlan_hdd_get_sta_tx_rate_stats() - get sta tx rate from peer stats
  * @link_info: Link info pointer of STA adapter to get stats
  *
+ * When latest tx pkt is ARP, it uses legacy rate 6Mbps, it will be
+ * reported to upper layer, misunderstands end users since it doesn't
+ * reflect general tx pkt rate. To avoid it:
+ * 1. Non-11a/11b/11g connection, tx_rate.rate >= HT_NSS1_MCS0_RATE, but mode
+ * isn't abg, update rate, mode and mcs/nss/bw.
+ * 2. Non-11a/11b/11g connection, tx_rate.rate < HT_NSS1_MCS0_RATE, downgrade
+ * to 11a/11b/11g, update rate and mode.
+ * 3. 11a/11b/11g connection, update rate and mode.
+ * 4. Other case: don't update, keep last mode/mcs/nss/bw.
+ *
  * Return: errno
  */
-
 static void
 wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 {
@@ -8351,10 +8375,22 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(link_info->vdev,
 							     peer_addr,
 							     &errno);
-	if (!errno) {
-		wlan_hdd_fill_rate_info(&txrx_stats, stats->peer_stats_info_ext);
-		if (txrx_stats.tx_rate.version) {
-			hdd_stats->class_a_stat.tx_rate_version = txrx_stats.tx_rate.version;
+	if (errno)
+		return;
+
+	wlan_hdd_fill_rate_info(&txrx_stats, stats->peer_stats_info_ext);
+	hdd_stats->class_a_stat.tx_rate_version = txrx_stats.tx_rate.version;
+	hdd_stats->class_a_stat.is_tx_rate_version_checked = true;
+	if (!txrx_stats.tx_rate.version) {
+		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
+		return;
+	}
+
+	if (!hdd_is_legacy_connection(link_info)) {
+		if (txrx_stats.tx_rate.rate >= HT_NSS1_MCS0_RATE &&
+		    txrx_stats.tx_rate.mode >= DOT11_N) {
+			/* convert to 100kbps expected by upper layer */
+			hdd_stats->class_a_stat.tx_rate = txrx_stats.tx_rate.rate / 100;
 			hdd_stats->class_a_stat.tx_preamble = txrx_stats.tx_rate.mode;
 			hdd_stats->class_a_stat.tx_bw = txrx_stats.tx_rate.bw;
 			hdd_stats->class_a_stat.tx_nss = txrx_stats.tx_rate.nss;
@@ -8362,10 +8398,15 @@ wlan_hdd_get_sta_tx_rate_stats(struct wlan_hdd_link_info *link_info)
 			hdd_stats->class_a_stat.tx_gi = txrx_stats.tx_rate.gi;
 			hdd_stats->class_a_stat.tx_dcm = txrx_stats.tx_rate.dcm;
 			hdd_stats->class_a_stat.tx_mcs_rate_flags = txrx_stats.tx_rate.rate_flags;
+		} else if (txrx_stats.tx_rate.rate < HT_NSS1_MCS0_RATE) {
+			hdd_stats->class_a_stat.tx_rate = txrx_stats.tx_rate.rate / 100;
+			hdd_stats->class_a_stat.tx_preamble = txrx_stats.tx_rate.mode;
 		}
-		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
-		hdd_stats->class_a_stat.is_tx_rate_version_checked = true;
+	} else {
+		hdd_stats->class_a_stat.tx_rate = txrx_stats.tx_rate.rate / 100;
+		hdd_stats->class_a_stat.tx_preamble = txrx_stats.tx_rate.mode;
 	}
+	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 }
 
 /**
@@ -8425,7 +8466,8 @@ static int wlan_hdd_get_sta_stats(struct wlan_hdd_link_info *link_info,
 	wlan_hdd_get_station_stats(link_info);
 
 	wlan_hdd_get_peer_rx_rate_stats(link_info);
-	wlan_hdd_get_sta_tx_rate_stats(link_info);
+	if (!pmo_tgt_is_target_suspended(hdd_ctx->psoc))
+		wlan_hdd_get_sta_tx_rate_stats(link_info);
 
 	wlan_hdd_update_rssi(link_info, sinfo);
 

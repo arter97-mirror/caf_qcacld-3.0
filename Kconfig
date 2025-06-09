@@ -497,6 +497,10 @@ config FEATURE_STATS_EXT_V2
 	bool "Enable FEATURE_STATS_EXT_V2"
 	default n
 
+config DP_FEATURE_TX_PAGE_POOL
+       bool "enable DP_FEATURE_TX_PAGE_POOL"
+       default n
+
 config FEATURE_TSO
 	bool "Enable TCP Segmentation Offload"
 	default n
@@ -2213,6 +2217,10 @@ config IPA_OPT_WIFI_DP_CTRL
 	bool "Enable IPA_OPT_WIFI_DP_CTRL"
 	depends on IPA_OPT_WIFI_DP
 	default n
+
+config IPA_WDI3_PENDING_BUFF_REPORT
+        bool "Enable IPA_WDI3_PENDING_BUFF_REPORT"
+        default n
 
 config DP_RX_MSDU_DONE_FAIL_HISTORY
         bool "Enable DP_RX_MSDU_DONE_FAIL_HISTORY"
