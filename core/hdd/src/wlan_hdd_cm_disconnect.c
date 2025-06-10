@@ -495,11 +495,6 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	else
 		is_locally_generated = true;
 
-	wlan_connectivity_disconnect_event(vdev, rsp->req.req.bssid.bytes,
-					   rsp->req.req.reason_code,
-					   link_info->rssi_on_disconnect,
-					   is_locally_generated);
-
 	hdd_handle_disassociation_event(link_info, &rsp->req.req.bssid);
 
 	wlan_rec_conn_info(link_info->vdev_id,
@@ -516,6 +511,14 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	adapter->last_disconnect_reason =
 			osif_cm_mac_to_qca_reason(rsp->req.req.reason_code);
 	hdd_set_disconnect_link_info_cb(link_info->vdev_id, false);
+
+	if (adapter->discon_link_info &&
+	    adapter->discon_link_info->vdev_id == link_info->vdev_id)
+		wlan_connectivity_disconnect_event(vdev,
+						   rsp->req.req.bssid.bytes,
+						   rsp->req.req.reason_code,
+						   link_info->rssi_on_disconnect,
+						   is_locally_generated);
 
 	return QDF_STATUS_SUCCESS;
 }
