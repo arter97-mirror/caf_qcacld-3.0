@@ -1460,7 +1460,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		pcl_len = *len;
 	}
 
-	if (policy_mgr_is_sap_mandatory_channel_set(psoc)) {
+	if (mode == PM_SAP_MODE &&
+	    policy_mgr_is_sap_mandatory_channel_set(psoc)) {
 		status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 				psoc, pcl_channels, pcl_weight, len, vdev_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
