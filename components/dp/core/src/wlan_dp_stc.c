@@ -264,22 +264,6 @@ wlan_dp_stc_fill_rx_flow_candidate(struct wlan_dp_stc *dp_stc,
 	candidate->flags |= WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID;
 }
 
-/**
- * wlan_dp_get_tx_flow_hdl() - Retrieve TX flow handle from flow ID
- * @dp_ctx: Pointer to the DP (Data Path) context structure
- * @flow_id: Flow ID used to index into the flow records
- *
- * This API is only call if the tx_flow_id is valid. STC takes care
- * of checking gl_flow_recs when trying to find the tx flow.
- *
- * Return: Pointer to the corresponding struct wlan_dp_spm_flow_info
- */
-static inline struct wlan_dp_spm_flow_info *
-wlan_dp_get_tx_flow_hdl(struct wlan_dp_psoc_context *dp_ctx, uint8_t flow_id)
-{
-	return &dp_ctx->gl_flow_recs[flow_id];
-}
-
 static inline void
 wlan_dp_stc_fill_bidi_flow_candidate(struct wlan_dp_stc *dp_stc,
 				     struct wlan_dp_stc_sampling_candidate *candidate,
@@ -1392,6 +1376,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 		}
 
 		c_entry->flow_active = 1;
+		c_entry->add_ts = dp_stc_get_timestamp();
 		wlan_dp_stc_remove_sampling_table_entry(dp_stc, s_entry);
 		wlan_dp_stc_process_add_classified_flow(dp_stc, c_entry);
 		break;
@@ -2439,10 +2424,13 @@ static inline void
 wlan_dp_stc_print_c_entry(struct wlan_dp_stc *dp_stc,
 			  struct wlan_dp_stc_classified_flow_entry *c_entry)
 {
-	uint64_t  cur_ts = dp_stc_get_timestamp();
+	struct flow_info *flow_tuple = &c_entry->flow_tuple;
+	uint64_t cur_ts = dp_stc_get_timestamp();
+	uint8_t buf[BUF_LEN_MAX];
 
 	dp_stc_info(dp_stc->logmask,
-		    "STC: id %d active %d vdev_id %u peer_id %u traffic_type %d inactive %llu/%llu[%u]",
+		    "STC: [%s] id %d active %d vdev_id %u peer_id %u traffic_type %d inactive %llu/%llu[%u]",
+		    dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
 		    c_entry->id, c_entry->flow_active, c_entry->vdev_id,
 		    c_entry->peer_id, c_entry->traffic_type,
 		    c_entry->inactive_time, cur_ts - c_entry->add_ts,

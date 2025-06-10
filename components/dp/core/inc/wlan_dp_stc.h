@@ -802,6 +802,54 @@ dp_stc_is_remove_flow_allowed(uint8_t classified, uint8_t selected_to_sample,
 }
 
 /**
+ * wlan_dp_get_tx_flow_hdl() - Retrieve TX flow handle from flow ID
+ * @dp_ctx: Pointer to the DP (Data Path) context structure
+ * @flow_id: Flow ID used to index into the flow records
+ *
+ * This API is only call if the tx_flow_id is valid. STC takes care
+ * of checking gl_flow_recs when trying to find the tx flow.
+ *
+ * Return: Pointer to the corresponding struct wlan_dp_spm_flow_info
+ */
+static inline struct wlan_dp_spm_flow_info *
+wlan_dp_get_tx_flow_hdl(struct wlan_dp_psoc_context *dp_ctx, uint8_t flow_id)
+{
+	return &dp_ctx->gl_flow_recs[flow_id];
+}
+
+static inline uint8_t *
+dp_print_tx_flow_info_to_str(uint32_t flow_id, enum wlan_dp_flow_dir dir,
+			     uint8_t *buf, uint16_t buf_len)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_spm_flow_info *tx_flow;
+	uint16_t len = 0;
+
+	tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, flow_id);
+	len += scnprintf(buf + len, buf_len - len, "%u %u %llu",
+			 tx_flow->selected_to_sample,
+			 tx_flow->classified, tx_flow->flow_add_ts);
+
+	return buf;
+}
+
+static inline uint8_t *
+dp_print_rx_flow_info_to_str(uint32_t flow_id, enum wlan_dp_flow_dir dir,
+			     uint8_t *buf, uint16_t buf_len)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct dp_fisa_rx_sw_ft *rx_flow;
+	uint16_t len = 0;
+
+	rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, flow_id);
+	len += scnprintf(buf + len, buf_len - len, "%u %u %llu",
+			 rx_flow->selected_to_sample,
+			 rx_flow->classified, rx_flow->flow_init_ts);
+
+	return buf;
+}
+
+/**
  * wlan_dp_indicate_flow_add() - Indication to STC when flow is added
  * @dp_ctx: Global DP psoc context
  * @dir: direction of flow (RX/TX)
@@ -817,20 +865,27 @@ wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 {
 	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
 	uint8_t buf[BUF_LEN_MAX];
+	uint8_t flow_info_buf[BUF_LEN_MAX];
 
 	if (!dp_stc)
 		return;
 
 	switch (dir) {
 	case WLAN_DP_FLOW_DIR_TX:
-		dp_stc_debug(dp_stc->logmask, "STC: Add TX flow [%u] %s",
+		dp_stc_debug(dp_stc->logmask, "STC: Add TX flow [%u] %s [%s]",
 			     flow_id, dp_print_tuple_to_str(flow_tuple, buf,
-							    BUF_LEN_MAX));
+							    BUF_LEN_MAX),
+			     dp_print_tx_flow_info_to_str(flow_id, dir,
+							  flow_info_buf,
+							  BUF_LEN_MAX));
 		break;
 	case WLAN_DP_FLOW_DIR_RX:
-		dp_stc_debug(dp_stc->logmask, "STC: Add RX flow [%u] %s",
+		dp_stc_debug(dp_stc->logmask, "STC: Add RX flow [%u] %s [%s]",
 			     flow_id, dp_print_tuple_to_str(flow_tuple, buf,
-							    BUF_LEN_MAX));
+							    BUF_LEN_MAX),
+			     dp_print_rx_flow_info_to_str(flow_id, dir,
+							  flow_info_buf,
+							  BUF_LEN_MAX));
 		break;
 	default:
 		break;
