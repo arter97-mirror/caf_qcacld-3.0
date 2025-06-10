@@ -882,6 +882,17 @@ QDF_STATUS hdd_tx_powerboost_reinit(struct hdd_context *hdd_ctx)
 	return status;
 }
 
+QDF_STATUS hdd_txpb_wifi_off_app_stop(struct hdd_context *hdd_ctx)
+{
+	struct reg_txpb_cmn_params params = {0};
+
+	if (!hdd_ctx->tx_pb.txpb_app_launched)
+		return QDF_STATUS_SUCCESS;
+
+	hdd_debug("TPB: Issue app stop due to WiFi off");
+	return hdd_txpb_inference_app_stop(hdd_ctx, &params);
+}
+
 /**
  * hdd_tx_pb_configure - Process the Tx Power boost config
  * operation in the received vendor command

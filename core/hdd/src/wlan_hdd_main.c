@@ -20397,6 +20397,7 @@ static void __hdd_inform_wifi_off(void)
 		return;
 
 	ucfg_dlm_wifi_off(hdd_ctx->pdev);
+	hdd_txpb_wifi_off_app_stop(hdd_ctx);
 
 	if (rtnl_trylock()) {
 		wlan_hdd_lpc_del_monitor_interface(hdd_ctx, false);
