@@ -15093,15 +15093,12 @@ static void hdd_set_mtrace_for_each(struct hdd_context *hdd_ctx)
 	uint8_t module_id = 0;
 	int qdf_print_idx = -1;
 
-	if (!hdd_ctx->config->enable_mtrace)
-		return;
-
 	qdf_print_idx = qdf_get_pidx();
 	for (module_id = 0; module_id < QDF_MODULE_ID_MAX; module_id++)
 		qdf_print_set_category_verbose(
 					qdf_print_idx,
 					module_id, QDF_TRACE_LEVEL_TRACE,
-					true);
+					hdd_ctx->config->enable_mtrace);
 }
 #else
 static void hdd_set_mtrace_for_each(struct hdd_context *hdd_ctx)
@@ -15171,6 +15168,9 @@ static void hdd_set_trace_level_for_each(struct hdd_context *hdd_ctx)
 	uint32_t bitmask;
 	uint32_t i;
 
+	/* gHostModuleLoglevel has a higher priority than enable_mtrace */
+	hdd_set_mtrace_for_each(hdd_ctx);
+
 	qdf_uint8_array_parse(cfg_get(hdd_ctx->psoc,
 				      CFG_ENABLE_HOST_MODULE_LOG_LEVEL),
 			      host_module_log,
@@ -15184,8 +15184,6 @@ static void hdd_set_trace_level_for_each(struct hdd_context *hdd_ctx)
 		    module_id >= QDF_MODULE_ID_MIN)
 			hdd_qdf_trace_enable(module_id, bitmask);
 	}
-
-	hdd_set_mtrace_for_each(hdd_ctx);
 }
 
 /**
