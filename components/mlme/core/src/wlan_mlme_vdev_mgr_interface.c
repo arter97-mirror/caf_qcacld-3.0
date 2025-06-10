@@ -2378,6 +2378,16 @@ static QDF_STATUS ap_mlme_vdev_csa_complete(struct vdev_mlme_obj *vdev_mlme)
 	return QDF_STATUS_SUCCESS;
 }
 
+uint32_t wlan_sap_get_acs_weight_adjustable(enum phy_ch_width cur_bw)
+{
+	return wlansap_get_acs_weight_adjustable(cur_bw);
+}
+
+bool wlan_sap_is_ch_non_overlap(uint8_t vdev_id, qdf_freq_t freq)
+{
+	return wlansap_is_ch_non_overlap(vdev_id, freq);
+}
+
 #ifdef WLAN_FEATURE_LL_LT_SAP
 QDF_STATUS
 wlan_ll_sap_sort_channel_list(uint8_t vdev_id, qdf_list_t *list,

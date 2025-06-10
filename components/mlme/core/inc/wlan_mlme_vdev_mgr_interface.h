@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -564,6 +564,24 @@ wlan_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+
+/**
+ * wlan_sap_get_acs_weight_adjustable() - get channel weight
+ * @cur_bw: bandwidth
+ *
+ * Return: channel weight
+ */
+uint32_t wlan_sap_get_acs_weight_adjustable(enum phy_ch_width cur_bw);
+
+/**
+ * wlan_sap_is_ch_non_overlap() - check if channel is overlapping
+ * @vdev_id: vdev id
+ * @freq: freq
+ *
+ * Return: true if channel is non overlapping
+ */
+bool
+wlan_sap_is_ch_non_overlap(uint8_t vdev_id, qdf_freq_t freq);
 
 #ifdef WLAN_FEATURE_LL_LT_SAP
 /**
