@@ -9108,11 +9108,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		freq = (qdf_freq_t)chandef->chan->center_freq;
 		channel_width = wlan_hdd_get_channel_bw(chandef->width);
 	}
+	intf_pm_mode =
+		policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+						     adapter->device_mode,
+						     adapter->deflink->vdev_id);
 
 	if (QDF_STATUS_SUCCESS !=
 	    ucfg_policy_mgr_get_sap_mandt_chnl(hdd_ctx->psoc, &mandt_chnl_list))
 		hdd_err("can't get mandatory channel list");
-	if (mandt_chnl_list && adapter->device_mode == QDF_SAP_MODE)
+	if (mandt_chnl_list && intf_pm_mode == PM_SAP_MODE)
 		policy_mgr_init_sap_mandatory_chan(hdd_ctx->psoc,
 						   chandef->chan->center_freq);
 
@@ -9139,11 +9143,6 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			  chandef->chan->center_freq);
 		return -EINVAL;
 	}
-
-	intf_pm_mode =
-		policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
-						     adapter->device_mode,
-						     adapter->deflink->vdev_id);
 
 	vdev_opmode = wlan_vdev_mlme_get_opmode(link_info->vdev);
 	ucfg_mlme_get_srd_master_mode_for_vdev(hdd_ctx->psoc, vdev_opmode,
