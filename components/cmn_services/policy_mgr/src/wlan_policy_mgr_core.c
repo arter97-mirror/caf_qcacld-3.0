@@ -5114,12 +5114,10 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 	uint32_t num_connections, acs_band = QCA_ACS_MODE_IEEE80211ANY;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	QDF_STATUS status;
-	struct policy_mgr_conc_connection_info
-			info[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
-	struct policy_mgr_conc_connection_info
-			info_sap[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
-	struct policy_mgr_conc_connection_info
-			info_go[MAX_NUMBER_OF_CONC_CONNECTIONS] = { {0} };
+	uint32_t size;
+	struct policy_mgr_conc_connection_info *info;
+	struct policy_mgr_conc_connection_info *info_sap;
+	struct policy_mgr_conc_connection_info *info_go;
 	uint8_t num_cxn_del = 0;
 	uint8_t num_cxn_del_sap = 0;
 	uint8_t num_cxn_del_go = 0;
@@ -5175,6 +5173,17 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 	    !policy_mgr_get_ap_6ghz_capable(psoc, vdev_id, NULL))
 		allow_6ghz = false;
 
+	size = sizeof(struct policy_mgr_conc_connection_info) *
+		MAX_NUMBER_OF_CONC_CONNECTIONS;
+	info = qdf_mem_malloc(size);
+	info_sap = qdf_mem_malloc(size);
+	info_go = qdf_mem_malloc(size);
+	if (!info || !info_sap || !info_go)
+		goto out;
+	qdf_mem_zero(info, size);
+	qdf_mem_zero(info_sap, size);
+	qdf_mem_zero(info_go, size);
+
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	/*
 	 * For SAP restart case SAP/GO entry might be present in table,
@@ -5229,6 +5238,14 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 	}
 
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+out:
+	if (info)
+		qdf_mem_free(info);
+	if (info_sap)
+		qdf_mem_free(info_sap);
+	if (info_go)
+		qdf_mem_free(info_go);
 }
 
 void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
