@@ -8271,6 +8271,7 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 	struct get_station_client_info *client_info;
 	uint8_t iter;
 	int flags = cds_get_gfp_flags();
+	bool is_nl_app_registered = false;
 
 	nl_buf_len = wlan_hdd_calculate_get_sta_len(sinfo);
 	for (iter = 0; iter < GET_STA_MAX_HOST_CLIENT; iter++) {
@@ -8278,6 +8279,8 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 
 		if (!client_info->in_use)
 			continue;
+
+		is_nl_app_registered = true;
 
 		skb = cfg80211_vendor_event_alloc_ucast(
 						hdd_ctx->wiphy, &adapter->wdev,
@@ -8418,6 +8421,9 @@ wlan_hdd_fill_send_get_sta_ucast_stats(struct wlan_hdd_link_info *link_info,
 		hdd_debug("PortId: %u", client_info->port_id);
 		wlan_cfg80211_vendor_event(skb, flags);
 	}
+
+	if (!is_nl_app_registered)
+		return QDF_STATUS_SUCCESS;
 
 	hdd_nofl_debug("RSSI %d tx_bytes %llu rx_bytes %llu tx_packets %u rx_packets %u tx_retries %u tx_failed %u rx_mpdu %u fcs_count %u signal_avg %u expected throughput %u connected time %u inactive time %u",
 		       sinfo->signal, sinfo->tx_bytes, sinfo->rx_bytes,
