@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -341,11 +341,6 @@ static void hdd_soc_recovery_cleanup(void)
 	/* nothing to do if the soc is already unloaded */
 	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
 		hdd_info("Driver modules are already closed");
-		return;
-	}
-
-	if (cds_is_load_or_unload_in_progress()) {
-		hdd_info("Load/unload in progress, ignore SSR shutdown");
 		return;
 	}
 
