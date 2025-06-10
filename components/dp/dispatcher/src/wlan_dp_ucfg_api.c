@@ -3454,3 +3454,16 @@ QDF_STATUS ucfg_dp_lpc_get_link_info(struct cdp_link_info *dp_link_info)
 
 	return dp_ctx->dp_ops.dp_lpc_get_link_info(dp_link_info);
 }
+
+QDF_STATUS ucfg_dp_update_pkt_capture_link_ctx(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err("DP link not found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return  wlan_pkt_capture_update_dp_link_ctx(dp_link);
+}

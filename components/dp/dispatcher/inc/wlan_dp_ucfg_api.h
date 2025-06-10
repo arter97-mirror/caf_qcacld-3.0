@@ -2178,4 +2178,13 @@ void ucfg_dp_set_ipv4_addr(struct wlan_objmgr_vdev *vdev, uint8_t *ip_addr);
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_dp_lpc_get_link_info(struct cdp_link_info *dp_link_info);
+
+/**
+ * ucfg_dp_update_pkt_capture_link_ctx() - Update pkt capture link ctx
+ * @vdev: vdev mapped to DP interface
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_update_pkt_capture_link_ctx(struct wlan_objmgr_vdev *vdev);
+
 #endif /* _WLAN_DP_UCFG_API_H_ */
