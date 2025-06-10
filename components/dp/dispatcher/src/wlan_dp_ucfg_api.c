@@ -1500,7 +1500,6 @@ QDF_STATUS ucfg_dp_softap_register_txrx_ops(struct wlan_objmgr_vdev *vdev,
 
 QDF_STATUS ucfg_dp_register_pkt_capture_callbacks(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
 
 	dp_link = dp_get_vdev_priv_obj(vdev);
@@ -1509,10 +1508,9 @@ QDF_STATUS ucfg_dp_register_pkt_capture_callbacks(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	dp_intf = dp_link->dp_intf;
 	return wlan_pkt_capture_register_callbacks(vdev,
 						   dp_mon_rx_packet_cbk,
-						   dp_intf);
+						   dp_link);
 }
 
 QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
