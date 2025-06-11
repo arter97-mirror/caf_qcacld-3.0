@@ -135,6 +135,17 @@ QDF_STATUS wlan_hdd_tx_power_boost_dev_create(void);
  * Return: void
  */
 void wlan_hdd_tx_power_boost_dev_destroy(void);
+
+/**
+ * hdd_txpb_wifi_off_app_stop() - Send App stop upon Wifi Off
+ * @hdd_ctx: HDD context
+ *
+ * This function sends APP stop to the firmware upon Wifi Off and
+ * APP start will be sent again upon Wifi ON (user space sends NL command)
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_txpb_wifi_off_app_stop(struct hdd_context *hdd_ctx);
 #else
 #define FEATURE_VENDOR_SUBCMD_CONFIG_TX_POWER_BOOST
 #define FEATURE_TX_POWER_BOOST_EVENTS
@@ -177,6 +188,12 @@ QDF_STATUS wlan_hdd_tx_power_boost_dev_create(void)
 static inline
 void wlan_hdd_tx_power_boost_dev_destroy(void)
 {
+}
+
+static inline
+QDF_STATUS hdd_txpb_wifi_off_app_stop(struct hdd_context *hdd_ctx)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* FEATURE_WLAN_TX_POWERBOOST */
 #endif /* __WLAN_HDD_TX_POWERBOOST_H */
