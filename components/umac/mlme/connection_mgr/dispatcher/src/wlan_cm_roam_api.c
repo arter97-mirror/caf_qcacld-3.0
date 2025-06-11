@@ -3660,12 +3660,12 @@ cm_stats_log_roam_scan_candidates(struct wmi_roam_candidate_info *ap,
 	char time[TIME_STRING_LEN], time2[TIME_STRING_LEN];
 
 
-	mlme_rl_nofl_info("%62s%62s", LINE_STR, LINE_STR);
-	mlme_rl_nofl_info("%13s %16s %8s %4s %4s %5s/%3s %3s/%3s %7s %7s %6s %12s %20s",
-			  "AP BSSID", "TSTAMP", "CH", "TY", "ETP", "RSSI",
-			  "SCR", "CU%", "SCR", "TOT_SCR", "BL_RSN", "BL_SRC",
-			  "BL_TSTAMP", "BL_TIMEOUT(ms)");
-	mlme_rl_nofl_info("%62s%62s", LINE_STR, LINE_STR);
+	mlme_nofl_info("%62s%62s", LINE_STR, LINE_STR);
+	mlme_nofl_info("%13s %16s %8s %4s %4s %5s/%3s %3s/%3s %7s %7s %6s %12s %20s",
+		       "AP BSSID", "TSTAMP", "CH", "TY", "ETP", "RSSI",
+		       "SCR", "CU%", "SCR", "TOT_SCR", "BL_RSN", "BL_SRC",
+		       "BL_TSTAMP", "BL_TIMEOUT(ms)");
+	mlme_nofl_info("%62s%62s", LINE_STR, LINE_STR);
 
 	if (num_entries > MAX_ROAM_CANDIDATE_AP)
 		num_entries = MAX_ROAM_CANDIDATE_AP;
@@ -3673,14 +3673,14 @@ cm_stats_log_roam_scan_candidates(struct wmi_roam_candidate_info *ap,
 	for (i = 0; i < num_entries; i++) {
 		mlme_get_converted_timestamp(ap->timestamp, time);
 		mlme_get_converted_timestamp(ap->dl_timestamp, time2);
-		mlme_rl_nofl_info(QDF_MAC_ADDR_FMT " %17s %4d %-4s %4d %3d/%-4d %2d/%-4d %5d %7d %7d %17s %9d",
-				  QDF_MAC_ADDR_REF(ap->bssid.bytes), time,
-			ap->freq,
-			((ap->type == 0) ? "C_AP" :
-			((ap->type == 2) ? "R_AP" : "P_AP")),
-			ap->etp, ap->rssi, ap->rssi_score, ap->cu_load,
-			ap->cu_score, ap->total_score, ap->dl_reason,
-			ap->dl_source, time2, ap->dl_original_timeout);
+		mlme_nofl_info(QDF_MAC_ADDR_FMT " %17s %4d %-4s %4d %3d/%-4d %2d/%-4d %5d %7d %7d %17s %9d",
+			       QDF_MAC_ADDR_REF(ap->bssid.bytes), time,
+			       ap->freq,
+			       ((ap->type == 0) ? "C_AP" :
+			       ((ap->type == 2) ? "R_AP" : "P_AP")),
+			       ap->etp, ap->rssi, ap->rssi_score, ap->cu_load,
+			       ap->cu_score, ap->total_score, ap->dl_reason,
+			       ap->dl_source, time2, ap->dl_original_timeout);
 		/* Update roam candidates info to userspace */
 		cm_roam_candidate_info_event(ap, i);
 		ap++;
