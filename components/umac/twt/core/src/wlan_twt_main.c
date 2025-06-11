@@ -2342,6 +2342,74 @@ fail:
 	return qdf_status;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_twt_clear_wait_for_notify_flag_for_ml() - Clear wait for notify flag
+ * for ml sta.
+ * @psoc: pointer to psoc object
+ * @vdev: pointer to vdev object
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_twt_clear_wait_for_notify_flag_for_ml(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev_ctx;
+	struct wlan_objmgr_vdev *vdev_iter;
+	uint32_t i;
+	QDF_STATUS status;
+
+	ml_dev_ctx = vdev->mlo_dev_ctx;
+	if (!ml_dev_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!ml_dev_ctx->wlan_vdev_list[i])
+			continue;
+		vdev_iter = ml_dev_ctx->wlan_vdev_list[i];
+		status = wlan_twt_set_wait_for_notify(
+						psoc,
+						wlan_vdev_get_id(vdev_iter),
+						false);
+	}
+
+	return status;
+}
+#else
+static QDF_STATUS
+wlan_twt_clear_wait_for_notify_flag_for_ml(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+static QDF_STATUS
+wlan_twt_clear_wait_for_notify_flag(struct wlan_objmgr_psoc *psoc,
+				    uint32_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_TWT_ID);
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		status = wlan_twt_set_wait_for_notify(psoc, vdev_id, false);
+		goto rel;
+	} else {
+		status = wlan_twt_clear_wait_for_notify_flag_for_ml(psoc, vdev);
+	}
+
+rel:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
+	return status;
+}
+
 QDF_STATUS
 wlan_twt_notify_event_handler(struct wlan_objmgr_psoc *psoc,
 			      struct twt_notify_event_param *event)
@@ -2349,8 +2417,9 @@ wlan_twt_notify_event_handler(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 
 	if (event->status == HOST_TWT_NOTIFY_EVENT_READY)
-		status = wlan_twt_set_wait_for_notify(psoc, event->vdev_id,
-						      false);
+		status = wlan_twt_clear_wait_for_notify_flag(
+							psoc,
+							event->vdev_id);
 	else
 		status = wlan_twt_update_peer_twt_required_bit(psoc, event);
 
