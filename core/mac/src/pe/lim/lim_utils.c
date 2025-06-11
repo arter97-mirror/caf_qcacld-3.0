@@ -11394,16 +11394,7 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 	if (cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
 		return false;
 
-	if (sta_ptr->htSupportedChannelWidthSet) {
-		if (sta_ptr->vhtSupportedChannelWidthSet >
-		    WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
-			oper_mode = CH_WIDTH_160MHZ;
-		else
-			oper_mode = sta_ptr->vhtSupportedChannelWidthSet + 1;
-	} else {
-		oper_mode = CH_WIDTH_20MHZ;
-	}
-
+	oper_mode = session->ch_width;
 	fw_vht_ch_wd = wlan_mlme_get_max_bw();
 
 	if (ch_width > fw_vht_ch_wd) {
