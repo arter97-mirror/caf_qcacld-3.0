@@ -5084,6 +5084,20 @@ cm_cp_stats_cstats_roam_result(struct wlan_objmgr_vdev *vdev,
 }
 #endif /* WLAN_CHIPSET_STATS */
 
+static inline bool
+is_roam_scan_type_full(struct wmi_roam_scan_data *roam_scan)
+{
+	if (!roam_scan || !roam_scan->present)
+		return false;
+
+	if (roam_scan->type == ROAM_STATS_SCAN_TYPE_FULL ||
+	    roam_scan->type == ROAM_STATS_SCAN_TYPE_HIGHER_BAND_5GHZ_6GHZ ||
+	    roam_scan->type == ROAM_STATS_SCAN_TYPE_HIGHER_BAND_6GHZ)
+		return true;
+
+	return false;
+}
+
 QDF_STATUS
 cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 			    struct roam_stats_event *stats_info)
@@ -5108,10 +5122,7 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < stats_info->num_tlv; i++) {
 		if (stats_info->trigger[i].present) {
 			bool is_full_scan =
-				stats_info->scan[i].present &&
-				(stats_info->scan[i].type ==
-				 WLAN_ROAM_SCAN_TYPE_FULL_SCAN);
-
+				is_roam_scan_type_full(&stats_info->scan[i]);
 			cm_cp_stats_cstats_roam_scan_start
 				(vdev, &stats_info->trigger[i], is_full_scan);
 
@@ -5139,7 +5150,8 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 					stats_info->trigger[i].timestamp);
 
 				cm_cp_stats_cstats_roam_scan_done
-				     (vdev, &stats_info->scan[i], is_full_scan);
+					(vdev, &stats_info->scan[i],
+					 is_full_scan);
 
 				trigger = stats_info->trigger[i].trigger_reason;
 				scan = &stats_info->scan[i];
