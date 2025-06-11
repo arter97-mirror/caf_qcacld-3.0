@@ -38,6 +38,7 @@
 #include "wlan_mlme_api.h"
 #include "osif_vdev_mgr_util.h"
 #include "wlan_hdd_main.h"
+#include "wlan_hdd_p2p.h"
 
 #define MAX_NO_OF_2_4_CHANNELS 14
 #define MAX_OFFCHAN_TIME_FOR_DNBS 150
@@ -102,6 +103,14 @@ p2p_wfdr2_attr_policy[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_CONFIG] = {.type = NLA_U8,},
 };
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+const struct nla_policy
+p2p_noa_attr_policy[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_COUNT] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_DURATION] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_INTERVAL] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_START] = {.type = NLA_U32},
+};
 
 #define DST_MAC_ADDRESS_OFFSET 4
 #define MGMT_FRAME_MATCH_LEN 6
@@ -987,3 +996,50 @@ int osif_p2p_parse_wfd_params(struct hdd_adapter *adapter, const void *data,
 	return ret;
 }
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+int osif_p2p_parse_noa_params(struct hdd_adapter *adapter,
+			      struct p2p_ps_config *noa, const void *data,
+			      int data_len)
+{
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX + 1];
+	int ret = 0;
+	int count, duration = 0, interval = 0, start = 0;
+
+	/* Parse and fetch NOA params*/
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_MAX,
+				    data, data_len, p2p_noa_attr_policy)) {
+		osif_debug("Invalid P2P NOA vendor command attributes");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_COUNT]) {
+		osif_debug("Invalid P2P NOA Count Attribute");
+		return -EINVAL;
+	}
+	count = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_COUNT]);
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_DURATION]) {
+		osif_debug("Invalid P2P NOA Duration Attribute");
+		return -EINVAL;
+	}
+	duration = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_DURATION]);
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_INTERVAL]) {
+		osif_debug("Invalid P2P NOA Interval Attribute");
+		return -EINVAL;
+	}
+	interval = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_INTERVAL]);
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_START])
+		start = nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_P2P_SET_NOA_START]);
+
+	osif_debug("P2P_SET GO noa: count=%d interval=%d duration=%d start=%d",
+		   count, interval, duration, start);
+
+	noa->count = count;
+	noa->duration = duration;
+	noa->interval = interval;
+	noa->start = start;
+
+	return ret;
+}
