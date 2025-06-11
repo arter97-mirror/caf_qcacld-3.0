@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2015, 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -81,6 +81,30 @@ void lim_release_pre_auth_node(struct mac_context *mac,
 void lim_restore_from_auth_state(struct mac_context *,
 				tSirResultCodes, uint16_t, struct pe_session *);
 uint8_t lim_delete_open_auth_pre_auth_node(struct mac_context *mac_ctx);
+
+#ifdef AUTO_PLATFORM
+/**
+ * lim_del_stale_auth_node_assoc_req_timeout() - Delete stale node once happen
+ * waiting for assoc req timeout.
+ * @mac_ctx: Pointer to Global MAC structure
+ * @auth_node:auth node in the list
+ *
+ * This function is called to delete stale node on receiving
+ * authentication frame and meanwhile it stuck in auth state
+ * more than INI assoc_request_wait_time defined.
+ *
+ * Return: None
+ */
+void
+lim_del_stale_auth_node_assoc_req_timeout(struct mac_context *mac_ctx,
+					  struct tLimPreAuthNode *auth_node);
+#else
+static inline void
+lim_del_stale_auth_node_assoc_req_timeout(struct mac_context *mac_ctx,
+					  struct tLimPreAuthNode *auth_node)
+{
+}
+#endif
 
 /* Encryption/Decryption related functions */
 void lim_compute_crc32(uint8_t *, uint8_t *, uint16_t);

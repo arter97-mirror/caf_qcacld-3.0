@@ -52,6 +52,9 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_vdev_mgr_api.h"
 
+#define MIN_FIRST_BMISS_CNT 2
+#define MIN_FINAL_BMISS_CNT 5
+
 #ifdef WLAN_FEATURE_SAE
 #define CM_IS_FW_FT_SAE_SUPPORTED(fw_akm_bitmap) \
 	(((fw_akm_bitmap) & (1 << AKM_FT_SAE)) ? true : false)
@@ -70,6 +73,33 @@
 #endif
 
 /**
+ * cm_roam_scan_update_bmiss_cnt_for_dfs() - Update beacon miss count
+ * for dfs sap concurrency case
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @first_val: input first beacon miss count
+ * @final_val: input final beacon miss count
+ *
+ * This function is used to update beacon miss count parameters
+ *
+ * Return: None
+ */
+static void
+cm_roam_scan_update_bmiss_cnt_for_dfs(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      uint8_t *first_val,
+				      uint8_t *final_val)
+{
+	if (policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(psoc, vdev_id)) {
+		if (*first_val > MIN_FIRST_BMISS_CNT)
+			*first_val = MIN_FIRST_BMISS_CNT;
+
+		if (*final_val > MIN_FINAL_BMISS_CNT)
+			*final_val = MIN_FINAL_BMISS_CNT;
+	}
+}
+
+/**
  * cm_roam_scan_bmiss_cnt() - set roam beacon miss count
  * @psoc: psoc pointer
  * @vdev_id: vdev id
@@ -83,15 +113,20 @@ static void
 cm_roam_scan_bmiss_cnt(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		       struct wlan_roam_beacon_miss_cnt *params)
 {
-	uint8_t beacon_miss_count;
+	uint8_t beacon_first_miss_count;
+	uint8_t beacon_final_miss_count;
 
 	params->vdev_id = vdev_id;
 
-	wlan_mlme_get_roam_bmiss_first_bcnt(psoc, &beacon_miss_count);
-	params->roam_bmiss_first_bcnt = beacon_miss_count;
+	wlan_mlme_get_roam_bmiss_first_bcnt(psoc, &beacon_first_miss_count);
+	wlan_mlme_get_roam_bmiss_final_bcnt(psoc, &beacon_final_miss_count);
 
-	wlan_mlme_get_roam_bmiss_final_bcnt(psoc, &beacon_miss_count);
-	params->roam_bmiss_final_bcnt = beacon_miss_count;
+	cm_roam_scan_update_bmiss_cnt_for_dfs(psoc, vdev_id,
+					      &beacon_first_miss_count,
+					      &beacon_final_miss_count);
+
+	params->roam_bmiss_first_bcnt = beacon_first_miss_count;
+	params->roam_bmiss_final_bcnt = beacon_final_miss_count;
 }
 
 /**
@@ -251,6 +286,28 @@ release:
 }
 
 /**
+ * cm_roam_update_trigger_bitmap() - update roam triggers based on
+ * dfs concurrency
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @params: roam triggers parameters
+ *
+ * This function is used to update roam triggers parameters
+ *
+ * Return: None
+ */
+static void
+cm_roam_update_trigger_bitmap(struct wlan_objmgr_psoc *psoc,
+			      uint8_t vdev_id,
+			      struct wlan_roam_triggers *params)
+{
+	if (policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(psoc, vdev_id)) {
+		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_DEAUTH);
+		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_BMISS);
+	}
+}
+
+/**
  * cm_roam_triggers() - set roam triggers
  * @psoc: psoc pointer
  * @vdev_id: vdev id
@@ -287,6 +344,8 @@ cm_roam_triggers(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_IDLE);
 		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_BTC);
 	}
+
+	cm_roam_update_trigger_bitmap(psoc, vdev_id, params);
 
 	mlme_debug("[ROAM_TRIGGER] trigger_bitmap:%d", params->trigger_bitmap);
 
@@ -491,6 +550,10 @@ cm_roam_scan_offload_fill_lfr3_config(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_INVAL;
 
+	if (!rso_cfg->roam_control_enable &&
+	    mlme_obj->cfg.lfr.roam_force_rssi_trigger)
+		*mode |= WMI_ROAM_SCAN_MODE_RSSI_CHANGE;
+
 	rso_config->roam_offload_enabled =
 		mlme_obj->cfg.lfr.lfr3_roaming_offload;
 	if (!rso_config->roam_offload_enabled)
@@ -515,9 +578,6 @@ cm_roam_scan_offload_fill_lfr3_config(struct wlan_objmgr_vdev *vdev,
 		mlme_obj->cfg.btm.rct_validity_timer;
 	rso_config->rso_lfr3_params.disable_self_roam =
 		!mlme_obj->cfg.lfr.enable_self_bss_roam;
-	if (!rso_cfg->roam_control_enable &&
-	    mlme_obj->cfg.lfr.roam_force_rssi_trigger)
-		*mode |= WMI_ROAM_SCAN_MODE_RSSI_CHANGE;
 	/*
 	 * Self rsn caps aren't sent to firmware, so in case of PMF required,
 	 * the firmware connects to a non PMF AP advertising PMF not required
@@ -2886,6 +2946,11 @@ static void cm_update_driver_assoc_ies(struct wlan_objmgr_psoc *psoc,
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
 		return;
+
+	/* Strip RSNO selector IE before sending to firmware */
+	wlan_strip_ie(rso_cfg->assoc_ie.ptr, (uint16_t *)&rso_cfg->assoc_ie.len,
+		      WLAN_ELEMID_VENDOR, ONE_BYTE, RSNO_OUI_SELECTION,
+		      RSNO_OUI_SIZE, NULL, 0);
 
 	rrm_cap_ie_data = wlan_cm_get_rrm_cap_ie_data();
 	/* Re-Assoc IE TLV parameters */

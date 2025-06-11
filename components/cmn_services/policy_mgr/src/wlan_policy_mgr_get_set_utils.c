@@ -2023,15 +2023,22 @@ policy_mgr_2_freq_same_mac_in_dbs(struct wlan_objmgr_psoc *psoc,
 }
 
 bool
-policy_mgr_2_freq_same_mac_in_sbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+policy_mgr_2_freq_same_mac_in_sbs(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t freq_1, qdf_freq_t freq_2)
 {
 	struct policy_mgr_freq_range *sbs_low_share;
 	struct policy_mgr_freq_range *sbs_uppr_share;
 	struct policy_mgr_freq_range *sbs_range;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
 
 	/* Return true if non SBS capable HW */
-	if (!policy_mgr_is_hw_sbs_capable(pm_ctx->psoc))
+	if (!policy_mgr_is_hw_sbs_capable(psoc))
 		return true;
 
 	if (policy_mgr_can_2ghz_share_low_high_5ghz_sbs(pm_ctx)) {
@@ -2080,13 +2087,8 @@ policy_mgr_is_cur_freq_range_sbs(struct wlan_objmgr_psoc *psoc)
 bool policy_mgr_2_freq_always_on_same_mac(struct wlan_objmgr_psoc *psoc,
 					  qdf_freq_t freq_1, qdf_freq_t freq_2)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool is_dbs_mode_same_mac = true;
 	bool is_sbs_mode_same_mac = true;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx)
-		return false;
 
 	is_dbs_mode_same_mac =
 		policy_mgr_2_freq_same_mac_in_dbs(psoc, freq_1, freq_2);
@@ -2094,7 +2096,7 @@ bool policy_mgr_2_freq_always_on_same_mac(struct wlan_objmgr_psoc *psoc,
 	/* if DBS mode leading to same mac, check for SBS mode */
 	if (is_dbs_mode_same_mac)
 		is_sbs_mode_same_mac =
-			policy_mgr_2_freq_same_mac_in_sbs(pm_ctx, freq_1,
+			policy_mgr_2_freq_same_mac_in_sbs(psoc, freq_1,
 							  freq_2);
 
 	policy_mgr_rl_debug("freq1 %d freq2 %d: Same mac:: DBS:%d SBS:%d",
@@ -2301,6 +2303,36 @@ policy_mgr_are_3_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 	return policy_mgr_3_freq_always_on_same_mac(psoc, freq_1, freq_2,
 						    freq_3);
 }
+
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+qdf_freq_t
+policy_mgr_get_conc_freq_if_ml_sta_in_smm(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t sap_ch_freq,
+					  qdf_freq_t ml_sta1_freq,
+					  qdf_freq_t ml_sta2_freq)
+{
+	qdf_freq_t intf_ch_freq;
+
+	if (policy_mgr_is_current_hwmode_dbs(psoc) ||
+	    policy_mgr_is_current_hwmode_sbs(psoc))
+		return 0;
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(ml_sta1_freq) ||
+	    WLAN_REG_IS_24GHZ_CH_FREQ(ml_sta2_freq)) {
+		if (policy_mgr_2_freq_same_mac_in_dbs(psoc, ml_sta1_freq,
+						      sap_ch_freq))
+			intf_ch_freq = ml_sta1_freq;
+		else
+			intf_ch_freq = ml_sta2_freq;
+	} else {
+		if (policy_mgr_2_freq_same_mac_in_sbs(psoc, ml_sta1_freq,
+						      sap_ch_freq))
+			intf_ch_freq = ml_sta1_freq;
+		else
+			intf_ch_freq = ml_sta2_freq;
+	}
+	return intf_ch_freq;
+}
+#endif
 
 #ifdef FEATURE_FOURTH_CONNECTION
 static void
@@ -2652,12 +2684,6 @@ end:
 bool policy_mgr_are_sbs_chan(struct wlan_objmgr_psoc *psoc, qdf_freq_t freq_1,
 			     qdf_freq_t freq_2)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx)
-		return false;
-
 	if (!policy_mgr_is_hw_sbs_capable(psoc))
 		return false;
 
@@ -2665,7 +2691,7 @@ bool policy_mgr_are_sbs_chan(struct wlan_objmgr_psoc *psoc, qdf_freq_t freq_1,
 	    WLAN_REG_IS_24GHZ_CH_FREQ(freq_2))
 		return false;
 
-	return !policy_mgr_2_freq_same_mac_in_sbs(pm_ctx, freq_1, freq_2);
+	return !policy_mgr_2_freq_same_mac_in_sbs(psoc, freq_1, freq_2);
 }
 
 bool policy_mgr_is_current_hwmode_sbs(struct wlan_objmgr_psoc *psoc)
@@ -13188,9 +13214,18 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	uint8_t sta_vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS * 2];
 	QDF_STATUS status;
 	struct policy_mgr_pcl_list pcl;
+	bool ml_sap_vdev = false;
+	uint32_t conc_ml_sap_freq;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
 	if (!psoc || !vdev || !pdev) {
 		policy_mgr_debug("psoc or vdev or pdev is NULL");
+		return false;
+	}
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
 		return false;
 	}
 
@@ -13334,6 +13369,21 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	 * primary channel are same.
 	 */
 	if (*con_freq == ch_freq && wlan_reg_get_bw_value(ch_width) > 20)
+		return false;
+
+	/*
+	 * In case of MLO SAP if the existing link freq is
+	 * same as ch_freq, don't allow. Instead override it.
+	 */
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	conc_ml_sap_freq = policy_mgr_get_conc_ml_sap_link_freq(
+							psoc,
+							wlan_vdev_get_id(vdev),
+							&ml_sap_vdev);
+
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	if (conc_ml_sap_freq == ch_freq)
 		return false;
 
 	return true;
@@ -14091,6 +14141,74 @@ policy_mgr_allow_concurrency_sta_csa(struct wlan_objmgr_psoc *psoc,
 						     num_del);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 	return is_allowed;
+}
+
+bool
+policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id)
+{
+	qdf_freq_t dfs_ch_frq = 0;
+	enum hw_mode_bandwidth ch_width;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t conn_index;
+	struct wlan_objmgr_vdev *vdev = NULL;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("Vdev[%d] is null", vdev_id);
+		return false;
+	}
+
+	/*
+	 * Skip logic for mlo sta firstly, to-do in future.
+	 * Reason: since for mlo sta share the same roaming
+	 * cfg parameters, eg 2+5, if 5GHz link is not assoc
+	 * link, then the RSO cfg cmd update for 5GHz vdev
+	 * will be blocked from cm_roam_send_rso_cmd().
+	 * please refer to CR-3098570.
+	 * So for mlo sta need additional change, not support
+	 * currently.
+	 */
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return false;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	policy_mgr_is_any_dfs_beaconing_session_present(psoc, &dfs_ch_frq,
+							&ch_width);
+	if (!dfs_ch_frq)
+		return false;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if (!pm_conc_connection_list[conn_index].in_use ||
+		    ((pm_conc_connection_list[conn_index].mode !=
+		      PM_STA_MODE) &&
+		     (pm_conc_connection_list[conn_index].mode !=
+		      PM_P2P_CLIENT_MODE)))
+			continue;
+
+		if (vdev_id == pm_conc_connection_list[conn_index].vdev_id &&
+		    pm_conc_connection_list[conn_index].freq == dfs_ch_frq) {
+			policymgr_nofl_debug("sta/p2p client vdev id %d scc on %d",
+					     vdev_id, dfs_ch_frq);
+			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+			return true;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return false;
 }
 
 #ifdef AUTO_PLATFORM

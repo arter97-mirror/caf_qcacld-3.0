@@ -7970,6 +7970,12 @@ hdd_vdev_configure_usr_ps_params(struct wlan_objmgr_psoc *psoc,
 }
 
 static void
+hdd_set_default_mrsno_gen_support(struct wlan_objmgr_vdev *vdev)
+{
+	wlan_vdev_set_rsno_gen_supported(vdev, 0);
+}
+
+static void
 hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 				 struct wlan_objmgr_vdev *vdev,
 				 struct wlan_hdd_link_info *link_info)
@@ -7982,10 +7988,12 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 		hdd_vdev_configure_rtt_mac_randomization(psoc, vdev);
 		hdd_vdev_configure_max_tdls_params(psoc, vdev);
 		hdd_vdev_configure_usr_ps_params(psoc, vdev, link_info);
+		hdd_set_default_mrsno_gen_support(vdev);
 		break;
 	case QDF_P2P_CLIENT_MODE:
 		hdd_vdev_configure_max_tdls_params(psoc, vdev);
 		hdd_vdev_configure_usr_ps_params(psoc, vdev, link_info);
+		hdd_set_default_mrsno_gen_support(vdev);
 		break;
 	case QDF_NAN_DISC_MODE:
 		hdd_vdev_configure_nan_params(psoc, vdev);
@@ -15313,6 +15321,9 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 	config->iface_change_wait_time = cfg_get(psoc,
 						 CFG_INTERFACE_CHANGE_WAIT);
 
+	config->shutdown_bootskip = cfg_get(psoc,
+					    CFG_INTERFACE_CHANGE_WAIT_BOOT_SKIP);
+
 	config->multicast_host_fw_msgs = cfg_get(psoc,
 						 CFG_MULTICAST_HOST_FW_MSGS);
 
@@ -18597,7 +18608,8 @@ QDF_STATUS hdd_psoc_create_vdevs(struct hdd_context *hdd_ctx)
 	ucfg_dp_try_set_rps_cpu_mask(hdd_ctx->psoc);
 
 	if (driver_mode != QDF_GLOBAL_FTM_MODE &&
-	    driver_mode != QDF_GLOBAL_EPPING_MODE)
+	    driver_mode != QDF_GLOBAL_EPPING_MODE &&
+	    !hdd_ctx->config->shutdown_bootskip)
 		hdd_psoc_idle_timer_start(hdd_ctx);
 
 	return QDF_STATUS_SUCCESS;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1425,6 +1425,14 @@ lim_check_oci_match(struct mac_context *mac, struct pe_session *pe_session,
 	 * Primary channel      : 1 byte
 	 * Freq_seg_1_ch_num    : 1 byte
 	 */
+
+	if (oci_ie[SIR_MAC_IE_LEN_OFFSET] <
+	    MIN_OCI_IE_LEN - sizeof(struct ie_header)) {
+		pe_err("OCI len %d is incorrect",
+		       oci_ie[SIR_MAC_IE_LEN_OFFSET]);
+		return false;
+	}
+
 	status = dot11f_unpack_ie_oci(mac,
 				      (uint8_t *)&oci_ie[OCI_IE_OP_CLS_OFFSET],
 				      oci_ie[SIR_MAC_IE_LEN_OFFSET] -
@@ -1533,12 +1541,16 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 		 * different from current frquency.
 		 * If there is channel switch and OCI is invalid in sa_query,
 		 * deauth STA on new channel.
+		 * Reset post csa sa query flag in case that post csa sa query
+		 * timer handler is handling station deauth.
 		 */
 		if (sta_ds && sta_ds->ocv_enabled &&
-		    sta_ds->last_ocv_done_freq != pe_session->curr_op_freq)
+		    sta_ds->last_ocv_done_freq != pe_session->curr_op_freq) {
+			sta_ds->post_csa_sa_query = 0;
 			lim_send_deauth_mgmt_frame(mac, REASON_OCI_MISMATCH,
 						   mac_header->sa, pe_session,
 						   false);
+		}
 		return;
 	}
 
@@ -1546,8 +1558,10 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 	 * Update the last ocv done freq when OCI is valid.
 	 * To support above algo, if it is moved to the current freq.
 	 */
-	if (sta_ds && sta_ds->ocv_enabled)
+	if (sta_ds && sta_ds->ocv_enabled) {
+		sta_ds->post_csa_sa_query = 0;
 		sta_ds->last_ocv_done_freq = pe_session->curr_op_freq;
+	}
 
 	/* Send 11w SA query response action frame */
 	if (lim_send_sa_query_response_frame(mac,

@@ -2049,7 +2049,8 @@ lim_get_self_dot11_mode(struct mac_context *mac_ctx, enum QDF_OPMODE opmode,
 static bool
 lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 			      struct bss_description *bss_desc,
-			      tDot11fBeaconIEs *ie_struct)
+			      tDot11fBeaconIEs *ie_struct,
+			      uint8_t vdev_id)
 {
 	struct scan_cache_entry *scan_entry;
 	bool is_eht_allowed;
@@ -2057,9 +2058,11 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 	if (!ie_struct->eht_cap.present)
 		return false;
 
-	scan_entry = wlan_scan_get_entry_by_bssid(mac_ctx->pdev,
-						  (struct qdf_mac_addr *)
-						  bss_desc->bssId);
+	scan_entry =
+		wlan_scan_entry_by_bssid_and_security(mac_ctx->pdev,
+						      (struct qdf_mac_addr *)
+						       bss_desc->bssId,
+						       vdev_id);
 
 	/*
 	 * If AP advertises multiple AKMs(WPA2 PSK + WPA3), allow connection
@@ -2086,7 +2089,7 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 static enum mlme_dot11_mode
 lim_get_bss_dot11_mode(struct mac_context *mac_ctx,
 		       struct bss_description *bss_desc,
-		       tDot11fBeaconIEs *ie_struct)
+		       tDot11fBeaconIEs *ie_struct, uint8_t vdev_id)
 {
 	enum mlme_dot11_mode bss_dot11_mode;
 
@@ -2117,7 +2120,8 @@ lim_get_bss_dot11_mode(struct mac_context *mac_ctx,
 		bss_dot11_mode = MLME_DOT11_MODE_11AX;
 
 	if (ie_struct->eht_cap.present &&
-	    lim_get_bss_11be_mode_allowed(mac_ctx, bss_desc, ie_struct))
+	    lim_get_bss_11be_mode_allowed(mac_ctx, bss_desc, ie_struct,
+					  vdev_id))
 		bss_dot11_mode = MLME_DOT11_MODE_11BE;
 
 	return bss_dot11_mode;
@@ -2800,7 +2804,8 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 						 session->vdev_id,
 						 self_dot11_mode);
 
-	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
+	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct,
+						session->vdev_id);
 
 	status = lim_get_intersected_dot11_mode_sta_ap(mac_ctx, self_dot11_mode,
 						       bss_dot11_mode,
@@ -2947,9 +2952,6 @@ static void lim_update_sae_config(struct mac_context *mac,
 {
 	struct wlan_crypto_pmksa *pmksa;
 	struct qdf_mac_addr bssid;
-	struct bss_description *bss_desc;
-	struct action_oui_search_attr ap_attr = {0};
-	bool is_vendor_ap = false;
 
 	qdf_mem_copy(bssid.bytes, session->bssId,
 		     QDF_MAC_ADDR_SIZE);
@@ -2959,16 +2961,6 @@ static void lim_update_sae_config(struct mac_context *mac,
 
 	pmksa = wlan_crypto_get_pmksa(session->vdev, &bssid);
 	if (!pmksa)
-		return;
-
-	bss_desc = &session->lim_join_req->bssDescription;
-	ap_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
-	ap_attr.ie_length =
-		wlan_get_ielen_from_bss_description(bss_desc);
-	is_vendor_ap = wlan_action_oui_search(mac->psoc,
-					      &ap_attr,
-					      ACTION_OUI_RESTRICT_MAX_MLO_LINKS);
-	if (is_vendor_ap)
 		return;
 
 	session->sae_pmk_cached = true;
@@ -4142,6 +4134,7 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 	uint8_t *rsnxe = NULL, *new_rsnxe = NULL;
 	uint8_t *ap_rsnxe = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t rsn_gen;
 
 	akm = wlan_crypto_get_param(session->vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
 	if (akm == -1 ||
@@ -4173,11 +4166,9 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 		return status;
 	}
 
-	ap_rsnxe = util_scan_entry_rsnxe(req->entry);
-	if (!ap_rsnxe)
-		ap_rsnxe_len = 0;
-	else
-		ap_rsnxe_len = ap_rsnxe[SIR_MAC_IE_LEN_OFFSET];
+	rsn_gen = req->entry->neg_sec_info.rsn_gen_selected;
+	ap_rsnxe = util_scan_entry_rsnxe_by_gen(req->entry, rsn_gen);
+	ap_rsnxe_len = util_get_rsnxe_len_by_gen(req->entry, rsn_gen);
 
 	/*
 	 * Do not modify userspace RSNXE if either:
@@ -4255,23 +4246,11 @@ end:
 }
 
 void
-lim_update_connect_rsn_ie(struct mac_context *mac,
-			  struct pe_session *session,
+lim_update_connect_rsn_ie(struct pe_session *session,
 			  uint8_t *rsn_ie_buf, struct wlan_crypto_pmksa *pmksa)
 {
 	uint8_t *rsn_ie_end;
 	uint16_t rsn_ie_len = 0;
-	struct bss_description *bss_desc =
-					&session->lim_join_req->bssDescription;
-	struct action_oui_search_attr ap_attr = {0};
-
-	ap_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
-	ap_attr.ie_length =
-		wlan_get_ielen_from_bss_description(bss_desc);
-	if (wlan_action_oui_search(mac->psoc,
-				   &ap_attr,
-				   ACTION_OUI_RESTRICT_MAX_MLO_LINKS))
-		pmksa = NULL;
 
 	rsn_ie_end = wlan_crypto_build_rsnie_with_pmksa(session->vdev,
 							rsn_ie_buf, pmksa);
@@ -4296,7 +4275,7 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	struct wlan_crypto_pmksa pmksa, *pmksa_peer;
 	struct bss_description *bss_desc;
 
-	rsn_ie = qdf_mem_malloc(DOT11F_IE_RSN_MAX_LEN + 2);
+	rsn_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
 	if (!rsn_ie)
 		return QDF_STATUS_E_NOMEM;
 
@@ -4345,7 +4324,7 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	if (pmksa_peer)
 		pe_debug("PMKSA found");
 
-	lim_update_connect_rsn_ie(mac_ctx, session, rsn_ie, pmksa_peer);
+	lim_update_connect_rsn_ie(session, rsn_ie, pmksa_peer);
 	qdf_mem_free(rsn_ie);
 
 	/*
@@ -4609,6 +4588,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	qdf_mem_copy(session->ssId.ssId, req->entry->ssid.ssid,
 		     session->ssId.length);
 	session->ssidHidden = req->is_ssid_hidden;
+	session->rsno_gen_used = req->rsno_gen_used;
 
 	status = lim_fill_pe_session(mac_ctx, session, bss_desc,
 				     req->entry->phy_mode);
@@ -4695,6 +4675,19 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 				      NULL, 0,
 				      mlme_priv->connect_info.ext_cap_ie,
 				      DOT11F_IE_EXTCAP_MAX_LEN);
+
+		/*
+		 * rsno_gen_used is used to append RSN selection IE in the
+		 * assoc request, therefore set the rsn gen only if the
+		 * DUT and AP supports MRSNO.
+		 */
+		if (wlan_vdev_get_rsno_gen_supported(session->vdev) &&
+		    (util_scan_entry_wifi6_rsno(req->entry) ||
+		     util_scan_entry_wifi7_rsno(req->entry)))
+			session->rsno_gen_used = req->rsno_gen_used;
+		else
+			session->rsno_gen_used = 0;
+
 		qdf_mem_free(add_ie);
 
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -5233,7 +5226,8 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 	lim_strip_rsnx_ie(mac_ctx, session_entry, req);
 
 	if (lim_is_rsn_profile(session_entry) &&
-	    !util_scan_entry_rsnxe(req->entry)) {
+	    !util_scan_entry_rsnxe_by_gen(req->entry,
+				req->entry->neg_sec_info.rsn_gen_selected)) {
 		pe_debug("Bss bcn has no RSNXE, strip if has");
 		status = lim_strip_ie(mac_ctx, req->assoc_ie.ptr,
 				      (uint16_t *)&req->assoc_ie.len,
@@ -5546,7 +5540,8 @@ lim_fill_preauth_req_dot11_mode(struct mac_context *mac_ctx,
 		   lim_intersect_user_dot11_mode(mac_ctx, QDF_STA_MODE,
 						 vdev_id, self_dot11_mode);
 
-	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
+	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct,
+						vdev_id);
 
 	status = lim_get_intersected_dot11_mode_sta_ap(mac_ctx, self_dot11_mode,
 						       bss_dot11_mode,
@@ -9903,13 +9898,22 @@ static bool
 lim_is_puncture_bitmap_changed(struct pe_session *session,
 			       struct channel_change_req *ch_change_req)
 {
-	uint16_t ori_puncture_bitmap;
 
-	ori_puncture_bitmap =
-		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
+	pe_debug("punct orig 0x%x target 0x%x", session->puncture_bitmap,
+		 ch_change_req->target_punc_bitmap);
 
-	return ori_puncture_bitmap != ch_change_req->target_punc_bitmap;
+	return session->puncture_bitmap != ch_change_req->target_punc_bitmap;
 }
+
+static void
+lim_change_puncture_bitmap(struct pe_session *session,
+			   struct channel_change_req *ch_change_req)
+{
+	pe_debug("punct 0x%x --> 0x%x", session->puncture_bitmap,
+		 ch_change_req->target_punc_bitmap);
+	session->puncture_bitmap = ch_change_req->target_punc_bitmap;
+}
+
 #else
 static inline bool
 lim_is_puncture_bitmap_changed(struct pe_session *session,
@@ -9917,6 +9921,13 @@ lim_is_puncture_bitmap_changed(struct pe_session *session,
 {
 	return false;
 }
+
+static void
+lim_change_puncture_bitmap(struct pe_session *session,
+			   struct channel_change_req *ch_change_req)
+{
+}
+
 #endif
 
 /**
@@ -10088,9 +10099,10 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		session_entry->channelChangeReasonCode =
 			LIM_SWITCH_CHANNEL_MONITOR;
 
-	pe_nofl_debug("SAP CSA: %d ---> %d, ch_bw %d, nw_type %d, dot11mode %d, old dot11mode %d",
+	pe_nofl_debug("SAP CSA: %d --> %d, ch_bw %d --> %d, nw_type %d, dot11mode %d, old dot11mode %d",
 		      session_entry->curr_op_freq, target_freq,
-		      ch_change_req->ch_width, ch_change_req->nw_type,
+		      session_entry->ch_width, ch_change_req->ch_width,
+		      ch_change_req->nw_type,
 		      ch_change_req->dot11mode, session_entry->dot11mode);
 
 	/* Update ht/vht/he/eht capability as per the new dot11mode */
@@ -10124,10 +10136,8 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		else
 			update_he_cap = false;
 		if (!update_he_cap) {
-			if ((session_entry->ch_width !=
-			     ch_change_req->ch_width) &&
-			    (session_entry->ch_width > CH_WIDTH_80MHZ ||
-			     ch_change_req->ch_width > CH_WIDTH_80MHZ))
+			if (session_entry->ch_width !=
+			    ch_change_req->ch_width)
 				update_he_cap = true;
 		}
 		if (update_he_cap) {
@@ -10177,6 +10187,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 			 ch_change_req->center_freq_seg0;
 	session_entry->ch_center_freq_seg1 =
 			ch_change_req->center_freq_seg1;
+	lim_change_puncture_bitmap(session_entry, ch_change_req);
 	session_entry->htSecondaryChannelOffset = ch_change_req->sec_ch_offset;
 	session_entry->htSupportedChannelWidthSet =
 		(ch_change_req->ch_width ? 1 : 0);
@@ -10816,6 +10827,9 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 		return;
 	}
 
+	qdf_mem_zero(&session_entry->gLimChannelSwitch,
+		     sizeof(session_entry->gLimChannelSwitch));
+
 	/* target channel */
 	session_entry->gLimChannelSwitch.primaryChannel =
 		wlan_reg_freq_to_chan(mac_ctx->pdev,
@@ -10882,6 +10896,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 				dfs_csa_ie_req->ch_params.center_freq_seg0;
 		session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
 				dfs_csa_ie_req->ch_params.center_freq_seg1;
+		lim_set_chan_switch_puncture(session_entry, punct_bitmap);
 
 		pe_debug("EHT BW %d CCFS0 %d, CCFS1 %d",
 			 dfs_csa_ie_req->ch_params.ch_width,

@@ -3497,6 +3497,24 @@ policy_mgr_are_3_freq_on_same_mac(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t freq_3);
 
 /**
+ * policy_mgr_get_conc_freq_if_ml_sta_in_smm() - Function to get concurrent
+ * frequency for SAP if ML STA is in SMM
+ * @psoc: Pointer to psoc
+ * @sap_ch_freq: User given SAP channel frequency
+ * @ml_sta1_freq: ML STA link 1 frequency
+ * @ml_sta2_freq: ML STA link2 freq
+ *
+ * Return: Interference freq for given SAP channel
+ */
+#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+qdf_freq_t
+policy_mgr_get_conc_freq_if_ml_sta_in_smm(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t sap_ch_freq,
+					  qdf_freq_t ml_sta1_freq,
+					  qdf_freq_t ml_sta2_freq);
+#endif
+
+/**
  * policy_mgr_allow_4th_new_freq() - Function to check whether 4th freq can
  * be allowed with existing 3 vifs
  * @psoc: Pointer to Psoc
@@ -6099,6 +6117,19 @@ QDF_STATUS policy_mgr_modify_pcl_for_vlp_channels(struct wlan_objmgr_psoc *psoc,
 						  struct weighed_pcl *pcl,
 						  uint32_t num_pcl);
 
+/**
+ * policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id() - Check if any STA/P2P ClI
+ * + SAP SCC present on DFS channel with specific STA/P2P CLI vdev id
+ * @psoc: psoc pointer
+ * @vdev_id: STA/P2P CLI vdev id
+ *
+ * Return: true if specific STA/P2P CLI + SAP SCC present on DFS channel,
+ * otherwise false.
+ */
+bool
+policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id);
+
 #ifdef AUTO_PLATFORM
 /**
  * policy_mgr_is_3vifs_mcc_to_scc_enabled() - Check if 3vifs mcc to scc is
@@ -6115,4 +6146,19 @@ policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif
+/**
+ * policy_mgr_get_conc_ml_sap_link_freq()- Get concurrent ML SAP link frequency
+ * @psoc: Pointer to Psoc
+ * @vdev_id: vdev id
+ * @ml_sap_vdev: ml sap vdev or not
+ *
+ * This API returns concurrent ml sap freq if there are any.
+ * This function can only call when locked by qdf_conc_list_lock.
+ *
+ * Return: Concurrent ml sap freq if present. Otherwise 0.
+ */
+uint32_t policy_mgr_get_conc_ml_sap_link_freq(struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id,
+					      bool *ml_sap_vdev);
+
 #endif /* __WLAN_POLICY_MGR_API_H */
