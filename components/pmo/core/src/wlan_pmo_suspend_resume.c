@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1576,6 +1576,18 @@ out:
 	return status;
 }
 
+static void pmo_wow_tx_done_cb(void)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		hdd_err("Invalid hdd_ctx");
+		return;
+	}
+
+	pld_set_cxpc(hdd_ctx->parent_dev);
+}
+
 void pmo_core_psoc_target_suspend_acknowledge(void *context, bool wow_nack,
 					      uint16_t reason_code)
 {
@@ -1596,6 +1608,8 @@ void pmo_core_psoc_target_suspend_acknowledge(void *context, bool wow_nack,
 	}
 
 	psoc_ctx = pmo_psoc_get_priv(psoc);
+	if (!wow_nack)
+		pmo_wow_tx_done_cb();
 
 	pmo_core_set_wow_nack(psoc_ctx, wow_nack, reason_code);
 	qdf_event_set(&psoc_ctx->wow.target_suspend);

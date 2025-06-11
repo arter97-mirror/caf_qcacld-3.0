@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2273,5 +2273,19 @@ pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 					    unsigned int *cpumask)
 {
 }
+#endif
+
+#ifdef FEATURE_WLAN_DIRECT_CX
+/**
+ * pld_set_cxpc()- Set CXPC Status
+ * @dev: device
+ *
+ * Set cxpc status
+ *
+ * Return: 0 for success. Negative error codes.
+ */
+void pld_set_cxpc(struct device *dev);
+#else
+static inline void pld_set_cxpc(struct device *dev) {}
 #endif
 #endif
