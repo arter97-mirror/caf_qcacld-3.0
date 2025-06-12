@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -286,6 +286,10 @@ struct wlan_mlo_ie {
  * @link_eht_op: eht op IE
  * @max_chan_swt_time: MLOTD
  * @bss_param_change_cnt: bss param change count
+ * @tsf_fw: tsf reported from fw
+ * @qtimer_fw: qtimer reported from fw
+ * @tsf_host: calculated tsf
+ * @tsf_valid: whether tsf_host is valid or not
  */
 struct mlo_link_ie {
 	tDot11fIEDSParams                    link_ds;
@@ -313,6 +317,10 @@ struct mlo_link_ie {
 	tDot11fIEeht_op                      link_eht_op;
 	uint32_t                             max_chan_swt_time;
 	uint8_t                              bss_param_change_cnt;
+	uint64_t                             tsf_fw;
+	uint64_t                             qtimer_fw;
+	uint64_t                             tsf_host;
+	bool                                 tsf_valid;
 };
 
 /**
@@ -667,6 +675,7 @@ struct dfs_p2p_group_info {
  * @ht_client_cnt:
  * @ch_switch_in_progress:
  * @post_csa_notify_cap: Send notify capability pending post CSA
+ * @post_csa_ocv_sa_query_timer: Timer to check peer STA CSA OCV SA Query
  * @he_with_wep_tkip:
  * @fils_info:
  * @prev_auth_seq_num: Sequence number of previously received auth frame to
@@ -712,6 +721,7 @@ struct dfs_p2p_group_info {
  * on 2.4 GHz
  * @join_probe_cnt: join probe request count
  * @cal_tpc_post_csa: Recalculate tx power power csa
+ * @rsno_gen_used: rsno gen used for connection
  * @wnm_action_dialog_token: Dialog token for WNM action frames.
  * @dfs_p2p_info: DFS P2P group operation info.
  */
@@ -994,6 +1004,9 @@ struct pe_session {
 	uint8_t ht_client_cnt;
 	bool ch_switch_in_progress;
 	bool post_csa_notify_cap;
+#ifdef CFG80211_SA_QUERY_OFFLOAD_SUPPORT
+	qdf_mc_timer_t post_csa_ocv_sa_query_timer;
+#endif
 	bool he_with_wep_tkip;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct pe_fils_session *fils_info;
@@ -1046,7 +1059,7 @@ struct pe_session {
 	bool is_unexpected_peer_error;
 	uint8_t join_probe_cnt;
 	bool cal_tpc_post_csa;
-
+	uint8_t rsno_gen_used;
 	uint8_t wnm_action_dialog_token;
 	struct dfs_p2p_group_info dfs_p2p_info;
 };

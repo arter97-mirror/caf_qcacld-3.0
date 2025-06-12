@@ -3839,6 +3839,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	bool capable, is_wps;
 	int32_t keymgmt;
 	enum policy_mgr_con_mode pm_con_mode;
+	qdf_freq_t ll_sap_freq;
 
 	if (!link_info)
 		return -EINVAL;
@@ -3892,6 +3893,19 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 				wlan_vdev_get_id(sap_ctx->vdev),
 				LL_SAP_CSA_CONCURENCY);
 		return ret;
+	}
+
+	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(hdd_ctx->psoc);
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+							   adapter->device_mode,
+							   link_info->vdev_id);
+
+	if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
+	    policy_mgr_are_2_freq_on_same_mac(hdd_ctx->psoc, target_chan_freq,
+					      ll_sap_freq)) {
+		hdd_err("ll_sap freq %d and sap freq %d are on same mac",
+			ll_sap_freq, target_chan_freq);
+		return -EINVAL;
 	}
 
 	if (wlan_reg_is_6ghz_chan_freq(target_chan_freq) &&
@@ -9522,6 +9536,21 @@ bool hdd_mlosap_check_support_link_num(struct hdd_adapter *adapter)
 		return true;
 
 	return false;
+}
+
+bool hdd_mlosap_check_support_multi_link(struct hdd_context *hdd_ctx)
+{
+	bool status = false;
+	uint16_t  link_num;
+
+	link_num = wlan_mlme_get_mlo_sap_support_link(hdd_ctx->psoc);
+
+	if (link_num > 1)
+		status = true;
+
+	mlme_debug("ML SAP supported link:  %u", link_num);
+
+	return status;
 }
 #endif
 

@@ -5438,7 +5438,7 @@ static inline void csr_qos_send_assoc_ind(struct mac_context *mac_ctx,
 			      assoc_info);
 }
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifdef WLAN_FEATURE_LFR3
 static void
 csr_qso_disconnect_complete_ind(struct mac_context *mac_ctx,
 				struct wlan_cm_connect_resp *connect_rsp)

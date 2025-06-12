@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -86,6 +86,30 @@
 		1000, \
 		CFG_VALUE_OR_DEFAULT, \
 		"auth rsp timeout")
+
+/*
+ * <ini>
+ * assoc_request_wait_time - Assoc req rx timeout value (unit: milliseconds)
+ * @Min: 0
+ * @Max: 65535
+ * @Default: 5000
+ *
+ * This cfg item is used to configure the association request rx timeout of
+ * each peer and pre-auth node will be deleted once timer expired.
+ *
+ * Supported Feature: SAP
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_ASSOC_REQ_TIMEOUT CFG_INI_UINT( \
+		"assoc_request_wait_time", \
+		0, \
+		65535, \
+		5000, \
+		CFG_VALUE_OR_DEFAULT, \
+		"assoc request wait time")
 
 /*
  * <ini>
@@ -293,6 +317,7 @@
 	CFG(CFG_JOIN_FAILURE_TIMEOUT) \
 	CFG(CFG_AUTH_FAILURE_TIMEOUT) \
 	CFG(CFG_AUTH_RSP_TIMEOUT) \
+	CFG(CFG_ASSOC_REQ_TIMEOUT) \
 	CFG(CFG_ASSOC_FAILURE_TIMEOUT) \
 	CFG(CFG_REASSOC_FAILURE_TIMEOUT) \
 	CFG(CFG_OLBC_DETECT_TIMEOUT) \
