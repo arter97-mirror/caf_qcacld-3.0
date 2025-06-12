@@ -1920,6 +1920,24 @@ void ucfg_dp_nud_indicate_roam(struct wlan_objmgr_vdev *vdev)
 	dp_nud_indicate_roam(vdev);
 }
 
+#ifdef WLAN_HAPS_ENABLE
+uint32_t ucfg_dp_get_haps_config(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("DP Context is NULL");
+		return 0;
+	}
+	return dp_ctx->dp_cfg.haps_config;
+}
+#else
+uint32_t ucfg_dp_get_haps_config(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+#endif
+
 void ucfg_dp_clear_arp_stats(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_link *dp_link = dp_get_vdev_priv_obj(vdev);
