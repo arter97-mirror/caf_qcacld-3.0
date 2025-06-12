@@ -369,12 +369,13 @@ static int copy_station_stats_to_adapter(struct wlan_hdd_link_info *link_info,
 				&hdd_stats->class_a_stat.rx_mcs_rate_flags);
 
 	/*
-	 * If tx_rate_version not 0, get last tx rate code from firmware
+	 * If WMI_REQUEST_PEER_STATS_INFO_CMDID is supported by target, and
+	 * tx_rate_version not 0, get last tx rate code from firmware
 	 * directly, and get last rx rate code from host DP, don't look up rate
 	 * table to get tx bw/mcs/nss.
 	 */
-	if (hdd_stats->class_a_stat.tx_rate_version ||
-	    !hdd_stats->class_a_stat.is_tx_rate_version_checked)
+	if (hdd_stats->class_a_stat.tx_rate_version &&
+	    hdd_stats->class_a_stat.is_tx_rate_version_checked)
 		goto out;
 
 	if (tx_nss > wlan_vdev_mlme_get_nss(vdev))
@@ -7811,6 +7812,9 @@ wlan_hdd_refill_os_rateflags(struct rate_info *os_rate, uint8_t preamble)
 		wlan_hdd_refill_os_eht_rateflags(os_rate, preamble);
 }
 
+/* EAPOL/ARP legacy rate, unit 100kbps */
+#define EAPOL_ARP_LEGACY_RATE 60
+
 /**
  * wlan_hdd_refill_actual_tx_rate() - Refill actual tx rates info stats
  * @sinfo: kernel station_info struct to populate
@@ -7838,6 +7842,14 @@ wlan_hdd_refill_actual_tx_rate(struct station_info *sinfo,
 	} else if (qdf_unlikely(preamble == INVALID_PREAMBLE)) {
 		hdd_debug("Driver failed to get rate");
 	}
+
+	/*
+	 * CTS case testWifiUsabilityStatsEntry will get tx rate once,
+	 * connected, F/W reports 0 tx rate after ignoring EAPOL/ARP tx pkt,
+	 * driver need report EAPOL/ARP rate 6Mbps to avoid case fail.
+	 */
+	if (!sinfo->txrate.legacy)
+		sinfo->txrate.legacy = EAPOL_ARP_LEGACY_RATE;
 
 	wlan_hdd_refill_os_rateflags(&sinfo->txrate, preamble);
 
