@@ -1777,10 +1777,10 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	uint8_t ap_nss;
 	struct vdev_type_nss *vdev_type_nss;
 
-	if (wlan_reg_is_5ghz_ch_freq(bss_desc->chan_freq))
-		vdev_type_nss = &mac_ctx->vdev_type_nss_5g;
-	else
+	if (wlan_reg_is_24ghz_ch_freq(bss_desc->chan_freq))
 		vdev_type_nss = &mac_ctx->vdev_type_nss_2g;
+	else
+		vdev_type_nss = &mac_ctx->vdev_type_nss_5g;
 
 	if (wlan_vdev_mlme_get_opmode(session->vdev) == QDF_P2P_CLIENT_MODE)
 		session->vdev_nss = vdev_type_nss->p2p_cli;
