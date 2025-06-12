@@ -1204,6 +1204,13 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 		sw_ft_entry = &(((struct dp_fisa_rx_sw_ft *)
 					fisa_hdl->base)[hashed_flow_idx]);
 		if (!sw_ft_entry->is_populated) {
+			/* Add locking to prevent race condition between FISA
+			 * aggregation and update, which can Lead to NULL
+			 * dp_ctx dereference in dp_add_nbuf_to_fisa_flow.
+			 */
+			qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
+			dp_rx_fisa_acquire_ft_lock(fisa_hdl, elem->reo_id);
+
 			/* Add SW FT entry */
 			dp_rx_fisa_update_sw_ft_entry(sw_ft_entry,
 						      flow_hash, elem->vdev,
@@ -1236,6 +1243,9 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			sw_ft_entry->add_timestamp = qdf_get_log_timestamp();
 
 			is_fst_updated = true;
+			dp_rx_fisa_release_ft_lock(fisa_hdl, elem->reo_id);
+			qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
+
 			wlan_dp_indicate_flow_add(fisa_hdl->dp_ctx,
 						  WLAN_DP_FLOW_DIR_RX,
 						  &flow_tuple,
