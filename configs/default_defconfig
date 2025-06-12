@@ -565,17 +565,16 @@ ifeq ($(CONFIG_ROME_IF),usb)
 	CONFIG_LINUX_QCMBR :=y
 endif
 
-
-CONFIG_FEATURE_EPPING := y
-
 #Flag to enable offload packets feature
 CONFIG_WLAN_OFFLOAD_PACKETS := y
 
 #enable TSF get feature
 CONFIG_WLAN_SYNC_TSF := y
-#Enable DSRC feature
+
+#Enable DSRC/EPPING feature
 ifeq ($(CONFIG_QCA_WIFI_SDIO), y)
 CONFIG_WLAN_FEATURE_DSRC := y
+CONFIG_FEATURE_EPPING := y
 endif
 
 ifneq ($(CONFIG_ROME_IF),usb)
