@@ -778,6 +778,15 @@ uint8_t ucfg_dp_nud_tracking_enabled(struct wlan_objmgr_psoc *psoc);
 void ucfg_dp_nud_indicate_roam(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * ucfg_dp_get_haps_config - get the haps config
+ *
+ * @psoc: PSOC Handle
+ *
+ * Return : HAPS config value.
+ */
+uint32_t ucfg_dp_get_haps_config(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_dp_clear_arp_stats() - Clear ARP Stats
  * @vdev: vdev context
  *
