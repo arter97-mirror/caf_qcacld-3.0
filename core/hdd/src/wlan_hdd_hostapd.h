@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -459,10 +459,12 @@ void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
 /**
  * hdd_is_any_sta_connecting() - check if any sta is connecting
  * @hdd_ctx: hdd context
+ * @op_mode: adapter mode
  *
  * Return: true if any sta is connecting
  */
-bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx);
+bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx,
+			       enum QDF_OPMODE op_mode);
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
