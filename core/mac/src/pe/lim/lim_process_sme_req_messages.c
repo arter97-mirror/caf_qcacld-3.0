@@ -8790,7 +8790,8 @@ lim_process_sme_send_vdev_pause(struct mac_context *mac_ctx,
 	vdev_pause_dur_ms = session->beaconParams.beaconInterval *
 						msg->vdev_pause_duration;
 	wlan_mlo_send_vdev_pause(mac_ctx->psoc, session->vdev,
-				 msg->session_id, vdev_pause_dur_ms);
+				 msg->session_id, vdev_pause_dur_ms,
+				 MLO_VDEV_PAUSE_TYPE_MLO_LINK);
 }
 
 static void lim_process_sme_update_config(struct mac_context *mac_ctx,
