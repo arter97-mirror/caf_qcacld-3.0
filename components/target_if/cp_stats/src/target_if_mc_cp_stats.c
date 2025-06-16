@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -365,6 +365,10 @@ static void target_if_cp_stats_free_peer_stats_info_ext(struct stats_event *ev)
 
 static void target_if_cp_stats_free_stats_event(struct stats_event *ev)
 {
+	if (ev->bcn_stats) {
+		qdf_mem_free(ev->bcn_stats);
+		ev->bcn_stats = NULL;
+	}
 	qdf_mem_free(ev->pdev_stats);
 	ev->pdev_stats = NULL;
 	qdf_mem_free(ev->pdev_extd_stats);
@@ -919,6 +923,62 @@ end:
 	return status;
 }
 
+static QDF_STATUS
+target_if_extract_bcn_rssi_history(struct wmi_unified *wmi_hdl,
+				   wmi_host_stats_event *stats_param,
+				   struct stats_event *ev,
+				   uint8_t *data)
+{
+	uint32_t i;
+	QDF_STATUS status;
+	struct wmi_host_recv_bcn_stats *recv_bcn_stats;
+
+	if (!(stats_param->stats_id & WMI_REQUEST_VDEV_RECV_BCN_STAT) ||
+	    !stats_param->num_recv_bcn_stats)
+		return QDF_STATUS_SUCCESS;
+
+	ev->bcn_stats = qdf_mem_malloc(sizeof(*ev->bcn_stats) *
+				       stats_param->num_recv_bcn_stats);
+	if (!ev->bcn_stats)
+		return QDF_STATUS_E_NOMEM;
+
+	recv_bcn_stats = qdf_mem_malloc(sizeof(*recv_bcn_stats));
+	if (!recv_bcn_stats) {
+		qdf_mem_free(ev->bcn_stats);
+		ev->bcn_stats = NULL;
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	ev->num_recv_bcn_stats = 0;
+	for (i = 0; i < stats_param->num_recv_bcn_stats; i++) {
+		qdf_mem_set(recv_bcn_stats, sizeof(*recv_bcn_stats), 0);
+		status = wmi_extract_recv_bcn_stats(wmi_hdl, data, i,
+						    recv_bcn_stats);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			/*
+			 * The bcn_stats allocated memory will get free in
+			 * target_if_cp_stats_free_stats_event() once
+			 * rx_ops->process_stats_event callback is completed
+			 * in target_if_mc_cp_stats_stats_event_handler()
+			 */
+			cp_stats_err("Error:%d wmi_extract_recv_bcn_stats failed",
+				     status);
+			qdf_mem_free(recv_bcn_stats);
+			return status;
+		}
+
+		ev->num_recv_bcn_stats++;
+		ev->bcn_stats[i].vdev_id = recv_bcn_stats->vdev_id;
+		qdf_mem_copy(&ev->bcn_stats[i].bcn_history,
+			     recv_bcn_stats->bcn_history,
+			     sizeof(struct wmi_bcn_his_info) *
+				    WMI_MAX_BCN_HISTORY);
+	}
+
+	qdf_mem_free(recv_bcn_stats);
+	return status;
+}
+
 static QDF_STATUS target_if_cp_stats_extract_event(struct wmi_unified *wmi_hdl,
 						   struct stats_event *ev,
 						   uint8_t *data)
@@ -935,7 +995,7 @@ static QDF_STATUS target_if_cp_stats_extract_event(struct wmi_unified *wmi_hdl,
 	cp_stats_nofl_debug("num: pdev: %d, pdev_extd: %d, vdev: %d, vdev_extd: %d, "
 			    "peer: %d, peer_extd: %d rssi: %d, mib %d, mib_extd %d, "
 			    "bcnflt: %d, channel: %d, bcn: %d, peer_extd2: %d, "
-			    "last_event: %x, stats id: %d",
+			    "recv_bcn: %d last_event: %x, stats id: %u",
 			    stats_param.num_pdev_stats,
 			    stats_param.num_pdev_ext_stats,
 			    stats_param.num_vdev_stats,
@@ -949,6 +1009,7 @@ static QDF_STATUS target_if_cp_stats_extract_event(struct wmi_unified *wmi_hdl,
 			    stats_param.num_chan_stats,
 			    stats_param.num_bcn_stats,
 			    stats_param.num_peer_adv_stats,
+			    stats_param.num_recv_bcn_stats,
 			    stats_param.last_event,
 			    stats_param.stats_id);
 
@@ -1007,6 +1068,12 @@ static QDF_STATUS target_if_cp_stats_extract_event(struct wmi_unified *wmi_hdl,
 	status = target_if_cp_stats_extract_vdev_extd_stats(wmi_hdl,
 							    &stats_param,
 							    ev, data);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = target_if_extract_bcn_rssi_history(wmi_hdl, &stats_param,
+						    ev, data);
+
 	return status;
 }
 
