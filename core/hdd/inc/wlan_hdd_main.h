@@ -715,6 +715,16 @@ struct wlan_hdd_peer_info {
 };
 #endif
 
+#define MAX_BCN_HISTORY 10
+
+/**
+ * struct bcn_his_info_stats - beacon rssi history stats
+ * @bcn_history: Beacon real RSSI history array
+ */
+struct bcn_his_info_stats {
+	struct bcn_his_info bcn_history[MAX_BCN_HISTORY];
+};
+
 #define MAX_SUBTYPES_TRACKED	4
 
 struct hdd_stats {
@@ -726,6 +736,7 @@ struct hdd_stats {
 	struct hdd_peer_stats peer_stats;
 	struct hdd_pmf_stats hdd_pmf_stats;
 	struct pmf_bcn_protect_stats bcn_protect_stats;
+	struct bcn_his_info_stats bcn_rssi_his_stats;
 };
 
 /**

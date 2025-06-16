@@ -296,6 +296,7 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	ucfg_cm_ft_reset(vdev);
 	ucfg_cm_reset_key(hdd_ctx->pdev, link_info->vdev_id);
 	hdd_clear_roam_profile_ie(adapter);
+	wlan_hdd_reset_bcn_rssi_history_stats(link_info);
 
 	if (adapter->device_mode == QDF_STA_MODE)
 		wlan_crypto_reset_vdev_params(vdev);
