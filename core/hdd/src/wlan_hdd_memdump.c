@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,8 +37,7 @@
 #define PROCFS_DRIVER_DUMP_NAME "driverdump"
 #define PROCFS_DRIVER_DUMP_PERM 0444
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)) && \
-	(LINUX_VERSION_CODE != KERNEL_VERSION(5, 14, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0))
 /*
  * Commit 359745d78351 ("proc: remove PDE_DATA() completely")
  * Replaced PDE_DATA() with pde_data()
