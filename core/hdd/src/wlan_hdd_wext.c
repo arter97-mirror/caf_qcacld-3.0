@@ -1768,7 +1768,6 @@
  */
 #define WE_GET_GTX_BWMASK               54
 #define WE_GET_TEMPERATURE              56
-#define WE_CAP_TSF                      58
 #define WE_GET_ROAM_SYNCH_DELAY         59
 
 /*
@@ -5620,9 +5619,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 					     QPOWER_CMD);
 		break;
 	}
-	case WE_CAP_TSF:
-		ret = hdd_capture_tsf(adapter, (uint32_t *)value, 1);
-		break;
+
 	case WE_GET_TEMPERATURE:
 	{
 		hdd_debug("WE_GET_TEMPERATURE");
@@ -9338,11 +9335,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_qnodatapoll"},
-
-	{WE_CAP_TSF,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "cap_tsf"},
 
 	{WE_GET_TEMPERATURE,
 	 0,

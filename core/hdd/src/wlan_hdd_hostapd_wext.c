@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ *Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1345,9 +1345,7 @@ static __iw_softap_getparam(struct net_device *dev,
 					     VDEV_CMD);
 		break;
 	}
-	case QCSAP_CAP_TSF:
-		ret = hdd_capture_tsf(adapter, (uint32_t *)value, 1);
-		break;
+
 	case QCASAP_GET_TEMP_CMD:
 	{
 		hdd_debug("QCASAP_GET_TEMP_CMD");
@@ -3031,9 +3029,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCASAP_NSS_CMD, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		"get_nss"
-	}, {
-		QCSAP_CAP_TSF, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		"cap_tsf"
 	}, {
 		QCSAP_IOCTL_SET_NONE_GET_THREE, 0, IW_PRIV_TYPE_INT |
 		IW_PRIV_SIZE_FIXED | 3,    ""

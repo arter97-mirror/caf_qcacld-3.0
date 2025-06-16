@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -221,7 +221,6 @@ enum {
 	QCASAP_SET_RADAR_DBG,
 	QCSAP_GET_FW_PROFILE_DATA,
 	QCSAP_START_FW_PROFILING,
-	QCSAP_CAP_TSF,
 	QCSAP_GET_TSF,
 	QCSAP_PARAM_CONC_SYSTEM_PREF,
 	QCASAP_PARAM_LDPC,
