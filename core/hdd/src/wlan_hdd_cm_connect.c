@@ -57,6 +57,8 @@
 #include <wlan_dp_ucfg_api.h>
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "wlan_action_oui_ucfg_api.h"
+#include "wlan_hdd_stats.h"
+#include "wlan_cp_stats_ucfg_api.h"
 
 #define MAX_ROAM_COUNT_VALUE (999)
 
@@ -1885,6 +1887,46 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO)
+static void hdd_post_conn_clear_bcn_rssi_stats(
+		struct wlan_objmgr_psoc *psoc,
+		struct wlan_hdd_link_info *link_info,
+		struct wlan_cm_connect_resp *rsp)
+{
+	struct mlo_link_info *rsp_partner_info;
+	uint8_t link_id = 0;
+	int i;
+	struct wlan_hdd_link_info *parnter_link_info;
+
+	if (!ucfg_cp_stats_is_bcn_rssi_history_report_cfg_enable(psoc))
+		return;
+
+	wlan_hdd_reset_bcn_rssi_history_stats(link_info);
+	for (i = 0 ; i < rsp->ml_parnter_info.num_partner_links; i++) {
+		rsp_partner_info = &rsp->ml_parnter_info.partner_link_info[i];
+		link_id = rsp_partner_info->link_id;
+		parnter_link_info = hdd_get_link_info_by_ieee_link_id(
+					link_info->adapter,
+					link_id, false);
+		if (!parnter_link_info) {
+			hdd_debug("no found link info for %d", link_id);
+			continue;
+		}
+		wlan_hdd_reset_bcn_rssi_history_stats(parnter_link_info);
+	}
+}
+#else
+static void hdd_post_conn_clear_bcn_rssi_stats(
+		struct wlan_objmgr_psoc *psoc,
+		struct wlan_hdd_link_info *link_info,
+		struct wlan_cm_connect_resp *rsp)
+{
+	if (!ucfg_cp_stats_is_bcn_rssi_history_report_cfg_enable(psoc))
+		return;
+	wlan_hdd_reset_bcn_rssi_history_stats(link_info);
+}
+#endif
+
 static void
 hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 					struct wlan_cm_connect_resp *rsp)
@@ -1913,7 +1955,7 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 
 	adapter = link_info->adapter;
 	hdd_cm_clear_pmf_stats(adapter);
-
+	hdd_post_conn_clear_bcn_rssi_stats(hdd_ctx->psoc, link_info, rsp);
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
 		/* Inform FTM TIME SYNC about the connection with AP */
