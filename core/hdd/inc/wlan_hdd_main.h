@@ -5739,15 +5739,6 @@ enum hw_mode_bandwidth wlan_hdd_get_channel_bw(enum nl80211_chan_width width);
 uint8_t *hdd_ch_width_str(enum phy_ch_width ch_width);
 
 /**
- * hdd_we_set_ch_width - Function to update channel width
- * @link_info: Link info pointer in HDD adapter.
- * @ch_width: enum eSirMacHTChannelWidth
- *
- * Return: 0 for success otherwise failure
- */
-int hdd_we_set_ch_width(struct wlan_hdd_link_info *link_info, int ch_width);
-
-/**
  * hdd_stop_adapter_ext: close/delete the vdev session in host/fw.
  * @hdd_ctx: HDD context
  * @adapter: Pointer to hdd_adapter

@@ -341,25 +341,6 @@
  * </ioctl>
  */
 #define WE_SET_RTSCTS        16
-/*
- * <ioctl>
- * chwidth - Set the channel bandwidth
- *
- * @INPUT: 0-20mhz to 3-160mhz
- *
- * @OUTPUT: None
- *
- * This IOTCL used to set the channel bandwidth
- *
- * @E.g: iwpriv wlan0 chwidth 1
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_SET_CHWIDTH       17
 #define WE_SET_ANI_POLL_PERIOD    19
 #define WE_SET_ANI_LISTEN_PERIOD  20
 #define WE_SET_ANI_OFDM_LEVEL     21
@@ -4760,7 +4741,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_RX_STBC] = hdd_set_rx_stbc,
 	[WE_SET_SHORT_GI] = hdd_we_set_short_gi,
 	[WE_SET_RTSCTS] = hdd_we_set_rtscts,
-	[WE_SET_CHWIDTH] = hdd_we_set_ch_width,
 	[WE_SET_ANI_POLL_PERIOD] = hdd_we_set_ani_poll_period,
 	[WE_SET_ANI_LISTEN_PERIOD] = hdd_we_set_ani_listen_period,
 	[WE_SET_ANI_OFDM_LEVEL] = hdd_we_set_ani_ofdm_level,
@@ -8786,11 +8766,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "enablertscts"},
-
-	{WE_SET_CHWIDTH,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "chwidth"},
 
 	{WE_SET_ANI_POLL_PERIOD,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
