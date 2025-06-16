@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -224,6 +224,11 @@ static inline int
 pld_pcie_smmu_unmap(struct device *dev, uint32_t iova_addr, size_t size)
 {
 	return 0;
+}
+
+static inline int pld_pcie_get_tsf_gpio(struct device *dev)
+{
+	return -EINVAL;
 }
 
 static inline int
@@ -593,6 +598,14 @@ static inline int pld_pcie_set_wfc_mode(struct device *dev,
 	return 0;
 }
 #endif
+
+/**
+ * pld_pcie_get_tsf_gpio() - Get GPIO pin number for GPIO IRQ based TSF sync
+ * @dev: device
+ *
+ * Return: GPIO pin number; Negative error code for failure
+ */
+int pld_pcie_get_tsf_gpio(struct device *dev);
 
 /**
  * pld_pcie_get_fw_files_for_target() - Get FW file names
