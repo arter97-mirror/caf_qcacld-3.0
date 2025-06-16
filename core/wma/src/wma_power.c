@@ -546,6 +546,18 @@ static QDF_STATUS wma_set_force_sleep(tp_wma_handle wma,
 		  vdev_id, ps_params->ps_ito);
 
 	ret = wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
+					   WMI_STA_PS_PARAM_ITO_LEVEL,
+					   ps_params->ps_opm_level);
+
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wma_err("Setting opm level Failed vdevId %d InAct %d",
+			vdev_id, ps_params->ps_opm_level);
+		return ret;
+	}
+	wma_debug("Set opm level vdevId %d InAct %d",
+		  vdev_id, ps_params->ps_opm_level);
+
+	ret = wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
 					   WMI_STA_PS_PARAM_SPEC_WAKE_INTERVAL,
 					   ps_params->spec_wake);
 
@@ -652,11 +664,15 @@ static QDF_STATUS wma_wlan_pmo_get_ps_params(struct wlan_objmgr_vdev *vdev,
 	case PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED:
 		ps_params->opm_mode = WMI_STA_PS_USER_DEF;
 		break;
+	case PMO_PS_ADVANCED_POWER_SAVE_LATENCY_BASED:
+		ps_params->opm_mode = WMI_STA_PS_LATENCY_DEF;
+		break;
 	default:
 		wma_err("Invalid opm_mode:%d", pmo_ps_param.opm_mode);
 		return QDF_STATUS_E_INVAL;
 	}
 	ps_params->ps_ito = pmo_ps_param.ps_ito;
+	ps_params->ps_opm_level = pmo_ps_param.ps_opm_level;
 	ps_params->spec_wake = pmo_ps_param.spec_wake;
 
 	return status;
@@ -826,6 +842,8 @@ wma_convert_opm_mode(enum wma_sta_ps_scheme_cfg opm_mode)
 		return WMI_STA_PS_OPM_AGGRESSIVE;
 	case WMA_STA_PS_USER_DEF:
 		return WMI_STA_PS_USER_DEF;
+	case WMA_STA_PS_LATENCY_DEF:
+		return WMI_STA_PS_LATENCY_DEF;
 	default:
 		wma_err("Invalid opm_mode: %d", opm_mode);
 		return WMI_STA_PS_OPM_CONSERVATIVE;
@@ -859,6 +877,21 @@ QDF_STATUS wma_set_power_config_ito(uint8_t vdev_id, uint16_t ps_ito)
 	return wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
 					   WMI_STA_PS_PARAM_INACTIVITY_TIME,
 					   ps_ito);
+}
+
+QDF_STATUS
+wma_set_power_config_opm_level(uint8_t vdev_id, uint8_t ps_opm_level)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma) {
+		wma_err("wma_handle is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wma_unified_set_sta_ps_param(wma->wmi_handle, vdev_id,
+					   WMI_STA_PS_PARAM_ITO_LEVEL,
+					   ps_opm_level);
 }
 
 QDF_STATUS wma_set_power_config_spec_wake(uint8_t vdev_id, uint16_t spec_wake)

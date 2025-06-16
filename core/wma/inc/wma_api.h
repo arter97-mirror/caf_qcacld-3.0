@@ -97,6 +97,7 @@ struct wma_caps_per_phy {
 
 struct wma_ps_params {
 	enum wmi_sta_ps_scheme_cfg opm_mode;
+	uint8_t ps_opm_level;
 	uint16_t ps_ito;
 	uint16_t spec_wake;
 };
@@ -106,11 +107,13 @@ struct wma_ps_params {
  * @WMA_STA_PS_OPM_CONSERVATIVE: Conservative OPM mode
  * @WMA_STA_PS_OPM_AGGRESSIVE: Aggressive OPM mode
  * @WMA_STA_PS_USER_DEF: User defined OPM mode
+ * @WMA_STA_PS_LATENCY_DEF: Latency based opm mode
  */
 enum wma_sta_ps_scheme_cfg {
 	WMA_STA_PS_OPM_CONSERVATIVE = 0,
 	WMA_STA_PS_OPM_AGGRESSIVE = 1,
 	WMA_STA_PS_USER_DEF = 2,
+	WMA_STA_PS_LATENCY_DEF = 3,
 };
 
 #define VDEV_CMD 1
@@ -479,6 +482,16 @@ QDF_STATUS wma_set_power_config(uint8_t vdev_id,
  * Return: QDF_STATUS_SUCCESS on success, error number otherwise
  */
 QDF_STATUS wma_set_power_config_ito(uint8_t vdev_id, uint16_t ps_ito);
+
+/**
+ * wma_set_power_config_opm_level() - update power save opm level
+ * @vdev_id:	  the Id of the vdev to configure
+ * @ps_opm_level: new power save inactivity timeout level
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error number otherwise
+ */
+QDF_STATUS
+wma_set_power_config_opm_level(uint8_t vdev_id, uint8_t ps_opm_level);
 
 /**
  * wma_set_power_config_spec_wake() - update opm speculative wake interval
