@@ -546,6 +546,34 @@ void hdd_display_hif_stats(void);
 void hdd_clear_hif_stats(void);
 
 /**
+ * wlan_hdd_reset_bcn_rssi_history_stats() - reset beacon rssi history
+ * stats in link info
+ * @link_info: link info
+ *
+ * Return: void
+ */
+void wlan_hdd_reset_bcn_rssi_history_stats(
+		struct wlan_hdd_link_info *link_info);
+
+/**
+ * wlan_hdd_get_station_bcn_rssi_history() - Retrieves the beacon RSSI
+ * history for a station.
+ *
+ * @link_info: Pointer to the wlan_hdd_link_info structure containing
+ * the link information.
+ * @bcn_rssi_stats: Pointer to the bcn_his_info_stats structure to store
+ * the beacon RSSI history.
+ *
+ * This function retrieves the beacon RSSI history for a station and
+ * stores it in the provided bcn_his_info_stats structure.
+ *
+ * Return: 0 on success, negative value on failure.
+ */
+int wlan_hdd_get_station_bcn_rssi_history(
+			struct wlan_hdd_link_info *link_info,
+			struct bcn_his_info_stats *bcn_rssi_stats);
+
+/**
  * wlan_hdd_cfg80211_stats_ext_callback() - ext stats callback
  * @hdd_handle: Opaque handle to HDD context
  * @data: ext stats payload

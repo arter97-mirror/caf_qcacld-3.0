@@ -164,6 +164,7 @@ static void wlan_cfg80211_mc_cp_stats_dealloc(void *priv)
 	wlan_cfg80211_mc_cp_stats_free_peer_stats_info_ext(stats);
 	wlan_free_mib_stats(stats);
 	qdf_mem_free(stats->vdev_extd_stats);
+	qdf_mem_free(stats->bcn_stats);
 }
 
 #define QCA_WLAN_VENDOR_ATTR_TOTAL_DRIVER_FW_LOCAL_WAKE \
@@ -1189,6 +1190,9 @@ wlan_cfg80211_mc_cp_stats_get_station_stats(struct wlan_objmgr_vdev *vdev,
 	priv->vdev_extd_stats = NULL;
 
 	out->bcn_protect_stats = priv->bcn_protect_stats;
+	out->num_recv_bcn_stats = priv->num_recv_bcn_stats;
+	out->bcn_stats = priv->bcn_stats;
+	priv->bcn_stats = NULL;
 	osif_request_put(request);
 
 	osif_debug("Exit");
@@ -1736,6 +1740,7 @@ void wlan_cfg80211_mc_cp_stats_free_stats_event(struct stats_event *stats)
 	wlan_free_mib_stats(stats);
 	wlan_cfg80211_mc_cp_stats_free_peer_stats_info_ext(stats);
 	qdf_mem_free(stats->vdev_extd_stats);
+	qdf_mem_free(stats->bcn_stats);
 	qdf_mem_free(stats);
 }
 
