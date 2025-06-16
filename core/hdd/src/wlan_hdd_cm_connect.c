@@ -609,7 +609,8 @@ hdd_get_sap_link_info_of_dfs(struct hdd_context *hdd_ctx)
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
-		if (adapter->device_mode != QDF_SAP_MODE)
+		if (adapter->device_mode != QDF_SAP_MODE &&
+		    adapter->device_mode != QDF_P2P_GO_MODE)
 			goto loop_next;
 
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
@@ -693,6 +694,7 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	bool is_6ghz_cap = false;
 	int ret;
 	struct wlan_hdd_link_info *link_info;
+	enum policy_mgr_con_mode dfs_con_mode = PM_SAP_MODE;
 
 	link_info = hdd_get_sap_link_info_of_dfs(hdd_ctx);
 	/* probably no dfs sap running, no handling required */
@@ -794,13 +796,15 @@ def_chan:
 		is_6ghz_cap = policy_mgr_get_ap_6ghz_capable(hdd_ctx->psoc,
 						link_info->vdev_id,
 							     NULL);
+	if (link_info->adapter->device_mode == QDF_P2P_GO_MODE)
+		dfs_con_mode = PM_P2P_GO_MODE;
 
 	if (!ch_freq || wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) ||
 	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq) ||
 	    wlan_reg_is_passive_for_freq(hdd_ctx->pdev, ch_freq) ||
 	    (WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq) && !is_6ghz_cap))
 		ch_freq = policy_mgr_get_nondfs_preferred_channel(
-				hdd_ctx->psoc, PM_SAP_MODE,
+				hdd_ctx->psoc, dfs_con_mode,
 				true, link_info->vdev_id);
 
 	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
