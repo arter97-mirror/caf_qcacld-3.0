@@ -1817,82 +1817,6 @@ static iw_softap_getassoc_stamacaddr(struct net_device *dev,
 	return errno;
 }
 
-/* Usage:
- *  mac addr will be accepted as a 6 octet mac address with each octet
- *  inputted in hex for e.g. 00:0a:f5:11:22:33 will be represented as
- *  0x00 0x0a 0xf5 0x11 0x22 0x33 while using this ioctl
- *
- *  Syntax:
- *  iwpriv softap.0 disassoc_sta <6 octet mac address>
- *
- *  e.g.
- *  disassociate sta with mac addr 00:0a:f5:11:22:33 from softap
- *  iwpriv softap.0 disassoc_sta 0x00 0x0a 0xf5 0x11 0x22 0x33
- */
-
-int
-static __iw_softap_disassoc_sta(struct net_device *dev,
-				struct iw_request_info *info,
-				union iwreq_data *wrqu, char *extra)
-{
-	struct hdd_adapter *adapter = (netdev_priv(dev));
-	struct hdd_context *hdd_ctx;
-	uint8_t *peer_macaddr;
-	int ret;
-	struct csr_del_sta_params del_sta_params;
-
-	hdd_enter_dev(dev);
-
-	if (!capable(CAP_NET_ADMIN)) {
-		hdd_err("permission check failed");
-		return -EPERM;
-	}
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
-
-	ret = hdd_check_private_wext_control(hdd_ctx, info);
-	if (0 != ret)
-		return ret;
-
-	/* iwpriv tool or framework calls this ioctl with
-	 * data passed in extra (less than 16 octets);
-	 */
-	peer_macaddr = (uint8_t *) (extra);
-
-	hdd_debug("data " QDF_MAC_ADDR_FMT,
-		  QDF_MAC_ADDR_REF(peer_macaddr));
-	wlansap_populate_del_sta_params(peer_macaddr,
-					REASON_DEAUTH_NETWORK_LEAVING,
-					SIR_MAC_MGMT_DISASSOC,
-					&del_sta_params);
-	hdd_softap_sta_disassoc(adapter, &del_sta_params);
-
-	hdd_exit();
-	return 0;
-}
-
-int
-static iw_softap_disassoc_sta(struct net_device *dev,
-			      struct iw_request_info *info,
-			      union iwreq_data *wrqu, char *extra)
-{
-	int errno;
-	struct osif_vdev_sync *vdev_sync;
-
-	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __iw_softap_disassoc_sta(dev, info, wrqu, extra);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-
 /**
  * __iw_get_char_setnone() - Generic "get char" private ioctl handler
  * @dev: device upon which the ioctl was received
@@ -3047,10 +2971,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCSAP_IOCTL_GET_BA_AGEING_TIMEOUT, 0,
 		IW_PRIV_TYPE_CHAR | WE_SAP_MAX_STA_INFO, "get_ba_timeout"
-	}, {
-		QCSAP_IOCTL_DISASSOC_STA,
-		IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 6, 0,
-		"disassoc_sta"
 	}
 	/* handler for main ioctl */
 	, {
@@ -3286,8 +3206,6 @@ static const iw_handler hostapd_private[] = {
 		iw_softap_getchannel,
 	[QCSAP_IOCTL_ASSOC_STA_MACADDR - SIOCIWFIRSTPRIV] =
 		iw_softap_getassoc_stamacaddr,
-	[QCSAP_IOCTL_DISASSOC_STA - SIOCIWFIRSTPRIV] =
-		iw_softap_disassoc_sta,
 	[QCSAP_PRIV_GET_CHAR_SET_NONE - SIOCIWFIRSTPRIV] =
 		iw_get_char_setnone,
 	[QCSAP_IOCTL_PRIV_SET_THREE_INT_GET_NONE -
