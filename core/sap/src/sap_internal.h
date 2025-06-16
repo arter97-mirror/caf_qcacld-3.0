@@ -400,6 +400,15 @@ void sap_dfs_cac_timer_callback(void *data);
  */
 void sap_cac_reset_notify(mac_handle_t mac_handle);
 
+/**
+ * sap_cac_reset_current_notify() - Current BSS cleanup notification handler
+ * @sap_ctx: SAP context
+ *
+ * This function should be called upon stop bss or channel switch to
+ * clean up DFS global structure of current SAP
+ */
+void sap_cac_reset_current_notify(struct sap_context *sap_ctx);
+
 bool is_concurrent_sap_ready_for_channel_change(mac_handle_t mac_handle,
 						struct sap_context *sap_ctx);
 

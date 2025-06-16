@@ -3047,6 +3047,12 @@ void sap_cac_reset_notify(mac_handle_t mac_handle)
 	}
 }
 
+void sap_cac_reset_current_notify(struct sap_context *sap_ctx)
+{
+	sap_ctx->isCacStartNotified = false;
+	sap_ctx->isCacEndNotified = false;
+}
+
 /**
  * sap_cac_start_notify() - Notify CAC start to HDD
  * @mac_handle: Opaque handle to the global MAC context
