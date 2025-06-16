@@ -1360,26 +1360,6 @@
 #define WE_GET_ANI_CCK_LEVEL      22
 /*
  * <ioctl>
- * get_cwmenable - Get the value of the dynamic channel bandwidth setting
- *
- * @INPUT: None
- *
- * @OUTPUT: Enable/disable dynamic channel bandwidth
- *  wlan0     get_cwmenable:0
- *
- * This IOTCL get the value of the dynamic channel bandwidth setting
- *
- * @E.g: iwpriv wlan0 get_cwmenable
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_DYNAMIC_BW         23
-/*
- * <ioctl>
  * get_txchainmask - Get the txchainmask that was set
  *
  * @INPUT: None
@@ -5170,15 +5150,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
-	case WE_GET_DYNAMIC_BW:
-	{
-		hdd_debug("GET wmi_pdev_param_ani_cck_level");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     wmi_pdev_param_dynamic_bw,
-					     PDEV_CMD);
-		break;
-	}
-
 	case WE_GET_11N_RATE:
 	{
 		hdd_debug("GET wmi_vdev_param_fixed_rate");
@@ -8852,11 +8823,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_aniccklvl"},
-
-	{WE_GET_DYNAMIC_BW,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_cwmenable"},
 
 	{WE_GET_GTX_HT_MCS,
 	 0,
