@@ -1223,6 +1223,7 @@ static void hdd_cm_save_bss_info(struct wlan_hdd_link_info *link_info,
 			     sizeof(hdd_sta_ctx->cache_conn_info));
 
 		hdd_copy_he_operation(hdd_sta_ctx, &assoc_resp->he_op);
+		hdd_copy_eht_caps(hdd_sta_ctx, assoc_resp);
 		hdd_cm_update_prev_ap_ie(hdd_sta_ctx, rsp);
 	}
 

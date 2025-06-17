@@ -8797,6 +8797,37 @@ hdd_cleanup_he_operation_info(struct wlan_hdd_link_info *link_info)
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
+	defined(WLAN_FEATURE_11BE)
+/**
+ * hdd_cleanup_eht_capabilities() - cleanup eht capabilities
+ * @link_info: pointer to link_info struct in adapter
+ *
+ * This function destroys eht capabilities info
+ *
+ * Return: none
+ */
+static void hdd_cleanup_eht_capabilities(struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_station_ctx *hdd_sta_ctx;
+
+	hdd_debug("cleanup eht capabilities");
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+
+	if (hdd_sta_ctx->conn_info.eht_cap) {
+		qdf_mem_free(hdd_sta_ctx->conn_info.eht_cap);
+		hdd_sta_ctx->conn_info.eht_cap = NULL;
+		hdd_sta_ctx->conn_info.eht_cap_len = 0;
+	}
+}
+#else
+static inline void
+hdd_cleanup_eht_capabilities(struct wlan_hdd_link_info *link_info)
+{
+}
+#endif
+
 /**
  * hdd_cleanup_prev_ap_bcn_ie() - cleanup previous ap beacon ie
  * @link_info: pointer to link_info struct in adapter
@@ -8824,6 +8855,7 @@ static void hdd_cleanup_prev_ap_bcn_ie(struct wlan_hdd_link_info *link_info)
 
 void hdd_cleanup_conn_info(struct wlan_hdd_link_info *link_info)
 {
+	hdd_cleanup_eht_capabilities(link_info);
 	hdd_cleanup_he_operation_info(link_info);
 	hdd_cleanup_prev_ap_bcn_ie(link_info);
 }

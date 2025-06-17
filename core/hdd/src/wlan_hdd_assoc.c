@@ -1127,6 +1127,442 @@ void hdd_copy_vht_operation(struct hdd_station_ctx *hdd_sta_ctx,
 	hdd_vht_ops->basic_mcs_set = vht_ops->basicMCSSet;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
+	defined(WLAN_FEATURE_11BE)
+
+#define EHT_MAC_CAP1_MAX_AMPDU		0x01
+#define EHT_MAC_CAP1_TRS_SUPPORT	0x02
+#define EHT_MAC_CAP1_TXOP_RET_SUPP	0x04
+#define EHT_MAC_CAP1_TWO_BQRS_SUPP	0x08
+#define EHT_MAC_CAP1_LINK_ADAP_SUPP	0x30
+
+#define EHT_MAC_CAP0_MAX_MPDU_POS	6
+#define EHT_MAC_CAP1_LINK_ADAP_SUPP_POS 4
+
+#define EHT_PHY_CAP8_LMT_CAP_SUPP_20MHZ	0x04
+#define EHT_PHY_CAP8_TRIG_MU_BF_FULL_BW	0x08
+#define EHT_PHY_CAP8_MRU_SUPP_20MHZ	0x10
+
+#define EHT_PHY_CAP0_BEAMFORMEE_SS_80MHZ_MASK		0x1
+#define EHT_PHY_CAP1_BEAMFORMEE_SS_80MHZ_MASK		1
+#define EHT_PHY_CAP1_BEAMFORMEE_SS_160MHZ_MASK		2
+#define EHT_PHY_CAP1_BEAMFORMEE_SS_320MHZ_MASK		5
+#define EHT_PHY_CAP2_SOUNDING_DIM_160MHZ_MASK		3
+#define EHT_PHY_CAP2_SOUNDING_DIM_320MHZ_MASK		6
+#define EHT_PHY_CAP3_SOUNDING_DIM_320MHZ_MASK		2
+#define EHT_PHY_CAP4_MAX_NC_MASK			4
+#define EHT_PHY_CAP5_COMMON_NOMINAL_PKT_PAD_MASK	4
+#define EHT_PHY_CAP5_MAX_NUM_SUPP_EHT_LTF_MASK		6
+#define EHT_PHY_CAP6_MAX_NUM_SUPP_EHT_LTF_MASK		2
+#define EHT_PHY_CAP6_MCS15_SUPP_MASK			3
+
+void hdd_copy_eht_caps(struct hdd_station_ctx *hdd_sta_ctx,
+		       tDot11fAssocResponse *assoc_resp)
+{
+	struct ieee80211_eht_cap_elem *eht_cap_elem;
+	tDot11fIEeht_cap *eht_caps = &assoc_resp->eht_cap;
+	tDot11fIEhe_cap *he_caps = &assoc_resp->he_cap;
+	bool is_band_2g;
+	uint32_t filled = 0, len = 0, eht_cap_len;
+	uint8_t temp = 0;
+
+	if (!he_caps->present)
+		return;
+
+	if (!eht_caps->present)
+		return;
+
+	is_band_2g =
+		WLAN_REG_IS_24GHZ_CH_FREQ(hdd_sta_ctx->conn_info.chan_freq);
+
+	if (((is_band_2g && !he_caps->chan_width_0) ||
+	     (!is_band_2g && !he_caps->chan_width_1 &&
+	     !he_caps->chan_width_2 && !he_caps->chan_width_3))) {
+		len += 4;
+	} else {
+		if ((is_band_2g && he_caps->chan_width_0) ||
+		    (!is_band_2g && he_caps->chan_width_1))
+			len += 3;
+	}
+
+	if (he_caps->chan_width_2)
+		len += 3;
+
+	if (eht_caps->support_320mhz_6ghz)
+		len += 3;
+
+	eht_cap_len = sizeof(struct ieee80211_eht_cap_elem) + len;
+	eht_cap_elem = qdf_mem_malloc(eht_cap_len);
+
+	if (!eht_cap_elem) {
+		hdd_err("Failed to allocate memory for EHT capabilities");
+		return;
+	}
+
+	if (eht_caps->epcs_pri_access)
+		eht_cap_elem->fixed.mac_cap_info[0] |=
+			IEEE80211_EHT_MAC_CAP0_EPCS_PRIO_ACCESS;
+	if (eht_caps->eht_om_ctl)
+		eht_cap_elem->fixed.mac_cap_info[0] |=
+			IEEE80211_EHT_MAC_CAP0_OM_CONTROL;
+	if (eht_caps->triggered_txop_sharing_mode1)
+		eht_cap_elem->fixed.mac_cap_info[0] |=
+			IEEE80211_EHT_MAC_CAP0_TRIG_TXOP_SHARING_MODE1;
+	if (eht_caps->triggered_txop_sharing_mode2)
+		eht_cap_elem->fixed.mac_cap_info[0] |=
+			IEEE80211_EHT_MAC_CAP0_TRIG_TXOP_SHARING_MODE2;
+	if (eht_caps->restricted_twt)
+		eht_cap_elem->fixed.mac_cap_info[0] |=
+			IEEE80211_EHT_MAC_CAP0_RESTRICTED_TWT;
+	if (eht_caps->scs_traffic_desc)
+		eht_cap_elem->fixed.mac_cap_info[0] |=
+			IEEE80211_EHT_MAC_CAP0_SCS_TRAFFIC_DESC;
+	if (eht_caps->max_mpdu_len) {
+		temp = eht_caps->max_mpdu_len << EHT_MAC_CAP0_MAX_MPDU_POS;
+		eht_cap_elem->fixed.mac_cap_info[0] |=
+				(temp &
+				IEEE80211_EHT_MAC_CAP0_MAX_MPDU_LEN_MASK);
+	}
+
+	if (eht_caps->max_a_mpdu_len_exponent_ext)
+		eht_cap_elem->fixed.mac_cap_info[1] |= EHT_MAC_CAP1_MAX_AMPDU;
+	if (eht_caps->eht_trs_support)
+		eht_cap_elem->fixed.mac_cap_info[1] |=
+						EHT_MAC_CAP1_TRS_SUPPORT;
+	if (eht_caps->txop_return_support_txop_share_m2)
+		eht_cap_elem->fixed.mac_cap_info[1] |=
+						EHT_MAC_CAP1_TXOP_RET_SUPP;
+	if (eht_caps->two_bqrs_support)
+		eht_cap_elem->fixed.mac_cap_info[1] |=
+						EHT_MAC_CAP1_TWO_BQRS_SUPP;
+	if (eht_caps->eht_link_adaptation_support) {
+		temp = eht_caps->eht_link_adaptation_support <<
+			EHT_MAC_CAP1_LINK_ADAP_SUPP_POS;
+		eht_cap_elem->fixed.mac_cap_info[1] |=
+				(temp & EHT_MAC_CAP1_LINK_ADAP_SUPP);
+	}
+
+	if (eht_caps->support_320mhz_6ghz)
+		eht_cap_elem->fixed.phy_cap_info[0] |=
+			IEEE80211_EHT_PHY_CAP0_320MHZ_IN_6GHZ;
+	if (eht_caps->ru_242tone_wt_20mhz)
+		eht_cap_elem->fixed.phy_cap_info[0] |=
+			IEEE80211_EHT_PHY_CAP0_242_TONE_RU_GT20MHZ;
+	if (eht_caps->ndp_4x_eht_ltf_3dot2_us_gi)
+		eht_cap_elem->fixed.phy_cap_info[0] |=
+			IEEE80211_EHT_PHY_CAP0_NDP_4_EHT_LFT_32_GI;
+	if (eht_caps->partial_bw_mu_mimo)
+		eht_cap_elem->fixed.phy_cap_info[0] |=
+			IEEE80211_EHT_PHY_CAP0_PARTIAL_BW_UL_MU_MIMO;
+	if (eht_caps->su_beamformer)
+		eht_cap_elem->fixed.phy_cap_info[0] |=
+			IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMER;
+	if (eht_caps->su_beamformee)
+		eht_cap_elem->fixed.phy_cap_info[0] |=
+			IEEE80211_EHT_PHY_CAP0_SU_BEAMFORMEE;
+	if (eht_caps->bfee_ss_le_80mhz & EHT_PHY_CAP0_BEAMFORMEE_SS_80MHZ_MASK)
+		eht_cap_elem->fixed.phy_cap_info[0] |=
+			IEEE80211_EHT_PHY_CAP0_BEAMFORMEE_SS_80MHZ_MASK;
+	if (eht_caps->bfee_ss_le_80mhz) {
+		temp = eht_caps->bfee_ss_le_80mhz >>
+			EHT_PHY_CAP1_BEAMFORMEE_SS_80MHZ_MASK;
+		eht_cap_elem->fixed.phy_cap_info[1] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP1_BEAMFORMEE_SS_80MHZ_MASK);
+	}
+
+	if (eht_caps->bfee_ss_160mhz) {
+		temp = eht_caps->bfee_ss_160mhz <<
+			EHT_PHY_CAP1_BEAMFORMEE_SS_160MHZ_MASK;
+		eht_cap_elem->fixed.phy_cap_info[1] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP1_BEAMFORMEE_SS_160MHZ_MASK);
+	}
+	if (eht_caps->bfee_ss_320mhz) {
+		temp = eht_caps->bfee_ss_320mhz <<
+			EHT_PHY_CAP1_BEAMFORMEE_SS_320MHZ_MASK;
+		eht_cap_elem->fixed.phy_cap_info[1] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP1_BEAMFORMEE_SS_320MHZ_MASK);
+	}
+
+	if (eht_caps->num_sounding_dim_le_80mhz)
+		eht_cap_elem->fixed.phy_cap_info[2] |=
+			(eht_caps->num_sounding_dim_le_80mhz &
+			IEEE80211_EHT_PHY_CAP2_SOUNDING_DIM_80MHZ_MASK);
+	if (eht_caps->num_sounding_dim_160mhz) {
+		temp = eht_caps->num_sounding_dim_160mhz <<
+			EHT_PHY_CAP2_SOUNDING_DIM_160MHZ_MASK;
+		eht_cap_elem->fixed.phy_cap_info[2] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP2_SOUNDING_DIM_160MHZ_MASK);
+	}
+	if (eht_caps->num_sounding_dim_320mhz) {
+		temp = eht_caps->num_sounding_dim_320mhz <<
+			EHT_PHY_CAP2_SOUNDING_DIM_320MHZ_MASK;
+		eht_cap_elem->fixed.phy_cap_info[2] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP2_SOUNDING_DIM_320MHZ_MASK);
+		temp = eht_caps->num_sounding_dim_320mhz >>
+			EHT_PHY_CAP3_SOUNDING_DIM_320MHZ_MASK;
+		eht_cap_elem->fixed.phy_cap_info[3] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP3_SOUNDING_DIM_320MHZ_MASK);
+	}
+
+	if (eht_caps->ng_16_su_feedback)
+		eht_cap_elem->fixed.phy_cap_info[3] |=
+			IEEE80211_EHT_PHY_CAP3_NG_16_SU_FEEDBACK;
+	if (eht_caps->ng_16_mu_feedback)
+		eht_cap_elem->fixed.phy_cap_info[3] |=
+			IEEE80211_EHT_PHY_CAP3_NG_16_MU_FEEDBACK;
+	if (eht_caps->cb_sz_4_2_su_feedback)
+		eht_cap_elem->fixed.phy_cap_info[3] |=
+			IEEE80211_EHT_PHY_CAP3_CODEBOOK_4_2_SU_FDBK;
+	if (eht_caps->cb_sz_7_5_su_feedback)
+		eht_cap_elem->fixed.phy_cap_info[3] |=
+			IEEE80211_EHT_PHY_CAP3_CODEBOOK_7_5_MU_FDBK;
+	if (eht_caps->trig_su_bforming_feedback)
+		eht_cap_elem->fixed.phy_cap_info[3] |=
+			IEEE80211_EHT_PHY_CAP3_TRIG_SU_BF_FDBK;
+	if (eht_caps->trig_mu_bforming_partial_bw_feedback)
+		eht_cap_elem->fixed.phy_cap_info[3] |=
+			IEEE80211_EHT_PHY_CAP3_TRIG_MU_BF_PART_BW_FDBK;
+	if (eht_caps->triggered_cqi_feedback)
+		eht_cap_elem->fixed.phy_cap_info[3] |=
+			IEEE80211_EHT_PHY_CAP3_TRIG_CQI_FDBK;
+
+	if (eht_caps->partial_bw_dl_mu_mimo)
+		eht_cap_elem->fixed.phy_cap_info[4] |=
+			IEEE80211_EHT_PHY_CAP4_PART_BW_DL_MU_MIMO;
+	if (eht_caps->psr_based_sr)
+		eht_cap_elem->fixed.phy_cap_info[4] |=
+			IEEE80211_EHT_PHY_CAP4_PSR_SR_SUPP;
+	if (eht_caps->power_boost_factor)
+		eht_cap_elem->fixed.phy_cap_info[4] |=
+			IEEE80211_EHT_PHY_CAP4_POWER_BOOST_FACT_SUPP;
+	if (eht_caps->eht_mu_ppdu_4x_ltf_0_8_us_gi)
+		eht_cap_elem->fixed.phy_cap_info[4] |=
+			IEEE80211_EHT_PHY_CAP4_EHT_MU_PPDU_4_EHT_LTF_08_GI;
+	if (eht_caps->max_nc) {
+		temp = eht_caps->max_nc << EHT_PHY_CAP4_MAX_NC_MASK;
+		eht_cap_elem->fixed.phy_cap_info[4] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP4_MAX_NC_MASK);
+	}
+
+	if (eht_caps->non_trig_cqi_feedback)
+		eht_cap_elem->fixed.phy_cap_info[5] |=
+			IEEE80211_EHT_PHY_CAP5_NON_TRIG_CQI_FEEDBACK;
+	if (eht_caps->tx_1024_4096_qam_lt_242_tone_ru)
+		eht_cap_elem->fixed.phy_cap_info[5] |=
+			IEEE80211_EHT_PHY_CAP5_TX_LESS_242_TONE_RU_SUPP;
+	if (eht_caps->rx_1024_4096_qam_lt_242_tone_ru)
+		eht_cap_elem->fixed.phy_cap_info[5] |=
+			IEEE80211_EHT_PHY_CAP5_RX_LESS_242_TONE_RU_SUPP;
+	if (eht_caps->ppet_present)
+		eht_cap_elem->fixed.phy_cap_info[5] |=
+			IEEE80211_EHT_PHY_CAP5_PPE_THRESHOLD_PRESENT;
+	if (eht_caps->common_nominal_pkt_padding) {
+		temp = eht_caps->common_nominal_pkt_padding <<
+			EHT_PHY_CAP5_COMMON_NOMINAL_PKT_PAD_MASK;
+		eht_cap_elem->fixed.phy_cap_info[5] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP5_COMMON_NOMINAL_PKT_PAD_MASK);
+	}
+	if (eht_caps->max_num_eht_ltf) {
+		temp = eht_caps->max_num_eht_ltf <<
+			EHT_PHY_CAP5_MAX_NUM_SUPP_EHT_LTF_MASK;
+		eht_cap_elem->fixed.phy_cap_info[5] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP5_MAX_NUM_SUPP_EHT_LTF_MASK);
+		temp = eht_caps->max_num_eht_ltf >>
+			EHT_PHY_CAP6_MAX_NUM_SUPP_EHT_LTF_MASK;
+		eht_cap_elem->fixed.phy_cap_info[6] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP6_MAX_NUM_SUPP_EHT_LTF_MASK);
+	}
+
+	if (eht_caps->mcs_15) {
+		temp = eht_caps->mcs_15 << EHT_PHY_CAP6_MCS15_SUPP_MASK;
+		eht_cap_elem->fixed.phy_cap_info[6] |=
+			(temp &
+			IEEE80211_EHT_PHY_CAP6_MCS15_SUPP_MASK);
+	}
+	if (eht_caps->eht_dup_6ghz)
+		eht_cap_elem->fixed.phy_cap_info[6] |=
+			IEEE80211_EHT_PHY_CAP6_EHT_DUP_6GHZ_SUPP;
+
+	if (eht_caps->op_sta_rx_ndp_wider_bw_20mhz)
+		eht_cap_elem->fixed.phy_cap_info[7] |=
+			IEEE80211_EHT_PHY_CAP7_20MHZ_STA_RX_NDP_WIDER_BW;
+	if (eht_caps->non_ofdma_ul_mu_mimo_le_80mhz)
+		eht_cap_elem->fixed.phy_cap_info[7] |=
+			IEEE80211_EHT_PHY_CAP7_NON_OFDMA_UL_MU_MIMO_80MHZ;
+	if (eht_caps->non_ofdma_ul_mu_mimo_160mhz)
+		eht_cap_elem->fixed.phy_cap_info[7] |=
+			IEEE80211_EHT_PHY_CAP7_NON_OFDMA_UL_MU_MIMO_160MHZ;
+	if (eht_caps->non_ofdma_ul_mu_mimo_320mhz)
+		eht_cap_elem->fixed.phy_cap_info[7] |=
+			IEEE80211_EHT_PHY_CAP7_NON_OFDMA_UL_MU_MIMO_320MHZ;
+	if (eht_caps->mu_bformer_le_80mhz)
+		eht_cap_elem->fixed.phy_cap_info[7] |=
+			IEEE80211_EHT_PHY_CAP7_MU_BEAMFORMER_80MHZ;
+	if (eht_caps->mu_bformer_160mhz)
+		eht_cap_elem->fixed.phy_cap_info[7] |=
+			IEEE80211_EHT_PHY_CAP7_MU_BEAMFORMER_160MHZ;
+	if (eht_caps->mu_bformer_320mhz)
+		eht_cap_elem->fixed.phy_cap_info[7] |=
+			IEEE80211_EHT_PHY_CAP7_MU_BEAMFORMER_320MHZ;
+	if (eht_caps->tb_sounding_feedback_rl)
+		eht_cap_elem->fixed.phy_cap_info[7] |=
+			IEEE80211_EHT_PHY_CAP7_TB_SOUNDING_FDBK_RATE_LIMIT;
+
+	if (eht_caps->rx_1k_qam_in_wider_bw_dl_ofdma)
+		eht_cap_elem->fixed.phy_cap_info[8] |=
+			IEEE80211_EHT_PHY_CAP8_RX_1024QAM_WIDER_BW_DL_OFDMA;
+	if (eht_caps->rx_4k_qam_in_wider_bw_dl_ofdma)
+		eht_cap_elem->fixed.phy_cap_info[8] |=
+			IEEE80211_EHT_PHY_CAP8_RX_4096QAM_WIDER_BW_DL_OFDMA;
+	if (eht_caps->limited_cap_support_20mhz)
+		eht_cap_elem->fixed.phy_cap_info[8] |=
+			EHT_PHY_CAP8_LMT_CAP_SUPP_20MHZ;
+	if (eht_caps->triggered_mu_bf_full_bw_fb_and_dl_mumimo)
+		eht_cap_elem->fixed.phy_cap_info[8] |=
+			EHT_PHY_CAP8_TRIG_MU_BF_FULL_BW;
+	if (eht_caps->mru_support_20mhz)
+		eht_cap_elem->fixed.phy_cap_info[8] |=
+			EHT_PHY_CAP8_MRU_SUPP_20MHZ;
+
+	if (((is_band_2g && !he_caps->chan_width_0) ||
+	     (!is_band_2g && !he_caps->chan_width_1 &&
+	     !he_caps->chan_width_2 && !he_caps->chan_width_3))) {
+		eht_cap_elem->optional[filled] =
+			eht_caps->bw_20_rx_max_nss_for_mcs_0_to_7 &
+			IEEE80211_EHT_MCS_NSS_RX;
+		eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_20_tx_max_nss_for_mcs_0_to_7 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) & IEEE80211_EHT_MCS_NSS_TX);
+		filled++;
+
+		eht_cap_elem->optional[filled] =
+			eht_caps->bw_20_rx_max_nss_for_mcs_8_and_9 &
+			IEEE80211_EHT_MCS_NSS_RX;
+		eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_20_tx_max_nss_for_mcs_8_and_9 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) & IEEE80211_EHT_MCS_NSS_TX);
+		filled++;
+
+		eht_cap_elem->optional[filled] =
+			eht_caps->bw_20_rx_max_nss_for_mcs_10_and_11 &
+			IEEE80211_EHT_MCS_NSS_RX;
+		eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_20_tx_max_nss_for_mcs_10_and_11 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) & IEEE80211_EHT_MCS_NSS_TX);
+		filled++;
+
+		eht_cap_elem->optional[filled] =
+			eht_caps->bw_20_rx_max_nss_for_mcs_12_and_13 &
+			IEEE80211_EHT_MCS_NSS_RX;
+		eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_20_tx_max_nss_for_mcs_12_and_13 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) & IEEE80211_EHT_MCS_NSS_TX);
+		filled++;
+	} else {
+		if ((is_band_2g && he_caps->chan_width_0) ||
+		    (!is_band_2g && he_caps->chan_width_1)) {
+			eht_cap_elem->optional[filled] =
+				eht_caps->bw_le_80_rx_max_nss_for_mcs_0_to_9 &
+				IEEE80211_EHT_MCS_NSS_RX;
+			eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_le_80_tx_max_nss_for_mcs_0_to_9 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) &
+			IEEE80211_EHT_MCS_NSS_TX);
+			filled++;
+
+			eht_cap_elem->optional[filled] =
+			eht_caps->bw_le_80_rx_max_nss_for_mcs_10_and_11 &
+			IEEE80211_EHT_MCS_NSS_RX;
+			eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_le_80_tx_max_nss_for_mcs_10_and_11 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) &
+			IEEE80211_EHT_MCS_NSS_TX);
+			filled++;
+
+			eht_cap_elem->optional[filled] =
+			eht_caps->bw_le_80_rx_max_nss_for_mcs_12_and_13 &
+			IEEE80211_EHT_MCS_NSS_RX;
+			eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_le_80_tx_max_nss_for_mcs_12_and_13 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) &
+			IEEE80211_EHT_MCS_NSS_TX);
+			filled++;
+		}
+	}
+
+	if (he_caps->chan_width_2) {
+		eht_cap_elem->optional[filled] =
+			eht_caps->bw_160_rx_max_nss_for_mcs_0_to_9 &
+			IEEE80211_EHT_MCS_NSS_RX;
+		eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_160_tx_max_nss_for_mcs_0_to_9 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) & IEEE80211_EHT_MCS_NSS_TX);
+		filled++;
+
+		eht_cap_elem->optional[filled] =
+			eht_caps->bw_160_rx_max_nss_for_mcs_10_and_11 &
+			IEEE80211_EHT_MCS_NSS_RX;
+		eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_160_tx_max_nss_for_mcs_10_and_11 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) & IEEE80211_EHT_MCS_NSS_TX);
+		filled++;
+
+		eht_cap_elem->optional[filled] =
+			eht_caps->bw_160_rx_max_nss_for_mcs_12_and_13 &
+			IEEE80211_EHT_MCS_NSS_RX;
+		eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_160_tx_max_nss_for_mcs_12_and_13 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) & IEEE80211_EHT_MCS_NSS_TX);
+		filled++;
+	}
+
+	if (eht_caps->support_320mhz_6ghz) {
+		eht_cap_elem->optional[filled] =
+			eht_caps->bw_320_rx_max_nss_for_mcs_0_to_9 &
+			IEEE80211_EHT_MCS_NSS_RX;
+		eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_320_tx_max_nss_for_mcs_0_to_9 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) & IEEE80211_EHT_MCS_NSS_TX);
+		filled++;
+
+		eht_cap_elem->optional[filled] =
+			eht_caps->bw_320_rx_max_nss_for_mcs_10_and_11 &
+			IEEE80211_EHT_MCS_NSS_RX;
+		eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_320_tx_max_nss_for_mcs_10_and_11 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) & IEEE80211_EHT_MCS_NSS_TX);
+		filled++;
+
+		eht_cap_elem->optional[filled] =
+			eht_caps->bw_320_rx_max_nss_for_mcs_12_and_13 &
+			IEEE80211_EHT_MCS_NSS_RX;
+		eht_cap_elem->optional[filled] |=
+			((eht_caps->bw_320_tx_max_nss_for_mcs_12_and_13 <<
+			EHTCAP_TX_MCS_NSS_MAP_IDX) & IEEE80211_EHT_MCS_NSS_TX);
+		filled++;
+	}
+
+	if (hdd_sta_ctx->conn_info.eht_cap) {
+		qdf_mem_free(hdd_sta_ctx->conn_info.eht_cap);
+		hdd_sta_ctx->conn_info.eht_cap = NULL;
+		hdd_sta_ctx->conn_info.eht_cap_len = 0;
+	}
+
+	hdd_sta_ctx->conn_info.eht_cap_len = len;
+	hdd_sta_ctx->conn_info.eht_cap = eht_cap_elem;
+}
+#endif
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0)) && \
 	defined(WLAN_FEATURE_11BE)
 void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
@@ -1508,6 +1944,8 @@ void hdd_copy_he_caps(struct hdd_station_ctx *hdd_sta_ctx,
 {
 	struct ieee80211_he_cap_elem *he_cap_elem =
 		&hdd_sta_ctx->conn_info.he_cap_elem;
+	struct ieee80211_he_mcs_nss_supp *he_mcs_nss =
+		&hdd_sta_ctx->conn_info.he_cap_mcs;
 
 	qdf_mem_zero(he_cap_elem, sizeof(struct ieee80211_he_cap_elem));
 
@@ -1778,6 +2216,23 @@ void hdd_copy_he_caps(struct hdd_station_ctx *hdd_sta_ctx,
 		     HE_PHY_CAP_NON_CMPR_SIGB_POS,
 		     HE_PHY_CAP_NON_CMPR_SGIB_BITS,
 		     he_caps->rx_full_bw_su_he_mu_non_cmpr_sigb);
+
+	he_mcs_nss->rx_mcs_80 = he_caps->rx_he_mcs_map_lt_80;
+	he_mcs_nss->tx_mcs_80 = he_caps->tx_he_mcs_map_lt_80;
+
+	if (he_caps->chan_width_2) {
+		he_mcs_nss->rx_mcs_160 =
+				*((uint16_t *)he_caps->rx_he_mcs_map_160);
+		he_mcs_nss->tx_mcs_160 =
+				*((uint16_t *)he_caps->tx_he_mcs_map_160);
+	}
+
+	if (he_caps->chan_width_3) {
+		he_mcs_nss->rx_mcs_80p80 =
+				*((uint16_t *)he_caps->rx_he_mcs_map_80_80);
+		he_mcs_nss->tx_mcs_80p80 =
+				*((uint16_t *)he_caps->tx_he_mcs_map_80_80);
+	}
 }
 
 void hdd_copy_he_operation(struct hdd_station_ctx *hdd_sta_ctx,

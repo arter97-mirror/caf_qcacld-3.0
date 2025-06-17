@@ -201,6 +201,7 @@ wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
 			 uint8_t *buf, ssize_t buf_avail_len)
 {
 	struct ieee80211_he_cap_elem *he_cap_elem;
+	struct ieee80211_he_mcs_nss_supp *he_mcs_nss;
 	ssize_t length = 0;
 	int ret;
 
@@ -208,21 +209,25 @@ wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
 		return length;
 
 	he_cap_elem = &conn_info->he_cap_elem;
+	he_mcs_nss = &conn_info->he_cap_mcs;
+
 	ret = scnprintf(buf, buf_avail_len,
-			"mac_cap_info = 0x%02x%02x%02x%02x%02x%02x\n"
-			"phy_cap_ch_width = 0x%02x\n"
-			"phy_cap_8_to_23 = 0x%02x%02x\n"
-			"phy_cap_24_to_39 = 0x%02x%02x\n"
-			"phy_cap_40_to_55 = 0x%02x%02x\n"
-			"phy_cap_56_to_71 = 0x%02x%02x\n"
-			"phy_cap_72_to_87 = 0x%02x%02x\n",
+			"he_mac_cap_info = 0x%02x%02x%02x%02x%02x%02x\n"
+			"he_phy_cap_ch_width = 0x%02x\n"
+			"he_phy_cap_8_to_23 = 0x%02x%02x\n"
+			"he_phy_cap_24_to_39 = 0x%02x%02x\n"
+			"he_phy_cap_40_to_55 = 0x%02x%02x\n"
+			"he_phy_cap_56_to_71 = 0x%02x%02x\n"
+			"he_phy_cap_72_to_87 = 0x%02x%02x\n"
+			"rx_he_mcs_lt_80 = 0x%04x\n"
+			"tx_he_mcs_lt_80 = 0x%04x\n",
 			he_cap_elem->mac_cap_info[5],
 			he_cap_elem->mac_cap_info[4],
 			he_cap_elem->mac_cap_info[3],
 			he_cap_elem->mac_cap_info[2],
 			he_cap_elem->mac_cap_info[1],
 			he_cap_elem->mac_cap_info[0],
-			he_cap_elem->phy_cap_info[0],
+			he_cap_elem->phy_cap_info[0] >> 1,
 			he_cap_elem->phy_cap_info[2],
 			he_cap_elem->phy_cap_info[1],
 			he_cap_elem->phy_cap_info[4],
@@ -232,12 +237,48 @@ wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
 			he_cap_elem->phy_cap_info[8],
 			he_cap_elem->phy_cap_info[7],
 			he_cap_elem->phy_cap_info[10],
-			he_cap_elem->phy_cap_info[9]);
+			he_cap_elem->phy_cap_info[9],
+			he_mcs_nss->rx_mcs_80,
+			he_mcs_nss->tx_mcs_80);
 
 	if (ret <= 0)
 		return length;
 
+	if (!(he_cap_elem->phy_cap_info[0] &
+	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G))
+		goto end;
+
 	length = ret;
+	ret = scnprintf(buf + length, buf_avail_len - length,
+			"rx_he_mcs_160 = 0x%04x\n"
+			"tx_he_mcs_160 = 0x%04x\n",
+			he_mcs_nss->rx_mcs_160,
+			he_mcs_nss->tx_mcs_160);
+
+	if (ret <= 0)
+		return length;
+
+	length += ret;
+	if (!(he_cap_elem->phy_cap_info[0] &
+	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_80PLUS80_MHZ_IN_5G))
+		return length;
+
+	ret = scnprintf(buf + length, buf_avail_len - length,
+			"rx_he_mcs_80p80 = 0x%04x\n"
+			"tx_he_mcs_80p80 = 0x%04x\n",
+			he_mcs_nss->rx_mcs_80p80,
+			he_mcs_nss->tx_mcs_80p80);
+
+	if (ret <= 0)
+		return length;
+
+	length += ret;
+
+	return length;
+
+end:
+	length = ret;
+
 	return length;
 }
 #else
@@ -249,7 +290,187 @@ wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
+	defined(WLAN_FEATURE_11BE)
+/* Calculate 802.11be EHT capabilities IE Tx/Rx EHT MCS NSS Support
+ * Field size
+ */
+static inline uint8_t
+wlan_hdd_eht_calculate_mcs_nss_size(
+			const struct ieee80211_he_cap_elem *he_cap,
+			const struct ieee80211_eht_cap_elem_fixed *eht_cap)
+{
+	uint8_t count = 0;
+
+	/* on 2.4 GHz, if it supports 40 MHz, the result is 3 */
+	if (he_cap->phy_cap_info[0] &
+	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G)
+		return 3;
+
+	/* on 2.4 GHz, these three bits are reserved, so should be 0 */
+	if (he_cap->phy_cap_info[0] &
+	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G)
+		count += 3;
+
+	if (he_cap->phy_cap_info[0] &
+	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G)
+		count += 3;
+
+	if (eht_cap->phy_cap_info[0] & IEEE80211_EHT_PHY_CAP0_320MHZ_IN_6GHZ)
+		count += 3;
+
+	if (count)
+		return count;
+
+	return 3;
+}
+
 /**
+ * wlan_hdd_add_eht_cap_info() - Populate EHT info
+ * @conn_info: station connection information
+ * @buf: output buffer to hold version info
+ * @buf_avail_len: available buffer length
+ *
+ * Return: No.of bytes populated by this function in buffer
+ */
+static ssize_t
+wlan_hdd_add_eht_cap_info(struct hdd_connection_info *conn_info,
+			  uint8_t *buf, ssize_t buf_avail_len)
+{
+	struct ieee80211_eht_cap_elem *eht_cap_elem;
+	struct ieee80211_he_cap_elem *he_cap_elem;
+	ssize_t length = 0;
+	int ret;
+	uint8_t count = 0, mcs_nss_len;
+	bool is_band_2g;
+	bool is_mcs_nss_20_2g, is_mcs_nss_20_5g, is_mcs_nss_80;
+
+	if (!conn_info->conn_flag.eht_present)
+		return length;
+
+	if (!conn_info->eht_cap || !conn_info->eht_cap_len)
+		return length;
+
+	he_cap_elem = &conn_info->he_cap_elem;
+	eht_cap_elem = conn_info->eht_cap;
+
+	ret = scnprintf(buf, buf_avail_len,
+			"eht_mac_cap_info = 0x%02x%02x\n"
+			"eht_phy_cap_0_to_15 = 0x%02x%02x\n"
+			"eht_phy_cap_16_to_31 = 0x%02x%02x\n"
+			"eht_phy_cap_32_to_39 = 0x%02x\n"
+			"eht_phy_cap_40_to_63 = 0x%02x%02x%02x\n"
+			"eht_phy_cap_64_to_71 = 0x%02x\n",
+			eht_cap_elem->fixed.mac_cap_info[1],
+			eht_cap_elem->fixed.mac_cap_info[0],
+			eht_cap_elem->fixed.phy_cap_info[1],
+			eht_cap_elem->fixed.phy_cap_info[0],
+			eht_cap_elem->fixed.phy_cap_info[3],
+			eht_cap_elem->fixed.phy_cap_info[2],
+			eht_cap_elem->fixed.phy_cap_info[4],
+			eht_cap_elem->fixed.phy_cap_info[7],
+			eht_cap_elem->fixed.phy_cap_info[6],
+			eht_cap_elem->fixed.phy_cap_info[5],
+			eht_cap_elem->fixed.phy_cap_info[8]);
+
+	if (ret <= 0)
+		return length;
+
+	length = ret;
+	if (!conn_info->conn_flag.he_present)
+		return length;
+
+	mcs_nss_len =
+	wlan_hdd_eht_calculate_mcs_nss_size(he_cap_elem, &eht_cap_elem->fixed);
+
+	if (mcs_nss_len != conn_info->eht_cap_len) {
+		hdd_debug("Length mismatch, mcs_nss_len %d eht_cap_len %d",
+			  mcs_nss_len, conn_info->eht_cap_len);
+		return length;
+	}
+
+	is_band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(conn_info->chan_freq);
+	is_mcs_nss_20_2g = (is_band_2g && !(he_cap_elem->phy_cap_info[0] &
+			IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G));
+	is_mcs_nss_20_5g =
+		(!is_band_2g && !(he_cap_elem->phy_cap_info[0] &
+		IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G) &&
+		!(he_cap_elem->phy_cap_info[0] &
+		IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G) &&
+		!(he_cap_elem->phy_cap_info[0] &
+		IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_80PLUS80_MHZ_IN_5G));
+	is_mcs_nss_80 =
+		(is_band_2g && (he_cap_elem->phy_cap_info[0] &
+		IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G)) ||
+		(!is_band_2g && (he_cap_elem->phy_cap_info[0] &
+		IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_80MHZ_IN_5G));
+
+	if (is_mcs_nss_20_2g || is_mcs_nss_20_5g) {
+		ret = scnprintf(buf + length, buf_avail_len - length,
+				"eht_mcs_nss_bw_20 = 0x%02x%02x%02x%02x\n",
+				eht_cap_elem->optional[count + 3],
+				eht_cap_elem->optional[count + 2],
+				eht_cap_elem->optional[count + 1],
+				eht_cap_elem->optional[count]);
+		if (ret <= 0)
+			return length;
+
+		count = 4;
+		length += ret;
+	} else {
+		if (is_mcs_nss_80) {
+			ret = scnprintf(buf + length, buf_avail_len - length,
+					"eht_mcs_nss_bw_80 = 0x%02x%02x%02x\n",
+					eht_cap_elem->optional[count + 2],
+					eht_cap_elem->optional[count + 1],
+					eht_cap_elem->optional[count]);
+			if (ret <= 0)
+				return length;
+
+			count = 3;
+			length += ret;
+		}
+	}
+
+	if (he_cap_elem->phy_cap_info[0] &
+	    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_160MHZ_IN_5G) {
+		ret = scnprintf(buf + length, buf_avail_len - length,
+				"eht_mcs_nss_bw_160 = 0x%02x%02x%02x\n",
+				eht_cap_elem->optional[count + 2],
+				eht_cap_elem->optional[count + 1],
+				eht_cap_elem->optional[count]);
+		if (ret <= 0)
+			return length;
+
+		count += 3;
+		length += ret;
+	}
+
+	if (eht_cap_elem->fixed.phy_cap_info[0] &
+	    IEEE80211_EHT_PHY_CAP0_320MHZ_IN_6GHZ) {
+		ret = scnprintf(buf + length, buf_avail_len - length,
+				"eht_mcs_nss_bw_320 = 0x%02x%02x%02x\n",
+				eht_cap_elem->optional[count + 2],
+				eht_cap_elem->optional[count + 1],
+				eht_cap_elem->optional[count]);
+		if (ret <= 0)
+			return length;
+
+		length += ret;
+	}
+
+	return length;
+}
+#else
+static ssize_t
+wlan_hdd_add_eht_cap_info(struct hdd_connection_info *conn_info,
+			  uint8_t *buf, ssize_t buf_avail_len)
+{
+	return 0;
+}
+#endif
+
+/**`
  * hdd_auth_type_str() - Get string for enum csr auth type
  * @auth_type: authentication id
  *
@@ -608,6 +829,9 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		length += wlan_hdd_add_he_cap_info(conn_info, buf + length,
 						   buf_avail_len - length);
 
+		length += wlan_hdd_add_eht_cap_info(conn_info, buf + length,
+						    buf_avail_len - length);
+
 		if (is_legacy)
 			return length;
 	}
@@ -711,6 +935,9 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 					    buf_avail_len - length);
 
 	length += wlan_hdd_add_he_cap_info(conn_info, buf + length,
+					   buf_avail_len - length);
+
+	length += wlan_hdd_add_eht_cap_info(conn_info, buf + length,
 					   buf_avail_len - length);
 
 	return length;

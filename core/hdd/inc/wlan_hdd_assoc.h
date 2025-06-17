@@ -147,6 +147,7 @@ struct hdd_conn_flag {
  * @ht_operation: HT operation info
  * @vht_operation: VHT operation info
  * @he_cap_elem: HE capabilities info
+ * @he_cap_mcs: HE capabilities of MCS info
  * @he_operation: HE operation info
  * @he_oper_len: length of @he_operation
  * @roam_count: roaming counter
@@ -163,6 +164,8 @@ struct hdd_conn_flag {
  * @prev_ap_bcn_ie: ap beacon IE information to which sta is currently connected
  * @ieee_link_id: AP Link Id valid for MLO connection
  * @mld_addr: AP MLD addr for MLO connection
+ * @eht_cap: EHT capabilities info
+ * @eht_cap_len: length of @eht_cap
  * @eht_operation: EHT operation info
  * @eht_oper_len: length of @eht_operation
  * @ap_nss: AP advertised nss
@@ -197,8 +200,9 @@ struct hdd_connection_info {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) \
      && defined(WLAN_FEATURE_11AX)
 	struct ieee80211_he_cap_elem he_cap_elem;
+	struct ieee80211_he_mcs_nss_supp he_cap_mcs;
 	struct ieee80211_he_operation *he_operation;
-	uint32_t he_oper_len;
+	uint8_t he_oper_len;
 #endif
 	uint32_t roam_count;
 	int8_t signal;
@@ -216,6 +220,8 @@ struct hdd_connection_info {
 #endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
 	defined(WLAN_FEATURE_11BE)
+	struct ieee80211_eht_cap_elem *eht_cap;
+	uint32_t eht_cap_len;
 	struct ieee80211_eht_operation eht_operation;
 	uint32_t eht_oper_len;
 #endif
@@ -588,6 +594,25 @@ void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
 #else
 static inline void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
 					  tDot11fIEeht_op *eht_ops)
+{
+}
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) && \
+	defined(WLAN_FEATURE_11BE)
+/**
+ * hdd_copy_eht_caps()- copy EHT capabilities element to
+ * hdd station context.
+ * @hdd_sta_ctx: pointer to hdd station context
+ * @assoc_resp: pointer to Assoc response
+ *
+ * Return: None
+ */
+void hdd_copy_eht_caps(struct hdd_station_ctx *hdd_sta_ctx,
+		       tDot11fAssocResponse * assoc_resp);
+#else
+static inline void hdd_copy_eht_caps(struct hdd_station_ctx *hdd_sta_ctx,
+				     tDot11fAssocResponse *assoc_resp)
 {
 }
 #endif
