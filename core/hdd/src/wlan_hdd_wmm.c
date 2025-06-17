@@ -1890,27 +1890,6 @@ void hdd_wmm_classify_critical_pkt(struct sk_buff *skb,
 	}
 }
 
-#ifdef DP_TRAFFIC_END_INDICATION
-/**
- * hdd_wmm_traffic_end_indication_is_enable() - Get feature enable/disable
- *                                              status
- * @adapter: hdd adapter handle
- *
- * Return: true if feature is enable else false
- */
-static inline bool
-hdd_wmm_traffic_end_indication_is_enable(struct hdd_adapter *adapter)
-{
-	return qdf_unlikely(adapter->traffic_end_ind_en);
-}
-#else
-static inline bool
-hdd_wmm_traffic_end_indication_is_enable(struct hdd_adapter *adapter)
-{
-	return false;
-}
-#endif
-
 static
 void hdd_wmm_get_user_priority_from_ip_tos(struct hdd_adapter *adapter,
 					   struct sk_buff *skb,
@@ -1923,7 +1902,6 @@ void hdd_wmm_get_user_priority_from_ip_tos(struct hdd_adapter *adapter,
 	struct iphdr *ip_hdr;
 	struct ipv6hdr *ipv6hdr;
 	unsigned char *pkt;
-	struct wlan_objmgr_psoc *psoc;
 
 	/* this code is executed for every packet therefore
 	 * all debug code is kept conditional
@@ -2019,11 +1997,6 @@ void hdd_wmm_get_user_priority_from_ip_tos(struct hdd_adapter *adapter,
 	}
 
 	dscp = (tos >> 2) & 0x3f;
-	if (hdd_wmm_traffic_end_indication_is_enable(adapter)) {
-		psoc = adapter->hdd_ctx->psoc;
-		ucfg_dp_traffic_end_indication_update_dscp(
-				psoc, adapter->deflink->vdev_id, &dscp);
-	}
 	*user_pri = adapter->dscp_to_up_map[dscp];
 
 #ifdef HDD_WMM_DEBUG

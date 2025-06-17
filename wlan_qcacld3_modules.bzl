@@ -928,11 +928,6 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_swlm.c",
         ],
     },
-    "CONFIG_DP_TRAFFIC_END_INDICATION": {
-        True: [
-            "core/hdd/src/wlan_hdd_sysfs_dp_traffic_end_indication.c",
-        ],
-    },
     "CONFIG_DSC_TEST": {
         True: [
             "components/dsc/test/wlan_dsc_test.c",

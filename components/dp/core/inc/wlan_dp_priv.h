@@ -773,7 +773,6 @@ struct wlan_dp_intf {
 	bool runtime_disable_rx_thread;
 
 	qdf_event_t qdf_sta_eap_frm_done_event;
-	struct dp_traffic_end_indication traffic_end_ind;
 #ifdef FEATURE_DIRECT_LINK
 	struct direct_link_info direct_link_config;
 #endif

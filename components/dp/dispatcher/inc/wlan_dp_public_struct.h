@@ -1060,19 +1060,6 @@ struct wlan_dp_user_config {
 	uint32_t arp_connectivity_map;
 };
 
-/**
- * struct dp_traffic_end_indication - Traffic end indication
- * @enabled: Feature enabled/disabled config
- * @def_dscp: Default DSCP value in regular packets in traffic
- * @spl_dscp: Special DSCP value to be used by packet to mark
- *            end of data stream
- */
-struct dp_traffic_end_indication {
-	bool enabled;
-	uint8_t def_dscp;
-	uint8_t spl_dscp;
-};
-
 #define DP_SVC_INVALID_ID 0xFF
 #define DP_MAX_SVC 32
 #define DP_SVC_ARRAY_SIZE DP_MAX_SVC

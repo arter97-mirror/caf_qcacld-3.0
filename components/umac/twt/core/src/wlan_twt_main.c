@@ -1983,17 +1983,13 @@ wlan_twt_setup_config(struct wlan_objmgr_pdev *pdev, uint32_t vdev_id,
 		      bool enable)
 {
 	struct wlan_objmgr_vdev *vdev = NULL;
-	struct dp_traffic_end_indication info;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 						    WLAN_TWT_ID);
 	if (!vdev)
 		return QDF_STATUS_SUCCESS;
 
-	info.enabled = enable;
-	info.def_dscp = 0;
-	info.spl_dscp = 0;
-	ucfg_dp_traffic_end_indication_set(vdev, info);
+	ucfg_dp_traffic_end_indication_set(vdev, enable);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
 	return QDF_STATUS_SUCCESS;

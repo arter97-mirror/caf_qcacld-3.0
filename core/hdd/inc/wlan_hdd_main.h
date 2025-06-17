@@ -1452,7 +1452,6 @@ enum hdd_wlm_latency_level {
  * @mlo_adapter_info:
  * @set_mac_addr_req_ctx: Set MAC address command request context
  * @delta_qtime: delta between host qtime and monotonic time
- * @traffic_end_ind_en: traffic end indication feature enable/disable
  * @is_dbam_configured:
  * @user_phy_mode: phy mode is set per vdev
  * @deflink: Default link pointing to the 0th index of the linkinfo array
@@ -1651,9 +1650,6 @@ struct hdd_adapter {
 	void *set_mac_addr_req_ctx;
 #endif
 	int64_t delta_qtime;
-#ifdef DP_TRAFFIC_END_INDICATION
-	bool traffic_end_ind_en;
-#endif
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	bool is_dbam_configured;
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -640,93 +640,6 @@ static void dp_softap_config_tx_pkt_tracing(struct wlan_dp_intf *dp_intf,
 			     QDF_TX));
 }
 
-#ifdef DP_TRAFFIC_END_INDICATION
-/**
- * wlan_dp_traffic_end_indication_update_dscp() - Compare dscp derived from
- *                                                provided tos value with
- *                                                stored value and update if
- *                                                it's equal to special dscp
- * @dp_intf: pointer to DP interface
- * @tos: pointer to tos
- *
- * Return: True if tos is updated else False
- */
-static inline bool
-wlan_dp_traffic_end_indication_update_dscp(struct wlan_dp_intf *dp_intf,
-					   uint8_t *tos)
-{
-	bool update;
-	uint8_t dscp, ecn;
-
-	ecn = (*tos & ~QDF_NBUF_PKT_IPV4_DSCP_MASK);
-	dscp = (*tos & QDF_NBUF_PKT_IPV4_DSCP_MASK) >>
-		QDF_NBUF_PKT_IPV4_DSCP_SHIFT;
-	update = (dp_intf->traffic_end_ind.spl_dscp == dscp);
-	if (update)
-		*tos = ((dp_intf->traffic_end_ind.def_dscp <<
-			 QDF_NBUF_PKT_IPV4_DSCP_SHIFT) | ecn);
-	return update;
-}
-
-/**
- * dp_softap_inspect_traffic_end_indication_pkt() - Restore tos field for last
- *                                                  packet in data stream
- * @dp_intf: pointer to DP interface
- * @nbuf: pointer to OS packet
- *
- * Return: None
- */
-static inline void
-dp_softap_inspect_traffic_end_indication_pkt(struct wlan_dp_intf *dp_intf,
-					     qdf_nbuf_t nbuf)
-{
-	uint8_t tos, tc;
-	bool ret;
-
-	if (qdf_nbuf_data_is_ipv4_pkt(qdf_nbuf_data(nbuf))) {
-		tos = qdf_nbuf_data_get_ipv4_tos(qdf_nbuf_data(nbuf));
-		ret = wlan_dp_traffic_end_indication_update_dscp(dp_intf, &tos);
-		if (ret) {
-			qdf_nbuf_data_set_ipv4_tos(qdf_nbuf_data(nbuf), tos);
-			if (qdf_nbuf_is_ipv4_last_fragment(nbuf))
-				QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) =
-					QDF_NBUF_CB_PACKET_TYPE_END_INDICATION;
-		}
-	} else if (qdf_nbuf_is_ipv6_pkt(nbuf)) {
-		tc = qdf_nbuf_data_get_ipv6_tc(qdf_nbuf_data(nbuf));
-		ret = wlan_dp_traffic_end_indication_update_dscp(dp_intf, &tc);
-		if (ret) {
-			qdf_nbuf_data_set_ipv6_tc(qdf_nbuf_data(nbuf), tc);
-			QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) =
-				QDF_NBUF_CB_PACKET_TYPE_END_INDICATION;
-		}
-	}
-}
-
-/**
- * dp_softap_traffic_end_indication_enabled() - Check if traffic end indication
- *                                              is enabled or not
- * @dp_intf: pointer to DP interface
- *
- * Return: True or False
- */
-static inline bool
-dp_softap_traffic_end_indication_enabled(struct wlan_dp_intf *dp_intf)
-{
-	return qdf_unlikely(dp_intf->traffic_end_ind.enabled);
-}
-#else
-static inline bool
-dp_softap_traffic_end_indication_enabled(struct wlan_dp_intf *dp_intf)
-{
-	return false;
-}
-
-static inline void
-dp_softap_inspect_traffic_end_indication_pkt(struct wlan_dp_intf *dp_intf,
-					     qdf_nbuf_t nbuf)
-{}
-#endif
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 static inline
 void dp_softap_fils_hlp_rx(struct wlan_dp_intf *dp_intf,
@@ -904,9 +817,6 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 		dp_softap_inspect_tx_eap_pkt(dp_link, nbuf, false);
 		dp_event_eapol_log(nbuf, QDF_TX);
 	}
-
-	if (dp_softap_traffic_end_indication_enabled(dp_intf))
-		dp_softap_inspect_traffic_end_indication_pkt(dp_intf, nbuf);
 
 	dp_softap_config_tx_pkt_tracing(dp_intf, nbuf);
 

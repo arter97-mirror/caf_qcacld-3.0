@@ -87,7 +87,6 @@
 #include <wlan_hdd_sysfs_get_freq_for_pwr.h>
 #include <wlan_hdd_sysfs_dp_tx_delay_stats.h>
 #include <wlan_hdd_sysfs_wifi_features.h>
-#include <wlan_hdd_sysfs_dp_traffic_end_indication.h>
 #include <wlan_hdd_sysfs_eht_rate.h>
 #include <wlan_hdd_sysfs_direct_link_ut_cmd.h>
 #include <wlan_hdd_sysfs_runtime_pm.h>
@@ -1280,7 +1279,6 @@ hdd_sysfs_create_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_dl_modes_create(adapter);
 	hdd_sysfs_11be_rate_create(adapter);
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
-	hdd_sysfs_dp_traffic_end_indication_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
 	hdd_sysfs_dfsnol_create(adapter);
 	hdd_sysfs_sap_bitrates_create(adapter);
@@ -1292,7 +1290,6 @@ hdd_sysfs_destroy_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_sap_bitrates_destroy(adapter);
 	hdd_sysfs_dfsnol_destroy(adapter);
 	hdd_sysfs_direct_link_ut_destroy(adapter);
-	hdd_sysfs_dp_traffic_end_indication_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
 	hdd_sysfs_11be_rate_destroy(adapter);
 	hdd_sysfs_dl_modes_destroy(adapter);

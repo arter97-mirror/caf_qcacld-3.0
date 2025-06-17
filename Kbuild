@@ -440,10 +440,6 @@ ifeq ($(CONFIG_DP_PKT_ADD_TIMESTAMP), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_add_timestamp.o
 endif
 
-ifeq ($(CONFIG_DP_TRAFFIC_END_INDICATION), y)
-HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_dp_traffic_end_indication.o
-endif
-
 ifeq ($(CONFIG_DP_HW_TX_DELAY_STATS_ENABLE), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_dp_tx_delay_stats.o
 endif

@@ -1340,57 +1340,23 @@ void ucfg_dp_stc_print_active_traffic_map(struct wlan_objmgr_psoc *psoc);
 
 #ifdef DP_TRAFFIC_END_INDICATION
 /**
- * ucfg_dp_traffic_end_indication_get() - Get data end indication info
- * @vdev: vdev handle
- * @info: variable to hold stored data end indication info
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-ucfg_dp_traffic_end_indication_get(struct wlan_objmgr_vdev *vdev,
-				   struct dp_traffic_end_indication *info);
-/**
  * ucfg_dp_traffic_end_indication_set() - Store data end indication info
  * @vdev: vdev handle
- * @info: variable holding new data end indication info
+ * @enabled: TWT end indication enabled flag
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 ucfg_dp_traffic_end_indication_set(struct wlan_objmgr_vdev *vdev,
-				   struct dp_traffic_end_indication info);
-/**
- * ucfg_dp_traffic_end_indication_update_dscp() - update dscp value to default
- * @psoc: psoc handle
- * @vdev_id: vdev id
- * @dscp: dscp value to be updated
- *
- * Return: void
- */
-void
-ucfg_dp_traffic_end_indication_update_dscp(struct wlan_objmgr_psoc *psoc,
-					   uint8_t vdev_id,
-					   unsigned char *dscp);
+				   bool enabled);
 #else
 static inline QDF_STATUS
-ucfg_dp_traffic_end_indication_get(struct wlan_objmgr_vdev *vdev,
-				   struct dp_traffic_end_indication *info)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
 ucfg_dp_traffic_end_indication_set(struct wlan_objmgr_vdev *vdev,
-				   struct dp_traffic_end_indication info)
+				   bool enabled)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline void
-ucfg_dp_traffic_end_indication_update_dscp(struct wlan_objmgr_psoc *psoc,
-					   uint8_t vdev_id,
-					   unsigned char *dscp)
-{}
 #endif
 
 /*
