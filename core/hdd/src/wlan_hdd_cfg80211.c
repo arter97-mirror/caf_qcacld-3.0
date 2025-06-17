@@ -29182,7 +29182,7 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 	if (link_vdev)
 		ucfg_tdls_put_tdls_link_vdev(link_vdev, WLAN_OSIF_TDLS_ID);
 
-	if (wlan_vdev_get_link_id(adapter->deflink->vdev) == link_id) {
+	if (wlan_vdev_get_link_id(vdev) == link_id) {
 		hdd_debug("add_key for same vdev: %d",
 			  adapter->deflink->vdev_id);
 		return wlan_hdd_add_key_vdev(mac_handle, vdev, key_index,
@@ -29196,6 +29196,17 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 		errno = wlan_add_key_standby_link(adapter, vdev, link_id,
 						  key_index, pairwise, params);
 		return errno;
+	} else if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(link_vdev)) {
+		/*
+		 * Use standby link key add for link switch VDEV because the
+		 * link ID is in transitioning on that VDEV and can lead to
+		 * peer not found issue.
+		 */
+		hdd_debug("Link switch in progress for %d",
+			  wlan_vdev_get_id(link_vdev));
+		errno = wlan_add_key_standby_link(adapter, link_vdev, link_id,
+						  key_index, pairwise, params);
+		goto release_ref;
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
