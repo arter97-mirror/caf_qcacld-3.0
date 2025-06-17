@@ -499,7 +499,6 @@
  */
 #define WE_SET_TXPOW_5G      30
 /* Private ioctl for firmware debug log */
-#define WE_DBGLOG_LOG_LEVEL             31
 #define WE_DBGLOG_VAP_ENABLE            32
 #define WE_DBGLOG_VAP_DISABLE           33
 #define WE_DBGLOG_MODULE_ENABLE         34
@@ -4385,14 +4384,6 @@ static int hdd_we_set_dbg(struct hdd_adapter *adapter,
 #define hdd_we_set_dbg(adapter, id, value) \
 			hdd_we_set_dbg(adapter, id, #id, value)
 
-static int hdd_we_dbglog_log_level(struct wlan_hdd_link_info *link_info,
-				   int value)
-{
-	return hdd_we_set_dbg(link_info->adapter,
-			      WMI_DBGLOG_LOG_LEVEL,
-			      value);
-}
-
 static int hdd_we_dbglog_vap_enable(struct wlan_hdd_link_info *link_info,
 				    int value)
 {
@@ -4745,7 +4736,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_RX_CHAINMASK] = hdd_we_set_rx_chainmask,
 	[WE_SET_TXPOW_2G] = hdd_we_set_txpow_2g,
 	[WE_SET_TXPOW_5G] = hdd_we_set_txpow_5g,
-	[WE_DBGLOG_LOG_LEVEL] = hdd_we_dbglog_log_level,
 	[WE_DBGLOG_VAP_ENABLE] = hdd_we_dbglog_vap_enable,
 	[WE_DBGLOG_VAP_DISABLE] = hdd_we_dbglog_vap_disable,
 	[WE_DBGLOG_MODULE_ENABLE] = hdd_we_dbglog_module_enable,
@@ -8865,11 +8855,6 @@ static const struct iw_priv_args we_private_args[] = {
 
 #ifdef FEATURE_FW_LOG_PARSING
 	/* Sub-cmds DBGLOG specific commands */
-	{WE_DBGLOG_LOG_LEVEL,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "dl_loglevel"},
-
 	{WE_DBGLOG_VAP_ENABLE,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,

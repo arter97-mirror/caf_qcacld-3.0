@@ -540,16 +540,6 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	}
 
-	/* Firmware debug log */
-	case QCSAP_DBGLOG_LOG_LEVEL:
-	{
-		hdd_debug("QCSAP_DBGLOG_LOG_LEVEL val %d", set_value);
-		ret = wma_cli_set_command(link_info->vdev_id,
-					  WMI_DBGLOG_LOG_LEVEL,
-					  set_value, DBG_CMD);
-		break;
-	}
-
 	case QCSAP_DBGLOG_VAP_ENABLE:
 	{
 		hdd_debug("QCSAP_DBGLOG_VAP_ENABLE val %d", set_value);
@@ -2709,10 +2699,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 #ifdef FEATURE_FW_LOG_PARSING
 	/* Sub-cmds DBGLOG specific commands */
 	{
-		QCSAP_DBGLOG_LOG_LEVEL,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		0, "dl_loglevel"
-	}, {
 		QCSAP_DBGLOG_VAP_ENABLE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dl_vapon"
 	}, {
