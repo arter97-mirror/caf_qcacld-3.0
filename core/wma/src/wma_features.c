@@ -1463,6 +1463,7 @@ static bool fill_csa_offload_params(
 	uint8_t is_csa_ie_present = false;
 	uint16_t chan_space;
 	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
+	uint16_t opclass_width;
 
 	wlan_reg_read_current_country(wlan_pdev_get_psoc(pdev), country_code);
 
@@ -1500,8 +1501,12 @@ static bool fill_csa_offload_params(
 									     xcsa_ie->newchannel,
 									     xcsa_ie->newClass);
 		}
+		wlan_reg_convert_chan_spacing_to_width(
+						chan_space,
+						&opclass_width);
 		csa_offload_event->new_ch_width =
-				wlan_reg_find_chwidth_from_bw(chan_space);
+			wlan_reg_find_chwidth_from_bw(opclass_width);
+
 		csa_offload_event->ies_present_flag |= MLME_XCSA_IE_PRESENT;
 		is_csa_ie_present = true;
 	}
