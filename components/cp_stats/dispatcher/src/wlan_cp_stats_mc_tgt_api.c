@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1090,6 +1090,10 @@ tgt_send_vdev_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
 		     &vdev_mc_stats->vdev_extd_stats,
 		     sizeof(vdev_mc_stats->vdev_extd_stats));
 
+	if (ev->bcn_stats)
+		qdf_mem_copy(&ev->bcn_stats[0], &vdev_mc_stats->bcn_stats,
+			     sizeof(vdev_mc_stats->bcn_stats));
+
 	wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
 
@@ -1340,6 +1344,13 @@ tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 	    !info.vdev_extd_stats)
 		goto end;
 
+	if (wlan_cp_stats_is_bcn_rssi_history_report_cfg_enable(psoc)) {
+		info.num_recv_bcn_stats = 1;
+		info.bcn_stats = qdf_mem_malloc(sizeof(*info.bcn_stats));
+		if (!info.bcn_stats)
+			goto end;
+	}
+
 	status = tgt_send_vdev_mc_cp_stats(psoc, &info, last_req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cp_stats_err("tgt_send_vdev_mc_cp_stats failed");
@@ -1405,6 +1416,54 @@ tgt_mc_cp_stats_prepare_n_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+static void
+tgt_mc_cp_stats_extract_vdev_bcn_rssi_history(struct wlan_objmgr_psoc *psoc,
+					      struct stats_event *ev)
+{
+	QDF_STATUS status;
+	struct request_info last_req = {0};
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mc_cp_stats *vdev_mc_stats;
+	struct vdev_cp_stats *vdev_cp_stats_priv;
+	uint8_t i, vdev_id;
+
+	status = ucfg_mc_cp_stats_get_pending_req(psoc,
+						  TYPE_STATION_STATS,
+						  &last_req);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	if (!ev->bcn_stats || !ev->num_recv_bcn_stats)
+		return;
+
+	for (i = 0; i < ev->num_recv_bcn_stats; i++) {
+		vdev_id = ev->bcn_stats[i].vdev_id;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+							    WLAN_CP_STATS_ID);
+
+		if (!vdev) {
+			cp_stats_err("vdev is null");
+			return;
+		}
+
+		vdev_cp_stats_priv = wlan_cp_stats_get_vdev_stats_obj(vdev);
+		if (!vdev_cp_stats_priv) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+			return;
+		}
+
+		wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
+		vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
+		qdf_mem_copy(&vdev_mc_stats->bcn_stats,
+			     &ev->bcn_stats[i],
+			     sizeof(vdev_mc_stats->bcn_stats));
+
+		wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+	}
+}
+
 static void tgt_mc_cp_stats_extract_station_stats(
 				struct wlan_objmgr_psoc *psoc,
 				struct stats_event *ev)
@@ -1427,6 +1486,7 @@ static void tgt_mc_cp_stats_extract_station_stats(
 	tgt_mc_cp_stats_extract_vdev_chain_rssi_stats(psoc, ev);
 	tgt_mc_cp_stats_extract_pmf_bcn_stats(psoc, ev);
 	tgt_mc_cp_stats_extract_vdev_extd_stats(psoc, ev);
+	tgt_mc_cp_stats_extract_vdev_bcn_rssi_history(psoc, ev);
 
 	/*
 	 * PEER stats are the last stats sent for get_station statistics.
