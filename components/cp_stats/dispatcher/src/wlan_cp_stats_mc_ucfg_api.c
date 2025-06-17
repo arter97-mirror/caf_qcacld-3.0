@@ -1039,6 +1039,8 @@ void ucfg_mc_cp_stats_free_stats_resources(struct stats_event *ev)
 	qdf_mem_free(ev->peer_extended_stats);
 	ucfg_mc_cp_stats_free_peer_stats_info_ext(ev);
 	qdf_mem_free(ev->vdev_extd_stats);
+	if (ev->bcn_stats)
+		qdf_mem_free(ev->bcn_stats);
 	qdf_mem_zero(ev, sizeof(*ev));
 }
 

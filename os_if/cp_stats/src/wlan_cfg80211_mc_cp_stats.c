@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -588,7 +588,7 @@ static void get_station_stats_cb(struct stats_event *ev, void *cookie)
 	struct stats_event *priv;
 	struct osif_request *request;
 	uint32_t summary_size, rssi_size, peer_adv_size = 0, pdev_size;
-	uint32_t vdev_extd_size;
+	uint32_t vdev_extd_size, recv_bcn_size;
 
 	request = osif_request_get(cookie);
 	if (!request) {
@@ -656,6 +656,16 @@ static void get_station_stats_cb(struct stats_event *ev, void *cookie)
 
 		qdf_mem_copy(priv->vdev_extd_stats, ev->vdev_extd_stats,
 			     vdev_extd_size);
+	}
+
+	if (ev->num_recv_bcn_stats && ev->bcn_stats) {
+		recv_bcn_size = sizeof(*ev->bcn_stats) * ev->num_recv_bcn_stats;
+		priv->bcn_stats = qdf_mem_malloc(recv_bcn_size);
+		if (!priv->bcn_stats)
+			goto station_stats_cb_fail;
+
+		priv->num_recv_bcn_stats = ev->num_recv_bcn_stats;
+		qdf_mem_copy(priv->bcn_stats, ev->bcn_stats, recv_bcn_size);
 	}
 
 	priv->num_summary_stats = ev->num_summary_stats;
