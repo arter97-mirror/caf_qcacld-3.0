@@ -5063,7 +5063,7 @@ void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
  */
 void sme_deregister_disconnect_cb(mac_handle_t mac_handle);
 
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * sme_pmkid_get_mld_addr - Get mld address from preauth list
  * @mac_handle: pointer to mac handle

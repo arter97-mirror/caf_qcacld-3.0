@@ -17759,7 +17759,7 @@ void sme_deregister_disconnect_cb(mac_handle_t mac_handle)
 	SME_EXIT();
 }
 
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO)
 void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
 			    uint8_t *peer_addr,
 			    uint8_t *mld_addr)

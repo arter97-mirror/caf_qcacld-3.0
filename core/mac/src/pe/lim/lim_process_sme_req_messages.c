@@ -5017,7 +5017,7 @@ cm_remove_force_bss_on_join_fail(struct cm_vdev_join_req *join_req)
 	return status;
 }
 
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO)
 void cm_get_pre_auth_mld_addr(struct mac_context *mac,
 			      uint8_t *peer_addr,
 			      uint8_t *mld_addr)
