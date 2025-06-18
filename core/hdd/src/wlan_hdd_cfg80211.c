@@ -13317,7 +13317,7 @@ wlan_hdd_set_wfc_wlm_client_latency_level(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t client_id, client_id_bitmap, latency_host_flags = 0;
 	QDF_STATUS status;
-	uint16_t cached_latency_level = 0;
+	uint16_t cached_latency_level = 0, latency_level_to_send  = 0;
 
 	if (!wfc_state) { /* WFC = 0 */
 		status = wlan_hdd_get_set_client_info_for_wfc_off_req(
@@ -13338,20 +13338,27 @@ wlan_hdd_set_wfc_wlm_client_latency_level(struct hdd_adapter *adapter,
 		 * set WFC = 0 for a port ID for which the host has already
 		 * received WFC = 1.
 		 **/
-		wfc_state = cached_latency_level;
+		latency_level_to_send = cached_latency_level;
 	} else { /* WFC = 1 */
 		status = wlan_hdd_get_set_client_info_for_wfc_on_req(adapter,
 					port_id, &client_id);
 		if (QDF_IS_STATUS_ERROR(status))
 			return status;
+
+		/**
+		 * When the WFC state is set to 1, the host should set the
+		 * latency level LATENCY_LEVEL_LOW to the firmware.
+		 */
+		latency_level_to_send =
+			QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_LOW - 1;
 	}
 
 	client_id_bitmap = BIT(client_id);
 
-	hdd_debug("port_id: %u, client_id: %d, wfc_state: %d",
-		  port_id, client_id, wfc_state);
+	hdd_debug("port_id: %u, client_id: %d, latency_level_to_send: %d",
+		  port_id, client_id, latency_level_to_send);
 
-	status = wlan_hdd_set_wlm_latency_level(adapter, wfc_state,
+	status = wlan_hdd_set_wlm_latency_level(adapter, latency_level_to_send,
 						client_id_bitmap, false);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("Fail to set latency level for client_id:%d",
