@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -237,8 +237,7 @@ wlan_hdd_sar_limits_policy[QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_MAX + 1];
 {                                                                       \
 	.info.vendor_id = QCA_NL80211_VENDOR_ID,                        \
 	.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_SET_SAR_LIMITS,        \
-	.flags = WIPHY_VENDOR_CMD_NEED_WDEV |                           \
-		 WIPHY_VENDOR_CMD_NEED_RUNNING,                         \
+	.flags = WIPHY_VENDOR_CMD_NEED_WDEV,                            \
 	.doit = wlan_hdd_cfg80211_set_sar_power_limits,                 \
 	vendor_command_policy(wlan_hdd_sar_limits_policy,               \
 			      QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_MAX)      \
