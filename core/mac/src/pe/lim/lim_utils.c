@@ -8975,31 +8975,51 @@ static void lim_revise_req_eht_cap_per_mode(struct mlme_legacy_priv *mlme_priv,
 	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_0_to_7 = nss;
 	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_8_and_9 = nss;
 	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_8_and_9 = nss;
-	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_12_and_13 = nss;
-	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_12_and_13 = nss;
+	if (mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_10_and_11) {
+		mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_12_and_13) {
+		mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
 
 	mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_0_to_9 = nss;
 	mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_0_to_9 = nss;
-	mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_12_and_13 = nss;
-	mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_12_and_13 = nss;
+	if (mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_10_and_11) {
+		mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_10_and_11 =
+									nss;
+		mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_10_and_11 =
+									nss;
+	}
+	if (mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_12_and_13) {
+		mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_12_and_13 =
+									nss;
+		mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_12_and_13 =
+									nss;
+	}
 
 	mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_0_to_9 = nss;
 	mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_0_to_9 = nss;
-	mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_12_and_13 = nss;
-	mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_12_and_13 = nss;
+	if (mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_10_and_11) {
+		mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_12_and_13) {
+		mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
 
 	mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_0_to_9 = nss;
 	mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_0_to_9 = nss;
-	mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_12_and_13 = nss;
-	mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_12_and_13 = nss;
+	if (mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_10_and_11) {
+		mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_12_and_13) {
+		mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
 }
 
 void lim_copy_bss_eht_cap(struct pe_session *session)
