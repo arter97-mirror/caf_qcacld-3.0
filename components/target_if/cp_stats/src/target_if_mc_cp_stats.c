@@ -1746,6 +1746,8 @@ static QDF_STATUS target_if_cp_stats_send_stats_req(
 
 	/* refer  (WMI_REQUEST_STATS_CMDID) */
 	param.stats_id = get_stats_id(type);
+	if (wlan_cp_stats_is_bcn_rssi_history_report_cfg_enable(psoc))
+		param.stats_id |= WMI_REQUEST_VDEV_RECV_BCN_STAT;
 	param.vdev_id = req->vdev_id;
 	param.pdev_id = req->pdev_id;
 

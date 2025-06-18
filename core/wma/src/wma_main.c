@@ -126,6 +126,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "wma_pasn_peer_api.h"
 #include "target_if_mgmt_rx_srng.h"
+#include "wlan_cp_stats_utils_api.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -776,6 +777,9 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 		wma_set_smem_mailbox_feature(wma_handle, tgt_cfg);
 	if (wma_is_epm_supported_cfg(wma_handle))
 		wma_set_epm_feature(wma_handle, tgt_cfg);
+
+	tgt_cfg->enable_bcn_rssi_history_report =
+			cds_cfg->enable_bcn_rssi_history_report;
 }
 
 /**
