@@ -778,13 +778,11 @@ struct mac_ss_bw_info {
 /**
  * struct wma_ini_config - Structure to hold wma ini configuration
  * @max_no_of_peers: Max Number of supported
- * @exclude_selftx_from_cca_busy: Exclude self tx time from cca busy time flag.
  *
  * Placeholder for WMA ini parameters.
  */
 struct wma_ini_config {
 	uint8_t max_no_of_peers;
-	bool exclude_selftx_from_cca_busy;
 };
 
 /**

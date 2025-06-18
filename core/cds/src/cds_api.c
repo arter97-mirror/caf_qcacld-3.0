@@ -736,21 +736,6 @@ static qdf_notif_block cds_hang_event_notifier = {
 };
 
 /**
- * cds_set_exclude_selftx_from_cca_busy_time() - Set exclude self tx time
- * from cca busy time bool in cds config
- * @exclude_selftx_from_cca_busy: Bool to be stored in cds config
- * @cds_cfg: Pointer to cds config
- *
- * Return: None
- */
-static void
-cds_set_exclude_selftx_from_cca_busy_time(bool exclude_selftx_from_cca_busy,
-					  struct cds_config_info *cds_cfg)
-{
-	cds_cfg->exclude_selftx_from_cca_busy = exclude_selftx_from_cca_busy;
-}
-
-/**
  * cds_open() - open the CDS Module
  *
  * cds_open() function opens the CDS Scheduler
@@ -866,9 +851,6 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 		goto err_htc_close;
 	}
 
-	cds_set_exclude_selftx_from_cca_busy_time(
-				hdd_ctx->config->exclude_selftx_from_cca_busy,
-				cds_cfg);
 	/*Open the WMA module */
 	status = wma_open(psoc, hdd_update_tgt_cfg, cds_cfg,
 			  hdd_ctx->target_type);

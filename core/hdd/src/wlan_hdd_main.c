@@ -15896,9 +15896,6 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 
 	hdd_get_wifi_features_cfg_update(config, psoc);
 	hdd_init_cpu_cxpc_threshold_cfg(config, psoc);
-
-	config->exclude_selftx_from_cca_busy =
-			cfg_get(psoc, CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME);
 	hdd_init_link_state_cfg(config, psoc);
 	config->sub_20_ch_width = cfg_get(psoc, CFG_SUB_20_CHANNEL_WIDTH);
 }
