@@ -415,6 +415,31 @@ void pkt_capture_drop_monpkt(struct pkt_capture_mon_context *mon_ctx)
 	}
 }
 
+static
+QDF_STATUS pkt_capture_unset_filters(struct wlan_objmgr_vdev *vdev,
+				     struct pkt_capture_vdev_priv *vdev_priv)
+{
+	QDF_STATUS status;
+
+	if (vdev_priv->frame_filter.connected_beacon_interval) {
+		status = tgt_pkt_capture_send_beacon_interval(vdev, 0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pkt_capture_err("send beacon interval fail");
+			goto error;
+		}
+	}
+
+	vdev_priv->frame_filter = (struct pkt_capture_frame_filter){0};
+	status = tgt_pkt_capture_send_mode(vdev, PACKET_CAPTURE_MODE_DISABLE);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pkt_capture_err("Unable to send packet capture mode to fw");
+		goto error;
+	}
+
+error:
+	return status;
+}
+
 int pkt_capture_suspend_mon_thread(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -449,7 +474,7 @@ int pkt_capture_suspend_mon_thread(struct wlan_objmgr_psoc *psoc)
 		goto release_vdev_ref;
 	}
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V3
-	status = tgt_pkt_capture_send_mode(vdev, PACKET_CAPTURE_MODE_DISABLE);
+	status = pkt_capture_unset_filters(vdev, vdev_priv);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pkt_capture_err("Unable to send packet capture mode to fw");
 		goto release_vdev_ref;
