@@ -2456,7 +2456,6 @@
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_TWO_INT_GET_NONE   (SIOCIWFIRSTPRIV + 28)
 #define WE_SET_SMPS_PARAM    1
-#define WE_DUMP_DP_TRACE_LEVEL    3
 /* Private sub ioctl for enabling and setting histogram interval of profiling */
 #define WE_ENABLE_FW_PROFILE    4
 #define WE_SET_FW_PROFILE_HIST_INTVL    5
@@ -8354,24 +8353,6 @@ static int iw_set_band_config(struct net_device *dev,
 	return errno;
 }
 
-
-
-#ifdef CONFIG_DP_TRACE
-void hdd_set_dump_dp_trace(uint16_t cmd_type, uint16_t count)
-{
-	hdd_debug("WE_DUMP_DP_TRACE_LEVEL: %d %d",
-		  cmd_type, count);
-	if (cmd_type == DUMP_DP_TRACE)
-		qdf_dp_trace_dump_all(count, QDF_TRACE_DEFAULT_PDEV_ID);
-	else if (cmd_type == ENABLE_DP_TRACE_LIVE_MODE)
-		qdf_dp_trace_enable_live_mode();
-	else if (cmd_type == CLEAR_DP_TRACE_BUFFER)
-		qdf_dp_trace_clear_buffer();
-	else if (cmd_type == DISABLE_DP_TRACE_LIVE_MODE)
-		qdf_dp_trace_disable_live_mode();
-}
-#endif
-
 static int __iw_set_two_ints_getnone(struct net_device *dev,
 				     struct iw_request_info *info,
 				     union iwreq_data *wrqu, char *extra)
@@ -8435,9 +8416,6 @@ static int __iw_set_two_ints_getnone(struct net_device *dev,
 		hdd_debug("%d %d", value[1], value[2]);
 		policy_mgr_set_dual_mac_fw_mode_config(hdd_ctx->psoc,
 			value[1], value[2]);
-		break;
-	case WE_DUMP_DP_TRACE_LEVEL:
-		hdd_set_dump_dp_trace(value[1], value[2]);
 		break;
 	case WE_SET_MON_MODE_CHAN:
 		if (value[1] > 256)
@@ -9540,11 +9518,6 @@ static const struct iw_priv_args we_private_args[] = {
 	{WE_SET_DUAL_MAC_FW_MODE_CONFIG,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
 	 0, "set_fw_mode_cfg"},
-#ifdef CONFIG_DP_TRACE
-	{WE_DUMP_DP_TRACE_LEVEL,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
-	 0, "dump_dp_trace"},
-#endif
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 	{WE_SET_MON_MODE_CHAN,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -333,13 +333,6 @@ struct iw_request_info;
  */
 int hdd_check_private_wext_control(struct hdd_context *hdd_ctx,
 				   struct iw_request_info *info);
-
-#ifdef CONFIG_DP_TRACE
-void hdd_set_dump_dp_trace(uint16_t cmd_type, uint16_t count);
-#else
-static inline
-void hdd_set_dump_dp_trace(uint16_t cmd_type, uint16_t count) {}
-#endif
 #else /* WLAN_WEXT_SUPPORT_ENABLE */
 static inline void hdd_register_wext(struct net_device *dev)
 {

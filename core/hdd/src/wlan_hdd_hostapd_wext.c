@@ -211,10 +211,6 @@ static int __iw_softap_set_two_ints_getnone(struct net_device *dev,
 		ret = hdd_crash_inject(adapter, value[1], value[2]);
 		break;
 
-	case QCSAP_IOCTL_DUMP_DP_TRACE_LEVEL:
-		hdd_set_dump_dp_trace(value[1], value[2]);
-		break;
-
 	case QCSAP_ENABLE_FW_PROFILE:
 		hdd_debug("QCSAP_ENABLE_FW_PROFILE: %d %d",
 		       value[1], value[2]);
@@ -3025,15 +3021,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		0,  "setRadarDbg"
 	}
 	,
-#ifdef CONFIG_DP_TRACE
-	/* dump dp trace - descriptor or dp trace records */
-	{
-		QCSAP_IOCTL_DUMP_DP_TRACE_LEVEL,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,
-		0, "dump_dp_trace"
-	}
-	,
-#endif
 	{
 		QCSAP_ENABLE_FW_PROFILE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2,

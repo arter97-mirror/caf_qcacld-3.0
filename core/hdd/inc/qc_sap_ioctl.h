@@ -102,7 +102,6 @@ struct channel_list_info {
 #define QCSAP_IOCTL_SET_TWO_INT_GET_NONE (SIOCIWFIRSTPRIV + 28)
 /* QCSAP_IOCTL_SET_TWO_INT_GET_NONE sub commands */
 #define QCSAP_IOCTL_SET_FW_CRASH_INJECT 1
-#define QCSAP_IOCTL_DUMP_DP_TRACE_LEVEL 2
 #define QCSAP_ENABLE_FW_PROFILE          3
 #define QCSAP_SET_FW_PROFILE_HIST_INTVL  4
 /* Private sub-ioctl for initiating WoW suspend without Apps suspend */
