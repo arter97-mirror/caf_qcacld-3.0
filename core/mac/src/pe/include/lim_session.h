@@ -869,8 +869,6 @@ struct pe_session {
 	uint8_t privacy;
 	tAniAuthType authType;
 	tDot11fIEWMMParams wmm_params;
-	tDot11fIERSN gStartBssRSNIe;
-	tDot11fIEWPA gStartBssWPAIe;
 	tSirAPWPSIEs APWPSIEs;
 	uint8_t apUapsdEnable;
 	tSirWPSPBCSession *pAPWPSPBCSession;

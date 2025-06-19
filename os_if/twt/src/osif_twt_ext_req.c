@@ -2822,6 +2822,7 @@ static int osif_twt_add_ac_config(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc;
 	enum QDF_OPMODE device_mode;
 	uint8_t twt_resp_cfg;
+	uint8_t vdev_id;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc)
@@ -2834,8 +2835,10 @@ static int osif_twt_add_ac_config(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
+	vdev_id = wlan_vdev_get_id(vdev);
 	ucfg_twt_cfg_get_responder(psoc, &twt_resp_cfg);
-	is_responder_en = ucfg_twt_resp_check_bit(device_mode, twt_resp_cfg);
+	is_responder_en = ucfg_twt_resp_check_bit(psoc, vdev_id, device_mode,
+						  twt_resp_cfg);
 
 	if (device_mode == QDF_SAP_MODE && is_responder_en) {
 		ret = ucfg_twt_ac_pdev_param_send(psoc,

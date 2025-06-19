@@ -479,6 +479,7 @@ struct fisa_pkt_hist {
  * @classified: flag to indicate flow has been classified
  * @peer_id: Peer ID
  * @c_flow_id: STC classified flow table ID
+ * @inactivity_timeout: inactivity timeout to be tested for STC interested flows
  */
 struct dp_fisa_rx_sw_ft {
 	void *hw_fse;
@@ -525,8 +526,8 @@ struct dp_fisa_rx_sw_ft {
 	uint32_t cmem_offset;
 	uint32_t metadata;
 	uint32_t reo_dest_indication;
-	qdf_time_t flow_init_ts;
-	qdf_time_t last_accessed_ts;
+	uint64_t flow_init_ts;
+	uint64_t last_accessed_ts;
 #ifdef WLAN_SUPPORT_RX_FISA_HIST
 	struct fisa_pkt_hist pkt_hist;
 #endif
@@ -545,6 +546,7 @@ struct dp_fisa_rx_sw_ft {
 	uint8_t classified;
 	uint16_t peer_id;
 	uint16_t c_flow_id;
+	uint64_t inactivity_timeout;
 };
 
 #define DP_RX_GET_SW_FT_ENTRY_SIZE sizeof(struct dp_fisa_rx_sw_ft)

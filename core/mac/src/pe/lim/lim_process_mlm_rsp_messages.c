@@ -2114,6 +2114,7 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 	tLimMlmStartCnf mlmStartCnf;
 	struct pe_session *pe_session;
 	uint8_t isWepEnabled = false;
+	uint32_t akm;
 
 	if (!add_bss_rsp) {
 		pe_err("Encountered NULL Pointer");
@@ -2152,9 +2153,10 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 		 * WEP then max clients supported is 16
 		 */
 		if (pe_session->privacy) {
-			if ((pe_session->gStartBssRSNIe.present)
-			    || (pe_session->gStartBssWPAIe.present))
-				pe_debug("WPA/WPA2 SAP configuration");
+			akm = wlan_crypto_get_param(pe_session->vdev,
+						    WLAN_CRYPTO_PARAM_KEY_MGMT);
+			if (akm && !(akm & (1 << WLAN_CRYPTO_KEY_MGMT_NONE)))
+				pe_debug("WPA/RSN SAP configuration");
 			else {
 				if (mac->mlme_cfg->sap_cfg.assoc_sta_limit >
 				    MAX_SUPPORTED_PEERS_WEP) {
@@ -3206,15 +3208,11 @@ lim_process_bcn_tpe_and_set_tpc(struct mac_context *mac_ctx,
 			 * indoor enabled AP TPC, so that FW can cache VLP TPC
 			 * and use during system suspend
 			 */
-			session_entry->best_6g_power_type = REG_VERY_LOW_POWER_AP;
-			lim_calculate_tpc(mac_ctx, session_entry, false);
+			lim_calculate_tpc(mac_ctx, session_entry, true);
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac_ctx->psoc,
 						      session_entry->vdev_id,
 						      &mlme_obj->reg_tpc_obj);
-
-			session_entry->best_6g_power_type =
-						REG_INDOOR_ENABLED_AP;
 		}
 		lim_calculate_tpc(mac_ctx, session_entry, false);
 
@@ -3627,9 +3625,10 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 				    struct vdev_start_response *rsp)
 {
 	QDF_STATUS status;
-	uint16_t channelChangeReasonCode;
+	uint16_t csa_reason_code;
 	struct pe_session *pe_session;
 	struct wlan_channel *vdev_chan;
+	uint32_t ap_power_type_6g;
 	/* we need to process the deferred message since the initiating req. there might be nested request. */
 	/* in the case of nested request the new request initiated from the response will take care of resetting */
 	/* the deferred flag. */
@@ -3647,7 +3646,7 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		return;
 	}
 	pe_session->ch_switch_in_progress = false;
-	channelChangeReasonCode = pe_session->channelChangeReasonCode;
+	csa_reason_code = pe_session->channelChangeReasonCode;
 	/* initialize it back to invalid id */
 	pe_session->chainMask = rsp->chain_mask;
 	pe_session->smpsMode = rsp->smps_mode;
@@ -3666,8 +3665,9 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 
 	lim_fill_dfs_p2p_group_params(pe_session);
 
-	pe_debug("new network type for peer: %d", pe_session->nwType);
-	switch (channelChangeReasonCode) {
+	pe_debug("new network type for peer: %d, csa_reason_code = %d",
+		 pe_session->nwType, csa_reason_code);
+	switch (csa_reason_code) {
 	case LIM_SWITCH_CHANNEL_REASSOC:
 		lim_process_switch_channel_re_assoc_req(mac, pe_session, status);
 		break;
@@ -3707,9 +3707,18 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 			ucfg_pkt_capture_record_channel(pe_session->vdev);
 		break;
 	case LIM_SWITCH_CHANNEL_SAP_DFS:
-		if (QDF_IS_STATUS_SUCCESS(status))
-			lim_set_tpc_power(mac, pe_session, NULL);
-
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			wlan_reg_get_cur_6g_ap_pwr_type(mac->pdev,
+							&ap_power_type_6g);
+			if (wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq) &&
+			    ap_power_type_6g == REG_INDOOR_ENABLED_AP) {
+				lim_set_tpc_power(mac, pe_session, NULL, true);
+				if (policy_mgr_is_vdev_ll_lt_sap(
+					mac->psoc, pe_session->vdev_id))
+					goto next;
+			}
+			lim_set_tpc_power(mac, pe_session, NULL, false);
+		}
 		/* Note: This event code specific to SAP mode
 		 * When SAP session issues channel change as performing
 		 * DFS, we will come here. Other sessions, for e.g. P2P
@@ -3718,6 +3727,7 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 		 * require completely different information for P2P unlike
 		 * SAP.
 		 */
+next:
 		lim_send_sme_ap_channel_switch_resp(mac, pe_session, rsp);
 		/* If MCC upgrade/DBS downgrade happened during channel switch,
 		 * the policy manager connection table needs to be updated.

@@ -6140,6 +6140,10 @@ roam_control_policy[QCA_ATTR_ROAM_CONTROL_MAX + 1] = {
 			.type = NLA_U32},
 	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_THRESHOLD_PERCENTAGE] = {
 			.type = NLA_U8},
+	[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_MIN_DELTA_THRESHOLD] = {
+			.type = NLA_U32},
+	[QCA_ATTR_ROAM_CONTROL_CONNECTED_BSS_RECONNECT_DISALLOW_PERIOD] = {
+			.type = NLA_U32},
 };
 
 /**
@@ -6825,6 +6829,47 @@ hdd_send_roam_score_delta_to_sme(struct hdd_context *hdd_ctx,
 }
 
 /**
+ * hdd_send_min_roam_score_delta_to_sme() - Set min roam score delta
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @min_roam_score_delta: Min roam score delta value in percentage.
+ *
+ * Send min_roam score delta value to FW.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_send_min_roam_score_delta_to_sme(struct hdd_context *hdd_ctx,
+				     uint8_t vdev_id,
+				     uint32_t min_roam_score_delta)
+{
+	return sme_set_min_roam_score_delta_value(hdd_ctx->mac_handle, vdev_id,
+						  min_roam_score_delta);
+}
+
+/*
+ * hdd_send_reconnect_disallow_period_to_sme() - Set time to reconnect
+ * disallow period value
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ * @reconnect_disallow_period: reconnect disallow period value
+ * in seconds.
+ *
+ * Send reconnect_disallow_period value to FW.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_send_reconnect_disallow_period_to_sme(struct hdd_context *hdd_ctx,
+					  uint8_t vdev_id,
+					  uint32_t reconnect_disallow_period)
+{
+	return sme_set_reconnect_disallow_period_value(hdd_ctx->mac_handle,
+						       vdev_id,
+						       reconnect_disallow_period);
+}
+
+/**
  * hdd_set_roam_with_control_config() - Set roam control configuration
  * @hdd_ctx: HDD context
  * @tb: List of attributes carrying roam subcmd data
@@ -7292,6 +7337,38 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("Failed to set roam score delta value");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CANDIDATE_SCORE_MIN_DELTA_THRESHOLD];
+	if (attr) {
+		value = nla_get_u32(attr);
+		if (!cfg_in_range(CFG_ROAM_COMMON_MIN_ROAM_DELTA, value)) {
+			hdd_err("Min roam score delta value %d out of range",
+				value);
+			return -EINVAL;
+		}
+
+		hdd_debug("Received min roam score delta value: %d", value);
+		status = hdd_send_min_roam_score_delta_to_sme(hdd_ctx, vdev_id,
+							      value);
+
+		is_rso_update_required = true;
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set min roam score delta value");
+	}
+
+	attr = tb2[QCA_ATTR_ROAM_CONTROL_CONNECTED_BSS_RECONNECT_DISALLOW_PERIOD];
+	if (attr) {
+		value = nla_get_u32(attr);
+
+		hdd_debug("Received reconnect_disallow_period value: %d",
+			  value);
+		status = hdd_send_reconnect_disallow_period_to_sme(hdd_ctx,
+								   vdev_id,
+								   value);
+		is_rso_update_required = true;
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to set reconnect_disallow_period");
 	}
 
 	/* send RSO update if required */
@@ -14422,6 +14499,7 @@ static int hdd_set_t2lm_negotiation_support(struct wlan_hdd_link_info *link_info
 	struct hdd_context *hdd_ctx = NULL;
 	uint8_t cfg_val;
 	enum wlan_t2lm_negotiation_support t2lm_support;
+	struct mac_context *mac_ctx;
 
 	if (!attr)
 		return -EINVAL;
@@ -14432,9 +14510,16 @@ static int hdd_set_t2lm_negotiation_support(struct wlan_hdd_link_info *link_info
 	hdd_debug("T2LM negotiation support: %d", t2lm_support);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	mac_ctx = MAC_CONTEXT(hdd_ctx->mac_handle);
 
 	wlan_mlme_set_t2lm_negotiation_supported(hdd_ctx->psoc,
 						 t2lm_support);
+	if (mac_ctx->usr_eht_testbed_cfg &&
+	    t2lm_support != T2LM_NEGOTIATION_DISABLED) {
+		hdd_debug("clear user disabled roaming for eht testbed");
+		ucfg_clear_user_disabled_roaming(hdd_ctx->psoc,
+						 link_info->vdev_id);
+	}
 
 	return 0;
 }
@@ -14444,6 +14529,7 @@ static int hdd_set_link_reconfig_support(struct wlan_hdd_link_info *link_info,
 {
 	struct hdd_context *hdd_ctx = NULL;
 	uint8_t cfg_val;
+	struct mac_context *mac_ctx;
 
 	if (!attr)
 		return -EINVAL;
@@ -14453,8 +14539,14 @@ static int hdd_set_link_reconfig_support(struct wlan_hdd_link_info *link_info,
 	hdd_debug("Multi-link reconfiguration support: %d", cfg_val);
 
 	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	mac_ctx = MAC_CONTEXT(hdd_ctx->mac_handle);
 
 	wlan_mlme_set_link_recfg_support(hdd_ctx->psoc, cfg_val);
+	if (mac_ctx->usr_eht_testbed_cfg && cfg_val) {
+		hdd_debug("clear user disabled roaming for eht testbed");
+		ucfg_clear_user_disabled_roaming(hdd_ctx->psoc,
+						 link_info->vdev_id);
+	}
 
 	return 0;
 }
@@ -35286,6 +35378,13 @@ __wlan_hdd_cfg80211_setup_link_reconfig(struct wiphy *wiphy,
 		hdd_debug("link reconfig not supported");
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return -EOPNOTSUPP;
+	}
+
+	if (mlo_is_roaming_in_progress(psoc,
+				       adapter->deflink->vdev_id)) {
+		hdd_debug("Roaming in progress, reject link reconfig");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return -EBUSY;
 	}
 
 	if (policy_mgr_link_reconfig_is_concurrency_present(psoc)) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -177,6 +177,59 @@ wlan_hdd_add_vht_cap_info(struct hdd_connection_info *conn_info,
 			vht_caps->supp_mcs.rx_highest,
 			vht_caps->supp_mcs.tx_mcs_map,
 			vht_caps->supp_mcs.tx_highest);
+	if (ret <= 0)
+		return length;
+
+	length = ret;
+	return length;
+}
+
+/**
+ * wlan_hdd_add_he_cap_info() - Populate HE info
+ * @conn_info: station connection information
+ * @buf: output buffer to hold version info
+ * @buf_avail_len: available buffer length
+ *
+ * Return: No.of bytes populated by this function in buffer
+ */
+static ssize_t
+wlan_hdd_add_he_cap_info(struct hdd_connection_info *conn_info,
+			 uint8_t *buf, ssize_t buf_avail_len)
+{
+	struct ieee80211_he_cap_elem *he_cap_elem;
+	ssize_t length = 0;
+	int ret;
+
+	if (!conn_info->conn_flag.he_present)
+		return length;
+
+	he_cap_elem = &conn_info->he_cap_elem;
+	ret = scnprintf(buf, buf_avail_len,
+			"mac_cap_info = 0x%02x%02x%02x%02x%02x%02x\n"
+			"phy_cap_ch_width = 0x%02x\n"
+			"phy_cap_8_to_23 = 0x%02x%02x\n"
+			"phy_cap_24_to_39 = 0x%02x%02x\n"
+			"phy_cap_40_to_55 = 0x%02x%02x\n"
+			"phy_cap_56_to_71 = 0x%02x%02x\n"
+			"phy_cap_72_to_87 = 0x%02x%02x\n",
+			he_cap_elem->mac_cap_info[5],
+			he_cap_elem->mac_cap_info[4],
+			he_cap_elem->mac_cap_info[3],
+			he_cap_elem->mac_cap_info[2],
+			he_cap_elem->mac_cap_info[1],
+			he_cap_elem->mac_cap_info[0],
+			he_cap_elem->phy_cap_info[0],
+			he_cap_elem->phy_cap_info[2],
+			he_cap_elem->phy_cap_info[1],
+			he_cap_elem->phy_cap_info[4],
+			he_cap_elem->phy_cap_info[3],
+			he_cap_elem->phy_cap_info[6],
+			he_cap_elem->phy_cap_info[5],
+			he_cap_elem->phy_cap_info[8],
+			he_cap_elem->phy_cap_info[7],
+			he_cap_elem->phy_cap_info[10],
+			he_cap_elem->phy_cap_info[9]);
+
 	if (ret <= 0)
 		return length;
 
@@ -513,6 +566,10 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 
 		length += wlan_hdd_add_vht_cap_info(conn_info, buf + length,
 						    buf_avail_len - length);
+
+		length += wlan_hdd_add_he_cap_info(conn_info, buf + length,
+						   buf_avail_len - length);
+
 		if (is_legacy)
 			return length;
 	}
@@ -614,6 +671,10 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	}
 	length += wlan_hdd_add_vht_cap_info(conn_info, buf + length,
 					    buf_avail_len - length);
+
+	length += wlan_hdd_add_he_cap_info(conn_info, buf + length,
+					   buf_avail_len - length);
+
 	return length;
 }
 #endif

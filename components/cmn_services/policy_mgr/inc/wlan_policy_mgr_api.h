@@ -1694,6 +1694,7 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
  * @psoc: PSOC object information
  * @ch_freq: pointer to channel frequency which needs to be filled
  * @exclude_mlo_sap_link: exclude freq of existing SAP link
+ * @sap_vdev_id: SAP vdev_id
  *
  * In-case if any connection is already present whose channel is none dfs then
  * return that channel
@@ -1702,7 +1703,8 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
  */
 bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
 					   uint32_t *ch_freq,
-					   bool exclude_mlo_sap_link);
+					   bool exclude_mlo_sap_link,
+					   uint8_t sap_vdev_id);
 
 /**
  * policy_mgr_get_dfs_beaconing_session_id() - to find the
@@ -1786,6 +1788,21 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 				  qdf_freq_t *intf_ch_freq,
 				  qdf_freq_t sap_ch_freq,
 				  uint8_t vdev_id, uint8_t cc_mode);
+
+/**
+ * policy_mgr_promote_best_sap_channel_in_pcl() - promote best channel
+ * from STA scan
+ * @psoc: psoc ctx
+ * @vdev_id: vdev id
+ * @pcl_channels: pcl channels
+ * @len: length
+ *
+ * Return: void
+ */
+void policy_mgr_promote_best_sap_channel_in_pcl(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id, uint32_t *pcl_channels,
+				uint32_t *len);
 
 /**
  * policy_mgr_handle_go_sap_fav_channel() - Get preferred force SCC
@@ -6278,6 +6295,19 @@ QDF_STATUS policy_mgr_modify_pcl_for_vlp_channels(struct wlan_objmgr_psoc *psoc,
 						  struct wlan_objmgr_pdev *pdev,
 						  struct weighed_pcl *pcl,
 						  uint32_t num_pcl);
+
+/**
+ * policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id() - Check if any STA/P2P ClI
+ * + SAP SCC present on DFS channel with specific STA/P2P CLI vdev id
+ * @psoc: psoc pointer
+ * @vdev_id: STA/P2P CLI vdev id
+ *
+ * Return: true if specific STA/P2P CLI + SAP SCC present on DFS channel,
+ * otherwise false.
+ */
+bool
+policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id);
 
 #ifdef AUTO_PLATFORM
 /**

@@ -3239,6 +3239,11 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		}
 
 		hdd_green_ap_add_sta(hdd_ctx);
+
+		if (!bAuthRequired)
+			hdd_son_deliver_peer_authorize_event(link_info,
+							     event->staMac.bytes);
+
 		hdd_son_deliver_assoc_disassoc_event(adapter,
 						     event->staMac,
 						     event->status,
@@ -9020,6 +9025,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	struct sap_config *sap_config;
 	struct hdd_ap_ctx *ap_ctx;
 	struct wlan_hdd_link_info *link_info;
+	qdf_freq_t user_config_freq;
 
 	hdd_enter();
 
@@ -9085,6 +9091,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 	channel_width = wlan_hdd_get_channel_bw(params->chandef.width);
 	freq = (qdf_freq_t)params->chandef.chan->center_freq;
+	user_config_freq = freq;
 
 	if (wlan_reg_is_6ghz_chan_freq(freq) &&
 	    !wlan_reg_is_6ghz_band_set(hdd_ctx->pdev)) {
@@ -9398,6 +9405,9 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 			goto err_start_bss;
 		}
+
+		if (user_config_freq != freq)
+			wlan_set_sap_user_config_freq(vdev, user_config_freq);
 
 		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 			link_id = wlan_vdev_get_link_id(vdev);

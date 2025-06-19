@@ -1135,6 +1135,22 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
 				 enum QDF_OPMODE device_mode);
 
 /**
+ * lim_get_bw_for_mcs_set() - Get channel width for populate mcs set
+ * @mac_ctx: Pointer to mac context
+ * @session: Pointer to session entry
+ * @ch_width: Input channel width
+ *
+ * This function gets channel width for populate mcs set. This is for channel
+ * width upgrade.
+ *
+ * Return: Updated channel width
+ */
+enum phy_ch_width
+lim_get_bw_for_mcs_set(struct mac_context *mac_ctx,
+		       struct pe_session *session,
+		       enum phy_ch_width ch_width);
+
+/**
  * lim_update_connect_rsn_ie() - Update the connection RSN IE
  * @session: PE session
  * @rsn_ie_buf: RSN IE buffer
@@ -3449,12 +3465,13 @@ lim_get_omn_channel_width(tDot11fIEOperatingMode *omn_ie);
  * @mac_ctx:    Pointer to Global MAC structure
  * @pe_session: Pointer to session
  * @bss_desc: Pointer to bss description
+ * @force_vlp: Flag to force use VLP power
  *
  * Return: TPC status
  */
 bool
 lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
-		  struct bss_description *bss_desc);
+		  struct bss_description *bss_desc, bool force_vlp);
 
 /**
  * lim_update_tx_power() - Function to update the TX power for

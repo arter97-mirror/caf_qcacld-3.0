@@ -55,6 +55,8 @@
 #include "wlan_cm_public_struct.h"
 #include "wlan_policy_mgr_i.h"
 
+#define MIN_FIRST_BMISS_CNT 2
+#define MIN_FINAL_BMISS_CNT 5
 
 #ifdef WLAN_FEATURE_SAE
 #define CM_IS_FW_FT_SAE_SUPPORTED(fw_akm_bitmap) \
@@ -74,6 +76,33 @@
 #endif
 
 /**
+ * cm_roam_scan_update_bmiss_cnt_for_dfs() - Update beacon miss count
+ * for dfs sap concurrency case
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @first_val: input first beacon miss count
+ * @final_val: input final beacon miss count
+ *
+ * This function is used to update beacon miss count parameters
+ *
+ * Return: None
+ */
+static void
+cm_roam_scan_update_bmiss_cnt_for_dfs(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      uint8_t *first_val,
+				      uint8_t *final_val)
+{
+	if (policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(psoc, vdev_id)) {
+		if (*first_val > MIN_FIRST_BMISS_CNT)
+			*first_val = MIN_FIRST_BMISS_CNT;
+
+		if (*final_val > MIN_FINAL_BMISS_CNT)
+			*final_val = MIN_FINAL_BMISS_CNT;
+	}
+}
+
+/**
  * cm_roam_scan_bmiss_cnt() - set roam beacon miss count
  * @psoc: psoc pointer
  * @vdev_id: vdev id
@@ -87,15 +116,20 @@ static void
 cm_roam_scan_bmiss_cnt(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		       struct wlan_roam_beacon_miss_cnt *params)
 {
-	uint8_t beacon_miss_count;
+	uint8_t beacon_first_miss_count;
+	uint8_t beacon_final_miss_count;
 
 	params->vdev_id = vdev_id;
 
-	wlan_mlme_get_roam_bmiss_first_bcnt(psoc, &beacon_miss_count);
-	params->roam_bmiss_first_bcnt = beacon_miss_count;
+	wlan_mlme_get_roam_bmiss_first_bcnt(psoc, &beacon_first_miss_count);
+	wlan_mlme_get_roam_bmiss_final_bcnt(psoc, &beacon_final_miss_count);
 
-	wlan_mlme_get_roam_bmiss_final_bcnt(psoc, &beacon_miss_count);
-	params->roam_bmiss_final_bcnt = beacon_miss_count;
+	cm_roam_scan_update_bmiss_cnt_for_dfs(psoc, vdev_id,
+					      &beacon_first_miss_count,
+					      &beacon_final_miss_count);
+
+	params->roam_bmiss_first_bcnt = beacon_first_miss_count;
+	params->roam_bmiss_final_bcnt = beacon_final_miss_count;
 }
 
 /**
@@ -289,6 +323,28 @@ release:
 }
 
 /**
+ * cm_roam_update_trigger_bitmap() - update roam triggers based on
+ * dfs concurrency
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @params: roam triggers parameters
+ *
+ * This function is used to update roam triggers parameters
+ *
+ * Return: None
+ */
+static void
+cm_roam_update_trigger_bitmap(struct wlan_objmgr_psoc *psoc,
+			      uint8_t vdev_id,
+			      struct wlan_roam_triggers *params)
+{
+	if (policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(psoc, vdev_id)) {
+		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_DEAUTH);
+		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_BMISS);
+	}
+}
+
+/**
  * cm_roam_triggers() - set roam triggers
  * @psoc: psoc pointer
  * @vdev_id: vdev id
@@ -325,6 +381,8 @@ cm_roam_triggers(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_IDLE);
 		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_BTC);
 	}
+
+	cm_roam_update_trigger_bitmap(psoc, vdev_id, params);
 
 	mlme_debug("[ROAM_TRIGGER] trigger_bitmap:%d", params->trigger_bitmap);
 
@@ -375,8 +433,37 @@ static void
 cm_roam_disconnect_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			  struct wlan_roam_disconnect_params *params)
 {
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+	struct rso_cfg_params *cfg_params;
+	uint32_t trigger_bitmap;
+
 	params->vdev_id = vdev_id;
 	wlan_mlme_get_enable_disconnect_roam_offload(psoc, &params->enable);
+	trigger_bitmap = mlme_get_roam_trigger_bitmap(psoc, vdev_id);
+
+	if (!(params->enable && (trigger_bitmap &
+				 BIT(ROAM_TRIGGER_REASON_DEAUTH))))
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_NB_ID);
+	if (!vdev) {
+		mlme_err("vdev is NULL");
+		return;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return;
+	}
+
+	cfg_params = &rso_cfg->cfg_param;
+	params->reconnect_disallow_period =
+				cfg_params->reconnect_disallow_period;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 }
 
 /**
@@ -1177,7 +1264,9 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 	uint8_t reason = REASON_SUPPLICANT_DE_INIT_ROAMING;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 	struct wlan_roam_idle_params idle_params;
-	bool send_idle_config = false;
+	struct wlan_roam_disconnect_params disconnect_params;
+	bool send_triggered_config = false;
+	uint32_t prev_trigger_bitmap, changed_trigger_bitmap;
 
 	if (!psoc)
 		return QDF_STATUS_E_INVAL;
@@ -1187,8 +1276,17 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	prev_trigger_bitmap = mlme_get_roam_trigger_bitmap(psoc, vdev_id);
+
 	mlme_set_roam_trigger_bitmap(psoc, trigger->vdev_id,
 				     trigger->trigger_bitmap);
+
+	/*
+	 * Changed trigger bitmap will capture the triggers whose states are
+	 * changed. This will be used to issue the commands to send the params
+	 * for those particular triggers whose states are changed.
+	 */
+	changed_trigger_bitmap = trigger->trigger_bitmap ^ prev_trigger_bitmap;
 
 	if (trigger->trigger_bitmap)
 		reason = REASON_SUPPLICANT_INIT_ROAMING;
@@ -1198,11 +1296,15 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 	 * is expected due to the new trigger bitmap.
 	 */
 	if (wlan_is_rso_enabled(pdev, vdev_id) && trigger->trigger_bitmap) {
-		send_idle_config = true;
+		send_triggered_config = true;
 		cm_roam_triggers(psoc, vdev_id, trigger);
 		cm_roam_idle_params(psoc, vdev_id, &idle_params);
+		cm_roam_disconnect_params(psoc, vdev_id, &disconnect_params);
 		if (!(trigger->trigger_bitmap & BIT(ROAM_TRIGGER_REASON_IDLE)))
 			idle_params.enable = false;
+		if (!(trigger->trigger_bitmap &
+			BIT(ROAM_TRIGGER_REASON_DEAUTH)))
+			disconnect_params.enable = false;
 		goto send_trigger;
 	}
 
@@ -1215,10 +1317,18 @@ QDF_STATUS cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev,
 
 send_trigger:
 	status = wlan_cm_tgt_send_roam_triggers(psoc, vdev_id, trigger);
-	if (!send_idle_config)
-		return status;
+	if (!send_triggered_config)
+		goto end;
 
-	return wlan_cm_tgt_send_idle_params(psoc, vdev_id, &idle_params);
+	if (changed_trigger_bitmap & BIT(ROAM_TRIGGER_REASON_DEAUTH))
+		wlan_cm_tgt_send_disconnect_roam_params(psoc, vdev_id,
+							&disconnect_params);
+
+	if (changed_trigger_bitmap & BIT(ROAM_TRIGGER_REASON_IDLE))
+		wlan_cm_tgt_send_idle_params(psoc, vdev_id, &idle_params);
+
+end:
+	return status;
 }
 
 static void cm_roam_set_roam_reason_better_ap(struct wlan_objmgr_psoc *psoc,
@@ -1682,7 +1792,7 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 		req_score_params->roam_score_delta =
 					cfg_params->roam_score_delta;
 		req_score_params->cand_min_roam_score_delta =
-					roam_score_params->min_roam_score_delta;
+					cfg_params->min_roam_score_delta;
 	}
 	req_score_params->band_2g_weightage = cfg_params->band_2g_weightage;
 	req_score_params->band_5g_weightage = cfg_params->band_5g_weightage;
@@ -6283,6 +6393,15 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 
 	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.roam_score_delta;
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id, ROAM_SCORE_DELTA, &src_cfg);
+
+	src_cfg.uint_value = mlme_obj->cfg.roam_scoring.min_roam_score_delta;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   MIN_ROAM_SCORE_DELTA, &src_cfg);
+
+	src_cfg.uint_value =
+		mlme_obj->cfg.lfr.reconnect_disallow_period;
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
+				   RECONNECT_DISALLOW_PERIOD, &src_cfg);
 	/*
 	 * Store the current PMK info of the AP
 	 * to the single pmk global cache if the BSS allows

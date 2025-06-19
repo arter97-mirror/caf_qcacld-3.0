@@ -642,8 +642,10 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						       bpcc);
 		}
 		lim_process_ml_reconfig(mac_ctx, session, rx_pkt_info);
-		lim_process_beacon_eht_op(session, bcn);
 	}
+
+	if (lim_is_session_eht_capable(session))
+		lim_process_beacon_eht_op(session, bcn);
 
 	if (!cu_flag)
 		return;
@@ -760,13 +762,11 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 
 		if (ap_constraint_change || (tpe_change && !skip_tpe) ||
 		    session->cal_tpc_post_csa || change_in_sta_pwr_type) {
-			lim_calculate_tpc(mac_ctx, session, false);
+			if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq) &&
+			    session->best_6g_power_type == REG_INDOOR_ENABLED_AP)
+				lim_set_tpc_power(mac_ctx, session, NULL, true);
+			lim_set_tpc_power(mac_ctx, session, NULL, false);
 			session->cal_tpc_post_csa = false;
-
-			if (tx_ops->set_tpc_power)
-				tx_ops->set_tpc_power(mac_ctx->psoc,
-						      session->vdev_id,
-						      &mlme_obj->reg_tpc_obj);
 		}
 	} else if (!session->sta_follows_sap_power) {
 		/* Obtain the Max Tx power for the current regulatory  */

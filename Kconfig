@@ -2252,6 +2252,10 @@ config FEATURE_WLAN_CH_AVOID_EXT
 	bool "enable FEATURE_WLAN_CH_AVOID_EXT"
 	default n
 
+config SAP_UNSAFE_FIXED_CHAN_ALLOW
+	bool "enable WLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW"
+	default n
+
 config WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE
 	bool "enable CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS_DISABLE"
 	default n
@@ -2854,5 +2858,19 @@ config WLAN_TX_POWERBOOST
 config CNSS_ETM_TRACE
 	bool "Enable CNSS_ETM_TRACE"
 	default n
+
+config DELAYED_REG_FORCE_WRITE
+	bool "Enable Delayed Reg force write"
+	default n
+
+config DP_COMP_FW_REINJECT_WAR
+	bool "enable DP_COMP_FW_REINJECT_WAR"
+	default n
+
+config AUTO_PLATFORM
+	bool "Enable Auto platform"
+	default n
+	help
+	Add support for the Qualcomm automotive platform
 
 endif # QCA_CLD_WLAN

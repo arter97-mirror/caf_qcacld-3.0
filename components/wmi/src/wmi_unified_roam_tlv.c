@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -6305,7 +6305,10 @@ send_disconnect_roam_params_tlv(wmi_unified_t wmi_handle,
 
 	cmd->vdev_id = req->vdev_id;
 	cmd->enable = req->enable;
-	wmi_debug("RSO_CFG: vdev_id:%d enable:%d", cmd->vdev_id, cmd->enable);
+	cmd->self_roaming_re_enable_time =
+		req->reconnect_disallow_period;
+	wmi_debug("RSO_CFG: vdev_id:%d enable:%d self_roaming_re_enable_time %d ",
+		  cmd->vdev_id, cmd->enable, cmd->self_roaming_re_enable_time);
 
 	wmi_mtrace(WMI_ROAM_DEAUTH_CONFIG_CMDID, cmd->vdev_id, 0);
 	if (wmi_unified_cmd_send(wmi_handle, buf, len,

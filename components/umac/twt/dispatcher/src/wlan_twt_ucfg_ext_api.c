@@ -304,9 +304,10 @@ ucfg_twt_tgt_caps_get_wake_dur_and_wake_intvl(
 							     max_wake_intvl);
 }
 
-bool ucfg_twt_resp_check_bit(enum QDF_OPMODE mode, uint8_t twt_resp_cfg)
+bool ucfg_twt_resp_check_bit(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			     enum QDF_OPMODE mode, uint8_t twt_resp_cfg)
 {
-	return TWT_RESP_CHECK_BIT(mode, twt_resp_cfg);
+	return wlan_twt_check_responder_bit(psoc, vdev_id, mode, twt_resp_cfg);
 }
 
 QDF_STATUS

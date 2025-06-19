@@ -447,7 +447,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type t2lm_status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      qdf_freq_t freq,
+				      enum wlan_diag_wifi_band band,
 				      bool is_rx, uint8_t subtype)
 {
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
@@ -466,7 +466,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.tx_status = wlan_get_diag_tx_status(tx_status);
 	wlan_diag_event.is_rx = is_rx;
 
-	wlan_diag_event.band = wlan_convert_freq_to_diag_band(freq);
+	wlan_diag_event.band = band;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
 				    EVENT_WLAN_MLO_T2LM_REQ_RESP);
@@ -1187,7 +1187,6 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 {
 	uint8_t int_reason = 0;
 	uint32_t diag_reason;
-	struct qdf_mac_addr peer_mac_addr;
 	struct wlan_objmgr_pdev *pdev;
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_packet_info);
@@ -1205,7 +1204,14 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	qdf_mem_copy(peer_mac_addr.bytes, peer_mac, QDF_MAC_ADDR_SIZE);
+	if (!peer_mac) {
+		logging_err("vdev:%d peer mac not found",
+			    wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
+		     peer_mac, QDF_MAC_ADDR_SIZE);
 
 	diag_reason =
 	wlan_connectivity_discon_reason_to_diag_reason(reason, &int_reason,

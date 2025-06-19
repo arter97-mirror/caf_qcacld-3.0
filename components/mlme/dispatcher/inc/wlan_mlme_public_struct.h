@@ -1895,6 +1895,7 @@ enum station_prefer_bw {
  * @mlo_max_simultaneous_links:     number of simultaneous links
  * @mlo_prefer_percentage:          percentage to boost/reduce mlo scoring
  * @mlo_5gl_5gh_mlsr:               enable/disable 5GL+5GH MLSR
+ * @ext_mld_cap_supp:               Include/exclude Extended MLD caps in assoc
  * @epcs_capability:                epcs capability enable or disable flag
  * @usr_disable_eht:                user disable the eht for STA
  * @eht_disable_punct_in_us_lpi:    Disable eht puncture in us lpi mode
@@ -1933,6 +1934,7 @@ struct wlan_mlme_sta_cfg {
 	uint8_t mlo_max_simultaneous_links;
 	int8_t mlo_prefer_percentage;
 	bool mlo_5gl_5gh_mlsr;
+	bool ext_mld_cap_supp;
 #endif
 #ifdef WLAN_FEATURE_11BE
 	bool epcs_capability;
@@ -2170,6 +2172,8 @@ struct fw_scan_channels {
  * @roam_periodic_scan_interval: the interval in seconds after which STA
  * performs periodic partial scans till roaming succeeds or RSSI recovers
  * above threshold.
+ * @reconnect_disallow_period: duration after which STA is allowed
+ * to reconnect to the same BSSID sending DEAUTH/DISASSOC frames.
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2193,6 +2197,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t sta_roam_disable;
 	uint32_t roam_info_stats_num;
 	uint8_t roam_high_rssi_delta;
+	uint32_t reconnect_disallow_period;
 #endif
 	bool early_stop_scan_enable;
 	bool enable_5g_band_pref;
@@ -2701,10 +2706,12 @@ struct wlan_mlme_wep_cfg {
  * struct wlan_mlme_wifi_pos_cfg - WIFI POS configs
  * @fine_time_meas_cap: fine timing measurement capability information
  * @oem_6g_support_disable: oem is 6Ghz disabled if set
+ * @is_rtt_bw_downgrade_enabled: RTT Bandwidth downgrade is enabled if set
  */
 struct wlan_mlme_wifi_pos_cfg {
 	uint32_t fine_time_meas_cap;
 	bool oem_6g_support_disable;
+	bool is_rtt_bw_downgrade_enabled;
 };
 
 #define MLME_SET_BIT(value, bit_offset) ((value) |= (1 << (bit_offset)))
@@ -2831,6 +2838,7 @@ enum mlme_reg_srd_master_modes {
  * @enable_pending_chan_list_req: enables/disables scan channel
  * list command to FW till the current scan is complete.
  * @retain_nol_across_regdmn_update: Retain the NOL list across the regdomain.
+ * @enable_nan_on_dfs_channels: Enable nan on DFS channels
  * @enable_nan_on_indoor_channels: Enable nan on Indoor channels
  * @enable_6ghz_sp_pwrmode_supp: Enable 6 GHz SP mode support
  * @afc_disable_timer_check: Disable AFC timer check
@@ -2860,6 +2868,7 @@ struct wlan_mlme_reg {
 	bool ignore_fw_reg_offload_ind;
 	bool enable_pending_chan_list_req;
 	bool retain_nol_across_regdmn_update;
+	bool enable_nan_on_dfs_channels;
 	bool enable_nan_on_indoor_channels;
 #if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
 	bool enable_6ghz_sp_pwrmode_supp;

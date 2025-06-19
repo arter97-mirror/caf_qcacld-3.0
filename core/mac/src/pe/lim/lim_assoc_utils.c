@@ -1305,15 +1305,17 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 	uint32_t self_sta_dot11mode;
 	uint8_t self_mcs, peer_mcs, idx;
 	struct mlme_vht_capabilities_info *vht_cap_info;
+	enum phy_ch_width ch_width;
 
 	self_sta_dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
-
 	if (!IS_DOT11_MODE_VHT(self_sta_dot11mode))
 		return QDF_STATUS_SUCCESS;
 
 	if (!peer_vht_caps || !peer_vht_caps->present)
 		return QDF_STATUS_SUCCESS;
 
+	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry,
+					  session_entry->ch_width);
 	vht_cap_info = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
 
 	rates->vhtRxMCSMap = (uint16_t)(vht_cap_info->rx_mcs_map |
@@ -1324,13 +1326,13 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 	for (idx = NSS_1x1_MODE; idx <= nss; idx++) {
 		bool vht20_mcs9_unsupported =
 			(session_entry &&
-			 (session_entry->ch_width == CH_WIDTH_20MHZ) &&
+			 (ch_width == CH_WIDTH_20MHZ) &&
 			 !vht_cap_info->enable_vht20_mcs9);
 
 		/* Unset the NSS not supported by peer */
-		if (VHT_IS_NSS_DISABLED(peer_vht_caps->txMCSMap, idx))
+		if (!VHT_MCS_IS_NSS_ENABLED(peer_vht_caps->txMCSMap, idx))
 			VHT_CLEAR_MCS_FOR_NSS(rates->vhtRxMCSMap, idx);
-		if (VHT_IS_NSS_DISABLED(peer_vht_caps->rxMCSMap, idx))
+		if (!VHT_MCS_IS_NSS_ENABLED(peer_vht_caps->rxMCSMap, idx))
 			VHT_CLEAR_MCS_FOR_NSS(rates->vhtTxMCSMap, idx);
 
 		/*
@@ -1378,7 +1380,7 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 		((rates->vhtTxMCSMap & VHT_MCS_1x1) == VHT_MCS_1x1) ?
 		true : false;
 
-	if (!sta_ds || CH_WIDTH_80MHZ >= session_entry->ch_width)
+	if (!sta_ds || CH_WIDTH_80MHZ >= ch_width)
 		return QDF_STATUS_SUCCESS;
 
 	sta_ds->vht_extended_nss_bw_cap =
@@ -3736,6 +3738,68 @@ lim_limit_bw_for_iot_ap(struct mac_context *mac_ctx,
 	}
 }
 
+static uint8_t lim_get_peer_supported_tx_nss(tpSchBeaconStruct beacon)
+{
+	uint8_t idx, tx_mcs_def_pos, tx_mcs_pos, *ht_mcs;
+
+	if (beacon->eht_cap.present) {
+		if (beacon->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9)
+			return beacon->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9;
+		if (beacon->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7)
+			return beacon->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7;
+	} else if (beacon->he_cap.present) {
+		for (idx = NSS_8x8_MODE; idx >= NSS_1x1_MODE; idx--)
+			if (HE_MCS_IS_NSS_ENABLED(beacon->he_cap.tx_he_mcs_map_lt_80,
+						  idx))
+				return idx;
+	} else if (beacon->VHTCaps.present) {
+		for (idx = NSS_8x8_MODE; idx >= NSS_1x1_MODE; idx--)
+			if (VHT_MCS_IS_NSS_ENABLED(beacon->VHTCaps.txMCSMap,
+						   idx))
+				return idx;
+	} else if (beacon->HTCaps.present) {
+		ht_mcs = beacon->HTCaps.supportedMCSSet;
+		tx_mcs_pos = WLAN_HT_CAP_TX_MAX_NSS_POS;
+		tx_mcs_def_pos = WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS;
+
+		if ((QDF_GET_BITS(ht_mcs[tx_mcs_def_pos / BITS_IN_A_BYTE],
+				  tx_mcs_def_pos % BITS_IN_A_BYTE, 2) == 0x3) &&
+		    QDF_GET_BITS(ht_mcs[tx_mcs_pos / BITS_IN_A_BYTE],
+				 tx_mcs_pos % BITS_IN_A_BYTE, 2))
+			return QDF_GET_BITS(ht_mcs[tx_mcs_pos / BITS_IN_A_BYTE],
+					    tx_mcs_pos % BITS_IN_A_BYTE, 2);
+
+		for (idx = NSS_4x4_MODE; idx >= NSS_1x1_MODE; idx--)
+			if (ht_mcs[idx - 1])
+				return idx;
+	}
+
+	return NSS_1x1_MODE;
+}
+
+static void
+lim_sta_update_max_channel_width(struct pe_session *pe_session,
+				 tpSirAssocRsp pAssocRsp,
+				 struct bss_params *pAddBssParams)
+{
+	enum phy_ch_width max_ch_width;
+
+	if (lim_is_eht_connection_op_info_present(pe_session, pAssocRsp)) {
+		max_ch_width = CH_WIDTH_320MHZ;
+	} else if ((pe_session->vhtCapability && pAssocRsp->VHTCaps.present) ||
+		 (lim_is_session_he_capable(pe_session) &&
+		  pAssocRsp->he_cap.present)) {
+		max_ch_width = CH_WIDTH_160MHZ;
+	} else {
+		max_ch_width = CH_WIDTH_40MHZ;
+	}
+
+	if (pAddBssParams->ch_width > max_ch_width) {
+		pAddBssParams->ch_width = max_ch_width;
+		pAddBssParams->staContext.ch_width = max_ch_width;
+	}
+}
+
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp,
 				   tpSchBeaconStruct pBeaconStruct,
 				   struct bss_description *bssDescription,
@@ -3800,16 +3864,20 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		 * width has been taken into account for calculating
 		 * pe_session->ch_width
 		 */
-		if ((chan_width_support &&
-		     ((pAssocRsp->HTCaps.supportedChannelWidthSet) ||
-		      (pBeaconStruct->HTCaps.present &&
-		       pBeaconStruct->HTCaps.supportedChannelWidthSet))) ||
-		    lim_is_eht_connection_op_info_present(pe_session,
-							  pAssocRsp)) {
+		if (lim_is_eht_connection_op_info_present(pe_session,
+							  pAssocRsp) ||
+		    (chan_width_support &&
+		    pAssocRsp->VHTCaps.present)) {
 			pAddBssParams->ch_width =
 					pe_session->ch_width;
 			pAddBssParams->staContext.ch_width =
-						pe_session->ch_width;
+					pe_session->ch_width;
+		} else if ((chan_width_support &&
+		     ((pAssocRsp->HTCaps.supportedChannelWidthSet) ||
+		      (pBeaconStruct->HTCaps.present &&
+		       pBeaconStruct->HTCaps.supportedChannelWidthSet)))) {
+			pAddBssParams->ch_width = CH_WIDTH_40MHZ;
+			pAddBssParams->staContext.ch_width = CH_WIDTH_40MHZ;
 		} else {
 			pAddBssParams->ch_width = CH_WIDTH_20MHZ;
 			pAddBssParams->staContext.ch_width = CH_WIDTH_20MHZ;
@@ -4101,6 +4169,8 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		}
 	}
 
+	pAddBssParams->staContext.bcn_tx_nss =
+				lim_get_peer_supported_tx_nss(pBeaconStruct);
 	lim_extract_per_link_id(pe_session, pAddBssParams, pAssocRsp);
 	lim_extract_ml_info(pe_session, pAddBssParams, pAssocRsp);
 	lim_intersect_ap_emlsr_caps(mac, pe_session, pAddBssParams, pAssocRsp);
@@ -4183,6 +4253,10 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		pAddBssParams->ch_width = CH_WIDTH_10MHZ;
 		pAddBssParams->staContext.ch_width = CH_WIDTH_10MHZ;
 	}
+
+	/* check and update max channel width supported */
+	lim_sta_update_max_channel_width(pe_session, pAssocRsp, pAddBssParams);
+
 	lim_set_sta_ctx_twt(&pAddBssParams->staContext, pe_session);
 
 	if (lim_is_fils_connection(pe_session))

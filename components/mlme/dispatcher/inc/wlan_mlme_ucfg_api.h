@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1214,6 +1214,19 @@ ucfg_mlme_get_fine_time_meas_cap(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_set_fine_time_meas_cap(struct wlan_objmgr_psoc *psoc,
 				 uint32_t fine_time_meas_cap);
+
+/**
+ * ucfg_mlme_is_rtt_bw_downgrade_enabled() - Check whether RTT dynamic
+ * bandwidth downgrade capability is enabled
+ * @psoc: pointer to psoc object
+ * @is_rtt_bw_downgrade_enabled: Pointer to the value which will be
+ * filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_is_rtt_bw_downgrade_enabled(struct wlan_objmgr_psoc *psoc,
+				      bool *is_rtt_bw_downgrade_enabled);
 
 /**
  * ucfg_mlme_get_pmkid_modes() - Get PMKID modes

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -144,6 +144,7 @@ struct hdd_conn_flag {
  * @hs20vendor_ie: holds passpoint/hs20 info
  * @ht_operation: HT operation info
  * @vht_operation: VHT operation info
+ * @he_cap_elem: HE capabilities info
  * @he_operation: HE operation info
  * @he_oper_len: length of @he_operation
  * @roam_count: roaming counter
@@ -193,6 +194,7 @@ struct hdd_connection_info {
 	struct ieee80211_vht_operation vht_operation;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) \
      && defined(WLAN_FEATURE_11AX)
+	struct ieee80211_he_cap_elem he_cap_elem;
 	struct ieee80211_he_operation *he_operation;
 	uint32_t he_oper_len;
 #endif
@@ -591,6 +593,16 @@ static inline void hdd_copy_eht_operation(struct hdd_station_ctx *hdd_sta_ctx,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
      defined(WLAN_FEATURE_11AX)
 /**
+ * hdd_copy_he_caps()- copy HE capabilities element to
+ * hdd station context.
+ * @hdd_sta_ctx: pointer to hdd station context
+ * @he_caps: pointer to he capabilities
+ *
+ * Return: None
+ */
+void hdd_copy_he_caps(struct hdd_station_ctx *hdd_sta_ctx,
+		      tDot11fIEhe_cap * he_caps);
+/**
  * hdd_copy_he_operation()- copy HE operations element to
  * hdd station context.
  * @hdd_sta_ctx: pointer to hdd station context
@@ -603,6 +615,11 @@ void hdd_copy_he_operation(struct hdd_station_ctx *hdd_sta_ctx,
 #else
 static inline void hdd_copy_he_operation(struct hdd_station_ctx *hdd_sta_ctx,
 					 tDot11fIEhe_op *he_operation)
+{
+}
+
+static inline void hdd_copy_he_caps(struct hdd_station_ctx *hdd_sta_ctx,
+				    tDot11fIEhe_cap *he_caps)
 {
 }
 #endif

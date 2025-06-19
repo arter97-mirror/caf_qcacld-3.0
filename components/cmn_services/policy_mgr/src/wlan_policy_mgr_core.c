@@ -4633,6 +4633,65 @@ policy_mgr_filter_non_acs_channels(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+void policy_mgr_promote_best_sap_channel_in_pcl(
+			struct wlan_objmgr_psoc *psoc,
+			uint8_t vdev_id, uint32_t *pcl_channels,
+			uint32_t *len)
+{
+	uint32_t tmp_freq;
+	struct wlan_objmgr_vdev *vdev;
+	enum QDF_OPMODE device_mode;
+	uint32_t *chan_list = NULL;
+	int8_t index_2ghz = -1;
+	uint8_t num_chan = 0, j, i;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    vdev_id,
+						    WLAN_LEGACY_SAP_ID);
+	if (!vdev)
+		return;
+
+	device_mode = wlan_vdev_mlme_get_opmode(vdev);
+	if (device_mode != QDF_SAP_MODE)
+		goto rel_ref;
+
+	/* retrieve the best channel list based on STA scan results */
+	wlan_get_sap_best_channel_2ghz(vdev, &chan_list, &num_chan);
+	if (!chan_list || !num_chan)
+		goto rel_ref;
+
+	/* find the first 2.4 GHz channel in the PCL */
+	for (i = 0; i < *len; i++) {
+		if (wlan_reg_is_24ghz_ch_freq(pcl_channels[i])) {
+			index_2ghz = i;
+			break;
+		}
+	}
+	/* exit if no 2.4 GHz channel is found in the PCL */
+	if (index_2ghz < 0)
+		goto rel_ref;
+
+	for (j = 0 ; j < num_chan; j++) {
+		if (!chan_list[j])
+			continue;
+		for (i = index_2ghz; i < *len; i++) {
+			/* skip non-matching or non-2.4 GHz channels */
+			if (chan_list[j] != pcl_channels[i] ||
+			    !wlan_reg_is_24ghz_ch_freq(pcl_channels[i]))
+				continue;
+			/* swap the best 2.4 GHz channel to the
+			 * front of the PCL
+			 */
+			tmp_freq = pcl_channels[index_2ghz];
+			pcl_channels[index_2ghz] = pcl_channels[i];
+			pcl_channels[i] = tmp_freq;
+			goto rel_ref;
+		}
+	}
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SAP_ID);
+}
+
 /**
  * policy_mgr_get_pref_force_scc_freq() - Get preferred force SCC
  * channel frequency
@@ -4663,7 +4722,7 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_con_mode mode;
 	QDF_STATUS status;
 	uint32_t i;
-	struct policy_mgr_pcl_list pcl, intersect_pcl;
+	struct policy_mgr_pcl_list pcl, *intersect_pcl;
 	bool allow_2ghz_only = false;
 	qdf_freq_t scc_ch_freq_on_same_mac = 0;
 	qdf_freq_t scc_ch_freq_on_diff_mac = 0;
@@ -4721,14 +4780,20 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	 * This prevents CSA of the SAP/GO to bands which were not
 	 * intended by the user during SAP start.
 	 */
-	intersect_pcl = pcl;
+	intersect_pcl = qdf_mem_malloc(sizeof(struct policy_mgr_pcl_list));
+	if (!intersect_pcl)
+		return QDF_STATUS_E_INVAL;
+
+	*intersect_pcl = pcl;
 	status = policy_mgr_filter_non_acs_channels(psoc, vdev_id,
-						    &intersect_pcl);
+						    intersect_pcl);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		/* Override the PCL list with the intersected list */
 		qdf_mem_zero(&pcl, sizeof(pcl));
-		pcl = intersect_pcl;
+		pcl = *intersect_pcl;
 	}
+
+	qdf_mem_free(intersect_pcl);
 
 	if ((acs_band == QCA_ACS_MODE_IEEE80211B ||
 	     acs_band == QCA_ACS_MODE_IEEE80211G) &&
@@ -4750,6 +4815,11 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 	 * If none of channels are available, we have to keep SAP channel
 	 * unchanged, and that may cause SAP MCC.
 	 */
+
+	policy_mgr_promote_best_sap_channel_in_pcl(psoc, vdev_id,
+						   pcl.pcl_list,
+						   &pcl.pcl_len);
+
 	for (i = 0; i < pcl.pcl_len; i++) {
 		pcl_freq = pcl.pcl_list[i];
 
@@ -5333,9 +5403,9 @@ policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	uint32_t freq;
-	uint8_t sap_vdev_id;
+	uint8_t sap_vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	enum phy_ch_width target_bw;
+	uint32_t sap_cnt;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -5345,22 +5415,27 @@ policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
 
 	policy_mgr_debug("action: %d reason: %d", next_action, reason);
 
-	policy_mgr_get_mode_specific_conn_info(psoc, &freq,
-					       &sap_vdev_id,
-					       PM_SAP_MODE);
+	sap_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
+							 sap_vdev_id,
+							 PM_SAP_MODE);
+	if (!sap_cnt) {
+		policy_mgr_err("sap count is 0!");
+		return status;
+	}
+
 	if (next_action == PM_DOWNGRADE_BW)
 		target_bw = CH_WIDTH_160MHZ;
 	else
 		target_bw = CH_WIDTH_320MHZ;
 
 	status = pm_ctx->sme_cbacks.sme_sap_update_ch_width(psoc,
-							    sap_vdev_id,
+							    sap_vdev_id[0],
 							    target_bw, reason,
 							    conc_vdev_id,
 							    request_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		policy_mgr_err("vdev %d failed to set BW to %d",
-			       sap_vdev_id, target_bw);
+			       sap_vdev_id[0], target_bw);
 
 	return status;
 }

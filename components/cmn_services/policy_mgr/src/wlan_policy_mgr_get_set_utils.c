@@ -11745,12 +11745,14 @@ bool policy_mgr_is_sta_active_connection_exists(
 
 bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
 					   uint32_t *ch_freq,
-					   bool exclude_mlo_sap_link)
+					   bool exclude_mlo_sap_link,
+					   uint8_t sap_vdev_id)
 {
 	bool status = false;
 	uint32_t conn_index = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t vdev_id;
+	uint32_t conc_ml_sap_freq = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -11758,15 +11760,23 @@ bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	if (exclude_mlo_sap_link)
+		conc_ml_sap_freq = policy_mgr_get_conc_ml_sap_link_freq(
+								psoc,
+								sap_vdev_id,
+								NULL);
 	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
 			conn_index++) {
 		vdev_id = pm_conc_connection_list[conn_index].vdev_id;
 		if (pm_conc_connection_list[conn_index].in_use &&
 		    !wlan_reg_is_dfs_for_freq(pm_ctx->pdev,
 		    pm_conc_connection_list[conn_index].freq)) {
-			if (exclude_mlo_sap_link &&
-			    policy_mgr_is_mlo_ap(psoc, vdev_id))
+			if (conc_ml_sap_freq &&
+			    conc_ml_sap_freq ==
+			    pm_conc_connection_list[conn_index].freq)
 				continue;
+
 			*ch_freq = pm_conc_connection_list[conn_index].freq;
 			status = true;
 		}
@@ -14155,6 +14165,11 @@ bool policy_mgr_any_other_vdev_on_same_mac_as_freq(
 		if (pm_conc_connection_list[conn_index].vdev_id == vdev_id)
 			continue;
 
+		if (pm_conc_connection_list[conn_index].mode == PM_NDI_MODE ||
+		    pm_conc_connection_list[conn_index].mode ==
+			PM_NAN_DISC_MODE)
+			continue;
+
 		if (policy_mgr_are_2_freq_on_same_mac(
 				psoc,
 				pm_conc_connection_list[conn_index].freq,
@@ -14904,6 +14919,74 @@ policy_mgr_allow_concurrency_sta_csa(struct wlan_objmgr_psoc *psoc,
 						     num_del);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 	return is_allowed;
+}
+
+bool
+policy_mgr_is_any_sta_dfs_ap_scc_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id)
+{
+	qdf_freq_t dfs_ch_frq = 0;
+	enum hw_mode_bandwidth ch_width;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t conn_index;
+	struct wlan_objmgr_vdev *vdev = NULL;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("Vdev[%d] is null", vdev_id);
+		return false;
+	}
+
+	/*
+	 * Skip logic for mlo sta firstly, to-do in future.
+	 * Reason: since for mlo sta share the same roaming
+	 * cfg parameters, eg 2+5, if 5GHz link is not assoc
+	 * link, then the RSO cfg cmd update for 5GHz vdev
+	 * will be blocked from cm_roam_send_rso_cmd().
+	 * please refer to CR-3098570.
+	 * So for mlo sta need additional change, not support
+	 * currently.
+	 */
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return false;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	policy_mgr_is_any_dfs_beaconing_session_present(psoc, &dfs_ch_frq,
+							&ch_width);
+	if (!dfs_ch_frq)
+		return false;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
+	     conn_index++) {
+		if (!pm_conc_connection_list[conn_index].in_use ||
+		    ((pm_conc_connection_list[conn_index].mode !=
+		      PM_STA_MODE) &&
+		     (pm_conc_connection_list[conn_index].mode !=
+		      PM_P2P_CLIENT_MODE)))
+			continue;
+
+		if (vdev_id == pm_conc_connection_list[conn_index].vdev_id &&
+		    pm_conc_connection_list[conn_index].freq == dfs_ch_frq) {
+			policymgr_nofl_debug("sta/p2p client vdev id %d scc on %d",
+					     vdev_id, dfs_ch_frq);
+			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+			return true;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return false;
 }
 
 #ifdef AUTO_PLATFORM

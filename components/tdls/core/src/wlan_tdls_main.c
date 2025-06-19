@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2196,7 +2196,6 @@ void tdls_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 			struct scan_event *event,
 			void *arg)
 {
-	enum QDF_OPMODE device_mode;
 	struct tdls_soc_priv_obj *tdls_soc;
 
 	if (!vdev || !event || !arg)
@@ -2204,8 +2203,6 @@ void tdls_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 
 	if (SCAN_EVENT_TYPE_COMPLETED != event->type)
 		return;
-
-	device_mode = wlan_vdev_mlme_get_opmode(vdev);
 
 	tdls_soc = (struct tdls_soc_priv_obj *) arg;
 	tdls_post_scan_done_msg(tdls_soc);

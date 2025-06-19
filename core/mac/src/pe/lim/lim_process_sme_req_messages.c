@@ -1161,13 +1161,6 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		/* Delete pre-auth list if any */
 		lim_delete_pre_auth_list(mac_ctx);
 
-		/*
-		 * keep the RSN/WPA IE information in PE Session Entry
-		 * later will be using this to check when received (Re)Assoc req
-		 */
-		lim_set_rs_nie_wp_aiefrom_sme_start_bss_req_message(mac_ctx,
-				&sme_start_bss_req->rsnIE, session);
-
 		if (LIM_IS_AP_ROLE(session) || LIM_IS_NDI_ROLE(session)) {
 			/* Initialize WPS PBC session link list */
 			session->pAPWPSPBCSession = NULL;
@@ -3865,10 +3858,14 @@ lim_cm_create_session(struct mac_context *mac_ctx, struct cm_vdev_join_req *req)
 	pe_session = pe_find_session_by_bssid(mac_ctx, req->entry->bssid.bytes,
 					      &session_id);
 
+	/* check if session exists for the same vdev id */
+	if (!pe_session)
+		pe_session = pe_find_session_by_vdev_id(mac_ctx, req->vdev_id);
+
 	if (pe_session) {
 		pe_err("vdev_id: %d cm_id 0x%x :pe-session(%d (vdev %d)) already exists for BSSID: "
 		       QDF_MAC_ADDR_FMT " in lim_sme_state = %X",
-		       req->vdev_id, req->cm_id, session_id,
+		       req->vdev_id, req->cm_id, pe_session->peSessionId,
 		       pe_session->vdev_id,
 		       QDF_MAC_ADDR_REF(req->entry->bssid.bytes),
 		       pe_session->limSmeState);
@@ -6732,7 +6729,6 @@ lim_update_both_eirp_psd(struct wlan_objmgr_vdev *vdev, int8_t max_tx_power,
 	struct wlan_objmgr_pdev *pdev;
 	uint16_t local_constraint = 0;
 
-
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!vdev_mlme) {
 		pe_err("vdev component object is NULL");
@@ -6773,17 +6769,15 @@ lim_update_both_eirp_psd(struct wlan_objmgr_vdev *vdev, int8_t max_tx_power,
 
 		if (vdev_mlme->reg_tpc_obj.is_power_constraint_abs) {
 			if (!local_constraint) {
+				pe_debug("ignore zero ap constraint power");
 				eirp_max_tx_power = eirp_reg_max;
 			} else {
 				eirp_max_tx_power = QDF_MIN(eirp_reg_max,
 							    local_constraint);
 			}
 		} else {
-			eirp_max_tx_power = eirp_reg_max - local_constraint;
-			if (!eirp_max_tx_power)
-				eirp_max_tx_power = eirp_reg_max;
+			eirp_max_tx_power = eirp_reg_max;
 		}
-
 
 		eirp_power =
 			vdev_mlme->reg_tpc_obj.chan_eirp_power_info[i].tx_power;
@@ -6803,7 +6797,7 @@ lim_update_both_eirp_psd(struct wlan_objmgr_vdev *vdev, int8_t max_tx_power,
 
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
-		       bool force_ap_vlp_pwr)
+		       bool force_vlp_pwr)
 {
 	bool is_psd_power = false;
 	bool is_tpe_present = false, is_6ghz_freq = false;
@@ -6859,6 +6853,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 			ap_power_type_6g = session->best_6g_power_type;
 			if (ap_power_type_6g == REG_INDOOR_ENABLED_AP)
 				skip_tpe = true;
+			if  (force_vlp_pwr)
+				ap_power_type_6g = REG_VERY_LOW_POWER_AP;
 		}
 	}
 
@@ -6916,7 +6912,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 					 is_psd_power, &reg_max,
 					 &reg_psd_pwr_max);
 				} else {
-					if (!force_ap_vlp_pwr &&
+					if (!force_vlp_pwr &&
 					    wlan_reg_decide_6ghz_power_within_bw_for_freq(
 							mac->pdev, oper_freq,
 							session->ch_width,
@@ -6932,7 +6928,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 						reg_psd_pwr_max =
 							psd_power_within_bw;
 					} else {
-						if (force_ap_vlp_pwr)
+						if (force_vlp_pwr)
 							ap_power_type_6g =
 								REG_VERY_LOW_POWER_AP;
 						else
@@ -6947,7 +6943,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 							&is_psd_power,
 							&reg_max,
 							&reg_psd_pwr_max,
-							force_ap_vlp_pwr);
+							force_vlp_pwr);
 					}
 				}
 			}
@@ -6975,19 +6971,18 @@ void lim_calculate_tpc(struct mac_context *mac,
 
 		/* max tx power calculation */
 		if (is_psd_power) {
+			pe_debug("Reg psd power: %d", reg_psd_pwr_max);
 			max_tx_power = reg_psd_pwr_max;
 		} else if (mlme_obj->reg_tpc_obj.is_power_constraint_abs) {
 			if (!local_constraint) {
-				pe_debug("ignore abs ap constraint power 0!");
+				pe_debug("Ignore zero abs ap constraint power");
 				max_tx_power = reg_max;
 			} else {
 				max_tx_power = QDF_MIN(reg_max,
 						       local_constraint);
 			}
 		} else {
-			max_tx_power = reg_max - local_constraint;
-			if (!max_tx_power)
-				max_tx_power = reg_max;
+			max_tx_power = reg_max;
 		}
 
 		/* In case TPE IE not present then set max tx power */
@@ -7779,7 +7774,7 @@ void lim_delete_all_peers(struct pe_session *session)
 	for (i = 1; i < session->dph.dphHashTable.size; i++) {
 		sta_ds = dph_get_hash_entry(mac_ctx, i,
 					    &session->dph.dphHashTable);
-		if (!sta_ds)
+		if (!sta_ds || !sta_ds->valid)
 			continue;
 		lim_mlo_notify_peer_disconn(session, sta_ds);
 		status = lim_del_sta(mac_ctx, sta_ds, false, session);
@@ -9755,9 +9750,12 @@ lim_update_bcn_with_new_ch_width(struct mac_context *mac_ctx,
 
 	session->gLimOperatingMode.present = 1;
 	session->gLimOperatingMode.chanWidth = ch_width;
+	if (session->nss)
+		session->gLimOperatingMode.rxNSS = session->nss - 1;
 
-	pe_debug("ch width %d",
-		 session->gLimOperatingMode.chanWidth);
+	pe_debug("ch width %d nss %d",
+		 session->gLimOperatingMode.chanWidth,
+		 session->gLimOperatingMode.rxNSS);
 
 	session->bw_update_include_ch_sw_ie = true;
 	status = qdf_mc_timer_start(&session->ap_ecsa_timer,
@@ -9860,6 +9858,7 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	struct scheduler_msg msg_return = {0};
 	uint8_t primary_channel;
 	struct ch_params ch_params = {0};
+	enum phy_ch_width non_eht_ch_width;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -9874,7 +9873,8 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 		goto fail;
 	}
 
-	if (session->opmode != QDF_SAP_MODE) {
+	if ((session->opmode != QDF_SAP_MODE) &&
+	    (session->opmode != QDF_P2P_GO_MODE)) {
 		pe_err("Invalid opmode %d", session->opmode);
 		goto fail;
 	}
@@ -9896,6 +9896,13 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 						ch_params.center_freq_seg0;
 	session->gLimChannelSwitch.ch_center_freq_seg1 =
 						ch_params.center_freq_seg1;
+
+	non_eht_ch_width = req->ch_width;
+	if (non_eht_ch_width >= CH_WIDTH_160MHZ &&
+	    wma_get_vht_ch_width() < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
+		non_eht_ch_width = CH_WIDTH_80MHZ;
+	}
+	session->gLimChannelSwitch.legacy_ch_width = non_eht_ch_width;
 
 	wlan_mlme_set_ap_oper_ch_width(session->vdev, req->ch_width);
 
@@ -10506,10 +10513,8 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		else
 			update_he_cap = false;
 		if (!update_he_cap) {
-			if ((session_entry->ch_width !=
-			     ch_change_req->ch_width) &&
-			    (session_entry->ch_width > CH_WIDTH_80MHZ ||
-			     ch_change_req->ch_width > CH_WIDTH_80MHZ))
+			if (session_entry->ch_width !=
+			    ch_change_req->ch_width)
 				update_he_cap = true;
 		}
 		if (update_he_cap) {

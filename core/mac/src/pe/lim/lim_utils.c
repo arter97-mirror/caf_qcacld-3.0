@@ -91,6 +91,7 @@
 #include "wlan_mlme_api.h"
 #include "wlan_tdls_api.h"
 #include "wlan_twt_cfg_ext_api.h"
+#include "wlan_dnw_api.h"
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -6158,6 +6159,44 @@ end:
 	return QDF_STATUS_E_FAILURE;
 }
 
+enum phy_ch_width
+lim_get_bw_for_mcs_set(struct mac_context *mac_ctx,
+		       struct pe_session *session,
+		       enum phy_ch_width ch_width)
+{
+	enum phy_ch_width bw, max_ch_width;
+
+	if (!session || !mac_ctx)
+		return ch_width;
+
+	bw = ch_width;
+	max_ch_width = wlan_mlme_get_max_bw();
+	/*
+	 * If the session is in STA or P2P Client mode, and the current channel
+	 * width is 80 MHz, while the maximum supported channel width is
+	 * greater than 160 MHz, then upgrade the channel width to 160 MHz in
+	 * case the AP or P2P GO also upgrades to 160 MHz.
+	 *
+	 * If the session is in SAP or P2P GO mode and a DFS No-Wait operation
+	 * is in progress, then populate the EHT MCS set based on the session's
+	 * current channel width.
+	 */
+	if ((session->opmode == QDF_STA_MODE ||
+	     session->opmode == QDF_P2P_CLIENT_MODE) &&
+	     (ch_width == CH_WIDTH_80MHZ) &&
+	     (max_ch_width >= CH_WIDTH_160MHZ)) {
+		bw = CH_WIDTH_160MHZ;
+	} else if ((session->opmode == QDF_SAP_MODE ||
+		    session->opmode == QDF_P2P_GO_MODE) &&
+		   (ch_width != session->ch_width) &&
+		   wlan_is_dnw_in_progress(mac_ctx->pdev,
+					   session->vdev_id)) {
+		bw = session->ch_width;
+	}
+
+	return bw;
+}
+
 #ifdef WLAN_FEATURE_11AX
 static
 void lim_update_ext_cap_he_params(struct mac_context *mac_ctx,
@@ -8190,7 +8229,8 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 		    (device_mode == QDF_P2P_GO_MODE &&
 		     wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id))) {
 		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_resp_cfg);
-		if (!TWT_RESP_CHECK_BIT(device_mode, twt_resp_cfg)) {
+		if (!wlan_twt_check_responder_bit(mac_ctx->psoc, vdev_id,
+						  device_mode, twt_resp_cfg)) {
 			he_cap->twt_responder = false;
 			he_cap->flex_twt_sched = false;
 		}
@@ -8296,6 +8336,7 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 	bool support_2x2 = false;
 	uint32_t self_sta_dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
 	uint16_t sap_rx_he_mcs_map_160;
+	enum phy_ch_width ch_width;
 
 	if (!IS_DOT11_MODE_HE(self_sta_dot11mode))
 		return QDF_STATUS_SUCCESS;
@@ -8310,7 +8351,9 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	pe_debug("session chan width: %d", session_entry->ch_width);
+	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry,
+					  session_entry->ch_width);
+	pe_debug("session chan width: %d", ch_width);
 	pe_debug("PEER: lt 80: rx 0x%04x tx 0x%04x, 160: rx 0x%04x tx 0x%04x, 80+80: rx 0x%04x tx 0x%04x",
 		peer_he_caps->rx_he_mcs_map_lt_80,
 		peer_he_caps->tx_he_mcs_map_lt_80,
@@ -8349,7 +8392,7 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 			mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80,
 			mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80);
 
-	if ((session_entry->ch_width == CH_WIDTH_160MHZ ||
+	if ((ch_width == CH_WIDTH_160MHZ ||
 	     lim_is_session_chwidth_320mhz(session_entry)) &&
 	     peer_he_caps->chan_width_2) {
 		lim_populate_he_mcs_per_bw(
@@ -8373,7 +8416,7 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 		rates->tx_he_mcs_map_160 = HE_MCS_ALL_DISABLED;
 		rates->rx_he_mcs_map_160 = HE_MCS_ALL_DISABLED;
 	}
-	if (session_entry->ch_width == CH_WIDTH_80P80MHZ) {
+	if (ch_width == CH_WIDTH_80P80MHZ) {
 		lim_populate_he_mcs_per_bw(
 			mac_ctx, &rates->rx_he_mcs_map_80_80,
 			&rates->tx_he_mcs_map_80_80,
@@ -8682,6 +8725,7 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry, ch_width);
 	pe_debug("bw is %d", ch_width);
 
 	switch (ch_width) {
@@ -11761,7 +11805,7 @@ enum phy_ch_width lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
 
 bool
 lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
-		  struct bss_description *bss_desc)
+		  struct bss_description *bss_desc, bool force_vlp)
 {
 	struct wlan_lmac_if_reg_tx_ops *tx_ops;
 	struct vdev_mlme_obj *mlme_obj;
@@ -11788,7 +11832,7 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
 	    session->opmode == QDF_P2P_GO_MODE)
 		mlme_obj->reg_tpc_obj.num_pwr_levels = 0;
 
-	lim_calculate_tpc(mac_ctx, session, false);
+	lim_calculate_tpc(mac_ctx, session, force_vlp);
 
 	tx_ops->set_tpc_power(mac_ctx->psoc, session->vdev_id,
 			      &mlme_obj->reg_tpc_obj);
@@ -11880,7 +11924,7 @@ lim_update_tx_power(struct mac_context *mac_ctx, struct pe_session *sap_session,
 		if (sta_session->lim_join_req)
 			bss_desc = &sta_session->lim_join_req->bssDescription;
 
-		lim_set_tpc_power(mac_ctx, sta_session, bss_desc);
+		lim_set_tpc_power(mac_ctx, sta_session, bss_desc, false);
 	} else {
 		/*
 		 * SAP and STA are in different AP power types. Therefore,
@@ -11994,7 +12038,7 @@ lim_check_conc_power_for_csa(struct mac_context *mac_ctx,
 	    (wlan_vdev_mlme_get_state(sap_session->vdev) == WLAN_VDEV_S_UP)) {
 		if (lim_is_power_change_required_for_sta(mac_ctx, sta_session,
 							 sap_session)) {
-			lim_set_tpc_power(mac_ctx, sap_session, NULL);
+			lim_set_tpc_power(mac_ctx, sap_session, NULL, false);
 			if (lim_update_tx_power(mac_ctx, sap_session,
 						sta_session, false) ==
 							QDF_STATUS_SUCCESS)
@@ -12075,7 +12119,7 @@ set_tpc:
 	if (session->lim_join_req)
 		bss_desc = &session->lim_join_req->bssDescription;
 
-	lim_set_tpc_power(mac_ctx, session, bss_desc);
+	lim_set_tpc_power(mac_ctx, session, bss_desc, false);
 }
 
 /**
@@ -12092,7 +12136,7 @@ lim_recompute_sta_cli_tpc(struct mac_context *mac,
 	enum reg_6g_ap_type power_type_6g;
 	QDF_STATUS status;
 
-	if (wlan_is_tdls_session_present(session->vdev))
+	if (QDF_IS_STATUS_SUCCESS(wlan_is_tdls_session_present(session->vdev)))
 		wlan_tdls_recompute_offchannel_mode(mac->psoc,
 						    session->vdev);
 
@@ -12120,7 +12164,7 @@ lim_recompute_sta_cli_tpc(struct mac_context *mac,
 
 	mlme_set_best_6g_power_type(session->vdev, power_type_6g);
 	session->best_6g_power_type = power_type_6g;
-	lim_set_tpc_power(mac, session, NULL);
+	lim_set_tpc_power(mac, session, NULL, false);
 }
 
 /**
@@ -12148,7 +12192,7 @@ lim_recompute_sap_go_tpc_bcn(struct mac_context *mac,
 		return;
 	}
 
-	lim_set_tpc_power(mac, session, NULL);
+	lim_set_tpc_power(mac, session, NULL, false);
 }
 
 void

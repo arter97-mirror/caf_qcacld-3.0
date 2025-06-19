@@ -403,13 +403,17 @@ ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_twt_resp_check_bit() - check TWT responder INI bit for provided mode.
+ *
+ * @psoc: Pointer to psoc object
+ * @vdev_id: VDEV ID
  * @mode: device mode
  * @twt_resp_cfg: TWT responder INI parameter
  *
  * Return: true if TWT responder INI bit is set for provided device mode,
  * otherwise false
  */
-bool ucfg_twt_resp_check_bit(enum QDF_OPMODE mode, uint8_t twt_resp_cfg);
+bool ucfg_twt_resp_check_bit(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			     enum QDF_OPMODE mode, uint8_t twt_resp_cfg);
 
 /**
  * ucfg_twt_send_responder_disable_per_vdev() - This API is wrapper for
@@ -581,7 +585,8 @@ ucfg_twt_reset_requestor_enable_cmd_in_progress(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline bool
-ucfg_twt_resp_check_bit(enum QDF_OPMODE mode, uint8_t twt_resp_cfg)
+ucfg_twt_resp_check_bit(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			enum QDF_OPMODE mode, uint8_t twt_resp_cfg)
 {
 	return false;
 }

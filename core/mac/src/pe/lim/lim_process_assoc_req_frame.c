@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -47,6 +47,7 @@
 #include "lim_mlo.h"
 #include "lim_process_fils.h"
 #include <son_api.h>
+#include "wlan_dnw_api.h"
 
 /**
  * lim_convert_supported_channels - Parses channel support IE
@@ -1062,7 +1063,7 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 				 tpSirAssocReq assoc_req, bool *pmf_connection,
 				 enum ani_akm_type *akm_type)
 {
-	uint32_t ret;
+	uint32_t ret, akm;
 	tDot11fIEWPA dot11f_ie_wpa = {0};
 	tDot11fIERSN dot11f_ie_rsn = {0};
 	enum wlan_status_code status = STATUS_SUCCESS;
@@ -1203,8 +1204,9 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 		*akm_type = lim_translate_rsn_oui_to_akm_type(
 						  dot11f_ie_wpa.auth_suites[0]);
 	} else {
-		if ((session->gStartBssRSNIe.present ||
-		    session->gStartBssWPAIe.present) &&
+		akm = wlan_crypto_get_param(session->vdev,
+					    WLAN_CRYPTO_PARAM_KEY_MGMT);
+		if (akm && !(akm & (1 << WLAN_CRYPTO_KEY_MGMT_NONE)) &&
 		    session->opmode == QDF_SAP_MODE) {
 			pe_warn("STA does not support RSN and WPA!");
 			lim_send_assoc_rsp_mgmt_frame(
@@ -1788,6 +1790,9 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 
 				sta_ds->ch_width = QDF_MIN(sta_ds->ch_width,
 							   session->ch_width);
+				sta_ds->ch_width = wlan_dnw_update_bandwidth(
+							session->vdev,
+							sta_ds->ch_width);
 			}
 		} else {
 			sta_ds->htSupportedChannelWidthSet = 0;
@@ -1905,8 +1910,8 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 
 		sta_ds->vhtSupportedRxNss = NSS_1x1_MODE;
 		for (idx = WLAN_MAX_VDEV_NSS; idx >= NSS_2x2_MODE; idx--) {
-			if (!VHT_IS_NSS_DISABLED(sta_ds->supportedRates.vhtTxMCSMap,
-						 idx)) {
+			if (VHT_MCS_IS_NSS_ENABLED(sta_ds->supportedRates.vhtTxMCSMap,
+						   idx)) {
 				sta_ds->vhtSupportedRxNss = idx;
 				break;
 			}

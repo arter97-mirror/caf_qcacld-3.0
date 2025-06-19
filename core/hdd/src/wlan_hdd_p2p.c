@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -57,6 +57,8 @@
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "os_if_dp_local_pkt_capture.h"
+#include "wlan_twt_ucfg_ext_cfg.h"
+#include "wlan_twt_ucfg_ext_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -1650,6 +1652,50 @@ void hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 	osif_vdev_sync_op_stop(vdev_sync);
 }
 
+#ifdef FEATURE_WLAN_SUPPORT_USD
+/**
+ * wlan_hdd_p2p_is_wfd_r2_twt_enable() - This function checks TWT enable for
+ * WFD R2 mode or not
+ * @adapter: pointer to adapter
+ * @psoc: pointer to PSOC object
+ * @vdev_id: VDEV ID
+ *
+ * Return: true if P2P is in WFD R2 mode and TWT is enable otherwise false
+ */
+static bool wlan_hdd_p2p_is_wfd_r2_twt_enable(struct hdd_adapter *adapter,
+					      struct wlan_objmgr_psoc *psoc,
+					      uint8_t vdev_id)
+{
+	if (!wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
+		return false;
+
+	if (adapter->device_mode == QDF_P2P_GO_MODE) {
+		uint8_t twt_resp_cfg;
+
+		ucfg_twt_cfg_get_responder(psoc, &twt_resp_cfg);
+		if (!ucfg_twt_resp_check_bit(psoc, vdev_id, QDF_P2P_GO_MODE,
+					     twt_resp_cfg))
+			return false;
+	} else if (adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+		bool twt_req;
+
+		hdd_get_twt_requestor(psoc, &twt_req);
+		if (!twt_req)
+			return false;
+	}
+
+	return true;
+}
+#else
+static inline bool
+wlan_hdd_p2p_is_wfd_r2_twt_enable(struct hdd_adapter *adapter,
+				  struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id)
+{
+	return false;
+}
+#endif
+
 int wlan_hdd_set_power_save(struct hdd_adapter *adapter,
 	struct p2p_ps_config *ps_config)
 {
@@ -1667,6 +1713,12 @@ int wlan_hdd_set_power_save(struct hdd_adapter *adapter,
 	psoc = hdd_ctx->psoc;
 	if (!psoc) {
 		hdd_err("psoc is null");
+		return -EINVAL;
+	}
+
+	if (wlan_hdd_p2p_is_wfd_r2_twt_enable(adapter, psoc,
+					      ps_config->vdev_id)) {
+		hdd_debug("WFD R2 mode, reject NOA cmd");
 		return -EINVAL;
 	}
 

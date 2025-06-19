@@ -309,8 +309,6 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	}
 
 	if (!is_link_switch) {
-		hdd_wmm_adapter_clear(adapter);
-
 		/* Clear saved connection information in HDD */
 		hdd_conn_remove_connect_info(sta_ctx);
 
@@ -320,10 +318,12 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		 * valid link_info for the given adapter. So avoid this reset
 		 * for Link Switch disconnect/internal disconnect
 		 */
-		if (source != CM_MLO_ROAM_INTERNAL_DISCONNECT)
+		if (source != CM_MLO_ROAM_INTERNAL_DISCONNECT) {
+			hdd_wmm_adapter_clear(adapter);
 			hdd_adapter_reset_station_ctx(adapter);
-		else
+		} else {
 			hdd_cm_clear_ieee_link_id(link_info, false);
+		}
 	}
 
 	ucfg_dp_remove_conn_info(vdev);
@@ -362,6 +362,8 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	 * connection.
 	 */
 	ucfg_clear_user_disabled_roaming(hdd_ctx->psoc, link_info->vdev_id);
+	/* Clear Extended MLD capability support flag of current connection */
+	wlan_mlme_set_ext_mld_cap_supp(hdd_ctx->psoc, false);
 }
 
 #ifdef WLAN_FEATURE_MSCS
@@ -495,7 +497,7 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 
 	wlan_connectivity_disconnect_event(vdev, rsp->req.req.bssid.bytes,
 					   rsp->req.req.reason_code,
-					   link_info->rssi,
+					   link_info->rssi_on_disconnect,
 					   is_locally_generated);
 
 	hdd_handle_disassociation_event(link_info, &rsp->req.req.bssid);
@@ -679,6 +681,8 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv)
 		return;
+
+	wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	if (!des_chan)

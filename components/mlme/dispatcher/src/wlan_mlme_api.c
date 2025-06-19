@@ -1399,7 +1399,7 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	bool eht_capab;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 
-	if (!mlme_obj)
+	if (!mlme_obj || !mac_ctx)
 		return QDF_STATUS_E_FAILURE;
 
 	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
@@ -1948,6 +1948,33 @@ bool wlan_mlme_get_sta_same_link_mld_addr(struct wlan_objmgr_psoc *psoc)
 		return false;
 
 	return mlme_obj->cfg.sta.mlo_same_link_mld_address;
+}
+
+QDF_STATUS
+wlan_mlme_set_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc,
+			       bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.sta.ext_mld_cap_supp = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool
+wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.sta.ext_mld_cap_supp;
 }
 #endif
 
@@ -4894,6 +4921,23 @@ wlan_mlme_get_indoor_support_for_nan(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*value = mlme_obj->cfg.reg.enable_nan_on_indoor_channels;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_support_for_nan_dfs_channel(struct wlan_objmgr_psoc *psoc,
+					  bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*value = mlme_obj->cfg.reg.enable_nan_on_dfs_channels;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -9278,6 +9322,16 @@ void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
 	cfg_params->roam_score_delta =
 			cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
+	mlme_obj->cfg.roam_scoring.min_roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA);
+	mlme_obj->cfg.roam_scoring.aggre_min_roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA);
+	cfg_params->min_roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA);
+	mlme_obj->cfg.lfr.reconnect_disallow_period =
+			DEFAULT_RECONNECT_DISALLOW_PERIOD;
+	cfg_params->reconnect_disallow_period =
+			DEFAULT_RECONNECT_DISALLOW_PERIOD;
 }
 #else
 void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,

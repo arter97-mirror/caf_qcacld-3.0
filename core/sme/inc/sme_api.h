@@ -5200,4 +5200,37 @@ QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
 QDF_STATUS sme_set_roam_cfg_rt_params_enabled(mac_handle_t mac_handle,
 					      uint8_t vdev_id,
 					      bool roam_cfg_rt_params_enabled);
+
+/**
+ * sme_set_min_roam_score_delta_value() - Send min roam score delta value to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @min_roam_score_delta: min roam score delta value in percentage
+ *
+ * Updated min roam score delta in roam info and a roam_offload_scan request.
+ *
+ * Return: QDF_STATUS
+ *
+ */
+QDF_STATUS sme_set_min_roam_score_delta_value(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      uint32_t min_roam_score_delta);
+
+/**
+ * sme_set_reconnect_disallow_period_value() - Send reconnect_disallow period
+ * value to SME.
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @reconnect_disallow_period: reconnect disallow period value
+ * in seconds.
+ *
+ * Updated reconnect disallow period in roam info and roam_offload_scan
+ * request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_set_reconnect_disallow_period_value(mac_handle_t mac_handle,
+					uint8_t vdev_id,
+					uint32_t reconnect_disallow_period);
 #endif /* #if !defined( __SME_API_H ) */

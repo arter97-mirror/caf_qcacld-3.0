@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -54,6 +54,24 @@ uint32_t ucfg_pmo_get_apf_instruction_size(struct wlan_objmgr_psoc *psoc)
 		return 0;
 
 	return pmo_get_apf_instruction_size(psoc);
+}
+
+uint32_t ucfg_pmo_get_apf_mode(struct wlan_objmgr_psoc *psoc)
+{
+	if (!psoc)
+		return 0;
+
+	return pmo_get_apf_mode(psoc);
+}
+
+QDF_STATUS ucfg_pmo_set_apf_mode(struct wlan_objmgr_psoc *psoc,
+				 uint32_t apf_mode,
+				 uint32_t vdev_id)
+{
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	return pmo_set_apf_mode(psoc, apf_mode, vdev_id);
 }
 
 uint8_t ucfg_pmo_get_num_wow_filters(struct wlan_objmgr_psoc *psoc)
@@ -734,15 +752,12 @@ uint32_t ucfg_pmo_get_apfv6_offload_bitmap(struct wlan_objmgr_psoc *psoc)
 {
 	return pmo_get_apfv6_offload_bitmap(psoc);
 }
-#endif
 
-bool
-ucfg_pmo_is_ssdp_enabled(struct wlan_objmgr_psoc *psoc)
+bool ucfg_pmo_is_apf_mode_enabled(struct wlan_objmgr_psoc *psoc)
 {
-	struct pmo_psoc_priv_obj *pmo_psoc_ctx = pmo_psoc_get_priv(psoc);
-
-	return pmo_psoc_ctx->psoc_cfg.ssdp;
+	return pmo_is_apf_mode_enabled(psoc);
 }
+#endif
 
 #ifdef FEATURE_RUNTIME_PM
 uint32_t

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -470,6 +470,17 @@ end:
 bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 {
 	bool nan_allowed = true;
+	bool enable_nan_on_dfs_channels = false;
+	wmi_unified_t wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_pdev(pdev);
+	if (!wmi_handle) {
+		nan_err("Invalid WMI handle");
+		return false;
+	}
+
+	wlan_mlme_get_support_for_nan_dfs_channel(wlan_pdev_get_psoc(pdev),
+						  &enable_nan_on_dfs_channels);
 
 	/* Check for 6GHz channels */
 	if (wlan_reg_is_6ghz_chan_freq(freq)) {
@@ -483,7 +494,12 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 						       QDF_NAN_DISC_MODE,
 						       &nan_allowed);
 	if (wlan_reg_is_dfs_for_freq(pdev, freq)) {
-		return false;
+		if (enable_nan_on_dfs_channels &&
+		    wmi_service_enabled(wmi_handle,
+					wmi_service_ndp_dfs_channel_support)) {
+			return true;
+		} else
+			return false;
 	} else if (wlan_reg_is_freq_indoor(pdev, freq)) {
 		wlan_mlme_get_indoor_support_for_nan(wlan_pdev_get_psoc(pdev),
 						     &nan_allowed);

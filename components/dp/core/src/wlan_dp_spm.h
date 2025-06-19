@@ -82,6 +82,7 @@ struct wlan_dp_spm_flow_tbl_stats {
  * @rcu: internal rcu lock for the structure
  * @id: Flow ID
  * @is_populated: Is flow valid
+ * @is_reserved: Is flow already reserved
  * @info: Flow details
  * @is_ipv4: Is flow IPV4
  * @guid: Global unique identifier
@@ -100,6 +101,7 @@ struct wlan_dp_spm_flow_tbl_stats {
  * @classified: Classification done
  * @reserved: unused
  * @flow_tuple_hash: flow_tuple_hash to identify bi-directional flow
+ * @inactivity_timeout: inactivity timeout to be tested for STC interested flows
  * @ul_tid: Uplink TID id for the flow
  */
 struct wlan_dp_spm_flow_info {
@@ -107,7 +109,8 @@ struct wlan_dp_spm_flow_info {
 	struct qdf_ht_entry hnode;
 	qdf_rcu_head_t rcu;
 	uint16_t id;
-	bool is_populated;
+	uint8_t is_populated;
+	uint8_t is_reserved;
 	struct flow_info info;
 	bool is_ipv4;
 	uint32_t guid;
@@ -126,6 +129,7 @@ struct wlan_dp_spm_flow_info {
 	uint8_t selected_to_sample;
 	uint8_t classified;
 	uint64_t flow_tuple_hash;
+	uint64_t inactivity_timeout;
 	uint8_t ul_tid;
 #endif
 };

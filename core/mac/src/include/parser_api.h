@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -61,8 +61,8 @@
 		     VHT_NUM_BITS_PER_NSS, (_mcs))
 #define VHT_CLEAR_MCS_FOR_NSS(_mcsmap, _nss) \
 	VHT_SET_MCS_FOR_NSS((_mcsmap), VHT_MCS_DISABLE, (_nss))
-#define VHT_IS_NSS_DISABLED(_mcsmap, _nss) \
-	(VHT_GET_MCS_FOR_NSS((_mcsmap), (_nss)) == VHT_MCS_DISABLE)
+#define VHT_MCS_IS_NSS_ENABLED(_mcs, _nss) \
+	(VHT_GET_MCS_FOR_NSS((_mcs), (_nss)) != VHT_MCS_DISABLE)
 #define VHT_DISABLE_ALL_MCS_NSS 0xFFFF
 #define VHT_DISABLE_MCS_OVER_NSS(_nss) \
 	(VHT_DISABLE_ALL_MCS_NSS ^ (BIT((_nss) * VHT_NUM_BITS_PER_NSS) - 1))

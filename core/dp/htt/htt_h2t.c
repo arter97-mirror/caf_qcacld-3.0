@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -629,7 +629,7 @@ htt_h2t_rx_ring_cfg_msg_hl(struct htt_pdev_t *pdev)
 
 	pkt = htt_htc_pkt_alloc(pdev);
 	if (!pkt)
-		return A_ERROR; /* failure */
+		return QDF_STATUS_E_NOMEM; /* failure */
 
 	/*
 	 * show that this is not a tx frame download
@@ -645,7 +645,7 @@ htt_h2t_rx_ring_cfg_msg_hl(struct htt_pdev_t *pdev)
 		HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, true);
 	if (!msg) {
 		htt_htc_pkt_free(pdev, pkt);
-		return A_ERROR; /* failure */
+		return QDF_STATUS_E_NOMEM; /* failure */
 	}
 	/*
 	 * Set the length of the message.

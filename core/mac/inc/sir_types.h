@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2016,2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -87,5 +87,9 @@ typedef struct opaque_hdd_handle *hdd_handle_t;
 #define NSS_2x2_MODE 2
 #define NSS_3x3_MODE 3
 #define NSS_4x4_MODE 4
+#define NSS_5x5_MODE 5
+#define NSS_6x6_MODE 6
+#define NSS_7x7_MODE 7
+#define NSS_8x8_MODE 8
 
 #endif /* __SIR_TYPES_H */

@@ -5533,6 +5533,7 @@ sched_disable:
 	 */
 	dispatcher_disable();
 	hdd_destroy_sysfs_files();
+	hdd_tx_powerboost_deinit(hdd_ctx);
 	cds_post_disable();
 unregister_notifiers:
 	hdd_unregister_notifiers(hdd_ctx);
@@ -7916,10 +7917,11 @@ bool hdd_is_vdev_in_conn_state(struct wlan_hdd_link_info *link_info)
 	}
 }
 
-#define MAX_VDEV_RTT_PARAMS 2
+#define MAX_VDEV_RTT_PARAMS 3
 /* params being sent:
  * wmi_vdev_param_enable_disable_rtt_responder_role
  * wmi_vdev_param_enable_disable_rtt_initiator_role
+ * wmi_vdev_param_enable_disable_rtt_bw_downgrade
  */
 QDF_STATUS
 hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
@@ -7932,6 +7934,7 @@ hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
 	uint8_t index = 0;
 	WMI_FW_SUB_FEAT_CAPS wmi_fw_rtt_respr, wmi_fw_rtt_initr;
 	uint32_t responder_bits = 0, initiator_bits = 0, rsta_11az_support;
+	bool enable_rtt_bw_downgrade;
 
 	switch (wlan_vdev_mlme_get_opmode(vdev)) {
 	case QDF_STA_MODE:
@@ -7979,6 +7982,19 @@ hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
 			MAX_VDEV_RTT_PARAMS);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+
+	hdd_debug("vdev: %d initiator: %d responder: %d",
+		  wlan_vdev_get_id(vdev), initiator_bits, responder_bits);
+
+	ucfg_mlme_is_rtt_bw_downgrade_enabled(psoc, &enable_rtt_bw_downgrade);
+	hdd_debug("vdev: %d enable dynamic downgrade RTT packet bandwidth: %d",
+		  wlan_vdev_get_id(vdev), enable_rtt_bw_downgrade);
+
+	status = mlme_check_index_setparam(
+			vdevsetparam,
+			wmi_vdev_param_enable_disable_rtt_bw_downgrade,
+			enable_rtt_bw_downgrade, index++,
+			MAX_VDEV_RTT_PARAMS);
 
 	status = sme_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
 						     vdev_id, vdevsetparam,
@@ -8552,6 +8568,7 @@ static char *net_dev_ref_debug_string_from_id(wlan_net_dev_ref_dbgid dbgid)
 		"NET_DEV_HOLD_ALLOW_NEW_INTF",
 		"NET_DEV_HOLD_GET_STA_CONNECTIONS",
 		"NET_DEV_HOLD_LOCAL_PKT_CAPTURE",
+		"NET_DEV_HOLD_SYSFS_APFMODE_STORE",
 		"NET_DEV_HOLD_ID_MAX"};
 	int32_t num_dbg_strings = QDF_ARRAY_SIZE(strings);
 
@@ -11324,6 +11341,12 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter)
 			return -EINVAL;
 		}
 
+		if (ucfg_scan_get_pdev_status(hdd_ctx->pdev) !=
+		    SCAN_NOT_IN_PROGRESS)
+			wlan_abort_scan(hdd_ctx->pdev,
+					wlan_objmgr_pdev_get_pdev_id(hdd_ctx->pdev),
+					INVAL_VDEV_ID, INVAL_SCAN_ID, true);
+
 		status =
 		  qdf_event_reset(&adapter->qdf_monitor_mode_vdev_up_event);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -12382,6 +12405,29 @@ out:
 }
 
 #ifdef SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+
+#ifdef AUTO_PLATFORM
+static bool
+hdd_shutdown_wlan_is_applicable(struct hdd_context *hdd_ctx, unsigned long evt)
+{
+	enum pmo_suspend_mode mode;
+
+	if (evt == PM_HIBERNATION_PREPARE)
+		return true;
+
+	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
+	hdd_debug("suspend mode is %d", mode);
+
+	if (mode == PMO_SUSPEND_SHUTDOWN)
+		return true;
+
+	if (mode == PMO_SUSPEND_WOW && !hdd_is_any_interface_open(hdd_ctx))
+		return true;
+
+	return false;
+}
+
+#else
 static bool
 hdd_shutdown_wlan_is_applicable(struct hdd_context *hdd_ctx, unsigned long evt)
 {
@@ -12405,6 +12451,7 @@ hdd_shutdown_wlan_is_applicable(struct hdd_context *hdd_ctx, unsigned long evt)
 
 	return false;
 }
+#endif
 
 static QDF_STATUS
 hdd_shutdown_wlan_in_suspend_prepare(struct hdd_context *hdd_ctx,
@@ -15146,6 +15193,9 @@ static void hdd_set_trace_level_for_each(struct hdd_context *hdd_ctx)
 	uint32_t bitmask;
 	uint32_t i;
 
+	/* gHostModuleLoglevel has a higher priority than enable_mtrace */
+	hdd_set_mtrace_for_each(hdd_ctx);
+
 	qdf_uint8_array_parse(cfg_get(hdd_ctx->psoc,
 				      CFG_ENABLE_HOST_MODULE_LOG_LEVEL),
 			      host_module_log,
@@ -15159,8 +15209,6 @@ static void hdd_set_trace_level_for_each(struct hdd_context *hdd_ctx)
 		    module_id >= QDF_MODULE_ID_MIN)
 			hdd_qdf_trace_enable(module_id, bitmask);
 	}
-
-	hdd_set_mtrace_for_each(hdd_ctx);
 }
 
 /**
@@ -21811,6 +21859,7 @@ static void hdd_create_wifi_root_obj_sysfs_files(void)
 	hdd_sysfs_create_wifi_root_obj();
 	hdd_create_wifi_feature_interface_sysfs_file();
 	hdd_create_rtpm_interface_sysfs_file();
+	hdd_create_apfmode_interface_sysfs_file();
 }
 
 int hdd_driver_load(void)
@@ -21968,6 +22017,7 @@ EXPORT_SYMBOL(hdd_driver_load);
  */
 static void hdd_distroy_wifi_root_obj_sysfs_files(void)
 {
+	hdd_destroy_apfmode_interface_sysfs_file();
 	hdd_destroy_rtpm_interface_sysfs_file();
 	hdd_destroy_wifi_feature_interface_sysfs_file();
 	hdd_sysfs_destroy_wifi_root_obj();

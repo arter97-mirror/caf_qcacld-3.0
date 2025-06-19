@@ -152,6 +152,21 @@ enum wlan_dp_stc_burst_state {
  */
 #define WLAN_DP_SAMPLING_BURST_STAT_STAGE_2_END 50
 
+#define DP_STC_IS_CLASSIFIED_KNOWN(classified_state) \
+			((classified_state) == DP_STC_CLASSIFIED_KNOWN)
+
+enum dp_stc_classified_state {
+	DP_STC_CLASSIFIED_INIT,
+	DP_STC_CLASSIFIED_UNKNOWN,
+	DP_STC_CLASSIFIED_KNOWN,
+
+	/*
+	 * Max value of classified state, based on the
+	 * size of the variable holding this state.
+	 */
+	DP_STC_CLASSIFIED_MAX = 255,
+};
+
 /**
  * enum wlan_stc_sampling_state - Sampling state
  * @WLAN_DP_SAMPLING_STATE_INIT: init state
@@ -180,8 +195,9 @@ enum wlan_stc_sampling_state {
 #define WLAN_DP_SAMPLING_CANDIDATE_VALID BIT(0)
 #define WLAN_DP_SAMPLING_CANDIDATE_TX_FLOW_VALID BIT(1)
 #define WLAN_DP_SAMPLING_CANDIDATE_RX_FLOW_VALID BIT(2)
-/* Sample this candidate for TxRx stage only */
-#define WLAN_DP_SAMPLING_CANDIDATE_ONLY_TXRX_STAGE BIT(3)
+#define WLAN_DP_SAMPLING_CANDIDATE_STAGE_1 BIT(3)
+#define WLAN_DP_SAMPLING_CANDIDATE_STAGE_2 BIT(4)
+#define WLAN_DP_SAMPLING_CANDIDATE_STAGE_3 BIT(5)
 
 enum wlan_dp_flow_dir {
 	WLAN_DP_FLOW_DIR_INVALID,
@@ -216,8 +232,10 @@ struct wlan_dp_stc_sampling_candidate {
 #define WLAN_DP_SAMPLING_FLAGS_TXRX_SAMPLES_READY BIT(2)
 #define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_1_READY BIT(3)
 #define WLAN_DP_SAMPLING_FLAGS_BURST_SAMPLES_2_READY BIT(4)
-/* Sample this flow for TxRx stage only */
-#define WLAN_DP_SAMPLING_FLAGS_ONLY_TXRX_STAGE BIT(5)
+#define WLAN_DP_SAMPLING_FLAGS_STAGE_1 BIT(5)
+#define WLAN_DP_SAMPLING_FLAGS_STAGE_2 BIT(6)
+#define WLAN_DP_SAMPLING_FLAGS_STAGE_3 BIT(7)
+#define WLAN_DP_SAMPLING_FLAGS_PEER_DEL BIT(8)
 
 #define WLAN_DP_SAMPLING_FLAGS1_FLOW_REPORT_SENT BIT(0)
 #define WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT BIT(1)
@@ -638,9 +656,11 @@ enum wlan_dp_stc_classfied_flow_state {
 
 #define WLAN_DP_CLASSIFIED_FLAGS_TX_FLOW_VALID 0
 #define WLAN_DP_CLASSIFIED_FLAGS_RX_FLOW_VALID 1
+#define WLAN_DP_CLASSIFIED_FLAGS_RT_FLOW_BIT 2
 
 #define WLAN_DP_CLASSIFIED_DEL_FLAGS_TX_DEL 0
 #define WLAN_DP_CLASSIFIED_DEL_FLAGS_RX_DEL 1
+#define WLAN_DP_CLASSIFIED_DEL_FLAGS_PEER 2
 
 static inline void
 wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
@@ -654,7 +674,7 @@ wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 	if (!dp_stc)
 		return;
 
-	if (!classified)
+	if (!DP_STC_IS_CLASSIFIED_KNOWN(classified))
 		return;
 
 	c_table = dp_stc->classified_flow_table;
@@ -681,7 +701,7 @@ wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 	if (!dp_stc)
 		return;
 
-	if (!classified)
+	if (!DP_STC_IS_CLASSIFIED_KNOWN(classified))
 		return;
 
 	c_table = dp_stc->classified_flow_table;
@@ -730,6 +750,19 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 
 	if (send_fw_indication)
 		qdf_atomic_set(&peer_tc->send_fw_ind, 1);
+}
+
+static inline bool
+dp_stc_is_remove_flow_allowed(uint8_t classified, uint8_t selected_to_sample,
+			      uint64_t inactivity_timeout, uint64_t active_ts,
+			      uint64_t cur_ts)
+{
+	if ((DP_STC_IS_CLASSIFIED_KNOWN(classified) || selected_to_sample) &&
+	    cur_ts > active_ts && inactivity_timeout &&
+	    (cur_ts - active_ts < inactivity_timeout))
+		return false;
+
+	return true;
 }
 
 /**
@@ -1012,6 +1045,14 @@ static inline void
 wlan_dp_stc_populate_flow_tuple(struct flow_info *flow_tuple,
 				struct cdp_rx_flow_tuple_info *flow_tuple_info)
 {
+}
+
+static inline bool
+dp_stc_is_remove_flow_allowed(uint8_t classified, uint8_t selected_to_sample,
+			      uint64_t inactivity_timeout, uint64_t active_ts,
+			      uint64_t cur_ts)
+{
+	return true;
 }
 
 static inline void

@@ -31,19 +31,29 @@ bool wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	uint64_t cur_ts = qdf_sched_clock();
 
-	if ((flow->selected_to_sample || flow->classified) &&
-	    ((cur_ts - flow->flow_add_ts) <
-	     WLAN_DP_SPM_FLOW_CLASSIFICATION_END_NS))
+	/*
+	 * flow_entry with id=0 is an invalid entry and hence marked as
+	 * is_populated=1. This entry should never be retired.
+	 */
+	if (flow->is_reserved)
+		return false;
+
+	if (!dp_stc_is_remove_flow_allowed(flow->classified,
+					   flow->selected_to_sample,
+					   flow->inactivity_timeout,
+					   flow->active_ts,
+					   cur_ts))
 		return false;
 
 	if ((cur_ts - flow->active_ts) <
 	    WLAN_DP_SPM_FLOW_LAST_ACTIVE_NS)
 		return false;
 
-	if (((cur_ts - flow->flow_add_ts) <
-	     WLAN_DP_SPM_FLOW_LONG_LIVE_MIN_NS) ||
-	    flow->num_pkts > WLAN_DP_SPM_FLOW_AGING_PKT_CNT)
-		return false;
+	/* This is a positive condition to allow eviction */
+	if (((cur_ts - flow->flow_add_ts) >
+	     WLAN_DP_SPM_FLOW_LONG_LIVE_MIN_NS) &&
+	    flow->num_pkts < WLAN_DP_SPM_FLOW_AGING_PKT_CNT)
+		return true;
 
 	/*
 	 * If the TX flow was active within certain duration specified by
@@ -864,22 +874,27 @@ void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct wlan_dp_spm_flow_info *flow;
 	int i, count = 0;
-	uint32_t num_entries = WLAN_DP_SPM_FLOW_REC_TBL_MAX * WLAN_DP_INTF_MAX;
+	uint32_t num_entries = WLAN_DP_SPM_FLOW_REC_TBL_MAX;
 	uint8_t buf[BUF_LEN_MAX];
 
 	if (!dp_ctx->gl_flow_recs)
 		return;
 
+	dp_info("cur_ts %llu", qdf_sched_clock());
+	dp_info("Flow <id> [<tuple>] <num_pkts> <classified> <selected_to_sample> <track_flow_stats> <c_flow_id> <inactivity_timeout> <ul_tid> <active_ts> ");
 	for (i = 0; i < num_entries; i++) {
 		flow = &dp_ctx->gl_flow_recs[i];
 		if (qdf_unlikely(!flow->is_populated))
 			continue;
 
 		count++;
-		dp_info("Flow id %u pkts %llu tuple: %s",
-			i, flow->num_pkts,
-			dp_print_tuple_to_str(&flow->info, buf,
-					      BUF_LEN_MAX));
+		dp_info("Flow %u [%s] %llu %u %u %u %u %llu %u: %llu",
+			i,  dp_print_tuple_to_str(&flow->info, buf,
+						  BUF_LEN_MAX),
+			flow->num_pkts, flow->classified,
+			flow->selected_to_sample, flow->track_flow_stats,
+			flow->c_flow_id, flow->inactivity_timeout, flow->ul_tid,
+			flow->active_ts);
 	}
 
 	dp_info("Printed %d flow entries of TX AFT", count);
@@ -939,6 +954,10 @@ void wlan_dp_spm_update_tx_flow_hash(struct wlan_dp_psoc_context *dp_ctx,
 
 #define DP_SPM_FLOW_TUPLE_CHECK_NUM_PKTS 8
 #define DP_SPM_FLOW_TUPLE_CHECK_TIME_MAX (1 * QDF_NSEC_PER_SEC)
+
+/* Flow Unique ID generator */
+static uint32_t flow_guid_gen;
+
 static inline void
 dp_spm_check_n_update_flow_info(struct wlan_dp_spm_flow_info *flow,
 				qdf_nbuf_t skb, uint64_t curr_ts)
@@ -968,6 +987,8 @@ dp_spm_check_n_update_flow_info(struct wlan_dp_spm_flow_info *flow,
 			dp_print_tuple_to_str(&flow_tuple, new_tuple_str,
 					      BUF_LEN_MAX));
 		qdf_mem_copy(&flow->info, &flow_tuple, sizeof(flow->info));
+		flow->guid = flow_guid_gen++;
+		flow->num_pkts = 1;
 		flow->flow_add_ts = curr_ts;
 		wlan_dp_spm_update_tx_flow_hash(dp_ctx, flow);
 	}
@@ -1005,7 +1026,7 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 		if (flow->cookie == cookie) {
 			qdf_rcu_read_unlock_bh();
 			wlan_dp_spm_update_flow_features(dp_intf, flow, nbuf);
-			if (flow->classified &&
+			if (DP_STC_IS_CLASSIFIED_KNOWN(flow->classified) &&
 			    flow->ul_tid != WLAN_DP_STC_UL_TID_INVALID) {
 				nbuf->mark =
 				      WLAN_DP_STC_ENCRYPT_UL_TID(flow->ul_tid);
@@ -1019,9 +1040,6 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 	return QDF_STATUS_E_NOENT;
 }
 #endif
-
-/* Flow Unique ID generator */
-static uint32_t flow_guid_gen;
 
 QDF_STATUS wlan_dp_spm_intf_ctx_init(struct wlan_dp_intf *dp_intf)
 {
@@ -1097,15 +1115,17 @@ void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
 		__qdf_mem_malloc(sizeof(struct wlan_dp_spm_flow_info) *
 				 WLAN_DP_SPM_FLOW_REC_TBL_MAX,
 				 __func__, __LINE__);
-	if (!dp_ctx->gl_flow_recs)
+	if (!dp_ctx->gl_flow_recs) {
 		dp_err("Failed to SPM Tx flow table");
+		return;
+	}
 
 	qdf_list_create(&dp_ctx->o_flow_rec_freelist,
 			WLAN_DP_SPM_FLOW_REC_TBL_MAX);
 	qdf_spinlock_create(&dp_ctx->flow_list_lock);
 
-	flow_rec = &dp_ctx->gl_flow_recs[0];
 	for (i = 0; i < WLAN_DP_SPM_FLOW_REC_TBL_MAX; i++) {
+		flow_rec = &dp_ctx->gl_flow_recs[i];
 		qdf_mem_zero(flow_rec, sizeof(struct wlan_dp_spm_flow_info));
 		flow_rec->id = i;
 		/* flow_id 0 is invalid and hence do not add it to freelist.
@@ -1114,10 +1134,12 @@ void wlan_dp_spm_flow_table_attach(struct wlan_dp_psoc_context *dp_ctx)
 		 *
 		 * Global Tx flow table index will be (intf_id << 6 | idx)
 		 */
-		if (i)
-			qdf_list_insert_back(&dp_ctx->o_flow_rec_freelist,
-					     &flow_rec->node);
-		flow_rec++;
+		if (!(i & SAWFISH_FLOW_ID_MAX)) {
+			flow_rec->is_reserved = 1;
+			continue;
+		}
+		qdf_list_insert_back(&dp_ctx->o_flow_rec_freelist,
+				     &flow_rec->node);
 	}
 
 }

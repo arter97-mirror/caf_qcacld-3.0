@@ -276,6 +276,17 @@ QDF_STATUS wlan_mlme_get_max_amsdu_num(struct wlan_objmgr_psoc *psoc,
 				       uint8_t *value);
 
 /**
+ * wlan_mlme_get_support_for_nan_dfs_channel - support for NAN dfs channel
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value where channel list is present
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_support_for_nan_dfs_channel(struct wlan_objmgr_psoc *psoc,
+					  bool *value);
+
+/**
  * wlan_mlme_set_max_amsdu_num() - set the max amsdu num
  * @psoc: pointer to psoc object
  * @value: value to be set for max_amsdu_num
@@ -4722,6 +4733,23 @@ bool wlan_mlme_get_sta_same_link_mld_addr(struct wlan_objmgr_psoc *psoc);
  */
 bool wlan_mlme_is_dual_sap_sta_enabled(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_mlme_set_ext_mld_cap_supp() - Set Extended MLD capability support
+ * @psoc: pointer to psoc object
+ * @value: value of Extended MLD cap support
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc,
+					  bool value);
+
+/**
+ * wlan_mlme_get_ext_mld_cap_supp() - Check if Extended MLD capability supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool to check if Extended MLD capability is supported
+ */
+bool wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
@@ -4792,6 +4820,18 @@ wlan_mlme_is_dual_sap_sta_enabled(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
+static inline QDF_STATUS
+wlan_mlme_set_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc,
+			       bool value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool
+wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif
 
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP

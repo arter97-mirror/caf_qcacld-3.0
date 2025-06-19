@@ -403,8 +403,6 @@ enum hdd_nb_cmd_id {
 	wlan_get_vendor_ie_ptr_from_oui(WPS_OUI_TYPE, WPS_OUI_TYPE_SIZE, \
 	ie, ie_len)
 
-#define BITS_IN_A_BYTE 8
-
 #define hdd_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_HDD, params)
 #define hdd_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_HDD, params)
 #define hdd_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_HDD, params)
@@ -588,6 +586,7 @@ typedef enum {
 	NET_DEV_HOLD_GET_STA_CONNECTIONS = 64,
 	NET_DEV_HOLD_LOCAL_PKT_CAPTURE = 65,
 	NET_DEV_HOLD_SENT_FRAME_TO_USERSPACE = 66,
+	NET_DEV_HOLD_SYSFS_APFMODE_STORE = 67,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -208,6 +208,7 @@ struct peer_ml_info {
  * @vht_caps: VHT vapabalities
  * @nwType: NW Type
  * @maxTxPower: max tx power
+ * @bcn_tx_nss: Tx NSS from beacon
  * @nss: Return the number of spatial streams supported
  * @stbc_capable: stbc capable
  * @no_ptk_4_way: Do not need 4-way handshake
@@ -290,7 +291,8 @@ typedef struct {
 	tSirNwType nwType;
 	int8_t maxTxPower;
 	uint8_t nonRoamReassoc;
-	uint32_t nss;
+	uint8_t bcn_tx_nss;
+	uint8_t nss;
 #ifdef WLAN_FEATURE_11AX
 	bool he_capable;
 	tDot11fIEhe_cap he_config;

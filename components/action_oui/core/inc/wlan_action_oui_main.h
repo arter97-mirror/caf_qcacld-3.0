@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -136,6 +136,16 @@ void action_oui_psoc_enable(struct wlan_objmgr_psoc *psoc);
  */
 void action_oui_psoc_disable(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_action_oui_v2_enabled() - Check whether action oui v2 is enabled
+ * @psoc: psoc object
+ *
+ * This function will check whether action oui v2 is enabled by both target cap
+ * and ini config.
+ *
+ * Return: True if action oui v2 is enabled by both target cap and ini config.
+ */
+bool wlan_action_oui_v2_enabled(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 bool wlan_action_oui_search(struct wlan_objmgr_psoc *psoc,
@@ -169,5 +179,10 @@ void action_oui_psoc_disable(struct wlan_objmgr_psoc *psoc)
 {
 }
 
+static inline
+bool wlan_action_oui_v2_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif
 #endif /* end  of _WLAN_ACTION_OUI_MAIN_H_ */

@@ -1,6 +1,6 @@
  /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3196,12 +3196,28 @@ update_deflink:
 }
 
 QDF_STATUS
+cm_roam_delete_session_for_sl_to_ml_failure(uint8_t vdev_id)
+{
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	struct pe_session *pe_session;
+
+	if (!mac_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	pe_session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (pe_session)
+		pe_delete_session(mac_ctx, pe_session);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
-			 uint8_t vdev_id, uint16_t ie_len)
+			 uint8_t vdev_id, uint16_t ie_len,
+			 bool *new_link_session)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct pe_session *pe_session;
-	bool new_link_session = false;
 	QDF_STATUS status;
 
 	if (!wma)
@@ -3209,7 +3225,6 @@ cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
 
 	pe_session = pe_find_session_by_vdev_id(wma->mac_context, vdev_id);
 	if (!pe_session) {
-		new_link_session = true;
 		/* Legacy to MLO roaming: create new pe session */
 		status = lim_create_and_fill_link_session(wma->mac_context,
 							  vdev_id,
@@ -3220,18 +3235,14 @@ cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
 				vdev_id);
 			return status;
 		}
+		if (new_link_session)
+			*new_link_session = true;
 	}
+
 	status = wma->pe_roam_synch_cb(wma->mac_context,
 				vdev_id, sync_ind, ie_len,
 				SIR_ROAM_SYNCH_PROPAGATION);
 
-	/* delete newly added pe session in case of failure */
-	if (new_link_session && QDF_IS_STATUS_ERROR(status)) {
-		pe_session = pe_find_session_by_vdev_id(wma->mac_context,
-							vdev_id);
-		if (pe_session)
-			pe_delete_session(wma->mac_context, pe_session);
-	}
 	return status;
 }
 

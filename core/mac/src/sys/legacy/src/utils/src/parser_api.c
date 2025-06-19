@@ -69,9 +69,9 @@
 #endif
 
 #include <wlan_vdev_mgr_utils_api.h>
-#include "cfg_mlme_he_caps.h"
-#include "cfg_ucfg_api.h"
 #include <wlan_dnw_api.h>
+#include "cfg_ucfg_api.h"
+#include "wlan_action_oui_main.h"
 
 #define BW_160 160
 
@@ -8246,8 +8246,10 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 		fallthrough;
 	case QDF_SAP_MODE:
 		wlan_twt_get_responder_cfg(mac->psoc, &twt_resp_cfg);
-		twt_responder = TWT_RESP_CHECK_BIT(session->opmode,
-						   twt_resp_cfg);
+		twt_responder = wlan_twt_check_responder_bit(mac->psoc,
+							     session->vdev_id,
+							     session->opmode,
+							     twt_resp_cfg);
 		he_cap->twt_responder =
 			twt_responder && twt_get_responder_flag(mac);
 		he_cap->broadcast_twt = bcast_responder;
@@ -8285,6 +8287,7 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 {
 	uint8_t *ppet, nss;
 	uint32_t value = 0;
+	enum phy_ch_width max_ch_width;
 
 	he_cap->present = 1;
 	nss = session ? session->nss : WLAN_MAX_VDEV_NSS;
@@ -8298,6 +8301,18 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		/** TODO: String items needs attention. **/
 		qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
 		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
+		/*
+		 * If the AP or P2P GO initially starts with an 80 MHz
+		 * bandwidth and later upgrades to 160 MHz, set the HE
+		 * capabilities to reflect a 160 MHz bandwidth.
+		 */
+		if (session->opmode == QDF_STA_MODE ||
+		    session->opmode == QDF_P2P_CLIENT_MODE) {
+			max_ch_width = wlan_mlme_get_max_bw();
+			if ((ch_width == CH_WIDTH_80MHZ) &&
+			    (max_ch_width >= CH_WIDTH_160MHZ))
+				ch_width = CH_WIDTH_160MHZ;
+		}
 	}
 
 	if (he_cap->ppet_present) {
@@ -8356,9 +8371,6 @@ populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 				tDot11fIEhe_cap *he_cap,
 				struct pe_session *session)
 {
-	uint8_t *ppet;
-	uint32_t ppet_value = 0;
-
 	if (is_2g) {
 		qdf_mem_copy(he_cap, &mac_ctx->he_cap_2g, sizeof(*he_cap));
 		if (session) {
@@ -8373,23 +8385,6 @@ populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 
 	if (session)
 		populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
-
-	if (he_cap->ppet_present) {
-		ppet_value = WNI_CFG_HE_PPET_LEN;
-		if (!is_2g)
-			qdf_mem_copy(he_cap->ppet.ppe_threshold.ppe_th,
-				     mac_ctx->mlme_cfg->he_caps.he_ppet_5g,
-				     ppet_value);
-		else
-			qdf_mem_copy(he_cap->ppet.ppe_threshold.ppe_th,
-				     mac_ctx->mlme_cfg->he_caps.he_ppet_2g,
-				     ppet_value);
-		ppet = he_cap->ppet.ppe_threshold.ppe_th;
-		he_cap->ppet.ppe_threshold.num_ppe_th =
-					lim_truncate_ppet(ppet, ppet_value);
-	} else {
-		he_cap->ppet.ppe_threshold.num_ppe_th = 0;
-	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -12977,8 +12972,11 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 		fallthrough;
 	case QDF_SAP_MODE:
 		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_resp_cfg);
-		twt_responder = TWT_RESP_CHECK_BIT(pe_session->opmode,
-						   twt_resp_cfg);
+		twt_responder = wlan_twt_check_responder_bit(
+							mac_ctx->psoc,
+							pe_session->vdev_id,
+							pe_session->opmode,
+							twt_resp_cfg);
 		p_ext_cap->twt_responder_support =
 			twt_responder && twt_get_responder_flag(mac_ctx);
 		break;
@@ -14009,10 +14007,15 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	struct wlan_mlo_eml_cap eml_cap = {0};
 	uint16_t presence_bitmap = 0;
 	bool is_2g;
-	uint8_t cb_mode;
+	uint32_t value = 0;
+	uint8_t *ppet, cb_mode;
 	uint8_t *eht_cap_ie = NULL;
 	bool sta_prof_he_ie = false;
 	bool set_ext_mld_cap = false;
+	struct bss_description *bss_desc =
+			&pe_session->lim_join_req->bssDescription;
+	struct action_oui_search_attr attr = {0};
+	uint16_t ie_len;
 
 	if (!mac_ctx || !pe_session || !frm)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -14083,17 +14086,32 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 
 	pe_debug("num partner links: %d", partner_info->num_partner_links);
 
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+	attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	attr.ie_length = ie_len;
+
 	/*
-	 * Include Ext MLD caps if AP advertises it in beacons. Else, check
-	 * if connection is 3 or more links. If neither, then do not include
-	 * the Ext MLD caps in assoc request.
+	 * Include Ext MLD caps if the support is set in MLME or if the AP
+	 * advertises the caps in beacons. Else, check if connection is 3 or
+	 * more links. If so, also check for AP link reconfig operation support
+	 * in case of MTK AP. If above conditions aren't met, then do not
+	 * include Ext MLD caps in assoc request.
 	 */
-	if (pe_session->vdev->mlo_dev_ctx &&
-	    pe_session->vdev->mlo_dev_ctx->mlo_extmld_cap_advertisement) {
+	if (wlan_mlme_get_ext_mld_cap_supp(psoc)) {
+		pe_debug("ext mld capability support is set");
+		set_ext_mld_cap = true;
+	} else if (pe_session->vdev->mlo_dev_ctx &&
+		   pe_session->vdev->mlo_dev_ctx->mlo_extmld_cap_advertisement) {
 		pe_debug("AP advertises ext mld caps");
 		set_ext_mld_cap = true;
-	} else if (partner_info->num_partner_links > 1) {
-		pe_debug("STA is connecting in 3 or more links");
+	} else if ((partner_info->num_partner_links > 1) &&
+		   (!wlan_action_oui_search(psoc, &attr,
+					    ACTION_OUI_EXT_MLD_CAP_OP) ||
+		    (pe_session->vdev->mlo_dev_ctx &&
+		     pe_session->vdev->mlo_dev_ctx->link_recfg_op_support &&
+		     wlan_action_oui_search(psoc, &attr,
+					    ACTION_OUI_EXT_MLD_CAP_OP)))) {
+		pe_debug("STA is connecting with >= 3 links");
 		set_ext_mld_cap = true;
 	} else {
 		pe_debug("Do not advertise ext mld caps");
@@ -14454,7 +14472,23 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 
 		populate_dot11f_he_caps_by_band(mac_ctx, is_2g, &he_caps,
 						pe_session);
+		if (he_caps.ppet_present) {
+			value = WNI_CFG_HE_PPET_LEN;
+			if (!is_2g)
+				qdf_mem_copy(he_caps.ppet.ppe_threshold.ppe_th,
+					mac_ctx->mlme_cfg->he_caps.he_ppet_5g,
+					value);
+			else
+				qdf_mem_copy(he_caps.ppet.ppe_threshold.ppe_th,
+					mac_ctx->mlme_cfg->he_caps.he_ppet_2g,
+					value);
 
+			ppet = he_caps.ppet.ppe_threshold.ppe_th;
+			he_caps.ppet.ppe_threshold.num_ppe_th =
+				lim_truncate_ppet(ppet, value);
+		} else {
+			he_caps.ppet.ppe_threshold.num_ppe_th = 0;
+		}
 		if ((he_caps.present && frm->he_cap.present &&
 		     qdf_mem_cmp(&he_caps, &frm->he_cap, sizeof(he_caps))) ||
 		     (he_caps.present && !frm->he_cap.present)) {

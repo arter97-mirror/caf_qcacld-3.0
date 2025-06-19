@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1127,11 +1127,6 @@ dp_fisa_flow_evict_check(struct dp_fisa_rx_sw_ft *sw_ft_entry)
 {
 	uint64_t sw_timestamp = qdf_sched_clock();
 
-	if ((sw_ft_entry->selected_to_sample || sw_ft_entry->classified) &&
-	    ((sw_timestamp - sw_ft_entry->flow_init_ts) <
-	     FISA_FT_ENTRY_CLASSIFICATION_END_NS))
-		return false;
-
 	if ((sw_timestamp - sw_ft_entry->last_accessed_ts) >
 	    FISA_FT_ENTRY_LONG_LIVE_MIN_NS)
 		return true;
@@ -1227,6 +1222,8 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			sw_ft_entry->flow_tuple_hash =
 				wlan_dp_get_flow_hash(dp_ctx, &flow_tuple);
 			sw_ft_entry->flow_init_ts = qdf_sched_clock();
+			sw_ft_entry->last_accessed_ts =
+						sw_ft_entry->flow_init_ts;
 			sw_ft_entry->is_flow_tcp = elem->is_tcp_flow;
 			sw_ft_entry->is_flow_udp = elem->is_udp_flow;
 			sw_ft_entry->peer_id = elem->peer_id;
@@ -1242,16 +1239,39 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			break;
 		}
 		/* else */
+
+		/*
+		 * For packets belonging to a flow (which just got added to FISA
+		 * table), the flow_idx_valid=0, since they passed through FSE
+		 * before the HW table update.
+		 * For such packets, is_same_flow has already been checked
+		 * against entry at hashed_flow_idx before queuing the work,
+		 * but if the entry was added at skid the flow tuple check is
+		 * not done. Hence do the flow tuple check here before
+		 * consuming another entry.
+		 */
+		if (is_same_flow(&sw_ft_entry->rx_flow_tuple_info,
+				 rx_flow_tuple_info))
+			break;
+
 		/* hash collision move to the next FT entry */
 		dp_fisa_debug("Hash collision %d",
 			      fisa_hdl->hash_collision_cnt);
 		fisa_hdl->hash_collision_cnt++;
 
-		timestamp = dp_fisa_rx_get_hw_ft_timestamp(fisa_hdl,
-							   hashed_flow_idx);
-		if (timestamp < lru_ft_entry_time) {
-			lru_ft_entry_time = timestamp;
-			lru_ft_entry_idx = hashed_flow_idx;
+		if (dp_stc_is_remove_flow_allowed(
+					sw_ft_entry->classified,
+					sw_ft_entry->selected_to_sample,
+					sw_ft_entry->inactivity_timeout,
+					sw_ft_entry->last_accessed_ts,
+					qdf_sched_clock())) {
+			timestamp = dp_fisa_rx_get_hw_ft_timestamp(
+							fisa_hdl,
+							hashed_flow_idx);
+			if (timestamp < lru_ft_entry_time) {
+				lru_ft_entry_time = timestamp;
+				lru_ft_entry_idx = hashed_flow_idx;
+			}
 		}
 		skid_count++;
 		hashed_flow_idx++;
@@ -2680,6 +2700,7 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 						head_nbuf);
 		if (fisa_flow) {
 			fisa_flow->num_pkts++;
+			fisa_flow->last_accessed_ts = qdf_sched_clock();
 			wlan_dp_fisa_nbuf_mark_flow_info(fisa_flow, head_nbuf);
 			dp_fisa_update_flow_balance_stats(fisa_flow, dp_ctx);
 		}
@@ -2687,7 +2708,6 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		/* Do not FISA aggregate IPSec packets */
 		if (fisa_flow &&
 		    fisa_flow->rx_flow_tuple_info.is_exception) {
-			fisa_flow->last_accessed_ts = qdf_sched_clock();
 			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
 			goto pull_nbuf;
 		}

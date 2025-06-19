@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -520,7 +520,7 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 	char *token;
 	bool valid = true;
 	bool oui_count_exceed = false;
-	uint32_t oui_index = 0;
+	uint32_t oui_index = 0, and_oui_index = 0;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct action_oui_priv *oui_priv;
 
@@ -622,6 +622,7 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 		if (action_token != ACTION_OUI_END_TOKEN)
 			continue;
 
+		ext.and_oui_index = and_oui_index;
 		status = action_oui_extension_store(psoc_priv, oui_priv, ext);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			valid = false;
@@ -641,6 +642,21 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 			if (str1)
 				oui_count_exceed = true;
 			break;
+		}
+
+		if (psoc_priv->is_action_oui_v2_used[action_id] &&
+		    str2 && *str2 != '\0') {
+			str1 = (char *)qdf_str_left_trim(str2);
+
+			if (!qdf_mem_cmp(str1, ACTION_OUI_OPERATOR_AND, 2)) {
+				token = strsep(&str1, " ");
+				and_oui_index++;
+			} else if (!qdf_mem_cmp(str1, ACTION_OUI_OPERATOR_OR, 2)) {
+				token = strsep(&str1, " ");
+				and_oui_index = 0;
+			} else {
+				and_oui_index = 0;
+			}
 		}
 
 		/* reset the params for next action OUI parse */
@@ -781,6 +797,8 @@ QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
 	req->action_id = oui_priv->id;
 	req->no_oui_extensions = no_oui_extensions;
 	req->total_no_oui_extensions = psoc_priv->max_extensions;
+	req->is_action_oui_v2_enabled =
+		psoc_priv->is_action_oui_v2_enabled;
 
 	extension = req->extension;
 	qdf_list_peek_front(extension_list, &node);
@@ -1024,6 +1042,7 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 	QDF_STATUS qdf_status;
 	const uint8_t *oui_ptr;
 	bool wildcard_oui = false;
+	bool oui_matched = false;
 
 	oui_priv = psoc_priv->oui_priv[action_id];
 	if (!oui_priv) {
@@ -1045,7 +1064,15 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 					   struct action_oui_extension_priv,
 					   item);
 		extension = &priv_ext->extension;
+		if (oui_matched) {
+			if (!extension->and_oui_index)
+				goto found;
+		} else {
+			if (extension->and_oui_index)
+				goto next;
+		}
 
+		oui_matched = false;
 		/*
 		 * If a wildcard OUI bit is not set in the info_mask, proceed
 		 * to other checks skipping the OUI and vendor data checks
@@ -1070,6 +1097,9 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 		if (!check_for_vendor_ap_capabilities(extension, attr))
 			goto next;
 
+		oui_matched = true;
+		goto next;
+found:
 		action_oui_debug("Vendor AP/STA found for OUI");
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   extension->oui, extension->oui_length);
@@ -1078,9 +1108,11 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 next:
 		qdf_status = qdf_list_peek_next(extension_list,
 						node, &next_node);
-		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+		if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+			if (qdf_status == QDF_STATUS_E_EMPTY && oui_matched)
+				goto found;
 			break;
-
+		}
 		node = next_node;
 		next_node = NULL;
 		wildcard_oui = false;

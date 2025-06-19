@@ -1338,6 +1338,7 @@ _conditional_srcs = {
             "components/pmo/core/src/wlan_pmo_wow.c",
             "components/pmo/dispatcher/src/wlan_pmo_obj_mgmt_api.c",
             "components/pmo/dispatcher/src/wlan_pmo_tgt_arp.c",
+	    "components/pmo/dispatcher/src/wlan_pmo_tgt_apf.c",
             "components/pmo/dispatcher/src/wlan_pmo_tgt_gtk.c",
             "components/pmo/dispatcher/src/wlan_pmo_tgt_hw_filter.c",
             "components/pmo/dispatcher/src/wlan_pmo_tgt_lphb.c",
@@ -1347,6 +1348,7 @@ _conditional_srcs = {
             "components/pmo/dispatcher/src/wlan_pmo_tgt_wow.c",
             "components/pmo/dispatcher/src/wlan_pmo_ucfg_api.c",
             "components/target_if/pmo/src/target_if_pmo_arp.c",
+	    "components/target_if/pmo/src/target_if_pmo_apf.c",
             "components/target_if/pmo/src/target_if_pmo_gtk.c",
             "components/target_if/pmo/src/target_if_pmo_hw_filter.c",
             "components/target_if/pmo/src/target_if_pmo_lphb.c",
@@ -1361,6 +1363,7 @@ _conditional_srcs = {
         True: [
             "core/hdd/src/wlan_hdd_apf.c",
             "cmn/wmi/src/wmi_unified_apf_tlv.c",
+	    "core/hdd/src/wlan_hdd_sysfs_apfmode.c",
         ],
     },
     "CONFIG_QCACLD_FEATURE_BTC_CHAIN_MODE": {

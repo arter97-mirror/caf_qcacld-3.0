@@ -197,7 +197,8 @@ void hdd_nan_sr_concurrency_update(struct nan_event_params *nan_evt)
 						sta_vdev, SR_OPERATION_SUSPEND,
 						SR_REASON_CODE_CONCURRENCY);
 		}
-		if (nan_evt->evt_type == nan_event_id_disable_ind) {
+		if (nan_evt->evt_type == nan_event_id_disable_ind ||
+		    nan_evt->evt_type == nan_event_id_disable_rsp) {
 			if (conn_count > 2) {
 				status =
 				policy_mgr_get_mac_id_by_session_id(

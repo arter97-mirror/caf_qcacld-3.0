@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -328,6 +328,25 @@ ucfg_mlme_set_fine_time_meas_cap(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 
 	mlme_obj->cfg.wifi_pos_cfg.fine_time_meas_cap = fine_time_meas_cap;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_mlme_is_rtt_bw_downgrade_enabled(struct wlan_objmgr_psoc *psoc,
+				      bool *is_rtt_bw_downgrade_enabled)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*is_rtt_bw_downgrade_enabled =
+			cfg_default(CFG_ENABLE_RTT_BW_DOWNGRADE);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*is_rtt_bw_downgrade_enabled =
+		mlme_obj->cfg.wifi_pos_cfg.is_rtt_bw_downgrade_enabled;
 
 	return QDF_STATUS_SUCCESS;
 }

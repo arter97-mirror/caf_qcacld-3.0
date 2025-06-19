@@ -58,6 +58,7 @@
 #include <cfg_ucfg_api.h>
 #include <wlan_twt_ucfg_ext_api.h>
 #include "wlan_hdd_stats.h"
+#include "wlan_hdd_son.h"
 
 /* Preprocessor definitions and constants */
 #undef QCA_HDD_SAP_DUMP_SK_BUFF
@@ -813,6 +814,8 @@ hdd_softap_change_per_sta_state(struct wlan_hdd_link_info *link_info,
 	} else {
 		hdd_err("vdev is NULL");
 	}
+
+	hdd_son_deliver_peer_authorize_event(link_info, sta_mac->bytes);
 
 put_ref:
 	hdd_put_sta_info_ref(&link_info->adapter->sta_info_list,

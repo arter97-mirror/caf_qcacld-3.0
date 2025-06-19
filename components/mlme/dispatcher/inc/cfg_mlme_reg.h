@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -125,6 +125,29 @@
 	"enable_nan_indoor_channel", \
 	0, \
 	"enable/disable indoor channels for NAN")
+
+/*
+ * <ini>
+ * enable_nan_on_dfs_channels - Enable DFS channels for NAN
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to support dfs channels for NAN interface
+ * Customer can config this item to enable/disable NAN in dfs channel
+ *
+ * Related: None
+ *
+ * Supported Feature: NAN
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DFS_CHANNEL_SUPPORT_FOR_NAN CFG_INI_BOOL( \
+	"enable_nan_on_dfs_channels", \
+	0, \
+	"enable/disable dfs channel for NAN")
 
 /*
  * <ini>
@@ -524,6 +547,7 @@ enum ignore_fw_coex_info_modes {
 	CFG_AFC_REG_ALL \
 	CFG(CFG_RETAIN_NOL_ACROSS_REG_DOMAIN) \
 	CFG_SAP_AVOID_ACS_FREQ_LIST_ALL \
-	CFG_C2C_SUPPORT
+	CFG_C2C_SUPPORT \
+	CFG(CFG_DFS_CHANNEL_SUPPORT_FOR_NAN)
 
 #endif /* CFG_MLME_REG_H__ */

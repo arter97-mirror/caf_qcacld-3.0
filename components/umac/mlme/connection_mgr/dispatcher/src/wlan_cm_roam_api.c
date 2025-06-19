@@ -1720,6 +1720,12 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	case ROAM_CONFIG_RT_PARAMS_ENABLED:
 		rso_cfg->roam_cfg_rt_params_enabled = src_config->bool_value;
 		break;
+	case MIN_ROAM_SCORE_DELTA:
+		dst_cfg->min_roam_score_delta = src_config->uint_value;
+		break;
+	case RECONNECT_DISALLOW_PERIOD:
+		dst_cfg->reconnect_disallow_period = src_config->uint_value;
+		break;
 	default:
 		mlme_err("Invalid roam config requested:%d", roam_cfg_type);
 		status = QDF_STATUS_E_FAILURE;

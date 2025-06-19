@@ -1706,7 +1706,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 {
 	struct peer_assoc_params *cmd;
 	int32_t ret, max_rates, i;
-	uint8_t *rate_pos;
+	uint8_t *rate_pos, enable_mimo = WLAN_MIMO_CAP_DISABLE;
 	wmi_rate_set peer_legacy_rates, peer_ht_rates;
 	uint32_t num_peer_11b_rates = 0;
 	uint32_t num_peer_11a_rates = 0;
@@ -2009,7 +2009,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 			cmd->peer_nss = NSS_1x1_MODE;
 			for (j = WLAN_MAX_VDEV_NSS; j >= NSS_2x2_MODE;
 			     j--) {
-				if (!VHT_IS_NSS_DISABLED(cmd->tx_mcs_set, j)) {
+				if (VHT_MCS_IS_NSS_ENABLED(cmd->tx_mcs_set, j)) {
 					cmd->peer_nss = j;
 					break;
 				}
@@ -2055,9 +2055,11 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	 * Limit nss to max number of rf chain supported by target
 	 * Otherwise Fw will crash
 	 */
-	if (cmd->peer_nss > WMA_MAX_NSS) {
-		wma_err("peer Nss %d is more than supported", cmd->peer_nss);
-		cmd->peer_nss = WMA_MAX_NSS;
+	wlan_mlme_get_vht_mimo_cap(mac->psoc, &enable_mimo);
+	if (cmd->peer_nss > enable_mimo + 1) {
+		wma_err("peer Nss %d is more than supported %d",
+			cmd->peer_nss, enable_mimo + 1);
+		cmd->peer_nss = enable_mimo + 1;
 	}
 
 	wma_populate_peer_he_cap(cmd, params);
@@ -2071,6 +2073,10 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 
 	/* Till conversion is not done in WMI we need to fill fw phy mode */
 	cmd->peer_phymode = wmi_host_to_fw_phymode(phymode);
+
+	/* Send non-zero max peer tx nss to FW when this field is not filled */
+	cmd->peer_max_tx_nss =
+		params->bcn_tx_nss ? params->bcn_tx_nss : cmd->peer_nss;
 
 	/*
 	 * For STA/P2P CLI mode get the Vdev AKM.

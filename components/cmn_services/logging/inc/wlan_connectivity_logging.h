@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -770,12 +770,12 @@ struct wlan_diag_mlo_t2lm_teardown {
  */
 struct wlan_diag_mlo_link_status {
 	struct wlan_connectivity_log_diag_cmn diag_cmn;
-	uint32_t version;
-	uint32_t active_link:5;
-	uint32_t prev_active_link:5;
-	uint32_t associated_links:5;
-	uint32_t reserved:17;
-	uint32_t reason;
+	uint8_t version;
+	uint16_t active_link:5;
+	uint16_t prev_active_link:5;
+	uint16_t associated_links:5;
+	uint16_t reserved:1;
+	uint8_t reason;
 } qdf_packed;
 
 #define DIAG_NBR_RPT_VERSION 1
@@ -1664,7 +1664,7 @@ void wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
  * @token: dialog Token
  * @t2lm_status: T2LM response status code. Refer enum wlan_t2lm_resp_frm_type
  * @tx_status: TX status
- * @freq: frequency on which frame was transmitted/received
+ * @band: diag band on which frame was transmitted/received
  * @is_rx: Flag to inidcate packet being received
  * @subtype: Determine whether the evnt sent is for t2lm request
  * or t2lm response
@@ -1676,7 +1676,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type t2lm_status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      qdf_freq_t freq,
+				      enum wlan_diag_wifi_band band,
 				      bool is_rx, uint8_t subtype);
 /**
  * wlan_connectivity_t2lm_status_event() - Fill and send T2LM data
@@ -1738,7 +1738,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      qdf_freq_t freq,
+				      enum wlan_diag_wifi_band band,
 				      bool is_rx, uint8_t subtype)
 {}
 
@@ -2063,7 +2063,7 @@ wlan_connectivity_t2lm_req_resp_event(struct wlan_objmgr_vdev *vdev,
 				      uint8_t token,
 				      enum wlan_t2lm_resp_frm_type status,
 				      enum qdf_dp_tx_rx_status tx_status,
-				      qdf_freq_t freq,
+				      enum wlan_diag_wifi_band band,
 				      bool is_rx, uint8_t subtype)
 {}
 

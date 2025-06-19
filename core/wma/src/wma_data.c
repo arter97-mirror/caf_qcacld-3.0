@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2247,7 +2247,9 @@ static bool wma_is_mlo_link_agnostic(struct wlan_objmgr_vdev *vdev,
 	    subType != SIR_MAC_MGMT_AUTH &&
 	    subType != SIR_MAC_MGMT_ASSOC_RSP &&
 	    subType != SIR_MAC_MGMT_REASSOC_RSP &&
-	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE))
+	    action != (ACTION_CATEGORY_BACK << 8 | ADDBA_RESPONSE) &&
+	    action != (ACTION_CATEGORY_PUBLIC << 8 |
+		       PUB_ACTION_EXT_CHANNEL_SWITCH_ID))
 		mlo_link_agnostic = true;
 
 end:

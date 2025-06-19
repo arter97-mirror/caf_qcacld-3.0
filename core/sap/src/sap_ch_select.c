@@ -3234,7 +3234,7 @@ sap_acs_next_lower_bandwidth(enum phy_ch_width ch_width)
  * Consider 4 char for Freq, 8 for weight, 1 for space and 1 for EOS.
  */
 #define SAP_SORTED_CHANNEL_INFO_LOG_LEN 14
-static uint8_t sap_get_bw_score_multiplier(enum phy_ch_width ch_width)
+uint8_t sap_get_bw_score_multiplier(enum phy_ch_width ch_width)
 {
 	switch (ch_width) {
 	case CH_WIDTH_320MHZ:
@@ -3294,7 +3294,8 @@ static void sap_dump_sorted_list(struct sap_sel_ch_info *ch_info,
 QDF_STATUS
 sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
 		      qdf_list_t *ch_list, struct sap_sel_ch_info *ch_info,
-		      v_REGDOMAIN_t *domain, uint32_t *operating_band)
+		      v_REGDOMAIN_t *domain, uint32_t *operating_band,
+		      bool only_2g_freq)
 {
 	uint8_t country[CDS_COUNTRY_CODE_LEN + 1];
 	struct sap_context *sap_ctx;
@@ -3330,6 +3331,11 @@ sap_sort_channel_list(struct mac_context *mac_ctx, uint8_t vdev_id,
 
 	SET_ACS_BAND(op_band, sap_ctx);
 
+	/* for 2 GHz scan driver is considering bw 20 MHz only */
+	if (only_2g_freq) {
+		op_band = eCSR_DOT11_MODE_11g;
+		cur_bw = CH_WIDTH_20MHZ;
+	}
 	/* Sort the ch lst as per the computed weights, lesser weight first. */
 	sap_sort_chl_weight_all(mac_ctx, sap_ctx, ch_info, op_band,
 				reg_domain, &cur_bw);
@@ -3364,7 +3370,8 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 	mac_ctx = MAC_CONTEXT(mac_handle);
 
 	status = sap_sort_channel_list(mac_ctx, sap_ctx->vdev_id, scan_list,
-				       spect_info, &domain, &operating_band);
+				       spect_info, &domain, &operating_band,
+				       false);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sap_err("vdev %d failed to sort sap channel list",
 			sap_ctx->vdev_id);

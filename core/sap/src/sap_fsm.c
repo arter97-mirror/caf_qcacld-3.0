@@ -68,6 +68,8 @@
 #include <wlan_p2p_api.h>
 #include <wlan_cfg80211_scan.h>
 #include <wlan_dnw_api.h>
+#include "wlan_if_mgr_public_struct.h"
+#include "wlan_if_mgr_ucfg_api.h"
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -92,9 +94,9 @@
  * Static Function Declarations and Definitions
  * -------------------------------------------------------------------------*/
 #ifdef SOFTAP_CHANNEL_RANGE
-static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
-				    uint32_t **freq_list,
-				    uint8_t *num_ch);
+QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
+			     uint32_t **freq_list,
+			     uint16_t *num_ch);
 #endif
 
 /*==========================================================================
@@ -1604,7 +1606,7 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 	struct wlan_objmgr_vdev *vdev = NULL;
 	uint8_t i, j;
 	uint32_t *freq_list = NULL;
-	uint8_t num_of_channels = 0;
+	uint16_t num_of_channels = 0;
 	mac_handle_t mac_handle;
 	uint32_t con_ch_freq;
 	uint8_t vdev_id;
@@ -3682,6 +3684,7 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	tSirMacRateSet *ext_rates = &sap_ctx->sap_bss_cfg.extendedRateSet;
 	uint8_t h2e;
 	uint32_t con_ch_freq, con_vdev_id;
+	struct if_mgr_event_data evt_data = {0};
 
 	/*
 	 * check if channel is in DFS_NOL or if the channel
@@ -3819,6 +3822,13 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	sap_ctx->sap_radar_found_status = false;
 
 	sap_debug("session: %d", sap_ctx->sessionId);
+	evt_data.ap_info.ap_freq = sap_ctx->chan_freq;
+	qdf_status =
+		ucfg_if_mgr_deliver_event(sap_ctx->vdev,
+					  WLAN_IF_MGR_EV_AP_CHANNEL_SELECTED,
+					  &evt_data);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+		sap_err("Failed to inform IF_MGR for channel selection");
 
 	qdf_status = sme_start_bss(mac_handle, sap_ctx->sessionId,
 				   &sap_ctx->sap_bss_cfg);
@@ -4808,9 +4818,9 @@ void sap_dump_acs_channel(struct sap_acs_cfg *acs_cfg)
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
-				    uint32_t **freq_list,
-				    uint8_t *num_ch)
+QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
+			     uint32_t **freq_list,
+			     uint16_t *num_ch)
 {
 	uint8_t loop_count;
 	uint32_t *list;
