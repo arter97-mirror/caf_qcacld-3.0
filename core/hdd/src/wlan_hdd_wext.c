@@ -969,26 +969,6 @@
 
 /*
  * <ioctl>
- * enable_dcm - enable Dual Carrier Modulation(DCM)
- *
- * @INPUT: 0/1
- *
- * @OUTPUT: None
- *
- * This IOCTL enables/disables DCM.
- *
- * @E.g: iwpriv wlan0 enable_dcm <0/1>
- *
- * Supported Feature: STA/SAP
- *
- * Usage: Internal
- *
- * </ioctl>
- */
-#define WE_SET_DCM                            92
-
-/*
- * <ioctl>
  * range_ext - enable Range extension
  *
  * @INPUT: 0/1
@@ -4309,14 +4289,6 @@ hdd_we_set_early_rx_drift_sample(struct wlan_hdd_link_info *link_info,
 			       value);
 }
 
-static int hdd_we_set_dcm(struct wlan_hdd_link_info *link_info,
-			  int value)
-{
-	return hdd_we_set_vdev(link_info->adapter,
-			       wmi_vdev_param_he_dcm_enable,
-			       value);
-}
-
 #define MAX_VDEV_HE_RANGE_PARAMS 2
 /* params being sent:
  * wmi_vdev_param_he_range_ext
@@ -4719,7 +4691,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_CHANNEL] = hdd_we_set_channel,
 	[WE_SET_CONC_SYSTEM_PREF] = hdd_we_set_conc_system_pref,
 	[WE_SET_11AX_RATE] = hdd_we_set_11ax_rate,
-	[WE_SET_DCM] = hdd_we_set_dcm,
 	[WE_SET_RANGE_EXT] = hdd_we_set_range_ext,
 	[WE_SET_PDEV_RESET] = hdd_handle_pdev_reset,
 	[WE_SET_MODULATED_DTIM] = hdd_we_set_modulated_dtim,
@@ -9532,11 +9503,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "set_11ax_rate"},
-
-	{WE_SET_DCM,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "enable_dcm"},
 
 	{WE_SET_RANGE_EXT,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,

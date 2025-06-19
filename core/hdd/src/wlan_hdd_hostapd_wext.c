@@ -955,12 +955,6 @@ static __iw_softap_setparam(struct net_device *dev,
 		ret = hdd_set_11ax_rate(adapter, set_value,
 					&link_info->session.ap.sap_config);
 		break;
-	case QCASAP_PARAM_DCM:
-		hdd_debug("Set wmi_vdev_param_he_dcm_enable: %d", set_value);
-		ret = wma_cli_set_command(link_info->vdev_id,
-					  wmi_vdev_param_he_dcm_enable,
-					  set_value, VDEV_CMD);
-		break;
 	case QCASAP_PARAM_RANGE_EXT:
 		hdd_debug("Set wmi_vdev_param_he_range_ext: %d", set_value);
 		ret = wma_cli_set_command(link_info->vdev_id,
@@ -3057,12 +3051,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCASAP_SET_11AX_RATE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "set_11ax_rate"
-	}
-	,
-	{
-		QCASAP_PARAM_DCM,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		0, "enable_dcm"
 	}
 	,
 	{
