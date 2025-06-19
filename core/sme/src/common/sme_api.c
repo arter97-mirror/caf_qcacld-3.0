@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2772,6 +2772,86 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 	return QDF_STATUS_SUCCESS;
 }
 
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP)
+static int sme_get_tsf_header_time(struct pe_session *session)
+{
+	if (!session)
+		return 0;
+
+	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
+		return TSF_MAC_HEADER_TIME_2GHZ + TSF_PHY_HEADER_TIME_2GHZ;
+	else if (wlan_reg_is_5ghz_ch_freq(session->curr_op_freq))
+		return TSF_MAC_HEADER_TIME_5GHZ + TSF_PHY_HEADER_TIME_5GHZ;
+
+	return TSF_MAC_HEADER_TIME_6GHZ + TSF_PHY_HEADER_TIME_6GHZ;
+}
+
+/**
+ * sme_process_tsf_each_link() - Calculate tsf for each link when TSF event
+ * is received.
+ * @mac: Global MAC pointer
+ * @tsfmsg: pointer to struct stsf which contains tsf information
+ *
+ * Calculate tsf for each link for MLO SAP case when received TSF event.
+ */
+static void
+sme_process_tsf_each_link(struct mac_context *mac, struct stsf *tsfmsg)
+{
+	uint8_t vdev_id;
+	int i;
+	uint64_t host_timer, timer_delta, header_time;
+	struct pe_session *session = NULL;
+
+	if (!tsfmsg) {
+		sme_err("Empty tsf msg!");
+		return;
+	}
+
+	vdev_id = tsfmsg->vdev_id;
+	session = pe_find_session_by_vdev_id(mac, vdev_id);
+	if (!session) {
+		sme_err("No session for vdev %d", vdev_id);
+		return;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_ap(session->vdev)) {
+		sme_debug("vdev_id %d is not an MLO vdev", vdev_id);
+		return;
+	}
+
+	session->mlo_link_info.link_ie.tsf_fw = tsfmsg->tsf_low
+				+ ((uint64_t)tsfmsg->tsf_high << 32);
+	session->mlo_link_info.link_ie.qtimer_fw = tsfmsg->soc_timer_low
+				+ ((uint64_t)tsfmsg->soc_timer_high << 32);
+
+	host_timer = qdf_get_time_of_the_day_us();
+
+	for (i = 0; i < mac->lim.maxBssId; i++) {
+		struct pe_session *session_entry = &mac->lim.gpSession[i];
+
+		if (session_entry->valid &&
+		    wlan_vdev_mlme_is_mlo_ap(session_entry->vdev)) {
+			timer_delta = host_timer -
+				session_entry->mlo_link_info.link_ie.qtimer_fw;
+			header_time = sme_get_tsf_header_time(session_entry);
+			session_entry->mlo_link_info.link_ie.tsf_host =
+				session_entry->mlo_link_info.link_ie.tsf_fw
+				+ timer_delta - header_time;
+			session_entry->mlo_link_info.link_ie.tsf_valid = true;
+			sme_debug("i=%d: timer_delta=%llu, tsf_fw=%llu, tsf_host=%llu",
+				  i, timer_delta,
+				  session_entry->mlo_link_info.link_ie.tsf_fw,
+				  session_entry->mlo_link_info.link_ie.tsf_host);
+		}
+	}
+}
+#else /* WLAN_FEATURE_MULTI_LINK_SAP */
+static void
+sme_process_tsf_each_link(struct mac_context *mac, struct stsf *tsfmsg)
+{
+}
+#endif /* WLAN_FEATURE_MULTI_LINK_SAP */
+
 QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -2899,6 +2979,7 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 			mac->sme.get_tsf_cb(mac->sme.get_tsf_cxt,
 					(struct stsf *)pMsg->bodyptr);
 		}
+		sme_process_tsf_each_link(mac, (struct stsf *)pMsg->bodyptr);
 		if (pMsg->bodyptr)
 			qdf_mem_free(pMsg->bodyptr);
 		break;

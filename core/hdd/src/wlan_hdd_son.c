@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -944,6 +944,61 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * hdd_eht_phymode_to_son_phymode() - convert from wlan eht phymode to son
+ * phymode
+ * @phymode: wlan phymode
+ *
+ * Return: ieee80211 phymode
+ */
+static enum ieee80211_phymode
+hdd_eht_phymode_to_son_phymode(enum wlan_phymode phymode)
+{
+	enum ieee80211_phymode son_phymode;
+
+	switch (phymode) {
+	case WLAN_PHYMODE_11BEA_EHT20:
+		son_phymode = IEEE80211_MODE_11BEA_EHT20;
+		break;
+	case WLAN_PHYMODE_11BEG_EHT20:
+		son_phymode = IEEE80211_MODE_11BEG_EHT20;
+		break;
+	case WLAN_PHYMODE_11BEA_EHT40:
+		son_phymode = IEEE80211_MODE_11BEA_EHT40;
+		break;
+	case WLAN_PHYMODE_11BEG_EHT40PLUS:
+		son_phymode = IEEE80211_MODE_11BEG_EHT40PLUS;
+		break;
+	case WLAN_PHYMODE_11BEG_EHT40MINUS:
+		son_phymode = IEEE80211_MODE_11BEG_EHT40MINUS;
+		break;
+	case WLAN_PHYMODE_11BEG_EHT40:
+		son_phymode = IEEE80211_MODE_11BEG_EHT40;
+		break;
+	case WLAN_PHYMODE_11BEA_EHT80:
+		son_phymode = IEEE80211_MODE_11BEA_EHT80;
+		break;
+	case WLAN_PHYMODE_11BEA_EHT160:
+		son_phymode = IEEE80211_MODE_11BEA_EHT160;
+		break;
+	case WLAN_PHYMODE_11BEA_EHT320:
+		son_phymode = IEEE80211_MODE_11BEA_EHT320;
+		break;
+	default:
+		son_phymode = IEEE80211_MODE_AUTO;
+		break;
+	}
+	return son_phymode;
+}
+#else
+static inline enum ieee80211_phymode
+hdd_eht_phymode_to_son_phymode(enum wlan_phymode phymode)
+{
+	return IEEE80211_MODE_AUTO;
+}
+#endif
+
 /**
  * hdd_wlan_phymode_to_son_phymode() - get son phymode from wlan_phymode phymode
  * @phymode: wlan_phymode phymode
@@ -1040,7 +1095,7 @@ static enum ieee80211_phymode hdd_wlan_phymode_to_son_phymode(
 		son_phymode = IEEE80211_MODE_11AXA_HE80_80;
 		break;
 	default:
-		son_phymode = IEEE80211_MODE_AUTO;
+		son_phymode = hdd_eht_phymode_to_son_phymode(phymode);
 		break;
 	}
 

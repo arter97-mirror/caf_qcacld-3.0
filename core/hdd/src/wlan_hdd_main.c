@@ -13299,6 +13299,26 @@ hdd_dp_register_ipa_wds_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
 }
 #endif /* IPA_WDS_EASYMESH_FEATURE */
 
+static QDF_STATUS wlan_hdd_get_netdev_by_vdev_id(uint32_t vdev_id,
+						 struct net_device **dev)
+{
+	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("failed to get link info by vdev id %u", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*dev = link_info->adapter->dev;
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * hdd_dp_register_callbacks() - Register DP callbacks with HDD
  * @hdd_ctx: HDD context
@@ -13343,6 +13363,7 @@ static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.dp_gro_rx_legacy_get_napi = hdd_legacy_gro_get_napi;
 	cb_obj.link_monitoring_cb = wlan_hdd_link_speed_update;
 	cb_obj.dp_fils_hlp_rx = hdd_fils_hlp_rx;
+	cb_obj.dp_get_ndev_by_vdev_id = wlan_hdd_get_netdev_by_vdev_id;
 	hdd_dp_register_ipa_wds_callbacks(&cb_obj);
 	os_if_dp_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3074,6 +3074,11 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		}
 
 		hdd_green_ap_add_sta(hdd_ctx);
+
+		if (!bAuthRequired)
+			hdd_son_deliver_peer_authorize_event(link_info,
+							     event->staMac.bytes);
+
 		hdd_son_deliver_assoc_disassoc_event(adapter,
 						     event->staMac,
 						     event->status,

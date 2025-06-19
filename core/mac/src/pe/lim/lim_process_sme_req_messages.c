@@ -7479,7 +7479,7 @@ void lim_delete_all_peers(struct pe_session *session)
 	for (i = 1; i < session->dph.dphHashTable.size; i++) {
 		sta_ds = dph_get_hash_entry(mac_ctx, i,
 					    &session->dph.dphHashTable);
-		if (!sta_ds)
+		if (!sta_ds || !sta_ds->valid)
 			continue;
 		lim_mlo_notify_peer_disconn(session, sta_ds);
 		status = lim_del_sta(mac_ctx, sta_ds, false, session);

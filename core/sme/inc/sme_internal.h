@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -386,6 +386,15 @@ typedef void (*sme_get_isolation_cb)(struct sir_isolation_resp *param,
 typedef QDF_STATUS (*md_host_evt_cb)(void *hdd_ctx, struct sir_md_evt *event);
 typedef QDF_STATUS (*md_bl_evt_cb)(void *hdd_ctx, struct sir_md_bl_evt *event);
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
+
+#if defined(WLAN_FEATURE_MULTI_LINK_SAP)
+#define TSF_MAC_HEADER_TIME_2GHZ 192
+#define TSF_MAC_HEADER_TIME_5GHZ 32
+#define TSF_MAC_HEADER_TIME_6GHZ 32
+#define TSF_PHY_HEADER_TIME_2GHZ 192
+#define TSF_PHY_HEADER_TIME_5GHZ 20
+#define TSF_PHY_HEADER_TIME_6GHZ 20
+#endif /* WLAN_FEATURE_MULTI_LINK_SAP */
 
 struct sme_context {
 	eSmeState state;
