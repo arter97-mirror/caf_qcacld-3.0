@@ -1443,27 +1443,6 @@
 #define WE_GET_11N_RATE      26
 /*
  * <ioctl>
- * get_ampdu - Get the maximum subframe of ampdu
- *
- * @INPUT: None
- *
- * @OUTPUT: Maximum subframe of ampdu
- *  wlan0     get_ampdu:1
- *
- * This IOCTL gets the maximum subframe of ampdu
- * This command is useful only if setting ampdu.
- *
- * @E.g: iwpriv wlan0 get_ampdu
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_AMPDU         27
-/*
- * <ioctl>
  * get_amsdu - Get the maximum subframe of amsdu
  *
  * @INPUT: None
@@ -5230,15 +5209,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
-	case WE_GET_AMPDU:
-	{
-		hdd_debug("GET AMPDU");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     GEN_VDEV_PARAM_AMPDU,
-					     GEN_CMD);
-		break;
-	}
-
 	case WE_GET_AMSDU:
 	{
 		hdd_debug("GET AMSDU");
@@ -8972,11 +8942,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_11nrate"},
-
-	{WE_GET_AMPDU,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_ampdu"},
 
 	{WE_GET_AMSDU,
 	 0,
