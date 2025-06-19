@@ -1183,6 +1183,7 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	uint32_t lru_ft_entry_idx = 0;
 	uint32_t timestamp;
 	uint32_t reo_dest_indication;
+	uint64_t cur_ts, last_accessed_ts;
 
 	/* Get the hash from TLV
 	 * FSE FT Toeplitz hash is same Common parser hash available in TLV
@@ -1263,12 +1264,14 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			      fisa_hdl->hash_collision_cnt);
 		fisa_hdl->hash_collision_cnt++;
 
-		if (dp_stc_is_remove_flow_allowed(
+		last_accessed_ts = sw_ft_entry->last_accessed_ts;
+		cur_ts = qdf_sched_clock();
+		if (cur_ts > last_accessed_ts &&
+		    dp_stc_is_remove_flow_allowed(
 					sw_ft_entry->classified,
 					sw_ft_entry->selected_to_sample,
 					sw_ft_entry->inactivity_timeout,
-					sw_ft_entry->last_accessed_ts,
-					qdf_sched_clock())) {
+					last_accessed_ts, qdf_sched_clock())) {
 			timestamp = dp_fisa_rx_get_hw_ft_timestamp(
 							fisa_hdl,
 							hashed_flow_idx);
@@ -1288,6 +1291,7 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	 * Remove LRU flow from SW FT
 	 */
 	if ((skid_count > max_skid_length) &&
+	    lru_ft_entry_time != 0xffffffff &&
 	    wlan_dp_cfg_is_rx_fisa_lru_del_enabled(dp_cfg)) {
 		uint8_t flow_evict_success_code;
 		dp_fisa_debug("Max skid length reached flow cannot be added, evict existing flow");

@@ -29,6 +29,8 @@ static inline
 uint8_t wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 {
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	uint64_t active_ts = flow->active_ts;
+	uint64_t add_ts = flow->flow_add_ts;
 	uint64_t cur_ts = qdf_sched_clock();
 
 	/*
@@ -38,11 +40,13 @@ uint8_t wlan_dp_spm_flow_evict_check(struct wlan_dp_spm_flow_info *flow)
 	if (flow->is_reserved)
 		return DP_EVICT_DENIED;
 
+	if (cur_ts < active_ts || cur_ts < add_ts)
+		return DP_EVICT_DENIED;
+
 	if (!dp_stc_is_remove_flow_allowed(flow->classified,
 					   flow->selected_to_sample,
 					   flow->inactivity_timeout,
-					   flow->active_ts,
-					   cur_ts))
+					   active_ts, cur_ts))
 		return DP_EVICT_DENIED;
 
 	if ((cur_ts - flow->active_ts) <

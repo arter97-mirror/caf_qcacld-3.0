@@ -42,7 +42,7 @@
 /* The below values are dependent on the STC FLOW inactive threshold */
 #define DP_STC_CLASSIFIED_FLOW_RM_INACTIVE_TIME_NS (30 * QDF_NSEC_PER_SEC)
 #define DP_STC_CLASSIFIED_RT_FLOW_RM_INACTIVE_TIME_NS (7 * QDF_NSEC_PER_SEC)
-#define DP_STC_SAMPLING_FLOW_RM_INACTIVE_TIME_NS (10 * QDF_NSEC_PER_SEC)
+#define DP_STC_SAMPLING_FLOW_RM_INACTIVE_TIME_NS (30 * QDF_NSEC_PER_SEC)
 
 /*
  * Value of WLAN_DP_STC_BK_PKT_THRESH is dependent on the value of

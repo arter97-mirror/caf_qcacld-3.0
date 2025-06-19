@@ -793,9 +793,9 @@ dp_stc_is_remove_flow_allowed(uint8_t classified, uint8_t selected_to_sample,
 			      uint64_t inactivity_timeout, uint64_t active_ts,
 			      uint64_t cur_ts)
 {
+	/* Caller has to make sure cur_ts > active_ts */
 	if ((DP_STC_IS_CLASSIFIED_KNOWN(classified) || selected_to_sample) &&
-	    cur_ts > active_ts && inactivity_timeout &&
-	    (cur_ts - active_ts < inactivity_timeout))
+	    inactivity_timeout && (cur_ts - active_ts < inactivity_timeout))
 		return false;
 
 	return true;
