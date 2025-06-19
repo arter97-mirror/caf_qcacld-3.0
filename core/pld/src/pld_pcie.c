@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -99,6 +99,8 @@ static void pld_pcie_remove(struct pci_dev *pdev)
 	int errno;
 	struct osif_psoc_sync *psoc_sync = NULL;
 
+	cds_set_driver_loaded(false);
+	cds_set_unload_in_progress(true);
 	if (!cds_is_pcie_link_resume_fail()) {
 		errno = osif_psoc_sync_trans_start_wait(&pdev->dev, &psoc_sync);
 		if (errno)

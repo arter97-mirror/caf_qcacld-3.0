@@ -26,6 +26,7 @@ _target_chipset_map = {
         "kiwi-v2",
         "qca6750",
         "wcn7750",
+        "wcn7760",
     ],
     "volcano": [
         "qca6750",
@@ -44,6 +45,7 @@ _chipset_hw_map = {
     "wcn7750": "BERYLLIUM",
     "qca6490": "LITHIUM",
     "wcn6450": "RHINE",
+    "wcn7760": "BERYLLIUM",
 }
 
 _chipset_header_map = {
@@ -75,6 +77,10 @@ _chipset_header_map = {
         "api/hw/wcn6450/v1",
         "cmn/hal/wifi3.0/wcn6450",
     ],
+    "wcn7760": [
+        "api/hw/qcc2072/v1",
+        "cmn/hal/wifi3.0/qcc2072",
+    ]
 }
 
 _hw_header_map = {
@@ -774,6 +780,14 @@ _conditional_srcs = {
             "cmn/hif/src/wcn7750def.c",
         ],
     },
+
+    "CONFIG_QCC2072_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/qcc2072/hal_qcc2072.c",
+            "cmn/hif/src/qcc2072def.c",
+        ],
+    },
+
     "CONFIG_CP_STATS": {
         True: [
             "cmn/target_if/cp_stats/src/target_if_cp_stats.c",

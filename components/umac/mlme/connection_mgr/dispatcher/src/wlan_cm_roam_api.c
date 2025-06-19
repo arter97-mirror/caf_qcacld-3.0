@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -928,6 +928,10 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 	case ROAM_RSSI_DIFF_6GHZ:
 		dst_config->uint_value = src_cfg->roam_rssi_diff_6ghz;
 		break;
+	case ROAM_RSSI_DELTA_6GHZ_TO_NON_6GHZ:
+		dst_config->uint_value =
+			src_cfg->roam_rssi_delta_6ghz_to_non_6ghz;
+		break;
 	case NEIGHBOUR_LOOKUP_THRESHOLD:
 		dst_config->uint_value = src_cfg->neighbor_lookup_threshold;
 		break;
@@ -1615,6 +1619,10 @@ wlan_cm_roam_cfg_set_value(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	case ROAM_RSSI_DIFF_6GHZ:
 		dst_cfg->roam_rssi_diff_6ghz = src_config->uint_value;
 		break;
+	case ROAM_RSSI_DELTA_6GHZ_TO_NON_6GHZ:
+		dst_cfg->roam_rssi_delta_6ghz_to_non_6ghz =
+						src_config->uint_value;
+		break;
 	case NEIGHBOUR_LOOKUP_THRESHOLD:
 		dst_cfg->neighbor_lookup_threshold = src_config->uint_value;
 		fallthrough;
@@ -1850,6 +1858,8 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 		mlme_obj->cfg.lfr.roam_rssi_diff;
 	cfg_params->roam_rssi_diff_6ghz =
 		mlme_obj->cfg.lfr.roam_rssi_diff_6ghz;
+	cfg_params->roam_rssi_delta_6ghz_to_non_6ghz =
+		mlme_obj->cfg.lfr.roam_rssi_delta_6ghz_to_non_6ghz;
 	cfg_params->bg_rssi_threshold =
 		mlme_obj->cfg.lfr.bg_rssi_threshold;
 

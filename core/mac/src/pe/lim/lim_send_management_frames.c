@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -366,7 +366,8 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	populate_dot11f_eht_caps(mac_ctx, pesession, &pr->eht_cap);
 
 	/* Populate Non-AP STA Regulatory connectivity element */
-	populate_dot11f_reg_connectivity(mac_ctx, &pr->reg_connect);
+	if (IS_DOT11_MODE_HE(dot11mode))
+		populate_dot11f_reg_connectivity(mac_ctx, &pr->reg_connect);
 
 	if (addn_ielen && additional_ie) {
 		qdf_mem_zero((uint8_t *)&extracted_ext_cap,
@@ -3294,7 +3295,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	/* Populate Non-AP STA Regulatory connectivity element */
-	populate_dot11f_reg_connectivity(mac_ctx, &frm->reg_connect);
+	if (IS_DOT11_MODE_HE(pe_session->dot11mode))
+		populate_dot11f_reg_connectivity(mac_ctx, &frm->reg_connect);
 
 	if (pe_session->is11Rconnection) {
 		struct bss_description *bssdescr;
@@ -3767,12 +3769,17 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
 
-	pe_debug("extr_ext_flag %d mbo ie len %d is open auth %d stripped vendor len %d he with tkip %d ht %d vht %d opmode %d vendor vht %d he %d eht %d",
-		 extr_ext_flag, mbo_ie_len, is_open_auth, current_len,
-		 pe_session->he_with_wep_tkip,
-		 frm->HTCaps.present, frm->VHTCaps.present,
-		 frm->OperatingMode.present, frm->vendor_vht_ie.present,
-		 frm->he_cap.present, frm->eht_cap.present);
+	pe_debug("Assoc Req IEs: dot11mode %d, extcap %d, open %d, IE len:: mbo %d vendor %d, rsnx %d, mscs %d, rsn_sel %d, ft11r %d, mlo %d, eht %d, fils %d",
+		 pe_session->dot11mode, extr_ext_flag,
+		 is_open_auth, mbo_ie_len,
+		 vendor_ie_len, rsnx_ie_len,
+		 mscs_ext_ie_len,
+		 rsn_sel_ie_len,
+		 adaptive_11r_ie_len,
+		 mlo_ie_len,
+		 eht_cap_ie_len,
+		 fils_hlp_ie_len);
+
 	pe_nofl_info("Assoc req TX: vdev %d to "QDF_MAC_ADDR_FMT" seq num %d",
 		     pe_session->vdev_id, QDF_MAC_ADDR_REF(pe_session->bssId),
 		     mac_ctx->mgmtSeqNum);
