@@ -1443,27 +1443,6 @@
 #define WE_GET_11N_RATE      26
 /*
  * <ioctl>
- * get_amsdu - Get the maximum subframe of amsdu
- *
- * @INPUT: None
- *
- * @OUTPUT: Maximum subframe of amsdu
- *  wlan0     get_amsdu:1
- *
- * This IOCTL gets the maximum subframe of amsdu.
- * This command is useful only if setting amsdu
- *
- * @E.g: iwpriv wlan0 get_amsdu
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_AMSDU         28
-/*
- * <ioctl>
  * get_txpow2g - Get the current 2 GHz Tx power setting
  *
  * @INPUT: None
@@ -5209,15 +5188,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
-	case WE_GET_AMSDU:
-	{
-		hdd_debug("GET AMSDU");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     GEN_VDEV_PARAM_AMSDU,
-					     GEN_CMD);
-		break;
-	}
-
 	case WE_GET_ROAM_SYNCH_DELAY:
 	{
 		hdd_debug("GET ROAM SYNCH DELAY");
@@ -8942,11 +8912,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_11nrate"},
-
-	{WE_GET_AMSDU,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_amsdu"},
 
 	{WE_GET_TXPOW_2G,
 	 0,
