@@ -549,15 +549,6 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	}
 
-	case QCSAP_DBGLOG_VAP_DISABLE:
-	{
-		hdd_debug("QCSAP_DBGLOG_VAP_DISABLE val %d", set_value);
-		ret = wma_cli_set_command(link_info->vdev_id,
-					  WMI_DBGLOG_VAP_DISABLE,
-					  set_value, DBG_CMD);
-		break;
-	}
-
 	case QCSAP_PARAM_SET_MCC_CHANNEL_LATENCY:
 	{
 		wlan_hdd_set_mcc_latency(adapter, set_value);
@@ -2667,10 +2658,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	{
 		QCSAP_DBGLOG_VAP_ENABLE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dl_vapon"
-	}, {
-		QCSAP_DBGLOG_VAP_DISABLE,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		0, "dl_vapoff"
 	},
 #endif /* FEATURE_FW_LOG_PARSING */
 	{
