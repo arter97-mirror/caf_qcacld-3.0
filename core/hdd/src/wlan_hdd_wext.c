@@ -499,7 +499,6 @@
  */
 #define WE_SET_TXPOW_5G      30
 /* Private ioctl for firmware debug log */
-#define WE_DBGLOG_VAP_ENABLE            32
 #define WE_SET_TXRX_FWSTATS             38
 /*
  * <ioctl>
@@ -4379,14 +4378,6 @@ static int hdd_we_set_dbg(struct hdd_adapter *adapter,
 #define hdd_we_set_dbg(adapter, id, value) \
 			hdd_we_set_dbg(adapter, id, #id, value)
 
-static int hdd_we_dbglog_vap_enable(struct wlan_hdd_link_info *link_info,
-				    int value)
-{
-	return hdd_we_set_dbg(link_info->adapter,
-			      WMI_DBGLOG_VAP_ENABLE,
-			      value);
-}
-
 static int hdd_we_start_fw_profile(struct wlan_hdd_link_info *link_info,
 				   int value)
 {
@@ -4691,7 +4682,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_RX_CHAINMASK] = hdd_we_set_rx_chainmask,
 	[WE_SET_TXPOW_2G] = hdd_we_set_txpow_2g,
 	[WE_SET_TXPOW_5G] = hdd_we_set_txpow_5g,
-	[WE_DBGLOG_VAP_ENABLE] = hdd_we_dbglog_vap_enable,
 	[WE_SET_TXRX_FWSTATS] = hdd_we_set_txrx_fwstats,
 	[WE_TXRX_FWSTATS_RESET] = hdd_we_txrx_fwstats_reset,
 	[WE_DUMP_STATS] = hdd_we_dump_stats,
@@ -8802,14 +8792,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "txpow5g"},
-
-#ifdef FEATURE_FW_LOG_PARSING
-	/* Sub-cmds DBGLOG specific commands */
-	{WE_DBGLOG_VAP_ENABLE,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "dl_vapon"},
-#endif /* FEATURE_FW_LOG_PARSING */
 
 	{WE_SET_TXRX_FWSTATS,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
