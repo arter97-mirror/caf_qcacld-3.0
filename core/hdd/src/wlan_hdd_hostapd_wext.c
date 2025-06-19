@@ -560,17 +560,6 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	}
 
-	case QCSAP_PARAM_RTSCTS:
-	{
-		ret = wma_cli_set_command(link_info->vdev_id,
-					  wmi_vdev_param_enable_rtscts,
-					  set_value, VDEV_CMD);
-		if (ret) {
-			hdd_err("FAILED TO SET RTSCTS at SAP");
-			ret = -EIO;
-		}
-		break;
-	}
 	case QCASAP_SET_11N_RATE:
 	{
 		uint8_t preamble = 0, nss = 0, rix = 0;
@@ -2637,10 +2626,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCASAP_TXRX_FWSTATS_RESET,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "txrx_fw_st_rst"
-	}, {
-		QCSAP_PARAM_RTSCTS,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		0, "enablertscts"
 	}, {
 		QCASAP_SET_11N_RATE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,

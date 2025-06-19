@@ -322,25 +322,6 @@
  * </ioctl>
  */
 #define WE_SET_SHORT_GI      15
-/*
- * <ioctl>
- * enablertscts - enables or disables rts/cts.
- *
- * @INPUT: 1-Enable , 0-Disable
- *
- * @OUTPUT: None
- *
- * This IOCTL enables or disables rts/cts.
- *
- * @E.g: iwpriv wlan0 enablertscts <value>
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_SET_RTSCTS        16
 #define WE_SET_ANI_POLL_PERIOD    19
 #define WE_SET_ANI_LISTEN_PERIOD  20
 #define WE_SET_ANI_OFDM_LEVEL     21
@@ -3637,56 +3618,6 @@ int hdd_we_set_short_gi(struct wlan_hdd_link_info *link_info, int sgi)
 	return errno;
 }
 
-static int hdd_we_set_rtscts(struct wlan_hdd_link_info *link_info, int rtscts)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
-	mac_handle_t mac_handle = hdd_ctx->mac_handle;
-	uint32_t value;
-	uint32_t rts_threshold_val;
-	QDF_STATUS status;
-	int errno;
-
-	hdd_debug("RTSCTS %d", rtscts);
-
-	if (!mac_handle) {
-		hdd_err("NULL Mac handle");
-		return -EINVAL;
-	}
-
-	status = ucfg_mlme_get_rts_threshold(hdd_ctx->psoc,
-					     &rts_threshold_val);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Get rts threshold failed, status %d", status);
-		return -EINVAL;
-	}
-
-	if ((rtscts & HDD_RTSCTS_EN_MASK) == HDD_RTSCTS_ENABLE) {
-		value = rts_threshold_val;
-	} else if (((rtscts & HDD_RTSCTS_EN_MASK) == 0) ||
-		   ((rtscts & HDD_RTSCTS_EN_MASK) == HDD_CTS_ENABLE)) {
-		value = cfg_max(CFG_RTS_THRESHOLD);
-	} else {
-		hdd_err_rl("Invalid value %d", rtscts);
-		return -EINVAL;
-	}
-
-	errno = wma_cli_set_command(link_info->vdev_id,
-				    wmi_vdev_param_enable_rtscts,
-				    rtscts, VDEV_CMD);
-	if (errno) {
-		hdd_err("Failed to set firmware, errno %d", errno);
-		return errno;
-	}
-
-	status = ucfg_mlme_set_rts_threshold(hdd_ctx->psoc, value);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Set rts threshold failed, status %d", status);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 static int hdd_we_set_11n_rate(struct wlan_hdd_link_info *link_info,
 			       int rate_code)
 {
@@ -4638,7 +4569,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_TX_STBC] = hdd_set_tx_stbc,
 	[WE_SET_RX_STBC] = hdd_set_rx_stbc,
 	[WE_SET_SHORT_GI] = hdd_we_set_short_gi,
-	[WE_SET_RTSCTS] = hdd_we_set_rtscts,
 	[WE_SET_ANI_POLL_PERIOD] = hdd_we_set_ani_poll_period,
 	[WE_SET_ANI_LISTEN_PERIOD] = hdd_we_set_ani_listen_period,
 	[WE_SET_ANI_OFDM_LEVEL] = hdd_we_set_ani_ofdm_level,
@@ -8626,11 +8556,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "shortgi"},
-
-	{WE_SET_RTSCTS,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "enablertscts"},
 
 	{WE_SET_ANI_POLL_PERIOD,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
