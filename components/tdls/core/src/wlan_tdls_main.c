@@ -1128,6 +1128,12 @@ bool tdls_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 						       NULL))
 		return false;
 
+	/* Disable the TDLS in case XPAN is present */
+	if (policy_mgr_get_ll_lt_sap_freq(psoc)) {
+		tdls_debug("XPAN is present, Don't allow TDLS");
+		return false;
+	}
+
 	return true;
 }
 #endif
