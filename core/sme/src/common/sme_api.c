@@ -16271,7 +16271,7 @@ void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 }
 
 int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
-			uint8_t cfg_val, enum sme_eht_tx_bfee_cap_type cap_type,
+			uint8_t cfg_val, enum sme_eht_cap_type cap_type,
 			enum QDF_OPMODE op_mode)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
@@ -16307,6 +16307,9 @@ int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
 		break;
 	case EHT_RX_EXTRA_ETH_LTF:
 		cfg_eht_cap->max_num_eht_ltf = cfg_val;
+		break;
+	case EHT_RTWT_SUPPORT:
+		cfg_eht_cap->restricted_twt = cfg_val;
 		break;
 	default:
 		sme_debug("default: Unhandled cap type %d", cap_type);

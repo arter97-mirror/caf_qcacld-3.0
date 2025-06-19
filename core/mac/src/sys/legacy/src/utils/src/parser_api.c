@@ -10353,6 +10353,11 @@ populate_dot11f_rtwt_eht_cap(struct mac_context *mac,
 {
 	bool restricted_support = false;
 
+	if (!eht_cap->restricted_twt) {
+		pe_debug("rTWT support disabled, do not update");
+		return;
+	}
+
 	wlan_twt_get_rtwt_support(mac->psoc, &restricted_support);
 
 	pe_debug("rTWT support: %d", restricted_support);
