@@ -1240,26 +1240,6 @@
 #define WE_GET_RTSCTS        16
 /*
  * <ioctl>
- * get_chwidth - Get the current channel width setting
- *
- * @INPUT: None
- *
- * @OUTPUT: channel width
- *  wlan0     get_chwidth:0
- *
- * This IOTCL get the current channel width setting.
- *
- * @E.g: iwpriv wlan0 get_chwidth
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_CHWIDTH       17
-/*
- * <ioctl>
  * get_anienable - Get the anienable
  *
  * @INPUT: None
@@ -5096,15 +5076,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
-	case WE_GET_CHWIDTH:
-	{
-		hdd_debug("GET wmi_vdev_param_chwidth");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     wmi_vdev_param_chwidth,
-					     VDEV_CMD);
-		break;
-	}
-
 	case WE_GET_ANI_EN_DIS:
 	{
 		hdd_debug("GET wmi_pdev_param_ani_enable");
@@ -8793,11 +8764,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_rtscts"},
-
-	{WE_GET_CHWIDTH,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_chwidth"},
 
 	{WE_GET_ANI_EN_DIS,
 	 0,

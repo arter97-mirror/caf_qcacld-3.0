@@ -62,27 +62,6 @@
 #define RC_2_RATE_IDX_11AC(_rc)        ((_rc) & 0xf)
 #define HT_RC_2_STREAMS_11AC(_rc)    ((((_rc) & 0x30) >> 4) + 1)
 
-static int hdd_sap_get_chan_width(struct hdd_adapter *adapter, int *value)
-{
-	struct sap_context *sap_ctx;
-	struct hdd_hostapd_state *hostapdstate;
-
-	hdd_enter();
-	hostapdstate = WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter->deflink);
-
-	if (hostapdstate->bss_state != BSS_START) {
-		*value = -EINVAL;
-		return -EINVAL;
-	}
-
-	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
-
-	*value = wlansap_get_chan_width(sap_ctx);
-	hdd_debug("chan_width = %d", *value);
-
-	return 0;
-}
-
 int
 static __iw_softap_get_ini_cfg(struct net_device *dev,
 			       struct iw_request_info *info,
@@ -1280,11 +1259,6 @@ static __iw_softap_getparam(struct net_device *dev,
 	case QCASAP_PARAM_RX_STBC:
 	{
 		ret = hdd_get_rx_stbc(adapter, value);
-		break;
-	}
-	case QCSAP_PARAM_CHAN_WIDTH:
-	{
-		ret = hdd_sap_get_chan_width(adapter, value);
 		break;
 	}
 	case QCASAP_PARAM_DCM:
@@ -2807,10 +2781,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCASAP_PARAM_RX_STBC, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		"get_rx_stbc"
-	}, {
-		QCSAP_PARAM_CHAN_WIDTH, 0,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		"get_chwidth"
 	}, {
 		QCASAP_TX_CHAINMASK_CMD, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
