@@ -10763,6 +10763,7 @@ lim_notify_channel_switch_started(struct mac_context *mac_ctx,
 				session->gLimChannelSwitch.ch_width,
 				session->dot11mode);
 
+	ch_params.ch_width = session->gLimChannelSwitch.ch_width;
 	wlan_reg_set_channel_params_for_pwrmode(
 				wlan_vdev_get_pdev(session->vdev),
 				session->gLimChannelSwitch.sw_target_freq,
