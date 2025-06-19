@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -67,7 +68,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 {
 	tDot11fReAssocRequest *frm;
 	uint16_t caps;
-	uint8_t *frame, *rsnxe;
+	uint8_t *frame, *rsnxe = NULL;
 	uint32_t bytes, payload, status;
 	uint8_t qos_enabled, wme_enabled, wsm_enabled;
 	void *packet;
@@ -540,7 +541,8 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 end:
-	qdf_mem_free(rsnxe);
+	if (rsnxe)
+		qdf_mem_free(rsnxe);
 	qdf_mem_free(frm);
 err:
 	/* Free up buffer allocated for mlmAssocReq */
