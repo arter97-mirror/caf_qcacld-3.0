@@ -522,7 +522,6 @@
  * </ioctl>
  */
 #define WE_SET_VHT_RATE                 39
-#define WE_DBGLOG_REPORT_ENABLE         40
 #define WE_TXRX_FWSTATS_RESET           41
 /*
  * <ioctl>
@@ -4406,14 +4405,6 @@ static int hdd_we_dbglog_type(struct wlan_hdd_link_info *link_info,
 			      value);
 }
 
-static int hdd_we_dbglog_report_enable(struct wlan_hdd_link_info *link_info,
-				       int value)
-{
-	return hdd_we_set_dbg(link_info->adapter,
-			      WMI_DBGLOG_REPORT_ENABLE,
-			      value);
-}
-
 static int hdd_we_start_fw_profile(struct wlan_hdd_link_info *link_info,
 				   int value)
 {
@@ -4721,7 +4712,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_DBGLOG_VAP_ENABLE] = hdd_we_dbglog_vap_enable,
 	[WE_DBGLOG_VAP_DISABLE] = hdd_we_dbglog_vap_disable,
 	[WE_DBGLOG_TYPE] = hdd_we_dbglog_type,
-	[WE_DBGLOG_REPORT_ENABLE] = hdd_we_dbglog_report_enable,
 	[WE_SET_TXRX_FWSTATS] = hdd_we_set_txrx_fwstats,
 	[WE_TXRX_FWSTATS_RESET] = hdd_we_txrx_fwstats_reset,
 	[WE_DUMP_STATS] = hdd_we_dump_stats,
@@ -8849,11 +8839,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "dl_type"},
-
-	{WE_DBGLOG_REPORT_ENABLE,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "dl_report"},
 #endif /* FEATURE_FW_LOG_PARSING */
 
 	{WE_SET_TXRX_FWSTATS,

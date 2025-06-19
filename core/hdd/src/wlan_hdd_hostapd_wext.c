@@ -566,14 +566,7 @@ static __iw_softap_setparam(struct net_device *dev,
 					  set_value, DBG_CMD);
 		break;
 	}
-	case QCSAP_DBGLOG_REPORT_ENABLE:
-	{
-		hdd_debug("QCSAP_DBGLOG_REPORT_ENABLE val %d", set_value);
-		ret = wma_cli_set_command(link_info->vdev_id,
-					  WMI_DBGLOG_REPORT_ENABLE,
-					  set_value, DBG_CMD);
-		break;
-	}
+
 	case QCSAP_PARAM_SET_MCC_CHANNEL_LATENCY:
 	{
 		wlan_hdd_set_mcc_latency(adapter, set_value);
@@ -2690,10 +2683,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCSAP_DBGLOG_TYPE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dl_type"
-	}, {
-		QCSAP_DBGLOG_REPORT_ENABLE,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		0, "dl_report"
 	},
 #endif /* FEATURE_FW_LOG_PARSING */
 	{
