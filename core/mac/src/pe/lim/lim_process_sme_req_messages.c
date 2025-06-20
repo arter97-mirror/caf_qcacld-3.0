@@ -3271,12 +3271,21 @@ void lim_disable_ht_dynamic_smps(struct pe_session *session)
 	session->ht_config.mimo_power_save = SMPS_MODE_DISABLED;
 }
 
+void lim_enable_ht_dynamic_smps(struct pe_session *session)
+{
+	session->ht_config.mimo_power_save = DYNAMIC_SMPS_MODE;
+}
 #ifdef WLAN_FEATURE_11AX
 static
 void lim_disable_he_dynamic_smps(struct pe_session *session)
 {
 	pe_debug("Disable HE D-SMPS");
 	session->he_config.he_dynamic_smps = 0;
+}
+
+void lim_enable_he_dynamic_smps(struct pe_session *session)
+{
+	session->he_config.he_dynamic_smps = 1;
 }
 
 bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
@@ -3287,31 +3296,51 @@ bool lim_is_he_dynamic_smps_enabled(struct pe_session *session)
 static inline
 void lim_disable_he_dynamic_smps(struct pe_session *session)
 {}
+
+static inline
+void lim_enable_he_dynamic_smps(struct pe_session *session)
+{}
 #endif
 
 /**
- * lim_disable_dsmps_for_iot_ap() - disable dynamic SMPS for IOT AP
+ * lim_cfg_dsmps_for_iot_ap() - Configure dynamic SMPS for IOT AP
  *@mac_ctx: mac context
  *@session: pe session
  *@bss_desc: bss descriptor
  *
- * When connecting to specific IOT AP, disable STA HT and HE dynamic SMPS
- * capabilities.
+ * When connecting to specific IOT AP, Configure STA HT and HE dynamic SMPS
+ * capabilities base on whitelist and blacklist.
+ * if while list exist, ignore blacklist, else check blacklist.
  *
  * Return: None
  */
 static void
-lim_disable_dsmps_for_iot_ap(struct mac_context *mac_ctx,
-			     struct pe_session *session,
-			     struct bss_description *bss_desc)
+lim_cfg_dsmps_for_iot_ap(struct mac_context *mac_ctx,
+			 struct pe_session *session,
+			 struct bss_description *bss_desc)
 {
 	struct action_oui_search_attr vendor_ap_search_attr = {0};
 	uint16_t ie_len;
+	bool is_empty;
 
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 
 	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
 	vendor_ap_search_attr.ie_length = ie_len;
+
+	if (wlan_action_oui_search(mac_ctx->psoc,
+				   &vendor_ap_search_attr,
+				   ACTION_OUI_ENABLE_DYNAMIC_SMPS)) {
+		lim_enable_ht_dynamic_smps(session);
+		lim_enable_he_dynamic_smps(session);
+		pe_debug("Enable HT and HE D-SMPS for this IOT AP");
+		return;
+	}
+
+	is_empty = wlan_action_oui_is_empty(mac_ctx->psoc,
+					    ACTION_OUI_ENABLE_DYNAMIC_SMPS);
+	if (!is_empty)
+		return;
 
 	if (wlan_action_oui_search(mac_ctx->psoc,
 				   &vendor_ap_search_attr,
@@ -3644,7 +3673,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 
 	lim_disable_bformee_for_iot_ap(mac_ctx, session, bss_desc);
 
-	lim_disable_dsmps_for_iot_ap(mac_ctx, session, bss_desc);
+	lim_disable_ht_he_dynamic_smps(session, bss_desc->chan_freq);
+	lim_cfg_dsmps_for_iot_ap(mac_ctx, session, bss_desc);
 
 	mlme_obj->reg_tpc_obj.is_power_constraint_abs =
 						!is_pwr_constraint;
@@ -4768,8 +4798,6 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	}
 
 	lim_copy_ml_partner_info_to_session(session, req);
-
-	lim_disable_ht_he_dynamic_smps(session, bss_desc->chan_freq);
 
 	pe_debug("Assoc IE len: %d", req->assoc_ie.len);
 	if (req->assoc_ie.len)
