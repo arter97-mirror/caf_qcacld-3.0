@@ -1353,6 +1353,7 @@ config WLAN_FEATURE_IGMP_OFFLOAD
 
 config WLAN_FEATURE_LINK_LAYER_STATS
 	bool "Enable WLAN_FEATURE_LINK_LAYER_STATS"
+	depends on WLAN_DEBUGFS
 	default n
 
 config WLAN_FEATURE_LPSS
@@ -2329,10 +2330,6 @@ config CHIP_VERSION
     int "Enable CHIP_VERSION"
     default 1
 endif
-
-config IPA3
-    bool "Enable IPA3"
-    default n
 
 config IPA_WDI_UNIFIED_API
     bool "ipa wdi unified API"
