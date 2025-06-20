@@ -231,6 +231,15 @@ QDF_STATUS ucfg_mlme_set_ht_cap_info(struct wlan_objmgr_psoc *psoc,
 	return wlan_mlme_set_ht_cap_info(psoc, ht_cap_info);
 }
 
+static inline
+QDF_STATUS ucfg_disable_dynamic_smps(struct wlan_objmgr_psoc *psoc)
+{
+	wlan_mlme_disable_ht_dynamic_smps(psoc);
+	wlan_mlme_disable_he_dynamic_smps(psoc);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * ucfg_mlme_get_max_amsdu_num() - get the max amsdu num
  * @psoc: pointer to psoc object
