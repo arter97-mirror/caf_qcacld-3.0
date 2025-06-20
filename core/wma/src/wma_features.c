@@ -2181,6 +2181,8 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 		return "PF_BLOCKING_LAST_TIME";
 	case WOW_REASON_VDEV_REPURPOSE:
 		return "VDEV_REPURPOSE";
+	case WOW_REASON_TDLS_PACKET_RX:
+		return "TDLS PKT Rx";
 	default:
 		return "unknown";
 	}
@@ -3205,6 +3207,7 @@ static int wma_wake_event_no_payload(
 	case WOW_REASON_GENERIC_WAKE:
 	case WOW_REASON_ROAM_STATS:
 	case WOW_REASON_RTT_11AZ:
+	case WOW_REASON_TDLS_PACKET_RX:
 		wma_info("Wake reason %s",
 			 wma_wow_wake_reason_str(wake_info->wake_reason));
 		return 0;
