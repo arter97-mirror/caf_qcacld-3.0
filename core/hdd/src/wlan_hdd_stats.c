@@ -1390,6 +1390,79 @@ static tSirWifiInterfaceMode hdd_map_device_to_ll_iface_mode(int device_mode)
 	}
 }
 
+/**
+ * hdd_get_link_tx_stats() - Get connected links' tx stats
+ * @link_info: Link info pointerin adapter
+ * @info: Pointer to wifi_interface_info struct
+ * Return: void
+ */
+static void hdd_get_link_tx_stats(struct wlan_hdd_link_info *link_info,
+				  struct wifi_interface_info *info)
+{
+	QDF_STATUS status;
+	struct cds_vdev_dp_stats dp_stats;
+	ol_txrx_soc_handle soc;
+	uint8_t *peer_mac;
+	struct cdp_peer_stats *peer_stats;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	if (!hdd_cm_is_vdev_connected(link_info)) {
+		info->link_stats_valid = false;
+		return;
+	}
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc) {
+		info->link_stats_valid = false;
+		return;
+	}
+
+	peer_mac = link_info->session.station.conn_info.bssid.bytes;
+
+	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
+	if (!peer_stats) {
+		info->link_stats_valid = false;
+		hdd_err("Failed to allocated memory for peer_stats");
+		return;
+	}
+
+	if (!wlan_hdd_is_per_link_stats_supported(hdd_ctx)) {
+		status = cdp_host_get_peer_stats(soc, link_info->vdev_id,
+						 peer_mac, peer_stats);
+	} else {
+		status = ucfg_dp_get_per_link_peer_stats(soc,
+						link_info->vdev_id,
+						peer_mac, peer_stats,
+						CDP_WILD_PEER_TYPE,
+						DP_STAT_NUM_SINGLE_LINK);
+	}
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		info->link_stats_valid = false;
+		qdf_mem_free(peer_stats);
+		return;
+	}
+
+	info->link_stats_valid = true;
+	info->link_tx_success  = peer_stats->tx.tx_success.num;
+	info->link_tx_retries  = peer_stats->tx.retries;
+	info->link_tx_failed   = peer_stats->tx.tx_failed;
+
+	qdf_mem_free(peer_stats);
+
+	if (cds_dp_get_vdev_stats(link_info->vdev_id, &dp_stats))
+		info->tx_dropped = dp_stats.tx_dropped;
+	else
+		info->tx_dropped = 0;
+
+	hdd_debug("vdev id %d peer mac " QDF_MAC_ADDR_FMT
+		  " tx_succ %d tx_retry %d tx_failed %d tx_drop %d",
+		  link_info->vdev_id,
+		  QDF_MAC_ADDR_REF(peer_mac),
+		  info->link_tx_success, info->link_tx_retries,
+		  info->link_tx_failed, info->tx_dropped);
+}
+
 bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 			    struct wifi_interface_info *info)
 {
@@ -1546,6 +1619,17 @@ wlan_hdd_update_iface_stats_info(struct wlan_hdd_link_info *link_info,
 
 	hdd_stats = &link_info->ll_iface_stats.link_stats;
 	stats = &if_stat->link_stats;
+
+	if (link_info->ll_iface_stats.info.link_stats_valid) {
+		if_stat->info.link_tx_success +=
+				link_info->ll_iface_stats.info.link_tx_success;
+		if_stat->info.link_tx_retries +=
+				link_info->ll_iface_stats.info.link_tx_retries;
+		if_stat->info.link_tx_failed  +=
+				link_info->ll_iface_stats.info.link_tx_failed;
+		if_stat->info.tx_dropped      +=
+				link_info->ll_iface_stats.info.tx_dropped;
+	}
 
 	if (!update_stats) {
 		wlan_hdd_update_wmm_ac_stats(link_info, if_stat, update_stats);
@@ -2119,6 +2203,8 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 			goto err;
 		}
 
+		hdd_get_link_tx_stats(link_info, iface_info);
+
 		wlan_hdd_update_iface_stats_info(link_info, &cumulative_if_stat,
 						 update_stats);
 	}
@@ -2159,6 +2245,8 @@ wlan_hdd_send_mlo_ll_iface_stats_to_user(struct hdd_adapter *adapter)
 
 		stats = &link_info->ll_iface_stats;
 		per_link_peers = stats->link_stats.num_peers;
+
+		hdd_get_link_tx_stats(link_info, iface_info);
 
 		if (!wlan_hdd_put_mlo_link_iface_info(&info, skb))
 			goto err;
@@ -2370,6 +2458,8 @@ hdd_link_layer_process_iface_stats(struct wlan_hdd_link_info *link_info,
 		wlan_cfg80211_vendor_free_skb(skb);
 		return;
 	}
+
+	hdd_get_link_tx_stats(link_info, &if_stat->info);
 
 	if (!put_wifi_iface_stats(if_stat, num_peers, skb, link_info)) {
 		hdd_err("put_wifi_iface_stats fail");

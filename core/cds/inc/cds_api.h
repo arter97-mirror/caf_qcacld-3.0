@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -92,11 +92,13 @@ enum cds_driver_state {
  *              than one retransmission attempt
  * @tx_mpdu_success_with_retries: Number of MPDU transmission retries done
  *				  in case of successful transmission.
+ * @tx_dropped: HOST internal dropped packet number
  */
 struct cds_vdev_dp_stats {
 	uint32_t tx_retries;
 	uint32_t tx_retries_mpdu;
 	uint32_t tx_mpdu_success_with_retries;
+	uint32_t tx_dropped;
 };
 
 #define __CDS_IS_DRIVER_STATE(_state, _mask) (((_state) & (_mask)) == (_mask))
