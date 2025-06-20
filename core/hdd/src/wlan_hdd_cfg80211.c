@@ -18130,7 +18130,7 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 	enum log_event_host_reason_code reason_code;
 	uint8_t final_dump_in_progress_val = 0;
 
-	hdd_enter();
+	hdd_debug("Bug report triggered by framework");
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -18166,8 +18166,6 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 		 * As part of DRIVER ring ID, flush both driver and fw logs.
 		 * For other Ring ID's driver doesn't have any rings to flush
 		 */
-		hdd_debug("Bug report triggered by framework");
-
 		if (hdd_ctx->is_drv_dump_in_progress_valid) {
 			final_dump_in_progress_val = hdd_ctx->dump_in_progress;
 		} else {
@@ -18178,6 +18176,11 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 				return -EINVAL;
 			}
 		}
+
+		hdd_debug("is_valid: %d, in_progress: %d, final_val: %d",
+			  hdd_ctx->is_drv_dump_in_progress_valid,
+			  hdd_ctx->dump_in_progress,
+			  final_dump_in_progress_val);
 
 		if (final_dump_in_progress_val == 1)
 			reason_code = WLAN_LOG_REASON_DUMP_IN_PROGRESS;
