@@ -78,6 +78,13 @@ enum pkt_capture_tx_status {
 struct wlan_objmgr_vdev *pkt_capture_get_vdev(void);
 
 /**
+ * pkt_capture_get_dhcp_full_pkt_req() - Get DHCP full packet request.
+ *
+ * Return: True if DHCP full pkt is needed otherwise false
+ */
+bool pkt_capture_get_dhcp_full_pkt_req(void);
+
+/**
  * pkt_capture_vdev_create_notification() - Handler for vdev create notify.
  * @vdev: vdev which is going to be created by objmgr
  * @arg: argument for notification handler.

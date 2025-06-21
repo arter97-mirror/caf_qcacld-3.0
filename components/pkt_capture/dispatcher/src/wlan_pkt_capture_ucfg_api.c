@@ -204,7 +204,7 @@ void ucfg_pkt_capture_rx_msdu_process(
 				uint8_t vdev_id, htt_pdev_handle pdev)
 {
 		pkt_capture_msdu_process_pkts(bssid, head_msdu,
-					      vdev_id, pdev, 0);
+					      vdev_id, pdev, 0, true);
 }
 
 bool ucfg_pkt_capture_rx_offloaded_pkt(qdf_nbuf_t rx_ind_msg)
