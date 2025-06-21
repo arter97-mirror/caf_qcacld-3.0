@@ -7502,7 +7502,7 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 			QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_NORMAL;
 	}
 	adapter->latency_level = latency_level;
-	adapter->cached_latency_level = WFC_INVALID_LATENCY_LEVEL;
+	adapter->cached_latency_level = HDD_WLM_LATENCY_LEVEL_NORMAL;
 	hdd_set_multi_client_ll_support(adapter);
 
 	/* set dev's parent to underlying device */
@@ -16032,7 +16032,8 @@ wlan_hdd_init_multi_client_info_table(struct hdd_adapter *adapter)
 		adapter->client_info[i].client_id = i;
 		adapter->client_info[i].port_id = 0;
 		adapter->client_info[i].in_use = false;
-		adapter->client_info[i].req_latency_level = 0;
+		adapter->client_info[i].req_latency_level =
+					HDD_WLM_LATENCY_LEVEL_NORMAL;
 		adapter->client_info[i].is_wfc_state = false;
 	}
 }
@@ -16048,7 +16049,8 @@ void wlan_hdd_deinit_multi_client_info_table(struct hdd_adapter *adapter)
 			adapter->client_info[i].port_id = 0;
 			adapter->client_info[i].client_id = i;
 			adapter->client_info[i].in_use = false;
-			adapter->client_info[i].req_latency_level = 0;
+			adapter->client_info[i].req_latency_level =
+						HDD_WLM_LATENCY_LEVEL_NORMAL;
 			adapter->client_info[i].is_wfc_state = false;
 		}
 	}
@@ -20348,7 +20350,7 @@ static void hdd_set_adapter_wlm_def_level(struct hdd_context *hdd_ctx)
 		else
 			adapter->latency_level = latency_level;
 
-		adapter->cached_latency_level = WFC_INVALID_LATENCY_LEVEL;
+		adapter->cached_latency_level = HDD_WLM_LATENCY_LEVEL_NORMAL;
 
 		qdf_status = ucfg_mlme_cfg_get_wlm_reset(hdd_ctx->psoc, &reset);
 		if (QDF_IS_STATUS_ERROR(qdf_status)) {

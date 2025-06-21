@@ -12348,6 +12348,11 @@ static int hdd_config_latency_level(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
+	/*
+	 * The latency level value in host/firmware is one less than the value
+	 * received from userspace. Always subtract one before sending the
+	 * latency level to firmware.
+	 */
 	host_latency_level = latency_level - 1;
 
 	if (hdd_get_multi_client_ll_support(adapter)) {
@@ -12382,6 +12387,7 @@ static int hdd_config_latency_level(struct wlan_hdd_link_info *link_info,
 			goto error;
 		}
 	} else {
+		hdd_debug("set legacy latency level: %d", latency_level);
 		status = sme_set_wlm_latency_level(hdd_ctx->mac_handle,
 						   link_info->vdev_id,
 						   host_latency_level, 0,
@@ -12390,6 +12396,9 @@ static int hdd_config_latency_level(struct wlan_hdd_link_info *link_info,
 			hdd_err("set latency level failed, %u", status);
 			goto error;
 		}
+		/* Update the adapter's latency level, as no response is
+		 * expected from the firmware in legacy case
+		 */
 		adapter->latency_level = host_latency_level;
 	}
 
@@ -13235,9 +13244,9 @@ wlan_hdd_get_set_client_info_for_wfc_on_req(struct hdd_adapter *adapter,
 				/* save old entry */
 				adapter->cached_latency_level =
 				    adapter->client_info[i].req_latency_level;
-				/* update entry with 1 */
+				/* update table entry with LATENCY LEVEL LOW */
 				adapter->client_info[i].req_latency_level =
-							WFC_ON_LATENCY_LEVEL;
+						HDD_WLM_LATENCY_LEVEL_LOW;
 				adapter->client_info[i].is_wfc_state = true;
 				hdd_debug("cached ll: %d, current ll: %d at index: %d for port_id: %u",
 					  adapter->cached_latency_level,
@@ -13254,9 +13263,9 @@ wlan_hdd_get_set_client_info_for_wfc_on_req(struct hdd_adapter *adapter,
 			adapter->client_info[i].port_id = port_id;
 			*client_id = adapter->client_info[i].client_id;
 			adapter->client_info[i].req_latency_level =
-							WFC_ON_LATENCY_LEVEL;
+						HDD_WLM_LATENCY_LEVEL_LOW;
 			adapter->cached_latency_level =
-						WFC_INVALID_LATENCY_LEVEL;
+						HDD_WLM_LATENCY_LEVEL_NORMAL;
 			adapter->client_info[i].is_wfc_state = true;
 			status = QDF_STATUS_SUCCESS;
 			break;
@@ -13300,7 +13309,7 @@ wlan_hdd_get_set_client_info_for_wfc_off_req(struct hdd_adapter *adapter,
 			*cached_latency_level =
 					adapter->cached_latency_level;
 			adapter->cached_latency_level =
-						WFC_INVALID_LATENCY_LEVEL;
+						HDD_WLM_LATENCY_LEVEL_NORMAL;
 			adapter->client_info[i].is_wfc_state = false;
 			return QDF_STATUS_SUCCESS;
 		}
@@ -13361,8 +13370,7 @@ wlan_hdd_set_wfc_wlm_client_latency_level(struct hdd_adapter *adapter,
 		 * When the WFC state is set to 1, the host should set the
 		 * latency level LATENCY_LEVEL_LOW to the firmware.
 		 */
-		latency_level_to_send =
-			QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_LOW - 1;
+		latency_level_to_send = HDD_WLM_LATENCY_LEVEL_LOW;
 	}
 
 	client_id_bitmap = BIT(client_id);

@@ -1277,17 +1277,31 @@ struct get_station_client_info {
 };
 
 /**
- * enum wfc_state_latency_level - value as per
- * QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE cmd
- * @WFC_OFF_LATENCY_LEVEL: level off
- * @WFC_ON_LATENCY_LEVEL: level on
- * @WFC_INVALID_LATENCY_LEVEL: Invalid level
+ * enum hdd_wlm_latency_level - Latency level values should match the definition
+ * in the INI "wlm_latency_level".
+ *
+ * @HDD_WLM_LATENCY_LEVEL_NORMAL: Default WLAN operation level focused on
+ * throughput.
+ *
+ * @HDD_WLM_LATENCY_LEVEL_XR: XR level to benefit extended reality (XR)
+ * applications by reducing latency and power through constrained scan,
+ * roaming, and adaptive power save.
+ *
+ * @HDD_WLM_LATENCY_LEVEL_LOW: Low latency level to benefit applications like
+ * concurrent downloading or video streaming through constrained scan and
+ * adaptive power save.
+ *
+ * @HDD_WLM_LATENCY_LEVEL_ULTRALOW: Ultra-low latency level to benefit gaming
+ * and voice applications through constrained scan, roaming, and adaptive
+ * power save.
  */
-enum wfc_state_latency_level {
-	WFC_OFF_LATENCY_LEVEL,
-	WFC_ON_LATENCY_LEVEL,
-	WFC_INVALID_LATENCY_LEVEL,
+enum hdd_wlm_latency_level {
+	HDD_WLM_LATENCY_LEVEL_NORMAL = 0,
+	HDD_WLM_LATENCY_LEVEL_XR = 1,
+	HDD_WLM_LATENCY_LEVEL_LOW = 2,
+	HDD_WLM_LATENCY_LEVEL_ULTRALOW = 3,
 };
+
 
 /**
  * struct hdd_adapter - hdd vdev/net_device context

@@ -7883,8 +7883,6 @@ QDF_STATUS sme_set_wlm_latency_level(mac_handle_t mac_handle,
 	struct wlm_latency_level_param params;
 	void *wma = cds_get_context(QDF_MODULE_ID_WMA);
 
-	SME_ENTER();
-
 	if (!wma) {
 		sme_err("wma is NULL");
 		return QDF_STATUS_E_FAILURE;

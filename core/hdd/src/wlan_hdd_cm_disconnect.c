@@ -572,7 +572,7 @@ static void hdd_cm_set_default_wlm_mode(struct hdd_adapter *adapter)
 		}
 	}
 
-	adapter->cached_latency_level = WFC_INVALID_LATENCY_LEVEL;
+	adapter->cached_latency_level = HDD_WLM_LATENCY_LEVEL_NORMAL;
 }
 
 /**
