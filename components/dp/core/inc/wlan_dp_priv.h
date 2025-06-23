@@ -426,6 +426,7 @@ struct fisa_pkt_hist {
  * @flow_id_toeplitz: toeplitz hash value
  * @flow_id: Flow index, equivalent to hash value truncated to FST size
  * @stats: Stats tracking for this flow
+ * @peer_id: Peer ID
  * @is_ipv4_addr_entry: Flag indicating whether flow is IPv4 address tuple
  * @is_valid: Flag indicating whether flow is valid
  * @is_populated: Flag indicating whether flow is populated
@@ -477,7 +478,6 @@ struct fisa_pkt_hist {
  * @track_flow_stats: flag to indicate if this flow is to be tracked
  * @selected_to_sample: flag to indicate flow has been selected to sample
  * @classified: flag to indicate flow has been classified
- * @peer_id: Peer ID
  * @c_flow_id: STC classified flow table ID
  * @inactivity_timeout: inactivity timeout to be tested for STC interested flows
  */
@@ -487,6 +487,7 @@ struct dp_fisa_rx_sw_ft {
 	uint32_t flow_id_toeplitz;
 	uint32_t flow_id;
 	struct cdp_flow_stats stats;
+	uint16_t peer_id;
 	uint8_t is_ipv4_addr_entry;
 	uint8_t is_valid;
 	uint8_t is_populated;
@@ -544,7 +545,6 @@ struct dp_fisa_rx_sw_ft {
 	uint8_t track_flow_stats;
 	uint8_t selected_to_sample;
 	uint8_t classified;
-	uint16_t peer_id;
 	uint16_t c_flow_id;
 	uint64_t inactivity_timeout;
 };

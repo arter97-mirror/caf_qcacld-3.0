@@ -1292,6 +1292,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint16_t c_id;
+	uint16_t peer_id = DP_STC_INVALID_PEER_ID;
 	uint8_t buf[BUF_LEN_MAX];
 
 	/*
@@ -1336,10 +1337,6 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 		if (state > WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
 			continue;
 
-		dp_info("STC: Move flow (%s) to classified flow %d for peer %d",
-			dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
-					      buf, BUF_LEN_MAX),
-			c_id, s_entry->peer_id);
 		/* Got a free entry */
 		qdf_atomic_set(&c_entry->state,
 			       WLAN_DP_STC_CLASSIFIED_FLOW_STATE_ADDED);
@@ -1353,7 +1350,6 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 				DP_STC_CLASSIFIED_RT_FLOW_RM_INACTIVE_TIME_NS :
 				DP_STC_CLASSIFIED_FLOW_RM_INACTIVE_TIME_NS;
 
-		c_entry->peer_id = s_entry->peer_id;
 		qdf_atomic_inc(&c_table->num_valid_entries);
 
 		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
@@ -1373,8 +1369,19 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 			rx_flow->classified = DP_STC_CLASSIFIED_KNOWN;
 			rx_flow->inactivity_timeout = flow_rm_inactivity_time;
 			rx_flow->c_flow_id = c_id;
+			peer_id = rx_flow->peer_id;
 		}
 
+		if (peer_id != DP_STC_INVALID_PEER_ID &&
+		    s_entry->peer_id != peer_id)
+			c_entry->peer_id = peer_id;
+		else
+			c_entry->peer_id = s_entry->peer_id;
+
+		dp_info("STC: Move flow (%s) to classified flow %d for peer %hu [PEER_ID: s_entry %hu, rx_flow %hu]",
+			dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
+					      buf, BUF_LEN_MAX),
+			c_id, c_entry->peer_id, s_entry->peer_id, peer_id);
 		c_entry->flow_active = 1;
 		c_entry->add_ts = dp_stc_get_timestamp();
 		wlan_dp_stc_remove_sampling_table_entry(dp_stc, s_entry);
@@ -1449,7 +1456,8 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
 		if (!rx_flow->is_populated ||
 		    rx_flow->selected_to_sample ||
-		    rx_flow->classified)
+		    rx_flow->classified ||
+		    rx_flow->peer_id == DP_STC_INVALID_PEER_ID)
 			continue;
 
 		if (cur_ts - rx_flow->flow_init_ts <

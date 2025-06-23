@@ -186,6 +186,7 @@ static struct ol_if_ops dp_ol_if_ops = {
 #endif
 #ifdef WLAN_DP_FEATURE_STC
 	.dp_peer_event_notify = wlan_dp_stc_peer_event_notify,
+	.rx_fst_inv_peer_id = wlan_dp_fisa_rx_fst_inv_peer_id,
 #endif
 	.peer_sta_kickout = wma_peer_sta_kickout,
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
