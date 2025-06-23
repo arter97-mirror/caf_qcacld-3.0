@@ -92,26 +92,14 @@ bool __ll_lt_sap_is_bs_req_valid(struct wlan_bearer_switch_request *bs_req,
 	return true;
 }
 
-/**
- * ll_lt_sap_deliver_audio_transport_switch_resp_to_fw() - Deliver audio
- * transport switch response to FW
- * @vdev: Vdev on which the request is received
- * @req_type: Transport switch type for which the response is received
- * @status: Status of the response
- *
- * Return: None
- */
-static void
+void
 ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(
-					struct wlan_objmgr_vdev *vdev,
+					struct wlan_objmgr_psoc *psoc,
 					enum bearer_switch_req_type req_type,
 					enum bearer_switch_status status)
 {
-	struct wlan_objmgr_psoc *psoc;
 	struct ll_sap_psoc_priv_obj *psoc_ll_sap_obj;
 	struct wlan_ll_sap_tx_ops *tx_ops;
-
-	psoc = wlan_vdev_get_psoc(vdev);
 
 	psoc_ll_sap_obj = wlan_objmgr_psoc_get_comp_private_obj(
 						psoc,
@@ -271,11 +259,19 @@ ll_lt_sap_invoke_req_callback_f(struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req,
 				QDF_STATUS status, const char *func)
 {
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(bs_ctx->vdev);
+	if (!psoc) {
+		ll_sap_err("BS_SM invalid psoc");
+		return;
+	}
+
 	if (bs_req->source == BEARER_SWITCH_REQ_FW) {
 		if (status == QDF_STATUS_E_ALREADY ||
 		    status == QDF_STATUS_SUCCESS)
 			ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(
-						bs_ctx->vdev,
+						psoc,
 						bs_req->req_type,
 						WLAN_BS_STATUS_COMPLETED);
 		else
@@ -539,7 +535,7 @@ ll_lt_sap_invoke_bs_requester_cbks(struct bearer_switch_info *bs_ctx,
 		if ((bs_ctx->requests[i].source == BEARER_SWITCH_REQ_FW) &&
 		    (status == QDF_STATUS_E_TIMEOUT))
 			ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(
-						bs_ctx->vdev,
+						psoc,
 						bs_ctx->requests[i].req_type,
 						WLAN_BS_STATUS_TIMEOUT);
 		else
@@ -1316,11 +1312,19 @@ ll_lt_sap_handle_bs_to_wlan_timeout(
 				struct bearer_switch_info *bs_ctx,
 				struct wlan_bearer_switch_request *bs_req)
 {
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(bs_ctx->vdev);
+	if (!psoc) {
+		ll_sap_err("BS_SM invalid psoc");
+		return;
+	}
+
 	bs_sm_transition_to(bs_ctx, BEARER_WLAN);
 
 	if (bs_req->source == BEARER_SWITCH_REQ_FW)
 		ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(
-							bs_ctx->vdev,
+							psoc,
 							bs_req->req_type,
 							WLAN_BS_STATUS_TIMEOUT);
 
@@ -2136,8 +2140,16 @@ ll_lt_sap_deliver_audio_transport_switch_resp(
 				enum bearer_switch_req_type req_type,
 				enum bearer_switch_status status)
 {
-	ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(vdev, req_type,
-							   status);
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		ll_sap_err("BS_SM invalid psoc");
+		return;
+	}
+
+	ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(psoc, req_type,
+							    status);
 
 	if (req_type == WLAN_BS_REQ_TO_NON_WLAN)
 		ll_lt_sap_deliver_non_wlan_audio_transport_switch_resp(

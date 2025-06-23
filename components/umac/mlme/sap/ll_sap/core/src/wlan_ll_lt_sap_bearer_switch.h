@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -367,4 +367,18 @@ ll_lt_sap_switch_bearer(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			enum bearer_switch_req_source source,
 			bearer_switch_requester_cb requester_cb,
 			uint32_t arg_value, void *arg);
+
+/**
+ * ll_lt_sap_deliver_audio_transport_switch_resp_to_fw() - Deliver audio
+ * transport switch response to FW
+ * @psoc: psoc on which the request is received
+ * @req_type: Transport switch type for which the response is received
+ * @status: Status of the response
+ *
+ * Return: None
+ */
+void ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(
+					  struct wlan_objmgr_psoc *psoc,
+					  enum bearer_switch_req_type req_type,
+					  enum bearer_switch_status status);
 #endif /* _WLAN_LL_LT_SAP_BEARER_SWITCH_H_ */

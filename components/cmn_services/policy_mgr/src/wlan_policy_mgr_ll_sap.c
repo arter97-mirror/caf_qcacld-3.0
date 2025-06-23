@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,18 +26,80 @@
 #include "wlan_ll_sap_api.h"
 #include "wlan_policy_mgr_api.h"
 
+/**
+ * policy_mgr_is_vdev_active_ll_sap() - check if the vdev is LL LT SAP
+ * and in up state and store the id
+ * @pdev: pdev common object
+ * @object: vdev object
+ * @arg: vdev operation search arg
+ *
+ * Return: None
+ */
+static void policy_mgr_is_vdev_active_ll_sap(struct wlan_objmgr_pdev *pdev,
+					     void *object, void *arg)
+{
+	uint8_t *ll_lt_sap_vdev_id = arg;
+	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)object;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!ll_lt_sap_vdev_id)
+		return;
+
+	if ((opmode != QDF_SAP_MODE) ||
+	    QDF_IS_STATUS_ERROR(wlan_vdev_is_up(vdev)))
+		return;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (psoc && policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+		*ll_lt_sap_vdev_id = vdev_id;
+}
+
+/**
+ * policy_mgr_get_active_ll_sap_vdev_id() -find the active ll lt SAP VDEV
+ * @pdev: psoc pdev common object
+ *
+ * Return : the ll lt sap vdev id
+ */
+static uint8_t
+policy_mgr_get_active_ll_sap_vdev_id(struct wlan_objmgr_pdev *pdev)
+{
+	uint8_t ll_lt_sap_vdev_id = WLAN_INVALID_VDEV_ID;
+
+	wlan_objmgr_pdev_iterate_obj_list(pdev, WLAN_VDEV_OP,
+					  policy_mgr_is_vdev_active_ll_sap,
+					  &ll_lt_sap_vdev_id, 0,
+					  WLAN_POLICY_MGR_ID);
+
+	return ll_lt_sap_vdev_id;
+}
+
 uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
 {
 	uint8_t ll_lt_sap_cnt;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return WLAN_INVALID_VDEV_ID;
+	}
 
 	ll_lt_sap_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							vdev_id_list,
 							PM_LL_LT_SAP_MODE);
 
 	/* Currently only 1 ll_lt_sap is supported */
-	if (!ll_lt_sap_cnt)
-		return WLAN_INVALID_VDEV_ID;
+	if (!ll_lt_sap_cnt) {
+		policy_mgr_info("Get ll lt sap vdev from vdev list, as its not yet added in connection table");
+		/*
+		 * FW can send req before LL SAP entry is added in table,
+		 * so get active ll SAP vdev from_vdev_list.
+		 */
+		return policy_mgr_get_active_ll_sap_vdev_id(pm_ctx->pdev);
+	}
 
 	return vdev_id_list[0];
 }
