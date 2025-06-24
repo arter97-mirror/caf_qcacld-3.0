@@ -3543,7 +3543,7 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_RU_PUNC_CHANDEF
 endif
 
-found = $(shell if grep -qF "Indicates whether the MLO reconfiguration request is initiated" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+found = $(shell if grep -qF "Indicates whether the add links request is initiated by" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
 ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_SETUP_LINK_RECONFIG_SUPPORT
 endif
