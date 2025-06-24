@@ -34937,6 +34937,73 @@ wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	osif_vdev_sync_op_stop(vdev_sync);
 }
+
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+static int
+__wlan_hdd_cfg80211_link_reconfig_remove(struct wiphy *wiphy, struct net_device *dev,
+		const struct cfg80211_link_reconfig_removal_params *params)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_hdd_link_info *link_info;
+	uint32_t config_tbtt = 0;
+	QDF_STATUS status;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("HDD context is NULL");
+		return -EINVAL;
+	}
+
+	link_info = hdd_get_link_info_by_link_id(adapter, params->link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
+
+	config_tbtt = params->link_removal_cntdown;
+
+	hdd_debug("MLO link reconfig remove: link %u with tbtt = %u",
+		  params->link_id, config_tbtt);
+
+	status = wlan_hdd_validate_mlo_link_removal_request(link_info,
+							    config_tbtt);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		status = wlan_hdd_process_mlo_link_removal_cmd(link_info,
+							       hdd_ctx->psoc,
+							       params);
+	else
+		hdd_err("Link removal validation failed, status: %d", status);
+
+	return qdf_status_to_os_return(status);
+}
+
+/**
+ * wlan_hdd_cfg80211_link_reconfig_remove() - API to handle Multi-link reconfig
+ * remove request comes from hostapd.
+ * @wiphy: Pointer to wiphy object
+ * @dev: Netdev object pointer
+ * @params: Pointer to reconfig link removal parameters
+ *
+ * Return: 0 on success, non-zero -ve value on failure
+ */
+static int
+wlan_hdd_cfg80211_link_reconfig_remove(struct wiphy *wiphy, struct net_device *dev,
+		const struct cfg80211_link_reconfig_removal_params *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_link_reconfig_remove(wiphy, dev, params);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif
 #else
 static int
 wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
@@ -36253,6 +36320,9 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 	.add_intf_link = wlan_hdd_cfg80211_add_intf_link,
 	.del_intf_link = wlan_hdd_cfg80211_del_intf_link,
+#endif
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+	.link_reconfig_remove = wlan_hdd_cfg80211_link_reconfig_remove,
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_TID_LINK_MAP_SUPPORT)
 	.get_link_tid_map_status = wlan_hdd_cfg80211_get_t2lm_mapping_status,

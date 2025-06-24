@@ -5674,4 +5674,17 @@ QDF_STATUS wlan_mlme_start_miracast_opt(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS wlan_mlme_stop_miracast_opt(struct wlan_objmgr_psoc *psoc);
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/*
+ * wlan_mlme_send_mlo_sap_link_removal_cmd() - send mlo sap link removal request
+ * @vdev: pointer to vdev
+ * @ie: link reconfig ie
+ * @elem_len: link reconfig ie length
+ *
+ * Return: True if send wmi cmd to FW success, otherwise false
+ */
+QDF_STATUS wlan_mlme_send_mlo_sap_link_removal_cmd(struct wlan_objmgr_vdev *vdev,
+						   const uint8_t *ie,
+						   size_t elem_len);
+#endif
 #endif /* _WLAN_MLME_API_H_ */
