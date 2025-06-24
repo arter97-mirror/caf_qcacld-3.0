@@ -13862,6 +13862,7 @@ static void hdd_display_stats_help(void)
 	HDD_DUMP_STAT_HELP(CDP_NAPI_STATS);
 	HDD_DUMP_STAT_HELP(CDP_DP_NAPI_STATS);
 	HDD_DUMP_STAT_HELP(CDP_DP_RX_THREAD_STATS);
+	HDD_DUMP_STAT_HELP(CDP_DP_HAPS_STATS);
 }
 
 int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int stats_id)
@@ -13895,6 +13896,9 @@ int hdd_wlan_dump_stats(struct hdd_adapter *adapter, int stats_id)
 	case CDP_DISCONNECT_STATS:
 		sme_display_disconnect_stats(hdd_ctx->mac_handle,
 					     adapter->deflink->vdev_id);
+		break;
+	case CDP_DP_HAPS_STATS:
+		ucfg_dp_haps_dump_stats(hdd_ctx->psoc);
 		break;
 	default:
 		status = cdp_display_stats(cds_get_context(QDF_MODULE_ID_SOC),
@@ -13932,6 +13936,9 @@ int hdd_wlan_clear_stats(struct hdd_adapter *adapter, int stats_id)
 		break;
 	case CDP_NAPI_STATS:
 		hdd_clear_napi_stats();
+		break;
+	case CDP_DP_HAPS_STATS:
+		ucfg_dp_haps_clear_stats(adapter->hdd_ctx->psoc);
 		break;
 	default:
 		status = cdp_clear_stats(cds_get_context(QDF_MODULE_ID_SOC),

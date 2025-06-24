@@ -3214,6 +3214,16 @@ QDF_STATUS ucfg_dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 	return dp_txrx_ext_dump_stats(soc, stats_id);
 }
 
+QDF_STATUS ucfg_dp_haps_dump_stats(struct wlan_objmgr_psoc *psoc)
+{
+	return dp_print_haps_stats(psoc);
+}
+
+void ucfg_dp_haps_clear_stats(struct wlan_objmgr_psoc *psoc)
+{
+	return dp_clear_haps_stats(psoc);
+}
+
 QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,
 				     qdf_cpu_mask *new_mask)
 {

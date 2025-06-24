@@ -30,7 +30,9 @@ void dp_vdev_haps_detach(struct wlan_dp_intf *dp_intf);
 
 void dp_haps_init(struct wlan_objmgr_psoc *psoc);
 
-QDF_STATUS dp_print_haps_stats(struct dp_soc *soc);
+QDF_STATUS dp_print_haps_stats(struct wlan_objmgr_psoc *psoc);
+
+void dp_clear_haps_stats(struct wlan_objmgr_psoc *psoc);
 
 static inline void dp_haps_kill_timer(qdf_hrtimer_data_t *timer)
 {
@@ -107,9 +109,13 @@ static inline void dp_haps_init(struct wlan_objmgr_psoc *psoc)
 {
 }
 
-static inline QDF_STATUS dp_print_haps_stats(struct dp_soc *soc)
+static inline QDF_STATUS dp_print_haps_stats(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline void dp_clear_haps_stats(struct wlan_objmgr_psoc *psoc)
+{
 }
 #endif
 #endif
