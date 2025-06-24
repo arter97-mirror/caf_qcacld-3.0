@@ -232,6 +232,7 @@
 #include "wlan_dnw_ucfg_api.h"
 #include "wlan_hdd_tx_powerboost.h"
 #include "wlan_mlo_link_force.h"
+#include "wlan_action_oui_ucfg_api.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -24514,6 +24515,50 @@ static int wlan_hdd_cfg80211_async_get_station(struct wiphy *wiphy,
 	return errno;
 }
 
+const struct nla_policy wlan_hdd_action_oui_cap_policy[
+		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_INVALID] = {
+							.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_NSS_MASK] = {
+							.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_HT] = {
+							.type = NLA_FLAG},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_VHT] = {
+							.type = NLA_FLAG},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_HE] = {
+							.type = NLA_FLAG},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_EHT] = {
+							.type = NLA_FLAG},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_BAND_MASK] = {
+							.type = NLA_U32},
+};
+
+const struct nla_policy wlan_hdd_action_oui_ext_policy[
+		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_INVALID] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_VENDOR_OUI] = {
+							.type = NLA_BINARY},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_VENDOR_DATA] = {
+							.type = NLA_BINARY},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_VENDOR_DATA_MASK] = {
+							.type = NLA_BINARY},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_BSSID] =
+						VENDOR_NLA_POLICY_MAC_ADDR,
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_BSSID_MASK] = {
+						.type = NLA_BINARY},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_CAPABILITY] = {
+						.type = NLA_NESTED},
+};
+
+const struct nla_policy wlan_hdd_cfg80211_set_action_oui_policy[
+			 QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_INVALID] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_ACTION] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_LIST] = {
+						.type = NLA_NESTED},
+	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_OP] = {.type = NLA_U8},
+};
+
 const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
@@ -25089,6 +25134,18 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 				      QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX)
 	},
 	FEATURE_VENDOR_SUBCMD_CONFIG_TX_POWER_BOOST
+
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_FEATURE_CONFIG,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			WIPHY_VENDOR_CMD_NEED_NETDEV |
+			WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_set_action_oui,
+		vendor_command_policy(wlan_hdd_cfg80211_set_action_oui_policy,
+				      QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_MAX)
+	},
+
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)
@@ -35630,6 +35687,397 @@ static void wlan_hdd_cfg80211_update_mgmt_frame_registrations(
 	__wlan_hdd_cfg80211_update_mgmt_frame_registrations(wiphy, wdev, upd);
 
 	osif_vdev_sync_op_stop(vdev_sync);
+}
+#endif
+
+#ifdef WLAN_FEATURE_ACTION_OUI
+
+#define MAX_ALLOWED_OUI 100
+
+#define FEATURE_CONFIG_EXT_OUI \
+	QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_VENDOR_OUI
+
+#define FEATURE_CONFIG_EXT_DATA \
+	QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_VENDOR_DATA
+
+#define FEATURE_CONFIG_EXT_DATA_MASK \
+	QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_VENDOR_DATA_MASK
+
+#define FEATURE_CONFIG_EXT_MAC_ADDR \
+	QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_BSSID
+
+#define FEATURE_CONFIG_EXT_MAC_MASK \
+		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_BSSID_MASK
+
+#define FEATURE_CONFIG_CAP QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_CAPABILITY
+#define FEATURE_CONFIG_CAPABILITY_MAX \
+		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_MAX
+#define FEATURE_CONFIG_CAP_NSS_MASK \
+		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_NSS_MASK
+#define FEATURE_CONFIG_CAP_HT \
+		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_HT
+#define FEATURE_CONFIG_CAP_VHT \
+		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_VHT
+#define FEATURE_CONFIG_CAP_HE \
+		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_HE
+#define FEATURE_CONFIG_CAP_EHT \
+		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_EHT
+#define FEATURE_CONFIG_CAP_BAND_MASK \
+		QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_CAPABILITY_BAND_MASK
+#ifdef ACTION_OUI_OP_ATTR
+static int
+wlan_hdd_parse_action_oui_op_attr(struct nlattr *tb2[],
+				  struct action_oui_extension *action_oui_ext)
+{
+	struct nlattr *tb3[FEATURE_CONFIG_CAPABILITY_MAX + 1];
+	struct nlattr *cap_attr = NULL;
+	int8_t *nested_data;
+	uint32_t length = 0, band_mask = UINT_MAX, reg_wifi_band_mask = 0;
+	uint32_t pending;
+	bool ht_cap = false,
+	he_cap = false, eht_cap = false, vht_cap = false;
+	int ret = 0;
+	uint8_t nss_bit_map = 0;
+	QDF_STATUS status;
+
+	if (tb2[FEATURE_CONFIG_EXT_MAC_ADDR]) {
+		length = nla_len(tb2[FEATURE_CONFIG_EXT_MAC_ADDR]);
+		nested_data = (uint8_t *)nla_data(
+				tb2[FEATURE_CONFIG_EXT_MAC_ADDR]);
+		status =
+			ucfg_action_oui_add_token(ACTION_OUI_MAC_ADDR_TOKEN,
+						  nested_data, length,
+						  action_oui_ext);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		/* MAC mask is manadatory if MAC is present */
+		if (!tb2[FEATURE_CONFIG_EXT_MAC_MASK]) {
+			hdd_err("mac mask missing");
+			ret = -EINVAL;
+			goto exit;
+		}
+	}
+
+	/* Ignore mac addr mask if extension mac addr not present */
+	if (tb2[FEATURE_CONFIG_EXT_MAC_ADDR] &&
+	    tb2[FEATURE_CONFIG_EXT_MAC_MASK]) {
+		length = nla_len(tb2[FEATURE_CONFIG_EXT_MAC_MASK]);
+		nested_data = (uint8_t *)nla_data(
+				tb2[FEATURE_CONFIG_EXT_MAC_MASK]);
+		status =
+			ucfg_action_oui_add_token(ACTION_OUI_MAC_BIT_MASK_TOKEN,
+						  nested_data, length,
+						  action_oui_ext);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			ret = -EINVAL;
+			goto exit;
+		}
+	}
+
+	/* EXT cap is optional field */
+	if (!tb2[FEATURE_CONFIG_CAP]) {
+		hdd_debug("oui ext cap not present");
+		goto exit;
+	}
+
+	nla_for_each_nested(cap_attr, tb2[FEATURE_CONFIG_CAP], pending) {
+		if (wlan_cfg80211_nla_parse(
+					tb3,
+					FEATURE_CONFIG_CAPABILITY_MAX,
+					nla_data(cap_attr), nla_len(cap_attr),
+					wlan_hdd_action_oui_cap_policy)) {
+			hdd_err_rl("nla cap parse failed");
+			ret = -EINVAL;
+			goto exit;
+		}
+		if (tb3[FEATURE_CONFIG_CAP_NSS_MASK])
+			nss_bit_map = nla_get_u8(
+					tb3[FEATURE_CONFIG_CAP_NSS_MASK]);
+		if (tb3[FEATURE_CONFIG_CAP_HT])
+			ht_cap = nla_get_flag(
+					tb3[FEATURE_CONFIG_CAP_HT]);
+		if (tb3[FEATURE_CONFIG_CAP_VHT])
+			vht_cap =
+				nla_get_flag(tb3[FEATURE_CONFIG_CAP_VHT]);
+		if (tb3[FEATURE_CONFIG_CAP_HE]) {
+			he_cap = nla_get_flag(
+					tb3[FEATURE_CONFIG_CAP_HE]);
+			hdd_debug("HE config cap not supported");
+			ret = -EOPNOTSUPP;
+			goto exit;
+		}
+		if (tb3[FEATURE_CONFIG_CAP_EHT]) {
+			eht_cap = nla_get_flag(
+					tb3[FEATURE_CONFIG_CAP_EHT]);
+			hdd_debug("EHT config cap not supported");
+			ret = -EOPNOTSUPP;
+			goto exit;
+		}
+		if (tb3[FEATURE_CONFIG_CAP_BAND_MASK]) {
+			band_mask = nla_get_u32(
+					tb3[FEATURE_CONFIG_CAP_BAND_MASK]);
+
+			reg_wifi_band_mask =
+				hdd_reg_legacy_setband_to_reg_wifi_band_bitmap(
+						band_mask);
+			if (reg_wifi_band_mask & BIT(REG_BAND_6G)) {
+				hdd_debug("action oui for 6G band not supported");
+				ret = -EOPNOTSUPP;
+				goto exit;
+			}
+		}
+
+		hdd_debug("nss_bit_map %d ht_cap %d vht_cap %d band_mask %d",
+			  nss_bit_map, ht_cap, vht_cap,
+			  reg_wifi_band_mask);
+
+		status = ucfg_action_oui_add_cap(
+				nss_bit_map, ht_cap,
+				vht_cap,
+				(uint8_t)reg_wifi_band_mask,
+				action_oui_ext);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			ret = -EINVAL;
+			goto exit;
+		}
+	}
+
+exit:
+	return ret;
+}
+#else
+static inline int
+wlan_hdd_parse_action_oui_op_attr(struct nlattr *tb2[],
+				  struct action_oui_extension *action_oui_ext)
+{
+	return 0;
+}
+#endif
+
+static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     const void *data,
+					     int data_len)
+{
+	int ret = 0;
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_MAX + 1];
+	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_MAX + 1];
+	enum QDF_GLOBAL_MODE curr_mode;
+	uint8_t action_oui_op;
+	struct action_oui_extension action_oui_ext = {0};
+	uint32_t rem, action_oui_id;
+	uint8_t i = 0;
+	struct nlattr *cur_attr = NULL;
+	int8_t *nested_data;
+	uint32_t length = 0;
+	QDF_STATUS status;
+
+	hdd_enter_dev(wdev->netdev);
+	curr_mode = hdd_get_conparam();
+
+	if (curr_mode == QDF_GLOBAL_FTM_MODE ||
+	    curr_mode == QDF_GLOBAL_MONITOR_MODE) {
+		hdd_err("Command not allowed in FTM/Monitor mode %d",
+			curr_mode);
+		return -EPERM;
+	}
+
+	if (hdd_validate_adapter(adapter))
+		return -EINVAL;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	if (wlan_cfg80211_nla_parse(
+				tb, QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_MAX,
+				data, data_len,
+				wlan_hdd_cfg80211_set_action_oui_policy)) {
+		hdd_err("invalid attribute");
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	/* oui id and oui op are manadatory params */
+	if (!tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_ACTION] ||
+	    !tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_OP]) {
+		hdd_err("OUI or OUI OP not present");
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	action_oui_id = nla_get_u32(
+			tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_ACTION]);
+	action_oui_op = nla_get_u8(
+			tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_OP]);
+	if (action_oui_id >
+	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISABLE_DSMPS ||
+	    action_oui_op > QCA_WLAN_VENDOR_FEATURE_CONFIG_DATA_CLEAR) {
+		hdd_err("Invalid oui id %d or oui op %d",
+			action_oui_id, action_oui_op);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	if (action_oui_id != QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ENABLE_DSMPS)
+	{
+		hdd_debug("only ID type enable is supported");
+		ret = -EOPNOTSUPP;
+		goto exit;
+	}
+
+	if (action_oui_op == QCA_WLAN_VENDOR_FEATURE_CONFIG_DATA_CLEAR) {
+		status = ucfg_action_oui_cleanup(
+					hdd_ctx->psoc,
+					ACTION_OUI_ENABLE_DYNAMIC_SMPS);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_debug("action oui cleanup failure");
+			ret = -EINVAL;
+		}
+		goto exit;
+	}
+
+	/* OUI EXT List is optional param */
+	if (!tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_LIST]) {
+		hdd_debug("oui extension list not present");
+		/* return success in this case but disable DSMPS*/
+		goto disable_dsmps;
+	}
+
+	nla_for_each_nested(cur_attr,
+			    tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_LIST],
+			    rem) {
+		qdf_mem_set(&action_oui_ext, sizeof(action_oui_ext), 0);
+		if (wlan_cfg80211_nla_parse(
+				tb2,
+				QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_MAX,
+				nla_data(cur_attr), nla_len(cur_attr),
+				wlan_hdd_action_oui_ext_policy)) {
+			hdd_err_rl("nla_parse failed");
+			ret = -EINVAL;
+			goto exit;
+		}
+		if (i >= MAX_ALLOWED_OUI) {
+			hdd_debug("MAX OUI can be handled : %d",
+				  MAX_ALLOWED_OUI);
+			/* return success in this case with 100 stored OUI's*/
+			goto disable_dsmps;
+		}
+
+		if (tb2[FEATURE_CONFIG_EXT_OUI]) {
+			length = nla_len(tb2[FEATURE_CONFIG_EXT_OUI]);
+			nested_data = (uint8_t *)nla_data(
+						tb2[FEATURE_CONFIG_EXT_OUI]);
+			status =
+				ucfg_action_oui_add_token(ACTION_OUI_TOKEN,
+							  nested_data, length,
+							  &action_oui_ext);
+
+			if (QDF_IS_STATUS_ERROR(status)) {
+				ret = -EINVAL;
+				goto exit;
+			}
+		}
+
+		if (tb2[FEATURE_CONFIG_EXT_DATA]) {
+			length = nla_len(tb2[FEATURE_CONFIG_EXT_DATA]);
+			nested_data = (uint8_t *)nla_data(
+						tb2[FEATURE_CONFIG_EXT_DATA]);
+
+			status = ucfg_action_oui_add_token(
+						  ACTION_OUI_DATA_TOKEN,
+						  nested_data, length,
+						  &action_oui_ext);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				ret = -EINVAL;
+				goto exit;
+			}
+
+			/* Data mask is manadatory if data is present */
+			if (!tb2[FEATURE_CONFIG_EXT_DATA_MASK]) {
+				hdd_err("data mask missing");
+				ret = -EINVAL;
+				goto exit;
+			}
+		}
+
+		/* Ignore data mask if extension data not present */
+		if (tb2[FEATURE_CONFIG_EXT_DATA] &&
+		    tb2[FEATURE_CONFIG_EXT_DATA_MASK]) {
+			length = nla_len(tb2[FEATURE_CONFIG_EXT_DATA_MASK]);
+
+			nested_data = (uint8_t *)nla_data(
+					tb2[FEATURE_CONFIG_EXT_DATA_MASK]);
+			status = ucfg_action_oui_add_token(
+						ACTION_OUI_DATA_BIT_MASK_TOKEN,
+						nested_data, length,
+						&action_oui_ext);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				ret = -EINVAL;
+				goto exit;
+			}
+		}
+		ret = wlan_hdd_parse_action_oui_op_attr(tb2, &action_oui_ext);
+		if (ret) {
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		hdd_debug("save data for %d action oui", i);
+		status = ucfg_action_oui_extension_store(
+					hdd_ctx->psoc,
+					ACTION_OUI_ENABLE_DYNAMIC_SMPS,
+					&action_oui_ext);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			ret = -EINVAL;
+			goto exit;
+		}
+		i++;
+	}
+
+disable_dsmps:
+	ucfg_disable_dynamic_smps(hdd_ctx->psoc);
+
+	sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+				  adapter->deflink->vdev_id,
+				  QDF_STA_MODE);
+exit:
+	return ret;
+}
+
+/**
+ * wlan_hdd_cfg80211_set_action_oui() - set action OUI
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+int wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
+				     struct wireless_dev *wdev,
+				     const void *data,
+				     int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = _wlan_hdd_cfg80211_set_action_oui(wiphy, wdev,
+						  data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
 }
 #endif
 
