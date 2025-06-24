@@ -59,6 +59,7 @@ _target_chipset_map = {
         "qcn7605",
         "qca6390",
         "qca6490",
+        "qca6490_cnss2",
         "kiwi-v2",
     ],
 }
@@ -71,6 +72,7 @@ _chipset_hw_map = {
     "wcn7750": "BERYLLIUM",
     "qca6390": "LITHIUM",
     "qca6490": "LITHIUM",
+    "qca6490_cnss2": "LITHIUM",
     "qcn7605": "HELIUMPLUS",
     "wcn6450": "RHINE",
     "fig": "BORON",
@@ -108,6 +110,10 @@ _chipset_header_map = {
         "cmn/hal/wifi3.0/qca6390",
     ],
     "qca6490": [
+        "api/hw/qca6490/v1",
+        "cmn/hal/wifi3.0/qca6490",
+    ],
+    "qca6490_cnss2": [
         "api/hw/qca6490/v1",
         "cmn/hal/wifi3.0/qca6490",
     ],
