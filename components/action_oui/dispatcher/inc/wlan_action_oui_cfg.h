@@ -972,6 +972,33 @@
 
 /*
  * <ini>
+ * CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK - Used to skip beacon
+ * frame channel mismatch check for specified AP.
+ *
+ * Default OUIs: (All values in Hex)
+ * OUI 1: 18FE34
+ *   OUI data Len: 00
+ *   Info Mask : 01 - only OUI present in Info mask
+ *
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK CFG_INI_STRING( \
+	"gActionOUISkipBcnChMismatchCheck", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"18FE34 00 01", \
+	"skip beacon frame channel mismatch check for specified AP.")
+
+/*
+ * <ini>
  * CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2 - Used to disable Dynamic SMPS
  * capability for specified AP.
  *
@@ -1022,6 +1049,7 @@
 	CFG(CFG_ACTION_OUI_DISABLE_AUX_LISTEN) \
 	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS) \
 	CFG(CFG_ACTION_OUI_EXT_MLD_CAP_OP) \
+	CFG(CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK) \
 	CFG(CFG_ENABLE_ACTION_OUI)
 
 /* Action OUI V2 ini use different name format XXX_V2, support operator
