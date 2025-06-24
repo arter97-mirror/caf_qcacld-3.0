@@ -6271,6 +6271,18 @@ wlan_hdd_convert_control_roam_trigger_bitmap(uint32_t trigger_reason_bitmap,
 		drv_trigger_bitmap |= BIT(ROAM_TRIGGER_REASON_FORCED);
 		drv_trigger_bitmap |= BIT(ROAM_TRIGGER_REASON_STA_KICKOUT);
 		drv_trigger_bitmap |= BIT(ROAM_TRIGGER_REASON_PMK_TIMEOUT);
+
+		/*
+		 * If roaming is triggered due to low RSSI or high BSS LOAD,
+		 * periodic and partial scans should take place. Therefore set
+		 * the bit ROAM_TRIGGER_REASON_PERIODIC, when either
+		 * ROAM_TRIGGER_REASON_LOW_RSSI or ROAM_TRIGGER_REASON_BSS_LOAD
+		 * is set while configuring the bitmap.
+		 */
+		if ((trigger_reason_bitmap &
+		     QCA_ROAM_TRIGGER_REASON_POOR_RSSI) ||
+		    (trigger_reason_bitmap & QCA_ROAM_TRIGGER_REASON_BSS_LOAD))
+			drv_trigger_bitmap |= BIT(ROAM_TRIGGER_REASON_PERIODIC);
 	}
 
 	return drv_trigger_bitmap;
