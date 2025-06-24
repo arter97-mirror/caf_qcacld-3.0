@@ -34908,6 +34908,62 @@ end:
 }
 
 /**
+ * wlan_hdd_sap_link_removal_check_and_reassign_deflink() - switch default link
+ * @adapter: HDD adapter
+ * @link_info: Pointer to hdd link info
+ * @link_id: link id
+ *
+ * Return: true if switch default link, otherwise false
+ */
+static bool
+wlan_hdd_sap_link_removal_check_and_reassign_deflink(struct hdd_adapter *adapter,
+						     struct wlan_hdd_link_info *link_info,
+						     unsigned int link_id)
+{
+	struct wlan_hdd_link_info *iter_link_info;
+	uint8_t link_idx;
+	bool found = false;
+
+	if (link_id == WLAN_INVALID_LINK_ID) {
+		hdd_err("Invalid input parameters of link_id");
+		return false;
+	}
+
+	if (!WLAN_HDD_IS_DEFLINK(link_info)) {
+		hdd_debug("Not a default link, no reassignment needed");
+		return true;
+	}
+
+	if (!qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+				 link_info->link_flags)) {
+		hdd_debug("del default link, clear flags");
+		return found;
+	}
+
+	hdd_debug("del default link for link removal");
+	hdd_adapter_for_each_active_link_info(adapter, iter_link_info) {
+		if (qdf_atomic_test_bit(SOFTAP_ADD_INTF_LINK,
+					iter_link_info->link_flags)) {
+			if (wlan_vdev_get_link_id(iter_link_info->vdev) ==
+						  link_id) {
+				continue;
+			} else if (wlan_vdev_get_link_id(iter_link_info->vdev) !=
+					WLAN_INVALID_LINK_ID) {
+				found = true;
+				break;
+			}
+		}
+	}
+
+	if (found)
+		adapter->deflink = iter_link_info;
+	else
+		hdd_debug("no more active link");
+
+	return found;
+}
+
+/**
  * __wlan_hdd_cfg80211_del_intf_link() - to process del_intf_link
  * @wiphy: Pointer to wiphy
  * @wdev: Pointer to wireless device
@@ -34931,13 +34987,19 @@ __wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy,
 		return;
 	}
 
-	if (!WLAN_HDD_IS_DEFLINK(link_info)) {
-		hdd_stop_ap_link(link_info);
+	if (!wlan_hdd_sap_link_removal_check_and_reassign_deflink(adapter,
+								  link_info,
+								  link_id))
+		goto end;
 
+	hdd_stop_ap_link(link_info);
+
+	if (!WLAN_HDD_IS_DEFLINK(link_info)) {
 		link_idx = hdd_adapter_get_index_of_link_info(link_info);
 		qdf_atomic_clear_bit(link_idx, &adapter->active_links);
 	}
 
+end:
 	qdf_atomic_clear_bit(SOFTAP_ADD_INTF_LINK, link_info->link_flags);
 }
 
