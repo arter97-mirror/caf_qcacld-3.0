@@ -237,27 +237,30 @@ dp_haps_fail_safe_timer_handler(qdf_hrtimer_data_t *arg)
 
 /**
  * dp_print_haps_stats() - Display HAPS stats
- * @soc: Datapath global soc handle
+ * @psoc: pointer to psoc object
  *
  * Returns: QDF_STATUS
  */
-QDF_STATUS dp_print_haps_stats(struct dp_soc *soc)
+QDF_STATUS dp_print_haps_stats(struct wlan_objmgr_psoc *psoc)
 {
-	uint8_t vdev_id, idx;
-	struct dp_vdev *vdev;
 	struct dp_haps *haps_ctx;
 	struct dp_haps_stats *stats;
+	uint32_t *hist;
 	qdf_time_t curr_time_ms, total_time;
+	struct wlan_dp_intf *dp_intf = NULL, *dp_intf_next = NULL;
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 
-	for (vdev_id = 0 ; vdev_id < MAX_VDEV_CNT; vdev_id++) {
-		vdev = soc->vdev_id_map[vdev_id];
-
-		if (!vdev)
+	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
+		if (!dp_intf)
 			continue;
 
-		haps_ctx = dp_get_haps_ctx_from_vdev(vdev->osif_vdev);
+		haps_ctx = &dp_intf->haps_ctx;
 		stats = &haps_ctx->stats;
 
+		if (!haps_ctx->is_enable || !stats->event_received)
+			continue;
+
+		hist = haps_ctx->stats.haps_pause_bucket;
 		curr_time_ms = US_TO_MS(qdf_get_log_timestamp_usecs());
 		total_time = curr_time_ms - stats->start_time;
 
@@ -265,7 +268,7 @@ QDF_STATUS dp_print_haps_stats(struct dp_soc *soc)
 			stats->total_pause_time += curr_time_ms -
 							stats->last_time;
 
-		dp_info("*** HAPS vdev:%u stats ***", vdev_id);
+		dp_info("*** HAPS vdev:%u stats ***", haps_ctx->vdev_id);
 		dp_info("Total HAPS events received: %u",
 			stats->event_received);
 		dp_info("Pause ind: %u", stats->pause_ind);
@@ -276,9 +279,12 @@ QDF_STATUS dp_print_haps_stats(struct dp_soc *soc)
 			stats->fail_safe_timer_expired);
 		dp_info("Total time/Pause time: %zu/%zu", total_time,
 			stats->total_pause_time);
-		dp_info("Pause bucket:");
-		for (idx = 0; idx < HAPS_BUCKET_MAX; idx++)
-			dp_info("[%u:%u] ", idx, stats->haps_pause_bucket[idx]);
+		dp_info("Pause bucket: 0-20[%u] 20-40[%u] 40-60[%u] 60-80[%u] "
+			"80-100[%u] 100-120[%u] 120-140[%u] 140+[%u]",
+			hist[HAPS_BUCKET_20_MS], hist[HAPS_BUCKET_40_MS],
+			hist[HAPS_BUCKET_60_MS], hist[HAPS_BUCKET_80_MS],
+			hist[HAPS_BUCKET_100_MS], hist[HAPS_BUCKET_120_MS],
+			hist[HAPS_BUCKET_140_MS], hist[HAPS_BUCKET_BEYOND]);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -286,24 +292,25 @@ QDF_STATUS dp_print_haps_stats(struct dp_soc *soc)
 
 /**
  * dp_clear_haps_stats() - Clear HAPS stats
- * @soc: Datapath global soc handle
+ * @psoc: pointer to psoc object
  *
  * Returns: None
  */
-void dp_clear_haps_stats(struct dp_soc *soc)
+void dp_clear_haps_stats(struct wlan_objmgr_psoc *psoc)
 {
-	uint8_t vdev_id;
-	struct dp_vdev *vdev;
 	struct dp_haps *haps_ctx;
+	struct wlan_dp_intf *dp_intf = NULL, *dp_intf_next = NULL;
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
 
-	for (vdev_id = 0 ; vdev_id < MAX_VDEV_CNT; vdev_id++) {
-		vdev = soc->vdev_id_map[vdev_id];
-
-		if (!vdev)
+	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
+		if (!dp_intf)
 			continue;
 
-		haps_ctx = dp_get_haps_ctx_from_vdev(vdev->osif_vdev);
+		haps_ctx = &dp_intf->haps_ctx;
+
 		qdf_mem_set(&haps_ctx->stats, 0, sizeof(struct dp_haps_stats));
+		haps_ctx->stats.start_time =
+				US_TO_MS(qdf_get_log_timestamp_usecs());
 	}
 }
 
