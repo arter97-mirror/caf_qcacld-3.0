@@ -257,8 +257,20 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
-	cm_update_scan_mlme_on_roam(vdev, &connected_bssid,
-				    SCAN_ENTRY_CON_STATE_NONE);
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    mlo_get_single_link_ml_roaming(psoc, vdev_id)) {
+		/*
+		 * For single link ML roaming, the peers will be deleted
+		 * before the start of the disconnect sequence for the partner
+		 * vdev. Therefore during disconnect, the BSSID would be zero.
+		 * So for such roaming, unlink the link BSS entries before the
+		 * peer deletion.
+		 */
+		cm_update_scan_mlme_for_mlo_roam(vdev);
+	} else {
+		cm_update_scan_mlme_on_roam(vdev, &connected_bssid,
+					    SCAN_ENTRY_CON_STATE_NONE);
+	}
 
 	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))
 		status = wlan_cm_roam_state_change(pdev,
@@ -649,6 +661,66 @@ cm_mlo_roam_copy_partner_info(struct wlan_cm_connect_resp *connect_rsp,
 	mlo_roam_copy_partner_info(&connect_rsp->ml_parnter_info,
 				   roam_synch_data, WLAN_INVALID_VDEV_ID,
 				   true);
+}
+
+void
+cm_update_scan_mlme_for_mlo_roam(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev;
+	struct wlan_objmgr_pdev *pdev;
+	struct mlo_link_info *link_info;
+	struct scan_filter *filter;
+	struct bss_info bss_info = {0};
+	struct mlme_info mlme;
+	QDF_STATUS status;
+	uint8_t i;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return;
+
+	ml_dev = vdev->mlo_dev_ctx;
+	if (!ml_dev || !ml_dev->link_ctx)
+		return;
+
+	status = wlan_vdev_mlme_get_ssid(vdev, bss_info.ssid.ssid,
+					 &bss_info.ssid.length);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("failed to get ssid");
+		return;
+	}
+
+	mlme.assoc_state = SCAN_ENTRY_CON_STATE_NONE;
+
+	filter = qdf_mem_malloc(sizeof(*filter));
+	if (!filter)
+		return;
+
+	link_info = &ml_dev->link_ctx->links_info[0];
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		qdf_mem_zero(filter, sizeof(struct scan_filter));
+		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
+			continue;
+
+		qdf_copy_macaddr(&bss_info.bssid, &link_info->ap_link_addr);
+		bss_info.freq = link_info->chan_freq;
+
+		wlan_scan_update_mlme_by_bssinfo(pdev, &bss_info, &mlme);
+
+		filter->num_of_bssid = 1;
+		qdf_copy_macaddr(&filter->bssid_list[0],
+				 &link_info->ap_link_addr);
+		if (wlan_scan_is_locally_generated_entry(pdev,
+							 &link_info->ap_link_addr))
+			ucfg_scan_flush_results(pdev, filter);
+
+		link_info++;
+	}
+
+	qdf_mem_free(filter);
 }
 #else
 static inline void
