@@ -4587,7 +4587,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
-				 ap_adapter->deflink->link_flags)) {
+				 link_info->link_flags)) {
 		hdd_err("SOFTAP_BSS_STARTED not set");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -4606,6 +4606,14 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(wlansap_context_get(sap_context))) {
 		hdd_err("sap_context is invalid");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+				link_info->link_flags)) {
+		wlansap_context_put(sap_context);
+		hdd_err("removing link in vdev:%d,reject restart sap",
+			vdev_id);
+		return -EINVAL;
 	}
 
 	policy_mgr_get_original_bw_for_sap_restart(psoc, &use_sap_original_bw);
