@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -217,7 +217,14 @@ cm_handle_disconnect_req(struct wlan_objmgr_vdev *vdev,
 
 	cm_csr_handle_diconnect_req(vdev, req);
 	wlan_roam_reset_roam_params(vdev);
-	cm_roam_restore_default_config(pdev, vdev_id);
+
+	/*
+	 * If the disconnect request is due to link switch
+	 * do not restore the default config.
+	 */
+	if (req->req.source != CM_MLO_LINK_SWITCH_DISCONNECT)
+		cm_roam_restore_default_config(pdev, vdev_id);
+
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	if (opmode == QDF_STA_MODE && !wlan_vdev_mlme_is_link_sta_vdev(vdev))
 		wlan_cm_roam_state_change(pdev, vdev_id,
