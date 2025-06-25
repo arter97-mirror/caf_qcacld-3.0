@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -930,6 +930,8 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	dp_fisa_cfg_init(config, psoc);
 	dp_direct_link_cfg_init(config, psoc);
 	wlan_dp_stc_cfg_init(config, psoc);
+
+	config->dp_irq_affinity_mask = cfg_get(psoc, CFG_DP_IRQ_AFFINITY_MASK);
 }
 
 /**

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1324,6 +1324,10 @@ hdd_sysfs_destroy_monitor_adapter_root_obj(struct hdd_adapter *adapter)
 
 void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 {
+	struct kobject *kobj = NULL;
+
+	kobj = pld_get_wifi_kobj(NULL);
+
 	hdd_sysfs_create_driver_root_obj();
 	hdd_sysfs_create_version_interface(hdd_ctx->psoc);
 	hdd_sysfs_mem_stats_create(wlan_kobject);
@@ -1331,7 +1335,10 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_create_powerstats_interface();
 		hdd_sysfs_create_max_chipset_log_size_interface(wifi_kobject,
 								hdd_ctx);
-		hdd_sysfs_create_dump_in_progress_interface(wifi_kobject);
+		if (!kobj)
+			hdd_sysfs_create_dump_in_progress_interface(
+								  wifi_kobject,
+								  hdd_ctx);
 		hdd_sysfs_fw_mode_config_create(driver_kobject);
 		hdd_sysfs_scan_disable_create(driver_kobject);
 		hdd_sysfs_wow_ito_create(driver_kobject);
@@ -1362,6 +1369,10 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 
 void hdd_destroy_sysfs_files(void)
 {
+	struct kobject *kobj = NULL;
+
+	kobj = pld_get_wifi_kobj(NULL);
+
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
 		hdd_sysfs_ipa_opt_dp_ctrl_rm_destroy(driver_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_destroy(driver_kobject);
@@ -1388,7 +1399,9 @@ void hdd_destroy_sysfs_files(void)
 		hdd_sysfs_wow_ito_destroy(driver_kobject);
 		hdd_sysfs_scan_disable_destroy(driver_kobject);
 		hdd_sysfs_fw_mode_config_destroy(driver_kobject);
-		hdd_sysfs_destroy_dump_in_progress_interface(wifi_kobject);
+		if (!kobj)
+			hdd_sysfs_destroy_dump_in_progress_interface(
+								  wifi_kobject);
 		hdd_sysfs_destroy_max_chipset_log_size_interface(wifi_kobject);
 		hdd_sysfs_destroy_powerstats_interface();
 	}

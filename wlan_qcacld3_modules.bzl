@@ -3,6 +3,9 @@ load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load(":target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
+    "neo-la": [
+	"kiwi-v2",
+    ],
     "anorak": [
         "qca6490",
         "kiwi-v2",
@@ -23,6 +26,7 @@ _target_chipset_map = {
         "kiwi-v2",
         "qca6750",
         "wcn7750",
+        "wcn7760",
     ],
     "volcano": [
         "qca6750",
@@ -41,6 +45,7 @@ _chipset_hw_map = {
     "wcn7750": "BERYLLIUM",
     "qca6490": "LITHIUM",
     "wcn6450": "RHINE",
+    "wcn7760": "BERYLLIUM",
 }
 
 _chipset_header_map = {
@@ -72,6 +77,10 @@ _chipset_header_map = {
         "api/hw/wcn6450/v1",
         "cmn/hal/wifi3.0/wcn6450",
     ],
+    "wcn7760": [
+        "api/hw/qcc2072/v1",
+        "cmn/hal/wifi3.0/qcc2072",
+    ]
 }
 
 _hw_header_map = {
@@ -771,6 +780,14 @@ _conditional_srcs = {
             "cmn/hif/src/wcn7750def.c",
         ],
     },
+
+    "CONFIG_QCC2072_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/qcc2072/hal_qcc2072.c",
+            "cmn/hif/src/qcc2072def.c",
+        ],
+    },
+
     "CONFIG_CP_STATS": {
         True: [
             "cmn/target_if/cp_stats/src/target_if_cp_stats.c",
@@ -2268,6 +2285,11 @@ _conditional_srcs = {
             "cmn/qdf/linux/src/qdf_page_pool.c",
         ],
     },
+    "CONFIG_DP_FEATURE_TX_PAGE_POOL": {
+        True: [
+            "cmn/qdf/linux/src/qdf_page_pool.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
@@ -2298,10 +2320,17 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//build/kernel/kleaf:socrepo_false": [],
         })
 
-    kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
-    })
+    if target == "neo-la":
+        kernel_build = select({
+            "//build/kernel/kleaf:microxr_kernel_build_true": "//:target_kernel_build",
+            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//conditions:default": "//msm-kernel:{}".format(tv),
+        })
+    else:
+        kernel_build = select({
+            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+        })
 
     ipaths = chipset_ipaths + hw_ipaths + _fixed_ipaths
 
@@ -2434,7 +2463,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
     ]
 
-    if target != "x1e80100" and target != "anorak":
+    if target != "x1e80100" and target != "anorak" and target != "neo-la":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),

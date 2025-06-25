@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -72,6 +72,15 @@ wlan_twt_cfg_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
  */
 QDF_STATUS
 wlan_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val);
+
+/**
+ * wlan_twt_cfg_reset_responder() - Reset cfg responder
+ * @psoc: psoc
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_twt_cfg_set_responder() - set cfg responder
@@ -266,6 +275,12 @@ wlan_twt_cfg_get_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
 
 static inline QDF_STATUS
 wlan_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_cfg_reset_responder(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
 }

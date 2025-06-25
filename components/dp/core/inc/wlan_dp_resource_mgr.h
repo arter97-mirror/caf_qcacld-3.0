@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: ISC
  */
 
@@ -91,6 +91,7 @@ struct wlan_dp_resource_ml_vote_info {
  * @tput1: Max throughput on MAC-1
  * @vdev_id: Vdev id
  * @mac_id: HW MAC id
+ * @nan_vote: current vote node is for nan
  */
 struct wlan_dp_resource_vote_node {
 	struct wlan_dp_peer_priv_context *priv_ctx;
@@ -108,6 +109,7 @@ struct wlan_dp_resource_vote_node {
 	uint64_t tput1;
 	uint32_t vdev_id;
 	uint32_t mac_id;
+	bool nan_vote;
 };
 
 /**

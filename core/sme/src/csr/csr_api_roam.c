@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3847,6 +3847,9 @@ static enum csr_akm_type csr_translate_akm_type(enum ani_akm_type akm_type)
 		break;
 	case ANI_AKM_TYPE_OSEN:
 		csr_akm_type = eCSR_AUTH_TYPE_OSEN;
+		break;
+	case ANI_AKM_TYPE_SAE_EXT_KEY:
+		csr_akm_type = eCSR_AUTH_TYPE_SAE_EXT_KEY;
 		break;
 	default:
 		csr_akm_type = eCSR_AUTH_TYPE_UNKNOWN;

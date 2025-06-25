@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -147,6 +147,34 @@ void *dp_prealloc_get_consistent_mem_unaligned(qdf_size_t size,
  */
 void dp_prealloc_put_consistent_mem_unaligned(void *va_unaligned);
 
+#if defined(DP_FEATURE_TX_PAGE_POOL) || defined(DP_FEATURE_RX_BUFFER_RECYCLE)
+/**
+ * dp_prealloc_get_page_pool() - get page pool from pre-alloc pool
+ * @type: page pool type whether tx or rx page pool
+ * @pool_size: requested page pool size
+ *
+ * Return: pointer to dp_page_pool_t on success or NULL on failure
+ */
+struct dp_page_pool_t*
+dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size);
+
+/**
+ * dp_prealloc_put_page_pool() - put page pool reference back to pre-alloc pool
+ * @pp: pointer to page pool memory
+ * @type: page pool type whether tx or rx page pool
+ *
+ * Return: None
+ */
+void dp_prealloc_put_page_pool(qdf_page_pool_t pp, enum qdf_dp_tx_pp_type type);
+
+/**
+ * dp_prealloc_page_pool_init() - initialize page pool memory
+ * @ctrl_psoc: pointer to psoc object
+ *
+ * Return: none
+ */
+void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc);
+#endif
 #else
 static inline
 QDF_STATUS dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)

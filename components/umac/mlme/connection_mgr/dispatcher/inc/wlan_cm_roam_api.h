@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -112,6 +112,8 @@ wlan_roam_update_cfg(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  */
 void wlan_cm_send_beacon_miss(uint8_t vdev_id, int32_t rssi);
 
+void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
+				    struct element_info *assoc_ie);
 #else
 static inline
 QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
@@ -149,6 +151,11 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline
+void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
+				    struct element_info *assoc_ie)
+{}
 #endif
 
 /**

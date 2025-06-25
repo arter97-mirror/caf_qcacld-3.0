@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -57,6 +57,7 @@
 #include <wlan_crypto_global_api.h>
 #include "../../core/src/vdev_mgr_ops.h"
 #include "wma.h"
+#include "wma_api.h"
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include "wlan_action_oui_main.h"
 #include <wlan_cm_api.h>
@@ -4758,7 +4759,8 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	}
 
 	/* Reset the SPMK global cache for non-SAE connection */
-	if (session->connected_akm != ANI_AKM_TYPE_SAE) {
+	if (session->connected_akm != ANI_AKM_TYPE_SAE &&
+	    session->connected_akm != ANI_AKM_TYPE_SAE_EXT_KEY) {
 		wlan_mlme_set_sae_single_pmk_bss_cap(mac_ctx->psoc,
 						     session->vdev_id,
 						     false);
@@ -6627,6 +6629,102 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
 	return max_tx_power;
 }
 
+/**
+ * lim_update_both_eirp_psd()- cap EIRP and PSD powers to avoid
+ * any issue by sending more than allowed regulatory power
+ *
+ * @vdev: objmgr vdev
+ * @max_tx_power: max allowed tx power
+ * @reg_max: regulatory maximum power
+ * @ap_power_type_6g: ap power type
+ * @oper_freq: operating freq
+ * @i: index
+ * Return: None
+ */
+static void
+lim_update_both_eirp_psd(struct wlan_objmgr_vdev *vdev, int8_t max_tx_power,
+			 int16_t reg_max, uint32_t ap_power_type_6g,
+			 qdf_freq_t oper_freq, uint8_t i)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+	int8_t psd_power;
+	int8_t eirp_power;
+	uint16_t eirp_reg_max, eirp_max_tx_power;
+	uint16_t psd_reg_max;
+	uint8_t num_psd_pwr_levels = 0;
+	uint8_t num_eirp_pwr_levels = 0;
+	struct wlan_objmgr_pdev *pdev;
+	uint16_t local_constraint = 0;
+
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		pe_err("vdev component object is NULL");
+		return;
+	}
+
+	num_psd_pwr_levels = vdev_mlme->reg_tpc_obj.num_psd_pwr_levels;
+	num_eirp_pwr_levels =
+		vdev_mlme->reg_tpc_obj.num_eirp_pwr_levels;
+
+	if (i < num_psd_pwr_levels) {
+		psd_power =
+			vdev_mlme->reg_tpc_obj.chan_psd_power_info[i].tx_power;
+		/**
+		 * AP advertises TPE IE tx power as 8-bit unsigned int.
+		 * STA needs to convert it into an 8-bit 2s complement
+		 * signed integer in the range –64 dBm to 63 dBm with a
+		 * 0.5 dB step
+		 */
+		psd_power /= 2;
+		max_tx_power = QDF_MIN(max_tx_power, psd_power);
+		vdev_mlme->reg_tpc_obj.chan_psd_power_info[i].tx_power = (uint8_t)max_tx_power;
+	}
+
+	if (i < num_eirp_pwr_levels) {
+		pdev = wlan_vdev_get_pdev(vdev);
+		if (!pdev) {
+			pe_err("pdev is NULL");
+			return;
+		}
+
+		wlan_reg_get_client_power_for_connecting_ap(
+			pdev, ap_power_type_6g, oper_freq,
+			0, &eirp_reg_max,
+			&psd_reg_max);
+
+		local_constraint = vdev_mlme->reg_tpc_obj.ap_constraint_power;
+
+		if (vdev_mlme->reg_tpc_obj.is_power_constraint_abs) {
+			if (!local_constraint) {
+				eirp_max_tx_power = eirp_reg_max;
+			} else {
+				eirp_max_tx_power = QDF_MIN(eirp_reg_max,
+							    local_constraint);
+			}
+		} else {
+			eirp_max_tx_power = eirp_reg_max - local_constraint;
+			if (!eirp_max_tx_power)
+				eirp_max_tx_power = eirp_reg_max;
+		}
+
+
+		eirp_power =
+			vdev_mlme->reg_tpc_obj.chan_eirp_power_info[i].tx_power;
+		/**
+		 * AP advertises TPE IE tx power as 8-bit unsigned int.
+		 * STA needs to convert it into an 8-bit 2s complement
+		 * signed integer in the range –64 dBm to 63 dBm with a
+		 * 0.5 dB step
+		 */
+		eirp_power /= 2;
+		max_tx_power = QDF_MIN(eirp_max_tx_power, eirp_power);
+		vdev_mlme->reg_tpc_obj.chan_eirp_power_info[i].tx_power =
+							(uint8_t)max_tx_power;
+	}
+
+}
+
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session)
 {
@@ -6634,6 +6732,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 	bool is_tpe_present = false, is_6ghz_freq = false;
 	uint8_t i = 0;
 	int8_t max_tx_power;
+	int8_t max_tx_power_allowed;
 	uint16_t reg_max = 0, reg_psd_pwr_max = 0;
 	uint16_t tx_power_within_bw = 0, psd_power_within_bw = 0;
 	uint16_t local_constraint, bw_val = 0;
@@ -6643,6 +6742,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 	struct vdev_mlme_obj *mlme_obj;
 	int8_t tpe_power;
 	bool skip_tpe = false;
+	bool psd_eirp_support_present;
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!mlme_obj) {
@@ -6809,6 +6909,11 @@ void lim_calculate_tpc(struct mac_context *mac,
 				max_tx_power = reg_max;
 		}
 
+		/* In case TPE IE not present then set max tx power */
+		max_tx_power_allowed = max_tx_power;
+
+		mlme_obj->reg_tpc_obj.power_type_6g = ap_power_type_6g;
+
 		/* If TPE is present */
 		if (is_tpe_present && !skip_tpe) {
 			if (!is_psd_power && mlme_obj->reg_tpc_obj.eirp_power)
@@ -6822,12 +6927,20 @@ void lim_calculate_tpc(struct mac_context *mac,
 			 * 0.5 dB step
 			 */
 			tpe_power /= 2;
-			max_tx_power = QDF_MIN(max_tx_power, tpe_power);
+			max_tx_power_allowed = QDF_MIN(max_tx_power, tpe_power);
 			pe_debug("TPE: %d", tpe_power);
+			wma_is_both_psd_eirp_support_present_for_sp(
+						&mlme_obj->reg_tpc_obj,
+						&psd_eirp_support_present);
+			if (psd_eirp_support_present &&
+			    LIM_IS_STA_ROLE(session))
+				lim_update_both_eirp_psd(session->vdev,
+							 max_tx_power,
+							 reg_max, ap_power_type_6g,
+							 oper_freq, i);
 		}
-
 		mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
-						(uint8_t)max_tx_power;
+						(uint8_t)max_tx_power_allowed;
 
 		pe_debug("freq: %d reg power: %d, max_tx_power(eirp/psd): %d",
 			 mlme_obj->reg_tpc_obj.frequency[i], reg_max,
@@ -6836,7 +6949,6 @@ void lim_calculate_tpc(struct mac_context *mac,
 
 	mlme_obj->reg_tpc_obj.num_pwr_levels = num_pwr_levels;
 	mlme_obj->reg_tpc_obj.eirp_power = reg_max;
-	mlme_obj->reg_tpc_obj.power_type_6g = ap_power_type_6g;
 	mlme_obj->reg_tpc_obj.is_psd_power = is_psd_power;
 
 	if (session->best_6g_power_type == REG_INDOOR_SP_AP)

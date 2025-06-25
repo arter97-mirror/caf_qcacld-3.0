@@ -991,7 +991,7 @@ QDF_OBJS := \
 	$(QDF_OBJ_DIR)/qdf_talloc.o \
 	$(QDF_OBJ_DIR)/qdf_types.o \
 
-ifeq ($(CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE), y)
+ifneq (,$(filter y,$(CONFIG_DP_FEATURE_TX_PAGE_POOL) $(CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE)))
 QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_page_pool.o
 endif
 
@@ -2249,7 +2249,7 @@ ifeq ($(CONFIG_WLAN_TX_FLOW_CONTROL_V2), y)
 DP_OBJS += $(DP_SRC)/dp_tx_flow_control.o
 endif
 
-ifeq ($(CONFIG_WLAN_FEATURE_RX_BUFFER_POOL), y)
+ifneq (,$(filter y,$(CONFIG_WLAN_FEATURE_RX_BUFFER_POOL) $(CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE)))
 DP_OBJS += $(DP_SRC)/dp_rx_buffer_pool.o
 endif
 
@@ -4552,6 +4552,11 @@ ccflags-$(CONFIG_FEATURE_WLAN_SUPPORT_USD) += -DFEATURE_WLAN_SUPPORT_USD
 #Enable support to get ANI value
 ifeq ($(CONFIG_ANI_LEVEL_REQUEST), y)
 ccflags-y += -DFEATURE_ANI_LEVEL_REQUEST
+endif
+
+ifeq ($(CONFIG_DP_FEATURE_TX_PAGE_POOL), y)
+ccflags-y += -DDP_FEATURE_TX_PAGE_POOL
+ccflags-y += -DWLAN_DP_ENABLE_SW_TSO
 endif
 
 #Flags to enable/disable WMI APIs

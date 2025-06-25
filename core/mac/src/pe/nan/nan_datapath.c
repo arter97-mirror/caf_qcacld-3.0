@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -80,8 +80,6 @@ static QDF_STATUS lim_add_ndi_peer(struct mac_context *mac_ctx,
 	}
 	pe_info("Need to create NDI Peer :" QDF_MAC_ADDR_FMT,
 		QDF_MAC_ADDR_REF(peer_mac_addr.bytes));
-
-	ucfg_nan_set_peer_mc_list(session->vdev, peer_mac_addr);
 
 	peer_idx = lim_assign_peer_idx(mac_ctx, session);
 	if (!peer_idx) {

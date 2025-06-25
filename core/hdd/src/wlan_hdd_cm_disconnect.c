@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -295,7 +296,6 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	ucfg_p2p_status_disconnect(vdev);
 	hdd_cfr_disconnect(vdev);
 
-	hdd_wmm_adapter_clear(adapter);
 	ucfg_cm_ft_reset(vdev);
 	ucfg_cm_reset_key(hdd_ctx->pdev, link_info->vdev_id);
 	hdd_clear_roam_profile_ie(adapter);
@@ -332,10 +332,12 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		 * valid link_info for the given adapter. So avoid this reset
 		 * for Link Switch disconnect/internal disconnect
 		 */
-		if (source != CM_MLO_ROAM_INTERNAL_DISCONNECT)
+		if (source != CM_MLO_ROAM_INTERNAL_DISCONNECT) {
+			hdd_wmm_adapter_clear(adapter);
 			hdd_adapter_reset_station_ctx(adapter);
-		else
+		} else {
 			hdd_cm_clear_ieee_link_id(link_info, false);
+		}
 	}
 
 	ucfg_dp_remove_conn_info(vdev);

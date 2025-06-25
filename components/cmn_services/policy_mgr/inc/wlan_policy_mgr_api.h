@@ -759,6 +759,18 @@ bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id, uint32_t ch_freq);
 
 /**
+ * policy_mgr_validate_sta_start() - Check if concurrency is
+ * allowed for STA start
+ * @vdev: vdev object information
+ *
+ * some platform STA+SAP+SAP not supported, add check STA starting
+ * allowed or not based on PCL in 3 Vifs case.
+ *
+ * Return: True if the concurrency is allowed for STA start
+ */
+bool policy_mgr_validate_sta_start(struct wlan_objmgr_vdev *vdev);
+
+/**
  * policy_mgr_handle_conc_multiport() - to handle multiport concurrency
  * @psoc: PSOC object information
  * @vdev_id: Vdev ID

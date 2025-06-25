@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,6 +33,7 @@
 #include "pld_internal.h"
 #include "pld_ipci.h"
 #include "osif_psoc_sync.h"
+#include "cds_api.h"
 
 #ifdef CONFIG_PLD_IPCI_ICNSS
 
@@ -85,6 +86,8 @@ static void pld_ipci_remove(struct device *dev)
 	int errno;
 	struct osif_psoc_sync *psoc_sync;
 
+	cds_set_driver_loaded(false);
+	cds_set_unload_in_progress(true);
 	errno = osif_psoc_sync_trans_start_wait(dev, &psoc_sync);
 	if (errno)
 		return;

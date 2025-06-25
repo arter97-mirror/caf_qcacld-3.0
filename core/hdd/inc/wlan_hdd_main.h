@@ -2121,6 +2121,7 @@ enum wlan_state_ctrl_str_id {
  * @twt_en_dis_work: work to send twt enable/disable cmd on MCC/SCC concurrency
  * @is_wifi3_0_target:
  * @dump_in_progress: Stores value of dump in progress
+ * @is_drv_dump_in_progress_valid: Is dump_inprogress sysfs node is valid
  * @max_chipset_log_size_enable: ini flag to enable/disable max_chipset_log_size
  * @max_chipset_log_size: Stores max chipset log size value
  * @dual_sta_policy: Concurrent STA policy configuration
@@ -2406,6 +2407,7 @@ struct hdd_context {
 #endif
 	bool is_wifi3_0_target;
 	bool dump_in_progress;
+	bool is_drv_dump_in_progress_valid;
 	bool max_chipset_log_size_enable;
 	uint16_t max_chipset_log_size;
 	struct hdd_dual_sta_policy dual_sta_policy;
@@ -6067,12 +6069,18 @@ static inline void hdd_wiphy_unlock(struct wiphy *wiphy, struct wireless_dev *de
 #else
 static inline void hdd_wiphy_lock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
 {
-	wiphy_lock(wiphy);
+	if (wiphy)
+		wiphy_lock(wiphy);
+	else if (dev_ptr)
+		mutex_lock(&dev_ptr->wiphy->mtx);
 }
 
 static inline void hdd_wiphy_unlock(struct wiphy *wiphy, struct wireless_dev *dev_ptr)
 {
-	wiphy_unlock(wiphy);
+	if (wiphy)
+		wiphy_unlock(wiphy);
+	else if (dev_ptr)
+		mutex_unlock(&dev_ptr->wiphy->mtx);
 }
 #endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

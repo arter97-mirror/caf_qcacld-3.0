@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2071,6 +2072,8 @@ struct fw_scan_channels {
  * @roam_preauth_no_ack_timeout: Configure the no ack timeout period
  * @roam_rssi_diff: Enable roam based on rssi
  * @roam_rssi_diff_6ghz: RSSI diff value to be used for roaming to 6 GHz AP.
+ * @roam_rssi_delta_6ghz_to_non_6ghz: RSSI diff value to be used for
+ * roaming from 6 GHz to Non 6GHz AP.
  * @bg_rssi_threshold: Background RSSI threshold
  * @roam_scan_offload_enabled: Enable Roam Scan Offload
  * @neighbor_scan_timer_period: Neighbor scan timer period
@@ -2208,6 +2211,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_preauth_no_ack_timeout;
 	uint8_t roam_rssi_diff;
 	uint8_t roam_rssi_diff_6ghz;
+	uint8_t roam_rssi_delta_6ghz_to_non_6ghz;
 	uint8_t bg_rssi_threshold;
 	bool roam_scan_offload_enabled;
 	uint32_t neighbor_scan_timer_period;
