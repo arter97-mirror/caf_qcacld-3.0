@@ -2275,7 +2275,8 @@ int wlan_hdd_sap_cfg_dfs_override(struct wlan_hdd_link_info *link_info)
 						     &con_ch_freq))
 		return 0;
 
-	if (con_vdev_id >= WLAN_UMAC_VDEV_ID_MAX)
+	if (con_vdev_id >= WLAN_UMAC_VDEV_ID_MAX ||
+	    con_vdev_id == link_info->vdev_id)
 		return 0;
 
 	conc_link_info = hdd_get_link_info_by_vdev(hdd_ctx, con_vdev_id);
@@ -2287,6 +2288,13 @@ int wlan_hdd_sap_cfg_dfs_override(struct wlan_hdd_link_info *link_info)
 	con_sap_adapter = conc_link_info->adapter;
 	if (!con_sap_adapter)
 		return 0;
+
+	/* channels of different link of same ML SAP should not same */
+	if (con_sap_adapter == link_info->adapter) {
+		hdd_debug("vdev %d and conc vdev %d belong to same adapter",
+			  link_info->vdev_id, con_vdev_id);
+		return 0;
+	}
 
 	con_sap_config = &conc_link_info->session.ap.sap_config;
 
