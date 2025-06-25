@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +30,7 @@
 #include "wlan_reg_ucfg_api.h"
 #include <host_diag_core_event.h>
 #include "wlan_policy_mgr_api.h"
+#include "wlan_mlme_api.h"
 
 static uint8_t calculate_hash_key(const uint8_t *macaddr)
 {
@@ -193,15 +194,19 @@ qdf_freq_t tdls_get_offchan_freq(struct wlan_objmgr_vdev *vdev,
 uint32_t tdls_get_offchan_bw(struct tdls_soc_priv_obj *soc_obj,
 			     qdf_freq_t off_chan_freq)
 {
-	uint32_t pre_off_chan_bw;
+	uint32_t pre_off_chan_bw = soc_obj->tdls_configs.tdls_pre_off_chan_bw;
+	bool is_160_allowed = true;
+	enum phy_ch_width fw_max_bw = wlan_mlme_get_max_bw();
 
-	if (wlan_reg_is_5ghz_ch_freq(off_chan_freq) &&
+	if (wlan_reg_is_5ghz_ch_freq(off_chan_freq) ||
+	    fw_max_bw < CH_WIDTH_160MHZ)
+		is_160_allowed = false;
+
+	if (!is_160_allowed &&
 	    CHECK_BIT(soc_obj->tdls_configs.tdls_pre_off_chan_bw,
 		      BW_160_OFFSET_BIT))
 		pre_off_chan_bw = soc_obj->tdls_configs.tdls_pre_off_chan_bw &
 						~(1 << BW_160_OFFSET_BIT);
-	else
-		pre_off_chan_bw = soc_obj->tdls_configs.tdls_pre_off_chan_bw;
 
 	return pre_off_chan_bw;
 }
