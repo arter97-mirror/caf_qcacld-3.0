@@ -3714,9 +3714,13 @@ stopbss:
 		 */
 		hdd_debug("vdev %d Disabling queues",
 			  adapter->deflink->vdev_id);
-		wlan_hdd_netif_queue_control(adapter,
-					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
-					WLAN_CONTROL_PATH);
+		if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+					link_info->link_flags))
+			hdd_debug("bypass all netif queue in link_removal progress");
+		else
+			wlan_hdd_netif_queue_control(adapter,
+						     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
+						     WLAN_CONTROL_PATH);
 
 		/* reclaim all resources allocated to the BSS */
 		qdf_status = hdd_softap_stop_bss(link_info);
@@ -8449,9 +8453,13 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	hdd_dcs_clear(adapter);
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
-	wlan_hdd_netif_queue_control(adapter,
-				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
-				     WLAN_CONTROL_PATH);
+	if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+				link_info->link_flags))
+		hdd_debug("bypass all netif queue in link_removal progress");
+	else
+		wlan_hdd_netif_queue_control(adapter,
+					     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
+					     WLAN_CONTROL_PATH);
 
 	wlan_hdd_cleanup_actionframe(link_info);
 	wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
