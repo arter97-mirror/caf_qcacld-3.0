@@ -6363,4 +6363,15 @@ uint32_t policy_mgr_get_conc_ml_sap_link_freq(struct wlan_objmgr_psoc *psoc,
 uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id, uint32_t freq);
 
+/**
+ * policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans() - Check if SAP is going
+ *							 to move from MCC to SCC
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: True if there is a SAP in MCC with STA and if it's going to move to
+ *	   STA channel, i.e. SCC
+ */
+bool
+policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(
+	struct wlan_objmgr_psoc *psoc);
 #endif /* __WLAN_POLICY_MGR_API_H */

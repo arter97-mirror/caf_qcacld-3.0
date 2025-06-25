@@ -15082,3 +15082,36 @@ uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
 
 	return scc_vdev_id;
 }
+
+bool
+policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(struct wlan_objmgr_psoc *psoc)
+{
+	qdf_freq_t sap_ch_freq[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS], i, sap_count;
+	uint8_t mcc_to_scc_switch = 0;
+	struct wlan_channel *vdev_chan = NULL;
+	struct wlan_objmgr_vdev *vdev;
+
+	sap_count = policy_mgr_get_mode_specific_conn_info(psoc, sap_ch_freq,
+							   vdev_id,
+							   PM_SAP_MODE);
+	policy_mgr_get_mcc_scc_switch(psoc, &mcc_to_scc_switch);
+
+	for (i = 0; i < sap_count; i++) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id[i],
+							    WLAN_POLICY_MGR_ID);
+		if (vdev) {
+			vdev_chan = wlan_vdev_get_active_channel(vdev);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		}
+		if (vdev_chan && policy_mgr_is_restart_sap_required(psoc,
+							vdev_id[i],
+							sap_ch_freq[i],
+							mcc_to_scc_switch,
+							vdev_chan->ch_cfreq2))
+			return true;
+		vdev_chan = NULL;
+	}
+
+	return false;
+}
