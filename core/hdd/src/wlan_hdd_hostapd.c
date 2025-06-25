@@ -6975,6 +6975,7 @@ wlan_hdd_validate_mlo_link_removal_request(struct wlan_hdd_link_info *link_info,
 {
 	uint16_t num_links = 0;
 	uint8_t i = 0;
+	uint16_t sap_peer_count;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
 	struct wlan_objmgr_vdev *partner_vdev;
@@ -7015,6 +7016,15 @@ wlan_hdd_validate_mlo_link_removal_request(struct wlan_hdd_link_info *link_info,
 	if (num_links <= 1) {
 		hdd_err("Link removal support MLD with at least 2 active AP");
 		status = QDF_STATUS_E_PERM;
+		goto release_ref;
+	}
+
+	sap_peer_count = wlan_vdev_get_peer_count(link_info->vdev);
+
+	if (sap_peer_count > 1) {
+		hdd_debug("link with %d client connected, reject link removal",
+			  sap_peer_count);
+		status = QDF_STATUS_E_NOSUPPORT;
 		goto release_ref;
 	}
 
