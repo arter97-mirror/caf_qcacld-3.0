@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,7 +35,7 @@
 #include <wlan_hdd_debugfs_llstat.h>
 #include <wlan_hdd_debugfs_mibstat.h>
 #include "wlan_hdd_debugfs_unit_test.h"
-
+#include "nan_ucfg_api.h"
 
 #define MAX_USER_COMMAND_SIZE_WOWL_ENABLE 8
 #define MAX_USER_COMMAND_SIZE_WOWL_PATTERN 512
@@ -450,6 +450,125 @@ static ssize_t wcnss_patterngen_write(struct file *file,
 	return err_size;
 }
 
+#ifdef NAN_PASN_UNIT_TEST_ENABLE
+#define NAN_PASN_PEER_MAC_ADDR "\xaa\xbb\xcc\xdd\xee\xff"
+#define NAN_UNIT_TEST_PASN_PEER_CREATE 1
+#define NAN_UNIT_TEST_PASN_PEER_DELETE 2
+#define MAX_USER_COMMAND_SIZE_NAN_PASN 32
+/**
+ * __wlan_hdd_debugfs_nan_pasn_write() - NAN PASN debugfs handler
+ * @net_dev: net_device context used to register the debugfs file
+ * @buf: text being written to the debugfs
+ * @count: size of @buf
+ * @ppos: (unused) offset into the virtual file system
+ *
+ * Return: number of bytes processed
+ */
+static ssize_t __wlan_hdd_debugfs_nan_pasn_write(struct net_device *net_dev,
+						 const char __user *buf,
+						 size_t count, loff_t *ppos)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(net_dev);
+	struct hdd_context *hdd_ctx;
+	char cmd[MAX_USER_COMMAND_SIZE_NAN_PASN + 1];
+	char *sptr, *token;
+	int ret;
+	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr peer_addr = {NAN_PASN_PEER_MAC_ADDR};
+	uint8_t cmd_type;
+
+	hdd_enter();
+
+	if (adapter->magic != WLAN_HDD_ADAPTER_MAGIC) {
+		hdd_err("Invalid adapter or adapter has invalid magic");
+		return -EINVAL;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	if (count > MAX_USER_COMMAND_SIZE_NAN_PASN) {
+		hdd_err("Command length %ld is larger", count);
+		return -EINVAL;
+	}
+
+	/* Get command from user */
+	if (copy_from_user(cmd, buf, count))
+		return -EFAULT;
+	cmd[count] = '\0';
+	sptr = cmd;
+
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+
+	if (kstrtou8(token, 0, &cmd_type))
+		return -EINVAL;
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(hdd_ctx->psoc,
+							QDF_NAN_DISC_MODE,
+							WLAN_NAN_ID);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		return -EINVAL;
+	}
+
+	switch (cmd_type) {
+	case NAN_UNIT_TEST_PASN_PEER_CREATE:
+		ucfg_nan_send_pasn_peer_create_cmd(hdd_ctx->psoc, vdev,
+						   peer_addr);
+		break;
+	case NAN_UNIT_TEST_PASN_PEER_DELETE:
+		ucfg_nan_send_delete_pasn_peer(hdd_ctx->psoc,
+					       wlan_vdev_get_id(vdev),
+					       &peer_addr);
+		break;
+	default:
+		hdd_err("wrong argument %d", cmd_type);
+		count = -EINVAL;
+		break;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+	hdd_exit();
+	return count;
+}
+
+/**
+ * wlan_hdd_debugfs_nan_pasn_write() - wrapper API for
+ * __wlan_hdd_debugfs_nan_pasn_write
+ * @file: file pointer
+ * @buf: buffer
+ * @count: count
+ * @ppos: position pointer
+ *
+ * Return: 0 on success, error number otherwise
+ */
+static ssize_t wlan_hdd_debugfs_nan_pasn_write(struct file *file,
+					       const char __user *buf,
+					       size_t count, loff_t *ppos)
+{
+	struct net_device *net_dev = file_inode(file)->i_private;
+	struct osif_vdev_sync *vdev_sync;
+	ssize_t err_size;
+
+	err_size = osif_vdev_sync_op_start(net_dev, &vdev_sync);
+	if (err_size)
+		return err_size;
+
+	err_size = __wlan_hdd_debugfs_nan_pasn_write(net_dev, buf, count, ppos);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return err_size;
+}
+#endif /* NAN_PASN_UNIT_TEST_ENABLE */
+
 /**
  * __wcnss_debugfs_open() - Generic debugfs open() handler
  * @net_dev: net_device context used to register the debugfs file
@@ -515,6 +634,39 @@ static const struct file_operations fops_patterngen = {
 	.llseek = default_llseek,
 };
 
+#ifdef NAN_PASN_UNIT_TEST_ENABLE
+static const struct file_operations fops_nan_pasn = {
+	.write = wlan_hdd_debugfs_nan_pasn_write,
+	.open = wcnss_debugfs_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
+/**
+ * hdd_debugfs_nan_pasn_init() - Initialize debugfs interface for NAN PASN
+ * testcase
+ * @adapter: interface adapter pointer
+ *
+ * Return: QDF_STATUS_SUCCESS if files registered, otherwise
+ *	   QDF_STATUS_E_FAILURE on failure
+ */
+static QDF_STATUS hdd_debugfs_nan_pasn_init(struct hdd_adapter *adapter)
+{
+	struct net_device *net_dev = adapter->dev;
+
+	if (debugfs_create_file("nan_pasn", 00400 | 00200,
+				adapter->debugfs_phy, net_dev, &fops_nan_pasn))
+		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_E_FAILURE;
+}
+#else
+static inline QDF_STATUS hdd_debugfs_nan_pasn_init(struct hdd_adapter *adapter)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* NAN_PASN_UNIT_TEST_ENABLE */
+
 /**
  * hdd_debugfs_init() - Initialize debugfs interface
  * @adapter: interface adapter pointer
@@ -546,6 +698,9 @@ QDF_STATUS hdd_debugfs_init(struct hdd_adapter *adapter)
 	if (!debugfs_create_file("pattern_gen", 00400 | 00200,
 					adapter->debugfs_phy, net_dev,
 					&fops_patterngen))
+		return QDF_STATUS_E_FAILURE;
+
+	if (hdd_debugfs_nan_pasn_init(adapter))
 		return QDF_STATUS_E_FAILURE;
 
 	if (wlan_hdd_create_mib_stats_file(adapter))
