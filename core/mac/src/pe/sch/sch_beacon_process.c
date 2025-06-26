@@ -615,7 +615,6 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	int8_t local_constraint = 0;
 	uint32_t chan_freq = 0;
 	struct vdev_mlme_obj *mlme_obj;
-	struct wlan_lmac_if_reg_tx_ops *tx_ops;
 	bool ap_constraint_change = false, tpe_change = false;
 	bool allow_tpc = false;
 	int8_t regMax = 0, maxTxPower = 0;
@@ -731,7 +730,6 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	 */
 	if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc) &&
 	    !session->sta_follows_sap_power) {
-		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
 
 		lim_parse_tpe_ie(mac_ctx, session, bcn->transmit_power_env,
 				 bcn->num_transmit_power_env, &bcn->he_op,

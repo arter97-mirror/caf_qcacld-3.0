@@ -193,6 +193,9 @@ void tdls_update_6g_power(struct wlan_objmgr_vdev *vdev,
 	tdls_set_mlme_ch_power(vdev, mlme_obj, tdls_soc_obj, freq);
 
 	tx_ops = wlan_reg_get_tx_ops(psoc);
+	if (!tx_ops)
+		return;
+
 	if (tx_ops->set_tpc_power)
 		tx_ops->set_tpc_power(psoc,
 				      wlan_vdev_get_id(vdev),

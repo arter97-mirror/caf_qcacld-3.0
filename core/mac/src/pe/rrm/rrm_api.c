@@ -278,6 +278,8 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 
 		if (pLinkReq->MaxTxPower.maxTxPower != ap_pwr_constraint) {
 			tx_ops = wlan_reg_get_tx_ops(mac->psoc);
+			if (!tx_ops)
+				return QDF_STATUS_E_FAILURE;
 
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac->psoc,
