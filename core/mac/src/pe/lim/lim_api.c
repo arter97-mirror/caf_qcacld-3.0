@@ -3672,7 +3672,7 @@ void lim_mon_deinit_session(struct mac_context *mac_ptr,
  */
 QDF_STATUS lim_update_ext_cap_ie(struct mac_context *mac_ctx, uint8_t *ie_data,
 				 uint8_t *local_ie_buf, uint16_t *local_ie_len,
-				 struct pe_session *session)
+				 uint8_t vdev_id)
 {
 	uint32_t dot11mode;
 	bool vht_enabled = false;
@@ -3701,7 +3701,7 @@ QDF_STATUS lim_update_ext_cap_ie(struct mac_context *mac_ctx, uint8_t *ie_data,
 		vht_enabled = true;
 
 	status = populate_dot11f_ext_cap(mac_ctx, vht_enabled,
-					&driver_ext_cap, NULL);
+					&driver_ext_cap, vdev_id);
 	if (QDF_STATUS_SUCCESS != status) {
 		pe_err("Failed %d to create ext cap IE. Use default value instead",
 				status);
@@ -3721,11 +3721,7 @@ QDF_STATUS lim_update_ext_cap_ie(struct mac_context *mac_ctx, uint8_t *ie_data,
 	}
 	lim_merge_extcap_struct(&driver_ext_cap, &default_scan_ext_cap, true);
 
-	if (session)
-		populate_dot11f_twt_extended_caps(mac_ctx, session,
-						  &driver_ext_cap);
-	else
-		pe_debug("Session NULL, cannot set TWT caps");
+	populate_dot11f_twt_extended_caps(mac_ctx, vdev_id, &driver_ext_cap);
 
 	local_ie_buf[*local_ie_len + 1] = driver_ext_cap.num_bytes;
 

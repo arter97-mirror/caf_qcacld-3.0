@@ -2123,6 +2123,14 @@ wlan_mlme_get_wmm_sba_ac_vo(struct wlan_objmgr_psoc *psoc, uint16_t *value);
 QDF_STATUS wlan_mlme_set_enable_bcast_probe_rsp(struct wlan_objmgr_psoc *psoc,
 						bool value);
 
+/*
+ * wlan_mlme_get_enable_bcast_probe_rsp() - Get enable bcast probe resp info
+ * @psoc: pointer to psoc object
+ *
+ * Return: Bcast probe response info
+ */
+bool wlan_mlme_get_enable_bcast_probe_rsp(struct wlan_objmgr_psoc *psoc);
+
 /**
  * wlan_mlme_get_wmm_uapsd_vo_srv_intv() - Get Uapsd service
  * interval for voice

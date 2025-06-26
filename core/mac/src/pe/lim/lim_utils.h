@@ -1652,7 +1652,7 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
  * Return: None
  */
 void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
-		     uint32_t num_bytes, uint8_t band);
+		     uint32_t num_bytes, uint8_t band, uint8_t vdev_id);
 
 /**
  * lim_send_he_caps_ie() - gets HE capability and send to firmware via wma
@@ -1889,9 +1889,9 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 {
 }
 
-static inline void lim_set_he_caps(struct mac_context *mac, struct pe_session *session,
-				   uint8_t *ie_start, uint32_t num_bytes,
-				   uint8_t band)
+static inline void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
+				   uint32_t num_bytes, uint8_t band,
+				   uint8_t vdev_id)
 {
 }
 

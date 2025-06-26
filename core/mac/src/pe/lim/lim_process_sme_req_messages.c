@@ -3577,10 +3577,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 			  bss_desc->chan_freq, bss_desc->rssi);
 	}
 
-	if (session->opmode == QDF_STA_MODE)
-		session->enable_bcast_probe_rsp =
-			mac_ctx->mlme_cfg->oce.enable_bcast_probe_rsp;
-
 	/* Store vendor specific IE for CISCO AP */
 	ie_len = (bss_desc->length + sizeof(bss_desc->length) -
 		 GET_FIELD_OFFSET(struct bss_description, ieFields));
@@ -3759,9 +3755,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_SME_STATE,
 			session->peSessionId,
 			session->limSmeState));
-
-	/* Enable MBSSID only for station */
-	session->is_mbssid_enabled = wma_is_mbssid_enabled();
 
 	/* Enable the spectrum management if this is a DFS channel */
 	if (session->country_info_present &&

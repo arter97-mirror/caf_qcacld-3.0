@@ -53,6 +53,7 @@
 #include "wlan_objmgr_vdev_obj.h"
 #include "utils_mlo.h"
 #include "lim_utils.h"
+#include "wlan_twt_cfg_ext_api.h"
 
 /*
  * cm_is_peer_preset_on_other_sta() - Check if peer exists on other STA
@@ -1947,6 +1948,7 @@ void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
 	struct wmi_unified *wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 	const uint8_t *ext_cap_ie;
 	struct s_ext_cap *extcap;
+	bool twt_requestor = false, twt_req_support = false;
 
 	if (!wmi_handle)
 		return;
@@ -1960,5 +1962,11 @@ void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
 		return;
 
 	extcap = (struct s_ext_cap *)&ext_cap_ie[2];
+	/* MBSSID */
 	extcap->multi_bssid = 1;
+	/* TWT requestor */
+	wlan_twt_get_requestor_cfg(psoc, &twt_requestor);
+	wlan_twt_cfg_get_req_flag(psoc, &twt_req_support);
+	extcap->twt_requestor_support = twt_requestor && twt_req_support;
+
 }

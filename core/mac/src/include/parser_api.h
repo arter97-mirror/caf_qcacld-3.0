@@ -1267,7 +1267,7 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 
 QDF_STATUS
 populate_dot11f_ext_cap(struct mac_context *mac, bool isVHTEnabled,
-			tDot11fIEExtCap *pDot11f, struct pe_session *pe_session);
+			tDot11fIEExtCap *pDot11f, uint8_t vdev_id);
 
 void populate_dot11f_qcn_ie(struct mac_context *mac,
 			    struct pe_session *pe_session,
@@ -1406,7 +1406,7 @@ QDF_STATUS
 populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 				bool is_2g,
 				tDot11fIEhe_cap *he_cap,
-				struct pe_session *session);
+				uint8_t vdev_id);
 
 /**
  * populate_dot11f_he_operation() - populate he operation IE
@@ -1472,7 +1472,7 @@ static inline QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 static inline QDF_STATUS
 populate_dot11f_he_caps_by_band(struct mac_context *mac_ctx,
 				bool is_2g,
-				tDot11fIEhe_cap *he_cap)
+				tDot11fIEhe_cap *he_cap, uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -1520,12 +1520,12 @@ static inline QDF_STATUS populate_dot11f_sr_info(
  * Return: QDF_STATUS Success or Failure
  */
 QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
-					     struct pe_session *pe_session,
+					     uint8_t vdev_id,
 					     tDot11fIEExtCap *dot11f);
 #else
 static inline
 QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
-					     struct pe_session *pe_session,
+					     uint8_t vdev_id,
 					     tDot11fIEExtCap *dot11f)
 {
 	return QDF_STATUS_SUCCESS;
