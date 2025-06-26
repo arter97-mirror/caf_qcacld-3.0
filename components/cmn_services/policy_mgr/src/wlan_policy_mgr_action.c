@@ -692,6 +692,9 @@ bool policy_mgr_is_dbs_allowed_for_concurrency(
 		case QDF_STA_MODE:
 		case QDF_SAP_MODE:
 		case QDF_NDI_MODE:
+		case QDF_P2P_DEVICE_MODE:
+		case QDF_P2P_CLIENT_MODE:
+		case QDF_P2P_GO_MODE:
 			return true;
 		default:
 			return false;
