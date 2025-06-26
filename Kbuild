@@ -4713,6 +4713,9 @@ ccflags-$(CONFIG_QCACLD_FEATURE_FW_STATE) += -DFEATURE_FW_STATE
 #Flag to enable set coex configuration feature
 ccflags-$(CONFIG_QCACLD_FEATURE_COEX_CONFIG) += -DFEATURE_COEX_CONFIG
 
+#Flag to enable SAP coex safe channel with bandwidth
+ccflags-$(CONFIG_FEATURE_WLAN_SAP_COEX_CHECK_BW) += -DFEATURE_WLAN_SAP_COEX_CHECK_BW
+
 #Flag to enable MPTA helper feature
 ccflags-$(CONFIG_QCACLD_FEATURE_MPTA_HELPER) += -DFEATURE_MPTA_HELPER
 

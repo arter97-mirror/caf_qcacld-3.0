@@ -4568,7 +4568,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	struct ch_params ch_params = {0};
 	struct hdd_adapter *ap_adapter;
 	struct wlan_hdd_link_info *link_info;
-	uint32_t sap_ch_freq, intf_ch_freq, temp_ch_freq;
+	uint32_t sap_ch_freq, intf_ch_freq, temp_ch_freq, center_freq;
 	struct sap_context *sap_context;
 	enum sap_csa_reason_code csa_reason =
 		CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
@@ -4631,8 +4631,10 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		sap_context->csa_reason = CSA_REASON_LL_LT_SAP_EVENT;
 		goto force_restart_chan;
 	} else {
-		intf_ch_freq = wlansap_get_chan_band_restrict(sap_context,
-							      &csa_reason);
+		intf_ch_freq =
+			wlansap_get_chan_band_restrict(sap_context,
+						       &csa_reason,
+						       &ch_params.ch_width);
 		if (!intf_ch_freq &&
 		    (csa_reason == CSA_REASON_CHAN_DISABLED ||
 		     csa_reason == CSA_REASON_BAND_RESTRICTED)) {
@@ -4645,6 +4647,15 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 
 	if (intf_ch_freq && intf_ch_freq != sap_context->chan_freq)
 		goto sap_restart;
+
+	if (csa_reason == CSA_REASON_UNSAFE_CHANNEL && intf_ch_freq &&
+	    (intf_ch_freq != sap_context->chan_freq ||
+	     ch_params.ch_width != sap_context->ch_params.ch_width)) {
+		wlansap_get_csa_chanwidth_from_phymode(sap_context,
+						       intf_ch_freq,
+						       &ch_params);
+		goto sap_restart;
+	}
 
 	/*
 	 * If STA+SAP sessions are on DFS channel and STA+SAP SCC is
@@ -4743,9 +4754,13 @@ sap_restart:
 					sap_context, intf_ch_freq,
 					&ch_params);
 
+	if (ch_params.mhz_freq_seg1)
+		center_freq = ch_params.mhz_freq_seg1;
+	else
+		center_freq = ch_params.mhz_freq_seg0;
 	if (sap_context->csa_reason == CSA_REASON_UNSAFE_CHANNEL &&
 	    (!policy_mgr_check_bw_with_unsafe_chan_freq(hdd_ctx->psoc,
-							ch_params.mhz_freq_seg0,
+							center_freq,
 							ch_params.ch_width))) {
 		hdd_debug("SAP bw shrink to 20M for unsafe from %d", ch_params.ch_width);
 		ch_params.ch_width = CH_WIDTH_20MHZ;

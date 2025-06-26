@@ -2000,6 +2000,30 @@ bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
+#ifdef FEATURE_WLAN_SAP_COEX_CHECK_BW
+bool policy_mgr_is_sap_safe_with_bw(struct wlan_objmgr_psoc *psoc,
+				    enum QDF_OPMODE opmode,
+				    bool acs_enable,
+				    uint32_t sap_freq,
+				    uint32_t center_freq,
+				    enum phy_ch_width bw)
+{
+	if (opmode != QDF_SAP_MODE)
+		return true;
+
+	if (!acs_enable)
+		return true;
+
+	if (policy_mgr_sta_sap_scc_on_lte_coex_chan(psoc) &&
+	    policy_mgr_is_sta_sap_scc(psoc, sap_freq, false)) {
+		policy_mgr_debug("sap freq %d is SCC with STA", sap_freq);
+		return true;
+	}
+
+	return policy_mgr_check_bw_with_unsafe_chan_freq(psoc, center_freq, bw);
+}
+#endif
+
 bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t sap_vdev_id, uint32_t *intf_ch_freq,
