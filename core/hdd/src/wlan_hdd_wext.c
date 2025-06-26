@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6878,7 +6878,8 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 			return -EINVAL;
 		}
 
-		if (apps_args[0] == CDP_TXRX_STATS_28) {
+		if (apps_args[0] == CDP_TXRX_STATS_28 ||
+		    apps_args[0] == CDP_TXRX_STATS_11) {
 			if (sta_ctx->conn_info.is_authenticated) {
 				hdd_debug("ap mac addr: "QDF_MAC_ADDR_FMT,
 					  QDF_MAC_ADDR_REF(sta_ctx->conn_info.bssid.bytes));
