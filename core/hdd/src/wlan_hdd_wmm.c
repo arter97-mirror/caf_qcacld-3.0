@@ -2141,8 +2141,9 @@ uint16_t hdd_get_tx_queue_for_ac(struct hdd_adapter *adapter,
 #else
 static inline
 uint16_t hdd_get_tx_queue_for_ac(struct hdd_adapter *adapter,
-				 struct sk_buff *skb, uint16_t ac) {
-	return ac;
+				 struct sk_buff *skb, uint16_t ac)
+{
+	return ac - !(NUM_HI_PRIO_TX_QUEUES);
 }
 #endif
 
