@@ -4177,6 +4177,41 @@ bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 				    enum QDF_OPMODE opmode,
 				    uint32_t sap_freq);
 
+#ifdef FEATURE_WLAN_SAP_COEX_CHECK_BW
+/**
+ * policy_mgr_is_sap_safe_with_bw() - Check if channel with specific bandwidth
+ * is crossing with unsafe channel list
+ * @psoc: PSOC object
+ * @opmode: Operating mode
+ * @acs_enable: ACS enable or not
+ * @sap_freq: SAP's primary channel frequency
+ * @center_freq: Center frequency of operating channel
+ * @bw: bandwidth of operating channel
+ *
+ * Only check SAP operating mode
+ * Only check when ACS mode is enable
+ *
+ * Return: true for safe, else false
+ */
+bool policy_mgr_is_sap_safe_with_bw(struct wlan_objmgr_psoc *psoc,
+				    enum QDF_OPMODE opmode,
+				    bool acs_enable,
+				    uint32_t sap_freq,
+				    uint32_t center_freq,
+				    enum phy_ch_width bw);
+#else
+static inline bool
+policy_mgr_is_sap_safe_with_bw(struct wlan_objmgr_psoc *psoc,
+			       enum QDF_OPMODE opmode,
+			       bool acs_enable,
+			       uint32_t sap_freq,
+			       uint32_t center_freq,
+			       enum phy_ch_width bw)
+{
+	return true;
+}
+#endif
+
 /**
  * policy_mgr_get_ch_width() - Convert hw_mode_bandwidth to phy_ch_width
  * @bw: Hardware mode band width used by WMI
