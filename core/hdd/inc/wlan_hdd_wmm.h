@@ -98,6 +98,9 @@ enum hdd_wmm_user_mode {
  * @HDD_LINUX_AC_BK: background priority
  * @HDD_LINUX_AC_BE: best effort priority
  * @HDD_LINUX_AC_MAX: max place holder
+ *
+ * Any modification to the order could potentially have impact
+ * on queue selection logic at hdd_get_tx_queue_for_ac.
  */
 enum hdd_wmm_linuxac {
 	HDD_LINUX_AC_HI_PRIO = 0,
