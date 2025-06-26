@@ -2296,4 +2296,14 @@ void pld_set_cxpc(struct device *dev);
 #else
 static inline void pld_set_cxpc(struct device *dev) {}
 #endif
+
+#if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
+int pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size);
+#else
+static inline int
+pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
+{
+	return -EINVAL;
+}
+#endif
 #endif

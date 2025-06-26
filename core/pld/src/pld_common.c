@@ -3073,3 +3073,23 @@ void pld_set_cxpc(struct device *dev)
 	}
 }
 #endif
+
+#if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
+int pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
+{
+	int ret;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_get_iova_info(dev, addr, size);
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_get_iova_info(dev, addr, size);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+#endif
