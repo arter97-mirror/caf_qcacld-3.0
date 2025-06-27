@@ -12677,54 +12677,6 @@ int hdd_set_mac_chan_width(struct wlan_hdd_link_info *link_info,
 }
 
 /**
- * hdd_covert_phy_ch_to_reg_chan() - Convert HT chan width to reg chan width
- * @ch_width: HT chan width
- *
- * Return: reg chan width
- */
-static
-uint16_t hdd_covert_phy_ch_to_reg_chan(enum eSirMacHTChannelWidth ch_width)
-{
-	enum phy_ch_width phy_ch_width;
-
-	phy_ch_width = hdd_convert_chwidth_to_phy_chwidth(ch_width);
-	return wlan_reg_get_bw_value(phy_ch_width);
-}
-
-#ifdef WLAN_FEATURE_11BE
-/**
- * hdd_get_mlo_link_freq() - This API is to get link freq of provided link
- * @vdev: objmgr vdev
- * @link_id: link id
- * @link_freq: link freq to get
- *
- * Return: Success/Failure
- */
-static int
-hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
-		      uint16_t *link_freq)
-{
-	struct mlo_link_info *mlo_link_info;
-
-	mlo_link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx,
-						       link_id);
-	if (!mlo_link_info)
-		return -EINVAL;
-
-	*link_freq = mlo_link_info->link_chan_info->ch_freq;
-
-	return 0;
-}
-#else
-static inline int
-hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
-		      uint16_t *link_freq)
-{
-	return -EINVAL;
-}
-#endif
-
-/**
  * hdd_set_channel_width() - set channel width
  * @link_info: Link info pointer in HDD adapter.
  * @tb: array of pointer to struct nlattr
@@ -12738,17 +12690,12 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	uint8_t nl80211_chwidth = CH_WIDTH_INVALID;
 	uint8_t link_id = WLAN_INVALID_LINK_ID;
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
-	struct nlattr *curr_attr;
-	struct nlattr *chn_bd = NULL;
-	struct nlattr *mlo_link_id;
+	struct nlattr *curr_attr, *chn_bd = NULL, *mlo_link_id;
 	enum eSirMacHTChannelWidth chwidth;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 	bool update_cw_allowed;
-	uint16_t link_freq = 0, max_allowed_bw, reg_ch_width;
-	struct wlan_channel *channel;
-	bool skip_mlo = false;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
@@ -12756,13 +12703,19 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
-	psoc = wlan_vdev_get_psoc(link_info->vdev);
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		hdd_debug("pdev is NULL");
+		ret = -EINVAL;
+		goto end;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc) {
 		hdd_debug("psoc is null");
 		ret = -EINVAL;
 		goto end;
 	}
-
 
 	ucfg_mlme_get_update_chan_width_allowed(psoc, &update_cw_allowed);
 	if (!update_cw_allowed) {
@@ -12772,26 +12725,9 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	}
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS]) {
-		skip_mlo = true;
-		goto skip_mlo;
-	}
-
-	nla_for_each_nested(curr_attr,
-			    tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS], rem) {
-		if (wlan_cfg80211_nla_parse_nested(tb2,
-						QCA_WLAN_VENDOR_ATTR_CONFIG_MAX,
-						   curr_attr,
-						  wlan_hdd_wifi_config_policy)){
-			hdd_err_rl("nla_parse failed");
-			ret = -EINVAL;
-			goto end;
-		}
-
-		chn_bd = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
-		mlo_link_id = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID];
-
-		if (!chn_bd || !mlo_link_id) {
-			hdd_err("invalid ch width or link id");
+		chn_bd = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
+		if (!chn_bd) {
+			hdd_err("[non-MLO] CHANNEL_WIDTH ATTR is NULL");
 			ret = 0;
 			goto end;
 		}
@@ -12800,81 +12736,61 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
 		if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
 		    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
-			hdd_err("Invalid channel width:%u", chwidth);
+			hdd_err("[non-MLO] Invalid channel width %u", chwidth);
 			ret = -EINVAL;
+			goto end;
+		}
+
+		hdd_debug("[non-MLO] vdev_id: %d channel width: %u",
+			  link_info->vdev_id, chwidth);
+		goto set_chan_width;
+	}
+
+	nla_for_each_nested(curr_attr,
+			    tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS], rem) {
+		if (wlan_cfg80211_nla_parse_nested(tb2,
+						QCA_WLAN_VENDOR_ATTR_CONFIG_MAX,
+						   curr_attr,
+						  wlan_hdd_wifi_config_policy)){
+			hdd_err_rl("[MLO] nla_parse failed");
+			ret = -EINVAL;
+			goto end;
+		}
+
+		chn_bd = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
+		if (!chn_bd) {
+			hdd_err("[MLO] invalid ch width");
+			ret = 0;
+			goto end;
+		}
+
+		nl80211_chwidth = nla_get_u8(chn_bd);
+		chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
+		if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
+		    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
+			hdd_err("[MLO] invalid channel width:%u", chwidth);
+			ret = -EINVAL;
+			goto end;
+		}
+
+		mlo_link_id = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID];
+		if (!mlo_link_id) {
+			hdd_err("[MLO] invalid link id");
+			ret = 0;
 			goto end;
 		}
 
 		link_id = nla_get_u8(mlo_link_id);
 		if (link_id > WLAN_MAX_LINK_ID) {
-			hdd_debug("invalid link_id:%u", link_id);
+			hdd_debug("[MLO] invalid link_id:%u", link_id);
 			ret = -EINVAL;
 			goto end;
 		}
-	}
 
-	if (link_id != WLAN_INVALID_LINK_ID)
-		goto set_chan_width;
-
-skip_mlo:
-	chn_bd = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
-
-	if (!chn_bd) {
-		ret = 0;
-		goto end;
-	}
-
-	nl80211_chwidth = nla_get_u8(chn_bd);
-	chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
-
-	if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
-	    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
-		hdd_err("Invalid channel width %u", chwidth);
-		ret = -EINVAL;
-		goto end;
+		hdd_debug("[MLO] chwidth: %u, link_id: %u", chwidth, link_id);
 	}
 
 set_chan_width:
-	hdd_debug("channel width:%u, link_id:%u", chwidth, link_id);
-
-	if (!skip_mlo) {
-		/* Get Link freq for MLO */
-		ret = hdd_get_mlo_link_freq(vdev, link_id, &link_freq);
-		if (ret) {
-			hdd_err("failed to get MLO link freq");
-			ret = -EINVAL;
-			goto end;
-		}
-	} else {
-		/* Get freq for NON-ML */
-		channel = wlan_vdev_get_active_channel(vdev);
-		if (channel)
-			link_freq = channel->ch_freq;
-
-		if (!link_freq) {
-			hdd_err("failed to get ch freq");
-			ret = -EINVAL;
-			goto end;
-		}
-	}
-
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		hdd_debug("invalid pdev");
-		ret = -EINVAL;
-		goto end;
-	}
-
-	max_allowed_bw = wlan_reg_get_max_chwidth(pdev, link_freq);
-
-	reg_ch_width = hdd_covert_phy_ch_to_reg_chan(chwidth);
-	if (reg_ch_width > max_allowed_bw) {
-		hdd_debug("provided ch_width %d > max allowed %d",
-			  reg_ch_width, max_allowed_bw);
-		ret = -EINVAL;
-		goto end;
-	}
-
 	ret = hdd_set_mac_chan_width(link_info, chwidth, link_id, true);
 
 end:
