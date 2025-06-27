@@ -303,6 +303,7 @@ static void pld_pcie_uevent(struct pci_dev *pdev,
 		data.uevent = PLD_FW_RECOVERY_START;
 		break;
 	case CNSS_FW_DOWN:
+	case CNSS_SYS_REBOOT:
 		data.uevent = PLD_FW_DOWN;
 		break;
 	default:
