@@ -3494,9 +3494,6 @@ wma_wow_pagefault_add_new_sym_from_event(tp_wma_handle wma,
 		new_pf_idx = tbl_idx;
 		new_pf_entry = &pf_sym_hist->wma_pf_sym[tbl_idx];
 		new_idx_cnt = new_pf_entry->pf_sym.count;
-		new_idx_last_ts = new_pf_entry->pf_ev_ts[new_idx_cnt - 1];
-		new_idx_old_ts = new_pf_entry->pf_ev_ts[0];
-
 		for (ev_lst_idx = 0; ev_lst_idx < pf_sym_list->num_pf_syms;
 		     ev_lst_idx++) {
 			if (!pf_sym_list->pf_sym[ev_lst_idx].count)
@@ -3517,6 +3514,9 @@ wma_wow_pagefault_add_new_sym_from_event(tp_wma_handle wma,
 			if (!new_idx_cnt)
 				goto add_sym;
 
+			new_idx_last_ts = new_pf_entry->pf_ev_ts[new_idx_cnt - 1];
+			new_idx_old_ts = new_pf_entry->pf_ev_ts[0];
+
 			/* Replace event if count is equal as current event
 			 * is latest and don't replace symbol from current event
 			 */
@@ -3527,6 +3527,11 @@ wma_wow_pagefault_add_new_sym_from_event(tp_wma_handle wma,
 			for (idx2 = tbl_idx + 1; idx2 < max_sym_count; idx2++) {
 				cur_pf_entry = &pf_sym_hist->wma_pf_sym[idx2];
 				cur_idx_cnt = cur_pf_entry->pf_sym.count;
+				if (!cur_idx_cnt) {
+					new_pf_idx = idx2;
+					goto add_sym;
+				}
+
 				cur_idx_last_ts =
 					cur_pf_entry->pf_ev_ts[cur_idx_cnt - 1];
 				cur_idx_old_ts = cur_pf_entry->pf_ev_ts[0];
