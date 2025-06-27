@@ -119,9 +119,11 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 			   txrx_min_max_stats->pkt_iat_max);
 	} else {
 		dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
-			   "STC: mdata 0x%x len %u iat %llu burst_state %u",
+			   "STC: mdata 0x%x len %u iat %llu burst_state %u [%llu] [%llu]",
 			   flow_entry->metadata, pkt_len, pkt_iat,
-			   flow_entry->burst_state);
+			   flow_entry->burst_state,
+			   flow_entry->burst_start_time,
+			   flow_entry->prev_pkt_arrival_ts);
 	}
 	/* TxRx Stats - End */
 
@@ -204,17 +206,17 @@ check_burst:
 							burst_dur);
 			DP_STC_UPDATE_MIN_MAX_SUM_STATS(burst_stats->burst_size,
 							burst_size);
+			dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
+				   "STC: Flow mdata 0x%x ts: start %llu end: %llu Burst end with size %u dur %u curr_ts %llu",
+				   flow_entry->metadata,
+				   flow_entry->burst_start_time,
+				   flow_entry->prev_pkt_arrival_ts,
+				   burst_size, burst_dur, curr_pkt_ts);
 			flow_entry->burst_start_time = curr_pkt_ts;
 			flow_entry->burst_state = BURST_DETECTION_INIT;
 			flow_entry->burst_start_detect_bytes = 0;
 			flow_entry->cur_burst_bytes = 0;
 			pkt_iat = 0;
-			dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
-				   "STC: Flow mdata 0x%x ts: start %llu end: %llu Burst end with size %u dur %u",
-				   flow_entry->metadata,
-				   flow_entry->burst_start_time,
-				   flow_entry->prev_pkt_arrival_ts,
-				   burst_size, burst_dur);
 			goto check_burst;
 		}
 
@@ -1767,6 +1769,10 @@ wlan_dp_stc_save_burst_samples(struct wlan_dp_stc *dp_stc,
 		 * Burst ended at the last packet, so calculate
 		 * burst duration using the last pkt timestamp
 		 */
+		dp_stc_debug(dp_stc->logmask, "tx burst: mdata 0x%x prev_ts: %llu start_time: %llu",
+			     s_entry->tx_flow_metadata,
+			     flow->prev_pkt_arrival_ts,
+			     flow->burst_start_time);
 		burst_dur = flow->prev_pkt_arrival_ts -
 					flow->burst_start_time;
 		burst_size = flow->cur_burst_bytes;
@@ -1795,6 +1801,10 @@ save_rx_flow_samples:
 		 * Burst ended at the last packet, so calculate
 		 * burst duration using the last pkt timestamp
 		 */
+		dp_stc_debug(dp_stc->logmask, "rx burst: mdata 0x%x prev_ts: %llu start_time: %llu",
+			     s_entry->rx_flow_metadata,
+			     flow->prev_pkt_arrival_ts,
+			     flow->burst_start_time);
 		burst_dur = flow->prev_pkt_arrival_ts -
 					flow->burst_start_time;
 		burst_size = flow->cur_burst_bytes;
