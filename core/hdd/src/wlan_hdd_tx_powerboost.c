@@ -758,6 +758,25 @@ hdd_txpb_inference_app_stop(struct hdd_context *hdd_ctx,
 {
 	QDF_STATUS status;
 
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED && !hdd_ctx->pdev) {
+		/*
+		 * Sometimes when system is overloaded and user does
+		 * wifi-off, race condition may happen and user thread
+		 * scheduling gets delayed and idle shutdown can happen
+		 * first and pdev can be deleted. Hence pdev will be NULL here
+		 *
+		 * In that case, firmware already cleared Tx powerboost
+		 * state, it is ok not to send app_stop to firmware but
+		 * host driver needs to clear its request queue and
+		 * txpb_app_launched status to false, so that upon next
+		 * wifi-on, it can send app_start to firmware.
+		 * It is treated as graceful success scenario
+		 */
+		hdd_warn("TPB: pdev is NULL");
+		status = QDF_STATUS_SUCCESS;
+		goto end;
+	}
+
 	status = hdd_txpb_inference_send_abort(hdd_ctx, pb_metadata);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("TPB: hdd_txpb_inference_send_abort failed: %d",
@@ -765,6 +784,7 @@ hdd_txpb_inference_app_stop(struct hdd_context *hdd_ctx,
 		return status;
 	}
 
+end:
 	hdd_txpb_req_queue_cleanup(hdd_ctx);
 	hdd_ctx->tx_pb.txpb_app_launched = false;
 	return status;
