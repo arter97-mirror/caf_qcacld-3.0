@@ -1585,14 +1585,14 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 		nbuf_receive_offload_ok = true;
 
 	gro_disallowed = qdf_atomic_read(&dp_intf->gro_disallowed);
-	if (gro_disallowed == 0 &&
-	    dp_intf->gro_flushed[rx_ctx_id] != 0) {
+	if (gro_disallowed == 0 && (dp_intf->gro_flushed[rx_ctx_id] != 0 ||
+				    !nbuf_receive_offload_ok)) {
 		if (qdf_likely(soc))
 			wlan_dp_set_fisa_disallowed_for_intf(soc, dp_intf,
 							     rx_ctx_id, 0);
 		dp_intf->gro_flushed[rx_ctx_id] = 0;
-	} else if (gro_disallowed &&
-		   dp_intf->gro_flushed[rx_ctx_id] == 0) {
+	} else if (gro_disallowed && (dp_intf->gro_flushed[rx_ctx_id] == 0 ||
+				      !nbuf_receive_offload_ok)) {
 		if (qdf_likely(soc))
 			wlan_dp_set_fisa_disallowed_for_intf(soc, dp_intf,
 							     rx_ctx_id, 1);
