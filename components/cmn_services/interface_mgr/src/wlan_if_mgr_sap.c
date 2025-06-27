@@ -214,8 +214,7 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		policy_mgr_check_sap_go_force_scc(psoc, vdev,
 						  CSA_REASON_GO_BSS_STARTED);
-
-	if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
+	else if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
 		policy_mgr_ll_lt_sap_restart_concurrent_sap(
 						psoc, LL_LT_SAP_EVENT_STARTED);
 	else
@@ -344,6 +343,17 @@ if_mgr_ap_csa_complete(struct wlan_objmgr_vdev *vdev,
 	status = wlan_p2p_check_and_force_scc_go_plus_go(psoc, vdev);
 	if (QDF_IS_STATUS_ERROR(status))
 		ifmgr_err("force scc failure with status: %d", status);
+
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
+		policy_mgr_check_sap_go_force_scc(psoc, vdev,
+						  CSA_REASON_GO_BSS_STARTED);
+	else if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
+		policy_mgr_ll_lt_sap_restart_concurrent_sap(
+						psoc, LL_LT_SAP_EVENT_STARTED);
+	else
+		policy_mgr_check_concurrent_intf_and_restart_sap(
+				psoc,
+				wlan_util_vdev_mgr_get_acs_mode_for_vdev(vdev));
 
 	wlan_tdls_notify_channel_switch_complete(psoc, vdev_id);
 
