@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -659,6 +659,10 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 					   (void *)&mac->lim.gpSession[i]);
 		if (status != QDF_STATUS_SUCCESS)
 			pe_err("cannot create ap_ecsa_timer");
+
+		status = lim_post_csa_ocv_sa_query_timer_init(session_ptr);
+		if (status != QDF_STATUS_SUCCESS)
+			pe_err("cannot create post csa ocv sa query timer");
 	}
 	if (session_ptr->opmode == QDF_STA_MODE)
 		session_ptr->is_session_obss_color_collision_det_enabled =
@@ -891,6 +895,7 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 		qdf_mc_timer_stop(&session->ap_ecsa_timer);
 		qdf_mc_timer_destroy(&session->ap_ecsa_timer);
 		lim_del_pmf_sa_query_timer(mac_ctx, session);
+		lim_post_csa_ocv_sa_query_timer_destroy(session);
 	}
 
 	/* Delete FT related information */
