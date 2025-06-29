@@ -10089,6 +10089,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 						    ch_change_req))) {
 		pe_err("Target channel and mode is same as current channel and mode channel freq %d and mode %d",
 		       session_entry->curr_op_freq, session_entry->ch_width);
+		lim_abort_channel_change(mac_ctx, ch_change_req->vdev_id);
 		return;
 	}
 
