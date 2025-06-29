@@ -400,6 +400,15 @@ void sap_dfs_cac_timer_callback(void *data);
  */
 void sap_cac_reset_notify(mac_handle_t mac_handle);
 
+/**
+ * sap_cac_reset_current_notify() - Current BSS cleanup notification handler
+ * @sap_ctx: SAP context
+ *
+ * This function should be called upon stop bss or channel switch to
+ * clean up DFS global structure of current SAP
+ */
+void sap_cac_reset_current_notify(struct sap_context *sap_ctx);
+
 bool is_concurrent_sap_ready_for_channel_change(mac_handle_t mac_handle,
 						struct sap_context *sap_ctx);
 
@@ -558,4 +567,30 @@ bool sap_plus_sap_cac_skip(struct mac_context *mac,
 void
 sap_build_start_bss_config(struct start_bss_config *sap_bss_cfg,
 			   struct sap_config *config);
+
+#ifdef QCA_DFS_BW_PUNCTURE
+/**
+ * sap_is_chan_change_needed_for_radar() - Check if SAP channel change needed
+ * when radar found.
+ * @sap_ctx: sap context.
+ * @freq: pointer to freq
+ *
+ * Even some 20 MHz sub channel disabled for nol, if puncture pattern is valid,
+ * SAP still can keep current channel width and primary channel, don't need
+ * change channel, but need send CSA to update puncture bitmap.
+ * if radar found on punctured sub channel, then do nothing, no CSA needed.
+ *
+ * Return: bool, true: channel change needed
+ */
+bool
+sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
+				    qdf_freq_t *freq);
+#else
+static inline bool
+sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
+				    qdf_freq_t *freq)
+{
+	return true;
+}
+#endif
 #endif
