@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3258,11 +3258,14 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
+bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx,
+			       enum QDF_OPMODE op_mode)
 {
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_IS_ANY_STA_CONNECTING;
+	bool is_connecting = false;
+	bool key_exchng_in_prog = false;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
@@ -3274,9 +3277,25 @@ bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx)
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 		if ((adapter->device_mode == QDF_STA_MODE) ||
 		    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-			if (hdd_cm_is_connecting(adapter)) {
-				hdd_debug("vdev_id %d: connecting",
-					  adapter->vdev_id);
+			is_connecting = hdd_cm_is_connecting(adapter);
+			key_exchng_in_prog =
+					sme_is_sta_key_exchange_in_progress(
+							hdd_ctx->mac_handle,
+							adapter->vdev_id);
+
+			/* In case of P2P GO + STA/CLI concurrency, when EAPOL
+			 * is in progress for STA/CLI, the P2P GO will still be
+			 * in NOA and if CSA is allowed then CSA frames won't
+			 * go over the air as P2P GO is in NOA.
+			 * In case of SAP, it doesn't need to check the EAPOL
+			 * in progress as the STA/CLI channel will be already
+			 * decided after getting connect complete indication.
+			 */
+			if ((op_mode == QDF_P2P_GO_MODE &&
+			     key_exchng_in_prog) || is_connecting) {
+				hdd_debug("vdev_id %d: connecting %d key_exchng_in_prog %d",
+					  adapter->vdev_id, is_connecting,
+					  key_exchng_in_prog);
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
@@ -3323,9 +3342,20 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	 * If sta connection is in progress do not allow SAP channel change from
 	 * user space as it may change the HW mode requirement, for which sta is
 	 * trying to connect.
+	 *
+	 * When P2P GO + STA/P2P-CLI concurrency arises. Dont allow CSA on GO
+	 * iface while eapol is in progress for STA/P2P-CLI vdev's or noa is in
+	 * progress in p2p go iface. Because for STA/P2P-CLI connection+eapol,
+	 * firmware does NOA(max 2.5 secs) on GO iface and during this time it
+	 * cannot do CSA as it won't be able to send CSA frames during NOA
+	 * period
 	 */
-	if (hdd_is_any_sta_connecting(hdd_ctx)) {
-		hdd_err("STA connection is in progress");
+	if (hdd_is_any_sta_connecting(hdd_ctx, adapter->device_mode) ||
+	    (adapter->device_mode == QDF_P2P_GO_MODE &&
+	     ucfg_p2p_is_p2p_go_noa_in_progress(hdd_ctx->pdev,
+						adapter->vdev_id))) {
+		hdd_err("vdev %d Do not allow CSA, STA connect/eapol/noa is in progress",
+			adapter->vdev_id);
 		return -EBUSY;
 	}
 

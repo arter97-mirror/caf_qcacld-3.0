@@ -328,7 +328,7 @@ static void __dsc_driver_op_stop(struct dsc_driver *driver, const char *func)
 
 	__dsc_lock(driver);
 	if (__dsc_ops_remove(&driver->ops, func))
-		qdf_event_set(&driver->ops.event);
+		qdf_event_set_all(&driver->ops.event);
 	__dsc_unlock(driver);
 }
 

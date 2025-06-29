@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2018, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -476,4 +476,15 @@ bool ucfg_p2p_is_roam_config_disabled(struct wlan_objmgr_psoc *psoc)
  * Return: p2p go supported on indoor channel
  */
 bool ucfg_p2p_get_indoor_ch_support(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_p2p_is_p2p_go_noa_in_progress() - Check whether P2P GO single shot noa
+ * is in progress or not
+ * @pdev: PDEV object manager for P2P GO
+ * @vdev_id: vdev id
+ *
+ * Return: True/False
+ */
+bool ucfg_p2p_is_p2p_go_noa_in_progress(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id);
 #endif /* _WLAN_P2P_UCFG_API_H_ */
