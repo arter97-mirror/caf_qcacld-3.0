@@ -1716,6 +1716,13 @@ int wlan_hdd_set_power_save(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
+	if (adapter->device_mode != QDF_P2P_GO_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
+		hdd_debug("unable to process device mode %d",
+			  adapter->device_mode);
+		return -EINVAL;
+	}
+
 	if (wlan_hdd_p2p_is_wfd_r2_twt_enable(adapter, psoc,
 					      ps_config->vdev_id)) {
 		hdd_debug("WFD R2 mode, reject NOA cmd");
