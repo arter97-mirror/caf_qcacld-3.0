@@ -1246,11 +1246,6 @@ static __iw_softap_getparam(struct net_device *dev,
 				WMI_WLAN_PROFILE_GET_PROFILE_DATA_CMDID,
 				0, DBG_CMD);
 		break;
-	case QCASAP_PARAM_LDPC:
-	{
-		ret = hdd_get_ldpc(adapter, value);
-		break;
-	}
 	case QCASAP_PARAM_TX_STBC:
 	{
 		ret = hdd_get_tx_stbc(adapter, value);
@@ -2766,10 +2761,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCSAP_GET_ACL, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		"get_acl_list"
-	}, {
-		QCASAP_PARAM_LDPC, 0,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		"get_ldpc"
 	}, {
 		QCASAP_PARAM_TX_STBC, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,

@@ -1140,26 +1140,6 @@
 #define WE_GET_NSS           11
 /*
  * <ioctl>
- * get_ldpc - This IOCTL gets the low density parity check (LDPC)
- *
- * @INPUT: None
- *
- * @OUTPUT: ldpc
- *  wlan0     get_ldpc:1
- *
- * This IOTCL used to gets the low density parity check (LDPC)
- *
- * @E.g: iwpriv wlan0 get_ldpc
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_LDPC          12
-/*
- * <ioctl>
  * get_tx_stbc - Get the value of the current Tx space time block code (STBC)
  *
  * @INPUT: None
@@ -4992,12 +4972,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
-	case WE_GET_LDPC:
-	{
-		ret = hdd_get_ldpc(adapter, value);
-		break;
-	}
-
 	case WE_GET_TX_STBC:
 	{
 		ret = hdd_get_tx_stbc(adapter, value);
@@ -8686,11 +8660,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_nss"},
-
-	{WE_GET_LDPC,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_ldpc"},
 
 	{WE_GET_TX_STBC,
 	 0,
