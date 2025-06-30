@@ -832,16 +832,6 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	}
 
-	case QCASAP_NSS_CMD:
-	{
-		hdd_debug("QCASAP_NSS_CMD val %d", set_value);
-		hdd_update_nss(link_info, set_value, set_value);
-		ret = wma_cli_set_command(link_info->vdev_id,
-					  wmi_vdev_param_nss,
-					  set_value, VDEV_CMD);
-		break;
-	}
-
 	case QCSAP_IPA_UC_STAT:
 	{
 		/* If input value is non-zero get stats */
@@ -1221,15 +1211,6 @@ static __iw_softap_getparam(struct net_device *dev,
 		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_pdev_param_rx_chain_mask,
 					     PDEV_CMD);
-		break;
-	}
-
-	case QCASAP_NSS_CMD:
-	{
-		hdd_debug("QCASAP_NSS_CMD");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     wmi_vdev_param_nss,
-					     VDEV_CMD);
 		break;
 	}
 
@@ -2686,9 +2667,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCASAP_SET_HE_BSS_COLOR,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "set_he_bss_clr"
 	}, {
-		QCASAP_NSS_CMD,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "set_nss"
-	}, {
 		QCASAP_SET_PHYMODE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "setphymode"
@@ -2777,9 +2755,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCASAP_RX_CHAINMASK_CMD, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		"get_rxchainmask"
-	}, {
-		QCASAP_NSS_CMD, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		"get_nss"
 	}, {
 		QCSAP_IOCTL_SET_NONE_GET_THREE, 0, IW_PRIV_TYPE_INT |
 		IW_PRIV_SIZE_FIXED | 3,    ""

@@ -228,25 +228,6 @@
 #define WE_SET_PHYMODE       10
 /*
  * <ioctl>
- * nss - Set the number of spatial streams
- *
- * @INPUT: int1…..int3
- *
- * @OUTPUT: None
- *
- * This IOCTL sets the number of spatial streams. Supported values are 1 and 2
- *
- * @E.g: iwpriv wlan0 nss 2
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_SET_NSS           11
-/*
- * <ioctl>
  * ldpc - Enables or disables LDPC
  *
  * @INPUT: 0 – Disable, 1 - Enable
@@ -1118,26 +1099,6 @@
  * </ioctl>
  */
 #define WE_GET_CONCURRENCY_MODE 9
-/*
- * <ioctl>
- * get_nss - Get the number of spatial STBC streams (NSS)
- *
- * @INPUT: None
- *
- * @OUTPUT: NSS
- *  wlan0     get_nss:2
- *
- * This IOTCL used to get the number of spatial STBC streams
- *
- * @E.g: iwpriv wlan0 get_nss
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_NSS           11
 /*
  * <ioctl>
  * get_tx_stbc - Get the value of the current Tx space time block code (STBC)
@@ -3431,24 +3392,6 @@ static int hdd_we_set_tm_level(struct wlan_hdd_link_info *link_info, int level)
 	return qdf_status_to_os_return(status);
 }
 
-static int hdd_we_set_nss(struct wlan_hdd_link_info *link_info, int nss)
-{
-	QDF_STATUS status;
-
-	hdd_debug("NSS %d", nss);
-
-	if ((nss > 2) || (nss <= 0)) {
-		hdd_err("Invalid NSS: %d", nss);
-		return -EINVAL;
-	}
-
-	status = hdd_update_nss(link_info, nss, nss);
-	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err("cfg set failed, value %d status %d", nss, status);
-
-	return qdf_status_to_os_return(status);
-}
-
 int hdd_we_set_short_gi(struct wlan_hdd_link_info *link_info, int sgi)
 {
 	int errno;
@@ -4415,7 +4358,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 #endif
 	[WE_SET_TM_LEVEL] = hdd_we_set_tm_level,
 	[WE_SET_PHYMODE] = hdd_we_update_phymode,
-	[WE_SET_NSS] = hdd_we_set_nss,
 	[WE_SET_GTX_HT_MCS] = hdd_we_set_gtx_ht_mcs,
 	[WE_SET_GTX_VHT_MCS] = hdd_we_set_gtx_vht_mcs,
 	[WE_SET_GTX_USRCFG] = hdd_we_set_gtx_usrcfg,
@@ -4890,22 +4832,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		*value = policy_mgr_get_concurrency_mode(hdd_ctx->psoc);
 
 		hdd_debug("concurrency mode=%d", *value);
-		break;
-	}
-
-	case WE_GET_NSS:
-	{
-		uint8_t nss;
-
-		status = hdd_get_nss(adapter, &nss);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			hdd_err("unable to get vht_enable2x2");
-			ret = -EIO;
-			break;
-		}
-		*value = nss;
-
-		hdd_debug("GET_NSS: Current NSS:%d", *value);
 		break;
 	}
 
@@ -8335,11 +8261,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "setphymode"},
 
-	{WE_SET_NSS,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "nss"},
-
 	{WE_SET_LDPC,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
@@ -8655,11 +8576,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "getconcurrency"},
-
-	{WE_GET_NSS,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_nss"},
 
 	{WE_GET_TX_STBC,
 	 0,
