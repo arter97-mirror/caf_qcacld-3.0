@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -259,8 +259,13 @@
 #define SIR_MAC_BAD_HTC_HE_VENDOR_OUI_LEN         4
 
 /* Maximum allowable size of a beacon,probe rsp and fils discovery frame */
+#ifdef WLAN_LARGE_MGMT_FRAMES_SUPPORT
+#define SIR_MAX_BEACON_SIZE     1280
+#define SIR_MAX_PROBE_RESP_SIZE 1280
+#else
 #define SIR_MAX_BEACON_SIZE     512
 #define SIR_MAX_PROBE_RESP_SIZE 512
+#endif
 #define SIR_MAX_FD_TMPL_SIZE    512
 
 
