@@ -1413,6 +1413,7 @@ _conditional_srcs = {
             "cmn/wmi/src/wmi_unified_nan_tlv.c",
             "components/nan/core/src/nan_api.c",
             "components/nan/core/src/nan_main.c",
+            "components/nan/core/src/nan_cfg.c",
             "components/nan/dispatcher/src/cfg_nan.c",
             "components/nan/dispatcher/src/nan_ucfg_api.c",
             "components/nan/dispatcher/src/wlan_nan_api.c",

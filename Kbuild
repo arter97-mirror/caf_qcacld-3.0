@@ -2646,6 +2646,7 @@ NAN_OS_IF_INC  := -I$(WLAN_ROOT)/os_if/nan/inc
 ifeq ($(CONFIG_QCACLD_FEATURE_NAN), y)
 WLAN_NAN_OBJS := $(NAN_CORE_DIR)/nan_main.o \
 		 $(NAN_CORE_DIR)/nan_api.o \
+		 $(NAN_CORE_DIR)/nan_cfg.o \
 		 $(NAN_UCFG_DIR)/nan_ucfg_api.o \
 		 $(NAN_UCFG_DIR)/wlan_nan_api.o \
 		 $(NAN_UCFG_DIR)/cfg_nan.o \
