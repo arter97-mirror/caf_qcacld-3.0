@@ -2060,58 +2060,6 @@ static int iw_softap_version(struct net_device *dev,
 	return errno;
 }
 
-static int hdd_softap_get_sta_info(struct hdd_adapter *adapter,
-				   uint8_t *buf,
-				   int size)
-{
-	int written;
-	struct hdd_station_info *sta, *tmp = NULL;
-
-	hdd_enter();
-
-	written = scnprintf(buf, size, "\nstaId staAddress\n");
-
-	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta, tmp,
-				  STA_INFO_SOFTAP_GET_STA_INFO) {
-		if (written >= size - 1) {
-			hdd_put_sta_info_ref(&adapter->sta_info_list,
-					     &sta, true,
-					     STA_INFO_SOFTAP_GET_STA_INFO);
-			if (tmp)
-				hdd_put_sta_info_ref(&adapter->sta_info_list,
-						&tmp, true,
-						STA_INFO_SOFTAP_GET_STA_INFO);
-			break;
-		}
-
-		if (QDF_IS_ADDR_BROADCAST(sta->sta_mac.bytes)) {
-			hdd_put_sta_info_ref(&adapter->sta_info_list,
-					     &sta, true,
-					     STA_INFO_SOFTAP_GET_STA_INFO);
-			continue;
-		}
-
-		written += scnprintf(buf + written, size - written,
-				     QDF_MAC_ADDR_FMT
-				     " ecsa=%d\n",
-				     QDF_MAC_ADDR_REF(sta->sta_mac.bytes),
-				     sta->ecsa_capable);
-
-		if (!qdf_is_macaddr_zero(&sta->mld_addr))
-			written += scnprintf(buf + written, size - written,
-					     "MLD:"
-					     QDF_MAC_ADDR_FMT"\n",
-					     QDF_MAC_ADDR_REF(sta->mld_addr.bytes));
-
-		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta, true,
-				     STA_INFO_SOFTAP_GET_STA_INFO);
-	}
-
-	hdd_exit();
-
-	return 0;
-}
-
 static int __iw_softap_get_channel_list(struct net_device *dev,
 					struct iw_request_info *info,
 					union iwreq_data *wrqu,
@@ -2161,62 +2109,6 @@ static int iw_softap_get_channel_list(struct net_device *dev,
 		return errno;
 
 	errno = __iw_softap_get_channel_list(dev, info, wrqu, extra);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-
-static int __iw_softap_get_sta_info(struct net_device *dev,
-				    struct iw_request_info *info,
-				    union iwreq_data *wrqu, char *extra)
-{
-	int errno;
-	struct hdd_adapter *adapter;
-	struct hdd_context *hdd_ctx;
-
-	hdd_enter_dev(dev);
-
-	adapter = netdev_priv(dev);
-	errno = hdd_validate_adapter(adapter);
-	if (errno)
-		return errno;
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	errno = wlan_hdd_validate_context(hdd_ctx);
-	if (errno)
-		return errno;
-
-	errno = hdd_check_private_wext_control(hdd_ctx, info);
-	if (errno)
-		return errno;
-
-	errno = hdd_softap_get_sta_info(adapter, extra, WE_SAP_MAX_STA_INFO);
-	if (errno) {
-		hdd_err("Failed to get sta info; errno:%d", errno);
-		return errno;
-	}
-
-	wrqu->data.length = strlen(extra);
-
-	hdd_exit();
-
-	return 0;
-}
-
-static int iw_softap_get_sta_info(struct net_device *dev,
-				  struct iw_request_info *info,
-				  union iwreq_data *wrqu,
-				  char *extra)
-{
-	int errno;
-	struct osif_vdev_sync *vdev_sync;
-
-	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __iw_softap_get_sta_info(dev, info, wrqu, extra);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
@@ -2778,9 +2670,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCSAP_IOCTL_VERSION, 0, IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
 		"version"
 	}, {
-		QCSAP_IOCTL_GET_STA_INFO, 0,
-		IW_PRIV_TYPE_CHAR | WE_SAP_MAX_STA_INFO, "get_sta_info"
-	}, {
 		QCSAP_IOCTL_GET_CHANNEL, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getchannel"
 	}, {
@@ -3018,8 +2907,6 @@ static const iw_handler hostapd_private[] = {
 		iw_softap_modify_acl,
 	[QCSAP_IOCTL_GET_CHANNEL_LIST - SIOCIWFIRSTPRIV] =
 		iw_softap_get_channel_list,
-	[QCSAP_IOCTL_GET_STA_INFO - SIOCIWFIRSTPRIV] =
-		iw_softap_get_sta_info,
 	[QCSAP_IOCTL_GET_BA_AGEING_TIMEOUT - SIOCIWFIRSTPRIV] =
 		iw_softap_get_ba_timeout,
 	[QCSAP_IOCTL_PRIV_GET_SOFTAP_LINK_SPEED -
