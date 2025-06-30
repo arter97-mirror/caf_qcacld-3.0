@@ -1624,25 +1624,6 @@
 
 /*
  * <ioctl>
- * get_dcm - Get dcm enablement value
- *
- * @INPUT: None
- *
- * @OUTPUT: 0/1
- * wlan0     get_dcm
- *
- * This IOCTL is used get dcm value
- *
- * Supported Feature: STA/SAP
- *
- * Usage: Internal
- *
- * </ioctl>
- */
-#define WE_GET_DCM                      60
-
-/*
- * <ioctl>
  * get_dcm - Get range extension enablement value
  *
  * @INPUT: None
@@ -5307,12 +5288,7 @@ static int __iw_setnone_getint(struct net_device *dev,
 		ret = wlan_hdd_get_temperature(adapter, value);
 		break;
 	}
-	case WE_GET_DCM:
-		hdd_debug("GET wmi_vdev_param_he_dcm");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     wmi_vdev_param_he_dcm_enable,
-					     VDEV_CMD);
-		break;
+
 	case WE_GET_RANGE_EXT:
 		hdd_debug("GET wmi_vdev_param_he_range_ext");
 		*value = wma_cli_get_command(adapter->deflink->vdev_id,
@@ -8924,11 +8900,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_temp"},
-
-	{WE_GET_DCM,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_dcm"},
 
 	{WE_GET_RANGE_EXT,
 	 0,
