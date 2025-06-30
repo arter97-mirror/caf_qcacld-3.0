@@ -5388,6 +5388,33 @@ static inline void wlan_hdd_set_usd_feature(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
+/**
+ * wlan_hdd_set_wfd_r2_feature() - Set WFD R2 related features based on FW
+ * capability
+ * @psoc: pointer to PSOC object
+ * @feature_flags: pointer to the byte array of features.
+ *
+ * Return: None
+ **/
+static inline void wlan_hdd_set_wfd_r2_feature(struct wlan_objmgr_psoc *psoc,
+					       uint8_t *feature_flags)
+{
+	if (!ucfg_p2p_is_fw_support_wfd_r2(psoc)) {
+		hdd_debug("WFD R2 feature is not supported by FW");
+		return;
+	}
+
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_P2P_V2);
+}
+#else
+static inline void wlan_hdd_set_wfd_r2_feature(struct wlan_objmgr_psoc *psoc,
+					       uint8_t *feature_flags)
+{
+}
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
+
 static inline void wlan_hdd_set_mrsno_feature(struct wlan_objmgr_psoc *psoc,
 					      uint8_t *feature_flags)
 {
@@ -5535,6 +5562,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_ll_lt_sap_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_usd_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_wfd_r2_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +

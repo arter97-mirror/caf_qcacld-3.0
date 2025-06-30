@@ -739,6 +739,15 @@ bool p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
  * Return: bool
  */
 bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * p2p_is_fw_support_wfd_r2() - wrapper API for API
+ * tgt_p2p_is_fw_support_wfd_r2()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if WFD R2 is supported by FW else false
+ */
+bool p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc);
 #else
 static inline bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
 {
