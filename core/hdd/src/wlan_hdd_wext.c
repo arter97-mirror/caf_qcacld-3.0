@@ -1599,26 +1599,6 @@
  * </ioctl>
  */
 #define WE_GET_GTX_MINTPC               53
-/*
- * <ioctl>
- * get_gtxBWMask - Get the tx BW MASK
- *
- * @INPUT: None
- *
- * @OUTPUT: MASK
- * wlan0     get_gtxBWMask:15
- *
- * This IOCTL is used get gtx bw mask
- *
- * @E.g: iwpriv wlan0 get_gtxBWMask
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_GTX_BWMASK               54
 #define WE_GET_TEMPERATURE              56
 #define WE_GET_ROAM_SYNCH_DELAY         59
 
@@ -5008,15 +4988,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		hdd_debug("GET wmi_vdev_param_gtx_mintpc");
 		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_mintpc,
-					     GTX_CMD);
-		break;
-	}
-
-	case WE_GET_GTX_BWMASK:
-	{
-		hdd_debug("GET wmi_vdev_param_gtx_bw_mask");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     wmi_vdev_param_gtx_bw_mask,
 					     GTX_CMD);
 		break;
 	}
@@ -8800,11 +8771,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_gtxMinTpc"},
-
-	{WE_GET_GTX_BWMASK,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_gtxBWMask"},
 
 	{WE_GET_TX_CHAINMASK,
 	 0,
