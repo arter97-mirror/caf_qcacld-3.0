@@ -2983,4 +2983,8 @@ config QCACLD_FEATURE_COEX_CONFIG
 config IPA_P2P_SUPPORT
 	bool "support p2p when IPA is enabled"
 	default n
+
+config WLAN_BU_DEBUG
+	bool "Enable WLAN DEBUG LOG BUFFER"
+	default n
 endif # QCA_CLD_WLAN
