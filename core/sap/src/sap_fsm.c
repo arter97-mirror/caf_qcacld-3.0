@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -66,6 +66,7 @@
 #include "wlan_ll_sap_api.h"
 #include "wlan_nan_api.h"
 #include <wlan_p2p_api.h>
+#include <wlan_dnw_api.h>
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -3565,6 +3566,47 @@ wlansap_is_power_change_required(struct mac_context *mac_ctx,
 	return state & CHANNEL_STATE_ENABLE;
 }
 
+#ifdef WLAN_FEATURE_DNW
+static QDF_STATUS
+sap_dnw_request_handler(void *ctx, enum phy_ch_width ori_ch_width,
+			enum phy_ch_width dg_ch_width,
+			enum wlan_dnw_request dnw_request)
+{
+	uint8_t vdev_id;
+	struct sap_context *sap_ctx = ctx;
+	enum policy_mgr_conn_update_reason reason;
+
+	if (!sap_ctx || !sap_ctx->vdev) {
+		sap_err("NULL vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_id = wlan_vdev_get_id(sap_ctx->vdev);
+	sap_debug("dnw request vdev %d bw ori %d down %d, request %d",
+		  vdev_id, dg_ch_width, ori_ch_width, dnw_request);
+
+	if (dnw_request == DNW_REQ_UPGRADE_BW) {
+		reason = POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP;
+		sme_sap_update_ch_width(wlan_vdev_get_psoc(sap_ctx->vdev),
+					vdev_id, ori_ch_width, reason, 0, 0);
+	} else if (dnw_request == DNW_REQ_DOWNGRADE_BW) {
+		wlansap_set_channel_change_with_csa(
+				sap_ctx, sap_ctx->chan_freq,
+				0, dg_ch_width, NO_SCHANS_PUNC, true);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+sap_dnw_request_handler(void *ctx, enum phy_ch_width ori_ch_width,
+			enum phy_ch_width dg_ch_width,
+			enum wlan_dnw_request dnw_request)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * sap_goto_starting() - Trigger softap start
  * @sap_ctx: SAP context
@@ -3643,6 +3685,18 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 				   &sap_ctx->sap_bss_cfg.dfs_regdomain,
 				   sap_ctx->chan_freq,
 				   &sap_ctx->ch_params);
+
+	/* Verify if DFS No Wait is applicable */
+	qdf_status = wlan_dnw_set_info(sap_ctx->vdev, sap_ctx->chan_freq,
+				       sap_ctx->ch_params.ch_width,
+				       sap_ctx->sap_bss_cfg.cac_duration_ms,
+				       mac_ctx->sap.SapDfsInfo.ignore_cac,
+				       sap_dnw_request_handler, sap_ctx);
+	if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		sap_ctx->sap_bss_cfg.cac_duration_ms = 0;
+		sap_debug("Start SAP with DFS No Wait");
+	}
+
 	mlme_set_cac_required(sap_ctx->vdev,
 			      !!sap_ctx->sap_bss_cfg.cac_duration_ms);
 
@@ -4081,6 +4135,10 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 					eSAP_START_BSS_EVENT,
 					(void *) eSAP_STATUS_SUCCESS);
 		}
+
+		/* DFS No Wait handle bss start success event*/
+		wlan_dnw_handle_bss_start(sap_ctx->vdev, true);
+
 		sap_chan_freq = sap_ctx->chan_freq;
 		band = wlan_reg_freq_to_band(sap_ctx->chan_freq);
 		if (sap_ctx->ch_params.center_freq_seg1)
@@ -4148,6 +4206,7 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 			if ((false == sap_dfs_info->ignore_cac) &&
 			    (cac_state == eSAP_DFS_DO_NOT_SKIP_CAC) &&
 			    !wlan_pre_cac_complete_get(sap_ctx->vdev) &&
+			    !wlan_is_dnw_in_progress(sap_ctx->vdev) &&
 			    policy_mgr_get_dfs_master_dynamic_enabled(
 					mac_ctx->psoc,
 					sap_ctx->sessionId)) {
@@ -4174,7 +4233,8 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 			}
 		}
 	} else if (msg == eSAP_MAC_START_FAILS ||
-		 msg == eSAP_HDD_STOP_INFRA_BSS) {
+		   msg == eSAP_HDD_STOP_INFRA_BSS) {
+			wlan_dnw_handle_bss_stop(sap_ctx->vdev);
 			qdf_status = sap_fsm_handle_start_failure(sap_ctx, msg,
 								  mac_handle);
 	} else if (msg == eSAP_OPERATING_CHANNEL_CHANGED) {
@@ -4190,7 +4250,12 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 				  eSAP_START_BSS_EVENT,
 				  (void *)eSAP_STATUS_SUCCESS);
 	} else if (msg == eSAP_DFS_CHANNEL_CAC_RADAR_FOUND) {
-		qdf_status = sap_fsm_handle_radar_during_cac(sap_ctx, mac_ctx);
+		if (wlan_is_dnw_in_progress(sap_ctx->vdev))
+			qdf_status = wlan_dnw_handle_radar_found(
+							sap_ctx->vdev);
+		else
+			qdf_status = sap_fsm_handle_radar_during_cac(
+							sap_ctx, mac_ctx);
 	} else if (msg == eSAP_DFS_CHANNEL_CAC_END) {
 		if (sap_ctx->vdev &&
 		    wlan_util_vdev_mgr_get_cac_timeout_for_vdev(sap_ctx->vdev)) {
@@ -4242,6 +4307,10 @@ static QDF_STATUS sap_fsm_state_started(struct sap_context *sap_ctx,
 		sap_ctx->fsm_state = SAP_STOPPING;
 		sap_debug("sap_fsm: vdev %d: SAP_STARTED => SAP_STOPPING",
 			  sap_ctx->vdev_id);
+
+		/* DFS No Wait handle bss stop event */
+		wlan_dnw_handle_bss_stop(sap_ctx->vdev);
+
 		qdf_status = sap_goto_stopping(sap_ctx);
 	} else if (eSAP_DFS_CHNL_SWITCH_ANNOUNCEMENT_START == msg) {
 		uint8_t intf;
@@ -4266,6 +4335,14 @@ static QDF_STATUS sap_fsm_state_started(struct sap_context *sap_ctx,
 			    mac_ctx->sap.sapCtxList[intf].sap_context) {
 				temp_sap_ctx =
 				    mac_ctx->sap.sapCtxList[intf].sap_context;
+				/*
+				 * Handle DFS No Wait in progress
+				 */
+				if (wlan_is_dnw_in_progress(sap_ctx->vdev)) {
+					wlan_dnw_handle_radar_found(
+							sap_ctx->vdev);
+					continue;
+				}
 				/*
 				 * Radar won't come on non-dfs channel, so
 				 * no need to move them
