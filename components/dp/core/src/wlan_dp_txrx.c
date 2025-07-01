@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -43,6 +43,10 @@
 #include "wlan_tdls_api.h"
 #include <qdf_trace.h>
 #include <qdf_net_stats.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
+#include <net/gro.h>
+#endif
 
 uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *intf_ctx)
 {
