@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -920,6 +920,19 @@ uint32_t hdd_reg_legacy_setband_to_reg_wifi_band_bitmap(uint8_t qca_setband)
 		break;
 	case (QCA_SETBAND_2G | QCA_SETBAND_5G):
 		band_bitmap |= (BIT(REG_BAND_2G) | BIT(REG_BAND_5G));
+		break;
+	case QCA_SETBAND_6G:
+		band_bitmap |= BIT(REG_BAND_6G);
+		break;
+	case QCA_SETBAND_6G | QCA_SETBAND_2G:
+		band_bitmap |= (BIT(REG_BAND_6G) | BIT(REG_BAND_2G));
+		break;
+	case QCA_SETBAND_6G | QCA_SETBAND_5G:
+		band_bitmap |= (BIT(REG_BAND_6G) | BIT(REG_BAND_5G));
+		break;
+	case QCA_SETBAND_6G | QCA_SETBAND_5G | QCA_SETBAND_2G:
+		band_bitmap |= (BIT(REG_BAND_6G) | BIT(REG_BAND_5G) |
+				BIT(REG_BAND_2G));
 		break;
 	default:
 		hdd_err("Invalid band value %u", qca_setband);
