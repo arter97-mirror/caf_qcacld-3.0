@@ -62,52 +62,6 @@
 #define RC_2_RATE_IDX_11AC(_rc)        ((_rc) & 0xf)
 #define HT_RC_2_STREAMS_11AC(_rc)    ((((_rc) & 0x30) >> 4) + 1)
 
-int
-static __iw_softap_get_ini_cfg(struct net_device *dev,
-			       struct iw_request_info *info,
-			       union iwreq_data *wrqu, char *extra)
-{
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	struct hdd_context *hdd_ctx;
-	int ret;
-
-	hdd_enter_dev(dev);
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret != 0)
-		return ret;
-
-	ret = hdd_check_private_wext_control(hdd_ctx, info);
-	if (0 != ret)
-		return ret;
-
-	hdd_debug("Printing CLD global INI Config");
-	hdd_cfg_get_global_config(hdd_ctx, extra, QCSAP_IOCTL_MAX_STR_LEN);
-	wrqu->data.length = strlen(extra) + 1;
-
-	return 0;
-}
-
-int
-static iw_softap_get_ini_cfg(struct net_device *dev,
-			     struct iw_request_info *info,
-			     union iwreq_data *wrqu, char *extra)
-{
-	int errno;
-	struct osif_vdev_sync *vdev_sync;
-
-	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __iw_softap_get_ini_cfg(dev, info, wrqu, extra);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-
 /**
  * __iw_softap_set_two_ints_getnone() - Generic "set two integer" ioctl handler
  * @dev: device upon which the ioctl was received
@@ -2593,13 +2547,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		0, "pktlog"
 	}
 	,
-	/* Get HDD CFG Ini param */
-	{
-		QCSAP_IOCTL_GET_INI_CFG,
-		0, IW_PRIV_TYPE_CHAR | QCSAP_IOCTL_MAX_STR_LEN, "getConfig"
-	}
-	,
-	/* handlers for main ioctl */
 	{
 	/* handlers for main ioctl */
 		QCSAP_IOCTL_SET_TWO_INT_GET_NONE,
@@ -2717,8 +2664,6 @@ static const iw_handler hostapd_private[] = {
 		iw_softap_set_max_tx_power,
 	[QCSAP_IOCTL_SET_PKTLOG - SIOCIWFIRSTPRIV] =
 		iw_softap_set_pktlog,
-	[QCSAP_IOCTL_GET_INI_CFG - SIOCIWFIRSTPRIV] =
-		iw_softap_get_ini_cfg,
 	[QCSAP_IOCTL_SET_TWO_INT_GET_NONE - SIOCIWFIRSTPRIV] =
 		iw_softap_set_two_ints_getnone,
 };

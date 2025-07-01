@@ -1593,26 +1593,6 @@
 #define WLAN_PRIV_GET_CHAR_SET_NONE   (SIOCIWFIRSTPRIV + 5)
 #define WE_WLAN_VERSION      1
 #define WE_GET_STATS         2
-/*
- * <ioctl>
- * getConfig - gets the values of all configurations listed in WCNSS
- *
- * @INPUT: None
- *
- * @OUTPUT: Current configuration to the sys log
- *  wlan0	getConfig: WLAN configuration written to system log
- *
- * This IOCTL gets the values of all configurations listed in WCNSS
- *
- * @E.g: iwpriv wlan0 getConfig
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_CFG           3
 #define WE_GET_WMM_STATUS    4
 /*
  * <ioctl>
@@ -5547,15 +5527,6 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		break;
 	}
 
-	case WE_GET_CFG:
-	{
-		hdd_debug("Printing CLD global INI Config");
-		hdd_cfg_get_global_config(WLAN_HDD_GET_CTX(adapter),
-					  extra,
-					  QCSAP_IOCTL_MAX_STR_LEN);
-		wrqu->data.length = strlen(extra) + 1;
-		break;
-	}
 	case WE_GET_RSSI:
 	{
 		int8_t s7Rssi = 0;
@@ -8760,11 +8731,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
 	 "getHostStates"},
-
-	{WE_GET_CFG,
-	 0,
-	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
-	 "getConfig"},
 
 	{WE_GET_RSSI,
 	 0,

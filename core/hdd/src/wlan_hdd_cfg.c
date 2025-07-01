@@ -1031,23 +1031,6 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx)
 }
 
 /**
- * hdd_cfg_get_global_config() - get the configuration table
- * @hdd_ctx: pointer to hdd context
- * @buf: buffer to store the configuration
- * @buflen: size of the buffer
- *
- * Return: none
- */
-void hdd_cfg_get_global_config(struct hdd_context *hdd_ctx, char *buf,
-			       int buflen)
-{
-	ucfg_cfg_store_print(hdd_ctx->psoc);
-
-	snprintf(buf, buflen,
-		 "WLAN configuration written to debug log");
-}
-
-/**
  * hdd_cfg_print_global_config() - print the configuration table
  * @hdd_ctx: pointer to hdd context
  *

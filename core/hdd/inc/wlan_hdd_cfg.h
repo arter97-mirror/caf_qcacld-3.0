@@ -230,8 +230,6 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx);
 QDF_STATUS hdd_set_policy_mgr_user_cfg(struct hdd_context *hdd_ctx);
 QDF_STATUS hdd_set_sme_chan_list(struct hdd_context *hdd_ctx);
 bool hdd_update_config_cfg(struct hdd_context *hdd_ctx);
-void hdd_cfg_get_global_config(struct hdd_context *hdd_ctx, char *buf,
-			       int buflen);
 
 eCsrPhyMode hdd_cfg_xlate_to_csr_phy_mode(enum hdd_dot11_mode dot11Mode);
 
