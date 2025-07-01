@@ -50,6 +50,10 @@
 #include <hif_napi.h>
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
+#include <net/gro.h>
+#endif
+
 uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *link_ctx)
 {
 	struct wlan_dp_link *dp_link = (struct wlan_dp_link *)link_ctx;
