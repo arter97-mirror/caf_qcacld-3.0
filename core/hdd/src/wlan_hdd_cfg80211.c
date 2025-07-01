@@ -26249,6 +26249,33 @@ static void wlan_hdd_update_ap_sme_cap_wiphy(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/**
+ * wlan_hdd_set_link_removal_offload_wiphy() - set link removal offload in wiphy
+ * @wiphy: WIPHY structure pointer
+ * @hdd_ctx: HDD context
+ *
+ * This function update ML SAP link removal offload capabilities in wiphy
+ *
+ * Return: void
+ */
+static inline
+void wlan_hdd_set_link_removal_offload_wiphy(struct wiphy *wiphy,
+					     struct hdd_context *hdd_ctx)
+{
+	if (!wlan_hdd_mlo_sap_link_removal_cap(hdd_ctx))
+		return;
+	wiphy_ext_feature_set(wiphy,
+			      NL80211_EXT_FEATURE_MLD_LINK_REMOVAL_OFFLOAD);
+}
+#else
+static inline
+void wlan_hdd_set_link_removal_offload_wiphy(struct wiphy *wiphy,
+					     struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 static inline
 void wlan_hdd_set_mlo_wiphy_ext_feature(struct wiphy *wiphy,
@@ -26261,6 +26288,7 @@ void wlan_hdd_set_mlo_wiphy_ext_feature(struct wiphy *wiphy,
 		return;
 
 	wiphy->flags |= WIPHY_FLAG_SUPPORTS_MLO;
+	wlan_hdd_set_link_removal_offload_wiphy(wiphy, hdd_ctx);
 }
 #else
 static inline
