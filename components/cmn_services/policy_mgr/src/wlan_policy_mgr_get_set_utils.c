@@ -7056,9 +7056,17 @@ policy_mgr_validate_set_mlo_link_cb(struct wlan_objmgr_psoc *psoc,
 }
 
 uint32_t
-policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc)
+policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct ml_link_force_state curr_state = {0};
+	uint8_t vdev_id_num = 0;
+	uint8_t vdev_ids[WLAN_MLO_MAX_VDEVS];
+	uint32_t vdev_id_bitmap_sz;
+	uint32_t vdev_id_bitmap[MLO_VDEV_BITMAP_SZ];
+	uint8_t idx = 0;
+	uint32_t ret_val = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -7066,10 +7074,21 @@ policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	policy_mgr_debug("active link bitmap value: %d",
-			 pm_ctx->active_vdev_bitmap);
+	if (!ml_is_nlink_service_supported(psoc)) {
+		ret_val = pm_ctx->active_vdev_bitmap;
+	} else {
+		ml_nlink_get_curr_force_state(psoc, vdev, &curr_state);
+		ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
+				psoc, vdev, curr_state.force_active_bitmap,
+				NULL, &vdev_id_bitmap_sz,
+				vdev_id_bitmap, &vdev_id_num, vdev_ids);
+		for (idx = 0; idx < vdev_id_bitmap_sz; idx++) {
+			ret_val = vdev_id_bitmap[idx];
+		}
+	}
+	policy_mgr_debug("active vdev id bitmap: %d", ret_val);
 
-	return pm_ctx->active_vdev_bitmap;
+	return ret_val;
 }
 
 /**

@@ -1420,13 +1420,15 @@ QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc);
 /**
  * policy_mgr_get_active_vdev_bitmap() - to get active ML STA vdev bitmap
  * @psoc: PSOC object information
+ * @vdev: Vdev object pointer
  *
  * This API will fetch the active ML STA vdev bitmap.
  *
  * Return: vdev bitmap value
  */
 uint32_t
-policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc);
+policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev);
 
 /**
  * policy_mgr_is_emlsr_sta_concurrency_present() - Check whether eMLSR
@@ -1554,7 +1556,8 @@ policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline uint32_t
-policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc)
+policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev)
 {
 	return 0;
 }
