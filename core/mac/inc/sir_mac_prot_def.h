@@ -139,7 +139,11 @@
 #define SIR_MAC_QCOM_VENDOR_SIZE     3
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
-#define SIR_MAC_MAX_ADD_IE_LENGTH       2048
+#ifdef WLAN_LARGE_MGMT_FRAMES_SUPPORT
+#define SIR_MAC_MAX_ADD_IE_LENGTH    1024
+#else
+#define SIR_MAC_MAX_ADD_IE_LENGTH    2048
+#endif
 
 /* / Minimum length of each IE */
 #define SIR_MAC_RSN_IE_MIN_LENGTH   2
