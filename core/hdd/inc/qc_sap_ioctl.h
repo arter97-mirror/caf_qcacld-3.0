@@ -24,15 +24,6 @@
  * QCSAP ioctls.
  */
 
-/*
- * Channel List Info
- */
-
-struct channel_list_info {
-	uint8_t num_channels;
-	uint8_t channels[NUM_CHANNELS];
-};
-
 #ifdef __linux__
 /*
  * Wireless Extensions API, private ioctl interfaces.
@@ -93,7 +84,6 @@ struct channel_list_info {
 #define WE_P2P_NOA_CMD  2
 
 #define QCSAP_IOCTL_MODIFY_ACL          (SIOCIWFIRSTPRIV + 18)
-#define QCSAP_IOCTL_GET_CHANNEL_LIST    (SIOCIWFIRSTPRIV + 19)
 #define QCSAP_IOCTL_SET_TX_POWER        (SIOCIWFIRSTPRIV + 20)
 #define QCSAP_IOCTL_GET_STA_INFO        (SIOCIWFIRSTPRIV + 21)
 #define QCSAP_IOCTL_SET_MAX_TX_POWER    (SIOCIWFIRSTPRIV + 22)

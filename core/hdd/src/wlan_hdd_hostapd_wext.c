@@ -1745,128 +1745,6 @@ static int iw_get_char_setnone(struct net_device *dev,
 	return errno;
 }
 
-static int iw_get_channel_list(struct net_device *dev,
-			       struct iw_request_info *info,
-			       union iwreq_data *wrqu, char *extra)
-{
-	uint32_t num_channels = 0;
-	uint8_t i = 0;
-	struct hdd_adapter *hostapd_adapter = (netdev_priv(dev));
-	struct channel_list_info *channel_list =
-		(struct channel_list_info *)extra;
-	struct regulatory_channel *cur_chan_list = NULL;
-	struct hdd_context *hdd_ctx;
-	int ret;
-	QDF_STATUS status;
-
-	hdd_enter_dev(dev);
-
-	hdd_ctx = WLAN_HDD_GET_CTX(hostapd_adapter);
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
-
-	ret = hdd_check_private_wext_control(hdd_ctx, info);
-	if (0 != ret)
-		return ret;
-
-	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
-	if (!cur_chan_list)
-		return -ENOMEM;
-
-	status = ucfg_reg_get_current_chan_list(hdd_ctx->pdev, cur_chan_list);
-	if (status != QDF_STATUS_SUCCESS) {
-		hdd_err_rl("Failed to get the current channel list");
-		qdf_mem_free(cur_chan_list);
-		return -EIO;
-	}
-
-	for (i = 0; i < NUM_CHANNELS; i++) {
-		/*
-		 * current channel list includes all channels. do not report
-		 * disabled channels
-		 */
-		if (cur_chan_list[i].chan_flags & REGULATORY_CHAN_DISABLED)
-			continue;
-
-		/*
-		 * do not include 6 GHz channels since they are ambiguous with
-		 * 2.4 GHz and 5 GHz channels. 6 GHz-aware applications should
-		 * not be using this interface, but instead should be using the
-		 * frequency-based interface
-		 */
-		if (wlan_reg_is_6ghz_chan_freq(cur_chan_list[i].center_freq))
-			continue;
-		channel_list->channels[num_channels] =
-						cur_chan_list[i].chan_num;
-		num_channels++;
-
-	}
-
-	qdf_mem_free(cur_chan_list);
-	hdd_debug_rl("number of channels %d", num_channels);
-	channel_list->num_channels = num_channels;
-	wrqu->data.length = num_channels + 1;
-	hdd_exit();
-
-	return 0;
-}
-
-int iw_get_channel_list_with_cc(struct net_device *dev,
-				mac_handle_t mac_handle,
-				struct iw_request_info *info,
-				union iwreq_data *wrqu,
-				char *extra)
-{
-	uint8_t i, len;
-	char *buf;
-	uint8_t ubuf[REG_ALPHA2_LEN + 1] = {0};
-	uint8_t ubuf_len = REG_ALPHA2_LEN + 1;
-	struct channel_list_info channel_list;
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-
-	hdd_enter_dev(dev);
-
-	memset(&channel_list, 0, sizeof(channel_list));
-
-	if (0 != iw_get_channel_list(dev, info, wrqu, (char *)&channel_list)) {
-		hdd_err_rl("GetChannelList Failed!!!");
-		return -EINVAL;
-	}
-
-	/*
-	 * Maximum buffer needed =
-	 * [4: 3 digits of num_chn + 1 space] +
-	 * [REG_ALPHA2_LEN: REG_ALPHA2_LEN digits] +
-	 * [4 * num_chn: (1 space + 3 digits of chn[i]) * num_chn] +
-	 * [1: Terminator].
-	 *
-	 * Check if sufficient buffer is available and then
-	 * proceed to fill the buffer.
-	 */
-	if (WE_MAX_STR_LEN <
-	    (4 + REG_ALPHA2_LEN + 4 * channel_list.num_channels + 1)) {
-		hdd_err_rl("Insufficient Buffer to populate channel list");
-		return -EINVAL;
-	}
-
-	buf = extra;
-	len = scnprintf(buf, WE_MAX_STR_LEN, "%u ", channel_list.num_channels);
-	wlan_reg_get_cc_and_src(mac->psoc, ubuf);
-	/* Printing Country code in getChannelList(break at '\0') */
-	for (i = 0; i < (ubuf_len - 1) && ubuf[i] != 0; i++)
-		len += scnprintf(buf + len, WE_MAX_STR_LEN - len, "%c", ubuf[i]);
-
-	for (i = 0; i < channel_list.num_channels; i++)
-		len += scnprintf(buf + len, WE_MAX_STR_LEN - len, " %u",
-				 channel_list.channels[i]);
-
-	wrqu->data.length = strlen(extra) + 1;
-
-	hdd_exit();
-	return 0;
-}
-
 static
 int __iw_get_genie(struct net_device *dev,
 		   struct iw_request_info *info,
@@ -2044,61 +1922,6 @@ static int iw_softap_version(struct net_device *dev,
 		return errno;
 
 	errno = __iw_softap_version(dev, info, wrqu, extra);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-
-static int __iw_softap_get_channel_list(struct net_device *dev,
-					struct iw_request_info *info,
-					union iwreq_data *wrqu,
-					char *extra)
-{
-	int ret;
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	struct hdd_context *hdd_ctx;
-	mac_handle_t mac_handle;
-
-	hdd_enter_dev(dev);
-
-	if (hdd_validate_adapter(adapter))
-		return -ENODEV;
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
-
-	ret = hdd_check_private_wext_control(hdd_ctx, info);
-	if (0 != ret)
-		return ret;
-
-	mac_handle = hdd_ctx->mac_handle;
-
-	ret = iw_get_channel_list_with_cc(dev, mac_handle,
-					  info, wrqu, extra);
-
-	if (0 != ret)
-		return -EINVAL;
-
-	hdd_exit();
-	return 0;
-}
-
-static int iw_softap_get_channel_list(struct net_device *dev,
-				      struct iw_request_info *info,
-				      union iwreq_data *wrqu,
-				      char *extra)
-{
-	int errno;
-	struct osif_vdev_sync *vdev_sync;
-
-	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __iw_softap_get_channel_list(dev, info, wrqu, extra);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
@@ -2750,14 +2573,7 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 8, 0, "modify_acl"
 	}
 	,
-	/* handlers for main ioctl */
-	{
-		QCSAP_IOCTL_GET_CHANNEL_LIST,
-		0,
-		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
-		"getChannelList"
-	}
-	,
+
 	/* handlers for main ioctl */
 	{
 		QCSAP_IOCTL_SET_TX_POWER,
@@ -2888,8 +2704,6 @@ static const iw_handler hostapd_private[] = {
 		iw_set_var_ints_getnone,
 	[QCSAP_IOCTL_MODIFY_ACL - SIOCIWFIRSTPRIV] =
 		iw_softap_modify_acl,
-	[QCSAP_IOCTL_GET_CHANNEL_LIST - SIOCIWFIRSTPRIV] =
-		iw_softap_get_channel_list,
 	[QCSAP_IOCTL_GET_BA_AGEING_TIMEOUT - SIOCIWFIRSTPRIV] =
 		iw_softap_get_ba_timeout,
 	[QCSAP_IOCTL_PRIV_GET_SOFTAP_LINK_SPEED -

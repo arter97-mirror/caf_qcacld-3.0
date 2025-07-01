@@ -1616,26 +1616,6 @@
 #define WE_GET_WMM_STATUS    4
 /*
  * <ioctl>
- * getChannelList - Get the available channel list while in QCMobileAP
- *
- * @INPUT: None
- *
- * @OUTPUT: Channel list
- * wlan0     getChannelList:36 US 1..165
- *
- * This IOCTL gets the available channel list while in QCMobileAP
- *
- * @E.g: iwpriv wlan0 getChannelList
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_CHANNEL_LIST  5
-/*
- * <ioctl>
  * getRSSI - Get the Received Signal Strength Indicator
  *
  * @INPUT: None
@@ -5663,15 +5643,6 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		break;
 	}
 
-	case WE_GET_CHANNEL_LIST:
-	{
-		if (0 !=
-		    iw_get_channel_list_with_cc(dev, mac_handle,
-						info, wrqu, extra))
-			return -EINVAL;
-		break;
-	}
-
 	case WE_GET_11W_INFO:
 	{
 		struct qdf_mac_addr connected_bssid;
@@ -8804,11 +8775,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
 	 "getWmmStatus"},
-
-	{WE_GET_CHANNEL_LIST,
-	 0,
-	 IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN,
-	 "getChannelList"},
 
 	{WE_GET_11W_INFO,
 	 0,
