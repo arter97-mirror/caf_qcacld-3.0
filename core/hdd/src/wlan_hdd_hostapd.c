@@ -9867,6 +9867,11 @@ void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter)
 		return;
 	}
 
+	if (wlan_hdd_link_removal_is_in_progress(adapter)) {
+		hdd_debug("bypass eSAP_STA_DISASSOC_EVENT when link removal");
+		return;
+	}
+
 	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
 				  STA_INFO_SAP_INDICATE_DISCONNECT_FOR_STA) {
 		hdd_debug("sta_mac: " QDF_MAC_ADDR_FMT,
