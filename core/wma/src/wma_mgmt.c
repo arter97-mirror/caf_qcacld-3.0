@@ -3401,7 +3401,8 @@ int wma_mgmt_tx_bundle_completion_handler(void *handle, uint8_t *buf,
 }
 
 static QDF_STATUS
-wma_update_peer_phymode(struct wlan_objmgr_peer *peer,
+wma_update_peer_phymode(struct wlan_objmgr_pdev *pdev,
+			struct wlan_objmgr_peer *peer,
 			enum phy_ch_width old_ch_width,
 			enum phy_ch_width new_ch_width,
 			enum wlan_phymode *peer_phymode)
@@ -3411,7 +3412,7 @@ wma_update_peer_phymode(struct wlan_objmgr_peer *peer,
 	enum wlan_phymode old_phymode;
 	enum wlan_peer_type peer_type;
 
-	if (!peer || !peer_phymode) {
+	if (!pdev || !peer || !peer_phymode) {
 		wma_err("null param");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -3424,7 +3425,7 @@ wma_update_peer_phymode(struct wlan_objmgr_peer *peer,
 		return QDF_STATUS_E_NOSUPPORT;
 
 	des_chan = wlan_vdev_mlme_get_des_chan(wlan_peer_get_vdev(peer));
-	if (!wlan_is_valid_dnw(wlan_peer_get_vdev(peer), des_chan->ch_freq,
+	if (!wlan_is_valid_dnw(pdev, des_chan->ch_freq,
 			       old_ch_width, new_ch_width))
 		return QDF_STATUS_E_NOSUPPORT;
 
@@ -3506,7 +3507,8 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 	if (ch_width < wmi_opmode_chwidth) {
 		peer_chwidth =
 			target_if_wmi_chan_width_to_phy_ch_width(ch_width);
-		status = wma_update_peer_phymode(peer, peer_chwidth,
+		status = wma_update_peer_phymode(wma_handle->pdev, peer,
+						 peer_chwidth,
 						 update_vht_opmode->chwidth,
 						 &peer_phymode);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
