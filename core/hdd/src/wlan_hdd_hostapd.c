@@ -7071,6 +7071,13 @@ static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 }
 #endif
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+bool wlan_hdd_mlo_sap_link_removal_cap(struct hdd_context *hdd_ctx)
+{
+	return wlan_mlo_ap_get_link_removal_cap(hdd_ctx->psoc);
+}
+#endif
+
 void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info)
 {
 	struct sap_config *sap_config;

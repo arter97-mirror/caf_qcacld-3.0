@@ -590,6 +590,26 @@ static inline void wlan_hdd_mlo_reset(struct wlan_hdd_link_info *link_info)
 }
 #endif /* end WLAN_FEATURE_11BE_MLO */
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/**
+ * wlan_hdd_mlo_sap_link_removal_cap() - get mlo sap link removal support
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Get link removal support from fw wmi service, if support set wiphy flag of
+ * NL80211_EXT_FEATURE_MLD_LINK_REMOVAL_OFFLOAD which hostapd/kernel will
+ * check when link removal request from user space.
+ *
+ * Return: true if support,false if not support
+ */
+bool wlan_hdd_mlo_sap_link_removal_cap(struct hdd_context *hdd_ctx);
+#else
+static inline
+bool wlan_hdd_mlo_sap_link_removal_cap(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
+#endif
+
 #ifdef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 /**
  * hdd_sap_is_acs_in_progress() - API to return if ACS is in progress
