@@ -1540,7 +1540,6 @@
  * </ioctl>
  */
 #define WE_GET_GTX_MINTPC               53
-#define WE_GET_TEMPERATURE              56
 #define WE_GET_ROAM_SYNCH_DELAY         59
 
 /* Private ioctls and their sub-ioctls */
@@ -5134,13 +5133,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
-	case WE_GET_TEMPERATURE:
-	{
-		hdd_debug("WE_GET_TEMPERATURE");
-		ret = wlan_hdd_get_temperature(adapter, value);
-		break;
-	}
-
 	default:
 	{
 		hdd_err("Invalid IOCTL get_value command %d",
@@ -8721,11 +8713,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_qnodatapoll"},
-
-	{WE_GET_TEMPERATURE,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_temp"},
 
 	/* handlers for main ioctl */
 	{WLAN_PRIV_SET_CHAR_GET_NONE,

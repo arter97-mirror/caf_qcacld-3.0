@@ -1214,12 +1214,6 @@ static __iw_softap_getparam(struct net_device *dev,
 		break;
 	}
 
-	case QCASAP_GET_TEMP_CMD:
-	{
-		hdd_debug("QCASAP_GET_TEMP_CMD");
-		ret = wlan_hdd_get_temperature(adapter, value);
-		break;
-	}
 	case QCSAP_GET_FW_PROFILE_DATA:
 		hdd_debug("QCSAP_GET_FW_PROFILE_DATA");
 		ret = wma_cli_set_command(
@@ -2653,9 +2647,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCSAP_GET_TSF, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3,
 		"get_tsf"
-	}, {
-		QCASAP_GET_TEMP_CMD, 0,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_temp"
 	}, {
 		QCSAP_GET_FW_PROFILE_DATA, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getProfileData"
