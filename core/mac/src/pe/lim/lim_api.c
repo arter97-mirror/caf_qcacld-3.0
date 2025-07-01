@@ -4969,8 +4969,8 @@ QDF_STATUS lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 			status = lim_add_bcn_probe(mac_ctx->pdev,
 						   link_probe_rsp.ptr,
 						   link_probe_rsp.len,
-						   true, chan_freq, rssi, 0,
-						   0);
+						   true, chan_freq,
+						   rssi, 0, 0);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				pe_err("failed to add bcn probe %d", status);
 				lim_clear_ml_partner_info(session_entry, idx);
@@ -5116,7 +5116,7 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 
 		lim_add_bcn_probe(mac_ctx->pdev, link_probe_rsp.ptr,
 				  link_probe_rsp.len,
-				  false, chan_freq, rssi, snr, 0);
+				  true, chan_freq, rssi, snr, 0);
 
 		partner_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
 						       WLAN_LEGACY_MAC_ID);
