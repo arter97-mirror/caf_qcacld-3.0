@@ -1101,26 +1101,6 @@
 #define WE_GET_CONCURRENCY_MODE 9
 /*
  * <ioctl>
- * get_tx_stbc - Get the value of the current Tx space time block code (STBC)
- *
- * @INPUT: None
- *
- * @OUTPUT: TXSTBC
- *  wlan0     get_tx_stbc:1
- *
- * This IOTCL get the value of the current Tx space time block code (STBC)
- *
- * @E.g: iwpriv wlan0 get_tx_stbc
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_TX_STBC       13
-/*
- * <ioctl>
  * get_rx_stbc - Gets the value of the current Rx STBC
  *
  * @INPUT: None
@@ -4878,12 +4858,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		break;
 	}
 
-	case WE_GET_TX_STBC:
-	{
-		ret = hdd_get_tx_stbc(adapter, value);
-		break;
-	}
-
 	case WE_GET_RX_STBC:
 	{
 		ret = hdd_get_rx_stbc(adapter, value);
@@ -8543,11 +8517,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "getconcurrency"},
-
-	{WE_GET_TX_STBC,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_tx_stbc"},
 
 	{WE_GET_RX_STBC,
 	 0,
