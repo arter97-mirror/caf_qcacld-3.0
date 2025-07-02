@@ -943,7 +943,7 @@ static QDF_STATUS target_if_cp_stats_extract_event(struct wmi_unified *wmi_hdl,
 
 	status = wmi_extract_stats_param(wmi_hdl, data, &stats_param);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("stats param extract failed: %d", status);
+		cp_stats_rl_err("stats param extract failed: %d", status);
 		return status;
 	}
 	cp_stats_nofl_debug("num: pdev: %d, pdev_extd: %d, vdev: %d, vdev_extd: %d, "
@@ -1085,7 +1085,7 @@ static int target_if_mc_cp_stats_stats_event_handler(ol_scn_t scn,
 
 	status = target_if_cp_stats_extract_event(wmi_handle, ev, data);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		cp_stats_err("extract event failed");
+		cp_stats_rl_err("extract event failed");
 		goto end;
 	}
 
