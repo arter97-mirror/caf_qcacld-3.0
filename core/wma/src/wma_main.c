@@ -6597,9 +6597,15 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	/*
 	 * Copy engine buffer is limited to 2K and maximum APF data send in a
 	 * WMI command depends on max bus size.
-	 * So, WMI MAX bus size is hardcoded to 2K.
+	 * So, WMI MAX bus size is hardcoded to 2K if max bus size is more
+	 * than 2K.
 	 */
-	tgt_cfg.wmi_max_len = WMI_MAX_BUS_SIZE - WMI_TLV_HEADROOM;
+	if (WMI_MAX_BUS_SIZE <= wmi_get_max_msg_len(wma_handle->wmi_handle))
+		tgt_cfg.wmi_max_len = WMI_MAX_BUS_SIZE - WMI_TLV_HEADROOM;
+	else
+		tgt_cfg.wmi_max_len =
+			wmi_get_max_msg_len(wma_handle->wmi_handle) -
+			WMI_TLV_HEADROOM;
 	tgt_cfg.tx_bfee_8ss_enabled = wma_handle->tx_bfee_8ss_enabled;
 	tgt_cfg.dynamic_nss_chains_support =
 				wma_handle->dynamic_nss_chains_support;
