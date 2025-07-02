@@ -596,6 +596,9 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 		}
 	}
 
+	if (punct_bitmap)
+		wlan_reg_set_input_punc_bitmap(&chan_params, punct_bitmap);
+
 	chan_params.ch_width = chan_width;
 	wlan_reg_set_channel_params_for_pwrmode(mac->pdev, chan_freq,
 						chan_freq, &chan_params,
@@ -607,7 +610,6 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 		psd_start_freq = chan_params.mhz_freq_seg0 - bw_val / 2 + 10;
 
 	if (punct_bitmap) {
-		wlan_reg_set_input_punc_bitmap(&chan_params, punct_bitmap);
 		wlan_reg_set_non_eht_ch_params(&chan_params, true);
 		wlan_reg_set_channel_params_for_pwrmode(mac->pdev, chan_freq,
 							chan_freq, &chan_params,
