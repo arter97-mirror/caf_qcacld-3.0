@@ -1372,7 +1372,7 @@ int osif_twt_sta_teardown_req(struct wlan_objmgr_vdev *vdev,
 	return osif_send_sta_twt_teardown_req(vdev, psoc, &params);
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * osif_twt_is_p2p_go_wfd_r2_mode() - This function finds VDEV for P2P GO mode
  * and checks WFD mode.
@@ -1527,7 +1527,7 @@ osif_twt_iterate_all_concurrency_vdev(struct wlan_objmgr_pdev *pdev,
 	twt_arg->p2p_r2_mode = false;
 	return QDF_STATUS_SUCCESS;
 }
-#endif
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 #define TWT_RESPONDER_SAP_MODE       0
 #define TWT_RESPONDER_LL_LT_SAP_MODE 1

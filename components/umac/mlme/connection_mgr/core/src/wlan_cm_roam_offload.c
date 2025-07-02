@@ -54,6 +54,7 @@
 #include "wmi_unified.h"
 #include "wlan_cm_public_struct.h"
 #include "wlan_policy_mgr_i.h"
+#include <wlan_mlo_link_recfg.h>
 
 #define MIN_FIRST_BMISS_CNT 2
 #define MIN_FINAL_BMISS_CNT 5
@@ -384,13 +385,13 @@ cm_roam_triggers(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	cm_roam_update_trigger_bitmap(psoc, vdev_id, params);
 
-	mlme_debug("[ROAM_TRIGGER] trigger_bitmap:%d", params->trigger_bitmap);
 
 	params->roam_scan_scheme_bitmap =
 		wlan_cm_get_roam_scan_scheme_bitmap(psoc, vdev_id);
 	wlan_cm_roam_get_vendor_btm_params(psoc, &params->vendor_btm_param);
 	wlan_cm_roam_get_score_delta_params(psoc, params);
 	wlan_cm_roam_get_min_rssi_params(psoc, params);
+	mlme_debug("triggers_bitmap:0x%x", params->trigger_bitmap);
 }
 
 /**
@@ -3924,17 +3925,27 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 
-	mlme_clear_rso_pending_disable_req_bitmap(psoc, vdev_id);
-	cm_roam_set_roam_reason_better_ap(psoc, vdev_id, false);
-	stop_req = qdf_mem_malloc(sizeof(*stop_req));
-	if (!stop_req)
-		return QDF_STATUS_E_NOMEM;
-
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_CM_ID);
 	if (!vdev) {
 		mlme_err("vdev object is NULL for vdev %d", vdev_id);
-		goto free_mem;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (mlo_is_link_recfg_in_progress(vdev)) {
+		mlme_debug("skip RSO cmd for vdev %d due to link recfg is in progress",
+			   vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_clear_rso_pending_disable_req_bitmap(psoc, vdev_id);
+	cm_roam_set_roam_reason_better_ap(psoc, vdev_id, false);
+
+	stop_req = qdf_mem_malloc(sizeof(*stop_req));
+	if (!stop_req) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return QDF_STATUS_E_NOMEM;
 	}
 
 	if (wlan_vdev_mlme_get_is_mlo_link(psoc, vdev_id)) {
@@ -4013,7 +4024,6 @@ cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 rel_vdev_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
-free_mem:
 	qdf_mem_free(stop_req);
 
 	return QDF_STATUS_SUCCESS;
@@ -5816,8 +5826,7 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.lfr.roam_scan_inactivity_time;
 	cfg_params->roam_inactive_data_packet_count =
 			mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
-	wlan_mlme_reinit_real_time_roam_parms(wlan_vdev_get_psoc(vdev),
-					      cfg_params, mlme_obj);
+	wlan_mlme_reinit_real_time_roam_parms(vdev);
 	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
 	rso_cfg->roam_band_bitmask = current_band;
 }
@@ -7664,9 +7673,10 @@ cm_roam_neigh_rpt_req_event(struct wmi_neighbor_report_data *neigh_rpt,
 	wlan_diag_event.token = neigh_rpt->req_token;
 	wlan_diag_event.band = neigh_rpt->band;
 	wlan_diag_event.is_tx = true;
+	wlan_diag_event.tx_fail_reason =
+	wlan_convert_host_to_diag_tx_fail_reason(neigh_rpt->tx_status);
 	wlan_diag_event.tx_status =
 		wlan_diag_get_tx_status(neigh_rpt->tx_status);
-	wlan_diag_event.tx_fail_reason = neigh_rpt->tx_status;
 
 	wlan_vdev_mlme_get_ssid(vdev, wlan_diag_event.ssid,
 				(uint8_t *)&wlan_diag_event.ssid_len);
@@ -8032,11 +8042,12 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 			  (uint64_t)frame_data->timestamp,
 			  &frame_data->bssid);
 
-	wlan_diag_event.version = DIAG_MGMT_VERSION_V2;
+	wlan_diag_event.version = DIAG_MGMT_VERSION_V5;
 	wlan_diag_event.sn = frame_data->seq_num;
 	wlan_diag_event.auth_algo = frame_data->auth_algo;
 	wlan_diag_event.rssi = frame_data->rssi;
-	wlan_diag_event.tx_fail_reason = frame_data->tx_status;
+	wlan_diag_event.tx_fail_reason =
+		wlan_convert_host_to_diag_tx_fail_reason(frame_data->tx_status);
 	wlan_diag_event.tx_status =
 				wlan_diag_get_tx_status(frame_data->tx_status);
 	wlan_diag_event.status = frame_data->status_code;

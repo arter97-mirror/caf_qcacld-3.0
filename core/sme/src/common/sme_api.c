@@ -6053,7 +6053,8 @@ QDF_STATUS sme_reset_tsfcb(mac_handle_t mac_handle)
 	return status;
 }
 
-#if defined(WLAN_FEATURE_TSF) && !defined(WLAN_FEATURE_TSF_PLUS_NOIRQ)
+#if defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ) || \
+	defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC)
 /*
  * sme_set_tsf_gpio() - set gpio pin that be toggled when capture tsf
  * @mac_handle: Handler return by mac_open
@@ -17758,7 +17759,7 @@ void sme_deregister_disconnect_cb(mac_handle_t mac_handle)
 	SME_EXIT();
 }
 
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO)
 void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
 			    uint8_t *peer_addr,
 			    uint8_t *mld_addr)

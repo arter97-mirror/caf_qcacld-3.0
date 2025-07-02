@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -494,7 +494,7 @@ QDF_STATUS  tgt_p2p_noa_event_cb(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 QDF_STATUS tgt_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
 				   struct p2p_usd_attr_params *param)
 {
@@ -505,7 +505,7 @@ bool tgt_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc)
 {
 	return target_if_p2p_is_fw_support_usd(psoc);
 }
-#endif /* FEATURE_WLAN_SUPPORT_USD */
+#endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 QDF_STATUS
 tgt_p2p_ap_assist_dfs_group_bmiss_ev_handler(struct wlan_objmgr_psoc *psoc,

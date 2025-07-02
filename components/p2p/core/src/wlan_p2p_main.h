@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -709,7 +709,8 @@ p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
  */
 const uint8_t *p2p_parse_assoc_ie_for_device_info(const uint8_t *assoc_ie,
 						  uint32_t assoc_ie_len);
-#ifdef FEATURE_WLAN_SUPPORT_USD
+
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 /**
  * p2p_send_usd_params() - Sent USD parameters to target
  * @psoc: pointer to PSOC object
@@ -727,7 +728,9 @@ QDF_STATUS p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
  * Return: true if USD is supported by FW else false
  */
 bool p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
+#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * p2p_is_vdev_wfd_r2_mode() - Returns true if current mode of VDEV operation
  * is WFD-R2.
@@ -741,7 +744,7 @@ static inline bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
 {
 	return false;
 }
-#endif /* FEATURE_WLAN_SUPPORT_USD */
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 /**
  * p2p_extract_ap_assist_dfs_params() - Extract P2P2 IE for assisted AP

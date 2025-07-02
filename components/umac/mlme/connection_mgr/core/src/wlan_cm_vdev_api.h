@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -589,7 +589,7 @@ QDF_STATUS cm_process_join_req(struct cm_vdev_join_req *join_req);
 QDF_STATUS
 cm_remove_force_bss_on_join_fail(struct cm_vdev_join_req *join_req);
 
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * cm_get_pre_auth_mld_addr - Get mld address from preauth list
  * @mac: pointer to mac object

@@ -2025,6 +2025,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 	uint32_t cur_sap_vdev_id = INVALID_VDEV_ID;
+	uint8_t nan_present;
 
 	if (intf_ch_freq)
 		*intf_ch_freq = 0;
@@ -2057,6 +2058,14 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 							  PM_STA_MODE, NULL) +
 		policy_mgr_mode_specific_connection_count(psoc,
 							  PM_P2P_CLIENT_MODE,
+							  NULL);
+
+	nan_present =
+		policy_mgr_mode_specific_connection_count(psoc,
+							  PM_NAN_DISC_MODE,
+							  NULL) +
+		policy_mgr_mode_specific_connection_count(psoc,
+							  PM_NDI_MODE,
 							  NULL);
 
 	for (i = 0 ; i < cc_count; i++) {
@@ -2128,6 +2137,7 @@ user_freq_check:
 		user_band = wlan_reg_freq_to_band(user_config_freq);
 
 		if (!ll_sap_freq && !sta_gc_present && user_config_freq &&
+		    !nan_present &&
 		    wlan_reg_is_enable_in_secondary_list_for_freq(pm_ctx->pdev,
 							user_config_freq) &&
 		    op_band < user_band) {
@@ -3778,6 +3788,7 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	uint32_t nan_2g_freq, nan_5g_freq;
 	uint8_t cc_mode;
 	uint8_t scc_vdev_id;
+	qdf_freq_t old_mhz_freq_seg1;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3837,6 +3848,8 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	sta_sap_scc_on_indoor_channel =
 		policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc);
 	old_ch_width = ch_params->ch_width;
+	old_mhz_freq_seg1 = ch_params->mhz_freq_seg1;
+
 	if (pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params)
 		pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params(
 			psoc, sap_vdev_id, ch_freq, ch_params);
@@ -3931,11 +3944,14 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	if (ch_freq != sap_ch_freq || old_ch_width != ch_params->ch_width) {
+	if (ch_freq != sap_ch_freq || old_ch_width != ch_params->ch_width ||
+	    old_mhz_freq_seg1 != ch_params->mhz_freq_seg1) {
 		*con_ch_freq = ch_freq;
-		policymgr_nofl_debug("sap conc result con freq %d bw %d org freq %d bw %d",
-				     ch_freq, ch_params->ch_width, sap_ch_freq,
-				     old_ch_width);
+		policymgr_nofl_debug("sap conc result con freq %d bw %d ccfs1 %d org freq %d bw %d ccfs1 %d",
+				     ch_freq, ch_params->ch_width,
+				     ch_params->mhz_freq_seg1,
+				     sap_ch_freq, old_ch_width,
+				     old_mhz_freq_seg1);
 	}
 
 	if (*con_ch_freq != 0 &&

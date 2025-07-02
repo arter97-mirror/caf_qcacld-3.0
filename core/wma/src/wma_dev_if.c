@@ -4071,6 +4071,9 @@ void wma_hold_req_timer(void *data)
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 	QDF_STATUS status;
 
+	if (!mac)
+		return;
+
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma)
 		return;

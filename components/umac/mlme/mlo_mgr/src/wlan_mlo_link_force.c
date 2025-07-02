@@ -6045,13 +6045,18 @@ ml_nlink_swtich_dynamic_inactive_link(struct wlan_objmgr_psoc *psoc,
 	struct ml_link_force_state curr_force_state = {0};
 	uint8_t link_ids[MAX_MLO_LINK_ID];
 	uint8_t num_ids;
+	uint8_t last_link_id;
+	uint32_t act_link_bitmap;
+	struct wlan_objmgr_vdev *link_vdev;
+	uint8_t link_vdev_id;
 
 	link_id = wlan_vdev_get_link_id(vdev);
 	if (link_id >= MAX_MLO_LINK_ID) {
 		mlo_err("invalid link id %d", link_id);
 		return QDF_STATUS_E_INVAL;
 	}
-
+	last_link_id = mlo_mgr_get_link_switch_last_link_id(vdev);
+	act_link_bitmap = ml_nlink_get_available_link_bitmap(psoc, vdev);
 	ml_nlink_get_curr_force_state(psoc, vdev, &curr_force_state);
 	standby_link_bitmap = ml_nlink_get_standby_link_bitmap(psoc, vdev);
 	standby_link_bitmap &= curr_force_state.force_inactive_num_bitmap &
@@ -6090,6 +6095,50 @@ ml_nlink_swtich_dynamic_inactive_link(struct wlan_objmgr_psoc *psoc,
 			  wlan_vdev_get_id(vdev), link_id, link_ids[0]);
 		ml_nlink_set_dynamic_inactive_links(psoc, vdev,
 						    dynamic_inactive_bitmap);
+	} else if (curr_force_state.curr_dynamic_inactive_bitmap &&
+		   (last_link_id != WLAN_INVALID_LINK_ID) &&
+		   ((1 << last_link_id) & standby_link_bitmap) &&
+		   !((1 << last_link_id) &
+			curr_force_state.curr_dynamic_inactive_bitmap) &&
+		   ((1 << last_link_id) &
+			curr_force_state.force_inactive_num_bitmap)) {
+		act_link_bitmap &=
+			curr_force_state.curr_dynamic_inactive_bitmap;
+		act_link_bitmap &= ~standby_link_bitmap;
+		act_link_bitmap &= ~curr_force_state.force_inactive_bitmap;
+
+		num_ids = convert_link_bitmap_to_link_ids(
+					act_link_bitmap,
+					QDF_ARRAY_SIZE(link_ids),
+					link_ids);
+		if (!num_ids)
+			return QDF_STATUS_SUCCESS;
+
+		link_vdev = mlo_get_vdev_by_link_id(vdev,
+						    link_ids[0],
+						    WLAN_MLO_MGR_ID);
+		if (!link_vdev) {
+			mlo_debug("links vdev not found for link id %d",
+				  link_ids[0]);
+			return QDF_STATUS_SUCCESS;
+		}
+		link_vdev_id = wlan_vdev_get_id(link_vdev);
+
+		/* Remove the link from dynamic inactive bitmap,
+		 * add the standby link to dynamic inactive bitmap.
+		 */
+		dynamic_inactive_bitmap =
+			curr_force_state.curr_dynamic_inactive_bitmap &
+						~(1 << link_ids[0]);
+		dynamic_inactive_bitmap |= 1 << last_link_id;
+		mlo_debug("move out link id %d from dynamic inactive, add standby link id %d",
+			  link_ids[0], last_link_id);
+		ml_nlink_set_dynamic_inactive_links(psoc, vdev,
+						    dynamic_inactive_bitmap);
+		policy_mgr_move_vdev_from_disabled_to_connection_tbl(
+							psoc,
+							link_vdev_id);
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_MLO_MGR_ID);
 	}
 
 	return QDF_STATUS_SUCCESS;

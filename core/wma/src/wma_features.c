@@ -323,7 +323,7 @@ end:
 	wma_post_link_status(pGetLinkStatus, LINK_STATUS_LEGACY);
 }
 
-#ifdef WLAN_FEATURE_TSF
+#ifdef WLAN_FEATURE_TSF_PLUS
 
 #if defined(WLAN_FEATURE_TSF_AUTO_REPORT) || defined(QCA_GET_TSF_VIA_REG)
 static inline void
@@ -407,7 +407,7 @@ int wma_vdev_tsf_handler(void *handle, uint8_t *data, uint32_t data_len)
 	return 0;
 }
 
-#if defined(QCA_WIFI_3_0) || defined(WLAN_FEATURE_TSF_TIMER_SYNC)
+#ifdef WLAN_FEATURE_TSF_PLUS_NOIRQ
 #define TSF_FW_ACTION_CMD TSF_TSTAMP_QTIMER_CAPTURE_REQ
 #else
 #define TSF_FW_ACTION_CMD TSF_TSTAMP_CAPTURE_REQ
@@ -1463,6 +1463,7 @@ static bool fill_csa_offload_params(
 	uint8_t is_csa_ie_present = false;
 	uint16_t chan_space;
 	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
+	uint16_t opclass_width;
 
 	wlan_reg_read_current_country(wlan_pdev_get_psoc(pdev), country_code);
 
@@ -1500,8 +1501,12 @@ static bool fill_csa_offload_params(
 									     xcsa_ie->newchannel,
 									     xcsa_ie->newClass);
 		}
+		wlan_reg_convert_chan_spacing_to_width(
+						chan_space,
+						&opclass_width);
 		csa_offload_event->new_ch_width =
-				wlan_reg_find_chwidth_from_bw(chan_space);
+			wlan_reg_find_chwidth_from_bw(opclass_width);
+
 		csa_offload_event->ies_present_flag |= MLME_XCSA_IE_PRESENT;
 		is_csa_ie_present = true;
 	}

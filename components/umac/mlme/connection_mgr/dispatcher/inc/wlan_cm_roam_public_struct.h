@@ -255,6 +255,46 @@ enum wlan_roam_frame_subtype {
 };
 
 /**
+ * enum wlan_roam_frame_tx_status - TX/RX packet status
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_INVALID:
+ * Invalid status
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK:
+ * successfully sent + acked
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK:
+ * packet sent but no ack received
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FAIL:
+ * Transmission failure during packet transfer
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_DROP:
+ * packet dropped due to congestion
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FILTERED:
+ * Packet dropped due TX filter
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TXOP_ABORT:
+ * TX operation is aborted
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_TID_DEL:
+ * TX TID deleted
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_SW_ABORT:
+ * operation aborted by FW
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MIG_DROP:
+ * Packet Dropped to TX Migration
+ * @ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MLO_TID_MIG:
+ * Packet Dropped due to TX TID Migration
+ */
+enum wlan_roam_frame_tx_status {
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_INVALID = 0,
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK = 1,
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK = 2,
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FAIL = 3,
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_DROP =
+		ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FAIL,
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FILTERED = 4,
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TXOP_ABORT = 5,
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_TID_DEL = 6,
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_SW_ABORT = 7,
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MIG_DROP = 8,
+	ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MLO_TID_MIG = 9,
+};
+
+/**
  * struct cm_roam_neighbor_report_offload_params - neighbor report offload
  *                                                 parameters
  * @offload_11k_enable_bitmask: neighbor report offload bitmask control

@@ -758,7 +758,7 @@ static void lim_update_connected_links(struct pe_session *session)
 {
 	mlo_update_connected_links(session->vdev, 1);
 	mlo_update_connected_links_bmap(session->vdev->mlo_dev_ctx,
-					session->ml_partner_info);
+					&session->ml_partner_info);
 }
 #else /* WLAN_FEATURE_11BE_MLO */
 static inline void

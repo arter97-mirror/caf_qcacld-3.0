@@ -187,7 +187,7 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 	uint8_t *mac_addr;
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	hdd_stop_tsf_sync(adapter);
+	hdd_reset_tsf_sync(adapter);
 	time_buffer_size = sizeof(sta_ctx->conn_info.connect_time);
 	qdf_mem_zero(sta_ctx->conn_info.connect_time, time_buffer_size);
 

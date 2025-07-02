@@ -2953,19 +2953,31 @@ static int os_if_nan_generic_req(struct wlan_objmgr_psoc *psoc,
 }
 
 static int os_if_process_nan_disable_req(struct wlan_objmgr_psoc *psoc,
-					 struct nlattr **tb)
+					 struct nlattr **tb, uint8_t vdev_id)
 {
 	uint8_t *data;
 	uint32_t data_len;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *vdev;
 
 	data = nla_data(tb[QCA_WLAN_VENDOR_ATTR_NAN_CMD_DATA]);
 	data_len = nla_len(tb[QCA_WLAN_VENDOR_ATTR_NAN_CMD_DATA]);
-	status = ucfg_nan_cache_disable_req_info(psoc, NAN_DISABLE_REQ_NB);
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
+	if (!vdev) {
+		osif_err("vdev is null for id %d", vdev_id);
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto end;
+	}
+
+	if (QDF_NAN_DISC_MODE == wlan_vdev_mlme_get_opmode(vdev))
+		status = ucfg_nan_cache_disable_req_info(psoc,
+							 NAN_DISABLE_REQ_NB);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 
 	if (QDF_IS_STATUS_SUCCESS(status))
 		status = ucfg_disable_nan_discovery(psoc, data, data_len);
 
+end:
 	return qdf_status_to_os_return(status);
 }
 
@@ -3075,7 +3087,7 @@ int os_if_process_nan_req(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		return os_if_process_nan_enable_req(pdev, tb, vdev_id);
 	case QCA_WLAN_NAN_EXT_SUBCMD_TYPE_DISABLE_REQ:
 		os_if_cstats_log_disable_nan_disc_evt(pdev, vdev_id);
-		return os_if_process_nan_disable_req(psoc, tb);
+		return os_if_process_nan_disable_req(psoc, tb, vdev_id);
 	default:
 		osif_err("Unrecognized NAN subcmd type(%d)", nan_subcmd);
 		return -EINVAL;

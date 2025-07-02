@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -291,7 +291,10 @@
  *     (0  1 ): Disallow all roaming
  *     (1  0 ): Allow roaming when final bmissed
  *     (1  1 ): Reserve
- * bit 8-9: Reserve for roaming
+ * bit 8: Final bmiss roam will be triggered when all active links
+ *        are final bmiss reported.
+ * bit 9-11 of flags is used for powersave operation
+ * bit 9: Disable BMPS if bit is set
  * bit 10: Disable css power collapse if setting
  * bit 11: Disable sys sleep if setting
  * bit 12-31: Reserve for future usage
@@ -353,7 +356,10 @@
  *     (0  1 ): Disallow all roaming
  *     (1  0 ): Allow roaming when final bmissed
  *     (1  1 ): Reserve
- * bit 8-9: Reserve for roaming
+ * bit 8: Final bmiss roam will be triggered when all active links
+ *        are final bmiss reported.
+ * bit 9-11 of flags is used for powersave operation
+ * bit 9: Disable BMPS if bit is set
  * bit 10: Disable css power collapse if setting
  * bit 11: Disable sys sleep if setting
  * bit 12-23: Reserve for future usage
@@ -380,7 +386,7 @@
  *
  * </ini>
  */
-#define CFG_DEFAULT_ULTLOW_FLAGS "0x180C83"
+#define CFG_DEFAULT_ULTLOW_FLAGS "0x180D83"
 #define CFG_LATENCY_FLAGS_ULTLOW \
 		CFG_INI_STRING("wlm_latency_flags_ultralow",\
 			       0, \

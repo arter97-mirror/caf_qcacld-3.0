@@ -1622,6 +1622,18 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 	struct wlan_hdd_link_info *link_info;
 
+	if (cds_get_conparam() != QDF_GLOBAL_MONITOR_MODE &&
+	    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
+	     ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))) {
+		hdd_info("Acquire wakelock for STA + monitor mode");
+
+		qdf_wake_lock_acquire(&hdd_ctx->monitor_mode_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+		hdd_lpc_disable_powersave(hdd_ctx);
+		qdf_runtime_pm_prevent_suspend(
+			&hdd_ctx->runtime_context.monitor_mode);
+	}
+
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		qdf_status = wlan_hdd_init_mon_link(hdd_ctx, link_info);
 		if (QDF_STATUS_SUCCESS != qdf_status)

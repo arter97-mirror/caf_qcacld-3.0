@@ -121,6 +121,7 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 	uint8_t sta_info_len = 0;
 	uint8_t tmp_rec_value;
 	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
+	uint16_t opclass_width;
 
 	if (!session || !bcn_ptr || !mac_ctx) {
 		pe_err("invalid input parameters");
@@ -223,8 +224,10 @@ void lim_process_beacon_mlo(struct mac_context *mac_ctx,
 						csa_param.channel, xcsa_ie->newClass);
 			}
 
+			wlan_reg_convert_chan_spacing_to_width(chan_space,
+							       &opclass_width);
 			csa_param.new_ch_width =
-					wlan_reg_find_chwidth_from_bw(chan_space);
+				wlan_reg_find_chwidth_from_bw(opclass_width);
 
 			if (!csa_param.csa_chan_freq) {
 				pe_nofl_rl_debug("invalid freq from xcsa ie newchannel %d link %d",

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2424,7 +2424,7 @@ int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value)
  *
  * Return: channel width of type enum phy_ch_width
  */
-static enum phy_ch_width
+enum phy_ch_width
 hdd_convert_chwidth_to_phy_chwidth(enum eSirMacHTChannelWidth chwidth)
 {
 	enum phy_ch_width ch_width = CH_WIDTH_INVALID;

@@ -4857,6 +4857,34 @@ bool lim_isconnected_on_dfs_freq(struct mac_context *mac_ctx,
 }
 
 #ifdef CFG80211_SA_QUERY_OFFLOAD_SUPPORT
+static void lim_get_ap_ocv_cap(struct pe_session *session,
+			       bool *is_ap_ovc_enabled)
+{
+	struct mac_context *mac_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	int32_t self_rsn_caps;
+
+	if (!session || !session->valid || !LIM_IS_AP_ROLE(session)) {
+		pe_err("Session is not valid");
+		return;
+	}
+
+	mac_ctx = session->mac_ctx;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    session->vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_err("Vdev is NULL");
+		return;
+	}
+
+	self_rsn_caps = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP);
+	if (self_rsn_caps & WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED)
+		*is_ap_ovc_enabled = true;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+}
+
 static void lim_post_csa_ocv_sa_query_timer_handler(void *session_ptr)
 {
 	struct pe_session *pe_session = (struct pe_session *)session_ptr;
@@ -4939,6 +4967,7 @@ void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
 	tpDphHashNode sta;
 	QDF_STATUS status;
 	bool ocv_check_csa_sa_query;
+	bool is_ap_ocv_enabled = false;
 
 	if (!pe_session || !pe_session->valid || !LIM_IS_AP_ROLE(pe_session))
 		return;
@@ -4953,6 +4982,12 @@ void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
 
 	if (!csa_done)
 		return;
+
+	lim_get_ap_ocv_cap(pe_session, &is_ap_ocv_enabled);
+	if (!is_ap_ocv_enabled) {
+		pe_debug("AP OCV caps not enabled,do not start post CSA timer");
+		return;
+	}
 
 	ocv_check_csa_sa_query = false;
 	for (index = 0; index < pe_session->dph.dphHashTable.size; index++) {
@@ -5600,7 +5635,7 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 			lim_update_sta_edca_params(mac,
 						   sta_session);
 		}
-	} else {
+	} else if (sap_session) {
 	/*
 	 * For STA+SAP/GO DBS, STA+SAP/GO MCC or standalone SAP/GO
 	 */
@@ -5610,9 +5645,8 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 				    cfg_get(mac->psoc,
 					    CFG_ENABLE_FW_RTS_PROFILE),
 				    VDEV_CMD);
-		if (sta_session) {
+		if (sta_session)
 			check_and_send_vendor_oui(mac, sta_session);
-		}
 
 		for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++) {
 			if (qdf_mem_cmp(&sap_session->gLimEdcaParamsActive[i],
@@ -5625,10 +5659,10 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 		}
 
 		if (params_update_required) {
-			for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++) {
+			for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++)
 				sap_session->gLimEdcaParamsActive[i] =
 					sap_session->gLimEdcaParams[i];
-			}
+
 			lim_send_edca_params(mac,
 					     sap_session->gLimEdcaParamsActive,
 					     sap_session->vdev_id, false);
@@ -5638,10 +5672,8 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 	 * In case of mcc, where cb can come from scc to mcc switch where we
 	 * need to restore the default parameters
 	 */
-			if (sta_session) {
-				lim_update_sta_edca_params(mac,
-							   sta_session);
-				}
+			if (sta_session)
+				lim_update_sta_edca_params(mac, sta_session);
 		}
 	}
 }
@@ -8943,31 +8975,51 @@ static void lim_revise_req_eht_cap_per_mode(struct mlme_legacy_priv *mlme_priv,
 	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_0_to_7 = nss;
 	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_8_and_9 = nss;
 	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_8_and_9 = nss;
-	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_12_and_13 = nss;
-	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_12_and_13 = nss;
+	if (mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_10_and_11) {
+		mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_12_and_13) {
+		mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
 
 	mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_0_to_9 = nss;
 	mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_0_to_9 = nss;
-	mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_12_and_13 = nss;
-	mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_12_and_13 = nss;
+	if (mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_10_and_11) {
+		mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_10_and_11 =
+									nss;
+		mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_10_and_11 =
+									nss;
+	}
+	if (mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_12_and_13) {
+		mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_12_and_13 =
+									nss;
+		mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_12_and_13 =
+									nss;
+	}
 
 	mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_0_to_9 = nss;
 	mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_0_to_9 = nss;
-	mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_12_and_13 = nss;
-	mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_12_and_13 = nss;
+	if (mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_10_and_11) {
+		mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_12_and_13) {
+		mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
 
 	mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_0_to_9 = nss;
 	mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_0_to_9 = nss;
-	mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_10_and_11 = nss;
-	mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_12_and_13 = nss;
-	mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_12_and_13 = nss;
+	if (mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_10_and_11) {
+		mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_10_and_11 = nss;
+		mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_10_and_11 = nss;
+	}
+	if (mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_12_and_13) {
+		mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_12_and_13 = nss;
+		mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_12_and_13 = nss;
+	}
 }
 
 void lim_copy_bss_eht_cap(struct pe_session *session)
@@ -10490,6 +10542,8 @@ void lim_process_ap_ecsa_timeout(void *data)
 		else
 			bcn_int = MLME_CFG_BEACON_INTERVAL_DEF;
 
+		bcn_int = SYS_TU_TO_MS(bcn_int);
+
 		status = qdf_mc_timer_start(&session->ap_ecsa_timer,
 					    bcn_int);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -11704,7 +11758,19 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 	if (cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
 		return false;
 
-	oper_mode = session->ch_width;
+	/* Don't treat 80+80 as 160MHz */
+	if (sta_ptr->htSupportedChannelWidthSet) {
+		if (sta_ptr->vhtSupportedChannelWidthSet >
+		    WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ &&
+		    sta_ptr->vhtSupportedChannelWidthSet !=
+		    WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
+			oper_mode = CH_WIDTH_160MHZ;
+		else
+			oper_mode = sta_ptr->vhtSupportedChannelWidthSet + 1;
+	} else {
+		oper_mode = CH_WIDTH_20MHZ;
+	}
+
 	fw_vht_ch_wd = wlan_mlme_get_max_bw();
 
 	if (ch_width > fw_vht_ch_wd) {

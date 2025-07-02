@@ -1051,7 +1051,7 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 			goto out;
 	}
 
-	wlan_diag_event.version = DIAG_MGMT_VERSION_V2;
+	wlan_diag_event.version = DIAG_MGMT_VERSION_V5;
 	wlan_diag_event.tx_fail_reason = tx_status;
 	wlan_diag_event.tx_status = wlan_get_diag_tx_status(tx_status);
 	wlan_diag_event.rssi = peer_rssi;
@@ -1198,6 +1198,12 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
 		return;
 
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_mac)) {
+		logging_debug("vdev:%d reason:%d , bssid is zero",
+			      wlan_vdev_get_id(vdev), reason);
+		return;
+	}
+
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
 		logging_err("Pdev not found");
@@ -1221,7 +1227,7 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.diag_cmn.ktime_us = qdf_ktime_to_us(qdf_ktime_get());
 	wlan_diag_event.diag_cmn.vdev_id = wlan_vdev_get_id(vdev);
 	wlan_diag_event.subtype = WLAN_CONN_DIAG_DISCONNECT_EVENT;
-	wlan_diag_event.version = DIAG_MGMT_VERSION_V4;
+	wlan_diag_event.version = DIAG_MGMT_VERSION_V5;
 
 	wlan_diag_event.rssi = rssi;
 
@@ -1230,6 +1236,34 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.rssi = rssi;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MGMT);
+}
+
+enum wlan_diag_tx_rx_status
+wlan_convert_host_to_diag_tx_fail_reason(enum wlan_roam_frame_tx_status
+					 tx_status)
+{
+	switch (tx_status) {
+	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_ACK:
+		return WLAN_DIAG_TX_RX_STATUS_OK;
+	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_NO_ACK:
+		return WLAN_DIAG_TX_RX_STATUS_NO_ACK;
+	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_DROP:
+		return WLAN_DIAG_TX_RX_STATUS_DROP;
+	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_FILTERED:
+		return WLAN_DIAG_TX_RX_TX_FILTERED;
+	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TXOP_ABORT:
+		return WLAN_DIAG_TX_RX_TXOP_ABORT;
+	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_TID_DEL:
+		return WLAN_DIAG_TX_RX_TX_TID_DEL;
+	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_SW_ABORT:
+		return WLAN_DIAG_TX_RX_SW_ABORT;
+	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MIG_DROP:
+		return WLAN_DIAG_TX_RX_TX_MIG_DROP;
+	case ROAM_FRAME_INFO_FRAME_TYPE_EXT_STATUS_TX_MLO_TID_MIG:
+		return WLAN_DIAG_TX_RX_MLO_TID_MIG;
+	default:
+		return WLAN_DIAG_TX_RX_STATUS_INVALID;
+	}
 }
 
 enum diag_tx_status

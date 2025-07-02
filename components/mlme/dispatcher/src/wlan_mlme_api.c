@@ -9298,10 +9298,26 @@ uint16_t wlan_mlme_get_sap_he_rx_mcs_map_160(struct wlan_objmgr_psoc *psoc)
 }
 
 #ifdef CONNECTION_ROAMING_CFG
-void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
-					   struct rso_cfg_params *cfg_params,
-					   struct wlan_mlme_psoc_ext_obj *mlme_obj)
+void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_vdev *vdev)
 {
+	struct wlan_objmgr_psoc *psoc;
+	struct rso_config *rso_cfg;
+	struct rso_cfg_params *cfg_params;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg)
+		return;
+
+	cfg_params = &rso_cfg->cfg_param;
 	mlme_obj->cfg.roam_scoring.band_2g_weightage =
 			cfg_get(psoc, CFG_SCORING_2G_BAND_WEIGHTAGE);
 	mlme_obj->cfg.roam_scoring.band_5g_weightage =
@@ -9332,11 +9348,16 @@ void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
 			DEFAULT_RECONNECT_DISALLOW_PERIOD;
 	cfg_params->reconnect_disallow_period =
 			DEFAULT_RECONNECT_DISALLOW_PERIOD;
+	cfg_params->band_2g_weightage =
+			cfg_get(psoc, CFG_SCORING_2G_BAND_WEIGHTAGE);
+	cfg_params->band_5g_weightage =
+			cfg_get(psoc, CFG_SCORING_5G_BAND_WEIGHTAGE);
+	cfg_params->band_6g_weightage =
+			cfg_get(psoc, CFG_SCORING_6G_BAND_WEIGHTAGE);
+	rso_cfg->roam_band_bitmask = REG_BAND_MASK_ALL;
 }
 #else
-void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_psoc *psoc,
-					   struct rso_cfg_params *cfg_params,
-					   struct wlan_mlme_psoc_ext_obj *mlme_obj)
+void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif

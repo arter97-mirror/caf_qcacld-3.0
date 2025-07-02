@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012 - 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -262,11 +262,11 @@ struct wlan_fwol_tsf_accuracy_configs {
  * @sap_xlna_bypass: bypass SAP xLNA
  * @is_rate_limit_enabled: Enable/disable RA rate limited
  * @tsf_gpio_pin: TSF GPIO Pin config
- * @tsf_irq_host_gpio_pin: TSF GPIO Pin config
- * @tsf_sync_host_gpio_pin: TSF Sync GPIO Pin config
  * @tsf_ptp_options: TSF Plus feature options config
  * @tsf_sync_enable: TSF sync feature enable/disable
  * @tsf_accuracy_configs: TSF Accuracy feature config parameters
+ * @tsf_irq_host_gpio_pin: TSF GPIO Pin config
+ * @tsf_sync_host_gpio_pin: TSF Sync GPIO Pin config
  * @sae_enable: SAE feature enable config
  * @gcmp_enable: GCMP feature enable config
  * @enable_tx_sch_delay: Enable TX SCH delay value config
@@ -311,9 +311,8 @@ struct wlan_fwol_cfg {
 #ifdef FEATURE_WLAN_RA_FILTERING
 	bool is_rate_limit_enabled;
 #endif
-#ifdef WLAN_FEATURE_TSF
-	uint32_t tsf_gpio_pin;
 #ifdef WLAN_FEATURE_TSF_PLUS
+	uint32_t tsf_gpio_pin;
 	uint32_t tsf_ptp_options;
 	bool tsf_sync_enable;
 #ifdef WLAN_FEATURE_TSF_ACCURACY
@@ -324,7 +323,6 @@ struct wlan_fwol_cfg {
 #endif
 #ifdef WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC
 	uint32_t tsf_sync_host_gpio_pin;
-#endif
 #endif
 #endif
 #ifdef WLAN_FEATURE_SAE

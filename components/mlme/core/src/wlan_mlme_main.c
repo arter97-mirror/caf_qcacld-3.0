@@ -4947,6 +4947,38 @@ rel_ref:
 	return status;
 }
 
+QDF_STATUS wlan_get_chan_by_vdev_id(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
+				    struct wlan_channel *channel)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_channel *chan;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+
+	if (!psoc) {
+		mlme_legacy_err("psoc object is NULL");
+		return status;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		mlme_legacy_err("vdev object is NULL");
+		return status;
+	}
+
+	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS)
+		goto rel_ref;
+	chan = wlan_vdev_get_active_channel(vdev);
+	if (!chan)
+		goto rel_ref;
+	*channel = *chan;
+	status = QDF_STATUS_SUCCESS;
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	return status;
+}
+
 QDF_STATUS wlan_strip_ie(uint8_t *addn_ie, uint16_t *addn_ielen,
 			 uint8_t eid, enum size_of_len_field size_of_len_field,
 			 uint8_t *oui, uint8_t oui_length,
@@ -6467,7 +6499,7 @@ uint16_t mlme_get_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev)
 	return vdev_mlme->p2p_dev_data.seq_num;
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 uint8_t wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id)
 {

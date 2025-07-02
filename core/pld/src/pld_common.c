@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3030,6 +3030,24 @@ void pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 		pld_ipci_get_cpumask_for_wlan_tx_comp_interrupts(dev, cpumask);
 		break;
 	default:
+		break;
+	}
+}
+#endif
+
+#ifdef FEATURE_WLAN_DIRECT_CX
+void pld_set_cxpc(struct device *dev)
+{
+	int ret;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = cnss_set_cxpc(dev, CX_OFF);
+		if (ret)
+			pr_err("Failed to set cxpc. Ret = %d\n", ret);
+		break;
+	default:
+		pr_err("Invalid device type\n");
 		break;
 	}
 }

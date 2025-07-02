@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -149,16 +149,17 @@ static void if_mgr_disable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 
 	/*
 	 * Host can't send RSO_STOP when roaming(ROAM_START/ROAM_SYNC) is in
-	 * progress as it might cause HO_FAIL. The requestor operation(e.g. SAP
-	 * start) waits till ROAM cmd is dequeued from SER queue. The requestor
-	 * operation starts once the current roaming is done and ROAM cmd is
-	 * dequeued.
+	 * progress or link recfg is in progress as it might cause HO_FAIL.
+	 * The requestor operation(e.g. SAP start) waits till ROAM cmd is
+	 * dequeued from SER queue. The requestor operation starts once the
+	 * current roaming is done and ROAM cmd is dequeued.
 	 * The requestor(e.g. SAP start) operation and next roaming can't run
 	 * in parallel in firmware, which means the request to disable roaming
 	 * can't be dropped. So, cache the request and send RSO_STOP to fw when
-	 * current roaming is done.
+	 * current roaming or link reconfg is done.
 	 */
-	if (wlan_cm_is_vdev_roaming(vdev)) {
+	if (wlan_cm_is_vdev_roaming(vdev) ||
+	    mlo_is_link_recfg_in_progress(vdev)) {
 		mlme_set_rso_pending_disable_req_bitmap(psoc, vdev_id,
 							roam_arg->requestor,
 							false);

@@ -2889,7 +2889,7 @@ static void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
 	wlan_hdd_set_lpc_powersave_disabled(hdd_ctx, false);
 }
 
-static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
+void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *sta_adapter;
 
@@ -2913,10 +2913,6 @@ static void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 }
 #else
 static inline void hdd_lpc_enable_powersave(struct hdd_context *hdd_ctx)
-{
-}
-
-static inline void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
 {
 }
 #endif
@@ -3442,18 +3438,6 @@ static int __hdd_mon_open(struct net_device *dev)
 		}
 		hdd_mon_turn_off_ps_and_wow(hdd_ctx);
 		set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
-	}
-
-	if (con_mode != QDF_GLOBAL_MONITOR_MODE &&
-	    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
-	     ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))) {
-		hdd_info("Acquire wakelock for STA + monitor mode");
-
-		qdf_wake_lock_acquire(&hdd_ctx->monitor_mode_wakelock,
-				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
-		hdd_lpc_disable_powersave(hdd_ctx);
-		qdf_runtime_pm_prevent_suspend(
-			&hdd_ctx->runtime_context.monitor_mode);
 	}
 
 	ret = hdd_set_mon_rx_cb(dev);
@@ -8201,7 +8185,7 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 	hdd_vdev_configure_rtscts_enable(hdd_ctx, vdev);
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * hdd_vdev_populate_wfd_mode - populate WFD mode in VDEV create params for
  * P2P GO only.
@@ -8226,7 +8210,7 @@ hdd_vdev_populate_wfd_mode(struct hdd_adapter *adapter,
 			   struct wlan_vdev_create_params *vdev_params)
 {
 }
-#endif
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC) && \
 	defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
@@ -9978,7 +9962,7 @@ static void __hdd_close_adapter(struct hdd_context *hdd_ctx,
 	ucfg_dp_destroy_intf(hdd_ctx->psoc, &adapter_mac);
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 /**
  * hdd_clear_usd_adapter() - set USD adapter to NULL, so that USD frames
  * can not be forwarded on USD adapter.
@@ -9998,7 +9982,7 @@ static inline void hdd_clear_usd_adapter(struct hdd_context *hdd_ctx,
 					 struct hdd_adapter *adapter)
 {
 }
-#endif
+#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 void hdd_close_adapter(struct hdd_context *hdd_ctx,
 		       struct hdd_adapter *adapter,
@@ -10714,7 +10698,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	if (link_info->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
 		wlan_hdd_cfg80211_deregister_frames(adapter);
 
-	hdd_stop_tsf_sync(adapter);
+	hdd_reset_tsf_sync(adapter);
 	hdd_flush_scan_block_work(adapter);
 	wlan_hdd_cfg80211_scan_block(adapter);
 	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
@@ -14541,7 +14525,7 @@ hdd_store_sap_restart_channel(qdf_freq_t restart_chan, qdf_freq_t *restart_chan_
 /**
  * hdd_check_chn_bw_boundary_unsafe() - check channel range unsafe
  * @hdd_ctxt: hdd context pointer
- * @adapter:  hdd adapter pointer
+ * @ap_ctx:  hdd ap context pointer
  *
  * hdd_check_chn_bw_boundary_unsafe check SAP channel range with certain
  * bandwidth whether cover all unsafe channel list.
@@ -14550,7 +14534,7 @@ hdd_store_sap_restart_channel(qdf_freq_t restart_chan, qdf_freq_t *restart_chan_
  */
 static bool
 hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
-				 struct hdd_adapter *adapter)
+				 struct hdd_ap_ctx *ap_ctx)
 {
 	uint32_t freq;
 	uint32_t start_freq = 0;
@@ -14559,8 +14543,8 @@ hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
 	uint8_t ch_width;
 	const struct bonded_channel_freq *bonded_chan_ptr_ptr = NULL;
 
-	freq = adapter->deflink->session.ap.operating_chan_freq;
-	ch_width = adapter->deflink->session.ap.sap_config.acs_cfg.ch_width;
+	freq = ap_ctx->operating_chan_freq;
+	ch_width = ap_ctx->sap_config.acs_cfg.ch_width;
 
 	if (ch_width > CH_WIDTH_20MHZ)
 		bonded_chan_ptr_ptr =
@@ -14650,7 +14634,7 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 				hdd_debug("SAP allowed in unsafe SCC channel");
 			else
 				found = hdd_check_chn_bw_boundary_unsafe(hdd_ctx,
-									 adapter);
+									 ap_ctx);
 			if (!found) {
 				hdd_store_sap_restart_channel(ap_chan_freq,
 							      restart_chan_store);
@@ -15789,6 +15773,9 @@ static void hdd_init_epm_value_cfg(struct hdd_config *config,
 				   struct wlan_objmgr_psoc *psoc)
 {
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma_handle)
+		return;
 
 	if (wma_is_epm_supported_cfg(wma_handle) &&
 	    wma_is_epm_supported_fw(wma_handle))
@@ -20397,6 +20384,7 @@ static void __hdd_inform_wifi_off(void)
 		return;
 
 	ucfg_dlm_wifi_off(hdd_ctx->pdev);
+	hdd_txpb_wifi_off_app_stop(hdd_ctx);
 
 	if (rtnl_trylock()) {
 		wlan_hdd_lpc_del_monitor_interface(hdd_ctx, false);

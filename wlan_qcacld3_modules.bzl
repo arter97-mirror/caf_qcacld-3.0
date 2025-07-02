@@ -2114,7 +2114,7 @@ _conditional_srcs = {
             "cmn/qdf/linux/src/qdf_streamfs.c",
         ],
     },
-    "CONFIG_WLAN_SYNC_TSF": {
+    "CONFIG_WLAN_SYNC_TSF_PLUS": {
         True: [
             "core/hdd/src/wlan_hdd_tsf.c",
         ],

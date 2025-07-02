@@ -2066,7 +2066,8 @@ QDF_STATUS sme_set_tsfcb(mac_handle_t mac_handle,
 
 QDF_STATUS sme_reset_tsfcb(mac_handle_t mac_handle);
 
-#if defined(WLAN_FEATURE_TSF) && !defined(WLAN_FEATURE_TSF_PLUS_NOIRQ)
+#if defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ) || \
+	defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC)
 QDF_STATUS sme_set_tsf_gpio(mac_handle_t mac_handle, uint32_t pinvalue);
 #endif
 
@@ -5062,7 +5063,7 @@ void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
  */
 void sme_deregister_disconnect_cb(mac_handle_t mac_handle);
 
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO)
 /**
  * sme_pmkid_get_mld_addr - Get mld address from preauth list
  * @mac_handle: pointer to mac handle

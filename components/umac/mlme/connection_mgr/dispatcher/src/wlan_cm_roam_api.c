@@ -2003,6 +2003,36 @@ QDF_STATUS cm_roam_release_lock(struct wlan_objmgr_vdev *vdev)
 	return qdf_mutex_release(&rso_cfg->cm_rso_lock);
 }
 
+/**
+ * is_freq_allowed_for_roam() - Determines whether a given
+ * frequency is permitted based on the configured roam band mask.
+ * @vdev: VDEV common object
+ * @chan_freq: Frequency received through the REASSOC driver command.
+ *
+ * Return: true if freq is allowed as per the currently configured roam bands
+ */
+static bool is_freq_allowed_for_roam(struct wlan_objmgr_vdev *vdev,
+				     qdf_freq_t chan_freq)
+{
+	struct wlan_objmgr_psoc *psoc;
+	enum reg_wifi_band reg_band;
+	uint32_t current_band;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlme_err("Invalid PSOC");
+		return false;
+	}
+
+	current_band = wlan_cm_get_roam_band_value(psoc, vdev);
+
+	reg_band = wlan_reg_freq_to_band(chan_freq);
+	if (reg_band == REG_BAND_UNKNOWN)
+		return false;
+
+	return QDF_HAS_PARAM(current_band, reg_band);
+}
+
 QDF_STATUS
 wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		    struct qdf_mac_addr *bssid, qdf_freq_t chan_freq,
@@ -2023,6 +2053,15 @@ wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	if (!vdev) {
 		mlme_err("vdev object is NULL");
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (chan_freq && !is_freq_allowed_for_roam(vdev, chan_freq)) {
+		mlme_rl_debug("vdev:%d, source:%d, allowed_bands:0x%x, freq:%d NOT allowed to roam",
+			      vdev_id, source,
+			      wlan_cm_get_roam_band_value(psoc, vdev),
+			      chan_freq);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	mlme_debug("vdev: %d source: %d freq: %d bssid: " QDF_MAC_ADDR_FMT,
@@ -3660,12 +3699,12 @@ cm_stats_log_roam_scan_candidates(struct wmi_roam_candidate_info *ap,
 	char time[TIME_STRING_LEN], time2[TIME_STRING_LEN];
 
 
-	mlme_rl_nofl_info("%62s%62s", LINE_STR, LINE_STR);
-	mlme_rl_nofl_info("%13s %16s %8s %4s %4s %5s/%3s %3s/%3s %7s %7s %6s %12s %20s",
-			  "AP BSSID", "TSTAMP", "CH", "TY", "ETP", "RSSI",
-			  "SCR", "CU%", "SCR", "TOT_SCR", "BL_RSN", "BL_SRC",
-			  "BL_TSTAMP", "BL_TIMEOUT(ms)");
-	mlme_rl_nofl_info("%62s%62s", LINE_STR, LINE_STR);
+	mlme_nofl_info("%62s%62s", LINE_STR, LINE_STR);
+	mlme_nofl_info("%13s %16s %8s %4s %4s %5s/%3s %3s/%3s %7s %7s %6s %12s %20s",
+		       "AP BSSID", "TSTAMP", "CH", "TY", "ETP", "RSSI",
+		       "SCR", "CU%", "SCR", "TOT_SCR", "BL_RSN", "BL_SRC",
+		       "BL_TSTAMP", "BL_TIMEOUT(ms)");
+	mlme_nofl_info("%62s%62s", LINE_STR, LINE_STR);
 
 	if (num_entries > MAX_ROAM_CANDIDATE_AP)
 		num_entries = MAX_ROAM_CANDIDATE_AP;
@@ -3673,14 +3712,14 @@ cm_stats_log_roam_scan_candidates(struct wmi_roam_candidate_info *ap,
 	for (i = 0; i < num_entries; i++) {
 		mlme_get_converted_timestamp(ap->timestamp, time);
 		mlme_get_converted_timestamp(ap->dl_timestamp, time2);
-		mlme_rl_nofl_info(QDF_MAC_ADDR_FMT " %17s %4d %-4s %4d %3d/%-4d %2d/%-4d %5d %7d %7d %17s %9d",
-				  QDF_MAC_ADDR_REF(ap->bssid.bytes), time,
-			ap->freq,
-			((ap->type == 0) ? "C_AP" :
-			((ap->type == 2) ? "R_AP" : "P_AP")),
-			ap->etp, ap->rssi, ap->rssi_score, ap->cu_load,
-			ap->cu_score, ap->total_score, ap->dl_reason,
-			ap->dl_source, time2, ap->dl_original_timeout);
+		mlme_nofl_info(QDF_MAC_ADDR_FMT " %17s %4d %-4s %4d %3d/%-4d %2d/%-4d %5d %7d %7d %17s %9d",
+			       QDF_MAC_ADDR_REF(ap->bssid.bytes), time,
+			       ap->freq,
+			       ((ap->type == 0) ? "C_AP" :
+			       ((ap->type == 2) ? "R_AP" : "P_AP")),
+			       ap->etp, ap->rssi, ap->rssi_score, ap->cu_load,
+			       ap->cu_score, ap->total_score, ap->dl_reason,
+			       ap->dl_source, time2, ap->dl_original_timeout);
 		/* Update roam candidates info to userspace */
 		cm_roam_candidate_info_event(ap, i);
 		ap++;
@@ -5084,6 +5123,20 @@ cm_cp_stats_cstats_roam_result(struct wlan_objmgr_vdev *vdev,
 }
 #endif /* WLAN_CHIPSET_STATS */
 
+static inline bool
+is_roam_scan_type_full(struct wmi_roam_scan_data *roam_scan)
+{
+	if (!roam_scan || !roam_scan->present)
+		return false;
+
+	if (roam_scan->type == ROAM_STATS_SCAN_TYPE_FULL ||
+	    roam_scan->type == ROAM_STATS_SCAN_TYPE_HIGHER_BAND_5GHZ_6GHZ ||
+	    roam_scan->type == ROAM_STATS_SCAN_TYPE_HIGHER_BAND_6GHZ)
+		return true;
+
+	return false;
+}
+
 QDF_STATUS
 cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 			    struct roam_stats_event *stats_info)
@@ -5108,10 +5161,7 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < stats_info->num_tlv; i++) {
 		if (stats_info->trigger[i].present) {
 			bool is_full_scan =
-				stats_info->scan[i].present &&
-				(stats_info->scan[i].type ==
-				 WLAN_ROAM_SCAN_TYPE_FULL_SCAN);
-
+				is_roam_scan_type_full(&stats_info->scan[i]);
 			cm_cp_stats_cstats_roam_scan_start
 				(vdev, &stats_info->trigger[i], is_full_scan);
 
@@ -5139,7 +5189,8 @@ cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
 					stats_info->trigger[i].timestamp);
 
 				cm_cp_stats_cstats_roam_scan_done
-				     (vdev, &stats_info->scan[i], is_full_scan);
+					(vdev, &stats_info->scan[i],
+					 is_full_scan);
 
 				trigger = stats_info->trigger[i].trigger_reason;
 				scan = &stats_info->scan[i];

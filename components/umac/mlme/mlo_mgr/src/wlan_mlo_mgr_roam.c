@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -753,7 +753,7 @@ mlo_roam_update_connected_links(struct wlan_objmgr_vdev *vdev,
 		mlo_update_connected_links(vdev, 1);
 	else
 		mlo_update_connected_links_bmap(vdev->mlo_dev_ctx,
-						connect_rsp->ml_parnter_info);
+						&connect_rsp->ml_parnter_info);
 }
 
 QDF_STATUS
@@ -1326,7 +1326,7 @@ mlo_roam_validate_req(struct wlan_objmgr_vdev *vdev,
 		 */
 		mlo_update_connected_links(vdev, 1);
 		mlo_update_connected_links_bmap(mlo_dev_ctx,
-						rsp->ml_parnter_info);
+						&rsp->ml_parnter_info);
 	}
 
 	return QDF_STATUS_SUCCESS;

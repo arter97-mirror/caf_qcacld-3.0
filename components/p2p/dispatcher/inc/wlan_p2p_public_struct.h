@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -402,7 +402,7 @@ enum p2p_attr_id {
 	P2P_ATTR_VENDOR_SPECIFIC = 221
 };
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 #define P2P_USD_SERVICE_LEN                    6
 #define P2P_USD_SSI_LEN                        1400
 #define P2P_USD_FRAME_LEN                      1024
@@ -527,6 +527,7 @@ struct p2p_usd_attr_params {
 	uint16_t ttl;
 };
 
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * enum p2p_mode_type: P2P mode type
  * @P2P_MODE_WFD_R1: Wi-Fi Direct R1 only
@@ -544,6 +545,6 @@ enum p2p_mode_type {
 	P2P_MODE_WFD_MAX,
 	P2P_MODE_WFD_INVALID = 0xFF,
 };
-
-#endif /* FEATURE_WLAN_SUPPORT_USD */
+#endif /* FEATURE_WLAN_SUPPORT_P2P */
+#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 #endif /* _WLAN_P2P_PUBLIC_STRUCT_H_ */

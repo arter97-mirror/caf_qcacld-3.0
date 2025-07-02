@@ -1777,10 +1777,10 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	uint8_t ap_nss;
 	struct vdev_type_nss *vdev_type_nss;
 
-	if (wlan_reg_is_5ghz_ch_freq(bss_desc->chan_freq))
-		vdev_type_nss = &mac_ctx->vdev_type_nss_5g;
-	else
+	if (wlan_reg_is_24ghz_ch_freq(bss_desc->chan_freq))
 		vdev_type_nss = &mac_ctx->vdev_type_nss_2g;
+	else
+		vdev_type_nss = &mac_ctx->vdev_type_nss_5g;
 
 	if (wlan_vdev_mlme_get_opmode(session->vdev) == QDF_P2P_CLIENT_MODE)
 		session->vdev_nss = vdev_type_nss->p2p_cli;
@@ -2826,7 +2826,7 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 	return status;
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * lim_set_wfd_mode_for_p2p_cli() - set WFD mode for P2P CLIENT when P2P GO
  * supports twt responder.
@@ -2864,7 +2864,7 @@ static inline void lim_set_wfd_mode_for_p2p_cli(struct pe_session *session,
 						tDot11fBeaconIEs *ie)
 {
 }
-#endif
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 #ifdef WLAN_FEATURE_11AX
 static bool lim_enable_twt(struct mac_context *mac_ctx, tDot11fBeaconIEs *ie)
@@ -5017,7 +5017,7 @@ cm_remove_force_bss_on_join_fail(struct cm_vdev_join_req *join_req)
 	return status;
 }
 
-#if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_FEATURE_11BE_MLO)
 void cm_get_pre_auth_mld_addr(struct mac_context *mac,
 			      uint8_t *peer_addr,
 			      uint8_t *mld_addr)
@@ -8790,7 +8790,8 @@ lim_process_sme_send_vdev_pause(struct mac_context *mac_ctx,
 	vdev_pause_dur_ms = session->beaconParams.beaconInterval *
 						msg->vdev_pause_duration;
 	wlan_mlo_send_vdev_pause(mac_ctx->psoc, session->vdev,
-				 msg->session_id, vdev_pause_dur_ms);
+				 msg->session_id, vdev_pause_dur_ms,
+				 MLO_VDEV_PAUSE_TYPE_MLO_LINK);
 }
 
 static void lim_process_sme_update_config(struct mac_context *mac_ctx,
@@ -10458,8 +10459,10 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 						   target_freq)) {
 		lim_abort_channel_change(mac_ctx, ch_change_req->vdev_id);
 		return;
-	} else if ((session_entry->curr_op_freq == target_freq &&
-		    session_entry->ch_width == ch_change_req->ch_width) &&
+	} else if (session_entry->curr_op_freq == target_freq &&
+		    session_entry->ch_width == ch_change_req->ch_width &&
+		    session_entry->ch_center_freq_seg1 ==
+		    ch_change_req->center_freq_seg1 &&
 		   (!IS_DOT11_MODE_EHT(session_entry->dot11mode) ||
 		    !lim_is_puncture_bitmap_changed(session_entry,
 						    ch_change_req))) {

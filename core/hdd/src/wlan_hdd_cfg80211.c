@@ -1981,7 +1981,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 
 	FEATURE_RSSI_MONITOR_VENDOR_EVENTS
 
-#ifdef WLAN_FEATURE_TSF
+#ifdef WLAN_FEATURE_TSF_PLUS
 	[QCA_NL80211_VENDOR_SUBCMD_TSF_INDEX] = {
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_TSF
@@ -5362,7 +5362,7 @@ static inline void wlan_hdd_set_ll_lt_sap_feature(struct wlan_objmgr_psoc *psoc,
 				  QCA_WLAN_VENDOR_FEATURE_ENHANCED_AUDIO_EXPERIENCE_OVER_WLAN);
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 /**
  * wlan_hdd_set_usd_feature() - Set USD related features based on FW capability
  * @psoc: pointer to PSOC object
@@ -5386,7 +5386,7 @@ static inline void wlan_hdd_set_usd_feature(struct wlan_objmgr_psoc *psoc,
 					    uint8_t *feature_flags)
 {
 }
-#endif
+#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 static inline void wlan_hdd_set_mrsno_feature(struct wlan_objmgr_psoc *psoc,
 					      uint8_t *feature_flags)
@@ -6737,41 +6737,6 @@ static bool is_roam_periodic_scan_interval_valid(uint32_t value)
 
 	return false;
 }
-
-/*
- * hdd_reset_dynamic_roam_control_params() - reset dynamic roam control params
- * to default values when roam control is enabled.
- * @psoc: Pointer to psoc
- * @vdev: vdev
- *
- * Return: null
- */
-static void
-hdd_reset_dynamic_roam_control_params(struct wlan_objmgr_psoc *psoc,
-				      struct wlan_objmgr_vdev *vdev)
-{
-	struct rso_config *rso_cfg;
-	struct rso_cfg_params *cfg_params;
-
-	rso_cfg = wlan_cm_get_rso_config(vdev);
-	if (!rso_cfg)
-		return;
-	cfg_params = &rso_cfg->cfg_param;
-
-	cfg_params->band_2g_weightage =
-			cfg_get(psoc, CFG_SCORING_2G_BAND_WEIGHTAGE);
-	cfg_params->band_5g_weightage =
-			cfg_get(psoc, CFG_SCORING_5G_BAND_WEIGHTAGE);
-	cfg_params->band_6g_weightage =
-			cfg_get(psoc, CFG_SCORING_6G_BAND_WEIGHTAGE);
-	cfg_params->roam_rescan_rssi_diff =
-			cfg_get(psoc, CFG_LFR_ROAM_RESCAN_RSSI_DIFF);
-	cfg_params->roam_periodic_scan_interval =
-			cfg_get(psoc, CFG_ROAM_SCAN_PERIOD);
-	cfg_params->roam_score_delta =
-			cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
-	rso_cfg->roam_band_bitmask = REG_BAND_MASK_ALL;
-}
 #else
 static bool is_band_weight_valid(struct nlattr **tb2, uint32_t value)
 {
@@ -6781,12 +6746,6 @@ static bool is_band_weight_valid(struct nlattr **tb2, uint32_t value)
 static bool is_roam_periodic_scan_interval_valid(uint32_t value)
 {
 	return false;
-}
-
-static void
-hdd_reset_dynamic_roam_control_params(struct wlan_objmgr_psoc *psoc,
-				      struct wlan_objmgr_vdev *vdev)
-{
 }
 #endif
 
@@ -6969,8 +6928,7 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 		 * before roam control is enabled to default values.
 		 */
 		if (roam_control_enable)
-			hdd_reset_dynamic_roam_control_params(hdd_ctx->psoc,
-							      link_info->vdev);
+			wlan_mlme_reinit_real_time_roam_parms(link_info->vdev);
 
 		status = sme_set_roam_config_enable(hdd_ctx->mac_handle,
 						    vdev_id,
@@ -12698,6 +12656,54 @@ int hdd_set_mac_chan_width(struct wlan_hdd_link_info *link_info,
 }
 
 /**
+ * hdd_covert_phy_ch_to_reg_chan() - Convert HT chan width to reg chan width
+ * @ch_width: HT chan width
+ *
+ * Return: reg chan width
+ */
+static
+uint16_t hdd_covert_phy_ch_to_reg_chan(enum eSirMacHTChannelWidth ch_width)
+{
+	enum phy_ch_width phy_ch_width;
+
+	phy_ch_width = hdd_convert_chwidth_to_phy_chwidth(ch_width);
+	return wlan_reg_get_bw_value(phy_ch_width);
+}
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * hdd_get_mlo_link_freq() - This API is to get link freq of provided link
+ * @vdev: objmgr vdev
+ * @link_id: link id
+ * @link_freq: link freq to get
+ *
+ * Return: Success/Failure
+ */
+static int
+hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
+		      uint16_t *link_freq)
+{
+	struct mlo_link_info *mlo_link_info;
+
+	mlo_link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx,
+						       link_id);
+	if (!mlo_link_info)
+		return -EINVAL;
+
+	*link_freq = mlo_link_info->link_chan_info->ch_freq;
+
+	return 0;
+}
+#else
+static inline int
+hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
+		      uint16_t *link_freq)
+{
+	return -EINVAL;
+}
+#endif
+
+/**
  * hdd_set_channel_width() - set channel width
  * @link_info: Link info pointer in HDD adapter.
  * @tb: array of pointer to struct nlattr
@@ -12707,7 +12713,7 @@ int hdd_set_mac_chan_width(struct wlan_hdd_link_info *link_info,
 static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 				 struct nlattr *tb[])
 {
-	int rem;
+	int rem, ret;
 	uint8_t nl80211_chwidth = CH_WIDTH_INVALID;
 	uint8_t link_id = WLAN_INVALID_LINK_ID;
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
@@ -12717,7 +12723,11 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	enum eSirMacHTChannelWidth chwidth;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
 	bool update_cw_allowed;
+	uint16_t link_freq = 0, max_allowed_bw, reg_ch_width;
+	struct wlan_channel *channel;
+	bool skip_mlo = false;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
@@ -12728,20 +12738,22 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	psoc = wlan_vdev_get_psoc(link_info->vdev);
 	if (!psoc) {
 		hdd_debug("psoc is null");
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto end;
 	}
 
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	ucfg_mlme_get_update_chan_width_allowed(psoc, &update_cw_allowed);
 	if (!update_cw_allowed) {
 		hdd_debug("update_channel_width is disabled via INI");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto end;
 	}
 
-	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS])
+	if (!tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS]) {
+		skip_mlo = true;
 		goto skip_mlo;
+	}
 
 	nla_for_each_nested(curr_attr,
 			    tb[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS], rem) {
@@ -12750,27 +12762,33 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 						   curr_attr,
 						  wlan_hdd_wifi_config_policy)){
 			hdd_err_rl("nla_parse failed");
-			return -EINVAL;
+			ret = -EINVAL;
+			goto end;
 		}
 
 		chn_bd = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
 		mlo_link_id = tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID];
 
-		if (!chn_bd || !mlo_link_id)
-			return 0;
+		if (!chn_bd || !mlo_link_id) {
+			hdd_err("invalid ch width or link id");
+			ret = 0;
+			goto end;
+		}
 
 		nl80211_chwidth = nla_get_u8(chn_bd);
 		chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
 		if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
 		    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
 			hdd_err("Invalid channel width:%u", chwidth);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto end;
 		}
 
 		link_id = nla_get_u8(mlo_link_id);
 		if (link_id > WLAN_MAX_LINK_ID) {
 			hdd_debug("invalid link_id:%u", link_id);
-			return -EINVAL;
+			ret = -EINVAL;
+			goto end;
 		}
 	}
 
@@ -12780,8 +12798,10 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 skip_mlo:
 	chn_bd = tb[QCA_WLAN_VENDOR_ATTR_CONFIG_CHANNEL_WIDTH];
 
-	if (!chn_bd)
-		return 0;
+	if (!chn_bd) {
+		ret = 0;
+		goto end;
+	}
 
 	nl80211_chwidth = nla_get_u8(chn_bd);
 	chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
@@ -12789,12 +12809,56 @@ skip_mlo:
 	if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
 	    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
 		hdd_err("Invalid channel width %u", chwidth);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto end;
 	}
 
 set_chan_width:
 	hdd_debug("channel width:%u, link_id:%u", chwidth, link_id);
-	return hdd_set_mac_chan_width(link_info, chwidth, link_id, true);
+
+	if (!skip_mlo) {
+		/* Get Link freq for MLO */
+		ret = hdd_get_mlo_link_freq(vdev, link_id, &link_freq);
+		if (ret) {
+			hdd_err("failed to get MLO link freq");
+			ret = -EINVAL;
+			goto end;
+		}
+	} else {
+		/* Get freq for NON-ML */
+		channel = wlan_vdev_get_active_channel(vdev);
+		if (channel)
+			link_freq = channel->ch_freq;
+
+		if (!link_freq) {
+			hdd_err("failed to get ch freq");
+			ret = -EINVAL;
+			goto end;
+		}
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		hdd_debug("invalid pdev");
+		ret = -EINVAL;
+		goto end;
+	}
+
+	max_allowed_bw = wlan_reg_get_max_chwidth(pdev, link_freq);
+
+	reg_ch_width = hdd_covert_phy_ch_to_reg_chan(chwidth);
+	if (reg_ch_width > max_allowed_bw) {
+		hdd_debug("provided ch_width %d > max allowed %d",
+			  reg_ch_width, max_allowed_bw);
+		ret = -EINVAL;
+		goto end;
+	}
+
+	ret = hdd_set_mac_chan_width(link_info, chwidth, link_id, true);
+
+end:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return ret;
 }
 
 /**
@@ -13253,7 +13317,7 @@ wlan_hdd_set_wfc_wlm_client_latency_level(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t client_id, client_id_bitmap, latency_host_flags = 0;
 	QDF_STATUS status;
-	uint16_t cached_latency_level = 0;
+	uint16_t cached_latency_level = 0, latency_level_to_send  = 0;
 
 	if (!wfc_state) { /* WFC = 0 */
 		status = wlan_hdd_get_set_client_info_for_wfc_off_req(
@@ -13274,20 +13338,27 @@ wlan_hdd_set_wfc_wlm_client_latency_level(struct hdd_adapter *adapter,
 		 * set WFC = 0 for a port ID for which the host has already
 		 * received WFC = 1.
 		 **/
-		wfc_state = cached_latency_level;
+		latency_level_to_send = cached_latency_level;
 	} else { /* WFC = 1 */
 		status = wlan_hdd_get_set_client_info_for_wfc_on_req(adapter,
 					port_id, &client_id);
 		if (QDF_IS_STATUS_ERROR(status))
 			return status;
+
+		/**
+		 * When the WFC state is set to 1, the host should set the
+		 * latency level LATENCY_LEVEL_LOW to the firmware.
+		 */
+		latency_level_to_send =
+			QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_LOW - 1;
 	}
 
 	client_id_bitmap = BIT(client_id);
 
-	hdd_debug("port_id: %u, client_id: %d, wfc_state: %d",
-		  port_id, client_id, wfc_state);
+	hdd_debug("port_id: %u, client_id: %d, latency_level_to_send: %d",
+		  port_id, client_id, latency_level_to_send);
 
-	status = wlan_hdd_set_wlm_latency_level(adapter, wfc_state,
+	status = wlan_hdd_set_wlm_latency_level(adapter, latency_level_to_send,
 						client_id_bitmap, false);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("Fail to set latency level for client_id:%d",
@@ -15189,7 +15260,6 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 
 		link_vdev = mlo_get_vdev_by_link_id(vdev, link_id,
 						    WLAN_OSIF_ID);
-
 		if (link_vdev) {
 			bss_chan = wlan_vdev_mlme_get_bss_chan(link_vdev);
 			if (!bss_chan) {
@@ -33842,6 +33912,7 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	chan_info->ch_width =
 			wlan_mlme_get_ch_width_from_phymode(peer_phymode);
 	ch_params.ch_width = chan_info->ch_width;
+	ch_params.mhz_freq_seg1 = chan_info->ch_cfreq2;
 
 	sec_2g_freq = hdd_get_sec_2ghz_freq(chan_info->ch_freq,
 					    chan_info->ch_width,

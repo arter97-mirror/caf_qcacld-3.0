@@ -3255,8 +3255,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint32_t aes_block_size_len = 0;
 	enum rateid min_rid = RATEID_DEFAULT;
 	uint8_t *mbo_ie = NULL, *adaptive_11r_ie = NULL, *vendor_ies = NULL;
-	uint8_t mbo_ie_len = 0, adaptive_11r_ie_len = 0, rsnx_ie_len = 0;
-	uint8_t mscs_ext_ie_len = 0;
+	uint8_t mbo_ie_len = 0, adaptive_11r_ie_len = 0;
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
 	bool bss_mfp_capable, frag_ie_present = false;
 	int8_t peer_rssi = 0;
@@ -3666,8 +3665,14 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			pe_err("Failed to strip Vendor IEs");
 			goto end;
 		}
-		rsnx_ie_len = rsnx_ie[1] + 2;
+		/*fill rsnx opaque*/
+		frm->RSNXEOpaque.present = 1;
+		frm->RSNXEOpaque.num_data = rsnx_ie[1];
+		qdf_mem_copy(frm->RSNXEOpaque.data, rsnx_ie + 2, /* EID, len */
+			     rsnx_ie[1]);
+
 	}
+
 	/* MSCS ext ie */
 	if (add_ie_len &&
 	    wlan_get_ext_ie_ptr_from_ext_id(MSCS_OUI_TYPE, MSCS_OUI_SIZE,
@@ -3684,7 +3689,11 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			pe_err("Failed to strip MSCS ext IE");
 			goto end;
 		}
-		mscs_ext_ie_len = mscs_ext_ie[1] + 2;
+		/*fill mscs opaque*/
+		frm->MSCSEXTOpaque.present = 1;
+		frm->MSCSEXTOpaque.num_data = mscs_ext_ie[1];
+		qdf_mem_copy(frm->MSCSEXTOpaque.data, mscs_ext_ie + 2,
+			     mscs_ext_ie[1]);
 	}
 
 	/*
@@ -3849,8 +3858,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
-		rsnx_ie_len + mbo_ie_len + adaptive_11r_ie_len +
-		mscs_ext_ie_len + vendor_ie_len + mlo_ie_len + fils_hlp_ie_len +
+		mbo_ie_len + adaptive_11r_ie_len +
+		vendor_ie_len + mlo_ie_len + fils_hlp_ie_len +
 		eht_cap_ie_len + wfa_gen_cap_ie_len + rsn_sel_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
@@ -3897,39 +3906,39 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		payload = payload + fils_hlp_ie_len;
 	}
 
+	if (mlo_ie_len) {
+		qdf_status = lim_fill_complete_mlo_ie(
+				pe_session, mlo_ie_len,
+				frame + sizeof(tSirMacMgmtHdr) + payload);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_debug("assemble ml ie error");
+			mlo_ie_len = 0;
+		}
+		payload = payload + mlo_ie_len;
+	}
+
 	if (eht_cap_ie_len) {
 		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     eht_cap_ie, eht_cap_ie_len);
 		payload += eht_cap_ie_len;
 	}
 
-	if (rsnx_ie && rsnx_ie_len) {
-		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
-			     rsnx_ie, rsnx_ie_len);
-		payload = payload + rsnx_ie_len;
-	}
-
-	if (mscs_ext_ie && mscs_ext_ie_len) {
-		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
-			     mscs_ext_ie, mscs_ext_ie_len);
-		payload = payload + mscs_ext_ie_len;
-	}
-
+	/* Need to put all the vendor specific IE to the nd of frame*/
 	if (rsn_sel_ie_len) {
 		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     rsn_sel_ie, rsn_sel_ie_len);
 		payload = payload + rsn_sel_ie_len;
 	}
 
-	/* Copy the vendor IEs to the end of the frame */
-	qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
-		     vendor_ies, vendor_ie_len);
-	payload = payload + vendor_ie_len;
-
 	/* Copy the MBO IE to the end of the frame */
 	qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 		     mbo_ie, mbo_ie_len);
 	payload = payload + mbo_ie_len;
+
+	/* Copy the vendor IEs to the end of the frame */
+	qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+		     vendor_ies, vendor_ie_len);
+	payload = payload + vendor_ie_len;
 
 	/*
 	 * Copy the Vendor specific Adaptive 11r IE to end of the
@@ -3938,16 +3947,6 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 		     adaptive_11r_ie, adaptive_11r_ie_len);
 	payload = payload + adaptive_11r_ie_len;
-
-	if (mlo_ie_len) {
-		qdf_status = lim_fill_complete_mlo_ie(pe_session, mlo_ie_len,
-				      frame + sizeof(tSirMacMgmtHdr) + payload);
-		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			pe_debug("assemble ml ie error");
-			mlo_ie_len = 0;
-		}
-		payload = payload + mlo_ie_len;
-	}
 
 	/*
 	 * Copy the WFA Vendor specific WiFi generation capability IE
@@ -3958,6 +3957,13 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			     wfa_gen_cap_ie, wfa_gen_cap_ie_len);
 		payload += wfa_gen_cap_ie_len;
 	}
+
+	/* Avoid adding any IE after vendor specific IE's */
+
+	lim_reorder_vendor_ies(mac_ctx,
+			       frame + sizeof(tSirMacMgmtHdr) +
+			       WLAN_ASSOC_REQ_IES_OFFSET,
+			       payload - WLAN_ASSOC_REQ_IES_OFFSET);
 
 	if (pe_session->assoc_req) {
 		qdf_mem_free(pe_session->assoc_req);
@@ -3998,11 +4004,10 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
 
-	pe_debug("Assoc Req IEs: dot11mode %d, extcap %d, open %d, IE len:: mbo %d vendor %d, rsnx %d, mscs %d, rsn_sel %d, ft11r %d, wfa %d, mlo %d, eht %d, fils %d",
+	pe_debug("Assoc Req IEs: dot11mode %d, extcap %d, open %d, IE len:: mbo %d vendor %d, rsn_sel %d, ft11r %d, wfa %d, mlo %d, eht %d, fils %d",
 		 pe_session->dot11mode, extr_ext_flag,
 		 is_open_auth, mbo_ie_len,
-		 vendor_ie_len, rsnx_ie_len,
-		 mscs_ext_ie_len,
+		 vendor_ie_len,
 		 rsn_sel_ie_len,
 		 adaptive_11r_ie_len,
 		 wfa_gen_cap_ie_len,
@@ -5214,6 +5219,7 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 	uint8_t txFlag = 0;
 	uint32_t val = 0;
 	uint8_t smeSessionId = 0;
+	int32_t rssi = 0;
 
 	if (!pe_session) {
 		return;
@@ -5368,11 +5374,13 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 					      pe_session,
 					      QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
 
+		wlan_get_rssi_by_bssid(mac->pdev, pMacHdr->bssId, &rssi);
+
 		wlan_connectivity_mgmt_event(mac->psoc,
 					     (struct wlan_frame_hdr *)pMacHdr,
 					     pe_session->vdev_id, nReason,
 					     QDF_TX_RX_STATUS_OK,
-					     mac->lim.bss_rssi, 0, 0, 0, 0,
+					     rssi, 0, 0, 0, 0,
 					     WLAN_DISASSOC_TX);
 
 		lim_cp_stats_cstats_log_disassoc_evt(pe_session, CSTATS_DIR_TX,
@@ -5424,6 +5432,7 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 	QDF_STATUS qdf_status;
 	uint8_t txFlag = 0;
 	uint32_t val = 0;
+	int32_t rssi = 0;
 #ifdef FEATURE_WLAN_TDLS
 	uint16_t aid;
 	tpDphHashNode sta;
@@ -5624,11 +5633,13 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 					      QDF_STATUS_SUCCESS,
 					      QDF_STATUS_SUCCESS);
 
+		wlan_get_rssi_by_bssid(mac->pdev, pMacHdr->bssId, &rssi);
+
 		wlan_connectivity_mgmt_event(mac->psoc,
 					     (struct wlan_frame_hdr *)pMacHdr,
 					     pe_session->vdev_id, nReason,
 					     QDF_TX_RX_STATUS_OK,
-					     mac->lim.bss_rssi, 0, 0, 0, 0,
+					     rssi, 0, 0, 0, 0,
 					     WLAN_DEAUTH_TX);
 
 		lim_cp_stats_cstats_log_deauth_evt(pe_session, CSTATS_DIR_TX,
@@ -6661,33 +6672,31 @@ lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 }
 #endif
 
-#define MIN_RRM_SIZE sizeof(tDot11fRadioMeasurementReport) - \
-		    (7 * sizeof(tDot11fIEMeasurementReport))
+#define ACTION_CODE_POS		 1
+#define DIALOG_POS		 2
+#define ACTION_HDR_LEN		 3
+#define MIN_MEASUREMENT_TAG_LEN	 3
+#define MEASUREMENT_RPT_TYPE_POS 4
 
 static QDF_STATUS
 lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 					  uint32_t tx_status, void *params)
 {
-	struct mac_context *mac_ctx = (struct mac_context *)context;
 	struct wlan_frame_hdr *mac_hdr;
 	struct wmi_mgmt_params *mgmt_params;
-	tDot11fRadioMeasurementReport *frm = NULL;
-	uint32_t extract_status;
 	uint8_t *frame_ptr;
 	uint8_t ff_offset;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	enum wlan_diag_wifi_band band;
 	enum qdf_dp_tx_rx_status qdf_tx_complete;
+	uint8_t num_measurements = 0;
+	uint16_t rem_len = 0;
+	uint8_t *frm;
+	const uint8_t *pos, *end, *ie;
+	uint8_t dialog_token;
 
 	if (!buf) {
 		pe_err("Invalid nbuf buffer");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	frm = qdf_mem_malloc(sizeof(*frm));
-	if (!frm) {
-		pe_err("Radio measurement buffer allocation failed");
-		qdf_nbuf_free(buf);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -6705,42 +6714,62 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 		qdf_tx_complete = QDF_TX_RX_STATUS_NO_ACK;
 
 	frame_ptr = qdf_nbuf_data(buf);
+	rem_len = qdf_nbuf_len(buf);
+
 	mac_hdr = (struct wlan_frame_hdr *)frame_ptr;
 	ff_offset = sizeof(*mac_hdr);
 	if (wlan_crypto_is_data_protected(frame_ptr))
 		ff_offset += IEEE80211_CCMP_MICLEN;
 
-	if (qdf_nbuf_len(buf) < (ff_offset + MIN_RRM_SIZE)) {
+	if (!rem_len || rem_len <= (ff_offset + ACTION_HDR_LEN)) {
+		pe_err("Invalid buffer length %d", rem_len);
 		status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
 
 	mgmt_params = params;
+	band = mgmt_params->band;
 
-	extract_status =
-		dot11f_unpack_radio_measurement_report(mac_ctx,
-						       frame_ptr + ff_offset,
-						       sizeof(*frm), frm,
-						       false);
+	//frm pointing to the fixed parameters
+	frm = frame_ptr + ff_offset;
+	rem_len -= ff_offset;
 
-	if (DOT11F_FAILED(extract_status)) {
-		pe_err("Failed to unpack Beacon Report response (0x%08x)",
-		       extract_status);
-		status = QDF_STATUS_E_FAILURE;
+	if (*frm != ACTION_CATEGORY_RRM ||
+	    frm[ACTION_CODE_POS] != RRM_RADIO_MEASURE_RPT) {
+		pe_debug("Not a beacon report frame type:%d", *frm);
 		goto out;
 	}
 
-	band = mgmt_params->band;
+	dialog_token = frm[DIALOG_POS];
 
-	if (frm->MeasurementReport[0].type == SIR_MAC_RRM_BEACON_TYPE)
-		lim_beacon_report_response_event(frm->DialogToken.token,
-						 frm->num_MeasurementReport,
-						 band,
-						 mgmt_params->vdev_id,
-						 qdf_tx_complete);
+	pos = frm + ACTION_HDR_LEN;
+	rem_len -= ACTION_HDR_LEN;
+	end = pos + rem_len;
+
+	while ((ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_MEASREP,
+					      pos, end - pos))) {
+		/* Tag length should have minimum of three octets,
+		 * i.e., Measurement Token, Measurement Report Mode
+		 * and Measurement Report Type.
+		 */
+		if (ie[TAG_LEN_POS] < MIN_MEASUREMENT_TAG_LEN) {
+			pe_debug("Bad Measurement Report element");
+			pos = ie + ie[TAG_LEN_POS] + MIN_IE_LEN;
+			continue;
+		}
+		if (ie[MEASUREMENT_RPT_TYPE_POS] == SIR_MAC_RRM_BEACON_TYPE)
+			++num_measurements;
+		pos = ie + ie[TAG_LEN_POS] + MIN_IE_LEN;
+	}
+
+	pe_debug("vdev_id %d dialog_token %d num_measuremt %d",
+		 mgmt_params->vdev_id, dialog_token, num_measurements);
+
+	lim_beacon_report_response_event(dialog_token, num_measurements, band,
+					 mgmt_params->vdev_id, qdf_tx_complete);
+
 out:
 	qdf_nbuf_free(buf);
-	qdf_mem_free(frm);
 
 	return status;
 }

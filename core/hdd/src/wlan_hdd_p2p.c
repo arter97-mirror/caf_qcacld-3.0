@@ -1378,7 +1378,7 @@ static bool hdd_compare_nan_address(struct hdd_context *hdd_ctx,
 	return false;
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 /**
  * hdd_get_usd_adapter() - get cached USD adapter
  * @hdd_ctx: pointer to hdd context
@@ -1396,7 +1396,7 @@ hdd_get_usd_adapter(struct hdd_context *hdd_ctx)
 {
 	return NULL;
 }
-#endif
+#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 /**
  * hdd_find_adapter_for_nan_oui_frames() - find adapter for NAN OUI frames
@@ -1652,7 +1652,7 @@ void hdd_indicate_mgmt_frame_to_user(struct wlan_hdd_link_info *link_info,
 	osif_vdev_sync_op_stop(vdev_sync);
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * wlan_hdd_p2p_is_wfd_r2_twt_enable() - This function checks TWT enable for
  * WFD R2 mode or not
@@ -2033,7 +2033,7 @@ void wlan_hdd_set_mcc_latency(struct hdd_adapter *adapter, int set_value)
 	}
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 /**
  * __wlan_hdd_cfg80211_p2p_send_usd_cmd() - Function to send USD vendor command
  * to the lower layers.
@@ -2101,6 +2101,7 @@ int wlan_hdd_cfg80211_p2p_send_usd_cmd(struct wiphy *wiphy,
 	return errno;
 }
 
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * __wlan_hdd_cfg80211_p2p_parse_wfd_params - This function parse P2P mode
  * params
@@ -2149,4 +2150,5 @@ int wlan_hdd_cfg80211_p2p_parse_wfd_params(struct wiphy *wiphy,
 
 	return errno;
 }
-#endif /* FEATURE_WLAN_SUPPORT_USD */
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
+#endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */

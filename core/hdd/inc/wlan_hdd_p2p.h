@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -222,7 +222,7 @@ wlan_hdd_get_sta_vdev_for_p2p_dev(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id,
 				  wlan_objmgr_ref_dbgid comp_id);
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * wlan_hdd_cfg80211_p2p_parse_wfd_params - this function start VDEV sync and
  * calls function __wlan_hdd_cfg80211_p2p_parse_wfdr2_params()
@@ -253,5 +253,5 @@ p2p_wfdr2_attr_policy[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_MAX + 1];
 },
 #else
 #define FEATURE_P2P_SET_MODE_VENDOR_COMMANDS
-#endif /* FEATURE_WLAN_SUPPORT_USD */
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 #endif /* __P2P_H */

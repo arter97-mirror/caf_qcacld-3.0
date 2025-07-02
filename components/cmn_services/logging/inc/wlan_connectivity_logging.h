@@ -1072,6 +1072,13 @@ struct wlan_diag_btm_info {
 #define MAX_VSIE_LEN 255
 #define DIAG_MGMT_VERSION_V4 4
 
+/*
+ * This version mandates to print the RSSI for Authentication,
+ * (Re)Association request/response, Deauthentication &
+ * Disassociation frames.
+ */
+#define DIAG_MGMT_VERSION_V5 5
+
 /**
  * struct wlan_diag_packet_info - Data packets related info
  * @diag_cmn: Common diag info
@@ -1635,6 +1642,18 @@ wlan_cdp_set_peer_freq(struct wlan_objmgr_psoc *psoc, uint8_t *peer_mac,
  */
 enum diag_tx_status
 wlan_diag_get_tx_status(enum wlan_diag_tx_rx_status tx_status);
+
+/**
+ * wlan_convert_host_to_diag_tx_fail_reason() - API to convert TX fail reason
+ * code to Connectivity logging TX Fail reason code
+ * @tx_status: Driver specific TX Fail reason code.
+ * Refer enum wlan_roam_frame_tx_status
+ *
+ * Return: TX status specified in enum wlan_diag_tx_rx_status
+ */
+enum wlan_diag_tx_rx_status
+wlan_convert_host_to_diag_tx_fail_reason(enum wlan_roam_frame_tx_status
+					 tx_status);
 
 #ifdef WLAN_FEATURE_11BE_MLO
 

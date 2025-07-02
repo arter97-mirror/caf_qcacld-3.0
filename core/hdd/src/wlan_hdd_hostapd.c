@@ -2793,7 +2793,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			ucfg_dp_set_bss_state_start(vdev, true);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		}
-		hdd_start_tsf_sync(adapter);
+		hdd_setup_tsf_sync(adapter);
 
 		hdd_hostapd_set_sap_key(adapter);
 
@@ -2919,7 +2919,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		}
 
 		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
-		hdd_stop_tsf_sync(adapter);
+		hdd_reset_tsf_sync(adapter);
 		break;
 	case eSAP_DFS_CAC_INTERRUPTED:
 		/*
@@ -3706,7 +3706,7 @@ stopbss:
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		}
 
-		hdd_stop_tsf_sync(adapter);
+		hdd_reset_tsf_sync(adapter);
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 		wlan_hdd_auto_shutdown_enable(hdd_ctx, true);
@@ -4200,6 +4200,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	wlan_reg_set_input_punc_bitmap(&ch_params, punct_bitmap);
 	target_bw = wlansap_get_csa_chanwidth_from_phymode(
 			sap_ctx, target_chan_freq, &ch_params);
+	ccfs1 = ch_params.mhz_freq_seg1;
 	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
 							   adapter->device_mode,
 							   link_info->vdev_id);
@@ -4669,7 +4670,8 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_get_chan_by_session_id(psoc, vdev_id, &sap_ch_freq);
 	if (!policy_mgr_is_restart_sap_required(hdd_ctx->psoc, vdev_id,
 						sap_ch_freq,
-						mcc_to_scc_switch)) {
+						mcc_to_scc_switch,
+						sap_context->ch_params.mhz_freq_seg1)) {
 		wlansap_context_put(sap_context);
 		hdd_debug("SAP needn't restart");
 		return QDF_STATUS_E_FAILURE;
@@ -4699,6 +4701,13 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
+	/* If primary frequency and bandwidth are same, intf_ch_freq is 0 here,
+	 * but for 6 GHz 320M case, if CCFS2 is different, CSA to force scc is
+	 * needed
+	 */
+	if (!intf_ch_freq && ch_params.ch_width == CH_WIDTH_320MHZ &&
+	    sap_context->ch_params.mhz_freq_seg1 != ch_params.mhz_freq_seg1)
+		intf_ch_freq = sap_ch_freq;
 sap_restart:
 	if (!intf_ch_freq) {
 		if (csa_reason == CSA_REASON_UNSAFE_CHANNEL) {
@@ -4712,6 +4721,7 @@ sap_restart:
 		wlansap_context_put(sap_context);
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	wlan_hdd_set_sap_csa_reason(psoc, vdev_id, csa_reason);
 
 	if (ch_params.ch_width == CH_WIDTH_MAX)
@@ -9108,11 +9118,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		freq = (qdf_freq_t)chandef->chan->center_freq;
 		channel_width = wlan_hdd_get_channel_bw(chandef->width);
 	}
+	intf_pm_mode =
+		policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+						     adapter->device_mode,
+						     adapter->deflink->vdev_id);
 
 	if (QDF_STATUS_SUCCESS !=
 	    ucfg_policy_mgr_get_sap_mandt_chnl(hdd_ctx->psoc, &mandt_chnl_list))
 		hdd_err("can't get mandatory channel list");
-	if (mandt_chnl_list && adapter->device_mode == QDF_SAP_MODE)
+	if (mandt_chnl_list && intf_pm_mode == PM_SAP_MODE)
 		policy_mgr_init_sap_mandatory_chan(hdd_ctx->psoc,
 						   chandef->chan->center_freq);
 
@@ -9139,11 +9153,6 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			  chandef->chan->center_freq);
 		return -EINVAL;
 	}
-
-	intf_pm_mode =
-		policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
-						     adapter->device_mode,
-						     adapter->deflink->vdev_id);
 
 	vdev_opmode = wlan_vdev_mlme_get_opmode(link_info->vdev);
 	ucfg_mlme_get_srd_master_mode_for_vdev(hdd_ctx->psoc, vdev_opmode,

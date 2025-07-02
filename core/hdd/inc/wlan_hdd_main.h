@@ -275,7 +275,7 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
 #define HDD_NL80211_BAND_6GHZ   NL80211_BAND_6GHZ
 #endif
 
-#define TSF_GPIO_PIN_INVALID 255
+#define TSF_GPIO_PIN_INVALID 512
 
 /** Length of the TX queue for the netdev */
 #define HDD_NETDEV_TX_QUEUE_LEN (3000)
@@ -1490,7 +1490,7 @@ struct hdd_adapter {
 	struct hdd_wapi_info wapi_info;
 #endif
 
-#ifdef WLAN_FEATURE_TSF
+#ifdef WLAN_FEATURE_TSF_PLUS
 	struct hdd_vdev_tsf tsf;
 #endif
 	struct hdd_multicast_addr_list mc_addr_list;
@@ -1628,7 +1628,7 @@ struct hdd_adapter {
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
 	bool wlm_ll_conn_flag;
 	struct wlan_hdd_link_info *discon_link_info;
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 	uint8_t wfd_mode;
 #endif
 	bool enable_active_apf_mode;
@@ -2432,7 +2432,7 @@ struct hdd_context {
 	/* Lock to control access to dnbs and coex avoid freq list */
 	struct mutex avoid_freq_lock;
 #endif
-#ifdef WLAN_FEATURE_TSF
+#ifdef WLAN_FEATURE_TSF_PLUS
 	struct hdd_ctx_tsf tsf;
 #endif
 
@@ -2573,7 +2573,7 @@ struct hdd_context {
 	qdf_list_t hdd_hlp_data_list;
 	struct work_struct hlp_processing_work;
 	struct notifier_block get_sta_user_notif;
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 	struct hdd_adapter *usd_adapter;
 #endif
 #ifdef FEATURE_WLAN_TX_POWERBOOST
@@ -6203,4 +6203,17 @@ struct class *wlan_hdd_class_create(const char *name)
 }
 #endif
 
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * hdd_lpc_disable_powersave() - Disable LPC power save
+ * @hdd_ctx: Pointer to hdd context
+ *
+ * Return: None
+ */
+void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx);
+#else
+static inline void hdd_lpc_disable_powersave(struct hdd_context *hdd_ctx)
+{
+}
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

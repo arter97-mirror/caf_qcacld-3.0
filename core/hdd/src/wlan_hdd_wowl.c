@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -312,8 +312,10 @@ bool hdd_del_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 	}
 
 	/* If pattern present, remove it from downstream */
-	if (!patternFound)
+	if (!patternFound) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 		return false;
+	}
 
 	status = ucfg_pmo_del_wow_user_pattern(vdev, id);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);

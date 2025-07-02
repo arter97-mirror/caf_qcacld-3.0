@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -434,27 +434,7 @@ static void ucfg_fwol_fetch_dhcp_server_settings(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-/**
- * ucfg_fwol_fetch_tsf_gpio_pin() - Populate the tsf_gpio_pin from cfg
- * @psoc: The global psoc handler
- * @fwol_cfg: The cfg structure
- *
- * Return: none
- */
-#ifdef WLAN_FEATURE_TSF
-static void ucfg_fwol_fetch_tsf_gpio_pin(struct wlan_objmgr_psoc *psoc,
-					 struct wlan_fwol_cfg *fwol_cfg)
-{
-	fwol_cfg->tsf_gpio_pin = cfg_get(psoc, CFG_SET_TSF_GPIO_PIN);
-}
-#else
-static void ucfg_fwol_fetch_tsf_gpio_pin(struct wlan_objmgr_psoc *psoc,
-					 struct wlan_fwol_cfg *fwol_cfg)
-{
-}
-#endif
-
-#if defined(WLAN_FEATURE_TSF) && defined(WLAN_FEATURE_TSF_PLUS)
+#ifdef WLAN_FEATURE_TSF_PLUS
 #ifdef WLAN_FEATURE_TSF_ACCURACY
 /**
  * fwol_init_tsf_accuracy_configs() - Populate the TSF Accuracy configs from cfg
@@ -507,7 +487,24 @@ static void ucfg_fwol_init_tsf_ptp_options(struct wlan_objmgr_psoc *psoc,
 	fwol_cfg->tsf_sync_enable = cfg_get(psoc, CFG_TSF_SYNC_ENABLE);
 	fwol_init_tsf_accuracy_configs(psoc, fwol_cfg);
 }
+
+/**
+ * ucfg_fwol_fetch_tsf_gpio_pin() - Populate the tsf_gpio_pin from cfg
+ * @psoc: The global psoc handler
+ * @fwol_cfg: The cfg structure
+ *
+ * Return: none
+ */
+static void ucfg_fwol_fetch_tsf_gpio_pin(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_fwol_cfg *fwol_cfg)
+{
+	fwol_cfg->tsf_gpio_pin = cfg_get(psoc, CFG_SET_TSF_GPIO_PIN);
+}
 #else
+static void ucfg_fwol_fetch_tsf_gpio_pin(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_fwol_cfg *fwol_cfg)
+{
+}
 static void ucfg_fwol_init_tsf_ptp_options(struct wlan_objmgr_psoc *psoc,
 					   struct wlan_fwol_cfg *fwol_cfg)
 {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,7 +42,7 @@
 #define MAX_NO_OF_2_4_CHANNELS 14
 #define MAX_OFFCHAN_TIME_FOR_DNBS 150
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 const struct nla_policy
 p2p_usd_chan_config_policy[QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_USD_CHAN_CONFIG_DEFAULT_FREQ] = {
@@ -97,11 +97,13 @@ p2p_usd_attr_policy[QCA_WLAN_VENDOR_ATTR_USD_MAX + 1] = {
 	},
 };
 
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 const struct nla_policy
 p2p_wfdr2_attr_policy[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_SET_P2P_MODE_CONFIG] = {.type = NLA_U8,},
 };
-#endif /* FEATURE_WLAN_SUPPORT_USD */
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
+#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 #define DST_MAC_ADDRESS_OFFSET 4
 #define MGMT_FRAME_MATCH_LEN 6
@@ -635,7 +637,7 @@ int wlan_cfg80211_mgmt_tx_cancel(struct wlan_objmgr_vdev *vdev,
 		ucfg_p2p_mgmt_tx_cancel(psoc, vdev, cookie, opmode));
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_USD
+#if defined(FEATURE_WLAN_SUPPORT_USD) || defined(FEATURE_WLAN_SUPPORT_P2P_R2)
 /**
  * osif_p2p_op_type_convert_qca_enum_to_p2p_enum() - this API convert
  * QCA_WLAN_VENDOR_USD_OP_TYPE_XX to P2P_USD_OP_TYPE_XX
@@ -926,6 +928,7 @@ mem_free:
 	return ret;
 }
 
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
 /**
  * osif_p2p_mode_convert_qca_enum_to_p2p_enum() - This API converts
  * QCA_P2P_MODE_WFD_XX to P2P_MODE_WFD_XX
@@ -986,4 +989,5 @@ int osif_p2p_parse_wfd_params(struct hdd_adapter *adapter, const void *data,
 
 	return ret;
 }
-#endif /* FEATURE_WLAN_SUPPORT_USD */
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
+#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
