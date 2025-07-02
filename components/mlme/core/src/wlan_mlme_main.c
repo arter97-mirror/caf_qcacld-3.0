@@ -6165,6 +6165,32 @@ QDF_STATUS wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+bool
+wlan_mlme_get_cur_ch_width_update_from_ap(struct wlan_objmgr_vdev *vdev,
+					  enum phy_ch_width *cur_ch_width)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	if (!cur_ch_width) {
+		mlme_err("invalid cur_ch_width");
+		return false;
+	}
+
+	if (mlme_priv->connect_info.assoc_chan_info.update_from_ap) {
+		*cur_ch_width =
+			mlme_priv->connect_info.assoc_chan_info.cur_ch_width;
+		return true;
+	}
+
+	return false;
+}
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS
 wmi_extract_peer_oper_mode_event(wmi_unified_t wmi_handle,

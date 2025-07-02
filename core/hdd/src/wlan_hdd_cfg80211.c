@@ -33923,6 +33923,7 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	uint8_t vdev_id;
 	struct wlan_channel *des_chan;
 	qdf_freq_t sec_2g_freq = 0;
+	enum phy_ch_width cur_ch_width;
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
@@ -33944,7 +33945,11 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 	mlme_get_peer_phymode(hdd_ctx->psoc, sta_ctx->conn_info.bssid.bytes,
 			      &peer_phymode);
 	chan_info->ch_width =
-			wlan_mlme_get_ch_width_from_phymode(peer_phymode);
+		wlan_mlme_get_ch_width_from_phymode(peer_phymode);
+
+	if (ucfg_mlme_get_cur_ch_width_update_from_ap(vdev, &cur_ch_width))
+		chan_info->ch_width = cur_ch_width;
+
 	ch_params.ch_width = chan_info->ch_width;
 	ch_params.mhz_freq_seg1 = chan_info->ch_cfreq2;
 

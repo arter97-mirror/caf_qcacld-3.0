@@ -3006,6 +3006,22 @@ ucfg_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_get_cur_ch_width_update_from_ap() - UCFG API to get current
+ * channel width if update is there from AP
+ *
+ * @vdev: pointer to vdev
+ * @cur_ch_width: current channel width
+ *
+ * Return: true if there is update else false
+ */
+static inline bool
+ucfg_mlme_get_cur_ch_width_update_from_ap(struct  wlan_objmgr_vdev *vdev,
+					  enum phy_ch_width *cur_ch_width)
+{
+	return wlan_mlme_get_cur_ch_width_update_from_ap(vdev, cur_ch_width);
+}
+
+/**
  * ucfg_mlme_get_vht_mimo_cap() - Enables/disables Tx/Rx MCS values for MIMO
  * @psoc: psoc context
  * @value: data to be get

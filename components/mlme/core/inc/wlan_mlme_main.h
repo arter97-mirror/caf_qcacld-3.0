@@ -2021,6 +2021,19 @@ wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 			 struct wlan_objmgr_vdev *vdev,
 			 uint8_t *rx_nss);
 
+/**
+ * wlan_mlme_get_cur_ch_width_update_from_ap() - API to get current channel
+ * width from AP
+ *
+ * @vdev: pointer to vdev
+ * @cur_ch_width : current ch width
+ *
+ * Return: true if there is update else false
+ */
+bool
+wlan_mlme_get_cur_ch_width_update_from_ap(struct wlan_objmgr_vdev *vdev,
+					  enum phy_ch_width *cur_ch_width);
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wlan_mlme_defer_pmk_set_in_roaming() - Set the set_key pending status
