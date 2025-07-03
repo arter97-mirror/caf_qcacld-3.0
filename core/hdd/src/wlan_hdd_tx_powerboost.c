@@ -30,6 +30,7 @@
 #include <wlan_reg_ucfg_api.h>
 #include "reg_services_public_struct.h"
 #include "wlan_osif_priv.h"
+#include "osif_psoc_sync.h"
 
 #define TX_PB_DMA_SIZE (100 * 1024)
 #define TXPB_MAX_REQ_COUNT 5
@@ -154,6 +155,8 @@ static void hdd_tx_powerboost_deinit_dma(struct hdd_context *hdd_ctx)
 				hdd_ctx->tx_pb.dma.paddr_unaligned,
 				0);
 	hdd_ctx->tx_pb.dma.vaddr_unaligned = NULL;
+	hdd_ctx->tx_pb.dma.vaddr = NULL;
+	hdd_ctx->tx_pb.dma.size = 0;
 	hdd_debug("TPB: DMA memory freed");
 }
 
@@ -309,22 +312,20 @@ hdd_txpb_req_dequeue(struct hdd_context *hdd_ctx,
 }
 
 static int
-tx_power_boost_mmap(struct file *filp, struct vm_area_struct *vma)
+__tx_power_boost_mmap(struct hdd_context *hdd_ctx,
+		      struct vm_area_struct *vma)
 {
 	int ret = 0;
 	struct page *page = NULL;
 	unsigned long size = (unsigned long)(vma->vm_end - vma->vm_start);
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret)
-		return ret;
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
 
 	if (size > hdd_ctx->tx_pb.dma.size) {
-		hdd_err("TPB: mmap size check failed (%lu %u)",
+		hdd_err_rl("TPB: mmap size check failed (%lu %u)",
 			size, hdd_ctx->tx_pb.dma.size);
-		ret = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
 
 	page = virt_to_page((unsigned long)hdd_ctx->tx_pb.dma.vaddr +
@@ -332,29 +333,46 @@ tx_power_boost_mmap(struct file *filp, struct vm_area_struct *vma)
 	ret = remap_pfn_range(vma, vma->vm_start, page_to_pfn(page),
 			      size, vma->vm_page_prot);
 	hdd_debug("TPB: mmap for %zu bytes success", size);
-	if (ret != 0)
-		goto out;
 
-out:
 	return ret;
 }
 
-static ssize_t
-tx_power_boost_read(struct file *filep, char *buffer, size_t len,
-		    loff_t *offset)
+static int
+tx_power_boost_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	int ret;
+	struct osif_psoc_sync *psoc_sync;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
 		return ret;
 
+	ret = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+				      &psoc_sync);
+	if (ret)
+		return ret;
+
+	ret = __tx_power_boost_mmap(hdd_ctx, vma);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return ret;
+}
+
+static ssize_t
+__tx_power_boost_read(struct hdd_context *hdd_ctx, char *buffer,
+		      size_t len)
+{
+	int ret;
+
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
 	if (len > hdd_ctx->tx_pb.dma.size) {
-		hdd_err("TPB: Read overflow! (%zu %u)", len,
-			hdd_ctx->tx_pb.dma.size);
-		ret = -EFAULT;
-		goto out;
+		hdd_err_rl("TPB: Read overflow! (%zu %u)", len,
+			    hdd_ctx->tx_pb.dma.size);
+		return -EFAULT;
 	}
 
 	if (copy_to_user(buffer, hdd_ctx->tx_pb.dma.vaddr,
@@ -365,7 +383,30 @@ tx_power_boost_read(struct file *filep, char *buffer, size_t len,
 		ret = -EFAULT;
 	}
 
-out:
+	return ret;
+}
+
+static ssize_t
+tx_power_boost_read(struct file *filep, char *buffer, size_t len,
+		    loff_t *offset)
+{
+	int ret;
+	struct osif_psoc_sync *psoc_sync;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	ret = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+				      &psoc_sync);
+	if (ret)
+		return ret;
+
+	ret = __tx_power_boost_read(hdd_ctx, buffer, len);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
 	return ret;
 }
 
@@ -955,8 +996,10 @@ static int hdd_tx_pb_configure(struct hdd_context *hdd_ctx,
 		qdf_wake_lock_release(&hdd_ctx->tx_pb.txpb_wake_lock,
 				WIFI_POWER_EVENT_WAKELOCK_TX_POWER_BOOST);
 
-		qdf_mem_set(hdd_ctx->tx_pb.dma.vaddr,
-			    hdd_ctx->tx_pb.dma.size, 0);
+		if (hdd_ctx->tx_pb.dma.vaddr) {
+			qdf_mem_set(hdd_ctx->tx_pb.dma.vaddr,
+				    hdd_ctx->tx_pb.dma.size, 0);
+		}
 	}
 
 	switch (oper) {
