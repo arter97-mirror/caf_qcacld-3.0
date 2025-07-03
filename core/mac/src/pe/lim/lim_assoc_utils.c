@@ -1325,9 +1325,8 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 
 	for (idx = NSS_1x1_MODE; idx <= nss; idx++) {
 		bool vht20_mcs9_unsupported =
-			(session_entry &&
-			 (ch_width == CH_WIDTH_20MHZ) &&
-			 !vht_cap_info->enable_vht20_mcs9);
+				ch_width == CH_WIDTH_20MHZ &&
+				!vht_cap_info->enable_vht20_mcs9;
 
 		/* Unset the NSS not supported by peer */
 		if (!VHT_MCS_IS_NSS_ENABLED(peer_vht_caps->txMCSMap, idx))
@@ -1372,9 +1371,6 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 
 	pe_debug("RxMCSMap %x TxMCSMap %x", rates->vhtRxMCSMap,
 		 rates->vhtTxMCSMap);
-
-	if (!session_entry)
-		return QDF_STATUS_SUCCESS;
 
 	session_entry->supported_nss_1x1 =
 		((rates->vhtTxMCSMap & VHT_MCS_1x1) == VHT_MCS_1x1) ?

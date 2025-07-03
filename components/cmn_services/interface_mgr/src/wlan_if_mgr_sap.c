@@ -410,6 +410,11 @@ if_mgr_ap_channel_selected(struct wlan_objmgr_vdev *vdev,
 	bool is_mcc = false;
 
 	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		ifmgr_debug("PSOC NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	sta_count = policy_mgr_get_mode_specific_conn_info(psoc, freq_list,
 							   NULL, PM_STA_MODE);
 	if (!sta_count)
