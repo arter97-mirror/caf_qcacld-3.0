@@ -1950,128 +1950,6 @@ static int iw_softap_get_ba_timeout(struct net_device *dev,
 	return errno;
 }
 
-static
-int __iw_get_softap_linkspeed(struct net_device *dev,
-			      struct iw_request_info *info,
-			      union iwreq_data *wrqu, char *extra)
-{
-	struct hdd_adapter *adapter = (netdev_priv(dev));
-	struct hdd_context *hdd_ctx;
-	char *out_link_speed = (char *)extra;
-	uint32_t link_speed = 0;
-	int len = sizeof(uint32_t) + 1;
-	struct qdf_mac_addr mac_address;
-	char macaddr_string[MAC_ADDRESS_STR_LEN + 1];
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	int rc, ret;
-
-	hdd_enter_dev(dev);
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
-
-	ret = hdd_check_private_wext_control(hdd_ctx, info);
-	if (0 != ret)
-		return ret;
-
-	hdd_debug("wrqu->data.length(%d)", wrqu->data.length);
-
-	/* Linkspeed is allowed for GO/SAP mode */
-	if (adapter->device_mode != QDF_P2P_GO_MODE &&
-	    adapter->device_mode != QDF_SAP_MODE) {
-		hdd_err("Link Speed is not allowed in Device mode %s(%d)",
-			qdf_opmode_str(adapter->device_mode),
-			adapter->device_mode);
-		return -ENOTSUPP;
-	}
-
-	if (wrqu->data.length >= MAC_ADDRESS_STR_LEN - 1) {
-		if (copy_from_user(macaddr_string,
-				   wrqu->data.pointer, MAC_ADDRESS_STR_LEN)) {
-			hdd_err("failed to copy data to user buffer");
-			return -EFAULT;
-		}
-		macaddr_string[MAC_ADDRESS_STR_LEN - 1] = '\0';
-
-		if (!mac_pton(macaddr_string, mac_address.bytes)) {
-			hdd_err("String to Hex conversion Failed");
-			return -EINVAL;
-		}
-	}
-	/* If no mac address is passed and/or its length is less than 17,
-	 * link speed for first connected client will be returned.
-	 */
-	if (wrqu->data.length < 17 || !QDF_IS_STATUS_SUCCESS(status)) {
-		struct hdd_station_info *sta_info, *tmp = NULL;
-
-		hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
-					  STA_INFO_GET_SOFTAP_LINKSPEED) {
-			if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
-				qdf_copy_macaddr(&mac_address,
-						 &sta_info->sta_mac);
-				status = QDF_STATUS_SUCCESS;
-				hdd_put_sta_info_ref(
-						&adapter->sta_info_list,
-						&sta_info, true,
-						STA_INFO_GET_SOFTAP_LINKSPEED);
-				if (tmp)
-					hdd_put_sta_info_ref(
-						&adapter->sta_info_list,
-						&tmp, true,
-						STA_INFO_GET_SOFTAP_LINKSPEED);
-				break;
-			}
-			hdd_put_sta_info_ref(&adapter->sta_info_list,
-					     &sta_info, true,
-					     STA_INFO_GET_SOFTAP_LINKSPEED);
-		}
-	}
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("Invalid peer macaddress");
-		return -EINVAL;
-	}
-	rc = wlan_hdd_get_linkspeed_for_peermac(adapter->deflink,
-						&mac_address, &link_speed);
-	if (rc) {
-		hdd_err("Unable to retrieve SME linkspeed");
-		return rc;
-	}
-
-	/* linkspeed in units of 500 kbps */
-	link_speed = link_speed / 500;
-	wrqu->data.length = len;
-	rc = snprintf(out_link_speed, len, "%u", link_speed);
-	if ((rc < 0) || (rc >= len)) {
-		/* encoding or length error? */
-		hdd_err("Unable to encode link speed");
-		return -EIO;
-	}
-	hdd_exit();
-	return 0;
-}
-
-static int
-iw_get_softap_linkspeed(struct net_device *dev,
-			struct iw_request_info *info,
-			union iwreq_data *wrqu,
-			char *extra)
-{
-	int errno;
-	struct osif_vdev_sync *vdev_sync;
-
-	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __iw_get_softap_linkspeed(dev, info, wrqu, extra);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-
 /**
  * __iw_get_peer_rssi() - get station's rssi
  * @dev: net device
@@ -2451,11 +2329,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN, "listProfile"
 	}
 	, {
-		QCSAP_IOCTL_PRIV_GET_SOFTAP_LINK_SPEED,
-		IW_PRIV_TYPE_CHAR | 18,
-		IW_PRIV_TYPE_CHAR | 5, "getLinkSpeed"
-	}
-	, {
 		QCSAP_IOCTL_PRIV_GET_RSSI,
 		IW_PRIV_TYPE_CHAR | 18,
 		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN, "getRSSI"
@@ -2653,9 +2526,6 @@ static const iw_handler hostapd_private[] = {
 		iw_softap_modify_acl,
 	[QCSAP_IOCTL_GET_BA_AGEING_TIMEOUT - SIOCIWFIRSTPRIV] =
 		iw_softap_get_ba_timeout,
-	[QCSAP_IOCTL_PRIV_GET_SOFTAP_LINK_SPEED -
-	 SIOCIWFIRSTPRIV] =
-		iw_get_softap_linkspeed,
 	[QCSAP_IOCTL_PRIV_GET_RSSI - SIOCIWFIRSTPRIV] =
 		iw_get_peer_rssi,
 	[QCSAP_IOCTL_SET_TX_POWER - SIOCIWFIRSTPRIV] =

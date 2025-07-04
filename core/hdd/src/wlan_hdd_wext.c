@@ -2222,27 +2222,6 @@
 /* 802.11p IOCTL */
 #define WLAN_SET_DOT11P_CHANNEL_SCHED    (SIOCIWFIRSTPRIV + 30)
 
-/*
- * <ioctl>
- * getLinkSpeed - Gets the current link speed in Mbps
- *
- * @INPUT: None
- *
- * @OUTPUT: linkspeed in mbps
- *  wlan0     getLinkSpeed:7
- *
- * This IOCTL is used get the current link speed in Mbps
- *
- * @E.g: iwpriv wlan0 getLinkSpeed
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WLAN_GET_LINK_SPEED          (SIOCIWFIRSTPRIV + 31)
-
 #define WLAN_STATS_INVALID            0
 #define WLAN_STATS_RETRY_CNT          1
 #define WLAN_STATS_MUL_RETRY_CNT      2
@@ -2594,82 +2573,6 @@ void hdd_wlan_list_fw_profile(uint16_t *length,
 static int hdd_we_dump_stats(struct wlan_hdd_link_info *link_info, int value)
 {
 	return hdd_wlan_dump_stats(link_info->adapter, value);
-}
-
-/**
- * __iw_get_linkspeed() - Get current link speed ioctl
- * @dev: device upon which the ioctl was received
- * @info: ioctl request information
- * @wrqu: ioctl request data
- * @extra: extra ioctl buffer
- *
- * Return: 0 on success, non-zero on error
- */
-static int __iw_get_linkspeed(struct net_device *dev,
-			      struct iw_request_info *info,
-			      union iwreq_data *wrqu, char *extra)
-{
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	char *out_link_speed = (char *)extra;
-	int len = sizeof(uint32_t) + 1;
-	uint32_t link_speed = 0;
-	struct hdd_context *hdd_ctx;
-	int ret, rc;
-
-	hdd_enter_dev(dev);
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
-
-	ret = hdd_check_private_wext_control(hdd_ctx, info);
-	if (0 != ret)
-		return ret;
-
-	ret = wlan_hdd_get_link_speed(adapter->deflink, &link_speed);
-	if (0 != ret)
-		return ret;
-
-	wrqu->data.length = len;
-	/* return the linkspeed as a string */
-	rc = snprintf(out_link_speed, len, "%u", link_speed);
-	if ((rc < 0) || (rc >= len)) {
-		/* encoding or length error? */
-		hdd_err("Unable to encode link speed");
-		return -EIO;
-	}
-
-	hdd_exit();
-	/* a value is being successfully returned */
-	return 0;
-}
-
-/**
- * iw_get_linkspeed() - Get current link speed ioctl
- * @dev: device upon which the ioctl was received
- * @info: ioctl request information
- * @wrqu: ioctl request data
- * @extra: extra ioctl buffer
- *
- * Return: 0 on success, non-zero on error
- */
-static int iw_get_linkspeed(struct net_device *dev,
-			    struct iw_request_info *info,
-			    union iwreq_data *wrqu, char *extra)
-{
-	int errno;
-	struct osif_vdev_sync *vdev_sync;
-
-	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __iw_get_linkspeed(dev, info, wrqu, extra);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
 }
 
 #ifdef FEATURE_WLM_STATS
@@ -8031,7 +7934,6 @@ static const iw_handler we_private[] = {
 	[WLAN_SET_BAND_CONFIG - SIOCIWFIRSTPRIV] = iw_set_band_config,
 	[WLAN_PRIV_SET_MCBC_FILTER - SIOCIWFIRSTPRIV] =
 		iw_set_dynamic_mcbc_filter,
-	[WLAN_GET_LINK_SPEED - SIOCIWFIRSTPRIV] = iw_get_linkspeed,
 #ifdef FEATURE_WLM_STATS
 	[WLAN_GET_WLM_STATS - SIOCIWFIRSTPRIV] = iw_get_wlm_stats,
 #endif
@@ -8899,11 +8801,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 0,
 	 "setMCBCFilter"},
-
-	{WLAN_GET_LINK_SPEED,
-	 IW_PRIV_TYPE_CHAR | 18,
-	 IW_PRIV_TYPE_CHAR | 5,
-	 "getLinkSpeed"},
 
 #ifdef FEATURE_WLM_STATS
 	{WLAN_GET_WLM_STATS,
