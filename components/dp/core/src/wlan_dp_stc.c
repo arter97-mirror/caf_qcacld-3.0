@@ -194,7 +194,8 @@ check_burst:
 	{
 		if (pkt_iat > BURST_END_TIME_THRESHOLD_NS) {
 			struct wlan_dp_stc_burst_stats *burst_stats;
-			uint32_t burst_dur, burst_size;
+			uint64_t burst_dur;
+			uint32_t burst_size;
 
 			flow_entry->burst_state = BURST_DETECTION_INIT;
 			burst_stats = &flow_entry->burst_stats;
@@ -212,7 +213,7 @@ check_burst:
 			DP_STC_UPDATE_MIN_MAX_SUM_STATS(burst_stats->burst_size,
 							burst_size);
 			dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
-				   "STC: Flow mdata 0x%x ts: start %llu end: %llu Burst end with size %u dur %u curr_ts %llu",
+				   "STC: Flow mdata 0x%x ts: start %llu end: %llu Burst end with size %u dur %llu curr_ts %llu",
 				   flow_entry->metadata,
 				   flow_entry->burst_start_time,
 				   flow_entry->prev_pkt_arrival_ts,
@@ -1748,7 +1749,8 @@ wlan_dp_stc_save_burst_samples(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_stc_flow_table_entry *flow;
 	struct wlan_dp_stc_burst_samples *burst_sample;
-	uint32_t burst_dur, burst_size;
+	uint64_t burst_dur;
+	uint32_t burst_size;
 	uint8_t burst_stage;
 
 	burst_stage = s_entry->flow_samples.curr_stats_stage;
