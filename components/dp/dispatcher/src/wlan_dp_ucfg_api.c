@@ -2881,7 +2881,7 @@ ucfg_dp_traffic_end_indication_set(struct wlan_objmgr_vdev *vdev, bool enabled)
 
 	dp_debug("enabled:%u", enabled);
 
-	vdev_param.cdp_vdev_param_traffic_end_ind = enabled;
+	vdev_param.cdp_vdev_param_twt_setup_enable = enabled;
 	if (cdp_txrx_set_vdev_param(cds_get_context(QDF_MODULE_ID_SOC),
 				    dp_link->link_id,
 				    CDP_ENABLE_TRAFFIC_END_INDICATION,
