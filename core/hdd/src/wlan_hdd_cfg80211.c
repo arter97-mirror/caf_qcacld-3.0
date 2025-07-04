@@ -33706,6 +33706,8 @@ wlan_hdd_cfg80211_get_channel_sap(struct wiphy *wiphy,
 	case eCSR_DOT11_MODE_11ac_ONLY:
 	case eCSR_DOT11_MODE_11ax:
 	case eCSR_DOT11_MODE_11ax_ONLY:
+	case eCSR_DOT11_MODE_11be:
+	case eCSR_DOT11_MODE_11be_ONLY:
 		is_legacy_phymode = false;
 		break;
 	default:
