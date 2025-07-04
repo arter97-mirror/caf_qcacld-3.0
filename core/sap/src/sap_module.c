@@ -4265,7 +4265,9 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		sap_debug("channel is passive");
 		*csa_reason = CSA_REASON_CHAN_PASSIVE;
 		return wlansap_get_safe_channel_from_pcl_for_sap(sap_ctx);
-	} else if (!policy_mgr_is_sap_freq_allowed(mac->psoc,
+	} else if (((sap_ctx->acs_cfg && sap_ctx->acs_cfg->acs_mode) ||
+		   policy_mgr_restrict_sap_on_unsafe_chan(mac->psoc)) &&
+		   !policy_mgr_is_sap_freq_allowed(mac->psoc,
 			wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
 			sap_ctx->chan_freq)) {
 		sap_debug("channel is unsafe");
