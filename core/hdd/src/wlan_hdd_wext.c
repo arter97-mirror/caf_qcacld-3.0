@@ -2034,28 +2034,6 @@
  * </ioctl>
  */
 #define WLAN_PRIV_DEL_TSPEC (SIOCIWFIRSTPRIV + 11)
-/*
- * <ioctl>
- * getTspec - Get TSPEC entry for each AC
- *
- * @INPUT: 1 TSPEC param
- *     @[arg0]: handle
- *
- * @OUTPUT: Success/Failure
- *
- * This IOCTL is used to get TSPEC entry for each AC.
- *
- * @E.g: iwpriv wlan0 getTspec <handle>
- * iwpriv wlan0 getTspec 7001
- * wlan0     delTspec:18
- *
- * Supported Feature: WMM
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WLAN_PRIV_GET_TSPEC (SIOCIWFIRSTPRIV + 13)
 
 /* (SIOCIWFIRSTPRIV + 10) is currently unused */
 /* (SIOCIWFIRSTPRIV + 12) is currently unused */
@@ -6537,80 +6515,6 @@ static int iw_del_tspec(struct net_device *dev,
 }
 
 /**
- * __iw_get_tspec - Get TSpec private ioctl handler
- * @dev: device upon which the ioctl was received
- * @info: ioctl request information
- * @wrqu: ioctl request data
- * @extra: ioctl extra data
- *
- * Return: 0 on success, non-zero on error
- */
-static int __iw_get_tspec(struct net_device *dev, struct iw_request_info *info,
-			  union iwreq_data *wrqu, char *extra)
-{
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	struct hdd_context *hdd_ctx;
-	int *params = (int *)extra;
-	hdd_wlan_wmm_status_e *wmm_status = (hdd_wlan_wmm_status_e *) extra;
-	uint32_t handle;
-	int ret;
-
-	hdd_enter_dev(dev);
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
-
-	ret = hdd_check_private_wext_control(hdd_ctx, info);
-	if (0 != ret)
-		return ret;
-
-	/* although we are defined to be a "get" ioctl, the params we require */
-	/* will fit in the iwreq_data, therefore unlike iw_add_tspec() there */
-	/* is no need to copy the params from user space */
-
-	/* validate the handle */
-	handle = params[HDD_WLAN_WMM_PARAM_HANDLE];
-	if (HDD_WMM_HANDLE_IMPLICIT == handle) {
-		/* that one is reserved */
-		*wmm_status = HDD_WLAN_WMM_STATUS_SETUP_FAILED_BAD_PARAM;
-		return 0;
-	}
-
-	*wmm_status = hdd_wmm_checkts(adapter, handle);
-	hdd_exit();
-	return 0;
-}
-
-/**
- * iw_get_tspec - Get TSpec private ioctl handler
- * @dev: device upon which the ioctl was received
- * @info: ioctl request information
- * @wrqu: ioctl request data
- * @extra: ioctl extra data
- *
- * Return: 0 on success, non-zero on error
- */
-static int iw_get_tspec(struct net_device *dev,
-			struct iw_request_info *info,
-			union iwreq_data *wrqu, char *extra)
-{
-	int errno;
-	struct osif_vdev_sync *vdev_sync;
-
-	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __iw_get_tspec(dev, info, wrqu, extra);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-
-/**
  * __iw_set_fties - Set FT IEs private ioctl handler
  * @dev: device upon which the ioctl was received
  * @info: ioctl request information
@@ -7795,7 +7699,6 @@ static const iw_handler we_private[] = {
 #endif
 	[WLAN_PRIV_ADD_TSPEC - SIOCIWFIRSTPRIV] = iw_add_tspec,
 	[WLAN_PRIV_DEL_TSPEC - SIOCIWFIRSTPRIV] = iw_del_tspec,
-	[WLAN_PRIV_GET_TSPEC - SIOCIWFIRSTPRIV] = iw_get_tspec,
 	[WLAN_PRIV_SET_FTIES - SIOCIWFIRSTPRIV] = iw_set_fties,
 	[WLAN_PRIV_SET_HOST_OFFLOAD - SIOCIWFIRSTPRIV] = iw_set_host_offload,
 	[WLAN_GET_WLAN_STATISTICS - SIOCIWFIRSTPRIV] = iw_get_statistics,
@@ -8628,12 +8531,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "delTspec"},
-
-	/* handlers for main ioctl */
-	{WLAN_PRIV_GET_TSPEC,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "getTspec"},
 
 	/* handlers for main ioctl - host offload */
 	{WLAN_PRIV_SET_HOST_OFFLOAD,
