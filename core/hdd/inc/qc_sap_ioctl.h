@@ -48,7 +48,6 @@
 
 /* Private ioctls and their sub-ioctls */
 #define QCSAP_PRIV_GET_CHAR_SET_NONE   (SIOCIWFIRSTPRIV + 13)
-#define QCSAP_GET_STATS 1
 #define QCSAP_LIST_FW_PROFILE 2
 
 /* (SIOCIWFIRSTPRIV + 14) is unused */

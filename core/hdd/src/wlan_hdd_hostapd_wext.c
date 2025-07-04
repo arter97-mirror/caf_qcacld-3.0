@@ -1658,10 +1658,6 @@ static int __iw_get_char_setnone(struct net_device *dev,
 		return ret;
 
 	switch (sub_cmd) {
-	case QCSAP_GET_STATS:
-		hdd_wlan_get_stats(adapter->deflink, &wrqu->data.length,
-				   extra, WE_MAX_STR_LEN);
-		break;
 	case QCSAP_LIST_FW_PROFILE:
 		hdd_wlan_list_fw_profile(&(wrqu->data.length),
 					extra, WE_MAX_STR_LEN);
@@ -2320,10 +2316,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN, ""
 	}
 	/* handler for sub-ioctl */
-	, {
-		QCSAP_GET_STATS, 0,
-		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN, "getStats"
-	}
 	, {
 		QCSAP_LIST_FW_PROFILE, 0,
 		IW_PRIV_TYPE_CHAR | WE_MAX_STR_LEN, "listProfile"
