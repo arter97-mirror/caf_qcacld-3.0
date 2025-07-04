@@ -712,26 +712,6 @@
 #define WE_SET_GTX_MINTPC               68
 /*
  * <ioctl>
- * gtxBWMask - Sets the BW mask (20/40/80/160 Mhz)
- *
- * @INPUT: Mask value
- *
- * @OUTPUT: None
- *
- * This IOTCL used to set gtxBWMask
- *
- * @E.g: iwpriv wlan0 gtxBWMask <value>
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-
-#define WE_SET_GTX_BWMASK               69
-/*
- * <ioctl>
  * setMccLatency - Sets the MCC latency value during STA-P2P concurrency
  *
  * @INPUT: set_value
@@ -3315,14 +3295,6 @@ static int hdd_we_set_gtx_mintpc(struct wlan_hdd_link_info *link_info,
 					 value);
 }
 
-static int hdd_we_set_gtx_bwmask(struct wlan_hdd_link_info *link_info,
-				 int value)
-{
-	return hdd_we_set_green_tx_param(link_info->adapter,
-					 wmi_vdev_param_gtx_bw_mask,
-					 value);
-}
-
 static int hdd_we_packet_power_save(struct hdd_adapter *adapter,
 				    packet_power_save id,
 				    const char *id_string,
@@ -4050,7 +4022,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_GTX_MARGIN] = hdd_we_set_gtx_margin,
 	[WE_SET_GTX_STEP] = hdd_we_set_gtx_step,
 	[WE_SET_GTX_MINTPC] = hdd_we_set_gtx_mintpc,
-	[WE_SET_GTX_BWMASK] = hdd_we_set_gtx_bwmask,
 	[WE_SET_LDPC] = hdd_set_ldpc,
 	[WE_SET_TX_STBC] = hdd_set_tx_stbc,
 	[WE_SET_RX_STBC] = hdd_set_rx_stbc,
@@ -7910,11 +7881,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "gtxMinTpc"},
-
-	{WE_SET_GTX_BWMASK,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "gtxBWMask"},
 
 	{WE_SET_TX_CHAINMASK,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,

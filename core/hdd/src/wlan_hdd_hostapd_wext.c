@@ -676,15 +676,6 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	}
 
-	case QCSAP_GTX_BWMASK:
-	{
-		hdd_debug("wmi_vdev_param_gtx_bw_mask%d", set_value);
-		ret = wma_cli_set_command(link_info->vdev_id,
-					  wmi_vdev_param_gtx_bw_mask,
-					  set_value, GTX_CMD);
-		break;
-	}
-
 	case QCASAP_SET_TM_LEVEL:
 	{
 		hdd_debug("Set Thermal Mitigation Level %d", set_value);
@@ -1111,15 +1102,6 @@ static __iw_softap_getparam(struct net_device *dev,
 		hdd_debug("GET wmi_vdev_param_gtx_mintpc");
 		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_mintpc,
-					     GTX_CMD);
-		break;
-	}
-
-	case QCSAP_GTX_BWMASK:
-	{
-		hdd_debug("GET wmi_vdev_param_gtx_bw_mask");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     wmi_vdev_param_gtx_bw_mask,
 					     GTX_CMD);
 		break;
 	}
@@ -2152,10 +2134,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCSAP_GTX_MINTPC,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "gtxMinTpc"
-	}, {
-		QCSAP_GTX_BWMASK,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		0, "gtxBWMask"
 	}, {
 		QCSAP_PARAM_CLR_ACL,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
