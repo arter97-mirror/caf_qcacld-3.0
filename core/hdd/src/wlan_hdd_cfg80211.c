@@ -311,9 +311,11 @@ static const u32 hdd_cipher_suites[] = {
 	WLAN_CIPHER_SUITE_SMS4,
 #endif
 	WLAN_CIPHER_SUITE_AES_CMAC,
+	WLAN_CIPHER_SUITE_CCMP_256,
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
 	WLAN_CIPHER_SUITE_BIP_GMAC_128,
 	WLAN_CIPHER_SUITE_BIP_GMAC_256,
+	WLAN_CIPHER_SUITE_BIP_CMAC_256
 #endif
 };
 
@@ -639,6 +641,7 @@ static const u32 hdd_ap_akm_suites[] = {
 	WLAN_AKM_SUITE_PSK,
 	WLAN_AKM_SUITE_SAE,
 	WLAN_AKM_SUITE_OWE,
+	WLAN_AKM_SUITE_SAE_EXT_KEY,
 };
 
 /* This structure contain information what akm suits are
