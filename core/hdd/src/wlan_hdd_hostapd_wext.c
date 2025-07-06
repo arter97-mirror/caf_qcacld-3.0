@@ -777,31 +777,6 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 	}
 
-	case QCSAP_IPA_UC_STAT:
-	{
-		/* If input value is non-zero get stats */
-		switch (set_value) {
-		case 1:
-			ucfg_ipa_uc_stat(hdd_ctx->pdev);
-			break;
-		case 2:
-			ucfg_ipa_uc_info(hdd_ctx->pdev);
-			break;
-		case 3:
-			ucfg_ipa_uc_rt_debug_host_dump(hdd_ctx->pdev);
-			break;
-		case 4:
-			ucfg_ipa_dump_info(hdd_ctx->pdev);
-			break;
-		default:
-			/* place holder for stats clean up
-			 * Stats clean not implemented yet on FW and IPA
-			 */
-			break;
-		}
-		return ret;
-	}
-
 	case QCASAP_SET_PHYMODE:
 		ret = hdd_we_update_phymode(link_info, set_value);
 		break;
@@ -2161,10 +2136,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCASAP_SET_RADAR_CMD,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "setRadar"
-	},
-	{
-		QCSAP_IPA_UC_STAT,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ipaucstat"
 	},
 	{
 		QCASAP_TX_CHAINMASK_CMD,
