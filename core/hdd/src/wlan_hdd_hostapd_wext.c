@@ -820,9 +820,6 @@ static __iw_softap_setparam(struct net_device *dev,
 					  WMI_WLAN_PROFILE_TRIGGER_CMDID,
 					  set_value, DBG_CMD);
 		break;
-	case QCASAP_PARAM_LDPC:
-		ret = hdd_set_ldpc(link_info, set_value);
-		break;
 	case QCASAP_PARAM_TX_STBC:
 		ret = hdd_set_tx_stbc(link_info, set_value);
 		break;
@@ -2164,10 +2161,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		QCSAP_START_FW_PROFILING,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "startProfile"
-	}, {
-		QCASAP_PARAM_LDPC,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		0, "ldpc"
 	}, {
 		QCASAP_PARAM_TX_STBC,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,

@@ -228,25 +228,6 @@
 #define WE_SET_PHYMODE       10
 /*
  * <ioctl>
- * ldpc - Enables or disables LDPC
- *
- * @INPUT: 0 – Disable, 1 - Enable
- *
- * @OUTPUT: None
- *
- * This IOCTL enables or disables LDPC
- *
- * @E.g: iwpriv wlan0 ldpc 1
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_SET_LDPC          12
-/*
- * <ioctl>
  * tx_stbc - Enables or disables tx_stbc
  *
  * @INPUT: Int 0 – Disable, 1 - Enable
@@ -4022,7 +4003,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_GTX_MARGIN] = hdd_we_set_gtx_margin,
 	[WE_SET_GTX_STEP] = hdd_we_set_gtx_step,
 	[WE_SET_GTX_MINTPC] = hdd_we_set_gtx_mintpc,
-	[WE_SET_LDPC] = hdd_set_ldpc,
 	[WE_SET_TX_STBC] = hdd_set_tx_stbc,
 	[WE_SET_RX_STBC] = hdd_set_rx_stbc,
 	[WE_SET_SHORT_GI] = hdd_we_set_short_gi,
@@ -7796,11 +7776,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "setphymode"},
-
-	{WE_SET_LDPC,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "ldpc"},
 
 	{WE_SET_TX_STBC,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
