@@ -823,9 +823,6 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCASAP_PARAM_TX_STBC:
 		ret = hdd_set_tx_stbc(link_info, set_value);
 		break;
-	case QCASAP_PARAM_RX_STBC:
-		ret = hdd_set_rx_stbc(link_info, set_value);
-		break;
 	case QCASAP_SET_11AX_RATE:
 		ret = hdd_set_11ax_rate(adapter, set_value,
 					&link_info->session.ap.sap_config);
@@ -1124,11 +1121,6 @@ static __iw_softap_getparam(struct net_device *dev,
 				0, DBG_CMD);
 		break;
 
-	case QCASAP_PARAM_RX_STBC:
-	{
-		ret = hdd_get_rx_stbc(adapter, value);
-		break;
-	}
 	case QCASAP_PARAM_DCM:
 	{
 		*value = wma_cli_get_command(adapter->deflink->vdev_id,
@@ -2015,10 +2007,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		0, "set_tx_stbc"
 	}, {
-		QCASAP_PARAM_RX_STBC,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		0, "set_rx_stbc"
-	}, {
 		QCSAP_IOCTL_GETPARAM, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getparam"
 	}, {
@@ -2063,10 +2051,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCSAP_GET_ACL, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		"get_acl_list"
-	}, {
-		QCASAP_PARAM_RX_STBC, 0,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		"get_rx_stbc"
 	}, {
 		QCASAP_TX_CHAINMASK_CMD, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,

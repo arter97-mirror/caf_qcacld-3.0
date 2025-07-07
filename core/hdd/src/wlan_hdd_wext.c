@@ -247,25 +247,6 @@
 #define WE_SET_TX_STBC       13
 /*
  * <ioctl>
- * rx_stbc - Set the rx_stbc parameter
- *
- * @INPUT: Int 0 – Disable, 1 - Enable
- *
- * @OUTPUT: None
- *
- * This IOTCL used to set rx_stbc parameter
- *
- * @E.g: iwpriv wlan0 rx_stbc <value>
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_SET_RX_STBC       14
-/*
- * <ioctl>
  * shortgi  - Sets the short-guard interval
  *
  * @INPUT: Fixed Rate: 0 - 400ns, 1 - 800ns, 2 - 1600ns, 3 - 3200us
@@ -1037,26 +1018,6 @@
  * </ioctl>
  */
 #define WE_GET_CONCURRENCY_MODE 9
-/*
- * <ioctl>
- * get_rx_stbc - Gets the value of the current Rx STBC
- *
- * @INPUT: None
- *
- * @OUTPUT: Rx STBC
- *  wlan0     get_rx_stbc:1
- *
- * This IOTCL used to get the value of the current Rx STBC
- *
- * @E.g: iwpriv wlan0 get_rx_stbc
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_RX_STBC       14
 /*
  * <ioctl>
  * get_shortgi - Get the value of the current short GI setting
@@ -3812,7 +3773,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_GTX_STEP] = hdd_we_set_gtx_step,
 	[WE_SET_GTX_MINTPC] = hdd_we_set_gtx_mintpc,
 	[WE_SET_TX_STBC] = hdd_set_tx_stbc,
-	[WE_SET_RX_STBC] = hdd_set_rx_stbc,
 	[WE_SET_SHORT_GI] = hdd_we_set_short_gi,
 	[WE_SET_ANI_POLL_PERIOD] = hdd_we_set_ani_poll_period,
 	[WE_SET_ANI_LISTEN_PERIOD] = hdd_we_set_ani_listen_period,
@@ -4333,12 +4293,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     wmi_vdev_param_gtx_mintpc,
 					     GTX_CMD);
-		break;
-	}
-
-	case WE_GET_RX_STBC:
-	{
-		ret = hdd_get_rx_stbc(adapter, value);
 		break;
 	}
 
@@ -7110,11 +7064,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "tx_stbc"},
 
-	{WE_SET_RX_STBC,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "rx_stbc"},
-
 	{WE_SET_SHORT_GI,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
@@ -7410,11 +7359,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "getconcurrency"},
-
-	{WE_GET_RX_STBC,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_rx_stbc"},
 
 	{WE_GET_SHORT_GI,
 	 0,
