@@ -1291,60 +1291,6 @@ static iw_softap_set_max_tx_power(struct net_device *dev,
 	return errno;
 }
 
-#ifndef REMOVE_PKT_LOG
-int
-static __iw_softap_set_pktlog(struct net_device *dev,
-				    struct iw_request_info *info,
-				    union iwreq_data *wrqu, char *extra)
-{
-	struct hdd_adapter *adapter = netdev_priv(dev);
-	struct hdd_context *hdd_ctx;
-	int *value = (int *)extra;
-	int ret;
-
-	hdd_enter_dev(dev);
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	ret = hdd_check_private_wext_control(hdd_ctx, info);
-	if (0 != ret)
-		return ret;
-
-	if (wrqu->data.length < 1 || wrqu->data.length > 2) {
-		hdd_err("pktlog: either 1 or 2 parameters are required");
-		return -EINVAL;
-	}
-
-	return hdd_process_pktlog_command(hdd_ctx, value[0], value[1]);
-}
-
-int
-static iw_softap_set_pktlog(struct net_device *dev,
-				  struct iw_request_info *info,
-				  union iwreq_data *wrqu, char *extra)
-{
-	int errno;
-	struct osif_vdev_sync *vdev_sync;
-
-	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __iw_softap_set_pktlog(dev, info, wrqu, extra);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-#else
-int
-static iw_softap_set_pktlog(struct net_device *dev,
-				  struct iw_request_info *info,
-				  union iwreq_data *wrqu, char *extra)
-{
-	return -EINVAL;
-}
-#endif
-
 int
 static __iw_softap_set_tx_power(struct net_device *dev,
 				struct iw_request_info *info,
@@ -2258,12 +2204,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}
 	,
 	{
-		QCSAP_IOCTL_SET_PKTLOG,
-		IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
-		0, "pktlog"
-	}
-	,
-	{
 	/* handlers for main ioctl */
 		QCSAP_IOCTL_SET_TWO_INT_GET_NONE,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0, ""
@@ -2373,8 +2313,6 @@ static const iw_handler hostapd_private[] = {
 		iw_softap_set_tx_power,
 	[QCSAP_IOCTL_SET_MAX_TX_POWER - SIOCIWFIRSTPRIV] =
 		iw_softap_set_max_tx_power,
-	[QCSAP_IOCTL_SET_PKTLOG - SIOCIWFIRSTPRIV] =
-		iw_softap_set_pktlog,
 	[QCSAP_IOCTL_SET_TWO_INT_GET_NONE - SIOCIWFIRSTPRIV] =
 		iw_softap_set_two_ints_getnone,
 };
