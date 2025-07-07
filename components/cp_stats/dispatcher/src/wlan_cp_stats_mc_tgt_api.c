@@ -1044,6 +1044,131 @@ tgt_mc_cp_stats_extract_vdev_extd_stats(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
+/**
+ * tgt_mc_cp_stats_reset_num_recv_bcn_stats() - Reset beacon statistics for a
+ * vdev
+ * @psoc: pointer to psoc object
+ * @last_req: pointer to the last request info
+ *
+ * This function resets the beacon statistics counter and invalidates all
+ * stored beacon statistics entries by setting their vdev_id to
+ * WLAN_INVALID_VDEV_ID which marks them as available for new data.
+ *
+ * Return: void
+ */
+static void
+tgt_mc_cp_stats_reset_num_recv_bcn_stats(struct wlan_objmgr_psoc *psoc,
+					 struct request_info *last_req)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mc_cp_stats *vdev_mc_stats;
+	struct vdev_cp_stats *vdev_cp_stats_priv;
+	uint8_t i;
+
+	if (!last_req)
+		return;
+
+	if (!wlan_cp_stats_is_bcn_rssi_history_report_cfg_enable(psoc))
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, last_req->vdev_id,
+						    WLAN_CP_STATS_ID);
+	if (!vdev) {
+		cp_stats_err("vdev object is null");
+		return;
+	}
+
+	vdev_cp_stats_priv = wlan_cp_stats_get_vdev_stats_obj(vdev);
+	if (!vdev_cp_stats_priv) {
+		cp_stats_err("vdev cp stats object is null");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+		return;
+	}
+
+	wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
+	vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
+	vdev_mc_stats->num_recv_bcn_stats = 0;
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++)
+		vdev_mc_stats->bcn_stats[i].vdev_id = WLAN_INVALID_VDEV_ID;
+
+	wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+}
+
+/**
+ * tgt_mc_cp_stats_send_recv_bcn_stats() - Send beacon statistics information
+ * @psoc: pointer to psoc object
+ * @ev: pointer to the stats event info
+ *
+ * This function saves the beacon statistics information in bcn_stats of
+ * stats_event structure and send it to upper layer.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+tgt_mc_cp_stats_send_recv_bcn_stats(struct wlan_objmgr_psoc *psoc,
+				    struct stats_event *ev)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mc_cp_stats *vdev_mc_stats;
+	struct vdev_cp_stats *vdev_cp_stats_priv;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct request_info last_req = {0};
+	uint8_t i;
+
+	if (!wlan_cp_stats_is_bcn_rssi_history_report_cfg_enable(psoc))
+		return status;
+
+	status = ucfg_mc_cp_stats_get_pending_req(psoc,
+						  TYPE_STATION_STATS,
+						  &last_req);
+	if (QDF_IS_STATUS_ERROR(status))
+		return QDF_STATUS_E_FAILURE;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, last_req.vdev_id,
+						    WLAN_CP_STATS_ID);
+	if (!vdev) {
+		cp_stats_err("vdev object is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev_cp_stats_priv = wlan_cp_stats_get_vdev_stats_obj(vdev);
+	if (!vdev_cp_stats_priv) {
+		cp_stats_err("vdev cp stats object is null");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
+	vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
+	if (!vdev_mc_stats || !vdev_mc_stats->num_recv_bcn_stats)
+		goto end;
+
+	ev->bcn_stats = qdf_mem_malloc(
+			sizeof(*ev->bcn_stats) *
+			vdev_mc_stats->num_recv_bcn_stats);
+	if (!ev->bcn_stats) {
+		status = QDF_STATUS_E_NOMEM;
+		cp_stats_err("Error:%d bcn_stats memory allocation failed",
+			     status);
+		goto end;
+	}
+
+	ev->num_recv_bcn_stats = 0;
+	for (i = 0; i < vdev_mc_stats->num_recv_bcn_stats; i++) {
+		ev->bcn_stats[i].vdev_id = vdev_mc_stats->bcn_stats[i].vdev_id;
+		qdf_mem_copy(&ev->bcn_stats[i].bcn_history,
+			     &vdev_mc_stats->bcn_stats[i].bcn_history,
+			     sizeof(vdev_mc_stats->bcn_stats[i].bcn_history));
+		ev->num_recv_bcn_stats++;
+	}
+end:
+	wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+
+	return status;
+}
+
 static QDF_STATUS
 tgt_send_vdev_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
 			  struct stats_event *ev,
@@ -1085,10 +1210,6 @@ tgt_send_vdev_mc_cp_stats(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_copy(&ev->vdev_extd_stats[0],
 		     &vdev_mc_stats->vdev_extd_stats,
 		     sizeof(vdev_mc_stats->vdev_extd_stats));
-
-	if (ev->bcn_stats)
-		qdf_mem_copy(&ev->bcn_stats[0], &vdev_mc_stats->bcn_stats,
-			     sizeof(vdev_mc_stats->bcn_stats));
 
 	wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
@@ -1340,13 +1461,6 @@ tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 	    !info.vdev_extd_stats)
 		goto end;
 
-	if (wlan_cp_stats_is_bcn_rssi_history_report_cfg_enable(psoc)) {
-		info.num_recv_bcn_stats = 1;
-		info.bcn_stats = qdf_mem_malloc(sizeof(*info.bcn_stats));
-		if (!info.bcn_stats)
-			goto end;
-	}
-
 	status = tgt_send_vdev_mc_cp_stats(psoc, &info, last_req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cp_stats_err("tgt_send_vdev_mc_cp_stats failed");
@@ -1373,6 +1487,9 @@ tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 		cp_stats_err("tgt_send_pdev_mc_cp_stats failed");
 		goto end;
 	}
+
+	status = tgt_mc_cp_stats_send_recv_bcn_stats(psoc, &info);
+
 end:
 	get_station_stats_cb(&info, last_req->cookie);
 
@@ -1421,7 +1538,7 @@ tgt_mc_cp_stats_extract_vdev_bcn_rssi_history(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	struct vdev_mc_cp_stats *vdev_mc_stats;
 	struct vdev_cp_stats *vdev_cp_stats_priv;
-	uint8_t i, vdev_id;
+	uint8_t i, j, ev_vdev_id, existing_vdev_id;
 
 	status = ucfg_mc_cp_stats_get_pending_req(psoc,
 						  TYPE_STATION_STATS,
@@ -1432,32 +1549,52 @@ tgt_mc_cp_stats_extract_vdev_bcn_rssi_history(struct wlan_objmgr_psoc *psoc,
 	if (!ev->bcn_stats || !ev->num_recv_bcn_stats)
 		return;
 
-	for (i = 0; i < ev->num_recv_bcn_stats; i++) {
-		vdev_id = ev->bcn_stats[i].vdev_id;
-
-		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-							    WLAN_CP_STATS_ID);
-
-		if (!vdev) {
-			cp_stats_err("vdev is null");
-			return;
-		}
-
-		vdev_cp_stats_priv = wlan_cp_stats_get_vdev_stats_obj(vdev);
-		if (!vdev_cp_stats_priv) {
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
-			return;
-		}
-
-		wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
-		vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
-		qdf_mem_copy(&vdev_mc_stats->bcn_stats,
-			     &ev->bcn_stats[i],
-			     sizeof(vdev_mc_stats->bcn_stats));
-
-		wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, last_req.vdev_id,
+						    WLAN_CP_STATS_ID);
+	if (!vdev) {
+		cp_stats_err("vdev is null");
+		return;
 	}
+
+	vdev_cp_stats_priv = wlan_cp_stats_get_vdev_stats_obj(vdev);
+	if (!vdev_cp_stats_priv) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
+		return;
+	}
+
+	wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
+	vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
+	if (!vdev_mc_stats)
+		goto end;
+
+	for (i = 0; i < ev->num_recv_bcn_stats; i++) {
+		ev_vdev_id = ev->bcn_stats[i].vdev_id;
+
+		for (j = 0; j < WLAN_UMAC_MLO_MAX_VDEVS; j++) {
+			existing_vdev_id =
+				vdev_mc_stats->bcn_stats[j].vdev_id;
+
+			if (existing_vdev_id == ev_vdev_id ||
+			    existing_vdev_id == WLAN_INVALID_VDEV_ID) {
+				if (existing_vdev_id == WLAN_INVALID_VDEV_ID &&
+				    vdev_mc_stats->num_recv_bcn_stats <
+				    WLAN_UMAC_MLO_MAX_VDEVS)
+					vdev_mc_stats->num_recv_bcn_stats++;
+
+				vdev_mc_stats->bcn_stats[j].vdev_id =
+								ev_vdev_id;
+				qdf_mem_copy(&vdev_mc_stats->bcn_stats[j].bcn_history,
+					     &ev->bcn_stats[i].bcn_history,
+					     sizeof(struct bcn_his_info) *
+					     WMI_MAX_BCN_HISTORY);
+				break;
+			}
+		}
+	}
+
+end:
+	wlan_cp_stats_vdev_obj_unlock(vdev_cp_stats_priv);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_CP_STATS_ID);
 }
 
 static void tgt_mc_cp_stats_extract_station_stats(
@@ -1492,9 +1629,12 @@ static void tgt_mc_cp_stats_extract_station_stats(
 		ucfg_mc_cp_stats_reset_pending_req(psoc, TYPE_STATION_STATS,
 						   &last_req,
 						   &pending);
-		if (pending && last_req.u.get_station_stats_cb)
+		if (pending && last_req.u.get_station_stats_cb) {
 			tgt_mc_cp_stats_prepare_n_send_raw_station_stats(
 							psoc, &last_req);
+			tgt_mc_cp_stats_reset_num_recv_bcn_stats(psoc,
+								 &last_req);
+		}
 	}
 }
 
