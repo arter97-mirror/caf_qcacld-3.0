@@ -1700,26 +1700,6 @@
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_NONE   (SIOCIWFIRSTPRIV + 6)
 
-/*
- * <ioctl>
- * reassoc - Trigger STA re-association to the connected AP
- *
- * @INPUT: None
- *
- * @OUTPUT: None
- *
- * This IOCTL is used to trigger STA reassociation to the connected AP.
- *
- * @E.g: iwpriv wlan0 reassoc
- *
- * Supported Feature: Roaming
- *
- * Usage: Internal
- *
- * </ioctl>
- */
-#define WE_SET_REASSOC_TRIGGER     8
-
 /* Sub ioctls 11 to 16 are not used */
 #define WE_GET_FW_PROFILE_DATA     18
 /*
@@ -5418,23 +5398,6 @@ static int __iw_setnone_getnone(struct net_device *dev,
 				0, DBG_CMD);
 		break;
 
-	case WE_SET_REASSOC_TRIGGER:
-	{
-		struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-		qdf_freq_t chan_freq =
-			wlan_get_operation_chan_freq(adapter->deflink->vdev);
-		struct qdf_mac_addr target_bssid;
-
-		wlan_mlme_get_bssid_vdev_id(hdd_ctx->pdev,
-					    adapter->deflink->vdev_id,
-					    &target_bssid);
-		ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev,
-					 adapter->deflink->vdev_id,
-					 &target_bssid, chan_freq,
-					 CM_ROAMING_USER);
-		return 0;
-	}
-
 	case WE_STOP_OBSS_SCAN:
 		/*
 		 * 1.OBSS Scan is mandatory while operating in 2.4GHz
@@ -7765,11 +7728,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 0,
 	 "getProfileData"},
-
-	{WE_SET_REASSOC_TRIGGER,
-	0,
-	0,
-	"reassoc"},
 
 	{WE_STOP_OBSS_SCAN,
 	 0,
