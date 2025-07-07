@@ -1178,90 +1178,6 @@ static iw_softap_getparam(struct net_device *dev,
 	return errno;
 }
 
-/* Usage:
- *  DENY_LIST  = 0
- *  ALLOW_LIST  = 1
- *  ADD MAC = 0
- *  REMOVE MAC  = 1
- *
- *  mac addr will be accepted as a 6 octet mac address with each octet
- *  inputted in hex for e.g. 00:0a:f5:11:22:33 will be represented as
- *  0x00 0x0a 0xf5 0x11 0x22 0x33 while using this ioctl
- *
- *  Syntax:
- *  iwpriv softap.0 modify_acl
- *  <6 octet mac addr> <list type> <cmd type>
- *
- *  Examples:
- *  eg 1. to add a mac addr 00:0a:f5:89:89:90 to the deny list
- *  iwpriv softap.0 modify_acl 0x00 0x0a 0xf5 0x89 0x89 0x90 0 0
- *  eg 2. to delete a mac addr 00:0a:f5:89:89:90 from allow list
- *  iwpriv softap.0 modify_acl 0x00 0x0a 0xf5 0x89 0x89 0x90 1 1
- */
-static
-int __iw_softap_modify_acl(struct net_device *dev,
-			   struct iw_request_info *info,
-			   union iwreq_data *wrqu, char *extra)
-{
-	struct hdd_adapter *adapter = (netdev_priv(dev));
-	uint8_t *value = (uint8_t *) extra;
-	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
-	int list_type, cmd, i;
-	int ret;
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	struct hdd_context *hdd_ctx;
-
-	hdd_enter_dev(dev);
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
-
-	ret = hdd_check_private_wext_control(hdd_ctx, info);
-	if (0 != ret)
-		return ret;
-
-	for (i = 0; i < QDF_MAC_ADDR_SIZE; i++)
-		peer_mac[i] = *(value + i);
-
-	list_type = (int)(*(value + i));
-	i++;
-	cmd = (int)(*(value + i));
-
-	hdd_debug("Modify ACL mac:" QDF_MAC_ADDR_FMT " type: %d cmd: %d",
-	       QDF_MAC_ADDR_REF(peer_mac), list_type, cmd);
-
-	qdf_status = wlansap_modify_acl(
-		WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink),
-		peer_mac, (eSapACLType) list_type, (eSapACLCmdType) cmd);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		hdd_err("Modify ACL failed");
-		ret = -EIO;
-	}
-	hdd_exit();
-	return ret;
-}
-
-static
-int iw_softap_modify_acl(struct net_device *dev,
-			 struct iw_request_info *info,
-			 union iwreq_data *wrqu, char *extra)
-{
-	int errno;
-	struct osif_vdev_sync *vdev_sync;
-
-	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __iw_softap_modify_acl(dev, info, wrqu, extra);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-
 int
 static __iw_softap_getchannel(struct net_device *dev,
 			      struct iw_request_info *info,
@@ -2330,13 +2246,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 #endif /* FW_THERMAL_THROTTLE_SUPPORT */
 	/* handlers for main ioctl */
 	{
-		QCSAP_IOCTL_MODIFY_ACL,
-		IW_PRIV_TYPE_BYTE | IW_PRIV_SIZE_FIXED | 8, 0, "modify_acl"
-	}
-	,
-
-	/* handlers for main ioctl */
-	{
 		QCSAP_IOCTL_SET_TX_POWER,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "setTxPower"
 	}
@@ -2456,8 +2365,6 @@ static const iw_handler hostapd_private[] = {
 	[QCSAP_IOCTL_PRIV_SET_VAR_INT_GET_NONE -
 	 SIOCIWFIRSTPRIV] =
 		iw_set_var_ints_getnone,
-	[QCSAP_IOCTL_MODIFY_ACL - SIOCIWFIRSTPRIV] =
-		iw_softap_modify_acl,
 	[QCSAP_IOCTL_GET_BA_AGEING_TIMEOUT - SIOCIWFIRSTPRIV] =
 		iw_softap_get_ba_timeout,
 	[QCSAP_IOCTL_PRIV_GET_RSSI - SIOCIWFIRSTPRIV] =
