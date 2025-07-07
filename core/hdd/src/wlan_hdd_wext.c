@@ -1898,7 +1898,6 @@
  */
 #define WE_SET_TXRX_STATS    24
 
-#define WE_MOTION_DET_CONFIG_PARAM                25
 #define WE_SET_THERMAL_THROTTLE_CFG               27
 /*
  * <ioctl>
@@ -5959,37 +5958,6 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 					     &req);
 		break;
 	}
-#ifdef WLAN_FEATURE_MOTION_DETECTION
-	case WE_MOTION_DET_CONFIG_PARAM:
-	{
-		struct sme_motion_det_cfg motion_det_cfg;
-
-		if (num_args != 15) {
-			hdd_err_rl("mt_config: Invalid no of args");
-			return -EINVAL;
-		}
-
-		motion_det_cfg.vdev_id = adapter->deflink->vdev_id;
-		motion_det_cfg.time_t1 = apps_args[0];
-		motion_det_cfg.time_t2 = apps_args[1];
-		motion_det_cfg.n1 = apps_args[2];
-		motion_det_cfg.n2 = apps_args[3];
-		motion_det_cfg.time_t1_gap = apps_args[4];
-		motion_det_cfg.time_t2_gap = apps_args[5];
-		motion_det_cfg.coarse_K = apps_args[6];
-		motion_det_cfg.fine_K = apps_args[7];
-		motion_det_cfg.coarse_Q = apps_args[8];
-		motion_det_cfg.fine_Q = apps_args[9];
-		motion_det_cfg.md_coarse_thr_high = apps_args[10];
-		motion_det_cfg.md_fine_thr_high = apps_args[11];
-		motion_det_cfg.md_coarse_thr_low = apps_args[12];
-		motion_det_cfg.md_fine_thr_low = apps_args[13];
-		adapter->motion_detection_mode = apps_args[14];
-		sme_motion_det_config(hdd_ctx->mac_handle, &motion_det_cfg);
-		adapter->motion_det_cfg =  true;
-	}
-	break;
-#endif /* WLAN_FEATURE_MOTION_DETECTION */
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 	case WE_SET_THERMAL_THROTTLE_CFG:
 	{
@@ -8536,11 +8504,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "mt_start"},
-
-	{WE_MOTION_DET_CONFIG_PARAM,
-	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
-	 0,
-	 "mt_config"},
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 };
 
