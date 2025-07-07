@@ -891,26 +891,6 @@
 
 /*
  * <ioctl>
- * range_ext - enable Range extension
- *
- * @INPUT: 0/1
- *
- * @OUTPUT: None
- *
- * This IOCTL enables/disables Range extension.
- *
- * @E.g: iwpriv wlan0 range_ext <1/0>
- *
- * Supported Feature: STA/SAP
- *
- * Usage: Internal
- *
- * </ioctl>
- */
-#define WE_SET_RANGE_EXT                      93
-
-/*
- * <ioctl>
  * wow_ito - sets the timeout value for inactivity data while
  * in power save mode during wow
  *
@@ -3630,46 +3610,6 @@ hdd_we_set_early_rx_drift_sample(struct wlan_hdd_link_info *link_info,
 }
 
 #define MAX_VDEV_HE_RANGE_PARAMS 2
-/* params being sent:
- * wmi_vdev_param_he_range_ext
- * wmi_vdev_param_non_data_he_range_ext
- */
-
-static int hdd_we_set_range_ext(struct wlan_hdd_link_info *link_info,
-				int value)
-{
-	int status;
-	struct dev_set_param setparam[MAX_VDEV_HE_RANGE_PARAMS] = {};
-	uint8_t index = 0;
-
-	status = mlme_check_index_setparam(setparam,
-					   wmi_vdev_param_he_range_ext,
-					   value, index++,
-					   MAX_VDEV_HE_RANGE_PARAMS);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("failed at wmi_vdev_param_he_range_ext");
-		goto error;
-	}
-
-	status = mlme_check_index_setparam(setparam,
-					   wmi_vdev_param_non_data_he_range_ext,
-					   value, index++,
-					   MAX_VDEV_HE_RANGE_PARAMS);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("failed at wmi_vdev_param_non_data_he_range_ext");
-		goto error;
-	}
-
-	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
-						     link_info->vdev_id,
-						     setparam, index);
-	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err("Failed to send vdev set params");
-
-error:
-	return status;
-}
-
 static int hdd_we_set_dbg(struct hdd_adapter *adapter,
 			  int id,
 			  const char *id_string,
@@ -3946,7 +3886,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_CHANNEL] = hdd_we_set_channel,
 	[WE_SET_CONC_SYSTEM_PREF] = hdd_we_set_conc_system_pref,
 	[WE_SET_11AX_RATE] = hdd_we_set_11ax_rate,
-	[WE_SET_RANGE_EXT] = hdd_we_set_range_ext,
 	[WE_SET_PDEV_RESET] = hdd_handle_pdev_reset,
 	[WE_SET_MODULATED_DTIM] = hdd_we_set_modulated_dtim,
 	[WE_SET_BTCOEX_MODE] = wlan_hdd_set_btcoex_mode,
@@ -7992,11 +7931,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "set_11ax_rate"},
-
-	{WE_SET_RANGE_EXT,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "range_ext"},
 
 	{WLAN_PRIV_SET_FTIES,
 	 IW_PRIV_TYPE_CHAR | MAX_FTIE_SIZE,
