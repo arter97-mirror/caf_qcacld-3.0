@@ -1900,8 +1900,6 @@
 #define WE_SET_TXRX_STATS    24
 
 #define WE_MOTION_DET_CONFIG_PARAM                25
-#define WE_MOTION_DET_BASE_LINE_CONFIG_PARAM      26
-
 #define WE_SET_THERMAL_THROTTLE_CFG               27
 /*
  * <ioctl>
@@ -6028,24 +6026,6 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 		adapter->motion_det_cfg =  true;
 	}
 	break;
-	case WE_MOTION_DET_BASE_LINE_CONFIG_PARAM:
-	{
-		struct sme_motion_det_base_line_cfg motion_det_base_line_cfg;
-
-		if (num_args != 4) {
-			hdd_err_rl("mt_bl_config: Invalid no of args");
-			return -EINVAL;
-		}
-
-		motion_det_base_line_cfg.vdev_id = adapter->deflink->vdev_id;
-		motion_det_base_line_cfg.bl_time_t = apps_args[0];
-		motion_det_base_line_cfg.bl_packet_gap = apps_args[1];
-		motion_det_base_line_cfg.bl_n = apps_args[2];
-		motion_det_base_line_cfg.bl_num_meas = apps_args[3];
-		sme_motion_det_base_line_config(hdd_ctx->mac_handle,
-						&motion_det_base_line_cfg);
-	}
-	break;
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 #ifdef FW_THERMAL_THROTTLE_SUPPORT
 	case WE_SET_THERMAL_THROTTLE_CFG:
@@ -8603,11 +8583,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
 	 0,
 	 "mt_config"},
-
-	{WE_MOTION_DET_BASE_LINE_CONFIG_PARAM,
-	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
-	 0,
-	 "mt_bl_config"},
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 };
 
