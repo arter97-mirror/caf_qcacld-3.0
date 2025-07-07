@@ -757,15 +757,6 @@ static __iw_softap_setparam(struct net_device *dev,
 
 		break;
 	}
-	case QCASAP_TX_CHAINMASK_CMD:
-	{
-		hdd_debug("QCASAP_TX_CHAINMASK_CMD val %d", set_value);
-		ret = wma_cli_set_command(link_info->vdev_id,
-					  wmi_pdev_param_tx_chain_mask,
-					  set_value, PDEV_CMD);
-		ret = hdd_set_antenna_mode(link_info, set_value);
-		break;
-	}
 
 	case QCASAP_RX_CHAINMASK_CMD:
 	{
@@ -1092,15 +1083,6 @@ static __iw_softap_getparam(struct net_device *dev,
 			hdd_err("QCSAP_GET_ACL returned Error: not completed");
 		}
 		*value = 0;
-		break;
-	}
-
-	case QCASAP_TX_CHAINMASK_CMD:
-	{
-		hdd_debug("QCASAP_TX_CHAINMASK_CMD");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     wmi_pdev_param_tx_chain_mask,
-					     PDEV_CMD);
 		break;
 	}
 
@@ -1974,11 +1956,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCASAP_SET_RADAR_CMD,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "setRadar"
-	},
-	{
-		QCASAP_TX_CHAINMASK_CMD,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		0, "set_txchainmask"
 	}, {
 		QCASAP_RX_CHAINMASK_CMD,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
@@ -2051,10 +2028,6 @@ static const struct iw_priv_args hostapd_private_args[] = {
 	}, {
 		QCSAP_GET_ACL, 0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 		"get_acl_list"
-	}, {
-		QCASAP_TX_CHAINMASK_CMD, 0,
-		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-		"get_txchainmask"
 	}, {
 		QCASAP_RX_CHAINMASK_CMD, 0,
 		IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,

@@ -290,25 +290,6 @@
 #define WE_SET_DYNAMIC_BW         23
 /*
  * <ioctl>
- * txchainmask - This IOCTL sets the current Tx chain mask
- *
- * @INPUT: Mask Value
- *
- * @OUTPUT: None
- *
- * This IOCTL sets the current Tx chain mask
- *
- * @E.g: iwpriv wlan0 txchainmask 1
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_SET_TX_CHAINMASK  24
-/*
- * <ioctl>
  * rxchainmask - Sets the current Rx chain mask
  *
  * @INPUT: Mask Value
@@ -1158,27 +1139,6 @@
  * </ioctl>
  */
 #define WE_GET_ANI_CCK_LEVEL      22
-/*
- * <ioctl>
- * get_txchainmask - Get the txchainmask that was set
- *
- * @INPUT: None
- *
- * @OUTPUT: txchainmask
- *  wlan0     get_txchainmask:1
- *
- * This IOCTL gets the txchainmask that was set
- * This command is useful if it was previously set
- *
- * @E.g: iwpriv wlan0 get_txchainmask
- *
- * Supported Feature: STA
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_GET_TX_CHAINMASK  24
 /*
  * <ioctl>
  * get_rxchainmask - Get the rxchainmask that was set
@@ -3396,20 +3356,6 @@ static int hdd_we_set_cts_cbw(struct wlan_hdd_link_info *link_info,
 			       value);
 }
 
-static int hdd_we_set_tx_chainmask(struct wlan_hdd_link_info *link_info,
-				   int value)
-{
-	int errno;
-
-	errno = hdd_we_set_pdev(link_info->adapter,
-				wmi_pdev_param_tx_chain_mask,
-				value);
-	if (errno)
-		return errno;
-
-	return hdd_set_antenna_mode(link_info, value);
-}
-
 static int hdd_we_set_rx_chainmask(struct wlan_hdd_link_info *link_info,
 				   int value)
 {
@@ -3784,7 +3730,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_VHT_RATE] = hdd_we_set_vht_rate,
 	[WE_SET_AMPDU] = hdd_we_set_ampdu,
 	[WE_SET_AMSDU] = hdd_we_set_amsdu,
-	[WE_SET_TX_CHAINMASK] = hdd_we_set_tx_chainmask,
 	[WE_SET_RX_CHAINMASK] = hdd_we_set_rx_chainmask,
 	[WE_SET_TXPOW_2G] = hdd_we_set_txpow_2g,
 	[WE_SET_TXPOW_5G] = hdd_we_set_txpow_5g,
@@ -4374,15 +4319,6 @@ static int __iw_setnone_getint(struct net_device *dev,
 		*value = wma_cli_get_command(adapter->deflink->vdev_id,
 					     GEN_VDEV_ROAM_SYNCH_DELAY,
 					     GEN_CMD);
-		break;
-	}
-
-	case WE_GET_TX_CHAINMASK:
-	{
-		hdd_debug("GET wmi_pdev_param_tx_chain_mask");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     wmi_pdev_param_tx_chain_mask,
-					     PDEV_CMD);
 		break;
 	}
 
@@ -7134,11 +7070,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "gtxMinTpc"},
 
-	{WE_SET_TX_CHAINMASK,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "txchainmask"},
-
 	{WE_SET_RX_CHAINMASK,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
@@ -7429,11 +7360,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 "get_gtxMinTpc"},
-
-	{WE_GET_TX_CHAINMASK,
-	 0,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 "get_txchainmask"},
 
 	{WE_GET_RX_CHAINMASK,
 	 0,
