@@ -1790,26 +1790,6 @@
 
 /*
  * <ioctl>
- * pm_cinfo - Shows the concurrent connection list.
- *
- * @INPUT: None
- *
- * @OUTPUT: None
- *
- * This IOCTL is used to show the concurrent connection list.
- *
- * @E.g: iwpriv wlan0 pm_cinfo
- *
- * Supported Feature: DBS
- *
- * Usage: Internal/External
- *
- * </ioctl>
- */
-#define WE_POLICY_MANAGER_CINFO_CMD    15
-
-/*
- * <ioctl>
  * ch_avoid - unit test SAP channel avoidance
  *
  * @INPUT: chan avoid ranges
@@ -5729,35 +5709,6 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 	}
 	break;
 
-	case WE_POLICY_MANAGER_CINFO_CMD:
-	{
-		struct policy_mgr_conc_connection_info *conn_info;
-		uint32_t i = 0, len = 0;
-
-		hdd_info("<iwpriv wlan0 pm_cinfo> is called");
-		conn_info = policy_mgr_get_conn_info(&len);
-		pr_info("+--------------------------+\n");
-		for (i = 0; i < len; i++) {
-			if (!conn_info->in_use)
-				continue;
-
-			pr_info("|table_index[%d]\t\t\n", i);
-			pr_info("|\t|vdev_id - %-10d|\n", conn_info->vdev_id);
-			pr_info("|\t|freq    - %-10d|\n", conn_info->freq);
-			pr_info("|\t|bw      - %-10d|\n", conn_info->bw);
-			pr_info("|\t|mode    - %-10d|\n", conn_info->mode);
-			pr_info("|\t|mac_id  - %-10d|\n", conn_info->mac);
-			pr_info("|\t|in_use  - %-10d|\n", conn_info->in_use);
-			pr_info("+--------------------------+\n");
-			conn_info++;
-		}
-
-		pr_info("|\t|current state dbs - %-10d, sbs - %-10d|\n",
-			policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc),
-			policy_mgr_is_current_hwmode_sbs(hdd_ctx->psoc));
-	}
-	break;
-
 	case WE_UNIT_TEST_CMD:
 	{
 		QDF_STATUS status;
@@ -7903,11 +7854,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 0,
 	 "dumplog"},
 #endif
-
-	{WE_POLICY_MANAGER_CINFO_CMD,
-	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
-	 0,
-	 "pm_cinfo"},
 
 	{WE_UNIT_TEST_CMD,
 	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
