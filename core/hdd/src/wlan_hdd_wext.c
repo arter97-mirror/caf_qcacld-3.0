@@ -981,7 +981,6 @@
 #define WE_SET_MODULATED_DTIM                   96
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION
-#define WE_MOTION_DET_START_STOP                97
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
 /*
@@ -3849,53 +3848,6 @@ static int hdd_we_set_modulated_dtim(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
-#ifdef WLAN_FEATURE_MOTION_DETECTION
-/**
- * hdd_we_motion_det_start_stop - start/stop motion detection
- * @link_info: Link info pointer in HDD adapter
- * @value: start/stop value to set
- *
- * Return: 0 on success, error on failure
- */
-static int hdd_we_motion_det_start_stop(struct wlan_hdd_link_info *link_info,
-					int value)
-{
-	struct sme_motion_det_en motion_det;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-
-	if (value < 0 || value > 1) {
-		hdd_err("Invalid value %d in mt_start", value);
-		return -EINVAL;
-	}
-
-	if (!adapter->motion_det_cfg) {
-		hdd_err("Motion Detection config values not available");
-		return -EINVAL;
-	}
-
-	if (!adapter->motion_det_baseline_value) {
-		hdd_err("Motion Detection Baselining not started/completed");
-		return -EAGAIN;
-	}
-
-	motion_det.vdev_id = link_info->vdev_id;
-	motion_det.enable = value;
-
-	if (value) {
-		/* For motion detection start, set motion_det_in_progress */
-		adapter->motion_det_in_progress = true;
-	} else {
-		/* For motion detection stop, reset motion_det_in_progress */
-		adapter->motion_det_in_progress = false;
-		adapter->motion_detection_mode = 0;
-	}
-
-	sme_motion_det_enable(hdd_ctx->mac_handle, &motion_det);
-
-	return 0;
-}
-#endif /* WLAN_FEATURE_MOTION_DETECTION */
-
 int wlan_hdd_set_btcoex_mode(struct wlan_hdd_link_info *link_info, int value)
 {
 	struct coex_config_params coex_cfg_params = {0};
@@ -4023,9 +3975,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_RANGE_EXT] = hdd_we_set_range_ext,
 	[WE_SET_PDEV_RESET] = hdd_handle_pdev_reset,
 	[WE_SET_MODULATED_DTIM] = hdd_we_set_modulated_dtim,
-#ifdef WLAN_FEATURE_MOTION_DETECTION
-	[WE_MOTION_DET_START_STOP] = hdd_we_motion_det_start_stop,
-#endif /* WLAN_FEATURE_MOTION_DETECTION */
 	[WE_SET_BTCOEX_MODE] = wlan_hdd_set_btcoex_mode,
 	[WE_SET_BTCOEX_RSSI_THRESHOLD] = wlan_hdd_set_btcoex_rssi_threshold,
 };
@@ -8498,13 +8447,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_CHAR | MAX_FTIE_SIZE,
 	 0,
 	 "set_ft_ies"},
-
-#ifdef WLAN_FEATURE_MOTION_DETECTION
-	{WE_MOTION_DET_START_STOP,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "mt_start"},
-#endif /* WLAN_FEATURE_MOTION_DETECTION */
 };
 
 const struct iw_handler_def we_handler_def = {
