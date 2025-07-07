@@ -982,7 +982,6 @@
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION
 #define WE_MOTION_DET_START_STOP                97
-#define WE_MOTION_DET_BASE_LINE_START_STOP      98
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
 /*
@@ -3896,40 +3895,6 @@ static int hdd_we_motion_det_start_stop(struct wlan_hdd_link_info *link_info,
 
 	return 0;
 }
-
-/**
- * hdd_we_motion_det_base_line_start_stop - start/stop md baselining
- * @link_info: Link info pointer in HDD adapter
- * @value: start/stop value to set
- *
- * Return: 0 on success, error on failure
- */
-static int
-hdd_we_motion_det_base_line_start_stop(struct wlan_hdd_link_info *link_info,
-				       int value)
-{
-	struct hdd_adapter *adapter = link_info->adapter;
-	struct sme_motion_det_base_line_en motion_det_base_line;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-
-	if (value < 0 || value > 1) {
-		hdd_err("Invalid value %d in mt_bl_start", value);
-		return -EINVAL;
-	}
-
-	/* Do not send baselining start/stop during motion detection phase */
-	if (adapter->motion_det_in_progress) {
-		hdd_err("Motion detection still in progress, try later");
-		return -EAGAIN;
-	}
-
-	motion_det_base_line.vdev_id = link_info->vdev_id;
-	motion_det_base_line.enable = value;
-	sme_motion_det_base_line_enable(hdd_ctx->mac_handle,
-					&motion_det_base_line);
-
-	return 0;
-}
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 
 int wlan_hdd_set_btcoex_mode(struct wlan_hdd_link_info *link_info, int value)
@@ -4061,8 +4026,6 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_MODULATED_DTIM] = hdd_we_set_modulated_dtim,
 #ifdef WLAN_FEATURE_MOTION_DETECTION
 	[WE_MOTION_DET_START_STOP] = hdd_we_motion_det_start_stop,
-	[WE_MOTION_DET_BASE_LINE_START_STOP] =
-				hdd_we_motion_det_base_line_start_stop,
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 	[WE_SET_BTCOEX_MODE] = wlan_hdd_set_btcoex_mode,
 	[WE_SET_BTCOEX_RSSI_THRESHOLD] = wlan_hdd_set_btcoex_rssi_threshold,
@@ -8573,11 +8536,6 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "mt_start"},
-
-	{WE_MOTION_DET_BASE_LINE_START_STOP,
-	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	 0,
-	 "mt_bl_start"},
 
 	{WE_MOTION_DET_CONFIG_PARAM,
 	 IW_PRIV_TYPE_INT | MAX_VAR_ARGS,
