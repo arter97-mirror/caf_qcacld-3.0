@@ -51,6 +51,8 @@ set_service_class_params_policy[QCA_WLAN_VENDOR_ATTR_SDWF_SVC_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_SDWF_SVC_BUFFER_LATENCY_TOLERANCE] = { .type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TX_TRIGGER_DSCP] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TX_REPLACE_DSCP] = { .type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_SDWF_SVC_ENABLE_TWT_TRAFFIC_END] = {
+		.type = NLA_FLAG },
 };
 
 static bool is_lapb_enabled(void)
@@ -179,6 +181,12 @@ os_if_dp_service_class_set_cmd(struct nlattr *svc_params[])
 		svc_data.flags |= DP_SVC_FLAGS_SVC_TID;
 	}
 
+	cmd_id = QCA_WLAN_VENDOR_ATTR_SDWF_SVC_ENABLE_TWT_TRAFFIC_END;
+	if (tb[cmd_id]) {
+		svc_data.en_twt_end_indication = nla_get_flag(tb[cmd_id]);
+		svc_data.flags |= DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END;
+	}
+
 	status = svc_validate_data(&svc_data);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		osif_err("Invalid input data");
@@ -288,6 +296,8 @@ os_if_dp_service_class_get_cmd(struct wiphy *wiphy, struct nlattr *svc_params[])
 		if (svc_table[i].flags & DP_SVC_FLAGS_SVC_TID)
 			nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_SDWF_SVC_TID,
 				   svc_table[i].override_tid);
+		if (svc_table[i].flags & DP_SVC_FLAGS_ENABLE_TWT_TRAFFIC_END)
+			nla_put_flag(skb, QCA_WLAN_VENDOR_ATTR_SDWF_SVC_ENABLE_TWT_TRAFFIC_END);
 
 		nla_nest_end(skb, svc_info);
 	}
