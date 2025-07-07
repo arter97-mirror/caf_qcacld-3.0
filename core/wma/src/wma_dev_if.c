@@ -3298,6 +3298,17 @@ wma_get_keep_sta_alive_method(struct wlan_objmgr_psoc *psoc, uint32_t *method)
 	}
 }
 
+static bool wma_is_apf_mode_allowed(struct vdev_mlme_obj *vdev_mlme,
+				    struct wlan_objmgr_vdev *vdev,
+				    tp_wma_handle wma_handle)
+{
+	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
+	    ucfg_pmo_is_apf_enabled(wma_handle->psoc) &&
+	    wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)
+		return true;
+	return false;
+}
+
 QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -3313,6 +3324,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	enum wmi_host_active_apf_mode uc_mode, mcbc_mode;
 	uint32_t offload_bitmap;
 	uint32_t apf_mode;
+	bool is_apf_allowed;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -3389,8 +3401,8 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 		wma_err("Failed to get value for WNI_CFG_ENABLE_MCC_ADAPTIVE_SCHED, leaving unchanged");
 	}
 
-	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
-	    ucfg_pmo_is_apf_enabled(wma_handle->psoc) &&
+	is_apf_allowed = wma_is_apf_mode_allowed(vdev_mlme, vdev, wma_handle);
+	if (is_apf_allowed &&
 	    !ucfg_pmo_is_configure_apf_per_screen_state(wma_handle->psoc)) {
 		uc_mode = wma_get_fw_active_apf_mode(
 					wma_handle->active_uc_apf_mode);
@@ -3405,8 +3417,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 			wma_err("Failed to configure active APF mode");
 	}
 
-	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
-	    ucfg_pmo_is_apf_enabled(wma_handle->psoc) &&
+	if (is_apf_allowed &&
 	    wmi_service_enabled(wma_handle->wmi_handle,
 				wmi_service_apf_data_offload_support_enabled)) {
 		offload_bitmap = ucfg_pmo_get_apfv6_offload_bitmap(
@@ -3419,8 +3430,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 			wma_err("Failed to configure APF supported offload bitmap");
 	}
 
-	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
-	    ucfg_pmo_is_apf_enabled(wma_handle->psoc) &&
+	if (is_apf_allowed &&
 	    ucfg_pmo_is_apf_mode_enabled(wma_handle->psoc)) {
 		apf_mode = ucfg_pmo_get_apf_mode(wma_handle->psoc);
 		ret = wmi_unified_set_apf_mode_bitmap_cmd(
