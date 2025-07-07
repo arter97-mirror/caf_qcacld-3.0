@@ -7259,7 +7259,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	ret = 0;
 	if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) ||
 	    !WLAN_REG_IS_24GHZ_CH_FREQ(config->chan_freq)) {
-		ret = wlan_hdd_sap_cfg_dfs_override(adapter);
+		ret = wlan_hdd_sap_cfg_dfs_override(link_info);
 		if (ret < 0)
 			goto error;
 	}
