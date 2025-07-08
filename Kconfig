@@ -273,7 +273,7 @@ config DP_MEM_PRE_ALLOC
 	default n
 
 config DBR_HOLD_LARGE_MEM
-	bool "Enable DP_MEM_PRE_ALLOC"
+	bool "Enable DBR_HOLD_LARGE_MEM"
 	default n
 
 config DUMP_REO_QUEUE_INFO_IN_DDR
@@ -2120,10 +2120,6 @@ config LL_DP_SUPPORT_NON_LITH
 	bool "ENABLE CONFIG_LL_DP_SUPPORT_NON_LITH"
 	default n
 
-config LL_DP_SUPPORT
-    bool "enable CONFIG_LL_DP_SUPPORT"
-    default n
-
 config QCA_SUPPORT_TX_THROTTLE_NON_LITH
 	bool "Enable CONFIG_QCA_SUPPORT_TX_THROTTLE_NON_LITH"
 	default n
@@ -2198,10 +2194,6 @@ config CFG80211_MLD_AP_STA_CONNECT_UPSTREAM_SUPPORT
 
 config DP_MULTIPASS_SUPPORT
 	bool "enable CONFIG_DP_MULTIPASS_SUPPORT"
-	default n
-
-config WLAN_FEATURE_LL_LT_SAP
-	bool "enable CONFIG_WLAN_FEATURE_LL_LT_SAP"
 	default n
 
 config WLAN_DP_VDEV_NO_SELF_PEER
@@ -2287,10 +2279,6 @@ config BCN_RATECODE_ENABLE
 config WLAN_DP_TXPOOL_SHARE
 	bool "enable CONFIG_WLAN_DP_TXPOOL_SHARE"
 	default n
-
-config WLAN_SYSFS
-    bool "enable WLAN SYSFS"
-    default n
 
 config WLAN_SYSFS_RF_TEST_MODE
 	bool "enable CONFIG_WLAN_SYSFS_RF_TEST_MODE"
@@ -2877,21 +2865,9 @@ config IPA_WDI_UNIFIED_API
     bool "ipa wdi unified API"
     default n
 
-config REMOVE_PKT_LOG
-    bool "remove pkt log"
-    default n
-
-config MDM_PLATFORM
-    bool "is mdm platform"
-    default n
-
 config FEATURE_IPA_PIPE_CHANGE_WDI1
     bool "ipa pipe change wdi1"
     default n
-
-config NUM_IPA_IFACE
-    int "IPA iface number"
-    default 2
 
 config ENABLE_VALLOC_REPLACE_MALLOC
     bool "replace malloc with valloc"
@@ -2899,22 +2875,6 @@ config ENABLE_VALLOC_REPLACE_MALLOC
 
 config INTRA_BSS_FWD_OFFLOAD
     bool "intra bss fwd offload"
-    default n
-
-config FEATURE_ROAM_DEBUG
-    bool "rome debug"
-    default n
-
-config WMI_ROAM_SUPPORT
-    bool "wmi roam support"
-    default n
-
-config TX_AGGREGATION_SIZE_ENABLE
-    bool "tx aggr size enable"
-    default n
-
-config RX_PERFORMANCE
-    bool "rx performance"
     default n
 
 config AR6320_SUPPORT
@@ -2929,32 +2889,12 @@ config DFS_FCC_TYPE4_DURATION_CHECK
     bool "check DFS FCC TYPE4 duration"
     default n
 
-config QCACLD_WLAN_LFR2
-    bool "wlan LFR2"
-    default n
-
-config FEATURE_WLAN_RA_FILTERING
-    bool "WLAN RA filtering"
-    default n
-
-config WLAN_FEATURE_SAE
-    bool "SAE feature"
-    default n
-
 config PKT_LOG
     bool "enable/disable pkt log"
     default n
 
-config WLAN_TX_FLOW_CONTROL_LEGACY
-    bool "use legacy tx flow control"
-    default n
-
 config WLAN_FEATURE_BMI
     bool "feature BMI"
-    default n
-
-config FEATURE_WLAN_AUTO_SHUTDOWN
-    bool "feature auto shutdown"
     default n
 
 config ALLOC_CONTIGUOUS_MULTI_PAGE
@@ -2981,14 +2921,6 @@ config AR6320_MONITOR_MODE
     bool "Flag for ROME MONITOR MODE"
     default n
 
-config AUTO_PLATFORM
-	bool "enable AUTO_PLATFORM"
-	default n
-
-config QCACLD_FEATURE_BTC_CHAIN_MODE
-	bool "enable QCACLD_FEATURE_BTC_CHAIN_MODE"
-	default n
-
 config SUPPORT_P2P_BY_ONE_INTF_WLAN
 	bool "support p2p by one interface"
 	default n
@@ -2999,10 +2931,6 @@ config WLAN_IPA_TX_FLOW_CONTROL
 
 config QCACLD_FEATURE_COEX_CONFIG
 	bool "bt coex config"
-	default n
-
-config SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
-	bool "shutdown wlan in system suspend"
 	default n
 
 config IPA_P2P_SUPPORT
