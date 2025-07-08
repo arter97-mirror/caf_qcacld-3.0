@@ -1266,6 +1266,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			cm_roam_start_init_on_connect(pdev, vdev_id);
 		}
 		wlan_cm_tgt_send_roam_sync_complete_cmd(psoc, vdev_id);
+		cm_start_roam_key_wait_timer(vdev);
 		mlo_roam_update_connected_links(vdev, connect_rsp);
 		mlo_set_single_link_ml_roaming(psoc, vdev_id,
 					       false);
@@ -1367,12 +1368,27 @@ cm_get_and_disable_link_from_roam_ind(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 }
+
+static bool
+cm_is_ml_opt_roaming(struct roam_offload_synch_ind *roam_sync,
+		     struct wlan_objmgr_vdev *vdev)
+{
+	return mlo_is_offload_roam_in_progress(vdev) &&
+		(roam_sync->num_setup_links > 1);
+}
 #else
 static inline void
 cm_get_and_disable_link_from_roam_ind(struct wlan_objmgr_psoc *psoc,
 				      uint8_t vdev_id,
 				      struct roam_offload_synch_ind *synch_data)
 {}
+
+static inline bool
+cm_is_ml_opt_roaming(struct roam_offload_synch_ind *roam_sync,
+		     struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
 #endif
 QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 {
@@ -1494,11 +1510,21 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 						   REASON_ROAM_HANDOFF_DONE);
 	}
 
-	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
-		wlan_cm_roam_state_change(pdev, vdev_id,
-					  WLAN_ROAM_RSO_ENABLED,
-					  REASON_CONNECT);
-	else
+	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED) {
+		/*
+		 * During MLO roam with partner link bringup offloaded to host,
+		 * disable the RSO until the partner vdev is brought up.
+		 */
+		if (cm_is_ml_opt_roaming(roam_synch_data, cm_ctx->vdev)) {
+			wlan_cm_roam_state_change(pdev, vdev_id,
+						  WLAN_ROAM_RSO_STOPPED,
+						  REASON_DISCONNECTED);
+		} else {
+			wlan_cm_roam_state_change(pdev, vdev_id,
+						  WLAN_ROAM_RSO_ENABLED,
+						  REASON_CONNECT);
+		}
+	} else {
 		/*
 		 * STA is just in associated state here, RSO
 		 * enable will be sent once EAP & EAPOL will be done by
@@ -1514,6 +1540,7 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_RSO_STOPPED,
 					  REASON_DISCONNECTED);
+	}
 	policy_mgr_check_concurrent_intf_and_restart_sap(psoc,
 			wlan_util_vdev_mgr_get_acs_mode_for_vdev(cm_ctx->vdev));
 

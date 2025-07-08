@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1029,6 +1029,7 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 	WMI_ROAM_EVENTID_param_tlvs *param_buf = NULL;
 	struct cm_hw_mode_trans_ind *hw_mode_trans_ind;
 	wmi_pdev_hw_mode_transition_event_fixed_param *hw_mode_trans_param;
+	wmi_roam_partner_link_param *roam_abort_info;
 
 	if (!evt_buf) {
 		wmi_debug("Empty roam_sync_event param buf");
@@ -1064,6 +1065,17 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 			  hw_mode_trans_param->num_vdev_mac_entries,
 			  param_buf->num_wmi_pdev_set_hw_mode_response_vdev_mac_mapping);
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	roam_abort_info = param_buf->partner_link_param;
+	if (roam_abort_info) {
+		roam_event->is_mlo_roam_aborted = true;
+		roam_event->roam_abort_link_bitmap =
+				roam_abort_info->deleted_ieee_link_id_bmap;
+		wmi_debug("Received roam abort link bitmap %x",
+			  roam_event->roam_abort_link_bitmap);
+	} else {
+		roam_event->is_mlo_roam_aborted = false;
 	}
 
 	roam_event->reason =
@@ -4750,6 +4762,8 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 			src_lfr3_params->rct_validity_timer;
 	roam_offload_params->roam_to_current_bss_disable =
 			src_lfr3_params->disable_self_roam;
+	roam_offload_params->mlo_roam_partner_bringup_by_host =
+			src_lfr3_params->mlo_roam_partner_bringup_offload;
 	wmi_debug("RSO_CFG: prefer_5g:%d rssi_cat_gap:%d select_5g_margin:%d ho_delay:%d max_sw_retry:%d no_ack_timeout:%d",
 		  roam_offload_params->prefer_5g,
 		  roam_offload_params->rssi_cat_gap,
@@ -4757,10 +4771,11 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 		  roam_offload_params->handoff_delay_for_rx,
 		  roam_offload_params->max_mlme_sw_retries,
 		  roam_offload_params->no_ack_timeout);
-	wmi_debug("RSO_CFG: reassoc_fail_timeout:%d rct_validity_time:%d disable_self_roam:%d",
+	wmi_debug("RSO_CFG: reassoc_fail_timeout:%d rct_validity_time:%d disable_self_roam:%d mlo_partner_bringup_offload:%d",
 		  roam_offload_params->reassoc_failure_timeout,
 		  roam_offload_params->roam_candidate_validity_time,
-		  roam_offload_params->roam_to_current_bss_disable);
+		  roam_offload_params->roam_to_current_bss_disable,
+		  roam_offload_params->mlo_roam_partner_bringup_by_host);
 
 	/* Fill the capabilities */
 	roam_offload_params->capability = src_lfr3_caps->capability;

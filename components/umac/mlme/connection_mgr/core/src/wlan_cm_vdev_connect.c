@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1618,6 +1618,83 @@ cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
 
 	return status;
 }
+
+QDF_STATUS cm_start_roam_key_wait_timer(struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct vdev_mlme_obj *vdev_mlme;
+
+	if (!mlo_is_offload_roam_in_progress(vdev))
+		return QDF_STATUS_SUCCESS;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlme_err("vdev priv mlme obj is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+	vdev_id = vdev->vdev_objmgr.vdev_id;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlme_err("psoc obj is NULL for vdev id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_err("psoc mlme obj is NULL for vdev id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return qdf_mc_timer_start(&vdev_mlme->ext_vdev_ptr->mlo_key_timer.timer,
+				  5000);
+}
+
+void cm_stop_roam_key_wait_timer(struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	if (!mlo_is_offload_roam_in_progress(vdev))
+		return;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlme_err("vdev priv mlme obj is NULL");
+		return;
+	}
+
+	qdf_mc_timer_stop(&vdev_mlme->ext_vdev_ptr->mlo_key_timer.timer);
+}
+
+void cm_roam_key_event_timeout_handler(void *data)
+{
+	uint8_t vdev_id;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct roam_key_event_wait_timer *mlo_timer =
+		(struct roam_key_event_wait_timer *)data;
+
+	vdev = mlo_timer->vdev;
+	vdev_id = vdev->vdev_objmgr.vdev_id;
+
+	mlme_debug("MLO roam key event timeout for vdev %d", vdev_id);
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlme_err("psoc obj is NULL for vdev id %d", vdev_id);
+		return;
+	}
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_err("psoc mlme obj is NULL for vdev id %d", vdev_id);
+		return;
+	}
+	wlan_cm_disconnect_on_wait_key_timeout(psoc, vdev);
+}
 #else
 static inline QDF_STATUS
 cm_update_tid_mapping(struct wlan_objmgr_vdev *vdev)
@@ -1662,6 +1739,7 @@ cm_install_link_vdev_keys(struct wlan_objmgr_vdev *vdev)
 	link_id = wlan_vdev_get_link_id(vdev);
 
 	if (!mlo_is_set_key_defered(vdev, link_id) &&
+	    !mlo_is_offload_roam_in_progress(vdev) &&
 	    !mlo_mgr_is_link_switch_in_progress(vdev)) {
 		mlme_debug("keys are not deferred for link_id %d", link_id);
 		return;

@@ -1074,14 +1074,11 @@ cm_akm_roam_allowed(struct wlan_objmgr_psoc *psoc,
 
 /**
  * cm_invalid_roam_reason_handler() - Handler for invalid roam reason
- * @vdev_id: vdev id
- * @notif: roam notification of type enum cm_roam_notif
- * @reason: Notif param value from the roam event that carries trigger reason
+ * @roam_event: roam event from firmware
  *
  * Return: QDF_STATUS
  */
-void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif,
-				    uint32_t reason);
+void cm_invalid_roam_reason_handler(struct roam_offload_roam_event *roam_event);
 
 /**
  * cm_handle_roam_reason_ho_failed() - Handler for roam due to ho failure
@@ -1822,6 +1819,15 @@ wlan_cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
 QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  struct wlan_crypto_key_entry *keys,
 					  uint8_t num_keys);
+
+/*
+ * cm_roam_partner_bringup_handler() - Handle the partner link bringup for MLO
+ * roaming
+ * @ml_ctx: Pointer to MLO dev context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_roam_partner_bringup_handler(struct wlan_mlo_dev_context *ml_ctx);
 #else
 static inline
 QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
@@ -1829,6 +1835,12 @@ QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  uint8_t num_keys)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS cm_roam_partner_bringup_handler(struct wlan_mlo_dev_context *ml_ctx)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

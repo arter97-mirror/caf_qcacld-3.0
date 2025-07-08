@@ -1,6 +1,6 @@
  /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -90,6 +90,7 @@
 #include <../../core/src/wlan_cm_roam_i.h>
 #include "wlan_cm_roam_api.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_mlo_mgr_sta.h"
 #include "lim_mlo.h"
 #include "wlan_dp_api.h"
 #ifdef FEATURE_WLAN_EXTSCAN
@@ -735,7 +736,8 @@ wma_roam_update_vdev(tp_wma_handle wma,
 	 */
 	if (!is_multi_link_roam(roam_synch_ind_ptr) ||
 	    wlan_vdev_mlme_get_is_mlo_link(wma->psoc, vdev_id) ||
-	    mlo_get_single_link_ml_roaming(wma->psoc, vdev_id)) {
+	    mlo_get_single_link_ml_roaming(wma->psoc, vdev_id) ||
+	    mlo_is_offload_roam_in_progress(wma->interfaces[vdev_id].vdev)) {
 		status = wma_delete_all_peers(wma, vdev_id);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto end;
@@ -2660,6 +2662,76 @@ void wma_roam_better_ap_handler(tp_wma_handle wma, uint32_t vdev_id)
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline uint32_t
+wma_convert_link_bitmap_to_link_ids(uint32_t link_bitmap, uint8_t link_id_sz,
+				    uint8_t *link_ids)
+{
+	uint32_t i = 0;
+	uint8_t id = 0;
+
+	while (link_bitmap) {
+		if (link_bitmap & 1) {
+			if (id >= 15) {
+				/* warning */
+				wma_err("linkid invalid %d 0x%x",
+					id, link_bitmap);
+				break;
+			}
+			if (link_ids) {
+				if (i >= link_id_sz) {
+					/* warning */
+					wma_err("linkid buff overflow 0x%x",
+						link_bitmap);
+					break;
+				}
+				link_ids[i] = id;
+			}
+			i++;
+		}
+		link_bitmap >>= 1;
+		id++;
+	}
+
+	return i;
+}
+
+static uint32_t
+wma_validate_roam_abort_bitmap(struct wlan_objmgr_vdev *vdev,
+			       uint32_t abort_bmap)
+{
+	uint32_t num_ids;
+	uint8_t link_ids[MAX_MLO_LINK_ID] = {0};
+
+	num_ids = wma_convert_link_bitmap_to_link_ids(abort_bmap,
+						      QDF_ARRAY_SIZE(link_ids),
+						      link_ids);
+	if (num_ids > 1) {
+		wma_err("More than 1 link got deleted in firmware %x",
+			abort_bmap);
+		QDF_ASSERT(0);
+		return MLO_INVALID_LINK_IDX;
+	}
+
+	wma_debug("Partner link %d is deleted in firmware", link_ids[0]);
+	return link_ids[0];
+}
+
+static void wma_handle_mlo_roam_abort(struct wlan_objmgr_vdev *vdev,
+				      uint32_t aborted_bmap)
+{
+	uint32_t aborted_link_id;
+
+	aborted_link_id = wma_validate_roam_abort_bitmap(vdev, aborted_bmap);
+	if (aborted_link_id == MLO_INVALID_LINK_IDX)
+		return;
+	cm_roam_handle_mlo_roam_abort(vdev, aborted_link_id);
+}
+#else
+static inline void wma_handle_mlo_roam_abort(struct wlan_objmgr_vdev *vdev,
+					     uint32_t aborted_bmap)
+{}
+#endif
 /**
  * wma_invalid_roam_reason_handler() - Handle Invalid roam notification
  * @wma: wma handle
@@ -2670,12 +2742,15 @@ void wma_roam_better_ap_handler(tp_wma_handle wma, uint32_t vdev_id)
  *
  * Return: None
  */
-static void wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
-					    uint32_t vdev_id,
-					    enum cm_roam_notif notif)
+static void
+wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
+				struct roam_offload_roam_event *roam_event)
 {
 	struct roam_offload_synch_ind *roam_synch_data;
 	enum sir_roam_op_code op_code;
+	struct wlan_objmgr_vdev *vdev;
+	uint32_t vdev_id = roam_event->vdev_id;
+	enum cm_roam_notif notif = roam_event->notif;
 
 	if (notif == CM_ROAM_NOTIF_ROAM_START) {
 		op_code = SIR_ROAMING_START;
@@ -2701,11 +2776,22 @@ static void wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
 	else
 		cm_fw_roam_abort_req(wma_handle->psoc, vdev_id);
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma_handle->psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev)
+		goto free_mem;
+
+	if (roam_event->is_mlo_roam_aborted &&
+	    roam_event->roam_abort_link_bitmap)
+		wma_handle_mlo_roam_abort(vdev,
+					  roam_event->roam_abort_link_bitmap);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+free_mem:
 	qdf_mem_free(roam_synch_data);
 }
 
-void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif,
-				    uint32_t reason)
+void cm_invalid_roam_reason_handler(struct roam_offload_roam_event *roam_event)
 {
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 
@@ -2713,13 +2799,14 @@ void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif,
 		QDF_ASSERT(0);
 		return;
 	}
-	wma_invalid_roam_reason_handler(wma_handle, vdev_id, notif);
+	wma_invalid_roam_reason_handler(wma_handle, roam_event);
 
-	if (notif == CM_ROAM_NOTIF_SCAN_START ||
-	    notif == CM_ROAM_NOTIF_SCAN_END)
-		cm_report_roam_rt_stats(wma_handle->psoc, vdev_id,
+	if (roam_event->notif == CM_ROAM_NOTIF_SCAN_START ||
+	    roam_event->notif == CM_ROAM_NOTIF_SCAN_END)
+		cm_report_roam_rt_stats(wma_handle->psoc, roam_event->vdev_id,
 					ROAM_RT_STATS_TYPE_SCAN_STATE,
-					NULL, notif, 0, reason);
+					NULL, roam_event->notif, 0,
+					roam_event->notif_params);
 }
 #endif
 

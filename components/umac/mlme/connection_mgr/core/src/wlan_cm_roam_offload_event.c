@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,6 +38,8 @@
 #include "connection_mgr/core/src/wlan_cm_main_api.h"
 #include "wlan_roam_debug.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_mlo_mgr_sta.h"
+#include "wlan_cm_vdev_api.h"
 
 static QDF_STATUS
 cm_fw_roam_ser_cb(struct wlan_serialization_command *cmd,
@@ -308,6 +310,42 @@ error:
 	return status;
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+void
+cm_roam_handle_mlo_roam_abort(struct wlan_objmgr_vdev *vdev,
+			      uint32_t aborted_link_id)
+{
+	struct wlan_objmgr_vdev *abort_vdev = NULL;
+	struct mlo_link_info *link_info;
+
+	abort_vdev = mlo_get_vdev_by_link_id(vdev, aborted_link_id,
+					     WLAN_LEGACY_MAC_ID);
+	if (!abort_vdev) {
+		mlme_err("VDEV not found for link id %d", aborted_link_id);
+		return;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(abort_vdev)) {
+		mlme_err("Roam is aborted on invalid vdev %d",
+			 wlan_vdev_get_id(abort_vdev));
+		goto end;
+	}
+
+	link_info = mlo_mgr_get_ap_link_by_link_id(abort_vdev->mlo_dev_ctx,
+						   aborted_link_id);
+	if (!link_info) {
+		mlme_err("Link info not found for link %d", aborted_link_id);
+		goto end;
+	}
+
+	mlo_mgr_link_switch_for_roam_abort(abort_vdev, aborted_link_id,
+					   link_info->link_chan_info->ch_freq);
+
+end:
+	wlan_objmgr_vdev_release_ref(abort_vdev, WLAN_LEGACY_MAC_ID);
+}
+#endif
+
 QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	struct wlan_objmgr_pdev *pdev;
@@ -498,6 +536,29 @@ QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  uint8_t num_keys)
 {
 	return wlan_crypto_key_event_handler(psoc, keys, num_keys);
+}
+
+QDF_STATUS cm_roam_partner_bringup_handler(struct wlan_mlo_dev_context *ml_ctx)
+{
+	struct wlan_objmgr_vdev *vdev = ml_ctx->wlan_vdev_list[0];
+	struct wlan_objmgr_psoc *psoc = NULL;
+	QDF_STATUS status;
+
+	if (!vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_E_FAILURE;
+
+	if (!mlo_is_offload_roam_in_progress(vdev))
+		return QDF_STATUS_SUCCESS;
+
+	cm_stop_roam_key_wait_timer(vdev);
+
+	status = mlo_roam_link_connect_notify(psoc, wlan_vdev_get_id(vdev));
+
+	return status;
 }
 #endif
 

@@ -1671,6 +1671,8 @@ struct wlan_roam_scan_mode_params {
  * @disable_self_roam: Disable roaming to current connected BSS.
  * @rct_validity_timer: duration value for which the entries in
  * roam candidate table(rct) are valid
+ * @mlo_roam_partner_bringup_offload: MLO roaming partner bringup offloaded to
+ * host
  */
 struct wlan_rso_lfr3_params {
 	uint8_t roam_rssi_cat_gap;
@@ -1682,6 +1684,7 @@ struct wlan_rso_lfr3_params {
 	uint32_t roam_preauth_no_ack_timeout;
 	bool disable_self_roam;
 	uint32_t rct_validity_timer;
+	bool mlo_roam_partner_bringup_offload;
 };
 
 #define WLAN_ROAM_OFFLOAD_NUM_MCS_SET     (16)
@@ -2629,6 +2632,8 @@ enum roam_dispatcher_events {
  * @hw_mode_trans_ind: HW mode transition indication
  * @deauth_disassoc_frame: Deauth/disassoc frame received from AP
  * @rso_timer_stopped: RSO timer stopped
+ * @is_mlo_roam_aborted: Is MLO roam aborted by firmware
+ * @roam_abort_link_bitmap: Link bitmap of the partner deleted by firmware
  */
 struct roam_offload_roam_event {
 	uint8_t vdev_id;
@@ -2641,6 +2646,8 @@ struct roam_offload_roam_event {
 	struct cm_hw_mode_trans_ind *hw_mode_trans_ind;
 	uint8_t *deauth_disassoc_frame;
 	bool rso_timer_stopped;
+	bool is_mlo_roam_aborted;
+	uint32_t roam_abort_link_bitmap;
 };
 
 /**
@@ -3107,6 +3114,10 @@ struct wlan_cm_roam_rx_ops {
 	void
 	(*roam_vendor_handoff_event)(struct wlan_objmgr_psoc *psoc,
 				     struct roam_vendor_handoff_params *data);
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	QDF_STATUS
+	(*roam_partner_bringup_event)(struct wlan_mlo_dev_context *ml_ctx);
 #endif
 };
 #endif

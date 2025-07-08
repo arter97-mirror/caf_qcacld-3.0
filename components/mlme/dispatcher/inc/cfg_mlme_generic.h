@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1307,6 +1307,30 @@ enum wlan_epcs_frame {
 	1, \
 	"Reduce power scan mode")
 
+/*
+ * <ini>
+ * offload_ml_roam_partner_bringup_to_host - Enable/Disable the bringup of the
+ * partner vdev link to the host during MLO roaming.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable the roam time optimization by which the
+ * host driver brings up the partner vdev post roam completion.
+ *
+ * Related: None
+ *
+ * Supported Feature: Roam, MLO
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+ #define CFG_PARTNER_BRINGUP_OFFLOAD_TO_HOST CFG_INI_BOOL( \
+				"offload_ml_roam_partner_bringup_to_host", \
+				0, \
+				"Enable disable MLO roaming optimization")
+
 #define CFG_GENERIC_ALL \
 	CFG(CFG_ENABLE_DEBUG_PACKET_LOG) \
 	CFG(CFG_PMF_SA_QUERY_MAX_RETRIES) \
@@ -1352,5 +1376,6 @@ enum wlan_epcs_frame {
 	CFG_SR_ENABLE_MODES_ALL \
 	CFG_T2LM_NEGOTIATION_SUPPORTED \
 	CFG_RELAXED_LPI_CONN_POLICY \
-	CFG(CFG_REDUCE_PWR_SCAN_MODE)
+	CFG(CFG_REDUCE_PWR_SCAN_MODE) \
+	CFG(CFG_PARTNER_BRINGUP_OFFLOAD_TO_HOST)
 #endif /* __CFG_MLME_GENERIC_H */
