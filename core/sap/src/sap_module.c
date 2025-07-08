@@ -1708,8 +1708,8 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 		       sap_context->ch_width_orig,
 		       sap_context->csa_reason,
 		       channel_bonding_mode,
-		       tgt_ch_params->mhz_freq_seg0,
-		       tgt_ch_params->mhz_freq_seg1);
+		       tgt_ch_params ? tgt_ch_params->mhz_freq_seg0 : 0,
+		       tgt_ch_params ? tgt_ch_params->mhz_freq_seg1 : 0);
 
 	return ch_width;
 }

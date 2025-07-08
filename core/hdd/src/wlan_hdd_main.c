@@ -6479,7 +6479,7 @@ QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 					      new_self_mac,
 					      true);
 
-	hdd_err("vdev id %d change self mac " QDF_MAC_ADDR_FMT " to "
+	hdd_debug("vdev id %d change self mac " QDF_MAC_ADDR_FMT " to "
 		QDF_MAC_ADDR_FMT, vdev_id,
 		QDF_MAC_ADDR_REF(old_self_mac->bytes),
 		QDF_MAC_ADDR_REF(new_self_mac->bytes));

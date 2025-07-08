@@ -239,6 +239,11 @@ mlo_roam_update_all_vdev_macaddr(struct wlan_objmgr_psoc *psoc,
 			 struct qdf_mac_addr *new_self_mac);
 	struct mlo_mgr_context *g_mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
+	if (!g_mlo_ctx) {
+		mlo_err("Invalid mlo ctx");
+		return;
+	}
+
 	/* Update the link address received from fw to vdev */
 	roamed_vdev_id = sync_ind->roamed_vdev_id;
 	for (i = 0; i < sync_ind->num_setup_links; i++) {
@@ -269,6 +274,12 @@ mlo_roam_update_all_vdev_macaddr(struct wlan_objmgr_psoc *psoc,
 
 		cb = g_mlo_ctx->osif_ops->mlo_roam_osif_update_mac_addr;
 		status = cb(vdev, old_self_mac, new_self_mac);
+		if (QDF_IS_STATUS_ERROR(status))
+			mlo_err("vdev id %d failed to change self mac "
+				QDF_MAC_ADDR_FMT " to "
+				QDF_MAC_ADDR_FMT, link_vdev_id,
+				QDF_MAC_ADDR_REF(old_self_mac->bytes),
+				QDF_MAC_ADDR_REF(new_self_mac->bytes));
 		wlan_vdev_mlme_set_linkaddr(vdev, new_self_mac->bytes);
 
 rel_ref:

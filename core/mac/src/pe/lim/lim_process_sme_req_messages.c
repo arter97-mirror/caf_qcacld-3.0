@@ -3271,6 +3271,7 @@ void lim_disable_ht_dynamic_smps(struct pe_session *session)
 	session->ht_config.mimo_power_save = SMPS_MODE_DISABLED;
 }
 
+static
 void lim_enable_ht_dynamic_smps(struct pe_session *session)
 {
 	session->ht_config.mimo_power_save = DYNAMIC_SMPS_MODE;
@@ -3283,6 +3284,7 @@ void lim_disable_he_dynamic_smps(struct pe_session *session)
 	session->he_config.he_dynamic_smps = 0;
 }
 
+static
 void lim_enable_he_dynamic_smps(struct pe_session *session)
 {
 	session->he_config.he_dynamic_smps = 1;
