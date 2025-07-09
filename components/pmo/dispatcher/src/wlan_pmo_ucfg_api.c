@@ -260,6 +260,11 @@ ucfg_pmo_ns_addr_scope(uint32_t ipv6_scope)
 	return PMO_NS_ADDR_SCOPE_INVALID;
 }
 
+bool ucfg_pmo_rate_limit_needed(struct wlan_objmgr_psoc *psoc)
+{
+	return pmo_rate_limit_needed(psoc);
+}
+
 QDF_STATUS ucfg_pmo_cache_mc_addr_list(
 		struct pmo_mc_addr_list_params *mc_list_config)
 {
