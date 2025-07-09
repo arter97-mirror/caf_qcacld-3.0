@@ -4033,6 +4033,13 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	if (!sap_ctx)
 		return -EINVAL;
 
+	if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+				link_info->link_flags)) {
+		hdd_err("CSA rejected - link removal in progress for vdev:%d",
+			link_info->vdev_id);
+		return -EINVAL;
+	}
+
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	/*
 	 * If sta connection is in progress do not allow SAP channel change from
