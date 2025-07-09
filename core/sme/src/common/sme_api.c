@@ -6427,6 +6427,13 @@ void sme_set_listen_interval(mac_handle_t mac_handle, uint8_t vdev_id)
 	wma_vdev_set_listen_interval(vdev_id, val);
 }
 
+void sme_set_eht_data_extra_ltf_tx(mac_handle_t mac_handle, uint8_t vdev_id,
+				   uint8_t val)
+{
+	pe_debug("EHT Extra LTF: %d", val);
+	wma_vdev_set_eht_data_extra_ltf_tx(vdev_id, val);
+}
+
 /*
  * sme_set_custom_mac_addr() -
  * Set the customer Mac Address.
@@ -16290,7 +16297,7 @@ int sme_update_eht_caps(mac_handle_t mac_handle, uint8_t session_id,
 		return -EINVAL;
 	}
 
-	sme_debug("EHT cap: cap type %d, cfg val %d", cap_type, cfg_val);
+	sme_debug("EHT cap type: %d, cfg val: %d", cap_type, cfg_val);
 	csr_update_session_eht_cap(mac_ctx, session);
 
 	qdf_mem_copy(&mac_ctx->eht_cap_2g, cfg_eht_cap,

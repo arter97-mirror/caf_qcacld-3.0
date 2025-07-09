@@ -1337,4 +1337,21 @@ void wma_vdev_set_listen_interval(uint8_t vdev_id, uint8_t val)
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("failed to set Listen interval for vdev: %d", vdev_id);
 }
+
+void wma_vdev_set_eht_data_extra_ltf_tx(uint8_t vdev_id, uint8_t val)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	QDF_STATUS status;
+
+	if (!wma) {
+		wma_err("wma handle is null");
+		return;
+	}
+
+	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
+				    WMI_VDEV_PARAM_EXTRA_EHT_LTF, val);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to set EHT Extra LTF for vdev: %d", vdev_id);
+}
 #endif
