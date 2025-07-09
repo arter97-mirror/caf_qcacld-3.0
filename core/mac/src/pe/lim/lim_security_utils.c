@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -772,10 +772,9 @@ lim_del_stale_auth_node_assoc_req_timeout(struct mac_context *mac_ctx,
 
 	assoc_req_timeout = SYS_MS_TO_TICKS(cfg->timeouts.assoc_req_timeout);
 
-	if (auth_node->mlmState == eLIM_MLM_AUTHENTICATED_STATE &&
-	    (qdf_mc_timer_get_system_ticks() >
+	if (qdf_mc_timer_get_system_ticks() >
 	    (assoc_req_timeout + auth_node->timestamp) ||
-	    qdf_mc_timer_get_system_ticks() < auth_node->timestamp)) {
+	    qdf_mc_timer_get_system_ticks() < auth_node->timestamp) {
 		pe_debug("delete stale auth node "QDF_MAC_ADDR_FMT,
 			 QDF_MAC_ADDR_REF(auth_node->peerMacAddr));
 		lim_delete_pre_auth_node(mac_ctx, auth_node->peerMacAddr);
