@@ -5126,6 +5126,10 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 			     &ar->he_6ghz_band_cap,
 			     sizeof(tDot11fIEhe_6ghz_band_cap));
 	}
+	if (ar->qcn_ie.present) {
+		qdf_mem_copy(&pAssocReq->qcn_ie, &ar->qcn_ie,
+			     sizeof(tDot11fIEqcn_ie));
+	}
 
 	sir_convert_reassoc_req_frame2_eht_struct(ar, pAssocReq);
 	sir_convert_reassoc_req_frame2_mlo_struct(pFrame, nFrame,
