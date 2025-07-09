@@ -1290,19 +1290,6 @@ _conditional_srcs = {
             "core/dp/htt/htt_t2h.c",
             "core/dp/htt/htt_tx.c",
         ],
-        False: [
-                "cmn/dp/wifi3.0/dp_arch_ops.c",
-                "cmn/dp/wifi3.0/dp_htt.c",
-                "cmn/dp/wifi3.0/dp_main.c",
-                "cmn/dp/wifi3.0/dp_peer.c",
-                "cmn/dp/wifi3.0/dp_rx.c",
-                "cmn/dp/wifi3.0/dp_rx_defrag.c",
-                "cmn/dp/wifi3.0/dp_rx_desc.c",
-                "cmn/dp/wifi3.0/dp_stats.c",
-                "cmn/dp/wifi3.0/dp_tx.c",
-                "cmn/dp/wifi3.0/dp_tx_desc.c",
-                "components/mlme/core/src/wlan_mlme_twt_api.c",
-        ],
     },
     "CONFIG_AR6320_TX_THROTTLE": {
         True: [
