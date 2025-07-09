@@ -6948,6 +6948,45 @@ hdd_set_derived_multicast_list(struct wlan_objmgr_psoc *psoc,
 	*mc_count += driver_mc_cnt;
 }
 
+static uint64_t last_set_multcast_ts;
+/* do not accept new set multcast request if less than 100 ms interval */
+#define MIN_INTERVAL_SET_MULTCAST_US 100000
+
+/**
+ * hdd_rate_limit_set_multicast_needed() - Determine whether to rate-limit
+ * multicast filter update requests.
+ * @hdd_ctx: hdd context
+ *
+ * In certain abnormal scenarios, __hdd_set_multicast_list() may be invoked
+ * very frequently by the kernel or user-space applications within a short
+ * time window. This can result in a large number of WMI commands being queued
+ * in the WMI layer, potentially leading to system instability.
+ *
+ * This API checks the current WMI pending queue length and applies rate
+ * limiting if the interval between consecutive calls is less than 100ms.
+ *
+ * Return: false if the multicast update should proceed, true if it should be
+ * rejected.
+ */
+static bool
+hdd_rate_limit_set_multicast_needed(struct hdd_context *hdd_ctx)
+{
+	uint64_t interval;
+	bool needed = false;
+
+	if (ucfg_pmo_rate_limit_needed(hdd_ctx->psoc)) {
+		interval = qdf_get_monotonic_boottime() - last_set_multcast_ts;
+		if (interval < MIN_INTERVAL_SET_MULTCAST_US) {
+			hdd_debug_rl("ignore due to interval %d",
+				     (uint32_t)interval);
+			needed = true;
+		}
+	}
+	last_set_multcast_ts = qdf_get_monotonic_boottime();
+
+	return needed;
+}
+
 /**
  * __hdd_set_multicast_list() - set the multicast address list
  * @dev: Pointer to the WLAN device.
@@ -6987,6 +7026,9 @@ static void __hdd_set_multicast_list(struct net_device *dev)
 		hdd_debug("Driver module is closed");
 		return;
 	}
+
+	if (hdd_rate_limit_set_multicast_needed(hdd_ctx))
+		return;
 
 	mc_list_request = qdf_mem_malloc(sizeof(*mc_list_request));
 	if (!mc_list_request)

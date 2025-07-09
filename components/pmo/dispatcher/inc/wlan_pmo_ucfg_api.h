@@ -552,6 +552,15 @@ QDF_STATUS ucfg_pmo_disable_hw_filter_in_fwr(struct wlan_objmgr_vdev *vdev);
 uint8_t ucfg_pmo_max_mc_addr_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_pmo_rate_limit_needed() -  check allow or not to set mc addr list
+ * wmi cmd to fw based on pending cmds
+ * @psoc: objmgr psoc
+ *
+ * Return: bool
+ */
+bool ucfg_pmo_rate_limit_needed(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_pmo_cache_mc_addr_list(): API to cache mc addr list in pmo vdev priv obj
  * @mc_list_config: list configuration
  *
@@ -1767,6 +1776,11 @@ ucfg_pmo_cache_mc_addr_list(
 		struct pmo_mc_addr_list_params *mc_list_config)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+bool ucfg_pmo_rate_limit_needed(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 
 static inline QDF_STATUS

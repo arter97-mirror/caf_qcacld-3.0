@@ -558,6 +558,20 @@ uint32_t pmo_get_ssr_frequency_on_pagefault(struct wlan_objmgr_psoc *psoc)
 	return pmo_psoc_ctx->psoc_cfg.ssr_frequency_on_pagefault;
 }
 
+bool pmo_rate_limit_needed(struct wlan_objmgr_psoc *psoc)
+{
+	bool rate_limit_needed = false;
+	int pending_cmds = pmo_tgt_psoc_get_pending_cmnds(psoc);
+
+	if (pending_cmds > WMI_MAX_CMDS / 2) {
+		rate_limit_needed = true;
+		pmo_debug_rl("pending_cmds %d max %d", pending_cmds,
+			     WMI_MAX_CMDS);
+	}
+
+	return rate_limit_needed;
+}
+
 QDF_STATUS pmo_get_vdev_bridge_addr(struct wlan_objmgr_vdev *vdev,
 				    struct qdf_mac_addr *bridgeaddr)
 {
