@@ -3660,6 +3660,13 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 	if (cc_count > MAX_NUMBER_OF_CONC_CONNECTIONS)
 		goto end;
 
+	if (policy_mgr_is_ml_sta_all_vdev_up(pm_ctx->psoc)) {
+		policy_mgr_debug("defer sap conc check to a later time due to all sta vdev up pending");
+		qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
+				       SAP_CONC_CHECK_DEFER_TIMEOUT_MS);
+		goto end;
+	}
+
 	/* For MLO STA 5 GHz + 6 GHz(no-psc chn) and SAP 5 GHz +
 	 * 6 GHz(psc chn), prefer switch 5 GHz SAP first, select
 	 * it as vdev[0] to restart first.

@@ -1410,6 +1410,14 @@ policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
 bool policy_mgr_is_set_link_in_progress(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_is_ml_sta_all_vdev_up() - Check if ml sta all vdev are up
+ * @psoc: psoc pointer
+ *
+ * Return: true if all vdev are up
+ */
+bool policy_mgr_is_ml_sta_all_vdev_up(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_wait_for_set_link_update() - Wait for set/clear link response
  * @psoc: psoc pointer
  *
@@ -1489,7 +1497,14 @@ policy_mgr_init_disallow_mode_bmap(struct mlo_link_set_active_req *req);
  */
 enum policy_mgr_curr_hw_mode
 policy_mgr_find_current_hw_mode(struct wlan_objmgr_psoc *psoc);
+
 #else
+static inline
+bool policy_mgr_is_ml_sta_all_vdev_up(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
 static inline bool
 policy_mgr_update_disallowed_mode_bitmap(struct wlan_objmgr_psoc *psoc,
 					 struct wlan_objmgr_vdev *vdev,

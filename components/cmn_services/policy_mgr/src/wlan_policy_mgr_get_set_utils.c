@@ -51,6 +51,7 @@
 #include "wlan_nan_api_i.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_crypto_global_api.h"
+#include "wlan_mlo_mgr_roam.h"
 
 /* invalid channel id. */
 #define INVALID_CHANNEL_ID 0
@@ -4879,6 +4880,42 @@ bool policy_mgr_is_set_link_in_progress(struct wlan_objmgr_psoc *psoc)
 
 	return policy_mgr_get_link_in_progress(pm_ctx);
 }
+
+#ifdef WLAN_FEATURE_11BE_MLO
+bool policy_mgr_is_ml_sta_all_vdev_up(struct wlan_objmgr_psoc *psoc)
+{
+	uint8_t num_ml_sta = 0, num_non_ml_sta = 0;
+	uint8_t ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t non_ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct wlan_objmgr_vdev *vdev;
+
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sta, ml_sta_idx,
+						&num_non_ml_sta, non_ml_sta_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
+	if (!num_ml_sta)
+		return false;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+					psoc,
+					vdev_id_list[ml_sta_idx[0]],
+					WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		policy_mgr_err("invalid vdev for id %d",
+			       vdev_id_list[ml_sta_idx[0]]);
+		return false;
+	}
+
+	if (!mlo_check_if_all_vdev_up(vdev)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return true;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	return false;
+}
+#endif
 
 /*
  * policy_mgr_trigger_roam_on_link_removal() - Trigger roam on link removal
