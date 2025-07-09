@@ -681,9 +681,10 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	qdf_dma_dir_t dir;
 	size_t buf_size;
-	uint32_t rx_buf_size = 0;
+	size_t rx_buf_size = 0;
 	bool rx_pp_en = false;
 	bool tx_pp_en = false;
+	int align;
 	int i;
 
 	if (!qdf_ctx)
@@ -691,12 +692,7 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 
 	wlan_cfg_get_tx_pp_cfg(ctrl_psoc, &tx_pp_en);
 	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_en, &rx_buf_size);
-
-	if (RX_DATA_BUFFER_OPT_ALIGNMENT)
-		rx_buf_size += RX_DATA_BUFFER_OPT_ALIGNMENT - 1;
-
-	rx_buf_size += QDF_SHINFO_SIZE;
-	rx_buf_size = QDF_NBUF_ALIGN(rx_buf_size);
+	dp_rx_page_pool_get_buf_params(&rx_buf_size, &align);
 
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_page_pool_allocs); i++) {
 		pp_t = &g_dp_page_pool_allocs[i];
@@ -995,7 +991,7 @@ static bool
 dp_prealloc_rx_iova_refcnt_mem_required(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 					struct dp_multi_page_prealloc *mp)
 {
-	uint32_t rx_buf_size;
+	size_t rx_buf_size;
 	bool rx_pp_enable = 0;
 
 	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_enable, &rx_buf_size);
