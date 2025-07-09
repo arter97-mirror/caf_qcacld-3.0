@@ -1218,6 +1218,13 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
+	/*
+	 * Skipping BEACON_MISSED disconnect event
+	 * since it has already been reported to userspace by the LIM layer
+	 */
+	if (reason == REASON_BEACON_MISSED)
+		return;
+
 	qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
 		     peer_mac, QDF_MAC_ADDR_SIZE);
 
