@@ -1116,7 +1116,7 @@ hdd_dhcp_v4_done_ind(mac_handle_t mac_handle,
 	hdd_debug("invoking sme_dhcp_stop_ind");
 	/* send dhcp prot stop ind when ip address is obtained */
 	sme_dhcp_done_ind(mac_handle, adapter->deflink->vdev_id);
-	if (hdd_cm_is_vdev_associated(adapter->deflink)) {
+	if (hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("associated, sending stop ind");
 		sme_dhcp_stop_ind(mac_handle,
 				  adapter->device_mode,

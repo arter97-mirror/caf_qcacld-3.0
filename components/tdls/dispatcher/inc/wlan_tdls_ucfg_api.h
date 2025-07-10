@@ -598,7 +598,6 @@ bool  ucfg_tdls_is_fw_11ax_capable(struct wlan_objmgr_psoc *psoc)
 return false;
 }
 
-static inline
 bool ucfg_tdls_is_key_install_allowed(struct wlan_objmgr_vdev *vdev,
 				      struct qdf_mac_addr *mac_addr)
 {
