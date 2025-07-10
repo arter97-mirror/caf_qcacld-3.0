@@ -528,7 +528,7 @@ void rrm_get_country_code_from_connected_profile(struct mac_context *mac,
 /**
  * wlan_diag_log_beacon_rpt_req_event() - Send Beacon Report Request logging
  * event.
- * @token: Dialog token
+ * @token: Measurement token
  * @mode: Measurement mode
  * @op_class: operating class
  * @chan: channel number
@@ -2504,7 +2504,7 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 			   session_entry->vdev_id);
 		req = &rrm_req->MeasurementRequest[0];
 		wlan_diag_log_beacon_rpt_req_event(
-			rrm_req->DialogToken.token,
+			req->measurement_token,
 			req->measurement_request.Beacon.meas_mode,
 			req->measurement_request.Beacon.regClass,
 			req->measurement_request.Beacon.channel,
@@ -2521,7 +2521,7 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 			rrm_req->NumOfRepetitions.repetitions);
 		req = &rrm_req->MeasurementRequest[0];
 		wlan_diag_log_beacon_rpt_req_event(
-			rrm_req->DialogToken.token,
+			req->measurement_token,
 			req->measurement_request.Beacon.meas_mode,
 			req->measurement_request.Beacon.regClass,
 			req->measurement_request.Beacon.channel,
@@ -2542,21 +2542,21 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 	}
 
 	for (index = 0; index < MAX_MEASUREMENT_REQUEST; index++) {
-		if (mac_ctx->rrm.rrmPEContext.pCurrentReq[index]) {
-			req = &rrm_req->MeasurementRequest[0];
-			wlan_diag_log_beacon_rpt_req_event(
-				rrm_req->DialogToken.token,
+		if (!mac_ctx->rrm.rrmPEContext.pCurrentReq[index])
+			continue;
+		req = &rrm_req->MeasurementRequest[index];
+		wlan_diag_log_beacon_rpt_req_event(
+				req->measurement_token,
 				req->measurement_request.Beacon.meas_mode,
 				req->measurement_request.Beacon.regClass,
 				req->measurement_request.Beacon.channel,
 				req->measurement_type,
 				req->measurement_request.Beacon.meas_duration,
 				session_entry);
-			reject = true;
-			pe_debug("RRM req for index: %d is already in progress",
-				 index);
-			break;
-		}
+		reject = true;
+		pe_debug("RRM req for index: %d is already in progress",
+			 index);
+		break;
 	}
 
 reject:

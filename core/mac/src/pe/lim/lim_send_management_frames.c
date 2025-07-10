@@ -6644,7 +6644,7 @@ returnAfterError:
 /**
  * lim_beacon_report_response_event() - Send Beacon Report Response log
  * event
- * @token: Dialog token
+ * @token: Measurement token
  * @num_rpt: Number of Report element
  * @band: Tx packet band info
  * @vdev_id: vdev id
@@ -6687,9 +6687,9 @@ lim_beacon_report_response_event(uint8_t token, uint8_t num_rpt,
 #endif
 
 #define ACTION_CODE_POS		 1
-#define DIALOG_POS		 2
 #define ACTION_HDR_LEN		 3
 #define MIN_MEASUREMENT_TAG_LEN	 3
+#define MEASUREMENT_TOKEN_POS	 2
 #define MEASUREMENT_RPT_TYPE_POS 4
 
 static QDF_STATUS
@@ -6707,7 +6707,9 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 	uint16_t rem_len = 0;
 	uint8_t *frm;
 	const uint8_t *pos, *end, *ie;
-	uint8_t dialog_token;
+	uint8_t measurement_token = 0;
+	struct mac_context *mac_ctx;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!buf) {
 		pe_err("Invalid nbuf buffer");
@@ -6719,6 +6721,31 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 		status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx) {
+		pe_err("Invalid mac_ctx");
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	mgmt_params = params;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    mgmt_params->vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	if (mlo_is_mld_sta(vdev))
+		band = wlan_convert_freq_to_diag_band(mgmt_params->chanfreq);
+	else
+		band = WLAN_INVALID_BAND;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 	if (tx_status == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK)
 		qdf_tx_complete = QDF_TX_RX_STATUS_OK;
@@ -6741,9 +6768,6 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 		goto out;
 	}
 
-	mgmt_params = params;
-	band = mgmt_params->band;
-
 	//frm pointing to the fixed parameters
 	frm = frame_ptr + ff_offset;
 	rem_len -= ff_offset;
@@ -6753,8 +6777,6 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 		pe_debug("Not a beacon report frame type:%d", *frm);
 		goto out;
 	}
-
-	dialog_token = frm[DIALOG_POS];
 
 	pos = frm + ACTION_HDR_LEN;
 	rem_len -= ACTION_HDR_LEN;
@@ -6771,17 +6793,20 @@ lim_mgmt_radio_measure_report_tx_complete(void *context, qdf_nbuf_t buf,
 			pos = ie + ie[TAG_LEN_POS] + MIN_IE_LEN;
 			continue;
 		}
-		if (ie[MEASUREMENT_RPT_TYPE_POS] == SIR_MAC_RRM_BEACON_TYPE)
+		if (ie[MEASUREMENT_RPT_TYPE_POS] == SIR_MAC_RRM_BEACON_TYPE) {
 			++num_measurements;
+			measurement_token = ie[MEASUREMENT_TOKEN_POS];
+		}
 		pos = ie + ie[TAG_LEN_POS] + MIN_IE_LEN;
 	}
 
-	pe_debug("vdev_id %d dialog_token %d num_measuremt %d",
-		 mgmt_params->vdev_id, dialog_token, num_measurements);
+	pe_debug("vdev_id %d measurement_token %d num_measuremt %d",
+		 mgmt_params->vdev_id, measurement_token, num_measurements);
 
-	lim_beacon_report_response_event(dialog_token, num_measurements, band,
-					 mgmt_params->vdev_id, qdf_tx_complete);
 
+	lim_beacon_report_response_event(measurement_token, num_measurements,
+					 band, mgmt_params->vdev_id,
+					 qdf_tx_complete);
 out:
 	qdf_nbuf_free(buf);
 
@@ -6942,11 +6967,12 @@ lim_send_radio_measure_report_action_frame(struct mac_context *mac,
 			nStatus);
 	}
 
-	pe_nofl_rl_info("TX: type:%d seq_no:%d dialog_token:%d no. of APs:%d is_last_rpt:%d num_report:%d peer:"QDF_MAC_ADDR_FMT,
+	pe_nofl_rl_info("TX: type:%d seq_no:%d token:%d no. of APs:%d is_last_rpt:%d num_report:%d peer:"QDF_MAC_ADDR_FMT,
 			frm->MeasurementReport[0].type,
 			(pMacHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET |
 			pMacHdr->seqControl.seqNumLo),
-			dialog_token, frm->num_MeasurementReport,
+			frm->MeasurementReport[0].token,
+			frm->num_MeasurementReport,
 			is_last_report, num_report, QDF_MAC_ADDR_REF(peer));
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
