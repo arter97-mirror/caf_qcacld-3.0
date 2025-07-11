@@ -3015,7 +3015,8 @@ void lim_get_basic_rates(tSirMacRateSet *b_rates, uint32_t chan_freq)
 	 */
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq))
 		wlan_populate_basic_rates(b_rates, false, true);
-	else if (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq))
+	else if (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) ||
+		 WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
 		wlan_populate_basic_rates(b_rates, true, true);
 }
 
