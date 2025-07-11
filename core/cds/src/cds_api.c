@@ -1409,6 +1409,9 @@ QDF_STATUS cds_post_disable(void)
 	 * - Clean up CE tasklets.
 	 */
 
+	cds_debug("suspend dp fisa");
+	ucfg_dp_fisa_suspend(gp_cds_context->dp_soc, OL_TXRX_PDEV_ID);
+
 	cds_debug("send deinit sequence to firmware");
 	if (cds_should_suspend_target())
 		cds_suspend_target(wma_handle);
