@@ -188,7 +188,7 @@ lim_get_he_rate_info_flag(tpDphHashNode sta_ds)
 static enum tx_rate_info
 lim_get_eht_rate_info_flag(tpDphHashNode sta_ds)
 {
-	if (sta_ds->eht_config.support_320mhz_6ghz)
+	if (sta_ds->ch_width == CH_WIDTH_320MHZ)
 		return  TX_RATE_EHT320;
 	else if (sta_ds->ch_width == CH_WIDTH_160MHZ)
 		return  TX_RATE_EHT160;
