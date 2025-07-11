@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -400,23 +401,32 @@ wma_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
 
 	wma_acquire_wakelock(&wma->wmi_cmd_rsp_wake_lock,
 			     WMA_PEER_DELETE_RESPONSE_TIMEOUT);
-	wma_debug("Delete all PASN peer of vdev:%d", wlan_vdev_get_id(vdev));
+	wma_debug("Delete all PASN peer of vdev:%d", vdev_id);
 
 	opmode = wlan_get_opmode_from_vdev_id(wma->pdev, vdev_id);
 	if (opmode == QDF_NAN_DISC_MODE) {
-		wlan_nan_vdev_delete_all_pasn_peers(vdev);
+		status = wlan_nan_vdev_delete_all_pasn_peers(vdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_resume_vdev_delete(wma, vdev_id);
+			wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+			return status;
+		}
 	} else {
 		rx_ops = wifi_pos_get_rx_ops(wma->psoc);
 		if (!rx_ops ||
 		    !rx_ops->wifi_pos_vdev_delete_all_ranging_peers_cb) {
 			wma_err("rx_ops is NULL");
+			wma_resume_vdev_delete(wma, vdev_id);
+			wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
 			return QDF_STATUS_E_NULL_VALUE;
 		}
 		status =
 			rx_ops->wifi_pos_vdev_delete_all_ranging_peers_cb(vdev);
 		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("Delete all ranging peers failed for vdev:%d",
+				vdev_id);
+			wma_resume_vdev_delete(wma, vdev_id);
 			wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
-			wma_err("Delete all ranging peers failed");
 			return status;
 		}
 	}
@@ -428,8 +438,8 @@ wma_delete_all_pasn_peers(struct wlan_objmgr_vdev *vdev)
 	if (!msg) {
 		wma_err("Failed to allocate request for vdev_id %d", vdev_id);
 		wma_remove_req(wma, vdev_id, WMA_PASN_PEER_DELETE_RESPONSE);
-		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
 		wma_resume_vdev_delete(wma, vdev_id);
+		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
 		return QDF_STATUS_E_FAILURE;
 	}
 
