@@ -24431,6 +24431,7 @@ static int __wlan_hdd_cfg80211_tpc_backoff(struct wiphy *wiphy,
 		goto fail;
 	}
 
+	qdf_mem_free(txpower_adjust_params);
 	return 0;
 
 fail:
