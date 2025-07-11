@@ -34028,7 +34028,7 @@ static int wlan_hdd_cfg80211_get_vdev_chan_info(struct hdd_context *hdd_ctx,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
-static int
+int
 wlan_hdd_get_standby_link_chan_info(struct hdd_adapter *adapter, int link_id,
 				    struct wlan_channel *chan_info)
 {
@@ -34050,13 +34050,6 @@ wlan_hdd_get_standby_link_chan_info(struct hdd_adapter *adapter, int link_id,
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	return ret;
-}
-#else
-static inline int
-wlan_hdd_get_standby_link_chan_info(struct hdd_adapter *adapter, int link_id,
-				    struct wlan_channel *chan_info)
-{
-	return -EINVAL;
 }
 #endif
 

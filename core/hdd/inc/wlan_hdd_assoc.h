@@ -118,6 +118,8 @@ struct hdd_conn_flag {
 #define ANTENNA_SEL_INFO_TX_SOUNDING_PPDU	0x40
 #define ANTENNA_SEL_INFO_RSVD			0x80
 
+#define WLAN_INVALID_RSSI_VALUE -128
+
 /**
  * struct hdd_connection_info - structure to store connection information
  * @conn_state: connection state of the NIC
