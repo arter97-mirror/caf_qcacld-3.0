@@ -155,8 +155,9 @@ static QDF_STATUS dp_rx_dump_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 			sw_ft_entry->aggr_count,
 			sw_ft_entry->flush_count,
 			sw_ft_entry->bytes_aggregated,
-			qdf_do_div(sw_ft_entry->bytes_aggregated,
-				   sw_ft_entry->flush_count),
+			sw_ft_entry->flush_count ?
+				qdf_do_div(sw_ft_entry->bytes_aggregated,
+					   sw_ft_entry->flush_count) : 0,
 			sw_ft_entry->same_mld_vdev_mismatch);
 	}
 	return QDF_STATUS_SUCCESS;
