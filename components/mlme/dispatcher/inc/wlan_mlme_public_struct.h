@@ -1895,7 +1895,8 @@ enum station_prefer_bw {
  * @mlo_max_simultaneous_links:     number of simultaneous links
  * @mlo_prefer_percentage:          percentage to boost/reduce mlo scoring
  * @mlo_5gl_5gh_mlsr:               enable/disable 5GL+5GH MLSR
- * @ext_mld_cap_supp:               Include/exclude Extended MLD caps in assoc
+ * @ext_mld_cap_supp:               Extended MLD cap support in assoc req
+ * @exclude_ext_mld_cap:            Exclude Extended MLD caps in assoc req
  * @epcs_capability:                epcs capability enable or disable flag
  * @usr_disable_eht:                user disable the eht for STA
  * @eht_disable_punct_in_us_lpi:    Disable eht puncture in us lpi mode
@@ -1935,6 +1936,7 @@ struct wlan_mlme_sta_cfg {
 	int8_t mlo_prefer_percentage;
 	bool mlo_5gl_5gh_mlsr;
 	bool ext_mld_cap_supp;
+	bool exclude_ext_mld_cap;
 #endif
 #ifdef WLAN_FEATURE_11BE
 	bool epcs_capability;

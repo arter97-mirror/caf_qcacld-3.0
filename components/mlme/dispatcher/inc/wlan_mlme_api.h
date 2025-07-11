@@ -4778,12 +4778,32 @@ QDF_STATUS wlan_mlme_set_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc,
 					  bool value);
 
 /**
+ * wlan_mlme_set_exclude_ext_mld_cap() - Exclude the Extended MLD capability in
+ * association request frame.
+ * @psoc: pointer to psoc object
+ * @value: value to exclude Extended MLD capability
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc,
+					     bool value);
+
+/**
  * wlan_mlme_get_ext_mld_cap_supp() - Check if Extended MLD capability supported
  * @psoc: pointer to psoc object
  *
  * Return: bool to check if Extended MLD capability is supported
  */
 bool wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_exclude_ext_mld_cap() - Check if Extended MLD capability
+ * needs to be excluded in association request frame.
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool to check if Extended MLD capability is excluded
+ */
+bool wlan_mlme_get_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
@@ -4861,8 +4881,21 @@ wlan_mlme_set_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
+static inline QDF_STATUS
+wlan_mlme_set_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc,
+				  bool value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline bool
 wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+wlan_mlme_get_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

@@ -1997,6 +1997,21 @@ wlan_mlme_set_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+wlan_mlme_set_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc,
+				  bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.sta.exclude_ext_mld_cap = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 bool
 wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc)
 {
@@ -2007,6 +2022,21 @@ wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc)
 		return false;
 
 	return mlme_obj->cfg.sta.ext_mld_cap_supp;
+}
+
+bool
+wlan_mlme_get_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	mlme_debug("Exclude ext mld cap: %d",
+		   mlme_obj->cfg.sta.exclude_ext_mld_cap);
+
+	return mlme_obj->cfg.sta.exclude_ext_mld_cap;
 }
 #endif
 
