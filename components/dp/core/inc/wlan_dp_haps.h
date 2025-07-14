@@ -33,10 +33,6 @@ void dp_vdev_haps_attach(struct cdp_soc *psoc, struct wlan_dp_intf *dp_intf,
 
 void dp_vdev_haps_detach(struct wlan_dp_intf *dp_intf);
 
-void dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, haps_state new_state,
-			qdf_ktime_t timeout, bool is_one_shot,
-			bool is_direct_reg_write);
-
 void dp_haps_init(struct wlan_objmgr_psoc *psoc);
 
 QDF_STATUS dp_print_haps_stats(struct dp_soc *soc);
