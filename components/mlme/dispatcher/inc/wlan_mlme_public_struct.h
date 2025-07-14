@@ -2085,7 +2085,6 @@ struct wlan_mlme_power {
  * @heart_beat_threshold: Heart beat threshold
  * @ap_keep_alive_timeout: AP keep alive timeout value
  * @ap_link_monitor_timeout: AP link monitor timeout value
- * @ps_data_inactivity_timeout: PS data inactivity timeout
  * @wmi_wq_watchdog_timeout: timeout period for wmi watchdog bite
  */
 struct wlan_mlme_timeout {
@@ -2100,7 +2099,6 @@ struct wlan_mlme_timeout {
 	uint32_t heart_beat_threshold;
 	uint32_t ap_keep_alive_timeout;
 	uint32_t ap_link_monitor_timeout;
-	uint32_t ps_data_inactivity_timeout;
 	uint32_t wmi_wq_watchdog_timeout;
 };
 
