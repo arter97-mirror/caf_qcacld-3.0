@@ -2861,4 +2861,8 @@ config AUTO_PLATFORM
 	help
 	Add support for the Qualcomm automotive platform
 
+config QCN7605_PCIE_SHADOW_REG_SUPPORT
+	bool "ENable pcie shadow register for genoa"
+	default n
+
 endif # QCA_CLD_WLAN

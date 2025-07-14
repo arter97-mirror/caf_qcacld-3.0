@@ -2057,7 +2057,8 @@ void hdd_wmm_classify_pkt(struct hdd_adapter *adapter,
 		ucfg_dp_fim_update_metadata((qdf_nbuf_t)skb,
 					    adapter->deflink->vdev);
 
-		if (skb->mark ^ WLAN_DP_STC_CLASSIFIED_TAG) {
+		if ((skb->mark & WLAN_DP_STC_CLASSIFIED_TAG) ==
+		    WLAN_DP_STC_CLASSIFIED_TAG) {
 			*user_pri = skb->mark & WLAN_DP_STC_UL_TID_MASK;
 			return;
 		}
@@ -2141,8 +2142,9 @@ uint16_t hdd_get_tx_queue_for_ac(struct hdd_adapter *adapter,
 #else
 static inline
 uint16_t hdd_get_tx_queue_for_ac(struct hdd_adapter *adapter,
-				 struct sk_buff *skb, uint16_t ac) {
-	return ac;
+				 struct sk_buff *skb, uint16_t ac)
+{
+	return ac - !(NUM_HI_PRIO_TX_QUEUES);
 }
 #endif
 
