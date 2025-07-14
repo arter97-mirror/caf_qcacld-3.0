@@ -9557,6 +9557,7 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	uint8_t primary_channel;
 	struct ch_params ch_params = {0};
 	enum phy_ch_width non_eht_ch_width;
+	struct wlan_channel *des_chan;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -9603,6 +9604,9 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	session->gLimChannelSwitch.legacy_ch_width = non_eht_ch_width;
 
 	wlan_mlme_set_ap_oper_ch_width(session->vdev, req->ch_width);
+
+	des_chan = wlan_vdev_mlme_get_des_chan(session->vdev);
+	des_chan->ch_width = ch_params.ch_width;
 
 	/* Send ECSA to the peers */
 	send_extended_chan_switch_action_frame(mac_ctx,
