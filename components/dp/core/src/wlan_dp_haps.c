@@ -138,9 +138,10 @@ void dp_haps_update_state(struct dp_haps *haps_ctx, haps_state new_state,
  *
  * Returns: none
  */
-void dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, haps_state new_state,
-			qdf_ktime_t time_rcvd, bool is_one_shot,
-			bool is_direct_reg_write)
+static void
+dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, haps_state new_state,
+		   qdf_ktime_t time_rcvd, bool is_one_shot,
+		   bool is_direct_reg_write)
 {
 	struct dp_haps *haps_ctx = dp_get_haps_ctx_from_vdev(osif_vdev);
 	uint64_t curr_time_us = qdf_get_log_timestamp_usecs();
@@ -305,6 +306,10 @@ void dp_clear_haps_stats(struct dp_soc *soc)
 	}
 }
 
+static struct cdp_haps_ops dp_ops_haps = {
+	.haps_handle_ind = dp_haps_handle_ind,
+};
+
 /**
  * dp_vdev_haps_attach() - Attach the HAPS
  * @psoc: Datapath global soc handle
@@ -346,6 +351,7 @@ void dp_vdev_haps_attach(struct cdp_soc *psoc, struct wlan_dp_intf *dp_intf,
 			 QDF_HRTIMER_MODE_REL,
 			 QDF_CONTEXT_TASKLET);
 
+	soc->cdp_soc.ops->haps_ops = &dp_ops_haps;
 	dp_info("HAPS is successfully attached for vdev:%u\n", vdev_id);
 }
 
