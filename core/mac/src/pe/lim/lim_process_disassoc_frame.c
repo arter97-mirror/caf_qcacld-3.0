@@ -68,6 +68,11 @@ lim_process_reassoc_pmf_comback(struct mac_context *mac_ctx,
 		session_entry->peSessionId,
 		session_entry->limSmeState));
 
+	if (lim_search_pre_auth_list(mac_ctx, pMlmAuthReq->peerMacAddr)) {
+		pe_debug("delete the pre auth node before send auth for comeback reassoc.");
+		lim_delete_pre_auth_node(mac_ctx, pMlmAuthReq->peerMacAddr);
+	}
+
 	pe_debug("trigger re-auth for the pmf comeback reassoc for "
 		  QDF_MAC_ADDR_FMT "authType = %d mlm state = %d, sme state = %d "
 		  "sessionId = %d", QDF_MAC_ADDR_REF(session_entry->bssId),
@@ -303,13 +308,6 @@ lim_process_disassoc_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 				"%d in sme state: %d from " QDF_MAC_ADDR_FMT, reasonCode,
 			GET_LIM_SYSTEM_ROLE(pe_session), pe_session->limSmeState,
 			QDF_MAC_ADDR_REF(pHdr->sa));
-		if(LIM_IS_STA_ROLE(pe_session) &&
-			pe_session->limMlmState == eLIM_MLM_WT_FT_REASSOC_RSP_STATE &&
-			pe_session->limSmeState == eLIM_SME_WT_REASSOC_STATE &&
-			pe_session->reassoc_pmf_comeback_flag) {
-			pe_debug("trigger auth again for the pmf comback case");
-			lim_process_reassoc_pmf_comback(mac, pe_session);
-		}
 		return;
 	}
 
