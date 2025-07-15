@@ -569,8 +569,6 @@ void lim_rx_invalid_peer_process(struct mac_context *mac_ctx,
 			(struct ol_rx_inv_peer_params *)lim_msg->bodyptr;
 	struct pe_session *session_entry;
 	uint16_t reason_code = REASON_CLASS3_FRAME_FROM_NON_ASSOC_STA;
-	uint16_t aid;
-	tpDphHashNode sta_ds;
 
 	if (!msg) {
 		pe_err("Invalid body pointer in message");
@@ -585,32 +583,29 @@ void lim_rx_invalid_peer_process(struct mac_context *mac_ctx,
 	}
 
 	/* only if SAP mode */
-	if (session_entry->bssType == eSIR_INFRA_AP_MODE) {
-		sta_ds = dph_lookup_hash_entry(mac_ctx, msg->ta, &aid,
-					       &session_entry->dph.dphHashTable);
-		if (sta_ds && sta_ds->is_key_installed) {
-			/*
-			 * Skip deauth for an associated STA.
-			 *
-			 * The deauth sent for invalid peer indication will
-			 * not cleanup the SM if this is an associated STA.
-			 * Therefore, the deauth for associated STA creates
-			 * stale entries even after STA gets disconnected.
-			 */
-			pe_err_rl("Received Invalid rx peer indication for an associated STA "
-			       QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(msg->ta));
-			qdf_mem_free(msg);
-			lim_msg->bodyptr = NULL;
-			return;
-		}
-		pe_debug("send deauth frame to non-assoc STA");
-		lim_send_deauth_mgmt_frame(mac_ctx,
-					   reason_code,
-					   msg->ta,
-					   session_entry,
-					   false);
+	if (session_entry->bssType != eSIR_INFRA_AP_MODE) {
+		pe_debug("unsupported BSS Type %d", session_entry->bssType);
+		goto end;
 	}
 
+	if (wlan_peer_is_key_installed(mac_ctx->psoc, msg->ta)) {
+		/*
+		 * Skip deauth for an associated STA.
+		 * The deauth sent for invalid peer indication will
+		 * not cleanup the SM if this is an associated STA.
+		 * Therefore, the deauth for associated STA creates
+		 * stale entries even after STA gets disconnected.
+		 */
+		pe_err_rl("Received Invalid rx peer indication for an associated STA "
+			  QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(msg->ta));
+		goto end;
+	}
+
+	pe_debug("send deauth frame to non-assoc STA");
+	lim_send_deauth_mgmt_frame(mac_ctx, reason_code, msg->ta, session_entry,
+				   false);
+
+end:
 	qdf_mem_free(msg);
 	lim_msg->bodyptr = NULL;
 }

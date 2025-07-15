@@ -181,7 +181,6 @@ typedef struct sDphHashNode {
 #endif
 	uint8_t timingMeasCap;
 	/* key installed for this STA or not in the firmware */
-	uint8_t is_key_installed;
 	uint8_t is_disassoc_deauth_in_progress;
 
 	uint8_t nss;
