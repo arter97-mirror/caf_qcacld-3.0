@@ -1098,9 +1098,25 @@ static inline void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
 
 void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param);
 void lim_pmf_comeback_timer_callback(void *context);
+
+/**
+ *
+ * lim_set_protected_bit() - API to set the protected bit in the management
+ * frame.
+ *
+ * @mac: Pointer to Global MAC structure
+ * @pe_session: Pointer to session corresponding to the connection
+ * @peer_mac: Peer address of the STA to which the frame is to be sent
+ * @pMacHdr: Pointer to the frame MAC header
+ *
+ * This function is called by various LIM modules to correctly set
+ * the Protected bit in the Frame Control Field of the 802.11 frame MAC header
+ *
+ * Return: none
+ */
 void lim_set_protected_bit(struct mac_context *mac,
 	struct pe_session *pe_session,
-	tSirMacAddr peer, tpSirMacMgmtHdr pMacHdr);
+	tSirMacAddr peer_mac, tpSirMacMgmtHdr pMacHdr);
 
 void lim_set_ht_caps(struct mac_context *p_mac, uint8_t *p_ie_start,
 		     uint32_t num_bytes);

@@ -683,7 +683,6 @@ bool is_mgmt_protected(uint32_t vdev_id,
 	uint16_t aid;
 	tpDphHashNode sta_ds;
 	struct pe_session *session;
-	bool protected = false;
 	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 
 	if (!mac_ctx)
@@ -698,19 +697,24 @@ bool is_mgmt_protected(uint32_t vdev_id,
 
 	sta_ds = dph_lookup_hash_entry(mac_ctx, (uint8_t *)peer_mac_addr, &aid,
 				       &session->dph.dphHashTable);
-	if (sta_ds) {
-		/* rmfenabled will be set at the time of addbss.
-		 * but sometimes EAP auth fails and keys are not
-		 * installed then if we send any management frame
-		 * like deauth/disassoc with this bit set then
-		 * firmware crashes. so check for keys are
-		 * installed or not also before setting the bit
-		 */
-		if (sta_ds->rmfEnabled && sta_ds->is_key_installed)
-			protected = true;
+	if (!sta_ds) {
+		pe_debug(QDF_MAC_ADDR_FMT " not found sta ds",
+			 QDF_MAC_ADDR_REF(peer_mac_addr));
+		return false;
 	}
 
-	return protected;
+	/* rmfenabled will be set at the time of addbss.
+	 * but sometimes EAP auth fails and keys are not
+	 * installed then if we send any management frame
+	 * like deauth/disassoc with this bit set then
+	 * firmware crashes. so check for keys are
+	 * installed or not also before setting the bit
+	 */
+	if (!sta_ds->rmfEnabled)
+		return false;
+
+	return wlan_peer_is_key_installed(mac_ctx->psoc,
+					  (uint8_t *)peer_mac_addr);
 }
 
 void lim_fill_dfs_p2p_group_params(struct pe_session *pe_session)
@@ -3245,7 +3249,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	}
 
 	if (roam_sync_ind_ptr->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
-		curr_sta_ds->is_key_installed = true;
+		wlan_peer_set_key_install_flag(mac_ctx->psoc, bssid.bytes,
+					       true);
 
 	lim_mlo_roam_copy_partner_info_to_session(ft_session_ptr,
 						  roam_sync_ind_ptr);

@@ -1288,8 +1288,6 @@ void lim_process_mlm_set_keys_cnf(struct mac_context *mac, uint32_t *msg_buf)
 	/* Prepare and send SME_SETCONTEXT_RSP message */
 	tLimMlmSetKeysCnf *pMlmSetKeysCnf;
 	struct pe_session *pe_session;
-	uint16_t aid;
-	tpDphHashNode sta_ds = NULL;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -1303,22 +1301,11 @@ void lim_process_mlm_set_keys_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		       pMlmSetKeysCnf->sessionId);
 		return;
 	}
-	/* if the status is success keys are installed in the
-	* Firmware so we can set the protection bit
-	*/
-	if (eSIR_SME_SUCCESS == pMlmSetKeysCnf->resultCode) {
-		sta_ds = dph_lookup_hash_entry(mac,
-				pMlmSetKeysCnf->peer_macaddr.bytes,
-				&aid, &pe_session->dph.dphHashTable);
-		if (sta_ds && pMlmSetKeysCnf->key_len_nonzero)
-			sta_ds->is_key_installed = 1;
-	}
-	pe_debug("vdev %d: " QDF_MAC_ADDR_FMT " Status %d key_len_nonzero %d key installed %d",
+	pe_debug("vdev %d: " QDF_MAC_ADDR_FMT " Status %d key_len_nonzero %d",
 		 pe_session->vdev_id,
 		 QDF_MAC_ADDR_REF(pMlmSetKeysCnf->peer_macaddr.bytes),
 		 pMlmSetKeysCnf->resultCode,
-		 pMlmSetKeysCnf->key_len_nonzero,
-		 sta_ds ? sta_ds->is_key_installed : 0);
+		 pMlmSetKeysCnf->key_len_nonzero);
 
 	lim_send_sme_set_context_rsp(mac,
 				     pMlmSetKeysCnf->peer_macaddr,

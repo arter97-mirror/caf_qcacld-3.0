@@ -5272,49 +5272,35 @@ void lim_get_short_slot_from_phy_mode(struct mac_context *mac, struct pe_session
 	*pShortSlotEnabled = val;
 }
 
-/**
- *
- * \brief This function is called by various LIM modules to correctly set
- * the Protected bit in the Frame Control Field of the 802.11 frame MAC header
- *
- *
- * \param  mac Pointer to Global MAC structure
- *
- * \param pe_session Pointer to session corresponding to the connection
- *
- * \param peer Peer address of the STA to which the frame is to be sent
- *
- * \param pMacHdr Pointer to the frame MAC header
- *
- * \return nothing
- *
- *
- */
 void
 lim_set_protected_bit(struct mac_context *mac,
 		      struct pe_session *pe_session,
-		      tSirMacAddr peer, tpSirMacMgmtHdr pMacHdr)
+		      tSirMacAddr peer_mac, tpSirMacMgmtHdr pMacHdr)
 {
 	uint16_t aid;
 	tpDphHashNode sta;
 
-	sta = dph_lookup_hash_entry(mac, peer, &aid,
+	sta = dph_lookup_hash_entry(mac, peer_mac, &aid,
 				    &pe_session->dph.dphHashTable);
-	if (sta) {
-		/* rmfenabled will be set at the time of addbss.
-		 * but sometimes EAP auth fails and keys are not
-		 * installed then if we send any management frame
-		 * like deauth/disassoc with this bit set then
-		 * firmware crashes. so check for keys are
-		 * installed or not also before setting the bit
-		 */
-		if (sta->rmfEnabled && sta->is_key_installed)
-			pMacHdr->fc.wep = 1;
-
-		pe_debug("wep:%d rmf:%d is_key_set:%d", pMacHdr->fc.wep,
-			 sta->rmfEnabled, sta->is_key_installed);
+	if (!sta) {
+		pe_debug(QDF_MAC_ADDR_FMT " not found sta ds",
+			 QDF_MAC_ADDR_REF(peer_mac));
+		return;
 	}
-} /*** end lim_set_protected_bit() ***/
+
+	/* rmfenabled will be set at the time of addbss.
+	 * but sometimes EAP auth fails and keys are not
+	 * installed then if we send any management frame
+	 * like deauth/disassoc with this bit set then
+	 * firmware crashes. so check for keys are
+	 * installed or not also before setting the bit
+	 */
+	if (!sta->rmfEnabled)
+		return;
+
+	if (wlan_peer_is_key_installed(mac->psoc, peer_mac))
+		pMacHdr->fc.wep = 1;
+}
 
 void lim_set_ht_caps(struct mac_context *p_mac, uint8_t *p_ie_start,
 		     uint32_t num_bytes)
