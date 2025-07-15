@@ -3694,6 +3694,7 @@ stopbss:
 		uint8_t *we_custom_event;
 		char *stopBssEvent = "STOP-BSS.response";       /* 17 */
 		int event_len = strlen(stopBssEvent);
+		uint8_t link_id;
 
 		/* Change the BSS state now since, as we are shutting
 		 * things down, we don't want interfaces to become
@@ -3701,6 +3702,15 @@ stopbss:
 		 */
 		hostapd_state->bss_state = BSS_STOP;
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
+		if (!cds_is_driver_recovering() || cds_is_driver_unloading()) {
+			if (vdev) {
+				link_id = wlan_vdev_get_link_id(vdev);
+				ucfg_crypto_free_key_by_link_id(hdd_ctx->psoc,
+							&link_info->link_addr,
+							link_id);
+			}
+		}
+
 		if (vdev) {
 			ucfg_dp_set_bss_state_start(vdev, false);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
