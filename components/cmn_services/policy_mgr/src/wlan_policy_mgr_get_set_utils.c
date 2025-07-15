@@ -14515,20 +14515,19 @@ bool policy_mgr_get_nan_sap_scc_on_lte_coex_chnl(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS
-policy_mgr_reset_sap_mandatory_channels(struct wlan_objmgr_psoc *psoc)
+policy_mgr_reset_sap_mandatory_channels(struct wlan_objmgr_vdev *vdev)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct sap_man_chan_info *man_chan_info = NULL;
 
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
+	man_chan_info = wlan_get_sap_man_chan_info(vdev);
+	if (!man_chan_info) {
+		policy_mgr_err("Invalid info");
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	pm_ctx->sap_mandatory_channels_len = 0;
-	qdf_mem_zero(pm_ctx->sap_mandatory_channels,
-		     QDF_ARRAY_SIZE(pm_ctx->sap_mandatory_channels) *
-		     sizeof(*pm_ctx->sap_mandatory_channels));
+	man_chan_info->sap_man_chan_len = 0;
+	qdf_mem_zero(man_chan_info->sap_man_chan,
+		     QDF_ARRAY_SIZE(man_chan_info->sap_man_chan) *
+		     sizeof(*man_chan_info->sap_man_chan));
 
 	return QDF_STATUS_SUCCESS;
 }

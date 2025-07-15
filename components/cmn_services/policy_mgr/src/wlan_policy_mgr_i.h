@@ -359,13 +359,6 @@ struct policy_mgr_cfg {
  * interaction with Policy Manager
  * @conc_cbacks: callbacks to be registered by lim for
  * interaction with Policy Manager
- * @sap_mandatory_channels: The user preferred master list on
- *                        which SAP can be brought up. This
- *                        mandatory channel freq list would be as per
- *                        OEMs preference & conforming to the
- *                        regulatory/other considerations
- * @sap_mandatory_channels_len: Length of the SAP mandatory
- *                            channel list
  * @do_sap_unsafe_ch_check: whether need check sap unsafe channel
  * @last_disconn_sta_freq: last disconnected sta channel freq
  * @concurrency_mode: active concurrency combination
@@ -425,8 +418,6 @@ struct policy_mgr_psoc_priv_obj {
 	struct policy_mgr_cdp_cbacks cdp_cbacks;
 	struct policy_mgr_dp_cbacks dp_cbacks;
 	struct policy_mgr_conc_cbacks conc_cbacks;
-	uint32_t sap_mandatory_channels[NUM_CHANNELS];
-	uint32_t sap_mandatory_channels_len;
 	qdf_freq_t last_disconn_sta_freq;
 	uint32_t concurrency_mode;
 	uint8_t no_of_open_sessions[QDF_MAX_NO_OF_MODE];
@@ -1266,11 +1257,11 @@ policy_mgr_set_freq_restriction_mask(struct policy_mgr_psoc_priv_obj *pm_ctx,
 
 /**
  * policy_mgr_dump_sap_mandatory() - Dump mandatory freq list
- * @pm_ctx: pm_ctx
+ * @vdev: vdev_ctx
  *
  * Return: None
  */
-void policy_mgr_dump_sap_mandatory(struct policy_mgr_psoc_priv_obj *pm_ctx);
+void policy_mgr_dump_sap_mandatory(struct wlan_objmgr_vdev *vdev);
 
 /**
  * policy_mgr_get_connection_max_channel_width() - Get max channel width

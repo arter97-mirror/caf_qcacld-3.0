@@ -4377,6 +4377,7 @@ void wlansap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
 	uint32_t *pcl_freqs;
 	QDF_STATUS status;
 	uint32_t pcl_len = 0;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!sap_ctx->acs_cfg || !sap_ctx->acs_cfg->master_ch_list_count)
 		return;
@@ -4395,11 +4396,21 @@ void wlansap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
 		sap_err("Invalid MAC context");
 		goto done;
 	}
-	status = policy_mgr_reset_sap_mandatory_channels(psoc);
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, sap_ctx->vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		sap_err("Invalid vdev Context");
+		return;
+	}
+	status = policy_mgr_reset_sap_mandatory_channels(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	vdev = NULL;
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sap_err("failed to reset mandatory channels");
 		goto done;
 	}
+
 	status = policy_mgr_get_pcl_for_vdev_id(mac->psoc, PM_SAP_MODE,
 						pcl_freqs, &pcl_len,
 						pcl.weight_list,

@@ -3715,6 +3715,7 @@ stopbss:
 		}
 
 		if (vdev) {
+			policy_mgr_reset_sap_mandatory_channels(vdev);
 			ucfg_dp_set_bss_state_start(vdev, false);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		}
@@ -8461,7 +8462,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	 * frequencies of new selected band can be removed in pcl
 	 * modification based on sap mandatory channel list.
 	 */
-	status = policy_mgr_reset_sap_mandatory_channels(hdd_ctx->psoc);
+	status = policy_mgr_reset_sap_mandatory_channels(link_info->vdev);
 	/* Don't go to exit in case of failure. Clean up & stop BSS */
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("failed to reset mandatory channels");
@@ -9313,6 +9314,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		hdd_err("can't get mandatory channel list");
 	if (mandt_chnl_list && intf_pm_mode == PM_SAP_MODE)
 		policy_mgr_init_sap_mandatory_chan(hdd_ctx->psoc,
+						   link_info->vdev,
 						   chandef->chan->center_freq);
 
 	sap_config->ch_params.center_freq_seg0 =

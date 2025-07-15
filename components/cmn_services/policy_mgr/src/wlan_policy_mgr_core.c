@@ -5831,41 +5831,41 @@ policy_mgr_get_current_pref_hw_mode_dual_dbs(
 }
 
 void policy_mgr_add_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_objmgr_vdev *vdev,
 				       uint32_t ch_freq)
 {
 	int i;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct sap_man_chan_info *man_chan_info = NULL;
 
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
+	man_chan_info = wlan_get_sap_man_chan_info(vdev);
+	if (!man_chan_info) {
+		policy_mgr_err("Invalid info");
 		return;
 	}
-
-	for (i = 0; i < pm_ctx->sap_mandatory_channels_len; i++) {
-		if (ch_freq == pm_ctx->sap_mandatory_channels[i])
+	for (i = 0; i < man_chan_info->sap_man_chan_len; i++) {
+		if (ch_freq == man_chan_info->sap_man_chan[i])
 			return;
 	}
-	if (pm_ctx->sap_mandatory_channels_len >= NUM_CHANNELS) {
+	if (man_chan_info->sap_man_chan_len >= NUM_CHANNELS) {
 		policy_mgr_err("mand list overflow (%u)", ch_freq);
 		return;
 	}
-	pm_ctx->sap_mandatory_channels[pm_ctx->sap_mandatory_channels_len++]
+	man_chan_info->sap_man_chan[man_chan_info->sap_man_chan_len++]
 		= ch_freq;
 }
 
 uint32_t policy_mgr_get_sap_mandatory_chan_list_len(
-		struct wlan_objmgr_psoc *psoc)
+		struct wlan_objmgr_psoc *psoc, struct wlan_objmgr_vdev *vdev)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct sap_man_chan_info *man_chan_info = NULL;
 
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
+	man_chan_info = wlan_get_sap_man_chan_info(vdev);
+	if (!man_chan_info) {
+		policy_mgr_err("Invalid info");
 		return 0;
 	}
 
-	return pm_ctx->sap_mandatory_channels_len;
+	return man_chan_info->sap_man_chan_len;
 }
 
 #if defined(CONFIG_BAND_6GHZ)
@@ -5873,13 +5873,15 @@ uint32_t policy_mgr_get_sap_mandatory_chan_list_len(
  * policy_mgr_add_sap_mandatory_6ghz_chan() - Add 6GHz SAP mandatory channel
  * list
  * @psoc: Pointer to soc
+ * @vdev: vdev ctx
  *
  * Add the 6GHz PSC VLP channel to SAP mandatory channel list.
  *
  * Return: None
  */
 static
-void  policy_mgr_add_sap_mandatory_6ghz_chan(struct wlan_objmgr_psoc *psoc)
+void  policy_mgr_add_sap_mandatory_6ghz_chan(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_objmgr_vdev *vdev)
 {
 	uint32_t ch_freq_list[NUM_CHANNELS] = {0};
 	uint32_t len = 0;
@@ -5889,6 +5891,7 @@ void  policy_mgr_add_sap_mandatory_6ghz_chan(struct wlan_objmgr_psoc *psoc)
 	bool is_psd;
 	uint16_t tx_power;
 	uint16_t eirp_psd_power;
+	struct sap_man_chan_info *man_chan_info = NULL;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -5902,8 +5905,13 @@ void  policy_mgr_add_sap_mandatory_6ghz_chan(struct wlan_objmgr_psoc *psoc)
 		return;
 	}
 
+	man_chan_info = wlan_get_sap_man_chan_info(vdev);
+	if (!man_chan_info) {
+		policy_mgr_err("Invalid info");
+		return;
+	}
 	for (i = 0; (i < len) && (i < NUM_CHANNELS) &&
-		    (pm_ctx->sap_mandatory_channels_len < NUM_CHANNELS); i++) {
+		    (man_chan_info->sap_man_chan_len < NUM_CHANNELS); i++) {
 		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq_list[i]))
 			continue;
 		if (WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(ch_freq_list[i])) {
@@ -5912,26 +5920,34 @@ void  policy_mgr_add_sap_mandatory_6ghz_chan(struct wlan_objmgr_psoc *psoc)
 				&tx_power, &eirp_psd_power, false);
 			if (status != QDF_STATUS_SUCCESS || !tx_power)
 				continue;
-			pm_ctx->sap_mandatory_channels[
-				pm_ctx->sap_mandatory_channels_len++] =
+			man_chan_info->sap_man_chan[
+				man_chan_info->sap_man_chan_len++] =
 				ch_freq_list[i];
 		}
 	}
 }
 #else
 static inline
-void  policy_mgr_add_sap_mandatory_6ghz_chan(struct wlan_objmgr_psoc *psoc)
+void  policy_mgr_add_sap_mandatory_6ghz_chan(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif
 
 #define MANDATORY_CHAN_CHAR_LEN 6
-void policy_mgr_dump_sap_mandatory(struct policy_mgr_psoc_priv_obj *pm_ctx)
+void policy_mgr_dump_sap_mandatory(struct wlan_objmgr_vdev *vdev)
 {
 	char *chan_buff;
-	uint32_t len = pm_ctx->sap_mandatory_channels_len;
+	uint32_t len = 0;
 	uint32_t idx, num = 0, buff_len;
+	struct sap_man_chan_info *man_chan_info = NULL;
 
+	man_chan_info = wlan_get_sap_man_chan_info(vdev);
+	if (!man_chan_info) {
+		policy_mgr_err("Invalid info");
+		return;
+	}
+	len = man_chan_info->sap_man_chan_len;
 	if (!len)
 		return;
 	buff_len = (QDF_MIN(len, NUM_CHANNELS) * MANDATORY_CHAN_CHAR_LEN) + 1;
@@ -5941,7 +5957,7 @@ void policy_mgr_dump_sap_mandatory(struct policy_mgr_psoc_priv_obj *pm_ctx)
 
 	for (idx = 0; (idx < len) && (idx < NUM_CHANNELS); idx++)
 		num += qdf_scnprintf(chan_buff + num, buff_len - num, " %d",
-				     pm_ctx->sap_mandatory_channels[idx]);
+				     man_chan_info->sap_man_chan[idx]);
 
 	policymgr_nofl_debug("Mandatory SAP fav freq(%d):%s", len, chan_buff);
 	qdf_mem_free(chan_buff);
@@ -5951,6 +5967,7 @@ void policy_mgr_dump_sap_mandatory(struct policy_mgr_psoc_priv_obj *pm_ctx)
  * policy_mgr_init_sap_mandatory_chan_by_band() - Init SAP mandatory channel
  * list based on band
  * @psoc: Pointer to soc
+ * @vdev: vdev ctx
  * @band_bitmap: band bitmap of type reg_wifi_band
  *
  * Initialize the 2.4G 5G 6G SAP mandatory channels based on band
@@ -5959,6 +5976,7 @@ void policy_mgr_dump_sap_mandatory(struct policy_mgr_psoc_priv_obj *pm_ctx)
  */
 static void
 policy_mgr_init_sap_mandatory_chan_by_band(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev,
 					   uint32_t band_bitmap)
 {
 	uint32_t ch_freq_list[NUM_CHANNELS] = {0};
@@ -5966,6 +5984,7 @@ policy_mgr_init_sap_mandatory_chan_by_band(struct wlan_objmgr_psoc *psoc,
 	int i;
 	QDF_STATUS status;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct sap_man_chan_info *man_chan_info = NULL;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -5979,73 +5998,80 @@ policy_mgr_init_sap_mandatory_chan_by_band(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("Error in getting valid channels");
 		return;
 	}
-	pm_ctx->sap_mandatory_channels_len = 0;
+
+	man_chan_info = wlan_get_sap_man_chan_info(vdev);
+	if (!man_chan_info) {
+		policy_mgr_err("Invalid info");
+		return;
+	}
+	man_chan_info->sap_man_chan_len = 0;
 	for (i = 0; (i < len) && (i < NUM_CHANNELS); i++) {
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq_list[i])) {
-			pm_ctx->sap_mandatory_channels[
-				pm_ctx->sap_mandatory_channels_len++] =
+			man_chan_info->sap_man_chan[
+				man_chan_info->sap_man_chan_len++] =
 				ch_freq_list[i];
 		}
 	}
 	if (band_bitmap & BIT(REG_BAND_5G))
 		for (i = 0; i < ARRAY_SIZE(sap_mand_5g_freq_list); i++)
 			policy_mgr_add_sap_mandatory_chan(
-				psoc, sap_mand_5g_freq_list[i]);
+				psoc, vdev, sap_mand_5g_freq_list[i]);
 	if (band_bitmap & BIT(REG_BAND_6G))
-		policy_mgr_add_sap_mandatory_6ghz_chan(psoc);
+		policy_mgr_add_sap_mandatory_6ghz_chan(psoc, vdev);
 
-	policy_mgr_dump_sap_mandatory(pm_ctx);
+	policy_mgr_dump_sap_mandatory(vdev);
 }
 
 void  policy_mgr_init_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev,
 					 uint32_t org_ch_freq)
 {
 	if (WLAN_REG_IS_5GHZ_CH_FREQ(org_ch_freq)) {
 		policy_mgr_init_sap_mandatory_chan_by_band(
-			psoc, BIT(REG_BAND_2G) | BIT(REG_BAND_5G));
+			psoc, vdev, BIT(REG_BAND_2G) | BIT(REG_BAND_5G));
 		policy_mgr_add_sap_mandatory_chan(
-			psoc, org_ch_freq);
+			psoc, vdev, org_ch_freq);
 	} else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(org_ch_freq)) {
 		policy_mgr_init_sap_mandatory_chan_by_band(
-				psoc,
+				psoc, vdev,
 				BIT(REG_BAND_2G) | BIT(REG_BAND_5G) |
 				BIT(REG_BAND_6G));
 	} else {
 		policy_mgr_init_sap_mandatory_chan_by_band(
-				psoc, BIT(REG_BAND_2G));
+				psoc, vdev, BIT(REG_BAND_2G));
 	}
 }
 
 void policy_mgr_remove_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_objmgr_vdev *vdev,
 					  uint32_t ch_freq)
 {
 	uint32_t ch_freq_list[NUM_CHANNELS] = {0};
 	uint32_t num_chan = 0;
 	int i;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct sap_man_chan_info *man_chan_info = NULL;
 
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
+	man_chan_info = wlan_get_sap_man_chan_info(vdev);
+	if (!man_chan_info) {
+		policy_mgr_err("Invalid info");
 		return;
 	}
-
-	if (pm_ctx->sap_mandatory_channels_len >= NUM_CHANNELS) {
+	if (man_chan_info->sap_man_chan_len >= NUM_CHANNELS) {
 		policy_mgr_err("Invalid channel len %d ",
-				pm_ctx->sap_mandatory_channels_len);
+				man_chan_info->sap_man_chan_len);
 		return;
 	}
 
-	for (i = 0; i < pm_ctx->sap_mandatory_channels_len; i++) {
-		if (ch_freq == pm_ctx->sap_mandatory_channels[i])
+	for (i = 0; i < man_chan_info->sap_man_chan_len; i++) {
+		if (ch_freq == man_chan_info->sap_man_chan[i])
 			continue;
-		ch_freq_list[num_chan++] = pm_ctx->sap_mandatory_channels[i];
+		ch_freq_list[num_chan++] = man_chan_info->sap_man_chan[i];
 	}
 
-	qdf_mem_zero(pm_ctx->sap_mandatory_channels,
-		     pm_ctx->sap_mandatory_channels_len *
-		     sizeof(*pm_ctx->sap_mandatory_channels));
-	qdf_mem_copy(pm_ctx->sap_mandatory_channels, ch_freq_list,
-		     num_chan * sizeof(*pm_ctx->sap_mandatory_channels));
-	pm_ctx->sap_mandatory_channels_len = num_chan;
+	qdf_mem_zero(man_chan_info->sap_man_chan,
+		     man_chan_info->sap_man_chan_len *
+		     sizeof(*man_chan_info->sap_man_chan));
+	qdf_mem_copy(man_chan_info->sap_man_chan, ch_freq_list,
+		     num_chan * sizeof(*man_chan_info->sap_man_chan));
+	man_chan_info->sap_man_chan_len = num_chan;
 }
