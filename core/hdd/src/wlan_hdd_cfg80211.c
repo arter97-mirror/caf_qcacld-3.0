@@ -30326,6 +30326,22 @@ QDF_STATUS hdd_softap_deauth_all_sta(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+					link_info->link_flags)) {
+			hdd_debug("link removal in progress,don't send deauth");
+			return true;
+		}
+	}
+	return false;
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_del_station() - delete station v2
  * @wiphy: Pointer to wiphy
@@ -30368,7 +30384,7 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 
 	if (QDF_SAP_MODE != adapter->device_mode &&
 	    QDF_P2P_GO_MODE != adapter->device_mode)
-		goto fn_end;
+		return 0;
 
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)mac)) {
 		struct wlan_objmgr_vdev *vdev;
@@ -30388,10 +30404,12 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 						hdd_ctx->psoc,
 						adapter->deflink->vdev_id);
 		}
+		if (wlan_hdd_link_removal_is_in_progress(adapter))
+			return 0;
 
 		if (!QDF_IS_STATUS_SUCCESS(hdd_softap_deauth_all_sta(adapter,
 								     param)))
-			goto fn_end;
+			return 0;
 	} else {
 		sta_info = hdd_get_sta_info_by_mac(
 						&adapter->sta_info_list,
@@ -30447,7 +30465,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 				     STA_INFO_CFG80211_DEL_STATION);
 	}
 
-fn_end:
 	return 0;
 }
 
