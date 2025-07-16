@@ -1330,6 +1330,20 @@ int wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 {
 	return -EOPNOTSUPP;
 }
+#endif
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/** wlan_hdd_link_removal_is_in_progress() - check link is removing or not
+ * @adapter: adapter pointer
+ *
+ * Return: true if link removal in progress, otherwise false
+ */
+bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter);
+#else
+static inline
+bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
+{
+	return false;
+}
 #endif
 #endif
