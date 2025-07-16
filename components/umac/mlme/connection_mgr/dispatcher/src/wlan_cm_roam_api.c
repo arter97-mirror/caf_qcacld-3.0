@@ -30,7 +30,6 @@
 #include "wlan_crypto_global_api.h"
 #include <wlan_cm_api.h>
 #include "connection_mgr/core/src/wlan_cm_roam.h"
-#include "wlan_cm_roam_api.h"
 #include "wlan_blm_api.h"
 #include <../../core/src/wlan_cm_roam_i.h>
 #include "wlan_reg_ucfg_api.h"

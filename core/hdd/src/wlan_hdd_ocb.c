@@ -37,9 +37,6 @@
 #include <cdp_txrx_handle.h>
 #include "wlan_ocb_public_structs.h"
 #include "wlan_ocb_ucfg_api.h"
-#include <cdp_txrx_cmn.h>
-#include <cdp_txrx_peer_ops.h>
-#include <cdp_txrx_handle.h>
 #include <cdp_txrx_ocb.h>
 #include "ol_txrx.h"
 #include "wlan_hdd_object_manager.h"

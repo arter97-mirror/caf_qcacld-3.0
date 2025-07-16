@@ -29,7 +29,6 @@
 #include "lim_timer_utils.h"
 #include "lim_send_messages.h"
 #include "lim_admit_control.h"
-#include "lim_send_messages.h"
 #include "lim_ft.h"
 #include "lim_ft_defs.h"
 #include "lim_session.h"

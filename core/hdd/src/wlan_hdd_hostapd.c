@@ -40,7 +40,6 @@
 #include <linux/ethtool.h>
 #include <wlan_hdd_includes.h>
 #include <qc_sap_ioctl.h>
-#include "osif_sync.h"
 #include <wlan_hdd_hostapd.h>
 #include <wlan_hdd_hostapd_wext.h>
 #include <wlan_hdd_green_ap.h>
@@ -73,7 +72,6 @@
 #include <cdp_txrx_misc.h>
 #include "wlan_hdd_object_manager.h"
 #include <qca_vendor.h>
-#include <cds_api.h>
 #include "wlan_hdd_he.h"
 #include "wlan_hdd_eht.h"
 #include "wlan_dfs_tgt_api.h"

@@ -74,7 +74,6 @@
 #include <linux/wireless.h>
 #include <net/cfg80211.h>
 #include <linux/inetdevice.h>
-#include <net/addrconf.h>
 #include "wlan_hdd_cfg80211.h"
 #include "wlan_hdd_ext_scan.h"
 #include "wlan_hdd_p2p.h"
@@ -85,10 +84,6 @@
 #include <linux/compat.h>
 #include <linux/ethtool.h>
 #include <linux/suspend.h>
-
-#ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
-#include "qdf_periodic_work.h"
-#endif
 
 #include <wlan_hdd_hostapd.h>
 #include <wlan_hdd_softap_tx_rx.h>
@@ -162,9 +157,7 @@
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_mlme_twt_ucfg_api.h"
 #include "wlan_fwol_ucfg_api.h"
-#include "wlan_policy_mgr_ucfg.h"
 #include "qdf_func_tracker.h"
-#include "pld_common.h"
 
 
 #ifdef CNSS_GENL
@@ -174,7 +167,6 @@
 #include <net/cnss_nl.h>
 #endif
 #endif
-#include "wlan_reg_ucfg_api.h"
 #include "wlan_ocb_ucfg_api.h"
 #include <wlan_hdd_spectralscan.h>
 #include "wlan_green_ap_ucfg_api.h"

@@ -36,7 +36,6 @@
 #include "nan_ucfg_api.h"
 #include "wlan_mlme_api.h"
 #include "sap_api.h"
-#include "wlan_mlme_api.h"
 #include "wlan_mlme_ucfg_api.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)

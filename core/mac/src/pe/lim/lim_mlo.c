@@ -29,7 +29,6 @@
 #include "wlan_mlo_mgr_ap.h"
 #include <wlan_mlo_mgr_peer.h>
 #include <lim_assoc_utils.h>
-#include <wlan_mlo_mgr_peer.h>
 #include <lim_utils.h>
 #include <utils_mlo.h>
 

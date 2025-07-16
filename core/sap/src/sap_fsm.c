@@ -54,7 +54,6 @@
 #include <net/cfg80211.h>
 #include <qca_vendor.h>
 #include <wlan_scan_ucfg_api.h>
-#include "wlan_reg_services_api.h"
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_policy_mgr_ucfg.h"
 #include "cfg_ucfg_api.h"

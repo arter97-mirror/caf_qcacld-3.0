@@ -39,13 +39,11 @@
 #include "sme_trace.h"
 #include "qdf_types.h"
 #include "qdf_util.h"
-#include "qdf_trace.h"
 #include "cds_utils.h"
 #include "sap_api.h"
 #include "mac_trace.h"
 #include "cds_regdomain.h"
 #include "sme_power_save_api.h"
-#include "wma.h"
 #include "wma_twt.h"
 #include "sch_api.h"
 #include "sme_nan_datapath.h"
@@ -74,7 +72,6 @@
 #include "wlan_mlme_twt_ucfg_api.h"
 #include "parser_api.h"
 #include <../../core/src/wlan_cm_vdev_api.h>
-#include <wlan_mlme_twt_api.h>
 #include "wlan_cm_roam_ucfg_api.h"
 #include <cm_utf.h>
 #include <wlan_mlo_mgr_sta.h>

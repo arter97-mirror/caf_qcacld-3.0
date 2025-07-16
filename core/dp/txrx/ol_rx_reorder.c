@@ -26,7 +26,6 @@
 #include <ol_txrx_htt_api.h>    /* ol_rx_addba_handler, etc. */
 #include <ol_ctrl_txrx_api.h>   /* ol_ctrl_rx_addba_complete */
 #include <ol_htt_rx_api.h>      /* htt_rx_desc_frame_free */
-#include <ol_ctrl_txrx_api.h>   /* ol_rx_err */
 
 /* datapath internal interfaces */
 #include <ol_txrx_peer_find.h>  /* ol_txrx_peer_find_by_id */

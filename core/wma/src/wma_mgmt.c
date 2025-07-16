@@ -62,7 +62,6 @@
 #include <cdp_txrx_cfg.h>
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_misc.h>
-#include <cdp_txrx_misc.h>
 #include "wlan_mgmt_txrx_tgt_api.h"
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_pdev_obj.h"

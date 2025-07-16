@@ -30,7 +30,6 @@
 #include "cds_ieee80211_common_i.h"
 #include "cds_config.h"
 #include "cds_utils.h"
-#include "wlan_reg_services_api.h"
 
 uint32_t cds_get_vendor_reg_flags(struct wlan_objmgr_pdev *pdev,
 		qdf_freq_t freq, uint16_t bandwidth,

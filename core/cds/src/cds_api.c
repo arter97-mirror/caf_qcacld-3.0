@@ -53,7 +53,6 @@
 #include "wlan_logging_sock_svc.h"
 #include "wma.h"
 #include "pktlog_ac.h"
-#include "wlan_policy_mgr_api.h"
 
 #include <cdp_txrx_cmn_reg.h>
 #include <cdp_txrx_cfg.h>
@@ -67,7 +66,6 @@
 #include "wlan_ipa_ucfg_api.h"
 #include "dp_txrx.h"
 #ifdef ENABLE_SMMU_S1_TRANSLATION
-#include "pld_common.h"
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0))
 #include <asm/dma-iommu.h>
 #endif

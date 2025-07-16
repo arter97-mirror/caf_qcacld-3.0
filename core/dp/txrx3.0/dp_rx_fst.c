@@ -20,7 +20,6 @@
 #include "qdf_nbuf.h"
 #include "cfg_dp.h"
 #include "wlan_cfg.h"
-#include "dp_types.h"
 #include "hal_rx_flow.h"
 #include "dp_htt.h"
 #include "dp_internal.h"

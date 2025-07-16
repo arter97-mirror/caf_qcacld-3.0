@@ -30,7 +30,6 @@
 #include <linux/etherdevice.h>
 #include <qdf_types.h>
 #include <ani_global.h>
-#include <qdf_types.h>
 #include <net/ieee80211_radiotap.h>
 #include <cds_sched.h>
 #include <wlan_hdd_napi.h>
