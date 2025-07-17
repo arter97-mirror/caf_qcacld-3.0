@@ -14,7 +14,8 @@
 #include "wlan_dp_haps.h"
 
 static void dp_haps_stats_update(struct dp_haps *haps_ctx,
-				 haps_state curr_state, haps_state new_state)
+				 enum cdp_haps_state curr_state,
+				 enum cdp_haps_state new_state)
 {
 	struct dp_haps_stats *stats = &haps_ctx->stats;
 	qdf_time_t delta = 0;
@@ -57,13 +58,13 @@ static void dp_haps_stats_update(struct dp_haps *haps_ctx,
  * Returns: none
  */
 static inline
-void dp_haps_update_state(struct dp_haps *haps_ctx, haps_state new_state,
-			  qdf_ktime_t timeout, bool is_one_shot,
-			  bool is_direct_reg_write)
+void dp_haps_update_state(struct dp_haps *haps_ctx,
+			  enum cdp_haps_state new_state, qdf_ktime_t timeout,
+			  bool is_one_shot, bool is_direct_reg_write)
 {
 	QDF_STATUS ret;
 	qdf_ktime_t retry_timeout;
-	haps_state curr_state = haps_ctx->state;
+	enum cdp_haps_state curr_state = haps_ctx->state;
 
 	dp_debug("HAPS: vdev_id:(%u) curr state:(%u) -> new state:(%u),"
 		 "is one shot:(%u) timeout:(%lld ns) is_direct_reg_write:(%u)",
@@ -139,7 +140,7 @@ void dp_haps_update_state(struct dp_haps *haps_ctx, haps_state new_state,
  * Returns: none
  */
 static void
-dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, haps_state new_state,
+dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, enum cdp_haps_state new_state,
 		   qdf_ktime_t time_rcvd, bool is_one_shot,
 		   bool is_direct_reg_write)
 {
@@ -202,8 +203,8 @@ dp_haps_timer_handler(qdf_hrtimer_data_t *arg)
 	haps_ctx = qdf_container_of(arg, struct dp_haps,
 				    haps_timer);
 
-	dp_haps_update_state(haps_ctx, STATE_UNPAUSE, 0, haps_ctx->is_one_shot,
-			     true);
+	dp_haps_update_state(haps_ctx, STATE_UNPAUSE, 0,
+			     haps_ctx->is_one_shot, true);
 
 	haps_ctx->stats.haps_timer_expired++;
 

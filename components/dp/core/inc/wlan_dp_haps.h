@@ -8,11 +8,6 @@
 
 #include "wlan_dp_priv.h"
 
-typedef enum {
-	STATE_UNPAUSE = 0,
-	STATE_PAUSE
-} haps_state;
-
 #ifdef WLAN_HAPS_ENABLE
 
 #define HAPS_TRY_AGAIN_TIME_NS 200000
