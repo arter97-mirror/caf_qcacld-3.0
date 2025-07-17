@@ -21115,6 +21115,7 @@ hdd_fill_usable_channels_data(struct sk_buff *skb, struct nlattr **tb,
 		nla_nest_end(skb, chan_params);
 	}
 	nla_nest_end(skb, config);
+	hdd_debug("valid usable channel count : %d", j);
 	return 0;
 }
 
@@ -21349,7 +21350,6 @@ static int __wlan_hdd_cfg80211_get_usable_channel(struct wiphy *wiphy,
 		ret = -EINVAL;
 		goto err;
 	}
-	hdd_debug("usable channel count : %d", count);
 
 	ret = hdd_send_usable_channel(hdd_ctx, res_msg, count, tb);
 	if (ret) {
