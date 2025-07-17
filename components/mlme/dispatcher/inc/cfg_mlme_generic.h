@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1317,7 +1317,7 @@ enum wlan_epcs_frame {
  * enable_reduce_pwr_scan - Enable/Disable reduced power scan mode
  * @Min: 0 Disable
  * @Max: 1 Enable
- * @Default: 0
+ * @Default: 1
  *
  * Related: None
  *
