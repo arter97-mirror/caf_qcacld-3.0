@@ -3437,6 +3437,7 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 			policy_mgr_debug("SAP vdev id %d restarts, old ch freq :%d new ch freq: %d",
 					vdev_id[i],
 					op_ch_freq_list[i], ch_freq);
+			break;
 		}
 	}
 
