@@ -3797,6 +3797,17 @@ static void sap_check_and_update_vdev_ch_params(struct sap_context *sap_ctx)
 		sap_debug("Couldn't get vdev active channel");
 		return;
 	}
+
+	/*
+	 * for LL LT SAP freq can change after serialization in case of race
+	 * between two interface to avoid SCC
+	 */
+	if (sap_ctx->chan_freq != chan->ch_freq) {
+		sap_debug("Vdev %d updated freq %d -> %d", sap_ctx->vdev_id,
+			  sap_ctx->chan_freq,
+			  chan->ch_freq);
+		sap_ctx->chan_freq = chan->ch_freq;
+	}
 	if (sap_ctx->ch_params.ch_width == chan->ch_width)
 		return;
 
@@ -3815,8 +3826,8 @@ static void sap_check_and_update_vdev_ch_params(struct sap_context *sap_ctx)
 		else
 			sap_ctx->ch_params.sec_ch_offset = HIGH_PRIMARY_CH;
 	}
-	sap_debug("updated BW %d -> %d", orig_ch_width,
-		  sap_ctx->ch_params.ch_width);
+	sap_debug("vdev %d updated BW %d -> %d", sap_ctx->vdev_id,
+		  orig_ch_width, sap_ctx->ch_params.ch_width);
 }
 
 /**

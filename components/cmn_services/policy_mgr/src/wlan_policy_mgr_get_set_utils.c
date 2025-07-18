@@ -13303,7 +13303,7 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
-		if (policy_mgr_is_ll_lt_sap_restart_required(psoc))
+		if (policy_mgr_is_ll_lt_sap_restart_required(psoc, 0))
 			return true;
 		return false;
 	}
