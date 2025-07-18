@@ -25,10 +25,6 @@
 #define ATH_SUPPORT_EXT_STAT 1
 #endif
 
-#ifndef CONFIG_AFC_SUPPORT
-#define CONFIG_AFC_SUPPORT 1
-#endif
-
 #ifndef OBSS_PD
 #define OBSS_PD 1
 #endif
@@ -41,12 +37,8 @@
 #define UMAC_SUPPORT_VI_DBG 1
 #endif
 
-#ifndef WLAN_FEATURE_11BE
-#define WLAN_FEATURE_11BE 1
-#endif
-
-#ifndef WLAN_FEATURE_11BE_MLO
-#define WLAN_FEATURE_11BE_MLO 1
+#ifndef ENABLE_SON_11BE_DEF
+#define ENABLE_SON_11BE_DEF 1
 #endif
 
 #ifndef WLAN_SUPPORT_DAP
@@ -57,7 +49,4 @@
 #define WLAN_SUPPORT_PRIMARY_ALLOWED_CHAN 1
 #endif
 
-#ifndef QCA_SUPPORT_SCAN_SPCL_VAP_STATS
-#define QCA_SUPPORT_SCAN_SPCL_VAP_STATS 1
-#endif
 #endif

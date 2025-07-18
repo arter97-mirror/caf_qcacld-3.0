@@ -111,7 +111,7 @@ struct ieee80211_bstm_candidate {
 	u_int8_t op_class;
 	/* PHY type */
 	u_int8_t phy_type;
-#ifdef WLAN_FEATURE_11BE_MLO
+#if defined(WLAN_FEATURE_11BE_MLO) || defined(ENABLE_SON_11BE_DEF)
 	/* MLD candidate */
 	u_int8_t mld;
 	/* MLD MAC */

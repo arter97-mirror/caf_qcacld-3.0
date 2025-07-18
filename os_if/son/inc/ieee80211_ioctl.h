@@ -664,6 +664,9 @@ struct ieee80211req_athdbg {
 		struct ieee80211req_fake_mgmt mgmt_frm;
 		struct ieee80211_tpe_ie_config tpe_conf;
 		wlan_latency_info_t wlan_latency_info;
+#if defined(QCA_SUPPORT_SON) && (QCA_SUPPORT_SON != 0)
+		mesh_dbg_req_t mesh_dbg_req;
+#endif
 #ifdef QCA_SUPPORT_SCAN_SPCL_VAP_STATS
 		ieee80211_scan_spcl_vap_stats_t scan_spcl_vap_stats;
 #endif

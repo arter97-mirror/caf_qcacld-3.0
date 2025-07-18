@@ -393,7 +393,7 @@ struct ieee80211req_sta_info {
 	u_int16_t isi_ehtcap_txmcsnssmap[EHTHANDLE_CAP_TXRX_MCS_NSS_SIZE];
 	u_int32_t isi_ehtcap_phyinfo[EHTHANDLE_CAP_PHYINFO_SIZE];
 #endif /* WLAN_FEATURE_11BE */
-#if WLAN_FEATURE_11BE_MLO
+#if defined(WLAN_FEATURE_11BE_MLO) || defined(ENABLE_SON_11BE_DEF)
 	u_int8_t isi_is_mlo;
 	u_int8_t isi_mldaddr[IEEE80211_ADDR_LEN];
 	u_int8_t isi_num_links;
@@ -652,7 +652,7 @@ struct ieee80211_mscs_descriptor {
 #define CHWIDTH_40                             40  /* Channel width 40 */
 #define CHWIDTH_80                             80  /* Channel width 80 */
 #define CHWIDTH_160                            160 /* Channel width 160 */
-#ifdef WLAN_FEATURE_11BE
+#if defined(WLAN_FEATURE_11BE) || defined(ENABLE_SON_11BE_DEF)
 #define CHWIDTH_320                            320 /* Channel width 320 */
 #endif /* WLAN_FEATURE_11BE */
 
