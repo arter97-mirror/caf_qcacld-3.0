@@ -105,13 +105,13 @@ uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
 }
 
 bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
+						qdf_freq_t ll_lt_sap_start_freq,
 						const char *func)
 {
 	qdf_freq_t ll_lt_sap_freq = 0;
-	uint8_t scc_vdev_id;
-	bool is_scc = false;
-	uint8_t conn_idx = 0;
+	uint8_t scc_vdev_id, inactive_scc_vdev;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t ll_lt_sap_vdev_id;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -121,35 +121,30 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
 
 	ll_lt_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
 
+	/* Check if we have a start freq to validate it during start */
+	if (!ll_lt_sap_freq && ll_lt_sap_start_freq) {
+		ll_lt_sap_freq = ll_lt_sap_start_freq;
+		policy_mgr_debug("LL LT SAP is not UP, validate starting freq %d",
+				 ll_lt_sap_start_freq);
+	}
+
 	if (!ll_lt_sap_freq)
 		return false;
+	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
 
-	/*
-	 * Restart ll_lt_sap if any other interface is present in SCC
-	 * with LL_LT_SAP.
-	 */
-	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	for (conn_idx = 0; conn_idx < MAX_NUMBER_OF_CONC_CONNECTIONS;
-	     conn_idx++) {
-		if (pm_conc_connection_list[conn_idx].mode ==
-		      PM_LL_LT_SAP_MODE)
-			continue;
+	inactive_scc_vdev = policy_mgr_get_inact_vdev_present_with_freq(psoc,
+							ll_lt_sap_freq,
+							ll_lt_sap_vdev_id);
+	scc_vdev_id = policy_mgr_get_vdev_present_with_freq(psoc,
+							ll_lt_sap_freq,
+							ll_lt_sap_vdev_id);
 
-		if (ll_lt_sap_freq == pm_conc_connection_list[conn_idx].freq) {
-			scc_vdev_id = pm_conc_connection_list[conn_idx].vdev_id;
-			is_scc = true;
-			break;
-		}
-	}
-	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-
-	if (is_scc) {
-		uint8_t ll_lt_sap_vdev_id =
-				wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
-
-		policy_mgr_rl_nofl_debug("%s ll_lt_sap vdev %d with freq %d is in scc with vdev %d",
+	if (scc_vdev_id != WLAN_UMAC_VDEV_ID_MAX ||
+	    inactive_scc_vdev != WLAN_UMAC_VDEV_ID_MAX) {
+		policy_mgr_rl_nofl_debug("%s LL LT sap %d with freq %d is in scc with vdev %d or inact vdev %d",
 					 func, ll_lt_sap_vdev_id,
-					 ll_lt_sap_freq, scc_vdev_id);
+					 ll_lt_sap_freq, scc_vdev_id,
+					 inactive_scc_vdev);
 		return true;
 	}
 

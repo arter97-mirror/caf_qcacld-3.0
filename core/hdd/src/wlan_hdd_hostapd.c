@@ -4632,7 +4632,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		ch_params.ch_width = CH_WIDTH_MAX;
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
-		if (!policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
+		if (!policy_mgr_is_ll_lt_sap_restart_required(psoc, 0)) {
 			hdd_debug("vdev %d freq %d, LL LT SAP dont need Channel change",
 				  vdev_id, sap_context->chan_freq);
 			wlansap_context_put(sap_context);

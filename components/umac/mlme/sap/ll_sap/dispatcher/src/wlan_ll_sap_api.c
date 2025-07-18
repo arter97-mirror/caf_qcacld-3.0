@@ -301,7 +301,7 @@ qdf_freq_t wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
 				chan_freq)) {
 		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
 		goto get_new_ll_lt_sap_freq;
-	} else if (policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
+	} else if (policy_mgr_is_ll_lt_sap_restart_required(psoc, chan_freq)) {
 		*csa_reason = CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
 		goto get_new_ll_lt_sap_freq;
 	}

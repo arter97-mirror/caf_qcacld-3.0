@@ -1782,12 +1782,13 @@ static bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 	return false;
 }
 #ifdef WLAN_FEATURE_11BE_MLO
-static bool
-policy_mgr_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
-					qdf_freq_t freq, uint8_t vdev_id)
+uint8_t
+policy_mgr_get_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+					    qdf_freq_t freq, uint8_t vdev_id)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t i;
+	uint8_t scc_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1800,29 +1801,23 @@ policy_mgr_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
 		if (pm_disabled_ml_links[i].in_use &&
 		    (pm_disabled_ml_links[i].vdev_id != vdev_id) &&
 		    (pm_disabled_ml_links[i].freq == freq)) {
-			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-			return true;
+			scc_vdev_id = pm_disabled_ml_links[i].vdev_id;
+			break;
 		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	return false;
-}
-#else
-static inline bool
-policy_mgr_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
-					qdf_freq_t freq, uint8_t vdev_id)
-{
-	return false;
+	return scc_vdev_id;
 }
 #endif
 
-static bool
-policy_mgr_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
-				  qdf_freq_t freq, uint8_t vdev_id)
+uint8_t
+policy_mgr_get_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+				      qdf_freq_t freq, uint8_t vdev_id)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t i;
+	uint8_t scc_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1835,13 +1830,13 @@ policy_mgr_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
 		if (pm_conc_connection_list[i].in_use &&
 		    (pm_conc_connection_list[i].vdev_id != vdev_id) &&
 		    (pm_conc_connection_list[i].freq == freq)) {
-			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-			return true;
+			scc_vdev_id = pm_conc_connection_list[i].vdev_id;
+			break;
 		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	return false;
+	return scc_vdev_id;
 }
 
 /**
@@ -1868,6 +1863,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	bool avoid_list_modified_pcl = false;
 	bool skip_scc_modified_pcl = false;
 	bool skip_inactive_scc_modified_pcl = false;
+	uint8_t scc_vdev_id;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1901,15 +1897,18 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			continue;
 		}
 
-		if (policy_mgr_vdev_present_with_freq(psoc, pcl_channels[i],
-						      vdev_id)) {
+		scc_vdev_id = policy_mgr_get_vdev_present_with_freq(psoc,
+								pcl_channels[i],
+								vdev_id);
+		if (scc_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
 			skip_scc_modified_pcl = true;
 			continue;
 		}
 
-		if (policy_mgr_inact_vdev_present_with_freq(psoc,
-							    pcl_channels[i],
-							    vdev_id)) {
+		scc_vdev_id = policy_mgr_get_inact_vdev_present_with_freq(psoc,
+								pcl_channels[i],
+								vdev_id);
+		if (scc_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
 			skip_inactive_scc_modified_pcl = true;
 			continue;
 		}
