@@ -482,7 +482,7 @@ wlansap_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 		goto cleanup;
 
 	filter->num_of_channels = num_of_channels;
-	qdf_mem_copy(filter->chan_freq_list, freq_list,
+	qdf_mem_copy(filter->chan_freq_list, &freq_list,
 		     filter->num_of_channels *
 		     sizeof(filter->chan_freq_list[0]));
 
