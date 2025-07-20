@@ -831,6 +831,49 @@ static enum hw_mode_bandwidth policy_mgr_map_wmi_channel_width_to_hw_mode_bw(
 	return HW_MODE_BW_NONE;
 }
 
+static void
+policy_mgr_get_hw_mode_min_chains(struct wlan_psoc_host_mac_phy_caps *caps,
+				  uint8_t *tx_chains, uint8_t *rx_chains)
+{
+	uint8_t num_min_tx_chains = 0, num_min_rx_chains = 0;
+	uint8_t num_tx_chains_5g = 0, num_rx_chains_5g = 0;
+	uint8_t num_tx_chains_2g = 0, num_rx_chains_2g = 0;
+
+	if (caps->supported_bands & WMI_HOST_WLAN_5G_CAPABILITY) {
+		num_tx_chains_5g = qdf_get_hweight32(caps->tx_chain_mask_5G);
+		num_rx_chains_5g = qdf_get_hweight32(caps->rx_chain_mask_5G);
+	}
+
+	if (caps->supported_bands & WMI_HOST_WLAN_2G_CAPABILITY) {
+		num_tx_chains_2g = qdf_get_hweight32(caps->tx_chain_mask_2G);
+		num_rx_chains_2g = qdf_get_hweight32(caps->rx_chain_mask_2G);
+	}
+
+	if (num_tx_chains_5g && num_tx_chains_2g)
+		num_min_tx_chains = QDF_MIN(num_tx_chains_5g, num_tx_chains_2g);
+	else if (num_tx_chains_5g)
+		num_min_tx_chains = num_tx_chains_5g;
+	else if (num_tx_chains_2g)
+		num_min_tx_chains = num_tx_chains_2g;
+
+	if (num_rx_chains_5g && num_rx_chains_2g)
+		num_min_rx_chains = QDF_MIN(num_rx_chains_5g, num_rx_chains_2g);
+	else if (num_rx_chains_5g)
+		num_min_rx_chains = num_rx_chains_5g;
+	else if (num_rx_chains_2g)
+		num_min_rx_chains = num_rx_chains_2g;
+
+	if (!*tx_chains && num_min_tx_chains)
+		*tx_chains = num_min_tx_chains;
+	else if (num_min_tx_chains)
+		*tx_chains = QDF_MIN(*tx_chains, num_min_tx_chains);
+
+	if (!*rx_chains && num_min_rx_chains)
+		*rx_chains = num_min_rx_chains;
+	else if (num_min_rx_chains)
+		*rx_chains = QDF_MIN(*rx_chains, num_min_rx_chains);
+}
+
 static void policy_mgr_get_hw_mode_params(
 		struct wlan_psoc_host_mac_phy_caps *caps,
 		struct policy_mgr_mac_ss_bw_info *info)
@@ -1677,6 +1720,7 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_mac_ss_bw_info mac1_ss_bw_info = {0};
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct tgt_info *info;
+	uint8_t min_tx_chains = 0, min_rx_chains = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1725,6 +1769,8 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 		/* Update for MAC0 */
 		tmp = &info->mac_phy_cap[j++];
 		policy_mgr_get_hw_mode_params(tmp, &mac0_ss_bw_info);
+		policy_mgr_get_hw_mode_min_chains(tmp, &min_tx_chains,
+						  &min_rx_chains);
 		dbs_mode = HW_MODE_DBS_NONE;
 		sbs_mode = HW_MODE_SBS_NONE;
 		emlsr_mode = HW_MODE_EMLSR_NONE;
@@ -1755,6 +1801,8 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 			/* Update for MAC1 */
 			tmp = &info->mac_phy_cap[j++];
 			policy_mgr_get_hw_mode_params(tmp, &mac1_ss_bw_info);
+			policy_mgr_get_hw_mode_min_chains(tmp, &min_tx_chains,
+							  &min_rx_chains);
 			policy_mgr_update_mac_freq_info(psoc, pm_ctx,
 							hw_config_type,
 							tmp->phy_id, tmp);
@@ -1794,6 +1842,9 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 			psoc, mac0_ss_bw_info, mac1_ss_bw_info,
 			dbs_mode, sbs_mode);
 	}
+
+	pm_ctx->cfg.min_tx_chains = min_tx_chains;
+	pm_ctx->cfg.min_rx_chains = min_rx_chains;
 
 	/*
 	 * Initializing Current frequency with SMM frequency.
@@ -3074,6 +3125,28 @@ bool policy_mgr_find_if_fw_supports_dbs(struct wlan_objmgr_psoc *psoc)
 	return true;
 }
 
+bool policy_mgr_find_if_hwlist_has_smm(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t param, i;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	for (i = 0; i < pm_ctx->num_dbs_hw_modes; i++) {
+		param = pm_ctx->hw_mode.hw_mode_list[i];
+		if (!POLICY_MGR_HW_MODE_DBS_MODE_GET(param) &&
+		    !POLICY_MGR_HW_MODE_SBS_MODE_GET(param))
+			return true;
+	}
+
+	return false;
+}
+
 bool policy_mgr_find_if_hwlist_has_dbs(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -3532,6 +3605,11 @@ bool policy_mgr_is_hw_dbs_required_for_band(struct wlan_objmgr_psoc *psoc,
 		return true;
 	else
 		return false;
+}
+
+bool policy_mgr_is_hw_smm_capable(struct wlan_objmgr_psoc *psoc)
+{
+	return policy_mgr_find_if_hwlist_has_smm(psoc);
 }
 
 bool policy_mgr_is_dp_hw_dbs_capable(struct wlan_objmgr_psoc *psoc)
@@ -12429,6 +12507,73 @@ void policy_mgr_get_hw_dbs_max_bw(struct wlan_objmgr_psoc *psoc,
 			continue;
 		}
 	}
+}
+
+QDF_STATUS
+policy_mgr_fetch_min_nss_across_hw_modes(struct wlan_objmgr_psoc *psoc,
+					 uint8_t *tx_nss, uint8_t *rx_nss)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	*tx_nss = pm_ctx->cfg.min_tx_chains;
+	*rx_nss = pm_ctx->cfg.min_rx_chains;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static uint8_t
+policy_mgr_get_mac_id_for_freq(struct policy_mgr_freq_range *freq_range,
+			       qdf_freq_t freq)
+{
+	uint8_t idx;
+
+	for (idx = MAC0_ID; idx < MAX_MAC; idx++)
+		if (policy_mgr_is_freq_on_mac_id(freq_range, freq, idx))
+			return idx;
+
+	return idx;
+}
+
+QDF_STATUS
+policy_mgr_curr_hwmode_fetch_chains_for_freq(struct wlan_objmgr_psoc *psoc,
+					     qdf_freq_t freq,
+					     uint8_t *tx_chains,
+					     uint8_t *rx_chains)
+{
+	uint8_t mac_id;
+	QDF_STATUS status;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct policy_mgr_freq_range *freq_range;
+	struct policy_mgr_hw_mode_params hw_mode;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	status = policy_mgr_get_current_hw_mode(psoc, &hw_mode);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	freq_range = pm_ctx->hw_mode.cur_mac_freq_range;
+	mac_id = policy_mgr_get_mac_id_for_freq(freq_range, freq);
+	if (mac_id >= MAX_MAC) {
+		policy_mgr_debug("Freq %u not within range", freq);
+		return QDF_STATUS_E_RANGE;
+	}
+
+	if (mac_id == MAC0_ID) {
+		*tx_chains = hw_mode.mac0_tx_ss;
+		*rx_chains = hw_mode.mac0_rx_ss;
+	} else {
+		*tx_chains = hw_mode.mac1_tx_ss;
+		*rx_chains = hw_mode.mac1_rx_ss;
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 uint32_t policy_mgr_get_hw_dbs_nss(struct wlan_objmgr_psoc *psoc,

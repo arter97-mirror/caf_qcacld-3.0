@@ -297,6 +297,8 @@ extern enum policy_mgr_conc_next_action
  * @sbs_enable: To enable/disable SBS
  * @multi_sap_allowed_on_same_band: Enable/Disable multi sap started
  *                                  on same band
+ * @min_tx_chains: Min number of Tx chains supported across all the HW modes
+ * @min_rx_chains: Min number of Rx chains supported across all the HW modes
  * @sr_in_same_mac_conc: Enable/Disable SR in same MAC concurrency
  * @use_sap_original_bw: Enable/Disable sap original BW as default
  *                       BW when do restart
@@ -330,6 +332,8 @@ struct policy_mgr_cfg {
 	enum policy_mgr_pcl_band_priority pcl_band_priority;
 	bool sbs_enable;
 	bool multi_sap_allowed_on_same_band;
+	uint8_t min_tx_chains;
+	uint8_t min_rx_chains;
 #ifdef WLAN_FEATURE_SR
 	bool sr_in_same_mac_conc;
 #endif
@@ -559,6 +563,16 @@ QDF_STATUS policy_mgr_get_updated_fw_mode_config(
  */
 bool policy_mgr_is_dual_mac_disabled_in_ini(
 		struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_find_if_hwlist_has_smm() - Find if hw list has SMM modes or not
+ * @psoc: PSOC object information
+ *
+ * Find if hw list has SMM modes or not
+ *
+ * Return: true or false
+ */
+bool policy_mgr_find_if_hwlist_has_smm(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_find_if_hwlist_has_dbs() - Find if hw list has DBS modes or not

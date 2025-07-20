@@ -3501,6 +3501,15 @@ QDF_STATUS policy_mgr_register_dp_cb(struct wlan_objmgr_psoc *psoc,
 		struct policy_mgr_dp_cbacks *dp_cbacks);
 
 /**
+ * policy_mgr_is_hw_smm_capable() - Check if HW is SMM capable
+ * @psoc: PSOC object information
+ * Checks if the HW is SMM capable
+ *
+ * Return: true if the HW is SMM capable
+ */
+bool policy_mgr_is_hw_smm_capable(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_find_if_fw_supports_dbs() - to find if FW/HW supports DBS
  * @psoc: PSOC object information
  *
@@ -4219,6 +4228,41 @@ void policy_mgr_update_new_hw_mode_index(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS policy_mgr_is_chan_ok_for_dnbs(struct wlan_objmgr_psoc *psoc,
 					  uint32_t ch_freq, bool *ok);
+
+/**
+ * policy_mgr_fetch_min_nss_across_hw_modes() - Fetch minimum NSS across
+ * HW modes
+ * @psoc: PSOC object information
+ * @tx_nss: Pointer to store minimum TX NSS
+ * @rx_nss: Pointer to store minimum RX NSS
+ *
+ * This function fetches the minimum number of spatial streams (NSS) supported
+ * across all hardware modes for both transmit and receive chains.
+ *
+ * Return: QDF_STATUS_SUCCESS if successful, QDF_STATUS_E_NULL_VALUE otherwise
+ */
+QDF_STATUS
+policy_mgr_fetch_min_nss_across_hw_modes(struct wlan_objmgr_psoc *psoc,
+					 uint8_t *tx_nss, uint8_t *rx_nss);
+
+/**
+ * policy_mgr_curr_hwmode_fetch_chains_for_freq() - API to fetch max
+ * supported chains of current hw mode.
+ * @psoc: Pointer to psoc object manager
+ * @freq: Frequency to find the chains for
+ * @tx_chains: Pointer to save the retrieved Tx chains
+ * @rx_chains: Pointer to save the retrieved Rx chains
+ *
+ * Fetch the current hw mode mac phy capabilities and based on the @freq
+ * return the chains supported by that mac on current hw mode.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_curr_hwmode_fetch_chains_for_freq(struct wlan_objmgr_psoc *psoc,
+					     qdf_freq_t freq,
+					     uint8_t *tx_chains,
+					     uint8_t *rx_chains);
 
 /**
  * policy_mgr_get_hw_dbs_nss() - Computes DBS NSS

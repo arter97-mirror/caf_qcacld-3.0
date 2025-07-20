@@ -58,6 +58,8 @@
 #define WEIGHT_OF_NON_PCL_CHANNELS 1
 #define WEIGHT_OF_DISALLOWED_CHANNELS 0
 
+#define MAC0_ID 0
+#define MAC1_ID 1
 #define MAX_MAC 2
 #define DEFAULT_MAC_ID 255
 
