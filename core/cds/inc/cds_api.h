@@ -530,8 +530,6 @@ bool cds_is_5_mhz_enabled(void);
 bool cds_is_10_mhz_enabled(void);
 bool cds_is_sub_20_mhz_enabled(void);
 QDF_STATUS cds_set_sub_20_support(bool enable);
-QDF_STATUS
-cds_set_sub_20_channel_width(enum cfg_sub_20_channel_width sub_20_ch_width);
 
 bool cds_is_self_recovery_enabled(void);
 bool cds_is_fw_down(void);

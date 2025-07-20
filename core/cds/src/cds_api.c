@@ -2817,34 +2817,6 @@ QDF_STATUS cds_set_sub_20_support(bool enable)
 }
 
 /**
- * cds_set_sub_20_channel_width() - API to set sub 20 MHz ch width
- * @sub_20_ch_width: pending sub 20 MHz ch width to set
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-cds_set_sub_20_channel_width(enum cfg_sub_20_channel_width sub_20_ch_width)
-{
-	struct cds_context *p_cds_context;
-
-	if (sub_20_ch_width > WLAN_SUB_20_CH_WIDTH_10)
-		return QDF_STATUS_E_INVAL;
-
-	p_cds_context = cds_get_context(QDF_MODULE_ID_QDF);
-	if (!p_cds_context || !p_cds_context->cds_cfg)
-		return QDF_STATUS_NOT_INITIALIZED;
-
-	if (!p_cds_context->cds_cfg->sub_20_support)
-		return QDF_STATUS_E_NOSUPPORT;
-
-	if (sub_20_ch_width == p_cds_context->cds_cfg->sub_20_channel_width)
-		return QDF_STATUS_E_ALREADY;
-
-	p_cds_context->cds_cfg->sub_20_channel_width = sub_20_ch_width;
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
  * cds_is_self_recovery_enabled() - API to get self recovery enabled
  *
  * Return: true if self recovery enabled, false otherwise

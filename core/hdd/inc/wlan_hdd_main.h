@@ -6137,18 +6137,6 @@ hdd_nb_get_link_id_from_params(void *params, enum hdd_nb_params_id id)
 }
 #endif
 
-/*
- * hdd_update_sub20_chan_width() - update sub 20 MHz channel width
- *
- * @link_info: Link info pointer in HDD adapter
- * @sub_20_ch_width: sub 20 MHz channel width to set
- *
- * Return: 0 on success, else error number
- */
-QDF_STATUS
-hdd_update_sub20_chan_width(struct wlan_hdd_link_info *link_info,
-			    enum cfg_sub_20_channel_width sub_20_ch_width);
-
 /**
  * hdd_allow_new_intf() - Allow new intf created or not
  * @hdd_ctx: hdd context
