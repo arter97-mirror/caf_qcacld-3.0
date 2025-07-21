@@ -6593,7 +6593,7 @@ static void wma_wait_tx_complete(tp_wma_handle wma,
 				    CDP_TX_PENDING, &val))
 		return;
 	while (val.cdp_pdev_param_tx_pending && max_wait_iterations) {
-		wma_warn("Waiting for outstanding packet to drain");
+		wma_debug("Waiting for outstanding packet to drain");
 		qdf_wait_for_event_completion(&wma->tx_queue_empty_event,
 				      WMA_TX_Q_RECHECK_TIMER_WAIT);
 		if (cdp_txrx_get_pdev_param(
