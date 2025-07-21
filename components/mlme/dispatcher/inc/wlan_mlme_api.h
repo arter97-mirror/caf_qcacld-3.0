@@ -5389,6 +5389,20 @@ wlan_mlme_set_ul_mu_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			   uint8_t ulmu_disable);
 
 /**
+ * wlan_mlme_init_fw_chain_cfg() - Wrapper API to save FW chains config in psoc
+ * @psoc: Pointer to PSOC object manager.
+ * @chain_cfg: Chains data to save.
+ *
+ * Return : QDF_STATUS
+ */
+static inline
+QDF_STATUS wlan_mlme_init_fw_chain_cfg(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_mlme_chain_cfg *chain_cfg)
+{
+	return mlme_init_fw_chain_cfg(psoc, chain_cfg);
+}
+
+/**
  * wlan_mlme_assemble_rate_code() - assemble rate code to be sent to FW
  *
  * @preamble: rate preamble

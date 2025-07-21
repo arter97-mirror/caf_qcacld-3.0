@@ -6178,6 +6178,20 @@ QDF_STATUS wlan_mlme_get_sta_num_rx_chains(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS mlme_init_fw_chain_cfg(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_mlme_chain_cfg *chain_cfg)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.fw_chain_cfg = *chain_cfg;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint8_t *rx_nss)

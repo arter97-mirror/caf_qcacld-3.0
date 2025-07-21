@@ -5191,8 +5191,8 @@ sme_modify_nss_in_mlme_cfg(mac_handle_t mac_handle,
 	uint32_t nss_mask = 0x7;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
-	if (!sme_is_nss_update_allowed(mac_ctx->fw_chain_cfg, rx_nss, tx_nss,
-				       band)) {
+	if (!sme_is_nss_update_allowed(mac_ctx->mlme_cfg->fw_chain_cfg,
+				       rx_nss, tx_nss, band)) {
 		sme_debug("Nss modification failed, fw doesn't support this nss %d",
 			  rx_nss);
 		return;
@@ -5230,7 +5230,7 @@ sme_modify_nss_chains_tgt_cfg(mac_handle_t mac_handle,
 	struct wlan_mlme_nss_chains *nss_chains_ini_cfg =
 					&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
 	uint8_t nss_shift = sme_get_nss_chain_shift(vdev_op_mode);
-	struct wlan_mlme_chain_cfg chain_cfg = mac_ctx->fw_chain_cfg;
+	struct wlan_mlme_chain_cfg chain_cfg = mac_ctx->mlme_cfg->fw_chain_cfg;
 
 	ini_rx_nss = GET_VDEV_NSS_CHAIN(nss_chains_ini_cfg->rx_nss[band],
 					nss_shift);
@@ -5453,7 +5453,7 @@ void sme_update_bfer_caps_as_per_nss_chains(mac_handle_t mac_handle,
 			SAP_NSS_CHAINS_SHIFT);
 
 	max_supported_tx_chains =
-			mac_ctx->fw_chain_cfg.max_tx_chains_5g;
+			mac_ctx->mlme_cfg->fw_chain_cfg.max_tx_chains_5g;
 
 	max_supported_tx_chains = QDF_MIN(ini_tx_chains,
 					  max_supported_tx_chains);
@@ -5463,8 +5463,8 @@ void sme_update_bfer_caps_as_per_nss_chains(mac_handle_t mac_handle,
 	if (max_supported_tx_chains == 1) {
 		sme_debug("ini support %d and firmware support %d",
 			  ini_tx_chains,
-			  mac_ctx->fw_chain_cfg.max_tx_chains_5g);
-		if (mac_ctx->fw_chain_cfg.max_tx_chains_5g == 1) {
+			  mac_ctx->mlme_cfg->fw_chain_cfg.max_tx_chains_5g);
+		if (mac_ctx->mlme_cfg->fw_chain_cfg.max_tx_chains_5g == 1) {
 			cfg->vht_cap.vht_su_bformer = 0;
 			sme_update_bfer_he_cap(cfg);
 			sme_update_bfer_eht_cap(cfg);

@@ -2937,6 +2937,8 @@ struct wlan_mlme_iot {
 /**
  * struct wlan_mlme_cfg - MLME config items
  * @chainmask_cfg: VHT chainmask related cfg items
+ * @fw_chain_cfg: FW per band chains config extracted from mac-phy caps
+ * and intersected with host caps
  * @edca_params: edca related CFG items
  * @gen: Generic CFG items
  * @ht_caps: HT related CFG Items
@@ -2990,6 +2992,7 @@ struct wlan_mlme_iot {
  */
 struct wlan_mlme_cfg {
 	struct wlan_mlme_chainmask chainmask_cfg;
+	struct wlan_mlme_chain_cfg fw_chain_cfg;
 	struct wlan_mlme_edca_params edca_params;
 	struct wlan_mlme_generic gen;
 	struct wlan_mlme_ht_caps ht_caps;

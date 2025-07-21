@@ -2065,6 +2065,18 @@ wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 			 uint8_t *rx_nss);
 
 /**
+ * mlme_init_fw_chain_cfg() - Initialize the psoc mlme's FW chains info
+ * @psoc: Pointer to PSOC object manager.
+ * @chain_cfg: Extracted FW chains info to save
+ *
+ * Save the FW chains info contained in @chain_cfg to psoc mlme priv object.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_init_fw_chain_cfg(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_mlme_chain_cfg *chain_cfg);
+
+/**
  * wlan_mlme_get_cur_ch_width_update_from_ap() - API to get current channel
  * width from AP
  *

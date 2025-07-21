@@ -6348,57 +6348,34 @@ static void wma_update_nan_target_caps(tp_wma_handle wma_handle,
 }
 #endif
 
-static uint8_t
-wma_convert_chainmask_to_chain(uint8_t chainmask)
+static QDF_STATUS wma_fill_chain_cfg(struct wlan_objmgr_psoc *psoc,
+				     struct wma_tgt_cfg *tgt_cfg)
 {
-	uint8_t num_chains = 0;
-
-	while (chainmask) {
-		chainmask &= (chainmask - 1);
-		num_chains++;
-	}
-
-	return num_chains;
-}
-
-static void
-wma_fill_chain_cfg(struct target_psoc_info *tgt_hdl,
-		   uint8_t phy)
-{
-	struct mac_context *mac_ctx;
-	uint8_t num_chain;
+	uint8_t num_chain, i;
+	struct wlan_mlme_chain_cfg fw_chain_cfg = {0};
+	struct target_psoc_info *tgt_hdl = psoc->tgt_if_handle;
 	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap =
-						tgt_hdl->info.mac_phy_cap;
+					tgt_hdl->info.mac_phy_cap;
 
-	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
-	if (!mac_ctx) {
-		wma_err("fill chain cfg failed as mac_ctx is NULL");
-		return;
+	for (i = 0; i < tgt_hdl->info.total_mac_phy_cnt; i++) {
+		num_chain = qdf_get_hweight32(mac_phy_cap[i].tx_chain_mask_2G);
+		if (num_chain > fw_chain_cfg.max_tx_chains_2g)
+			fw_chain_cfg.max_tx_chains_2g = num_chain;
+
+		num_chain = qdf_get_hweight32(mac_phy_cap[i].tx_chain_mask_5G);
+		if (num_chain > fw_chain_cfg.max_tx_chains_5g)
+			fw_chain_cfg.max_tx_chains_5g = num_chain;
+
+		num_chain = qdf_get_hweight32(mac_phy_cap[i].rx_chain_mask_2G);
+		if (num_chain > fw_chain_cfg.max_rx_chains_2g)
+			fw_chain_cfg.max_rx_chains_2g = num_chain;
+
+		num_chain = qdf_get_hweight32(mac_phy_cap[i].rx_chain_mask_5G);
+		if (num_chain > fw_chain_cfg.max_rx_chains_5g)
+			fw_chain_cfg.max_rx_chains_5g = num_chain;
 	}
 
-	num_chain = wma_convert_chainmask_to_chain(mac_phy_cap[phy].
-						   tx_chain_mask_2G);
-
-	if (num_chain > mac_ctx->fw_chain_cfg.max_tx_chains_2g)
-		mac_ctx->fw_chain_cfg.max_tx_chains_2g = num_chain;
-
-	num_chain = wma_convert_chainmask_to_chain(mac_phy_cap[phy].
-						   tx_chain_mask_5G);
-
-	if (num_chain > mac_ctx->fw_chain_cfg.max_tx_chains_5g)
-		mac_ctx->fw_chain_cfg.max_tx_chains_5g = num_chain;
-
-	num_chain = wma_convert_chainmask_to_chain(mac_phy_cap[phy].
-						   rx_chain_mask_2G);
-
-	if (num_chain > mac_ctx->fw_chain_cfg.max_rx_chains_2g)
-		mac_ctx->fw_chain_cfg.max_rx_chains_2g = num_chain;
-
-	num_chain = wma_convert_chainmask_to_chain(mac_phy_cap[phy].
-						   rx_chain_mask_5G);
-
-	if (num_chain > mac_ctx->fw_chain_cfg.max_rx_chains_5g)
-		mac_ctx->fw_chain_cfg.max_rx_chains_5g = num_chain;
+	return wlan_mlme_init_fw_chain_cfg(psoc, &fw_chain_cfg);
 }
 
 static void wma_update_mlme_related_tgt_caps(struct wlan_objmgr_psoc *psoc,
@@ -6529,6 +6506,7 @@ wma_is_dbs_mandatory(struct wlan_objmgr_psoc *psoc,
  */
 static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 {
+	QDF_STATUS status;
 	struct wma_tgt_cfg tgt_cfg;
 	void *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	target_resource_config *wlan_res_cfg;
@@ -6536,7 +6514,6 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	struct wlan_psoc_host_service_ext2_param *service_ext2_param;
 	struct target_psoc_info *tgt_hdl;
 	struct wmi_unified *wmi_handle;
-	uint8_t i;
 	int ret;
 
 	wma_debug("Enter");
@@ -6582,6 +6559,13 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 		     ATH_MAC_LEN);
 
 	wma_update_target_services(wmi_handle, &tgt_cfg.services);
+	/* Take the max of chains supported by FW, which will limit nss */
+	status = wma_fill_chain_cfg(wma_handle->psoc, &tgt_cfg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Failed to store FW chains config %d", status);
+		return qdf_status_to_os_return(status);
+	}
+
 	wma_update_target_ht_cap(tgt_hdl, &tgt_cfg.ht_cap);
 	wma_update_target_vht_cap(tgt_hdl, &tgt_cfg.vht_cap);
 	/*
@@ -6644,9 +6628,6 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	wma_update_restricted_80p80_bw_support(wma_handle, &tgt_cfg);
 	wma_update_aux_dev_caps(tgt_hdl, &tgt_cfg);
 	wma_update_tx_powerboost(service_ext2_param, &tgt_cfg);
-	/* Take the max of chains supported by FW, which will limit nss */
-	for (i = 0; i < tgt_hdl->info.total_mac_phy_cnt; i++)
-		wma_fill_chain_cfg(tgt_hdl, i);
 
 	ret = wma_handle->tgt_cfg_update_cb(hdd_ctx, &tgt_cfg);
 	if (ret)

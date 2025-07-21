@@ -674,7 +674,6 @@ struct ani_level_params {
  */
 struct mac_context {
 	enum qdf_driver_type gDriverType;
-	struct wlan_mlme_chain_cfg fw_chain_cfg;
 	struct wlan_mlme_cfg *mlme_cfg;
 	struct lim_context lim;
 	struct sch_context sch;
