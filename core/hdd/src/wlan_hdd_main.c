@@ -2365,7 +2365,6 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	uint8_t mpdu_density;
 	struct mlme_ht_capabilities_info ht_cap_info;
 	uint8_t mcs_set[SIZE_OF_SUPPORTED_MCS_SET];
-	uint8_t num_chains_cap_mimo;
 
 	/* get the MPDU density */
 	status = ucfg_mlme_get_ht_mpdu_density(hdd_ctx->psoc, &mpdu_density);
@@ -2417,36 +2416,16 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 			ht_cap_info.mimo_power_save = HDD_SMPS_MODE_DISABLED;
 	}
 
-	hdd_ctx->num_rf_chains = cfg->num_rf_chains;
 	hdd_ctx->ht_tx_stbc_supported = cfg->ht_tx_stbc;
 
-	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
-					    &num_chains_cap_mimo);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("unable to get vht_enable2x2");
-
-	if (num_chains_cap_mimo > (cfg->num_rf_chains - 1)) {
-		uint8_t updated_mimo_cap = cfg->num_rf_chains - 1;
-
-		status = ucfg_mlme_set_vht_mimo_cap(hdd_ctx->psoc,
-						    updated_mimo_cap);
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_err("unable to set vht_mimo cap");
-		else
-			hdd_debug("update vht mimo ini value %d to %d",
-				  num_chains_cap_mimo, updated_mimo_cap);
-
-		num_chains_cap_mimo = updated_mimo_cap;
-	}
-
-	if (!(cfg->ht_tx_stbc && num_chains_cap_mimo))
+	if (!(cfg->ht_tx_stbc && hdd_ctx->num_rf_chains > NSS_1x1_MODE))
 		ht_cap_info.tx_stbc = 0;
 
 	status = ucfg_mlme_set_ht_cap_info(hdd_ctx->psoc, ht_cap_info);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_err("could not set HT capability to CCM");
 
-	if (!num_chains_cap_mimo)
+	if (hdd_ctx->num_rf_chains < NSS_2x2_MODE)
 		return;
 
 	hdd_debug("Read MCS rate set");
@@ -2457,7 +2436,7 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 		return;
 
 #define WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES 0xff
-	for (value = 0; value <= num_chains_cap_mimo; value++)
+	for (value = 0; value < hdd_ctx->num_rf_chains; value++)
 		mcs_set[value] = WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES;
 
 	/* If set, the Tx MCS set is same as Rx MCS set in HT connection */
@@ -3242,9 +3221,9 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 
 	hdd_update_tgt_services(hdd_ctx, &cfg->services);
 
-	hdd_update_tgt_ht_cap(hdd_ctx, &cfg->ht_cap);
-
 	sme_update_bfer_caps_as_per_nss_chains(hdd_ctx->mac_handle, cfg);
+
+	hdd_update_tgt_ht_cap(hdd_ctx, &cfg->ht_cap);
 
 	hdd_update_tgt_vht_cap(hdd_ctx, &cfg->vht_cap);
 
