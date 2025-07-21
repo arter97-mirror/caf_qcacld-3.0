@@ -6274,6 +6274,57 @@ QDF_STATUS mlme_update_max_fw_chains_cfg(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+void mlme_set_ht_mcsset_for_nss(struct wlan_objmgr_psoc *psoc,
+				tDot11fIEHTCaps *ht_caps, uint8_t *mcs_set,
+				uint8_t tx_nss, uint8_t rx_nss)
+{
+	QDF_STATUS status;
+	uint8_t idx, max_tx_nss, max_rx_nss;
+	uint8_t tx_mcs_def_pos = WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS;
+	uint8_t tx_mcs_pos = WLAN_HT_CAP_TX_MAX_NSS_POS;
+	uint8_t *mcs_set_ptr = NULL;
+
+	if (ht_caps && ht_caps->present)
+		mcs_set_ptr = ht_caps->supportedMCSSet;
+	else if (mcs_set)
+		mcs_set_ptr = mcs_set;
+
+	if (!mcs_set_ptr)
+		return;
+
+	status = policy_mgr_fetch_min_nss_across_hw_modes(psoc, &max_tx_nss,
+							  &max_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_debug("Failed to fetch NSS");
+		return;
+	}
+
+	max_tx_nss = QDF_MIN(tx_nss, max_tx_nss);
+	max_rx_nss = QDF_MIN(rx_nss, max_rx_nss);
+
+	if (max_tx_nss > NSS_4x4_MODE)
+		max_tx_nss = NSS_4x4_MODE;
+
+	if (max_rx_nss > NSS_4x4_MODE)
+		max_rx_nss = NSS_4x4_MODE;
+
+	for (idx = max_rx_nss; idx < NSS_4x4_MODE; idx++)
+		mcs_set_ptr[idx] = 0x0;
+
+	if (max_rx_nss == max_tx_nss) {
+		if (QDF_GET_BITS(mcs_set_ptr[tx_mcs_def_pos / BITS_IN_A_BYTE],
+				 tx_mcs_def_pos % BITS_IN_A_BYTE, 2) != 0x1)
+			QDF_SET_BITS(mcs_set_ptr[tx_mcs_def_pos /
+						 BITS_IN_A_BYTE],
+				     tx_mcs_def_pos % BITS_IN_A_BYTE, 4, 0x1);
+	} else {
+		QDF_SET_BITS(mcs_set_ptr[tx_mcs_def_pos / BITS_IN_A_BYTE],
+			     tx_mcs_def_pos % BITS_IN_A_BYTE, 2, 0x3);
+		QDF_SET_BITS(mcs_set_ptr[tx_mcs_pos / BITS_IN_A_BYTE],
+			     tx_mcs_pos % BITS_IN_A_BYTE, 2, max_tx_nss - 1);
+	}
+}
+
 QDF_STATUS wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint8_t *rx_nss)

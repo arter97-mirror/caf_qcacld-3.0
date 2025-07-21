@@ -1289,6 +1289,17 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 
 void lim_log_vht_cap(struct mac_context *mac, tDot11fIEVHTCaps *pDot11f);
 
+/**
+ * lim_extract_ht_caps_txrx_nss() - API to extract Tx/Rx NSS from HT caps
+ * @mcs_set: Pointer to HT MCS-SET
+ * @tx_nss: Pointer to hold extracted Tx NSS
+ * @rx_nss: Pointer to hold extracted Rx NSS
+ *
+ * Return: void
+ */
+void lim_extract_ht_caps_txrx_nss(uint8_t *mcs_set, uint8_t *tx_nss,
+				  uint8_t *rx_nss);
+
 QDF_STATUS
 populate_dot11f_vht_caps(struct mac_context *mac, struct pe_session *pe_session,
 			tDot11fIEVHTCaps *pDot11f);

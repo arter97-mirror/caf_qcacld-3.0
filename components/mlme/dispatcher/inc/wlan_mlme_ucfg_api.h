@@ -3023,6 +3023,27 @@ QDF_STATUS ucfg_mlme_update_max_fw_chains_cfg(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_set_ht_mcsset_for_nss() - Set HT MCS set based on NSS
+ * @psoc: pointer to psoc object
+ * @ht_caps: pointer to HT capabilities structure
+ * @mcs_set: pointer to MCS set array
+ * @tx_nss: number of spatial streams for transmission
+ * @rx_nss: number of spatial streams for reception
+ *
+ * This function sets the HT MCS set based on the number of spatial streams
+ * for transmission and reception.
+ *
+ * Return: None
+ */
+static inline
+void ucfg_mlme_set_ht_mcsset_for_nss(struct wlan_objmgr_psoc *psoc,
+				     tDot11fIEHTCaps *ht_caps, uint8_t *mcs_set,
+				     uint8_t tx_nss, uint8_t rx_nss)
+{
+	mlme_set_ht_mcsset_for_nss(psoc, ht_caps, mcs_set, tx_nss, rx_nss);
+}
+
+/**
  * ucfg_mlme_get_cur_ch_width_update_from_ap() - UCFG API to get current
  * channel width if update is there from AP
  *

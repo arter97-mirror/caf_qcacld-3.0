@@ -5425,6 +5425,24 @@ QDF_STATUS wlan_mlme_init_fw_chain_cfg(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * wlan_mlme_set_ht_mcsset_for_nss() - Wrapper API to fill the HT caps' MCS-SET
+ * @psoc: Pointer to psoc object manager
+ * @ht_caps: Pointer to HT capability IE struct
+ * @mcs_set: Pointer to MCS SET of HT Caps
+ * @tx_nss: Tx value of NSS
+ * @rx_nss: Rx value of NSS
+ *
+ * Return: void
+ */
+static inline
+void wlan_mlme_set_ht_mcsset_for_nss(struct wlan_objmgr_psoc *psoc,
+				     tDot11fIEHTCaps *ht_caps, uint8_t *mcs_set,
+				     uint8_t tx_nss, uint8_t rx_nss)
+{
+	mlme_set_ht_mcsset_for_nss(psoc, ht_caps, mcs_set, tx_nss, rx_nss);
+}
+
+/**
  * wlan_mlme_assemble_rate_code() - assemble rate code to be sent to FW
  *
  * @preamble: rate preamble

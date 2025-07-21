@@ -2289,6 +2289,23 @@ QDF_STATUS mlme_update_max_fw_chains_cfg(struct wlan_objmgr_psoc *psoc,
 					 uint8_t tx_chains, uint8_t rx_chains);
 
 /**
+ * mlme_set_ht_mcsset_for_nss() - API to fill the MCS set for HT capability IE
+ * @psoc: PSOC object manager pointer
+ * @ht_caps: Pointer to whole HT caps
+ * @mcs_set: Pointer to MCS set of the HT caps
+ * @tx_nss: Value of Tx NSS to fill
+ * @rx_nss: Value of Rx NSS to fill
+ *
+ * Fill the Tx/Rx NSS in the buffer pointed by @ht_caps / @mcs_set within
+ * the HT caps limit (4SS)
+ *
+ * Return: void
+ */
+void mlme_set_ht_mcsset_for_nss(struct wlan_objmgr_psoc *psoc,
+				tDot11fIEHTCaps *ht_caps, uint8_t *mcs_set,
+				uint8_t tx_nss, uint8_t rx_nss);
+
+/**
  * wlan_mlme_get_cur_ch_width_update_from_ap() - API to get current channel
  * width from AP
  *

@@ -1556,6 +1556,26 @@ static void lim_log_qos_map_set(struct mac_context *mac,
 			   sizeof(pQosMapSet->dscp_range));
 }
 
+void lim_extract_ht_caps_txrx_nss(uint8_t *mcs_set, uint8_t *tx_nss,
+				  uint8_t *rx_nss)
+{
+	uint8_t idx, tx_mcs_pos = WLAN_HT_CAP_TX_MAX_NSS_POS;
+	uint8_t tx_mcs_def_pos = WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS;
+
+	for (idx = NSS_1x1_MODE; idx <= NSS_4x4_MODE; idx++)
+		if (!mcs_set[idx - 1])
+			break;
+
+	*rx_nss = idx - 1;
+
+	if (QDF_GET_BITS(mcs_set[tx_mcs_def_pos / BITS_IN_A_BYTE],
+			 tx_mcs_def_pos % BITS_IN_A_BYTE, 2) == 0x3)
+		*tx_nss = QDF_GET_BITS(mcs_set[tx_mcs_pos / BITS_IN_A_BYTE],
+				       tx_mcs_pos % BITS_IN_A_BYTE, 2) + 1;
+	else
+		*tx_nss = *rx_nss;
+}
+
 QDF_STATUS
 populate_dot11f_vht_caps(struct mac_context *mac,
 			 struct pe_session *pe_session, tDot11fIEVHTCaps *pDot11f)
