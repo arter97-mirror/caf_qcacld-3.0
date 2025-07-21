@@ -2779,6 +2779,13 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 	dp_ctx->dp_stc = dp_stc;
 	dp_stc->dp_ctx = dp_ctx;
 
+	/* Init timer */
+	qdf_hrtimer_init(&dp_stc->flow_sampling_timer,
+			 wlan_dp_stc_flow_sampling_timer, QDF_CLOCK_MONOTONIC,
+			 QDF_HRTIMER_MODE_REL, QDF_CONTEXT_HARDWARE);
+
+	dp_stc->sample_timer_state = WLAN_DP_STC_TIMER_INIT;
+
 	/* Init periodic work */
 	status = qdf_periodic_work_create(&dp_stc->flow_monitor_work,
 					  wlan_dp_stc_flow_monitor_work_handler,
@@ -2801,12 +2808,6 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 	if (dp_stc->rtpm_control)
 		hif_rtpm_register(HIF_RTPM_ID_DP_STC, NULL);
 
-	/* Init timer */
-	qdf_hrtimer_init(&dp_stc->flow_sampling_timer,
-			 wlan_dp_stc_flow_sampling_timer, QDF_CLOCK_MONOTONIC,
-			 QDF_HRTIMER_MODE_REL, QDF_CONTEXT_HARDWARE);
-
-	dp_stc->sample_timer_state = WLAN_DP_STC_TIMER_INIT;
 	dp_fisa_rx_add_tcp_flow_to_fst(dp_ctx);
 	/* Enable basic STC logs */
 	dp_stc->logmask = WLAN_DP_STC_LOGMASK_VERBOSE_L1;
@@ -2839,9 +2840,9 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 	}
 
 	dp_info("STC: detach");
-	qdf_hrtimer_cancel(&dp_stc->flow_sampling_timer);
 	qdf_periodic_work_stop_sync(&dp_stc->flow_monitor_work);
 	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
+	qdf_hrtimer_cancel(&dp_stc->flow_sampling_timer);
 
 	if (dp_stc->rtpm_control) {
 		if (dp_stc->rtpm_control_flow_cnt)
