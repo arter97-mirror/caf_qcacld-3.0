@@ -903,6 +903,10 @@ config QCOM_LTE_COEX
 	bool "Enable QCOM LTE Coex feature"
 	default n
 
+config FEATURE_WLAN_SAP_COEX_CHECK_BW
+	bool "Enable SAP Coex check with bandwidth feature"
+	default n
+
 config QCOM_TDLS
 	bool "Enable TDLS feature"
 	default n
