@@ -715,6 +715,16 @@ struct wlan_hdd_peer_info {
 };
 #endif
 
+#define MAX_BCN_HISTORY 10
+
+/**
+ * struct bcn_his_info_stats - beacon rssi history stats
+ * @bcn_history: Beacon real RSSI history array
+ */
+struct bcn_his_info_stats {
+	struct bcn_his_info bcn_history[MAX_BCN_HISTORY];
+};
+
 #define MAX_SUBTYPES_TRACKED	4
 
 struct hdd_stats {
@@ -726,6 +736,7 @@ struct hdd_stats {
 	struct hdd_peer_stats peer_stats;
 	struct hdd_pmf_stats hdd_pmf_stats;
 	struct pmf_bcn_protect_stats bcn_protect_stats;
+	struct bcn_his_info_stats bcn_rssi_his_stats;
 };
 
 /**
@@ -1277,17 +1288,31 @@ struct get_station_client_info {
 };
 
 /**
- * enum wfc_state_latency_level - value as per
- * QCA_WLAN_VENDOR_ATTR_CONFIG_WFC_STATE cmd
- * @WFC_OFF_LATENCY_LEVEL: level off
- * @WFC_ON_LATENCY_LEVEL: level on
- * @WFC_INVALID_LATENCY_LEVEL: Invalid level
+ * enum hdd_wlm_latency_level - Latency level values should match the definition
+ * in the INI "wlm_latency_level".
+ *
+ * @HDD_WLM_LATENCY_LEVEL_NORMAL: Default WLAN operation level focused on
+ * throughput.
+ *
+ * @HDD_WLM_LATENCY_LEVEL_XR: XR level to benefit extended reality (XR)
+ * applications by reducing latency and power through constrained scan,
+ * roaming, and adaptive power save.
+ *
+ * @HDD_WLM_LATENCY_LEVEL_LOW: Low latency level to benefit applications like
+ * concurrent downloading or video streaming through constrained scan and
+ * adaptive power save.
+ *
+ * @HDD_WLM_LATENCY_LEVEL_ULTRALOW: Ultra-low latency level to benefit gaming
+ * and voice applications through constrained scan, roaming, and adaptive
+ * power save.
  */
-enum wfc_state_latency_level {
-	WFC_OFF_LATENCY_LEVEL,
-	WFC_ON_LATENCY_LEVEL,
-	WFC_INVALID_LATENCY_LEVEL,
+enum hdd_wlm_latency_level {
+	HDD_WLM_LATENCY_LEVEL_NORMAL = 0,
+	HDD_WLM_LATENCY_LEVEL_XR = 1,
+	HDD_WLM_LATENCY_LEVEL_LOW = 2,
+	HDD_WLM_LATENCY_LEVEL_ULTRALOW = 3,
 };
+
 
 /**
  * struct hdd_adapter - hdd vdev/net_device context

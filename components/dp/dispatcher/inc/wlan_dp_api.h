@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -56,6 +56,17 @@ QDF_STATUS wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
  * Return: None
  */
 void wlan_dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id);
+
+#ifdef WLAN_DP_FEATURE_STC
+/*
+ * wlan_dp_fisa_rx_fst_inv_peer_id() - Invalidate the peer_id in all the FST
+ *				      entries which belong to this peer
+ * @peer_id: peer_id for which the invalidation is to be done
+ *
+ * Return: None
+ */
+void wlan_dp_fisa_rx_fst_inv_peer_id(uint16_t peer_id);
+#endif
 
 /**
  * wlan_dp_set_fst_in_cmem() - Set flag to indicate FST is in CMEM

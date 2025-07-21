@@ -231,6 +231,15 @@ QDF_STATUS ucfg_mlme_set_ht_cap_info(struct wlan_objmgr_psoc *psoc,
 	return wlan_mlme_set_ht_cap_info(psoc, ht_cap_info);
 }
 
+static inline
+QDF_STATUS ucfg_disable_dynamic_smps(struct wlan_objmgr_psoc *psoc)
+{
+	wlan_mlme_disable_ht_dynamic_smps(psoc);
+	wlan_mlme_disable_he_dynamic_smps(psoc);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * ucfg_mlme_get_max_amsdu_num() - get the max amsdu num
  * @psoc: pointer to psoc object
@@ -2994,6 +3003,22 @@ ucfg_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 			 uint8_t *rx_nss)
 {
 	return wlan_mlme_get_sta_rx_nss(psoc, vdev, rx_nss);
+}
+
+/**
+ * ucfg_mlme_get_cur_ch_width_update_from_ap() - UCFG API to get current
+ * channel width if update is there from AP
+ *
+ * @vdev: pointer to vdev
+ * @cur_ch_width: current channel width
+ *
+ * Return: true if there is update else false
+ */
+static inline bool
+ucfg_mlme_get_cur_ch_width_update_from_ap(struct  wlan_objmgr_vdev *vdev,
+					  enum phy_ch_width *cur_ch_width)
+{
+	return wlan_mlme_get_cur_ch_width_update_from_ap(vdev, cur_ch_width);
 }
 
 /**

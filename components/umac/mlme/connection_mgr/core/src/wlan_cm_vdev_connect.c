@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1855,8 +1855,6 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 	    !(rsp->cm_id & (CM_ID_LSWITCH_BIT | CM_ID_LINKADD_BIT)))
 		ucfg_policy_mgr_post_sta_p2p_start_failed(wlan_vdev_get_psoc(vdev),
 							  wlan_vdev_get_id(vdev));
-
-	mlo_roam_connect_complete(vdev);
 
 	if (op_mode == QDF_STA_MODE &&
 		(wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||

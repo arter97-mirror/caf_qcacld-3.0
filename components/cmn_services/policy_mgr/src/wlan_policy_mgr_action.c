@@ -692,6 +692,9 @@ bool policy_mgr_is_dbs_allowed_for_concurrency(
 		case QDF_STA_MODE:
 		case QDF_SAP_MODE:
 		case QDF_NDI_MODE:
+		case QDF_P2P_DEVICE_MODE:
+		case QDF_P2P_CLIENT_MODE:
+		case QDF_P2P_GO_MODE:
 			return true;
 		default:
 			return false;
@@ -3649,6 +3652,7 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 			policy_mgr_debug("SAP vdev id %d restarts, old ch freq :%d new ch freq: %d",
 					vdev_id[i],
 					op_ch_freq_list[i], ch_freq);
+			break;
 		}
 	}
 

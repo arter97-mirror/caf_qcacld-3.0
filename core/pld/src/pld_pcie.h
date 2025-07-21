@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -101,6 +101,11 @@ static inline int pld_pcie_wlan_hw_enable(void)
 	return 0;
 }
 
+static inline int pld_pcie_set_host_param(struct device *dev,
+					  const char *chip_name)
+{
+	return 0;
+}
 #else
 
 /**
@@ -130,6 +135,25 @@ int pld_pcie_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
  *         Non zero failure code for errors
  */
 int pld_pcie_wlan_disable(struct device *dev, enum pld_driver_mode mode);
+
+/**
+ * pld_pcie_set_host_param() - set host param
+ * @dev: device
+ * @chip_name: chip name
+ *
+ * This function passes host param chipname.
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0))
+int pld_pcie_set_host_param(struct device *dev, const char *chip_name);
+#else
+static inline int pld_pcie_set_host_param(struct device *dev,
+					  const char *chip_name)
+{
+	return 0;
+}
+#endif
 
 #ifdef FEATURE_CNSS_HW_SECURE_DISABLE
 static inline int pld_pcie_wlan_hw_enable(void)
@@ -224,6 +248,11 @@ static inline int
 pld_pcie_smmu_unmap(struct device *dev, uint32_t iova_addr, size_t size)
 {
 	return 0;
+}
+
+static inline int pld_pcie_get_tsf_gpio(struct device *dev)
+{
+	return -EINVAL;
 }
 
 static inline int
@@ -582,6 +611,12 @@ pld_pcie_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 						 unsigned int *cpumask)
 {
 }
+
+static inline int
+pld_pcie_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
+{
+	return -EINVAL;
+}
 #else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
 int pld_pcie_set_wfc_mode(struct device *dev,
@@ -593,6 +628,14 @@ static inline int pld_pcie_set_wfc_mode(struct device *dev,
 	return 0;
 }
 #endif
+
+/**
+ * pld_pcie_get_tsf_gpio() - Get GPIO pin number for GPIO IRQ based TSF sync
+ * @dev: device
+ *
+ * Return: GPIO pin number; Negative error code for failure
+ */
+int pld_pcie_get_tsf_gpio(struct device *dev);
 
 /**
  * pld_pcie_get_fw_files_for_target() - Get FW file names
@@ -1148,5 +1191,11 @@ pld_pcie_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 {
 }
 #endif /* CONFIG_DT_CPU_MASK_DP_INTR */
+
+static inline int
+pld_pcie_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
+{
+	return cnss_pci_get_iova_info(dev, addr, size);
+}
 #endif
 #endif

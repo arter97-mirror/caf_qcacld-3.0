@@ -39,9 +39,15 @@
 
 /*
  * Maximum number of action oui extensions supported in
- * each action oui category
+ * each action oui category to F/W
  */
-#define ACTION_OUI_MAX_EXTENSIONS 10
+#define ACTION_OUI_MAX_EXT_TO_FW 10
+
+/*
+ * Maximum number of action oui extensions supported in
+ * each action oui category for host only
+ */
+#define ACTION_OUI_MAX_EXT_HOST_ONLY 100
 
 /*
  * Firmware allocates memory for the extensions only during init time.
@@ -134,6 +140,10 @@
  * @ACTION_OUI_ENABLE_CTS2SELF: enable cts to self for specified AP's
  * @ACTION_OUI_LIMIT_BW: Limit BW if vendor OUI is received in beacon.
  * @ACTION_OUI_EXT_MLD_CAP_OP: Exclude Extended MLD cap and op for specified AP
+ * @ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK: skip beacon frame channel mismatch
+ * check for specified AP.
+ * @ACTION_OUI_ENABLE_DYNAMIC_SMPS: Enable Dynamic SMPS for specified AP,
+ * priority higher than ACTION_OUI_DISABLE_DYNAMIC_SMPS
  * @ACTION_OUI_MAXIMUM_ID: maximum number of action oui types
  */
 enum action_oui_id {
@@ -162,9 +172,10 @@ enum action_oui_id {
 	ACTION_OUI_DISABLE_BFORMEE,
 	ACTION_OUI_DISABLE_AGGRESSIVE_EDCA,
 	ACTION_OUI_ENABLE_CTS2SELF,
-
 	ACTION_OUI_LIMIT_BW,
 	ACTION_OUI_EXT_MLD_CAP_OP,
+	ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK,
+	ACTION_OUI_ENABLE_DYNAMIC_SMPS,
 	ACTION_OUI_MAXIMUM_ID
 };
 
@@ -271,5 +282,58 @@ struct action_oui_search_attr {
 	bool enable_2g;
 	bool enable_5g;
 };
+
+/**
+ * enum action_oui_token_type - token types expected.
+ * @ACTION_OUI_TOKEN: oui
+ * @ACTION_OUI_DATA_LENGTH_TOKEN: data length
+ * @ACTION_OUI_DATA_TOKEN: OUI data
+ * @ACTION_OUI_DATA_MASK_TOKEN: data mask
+ * @ACTION_OUI_INFO_MASK_TOKEN: info mask
+ * @ACTION_OUI_MAC_ADDR_TOKEN: mac addr
+ * @ACTION_OUI_MAC_MASK_TOKEN: mac mask
+ * @ACTION_OUI_CAPABILITY_TOKEN: capability
+ * @ACTION_OUI_DATA_BIT_MASK_TOKEN: data bit mask
+ * @ACTION_OUI_MAC_BIT_MASK_TOKEN: mac bit mask
+ * @ACTION_OUI_END_TOKEN: end of one oui extension
+ */
+enum action_oui_token_type {
+	ACTION_OUI_TOKEN = 1 << 0,
+	ACTION_OUI_DATA_LENGTH_TOKEN = 1 << 1,
+	ACTION_OUI_DATA_TOKEN = 1 << 2,
+	ACTION_OUI_DATA_MASK_TOKEN = 1 << 3,
+	ACTION_OUI_INFO_MASK_TOKEN = 1 << 4,
+	ACTION_OUI_MAC_ADDR_TOKEN = 1 << 5,
+	ACTION_OUI_MAC_MASK_TOKEN = 1 << 6,
+	ACTION_OUI_CAPABILITY_TOKEN = 1 << 7,
+	ACTION_OUI_DATA_BIT_MASK_TOKEN = 1 << 8,
+	ACTION_OUI_MAC_BIT_MASK_TOKEN = 1 << 9,
+	ACTION_OUI_END_TOKEN = 1 << 10,
+};
+
+#ifdef ACTION_OUI_OP_ATTR
+/**
+ * struct action_oui_cap - action oui cap
+ * @nss_bitmap: nss bitmap
+ *  bit 0 : NSS 1
+ *  bit 1 : NSS 2
+ *  bit 2 : NSS 3
+ *  bit 3 : NSS 4
+ * @ht: is ht supported
+ * @vht: is vht supported
+ * @band_bitmap: band bitmap: 2G and 5G
+ */
+struct action_oui_cap {
+	uint8_t nss_bitmap:4;
+	uint8_t ht:1;
+	uint8_t vht:1;
+	uint8_t band_bitmap:2;
+};
+
+union action_oui_capability {
+	uint8_t val;
+	struct action_oui_cap bitmap;
+};
+#endif
 
 #endif /* _WLAN_ACTION_OUI_PUBLIC_STRUCT_H_ */

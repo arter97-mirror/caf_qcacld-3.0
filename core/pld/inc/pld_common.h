@@ -761,6 +761,18 @@ int pld_set_fw_log_mode(struct device *dev, u8 fw_log_mode);
 void pld_get_default_fw_files(struct pld_fw_files *pfw_files);
 
 /**
+ * pld_set_host_param() - Set host param
+ * @dev: device
+ * @chip_name: chipname
+ *
+ * This function sets host params.
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_set_host_param(struct device *dev, const char *chip_name);
+
+/**
  * pld_get_fw_files_for_target() - Get FW file names
  * @dev: device
  * @pfw_files: buffer for FW file names
@@ -1999,6 +2011,14 @@ int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 void pld_set_tsf_sync_period(struct device *dev, u32 val);
 
 /**
+ * pld_get_tsf_gpio() - Get GPIO pin number for GPIO IRQ based TSF sync
+ * @dev: device
+ *
+ * Return: GPIO pin number; Negative error code for failure
+ */
+int pld_get_tsf_gpio(struct device *dev);
+
+/**
  * pld_reset_tsf_sync_period() - Reset TSF sync period
  * @dev: device
  *
@@ -2287,5 +2307,15 @@ pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 void pld_set_cxpc(struct device *dev);
 #else
 static inline void pld_set_cxpc(struct device *dev) {}
+#endif
+
+#if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
+int pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size);
+#else
+static inline int
+pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
+{
+	return -EINVAL;
+}
 #endif
 #endif

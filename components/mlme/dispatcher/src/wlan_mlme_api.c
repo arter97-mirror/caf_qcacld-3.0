@@ -149,6 +149,38 @@ QDF_STATUS wlan_mlme_set_ht_cap_info(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+wlan_mlme_disable_ht_dynamic_smps(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_legacy_debug("Disable HT D-SMPS");
+	mlme_obj->cfg.ht_caps.ht_cap_info.mimo_power_save = SMPS_MODE_DISABLED;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#ifdef WLAN_FEATURE_11AX
+QDF_STATUS
+wlan_mlme_disable_he_dynamic_smps(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_legacy_debug("Disable HE D-SMPS");
+	mlme_obj->cfg.he_caps.dot11_he_cap.he_dynamic_smps = 0;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS wlan_mlme_get_max_amsdu_num(struct wlan_objmgr_psoc *psoc,
 				       uint8_t *value)
 {

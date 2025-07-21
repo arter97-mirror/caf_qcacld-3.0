@@ -43,12 +43,14 @@ wlan_twt_cfg_get_req_flag(struct wlan_objmgr_psoc *psoc, bool *val);
 /**
  * wlan_twt_cfg_get_res_flag() - Get TWT responder flag
  * @psoc: Pointer to global psoc object
+ * @vdev_id: VDEV ID
  * @val: pointer to output variable
  *
  * Return: QDF_STATUS_SUCCESS
  */
 QDF_STATUS
-wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val);
+wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			  bool *val);
 
 /**
  * wlan_twt_cfg_get_twt_dis_on_scan() - Get TWT disable on scan flag
@@ -195,9 +197,11 @@ bool wlan_twt_check_responder_bit(struct wlan_objmgr_psoc *psoc,
 #else
 
 static inline QDF_STATUS
-wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val)
+wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			  bool *val)
 {
-	return QDF_STATUS_SUCCESS;
+	*val = false;
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
 static inline QDF_STATUS

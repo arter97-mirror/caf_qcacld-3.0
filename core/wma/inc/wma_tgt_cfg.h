@@ -42,6 +42,7 @@
  * @en_tdls_11ax_support: Get TDLS ax support
  * @en_tdls_6g_support: Get TDLS 6g fw capability
  * @en_tdls_mlo_support: Get TDLS mlo fw support
+ * @en_tdls_nss_confirm_support: Get TDLS TDLS NSS operation fw support
  * @en_n_link_mlo_support: Get N-Link mlo fw support
  * @en_roam_offload: enable roam offload
  * @en_11ax: enable 11ax
@@ -87,6 +88,9 @@ struct wma_tgt_services {
 #ifdef WLAN_FEATURE_11BE
 	bool en_tdls_mlo_support;
 	bool en_n_link_mlo_support;
+#endif
+#ifdef WLAN_FEATURE_TDLS_NSS_4_4
+	bool en_tdls_nss_confirm_support;
 #endif
 #endif /* FEATURE_WLAN_TDLS */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD

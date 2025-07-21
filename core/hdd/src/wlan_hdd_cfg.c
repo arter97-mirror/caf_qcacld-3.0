@@ -2700,6 +2700,56 @@ wlan_update_mlo_link_chn_width(struct hdd_adapter *adapter,
 }
 #endif
 
+/**
+ * hdd_convert_ht_to_reg_width() - convert HT channel width to regulatory
+ * channel width
+ * @ch_width: HT channel width
+ *
+ * Return: corresponding regulatory channel width
+ */
+static
+uint16_t hdd_convert_ht_to_reg_width(enum eSirMacHTChannelWidth ch_width)
+{
+	enum phy_ch_width phy_ch_width;
+
+	phy_ch_width = hdd_convert_chwidth_to_phy_chwidth(ch_width);
+
+	return wlan_reg_get_bw_value(phy_ch_width);
+}
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * hdd_get_mlo_link_freq() - Retrieve the link frequency for a given link
+ * @vdev: Pointer to the objmgr vdev object
+ * @link_id: ID of the MLO link
+ * @link_freq: Pointer to store the retrieved link frequency
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
+		      uint16_t *link_freq)
+{
+	struct mlo_link_info *mlo_link_info;
+
+	mlo_link_info = mlo_mgr_get_ap_link_by_link_id(vdev->mlo_dev_ctx,
+						       link_id);
+	if (!mlo_link_info)
+		return -EINVAL;
+
+	*link_freq = mlo_link_info->link_chan_info->ch_freq;
+
+	return 0;
+}
+#else
+static inline int
+hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
+		      uint16_t *link_freq)
+{
+	return -EINVAL;
+}
+#endif
+
 int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 			     enum eSirMacHTChannelWidth chwidth,
 			     uint32_t bonding_mode, uint8_t link_id,
@@ -2707,15 +2757,15 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 {
 	struct hdd_context *hdd_ctx;
 	int ret;
-	enum phy_ch_width ch_width;
-	struct wlan_objmgr_vdev *link_vdev;
-	struct wlan_objmgr_vdev *vdev;
+	enum phy_ch_width ch_width, new_ch_width;
+	struct wlan_objmgr_vdev *link_vdev, *vdev;
+	struct wlan_objmgr_pdev *pdev;
 	struct wlan_hdd_link_info *link_info_t;
-	uint8_t link_vdev_id;
+	uint8_t link_vdev_id = link_info->vdev_id;
 	enum QDF_OPMODE op_mode;
 	QDF_STATUS status;
-	uint8_t vdev_id = link_info->vdev_id;
-	enum phy_ch_width new_ch_width;
+	uint16_t operating_freq = 0, max_allowed_bw, bw_to_update;
+	struct wlan_channel *comp_vdev_chan = NULL;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	if (!hdd_ctx) {
@@ -2726,13 +2776,20 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 	op_mode = link_info->adapter->device_mode;
 	if (op_mode != QDF_STA_MODE) {
 		hdd_debug("vdev %d: op mode %d, CW update not supported",
-			  vdev_id, op_mode);
+			  link_info->vdev_id, op_mode);
 		return -EINVAL;
 	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
-		hdd_err("vdev %d: vdev not found", vdev_id);
+		hdd_err("vdev %d: vdev not found", link_info->vdev_id);
+		return -EINVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		hdd_debug("pdev is NULL");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return -EINVAL;
 	}
 
@@ -2751,6 +2808,19 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 			return -EINVAL;
 		}
 
+		/*
+		 * Get the current operating frequency for the specified
+		 * link ID in an MLO connection. hdd_get_mlo_link_freq()
+		 * may fail if the link is not initialized or active.
+		 */
+		ret = hdd_get_mlo_link_freq(vdev, link_id, &operating_freq);
+		if (ret) {
+			hdd_err("failed to get MLO link freq");
+			link_vdev = vdev;
+			/* Send legacy cmd to FW if the VDEV is not active */
+			goto set_command;
+		}
+
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 		link_vdev = hdd_objmgr_get_vdev_by_user(link_info_t,
@@ -2767,8 +2837,36 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 			ch_width = new_ch_width;
 	} else {
 		link_vdev = vdev;
-		link_vdev_id = vdev_id;
 		link_info_t = link_info;
+		/*
+		 * Retrieve the current operating frequency for a non-MLO
+		 * connection. wlan_vdev_get_active_channel() returns NULL
+		 * if the vdev is not active (i.e., not connected or not
+		 * started).
+		 */
+		comp_vdev_chan = wlan_vdev_get_active_channel(vdev);
+		if (!comp_vdev_chan) {
+			hdd_err("vdev %d: comp_vdev_chan is NULL",
+				link_info->vdev_id);
+			/* Send legacy cmd to FW if the VDEV is not active */
+			goto set_command;
+		}
+
+		operating_freq = comp_vdev_chan->ch_freq;
+	}
+
+	if (operating_freq) {
+		/* Regulatory bandwidth check for a valid operating_freq */
+		max_allowed_bw = wlan_reg_get_max_chwidth(pdev, operating_freq);
+		bw_to_update = hdd_convert_ht_to_reg_width(chwidth);
+
+		hdd_debug("op_freq: %d, max_allowed_bw: %d, bw_to_update: %d",
+			  operating_freq, max_allowed_bw, bw_to_update);
+
+		if (bw_to_update > max_allowed_bw) {
+			hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
+			return -EINVAL;
+		}
 	}
 
 	if (ucfg_mlme_is_chwidth_with_notify_supported(hdd_ctx->psoc) &&
@@ -2795,6 +2893,8 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 		hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 		return 0;
 	}
+
+set_command:
 	hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 
 	ret = wma_cli_set_command(link_vdev_id, wmi_vdev_param_chwidth,

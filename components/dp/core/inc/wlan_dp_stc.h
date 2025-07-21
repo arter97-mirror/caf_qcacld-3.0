@@ -75,6 +75,11 @@
 			__field##_max = __val;				\
 	} while (0)
 
+#define DP_STC_UPDATE_SUM_STATS(__field, __val)			\
+	do {								\
+		__field##_sum += __val;					\
+	} while (0)
+
 #define DP_STC_UPDATE_WIN_MIN_MAX_STATS(__field, __val)			\
 	do {								\
 		if (__field##_min == 0 || __field##_min > __val)	\
@@ -94,6 +99,9 @@
 #define WLAN_DP_STC_TX_FLOW_ID_INTF_ID_SHIFT 6
 #define WLAN_DP_STC_TX_FLOW_ID_INTF_ID_MASK 0x3
 #define WLAN_DP_STC_TX_FLOW_ID_MASK 0x3f
+
+/* This macro is a copy of DP_INVALID_PEER_ID */
+#define DP_STC_INVALID_PEER_ID 0xFFFF
 
 /**
  * struct wlan_dp_stc_peer_ping_info - Active ping information table with
@@ -770,7 +778,7 @@ wlan_dp_stc_mark_ping_ts(struct wlan_dp_psoc_context *dp_ctx,
 	if (!dp_stc)
 		return;
 
-	if (peer_id == 0xFFFF)
+	if (peer_id == DP_STC_INVALID_PEER_ID)
 		return;
 
 	peer_tc = &dp_stc->peer_tc[peer_id];

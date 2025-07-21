@@ -2359,7 +2359,7 @@ wlan_twt_clear_wait_for_notify_flag_for_ml(
 	struct wlan_mlo_dev_context *ml_dev_ctx;
 	struct wlan_objmgr_vdev *vdev_iter;
 	uint32_t i;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	ml_dev_ctx = vdev->mlo_dev_ctx;
 	if (!ml_dev_ctx)

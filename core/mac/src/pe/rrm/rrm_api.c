@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -278,6 +278,8 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 
 		if (pLinkReq->MaxTxPower.maxTxPower != ap_pwr_constraint) {
 			tx_ops = wlan_reg_get_tx_ops(mac->psoc);
+			if (!tx_ops)
+				return QDF_STATUS_E_FAILURE;
 
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac->psoc,
@@ -1819,7 +1821,7 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 			 * If last beacon report indication is not supported,
 			 * truncate and move on to the next beacon.
 			 */
-			if (rem_len &&
+			if (rem_len && bss_desc &&
 			    curr_req->request.Beacon.
 			    last_beacon_report_indication) {
 				offset = GET_IE_LEN_IN_BSS(
@@ -1896,8 +1898,7 @@ end:
 		rrm_cleanup(mac_ctx, beacon_xmit_ind->measurement_idx);
 	}
 
-	if (report)
-		qdf_mem_free(report);
+	qdf_mem_free(report);
 
 	return status;
 }

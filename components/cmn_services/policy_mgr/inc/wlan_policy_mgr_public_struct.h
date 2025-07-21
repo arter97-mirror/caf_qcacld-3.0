@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -59,6 +59,7 @@
 #define WEIGHT_OF_DISALLOWED_CHANNELS 0
 
 #define MAX_MAC 2
+#define DEFAULT_MAC_ID 255
 
 #if defined(FEATURE_SIXTH_CONNECTION)
 #define MAX_NUMBER_OF_CONC_CONNECTIONS 6

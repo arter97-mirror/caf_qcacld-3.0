@@ -73,8 +73,10 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 	/* TxRx Stats - Start */
 	if (flow_entry->prev_pkt_arrival_ts) {
 		pkt_iat = curr_pkt_ts - flow_entry->prev_pkt_arrival_ts;
-		DP_STC_UPDATE_MIN_MAX_SUM_STATS(flow_entry->txrx_stats.pkt_iat,
-						pkt_iat);
+		DP_STC_UPDATE_MIN_MAX_STATS(flow_entry->txrx_stats.pkt_iat,
+					    pkt_iat);
+		DP_STC_UPDATE_SUM_STATS(flow_entry->txrx_stats.pkt_iat_burst,
+					pkt_iat);
 	}
 
 	flow_entry->txrx_stats.bytes += pkt_len;
@@ -107,9 +109,12 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 		DP_STC_UPDATE_WIN_MIN_MAX_STATS(txrx_min_max_stats->pkt_size,
 						pkt_len);
 		if (!qdf_atomic_test_and_clear_bit(WLAN_DP_STC_TRANSITION_FLAG_SAMPLE,
-						   &flow_entry->transition_flags))
+						   &flow_entry->transition_flags)) {
 			DP_STC_UPDATE_WIN_MIN_MAX_STATS(txrx_min_max_stats->pkt_iat,
 							pkt_iat);
+			DP_STC_UPDATE_SUM_STATS(flow_entry->txrx_stats.pkt_iat_txrx,
+						pkt_iat);
+		}
 		dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_TXRX_PKT,
 			   "STC: [%hu:%hu] mdata 0x%x len %u [%u - %u] iat %llu [%llu - %llu]",
 			   s, w, flow_entry->metadata,
@@ -119,9 +124,11 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 			   txrx_min_max_stats->pkt_iat_max);
 	} else {
 		dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
-			   "STC: mdata 0x%x len %u iat %llu burst_state %u",
+			   "STC: mdata 0x%x len %u iat %llu burst_state %u [%llu] [%llu]",
 			   flow_entry->metadata, pkt_len, pkt_iat,
-			   flow_entry->burst_state);
+			   flow_entry->burst_state,
+			   flow_entry->burst_start_time,
+			   flow_entry->prev_pkt_arrival_ts);
 	}
 	/* TxRx Stats - End */
 
@@ -187,7 +194,8 @@ check_burst:
 	{
 		if (pkt_iat > BURST_END_TIME_THRESHOLD_NS) {
 			struct wlan_dp_stc_burst_stats *burst_stats;
-			uint32_t burst_dur, burst_size;
+			uint64_t burst_dur;
+			uint32_t burst_size;
 
 			flow_entry->burst_state = BURST_DETECTION_INIT;
 			burst_stats = &flow_entry->burst_stats;
@@ -204,17 +212,17 @@ check_burst:
 							burst_dur);
 			DP_STC_UPDATE_MIN_MAX_SUM_STATS(burst_stats->burst_size,
 							burst_size);
+			dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
+				   "STC: Flow mdata 0x%x ts: start %llu end: %llu Burst end with size %u dur %llu curr_ts %llu",
+				   flow_entry->metadata,
+				   flow_entry->burst_start_time,
+				   flow_entry->prev_pkt_arrival_ts,
+				   burst_size, burst_dur, curr_pkt_ts);
 			flow_entry->burst_start_time = curr_pkt_ts;
 			flow_entry->burst_state = BURST_DETECTION_INIT;
 			flow_entry->burst_start_detect_bytes = 0;
 			flow_entry->cur_burst_bytes = 0;
 			pkt_iat = 0;
-			dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
-				   "STC: Flow mdata 0x%x ts: start %llu end: %llu Burst end with size %u dur %u",
-				   flow_entry->metadata,
-				   flow_entry->burst_start_time,
-				   flow_entry->prev_pkt_arrival_ts,
-				   burst_size, burst_dur);
 			goto check_burst;
 		}
 
@@ -1292,6 +1300,7 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 	struct wlan_dp_spm_flow_info *tx_flow;
 	struct dp_fisa_rx_sw_ft *rx_flow;
 	uint16_t c_id;
+	uint16_t peer_id = DP_STC_INVALID_PEER_ID;
 	uint8_t buf[BUF_LEN_MAX];
 
 	/*
@@ -1336,10 +1345,6 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 		if (state > WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
 			continue;
 
-		dp_info("STC: Move flow (%s) to classified flow %d for peer %d",
-			dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
-					      buf, BUF_LEN_MAX),
-			c_id, s_entry->peer_id);
 		/* Got a free entry */
 		qdf_atomic_set(&c_entry->state,
 			       WLAN_DP_STC_CLASSIFIED_FLOW_STATE_ADDED);
@@ -1353,7 +1358,6 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 				DP_STC_CLASSIFIED_RT_FLOW_RM_INACTIVE_TIME_NS :
 				DP_STC_CLASSIFIED_FLOW_RM_INACTIVE_TIME_NS;
 
-		c_entry->peer_id = s_entry->peer_id;
 		qdf_atomic_inc(&c_table->num_valid_entries);
 
 		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
@@ -1373,8 +1377,19 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 			rx_flow->classified = DP_STC_CLASSIFIED_KNOWN;
 			rx_flow->inactivity_timeout = flow_rm_inactivity_time;
 			rx_flow->c_flow_id = c_id;
+			peer_id = rx_flow->peer_id;
 		}
 
+		if (peer_id != DP_STC_INVALID_PEER_ID &&
+		    s_entry->peer_id != peer_id)
+			c_entry->peer_id = peer_id;
+		else
+			c_entry->peer_id = s_entry->peer_id;
+
+		dp_info("STC: Move flow (%s) to classified flow %d for peer %hu [PEER_ID: s_entry %hu, rx_flow %hu]",
+			dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
+					      buf, BUF_LEN_MAX),
+			c_id, c_entry->peer_id, s_entry->peer_id, peer_id);
 		c_entry->flow_active = 1;
 		c_entry->add_ts = dp_stc_get_timestamp();
 		wlan_dp_stc_remove_sampling_table_entry(dp_stc, s_entry);
@@ -1449,7 +1464,8 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
 		if (!rx_flow->is_populated ||
 		    rx_flow->selected_to_sample ||
-		    rx_flow->classified)
+		    rx_flow->classified ||
+		    rx_flow->peer_id == DP_STC_INVALID_PEER_ID)
 			continue;
 
 		if (cur_ts - rx_flow->flow_init_ts <
@@ -1698,7 +1714,7 @@ wlan_dp_stc_save_delta_stats(struct wlan_dp_stc_txrx_stats *dst,
 {
 	dst->bytes = cur->bytes - ref->bytes;
 	dst->pkts = cur->pkts - ref->pkts;
-	dst->pkt_iat_sum = cur->pkt_iat_sum - ref->pkt_iat_sum;
+	dst->pkt_iat_sum = cur->pkt_iat_txrx_sum - ref->pkt_iat_txrx_sum;
 
 	return dst->pkts;
 }
@@ -1733,7 +1749,8 @@ wlan_dp_stc_save_burst_samples(struct wlan_dp_stc *dp_stc,
 {
 	struct wlan_dp_stc_flow_table_entry *flow;
 	struct wlan_dp_stc_burst_samples *burst_sample;
-	uint32_t burst_dur, burst_size;
+	uint64_t burst_dur;
+	uint32_t burst_size;
 	uint8_t burst_stage;
 
 	burst_stage = s_entry->flow_samples.curr_stats_stage;
@@ -1748,6 +1765,8 @@ wlan_dp_stc_save_burst_samples(struct wlan_dp_stc *dp_stc,
 	flow = &dp_stc->tx_flow_table->entries[s_entry->tx_flow_id];
 	qdf_mem_copy(&burst_sample->txrx_samples.tx, &flow->txrx_stats,
 		     sizeof(burst_sample->txrx_samples.tx));
+	burst_sample->txrx_samples.tx.pkt_iat_sum =
+					flow->txrx_stats.pkt_iat_burst_sum;
 	qdf_mem_copy(&burst_sample->tx, &flow->burst_stats,
 		     sizeof(burst_sample->tx));
 	if (flow->burst_state == BURST_DETECTION_BURST_START) {
@@ -1759,6 +1778,10 @@ wlan_dp_stc_save_burst_samples(struct wlan_dp_stc *dp_stc,
 		 * Burst ended at the last packet, so calculate
 		 * burst duration using the last pkt timestamp
 		 */
+		dp_stc_debug(dp_stc->logmask, "tx burst: mdata 0x%x prev_ts: %llu start_time: %llu",
+			     s_entry->tx_flow_metadata,
+			     flow->prev_pkt_arrival_ts,
+			     flow->burst_start_time);
 		burst_dur = flow->prev_pkt_arrival_ts -
 					flow->burst_start_time;
 		burst_size = flow->cur_burst_bytes;
@@ -1776,6 +1799,8 @@ save_rx_flow_samples:
 	flow = &dp_stc->rx_flow_table->entries[s_entry->rx_flow_id];
 	qdf_mem_copy(&burst_sample->txrx_samples.rx, &flow->txrx_stats,
 		     sizeof(burst_sample->txrx_samples.rx));
+	burst_sample->txrx_samples.rx.pkt_iat_sum =
+					flow->txrx_stats.pkt_iat_burst_sum;
 	qdf_mem_copy(&burst_sample->rx, &flow->burst_stats,
 		     sizeof(burst_sample->rx));
 	if (flow->burst_state == BURST_DETECTION_BURST_START) {
@@ -1787,6 +1812,10 @@ save_rx_flow_samples:
 		 * Burst ended at the last packet, so calculate
 		 * burst duration using the last pkt timestamp
 		 */
+		dp_stc_debug(dp_stc->logmask, "rx burst: mdata 0x%x prev_ts: %llu start_time: %llu",
+			     s_entry->rx_flow_metadata,
+			     flow->prev_pkt_arrival_ts,
+			     flow->burst_start_time);
 		burst_dur = flow->prev_pkt_arrival_ts -
 					flow->burst_start_time;
 		burst_size = flow->cur_burst_bytes;

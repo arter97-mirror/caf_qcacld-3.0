@@ -482,7 +482,7 @@ wlansap_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 		goto cleanup;
 
 	filter->num_of_channels = num_of_channels;
-	qdf_mem_copy(filter->chan_freq_list, &freq_list,
+	qdf_mem_copy(filter->chan_freq_list, freq_list,
 		     filter->num_of_channels *
 		     sizeof(filter->chan_freq_list[0]));
 
@@ -1708,8 +1708,8 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 		       sap_context->ch_width_orig,
 		       sap_context->csa_reason,
 		       channel_bonding_mode,
-		       tgt_ch_params->mhz_freq_seg0,
-		       tgt_ch_params->mhz_freq_seg1);
+		       tgt_ch_params ? tgt_ch_params->mhz_freq_seg0 : 0,
+		       tgt_ch_params ? tgt_ch_params->mhz_freq_seg1 : 0);
 
 	return ch_width;
 }

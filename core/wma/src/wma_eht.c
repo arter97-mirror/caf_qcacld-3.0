@@ -179,11 +179,284 @@ static const struct index_eht_data_rate_type eht_mcs_nss2[] = {
 	     {{57648, 54444, 49000}, {0} }}
 };
 
+static void wma_aggregate_eht_cap(tDot11fIEeht_cap *aggr_eht_cap,
+				  tDot11fIEeht_cap *eht_cap)
+{
+	if (!aggr_eht_cap->present) {
+		qdf_mem_copy(aggr_eht_cap, eht_cap, sizeof(tDot11fIEeht_cap));
+		return;
+	}
+
+	/* EHT MAC capabilities */
+	aggr_eht_cap->epcs_pri_access |= eht_cap->epcs_pri_access;
+	aggr_eht_cap->eht_om_ctl |= eht_cap->eht_om_ctl;
+	aggr_eht_cap->triggered_txop_sharing_mode1 |=
+			eht_cap->triggered_txop_sharing_mode1;
+	aggr_eht_cap->triggered_txop_sharing_mode2 |=
+			eht_cap->triggered_txop_sharing_mode2;
+	aggr_eht_cap->restricted_twt |= eht_cap->restricted_twt;
+	aggr_eht_cap->scs_traffic_desc |= eht_cap->scs_traffic_desc;
+	aggr_eht_cap->max_mpdu_len = QDF_MAX(aggr_eht_cap->max_mpdu_len,
+					     eht_cap->max_mpdu_len);
+	aggr_eht_cap->max_a_mpdu_len_exponent_ext |=
+			eht_cap->max_a_mpdu_len_exponent_ext;
+	aggr_eht_cap->eht_trs_support |= eht_cap->eht_trs_support;
+	aggr_eht_cap->txop_return_support_txop_share_m2 |=
+			eht_cap->txop_return_support_txop_share_m2;
+	aggr_eht_cap->two_bqrs_support |= eht_cap->two_bqrs_support;
+	aggr_eht_cap->eht_link_adaptation_support =
+			QDF_MAX(aggr_eht_cap->eht_link_adaptation_support,
+				eht_cap->eht_link_adaptation_support);
+
+	/* EHT PHY capabilities */
+	aggr_eht_cap->support_320mhz_6ghz |= eht_cap->support_320mhz_6ghz;
+	aggr_eht_cap->ru_242tone_wt_20mhz |= eht_cap->ru_242tone_wt_20mhz;
+	aggr_eht_cap->ndp_4x_eht_ltf_3dot2_us_gi |=
+			eht_cap->ndp_4x_eht_ltf_3dot2_us_gi;
+	aggr_eht_cap->partial_bw_mu_mimo |= eht_cap->partial_bw_mu_mimo;
+	aggr_eht_cap->su_beamformer |= eht_cap->su_beamformer;
+	aggr_eht_cap->su_beamformee |= eht_cap->su_beamformee;
+	aggr_eht_cap->bfee_ss_le_80mhz = QDF_MAX(aggr_eht_cap->bfee_ss_le_80mhz,
+						 eht_cap->bfee_ss_le_80mhz);
+	aggr_eht_cap->bfee_ss_160mhz = QDF_MAX(aggr_eht_cap->bfee_ss_160mhz,
+					       eht_cap->bfee_ss_160mhz);
+	aggr_eht_cap->bfee_ss_320mhz = QDF_MAX(aggr_eht_cap->bfee_ss_320mhz,
+					       eht_cap->bfee_ss_320mhz);
+	aggr_eht_cap->num_sounding_dim_le_80mhz =
+			QDF_MAX(aggr_eht_cap->num_sounding_dim_le_80mhz,
+				eht_cap->num_sounding_dim_le_80mhz);
+	aggr_eht_cap->num_sounding_dim_160mhz =
+			QDF_MAX(aggr_eht_cap->num_sounding_dim_160mhz,
+				eht_cap->num_sounding_dim_160mhz);
+	aggr_eht_cap->num_sounding_dim_320mhz =
+			QDF_MAX(aggr_eht_cap->num_sounding_dim_320mhz,
+				eht_cap->num_sounding_dim_320mhz);
+	aggr_eht_cap->ng_16_su_feedback |= eht_cap->ng_16_su_feedback;
+	aggr_eht_cap->ng_16_mu_feedback |= eht_cap->ng_16_mu_feedback;
+	aggr_eht_cap->cb_sz_4_2_su_feedback |= eht_cap->cb_sz_4_2_su_feedback;
+	aggr_eht_cap->cb_sz_7_5_su_feedback |= eht_cap->cb_sz_7_5_su_feedback;
+	aggr_eht_cap->trig_su_bforming_feedback |=
+			eht_cap->trig_su_bforming_feedback;
+	aggr_eht_cap->trig_mu_bforming_partial_bw_feedback |=
+			eht_cap->trig_mu_bforming_partial_bw_feedback;
+	aggr_eht_cap->triggered_cqi_feedback |= eht_cap->triggered_cqi_feedback;
+	aggr_eht_cap->partial_bw_dl_mu_mimo |= eht_cap->partial_bw_dl_mu_mimo;
+	aggr_eht_cap->psr_based_sr |= eht_cap->psr_based_sr;
+	aggr_eht_cap->power_boost_factor |= eht_cap->power_boost_factor;
+	aggr_eht_cap->eht_mu_ppdu_4x_ltf_0_8_us_gi |=
+			eht_cap->eht_mu_ppdu_4x_ltf_0_8_us_gi;
+	aggr_eht_cap->max_nc = QDF_MAX(aggr_eht_cap->max_nc, eht_cap->max_nc);
+	aggr_eht_cap->non_trig_cqi_feedback |= eht_cap->non_trig_cqi_feedback;
+	aggr_eht_cap->tx_1024_4096_qam_lt_242_tone_ru |=
+			eht_cap->tx_1024_4096_qam_lt_242_tone_ru;
+	aggr_eht_cap->rx_1024_4096_qam_lt_242_tone_ru |=
+			eht_cap->rx_1024_4096_qam_lt_242_tone_ru;
+	aggr_eht_cap->ppet_present |= eht_cap->ppet_present;
+	aggr_eht_cap->common_nominal_pkt_padding =
+			QDF_MAX(aggr_eht_cap->common_nominal_pkt_padding,
+				eht_cap->common_nominal_pkt_padding);
+	if (eht_cap->max_num_eht_ltf & 0x1) {
+		QDF_SET_BITS(aggr_eht_cap->max_num_eht_ltf, 1, 2,
+			     QDF_MAX(QDF_GET_BITS(eht_cap->max_num_eht_ltf,
+						  1, 2),
+				     QDF_GET_BITS(aggr_eht_cap->max_num_eht_ltf,
+						  1, 2)));
+		QDF_SET_BITS(aggr_eht_cap->max_num_eht_ltf, 3, 2,
+			     QDF_MAX(QDF_GET_BITS(eht_cap->max_num_eht_ltf,
+						  3, 2),
+				     QDF_GET_BITS(aggr_eht_cap->max_num_eht_ltf,
+						  3, 2)));
+		aggr_eht_cap->max_num_eht_ltf |= 0x1;
+	}
+	aggr_eht_cap->mcs_15 |= eht_cap->mcs_15;
+	aggr_eht_cap->eht_dup_6ghz |= eht_cap->eht_dup_6ghz;
+	aggr_eht_cap->op_sta_rx_ndp_wider_bw_20mhz |=
+			eht_cap->op_sta_rx_ndp_wider_bw_20mhz;
+	aggr_eht_cap->non_ofdma_ul_mu_mimo_le_80mhz |=
+			eht_cap->non_ofdma_ul_mu_mimo_le_80mhz;
+	aggr_eht_cap->non_ofdma_ul_mu_mimo_160mhz |=
+			eht_cap->non_ofdma_ul_mu_mimo_160mhz;
+	aggr_eht_cap->non_ofdma_ul_mu_mimo_320mhz |=
+			eht_cap->non_ofdma_ul_mu_mimo_320mhz;
+	aggr_eht_cap->mu_bformer_le_80mhz |= eht_cap->mu_bformer_le_80mhz;
+	aggr_eht_cap->mu_bformer_160mhz |= eht_cap->mu_bformer_160mhz;
+	aggr_eht_cap->mu_bformer_320mhz |= eht_cap->mu_bformer_320mhz;
+	aggr_eht_cap->tb_sounding_feedback_rl |=
+			eht_cap->tb_sounding_feedback_rl;
+	aggr_eht_cap->rx_1k_qam_in_wider_bw_dl_ofdma |=
+			eht_cap->rx_1k_qam_in_wider_bw_dl_ofdma;
+	aggr_eht_cap->rx_4k_qam_in_wider_bw_dl_ofdma |=
+			eht_cap->rx_4k_qam_in_wider_bw_dl_ofdma;
+	aggr_eht_cap->limited_cap_support_20mhz |=
+			eht_cap->limited_cap_support_20mhz;
+	aggr_eht_cap->triggered_mu_bf_full_bw_fb_and_dl_mumimo |=
+			eht_cap->triggered_mu_bf_full_bw_fb_and_dl_mumimo;
+	aggr_eht_cap->mru_support_20mhz |= eht_cap->mru_support_20mhz;
+
+	aggr_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7 =
+		QDF_MAX(aggr_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7,
+			eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7);
+	aggr_eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7 =
+		QDF_MAX(aggr_eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7,
+			eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7);
+	aggr_eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9 =
+		QDF_MAX(aggr_eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9,
+			eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9);
+	aggr_eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9 =
+		QDF_MAX(aggr_eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9,
+			eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9);
+	aggr_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11 =
+		QDF_MAX(aggr_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11);
+	aggr_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11 =
+		QDF_MAX(aggr_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11);
+	aggr_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13 =
+		QDF_MAX(aggr_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13);
+	aggr_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13 =
+		QDF_MAX(aggr_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13);
+
+	aggr_eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9 =
+		QDF_MAX(aggr_eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9);
+	aggr_eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9 =
+		QDF_MAX(aggr_eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9);
+	aggr_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 =
+		QDF_MAX(aggr_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11);
+	aggr_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 =
+		QDF_MAX(aggr_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11);
+	aggr_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 =
+		QDF_MAX(aggr_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13);
+	aggr_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 =
+		QDF_MAX(aggr_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13);
+
+	aggr_eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 =
+		QDF_MAX(aggr_eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9);
+	aggr_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 =
+		QDF_MAX(aggr_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9);
+	aggr_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 =
+		QDF_MAX(aggr_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11);
+	aggr_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 =
+		QDF_MAX(aggr_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11);
+	aggr_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 =
+		QDF_MAX(aggr_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13);
+	aggr_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 =
+		QDF_MAX(aggr_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13);
+
+	aggr_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 =
+		QDF_MAX(aggr_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9);
+	aggr_eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 =
+		QDF_MAX(aggr_eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9);
+	aggr_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 =
+		QDF_MAX(aggr_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11);
+	aggr_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 =
+		QDF_MAX(aggr_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11);
+	aggr_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 =
+		QDF_MAX(aggr_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13);
+	aggr_eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 =
+		QDF_MAX(aggr_eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13);
+
+	/* TODO: PPET */
+}
+
+static void
+wma_update_eht_20mhz_only_mcs(uint32_t mcs_2g_20, tDot11fIEeht_cap *eht_cap)
+{
+	eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7 =
+					QDF_GET_BITS(mcs_2g_20, 0, 4);
+	eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7 =
+					QDF_GET_BITS(mcs_2g_20, 4, 4);
+	eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9 =
+					QDF_GET_BITS(mcs_2g_20, 8, 4);
+	eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9 =
+					QDF_GET_BITS(mcs_2g_20, 12, 4);
+	eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11 =
+					QDF_GET_BITS(mcs_2g_20, 16, 4);
+	eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11 =
+					QDF_GET_BITS(mcs_2g_20, 20, 4);
+	eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13 =
+					QDF_GET_BITS(mcs_2g_20, 24, 4);
+	eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13 =
+					QDF_GET_BITS(mcs_2g_20, 28, 4);
+}
+
+static void
+wma_update_eht_le_80mhz_mcs(uint32_t mcs_le_80, tDot11fIEeht_cap *eht_cap)
+{
+	eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9 =
+					QDF_GET_BITS(mcs_le_80, 0, 4);
+	eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9 =
+					QDF_GET_BITS(mcs_le_80, 4, 4);
+	eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 =
+					QDF_GET_BITS(mcs_le_80, 8, 4);
+	eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 =
+					QDF_GET_BITS(mcs_le_80, 12, 4);
+	eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 =
+					QDF_GET_BITS(mcs_le_80, 16, 4);
+	eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 =
+					QDF_GET_BITS(mcs_le_80, 20, 4);
+}
+
+static void
+wma_update_eht_160mhz_mcs(uint32_t mcs_160mhz, tDot11fIEeht_cap *eht_cap)
+{
+	eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 =
+					QDF_GET_BITS(mcs_160mhz, 0, 4);
+	eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 =
+					QDF_GET_BITS(mcs_160mhz, 4, 4);
+	eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 =
+					QDF_GET_BITS(mcs_160mhz, 8, 4);
+	eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 =
+					QDF_GET_BITS(mcs_160mhz, 12, 4);
+	eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 =
+					QDF_GET_BITS(mcs_160mhz, 16, 4);
+	eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 =
+					QDF_GET_BITS(mcs_160mhz, 20, 4);
+}
+
+static void
+wma_update_eht_320mhz_mcs(uint32_t mcs_320mhz, tDot11fIEeht_cap *eht_cap)
+{
+	eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 =
+					QDF_GET_BITS(mcs_320mhz, 0, 4);
+	eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 =
+					QDF_GET_BITS(mcs_320mhz, 4, 4);
+	eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 =
+					QDF_GET_BITS(mcs_320mhz, 8, 4);
+	eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 =
+					QDF_GET_BITS(mcs_320mhz, 12, 4);
+	eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 =
+					QDF_GET_BITS(mcs_320mhz, 16, 4);
+	eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 =
+					QDF_GET_BITS(mcs_320mhz, 20, 4);
+}
+
 /**
  * wma_convert_eht_cap() - convert EHT capabilities into dot11f structure
  * @eht_cap: pointer to dot11f structure
  * @mac_cap: Received EHT MAC capability
  * @phy_cap: Received EHT PHY capability
+ * @mcs_map: Pointer to first index of MCS mapping
+ * @band: Band of current caps
  *
  * This function converts various EHT capability received as part of extended
  * service ready event into dot11f structure.
@@ -191,7 +464,8 @@ static const struct index_eht_data_rate_type eht_mcs_nss2[] = {
  * Return: None
  */
 static void wma_convert_eht_cap(tDot11fIEeht_cap *eht_cap, uint32_t *mac_cap,
-				uint32_t *phy_cap)
+				uint32_t *phy_cap, uint32_t *mcs_map,
+				WLAN_BAND_CAPABILITY band)
 {
 	eht_cap->present = true;
 
@@ -289,7 +563,15 @@ static void wma_convert_eht_cap(tDot11fIEeht_cap *eht_cap, uint32_t *mac_cap,
 	eht_cap->mru_support_20mhz =
 			WMI_EHTCAP_PHY_20MHZ_ONLY_MRU_SUPP_GET(phy_cap);
 
-	/* TODO: MCS map and PPET */
+	wma_update_eht_20mhz_only_mcs(mcs_map[0], eht_cap);
+	wma_update_eht_le_80mhz_mcs(mcs_map[1], eht_cap);
+
+	if (band == WLAN_5G_CAPABILITY) {
+		wma_update_eht_160mhz_mcs(mcs_map[2], eht_cap);
+		wma_update_eht_320mhz_mcs(mcs_map[3], eht_cap);
+	}
+
+	/* TODO: PPET */
 }
 
 void wma_eht_update_tgt_services(struct wmi_unified *wmi_handle,
@@ -331,75 +613,6 @@ wma_update_eht_cap_support_for_320mhz(struct target_psoc_info *tgt_hdl,
 		  eht_cap->support_320mhz_6ghz, eht_cap->max_num_eht_ltf);
 }
 
-static void
-wma_update_eht_20mhz_only_mcs(uint32_t *mcs_2g_20, tDot11fIEeht_cap *eht_cap)
-{
-	eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7 |= QDF_GET_BITS(*mcs_2g_20, 0, 4);
-	eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7 |= QDF_GET_BITS(*mcs_2g_20, 4, 4);
-	eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9 |= QDF_GET_BITS(*mcs_2g_20, 8, 4);
-	eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9 |=
-						QDF_GET_BITS(*mcs_2g_20, 12, 4);
-	eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11 |=
-						QDF_GET_BITS(*mcs_2g_20, 16, 4);
-	eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11 |=
-						QDF_GET_BITS(*mcs_2g_20, 20, 4);
-	eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13 |=
-						QDF_GET_BITS(*mcs_2g_20, 24, 4);
-	eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13 |=
-						QDF_GET_BITS(*mcs_2g_20, 28, 4);
-}
-
-static void
-wma_update_eht_le_80mhz_mcs(uint32_t *mcs_le_80, tDot11fIEeht_cap *eht_cap)
-{
-	eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9 |=
-						QDF_GET_BITS(*mcs_le_80, 0, 4);
-	eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9 |=
-						QDF_GET_BITS(*mcs_le_80, 4, 4);
-	eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 |=
-						QDF_GET_BITS(*mcs_le_80, 8, 4);
-	eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 |=
-						QDF_GET_BITS(*mcs_le_80, 12, 4);
-	eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 |=
-						QDF_GET_BITS(*mcs_le_80, 16, 4);
-	eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 |=
-						QDF_GET_BITS(*mcs_le_80, 20, 4);
-}
-
-static void
-wma_update_eht_160mhz_mcs(uint32_t *mcs_160mhz, tDot11fIEeht_cap *eht_cap)
-{
-	eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 |=
-						QDF_GET_BITS(*mcs_160mhz, 0, 4);
-	eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 |=
-						QDF_GET_BITS(*mcs_160mhz, 4, 4);
-	eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 |=
-						QDF_GET_BITS(*mcs_160mhz, 8, 4);
-	eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 |=
-					       QDF_GET_BITS(*mcs_160mhz, 12, 4);
-	eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 |=
-					       QDF_GET_BITS(*mcs_160mhz, 16, 4);
-	eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 |=
-					       QDF_GET_BITS(*mcs_160mhz, 20, 4);
-}
-
-static void
-wma_update_eht_320mhz_mcs(uint32_t *mcs_320mhz, tDot11fIEeht_cap *eht_cap)
-{
-	eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 |=
-						QDF_GET_BITS(*mcs_320mhz, 0, 4);
-	eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 |=
-						QDF_GET_BITS(*mcs_320mhz, 4, 4);
-	eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 |=
-						QDF_GET_BITS(*mcs_320mhz, 8, 4);
-	eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 |=
-					       QDF_GET_BITS(*mcs_320mhz, 12, 4);
-	eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 |=
-					       QDF_GET_BITS(*mcs_320mhz, 16, 4);
-	eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 |=
-					       QDF_GET_BITS(*mcs_320mhz, 20, 4);
-}
-
 void wma_update_target_ext_eht_cap(struct target_psoc_info *tgt_hdl,
 				   struct wma_tgt_cfg *tgt_cfg)
 {
@@ -411,7 +624,6 @@ void wma_update_target_ext_eht_cap(struct target_psoc_info *tgt_hdl,
 	struct wlan_psoc_host_mac_phy_caps_ext2 *mac_phy_cap, *mac_phy_caps2;
 	struct wlan_psoc_host_mac_phy_caps *host_cap;
 	uint32_t supported_bands;
-	uint32_t *mcs_supp;
 
 	qdf_mem_zero(eht_cap_2g, sizeof(tDot11fIEeht_cap));
 	qdf_mem_zero(eht_cap_5g, sizeof(tDot11fIEeht_cap));
@@ -439,54 +651,41 @@ void wma_update_target_ext_eht_cap(struct target_psoc_info *tgt_hdl,
 
 	for (i = 0; i < total_mac_phy_cnt; i++) {
 		supported_bands = host_cap[i].supported_bands;
-		qdf_mem_zero(&eht_cap_mac, sizeof(tDot11fIEeht_cap));
 		mac_phy_caps2 = &mac_phy_cap[i];
 		if (supported_bands & WLAN_2G_CAPABILITY) {
+			qdf_mem_zero(&eht_cap_mac, sizeof(tDot11fIEeht_cap));
 			wma_convert_eht_cap(&eht_cap_mac,
 					    mac_phy_caps2->eht_cap_info_2G,
-					    mac_phy_caps2->eht_cap_phy_info_2G);
-				/* TODO: PPET */
-			/* WMI_EHT_SUPP_MCS_20MHZ_ONLY */
-			mcs_supp = &mac_phy_caps2->eht_supp_mcs_ext_2G[0];
-			wma_update_eht_20mhz_only_mcs(mcs_supp, &eht_cap_mac);
-			/* WMI_EHT_SUPP_MCS_LE_80MHZ */
-			mcs_supp = &mac_phy_caps2->eht_supp_mcs_ext_2G[1];
-			wma_update_eht_le_80mhz_mcs(mcs_supp, &eht_cap_mac);
-
-			qdf_mem_copy(eht_cap_2g, &eht_cap_mac,
-				     sizeof(tDot11fIEeht_cap));
+					    mac_phy_caps2->eht_cap_phy_info_2G,
+					    mac_phy_caps2->eht_supp_mcs_ext_2G,
+					    WLAN_2G_CAPABILITY);
+			wma_aggregate_eht_cap(eht_cap_2g, &eht_cap_mac);
+			wma_aggregate_eht_cap(eht_cap, &eht_cap_mac);
+			/* TODO: PPET */
 		}
 
 		if (supported_bands & WLAN_5G_CAPABILITY) {
 			qdf_mem_zero(&eht_cap_mac, sizeof(tDot11fIEeht_cap));
 			wma_convert_eht_cap(&eht_cap_mac,
 					    mac_phy_caps2->eht_cap_info_5G,
-					    mac_phy_caps2->eht_cap_phy_info_5G);
-
-			/* WMI_EHT_SUPP_MCS_20MHZ_ONLY */
-			mcs_supp = &mac_phy_caps2->eht_supp_mcs_ext_5G[0];
-			wma_update_eht_20mhz_only_mcs(mcs_supp, &eht_cap_mac);
-			/* WMI_EHT_SUPP_MCS_LE_80MHZ */
-			mcs_supp = &mac_phy_caps2->eht_supp_mcs_ext_5G[1];
-			wma_update_eht_le_80mhz_mcs(mcs_supp, &eht_cap_mac);
-
-			/* WMI_EHT_SUPP_MCS_160MHZ */
-			mcs_supp = &mac_phy_caps2->eht_supp_mcs_ext_5G[2];
-			wma_update_eht_160mhz_mcs(mcs_supp, &eht_cap_mac);
-			/* WMI_EHT_SUPP_MCS_320MHZ */
-			mcs_supp = &mac_phy_caps2->eht_supp_mcs_ext_5G[3];
-			wma_update_eht_320mhz_mcs(mcs_supp, &eht_cap_mac);
-
-			qdf_mem_copy(eht_cap_5g, &eht_cap_mac,
-				     sizeof(tDot11fIEeht_cap));
+					    mac_phy_caps2->eht_cap_phy_info_5G,
+					    mac_phy_caps2->eht_supp_mcs_ext_5G,
+					    WLAN_5G_CAPABILITY);
+			wma_aggregate_eht_cap(eht_cap_5g, &eht_cap_mac);
+			wma_aggregate_eht_cap(eht_cap, &eht_cap_mac);
+			/* TODO: PPET */
 		}
 	}
-	qdf_mem_copy(eht_cap, &eht_cap_mac, sizeof(tDot11fIEeht_cap));
 
 	wma_update_eht_cap_support_for_320mhz(tgt_hdl, eht_cap);
 	wma_update_eht_cap_support_for_320mhz(tgt_hdl, eht_cap_5g);
 
+	wma_debug("Aggregated 2g/5g caps");
 	wma_print_eht_cap(eht_cap);
+	wma_debug("Aggregated 2g caps");
+	wma_print_eht_cap(eht_cap_2g);
+	wma_debug("Aggregated 5g caps");
+	wma_print_eht_cap(eht_cap_5g);
 }
 
 void wma_update_vdev_eht_ops(uint32_t *eht_ops, tDot11fIEeht_op *eht_op)

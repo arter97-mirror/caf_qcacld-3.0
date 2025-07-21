@@ -725,6 +725,8 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		if (session->lim_join_req)
 			bss = &session->lim_join_req->bssDescription;
 		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
+		if (!tx_ops)
+			goto end;
 
 		if (!bss) {
 			pe_err("bss descriptor is NULL");

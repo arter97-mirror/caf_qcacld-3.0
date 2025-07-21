@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -289,6 +289,12 @@ void pld_ipci_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
 static inline
 int pld_ipci_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
 				     size_t *size)
+{
+	return -EINVAL;
+}
+
+static inline int
+pld_ipci_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
 {
 	return -EINVAL;
 }
@@ -683,5 +689,10 @@ static inline int pld_ipci_get_direct_link_sid(struct device *dev,
 }
 #endif
 
+static inline int
+pld_ipci_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
+{
+	return icnss_get_iova_info(dev, addr, size);
+}
 #endif
 #endif

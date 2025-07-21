@@ -2896,9 +2896,10 @@ exit:
 		wlan_scan_purge_results(list);
 }
 
-#define SAE_AUTH_SEQ_NUM_OFFSET         2
-#define SAE_AUTH_STATUS_CODE_OFFSET     4
-#define SAE_AUTH_MESSAGE_TYPE_OFFSET    6
+#define DISCONNECT_FRAME_REASON_CODE_LENGTH	2
+#define SAE_AUTH_SEQ_NUM_OFFSET			2
+#define SAE_AUTH_STATUS_CODE_OFFSET		4
+#define SAE_AUTH_MESSAGE_TYPE_OFFSET		6
 #define SAE_FRAME_LENGTH \
 	(sizeof(struct wlan_frame_hdr) + SAE_AUTH_MESSAGE_TYPE_OFFSET)
 
@@ -2926,6 +2927,8 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 	uint8_t *frm_body;
 	uint16_t reason_code = 0;
 	int32_t rssi = 0;
+	uint8_t ff_offset = 0;
+	uint8_t *frame_ptr;
 
 	if (!params) {
 		pe_err("MGMT param not present for the event: %d", tag);
@@ -2978,8 +2981,19 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 			return;
 		}
 
-		if (tag == WLAN_DEAUTH_TX || tag == WLAN_DISASSOC_TX)
-			reason_code = pe_session->deauth_disassoc_rc;
+		if (tag == WLAN_DEAUTH_TX || tag == WLAN_DISASSOC_TX) {
+			ff_offset = sizeof(struct wlan_frame_hdr);
+			frame_ptr = qdf_nbuf_data(buf);
+
+			if (wlan_crypto_is_data_protected(frame_ptr))
+				ff_offset += IEEE80211_CCMP_MICLEN;
+
+			if (qdf_nbuf_len(buf) < (ff_offset +
+					 DISCONNECT_FRAME_REASON_CODE_LENGTH))
+				return;
+
+			reason_code = *(uint16_t *)(frame_ptr + ff_offset);
+		}
 
 		wlan_connectivity_mgmt_event(
 					mac->psoc,

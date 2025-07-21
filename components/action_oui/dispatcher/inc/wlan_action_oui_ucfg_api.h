@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -29,6 +29,7 @@
 #include <qdf_types.h>
 #include "wlan_action_oui_public_struct.h"
 #include "wlan_action_oui_objmgr.h"
+#include "wlan_action_oui_main.h"
 
 #ifdef WLAN_FEATURE_ACTION_OUI
 
@@ -159,6 +160,97 @@ QDF_STATUS ucfg_action_oui_send_by_id(struct wlan_objmgr_psoc *psoc,
 uint8_t *
 ucfg_action_oui_get_config(struct wlan_objmgr_psoc *psoc,
 			   enum action_oui_id action_id);
+
+/**
+ * ucfg_action_oui_add_token() - Add action oui token to oui extension
+ * @action_token: oui token type
+ * @value: oui token value
+ * @value_len: oui token value
+ * @oui_ext: pointer to action oui extension to save token
+ *
+ * Return: QDF_STATUS.
+ */
+static inline QDF_STATUS
+ucfg_action_oui_add_token(enum action_oui_token_type action_token,
+			  uint8_t *value,
+			  uint32_t value_len,
+			  struct action_oui_extension *oui_ext)
+{
+	if (!oui_ext) {
+		action_oui_err("oui_ext is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return wlan_action_oui_add_token(action_token,
+					 value,
+					 value_len,
+					 oui_ext);
+}
+
+#ifdef ACTION_OUI_OP_ATTR
+/**
+ * ucfg_action_oui_add_cap() - Add action oui capability config
+ * @nss_bitmap: oui token type
+ * @nss_bitmap: nss bitmap
+ *  bit 0 : NSS 1
+ *  bit 1 : NSS 2
+ *  bit 2 : NSS 3
+ *  bit 3 : NSS 4
+ * @ht: is ht supported
+ * @vht: is vht supported
+ * @band_bitmap: band bitmap: 2G and 5G
+ * @oui_ext: pointer to action oui extension to save cap
+ *
+ * Return: QDF_STATUS.
+ */
+static inline QDF_STATUS
+ucfg_action_oui_add_cap(uint8_t nss_bitmap,
+			bool ht,
+			bool vht,
+			uint8_t band_bitmap,
+			struct action_oui_extension *oui_ext)
+{
+	return wlan_action_oui_add_cap(nss_bitmap, ht, vht, band_bitmap,
+				       oui_ext);
+}
+#else
+static inline QDF_STATUS
+ucfg_action_oui_add_cap(uint8_t nss_bitmap,
+			bool ht,
+			bool vht,
+			uint8_t band_bitmap,
+			struct action_oui_extension *oui_ext)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+/**
+ * ucfg_action_oui_extension_store() - Store action oui extension
+ * @psoc: objmgr psoc object
+ * @action_id: type of action to be stored
+ * @oui_ext: pointer to action oui extension to save token
+ *
+ * Return: QDF_STATUS.
+ */
+static inline QDF_STATUS
+ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
+				enum action_oui_id action_id,
+				struct action_oui_extension *oui_ext)
+{
+	QDF_STATUS status;
+
+	if (!oui_ext) {
+		action_oui_err("oui_ext is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wlan_action_oui_extension_store(psoc, action_id, oui_ext);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	return ucfg_action_oui_send_by_id(psoc, action_id);
+}
 #else
 
 /**
@@ -325,6 +417,33 @@ ucfg_action_oui_get_config(struct wlan_objmgr_psoc *psoc,
 			   enum action_oui_id action_id)
 {
 	return "";
+}
+
+static inline QDF_STATUS
+ucfg_action_oui_add_token(enum action_oui_token_type action_token,
+			  uint8_t *value,
+			  uint32_t value_len,
+			  struct action_oui_extension *oui_ext)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_action_oui_add_cap(uint8_t nss_bitmap,
+			bool ht,
+			bool vht,
+			uint8_t band_bitmap,
+			struct action_oui_extension *oui_ext)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
+				enum action_oui_id action_id,
+				struct action_oui_extension *oui_ext)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_ACTION_OUI */
 

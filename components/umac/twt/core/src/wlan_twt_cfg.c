@@ -59,7 +59,6 @@ QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 	twt_cfg->disable_twt_on_scan = cfg_get(psoc, CFG_DISABLE_TWT_ON_SCAN);
 	twt_cfg->flex_twt_sched = cfg_default(CFG_HE_FLEX_TWT_SCHED);
 	twt_cfg->req_flag = false;
-	twt_cfg->res_flag = false;
 	twt_cfg->rtwt_requestor_enabled = CFG_GET_RTWT_REQ(rtwt_conf);
 	twt_cfg->rtwt_responder_enabled = CFG_GET_RTWT_RES(rtwt_conf);
 
@@ -301,17 +300,26 @@ wlan_twt_cfg_set_requestor_flag(struct wlan_objmgr_psoc *psoc, bool val)
 }
 
 QDF_STATUS
-wlan_twt_cfg_get_responder_flag(struct wlan_objmgr_psoc *psoc, bool *val)
+wlan_twt_cfg_get_responder_flag(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+				bool *val)
 {
-	struct twt_psoc_priv_obj *twt_psoc_obj;
+	QDF_STATUS status;
+	uint8_t mac_id;
 
-	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
-	if (!twt_psoc_obj)
-		return QDF_STATUS_E_INVAL;
+	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, vdev_id);
+	if (mac_id == DEFAULT_MAC_ID) {
+		for (mac_id = 0; mac_id <= MAX_MAC; mac_id++) {
+			status = wlan_twt_cfg_get_mac_responder_flag(psoc,
+								     mac_id,
+								     val);
+			if (*val)
+				break;
+		}
+	} else {
+		status = wlan_twt_cfg_get_mac_responder_flag(psoc, mac_id, val);
+	}
 
-	*val = twt_psoc_obj->cfg_params.res_flag;
-
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 QDF_STATUS
@@ -327,20 +335,6 @@ wlan_twt_cfg_get_twt_disabled_on_scan(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*val = twt_psoc_obj->cfg_params.disable_twt_on_scan;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-wlan_twt_cfg_set_responder_flag(struct wlan_objmgr_psoc *psoc, bool val)
-{
-	struct twt_psoc_priv_obj *twt_psoc_obj;
-
-	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
-	if (!twt_psoc_obj)
-		return QDF_STATUS_E_INVAL;
-
-	twt_psoc_obj->cfg_params.res_flag = val;
 
 	return QDF_STATUS_SUCCESS;
 }

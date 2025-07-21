@@ -257,6 +257,7 @@
 #include <cfg_mlme_vht_caps.h>
 #include "wlan_hdd_tx_powerboost.h"
 #include "wifi_pos_pasn_api.h"
+#include "wlan_cp_stats_ucfg_api.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -6479,7 +6480,7 @@ QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 					      new_self_mac,
 					      true);
 
-	hdd_err("vdev id %d change self mac " QDF_MAC_ADDR_FMT " to "
+	hdd_debug("vdev id %d change self mac " QDF_MAC_ADDR_FMT " to "
 		QDF_MAC_ADDR_FMT, vdev_id,
 		QDF_MAC_ADDR_REF(old_self_mac->bytes),
 		QDF_MAC_ADDR_REF(new_self_mac->bytes));
@@ -7502,7 +7503,7 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 			QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_NORMAL;
 	}
 	adapter->latency_level = latency_level;
-	adapter->cached_latency_level = WFC_INVALID_LATENCY_LEVEL;
+	adapter->cached_latency_level = HDD_WLM_LATENCY_LEVEL_NORMAL;
 	hdd_set_multi_client_ll_support(adapter);
 
 	/* set dev's parent to underlying device */
@@ -13677,6 +13678,24 @@ static inline void wlan_hdd_send_mscs_action_frame(hdd_cb_handle context,
 }
 #endif
 
+#ifdef WLAN_HAPS_ENABLE
+static inline void wlan_hdd_update_qtime_sync_period(hdd_cb_handle context,
+						     uint32_t sync_interval)
+{
+	struct hdd_context *hdd_ctx = hdd_cb_handle_to_context(context);
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	pld_set_tsf_sync_period(hdd_ctx->parent_dev, sync_interval);
+}
+#else
+static inline void wlan_hdd_update_qtime_sync_period(hdd_cb_handle context,
+						     uint32_t sync_interval)
+{
+}
+#endif
+
 #if defined(WLAN_FEATURE_ROAM_OFFLOAD) && \
 defined(FEATURE_RX_LINKSPEED_ROAM_TRIGGER)
 void wlan_hdd_link_speed_update(struct wlan_objmgr_psoc *psoc,
@@ -13766,6 +13785,9 @@ static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.dp_fils_hlp_rx = hdd_fils_hlp_rx;
 	cb_obj.dp_get_ndev_by_vdev_id = wlan_hdd_get_netdev_by_vdev_id;
 	hdd_dp_register_ipa_wds_callbacks(&cb_obj);
+	cb_obj.wlan_dp_haps_update_qtime_sync_period =
+					wlan_hdd_update_qtime_sync_period;
+
 	os_if_dp_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }
 
@@ -16032,7 +16054,8 @@ wlan_hdd_init_multi_client_info_table(struct hdd_adapter *adapter)
 		adapter->client_info[i].client_id = i;
 		adapter->client_info[i].port_id = 0;
 		adapter->client_info[i].in_use = false;
-		adapter->client_info[i].req_latency_level = 0;
+		adapter->client_info[i].req_latency_level =
+					HDD_WLM_LATENCY_LEVEL_NORMAL;
 		adapter->client_info[i].is_wfc_state = false;
 	}
 }
@@ -16048,7 +16071,8 @@ void wlan_hdd_deinit_multi_client_info_table(struct hdd_adapter *adapter)
 			adapter->client_info[i].port_id = 0;
 			adapter->client_info[i].client_id = i;
 			adapter->client_info[i].in_use = false;
-			adapter->client_info[i].req_latency_level = 0;
+			adapter->client_info[i].req_latency_level =
+						HDD_WLM_LATENCY_LEVEL_NORMAL;
 			adapter->client_info[i].is_wfc_state = false;
 		}
 	}
@@ -16700,6 +16724,9 @@ static int hdd_update_cds_config(struct hdd_context *hdd_ctx)
 	hdd_lpass_populate_cds_config(cds_cfg, hdd_ctx);
 	cds_cfg->is_pm_fw_debug_enable =
 				ucfg_pmo_is_fw_debug_enable(hdd_ctx->psoc);
+	cds_cfg->enable_bcn_rssi_history_report =
+		ucfg_cp_stats_is_bcn_rssi_history_report_cfg_enable(
+								hdd_ctx->psoc);
 	cds_init_ini_config(cds_cfg);
 	return 0;
 
@@ -20348,7 +20375,7 @@ static void hdd_set_adapter_wlm_def_level(struct hdd_context *hdd_ctx)
 		else
 			adapter->latency_level = latency_level;
 
-		adapter->cached_latency_level = WFC_INVALID_LATENCY_LEVEL;
+		adapter->cached_latency_level = HDD_WLM_LATENCY_LEVEL_NORMAL;
 
 		qdf_status = ucfg_mlme_cfg_get_wlm_reset(hdd_ctx->psoc, &reset);
 		if (QDF_IS_STATUS_ERROR(qdf_status)) {

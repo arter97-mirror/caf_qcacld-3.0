@@ -27,9 +27,10 @@ wlan_twt_cfg_get_req_flag(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 QDF_STATUS
-wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, bool *val)
+wlan_twt_cfg_get_res_flag(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			  bool *val)
 {
-	return wlan_twt_cfg_get_responder_flag(psoc, val);
+	return wlan_twt_cfg_get_responder_flag(psoc, vdev_id, val);
 }
 
 QDF_STATUS

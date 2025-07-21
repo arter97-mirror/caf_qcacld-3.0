@@ -9039,7 +9039,6 @@ void lim_copy_bss_eht_cap(struct pe_session *session)
 	 * Disable unsupported capabilities per mode.
 	 */
 	lim_revise_req_eht_cap_per_mode(mlme_priv, session);
-	lim_update_eht_caps_mcs(session->mac_ctx, session);
 	qdf_mem_copy(&session->eht_config, &mlme_priv->eht_config,
 		     sizeof(session->eht_config));
 

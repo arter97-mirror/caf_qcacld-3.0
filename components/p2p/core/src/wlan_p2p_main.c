@@ -1999,6 +1999,11 @@ bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
 
 	return true;
 }
+
+bool p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc)
+{
+	return tgt_p2p_is_fw_support_wfd_r2(psoc);
+}
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
 bool p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -193,6 +193,9 @@ void tdls_update_6g_power(struct wlan_objmgr_vdev *vdev,
 	tdls_set_mlme_ch_power(vdev, mlme_obj, tdls_soc_obj, freq);
 
 	tx_ops = wlan_reg_get_tx_ops(psoc);
+	if (!tx_ops)
+		return;
+
 	if (tx_ops->set_tpc_power)
 		tx_ops->set_tpc_power(psoc,
 				      wlan_vdev_get_id(vdev),
@@ -1273,6 +1276,18 @@ QDF_STATUS tdls_process_update_peer(struct tdls_update_peer_request *req)
 	}
 
 	vdev = req->vdev;
+	if (!tdls_check_is_tdls_allowed(vdev)) {
+		tdls_err("TDLS not allowed, reject update station for vdev: %d",
+			 wlan_vdev_get_id(vdev));
+		goto error;
+	}
+
+	if (mlo_mgr_is_link_switch_in_progress(vdev)) {
+		tdls_err("Link Switch in progress, reject update sta for vdev: %d",
+			 wlan_vdev_get_id(vdev));
+		goto error;
+	}
+
 	cmd.cmd_type = WLAN_SER_CMD_TDLS_ADD_PEER;
 	cmd.cmd_id = 0;
 	cmd.cmd_cb = tdls_update_peer_serialize_callback;
@@ -1794,8 +1809,9 @@ QDF_STATUS tdls_process_del_peer_rsp(struct tdls_del_sta_rsp *rsp)
 		 * To avoid that set the tdls_support as not supported for that
 		 * peer
 		 */
-		if (curr_peer->sta_kickout_count >=
-				WLAN_TDLS_STA_KICKOUT_THRESHOLD) {
+		if (curr_peer &&
+		    curr_peer->sta_kickout_count >=
+					WLAN_TDLS_STA_KICKOUT_THRESHOLD) {
 			curr_peer->tdls_support = TDLS_CAP_NOT_SUPPORTED;
 			tdls_debug("Sta Kickout Threshold reached, set cap to unsupported");
 		}

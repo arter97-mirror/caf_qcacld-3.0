@@ -56,6 +56,7 @@ _target_chipset_map = {
         "qcn7605",
         "qca6390",
         "qca6490",
+        "qca6490_cnss2",
         "kiwi-v2",
     ],
 }
@@ -68,6 +69,7 @@ _chipset_hw_map = {
     "wcn7750": "BERYLLIUM",
     "qca6390": "LITHIUM",
     "qca6490": "LITHIUM",
+    "qca6490_cnss2": "LITHIUM",
     "qcn7605": "HELIUMPLUS",
     "wcn6450": "RHINE",
     "fig": "BORON",
@@ -104,6 +106,10 @@ _chipset_header_map = {
         "cmn/hal/wifi3.0/qca6390",
     ],
     "qca6490": [
+        "api/hw/qca6490/v1",
+        "cmn/hal/wifi3.0/qca6490",
+    ],
+    "qca6490_cnss2": [
         "api/hw/qca6490/v1",
         "cmn/hal/wifi3.0/qca6490",
     ],
@@ -1407,6 +1413,7 @@ _conditional_srcs = {
             "cmn/wmi/src/wmi_unified_nan_tlv.c",
             "components/nan/core/src/nan_api.c",
             "components/nan/core/src/nan_main.c",
+            "components/nan/core/src/nan_cfg.c",
             "components/nan/dispatcher/src/cfg_nan.c",
             "components/nan/dispatcher/src/nan_ucfg_api.c",
             "components/nan/dispatcher/src/wlan_nan_api.c",
@@ -2524,7 +2531,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "flag": "CFG80211_RU_PUNC_CHANDEF",
         },
         {
-            "pattern": "Indicates whether the MLO reconfiguration request is initiated",
+            "pattern": "Indicates whether the add links request is initiated by",
             "file": "include/net/cfg80211.h",
             "flag": "CFG80211_SETUP_LINK_RECONFIG_SUPPORT",
         },

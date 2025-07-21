@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -102,6 +102,7 @@ struct wlan_cds_feature_set {
  * @get_wifi_features: Get wifi features from fw
  * @exclude_selftx_from_cca_busy: Exclude selx tx time from cca busy time
  * @is_pm_fw_debug_enable: flag to check FW debug is enabled or not
+ * @enable_bcn_rssi_history_report: beacon rssi history report config
  */
 
 struct cds_config_info {
@@ -140,5 +141,6 @@ struct cds_config_info {
 #endif
 	bool exclude_selftx_from_cca_busy;
 	bool is_pm_fw_debug_enable;
+	bool enable_bcn_rssi_history_report;
 };
 #endif /* !defined( __CDS_CONFIG_H ) */

@@ -2646,6 +2646,7 @@ NAN_OS_IF_INC  := -I$(WLAN_ROOT)/os_if/nan/inc
 ifeq ($(CONFIG_QCACLD_FEATURE_NAN), y)
 WLAN_NAN_OBJS := $(NAN_CORE_DIR)/nan_main.o \
 		 $(NAN_CORE_DIR)/nan_api.o \
+		 $(NAN_CORE_DIR)/nan_cfg.o \
 		 $(NAN_UCFG_DIR)/nan_ucfg_api.o \
 		 $(NAN_UCFG_DIR)/wlan_nan_api.o \
 		 $(NAN_UCFG_DIR)/cfg_nan.o \
@@ -2764,6 +2765,10 @@ endif
 
 ifeq ($(CONFIG_WLAN_DP_DYNAMIC_RESOURCE_MGMT), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_resource_mgr.o
+endif
+
+ifeq ($(CONFIG_WLAN_HAPS_ENABLE), y)
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_haps.o
 endif
 
 $(call add-wlan-objs,dp_comp,$(WLAN_DP_COMP_OBJS))
@@ -3543,7 +3548,7 @@ ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_RU_PUNC_CHANDEF
 endif
 
-found = $(shell if grep -qF "Indicates whether the MLO reconfiguration request is initiated" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+found = $(shell if grep -qF "Indicates whether the add links request is initiated by" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
 ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DCFG80211_SETUP_LINK_RECONFIG_SUPPORT
 endif
@@ -3553,6 +3558,10 @@ CONFIG_WLAN_DP_MLO_DEV_CTX := y
 CONFIG_QCA_DP_TX_FW_METADATA_V2 := y
 CONFIG_WLAN_DP_TXPOOL_SHARE := y
 CONFIG_WLAN_MCAST_MLO_SAP := y
+found = $(shell if grep -qF "cfg80211_link_reconfig_removal_params" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+CONFIG_MLO_SAP_LINK_REMOVAL := y
+endif
 endif
 
 ifeq (qca_cld3, $(WLAN_WEAR_CHIPSET))
@@ -4548,6 +4557,7 @@ ccflags-$(CONFIG_WLAN_HDD_MULTI_VDEV_SINGLE_NDEV) += -DWLAN_HDD_MULTI_VDEV_SINGL
 ccflags-$(CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE) += -DDP_FEATURE_RX_BUFFER_RECYCLE
 ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 ccflags-$(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP) += -DWLAN_FEATURE_MULTI_LINK_SAP
+ccflags-$(CONFIG_MLO_SAP_LINK_REMOVAL) += -DWLAN_FEATURE_MLO_SAP_LINK_REMOVAL
 endif
 ccflags-$(CONFIG_WLAN_FEATURE_11BE_MLO) += -DWLAN_SUPPORT_11BE_D3_0
 ccflags-$(CONFIG_WLAN_MCAST_MLO_SAP) += -DWLAN_MCAST_MLO_SAP
@@ -5088,6 +5098,7 @@ ccflags-$(CONFIG_FEATURE_ENABLE_CE_DP_IRQ_AFFINE) += -DFEATURE_ENABLE_CE_DP_IRQ_
 ccflags-$(CONFIG_WLAN_SUPPORT_SERVICE_CLASS) += -DWLAN_SUPPORT_SERVICE_CLASS
 ccflags-$(CONFIG_WLAN_SUPPORT_FLOW_PRIORTIZATION) += -DWLAN_SUPPORT_FLOW_PRIORTIZATION
 ccflags-$(CONFIG_WLAN_SUPPORT_LAPB) += -DWLAN_SUPPORT_LAPB
+ccflags-$(CONFIG_WLAN_HAPS_ENABLE) += -DWLAN_HAPS_ENABLE
 found = $(shell if grep -qF "walt_get_cpus_taken" $(srctree)/kernel/sched/walt/walt.c; then echo "yes" ;else echo "no" ;fi;)
 ifeq ($(findstring yes, $(found)), yes)
 ccflags-y += -DWALT_GET_CPU_TAKEN_SUPPORT

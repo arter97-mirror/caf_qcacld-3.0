@@ -92,6 +92,7 @@
 #include "wlan_hdd_son.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_cm_ucfg_api.h"
+#include "wlan_mlo_mgr_roam.h"
 
 /* These are needed to recognize WPA and RSN suite types */
 #define HDD_WPA_OUI_SIZE 4
@@ -3499,6 +3500,24 @@ void hdd_roam_profile_init(struct wlan_hdd_link_info *link_info)
 	hdd_exit();
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/*
+ * hdd_cm_roam_connect_complete() - Callback to complete roaming
+ * @vdev: pointer to vdev object
+ *
+ * Return: None
+ */
+static void hdd_cm_roam_connect_complete(struct wlan_objmgr_vdev *vdev)
+{
+	mlo_roam_connect_complete(vdev);
+}
+#else
+static inline
+void hdd_cm_roam_connect_complete(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
+
 struct osif_cm_ops osif_ops = {
 	.connect_active_notify_cb = hdd_cm_connect_active_notify,
 	.connect_complete_cb = hdd_cm_connect_complete,
@@ -3508,6 +3527,7 @@ struct osif_cm_ops osif_ops = {
 	.save_gtk_cb = hdd_cm_save_gtk,
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	.roam_rt_stats_event_cb = wlan_hdd_cfg80211_roam_events_callback,
+	.roam_complete_notify_cb = hdd_cm_roam_connect_complete,
 #endif
 #ifdef WLAN_FEATURE_FILS_SK
 	.set_hlp_data_cb = hdd_cm_set_hlp_data,

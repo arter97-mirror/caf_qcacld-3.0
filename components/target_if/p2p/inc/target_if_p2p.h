@@ -157,4 +157,15 @@ QDF_STATUS target_if_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
  */
 bool target_if_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_USD  || FEATURE_WLAN_SUPPORT_P2P_R2 */
+
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
+/**
+ * target_if_p2p_is_fw_support_wfd_r2() - return WFD R2 service capability
+ * from FW.
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if WFD R2 supported by FW otherwise false
+ */
+bool target_if_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc);
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 #endif /* _TARGET_IF_P2P_H_ */

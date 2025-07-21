@@ -970,6 +970,134 @@ tdls_check_support_upto_11be(uint8_t tdls_support_enable,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+struct wlan_objmgr_vdev *wlan_tdls_get_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+						uint8_t index,
+						wlan_objmgr_ref_dbgid dbg_id)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_vdev *mlo_vdev;
+
+	if (!vdev)
+		return NULL;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx)
+		return NULL;
+
+	mlo_vdev = mlo_dev_ctx->wlan_vdev_list[index];
+	if (mlo_vdev &&
+	    wlan_objmgr_vdev_try_get_ref(mlo_vdev, dbg_id) ==
+							QDF_STATUS_SUCCESS)
+		return mlo_vdev;
+
+	return NULL;
+}
+
+void wlan_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+				wlan_objmgr_ref_dbgid dbg_id)
+{
+	if (!vdev)
+		return;
+
+	wlan_objmgr_vdev_release_ref(vdev, dbg_id);
+}
+
+/**
+ * tdls_is_6g_freq_allowed_in_ml_vdev() - Check whether 6g freq is
+ * present or not in ml vdev. If it is present, check whether it is
+ * allowed or not
+ * @vdev: pointer to vdev
+ *
+ * Return: True/False
+ */
+static bool tdls_is_6g_freq_allowed_in_ml_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev_ctx;
+	struct wlan_objmgr_vdev *vdev_iter;
+	struct wlan_objmgr_pdev *pdev;
+	QDF_STATUS status;
+	qdf_freq_t ch_freq;
+	uint8_t i, vdev_id;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return false;
+
+	ml_dev_ctx = vdev->mlo_dev_ctx;
+	if (!ml_dev_ctx)
+		return false;
+
+	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!ml_dev_ctx->wlan_vdev_list[i])
+			continue;
+
+		vdev_iter = ml_dev_ctx->wlan_vdev_list[i];
+		status = wlan_objmgr_vdev_try_get_ref(vdev_iter,
+						      WLAN_TDLS_NB_ID);
+		if (QDF_IS_STATUS_ERROR(status))
+			continue;
+
+		ch_freq = wlan_get_operation_chan_freq(vdev_iter);
+		vdev_id =  wlan_vdev_get_id(vdev_iter);
+		wlan_objmgr_vdev_release_ref(vdev_iter, WLAN_TDLS_NB_ID);
+		if (wlan_reg_is_6ghz_chan_freq(ch_freq) &&
+		    !tdls_is_6g_freq_allowed(pdev, ch_freq)) {
+			tdls_err("vdev:%d 6g freq:%d not allowed for tdls",
+				 vdev_id, ch_freq);
+			return false;
+		}
+	}
+	return true;
+}
+
+#else
+struct wlan_objmgr_vdev *wlan_tdls_get_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+						uint8_t index,
+						wlan_objmgr_ref_dbgid dbg_id)
+{
+	return NULL;
+}
+
+void wlan_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
+				wlan_objmgr_ref_dbgid dbg_id)
+{
+}
+
+static bool tdls_is_6g_freq_allowed_in_ml_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif
+
+/**
+ * tdls_check_6g_freq_allowed() - tdls check whether 6G freq allowed
+ * or not.
+ * @pdev: pointer to pdev
+ * @vdev: pointer to vdev
+ * @ch_freq: channel frequency
+ *
+ * Return: True/False
+ */
+static bool tdls_check_6g_freq_allowed(struct wlan_objmgr_pdev *pdev,
+				       struct wlan_objmgr_vdev *vdev,
+				       qdf_freq_t ch_freq)
+{
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		if (wlan_reg_is_6ghz_chan_freq(ch_freq) &&
+		    !tdls_is_6g_freq_allowed(pdev, ch_freq)) {
+			tdls_debug("6GHz freq:%d not allowed for TDLS",
+				   ch_freq);
+			return false;
+		}
+	} else {
+		if (!tdls_is_6g_freq_allowed_in_ml_vdev(vdev))
+			return false;
+	}
+
+	return true;
+}
+
 /**
  * tdls_check_support_bit() - Check TDLS enable support bits
  * @vdev: vdev object
@@ -1078,10 +1206,9 @@ bool tdls_check_is_tdls_allowed(struct wlan_objmgr_vdev *vdev)
 	}
 
 	ch_freq = wlan_get_operation_chan_freq(vdev);
-	if (wlan_reg_is_6ghz_chan_freq(ch_freq) &&
-	    !tdls_is_6g_freq_allowed(pdev, ch_freq)) {
-		tdls_debug("6GHz freq:%d not allowed for TDLS", ch_freq);
+	if (!tdls_check_6g_freq_allowed(pdev, vdev, ch_freq)) {
 		state = false;
+		goto exit;
 	}
 
 exit:
@@ -1322,51 +1449,6 @@ release_ref:
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO
-struct wlan_objmgr_vdev *wlan_tdls_get_mlo_vdev(struct wlan_objmgr_vdev *vdev,
-						uint8_t index,
-						wlan_objmgr_ref_dbgid dbg_id)
-{
-	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	struct wlan_objmgr_vdev *mlo_vdev;
-
-	if (!vdev)
-		return NULL;
-
-	mlo_dev_ctx = vdev->mlo_dev_ctx;
-	if (!mlo_dev_ctx)
-		return NULL;
-
-	mlo_vdev = mlo_dev_ctx->wlan_vdev_list[index];
-	if (mlo_vdev &&
-	    wlan_objmgr_vdev_try_get_ref(mlo_vdev, dbg_id) ==
-							QDF_STATUS_SUCCESS)
-		return mlo_vdev;
-
-	return NULL;
-}
-
-void wlan_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
-				wlan_objmgr_ref_dbgid dbg_id)
-{
-	if (!vdev)
-		return;
-
-	wlan_objmgr_vdev_release_ref(vdev, dbg_id);
-}
-#else
-struct wlan_objmgr_vdev *wlan_tdls_get_mlo_vdev(struct wlan_objmgr_vdev *vdev,
-						uint8_t index,
-						wlan_objmgr_ref_dbgid dbg_id)
-{
-	return NULL;
-}
-
-void wlan_tdls_release_mlo_vdev(struct wlan_objmgr_vdev *vdev,
-				wlan_objmgr_ref_dbgid dbg_id)
-{
-}
-#endif
 /**
  * tdls_get_vdev() - Get tdls specific vdev object manager
  * @psoc: wlan psoc object manager
@@ -1655,7 +1737,11 @@ tdls_process_sta_connect(struct tdls_sta_notify_params *notify)
 	if (!tdls_check_is_tdls_allowed(notify->vdev))
 		return QDF_STATUS_E_NOSUPPORT;
 
-	tdls_process_enable_for_vdev(notify->vdev);
+	if (wlan_cm_is_link_switch_connection(notify->vdev) &&
+	    wlan_vdev_mlme_is_mlo_vdev(notify->vdev))
+		tdls_process_enable_disable_for_ml_vdev(notify->vdev, true);
+	else
+		tdls_process_enable_for_vdev(notify->vdev);
 
 	return QDF_STATUS_SUCCESS;
 }

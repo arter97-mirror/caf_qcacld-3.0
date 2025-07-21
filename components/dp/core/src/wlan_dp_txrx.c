@@ -830,6 +830,10 @@ void dp_sta_notify_tx_comp_cb(qdf_nbuf_t nbuf, void *ctx, uint16_t flag)
 
 	switch (QDF_NBUF_CB_GET_PACKET_TYPE(nbuf)) {
 	case QDF_NBUF_CB_PACKET_TYPE_ARP:
+		if (!(qdf_nbuf_data_is_arp_req(nbuf) &&
+		      dp_intf->track_arp_ip == qdf_nbuf_get_arp_tgt_ip(nbuf)))
+			break;
+
 		if (flag & BIT(QDF_TX_RX_STATUS_DOWNLOAD_SUCC))
 			++dp_intf->dp_stats.arp_stats.
 				tx_host_fw_sent;
@@ -1581,14 +1585,14 @@ QDF_STATUS wlan_dp_rx_deliver_to_stack(struct wlan_dp_intf *dp_intf,
 		nbuf_receive_offload_ok = true;
 
 	gro_disallowed = qdf_atomic_read(&dp_intf->gro_disallowed);
-	if (gro_disallowed == 0 &&
-	    dp_intf->gro_flushed[rx_ctx_id] != 0) {
+	if (gro_disallowed == 0 && (dp_intf->gro_flushed[rx_ctx_id] != 0 ||
+				    !nbuf_receive_offload_ok)) {
 		if (qdf_likely(soc))
 			wlan_dp_set_fisa_disallowed_for_intf(soc, dp_intf,
 							     rx_ctx_id, 0);
 		dp_intf->gro_flushed[rx_ctx_id] = 0;
-	} else if (gro_disallowed &&
-		   dp_intf->gro_flushed[rx_ctx_id] == 0) {
+	} else if (gro_disallowed && (dp_intf->gro_flushed[rx_ctx_id] == 0 ||
+				      !nbuf_receive_offload_ok)) {
 		if (qdf_likely(soc))
 			wlan_dp_set_fisa_disallowed_for_intf(soc, dp_intf,
 							     rx_ctx_id, 1);

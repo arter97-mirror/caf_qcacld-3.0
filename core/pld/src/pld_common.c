@@ -437,6 +437,30 @@ int pld_wlan_disable(struct device *dev, enum pld_driver_mode mode)
 	return ret;
 }
 
+int pld_set_host_param(struct device *dev, const char *chip_name)
+{
+	int ret = 0;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_set_host_param(dev, chip_name);
+		break;
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+	case PLD_BUS_TYPE_IPCI:
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
 int pld_wlan_hw_enable(void)
 {
 	return pld_pcie_wlan_hw_enable();
@@ -2832,6 +2856,27 @@ void pld_set_tsf_sync_period(struct device *dev, u32 val)
 	}
 }
 
+int pld_get_tsf_gpio(struct device *dev)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		return pld_pcie_get_tsf_gpio(dev);
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		break;
+	}
+
+	return -EINVAL;
+}
+
 void pld_reset_tsf_sync_period(struct device *dev)
 {
 	switch (pld_get_bus_type(dev)) {
@@ -3050,5 +3095,25 @@ void pld_set_cxpc(struct device *dev)
 		pr_err("Invalid device type\n");
 		break;
 	}
+}
+#endif
+
+#if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
+int pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
+{
+	int ret;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_get_iova_info(dev, addr, size);
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_get_iova_info(dev, addr, size);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return ret;
 }
 #endif

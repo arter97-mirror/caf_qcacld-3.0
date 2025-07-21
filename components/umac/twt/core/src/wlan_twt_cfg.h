@@ -165,24 +165,17 @@ QDF_STATUS
 wlan_twt_cfg_set_requestor_flag(struct wlan_objmgr_psoc *psoc, bool val);
 
 /**
- * wlan_twt_cfg_get_responder_flag() - get responder flag
+ * wlan_twt_cfg_get_responder_flag() - This API intersects TWT responder flag
+ * from VDEV and MAC
  * @psoc: Pointer to global psoc
+ * @vdev_id: VDEV ID
  * @val: pointer to output variable
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-wlan_twt_cfg_get_responder_flag(struct wlan_objmgr_psoc *psoc, bool *val);
-
-/**
- * wlan_twt_cfg_set_responder_flag() - set responder flag
- * @psoc: Pointer to global psoc
- * @val: value to be set
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_twt_cfg_set_responder_flag(struct wlan_objmgr_psoc *psoc, bool val);
+wlan_twt_cfg_get_responder_flag(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+				bool *val);
 
 /**
  * wlan_twt_cfg_get_flex_sched() - get flex scheduling
@@ -365,15 +358,11 @@ wlan_twt_cfg_set_requestor_flag(struct wlan_objmgr_psoc *psoc, bool val)
 }
 
 static inline QDF_STATUS
-wlan_twt_cfg_get_responder_flag(struct wlan_objmgr_psoc *psoc, bool *val)
+wlan_twt_cfg_get_responder_flag(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+				bool *val)
 {
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wlan_twt_cfg_set_responder_flag(struct wlan_objmgr_psoc *psoc, bool val)
-{
-	return QDF_STATUS_SUCCESS;
+	*val = false;
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
 static inline QDF_STATUS

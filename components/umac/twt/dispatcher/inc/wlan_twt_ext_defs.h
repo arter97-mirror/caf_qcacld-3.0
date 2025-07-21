@@ -40,7 +40,6 @@
  * @disable_twt_on_scan: Enable/Disable twt on scan
  * @flex_twt_sched: flex twt scheduling enable/disable
  * @req_flag: requestor flag enable/disable
- * @res_flag: responder flag enable/disable
  * @rtwt_requestor_enabled: Restricted TWT requestor enable or disable
  * @rtwt_responder_enabled: Restricted TWT responder enable or disable
  * @twt_req_ht_vht: TWT requestor support in ht/vht mode
@@ -58,7 +57,6 @@ struct twt_mc_cfg_params {
 	bool disable_twt_on_scan;
 	bool flex_twt_sched;
 	bool req_flag;
-	bool res_flag;
 	bool rtwt_requestor_enabled;
 	bool rtwt_responder_enabled;
 	bool twt_req_ht_vht;

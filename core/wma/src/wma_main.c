@@ -126,6 +126,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "wma_pasn_peer_api.h"
 #include "target_if_mgmt_rx_srng.h"
+#include "wlan_cp_stats_utils_api.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -776,6 +777,9 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 		wma_set_smem_mailbox_feature(wma_handle, tgt_cfg);
 	if (wma_is_epm_supported_cfg(wma_handle))
 		wma_set_epm_feature(wma_handle, tgt_cfg);
+
+	tgt_cfg->enable_bcn_rssi_history_report =
+			cds_cfg->enable_bcn_rssi_history_report;
 }
 
 /**
@@ -5309,6 +5313,32 @@ wma_get_tdls_wideband_support(struct wmi_unified *wmi_handle,
 					     wmi_service_tdls_wideband_support);
 }
 
+#ifdef WLAN_FEATURE_TDLS_NSS_4_4
+/**
+ * wma_get_tdls_nss_confirm_support() - update tgt services with service tdls
+ * NSS operation
+ * @wmi_handle: Unified wmi_handle
+ * @cfg: target services
+ *
+ * Return: none
+ */
+static inline void
+wma_get_tdls_nss_confirm_support(struct wmi_unified *wmi_handle,
+				 struct wma_tgt_services *cfg)
+{
+	cfg->en_tdls_nss_confirm_support =
+				wmi_service_enabled(
+					wmi_handle,
+					wmi_service_tdls_nss_confirm_support);
+}
+#else
+static inline void
+wma_get_tdls_nss_confirm_support(struct wmi_unified *wmi_handle,
+				 struct wma_tgt_services *cfg)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * wma_get_tdls_mlo_support() - update tgt service with service tdls
@@ -5408,6 +5438,11 @@ wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
 static inline void
 wma_get_tdls_6g_support(struct wmi_unified *wmi_handle,
 			struct wma_tgt_services *cfg)
+{}
+
+static inline void
+wma_get_tdls_nss_confirm_support(struct wmi_unified *wmi_handle,
+				 struct wma_tgt_services *cfg)
 {}
 
 static inline void
@@ -5638,6 +5673,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	wma_get_tdls_6g_support(wmi_handle, cfg);
 	wma_get_tdls_wideband_support(wmi_handle, cfg);
 	wma_get_dynamic_vdev_macaddr_support(wmi_handle, cfg);
+	wma_get_tdls_nss_confirm_support(wmi_handle, cfg);
 	wma_get_service_cap_per_link_mlo_stats(wmi_handle, cfg);
 	wma_get_n_link_mlo_support(wmi_handle, cfg);
 	wma_get_mlo_tid_to_link_mapping_support(wmi_handle, cfg);

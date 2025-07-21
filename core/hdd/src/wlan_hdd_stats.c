@@ -256,6 +256,129 @@ static inline uint8_t hdd_map_he_gi_to_os(enum txrate_gi guard_interval)
 }
 #endif
 
+void wlan_hdd_reset_bcn_rssi_history_stats(
+	struct wlan_hdd_link_info *link_info)
+{
+	qdf_mem_zero(&link_info->hdd_stats.bcn_rssi_his_stats,
+		     sizeof(link_info->hdd_stats.bcn_rssi_his_stats));
+}
+
+int wlan_hdd_get_station_bcn_rssi_history(
+	struct wlan_hdd_link_info *link_info,
+	struct bcn_his_info_stats *bcn_rssi_stats)
+{
+	struct hdd_adapter *adapter;
+	uint8_t link_id;
+	struct hdd_context *hdd_ctx;
+
+	if (!link_info || !bcn_rssi_stats)
+		return -EINVAL;
+
+	adapter = link_info->adapter;
+	if (hdd_validate_adapter(adapter))
+		return -EINVAL;
+
+	if (adapter->device_mode != QDF_STA_MODE)
+		return -EINVAL;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("Invalid hdd context");
+		return -EINVAL;
+	}
+
+	if (!ucfg_cp_stats_is_bcn_rssi_history_report_cfg_enable(
+						hdd_ctx->psoc))
+		return -EINVAL;
+
+	if (wlan_hdd_is_mlo_connection(adapter->deflink)) {
+		link_id = hdd_cm_get_ieee_link_id(link_info, false);
+		if (link_id == WLAN_INVALID_LINK_ID)
+			return -EINVAL;
+	} else {
+		if (link_info != adapter->deflink)
+			return -EINVAL;
+	}
+	qdf_mem_copy(bcn_rssi_stats,
+		     &link_info->hdd_stats.bcn_rssi_his_stats,
+		     sizeof(*bcn_rssi_stats));
+
+	return 0;
+}
+
+#define HDD_MAX_BCN_RSSI_INFO_LOG 192
+
+static void hdd_dump_bcn_rssi_history(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+	struct bcn_his_info_stats bcn_rssi_stats;
+	int ret;
+	uint32_t i;
+	uint8_t info[HDD_MAX_BCN_RSSI_INFO_LOG];
+	int len;
+
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		ret = wlan_hdd_get_station_bcn_rssi_history(
+					link_info, &bcn_rssi_stats);
+		if (ret)
+			continue;
+		len = 0;
+		for (i = 0; i < QDF_ARRAY_SIZE(bcn_rssi_stats.bcn_history);
+			i++) {
+			struct bcn_his_info *bcn_rssi_info =
+					&bcn_rssi_stats.bcn_history[i];
+			ret = scnprintf(info + len, sizeof(info) - len,
+					"%d 0x%x,",
+					bcn_rssi_info->bcn_rssi,
+					bcn_rssi_info->bcn_tsf);
+			if (ret <= 0)
+				break;
+			len += ret;
+			if (len >= (sizeof(info) - 20)) {
+				hdd_nofl_debug("bcn_rssi_his vdev %d (rssi and tsf): %s",
+					       link_info->vdev_id,
+					       info);
+				len = 0;
+			}
+		}
+		if (len > 0)
+			hdd_nofl_debug("bcn_rssi_his vdev %d (rssi and tsf): %s",
+				       link_info->vdev_id, info);
+	}
+}
+
+static void
+copy_station_bcn_rssi_stats(struct wlan_objmgr_psoc *psoc,
+			    struct hdd_adapter *adapter,
+			    struct stats_event *stats)
+{
+	struct wlan_hdd_link_info *link_info;
+	uint8_t i;
+
+	if (!ucfg_cp_stats_is_bcn_rssi_history_report_cfg_enable(
+							psoc))
+		return;
+	if (!stats->num_recv_bcn_stats || !stats->bcn_stats)
+		return;
+	for (i = 0; i < stats->num_recv_bcn_stats; i++) {
+		struct bcn_his_info_stats *bcn_rssi_his_stats;
+
+		link_info = wlan_hdd_get_link_info_from_vdev(
+				psoc, stats->bcn_stats[i].vdev_id);
+		if (!link_info) {
+			hdd_debug("no link info found vdev %d",
+				  stats->bcn_stats[i].vdev_id);
+			continue;
+		}
+		bcn_rssi_his_stats = &link_info->hdd_stats.bcn_rssi_his_stats;
+		qdf_mem_copy(&bcn_rssi_his_stats->bcn_history[0],
+			     &stats->bcn_stats[i].bcn_history[0],
+			     sizeof(stats->bcn_stats[i].bcn_history));
+	}
+
+	hdd_dump_bcn_rssi_history(adapter);
+}
+
 /*
  * copy_station_stats_to_adapter() - Copy station stats to adapter
  * @link_info: Pointer to link_info in adapter
@@ -325,6 +448,8 @@ static int copy_station_stats_to_adapter(struct wlan_hdd_link_info *link_info,
 		     stats->vdev_chain_rssi[0].chain_rssi,
 		     sizeof(stats->vdev_chain_rssi[0].chain_rssi));
 	hdd_stats->bcn_protect_stats = stats->bcn_protect_stats;
+	copy_station_bcn_rssi_stats(wlan_vdev_get_psoc(vdev), adapter,
+				    stats);
 
 	dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
 	if (!dynamic_cfg) {
@@ -12494,8 +12619,64 @@ static int nl_srv_bcast_cstats(struct sk_buff *skb)
 }
 #endif
 
+#define MARKER_LEN 6 /* Length of "CS_FSM" and "CS_FEM" */
+#define ANI_HDR_SIZE 2
+
+/**
+ * hdd_print_second_64_bits_cstats_fw_type() - Print the second 64 bits of the
+ * payload, which represent the timestamp of the event at which the host
+ * receives the CSTATS QMI event from the firmware.
+ * latency stats
+ * @buffer: pointer to event buffer
+ * @len: buffer length
+ *
+ * Return: None
+ */
+static void hdd_print_second_64_bits_cstats_fw_type(char *buffer,
+						    unsigned int len)
+{
+	const char *start_marker = "CS_FSM";
+	const char *end_marker = "CS_FEM";
+	uint32_t i, j, start, end, payload_len;
+	uint64_t second_64 = 0;
+
+	/* skips the 2-byte ANI HDR at the beginning */
+	for (i = ANI_HDR_SIZE; i < len - 1; i++) {
+		/* Look for start marker */
+		if (qdf_mem_cmp(&buffer[i], start_marker, MARKER_LEN) == 0) {
+			start = i + MARKER_LEN;
+			/* look for end marker */
+			for (j = start; j < len - 1; j++) {
+				if (qdf_mem_cmp(&buffer[j], end_marker,
+						MARKER_LEN) == 0) {
+					end = j;
+					payload_len = end - start;
+					if (payload_len >= 16) {
+						/*
+						 * extract second 64 bits
+						 * (bytes 8 to 15) of payload
+						 */
+						second_64 = 0;
+						qdf_mem_copy(&second_64,
+							     &buffer[start + 8],
+							     8);
+						hdd_debug("Second 64 bits:%llu",
+							  second_64);
+					} else {
+						hdd_debug("Payload too short");
+					}
+					/* move past this payload */
+					i = j + MARKER_LEN - 1;
+					break;
+				}
+			}
+		}
+	}
+}
+
 int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
-				      enum cstats_types type)
+				      enum cstats_types type,
+				      bool is_logging_enable)
 {
 	struct sk_buff *skb = NULL;
 	struct nlmsghdr *nlh;
@@ -12511,6 +12692,9 @@ int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
 		*(unsigned short *)(buff) = ANI_NL_MSG_CSTATS_FW_LOG_TYPE;
 		*(unsigned short *)(buff + 2) = len - sizeof(tAniHdr);
 	}
+
+	if (type == CSTATS_FW_TYPE && is_logging_enable)
+		hdd_print_second_64_bits_cstats_fw_type(buff, len);
 
 	skb = dev_alloc_skb(MAX_CSTATS_NODE_LENGTH);
 	if (!skb) {

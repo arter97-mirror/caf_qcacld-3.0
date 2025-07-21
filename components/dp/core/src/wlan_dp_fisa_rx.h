@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -68,9 +68,16 @@
 
 #define DP_FT_LOCK_MAX_RECORDS 32
 
+/**
+ * enum dp_ft_action - Fisa action code for flow table task
+ * @DP_FT_ADD: Add flow table entry
+ * @DP_FT_DEL: Delete flow table entry
+ * @DP_FT_INV_PEER_ID: Invalidate flow table entry for a peer
+ */
 enum dp_ft_action {
 	DP_FT_ADD,
 	DP_FT_DEL,
+	DP_FT_INV_PEER_ID,
 };
 
 struct dp_fisa_rx_fst_update_elem {
@@ -218,6 +225,17 @@ void dp_rx_fst_requeue_wq(struct wlan_dp_psoc_context *dp_ctx);
 
 void dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id);
 
+#ifdef WLAN_DP_FEATURE_STC
+/*
+ * dp_fisa_rx_fst_inv_peer_id() - Invalidate the peer_id in all the FST
+ *				  entries which belong to this peer
+ * @peer_id: peer_id for which the invalidation is to be done
+ *
+ * Return: None
+ */
+void dp_fisa_rx_fst_inv_peer_id(uint16_t peer_id);
+#endif
+
 /**
  * dp_fisa_cfg_init() - FISA INI items init
  * @config: SoC CFG config
@@ -268,6 +286,10 @@ dp_rx_fst_update_pm_suspend_status(struct wlan_dp_psoc_context *dp_ctx,
 }
 
 static inline void dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id)
+{
+}
+
+static inline void dp_fisa_rx_fst_inv_peer_id(uint16_t peer_id)
 {
 }
 

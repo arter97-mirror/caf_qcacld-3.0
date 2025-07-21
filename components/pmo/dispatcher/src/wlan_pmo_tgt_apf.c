@@ -38,8 +38,11 @@ QDF_STATUS pmo_tgt_set_apf_mode_req(struct wlan_objmgr_psoc *psoc,
 	if (!pmo_tx_ops.send_apf_mode_req) {
 		pmo_err("send_apf_mode_req is null");
 		status = QDF_STATUS_E_NULL_VALUE;
+		return status;
 	}
+
 	status = pmo_tx_ops.send_apf_mode_req(psoc, apf_mode, vdev_id);
+
 	if (QDF_IS_STATUS_ERROR(status))
 		pmo_err("Failed to send APF mode");
 

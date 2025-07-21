@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -187,6 +187,46 @@ void dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id)
 		break;
 	}
 }
+
+#ifdef WLAN_DP_FEATURE_STC
+void dp_fisa_rx_fst_inv_peer_id(uint16_t peer_id)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
+	struct dp_rx_fst *fisa_hdl = dp_ctx->rx_fst;
+	struct dp_fisa_rx_fst_update_elem *elem;
+
+	/* Check if it is enabled in the INI */
+	if (!wlan_dp_cfg_is_rx_fisa_enabled(dp_cfg))
+		return;
+
+	if (!fisa_hdl->fst_in_cmem)
+		return;
+
+	elem = qdf_mem_malloc(sizeof(*elem));
+	if (!elem) {
+		/* TODO - How to handle this case ? */
+		return;
+	}
+
+	elem->action_code = DP_FT_INV_PEER_ID;
+	elem->peer_id = peer_id;
+	qdf_spin_lock_bh(&fisa_hdl->dp_rx_fst_lock);
+	qdf_list_insert_back(&fisa_hdl->fst_update_list, &elem->node);
+	qdf_spin_unlock_bh(&fisa_hdl->dp_rx_fst_lock);
+	if (qdf_atomic_read(&fisa_hdl->pm_suspended)) {
+		fisa_hdl->fst_wq_defer = true;
+		dp_info("Defer DP_FT_INV_PEER_ID task in WoW for peer %hu",
+			peer_id);
+	} else {
+		qdf_queue_work(fisa_hdl->dp_ctx->qdf_dev,
+			       fisa_hdl->fst_update_wq,
+			       &fisa_hdl->fst_update_work);
+		dp_info("Queued DP_FT_INV_PEER_ID task in work for peer %hu",
+			peer_id);
+	}
+}
+#endif
 
 /**
  * dp_rx_flow_send_htt_operation_cmd() - Invalidate FSE cache on FT change

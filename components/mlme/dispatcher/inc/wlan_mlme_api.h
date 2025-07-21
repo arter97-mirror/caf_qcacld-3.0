@@ -266,6 +266,32 @@ QDF_STATUS wlan_mlme_set_ht_cap_info(struct wlan_objmgr_psoc *psoc,
 				     ht_cap_info);
 
 /**
+ * wlan_mlme_disable_ht_dynamic_smps() - Disable HT dynamic smps
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_disable_ht_dynamic_smps(struct wlan_objmgr_psoc *psoc);
+
+#ifdef WLAN_FEATURE_11AX
+/**
+ * wlan_mlme_disable_he_dynamic_smps() - Disable HE dynamic smps
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_disable_he_dynamic_smps(struct wlan_objmgr_psoc *psoc);
+#else
+static inline QDF_STATUS
+wlan_mlme_disable_he_dynamic_smps(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+/**
  * wlan_mlme_get_max_amsdu_num() - get the max amsdu num
  * @psoc: pointer to psoc object
  * @value: pointer to the value where the max_amsdu num is to be filled

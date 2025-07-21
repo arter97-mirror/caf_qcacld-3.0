@@ -1194,13 +1194,9 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
 		return;
 
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
-	    wlan_vdev_mlme_is_mlo_link_vdev(vdev))
-		return;
-
-	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_mac)) {
-		logging_debug("vdev:%d reason:%d , bssid is zero",
-			      wlan_vdev_get_id(vdev), reason);
+	if (!peer_mac) {
+		logging_err("vdev:%d peer mac not found",
+			    wlan_vdev_get_id(vdev));
 		return;
 	}
 
@@ -1213,6 +1209,12 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 	if (!peer_mac) {
 		logging_err("vdev:%d peer mac not found",
 			    wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_mac)) {
+		logging_debug("vdev:%d reason:%d , bssid is zero",
+			      wlan_vdev_get_id(vdev), reason);
 		return;
 	}
 
@@ -1233,7 +1235,6 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 
 	wlan_diag_event.reason = diag_reason;
 	wlan_diag_event.sub_reason = int_reason;
-	wlan_diag_event.rssi = rssi;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_MGMT);
 }

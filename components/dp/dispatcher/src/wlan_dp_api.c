@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -46,6 +46,13 @@ void wlan_dp_print_fisa_rx_stats(enum cdp_fisa_stats_id stats_id)
 {
 	dp_print_fisa_rx_stats(stats_id);
 }
+
+#ifdef WLAN_DP_FEATURE_STC
+void wlan_dp_fisa_rx_fst_inv_peer_id(uint16_t peer_id)
+{
+	dp_fisa_rx_fst_inv_peer_id(peer_id);
+}
+#endif
 
 void wlan_dp_set_fst_in_cmem(bool fst_in_cmem)
 {

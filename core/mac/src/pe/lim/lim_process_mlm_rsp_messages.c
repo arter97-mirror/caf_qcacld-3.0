@@ -2444,6 +2444,9 @@ lim_set_tpc_for_sap_go(struct mac_context *mac_ctx,
 	}
 
 	tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
+	if (!tx_ops)
+		return;
+
 	wlan_reg_get_cur_6g_ap_pwr_type(mac_ctx->pdev, &ap_power_type_6g);
 	if (wlan_reg_is_6ghz_chan_freq(session_entry->curr_op_freq) &&
 	    ap_power_type_6g == REG_INDOOR_ENABLED_AP) {
@@ -3184,6 +3187,9 @@ lim_process_bcn_tpe_and_set_tpc(struct mac_context *mac_ctx,
 	if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc) &&
 	    !session_entry->sta_follows_sap_power) {
 		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
+		if (!tx_ops)
+			return;
+
 		if (session_entry->lim_join_req)
 			bss = &session_entry->lim_join_req->bssDescription;
 		if (!bss) {

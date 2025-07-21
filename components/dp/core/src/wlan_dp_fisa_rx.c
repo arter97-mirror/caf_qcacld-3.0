@@ -1337,6 +1337,25 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 	}
 }
 
+static void _dp_fisa_rx_fst_inv_peer_id(struct dp_rx_fst *fisa_hdl,
+					struct dp_fisa_rx_fst_update_elem *elem)
+{
+	struct dp_fisa_rx_sw_ft *sw_ft_entry;
+	uint16_t peer_id = elem->peer_id;
+	uint16_t i, count = 0;
+
+	sw_ft_entry = (struct dp_fisa_rx_sw_ft *)fisa_hdl->base;
+	for (i = 0; i < fisa_hdl->max_entries; i++) {
+		if (sw_ft_entry[i].is_populated &&
+		    sw_ft_entry[i].peer_id == peer_id) {
+			sw_ft_entry[i].peer_id = 0xFFFF;
+			count++;
+		}
+	}
+
+	dp_info("Invalidated %d entries for peer %hu", count, peer_id);
+}
+
 /**
  * dp_fisa_rx_fst_update_work() - Work functions for FST updates
  * @arg: argument passed to the work function
@@ -1367,6 +1386,15 @@ void dp_fisa_rx_fst_update_work(void *arg)
 	while (qdf_list_peek_front(&fisa_hdl->fst_update_list, &node) ==
 	       QDF_STATUS_SUCCESS) {
 		elem = (struct dp_fisa_rx_fst_update_elem *)node;
+		if (elem->action_code == DP_FT_INV_PEER_ID) {
+			_dp_fisa_rx_fst_inv_peer_id(fisa_hdl,
+						    elem);
+			qdf_list_remove_front(&fisa_hdl->fst_update_list,
+					      &node);
+			qdf_mem_free(elem);
+			continue;
+		}
+
 		vdev = dp_vdev_get_ref_by_id(fisa_hdl->soc_hdl,
 					     elem->vdev_id,
 					     DP_MOD_ID_RX);
@@ -2723,6 +2751,7 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		if (fisa_flow) {
 			fisa_flow->num_pkts++;
 			fisa_flow->last_accessed_ts = qdf_sched_clock();
+			fisa_flow->peer_id = QDF_NBUF_CB_RX_PEER_ID(head_nbuf);
 			wlan_dp_fisa_nbuf_mark_flow_info(fisa_flow, head_nbuf);
 			dp_fisa_update_flow_balance_stats(fisa_flow, dp_ctx);
 		}
