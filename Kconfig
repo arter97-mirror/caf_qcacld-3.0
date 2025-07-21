@@ -1353,6 +1353,7 @@ config WLAN_FEATURE_IGMP_OFFLOAD
 
 config WLAN_FEATURE_LINK_LAYER_STATS
 	bool "Enable WLAN_FEATURE_LINK_LAYER_STATS"
+	depends on WLAN_DEBUGFS
 	default n
 
 config WLAN_FEATURE_LPSS
@@ -2005,10 +2006,6 @@ config DP_MLO_LINK_STATS_SUPPORT
 	bool "enable CONFIG_DP_MLO_LINK_STATS_SUPPORT"
 	default n
 
-config MULTI_IF_NAME
-	string "set MULTI_IF_NAME"
-	default "wlan"
-
 config CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA
 	bool "enable CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA"
 	default n
@@ -2334,10 +2331,6 @@ config CHIP_VERSION
     default 1
 endif
 
-config IPA3
-    bool "Enable IPA3"
-    default n
-
 config IPA_WDI_UNIFIED_API
     bool "ipa wdi unified API"
     default n
@@ -2388,7 +2381,7 @@ config RX_PERFORMANCE
 
 config AR6320_SUPPORT
     bool "support AR6320"
-    default y
+    default n
 
 config DYNAMIC_SINGLE_CHIP
     string "dynamic single chip name"
@@ -2396,11 +2389,7 @@ config DYNAMIC_SINGLE_CHIP
 
 config DFS_FCC_TYPE4_DURATION_CHECK
     bool "check DFS FCC TYPE4 duration"
-    default y
-
-config WLAN_OPEN_SOURCE
-    bool "set wlan as open source"
-    default y
+    default n
 
 config QCACLD_WLAN_LFR2
     bool "wlan LFR2"
@@ -2412,19 +2401,19 @@ config FEATURE_WLAN_RA_FILTERING
 
 config WLAN_FEATURE_SAE
     bool "SAE feature"
-    default y
+    default n
 
 config PKT_LOG
     bool "enable/disable pkt log"
-    default y
+    default n
 
 config WLAN_TX_FLOW_CONTROL_LEGACY
     bool "use legacy tx flow control"
-    default y
+    default n
 
 config WLAN_FEATURE_BMI
     bool "feature BMI"
-    default y
+    default n
 
 config FEATURE_WLAN_AUTO_SHUTDOWN
     bool "feature auto shutdown"
@@ -2448,9 +2437,37 @@ config AR6320_TX_THROTTLE
 
 config AR6320_LL_DP_SUPPORT
     bool "Flag for ROME LL DP"
-    default y
+    default n
 
 config AR6320_MONITOR_MODE
     bool "Flag for ROME MONITOR MODE"
-    default y
+    default n
+
+config AUTO_PLATFORM
+	bool "enable AUTO_PLATFORM"
+	default n
+
+config QCACLD_FEATURE_BTC_CHAIN_MODE
+	bool "enable QCACLD_FEATURE_BTC_CHAIN_MODE"
+	default n
+
+config SUPPORT_P2P_BY_ONE_INTF_WLAN
+	bool "support p2p by one interface"
+	default n
+
+config WLAN_IPA_TX_FLOW_CONTROL
+	bool "enable IPA tx flow control"
+	default n
+
+config QCACLD_FEATURE_COEX_CONFIG
+	bool "bt coex config"
+	default n
+
+config SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+	bool "shutdown wlan in system suspend"
+	default n
+
+config IPA_P2P_SUPPORT
+	bool "support p2p when IPA is enabled"
+	default n
 endif # QCA_CLD_WLAN

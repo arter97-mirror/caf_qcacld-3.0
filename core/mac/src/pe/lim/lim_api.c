@@ -2078,8 +2078,8 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 	assoc_ies_len = roam_synch->reassoc_req_length -
 				sizeof(tSirMacMgmtHdr) - ies_offset;
 
-	rsn_ie = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSN, assoc_ies,
-					  assoc_ies_len);
+	rsn_ie = wlan_get_rsn_data_from_ie_ptr(assoc_ies, assoc_ies_len);
+
 	wpa_oui = WLAN_WPA_SEL(WLAN_WPA_OUI_TYPE);
 	wpa_ie = wlan_get_vendor_ie_ptr_from_oui((uint8_t *)&wpa_oui,
 						 WLAN_OUI_SIZE, assoc_ies,
@@ -2089,8 +2089,8 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 		return;
 	}
 
-	wlan_set_vdev_crypto_prarams_from_ie(ft_session->vdev, assoc_ies,
-					     assoc_ies_len);
+	wlan_set_vdev_crypto_params_from_ie(ft_session->vdev, assoc_ies,
+					    assoc_ies_len);
 	ft_session->limRmfEnabled =
 		lim_get_vdev_rmf_capable(mac_ctx, ft_session);
 	crypto_params = wlan_crypto_vdev_get_crypto_params(ft_session->vdev);
@@ -3931,6 +3931,8 @@ lim_create_and_fill_link_session(struct mac_context *mac_ctx,
 	if (!pe_session)
 		goto fail;
 
+	pe_update_crypto_params(mac_ctx, pe_session, sync_ind);
+
 	status = lim_cm_fill_link_session(mac_ctx, vdev_id,
 					  pe_session, sync_ind, ie_len);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -4315,8 +4317,9 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	cache_entry = wlan_scan_get_scan_entry_by_mac_freq(pdev, link_addr,
-							   freq);
+	cache_entry =
+		wlan_scan_entry_by_bssid_and_security(pdev, link_addr,
+						      wlan_vdev_get_id(vdev));
 	if (!cache_entry)
 		return QDF_STATUS_E_FAILURE;
 
@@ -4553,6 +4556,23 @@ static void lim_gen_link_specific_rnr_ie(struct mac_context *mac_ctx,
 			   new_rnr_ie[1] + MIN_IE_LEN);
 }
 
+static inline void fill_crypto_filter_params(struct scan_filter *filter,
+					     struct wlan_objmgr_vdev *vdev)
+{
+	filter->authmodeset =
+		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE);
+	filter->ucastcipherset =
+		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_UCAST_CIPHER);
+	filter->mcastcipherset =
+		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_MCAST_CIPHER);
+	filter->key_mgmt =
+		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+	filter->mgmtcipherset =
+		wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_MGMT_CIPHER);
+	filter->ignore_pmf_cap = true;
+	filter->mrsno_gen = wlan_vdev_get_rsno_gen_supported(vdev);
+}
+
 static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 {
 	struct scan_filter *filter;
@@ -4611,6 +4631,8 @@ static QDF_STATUS lim_check_partner_link_for_cmn_akm(struct pe_session *session)
 
 		qdf_copy_macaddr(&bssid_list[idx], &link_info->link_addr);
 	}
+
+	fill_crypto_filter_params(filter, session->vdev);
 
 	wlan_vdev_get_bss_peer_mld_mac(session->vdev, &mld_addr);
 	filter->match_mld_addr = true;

@@ -2323,7 +2323,9 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 		link_id = wlan_vdev_get_link_id(vdev);
 
 	ucfg_mlme_get_sap_chn_switch_bcn_count(psoc, &ch_switch_count);
-	input_punc_bitmap = wlan_reg_get_input_punc_bitmap(ch_params);
+	input_punc_bitmap = wlan_reg_get_reg_punc_bitmap(ch_params);
+	if (!input_punc_bitmap)
+		input_punc_bitmap = wlan_reg_get_input_punc_bitmap(ch_params);
 
 	hdd_debug("channel switch started notify: link_id %d, vdev_id %d chan:%d width:%d freq1:%d freq2:%d punct 0x%x ch_switch_count %d",
 		  link_id, vdev_id, chandef.chan->center_freq, chandef.width,
@@ -3839,6 +3841,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	bool capable, is_wps;
 	int32_t keymgmt;
 	enum policy_mgr_con_mode pm_con_mode;
+	qdf_freq_t ll_sap_freq;
 
 	if (!link_info)
 		return -EINVAL;
@@ -3892,6 +3895,19 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 				wlan_vdev_get_id(sap_ctx->vdev),
 				LL_SAP_CSA_CONCURENCY);
 		return ret;
+	}
+
+	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(hdd_ctx->psoc);
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
+							   adapter->device_mode,
+							   link_info->vdev_id);
+
+	if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
+	    policy_mgr_are_2_freq_on_same_mac(hdd_ctx->psoc, target_chan_freq,
+					      ll_sap_freq)) {
+		hdd_err("ll_sap freq %d and sap freq %d are on same mac",
+			ll_sap_freq, target_chan_freq);
+		return -EINVAL;
 	}
 
 	if (wlan_reg_is_6ghz_chan_freq(target_chan_freq) &&
@@ -8752,6 +8768,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	struct sap_config *sap_config;
 	struct hdd_ap_ctx *ap_ctx;
 	struct wlan_hdd_link_info *link_info;
+	qdf_freq_t user_config_freq;
 
 	hdd_enter();
 
@@ -8817,6 +8834,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 	channel_width = wlan_hdd_get_channel_bw(params->chandef.width);
 	freq = (qdf_freq_t)params->chandef.chan->center_freq;
+	user_config_freq = freq;
 
 	if (wlan_reg_is_6ghz_chan_freq(freq) &&
 	    !wlan_reg_is_6ghz_band_set(hdd_ctx->pdev)) {
@@ -9128,6 +9146,9 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 		if (!vdev)
 			return -EINVAL;
+
+		if (user_config_freq != freq)
+			wlan_set_sap_user_config_freq(vdev, user_config_freq);
 
 		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 			link_id = wlan_vdev_get_link_id(vdev);

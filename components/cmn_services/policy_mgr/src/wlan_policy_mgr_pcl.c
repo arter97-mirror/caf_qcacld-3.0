@@ -3960,28 +3960,28 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[1]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_SAP_5_HIGH_SBS;
 		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[1]].freq) &&
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[0]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_SAP_5_HIGH_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[1]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[1]].freq) &&
 		     wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 		     WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_HIGH_SAP_5_LOW_SBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -3996,10 +3996,11 @@ enum policy_mgr_three_connection_mode
 	} else if (num_ml_sta == 2 && count_nan_disc == 1) {
 		/* ML STA + SAP */
 		index = PM_NAN_DISC_24_STA_STA_SCC_MCC_DBS;
-	} else if (count_sap == 1 && count_sta == 2 && !num_ml_sta) {
+	} else if (count_sap == 1 && count_sta == 2 && num_ml_sta <= 1) {
 		/* This covers the below combinations,
 		 * 1. SAP + non-ML STA + non-ML STA
-		 * 2. P2P GO/CLI + non-ML STA + non-ML STA
+		 * 2. SAP + non-ML STA + ML STA
+		 * 3. P2P GO/CLI + non-ML STA + non-ML STA
 		 */
 		policy_mgr_debug(
 			"channel: sap0: %d, sta0: %d, sta1: %d",
@@ -4058,28 +4059,28 @@ enum policy_mgr_three_connection_mode
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[1]].freq)) {
-			index = PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS;
+			index = PM_STA_SAP_5_HIGH_STA_5_LOW_SBS;
 		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[1]].freq) &&
 			wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq)) {
-			index = PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS;
+			index = PM_STA_SAP_5_HIGH_STA_5_LOW_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[0]].freq) &&
 			 WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[1]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_STA_5_HIGH_SBS;
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			pm_conc_connection_list[list_sta[1]].freq) &&
 			 WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sap[0]].freq) &&
 			WLAN_REG_IS_5GHZ_CH_FREQ(
 			pm_conc_connection_list[list_sta[0]].freq)) {
-			index = PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS;
+			index = PM_STA_SAP_5_LOW_STA_5_HIGH_SBS;
 		} else {
 			index =  PM_MAX_THREE_CONNECTION_MODE;
 		}
@@ -4349,7 +4350,7 @@ policy_mgr_get_nondfs_preferred_channel(struct wlan_objmgr_psoc *psoc,
 		 */
 		if (true == policy_mgr_is_any_nondfs_chnl_present(
 			psoc, &non_dfs_freq,
-			policy_mgr_is_mlo_ap(psoc, vdev_id)))
+			policy_mgr_is_mlo_ap(psoc, vdev_id), vdev_id))
 			return non_dfs_freq;
 
 		if (QDF_STATUS_SUCCESS !=

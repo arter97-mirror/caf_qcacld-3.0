@@ -799,6 +799,7 @@ struct wlan_mlme_cfg_sap {
  * @dfs_beacon_tx_enhanced: enhance dfs beacon tx
  * @dfs_prefer_non_dfs: perefer non dfs channel after radar
  * @dfs_disable_japan_w53: Disable W53 channels
+ * @enable_sap_dfs_puncture: Enable sap dfs puncture
  * @sap_tx_leakage_threshold: sap tx leakage threshold
  * @dfs_pri_multiplier: dfs_pri_multiplier for handle missing pulses
  */
@@ -810,6 +811,7 @@ struct wlan_mlme_dfs_cfg {
 	bool dfs_beacon_tx_enhanced;
 	bool dfs_prefer_non_dfs;
 	bool dfs_disable_japan_w53;
+	bool enable_sap_dfs_puncture;
 	uint32_t sap_tx_leakage_threshold;
 	uint32_t dfs_pri_multiplier;
 };
@@ -2127,6 +2129,7 @@ struct fw_scan_channels {
  * for Hotspot 2.0
  * @roam_aggre_scan_step_rssi: Roam scan step RSSI in aggressive mode
  * @roam_aggre_threshold: Roam threshold in aggressive mode
+ * @mrsno_support: FW support for Multi RSNO feature
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -2258,6 +2261,7 @@ struct wlan_mlme_lfr_cfg {
 	bool hs20_btm_offload_disable;
 	uint32_t roam_aggre_scan_step_rssi;
 	uint32_t roam_aggre_threshold;
+	bool mrsno_support;
 };
 
 /**

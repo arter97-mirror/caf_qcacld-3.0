@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -122,6 +122,9 @@
 /* SR is disabled if NON_SRG is disallowed and SRG INFO is not present */
 #define SR_DISABLE NON_SRG_PD_SR_DISALLOWED & (~SRG_INFO_PRESENT & 0x0F)
 
+/* SAP Post CSA OCV SA Query waiting time */
+#define POST_CSA_CHECK_OCV_SA_QUERY_TIME (15 * 1000)
+
 typedef union uPmfSaQueryTimerId {
 	struct {
 		uint8_t sessionId;
@@ -239,6 +242,7 @@ static inline void lim_set_chan_switch_puncture(struct pe_session *session,
 	if (!session)
 		return;
 
+	pe_debug("0x%x", punct_bitmap);
 	session->gLimChannelSwitch.puncture_bitmap = punct_bitmap;
 }
 #else
@@ -1061,6 +1065,29 @@ void lim_clean_up_disassoc_deauth_req(struct mac_context *mac, uint8_t *staMac,
 bool lim_check_disassoc_deauth_ack_pending(struct mac_context *mac,
 		uint8_t *staMac);
 
+#ifdef CFG80211_SA_QUERY_OFFLOAD_SUPPORT
+QDF_STATUS lim_post_csa_ocv_sa_query_timer_init(struct pe_session *pe_session);
+void lim_post_csa_ocv_sa_query_timer_destroy(struct pe_session *pe_session);
+void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
+		struct pe_session *pe_session, bool csa_done);
+#else
+static inline QDF_STATUS lim_post_csa_ocv_sa_query_timer_init(
+		struct pe_session *pe_session)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void lim_post_csa_ocv_sa_query_timer_destroy(
+		struct pe_session *pe_session)
+{
+}
+
+static inline void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
+		struct pe_session *pe_session, bool csa_done)
+{
+}
+#endif /* CFG80211_SA_QUERY_OFFLOAD_SUPPORT */
+
 void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param);
 void lim_pmf_comeback_timer_callback(void *context);
 void lim_set_protected_bit(struct mac_context *mac,
@@ -1101,7 +1128,6 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
 
 /**
  * lim_update_connect_rsn_ie() - Update the connection RSN IE
- * @mac_ctx: MAC context
  * @session: PE session
  * @rsn_ie_buf: RSN IE buffer
  * @pmksa: PMKSA entry for the connecting AP
@@ -1109,8 +1135,7 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
  * Return: None
  */
 void
-lim_update_connect_rsn_ie(struct mac_context *mac_ctx,
-			  struct pe_session *session, uint8_t *rsn_ie_buf,
+lim_update_connect_rsn_ie(struct pe_session *session, uint8_t *rsn_ie_buf,
 			  struct wlan_crypto_pmksa *pmksa);
 
 /**
@@ -3829,4 +3854,18 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width ch_width,
  * Return: true if bssid and destination address are different
  */
 bool lim_mismatch_bssid_da(tpSirMacMgmtHdr hdr);
+
+/**
+ * lim_set_session_channel_params() : set session channel params
+ * @mac: pointer to MAC
+ * @session: pointer to session
+ *
+ * check and update channel params of pe session by regulatory
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
+					  struct pe_session *session);
+
 #endif /* __LIM_UTILS_H */

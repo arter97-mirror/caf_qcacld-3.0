@@ -5295,6 +5295,20 @@ static inline void wlan_hdd_set_ll_lt_sap_feature(struct wlan_objmgr_psoc *psoc,
 				      QCA_WLAN_VENDOR_FEATURE_ENHANCED_AUDIO_EXPERIENCE_OVER_WLAN);
 }
 
+static inline void wlan_hdd_set_mrsno_feature(struct wlan_objmgr_psoc *psoc,
+					      uint8_t *feature_flags)
+{
+	bool val = false;
+
+	if (QDF_IS_STATUS_ERROR(ucfg_mlme_get_mrsno_support(psoc, &val)) ||
+	    !val)
+		return;
+
+	hdd_debug("Target supports MRSNO");
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_RSN_OVERRIDE_STA);
+}
+
 #define MAX_CONCURRENT_CHAN_ON_24G    2
 #define MAX_CONCURRENT_CHAN_ON_5G     2
 
@@ -5418,6 +5432,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 				QCA_WLAN_VENDOR_FEATURE_AP_ALLOWED_FREQ_LIST);
 	wlan_wifi_pos_cfg80211_set_features(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_ll_lt_sap_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
@@ -9053,6 +9068,8 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_SCS_TRAFFIC_SUPPORT] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_RSNE_ADD_RANDOM_PMKIDS] = {
+			.type = NLA_U8}
 };
 
 /**
@@ -14644,6 +14661,86 @@ end:
 	return ret;
 }
 
+static const struct nla_policy
+wlan_hdd_connect_ext_attr[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES] = {.type = NLA_U8},
+};
+
+static int
+__wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     const void *data, int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX + 1];
+	struct wlan_hdd_link_info *link_info;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t ext_features = 0, rsno_gen = 0;
+	int8_t ret = 0;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX,
+				    data, data_len,
+				    wlan_hdd_connect_ext_attr)) {
+		hdd_err("Invalid qca_wlan_vendor_attr_connect_ext attr");
+		ret = -EINVAL;
+		goto rel;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES]) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES attribute");
+		ret = -EINVAL;
+		goto rel;
+	}
+
+	ext_features =
+		nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_FEATURES]);
+	hdd_debug("Received extended connect features %x", ext_features);
+
+	if (ext_features &  BIT(QCA_CONNECT_EXT_FEATURE_RSNO))
+		rsno_gen = RSNO_GEN_WIFI7;
+
+	hdd_adapter_for_each_link_info(adapter, link_info) {
+		if (!link_info->vdev)
+			continue;
+		wlan_vdev_set_rsno_gen_supported(link_info->vdev, rsno_gen);
+		wma_cli_set_command(link_info->vdev_id,
+				    wmi_vdev_param_connect_ext_features,
+				    ext_features, VDEV_CMD);
+	}
+
+rel:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	return ret;
+}
+
+static int
+wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
+					   struct wireless_dev *wdev,
+					   const void *data, int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_set_connect_ext_features(wiphy, wdev,
+							     data, data_len);
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 /**
  * __wlan_hdd_cfg80211_wifi_configuration_set() - Wifi configuration
  * vendor command
@@ -16137,6 +16234,17 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 							cfg_val);
 		if (ret_val)
 			hdd_err("Failed to set SCS traffic desc support");
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_RSNE_ADD_RANDOM_PMKIDS;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("Add %d random PMKID to the assoc request", cfg_val);
+		if (cfg_val > 12)
+			cfg_val = 0;
+		wlan_crypto_set_vdev_param(link_info->vdev,
+					   WLAN_CRYPTO_PARAM_RANDOM_PMKID,
+					   cfg_val);
 	}
 
 	if (update_sme_cfg)
@@ -23101,6 +23209,16 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 		.doit = wlan_hdd_cfg80211_async_get_station,
 		vendor_command_policy(wlan_hdd_async_get_station,
 				      GET_STATION_MAX)
+	},
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd =  QCA_NL80211_VENDOR_SUBCMD_CONNECT_EXT,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			 WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_set_connect_ext_features,
+		vendor_command_policy(wlan_hdd_connect_ext_attr,
+				      QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX)
 	},
 };
 

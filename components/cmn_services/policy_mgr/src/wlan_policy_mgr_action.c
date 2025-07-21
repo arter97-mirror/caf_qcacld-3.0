@@ -1983,6 +1983,10 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	uint32_t sta_gc_present = 0;
 	qdf_freq_t user_config_freq = 0;
 	enum reg_wifi_band user_band, op_band;
+	qdf_freq_t ll_sap_freq;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+	uint32_t cur_sap_vdev_id = INVALID_VDEV_ID;
 
 	if (intf_ch_freq)
 		*intf_ch_freq = 0;
@@ -1993,6 +1997,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		return false;
 	}
 
+	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
 	policy_mgr_get_sta_sap_scc_on_dfs_chnl(psoc, &sta_sap_scc_on_dfs_chnl_config_value);
 
 	if (!policy_mgr_is_hw_dbs_capable(psoc))
@@ -2021,9 +2026,10 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		    sap_vdev_id != vdev_id[i])
 			continue;
 
-		sap_vdev_id = vdev_id[i];
+		cur_sap_vdev_id = vdev_id[i];
 		user_config_freq =
-			policy_mgr_get_user_config_sap_freq(psoc, sap_vdev_id);
+			policy_mgr_get_user_config_sap_freq(psoc,
+							    cur_sap_vdev_id);
 
 		if (policy_mgr_is_any_mode_active_on_band_along_with_session(
 				psoc,  vdev_id[i],
@@ -2065,7 +2071,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		if (pm_ctx->last_disconn_sta_freq == op_ch_freq_list[i] &&
 		    !policy_mgr_is_sap_go_interface_allowed_on_indoor(
 							pm_ctx->pdev,
-							sap_vdev_id,
+							cur_sap_vdev_id,
 							op_ch_freq_list[i])) {
 			curr_sap_freq = op_ch_freq_list[i];
 			policy_mgr_debug("indoor sap_ch_freq %u",
@@ -2083,7 +2089,7 @@ user_freq_check:
 		op_band = wlan_reg_freq_to_band(op_ch_freq_list[i]);
 		user_band = wlan_reg_freq_to_band(user_config_freq);
 
-		if (!sta_gc_present && user_config_freq &&
+		if (!ll_sap_freq && !sta_gc_present && user_config_freq &&
 		    op_band < user_band) {
 			curr_sap_freq = op_ch_freq_list[i];
 			policy_mgr_debug("Move sap to user configured freq: %d",
@@ -2099,7 +2105,7 @@ user_freq_check:
 
 	mode = i >= go_index_start ? PM_P2P_GO_MODE : PM_SAP_MODE;
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, sap_vdev_id,
+	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, cur_sap_vdev_id,
 						      &info, &num_cxn_del);
 
 	/* Add the user config ch as first condidate */
@@ -2108,18 +2114,35 @@ user_freq_check:
 	status = policy_mgr_get_pcl(psoc, mode, &pcl_channels[1], &pcl_len,
 				    &pcl_weight[1],
 				    QDF_ARRAY_SIZE(pcl_weight) - 1,
-				    sap_vdev_id);
+				    cur_sap_vdev_id);
 	if (status == QDF_STATUS_SUCCESS)
 		pcl_len++;
 	else
 		pcl_len = 1;
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, cur_sap_vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev is NULL");
+		goto out;
+	}
+	pdev = wlan_vdev_get_pdev(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	for (i = 0; i < pcl_len; i++) {
 		if (pcl_channels[i] == curr_sap_freq)
 			continue;
 
-		if (!policy_mgr_is_safe_channel(psoc, pcl_channels[i]) ||
+		if (ll_sap_freq &&
+		    wlan_get_opmode_from_vdev_id(pm_ctx->pdev,
+					cur_sap_vdev_id) == QDF_SAP_MODE &&
+		    policy_mgr_are_2_freq_on_same_mac(psoc, pcl_channels[i],
+						      ll_sap_freq))
+			continue;
+
+		if (!wlan_reg_is_freq_enabled(pdev, pcl_channels[i],
+					      REG_CURRENT_PWR_MODE) ||
+		    !policy_mgr_is_safe_channel(psoc, pcl_channels[i]) ||
 		    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, pcl_channels[i]))
 			continue;
 
@@ -2133,7 +2156,7 @@ user_freq_check:
 		if (!sta_gc_present &&
 		    !policy_mgr_is_sap_go_interface_allowed_on_indoor(
 							pm_ctx->pdev,
-							sap_vdev_id,
+							cur_sap_vdev_id,
 							pcl_channels[i])) {
 			policy_mgr_debug("Do not allow SAP on indoor frequency, STA is absent");
 			continue;
@@ -2142,7 +2165,7 @@ user_freq_check:
 		new_sap_freq = pcl_channels[i];
 		break;
 	}
-
+out:
 	/* Restore the connection entry */
 	if (num_cxn_del > 0)
 		policy_mgr_restore_deleted_conn_info(psoc, &info, num_cxn_del);
@@ -2155,7 +2178,7 @@ user_freq_check:
 
 	*intf_ch_freq = new_sap_freq;
 	policy_mgr_debug("Standalone SAP(vdev_id %d) will be moved to channel %u",
-			 sap_vdev_id, *intf_ch_freq);
+			 cur_sap_vdev_id, *intf_ch_freq);
 
 	return true;
 }
@@ -3414,6 +3437,7 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
 			policy_mgr_debug("SAP vdev id %d restarts, old ch freq :%d new ch freq: %d",
 					vdev_id[i],
 					op_ch_freq_list[i], ch_freq);
+			break;
 		}
 	}
 
@@ -4026,7 +4050,8 @@ policy_mgr_sta_sap_dfs_scc_conc_check(struct wlan_objmgr_psoc *psoc,
 	 * and receives the very first beacon, then it will enforece SCC
 	 */
 	if (wlan_reg_is_dfs_for_freq(pdev, new_freq) ||
-	    wlan_reg_is_freq_indoor(pdev, new_freq)) {
+	    wlan_reg_is_freq_indoor(pdev, new_freq) ||
+	    !wlan_reg_is_freq_enabled(pdev, new_freq, REG_CURRENT_PWR_MODE)) {
 		if (wlan_reg_is_24ghz_ch_freq(new_freq)) {
 			new_freq = wlan_reg_min_24ghz_chan_freq();
 		} else if (wlan_reg_is_5ghz_ch_freq(new_freq)) {
