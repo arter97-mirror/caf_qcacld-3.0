@@ -315,8 +315,7 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 					   &pAddBssParams->staContext.
 					   supportedRates,
 					   pBeaconStruct->HTCaps.supportedMCSSet,
-					   false, ft_session,
-					   &pBeaconStruct->VHTCaps,
+					   ft_session, &pBeaconStruct->VHTCaps,
 					   &pBeaconStruct->he_cap,
 					   &pBeaconStruct->eht_cap, NULL,
 					   bssDescription);

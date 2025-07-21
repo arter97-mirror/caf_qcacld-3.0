@@ -1418,12 +1418,7 @@ static void lim_dump_ht_mcs_mask(uint8_t *self_mcs, uint8_t *peer_mcs)
 
 QDF_STATUS lim_populate_own_rate_set(struct mac_context *mac_ctx,
 				     struct supported_rates *rates,
-				     uint8_t *supported_mcs_set,
-				     uint8_t basic_only,
-				     struct pe_session *session_entry,
-				     struct sDot11fIEVHTCaps *vht_caps,
-				     struct sDot11fIEhe_cap *he_caps,
-				     struct sDot11fIEeht_cap *eht_caps)
+				     struct pe_session *session_entry)
 {
 	tSirMacRateSet temp_rate_set;
 	tSirMacRateSet temp_rate_set2;
@@ -1433,8 +1428,6 @@ QDF_STATUS lim_populate_own_rate_set(struct mac_context *mac_ctx,
 	uint8_t a_rate_index = 0;
 	uint8_t b_rate_index = 0;
 	qdf_size_t val_len;
-
-	is_arate = 0;
 
 	self_sta_dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
 	lim_get_phy_mode(mac_ctx, &phy_mode, session_entry);
@@ -1525,27 +1518,9 @@ QDF_STATUS lim_populate_own_rate_set(struct mac_context *mac_ctx,
 
 		if (session_entry->nss == NSS_1x1_MODE)
 			rates->supportedMCSSet[1] = 0;
-		/*
-		 * if supported MCS Set of the peer is passed in,
-		 * then do the intersection
-		 * else use the MCS set from local CFG.
-		 */
-
-		if (supported_mcs_set) {
-			for (i = 0; i < SIR_MAC_MAX_SUPPORTED_MCS_SET; i++)
-				rates->supportedMCSSet[i] &=
-					 supported_mcs_set[i];
-		}
 
 		lim_dump_ht_mcs_mask(rates->supportedMCSSet, NULL);
 	}
-	lim_populate_vht_mcs_set(mac_ctx, rates, vht_caps, session_entry,
-				 session_entry->nss, NULL);
-	lim_populate_he_mcs_set(mac_ctx, rates, he_caps,
-			session_entry, session_entry->nss);
-	lim_populate_eht_mcs_set(mac_ctx, rates, eht_caps,
-				 session_entry, session_entry->ch_width,
-				 wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq));
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1620,7 +1595,6 @@ static void lim_remove_membership_selectors(tSirMacRateSet *rate_set)
 QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 				      struct supported_rates *pRates,
 				      uint8_t *pSupportedMCSSet,
-				      uint8_t basicOnly,
 				      struct pe_session *pe_session,
 				      tDot11fIEVHTCaps *pVHTCaps,
 				      tDot11fIEhe_cap *he_caps,
@@ -1701,9 +1675,7 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 		 * can be used for sending control frames. HAL updates the
 		 * response rate table whenever basic rate set is changed.
 		 */
-		if (basicOnly && !(tempRateSet.rate[min] & 0x80)) {
-			pe_debug("Invalid basic rate");
-		} else if (sirIsArate(tempRateSet.rate[min] & 0x7f)) {
+		if (sirIsArate(tempRateSet.rate[min] & 0x7f)) {
 			if (aRateIndex >= SIR_NUM_11A_RATES) {
 				pe_debug("OOB, aRateIndex: %d", aRateIndex);
 			} else if (aRateIndex >= 1 && (tempRateSet.rate[min] ==
@@ -2935,8 +2907,7 @@ lim_add_sta_self(struct mac_context *mac, uint8_t updateSta,
 	lim_set_mbssid_info(pe_session);
 
 	lim_populate_own_rate_set(mac, &pAddStaParams->supportedRates,
-				  NULL, false,
-				  pe_session, NULL, NULL, NULL);
+				  pe_session);
 	if (IS_DOT11_MODE_HT(selfStaDot11Mode)) {
 		pAddStaParams->htCapable = true;
 
@@ -4515,14 +4486,12 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 
 	/* Update the rates */
 	lim_populate_peer_rate_set(mac,
-			&pAddBssParams->staContext.
-			supportedRates,
-			pBeaconStruct->HTCaps.supportedMCSSet,
-			false, pe_session,
-			&pBeaconStruct->VHTCaps,
-			&pBeaconStruct->he_cap,
-			&pBeaconStruct->eht_cap, NULL,
-			bssDescription);
+				   &pAddBssParams->staContext.supportedRates,
+				   pBeaconStruct->HTCaps.supportedMCSSet,
+				   pe_session, &pBeaconStruct->VHTCaps,
+				   &pBeaconStruct->he_cap,
+				   &pBeaconStruct->eht_cap, NULL,
+				   bssDescription);
 
 	pAddBssParams->staContext.encryptType = pe_session->encryptType;
 
