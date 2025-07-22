@@ -422,7 +422,7 @@ void lim_set_bcn_probe_filter(struct mac_context *mac_ctx,
 		return;
 	}
 
-	bss_type = session->bssType;
+	bss_type = GET_LIM_BSS_TYPE(session);
 	session_id = session->peSessionId;
 	bssid = &session->bssId;
 
@@ -459,7 +459,7 @@ void lim_reset_bcn_probe_filter(struct mac_context *mac_ctx,
 		return;
 	}
 
-	bss_type = session->bssType;
+	bss_type = GET_LIM_BSS_TYPE(session);
 	session_id = session->peSessionId;
 
 	if (session_id >= WLAN_MAX_VDEVS) {
@@ -499,7 +499,7 @@ void lim_update_bcn_probe_filter(struct mac_context *mac_ctx,
 		return;
 	}
 
-	bss_type = session->bssType;
+	bss_type = GET_LIM_BSS_TYPE(session);
 	session_id = session->peSessionId;
 
 	if (session_id >= WLAN_MAX_VDEVS) {
@@ -559,21 +559,21 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 	session_ptr->dph.dphHashTable.size = numSta + 1;
 	dph_hash_table_init(mac, &session_ptr->dph.dphHashTable);
 
-	/* Copy the BSSID to the session table */
-	sir_copy_mac_addr(session_ptr->bssId, bssid);
-	if (bssType == eSIR_MONITOR_MODE)
-		sir_copy_mac_addr(mac->lim.gpSession[i].self_mac_addr, bssid);
 	session_ptr->valid = true;
 	/* Initialize the SME and MLM states to IDLE */
 	session_ptr->limMlmState = eLIM_MLM_IDLE_STATE;
 	session_ptr->limSmeState = eLIM_SME_IDLE_STATE;
 	session_ptr->limCurrentAuthType = eSIR_OPEN_SYSTEM;
-	pe_init_beacon_params(mac, &mac->lim.gpSession[i]);
+	pe_init_beacon_params(mac, session_ptr);
 	session_ptr->is11Rconnection = false;
 	*sessionId = i;
 	session_ptr->peSessionId = i;
 	session_ptr->bssType = bssType;
 	session_ptr->gLimPhyMode = WNI_CFG_PHY_MODE_11G;
+	/* Copy the BSSID to the session table */
+	sir_copy_mac_addr(session_ptr->bssId, bssid);
+	if (LIM_IS_MONITOR_ROLE(session_ptr))
+		sir_copy_mac_addr(session_ptr->self_mac_addr, bssid);
 	/* Initialize CB mode variables when session is created */
 	session_ptr->htSupportedChannelWidthSet = 0;
 	session_ptr->htRecommendedTxWidthSet = 0;
@@ -588,7 +588,7 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 	session_ptr->is_session_obss_color_collision_det_enabled =
 		mac->mlme_cfg->obss_ht40.obss_color_collision_offload_enabled;
 
-	if (bssType == eSIR_INFRA_AP_MODE) {
+	if (LIM_IS_AP_ROLE(session_ptr)) {
 		session_ptr->pSchProbeRspTemplate =
 			qdf_mem_malloc(SIR_MAX_PROBE_RESP_SIZE);
 		session_ptr->pSchBeaconFrameBegin =
@@ -623,18 +623,15 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 		 *sessionId, session_ptr->opmode, vdev_id,
 		 QDF_MAC_ADDR_REF(bssid), numSta);
 
-	if (!lim_create_peer_idxpool(
-		session_ptr,
-		lim_get_peer_idxpool_size(numSta, bssType)))
+	if (!lim_create_peer_idxpool(session_ptr,
+				     lim_get_peer_idxpool_size(numSta,
+							       bssType)))
 		goto free_session_attrs;
 
-	if (eSIR_INFRASTRUCTURE_MODE == bssType)
-		lim_ft_open(mac, &mac->lim.gpSession[i]);
+	if (LIM_IS_STA_ROLE(session_ptr) || LIM_IS_MONITOR_ROLE(session_ptr))
+		lim_ft_open(mac, session_ptr);
 
-	if (eSIR_MONITOR_MODE == bssType)
-		lim_ft_open(mac, &mac->lim.gpSession[i]);
-
-	if (eSIR_INFRA_AP_MODE == bssType) {
+	if (LIM_IS_AP_ROLE(session_ptr)) {
 		session_ptr->old_protection_state = 0;
 		session_ptr->is_session_obss_offload_enabled = false;
 		session_ptr->is_obss_reset_timer_initialized = false;
@@ -1197,7 +1194,8 @@ void lim_dump_eht_info(struct pe_session *session)
 		if (len >= buf_len)
 			break;
 
-		len += qdf_scnprintf(buffer + len, buf_len - len, "Link %d: " QDF_MAC_ADDR_FMT,
+		len += qdf_scnprintf(buffer + len, buf_len - len,
+				     ", Link %d: " QDF_MAC_ADDR_FMT,
 				     partner_info->partner_link_info[idx].link_id,
 				     QDF_MAC_ADDR_REF(partner_info->partner_link_info[idx].link_addr.bytes));
 	}

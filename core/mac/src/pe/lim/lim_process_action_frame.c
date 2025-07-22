@@ -2272,7 +2272,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 				RXMGMT_FLAG_NONE);
 		} else {
 			pe_debug("Dropping the vendor specific action frame SelfSta address system role: %d",
-				 GET_LIM_SYSTEM_ROLE(session));
+				 GET_LIM_BSS_TYPE(session));
 		}
 	break;
 	case ACTION_CATEGORY_PUBLIC:

@@ -1863,7 +1863,7 @@ __lim_process_channel_switch_timeout(struct pe_session *pe_session)
 
 	if (!LIM_IS_STA_ROLE(pe_session)) {
 		pe_warn("Channel switch can be done only in STA role, Current Role: %d",
-			       GET_LIM_SYSTEM_ROLE(pe_session));
+			       GET_LIM_BSS_TYPE(pe_session));
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -4515,11 +4515,8 @@ void lim_set_tspec_uapsd_mask_per_session(struct mac_context *mac,
 void lim_handle_heart_beat_timeout_for_session(struct mac_context *mac_ctx,
 					       struct pe_session *psession_entry)
 {
-	if (psession_entry->valid) {
-		if ((psession_entry->bssType == eSIR_INFRASTRUCTURE_MODE) &&
-					(LIM_IS_STA_ROLE(psession_entry)))
-			lim_handle_heart_beat_failure(mac_ctx, psession_entry);
-	}
+	if (psession_entry->valid && LIM_IS_STA_ROLE(psession_entry))
+		lim_handle_heart_beat_failure(mac_ctx, psession_entry);
 }
 
 void lim_process_add_sta_rsp(struct mac_context *mac_ctx,
@@ -4558,22 +4555,19 @@ void lim_process_add_sta_rsp(struct mac_context *mac_ctx,
 void lim_update_beacon(struct mac_context *mac_ctx)
 {
 	uint8_t i;
+	struct pe_session *session;
 
 	for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
 		if (mac_ctx->lim.gpSession[i].valid != true)
 			continue;
-		if ((mac_ctx->lim.gpSession[i].limSystemRole == eLIM_AP_ROLE)
-			&& (eLIM_SME_NORMAL_STATE ==
-				mac_ctx->lim.gpSession[i].limSmeState)) {
+		session = &mac_ctx->lim.gpSession[i];
+		if (LIM_IS_AP_ROLE(session) &&
+		    (eLIM_SME_NORMAL_STATE == session->limSmeState)) {
+			sch_set_fixed_beacon_fields(mac_ctx, session);
 
-			sch_set_fixed_beacon_fields(mac_ctx,
-						&mac_ctx->lim.gpSession[i]);
-
-			if (false == mac_ctx->sap.SapDfsInfo.
-					is_dfs_cac_timer_running)
-				lim_send_beacon_ind(mac_ctx,
-						&mac_ctx->lim.gpSession[i],
-						REASON_DEFAULT);
+			if (!mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)
+				lim_send_beacon_ind(mac_ctx, session,
+						    REASON_DEFAULT);
 		}
 	}
 }
@@ -4584,7 +4578,7 @@ struct pe_session *lim_is_ap_session_active(struct mac_context *mac)
 
 	for (i = 0; i < mac->lim.maxBssId; i++) {
 		if (mac->lim.gpSession[i].valid &&
-		    (mac->lim.gpSession[i].limSystemRole == eLIM_AP_ROLE))
+		    LIM_IS_AP_ROLE(&mac->lim.gpSession[i]))
 			return &mac->lim.gpSession[i];
 	}
 
@@ -5686,16 +5680,13 @@ void lim_send_conc_params_update(void)
 		if (sta_session && sap_session)
 			break;
 
-		if ((mac->lim.gpSession[i].valid) &&
-		    (mac->lim.gpSession[i].limSystemRole ==
-		     eLIM_STA_ROLE)) {
+		if (mac->lim.gpSession[i].valid &&
+		    LIM_IS_STA_ROLE(&mac->lim.gpSession[i])) {
 			sta_session = &mac->lim.gpSession[i];
 			continue;
 		}
-		if ((mac->lim.gpSession[i].valid) &&
-		    ((mac->lim.gpSession[i].limSystemRole == eLIM_AP_ROLE) ||
-		    (mac->lim.gpSession[i].limSystemRole ==
-		     eLIM_P2P_DEVICE_GO))) {
+		if (mac->lim.gpSession[i].valid &&
+		    LIM_IS_AP_ROLE(&mac->lim.gpSession[i])) {
 			sap_session = &mac->lim.gpSession[i];
 			continue;
 		}
@@ -6726,7 +6717,7 @@ const char *lim_bss_type_to_string(const uint16_t bss_type)
 	switch (bss_type) {
 	CASE_RETURN_STRING(eSIR_INFRASTRUCTURE_MODE);
 	CASE_RETURN_STRING(eSIR_INFRA_AP_MODE);
-	CASE_RETURN_STRING(eSIR_AUTO_MODE);
+	CASE_RETURN_STRING(eSIR_MONITOR_MODE);
 	CASE_RETURN_STRING(eSIR_NDI_MODE);
 	default:
 		return "Unknown bss_type";
@@ -11177,8 +11168,7 @@ QDF_STATUS lim_get_capability_info(struct mac_context *mac, uint16_t *pcap,
 	if (LIM_IS_AP_ROLE(pe_session) ||
 		LIM_IS_STA_ROLE(pe_session))
 		pcap_info->ess = 1;      /* ESS bit */
-	else if (LIM_IS_P2P_DEVICE_ROLE(pe_session) ||
-		LIM_IS_NDI_ROLE(pe_session)) {
+	else if (LIM_IS_NDI_ROLE(pe_session)) {
 		pcap_info->ess = 0;
 		pcap_info->ibss = 0;
 	} else

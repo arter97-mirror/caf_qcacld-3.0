@@ -1266,9 +1266,8 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 			struct pe_session *pe_session,
 			tDot11fIEVHTOperation *pDot11f);
 
-QDF_STATUS
-populate_dot11f_ext_cap(struct mac_context *mac, bool isVHTEnabled,
-			tDot11fIEExtCap *pDot11f, uint8_t vdev_id);
+QDF_STATUS populate_dot11f_ext_cap(struct mac_context *mac, bool isVHTEnabled,
+				   tDot11fIEExtCap *pDot11f, uint8_t vdev_id);
 
 void populate_dot11f_qcn_ie(struct mac_context *mac,
 			    struct pe_session *pe_session,

@@ -4001,7 +4001,7 @@ QDF_STATUS lim_process_sme_tdls_mgmt_send_req(struct mac_context *mac_ctx,
 	/* check if we are in proper state to work as TDLS client */
 	if (!LIM_IS_STA_ROLE(session_entry)) {
 		pe_err("send mgmt received in wrong system Role: %d",
-		       GET_LIM_SYSTEM_ROLE(session_entry));
+		       GET_LIM_BSS_TYPE(session_entry));
 		goto lim_tdls_send_mgmt_error;
 	}
 
@@ -4163,7 +4163,7 @@ QDF_STATUS lim_process_sme_tdls_add_sta_req(struct mac_context *mac,
 	/* check if we are in proper state to work as TDLS client */
 	if (!LIM_IS_STA_ROLE(pe_session)) {
 		pe_err("send mgmt received in wrong system Role: %d",
-			  GET_LIM_SYSTEM_ROLE(pe_session));
+			  GET_LIM_BSS_TYPE(pe_session));
 		goto lim_tdls_add_sta_error;
 	}
 
@@ -4236,7 +4236,7 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 	/* check if we are in proper state to work as TDLS client */
 	if (!LIM_IS_STA_ROLE(pe_session)) {
 		pe_err("Del sta received in wrong system Role %d",
-		       GET_LIM_SYSTEM_ROLE(pe_session));
+		       GET_LIM_BSS_TYPE(pe_session));
 		goto lim_tdls_del_sta_error;
 	}
 

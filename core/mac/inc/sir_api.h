@@ -728,17 +728,16 @@ struct sir_set_antenna_mode {
 
 /**
  * enum bss_type - Enum for BSS type used in scanning/joining etc.
- *
+ * @eSIR_UNKNOWN_MODE: Un-initialized mode
  * @eSIR_INFRASTRUCTURE_MODE: Infrastructure station
  * @eSIR_INFRA_AP_MODE: softAP mode
- * @eSIR_AUTO_MODE: Auto role
  * @eSIR_MONITOR_MODE: Monitor mode
  * @eSIR_NDI_MODE: NAN datapath mode
  */
 enum bss_type {
+	eSIR_UNKNOWN_MODE,
 	eSIR_INFRASTRUCTURE_MODE,
 	eSIR_INFRA_AP_MODE,
-	eSIR_AUTO_MODE,
 	eSIR_MONITOR_MODE,
 	eSIR_NDI_MODE,
 	eSIR_DONOT_USE_BSS_TYPE = SIR_MAX_ENUM_SIZE

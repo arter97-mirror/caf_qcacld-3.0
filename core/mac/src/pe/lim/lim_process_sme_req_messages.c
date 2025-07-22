@@ -482,7 +482,6 @@ lim_configure_ap_start_bss_session(struct mac_context *mac_ctx,
 	bool sap_uapsd;
 	uint16_t ht_cap = cfg_default(CFG_AP_PROTECTION_MODE);
 
-	session->limSystemRole = eLIM_AP_ROLE;
 	session->privacy = sme_start_bss_req->privacy;
 	session->fwdWPSPBCProbeReq = 1;
 	session->authType = sme_start_bss_req->authType;
@@ -907,10 +906,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 	vdev_id = sme_start_bss_req->vdev_id;
 
 	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
-	if (opmode == QDF_NDI_MODE)
-		bss_type = eSIR_NDI_MODE;
-	else
-		bss_type = eSIR_INFRA_AP_MODE;
+	bss_type = opmode == QDF_NDI_MODE ? eSIR_NDI_MODE : eSIR_INFRA_AP_MODE;
 
 	wlan_mlme_get_mac_vdev_id(mac_ctx->pdev, vdev_id, &bssid);
 
@@ -1046,7 +1042,6 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			break;
 		case eSIR_NDI_MODE:
 			session->vdev_nss = vdev_type_nss->ndi;
-			session->limSystemRole = eLIM_NDI_ROLE;
 			break;
 
 
@@ -1192,12 +1187,9 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			session->lim11hEnable =
 				mac_ctx->mlme_cfg->gen.enabled_11h;
 
-			if (session->lim11hEnable &&
-			    session->bssType == eSIR_INFRA_AP_MODE) {
+			if (session->lim11hEnable && LIM_IS_AP_ROLE(session))
 				session->lim11hEnable =
-					mac_ctx->mlme_cfg->
-					dfs_cfg.dfs_master_capable;
-			}
+				  mac_ctx->mlme_cfg->dfs_cfg.dfs_master_capable;
 		}
 
 		if (!session->lim11hEnable)
@@ -3659,7 +3651,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->txLdpcIniFeatureEnabled =
 		mac_ctx->mlme_cfg->ht_caps.tx_ldpc_enable;
 
-	session->limSystemRole = eLIM_STA_ROLE;
 	if (session->nss == 1)
 		session->supported_nss_1x1 = true;
 
@@ -4770,11 +4761,8 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 				 false);
 	status = wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc,
 						    req->entry);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		qdf_mem_free(session->lim_join_req);
-		session->lim_join_req = NULL;
-		return QDF_STATUS_E_FAILURE;
-	}
+	if (QDF_IS_STATUS_ERROR(status))
+		goto mem_free;
 
 	akm = wlan_crypto_get_param(session->vdev,
 				    WLAN_CRYPTO_PARAM_KEY_MGMT);
@@ -4799,10 +4787,8 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to fill pe session vdev id %d",
 		       session->vdev_id);
-		qdf_mem_free(session->lim_join_req);
-		session->lim_join_req = NULL;
 		req->req_fail_status_code = req_fail_status_code;
-		return QDF_STATUS_E_FAILURE;
+		goto mem_free;
 	}
 
 	lim_copy_ml_partner_info_to_session(session, req);
@@ -4820,9 +4806,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	status = lim_fill_crypto_params(mac_ctx, session, req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Error in handling RSNXE");
-		qdf_mem_free(session->lim_join_req);
-		session->lim_join_req = NULL;
-		return QDF_STATUS_E_FAILURE;
+		goto mem_free;
 	}
 
 	/* Reset the SPMK global cache for non-SAE connection */
@@ -4854,9 +4838,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session->vdev);
 	if (!mlme_priv) {
 		pe_err("Invalid mlme priv object");
-		qdf_mem_free(session->lim_join_req);
-		session->lim_join_req = NULL;
-		return QDF_STATUS_E_FAILURE;
+		goto mem_free;
 	}
 	qdf_mem_zero(mlme_priv->connect_info.ext_cap_ie,
 		     DOT11F_IE_EXTCAP_MAX_LEN + 2);
@@ -4867,11 +4849,9 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 
 		add_ie_len = session->lim_join_req->addIEAssoc.length;
 		add_ie = qdf_mem_malloc(add_ie_len);
-		if (!add_ie) {
-			qdf_mem_free(session->lim_join_req);
-			session->lim_join_req = NULL;
-			return QDF_STATUS_E_FAILURE;
-		}
+		if (!add_ie)
+			goto mem_free;
+
 		qdf_mem_copy(add_ie,
 			     session->lim_join_req->addIEAssoc.addIEdata,
 			     add_ie_len);
@@ -4901,19 +4881,14 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 			       status);
 			qdf_mem_zero(mlme_priv->connect_info.ext_cap_ie,
 				     DOT11F_IE_EXTCAP_MAX_LEN + 2);
-			qdf_mem_free(session->lim_join_req);
-			session->lim_join_req = NULL;
-			return QDF_STATUS_E_FAILURE;
+			goto mem_free;
 		}
 	}
 
-	if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
-		if (!lim_is_session_he_capable(session)) {
-			pe_err("JOIN_REQ with invalid 6G security");
-			qdf_mem_free(session->lim_join_req);
-			session->lim_join_req = NULL;
-			return QDF_STATUS_E_FAILURE;
-		}
+	if (wlan_reg_is_6ghz_chan_freq(session->curr_op_freq) &&
+	    !lim_is_session_he_capable(session)) {
+		pe_err("JOIN_REQ with invalid 6G security");
+		goto mem_free;
 	}
 
 	wlan_psoc_mlme_get_11be_capab(mac_ctx->psoc, &eht_capab);
@@ -4923,6 +4898,12 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	lim_set_emlsr_caps(mac_ctx, session);
 
 	return QDF_STATUS_SUCCESS;
+
+mem_free:
+	qdf_mem_free(session->lim_join_req);
+	session->lim_join_req = NULL;
+
+	return QDF_STATUS_E_FAILURE;
 }
 
 static QDF_STATUS
@@ -5748,8 +5729,8 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 end:
 	if (reassoc_req) {
 		qdf_mem_free(reassoc_req);
-		if (session_entry)
-			session_entry->pLimReAssocReq = NULL;
+		session_entry->lim_join_req = NULL;
+		session_entry->pLimReAssocReq = NULL;
 	}
 
 	/*
@@ -7212,8 +7193,8 @@ static void __lim_process_sme_disassoc_req(struct mac_context *mac,
 	    smeDisassocReq.reasonCode == REASON_HOST_TRIGGERED_SILENT_DEAUTH)
 		lim_ft_cleanup_pre_auth_info(mac, pe_session);
 
-	switch (GET_LIM_SYSTEM_ROLE(pe_session)) {
-	case eLIM_STA_ROLE:
+	switch (GET_LIM_BSS_TYPE(pe_session)) {
+	case eSIR_INFRASTRUCTURE_MODE:
 		switch (pe_session->limSmeState) {
 		case eLIM_SME_ASSOCIATED_STATE:
 		case eLIM_SME_LINK_EST_STATE:
@@ -7287,7 +7268,7 @@ static void __lim_process_sme_disassoc_req(struct mac_context *mac,
 
 		break;
 
-	case eLIM_AP_ROLE:
+	case eSIR_INFRA_AP_MODE:
 		/* Check if MAC address is MLD of the client and
 		 * change it to primary link address to send OTA.
 		 */
@@ -7296,14 +7277,14 @@ static void __lim_process_sme_disassoc_req(struct mac_context *mac,
 		break;
 
 	default:
-		/* eLIM_UNKNOWN_ROLE */
+		/* eSIR_UNKNOWN_MODE */
 		pe_err("received unexpected SME_DISASSOC_REQ for role %d",
-			GET_LIM_SYSTEM_ROLE(pe_session));
+			GET_LIM_BSS_TYPE(pe_session));
 
 		retCode = eSIR_SME_UNEXPECTED_REQ_RESULT_CODE;
 		disassocTrigger = eLIM_HOST_DISASSOC;
 		goto sendDisassoc;
-	} /* end switch (mac->lim.gLimSystemRole) */
+	}
 
 	disassocTrigger = eLIM_HOST_DISASSOC;
 	reasonCode = smeDisassocReq.reasonCode;
@@ -7417,8 +7398,8 @@ void __lim_process_sme_disassoc_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		 QDF_MAC_ADDR_REF(smeDisassocCnf.peer_macaddr.bytes),
 		 QDF_MAC_ADDR_REF(smeDisassocCnf.bssid.bytes));
 
-	switch (GET_LIM_SYSTEM_ROLE(pe_session)) {
-	case eLIM_STA_ROLE:
+	switch (GET_LIM_BSS_TYPE(pe_session)) {
+	case eSIR_INFRASTRUCTURE_MODE:
 		if ((pe_session->limSmeState != eLIM_SME_IDLE_STATE) &&
 		    (pe_session->limSmeState != eLIM_SME_WT_DISASSOC_STATE)
 		    && (pe_session->limSmeState !=
@@ -7440,11 +7421,11 @@ void __lim_process_sme_disassoc_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		}
 		break;
 
-	case eLIM_AP_ROLE:
+	case eSIR_INFRA_AP_MODE:
 		break;
-	default:                /* eLIM_UNKNOWN_ROLE */
+	default:                /* eSIR_UNKNOWN_MODE */
 		pe_err("received unexpected SME_DISASSOC_CNF role %d",
-			GET_LIM_SYSTEM_ROLE(pe_session));
+			GET_LIM_BSS_TYPE(pe_session));
 		status = lim_prepare_disconnect_done_ind(
 					mac, &msg,
 					pe_session->smeSessionId,
@@ -7574,8 +7555,8 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 
 	session_entry->vdev_id = vdev_id;
 
-	switch (GET_LIM_SYSTEM_ROLE(session_entry)) {
-	case eLIM_STA_ROLE:
+	switch (GET_LIM_BSS_TYPE(session_entry)) {
+	case eSIR_INFRASTRUCTURE_MODE:
 		switch (session_entry->limSmeState) {
 		case eLIM_SME_ASSOCIATED_STATE:
 		case eLIM_SME_LINK_EST_STATE:
@@ -7645,7 +7626,7 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 			return;
 		}
 		break;
-	case eLIM_AP_ROLE:
+	case eSIR_INFRA_AP_MODE:
 		/* Check if MAC address is MLD of the client and
 		 * change it to primary link address to send OTA.
 		 */
@@ -7654,7 +7635,7 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 		break;
 	default:
 		pe_err("received unexpected SME_DEAUTH_REQ for role %X",
-			GET_LIM_SYSTEM_ROLE(session_entry));
+			GET_LIM_BSS_TYPE(session_entry));
 		if (mac_ctx->lim.gLimRspReqd) {
 			mac_ctx->lim.gLimRspReqd = false;
 			ret_code = eSIR_SME_INVALID_PARAMETERS;
@@ -7662,10 +7643,10 @@ static void __lim_process_sme_deauth_req(struct mac_context *mac_ctx,
 			goto send_deauth;
 		}
 		return;
-	} /* end switch (mac_ctx->lim.gLimSystemRole) */
+	}
 
 	if (sme_deauth_req.reasonCode == eLIM_LINK_MONITORING_DEAUTH &&
-	    session_entry->limSystemRole == eLIM_STA_ROLE) {
+	    LIM_IS_STA_ROLE(session_entry)) {
 		/* Deauthentication is triggered by Link Monitoring */
 		pe_debug("** Lost link with AP **");
 		deauth_trigger = eLIM_LINK_MONITORING_DEAUTH;
@@ -7945,7 +7926,7 @@ __lim_handle_sme_stop_bss_request(struct mac_context *mac, uint32_t *msg_buf)
 		 */
 		pe_err("received unexpected SME_STOP_BSS_REQ in state %X, for role %d",
 			pe_session->limSmeState,
-			GET_LIM_SYSTEM_ROLE(pe_session));
+			GET_LIM_BSS_TYPE(pe_session));
 		lim_print_sme_state(mac, LOGE, pe_session->limSmeState);
 		/* / Send Stop BSS response to host */
 		lim_send_stop_bss_response(mac, vdev_id,
@@ -8063,7 +8044,7 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *mac_ctx, uint32_t msg_t
 	    (session_entry->limSmeState != eLIM_SME_NORMAL_STATE)) {
 		pe_err("Rcvd unexpected msg %X in state %X, in role %X",
 			msg_type, session_entry->limSmeState,
-			GET_LIM_SYSTEM_ROLE(session_entry));
+			GET_LIM_BSS_TYPE(session_entry));
 		goto end;
 	}
 	sta_ds = dph_get_hash_entry(mac_ctx, assoc_cnf.aid,
@@ -8506,7 +8487,7 @@ void lim_process_sme_addts_rsp_timeout(struct mac_context *mac, uint32_t param)
 
 	if (!LIM_IS_STA_ROLE(pe_session)) {
 		pe_warn("AddtsRspTimeout in non-Sta role (%d)",
-			GET_LIM_SYSTEM_ROLE(pe_session));
+			GET_LIM_BSS_TYPE(pe_session));
 		mac->lim.gLimAddtsSent = false;
 		return;
 	}
@@ -8641,7 +8622,7 @@ lim_process_sme_update_session_edca_txq_params(struct mac_context *mac_ctx,
 	    (pe_session->limSmeState != eLIM_SME_NORMAL_STATE)) {
 		pe_err("Rcvd edca update req in state %X, in role %X",
 		       pe_session->limSmeState,
-		       GET_LIM_SYSTEM_ROLE(pe_session));
+		       GET_LIM_BSS_TYPE(pe_session));
 		return;
 	}
 
@@ -10290,7 +10271,7 @@ static void lim_change_channel(
 	struct mac_context *mac_ctx,
 	struct pe_session *session_entry)
 {
-	if (session_entry->bssType == eSIR_MONITOR_MODE)
+	if (LIM_IS_MONITOR_ROLE(session_entry))
 		return lim_mon_change_channel(mac_ctx, session_entry);
 
 	mlme_set_chan_switch_in_progress(session_entry->vdev, true);
@@ -11252,7 +11233,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 
 	if (session_entry->valid && !LIM_IS_AP_ROLE(session_entry)) {
 		pe_err("Invalid SystemRole %d",
-			GET_LIM_SYSTEM_ROLE(session_entry));
+			GET_LIM_BSS_TYPE(session_entry));
 		return;
 	}
 
@@ -11573,7 +11554,7 @@ static void lim_process_nss_update_request(struct mac_context *mac_ctx,
 
 	if (session_entry->valid && !LIM_IS_AP_ROLE(session_entry)) {
 		pe_err("Invalid SystemRole %d",
-			GET_LIM_SYSTEM_ROLE(session_entry));
+			GET_LIM_BSS_TYPE(session_entry));
 		goto end;
 	}
 
@@ -11699,7 +11680,7 @@ static void obss_color_collision_process_color_disable(struct mac_context *mac_c
 
 	if (session->valid && !LIM_IS_AP_ROLE(session)) {
 		pe_err("Invalid SystemRole %d",
-		       GET_LIM_SYSTEM_ROLE(session));
+		       GET_LIM_BSS_TYPE(session));
 		return;
 	}
 
@@ -11857,7 +11838,7 @@ void lim_process_set_he_bss_color(struct mac_context *mac_ctx, uint32_t *msg_buf
 
 	if (session_entry->valid && !LIM_IS_AP_ROLE(session_entry)) {
 		pe_err("Invalid SystemRole %d",
-			GET_LIM_SYSTEM_ROLE(session_entry));
+			GET_LIM_BSS_TYPE(session_entry));
 		return;
 	}
 
@@ -12067,7 +12048,7 @@ void lim_process_obss_color_collision_info(struct mac_context *mac_ctx,
 	case OBSS_COLOR_FREE_SLOT_TIMER_EXPIRY:
 		if (session->valid && !LIM_IS_AP_ROLE(session)) {
 			pe_debug("Invalid System Role %d",
-				 GET_LIM_SYSTEM_ROLE(session));
+				 GET_LIM_BSS_TYPE(session));
 			return;
 		}
 

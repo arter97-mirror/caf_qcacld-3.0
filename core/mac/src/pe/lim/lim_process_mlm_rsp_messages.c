@@ -203,9 +203,9 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		MTRACE(mac_trace
 			       (mac, TRACE_CODE_SME_STATE, pe_session->peSessionId,
 			       pe_session->limSmeState));
-		if (pe_session->bssType == eSIR_INFRA_AP_MODE)
+		if (LIM_IS_AP_ROLE(pe_session))
 			pe_debug("*** Started BSS in INFRA AP SIDE***");
-		else if (pe_session->bssType == eSIR_NDI_MODE)
+		else if (LIM_IS_NDI_ROLE(pe_session))
 			pe_debug("*** Started BSS in NDI mode ***");
 		else
 			pe_debug("*** Started BSS ***");
@@ -967,20 +967,20 @@ void lim_process_mlm_disassoc_ind(struct mac_context *mac, uint32_t *msg_buf)
 		pe_err("Session Does not exist for given sessionID");
 		return;
 	}
-	switch (GET_LIM_SYSTEM_ROLE(pe_session)) {
-	case eLIM_STA_ROLE:
+	switch (GET_LIM_BSS_TYPE(pe_session)) {
+	case eSIR_INFRASTRUCTURE_MODE:
 		pe_session->limSmeState = eLIM_SME_WT_DISASSOC_STATE;
-		MTRACE(mac_trace
-			       (mac, TRACE_CODE_SME_STATE, pe_session->peSessionId,
-			       pe_session->limSmeState));
+		MTRACE(mac_trace(mac, TRACE_CODE_SME_STATE,
+				 pe_session->peSessionId,
+				 pe_session->limSmeState));
 		break;
-	default:        /* eLIM_AP_ROLE */
+	default:        /* eSIR_INFRA_AP_MODE */
 		pe_debug("*** Peer staId=%d Disassociated ***",
-			       pMlmDisassocInd->aid);
+			 pMlmDisassocInd->aid);
 		/* Send SME_DISASOC_IND after Polaris cleanup */
 		/* (after receiving LIM_MLM_PURGE_STA_IND) */
 		break;
-	} /* end switch (GET_LIM_SYSTEM_ROLE(pe_session)) */
+	} /* end switch (GET_LIM_BSS_TYPE(pe_session)) */
 } /*** end lim_process_mlm_disassoc_ind() ***/
 
 /**
@@ -993,8 +993,7 @@ void lim_process_mlm_disassoc_ind(struct mac_context *mac, uint32_t *msg_buf)
  *
  * Return: None
  */
-void lim_process_mlm_disassoc_cnf(struct mac_context *mac_ctx,
-	uint32_t *msg)
+void lim_process_mlm_disassoc_cnf(struct mac_context *mac_ctx, uint32_t *msg)
 {
 	tSirResultCodes result_code;
 	tLimMlmDisassocCnf *disassoc_cnf;
@@ -1083,7 +1082,6 @@ static void lim_process_mlm_deauth_ind(struct mac_context *mac_ctx,
 {
 	struct pe_session *session;
 	uint8_t session_id;
-	enum eLimSystemRole role;
 
 	if (!deauth_ind) {
 		pe_err("deauth_ind is null");
@@ -1097,8 +1095,8 @@ static void lim_process_mlm_deauth_ind(struct mac_context *mac_ctx,
 		       QDF_MAC_ADDR_REF(deauth_ind->peerMacAddr));
 		return;
 	}
-	role = GET_LIM_SYSTEM_ROLE(session);
-	if (role == eLIM_STA_ROLE) {
+
+	if (LIM_IS_STA_ROLE(session)) {
 		session->limSmeState = eLIM_SME_WT_DEAUTH_STATE;
 		MTRACE(mac_trace(mac_ctx, TRACE_CODE_SME_STATE,
 				 session->peSessionId, session->limSmeState));
@@ -1219,50 +1217,42 @@ void lim_process_mlm_purge_sta_ind(struct mac_context *mac, uint32_t *msg_buf)
 	}
 	/* Purge STA indication from MLM */
 	resultCode = (tSirResultCodes) pMlmPurgeStaInd->reasonCode;
-	switch (GET_LIM_SYSTEM_ROLE(pe_session)) {
-	case eLIM_STA_ROLE:
-	default:        /* eLIM_AP_ROLE */
-		if (LIM_IS_STA_ROLE(pe_session) &&
-		   (pe_session->limSmeState !=
-			eLIM_SME_WT_DISASSOC_STATE) &&
-		   (pe_session->limSmeState != eLIM_SME_WT_DEAUTH_STATE)) {
-			/**
-			 * Should not have received
-			 * Purge STA indication
-			 * from MLM in other states.
-			 * Log error
-			 */
-			pe_err("received unexpected MLM_PURGE_STA_IND in state %X",
-				       pe_session->limSmeState);
-			break;
-		}
-		pe_debug("*** Cleanup completed for staId=%d ***",
-			       pMlmPurgeStaInd->aid);
-		if (LIM_IS_STA_ROLE(pe_session)) {
-			pe_session->limSmeState = eLIM_SME_IDLE_STATE;
-			MTRACE(mac_trace
-				       (mac, TRACE_CODE_SME_STATE,
-				       pe_session->peSessionId,
-				       pe_session->limSmeState));
+	if (LIM_IS_STA_ROLE(pe_session) &&
+	    (pe_session->limSmeState != eLIM_SME_WT_DISASSOC_STATE) &&
+	    (pe_session->limSmeState != eLIM_SME_WT_DEAUTH_STATE)) {
+		/**
+		 * Should not have received
+		 * Purge STA indication
+		 * from MLM in other states.
+		 * Log error
+		 */
+		pe_err("received unexpected MLM_PURGE_STA_IND in state %X",
+		       pe_session->limSmeState);
+		return;
+	}
 
-		}
-		if (pMlmPurgeStaInd->purgeTrigger == eLIM_PEER_ENTITY_DEAUTH) {
-			lim_send_sme_deauth_ntf(mac,
-						pMlmPurgeStaInd->peerMacAddr,
-						resultCode,
-						pMlmPurgeStaInd->purgeTrigger,
-						pMlmPurgeStaInd->aid,
-						pe_session->smeSessionId);
-		} else
-			lim_send_sme_disassoc_ntf(mac,
-						  pMlmPurgeStaInd->peerMacAddr,
-						  (uint8_t *)mld_addr.bytes,
-						  resultCode,
-						  pMlmPurgeStaInd->purgeTrigger,
-						  pMlmPurgeStaInd->aid,
-						  pe_session->smeSessionId,
-						  pe_session);
-	} /* end switch (GET_LIM_SYSTEM_ROLE(pe_session)) */
+	pe_debug("*** Cleanup completed for staId=%d ***",
+		 pMlmPurgeStaInd->aid);
+	if (LIM_IS_STA_ROLE(pe_session)) {
+		pe_session->limSmeState = eLIM_SME_IDLE_STATE;
+		MTRACE(mac_trace(mac, TRACE_CODE_SME_STATE,
+				 pe_session->peSessionId,
+				 pe_session->limSmeState));
+	}
+
+	if (pMlmPurgeStaInd->purgeTrigger == eLIM_PEER_ENTITY_DEAUTH)
+		lim_send_sme_deauth_ntf(mac, pMlmPurgeStaInd->peerMacAddr,
+					resultCode,
+					pMlmPurgeStaInd->purgeTrigger,
+					pMlmPurgeStaInd->aid,
+					pe_session->smeSessionId);
+	else
+		lim_send_sme_disassoc_ntf(mac,
+					  pMlmPurgeStaInd->peerMacAddr,
+					  (uint8_t *)mld_addr.bytes, resultCode,
+					  pMlmPurgeStaInd->purgeTrigger,
+					  pMlmPurgeStaInd->aid,
+					  pe_session->smeSessionId, pe_session);
 } /*** end lim_process_mlm_purge_sta_ind() ***/
 
 /**
@@ -1384,9 +1374,9 @@ QDF_STATUS lim_sta_handle_connect_fail(join_params *param)
 		session->lim_join_req = NULL;
 		/* Cleanup if add bss failed */
 		if (session->add_bss_failed) {
-			dph_delete_hash_entry(mac_ctx,
-				 sta_ds->staAddr, sta_ds->assocId,
-				 &session->dph.dphHashTable);
+			dph_delete_hash_entry(mac_ctx, sta_ds->staAddr,
+					      sta_ds->assocId,
+					      &session->dph.dphHashTable);
 			goto error;
 		}
 		return QDF_STATUS_SUCCESS;
@@ -2125,7 +2115,6 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 		MTRACE(mac_trace
 			       (mac, TRACE_CODE_MLM_STATE, pe_session->peSessionId,
 			       pe_session->limMlmState));
-		pe_session->limSystemRole = eLIM_AP_ROLE;
 
 		lim_fill_dfs_p2p_group_params(pe_session);
 
@@ -2477,7 +2466,6 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 {
 	tLimMlmStartCnf mlm_start_cnf;
 	struct pe_session *session_entry;
-	enum bss_type bss_type;
 
 	if (!add_bss_rsp) {
 		pe_err("add_bss_rsp is NULL");
@@ -2505,10 +2493,9 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 		if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc))
 			lim_set_tpc_for_sap_go(mac_ctx, session_entry);
 
-	bss_type = session_entry->bssType;
 	/* update PE session Id */
 	mlm_start_cnf.sessionId = session_entry->peSessionId;
-	if (eSIR_NDI_MODE == session_entry->bssType) {
+	if (LIM_IS_NDI_ROLE(session_entry)) {
 		lim_process_ndi_mlm_add_bss_rsp(mac_ctx, add_bss_rsp,
 						session_entry);
 	} else {
@@ -3602,7 +3589,7 @@ static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 {
 	struct scheduler_msg message = {0};
 
-	if (session->bssType != eSIR_MONITOR_MODE)
+	if (!LIM_IS_MONITOR_ROLE(session))
 		return;
 
 	if (QDF_IS_STATUS_ERROR(status)) {

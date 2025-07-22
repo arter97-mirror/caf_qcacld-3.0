@@ -177,15 +177,13 @@ uint32_t lim_create_timers(struct mac_context *mac)
 {
 	uint32_t cfgValue, i = 0;
 
-	pe_debug("Creating Timers used by LIM module in Role: %d",
-	       mac->lim.gLimSystemRole);
+	pe_debug("Creating Timers used by LIM module");
 	/* Create timers required for host roaming feature */
 	if (TX_SUCCESS != lim_create_timers_host_roam(mac))
 		return TX_TIMER_ERROR;
 
-	if (mac->lim.gLimSystemRole != eLIM_AP_ROLE)
-		if (false == lim_create_non_ap_timers(mac))
-			goto err_timer;
+	if (!lim_create_non_ap_timers(mac))
+		goto err_timer;
 
 	cfgValue = mac->mlme_cfg->sta.wait_cnf_timeout;
 	cfgValue = SYS_MS_TO_TICKS(cfgValue);

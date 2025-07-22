@@ -2675,7 +2675,7 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 		pe_err("Rcvd unexpected ASSOC REQ, sessionid: %d sys sub_type: %d for role: %d from: "
 		       QDF_MAC_ADDR_FMT,
 		       session->peSessionId, sub_type,
-		       GET_LIM_SYSTEM_ROLE(session),
+		       GET_LIM_BSS_TYPE(session),
 		       QDF_MAC_ADDR_REF(sa));
 		return QDF_STATUS_E_INVAL;
 	}
@@ -2686,7 +2686,7 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 		pe_err("drop ASSOC REQ on vdev %d role: %d from: "
 		       QDF_MAC_ADDR_FMT " when stop bss pending",
 		       session->vdev_id,
-		       GET_LIM_SYSTEM_ROLE(session),
+		       GET_LIM_BSS_TYPE(session),
 		       QDF_MAC_ADDR_REF(sa));
 		return QDF_STATUS_E_INVAL;
 	}
@@ -2695,7 +2695,7 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 		pe_err("drop ASSOC REQ on sessionid: %d role: %d from: "
 		       QDF_MAC_ADDR_FMT " in limMlmState: %d",
 		       session->peSessionId,
-		       GET_LIM_SYSTEM_ROLE(session),
+		       GET_LIM_BSS_TYPE(session),
 		       QDF_MAC_ADDR_REF(sa),
 		       eLIM_MLM_WT_DEL_BSS_RSP_STATE);
 		return QDF_STATUS_E_INVAL;
@@ -3079,7 +3079,7 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
 
 	pe_nofl_rl_debug("Assoc req RX: subtype %d vdev %d sys role %d lim state %d rssi %d from " QDF_MAC_ADDR_FMT,
-			 sub_type, session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
+			 sub_type, session->vdev_id, GET_LIM_BSS_TYPE(session),
 			 session->limMlmState,
 			 WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
 			 QDF_MAC_ADDR_REF(hdr->sa));
@@ -3127,7 +3127,7 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 		if (hdr->fc.retry > 0) {
 			pe_err("STA is initiating Assoc Req after ACK lost. Do not process sessionid: %d sys sub_type=%d for role=%d from: "
 				QDF_MAC_ADDR_FMT, session->peSessionId,
-			sub_type, GET_LIM_SYSTEM_ROLE(session),
+			sub_type, GET_LIM_BSS_TYPE(session),
 			QDF_MAC_ADDR_REF(hdr->sa));
 			return;
 		} else if (sub_type == LIM_REASSOC) {
@@ -3157,11 +3157,10 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 				sub_type,
 				sta_ds, session, false,
 				(struct qdf_mac_addr *)sta_ds->mld_addr);
-			pe_err("DUT already received an assoc request frame and STA is sending another assoc req.So, do not Process sessionid: %d sys sub_type: %d for role: %d from: "
-					QDF_MAC_ADDR_FMT,
-				session->peSessionId, sub_type,
-				session->limSystemRole,
-				QDF_MAC_ADDR_REF(hdr->sa));
+			pe_err("DUT already received an assoc request frame and STA is sending another assoc req.So, do not Process sessionid: %d sys sub_type: %d for role: %d from: " QDF_MAC_ADDR_FMT,
+			       session->peSessionId, sub_type,
+			       GET_LIM_BSS_TYPE(session),
+			       QDF_MAC_ADDR_REF(hdr->sa));
 			return;
 		}
 	} else if (sta_ds && sta_ds->rmfEnabled && !is_key_installed) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -450,12 +450,11 @@ void lim_handle_ft_pre_auth_rsp(struct mac_context *mac, QDF_STATUS status,
 	if (pe_session->ftPEContext.ftPreAuthStatus == QDF_STATUS_SUCCESS) {
 		pbssDescription =
 		      pe_session->ftPEContext.pFTPreAuthReq->pbssDescription;
-		ft_session =
-			pe_create_session(mac, pbssDescription->bssId,
-					  &sessionId,
-					  mac->lim.max_sta_of_pe_session,
-					  pe_session->bssType,
-					  pe_session->vdev_id);
+		ft_session = pe_create_session(mac, pbssDescription->bssId,
+					       &sessionId,
+					       mac->lim.max_sta_of_pe_session,
+					       GET_LIM_BSS_TYPE(pe_session),
+					       pe_session->vdev_id);
 		if (!ft_session) {
 			pe_err("Session not created for pre-auth 11R AP");
 			status = QDF_STATUS_E_FAILURE;
@@ -471,10 +470,9 @@ void lim_handle_ft_pre_auth_rsp(struct mac_context *mac, QDF_STATUS status,
 		/* Update the beacon/probe filter in mac_ctx */
 		lim_set_bcn_probe_filter(mac, ft_session, 0);
 
-		if (ft_session->bssType == eSIR_INFRASTRUCTURE_MODE)
-			ft_session->limSystemRole = eLIM_STA_ROLE;
-		else
-			pe_err("Invalid bss type");
+		if (!LIM_IS_STA_ROLE(ft_session))
+			pe_err("Invalid bss type %d",
+			       GET_LIM_BSS_TYPE(ft_session));
 
 		ft_session->limPrevSmeState = ft_session->limSmeState;
 		ft_session->ht_config = pe_session->ht_config;

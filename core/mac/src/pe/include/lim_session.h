@@ -451,7 +451,6 @@ struct punc_chan_info {
  * @limPrevMlmState: Previous MLM State
  * @limSmeState: SME State
  * @limPrevSmeState: Previous SME State
- * @limSystemRole:
  * @bssType:
  * @nwType:
  * @pLimStartBssReq:
@@ -767,7 +766,6 @@ struct pe_session {
 	tLimMlmStates limPrevMlmState;
 	tLimSmeStates limSmeState;
 	tLimSmeStates limPrevSmeState;
-	tLimSystemRole limSystemRole;
 	enum bss_type bssType;
 	tSirNwType nwType;
 	struct start_bss_config *pLimStartBssReq;

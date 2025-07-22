@@ -3251,7 +3251,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	ft_session_ptr = pe_create_session(mac_ctx, bss_desc->bssId,
 					   &session_id,
 					   mac_ctx->lim.max_sta_of_pe_session,
-					   session_ptr->bssType,
+					   GET_LIM_BSS_TYPE(session_ptr),
 					   session_ptr->vdev_id);
 	if (!ft_session_ptr) {
 		pe_err("LFR3:Cannot create PE Session bssid: "QDF_MAC_ADDR_FMT,
@@ -3264,7 +3264,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	sir_copy_mac_addr(ft_session_ptr->limReAssocbssId, bss_desc->bssId);
 	session_ptr->bRoamSynchInProgress = true;
 	ft_session_ptr->bRoamSynchInProgress = true;
-	ft_session_ptr->limSystemRole = eLIM_STA_ROLE;
 	sir_copy_mac_addr(session_ptr->limReAssocbssId, bss_desc->bssId);
 	ft_session_ptr->csaOffloadEnable = session_ptr->csaOffloadEnable;
 
@@ -3736,10 +3735,9 @@ void lim_mon_deinit_session(struct mac_context *mac_ptr,
 
 	session = pe_find_session_by_vdev_id(mac_ptr, msg->vdev_id);
 
-	if (session && session->bssType == eSIR_MONITOR_MODE) {
+	if (session && LIM_IS_MONITOR_ROLE(session)) {
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
-					      WLAN_VDEV_SM_EV_DOWN,
-					      0, NULL);
+					      WLAN_VDEV_SM_EV_DOWN, 0, NULL);
 		pe_delete_session(mac_ptr, session);
 	}
 }

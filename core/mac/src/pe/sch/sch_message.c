@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -205,8 +205,8 @@ static bool
 broadcast_wmm_of_concurrent_sta_session(struct mac_context *mac_ctx,
 					struct pe_session *session)
 {
-	uint8_t i, j;
-	struct pe_session *concurrent_session = NULL;
+	uint8_t i;
+	struct pe_session *concurrent_session = NULL, *cur_session;
 
 	for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
 		/*
@@ -214,16 +214,14 @@ broadcast_wmm_of_concurrent_sta_session(struct mac_context *mac_ctx,
 		 * The session entry passed to this API is for GO/SoftAP session
 		 * that is getting added currently
 		 */
-		if (!((mac_ctx->lim.gpSession[i].valid == true) &&
-		    (mac_ctx->lim.gpSession[i].peSessionId !=
-			session->peSessionId) &&
-		    (mac_ctx->lim.gpSession[i].curr_op_freq ==
-			session->curr_op_freq) &&
-		    (mac_ctx->lim.gpSession[i].limSystemRole ==
-			eLIM_STA_ROLE)))
+		cur_session = &mac_ctx->lim.gpSession[i];
+		if (!(cur_session->valid &&
+		      (cur_session->peSessionId != session->peSessionId) &&
+		      (cur_session->curr_op_freq == session->curr_op_freq) &&
+		      LIM_IS_STA_ROLE(cur_session)))
 			continue;
 
-		concurrent_session = &(mac_ctx->lim.gpSession[i]);
+		concurrent_session = cur_session;
 		break;
 	}
 
@@ -239,23 +237,23 @@ broadcast_wmm_of_concurrent_sta_session(struct mac_context *mac_ctx,
 	 * Once atleast one concurrent session on same channel is found and WMM
 	 * broadcast params for current SoftAP/GO session updated, return
 	 */
-	for (j = 0; j < QCA_WLAN_AC_ALL; j++) {
-		session->gLimEdcaParamsBC[j].aci.acm =
-			concurrent_session->gLimEdcaParams[j].aci.acm;
-		session->gLimEdcaParamsBC[j].aci.aifsn =
-			concurrent_session->gLimEdcaParams[j].aci.aifsn;
-		session->gLimEdcaParamsBC[j].cw.min =
-			concurrent_session->gLimEdcaParams[j].cw.min;
-		session->gLimEdcaParamsBC[j].cw.max =
-			concurrent_session->gLimEdcaParams[j].cw.max;
-		session->gLimEdcaParamsBC[j].txoplimit =
-			concurrent_session->gLimEdcaParams[j].txoplimit;
+	for (i = 0; i < QCA_WLAN_AC_ALL; i++) {
+		session->gLimEdcaParamsBC[i].aci.acm =
+			concurrent_session->gLimEdcaParams[i].aci.acm;
+		session->gLimEdcaParamsBC[i].aci.aifsn =
+			concurrent_session->gLimEdcaParams[i].aci.aifsn;
+		session->gLimEdcaParamsBC[i].cw.min =
+			concurrent_session->gLimEdcaParams[i].cw.min;
+		session->gLimEdcaParamsBC[i].cw.max =
+			concurrent_session->gLimEdcaParams[i].cw.max;
+		session->gLimEdcaParamsBC[i].txoplimit =
+			concurrent_session->gLimEdcaParams[i].txoplimit;
 		pe_debug("QoSUpdateBCast changed again due to concurrent INFRA STA session: AC :%d: AIFSN: %d, ACM %d, CWmin %d, CWmax %d, TxOp %d",
-		       j, session->gLimEdcaParamsBC[j].aci.aifsn,
-		       session->gLimEdcaParamsBC[j].aci.acm,
-		       session->gLimEdcaParamsBC[j].cw.min,
-		       session->gLimEdcaParamsBC[j].cw.max,
-		       session->gLimEdcaParamsBC[j].txoplimit);
+			 i, session->gLimEdcaParamsBC[i].aci.aifsn,
+			 session->gLimEdcaParamsBC[i].aci.acm,
+			 session->gLimEdcaParamsBC[i].cw.min,
+			 session->gLimEdcaParamsBC[i].cw.max,
+			 session->gLimEdcaParamsBC[i].txoplimit);
 	}
 	return true;
 }

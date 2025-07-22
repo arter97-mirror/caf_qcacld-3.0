@@ -997,16 +997,13 @@ uint32_t lim_defer_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
  *
  * Return:      None.
  */
+#ifdef FEATURE_WLAN_TDLS
 static void lim_handle_unknown_a2_index_frames(struct mac_context *mac_ctx,
-	void *rx_pkt_buffer, struct pe_session *session_entry)
+					       void *rx_pkt_buffer,
+					       struct pe_session *session_entry)
 {
-#ifdef FEATURE_WLAN_TDLS
 	tpSirMacDataHdr3a mac_hdr;
-#endif
-	if (LIM_IS_P2P_DEVICE_ROLE(session_entry))
-		lim_process_action_frame_no_session(mac_ctx,
-			(uint8_t *) rx_pkt_buffer);
-#ifdef FEATURE_WLAN_TDLS
+
 	mac_hdr = WMA_GET_RX_MPDUHEADER3A(rx_pkt_buffer);
 
 	if (IEEE80211_IS_MULTICAST(mac_hdr->addr2)) {
@@ -1024,9 +1021,16 @@ static void lim_handle_unknown_a2_index_frames(struct mac_context *mac_ctx,
 		(mac_hdr->fc.type == WLAN_FC0_TYPE_MGMT) &&
 		(mac_hdr->fc.subType == SIR_MAC_MGMT_ACTION))
 		lim_process_action_frame(mac_ctx, rx_pkt_buffer, session_entry);
-#endif
 	return;
 }
+#else
+static inline
+void lim_handle_unknown_a2_index_frames(struct mac_context *mac_ctx,
+					void *rx_pkt_buffer,
+					struct pe_session *session_entry)
+{
+}
+#endif
 
 static bool
 lim_is_ignore_btm_frame(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
@@ -2318,28 +2322,26 @@ static void lim_process_normal_hdd_msg(struct mac_context *mac_ctx,
 {
 	bool defer_msg = true;
 
-	/* Added For BT-AMP Support */
-	if ((mac_ctx->lim.gLimSystemRole == eLIM_AP_ROLE)
-		|| (mac_ctx->lim.gLimSystemRole == eLIM_UNKNOWN_ROLE)) {
-		/*
-		 * This check is required only for the AP and in 2 cases.
-		 * 1. If we are in learn mode and we receive any of these
-		 * messages, you have to come out of scan and process the
-		 * message, hence dont defer the message here. In handler,
-		 * these message could be deferred till we actually come out of
-		 * scan mode.
-		 * 2. If radar is detected, you might have to defer all of
-		 * these messages except Stop BSS request/ Switch channel
-		 * request. This decision is also made inside its handler.
-		 *
-		 * Please be careful while using the flag defer_msg. Possibly
-		 * you might end up in an infinite loop.
-		 */
-		if ((msg->type == eWNI_SME_START_BSS_REQ) ||
-			(msg->type == eWNI_SME_STOP_BSS_REQ) ||
-			(msg->type == eWNI_SME_SWITCH_CHL_IND))
-			defer_msg = false;
-	}
+	/*
+	 *  Added For BT-AMP Support
+	 *
+	 * This check is required only for the AP and in 2 cases.
+	 * 1. If we are in learn mode and we receive any of these
+	 * messages, you have to come out of scan and process the
+	 * message, hence dont defer the message here. In handler,
+	 * these message could be deferred till we actually come out of
+	 * scan mode.
+	 * 2. If radar is detected, you might have to defer all of
+	 * these messages except Stop BSS request/ Switch channel
+	 * request. This decision is also made inside its handler.
+	 *
+	 * Please be careful while using the flag defer_msg. Possibly
+	 * you might end up in an infinite loop.
+	 */
+	if (msg->type == eWNI_SME_START_BSS_REQ ||
+	    msg->type == eWNI_SME_STOP_BSS_REQ ||
+	    msg->type == eWNI_SME_SWITCH_CHL_IND)
+		defer_msg = false;
 
 	if (mac_ctx->lim.gLimAddtsSent && defer_msg) {
 		/*
@@ -2438,21 +2440,18 @@ void lim_log_session_states(struct mac_context *mac_ctx)
 {
 #ifdef WLAN_DEBUG
 	int i;
+	struct pe_session *session;
 
 	for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
-		if (mac_ctx->lim.gpSession[i].valid) {
-			pe_debug("sysRole(%d) Session (%d)",
-				mac_ctx->lim.gLimSystemRole, i);
-			pe_debug("SME: Curr %s,Prev %s,MLM: Curr %s,Prev %s",
-				lim_sme_state_str(
-				mac_ctx->lim.gpSession[i].limSmeState),
-				lim_sme_state_str(
-				mac_ctx->lim.gpSession[i].limPrevSmeState),
-				lim_mlm_state_str(
-				mac_ctx->lim.gpSession[i].limMlmState),
-				lim_mlm_state_str(
-				mac_ctx->lim.gpSession[i].limPrevMlmState));
-		}
+		if (!mac_ctx->lim.gpSession[i].valid)
+			continue;
+
+		session = &mac_ctx->lim.gpSession[i];
+		pe_debug("session %d SME: Curr %s,Prev %s,MLM: Curr %s,Prev %s",
+			 i, lim_sme_state_str(session->limSmeState),
+			 lim_sme_state_str(session->limPrevSmeState),
+			 lim_mlm_state_str(session->limMlmState),
+			 lim_mlm_state_str(session->limPrevMlmState));
 	}
 #endif
 }

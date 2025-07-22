@@ -146,7 +146,7 @@ static void lim_ndp_delete_peer_by_addr(struct mac_context *mac_ctx, uint8_t vde
 		QDF_MAC_ADDR_REF(peer_ndi_mac_addr.bytes));
 
 	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
-	if (!session || (session->bssType != eSIR_NDI_MODE)) {
+	if (!session || !LIM_IS_NDI_ROLE(session)) {
 		pe_err("PE session is NULL or non-NDI for sme session %d",
 			vdev_id);
 		return;
@@ -217,7 +217,7 @@ static void lim_ndp_delete_peers(struct mac_context *mac_ctx,
 
 		session = pe_find_session_by_vdev_id(mac_ctx,
 						     ndp_map[i].vdev_id);
-		if (!session || (session->bssType != eSIR_NDI_MODE)) {
+		if (!session || !LIM_IS_NDI_ROLE(session)) {
 			pe_err("PE session is NULL or non-NDI for sme session %d",
 				ndp_map[i].vdev_id);
 			continue;
@@ -273,7 +273,7 @@ void lim_ndp_delete_peers_converged(struct peer_nan_datapath_map *ndp_map,
 }
 
 /**
- * lim_process_ndi_del_sta_rsp() - Handle WDA_DELETE_STA_RSP in eLIM_NDI_ROLE
+ * lim_process_ndi_del_sta_rsp() - Handle WDA_DELETE_STA_RSP in eSIR_NDI_MODE
  * @mac_ctx: Global MAC context
  * @lim_msg: LIM message
  * @pe_session: PE session
@@ -364,7 +364,6 @@ void lim_process_ndi_mlm_add_bss_rsp(struct mac_context *mac_ctx,
 			session_entry->peSessionId,
 			session_entry->limMlmState));
 		session_entry->vdev_id = add_bss_rsp->vdev_id;
-		session_entry->limSystemRole = eLIM_NDI_ROLE;
 		session_entry->statypeForBss = STA_ENTRY_SELF;
 		/* Apply previously set configuration at HW */
 		lim_apply_configuration(mac_ctx, session_entry);

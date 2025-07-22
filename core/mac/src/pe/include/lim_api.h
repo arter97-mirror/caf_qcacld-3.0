@@ -48,15 +48,17 @@
 #define limResetHBPktCount(pe_session)   (pe_session->LimRxedBeaconCntDuringHB = 0)
 
 /* Useful macros for fetching various states in mac->lim */
-/* gLimSystemRole */
-#define GET_LIM_SYSTEM_ROLE(pe_session)      (pe_session->limSystemRole)
-#define LIM_IS_AP_ROLE(pe_session)           (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_AP_ROLE)
-#define LIM_IS_STA_ROLE(pe_session)          (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_STA_ROLE)
-#define LIM_IS_UNKNOWN_ROLE(pe_session)      (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_UNKNOWN_ROLE)
-#define LIM_IS_P2P_DEVICE_ROLE(pe_session)   (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_P2P_DEVICE_ROLE)
-#define LIM_IS_P2P_DEVICE_GO(pe_session)     (GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_P2P_DEVICE_GO)
-#define LIM_IS_NDI_ROLE(pe_session) \
-		(GET_LIM_SYSTEM_ROLE(pe_session) == eLIM_NDI_ROLE)
+#define GET_LIM_BSS_TYPE(_pe_session)      ((_pe_session)->bssType)
+#define LIM_IS_AP_ROLE(_pe_session) \
+	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_INFRA_AP_MODE)
+#define LIM_IS_STA_ROLE(_pe_session) \
+	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_INFRASTRUCTURE_MODE)
+#define LIM_IS_UNKNOWN_ROLE(_pe_session) \
+	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_UNKNOWN_MODE)
+#define LIM_IS_NDI_ROLE(_pe_session) \
+	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_NDI_MODE)
+#define LIM_IS_MONITOR_ROLE(_pe_session) \
+	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_MONITOR_MODE)
 /* gLimSmeState */
 #define GET_LIM_SME_STATE(mac)                 (mac->lim.gLimSmeState)
 #define SET_LIM_SME_STATE(mac, state)          (mac->lim.gLimSmeState = state)

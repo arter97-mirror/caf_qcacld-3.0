@@ -361,8 +361,6 @@ struct lim_context {
 
 	/* / SME State visible across all Sirius modules */
 	tLimSmeStates gLimSmeState;
-	/* / This indicates whether we're an AP, STA in BSS/IBSS */
-	tLimSystemRole gLimSystemRole;
 
 	/* Number of STAs that do not support short preamble */
 	tLimNoShortParams gLimNoShortParams;

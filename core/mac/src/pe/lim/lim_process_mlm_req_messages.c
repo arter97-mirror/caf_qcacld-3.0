@@ -808,7 +808,7 @@ static void lim_process_mlm_auth_req(struct mac_context *mac_ctx, uint32_t *msg)
 	}
 
 	pe_debug("vdev %d Systemrole %d mlmstate %d from: " QDF_MAC_ADDR_FMT "with authtype %d",
-		 session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
+		 session->vdev_id, GET_LIM_BSS_TYPE(session),
 		 session->limMlmState,
 		 QDF_MAC_ADDR_REF(mac_ctx->lim.gpLimMlmAuthReq->peerMacAddr),
 		 mac_ctx->lim.gpLimMlmAuthReq->authType);
@@ -1020,7 +1020,7 @@ static void lim_process_mlm_assoc_req(struct mac_context *mac_ctx, uint32_t *msg
 		 */
 		pe_warn("received unexpected MLM_ASSOC_CNF in state %X for role=%d, MAC addr= "
 			   QDF_MAC_ADDR_FMT, session_entry->limMlmState,
-			GET_LIM_SYSTEM_ROLE(session_entry),
+			GET_LIM_BSS_TYPE(session_entry),
 			QDF_MAC_ADDR_REF(mlm_assoc_req->peerMacAddr));
 		lim_print_mlm_state(mac_ctx, LOGW, session_entry->limMlmState);
 		mlm_assoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
@@ -1107,8 +1107,8 @@ lim_process_mlm_disassoc_req_ntf(struct mac_context *mac_ctx,
 
 	qdf_mem_copy(curr_bssid.bytes, session->bssId, QDF_MAC_ADDR_SIZE);
 
-	switch (GET_LIM_SYSTEM_ROLE(session)) {
-	case eLIM_STA_ROLE:
+	switch (GET_LIM_BSS_TYPE(session)) {
+	case eSIR_INFRASTRUCTURE_MODE:
 		if (!qdf_is_macaddr_equal(&mlm_disassocreq->peer_macaddr,
 				     &curr_bssid)) {
 			pe_warn("received MLM_DISASSOC_REQ with invalid BSS: "QDF_MAC_ADDR_FMT,
@@ -1150,7 +1150,7 @@ lim_process_mlm_disassoc_req_ntf(struct mac_context *mac_ctx,
 		break;
 	default:
 		break;
-	} /* end switch (GET_LIM_SYSTEM_ROLE(session)) */
+	} /* end switch (GET_LIM_BSS_TYPE(session)) */
 
 	/*
 	 * Check if there exists a context for the peer entity
@@ -1429,8 +1429,8 @@ lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 	}
 	sir_copy_mac_addr(curr_bssId, session->bssId);
 
-	switch (GET_LIM_SYSTEM_ROLE(session)) {
-	case eLIM_STA_ROLE:
+	switch (GET_LIM_BSS_TYPE(session)) {
+	case eSIR_INFRASTRUCTURE_MODE:
 		switch (session->limMlmState) {
 		case eLIM_MLM_IDLE_STATE:
 			/*
@@ -1517,7 +1517,7 @@ lim_process_mlm_deauth_req_ntf(struct mac_context *mac_ctx,
 		break;
 	default:
 		break;
-	} /* end switch (GET_LIM_SYSTEM_ROLE(session)) */
+	} /* end switch (GET_LIM_BSS_TYPE(session)) */
 
 	/*
 	 * Check if there exists a context for the peer entity
@@ -2151,7 +2151,7 @@ void lim_process_assoc_failure_timeout(struct mac_context *mac_ctx,
 		 */
 		pe_warn("received unexpected REASSOC failure timeout in state %X for role %d",
 			session->limMlmState,
-			GET_LIM_SYSTEM_ROLE(session));
+			GET_LIM_BSS_TYPE(session));
 		lim_print_mlm_state(mac_ctx, LOGW, session->limMlmState);
 		return;
 	}

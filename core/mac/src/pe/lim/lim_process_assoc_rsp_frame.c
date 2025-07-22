@@ -1263,7 +1263,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		 * Response frame on AP. Log error
 		 */
 		pe_err("Should not received Re/Assoc Response in role: %d",
-			GET_LIM_SYSTEM_ROLE(session_entry));
+		       GET_LIM_BSS_TYPE(session_entry));
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1283,7 +1283,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	pe_nofl_rl_info("Assoc rsp RX: subtype %d vdev %d sys role %d lim state %d rssi %d from " QDF_MAC_ADDR_FMT,
 			subtype, session_entry->vdev_id,
-			GET_LIM_SYSTEM_ROLE(session_entry),
+			GET_LIM_BSS_TYPE(session_entry),
 			session_entry->limMlmState, rssi,
 			QDF_MAC_ADDR_REF(hdr->sa));
 

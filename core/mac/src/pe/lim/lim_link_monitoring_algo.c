@@ -72,7 +72,7 @@ static void lim_delete_sta_util(struct mac_context *mac_ctx, tpDeleteStaContext 
 
 	if (!stads) {
 		pe_err("Invalid STA limSystemRole: %d",
-			GET_LIM_SYSTEM_ROLE(session_entry));
+		       GET_LIM_BSS_TYPE(session_entry));
 		return;
 	}
 	stads->del_sta_ctx_rssi = msg->rssi;
@@ -588,7 +588,7 @@ void lim_rx_invalid_peer_process(struct mac_context *mac_ctx,
 	}
 
 	/* only if SAP mode */
-	if (session_entry->bssType != eSIR_INFRA_AP_MODE) {
+	if (!LIM_IS_AP_ROLE(session_entry)) {
 		pe_debug("unsupported BSS Type %d", session_entry->bssType);
 		goto end;
 	}

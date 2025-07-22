@@ -786,7 +786,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	}
 	session->schBeaconOffsetBegin = offset + (uint16_t) n_bytes;
 	/* Initialize the 'new' fields at the end of the beacon */
-	if (session->limSystemRole == eLIM_AP_ROLE &&
+	if (LIM_IS_AP_ROLE(session) &&
 	    (session->dfsIncludeChanSwIe == true ||
 	     session->bw_update_include_ch_sw_ie == true)) {
 		if (!CHAN_HOP_ALL_BANDS_ENABLE ||
@@ -821,12 +821,9 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 						  &bcn_2->PowerConstraints);
 		populate_dot11f_tpc_report(mac_ctx, &bcn_2->TPCReport, session);
 		/* Need to insert channel switch announcement here */
-		if ((LIM_IS_AP_ROLE(session) ||
-		     LIM_IS_P2P_DEVICE_GO(session)) &&
-		    session->dfsIncludeChanSwIe) {
+		if (LIM_IS_AP_ROLE(session) && session->dfsIncludeChanSwIe)
 			populate_channel_switch_ann(mac_ctx, bcn_2, session);
-		}
-	} else if ((LIM_IS_AP_ROLE(session) || LIM_IS_P2P_DEVICE_GO(session)) &&
+	} else if (LIM_IS_AP_ROLE(session) &&
 		   session->dfsIncludeChanWrapperIe) {
 		populate_dot11f_chan_switch_wrapper(mac_ctx,
 						    &bcn_2->ChannelSwitchWrapper,
@@ -1741,8 +1738,8 @@ QDF_STATUS sch_process_pre_beacon_ind(struct mac_context *mac,
 		goto end;
 	}
 
-	switch (GET_LIM_SYSTEM_ROLE(pe_session)) {
-	case eLIM_AP_ROLE: {
+	switch (GET_LIM_BSS_TYPE(pe_session)) {
+	case eSIR_INFRA_AP_MODE: {
 		uint8_t *ptr =
 			&pe_session->pSchBeaconFrameBegin[pe_session->
 							     schBeaconOffsetBegin];
@@ -1763,7 +1760,7 @@ QDF_STATUS sch_process_pre_beacon_ind(struct mac_context *mac,
 
 	default:
 		pe_err("Error-PE has Receive PreBeconGenIndication when System is in %d role",
-		       GET_LIM_SYSTEM_ROLE(pe_session));
+		       GET_LIM_BSS_TYPE(pe_session));
 	}
 
 end:

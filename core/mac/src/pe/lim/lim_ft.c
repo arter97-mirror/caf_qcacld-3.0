@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -778,18 +778,14 @@ lim_fill_ft_session(struct mac_context *mac,
 	/* Store beaconInterval */
 	ft_session->beaconParams.beaconInterval =
 		pbssDescription->beaconInterval;
-	ft_session->bssType = pe_session->bssType;
+	ft_session->bssType = GET_LIM_BSS_TYPE(pe_session);
 
 	ft_session->statypeForBss = STA_ENTRY_PEER;
 	ft_session->nwType = pbssDescription->nwType;
 
 
-	if (ft_session->bssType == eSIR_INFRASTRUCTURE_MODE) {
-		ft_session->limSystemRole = eLIM_STA_ROLE;
-	} else {
-		/* Throw an error & return & make sure to delete the session */
-		pe_warn("Invalid bss type");
-	}
+	if (!LIM_IS_STA_ROLE(ft_session))
+		pe_warn("Invalid bss type %d", GET_LIM_BSS_TYPE(ft_session));
 
 	ft_session->limCurrentBssCaps = pbssDescription->capabilityInfo;
 	ft_session->limReassocBssCaps = pbssDescription->capabilityInfo;

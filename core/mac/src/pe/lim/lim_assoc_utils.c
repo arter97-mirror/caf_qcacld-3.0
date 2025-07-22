@@ -2413,8 +2413,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 				sta_ds->vhtSupportedChannelWidthSet + 1;
 
 		add_sta_params->vhtSupportedRxNss = sta_ds->vhtSupportedRxNss;
-		if (LIM_IS_AP_ROLE(session_entry) ||
-				LIM_IS_P2P_DEVICE_GO(session_entry))
+		if (LIM_IS_AP_ROLE(session_entry))
 			add_sta_params->vhtSupportedRxNss = QDF_MIN(
 					add_sta_params->vhtSupportedRxNss,
 					session_entry->nss);

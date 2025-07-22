@@ -4275,7 +4275,7 @@ static uint32_t lim_calculate_auth_mlo_ie_len(struct mac_context *mac_ctx,
 	if (wlan_vdev_mlme_is_mlo_vdev(session->vdev)) {
 		qdf_mem_zero(mlo_ie, sizeof(*mlo_ie));
 
-		pe_debug("Auth TX sys role: %d", GET_LIM_SYSTEM_ROLE(session));
+		pe_debug("Auth TX sys role: %d", GET_LIM_BSS_TYPE(session));
 		if (LIM_IS_STA_ROLE(session)) {
 			populate_dot11f_auth_mlo_ie(mac_ctx, session, mlo_ie);
 			mlo_ie_len = lim_caculate_mlo_ie_length(mlo_ie);
@@ -4791,7 +4791,7 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx, uint8_t vdev_id)
 		/* / Receive path cleanup with dummy packet */
 		lim_ft_cleanup_pre_auth_info(mac_ctx, session_entry);
 		lim_cleanup_rx_path(mac_ctx, sta_ds, session_entry, true);
-		if ((session_entry->limSystemRole == eLIM_STA_ROLE) &&
+		if (LIM_IS_STA_ROLE(session_entry) &&
 		    (
 #ifdef FEATURE_WLAN_ESE
 		    (wlan_cm_get_ese_assoc(mac_ctx->pdev,
@@ -4807,21 +4807,16 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx, uint8_t vdev_id)
 			lim_ft_cleanup(mac_ctx, session_entry);
 		} else {
 #ifdef FEATURE_WLAN_ESE
-			pe_debug("No FT Preauth Session Cleanup in role %d"
-				 " isESE %d"
-				 " isLFR %d"
-				 " is11r %d, Deauth reason %d Trigger = %d",
-				 session_entry->limSystemRole,
+			pe_debug("No FT Preauth Session Cleanup in role %d isESE %d isLFR %d is11r %d, Deauth reason %d Trigger = %d",
+				 GET_LIM_BSS_TYPE(session_entry),
 				 mac_ctx->mlme_cfg->lfr.ese_enabled,
 				 cm_is_fast_roam_enabled(mac_ctx->psoc),
 				 session_entry->is11Rconnection,
 				 deauth_req->reasonCode,
 				 deauth_req->deauthTrigger);
 #else
-			pe_debug("No FT Preauth Session Cleanup in role %d"
-				 " isLFR %d"
-				 " is11r %d, Deauth reason %d Trigger = %d",
-				 session_entry->limSystemRole,
+			pe_debug("No FT Preauth Session Cleanup in role %d isLFR %d is11r %d, Deauth reason %d Trigger = %d",
+				 GET_LIM_BSS_TYPE(session_entry),
 				 cm_is_fast_roam_enabled(mac_ctx->psoc),
 				 session_entry->is11Rconnection,
 				 deauth_req->reasonCode,

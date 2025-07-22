@@ -1879,7 +1879,7 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	auth_alg = *(uint16_t *) body_ptr;
 
 	pe_nofl_rl_info("Auth RX: vdev %d sys role %d lim_state %d from " QDF_MAC_ADDR_FMT " rssi %d auth_alg %d seq %d",
-			pe_session->vdev_id, GET_LIM_SYSTEM_ROLE(pe_session),
+			pe_session->vdev_id, GET_LIM_BSS_TYPE(pe_session),
 			pe_session->limMlmState,
 			QDF_MAC_ADDR_REF(mac_hdr->sa),
 			WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
@@ -1943,7 +1943,7 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				STATUS_CHALLENGE_FAIL;
 			/* Log error */
 			pe_err("rx Auth frm with wep bit set role: %d "QDF_MAC_ADDR_FMT,
-				GET_LIM_SYSTEM_ROLE(pe_session),
+				GET_LIM_BSS_TYPE(pe_session),
 				QDF_MAC_ADDR_REF(mac_hdr->sa));
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame,
 				mac_hdr->sa, LIM_NO_WEP_IN_FC,

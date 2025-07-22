@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -76,7 +76,7 @@ void lim_process_mlm_reassoc_req(struct mac_context *mac_ctx,
 	}
 
 	pe_debug("ReAssoc Req on session: %d role: %d mlm: %d " QDF_MAC_ADDR_FMT,
-		reassoc_req->sessionId, GET_LIM_SYSTEM_ROLE(session),
+		reassoc_req->sessionId, GET_LIM_BSS_TYPE(session),
 		session->limMlmState,
 		QDF_MAC_ADDR_REF(reassoc_req->peerMacAddr));
 
@@ -91,7 +91,7 @@ void lim_process_mlm_reassoc_req(struct mac_context *mac_ctx,
 
 		pe_warn("unexpected msg state: %X role: %d MAC "
 			QDF_MAC_ADDR_FMT,
-			session->limMlmState, GET_LIM_SYSTEM_ROLE(session),
+			session->limMlmState, GET_LIM_BSS_TYPE(session),
 			QDF_MAC_ADDR_REF(reassoc_req->peerMacAddr));
 		lim_print_mlm_state(mac_ctx, LOGW, session->limMlmState);
 		reassoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
@@ -252,7 +252,7 @@ void lim_process_mlm_reassoc_cnf(struct mac_context *mac_ctx, uint32_t *msg_buf)
 		 * from MLM in other states OR on AP.
 		 */
 		pe_err("Rcv unexpected MLM_REASSOC_CNF role: %d sme 0x%X",
-		       GET_LIM_SYSTEM_ROLE(session), session->limSmeState);
+		       GET_LIM_BSS_TYPE(session), session->limSmeState);
 		return;
 	}
 

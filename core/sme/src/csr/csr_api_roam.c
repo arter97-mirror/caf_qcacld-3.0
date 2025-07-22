@@ -5663,7 +5663,11 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 	if (!bss_desc)
 		goto purge_list;
 
-	wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc, cur_node->entry);
+	status = wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc,
+						    cur_node->entry);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto purge_list;
+
 	src_cfg.uint_value = bss_desc->mbo_oce_enabled_ap;
 	wlan_cm_roam_cfg_set_value(mac_ctx->psoc, vdev_id, MBO_OCE_ENABLED_AP,
 				   &src_cfg);

@@ -1840,10 +1840,8 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 
 }
 
-QDF_STATUS
-populate_dot11f_ext_cap(struct mac_context *mac,
-			bool isVHTEnabled, tDot11fIEExtCap *pDot11f,
-			uint8_t vdev_id)
+QDF_STATUS populate_dot11f_ext_cap(struct mac_context *mac, bool isVHTEnabled,
+				   tDot11fIEExtCap *pDot11f, uint8_t vdev_id)
 {
 	struct s_ext_cap *p_ext_cap;
 	struct pe_session *pe_session;
@@ -1861,10 +1859,9 @@ populate_dot11f_ext_cap(struct mac_context *mac,
 		pe_debug("11MC support enabled");
 		pDot11f->num_bytes = DOT11F_IE_EXTCAP_MAX_LEN;
 	} else {
-		if (opmode != QDF_SAP_MODE)
-			pDot11f->num_bytes = DOT11F_IE_EXTCAP_MAX_LEN;
-		else
-			pDot11f->num_bytes = DOT11F_IE_EXTCAP_MIN_LEN;
+		pDot11f->num_bytes = (opmode == QDF_SAP_MODE) ?
+				     DOT11F_IE_EXTCAP_MIN_LEN :
+				     DOT11F_IE_EXTCAP_MAX_LEN;
 	}
 
 	p_ext_cap = (struct s_ext_cap *)pDot11f->bytes;
@@ -8454,7 +8451,7 @@ populate_dot11f_he_operation(struct mac_context *mac_ctx,
 	    (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, session->vdev_id) &&
 	    WLAN_REG_IS_6GHZ_CHAN_FREQ(session->curr_op_freq))) {
 		he_op->oper_info_6g_present = 1;
-		if (session->bssType != eSIR_INFRA_AP_MODE) {
+		if (!LIM_IS_AP_ROLE(session)) {
 			he_op->oper_info_6g.info.ch_width = ch_width;
 			he_op->oper_info_6g.info.center_freq_seg0 =
 						session->ch_center_freq_seg0;

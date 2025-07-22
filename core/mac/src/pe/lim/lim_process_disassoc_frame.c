@@ -162,7 +162,7 @@ lim_process_disassoc_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 			QDF_MAC_ADDR_REF(pHdr->da), frame_rssi,
 			reasonCode, pe_session->limMlmState,
 			pe_session->limSmeState,
-			GET_LIM_SYSTEM_ROLE(pe_session));
+			GET_LIM_BSS_TYPE(pe_session));
 	lim_diag_event_report(mac, WLAN_PE_DIAG_DISASSOC_FRAME_EVENT,
 		pe_session, 0, reasonCode);
 
@@ -279,7 +279,7 @@ lim_process_disassoc_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		/* Received Disassoc in un-known role. Log and ignore it */
 		pe_err("received Disassoc frame with invalid reasonCode: %d in role:"
 				"%d in sme state: %d from " QDF_MAC_ADDR_FMT, reasonCode,
-			GET_LIM_SYSTEM_ROLE(pe_session), pe_session->limSmeState,
+			GET_LIM_BSS_TYPE(pe_session), pe_session->limSmeState,
 			QDF_MAC_ADDR_REF(pHdr->sa));
 
 		return;

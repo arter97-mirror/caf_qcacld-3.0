@@ -168,7 +168,7 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 			QDF_MAC_ADDR_REF(pHdr->da), frame_rssi,
 			reasonCode, pe_session->limMlmState,
 			pe_session->limSmeState,
-			GET_LIM_SYSTEM_ROLE(pe_session));
+			GET_LIM_BSS_TYPE(pe_session));
 
 	lim_diag_event_report(mac, WLAN_PE_DIAG_DEAUTH_FRAME_EVENT,
 		pe_session, 0, reasonCode);
@@ -237,7 +237,7 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		/* Received Deauth frame un-known role. Log and ignore it */
 		pe_err("received Deauth frame with reasonCode %d in role %d from "
 			QDF_MAC_ADDR_FMT, reasonCode,
-			GET_LIM_SYSTEM_ROLE(pe_session),
+			GET_LIM_BSS_TYPE(pe_session),
 			QDF_MAC_ADDR_REF(pHdr->sa));
 
 		return;
@@ -406,8 +406,8 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 		return;
 	}
 	/* Check for pre-assoc states */
-	switch (GET_LIM_SYSTEM_ROLE(pe_session)) {
-	case eLIM_STA_ROLE:
+	switch (GET_LIM_BSS_TYPE(pe_session)) {
+	case eSIR_INFRASTRUCTURE_MODE:
 		switch (pe_session->limMlmState) {
 		case eLIM_MLM_WT_AUTH_FRAME2_STATE:
 			/**
@@ -568,13 +568,11 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 			return;
 		}
 		break;
-
-	case eLIM_AP_ROLE:
+	case eSIR_INFRA_AP_MODE:
 		break;
-
 	default:
 		return;
-	} /* end switch (mac->lim.gLimSystemRole) */
+	}
 
 	/**
 	 * Extract 'associated' context for STA, if any.

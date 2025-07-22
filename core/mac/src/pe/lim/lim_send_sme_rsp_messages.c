@@ -1156,14 +1156,14 @@ lim_send_sme_deauth_ind(struct mac_context *mac, tpDphHashNode sta,
 	pSirSmeDeauthInd->length = sizeof(*pSirSmeDeauthInd);
 
 	pSirSmeDeauthInd->vdev_id = pe_session->smeSessionId;
-	if (eSIR_INFRA_AP_MODE == pe_session->bssType) {
+	if (LIM_IS_AP_ROLE(pe_session))
 		pSirSmeDeauthInd->status_code =
 			(tSirResultCodes) sta->mlmStaContext.cleanupTrigger;
-	} else {
+	else
 		/* Need to indicate the reason code over the air */
 		pSirSmeDeauthInd->status_code =
 			(tSirResultCodes) sta->mlmStaContext.disassocReason;
-	}
+
 	/* BSSID */
 	qdf_mem_copy(pSirSmeDeauthInd->bssid.bytes, pe_session->bssId,
 		     QDF_MAC_ADDR_SIZE);
@@ -2930,7 +2930,7 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 	wlan_vdev_mlme_set_sap_go_move_before_sta(session->vdev, false);
 
 	pe_debug("Vdev %d role: %d swIe: %d opIe: %d switch cnt:%d Is SAP / GO Moved before STA: %d",
-		 session->vdev_id, GET_LIM_SYSTEM_ROLE(session),
+		 session->vdev_id, GET_LIM_BSS_TYPE(session),
 		 session->dfsIncludeChanSwIe,
 		 session->gLimOperatingMode.present,
 		 session->gLimChannelSwitch.switchCount,
