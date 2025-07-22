@@ -213,16 +213,20 @@ wlan_mgmt_rx_srng_attach_buffers(struct mgmt_rx_srng_pdev_priv *pdev_priv)
 	qdf_dma_addr_t paddr;
 	int i;
 	void *ring_entry;
+	int write_idx = pdev_priv->write_idx;
 
-	hal_srng_access_start(pdev_priv->hal_soc, srng);
 	for (i = 0; i < MGMT_RX_SRNG_ENTRIES - 1; i++) {
 		status = wlan_mgmt_rx_srng_alloc_buf(pdev_priv, i, &paddr);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			hal_srng_access_end(pdev_priv->hal_soc, srng);
 			wlan_mgmt_rx_srng_free_buffers(pdev_priv);
 			return status;
 		}
+		pdev_priv->write_idx =
+			(pdev_priv->write_idx + 1) % MGMT_RX_SRNG_ENTRIES;
+	}
 
+	hal_srng_access_start(pdev_priv->hal_soc, srng);
+	for (i = 0; i < MGMT_RX_SRNG_ENTRIES - 1; i++) {
 		ring_entry = hal_srng_src_get_next(pdev_priv->hal_soc, srng);
 		if (!ring_entry) {
 			mgmt_rx_srng_err("Failure to get mgmt refill entry");
@@ -230,10 +234,10 @@ wlan_mgmt_rx_srng_attach_buffers(struct mgmt_rx_srng_pdev_priv *pdev_priv)
 		}
 
 		hal_rxdma_buff_addr_info_set(
-			pdev_priv->hal_soc, ring_entry, paddr,
-			pdev_priv->rx_desc[pdev_priv->write_idx].cookie, 0);
-		pdev_priv->write_idx =
-			(pdev_priv->write_idx + 1) % MGMT_RX_SRNG_ENTRIES;
+			pdev_priv->hal_soc, ring_entry,
+			pdev_priv->rx_desc[write_idx].pa,
+			pdev_priv->rx_desc[write_idx].cookie, 0);
+		write_idx = (write_idx + 1) % MGMT_RX_SRNG_ENTRIES;
 	}
 	hal_srng_access_end(pdev_priv->hal_soc, srng);
 
