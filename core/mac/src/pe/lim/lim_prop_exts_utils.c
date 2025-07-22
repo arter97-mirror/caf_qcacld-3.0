@@ -52,76 +52,73 @@
 /**
  * get_local_power_constraint_probe_response() - extracts local constraint
  * from probe response
- * @beacon_struct: beacon structure
+ * @bcn_ies: Pointer to  beacon IEs
  * @local_constraint: local constraint pointer
- * @session: A pointer to session entry.
  *
  * Return: None
  */
-static void get_local_power_constraint_probe_response(
-		tpSirProbeRespBeacon beacon_struct,
-		int8_t *local_constraint,
-		struct pe_session *session)
+static inline
+void get_local_power_constraint_probe_response(tDot11fBeaconIEs *bcn_ies,
+					       int8_t *local_constraint)
 {
-	if (beacon_struct->eseTxPwr.present)
-		*local_constraint =
-			beacon_struct->eseTxPwr.power_limit;
+	if (bcn_ies->ESEVersion.present)
+		*local_constraint = bcn_ies->ESETxmitPower.power_limit;
 }
 
 /**
  * get_ese_version_ie_probe_response() - extracts ESE version IE
  * from probe response
  * @mac_ctx: MAC context
- * @beacon_struct: beacon structure
  * @session: A pointer to session entry.
+ * @bcn_ies: Pointer to beacon IEs
  *
  * Return: None
  */
-static void get_ese_version_ie_probe_response(struct mac_context *mac_ctx,
-					tpSirProbeRespBeacon beacon_struct,
-					struct pe_session *session)
+static inline
+void get_ese_version_ie_probe_response(struct mac_context *mac_ctx,
+				       struct pe_session *session,
+				       tDot11fBeaconIEs *bcn_ies)
 {
 	if (mac_ctx->mlme_cfg->lfr.ese_enabled)
 		session->is_ese_version_ie_present =
-			beacon_struct->is_ese_ver_ie_present;
+					bcn_ies->ESEVersion.present;
 }
 #else
-static void get_local_power_constraint_probe_response(
-		tpSirProbeRespBeacon beacon_struct,
-		int8_t *local_constraint,
-		struct pe_session *session)
+static inline
+void get_local_power_constraint_probe_response(tDot11fBeaconIEs *bcn_ies,
+					       int8_t *local_constraint)
 {
 
 }
 
-static inline void get_ese_version_ie_probe_response(struct mac_context *mac_ctx,
-					tpSirProbeRespBeacon beacon_struct,
-					struct pe_session *session)
+static inline
+void get_ese_version_ie_probe_response(struct mac_context *mac_ctx,
+				       struct pe_session *session,
+				       tDot11fBeaconIEs *bcn_ies)
 {
 }
 #endif
 
 #ifdef WLAN_FEATURE_11AX
 static void lim_extract_he_op(struct pe_session *session,
-		tSirProbeRespBeacon *beacon_struct)
+			      tDot11fBeaconIEs *bcn_ies)
 {
 	uint8_t fw_vht_ch_wd;
 	uint8_t ap_bcon_ch_width;
 	uint8_t center_freq_diff;
 
-	if (!session->he_capable)
+	if (!session->he_capable || !bcn_ies->he_op.present)
 		return;
-	if (!beacon_struct->he_op.present) {
-		return;
-	}
-	qdf_mem_copy(&session->he_op, &beacon_struct->he_op,
-			sizeof(session->he_op));
+
+	qdf_mem_copy(&session->he_op, &bcn_ies->he_op, sizeof(session->he_op));
 	if (!session->he_6ghz_band)
 		return;
+
 	if (!session->he_op.oper_info_6g_present) {
 		session->ap_defined_power_type_6g = REG_CURRENT_MAX_AP_TYPE;
 		return;
 	}
+
 	session->ch_width = session->he_op.oper_info_6g.info.ch_width;
 	session->ch_center_freq_seg0 =
 		session->he_op.oper_info_6g.info.center_freq_seg0;
@@ -190,19 +187,24 @@ static bool lim_validate_he160_mcs_map(struct mac_context *mac_ctx,
 }
 
 static void lim_check_is_he_mcs_valid(struct pe_session *session,
-				      tSirProbeRespBeacon *beacon_struct)
+				      tDot11fBeaconIEs *bcn_ies)
 {
 	uint8_t i;
-	uint16_t mcs_map;
+	uint16_t mcs_map = HE_MCS_ALL_DISABLED;
 
-	if (!session->he_capable || !beacon_struct->he_cap.present)
+	if (!session->he_capable)
 		return;
 
-	mcs_map = beacon_struct->he_cap.rx_he_mcs_map_lt_80;
+	if (!bcn_ies->he_cap.present)
+		goto downgrade_11ac;
+
+	mcs_map = bcn_ies->he_cap.rx_he_mcs_map_lt_80;
 	for (i = 0; i < session->nss; i++) {
 		if (((mcs_map >> (i * 2)) & 0x3) != 0x3)
 			return;
 	}
+
+downgrade_11ac:
 	session->he_capable = false;
 	if (session->vhtCapability)
 		session->dot11mode = MLME_DOT11_MODE_11AC;
@@ -213,7 +215,7 @@ static void lim_check_is_he_mcs_valid(struct pe_session *session,
 }
 
 void lim_update_he_bw_cap_mcs(struct pe_session *session,
-			      tSirProbeRespBeacon *beacon)
+			      tDot11fBeaconIEs *bcn_ies)
 {
 	uint8_t is_80mhz;
 	uint8_t sta_prefer_80mhz_over_160mhz;
@@ -225,13 +227,13 @@ void lim_update_he_bw_cap_mcs(struct pe_session *session,
 		session->mac_ctx->mlme_cfg->sta.sta_prefer_80mhz_over_160mhz;
 	if ((session->opmode == QDF_STA_MODE ||
 	     session->opmode == QDF_P2P_CLIENT_MODE) &&
-	    beacon && beacon->he_cap.present) {
-		if (!beacon->he_cap.chan_width_2) {
+	    bcn_ies && bcn_ies->he_cap.present) {
+		if (!bcn_ies->he_cap.chan_width_2) {
 			is_80mhz = 1;
-		} else if (beacon->he_cap.chan_width_2 &&
+		} else if (bcn_ies->he_cap.chan_width_2 &&
 			 !lim_validate_he160_mcs_map(session->mac_ctx,
-			   *((uint16_t *)beacon->he_cap.rx_he_mcs_map_160),
-			   *((uint16_t *)beacon->he_cap.tx_he_mcs_map_160),
+			   *((uint16_t *)bcn_ies->he_cap.rx_he_mcs_map_160),
+			   *((uint16_t *)bcn_ies->he_cap.tx_he_mcs_map_160),
 						     session->nss)) {
 			is_80mhz = 1;
 			if (session->ch_width == CH_WIDTH_160MHZ) {
@@ -299,10 +301,10 @@ void lim_update_he_bw_cap_mcs(struct pe_session *session,
 							HE_MCS_ALL_DISABLED;
 	}
 
-	if (beacon)
+	if (bcn_ies)
 		pe_debug("Session width %d, AP: he_cap %d wd_2 %d is_80 %d",
-			 session->ch_width, beacon->he_cap.present,
-			 beacon->he_cap.chan_width_2, is_80mhz);
+			 session->ch_width, bcn_ies->he_cap.present,
+			 bcn_ies->he_cap.chan_width_2, is_80mhz);
 	lim_print_he_channel_widths(&session->he_config);
 }
 
@@ -324,10 +326,11 @@ void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
 }
 #else
 static inline void lim_extract_he_op(struct pe_session *session,
-		tSirProbeRespBeacon *beacon_struct)
+				     tDot11fBeaconIEs *bcn_ies)
 {}
-static void lim_check_is_he_mcs_valid(struct pe_session *session,
-				      tSirProbeRespBeacon *beacon_struct)
+
+static inline void lim_check_is_he_mcs_valid(struct pe_session *session,
+					     tDot11fBeaconIEs *bcn_ies)
 {
 }
 
@@ -338,21 +341,15 @@ void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #ifdef WLAN_FEATURE_11BE
-void lim_extract_eht_op(struct pe_session *session,
-			tSirProbeRespBeacon *beacon_struct)
+void lim_extract_eht_op(struct pe_session *session, tDot11fBeaconIEs *bcn_ies)
 {
 	uint32_t max_eht_bw;
 
-	if (!session->eht_capable)
+	if (!session->eht_capable || !bcn_ies->eht_op.present ||
+	    !bcn_ies->eht_op.eht_op_information_present)
 		return;
 
-	if (!beacon_struct->eht_op.present)
-		return;
-
-	if (!beacon_struct->eht_op.eht_op_information_present)
-		return;
-
-	qdf_mem_copy(&session->eht_op, &beacon_struct->eht_op,
+	qdf_mem_copy(&session->eht_op, &bcn_ies->eht_op,
 		     sizeof(session->eht_op));
 
 	max_eht_bw = wma_get_eht_ch_width();
@@ -389,18 +386,18 @@ void lim_extract_eht_op(struct pe_session *session,
 }
 
 void lim_update_eht_bw_cap_mcs(struct pe_session *session,
-			       tSirProbeRespBeacon *beacon)
+			       tDot11fBeaconIEs *bcn_ies)
 {
 	if (!session->eht_capable)
 		return;
 
 	if ((session->opmode == QDF_STA_MODE ||
 	     session->opmode == QDF_P2P_CLIENT_MODE) &&
-	    beacon && beacon->eht_cap.present) {
-		if (!beacon->eht_cap.support_320mhz_6ghz)
+	    bcn_ies && bcn_ies->eht_cap.present) {
+		if (!bcn_ies->eht_cap.support_320mhz_6ghz)
 			session->eht_config.support_320mhz_6ghz = 0;
-		if (!beacon->eht_cap.support_320mhz_6ghz ||
-		    !beacon->eht_cap.su_beamformer)
+		if (!bcn_ies->eht_cap.support_320mhz_6ghz ||
+		    !bcn_ies->eht_cap.su_beamformer)
 			session->eht_config.num_sounding_dim_320mhz = 0;
 	}
 }
@@ -523,7 +520,7 @@ static inline bool lim_extract_adaptive_11r_cap(uint8_t *ie, uint16_t ie_len)
 
 #ifdef WLAN_FEATURE_11AX
 static void lim_check_peer_ldpc_and_update(struct pe_session *session,
-				    tSirProbeRespBeacon *beacon_struct)
+					   tDot11fBeaconIEs *bcn_ies)
 {
 	/*
 	 * In 2.4G if AP supports HE till MCS 0-9 we can associate
@@ -531,9 +528,9 @@ static void lim_check_peer_ldpc_and_update(struct pe_session *session,
 	 */
 	if (session->he_capable &&
 	    WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq) &&
-	    beacon_struct->he_cap.present &&
-	    lim_check_he_80_mcs11_supp(session, &beacon_struct->he_cap) &&
-	    !beacon_struct->he_cap.ldpc_coding) {
+	    bcn_ies->he_cap.present &&
+	    lim_check_he_80_mcs11_supp(session, &bcn_ies->he_cap) &&
+	    !bcn_ies->he_cap.ldpc_coding) {
 		session->he_capable = false;
 		pe_err("LDPC check failed for HE operation");
 		if (session->vhtCapability) {
@@ -546,8 +543,8 @@ static void lim_check_peer_ldpc_and_update(struct pe_session *session,
 	}
 }
 #else
-static void lim_check_peer_ldpc_and_update(struct pe_session *session,
-					   tSirProbeRespBeacon *beacon_struct)
+static inline void lim_check_peer_ldpc_and_update(struct pe_session *session,
+						  tDot11fBeaconIEs *bcn_ies)
 {}
 #endif
 
@@ -838,13 +835,13 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 		}
 	}
 
-	lim_check_is_he_mcs_valid(session, beacon_struct);
-	lim_check_peer_ldpc_and_update(session, beacon_struct);
-	lim_extract_he_op(session, beacon_struct);
-	lim_extract_eht_op(session, beacon_struct);
+	lim_check_is_he_mcs_valid(session, bcn_ies);
+	lim_check_peer_ldpc_and_update(session, bcn_ies);
+	lim_extract_he_op(session, bcn_ies);
+	lim_extract_eht_op(session, bcn_ies);
 	if (!mac_ctx->usr_eht_testbed_cfg)
-		lim_update_he_bw_cap_mcs(session, beacon_struct);
-	lim_update_eht_bw_cap_mcs(session, beacon_struct);
+		lim_update_he_bw_cap_mcs(session, bcn_ies);
+	lim_update_eht_bw_cap_mcs(session, bcn_ies);
 	/* Extract the UAPSD flag from WMM Parameter element */
 	if (beacon_struct->wmeEdcaPresent)
 		*uapsd = beacon_struct->edcaParams.qosInfo.uapsd;
@@ -856,13 +853,13 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 					localPowerConstraints;
 			*is_pwr_constraint = true;
 		} else {
-			get_local_power_constraint_probe_response(
-				beacon_struct, local_constraint, session);
+			get_local_power_constraint_probe_response(bcn_ies,
+								  local_constraint);
 			*is_pwr_constraint = false;
 		}
 	}
 
-	get_ese_version_ie_probe_response(mac_ctx, beacon_struct, session);
+	get_ese_version_ie_probe_response(mac_ctx, session, bcn_ies);
 
 	session->country_info_present = false;
 	/* Initializing before first use */

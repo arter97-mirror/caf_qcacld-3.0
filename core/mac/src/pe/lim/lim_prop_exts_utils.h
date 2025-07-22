@@ -61,17 +61,15 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 /**
  * lim_extract_eht_op() - Extract EHT operation IE into session
  * @session: Pointer to pe_session
- * @beacon_struct: Pointer to extracted beacon/probe response of the
+ * @bcn_ies: Pointer to beacon IEs
  * AP
  *
  * Return: None
  */
-void lim_extract_eht_op(struct pe_session *session,
-			tSirProbeRespBeacon *beacon_struct);
+void lim_extract_eht_op(struct pe_session *session, tDot11fBeaconIEs *bcn_ies);
 #else
-static inline void
-lim_extract_eht_op(struct pe_session *session,
-		   tSirProbeRespBeacon *beacon_struct)
+static inline
+void lim_extract_eht_op(struct pe_session *session, tDot11fBeaconIEs *bcn_ies)
 {}
 #endif
 

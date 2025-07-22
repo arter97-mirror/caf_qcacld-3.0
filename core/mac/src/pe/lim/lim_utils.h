@@ -1605,12 +1605,12 @@ static inline bool lim_is_session_he_capable(struct pe_session *session)
 /**
  * lim_update_he_bw_cap_mcs(): Update he mcs map per bandwidth
  * @session_entry: pointer to PE session
- * @beacon: pointer to beacon
+ * @bcn_ies: Pointer to beacon IEs
  *
  * Return: None
  */
 void lim_update_he_bw_cap_mcs(struct pe_session *session,
-			      tSirProbeRespBeacon *beacon);
+			      tDot11fBeaconIEs *bcn_ies);
 
 static inline bool lim_is_he_6ghz_band(struct pe_session *session)
 {
@@ -1884,7 +1884,7 @@ static inline bool lim_is_session_he_capable(struct pe_session *session)
 }
 
 static inline void lim_update_he_bw_cap_mcs(struct pe_session *session,
-					    tSirProbeRespBeacon *beacon)
+					    tDot11fBeaconIEs *bcn_ies)
 {
 }
 
@@ -2049,12 +2049,12 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 /**
  * lim_update_eht_bw_cap_mcs(): Update eht mcs map per bandwidth
  * @session_entry: pointer to PE session
- * @beacon: pointer to beacon
+ * @bcn_ies: Pointer to beacon IEs
  *
  * Return: None
  */
 void lim_update_eht_bw_cap_mcs(struct pe_session *session,
-			       tSirProbeRespBeacon *beacon);
+			       tDot11fBeaconIEs *bcn_ies);
 
 /**
  * lim_add_self_eht_cap() - Copy EHT capability into add sta from PE session
@@ -2420,7 +2420,7 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 }
 
 static inline void lim_update_eht_bw_cap_mcs(struct pe_session *session,
-					     tSirProbeRespBeacon *beacon)
+					     tDot11fBeaconIEs *bcn_ies)
 {
 }
 
