@@ -3595,10 +3595,12 @@ bool policy_mgr_is_sta_connected_2g(struct wlan_objmgr_psoc *psoc);
  * 5g channel when dfs ap is present.
  *
  * @psoc: pointer to soc
+ * @freq: DFS freq of concurrent SAP/GO
  *
  * Return: true if sta scan 5g chan should be skipped
  */
-bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc);
+bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc,
+					      qdf_freq_t *freq);
 
 /**
  * policy_mgr_scan_trim_chnls_for_connected_ap() - check if sta scan
