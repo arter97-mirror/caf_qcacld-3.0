@@ -1576,6 +1576,35 @@ void lim_extract_ht_caps_txrx_nss(uint8_t *mcs_set, uint8_t *tx_nss,
 		*tx_nss = *rx_nss;
 }
 
+void lim_update_dot11f_vht_caps_for_nss(tDot11fIEVHTCaps *vht_cap,
+					uint8_t tx_nss, uint8_t rx_nss)
+{
+	vht_cap->txMCSMap |= VHT_DISABLE_MCS_OVER_NSS(tx_nss);
+	vht_cap->rxMCSMap |= VHT_DISABLE_MCS_OVER_NSS(rx_nss);
+	vht_cap->txSupDataRate = VHT_GET_DATARATE_FOR_NSS_AND_GI(tx_nss, true);
+	vht_cap->rxHighSupDataRate =
+				VHT_GET_DATARATE_FOR_NSS_AND_GI(rx_nss, true);
+}
+
+void lim_extract_vht_caps_txrx_nss(tDot11fIEVHTCaps *vht_caps, uint8_t *tx_nss,
+				   uint8_t *rx_nss)
+{
+	uint8_t idx;
+
+	*tx_nss = 0;
+	*rx_nss = 0;
+
+	if (!vht_caps->present)
+		return;
+
+	for (idx = NSS_1x1_MODE; idx <= NSS_8x8_MODE; idx++) {
+		if (VHT_MCS_IS_NSS_ENABLED(vht_caps->rxMCSMap, idx))
+			*rx_nss = idx;
+		if (VHT_MCS_IS_NSS_ENABLED(vht_caps->txMCSMap, idx))
+			*tx_nss = idx;
+	}
+}
+
 QDF_STATUS
 populate_dot11f_vht_caps(struct mac_context *mac,
 			 struct pe_session *pe_session, tDot11fIEVHTCaps *pDot11f)

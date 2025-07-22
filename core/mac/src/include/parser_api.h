@@ -48,25 +48,6 @@
 #define IS_24G_CH(__chNum) ((__chNum > 0) && (__chNum < 15))
 #define IS_5G_CH(__chNum) ((__chNum >= 36) && (__chNum <= 165))
 #define IS_2X2_CHAIN(__chain) ((__chain & 0x3) == 0x3)
-#define VHT_MCS_0_8 0x1
-#define VHT_MCS_0_9 0x2
-#define VHT_MCS_DISABLE 0x3
-#define VHT_1x1_MCS_MASK 0x3
-#define VHT_NUM_BITS_PER_NSS 0x2
-#define VHT_GET_MCS_FOR_NSS(_mcsmap, _nss) \
-	QDF_GET_BITS((_mcsmap), ((_nss) - 1) * VHT_NUM_BITS_PER_NSS, \
-		     VHT_NUM_BITS_PER_NSS)
-#define VHT_SET_MCS_FOR_NSS(_mcsmap, _mcs, _nss) \
-	QDF_SET_BITS((_mcsmap), ((_nss) - 1) * VHT_NUM_BITS_PER_NSS, \
-		     VHT_NUM_BITS_PER_NSS, (_mcs))
-#define VHT_CLEAR_MCS_FOR_NSS(_mcsmap, _nss) \
-	VHT_SET_MCS_FOR_NSS((_mcsmap), VHT_MCS_DISABLE, (_nss))
-#define VHT_MCS_IS_NSS_ENABLED(_mcs, _nss) \
-	(VHT_GET_MCS_FOR_NSS((_mcs), (_nss)) != VHT_MCS_DISABLE)
-#define VHT_DISABLE_ALL_MCS_NSS 0xFFFF
-#define VHT_DISABLE_MCS_OVER_NSS(_nss) \
-	(VHT_DISABLE_ALL_MCS_NSS ^ (BIT((_nss) * VHT_NUM_BITS_PER_NSS) - 1))
-
 
 #define MBO_IE_ASSOC_DISALLOWED_SUBATTR_ID 0x04
 
@@ -1299,6 +1280,33 @@ void lim_log_vht_cap(struct mac_context *mac, tDot11fIEVHTCaps *pDot11f);
  */
 void lim_extract_ht_caps_txrx_nss(uint8_t *mcs_set, uint8_t *tx_nss,
 				  uint8_t *rx_nss);
+
+/**
+ * lim_update_dot11f_vht_caps_for_nss() - Update VHT capabilities for NSS
+ * @vht_cap: Pointer to VHT capabilities IE
+ * @tx_nss: Number of Spatial Streams for TX
+ * @rx_nss: Number of Spatial Streams for RX
+ *
+ * This function updates the VHT capabilities IE based on the number of
+ * spatial streams supported for transmission and reception. It disables
+ * MCS rates for NSS values higher than what's supported, and sets the
+ * appropriate data rates based on the supported NSS values.
+ *
+ * Return: None
+ */
+void lim_update_dot11f_vht_caps_for_nss(tDot11fIEVHTCaps *vht_cap,
+					uint8_t tx_nss, uint8_t rx_nss);
+
+/**
+ * lim_extract_vht_caps_txrx_nss() - API to extract Tx/Rx NSS from VHT caps
+ * @vht_caps: Pointer to VHT caps struct
+ * @tx_nss: Pointer to hold extracted Tx NSS
+ * @rx_nss: Pointer to hold extracted Rx NSS
+ *
+ * Return: void
+ */
+void lim_extract_vht_caps_txrx_nss(tDot11fIEVHTCaps *vht_caps, uint8_t *tx_nss,
+				   uint8_t *rx_nss);
 
 QDF_STATUS
 populate_dot11f_vht_caps(struct mac_context *mac, struct pe_session *pe_session,
