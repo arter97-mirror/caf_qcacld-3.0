@@ -303,9 +303,6 @@ void lim_prepare_and_send_del_sta_cnf(struct mac_context *mac,
 				      tSirResultCodes status_code,
 				      struct pe_session *pe_session);
 
-QDF_STATUS lim_extract_ap_capabilities(struct mac_context *mac, uint8_t *pIE,
-					  uint16_t ieLen,
-					  tpSirProbeRespBeacon beaconStruct);
 void lim_init_pre_auth_timer_table(struct mac_context *mac,
 				   tpLimPreAuthTable pPreAuthTimerTable);
 tpLimPreAuthNode lim_acquire_free_pre_auth_node(struct mac_context *mac,

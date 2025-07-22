@@ -3349,50 +3349,6 @@ lim_check_and_announce_join_success(struct mac_context *mac_ctx,
 }
 
 /**
- * lim_extract_ap_capabilities()
- *
- ***FUNCTION:
- * This function is called to extract all of the AP's capabilities
- * from the IEs received from it in Beacon/Probe Response frames
- *
- ***LOGIC:
- * This routine mimics the lim_extract_ap_capability() API. The difference here
- * is that this API returns the entire tSirProbeRespBeacon info as is. It is
- * left to the caller of this API to use this info as required
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- *
- * @param   mac         Pointer to Global MAC structure
- * @param   pIE          Pointer to starting IE in Beacon/Probe Response
- * @param   ieLen        Length of all IEs combined
- * @param   beaconStruct A pointer to tSirProbeRespBeacon that needs to be
- *                       populated
- * @return  status       A status reporting QDF_STATUS_SUCCESS or QDF_STATUS_E_FAILURE
- */
-QDF_STATUS lim_extract_ap_capabilities(struct mac_context *mac,
-					  uint8_t *pIE,
-					  uint16_t ieLen,
-					  tpSirProbeRespBeacon beaconStruct)
-{
-	qdf_mem_zero((uint8_t *) beaconStruct, sizeof(tSirProbeRespBeacon));
-
-	/* Parse the Beacon IE's, Don't try to parse if we dont have anything in IE */
-	if (ieLen > 0) {
-		if (QDF_STATUS_SUCCESS !=
-		    sir_parse_beacon_ie(mac, beaconStruct, pIE,
-					(uint32_t) ieLen)) {
-			pe_err("APCapExtract: Beacon parsing error!");
-			return QDF_STATUS_E_FAILURE;
-		}
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
  * lim_del_bss()
  *
  ***FUNCTION:
