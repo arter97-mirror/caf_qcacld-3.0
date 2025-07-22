@@ -402,7 +402,7 @@ static uint8_t lim_convert_phymode_to_dot11mode(enum wlan_phymode phymode)
  * Return: dot11mode.
  */
 static uint8_t lim_calculate_dot11_mode(struct mac_context *mac_ctx,
-					tSchBeaconStruct *bcn,
+					tDot11fBeaconIEs *bcn,
 					enum reg_wifi_band band)
 {
 	enum mlme_dot11_mode self_dot11_mode;
@@ -464,7 +464,7 @@ static uint8_t lim_calculate_dot11_mode(struct mac_context *mac_ctx,
 static void lim_fill_dot11mode(struct mac_context *mac_ctx,
 			       struct pe_session *ft_session,
 			       struct pe_session *pe_session,
-			       tSchBeaconStruct *bcn,
+			       tDot11fBeaconIEs *bcn,
 			       enum wlan_phymode bss_phymode)
 {
 	if (pe_session->ftPEContext.pFTPreAuthReq &&
@@ -499,7 +499,7 @@ static void lim_fill_dot11mode(struct mac_context *mac_ctx,
 static void lim_fill_dot11mode(struct mac_context *mac_ctx,
 			       struct pe_session *ft_session,
 			       struct pe_session *pe_session,
-			       tSchBeaconStruct *bcn,
+			       tDot11fBeaconIEs *bcn,
 			       enum wlan_phymode bss_phymode)
 {
 	ft_session->dot11mode =
@@ -617,14 +617,9 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 			       enum wlan_phymode bss_phymode)
 {
 	uint8_t bss_chan_id;
-	tSchBeaconStruct *pBeaconStruct;
 	uint8_t cb_mode;
 	QDF_STATUS status;
 	tDot11fBeaconIEs *bcn_ies = &bss_desc->bcn_ies;
-
-	pBeaconStruct = qdf_mem_malloc(sizeof(tSchBeaconStruct));
-	if (!pBeaconStruct)
-		return QDF_STATUS_E_NOMEM;
 
 	/* Retrieve the session that was already created and update the entry */
 	ft_session->limWmeEnabled = pe_session->limWmeEnabled;
@@ -637,10 +632,6 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 	/* Fields to be filled later */
 	ft_session->lim_join_req = NULL;
 	ft_session->smeSessionId = pe_session->smeSessionId;
-
-	lim_extract_ap_capabilities(mac, (uint8_t *)bss_desc->ieFields,
-			lim_get_ielen_from_bss_description(bss_desc),
-			pBeaconStruct);
 
 	qdf_mem_zero(&ft_session->wmm_params, sizeof(tDot11fIEWMMParams));
 	if (bcn_ies->WMMParams.present)
@@ -658,7 +649,7 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 	ft_session->curr_op_freq = bss_desc->chan_freq;
 	ft_session->limRFBand = lim_get_rf_band(ft_session->curr_op_freq);
 
-	lim_fill_dot11mode(mac, ft_session, pe_session, pBeaconStruct,
+	lim_fill_dot11mode(mac, ft_session, pe_session, bcn_ies,
 			   bss_phymode);
 	pe_debug("dot11mode: %d bss_phymode %d", ft_session->dot11mode,
 		 bss_phymode);
@@ -779,13 +770,13 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 					     pe_session);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to fill power info in ft session");
-		goto exit;
+		return status;
 	}
 
 	status = lim_set_session_channel_params(mac, ft_session);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to set session channel params");
-		goto exit;
+		return status;
 	}
 
 	ft_session->limReassocBssQosCaps =
@@ -822,9 +813,7 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 		mac->mlme_cfg->ht_caps.smps,
 		ft_session->supported_nss_1x1);
 
-exit:
-	qdf_mem_free(pBeaconStruct);
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

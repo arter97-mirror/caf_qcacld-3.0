@@ -2042,17 +2042,12 @@ lim_get_self_dot11_mode(struct mac_context *mac_ctx, enum QDF_OPMODE opmode,
 	return self_dot11_mode;
 }
 
-static bool
-lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
-			      struct bss_description *bss_desc,
-			      tDot11fBeaconIEs *ie_struct,
-			      uint8_t vdev_id)
+static bool lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
+					  struct bss_description *bss_desc,
+					  uint8_t vdev_id)
 {
 	struct scan_cache_entry *scan_entry;
 	bool is_eht_allowed;
-
-	if (!ie_struct->eht_cap.present)
-		return false;
 
 	scan_entry =
 		wlan_scan_entry_by_bssid_and_security(mac_ctx->pdev,
@@ -2084,10 +2079,10 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 
 static enum mlme_dot11_mode
 lim_get_bss_dot11_mode(struct mac_context *mac_ctx,
-		       struct bss_description *bss_desc,
-		       tDot11fBeaconIEs *ie_struct, uint8_t vdev_id)
+		       struct bss_description *bss_desc, uint8_t vdev_id)
 {
 	enum mlme_dot11_mode bss_dot11_mode;
+	tDot11fBeaconIEs *ie_struct = &bss_desc->bcn_ies;
 
 	switch (bss_desc->nwType) {
 	case eSIR_11B_NW_TYPE:
@@ -2116,8 +2111,7 @@ lim_get_bss_dot11_mode(struct mac_context *mac_ctx,
 		bss_dot11_mode = MLME_DOT11_MODE_11AX;
 
 	if (ie_struct->eht_cap.present &&
-	    lim_get_bss_11be_mode_allowed(mac_ctx, bss_desc, ie_struct,
-					  vdev_id))
+	    lim_get_bss_11be_mode_allowed(mac_ctx, bss_desc, vdev_id))
 		bss_dot11_mode = MLME_DOT11_MODE_11BE;
 
 	return bss_dot11_mode;
@@ -2269,7 +2263,6 @@ lim_handle_11g_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 static QDF_STATUS
 lim_handle_11n_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 			  enum mlme_dot11_mode *intersected_mode,
-			  tDot11fBeaconIEs *ie_struct,
 			  struct bss_description *bss_desc)
 {
 	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(bss_desc->chan_freq)) {
@@ -2285,7 +2278,7 @@ lim_handle_11n_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 	case MLME_DOT11_MODE_11AC:
 	case MLME_DOT11_MODE_11BE:
 	case MLME_DOT11_MODE_11AX:
-		if (ie_struct->HTCaps.present) {
+		if (bss_desc->bcn_ies.HTCaps.present) {
 			*intersected_mode = MLME_DOT11_MODE_11N;
 			break;
 		}
@@ -2314,7 +2307,6 @@ lim_handle_11n_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 static QDF_STATUS
 lim_handle_11ac_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 			   enum mlme_dot11_mode *intersected_mode,
-			   tDot11fBeaconIEs *ie_struct,
 			   struct bss_description *bss_desc)
 {
 	bool vht_capable = false;
@@ -2325,8 +2317,8 @@ lim_handle_11ac_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (IS_BSS_VHT_CAPABLE(ie_struct->VHTCaps) ||
-	    IS_BSS_VHT_CAPABLE(ie_struct->vendor_vht_ie.VHTCaps))
+	if (IS_BSS_VHT_CAPABLE(bss_desc->bcn_ies.VHTCaps) ||
+	    IS_BSS_VHT_CAPABLE(bss_desc->bcn_ies.vendor_vht_ie.VHTCaps))
 		vht_capable = true;
 
 	switch (bss_dot11_mode) {
@@ -2342,7 +2334,7 @@ lim_handle_11ac_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 			*intersected_mode = MLME_DOT11_MODE_11AC;
 			break;
 		}
-		if (ie_struct->HTCaps.present) {
+		if (bss_desc->bcn_ies.HTCaps.present) {
 			*intersected_mode = MLME_DOT11_MODE_11N;
 			break;
 		}
@@ -2371,13 +2363,12 @@ lim_handle_11ac_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 static QDF_STATUS
 lim_handle_11ax_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 			   enum mlme_dot11_mode *intersected_mode,
-			   tDot11fBeaconIEs *ie_struct,
 			   struct bss_description *bss_desc)
 {
 	bool vht_capable = false;
 
-	if (IS_BSS_VHT_CAPABLE(ie_struct->VHTCaps) ||
-	    IS_BSS_VHT_CAPABLE(ie_struct->vendor_vht_ie.VHTCaps))
+	if (IS_BSS_VHT_CAPABLE(bss_desc->bcn_ies.VHTCaps) ||
+	    IS_BSS_VHT_CAPABLE(bss_desc->bcn_ies.vendor_vht_ie.VHTCaps))
 		vht_capable = true;
 
 	switch (bss_dot11_mode) {
@@ -2391,7 +2382,7 @@ lim_handle_11ax_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 		*intersected_mode = MLME_DOT11_MODE_11AX;
 		break;
 	case MLME_DOT11_MODE_11BE:
-		if (ie_struct->he_cap.present) {
+		if (bss_desc->bcn_ies.he_cap.present) {
 			*intersected_mode = MLME_DOT11_MODE_11AX;
 			break;
 		}
@@ -2399,7 +2390,7 @@ lim_handle_11ax_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 			*intersected_mode = MLME_DOT11_MODE_11AC;
 			break;
 		}
-		if (ie_struct->HTCaps.present) {
+		if (bss_desc->bcn_ies.HTCaps.present) {
 			*intersected_mode = MLME_DOT11_MODE_11N;
 			break;
 		}
@@ -2500,7 +2491,6 @@ lim_handle_11g_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 static QDF_STATUS
 lim_handle_11n_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 			       enum mlme_dot11_mode *intersected_mode,
-			       tDot11fBeaconIEs *ie_struct,
 			       struct bss_description *bss_desc)
 {
 	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(bss_desc->chan_freq)) {
@@ -2516,7 +2506,7 @@ lim_handle_11n_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 	case MLME_DOT11_MODE_11AC:
 	case MLME_DOT11_MODE_11AX:
 	case MLME_DOT11_MODE_11BE:
-		if (ie_struct->HTCaps.present) {
+		if (bss_desc->bcn_ies.HTCaps.present) {
 			*intersected_mode = MLME_DOT11_MODE_11N;
 			break;
 		}
@@ -2539,7 +2529,6 @@ lim_handle_11n_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 static QDF_STATUS
 lim_handle_11ac_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 				enum mlme_dot11_mode *intersected_mode,
-				tDot11fBeaconIEs *ie_struct,
 				struct bss_description *bss_desc)
 {
 	bool vht_capable = false;
@@ -2550,8 +2539,8 @@ lim_handle_11ac_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (IS_BSS_VHT_CAPABLE(ie_struct->VHTCaps) ||
-	    IS_BSS_VHT_CAPABLE(ie_struct->vendor_vht_ie.VHTCaps))
+	if (IS_BSS_VHT_CAPABLE(bss_desc->bcn_ies.VHTCaps) ||
+	    IS_BSS_VHT_CAPABLE(bss_desc->bcn_ies.vendor_vht_ie.VHTCaps))
 		vht_capable = true;
 
 	switch (bss_dot11_mode) {
@@ -2642,7 +2631,6 @@ lim_get_intersected_dot11_mode_sta_ap(struct mac_context *mac_ctx,
 				      enum mlme_dot11_mode self_dot11_mode,
 				      enum mlme_dot11_mode bss_dot11_mode,
 				      enum mlme_dot11_mode *intersected_mode,
-				      tDot11fBeaconIEs *ie_struct,
 				      struct bss_description *bss_desc)
 {
 	switch (self_dot11_mode) {
@@ -2660,8 +2648,7 @@ lim_get_intersected_dot11_mode_sta_ap(struct mac_context *mac_ctx,
 						 intersected_mode, bss_desc);
 	case MLME_DOT11_MODE_11N:
 		return lim_handle_11n_dot11_mode(bss_dot11_mode,
-						 intersected_mode, ie_struct,
-						 bss_desc);
+						 intersected_mode, bss_desc);
 	case MLME_DOT11_MODE_11G_ONLY:
 		return lim_handle_11g_only_dot11_mode(bss_dot11_mode,
 						      intersected_mode,
@@ -2669,26 +2656,21 @@ lim_get_intersected_dot11_mode_sta_ap(struct mac_context *mac_ctx,
 	case MLME_DOT11_MODE_11N_ONLY:
 		return lim_handle_11n_only_dot11_mode(bss_dot11_mode,
 						       intersected_mode,
-						       ie_struct,
 						       bss_desc);
 	case MLME_DOT11_MODE_11AC:
 		return lim_handle_11ac_dot11_mode(bss_dot11_mode,
-						  intersected_mode, ie_struct,
-						  bss_desc);
+						  intersected_mode, bss_desc);
 	case MLME_DOT11_MODE_11AC_ONLY:
 		return lim_handle_11ac_only_dot11_mode(bss_dot11_mode,
 						       intersected_mode,
-						       ie_struct,
 						       bss_desc);
 	case MLME_DOT11_MODE_11AX:
 		return lim_handle_11ax_dot11_mode(bss_dot11_mode,
-						  intersected_mode,
-						  ie_struct,
-						  bss_desc);
+						  intersected_mode, bss_desc);
 	case MLME_DOT11_MODE_11AX_ONLY:
 		return lim_handle_11ax_only_dot11_mode(bss_dot11_mode,
 						       intersected_mode,
-						       ie_struct);
+						       &bss_desc->bcn_ies);
 	case MLME_DOT11_MODE_11BE:
 		return lim_handle_11be_dot11_mode(bss_dot11_mode,
 						  intersected_mode);
@@ -2780,33 +2762,33 @@ lim_intersect_phy_mode_to_scan_phy_mode(
 }
 #endif
 
-static QDF_STATUS
-lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
-		    tDot11fBeaconIEs *ie_struct, enum wlan_phymode phy_mode)
+static QDF_STATUS lim_fill_dot11_mode(struct mac_context *mac_ctx,
+				      struct pe_session *session,
+				      enum wlan_phymode phy_mode)
 {
-	struct bss_description *bss_desc =
-					&session->lim_join_req->bssDescription;
 	QDF_STATUS status;
 	enum mlme_dot11_mode self_dot11_mode;
 	enum mlme_dot11_mode bss_dot11_mode;
 	enum mlme_dot11_mode intersected_mode;
+	struct bss_description *bss_desc =
+				&session->lim_join_req->bssDescription;
 
 	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, session->opmode,
 						  session->vdev_id);
 
 	/* if user set dot11 mode by cmd, need to do intersect first */
-	self_dot11_mode =
-		   lim_intersect_user_dot11_mode(mac_ctx, session->opmode,
-						 session->vdev_id,
-						 self_dot11_mode);
+	self_dot11_mode = lim_intersect_user_dot11_mode(mac_ctx,
+							session->opmode,
+							session->vdev_id,
+							self_dot11_mode);
 
-	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct,
+	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc,
 						session->vdev_id);
 
 	status = lim_get_intersected_dot11_mode_sta_ap(mac_ctx, self_dot11_mode,
 						       bss_dot11_mode,
 						       &intersected_mode,
-						       ie_struct, bss_desc);
+						       bss_desc);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 	intersected_mode = lim_intersect_phy_mode_to_scan_phy_mode(
@@ -3471,7 +3453,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->enable_session_twt_support =
 					lim_enable_twt(mac_ctx, ie_struct);
 	lim_set_wfd_mode_for_p2p_cli(session, ie_struct);
-	status = lim_fill_dot11_mode(mac_ctx, session, ie_struct, phy_mode);
+	status = lim_fill_dot11_mode(mac_ctx, session, phy_mode);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		status = QDF_STATUS_E_FAILURE;
 		goto send;
@@ -5739,49 +5721,36 @@ QDF_STATUS cm_process_reassoc_req(struct scheduler_msg *msg)
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS
-lim_fill_preauth_req_dot11_mode(struct mac_context *mac_ctx,
-				tpSirFTPreAuthReq req,
-				uint8_t vdev_id)
+static QDF_STATUS lim_fill_preauth_req_dot11_mode(struct mac_context *mac_ctx,
+						  tpSirFTPreAuthReq req,
+						  uint8_t vdev_id)
 {
 	QDF_STATUS status;
-	tDot11fBeaconIEs *ie_struct;
 	enum mlme_dot11_mode self_dot11_mode;
 	enum mlme_dot11_mode bss_dot11_mode;
 	enum mlme_dot11_mode intersected_mode;
 	struct bss_description *bss_desc = req->pbssDescription;
 
-	status = wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
-						     &ie_struct);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		mlme_err("IE parsing failed");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, QDF_STA_MODE,
 						  vdev_id);
 	/* if user set dot11 mode by cmd, need to do intersect first */
-	self_dot11_mode =
-		   lim_intersect_user_dot11_mode(mac_ctx, QDF_STA_MODE,
-						 vdev_id, self_dot11_mode);
+	self_dot11_mode = lim_intersect_user_dot11_mode(mac_ctx, QDF_STA_MODE,
+							vdev_id,
+							self_dot11_mode);
 
-	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct,
-						vdev_id);
+	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, vdev_id);
 
 	status = lim_get_intersected_dot11_mode_sta_ap(mac_ctx, self_dot11_mode,
 						       bss_dot11_mode,
 						       &intersected_mode,
-						       ie_struct, bss_desc);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		qdf_mem_free(ie_struct);
+						       bss_desc);
+	if (QDF_IS_STATUS_ERROR(status))
 		return status;
-	}
 
 	req->dot11mode = intersected_mode;
 	pe_debug("vdev %d self dot11mode %d bss_dot11 mode %d intersected_mode %d",
 		 vdev_id, self_dot11_mode, bss_dot11_mode, intersected_mode);
 
-	qdf_mem_free(ie_struct);
 	return status;
 }
 
