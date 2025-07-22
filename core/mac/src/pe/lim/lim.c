@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,7 +37,6 @@
 #include "lim_process_probe_rsp_frame.c"
 #include "lim_process_sme_req_messages.c"
 #include "lim_prop_exts_utils.c"
-#include "lim_scan_result_utils.c"
 #include "lim_security_utils.c"
 #include "lim_send_management_frames.c"
 #include "lim_send_messages.c"

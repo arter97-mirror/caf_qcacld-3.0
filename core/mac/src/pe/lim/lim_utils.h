@@ -33,7 +33,6 @@
 #include "sir_debug.h"
 
 #include "lim_types.h"
-#include "lim_scan_result_utils.h"
 #include "lim_timer_utils.h"
 #include "lim_trace.h"
 #include "include/wlan_vdev_mlme.h"
@@ -780,17 +779,6 @@ QDF_STATUS lim_post_sm_state_update(struct mac_context *mac,
 
 void lim_delete_sta_context(struct mac_context *mac, struct scheduler_msg *limMsg);
 void lim_delete_dialogue_token_list(struct mac_context *mac);
-
-/**
- * lim_get_channel_from_beacon() - extract channel number
- * from beacon and convert to channel frequency
- * @mac: Pointer to Global MAC structure
- * @pBeacon: Pointer to beacon or probe rsp
- *
- * Return: channel frequency
- */
-uint32_t lim_get_channel_from_beacon(struct mac_context *mac,
-				     tpSchBeaconStruct pBeacon);
 
 /**
  * lim_get_nw_type() - Get type of the network from

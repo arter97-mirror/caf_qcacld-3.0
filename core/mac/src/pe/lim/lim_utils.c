@@ -4448,25 +4448,6 @@ tSirNwType lim_get_nw_type(struct mac_context *mac, uint32_t chan_freq, uint32_t
 	return nwType;
 }
 
-uint32_t lim_get_channel_from_beacon(struct mac_context *mac, tpSchBeaconStruct pBeacon)
-{
-	uint8_t chan_freq = 0;
-
-	if (pBeacon->he_op.oper_info_6g_present)
-		chan_freq = wlan_reg_chan_band_to_freq(mac->pdev,
-						   pBeacon->he_op.oper_info_6g.info.primary_ch,
-						   BIT(REG_BAND_6G));
-	else if (pBeacon->dsParamsPresent)
-		chan_freq = pBeacon->chan_freq;
-	else if (pBeacon->HTInfo.present)
-		chan_freq = wlan_reg_legacy_chan_to_freq(mac->pdev,
-							 pBeacon->HTInfo.primaryChannel);
-	else
-		chan_freq = pBeacon->chan_freq;
-
-	return chan_freq;
-}
-
 void lim_set_tspec_uapsd_mask_per_session(struct mac_context *mac,
 					  struct pe_session *pe_session,
 					  struct mac_ts_info *pTsInfo,

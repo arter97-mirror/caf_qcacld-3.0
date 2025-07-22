@@ -651,7 +651,6 @@ __lim_ext_scan_forward_bcn_probe_rsp(struct mac_context *pmac, uint8_t *rx_pkt_i
 	struct scheduler_msg         mmh_msg = {0};
 	tpSirMacMgmtHdr              hdr;
 	uint32_t frame_len;
-	struct bss_description *bssdescr;
 
 	result = qdf_mem_malloc(sizeof(*result) + ie_len);
 	if (!result)
@@ -685,19 +684,6 @@ __lim_ext_scan_forward_bcn_probe_rsp(struct mac_context *pmac, uint8_t *rx_pkt_i
 	/* Copy IE fields */
 	qdf_mem_copy((uint8_t *) &result->ap.ieData,
 			body + SIR_MAC_B_PR_SSID_OFFSET, ie_len);
-
-	frame_len = sizeof(*bssdescr) + ie_len - sizeof(bssdescr->ieFields[1]);
-	bssdescr = qdf_mem_malloc(frame_len);
-	if (!bssdescr) {
-		qdf_mem_free(result);
-		return;
-	}
-
-	qdf_mem_zero(bssdescr, frame_len);
-
-	lim_collect_bss_description(pmac, bssdescr, frame, rx_pkt_info, false);
-
-	qdf_mem_free(bssdescr);
 
 	mmh_msg.type = msg_type;
 	mmh_msg.bodyptr = result;

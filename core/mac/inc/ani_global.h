@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -583,7 +583,6 @@ struct lim_context {
 		(struct mac_context *mac, struct scheduler_msg *msg);
 	stop_roaming_fn_t stop_roaming_callback;
 	uint8_t retry_packet_cnt;
-	uint8_t beacon_probe_rsp_cnt_per_scan;
 	wlan_scan_requester req_id;
 	QDF_STATUS (*sme_bcn_rcv_callback)(hdd_handle_t hdd_handle,
 				struct wlan_beacon_report *beacon_report);

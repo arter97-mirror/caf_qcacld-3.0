@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -1014,9 +1013,6 @@ void lim_process_rx_scan_handler(struct wlan_objmgr_vdev *vdev,
 	case SIR_SCAN_EVENT_STARTED:
 		break;
 	case SIR_SCAN_EVENT_COMPLETED:
-		pe_debug("No.of beacons and probe response received per scan %d",
-			 mac_ctx->lim.beacon_probe_rsp_cnt_per_scan);
-		fallthrough;
 	case SIR_SCAN_EVENT_FOREIGN_CHANNEL:
 	case SIR_SCAN_EVENT_START_FAILED:
 		if ((mac_ctx->lim.req_id | PREAUTH_REQUESTOR_ID) ==

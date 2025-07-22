@@ -2645,20 +2645,6 @@ end:
 	return status;
 }
 
-/**
- * rrm_get_start_tsf() - Get the Start TSF.
- * @mac: pointer to mac context
- * @pStartTSF: store star TSF in this buffer.
- *
- * Return: None
- */
-void rrm_get_start_tsf(struct mac_context *mac, uint32_t *pStartTSF)
-{
-	pStartTSF[0] = mac->rrm.rrmPEContext.startTSF[0];
-	pStartTSF[1] = mac->rrm.rrmPEContext.startTSF[1];
-
-}
-
 /* -------------------------------------------------------------------- */
 /**
  * rrm_get_capabilities() - Returns a pointer to tpRRMCaps with all the

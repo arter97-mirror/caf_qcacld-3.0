@@ -818,8 +818,6 @@ struct bss_description {
 	uint8_t mdiePresent;
 	/* MDIE for 11r, picked from the beacons */
 	uint8_t mdie[SIR_MDIE_SIZE];
-	/* whether it is from a probe rsp */
-	uint8_t fProbeRsp;
 	struct scan_mbssid_info mbssid_info;
 #ifdef WLAN_FEATURE_FILS_SK
 	struct fils_ind_elements fils_info_element;

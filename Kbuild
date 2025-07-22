@@ -705,7 +705,6 @@ MAC_LIM_OBJS := $(MAC_SRC_DIR)/pe/lim/lim_aid_mgmt.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_process_probe_rsp_frame.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_process_sme_req_messages.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_prop_exts_utils.o \
-		$(MAC_SRC_DIR)/pe/lim/lim_scan_result_utils.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_security_utils.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_send_management_frames.o \
 		$(MAC_SRC_DIR)/pe/lim/lim_send_messages.o \

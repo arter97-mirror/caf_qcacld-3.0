@@ -2541,9 +2541,6 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 					   ieFields[0]) -
 				sizeof(bss_desc_ptr->length) + ie_len);
 
-	bss_desc_ptr->fProbeRsp = !(is_mlo_link ?
-					roam_synch_ind->is_link_beacon :
-					roam_synch_ind->is_beacon);
 	bss_desc_ptr->rssi = roam_synch_ind->rssi;
 
 	if (is_multi_link_roam(roam_synch_ind)) {

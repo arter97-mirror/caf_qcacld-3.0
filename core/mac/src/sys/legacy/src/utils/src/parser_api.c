@@ -13722,8 +13722,6 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 		mac_ctx->rrm.rrmPEContext.startTSF[1];
 	bss_desc->parentTSF =
 		scan_entry->rrm_parent_tsf;
-	bss_desc->fProbeRsp = (scan_entry->frm_subtype ==
-			  MGMT_SUBTYPE_PROBE_RESP);
 	bss_desc->adaptive_11r_ap = scan_entry->adaptive_11r_ap;
 	bss_desc->is_ml_ap  =
 			util_scan_entry_bv_ml_ie(scan_entry) ? true : false;

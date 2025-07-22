@@ -2205,7 +2205,6 @@ struct hdd_tx_powerboost {
  * @tdls_source_bitmap: bit map to set/reset TDLS by different sources
  * @tdls_umac_comp_active: Is the TDLS component active
  * @tdls_nap_active: Is napier specific tdls data path enabled
- * @beacon_probe_rsp_cnt_per_scan:
  * @last_scan_reject_vdev_id:
  * @last_scan_reject_reason:
  * @last_scan_reject_timestamp:
@@ -2462,7 +2461,6 @@ struct hdd_context {
 	unsigned long tdls_source_bitmap;
 	bool tdls_umac_comp_active;
 	bool tdls_nap_active;
-	uint8_t beacon_probe_rsp_cnt_per_scan;
 	uint8_t last_scan_reject_vdev_id;
 	enum scan_reject_states last_scan_reject_reason;
 	unsigned long last_scan_reject_timestamp;

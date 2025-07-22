@@ -696,7 +696,6 @@ _fixed_srcs = [
     "core/mac/src/pe/lim/lim_process_probe_rsp_frame.c",
     "core/mac/src/pe/lim/lim_process_sme_req_messages.c",
     "core/mac/src/pe/lim/lim_prop_exts_utils.c",
-    "core/mac/src/pe/lim/lim_scan_result_utils.c",
     "core/mac/src/pe/lim/lim_security_utils.c",
     "core/mac/src/pe/lim/lim_send_management_frames.c",
     "core/mac/src/pe/lim/lim_send_messages.c",

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2012, 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -79,8 +79,6 @@ void rrm_cache_mgmt_tx_power(struct mac_context *mac,
 
 tpRRMCaps rrm_get_capabilities(struct mac_context *mac,
 			       struct pe_session *pe_session);
-
-void rrm_get_start_tsf(struct mac_context *mac, uint32_t *pStartTSF);
 
 QDF_STATUS rrm_set_max_tx_power_rsp(struct mac_context *mac,
 				    struct scheduler_msg *limMsgQ);
