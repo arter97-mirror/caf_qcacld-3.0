@@ -143,6 +143,10 @@ config CNSS_FIG
 	bool "Enable CNSS_FIG"
 	default n
 
+config CNSS_FIG_V2
+	bool "Enable CNSS_FIG_V2"
+	default n
+
 config INCLUDE_HAL_KIWI
 	bool "Enable INCLUDE_HAL_KIWI"
 	default n

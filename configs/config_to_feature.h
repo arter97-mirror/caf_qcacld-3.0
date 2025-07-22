@@ -1617,6 +1617,10 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 #define QCA_WIFI_FIG (1)
 #endif
 
+#ifdef CONFIG_CNSS_FIG_V2
+#define QCA_WIFI_FIG_v2 (1)
+#endif
+
 #ifdef CONFIG_INCLUDE_HAL_KIWI
 #define INCLUDE_HAL_KIWI (1)
 #endif
