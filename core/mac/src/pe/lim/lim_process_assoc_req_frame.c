@@ -47,6 +47,7 @@
 #include "lim_mlo.h"
 #include "lim_process_fils.h"
 #include <son_api.h>
+#include "wlan_dnw_api.h"
 
 /**
  * lim_convert_supported_channels - Parses channel support IE
@@ -1750,6 +1751,9 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 
 				sta_ds->ch_width = QDF_MIN(sta_ds->ch_width,
 							   session->ch_width);
+				sta_ds->ch_width = wlan_dnw_update_bandwidth(
+							session->vdev,
+							sta_ds->ch_width);
 			}
 		} else {
 			sta_ds->htSupportedChannelWidthSet = 0;

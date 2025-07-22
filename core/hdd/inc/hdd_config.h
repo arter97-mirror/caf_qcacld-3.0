@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -283,6 +283,33 @@ enum hdd_dot11_mode {
 			CFG_INTERFACE_CHANGE_WAIT_DEFAULT, \
 			CFG_VALUE_OR_DEFAULT, \
 			"Interface change wait")
+
+#define CFG_IDLESHUTDOWN_BOOTSKIP_DEFAULT 0
+/*
+ * <ini>
+ * gInterfaceChangeWait_BootSkip  - Whether to skip idle shutdown
+ * during load phase.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to decide whether skip idle shutdown or not during
+ * driver load phase.
+ *
+ * Value 1 can be used to skip idle shutdown during driver loading phase.
+ *
+ * Related: gInterfaceChangeWait
+ *
+ * Supported Feature: All
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_INTERFACE_CHANGE_WAIT_BOOT_SKIP CFG_INI_BOOL( \
+		"gInterfaceChangeWait_BootSkip", \
+		CFG_IDLESHUTDOWN_BOOTSKIP_DEFAULT, \
+		"Idle shutdown skip during boot")
 
 #ifdef QCA_WIFI_EMULATION
 #define CFG_TIMER_MULTIPLIER_DEFAULT	100
@@ -1645,6 +1672,7 @@ enum host_log_level {
 	CFG(CFG_ENABLE_RAMDUMP_COLLECTION) \
 	CFG(CFG_ENABLE_UNIT_TEST_FRAMEWORK) \
 	CFG(CFG_INTERFACE_CHANGE_WAIT) \
+	CFG(CFG_INTERFACE_CHANGE_WAIT_BOOT_SKIP) \
 	CFG(CFG_INFORM_BSS_RSSI_RAW) \
 	CFG(CFG_MULTICAST_HOST_FW_MSGS) \
 	CFG(CFG_NUM_VDEV_ENABLE) \

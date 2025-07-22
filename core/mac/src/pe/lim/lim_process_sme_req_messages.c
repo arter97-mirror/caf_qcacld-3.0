@@ -7479,7 +7479,7 @@ void lim_delete_all_peers(struct pe_session *session)
 	for (i = 1; i < session->dph.dphHashTable.size; i++) {
 		sta_ds = dph_get_hash_entry(mac_ctx, i,
 					    &session->dph.dphHashTable);
-		if (!sta_ds)
+		if (!sta_ds || !sta_ds->valid)
 			continue;
 		lim_mlo_notify_peer_disconn(session, sta_ds);
 		status = lim_del_sta(mac_ctx, sta_ds, false, session);
@@ -9448,9 +9448,12 @@ lim_update_bcn_with_new_ch_width(struct mac_context *mac_ctx,
 
 	session->gLimOperatingMode.present = 1;
 	session->gLimOperatingMode.chanWidth = ch_width;
+	if (session->nss)
+		session->gLimOperatingMode.rxNSS = session->nss - 1;
 
-	pe_debug("ch width %d",
-		 session->gLimOperatingMode.chanWidth);
+	pe_debug("ch width %d nss %d",
+		 session->gLimOperatingMode.chanWidth,
+		 session->gLimOperatingMode.rxNSS);
 
 	session->bw_update_include_ch_sw_ie = true;
 	status = qdf_mc_timer_start(&session->ap_ecsa_timer,
@@ -9485,11 +9488,11 @@ lim_calculate_peer_ch_width(struct pe_session *session,
 			    uint8_t *mac_addr,
 			    enum phy_ch_width new_ch_width)
 {
-	enum phy_ch_width peer_org_bw, updated_bw;
+	enum phy_ch_width peer_max_bw, updated_bw;
 	struct peer_oper_mode_event data = {0};
 	QDF_STATUS status;
 
-	peer_org_bw = wlan_mlme_get_peer_ch_width(
+	peer_max_bw = wlan_mlme_get_max_peer_ch_width(
 				wlan_vdev_get_psoc(session->vdev), mac_addr);
 
 	updated_bw = new_ch_width;
@@ -9500,11 +9503,11 @@ lim_calculate_peer_ch_width(struct pe_session *session,
 	if (QDF_IS_STATUS_SUCCESS(status))
 		updated_bw = data.new_bw;
 
-	pe_debug("Peer: " QDF_MAC_ADDR_FMT " original bw: %d, updated bw: %d, new bw: %d",
-		 QDF_MAC_ADDR_REF(mac_addr), peer_org_bw, updated_bw,
+	pe_debug("Peer: " QDF_MAC_ADDR_FMT " dot11 max bw %d, peer updated bw %d, new target bw %d",
+		 QDF_MAC_ADDR_REF(mac_addr), peer_max_bw, updated_bw,
 		 new_ch_width);
 
-	return qdf_min(peer_org_bw, qdf_min(updated_bw, new_ch_width));
+	return qdf_min(peer_max_bw, qdf_min(updated_bw, new_ch_width));
 }
 
 static void
@@ -9553,6 +9556,7 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	struct scheduler_msg msg_return = {0};
 	uint8_t primary_channel;
 	struct ch_params ch_params = {0};
+	enum phy_ch_width non_eht_ch_width;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -9567,7 +9571,8 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 		goto fail;
 	}
 
-	if (session->opmode != QDF_SAP_MODE) {
+	if ((session->opmode != QDF_SAP_MODE) &&
+	    (session->opmode != QDF_P2P_GO_MODE)) {
 		pe_err("Invalid opmode %d", session->opmode);
 		goto fail;
 	}
@@ -9589,6 +9594,13 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 						ch_params.center_freq_seg0;
 	session->gLimChannelSwitch.ch_center_freq_seg1 =
 						ch_params.center_freq_seg1;
+
+	non_eht_ch_width = req->ch_width;
+	if (non_eht_ch_width >= CH_WIDTH_160MHZ &&
+	    wma_get_vht_ch_width() < WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
+		non_eht_ch_width = CH_WIDTH_80MHZ;
+	}
+	session->gLimChannelSwitch.legacy_ch_width = non_eht_ch_width;
 
 	wlan_mlme_set_ap_oper_ch_width(session->vdev, req->ch_width);
 
@@ -9952,13 +9964,22 @@ static bool
 lim_is_puncture_bitmap_changed(struct pe_session *session,
 			       struct channel_change_req *ch_change_req)
 {
-	uint16_t ori_puncture_bitmap;
 
-	ori_puncture_bitmap =
-		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap;
+	pe_debug("punct orig 0x%x target 0x%x", session->puncture_bitmap,
+		 ch_change_req->target_punc_bitmap);
 
-	return ori_puncture_bitmap != ch_change_req->target_punc_bitmap;
+	return session->puncture_bitmap != ch_change_req->target_punc_bitmap;
 }
+
+static void
+lim_change_puncture_bitmap(struct pe_session *session,
+			   struct channel_change_req *ch_change_req)
+{
+	pe_debug("punct 0x%x --> 0x%x", session->puncture_bitmap,
+		 ch_change_req->target_punc_bitmap);
+	session->puncture_bitmap = ch_change_req->target_punc_bitmap;
+}
+
 #else
 static inline bool
 lim_is_puncture_bitmap_changed(struct pe_session *session,
@@ -9966,6 +9987,13 @@ lim_is_puncture_bitmap_changed(struct pe_session *session,
 {
 	return false;
 }
+
+static void
+lim_change_puncture_bitmap(struct pe_session *session,
+			   struct channel_change_req *ch_change_req)
+{
+}
+
 #endif
 
 /**
@@ -10127,6 +10155,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 						    ch_change_req))) {
 		pe_err("Target channel and mode is same as current channel and mode channel freq %d and mode %d",
 		       session_entry->curr_op_freq, session_entry->ch_width);
+		lim_abort_channel_change(mac_ctx, ch_change_req->vdev_id);
 		return;
 	}
 
@@ -10137,9 +10166,10 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		session_entry->channelChangeReasonCode =
 			LIM_SWITCH_CHANNEL_MONITOR;
 
-	pe_nofl_debug("SAP CSA: %d ---> %d, ch_bw %d, nw_type %d, dot11mode %d, old dot11mode %d",
+	pe_nofl_debug("SAP CSA: %d --> %d, ch_bw %d --> %d, nw_type %d, dot11mode %d, old dot11mode %d",
 		      session_entry->curr_op_freq, target_freq,
-		      ch_change_req->ch_width, ch_change_req->nw_type,
+		      session_entry->ch_width, ch_change_req->ch_width,
+		      ch_change_req->nw_type,
 		      ch_change_req->dot11mode, session_entry->dot11mode);
 
 	/* Update ht/vht/he/eht capability as per the new dot11mode */
@@ -10226,6 +10256,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 			 ch_change_req->center_freq_seg0;
 	session_entry->ch_center_freq_seg1 =
 			ch_change_req->center_freq_seg1;
+	lim_change_puncture_bitmap(session_entry, ch_change_req);
 	session_entry->htSecondaryChannelOffset = ch_change_req->sec_ch_offset;
 	session_entry->htSupportedChannelWidthSet =
 		(ch_change_req->ch_width ? 1 : 0);
@@ -10763,6 +10794,7 @@ lim_notify_channel_switch_started(struct mac_context *mac_ctx,
 				session->gLimChannelSwitch.ch_width,
 				session->dot11mode);
 
+	ch_params.ch_width = session->gLimChannelSwitch.ch_width;
 	wlan_reg_set_channel_params_for_pwrmode(
 				wlan_vdev_get_pdev(session->vdev),
 				session->gLimChannelSwitch.sw_target_freq,
@@ -10859,6 +10891,9 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 		return;
 	}
 
+	qdf_mem_zero(&session_entry->gLimChannelSwitch,
+		     sizeof(session_entry->gLimChannelSwitch));
+
 	/* target channel */
 	session_entry->gLimChannelSwitch.primaryChannel =
 		wlan_reg_freq_to_chan(mac_ctx->pdev,
@@ -10925,6 +10960,7 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 				dfs_csa_ie_req->ch_params.center_freq_seg0;
 		session_entry->gLimChannelSwitch.ch_center_freq_seg1 =
 				dfs_csa_ie_req->ch_params.center_freq_seg1;
+		lim_set_chan_switch_puncture(session_entry, punct_bitmap);
 
 		pe_debug("EHT BW %d CCFS0 %d, CCFS1 %d",
 			 dfs_csa_ie_req->ch_params.ch_width,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -58,6 +58,7 @@
 #include "cfg_dlm.h"
 #include "cfg_pkt_capture.h"
 #include "wlan_action_oui_cfg.h"
+#include "wlan_pre_cac_cfg.h"
 
 /* Maintain Alphabetic order here while adding components */
 #define CFG_ALL \
@@ -77,5 +78,6 @@
 	CFG_PKT_CAPTURE_MODE_ALL \
 	CFG_TIME_SYNC_FTM_ALL \
 	CFG_ACTION_OUI \
-	CFG_MGMT_RX_SRNG
+	CFG_MGMT_RX_SRNG \
+	CFG_PRE_CAC_ALL
 

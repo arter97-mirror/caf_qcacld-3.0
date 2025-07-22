@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2301,7 +2301,9 @@ static void hdd_chan_change_started_notify(struct wlan_hdd_link_info *link_info,
 		link_id = wlan_vdev_get_link_id(vdev);
 
 	ucfg_mlme_get_sap_chn_switch_bcn_count(psoc, &ch_switch_count);
-	input_punc_bitmap = wlan_reg_get_input_punc_bitmap(ch_params);
+	input_punc_bitmap = wlan_reg_get_reg_punc_bitmap(ch_params);
+	if (!input_punc_bitmap)
+		input_punc_bitmap = wlan_reg_get_input_punc_bitmap(ch_params);
 
 	hdd_debug("channel switch started notify: link_id %d, vdev_id %d chan:%d width:%d freq1:%d freq2:%d punct 0x%x ch_switch_count %d",
 		  link_id, vdev_id, chandef.chan->center_freq, chandef.width,
@@ -3074,6 +3076,11 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		}
 
 		hdd_green_ap_add_sta(hdd_ctx);
+
+		if (!bAuthRequired)
+			hdd_son_deliver_peer_authorize_event(link_info,
+							     event->staMac.bytes);
+
 		hdd_son_deliver_assoc_disassoc_event(adapter,
 						     event->staMac,
 						     event->status,
@@ -7252,7 +7259,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	ret = 0;
 	if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) ||
 	    !WLAN_REG_IS_24GHZ_CH_FREQ(config->chan_freq)) {
-		ret = wlan_hdd_sap_cfg_dfs_override(adapter);
+		ret = wlan_hdd_sap_cfg_dfs_override(link_info);
 		if (ret < 0)
 			goto error;
 	}

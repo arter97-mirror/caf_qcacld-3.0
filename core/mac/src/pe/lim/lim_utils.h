@@ -239,6 +239,7 @@ static inline void lim_set_chan_switch_puncture(struct pe_session *session,
 	if (!session)
 		return;
 
+	pe_debug("0x%x", punct_bitmap);
 	session->gLimChannelSwitch.puncture_bitmap = punct_bitmap;
 }
 #else
@@ -1098,6 +1099,22 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
 				 uint8_t vdev_id,
 				 enum mlme_dot11_mode dot11_mode,
 				 enum QDF_OPMODE device_mode);
+
+/**
+ * lim_get_bw_for_mcs_set() - Get channel width for populate mcs set
+ * @mac_ctx: Pointer to mac context
+ * @session: Pointer to session entry
+ * @ch_width: Input channel width
+ *
+ * This function gets channel width for populate mcs set. This is for channel
+ * width upgrade.
+ *
+ * Return: Updated channel width
+ */
+enum phy_ch_width
+lim_get_bw_for_mcs_set(struct mac_context *mac_ctx,
+		       struct pe_session *session,
+		       enum phy_ch_width ch_width);
 
 /**
  * lim_update_connect_rsn_ie() - Update the connection RSN IE
@@ -3819,4 +3836,18 @@ QDF_STATUS lim_fill_complete_tpe_ie(enum phy_ch_width ch_width,
 				    uint16_t tpe_ie_len,
 				    tDot11fIEtransmit_power_env *tpe_ptr,
 				    uint16_t num_tpe, uint8_t *target);
+
+/**
+ * lim_set_session_channel_params() : set session channel params
+ * @mac: pointer to MAC
+ * @session: pointer to session
+ *
+ * check and update channel params of pe session by regulatory
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
+					  struct pe_session *session);
+
 #endif /* __LIM_UTILS_H */

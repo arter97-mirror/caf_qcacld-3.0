@@ -58,6 +58,7 @@
 #include "wlan_pre_cac_api.h"
 #include "target_if.h"
 #include "wlan_hdd_regulatory.h"
+#include <wlan_dnw_api.h>
 
 #define SAP_DEBUG
 static struct sap_context *gp_sap_ctx[SAP_MAX_NUM_SESSION];
@@ -1685,6 +1686,7 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 	bool is_dfs;
 	struct ch_params tmp_ch_params = {0};
 	enum channel_state state;
+	bool is_cac_reset_needed = true;
 
 	if (!sap_ctx) {
 		sap_err("Invalid SAP pointer");
@@ -1708,8 +1710,16 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 		sap_err("%u is unsafe channel freq", target_chan_freq);
 		return QDF_STATUS_E_FAULT;
 	}
-	sap_nofl_debug("SAP CSA: %d BW %d ---> %d BW %d ccfs1 %d, punc 0x%x, conn on 5GHz:%d, csa_reason:%s(%d) strict %d vdev %d",
+
+	if (sap_phymode_is_eht(sap_ctx->phyMode))
+		wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params, true);
+	wlan_reg_set_channel_params_for_pwrmode(mac->pdev,
+						sap_ctx->chan_freq,
+						0, &sap_ctx->ch_params,
+						REG_CURRENT_PWR_MODE);
+	sap_nofl_debug("SAP CSA: %d BW %d punct 0x%x ---> %d BW %d ccfs1 %d, punc 0x%x, conn on 5GHz:%d, csa_reason:%s(%d) strict %d vdev %d",
 		       sap_ctx->chan_freq, sap_ctx->ch_params.ch_width,
+		       wlan_reg_get_reg_punc_bitmap(&sap_ctx->ch_params),
 		       target_chan_freq, target_bw, ccfs1, punct_bitmap,
 		       policy_mgr_is_any_mode_active_on_band_along_with_session(
 		       mac->psoc, sap_ctx->sessionId, POLICY_MGR_BAND_5),
@@ -1748,12 +1758,17 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 						&tmp_ch_params,
 						REG_CURRENT_PWR_MODE);
 	if (sap_ctx->chan_freq == target_chan_freq &&
-	    sap_ctx->ch_params.ch_width == tmp_ch_params.ch_width &&
-	    wlan_reg_get_reg_punc_bitmap(&sap_ctx->ch_params) == punct_bitmap) {
-		sap_nofl_debug("target freq and bw %d not changed",
-			       tmp_ch_params.ch_width);
-		return QDF_STATUS_E_FAULT;
+	    sap_ctx->ch_params.ch_width == tmp_ch_params.ch_width) {
+		if (wlan_reg_get_reg_punc_bitmap(&sap_ctx->ch_params) ==
+		    punct_bitmap) {
+			sap_nofl_debug("target freq and bw %d not changed",
+				       tmp_ch_params.ch_width);
+			return QDF_STATUS_E_FAULT;
+		}
+
+		is_cac_reset_needed = false;
 	}
+
 	is_dfs = wlan_mlme_check_chan_param_has_dfs(
 			mac->pdev, &tmp_ch_params,
 			target_chan_freq);
@@ -1788,6 +1803,12 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 		 * state.
 		 */
 		if (sap_ctx->fsm_state == SAP_STARTED) {
+			/* Stop DFS No Wait if it's in progress */
+			if (wlan_is_dnw_in_progress(mac->pdev,
+						    sap_ctx->vdev_id))
+				wlan_dnw_handle_bss_stop(mac->pdev,
+							 sap_ctx->vdev_id);
+
 			status = wlansap_set_chan_params_for_csa(
 					mac, sap_ctx, target_chan_freq, ccfs1,
 					target_bw, punct_bitmap);
@@ -1832,7 +1853,8 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 			 * request was issued.
 			 */
 			sap_ctx->sap_radar_found_status = true;
-			sap_cac_reset_current_notify(sap_ctx);
+			if (is_cac_reset_needed)
+				sap_cac_reset_current_notify(sap_ctx);
 
 			/*
 			 * If hw_mode_status is QDF_STATUS_SUCCESS mean HW mode
@@ -1867,6 +1889,62 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_DNW
+QDF_STATUS sap_dnw_downgrade_channel_width(struct sap_context *sap_ctx,
+					   enum phy_ch_width target_bw) {
+	QDF_STATUS status, hw_mode_status;
+	struct mac_context *mac;
+
+	if (!sap_ctx) {
+		sap_err("Invalid SAP pointer");
+
+		return QDF_STATUS_E_FAULT;
+	}
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	if (sap_ctx->fsm_state != SAP_STARTED) {
+		sap_debug("sap isn't started, %d", sap_ctx->fsm_state);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = wlansap_set_chan_params_for_csa(mac, sap_ctx,
+						 sap_ctx->chan_freq, 0,
+						 target_bw,
+						 NO_SCHANS_PUNC);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	hw_mode_status = policy_mgr_check_and_set_hw_mode_for_channel_switch(
+				   mac->psoc, sap_ctx->sessionId,
+				   sap_ctx->chan_freq,
+				   POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP);
+
+	if (hw_mode_status == QDF_STATUS_E_FAILURE) {
+		sap_err("HW change required but failed to set hw mode");
+		return hw_mode_status;
+	}
+
+	status = policy_mgr_reset_chan_switch_complete_evt(mac->psoc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sap_debug("Reset channel switch evt fail");
+		return status;
+	}
+
+	mac->sap.SapDfsInfo.csaIERequired = true;
+	sap_ctx->sap_radar_found_status = true;
+	sap_cac_reset_current_notify(sap_ctx);
+
+	sap_start_csa_restart(mac, sap_ctx);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 QDF_STATUS wlan_sap_getstation_ie_information(struct sap_context *sap_ctx,
 					      uint32_t *len, uint8_t *buf)
@@ -1931,7 +2009,16 @@ static void
 wlansap_fill_channel_change_puncture(struct channel_change_req *req,
 				     struct ch_params *ch_param)
 {
-	req->target_punc_bitmap = ch_param->input_punc_bitmap;
+	sap_debug("target freq %d bw %d ccfs1 %d reg_punc 0x%x input_punc 0x%x",
+		  req->target_chan_freq,
+		  req->ch_width,
+		  req->center_freq_seg1,
+		  ch_param->reg_punc_bitmap,
+		  ch_param->input_punc_bitmap);
+	if (ch_param->reg_punc_bitmap)
+		req->target_punc_bitmap = ch_param->reg_punc_bitmap;
+	else
+		req->target_punc_bitmap = ch_param->input_punc_bitmap;
 }
 #else
 static inline void

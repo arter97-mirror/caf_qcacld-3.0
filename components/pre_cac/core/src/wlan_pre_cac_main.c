@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,8 @@
 #include "wlan_policy_mgr_api.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_mlme_api.h"
+#include <cfg_ucfg_api.h>
+#include "wlan_pre_cac_cfg.h"
 
 struct pre_cac_ops *glbl_pre_cac_ops;
 
@@ -524,6 +526,79 @@ exit:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_DNW
+static void dnw_cfg_init(struct wlan_objmgr_pdev *pdev,
+			 struct pre_cac_pdev_priv *pdev_priv)
+{
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+
+	if (!psoc) {
+		pre_cac_err("null psoc");
+		return;
+	}
+	pdev_priv->dnw_pdev_info.enabled = cfg_get(
+				psoc, CFG_ENABLE_DFS_NO_WAIT);
+	pre_cac_debug("DNW enable %d", pdev_priv->dnw_pdev_info.enabled);
+}
+#else
+static inline void dnw_cfg_init(struct wlan_objmgr_pdev *pdev,
+				struct pre_cac_pdev_priv *pdev_priv)
+{
+}
+#endif /* WLAN_FEATURE_DNW */
+
+QDF_STATUS
+pre_cac_pdev_create_notification(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	struct pre_cac_pdev_priv *pdev_priv;
+	QDF_STATUS status;
+
+	pdev_priv = qdf_mem_malloc(sizeof(*pdev_priv));
+	if (!pdev_priv)
+		return QDF_STATUS_E_NOMEM;
+
+	status = wlan_objmgr_pdev_component_obj_attach(
+				pdev, WLAN_UMAC_COMP_PRE_CAC,
+				pdev_priv, QDF_STATUS_SUCCESS);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pre_cac_err("Failed to attach pdev component obj");
+		goto free_pdev_priv;
+	}
+	pdev_priv->pdev = pdev;
+	dnw_cfg_init(pdev, pdev_priv);
+
+	return status;
+
+free_pdev_priv:
+	qdf_mem_free(pdev_priv);
+	return status;
+}
+
+QDF_STATUS
+pre_cac_pdev_destroy_notification(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	struct pre_cac_pdev_priv *pdev_priv;
+	QDF_STATUS status;
+
+	pdev_priv = wlan_objmgr_pdev_get_comp_private_obj(
+				pdev, WLAN_UMAC_COMP_PRE_CAC);
+	if (!pdev_priv) {
+		pre_cac_err("pdev priv is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = wlan_objmgr_pdev_component_obj_detach(
+					pdev, WLAN_UMAC_COMP_PRE_CAC,
+					pdev_priv);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pre_cac_err("Failed to detach pdev component obj");
+		return status;
+	}
+
+	qdf_mem_free(pdev_priv);
+	return status;
+}
+
 QDF_STATUS
 pre_cac_psoc_create_notification(struct wlan_objmgr_psoc *psoc, void *arg)
 {
@@ -595,6 +670,24 @@ QDF_STATUS pre_cac_init(void)
 		goto fail_destroy_psoc;
 	}
 
+	status = wlan_objmgr_register_pdev_create_handler(
+				WLAN_UMAC_COMP_PRE_CAC,
+				pre_cac_pdev_create_notification,
+				NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pre_cac_err("Failed to register pdev create handler");
+		goto fail_create_pdev;
+	}
+
+	status = wlan_objmgr_register_pdev_destroy_handler(
+				WLAN_UMAC_COMP_PRE_CAC,
+				pre_cac_pdev_destroy_notification,
+				NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pre_cac_err("Failed to register pdev delete handler");
+		goto fail_destroy_pdev;
+	}
+
 	status = wlan_objmgr_register_vdev_create_handler(
 				WLAN_UMAC_COMP_PRE_CAC,
 				pre_cac_vdev_create_notification, NULL);
@@ -617,6 +710,14 @@ fail_destroy_vdev:
 		pre_cac_vdev_create_notification, NULL);
 
 fail_create_vdev:
+	wlan_objmgr_unregister_pdev_destroy_handler(WLAN_UMAC_COMP_PRE_CAC,
+		pre_cac_pdev_destroy_notification, NULL);
+
+fail_destroy_pdev:
+	wlan_objmgr_unregister_pdev_create_handler(WLAN_UMAC_COMP_PRE_CAC,
+		pre_cac_pdev_create_notification, NULL);
+
+fail_create_pdev:
 	wlan_objmgr_unregister_psoc_destroy_handler(WLAN_UMAC_COMP_PRE_CAC,
 		pre_cac_psoc_destroy_notification, NULL);
 
@@ -643,6 +744,20 @@ void pre_cac_deinit(void)
 				pre_cac_vdev_create_notification, NULL);
 	if (QDF_IS_STATUS_ERROR(status))
 		pre_cac_err("Failed to unregister vdev create handler");
+
+	status = wlan_objmgr_unregister_pdev_destroy_handler(
+				WLAN_UMAC_COMP_PRE_CAC,
+				pre_cac_pdev_destroy_notification,
+				NULL);
+	if (QDF_IS_STATUS_ERROR(status))
+		pre_cac_err("Failed to unregister pdev destroy handler");
+
+	status = wlan_objmgr_unregister_pdev_create_handler(
+				WLAN_UMAC_COMP_PRE_CAC,
+				pre_cac_pdev_create_notification,
+				NULL);
+	if (QDF_IS_STATUS_ERROR(status))
+		pre_cac_err("Failed to unregister pdev create handler");
 
 	status = wlan_objmgr_unregister_psoc_destroy_handler(
 				WLAN_UMAC_COMP_PRE_CAC,

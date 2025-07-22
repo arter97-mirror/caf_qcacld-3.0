@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1974,11 +1974,30 @@ static bool lim_sta_follow_csa(struct pe_session *session_entry,
 			       tLimChannelSwitchInfo *lim_ch_switch,
 			       struct ch_params ch_params)
 {
+	enum phy_ch_width max_ch_width, assoc_ch_width;
+	struct mlme_legacy_priv *mlme_priv;
+
 	if (session_entry->curr_op_freq == csa_params->csa_chan_freq &&
 	    session_entry->ch_width == ch_params.ch_width &&
 	    lim_is_puncture_same(lim_ch_switch, session_entry)) {
-		pe_debug("Ignore CSA, no change in ch, bw and puncture");
-		return false;
+		mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
+		if (!mlme_priv) {
+			pe_err("null mlme priv");
+			return false;
+		}
+		assoc_ch_width =
+			mlme_priv->connect_info.assoc_chan_info.assoc_ch_width;
+		max_ch_width = wlan_mlme_get_max_bw();
+		if (assoc_ch_width == CH_WIDTH_80MHZ &&
+		    ch_params.ch_width == CH_WIDTH_160MHZ &&
+		    max_ch_width >= CH_WIDTH_160MHZ) {
+			pe_debug("BW upgrade %d->%d",
+				 assoc_ch_width,
+				 ch_params.ch_width);
+		} else {
+			pe_debug("Ignore CSA, no change in ch, bw and puncture");
+			return false;
+		}
 	}
 	return true;
 }
@@ -2394,13 +2413,13 @@ void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
 	if (wlan_vdev_mlme_is_mlo_vdev(session_entry->vdev)) {
 		link_id = wlan_vdev_get_link_id(session_entry->vdev);
 		update_csa_link_info(session_entry->vdev, link_id, csa_params);
-	} else {
-		mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
-		if (!mlme_priv)
-			return;
-		mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
-						csa_params->new_ch_width;
 	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session_entry->vdev);
+	if (!mlme_priv)
+		goto send_event;
+	mlme_priv->connect_info.assoc_chan_info.assoc_ch_width =
+						csa_params->new_ch_width;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_params->csa_chan_freq) &&
 	    session_entry->dot11mode == MLME_DOT11_MODE_11A)
