@@ -6525,65 +6525,7 @@ parse_both_tpe_present:
 	}
 }
 
-void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
-				    struct pe_session *session,
-				    struct bss_description *bss_desc,
-				    bool *has_tpe_updated)
-{
-	tDot11fBeaconIEs *bcn_ie;
-	uint32_t buf_len;
-	uint8_t *buf;
-	int status;
-
-	bcn_ie = qdf_mem_malloc(sizeof(*bcn_ie));
-	if (!bcn_ie)
-		return;
-
-	buf_len = lim_get_ielen_from_bss_description(bss_desc);
-	buf = (uint8_t *)bss_desc->ieFields;
-	status = dot11f_unpack_beacon_i_es(mac, buf, buf_len, bcn_ie, false);
-	if (DOT11F_FAILED(status)) {
-		pe_err("Failed to parse Beacon IEs (0x%08x, %d bytes):",
-		       status, buf_len);
-		qdf_mem_free(bcn_ie);
-		return;
-	} else if (DOT11F_WARNED(status)) {
-		pe_debug("warnings (0x%08x, %d bytes):", status, buf_len);
-	}
-
-	status = lim_strip_and_decode_eht_op(buf, buf_len, &bcn_ie->eht_op,
-					     bcn_ie->VHTOperation,
-					     bcn_ie->he_op,
-					     bcn_ie->HTInfo);
-	if (status != QDF_STATUS_SUCCESS) {
-		pe_err("Failed to extract eht op");
-		return;
-	}
-
-	status = lim_strip_and_decode_eht_cap(buf, buf_len, &bcn_ie->eht_cap,
-					      bcn_ie->he_cap,
-					      session->curr_op_freq, false);
-	if (status != QDF_STATUS_SUCCESS) {
-		pe_err("Failed to extract eht cap");
-		return;
-	}
-
-	status = lim_strip_and_decode_tpe_ie(buf, buf_len,
-					     bcn_ie->transmit_power_env,
-					     &bcn_ie->num_transmit_power_env);
-	if (status != QDF_STATUS_SUCCESS) {
-		pe_err("Failed to extract TPE IE");
-		return;
-	}
-
-	lim_parse_tpe_ie(mac, session, bcn_ie->transmit_power_env,
-			 bcn_ie->num_transmit_power_env, &bcn_ie->he_op,
-			 has_tpe_updated);
-	qdf_mem_free(bcn_ie);
-}
-
-uint32_t lim_get_num_pwr_levels(bool is_psd,
-				enum phy_ch_width ch_width)
+uint32_t lim_get_num_pwr_levels(bool is_psd, enum phy_ch_width ch_width)
 {
 	uint32_t num_pwr_levels = 0;
 

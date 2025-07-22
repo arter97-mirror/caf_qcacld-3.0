@@ -721,8 +721,10 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			goto end;
 		}
 
-		lim_process_tpe_ie_from_beacon(mac_ctx, session,
-					       bss, &tpe_change);
+		lim_parse_tpe_ie(mac_ctx, session,
+				 bss->bcn_ies.transmit_power_env,
+				 bss->bcn_ies.num_transmit_power_env,
+				 &bss->bcn_ies.he_op, &tpe_change);
 		if (!tpe_change) {
 			pe_nofl_rl_debug("no change in TPE IE");
 			goto end;

@@ -3305,20 +3305,6 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		      bool *has_tpe_updated);
 
 /**
- * lim_process_tpe_ie_from_beacon() - get the TPE IE from the BSS descriptor
- * @mac_ctx: mac context
- * @session: pe session
- * @bss_desc: pointer to BSS descriptor
- * @has_tpe_updated: flag set to true only if the TPE values have changed
- *
- * Return: void
- */
-void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
-				    struct pe_session *session,
-				    struct bss_description *bss_desc,
-				    bool *has_tpe_updated);
-
-/**
  * lim_is_ap_power_type_6g_invalid() - Check if the AP power type for 6 GHz
  * channel is invalid
  * @session: pe session

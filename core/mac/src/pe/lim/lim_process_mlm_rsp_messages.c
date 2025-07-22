@@ -3185,14 +3185,16 @@ lim_process_bcn_tpe_and_set_tpc(struct mac_context *mac_ctx,
 			return;
 		}
 
-		lim_process_tpe_ie_from_beacon(mac_ctx, session_entry, bss,
-					       &tpe_change);
-
 		mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session_entry->vdev);
 		if (!mlme_obj) {
 			pe_err("vdev component object is NULL");
 			return;
 		}
+
+		lim_parse_tpe_ie(mac_ctx, session_entry,
+				 bss->bcn_ies.transmit_power_env,
+				 bss->bcn_ies.num_transmit_power_env,
+				 &bss->bcn_ies.he_op, &tpe_change);
 
 		if (wlan_reg_is_6ghz_chan_freq(session_entry->curr_op_freq) &&
 		    session_entry->best_6g_power_type == REG_INDOOR_ENABLED_AP) {

@@ -3282,7 +3282,10 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	/* Next routine may update nss based on dot11Mode */
 
 	lim_ft_prepare_add_bss_req(mac_ctx, ft_session_ptr, bss_desc);
-	lim_process_tpe_ie_from_beacon(mac_ctx, ft_session_ptr, bss_desc, &tpe_change);
+	lim_parse_tpe_ie(mac_ctx, ft_session_ptr,
+			 bss_desc->bcn_ies.transmit_power_env,
+			 bss_desc->bcn_ies.num_transmit_power_env,
+			 &bss_desc->bcn_ies.he_op, &tpe_change);
 
 	if (session_ptr->is11Rconnection)
 		lim_fill_fils_ft(session_ptr, ft_session_ptr);

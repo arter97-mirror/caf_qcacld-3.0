@@ -11893,10 +11893,11 @@ lim_set_tpc_power(struct mac_context *mac_ctx, struct pe_session *session,
 		return false;
 
 	if ((session->opmode == QDF_STA_MODE ||
-	     session->opmode == QDF_P2P_CLIENT_MODE) &&
-	     bss_desc)
-		lim_process_tpe_ie_from_beacon(mac_ctx, session,
-					       bss_desc, &tpe_change);
+	     session->opmode == QDF_P2P_CLIENT_MODE) && bss_desc)
+		lim_parse_tpe_ie(mac_ctx, session,
+				 bss_desc->bcn_ies.transmit_power_env,
+				 bss_desc->bcn_ies.num_transmit_power_env,
+				 &bss_desc->bcn_ies.he_op, &tpe_change);
 
 	if (session->opmode == QDF_SAP_MODE ||
 	    session->opmode == QDF_P2P_GO_MODE)
