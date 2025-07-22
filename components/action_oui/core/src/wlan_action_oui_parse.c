@@ -474,27 +474,39 @@ validate_and_convert_capability(uint8_t *token,
 QDF_STATUS
 action_oui_extension_store(struct action_oui_psoc_priv *psoc_priv,
 			   struct action_oui_priv *oui_priv,
-			   struct action_oui_extension *ext)
+			   struct action_oui_extension *ext,
+			   uint8_t oui_ext_num)
 {
 	struct action_oui_extension_priv *ext_priv;
+	uint32_t total_num, max_num, i;
+
+	max_num = wlan_action_oui_max_ext_num(oui_priv->id);
 
 	qdf_mutex_acquire(&oui_priv->extension_lock);
-	if (qdf_list_size(&oui_priv->extension_list) ==
-			  wlan_action_oui_max_ext_num(oui_priv->id)) {
+	total_num = qdf_list_size(&oui_priv->extension_list) + oui_ext_num;
+	if (total_num > max_num) {
 		qdf_mutex_release(&oui_priv->extension_lock);
-		action_oui_err("Reached maximum OUI extensions");
+		action_oui_err("Reached maximum OUI ext num %d/%d",
+			       total_num, max_num);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	ext_priv = qdf_mem_malloc(sizeof(*ext_priv));
-	if (!ext_priv) {
-		qdf_mutex_release(&oui_priv->extension_lock);
-		return QDF_STATUS_E_NOMEM;
+	for (i = 0; i < oui_ext_num; i++) {
+		ext_priv = qdf_mem_malloc(sizeof(*ext_priv));
+		if (!ext_priv) {
+			qdf_mutex_release(&oui_priv->extension_lock);
+			action_oui_fatal("malloc %zu B fail for %d/%d oui ext",
+					 sizeof(*ext_priv), i + 1, oui_ext_num);
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		ext_priv->extension = ext[i];
+		qdf_list_insert_back(&oui_priv->extension_list,
+				     &ext_priv->item);
+		psoc_priv->total_extensions++;
+		wlan_action_oui_extension_dump(&ext[i]);
 	}
 
-	ext_priv->extension = *ext;
-	qdf_list_insert_back(&oui_priv->extension_list, &ext_priv->item);
-	psoc_priv->total_extensions++;
 	qdf_mutex_release(&oui_priv->extension_lock);
 
 	return QDF_STATUS_SUCCESS;
@@ -614,7 +626,8 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 			continue;
 
 		ext.and_oui_index = and_oui_index;
-		status = action_oui_extension_store(psoc_priv, oui_priv, &ext);
+		status = action_oui_extension_store(psoc_priv, oui_priv, &ext,
+						    1);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			valid = false;
 			action_oui_err("sme set of extension: %u for action oui: %u failed",

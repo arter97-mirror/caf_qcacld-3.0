@@ -35905,6 +35905,17 @@ wlan_hdd_parse_action_oui_op_attr(struct nlattr *tb2[],
 }
 #endif
 
+/**
+ * _wlan_hdd_cfg80211_set_action_oui - Set action oui configuration
+ * @wiphy: The wiphy device
+ * @wdev: The wireless device
+ * @data: The data to be processed
+ * @data_len: The length of the data
+ *
+ * This function sets the action oui configuration for the given wiphy device.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
 static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 					     struct wireless_dev *wdev,
 					     const void *data,
@@ -35918,12 +35929,13 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_MAX + 1];
 	enum QDF_GLOBAL_MODE curr_mode;
 	uint8_t action_oui_op;
-	struct action_oui_extension action_oui_ext = {0};
+	struct action_oui_extension *action_oui_ext = NULL;
+	struct action_oui_extension *action_oui_buf = NULL;
 	uint32_t rem, action_oui_id;
 	uint8_t i = 0;
 	struct nlattr *cur_attr = NULL;
 	int8_t *nested_data;
-	uint32_t length = 0;
+	uint32_t length = 0, mem_size = 0;
 	QDF_STATUS status;
 
 	hdd_enter_dev(wdev->netdev);
@@ -35952,7 +35964,7 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 		goto exit;
 	}
 
-	/* oui id and oui op are manadatory params */
+	/* oui id and oui op are mandatory params */
 	if (!tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_ACTION] ||
 	    !tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_OP]) {
 		hdd_err("OUI or OUI OP not present");
@@ -35998,10 +36010,18 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 		goto disable_dsmps;
 	}
 
+	mem_size = MAX_ALLOWED_OUI * sizeof(struct action_oui_extension);
+	action_oui_buf = qdf_mem_malloc(mem_size);
+	if (!action_oui_buf) {
+		hdd_err("malloc %dB fail", mem_size);
+		ret = -ENOMEM;
+		goto exit;
+	}
+
+	action_oui_ext = action_oui_buf;
 	nla_for_each_nested(cur_attr,
 			    tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_LIST],
 			    rem) {
-		qdf_mem_set(&action_oui_ext, sizeof(action_oui_ext), 0);
 		if (wlan_cfg80211_nla_parse(
 				tb2,
 				QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_MAX,
@@ -36014,8 +36034,8 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 		if (i >= MAX_ALLOWED_OUI) {
 			hdd_debug("MAX OUI can be handled : %d",
 				  MAX_ALLOWED_OUI);
-			/* return success in this case with 100 stored OUI's*/
-			goto disable_dsmps;
+			ret = -EINVAL;
+			goto exit;
 		}
 
 		if (tb2[FEATURE_CONFIG_EXT_OUI]) {
@@ -36025,7 +36045,7 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 			status =
 				ucfg_action_oui_add_token(ACTION_OUI_TOKEN,
 							  nested_data, length,
-							  &action_oui_ext);
+							  action_oui_ext);
 
 			if (QDF_IS_STATUS_ERROR(status)) {
 				ret = -EINVAL;
@@ -36041,13 +36061,13 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 			status = ucfg_action_oui_add_token(
 						  ACTION_OUI_DATA_TOKEN,
 						  nested_data, length,
-						  &action_oui_ext);
+						  action_oui_ext);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				ret = -EINVAL;
 				goto exit;
 			}
 
-			/* Data mask is manadatory if data is present */
+			/* Data mask is mandatory if data is present */
 			if (!tb2[FEATURE_CONFIG_EXT_DATA_MASK]) {
 				hdd_err("data mask missing");
 				ret = -EINVAL;
@@ -36065,28 +36085,29 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 			status = ucfg_action_oui_add_token(
 						ACTION_OUI_DATA_BIT_MASK_TOKEN,
 						nested_data, length,
-						&action_oui_ext);
+						action_oui_ext);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				ret = -EINVAL;
 				goto exit;
 			}
 		}
-		ret = wlan_hdd_parse_action_oui_op_attr(tb2, &action_oui_ext);
+		ret = wlan_hdd_parse_action_oui_op_attr(tb2, action_oui_ext);
 		if (ret) {
 			ret = -EINVAL;
 			goto exit;
 		}
 
-		hdd_debug("save data for %d action oui", i);
-		status = ucfg_action_oui_extension_store(
-					hdd_ctx->psoc,
-					ACTION_OUI_ENABLE_DYNAMIC_SMPS,
-					&action_oui_ext);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			ret = -EINVAL;
-			goto exit;
-		}
 		i++;
+		action_oui_ext++;
+	}
+
+	hdd_debug("oui num %d", i);
+	status = ucfg_action_oui_extension_store(hdd_ctx->psoc,
+						 ACTION_OUI_ENABLE_DYNAMIC_SMPS,
+						 action_oui_buf, i);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		ret = -EINVAL;
+		goto exit;
 	}
 
 disable_dsmps:
@@ -36096,6 +36117,9 @@ disable_dsmps:
 				  adapter->deflink->vdev_id,
 				  QDF_STA_MODE);
 exit:
+	if (action_oui_buf)
+		qdf_mem_free(action_oui_buf);
+
 	return ret;
 }
 
