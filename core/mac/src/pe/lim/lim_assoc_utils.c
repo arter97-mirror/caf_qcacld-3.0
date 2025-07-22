@@ -525,13 +525,6 @@ lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
 
 		sir_copy_mac_addr(nullAddr, pe_session->bssId);
 
-		/* Free up buffer allocated for JoinReq held by */
-		/* MLM state machine */
-		if (pe_session->pLimMlmJoinReq) {
-			qdf_mem_free(pe_session->pLimMlmJoinReq);
-			pe_session->pLimMlmJoinReq = NULL;
-		}
-
 		pe_session->limAID = 0;
 	}
 
@@ -3322,10 +3315,6 @@ lim_check_and_announce_join_success(struct mac_context *mac_ctx,
 		mlm_join_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
 		session_entry->limMlmState = eLIM_MLM_IDLE_STATE;
 		mlm_join_cnf.sessionId = session_entry->peSessionId;
-		if (session_entry->pLimMlmJoinReq) {
-			qdf_mem_free(session_entry->pLimMlmJoinReq);
-			session_entry->pLimMlmJoinReq = NULL;
-		}
 		lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF,
 				(uint32_t *) &mlm_join_cnf);
 		return;

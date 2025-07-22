@@ -3848,25 +3848,14 @@ static QDF_STATUS
 lim_send_connect_req_to_mlm(struct pe_session *session)
 {
 	tLimMlmJoinReq *mlm_join_req;
-	uint32_t len;
 	QDF_STATUS status;
 
-	len = sizeof(tLimMlmJoinReq) +
-			session->lim_join_req->bssDescription.length + 2;
-	mlm_join_req = qdf_mem_malloc(len);
+	mlm_join_req = qdf_mem_malloc(sizeof(tLimMlmJoinReq));
 	if (!mlm_join_req)
 		return QDF_STATUS_E_FAILURE;
 
 	/* PE SessionId is stored as a part of JoinReq */
 	mlm_join_req->sessionId = session->peSessionId;
-
-	mlm_join_req->bssDescription.length =
-		session->lim_join_req->bssDescription.length;
-
-	qdf_mem_copy((uint8_t *) &mlm_join_req->bssDescription.bssId,
-		(uint8_t *)
-		&session->lim_join_req->bssDescription.bssId,
-		session->lim_join_req->bssDescription.length + 2);
 
 	/* Issue LIM_MLM_JOIN_REQ to MLM */
 	status = lim_send_join_req(session, mlm_join_req);

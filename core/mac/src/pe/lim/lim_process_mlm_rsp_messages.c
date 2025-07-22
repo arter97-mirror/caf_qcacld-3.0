@@ -3316,10 +3316,6 @@ err:
 			     (uint32_t *)&assoc_cnf);
 
 	if (session_entry) {
-		if (session_entry->pLimMlmJoinReq) {
-			qdf_mem_free(session_entry->pLimMlmJoinReq);
-			session_entry->pLimMlmJoinReq = NULL;
-		}
 		if (session_entry->lim_join_req) {
 			qdf_mem_free(session_entry->lim_join_req);
 			session_entry->lim_join_req = NULL;
@@ -3412,8 +3408,7 @@ static void lim_process_switch_channel_join_req(
 		goto error;
 	}
 
-	if ((!session_entry) || (!session_entry->pLimMlmJoinReq) ||
-	    (!session_entry->lim_join_req)) {
+	if (!session_entry || !session_entry->lim_join_req) {
 		pe_err("invalid pointer!!");
 		goto error;
 	}
@@ -3467,29 +3462,27 @@ static void lim_process_switch_channel_join_req(
 	* last disconnection was caused by HB failure.
 	*/
 	if (mac_ctx->mlme_cfg->sta.deauth_before_connection) {
-		int apCount;
+		int ap_cnt;
 
-		for (apCount = 0; apCount < 2; apCount++) {
+		for (ap_cnt = 0; ap_cnt < 2; ap_cnt++) {
+			if (qdf_mem_cmp(bss->bssId,
+					mac_ctx->lim.gLimHeartBeatApMac[ap_cnt],
+					sizeof(tSirMacAddr)))
+				continue;
 
-			if (!qdf_mem_cmp(session_entry->pLimMlmJoinReq->bssDescription.bssId,
-				mac_ctx->lim.gLimHeartBeatApMac[apCount], sizeof(tSirMacAddr))) {
+			pe_err("Index %d Sessionid: %d Send deauth on channel freq %d to BSSID: " QDF_MAC_ADDR_FMT,
+			       ap_cnt, session_entry->peSessionId,
+			       session_entry->curr_op_freq,
+			       QDF_MAC_ADDR_REF(bss->bssId));
 
-				pe_err("Index %d Sessionid: %d Send deauth on "
-				"channel freq %d to BSSID: " QDF_MAC_ADDR_FMT,
-				apCount,
-				session_entry->peSessionId,
-				session_entry->curr_op_freq,
-				QDF_MAC_ADDR_REF(
-				session_entry->pLimMlmJoinReq->bssDescription.bssId));
+			lim_send_deauth_mgmt_frame(mac_ctx,
+						   REASON_UNSPEC_FAILURE,
+						   bss->bssId, session_entry,
+						   false);
 
-				lim_send_deauth_mgmt_frame(mac_ctx, REASON_UNSPEC_FAILURE,
-					session_entry->pLimMlmJoinReq->bssDescription.bssId,
-					session_entry, false);
-
-				qdf_mem_zero(mac_ctx->lim.gLimHeartBeatApMac[apCount],
-					sizeof(tSirMacAddr));
-				break;
-			}
+			qdf_mem_zero(mac_ctx->lim.gLimHeartBeatApMac[ap_cnt],
+				     sizeof(tSirMacAddr));
+			break;
 		}
 	}
 
@@ -3528,8 +3521,7 @@ static void lim_process_switch_channel_join_req(
 		 session_entry->vdev_id, session_entry->curr_op_freq,
 		 QDF_SSID_REF(session_entry->ssId.length,
 			      session_entry->ssId.ssId),
-		 QDF_MAC_ADDR_REF(
-		 session_entry->pLimMlmJoinReq->bssDescription.bssId));
+		 QDF_MAC_ADDR_REF(bss->bssId));
 
 	/*
 	 * We need to wait for probe response, so start join
@@ -3567,10 +3559,6 @@ static void lim_process_switch_channel_join_req(
 	return;
 error:
 	if (session_entry) {
-		if (session_entry->pLimMlmJoinReq) {
-			qdf_mem_free(session_entry->pLimMlmJoinReq);
-			session_entry->pLimMlmJoinReq = NULL;
-		}
 		if (session_entry->lim_join_req) {
 			qdf_mem_free(session_entry->lim_join_req);
 			session_entry->lim_join_req = NULL;

@@ -456,7 +456,6 @@ struct punc_chan_info {
  * @pLimStartBssReq:
  * @lim_join_req: handle to sme join req
  * @pLimReAssocReq: handle to sme reassoc req
- * @pLimMlmJoinReq: handle to MLM join Req
  * @pLimMlmReassocRetryReq: keep reasoc req for retry
  * @pLimMlmReassocReq: handle to MLM reassoc Req
  * @channelChangeReasonCode:
@@ -771,7 +770,6 @@ struct pe_session {
 	struct start_bss_config *pLimStartBssReq;
 	struct join_req *lim_join_req;
 	struct join_req *pLimReAssocReq;
-	tpLimMlmJoinReq pLimMlmJoinReq;
 	void *pLimMlmReassocRetryReq;
 	void *pLimMlmReassocReq;
 	uint16_t channelChangeReasonCode;

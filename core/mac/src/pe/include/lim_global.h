@@ -152,12 +152,6 @@ typedef struct sLimMlmAuthReq {
 
 typedef struct sLimMlmJoinReq {
 	uint8_t sessionId;
-	struct bss_description bssDescription;
-	/*
-	 * WARNING: Pls make bssDescription as last variable in struct
-	 * tLimMlmJoinReq as it has ieFields followed after this bss
-	 * description. Adding a variable after this corrupts the ieFields
-	 */
 } tLimMlmJoinReq, *tpLimMlmJoinReq;
 
 /* Forward declarations */

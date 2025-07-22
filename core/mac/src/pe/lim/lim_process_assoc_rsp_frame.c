@@ -1648,11 +1648,6 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (assoc_rsp->tsmPresent)
 		lim_update_ese_tsm(mac_ctx, session_entry, assoc_rsp);
 #endif
-		if (session_entry->pLimMlmJoinReq) {
-			qdf_mem_free(session_entry->pLimMlmJoinReq);
-			session_entry->pLimMlmJoinReq = NULL;
-		}
-
 		if (session_entry->limAssocResponseData) {
 			tpSirAssocRsp pre_assoc_rsp;
 
@@ -1938,10 +1933,6 @@ assocReject:
 		MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE,
 			session_entry->peSessionId,
 			session_entry->limMlmState));
-		if (session_entry->pLimMlmJoinReq) {
-			qdf_mem_free(session_entry->pLimMlmJoinReq);
-			session_entry->pLimMlmJoinReq = NULL;
-		}
 
 		if (subtype == LIM_ASSOC ||
 		    !cm_is_vdev_roaming(session_entry->vdev)) {

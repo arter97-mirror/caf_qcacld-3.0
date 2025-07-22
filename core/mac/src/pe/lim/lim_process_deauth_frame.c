@@ -462,10 +462,6 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 				lim_delete_pre_auth_node(mac_ctx, addr);
 
 			lim_stop_pmfcomeback_timer(pe_session);
-			if (pe_session->pLimMlmJoinReq) {
-				qdf_mem_free(pe_session->pLimMlmJoinReq);
-				pe_session->pLimMlmJoinReq = NULL;
-			}
 
 			mlmAssocCnf.resultCode = eSIR_SME_DEAUTH_WHILE_JOIN;
 			mlmAssocCnf.protStatusCode = rc;

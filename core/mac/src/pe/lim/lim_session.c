@@ -924,11 +924,6 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 		session->pLimReAssocReq = NULL;
 	}
 
-	if (session->pLimMlmJoinReq) {
-		qdf_mem_free(session->pLimMlmJoinReq);
-		session->pLimMlmJoinReq = NULL;
-	}
-
 	if (session->dph.dphHashTable.pHashTable) {
 		qdf_mem_free(session->dph.dphHashTable.pHashTable);
 		session->dph.dphHashTable.pHashTable = NULL;

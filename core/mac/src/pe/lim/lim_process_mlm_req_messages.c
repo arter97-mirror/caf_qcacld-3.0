@@ -567,19 +567,16 @@ lim_process_mlm_post_join_suspend_link(struct mac_context *mac_ctx,
 void lim_process_mlm_join_req(struct mac_context *mac_ctx,
 			      tLimMlmJoinReq *mlm_join_req)
 {
-	uint8_t sessionid;
 	struct pe_session *session;
 
-	sessionid = mlm_join_req->sessionId;
+	session = pe_find_session_by_session_id(mac_ctx,
+						mlm_join_req->sessionId);
+	if (session)
+		lim_process_mlm_post_join_suspend_link(mac_ctx, session);
+	else
+		pe_err("SessionId:%d does not exist", mlm_join_req->sessionId);
 
-	session = pe_find_session_by_session_id(mac_ctx, sessionid);
-	if (!session) {
-		pe_err("SessionId:%d does not exist", sessionid);
-		return;
-	}
-
-	session->pLimMlmJoinReq = mlm_join_req;
-	lim_process_mlm_post_join_suspend_link(mac_ctx, session);
+	qdf_mem_free(mlm_join_req);
 }
 
 /**
@@ -1747,11 +1744,6 @@ void lim_process_join_failure_timeout(struct mac_context *mac_ctx)
 				 session->peSessionId, session->limMlmState));
 		/* Update PE session Id */
 		mlm_join_cnf.sessionId = session->peSessionId;
-		/* Freeup buffer allocated to join request */
-		if (session->pLimMlmJoinReq) {
-			qdf_mem_free(session->pLimMlmJoinReq);
-			session->pLimMlmJoinReq = NULL;
-		}
 		lim_post_sme_message(mac_ctx, LIM_MLM_JOIN_CNF,
 				     (uint32_t *) &mlm_join_cnf);
 		return;
@@ -2165,14 +2157,6 @@ void lim_process_assoc_failure_timeout(struct mac_context *mac_ctx,
 		/* Change timer for future activations */
 		lim_deactivate_and_change_timer(mac_ctx, eLIM_ASSOC_FAIL_TIMER);
 		lim_stop_pmfcomeback_timer(session);
-		/*
-		 * Free up buffer allocated for JoinReq held by
-		 * MLM state machine
-		 */
-		if (session->pLimMlmJoinReq) {
-			qdf_mem_free(session->pLimMlmJoinReq);
-			session->pLimMlmJoinReq = NULL;
-		}
 		/* To remove the preauth node in case of fail to associate */
 		if (lim_search_pre_auth_list(mac_ctx, session->bssId)) {
 			pe_debug("delete pre auth node for "QDF_MAC_ADDR_FMT,
