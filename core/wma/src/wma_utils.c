@@ -863,7 +863,7 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 		return -EINVAL;
 	}
 
-	if ((param_buf->num_partner_link_stats + 1) <
+	if ((param_buf->num_partner_link_stats + 1) !=
 	    param_buf->num_stats_ext2_data) {
 		wma_err("Invalid num_stats_ext2_data:%d num_partner_link_stats %d",
 			param_buf->num_stats_ext2_data,
