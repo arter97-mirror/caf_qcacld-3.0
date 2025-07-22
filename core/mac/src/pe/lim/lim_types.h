@@ -1411,34 +1411,6 @@ lim_post_mlm_message(struct mac_context *mac, uint32_t msgType,
 } /*** end lim_post_mlm_message() ***/
 
 /**
- * lim_get_ielen_from_bss_description()
- *
- ***FUNCTION:
- * This function is called in various places to get IE length
- * from struct bss_description structure
- * number being scanned.
- *
- ***PARAMS:
- *
- ***LOGIC:
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param     pBssDescr
- * @return    Total IE length
- */
-
-static inline uint16_t
-lim_get_ielen_from_bss_description(struct bss_description *pBssDescr)
-{
-	return wlan_get_ielen_from_bss_description(pBssDescr);
-} /*** end lim_get_ielen_from_bss_description() ***/
-
-/**
  * lim_send_beacon_ind() - send the beacon indication
  * @mac_ctx: pointer to mac structure
  * @session: pe session

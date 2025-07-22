@@ -3618,12 +3618,11 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		goto send;
 	}
 
-	status = lim_extract_ap_capability(mac_ctx,
-		(uint8_t *)bss_desc->ieFields,
-		lim_get_ielen_from_bss_description(bss_desc),
-		&session->limCurrentBssQosCaps,
-		&session->gLimCurrentBssUapsd,
-		&local_power_constraint, session, &is_pwr_constraint);
+	status = lim_extract_ap_capability(mac_ctx, session, bss_desc,
+					   &session->limCurrentBssQosCaps,
+					   &session->gLimCurrentBssUapsd,
+					   &local_power_constraint,
+					   &is_pwr_constraint);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("extract ap caps failed %d", status);
 		goto send;
@@ -5542,12 +5541,10 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 		mac_ctx->pdev, session_entry->curr_op_freq);
 	local_pwr_constraint = reg_max;
 
-	lim_extract_ap_capability(mac_ctx, (uint8_t *)bss_desc->ieFields,
-				  lim_get_ielen_from_bss_description(bss_desc),
+	lim_extract_ap_capability(mac_ctx, session_entry, bss_desc,
 				  &session_entry->limReassocBssQosCaps,
 				  &session_entry->gLimCurrentBssUapsd,
-				  &local_pwr_constraint, session_entry,
-				  &is_pwr_constraint);
+				  &local_pwr_constraint, &is_pwr_constraint);
 	if (is_pwr_constraint)
 		local_pwr_constraint = reg_max - local_pwr_constraint;
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2014, 2016, 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,12 +38,11 @@
 /**
  * lim_extract_ap_capability() - extract AP's HCF/WME/WSM capability
  * @mac_ctx: Pointer to Global MAC structure
- * @p_ie: Pointer to starting IE in Beacon/Probe Response
- * @ie_len: Length of all IEs combined
+ * @session: A pointer to session entry.
+ * @bss_desc: BSS descriptor pointer
  * @qos_cap: Bits are set according to capabilities
  * @uapsd: pointer to uapsd
  * @local_constraint: Pointer to local power constraint.
- * @session: A pointer to session entry.
  * @is_pwr_constraint: Check for Power constraint bit in beacon
  *
  * This function is called to extract AP's HCF/WME/WSM capability
@@ -51,11 +50,12 @@
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
-			  uint16_t ie_len, uint8_t *qos_cap, uint8_t *uapsd,
-			  int8_t *local_constraint, struct pe_session *session,
-			  bool *is_pwr_constraint);
+QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
+				     struct pe_session *session,
+				     struct bss_description *bss_desc,
+				     uint8_t *qos_cap, uint8_t *uapsd,
+				     int8_t *local_constraint,
+				     bool *is_pwr_constraint);
 
 #ifdef WLAN_FEATURE_11BE
 /**

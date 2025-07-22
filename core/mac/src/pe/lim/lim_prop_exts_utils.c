@@ -593,12 +593,12 @@ void lim_update_ch_width_for_p2p_client(struct mac_context *mac,
 		 session->ch_center_freq_seg0, session->ch_center_freq_seg1);
 }
 
-QDF_STATUS
-lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
-			  uint16_t ie_len, uint8_t *qos_cap,
-			  uint8_t *uapsd, int8_t *local_constraint,
-			  struct pe_session *session,
-			  bool *is_pwr_constraint)
+QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
+				     struct pe_session *session,
+				     struct bss_description *bss_desc,
+				     uint8_t *qos_cap, uint8_t *uapsd,
+				     int8_t *local_constraint,
+				     bool *is_pwr_constraint)
 {
 	tSirProbeRespBeacon *beacon_struct;
 	uint8_t ap_bcon_ch_width;
@@ -612,6 +612,9 @@ lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	tDot11fIEVHTCaps *vht_caps;
 	uint8_t channel = 0;
 	uint8_t sta_prefer_80mhz_over_160mhz;
+	uint8_t *p_ie;
+	uint16_t ie_len;
+	tDot11fBeaconIEs *bcn_ies;
 	struct mlme_vht_capabilities_info *mlme_vht_cap;
 	QDF_STATUS status;
 
@@ -623,6 +626,10 @@ lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	*uapsd = 0;
 	sta_prefer_80mhz_over_160mhz =
 		session->mac_ctx->mlme_cfg->sta.sta_prefer_80mhz_over_160mhz;
+
+	bcn_ies = &bss_desc->bcn_ies;
+	p_ie = (uint8_t *)&bss_desc->ieFields[0];
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 
 	status = sir_parse_beacon_ie(mac_ctx, beacon_struct, p_ie,
 				     (uint32_t)ie_len);
