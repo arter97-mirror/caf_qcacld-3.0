@@ -19,9 +19,10 @@ _target_chipset_map = {
                 "qca6750",
                 "adrastea",
         ],
-	"lahaina":[
+        "lahaina":[
                 "qca6490",
                 "qca6750",
+                "wlan",
         ],
 }
 
@@ -29,7 +30,7 @@ _chipset_hw_map = {
         "wlan"   : "ADRASTEA",
         "adrastea" : "ADRASTEA",
         "qca6750": "MOSELLE",
-	"qca6490": "LITHIUM",
+        "qca6490": "LITHIUM",
 }
 
 _chipset_header_map = {
@@ -2062,10 +2063,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    if chipset == "wlan":
-        out = "{}.ko".format(chipset.replace("-", "_"))
-    else:
-        out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
+    out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
@@ -2081,7 +2079,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
     })
 
-    if chipset == "qca6750":
+    if chipset == "qca6750" or chipset == "wlan":
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]

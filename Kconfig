@@ -75,6 +75,10 @@ config WLAN_FASTPATH
 	bool "Enable fastpath for datapackets"
 	default n
 
+config ATH_11AC_TXCOMPACT
+	bool "Enable ath 11ac tx compact support"
+	default n
+
 config WLAN_NAPI
 	bool "Enable NAPI - datapath rx"
 	default n
