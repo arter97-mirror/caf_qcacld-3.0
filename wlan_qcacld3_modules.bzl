@@ -54,6 +54,7 @@ _target_chipset_map = {
         "kiwi-v2",
         "wcn7750",
         "fig",
+        "fig-v2",
     ],
     "alor-le": [
         "wcn7750",
@@ -80,6 +81,7 @@ _target_chipset_map = {
     "art": [
         "peach-v2",
         "fig",
+        "fig-v2",
     ],
 }
 _target_chipset_map["art16k"] = _target_chipset_map["art"]
@@ -96,6 +98,7 @@ _chipset_hw_map = {
     "qcn7605": "HELIUMPLUS",
     "wcn6450": "RHINE",
     "fig": "BORON",
+    "fig-v2": "BORON",
     "wcn7760": "BERYLLIUM",
     "qca6574": "ROME",
     "qca6574au-3": "ROME-SDIO",
@@ -113,6 +116,10 @@ _chipset_header_map = {
     "fig": [
         "api/hw/fig/v1",
         "cmn/hal/wifi3.0/fig",
+    ],
+    "fig-v2": [
+	"api/hw/fig/v2",
+	"cmn/hal/wifi3.0/fig",
     ],
     "kiwi-v2": [
         "api/hw/kiwi/v2",
