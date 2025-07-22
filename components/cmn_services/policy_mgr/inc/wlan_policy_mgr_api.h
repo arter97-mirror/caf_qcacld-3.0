@@ -279,6 +279,30 @@ policy_mgr_get_sta_sap_scc_on_dfs_chnl(struct wlan_objmgr_psoc *psoc,
 				       uint8_t *sta_sap_scc_on_dfs_chnl);
 
 /**
+ * policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl() - Get if STA-SAP scc is
+ * allowed on indoor channel
+ * @psoc: Global psoc pointer
+ *
+ * Return: true if STA-SAP SCC on indoor channel is allowed
+ */
+bool policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(
+				struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_multi_sap_allowed_on_same_band() - to find out if multi sap
+ * is allowed on same band
+ * @psoc: pointer to psoc
+ * @multi_sap_allowed_on_same_band: value to be filled
+ *
+ * This API is used to find out whether multi sap is allowed on same band
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS
+policy_mgr_get_multi_sap_allowed_on_same_band(struct wlan_objmgr_psoc *psoc,
+				bool *multi_sap_allowed_on_same_band);
+
+/**
  * policy_mgr_get_dfs_master_dynamic_enabled() - support dfs master or not
  * on AP interafce when STA+SAP(GO) concurrency
  * @psoc: pointer to psoc
