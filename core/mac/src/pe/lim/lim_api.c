@@ -5231,7 +5231,7 @@ void lim_update_vdev_sr_elements(struct pe_session *session_entry,
 	uint8_t non_srg_max_pd_offset, srg_min_pd_offset, srg_max_pd_offset;
 	uint64_t srg_color_bit_map = 0;
 	uint64_t srg_partial_bssid_bit_map = 0;
-	tDot11fIEspatial_reuse *srp_ie = &sta_ds->parsed_ies.srp_ie;
+	tDot11fIEspatial_reuse *srp_ie = &sta_ds->srp_ie;
 
 	sr_ctrl = srp_ie->sr_value15_allow << 4 |
 		  srp_ie->srg_info_present << 3 |

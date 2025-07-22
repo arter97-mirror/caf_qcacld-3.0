@@ -58,40 +58,6 @@ typedef struct sDphQosParams {
 	tSirMacEdcaParamSetIE peer_edca_params;
 } tDphQosParams;
 
-/**
- * struct parsed_ies: Parsed IE's of BSS capability
- * @ht_caps: HT caps IE
- * @vht_caps: VHT caps IE
- * @ht_operation: HT operation IE
- * @vht_operation: VHT operation IE
- * @hs20vendor_ie: HS2.0 vendor IE
- * @he_operation: HE operation IE
- * @srp_ie: Spatial Reuse Parameter IE
- * @eht_operation: EHT IE
- *
- * This structure holds the parsed IE of connected BSS
- * and this is not the intersection of BSS and STA
- * capability. For example, if BSS supports 80 MHz
- * and STA connects to BSS in 20 MHz, this structure
- * holds 80 MHz as peer capability.
- */
-struct parsed_ies {
-	tDot11fIEHTCaps ht_caps;
-	tDot11fIEVHTCaps vht_caps;
-	tDot11fIEHTInfo ht_operation;
-	tDot11fIEVHTOperation vht_operation;
-	tDot11fIEhs20vendor_ie hs20vendor_ie;
-#ifdef WLAN_FEATURE_11AX
-	tDot11fIEhe_op he_operation;
-#endif
-#ifdef WLAN_FEATURE_SR
-	tDot11fIEspatial_reuse srp_ie;
-#endif
-#ifdef WLAN_FEATURE_11BE
-	tDot11fIEeht_op eht_operation;
-#endif
-};
-
 /* STA state node */
 typedef struct sDphHashNode {
 	/*
@@ -189,7 +155,9 @@ typedef struct sDphHashNode {
 	bool sta_deletion_in_progress;
 	/* Flag indicating connected STA doesn't support ECSA */
 	uint8_t non_ecsa_capable;
-	struct parsed_ies parsed_ies;
+#ifdef WLAN_FEATURE_SR
+	tDot11fIEspatial_reuse srp_ie;
+#endif
 	uint32_t last_ocv_done_freq;
 
 #ifdef WLAN_FEATURE_11AX

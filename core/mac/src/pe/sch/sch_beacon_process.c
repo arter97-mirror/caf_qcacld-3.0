@@ -516,24 +516,13 @@ static void lim_detect_change_in_srp(struct mac_context *mac_ctx,
 				     struct pe_session *session,
 				     tpSchBeaconStruct bcn)
 {
-	tDot11fIEspatial_reuse sr_ie;
-	int32_t ret = 0;
-
-	sr_ie = sta->parsed_ies.srp_ie;
-	if (sr_ie.present || bcn->srp_ie.present) {
-		ret = qdf_mem_cmp(&sr_ie, &bcn->srp_ie,
-				  sizeof(tDot11fIEspatial_reuse));
-
-		if (ret) {
-			/*
-			 * If SRP IE has changes, update the new params.
-			 */
-			sta->parsed_ies.srp_ie = bcn->srp_ie;
-			lim_update_vdev_sr_elements(session, sta);
-
-			lim_handle_sr_cap(session->vdev,
-					  SR_REASON_CODE_BCN_IE_CHANGE);
-		}
+	if ((sta->srp_ie.present || bcn->srp_ie.present) &&
+	    qdf_mem_cmp(&sta->srp_ie, &bcn->srp_ie,
+			sizeof(tDot11fIEspatial_reuse))) {
+		/* If SRP IE has changes, update the new params. */
+		sta->srp_ie = bcn->srp_ie;
+		lim_update_vdev_sr_elements(session, sta);
+		lim_handle_sr_cap(session->vdev, SR_REASON_CODE_BCN_IE_CHANGE);
 	}
 }
 #else

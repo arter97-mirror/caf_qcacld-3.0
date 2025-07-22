@@ -2250,7 +2250,7 @@ static QDF_STATUS lim_update_srp_ie(tSirProbeRespBeacon *bp_rsp,
 	QDF_STATUS status = QDF_STATUS_E_NOSUPPORT;
 
 	if (bp_rsp->srp_ie.present) {
-		sta_ds->parsed_ies.srp_ie = bp_rsp->srp_ie;
+		sta_ds->srp_ie = bp_rsp->srp_ie;
 		status = QDF_STATUS_SUCCESS;
 	}
 

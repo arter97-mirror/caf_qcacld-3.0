@@ -611,45 +611,17 @@ uint8_t lim_get_nss_supported_by_ap(tDot11fIEVHTCaps *vht_caps,
 	return NSS_1x1_MODE;
 }
 
-#ifdef WLAN_FEATURE_11AX
-static void lim_process_he_info(tpSirProbeRespBeacon beacon,
-				tpDphHashNode sta_ds)
-{
-	if (beacon->he_op.present)
-		sta_ds->parsed_ies.he_operation = beacon->he_op;
-}
-#else
-static inline void lim_process_he_info(tpSirProbeRespBeacon beacon,
-				       tpDphHashNode sta_ds)
-{
-}
-#endif
-
 #ifdef WLAN_FEATURE_SR
 QDF_STATUS lim_process_srp_ie(tpSirAssocRsp ar, tpDphHashNode sta_ds)
 {
 	QDF_STATUS status = QDF_STATUS_E_NOSUPPORT;
 
 	if (ar->srp_ie.present) {
-		sta_ds->parsed_ies.srp_ie = ar->srp_ie;
+		sta_ds->srp_ie = ar->srp_ie;
 		status = QDF_STATUS_SUCCESS;
 	}
 
 	return status;
-}
-#endif
-
-#ifdef WLAN_FEATURE_11BE
-static void lim_process_eht_info(tpSirProbeRespBeacon beacon,
-				 tpDphHashNode sta_ds)
-{
-	if (beacon->eht_op.present)
-		sta_ds->parsed_ies.eht_operation = beacon->eht_op;
-}
-#else
-static inline void lim_process_eht_info(tpSirProbeRespBeacon beacon,
-					tpDphHashNode sta_ds)
-{
 }
 #endif
 
@@ -1864,23 +1836,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		}
 	}
 
-	if (beacon->VHTCaps.present)
-		sta_ds->parsed_ies.vht_caps = beacon->VHTCaps;
-	if (beacon->HTCaps.present)
-		sta_ds->parsed_ies.ht_caps = beacon->HTCaps;
-	if (beacon->hs20vendor_ie.present)
-		sta_ds->parsed_ies.hs20vendor_ie = beacon->hs20vendor_ie;
-	if (beacon->HTInfo.present)
-		sta_ds->parsed_ies.ht_operation = beacon->HTInfo;
-	if (beacon->VHTOperation.present)
-		sta_ds->parsed_ies.vht_operation = beacon->VHTOperation;
-
-	lim_process_he_info(beacon, sta_ds);
 	if (lim_process_srp_ie(assoc_rsp, sta_ds) == QDF_STATUS_SUCCESS)
 		lim_update_vdev_sr_elements(session_entry, sta_ds);
-
-	if (lim_is_session_eht_capable(session_entry))
-		lim_process_eht_info(beacon, sta_ds);
 
 	if (mac_ctx->lim.gLimProtectionControl !=
 	    MLME_FORCE_POLICY_PROTECTION_DISABLE)
