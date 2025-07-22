@@ -791,8 +791,8 @@ lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	}
 
 	if (session->vhtCapability && session->vhtCapabilityPresentInBeacon &&
-	    beacon_struct->ext_cap.present) {
-		ext_cap = (struct s_ext_cap *)beacon_struct->ext_cap.bytes;
+	    beacon_struct->ExtCap.present) {
+		ext_cap = (struct s_ext_cap *)beacon_struct->ExtCap.bytes;
 		session->gLimOperatingMode.present =
 					ext_cap->oper_mode_notification;
 		if (ext_cap->oper_mode_notification) {
@@ -859,7 +859,7 @@ lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	if (beacon_struct->countryInfoPresent)
 		session->country_info_present = true;
 	/* Check if Extended caps are present in probe resp or not */
-	if (beacon_struct->ext_cap.present)
+	if (beacon_struct->ExtCap.present)
 		session->is_ext_caps_present = true;
 	/* Update HS 2.0 Information Element */
 	if (beacon_struct->hs20vendor_ie.present) {

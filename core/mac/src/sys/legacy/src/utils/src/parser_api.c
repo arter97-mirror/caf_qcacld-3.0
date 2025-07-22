@@ -3578,6 +3578,11 @@ QDF_STATUS sir_convert_probe_frame2_struct(struct mac_context *mac,
 		qdf_mem_copy(&pProbeResp->VHTOperation, &pr->VHTOperation,
 			     sizeof(tDot11fIEVHTOperation));
 	}
+
+	if (pr->ExtCap.present)
+		qdf_mem_copy(&pProbeResp->ExtCap, &pr->ExtCap,
+			     sizeof(tDot11fIEExtCap));
+
 	if (pr->VHTExtBssLoad.present) {
 		qdf_mem_copy(&pProbeResp->VHTExtBssLoad, &pr->VHTExtBssLoad,
 			     sizeof(tDot11fIEVHTExtBssLoad));
@@ -3980,9 +3985,9 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 		lim_log_vht_cap(mac, &pAssocReq->VHTCaps);
 	}
 	if (ar->OperatingMode.present) {
-		qdf_mem_copy(&pAssocReq->operMode, &ar->OperatingMode,
+		qdf_mem_copy(&pAssocReq->OperatingMode, &ar->OperatingMode,
 			     sizeof(tDot11fIEOperatingMode));
-		lim_log_operating_mode(mac, &pAssocReq->operMode);
+		lim_log_operating_mode(mac, &pAssocReq->OperatingMode);
 	}
 	if (ar->ExtCap.present) {
 		struct s_ext_cap *ext_cap;
@@ -4803,10 +4808,9 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 			ext_cap->fine_time_meas_responder);
 	}
 
-	if (ar->OperatingMode.present) {
-		qdf_mem_copy(&pAssocRsp->oper_mode_ntf, &ar->OperatingMode,
+	if (ar->OperatingMode.present)
+		qdf_mem_copy(&pAssocRsp->OperatingMode, &ar->OperatingMode,
 			     sizeof(tDot11fIEOperatingMode));
-	}
 
 	if (ar->QosMapSet.present) {
 		pAssocRsp->QosMapSet.present = 1;
@@ -5137,10 +5141,10 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 			     sizeof(tDot11fIEVHTCaps));
 	}
 	if (ar->OperatingMode.present) {
-		qdf_mem_copy(&pAssocReq->operMode, &ar->OperatingMode,
+		qdf_mem_copy(&pAssocReq->OperatingMode, &ar->OperatingMode,
 			     sizeof(tDot11fIEOperatingMode));
 		pe_warn("Received Assoc Req with Operating Mode IE");
-		lim_log_operating_mode(mac, &pAssocReq->operMode);
+		lim_log_operating_mode(mac, &pAssocReq->OperatingMode);
 	}
 	if (ar->ExtCap.present) {
 		struct s_ext_cap *ext_cap;
@@ -5768,10 +5772,10 @@ QDF_STATUS sir_parse_beacon_ie(struct mac_context *mac,
 				&pBies->vendor_vht_ie.VHTOperation,
 				sizeof(tDot11fIEVHTOperation));
 	}
-	if (pBies->ExtCap.present) {
-		qdf_mem_copy(&pBeaconStruct->ext_cap, &pBies->ExtCap,
-				sizeof(tDot11fIEExtCap));
-	}
+	if (pBies->ExtCap.present)
+		qdf_mem_copy(&pBeaconStruct->ExtCap, &pBies->ExtCap,
+			     sizeof(tDot11fIEExtCap));
+
 	/* Update HS 2.0 Information Element */
 	if (pBies->hs20vendor_ie.present) {
 		pe_debug("HS20 Indication Element Present, rel#:%u, id:%u",
@@ -6306,6 +6310,11 @@ QDF_STATUS sir_convert_beacon_frame2_struct(struct mac_context *mac,
 			     &pBeacon->VHTOperation,
 			     sizeof(tDot11fIEVHTOperation));
 	}
+
+	if (pBeacon->ExtCap.present)
+		qdf_mem_copy(&pBeaconStruct->ExtCap, &pBeacon->ExtCap,
+			     sizeof(tDot11fIEExtCap));
+
 	if (pBeacon->VHTExtBssLoad.present) {
 		qdf_mem_copy(&pBeaconStruct->VHTExtBssLoad,
 			     &pBeacon->VHTExtBssLoad,
@@ -6342,6 +6351,11 @@ QDF_STATUS sir_convert_beacon_frame2_struct(struct mac_context *mac,
 				&pBeacon->VHTOperation,
 				sizeof(tDot11fIEVHTOperation));
 	}
+
+	if (pBeacon->ExtCap.present)
+		qdf_mem_copy(&pBeaconStruct->ExtCap, &pBeacon->ExtCap,
+			     sizeof(tDot11fIEExtCap));
+
 	/* Update HS 2.0 Information Element */
 	if (pBeacon->hs20vendor_ie.present) {
 		qdf_mem_copy(&pBeaconStruct->hs20vendor_ie,

@@ -1777,9 +1777,9 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 				session->htSecondaryChannelOffset;
 			sta_ds->ch_width = CH_WIDTH_40MHZ;
 			if (sta_ds->mlmStaContext.vhtCapability) {
-				if (assoc_req->operMode.present) {
+				if (assoc_req->OperatingMode.present) {
 					sta_ds->ch_width =
-						assoc_req->operMode.chanWidth;
+					    assoc_req->OperatingMode.chanWidth;
 				} else if (vht_caps->supportedChannelWidthSet ==
 					   VHT_CAP_160_AND_80P80_SUPP) {
 					sta_ds->ch_width = CH_WIDTH_80P80MHZ;
@@ -1923,8 +1923,8 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 		return false;
 	}
 
-	if (assoc_req->operMode.present) {
-		sta_ds->vhtSupportedRxNss = assoc_req->operMode.rxNSS + 1;
+	if (assoc_req->OperatingMode.present) {
+		sta_ds->vhtSupportedRxNss = assoc_req->OperatingMode.rxNSS + 1;
 	} else {
 		uint8_t idx;
 

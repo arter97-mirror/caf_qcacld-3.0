@@ -187,11 +187,10 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 		if (session_entry->htSupportedChannelWidthSet) {
 			if (vht_oper && vht_oper->present) {
 				vht_ch_width =
-					lim_get_vht_ch_width(vht_caps,
-							     vht_oper,
-							     &assoc_rsp->HTInfo,
-							     &assoc_rsp->HTCaps,
-							     &assoc_rsp->oper_mode_ntf);
+				    lim_get_vht_ch_width(vht_caps, vht_oper,
+							 &assoc_rsp->HTInfo,
+							 &assoc_rsp->HTCaps,
+							 &assoc_rsp->OperatingMode);
 				sta_ds->vhtSupportedChannelWidthSet =
 					lim_convert_phy_width_to_vht_width(vht_ch_width);
 			} else {
@@ -343,7 +342,7 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	if (session_entry->limRmfEnabled)
 		sta_ds->rmfEnabled = 1;
 
-	if (session_entry->vhtCapability && assoc_rsp->oper_mode_ntf.present) {
+	if (session_entry->vhtCapability && assoc_rsp->OperatingMode.present) {
 		/**
 		 * OMN IE is present in the Assoc response, but the channel
 		 * width/Rx NSS update will happen through the peer_assoc cmd.
@@ -351,9 +350,9 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 		QDF_STATUS status;
 
 		omn_ie_ch_width =
-			lim_get_omn_channel_width(&assoc_rsp->oper_mode_ntf);
+			lim_get_omn_channel_width(&assoc_rsp->OperatingMode);
 		pe_debug("OMN IE in (re)assoc rsp, ie width %d ch_width %d",
-			 assoc_rsp->oper_mode_ntf.chanWidth, omn_ie_ch_width);
+			 assoc_rsp->OperatingMode.chanWidth, omn_ie_ch_width);
 
 		status = wlan_mlme_update_cur_ch_width(session_entry->vdev,
 						       omn_ie_ch_width, true);

@@ -286,7 +286,7 @@ typedef struct sSirProbeRespBeacon {
 	tDot11fIEVHTCaps VHTCaps;
 	tDot11fIEVHTOperation VHTOperation;
 	tDot11fIEVHTExtBssLoad VHTExtBssLoad;
-	tDot11fIEExtCap ext_cap;
+	tDot11fIEExtCap ExtCap;
 	tDot11fIEOperatingMode OperatingMode;
 	uint8_t WiderBWChanSwitchAnnPresent;
 	tDot11fIEWiderBWChanSwitchAnn WiderBWChanSwitchAnn;
@@ -393,7 +393,7 @@ typedef struct sSirAssocReq {
 	uint32_t assocReqFrameLength;
 	uint8_t *assocReqFrame;
 	tDot11fIEVHTCaps VHTCaps;
-	tDot11fIEOperatingMode operMode;
+	tDot11fIEOperatingMode OperatingMode;
 	tDot11fIEExtCap ExtCap;
 	tDot11fIEbss_max_idle_period bss_max_idle_period;
 	tDot11fIEvendor_vht_ie vendor_vht_ie;
@@ -507,7 +507,7 @@ typedef struct sSirAssocRsp {
 	tDot11fIEVHTCaps VHTCaps;
 	tDot11fIEVHTOperation VHTOperation;
 	tDot11fIEExtCap ExtCap;
-	tDot11fIEOperatingMode oper_mode_ntf;
+	tDot11fIEOperatingMode OperatingMode;
 	struct qos_map_set QosMapSet;
 	tDot11fIETimeoutInterval TimeoutInterval;
 	tDot11fIERRMEnabledCap rrm_caps;
