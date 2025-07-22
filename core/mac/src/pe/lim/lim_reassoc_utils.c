@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -174,9 +174,8 @@ void lim_handle_del_bss_in_re_assoc_context(struct mac_context *mac,
 		lim_update_re_assoc_globals(mac, assocRsp, pe_session);
 		if (mac->lim.gLimProtectionControl !=
 		    MLME_FORCE_POLICY_PROTECTION_DISABLE)
-			lim_decide_sta_protection_on_assoc(mac,
-				beacon_struct,
-				pe_session);
+			lim_decide_sta_protection_on_assoc(mac,	pe_session,
+							   bss_desc);
 		if (beacon_struct->erpPresent) {
 			if (beacon_struct->erpIEInfo.barkerPreambleMode)
 				pe_session->beaconParams.fShortPreamble = 0;
@@ -295,10 +294,8 @@ void lim_handle_add_bss_in_re_assoc_context(struct mac_context *mac,
 		lim_update_re_assoc_globals(mac, assocRsp, pe_session);
 		if (mac->lim.gLimProtectionControl !=
 		    MLME_FORCE_POLICY_PROTECTION_DISABLE)
-			lim_decide_sta_protection_on_assoc(mac,
-							   pBeaconStruct,
-							   pe_session);
-
+			lim_decide_sta_protection_on_assoc(mac, pe_session,
+							   &pe_session->pLimReAssocReq->bssDescription);
 		if (pBeaconStruct->erpPresent) {
 			if (pBeaconStruct->erpIEInfo.barkerPreambleMode)
 				pe_session->beaconParams.

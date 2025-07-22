@@ -511,9 +511,45 @@ void lim_decide_sta_protection(struct mac_context *mac,
 		tpSchBeaconStruct pBeaconStruct,
 		tpUpdateBeaconParams pBeaconParams,
 		struct pe_session *pe_session);
+
+/**
+ * lim_decide_sta_protection_on_assoc() - Configure protection settings during
+ * STA association
+ * @mac: Pointer to the MAC context
+ * @pe_session: Pointer to the PE session context
+ * @bss_desc: Pointer to the BSS description containing beacon IEs
+
+ * This function determines and sets protection-related parameters for a STA
+ * during association based on the operating band (2.4 GHz or 5 GHz), PHY mode,
+ * and beacon IEs received from the AP. It updates the session's beaconParams
+ * structure to reflect coexistence requirements with legacy devices (11b, 11g),
+ * HT20 coexistence, and other protection mechanisms.
+
+ * Key decisions made include:
+ * - Whether protection is needed from 11b (llbCoexist), 11g (llgCoexist),
+ *   or HT20 (ht20Coexist)
+ * - Whether RIFS mode, non-GF device presence, and L-SIG TXOP protection
+ *   are supported
+ * - Whether OBSS non-HT STA is present (gHTObssMode)
+
+ * Assumptions:
+ * - bss_desc->bcn_ies is valid and populated with beacon IEs
+ * - pe_session is initialized and contains valid HT capability flags
+ * - mac->lim.cfgProtection contains configuration flags for protection policies
+ * - Function is invoked only when protection control is enabled
+
+ * Limitations:
+ * - Some logic (e.g., ERP protection) is not sessionized and may need
+ *   future refactoring
+ * - The function assumes that PHY mode and RF band are correctly derived
+ *   from session context
+ *
+ * This function does not return a value; it directly modifies
+ * the pe_session->beaconParams.
+ */
 void lim_decide_sta_protection_on_assoc(struct mac_context *mac,
-		tpSchBeaconStruct pBeaconStruct,
-		struct pe_session *pe_session);
+					struct pe_session *pe_session,
+					struct bss_description *bss_desc);
 
 /**
  * lim_get_cb_mode_for_freq() - Get cb mode depending on the freq

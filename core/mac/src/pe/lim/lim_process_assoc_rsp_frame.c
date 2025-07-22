@@ -1831,8 +1831,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (mac_ctx->lim.gLimProtectionControl !=
 	    MLME_FORCE_POLICY_PROTECTION_DISABLE)
-		lim_decide_sta_protection_on_assoc(mac_ctx, beacon,
-						   session_entry);
+		lim_decide_sta_protection_on_assoc(mac_ctx, session_entry,
+						   &session_entry->lim_join_req->bssDescription);
 
 	if (beacon->erpPresent) {
 		if (beacon->erpIEInfo.barkerPreambleMode)

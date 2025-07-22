@@ -4267,8 +4267,8 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 
 	if (mac->lim.gLimProtectionControl !=
 	    MLME_FORCE_POLICY_PROTECTION_DISABLE)
-		lim_decide_sta_protection_on_assoc(mac, pBeaconStruct,
-						   pe_session);
+		lim_decide_sta_protection_on_assoc(mac, pe_session,
+						   bssDescription);
 	qdf_mem_copy(pAddBssParams->bssId, bssDescription->bssId,
 		     sizeof(tSirMacAddr));
 

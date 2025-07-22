@@ -1479,18 +1479,11 @@ lim_update_short_slot_time(struct mac_context *mac_ctx, tSirMacAddr peer_mac_add
 	}
 }
 
-/** -------------------------------------------------------------
-   \fn lim_decide_sta_protection_on_assoc
-   \brief Decide protection related settings on Sta while association.
-   \param      struct mac_context *   mac
-   \param      tpSchBeaconStruct pBeaconStruct
-   \return      None
-   -------------------------------------------------------------*/
-void
-lim_decide_sta_protection_on_assoc(struct mac_context *mac,
-				   tpSchBeaconStruct pBeaconStruct,
-				   struct pe_session *pe_session)
+void lim_decide_sta_protection_on_assoc(struct mac_context *mac,
+					struct pe_session *pe_session,
+					struct bss_description *bss_desc)
 {
+	tDot11fBeaconIEs *bcn_ies = &bss_desc->bcn_ies;
 	enum reg_wifi_band rfBand = REG_BAND_UNKNOWN;
 	uint32_t phyMode = WNI_CFG_PHY_MODE_NONE;
 
@@ -1498,17 +1491,16 @@ lim_decide_sta_protection_on_assoc(struct mac_context *mac,
 	lim_get_phy_mode(mac, &phyMode, pe_session);
 
 	if (REG_BAND_5G == rfBand) {
-		if ((eSIR_HT_OP_MODE_MIXED == pBeaconStruct->HTInfo.opMode) ||
+		if ((eSIR_HT_OP_MODE_MIXED == bcn_ies->HTInfo.opMode) ||
 		    (eSIR_HT_OP_MODE_OVERLAP_LEGACY ==
-		     pBeaconStruct->HTInfo.opMode)) {
+		     bcn_ies->HTInfo.opMode)) {
 			if (mac->lim.cfgProtection.fromlla)
 				pe_session->beaconParams.llaCoexist = true;
 		} else if (eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT ==
-			   pBeaconStruct->HTInfo.opMode) {
+			   bcn_ies->HTInfo.opMode) {
 			if (mac->lim.cfgProtection.ht20)
 				pe_session->beaconParams.ht20Coexist = true;
 		}
-
 	} else if (REG_BAND_2G == rfBand) {
 		/* spec 7.3.2.13 */
 		/* UseProtection will be set when nonERP STA is associated. */
@@ -1522,30 +1514,26 @@ lim_decide_sta_protection_on_assoc(struct mac_context *mac,
 		/* TODO, This is not sessionized */
 		if (phyMode != WNI_CFG_PHY_MODE_11B) {
 			if (mac->lim.cfgProtection.fromllb &&
-			    pBeaconStruct->erpPresent &&
-			    (pBeaconStruct->erpIEInfo.useProtection ||
-			     pBeaconStruct->erpIEInfo.nonErpPresent)) {
+			    bcn_ies->ERPInfo.present &&
+			    (bcn_ies->ERPInfo.use_prot ||
+			     bcn_ies->ERPInfo.non_erp_present))
 				pe_session->beaconParams.llbCoexist = true;
-			}
-			/* AP has no 11b station associated. */
-			else {
+			else
+				/* AP has no 11b station associated. */
 				pe_session->beaconParams.llbCoexist = false;
-			}
 		}
 		/* following code block is only for HT station. */
-		if ((pe_session->htCapability) &&
-		    (pBeaconStruct->HTInfo.present)) {
-			tDot11fIEHTInfo htInfo = pBeaconStruct->HTInfo;
-
+		if (pe_session->htCapability && bcn_ies->HTInfo.present) {
 			/* Obss Non HT STA present mode */
 			pe_session->beaconParams.gHTObssMode =
-				(uint8_t) htInfo.obssNonHTStaPresent;
+				(uint8_t)bcn_ies->HTInfo.obssNonHTStaPresent;
 
 			/* CFG protection from 11G is enabled and */
 			/* our AP has at least one 11G station associated. */
 			if (mac->lim.cfgProtection.fromllg &&
-			    ((eSIR_HT_OP_MODE_MIXED == htInfo.opMode) ||
-			     (eSIR_HT_OP_MODE_OVERLAP_LEGACY == htInfo.opMode))
+			    (eSIR_HT_OP_MODE_MIXED == bcn_ies->HTInfo.opMode ||
+			     eSIR_HT_OP_MODE_OVERLAP_LEGACY ==
+			     bcn_ies->HTInfo.opMode)
 			    && (!pe_session->beaconParams.llbCoexist)) {
 				if (mac->lim.cfgProtection.fromllg)
 					pe_session->beaconParams.llgCoexist =
@@ -1554,7 +1542,8 @@ lim_decide_sta_protection_on_assoc(struct mac_context *mac,
 			/* AP has only HT stations associated and at least one station is HT 20 */
 			/* disable protection from any non-HT devices. */
 			/* decision for disabling protection from 11b has already been taken above. */
-			if (eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT == htInfo.opMode) {
+			if (eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT ==
+			    bcn_ies->HTInfo.opMode) {
 				/* Disable protection from 11G station. */
 				pe_session->beaconParams.llgCoexist = false;
 				/* CFG protection from HT 20 is enabled. */
@@ -1564,7 +1553,7 @@ lim_decide_sta_protection_on_assoc(struct mac_context *mac,
 			}
 			/* Disable protection from non-HT and HT20 devices. */
 			/* decision for disabling protection from 11b has already been taken above. */
-			if (eSIR_HT_OP_MODE_PURE == htInfo.opMode) {
+			if (eSIR_HT_OP_MODE_PURE == bcn_ies->HTInfo.opMode) {
 				pe_session->beaconParams.llgCoexist = false;
 				pe_session->beaconParams.ht20Coexist = false;
 			}
@@ -1572,15 +1561,13 @@ lim_decide_sta_protection_on_assoc(struct mac_context *mac,
 		}
 	}
 	/* protection related factors other than HT operating mode. Applies to 2.4 GHZ as well as 5 GHZ. */
-	if ((pe_session->htCapability) && (pBeaconStruct->HTInfo.present)) {
-		tDot11fIEHTInfo htInfo = pBeaconStruct->HTInfo;
-
+	if (pe_session->htCapability && bcn_ies->HTInfo.present) {
 		pe_session->beaconParams.fRIFSMode =
-			(uint8_t) htInfo.rifsMode;
+					(uint8_t)bcn_ies->HTInfo.rifsMode;
 		pe_session->beaconParams.llnNonGFCoexist =
-			(uint8_t) htInfo.nonGFDevicesPresent;
+			(uint8_t)bcn_ies->HTInfo.nonGFDevicesPresent;
 		pe_session->beaconParams.fLsigTXOPProtectionFullSupport =
-			(uint8_t) htInfo.lsigTXOPProtectionFullSupport;
+			(uint8_t)bcn_ies->HTInfo.lsigTXOPProtectionFullSupport;
 	}
 }
 

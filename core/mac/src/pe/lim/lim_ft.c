@@ -148,8 +148,8 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 
 	if (mac->lim.gLimProtectionControl !=
 	    MLME_FORCE_POLICY_PROTECTION_DISABLE)
-		lim_decide_sta_protection_on_assoc(mac, pBeaconStruct,
-						   ft_session);
+		lim_decide_sta_protection_on_assoc(mac, ft_session,
+						   bssDescription);
 
 	qdf_mem_copy(pAddBssParams->bssId, bssDescription->bssId,
 		     sizeof(tSirMacAddr));
