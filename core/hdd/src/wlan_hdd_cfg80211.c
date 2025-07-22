@@ -3423,7 +3423,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 					&sap_config->acs_cfg.pcl_ch_count,
 					sap_config->acs_cfg.
 					pcl_channels_weight_list,
-					NUM_CHANNELS);
+					NUM_CHANNELS, adapter->vdev_id);
 
 	sap_config->acs_cfg.band = hw_mode;
 
@@ -12232,7 +12232,8 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 	status = policy_mgr_get_pcl(
 			hdd_ctx->psoc, intf_mode, chan_weights->pcl_list,
 			&chan_weights->pcl_len, chan_weights->weight_list,
-			QDF_ARRAY_SIZE(chan_weights->weight_list));
+			QDF_ARRAY_SIZE(chan_weights->weight_list),
+			adapter->vdev_id);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Get pcl failed");
 		qdf_mem_free(chan_weights);
@@ -12430,7 +12431,7 @@ static int __wlan_hdd_cfg80211_set_probable_oper_channel(struct wiphy *wiphy,
 	/* check pcl table */
 	if (!policy_mgr_allow_concurrency(hdd_ctx->psoc, intf_mode,
 					  ch_freq, HW_MODE_20_MHZ,
-					  conc_ext_flags)) {
+					  conc_ext_flags, adapter->vdev_id)) {
 		hdd_err("Set channel hint failed due to concurrency check");
 		return -EINVAL;
 	}

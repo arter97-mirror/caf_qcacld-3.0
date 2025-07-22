@@ -4338,7 +4338,7 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 				  enum policy_mgr_con_mode mode,
 				  uint32_t ch_freq,
 				  enum hw_mode_bandwidth bw,
-				  uint32_t ext_flags)
+				  uint32_t ext_flags, uint8_t vdev_id)
 {
 	QDF_STATUS status;
 	struct policy_mgr_pcl_list pcl;
@@ -4347,7 +4347,7 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_zero(&pcl, sizeof(pcl));
 	status = policy_mgr_get_pcl(psoc, mode, pcl.pcl_list, &pcl.pcl_len,
 				    pcl.weight_list,
-				    QDF_ARRAY_SIZE(pcl.weight_list));
+				    QDF_ARRAY_SIZE(pcl.weight_list), vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("disallow connection:%d", status);
 		return false;
@@ -4430,7 +4430,7 @@ policy_mgr_allow_concurrency_csa(struct wlan_objmgr_psoc *psoc,
 						    WLAN_POLICY_MGR_ID);
 	conc_ext_flags = policy_mgr_get_conc_ext_flags(vdev, false);
 	allow = policy_mgr_allow_concurrency(psoc, mode, ch_freq,
-					     bw, conc_ext_flags);
+					     bw, conc_ext_flags, vdev_id);
 	if (vdev)
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
@@ -4603,7 +4603,7 @@ bool policy_mgr_check_for_session_conc(struct wlan_objmgr_psoc *psoc,
 	/* Take care of 160MHz and 80+80Mhz later */
 	conc_ext_flags = policy_mgr_get_conc_ext_flags(vdev, false);
 	ret = policy_mgr_allow_concurrency(psoc, mode, ch_freq, HW_MODE_20_MHZ,
-					   conc_ext_flags);
+					   conc_ext_flags, session_id);
 	if (vdev)
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 

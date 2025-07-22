@@ -1106,7 +1106,8 @@ QDF_STATUS nan_datapath_event_handler(struct scheduler_msg *pe_msg)
 	return status;
 }
 
-bool nan_is_enable_allowed(struct wlan_objmgr_psoc *psoc, uint32_t nan_ch_freq)
+bool nan_is_enable_allowed(struct wlan_objmgr_psoc *psoc, uint32_t nan_ch_freq,
+			   uint8_t vdev_id)
 {
 	if (!psoc) {
 		nan_err("psoc object object is NULL");
@@ -1117,7 +1118,7 @@ bool nan_is_enable_allowed(struct wlan_objmgr_psoc *psoc, uint32_t nan_ch_freq)
 		ucfg_is_nan_conc_control_supported(psoc) &&
 		policy_mgr_allow_concurrency(psoc, PM_NAN_DISC_MODE,
 					     nan_ch_freq, HW_MODE_20_MHZ,
-					     0));
+					     0, vdev_id));
 }
 
 bool nan_is_disc_active(struct wlan_objmgr_psoc *psoc)

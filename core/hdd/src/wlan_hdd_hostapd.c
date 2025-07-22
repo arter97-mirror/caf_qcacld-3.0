@@ -6294,11 +6294,13 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	}
 
 	if (check_for_concurrency) {
-		if (!policy_mgr_allow_concurrency(hdd_ctx->psoc,
+		if (!policy_mgr_allow_concurrency(
+				hdd_ctx->psoc,
 				policy_mgr_convert_device_mode_to_qdf_type(
 					adapter->device_mode),
 				config->chan_freq, HW_MODE_20_MHZ,
-				policy_mgr_get_conc_ext_flags(vdev, false))) {
+				policy_mgr_get_conc_ext_flags(vdev, false),
+				adapter->vdev_id)) {
 			mutex_unlock(&hdd_ctx->sap_lock);
 
 			hdd_err("This concurrency combination is not allowed");
@@ -7150,13 +7152,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		hdd_debug("NAN disabled due to concurrency constraints");
 
 	/* check if concurrency is allowed */
-	if (!policy_mgr_allow_concurrency(hdd_ctx->psoc,
+	if (!policy_mgr_allow_concurrency(
+				hdd_ctx->psoc,
 				policy_mgr_convert_device_mode_to_qdf_type(
 				adapter->device_mode),
 				freq,
 				channel_width,
 				policy_mgr_get_conc_ext_flags(adapter->vdev,
-							      false))) {
+							      false),
+				adapter->vdev_id)) {
 		hdd_err("Connection failed due to concurrency check failure");
 		return -EINVAL;
 	}
