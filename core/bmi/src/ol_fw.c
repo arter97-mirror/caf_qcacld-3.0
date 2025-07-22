@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -50,6 +50,8 @@
 #ifdef FEATURE_SECURE_FIRMWARE
 static struct hash_fw fw_hash;
 #endif
+
+#define MAX_WAKELOCK_FOR_FW_DOWNLOAD 1000
 
 static uint32_t refclk_speed_to_hz[] = {
 	48000000,               /* SOC_REFCLK_48_MHZ */
@@ -518,11 +520,10 @@ static int
 ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 		     uint32_t address, bool compressed)
 {
-	#define MAX_WAKELOCK_FOR_FW_DOWNLOAD 1000	//1s
 	int ret;
 
 	qdf_wake_lock_timeout_acquire(&ol_ctx->fw_dl_wakelock,
-					MAX_WAKELOCK_FOR_FW_DOWNLOAD);
+				      MAX_WAKELOCK_FOR_FW_DOWNLOAD);
 
 	ret = __ol_transfer_bin_file(ol_ctx, file, address, compressed);
 
@@ -1072,6 +1073,7 @@ static QDF_STATUS ol_patch_pll_switch(struct ol_context *ol_ctx)
 	uint32_t cmnos_cpu_speed_addr = 0;
 	struct hif_target_info *tgt_info = hif_get_target_info_handle(hif);
 	uint32_t target_version = tgt_info->target_version;
+	struct targetdef_t *scn = &ol_ctx->tgt_def;
 
 	switch (target_version) {
 	case AR6320_REV1_1_VERSION:
