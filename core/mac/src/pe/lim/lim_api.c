@@ -4407,6 +4407,7 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	struct scan_cache_entry *cache_entry;
 	struct wlan_channel channel;
 	bool is_security_allowed;
+	struct mlo_link_info link_info;
 
 	pdev = mac_ctx->pdev;
 	if (!pdev) {
@@ -4437,8 +4438,11 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	if (channel.ch_width == CH_WIDTH_20MHZ)
 		channel.ch_cfreq1 = channel.ch_freq;
 
-	mlo_mgr_update_ap_link_info(vdev, link_id, (uint8_t *)link_addr,
-				    channel);
+	link_info.link_chan_info = &channel;
+	link_info.link_id = link_id;
+	qdf_copy_macaddr(&link_info.ap_link_addr, link_addr);
+
+	mlo_mgr_update_ap_link_info(vdev, &link_info);
 
 	/**
 	 * Reject all the partner link if any partner link  doesn’t pass the

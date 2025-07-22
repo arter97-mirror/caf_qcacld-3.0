@@ -3070,9 +3070,8 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 {
 	struct mlo_partner_info *partner_info;
 	struct mlo_link_info *partner_link_info;
-	struct wlan_channel channel = {0};
 	struct mlo_link_switch_context *link_ctx;
-	uint8_t i = 0;
+	uint8_t i;
 	QDF_STATUS status;
 
 	if (!session->vdev) {
@@ -3096,21 +3095,15 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 	}
 
 	/* Populating Assoc Link Band info */
-	channel.ch_freq = (uint16_t)session->curr_op_freq;
-
 	mlo_mgr_reset_ap_link_info(session->vdev);
-	mlo_mgr_update_ap_link_info(session->vdev,
-				    wlan_vdev_get_link_id(session->vdev),
-				    session->bssId, channel);
-	status =
-	lim_update_mlo_mgr_info(mac_ctx,
-				session->vdev,
-				(struct qdf_mac_addr *)session->bssId,
-				wlan_vdev_get_link_id(session->vdev),
-				channel.ch_freq);
+	status = lim_update_mlo_mgr_info(mac_ctx, session->vdev,
+					 (struct qdf_mac_addr *)session->bssId,
+					 wlan_vdev_get_link_id(session->vdev),
+					 session->curr_op_freq);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("unable to update mlo info for link id %d freq %d",
-		       wlan_vdev_get_link_id(session->vdev), channel.ch_freq);
+		       wlan_vdev_get_link_id(session->vdev),
+		       session->curr_op_freq);
 		return status;
 	}
 	/* Populating Partner link band Info */
@@ -3118,18 +3111,11 @@ lim_update_mlo_mgr_ap_link_info_mbssid_connect(struct mac_context *mac_ctx,
 	for (i = 0; i < partner_info->num_partner_links; i++) {
 		partner_link_info = &partner_info->partner_link_info[i];
 
-		qdf_mem_zero(&channel, sizeof(channel));
-		channel.ch_freq = partner_link_info->chan_freq;
-
-		mlo_mgr_update_ap_link_info(session->vdev,
-					    partner_link_info->link_id,
-					    partner_link_info->link_addr.bytes,
-					    channel);
 		status = lim_update_mlo_mgr_info(mac_ctx,
 						 session->vdev,
 						 &partner_link_info->link_addr,
 						 partner_link_info->link_id,
-						 channel.ch_freq);
+						 partner_link_info->chan_freq);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("failed %d to update mlo_mgr link id %d freq %d",
 			       status, partner_link_info->link_id,
