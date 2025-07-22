@@ -179,6 +179,156 @@ static const struct index_eht_data_rate_type eht_mcs_nss2[] = {
 	     {{57648, 54444, 49000}, {0} }}
 };
 
+/*MCS parameters with Nss = 3*/
+static const struct index_eht_data_rate_type eht_mcs_nss3[] = {
+/* MCS,   {dcm0:0.8/1.6/3.2},         {dcm1:0.8/1.6/3.2} */
+	{0,  {{258,   243,   219}, {0} }, /* EHT20 */
+	     {{516,   489,   438}, {0} }, /* EHT40 */
+	     {{1080,  1020,  918}, {0} }, /* EHT80 */
+	     {{2163,  2043,  1839}, {0} }, /* EHT160 */
+	     {{4323,  4083,  3675}, {0} } }, /* EHT320 */
+	{1,  {{516,   489,   438}, {0} },
+	     {{1032,  975,   879}, {0} },
+	     {{2163,  2043,  1839}, {0} },
+	     {{4323,  4083,  3675}, {0} },
+	     {{8646,  8166,  7350}, {0} } },
+	{2,  {{774,   732,   657}, {0} },
+	     {{1548,  1464,  1317}, {0} },
+	     {{3243,  3063,  2757}, {0} },
+	     {{6486,  6126,  5514}, {0} },
+	     {{12972, 12249, 11025}, {0} } },
+	{3,  {{1032,  975,   879}, {0} },
+	     {{2064,  1950,  1755}, {0} },
+	     {{4323,  4083,  3675}, {0} },
+	     {{8646,  8166,  7350}, {0} },
+	     {{17295, 16332, 14700}, {0} } },
+	{4,  {{1548,  1464,  1317}, {0} },
+	     {{3096,  2925,  2634}, {0} },
+	     {{6486,  6126,  5514}, {0} },
+	     {{12972, 12249, 11025}, {0} },
+	     {{25941, 24501, 22050}, {0} } },
+	{5,  {{2064, 1950, 1755}, {0} },
+	     {{4128, 3900, 3510}, {0} },
+	     {{8646, 8166, 7350}, {0} },
+	     {{17295, 16332, 14700}, {0} },
+	     {{34587, 32667, 29400}, {0} } },
+	{6,  {{2322, 2193, 1974}, {0} },
+	     {{4647, 4389, 3948}, {0} },
+	     {{9729, 9189, 8268}, {0} },
+	     {{19455, 18375, 16539}, {0} },
+	     {{38913, 36750, 33075}, {0} } },
+	{7,  {{2580, 2439, 2193}, {0} },
+	     {{5163, 4875, 4389}, {0} },
+	     {{10809, 10209, 9189}, {0} },
+	     {{21618, 20418, 18375}, {0} },
+	     {{43236, 40833, 36750}, {0} } },
+	{8,  {{3096, 2925, 2634}, {0} },
+	     {{6195, 5850, 5265}, {0} },
+	     {{12972, 12249, 11025}, {0} },
+	     {{25941, 24501, 22050}, {0} },
+	     {{51882, 48999, 44100}, {0} } },
+	{9,  {{3441, 3249, 2925}, {0} },
+	     {{6882, 6501, 5850}, {0} },
+	     {{14412, 13611, 12249}, {0} },
+	     {{28824, 27222, 24501}, {0} },
+	     {{57648, 54444, 48999}, {0} } },
+	{10, {{3870, 3657, 3291}, {0} },
+	     {{7743, 7314, 6582}, {0} },
+	     {{16212, 15312, 13782}, {0} },
+	     {{32427, 30624, 27564}, {0} },
+	     {{64854, 61251, 55125}, {0} } },
+	{11, {{4302, 4062, 3657}, {0} },
+	     {{8604, 8124, 7314}, {0} },
+	     {{18015, 17013, 15312}, {0} },
+	     {{36030, 34029, 30624}, {0} },
+	     {{72060, 68055, 61251}, {0} } },
+	{12, {{4647, 4389, 3948}, {0} },
+	     {{9291, 8775, 7899}, {0} },
+	     {{19455, 18375, 16539}, {0} },
+	     {{38913, 36750, 33075}, {0} },
+	     {{77823, 73500, 66150}, {0} } },
+	{13, {{5163, 4875, 4389}, {0} },
+	     {{10323, 9750, 8775}, {0} },
+	     {{21618, 20418, 18375}, {0} },
+	     {{43236, 40833, 36750}, {0} },
+	     {{86472, 81666, 73500}, {0} } },
+};
+
+/*MCS parameters with Nss = 4*/
+static const struct index_eht_data_rate_type eht_mcs_nss4[] = {
+/* MCS,   {dcm0:0.8/1.6/3.2},         {dcm1:0.8/1.6/3.2} */
+	{0,  {{344,   324,   292}, {0} }, /* EHT20 */
+	     {{688,   652,   584}, {0} }, /* EHT40 */
+	     {{1440,  1360,  1224}, {0} }, /* EHT80 */
+	     {{2884,  2724,  2452}, {0} }, /* EHT160 */
+	     {{5764,  5444,  4900}, {0} } }, /* EHT320 */
+	{1,  {{688,   652,   584}, {0} },
+	     {{1376,  1300,  1172}, {0} },
+	     {{2884,  2724,  2452}, {0} },
+	     {{5764,  5444,  4900}, {0} },
+	     {{11528, 10888, 9800}, {0} } },
+	{2,  {{1032,  976,   876}, {0} },
+	     {{2064,  1952,  1756}, {0} },
+	     {{4324,  4084,  3676}, {0} },
+	     {{8648,  8168,  7352}, {0} },
+	     {{17296, 16332, 14700}, {0} } },
+	{3,  {{1376,  1300,  1172}, {0} },
+	     {{2752,  2600,  2340}, {0} },
+	     {{5764,  5444,  4900}, {0} },
+	     {{11528, 10888, 9800}, {0} },
+	     {{23060, 21776, 19600}, {0} } },
+	{4,  {{2064,  1952,  1756}, {0} },
+	     {{4128,  3900,  3512}, {0} },
+	     {{8648,  8168,  7352}, {0} },
+	     {{17296, 16332, 14700}, {0} },
+	     {{34588, 32668, 29400}, {0} } },
+	{5,  {{2752, 2600, 2340}, {0} },
+	     {{5504, 5200, 4680}, {0} },
+	     {{11528, 10888, 9800}, {0} },
+	     {{23060, 21776, 19600}, {0} },
+	     {{46116, 43556, 39200}, {0} } },
+	{6,  {{3096, 2924, 2632}, {0} },
+	     {{6196, 5852, 5264}, {0} },
+	     {{12972, 12252, 11024}, {0} },
+	     {{25940, 24500, 22052}, {0} },
+	     {{51884, 49000, 44100}, {0} } },
+	{7,  {{3440, 3250, 2924}, {0} },
+	     {{6884, 6500, 5852}, {0} },
+	     {{14412, 13612, 12252}, {0} },
+	     {{28824, 27224, 24500}, {0} },
+	     {{57648, 54444, 49000}, {0} } },
+	{8,  {{4128, 3900, 3512}, {0} },
+	     {{8260, 7800, 7020}, {0} },
+	     {{17296, 16332, 14700}, {0} },
+	     {{34588, 32668, 29400}, {0} },
+	     {{69176, 65332, 58800}, {0} } },
+	{9,  {{4588, 4332, 3900}, {0} },
+	     {{9176, 8668, 7800}, {0} },
+	     {{19216, 18148, 16332}, {0} },
+	     {{38432, 36296, 32668}, {0} },
+	     {{76864, 72592, 65332}, {0} } },
+	{10, {{5160, 4876, 4388}, {0} },
+	     {{10324, 9752, 8776}, {0} },
+	     {{21616, 20416, 18376}, {0} },
+	     {{43236, 40832, 36752}, {0} },
+	     {{86472, 81668, 73500}, {0} } },
+	{11, {{5736, 5416, 4876}, {0} },
+	     {{11472, 10832, 9752}, {0} },
+	     {{24020, 22684, 20416}, {0} },
+	     {{48040, 45372, 40832}, {0} },
+	     {{96080, 90740, 81668}, {0} } },
+	{12, {{6196, 5852, 5264}, {0} },
+	     {{12388, 11700, 10532}, {0} },
+	     {{25940, 24500, 22052}, {0} },
+	     {{51884, 49000, 44100}, {0} },
+	     {{103764, 98000, 88200}, {0} } },
+	{13, {{6884, 6500, 5852}, {0} },
+	     {{13764, 13000, 11700}, {0} },
+	     {{28824, 27224, 24500}, {0} },
+	     {{57648, 54444, 49000}, {0} },
+	     {{115296, 108888, 98000}, {0} } },
+};
+
 static void wma_aggregate_eht_cap(tDot11fIEeht_cap *aggr_eht_cap,
 				  tDot11fIEeht_cap *eht_cap)
 {
@@ -1188,7 +1338,7 @@ enum tx_rate_info wma_get_eht_rate_flags(enum phy_ch_width ch_width)
 	return rate_flags;
 }
 
-uint16_t wma_match_eht_rate(uint16_t raw_rate,
+uint32_t wma_match_eht_rate(uint16_t raw_rate,
 			    enum tx_rate_info rate_flags,
 			    uint8_t *nss, uint8_t *dcm,
 			    enum txrate_gi *guard_interval,
@@ -1198,10 +1348,8 @@ uint16_t wma_match_eht_rate(uint16_t raw_rate,
 	uint8_t index;
 	uint8_t dcm_index_max = 1;
 	uint8_t dcm_index;
-	uint16_t match_rate = 0;
-	const uint16_t *nss1_rate;
-	const uint16_t *nss2_rate;
-
+	uint32_t match_rate = 0;
+	const uint32_t *nss_rate[4];
 	*p_index = 0;
 	if (!(rate_flags & (TX_RATE_EHT320 | TX_RATE_EHT160 | TX_RATE_EHT80 |
 	      TX_RATE_EHT40 | TX_RATE_EHT20)))
@@ -1211,22 +1359,24 @@ uint16_t wma_match_eht_rate(uint16_t raw_rate,
 		dcm_index_max = IS_MCS_HAS_DCM_RATE(index) ? 2 : 1;
 		for (dcm_index = 0; dcm_index < dcm_index_max; dcm_index++) {
 			if (rate_flags & TX_RATE_EHT320) {
-				nss1_rate = &eht_mcs_nss1[index].supported_eht320_rate[dcm_index][0];
-				nss2_rate = &eht_mcs_nss2[index].supported_eht320_rate[dcm_index][0];
+				nss_rate[0] = &eht_mcs_nss1[index].supported_eht320_rate[dcm_index][0];
+				nss_rate[1] = &eht_mcs_nss2[index].supported_eht320_rate[dcm_index][0];
+				nss_rate[2] = &eht_mcs_nss3[index].supported_eht320_rate[dcm_index][0];
+				nss_rate[3] = &eht_mcs_nss4[index].supported_eht320_rate[dcm_index][0];
 				match_rate = wma_mcs_rate_match(raw_rate, 1,
-								nss1_rate,
-								nss2_rate,
+								nss_rate,
 								nss,
 								guard_interval);
 				if (match_rate)
 					goto rate_found;
 			}
 			if (rate_flags & TX_RATE_EHT160) {
-				nss1_rate = &eht_mcs_nss1[index].supported_eht160_rate[dcm_index][0];
-				nss2_rate = &eht_mcs_nss2[index].supported_eht160_rate[dcm_index][0];
+				nss_rate[0] = &eht_mcs_nss1[index].supported_eht160_rate[dcm_index][0];
+				nss_rate[1] = &eht_mcs_nss2[index].supported_eht160_rate[dcm_index][0];
+				nss_rate[2] = &eht_mcs_nss3[index].supported_eht160_rate[dcm_index][0];
+				nss_rate[3] = &eht_mcs_nss4[index].supported_eht160_rate[dcm_index][0];
 				match_rate = wma_mcs_rate_match(raw_rate, 1,
-								nss1_rate,
-								nss2_rate,
+								nss_rate,
 								nss,
 								guard_interval);
 				if (match_rate)
@@ -1234,12 +1384,13 @@ uint16_t wma_match_eht_rate(uint16_t raw_rate,
 			}
 
 			if (rate_flags & (TX_RATE_EHT80 | TX_RATE_EHT160)) {
-				nss1_rate = &eht_mcs_nss1[index].supported_eht80_rate[dcm_index][0];
-				nss2_rate = &eht_mcs_nss2[index].supported_eht80_rate[dcm_index][0];
-				/* check for he80 nss1/2 rate set */
+				nss_rate[0] = &eht_mcs_nss1[index].supported_eht80_rate[dcm_index][0];
+				nss_rate[1] = &eht_mcs_nss2[index].supported_eht80_rate[dcm_index][0];
+				nss_rate[2] = &eht_mcs_nss3[index].supported_eht80_rate[dcm_index][0];
+				nss_rate[3] = &eht_mcs_nss4[index].supported_eht80_rate[dcm_index][0];
+				/* check for he80 nss1/2/3/4 rate set */
 				match_rate = wma_mcs_rate_match(raw_rate, 1,
-								nss1_rate,
-								nss2_rate,
+								nss_rate,
 								nss,
 								guard_interval);
 				if (match_rate) {
@@ -1250,11 +1401,12 @@ uint16_t wma_match_eht_rate(uint16_t raw_rate,
 
 			if (rate_flags & (TX_RATE_EHT40 | TX_RATE_EHT80 |
 					  TX_RATE_EHT160)) {
-				nss1_rate = &eht_mcs_nss1[index].supported_eht40_rate[dcm_index][0];
-				nss2_rate = &eht_mcs_nss2[index].supported_eht40_rate[dcm_index][0];
+				nss_rate[0] = &eht_mcs_nss1[index].supported_eht40_rate[dcm_index][0];
+				nss_rate[1] = &eht_mcs_nss2[index].supported_eht40_rate[dcm_index][0];
+				nss_rate[2] = &eht_mcs_nss3[index].supported_eht40_rate[dcm_index][0];
+				nss_rate[3] = &eht_mcs_nss4[index].supported_eht40_rate[dcm_index][0];
 				match_rate = wma_mcs_rate_match(raw_rate, 1,
-								nss1_rate,
-								nss2_rate,
+								nss_rate,
 								nss,
 								guard_interval);
 
@@ -1267,11 +1419,12 @@ uint16_t wma_match_eht_rate(uint16_t raw_rate,
 
 			if (rate_flags & (TX_RATE_EHT80 | TX_RATE_EHT40 |
 				TX_RATE_EHT20 | TX_RATE_EHT160)) {
-				nss1_rate = &eht_mcs_nss1[index].supported_eht20_rate[dcm_index][0];
-				nss2_rate = &eht_mcs_nss2[index].supported_eht20_rate[dcm_index][0];
+				nss_rate[0] = &eht_mcs_nss1[index].supported_eht20_rate[dcm_index][0];
+				nss_rate[1] = &eht_mcs_nss2[index].supported_eht20_rate[dcm_index][0];
+				nss_rate[2] = &eht_mcs_nss3[index].supported_eht20_rate[dcm_index][0];
+				nss_rate[3] = &eht_mcs_nss4[index].supported_eht20_rate[dcm_index][0];
 				match_rate = wma_mcs_rate_match(raw_rate, 1,
-								nss1_rate,
-								nss2_rate,
+								nss_rate,
 								nss,
 								guard_interval);
 

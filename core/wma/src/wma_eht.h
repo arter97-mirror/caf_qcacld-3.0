@@ -41,11 +41,11 @@ enum EHT_TXRX_MCS_NSS_IDX {
  */
 struct index_eht_data_rate_type {
 	uint8_t beacon_rate_index;
-	uint16_t supported_eht20_rate[MAX_EHT_DCM_INDEX][3];
-	uint16_t supported_eht40_rate[MAX_EHT_DCM_INDEX][3];
-	uint16_t supported_eht80_rate[MAX_EHT_DCM_INDEX][3];
-	uint16_t supported_eht160_rate[MAX_EHT_DCM_INDEX][3];
-	uint16_t supported_eht320_rate[MAX_EHT_DCM_INDEX][3];
+	uint32_t supported_eht20_rate[MAX_EHT_DCM_INDEX][3];
+	uint32_t supported_eht40_rate[MAX_EHT_DCM_INDEX][3];
+	uint32_t supported_eht80_rate[MAX_EHT_DCM_INDEX][3];
+	uint32_t supported_eht160_rate[MAX_EHT_DCM_INDEX][3];
+	uint32_t supported_eht320_rate[MAX_EHT_DCM_INDEX][3];
 };
 
 /*
@@ -217,7 +217,7 @@ enum tx_rate_info wma_get_eht_rate_flags(enum phy_ch_width ch_width);
  *
  *  Return: return match rate if found, else 0
  */
-uint16_t wma_match_eht_rate(uint16_t raw_rate,
+uint32_t wma_match_eht_rate(uint16_t raw_rate,
 			    enum tx_rate_info rate_flags,
 			    uint8_t *nss, uint8_t *dcm,
 			    enum txrate_gi *guard_interval,
@@ -339,7 +339,7 @@ enum tx_rate_info wma_get_eht_rate_flags(enum phy_ch_width ch_width)
 }
 
 static inline
-uint16_t wma_match_eht_rate(uint16_t raw_rate,
+uint32_t wma_match_eht_rate(uint16_t raw_rate,
 			    enum tx_rate_info rate_flags,
 			    uint8_t *nss, uint8_t *dcm,
 			    enum txrate_gi *guard_interval,

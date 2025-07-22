@@ -45,7 +45,7 @@
 
 #endif /* WLAN_SUPPORT_TWT */
 
-#define MAX_NUM_CHAINS              2
+#define MAX_NUM_CHAINS              4
 
 #define MAX_MIB_STATS               1
 

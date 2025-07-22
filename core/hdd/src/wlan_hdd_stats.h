@@ -111,10 +111,10 @@ extern const struct nla_policy qca_wlan_vendor_ll_get_policy[
  */
 struct index_he_data_rate_type {
 	uint8_t beacon_rate_index;
-	uint16_t supported_HE20_rate[MAX_HE_DCM_INDEX][3];
-	uint16_t supported_HE40_rate[MAX_HE_DCM_INDEX][3];
-	uint16_t supported_HE80_rate[MAX_HE_DCM_INDEX][3];
-	uint16_t supported_HE160_rate[MAX_HE_DCM_INDEX][3];
+	uint32_t supported_HE20_rate[MAX_HE_DCM_INDEX][3];
+	uint32_t supported_HE40_rate[MAX_HE_DCM_INDEX][3];
+	uint32_t supported_HE80_rate[MAX_HE_DCM_INDEX][3];
+	uint32_t supported_HE160_rate[MAX_HE_DCM_INDEX][3];
 };
 
 /**

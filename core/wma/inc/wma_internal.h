@@ -74,8 +74,8 @@
  */
 struct index_data_rate_type {
 	uint8_t  mcs_index;
-	uint16_t ht20_rate[2];
-	uint16_t ht40_rate[2];
+	uint32_t ht20_rate[2];
+	uint32_t ht40_rate[2];
 };
 
 /**
@@ -88,10 +88,10 @@ struct index_data_rate_type {
  */
 struct index_vht_data_rate_type {
 	uint8_t mcs_index;
-	uint16_t ht20_rate[2];
-	uint16_t ht40_rate[2];
-	uint16_t ht80_rate[2];
-	uint16_t ht160_rate[2];
+	uint32_t ht20_rate[2];
+	uint32_t ht40_rate[2];
+	uint32_t ht80_rate[2];
+	uint32_t ht160_rate[2];
 };
 
 #ifdef WLAN_FEATURE_11AX
@@ -106,10 +106,10 @@ struct index_vht_data_rate_type {
  */
 struct index_he_data_rate_type {
 	uint8_t beacon_rate_index;
-	uint16_t supported_he20_rate[MAX_HE_DCM_INDEX][3];
-	uint16_t supported_he40_rate[MAX_HE_DCM_INDEX][3];
-	uint16_t supported_he80_rate[MAX_HE_DCM_INDEX][3];
-	uint16_t supported_he160_rate[MAX_HE_DCM_INDEX][3];
+	uint32_t supported_he20_rate[MAX_HE_DCM_INDEX][3];
+	uint32_t supported_he40_rate[MAX_HE_DCM_INDEX][3];
+	uint32_t supported_he80_rate[MAX_HE_DCM_INDEX][3];
+	uint32_t supported_he160_rate[MAX_HE_DCM_INDEX][3];
 };
 #endif
 
@@ -1733,8 +1733,7 @@ int wma_get_ani_level_evt_handler(void *handle, uint8_t *event_buf,
  * wma_mcs_rate_match() - find the match mcs rate
  * @raw_rate: the rate to look up
  * @is_he: if it is he rate
- * @nss1_rate: the nss1 rate
- * @nss2_rate: the nss2 rate
+ * @nss_rate: the NSS rate for NSS [1-4]
  * @nss: the nss in use
  * @guard_interval: to get guard interval from rate
  *
@@ -1743,9 +1742,8 @@ int wma_get_ani_level_evt_handler(void *handle, uint8_t *event_buf,
  *
  * Return: the found rate or 0 otherwise
  */
-uint16_t wma_mcs_rate_match(uint16_t raw_rate, bool is_he,
-			    const uint16_t *nss1_rate,
-			    const uint16_t *nss2_rate,
+uint32_t wma_mcs_rate_match(uint16_t raw_rate, bool is_he,
+			    const uint32_t *nss_rate[4],
 			    uint8_t *nss, enum txrate_gi *guard_interval);
 
 /**

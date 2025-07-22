@@ -102,7 +102,7 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #define QOS_MAP_LEN_MIN (QOS_MAP_RANGE_NUM * 2)
 #define QOS_MAP_LEN_MAX \
 	(QOS_MAP_LEN_MIN + 2 * QOS_MAP_MAX_EX)
-#define NUM_CHAINS_MAX  2
+#define NUM_CHAINS_MAX  4
 
 /* Maximum number of realms present in fils indication element */
 #define SIR_MAX_REALM_COUNT 7
