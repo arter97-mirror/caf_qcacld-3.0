@@ -1118,7 +1118,6 @@ static inline void pe_free_dph_node_array_buffer(void)
  * @mac: pointer to global adapter context
  * @bssid: BSSID of the new session
  * @sessionId: PE session ID is returned here, if PE session is created.
- * @numSta: number of stations
  * @bssType: bss type of new session to do conditional memory allocation.
  * @vdev_id: vdev_id
  *
@@ -1129,8 +1128,7 @@ static inline void pe_free_dph_node_array_buffer(void)
  */
 struct pe_session *pe_create_session(struct mac_context *mac,
 				     uint8_t *bssid, uint8_t *sessionId,
-				     uint16_t numSta, enum bss_type bssType,
-				     uint8_t vdev_id);
+				     enum bss_type bssType, uint8_t vdev_id);
 
 /**
  * pe_find_session_by_bssid() - looks up the PE session given the BSSID.

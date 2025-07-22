@@ -524,13 +524,12 @@ void lim_update_bcn_probe_filter(struct mac_context *mac_ctx,
 		 filter->num_sap_sessions);
 }
 
-struct pe_session *pe_create_session(struct mac_context *mac,
-				     uint8_t *bssid, uint8_t *sessionId,
-				     uint16_t numSta, enum bss_type bssType,
+struct pe_session *pe_create_session(struct mac_context *mac, uint8_t *bssid,
+				     uint8_t *sessionId, enum bss_type bssType,
 				     uint8_t vdev_id)
 {
 	QDF_STATUS status;
-	uint8_t i;
+	uint8_t i, numsta = mac->lim.max_sta_of_pe_session;
 	struct pe_session *session_ptr;
 	struct wlan_objmgr_vdev *vdev;
 
@@ -550,13 +549,13 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 	qdf_mem_zero((void *)session_ptr, sizeof(struct pe_session));
 	/* Allocate space for Station Table for this session. */
 	session_ptr->dph.dphHashTable.pHashTable =
-		qdf_mem_malloc(sizeof(tpDphHashNode) * (numSta + 1));
+		qdf_mem_malloc(sizeof(tpDphHashNode) * (numsta + 1));
 	if (!session_ptr->dph.dphHashTable.pHashTable)
 		return NULL;
 
 	session_ptr->dph.dphHashTable.pDphNodeArray =
 					pe_get_session_dph_node_array(i);
-	session_ptr->dph.dphHashTable.size = numSta + 1;
+	session_ptr->dph.dphHashTable.size = numsta + 1;
 	dph_hash_table_init(mac, &session_ptr->dph.dphHashTable);
 
 	session_ptr->valid = true;
@@ -621,10 +620,10 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 	mlme_set_tdls_prohibited(vdev, false);
 	pe_debug("Create PE session: %d opmode %d vdev_id %d  BSSID: "QDF_MAC_ADDR_FMT" Max No of STA: %d",
 		 *sessionId, session_ptr->opmode, vdev_id,
-		 QDF_MAC_ADDR_REF(bssid), numSta);
+		 QDF_MAC_ADDR_REF(bssid), numsta);
 
 	if (!lim_create_peer_idxpool(session_ptr,
-				     lim_get_peer_idxpool_size(numSta,
+				     lim_get_peer_idxpool_size(numsta,
 							       bssType)))
 		goto free_session_attrs;
 

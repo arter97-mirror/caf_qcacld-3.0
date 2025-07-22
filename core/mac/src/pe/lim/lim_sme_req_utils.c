@@ -140,35 +140,10 @@ lim_set_rnr_ie_from_start_bss_req(struct mac_context *mac_ctx,
 #endif
 
 bool lim_is_sme_start_bss_req_valid(struct mac_context *mac_ctx,
-				    struct start_bss_config *start_bss_req,
-				    enum bss_type bss_type)
+				    struct start_bss_config *start_bss_req)
 {
 	uint8_t i = 0;
 	tSirMacRateSet *opr_rates = &start_bss_req->operationalRateSet;
-
-	switch (bss_type) {
-	case eSIR_INFRASTRUCTURE_MODE:
-		/**
-		 * Should not have received start BSS req with bssType
-		 * Infrastructure on STA.
-		 */
-		pe_warn("Invalid bss type: %d in eWNI_SME_START_BSS_REQ",
-			bss_type);
-		return false;
-		break;
-	case eSIR_INFRA_AP_MODE:
-		break;
-	case eSIR_NDI_MODE:
-		break;
-	default:
-		/**
-		 * Should not have received start BSS req with bssType
-		 * other than Infrastructure/IBSS.
-		 */
-		pe_warn("Invalid bss type: %d in eWNI_SME_START_BSS_REQ",
-			bss_type);
-		return false;
-	}
 
 	if (start_bss_req->nwType != eSIR_11A_NW_TYPE
 	    && start_bss_req->nwType != eSIR_11B_NW_TYPE

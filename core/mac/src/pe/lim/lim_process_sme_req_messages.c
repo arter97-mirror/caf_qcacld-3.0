@@ -914,7 +914,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 	if ((mac_ctx->lim.gLimSmeState == eLIM_SME_OFFLINE_STATE) ||
 	    (mac_ctx->lim.gLimSmeState == eLIM_SME_IDLE_STATE)) {
 		if (!lim_is_sme_start_bss_req_valid(mac_ctx,
-					sme_start_bss_req, bss_type)) {
+						    sme_start_bss_req)) {
 			pe_warn("Received invalid eWNI_SME_START_BSS_REQ");
 			ret_code = eSIR_SME_INVALID_PARAMETERS;
 			goto free;
@@ -934,10 +934,8 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			goto free;
 		} else {
 			session = pe_create_session(mac_ctx, bssid.bytes,
-					&session_id,
-					mac_ctx->lim.max_sta_of_pe_session,
-					bss_type,
-					sme_start_bss_req->vdev_id);
+						    &session_id, bss_type,
+						    vdev_id);
 			if (!session) {
 				pe_warn("Session Can not be created");
 				ret_code = eSIR_SME_RESOURCES_UNAVAILABLE;
@@ -1032,30 +1030,15 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 						channelBondingMode24GHz;
 		}
 
-		switch (bss_type) {
-		case eSIR_INFRA_AP_MODE:
+		if (bss_type == eSIR_INFRA_AP_MODE) {
 			lim_configure_ap_start_bss_session(mac_ctx, session,
 				sme_start_bss_req);
 			if (session->opmode == QDF_SAP_MODE)
 				session->vdev_nss = vdev_type_nss->sap;
 			else
 				session->vdev_nss = vdev_type_nss->p2p_go;
-			break;
-		case eSIR_NDI_MODE:
+		} else {
 			session->vdev_nss = vdev_type_nss->ndi;
-			break;
-
-
-		/*
-		 * There is one more mode called auto mode.
-		 * which is used no where
-		 */
-
-		/* FORBUILD -TEMPFIX.. HOW TO use AUTO MODE????? */
-
-		default:
-			/* not used anywhere...used in scan function */
-			break;
 		}
 
 		session->nss = session->vdev_nss;
@@ -3866,10 +3849,8 @@ lim_cm_create_session(struct mac_context *mac_ctx, struct cm_vdev_join_req *req)
 	}
 
 	pe_session = pe_create_session(mac_ctx, req->entry->bssid.bytes,
-			&session_id,
-			mac_ctx->lim.max_sta_of_pe_session,
-			eSIR_INFRASTRUCTURE_MODE,
-			req->vdev_id);
+				       &session_id, eSIR_INFRASTRUCTURE_MODE,
+				       req->vdev_id);
 	if (!pe_session)
 		pe_err("vdev_id: %d cm_id 0x%x : pe_session create failed BSSID"
 		       QDF_MAC_ADDR_FMT, req->vdev_id, req->cm_id,

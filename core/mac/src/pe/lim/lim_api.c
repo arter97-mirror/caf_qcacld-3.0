@@ -3242,7 +3242,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	status = QDF_STATUS_E_FAILURE;
 	ft_session_ptr = pe_create_session(mac_ctx, bss_desc->bssId,
 					   &session_id,
-					   mac_ctx->lim.max_sta_of_pe_session,
 					   GET_LIM_BSS_TYPE(session_ptr),
 					   session_ptr->vdev_id);
 	if (!ft_session_ptr) {
@@ -3711,9 +3710,7 @@ void lim_mon_init_session(struct mac_context *mac_ptr,
 	uint8_t session_id;
 
 	psession_entry = pe_create_session(mac_ptr, msg->bss_id.bytes,
-					   &session_id,
-					   mac_ptr->lim.max_sta_of_pe_session,
-					   eSIR_MONITOR_MODE,
+					   &session_id, eSIR_MONITOR_MODE,
 					   msg->vdev_id);
 	if (!psession_entry) {
 		pe_err("Monitor mode: Session Can not be created bssid: "
@@ -3984,7 +3981,6 @@ lim_cm_roam_create_session(struct mac_context *mac_ctx,
 	if (!pe_session && is_link_vdev) {
 		pe_session = pe_create_session(mac_ctx, &link_mac_addr.bytes[0],
 					       &session_id,
-					       mac_ctx->lim.max_sta_of_pe_session,
 					       eSIR_INFRASTRUCTURE_MODE,
 					       vdev_id);
 		if (!pe_session) {
