@@ -214,20 +214,6 @@ lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
 }
 #endif
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-static inline bool lim_is_roam_synch_in_progress(struct wlan_objmgr_psoc *psoc,
-						 struct pe_session *pe_session)
-{
-	return wlan_cm_is_vdev_roam_sync_inprogress(pe_session->vdev);
-}
-#else
-static inline bool lim_is_roam_synch_in_progress(struct wlan_objmgr_psoc *psoc,
-						 struct pe_session *pe_session)
-{
-	return false;
-}
-#endif
-
 void
 lim_send_del_sta_cnf(struct mac_context *mac, struct qdf_mac_addr sta_dsaddr,
 		     struct qdf_mac_addr sta_mld_addr,

@@ -1237,7 +1237,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry) ||
+	if (wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev) ||
 	    wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
 		hdr = (tpSirMacMgmtHdr)rx_pkt_info;
 		rssi = 0;
@@ -1261,7 +1261,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (((subtype == LIM_ASSOC) &&
 		(session_entry->limMlmState != eLIM_MLM_WT_ASSOC_RSP_STATE)) ||
 		((subtype == LIM_REASSOC) &&
-		 !lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry) &&
+		 !wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev) &&
 		 !MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(mac_ctx->psoc,
 						     session_entry->vdev_id) &&
 		((session_entry->limMlmState != eLIM_MLM_WT_REASSOC_RSP_STATE)
@@ -1283,53 +1283,47 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return QDF_STATUS_E_INVAL;
 	}
 	sir_copy_mac_addr(current_bssid, session_entry->bssId);
-	if (subtype == LIM_ASSOC) {
-		if (qdf_mem_cmp
-			(hdr->sa, current_bssid, sizeof(tSirMacAddr))) {
-			/*
-			 * Received Association Response frame from an entity
-			 * other than one to which request was initiated.
-			 * Ignore this and wait until Assoc Failure Timeout
-			 */
-			pe_warn("received AssocRsp from unexpected peer "QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(hdr->sa));
+	if (subtype == LIM_ASSOC &&
+	    qdf_mem_cmp(hdr->sa, current_bssid, sizeof(tSirMacAddr))) {
+		/*
+		 * Received Association Response frame from an entity
+		 * other than one to which request was initiated.
+		 * Ignore this and wait until Assoc Failure Timeout
+		 */
+		pe_warn("received AssocRsp from unexpected peer "QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(hdr->sa));
 
-			if (lim_is_roam_synch_in_progress(mac_ctx->psoc,
-							  session_entry))
-				return QDF_STATUS_E_INVAL;
+		if (wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev))
+			return QDF_STATUS_E_INVAL;
 
-			/*
-			 * Send Assoc failure to avoid connection in
-			 * progress state for link vdev.
-			 */
-			lim_send_join_fail_on_vdev(mac_ctx, session_entry,
-						   eSIR_SME_ASSOC_REFUSED);
-			return QDF_STATUS_SUCCESS;
-		}
-	} else {
-		if (qdf_mem_cmp
-			(hdr->sa, session_entry->limReAssocbssId,
-			sizeof(tSirMacAddr))) {
-			/*
-			 * Received Reassociation Response frame from an entity
-			 * other than one to which request was initiated.
-			 * Ignore this and wait until Reassoc Failure Timeout.
-			 */
-			pe_warn("received ReassocRsp from unexpected peer "QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(hdr->sa));
+		/*
+		 * Send Assoc failure to avoid connection in
+		 * progress state for link vdev.
+		 */
+		lim_send_join_fail_on_vdev(mac_ctx, session_entry,
+					   eSIR_SME_ASSOC_REFUSED);
+		return QDF_STATUS_SUCCESS;
+	} else if (subtype == LIM_REASSOC &&
+		   qdf_mem_cmp(hdr->sa, session_entry->limReAssocbssId,
+			       sizeof(tSirMacAddr))) {
+		/*
+		 * Received Reassociation Response frame from an entity
+		 * other than one to which request was initiated.
+		 * Ignore this and wait until Reassoc Failure Timeout.
+		 */
+		pe_warn("received ReassocRsp from unexpected peer " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(hdr->sa));
 
-			if (lim_is_roam_synch_in_progress(mac_ctx->psoc,
-							  session_entry))
-				return QDF_STATUS_E_INVAL;
+		if (wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev))
+			return QDF_STATUS_E_INVAL;
 
-			/*
-			 * Send Reassoc failure to avoid connection in
-			 * progress state for link vdev.
-			 */
-			lim_send_join_fail_on_vdev(mac_ctx, session_entry,
-						   eSIR_SME_REASSOC_REFUSED);
-			return QDF_STATUS_SUCCESS;
-		}
+		/*
+		 * Send Reassoc failure to avoid connection in
+		 * progress state for link vdev.
+		 */
+		lim_send_join_fail_on_vdev(mac_ctx, session_entry,
+					   eSIR_SME_REASSOC_REFUSED);
+		return QDF_STATUS_SUCCESS;
 	}
 
 	assoc_rsp = qdf_mem_malloc(sizeof(*assoc_rsp));
@@ -1338,7 +1332,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	}
 
 	/* Get pointer to Re/Association Response frame body */
-	if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry) ||
+	if (wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev) ||
 	    wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
 		body =  rx_pkt_info + SIR_MAC_HDR_LEN_3A;
 		frame_body_len -= SIR_MAC_HDR_LEN_3A;
@@ -1664,8 +1658,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 		if ((session_entry->limMlmState ==
 		     eLIM_MLM_WT_FT_REASSOC_RSP_STATE) ||
-		    lim_is_roam_synch_in_progress(mac_ctx->psoc,
-						  session_entry)) {
+		    wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev)) {
 			pe_debug("Sending self sta");
 			lim_update_assoc_sta_datas(mac_ctx, sta_ds, assoc_rsp,
 				session_entry, NULL);
@@ -1678,8 +1671,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				session_entry->gLimEdcaParams,
 				session_entry);
 			/* Send the active EDCA parameters to HAL */
-			if (!lim_is_roam_synch_in_progress(mac_ctx->psoc,
-							   session_entry)) {
+			if (!wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev)) {
 				lim_send_edca_params(mac_ctx,
 					session_entry->gLimEdcaParamsActive,
 					session_entry->vdev_id, false);

@@ -4005,7 +4005,7 @@ QDF_STATUS lim_process_sme_tdls_mgmt_send_req(struct mac_context *mac_ctx,
 		goto lim_tdls_send_mgmt_error;
 	}
 
-	if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry)) {
+	if (wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev)) {
 		pe_err("roaming in progress, reject mgmt! for session %d",
 		       send_req->session_id);
 		result_code = eSIR_SME_REFUSED;
@@ -4167,7 +4167,7 @@ QDF_STATUS lim_process_sme_tdls_add_sta_req(struct mac_context *mac,
 		goto lim_tdls_add_sta_error;
 	}
 
-	if (lim_is_roam_synch_in_progress(mac->psoc, pe_session)) {
+	if (wlan_cm_is_vdev_roam_sync_inprogress(pe_session->vdev)) {
 		pe_err("roaming in progress, reject add sta! for session %d",
 		       add_sta_req->session_id);
 		goto lim_tdls_add_sta_error;
@@ -4240,7 +4240,7 @@ QDF_STATUS lim_process_sme_tdls_del_sta_req(struct mac_context *mac,
 		goto lim_tdls_del_sta_error;
 	}
 
-	if (lim_is_roam_synch_in_progress(mac->psoc, pe_session)) {
+	if (wlan_cm_is_vdev_roam_sync_inprogress(pe_session->vdev)) {
 		pe_err("roaming in progress, reject del sta! for session %d",
 		       del_sta_req->session_id);
 		lim_send_sme_tdls_del_sta_rsp(mac, del_sta_req->session_id,
@@ -4309,8 +4309,7 @@ static void lim_check_aid_and_delete_peer(struct mac_context *p_mac,
 			pe_err("Deleting "QDF_MAC_ADDR_FMT,
 			       QDF_MAC_ADDR_REF(stads->staAddr));
 
-			if (!lim_is_roam_synch_in_progress(p_mac->psoc,
-							   session_entry))
+			if (!wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev))
 				lim_send_deauth_mgmt_frame(
 					p_mac,
 					REASON_DEAUTH_NETWORK_LEAVING,
@@ -4389,7 +4388,7 @@ QDF_STATUS lim_delete_tdls_peers(struct mac_context *mac_ctx,
 	tgt_tdls_delete_all_peers_indication(mac_ctx->psoc,
 					     session_entry->vdev_id);
 
-	if (lim_is_roam_synch_in_progress(mac_ctx->psoc, session_entry))
+	if (wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev))
 		return QDF_STATUS_SUCCESS;
 
 	/*

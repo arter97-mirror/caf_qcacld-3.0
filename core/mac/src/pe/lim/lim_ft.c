@@ -331,7 +331,7 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 	pAddBssParams->staContext.smesessionId = ft_session->smeSessionId;
 
 	/* Set a new state for MLME */
-	if (!lim_is_roam_synch_in_progress(mac->psoc, ft_session)) {
+	if (!wlan_cm_is_vdev_roam_sync_inprogress(ft_session->vdev)) {
 		ft_session->limMlmState =
 			eLIM_MLM_WT_ADD_BSS_RSP_FT_REASSOC_STATE;
 		MTRACE(mac_trace
@@ -816,7 +816,7 @@ lim_fill_ft_session(struct mac_context *mac,
 		pBeaconStruct->is_ese_ver_ie_present;
 #endif
 
-	if (!lim_is_roam_synch_in_progress(mac->psoc, pe_session)) {
+	if (!wlan_cm_is_vdev_roam_sync_inprogress(pe_session->vdev)) {
 		ft_session->limPrevSmeState = ft_session->limSmeState;
 		ft_session->limSmeState = eLIM_SME_WT_REASSOC_STATE;
 		MTRACE(mac_trace(mac,
