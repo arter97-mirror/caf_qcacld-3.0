@@ -821,12 +821,13 @@ struct bss_description {
 #ifdef WLAN_FEATURE_FILS_SK
 	struct fils_ind_elements fils_info_element;
 #endif
-	uint32_t adaptive_11r_ap;
-	uint32_t mbo_oce_enabled_ap;
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
-	uint32_t is_single_pmk;
+	bool is_single_pmk;
 #endif
-	uint32_t is_ml_ap;
+	uint8_t adaptive_11r_ap : 1,
+		mbo_oce_enabled_ap : 1,
+		is_ml_ap : 1;
+	tDot11fBeaconIEs bcn_ies;
 	/* Please keep the structure 4 bytes aligned above the ieFields */
 	QDF_FLEX_ARRAY(uint32_t, ieFields);
 };

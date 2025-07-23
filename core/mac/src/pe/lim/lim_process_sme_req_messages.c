@@ -5434,16 +5434,8 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 	/* Store the reassoc handle in the session Table */
 	session_entry->lim_join_req = reassoc_req;
 	session_entry->pLimReAssocReq = reassoc_req;
+	ie_struct = &bss_desc->bcn_ies;
 
-	status = wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
-						     &ie_struct);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("IE parsing failed vdev id %d",
-		       session_entry->vdev_id);
-		session_entry->lim_join_req = NULL;
-		ret_code = eSIR_SME_RESOURCES_UNAVAILABLE;
-		goto end;
-	}
 	pe_debug("Assoc IE len: %d", req->assoc_ie.len);
 	if (req->assoc_ie.len)
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
@@ -5529,8 +5521,6 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 			mac_ctx->mlme_cfg->ht_caps.short_slot_time_enabled;
 	session_entry->enable_session_twt_support =
 					lim_enable_twt(mac_ctx, ie_struct);
-
-	qdf_mem_free(ie_struct);
 
 	session_entry->send_smps_action =
 		mac_ctx->roam.configParam.send_smps_action;

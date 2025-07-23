@@ -13087,20 +13087,24 @@ wlan_fill_single_pmk_ap_cap_from_scan_entry(struct mac_context *mac_ctx,
 #endif
 
 QDF_STATUS wlan_parse_bss_description_ies(struct mac_context *mac_ctx,
-					  struct bss_description *bss_desc,
-					  tDot11fBeaconIEs *ie_struct)
+					  struct bss_description *bss_desc)
 {
-	int ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 	QDF_STATUS status;
+	tDot11fBeaconIEs *ie_struct = &bss_desc->bcn_ies;
+	uint16_t ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+	uint32_t ret;
 
-	if (ie_len <= 0 || !ie_struct) {
+	if (!ie_len) {
 		pe_err("BSS description has invalid IE : %d", ie_len);
 		return QDF_STATUS_E_FAILURE;
 	}
-	if (DOT11F_FAILED(dot11f_unpack_beacon_i_es
-			  (mac_ctx, (uint8_t *)bss_desc->ieFields,
-			  ie_len, ie_struct, false))) {
-		pe_err("Beacon IE parsing failed");
+
+	qdf_mem_zero(ie_struct, sizeof(tDot11fBeaconIEs));
+
+	ret = dot11f_unpack_beacon_i_es(mac_ctx, (uint8_t *)bss_desc->ieFields,
+					ie_len, ie_struct, false);
+	if (DOT11F_FAILED(ret)) {
+		pe_err("Beacon IE parsing failed %d", ret);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -13109,59 +13113,58 @@ QDF_STATUS wlan_parse_bss_description_ies(struct mac_context *mac_ctx,
 					     ie_struct->VHTOperation,
 					     ie_struct->he_op,
 					     ie_struct->HTInfo);
-	if (status != QDF_STATUS_SUCCESS) {
-		pe_err("Failed to extract eht op");
-		return QDF_STATUS_E_FAILURE;
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to extract eht op %d", status);
+		return status;
 	}
 
 	status = lim_strip_and_decode_eht_cap((uint8_t *)bss_desc->ieFields,
 					      ie_len, &ie_struct->eht_cap,
 					      ie_struct->he_cap,
 					      bss_desc->chan_freq, false);
-	if (status != QDF_STATUS_SUCCESS) {
-		pe_err("Failed to extract eht cap");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	status = lim_strip_and_decode_tpe_ie(
-				(uint8_t *)bss_desc->ieFields, ie_len,
-				ie_struct->transmit_power_env,
-				&ie_struct->num_transmit_power_env);
-	if (status != QDF_STATUS_SUCCESS) {
-		pe_err("Failed to extract TPE IE");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-wlan_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
-				    struct bss_description *bss_desc,
-				    tDot11fBeaconIEs **ie_struct)
-{
-	QDF_STATUS status;
-
-	if (!bss_desc || !ie_struct)
-		return QDF_STATUS_E_INVAL;
-
-	*ie_struct = qdf_mem_malloc(sizeof(tDot11fBeaconIEs));
-	if (!*ie_struct)
-		return QDF_STATUS_E_NOMEM;
-
-	status = wlan_parse_bss_description_ies(mac_ctx, bss_desc,
-					        *ie_struct);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		qdf_mem_free(*ie_struct);
-		*ie_struct = NULL;
+		pe_err("Failed to extract eht cap %d", status);
+		return status;
 	}
+
+	status = lim_strip_and_decode_tpe_ie((uint8_t *)bss_desc->ieFields,
+					     ie_len,
+					     ie_struct->transmit_power_env,
+					     &ie_struct->num_transmit_power_env);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("Failed to extract TPE IE %d", status);
 
 	return status;
 }
 
-void
-wlan_populate_basic_rates(tSirMacRateSet *rate_set, bool is_ofdm_rates,
-			  bool is_basic_rates)
+QDF_STATUS wlan_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
+					       struct bss_description *bss_desc,
+					       tDot11fBeaconIEs **ie_struct)
+{
+	QDF_STATUS status;
+	tDot11fBeaconIEs *bcn_struct;
+
+	if (!bss_desc || !ie_struct)
+		return QDF_STATUS_E_INVAL;
+
+	bcn_struct = qdf_mem_malloc(sizeof(tDot11fBeaconIEs));
+	if (!bcn_struct)
+		return QDF_STATUS_E_NOMEM;
+
+	status = wlan_parse_bss_description_ies(mac_ctx, bss_desc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(bcn_struct);
+		return status;
+	}
+
+	*ie_struct = bcn_struct;
+	qdf_mem_copy(bcn_struct, &bss_desc->bcn_ies, sizeof(tDot11fBeaconIEs));
+
+	return status;
+}
+
+void wlan_populate_basic_rates(tSirMacRateSet *rate_set, bool is_ofdm_rates,
+			       bool is_basic_rates)
 {
 	uint8_t ofdm_rates[8] = {
 		SIR_MAC_RATE_6,
@@ -13694,23 +13697,23 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 {
 	uint8_t *ie_ptr;
 	uint32_t ie_len;
-	tpSirMacMgmtHdr hdr;
-	tDot11fBeaconIEs *bcn_ies;
 	QDF_STATUS status;
-
-	hdr = (tpSirMacMgmtHdr)scan_entry->raw_frame.ptr;
+	tDot11fBeaconIEs *bcn_ies;
 
 	ie_len = util_scan_entry_ie_len(scan_entry);
 	ie_ptr = util_scan_entry_ie_data(scan_entry);
 
+	qdf_mem_copy((uint8_t *)&bss_desc->ieFields, ie_ptr, ie_len);
 	bss_desc->length = (uint16_t) (offsetof(struct bss_description,
 			   ieFields[0]) - sizeof(bss_desc->length) + ie_len);
 
+	status = wlan_parse_bss_description_ies(mac_ctx, bss_desc);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
 	qdf_mem_copy(bss_desc->bssId, scan_entry->bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);
-	qdf_mem_copy(bss_desc->timeStamp,
-		scan_entry->tsf_info.data, 8);
-
+	qdf_mem_copy(bss_desc->timeStamp, scan_entry->tsf_info.data, 8);
 	bss_desc->beaconInterval = scan_entry->bcn_int;
 	bss_desc->capabilityInfo = scan_entry->cap_info.value;
 
@@ -13727,12 +13730,9 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 
 	/* channel frequency what peer sent in beacon/probersp. */
 	bss_desc->chan_freq = scan_entry->channel.chan_freq;
-	bss_desc->startTSF[0] =
-		mac_ctx->rrm.rrmPEContext.startTSF[0];
-	bss_desc->startTSF[1] =
-		mac_ctx->rrm.rrmPEContext.startTSF[1];
-	bss_desc->parentTSF =
-		scan_entry->rrm_parent_tsf;
+	bss_desc->startTSF[0] =	mac_ctx->rrm.rrmPEContext.startTSF[0];
+	bss_desc->startTSF[1] = mac_ctx->rrm.rrmPEContext.startTSF[1];
+	bss_desc->parentTSF = scan_entry->rrm_parent_tsf;
 	bss_desc->adaptive_11r_ap = scan_entry->adaptive_11r_ap;
 	bss_desc->is_ml_ap  =
 			util_scan_entry_bv_ml_ie(scan_entry) ? true : false;
@@ -13746,13 +13746,7 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 	qdf_mem_copy(&bss_desc->mbssid_info, &scan_entry->mbssid_info,
 		     sizeof(struct scan_mbssid_info));
 
-	qdf_mem_copy((uint8_t *) &bss_desc->ieFields, ie_ptr, ie_len);
-
-	status = wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
-						     &bcn_ies);
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
-
+	bcn_ies = &bss_desc->bcn_ies;
 	if (bcn_ies->MobilityDomain.present) {
 		bss_desc->mdiePresent = true;
 		qdf_mem_copy((uint8_t *)&(bss_desc->mdie[0]),
@@ -13764,8 +13758,6 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 	}
 
 	wlan_update_bss_with_fils_data(mac_ctx, scan_entry, bss_desc);
-
-	qdf_mem_free(bcn_ies);
 
 	return QDF_STATUS_SUCCESS;
 }

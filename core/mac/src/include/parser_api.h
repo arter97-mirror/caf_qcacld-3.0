@@ -1969,9 +1969,25 @@ static inline uint32_t lim_truncate_ppet(uint8_t *ppet, uint32_t max_len)
 	return max_len;
 }
 
+/**
+ * wlan_parse_bss_description_ies() - API to parse BSS descriptor struct
+ * and extract the beacon frame.
+ * @mac_ctx: Pointer to global MAC context
+ * @bss_desc: Pointer to BSS descriptor
+ *
+ * The API parses the beacon frame pointer at the end of the struct (variable
+ * len array) and saves the extracted buffer in @bcn_ies field in the @bss_desc
+ * If memory is already allocated to @bcn_ies, then same memory will be reused,
+ * else new memory is allocated to hold the extracted beacon IEs
+ *
+ * Incase of error the API clears the memory pointed by @bcn_ies field, else
+ * returns success and caller APIs need to ensure to free the beacon IEs before
+ * freeing the bss desc incase of success.
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS wlan_parse_bss_description_ies(struct mac_context *mac_ctx,
-					  struct bss_description *bss_desc,
-					  tDot11fBeaconIEs *ie_struct);
+					  struct bss_description *bss_desc);
 
 QDF_STATUS
 wlan_get_parsed_bss_description_ies(struct mac_context *mac_ctx,

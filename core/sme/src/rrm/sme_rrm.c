@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -166,8 +166,9 @@ static void rrm_indicate_neighbor_report_result(struct mac_context *mac,
 
 static QDF_STATUS
 sme_rrm_send_beacon_report_xmit_ind(struct mac_context *mac_ctx,
-	uint8_t measurement_index, tCsrScanResultInfo **result_arr,
-	uint8_t msrmnt_status, uint8_t bss_count)
+				    uint8_t measurement_index,
+				    tCsrScanResultInfo **result_arr,
+				    uint8_t msrmnt_status, uint8_t bss_count)
 {
 	struct bss_description *bss_desc = NULL;
 	tpSirBeaconReportXmitInd beacon_rep;
@@ -210,13 +211,11 @@ sme_rrm_send_beacon_report_xmit_ind(struct mac_context *mac_ctx,
 				break;
 			size =  bss_desc->length + sizeof(bss_desc->length);
 			beacon_rep->pBssDescription[i] = qdf_mem_malloc(size);
-			if (NULL ==
-				beacon_rep->pBssDescription[i])
+			if (!beacon_rep->pBssDescription[i])
 				break;
 			qdf_mem_copy(beacon_rep->pBssDescription[i],
-				bss_desc, size);
-			tmp_bss_desc[i] =
-				beacon_rep->pBssDescription[i];
+				     bss_desc, size);
+			tmp_bss_desc[i] = beacon_rep->pBssDescription[i];
 			sme_debug("RRM Result Bssid = " QDF_MAC_ADDR_FMT
 				  " freq= %d, rssi = -%d",
 				  QDF_MAC_ADDR_REF(
