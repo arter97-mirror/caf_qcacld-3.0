@@ -2865,4 +2865,83 @@ config QCN7605_PCIE_SHADOW_REG_SUPPORT
 	bool "ENable pcie shadow register for genoa"
 	default n
 
+config IPA3
+    bool "Enable IPA3"
+    default n
+
+config IPA_WDI_UNIFIED_API
+    bool "ipa wdi unified API"
+    default n
+
+config FEATURE_IPA_PIPE_CHANGE_WDI1
+    bool "ipa pipe change wdi1"
+    default n
+
+config ENABLE_VALLOC_REPLACE_MALLOC
+    bool "replace malloc with valloc"
+    default n
+
+config INTRA_BSS_FWD_OFFLOAD
+    bool "intra bss fwd offload"
+    default n
+
+config AR6320_SUPPORT
+    bool "support AR6320"
+    default n
+
+config DYNAMIC_SINGLE_CHIP
+    string "dynamic single chip name"
+    default ""
+
+config DFS_FCC_TYPE4_DURATION_CHECK
+    bool "check DFS FCC TYPE4 duration"
+    default n
+
+config PKT_LOG
+    bool "enable/disable pkt log"
+    default n
+
+config WLAN_FEATURE_BMI
+    bool "feature BMI"
+    default n
+
+config ALLOC_CONTIGUOUS_MULTI_PAGE
+    bool "alloc contiguous multi page"
+    default n
+
+config LEGACY_IPA_OFFLOAD
+    bool "Flag for ROME and GENOA IPA"
+    default n
+
+config DP_IPA_OFFLOAD
+    bool "Flag to enable IPA for chips go dp path"
+    default n
+
+config AR6320_TX_THROTTLE
+    bool "Flag for ROME tx throttle"
+    default n
+
+config AR6320_LL_DP_SUPPORT
+    bool "Flag for ROME LL DP"
+    default n
+
+config AR6320_MONITOR_MODE
+    bool "Flag for ROME MONITOR MODE"
+    default n
+
+config SUPPORT_P2P_BY_ONE_INTF_WLAN
+	bool "support p2p by one interface"
+	default n
+
+config WLAN_IPA_TX_FLOW_CONTROL
+	bool "enable IPA tx flow control"
+	default n
+
+config QCACLD_FEATURE_COEX_CONFIG
+	bool "bt coex config"
+	default n
+
+config IPA_P2P_SUPPORT
+	bool "support p2p when IPA is enabled"
+	default n
 endif # QCA_CLD_WLAN
