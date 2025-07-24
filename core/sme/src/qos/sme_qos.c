@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -405,8 +405,9 @@ static void sme_qos_state_transition(uint8_t sessionId,
 static QDF_STATUS sme_qos_buffer_cmd(struct sme_qos_cmdinfo *pcmd, bool
 					insert_head);
 static QDF_STATUS sme_qos_process_buffered_cmd(uint8_t sessionId);
-static QDF_STATUS sme_qos_save_assoc_info(struct sme_qos_sessioninfo *pSession,
-				   sme_QosAssocInfo *pAssoc_info);
+static QDF_STATUS sme_qos_save_assoc_info(struct mac_context *mac,
+					  struct sme_qos_sessioninfo *pSession,
+					  sme_QosAssocInfo *pAssoc_info);
 static QDF_STATUS sme_qos_setup_fnp(struct mac_context *mac, tListElem *pEntry);
 static QDF_STATUS sme_qos_modification_notify_fnp(struct mac_context *mac,
 					   tListElem *pEntry);
@@ -2484,8 +2485,8 @@ static enum sme_qos_statustype sme_qos_setup(struct mac_context *mac,
 {
 	struct sme_qos_sessioninfo *pSession;
 	struct sme_qos_acinfo *pACInfo;
+	tDot11fBeaconIEs *pIes;
 	enum sme_qos_statustype status = SME_QOS_STATUS_SETUP_FAILURE_RSP;
-	tDot11fBeaconIEs *pIes = NULL;
 	tCsrRoamModifyProfileFields modifyProfileFields;
 	QDF_STATUS hstatus;
 
@@ -2502,19 +2503,10 @@ static enum sme_qos_statustype sme_qos_setup(struct mac_context *mac,
 		sme_err("Session %d has an Invalid BSS Descriptor", sessionId);
 		return status;
 	}
-	hstatus = csr_get_parsed_bss_description_ies(mac,
-						   pSession->assocInfo.bss_desc,
-						      &pIes);
-	if (!QDF_IS_STATUS_SUCCESS(hstatus)) {
-		sme_err("On session %d unable to parse BSS IEs", sessionId);
-		return status;
-	}
 
-	/* success so pIes was allocated */
-
+	pIes = &pSession->assocInfo.bss_desc->bcn_ies;
 	if (!CSR_IS_QOS_BSS(pIes)) {
 		sme_err("On session %d AP doesn't support QoS", sessionId);
-		qdf_mem_free(pIes);
 		/* notify HDD through the synchronous status msg */
 		return SME_QOS_STATUS_SETUP_NOT_QOS_AP_RSP;
 	}
@@ -2654,7 +2646,6 @@ static enum sme_qos_statustype sme_qos_setup(struct mac_context *mac,
 		}
 	} while (0);
 
-	qdf_mem_free(pIes);
 	return status;
 }
 
@@ -4047,7 +4038,8 @@ static QDF_STATUS sme_qos_process_assoc_complete_ev(struct mac_context *mac, uin
 					pEvent_info)->bss_desc->bssId)))) {
 			sme_err("assoc with the same BSS, no update needed");
 		} else
-			status = sme_qos_save_assoc_info(pSession, pEvent_info);
+			status = sme_qos_save_assoc_info(mac, pSession,
+							 pEvent_info);
 	} else {
 		sme_err("wrong state: BE %d, BK %d, VI %d, VO %d",
 			pSession->ac_info[QCA_WLAN_AC_BE].curr_state,
@@ -4312,7 +4304,8 @@ QDF_STATUS sme_qos_handle_handoff_state(struct mac_context *mac_ctx,
  * Return: QDF_STATUS
  */
 static QDF_STATUS sme_qos_process_reassoc_success_ev(struct mac_context *mac_ctx,
-				uint8_t sessionid, void *event_info)
+						     uint8_t sessionid,
+						     void *event_info)
 {
 
 	struct csr_roam_session *csr_roam_session = NULL;
@@ -4340,7 +4333,7 @@ static QDF_STATUS sme_qos_process_reassoc_success_ev(struct mac_context *mac_ctx
 		sme_err("bss_desc is NULL");
 		return status;
 	}
-	status = sme_qos_save_assoc_info(qos_session, event_info);
+	status = sme_qos_save_assoc_info(mac_ctx, qos_session, event_info);
 	if (status)
 		sme_err("sme_qos_save_assoc_info() failed");
 
@@ -5673,23 +5666,7 @@ sme_qos_is_acm(struct mac_context *mac, struct bss_description *pSirBssDesc,
 	       enum qca_wlan_ac_type ac, tDot11fBeaconIEs *pIes)
 {
 	bool ret_val = false;
-	tDot11fBeaconIEs *pIesLocal;
-
-	if (pIes)
-		/* IEs were provided so use them locally */
-		pIesLocal = pIes;
-	else {
-		/* IEs were not provided so parse them ourselves */
-		if (!QDF_IS_STATUS_SUCCESS
-			    (csr_get_parsed_bss_description_ies
-				    (mac, pSirBssDesc, &pIesLocal))) {
-			/* err msg */
-			sme_err("csr_get_parsed_bss_description_ies() failed");
-			return false;
-		}
-
-		/* if success then pIesLocal was allocated */
-	}
+	tDot11fBeaconIEs *pIesLocal = pIes ? pIes : &pSirBssDesc->bcn_ies;
 
 	if (CSR_IS_QOS_BSS(pIesLocal)) {
 		switch (ac) {
@@ -5714,9 +5691,6 @@ sme_qos_is_acm(struct mac_context *mac, struct bss_description *pSirBssDesc,
 			break;
 		}
 	} /* IS_QOS_BSS */
-	if (!pIes)
-		/* IEs were allocated locally so free them */
-		qdf_mem_free(pIesLocal);
 
 	return ret_val;
 }
@@ -6031,6 +6005,7 @@ static QDF_STATUS sme_qos_delete_buffered_requests(struct mac_context *mac,
 
 /**
  * sme_qos_save_assoc_info() - save assoc info.
+ * @mac: Global mac context
  * @pSession: pointer to QOS session
  * @pAssoc_info: pointer to the assoc structure to store the BSS descriptor
  *               of the AP, the profile that HDD sent down with the
@@ -6042,11 +6017,12 @@ static QDF_STATUS sme_qos_delete_buffered_requests(struct mac_context *mac,
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS sme_qos_save_assoc_info(struct sme_qos_sessioninfo *pSession,
-				   sme_QosAssocInfo *pAssoc_info)
+static QDF_STATUS sme_qos_save_assoc_info(struct mac_context *mac,
+					  struct sme_qos_sessioninfo *pSession,
+					  sme_QosAssocInfo *pAssoc_info)
 {
-	struct bss_description *bss_desc = NULL;
 	uint32_t bssLen = 0;
+	struct bss_description *bss_desc = NULL;
 
 	if (!pAssoc_info) {
 		sme_err("pAssoc_info is NULL");
@@ -6065,8 +6041,8 @@ static QDF_STATUS sme_qos_save_assoc_info(struct sme_qos_sessioninfo *pSession,
 		return QDF_STATUS_E_NOMEM;
 
 	qdf_mem_copy(bss_desc, pAssoc_info->bss_desc, bssLen);
+
 	pSession->assocInfo.bss_desc = bss_desc;
-	/* save the apsd info from assoc */
 	pSession->apsdMask |= pAssoc_info->uapsd_mask;
 
 	/* [TODO] Do we need to update the global APSD bitmap? */
@@ -6803,9 +6779,8 @@ bool sme_qos_is_ts_info_ack_policy_valid(mac_handle_t mac_handle,
 					 struct sme_qos_wmmtspecinfo *pQoSInfo,
 					 uint8_t sessionId)
 {
-	tDot11fBeaconIEs *pIes = NULL;
+	tDot11fBeaconIEs *pIes;
 	struct sme_qos_sessioninfo *pSession;
-	QDF_STATUS hstatus;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 
 	if (!CSR_IS_SESSION_VALID(mac, sessionId)) {
@@ -6814,7 +6789,6 @@ bool sme_qos_is_ts_info_ack_policy_valid(mac_handle_t mac_handle,
 	}
 
 	pSession = &sme_qos_cb.sessionInfo[sessionId];
-
 	if (!pSession->sessionActive) {
 		sme_err("Session %d is inactive", sessionId);
 		return false;
@@ -6825,27 +6799,15 @@ bool sme_qos_is_ts_info_ack_policy_valid(mac_handle_t mac_handle,
 		return false;
 	}
 
-	hstatus = csr_get_parsed_bss_description_ies(mac,
-						   pSession->assocInfo.bss_desc,
-						      &pIes);
-	if (!QDF_IS_STATUS_SUCCESS(hstatus)) {
-		sme_err("On session %d unable to parse BSS IEs", sessionId);
-		return false;
-	}
-
-	/* success means pIes was allocated */
-
+	pIes = &pSession->assocInfo.bss_desc->bcn_ies;
 	if (!pIes->HTCaps.present &&
 	    pQoSInfo->ts_info.ack_policy ==
 	    SME_QOS_WMM_TS_ACK_POLICY_HT_IMMEDIATE_BLOCK_ACK) {
 		sme_err("On session %d HT Caps aren't present but application set ack policy to HT ",
 			sessionId);
-
-		qdf_mem_free(pIes);
 		return false;
 	}
 
-	qdf_mem_free(pIes);
 	return true;
 }
 
