@@ -1553,14 +1553,14 @@ void lim_check_and_force_he_ldpc_cap(struct pe_session *session,
  * @sta_ds: pointer to sta dph hash table entry
  * @assoc_rsp: pointer to assoc response
  * @session_entry: pointer to PE session
- * @beacon: pointer to beacon
+ * @he_cap: Pointer to he caps from beacon
  *
  * Return: None
  */
 void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 			      tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
 			      struct pe_session *session_entry,
-			      tSchBeaconStruct *beacon);
+			      tDot11fIEhe_cap *he_cap);
 
 /**
  * lim_update_usr_he_cap() - Update HE capability based on userspace
@@ -1837,7 +1837,7 @@ static inline void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 					    tpDphHashNode sta_ds,
 					    tpSirAssocRsp assoc_rsp,
 					    struct pe_session *session_entry,
-					    tSchBeaconStruct *beacon)
+					    tDot11fIEhe_cap *he_cap)
 {
 	return;
 }

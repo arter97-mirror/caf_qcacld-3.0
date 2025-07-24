@@ -169,8 +169,8 @@ void lim_handle_del_bss_in_re_assoc_context(struct mac_context *mac,
 			lim_get_ielen_from_bss_description(bss_desc),
 			beacon_struct);
 
-		lim_update_assoc_sta_datas(mac, sta, assocRsp,
-			pe_session, beacon_struct);
+		lim_update_assoc_sta_datas(mac, sta, assocRsp, pe_session,
+					   bss_desc);
 		lim_update_re_assoc_globals(mac, assocRsp, pe_session);
 		if (mac->lim.gLimProtectionControl !=
 		    MLME_FORCE_POLICY_PROTECTION_DISABLE)
@@ -290,7 +290,7 @@ void lim_handle_add_bss_in_re_assoc_context(struct mac_context *mac,
 				(&pe_session->pLimReAssocReq->bssDescription),
 				pBeaconStruct);
 		lim_update_assoc_sta_datas(mac, sta, assocRsp,
-					   pe_session, pBeaconStruct);
+					   pe_session, &pe_session->pLimReAssocReq->bssDescription);
 		lim_update_re_assoc_globals(mac, assocRsp, pe_session);
 		if (mac->lim.gLimProtectionControl !=
 		    MLME_FORCE_POLICY_PROTECTION_DISABLE)

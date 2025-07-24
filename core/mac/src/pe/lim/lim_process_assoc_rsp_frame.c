@@ -46,6 +46,7 @@
 #include "wlan_mlme_twt_api.h"
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_connectivity_logging.h"
+#include <utils_parser.h>
 #include <lim_mlo.h>
 #include "parser_api.h"
 #include "wlan_twt_cfg_ext_api.h"
@@ -124,21 +125,10 @@ static void lim_update_stads_htcap(struct mac_context *mac_ctx,
 	}
 }
 
-/**
- * lim_update_assoc_sta_datas() - Updates station Descriptor
- * mac_ctx: Pointer to Global MAC structure
- * sta_ds: Station Descriptor in DPH
- * assoc_rsp: Pointer to Association Response Structure
- * session_entry : PE session Entry
- *
- * This function is called to Update the Station Descriptor (dph) Details from
- * Association / ReAssociation Response Frame
- *
- * Return: None
- */
 void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
-	tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
-	struct pe_session *session_entry, tSchBeaconStruct *beacon)
+				tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
+				struct pe_session *session_entry,
+				struct bss_description *bss_desc)
 {
 	uint8_t idx;
 	uint32_t phy_mode;
@@ -146,7 +136,6 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	tDot11fIEhe_cap *he_cap = NULL;
 	tDot11fIEeht_cap *eht_cap = NULL;
-	struct bss_description *bss_desc = NULL;
 	tDot11fIEVHTOperation *vht_oper = NULL;
 	enum phy_ch_width omn_ie_ch_width, vht_ch_width;
 
@@ -208,8 +197,8 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 				vht_mcs_10_11_supp;
 	}
 
-	lim_update_stads_he_caps(mac_ctx, sta_ds, assoc_rsp,
-				 session_entry, beacon);
+	lim_update_stads_he_caps(mac_ctx, sta_ds, assoc_rsp, session_entry,
+				 (bss_desc ? &bss_desc->bcn_ies.he_cap : NULL));
 
 	lim_update_stads_eht_caps(mac_ctx, sta_ds, assoc_rsp, session_entry);
 
@@ -218,9 +207,6 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 
 	if (lim_is_sta_eht_capable(sta_ds))
 		eht_cap = &assoc_rsp->eht_cap;
-
-	if (session_entry->lim_join_req)
-		bss_desc = &session_entry->lim_join_req->bssDescription;
 
 	if (lim_populate_peer_rate_set(mac_ctx, &sta_ds->supportedRates,
 				       assoc_rsp->HTCaps.supportedMCSSet,
@@ -249,27 +235,11 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	sta_ds->qosMode = 0;
 	sta_ds->lleEnabled = 0;
 
-	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(session_entry->vdev)) {
-		QDF_STATUS status;
-		tSirProbeRespBeacon *probe_rsp;
-		uint8_t *prb_frame_ptr =
-				session_entry->beacon + WLAN_MAC_HDR_LEN_3A;
-		uint32_t prb_frame_len =
-				session_entry->bcnLen - WLAN_MAC_HDR_LEN_3A;
-
-		probe_rsp = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
-		if (probe_rsp) {
-			status = sir_convert_probe_frame2_struct(mac_ctx,
-								 prb_frame_ptr,
-								 prb_frame_len,
-								 probe_rsp);
-			if (QDF_IS_STATUS_SUCCESS(status))
-				qdf_mem_copy(&assoc_rsp->edca,
-					     &probe_rsp->edcaParams,
-					     sizeof(assoc_rsp->edca));
-
-			qdf_mem_free(probe_rsp);
-		}
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(session_entry->vdev) &&
+	    bss_desc && bss_desc->bcn_ies.EDCAParamSet.present) {
+		assoc_rsp->edcaPresent = true;
+		convert_edca_param(mac_ctx, &assoc_rsp->edca,
+				   &bss_desc->bcn_ies.EDCAParamSet);
 	}
 
 	/* update TSID to UP mapping */
@@ -1661,7 +1631,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		    wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev)) {
 			pe_debug("Sending self sta");
 			lim_update_assoc_sta_datas(mac_ctx, sta_ds, assoc_rsp,
-				session_entry, NULL);
+						   session_entry, NULL);
 			lim_update_stads_ext_cap(mac_ctx, session_entry,
 						 assoc_rsp, sta_ds);
 			/* Store assigned AID for TIM processing */
@@ -1808,8 +1778,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			ie, ie_len);
 	}
 
-	lim_update_assoc_sta_datas(mac_ctx, sta_ds, assoc_rsp,
-				   session_entry, beacon);
+	lim_update_assoc_sta_datas(mac_ctx, sta_ds, assoc_rsp, session_entry,
+				   &session_entry->lim_join_req->bssDescription);
 
 	if (lim_is_session_he_capable(session_entry)) {
 		session_entry->mu_edca_present = assoc_rsp->mu_edca_present;

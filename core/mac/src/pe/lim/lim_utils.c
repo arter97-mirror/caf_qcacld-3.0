@@ -7334,7 +7334,7 @@ void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
 void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 			      tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
 			      struct pe_session *session_entry,
-			      tSchBeaconStruct *beacon)
+			      tDot11fIEhe_cap *he_cap)
 {
 	/* If HE is not supported, do not fill sta_ds and return */
 	if (!IS_DOT11_MODE_HE(session_entry->dot11mode))
@@ -7351,11 +7351,9 @@ void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 	/* setting ldpc_coding if any of assoc_rsp or beacon has ldpc_coding
 	 * enabled
 	 */
-	if (beacon)
-		assoc_rsp->he_cap.ldpc_coding |= beacon->he_cap.ldpc_coding;
+	if (he_cap)
+		assoc_rsp->he_cap.ldpc_coding |= he_cap->ldpc_coding;
 	lim_check_and_force_he_ldpc_cap(session_entry, &assoc_rsp->he_cap);
-	if (beacon)
-		beacon->he_cap.ldpc_coding = assoc_rsp->he_cap.ldpc_coding;
 
 	qdf_mem_copy(&sta_ds->he_config, &assoc_rsp->he_cap,
 		     sizeof(tDot11fIEhe_cap));

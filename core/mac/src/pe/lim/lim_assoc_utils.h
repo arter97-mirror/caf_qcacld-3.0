@@ -231,10 +231,23 @@ void lim_update_re_assoc_globals(struct mac_context *mac,
 				 tpSirAssocRsp pAssocRsp,
 				 struct pe_session *pe_session);
 
+/**
+ * lim_update_assoc_sta_datas() - Updates station Descriptor
+ * @mac_ctx: Pointer to Global MAC structure
+ * @sta_ds: Station Descriptor in DPH
+ * @assoc_rsp: Pointer to Association Response Structure
+ * @session_entry : PE session Entry
+ * @bss_desc: Pointer to BSS descriptor
+ *
+ * This function is called to Update the Station Descriptor (dph) Details from
+ * Association / ReAssociation Response Frame
+ *
+ * Return: None
+ */
 void lim_update_assoc_sta_datas(struct mac_context *mac,
 				tpDphHashNode sta, tpSirAssocRsp pAssocRsp,
 				struct pe_session *pe_session,
-				tSchBeaconStruct *beacon);
+				struct bss_description *bss_desc);
 
 /**
  * lim_sta_add_bss_update_ht_parameter() - function to update ht related
