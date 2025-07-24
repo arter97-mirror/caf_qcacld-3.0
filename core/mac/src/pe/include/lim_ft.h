@@ -146,8 +146,8 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 /**
  * lim_ft_prepare_add_bss_req() - Create Add Bss Req to the new AP
  * @mac: Global MAC context
- * @add_bss_params: Bss params including rsp data
- * @pe_session: PE Session
+ * @ft_session: FT PE Session
+ * @bss_desc: Pointer to bss descriptor
  *
  * This will be used when we are ready to FT to the new AP.
  * The newly created ft Session entry is passed to this function
@@ -156,7 +156,7 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
  */
 void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 				struct pe_session *ft_session,
-				struct bss_description *bssDescription);
+				struct bss_description *bss_desc);
 
 QDF_STATUS lim_send_preauth_scan_offload(struct mac_context *mac_ctx,
 		struct pe_session *session_entry, tSirFTPreAuthReq *ft_preauth_req);
@@ -169,9 +169,11 @@ static inline QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 {
 	return QDF_STATUS_SUCCESS;
 }
-static inline void lim_ft_prepare_add_bss_req(struct mac_context *mac,
-		struct pe_session *ft_session,
-		struct bss_description *bssDescription)
+
+static inline
+void lim_ft_prepare_add_bss_req(struct mac_context *mac,
+				struct pe_session *ft_session,
+				struct bss_description *bss_desc)
 {}
 #endif
 
