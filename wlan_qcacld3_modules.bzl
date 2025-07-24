@@ -9,6 +9,10 @@ _target_chipset_map = {
     "neo-la": [
         "kiwi-v2",
     ],
+    "sa510m": [
+        "qca6574",
+        "qca6490",
+    ],
     "anorak": [
         "qca6490",
         "kiwi-v2",
@@ -74,6 +78,7 @@ _chipset_hw_map = {
     "wcn6450": "RHINE",
     "fig": "BORON",
     "wcn7760": "BERYLLIUM",
+    "qca6574": "ROME",
 }
 
 _chipset_header_map = {
@@ -122,7 +127,9 @@ _chipset_header_map = {
     "wcn7760": [
         "api/hw/qcc2072/v1",
         "cmn/hal/wifi3.0/qcc2072",
-    ]
+    ],
+    "qca6574": [
+    ],
 }
 
 _hw_header_map = {
@@ -143,6 +150,8 @@ _hw_header_map = {
         "cmn/hal/wifi3.0/rh",
     ],
     "HELIUMPLUS": [
+    ],
+    "ROME": [
     ],
 }
 
@@ -370,6 +379,7 @@ _fixed_ipaths = [
     "components/wmi/inc",
     "components/wmi/src",
     "core/bmi/inc",
+    "core/bmi/src",
     "core/cds/inc",
     "core/cds/src",
     "core/dp/htt",
@@ -1227,6 +1237,23 @@ _conditional_srcs = {
 		"cmn/ipa/core/src/wlan_ipa_logging.c"
 	    ],
     },
+    "CONFIG_LEGACY_IPA_OFFLOAD": {
+        True: [
+            "core/dp/txrx/ol_txrx_ipa.c",
+            "cmn/qdf/linux/src/qdf_ipa.c",
+            "cmn/ipa/core/src/wlan_ipa_core.c",
+            "cmn/ipa/core/src/wlan_ipa_main.c",
+            "cmn/ipa/core/src/wlan_ipa_rm.c",
+            "cmn/ipa/core/src/wlan_ipa_stats.c",
+            "cmn/ipa/dispatcher/src/wlan_ipa_obj_mgmt_api.c",
+            "cmn/ipa/dispatcher/src/wlan_ipa_tgt_api.c",
+            "cmn/ipa/dispatcher/src/wlan_ipa_ucfg_api.c",
+            "cmn/target_if/ipa/src/target_if_ipa.c",
+            "core/hdd/src/wlan_hdd_ipa.c",
+            # TODO: need a separate flag for sysfs
+            "core/hdd/src/wlan_hdd_sysfs_ipa.c",
+        ],
+    },
     "CONFIG_IPCIE_FW_SIM": {
         True: [
             "core/pld/src/pld_pcie_fw_sim.c",
@@ -1247,6 +1274,47 @@ _conditional_srcs = {
         True: [
             "cmn/os_if/linux/ftm/src/wlan_ioctl_ftm.c",
         ],
+    },
+    "CONFIG_AR6320_SUPPORT": {
+        True: [
+            "cmn/hif/src/ce/ce_service_legacy.c",
+            "core/dp/txrx/ol_cfg.c",
+            "core/dp/txrx/ol_rx.c",
+            "core/dp/txrx/ol_rx_defrag.c",
+            "core/dp/txrx/ol_rx_fwd.c",
+            "core/dp/txrx/ol_rx_pn.c",
+            "core/dp/txrx/ol_rx_reorder.c",
+            "core/dp/txrx/ol_rx_reorder_timeout.c",
+            "core/dp/txrx/ol_tx.c",
+            "core/dp/txrx/ol_txrx.c",
+            "core/dp/txrx/ol_txrx_encap.c",
+            "core/dp/txrx/ol_txrx_peer_find.c",
+            "core/dp/txrx/ol_tx_desc.c",
+            "core/dp/txrx/ol_tx_send.c",
+            "core/dp/htt/htt.c",
+            "core/dp/htt/htt_fw_stats.c",
+            "core/dp/htt/htt_h2t.c",
+            "core/dp/htt/htt_rx.c",
+            "core/dp/htt/htt_t2h.c",
+            "core/dp/htt/htt_tx.c",
+        ],
+    },
+    "CONFIG_AR6320_TX_THROTTLE": {
+        True: [
+            "core/dp/txrx/ol_txrx_ipa.c",
+        ]
+    },
+    "CONFIG_AR6320_LL_DP_SUPPORT": {
+        True: [
+            "core/dp/htt/htt_rx_ll.c",
+            "core/dp/txrx/ol_tx_ll.c",
+            "core/dp/txrx/ol_tx_ll_legacy.c",
+        ]
+    },
+    "CONFIG_AR6320_MONITOR_MODE": {
+        True: [
+            "core/dp/htt/htt_monitor_rx.c",
+        ]
     },
     "CONFIG_LITHIUM": {
         True: [
@@ -1827,7 +1895,6 @@ _conditional_srcs = {
     "CONFIG_WLAN_FEATURE_BMI": {
         True: [
             "cmn/hif/src/ce/ce_bmi.c",
-            "cmn/hif/src/sdio/hif_bmi_reg_access.c",
             "core/bmi/src/bmi.c",
             "core/bmi/src/bmi_1.c",
             "core/bmi/src/ol_fw.c",
@@ -2290,7 +2357,7 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_txrx_stats.c",
         ],
     },
-    "LEGACY_CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY": {
+    "CONFIG_WLAN_TX_FLOW_CONTROL_LEGACY": {
         True: [
             "core/dp/txrx/ol_txrx_legacy_flow_control.c",
         ],
@@ -2452,24 +2519,27 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     chipset_ipaths = _chipset_header_map[chipset]
     hw_ipaths = _hw_header_map[hw]
 
-    deps = select({
-        "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}/net/wireless/cfg80211".format(tv),
-            "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(tv),
-            "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
-            "//soc-repo:{}/kernel/sched/walt/sched-walt".format(tv),
-        ],
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
-    })
+    if target != "sa510m":
+        deps = select({
+            "//build/kernel/kleaf:socrepo_true": [
+                "//soc-repo:all_headers",
+                "//soc-repo:{}/net/wireless/cfg80211".format(tv),
+                "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(tv),
+                "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
+                "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
+                "//soc-repo:{}/kernel/sched/walt/sched-walt".format(tv),
+            ],
+            "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+        })
 
-    deps += select({
-        "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
-        ],
-        "//build/kernel/kleaf:socrepo_false": [],
-    })
+        deps += select({
+            "//build/kernel/kleaf:socrepo_true": [
+                "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
+            ],
+            "//build/kernel/kleaf:socrepo_false": [],
+        })
+    else:
+        deps = [ "//msm-kernel:all_headers_arm", ]
 
     if target == "neo-la":
         kernel_build = select({
@@ -2618,6 +2688,8 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     if target == "sdxkova":
         out = "wlan.ko"
+    elif target == "sa510m":
+        out = "{}.ko".format(chipset)
     else:
         out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
 
@@ -2628,19 +2700,35 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
-    else:
+    elif target != "sa510m":
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
         ]
+    else:
+        deps += [
+            "//wlan/platform:{}_cnss2".format(tv),
+        ]
+    if target != "sa510m":
+        deps = deps + [
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
+            "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+        ]
+    else:
+        deps = deps + [
+                "//wlan/platform:{}_cnss_prealloc".format(tv),
+                "//wlan/platform:{}_cnss_utils".format(tv),
+                "//wlan/platform:{}_cnss_nl".format(tv),
+                "//wlan/platform:wlan-platform-headers",
+            ]
 
-    deps = deps + [
-        "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
-        "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
-        "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
-        "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
-    ]
-
-    if target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm":
+    if target == "sa510m":
+        deps = deps + [
+            "//dataipa:include_headers",
+            "//dataipa:{}_{}_ipam".format(target, variant),
+        ]
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
