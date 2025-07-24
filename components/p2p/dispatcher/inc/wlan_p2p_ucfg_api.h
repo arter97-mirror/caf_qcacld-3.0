@@ -575,6 +575,22 @@ static inline bool ucfg_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc)
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
+#ifdef FEATURE_WLAN_SUPPORT_PCC
+/**
+ * ucfg_p2p_is_fw_support_pcc() - wrapper API of
+ * p2p_is_fw_support_pcc()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if PCC is supported by FW else false
+ */
+bool ucfg_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool ucfg_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif /* FEATURE_WLAN_SUPPORT_PCC */
+
 /**
  * ucfg_p2p_fw_support_ap_assist_dfs_group() - Wrapper API to get the FW
  * support for assisted AP DFS P2P group operation
