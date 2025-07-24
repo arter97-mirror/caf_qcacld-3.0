@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -526,7 +526,7 @@ static int dp_rx_thread_process_nbufq(struct dp_rx_thread *rx_thread)
 		num_list_elements += qdf_nbuf_get_gso_segs(nbuf_list);
 		rx_thread->stats.nbuf_dequeued += num_list_elements;
 		iterates += num_list_elements;
-		cpu_index = qdf_get_smp_processor_id();
+		cpu_index = qdf_get_raw_smp_processor_id();
 		rx_thread->stats.nbuf_per_cpu[cpu_index] += num_list_elements;
 
 		vdev_id = QDF_NBUF_CB_RX_VDEV_ID(nbuf_list);
