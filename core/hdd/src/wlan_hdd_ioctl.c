@@ -2027,10 +2027,14 @@ struct link_status_priv {
 static int hdd_conc_set_dwell_time(struct hdd_adapter *adapter,
 				   uint8_t *command)
 {
-	u8 *value = command;
+	u8 *value;
 	int val = 0, temp = 0;
 	int retval = 0;
 
+	if (!command)
+		return -EINVAL;
+
+	value = command;
 	if (strncmp(command, "CONCSETDWELLTIME ACTIVE MAX", 27) == 0) {
 		if (drv_cmd_validate(command, 27)) {
 			hdd_err("Invalid driver command");
