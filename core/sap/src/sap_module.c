@@ -1894,7 +1894,10 @@ wlansap_override_csa_strict_for_sap(mac_handle_t mac_handle,
 				&con_freq, &ch_width);
 	if (existing_vdev_id < WLAN_UMAC_VDEV_ID_MAX &&
 	    (existing_vdev_mode == PM_STA_MODE ||
-	     existing_vdev_mode == PM_P2P_CLIENT_MODE))
+	     existing_vdev_mode == PM_P2P_CLIENT_MODE ||
+	     existing_vdev_mode == PM_SAP_MODE ||
+	     existing_vdev_mode == PM_P2P_GO_MODE ||
+	     existing_vdev_mode == PM_LL_LT_SAP_MODE))
 		return strict;
 
 	return true;
