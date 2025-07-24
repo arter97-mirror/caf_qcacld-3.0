@@ -1184,7 +1184,6 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	tpDphHashNode sta_ds;
 	tpSirAssocRsp assoc_rsp;
 	tLimMlmAssocCnf assoc_cnf;
-	tSchBeaconStruct *beacon = NULL;
 	uint8_t ap_nss;
 	uint16_t aid;
 	int8_t rssi;
@@ -1192,6 +1191,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	enum ani_akm_type auth_type;
 	bool sha384_akm, twt_req_ht_vht = false;
 	struct s_ext_cap *ext_cap;
+	struct bss_description *bss_desc;
 
 	assoc_cnf.resultCode = eSIR_SME_SUCCESS;
 	/* Update PE session Id */
@@ -1753,33 +1753,19 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 				     assoc_rsp);
 
 	lim_process_assoc_rsp_t2lm(session_entry, assoc_rsp);
-	/*
-	 * Extract the AP capabilities from the beacon that
-	 * was received earlier
-	 */
-	beacon = qdf_mem_malloc(sizeof(tSchBeaconStruct));
-	if (!beacon) {
-		clean_up_ft_sha384(assoc_rsp, sha384_akm);
-		if (session_entry->limAssocResponseData != assoc_rsp)
-			qdf_mem_free(assoc_rsp);
 
-		return QDF_STATUS_E_NOMEM;
-	}
-	ie_len = lim_get_ielen_from_bss_description(
-		&session_entry->lim_join_req->bssDescription);
-	ie = (uint8_t *)session_entry->lim_join_req->bssDescription.ieFields;
+	bss_desc = &session_entry->lim_join_req->bssDescription;
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+	ie = (uint8_t *)bss_desc->ieFields;
+
 	lim_update_iot_aggr_sz(mac_ctx, ie, ie_len, session_entry);
+	if (session_entry->opmode == QDF_STA_MODE)
+		lim_enable_cts_to_self_for_exempted_iot_ap(mac_ctx,
+							   session_entry,
+							   ie, ie_len);
 
-	lim_extract_ap_capabilities(mac_ctx, ie, ie_len, beacon);
-
-	if (session_entry->opmode == QDF_STA_MODE) {
-		lim_enable_cts_to_self_for_exempted_iot_ap(
-			mac_ctx, session_entry,
-			ie, ie_len);
-	}
-
-	lim_update_assoc_sta_datas(mac_ctx, sta_ds, assoc_rsp, session_entry,
-				   &session_entry->lim_join_req->bssDescription);
+	lim_update_assoc_sta_datas(mac_ctx, sta_ds, assoc_rsp,
+				   session_entry, bss_desc);
 
 	if (lim_is_session_he_capable(session_entry)) {
 		session_entry->mu_edca_present = assoc_rsp->mu_edca_present;
@@ -1802,14 +1788,11 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (mac_ctx->lim.gLimProtectionControl !=
 	    MLME_FORCE_POLICY_PROTECTION_DISABLE)
 		lim_decide_sta_protection_on_assoc(mac_ctx, session_entry,
-						   &session_entry->lim_join_req->bssDescription);
+						   bss_desc);
 
-	if (beacon->erpPresent) {
-		if (beacon->erpIEInfo.barkerPreambleMode)
-			session_entry->beaconParams.fShortPreamble = false;
-		else
-			session_entry->beaconParams.fShortPreamble = true;
-	}
+	if (bss_desc->bcn_ies.ERPInfo.present)
+		session_entry->beaconParams.fShortPreamble =
+			!bss_desc->bcn_ies.ERPInfo.barker_preamble;
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_CONNECTED, session_entry,
@@ -1818,15 +1801,12 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	lim_update_stads_ext_cap(mac_ctx, session_entry, assoc_rsp, sta_ds);
 
 	/* Update the BSS Entry, this entry was added during preassoc. */
-	if (QDF_STATUS_SUCCESS ==
-	    lim_sta_send_add_bss(mac_ctx, assoc_rsp,
-				 &session_entry->lim_join_req->bssDescription,
-				 true, session_entry)) {
+	if (QDF_STATUS_SUCCESS == lim_sta_send_add_bss(mac_ctx, assoc_rsp,
+						       bss_desc, true,
+						       session_entry)) {
 		clean_up_ft_sha384(assoc_rsp, sha384_akm);
 		if (session_entry->limAssocResponseData != assoc_rsp)
 			qdf_mem_free(assoc_rsp);
-
-		qdf_mem_free(beacon);
 
 		return QDF_STATUS_SUCCESS;
 	}
@@ -1867,7 +1847,6 @@ assocReject:
 			session_entry);
 	}
 free_mem:
-	qdf_mem_free(beacon);
 	qdf_mem_free(assoc_rsp->sha384_ft_subelem.gtk);
 	qdf_mem_free(assoc_rsp->sha384_ft_subelem.igtk);
 	qdf_mem_free(assoc_rsp);
