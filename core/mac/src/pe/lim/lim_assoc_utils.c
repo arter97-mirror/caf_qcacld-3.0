@@ -3984,9 +3984,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		}
 		if (lim_is_session_he_capable(pe_session) &&
 		    pAssocRsp->he_cap.present) {
-			lim_intersect_ap_he_caps(pe_session,
-						 pAddBssParams,
-						 pBeaconStruct,
+			lim_intersect_ap_he_caps(pe_session, pAddBssParams,
 						 pAssocRsp, bssDescription);
 			lim_update_he_stbc_capable(&pAddBssParams->staContext);
 			lim_update_he_mcs_12_13(&pAddBssParams->staContext,
@@ -3994,12 +3992,11 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		}
 
 		if (lim_is_session_eht_capable(pe_session) &&
-		    pAssocRsp->eht_cap.present) {
-			lim_intersect_ap_eht_caps(pe_session,
-						  pAddBssParams,
-						  pBeaconStruct,
+		    pAssocRsp->eht_cap.present)
+			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
+						  &bssDescription->bcn_ies,
 						  pAssocRsp);
-		}
+
 		/* Use STA SMPS capability as AP's SMPS value is not valid,
 		 * and use p2p GO's assoc response value to avoid IOT issue.
 		 */
@@ -4077,9 +4074,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	if (lim_is_he_6ghz_band(pe_session)) {
 		if (lim_is_session_he_capable(pe_session) &&
 		    pAssocRsp->he_cap.present) {
-			lim_intersect_ap_he_caps(pe_session,
-						 pAddBssParams,
-						 pBeaconStruct,
+			lim_intersect_ap_he_caps(pe_session, pAddBssParams,
 						 pAssocRsp, bssDescription);
 			lim_update_he_stbc_capable(&pAddBssParams->staContext);
 			lim_update_he_mcs_12_13(&pAddBssParams->staContext,
@@ -4100,12 +4095,10 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 						&pAddBssParams->staContext);
 		}
 		if (lim_is_session_eht_capable(pe_session) &&
-		    pAssocRsp->eht_cap.present) {
-			lim_intersect_ap_eht_caps(pe_session,
-						  pAddBssParams,
-						  pBeaconStruct,
+		    pAssocRsp->eht_cap.present)
+			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
+						  &bssDescription->bcn_ies,
 						  pAssocRsp);
-		}
 	}
 
 	pAddBssParams->staContext.bcn_tx_nss =
@@ -4385,13 +4378,13 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 		if (lim_is_session_he_capable(pe_session) &&
 			pBeaconStruct->he_cap.present)
 			lim_intersect_ap_he_caps(pe_session, pAddBssParams,
-						 pBeaconStruct, NULL,
-						 bssDescription);
+						 NULL, bssDescription);
 
 		if (lim_is_session_eht_capable(pe_session) &&
 		    pBeaconStruct->eht_cap.present)
 			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
-						  pBeaconStruct, NULL);
+						  &bssDescription->bcn_ies,
+						  NULL);
 
 		if (pBeaconStruct->HTCaps.supportedChannelWidthSet &&
 		    chan_width_support) {

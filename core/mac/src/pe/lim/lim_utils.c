@@ -7260,7 +7260,6 @@ lim_is_vendor_htc_he_ap(struct bss_description *bss_desc)
 
 void lim_intersect_ap_he_caps(struct pe_session *session,
 			      struct bss_params *add_bss,
-			      tSchBeaconStruct *beacon,
 			      tpSirAssocRsp assoc_rsp,
 			      struct bss_description *bss_desc)
 {
@@ -7271,7 +7270,7 @@ void lim_intersect_ap_he_caps(struct pe_session *session,
 	if (assoc_rsp && assoc_rsp->he_cap.present)
 		rcvd_he = &assoc_rsp->he_cap;
 	else
-		rcvd_he = &beacon->he_cap;
+		rcvd_he = &bss_desc->bcn_ies.he_cap;
 
 	lim_intersect_he_caps(rcvd_he, peer_he, session);
 	peer_he->htc_he = rcvd_he->htc_he;
@@ -9051,7 +9050,7 @@ void lim_add_eht_cap(struct mac_context *mac_ctx, struct pe_session *pe_session,
 
 void lim_intersect_ap_eht_caps(struct pe_session *session,
 			       struct bss_params *add_bss,
-			       tSchBeaconStruct *beacon,
+			       tDot11fBeaconIEs *beacon,
 			       tpSirAssocRsp assoc_rsp)
 {
 	tDot11fIEeht_cap *rcvd_eht;

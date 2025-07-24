@@ -1391,7 +1391,6 @@ QDF_STATUS lim_strip_ie(struct mac_context *mac_ctx,
  * lim_intersect_ap_he_caps() - Intersect AP capability with self STA capability
  * @session: pointer to PE session
  * @add_bss: pointer to ADD BSS params
- * @beacon: pointer to beacon
  * @assoc_rsp: pointer to assoc response
  * @bss_desc: pointer to BSS description
  *
@@ -1399,7 +1398,6 @@ QDF_STATUS lim_strip_ie(struct mac_context *mac_ctx,
  */
 void lim_intersect_ap_he_caps(struct pe_session *session,
 			      struct bss_params *add_bss,
-			      tSchBeaconStruct *pBeaconStruct,
 			      tpSirAssocRsp assoc_rsp,
 			      struct bss_description *bss_desc);
 
@@ -1822,7 +1820,6 @@ static inline void lim_update_he_6gop_assoc_resp(
 
 static inline void lim_intersect_ap_he_caps(struct pe_session *session,
 					    struct bss_params *add_bss,
-					    tSchBeaconStruct *pBeaconStruct,
 					    tpSirAssocRsp assoc_rsp,
 					    struct bss_description *bss_desc)
 {
@@ -2120,7 +2117,7 @@ void lim_add_eht_cap(struct mac_context *mac_ctx, struct pe_session *pe_session,
  */
 void lim_intersect_ap_eht_caps(struct pe_session *session,
 			       struct bss_params *add_bss,
-			       tSchBeaconStruct *pBeaconStruct,
+			       tDot11fBeaconIEs *beacon,
 			       tpSirAssocRsp assoc_rsp);
 
 /**
@@ -2452,11 +2449,11 @@ static inline void lim_add_eht_cap(struct mac_context *mac_ctx,
 {
 }
 
-static inline void
-lim_intersect_ap_eht_caps(struct pe_session *session,
-			  struct bss_params *add_bss,
-			  tSchBeaconStruct *pBeaconStruct,
-			  tpSirAssocRsp assoc_rsp)
+static inline
+void lim_intersect_ap_eht_caps(struct pe_session *session,
+			       struct bss_params *add_bss,
+			       tDot11fBeaconIEs *beacon,
+			       tpSirAssocRsp assoc_rsp)
 {
 }
 
