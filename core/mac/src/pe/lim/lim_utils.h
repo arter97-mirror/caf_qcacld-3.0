@@ -54,8 +54,11 @@
 #define LIM_SPECTRUM_MANAGEMENT_BIT_MASK          0x0100
 #define LIM_RRM_BIT_MASK                          0x1000
 #define LIM_SHORT_PREAMBLE_BIT_MASK               0x0020
+#define LIM_SHORT_SLOT_TIME_MASK                  0x0400
 #define LIM_IMMEDIATE_BLOCK_ACK_MASK              0x8000
 #define LIM_MAX_REASSOC_RETRY_LIMIT            2
+
+#define LIM_QOS_AP_SUPPORTS_APSD                  0x80
 
 #define VHT_MCS_3x3_MASK    0x30
 #define VHT_MCS_2x2_MASK    0x0C
