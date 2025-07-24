@@ -271,8 +271,7 @@ void lim_sta_add_bss_update_ht_parameter(uint32_t bss_chan_freq,
  * rsp in sta mode
  *.@mac: pointer to Global MAC structure
  * @pAssocRsp: contains the structured assoc/reassoc Response got from AP
- * @beaconstruct: the ProbeRsp/Beacon structured details
- * @bssDescription: bss description passed to PE from the SME
+ * @bss_desc: bss description passed to PE from the SME
  * @updateEntry: bool flag of whether update bss and sta
  * @pe_session: pointer to pe session
  *
@@ -280,8 +279,7 @@ void lim_sta_add_bss_update_ht_parameter(uint32_t bss_chan_freq,
  */
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 				tpSirAssocRsp pAssocRsp,
-				tpSchBeaconStruct pBeaconStruct,
-				struct bss_description *bssDescription,
+				struct bss_description *bss_desc,
 				uint8_t updateEntry,
 				struct pe_session *pe_session);
 

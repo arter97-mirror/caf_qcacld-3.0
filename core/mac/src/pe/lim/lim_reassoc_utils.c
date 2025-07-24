@@ -186,13 +186,13 @@ void lim_handle_del_bss_in_re_assoc_context(struct mac_context *mac,
 		 * updateBss flag is false, as in this case, PE is first
 		 * deleting the existing BSS and then adding a new one
 		 */
-		if (QDF_STATUS_SUCCESS !=
-		    lim_sta_send_add_bss(mac, assocRsp, beacon_struct,
-				bss_desc,
-				false, pe_session)) {
+		if (QDF_STATUS_SUCCESS != lim_sta_send_add_bss(mac, assocRsp,
+							       bss_desc, false,
+							       pe_session)) {
 			pe_err("Posting ADDBSS in the ReAssocCtx Failed");
 			retStatus = QDF_STATUS_E_FAILURE;
 		}
+
 		if (retStatus != QDF_STATUS_SUCCESS) {
 			mlmReassocCnf.resultCode =
 				eSIR_SME_RESOURCES_UNAVAILABLE;
@@ -307,7 +307,7 @@ void lim_handle_add_bss_in_re_assoc_context(struct mac_context *mac,
 
 		pe_session->isNonRoamReassoc = 1;
 		if (QDF_STATUS_SUCCESS !=
-		    lim_sta_send_add_bss(mac, assocRsp, pBeaconStruct,
+		    lim_sta_send_add_bss(mac, assocRsp,
 					 &pe_session->pLimReAssocReq->
 					 bssDescription, true,
 					 pe_session)) {

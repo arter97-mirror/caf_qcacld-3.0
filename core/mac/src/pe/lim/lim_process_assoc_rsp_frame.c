@@ -1819,7 +1819,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	/* Update the BSS Entry, this entry was added during preassoc. */
 	if (QDF_STATUS_SUCCESS ==
-	    lim_sta_send_add_bss(mac_ctx, assoc_rsp, beacon,
+	    lim_sta_send_add_bss(mac_ctx, assoc_rsp,
 				 &session_entry->lim_join_req->bssDescription,
 				 true, session_entry)) {
 		clean_up_ft_sha384(assoc_rsp, sha384_akm);

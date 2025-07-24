@@ -3677,27 +3677,27 @@ lim_limit_bw_for_iot_ap(struct mac_context *mac_ctx,
 	}
 }
 
-static uint8_t lim_get_peer_supported_tx_nss(tpSchBeaconStruct beacon)
+static uint8_t lim_get_peer_supported_tx_nss(tDot11fBeaconIEs *bcn_ies)
 {
 	uint8_t idx, tx_mcs_def_pos, tx_mcs_pos, *ht_mcs;
 
-	if (beacon->eht_cap.present) {
-		if (beacon->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9)
-			return beacon->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9;
-		if (beacon->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7)
-			return beacon->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7;
-	} else if (beacon->he_cap.present) {
+	if (bcn_ies->eht_cap.present) {
+		if (bcn_ies->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9)
+			return bcn_ies->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9;
+		if (bcn_ies->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7)
+			return bcn_ies->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7;
+	} else if (bcn_ies->he_cap.present) {
 		for (idx = NSS_8x8_MODE; idx >= NSS_1x1_MODE; idx--)
-			if (HE_MCS_IS_NSS_ENABLED(beacon->he_cap.tx_he_mcs_map_lt_80,
+			if (HE_MCS_IS_NSS_ENABLED(bcn_ies->he_cap.tx_he_mcs_map_lt_80,
 						  idx))
 				return idx;
-	} else if (beacon->VHTCaps.present) {
+	} else if (bcn_ies->VHTCaps.present) {
 		for (idx = NSS_8x8_MODE; idx >= NSS_1x1_MODE; idx--)
-			if (VHT_MCS_IS_NSS_ENABLED(beacon->VHTCaps.txMCSMap,
+			if (VHT_MCS_IS_NSS_ENABLED(bcn_ies->VHTCaps.txMCSMap,
 						   idx))
 				return idx;
-	} else if (beacon->HTCaps.present) {
-		ht_mcs = beacon->HTCaps.supportedMCSSet;
+	} else if (bcn_ies->HTCaps.present) {
+		ht_mcs = bcn_ies->HTCaps.supportedMCSSet;
 		tx_mcs_pos = WLAN_HT_CAP_TX_MAX_NSS_POS;
 		tx_mcs_def_pos = WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS;
 
@@ -3739,10 +3739,11 @@ lim_sta_update_max_channel_width(struct pe_session *pe_session,
 	}
 }
 
-QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp,
-				   tpSchBeaconStruct pBeaconStruct,
-				   struct bss_description *bssDescription,
-				   uint8_t updateEntry, struct pe_session *pe_session)
+QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
+				tpSirAssocRsp pAssocRsp,
+				struct bss_description *bss_desc,
+				uint8_t updateEntry,
+				struct pe_session *pe_session)
 {
 	struct bss_params *pAddBssParams = NULL;
 	QDF_STATUS retCode;
@@ -3754,6 +3755,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	tAddStaParams *sta_context;
 	uint32_t listen_interval = MLME_CFG_LISTEN_INTERVAL;
 	struct mlme_vht_capabilities_info *vht_cap_info;
+	tDot11fBeaconIEs *bcn_ies = &bss_desc->bcn_ies;
 
 	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
 
@@ -3764,19 +3766,19 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		goto returnFailure;
 	}
 
-	qdf_mem_copy(pAddBssParams->bssId, bssDescription->bssId,
+	qdf_mem_copy(pAddBssParams->bssId, bss_desc->bssId,
 		     sizeof(tSirMacAddr));
 
-	pAddBssParams->beaconInterval = bssDescription->beaconInterval;
+	pAddBssParams->beaconInterval = bss_desc->beaconInterval;
 
-	pAddBssParams->dtimPeriod = pBeaconStruct->tim.dtimPeriod;
+	pAddBssParams->dtimPeriod = bcn_ies->TIM.dtim_period;
 	pAddBssParams->updateBss = updateEntry;
 
 	if (IS_DOT11_MODE_11B(pe_session->dot11mode) &&
-	    bssDescription->nwType != eSIR_11B_NW_TYPE) {
+	    bss_desc->nwType != eSIR_11B_NW_TYPE) {
 		pAddBssParams->nwType = eSIR_11B_NW_TYPE;
 	} else {
-		pAddBssParams->nwType = bssDescription->nwType;
+		pAddBssParams->nwType = bss_desc->nwType;
 	}
 
 	pAddBssParams->shortSlotTimeSupported =
@@ -3792,7 +3794,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 					      eHT_SUPPORTED_CHANNEL_WIDTH_SET,
 					      pe_session);
 
-		lim_sta_add_bss_update_ht_parameter(bssDescription->chan_freq,
+		lim_sta_add_bss_update_ht_parameter(bss_desc->chan_freq,
 						    &pAssocRsp->HTCaps,
 						    &pAssocRsp->HTInfo,
 						    chan_width_support,
@@ -3813,8 +3815,8 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 					pe_session->ch_width;
 		} else if ((chan_width_support &&
 		     ((pAssocRsp->HTCaps.supportedChannelWidthSet) ||
-		      (pBeaconStruct->HTCaps.present &&
-		       pBeaconStruct->HTCaps.supportedChannelWidthSet)))) {
+		      (bcn_ies->HTCaps.present &&
+		       bcn_ies->HTCaps.supportedChannelWidthSet)))) {
 			pAddBssParams->ch_width = CH_WIDTH_40MHZ;
 			pAddBssParams->staContext.ch_width = CH_WIDTH_40MHZ;
 		} else {
@@ -3850,11 +3852,11 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 						       pe_session);
 		if (vht_caps)
 			lim_update_vhtcaps_assoc_resp(mac, pAddBssParams,
-					vht_caps, pe_session);
+						      vht_caps, pe_session);
 	}
 
 	if (lim_is_session_he_capable(pe_session) &&
-			(pAssocRsp->he_cap.present)) {
+	    pAssocRsp->he_cap.present) {
 		/* Use STA SMPS capability as AP's SMPS value is not valid,
 		 * and use p2p GO's assoc response value to avoid IOT issue.
 		 */
@@ -3900,7 +3902,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	pAddBssParams->staContext.staType = STA_ENTRY_OTHER;
 
 	qdf_mem_copy(pAddBssParams->staContext.bssId,
-			bssDescription->bssId, sizeof(tSirMacAddr));
+		     bss_desc->bssId, sizeof(tSirMacAddr));
 
 	listen_interval = mac->mlme_cfg->sap_cfg.listen_interval;
 	pAddBssParams->staContext.listenInterval = listen_interval;
@@ -3927,17 +3929,16 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	pAddBssParams->staContext.maxSPLen = 0;
 	pAddBssParams->staContext.updateSta = updateEntry;
 
-	if (IS_DOT11_MODE_HT(pe_session->dot11mode)
-			&& pBeaconStruct->HTCaps.present) {
+	if (IS_DOT11_MODE_HT(pe_session->dot11mode) &&
+	    bcn_ies->HTCaps.present) {
 		pAddBssParams->staContext.htCapable = 1;
 		if (pe_session->ht_config.tx_stbc)
 			pAddBssParams->staContext.stbc_capable =
 				pAssocRsp->HTCaps.rxSTBC;
 
 		if (pe_session->vhtCapability &&
-				(IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps) ||
-				 IS_BSS_VHT_CAPABLE(pBeaconStruct->
-						    vendor_vht_ie.VHTCaps))) {
+			(IS_BSS_VHT_CAPABLE(bcn_ies->VHTCaps) ||
+			 IS_BSS_VHT_CAPABLE(bcn_ies->vendor_vht_ie.VHTCaps))) {
 			pAddBssParams->staContext.vhtCapable = 1;
 			pAddBssParams->staContext.vht_mcs_10_11_supp =
 				sta->vht_mcs_10_11_supp;
@@ -3985,7 +3986,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		if (lim_is_session_he_capable(pe_session) &&
 		    pAssocRsp->he_cap.present) {
 			lim_intersect_ap_he_caps(pe_session, pAddBssParams,
-						 pAssocRsp, bssDescription);
+						 pAssocRsp, bss_desc);
 			lim_update_he_stbc_capable(&pAddBssParams->staContext);
 			lim_update_he_mcs_12_13(&pAddBssParams->staContext,
 						sta);
@@ -3994,8 +3995,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		if (lim_is_session_eht_capable(pe_session) &&
 		    pAssocRsp->eht_cap.present)
 			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
-						  &bssDescription->bcn_ies,
-						  pAssocRsp);
+						  bcn_ies, pAssocRsp);
 
 		/* Use STA SMPS capability as AP's SMPS value is not valid,
 		 * and use p2p GO's assoc response value to avoid IOT issue.
@@ -4075,7 +4075,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		if (lim_is_session_he_capable(pe_session) &&
 		    pAssocRsp->he_cap.present) {
 			lim_intersect_ap_he_caps(pe_session, pAddBssParams,
-						 pAssocRsp, bssDescription);
+						 pAssocRsp, bss_desc);
 			lim_update_he_stbc_capable(&pAddBssParams->staContext);
 			lim_update_he_mcs_12_13(&pAddBssParams->staContext,
 						sta);
@@ -4097,30 +4097,29 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		if (lim_is_session_eht_capable(pe_session) &&
 		    pAssocRsp->eht_cap.present)
 			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
-						  &bssDescription->bcn_ies,
-						  pAssocRsp);
+						  bcn_ies, pAssocRsp);
 	}
 
 	pAddBssParams->staContext.bcn_tx_nss =
-				lim_get_peer_supported_tx_nss(pBeaconStruct);
+				lim_get_peer_supported_tx_nss(bcn_ies);
 	lim_extract_per_link_id(pe_session, pAddBssParams, pAssocRsp);
 	lim_extract_ml_info(pe_session, pAddBssParams, pAssocRsp);
 	lim_intersect_ap_emlsr_caps(mac, pe_session, pAddBssParams, pAssocRsp);
 	lim_extract_msd_caps(mac, pe_session, pAddBssParams, pAssocRsp);
 	lim_extract_ext_mld_caps(mac, pe_session, pAddBssParams, pAssocRsp);
 
-	pAddBssParams->staContext.smesessionId =
-		pe_session->smeSessionId;
-	pAddBssParams->staContext.wpa_rsn = pBeaconStruct->rsnPresent;
-	pAddBssParams->staContext.wpa_rsn |=
-		(pBeaconStruct->wpaPresent << 1);
+	pAddBssParams->staContext.smesessionId = pe_session->smeSessionId;
+	pAddBssParams->staContext.wpa_rsn =
+				(bcn_ies->RSNOpaque.present ? 1 : 0) |
+				((bcn_ies->WPA.present ? 1 : 0) << 1);
+
 	/* For OSEN Connection AP does not advertise RSN or WPA IE
 	 * so from the IEs we get from supplicant we get this info
 	 * so for FW to transmit EAPOL message 4 we shall set
 	 * wpa_rsn
 	 */
-	if ((!pAddBssParams->staContext.wpa_rsn)
-			&& (pe_session->isOSENConnection))
+	if (!pAddBssParams->staContext.wpa_rsn &&
+	    pe_session->isOSENConnection)
 		pAddBssParams->staContext.wpa_rsn = 1;
 	qdf_mem_copy(&pAddBssParams->staContext.capab_info,
 			&pAssocRsp->capabilityInfo,
@@ -4213,7 +4212,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		pe_err("wma_send_peer_assoc_req failed=%X",
 		       retCode);
 	} else {
-		lim_limit_bw_for_iot_ap(mac, pe_session, bssDescription);
+		lim_limit_bw_for_iot_ap(mac, pe_session, bss_desc);
 	}
 	qdf_mem_free(pAddBssParams);
 
