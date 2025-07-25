@@ -32,7 +32,7 @@ static inline int ucfg_dp_update_sawf_metadata(struct wlan_dp_intf *dp_intf,
 }
 #endif
 
-#ifdef CONFIG_WLAN_SUPPORT_LAPB
+#ifdef WLAN_SUPPORT_LAPB
 static inline void ucfg_dp_update_lapb_metadata(struct wlan_dp_intf *dp_intf,
 						qdf_nbuf_t nbuf)
 {
