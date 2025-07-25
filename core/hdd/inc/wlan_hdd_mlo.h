@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -467,5 +467,27 @@ void hdd_update_link_state_cached_timestamp(struct hdd_adapter *adapter)
 }
 
 #define FEATURE_ML_LINK_STATE_COMMANDS
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * hdd_mlo_update_link_state_change() - API to send the MLO link state change
+ * to the userspace.
+ * @reason: Reason for the link switch
+ * @active_bmap: Current MLO active links
+ * @inactive_bmap: Current MLO inactive links
+ *
+ *
+ * Return: None
+ */
+void
+hdd_mlo_update_link_state_change(uint32_t reason, uint32_t active_bmap,
+				 uint32_t inactive_bmap);
+#else
+static inline
+void hdd_mlo_update_link_state_change(uint32_t reason, uint32_t active_bmap,
+				      uint32_t inactive_bmap)
+{
+}
 #endif
 #endif

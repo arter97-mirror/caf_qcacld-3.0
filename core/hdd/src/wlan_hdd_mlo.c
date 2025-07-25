@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -291,6 +291,8 @@ static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_mgr_osif_update_link_state = hdd_mlo_update_vdev_active_flag,
 	.mlo_mgr_osif_chan_switch_notification =
 					hdd_mlo_channel_switch_notify,
+	.mlo_mgr_osif_update_link_state_change =
+					hdd_mlo_update_link_state_change,
 };
 
 QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)
