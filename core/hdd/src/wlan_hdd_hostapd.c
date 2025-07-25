@@ -4026,6 +4026,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	int32_t keymgmt;
 	enum policy_mgr_con_mode pm_con_mode;
 	qdf_freq_t ll_sap_freq;
+	bool is_ll_lt_sap_vdev;
 
 	if (!link_info)
 		return -EINVAL;
@@ -4079,17 +4080,16 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	 * vdev is ll sap.
 	 *
 	 */
-	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
-					 wlan_vdev_get_id(sap_ctx->vdev)) &&
+	is_ll_lt_sap_vdev = policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+							 link_info->vdev_id);
+	if (is_ll_lt_sap_vdev &&
 	    sap_ctx->csa_reason != CSA_REASON_DCS &&
 	    sap_ctx->csa_reason != CSA_REASON_USER_INITIATED) {
 		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
 					    CSA_REASON_LL_LT_SAP_EVENT);
-		hdd_dcs_trigger_csa_for_ll_lt_sap(
-				hdd_ctx->psoc,
-				hdd_ctx,
-				wlan_vdev_get_id(sap_ctx->vdev),
-				LL_SAP_CSA_CONCURENCY);
+		hdd_dcs_trigger_csa_for_ll_lt_sap(hdd_ctx->psoc, hdd_ctx,
+						  link_info->vdev_id,
+						  LL_SAP_CSA_CONCURENCY);
 		return ret;
 	}
 
@@ -4098,10 +4098,21 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 							   adapter->device_mode,
 							   link_info->vdev_id);
 
-	if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
+	if (is_ll_lt_sap_vdev &&
+	    !policy_mgr_is_ll_lt_freq_allowed(hdd_ctx->psoc,
+				target_chan_freq, link_info->vdev_id)) {
+		hdd_err("ll_sap %d new freq %d not allowed as it creating SCC",
+			link_info->vdev_id, target_chan_freq);
+		return -EINVAL;
+	} else if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
 	    policy_mgr_are_2_freq_on_same_mac(hdd_ctx->psoc, target_chan_freq,
 					      ll_sap_freq)) {
 		hdd_err("ll_sap freq %d and sap freq %d are on same mac",
+			ll_sap_freq, target_chan_freq);
+		return -EINVAL;
+	} else if (ll_sap_freq && pm_con_mode == PM_P2P_GO_MODE &&
+		   ll_sap_freq == target_chan_freq) {
+		hdd_err("ll_sap freq %d and GO freq %d will lead to SCC",
 			ll_sap_freq, target_chan_freq);
 		return -EINVAL;
 	}

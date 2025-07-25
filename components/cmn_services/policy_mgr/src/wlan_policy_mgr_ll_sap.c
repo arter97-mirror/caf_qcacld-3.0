@@ -104,20 +104,38 @@ uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc)
 	return vdev_id_list[0];
 }
 
+bool __policy_mgr_is_ll_lt_freq_allowed(struct wlan_objmgr_psoc *psoc,
+					qdf_freq_t ll_lt_sap_freq,
+					uint8_t ll_lt_sap_vdev_id,
+					const char *func)
+{
+	uint8_t scc_vdev_id, inactive_scc_vdev;
+
+	inactive_scc_vdev = policy_mgr_get_inact_vdev_present_with_freq(psoc,
+							ll_lt_sap_freq,
+							ll_lt_sap_vdev_id);
+	scc_vdev_id = policy_mgr_get_vdev_present_with_freq(psoc,
+							ll_lt_sap_freq,
+							ll_lt_sap_vdev_id);
+
+	if (scc_vdev_id != WLAN_UMAC_VDEV_ID_MAX ||
+	    inactive_scc_vdev != WLAN_UMAC_VDEV_ID_MAX) {
+		policy_mgr_rl_nofl_debug("%s: LL SAP %d with freq %d not allowed as vdev (%d or %d) is scc",
+					 func, ll_lt_sap_vdev_id,
+					 ll_lt_sap_freq, scc_vdev_id,
+					 inactive_scc_vdev);
+		return false;
+	}
+
+	return true;
+}
+
 bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
 						qdf_freq_t ll_lt_sap_start_freq,
 						const char *func)
 {
 	qdf_freq_t ll_lt_sap_freq = 0;
-	uint8_t scc_vdev_id, inactive_scc_vdev;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint8_t ll_lt_sap_vdev_id;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid pm ctx");
-		return false;
-	}
 
 	ll_lt_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
 
@@ -132,23 +150,8 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
 		return false;
 	ll_lt_sap_vdev_id = wlan_policy_mgr_get_ll_lt_sap_vdev_id(psoc);
 
-	inactive_scc_vdev = policy_mgr_get_inact_vdev_present_with_freq(psoc,
-							ll_lt_sap_freq,
-							ll_lt_sap_vdev_id);
-	scc_vdev_id = policy_mgr_get_vdev_present_with_freq(psoc,
-							ll_lt_sap_freq,
-							ll_lt_sap_vdev_id);
-
-	if (scc_vdev_id != WLAN_UMAC_VDEV_ID_MAX ||
-	    inactive_scc_vdev != WLAN_UMAC_VDEV_ID_MAX) {
-		policy_mgr_rl_nofl_debug("%s LL LT sap %d with freq %d is in scc with vdev %d or inact vdev %d",
-					 func, ll_lt_sap_vdev_id,
-					 ll_lt_sap_freq, scc_vdev_id,
-					 inactive_scc_vdev);
-		return true;
-	}
-
-	return false;
+	return !__policy_mgr_is_ll_lt_freq_allowed(psoc, ll_lt_sap_freq,
+						   ll_lt_sap_vdev_id, func);
 }
 
 /**
