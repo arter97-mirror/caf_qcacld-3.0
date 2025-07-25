@@ -11628,8 +11628,6 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 	mlme_obj->mgmt.rate_info.quarter_rate = cds_is_5_mhz_enabled();
 	mlme_obj->mgmt.rate_info.half_rate = cds_is_10_mhz_enabled();
 
-	mlme_obj->mgmt.chainmask_info.num_rx_chain = session->cap_rx_nss;
-	mlme_obj->mgmt.chainmask_info.num_tx_chain = session->cap_tx_nss;
 	wlan_vdev_mlme_set_ssid(mlme_obj->vdev, session->ssId.ssId,
 				session->ssId.length);
 

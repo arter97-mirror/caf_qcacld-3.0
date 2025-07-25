@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -68,9 +69,6 @@ static QDF_STATUS wma_start_ocb_vdev(struct ocb_config *config)
 	status = lim_set_ch_phy_mode(vdev, dot11_mode);
 	if (QDF_IS_STATUS_ERROR(status))
 		return QDF_STATUS_E_FAILURE;
-
-	mlme_obj->mgmt.chainmask_info.num_rx_chain = 2;
-	mlme_obj->mgmt.chainmask_info.num_tx_chain = 2;
 
 	status = wma_vdev_pre_start(config->vdev_id, false);
 	if (status != QDF_STATUS_SUCCESS)
