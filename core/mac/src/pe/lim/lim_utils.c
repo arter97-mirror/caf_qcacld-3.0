@@ -9178,6 +9178,8 @@ void lim_decide_eht_op(struct mac_context *mac_ctx, uint32_t *mlme_eht_ops,
 	session->puncture_bitmap = ori_puncture_bitmap;
 
 	wma_update_vdev_eht_ops(mlme_eht_ops, &session->eht_op);
+
+	session->eht_op.mcs15_disable = true;
 }
 
 void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)

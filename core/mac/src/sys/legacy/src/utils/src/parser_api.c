@@ -10586,6 +10586,8 @@ void lim_ieee80211_pack_ehtop(uint8_t *ie, tDot11fIEeht_op dot11f_eht_op,
 	val = dot11f_eht_op.group_addr_bu_indication_exponent;
 	EHTOP_PARAMS_GROUP_ADDR_BU_IND_EXPONENT_SET_TO_IE(ehtop->ehtop_param,
 							  val);
+
+	val = dot11f_eht_op.mcs15_disable;
 	EHTOP_PARAMS_MCS15_DISABLE_SET_TO_IE(ehtop->ehtop_param,
 							  val);
 
