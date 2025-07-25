@@ -67,6 +67,27 @@ bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
 	__policy_mgr_is_ll_lt_sap_restart_required(psoc, ll_sap_freq, __func__)
 
 /**
+ * __policy_mgr_is_ll_lt_freq_allowed() - Check if ll_lt_sap given freq
+ * can be allowed
+ * @psoc: PSOC object
+ * @ll_lt_sap_freq: LL LT SAP freq to check
+ * @ll_lt_sap_vdev_id: LL LT SAP vdev id
+ * @func: Function pointer of the caller function.
+ *
+ * This API checks if ll_lt_sap restart is required or not
+ *
+ * Return: true if frequency is allowed, false otherwise
+ */
+bool __policy_mgr_is_ll_lt_freq_allowed(struct wlan_objmgr_psoc *psoc,
+					qdf_freq_t ll_lt_sap_freq,
+					uint8_t ll_lt_sap_vdev_id,
+					const char *func);
+
+#define policy_mgr_is_ll_lt_freq_allowed(psoc, ll_sap_freq, ll_lt_sap_vdev_id) \
+	__policy_mgr_is_ll_lt_freq_allowed(psoc, ll_sap_freq, \
+					ll_lt_sap_vdev_id, __func__)
+
+/**
  * policy_mgr_ll_lt_sap_restart_concurrent_sap() - Check and restart
  * concurrent SAP or ll_lt_sap
  * @psoc: PSOC object
@@ -93,6 +114,14 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 static inline bool
 policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
 					 qdf_freq_t ll_lt_sap_start_freq)
+{
+	return false;
+}
+
+static inline bool
+policy_mgr_is_ll_lt_freq_allowed(struct wlan_objmgr_psoc *psoc,
+				 qdf_freq_t ll_lt_sap_freq,
+				 uint8_t ll_lt_sap_vdev_id)
 {
 	return false;
 }
