@@ -92,6 +92,63 @@ struct wlan_mlme_nss_chains *mlme_get_dynamic_vdev_config(
 	return &mlme_priv->dynamic_cfg;
 }
 
+QDF_STATUS mlme_get_vdev_nss_by_freq_from_cfg(struct wlan_objmgr_vdev *vdev,
+					      struct wlan_mlme_nss_chains *cfg,
+					      qdf_freq_t freq, uint8_t *tx_nss,
+					      uint8_t *rx_nss)
+{
+	enum nss_chains_band_info band;
+
+	if (!cfg)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	if (wlan_reg_is_24ghz_ch_freq(freq))
+		band = NSS_CHAINS_BAND_2GHZ;
+	else
+		band = NSS_CHAINS_BAND_5GHZ;
+
+	*tx_nss = (uint8_t)cfg->tx_nss[band];
+	*rx_nss = (uint8_t)cfg->rx_nss[band];
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+mlme_get_vdev_all_bands_nss_from_cfg(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_mlme_nss_chains *cfg,
+				     uint8_t *tx_nss_2g, uint8_t *rx_nss_2g,
+				     uint8_t *tx_nss_5g, uint8_t *rx_nss_5g)
+{
+	if (!cfg)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	*tx_nss_2g = (uint8_t)cfg->tx_nss[NSS_CHAINS_BAND_2GHZ];
+	*rx_nss_2g = (uint8_t)cfg->rx_nss[NSS_CHAINS_BAND_2GHZ];
+
+	*tx_nss_5g = (uint8_t)cfg->tx_nss[NSS_CHAINS_BAND_5GHZ];
+	*rx_nss_5g = (uint8_t)cfg->rx_nss[NSS_CHAINS_BAND_5GHZ];
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool
+mlme_is_vdev_nss_differs_across_bands_from_cfg(struct wlan_objmgr_vdev *vdev,
+					       struct wlan_mlme_nss_chains *cfg)
+{
+	QDF_STATUS status;
+	uint8_t tx_nss_2g, rx_nss_2g, tx_nss_5g, rx_nss_5g;
+
+	status = mlme_get_vdev_all_bands_nss_from_cfg(vdev, cfg,
+						      &tx_nss_2g, &rx_nss_2g,
+						      &tx_nss_5g, &rx_nss_5g);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
+
+	if (tx_nss_2g == tx_nss_5g && rx_nss_2g == rx_nss_5g)
+		return false;
+
+	return true;
+}
 /* Buffer len size to consider the 4 char freq, and a space, Total 5 */
 #define MLME_CHAN_WEIGHT_CHAR_LEN 5
 #define MLME_MAX_CHAN_TO_PRINT 39

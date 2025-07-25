@@ -1115,6 +1115,15 @@ mlme_peer_object_destroyed_notification(struct wlan_objmgr_peer *peer,
 uint8_t *mlme_get_dynamic_oce_flags(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlme_get_ini_vdev_config() - get the vdev ini config params
+ * @vdev: vdev pointer
+ *
+ * Return: pointer to the ini vdev config structure
+ */
+struct wlan_mlme_nss_chains *mlme_get_ini_vdev_config(
+					struct wlan_objmgr_vdev *vdev);
+
+/**
  * mlme_get_dynamic_vdev_config() - get the vdev dynamic config params
  * @vdev: vdev pointer
  *
@@ -1122,6 +1131,200 @@ uint8_t *mlme_get_dynamic_oce_flags(struct wlan_objmgr_vdev *vdev);
  */
 struct wlan_mlme_nss_chains *mlme_get_dynamic_vdev_config(
 					struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_get_vdev_nss_by_freq_from_cfg() - Get the NSS values for a given
+ * frequency band
+ * @vdev: Pointer to vdev object
+ * @cfg: Pointer to the NSS chains config
+ * @freq: Frequency for which NSS values are required
+ * @tx_nss: Pointer to store the TX NSS value
+ * @rx_nss: Pointer to store the RX NSS value
+ *
+ * This function determines the band (2.4GHz or 5GHz) based on the given
+ * frequency and returns the corresponding TX and RX NSS values from the config.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
+ */
+QDF_STATUS mlme_get_vdev_nss_by_freq_from_cfg(struct wlan_objmgr_vdev *vdev,
+					      struct wlan_mlme_nss_chains *cfg,
+					      qdf_freq_t freq, uint8_t *tx_nss,
+					      uint8_t *rx_nss);
+
+/**
+ * mlme_get_vdev_all_bands_nss_from_cfg() - Get the NSS values for all bands
+ * @vdev: Pointer to vdev object
+ * @cfg: Pointer to the NSS chains config
+ * @tx_nss_2g: Pointer to store the 2.4GHz TX NSS value
+ * @rx_nss_2g: Pointer to store the 2.4GHz RX NSS value
+ * @tx_nss_5g: Pointer to store the 5GHz TX NSS value
+ * @rx_nss_5g: Pointer to store the 5GHz RX NSS value
+ *
+ * This function retrieves the TX and RX NSS values for both 2.4GHz and 5GHz
+ * bands from the provided NSS chains configuration.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
+ */
+QDF_STATUS
+mlme_get_vdev_all_bands_nss_from_cfg(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_mlme_nss_chains *cfg,
+				     uint8_t *tx_nss_2g, uint8_t *rx_nss_2g,
+				     uint8_t *tx_nss_5g, uint8_t *rx_nss_5g);
+
+/**
+ * mlme_is_vdev_nss_differs_across_bands_from_cfg() - Check if NSS values
+ * differ across bands
+ * @vdev: Pointer to vdev object
+ * @cfg: Pointer to the NSS chains config
+ *
+ * This function checks if the TX and RX NSS values are different
+ * between 2.4GHz and 5GHz bands for the given vdev configuration.
+ *
+ * Return: true if NSS values differ across bands, false otherwise or on error
+ */
+bool
+mlme_is_vdev_nss_differs_across_bands_from_cfg(struct wlan_objmgr_vdev *vdev,
+					       struct wlan_mlme_nss_chains *cfg);
+
+/**
+ * mlme_get_vdev_nss_by_freq_from_ini() - Get NSS values from INI config
+ * for a frequency band
+ * @vdev: Pointer to vdev object
+ * @freq: Frequency for which NSS values are required
+ * @tx_nss: Pointer to store the TX NSS value
+ * @rx_nss: Pointer to store the RX NSS value
+ *
+ * This function retrieves the TX and RX NSS values from the INI configuration
+ * for the specified frequency.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
+ */
+static inline
+QDF_STATUS mlme_get_vdev_nss_by_freq_from_ini(struct wlan_objmgr_vdev *vdev,
+					      qdf_freq_t freq, uint8_t *tx_nss,
+					      uint8_t *rx_nss)
+{
+	struct wlan_mlme_nss_chains *cfg = mlme_get_ini_vdev_config(vdev);
+
+	return mlme_get_vdev_nss_by_freq_from_cfg(vdev, cfg, freq,
+						  tx_nss, rx_nss);
+}
+
+/**
+ * mlme_get_vdev_all_bands_nss_from_ini() - Get NSS values for all bands
+ * from INI config
+ * @vdev: Pointer to vdev object
+ * @tx_nss_2g: Pointer to store the 2.4GHz TX NSS value
+ * @rx_nss_2g: Pointer to store the 2.4GHz RX NSS value
+ * @tx_nss_5g: Pointer to store the 5GHz TX NSS value
+ * @rx_nss_5g: Pointer to store the 5GHz RX NSS value
+ *
+ * This function retrieves the TX and RX NSS values for both 2.4GHz and 5GHz
+ * bands from the INI configuration.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
+ */
+static inline
+QDF_STATUS mlme_get_vdev_all_bands_nss_from_ini(struct wlan_objmgr_vdev *vdev,
+						uint8_t *tx_nss_2g,
+						uint8_t *rx_nss_2g,
+						uint8_t *tx_nss_5g,
+						uint8_t *rx_nss_5g)
+{
+	struct wlan_mlme_nss_chains *cfg = mlme_get_ini_vdev_config(vdev);
+
+	return mlme_get_vdev_all_bands_nss_from_cfg(vdev, cfg,
+						    tx_nss_2g, rx_nss_2g,
+						    tx_nss_5g, rx_nss_5g);
+}
+
+/**
+ * mlme_is_vdev_nss_differs_across_bands_from_ini() - Check if NSS values differ
+ * across bands in INI config
+ * @vdev: Pointer to vdev object
+ *
+ * This function checks if the TX and RX NSS values are different between
+ * 2.4GHz and 5GHz bands in the INI configuration.
+ *
+ * Return: true if NSS values differ across bands, false otherwise or on error
+ */
+static inline bool
+mlme_is_vdev_nss_differs_across_bands_from_ini(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlme_nss_chains *cfg = mlme_get_ini_vdev_config(vdev);
+
+	return mlme_is_vdev_nss_differs_across_bands_from_cfg(vdev, cfg);
+}
+
+/**
+ * mlme_get_vdev_nss_by_freq_from_dyn() - Get NSS values from dynamic config
+ * for a frequency band
+ * @vdev: Pointer to vdev object
+ * @freq: Frequency for which NSS values are required
+ * @tx_nss: Pointer to store the TX NSS value
+ * @rx_nss: Pointer to store the RX NSS value
+ *
+ * This function retrieves the TX and RX NSS values from the dynamic
+ * configuration for the specified frequency.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
+ */
+static inline
+QDF_STATUS mlme_get_vdev_nss_by_freq_from_dyn(struct wlan_objmgr_vdev *vdev,
+					      qdf_freq_t freq, uint8_t *tx_nss,
+					      uint8_t *rx_nss)
+{
+	struct wlan_mlme_nss_chains *cfg = mlme_get_dynamic_vdev_config(vdev);
+
+	return mlme_get_vdev_nss_by_freq_from_cfg(vdev, cfg, freq,
+						  tx_nss, rx_nss);
+}
+
+/**
+ * mlme_get_vdev_all_bands_nss_from_dyn() - Get NSS values for all bands
+ * from dynamic config
+ * @vdev: Pointer to vdev object
+ * @tx_nss_2g: Pointer to store the 2.4GHz TX NSS value
+ * @rx_nss_2g: Pointer to store the 2.4GHz RX NSS value
+ * @tx_nss_5g: Pointer to store the 5GHz TX NSS value
+ * @rx_nss_5g: Pointer to store the 5GHz RX NSS value
+ *
+ * This function retrieves the TX and RX NSS values for both 2.4GHz and 5GHz
+ * bands from the dynamic configuration.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_NULL_VALUE if cfg is NULL
+ */
+static inline
+QDF_STATUS mlme_get_vdev_all_bands_nss_from_dyn(struct wlan_objmgr_vdev *vdev,
+						uint8_t *tx_nss_2g,
+						uint8_t *rx_nss_2g,
+						uint8_t *tx_nss_5g,
+						uint8_t *rx_nss_5g)
+{
+	struct wlan_mlme_nss_chains *cfg = mlme_get_dynamic_vdev_config(vdev);
+
+	return mlme_get_vdev_all_bands_nss_from_cfg(vdev, cfg,
+						    tx_nss_2g, rx_nss_2g,
+						    tx_nss_5g, rx_nss_5g);
+}
+
+/**
+ * mlme_is_vdev_nss_differs_across_bands_from_dyn() - Check if NSS values differ
+ * across bands in dynamic config
+ * @vdev: Pointer to vdev object
+ *
+ * This function checks if the TX and RX NSS values are different between
+ * 2.4GHz and 5GHz bands in the dynamic configuration.
+ *
+ * Return: true if NSS values differ across bands, false otherwise or on error
+ */
+static inline bool
+mlme_is_vdev_nss_differs_across_bands_from_dyn(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlme_nss_chains *cfg = mlme_get_dynamic_vdev_config(vdev);
+
+	return mlme_is_vdev_nss_differs_across_bands_from_cfg(vdev, cfg);
+}
 
 /**
  * mlme_get_vdev_he_ops()  - Get vdev HE operations IE info
@@ -1142,15 +1345,6 @@ uint32_t mlme_get_vdev_he_ops(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
  */
 QDF_STATUS mlme_connected_chan_stats_request(struct wlan_objmgr_psoc *psoc,
 					     uint8_t vdev_id);
-
-/**
- * mlme_get_ini_vdev_config() - get the vdev ini config params
- * @vdev: vdev pointer
- *
- * Return: pointer to the ini vdev config structure
- */
-struct wlan_mlme_nss_chains *mlme_get_ini_vdev_config(
-					struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlme_cfg_on_psoc_enable() - Populate MLME structure from CFG and INI
