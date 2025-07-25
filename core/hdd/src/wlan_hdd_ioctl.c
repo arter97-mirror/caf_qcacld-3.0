@@ -3332,8 +3332,10 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
-	status = ucfg_pmo_tgt_psoc_send_idle_roam_suspend_mode(hdd_ctx->psoc,
-							       idle_monitor);
+	status = hdd_update_send_idle_roam_bitmap(link_info, hdd_ctx,
+						  idle_monitor,
+						  IDLE_ROAM_SETSUSPEND_CMD);
+
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("Send suspend mode to fw failed");
 		return -EINVAL;
