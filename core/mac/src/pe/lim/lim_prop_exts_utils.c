@@ -597,27 +597,16 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 				     int8_t *local_constraint,
 				     bool *is_pwr_constraint)
 {
-	tSirProbeRespBeacon *beacon_struct;
-	uint8_t ap_bcon_ch_width;
 	bool new_ch_width_dfn = false;
 	tDot11fIEVHTOperation *vht_op;
-	uint8_t fw_vht_ch_wd;
-	uint8_t vht_ch_wd;
-	uint8_t center_freq_diff;
 	struct s_ext_cap *ext_cap;
-	uint8_t chan_center_freq_seg1;
 	tDot11fIEVHTCaps *vht_caps;
-	uint8_t channel = 0;
-	uint8_t sta_prefer_80mhz_over_160mhz;
-	uint8_t *p_ie;
+	uint8_t fw_vht_ch_wd, vht_ch_wd, center_freq_diff;
+	uint8_t channel, chan_center_freq_seg1, ap_bcon_ch_width;
+	uint8_t sta_prefer_80mhz_over_160mhz, *ie;
 	uint16_t ie_len;
 	tDot11fBeaconIEs *bcn_ies;
 	struct mlme_vht_capabilities_info *mlme_vht_cap;
-	QDF_STATUS status;
-
-	beacon_struct = qdf_mem_malloc(sizeof(tSirProbeRespBeacon));
-	if (!beacon_struct)
-		return QDF_STATUS_E_NOMEM;
 
 	*qos_cap = 0;
 	*uapsd = 0;
@@ -625,50 +614,38 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 		session->mac_ctx->mlme_cfg->sta.sta_prefer_80mhz_over_160mhz;
 
 	bcn_ies = &bss_desc->bcn_ies;
-	p_ie = (uint8_t *)&bss_desc->ieFields[0];
+	ie = (uint8_t *)&bss_desc->ieFields[0];
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 
-	status = sir_parse_beacon_ie(mac_ctx, beacon_struct, p_ie,
-				     (uint32_t)ie_len);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("sir_parse_beacon_ie failed to parse beacon");
-		qdf_mem_free(beacon_struct);
-		return status;
-	}
-
 	mlme_vht_cap = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
-	if (beacon_struct->wmeInfoPresent ||
-	    beacon_struct->wmeEdcaPresent ||
-	    beacon_struct->HTCaps.present)
+	if (bcn_ies->WMMInfoAp.present || bcn_ies->WMMParams.present ||
+	    bcn_ies->HTCaps.present)
 		LIM_BSS_CAPS_SET(WME, *qos_cap);
 
-	if (LIM_BSS_CAPS_GET(WME, *qos_cap) && beacon_struct->wsmCapablePresent)
+	if (LIM_BSS_CAPS_GET(WME, *qos_cap) && bcn_ies->WMMCaps.present)
 		LIM_BSS_CAPS_SET(WSM, *qos_cap);
 
-	if (beacon_struct->HTCaps.present)
-		mac_ctx->lim.htCapabilityPresentInBeacon = 1;
-	else
-		mac_ctx->lim.htCapabilityPresentInBeacon = 0;
+	mac_ctx->lim.htCapabilityPresentInBeacon = bcn_ies->HTCaps.present;
 
-	vht_op = &beacon_struct->VHTOperation;
-	vht_caps = &beacon_struct->VHTCaps;
-	if (IS_BSS_VHT_CAPABLE(beacon_struct->VHTCaps) && vht_op->present &&
+	vht_op = &bcn_ies->VHTOperation;
+	vht_caps = &bcn_ies->VHTCaps;
+	if (IS_BSS_VHT_CAPABLE(bcn_ies->VHTCaps) && vht_op->present &&
 	    session->vhtCapability) {
 		session->vhtCapabilityPresentInBeacon = 1;
 
-		if (((beacon_struct->Vendor1IEPresent &&
-		      beacon_struct->vendor_vht_ie.present &&
-		      beacon_struct->Vendor3IEPresent)) &&
-		      (((beacon_struct->VHTCaps.txMCSMap & VHT_MCS_3x3_MASK) ==
+		if (((bcn_ies->Vendor1IE.present &&
+		      bcn_ies->vendor_vht_ie.present &&
+		      bcn_ies->Vendor3IE.present)) &&
+		      (((bcn_ies->VHTCaps.txMCSMap & VHT_MCS_3x3_MASK) ==
 			VHT_MCS_3x3_MASK) &&
-		      ((beacon_struct->VHTCaps.txMCSMap & VHT_MCS_2x2_MASK) !=
+		      ((bcn_ies->VHTCaps.txMCSMap & VHT_MCS_2x2_MASK) !=
 		       VHT_MCS_2x2_MASK)))
 			session->vht_config.su_beam_formee = 0;
 	} else {
 		session->vhtCapabilityPresentInBeacon = 0;
 	}
 
-	if (beacon_struct->qcn_ie.present)
+	if (bcn_ies->qcn_ie.present)
 		session->qcn_ie_present_in_beacon = true;
 
 	if (session->vhtCapabilityPresentInBeacon == 1 &&
@@ -677,12 +654,10 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 			session->vht_config.su_beam_formee = 0;
 
 		if (session->opmode == QDF_P2P_CLIENT_MODE &&
-		    !wlan_reg_is_24ghz_ch_freq(beacon_struct->chan_freq) &&
-			mac_ctx->roam.configParam.channelBondingMode5GHz)
-			lim_update_ch_width_for_p2p_client(
-					mac_ctx, session,
-					beacon_struct->chan_freq);
-
+		    !wlan_reg_is_24ghz_ch_freq(bss_desc->chan_freq) &&
+		    mac_ctx->roam.configParam.channelBondingMode5GHz)
+			lim_update_ch_width_for_p2p_client(mac_ctx, session,
+							   bss_desc->chan_freq);
 	} else if (session->vhtCapabilityPresentInBeacon && vht_op->chanWidth) {
 		/* If VHT is supported min 80 MHz support is must */
 		ap_bcon_ch_width = vht_op->chanWidth;
@@ -692,7 +667,7 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 					vht_op->chan_center_freq_seg1;
 			else
 				chan_center_freq_seg1 =
-				beacon_struct->HTInfo.chan_center_freq_seg2;
+					bcn_ies->HTInfo.chan_center_freq_seg2;
 		} else {
 			chan_center_freq_seg1 = vht_op->chan_center_freq_seg1;
 		}
@@ -743,8 +718,8 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 				vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
 			else if ((sta_prefer_80mhz_over_160mhz ==
 						STA_PREFER_BW_VHT80MHZ) &&
-			  (!(IS_VHT_NSS_1x1(beacon_struct->VHTCaps.txMCSMap)) &&
-			    (!IS_VHT_NSS_1x1(beacon_struct->VHTCaps.rxMCSMap))))
+			  (!(IS_VHT_NSS_1x1(bcn_ies->VHTCaps.txMCSMap)) &&
+			    (!IS_VHT_NSS_1x1(bcn_ies->VHTCaps.rxMCSMap))))
 				vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
 		}
 		/*
@@ -766,7 +741,7 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 		session->ch_center_freq_seg0 = vht_op->chan_center_freq_seg0;
 		session->ch_center_freq_seg1 = chan_center_freq_seg1;
 		channel = wlan_reg_freq_to_chan(mac_ctx->pdev,
-						beacon_struct->chan_freq);
+						bss_desc->chan_freq);
 		if (vht_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
 			/* DUT or AP supports only 160MHz */
 			if (ap_bcon_ch_width ==
@@ -798,8 +773,8 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 	}
 
 	if (session->vhtCapability && session->vhtCapabilityPresentInBeacon &&
-	    beacon_struct->ExtCap.present) {
-		ext_cap = (struct s_ext_cap *)beacon_struct->ExtCap.bytes;
+	    bcn_ies->ExtCap.present) {
+		ext_cap = (struct s_ext_cap *)bcn_ies->ExtCap.bytes;
 		session->gLimOperatingMode.present =
 					ext_cap->oper_mode_notification;
 		if (ext_cap->oper_mode_notification) {
@@ -823,9 +798,9 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 			    session->opmode == QDF_STA_MODE &&
 			    !session->nss_forced_1x1 &&
 			     lim_get_nss_supported_by_ap(
-					&beacon_struct->VHTCaps,
-					&beacon_struct->HTCaps,
-					&beacon_struct->he_cap) == NSS_1x1_MODE)
+					&bcn_ies->VHTCaps,
+					&bcn_ies->HTCaps,
+					&bcn_ies->he_cap) == NSS_1x1_MODE)
 				session->gLimOperatingMode.rxNSS = self_nss - 1;
 			else
 				session->gLimOperatingMode.rxNSS =
@@ -843,14 +818,13 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 		lim_update_he_bw_cap_mcs(session, bcn_ies);
 	lim_update_eht_bw_cap_mcs(session, bcn_ies);
 	/* Extract the UAPSD flag from WMM Parameter element */
-	if (beacon_struct->wmeEdcaPresent)
-		*uapsd = beacon_struct->edcaParams.qosInfo.uapsd;
+	if (bcn_ies->WMMParams.present)
+		*uapsd = bcn_ies->WMMParams.qosInfo & LIM_QOS_AP_SUPPORTS_APSD;
 
 	if (mac_ctx->mlme_cfg->sta.allow_tpc_from_ap) {
-		if (beacon_struct->powerConstraintPresent) {
+		if (bcn_ies->PowerConstraints.present) {
 			*local_constraint =
-				beacon_struct->localPowerConstraint.
-					localPowerConstraints;
+				bcn_ies->PowerConstraints.localPowerConstraints;
 			*is_pwr_constraint = true;
 		} else {
 			get_local_power_constraint_probe_response(bcn_ies,
@@ -863,32 +837,30 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 
 	session->country_info_present = false;
 	/* Initializing before first use */
-	if (beacon_struct->countryInfoPresent)
+	if (bcn_ies->Country.present)
 		session->country_info_present = true;
 	/* Check if Extended caps are present in probe resp or not */
-	if (beacon_struct->ExtCap.present)
+	if (bcn_ies->ExtCap.present)
 		session->is_ext_caps_present = true;
 	/* Update HS 2.0 Information Element */
-	if (beacon_struct->hs20vendor_ie.present) {
+	if (bcn_ies->hs20vendor_ie.present) {
 		pe_debug("HS20 Indication Element Present, rel#: %u id: %u",
-			beacon_struct->hs20vendor_ie.release_num,
-			beacon_struct->hs20vendor_ie.hs_id_present);
-		qdf_mem_copy(&session->hs20vendor_ie,
-			&beacon_struct->hs20vendor_ie,
-			sizeof(tDot11fIEhs20vendor_ie) -
-			sizeof(beacon_struct->hs20vendor_ie.hs_id));
-		if (beacon_struct->hs20vendor_ie.hs_id_present)
+			 bcn_ies->hs20vendor_ie.release_num,
+			 bcn_ies->hs20vendor_ie.hs_id_present);
+		qdf_mem_copy(&session->hs20vendor_ie, &bcn_ies->hs20vendor_ie,
+			     (sizeof(tDot11fIEhs20vendor_ie) -
+			      sizeof(bcn_ies->hs20vendor_ie.hs_id)));
+		if (bcn_ies->hs20vendor_ie.hs_id_present)
 			qdf_mem_copy(&session->hs20vendor_ie.hs_id,
-				&beacon_struct->hs20vendor_ie.hs_id,
-				sizeof(beacon_struct->hs20vendor_ie.hs_id));
+				     &bcn_ies->hs20vendor_ie.hs_id,
+				     sizeof(bcn_ies->hs20vendor_ie.hs_id));
 	}
 
 	lim_objmgr_update_vdev_nss(mac_ctx->psoc, session->smeSessionId,
 				   session->nss);
 
 	session->is_adaptive_11r_connection =
-			lim_extract_adaptive_11r_cap(p_ie, ie_len);
-	qdf_mem_free(beacon_struct);
+			lim_extract_adaptive_11r_cap(ie, ie_len);
 
 	return QDF_STATUS_SUCCESS;
 } /****** end lim_extract_ap_capability() ******/
