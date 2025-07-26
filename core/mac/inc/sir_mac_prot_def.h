@@ -985,7 +985,8 @@ typedef struct sHtCaps {
 /* Supported MCS set */
 #define SIZE_OF_SUPPORTED_MCS_SET                          16
 #define SIZE_OF_BASIC_MCS_SET                              16
-#define VALID_MCS_SIZE                                     77   /* 0-76 */
+#define VALID_MCS_SIZE_BITS                                77   /* 0-76 */
+#define VALID_MCS_SIZE_BYTES           (VALID_MCS_SIZE_BITS / BITS_IN_A_BYTE)
 #define MCS_RX_HIGHEST_SUPPORTED_RATE_BYTE_OFFSET          10
 #define WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS                 96
 #define WLAN_HT_CAP_TX_MAX_NSS_POS                         98

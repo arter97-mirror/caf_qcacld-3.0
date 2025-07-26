@@ -31,6 +31,7 @@
 	mcs[1] = 0x00;        \
 	mcs[2] = 0x00;        \
 	mcs[3] = 0x00;        \
+	mcs[WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS / BITS_IN_A_BYTE] = 0x1; \
 	} while(0)
 
 wlan_bs_req_id

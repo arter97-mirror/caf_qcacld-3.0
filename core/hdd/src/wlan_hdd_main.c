@@ -2357,7 +2357,7 @@ static void hdd_update_wiphy_vhtcap(struct hdd_context *hdd_ctx)
 }
 
 static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
-				  struct wma_tgt_ht_cap *cfg)
+				  struct wma_tgt_cfg *cfg)
 {
 	QDF_STATUS status;
 	qdf_size_t value_len;
@@ -2365,6 +2365,7 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	uint8_t mpdu_density;
 	struct mlme_ht_capabilities_info ht_cap_info;
 	uint8_t mcs_set[SIZE_OF_SUPPORTED_MCS_SET];
+	struct wma_tgt_ht_cap *ht_cfg = &cfg->ht_cap;
 
 	/* get the MPDU density */
 	status = ucfg_mlme_get_ht_mpdu_density(hdd_ctx->psoc, &mpdu_density);
@@ -2379,9 +2380,9 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	 * than the one supported by target,
 	 * if target value is 0, then follow user's setting.
 	 */
-	if (cfg->mpdu_density && mpdu_density > cfg->mpdu_density) {
+	if (ht_cfg->mpdu_density && mpdu_density > ht_cfg->mpdu_density) {
 		status = ucfg_mlme_set_ht_mpdu_density(hdd_ctx->psoc,
-						       cfg->mpdu_density);
+						       ht_cfg->mpdu_density);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("could not set HT capability to CCM");
 	}
@@ -2394,31 +2395,31 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	}
 
 	/* check and update RX STBC */
-	if (ht_cap_info.rx_stbc && !cfg->ht_rx_stbc)
-		ht_cap_info.rx_stbc = cfg->ht_rx_stbc;
+	if (ht_cap_info.rx_stbc && !ht_cfg->ht_rx_stbc)
+		ht_cap_info.rx_stbc = ht_cfg->ht_rx_stbc;
 
 	/* Set the LDPC capability */
-	if (ht_cap_info.adv_coding_cap && !cfg->ht_rx_ldpc)
-		ht_cap_info.adv_coding_cap = cfg->ht_rx_ldpc;
+	if (ht_cap_info.adv_coding_cap && !ht_cfg->ht_rx_ldpc)
+		ht_cap_info.adv_coding_cap = ht_cfg->ht_rx_ldpc;
 
-	if (ht_cap_info.short_gi_20_mhz && !cfg->ht_sgi_20)
-		ht_cap_info.short_gi_20_mhz = cfg->ht_sgi_20;
+	if (ht_cap_info.short_gi_20_mhz && !ht_cfg->ht_sgi_20)
+		ht_cap_info.short_gi_20_mhz = ht_cfg->ht_sgi_20;
 
-	if (ht_cap_info.short_gi_40_mhz && !cfg->ht_sgi_40)
-		ht_cap_info.short_gi_40_mhz = cfg->ht_sgi_40;
+	if (ht_cap_info.short_gi_40_mhz && !ht_cfg->ht_sgi_40)
+		ht_cap_info.short_gi_40_mhz = ht_cfg->ht_sgi_40;
 
 	hdd_debug("gHtSMPS ini: %d, dynamic_smps fw cap: %d",
-		  ht_cap_info.mimo_power_save, cfg->dynamic_smps);
+		  ht_cap_info.mimo_power_save, ht_cfg->dynamic_smps);
 	if (ht_cap_info.mimo_power_save == HDD_SMPS_MODE_DYNAMIC) {
-		if (cfg->dynamic_smps)
+		if (ht_cfg->dynamic_smps)
 			ht_cap_info.mimo_power_save = HDD_SMPS_MODE_DYNAMIC;
 		else
 			ht_cap_info.mimo_power_save = HDD_SMPS_MODE_DISABLED;
 	}
 
-	hdd_ctx->ht_tx_stbc_supported = cfg->ht_tx_stbc;
+	hdd_ctx->ht_tx_stbc_supported = ht_cfg->ht_tx_stbc;
 
-	if (!(cfg->ht_tx_stbc && hdd_ctx->num_rf_chains > NSS_1x1_MODE))
+	if (!(ht_cfg->ht_tx_stbc && hdd_ctx->num_rf_chains > NSS_1x1_MODE))
 		ht_cap_info.tx_stbc = 0;
 
 	status = ucfg_mlme_set_ht_cap_info(hdd_ctx->psoc, ht_cap_info);
@@ -2435,19 +2436,17 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
-#define WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES 0xff
-	for (value = 0; value < hdd_ctx->num_rf_chains; value++)
-		mcs_set[value] = WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES;
+	for (value = 0; value < cfg->max_rx_chains; value++)
+		mcs_set[value] = 0xFF;
 
-	/* If set, the Tx MCS set is same as Rx MCS set in HT connection */
-	QDF_SET_BITS(mcs_set[WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS / BITS_IN_A_BYTE],
-		     WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS % BITS_IN_A_BYTE, 1, 1);
+	ucfg_mlme_set_ht_mcsset_for_nss(hdd_ctx->psoc, NULL, mcs_set,
+					cfg->max_tx_chains,
+					cfg->max_rx_chains);
 
 	status = ucfg_mlme_set_supported_mcs_set(hdd_ctx->psoc, mcs_set,
 						 value_len);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("could not set MCS SET to CCM");
-#undef WLAN_HDD_RX_MCS_ALL_NSTREAM_RATES
 }
 
 static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
@@ -3223,7 +3222,7 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 
 	sme_update_bfer_caps_as_per_nss_chains(hdd_ctx->mac_handle, cfg);
 
-	hdd_update_tgt_ht_cap(hdd_ctx, &cfg->ht_cap);
+	hdd_update_tgt_ht_cap(hdd_ctx, cfg);
 
 	hdd_update_tgt_vht_cap(hdd_ctx, &cfg->vht_cap);
 

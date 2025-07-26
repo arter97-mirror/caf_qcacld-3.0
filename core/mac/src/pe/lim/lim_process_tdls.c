@@ -901,8 +901,8 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 			if (pe_session->ch_width == CH_WIDTH_20MHZ)
 				htCap->supportedChannelWidthSet = 0;
 
-		if (NSS_1x1_MODE == nss)
-			htCap->supportedMCSSet[1] = 0;
+		wlan_mlme_set_ht_mcsset_for_nss(mac->psoc, htCap, NULL,
+						nss, nss);
 		/*
 		 * Advertise ht capability and max supported channel bandwidth
 		 * when populating HT IE in TDLS Setup Request/Setup Response/
@@ -3434,6 +3434,8 @@ lim_tdls_populate_matching_rate_set(struct mac_context *mac_ctx,
 	    (stads->mlmStaContext.htCapability))
 #endif
 	{
+		uint8_t self_rx_nss, self_tx_nss, peer_rx_nss, peer_tx_nss;
+
 		val_len = SIZE_OF_SUPPORTED_MCS_SET;
 		if (wlan_mlme_get_cfg_str(
 			mcsSet,
@@ -3444,11 +3446,20 @@ lim_tdls_populate_matching_rate_set(struct mac_context *mac_ctx,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		if (NSS_1x1_MODE == nss)
-			mcsSet[1] = 0;
-		for (i = 0; i < val_len; i++)
+		lim_extract_ht_caps_txrx_nss(mcsSet, &self_tx_nss,
+					     &self_rx_nss);
+		lim_extract_ht_caps_txrx_nss(supp_mcs_set, &peer_tx_nss,
+					     &peer_rx_nss);
+		for (i = 0; i < VALID_MCS_SIZE_BYTES; i++)
 			stads->supportedRates.supportedMCSSet[i] =
 				mcsSet[i] & supp_mcs_set[i];
+
+		self_tx_nss = QDF_MIN(nss, QDF_MIN(self_tx_nss, peer_rx_nss));
+		self_rx_nss = QDF_MIN(nss, QDF_MIN(self_rx_nss, peer_tx_nss));
+
+		wlan_mlme_set_ht_mcsset_for_nss(mac_ctx->psoc, NULL,
+						stads->supportedRates.supportedMCSSet,
+						nss, nss);
 
 		pe_debug("MCS Rate Set Bitmap from CFG and DPH");
 		for (i = 0; i < SIR_MAC_MAX_SUPPORTED_MCS_SET; i++) {

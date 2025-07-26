@@ -1009,7 +1009,7 @@ static void wma_mask_tx_ht_rate(tp_wma_handle wma, uint8_t *mcs_set)
 		wma_debug("set mcs_limit %x", mcs_limit);
 
 		mcs_limit &= CFG_DATA_MASK;
-		for (i = 0, j = 0; i < MAX_SUPPORTED_RATES;) {
+		for (i = 0, j = 0; i < VALID_MCS_SIZE_BITS;) {
 			if (j < mcs_limit / 8) {
 				rate_pos[j] = 0xff;
 				j++;
@@ -1788,7 +1788,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	max_rates = sizeof(peer_ht_rates.rates) /
 		    sizeof(peer_ht_rates.rates[0]);
 	rate_pos = (uint8_t *) peer_ht_rates.rates;
-	for (i = 0; i < VALID_MCS_SIZE; i++) {
+	for (i = 0; i < VALID_MCS_SIZE_BITS; i++) {
 		if (params->supportedRates.supportedMCSSet[i / 8] &
 		    (1 << (i % 8))) {
 			rate_pos[peer_ht_rates.num_rates++] = i;

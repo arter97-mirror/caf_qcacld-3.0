@@ -1210,13 +1210,13 @@ populate_dot11f_ext_supp_rates1(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 } /* populate_dot11f_ext_supp_rates1. */
 
-QDF_STATUS
-populate_dot11f_ht_caps(struct mac_context *mac,
-			struct pe_session *pe_session, tDot11fIEHTCaps *pDot11f)
+QDF_STATUS populate_dot11f_ht_caps(struct mac_context *mac,
+				   struct pe_session *pe_session,
+				   tDot11fIEHTCaps *pDot11f)
 {
 	qdf_size_t ncfglen;
 	QDF_STATUS nSirStatus;
-	uint8_t i, max_nss, cb_mode, disable_high_ht_mcs_2x2 = 0;
+	uint8_t cb_mode, disable_high_ht_mcs_2x2 = 0;
 	struct ch_params ch_params = {0};
 
 	tSirMacTxBFCapabilityInfo *pTxBFCapabilityInfo;
@@ -1235,6 +1235,19 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 	pDot11f->stbcControlFrame = ht_cap_info->stbc_control_frame;
 	pDot11f->lsigTXOPProtection = ht_cap_info->l_sig_tx_op_protection;
 
+	ncfglen = SIZE_OF_SUPPORTED_MCS_SET;
+	nSirStatus =
+		wlan_mlme_get_cfg_str(pDot11f->supportedMCSSet,
+				      &mac->mlme_cfg->rates.supported_mcs_set,
+				      &ncfglen);
+	if (QDF_IS_STATUS_ERROR(nSirStatus)) {
+		pe_err("Failed to retrieve nItem from CFG status: %d",
+		       (nSirStatus));
+		return nSirStatus;
+	}
+
+	pDot11f->present = 1;
+
 	/* All sessionized entries will need the check below */
 	if (!pe_session) {     /* Only in case of NO session */
 		pDot11f->supportedChannelWidthSet =
@@ -1246,6 +1259,8 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 		pDot11f->shortGI40MHz = ht_cap_info->short_gi_40_mhz;
 		pDot11f->mimoPowerSave = ht_cap_info->mimo_power_save;
 	} else {
+		uint8_t rx_nss, tx_nss;
+
 		cb_mode = lim_get_cb_mode_for_freq(mac, pe_session,
 						   pe_session->curr_op_freq);
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq) &&
@@ -1279,37 +1294,12 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 		pDot11f->shortGI40MHz = pe_session->ht_config.short_gi_40_mhz;
 		pDot11f->mimoPowerSave = pe_session->ht_config.mimo_power_save;
 		mac->mlme_cfg->ht_caps.smps = pe_session->ht_config.mimo_power_save;
-	}
 
-	/* Ensure that shortGI40MHz is Disabled if supportedChannelWidthSet is
-	   eHT_CHANNEL_WIDTH_20MHZ */
-	if (pDot11f->supportedChannelWidthSet == eHT_CHANNEL_WIDTH_20MHZ)
-		pDot11f->shortGI40MHz = 0;
-
-	pDot11f->maxRxAMPDUFactor =
-		mac->mlme_cfg->ht_caps.ampdu_params.max_rx_ampdu_factor;
-	pDot11f->mpduDensity =
-		mac->mlme_cfg->ht_caps.ampdu_params.mpdu_density;
-	pDot11f->reserved1 = mac->mlme_cfg->ht_caps.ampdu_params.reserved;
-
-	ncfglen = SIZE_OF_SUPPORTED_MCS_SET;
-	nSirStatus =
-		wlan_mlme_get_cfg_str(pDot11f->supportedMCSSet,
-				      &mac->mlme_cfg->rates.supported_mcs_set,
-				      &ncfglen);
-	if (QDF_IS_STATUS_ERROR(nSirStatus)) {
-		pe_err("Failed to retrieve nItem from CFG status: %d",
-		       (nSirStatus));
-		return nSirStatus;
-	}
-
-	if (pe_session) {
-		if (pe_session->cap_tx_nss < NSS_2x2_MODE) {
+		if (pe_session->cap_tx_nss < NSS_2x2_MODE)
 			pDot11f->txSTBC = 0;
-		} else {
+		else
 			disable_high_ht_mcs_2x2 =
 				mac->mlme_cfg->rates.disable_high_ht_mcs_2x2;
-		}
 
 		if (disable_high_ht_mcs_2x2 &&
 		    pe_session->opmode == QDF_STA_MODE &&
@@ -1321,17 +1311,32 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 							disable_high_ht_mcs_2x2;
 
 			/* Reset all higher MCS, means NSS3 and NSS4 */
-			max_nss = QDF_MIN(NSS_2x2_MODE, pe_session->cap_tx_nss);
+			tx_nss = QDF_MIN(NSS_2x2_MODE, pe_session->cap_tx_nss);
+			rx_nss = QDF_MIN(NSS_2x2_MODE, pe_session->cap_rx_nss);
 		} else {
-			max_nss = pe_session->cap_tx_nss;
+			tx_nss = pe_session->cap_tx_nss;
+			rx_nss = pe_session->cap_rx_nss;
 		}
 
-		for (i = max_nss; i < WLAN_MAX_VDEV_NSS; i++)
-			pDot11f->supportedMCSSet[i] = 0x0;
+		wlan_mlme_set_ht_mcsset_for_nss(mac->psoc, pDot11f, NULL,
+						tx_nss, rx_nss);
 
 		wlan_ll_lt_sap_get_mcs(mac->psoc, pe_session->vdev_id,
 				       pDot11f->supportedMCSSet);
 	}
+
+	/*
+	 * Ensure that shortGI40MHz is Disabled if supportedChannelWidthSet is
+	 * eHT_CHANNEL_WIDTH_20MHZ
+	 */
+	if (pDot11f->supportedChannelWidthSet == eHT_CHANNEL_WIDTH_20MHZ)
+		pDot11f->shortGI40MHz = 0;
+
+	pDot11f->maxRxAMPDUFactor =
+		mac->mlme_cfg->ht_caps.ampdu_params.max_rx_ampdu_factor;
+	pDot11f->mpduDensity =
+		mac->mlme_cfg->ht_caps.ampdu_params.mpdu_density;
+	pDot11f->reserved1 = mac->mlme_cfg->ht_caps.ampdu_params.reserved;
 
 	/* If STA mode, session supported NSS > 1 and
 	 * SMPS enabled publish HT SMPS IE
@@ -1387,8 +1392,6 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 		pASCapabilityInfo->antennaIndicesFeedback;
 	pDot11f->rxAS = pASCapabilityInfo->rxAS;
 	pDot11f->txSoundingPPDUs = pASCapabilityInfo->txSoundingPPDUs;
-
-	pDot11f->present = 1;
 
 	return QDF_STATUS_SUCCESS;
 

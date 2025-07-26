@@ -267,7 +267,6 @@ uint8_t lim_check_mcs_set(struct mac_context *mac, uint8_t *supportedMCSSet)
 	uint8_t basicMCSSet[SIZE_OF_BASIC_MCS_SET] = { 0 };
 	qdf_size_t cfg_len = 0;
 	uint8_t i;
-	uint8_t validBytes;
 	uint8_t lastByteMCSMask = 0x1f;
 
 	cfg_len = mac->mlme_cfg->rates.basic_mcs_set.len;
@@ -279,10 +278,8 @@ uint8_t lim_check_mcs_set(struct mac_context *mac, uint8_t *supportedMCSSet)
 		return false;
 	}
 
-	validBytes = VALID_MCS_SIZE / 8;
-
 	/* check if all the Basic MCS Bits are set in supported MCS bitmap */
-	for (i = 0; i < validBytes; i++) {
+	for (i = 0; i < VALID_MCS_SIZE_BYTES; i++) {
 		if ((basicMCSSet[i] & supportedMCSSet[i]) != basicMCSSet[i]) {
 			pe_warn("One of Basic MCS Set Rates is not supported by the Station");
 			return false;
@@ -1517,8 +1514,10 @@ QDF_STATUS lim_populate_own_rate_set(struct mac_context *mac_ctx,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		if (session_entry->cap_tx_nss == NSS_1x1_MODE)
-			rates->supportedMCSSet[1] = 0;
+		wlan_mlme_set_ht_mcsset_for_nss(mac_ctx->psoc, NULL,
+						rates->supportedMCSSet,
+						session_entry->cap_tx_nss,
+						session_entry->cap_rx_nss);
 
 		lim_dump_ht_mcs_mask(rates->supportedMCSSet, NULL);
 	}
@@ -1706,7 +1705,7 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 
 	if (IS_DOT11_MODE_HT(pe_session->dot11mode) &&
 	    !lim_is_he_6ghz_band(pe_session)) {
-		uint8_t idx;
+		uint8_t self_tx_nss, self_rx_nss, peer_tx_nss, peer_rx_nss;
 
 		val_len = SIZE_OF_SUPPORTED_MCS_SET;
 		if (wlan_mlme_get_cfg_str(
@@ -1717,18 +1716,33 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		for (idx = pe_session->cap_tx_nss;
-		     idx < WLAN_MAX_VDEV_NSS; idx++)
-			pRates->supportedMCSSet[idx] = 0;
+		lim_extract_ht_caps_txrx_nss(pRates->supportedMCSSet,
+					     &self_tx_nss, &self_rx_nss);
 
 		/* if supported MCS Set of the peer is passed in, then do the
 		 * intersection, else use the MCS set from local CFG.
 		 */
 		if (pSupportedMCSSet) {
-			for (i = 0; i < SIR_MAC_MAX_SUPPORTED_MCS_SET; i++)
+			for (i = 0; i < VALID_MCS_SIZE_BYTES; i++)
 				pRates->supportedMCSSet[i] &=
 					pSupportedMCSSet[i];
+			lim_extract_ht_caps_txrx_nss(pSupportedMCSSet,
+						     &peer_tx_nss,
+						     &peer_rx_nss);
+		} else {
+			peer_tx_nss = self_rx_nss;
+			peer_rx_nss = self_tx_nss;
 		}
+
+		self_rx_nss = QDF_MIN(pe_session->cap_rx_nss,
+				      QDF_MIN(self_rx_nss, peer_tx_nss));
+
+		self_tx_nss = QDF_MIN(pe_session->cap_tx_nss,
+				      QDF_MIN(self_tx_nss, peer_rx_nss));
+
+		wlan_mlme_set_ht_mcsset_for_nss(mac->psoc, NULL,
+						pRates->supportedMCSSet,
+						self_tx_nss, self_rx_nss);
 
 		lim_dump_ht_mcs_mask(NULL, pRates->supportedMCSSet);
 
@@ -1965,7 +1979,7 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 		(sta_ds->mlmStaContext.htCapability))
 #endif
 	{
-		uint8_t idx;
+		uint8_t self_rx_nss, self_tx_nss, peer_rx_nss, peer_tx_nss;
 
 		val_len = SIZE_OF_SUPPORTED_MCS_SET;
 		if (wlan_mlme_get_cfg_str(
@@ -1976,17 +1990,26 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		for (idx = session_entry->cap_tx_nss;
-		     idx < WLAN_MAX_VDEV_NSS; idx++)
-			mcs_set[idx] = 0;
+		lim_extract_ht_caps_txrx_nss(mcs_set, &self_tx_nss,
+					     &self_rx_nss);
+		lim_extract_ht_caps_txrx_nss(supported_mcs_set, &peer_tx_nss,
+					     &peer_rx_nss);
 
-		wlan_ll_lt_sap_get_mcs(mac_ctx->psoc, session_entry->vdev_id,
-				       mcs_set);
-
-		for (i = 0; i < val_len; i++)
+		for (i = 0; i < VALID_MCS_SIZE_BYTES; i++)
 			sta_ds->supportedRates.supportedMCSSet[i] =
 				mcs_set[i] & supported_mcs_set[i];
 
+		self_tx_nss = QDF_MIN(session_entry->cap_tx_nss,
+				      QDF_MIN(self_tx_nss, peer_rx_nss));
+		self_rx_nss = QDF_MIN(session_entry->cap_rx_nss,
+				      QDF_MIN(self_rx_nss, peer_tx_nss));
+
+		wlan_mlme_set_ht_mcsset_for_nss(mac_ctx->psoc, NULL,
+						sta_ds->supportedRates.supportedMCSSet,
+						self_tx_nss, self_rx_nss);
+
+		wlan_ll_lt_sap_get_mcs(mac_ctx->psoc, session_entry->vdev_id,
+				       mcs_set);
 		lim_dump_ht_mcs_mask(mcs_set,
 				     sta_ds->supportedRates.supportedMCSSet);
 	}

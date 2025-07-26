@@ -5457,7 +5457,7 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 
 		mcs_limit &= CFG_DATA_MASK;
 		rate_pos = (u_int8_t *)add_sta->supportedRates.supportedMCSSet;
-		for (i = 0, j = 0; i < MAX_SUPPORTED_RATES;) {
+		for (i = 0, j = 0; i < VALID_MCS_SIZE_BITS;) {
 			if (j < mcs_limit / 8) {
 				rate_pos[j] = 0xff;
 				j++;
