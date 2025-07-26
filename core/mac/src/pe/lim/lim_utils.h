@@ -1494,6 +1494,15 @@ void lim_copy_join_req_he_cap(struct pe_session *session);
 void lim_log_he_6g_cap(struct mac_context *mac,
 		       tDot11fIEhe_6ghz_band_cap *he_6g_cap);
 
+static inline void lim_update_session_he_config_nss(struct mac_context *mac,
+						    struct pe_session *session,
+						    uint8_t tx_nss,
+						    uint8_t rx_nss)
+{
+	wlan_mlme_set_he_mcsset_for_nss(mac->mlme_cfg, &session->he_config,
+					tx_nss, rx_nss);
+}
+
 /**
  * lim_log_he_op() - Print HE Operation
  * @mac: pointer to MAC context
@@ -1858,6 +1867,13 @@ void lim_copy_bss_he_cap(struct pe_session *session)
 }
 
 static inline void lim_copy_join_req_he_cap(struct pe_session *session)
+{
+}
+
+static inline void lim_update_session_he_config_nss(struct mac_context *mac,
+						    struct pe_session *session,
+						    uint8_t tx_nss,
+						    uint8_t rx_nss)
 {
 }
 

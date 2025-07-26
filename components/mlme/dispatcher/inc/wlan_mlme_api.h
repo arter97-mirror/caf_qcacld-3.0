@@ -5443,6 +5443,23 @@ void wlan_mlme_set_ht_mcsset_for_nss(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * wlan_mlme_set_he_mcsset_for_nss() - Wrapper API to fill the HE caps' MCS-SET
+ * @mlme_cfg: PSOC MLME config
+ * @dst_he_cap: Pointer to destination HE capability IE struct
+ * @tx_nss: Tx value of NSS
+ * @rx_nss: Rx value of NSS
+ *
+ * Return: void
+ */
+static inline
+void wlan_mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
+				     tDot11fIEhe_cap *dst_he_cap,
+				     uint8_t tx_nss, uint8_t rx_nss)
+{
+	mlme_set_he_mcsset_for_nss(mlme_cfg, dst_he_cap, tx_nss, rx_nss);
+}
+
+/**
  * wlan_mlme_assemble_rate_code() - assemble rate code to be sent to FW
  *
  * @preamble: rate preamble

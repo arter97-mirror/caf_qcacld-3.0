@@ -6325,6 +6325,36 @@ void mlme_set_ht_mcsset_for_nss(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
+#ifdef WLAN_FEATURE_11AX
+void mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
+				tDot11fIEhe_cap *dst_he_cap,
+				uint8_t tx_nss, uint8_t rx_nss)
+{
+	uint16_t dst_tx_mcs, dst_rx_mcs;
+	uint16_t disable_tx_mask, disable_rx_mask;
+	tDot11fIEhe_cap *base_he_cap = &mlme_cfg->he_caps.dot11_he_cap;
+
+	if (!base_he_cap->present || !dst_he_cap->present)
+		return;
+
+	disable_rx_mask = HE_DISABLE_MCS_OVER_NSS(rx_nss);
+	dst_rx_mcs = base_he_cap->rx_he_mcs_map_lt_80 | disable_rx_mask;
+	if (dst_he_cap->rx_he_mcs_map_lt_80 != dst_rx_mcs) {
+		dst_he_cap->rx_he_mcs_map_lt_80 = dst_rx_mcs;
+		*(uint16_t *)dst_he_cap->rx_he_mcs_map_160 = dst_rx_mcs;
+		*(uint16_t *)dst_he_cap->rx_he_mcs_map_80_80 = dst_rx_mcs;
+	}
+
+	disable_tx_mask = HE_DISABLE_MCS_OVER_NSS(tx_nss);
+	dst_tx_mcs = base_he_cap->tx_he_mcs_map_lt_80 | disable_tx_mask;
+	if (dst_he_cap->tx_he_mcs_map_lt_80 != dst_tx_mcs) {
+		dst_he_cap->tx_he_mcs_map_lt_80 = dst_tx_mcs;
+		*(uint16_t *)dst_he_cap->tx_he_mcs_map_160 = dst_tx_mcs;
+		*(uint16_t *)dst_he_cap->tx_he_mcs_map_80_80 = dst_tx_mcs;
+	}
+}
+#endif
+
 QDF_STATUS wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint8_t *rx_nss)

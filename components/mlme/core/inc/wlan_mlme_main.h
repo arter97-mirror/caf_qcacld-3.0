@@ -2305,6 +2305,31 @@ void mlme_set_ht_mcsset_for_nss(struct wlan_objmgr_psoc *psoc,
 				tDot11fIEHTCaps *ht_caps, uint8_t *mcs_set,
 				uint8_t tx_nss, uint8_t rx_nss);
 
+#ifdef WLAN_FEATURE_11AX
+/**
+ * mlme_set_he_mcsset_for_nss() - Set HE MCS set for NSS
+ * @mlme_cfg: Pointer to PSOC MLME private comp
+ * @dst_he_cap: Pointer to destination HE capability structure
+ * @tx_nss: Transmit NSS value
+ * @rx_nss: Receive NSS value
+ *
+ * This function sets the HE MCS map for the given NSS values. It updates
+ * the destination HE capability structure with modified MCS maps that
+ * disable MCS rates for spatial streams beyond the specified NSS values.
+ *
+ * Return: None
+ */
+void mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
+				tDot11fIEhe_cap *dst_he_cap,
+				uint8_t tx_nss, uint8_t rx_nss);
+#else
+static inline void mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
+					      tDot11fIEhe_cap *dst_he_cap,
+					      uint8_t tx_nss, uint8_t rx_nss)
+{
+}
+#endif
+
 /**
  * wlan_mlme_get_cur_ch_width_update_from_ap() - API to get current channel
  * width from AP
