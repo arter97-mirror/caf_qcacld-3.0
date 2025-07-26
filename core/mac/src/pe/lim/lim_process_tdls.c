@@ -3323,6 +3323,8 @@ lim_tdls_populate_eht_mcs(struct mac_context *mac_ctx, tpDphHashNode stads,
 	lim_populate_eht_mcs_set(mac_ctx, &stads->supportedRates,
 				 &stads->eht_config, session_entry,
 				 session_entry->ch_width,
+				 session_entry->cap_tx_nss,
+				 session_entry->cap_rx_nss,
 				 wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq));
 }
 #else

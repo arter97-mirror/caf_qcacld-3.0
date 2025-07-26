@@ -8568,127 +8568,135 @@ void lim_strip_mlo_ie(struct mac_context *mac_ctx,
 #ifdef WLAN_FEATURE_11BE
 static void lim_populate_eht_320_mcs_set(struct mac_context *mac_ctx,
 					 struct supported_rates *rates,
-					 tDot11fIEeht_cap *peer_eht_caps)
+					 tDot11fIEeht_cap *peer_eht_caps,
+					 tDot11fIEeht_cap *self_eht_caps,
+					 uint8_t tx_nss, uint8_t rx_nss)
 {
-	tDot11fIEeht_cap *fw_5g_eht_cap;
+	if (self_eht_caps->bw_320_tx_max_nss_for_mcs_12_and_13) {
+		rates->bw_320_rx_max_nss_for_mcs_12_and_13 =
+			QDF_MIN(peer_eht_caps->bw_320_rx_max_nss_for_mcs_12_and_13,
+				tx_nss);
+		rates->bw_320_tx_max_nss_for_mcs_12_and_13 =
+			QDF_MIN(peer_eht_caps->bw_320_tx_max_nss_for_mcs_12_and_13,
+				rx_nss);
+	}
 
-	fw_5g_eht_cap = &mac_ctx->eht_cap_5g;
+	if (self_eht_caps->bw_320_tx_max_nss_for_mcs_10_and_11) {
+		rates->bw_320_rx_max_nss_for_mcs_10_and_11 =
+			QDF_MIN(peer_eht_caps->bw_320_rx_max_nss_for_mcs_10_and_11,
+				tx_nss);
+		rates->bw_320_tx_max_nss_for_mcs_10_and_11 =
+			QDF_MIN(peer_eht_caps->bw_320_tx_max_nss_for_mcs_10_and_11,
+				rx_nss);
+	}
 
-	rates->bw_320_tx_max_nss_for_mcs_12_and_13 =
-		QDF_MIN(peer_eht_caps->bw_320_tx_max_nss_for_mcs_12_and_13,
-			fw_5g_eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13);
-	rates->bw_320_rx_max_nss_for_mcs_12_and_13 =
-		QDF_MIN(peer_eht_caps->bw_320_rx_max_nss_for_mcs_12_and_13,
-			fw_5g_eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13);
-	rates->bw_320_tx_max_nss_for_mcs_10_and_11 =
-		QDF_MIN(peer_eht_caps->bw_320_tx_max_nss_for_mcs_10_and_11,
-			fw_5g_eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11);
-	rates->bw_320_rx_max_nss_for_mcs_10_and_11 =
-		QDF_MIN(peer_eht_caps->bw_320_rx_max_nss_for_mcs_10_and_11,
-			fw_5g_eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11);
 	rates->bw_320_rx_max_nss_for_mcs_0_to_9 =
 		QDF_MIN(peer_eht_caps->bw_320_rx_max_nss_for_mcs_0_to_9,
-			fw_5g_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9);
+			tx_nss);
 	rates->bw_320_tx_max_nss_for_mcs_0_to_9 =
 		QDF_MIN(peer_eht_caps->bw_320_tx_max_nss_for_mcs_0_to_9,
-			fw_5g_eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9);
-	rates->bw_320_rx_max_nss_for_mcs_0_to_9 =
-		QDF_MIN(peer_eht_caps->bw_320_rx_max_nss_for_mcs_0_to_9,
-			fw_5g_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9);
-	rates->bw_320_rx_max_nss_for_mcs_0_to_9 =
-		QDF_MIN(peer_eht_caps->bw_320_rx_max_nss_for_mcs_0_to_9,
-			fw_5g_eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9);
+			rx_nss);
 }
 
 static void lim_populate_eht_160_mcs_set(struct mac_context *mac_ctx,
 					 struct supported_rates *rates,
-					 tDot11fIEeht_cap *peer_eht_caps)
+					 tDot11fIEeht_cap *peer_eht_caps,
+					 tDot11fIEeht_cap *self_eht_caps,
+					 uint8_t tx_nss, uint8_t rx_nss)
 {
-	tDot11fIEeht_cap *fw_5g_eht_cap;
+	if (self_eht_caps->bw_160_tx_max_nss_for_mcs_12_and_13) {
+		rates->bw_160_rx_max_nss_for_mcs_12_and_13 =
+			QDF_MIN(peer_eht_caps->bw_160_rx_max_nss_for_mcs_12_and_13,
+				tx_nss);
+		rates->bw_160_tx_max_nss_for_mcs_12_and_13 =
+			QDF_MIN(peer_eht_caps->bw_160_tx_max_nss_for_mcs_12_and_13,
+				rx_nss);
+	}
 
-	fw_5g_eht_cap = &mac_ctx->eht_cap_5g;
+	if (self_eht_caps->bw_160_tx_max_nss_for_mcs_10_and_11) {
+		rates->bw_160_rx_max_nss_for_mcs_10_and_11 =
+			QDF_MIN(peer_eht_caps->bw_160_rx_max_nss_for_mcs_10_and_11,
+				tx_nss);
+		rates->bw_160_tx_max_nss_for_mcs_10_and_11 =
+			QDF_MIN(peer_eht_caps->bw_160_tx_max_nss_for_mcs_10_and_11,
+				rx_nss);
+	}
 
-	rates->bw_160_tx_max_nss_for_mcs_12_and_13 =
-		QDF_MIN(peer_eht_caps->bw_160_tx_max_nss_for_mcs_12_and_13,
-			fw_5g_eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13);
-	rates->bw_160_rx_max_nss_for_mcs_12_and_13 =
-		QDF_MIN(peer_eht_caps->bw_160_rx_max_nss_for_mcs_12_and_13,
-			fw_5g_eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13);
-	rates->bw_160_tx_max_nss_for_mcs_10_and_11 =
-		QDF_MIN(peer_eht_caps->bw_160_tx_max_nss_for_mcs_10_and_11,
-			fw_5g_eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11);
-	rates->bw_160_rx_max_nss_for_mcs_10_and_11 =
-		QDF_MIN(peer_eht_caps->bw_160_rx_max_nss_for_mcs_10_and_11,
-			fw_5g_eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11);
-	rates->bw_160_tx_max_nss_for_mcs_0_to_9 =
-		QDF_MIN(peer_eht_caps->bw_160_tx_max_nss_for_mcs_0_to_9,
-			fw_5g_eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9);
 	rates->bw_160_rx_max_nss_for_mcs_0_to_9 =
 		QDF_MIN(peer_eht_caps->bw_160_rx_max_nss_for_mcs_0_to_9,
-			fw_5g_eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9);
+			tx_nss);
+	rates->bw_160_tx_max_nss_for_mcs_0_to_9 =
+		QDF_MIN(peer_eht_caps->bw_160_tx_max_nss_for_mcs_0_to_9,
+			rx_nss);
 }
 
 static void lim_populate_eht_le80_mcs_set(struct mac_context *mac_ctx,
 					  struct supported_rates *rates,
-					  tDot11fIEeht_cap *peer_eht_caps)
+					  tDot11fIEeht_cap *peer_eht_caps,
+					  tDot11fIEeht_cap *self_eht_caps,
+					  uint8_t tx_nss, uint8_t rx_nss)
 {
-	tDot11fIEeht_cap *fw_le80_eht_cap;
+	if (self_eht_caps->bw_le_80_tx_max_nss_for_mcs_12_and_13) {
+		rates->bw_le_80_rx_max_nss_for_mcs_12_and_13 =
+			QDF_MIN(peer_eht_caps->bw_le_80_rx_max_nss_for_mcs_12_and_13,
+				tx_nss);
+		rates->bw_le_80_tx_max_nss_for_mcs_12_and_13 =
+			QDF_MIN(peer_eht_caps->bw_le_80_tx_max_nss_for_mcs_12_and_13,
+				rx_nss);
+	}
+	if (self_eht_caps->bw_le_80_tx_max_nss_for_mcs_10_and_11) {
+		rates->bw_le_80_rx_max_nss_for_mcs_10_and_11 =
+			QDF_MIN(peer_eht_caps->bw_le_80_rx_max_nss_for_mcs_10_and_11,
+				tx_nss);
+		rates->bw_le_80_tx_max_nss_for_mcs_10_and_11 =
+			QDF_MIN(peer_eht_caps->bw_le_80_tx_max_nss_for_mcs_10_and_11,
+				rx_nss);
+	}
 
-	fw_le80_eht_cap = &mac_ctx->eht_cap_5g;
-
-	rates->bw_le_80_tx_max_nss_for_mcs_12_and_13 =
-		QDF_MIN(peer_eht_caps->bw_le_80_tx_max_nss_for_mcs_12_and_13,
-			fw_le80_eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13);
-	rates->bw_le_80_rx_max_nss_for_mcs_12_and_13 =
-		QDF_MIN(peer_eht_caps->bw_le_80_rx_max_nss_for_mcs_12_and_13,
-			fw_le80_eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13);
-	rates->bw_le_80_tx_max_nss_for_mcs_10_and_11 =
-		QDF_MIN(peer_eht_caps->bw_le_80_tx_max_nss_for_mcs_10_and_11,
-			fw_le80_eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11);
-	rates->bw_le_80_rx_max_nss_for_mcs_10_and_11 =
-		QDF_MIN(peer_eht_caps->bw_le_80_rx_max_nss_for_mcs_10_and_11,
-			fw_le80_eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11);
-	rates->bw_le_80_tx_max_nss_for_mcs_0_to_9 =
-		QDF_MIN(peer_eht_caps->bw_le_80_tx_max_nss_for_mcs_0_to_9,
-			fw_le80_eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9);
 	rates->bw_le_80_rx_max_nss_for_mcs_0_to_9 =
 		QDF_MIN(peer_eht_caps->bw_le_80_rx_max_nss_for_mcs_0_to_9,
-			fw_le80_eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9);
+			tx_nss);
+	rates->bw_le_80_tx_max_nss_for_mcs_0_to_9 =
+		QDF_MIN(peer_eht_caps->bw_le_80_tx_max_nss_for_mcs_0_to_9,
+			rx_nss);
 }
 
 static void lim_populate_eht_20only_mcs_set(struct mac_context *mac_ctx,
 					    struct supported_rates *rates,
 					    tDot11fIEeht_cap *peer_eht_caps,
-					    bool is_2g)
+					    tDot11fIEeht_cap *self_eht_caps,
+					    uint8_t tx_nss, uint8_t rx_nss)
 {
-	tDot11fIEeht_cap *fw_eht_cap;
+	if (self_eht_caps->bw_20_tx_max_nss_for_mcs_12_and_13) {
+		rates->bw_20_rx_max_nss_for_mcs_12_and_13 =
+			QDF_MIN(peer_eht_caps->bw_20_rx_max_nss_for_mcs_12_and_13,
+				tx_nss);
+		rates->bw_20_tx_max_nss_for_mcs_12_and_13 =
+			QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_12_and_13,
+				rx_nss);
+	}
 
-	fw_eht_cap = is_2g ? &mac_ctx->eht_cap_2g : &mac_ctx->eht_cap_5g;
+	if (self_eht_caps->bw_20_tx_max_nss_for_mcs_10_and_11) {
+		rates->bw_20_rx_max_nss_for_mcs_10_and_11 =
+			QDF_MIN(peer_eht_caps->bw_20_rx_max_nss_for_mcs_10_and_11,
+				tx_nss);
+		rates->bw_20_tx_max_nss_for_mcs_10_and_11 =
+			QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_10_and_11,
+				rx_nss);
+	}
 
-	rates->bw_20_tx_max_nss_for_mcs_12_and_13 =
-		QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_12_and_13,
-			fw_eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13);
-	rates->bw_20_rx_max_nss_for_mcs_12_and_13 =
-		QDF_MIN(peer_eht_caps->bw_20_rx_max_nss_for_mcs_12_and_13,
-			fw_eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13);
-	rates->bw_20_tx_max_nss_for_mcs_10_and_11 =
-		QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_10_and_11,
-			fw_eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11);
-	rates->bw_20_rx_max_nss_for_mcs_10_and_11 =
-		QDF_MIN(peer_eht_caps->bw_20_rx_max_nss_for_mcs_10_and_11,
-			fw_eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11);
-	rates->bw_20_tx_max_nss_for_mcs_8_and_9 =
-		QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_8_and_9,
-			fw_eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9);
 	rates->bw_20_rx_max_nss_for_mcs_8_and_9 =
 		QDF_MIN(peer_eht_caps->bw_20_rx_max_nss_for_mcs_8_and_9,
-			fw_eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9);
-	rates->bw_20_tx_max_nss_for_mcs_0_to_7 =
-		QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_0_to_7,
-			fw_eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7);
+			tx_nss);
+	rates->bw_20_tx_max_nss_for_mcs_8_and_9 =
+		QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_8_and_9,
+			rx_nss);
 	rates->bw_20_rx_max_nss_for_mcs_0_to_7 =
 		QDF_MIN(peer_eht_caps->bw_20_rx_max_nss_for_mcs_0_to_7,
-			fw_eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7);
+			tx_nss);
+	rates->bw_20_tx_max_nss_for_mcs_0_to_7 =
+		QDF_MIN(peer_eht_caps->bw_20_tx_max_nss_for_mcs_0_to_7,
+			rx_nss);
 }
 
 QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
@@ -8696,8 +8704,10 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
 				    enum phy_ch_width ch_width,
-				    bool is_2g)
+				    uint8_t tx_nss, uint8_t rx_nss, bool is_2g)
 {
+	tDot11fIEeht_cap *self_eht_cap;
+
 	if ((!peer_eht_caps) || (!peer_eht_caps->present)) {
 		pe_debug("peer not eht capable or eht_caps NULL");
 		return QDF_STATUS_SUCCESS;
@@ -8707,23 +8717,31 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 		return QDF_STATUS_SUCCESS;
 	}
 
+	self_eht_cap = is_2g ? &mac_ctx->eht_cap_2g : &mac_ctx->eht_cap_5g;
 	ch_width = lim_get_bw_for_mcs_set(mac_ctx, session_entry, ch_width);
 	pe_debug("bw is %d", ch_width);
 
 	switch (ch_width) {
 	case CH_WIDTH_320MHZ:
-		lim_populate_eht_320_mcs_set(mac_ctx, rates, peer_eht_caps);
+		lim_populate_eht_320_mcs_set(mac_ctx, rates,
+					     peer_eht_caps, self_eht_cap,
+					     tx_nss, rx_nss);
 		fallthrough;
 	case CH_WIDTH_160MHZ:
-		lim_populate_eht_160_mcs_set(mac_ctx, rates, peer_eht_caps);
+		lim_populate_eht_160_mcs_set(mac_ctx, rates,
+					     peer_eht_caps, self_eht_cap,
+					     tx_nss, rx_nss);
 		fallthrough;
 	case CH_WIDTH_80MHZ:
 	case CH_WIDTH_40MHZ:
-		lim_populate_eht_le80_mcs_set(mac_ctx, rates, peer_eht_caps);
+		lim_populate_eht_le80_mcs_set(mac_ctx, rates,
+					      peer_eht_caps, self_eht_cap,
+					      tx_nss, rx_nss);
 		break;
 	case CH_WIDTH_20MHZ:
-		lim_populate_eht_20only_mcs_set(mac_ctx, rates, peer_eht_caps,
-						is_2g);
+		lim_populate_eht_20only_mcs_set(mac_ctx, rates,
+						peer_eht_caps, self_eht_cap,
+						tx_nss, rx_nss);
 		break;
 	default:
 		break;
@@ -8896,6 +8914,10 @@ lim_revise_req_eht_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 		mlme_priv->eht_config = mac->eht_cap_2g;
 	else
 		mlme_priv->eht_config = mac->eht_cap_5g;
+
+	wlan_mlme_set_eht_mcsset_for_nss(&mlme_priv->eht_config,
+					 session->cap_tx_nss,
+					 session->cap_rx_nss);
 }
 
 /**
@@ -8908,8 +8930,6 @@ lim_revise_req_eht_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 static void lim_revise_req_eht_cap_per_mode(struct mlme_legacy_priv *mlme_priv,
 					    struct pe_session *session)
 {
-	uint8_t nss = session->cap_tx_nss;
-
 	if (session->opmode == QDF_SAP_MODE ||
 	    session->opmode == QDF_P2P_GO_MODE) {
 		pe_debug("Disable eht cap for SAP/GO");
@@ -8920,56 +8940,6 @@ static void lim_revise_req_eht_cap_per_mode(struct mlme_legacy_priv *mlme_priv,
 	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_le_80mhz = 0;
 	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_160mhz = 0;
 	mlme_priv->eht_config.non_ofdma_ul_mu_mimo_320mhz = 0;
-
-	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_0_to_7 = nss;
-	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_0_to_7 = nss;
-	mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_8_and_9 = nss;
-	mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_8_and_9 = nss;
-	if (mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_10_and_11) {
-		mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_10_and_11 = nss;
-		mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_10_and_11 = nss;
-	}
-	if (mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_12_and_13) {
-		mlme_priv->eht_config.bw_20_rx_max_nss_for_mcs_12_and_13 = nss;
-		mlme_priv->eht_config.bw_20_tx_max_nss_for_mcs_12_and_13 = nss;
-	}
-
-	mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_0_to_9 = nss;
-	mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_0_to_9 = nss;
-	if (mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_10_and_11) {
-		mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_10_and_11 =
-									nss;
-		mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_10_and_11 =
-									nss;
-	}
-	if (mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_12_and_13) {
-		mlme_priv->eht_config.bw_le_80_rx_max_nss_for_mcs_12_and_13 =
-									nss;
-		mlme_priv->eht_config.bw_le_80_tx_max_nss_for_mcs_12_and_13 =
-									nss;
-	}
-
-	mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_0_to_9 = nss;
-	mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_0_to_9 = nss;
-	if (mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_10_and_11) {
-		mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_10_and_11 = nss;
-		mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_10_and_11 = nss;
-	}
-	if (mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_12_and_13) {
-		mlme_priv->eht_config.bw_160_rx_max_nss_for_mcs_12_and_13 = nss;
-		mlme_priv->eht_config.bw_160_tx_max_nss_for_mcs_12_and_13 = nss;
-	}
-
-	mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_0_to_9 = nss;
-	mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_0_to_9 = nss;
-	if (mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_10_and_11) {
-		mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_10_and_11 = nss;
-		mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_10_and_11 = nss;
-	}
-	if (mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_12_and_13) {
-		mlme_priv->eht_config.bw_320_rx_max_nss_for_mcs_12_and_13 = nss;
-		mlme_priv->eht_config.bw_320_tx_max_nss_for_mcs_12_and_13 = nss;
-	}
 }
 
 void lim_copy_bss_eht_cap(struct pe_session *session)

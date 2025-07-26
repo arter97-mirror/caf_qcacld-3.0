@@ -1762,6 +1762,7 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 
 	lim_populate_eht_mcs_set(mac, pRates, eht_caps,
 				 pe_session, pe_session->ch_width,
+				 pe_session->cap_tx_nss, pe_session->cap_rx_nss,
 				 wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq));
 
 	pe_debug("nss 1x1 %d nss %d", pe_session->supported_nss_1x1,
@@ -2013,6 +2014,8 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 				session_entry->cap_rx_nss);
 	lim_populate_eht_mcs_set(mac_ctx, &sta_ds->supportedRates, eht_caps,
 				 session_entry, sta_ds->ch_width,
+				 session_entry->cap_tx_nss,
+				 session_entry->cap_rx_nss,
 				 wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq));
 	/*
 	 * Set the erpEnabled bit if the phy is in G mode and at least

@@ -11461,6 +11461,13 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 
 	ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(mac_ctx->psoc, &value);
 
+	wlan_mlme_set_eht_mcsset_for_nss(&cfg->eht_cap_2g, cfg->max_tx_chains,
+					 cfg->max_rx_chains);
+	wlan_mlme_set_eht_mcsset_for_nss(&cfg->eht_cap_5g, cfg->max_tx_chains,
+					 cfg->max_rx_chains);
+	wlan_mlme_set_eht_mcsset_for_nss(&cfg->eht_cap, cfg->max_tx_chains,
+					 cfg->max_rx_chains);
+
 	qdf_mem_copy(&mac_ctx->eht_cap_2g,
 		     &cfg->eht_cap_2g,
 		     sizeof(tDot11fIEeht_cap));

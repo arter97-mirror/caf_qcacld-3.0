@@ -2051,6 +2051,8 @@ QDF_STATUS lim_strip_eht_cap_ie(struct mac_context *mac_ctx,
  * @peer_eht_caps: pointer to peer EHT capabilities
  * @session_entry: pe session entry
  * @ch_width: channel width of the association
+ * @tx_nss: Number of Tx NSS
+ * @rx_nss: Number of Rx NSS
  * @is_2g: Is 2g band params
  *
  * Populates EHT mcs rate set based on peer and self capabilities
@@ -2062,7 +2064,7 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
 				    enum phy_ch_width ch_width,
-				    bool is_2g);
+				    uint8_t tx_nss, uint8_t rx_nss, bool is_2g);
 
 /**
  * lim_update_eht_bw_cap_mcs(): Update eht mcs map per bandwidth
@@ -2363,17 +2365,6 @@ void lim_update_stads_eht_bw_320mhz(struct pe_session *session,
 bool lim_is_session_chwidth_320mhz(struct pe_session *session);
 
 /**
- * lim_update_eht_caps_mcs() - update eht caps
- *
- * @mac: Pointer to Global mac structure
- * @session: Session pointer of the interface
- *
- * Return: None
- */
-void
-lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session);
-
-/**
  * lim_update_des_chan_puncture() - set puncture_bitmap of des_chan
  * @des_chan: pointer to wlan_channel
  * @ch_params: pointer to ch_params
@@ -2440,7 +2431,7 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    tDot11fIEeht_cap *peer_eht_caps,
 				    struct pe_session *session_entry,
 				    enum phy_ch_width ch_width,
-				    bool is_2g)
+				    uint8_t tx_nss, uint8_t rx_nss, bool is_2g)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -2585,11 +2576,6 @@ static inline bool
 lim_is_session_chwidth_320mhz(struct pe_session *session)
 {
 	return false;
-}
-
-static inline void
-lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
-{
 }
 
 static inline void

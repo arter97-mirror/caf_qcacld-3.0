@@ -10497,12 +10497,8 @@ populate_dot11f_revise_eht_caps(struct pe_session *session,
 		eht_cap->bfee_ss_320mhz = 0;
 	}
 
+	eht_cap->epcs_pri_access = wlan_epcs_get_config(session->vdev);
 	pe_debug("320 MHz support %d", eht_cap->support_320mhz_6ghz);
-
-	if (wlan_epcs_get_config(session->vdev))
-		eht_cap->epcs_pri_access = 1;
-	else
-		eht_cap->epcs_pri_access = 0;
 }
 
 QDF_STATUS populate_dot11f_eht_caps(struct mac_context *mac_ctx,
