@@ -5460,6 +5460,25 @@ void wlan_mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
 }
 
 /**
+ * wlan_mlme_set_eht_mcsset_for_nss() - Wrapper API to fill the EHT caps'
+ * MCS-SET
+ * @eht_cap: Pointer to EHT capability IE struct
+ * @tx_nss: Tx value of NSS
+ * @rx_nss: Rx value of NSS
+ *
+ * This function is a wrapper to mlme_set_eht_mcsset_for_nss() which configures
+ * the EHT MCS set based on the provided NSS values for transmit and receive.
+ *
+ * Return: void
+ */
+static inline void wlan_mlme_set_eht_mcsset_for_nss(tDot11fIEeht_cap *eht_cap,
+						    uint8_t tx_nss,
+						    uint8_t rx_nss)
+{
+	mlme_set_eht_mcsset_for_nss(eht_cap, tx_nss, rx_nss);
+}
+
+/**
  * wlan_mlme_assemble_rate_code() - assemble rate code to be sent to FW
  *
  * @preamble: rate preamble

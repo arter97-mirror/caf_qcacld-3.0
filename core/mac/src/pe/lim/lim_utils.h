@@ -2302,6 +2302,14 @@ void lim_set_eht_caps(struct mac_context *mac, uint8_t *ie_start,
 QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
 				enum QDF_OPMODE device_mode,
 				uint8_t vdev_id);
+
+static inline void lim_update_session_eht_config_nss(struct pe_session *session,
+						     uint8_t tx_nss,
+						     uint8_t rx_nss)
+{
+	wlan_mlme_set_eht_mcsset_for_nss(&session->eht_config, tx_nss, rx_nss);
+}
+
 /**
  * lim_log_eht_op() - Print EHT Operation
  * @mac: pointer to MAC context
@@ -2525,6 +2533,12 @@ lim_update_session_eht_capable_chan_switch(struct mac_context *mac,
 static inline void
 lim_update_bss_eht_capable(struct mac_context *mac,
 			   struct bss_params *add_bss)
+{
+}
+
+static inline void lim_update_session_eht_config_nss(struct pe_session *session,
+						     uint8_t tx_nss,
+						     uint8_t rx_nss)
 {
 }
 

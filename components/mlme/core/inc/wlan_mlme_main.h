@@ -2305,6 +2305,29 @@ void mlme_set_ht_mcsset_for_nss(struct wlan_objmgr_psoc *psoc,
 				tDot11fIEHTCaps *ht_caps, uint8_t *mcs_set,
 				uint8_t tx_nss, uint8_t rx_nss);
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * mlme_set_eht_mcsset_for_nss - Set EHT MCS set based on NSS
+ * @eht_cap: Pointer to EHT capabilities structure
+ * @tx_nss: Transmit NSS value to be set
+ * @rx_nss: Receive NSS value to be set
+ *
+ * This function updates the EHT capabilities structure with the provided
+ * transmit and receive NSS values. It sets the maximum NSS values for
+ * different bandwidths and MCS ranges if they are present and different
+ * from the provided NSS values.
+ *
+ * Return: None
+ */
+void mlme_set_eht_mcsset_for_nss(tDot11fIEeht_cap *eht_cap,
+				 uint8_t tx_nss, uint8_t rx_nss);
+#else
+static inline void mlme_set_eht_mcsset_for_nss(tDot11fIEeht_cap *eht_cap,
+					       uint8_t tx_nss, uint8_t rx_nss)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 /**
  * mlme_set_he_mcsset_for_nss() - Set HE MCS set for NSS

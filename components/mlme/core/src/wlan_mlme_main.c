@@ -6325,6 +6325,67 @@ void mlme_set_ht_mcsset_for_nss(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE
+void mlme_set_eht_mcsset_for_nss(tDot11fIEeht_cap *eht_cap,
+				 uint8_t tx_nss, uint8_t rx_nss)
+{
+	if (!eht_cap->present)
+		return;
+
+	if (eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7 &&
+	    eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7 != rx_nss) {
+		eht_cap->bw_20_rx_max_nss_for_mcs_0_to_7 = rx_nss;
+		eht_cap->bw_20_rx_max_nss_for_mcs_8_and_9 = rx_nss;
+		eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+		eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+		eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 = rx_nss;
+
+		if (eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11)
+			eht_cap->bw_20_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		if (eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13)
+			eht_cap->bw_20_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		if (eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11)
+			eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		if (eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13)
+			eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		if (eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11)
+			eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		if (eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13)
+			eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+		if (eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11)
+			eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 = rx_nss;
+		if (eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13)
+			eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 = rx_nss;
+	}
+
+	if (eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7 &&
+	    eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7 != tx_nss) {
+		eht_cap->bw_20_tx_max_nss_for_mcs_0_to_7 = tx_nss;
+		eht_cap->bw_20_tx_max_nss_for_mcs_8_and_9 = tx_nss;
+		eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+		eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+		eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 = tx_nss;
+
+		if (eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11)
+			eht_cap->bw_20_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+		if (eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13)
+			eht_cap->bw_20_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+		if (eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11)
+			eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+		if (eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13)
+			eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+		if (eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11)
+			eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+		if (eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13)
+			eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+		if (eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11)
+			eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 = tx_nss;
+		if (eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13)
+			eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13 = tx_nss;
+	}
+}
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 void mlme_set_he_mcsset_for_nss(struct wlan_mlme_cfg *mlme_cfg,
 				tDot11fIEhe_cap *dst_he_cap,
