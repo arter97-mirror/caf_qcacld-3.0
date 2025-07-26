@@ -1027,85 +1027,57 @@ QDF_STATUS wlan_mlme_cfg_get_enable_ul_ofdm(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-uint16_t wlan_mlme_get_min_he_mcs_map(uint16_t val1, uint16_t val2)
-{
-	uint16_t ret = 0, i;
-
-	for (i = 0; i < 8; i++) {
-		if (((val1 >> (2 * i)) & 0x3) == 0x3 ||
-		    ((val2 >> (2 * i)) & 0x3) == 0x3) {
-			ret |= 0x3 << (2 * i);
-			continue;
-		}
-		ret |= QDF_MIN((val1 >> (2 * i)) & 0x3,
-			      (val2 >> (2 * i)) & 0x3) << (2 * i);
-	}
-	return ret;
-}
-
 QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
-					  struct wma_tgt_cfg *wma_cfg,
-					  uint8_t num_rf_chains)
+					  struct wma_tgt_cfg *wma_cfg)
 {
-	uint8_t chan_width;
+	uint8_t value, chan_width;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	tDot11fIEhe_cap *he_cap = &wma_cfg->he_cap;
+	tDot11fIEhe_cap *mlme_he_cap, *he_cap = &wma_cfg->he_cap;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	uint8_t value, twt_req, twt_resp;
-	uint16_t tx_mcs_map = 0;
-	uint16_t rx_mcs_map = 0;
-	uint8_t vht_enable_mimo;
 
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
 
-	vht_enable_mimo = mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo;
+	mlme_he_cap = &mlme_obj->cfg.he_caps.dot11_he_cap;
+	mlme_he_cap->present = 1;
+	mlme_he_cap->htc_he = he_cap->htc_he;
 
-	mlme_obj->cfg.he_caps.dot11_he_cap.present = 1;
-	mlme_obj->cfg.he_caps.dot11_he_cap.htc_he = he_cap->htc_he;
+	mlme_he_cap->twt_request =
+		QDF_MIN(he_cap->twt_request, mlme_he_cap->twt_request);
 
-	twt_req = QDF_MIN(he_cap->twt_request,
-			  mlme_obj->cfg.he_caps.dot11_he_cap.twt_request);
-	mlme_obj->cfg.he_caps.dot11_he_cap.twt_request = twt_req;
-
-	twt_resp = QDF_MIN(he_cap->twt_responder,
-			   mlme_obj->cfg.he_caps.dot11_he_cap.twt_responder);
-	mlme_obj->cfg.he_caps.dot11_he_cap.twt_responder = twt_resp;
+	mlme_he_cap->twt_responder =
+		QDF_MIN(he_cap->twt_responder, mlme_he_cap->twt_responder);
 
 	value = QDF_MIN(he_cap->fragmentation,
 			mlme_obj->cfg.he_caps.he_dynamic_fragmentation);
 
 	if (cfg_in_range(CFG_HE_FRAGMENTATION, value))
-		mlme_obj->cfg.he_caps.dot11_he_cap.fragmentation = value;
+		mlme_he_cap->fragmentation = value;
 
 	if (cfg_in_range(CFG_HE_MAX_FRAG_MSDU,
 			 he_cap->max_num_frag_msdu_amsdu_exp))
-		mlme_obj->cfg.he_caps.dot11_he_cap.max_num_frag_msdu_amsdu_exp =
+		mlme_he_cap->max_num_frag_msdu_amsdu_exp =
 					he_cap->max_num_frag_msdu_amsdu_exp;
 	if (cfg_in_range(CFG_HE_MIN_FRAG_SIZE, he_cap->min_frag_size))
-		mlme_obj->cfg.he_caps.dot11_he_cap.min_frag_size =
-					he_cap->min_frag_size;
+		mlme_he_cap->min_frag_size = he_cap->min_frag_size;
 	if (cfg_in_range(CFG_HE_TRIG_PAD, he_cap->trigger_frm_mac_pad))
-		mlme_obj->cfg.he_caps.dot11_he_cap.trigger_frm_mac_pad =
-			QDF_MIN(he_cap->trigger_frm_mac_pad,
-				mlme_obj->cfg.he_caps.dot11_he_cap.trigger_frm_mac_pad);
+		mlme_he_cap->trigger_frm_mac_pad =
+				QDF_MIN(he_cap->trigger_frm_mac_pad,
+					mlme_he_cap->trigger_frm_mac_pad);
 	if (cfg_in_range(CFG_HE_MTID_AGGR_RX, he_cap->multi_tid_aggr_rx_supp))
-		mlme_obj->cfg.he_caps.dot11_he_cap.multi_tid_aggr_rx_supp =
+		mlme_he_cap->multi_tid_aggr_rx_supp =
 					he_cap->multi_tid_aggr_rx_supp;
 	if (cfg_in_range(CFG_HE_MTID_AGGR_TX, he_cap->multi_tid_aggr_tx_supp))
-		mlme_obj->cfg.he_caps.dot11_he_cap.multi_tid_aggr_tx_supp =
+		mlme_he_cap->multi_tid_aggr_tx_supp =
 					he_cap->multi_tid_aggr_tx_supp;
 	if (cfg_in_range(CFG_HE_LINK_ADAPTATION, he_cap->he_link_adaptation))
-		mlme_obj->cfg.he_caps.dot11_he_cap.he_link_adaptation =
-					he_cap->he_link_adaptation;
-	mlme_obj->cfg.he_caps.dot11_he_cap.all_ack = he_cap->all_ack;
-	mlme_obj->cfg.he_caps.dot11_he_cap.trigd_rsp_sched =
-					he_cap->trigd_rsp_sched;
-	mlme_obj->cfg.he_caps.dot11_he_cap.a_bsr = he_cap->a_bsr;
+		mlme_he_cap->he_link_adaptation = he_cap->he_link_adaptation;
+	mlme_he_cap->all_ack = he_cap->all_ack;
+	mlme_he_cap->trigd_rsp_sched = he_cap->trigd_rsp_sched;
+	mlme_he_cap->a_bsr = he_cap->a_bsr;
 
-	value = QDF_MIN(he_cap->broadcast_twt,
-			mlme_obj->cfg.he_caps.dot11_he_cap.broadcast_twt);
-	mlme_obj->cfg.he_caps.dot11_he_cap.broadcast_twt = value;
+	mlme_he_cap->broadcast_twt =
+		QDF_MIN(he_cap->broadcast_twt, mlme_he_cap->broadcast_twt);
 
 	/*
 	 * As per 802.11ax spec, Flexible TWT capability can be set
@@ -1114,52 +1086,38 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	 * does not support it. Hence enabling Flexible TWT only when
 	 * either or both of the TWT Requestor/Responder capability
 	 * is set/enabled.
-	 */
-	value = QDF_MIN(he_cap->flex_twt_sched, (twt_req || twt_resp));
-	/*
 	 * mlme obj will have intersected flex_twt_sched value
 	 * taken from ini value, FW capability and twt req/resp
 	 */
-	value = QDF_MIN(value,
-			mlme_obj->cfg.he_caps.dot11_he_cap.flex_twt_sched);
-	mlme_obj->cfg.he_caps.dot11_he_cap.flex_twt_sched = value;
+	value = QDF_MIN(mlme_he_cap->twt_request || mlme_he_cap->twt_responder,
+			mlme_he_cap->flex_twt_sched);
+	mlme_he_cap->flex_twt_sched = QDF_MIN(value, he_cap->flex_twt_sched);
 
-	mlme_obj->cfg.he_caps.dot11_he_cap.ba_32bit_bitmap =
-					he_cap->ba_32bit_bitmap;
-	mlme_obj->cfg.he_caps.dot11_he_cap.mu_cascade = he_cap->mu_cascade;
-	mlme_obj->cfg.he_caps.dot11_he_cap.ack_enabled_multitid =
-					he_cap->ack_enabled_multitid;
-	mlme_obj->cfg.he_caps.dot11_he_cap.omi_a_ctrl = he_cap->omi_a_ctrl;
-	mlme_obj->cfg.he_caps.dot11_he_cap.ofdma_ra = he_cap->ofdma_ra;
+	mlme_he_cap->ba_32bit_bitmap = he_cap->ba_32bit_bitmap;
+	mlme_he_cap->mu_cascade = he_cap->mu_cascade;
+	mlme_he_cap->ack_enabled_multitid = he_cap->ack_enabled_multitid;
+	mlme_he_cap->omi_a_ctrl = he_cap->omi_a_ctrl;
+	mlme_he_cap->ofdma_ra = he_cap->ofdma_ra;
 	if (cfg_in_range(CFG_HE_MAX_AMPDU_LEN, he_cap->max_ampdu_len_exp_ext))
-		mlme_obj->cfg.he_caps.dot11_he_cap.max_ampdu_len_exp_ext =
-					he_cap->max_ampdu_len_exp_ext;
-	mlme_obj->cfg.he_caps.dot11_he_cap.amsdu_frag = he_cap->amsdu_frag;
-	mlme_obj->cfg.he_caps.dot11_he_cap.rx_ctrl_frame =
-					he_cap->rx_ctrl_frame;
-	mlme_obj->cfg.he_caps.dot11_he_cap.bsrp_ampdu_aggr =
-					he_cap->bsrp_ampdu_aggr;
-	mlme_obj->cfg.he_caps.dot11_he_cap.qtp = he_cap->qtp;
-	mlme_obj->cfg.he_caps.dot11_he_cap.a_bqr = he_cap->a_bqr;
-	mlme_obj->cfg.he_caps.dot11_he_cap.spatial_reuse_param_rspder =
-					he_cap->spatial_reuse_param_rspder;
-	mlme_obj->cfg.he_caps.dot11_he_cap.ndp_feedback_supp =
-					he_cap->ndp_feedback_supp;
-	mlme_obj->cfg.he_caps.dot11_he_cap.ops_supp = he_cap->ops_supp;
-	mlme_obj->cfg.he_caps.dot11_he_cap.amsdu_in_ampdu =
-					he_cap->amsdu_in_ampdu;
-	mlme_obj->cfg.he_caps.dot11_he_cap.he_sub_ch_sel_tx_supp =
-					he_cap->he_sub_ch_sel_tx_supp;
-	mlme_obj->cfg.he_caps.dot11_he_cap.ul_2x996_tone_ru_supp =
-					he_cap->ul_2x996_tone_ru_supp;
-	mlme_obj->cfg.he_caps.dot11_he_cap.om_ctrl_ul_mu_data_dis_rx =
-					he_cap->om_ctrl_ul_mu_data_dis_rx;
-	mlme_obj->cfg.he_caps.dot11_he_cap.he_dynamic_smps =
-					he_cap->he_dynamic_smps;
-	mlme_obj->cfg.he_caps.dot11_he_cap.punctured_sounding_supp =
-					he_cap->punctured_sounding_supp;
-	mlme_obj->cfg.he_caps.dot11_he_cap.ht_vht_trg_frm_rx_supp =
-					he_cap->ht_vht_trg_frm_rx_supp;
+		mlme_he_cap->max_ampdu_len_exp_ext =
+				he_cap->max_ampdu_len_exp_ext;
+	mlme_he_cap->amsdu_frag = he_cap->amsdu_frag;
+	mlme_he_cap->rx_ctrl_frame = he_cap->rx_ctrl_frame;
+	mlme_he_cap->bsrp_ampdu_aggr = he_cap->bsrp_ampdu_aggr;
+	mlme_he_cap->qtp = he_cap->qtp;
+	mlme_he_cap->a_bqr = he_cap->a_bqr;
+	mlme_he_cap->spatial_reuse_param_rspder =
+				he_cap->spatial_reuse_param_rspder;
+	mlme_he_cap->ndp_feedback_supp = he_cap->ndp_feedback_supp;
+	mlme_he_cap->ops_supp = he_cap->ops_supp;
+	mlme_he_cap->amsdu_in_ampdu = he_cap->amsdu_in_ampdu;
+	mlme_he_cap->he_sub_ch_sel_tx_supp = he_cap->he_sub_ch_sel_tx_supp;
+	mlme_he_cap->ul_2x996_tone_ru_supp = he_cap->ul_2x996_tone_ru_supp;
+	mlme_he_cap->om_ctrl_ul_mu_data_dis_rx =
+				he_cap->om_ctrl_ul_mu_data_dis_rx;
+	mlme_he_cap->he_dynamic_smps = he_cap->he_dynamic_smps;
+	mlme_he_cap->punctured_sounding_supp = he_cap->punctured_sounding_supp;
+	mlme_he_cap->ht_vht_trg_frm_rx_supp = he_cap->ht_vht_trg_frm_rx_supp;
 
 	chan_width = HE_CH_WIDTH_COMBINE(he_cap->chan_width_0,
 					 he_cap->chan_width_1,
@@ -1169,223 +1127,137 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 					 he_cap->chan_width_5,
 					 he_cap->chan_width_6);
 	if (cfg_in_range(CFG_HE_CHAN_WIDTH, chan_width)) {
-		mlme_obj->cfg.he_caps.dot11_he_cap.chan_width_0 =
-						he_cap->chan_width_0;
-		mlme_obj->cfg.he_caps.dot11_he_cap.chan_width_1 =
-						he_cap->chan_width_1;
-		mlme_obj->cfg.he_caps.dot11_he_cap.chan_width_2 =
-						he_cap->chan_width_2;
-		mlme_obj->cfg.he_caps.dot11_he_cap.chan_width_3 =
-						he_cap->chan_width_3;
-		mlme_obj->cfg.he_caps.dot11_he_cap.chan_width_4 =
-						he_cap->chan_width_4;
-		mlme_obj->cfg.he_caps.dot11_he_cap.chan_width_5 =
-						he_cap->chan_width_5;
-		mlme_obj->cfg.he_caps.dot11_he_cap.chan_width_6 =
-						he_cap->chan_width_6;
+		mlme_he_cap->chan_width_0 = he_cap->chan_width_0;
+		mlme_he_cap->chan_width_1 = he_cap->chan_width_1;
+		mlme_he_cap->chan_width_2 = he_cap->chan_width_2;
+		mlme_he_cap->chan_width_3 = he_cap->chan_width_3;
+		mlme_he_cap->chan_width_4 = he_cap->chan_width_4;
+		mlme_he_cap->chan_width_5 = he_cap->chan_width_5;
+		mlme_he_cap->chan_width_6 = he_cap->chan_width_6;
 	}
 	if (cfg_in_range(CFG_HE_RX_PREAM_PUNC, he_cap->rx_pream_puncturing))
-		mlme_obj->cfg.he_caps.dot11_he_cap.rx_pream_puncturing =
-				he_cap->rx_pream_puncturing;
-	mlme_obj->cfg.he_caps.dot11_he_cap.device_class = he_cap->device_class;
-	mlme_obj->cfg.he_caps.dot11_he_cap.ldpc_coding = he_cap->ldpc_coding;
+		mlme_he_cap->rx_pream_puncturing = he_cap->rx_pream_puncturing;
+	mlme_he_cap->device_class = he_cap->device_class;
+	mlme_he_cap->ldpc_coding = he_cap->ldpc_coding;
 	if (cfg_in_range(CFG_HE_LTF_PPDU, he_cap->he_1x_ltf_800_gi_ppdu))
-		mlme_obj->cfg.he_caps.dot11_he_cap.he_1x_ltf_800_gi_ppdu =
+		mlme_he_cap->he_1x_ltf_800_gi_ppdu =
 					he_cap->he_1x_ltf_800_gi_ppdu;
 	if (cfg_in_range(CFG_HE_MIDAMBLE_RX_MAX_NSTS,
 			 he_cap->midamble_tx_rx_max_nsts))
-		mlme_obj->cfg.he_caps.dot11_he_cap.midamble_tx_rx_max_nsts =
+		mlme_he_cap->midamble_tx_rx_max_nsts =
 					he_cap->midamble_tx_rx_max_nsts;
-	mlme_obj->cfg.he_caps.dot11_he_cap.he_4x_ltf_3200_gi_ndp =
-					he_cap->he_4x_ltf_3200_gi_ndp;
+	mlme_he_cap->he_4x_ltf_3200_gi_ndp = he_cap->he_4x_ltf_3200_gi_ndp;
 	if (mlme_obj->cfg.vht_caps.vht_cap_info.rx_stbc) {
-		mlme_obj->cfg.he_caps.dot11_he_cap.rx_stbc_lt_80mhz =
-					he_cap->rx_stbc_lt_80mhz;
-		mlme_obj->cfg.he_caps.dot11_he_cap.rx_stbc_gt_80mhz =
-					he_cap->rx_stbc_gt_80mhz;
+		mlme_he_cap->rx_stbc_lt_80mhz = he_cap->rx_stbc_lt_80mhz;
+		mlme_he_cap->rx_stbc_gt_80mhz = he_cap->rx_stbc_gt_80mhz;
 	} else {
-		mlme_obj->cfg.he_caps.dot11_he_cap.rx_stbc_lt_80mhz = 0;
-		mlme_obj->cfg.he_caps.dot11_he_cap.rx_stbc_gt_80mhz = 0;
+		mlme_he_cap->rx_stbc_lt_80mhz = 0;
+		mlme_he_cap->rx_stbc_gt_80mhz = 0;
 	}
 	if (mlme_obj->cfg.vht_caps.vht_cap_info.tx_stbc) {
-		mlme_obj->cfg.he_caps.dot11_he_cap.tb_ppdu_tx_stbc_lt_80mhz =
+		mlme_he_cap->tb_ppdu_tx_stbc_lt_80mhz =
 					he_cap->tb_ppdu_tx_stbc_lt_80mhz;
-		mlme_obj->cfg.he_caps.dot11_he_cap.tb_ppdu_tx_stbc_gt_80mhz =
+		mlme_he_cap->tb_ppdu_tx_stbc_gt_80mhz =
 					he_cap->tb_ppdu_tx_stbc_gt_80mhz;
 	} else {
-		mlme_obj->cfg.he_caps.dot11_he_cap.tb_ppdu_tx_stbc_lt_80mhz = 0;
-		mlme_obj->cfg.he_caps.dot11_he_cap.tb_ppdu_tx_stbc_gt_80mhz = 0;
+		mlme_he_cap->tb_ppdu_tx_stbc_lt_80mhz = 0;
+		mlme_he_cap->tb_ppdu_tx_stbc_gt_80mhz = 0;
 	}
 
 	if (cfg_in_range(CFG_HE_DOPPLER, he_cap->doppler))
-		mlme_obj->cfg.he_caps.dot11_he_cap.doppler = he_cap->doppler;
+		mlme_he_cap->doppler = he_cap->doppler;
 	if (cfg_in_range(CFG_HE_DCM_TX, he_cap->dcm_enc_tx))
-		mlme_obj->cfg.he_caps.dot11_he_cap.dcm_enc_tx =
-						he_cap->dcm_enc_tx;
+		mlme_he_cap->dcm_enc_tx = he_cap->dcm_enc_tx;
 	if (cfg_in_range(CFG_HE_DCM_RX, he_cap->dcm_enc_rx))
-		mlme_obj->cfg.he_caps.dot11_he_cap.dcm_enc_rx =
-						he_cap->dcm_enc_rx;
-	mlme_obj->cfg.he_caps.dot11_he_cap.ul_he_mu = he_cap->ul_he_mu;
+		mlme_he_cap->dcm_enc_rx = he_cap->dcm_enc_rx;
+	mlme_he_cap->ul_he_mu = he_cap->ul_he_mu;
 	if (mlme_obj->cfg.vht_caps.vht_cap_info.su_bformer) {
-		mlme_obj->cfg.he_caps.dot11_he_cap.su_beamformer =
-					he_cap->su_beamformer;
+		mlme_he_cap->su_beamformer = he_cap->su_beamformer;
 		if (cfg_in_range(CFG_HE_NUM_SOUND_LT80,
 				 he_cap->num_sounding_lt_80))
-			mlme_obj->cfg.he_caps.dot11_he_cap.num_sounding_lt_80 =
+			mlme_he_cap->num_sounding_lt_80 =
 						he_cap->num_sounding_lt_80;
 		if (cfg_in_range(CFG_HE_NUM_SOUND_GT80,
 				 he_cap->num_sounding_gt_80))
-			mlme_obj->cfg.he_caps.dot11_he_cap.num_sounding_gt_80 =
+			mlme_he_cap->num_sounding_gt_80 =
 						he_cap->num_sounding_gt_80;
-		mlme_obj->cfg.he_caps.dot11_he_cap.mu_beamformer =
-					he_cap->mu_beamformer;
+		mlme_he_cap->mu_beamformer = he_cap->mu_beamformer;
 
 	} else {
-		mlme_obj->cfg.he_caps.dot11_he_cap.su_beamformer = 0;
-		mlme_obj->cfg.he_caps.dot11_he_cap.num_sounding_lt_80 = 0;
-		mlme_obj->cfg.he_caps.dot11_he_cap.num_sounding_gt_80 = 0;
-		mlme_obj->cfg.he_caps.dot11_he_cap.mu_beamformer = 0;
+		mlme_he_cap->su_beamformer = 0;
+		mlme_he_cap->num_sounding_lt_80 = 0;
+		mlme_he_cap->num_sounding_gt_80 = 0;
+		mlme_he_cap->mu_beamformer = 0;
 	}
 
 	if (mlme_obj->cfg.vht_caps.vht_cap_info.su_bformee) {
-		mlme_obj->cfg.he_caps.dot11_he_cap.su_beamformee =
-					he_cap->su_beamformee;
+		mlme_he_cap->su_beamformee = he_cap->su_beamformee;
 		if (cfg_in_range(CFG_HE_BFEE_STS_LT80, he_cap->bfee_sts_lt_80))
-			mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_lt_80 =
-						he_cap->bfee_sts_lt_80;
+			mlme_he_cap->bfee_sts_lt_80 = he_cap->bfee_sts_lt_80;
 		if (cfg_in_range(CFG_HE_BFEE_STS_GT80, he_cap->bfee_sts_gt_80))
-			mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_gt_80 =
-						he_cap->bfee_sts_gt_80;
+			mlme_he_cap->bfee_sts_gt_80 = he_cap->bfee_sts_gt_80;
 
-		if ((mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_lt_80 >
+		if ((mlme_he_cap->bfee_sts_lt_80 >
 		     MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
-		     !wma_cfg->tx_bfee_8ss_enabled) {
-			mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_lt_80 =
-				QDF_MIN(mlme_obj->cfg.he_caps.dot11_he_cap.
-				bfee_sts_lt_80,
-				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF);
-		}
-		if ((mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_gt_80 >
+		     !wma_cfg->tx_bfee_8ss_enabled)
+			mlme_he_cap->bfee_sts_lt_80 =
+				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF;
+		if ((mlme_he_cap->bfee_sts_gt_80 >
 		     MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&
-		     !wma_cfg->tx_bfee_8ss_enabled) {
-			mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_gt_80 =
-				QDF_MIN(mlme_obj->cfg.he_caps.dot11_he_cap.
-				bfee_sts_gt_80,
-				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF);
-		}
+		     !wma_cfg->tx_bfee_8ss_enabled)
+			mlme_he_cap->bfee_sts_gt_80 =
+				MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF;
 	} else {
-		mlme_obj->cfg.he_caps.dot11_he_cap.su_beamformee = 0;
-		mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_lt_80 = 0;
-		mlme_obj->cfg.he_caps.dot11_he_cap.bfee_sts_gt_80 = 0;
+		mlme_he_cap->su_beamformee = 0;
+		mlme_he_cap->bfee_sts_lt_80 = 0;
+		mlme_he_cap->bfee_sts_gt_80 = 0;
 	}
 
 	if (!mlme_obj->cfg.he_caps.enable_ul_mimo) {
 		mlme_debug("UL MIMO feature is disabled via ini, fw caps :%d",
 			   he_cap->ul_mu);
-		mlme_obj->cfg.he_caps.dot11_he_cap.ul_mu = 0;
+		mlme_he_cap->ul_mu = 0;
 	} else {
-		mlme_obj->cfg.he_caps.dot11_he_cap.ul_mu = he_cap->ul_mu;
+		mlme_he_cap->ul_mu = he_cap->ul_mu;
 	}
 
-	mlme_obj->cfg.he_caps.dot11_he_cap.su_feedback_tone16 =
-					he_cap->su_feedback_tone16;
-	mlme_obj->cfg.he_caps.dot11_he_cap.mu_feedback_tone16 =
-					he_cap->mu_feedback_tone16;
-	mlme_obj->cfg.he_caps.dot11_he_cap.codebook_su = he_cap->codebook_su;
-	mlme_obj->cfg.he_caps.dot11_he_cap.codebook_mu = he_cap->codebook_mu;
+	mlme_he_cap->su_feedback_tone16 = he_cap->su_feedback_tone16;
+	mlme_he_cap->mu_feedback_tone16 = he_cap->mu_feedback_tone16;
+	mlme_he_cap->codebook_su = he_cap->codebook_su;
+	mlme_he_cap->codebook_mu = he_cap->codebook_mu;
 	if (cfg_in_range(CFG_HE_BFRM_FEED, he_cap->beamforming_feedback))
-		mlme_obj->cfg.he_caps.dot11_he_cap.beamforming_feedback =
+		mlme_he_cap->beamforming_feedback =
 					he_cap->beamforming_feedback;
-	mlme_obj->cfg.he_caps.dot11_he_cap.he_er_su_ppdu =
-					he_cap->he_er_su_ppdu;
-	mlme_obj->cfg.he_caps.dot11_he_cap.dl_mu_mimo_part_bw =
-					he_cap->dl_mu_mimo_part_bw;
-	mlme_obj->cfg.he_caps.dot11_he_cap.ppet_present = he_cap->ppet_present;
-	mlme_obj->cfg.he_caps.dot11_he_cap.srp = he_cap->srp;
-	mlme_obj->cfg.he_caps.dot11_he_cap.power_boost = he_cap->power_boost;
-	mlme_obj->cfg.he_caps.dot11_he_cap.he_ltf_800_gi_4x =
-					he_cap->he_ltf_800_gi_4x;
+	mlme_he_cap->he_er_su_ppdu = he_cap->he_er_su_ppdu;
+	mlme_he_cap->dl_mu_mimo_part_bw = he_cap->dl_mu_mimo_part_bw;
+	mlme_he_cap->ppet_present = he_cap->ppet_present;
+	mlme_he_cap->srp = he_cap->srp;
+	mlme_he_cap->power_boost = he_cap->power_boost;
+	mlme_he_cap->he_ltf_800_gi_4x =	he_cap->he_ltf_800_gi_4x;
 	if (cfg_in_range(CFG_HE_MAX_NC, he_cap->max_nc))
-		mlme_obj->cfg.he_caps.dot11_he_cap.max_nc = he_cap->max_nc;
-	mlme_obj->cfg.he_caps.dot11_he_cap.er_he_ltf_800_gi_4x =
-					he_cap->er_he_ltf_800_gi_4x;
-	mlme_obj->cfg.he_caps.dot11_he_cap.he_ppdu_20_in_40Mhz_2G =
-					he_cap->he_ppdu_20_in_40Mhz_2G;
-	mlme_obj->cfg.he_caps.dot11_he_cap.he_ppdu_20_in_160_80p80Mhz =
+		mlme_he_cap->max_nc = he_cap->max_nc;
+	mlme_he_cap->er_he_ltf_800_gi_4x = he_cap->er_he_ltf_800_gi_4x;
+	mlme_he_cap->he_ppdu_20_in_40Mhz_2G = he_cap->he_ppdu_20_in_40Mhz_2G;
+	mlme_he_cap->he_ppdu_20_in_160_80p80Mhz =
 					he_cap->he_ppdu_20_in_160_80p80Mhz;
-	mlme_obj->cfg.he_caps.dot11_he_cap.he_ppdu_80_in_160_80p80Mhz =
+	mlme_he_cap->he_ppdu_80_in_160_80p80Mhz =
 					he_cap->he_ppdu_80_in_160_80p80Mhz;
-	mlme_obj->cfg.he_caps.dot11_he_cap.er_1x_he_ltf_gi =
-					he_cap->er_1x_he_ltf_gi;
-	mlme_obj->cfg.he_caps.dot11_he_cap.midamble_tx_rx_1x_he_ltf =
+	mlme_he_cap->er_1x_he_ltf_gi = he_cap->er_1x_he_ltf_gi;
+	mlme_he_cap->midamble_tx_rx_1x_he_ltf =
 					he_cap->midamble_tx_rx_1x_he_ltf;
 	if (cfg_in_range(CFG_HE_DCM_MAX_BW, he_cap->dcm_max_bw))
-		mlme_obj->cfg.he_caps.dot11_he_cap.dcm_max_bw =
-					he_cap->dcm_max_bw;
-	mlme_obj->cfg.he_caps.dot11_he_cap.longer_than_16_he_sigb_ofdm_sym =
+		mlme_he_cap->dcm_max_bw = he_cap->dcm_max_bw;
+	mlme_he_cap->longer_than_16_he_sigb_ofdm_sym =
 					he_cap->longer_than_16_he_sigb_ofdm_sym;
-	mlme_obj->cfg.he_caps.dot11_he_cap.tx_1024_qam_lt_242_tone_ru =
+	mlme_he_cap->tx_1024_qam_lt_242_tone_ru =
 					he_cap->tx_1024_qam_lt_242_tone_ru;
-	mlme_obj->cfg.he_caps.dot11_he_cap.rx_1024_qam_lt_242_tone_ru =
+	mlme_he_cap->rx_1024_qam_lt_242_tone_ru =
 					he_cap->rx_1024_qam_lt_242_tone_ru;
-	mlme_obj->cfg.he_caps.dot11_he_cap.non_trig_cqi_feedback =
-					he_cap->non_trig_cqi_feedback;
-	mlme_obj->cfg.he_caps.dot11_he_cap.rx_full_bw_su_he_mu_compress_sigb =
+	mlme_he_cap->non_trig_cqi_feedback = he_cap->non_trig_cqi_feedback;
+	mlme_he_cap->rx_full_bw_su_he_mu_compress_sigb =
 				he_cap->rx_full_bw_su_he_mu_compress_sigb;
-	mlme_obj->cfg.he_caps.dot11_he_cap.rx_full_bw_su_he_mu_non_cmpr_sigb =
+	mlme_he_cap->rx_full_bw_su_he_mu_non_cmpr_sigb =
 				he_cap->rx_full_bw_su_he_mu_non_cmpr_sigb;
-
-	tx_mcs_map = wlan_mlme_get_min_he_mcs_map(
-		mlme_obj->cfg.he_caps.dot11_he_cap.tx_he_mcs_map_lt_80,
-		he_cap->tx_he_mcs_map_lt_80);
-	rx_mcs_map = wlan_mlme_get_min_he_mcs_map(
-		mlme_obj->cfg.he_caps.dot11_he_cap.rx_he_mcs_map_lt_80,
-		he_cap->rx_he_mcs_map_lt_80);
-
-	tx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(QDF_MIN(vht_enable_mimo + 1,
-						      num_rf_chains));
-	rx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(QDF_MIN(vht_enable_mimo + 1,
-						      num_rf_chains));
-	if (cfg_in_range(CFG_HE_RX_MCS_MAP_LT_80, rx_mcs_map))
-		mlme_obj->cfg.he_caps.dot11_he_cap.rx_he_mcs_map_lt_80 =
-			rx_mcs_map;
-	if (cfg_in_range(CFG_HE_TX_MCS_MAP_LT_80, tx_mcs_map))
-		mlme_obj->cfg.he_caps.dot11_he_cap.tx_he_mcs_map_lt_80 =
-			tx_mcs_map;
-
-	tx_mcs_map = wlan_mlme_get_min_he_mcs_map(
-	   *((uint16_t *)mlme_obj->cfg.he_caps.dot11_he_cap.tx_he_mcs_map_160),
-	   *((uint16_t *)he_cap->tx_he_mcs_map_160));
-	rx_mcs_map = wlan_mlme_get_min_he_mcs_map(
-	   *((uint16_t *)mlme_obj->cfg.he_caps.dot11_he_cap.rx_he_mcs_map_160),
-	   *((uint16_t *)he_cap->rx_he_mcs_map_160));
-
-	tx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(QDF_MIN(vht_enable_mimo + 1,
-						      num_rf_chains));
-	rx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(QDF_MIN(vht_enable_mimo + 1,
-						      num_rf_chains));
-
-	if (cfg_in_range(CFG_HE_RX_MCS_MAP_160, rx_mcs_map))
-		qdf_mem_copy(mlme_obj->cfg.he_caps.dot11_he_cap.
-			     rx_he_mcs_map_160,
-			     &rx_mcs_map, sizeof(uint16_t));
-
-	if (cfg_in_range(CFG_HE_TX_MCS_MAP_160, tx_mcs_map))
-		qdf_mem_copy(mlme_obj->cfg.he_caps.dot11_he_cap.
-			     tx_he_mcs_map_160,
-			     &tx_mcs_map, sizeof(uint16_t));
-
-	if (cfg_in_range(CFG_HE_RX_MCS_MAP_80_80,
-			 *((uint16_t *)he_cap->rx_he_mcs_map_80_80)))
-		qdf_mem_copy(mlme_obj->cfg.he_caps.dot11_he_cap.
-			     rx_he_mcs_map_80_80,
-			     he_cap->rx_he_mcs_map_80_80, sizeof(uint16_t));
-
-	if (cfg_in_range(CFG_HE_TX_MCS_MAP_80_80,
-			 *((uint16_t *)he_cap->tx_he_mcs_map_80_80)))
-		qdf_mem_copy(mlme_obj->cfg.he_caps.dot11_he_cap.
-			     tx_he_mcs_map_80_80,
-			     he_cap->tx_he_mcs_map_80_80, sizeof(uint16_t));
 
 	qdf_mem_copy(mlme_obj->cfg.he_caps.he_ppet_2g, wma_cfg->ppet_2g,
 		     HE_MAX_PPET_SIZE);
@@ -1393,7 +1265,7 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_copy(mlme_obj->cfg.he_caps.he_ppet_5g, wma_cfg->ppet_5g,
 		     HE_MAX_PPET_SIZE);
 
-	mlme_obj->cfg.he_caps.he_cap_orig = mlme_obj->cfg.he_caps.dot11_he_cap;
+	mlme_obj->cfg.he_caps.he_cap_orig = *mlme_he_cap;
 	/* Take intersection of host and FW capabilities */
 	mlme_obj->cfg.he_caps.he_mcs_12_13_supp_2g &=
 						  wma_cfg->he_mcs_12_13_supp_2g;

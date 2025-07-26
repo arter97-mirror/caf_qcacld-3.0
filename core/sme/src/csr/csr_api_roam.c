@@ -1875,8 +1875,8 @@ void csr_update_session_he_cap(struct mac_context *mac_ctx,
 		sap_rx_mcs_map =
 			wlan_mlme_get_sap_he_rx_mcs_map_160(mac_ctx->psoc);
 		sap_rx_mcs_map =
-			wlan_mlme_get_min_he_mcs_map(sap_rx_mcs_map,
-						     *((uint16_t *)he_cap->rx_he_mcs_map_160));
+			HE_INTERSECT_MCS(sap_rx_mcs_map,
+					 *((uint16_t *)he_cap->rx_he_mcs_map_160));
 		qdf_mem_copy(&he_cap->rx_he_mcs_map_160, &sap_rx_mcs_map,
 			     sizeof(sap_rx_mcs_map));
 	}

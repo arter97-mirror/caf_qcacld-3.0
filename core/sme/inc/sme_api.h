@@ -3614,13 +3614,10 @@ struct omi_ctrl_tx {
  * sme_update_tgt_he_cap() - sets the HE caps to pmac
  * @mac_handle: Pointer to MAC handle
  * @cfg: Pointer to WMA target CFG
- * @he_cap_ini: Pointer to HE CAP configured by INI
  *
  * Return: None
  */
-void sme_update_tgt_he_cap(mac_handle_t mac_handle,
-			   struct wma_tgt_cfg *cfg,
-			   tDot11fIEhe_cap *he_cap_ini);
+void sme_update_tgt_he_cap(mac_handle_t mac_handle, struct wma_tgt_cfg *cfg);
 
 /**
  * sme_update_he_cap_nss() - sets the nss based on user request
@@ -3861,8 +3858,7 @@ int sme_update_he_full_ul_mumimo(mac_handle_t mac_handle, uint8_t session_id,
 				 uint8_t cfg_val);
 #else
 static inline void sme_update_tgt_he_cap(mac_handle_t mac_handle,
-					 struct wma_tgt_cfg *cfg,
-					 tDot11fIEhe_cap *he_cap_ini)
+					 struct wma_tgt_cfg *cfg)
 {}
 static inline void sme_update_he_cap_nss(mac_handle_t mac_handle,
 					 uint8_t session_id,

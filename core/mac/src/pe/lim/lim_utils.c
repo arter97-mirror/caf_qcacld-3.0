@@ -7076,17 +7076,13 @@ static bool lim_check_is_bss_greater_than_4_nss_supp(struct pe_session *session,
 						     tDot11fIEhe_cap *he_cap)
 {
 	uint8_t i;
-	uint16_t mcs_map;
-#define NSS_4 4
-#define NSS_8 8
 
 	if (!session->he_capable || !he_cap->present)
 		return false;
-	mcs_map = he_cap->rx_he_mcs_map_lt_80;
-	for (i = NSS_4; i < NSS_8; i++) {
-		if (((mcs_map >> (i * 2)) & 0x3) != 0x3)
+
+	for (i = NSS_4x4_MODE; i <= NSS_8x8_MODE; i++)
+		if (HE_MCS_IS_NSS_ENABLED(he_cap->rx_he_mcs_map_lt_80, i))
 			return true;
-	}
 
 	return false;
 }
@@ -7628,6 +7624,11 @@ lim_revise_req_he_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 		he_config->codebook_su = mac->he_cap_5g.codebook_su;
 		he_config->codebook_mu = mac->he_cap_5g.codebook_mu;
 	}
+
+	wlan_mlme_set_he_mcsset_for_nss(mac->mlme_cfg, he_config,
+					session->cap_tx_nss,
+					session->cap_rx_nss);
+
 	lim_print_he_config(mlme_priv->he_config);
 
 }
@@ -8318,8 +8319,8 @@ QDF_STATUS lim_populate_he_mcs_per_bw(struct mac_context *mac_ctx,
 				      uint16_t *supp_rx_mcs,
 				      uint16_t *supp_tx_mcs,
 				      uint16_t peer_rx, uint16_t peer_tx,
-				      uint8_t nss, uint16_t rx_mcs,
-				      uint16_t tx_mcs)
+				      uint8_t tx_nss, uint8_t rx_nss,
+				      uint16_t rx_mcs, uint16_t tx_mcs)
 {
 
 	pe_debug("peer rates: rx_mcs - 0x%04x tx_mcs - 0x%04x",
@@ -8331,8 +8332,8 @@ QDF_STATUS lim_populate_he_mcs_per_bw(struct mac_context *mac_ctx,
 	*supp_tx_mcs = HE_INTERSECT_MCS(rx_mcs, peer_tx);
 	*supp_rx_mcs = HE_INTERSECT_MCS(tx_mcs, peer_rx);
 
-	*supp_tx_mcs |= HE_DISABLE_MCS_OVER_NSS(nss);
-	*supp_rx_mcs |= HE_DISABLE_MCS_OVER_NSS(nss);
+	*supp_tx_mcs |= HE_DISABLE_MCS_OVER_NSS(rx_nss);
+	*supp_rx_mcs |= HE_DISABLE_MCS_OVER_NSS(tx_nss);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -8340,9 +8341,9 @@ QDF_STATUS lim_populate_he_mcs_per_bw(struct mac_context *mac_ctx,
 QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 				   struct supported_rates *rates,
 				   tDot11fIEhe_cap *peer_he_caps,
-				   struct pe_session *session_entry, uint8_t nss)
+				   struct pe_session *session_entry,
+				   uint8_t tx_nss, uint8_t rx_nss)
 {
-	bool support_2x2 = false;
 	uint32_t self_sta_dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
 	uint16_t sap_rx_he_mcs_map_160;
 	enum phy_ch_width ch_width;
@@ -8371,25 +8372,12 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 		(*(uint16_t *)peer_he_caps->rx_he_mcs_map_80_80),
 		(*(uint16_t *)peer_he_caps->tx_he_mcs_map_80_80));
 
-	if (nss >= NSS_2x2_MODE) {
-		if (mac_ctx->mlme_cfg->gen.as_enabled &&
-		    wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq)) {
-			if (IS_2X2_CHAIN(session_entry->chainMask))
-				support_2x2 = true;
-			else
-				pe_err("2x2 not enabled %d",
-					session_entry->chainMask);
-		} else {
-			support_2x2 = true;
-		}
-	}
-
 	if (wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq))
 		lim_populate_he_mcs_per_bw(mac_ctx,
 			&rates->rx_he_mcs_map_lt_80,
 			&rates->tx_he_mcs_map_lt_80,
 			peer_he_caps->rx_he_mcs_map_lt_80,
-			peer_he_caps->tx_he_mcs_map_lt_80, nss,
+			peer_he_caps->tx_he_mcs_map_lt_80, tx_nss, rx_nss,
 			mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80,
 			mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80);
 	else
@@ -8397,7 +8385,7 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 			&rates->rx_he_mcs_map_lt_80,
 			&rates->tx_he_mcs_map_lt_80,
 			peer_he_caps->rx_he_mcs_map_lt_80,
-			peer_he_caps->tx_he_mcs_map_lt_80, nss,
+			peer_he_caps->tx_he_mcs_map_lt_80, tx_nss, rx_nss,
 			mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80,
 			mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80);
 
@@ -8409,7 +8397,7 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 			&rates->tx_he_mcs_map_160,
 			*((uint16_t *)peer_he_caps->rx_he_mcs_map_160),
 			*((uint16_t *)peer_he_caps->tx_he_mcs_map_160),
-			nss,
+			tx_nss, rx_nss,
 			*((uint16_t *)mac_ctx->he_cap_5g.rx_he_mcs_map_160),
 			*((uint16_t *)mac_ctx->he_cap_5g.tx_he_mcs_map_160));
 
@@ -8417,10 +8405,9 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 			sap_rx_he_mcs_map_160 =
 				wlan_mlme_get_sap_he_rx_mcs_map_160(mac_ctx->psoc);
 			rates->rx_he_mcs_map_160 =
-				wlan_mlme_get_min_he_mcs_map(sap_rx_he_mcs_map_160,
-							     rates->rx_he_mcs_map_160);
+				HE_INTERSECT_MCS(sap_rx_he_mcs_map_160,
+						 rates->rx_he_mcs_map_160);
 		}
-
 	} else {
 		rates->tx_he_mcs_map_160 = HE_MCS_ALL_DISABLED;
 		rates->rx_he_mcs_map_160 = HE_MCS_ALL_DISABLED;
@@ -8430,27 +8417,13 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 			mac_ctx, &rates->rx_he_mcs_map_80_80,
 			&rates->tx_he_mcs_map_80_80,
 			*((uint16_t *)peer_he_caps->rx_he_mcs_map_80_80),
-			*((uint16_t *)peer_he_caps->tx_he_mcs_map_80_80), nss,
+			*((uint16_t *)peer_he_caps->tx_he_mcs_map_80_80),
+			tx_nss, rx_nss,
 			*((uint16_t *)mac_ctx->he_cap_5g.rx_he_mcs_map_80_80),
 			*((uint16_t *)mac_ctx->he_cap_5g.tx_he_mcs_map_80_80));
 	} else {
 		rates->tx_he_mcs_map_80_80 = HE_MCS_ALL_DISABLED;
 		rates->rx_he_mcs_map_80_80 = HE_MCS_ALL_DISABLED;
-	}
-	if (!support_2x2) {
-		/* disable 2 and higher NSS MCS sets */
-		rates->rx_he_mcs_map_lt_80 |=
-				HE_DISABLE_MCS_OVER_NSS(NSS_1x1_MODE);
-		rates->tx_he_mcs_map_lt_80 |=
-				HE_DISABLE_MCS_OVER_NSS(NSS_1x1_MODE);
-		rates->rx_he_mcs_map_160 |=
-				HE_DISABLE_MCS_OVER_NSS(NSS_1x1_MODE);
-		rates->tx_he_mcs_map_160 |=
-				HE_DISABLE_MCS_OVER_NSS(NSS_1x1_MODE);
-		rates->rx_he_mcs_map_80_80 |=
-				HE_DISABLE_MCS_OVER_NSS(NSS_1x1_MODE);
-		rates->tx_he_mcs_map_80_80 |=
-				HE_DISABLE_MCS_OVER_NSS(NSS_1x1_MODE);
 	}
 
 	pe_debug("lt 80: rx 0x%x tx 0x%x, 160: rx 0x%x tx 0x%x, 80_80: rx 0x%x tx 0x%x",

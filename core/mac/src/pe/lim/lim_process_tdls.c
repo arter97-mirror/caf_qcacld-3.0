@@ -1191,25 +1191,16 @@ static void lim_tdls_populate_he_operations(struct mac_context *mac,
 					    struct pe_session *pe_session,
 					    tDot11fIEhe_op *he_op)
 {
-	struct wlan_mlme_he_caps *he_cap_info;
-	uint16_t mcs_set = 0;
+	struct wlan_mlme_he_caps *he_cap_info = &mac->mlme_cfg->he_caps;
 
-	he_cap_info = &mac->mlme_cfg->he_caps;
 	he_op->co_located_bss = 0;
 	he_op->bss_color = pe_session->he_bss_color_change.new_color;
 	if (!he_op->bss_color)
 		he_op->bss_col_disabled = 1;
 
-	mcs_set = (uint16_t)he_cap_info->he_ops_basic_mcs_nss;
-	if (pe_session->cap_tx_nss == NSS_1x1_MODE)
-		mcs_set |= 0xFFFC;
-	else
-		mcs_set |= 0xFFF0;
-
-	*((uint16_t *)he_op->basic_mcs_nss) = mcs_set;
-	populate_dot11f_he_operation(mac,
-				     pe_session,
-				     he_op);
+	*((uint16_t *)he_op->basic_mcs_nss) =
+			(uint16_t)he_cap_info->he_ops_basic_mcs_nss;
+	populate_dot11f_he_operation(mac, pe_session, he_op);
 }
 
 static void lim_tdls_fill_setup_cnf_he_op(struct mac_context *mac,
@@ -1273,7 +1264,7 @@ static void lim_tdls_fill_he_wideband_offchannel_mcs(struct mac_context *mac_ctx
 			&rates->tx_he_mcs_map_160,
 			*((uint16_t *)peer_he_caps->rx_he_mcs_map_160),
 			*((uint16_t *)peer_he_caps->tx_he_mcs_map_160),
-			nss,
+			nss, nss,
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				rx_he_mcs_map_160),
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
@@ -1285,7 +1276,7 @@ static void lim_tdls_fill_he_wideband_offchannel_mcs(struct mac_context *mac_ctx
 			&rates->tx_he_mcs_map_160,
 			rx_he_mcs_map_160,
 			tx_he_mcs_map_160,
-			nss,
+			nss, nss,
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				rx_he_mcs_map_160),
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
@@ -1300,6 +1291,7 @@ static void lim_tdls_fill_he_wideband_offchannel_mcs(struct mac_context *mac_ctx
 			&rates->tx_he_mcs_map_80_80,
 			*((uint16_t *)peer_he_caps->rx_he_mcs_map_80_80),
 			*((uint16_t *)peer_he_caps->tx_he_mcs_map_80_80), nss,
+			nss,
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 					rx_he_mcs_map_80_80),
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
@@ -1316,7 +1308,7 @@ static void lim_tdls_populate_he_matching_rate_set(struct mac_context *mac_ctx,
 						   struct pe_session *session)
 {
 	lim_populate_he_mcs_set(mac_ctx, &stads->supportedRates,
-				&stads->he_config, session, nss);
+				&stads->he_config, session, nss, nss);
 
 	lim_tdls_fill_he_wideband_offchannel_mcs(mac_ctx, stads, nss, session);
 }

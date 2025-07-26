@@ -176,11 +176,11 @@ static void wma_convert_he_cap(tDot11fIEhe_cap *he_cap, uint32_t *mac_cap,
 			       uint32_t tx_chain_mask, uint32_t rx_chain_mask,
 			       uint16_t *mcs_12_13_supp)
 {
-	uint8_t nss, chan_width;
+	uint8_t tx_nss, rx_nss, chan_width;
 	uint16_t rx_mcs_le_80, tx_mcs_le_80, rx_mcs_160, tx_mcs_160;
 
-	nss = QDF_MAX(wma_get_num_of_setbits_from_bitmask(tx_chain_mask),
-			wma_get_num_of_setbits_from_bitmask(rx_chain_mask));
+	tx_nss = qdf_get_hweight32(tx_chain_mask);
+	rx_nss = qdf_get_hweight32(rx_chain_mask);
 
 	he_cap->present = true;
 	/* HE MAC capabilities */
@@ -324,10 +324,10 @@ static void wma_convert_he_cap(tDot11fIEhe_cap *he_cap, uint32_t *mac_cap,
 	tx_mcs_160 = (supp_mcs & 0xFFFF0000) >> 16;
 	/* if FW indicated it is using 1x1 disable upper NSS-MCS sets */
 
-	rx_mcs_le_80 |= HE_DISABLE_MCS_OVER_NSS(nss);
-	tx_mcs_le_80 |= HE_DISABLE_MCS_OVER_NSS(nss);
-	rx_mcs_160 |= HE_DISABLE_MCS_OVER_NSS(nss);
-	tx_mcs_160 |= HE_DISABLE_MCS_OVER_NSS(nss);
+	rx_mcs_le_80 |= HE_DISABLE_MCS_OVER_NSS(rx_nss);
+	tx_mcs_le_80 |= HE_DISABLE_MCS_OVER_NSS(tx_nss);
+	rx_mcs_160 |= HE_DISABLE_MCS_OVER_NSS(rx_nss);
+	tx_mcs_160 |= HE_DISABLE_MCS_OVER_NSS(tx_nss);
 
 	he_cap->rx_he_mcs_map_lt_80 = rx_mcs_le_80;
 	he_cap->tx_he_mcs_map_lt_80 = tx_mcs_le_80;

@@ -4619,13 +4619,6 @@ struct he_capability {
 #define HE_MCS_IS_NSS_ENABLED(mcs_set, nss) (false)
 #endif
 
-#define HE_GET_NSS(mcs, nss)                                         \
-	do {                                                         \
-		(nss) = 0;                                           \
-		while ((((mcs) >> ((nss)*2)) & 3) != 3 && nss < 8)   \
-			(nss)++;                                     \
-	} while (0)
-
 #ifdef WLAN_FEATURE_11BE
 #define EHT_MAX_PHY_CAP_SIZE 3
 #define EHT_OP_OUI_TYPE "\x6a"

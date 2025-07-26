@@ -1511,15 +1511,23 @@ QDF_STATUS lim_populate_own_rate_set(struct mac_context *mac_ctx,
 static bool lim_check_valid_mcs_for_nss(struct pe_session *session,
 					tDot11fIEhe_cap *he_caps)
 {
-	uint8_t i;
+	uint16_t mcs_map;
 
 	if (!session->he_capable || !he_caps || !he_caps->present)
 		return true;
 
-	for (i = NSS_1x1_MODE; i <= session->cap_tx_nss; i++)
-		if (!HE_MCS_IS_NSS_ENABLED(he_caps->rx_he_mcs_map_lt_80, i) ||
-		    !HE_MCS_IS_NSS_ENABLED(he_caps->tx_he_mcs_map_lt_80, i))
-			return false;
+	/* Earlier the code is checking all the nss to be enabled,.
+	 * modifying it to allow if atleast one ss is enabled in both direction.
+	 */
+	mcs_map = he_caps->tx_he_mcs_map_lt_80 |
+		  HE_DISABLE_MCS_OVER_NSS(session->cap_rx_nss);
+	if (mcs_map == HE_MCS_ALL_DISABLED)
+		return false;
+
+	mcs_map = he_caps->rx_he_mcs_map_lt_80 |
+		  HE_DISABLE_MCS_OVER_NSS(session->cap_tx_nss);
+	if (mcs_map == HE_MCS_ALL_DISABLED)
+		return false;
 
 	if ((session->ch_width == CH_WIDTH_160MHZ ||
 	     lim_is_session_chwidth_320mhz(session)) &&
@@ -1750,7 +1758,8 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 	}
 
 	lim_populate_he_mcs_set(mac, pRates, peer_he_caps, pe_session,
-				pe_session->cap_tx_nss);
+				pe_session->cap_tx_nss, pe_session->cap_rx_nss);
+
 	lim_populate_eht_mcs_set(mac, pRates, eht_caps,
 				 pe_session, pe_session->ch_width,
 				 wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq));
@@ -2000,7 +2009,8 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 				 session_entry, session_entry->cap_tx_nss,
 				 session_entry->cap_rx_nss, sta_ds);
 	lim_populate_he_mcs_set(mac_ctx, &sta_ds->supportedRates, he_caps,
-				session_entry, session_entry->cap_tx_nss);
+				session_entry, session_entry->cap_tx_nss,
+				session_entry->cap_rx_nss);
 	lim_populate_eht_mcs_set(mac_ctx, &sta_ds->supportedRates, eht_caps,
 				 session_entry, sta_ds->ch_width,
 				 wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq));

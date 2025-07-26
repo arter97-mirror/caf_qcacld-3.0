@@ -3997,7 +3997,6 @@ QDF_STATUS ucfg_mlme_cfg_get_wlm_reset(struct wlan_objmgr_psoc *psoc,
  *
  * @psoc: pointer to psoc object
  * @cfg: pointer to config params from target
- * @num_rf_chains: Num of RF chains supported
  *
  * Inline UCFG API to be used by HDD/OSIF callers to update
  * he caps in mlme.
@@ -4006,9 +4005,9 @@ QDF_STATUS ucfg_mlme_cfg_get_wlm_reset(struct wlan_objmgr_psoc *psoc,
  */
 static inline QDF_STATUS
 ucfg_mlme_update_tgt_he_cap(struct wlan_objmgr_psoc *psoc,
-			    struct wma_tgt_cfg *cfg, uint8_t num_rf_chains)
+			    struct wma_tgt_cfg *cfg)
 {
-	return mlme_update_tgt_he_caps_in_cfg(psoc, cfg, num_rf_chains);
+	return mlme_update_tgt_he_caps_in_cfg(psoc, cfg);
 }
 
 /**

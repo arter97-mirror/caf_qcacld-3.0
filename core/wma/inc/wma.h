@@ -1613,8 +1613,6 @@ QDF_STATUS wma_process_fw_test_cmd(WMA_HANDLE handle,
 QDF_STATUS wma_send_ht40_obss_scanind(tp_wma_handle wma,
 	struct obss_ht40_scanind *req);
 
-uint32_t wma_get_num_of_setbits_from_bitmask(uint32_t mask);
-
 #ifdef FEATURE_WLAN_APF
 /**
  *  wma_get_apf_caps_event_handler() - Event handler for get apf capability

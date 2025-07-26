@@ -8424,18 +8424,16 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 				   enum phy_ch_width ch_width,
 				   tDot11fIEhe_cap *he_cap)
 {
-	uint8_t *ppet, nss;
+	uint8_t *ppet;
 	uint32_t value = 0;
 	enum phy_ch_width max_ch_width;
 
 	he_cap->present = 1;
-	nss = session ? session->cap_tx_nss : WLAN_MAX_VDEV_NSS;
 
 	if (!session) {
 		qdf_mem_copy(he_cap, &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
 			     sizeof(tDot11fIEhe_cap));
-		if (!freq)
-			goto fill_nss;
+		return QDF_STATUS_SUCCESS;
 	} else {
 		/* Update HE Dynamic SMPS based on HT SMPS INI config */
 		if (LIM_IS_STA_ROLE(session)) {
@@ -8500,16 +8498,6 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 			he_cap->chan_width_3 = 0;
 		}
 	}
-
-fill_nss:
-	he_cap->rx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(nss);
-	he_cap->tx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(nss);
-	*(uint16_t *)he_cap->rx_he_mcs_map_160 |= HE_DISABLE_MCS_OVER_NSS(nss);
-	*(uint16_t *)he_cap->tx_he_mcs_map_160 |= HE_DISABLE_MCS_OVER_NSS(nss);
-	*(uint16_t *)he_cap->rx_he_mcs_map_80_80 |=
-					HE_DISABLE_MCS_OVER_NSS(nss);
-	*(uint16_t *)he_cap->tx_he_mcs_map_80_80 |=
-					HE_DISABLE_MCS_OVER_NSS(nss);
 
 	return QDF_STATUS_SUCCESS;
 }

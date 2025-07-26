@@ -11570,14 +11570,62 @@ int sme_update_eht_scs_traffic_desc_support(mac_handle_t mac_handle,
 #endif
 
 #ifdef WLAN_FEATURE_11AX
-void sme_update_tgt_he_cap(mac_handle_t mac_handle,
-			   struct wma_tgt_cfg *cfg,
-			   tDot11fIEhe_cap *he_cap_ini)
+static void sme_update_tgt_he_nss_cap(struct mac_context *mac_ctx,
+				      tDot11fIEhe_cap *he_cap,
+				      uint8_t max_tx_nss, uint8_t max_rx_nss)
+{
+	uint16_t tx_mcs_map, rx_mcs_map;
+	tDot11fIEhe_cap *he_ini_cap = &mac_ctx->mlme_cfg->he_caps.dot11_he_cap;
+
+	he_cap->rx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(max_rx_nss);
+	he_cap->tx_he_mcs_map_lt_80 |= HE_DISABLE_MCS_OVER_NSS(max_tx_nss);
+	he_cap->rx_he_mcs_map_lt_80 =
+		HE_INTERSECT_MCS(he_cap->rx_he_mcs_map_lt_80,
+				 he_ini_cap->rx_he_mcs_map_lt_80);
+	he_cap->tx_he_mcs_map_lt_80 =
+		HE_INTERSECT_MCS(he_cap->tx_he_mcs_map_lt_80,
+				 he_ini_cap->tx_he_mcs_map_lt_80);
+
+	rx_mcs_map = *(uint16_t *)he_cap->rx_he_mcs_map_160;
+	rx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(max_rx_nss);
+	rx_mcs_map =
+		HE_INTERSECT_MCS(rx_mcs_map,
+				 *(uint16_t *)he_ini_cap->rx_he_mcs_map_160);
+	*(uint16_t *)he_cap->rx_he_mcs_map_160 = rx_mcs_map;
+
+	tx_mcs_map = *(uint16_t *)he_cap->tx_he_mcs_map_160;
+	tx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(max_tx_nss);
+	tx_mcs_map =
+		HE_INTERSECT_MCS(tx_mcs_map,
+				 *(uint16_t *)he_ini_cap->tx_he_mcs_map_160);
+	*(uint16_t *)he_cap->tx_he_mcs_map_160 = tx_mcs_map;
+
+	rx_mcs_map = *(uint16_t *)he_cap->rx_he_mcs_map_80_80;
+	rx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(max_rx_nss);
+	rx_mcs_map =
+		HE_INTERSECT_MCS(rx_mcs_map,
+				 *(uint16_t *)he_ini_cap->rx_he_mcs_map_80_80);
+	*(uint16_t *)he_cap->rx_he_mcs_map_80_80 = rx_mcs_map;
+
+	tx_mcs_map = *(uint16_t *)he_cap->tx_he_mcs_map_80_80;
+	tx_mcs_map |= HE_DISABLE_MCS_OVER_NSS(max_tx_nss);
+	tx_mcs_map =
+		HE_INTERSECT_MCS(tx_mcs_map,
+				 *(uint16_t *)he_ini_cap->tx_he_mcs_map_80_80);
+	*(uint16_t *)he_cap->tx_he_mcs_map_80_80 = tx_mcs_map;
+}
+
+void sme_update_tgt_he_cap(mac_handle_t mac_handle, struct wma_tgt_cfg *cfg)
 {
 	uint8_t value;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-	uint8_t vht_enable_mimo =
-			mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo;
+
+	sme_update_tgt_he_nss_cap(mac_ctx, &cfg->he_cap_2g,
+				  cfg->max_tx_chains, cfg->max_rx_chains);
+	sme_update_tgt_he_nss_cap(mac_ctx, &cfg->he_cap_5g,
+				  cfg->max_tx_chains, cfg->max_rx_chains);
+	sme_update_tgt_he_nss_cap(mac_ctx, &cfg->he_cap,
+				  cfg->max_tx_chains, cfg->max_rx_chains);
 
 	qdf_mem_copy(&mac_ctx->he_cap_2g,
 		     &cfg->he_cap_2g,
@@ -11604,40 +11652,16 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 	}
 
 	/* modify HE Caps field according to INI setting */
+	value = mac_ctx->mlme_cfg->vht_caps.vht_cap_info.tx_bfee_ant_supp;
+
 	mac_ctx->he_cap_2g.bfee_sts_lt_80 =
-			QDF_MIN(cfg->he_cap_2g.bfee_sts_lt_80,
-				he_cap_ini->bfee_sts_lt_80);
+				QDF_MIN(cfg->he_cap_2g.bfee_sts_lt_80, value);
 	mac_ctx->he_cap_2g.bfee_sts_gt_80 = 0;
 
 	mac_ctx->he_cap_5g.bfee_sts_lt_80 =
-			QDF_MIN(cfg->he_cap_5g.bfee_sts_lt_80,
-				he_cap_ini->bfee_sts_lt_80);
+				QDF_MIN(cfg->he_cap_5g.bfee_sts_lt_80, value);
 	mac_ctx->he_cap_5g.bfee_sts_gt_80 =
-			QDF_MIN(cfg->he_cap_5g.bfee_sts_gt_80,
-				he_cap_ini->bfee_sts_gt_80);
-
-	mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 |=
-			HE_DISABLE_MCS_OVER_NSS(vht_enable_mimo + 1);
-	mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80 |=
-			HE_DISABLE_MCS_OVER_NSS(vht_enable_mimo + 1);
-	mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80 |=
-			HE_DISABLE_MCS_OVER_NSS(vht_enable_mimo + 1);
-	mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 |=
-			HE_DISABLE_MCS_OVER_NSS(vht_enable_mimo + 1);
-
-	mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(
-		mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80,
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80);
-	mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(
-		mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80,
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80);
-	mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(
-		mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80,
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80);
-	mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(
-		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80,
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80);
-
+				QDF_MIN(cfg->he_cap_5g.bfee_sts_gt_80, value);
 
 	value = QDF_MIN(mac_ctx->he_cap_2g.fragmentation,
 			mac_ctx->mlme_cfg->he_caps.he_dynamic_fragmentation);
@@ -11670,10 +11694,11 @@ void sme_update_he_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
 	uint32_t rx_mcs_map = 0;
 	uint8_t idx, mcs_map = 0;
 
-	if (!nss || (nss > 2)) {
+	if (!nss || (nss > WLAN_MAX_VDEV_NSS)) {
 		sme_err("invalid Nss value nss %d", nss);
 		return;
 	}
+
 	csr_session = CSR_GET_SESSION(mac_ctx, session_id);
 	if (!csr_session) {
 		sme_err("No session for id %d", session_id);
@@ -11730,10 +11755,15 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *csr_session;
 	uint16_t mcs_val = 0;
-	uint16_t mcs_map = HE_MCS_ALL_DISABLED;
-	uint16_t mcs_map_cfg;
-	uint8_t nss = 0, i;
-	uint16_t mcs_mask = 0x3;
+	uint16_t tx_mcs = HE_MCS_ALL_DISABLED, rx_mcs = HE_MCS_ALL_DISABLED;
+	uint16_t tx_mcsmap, rx_mcsmap;
+	uint8_t i;
+
+	if ((he_mcs & 0x3) == HE_MCS_DISABLE) {
+		sme_err("Invalid HE MCS 0x%0x, can't disable 0-7 for 1ss",
+			he_mcs);
+		return -EINVAL;
+	}
 
 	csr_session = CSR_GET_SESSION(mac_ctx, session_id);
 	if (!csr_session) {
@@ -11741,56 +11771,43 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 		return -EINVAL;
 	}
 
-	mcs_map_cfg =
-		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80;
-	for (nss = 0; nss < VHT_MAX_NSS; nss++) {
-		if ((mcs_map_cfg & mcs_mask) ==  mcs_mask)
-			break;
-		mcs_mask = (mcs_mask << 2);
-	}
-	if (nss > 2)
-		nss = 2;
-
-	if ((he_mcs & 0x3) == HE_MCS_DISABLE) {
-		sme_err("Invalid HE MCS 0x%0x, can't disable 0-7 for 1ss",
-			he_mcs);
-		return -EINVAL;
-	}
 	mcs_val = he_mcs & 0x3;
+	tx_mcsmap = mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80;
+	rx_mcsmap = mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80;
+	for (i = NSS_1x1_MODE; i <= WLAN_MAX_VDEV_NSS; i++) {
+		if (HE_MCS_IS_NSS_ENABLED(tx_mcsmap, i))
+			HE_SET_MCS_FOR_NSS(tx_mcs, mcs_val, i);
+		if (HE_MCS_IS_NSS_ENABLED(rx_mcsmap, i))
+			HE_SET_MCS_FOR_NSS(rx_mcs, mcs_val, i);
+	}
+
 	switch (he_mcs) {
 	case HE_80_MCS0_7:
 	case HE_80_MCS0_9:
 	case HE_80_MCS0_11:
-		for (i = 1; i <= nss; i++)
-			HE_SET_MCS_FOR_NSS(mcs_map, mcs_val, i);
-
-		sme_debug("HE 80 nss: %d, mcs: 0x%0X", nss, mcs_map);
-		if (cfg_in_range(CFG_HE_TX_MCS_MAP_LT_80, mcs_map))
+		sme_debug("HE 80 tx_mcs: 0x%0x rx_mcs: 0x%x", tx_mcs, rx_mcs);
+		if (cfg_in_range(CFG_HE_TX_MCS_MAP_LT_80, tx_mcs))
 			mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
-			tx_he_mcs_map_lt_80 = mcs_map;
-		if (cfg_in_range(CFG_HE_RX_MCS_MAP_LT_80, mcs_map))
+			tx_he_mcs_map_lt_80 = tx_mcs;
+		if (cfg_in_range(CFG_HE_RX_MCS_MAP_LT_80, rx_mcs))
 			mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
-			rx_he_mcs_map_lt_80 = mcs_map;
-		mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80 = mcs_map;
-		mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = mcs_map;
-		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 = mcs_map;
-		mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80 = mcs_map;
+			rx_he_mcs_map_lt_80 = rx_mcs;
+		mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80 = tx_mcs;
+		mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = rx_mcs;
+		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 = tx_mcs;
+		mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80 = rx_mcs;
 		break;
-
 	case HE_160_MCS0_7:
 	case HE_160_MCS0_9:
 	case HE_160_MCS0_11:
-		for (i = 1; i <= nss; i++)
-			HE_SET_MCS_FOR_NSS(mcs_map, mcs_val, i);
-
-		sme_debug("HE 160 nss: %d, mcs: 0x%0X", nss, mcs_map);
-		if (cfg_in_range(CFG_HE_TX_MCS_MAP_160, mcs_map))
+		sme_debug("HE 160 tx_mcs: 0x%0x rx_mcs: 0x%x", tx_mcs, rx_mcs);
+		if (cfg_in_range(CFG_HE_TX_MCS_MAP_160, tx_mcs))
 			qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
-				     tx_he_mcs_map_160, &mcs_map,
+				     tx_he_mcs_map_160, &tx_mcs,
 				     sizeof(uint16_t));
-		if (cfg_in_range(CFG_HE_RX_MCS_MAP_160, mcs_map))
+		if (cfg_in_range(CFG_HE_RX_MCS_MAP_160, rx_mcs))
 			qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
-				     rx_he_mcs_map_160, &mcs_map,
+				     rx_he_mcs_map_160, &rx_mcs,
 				     sizeof(uint16_t));
 		qdf_mem_copy(mac_ctx->he_cap_5g.tx_he_mcs_map_160,
 			     mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
@@ -11801,18 +11818,18 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 			     rx_he_mcs_map_160,
 			     sizeof(uint16_t));
 		break;
-
 	case HE_80p80_MCS0_7:
 	case HE_80p80_MCS0_9:
 	case HE_80p80_MCS0_11:
-		HE_SET_MCS_FOR_NSS(mcs_map, mcs_val, 1);
-		if (cfg_in_range(CFG_HE_TX_MCS_MAP_80_80, mcs_map))
+		sme_debug("HE 80+80 tx_mcs: 0x%0x rx_mcs: 0x%x",
+			  tx_mcs, rx_mcs);
+		if (cfg_in_range(CFG_HE_TX_MCS_MAP_80_80, tx_mcs))
 			qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
-				     tx_he_mcs_map_80_80, &mcs_map,
+				     tx_he_mcs_map_80_80, &tx_mcs,
 				     sizeof(uint16_t));
-		if (cfg_in_range(CFG_HE_RX_MCS_MAP_80_80, mcs_map))
+		if (cfg_in_range(CFG_HE_RX_MCS_MAP_80_80, rx_mcs))
 			qdf_mem_copy(mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
-				     rx_he_mcs_map_80_80, &mcs_map,
+				     rx_he_mcs_map_80_80, &rx_mcs,
 				     sizeof(uint16_t));
 		break;
 
@@ -11820,7 +11837,6 @@ int sme_update_he_mcs(mac_handle_t mac_handle, uint8_t session_id,
 		sme_err("Invalid HE MCS 0x%0x", he_mcs);
 		return -EINVAL;
 	}
-	sme_debug("new HE MCS 0x%0x", mcs_map);
 	sme_set_vdev_ies_per_band(mac_handle, session_id, QDF_STA_MODE);
 	csr_update_session_he_cap(mac_ctx, csr_session);
 

@@ -163,24 +163,25 @@ static void lim_extract_he_op(struct pe_session *session,
 	}
 }
 
-static bool lim_validate_he160_mcs_map(struct mac_context *mac_ctx,
-				       uint16_t peer_rx, uint16_t peer_tx,
-				       uint8_t nss)
+static bool lim_validate_he160_mcs_map(struct pe_session *session,
+				       uint16_t peer_rx_mcs,
+				       uint16_t peer_tx_mcs)
 {
 	uint16_t rx_he_mcs_map;
 	uint16_t tx_he_mcs_map;
 	uint16_t he_mcs_map;
+	struct mac_context *mac_ctx = session->mac_ctx;
 
 	he_mcs_map = *((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				tx_he_mcs_map_160);
-	rx_he_mcs_map = HE_INTERSECT_MCS(peer_rx, he_mcs_map);
+	tx_he_mcs_map = HE_INTERSECT_MCS(peer_rx_mcs, he_mcs_map);
 
 	he_mcs_map = *((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				rx_he_mcs_map_160);
-	tx_he_mcs_map = HE_INTERSECT_MCS(peer_tx, he_mcs_map);
+	rx_he_mcs_map = HE_INTERSECT_MCS(peer_tx_mcs, he_mcs_map);
 
-	rx_he_mcs_map |= HE_DISABLE_MCS_OVER_NSS(nss);
-	tx_he_mcs_map |= HE_DISABLE_MCS_OVER_NSS(nss);
+	rx_he_mcs_map |= HE_DISABLE_MCS_OVER_NSS(session->cap_rx_nss);
+	tx_he_mcs_map |= HE_DISABLE_MCS_OVER_NSS(session->cap_tx_nss);
 
 	return ((rx_he_mcs_map != HE_MCS_ALL_DISABLED) &&
 		(tx_he_mcs_map != HE_MCS_ALL_DISABLED));
@@ -189,7 +190,6 @@ static bool lim_validate_he160_mcs_map(struct mac_context *mac_ctx,
 static void lim_check_is_he_mcs_valid(struct pe_session *session,
 				      tDot11fBeaconIEs *bcn_ies)
 {
-	uint8_t i;
 	uint16_t mcs_map = HE_MCS_ALL_DISABLED;
 
 	if (!session->he_capable)
@@ -198,11 +198,10 @@ static void lim_check_is_he_mcs_valid(struct pe_session *session,
 	if (!bcn_ies->he_cap.present)
 		goto downgrade_11ac;
 
-	mcs_map = bcn_ies->he_cap.rx_he_mcs_map_lt_80;
-	for (i = 0; i < session->cap_tx_nss; i++) {
-		if (((mcs_map >> (i * 2)) & 0x3) != 0x3)
-			return;
-	}
+	mcs_map = bcn_ies->he_cap.rx_he_mcs_map_lt_80 |
+		  HE_DISABLE_MCS_OVER_NSS(session->cap_tx_nss);
+	if (mcs_map != HE_MCS_ALL_DISABLED)
+		return;
 
 downgrade_11ac:
 	session->he_capable = false;
@@ -232,10 +231,9 @@ void lim_update_he_bw_cap_mcs(struct pe_session *session,
 		if (!bcn_ies->he_cap.chan_width_2) {
 			is_80mhz = 1;
 		} else if (bcn_ies->he_cap.chan_width_2 &&
-			 !lim_validate_he160_mcs_map(session->mac_ctx,
+			   !lim_validate_he160_mcs_map(session,
 			   *((uint16_t *)bcn_ies->he_cap.rx_he_mcs_map_160),
-			   *((uint16_t *)bcn_ies->he_cap.tx_he_mcs_map_160),
-						     session->cap_tx_nss)) {
+			   *((uint16_t *)bcn_ies->he_cap.tx_he_mcs_map_160))) {
 			is_80mhz = 1;
 			if (session->ch_width == CH_WIDTH_160MHZ) {
 				pe_debug("HE160 Rx/Tx MCS is not valid, falling back to 80MHz");

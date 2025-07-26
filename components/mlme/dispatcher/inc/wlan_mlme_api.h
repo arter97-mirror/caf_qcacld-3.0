@@ -1320,7 +1320,6 @@ QDF_STATUS wlan_mlme_cfg_get_enable_ul_ofdm(struct wlan_objmgr_psoc *psoc,
  * mlme_update_tgt_he_caps_in_cfg() - Update tgt he cap in mlme component
  * @psoc: pointer to psoc object
  * @cfg: pointer to config params from target
- * @num_rf_chains: Num of RF chains supported
  *
  * This api to be used by callers to update
  * he caps in mlme.
@@ -1328,8 +1327,7 @@ QDF_STATUS wlan_mlme_cfg_get_enable_ul_ofdm(struct wlan_objmgr_psoc *psoc,
  * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
  */
 QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
-					  struct wma_tgt_cfg *cfg,
-					  uint8_t num_rf_chains);
+					  struct wma_tgt_cfg *cfg);
 #endif
 
 /**
@@ -5746,20 +5744,6 @@ wlan_mlme_get_fw_optimized_power_cap(struct wlan_objmgr_psoc *psoc, bool *cap);
  * Return: beacon interval
  */
 uint32_t wlan_mlme_get_beacon_interval(struct wlan_objmgr_vdev *vdev);
-
-/* wlan_mlme_get_min_he_mcs_map() - get intersected HE MCS MAP between 2 HE MCS MAP
- * @he_mcs_map1: HE MCS MAP 1
- * @he_mcs_map2: HE MCS MAP 2
- *
- * Rx HE-MCS Map and Tx HE-MCS Map subfields format where 2-bit indicates
- * 0 indicates support for HE-MCS 0-7 for n spatial streams
- * 1 indicates support for HE-MCS 0-9 for n spatial streams
- * 2 indicates support for HE-MCS 0-11 for n spatial streams
- * 3 indicates that n spatial streams is not supported for HE PPDUs
- *
- */
-uint16_t
-wlan_mlme_get_min_he_mcs_map(uint16_t he_mcs_map1, uint16_t he_mcs_map2);
 
 /**
  * wlan_mlme_get_sap_he_rx_mcs_map_160 - Get sap rx mcs map 160 of he cap

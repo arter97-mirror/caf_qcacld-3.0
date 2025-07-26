@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -66,20 +66,8 @@ qca_wlan_vendor_srp_param_policy[QCA_WLAN_VENDOR_ATTR_SR_PARAMS_MAX + 1] = {
 void hdd_update_tgt_he_cap(struct hdd_context *hdd_ctx,
 			   struct wma_tgt_cfg *cfg)
 {
-	QDF_STATUS status;
-	tDot11fIEhe_cap he_cap_ini = {0};
-	uint8_t value = 0;
-
-	status = ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(hdd_ctx->psoc,
-							&value);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("unable to get tx_bfee_ant_supp");
-
-	he_cap_ini.bfee_sts_lt_80 = value;
-	he_cap_ini.bfee_sts_gt_80 = value;
-	sme_update_tgt_he_cap(hdd_ctx->mac_handle, cfg, &he_cap_ini);
-
-	ucfg_mlme_update_tgt_he_cap(hdd_ctx->psoc, cfg, hdd_ctx->num_rf_chains);
+	sme_update_tgt_he_cap(hdd_ctx->mac_handle, cfg);
+	ucfg_mlme_update_tgt_he_cap(hdd_ctx->psoc, cfg);
 }
 
 void wlan_hdd_check_11ax_support(struct hdd_beacon_data *beacon,
