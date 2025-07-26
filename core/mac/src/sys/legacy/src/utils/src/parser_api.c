@@ -14580,6 +14580,9 @@ no_ext_mld_cap:
 			}
 		}
 
+		wlan_mlme_set_ht_mcsset_for_nss(mac_ctx->psoc, &ht_caps, NULL,
+						ml_link_info->cnx_tx_nss,
+						ml_link_info->cnx_rx_nss);
 		if ((ht_caps.present && frm->HTCaps.present &&
 		     qdf_mem_cmp(&ht_caps, &frm->HTCaps, sizeof(ht_caps))) ||
 		     (ht_caps.present && !frm->HTCaps.present)) {
@@ -14642,6 +14645,10 @@ no_ext_mld_cap:
 				vht_caps.shortGI160and80plus80MHz = 0;
 			}
 		}
+
+		lim_update_dot11f_vht_caps_for_nss(&vht_caps,
+						   ml_link_info->cnx_tx_nss,
+						   ml_link_info->cnx_rx_nss);
 		if ((vht_caps.present && frm->VHTCaps.present &&
 		     qdf_mem_cmp(&vht_caps, &frm->VHTCaps, sizeof(vht_caps))) ||
 		     (vht_caps.present && !frm->VHTCaps.present)) {
@@ -14674,6 +14681,9 @@ no_ext_mld_cap:
 		} else {
 			he_caps.ppet.ppe_threshold.num_ppe_th = 0;
 		}
+		wlan_mlme_set_he_mcsset_for_nss(mac_ctx->mlme_cfg, &he_caps,
+						ml_link_info->cnx_tx_nss,
+						ml_link_info->cnx_rx_nss);
 		if ((he_caps.present && frm->he_cap.present &&
 		     qdf_mem_cmp(&he_caps, &frm->he_cap, sizeof(he_caps))) ||
 		     (he_caps.present && !frm->he_cap.present)) {
@@ -14718,6 +14728,9 @@ no_ext_mld_cap:
 		if (!eht_caps.support_320mhz_6ghz || !eht_caps.su_beamformer)
 			eht_caps.num_sounding_dim_320mhz = 0;
 
+		wlan_mlme_set_eht_mcsset_for_nss(&eht_caps,
+						 ml_link_info->cnx_tx_nss,
+						 ml_link_info->cnx_rx_nss);
 		if ((eht_caps.present && frm->eht_cap.present &&
 		     qdf_mem_cmp(&eht_caps, &frm->eht_cap, sizeof(eht_caps))) ||
 		     (eht_caps.present && !frm->eht_cap.present) ||
