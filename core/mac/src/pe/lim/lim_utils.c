@@ -6117,6 +6117,13 @@ static void lim_update_ap_he_op(struct pe_session *session,
 						ch_params->center_freq_seg1;
 		session->he_op.oper_info_6g.info.ch_width =
 						ch_params->ch_width;
+	} else {
+		session->he_punc_chan_info.present = 1;
+		session->he_punc_chan_info.chan_width = ch_params->ch_width;
+		session->he_punc_chan_info.center_freq_seg0 =
+						ch_params->center_freq_seg0;
+		session->he_punc_chan_info.center_freq_seg1 =
+						ch_params->center_freq_seg1;
 	}
 }
 #else
