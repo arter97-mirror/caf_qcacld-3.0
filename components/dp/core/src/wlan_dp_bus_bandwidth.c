@@ -1536,6 +1536,20 @@ static inline void dp_set_tx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 	}
 }
 
+#ifdef IPA_OPT_WIFI_DP
+static inline
+bool dp_ipa_is_fw_wdi_activated(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return false;
+}
+#else
+static inline
+bool dp_ipa_is_fw_wdi_activated(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return ucfg_ipa_is_fw_wdi_activated(dp_ctx->psoc);
+}
+#endif
+
 /**
  * dp_pld_request_bus_bandwidth() - Function to control bus bandwidth
  * @dp_ctx: handle to DP context
@@ -1615,12 +1629,12 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	 * only when TPUT can reach VHT80 KPI and IPA is disabled,
 	 * for other cases, follow general voting logic
 	 */
-	if (!ucfg_ipa_is_fw_wdi_activated(dp_ctx->psoc) &&
+	if (!dp_ipa_is_fw_wdi_activated(dp_ctx) &&
 	    policy_mgr_is_current_hwmode_dbs(dp_ctx->psoc) &&
 	    (total_pkts > dp_ctx->dp_cfg.bus_bw_dbs_threshold) &&
 	    (tput_level < TPUT_LEVEL_SUPER_HIGH)) {
-		next_vote_level = PLD_BUS_WIDTH_ULTRA_HIGH;
-		tput_level = TPUT_LEVEL_ULTRA_HIGH;
+		next_vote_level = PLD_BUS_WIDTH_MAX;
+		tput_level = TPUT_LEVEL_SUPER_HIGH;
 	}
 
 	param.policy = BBM_TPUT_POLICY;
