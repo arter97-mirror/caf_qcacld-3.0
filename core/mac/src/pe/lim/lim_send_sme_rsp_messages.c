@@ -1808,7 +1808,9 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	enum QDF_OPMODE mode;
 	qdf_freq_t csa_freq = csa_params->csa_chan_freq, sec_ch_2g_freq = 0;
 	enum phy_ch_width new_ch_width = csa_params->new_ch_width;
-	enum channel_state chan_state;
+	enum channel_state chan_state = CHANNEL_STATE_ENABLE;
+	enum reg_6g_ap_type power_type;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!session_entry->vdev ||
 	    wlan_cm_is_vdev_disconnecting(session_entry->vdev) ||
@@ -1826,16 +1828,29 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 			sec_ch_2g_freq = csa_freq - HT40_SEC_OFFSET;
 	}
 
-	chan_state = wlan_reg_get_bonded_channel_state_for_pwrmode(
-						mac_ctx->pdev,
-						csa_freq, new_ch_width,
-						sec_ch_2g_freq,
-						REG_CURRENT_PWR_MODE);
+	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(csa_freq)) {
+		status = wlan_reg_get_best_6g_power_type(
+					mac_ctx->psoc, mac_ctx->pdev,
+					&power_type,
+					session_entry->best_6g_power_type,
+					csa_freq);
+		if (QDF_IS_STATUS_ERROR(status))
+			chan_state = CHANNEL_STATE_INVALID;
+	} else {
+		chan_state = wlan_reg_get_bonded_channel_state_for_pwrmode(
+							mac_ctx->pdev,
+							csa_freq, new_ch_width,
+							sec_ch_2g_freq,
+							REG_CURRENT_PWR_MODE);
+	}
+
 	if (chan_state == CHANNEL_STATE_INVALID ||
 	    chan_state == CHANNEL_STATE_DISABLE) {
-		pe_err("Invalid csa_freq %d ch_width %d ccfs0 %d ccfs1 %d sec_ch %d. Disconnect",
+		pe_err("Invalid csa_freq %d ch_width %d ccfs0 %d ccfs1 %d sec_ch %d pwr_type %d. Disconnect",
 		       csa_freq, new_ch_width, csa_params->new_ch_freq_seg1,
-		       csa_params->new_ch_freq_seg2, sec_ch_2g_freq);
+		       csa_params->new_ch_freq_seg2, sec_ch_2g_freq,
+		       session_entry->best_6g_power_type);
+
 		lim_tear_down_link_with_ap(mac_ctx,
 					   session_entry->peSessionId,
 					   REASON_CHANNEL_SWITCH_FAILED,
