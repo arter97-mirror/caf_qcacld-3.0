@@ -462,23 +462,6 @@ rel_ref:
 }
 #endif
 
-void lim_objmgr_update_vdev_nss(struct wlan_objmgr_psoc *psoc,
-				uint8_t vdev_id, uint8_t nss)
-{
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_LEGACY_MAC_ID);
-	if (!vdev) {
-		pe_err("vdev not found for id: %d", vdev_id);
-		return;
-	}
-	wlan_vdev_obj_lock(vdev);
-	wlan_vdev_mlme_set_nss(vdev, nss);
-	wlan_vdev_obj_unlock(vdev);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-}
-
 #ifdef WLAN_ADAPTIVE_11R
 /**
  * lim_extract_adaptive_11r_cap() - check if the AP has adaptive 11r

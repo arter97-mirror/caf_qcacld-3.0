@@ -209,7 +209,6 @@ struct peer_ml_info {
  * @nwType: NW Type
  * @maxTxPower: max tx power
  * @bcn_tx_nss: Tx NSS from beacon
- * @nss: Return the number of spatial streams supported
  * @self_cap_tx_nss: Intersected DUT Tx capability NSS to be used with this peer
  * @self_cap_rx_nss: Intersected DUT Rx capability NSS to be used with this peer
  * @self_op_tx_nss: Intersected DUT Tx operating NSS to be used with this peer.
@@ -272,7 +271,6 @@ typedef struct {
 	uint8_t p2pCapableSta;
 	uint8_t csaOffloadEnable;
 	uint8_t vhtCapable;
-	uint8_t vhtSupportedRxNss;
 	uint8_t vht_160mhz_nss;
 	uint8_t vht_80p80mhz_nss;
 	uint8_t vht_extended_nss_bw_cap;
@@ -296,7 +294,6 @@ typedef struct {
 	int8_t maxTxPower;
 	uint8_t nonRoamReassoc;
 	uint8_t bcn_tx_nss;
-	uint8_t nss;
 	uint8_t self_cap_tx_nss;
 	uint8_t self_cap_rx_nss;
 	uint8_t self_op_tx_nss;

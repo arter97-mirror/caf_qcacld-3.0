@@ -365,21 +365,6 @@ static inline void lim_free_tspec_ie(struct pe_session *pe_session)
 {}
 #endif
 
-static void lim_cm_fill_rsp_from_stads(struct mac_context *mac_ctx,
-				       struct pe_session *pe_session,
-				       struct cm_vdev_join_rsp *rsp)
-{
-	tpDphHashNode sta_ds;
-
-	sta_ds = dph_get_hash_entry(mac_ctx,
-				    DPH_STA_HASH_INDEX_PEER,
-				    &pe_session->dph.dphHashTable);
-	if (!sta_ds)
-		return;
-
-	rsp->nss = sta_ds->nss;
-}
-
 static QDF_STATUS
 lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 					struct pe_session *pe_session,
@@ -466,7 +451,6 @@ lim_cm_prepare_join_rsp_from_pe_session(struct mac_context *mac_ctx,
 		lim_copy_tspec_ie(pe_session, rsp);
 
 		lim_send_smps_intolerent(mac_ctx, pe_session, bcn_len, bcn_ptr);
-		lim_cm_fill_rsp_from_stads(mac_ctx, pe_session, rsp);
 		rsp->uapsd_mask = pe_session->gUapsdPerAcBitmask;
 
 		mlo_mgr_update_link_status_code(pe_session->vdev,

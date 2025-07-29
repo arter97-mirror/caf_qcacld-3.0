@@ -6162,11 +6162,12 @@ QDF_STATUS wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint8_t *tx_nss)
 {
-	uint8_t proto_generic_nss;
 	bool dynamic_nss_chains_support;
 	struct wlan_mlme_nss_chains *dynamic_cfg;
 	enum band_info operating_band;
 	QDF_STATUS status;
+	uint8_t conn_cap_tx_nss, conn_cap_rx_nss;
+	uint8_t conn_op_tx_nss, conn_op_rx_nss;
 
 	status = wlan_mlme_cfg_get_dynamic_nss_chains_support
 					(psoc, &dynamic_nss_chains_support);
@@ -6175,7 +6176,17 @@ QDF_STATUS wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	proto_generic_nss = wlan_vdev_mlme_get_nss(vdev);
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &conn_cap_tx_nss,
+						   &conn_cap_rx_nss,
+						   &conn_op_tx_nss,
+						   &conn_op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_debug("Get NSS failed for %d with %d",
+			   wlan_vdev_get_id(vdev), status);
+		return status;
+	}
+
 	if (dynamic_nss_chains_support) {
 		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
 		if (!dynamic_cfg) {
@@ -6196,10 +6207,10 @@ QDF_STATUS wlan_mlme_get_sta_tx_nss(struct wlan_objmgr_psoc *psoc,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		if (*tx_nss > proto_generic_nss)
-			*tx_nss = proto_generic_nss;
+		if (*tx_nss > conn_cap_tx_nss)
+			*tx_nss = conn_cap_tx_nss;
 	} else {
-		*tx_nss = proto_generic_nss;
+		*tx_nss = conn_cap_tx_nss;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -6438,11 +6449,12 @@ QDF_STATUS wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint8_t *rx_nss)
 {
-	uint8_t proto_generic_nss;
 	bool dynamic_nss_chains_support;
 	struct wlan_mlme_nss_chains *dynamic_cfg;
 	enum band_info operating_band;
 	QDF_STATUS status;
+	uint8_t conn_cap_tx_nss, conn_cap_rx_nss;
+	uint8_t conn_op_tx_nss, conn_op_rx_nss;
 
 	status = wlan_mlme_cfg_get_dynamic_nss_chains_support
 					(psoc, &dynamic_nss_chains_support);
@@ -6451,7 +6463,17 @@ QDF_STATUS wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	proto_generic_nss = wlan_vdev_mlme_get_nss(vdev);
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &conn_cap_tx_nss,
+						   &conn_cap_rx_nss,
+						   &conn_op_tx_nss,
+						   &conn_op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_debug("Get NSS failed for %d with %d",
+			   wlan_vdev_get_id(vdev), status);
+		return status;
+	}
+
 	if (dynamic_nss_chains_support) {
 		dynamic_cfg = mlme_get_dynamic_vdev_config(vdev);
 		if (!dynamic_cfg) {
@@ -6472,10 +6494,10 @@ QDF_STATUS wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		if (*rx_nss > proto_generic_nss)
-			*rx_nss = proto_generic_nss;
+		if (*rx_nss > conn_cap_rx_nss)
+			*rx_nss = conn_cap_rx_nss;
 	} else {
-		*rx_nss = proto_generic_nss;
+		*rx_nss = conn_cap_rx_nss;
 	}
 
 	return QDF_STATUS_SUCCESS;

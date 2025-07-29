@@ -1583,6 +1583,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		nss_ies.op_rx_nss = QDF_MIN(nss_ies.op_rx_nss, cap_ap_rx_nss);
 	}
 
+	wlan_mlme_set_ap_nss(session_entry->vdev, nss_ies.cap_rx_nss);
 	pe_debug("AP supported NSS = %dx%d, OP %dx%d",
 		 nss_ies.cap_tx_nss, nss_ies.cap_rx_nss,
 		 nss_ies.op_tx_nss, nss_ies.op_rx_nss);

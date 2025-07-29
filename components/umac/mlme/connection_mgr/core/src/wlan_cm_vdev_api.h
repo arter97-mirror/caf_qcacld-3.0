@@ -131,7 +131,6 @@ struct cm_vdev_hw_mode_rsp {
  * @connect_rsp: Connect response to be sent to CM
  * @ric_resp_ie: ric ie data
  * @tspec_ie: tspec ie
- * @nss: used nss
  * @uapsd_mask: uapsd mask
  */
 struct cm_vdev_join_rsp {
@@ -141,7 +140,6 @@ struct cm_vdev_join_rsp {
 #ifdef FEATURE_WLAN_ESE
 	struct element_info tspec_ie;
 #endif
-	uint8_t nss;
 	uint8_t uapsd_mask;
 };
 

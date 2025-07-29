@@ -1513,57 +1513,6 @@ static void wma_populate_peer_mlo_cap(struct peer_assoc_params *peer,
 }
 #endif
 
-void wma_objmgr_set_peer_mlme_nss(tp_wma_handle wma, uint8_t *mac_addr,
-				  uint8_t nss)
-{
-	uint8_t pdev_id;
-	struct wlan_objmgr_peer *peer;
-	struct peer_mlme_priv_obj *peer_priv;
-	struct wlan_objmgr_psoc *psoc = wma->psoc;
-
-	pdev_id = wlan_objmgr_pdev_get_pdev_id(wma->pdev);
-	peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
-				    WLAN_LEGACY_WMA_ID);
-	if (!peer)
-		return;
-
-	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
-							  WLAN_UMAC_COMP_MLME);
-	if (!peer_priv) {
-		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
-		return;
-	}
-
-	peer_priv->nss = nss;
-	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
-}
-
-uint8_t wma_objmgr_get_peer_mlme_nss(tp_wma_handle wma, uint8_t *mac_addr)
-{
-	uint8_t pdev_id;
-	struct wlan_objmgr_peer *peer;
-	struct peer_mlme_priv_obj *peer_priv;
-	struct wlan_objmgr_psoc *psoc = wma->psoc;
-	uint8_t nss;
-
-	pdev_id = wlan_objmgr_pdev_get_pdev_id(wma->pdev);
-	peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
-				    WLAN_LEGACY_WMA_ID);
-	if (!peer)
-		return 0;
-
-	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
-							  WLAN_UMAC_COMP_MLME);
-	if (!peer_priv) {
-		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
-		return 0;
-	}
-
-	nss = peer_priv->nss;
-	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
-	return nss;
-}
-
 void wma_objmgr_set_peer_mlme_phymode(tp_wma_handle wma, uint8_t *mac_addr,
 				      enum wlan_phymode phymode)
 {
@@ -2055,10 +2004,6 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	wma_populate_peer_eht_cap(cmd, params);
 	wma_populate_peer_puncture(cmd, des_chan);
 	wma_populate_peer_mlo_cap(cmd, params);
-
-	if (!wma_is_vdev_in_ap_mode(wma, params->smesessionId))
-		intr->nss = cmd->peer_op_dl_nss;
-	wma_objmgr_set_peer_mlme_nss(wma, cmd->peer_mac, cmd->peer_op_dl_nss);
 
 	/* Till conversion is not done in WMI we need to fill fw phy mode */
 	cmd->peer_phymode = wmi_host_to_fw_phymode(phymode);
@@ -3612,8 +3557,6 @@ void wma_process_update_rx_nss(tp_wma_handle wma_handle,
 			       tUpdateRxNss *update_rx_nss)
 {
 	struct target_psoc_info *tgt_hdl;
-	struct wma_txrx_node *intr =
-		&wma_handle->interfaces[update_rx_nss->smesessionId];
 	int rx_nss = update_rx_nss->rxNss;
 	int num_rf_chains;
 
@@ -3627,7 +3570,6 @@ void wma_process_update_rx_nss(tp_wma_handle wma_handle,
 	if (rx_nss > num_rf_chains || rx_nss > WMA_MAX_NSS)
 		rx_nss = QDF_MIN(num_rf_chains, WMA_MAX_NSS);
 
-	intr->nss = (uint8_t)rx_nss;
 	update_rx_nss->rxNss = (uint32_t)rx_nss;
 
 	wma_debug("Rx Nss = %d", update_rx_nss->rxNss);

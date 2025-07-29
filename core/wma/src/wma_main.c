@@ -2375,9 +2375,7 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 			"vdev_up %d\n"
 			"aid %d\n"
 			"rate_flags %d\n"
-			"nss %d\n"
-			"nwType %d\n"
-			"tx_streams %d",
+			"nwType %d\n",
 			vdev_id,
 			stats.pno_match_wake_up_count,
 			stats.pno_complete_wake_up_count,
@@ -2402,9 +2400,7 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 			wma_is_vdev_up(vdev_id),
 			iface->aid,
 			rate_flag,
-			iface->nss,
-			iface->nwType,
-			iface->tx_streams);
+			iface->nwType);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 	}
 

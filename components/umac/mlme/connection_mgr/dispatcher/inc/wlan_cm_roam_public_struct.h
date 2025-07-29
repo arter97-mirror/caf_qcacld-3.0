@@ -3153,7 +3153,6 @@ struct roam_offload_synch_ind {
 	uint16_t aid;
 	bool hw_mode_trans_present;
 	struct cm_hw_mode_trans_ind hw_mode_trans_ind;
-	uint8_t nss;
 	struct qdf_mac_addr dst_mac;
 	struct qdf_mac_addr src_mac;
 	uint16_t hlp_data_len;

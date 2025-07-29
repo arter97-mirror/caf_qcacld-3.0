@@ -561,13 +561,16 @@ static int copy_station_stats_to_adapter(struct wlan_hdd_link_info *link_info,
 					 struct stats_event *stats)
 {
 	int ret = 0;
+	QDF_STATUS status;
 	struct wlan_mlme_nss_chains *dynamic_cfg;
-	uint32_t tx_nss, rx_nss;
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t he_mcs_12_13_map;
 	bool is_he_mcs_12_13_supported;
 	struct hdd_stats *hdd_stats;
 	struct hdd_adapter *adapter = link_info->adapter;
+	uint8_t tx_nss, rx_nss;
+	uint8_t conn_cap_tx_nss, conn_cap_rx_nss;
+	uint8_t conn_op_tx_nss, conn_op_rx_nss;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
 	if (!vdev)
@@ -630,23 +633,40 @@ static int copy_station_stats_to_adapter(struct wlan_hdd_link_info *link_info,
 		goto out;
 	}
 
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &conn_cap_tx_nss,
+						   &conn_cap_rx_nss,
+						   &conn_op_tx_nss,
+						   &conn_op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("Get NSS failed for %d with %d",
+			  link_info->vdev_id, status);
+		ret = qdf_status_to_os_return(status);
+		goto out;
+	}
+
 	switch (hdd_conn_get_connected_band(link_info)) {
 	case BAND_2G:
 		tx_nss = dynamic_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ];
 		rx_nss = dynamic_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ];
+		if (tx_nss > conn_cap_tx_nss)
+			tx_nss = conn_cap_tx_nss;
+		if (rx_nss > conn_cap_rx_nss)
+			rx_nss = conn_cap_rx_nss;
 		break;
 	case BAND_5G:
 		tx_nss = dynamic_cfg->tx_nss[NSS_CHAINS_BAND_5GHZ];
 		rx_nss = dynamic_cfg->rx_nss[NSS_CHAINS_BAND_5GHZ];
+		if (tx_nss > conn_cap_tx_nss)
+			tx_nss = conn_cap_tx_nss;
+		if (rx_nss > conn_cap_rx_nss)
+			rx_nss = conn_cap_rx_nss;
 		break;
 	default:
-		tx_nss = wlan_vdev_mlme_get_nss(vdev);
-		rx_nss = wlan_vdev_mlme_get_nss(vdev);
+		tx_nss = conn_cap_tx_nss;
+		rx_nss = conn_cap_rx_nss;
+		break;
 	}
-
-	/* Intersection of self and AP's NSS capability */
-	if (rx_nss > wlan_vdev_mlme_get_nss(vdev))
-		rx_nss = wlan_vdev_mlme_get_nss(vdev);
 
 	/* save class a stats to legacy location */
 	hdd_stats->class_a_stat.rx_nss = rx_nss;
@@ -675,8 +695,6 @@ static int copy_station_stats_to_adapter(struct wlan_hdd_link_info *link_info,
 	    hdd_stats->class_a_stat.is_tx_rate_version_checked)
 		goto out;
 
-	if (tx_nss > wlan_vdev_mlme_get_nss(vdev))
-		tx_nss = wlan_vdev_mlme_get_nss(vdev);
 	hdd_stats->class_a_stat.tx_nss = tx_nss;
 	hdd_stats->class_a_stat.tx_rate = stats->tx_rate;
 	hdd_stats->class_a_stat.tx_mcs_index =
@@ -7812,13 +7830,16 @@ static void wlan_hdd_fill_os_rate_info(enum tx_rate_info rate_flags,
 
 void hdd_get_max_tx_bitrate(struct wlan_hdd_link_info *link_info)
 {
+	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = link_info->adapter->hdd_ctx;
 	struct station_info sinfo;
 	enum tx_rate_info tx_rate_flags;
-	uint8_t tx_mcs_index, tx_nss = 1;
+	uint8_t tx_mcs_index;
 	uint16_t my_tx_rate;
 	struct hdd_station_ctx *hdd_sta_ctx;
 	struct wlan_objmgr_vdev *vdev;
+	uint8_t cap_tx_nss = NSS_1x1_MODE, cap_rx_nss = NSS_1x1_MODE;
+	uint8_t op_tx_nss, op_rx_nss;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 
@@ -7838,12 +7859,19 @@ void hdd_get_max_tx_bitrate(struct wlan_hdd_link_info *link_info)
 			 * NSS from FW is not reliable as it changes
 			 * as per the environment quality.
 			 */
-			tx_nss = wlan_vdev_mlme_get_nss(vdev);
+			status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+								   &cap_tx_nss,
+								   &cap_rx_nss,
+								   &op_tx_nss,
+								   &op_rx_nss);
+			if (QDF_IS_STATUS_ERROR(status))
+				hdd_debug("Get NSS failed for %d with %d",
+					  link_info->vdev_id, status);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 		} else {
-			tx_nss = link_info->hdd_stats.class_a_stat.tx_nss;
+			cap_tx_nss = link_info->hdd_stats.class_a_stat.tx_nss;
 		}
-		hdd_check_and_update_nss(hdd_ctx, &tx_nss, NULL);
+		hdd_check_and_update_nss(hdd_ctx, &cap_tx_nss, NULL);
 
 		if (tx_mcs_index == INVALID_MCS_IDX)
 			tx_mcs_index = 0;
@@ -7851,7 +7879,7 @@ void hdd_get_max_tx_bitrate(struct wlan_hdd_link_info *link_info)
 
 	if (hdd_report_max_rate(link_info, hdd_ctx->mac_handle, &sinfo.txrate,
 				sinfo.signal, tx_rate_flags, tx_mcs_index,
-				my_tx_rate, tx_nss)) {
+				my_tx_rate, cap_tx_nss)) {
 		hdd_sta_ctx->cache_conn_info.max_tx_bitrate = sinfo.txrate;
 		hdd_debug("Reporting max tx rate flags %d mcs %d nss %d bw %d",
 			  sinfo.txrate.flags, sinfo.txrate.mcs,
@@ -8549,16 +8577,27 @@ static int wlan_hdd_update_rate_info(struct wlan_hdd_link_info *link_info,
 	if (sinfo->signal == WLAN_INVALID_RSSI_VALUE) {
 		hdd_debug("don't fill tx rx rate for inactive link");
 	} else if (!ucfg_mlme_stats_is_link_speed_report_actual(hdd_ctx->psoc)) {
+		QDF_STATUS status;
 		bool tx_rate_calc, rx_rate_calc;
 		uint8_t tx_nss_max, rx_nss_max;
+		uint8_t op_tx_nss_max, op_rx_nss_max;
 
 		/*
 		 * Take static NSS for reporting max rates. NSS from the FW
 		 * is not reliable as it changes as per the environment
 		 * quality.
 		 */
-		tx_nss_max = wlan_vdev_mlme_get_nss(vdev);
-		rx_nss_max = wlan_vdev_mlme_get_nss(vdev);
+		status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+							   &tx_nss_max,
+							   &rx_nss_max,
+							   &op_tx_nss_max,
+							   &op_rx_nss_max);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+			hdd_debug("Get NSS failed for %d with %d",
+				  link_info->vdev_id, status);
+			return qdf_status_to_os_return(status);
+		}
 
 		hdd_check_and_update_nss(hdd_ctx, &tx_nss_max, &rx_nss_max);
 

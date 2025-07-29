@@ -673,8 +673,6 @@ struct punc_chan_info {
  * @country_info_present: flag to indicate country code in beacon
  * @add_bss_failed:
  * @obss_ht40_scanparam: OBSS Scan IE Parameters
- * @vdev_nss:
- * @nss:
  * @cap_tx_nss: Session's Tx NSS capability, will be intersected NSS for
  * STA/P2P-CLI mode and will be current operating Tx NSS for SAP/P2P-GO.
  * @cap_rx_nss: Session's Rx NSS capability, will be intersected NSS for
@@ -999,8 +997,6 @@ struct pe_session {
 	uint8_t country_info_present;
 	bool add_bss_failed;
 	struct obss_scanparam obss_ht40_scanparam;
-	uint8_t vdev_nss;
-	uint8_t nss;
 	uint8_t cap_tx_nss;
 	uint8_t cap_rx_nss;
 	bool nss_forced_1x1;

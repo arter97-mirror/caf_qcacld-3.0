@@ -3374,8 +3374,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 						roam_sync_ind_ptr);
 	roam_sync_ind_ptr->aid = ft_session_ptr->limAID;
 	curr_sta_ds->mlmStaContext.mlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
-	curr_sta_ds->nss = ft_session_ptr->cap_tx_nss;
-	roam_sync_ind_ptr->nss = ft_session_ptr->cap_tx_nss;
 	ft_session_ptr->limMlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
 	ft_session_ptr->limPrevMlmState = ft_session_ptr->limMlmState;
 	lim_init_tdls_data(mac_ctx, ft_session_ptr);

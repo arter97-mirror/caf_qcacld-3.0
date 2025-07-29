@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -93,7 +93,6 @@ QDF_STATUS wma_add_sta_ndi_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 		  QDF_MAC_ADDR_REF(add_sta->staMac), state);
 	cdp_peer_state_update(soc, add_sta->staMac, state);
 
-	add_sta->nss    = iface->nss;
 	add_sta->status = QDF_STATUS_SUCCESS;
 send_rsp:
 	status = add_sta->status;

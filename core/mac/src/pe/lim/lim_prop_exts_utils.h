@@ -76,17 +76,6 @@ void lim_extract_eht_op(struct pe_session *session, tDot11fBeaconIEs *bcn_ies)
 ePhyChanBondState lim_get_htcb_state(ePhyChanBondState aniCBMode);
 
 /**
- * lim_objmgr_update_vdev_nss() - update nss in vdev object
- * @psoc: Pointer to Global MAC structure
- * @vdev_id: vdev id
- * @nss: nss
- *
- * Return: None
- */
-void lim_objmgr_update_vdev_nss(struct wlan_objmgr_psoc *psoc,
-				uint8_t vdev_id, uint8_t nss);
-
-/**
  * lim_update_he_mcs_12_13_map() - update he_mcs_12_13_map in vdev object
  * @psoc: Pointer to Global MAC structure
  * @vdev_id: vdev id

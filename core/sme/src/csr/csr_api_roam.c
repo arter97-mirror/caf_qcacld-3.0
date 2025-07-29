@@ -5756,7 +5756,7 @@ QDF_STATUS cm_csr_connect_rsp(struct wlan_objmgr_vdev *vdev,
 		wlan_cm_roam_cfg_set_value(mac_ctx->psoc, vdev_id, UAPSD_MASK,
 					   &src_config);
 	}
-	session->nss = rsp->nss;
+
 	csr_fill_connected_info(mac_ctx, session, rsp);
 	csr_fill_connected_profile(mac_ctx, session, vdev, rsp);
 

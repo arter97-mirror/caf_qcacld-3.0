@@ -3923,7 +3923,6 @@ QDF_STATUS wma_ndi_update_connection_info(uint8_t vdev_id,
 
 	wma_iface_entry->chan_width = ndp_chan_info->ch_width;
 	wma_iface_entry->ch_freq = ndp_chan_info->freq;
-	wma_iface_entry->nss = ndp_chan_info->nss;
 	wlan_mlme_set_vdev_mac_id(wma->pdev, vdev_id, ndp_chan_info->mac_id);
 
 	return QDF_STATUS_SUCCESS;
@@ -4000,12 +3999,6 @@ void wma_update_intf_hw_mode_params(uint32_t vdev_id, uint32_t mac_id,
 		return;
 	}
 	wlan_mlme_set_vdev_mac_id(wma->pdev, vdev_id, mac_id);
-	if (mac_id == 0)
-		wma->interfaces[vdev_id].tx_streams =
-			hw_mode.mac0_tx_ss;
-	else
-		wma->interfaces[vdev_id].tx_streams =
-			hw_mode.mac1_tx_ss;
 }
 
 /**

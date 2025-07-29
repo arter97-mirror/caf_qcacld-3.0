@@ -1417,9 +1417,6 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	if (rsp->status == QDF_STATUS_SUCCESS) {
-		wma->interfaces[rsp->vdev_id].tx_streams =
-			rsp->cfgd_tx_streams;
-
 		if (wlan_res_cfg->use_pdev_id) {
 			if (rsp->mac_id == OL_TXRX_PDEV_ID) {
 				wma_err("soc level id received for mac id");
@@ -5537,7 +5534,6 @@ static void wma_add_sta_req_ap_mode(tp_wma_handle wma, tpAddStaParams add_sta)
 		  QDF_MAC_ADDR_REF(add_sta->staMac), state);
 	cdp_peer_state_update(soc, add_sta->staMac, state);
 
-	add_sta->nss    = wma_objmgr_get_peer_mlme_nss(wma, add_sta->staMac);
 	add_sta->status = QDF_STATUS_SUCCESS;
 send_rsp:
 	/* Do not send add stat resp when peer assoc cnf is enabled */
@@ -6025,7 +6021,6 @@ rel_ref:
 	} else {
 		wma_debug("listen interval offload is not set");
 	}
-	params->nss = iface->nss;
 out:
 	iface->aid = params->assocId;
 

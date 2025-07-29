@@ -703,7 +703,6 @@ struct wma_invalid_peer_params {
  * @peer_count: peer count
  * @plink_status_req: link status request
  * @psnr_req: snr request
- * @tx_streams: number of tx streams can be used by the vdev
  * @mac_id: the mac on which vdev is on
  * @arp_offload_req: cached arp offload request
  * @ns_offload_req: cached ns offload request
@@ -748,7 +747,6 @@ struct wma_txrx_node {
 #ifdef FEATURE_WLAN_EXTSCAN
 	bool extscan_in_progress;
 #endif
-	uint32_t tx_streams;
 	int32_t roam_synch_delay;
 	struct sme_rcpi_req *rcpi_req;
 	bool in_bmps;

@@ -1088,12 +1088,15 @@ hdd_populate_vdev_nss(struct wlan_mlme_nss_chains *user_cfg,
 static QDF_STATUS hdd_set_nss_params(struct wlan_hdd_link_info *link_info,
 				     uint8_t tx_nss, uint8_t rx_nss)
 {
+	QDF_STATUS status;
 	enum nss_chains_band_info band;
 	struct wlan_mlme_nss_chains user_cfg;
 	mac_handle_t mac_handle;
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_vdev *vdev;
+	uint8_t conn_cap_tx_nss, conn_cap_rx_nss;
+	uint8_t conn_op_tx_nss, conn_op_rx_nss;
 
 	qdf_mem_zero(&user_cfg, sizeof(user_cfg));
 
@@ -1111,18 +1114,29 @@ static QDF_STATUS hdd_set_nss_params(struct wlan_hdd_link_info *link_info,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &conn_cap_tx_nss,
+						   &conn_cap_rx_nss,
+						   &conn_op_tx_nss,
+						   &conn_op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
+		hdd_debug("Get NSS failed for %d with %d",
+			  link_info->vdev_id, status);
+		return status;
+	}
+
 	/* For STA tx/rx nss value is updated at the time of connection,
 	 * for SAP case nss values will not get update, so can skip check
 	 * for SAP/P2P_GO mode.
 	 */
 	if (adapter->device_mode != QDF_SAP_MODE &&
 	    adapter->device_mode != QDF_P2P_GO_MODE &&
-	    (tx_nss > wlan_vdev_mlme_get_nss(vdev) ||
-	    rx_nss > wlan_vdev_mlme_get_nss(vdev))) {
-		hdd_err("Given tx nss/rx nss is greater than intersected nss = %d",
-			wlan_vdev_mlme_get_nss(vdev));
+	    (tx_nss > conn_cap_tx_nss || rx_nss > conn_cap_rx_nss)) {
+		hdd_err("User Tx/Rx NSS %dx%d not within conn Tx/Rx NSS %dx%d",
+			tx_nss, rx_nss, conn_cap_tx_nss, conn_cap_rx_nss);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
-		return QDF_STATUS_E_FAILURE;
+		return QDF_STATUS_E_RANGE;
 	}
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_HDD_ID_OBJ_MGR);
 

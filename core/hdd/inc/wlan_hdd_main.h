@@ -4886,7 +4886,6 @@ static inline void hdd_send_peer_status_ind_to_app(
 	ch_info.info = chan_info->info;
 	ch_info.reg_info_1 = chan_info->reg_info_1;
 	ch_info.reg_info_2 = chan_info->reg_info_2;
-	ch_info.nss = chan_info->nss;
 	ch_info.rate_flags = chan_info->rate_flags;
 	ch_info.sec_ch_offset = chan_info->sec_ch_offset;
 	ch_info.ch_width = chan_info->ch_width;

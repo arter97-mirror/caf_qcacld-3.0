@@ -814,7 +814,6 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 	rsp->connect_rsp.is_reassoc = true;
 	rsp->connect_rsp.connect_status = QDF_STATUS_SUCCESS;
 	rsp->connect_rsp.cm_id = cm_id;
-	rsp->nss = roam_synch_data->nss;
 
 	if (roam_synch_data->ric_data_len) {
 		rsp->ric_resp_ie.len = roam_synch_data->ric_data_len;

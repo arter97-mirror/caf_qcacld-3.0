@@ -3900,7 +3900,7 @@ bool lim_fill_lim_assoc_ind_params(
 		(session_entry->maxTxPower << 16);
 	assoc_ind->chan_info.reg_info_2 =
 		(session_entry->maxTxPower << 8);
-	assoc_ind->chan_info.nss = sta_ds->nss;
+	assoc_ind->chan_info.nss = sta_ds->op_tx_nss;
 	assoc_ind->chan_info.rate_flags =
 		lim_get_max_rate_flags(mac_ctx, sta_ds);
 	assoc_ind->ampdu = false;

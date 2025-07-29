@@ -10944,6 +10944,8 @@ static int hdd_set_tx_rx_nss_per_band(struct wlan_hdd_link_info *link_info,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
+	uint8_t conn_cap_tx_nss, conn_cap_rx_nss;
+	uint8_t conn_op_tx_nss, conn_op_rx_nss;
 
 	if (wlan_hdd_validate_context(hdd_ctx)) {
 		hdd_err("Invalid hdd_ctx");
@@ -10978,18 +10980,28 @@ static int hdd_set_tx_rx_nss_per_band(struct wlan_hdd_link_info *link_info,
 		return -EINVAL;
 	}
 
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &conn_cap_tx_nss,
+						   &conn_cap_rx_nss,
+						   &conn_op_tx_nss,
+						   &conn_op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		hdd_debug("Get NSS failed for %d with %d",
+			  link_info->vdev_id, status);
+		return status;
+	}
+
 	/* For STA tx/rx nss value is updated at the time of connection,
 	 * for SAP case nss values will not get update, so can skip check
 	 * for SAP/P2P_GO mode.
 	 */
 	if (link_info->adapter->device_mode != QDF_SAP_MODE &&
 	    link_info->adapter->device_mode != QDF_P2P_GO_MODE &&
-	    (tx_nss_2g > wlan_vdev_mlme_get_nss(vdev) ||
-	    rx_nss_2g > wlan_vdev_mlme_get_nss(vdev) ||
-	    tx_nss_5g > wlan_vdev_mlme_get_nss(vdev) ||
-	    rx_nss_5g > wlan_vdev_mlme_get_nss(vdev))) {
+	    (tx_nss_2g > conn_cap_tx_nss || rx_nss_2g > conn_cap_rx_nss ||
+	     tx_nss_5g > conn_cap_tx_nss || rx_nss_5g > conn_cap_rx_nss)) {
 		hdd_err("Given tx nss/rx nss is greater than intersected nss = %d",
-			wlan_vdev_mlme_get_nss(vdev));
+			conn_cap_tx_nss);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return -EINVAL;
 	}

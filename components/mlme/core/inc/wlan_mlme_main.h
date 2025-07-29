@@ -208,7 +208,6 @@ struct sae_auth_retry {
  * @twt_ctx: TWT context
  * @disallow_kickout: False if the peer can be kicked out. Peer can't be kicked
  *                 out if it is being steered
- * @nss: Peer NSS
  * @assoc_rsp: assoc rsp IE received during connection
  * @peer_ind_bw: peer indication channel bandwidth
  */
@@ -225,7 +224,6 @@ struct peer_mlme_priv_obj {
 #ifdef WLAN_FEATURE_SON
 	bool disallow_kickout;
 #endif
-	uint8_t nss;
 	struct element_info assoc_rsp;
 	enum phy_ch_width peer_ind_bw;
 };

@@ -1589,11 +1589,10 @@ void lim_process_sta_mlm_add_sta_rsp(struct mac_context *mac_ctx,
 		sta_ds =
 			dph_get_hash_entry(mac_ctx, DPH_STA_HASH_INDEX_PEER,
 				&session_entry->dph.dphHashTable);
-		if (sta_ds) {
+		if (sta_ds)
 			sta_ds->mlmStaContext.mlmState =
 				eLIM_MLM_LINK_ESTABLISHED_STATE;
-			sta_ds->nss = add_sta_params->nss;
-		} else
+		else
 			pe_warn("Fail to get DPH Hash Entry for AID - %d",
 				DPH_STA_HASH_INDEX_PEER);
 		session_entry->limMlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
@@ -2058,7 +2057,7 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 		add_sta_rsp_status = false;
 		goto end;
 	}
-	sta->nss = pAddStaParams->nss;
+
 	/* if the AssocRsp frame is not acknowledged, then keep alive timer will take care of the state */
 	sta->valid = 1;
 	sta->mlmStaContext.mlmState = eLIM_MLM_WT_ASSOC_CNF_STATE;

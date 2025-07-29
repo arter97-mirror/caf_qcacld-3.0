@@ -708,7 +708,6 @@ wma_roam_update_vdev(tp_wma_handle wma,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	vdev_id = roamed_vdev_id;
-	wma->interfaces[vdev_id].nss = roam_synch_ind_ptr->nss;
 
 	/* update channel width */
 	wma->interfaces[vdev_id].chan_width = roam_synch_ind_ptr->chan_width;

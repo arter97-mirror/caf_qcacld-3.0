@@ -128,7 +128,6 @@ typedef struct sDphHashNode {
 
 	uint8_t vhtSupportedChannelWidthSet;
 	enum phy_ch_width ch_width;
-	uint8_t vhtSupportedRxNss;
 	uint8_t vhtBeamFormerCapable;
 	uint8_t vht_su_bfee_capable;
 	uint8_t vht_mcs_10_11_supp;
@@ -150,7 +149,6 @@ typedef struct sDphHashNode {
 	/* key installed for this STA or not in the firmware */
 	uint8_t is_disassoc_deauth_in_progress;
 
-	uint8_t nss;
 	/* Intersected capability Tx NSS for this session */
 	uint8_t cap_tx_nss;
 	/* Intersected capability Rx NSS for this session */
