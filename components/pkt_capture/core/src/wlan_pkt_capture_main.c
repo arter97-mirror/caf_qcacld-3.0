@@ -825,6 +825,13 @@ QDF_STATUS pkt_capture_deregister_callbacks(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_INVAL;
 	}
 
+	/*
+	 * If packet capture is disabled because of any other command such
+	 * as LPC suspend. then no need to send disable again.
+	 */
+	if (pkt_capture_get_pktcap_mode(psoc) == PACKET_CAPTURE_MODE_DISABLE)
+		return QDF_STATUS_SUCCESS;
+
 	status = tgt_pkt_capture_send_mode(vdev, PACKET_CAPTURE_MODE_DISABLE);
 	if (QDF_IS_STATUS_ERROR(status))
 		pkt_capture_err("Unable to send packet capture mode to fw");
