@@ -797,6 +797,15 @@ QDF_STATUS
 wma_validate_txrx_chain_mask(uint32_t paramid, uint32_t paramvalue);
 
 /**
+ * wma_get_txrx_default_chain_mask - get default chain mask
+ * @psoc: psoc
+ *
+ * Return: default chain mask
+ */
+
+uint8_t wma_get_txrx_default_chain_mask(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wma_vdev_set_data_tx_callback() - Set dp vdev tx callback
  * @vdev: vdev obj
  *

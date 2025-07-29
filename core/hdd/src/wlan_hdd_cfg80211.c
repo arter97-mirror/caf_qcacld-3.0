@@ -233,6 +233,7 @@
 #include "wlan_hdd_tx_powerboost.h"
 #include "wlan_mlo_link_force.h"
 #include "wlan_action_oui_ucfg_api.h"
+#include "wma_api.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -9547,6 +9548,10 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_EMLSR_LINKS] = {
 		.type = NLA_NESTED},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_CHAIN_MASK_2GHZ] = {
+		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_CHAIN_MASK_5GHZ] = {
+		.type = NLA_U8},
 };
 
 
@@ -10953,6 +10958,114 @@ static int hdd_config_vdev_chains_per_band(struct wlan_hdd_link_info *link_info,
 							    tx_chains_5g,
 							    rx_chains_5g);
 	return 0;
+}
+
+#define MAX_PDEV_TXRX_CHAIN_PARAMS 4
+#define DEFAULT_CHAIN_MASK 0xff
+static int _hdd_config_set_tx_chain_mask_per_band(struct wiphy *wiphy,
+						  uint8_t tx_chain_mask_2g,
+						  uint8_t tx_chain_mask_5g)
+{
+	int ret;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct dev_set_param setparam[MAX_PDEV_TXRX_CHAIN_PARAMS] = {};
+	uint8_t index = 0;
+	QDF_STATUS status;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return -EINVAL;
+
+	mlme_obj = mlme_get_psoc_ext_obj(hdd_ctx->psoc);
+	if (!mlme_obj) {
+		sme_err("NULL mlme psoc object");
+		return -EINVAL;
+	}
+
+	if (tx_chain_mask_2g) {
+		if (tx_chain_mask_2g == DEFAULT_CHAIN_MASK)
+			tx_chain_mask_2g = wma_get_txrx_default_chain_mask(hdd_ctx->psoc);
+
+		status = sme_validate_txrx_chain_mask(wmi_pdev_param_tx_chain_mask_2g,
+						      tx_chain_mask_2g);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			mlme_obj->cfg.chainmask_cfg.tx_chain_mask_2g = tx_chain_mask_2g;
+
+			ret = mlme_check_index_setparam(setparam,
+							wmi_pdev_param_tx_chain_mask_2g,
+							tx_chain_mask_2g, index++,
+							MAX_PDEV_TXRX_CHAIN_PARAMS);
+			if (QDF_IS_STATUS_ERROR(ret)) {
+				hdd_err("failed at wmi_pdev_param_tx_chain_mask_2g");
+				return -EINVAL;
+			}
+		} else {
+			return -EINVAL;
+		}
+	}
+
+	if (tx_chain_mask_5g) {
+		if (tx_chain_mask_5g == DEFAULT_CHAIN_MASK)
+			tx_chain_mask_5g = wma_get_txrx_default_chain_mask(hdd_ctx->psoc);
+
+		status = sme_validate_txrx_chain_mask(wmi_pdev_param_tx_chain_mask_5g,
+						      tx_chain_mask_5g);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			mlme_obj->cfg.chainmask_cfg.tx_chain_mask_5g = tx_chain_mask_5g;
+
+			ret = mlme_check_index_setparam(setparam,
+							wmi_pdev_param_tx_chain_mask_5g,
+							tx_chain_mask_5g, index++,
+							MAX_PDEV_TXRX_CHAIN_PARAMS);
+			if (QDF_IS_STATUS_ERROR(ret)) {
+				hdd_err("failed at wmi_pdev_param_tx_chain_mask_5g");
+				return -EINVAL;
+			}
+		} else {
+			return -EINVAL;
+		}
+	}
+
+	ret = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						  WMI_PDEV_ID_SOC, setparam,
+						  index);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("failed to send TX, RX chain mask params");
+
+	return ret;
+}
+
+static int hdd_config_set_tx_chain_mask_per_band(struct wlan_hdd_link_info *link_info,
+						 struct nlattr *tb[])
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	uint8_t tx_chain_mask_2g = 0, tx_chain_mask_5g = 0;
+	struct nlattr *tx_attr_2g =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_CHAIN_MASK_2GHZ];
+	struct nlattr *tx_attr_5g =
+		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_CHAIN_MASK_5GHZ];
+
+	if (!tx_attr_2g && !tx_attr_5g)
+		return 0;
+
+	if (tx_attr_2g)
+		tx_chain_mask_2g = nla_get_u8(tx_attr_2g);
+
+	if (tx_attr_5g)
+		tx_chain_mask_5g = nla_get_u8(tx_attr_5g);
+
+	hdd_debug("tx chain mask 2g %d 5g %d", tx_chain_mask_2g,
+		  tx_chain_mask_5g);
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("Invalid hdd_ctx");
+		return -EINVAL;
+	}
+
+	return _hdd_config_set_tx_chain_mask_per_band(hdd_ctx->wiphy,
+						      tx_chain_mask_2g,
+						      tx_chain_mask_5g);
 }
 
 #ifdef WLAN_FEATURE_SON
@@ -15918,6 +16031,7 @@ static const interdependent_setter_fn interdependent_setters[] = {
 	hdd_config_tx_rx_nss_per_band,
 	hdd_config_vdev_chains_per_band,
 	hdd_config_data_stall_param,
+	hdd_config_set_tx_chain_mask_per_band,
 };
 
 /**
