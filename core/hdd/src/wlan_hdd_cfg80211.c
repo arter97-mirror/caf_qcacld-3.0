@@ -5493,6 +5493,26 @@ static inline void wlan_hdd_set_mrsno_feature(struct wlan_objmgr_psoc *psoc,
 				  QCA_WLAN_VENDOR_FEATURE_RSN_OVERRIDE_STA);
 }
 
+static inline void wlan_hdd_set_tx_power_feature(struct wlan_objmgr_psoc *psoc,
+						 uint8_t *feature_flags)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		hdd_err("wmi handle is NULL");
+		return;
+	}
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_tx_power_limit)) {
+		hdd_err("WMI_SERVICE_TX_POWER_LIMIT is not enabled");
+		return;
+	}
+
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_TX_POWER_LIMIT);
+}
+
 #define MAX_CONCURRENT_CHAN_ON_24G    2
 #define MAX_CONCURRENT_CHAN_ON_5G     2
 
@@ -5627,6 +5647,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_usd_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_wfd_r2_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_tx_power_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
@@ -9402,6 +9423,8 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
 	QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID
 #define CONFIG_MLO_LINKS \
 	QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS
+#define CONFIG_TX_POWER_LIMIT_ENABLE \
+	QCA_WLAN_VENDOR_ATTR_CONFIG_TX_POWER_LIMIT_ENABLE
 
 #define ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD \
 	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD
@@ -9609,6 +9632,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_CHAIN_MASK_2GHZ] = {
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_CHAIN_MASK_5GHZ] = {
+		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_POWER_LIMIT_ENABLE] = {
 		.type = NLA_U8},
 };
 
@@ -13069,6 +13094,36 @@ static int hdd_set_dynamic_bw(struct wlan_hdd_link_info *link_info,
 				   enable, PDEV_CMD);
 }
 
+static int hdd_set_tx_power_limit_enable(struct wlan_hdd_link_info *link_info,
+					 const struct nlattr *attr)
+{
+	uint8_t enable;
+	int errno;
+	struct wmi_unified *wmi_handle;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(hdd_ctx->psoc);
+	if (!wmi_handle) {
+		hdd_err("wmi handle is NULL");
+		return -EINVAL;
+	}
+
+	enable = nla_get_u8(attr);
+	if (!wmi_service_enabled(wmi_handle, wmi_service_tx_power_limit)) {
+		hdd_err("WMI_SERVICE_TX_POWER_LIMIT is not enabled");
+		return -EINVAL;
+	}
+
+	return wma_cli_set_command(link_info->vdev_id,
+				   WMI_PDEV_PARAM_TEMP_TX_POWER_LIMIT,
+				   enable, PDEV_CMD);
+}
+
 /**
  * hdd_set_nss() - set the number of spatial streams supported by the adapter
  * @link_info: Link info pointer in HDD adapter
@@ -15068,6 +15123,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_config_dfs_no_wait_support},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_EMLSR_LINKS,
 	 hdd_set_eht_emlsr_links},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_TX_POWER_LIMIT_ENABLE,
+	 hdd_set_tx_power_limit_enable},
 };
 
 #ifdef WLAN_FEATURE_ELNA
