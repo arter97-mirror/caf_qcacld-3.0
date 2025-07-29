@@ -87,7 +87,6 @@
 #include "wlan_hdd_thermal.h"
 #include "wlan_hdd_object_manager.h"
 #include <linux/igmp.h>
-#include "qdf_types.h"
 #include <linux/cpuidle.h>
 #include <cdp_txrx_ctrl.h>
 

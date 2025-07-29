@@ -61,7 +61,6 @@
 #include "cds_packet.h"
 #include "cds_utils.h"
 #include "sys_startup.h"
-#include "cds_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "nan_datapath.h"
 #include "wma.h"

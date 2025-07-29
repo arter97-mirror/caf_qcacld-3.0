@@ -62,7 +62,6 @@
 #include "qwlan_version.h"
 #include "wlan_hdd_host_offload.h"
 
-#include <linux/wireless.h>
 #include <net/cfg80211.h>
 
 #include "wlan_hdd_misc.h"
@@ -91,8 +90,6 @@
 #include "cds_utils.h"
 #include "wlan_osif_request_manager.h"
 #include "os_if_wifi_pos.h"
-#include <cdp_txrx_stats.h>
-#include <cds_api.h>
 #include "wlan_dsc_test.h"
 #include <wlan_osif_priv.h>
 #include "wlan_hdd_regulatory.h"
@@ -104,8 +101,6 @@
 #include "wlan_mlme_public_struct.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_policy_mgr_ucfg.h"
-#include "wlan_mlme_public_struct.h"
-#include "cfg_ucfg_api.h"
 #include "cfg_mlme_threshold.h"
 #include "wlan_pmo_cfg.h"
 #include "wlan_pmo_ucfg_api.h"

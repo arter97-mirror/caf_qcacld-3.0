@@ -64,7 +64,6 @@
 #include <wlan_mlme_ucfg_api.h>
 #include <wlan_reg_ucfg_api.h>
 #include "wlan_lmac_if_def.h"
-#include "wlan_reg_services_api.h"
 #include <lim_mlo.h>
 #include <wlan_vdev_mgr_utils_api.h>
 #include "cfg_ucfg_api.h"

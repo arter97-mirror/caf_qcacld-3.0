@@ -27,7 +27,6 @@
 
 #include "wlan_hdd_includes.h"
 #include "cds_api.h"
-#include "cds_api.h"
 #include "ani_global.h"
 #include "dot11f.h"
 #include "cds_sched.h"

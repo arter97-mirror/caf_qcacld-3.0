@@ -30,7 +30,6 @@
 #include "lim_prop_exts_utils.h"
 #include "lim_security_utils.h"
 #include "lim_send_messages.h"
-#include "lim_send_messages.h"
 #include "lim_session_utils.h"
 #include <lim_ft.h>
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM

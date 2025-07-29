@@ -22,7 +22,6 @@
 
 #include "wlan_action_oui_ucfg_api.h"
 #include "wlan_action_oui_main.h"
-#include "wlan_action_oui_main.h"
 #include "target_if_action_oui.h"
 #include "wlan_action_oui_tgt_api.h"
 #include <qdf_str.h>

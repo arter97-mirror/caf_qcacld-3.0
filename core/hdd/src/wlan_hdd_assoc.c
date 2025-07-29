@@ -54,7 +54,6 @@
 #include <cdp_txrx_misc.h>
 #include <cdp_txrx_ctrl.h>
 #include "ol_txrx.h"
-#include <wlan_logging_sock_svc.h>
 #include <wlan_hdd_object_manager.h>
 #include <cdp_txrx_handle.h>
 #include "wlan_pmo_ucfg_api.h"
@@ -70,7 +69,6 @@
 
 #include "wlan_hdd_nud_tracking.h"
 #include <wlan_cfg80211_crypto.h>
-#include <wlan_crypto_global_api.h>
 #include "wlan_blm_ucfg_api.h"
 #include "wlan_hdd_sta_info.h"
 #include "wlan_hdd_ftm_time_sync.h"

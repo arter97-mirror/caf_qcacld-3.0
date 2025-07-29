@@ -41,7 +41,6 @@
 #include "wlan_hdd_tdls.h"
 #include "wlan_hdd_trace.h"
 #include "qdf_types.h"
-#include "qdf_trace.h"
 #include "cds_sched.h"
 #include "wlan_policy_mgr_api.h"
 #include "cds_utils.h"

@@ -16,6 +16,8 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include "hif_napi.h"
+
 #ifndef __HDD_NAPI_H__
 #define __HDD_NAPI_H__
 
@@ -25,9 +27,6 @@
  *
  * WLAN NAPI interface module headers
  */
-
-/* CLD headers */
-#include "hif_napi.h"
 
 /* Linux headers */
 #include <linux/netdevice.h> /* net_device */
@@ -68,7 +67,6 @@ static inline int hdd_napi_serialize(int is_on)
 #endif /* HELIUMPLUS && MSM_PLATFORM */
 
 #else /* ! defined(FEATURE_NAPI) */
-#include "hif_napi.h"
 /**
  * Stub API
  *

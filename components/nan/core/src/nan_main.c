@@ -36,7 +36,6 @@
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
 #include "qdf_platform.h"
-#include "wlan_osif_request_manager.h"
 #include "wlan_p2p_api.h"
 
 QDF_STATUS nan_set_discovery_state(struct wlan_objmgr_psoc *psoc,

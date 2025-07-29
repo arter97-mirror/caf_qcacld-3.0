@@ -28,7 +28,6 @@
 #include "wmi_services.h"
 #include "wmi_unified.h"
 #include "wmi_version.h"
-#include "qdf_types.h"
 #include "qdf_status.h"
 #include "cds_sched.h"
 #include "cds_config.h"
