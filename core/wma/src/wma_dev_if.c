@@ -3237,6 +3237,22 @@ wma_get_keep_sta_alive_method(struct wlan_objmgr_psoc *psoc, uint32_t *method)
 	}
 }
 
+static void wma_set_burst_enable(tp_wma_handle wma, uint32_t burst_enable)
+{
+	struct pdev_params param = {0};
+	QDF_STATUS ret;
+
+	param.param_id = wmi_pdev_param_burst_enable;
+	param.param_value = burst_enable;
+	ret = wmi_unified_pdev_param_send(wma->wmi_handle,
+					 &param, WMA_WILDCARD_PDEV_ID);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wma_err("Failed to set Burst enable (%d)", ret);
+	} else {
+		wma_debug("Burst enable set");
+	}
+}
+
 QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -3345,13 +3361,8 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 		if (QDF_IS_STATUS_ERROR(status))
 			wma_err("Failed to get sifs burst value, use default");
 
-		status = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
-					    WMI_PDEV_PARAM_BURST_ENABLE,
-					    enable_sifs_burst);
+		wma_set_burst_enable(wma_handle, enable_sifs_burst);
 
-		if (QDF_IS_STATUS_ERROR(status))
-			wma_err("WMI_PDEV_PARAM_BURST_ENABLE set failed %d",
-				status);
 		break;
 	default:
 		break;
