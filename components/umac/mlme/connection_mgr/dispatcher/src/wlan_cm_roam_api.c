@@ -3451,10 +3451,14 @@ cm_roam_stats_print_scan_info(struct wlan_objmgr_psoc *psoc,
 		buf_cons = qdf_snprint(tmp, buf_left, "{");
 		buf_left -= buf_cons;
 		tmp += buf_cons;
-
 		for (i = 0; i < num_ch; i++) {
 			buf_cons = qdf_snprint(tmp, buf_left, "%d ",
 					       scan->chan_freq[i]);
+			if (buf_cons > buf_left) {
+				mlme_err("buf_left size insufficient");
+				qdf_mem_free(buf);
+				return;
+			}
 			buf_left -= buf_cons;
 			tmp += buf_cons;
 		}
