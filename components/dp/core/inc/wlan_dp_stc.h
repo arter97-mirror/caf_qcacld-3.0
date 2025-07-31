@@ -699,18 +699,19 @@ wlan_dp_stc_tx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 	if (!dp_stc)
 		return;
 
-	if (!DP_STC_IS_CLASSIFIED_KNOWN(classified))
-		return;
-
 	c_table = dp_stc->classified_flow_table;
 	c_entry = &c_table->entries[c_flow_id];
 	flow_tuple = &c_entry->flow_tuple;
 	dp_stc_debug(dp_stc->logmask,
-		     "STC: c_state: [%u], c_flags: [%lu], Remove TX flow [%u] reason:[%u], tuple: %s",
+		     "STC: c_state: [%u], c_flags: [%lu], classified: [%u] Remove TX flow [%u] reason:[%u], tuple: %s",
 		     qdf_atomic_read(&c_entry->state),
-		     c_entry->flags, c_flow_id, flow_evict_success_code,
+		     c_entry->flags, classified, c_flow_id,
+		     flow_evict_success_code,
 		     dp_print_tuple_to_str(flow_tuple, buf,
 					   BUF_LEN_MAX));
+
+	if (!DP_STC_IS_CLASSIFIED_KNOWN(classified))
+		return;
 
 	if (qdf_atomic_read(&c_entry->state) ==
 					WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)
@@ -737,18 +738,19 @@ wlan_dp_stc_rx_flow_retire_ind(struct wlan_dp_psoc_context *dp_ctx,
 	if (!dp_stc)
 		return;
 
-	if (!DP_STC_IS_CLASSIFIED_KNOWN(classified))
-		return;
-
 	c_table = dp_stc->classified_flow_table;
 	c_entry = &c_table->entries[c_flow_id];
 	flow_tuple = &c_entry->flow_tuple;
 	dp_stc_debug(dp_stc->logmask,
-		     "STC: c_state: [%u], c_flags: [%lu], Remove RX flow [%u] reason:[%u], tuple: %s",
+		     "STC: c_state: [%u], c_flags: [%lu], classified: [%u] Remove RX flow [%u] reason:[%u], tuple: %s",
 		     qdf_atomic_read(&c_entry->state),
-		     c_entry->flags, c_flow_id, flow_evict_success_code,
+		     c_entry->flags, classified, c_flow_id,
+		     flow_evict_success_code,
 		     dp_print_tuple_to_str(flow_tuple, buf,
 					   BUF_LEN_MAX));
+
+	if (!DP_STC_IS_CLASSIFIED_KNOWN(classified))
+		return;
 
 	if (qdf_atomic_read(&c_entry->state) ==
 					WLAN_DP_STC_CLASSIFIED_FLOW_STATE_INIT)

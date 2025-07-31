@@ -1319,14 +1319,18 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 	/* Should this indication be done from flow classify handler ? */
 	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, s_entry->tx_flow_id);
-		tx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
-		tx_flow->selected_to_sample = 0;
+		if (s_entry->tx_flow_metadata == tx_flow->guid) {
+			tx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
+			tx_flow->selected_to_sample = 0;
+		}
 	}
 
 	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, s_entry->rx_flow_id);
-		rx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
-		rx_flow->selected_to_sample = 0;
+		if (s_entry->rx_flow_metadata == rx_flow->metadata) {
+			rx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
+			rx_flow->selected_to_sample = 0;
+		}
 	}
 
 	if (!wlan_dp_stc_is_traffic_type_known(s_entry->traffic_type)) {
