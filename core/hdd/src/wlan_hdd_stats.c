@@ -6142,8 +6142,6 @@ int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
 
-	return -EINVAL;
-
 	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
 	if (errno)
 		return errno;
