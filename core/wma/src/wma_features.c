@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -606,15 +606,8 @@ QDF_STATUS wma_set_wisa_params(tp_wma_handle wma_handle,
 }
 
 #ifdef FEATURE_WLAN_APF
-/*
- * get_fw_active_apf_mode() - convert HDD APF mode to FW configurable APF
- * mode
- * @mode: APF mode maintained in HDD
- *
- * Return: FW configurable BP mode
- */
-static enum wmi_host_active_apf_mode
-get_fw_active_apf_mode(enum active_apf_mode mode)
+enum wmi_host_active_apf_mode
+wma_get_fw_active_apf_mode(enum active_apf_mode mode)
 {
 	switch (mode) {
 	case ACTIVE_APF_DISABLED:
@@ -663,10 +656,13 @@ QDF_STATUS wma_enable_active_apf_mode(WMA_HANDLE handle, tAniDHCPInd *ta_dhcp_in
 		ret = -EINVAL;
 		goto release_ref_and_return;
 	}
+
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
 	    ucfg_pmo_is_apf_enabled(wma_handle->psoc)) {
-		uc_mode = get_fw_active_apf_mode(wma_handle->active_uc_apf_mode);
-		mcbc_mode = get_fw_active_apf_mode(wma_handle->active_mc_bc_apf_mode);
+		uc_mode = wma_get_fw_active_apf_mode(
+					wma_handle->active_uc_apf_mode);
+		mcbc_mode = wma_get_fw_active_apf_mode(
+					wma_handle->active_mc_bc_apf_mode);
 		wma_debug("Configuring Active APF Mode UC:%d MC/BC:%d for vdev %u",
 			  uc_mode, mcbc_mode, vdev_id);
 
@@ -1726,14 +1722,14 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	csa_offload_event = qdf_mem_malloc(sizeof(*csa_offload_event));
 	if (!csa_offload_event) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
-			return -EINVAL;
+		goto send_event;
 	}
 	if (wlan_cm_is_vdev_roaming(vdev)) {
 		wma_err("Roaming in progress for vdev %d, ignore csa event",
 			 vdev_id);
 		qdf_mem_free(csa_offload_event);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
-		return -EINVAL;
+		goto send_event;
 	}
 
 	qdf_mem_zero(csa_offload_event, sizeof(*csa_offload_event));
@@ -1744,7 +1740,7 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 		wma_err("CSA Event error: No CSA IE present");
 		qdf_mem_free(csa_offload_event);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
-		return -EINVAL;
+		goto send_event;
 	}
 
 	if (csa_event->ies_present_flag & WMI_CSWRAP_IE_EXT_VER_2_PRESENT) {
@@ -1824,11 +1820,16 @@ got_chan:
 		wma_err("CSA Event with channel %d. Ignore !!",
 			 csa_offload_event->channel);
 		qdf_mem_free(csa_offload_event);
-		return -EINVAL;
+		goto send_event;
 	}
 
 	wma_send_msg(wma, WMA_CSA_OFFLOAD_EVENT, (void *)csa_offload_event, 0);
+
 	return 0;
+
+send_event:
+	wlan_mlme_send_csa_event_status_ind(vdev, 0);
+	return -EINVAL;
 }
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -6163,8 +6164,8 @@ int wma_wlan_bt_activity_evt_handler(void *handle, uint8_t *event, uint32_t len)
 		return -EINVAL;
 	}
 
-	wma_info("Received BT activity event %u",
-		fixed_param->coex_profile_evt);
+	wma_debug("Received BT activity event %u",
+		  fixed_param->coex_profile_evt);
 
 	sme_msg.type = eWNI_SME_BT_ACTIVITY_INFO_IND;
 	sme_msg.bodyptr = NULL;

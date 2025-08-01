@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1380,6 +1380,7 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	struct twt_conc_context twt_arg;
 	uint8_t pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	uint32_t reason;
 
 	num_connections = policy_mgr_get_connection_count(psoc);
 	sta_count = policy_mgr_mode_specific_connection_count(psoc,
@@ -1397,6 +1398,9 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 			osif_twt_send_requestor_enable_cmd(psoc, pdev_id);
 		} else if (sap_count == 1) {
 			osif_twt_send_responder_enable_cmd(psoc, pdev_id);
+			reason = HOST_TWT_DISABLE_REASON_NONE;
+			osif_twt_send_requestor_disable_cmd(psoc, pdev_id,
+							    reason);
 			ucfg_twt_update_beacon_template();
 		}
 		break;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2161,6 +2161,15 @@ static void wma_upt_mlo_partner_info(struct beacon_tmpl_params *params,
 }
 #endif
 
+/*
+ * csa_event_bitmap is used to indicate to FW when to
+ * send the CSA switch count status from FW to host.
+ * See WMI_CSA_EVENT_BMAP for more information.
+ * If CSA switch count event is needed to be sent when
+ * the switch count is 1 set the bitmap to
+ * CSA_EVENT_BITMAP_FW_OFFLOAD (0X80000002).
+ */
+#define CSA_EVENT_BITMAP_FW_OFFLOAD 0X80000002
 /**
  * wma_unified_bcn_tmpl_send() - send beacon template to fw
  * @wma:wma handle
@@ -2183,6 +2192,7 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 	uint16_t p2p_ie_len = 0;
 	uint64_t adjusted_tsf_le;
 	struct ieee80211_frame *wh;
+	bool csa_tx_offload;
 
 	if (!wma_is_vdev_valid(vdev_id)) {
 		wma_err("vdev id:%d is not active ", vdev_id);
@@ -2254,6 +2264,22 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 			bcn_info->ecsa_count_offset - bytes_to_strip;
 
 	wma_upt_mlo_partner_info(&params, bcn_info, bytes_to_strip);
+
+	csa_tx_offload = wlan_psoc_nif_fw_ext_cap_get(wma->psoc,
+						      WLAN_SOC_CEXT_CSA_TX_OFFLOAD);
+
+	/*
+	 * Set value of csa_event_bitmap to CSA_EVENT_BITMAP_FW_OFFLOAD,
+	 * if csa_tx_offload is enabled. This indicates FW to send the
+	 * CSA event to HOST when CSA down count is set to 1 instead 0.
+	 * When FW sends the event at CSA down count 0, it requests HOST
+	 * to issue VDEV restart 1TBTT timeout post beacon with
+	 * CSA down count 1 is sent. During this 1TBTT window,
+	 * frames might still get sent on the old channel.
+	 */
+	if ((bcn_info->csa_count_offset || bcn_info->ecsa_count_offset) &&
+	    csa_tx_offload)
+		params.csa_event_bitmap = CSA_EVENT_BITMAP_FW_OFFLOAD;
 
 	ret = wmi_unified_beacon_tmpl_send_cmd(wma->wmi_handle,
 				 &params);

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -145,13 +145,6 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_EHT_OPERATION
 #define ASSOCIATED_BW \
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOCIATED_BW
-
-/*
- * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
- * feature or not, if first bit is 1 it indicates that FW supports this
- * feature, if it is 0 it indicates FW doesn't support this feature
- */
-#define HDD_STATION_INFO_RX_MC_BC_COUNT (1 << 31)
 
 /*
  * Use this macro to check channel bandwidth 160MHZ
@@ -1487,17 +1480,10 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 		hdd_err("dot11 mode put fail");
 		goto fail;
 	}
-	if (!(stainfo->rx_mc_bc_cnt & HDD_STATION_INFO_RX_MC_BC_COUNT)) {
-		hdd_debug("rx mc bc count is not supported by FW");
-	} else if (nla_put_u32(skb, REMOTE_RX_BC_MC_COUNT,
-			       (stainfo->rx_mc_bc_cnt &
-			       (~HDD_STATION_INFO_RX_MC_BC_COUNT)))) {
+
+	if (nla_put_u32(skb, REMOTE_RX_BC_MC_COUNT, stainfo->rx_mc_bc_cnt)) {
 		hdd_err("rx mc bc put fail");
 		goto fail;
-	} else {
-		hdd_nofl_debug("Remote STA RX mc_bc_count: %d",
-			       (stainfo->rx_mc_bc_cnt &
-			       (~HDD_STATION_INFO_RX_MC_BC_COUNT)));
 	}
 
 	/* Currently rx_retry count is not supported */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5448,4 +5448,15 @@ uint16_t ucfg_mlme_get_keepalive_period(struct wlan_objmgr_vdev *vdev)
 {
 	return wlan_mlme_get_keepalive_period(vdev);
 }
+
+/*
+ * ucfg_mlme_get_dfs_discard_mode() - Get the dfs discard mode
+ * @psoc: pointer to psoc object
+ * @val:  bit mask of mode for which DFS channel need to discard
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_dfs_discard_mode(struct wlan_objmgr_psoc *psoc,
+			       uint8_t *val);
 #endif /* _WLAN_MLME_UCFG_API_H_ */

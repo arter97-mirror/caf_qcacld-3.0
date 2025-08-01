@@ -809,6 +809,7 @@ CONFIG_WLAN_WBUFF := y
 endif
 
 CONFIG_WLAN_FEATURE_SAP_ACS_OPTIMIZE := y
+CONFIG_WLAN_FEATURE_SR := y
 
 # Enable sending DSCP-TID map config to firmware
 CONFIG_WLAN_CUSTOM_DSCP_UP_MAP := y

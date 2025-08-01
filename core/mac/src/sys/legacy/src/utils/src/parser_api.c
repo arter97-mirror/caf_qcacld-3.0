@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1145,6 +1145,7 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 				   tDot11fBeaconIEs *ie_struct,
 				   struct pe_session *pe_session)
 {
+	struct wlan_crypto_params *crypto_params;
 	ePhyChanBondState cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
 	uint32_t sec_ch_freq = 0;
 	uint32_t self_cb_mode;
@@ -1164,24 +1165,17 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 		return PHY_SINGLE_CHANNEL_CENTERED;
 	}
 
-	/* In Case WPA2 and TKIP is the only one cipher suite in Pairwise */
-	if ((ie_struct->RSN.present &&
-	    (ie_struct->RSN.pwise_cipher_suite_count == 1) &&
-	    !qdf_mem_cmp(&(ie_struct->RSN.pwise_cipher_suites[0][0]),
-			 "\x00\x0f\xac\x02", 4)) ||
-		/* In Case only WPA1 is supported and TKIP is
-		 * the only one cipher suite in Unicast.
-		 */
-	    (!ie_struct->RSN.present && (ie_struct->WPA.present &&
-	    (ie_struct->WPA.unicast_cipher_count == 1) &&
-	    !qdf_mem_cmp(&(ie_struct->WPA.unicast_ciphers[0][0]),
-			 "\x00\x50\xf2\x02", 4)))) {
-		pe_debug("No channel bonding in TKIP mode");
-		return PHY_SINGLE_CHANNEL_CENTERED;
-	}
-
 	if (!ie_struct->HTInfo.present)
 		return PHY_SINGLE_CHANNEL_CENTERED;
+
+	/* In Case WPA2 and TKIP is the only one cipher suite in Pairwise */
+	crypto_params = wlan_crypto_vdev_get_crypto_params(pe_session->vdev);
+	if (crypto_params && QDF_HAS_PARAM(crypto_params->ucastcipherset,
+					   WLAN_CRYPTO_CIPHER_TKIP)) {
+		pe_debug("No channel bonding in TKIP mode, ucast: %x",
+			 crypto_params->ucastcipherset);
+		return PHY_SINGLE_CHANNEL_CENTERED;
+	}
 
 	pe_debug("ch freq %d scws %u rtws %u sco %u", ch_freq,
 		 ie_struct->HTCaps.supportedChannelWidthSet,
@@ -5075,9 +5069,11 @@ QDF_STATUS sir_parse_beacon_ie(struct mac_context *mac,
 						 pBies->HTInfo.primaryChannel);
 	}
 
-	if (pBies->RSN.present) {
+	if (pBies->RSNOpaque.present) {
 		pBeaconStruct->rsnPresent = 1;
-		convert_rsn(mac, &pBeaconStruct->rsn, &pBies->RSN);
+		convert_rsn_opaque(mac, &pBeaconStruct->rsn, &pBies->RSNOpaque);
+	} else {
+		pe_debug("RSN IE is not present");
 	}
 
 	if (pBies->WPA.present) {
@@ -5613,9 +5609,10 @@ QDF_STATUS sir_convert_beacon_frame2_struct(struct mac_context *mac,
 		pe_debug_rl("In Beacon No Channel info");
 	}
 
-	if (pBeacon->RSN.present) {
+	if (pBeacon->RSNOpaque.present) {
 		pBeaconStruct->rsnPresent = 1;
-		convert_rsn(mac, &pBeaconStruct->rsn, &pBeacon->RSN);
+		convert_rsn_opaque(mac, &pBeaconStruct->rsn,
+				   &pBeacon->RSNOpaque);
 	}
 
 	if (pBeacon->WPA.present) {
@@ -7637,14 +7634,17 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 	bcast_requestor = bcast_requestor &&
 			  !mac->mlme_cfg->twt_cfg.disable_btwt_usr_cfg;
 	wlan_twt_get_bcast_responder_cfg(mac->psoc, &bcast_responder);
-	wlan_twt_get_requestor_cfg(mac->psoc, &twt_requestor);
-	wlan_twt_get_responder_cfg(mac->psoc, &twt_responder);
 
 	he_cap->broadcast_twt = 0;
-	if (session->opmode == QDF_STA_MODE ||
-	    session->opmode == QDF_SAP_MODE) {
+	he_cap->twt_request = 0;
+	he_cap->twt_responder = 0;
+	if (session->opmode == QDF_STA_MODE) {
+		wlan_twt_get_requestor_cfg(mac->psoc, &twt_requestor);
 		he_cap->twt_request =
 			twt_requestor && twt_get_requestor_flag(mac);
+	}
+	if (session->opmode == QDF_SAP_MODE) {
+		wlan_twt_get_responder_cfg(mac->psoc, &twt_responder);
 		he_cap->twt_responder =
 			twt_responder && twt_get_responder_flag(mac);
 	}

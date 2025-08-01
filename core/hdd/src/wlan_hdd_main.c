@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1363,9 +1363,13 @@ int __wlan_hdd_validate_context(struct hdd_context *hdd_ctx, const char *func)
 		return -EAGAIN;
 	}
 
-	if (cds_is_load_or_unload_in_progress()) {
-		hdd_debug("Load/unload in progress (via %s); state:0x%x",
-			  func, cds_get_driver_state());
+	if (cds_is_driver_unloading()) {
+		hdd_err("Driver unload is in progress (via %s)", func);
+		return -ENODEV;
+	}
+
+	if (cds_is_driver_loading()) {
+		hdd_err("Driver load is in progress (via %s)", func);
 		return -EAGAIN;
 	}
 
@@ -2858,6 +2862,14 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 		goto pdev_close;
 	}
 
+	status = ucfg_reg_get_band(hdd_ctx->pdev, &temp_band_cap);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get REG band capability");
+		ret = qdf_status_to_os_return(status);
+		goto pdev_close;
+	}
+
+	band_capability &= temp_band_cap;
 	band_capability =
 		hdd_update_band_cap_from_dot11mode(hdd_ctx, band_capability);
 

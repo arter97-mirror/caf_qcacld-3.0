@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4789,6 +4789,7 @@ void __hdd_twt_update_work_handler(struct hdd_context *hdd_ctx)
 			hdd_send_twt_requestor_enable_cmd(hdd_ctx);
 		} else if (sap_count == 1) {
 			hdd_send_twt_responder_enable_cmd(hdd_ctx);
+			hdd_send_twt_requestor_disable_cmd(hdd_ctx, 0);
 			sme_twt_update_beacon_template(hdd_ctx->mac_handle);
 		}
 		break;

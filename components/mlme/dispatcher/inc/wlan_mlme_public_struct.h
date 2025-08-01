@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -799,6 +799,7 @@ struct wlan_mlme_cfg_sap {
  * @dfs_disable_japan_w53: Disable W53 channels
  * @sap_tx_leakage_threshold: sap tx leakage threshold
  * @dfs_pri_multiplier: dfs_pri_multiplier for handle missing pulses
+ * @dfs_discard_mode: Modes for which DFS channels need to discard
  */
 struct wlan_mlme_dfs_cfg {
 	bool dfs_master_capable;
@@ -810,6 +811,7 @@ struct wlan_mlme_dfs_cfg {
 	bool dfs_disable_japan_w53;
 	uint32_t sap_tx_leakage_threshold;
 	uint32_t dfs_pri_multiplier;
+	uint8_t dfs_discard_mode;
 };
 
 /**

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -719,17 +719,20 @@ dp_update_mem_size_by_ring_type(struct wlan_dp_prealloc_cfg *cfg,
  * @cfg: prealloc related cfg params
  * @desc_type: descriptor type
  * @num_elements: num of descriptor elements
+ * @elem_size: size of the descriptor element
  *
  * Return: None
  */
 static void
 dp_update_num_elements_by_desc_type(struct wlan_dp_prealloc_cfg *cfg,
 				    enum qdf_dp_desc_type desc_type,
-				    uint16_t *num_elements)
+				    uint16_t *num_elements,
+				    qdf_size_t *elem_size)
 {
 	switch (desc_type) {
 	case QDF_DP_TX_DESC_TYPE:
 		*num_elements = cfg->num_tx_desc;
+		*elem_size = qdf_get_pwr2(sizeof(struct dp_tx_desc_s));
 		return;
 	case QDF_DP_TX_EXT_DESC_TYPE:
 	case QDF_DP_TX_EXT_DESC_LINK_TYPE:
@@ -862,7 +865,8 @@ QDF_STATUS dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 		mp = &g_dp_multi_page_allocs[i];
 		mp->in_use = false;
 		dp_update_num_elements_by_desc_type(&cfg, mp->desc_type,
-						    &mp->element_num);
+						    &mp->element_num,
+						    &mp->element_size);
 		if (mp->cacheable)
 			mp->pages.page_size = DP_BLOCKMEM_SIZE;
 

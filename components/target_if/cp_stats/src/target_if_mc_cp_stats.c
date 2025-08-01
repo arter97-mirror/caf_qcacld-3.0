@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,6 +44,13 @@
 #ifdef WLAN_FEATURE_SON
 #include "son_api.h"
 #endif
+
+/*
+ * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
+ * feature or not, if first bit is 1 it indicates that FW supports this
+ * feature, if it is 0 it indicates FW doesn't support this feature
+ */
+#define STATION_INFO_RX_MC_BC_COUNT (1 << 31)
 
 #if defined(WLAN_SUPPORT_TWT) && defined(WLAN_TWT_CONV_SUPPORTED)
 static QDF_STATUS
@@ -562,6 +569,13 @@ static void target_if_cp_stats_extract_peer_extd_stats(
 			ev->peer_extended_stats[i].peer_macaddr);
 		ev->peer_extended_stats[i].rx_mc_bc_cnt =
 						peer_extd_stats.rx_mc_bc_cnt;
+
+		if (!(ev->peer_extended_stats[i].rx_mc_bc_cnt &
+		      STATION_INFO_RX_MC_BC_COUNT))
+			ev->peer_extended_stats[i].rx_mc_bc_cnt = 0;
+		else
+			ev->peer_extended_stats[i].rx_mc_bc_cnt &=
+						~STATION_INFO_RX_MC_BC_COUNT;
 
 		peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
 		if (!peer_stats)

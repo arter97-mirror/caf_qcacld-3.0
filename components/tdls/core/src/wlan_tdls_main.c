@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2262,13 +2262,20 @@ static uint8_t tdls_find_opclass_frm_freq(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	uint8_t channel, opclass;
+	bool global_tbl_lookup = false;
 
 	if (!pdev) {
 		tdls_err("pdev is NULL");
 		return 0;
 	}
 
-	wlan_reg_freq_width_to_chan_op_class(pdev, ch_freq, bw_offset, false,
+	if (wlan_reg_is_6ghz_chan_freq(ch_freq)) {
+		tdls_debug_rl("allow to set op class with global_op_class");
+		global_tbl_lookup = true;
+	}
+
+	wlan_reg_freq_width_to_chan_op_class(pdev, ch_freq, bw_offset,
+					     global_tbl_lookup,
 					     BIT(behav_limit), &opclass,
 					     &channel);
 

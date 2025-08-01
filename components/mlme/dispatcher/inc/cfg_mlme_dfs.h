@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -224,6 +224,34 @@
 			0, \
 			"Block W53 channels in random selection")
 
+/*
+ * <ini>
+ * discardDFSchannelforMode - discard DFS channels for
+ * provided mode
+ * @Min: 0
+ * @Max: 10
+ * @Default: 0
+ *
+ * customer can set this value from 0 to 3 which means
+ * DFS channels will be discarded for mentioned mode while
+ * getting usable channels even if gEnableDFSMasterCap ini
+ * is enabled.
+ * BIT 0 - SAP MODE
+ * BIT 1 - P2P GO MODE
+ *
+ * Related: none
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DISCARD_DFS_CHANNEL_FOR_MODE CFG_INI_UINT( \
+			"discardDFSchannelforMode", \
+			0, \
+			3, \
+			0, \
+			CFG_VALUE_OR_DEFAULT, \
+			"discard DFS channel")
 #define CFG_DFS_ALL \
 	CFG(CFG_IGNORE_CAC) \
 	CFG(CFG_DISABLE_DFS_CH_SWITCH) \
@@ -233,6 +261,7 @@
 	CFG(CFG_ENABLE_NON_DFS_CHAN_ON_RADAR) \
 	CFG(CFG_ENABLE_DFS_MASTER_CAPABILITY) \
 	CFG(CFG_DISABLE_DFS_JAPAN_W53) \
-	CFG(CFG_ENABLE_DFS_PHYERR_FILTEROFFLOAD)
+	CFG(CFG_ENABLE_DFS_PHYERR_FILTEROFFLOAD) \
+	CFG(CFG_DISCARD_DFS_CHANNEL_FOR_MODE)
 
 #endif /* __CFG_MLME_DFS_H */

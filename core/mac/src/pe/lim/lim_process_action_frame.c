@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -74,29 +74,21 @@
 
 static last_processed_msg rrm_link_action_frm;
 
-/**-----------------------------------------------------------------
-   \fn     lim_stop_tx_and_switch_channel
-   \brief  Stops the transmission if channel switch mode is silent and
-   starts the channel switch timer.
-
-   \param  mac
-   \return NONE
-   -----------------------------------------------------------------*/
-void lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId)
+QDF_STATUS lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId)
 {
 	struct pe_session *pe_session;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
 	pe_session = pe_find_session_by_session_id(mac, sessionId);
 
 	if (!pe_session) {
 		pe_err("Session: %d not active", sessionId);
-		return;
+		return status;
 	}
 
 	if (pe_session->ftPEContext.pFTPreAuthReq) {
 		pe_debug("Avoid Switch Channel req during pre auth");
-		return;
+		return status;
 	}
 
 	status = policy_mgr_check_and_set_hw_mode_for_channel_switch(mac->psoc,
@@ -118,17 +110,17 @@ void lim_stop_tx_and_switch_channel(struct mac_context *mac, uint8_t sessionId)
 		pe_err("Failed to set required HW mode for channel %d freq %d, ignore CSA",
 		       pe_session->gLimChannelSwitch.primaryChannel,
 		       pe_session->gLimChannelSwitch.sw_target_freq);
-		return;
+		return status;
 	}
 
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		pe_info("Channel change will continue after HW mode change");
-		return;
+		return status;
 	}
 
-	lim_process_channel_switch(mac, pe_session->smeSessionId);
+	status = lim_process_channel_switch(mac, pe_session->smeSessionId);
 
-	return;
+	return status;
 }
 
 /**
