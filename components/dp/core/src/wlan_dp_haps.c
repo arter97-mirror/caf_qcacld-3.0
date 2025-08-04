@@ -149,6 +149,11 @@ dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, enum cdp_haps_state new_state,
 	uint64_t delta_us = 0;
 	qdf_time_t timeout;
 
+	if (!haps_ctx) {
+		dp_err("HAPS: Null haps_ctx rcvd");
+		return;
+	}
+
 	if (!dp_is_haps_enabled(osif_vdev)) {
 		dp_err("HAPS: Not enabled");
 		return;
