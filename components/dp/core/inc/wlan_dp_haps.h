@@ -71,7 +71,10 @@ static inline bool dp_is_haps_enabled(ol_osif_vdev_handle osif_vdev)
 {
 	struct dp_haps *haps_ctx = dp_get_haps_ctx_from_vdev(osif_vdev);
 
-	return haps_ctx->is_enable;
+	if (haps_ctx)
+		return haps_ctx->is_enable;
+	else
+		return false;
 }
 
 /**
@@ -86,7 +89,7 @@ bool dp_is_haps_paused(struct dp_soc *soc, ol_osif_vdev_handle osif_vdev)
 {
 	struct dp_haps *haps_ctx = dp_get_haps_ctx_from_vdev(osif_vdev);
 
-	if (!haps_ctx->is_enable)
+	if (!haps_ctx || !haps_ctx->is_enable)
 		return false;
 
 	if (haps_ctx->state == STATE_PAUSE)
