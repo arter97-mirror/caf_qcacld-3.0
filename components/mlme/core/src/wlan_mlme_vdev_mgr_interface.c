@@ -49,9 +49,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_cp_stats_mc_tgt_api.h"
 #include "wlan_objmgr_pdev_obj.h"
-#ifdef WLAN_FEATURE_LL_LT_SAP
 #include "wlan_ll_sap_api.h"
-#endif
 #include "wlan_nan_api_i.h"
 #include "wlan_tdls_api.h"
 #include <wlan_p2p_api.h>
