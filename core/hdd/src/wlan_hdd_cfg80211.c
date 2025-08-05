@@ -807,7 +807,6 @@ wlan_hdd_p2p_p2p_iface_limit[] = {
 };
 
 /* STA + AP + AP combination */
-#ifdef WLAN_FEATURE_LL_LT_SAP
 static const struct ieee80211_iface_limit
 wlan_hdd_sta_ap_ap_iface_limit[] = {
 	{
@@ -819,7 +818,6 @@ wlan_hdd_sta_ap_ap_iface_limit[] = {
 	   .types = BIT(NL80211_IFTYPE_AP)
 	},
 };
-#endif /* WLAN_FEATURE_LL_LT_SAP */
 
 /* STA + AP combination */
 static const struct ieee80211_iface_limit
@@ -1012,7 +1010,6 @@ static struct ieee80211_iface_combination
 		.beacon_int_infra_match = true,
 	},
 
-#ifdef WLAN_FEATURE_LL_LT_SAP
 	/* STA + SAP + SAP */
 	{
 		.limits = wlan_hdd_sta_ap_ap_iface_limit,
@@ -1021,7 +1018,6 @@ static struct ieee80211_iface_combination
 		.n_limits = ARRAY_SIZE(wlan_hdd_sta_ap_ap_iface_limit),
 		.beacon_int_infra_match = true,
 	},
-#endif
 	/* STA + SAP */
 	{
 		.limits = wlan_hdd_sta_ap_iface_limit,
