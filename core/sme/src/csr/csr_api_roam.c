@@ -5959,6 +5959,12 @@ QDF_STATUS cm_csr_handle_diconnect_req(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if (cm_csr_is_ss_wait_for_key(vdev_id)) {
+		mlme_debug("Stop Wait for key timer");
+		cm_stop_wait_for_key_timer(mac_ctx->psoc, vdev_id);
+		cm_csr_set_ss_none(vdev_id);
+	}
+
 	cm_csr_set_joining(vdev_id);
 
 	/* Update the disconnect stats */
