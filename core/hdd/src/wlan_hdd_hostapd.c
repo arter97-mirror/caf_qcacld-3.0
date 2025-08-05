@@ -3568,8 +3568,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			}
 		}
 
-		/* Check any other sap need restart */
-		if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+		/* Check any SAP need restart, if initiater was not LL SAP */
+		if (sap_ctx->csa_reason != CSA_REASON_LL_LT_SAP_EVENT &&
+		    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 						  link_info->vdev_id))
 			hdd_hostapd_check_channel_post_csa(hdd_ctx, adapter);
 
@@ -3912,7 +3913,6 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	bool capable, is_wps;
 	int32_t keymgmt;
 	enum policy_mgr_con_mode pm_con_mode;
-	qdf_freq_t ll_sap_freq;
 	bool is_ll_lt_sap_vdev;
 
 	if (!link_info)
@@ -3968,27 +3968,14 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 		return ret;
 	}
 
-	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(hdd_ctx->psoc);
 	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
 							   adapter->device_mode,
 							   link_info->vdev_id);
 
-	if (is_ll_lt_sap_vdev &&
-	    !policy_mgr_is_ll_lt_freq_allowed(hdd_ctx->psoc,
-				target_chan_freq, link_info->vdev_id)) {
-		hdd_err("ll_sap %d new freq %d not allowed as it creating SCC",
+	if (!policy_mgr_ll_lt_sap_allow_csa(hdd_ctx->psoc, link_info->vdev_id,
+					    target_chan_freq, pm_con_mode)) {
+		hdd_err("vdev %d Reject CSA on %d, due to LL LT SAP concurecny",
 			link_info->vdev_id, target_chan_freq);
-		return -EINVAL;
-	} else if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
-	    policy_mgr_are_2_freq_on_same_mac(hdd_ctx->psoc, target_chan_freq,
-					      ll_sap_freq)) {
-		hdd_err("ll_sap freq %d and sap freq %d are on same mac",
-			ll_sap_freq, target_chan_freq);
-		return -EINVAL;
-	} else if (ll_sap_freq && pm_con_mode == PM_P2P_GO_MODE &&
-		   ll_sap_freq == target_chan_freq) {
-		hdd_err("ll_sap freq %d and GO freq %d will lead to SCC",
-			ll_sap_freq, target_chan_freq);
 		return -EINVAL;
 	}
 
