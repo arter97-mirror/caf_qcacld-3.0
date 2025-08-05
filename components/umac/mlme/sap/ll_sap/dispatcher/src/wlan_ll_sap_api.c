@@ -516,6 +516,20 @@ wlan_ll_sap_set_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
 	return ll_sap_set_cur_freq_unused_cu(psoc, vdev_id, unused_cu);
 }
 
+bool
+wlan_ll_sap_is_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id)
+{
+	return ll_sap_is_start_bss_in_progress(psoc, vdev_id);
+}
+
+QDF_STATUS
+wlan_ll_sap_set_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id, bool start_bss)
+{
+	return ll_sap_set_start_bss_in_progress(psoc, vdev_id, start_bss);
+}
+
 uint64_t
 wlan_ll_sap_get_target_tsf_for_vdev_restart(struct wlan_objmgr_vdev *vdev)
 {

@@ -292,6 +292,32 @@ wlan_ll_sap_set_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
 				   uint8_t vdev_id, uint32_t unused_cu);
 
 /**
+ * wlan_ll_sap_is_start_bss_in_progress() - Check if ll sap start is in progress
+ * @psoc: psoc pointer
+ * @vdev_id: vdev_id
+ *
+ * This function checks if the LL SAP start process is currently in progress for
+ * the given vdev.
+ *
+ * Return: true if start BSS is in progress, false otherwise.
+ */
+bool wlan_ll_sap_is_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id);
+
+/**
+ * wlan_ll_sap_set_start_bss_in_progress() - set ll sap start is in progress
+ * state
+ * @psoc: psoc pointer
+ * @vdev_id: vdev_id
+ * @start_bss: start bss state
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_ll_sap_set_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id, bool start_bss);
+
+/**
  * wlan_ll_sap_get_target_tsf_for_vdev_restart() - Get target_tsf for vdev
  * restart
  * @vdev: vdev pointer
@@ -502,6 +528,20 @@ uint32_t wlan_ll_sap_get_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id)
 {
 	return 0;
+}
+
+static inline bool
+wlan_ll_sap_is_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id)
+{
+	return false;
+}
+
+static inline QDF_STATUS
+wlan_ll_sap_set_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id, bool start_bss)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline

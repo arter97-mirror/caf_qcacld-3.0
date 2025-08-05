@@ -22,6 +22,7 @@
 #define WLAN_POLICY_MGR_LL_SAP_H
 
 #include "wlan_objmgr_psoc_obj.h"
+#include "wlan_policy_mgr_public_struct.h"
 
 /**
  * enum ll_lt_sap_event - event of LL SAP
@@ -109,6 +110,21 @@ bool __policy_mgr_is_ll_lt_freq_allowed(struct wlan_objmgr_psoc *psoc,
  */
 void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 						 enum ll_lt_sap_event event);
+
+/**
+ * policy_mgr_ll_lt_sap_allow_csa() - Check if CSA can be allowed for the given
+ * vdev for the given freq.
+ * @psoc: PSOC object
+ * @vdev_id: vdev id whic initiated CSA
+ * @target_freq: target freq for CSA
+ * @pm_con_mode: con mode for vdev
+ *
+ * Return: true if allowed else false
+ */
+bool policy_mgr_ll_lt_sap_allow_csa(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id, qdf_freq_t target_freq,
+				    enum policy_mgr_con_mode pm_con_mode);
+
 #else
 
 static inline bool
@@ -137,5 +153,14 @@ policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 					    enum ll_lt_sap_event event)
 {
 }
+
+static inline bool
+policy_mgr_ll_lt_sap_allow_csa(struct wlan_objmgr_psoc *psoc,
+			       uint8_t vdev_id, qdf_freq_t target_freq,
+			       enum policy_mgr_con_mode pm_con_mode)
+{
+	return true;
+}
+
 #endif
 #endif /* WLAN_POLICY_MGR_LL_SAP_H */

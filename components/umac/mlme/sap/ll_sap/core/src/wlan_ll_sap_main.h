@@ -114,12 +114,14 @@ struct ll_sap_vdev_peer_entry {
  * @high_ap_availability_cookie: High AP availability cookie
  * @target_tsf: pointer to target_tsf structure
  * @cur_freq_unused_cu: current freq and unused channel utilization
+ * @start_bss_in_progress: flag to indicate start bss process is in progress
  */
 struct ll_sap_vdev_priv_obj {
 	struct bearer_switch_info *bearer_switch_ctx;
 	uint16_t high_ap_availability_cookie[MAX_HIGH_AP_AVAILABILITY_REQUESTS];
 	struct target_tsf target_tsf;
 	uint32_t cur_freq_unused_cu;
+	bool start_bss_in_progress;
 };
 
 /**
@@ -213,6 +215,31 @@ QDF_STATUS ll_sap_set_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+/**
+ * ll_sap_is_start_bss_in_progress() - Check if ll sap start is in progress
+ * @psoc: psoc pointer
+ * @vdev_id: vdev_id
+ *
+ * This function checks if the LL SAP start process is currently in progress for
+ * the given vdev.
+ *
+ * Return: true if start BSS is in progress, false otherwise.
+ */
+bool ll_sap_is_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id);
+
+/**
+ * ll_sap_set_start_bss_in_progress() - set ll sap start is in progress state
+ * @psoc: psoc pointer
+ * @vdev_id: vdev_id
+ * @start_bss: start bss state
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ll_sap_set_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id,
+					    bool start_bss);
 
 /**
  * ll_sap_init() - initializes ll_sap component
