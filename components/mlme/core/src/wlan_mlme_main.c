@@ -5791,6 +5791,28 @@ QDF_STATUS wlan_set_sap_best_channel_2ghz(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+struct sap_man_chan_info
+*wlan_get_sap_man_chan_info(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return NULL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_err("Cannot get ch_sw_info for mode %d",
+			 opmode);
+		return NULL;
+	}
+
+	return &mlme_priv->mlme_ap.man_chan_info;
+}
+
 struct sap_ch_switch_info *wlan_get_sap_ch_sw_info(
 				struct wlan_objmgr_vdev *vdev)
 {

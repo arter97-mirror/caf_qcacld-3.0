@@ -7056,9 +7056,17 @@ policy_mgr_validate_set_mlo_link_cb(struct wlan_objmgr_psoc *psoc,
 }
 
 uint32_t
-policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc)
+policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct ml_link_force_state curr_state = {0};
+	uint8_t vdev_id_num = 0;
+	uint8_t vdev_ids[WLAN_MLO_MAX_VDEVS];
+	uint32_t vdev_id_bitmap_sz;
+	uint32_t vdev_id_bitmap[MLO_VDEV_BITMAP_SZ];
+	uint8_t idx = 0;
+	uint32_t ret_val = 0;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -7066,10 +7074,21 @@ policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	policy_mgr_debug("active link bitmap value: %d",
-			 pm_ctx->active_vdev_bitmap);
+	if (!ml_is_nlink_service_supported(psoc)) {
+		ret_val = pm_ctx->active_vdev_bitmap;
+	} else {
+		ml_nlink_get_curr_force_state(psoc, vdev, &curr_state);
+		ml_nlink_convert_linkid_bitmap_to_vdev_bitmap(
+				psoc, vdev, curr_state.force_active_bitmap,
+				NULL, &vdev_id_bitmap_sz,
+				vdev_id_bitmap, &vdev_id_num, vdev_ids);
+		for (idx = 0; idx < vdev_id_bitmap_sz; idx++) {
+			ret_val = vdev_id_bitmap[idx];
+		}
+	}
+	policy_mgr_debug("active vdev id bitmap: %d", ret_val);
 
-	return pm_ctx->active_vdev_bitmap;
+	return ret_val;
 }
 
 /**
@@ -13609,6 +13628,8 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	uint32_t nan_scc_freq = 0;
 	struct wlan_channel sta_ch_info = {0};
 	QDF_STATUS status;
+	bool is_same_vdev = false, is_5ghz = false, is_dfs = false;
+
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -13642,22 +13663,30 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
 		if (!connection[i].in_use)
 			continue;
-		if (connection[i].vdev_id == vdev_id) {
-			if (WLAN_REG_IS_5GHZ_CH_FREQ(connection[i].freq) &&
-			    (connection[i].ch_flagext & (IEEE80211_CHAN_DFS |
-					      IEEE80211_CHAN_DFS_CFREQ2)))
+
+		is_same_vdev = (connection[i].vdev_id == vdev_id);
+		is_5ghz = WLAN_REG_IS_5GHZ_CH_FREQ(connection[i].freq);
+		is_dfs = connection[i].ch_flagext &
+			(IEEE80211_CHAN_DFS | IEEE80211_CHAN_DFS_CFREQ2);
+
+		if (is_same_vdev) {
+			if (is_5ghz && is_dfs)
 				sap_on_dfs = true;
 			sap_found = true;
-		} else {
-			if (connection[i].freq == freq)
-				num_scc_conn++;
-			else
-				num_mcc_conn++;
-
-			if (!WLAN_REG_IS_24GHZ_CH_FREQ(connection[i].freq))
-				num_5_or_6_conn++;
+			continue;
 		}
+
+		if (connection[i].freq == freq)
+			num_scc_conn++;
+		else if (policy_mgr_2_freq_always_on_same_mac(
+					psoc,
+					connection[i].freq, freq))
+			num_mcc_conn++;
+
+		if (!WLAN_REG_IS_24GHZ_CH_FREQ(connection[i].freq))
+			num_5_or_6_conn++;
 	}
+
 	if (!sap_found) {
 		policy_mgr_err("Invalid vdev id: %d", vdev_id);
 		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
@@ -14505,20 +14534,19 @@ bool policy_mgr_get_nan_sap_scc_on_lte_coex_chnl(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS
-policy_mgr_reset_sap_mandatory_channels(struct wlan_objmgr_psoc *psoc)
+policy_mgr_reset_sap_mandatory_channels(struct wlan_objmgr_vdev *vdev)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct sap_man_chan_info *man_chan_info = NULL;
 
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
+	man_chan_info = wlan_get_sap_man_chan_info(vdev);
+	if (!man_chan_info) {
+		policy_mgr_err("Invalid info");
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	pm_ctx->sap_mandatory_channels_len = 0;
-	qdf_mem_zero(pm_ctx->sap_mandatory_channels,
-		     QDF_ARRAY_SIZE(pm_ctx->sap_mandatory_channels) *
-		     sizeof(*pm_ctx->sap_mandatory_channels));
+	man_chan_info->sap_man_chan_len = 0;
+	qdf_mem_zero(man_chan_info->sap_man_chan,
+		     QDF_ARRAY_SIZE(man_chan_info->sap_man_chan) *
+		     sizeof(*man_chan_info->sap_man_chan));
 
 	return QDF_STATUS_SUCCESS;
 }

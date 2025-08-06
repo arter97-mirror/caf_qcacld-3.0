@@ -17676,7 +17676,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("Send vdev pause on ML sta vdev for %d beacon periods",
 			  cfg_val);
-		bitmap = policy_mgr_get_active_vdev_bitmap(hdd_ctx->psoc);
+		bitmap = policy_mgr_get_active_vdev_bitmap(hdd_ctx->psoc,
+							   link_info->vdev);
 		for (idx = 0; idx < 32; idx++) {
 			if (bitmap & (1 << idx)) {
 				vdev_id = idx;
@@ -17796,6 +17797,9 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		ret_val = sme_update_eht_caps(mac_handle, link_info->vdev_id,
 					      cfg_val, EHT_RX_EXTRA_ETH_LTF,
 					      adapter->device_mode);
+		sme_set_eht_data_extra_ltf_tx(mac_handle, link_info->vdev_id,
+					      cfg_val);
+
 		if (ret_val)
 			sme_err("Failed to update extra EHT-LTF");
 	}
@@ -20337,7 +20341,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 		}
 
 		status = policy_mgr_set_sap_mandatory_channels(
-			hdd_ctx->psoc, freq, freq_len);
+			hdd_ctx->psoc, link_info->vdev, freq, freq_len);
 		if (QDF_IS_STATUS_ERROR(status))
 			return -EINVAL;
 	}

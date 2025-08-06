@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -368,10 +368,30 @@ QDF_STATUS wma_set_eht_txbf_vdev_params(struct mac_context *mac, uint32_t *mode)
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wma_vdev_set_listen_interval() - Set listen interval value to FW
+ * @vdev_id: vdev id
+ * @val: listen interval value
+ *
+ * Return: void
+ */
 void wma_vdev_set_listen_interval(uint8_t vdev_id, uint8_t val);
+
+/**
+ * wma_vdev_set_eht_data_extra_ltf_tx() - Set Extra EHT LTF value to FW
+ * @vdev_id: vdev id
+ * @val: Extra EHT LTF value
+ *
+ * Return: void
+ */
+void wma_vdev_set_eht_data_extra_ltf_tx(uint8_t vdev_id, uint8_t val);
 #else
 static inline
 void wma_vdev_set_listen_interval(uint8_t vdev_id, uint8_t val)
+{}
+
+static inline
+void wma_vdev_set_eht_data_extra_ltf_tx(uint8_t vdev_id, uint8_t val)
 {}
 #endif
 #endif

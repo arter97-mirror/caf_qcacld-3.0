@@ -1420,13 +1420,15 @@ QDF_STATUS policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc);
 /**
  * policy_mgr_get_active_vdev_bitmap() - to get active ML STA vdev bitmap
  * @psoc: PSOC object information
+ * @vdev: Vdev object pointer
  *
  * This API will fetch the active ML STA vdev bitmap.
  *
  * Return: vdev bitmap value
  */
 uint32_t
-policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc);
+policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev);
 
 /**
  * policy_mgr_is_emlsr_sta_concurrency_present() - Check whether eMLSR
@@ -1554,7 +1556,8 @@ policy_mgr_wait_for_set_link_update(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline uint32_t
-policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc)
+policy_mgr_get_active_vdev_bitmap(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev)
 {
 	return 0;
 }
@@ -2833,19 +2836,19 @@ QDF_STATUS policy_mgr_restart_opportunistic_timer(
  * policy_mgr_modify_sap_pcl_based_on_mandatory_channel() -
  * Modify SAPs PCL based on mandatory channel list
  * @psoc: PSOC object information
+ * @vdev: vdev ctx
  * @pcl_list_org: Pointer to the preferred channel freq list to be trimmed
  * @weight_list_org: Pointer to the weights of the preferred channel list
  * @pcl_len_org: Pointer to the length of the preferred channel list
- * @vdev_id: VDEV ID
  *
  * Modifies the preferred channel list of SAP based on the mandatory channel
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
-		struct wlan_objmgr_psoc *psoc, uint32_t *pcl_list_org,
-		uint8_t *weight_list_org, uint32_t *pcl_len_org,
-		uint8_t vdev_id);
+		struct wlan_objmgr_psoc *psoc, struct wlan_objmgr_vdev *vdev,
+		uint32_t *pcl_list_org,
+		uint8_t *weight_list_org, uint32_t *pcl_len_org);
 
 /**
  * policy_mgr_update_and_wait_for_connection_update() - Update and wait for
@@ -2868,11 +2871,13 @@ QDF_STATUS policy_mgr_update_and_wait_for_connection_update(
  * policy_mgr_is_sap_mandatory_channel_set() - Checks if SAP
  * mandatory channel is set
  * @psoc: PSOC object information
+ * @vdev: vdev ctx
  * Checks if any mandatory channel is set for SAP operation
  *
  * Return: True if mandatory channel is set, false otherwise
  */
-bool policy_mgr_is_sap_mandatory_channel_set(struct wlan_objmgr_psoc *psoc);
+bool policy_mgr_is_sap_mandatory_channel_set(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_objmgr_vdev *vdev);
 
 /**
  * policy_mgr_list_has_24GHz_channel() - Check if list contains 2.4GHz channels
@@ -2951,6 +2956,7 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 /**
  * policy_mgr_set_sap_mandatory_channels() - Set the mandatory channel for SAP
  * @psoc: PSOC object information
+ * @vdev: vdev ctx
  * @ch_freq_list: Channel frequency list to be set
  * @len: Length of the channel list
  *
@@ -2960,6 +2966,7 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
  * Return: QDF_STATUS
  */
 QDF_STATUS policy_mgr_set_sap_mandatory_channels(struct wlan_objmgr_psoc *psoc,
+						 struct wlan_objmgr_vdev *vdev,
 						 uint32_t *ch_freq_list,
 						 uint32_t len);
 
@@ -4463,6 +4470,7 @@ uint32_t policy_mgr_mode_specific_get_channel(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_add_sap_mandatory_chan() - Add chan to SAP mandatory channel
  * list
  * @psoc: Pointer to soc
+ * @vdev: vdev ctx
  * @ch_freq: Channel frequency to be added
  *
  * Add chan to SAP mandatory channel list
@@ -4470,24 +4478,27 @@ uint32_t policy_mgr_mode_specific_get_channel(struct wlan_objmgr_psoc *psoc,
  * Return: None
  */
 void policy_mgr_add_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_objmgr_vdev *vdev,
 				       uint32_t ch_freq);
 
 /**
  * policy_mgr_get_sap_mandatory_chan_list_len() - Return the SAP mandatory
  * channel list len
  * @psoc: Pointer to soc
+ * @vdev: vdev ctx
  *
  * Get the SAP mandatory channel list len
  *
  * Return: Channel list length
  */
 uint32_t policy_mgr_get_sap_mandatory_chan_list_len(
-		struct wlan_objmgr_psoc *psoc);
+		struct wlan_objmgr_psoc *psoc, struct wlan_objmgr_vdev *vdev);
 
 /**
  * policy_mgr_init_sap_mandatory_chan() - Init 2.4G 5G 6G SAP mandatory channel
  * list
  * @psoc: Pointer to soc
+ * @vdev: vdev ctx
  * @org_ch_freq: sap initial channel frequency MHz
  *
  * Initialize the 2.4G 5G 6G SAP mandatory channels
@@ -4495,12 +4506,14 @@ uint32_t policy_mgr_get_sap_mandatory_chan_list_len(
  * Return: None
  */
 void  policy_mgr_init_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev,
 					 uint32_t org_ch_freq);
 
 /**
  * policy_mgr_remove_sap_mandatory_chan() - Remove channel from SAP mandatory
  * channel list
  * @psoc: Pointer to soc
+ * @vdev: vdev ctx
  * @ch_freq: channel frequency to be removed from mandatory list
  *
  * Remove channel from SAP mandatory channel list
@@ -4508,6 +4521,7 @@ void  policy_mgr_init_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
  * Return: None
  */
 void policy_mgr_remove_sap_mandatory_chan(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_objmgr_vdev *vdev,
 					  uint32_t ch_freq);
 
 /*
@@ -6074,14 +6088,14 @@ bool policy_mgr_get_nan_sap_scc_on_lte_coex_chnl(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_reset_sap_mandatory_channels() - Reset the SAP mandatory channels
- * @psoc: psoc object
+ * @vdev: vdev object
  *
  * Resets the SAP mandatory channel list and the length of the list
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-policy_mgr_reset_sap_mandatory_channels(struct wlan_objmgr_psoc *psoc);
+policy_mgr_reset_sap_mandatory_channels(struct wlan_objmgr_vdev *vdev);
 
 /**
  * policy_mgr_get_sap_mode_count() - Get SAP interface counts

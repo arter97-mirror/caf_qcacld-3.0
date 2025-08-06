@@ -3715,6 +3715,7 @@ stopbss:
 		}
 
 		if (vdev) {
+			policy_mgr_reset_sap_mandatory_channels(vdev);
 			ucfg_dp_set_bss_state_start(vdev, false);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		}
@@ -6974,6 +6975,7 @@ wlan_hdd_validate_mlo_link_removal_request(struct wlan_hdd_link_info *link_info,
 {
 	uint16_t num_links = 0;
 	uint8_t i = 0;
+	uint16_t sap_peer_count;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
 	struct wlan_objmgr_vdev *partner_vdev;
@@ -7014,6 +7016,15 @@ wlan_hdd_validate_mlo_link_removal_request(struct wlan_hdd_link_info *link_info,
 	if (num_links <= 1) {
 		hdd_err("Link removal support MLD with at least 2 active AP");
 		status = QDF_STATUS_E_PERM;
+		goto release_ref;
+	}
+
+	sap_peer_count = wlan_vdev_get_peer_count(link_info->vdev);
+
+	if (sap_peer_count > 1) {
+		hdd_debug("link with %d client connected, reject link removal",
+			  sap_peer_count);
+		status = QDF_STATUS_E_NOSUPPORT;
 		goto release_ref;
 	}
 
@@ -8461,7 +8472,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	 * frequencies of new selected band can be removed in pcl
 	 * modification based on sap mandatory channel list.
 	 */
-	status = policy_mgr_reset_sap_mandatory_channels(hdd_ctx->psoc);
+	status = policy_mgr_reset_sap_mandatory_channels(link_info->vdev);
 	/* Don't go to exit in case of failure. Clean up & stop BSS */
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("failed to reset mandatory channels");
@@ -9313,6 +9324,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		hdd_err("can't get mandatory channel list");
 	if (mandt_chnl_list && intf_pm_mode == PM_SAP_MODE)
 		policy_mgr_init_sap_mandatory_chan(hdd_ctx->psoc,
+						   link_info->vdev,
 						   chandef->chan->center_freq);
 
 	sap_config->ch_params.center_freq_seg0 =

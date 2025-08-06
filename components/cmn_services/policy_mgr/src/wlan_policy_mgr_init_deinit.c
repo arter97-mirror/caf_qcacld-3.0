@@ -788,12 +788,6 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	policy_mgr_get_mcc_adaptive_sch(psoc, &enable_mcc_adaptive_sch);
 	policy_mgr_set_dynamic_mcc_adaptive_sch(psoc, enable_mcc_adaptive_sch);
 	pm_ctx->hw_mode_change_in_progress = POLICY_MGR_HW_MODE_NOT_IN_PROGRESS;
-	/* reset sap mandatory channels */
-	status = policy_mgr_reset_sap_mandatory_channels(psoc);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		policy_mgr_err("failed to reset mandatory channels");
-		return status;
-	}
 
 	/* init PCL table & function pointers based on HW capability */
 	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
@@ -942,14 +936,6 @@ QDF_STATUS policy_mgr_psoc_disable(struct wlan_objmgr_psoc *psoc)
 	if (!QDF_IS_STATUS_SUCCESS(qdf_mc_timer_destroy(
 			&pm_ctx->dbs_opportunistic_timer))) {
 		policy_mgr_err("Cannot deallocate dbs opportunistic timer");
-		status = QDF_STATUS_E_FAILURE;
-		QDF_ASSERT(0);
-	}
-
-	/* reset sap mandatory channels */
-	if (QDF_IS_STATUS_ERROR(
-		policy_mgr_reset_sap_mandatory_channels(psoc))) {
-		policy_mgr_err("failed to reset sap mandatory channels");
 		status = QDF_STATUS_E_FAILURE;
 		QDF_ASSERT(0);
 	}

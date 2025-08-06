@@ -72,6 +72,7 @@
 #include <wlan_dnw_api.h>
 #include "cfg_ucfg_api.h"
 #include "wlan_action_oui_main.h"
+#include <wlan_p2p_api.h>
 
 #define BW_160 160
 
@@ -1878,7 +1879,8 @@ populate_dot11f_ext_cap(struct mac_context *mac,
 		p_ext_cap->beacon_protection_enable = pe_session ?
 			mlme_get_bigtk_support(pe_session->vdev) : false;
 	}
-	if (opmode == QDF_P2P_GO_MODE || opmode == QDF_P2P_CLIENT_MODE) {
+	if ((opmode == QDF_P2P_GO_MODE || opmode == QDF_P2P_CLIENT_MODE) &&
+	    wlan_p2p_fw_support_ap_assist_dfs_group(mac->psoc)) {
 		p_ext_cap->chan_usage = true;
 		p_ext_cap->cap_notif_support = true;
 	}
@@ -10584,6 +10586,8 @@ void lim_ieee80211_pack_ehtop(uint8_t *ie, tDot11fIEeht_op dot11f_eht_op,
 	val = dot11f_eht_op.group_addr_bu_indication_exponent;
 	EHTOP_PARAMS_GROUP_ADDR_BU_IND_EXPONENT_SET_TO_IE(ehtop->ehtop_param,
 							  val);
+
+	val = dot11f_eht_op.mcs15_disable;
 	EHTOP_PARAMS_MCS15_DISABLE_SET_TO_IE(ehtop->ehtop_param,
 							  val);
 
