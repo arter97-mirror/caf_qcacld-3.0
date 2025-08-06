@@ -162,7 +162,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	void *packet;
 	QDF_STATUS qdf_status;
 	tSirMacSSid *ssid;
-	tSirMacAddr *bssid;
+	tSirMacAddr bssid;
 	qdf_freq_t chan_freq;
 	tSirMacAddr *self_macaddr;
 	uint32_t dot11mode;
@@ -189,7 +189,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		addn_ielen = *additional_ielen;
 
 	ssid = &pesession->ssId;
-	bssid = &pesession->bssId;
+	sir_copy_mac_addr(bssid, pesession->bssId);
 	chan_freq = pesession->curr_op_freq;
 	self_macaddr = &pesession->self_mac_addr;
 	dot11mode = pesession->dot11mode;
@@ -233,7 +233,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	 */
 	if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq) &&
 	    pesession->join_probe_cnt > 2)
-		sir_copy_mac_addr(*bssid, bcast_mac);
+		sir_copy_mac_addr(bssid, bcast_mac);
 
 	/* The scheme here is to fill out a 'tDot11fProbeRequest' structure */
 	/* and then hand it off to 'dot11f_pack_probe_request' (for */
@@ -316,7 +316,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	if (IS_DOT11_MODE_EHT(dot11mode) && pesession->lim_join_req &&
-	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)bssid)) {
+	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)&bssid)) {
 		lim_update_session_eht_capable(pesession, true);
 		populate_dot11f_eht_caps(mac_ctx, pesession, &pr->eht_cap);
 
@@ -418,7 +418,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	/* Next, we fill out the buffer descriptor: */
 	lim_populate_mac_header(mac_ctx, frame, WLAN_FC0_TYPE_MGMT,
-				SIR_MAC_MGMT_PROBE_REQ, *bssid, *self_macaddr);
+				SIR_MAC_MGMT_PROBE_REQ, bssid, *self_macaddr);
 
 	/* That done, pack the Probe Request: */
 	status = dot11f_pack_probe_request(mac_ctx, pr, frame +
@@ -459,7 +459,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	pe_nofl_debug("Probe req TX: vdev %d seq num %d to " QDF_MAC_ADDR_FMT " len %d",
 		      vdev_id, mac_ctx->mgmtSeqNum,
-		      QDF_MAC_ADDR_REF(*bssid),
+		      QDF_MAC_ADDR_REF(bssid),
 		      (int)sizeof(tSirMacMgmtHdr) + payload);
 	mgmt_txrx_frame_hex_dump(frame, sizeof(tSirMacMgmtHdr) + payload, true);
 
