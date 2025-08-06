@@ -1377,6 +1377,8 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_ipa_opt_dp_ctrl_rm_create(driver_kobject);
 		hdd_sysfs_apfmode_create(driver_kobject);
 		hdd_sysfs_dp_dal_create(driver_kobject);
+		hdd_sysfs_create_enhance_chipset_logging_interface(
+							wifi_kobject, hdd_ctx);
 	}
 }
 
@@ -1387,6 +1389,8 @@ void hdd_destroy_sysfs_files(void)
 	kobj = pld_get_wifi_kobj(NULL);
 
 	if  (QDF_GLOBAL_MISSION_MODE == hdd_get_conparam()) {
+		hdd_sysfs_destroy_enhance_chipset_logging_interface(
+								wifi_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_rm_destroy(driver_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_destroy(driver_kobject);
 		hdd_sysfs_destroy_logging_config_interface(driver_kobject);

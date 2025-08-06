@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022,2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,6 +45,27 @@ void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject,
  */
 void hdd_sysfs_destroy_dump_in_progress_interface(struct kobject *wifi_kobject);
 
+/**
+ * hdd_sysfs_create_enhance_chipset_logging_interface() - Create sysfs file
+ * @wifi_kobject: Pointer to the wifi kobject under which the file is created
+ * @hdd_ctx: Pointer to the hdd_context structure
+ *
+ * This function creates the sysfs file 'enhance_chipset_logging' under
+ * /sys/wifi/. It allows cnss_diag to signal support for
+ * userspace caching.
+ */
+void
+hdd_sysfs_create_enhance_chipset_logging_interface(struct kobject *wifi_kobject,
+						   struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_sysfs_destroy_enhance_chipset_logging_interface() - Remove sysfs file
+ * @wifi_kobject: Pointer to the wifi kobject under which the file was created
+ *
+ * This function removes the sysfs file 'enhance_chipset_logging' if it exists.
+ */
+void hdd_sysfs_destroy_enhance_chipset_logging_interface(
+					struct kobject *wifi_kobject);
 #else
 static inline void
 hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject,
@@ -52,6 +74,17 @@ hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject,
 }
 static inline void
 hdd_sysfs_destroy_dump_in_progress_interface(struct kobject *wifi_kobject)
+{
+}
+
+static inline void
+hdd_sysfs_create_enhance_chipset_logging_interface(struct kobject *wifi_kobject,
+						   struct hdd_context *hdd_ctx)
+{
+}
+
+static inline void hdd_sysfs_destroy_enhance_chipset_logging_interface(
+					struct kobject *wifi_kobject)
 {
 }
 #endif

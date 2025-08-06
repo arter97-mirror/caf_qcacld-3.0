@@ -2305,6 +2305,7 @@ struct hdd_tx_powerboost {
  * @twt_en_dis_work: work to send twt enable/disable cmd on MCC/SCC concurrency
  * @is_wifi3_0_target:
  * @dump_in_progress: Stores value of dump in progress
+ * @enhance_chipset_logging: To know whether userspace caching is supported
  * @is_drv_dump_in_progress_valid: Is dump_inprogress sysfs node is valid
  * @max_chipset_log_size_enable: ini flag to enable/disable max_chipset_log_size
  * @max_chipset_log_size: Stores max chipset log size value
@@ -2592,6 +2593,7 @@ struct hdd_context {
 #endif
 	bool is_wifi3_0_target;
 	bool dump_in_progress;
+	bool enhance_chipset_logging;
 	bool is_drv_dump_in_progress_valid;
 	bool max_chipset_log_size_enable;
 	uint16_t max_chipset_log_size;
