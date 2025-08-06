@@ -205,6 +205,7 @@ struct cds_context {
 	uint32_t packet_stats_log_level;
 	uint32_t driver_debug_log_level;
 	uint32_t fw_debug_log_level;
+	uint32_t custom_log_level;
 	struct cds_log_complete log_complete;
 	qdf_spinlock_t bug_report_lock;
 

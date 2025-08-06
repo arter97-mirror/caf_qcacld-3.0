@@ -217,6 +217,7 @@ enum wifi_driver_log_level {
  * @RING_ID_PER_PACKET_STATS: Per packet statistic ring id
  * @RING_ID_DRIVER_DEBUG:     Driver debug messages ring id
  * @RING_ID_FIRMWARE_DEBUG:   Firmware debug messages ring id
+ * @RING_ID_CUSTOM:                 Custom Wifi event ring id
  *
  * This enum has the ring id values of logging rings
  */
@@ -226,6 +227,7 @@ enum wifi_logging_ring_id {
 	RING_ID_PER_PACKET_STATS,
 	RING_ID_DRIVER_DEBUG,
 	RING_ID_FIRMWARE_DEBUG,
+	RING_ID_CUSTOM,
 };
 
 /* ------------------------------------------------------------------- */

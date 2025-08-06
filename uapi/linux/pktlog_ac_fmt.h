@@ -91,6 +91,10 @@ struct ath_pktlog_hdr {
 #define ATH_PKTLOG_HDR_TIMESTAMP_OFFSET 2
 #define ATH_PKTLOG_HDR_TYPE_SPECIFIC_DATA_OFFSET 3
 
+#define ATH_SW_EVENT_TYPE_MASK 0xffff
+#define ATH_SW_EVENT_TYPE_AGGREGATE_NUM_SHIFT 16
+#define ATH_PKTLOG_SW_EVENT_AGGREGATE 1
+
 /**
  * enum - Pktlog flag field details
  * packet origin [1:0]
@@ -120,6 +124,7 @@ enum {
 #define ATH_PKTLOG_PHYERR   0x000000040
 #define ATH_PKTLOG_PROMISC  0x000000080
 #define ATH_PKTLOG_SW_EVENT 0x000000100
+#define ATH_PKTLOG_CUSTOM   0x000000200
 
 /* WIN defns */
 #define ATH_PKTLOG_H_INFO   0x000000200
@@ -144,7 +149,8 @@ enum {
 /* From WIN definations */
 #define PKTLOG_TYPE_LITE_T2H     23
 #define PKTLOG_TYPE_LITE_RX      24
-#define PKTLOG_TYPE_MAX          25
+#define PKTLOG_TYPE_CUSTOM_PKT   26
+#define PKTLOG_TYPE_MAX          27
 
 #define PKTLOG_MAX_TXCTL_WORDS 57       /* +2 words for bitmap */
 #define PKTLOG_MAX_TXSTATUS_WORDS 32

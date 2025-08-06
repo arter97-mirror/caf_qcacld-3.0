@@ -2038,6 +2038,9 @@ void cds_set_ring_log_level(uint32_t ring_id, uint32_t log_level)
 	} else if (ring_id == RING_ID_FIRMWARE_DEBUG) {
 		p_cds_context->fw_debug_log_level = log_val;
 		return;
+	} else if (ring_id == RING_ID_CUSTOM) {
+		p_cds_context->custom_log_level = log_val;
+		return;
 	}
 }
 
@@ -2069,6 +2072,8 @@ enum wifi_driver_log_level cds_get_ring_log_level(uint32_t ring_id)
 		return p_cds_context->driver_debug_log_level;
 	else if (ring_id == RING_ID_FIRMWARE_DEBUG)
 		return p_cds_context->fw_debug_log_level;
+	else if(ring_id == RING_ID_CUSTOM)
+		return p_cds_context->custom_log_level;
 
 	return WLAN_LOG_LEVEL_OFF;
 }
@@ -2671,6 +2676,72 @@ inline void cds_pkt_stats_to_logger_thread(void *pl_hdr, void *pkt_dump,
 
 	wlan_pkt_stats_to_logger_thread(pl_hdr, pkt_dump, data);
 }
+
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+/*
+ * cds_custom_to_logger_thread() - send pktstats to user
+ * @pl_hdr: Pointer to pl_hdr
+ * @pkt_dump: Pointer to pkt_dump data structure.
+ * @data: Pointer to data
+ *
+ * This function is used to send the pkt stats to SVC module.
+ *
+ * Return: None
+ */
+inline void cds_custom_to_logger_thread(void *pl_hdr, void *pkt_dump,
+						void *data)
+{
+	if (cds_get_ring_log_level(RING_ID_CUSTOM) !=
+						WLAN_LOG_LEVEL_ACTIVE) {
+		return;
+	}
+
+	wlan_pkt_stats_to_logger_thread(pl_hdr, pkt_dump, data);
+}
+
+/*
+ * send_custom_packet_select() - send host custom event pkt.
+ * @buf: custom evnets pkt (hdr + payload)
+ * Each event packet includes a fixed-length header and a variable-length payload
+ * Paylod len defined in header.
+ * This function is used to send custom event pkt to HAL layer
+ * using wlan_pkt_stats_to_logger_thread
+ *
+ * Return: None
+ *
+ */
+void send_custom_packet_select( void* buf)
+{
+	struct ath_pktlog_hdr pktlog_hdr = {0};
+	struct mon_report_status* mon_report= NULL;
+	uint8_t mon_report_buf[128] = {0};
+	uint32_t report_hdr_len, report_payload_len;
+
+	if (!buf) {
+		pr_err("%s: Invalid buf.\n", __func__);
+		return;
+	}
+
+	mon_report = (struct mon_report_status*)buf;
+	report_hdr_len = sizeof(struct mon_report_status);
+	report_payload_len = mon_report->payload_len;
+
+	memcpy(mon_report_buf, buf, report_hdr_len + report_payload_len);
+
+#if defined(HELIUMPLUS)
+	pktlog_hdr.flags |= PKTLOG_HDR_SIZE_16;
+#endif
+
+	QDF_TRACE_DEBUG(QDF_MODULE_ID_QDF,
+				"%s: time:0x%x payload_len(%d,%d)",
+				__func__, mon_report->qtime,
+				report_hdr_len, report_payload_len);
+	pktlog_hdr.log_type = PKTLOG_TYPE_CUSTOM_PKT;
+	pktlog_hdr.size = report_hdr_len + report_payload_len;
+
+	cds_custom_to_logger_thread(&pktlog_hdr, NULL, (void*)mon_report_buf);
+}
+#endif
 #endif
 
 /**

@@ -451,6 +451,10 @@ enum QDF_GLOBAL_MODE cds_get_conparam(void);
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
 void cds_pkt_stats_to_logger_thread(void *pl_hdr, void *pkt_dump, void *data);
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+inline void cds_custom_to_logger_thread(void *pl_hdr, void *pkt_dump,
+						void *data);
+#endif
 #else
 static inline
 void cds_pkt_stats_to_logger_thread(void *pl_hdr, void *pkt_dump, void *data)
@@ -556,4 +560,12 @@ QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present);
  * Return: Status of map operation
  */
 int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr);
+
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+void send_custom_packet_select(void* buf);
+#else
+static inline void send_custom_packet_select(void* buf)
+{
+}
+#endif
 #endif /* if !defined __CDS_API_H */
