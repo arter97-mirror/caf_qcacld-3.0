@@ -86,6 +86,11 @@
 #include "wlan_pkt_capture_ucfg_api.h"
 #include "wlan_hdd_thermal.h"
 #include "wlan_hdd_object_manager.h"
+
+#ifdef CONFIG_WLAN_ICMP_REQ_DETECT
+#include "wlan_pmo_priv.h"
+#endif
+
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_NAPIER_EMULATION
 #define HDD_SSR_BRING_UP_TIME 3000000
@@ -3213,11 +3218,6 @@ hdd_powersave_mode_change(struct hdd_adapter *adapter,
 	int ret;
 	QDF_STATUS status;
 
-	if (!ucfg_pmo_get_default_power_save_mode(hdd_ctx->psoc)) {
-		hdd_err_rl("OPM power save is disabled in ini");
-		return -EINVAL;
-	}
-
 	if (adapter->device_mode != QDF_STA_MODE &&
 	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
 		hdd_info("Advanced power save only allowed in STA/P2P-Client modes:%d",
@@ -3237,13 +3237,11 @@ hdd_powersave_mode_change(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	if (ps_params->opm_mode == PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED) {
-		ret = hdd_set_power_config_params(hdd_ctx, adapter,
-						  ps_params->ps_ito,
-						  ps_params->spec_wake);
-		if (ret)
-			return ret;
-	}
+	ret = hdd_set_power_config_params(hdd_ctx, adapter,
+					  ps_params->ps_ito,
+					  ps_params->spec_wake);
+	if (ret)
+		return ret;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
 	if (vdev) {
@@ -3256,6 +3254,7 @@ hdd_powersave_mode_change(struct hdd_adapter *adapter,
 void hdd_ps_timer_expired_handler(void *adapter_context)
 {
 	struct hdd_adapter *adapter = (struct hdd_adapter *)adapter_context;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct pmo_ps_params ps_params = {0};
 	QDF_STATUS status;
 	uint64_t delt = 0;
@@ -3268,9 +3267,12 @@ void hdd_ps_timer_expired_handler(void *adapter_context)
 
 	ucfg_pmo_get_ps_params(adapter->vdev, &ps_params);
 
-	if ((ps_params.opm_mode != PMO_PS_ADVANCED_POWER_SAVE_ENABLE) &&
+	if ((ps_params.opm_mode == PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED) &&
 	    (delt > NO_ICMP_INTERVAL)) {
-		ps_params.opm_mode = PMO_PS_ADVANCED_POWER_SAVE_ENABLE;
+		/* get ps mode from org ini */
+		ps_params.opm_mode = ucfg_pmo_get_default_power_save_mode(hdd_ctx->psoc);
+		ps_params.ps_ito = PMO_PS_DATA_INACTIVITY_TIMEOUT;
+		ps_params.spec_wake = PMO_PS_DATA_SPEC_WAKE;
 		hdd_powersave_mode_change(adapter, &ps_params);
 	} else {
 		status = qdf_mc_timer_start(&adapter->ps_timer,
@@ -3311,10 +3313,18 @@ hdd_icmp_ps_change_handler(struct hdd_adapter *adapter,
 
 		ucfg_pmo_get_ps_params(adapter->vdev, &ps_params);
 
+		if (ps_params.opm_mode == PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED &&
+			ps_params.ps_ito != ITO_TIME) {
+			ps_params.ps_ito = ITO_TIME;
+			ps_params.spec_wake = PMO_PS_DATA_SPEC_WAKE;
+			hdd_powersave_mode_change(adapter, &ps_params);
+			return;
+		}
+
 		if (ps_params.opm_mode != PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED) {
 			ps_params.opm_mode = PMO_PS_ADVANCED_POWER_SAVE_USER_DEFINED;
 			ps_params.ps_ito = ITO_TIME;
-			ps_params.spec_wake = 0;
+			ps_params.spec_wake = PMO_PS_DATA_SPEC_WAKE;
 			hdd_powersave_mode_change(adapter, &ps_params);
 		}
 	}
