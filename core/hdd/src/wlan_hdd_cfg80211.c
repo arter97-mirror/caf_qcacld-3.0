@@ -12773,11 +12773,12 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	uint8_t link_id = WLAN_INVALID_LINK_ID;
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
 	struct nlattr *curr_attr, *chn_bd = NULL, *mlo_link_id;
-	enum eSirMacHTChannelWidth chwidth;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 	bool update_cw_allowed;
+	/* Default or safe chan width fallback */
+	enum eSirMacHTChannelWidth chwidth = eHT_CHANNEL_WIDTH_20MHZ;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
