@@ -2516,7 +2516,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     if target != "sa510m":
         deps = select({
-            "//build/kernel/kleaf:socrepo_true": [
+            "//build/qcom_build_extensions:qtisocrepo_true": [
                 "//soc-repo:all_headers",
                 "//soc-repo:{}/net/wireless/cfg80211".format(tv),
                 "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(tv),
@@ -2524,14 +2524,14 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
                 "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
                 "//soc-repo:{}/kernel/sched/walt/sched-walt".format(tv),
             ],
-            "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+            "//build/qcom_build_extensions:qtisocrepo_false": ["//msm-kernel:all_headers"],
         })
 
         deps += select({
-            "//build/kernel/kleaf:socrepo_true": [
+            "//build/qcom_build_extensions:qtisocrepo_true": [
                 "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
             ],
-            "//build/kernel/kleaf:socrepo_false": [],
+            "//build/qcom_build_extensions:qtisocrepo_false": [],
         })
     else:
         deps = [ "//msm-kernel:all_headers_arm", ]
@@ -2544,8 +2544,8 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         })
     else:
         kernel_build = select({
-            "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
-            "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+            "//build/qcom_build_extensions:qtisocrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+            "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}".format(tv),
         })
 
     ipaths = chipset_ipaths + hw_ipaths + _fixed_ipaths
