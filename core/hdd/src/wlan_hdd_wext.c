@@ -1147,6 +1147,26 @@
  */
 #define WE_SET_BTCOEX_RSSI_THRESHOLD	100
 
+/*
+ * <ioctl>
+ * enable_roam - enable/disable STA roam
+ *
+ * @INPUT: 0/1
+ *
+ * @OUTPUT: None
+ *
+ * This IOCTL enables/disables STA roam.
+ *
+ * @E.g: iwpriv wlan0 enable_roam <0/1>
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal
+ *
+ * </ioctl>
+ */
+#define WE_ENABLE_ROAM                 101
+
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_NONE_GET_INT    (SIOCIWFIRSTPRIV + 1)
 #define WE_GET_11D_STATE     1
@@ -4650,6 +4670,27 @@ int wlan_hdd_set_btcoex_rssi_threshold(struct hdd_adapter *adapter, int value)
 	}
 	return 0;
 }
+
+int wlan_hdd_set_roam_enable_disable(struct hdd_adapter *adapter, int value)
+{
+	bool enable_roam;
+
+	if (!value)
+		enable_roam = false;
+	else
+		enable_roam = true;
+
+	if (enable_roam) {
+		hdd_info("set the roam enable");
+		wlan_hdd_enable_roaming(adapter, RSO_IOCTL_SET);
+	} else {
+		hdd_info("set the roam disable");
+		wlan_hdd_disable_roaming(adapter, RSO_IOCTL_SET);
+	}
+
+	return 0;
+}
+
 typedef int (*setint_getnone_fn)(struct hdd_adapter *adapter, int value);
 static const setint_getnone_fn setint_getnone_cb[] = {
 	[WE_SET_11D_STATE] = hdd_we_set_11d_state,
@@ -4755,6 +4796,7 @@ static const setint_getnone_fn setint_getnone_cb[] = {
 #endif /* WLAN_FEATURE_MOTION_DETECTION */
 	[WE_SET_BTCOEX_MODE] = wlan_hdd_set_btcoex_mode,
 	[WE_SET_BTCOEX_RSSI_THRESHOLD] = wlan_hdd_set_btcoex_rssi_threshold,
+	[WE_ENABLE_ROAM] = wlan_hdd_set_roam_enable_disable,
 };
 
 static setint_getnone_fn hdd_get_setint_getnone_cb(int param)
@@ -9656,6 +9698,11 @@ static const struct iw_priv_args we_private_args[] = {
 	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 	 0,
 	 "range_ext"},
+
+	{WE_ENABLE_ROAM,
+	 IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	 0,
+	 "enable_roam"},
 
 	{WLAN_PRIV_SET_FTIES,
 	 IW_PRIV_TYPE_CHAR | MAX_FTIE_SIZE,

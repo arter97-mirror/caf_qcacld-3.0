@@ -487,6 +487,7 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status = event_data->status;
+	bool roam_status;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -512,12 +513,22 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 				     vdev->vdev_objmgr.vdev_id);
 			policy_mgr_set_pcl_for_connected_vdev(psoc,
 					      vdev->vdev_objmgr.vdev_id, false);
+
+			qdf_spin_lock_bh(&psoc->roam_set_lock);
+			roam_status = psoc->roam_enabled;
+			qdf_spin_unlock_bh(&psoc->roam_set_lock);
 			/*
 			 * Enable roaming on other STA iface except this one.
 			 * Firmware doesn't support connection on one STA iface
 			 * while roaming on other STA iface.
 			 */
-			if_mgr_enable_roaming(pdev, vdev, RSO_CONNECT_START);
+			if (roam_status) {
+				ifmgr_info("Enable roaming for the connect completed.");
+				if_mgr_enable_roaming(pdev, vdev, RSO_CONNECT_START);
+			} else {
+				ifmgr_info("Disable roaming from the ioctl set.");
+				if_mgr_disable_roaming(pdev, vdev, RSO_IOCTL_SET);
+			}
 		}
 		if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)
 			if_mgr_handle_ml_sta_link_concurrency(psoc, vdev, true);
@@ -525,12 +536,21 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 		/* notify connect failure on final failure */
 		ucfg_tdls_notify_connect_failure(psoc);
 
+		qdf_spin_lock_bh(&psoc->roam_set_lock);
+		roam_status = psoc->roam_enabled;
+		qdf_spin_unlock_bh(&psoc->roam_set_lock);
 		/*
 		 * Enable roaming on other STA iface except this one.
 		 * Firmware doesn't support connection on one STA iface
 		 * while roaming on other STA iface.
 		 */
-		if_mgr_enable_roaming(pdev, vdev, RSO_CONNECT_START);
+		if (roam_status) {
+			ifmgr_info("Enable roaming for the connect failure.");
+			if_mgr_enable_roaming(pdev, vdev, RSO_CONNECT_START);
+		} else {
+			ifmgr_info("Disable roaming from the ioctl set");
+			if_mgr_disable_roaming(pdev, vdev, RSO_IOCTL_SET);
+		}
 	}
 
 	policy_mgr_check_n_start_opportunistic_timer(psoc);

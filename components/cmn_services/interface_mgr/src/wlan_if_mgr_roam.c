@@ -86,12 +86,20 @@ static void if_mgr_disable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 	vdev_id = wlan_vdev_get_id(vdev);
 	curr_vdev_id = roam_arg->curr_vdev_id;
 
+	if (roam_arg->requestor == RSO_IOCTL_SET &&
+	    wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE &&
+	    vdev->vdev_mlme.mlme_state == WLAN_VDEV_S_UP) {
+		ifmgr_info("Disable roam as it has been set from the ioctl.");
+		goto done;
+	}
+
 	if (curr_vdev_id == vdev_id ||
 	    wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE ||
 	    wlan_cm_is_vdev_roam_sync_inprogress(vdev) ||
 	    vdev->vdev_mlme.mlme_state != WLAN_VDEV_S_UP)
 		return;
 
+done:
 	/*
 	 * Disable roaming only for the STA vdev which is not is roam sync state
 	 * and VDEV is in UP state.
