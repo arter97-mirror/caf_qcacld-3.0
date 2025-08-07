@@ -2002,6 +2002,17 @@ populate_dot11f_operating_mode(struct mac_context *mac,
 	pDot11f->present = 1;
 
 	pDot11f->chanWidth = pe_session->gLimOperatingMode.chanWidth;
+	/*
+	 * Channel Width in tDot11fIEOperatingMode
+	 * 0: 20 MHz, 1: 40 MHz,
+	 * 2: vht_160_80p80_supp is 0, 80 MHz
+	 *    vht_160_80p80_supp is 1, 160/80+80 MHz
+	 * 3: Reserved
+	 */
+	if (pe_session->gLimOperatingMode.chanWidth >= CH_WIDTH_160MHZ) {
+		pDot11f->chanWidth = WNI_OMI_CH_WIDTH_80MHZ;
+		pDot11f->vht_160_80p80_supp = 1;
+	}
 	pDot11f->rxNSS = pe_session->gLimOperatingMode.rxNSS;
 	pDot11f->rxNSSType = pe_session->gLimOperatingMode.rxNSSType;
 
