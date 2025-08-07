@@ -5851,4 +5851,28 @@ static inline bool ucfg_mlme_is_dual_sap_sta_supported(
 {
 	return wlan_mlme_is_dual_sap_sta_enabled(psoc);
 }
+
+/**
+ * ucfg_mlme_start_miracast_opt() - Start timer and wakelock for miracast
+ * optimization
+ * @psoc: psoc
+ * Return: QDF_STATUS
+ */
+static inline
+QDF_STATUS ucfg_mlme_start_miracast_opt(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_start_miracast_opt(psoc);
+}
+
+/**
+ * ucfg_mlme_stop_miracast_opt() - Stop timer and wakelock for miracast
+ * optimization
+ * @psoc: psoc
+ * Return: QDF_STATUS
+ */
+static inline
+QDF_STATUS ucfg_mlme_stop_miracast_opt(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_stop_miracast_opt(psoc);
+}
 #endif /* _WLAN_MLME_UCFG_API_H_ */

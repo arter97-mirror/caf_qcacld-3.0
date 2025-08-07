@@ -1441,7 +1441,7 @@ _conditional_srcs = {
             "components/cmn_services/logging/src/wlan_connectivity_logging.c",
         ],
     },
-    "CONFIG_QCACLD_WLAN_CONNECTIVITY_DIAG_LOGGING": {
+    "CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING": {
         True: [
             "core/hdd/src/wlan_hdd_connectivity_logging.c",
             "components/cmn_services/logging/src/wlan_connectivity_logging.c",
@@ -2435,6 +2435,11 @@ _conditional_srcs = {
     "CONFIG_WLAN_TX_POWERBOOST": {
         True: [
             "core/hdd/src/wlan_hdd_tx_powerboost.c",
+        ],
+    },
+    "CONFIG_WLAN_HAPS_ENABLE": {
+        True: [
+            "components/dp/core/src/wlan_dp_haps.c",
         ],
     },
 }

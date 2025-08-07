@@ -3080,24 +3080,6 @@ void pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 }
 #endif
 
-#ifdef FEATURE_WLAN_DIRECT_CX
-void pld_set_cxpc(struct device *dev)
-{
-	int ret;
-
-	switch (pld_get_bus_type(dev)) {
-	case PLD_BUS_TYPE_PCIE:
-		ret = cnss_set_cxpc(dev, CX_OFF);
-		if (ret)
-			pr_err("Failed to set cxpc. Ret = %d\n", ret);
-		break;
-	default:
-		pr_err("Invalid device type\n");
-		break;
-	}
-}
-#endif
-
 #if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
 int pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
 {

@@ -113,7 +113,7 @@
  */
 #define CFG_RESPONDER_SECURE_LTF_SUPPORT CFG_INI_BOOL( \
 		"enable_responder_secure_ltf_support", \
-		false, \
+		true, \
 		"enable Responder secure LTF support")
 
 /*
@@ -147,7 +147,7 @@
 		"enable_responder_11az_support", \
 		0, \
 		3, \
-		0, \
+		3, \
 		CFG_VALUE_OR_DEFAULT, \
 		"enable Responder 11az support")
 

@@ -1072,6 +1072,10 @@ config QCOM_LTE_COEX
 	bool "Enable QCOM LTE Coex feature"
 	default n
 
+config FEATURE_WLAN_SAP_COEX_CHECK_BW
+	bool "Enable SAP Coex check with bandwidth feature"
+	default n
+
 config QCOM_TDLS
 	bool "Enable TDLS feature"
 	default n
@@ -2119,6 +2123,12 @@ config WLAN_SUPPORT_LAPB
 config WLAN_FEATURE_LATENCY_SENSITIVE_REO
 	bool "enable WLAN_FEATURE_LATENCY_SENSITIVE_REO"
 	default n
+
+config WLAN_HAPS_ENABLE
+	bool "Enable CONFIG_WLAN_HAPS_ENABLE"
+	default n
+	help
+	This option enables the Host Aware Power Save feature.
 
 config WLAN_CTRL_NAME
 	string "Enable CONFIG_WLAN_CTRL_NAME"

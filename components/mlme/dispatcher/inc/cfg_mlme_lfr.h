@@ -2247,7 +2247,7 @@
 	"gDelayBeforeVdevStop", \
 	2, \
 	200, \
-	20, \
+	10, \
 	CFG_VALUE_OR_DEFAULT, \
 	"wait time for tx complete before vdev stop")
 /*

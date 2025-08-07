@@ -4009,6 +4009,11 @@ cm_roam_print_frame_info(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < frame_data->num_frame; i++) {
 		cached_vdev_id = vdev_id;
 		frame_info = &frame_data->frame_info[i];
+
+		mlme_rl_nofl_info("VDEV[%d] Auth algo: %d, bssid: " QDF_MAC_ADDR_FMT,
+				  vdev_id, frame_info->auth_algo,
+				  QDF_MAC_ADDR_REF(frame_info->bssid.bytes));
+
 		/*
 		 * For SAE auth frame, since host sends the authentication
 		 * frames, its cached in the TX/RX path and the cached

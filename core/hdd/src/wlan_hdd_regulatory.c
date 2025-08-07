@@ -2067,6 +2067,10 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 	bool reg_flag;
 
 	pdev_priv = wlan_pdev_get_ospriv(pdev);
+	if (!pdev_priv) {
+		hdd_err("pdev_priv null");
+		return;
+	}
 	wiphy = pdev_priv->wiphy;
 	hdd_ctx = wiphy_priv(wiphy);
 

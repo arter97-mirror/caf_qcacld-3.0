@@ -1276,6 +1276,28 @@ int hdd_vdev_send_sta_keep_alive_interval(struct wlan_hdd_link_info *link_info,
  */
 void wlan_hdd_save_sta_keep_alive_interval(struct hdd_adapter *adapter,
 					   uint16_t sta_alive_interval);
+
+/**
+ * wlan_hdd_get_standby_link_chan_info() - get channel info of standby link in
+ * mlo link connection and copied in chan_info structure
+ * @adapter: HDD adapter pointer
+ * @link_id: Link id of standby link
+ * @chan_info: channel info from wlan channel structure
+ */
+
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+int
+wlan_hdd_get_standby_link_chan_info(struct hdd_adapter *adapter, int link_id,
+				    struct wlan_channel *chan_info);
+#else
+static inline int
+wlan_hdd_get_standby_link_chan_info(struct hdd_adapter *adapter, int link_id,
+				    struct wlan_channel *chan_info)
+{
+	return -EINVAL;
+}
+#endif
+
 /**
  * hdd_convert_phy_bw_to_nl_bw - Convert phy bandwidth to nl bandwidth
  * @bw: phy bandwidth

@@ -92,6 +92,11 @@ __hdd_sysfs_apfmode_store(struct hdd_context *hdd_ctx,
 	if (kstrtou32(token, 0, &value))
 		return -EINVAL;
 
+	if (value < 0 || value > 4) {
+		hdd_err_rl("invalid apfmode value %d, must be between 0-4", value);
+		return -EINVAL;
+	}
+
 	hdd_debug("apfmode %d", value);
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,

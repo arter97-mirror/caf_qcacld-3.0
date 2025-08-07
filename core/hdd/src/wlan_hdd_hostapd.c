@@ -3694,6 +3694,7 @@ stopbss:
 		uint8_t *we_custom_event;
 		char *stopBssEvent = "STOP-BSS.response";       /* 17 */
 		int event_len = strlen(stopBssEvent);
+		uint8_t link_id;
 
 		/* Change the BSS state now since, as we are shutting
 		 * things down, we don't want interfaces to become
@@ -3701,6 +3702,15 @@ stopbss:
 		 */
 		hostapd_state->bss_state = BSS_STOP;
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
+		if (!cds_is_driver_recovering() || cds_is_driver_unloading()) {
+			if (vdev) {
+				link_id = wlan_vdev_get_link_id(vdev);
+				ucfg_crypto_free_key_by_link_id(hdd_ctx->psoc,
+							&link_info->link_addr,
+							link_id);
+			}
+		}
+
 		if (vdev) {
 			ucfg_dp_set_bss_state_start(vdev, false);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
@@ -4568,7 +4578,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	struct ch_params ch_params = {0};
 	struct hdd_adapter *ap_adapter;
 	struct wlan_hdd_link_info *link_info;
-	uint32_t sap_ch_freq, intf_ch_freq, temp_ch_freq;
+	uint32_t sap_ch_freq, intf_ch_freq, temp_ch_freq, center_freq;
 	struct sap_context *sap_context;
 	enum sap_csa_reason_code csa_reason =
 		CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
@@ -4631,8 +4641,10 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		sap_context->csa_reason = CSA_REASON_LL_LT_SAP_EVENT;
 		goto force_restart_chan;
 	} else {
-		intf_ch_freq = wlansap_get_chan_band_restrict(sap_context,
-							      &csa_reason);
+		intf_ch_freq =
+			wlansap_get_chan_band_restrict(sap_context,
+						       &csa_reason,
+						       &ch_params.ch_width);
 		if (!intf_ch_freq &&
 		    (csa_reason == CSA_REASON_CHAN_DISABLED ||
 		     csa_reason == CSA_REASON_BAND_RESTRICTED)) {
@@ -4645,6 +4657,15 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 
 	if (intf_ch_freq && intf_ch_freq != sap_context->chan_freq)
 		goto sap_restart;
+
+	if (csa_reason == CSA_REASON_UNSAFE_CHANNEL && intf_ch_freq &&
+	    (intf_ch_freq != sap_context->chan_freq ||
+	     ch_params.ch_width != sap_context->ch_params.ch_width)) {
+		wlansap_get_csa_chanwidth_from_phymode(sap_context,
+						       intf_ch_freq,
+						       &ch_params);
+		goto sap_restart;
+	}
 
 	/*
 	 * If STA+SAP sessions are on DFS channel and STA+SAP SCC is
@@ -4743,9 +4764,13 @@ sap_restart:
 					sap_context, intf_ch_freq,
 					&ch_params);
 
+	if (ch_params.mhz_freq_seg1)
+		center_freq = ch_params.mhz_freq_seg1;
+	else
+		center_freq = ch_params.mhz_freq_seg0;
 	if (sap_context->csa_reason == CSA_REASON_UNSAFE_CHANNEL &&
 	    (!policy_mgr_check_bw_with_unsafe_chan_freq(hdd_ctx->psoc,
-							ch_params.mhz_freq_seg0,
+							center_freq,
 							ch_params.ch_width))) {
 		hdd_debug("SAP bw shrink to 20M for unsafe from %d", ch_params.ch_width);
 		ch_params.ch_width = CH_WIDTH_20MHZ;
@@ -8026,8 +8051,10 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		goto error;
 	}
 
-	/* Cancel all ongoing/pending no sap scan requests */
-	hdd_abort_non_sap_scan_all_adapters(hdd_ctx);
+	if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, link_info->vdev_id)) {
+		/* Cancel all ongoing/pending no sap scan requests */
+		hdd_abort_non_sap_scan_all_adapters(hdd_ctx);
+	}
 
 	status = wlansap_start_bss(sap_ctx, sap_event_callback, config);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {

@@ -133,53 +133,70 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 	    qdf_atomic_dec_and_test(&tdls_soc->timer_cnt)) {
 		tdls_process_mlo_cal_tdls_link_score(vdev);
 		select_vdev = tdls_process_mlo_choice_tdls_vdev(vdev);
+
+		/*
+		 * If select vdev is present, then TDLS discovery response is
+		 * received and one of the link will be used for TDLS connection
+		 *
+		 * If there is no discovery response on both the vdev, then the
+		 * select_vdev will be NULL & the TDLS link should be set to
+		 * unforce. When the TDLS discovery response is retried, the
+		 * link will be forced to active again.
+		 */
+		if (!select_vdev) {
+			tdls_debug("no discovery response");
+			goto update_link_status_and_unforce;
+		}
+
+		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(select_vdev);
+		if (!tdls_vdev)
+			return;
+
 		tdls_link_vdev = tdls_mlo_get_tdls_link_vdev(vdev);
 		if (!tdls_link_vdev) {
 			tdls_err("tdls link vdev is null");
+			goto cleanup;
+		}
+
+		/*
+		 * TDLS connection already present on other vdev.
+		 * Ignore this TDLS discovery.
+		 */
+		if (tdls_link_vdev != select_vdev) {
+			tdls_debug("tdls link created on vdev %d",
+				   wlan_vdev_get_id(tdls_link_vdev));
+			goto cleanup;
+		}
+
+		if (!tdls_vdev->rx_mgmt) {
+			tdls_debug("vdev %d doesn't have discovery response cached",
+				   wlan_vdev_get_id(tdls_link_vdev));
 			return;
 		}
 
-		if (select_vdev) {
-			tdls_vdev = wlan_vdev_get_tdls_vdev_obj(select_vdev);
-			if (!tdls_vdev)
-				return;
+		rx_mgmt = tdls_vdev->rx_mgmt;
+		mac = &rx_mgmt->buf[TDLS_80211_PEER_ADDR_OFFSET];
 
-			if (tdls_link_vdev != select_vdev) {
-				tdls_debug("tdls link created on vdev %d",
-					   wlan_vdev_get_id(tdls_link_vdev));
-				goto exit;
-			}
+		tdls_notice("[TDLS] vdev:%d TDLS Discovery Response, " QDF_MAC_ADDR_FMT " RSSI[%d]<---OTA",
+			    wlan_vdev_get_id(tdls_vdev->vdev),
+			    QDF_MAC_ADDR_REF(mac), rx_mgmt->rx_rssi);
 
-			if (!tdls_vdev->rx_mgmt) {
-				tdls_debug("vdev %d doesn't have discovery response cached",
-					   wlan_vdev_get_id(tdls_link_vdev));
-				return;
-			}
+		if (tdls_soc && tdls_soc->tdls_rx_cb)
+			tdls_soc->tdls_rx_cb(tdls_soc->tdls_rx_cb_data,
+					     rx_mgmt);
+		tdls_recv_discovery_resp(tdls_vdev, mac);
+		tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
 
-			rx_mgmt = tdls_vdev->rx_mgmt;
-			mac = &rx_mgmt->buf[TDLS_80211_PEER_ADDR_OFFSET];
+cleanup:
+		qdf_mem_free(tdls_vdev->rx_mgmt);
+		tdls_vdev->rx_mgmt = NULL;
+		tdls_vdev->link_score = 0;
 
-			tdls_notice("[TDLS] vdev:%d TDLS Discovery Response, " QDF_MAC_ADDR_FMT " RSSI[%d]<---OTA",
-				    wlan_vdev_get_id(tdls_vdev->vdev),
-				    QDF_MAC_ADDR_REF(mac), rx_mgmt->rx_rssi);
+		return;
 
-			if (tdls_soc && tdls_soc->tdls_rx_cb)
-				tdls_soc->tdls_rx_cb(tdls_soc->tdls_rx_cb_data,
-						     rx_mgmt);
-			tdls_recv_discovery_resp(tdls_vdev, mac);
-			tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
-
-exit:
-			qdf_mem_free(tdls_vdev->rx_mgmt);
-			tdls_vdev->rx_mgmt = NULL;
-			tdls_vdev->link_score = 0;
-
-			return;
-		}
-
-		tdls_debug("no discovery response");
 	}
 
+update_link_status_and_unforce:
 	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
 	if (!tdls_vdev)
 		return;
@@ -213,8 +230,7 @@ exit:
 	}
 
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev) && unforce) {
-		tdls_debug("try to set vdev %d to unforce",
-			   wlan_vdev_get_id(vdev));
+		tdls_debug("Set vdev %d to unforce", wlan_vdev_get_id(vdev));
 		tdls_set_link_unforce(vdev);
 	}
 

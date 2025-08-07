@@ -9401,3 +9401,68 @@ wlan_mlme_get_c2c_support(struct wlan_objmgr_psoc *psoc, bool *value)
 	return mlme_get_c2c_support(psoc, value);
 }
 #endif
+
+#define MIRACAST_OPT_MAX_TIME 20000
+QDF_STATUS wlan_mlme_start_miracast_opt(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_debug("enter");
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	qdf_timer_mod(&mlme_obj->miracast_opt_timer, MIRACAST_OPT_MAX_TIME);
+	qdf_wake_lock_timeout_acquire(&mlme_obj->miracast_opt_wakelock,
+				      MIRACAST_OPT_MAX_TIME);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_stop_miracast_opt(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_debug("enter");
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	qdf_timer_sync_cancel(&mlme_obj->miracast_opt_timer);
+	qdf_wake_lock_release(&mlme_obj->miracast_opt_wakelock,
+			      WIFI_POWER_EVENT_WAKELOCK_MIRACAST_OPT);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void wlan_mlme_miracast_opt_timer_handler(void *arg)
+{
+	mlme_debug("enter");
+
+	wma_cli_set_command(0, wmi_pdev_param_power_collapse_enable, 1,
+			    PDEV_CMD);
+}
+
+QDF_STATUS
+wlan_mlme_init_miracast_opt(struct wlan_mlme_psoc_ext_obj *mlme_obj)
+{
+	mlme_debug("enter");
+	qdf_timer_init(NULL, &mlme_obj->miracast_opt_timer,
+		       wlan_mlme_miracast_opt_timer_handler, (void *)mlme_obj,
+		       QDF_TIMER_TYPE_SW);
+
+	qdf_wake_lock_create(&mlme_obj->miracast_opt_wakelock, "miracast_opt");
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_deinit_miracast_opt(struct wlan_mlme_psoc_ext_obj *mlme_obj)
+{
+	mlme_debug("enter");
+	qdf_timer_stop(&mlme_obj->miracast_opt_timer);
+	qdf_timer_free(&mlme_obj->miracast_opt_timer);
+	qdf_wake_lock_destroy(&mlme_obj->miracast_opt_wakelock);
+
+	return QDF_STATUS_SUCCESS;
+}

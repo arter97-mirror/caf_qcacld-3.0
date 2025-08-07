@@ -3533,6 +3533,7 @@ static void sap_validate_chanmode_and_chwidth(struct mac_context *mac_ctx,
 {
 	uint32_t orig_phymode;
 	enum phy_ch_width orig_ch_width;
+	qdf_freq_t sec_ch_2g_freq = 0;
 
 	orig_ch_width = sap_ctx->ch_params.ch_width;
 	orig_phymode = sap_ctx->phyMode;
@@ -3563,10 +3564,19 @@ static void sap_validate_chanmode_and_chwidth(struct mac_context *mac_ctx,
 		sap_ctx->ch_params.ch_width = CH_WIDTH_160MHZ;
 	}
 
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(sap_ctx->chan_freq) &&
+	    sap_ctx->ch_params.ch_width == CH_WIDTH_40MHZ) {
+		if (sap_ctx->ch_params.sec_ch_offset == LOW_PRIMARY_CH)
+			sec_ch_2g_freq = sap_ctx->chan_freq + 20;
+		else if (sap_ctx->ch_params.sec_ch_offset ==
+						HIGH_PRIMARY_CH)
+			sec_ch_2g_freq = sap_ctx->chan_freq - 20;
+	}
+
 	if (orig_ch_width != sap_ctx->ch_params.ch_width)
 		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
 						       sap_ctx->chan_freq,
-						       sap_ctx->ch_params.sec_ch_offset,
+						       sec_ch_2g_freq,
 						       &sap_ctx->ch_params,
 						       REG_CURRENT_PWR_MODE);
 

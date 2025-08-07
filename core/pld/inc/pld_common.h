@@ -2295,20 +2295,6 @@ pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 }
 #endif
 
-#ifdef FEATURE_WLAN_DIRECT_CX
-/**
- * pld_set_cxpc()- Set CXPC Status
- * @dev: device
- *
- * Set cxpc status
- *
- * Return: 0 for success. Negative error codes.
- */
-void pld_set_cxpc(struct device *dev);
-#else
-static inline void pld_set_cxpc(struct device *dev) {}
-#endif
-
 #if defined(DP_FEATURE_RX_BUFFER_RECYCLE) && defined(IPA_OFFLOAD)
 int pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size);
 #else
