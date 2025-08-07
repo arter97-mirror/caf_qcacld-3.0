@@ -26249,6 +26249,33 @@ static void wlan_hdd_update_ap_sme_cap_wiphy(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/**
+ * wlan_hdd_set_link_removal_offload_wiphy() - set link removal offload in wiphy
+ * @wiphy: WIPHY structure pointer
+ * @hdd_ctx: HDD context
+ *
+ * This function update ML SAP link removal offload capabilities in wiphy
+ *
+ * Return: void
+ */
+static inline
+void wlan_hdd_set_link_removal_offload_wiphy(struct wiphy *wiphy,
+					     struct hdd_context *hdd_ctx)
+{
+	if (!wlan_hdd_mlo_sap_link_removal_cap(hdd_ctx))
+		return;
+	wiphy_ext_feature_set(wiphy,
+			      NL80211_EXT_FEATURE_MLD_LINK_REMOVAL_OFFLOAD);
+}
+#else
+static inline
+void wlan_hdd_set_link_removal_offload_wiphy(struct wiphy *wiphy,
+					     struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 static inline
 void wlan_hdd_set_mlo_wiphy_ext_feature(struct wiphy *wiphy,
@@ -26261,6 +26288,7 @@ void wlan_hdd_set_mlo_wiphy_ext_feature(struct wiphy *wiphy,
 		return;
 
 	wiphy->flags |= WIPHY_FLAG_SUPPORTS_MLO;
+	wlan_hdd_set_link_removal_offload_wiphy(wiphy, hdd_ctx);
 }
 #else
 static inline
@@ -30667,6 +30695,22 @@ QDF_STATUS hdd_softap_deauth_all_sta(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+					link_info->link_flags)) {
+			hdd_debug("link removal in progress,don't send deauth");
+			return true;
+		}
+	}
+	return false;
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_del_station() - delete station v2
  * @wiphy: Pointer to wiphy
@@ -30709,7 +30753,7 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 
 	if (QDF_SAP_MODE != adapter->device_mode &&
 	    QDF_P2P_GO_MODE != adapter->device_mode)
-		goto fn_end;
+		return 0;
 
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)mac)) {
 		struct wlan_objmgr_vdev *vdev;
@@ -30729,10 +30773,12 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 						hdd_ctx->psoc,
 						adapter->deflink->vdev_id);
 		}
+		if (wlan_hdd_link_removal_is_in_progress(adapter))
+			return 0;
 
 		if (!QDF_IS_STATUS_SUCCESS(hdd_softap_deauth_all_sta(adapter,
 								     param)))
-			goto fn_end;
+			return 0;
 	} else {
 		sta_info = hdd_get_sta_info_by_mac(
 						&adapter->sta_info_list,
@@ -30788,7 +30834,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 				     STA_INFO_CFG80211_DEL_STATION);
 	}
 
-fn_end:
 	return 0;
 }
 
@@ -32379,6 +32424,7 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	struct hdd_hostapd_state *hostapd_state;
 	struct wlan_hdd_link_info *link_info;
 	uint16_t csa_punct_bitmap;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -32409,6 +32455,10 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	if (!status)
 		return -EINVAL;
 
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
 				    CSA_REASON_USER_INITIATED);
 
@@ -32429,16 +32479,21 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d",
 			csa_params->chandef.chan->center_freq, ret);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return ret;
 	}
 
 	status = qdf_wait_for_event_completion(&hostapd_state->qdf_event,
 					       SME_CMD_START_BSS_TIMEOUT);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wait for qdf_event failed!!");
-	else
+	} else {
+		wlan_set_sap_user_config_freq(vdev,
+			csa_params->chandef.chan->center_freq);
 		hdd_debug("csa done");
+	}
 
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	return ret;
 }
 

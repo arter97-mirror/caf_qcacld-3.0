@@ -15342,7 +15342,30 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 			len_remaining -= len_consumed;
 		}
 
-		if (wme_enabled && WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq)) {
+		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps,
+						 NULL);
+		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
+			eht_caps.support_320mhz_6ghz = 0;
+
+		if (eht_caps.present || sta_prof_he_ie) {
+			eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
+			if (eht_cap_ie) {
+				len_consumed = 0;
+				lim_ieee80211_pack_ehtcap(eht_cap_ie, eht_caps,
+							  he_caps, is_2g, true);
+				len_consumed = eht_cap_ie[1] + 2;
+
+				qdf_mem_copy(p_sta_prof, eht_cap_ie,
+					     len_consumed);
+				qdf_mem_free(eht_cap_ie);
+				p_sta_prof += len_consumed;
+				len_remaining -= len_consumed;
+			} else {
+				pe_err("malloc failed for eht_cap_ie");
+			}
+		}
+
+		if (wme_enabled) {
 			populate_dot11f_wmm_info_station_per_session(mac_ctx,
 				pe_session, &wmm_info);
 
@@ -15370,28 +15393,6 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 			}
 		}
 
-		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps,
-						 NULL);
-		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
-			eht_caps.support_320mhz_6ghz = 0;
-
-		if (eht_caps.present || sta_prof_he_ie) {
-			eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
-			if (eht_cap_ie) {
-				len_consumed = 0;
-				lim_ieee80211_pack_ehtcap(eht_cap_ie, eht_caps,
-							  he_caps, is_2g, true);
-				len_consumed = eht_cap_ie[1] + 2;
-
-				qdf_mem_copy(p_sta_prof, eht_cap_ie,
-					     len_consumed);
-				qdf_mem_free(eht_cap_ie);
-				p_sta_prof += len_consumed;
-				len_remaining -= len_consumed;
-			} else {
-				pe_err("malloc failed for eht_cap_ie");
-			}
-		}
 		sta_prof->num_data = p_sta_prof - sta_prof->data;
 		if (sta_prof->num_data > WLAN_MAX_IE_LEN + MIN_IE_LEN) {
 			sta_prof->data[TAG_LEN_POS] = WLAN_MAX_IE_LEN;

@@ -233,6 +233,12 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 		sap_err("Invalid channel info");
 		return true;
 	}
+
+	if (mac_ctx->mlme_cfg->dfs_cfg.dfs_disable_channel_switch) {
+		sap_debug("dfs channel switch disabled, need to csa to self");
+		return true;
+	}
+
 	ch_params = &ch_switch_info->new_ch_params;
 
 	if (ch_switch_info->orig_chan_width == 0) {

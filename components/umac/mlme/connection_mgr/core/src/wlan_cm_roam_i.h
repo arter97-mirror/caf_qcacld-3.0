@@ -186,24 +186,10 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
  * Return: none
  */
 void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev);
-
-/**
- * cm_update_scan_mlme_for_mlo_roam() - update the scan mlme info
- * on roam sync ind for MLO connection
- * @vdev: Object manager vdev
- *
- * Return: void
- */
-void
-cm_update_scan_mlme_for_mlo_roam(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
 {
 }
-
-static inline
-void cm_update_scan_mlme_for_mlo_roam(struct wlan_objmgr_vdev *vdev)
-{}
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* _WLAN_CM_ROAM_I_H_ */

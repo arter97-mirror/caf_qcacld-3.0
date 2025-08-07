@@ -2948,6 +2948,16 @@ struct wifi_interface_info {
 	/* country string for this association */
 	uint8_t countryStr[REG_ALPHA2_LEN + 1];
 	uint8_t time_slice_duty_cycle;
+	/* link stats valid*/
+	bool link_stats_valid;
+	/* TX success counter */
+	uint32_t link_tx_success;
+	/* TX retries counter */
+	uint32_t link_tx_retries;
+	/* TX failed counter */
+	uint32_t link_tx_failed;
+	/* Overall TX drop counter */
+	uint32_t tx_dropped;
 };
 
 /**

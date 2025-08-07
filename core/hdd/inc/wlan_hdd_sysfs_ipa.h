@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -45,7 +45,19 @@ void hdd_sysfs_ipa_create(struct hdd_adapter *adapter);
  * Return: NONE
  */
 void hdd_sysfs_ipa_destroy(struct hdd_adapter *adapter);
+#else
+static inline
+void hdd_sysfs_ipa_create(struct hdd_adapter *adapter)
+{
+}
 
+static inline
+void hdd_sysfs_ipa_destroy(struct hdd_adapter *adapter)
+{
+}
+#endif
+
+#if defined(WLAN_SYSFS) && defined(IPA_OFFLOAD) && defined(WLAN_UNIT_TEST)
 /**
  * hdd_sysfs_ipa_opt_dp_ctrl_create(): Initialize sysfs file for opt_dp_ctrl
  * filter add
@@ -81,16 +93,6 @@ void hdd_sysfs_ipa_opt_dp_ctrl_rm_create(struct kobject *driver_kobject);
  */
 void hdd_sysfs_ipa_opt_dp_ctrl_rm_destroy(struct kobject *driver_kobject);
 #else
-static inline
-void hdd_sysfs_ipa_create(struct hdd_adapter *adapter)
-{
-}
-
-static inline
-void hdd_sysfs_ipa_destroy(struct hdd_adapter *adapter)
-{
-}
-
 static inline
 void hdd_sysfs_ipa_opt_dp_ctrl_create(struct kobject *driver_kobject)
 {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,14 +21,18 @@
 #include <wlan_hdd_sysfs.h>
 #include "osif_sync.h"
 #include "wlan_dp_ucfg_api.h"
+#include <qdf_net_types.h>
 
 #ifdef IPA_OFFLOAD
 #define MAX_USER_COMMAND_SIZE_IPAUCSTAT 4
 #define MAX_OPT_DP_CTRL_FLT_ADD_CMD_SIZE 250
 #define MAX_OPT_DP_CTRL_FLT_DEL_CMD_SIZE 50
 #define IPV6ARRAY 4
+#define IPV4ARRAY_U8 4
 #define IPV6ARRAY_U8 16
 #define IPV6ARRAY_U16 8
+#define IPA_OPT_DP_RESV 1
+#define IPA_OPT_DP_RELEASE 4
 
 static ssize_t __hdd_sysfs_ipaucstate_store(struct net_device *net_dev,
 					    const char __user *buf,
@@ -114,17 +118,30 @@ static ssize_t hdd_sysfs_ipaucstate_store(struct device *dev,
 	return err_size;
 }
 
-static uint32_t convert_ip(char *sptr)
+static DEVICE_ATTR(ipaucstat, 0220,
+		   NULL, hdd_sysfs_ipaucstate_store);
+
+void hdd_sysfs_ipa_create(struct hdd_adapter *adapter)
 {
-	uint8_t var[4] = {0};
+	if (device_create_file(&adapter->dev->dev, &dev_attr_ipaucstat))
+		hdd_err("could not create wlan sysfs file");
+}
+
+void hdd_sysfs_ipa_destroy(struct hdd_adapter *adapter)
+{
+	device_remove_file(&adapter->dev->dev, &dev_attr_ipaucstat);
+}
+
+#ifdef WLAN_UNIT_TEST
+static int convert_ip(char *sptr)
+{
+	uint8_t var[IPV4ARRAY_U8] = {0};
 	uint8_t i = 0;
 	char *token;
 	uint32_t ip;
 
 	token = strsep(&sptr, ".");
-	while (token) {
-		if (!token)
-			break;
+	while (token && i < IPV4ARRAY_U8) {
 		if (kstrtou8(token, 0, &var[i]))
 			return -EINVAL;
 		i++;
@@ -132,50 +149,31 @@ static uint32_t convert_ip(char *sptr)
 	}
 
 	ip = (var[0] << 24) | (var[1] << 16) | (var[2] << 8) | (var[3]);
-	ipa_debug("ip %u", ip);
+	ipa_debug("opt_dp_ctrl, ipv4 = 0x%x", ip);
 
 	return ip;
 }
 
 static int parse_ipv6(char *str_ptr, uint32_t *ipv6_addr)
 {
-	uint8_t temp_addr[IPV6ARRAY_U8];
-	uint8_t *curr_ptr = temp_addr;
-	int value = 0;
-	int digits = 0;
-	uint16_t digit_value;
-	int i;
+	int ret, i;
+	u8 addr[IPV6ARRAY_U8] = {0};
 
-	for (i = 0; i < IPV6ARRAY; i++)
-		ipv6_addr[i] = 0;
+	if (!str_ptr || !*str_ptr)
+		return -EINVAL;
 
-	for (i = 0; i < IPV6ARRAY_U16; i++) {
-		if (*str_ptr == ':')
-			str_ptr++;
-
-		value = 0;
-		digits = 0;
-		while (*str_ptr && *str_ptr != ':' && digits < 4) {
-			if (kstrtou16(str_ptr, 16, &digit_value) &&
-			    digit_value < 0)
-				return -EINVAL;
-
-			value = (value << 4) | digit_value;
-			digits++;
-			str_ptr++;
-		}
-
-		*curr_ptr++ = (value >> 8) & 0xff;
-		*curr_ptr++ = value & 0xff;
+	ret = qdf_in6_pton(str_ptr, addr);
+	if (ret != 1) {
+		ipa_err("Failed to parse IPv6 address: %s", str_ptr);
+		return -EINVAL;
 	}
 
-	/* Convert the uint8_t array to uint32_t array */
-	for (i = 0; i < IPV6ARRAY; ++i) {
-		ipv6_addr[i] = (temp_addr[i * 4] << 24) |
-				(temp_addr[i * 4 + 1] << 16) |
-				(temp_addr[i * 4 + 2] << 8) |
-				temp_addr[i * 4 + 3];
-		ipa_debug("opt_dp_ctrl, ipv6_array[%d] %d", i, ipv6_addr[i]);
+	for (i = 0; i < IPV6ARRAY; i++) {
+		ipv6_addr[i] = (addr[4 * i] << 24) |
+			       (addr[4 * i + 1] << 16) |
+			       (addr[4 * i + 2] << 8) |
+			       (addr[4 * i + 3]);
+		ipa_debug("opt_dp_ctrl, ipv6_addr[%d] = 0x%x", i, ipv6_addr[i]);
 	}
 
 	return 0;
@@ -194,6 +192,7 @@ static ssize_t __hdd_sysfs_ipaoptdpctrl_store(struct hdd_context *hdd_ctx,
 	uint32_t sipv4, dipv4;
 	char *sipv6, *dipv6;
 	int i = 0;
+	uint8_t module = 0;
 
 	hdd_enter();
 
@@ -209,8 +208,19 @@ static ssize_t __hdd_sysfs_ipaoptdpctrl_store(struct hdd_context *hdd_ctx,
 		return ret;
 	}
 
+	qdf_mem_zero(&ipa_flt_add_params, sizeof(ipa_flt_add_params));
 	sptr = cmd;
 	/* Get num_tuples */
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+
+	if (kstrtou8(token, 0, &module))
+		return -EINVAL;
+
+	if (module == IPA_OPT_DP_RESV)
+		goto out;
+
 	token = strsep(&sptr, " ");
 	if (!token)
 		return -EINVAL;
@@ -285,7 +295,9 @@ static ssize_t __hdd_sysfs_ipaoptdpctrl_store(struct hdd_context *hdd_ctx,
 		ipa_flt_add_params.flt_info[i].protocol = 17;
 	}
 
-	ucfg_ipa_set_opt_dp_ctrl_flt(hdd_ctx->pdev, &ipa_flt_add_params);
+out:
+	ucfg_ipa_set_opt_dp_ctrl_flt(hdd_ctx->pdev, &ipa_flt_add_params,
+				     module);
 	hdd_exit();
 
 	return count;
@@ -337,6 +349,7 @@ static ssize_t __hdd_sysfs_ipaoptdpctrlrm_store(struct hdd_context *hdd_ctx,
 	char *sptr, *token;
 	struct ipa_wdi_opt_dpath_flt_rem_cb_params ipa_flt_rm_params;
 	int i = 0;
+	uint8_t module = 0;
 
 	hdd_enter();
 
@@ -352,8 +365,19 @@ static ssize_t __hdd_sysfs_ipaoptdpctrlrm_store(struct hdd_context *hdd_ctx,
 		return ret;
 	}
 
+	qdf_mem_zero(&ipa_flt_rm_params, sizeof(ipa_flt_rm_params));
 	sptr = cmd;
 	/* Get num_tuples */
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+
+	if (kstrtou8(token, 0, &module))
+		return -EINVAL;
+
+	if (module == IPA_OPT_DP_RELEASE)
+		goto out;
+
 	token = strsep(&sptr, " ");
 	if (!token)
 		return -EINVAL;
@@ -370,7 +394,9 @@ static ssize_t __hdd_sysfs_ipaoptdpctrlrm_store(struct hdd_context *hdd_ctx,
 			return -EINVAL;
 	}
 
-	ucfg_ipa_set_opt_dp_ctrl_flt_rm(hdd_ctx->pdev, &ipa_flt_rm_params);
+out:
+	ucfg_ipa_set_opt_dp_ctrl_flt_rm(hdd_ctx->pdev, &ipa_flt_rm_params,
+					module);
 	hdd_exit();
 
 	return count;
@@ -413,25 +439,11 @@ static ssize_t hdd_sysfs_ipaoptdpctrlrm_store(struct kobject *kobj,
 	return errno_size;
 }
 
-static DEVICE_ATTR(ipaucstat, 0220,
-		   NULL, hdd_sysfs_ipaucstate_store);
-
 static struct kobj_attribute ipaoptdpctrl_attribute =
 	__ATTR(ipaoptdpctrl, 0220, NULL, hdd_sysfs_ipaoptdpctrl_store);
 
 static struct kobj_attribute ipaoptdpctrlrm_attribute =
 	__ATTR(ipaoptdpctrlrm, 0220, NULL, hdd_sysfs_ipaoptdpctrlrm_store);
-
-void hdd_sysfs_ipa_create(struct hdd_adapter *adapter)
-{
-	if (device_create_file(&adapter->dev->dev, &dev_attr_ipaucstat))
-		hdd_err("could not create wlan sysfs file");
-}
-
-void hdd_sysfs_ipa_destroy(struct hdd_adapter *adapter)
-{
-	device_remove_file(&adapter->dev->dev, &dev_attr_ipaucstat);
-}
 
 void hdd_sysfs_ipa_opt_dp_ctrl_create(struct kobject *driver_kobject)
 {
@@ -482,4 +494,5 @@ void hdd_sysfs_ipa_opt_dp_ctrl_rm_destroy(struct kobject *driver_kobject)
 
 	sysfs_remove_file(driver_kobject, &ipaoptdpctrlrm_attribute.attr);
 }
+#endif
 #endif

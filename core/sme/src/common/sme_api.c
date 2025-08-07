@@ -15821,12 +15821,17 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 		sme_err("Failed to set scan mode for 6 GHz, %d", status);
 }
 
+#define BA_BUFF_SIZE_512                 5
+#define CMD_DISABLE_BW_SUBFRAME_SIZING   0x48
+#define PARAM_DISABLE_BW_SUBFRAME_SIZING 702
+
 void sme_config_ba_mode_all_vdevs(mac_handle_t mac_handle, uint8_t val)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	uint8_t vdev_id;
 	int ret_val = 0;
 	struct wlan_objmgr_vdev *vdev;
+	uint32_t arg[2];
 
 	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
 		vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev,
@@ -15846,6 +15851,17 @@ void sme_config_ba_mode_all_vdevs(mac_handle_t mac_handle, uint8_t val)
 		else
 			sme_debug("vdev: %d ba mode: %d param id %d",
 				  vdev_id, val, wmi_vdev_param_set_ba_mode);
+		if (val == BA_BUFF_SIZE_512) {
+			arg[0] = PARAM_DISABLE_BW_SUBFRAME_SIZING;
+			arg[1] = 0;
+			ret_val =
+			sme_send_unit_test_cmd(vdev_id,
+					       CMD_DISABLE_BW_SUBFRAME_SIZING,
+					       2, arg);
+			if (QDF_IS_STATUS_ERROR(ret_val))
+				sme_err("Failed to disable bw based subframe sizing");
+		}
+
 	}
 }
 #endif
