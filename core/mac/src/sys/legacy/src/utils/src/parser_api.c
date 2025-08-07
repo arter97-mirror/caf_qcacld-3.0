@@ -68,6 +68,7 @@
 #endif
 
 #include <wlan_vdev_mgr_utils_api.h>
+#include <wlan_dnw_api.h>
 
 #define BW_160 160
 
@@ -1714,18 +1715,30 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 	band = wlan_reg_freq_to_band(pe_session->curr_op_freq);
 	band_mask = 1 << band;
 
-	ch_params.ch_width = pe_session->ch_width;
-	ch_params.mhz_freq_seg0 =
-		wlan_reg_chan_band_to_freq(mac->pdev,
-					   pe_session->ch_center_freq_seg0,
-					   band_mask);
-
-	if (pe_session->ch_center_freq_seg1)
+	if (pe_session->opmode == QDF_SAP_MODE &&
+	    lim_is_session_eht_capable(pe_session) &&
+	    pe_session->he_punc_chan_info.present) {
+		ch_params.mhz_freq_seg0 =
+				pe_session->he_punc_chan_info.center_freq_seg0;
 		ch_params.mhz_freq_seg1 =
-			wlan_reg_chan_band_to_freq(mac->pdev,
-						   pe_session->ch_center_freq_seg1,
-						   band_mask);
+				pe_session->he_punc_chan_info.center_freq_seg1;
+		ch_params.ch_width = pe_session->he_punc_chan_info.chan_width;
+	} else {
+		ch_params.ch_width = pe_session->ch_width;
+		ch_params.mhz_freq_seg0 = wlan_reg_chan_band_to_freq(
+						mac->pdev,
+						pe_session->ch_center_freq_seg0,
+						band_mask);
+		if (pe_session->ch_center_freq_seg1)
+			ch_params.mhz_freq_seg1 =
+					wlan_reg_chan_band_to_freq(
+						mac->pdev,
+						pe_session->ch_center_freq_seg1,
+						band_mask);
+	}
 
+	ch_params.ch_width = wlan_dnw_update_bandwidth(pe_session->vdev,
+						       pe_session->ch_width);
 	if (band == (REG_BAND_2G) && ch_params.ch_width == CH_WIDTH_40MHZ) {
 		if (ch_params.mhz_freq_seg0 ==  pe_session->curr_op_freq + 10)
 			sec_chan_freq = pe_session->curr_op_freq + 20;
@@ -1740,12 +1753,12 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 
 	pDot11f->present = 1;
 
-	if (pe_session->ch_width > CH_WIDTH_40MHZ) {
+	if (ch_params.ch_width > CH_WIDTH_40MHZ) {
 		pDot11f->chanWidth = 1;
 		pDot11f->chan_center_freq_seg0 =
 			ch_params.center_freq_seg0;
-		if (pe_session->ch_width == CH_WIDTH_80P80MHZ ||
-				pe_session->ch_width == CH_WIDTH_160MHZ)
+		if (ch_params.ch_width == CH_WIDTH_80P80MHZ ||
+		    ch_params.ch_width == CH_WIDTH_160MHZ)
 			pDot11f->chan_center_freq_seg1 =
 				ch_params.center_freq_seg1;
 		else
@@ -5062,6 +5075,10 @@ sir_convert_reassoc_req_frame2_struct(struct mac_context *mac,
 			     &ar->he_6ghz_band_cap,
 			     sizeof(tDot11fIEhe_6ghz_band_cap));
 	}
+	if (ar->qcn_ie.present) {
+		qdf_mem_copy(&pAssocReq->qcn_ie, &ar->qcn_ie,
+			     sizeof(tDot11fIEqcn_ie));
+	}
 
 	sir_convert_reassoc_req_frame2_eht_struct(ar, pAssocReq);
 	sir_convert_reassoc_req_frame2_mlo_struct(pFrame, nFrame,
@@ -8291,8 +8308,11 @@ populate_dot11f_he_operation(struct mac_context *mac_ctx,
 			     struct pe_session *session, tDot11fIEhe_op *he_op)
 {
 	enum reg_6g_ap_type ap_pwr_type;
+	enum phy_ch_width ch_width;
+
 	qdf_mem_copy(he_op, &session->he_op, sizeof(*he_op));
 
+	ch_width = wlan_dnw_update_bandwidth(session->vdev, session->ch_width);
 	he_op->present = 1;
 	he_op->vht_oper_present = 0;
 	if (session->he_6ghz_band ||
@@ -8300,11 +8320,11 @@ populate_dot11f_he_operation(struct mac_context *mac_ctx,
 	    WLAN_REG_IS_6GHZ_CHAN_FREQ(session->curr_op_freq))) {
 		he_op->oper_info_6g_present = 1;
 		if (session->bssType != eSIR_INFRA_AP_MODE) {
-			he_op->oper_info_6g.info.ch_width = session->ch_width;
+			he_op->oper_info_6g.info.ch_width = ch_width;
 			he_op->oper_info_6g.info.center_freq_seg0 =
 						session->ch_center_freq_seg0;
-			if (session->ch_width == CH_WIDTH_80P80MHZ ||
-			    session->ch_width == CH_WIDTH_160MHZ) {
+			if (ch_width == CH_WIDTH_80P80MHZ ||
+			    ch_width == CH_WIDTH_160MHZ) {
 				he_op->oper_info_6g.info.center_freq_seg1 =
 					session->ch_center_freq_seg1;
 				he_op->oper_info_6g.info.ch_width =
@@ -10536,6 +10556,8 @@ QDF_STATUS populate_dot11f_eht_operation(struct mac_context *mac_ctx,
 	eht_op->eht_op_information_present = 1;
 
 	oper_ch_width = wlan_mlme_get_ap_oper_ch_width(session->vdev);
+	oper_ch_width = wlan_dnw_update_bandwidth(session->vdev,
+						  oper_ch_width);
 	if (oper_ch_width == CH_WIDTH_320MHZ) {
 		eht_op->channel_width = WLAN_EHT_CHWIDTH_320;
 		eht_op->ccfs0 = session->ch_center_freq_seg0;

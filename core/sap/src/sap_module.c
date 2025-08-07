@@ -4139,9 +4139,10 @@ done:
 }
 
 qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
-					  enum sap_csa_reason_code *csa_reason)
+					  enum sap_csa_reason_code *csa_reason,
+					  enum phy_ch_width *ch_width)
 {
-	uint32_t restart_freq;
+	uint32_t restart_freq, center_freq;
 	uint16_t intf_ch_freq;
 	uint32_t phy_mode;
 	struct mac_context *mac;
@@ -4177,6 +4178,11 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 	sta_sap_scc_on_indoor_channel =
 		policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(mac->psoc);
 	sap_band = wlan_reg_freq_to_band(sap_ctx->chan_freq);
+
+	if (sap_ctx->ch_params.mhz_freq_seg1)
+		center_freq = sap_ctx->ch_params.mhz_freq_seg1;
+	else
+		center_freq = sap_ctx->ch_params.mhz_freq_seg0;
 
 	sap_debug("SAP/Go current band: %d, pdev band capability: %d, cur freq %d (is valid %d), prev freq %d (is valid %d)",
 		  sap_band, band, sap_ctx->chan_freq,
@@ -4265,7 +4271,17 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		sap_debug("channel is unsafe");
 		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
 		return wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx,
-								       NULL);
+								       ch_width);
+	} else if (!policy_mgr_is_sap_safe_with_bw(mac->psoc,
+			wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
+			sap_ctx->acs_cfg ? sap_ctx->acs_cfg->acs_mode : false,
+			sap_ctx->chan_freq, center_freq,
+			sap_ctx->ch_params.ch_width)) {
+		sap_debug("channel with bw %d center %d is unsafe",
+			  sap_ctx->ch_params.ch_width, center_freq);
+		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
+		return wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx,
+								       ch_width);
 	} else if (sap_band == REG_BAND_6G &&
 		   wlan_reg_get_keep_6ghz_sta_cli_connection(mac->pdev)) {
 		ch_params.ch_width = sap_ctx->ch_params.ch_width;

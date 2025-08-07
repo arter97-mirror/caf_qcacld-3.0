@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1218,13 +1218,11 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			break;
 		} else if (!is_csa_needed && chan_freq) {
 			mac_ctx->sap.SapDfsInfo.target_chan_freq = chan_freq;
+			sap_ctx->sap_radar_found_status = true;
+			break;
 		} else {
 			mac_ctx->sap.SapDfsInfo.target_chan_freq =
 						sap_indicate_radar(sap_ctx);
-			if (mac_ctx->sap.SapDfsInfo.target_chan_freq != 0) {
-				sap_cac_reset_notify(mac_handle);
-				break;
-			}
 		}
 
 		/* if there is an assigned next channel hopping */
@@ -1239,6 +1237,11 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		    !mac_ctx->sap.SapDfsInfo.target_chan_freq) {
 			/* Return from here, processing will be done later */
 			goto EXIT;
+		}
+
+		if (mac_ctx->sap.SapDfsInfo.target_chan_freq != 0) {
+			sap_cac_reset_notify(mac_handle);
+			break;
 		}
 
 		/* Issue stopbss for each sapctx */
