@@ -16532,9 +16532,45 @@ wlan_hdd_disable_roaming(struct hdd_adapter *cur_adapter,
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_DISABLE_ROAMING;
+	struct wlan_objmgr_psoc *psoc = NULL;
 
-	if (!policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc))
+	if (rso_op_requestor == RSO_IOCTL_SET) {
+		psoc = hdd_ctx->psoc;
+		if (!psoc) {
+			hdd_info("psoc is NULL.");
+		} else {
+			if (!psoc->roam_enabled) {
+				hdd_info("roaming has already been disabled.");
+				return;
+			}
+			qdf_spin_lock_bh(&psoc->roam_set_lock);
+			psoc->roam_enabled = false;
+			qdf_spin_unlock_bh(&psoc->roam_set_lock);
+		}
+
+		if (hdd_is_roaming_in_progress(hdd_ctx)) {
+			hdd_info("roaming in progress, roam disable take effect later.");
+			return;
+		}
+	}
+
+	if (cur_adapter->device_mode == QDF_STA_MODE) {
+		if (hdd_cm_is_vdev_associated(cur_adapter)) {
+			hdd_info("Disable roaming.");
+			sme_stop_roaming(hdd_ctx->mac_handle,
+					 cur_adapter->vdev_id,
+					 REASON_DRIVER_DISABLED,
+					 rso_op_requestor);
+		} else {
+			hdd_info("the current sta is not associated.");
+		}
+	}
+
+	if (!policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc)) {
+		if (rso_op_requestor == RSO_IOCTL_SET)
+			hdd_info("no sta is active, roam disable take effect later.");
 		return;
+	}
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
@@ -16561,9 +16597,45 @@ wlan_hdd_enable_roaming(struct hdd_adapter *cur_adapter,
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_ENABLE_ROAMING;
+	struct wlan_objmgr_psoc *psoc = NULL;
 
-	if (!policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc))
+	if (rso_op_requestor == RSO_IOCTL_SET) {
+		psoc = hdd_ctx->psoc;
+		if (!psoc) {
+			hdd_info("psoc is NULL.");
+		} else {
+			if (psoc->roam_enabled) {
+				hdd_info("roaming has already been enabled.");
+				return;
+			}
+			qdf_spin_lock_bh(&psoc->roam_set_lock);
+			psoc->roam_enabled = true;
+			qdf_spin_unlock_bh(&psoc->roam_set_lock);
+		}
+
+		if (hdd_is_roaming_in_progress(hdd_ctx)) {
+			hdd_info("roaming in progress, roam set take effect later.");
+			return;
+		}
+	}
+
+	if (cur_adapter->device_mode == QDF_STA_MODE) {
+		if (hdd_cm_is_vdev_associated(cur_adapter)) {
+			hdd_info("Enable roaming.");
+			sme_start_roaming(hdd_ctx->mac_handle,
+					  cur_adapter->vdev_id,
+					  REASON_DRIVER_ENABLED,
+					  rso_op_requestor);
+		} else {
+			hdd_info("the current sta is not associated");
+		}
+	}
+
+	if (!policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc)) {
+		if (rso_op_requestor == RSO_IOCTL_SET)
+			hdd_info("no sta is active, roam set take effect later.");
 		return;
+	}
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
