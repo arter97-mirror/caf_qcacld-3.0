@@ -134,6 +134,7 @@ struct dp_rtpm_tput_policy_context {
  * be sent to FW.
  * @lro_enable: Enable/Disable lro
  * @gro_enable: Enable/Disable gro
+ * @haps_config: Store the HAPS power save config
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -201,6 +202,9 @@ struct wlan_dp_psoc_cfg {
 
 	bool lro_enable;
 	bool gro_enable;
+#ifdef WLAN_HAPS_ENABLE
+	uint32_t haps_config;
+#endif
 };
 
 /**
@@ -378,6 +382,7 @@ struct direct_link_info {
  * @direct_link_config: direct link configuration parameters
  * @fpm_ctx: Flow policy manager context
  * @fim_ctx: Flow identification manager context
+ * @haps_ctx: HAPS context
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -443,6 +448,9 @@ struct wlan_dp_intf {
 #ifdef WLAN_SUPPORT_FLOW_PRIORTIZATION
 	struct fpm_table *fpm_ctx;
 	struct fim_vdev_ctx *fim_ctx;
+#endif
+#ifdef WLAN_HAPS_ENABLE
+	struct dp_haps haps_ctx;
 #endif
 };
 

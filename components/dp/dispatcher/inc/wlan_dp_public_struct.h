@@ -35,6 +35,7 @@
 #include <qdf_types.h>
 #include <qdf_hashtable.h>
 #include <qdf_notifier.h>
+#include <qdf_hrtimer.h>
 #include "wlan_dp_rx_thread.h"
 
 #define DP_MAX_SUBTYPES_TRACKED	4
@@ -626,6 +627,8 @@ union wlan_tp_data {
  * @link_monitoring_cb: Callback API to handle link speed change
  * @osif_dp_get_net_dev_from_vdev: Callback API to get net device reference
  * with the vdev
+ * @wlan_dp_haps_update_qtime_sync_period: Callback API to update the qtime
+ * sync period for haps feature
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
@@ -713,6 +716,8 @@ struct wlan_dp_psoc_callbacks {
 				   bool is_link_speed_good);
 	int (*osif_dp_get_net_dev_from_vdev)(struct wlan_objmgr_vdev *vdev,
 					     qdf_netdev_t *netdev);
+	void (*wlan_dp_haps_update_qtime_sync_period)(hdd_cb_handle context,
+						      uint32_t sync_interval);
 };
 
 /**
@@ -893,4 +898,42 @@ struct fpm_table {
 	qdf_atomic_notif_head fpm_policy_event_notif_head;
 };
 
+#ifdef WLAN_HAPS_ENABLE
+enum haps_hist_buckets {
+	HAPS_BUCKET_20_MS,
+	HAPS_BUCKET_40_MS,
+	HAPS_BUCKET_60_MS,
+	HAPS_BUCKET_80_MS,
+	HAPS_BUCKET_100_MS,
+	HAPS_BUCKET_120_MS,
+	HAPS_BUCKET_140_MS,
+	HAPS_BUCKET_BEYOND,
+	HAPS_BUCKET_MAX
+};
+
+struct dp_haps_stats {
+	uint32_t event_received;
+	uint32_t pause_ind;
+	uint32_t oneshot_pause_ind;
+	uint32_t unpause_ind;
+	uint32_t haps_timer_expired;
+	uint32_t fail_safe_timer_expired;
+	uint32_t haps_pause_bucket[HAPS_BUCKET_MAX];
+	qdf_time_t start_time;
+	qdf_time_t last_time;
+	qdf_time_t total_time;
+	qdf_time_t total_pause_time;
+};
+
+struct dp_haps {
+	bool is_enable;
+	bool is_one_shot;
+	uint8_t state;
+	uint8_t vdev_id;
+	struct dp_soc *soc;
+	struct dp_haps_stats stats;
+	qdf_hrtimer_data_t haps_timer;
+	qdf_hrtimer_data_t haps_fail_safe_timer;
+};
+#endif
 #endif /* end  of _WLAN_DP_PUBLIC_STRUCT_H_ */
