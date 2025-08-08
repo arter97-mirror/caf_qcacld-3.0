@@ -601,7 +601,7 @@ int ol_write_ramdump_to_file(uint32_t file_no, int8_t *buf, uint32_t size)
 	ktime_get_real_ts64(&ts);
 
 	/* Create filename with timestamp */
-	snprintf(filename, sizeof(filename), "/home/root/");
+	snprintf(filename, sizeof(filename), "/root/");
 
 	/* Convert rtc to local time */
 	ts.tv_sec -= sys_tz.tz_minuteswest * 60;
