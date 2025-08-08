@@ -60,7 +60,6 @@
 #include <ol_tx_sched.h>           /* ol_tx_sched_attach, etc. */
 #include <ol_txrx.h>
 #include <ol_txrx_types.h>
-#include <ol_cfg.h>
 #include <cdp_txrx_flow_ctrl_legacy.h>
 #include <cdp_txrx_cmn_reg.h>
 #include <cdp_txrx_bus.h>
@@ -77,7 +76,6 @@
 #include "epping_main.h"
 #include <a_types.h>
 #include <cdp_txrx_handle.h>
-#include <cdp_txrx_cmn_reg.h>
 #include "wlan_qct_sys.h"
 
 #include <htt_internal.h>

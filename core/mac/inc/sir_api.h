@@ -40,7 +40,6 @@ struct mac_context;
 #include "sir_mac_prot_def.h"
 #include "ani_system_defs.h"
 #include "sir_params.h"
-#include "cds_regdomain.h"
 #include "wmi_unified.h"
 #include "wmi_unified_param.h"
 #include "ol_txrx_htt_api.h"

@@ -31,7 +31,6 @@
 #include <wlan_hdd_main.h>
 #include <wlan_hdd_assoc.h>
 #include <wlan_hdd_cfg.h>
-#include <linux/string.h>
 #include <qdf_types.h>
 #include <csr_api.h>
 #include <wlan_hdd_misc.h>

@@ -150,17 +150,14 @@
 #include "wlan_hdd_oemdata.h"
 #include "os_if_fwol.h"
 #include "wlan_hdd_sta_info.h"
-#include "sme_api.h"
 #include "wlan_hdd_thermal.h"
 #include <ol_defines.h>
 #include "wlan_hdd_btc_chain_mode.h"
 #include "os_if_nan.h"
-#include "wlan_hdd_apf.h"
 #include "wlan_hdd_cfr.h"
 #include "wlan_hdd_ioctl.h"
 #include "wlan_cm_roam_ucfg_api.h"
 #include "hif.h"
-#include "wlan_reg_ucfg_api.h"
 #include "wlan_hdd_twt.h"
 #include "wlan_hdd_gpio.h"
 #include "wlan_hdd_medium_assess.h"
@@ -466,9 +463,44 @@ static void hdd_init_6ghz(struct hdd_context *hdd_ctx)
 
 	hdd_exit();
 }
+
+/**
+ * wlan_hdd_populate_6g_chan_info() - Populate 6 GHz chan info in hdd context
+ * @hdd_ctx: pointer to hdd context
+ * @index: 6 GHz channel beginning index in chan_info of @hdd_ctx
+ *
+ * Return: Number of 6 GHz channels populated
+ */
+static uint32_t
+wlan_hdd_populate_6g_chan_info(struct hdd_context *hdd_ctx, uint32_t index)
+{
+	uint32_t num_6g, i;
+	struct scan_chan_info *chan_info;
+
+	if (!hdd_ctx->wiphy->bands[HDD_NL80211_BAND_6GHZ] ||
+	    !hdd_ctx->wiphy->bands[HDD_NL80211_BAND_6GHZ]->n_channels) {
+		hdd_debug("6GHz channel list not populated to wiphy");
+		return 0;
+	}
+
+	num_6g = QDF_ARRAY_SIZE(hdd_channels_6_ghz);
+	chan_info = hdd_ctx->chan_info;
+
+	for (i = 0; i < num_6g; i++)
+		chan_info[index + i].freq = hdd_channels_6_ghz[i].center_freq;
+
+	return num_6g;
+}
+
 #else
 static void hdd_init_6ghz(struct hdd_context *hdd_ctx)
 {
+}
+
+static inline uint32_t
+wlan_hdd_populate_6g_chan_info(struct hdd_context *hdd_ctx, uint32_t index)
+{
+	return 0;
 }
 #endif
 
@@ -3388,7 +3420,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 					&sap_config->acs_cfg.pcl_ch_count,
 					sap_config->acs_cfg.
 					pcl_channels_weight_list,
-					NUM_CHANNELS);
+					NUM_CHANNELS, adapter->vdev_id);
 
 	sap_config->acs_cfg.band = hw_mode;
 
@@ -6122,11 +6154,14 @@ static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
 			 *  with SAP on DFS, there cannot be conurrency on
 			 *  single radio. But then we can have multiple
 			 *  radios !!
+			 *
+			 *  Indoor channels are also marked DFS, therefore
+			 *  check if the channel has REGULATORY_CHAN_RADAR
+			 *  channel flag to identify if the channel is DFS
 			 */
-			if (CHANNEL_STATE_DFS ==
-			    wlan_reg_get_channel_state_from_secondary_list_for_freq(
-				hdd_ctx->pdev,
-				ap_ctx->operating_chan_freq)) {
+			if (wlan_reg_is_dfs_for_freq(
+						hdd_ctx->pdev,
+						ap_ctx->operating_chan_freq)) {
 				hdd_err("SAP running on DFS channel");
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
@@ -6142,13 +6177,16 @@ static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
 				WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 			/*
 			 *  if STA is already connected on DFS channel,
-			 *  do not disable scan on dfs channels
+			 *  do not disable scan on dfs channels.
+			 *
+			 *  Indoor channels are also marked DFS, therefore
+			 *  check if the channel has REGULATORY_CHAN_RADAR
+			 *  channel flag to identify if the channel is DFS
 			 */
 			if (hdd_cm_is_vdev_associated(adapter) &&
-			    (CHANNEL_STATE_DFS ==
-			     wlan_reg_get_channel_state_for_freq(
-				hdd_ctx->pdev,
-				sta_ctx->conn_info.chan_freq))) {
+			    wlan_reg_is_dfs_for_freq(
+				    hdd_ctx->pdev,
+				    sta_ctx->conn_info.chan_freq)) {
 				hdd_err("client connected on DFS channel");
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
@@ -12191,7 +12229,8 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 	status = policy_mgr_get_pcl(
 			hdd_ctx->psoc, intf_mode, chan_weights->pcl_list,
 			&chan_weights->pcl_len, chan_weights->weight_list,
-			QDF_ARRAY_SIZE(chan_weights->weight_list));
+			QDF_ARRAY_SIZE(chan_weights->weight_list),
+			adapter->vdev_id);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Get pcl failed");
 		qdf_mem_free(chan_weights);
@@ -12389,7 +12428,7 @@ static int __wlan_hdd_cfg80211_set_probable_oper_channel(struct wiphy *wiphy,
 	/* check pcl table */
 	if (!policy_mgr_allow_concurrency(hdd_ctx->psoc, intf_mode,
 					  ch_freq, HW_MODE_20_MHZ,
-					  conc_ext_flags)) {
+					  conc_ext_flags, adapter->vdev_id)) {
 		hdd_err("Set channel hint failed due to concurrency check");
 		return -EINVAL;
 	}
@@ -22971,7 +23010,7 @@ static void wlan_hdd_chan_info_cb(struct scan_chan_info *info)
 	}
 
 	chan = hdd_ctx->chan_info;
-	for (idx = 0; idx < SIR_MAX_NUM_CHANNELS; idx++) {
+	for (idx = 0; idx < NUM_CHANNELS; idx++) {
 		if (chan[idx].freq == info->freq) {
 			hdd_update_chan_info(hdd_ctx, &chan[idx], info,
 				info->cmd_flag);
@@ -23020,20 +23059,17 @@ void wlan_hdd_init_chan_info(struct hdd_context *hdd_ctx)
 	}
 
 	num_5g = QDF_ARRAY_SIZE(hdd_channels_5_ghz);
-	for (; (index - num_2g) < num_5g; index++) {
-		if (wlan_reg_is_dsrc_freq(
-		    hdd_channels_5_ghz[index - num_2g].center_freq))
-			continue;
+	for (; (index - num_2g) < num_5g; index++)
 		hdd_ctx->chan_info[index].freq =
 			hdd_channels_5_ghz[index - num_2g].center_freq;
-	}
 
 	index = num_2g + num_5g;
-	index = wlan_hdd_populate_5dot9_chan_info(hdd_ctx, index);
+	index += wlan_hdd_populate_5dot9_chan_info(hdd_ctx, index);
+	index += wlan_hdd_populate_6g_chan_info(hdd_ctx, index);
+	hdd_debug("Number of channels populated : %d", index);
 
 	mac_handle = hdd_ctx->mac_handle;
-	sme_set_chan_info_callback(mac_handle,
-				   &wlan_hdd_chan_info_cb);
+	sme_set_chan_info_callback(mac_handle, &wlan_hdd_chan_info_cb);
 }
 
 /**

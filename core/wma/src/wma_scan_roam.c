@@ -81,14 +81,11 @@
 #include <wlan_mlme_main.h>
 #include <wlan_crypto_global_api.h>
 #include <cdp_txrx_mon.h>
-#include <cdp_txrx_ctrl.h>
-#include "wlan_blm_api.h"
 #include "wlan_cm_roam_api.h"
 #ifdef FEATURE_WLAN_DIAG_SUPPORT    /* FEATURE_WLAN_DIAG_SUPPORT */
 #include "host_diag_core_log.h"
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 #include <../../core/src/wlan_cm_roam_i.h>
-#include "wlan_cm_roam_api.h"
 #include "wlan_mlo_mgr_roam.h"
 #ifdef FEATURE_WLAN_EXTSCAN
 #define WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION WAKELOCK_DURATION_RECOMMENDED

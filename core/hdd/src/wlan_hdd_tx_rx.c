@@ -72,7 +72,6 @@
 #include "nan_public_structs.h"
 #include "nan_ucfg_api.h"
 #include <wlan_hdd_sar_limits.h>
-#include "wlan_hdd_object_manager.h"
 #include "wlan_hdd_mlo.h"
 
 #ifdef TX_MULTIQ_PER_AC

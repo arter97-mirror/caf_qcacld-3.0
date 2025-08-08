@@ -452,10 +452,13 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	struct hdd_hostapd_state *hostapd_state;
 	QDF_STATUS status;
 	qdf_freq_t ch_freq = 0;
+	enum phy_ch_width ch_bw;
+	enum channel_state ch_state;
 	struct scan_filter *scan_filter;
 	qdf_list_t *list = NULL;
 	qdf_list_node_t *cur_lst = NULL;
 	struct scan_cache_node *cur_node = NULL;
+	bool is_6ghz_cap = false;
 
 	ap_adapter = hdd_get_sap_adapter_of_dfs(hdd_ctx);
 	/* probably no dfs sap running, no handling required */
@@ -495,11 +498,15 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 		qdf_mem_copy(scan_filter->bssid_list[0].bytes, req->bssid,
 			     QDF_MAC_ADDR_SIZE);
 	}
-	scan_filter->num_of_ssid = 1;
-	scan_filter->ssid_list[0].length =
-				QDF_MIN(req->ssid_len, QDF_MAC_ADDR_SIZE);
-	qdf_mem_copy(scan_filter->ssid_list[0].ssid, req->ssid,
-		     scan_filter->ssid_list[0].length);
+	if (req->ssid_len > WLAN_SSID_MAX_LEN) {
+		scan_filter->num_of_ssid = 0;
+		hdd_err("req ssid len invalid %zu", req->ssid_len);
+	} else {
+		scan_filter->num_of_ssid = 1;
+		scan_filter->ssid_list[0].length = req->ssid_len;
+		qdf_mem_copy(scan_filter->ssid_list[0].ssid, req->ssid,
+			     scan_filter->ssid_list[0].length);
+	}
 	scan_filter->ignore_auth_enc_type = true;
 	list = ucfg_scan_get_result(hdd_ctx->pdev, scan_filter);
 	qdf_mem_free(scan_filter);
@@ -527,16 +534,58 @@ def_chan:
 		return true;
 	}
 
+	if (ch_freq &&
+	    policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(hdd_ctx->psoc) &&
+	    wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) &&
+	    ch_freq == hdd_ap_ctx->operating_chan_freq) {
+		hdd_debug("sta freq allow with running dfs sap %d", ch_freq);
+		return true;
+	}
+
 	/*
 	 * If channel is 0 or DFS or LTE unsafe then better to call pcl and
 	 * find out the best channel. If channel is non-dfs 5 GHz then
 	 * better move SAP to STA's channel to make scc, so we have room
 	 * for 3port MCC scenario.
 	 */
+	ch_bw = hdd_ap_ctx->sap_config.ch_width_orig;
+	if (ch_freq)
+		is_6ghz_cap = policy_mgr_get_ap_6ghz_capable(hdd_ctx->psoc,
+						ap_adapter->vdev_id,
+							     NULL);
+
 	if (!ch_freq || wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, ch_freq) ||
-	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq))
+	    !policy_mgr_is_safe_channel(hdd_ctx->psoc, ch_freq) ||
+	    wlan_reg_is_passive_for_freq(hdd_ctx->pdev, ch_freq) ||
+	    (WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq) && !is_6ghz_cap))
 		ch_freq = policy_mgr_get_nondfs_preferred_channel(
-			hdd_ctx->psoc, PM_SAP_MODE, true);
+				hdd_ctx->psoc, PM_SAP_MODE,
+				true, ap_adapter->vdev_id);
+
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
+	    ch_bw > CH_WIDTH_20MHZ) {
+		struct ch_params ch_params;
+
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
+		ch_params.ch_width = ch_bw;
+		ch_state =
+		wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+				hdd_ctx->pdev, ch_freq, &ch_params,
+				REG_CURRENT_PWR_MODE);
+		while (ch_bw > CH_WIDTH_20MHZ &&
+		       ch_state != CHANNEL_STATE_ENABLE) {
+			ch_bw =
+			wlan_reg_get_next_lower_bandwidth(ch_bw);
+			ch_params.ch_width = ch_bw;
+			ch_state =
+			wlan_reg_get_5g_bonded_channel_state_for_pwrmode
+				(hdd_ctx->pdev, ch_freq, &ch_params,
+				REG_CURRENT_PWR_MODE);
+		}
+		hdd_debug("bw change from %d to %d",
+			  hdd_ap_ctx->sap_config.ch_width_orig,
+			  ch_bw);
+	}
 
 	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
 	qdf_event_reset(&hostapd_state->qdf_event);
@@ -545,7 +594,7 @@ def_chan:
 
 	status = wlansap_set_channel_change_with_csa(
 			WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter), ch_freq,
-			hdd_ap_ctx->sap_config.ch_width_orig, false);
+			ch_bw, false);
 
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("Set channel with CSA IE failed, can't allow STA");

@@ -40,7 +40,6 @@
 #include <linux/ethtool.h>
 #include <wlan_hdd_includes.h>
 #include <qc_sap_ioctl.h>
-#include "osif_sync.h"
 #include <wlan_hdd_hostapd.h>
 #include <wlan_hdd_hostapd_wext.h>
 #include <wlan_hdd_green_ap.h>
@@ -73,7 +72,6 @@
 #include <cdp_txrx_misc.h>
 #include "wlan_hdd_object_manager.h"
 #include <qca_vendor.h>
-#include <cds_api.h>
 #include "wlan_hdd_he.h"
 #include "wlan_hdd_eht.h"
 #include "wlan_dfs_tgt_api.h"
@@ -2020,13 +2018,16 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		wlansap_get_dfs_cac_state(mac_handle, &cac_state);
 
 		/* DFS requirement: DO NOT transmit during CAC. */
-		if (CHANNEL_STATE_DFS !=
-		    wlan_reg_get_channel_state_from_secondary_list_for_freq(
-			hdd_ctx->pdev, ap_ctx->operating_chan_freq) ||
-			ignoreCAC ||
-			(hdd_ctx->dev_dfs_cac_status ==
-			DFS_CAC_ALREADY_DONE) ||
-			(eSAP_DFS_SKIP_CAC == cac_state))
+
+		/* Indoor channels are also marked DFS, therefore
+		 * check if the channel has REGULATORY_CHAN_RADAR
+		 * channel flag to identify if the channel is DFS
+		 */
+		if (!wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
+					      ap_ctx->operating_chan_freq) ||
+		    ignoreCAC ||
+		    hdd_ctx->dev_dfs_cac_status == DFS_CAC_ALREADY_DONE ||
+		    eSAP_DFS_SKIP_CAC == cac_state)
 			ap_ctx->dfs_cac_block_tx = false;
 		else
 			ap_ctx->dfs_cac_block_tx = true;
@@ -2915,10 +2916,13 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		policy_mgr_set_chan_switch_complete_evt(hdd_ctx->psoc);
 		wlan_hdd_enable_roaming(adapter,
 					RSO_SAP_CHANNEL_CHANGE);
-		if (CHANNEL_STATE_DFS !=
-		    wlan_reg_get_channel_state_from_secondary_list_for_freq(
-						hdd_ctx->pdev,
-						ap_ctx->operating_chan_freq))
+
+		/* Indoor channels are also marked DFS, therefore
+		 * check if the channel has REGULATORY_CHAN_RADAR
+		 * channel flag to identify if the channel is DFS
+		 */
+		if (!wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
+					      ap_ctx->operating_chan_freq))
 			ap_ctx->dfs_cac_block_tx = false;
 
 		/* Check any other sap need restart */
@@ -3225,6 +3229,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	struct wlan_objmgr_vdev *vdev;
 	bool strict;
 	uint32_t sta_cnt = 0;
+	struct ch_params ch_params = {0};
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -3305,7 +3310,9 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 		hdd_err("Channel switch in progress!!");
 		return -EBUSY;
 	}
-
+	ch_params.ch_width = target_bw;
+	target_bw = wlansap_get_csa_chanwidth_from_phymode(
+			sap_ctx, target_chan_freq, &ch_params);
 	/*
 	 * Do SAP concurrency check to cover channel switch case as following:
 	 * There is already existing SAP+GO combination but due to upper layer
@@ -3322,7 +3329,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 				hdd_ctx->psoc,
 				policy_mgr_convert_device_mode_to_qdf_type(
 					adapter->device_mode),
-				target_chan_freq,
+				target_chan_freq, policy_mgr_get_bw(target_bw),
 				adapter->vdev_id,
 				forced,
 				sap_ctx->csa_reason)) {
@@ -5701,6 +5708,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	struct s_ext_cap *p_ext_cap;
 	enum reg_phymode reg_phy_mode, updated_phy_mode;
 	struct sap_context *sap_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	uint32_t user_config_freq = 0;
 
 	hdd_enter();
 
@@ -5709,6 +5718,10 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		return ret;
 
 	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
+		return -EINVAL;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_HDD_ID_OBJ_MGR);
+	if (!vdev)
 		return -EINVAL;
 
 	ucfg_mlme_get_sap_force_11n_for_11ac(hdd_ctx->psoc,
@@ -5721,12 +5734,12 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 
 	if (deliver_start_evt) {
 		status = ucfg_if_mgr_deliver_event(
-					adapter->vdev,
-					WLAN_IF_MGR_EV_AP_START_BSS,
+					vdev, WLAN_IF_MGR_EV_AP_START_BSS,
 					NULL);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("start bss failed!!");
-			return -EINVAL;
+			ret = -EINVAL;
+			goto deliver_start_err;
 		}
 	}
 	/*
@@ -5764,6 +5777,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		ret = -EINVAL;
 		goto free;
 	}
+
+	user_config_freq = config->chan_freq;
 
 	if (QDF_STATUS_SUCCESS !=
 	    ucfg_policy_mgr_get_indoor_chnl_marking(hdd_ctx->psoc,
@@ -5821,8 +5836,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		config->acs_dfs_mode = wlan_hdd_get_dfs_mode(mode);
 	}
 
-	policy_mgr_update_user_config_sap_chan(hdd_ctx->psoc,
-					       config->chan_freq);
 	ucfg_policy_mgr_get_mcc_scc_switch(hdd_ctx->psoc, &mcc_to_scc_switch);
 
 	if (adapter->device_mode == QDF_SAP_MODE ||
@@ -5847,7 +5860,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 						    &target_bigtk_support);
 			if (target_bigtk_support &&
 			    p_ext_cap->beacon_protection_enable)
-				mlme_set_bigtk_support(adapter->vdev, true);
+				mlme_set_bigtk_support(vdev, true);
 		}
 
 		/* Overwrite second AP's channel with first only when:
@@ -6218,6 +6231,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	}
 
 	config->ch_params.ch_width = config->ch_width_orig;
+	if (wlan_vdev_mlme_is_mlo_ap(vdev))
+		wlan_reg_set_create_punc_bitmap(&config->ch_params, true);
 	if ((config->ch_params.ch_width == CH_WIDTH_80P80MHZ) &&
 	    ucfg_mlme_get_restricted_80p80_bw_supp(hdd_ctx->psoc)) {
 		if (!((config->ch_params.center_freq_seg0 == 138 &&
@@ -6277,12 +6292,13 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	}
 
 	if (check_for_concurrency) {
-		if (!policy_mgr_allow_concurrency(hdd_ctx->psoc,
+		if (!policy_mgr_allow_concurrency(
+				hdd_ctx->psoc,
 				policy_mgr_convert_device_mode_to_qdf_type(
 					adapter->device_mode),
 				config->chan_freq, HW_MODE_20_MHZ,
-				policy_mgr_get_conc_ext_flags(adapter->vdev,
-							      false))) {
+				policy_mgr_get_conc_ext_flags(vdev, false),
+				adapter->vdev_id)) {
 			mutex_unlock(&hdd_ctx->sap_lock);
 
 			hdd_err("This concurrency combination is not allowed");
@@ -6363,15 +6379,16 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 
 		hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode,
 					    true);
+		wlan_set_sap_user_config_freq(vdev, user_config_freq);
 	}
 
 	wlan_hdd_dhcp_offload_enable(hdd_ctx, adapter);
-	ucfg_p2p_status_start_bss(adapter->vdev);
+	ucfg_p2p_status_start_bss(vdev);
 
 	/* Check and restart SAP if it is on unsafe channel */
 	hdd_unsafe_channel_restart_sap(hdd_ctx);
 
-	ucfg_ftm_time_sync_update_bss_state(adapter->vdev,
+	ucfg_ftm_time_sync_update_bss_state(vdev,
 					    FTM_TIME_SYNC_BSS_STARTED);
 
 	hdd_set_connection_in_progress(false);
@@ -6394,7 +6411,7 @@ free:
 	wlan_twt_concurrency_update(hdd_ctx);
 	if (deliver_start_evt) {
 		status = ucfg_if_mgr_deliver_event(
-					adapter->vdev,
+					vdev,
 					WLAN_IF_MGR_EV_AP_START_BSS_COMPLETE,
 					NULL);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -6403,6 +6420,9 @@ free:
 		}
 	}
 	qdf_mem_free(sme_config);
+deliver_start_err:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_HDD_ID_OBJ_MGR);
+
 	return ret;
 }
 
@@ -6554,6 +6574,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode,
 					    false);
 		wlan_twt_concurrency_update(hdd_ctx);
+		wlan_set_sap_user_config_freq(adapter->vdev, 0);
 		status = ucfg_if_mgr_deliver_event(adapter->vdev,
 				WLAN_IF_MGR_EV_AP_STOP_BSS_COMPLETE,
 				NULL);
@@ -7065,6 +7086,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		enum channel_state ch_state;
 		enum phy_ch_width sub_20_ch_width = CH_WIDTH_INVALID;
 		struct sap_config *sap_cfg = &adapter->session.ap.sap_config;
+		struct ch_params ch_params;
 
 		if (CHANNEL_STATE_DFS ==
 		    wlan_reg_get_channel_state_from_secondary_list_for_freq(
@@ -7082,9 +7104,13 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			sub_20_ch_width = CH_WIDTH_5MHZ;
 		if (cds_is_10_mhz_enabled())
 			sub_20_ch_width = CH_WIDTH_10MHZ;
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
+		ch_params.ch_width = sub_20_ch_width;
 		if (WLAN_REG_IS_5GHZ_CH_FREQ(freq))
-			ch_state = wlan_reg_get_5g_bonded_channel_state_for_freq(hdd_ctx->pdev, freq,
-										 sub_20_ch_width);
+			ch_state =
+			wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+						hdd_ctx->pdev, freq, &ch_params,
+						REG_CURRENT_PWR_MODE);
 		else
 			ch_state = wlan_reg_get_2g_bonded_channel_state_for_freq(hdd_ctx->pdev, freq,
 										 sub_20_ch_width, 0);
@@ -7124,13 +7150,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		hdd_debug("NAN disabled due to concurrency constraints");
 
 	/* check if concurrency is allowed */
-	if (!policy_mgr_allow_concurrency(hdd_ctx->psoc,
+	if (!policy_mgr_allow_concurrency(
+				hdd_ctx->psoc,
 				policy_mgr_convert_device_mode_to_qdf_type(
 				adapter->device_mode),
 				freq,
 				channel_width,
 				policy_mgr_get_conc_ext_flags(adapter->vdev,
-							      false))) {
+							      false),
+				adapter->vdev_id)) {
 		hdd_err("Connection failed due to concurrency check failure");
 		return -EINVAL;
 	}

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,7 +31,6 @@
 #include "cds_ieee80211_common_i.h"
 #include "cds_config.h"
 #include "cds_utils.h"
-#include "wlan_reg_services_api.h"
 
 uint32_t cds_get_vendor_reg_flags(struct wlan_objmgr_pdev *pdev,
 		qdf_freq_t freq, uint16_t bandwidth,
@@ -60,11 +60,14 @@ uint32_t cds_get_vendor_reg_flags(struct wlan_objmgr_pdev *pdev,
 		flags |= IEEE80211_CHAN_2GHZ;
 	} else
 		flags |= IEEE80211_CHAN_5GHZ;
+	qdf_mem_zero(&ch_params, sizeof(ch_params));
 
 	switch (bandwidth) {
 	case CH_WIDTH_80P80MHZ:
-		if (wlan_reg_get_5g_bonded_channel_state_for_freq(pdev, freq,
-								  bandwidth) !=
+		ch_params.ch_width = bandwidth;
+		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+					pdev, freq,
+					&ch_params, REG_CURRENT_PWR_MODE) !=
 		    CHANNEL_STATE_INVALID) {
 			if (is_vht_enabled)
 				flags |= IEEE80211_CHAN_VHT80_80;
@@ -72,8 +75,10 @@ uint32_t cds_get_vendor_reg_flags(struct wlan_objmgr_pdev *pdev,
 		bandwidth = CH_WIDTH_160MHZ;
 	/* FALLTHROUGH */
 	case CH_WIDTH_160MHZ:
-		if (wlan_reg_get_5g_bonded_channel_state_for_freq(pdev, freq,
-								  bandwidth) !=
+		ch_params.ch_width = bandwidth;
+		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+					pdev, freq,
+					&ch_params, REG_CURRENT_PWR_MODE) !=
 		    CHANNEL_STATE_INVALID) {
 			if (is_vht_enabled)
 				flags |= IEEE80211_CHAN_VHT160;
@@ -81,8 +86,10 @@ uint32_t cds_get_vendor_reg_flags(struct wlan_objmgr_pdev *pdev,
 		bandwidth = CH_WIDTH_80MHZ;
 	/* FALLTHROUGH */
 	case CH_WIDTH_80MHZ:
-		if (wlan_reg_get_5g_bonded_channel_state_for_freq(pdev, freq,
-								  bandwidth) !=
+		ch_params.ch_width = bandwidth;
+		if (wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+					pdev, freq,
+					&ch_params, REG_CURRENT_PWR_MODE) !=
 		    CHANNEL_STATE_INVALID) {
 			if (is_vht_enabled)
 				flags |= IEEE80211_CHAN_VHT80;

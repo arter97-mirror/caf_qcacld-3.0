@@ -49,7 +49,6 @@
 #ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
 #include <cdp_txrx_ctrl.h>
 #endif
-#include "wlan_hdd_stats.h"
 
 /*
  * define short names for the global vendor params

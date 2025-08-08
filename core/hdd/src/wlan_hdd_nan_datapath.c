@@ -27,7 +27,6 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <linux/etherdevice.h>
-#include "wlan_hdd_includes.h"
 #include "wlan_hdd_p2p.h"
 #include "osif_sync.h"
 #include "wma_api.h"

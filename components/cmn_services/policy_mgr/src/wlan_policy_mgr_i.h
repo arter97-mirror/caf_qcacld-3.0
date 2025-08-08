@@ -241,6 +241,8 @@ extern enum policy_mgr_conc_next_action
  * @is_force_1x1_enable: Is 1x1 forced for connection
  * @sta_sap_scc_on_dfs_chnl: STA-SAP SCC on DFS channel
  * @sta_sap_scc_on_lte_coex_chnl: STA-SAP SCC on LTE Co-ex channel
+ * @sta_sap_scc_on_indoor_channel: Allow STA-SAP scc on indoor only
+ * channels
  * @nan_sap_scc_on_lte_coex_chnl: NAN-SAP SCC on LTE Co-ex channel
  * @sap_mandatory_chnl_enable: To enable/disable SAP mandatory channels
  * @mark_indoor_chnl_disable: Mark indoor channel as disable or enable
@@ -265,6 +267,7 @@ struct policy_mgr_cfg {
 	enum force_1x1_type is_force_1x1_enable;
 	uint8_t sta_sap_scc_on_dfs_chnl;
 	uint8_t sta_sap_scc_on_lte_coex_chnl;
+	bool sta_sap_scc_on_indoor_channel;
 	uint8_t nan_sap_scc_on_lte_coex_chnl;
 	uint8_t sap_mandatory_chnl_enable;
 	uint8_t mark_indoor_chnl_disable;
@@ -305,6 +308,8 @@ struct policy_mgr_cfg {
  *                        regulatory/other considerations
  * @sap_mandatory_channels_len: Length of the SAP mandatory
  *                            channel list
+ * @do_sap_unsafe_ch_check: whether need check sap unsafe channel
+ * @last_disconn_sta_freq: last disconnected sta channel freq
  * @concurrency_mode: active concurrency combination
  * @no_of_open_sessions: Number of active vdevs
  * @no_of_active_sessions: Number of active connections
@@ -327,7 +332,6 @@ struct policy_mgr_cfg {
  *                               & FW HW mode
  * @channel_switch_complete_evt: qdf event for channel switch completion check
  * @mode_change_cb: Mode change callback
- * @user_config_sap_ch_freq: SAP channel freq configured by user application
  * @cfg: Policy manager config data
  * @dynamic_mcc_adaptive_sched: disable/enable mcc adaptive scheduler feature
  * @dynamic_dfs_master_disabled: current state of dynamic dfs master
@@ -347,7 +351,7 @@ struct policy_mgr_psoc_priv_obj {
 	struct policy_mgr_conc_cbacks conc_cbacks;
 	uint32_t sap_mandatory_channels[NUM_CHANNELS];
 	uint32_t sap_mandatory_channels_len;
-	bool do_sap_unsafe_ch_check;
+	qdf_freq_t last_disconn_sta_freq;
 	uint32_t concurrency_mode;
 	uint8_t no_of_open_sessions[QDF_MAX_NO_OF_MODE];
 	uint8_t no_of_active_sessions[QDF_MAX_NO_OF_MODE];
@@ -367,7 +371,6 @@ struct policy_mgr_psoc_priv_obj {
 	qdf_event_t opportunistic_update_done_evt;
 	qdf_event_t channel_switch_complete_evt;
 	send_mode_change_event_cb mode_change_cb;
-	uint32_t user_config_sap_ch_freq;
 	struct policy_mgr_cfg cfg;
 	uint32_t valid_ch_freq_list[NUM_CHANNELS];
 	uint32_t valid_ch_freq_list_count;
@@ -572,31 +575,9 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 				uint32_t session_id, void *context,
 				uint32_t request_id);
 void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc);
-
-/**
- * policy_mgr_pdev_get_pcl() - GET PCL channel list
- * @psoc: PSOC object information
- * @mode: Adapter mode
- * @pcl: the pointer of pcl list
- *
- * Fetches the PCL.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS policy_mgr_pdev_get_pcl(struct wlan_objmgr_psoc *psoc,
-				   enum QDF_OPMODE mode,
-				   struct policy_mgr_pcl_list *pcl);
 void pm_dbs_opportunistic_timer_handler(void *data);
 enum policy_mgr_con_mode policy_mgr_get_mode(uint8_t type,
 		uint8_t subtype);
-
-/**
- * policy_mgr_get_bw() - Convert phy_ch_width to hw_mode_bandwidth.
- * @chan_width: phy_ch_width
- *
- * Return: hw_mode_bandwidth
- */
-enum hw_mode_bandwidth policy_mgr_get_bw(enum phy_ch_width chan_width);
 
 /**
  * policy_mgr_get_channel_list() - Get channel list based on PCL and mode
@@ -837,4 +818,17 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 				       uint32_t ch_freq,
 				       enum hw_mode_bandwidth bw,
 				       uint32_t ext_flags);
+
+/**
+ * policy_mgr_get_connection_for_vdev_id() - provides the
+ * particular connection with the requested vdev id
+ * @vdev_id: vdev id of the connection
+ *
+ * This function provides the specific connection with the
+ * requested vdev id
+ *
+ * Return: index in the connection table
+ */
+uint32_t policy_mgr_get_connection_for_vdev_id(struct wlan_objmgr_psoc *psoc,
+					       uint32_t vdev_id);
 #endif

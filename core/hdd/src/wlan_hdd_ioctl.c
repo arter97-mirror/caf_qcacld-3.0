@@ -47,7 +47,6 @@
 #include "wlan_hdd_object_manager.h"
 #include "hif.h"
 #include "wlan_scan_ucfg_api.h"
-#include "wlan_reg_ucfg_api.h"
 #include "qdf_func_tracker.h"
 #include "wlan_cm_roam_ucfg_api.h"
 

@@ -1817,7 +1817,7 @@ static QDF_STATUS hdd_son_init_acs_channels(struct hdd_adapter *adapter,
 				   acs_cfg->pcl_chan_freq,
 				   &acs_cfg->pcl_ch_count,
 				   acs_cfg->pcl_channels_weight_list,
-				   NUM_CHANNELS);
+				   NUM_CHANNELS, adapter->vdev_id);
 		wlan_hdd_trim_acs_channel_list(acs_cfg->pcl_chan_freq,
 					       acs_cfg->pcl_ch_count,
 					       acs_cfg->freq_list,

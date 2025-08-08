@@ -25,7 +25,6 @@
 #include "wlan_mgmt_txrx_utils_api.h"
 #include "cdp_txrx_ctrl.h"
 #include "cfg_ucfg_api.h"
-#include "wlan_mgmt_txrx_utils_api.h"
 
 void pkt_capture_mon(struct pkt_capture_cb_context *cb_ctx, qdf_nbuf_t msdu,
 		     struct wlan_objmgr_vdev *vdev, uint16_t ch_freq)

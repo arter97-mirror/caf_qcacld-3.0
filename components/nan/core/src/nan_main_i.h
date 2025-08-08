@@ -263,10 +263,12 @@ enum nan_disc_state nan_get_discovery_state(struct wlan_objmgr_psoc *psoc);
  * nan_is_enable_allowed: Queries whether NAN Discovery is allowed
  * @psoc: PSOC object
  * @nan_ch_freq: Possible primary social channel for NAN Discovery
+ * @vdev_id: Vdev Id
  *
  * Return: True if NAN Enable is allowed on given channel, False otherwise
  */
-bool nan_is_enable_allowed(struct wlan_objmgr_psoc *psoc, uint32_t nan_ch_freq);
+bool nan_is_enable_allowed(struct wlan_objmgr_psoc *psoc, uint32_t nan_ch_freq,
+			   uint8_t vdev_id);
 
 /*
  * nan_is_disc_active: Queries whether NAN Discovery is active
