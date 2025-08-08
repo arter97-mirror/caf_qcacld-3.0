@@ -3709,9 +3709,7 @@ void sme_get_pmk_info(mac_handle_t mac_handle, uint8_t session_id,
 		sme_release_global_lock(&mac_ctx->sme);
 	}
 }
-#endif
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /*
  * sme_roam_set_psk_pmk() - a wrapper function to request CSR to save PSK/PMK
  * This is a synchronous call.
@@ -3755,6 +3753,231 @@ QDF_STATUS sme_set_pmk_cache_ft(mac_handle_t mac_handle, uint8_t vdev_id,
 		sme_release_global_lock(&mac->sme);
 	}
 	return status;
+}
+
+QDF_STATUS
+sme_set_reconnect_disallow_period_value(mac_handle_t mac_handle,
+					uint8_t vdev_id,
+					uint32_t reconnect_disallow_period)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = reconnect_disallow_period;
+	/*
+	 * To retain the reconnect disallow period value across roaming and to
+	 * cache the value when command to set the reconnect disallow period
+	 * value is received in disconnected state, update the value to the
+	 * global mlme_obj.
+	 */
+	mac->mlme_cfg->lfr.reconnect_disallow_period = src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  RECONNECT_DISALLOW_PERIOD,
+					  &src_config);
+}
+
+QDF_STATUS sme_set_min_roam_score_delta_value(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      uint32_t min_roam_score_delta)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+
+	src_config.uint_value = min_roam_score_delta;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/*
+	 * If roaming mode is aggressive and the user configured
+	 * min_roam_score_delta is received, update this value to
+	 * aggre_min_roam_score_delta.
+	 */
+	if (rso_cfg->is_aggressive_roaming_mode &&
+	    !rso_cfg->roam_control_enable)
+		wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					   ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA,
+					   &src_config);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
+	/*
+	 * To retain the min roam score delta value across roaming and to cache
+	 * the value when command to set the min roam score delta value
+	 * is received in disconnected state, update the value to the global
+	 * mlme_obj.
+	 */
+	mac->mlme_cfg->roam_scoring.min_roam_score_delta =
+							src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  MIN_ROAM_SCORE_DELTA,
+					  &src_config);
+}
+
+QDF_STATUS sme_update_2g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_2g_weightage)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = band_2g_weightage;
+	mac->mlme_cfg->roam_scoring.band_2g_weightage =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_2P4GHZ_BAND_WEIGHTAGE,
+					  &src_config);
+}
+
+QDF_STATUS sme_update_5g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_5g_weightage)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = band_5g_weightage;
+	mac->mlme_cfg->roam_scoring.band_5g_weightage =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_5GHZ_BAND_WEIGHTAGE,
+					  &src_config);
+}
+
+QDF_STATUS sme_update_6g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_6g_weightage)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = band_6g_weightage;
+	mac->mlme_cfg->roam_scoring.band_6g_weightage =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_6GHZ_BAND_WEIGHTAGE,
+					  &src_config);
+}
+
+QDF_STATUS
+sme_set_roam_periodic_scan_interval_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_periodic_scan_interval)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.uint_value = roam_periodic_scan_interval;
+	mac->mlme_cfg->lfr.roam_periodic_scan_interval =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_PERIODIC_SCAN_INTERVAL,
+					  &src_config);
+}
+
+QDF_STATUS
+sme_get_roam_periodic_scan_interval(mac_handle_t mac_handle,
+				    uint8_t vdev_id,
+				    uint32_t *roam_periodic_scan_interval)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy temp;
+
+	wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id,
+				   ROAM_PERIODIC_SCAN_INTERVAL, &temp);
+
+	*roam_periodic_scan_interval = temp.uint_value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS sme_set_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_score_delta)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+	struct rso_config *rso_cfg;
+	struct wlan_objmgr_vdev *vdev;
+
+	src_config.uint_value = roam_score_delta;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* If roaming mode is aggressive and the user configured
+	 * roam_score_delta is received, update this value to
+	 * roam_aggre_scan_step_rssi.
+	 */
+	if (rso_cfg->is_aggressive_roaming_mode &&
+	    !rso_cfg->roam_control_enable)
+		wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					   ROAM_AGGRESSIVE_SCORE_DELTA,
+					   &src_config);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
+	mac->mlme_cfg->roam_scoring.roam_score_delta =
+						src_config.uint_value;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_SCORE_DELTA, &src_config);
+}
+
+QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t *roam_score_delta)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy temp;
+
+	wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id, ROAM_SCORE_DELTA, &temp);
+
+	*roam_score_delta = temp.uint_value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS sme_set_roam_cfg_rt_params_enabled(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      bool roam_cfg_rt_params_enabled)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct cm_roam_values_copy src_config = {};
+
+	src_config.bool_value = roam_cfg_rt_params_enabled;
+
+	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
+					  ROAM_CONFIG_RT_PARAMS_ENABLED,
+					  &src_config);
 }
 #endif
 
@@ -17829,229 +18052,3 @@ void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
 	return cm_get_pre_auth_mld_addr(mac, peer_addr, mld_addr);
 }
 #endif
-
-QDF_STATUS sme_update_2g_band_weight_value(mac_handle_t mac_handle,
-					   uint8_t vdev_id,
-					   uint32_t band_2g_weightage)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy src_config = {};
-
-	src_config.uint_value = band_2g_weightage;
-	mac->mlme_cfg->roam_scoring.band_2g_weightage =
-						src_config.uint_value;
-
-	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
-					  ROAM_2P4GHZ_BAND_WEIGHTAGE,
-					  &src_config);
-}
-
-QDF_STATUS sme_update_5g_band_weight_value(mac_handle_t mac_handle,
-					   uint8_t vdev_id,
-					   uint32_t band_5g_weightage)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy src_config = {};
-
-	src_config.uint_value = band_5g_weightage;
-	mac->mlme_cfg->roam_scoring.band_5g_weightage =
-						src_config.uint_value;
-
-	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
-					  ROAM_5GHZ_BAND_WEIGHTAGE,
-					  &src_config);
-}
-
-QDF_STATUS sme_update_6g_band_weight_value(mac_handle_t mac_handle,
-					   uint8_t vdev_id,
-					   uint32_t band_6g_weightage)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy src_config = {};
-
-	src_config.uint_value = band_6g_weightage;
-	mac->mlme_cfg->roam_scoring.band_6g_weightage =
-						src_config.uint_value;
-
-	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
-					  ROAM_6GHZ_BAND_WEIGHTAGE,
-					  &src_config);
-}
-
-QDF_STATUS
-sme_set_roam_periodic_scan_interval_value(mac_handle_t mac_handle,
-					  uint8_t vdev_id,
-					  uint32_t roam_periodic_scan_interval)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy src_config = {};
-
-	src_config.uint_value = roam_periodic_scan_interval;
-	mac->mlme_cfg->lfr.roam_periodic_scan_interval =
-						src_config.uint_value;
-
-	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
-					  ROAM_PERIODIC_SCAN_INTERVAL,
-					  &src_config);
-}
-
-QDF_STATUS
-sme_get_roam_periodic_scan_interval(mac_handle_t mac_handle,
-				    uint8_t vdev_id,
-				    uint32_t *roam_periodic_scan_interval)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy temp;
-
-	wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id,
-				   ROAM_PERIODIC_SCAN_INTERVAL, &temp);
-
-	*roam_periodic_scan_interval = temp.uint_value;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS sme_set_roam_score_delta_value(mac_handle_t mac_handle,
-					  uint8_t vdev_id,
-					  uint32_t roam_score_delta)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy src_config = {};
-	struct rso_config *rso_cfg;
-	struct wlan_objmgr_vdev *vdev;
-
-	src_config.uint_value = roam_score_delta;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev, vdev_id,
-						    WLAN_LEGACY_SME_ID);
-
-	if (!vdev) {
-		sme_err("vdev object is NULL for vdev %d", vdev_id);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	rso_cfg = wlan_cm_get_rso_config(vdev);
-	if (!rso_cfg) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/* If roaming mode is aggressive and the user configured
-	 * roam_score_delta is received, update this value to
-	 * roam_aggre_scan_step_rssi.
-	 */
-	if (rso_cfg->is_aggressive_roaming_mode &&
-	    !rso_cfg->roam_control_enable)
-		wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
-					   ROAM_AGGRESSIVE_SCORE_DELTA,
-					   &src_config);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
-
-	mac->mlme_cfg->roam_scoring.roam_score_delta =
-						src_config.uint_value;
-
-	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
-					  ROAM_SCORE_DELTA, &src_config);
-}
-
-QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
-					  uint8_t vdev_id,
-					  uint32_t *roam_score_delta)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy temp;
-
-	wlan_cm_roam_cfg_get_value(mac->psoc, vdev_id, ROAM_SCORE_DELTA, &temp);
-
-	*roam_score_delta = temp.uint_value;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS sme_set_roam_cfg_rt_params_enabled(mac_handle_t mac_handle,
-					      uint8_t vdev_id,
-					      bool roam_cfg_rt_params_enabled)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy src_config = {};
-
-	src_config.bool_value = roam_cfg_rt_params_enabled;
-
-	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
-					  ROAM_CONFIG_RT_PARAMS_ENABLED,
-					  &src_config);
-}
-
-QDF_STATUS sme_set_min_roam_score_delta_value(mac_handle_t mac_handle,
-					      uint8_t vdev_id,
-					      uint32_t min_roam_score_delta)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy src_config = {};
-	struct rso_config *rso_cfg;
-	struct wlan_objmgr_vdev *vdev;
-
-	src_config.uint_value = min_roam_score_delta;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev, vdev_id,
-						    WLAN_LEGACY_SME_ID);
-
-	if (!vdev) {
-		sme_err("vdev object is NULL for vdev %d", vdev_id);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	rso_cfg = wlan_cm_get_rso_config(vdev);
-	if (!rso_cfg) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	/*
-	 * If roaming mode is aggressive and the user configured
-	 * min_roam_score_delta is received, update this value to
-	 * aggre_min_roam_score_delta.
-	 */
-	if (rso_cfg->is_aggressive_roaming_mode &&
-	    !rso_cfg->roam_control_enable)
-		wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
-					   ROAM_COMMON_AGGRESSIVE_MIN_ROAM_DELTA,
-					   &src_config);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
-
-	/*
-	 * To retain the min roam score delta value across roaming and to cache
-	 * the value when command to set the min roam score delta value
-	 * is received in disconnected state, update the value to the global
-	 * mlme_obj.
-	 */
-	mac->mlme_cfg->roam_scoring.min_roam_score_delta =
-							src_config.uint_value;
-
-	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
-					  MIN_ROAM_SCORE_DELTA,
-					  &src_config);
-}
-
-QDF_STATUS
-sme_set_reconnect_disallow_period_value(mac_handle_t mac_handle,
-					uint8_t vdev_id,
-					uint32_t reconnect_disallow_period)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy src_config = {};
-
-	src_config.uint_value = reconnect_disallow_period;
-	/*
-	 * To retain the reconnect disallow period value across roaming and to
-	 * cache the value when command to set the reconnect disallow period
-	 * value is received in disconnected state, update the value to the
-	 * global mlme_obj.
-	 */
-	mac->mlme_cfg->lfr.reconnect_disallow_period =
-						src_config.uint_value;
-
-	return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
-					  RECONNECT_DISALLOW_PERIOD,
-					  &src_config);
-}

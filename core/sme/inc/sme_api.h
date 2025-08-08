@@ -664,6 +664,156 @@ QDF_STATUS sme_roam_set_psk_pmk(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_set_pmk_cache_ft(mac_handle_t mac_handle, uint8_t vdev_id,
 				struct wlan_crypto_pmksa *pmk_cache);
+
+/**
+ * sme_set_reconnect_disallow_period_value() - Send reconnect_disallow period
+ * value to SME.
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @reconnect_disallow_period: reconnect disallow period value
+ * in seconds.
+ *
+ * Updated reconnect disallow period in roam info and roam_offload_scan
+ * request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_set_reconnect_disallow_period_value(mac_handle_t mac_handle,
+					uint8_t vdev_id,
+					uint32_t reconnect_disallow_period);
+
+/**
+ * sme_set_min_roam_score_delta_value() - Send min roam score delta value to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @min_roam_score_delta: min roam score delta value in percentage
+ *
+ * Updated min roam score delta in roam info and a roam_offload_scan request.
+ *
+ * Return: QDF_STATUS
+ *
+ */
+QDF_STATUS sme_set_min_roam_score_delta_value(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      uint32_t min_roam_score_delta);
+
+/**
+ * sme_update_2g_band_weight_value()-Send 2.4 GHz band weight value to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @band_2g_weightage: 2.4 GHz band weightage in percentage
+ *
+ * Updated 2.4 GHz band weightage in roam info and a roam_offload_scan request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_2g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_2g_weightage);
+/**
+ * sme_update_5g_band_weight_value()-Send 5 GHz band weight value to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @band_5g_weightage: 5 GHz band weightage in percentage
+ *
+ * Updated 5 GHz band weightage in roam info and a roam_offload_scan request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_5g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_5g_weightage);
+
+/**
+ * sme_update_6g_band_weight_value()-Send 6 GHz band weight value to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @band_6g_weightage: 6 GHz band weightage in percentage
+ *
+ * Updated 6 GHz band weightage in roam info and a roam_offload_scan request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_6g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_6g_weightage);
+
+/**
+ * sme_set_roam_periodic_scan_interval_value()- Send roam periodic scan interval
+ * to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @roam_periodic_scan_interval
+ *
+ * Updated roam periodic scan interval in roam info and a roam_offload_scan
+ * request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_set_roam_periodic_scan_interval_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_periodic_scan_interval);
+
+/**
+ * sme_get_roam_periodic_scan_interval() - Get roam periodic scan interval
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @roam_periodic_scan_interval: Pointer of a buffer to fill the
+ * roam_periodic_scan_interval
+ *
+ * Get the roam_periodic_scan_interval and fill in the given
+ * buffer roam_periodic_scan_interval.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sme_get_roam_periodic_scan_interval(mac_handle_t mac_handle,
+				    uint8_t vdev_id,
+				    uint32_t *roam_periodic_scan_interval);
+
+/**
+ * sme_set_roam_score_delta_value() - Send roam score delta value to SME
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @roam_score_delta: Roam score delta value in percentage
+ *
+ * Updated Roam score delta in roam info and a roam_offload_scan request.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_score_delta);
+
+/**
+ * sme_get_roam_score_delta_value() - Get roam score delta value
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @roam_score_delta: Pointer of a buffer to fill the roam score delta value
+ *
+ * Get the roam_score_delta and fill in the given
+ * buffer roam_score_delta.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t *roam_score_delta);
+
+/**
+ * sme_set_roam_cfg_rt_params_enabled() -
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ * @roam_cfg_rt_params_enabled: bool value to set the status of
+ * roam_cfg_rt_params_enabled flag in vdev rso config.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_set_roam_cfg_rt_params_enabled(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      bool roam_cfg_rt_params_enabled);
 #else
 static inline
 void sme_get_pmk_info(mac_handle_t mac_handle, uint8_t session_id,
@@ -699,6 +849,85 @@ QDF_STATUS sme_set_pmk_cache_ft(mac_handle_t mac_handle, uint8_t vdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline QDF_STATUS
+sme_set_reconnect_disallow_period_value(mac_handle_t mac_handle,
+					uint8_t vdev_id,
+					uint32_t reconnect_disallow_period)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS sme_set_min_roam_score_delta_value(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      uint32_t min_roam_score_delta)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS sme_update_2g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_2g_weightage)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS sme_update_5g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_5g_weightage)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS sme_update_6g_band_weight_value(mac_handle_t mac_handle,
+					   uint8_t vdev_id,
+					   uint32_t band_6g_weightage)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+sme_set_roam_periodic_scan_interval_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_periodic_scan_interval)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+sme_get_roam_periodic_scan_interval(mac_handle_t mac_handle,
+				    uint8_t vdev_id,
+				    uint32_t *roam_periodic_scan_interval)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS sme_set_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t roam_score_delta)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
+					  uint8_t vdev_id,
+					  uint32_t *roam_score_delta)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS sme_set_roam_cfg_rt_params_enabled(mac_handle_t mac_handle,
+					      uint8_t vdev_id,
+					      bool roam_cfg_rt_params_enabled)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
 #endif
 
 QDF_STATUS sme_get_config_param(mac_handle_t mac_handle,
@@ -5095,154 +5324,4 @@ void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
 {
 }
 #endif
-
-/**
- * sme_update_2g_band_weight_value()-Send 2.4 GHz band weight value to SME
- * @mac_handle: Opaque handle to the MAC context
- * @vdev_id: vdev id
- * @band_2g_weightage: 2.4 GHz band weightage in percentage
- *
- * Updated 2.4 GHz band weightage in roam info and a roam_offload_scan request.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_update_2g_band_weight_value(mac_handle_t mac_handle,
-					   uint8_t vdev_id,
-					   uint32_t band_2g_weightage);
-/**
- * sme_update_5g_band_weight_value()-Send 5 GHz band weight value to SME
- * @mac_handle: Opaque handle to the MAC context
- * @vdev_id: vdev id
- * @band_5g_weightage: 5 GHz band weightage in percentage
- *
- * Updated 5 GHz band weightage in roam info and a roam_offload_scan request.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_update_5g_band_weight_value(mac_handle_t mac_handle,
-					   uint8_t vdev_id,
-					   uint32_t band_5g_weightage);
-
-/**
- * sme_update_6g_band_weight_value()-Send 6 GHz band weight value to SME
- * @mac_handle: Opaque handle to the MAC context
- * @vdev_id: vdev id
- * @band_6g_weightage: 6 GHz band weightage in percentage
- *
- * Updated 6 GHz band weightage in roam info and a roam_offload_scan request.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_update_6g_band_weight_value(mac_handle_t mac_handle,
-					   uint8_t vdev_id,
-					   uint32_t band_6g_weightage);
-
-/**
- * sme_set_roam_periodic_scan_interval_value()- Send roam periodic scan interval
- * to SME
- * @mac_handle: Opaque handle to the MAC context
- * @vdev_id: vdev id
- * @roam_periodic_scan_interval
- *
- * Updated roam periodic scan interval in roam info and a roam_offload_scan
- * request
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-sme_set_roam_periodic_scan_interval_value(mac_handle_t mac_handle,
-					  uint8_t vdev_id,
-					  uint32_t roam_periodic_scan_interval);
-
-/**
- * sme_get_roam_periodic_scan_interval() - Get roam periodic scan interval
- * @mac_handle: Opaque handle to the MAC context
- * @vdev_id: vdev id
- * @roam_periodic_scan_interval: Pointer of a buffer to fill the
- * roam_periodic_scan_interval
- *
- * Get the roam_periodic_scan_interval and fill in the given
- * buffer roam_periodic_scan_interval.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-sme_get_roam_periodic_scan_interval(mac_handle_t mac_handle,
-				    uint8_t vdev_id,
-				    uint32_t *roam_periodic_scan_interval);
-
-/**
- * sme_set_roam_score_delta_value() - Send roam score delta value to SME
- * @mac_handle: Opaque handle to the MAC context
- * @vdev_id: vdev id
- * @roam_score_delta: Roam score delta value in percentage
- *
- * Updated Roam score delta in roam info and a roam_offload_scan request.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_set_roam_score_delta_value(mac_handle_t mac_handle,
-					  uint8_t vdev_id,
-					  uint32_t roam_score_delta);
-
-/**
- * sme_get_roam_score_delta_value() - Get roam score delta value
- * @mac_handle: Opaque handle to the MAC context
- * @vdev_id: vdev id
- * @roam_score_delta: Pointer of a buffer to fill the roam score delta value
- *
- * Get the roam_score_delta and fill in the given
- * buffer roam_score_delta.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_get_roam_score_delta_value(mac_handle_t mac_handle,
-					  uint8_t vdev_id,
-					  uint32_t *roam_score_delta);
-
-/**
- * sme_set_roam_cfg_rt_params_enabled() -
- * @mac_handle: Opaque handle to the MAC context
- * @vdev_id: vdev id
- * @roam_cfg_rt_params_enabled: bool value to set the status of
- * roam_cfg_rt_params_enabled flag in vdev rso config.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_set_roam_cfg_rt_params_enabled(mac_handle_t mac_handle,
-					      uint8_t vdev_id,
-					      bool roam_cfg_rt_params_enabled);
-
-/**
- * sme_set_min_roam_score_delta_value() - Send min roam score delta value to SME
- * @mac_handle: Opaque handle to the MAC context
- * @vdev_id: vdev id
- * @min_roam_score_delta: min roam score delta value in percentage
- *
- * Updated min roam score delta in roam info and a roam_offload_scan request.
- *
- * Return: QDF_STATUS
- *
- */
-QDF_STATUS sme_set_min_roam_score_delta_value(mac_handle_t mac_handle,
-					      uint8_t vdev_id,
-					      uint32_t min_roam_score_delta);
-
-/**
- * sme_set_reconnect_disallow_period_value() - Send reconnect_disallow period
- * value to SME.
- * @mac_handle: Opaque handle to the MAC context
- * @vdev_id: vdev id
- * @reconnect_disallow_period: reconnect disallow period value
- * in seconds.
- *
- * Updated reconnect disallow period in roam info and roam_offload_scan
- * request.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-sme_set_reconnect_disallow_period_value(mac_handle_t mac_handle,
-					uint8_t vdev_id,
-					uint32_t reconnect_disallow_period);
 #endif /* #if !defined( __SME_API_H ) */
