@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -445,6 +445,11 @@ int hdd_sysfs_dp_stc_create(struct kobject *driver_kobject)
 		return -EINVAL;
 	}
 
+	if (!ucfg_dp_cfg_is_stc_enabled()) {
+		hdd_info("STC: feature not enabled via cfg");
+		return 0;
+	}
+
 	error = sysfs_create_file(driver_kobject,
 				  &dp_stc_logmask_attribute.attr);
 	if (error)
@@ -482,6 +487,11 @@ void hdd_sysfs_dp_stc_destroy(struct kobject *driver_kobject)
 {
 	if (!driver_kobject) {
 		hdd_err("could not get driver kobject!");
+		return;
+	}
+
+	if (!ucfg_dp_cfg_is_stc_enabled()) {
+		hdd_info("STC: feature not enabled via cfg");
 		return;
 	}
 

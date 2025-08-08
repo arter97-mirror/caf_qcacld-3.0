@@ -2190,6 +2190,16 @@ bool
 ucfg_dp_get_dump_periodic_custom_stats_enable(struct wlan_objmgr_vdev *vdev);
 #endif
 
+/**
+ * ucfg_dp_cfg_is_stc_enabled - Check if STC is enabled
+ *
+ * This function queries the DP (Data Path) configuration to determine whether
+ * Smart Traffic Classification (STC) is enabled for the current context.
+ *
+ * Return: true if STC is enabled, false otherwise.
+ */
+bool ucfg_dp_cfg_is_stc_enabled(void);
+
 #ifdef WLAN_DP_FEATURE_STC
 /**
  * ucfg_dp_flow_classify_result() - Indicate Flow classify result
