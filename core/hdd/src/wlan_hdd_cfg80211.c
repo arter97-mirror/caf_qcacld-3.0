@@ -34932,7 +34932,6 @@ wlan_hdd_sap_link_removal_check_and_reassign_deflink(struct hdd_adapter *adapter
 						     unsigned int link_id)
 {
 	struct wlan_hdd_link_info *iter_link_info;
-	uint8_t link_idx;
 	bool found = false;
 
 	if (link_id == WLAN_INVALID_LINK_ID) {
