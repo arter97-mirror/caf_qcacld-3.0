@@ -87,6 +87,23 @@ enum sr_status_of_roamed_ap {
 #endif
 
 /**
+ * lim_remove_invalid_partner_links() - remove invalid partner links
+ * @session_entry: pe session
+ *
+ * Return: void
+ */
+void lim_remove_invalid_partner_links(struct pe_session *session_entry);
+
+/**
+ * lim_clear_ml_partner_info() - clear partner link info
+ * @session_entry: pe session
+ * @idx: index of partner link info to be cleared
+ *
+ * Return: void
+ */
+void lim_clear_ml_partner_info(struct pe_session *session_entry, int8_t idx);
+
+/**
  * lim_post_msg_api() - post normal priority PE message
  * @mac: mac context
  * @msg: message to be posted

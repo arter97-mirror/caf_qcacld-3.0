@@ -232,10 +232,13 @@ lim_update_mlo_mgr_prb_info(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("failed to add assoc link probe rsp %d freq %d", status,
 		       probe_rsp->chan_freq);
+	if (session_entry->curr_op_freq != probe_rsp->chan_freq)
+		pe_debug("probe_rsp->chan_freq %d curr_op_freq %d mismatching",
+			 probe_rsp->chan_freq, session_entry->curr_op_freq);
 
 	lim_update_mlo_mgr_info(mac_ctx, session_entry->vdev, mac_addr,
 				session_entry->lim_join_req->assoc_link_id,
-				probe_rsp->chan_freq);
+				session_entry->curr_op_freq);
 
 	link_info = mlo_mgr_get_ap_link_by_link_id(
 			session_entry->vdev->mlo_dev_ctx,
