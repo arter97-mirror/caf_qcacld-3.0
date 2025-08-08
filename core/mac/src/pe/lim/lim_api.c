@@ -4252,7 +4252,7 @@ lim_validate_probe_rsp_link_info(struct pe_session *session_entry,
 	return status;
 }
 
-static void
+void
 lim_clear_ml_partner_info(struct pe_session *session_entry, int8_t idx)
 {
 	uint8_t start_idx, end_idx;
@@ -4285,7 +4285,7 @@ lim_clear_ml_partner_info(struct pe_session *session_entry, int8_t idx)
 	}
 }
 
-static void lim_remove_invalid_partner_links(struct pe_session *session_entry)
+void lim_remove_invalid_partner_links(struct pe_session *session_entry)
 {
 	uint8_t valid_links = 0, idx;
 	struct mlo_partner_info *partner_info;
@@ -4368,7 +4368,8 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 
 	cache_entry =
 		wlan_scan_entry_by_bssid_and_security(pdev, link_addr,
-						      wlan_vdev_get_id(vdev));
+						      wlan_vdev_get_id(vdev),
+						      freq);
 	if (!cache_entry)
 		return QDF_STATUS_E_FAILURE;
 

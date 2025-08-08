@@ -2058,7 +2058,7 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 		wlan_scan_entry_by_bssid_and_security(mac_ctx->pdev,
 						      (struct qdf_mac_addr *)
 						       bss_desc->bssId,
-						       vdev_id);
+						       vdev_id, 0);
 
 	/*
 	 * If AP advertises multiple AKMs(WPA2 PSK + WPA3), allow connection
