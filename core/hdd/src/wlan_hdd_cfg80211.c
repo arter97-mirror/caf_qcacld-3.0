@@ -5843,6 +5843,34 @@ static inline void wlan_hdd_set_smd_feature(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static inline void
+wlan_hdd_set_11bi_pmkid_privacy_feature(struct wlan_objmgr_psoc *psoc,
+					uint8_t *feature_flags)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle)
+		return;
+
+	if (!wmi_service_enabled(wmi_handle,
+				 wmi_service_11bi_pmkid_privacy_support))
+		return;
+
+	hdd_debug("11bi PMKSA caching privacy supported");
+	wlan_cfg80211_set_feature(
+		feature_flags,
+		QCA_WLAN_VENDOR_FEATURE_SUPPORT_PMKSA_CACHING_PRIVACY);
+}
+#else
+static inline void
+wlan_hdd_set_11bi_pmkid_privacy_feature(struct wlan_objmgr_psoc *psoc,
+					uint8_t *feature_flags)
+{
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 #if defined NL80211_EXT_FEATURE_PROBE_AP_SUPPORT
 static inline bool wlan_hdd_check_probe_peer_feature(struct wlan_objmgr_psoc
 						     *psoc)
@@ -6035,6 +6063,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_sar_user_scenario_to_dsi_mapping_feature(hdd_ctx->config,
 							      feature_flags);
 	wlan_hdd_set_smd_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_11bi_pmkid_privacy_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
@@ -31305,6 +31334,42 @@ static void wlan_hdd_set_remain_on_channel(struct wiphy *wiphy)
 {}
 #endif
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static inline void
+wlan_hdd_set_11bi_ext_feature(struct wiphy *wiphy,
+			      struct wlan_objmgr_psoc *psoc)
+{
+	struct wmi_unified *wmi_handle;
+	bool eppke = false, auth_1x = false;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle)
+		return;
+
+	if (wmi_service_enabled(wmi_handle, wmi_service_11bi_eppke_support)) {
+		/* EPPKE requires association frame encryption */
+		wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_EPPKE);
+		wiphy_ext_feature_set(
+			wiphy, NL80211_EXT_FEATURE_ASSOC_FRAME_ENCRYPTION);
+		eppke = true;
+	}
+
+	if (wmi_service_enabled(wmi_handle,
+				wmi_service_11bi_8021x_auth_support)) {
+		wiphy_ext_feature_set(
+			wiphy, NL80211_EXT_FEATURE_IEEE8021X_AUTH);
+		auth_1x = true;
+	}
+
+	hdd_debug("11bi caps: eppke=%d 1x_auth=%d", eppke, auth_1x);
+}
+#else
+static inline void wlan_hdd_set_11bi_ext_feature(struct wiphy *wiphy,
+						 struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 /*
  * In this function, wiphy structure is updated after QDF
  * initialization. In wlan_hdd_cfg80211_init, only the
@@ -31393,6 +31458,7 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 #endif
 	wlan_hdd_set_remain_on_channel(wiphy);
 	wlan_hdd_set_nan_cap(hdd_ctx);
+	wlan_hdd_set_11bi_ext_feature(wiphy, hdd_ctx->psoc);
 }
 
 /**
