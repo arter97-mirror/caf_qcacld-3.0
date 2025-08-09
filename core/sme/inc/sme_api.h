@@ -4275,6 +4275,19 @@ int sme_send_vdev_pause_for_bcn_period(mac_handle_t mac_handle,
 				       uint8_t session_id,
 				       uint8_t cfg_val);
 
+/**
+ * sme_send_ext_mld_cap_wfatest_cmd() - Send Extended MLD capability support
+ * config to FW via wfa test command
+ *
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: vdev id
+ * @value: Extended MLD capability support
+ *
+ * Return: None
+ */
+void sme_send_ext_mld_cap_wfatest_cmd(mac_handle_t mac_handle, uint8_t vdev_id,
+				      uint8_t value);
+
 #else
 static inline void sme_set_eht_testbed_def(mac_handle_t mac_handle,
 					   uint8_t vdev_id)
@@ -4327,6 +4340,11 @@ void sme_activate_mlo_links(mac_handle_t mac_handle, uint8_t session_id,
 			    enum mlo_link_force_reason force_reason)
 {
 }
+
+static inline
+void sme_send_ext_mld_cap_wfatest_cmd(mac_handle_t mac_handle, uint8_t vdev_id,
+				      uint8_t value)
+{}
 #endif
 
 /**

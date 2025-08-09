@@ -18265,6 +18265,10 @@ BTM_REQ_RESP_DONE:
 								  false);
 			if (ret_val)
 				hdd_err("Failed to set exclude ext MLD cap");
+
+			sme_send_ext_mld_cap_wfatest_cmd(mac_handle,
+							 link_info->vdev_id,
+							 true);
 		}
 	}
 
