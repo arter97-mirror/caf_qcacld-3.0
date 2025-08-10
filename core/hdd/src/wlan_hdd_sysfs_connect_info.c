@@ -591,6 +591,8 @@ uint8_t *hdd_auth_type_str(uint32_t auth_type)
 		return "OSEN";
 	case eCSR_AUTH_TYPE_FT_SAE_EXT_KEY:
 		return "FT SAE EXT";
+	case eCSR_AUTH_TYPE_EPPKE:
+		return "EPPKE";
 	case eCSR_AUTH_TYPE_FT_SAE:
 		return "FT SAE";
 	case eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384:

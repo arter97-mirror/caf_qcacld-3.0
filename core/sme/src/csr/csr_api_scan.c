@@ -602,6 +602,23 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 	qdf_mem_free(p_buf);
 }
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static bool csr_fill_eppke_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
+{
+	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_EPPKE)) {
+		*auth_type = eCSR_AUTH_TYPE_EPPKE;
+		return true;
+	}
+	return false;
+}
+#else
+static inline bool
+csr_fill_eppke_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 static void csr_fill_rsn_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
 {
 	/* Try the more preferred ones first. */
@@ -621,6 +638,8 @@ static void csr_fill_rsn_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
 		*auth_type = eCSR_AUTH_TYPE_FT_SAE;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
 		*auth_type = eCSR_AUTH_TYPE_SAE;
+	else if (csr_fill_eppke_auth_type(auth_type, akm))
+		return;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_DPP))
 		*auth_type = eCSR_AUTH_TYPE_DPP_RSN;
 	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OSEN))

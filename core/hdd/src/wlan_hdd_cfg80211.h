@@ -194,6 +194,14 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 #ifndef NL80211_AUTHTYPE_FILS_PK
 #define NL80211_AUTHTYPE_FILS_PK 7
 #endif
+#ifndef NL80211_AUTHTYPE_EPPKE
+#define NL80211_AUTHTYPE_EPPKE 8
+#endif
+#ifndef NL80211_AUTHTYPE_IEEE8021X
+#define NL80211_AUTHTYPE_IEEE8021X 9
+#endif
+
+/* AKM Suites */
 #ifndef WLAN_AKM_SUITE_FILS_SHA256
 #define WLAN_AKM_SUITE_FILS_SHA256 0x000FAC0E
 #endif
@@ -240,6 +248,10 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 
 #ifndef WLAN_AKM_SUITE_FT_SAE_EXT_KEY
 #define WLAN_AKM_SUITE_FT_SAE_EXT_KEY 0x000FAC19
+#endif
+
+#ifndef WLAN_AKM_SUITE_EPPKE
+#define WLAN_AKM_SUITE_EPPKE 0x000FAC1D
 #endif
 
 #ifdef FEATURE_WLAN_TDLS
@@ -713,8 +725,7 @@ int wlan_hdd_change_hw_mode_for_given_chnl(struct hdd_adapter *adapter,
 					   uint32_t chan_freq,
 					   enum policy_mgr_conn_update_reason reason);
 
-#if (defined(WLAN_FEATURE_11BI_SECURITY) && \
-	defined(CFG80211_80211BI_AUTH_SUPPORT)) || \
+#if defined(WLAN_FEATURE_11BI_SECURITY) || \
 	defined(WLAN_FEATURE_11BN_SMD)
 /**
  * wlan_hdd_external_auth_callback() - Callback to initiate external
