@@ -1231,6 +1231,24 @@ enum wlan_epcs_frame {
 #define CFG_T2LM_NEGOTIATION_SUPPORTED
 #endif
 
+/*
+ * <ini>
+ *
+ * enable_reduce_pwr_scan - Enable/Disable reduced power scan mode
+ * @Min: 0 Disable
+ * @Max: 1 Enable
+ * @Default: 0
+ *
+ * Related: None
+ *
+ *
+ * </ini>
+ */
+#define CFG_REDUCE_PWR_SCAN_MODE CFG_INI_BOOL( \
+	"enable_reduce_pwr_scan", \
+	1, \
+	"Reduce power scan mode")
+
 #define CFG_GENERIC_ALL \
 	CFG(CFG_ENABLE_DEBUG_PACKET_LOG) \
 	CFG(CFG_PMF_SA_QUERY_MAX_RETRIES) \
@@ -1272,6 +1290,7 @@ enum wlan_epcs_frame {
 	CFG_6GHZ_STD_CONN_POLICY \
 	CFG_EMLSR_MODE_ENABLED \
 	CFG_SR_ENABLE_MODES_ALL \
-	CFG_T2LM_NEGOTIATION_SUPPORTED\
-	CFG_DIS_VLP_STA_CONN_TO_SP_AP
+	CFG_T2LM_NEGOTIATION_SUPPORTED \
+	CFG_DIS_VLP_STA_CONN_TO_SP_AP \
+	CFG(CFG_REDUCE_PWR_SCAN_MODE)
 #endif /* __CFG_MLME_GENERIC_H */
