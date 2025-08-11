@@ -2011,6 +2011,28 @@ int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 void pld_set_tsf_sync_period(struct device *dev, u32 val);
 
 /**
+ * pld_register_tsf_sync_qtime() - Register a handler to get host time when
+ *				firmware captures tsf time.
+ * @dev: device
+ * @handler: handler to get host time
+ * @context: context
+ *
+ * Return: Zero upon successful registration; Negative error code for failure
+ */
+int pld_register_tsf_sync_qtime(struct device *dev,
+				void (*handler)(void *, uint64_t),
+				void *context);
+
+/**
+ * pld_unregister_tsf_sync_qtime() - Unregister for tsf captured host time.
+ * @dev: device
+ * @context: context
+ *
+ * Return: Zero upon successful unregistration; Negative error code for failure
+ */
+int pld_unregister_tsf_sync_qtime(struct device *dev, void *context);
+
+/**
  * pld_reset_tsf_sync_period() - Reset TSF sync period
  * @dev: device
  *

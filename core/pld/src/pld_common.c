@@ -2856,6 +2856,51 @@ void pld_set_tsf_sync_period(struct device *dev, u32 val)
 	}
 }
 
+int pld_register_tsf_sync_qtime(struct device *dev,
+				void (*handler)(void *, uint64_t),
+				void *context)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		return pld_pcie_register_tsf_sync_time(dev, handler, context);
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		break;
+	}
+
+	return -EINVAL;
+}
+
+int pld_unregister_tsf_sync_qtime(struct device *dev,
+				  void *context)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		return pld_pcie_unregister_tsf_sync_time(dev, context);
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		break;
+	}
+
+	return -EINVAL;
+}
+
 void pld_reset_tsf_sync_period(struct device *dev)
 {
 	switch (pld_get_bus_type(dev)) {

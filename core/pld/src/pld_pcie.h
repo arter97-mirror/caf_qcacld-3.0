@@ -250,6 +250,20 @@ pld_pcie_smmu_unmap(struct device *dev, uint32_t iova_addr, size_t size)
 	return 0;
 }
 
+static inline
+int pld_pcie_register_tsf_sync_time(struct device *dev,
+				    void (*handler)(void *, uint64_t),
+				    void *context)
+{
+	return -EINVAL;
+}
+
+static inline int pld_pcie_unregister_tsf_sync_time(struct device *dev,
+						    void *context)
+{
+	return -EINVAL;
+}
+
 static inline int
 pld_pcie_get_fw_files_for_target(struct device *dev,
 				 struct pld_fw_files *pfw_files,
@@ -623,6 +637,28 @@ static inline int pld_pcie_set_wfc_mode(struct device *dev,
 	return 0;
 }
 #endif
+
+/**
+ * pld_pcie_register_tsf_sync_time() - Register a handler to get host time when
+ *					firmware captures tsf time.
+ * @dev: device
+ * @handler: handler to get host time
+ * @context: context
+ *
+ * Return: Zero upon successful registration; Negative error code for failure
+ */
+int pld_pcie_register_tsf_sync_time(struct device *dev,
+				    void (*handler)(void *, uint64_t),
+				    void *context);
+
+/**
+ * pld_pcie_unregister_tsf_sync_time() - Unregister for tsf captured host time.
+ * @dev: device
+ * @context: context
+ *
+ * Return: Zero upon successful registration; Negative error code for failure
+ */
+int pld_pcie_unregister_tsf_sync_time(struct device *dev, void *context);
 
 /**
  * pld_pcie_get_fw_files_for_target() - Get FW file names

@@ -891,6 +891,32 @@ int pld_pcie_wlan_disable(struct device *dev, enum pld_driver_mode mode)
 	return cnss_wlan_disable(dev, CNSS_OFF);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+int pld_pcie_register_tsf_sync_time(struct device *dev,
+				    wlan_tsf_handler_t handler,
+				    void *context)
+{
+	return cnss_register_tsf_captured_handler(dev, handler, context);
+}
+
+int pld_pcie_unregister_tsf_sync_time(struct device *dev, void *context)
+{
+	return cnss_unregister_tsf_captured_handler(dev, context);
+}
+#else
+int pld_pcie_register_tsf_sync_time(struct device *dev,
+				    void (*handler)(void *, uint64_t),
+				    void *context)
+{
+	return -EINVAL;
+}
+
+int pld_pcie_unregister_tsf_sync_time(struct device *dev, void *context)
+{
+	return -EINVAL;
+}
+#endif
+
 int pld_pcie_get_fw_files_for_target(struct device *dev,
 				     struct pld_fw_files *pfw_files,
 				     u32 target_type, u32 target_version)

@@ -3062,6 +3062,27 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 }
 
 #ifdef WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ
+static inline void hdd_tsf_captured_ts_handler(void *arg, uint64_t ts)
+{
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx;
+
+	if (!arg) {
+		hdd_err("context is invalid");
+		return;
+	}
+
+	hdd_ctx = (struct hdd_context *)arg;
+
+	adapter = hdd_ctx->tsf.cap_tsf_context;
+	if (!adapter) {
+		hdd_err("adapter is invalid");
+		return;
+	}
+
+	hdd_update_host_time(adapter, ts * NSEC_PER_USEC);
+}
+
 static inline irqreturn_t hdd_tsf_captured_irq_handler(int irq, void *arg)
 {
 	struct hdd_adapter *adapter;
@@ -3176,6 +3197,12 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_init(struct hdd_context *hdd_ctx)
 	int ret;
 	QDF_STATUS status;
 
+	ret = pld_register_tsf_sync_qtime(hdd_ctx->parent_dev,
+					  hdd_tsf_captured_ts_handler,
+					  hdd_ctx);
+	if (!ret)
+		goto pass;
+
 	status = ucfg_fwol_get_tsf_irq_host_gpio_pin(hdd_ctx->psoc,
 						     &tsf_irq_gpio_pin);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -3217,6 +3244,7 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_init(struct hdd_context *hdd_ctx)
 		goto fail_free_gpio;
 	}
 
+pass:
 	wlan_hdd_tsf_plus_sock_ts_init(hdd_ctx);
 
 	return HDD_TSF_OP_SUCC;
@@ -3231,10 +3259,11 @@ fail:
 static
 enum hdd_tsf_op_result wlan_hdd_tsf_plus_deinit(struct hdd_context *hdd_ctx)
 {
+	wlan_hdd_tsf_plus_sock_ts_deinit(hdd_ctx);
+	pld_unregister_tsf_sync_qtime(hdd_ctx->parent_dev, hdd_ctx);
+
 	if (tsf_irq_gpio_pin == TSF_GPIO_PIN_INVALID)
 		return HDD_TSF_OP_FAIL;
-
-	wlan_hdd_tsf_plus_sock_ts_deinit(hdd_ctx);
 
 	if (tsf_gpio_irq_num >= 0) {
 		free_irq(tsf_gpio_irq_num, hdd_ctx);
