@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -312,7 +312,11 @@ static bool hdd_check_and_fill_freq(uint32_t in_chan, qdf_freq_t *freq,
 	else
 		return false;
 
-	if (!wlan_reg_is_freq_enabled(pdev, *freq, REG_CURRENT_PWR_MODE))
+	hdd_debug("channel num: %d, freq: %d", in_chan, *freq);
+
+	/* freq = 0 is a valid input, so return true */
+	if (*freq &&
+	    !wlan_reg_is_freq_enabled(pdev, *freq, REG_CURRENT_PWR_MODE))
 		return false;
 
 	return true;
