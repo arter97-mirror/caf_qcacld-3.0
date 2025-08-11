@@ -551,7 +551,6 @@ struct sap_config {
 	enum sap_acs_dfs_mode acs_dfs_mode;
 	struct hdd_channel_info *channel_info;
 	uint32_t channel_info_count;
-	bool dfs_cac_offload;
 #ifdef WLAN_FEATURE_11BE_MLO
 	bool mlo_sap;
 	uint8_t link_id;
@@ -764,6 +763,7 @@ QDF_STATUS sap_destroy_ctx(struct sap_context *sap_ctx);
  * @mode: Device mode
  * @addr: MAC address of the SAP
  * @session_id: Pointer to the session id
+ * @cac_offload: if CAC is offloaded
  * @reinit: if called as part of reinit
  *
  * sap_create_ctx() allocates the sap context which is uninitialized.
@@ -775,8 +775,9 @@ QDF_STATUS sap_destroy_ctx(struct sap_context *sap_ctx);
  *         QDF_STATUS_SUCCESS: Success
  */
 QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
-			 enum QDF_OPMODE mode,
-			 uint8_t *addr, uint32_t session_id, bool reinit);
+			enum QDF_OPMODE mode,
+			uint8_t *addr, uint32_t session_id,
+			bool cac_offload, bool reinit);
 
 /**
  * sap_deinit_ctx() - De-initialize the sap context
