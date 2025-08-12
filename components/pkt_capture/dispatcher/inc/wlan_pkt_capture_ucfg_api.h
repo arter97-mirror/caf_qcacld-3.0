@@ -63,6 +63,15 @@ enum pkt_capture_mode
 ucfg_pkt_capture_get_mode(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_pkt_capture_get_full_rx_mgmt_frames() - get full rx mgmt frames config
+ * @psoc: objmgr psoc handle
+ *
+ * Return: True if the Full RX MGMT frames config is enabled.
+ */
+bool
+ucfg_pkt_capture_get_full_rx_mgmt_frames(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_pkt_capture_suspend_mon_thread() - suspend packet capture mon thread
  * @psoc: pointer to psoc object
  *
@@ -314,6 +323,12 @@ static inline
 enum pkt_capture_mode ucfg_pkt_capture_get_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return PACKET_CAPTURE_MODE_DISABLE;
+}
+
+static inline
+bool ucfg_pkt_capture_get_full_rx_mgmt_frames(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 
 static inline
