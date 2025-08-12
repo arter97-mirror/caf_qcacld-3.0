@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,9 @@
 #include "qdf_types.h"
 #include "dp_tx.h"
 
+#define TRY_LOCK_TIMEOUT_NS   20000
+#define TIMER_RESTART_TIME_NS 200000
+
 /**
  * dp_lapb_tcl_hp_update_timer_handler() - LAPB timer interrupt handler
  * @arg: private data of the timer
@@ -51,8 +54,9 @@ dp_lapb_tcl_hp_update_timer_handler(qdf_hrtimer_data_t *arg)
 
 	hal_ring_hdl = soc->tcl_data_ring[ring_id].hal_srng;
 
-	if (qdf_unlikely(hal_srng_access_start(soc->hal_soc, hal_ring_hdl)))
-		goto fail;
+	if (qdf_unlikely(dp_hal_srng_try_access_start(soc->hal_soc,
+			 hal_ring_hdl, TRY_LOCK_TIMEOUT_NS)))
+		goto timer_restart;
 
 	if (hif_rtpm_get(HIF_RTPM_GET_ASYNC, HIF_RTPM_ID_DP)) {
 		hal_srng_access_end_reap(soc->hal_soc, hal_ring_hdl);
@@ -67,6 +71,14 @@ dp_lapb_tcl_hp_update_timer_handler(qdf_hrtimer_data_t *arg)
 	lapb_ctx->stats.timer_expired++;
 fail:
 	return QDF_HRTIMER_NORESTART;
+
+timer_restart:
+	qdf_hrtimer_forward(&lapb_ctx->lapb_flow_timer,
+			    qdf_ktime_get(),
+			    qdf_time_ns_to_ktime(TIMER_RESTART_TIME_NS));
+
+	return QDF_HRTIMER_RESTART;
+
 }
 
 /**
@@ -83,13 +95,11 @@ dp_lapb_tcl_hp_update_timer(struct dp_soc *soc, uint32_t max_latency)
 	qdf_hrtimer_data_t *lapb_flow_timer =
 				&lapb_ctx->lapb_flow_timer;
 	uint64_t time_remaining;
-	bool test;
 
 	if (qdf_hrtimer_callback_running(lapb_flow_timer))
 		return;
 
-	test = qdf_hrtimer_is_queued(lapb_flow_timer);
-	if (!test) {
+	if (!qdf_hrtimer_is_queued(lapb_flow_timer)) {
 		qdf_hrtimer_start(lapb_flow_timer,
 				  qdf_time_ms_to_ktime(max_latency),
 				  QDF_HRTIMER_MODE_REL);
@@ -99,7 +109,6 @@ dp_lapb_tcl_hp_update_timer(struct dp_soc *soc, uint32_t max_latency)
 	time_remaining = qdf_ktime_to_ms
 				(qdf_hrtimer_get_remaining(lapb_flow_timer));
 	if (time_remaining > max_latency) {
-		qdf_hrtimer_kill(lapb_flow_timer);
 		qdf_hrtimer_start(lapb_flow_timer,
 				  qdf_time_ms_to_ktime(max_latency),
 				  QDF_HRTIMER_MODE_REL);
@@ -124,7 +133,8 @@ dp_lapb_handle_tcl_hp_update(struct dp_soc *soc, int *coalesce,
 
 	if (msdu_info->frm_type == dp_tx_frm_tso) {
 		if (msdu_info->skip_hp_update) {
-			if (qdf_hrtimer_is_queued(lapb_flow_timer))
+			if (qdf_hrtimer_is_queued(lapb_flow_timer) &&
+			    !qdf_hrtimer_callback_running(lapb_flow_timer))
 				qdf_hrtimer_kill(lapb_flow_timer);
 
 			*coalesce = 1;
@@ -132,7 +142,8 @@ dp_lapb_handle_tcl_hp_update(struct dp_soc *soc, int *coalesce,
 		}
 	}
 
-	if (qdf_hrtimer_is_queued(lapb_flow_timer))
+	if (qdf_hrtimer_is_queued(lapb_flow_timer) &&
+	    !qdf_hrtimer_callback_running(lapb_flow_timer))
 		qdf_hrtimer_kill(lapb_flow_timer);
 
 	*coalesce = 0;
@@ -267,7 +278,7 @@ QDF_STATUS wlan_dp_lapb_flow_attach(struct dp_soc *soc)
 			 dp_lapb_tcl_hp_update_timer_handler,
 			 QDF_CLOCK_MONOTONIC,
 			 QDF_HRTIMER_MODE_REL,
-			 QDF_CONTEXT_HARDWARE);
+			 QDF_CONTEXT_TASKLET);
 
 	lapb_ctx->soc = soc;
 	lapb_ctx->is_init = true;

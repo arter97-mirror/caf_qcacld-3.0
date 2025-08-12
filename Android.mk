@@ -45,6 +45,11 @@ LOCAL_MODULE_DDK_BUILD := true
 LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
 endif
 
+ifeq ($(TARGET_BOARD_PLATFORM), neo61)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_DDK_ALLOW_UNSAFE_HEADERS := true
+endif
+
 LOCAL_PATH := $(call my-dir)
 $(call wlog,LOCAL_PATH=$(LOCAL_PATH))
 BOARD_OPENSOURCE_DIR ?= vendor/qcom/opensource
@@ -275,7 +280,9 @@ KBUILD_OPTIONS += $(WLAN_SELECT)
 
 ifneq ($(TARGET_BOARD_PLATFORM), hala)
 ifneq ($(TARGET_BOARD_PLATFORM), anorak61)
+ifneq ($(TARGET_BOARD_PLATFORM), neo61)
 KBUILD_REQUIRED_KOS := ipam.ko
+endif
 endif
 endif
 

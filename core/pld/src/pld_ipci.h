@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -172,6 +172,12 @@ static inline int
 pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
 			  int (*cb)(void *ctx, uint16_t type,
 				    void *event, int event_len))
+{
+	return -EINVAL;
+}
+
+static inline int
+pld_ipci_get_dump_inprogress(struct device *dev, uint8_t *val)
 {
 	return -EINVAL;
 }
@@ -458,7 +464,7 @@ pld_ipci_qmi_send(struct device *dev, int type, void *cmd,
 	return icnss_qmi_send(dev, type, cmd, cmd_len, cb_ctx, cb);
 }
 
-#ifdef WLAN_CHIPSET_STATS
+#if defined(WLAN_CHIPSET_STATS) && defined(CNSS_QMI_ASYNC_EVENT_SUPPORT)
 static inline int
 pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
 			  int (*cb)(void *ctx, uint16_t type,
@@ -466,6 +472,20 @@ pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
 {
 	return icnss_register_driver_async_data_cb(dev, cb_ctx, cb);
 }
+
+#if defined(CONFIG_SEC_SS_CNSS_FEATURE_SYSFS)
+static inline int
+pld_ipci_get_dump_inprogress(struct device *dev, uint8_t *val)
+{
+	return icnss_get_dump_inprogress(dev, val);
+}
+#else
+static inline int
+pld_ipci_get_dump_inprogress(struct device *dev, uint8_t *val)
+{
+	return -EPERM;
+}
+#endif
 #else
 static inline int
 pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
@@ -473,6 +493,12 @@ pld_ipci_register_qmi_ind(struct device *dev, void *cb_ctx,
 				    void *event, int event_len))
 {
 	return 0;
+}
+
+static inline int
+pld_ipci_get_dump_inprogress(struct device *dev, uint8_t *val)
+{
+	return -EINVAL;
 }
 #endif
 

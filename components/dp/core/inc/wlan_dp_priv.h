@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -129,6 +129,7 @@ struct dp_rtpm_tput_policy_context {
  * @is_load_balance_enabled: indicates whether load balance is enabled or not
  * @is_flow_balance_enabled: indicates whether flow balance is enabled or not
  * @stc_enable: indicates whether STC feature is enabled or not
+ * @dp_irq_affinity_mask: DP IRQ affinity mask (0 for disable)
  */
 struct wlan_dp_psoc_cfg {
 	bool tx_orphan_enable;
@@ -214,6 +215,7 @@ struct wlan_dp_psoc_cfg {
 #ifdef WLAN_DP_FEATURE_STC
 	bool stc_enable;
 #endif
+	uint32_t dp_irq_affinity_mask;
 };
 
 /**

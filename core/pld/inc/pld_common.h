@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1693,6 +1693,18 @@ int pld_qmi_send(struct device *dev, int type, void *cmd,
 int pld_qmi_indication(struct device *dev, void *cb_ctx,
 		       int (*cb)(void *ctx, uint16_t type,
 				 void *event, int event_len));
+
+/**
+ * pld_get_dump_inprogress() - Get dump_inprogress sysfs value
+ * @dev: device pointer
+ * @val: address to store the value
+ *
+ * This API can be used to get dump_inprogress sysfs value
+ *
+ * Return: 0 if successful
+ *         Non zero failure code for errors
+ */
+int pld_get_dump_inprogress(struct device *dev, uint8_t *val);
 
 /**
  * pld_is_fw_dump_skipped() - get fw dump skipped status.

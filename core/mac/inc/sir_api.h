@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3718,7 +3718,11 @@ struct chip_pwr_save_fail_detected_params {
 #define DEFAULT_SCAN_IE_ID 256
 
  /* MAX_DEFAULT_SCAN_IE_LEN - Maximum length of Default Scan IE's */
+#ifdef WLAN_LARGE_MGMT_FRAMES_SUPPORT
+#define MAX_DEFAULT_SCAN_IE_LEN 1024
+#else
 #define MAX_DEFAULT_SCAN_IE_LEN 2048
+#endif
 
  /* Extended Capabilities IE header(IE Id + IE Length) length */
 #define EXT_CAP_IE_HDR_LEN 2

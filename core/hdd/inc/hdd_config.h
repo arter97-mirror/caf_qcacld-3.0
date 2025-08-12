@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1623,6 +1623,52 @@ enum host_log_level {
 #define CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL
 #endif
 
+/*
+ * <ini>
+ * chipset_stats_push_rbs_delay_val_ms - INI to configure delay value when
+ *					 pushing chipset stats RB's to userspace
+ *
+ * @Min: 0
+ * @Max: 600000
+ * Default: 0
+ *
+ * This INI is used to provide delay value(in ms) from the user
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_CHIPSET_STATS_PUSH_RBS_DELAY_VAL_MS CFG_INI_UINT( \
+			"chipset_stats_push_rbs_delay_val_ms", \
+			0, \
+			600000, \
+			0, \
+			CFG_VALUE_OR_DEFAULT, \
+			"User delay value in ms")
+
+/*
+ * <ini>
+ * chipset_stats_push_rbs_delay_interval - INI to used to provide delay interval
+ *
+ * @Min: 0
+ * @Max: 600000
+ * Default: 0
+ *
+ * This INI represent after how many RB node the
+ * CFG_CHIPSET_STATS_PUSH_RBS_DELAY_VAL_MS is to be applied
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_CHIPSET_STATS_PUSH_RBS_DELAY_INTERVAL CFG_INI_UINT( \
+			"chipset_stats_push_rbs_delay_interval", \
+			0, \
+			600000, \
+			0, \
+			CFG_VALUE_OR_DEFAULT, \
+			"User delay interval")
+
 #define CFG_HDD_ALL \
 	CFG_DYNAMIC_MAC_ADDR_UPDATE_SUPPORTED_ALL \
 	CFG_ENABLE_PACKET_LOG_ALL \
@@ -1673,5 +1719,7 @@ enum host_log_level {
 	CFG_UL_JITTER_LOG_ALL \
 	CFG_EPM_ENABLE_ALL \
 	CFG_EPM_VALUE_ALL \
-	CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL
+	CFG_MAX_CHIPSET_LOG_SIZE_ENABLE_ALL \
+	CFG(CFG_CHIPSET_STATS_PUSH_RBS_DELAY_VAL_MS) \
+	CFG(CFG_CHIPSET_STATS_PUSH_RBS_DELAY_INTERVAL)
 #endif
