@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -61,6 +61,18 @@ struct wlan_objmgr_vdev;
 #define NAN_2GHZ_SOCIAL_CH_FREQ 2437
 
 #define NAN_PARING_BIT 1
+
+/**
+ * enum nan_disable_req_type - NAN disable request type
+ * @NAN_DISABLE_REQ_DEFAULT: Default NAN disable request
+ * @NAN_DISABLE_REQ_NB: NB NAN disable request
+ * @NAN_DISABLE_REQ_INTERNAL: Internal NAN disable request
+ */
+enum nan_disable_req_type {
+	NAN_DISABLE_REQ_DEFAULT,
+	NAN_DISABLE_REQ_NB,
+	NAN_DISABLE_REQ_INTERNAL,
+};
 
 /**
  * enum nan_discovery_msg_type - NAN msg type
@@ -544,6 +556,7 @@ struct nan_datapath_end_all_ndps {
  * @nan_event_id_disable_ind: NAN Disable Indication event ID
  * @nan_event_id_generic_rsp: All remaining NAN events, treated as passthrough
  * @nan_event_id_de_ind: Discovery Engine event Indication
+ * @nan_event_id_disable_rsp: NAN Disable Response event ID
  */
 enum nan_event_id_types {
 	nan_event_id_error_rsp = 0,
@@ -551,6 +564,7 @@ enum nan_event_id_types {
 	nan_event_id_disable_ind,
 	nan_event_id_generic_rsp,
 	nan_event_id_de_ind,
+	nan_event_id_disable_rsp,
 };
 
 /**

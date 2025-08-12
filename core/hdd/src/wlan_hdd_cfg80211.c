@@ -25220,7 +25220,17 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		    wlan_hdd_is_sap_sta_nan_concurrency_present(i))
 			continue;
 
-		if (sap_sta_nan_concurrency) {
+		/**
+		 * Enabling sap_sta_nan_concurrency will remove existing
+		 * STA + NAN and SAP + NAN configurations.
+		 * For non-DBS cases, it will not add STA + SAP + NAN
+		 * as the interface count exceeds two.
+		 * However, it will still remove STA + NAN and SAP + NAN.
+		 * Below check is to prevent removing STA + NAN and SAP + NAN
+		 * if non-DBS is present.
+		 */
+		if (sap_sta_nan_concurrency &&
+		    ucfg_policy_mgr_is_fw_supports_dbs(psoc)) {
 			/* remove STA NAN concurrency */
 			if (wlan_hdd_is_sta_nan_concurrency_present(
 					wlan_hdd_iface_combination, i))
@@ -33828,11 +33838,6 @@ static void __wlan_hdd_cfg80211_update_mgmt_frame_registrations(
 
 	hdd_debug("Mode: %d, set mgmt regis update value 0x%x",
 		  adapter->device_mode, upd->interface_stypes);
-
-	if (adapter->device_mode == QDF_P2P_DEVICE_MODE)
-		ucfg_p2p_set_mgmt_frm_registration_update(
-						hdd_ctx->psoc,
-						upd->interface_stypes);
 }
 
 /**

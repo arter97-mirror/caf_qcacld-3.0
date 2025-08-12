@@ -5191,6 +5191,14 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		goto end;
 	}
 
+	if (requested_state == WLAN_ROAM_RSO_ENABLED &&
+	    (policy_mgr_is_chan_switch_in_progress(psoc) ||
+	     policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc))) {
+		mlme_debug("ROAM: roam state(%d) change requested when a concurrent SAP is in MCC or CSA is in progress",
+			   requested_state);
+		goto end;
+	}
+
 	status = cm_handle_mlo_rso_state_change(pdev, &vdev_id, requested_state,
 						reason, &is_rso_skip);
 	if (is_rso_skip)

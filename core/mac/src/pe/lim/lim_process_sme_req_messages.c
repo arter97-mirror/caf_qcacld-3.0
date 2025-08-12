@@ -6656,7 +6656,6 @@ lim_update_both_eirp_psd(struct wlan_objmgr_vdev *vdev, int8_t max_tx_power,
 	struct wlan_objmgr_pdev *pdev;
 	uint16_t local_constraint = 0;
 
-
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
 	if (!vdev_mlme) {
 		pe_err("vdev component object is NULL");
@@ -6697,17 +6696,15 @@ lim_update_both_eirp_psd(struct wlan_objmgr_vdev *vdev, int8_t max_tx_power,
 
 		if (vdev_mlme->reg_tpc_obj.is_power_constraint_abs) {
 			if (!local_constraint) {
+				pe_debug("ignore zero ap constraint power");
 				eirp_max_tx_power = eirp_reg_max;
 			} else {
 				eirp_max_tx_power = QDF_MIN(eirp_reg_max,
 							    local_constraint);
 			}
 		} else {
-			eirp_max_tx_power = eirp_reg_max - local_constraint;
-			if (!eirp_max_tx_power)
-				eirp_max_tx_power = eirp_reg_max;
+			eirp_max_tx_power = eirp_reg_max;
 		}
-
 
 		eirp_power =
 			vdev_mlme->reg_tpc_obj.chan_eirp_power_info[i].tx_power;
@@ -6894,19 +6891,18 @@ void lim_calculate_tpc(struct mac_context *mac,
 			 mlme_obj->reg_tpc_obj.is_power_constraint_abs);
 
 		if (is_psd_power) {
+			pe_debug("Reg psd power: %d", reg_psd_pwr_max);
 			max_tx_power = reg_psd_pwr_max;
 		} else if (mlme_obj->reg_tpc_obj.is_power_constraint_abs) {
 			if (!local_constraint) {
-				pe_debug("ignore abs ap constraint power 0!");
+				pe_debug("Ignore zero abs ap constraint power");
 				max_tx_power = reg_max;
 			} else {
 				max_tx_power = QDF_MIN(reg_max,
 						       local_constraint);
 			}
 		} else {
-			max_tx_power = reg_max - local_constraint;
-			if (!max_tx_power)
-				max_tx_power = reg_max;
+			max_tx_power = reg_max;
 		}
 
 		/* In case TPE IE not present then set max tx power */
