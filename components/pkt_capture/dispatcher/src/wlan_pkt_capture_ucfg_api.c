@@ -35,6 +35,11 @@ enum pkt_capture_mode ucfg_pkt_capture_get_mode(struct wlan_objmgr_psoc *psoc)
 	return pkt_capture_get_mode(psoc);
 }
 
+bool ucfg_pkt_capture_get_full_rx_mgmt_frames(struct wlan_objmgr_psoc *psoc)
+{
+	return pkt_capture_get_full_rx_mgmt_frames(psoc);
+}
+
 QDF_STATUS
 ucfg_pkt_capture_register_callbacks(struct wlan_objmgr_vdev *vdev,
 				    QDF_STATUS (*mon_cb)(void *, qdf_nbuf_t),
