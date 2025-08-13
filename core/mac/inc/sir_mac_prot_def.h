@@ -264,8 +264,8 @@
 
 /* Maximum allowable size of a beacon,probe rsp and fils discovery frame */
 #ifdef WLAN_LARGE_MGMT_FRAMES_SUPPORT
-#define SIR_MAX_BEACON_SIZE     1280
-#define SIR_MAX_PROBE_RESP_SIZE 1280
+#define SIR_MAX_BEACON_SIZE     1024
+#define SIR_MAX_PROBE_RESP_SIZE 1024
 #else
 #define SIR_MAX_BEACON_SIZE     512
 #define SIR_MAX_PROBE_RESP_SIZE 512
