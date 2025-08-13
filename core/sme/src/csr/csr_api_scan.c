@@ -619,7 +619,8 @@ csr_fill_eppke_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
 }
 #endif /* WLAN_FEATURE_11BI_SECURITY */
 
-static void csr_fill_rsn_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
+static void csr_fill_rsn_auth_type(uint32_t authmodeset,
+				   enum csr_akm_type *auth_type, uint32_t akm)
 {
 	/* Try the more preferred ones first. */
 	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384))
@@ -729,8 +730,10 @@ void csr_fill_auth_type(enum csr_akm_type *auth_type,
 	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_RSNA) ||
 	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_CCKM) ||
 	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_SAE) ||
-	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_FILS_SK)) {
-		csr_fill_rsn_auth_type(auth_type, akm);
+	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_EPPKE) ||
+	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_FILS_SK) ||
+	    QDF_HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_8021X_IN_AUTH)) {
+		csr_fill_rsn_auth_type(authmodeset, auth_type, akm);
 		return;
 	}
 
