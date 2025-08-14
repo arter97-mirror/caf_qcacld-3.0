@@ -331,6 +331,10 @@ bool hdd_tsf_is_tsf64_tx_set(struct hdd_context *hdd)
 }
 #endif
 
+int32_t hdd_get_soctime_from_tsf64time(
+        struct hdd_adapter *adapter, uint64_t tsf64_time,
+        uint64_t *soc_time);
+
 #ifdef WLAN_FEATURE_TSF_PTP
 /**
  * wlan_get_ts_info() - return ts info to uplayer

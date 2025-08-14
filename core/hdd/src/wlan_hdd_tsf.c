@@ -690,7 +690,7 @@ static inline int32_t hdd_get_targettime_from_hosttime(
  * other: fail
  *
  */
-static inline int32_t hdd_get_soctime_from_tsf64time(
+int32_t hdd_get_soctime_from_tsf64time(
 	struct hdd_adapter *adapter, uint64_t tsf64_time,
 	uint64_t *soc_time)
 {

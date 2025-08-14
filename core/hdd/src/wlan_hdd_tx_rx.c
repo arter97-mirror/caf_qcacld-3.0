@@ -1901,7 +1901,7 @@ void hdd_disable_rx_ol_for_low_tput(struct hdd_context *hdd_ctx, bool disable)
 }
 #endif /* RECEIVE_OFFLOAD */
 
-#ifdef WLAN_FEATURE_TSF_PLUS
+#if defined(WLAN_FEATURE_TSF_PLUS) && !defined(WLAN_FEATURE_WIFI_EVENT_CUSTOM)
 static inline void hdd_tsf_timestamp_rx(struct hdd_context *hdd_ctx,
 					qdf_nbuf_t netbuf,
 					uint64_t target_time)
