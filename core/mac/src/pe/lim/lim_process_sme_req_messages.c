@@ -1080,6 +1080,43 @@ static inline void lim_update_sae_config(struct pe_session *session,
 {}
 #endif
 
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+static void csr_send_custom_join_req_event(struct pe_session *session,
+					   tLimMlmJoinReq *mlm_join_req)
+{
+	struct join_req_event *event = NULL;
+	struct mon_report_status *mon_report= NULL;
+	uint8_t *buf = NULL;
+
+	buf = qdf_mem_malloc(sizeof(struct mon_report_status) +
+			     sizeof(struct join_req_event));
+	if (!buf) {
+		pe_err("Allocate Memory failed for buf");
+		return;
+	}
+
+	mon_report = (struct mon_report_status *)buf;
+	event = (struct join_req_event *)(mon_report->payload);
+
+	mon_report->type = JOIN_REQ_EVENT;
+	mon_report->payload_len = sizeof(struct join_req_event);
+	mon_report->qtime = qdf_get_log_timestamp_usecs();
+
+	qdf_mem_copy(event->bssid, mlm_join_req->bssDescription.bssId,
+		     QDF_MAC_ADDR_SIZE);
+	event->channel = session->currentOperChannel;
+	event->rssi = session->rssi;
+
+	send_custom_packet_select(buf);
+	qdf_mem_free(buf);
+}
+#else
+static void csr_send_custom_join_req_event(struct pe_session *session,
+					   tLimMlmJoinReq *mlm_join_req)
+{
+}
+#endif
+
 /**
  * lim_send_join_req() - send vdev start request for assoc
  *@session: pe session
@@ -1095,6 +1132,8 @@ static QDF_STATUS lim_send_join_req(struct pe_session *session,
 	status = mlme_set_assoc_type(session->vdev, VDEV_ASSOC);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+
+	csr_send_custom_join_req_event(session, mlm_join_req);
 
 	return wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					     WLAN_VDEV_SM_EV_START,

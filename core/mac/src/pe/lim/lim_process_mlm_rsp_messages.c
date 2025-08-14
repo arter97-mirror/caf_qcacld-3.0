@@ -1307,6 +1307,38 @@ error:
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+static void csr_send_custom_join_resp_event(int reason, int status)
+{
+	struct join_resp_event *event = NULL;
+	struct mon_report_status *mon_report = NULL;
+	uint8_t *buf = NULL;
+
+	buf = qdf_mem_malloc(sizeof(struct mon_report_status) +
+			     sizeof(struct join_resp_event));
+	if (!buf) {
+		pe_err("Allocate Memory failed for buf");
+		return;
+	}
+
+	mon_report = (struct mon_report_status *)buf;
+	event = (struct join_resp_event *)(mon_report->payload);
+
+	mon_report->type = JOIN_RESP_EVENT;
+	mon_report->payload_len = sizeof(struct join_resp_event);
+	mon_report->qtime = qdf_get_log_timestamp_usecs();
+
+	event->reason = reason;
+	event->status_code = status;
+	send_custom_packet_select(buf);
+	qdf_mem_free(buf);
+}
+#else
+static void csr_send_custom_join_resp_event(int reason, int status)
+{
+}
+#endif
+
 /**
  * lim_handle_sme_join_result() - Handles sme join result
  * @mac_ctx:  Pointer to Global MAC structure
@@ -1332,6 +1364,8 @@ void lim_handle_sme_join_result(struct mac_context *mac_ctx,
 		pe_err("session is NULL");
 		return;
 	}
+
+	csr_send_custom_join_resp_event(result_code, prot_status_code);
 
 	if (result_code == eSIR_SME_SUCCESS) {
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
