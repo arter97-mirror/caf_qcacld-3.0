@@ -598,7 +598,7 @@ wlan_action_oui_add_token_opt(enum action_oui_token_type action_token,
 			      uint32_t value_len,
 			      struct action_oui_extension *ext)
 {
-	uint8_t byte_mask_value[ACTION_OUI_MAX_DATA_MASK_LENGTH] = {0};
+	uint8_t byte_mask_value[ACTION_OUI_MAX_DATA_MASK_LENGTH_HOST_ONLY] = {0};
 	uint32_t byte_mask_len = 0;
 
 	switch (action_token) {
@@ -703,7 +703,7 @@ wlan_action_oui_add_token(enum action_oui_token_type action_token,
 			  uint32_t value_len,
 			  struct action_oui_extension *ext)
 {
-	uint8_t byte_mask_value[ACTION_OUI_MAX_DATA_MASK_LENGTH] = {0};
+	uint8_t byte_mask_value[ACTION_OUI_MAX_DATA_MASK_LENGTH_HOST_ONLY] = {0};
 	uint32_t byte_mask_len = 0;
 
 	switch (action_token) {
@@ -720,7 +720,7 @@ wlan_action_oui_add_token(enum action_oui_token_type action_token,
 		ext->info_mask = ext->info_mask | ACTION_OUI_INFO_OUI;
 		break;
 	case ACTION_OUI_DATA_TOKEN:
-		if (value_len > ACTION_OUI_MAX_DATA_LENGTH) {
+		if (value_len > ACTION_OUI_MAX_DATA_LENGTH_HOST_ONLY) {
 			action_oui_err("Invalid data len %u", value_len);
 			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_ACTION_OUI,
 					   QDF_TRACE_LEVEL_DEBUG,
@@ -731,7 +731,7 @@ wlan_action_oui_add_token(enum action_oui_token_type action_token,
 		ext->data_length = value_len;
 		break;
 	case ACTION_OUI_DATA_MASK_TOKEN:
-		if (value_len > ACTION_OUI_MAX_DATA_MASK_LENGTH) {
+		if (value_len > ACTION_OUI_MAX_DATA_MASK_LENGTH_HOST_ONLY) {
 			action_oui_err("Invalid data mask len %u", value_len);
 			return QDF_STATUS_E_INVAL;
 		}
@@ -739,7 +739,7 @@ wlan_action_oui_add_token(enum action_oui_token_type action_token,
 		ext->data_mask_length = value_len;
 		break;
 	case ACTION_OUI_DATA_BIT_MASK_TOKEN:
-		if (value_len > ACTION_OUI_MAX_DATA_LENGTH) {
+		if (value_len > ACTION_OUI_MAX_DATA_LENGTH_HOST_ONLY) {
 			action_oui_err("Invalid data mask len %u", value_len);
 			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_ACTION_OUI,
 					   QDF_TRACE_LEVEL_DEBUG,

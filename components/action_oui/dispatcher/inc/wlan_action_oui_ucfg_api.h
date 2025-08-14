@@ -249,10 +249,7 @@ ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 
 	status = wlan_action_oui_extension_store(psoc, action_id, oui_ext,
 						 oui_ext_num);
-	if (QDF_IS_STATUS_ERROR(status))
-		return status;
-
-	return ucfg_action_oui_send_by_id(psoc, action_id);
+	return status;
 }
 #else
 

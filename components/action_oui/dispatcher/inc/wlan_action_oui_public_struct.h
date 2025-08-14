@@ -63,6 +63,19 @@
 #define ACTION_OUI_MAX_OUI_LENGTH 5
 #define ACTION_OUI_MAX_DATA_LENGTH 20
 #define ACTION_OUI_MAX_DATA_MASK_LENGTH 3
+
+/*
+ * Maximum data length for host-only OUI extensions.
+ * This is larger than ACTION_OUI_MAX_DATA_LENGTH which is limited by firmware.
+ */
+#define ACTION_OUI_MAX_DATA_LENGTH_HOST_ONLY 64
+
+/*
+ * Maximum data mask length for host-only OUI extensions.
+ * This is larger than ACTION_OUI_MAX_DATA_MASK_LENGTH which is limited by
+ * firmware.
+ */
+#define ACTION_OUI_MAX_DATA_MASK_LENGTH_HOST_ONLY 8
 #define ACTION_OUI_MAC_MASK_LENGTH 1
 #define ACTION_OUI_MAX_CAPABILITY_LENGTH 1
 
@@ -233,8 +246,8 @@ struct action_oui_extension {
 	uint32_t mac_mask_length;
 	uint32_t capability_length;
 	uint8_t oui[ACTION_OUI_MAX_OUI_LENGTH];
-	uint8_t data[ACTION_OUI_MAX_DATA_LENGTH];
-	uint8_t data_mask[ACTION_OUI_MAX_DATA_MASK_LENGTH];
+	uint8_t data[ACTION_OUI_MAX_DATA_LENGTH_HOST_ONLY];
+	uint8_t data_mask[ACTION_OUI_MAX_DATA_MASK_LENGTH_HOST_ONLY];
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
 	uint8_t mac_mask[ACTION_OUI_MAC_MASK_LENGTH];
 	uint8_t capability[ACTION_OUI_MAX_CAPABILITY_LENGTH];
