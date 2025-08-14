@@ -1748,6 +1748,7 @@ QDF_STATUS ol_txrx_ipa_disable_pipes(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
 	struct ol_txrx_ipa_resources *ipa_res;
 	int result;
+	uint8_t retry_cnt = 3;
 
 	if (!pdev) {
 		ol_txrx_err("Invalid instance");
@@ -1782,12 +1783,15 @@ QDF_STATUS ol_txrx_ipa_disable_pipes(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 				__func__, result);
 		goto smmu_unmap;
 	}
-	result = qdf_ipa_disable_wdi_pipe(ipa_res->tx_pipe_handle);
+
+	do {
+		result = qdf_ipa_disable_wdi_pipe(ipa_res->tx_pipe_handle);
+	} while (result && --retry_cnt > 0);
 	if (result) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 				"%s: Disable TX PIPE fail, code %d",
 				__func__, result);
-		goto smmu_unmap;
+		QDF_BUG(0);
 	}
 
 smmu_unmap:
