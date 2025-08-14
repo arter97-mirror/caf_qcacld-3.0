@@ -1529,10 +1529,6 @@ osif_twt_iterate_all_concurrency_vdev(struct wlan_objmgr_pdev *pdev,
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
-#define TWT_RESPONDER_SAP_MODE       0
-#define TWT_RESPONDER_LL_LT_SAP_MODE 1
-#define TWT_RESPONDER_P2P_GO_MODE    2
-
 QDF_STATUS
 osif_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id, uint8_t mode,
