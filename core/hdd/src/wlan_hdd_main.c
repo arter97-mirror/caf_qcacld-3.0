@@ -18818,7 +18818,7 @@ static int con_mode_handler(const char *kmessage, const struct kernel_param *kp)
  */
 
 /* Max number of retries (arbitrary)*/
-#define HDD_MAX_PLD_REGISTER_RETRY (100)
+#define HDD_MAX_PLD_REGISTER_RETRY (50)
 
 /* Max amount of time we sleep before each retry */
 #define HDD_PLD_REGISTER_FAIL_SLEEP_DURATION (100)
