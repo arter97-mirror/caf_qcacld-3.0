@@ -9022,6 +9022,62 @@ hdd_sap_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 	((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)) || \
 	  defined(CFG80211_TWT_RESPONDER_SUPPORT))
 #ifdef WLAN_TWT_CONV_SUPPORTED
+
+/**
+ * wlan_hdd_configure_twt_responder_disable_by_mode() - Disable twt_responder
+ * at vdev level based on mode
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev id
+ * @mode: QDF mode
+ * @twt_resp_cfg: twt responder config
+ * @twt_responder: twt_responder value received from
+ * wlan_hdd_configure_twt_responder()
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wlan_hdd_configure_twt_responder_disable_by_mode(struct wlan_objmgr_psoc *psoc,
+						 uint8_t vdev_id, uint8_t mode,
+						 uint8_t twt_resp_cfg,
+						 bool twt_responder)
+{
+	bool sap_resp_enable = true;
+	bool ll_lt_sap_resp_enable = true;
+	bool p2p_go_resp_enable = true;
+	bool twt_rsp_disable_svc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	ucfg_twt_tgt_caps_get_resp_disable_per_vdev(psoc, &twt_rsp_disable_svc);
+	if (!twt_rsp_disable_svc && !twt_resp_cfg)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	switch (mode) {
+	case QDF_SAP_MODE:
+		if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id))
+			ll_lt_sap_resp_enable =
+			QDF_MIN((twt_resp_cfg & BIT(TWT_RESPONDER_LL_LT_SAP_MODE)),
+				twt_responder);
+		else
+			sap_resp_enable =
+			QDF_MIN((twt_resp_cfg & BIT(TWT_RESPONDER_SAP_MODE)),
+				twt_responder);
+		break;
+	case QDF_P2P_GO_MODE:
+		p2p_go_resp_enable =
+			QDF_MIN((twt_resp_cfg & BIT(TWT_RESPONDER_P2P_GO_MODE)),
+				twt_responder);
+		break;
+	default:
+		hdd_err("TWT responder is not supported for mode %d", mode);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!sap_resp_enable || !ll_lt_sap_resp_enable || !p2p_go_resp_enable)
+		status = ucfg_twt_send_responder_disable_per_vdev(psoc,
+								  vdev_id);
+	return status;
+}
+
 void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 				      bool twt_responder, uint8_t vdev_id)
 {
@@ -9059,20 +9115,18 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 		return;
 	}
 
-	if (!twt_res_svc_cap || !enable_twt || !twt_responder)
-		ucfg_twt_cfg_set_responder(hdd_ctx->psoc, 0);
-
 	hdd_debug("cfg80211 TWT responder: %d, enable twt: %d, twt_res_cfg: %d",
 		  twt_responder, enable_twt, twt_res_cfg);
-	if (enable_twt && twt_responder && twt_res_cfg) {
+	if (enable_twt && twt_res_cfg) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
 		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason, vdev_id);
 	}
 
-	osif_twt_send_responder_disable_per_vdev(hdd_ctx->psoc, vdev_id, mode,
-						 twt_res_cfg);
+	wlan_hdd_configure_twt_responder_disable_by_mode(hdd_ctx->psoc, vdev_id,
+							 mode, twt_res_cfg,
+							 twt_responder);
 }
 
 static void
