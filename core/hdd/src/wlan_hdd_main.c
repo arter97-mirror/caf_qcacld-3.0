@@ -8520,6 +8520,39 @@ static int hdd_wiphy_init(struct hdd_context *hdd_ctx)
 }
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+struct tx_rx_custom_stats g_custom_stats;
+static void hdd_send_stats_cfm_event(void)
+{
+	struct stats_cfm_event *event = NULL;
+	struct mon_report_status *mon_report = NULL;
+	uint8_t *buf = NULL;
+
+	buf = qdf_mem_malloc(sizeof(struct mon_report_status) +
+							sizeof(struct stats_cfm_event));
+	if (!buf) {
+		hdd_err("Allocate Memory failed for buf");
+		return;
+	}
+
+	mon_report = (struct mon_report_status *)buf;
+	event = (struct stats_cfm_event *)(mon_report->payload);
+
+	mon_report->type = STATS_CFM_EVENT;
+	mon_report->payload_len = sizeof(struct stats_cfm_event);
+	mon_report->qtime = qdf_get_log_timestamp_usecs()
+					     / USEC_PER_MSEC;
+
+	event->tx_pkts = g_custom_stats.tx_pkts;
+	event->tx_retrans_pkts = g_custom_stats.tx_retrans_pkts;
+	event->rx_pkts = g_custom_stats.rx_pkts;
+	event->rx_ucast_pkts = g_custom_stats.rx_ucast_pkts;
+
+	send_custom_packet_select(buf);
+
+	qdf_mem_free(buf);
+}
+#endif
 /**
  * hdd_display_periodic_stats() - Function to display periodic stats
  * @hdd_ctx - handle to hdd context
@@ -8574,6 +8607,9 @@ static void hdd_display_periodic_stats(struct hdd_context *hdd_ctx,
 			wlan_hdd_display_netif_queue_history
 				(hdd_ctx, QDF_STATS_VERBOSITY_LEVEL_LOW);
 			qdf_dp_trace_dump_stats();
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+			hdd_send_stats_cfm_event();
+#endif
 		}
 		counter = 0;
 		data_in_time_period = false;

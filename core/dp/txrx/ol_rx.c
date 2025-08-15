@@ -1267,6 +1267,7 @@ ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 	qdf_nbuf_t deliver_list_tail = NULL;
 	qdf_nbuf_t msdu;
 	bool filter = false;
+	bool is_mcast = false;
 #ifdef QCA_SUPPORT_SW_TXRX_ENCAP
 	struct ol_rx_decap_info_t info;
 
@@ -1316,7 +1317,7 @@ ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 		 */
 		if (htt_rx_msdu_first_msdu_flag(htt_pdev, rx_desc))
 			filter = ol_rx_filter(vdev, peer, msdu, rx_desc);
-
+		is_mcast = htt_rx_msdu_is_wlan_mcast(htt_pdev, rx_desc);
 #ifdef QCA_SUPPORT_SW_TXRX_ENCAP
 DONE:
 #endif
@@ -1352,6 +1353,9 @@ DONE:
 			TXRX_STATS_MSDU_INCR(vdev->pdev, rx.delivered, msdu);
 
 			ol_rx_timestamp(pdev->ctrl_pdev, rx_desc, msdu);
+			is_mcast = htt_rx_msdu_is_wlan_mcast(htt_pdev, rx_desc);
+			if(!is_mcast)
+				TXRX_STATS_MSDU_INCR(vdev->pdev, rx.u_delivered, msdu);
 			OL_TXRX_LIST_APPEND(deliver_list_head,
 					    deliver_list_tail, msdu);
 		}

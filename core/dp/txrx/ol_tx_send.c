@@ -961,6 +961,10 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 	struct htt_tx_compl_ind_append_tx_tstamp *txtstamp_list = NULL;
 	struct htt_tx_compl_ind_append_tx_tsf64 *txtstamp64_list = NULL;
 	struct htt_tx_data_hdr_information *pkt_capture_txcomp_hdr_list = NULL;
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	struct htt_tx_data_hdr_information *custom_stat_txcomp_hdr_list = NULL;
+	struct htt_tx_data_hdr_information *custom_stat_payload_hdr;
+#endif
 	u_int32_t *msg_word_header = (u_int32_t *)msg;
 	/*msg_word skip header*/
 	u_int32_t *msg_word_payload = msg_word_header + 1;
@@ -984,6 +988,13 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 			txtstamp64_list = ol_tx_get_txtstamp64s(
 				msg_word_header, &msg_word_payload, num_msdus);
 	}
+
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+		custom_stat_txcomp_hdr_list =
+				ucfg_pkt_capture_tx_get_txcomplete_data_hdr(
+								msg_word,
+								num_msdus);
+#endif
 
 	if ((ucfg_pkt_capture_get_pktcap_mode() &
 	     PKT_CAPTURE_MODE_DATA_ONLY))
@@ -1016,7 +1027,14 @@ ol_tx_completion_handler(ol_txrx_pdev_handle pdev,
 			ol_tx_timestamp(pdev, netbuf,
 					(u_int64_t)txtstamp_list->timestamp[i]
 					);
-
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+		if(custom_stat_txcomp_hdr_list) {
+			custom_stat_payload_hdr = &custom_stat_txcomp_hdr_list[i];
+			if(custom_stat_payload_hdr->tx_retry_cnt) {
+				TXRX_STATS_INCR(pdev, pub.tx.tx_retry);
+			}
+		}
+#endif
 		if (pkt_capture_txcomp_hdr_list) {
 			ol_tx_pkt_capture_tx_completion_process(
 						pdev,

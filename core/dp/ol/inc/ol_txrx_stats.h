@@ -122,6 +122,7 @@ struct ol_txrx_stats_tx {
 	struct ol_txrx_stats_tx_histogram comp_histogram;
 	/* TSO (TCP segmentation offload) information */
 	struct ol_txrx_stats_tx_tso tso;
+	uint64_t tx_retry;
 };
 
 /*
@@ -155,6 +156,8 @@ struct ol_txrx_stats_rx {
 	struct ol_txrx_stats_rx_histogram rx_ind_histogram;
 	uint32_t msdus_with_frag_ind;
 	uint32_t msdus_with_offload_ind;
+	/* Unicast MSDUs given to the OS shim */
+	struct ol_txrx_stats_elem u_delivered;
 };
 struct ol_txrx_stats {
 	struct ol_txrx_stats_tx tx;

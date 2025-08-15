@@ -4198,6 +4198,37 @@ static void ol_txrx_disp_peer_stats(ol_txrx_pdev_handle pdev)
 }
 #endif
 
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+static void ol_txrx_g_custom_stats_update(ol_txrx_pdev_handle pdev)
+{
+	if (!pdev)
+		return;
+
+	g_custom_stats.prev_tx_pkts = g_custom_stats.tx_pkts;
+	g_custom_stats.prev_tx_retrans_pkts = g_custom_stats.tx_retrans_pkts;
+	g_custom_stats.prev_rx_pkts = g_custom_stats.rx_pkts;
+	g_custom_stats.prev_rx_ucast_pkts = g_custom_stats.rx_ucast_pkts;
+
+	g_custom_stats.tx_pkts = pdev->stats.pub.tx.delivered.pkts;
+	g_custom_stats.tx_retrans_pkts = pdev->stats.pub.tx.tx_retry;
+	g_custom_stats.rx_pkts = pdev->stats.pub.rx.delivered.pkts;
+	g_custom_stats.rx_ucast_pkts = pdev->stats.pub.rx.u_delivered.pkts;
+
+	txrx_nofl_dbg("JNL: prev(%d,%d,%d,%d),cur(%d,%d,%d,%d)(0x%x,0x%x,0x%x,0x%x)",
+		g_custom_stats.prev_tx_pkts, g_custom_stats.prev_tx_retrans_pkts,
+		g_custom_stats.prev_rx_pkts, g_custom_stats.prev_rx_ucast_pkts,
+		g_custom_stats.tx_pkts, g_custom_stats.tx_retrans_pkts,
+		g_custom_stats.rx_pkts, g_custom_stats.rx_ucast_pkts,
+		g_custom_stats.tx_pkts, g_custom_stats.tx_retrans_pkts,
+		g_custom_stats.rx_pkts, g_custom_stats.rx_ucast_pkts);
+}
+#else
+static inline
+void ol_txrx_g_custom_stats_update(ol_txrx_pdev_handle pdev)
+{
+}
+#endif
+
 void ol_txrx_stats_display(ol_txrx_pdev_handle pdev,
 			   enum qdf_stats_verbosity_level level)
 {
@@ -4206,6 +4237,8 @@ void ol_txrx_stats_display(ol_txrx_pdev_handle pdev,
 		  + pdev->stats.pub.tx.dropped.target_discard.pkts
 		  + pdev->stats.pub.tx.dropped.no_ack.pkts
 		  + pdev->stats.pub.tx.dropped.others.pkts;
+
+	ol_txrx_g_custom_stats_update(pdev);
 
 	if (level == QDF_STATS_VERBOSITY_LEVEL_LOW) {
 		txrx_nofl_dbg("STATS |%u %u|TX: %lld tso %lld ok %lld drops(%u-%lld %u-%lld %u-%lld ?-%lld hR-%lld)|RX: %lld drops(E %lld PI %lld ME %lld) fwd(S %d F %d SF %d)|",

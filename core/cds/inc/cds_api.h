@@ -613,6 +613,19 @@ int cds_smmu_map_unmap(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr);
 
 #ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
 void send_custom_packet_select(void* buf);
+
+struct tx_rx_custom_stats {
+	uint32_t tx_pkts;              /* txframe */
+	uint32_t tx_retrans_pkts;      /* txretrans */
+	uint32_t rx_pkts;              /* rxframe */
+	uint32_t rx_ucast_pkts;        /* rxdfrmucastmbss */
+	/* Previous records */
+	uint32_t prev_tx_pkts;
+	uint32_t prev_tx_retrans_pkts;
+	uint32_t prev_rx_pkts;
+	uint32_t prev_rx_ucast_pkts;
+};
+extern struct tx_rx_custom_stats g_custom_stats;
 #else
 static inline void send_custom_packet_select(void* buf)
 {
