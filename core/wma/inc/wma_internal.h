@@ -933,6 +933,14 @@ void wma_hidden_ssid_vdev_restart(tp_wma_handle wma_handle,
  */
 void wma_enable_sta_ps_mode(tpEnablePsParams ps_req);
 
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+void wma_send_custom_dyn_ps_event(bool enable);
+#else
+void wma_send_custom_dyn_ps_event(bool enable)
+{
+}
+#endif
+
 QDF_STATUS wma_unified_set_sta_ps_param(wmi_unified_t wmi_handle,
 					    uint32_t vdev_id, uint32_t param,
 					    uint32_t value);

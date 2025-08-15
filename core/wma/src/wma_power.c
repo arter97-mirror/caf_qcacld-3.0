@@ -747,6 +747,27 @@ static enum powersave_qpower_mode wma_get_qpower_config(tp_wma_handle wma)
 	}
 }
 
+void wma_send_custom_dyn_ps_event(bool enable)
+{
+	struct mon_report_status* mon_report= NULL;
+	uint8_t *buf = NULL;
+
+	buf = qdf_mem_malloc(sizeof(struct mon_report_status));
+	if (!buf) {
+                pe_err("Allocate Memory failed for buf");
+                return;
+	}
+
+	mon_report = (struct mon_report_status*)buf;
+
+	mon_report->type = enable ? ENABLE_DYN_POWERSAVE : DISABLE_DYN_POWERSAVE;
+	mon_report->payload_len = 0;
+	mon_report->qtime = qdf_get_log_timestamp_usecs();
+
+	send_custom_packet_select(buf);
+	qdf_mem_free(buf);
+}
+
 void wma_enable_sta_ps_mode(tpEnablePsParams ps_req)
 {
 	uint32_t vdev_id = ps_req->sessionid;
@@ -845,6 +866,7 @@ void wma_enable_sta_ps_mode(tpEnablePsParams ps_req)
 
 	/* power save request succeeded */
 	iface->in_bmps = true;
+	wma_send_custom_dyn_ps_event(iface->in_bmps);
 }
 
 
@@ -879,6 +901,7 @@ void wma_disable_sta_ps_mode(tpDisablePsParams ps_req)
 		return;
 	}
 	iface->in_bmps = false;
+	wma_send_custom_dyn_ps_event(iface->in_bmps);
 
 	/* Disable UAPSD incase if additional Req came */
 	if (eSIR_ADDON_DISABLE_UAPSD == ps_req->psSetting) {
@@ -1628,6 +1651,7 @@ QDF_STATUS wma_set_idle_ps_config(void *wma_ptr, uint32_t idle_ps)
 		return QDF_STATUS_E_FAILURE;
 	}
 	wma->in_imps = !!idle_ps;
+	wma_send_custom_dyn_ps_event(wma->in_imps);
 
 	WMA_LOGD("Successfully Set Idle Ps Config %d", idle_ps);
 	return QDF_STATUS_SUCCESS;

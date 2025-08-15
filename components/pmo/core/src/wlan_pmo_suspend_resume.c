@@ -40,6 +40,8 @@
 #include "cfg_mlme_sap.h"
 #include "cfg_ucfg_api.h"
 #include "cdp_txrx_bus.h"
+#include "wma.h"
+#include "wma_internal.h"
 
 /**
  * pmo_core_get_vdev_dtim_period() - Get vdev dtim period
@@ -845,6 +847,7 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 		host_credits, wmi_pending_cmds);
 
 	pmo_core_update_wow_enable_cmd_sent(psoc_ctx, true);
+	wma_send_custom_dyn_ps_event(true);
 
 out:
 	pmo_exit();
@@ -1225,6 +1228,7 @@ QDF_STATUS pmo_core_psoc_disable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 		goto out;
 
 	pmo_core_update_wow_enable_cmd_sent(psoc_ctx, false);
+	wma_send_custom_dyn_ps_event(false);
 
 	/* To allow the tx pause/unpause events */
 	pmo_core_update_wow_bus_suspend(psoc, psoc_ctx, false);
