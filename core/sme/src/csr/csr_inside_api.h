@@ -610,6 +610,9 @@ QDF_STATUS csr_roam_connect(struct mac_context *mac, uint32_t sessionId,
 			    struct csr_roam_profile *pProfile,
 			    uint32_t *pRoamId);
 
+QDF_STATUS csr_parse_scan_list(struct mac_context *mac_ctx,
+			       struct scan_result_list *ret_list,
+			       qdf_list_t *scan_list);
 /*
  * csr_roam_reassoc() -
  * To inititiate a re-association

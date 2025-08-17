@@ -2700,7 +2700,7 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS csr_parse_scan_list(struct mac_context *mac_ctx,
+QDF_STATUS csr_parse_scan_list(struct mac_context *mac_ctx,
 				      struct scan_result_list *ret_list,
 				      qdf_list_t *scan_list)
 {
