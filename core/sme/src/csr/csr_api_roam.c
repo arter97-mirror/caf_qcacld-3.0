@@ -3477,7 +3477,8 @@ static void csr_send_custom_ap_info_event(struct mac_context *mac_ctx,
 
 	mon_report->type = AP_INFO_EVENT;
 	mon_report->payload_len = sizeof(struct ap_info_event);
-	mon_report->qtime = qdf_get_log_timestamp_usecs();
+	mon_report->qtime = qdf_get_log_timestamp_usecs() /
+			    USEC_PER_MSEC;
 
 	qdf_mem_copy(event->bssid, conn_profile->bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);

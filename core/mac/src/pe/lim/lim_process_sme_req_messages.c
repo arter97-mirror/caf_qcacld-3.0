@@ -1100,7 +1100,8 @@ static void csr_send_custom_join_req_event(struct pe_session *session,
 
 	mon_report->type = JOIN_REQ_EVENT;
 	mon_report->payload_len = sizeof(struct join_req_event);
-	mon_report->qtime = qdf_get_log_timestamp_usecs();
+	mon_report->qtime = qdf_get_log_timestamp_usecs() /
+			    USEC_PER_MSEC;
 
 	qdf_mem_copy(event->bssid, mlm_join_req->bssDescription.bssId,
 		     QDF_MAC_ADDR_SIZE);

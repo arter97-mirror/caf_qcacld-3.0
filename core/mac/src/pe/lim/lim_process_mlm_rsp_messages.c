@@ -1326,7 +1326,8 @@ static void csr_send_custom_join_resp_event(int reason, int status)
 
 	mon_report->type = JOIN_RESP_EVENT;
 	mon_report->payload_len = sizeof(struct join_resp_event);
-	mon_report->qtime = qdf_get_log_timestamp_usecs();
+	mon_report->qtime = qdf_get_log_timestamp_usecs() /
+			    USEC_PER_MSEC;
 
 	event->reason = reason;
 	event->status_code = status;
