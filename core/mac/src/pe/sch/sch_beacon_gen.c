@@ -913,7 +913,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	}
 
 	populate_dot11f_ext_cap(mac_ctx, is_vht_enabled, &bcn_2->ExtCap,
-				session);
+				session->vdev_id);
 
 	populate_dot11f_ext_supp_rates(mac_ctx,
 				POPULATE_DOT11F_RATES_OPERATIONAL,
@@ -1052,7 +1052,8 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			 * because the bits for TWT are unique to STA and AP and
 			 * cannot be intersected.
 			 */
-			populate_dot11f_twt_extended_caps(mac_ctx, session,
+			populate_dot11f_twt_extended_caps(mac_ctx,
+							  session->vdev_id,
 							  &bcn_2->ExtCap);
 		}
 	}

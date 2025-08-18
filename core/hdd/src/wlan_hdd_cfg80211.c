@@ -17676,7 +17676,8 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		cfg_val = nla_get_u8(tb[cmd_id]);
 		hdd_debug("Send vdev pause on ML sta vdev for %d beacon periods",
 			  cfg_val);
-		bitmap = policy_mgr_get_active_vdev_bitmap(hdd_ctx->psoc);
+		bitmap = policy_mgr_get_active_vdev_bitmap(hdd_ctx->psoc,
+							   link_info->vdev);
 		for (idx = 0; idx < 32; idx++) {
 			if (bitmap & (1 << idx)) {
 				vdev_id = idx;
@@ -17796,6 +17797,9 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		ret_val = sme_update_eht_caps(mac_handle, link_info->vdev_id,
 					      cfg_val, EHT_RX_EXTRA_ETH_LTF,
 					      adapter->device_mode);
+		sme_set_eht_data_extra_ltf_tx(mac_handle, link_info->vdev_id,
+					      cfg_val);
+
 		if (ret_val)
 			sme_err("Failed to update extra EHT-LTF");
 	}
@@ -20337,7 +20341,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 		}
 
 		status = policy_mgr_set_sap_mandatory_channels(
-			hdd_ctx->psoc, freq, freq_len);
+			hdd_ctx->psoc, link_info->vdev, freq, freq_len);
 		if (QDF_IS_STATUS_ERROR(status))
 			return -EINVAL;
 	}
@@ -26245,6 +26249,33 @@ static void wlan_hdd_update_ap_sme_cap_wiphy(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/**
+ * wlan_hdd_set_link_removal_offload_wiphy() - set link removal offload in wiphy
+ * @wiphy: WIPHY structure pointer
+ * @hdd_ctx: HDD context
+ *
+ * This function update ML SAP link removal offload capabilities in wiphy
+ *
+ * Return: void
+ */
+static inline
+void wlan_hdd_set_link_removal_offload_wiphy(struct wiphy *wiphy,
+					     struct hdd_context *hdd_ctx)
+{
+	if (!wlan_hdd_mlo_sap_link_removal_cap(hdd_ctx))
+		return;
+	wiphy_ext_feature_set(wiphy,
+			      NL80211_EXT_FEATURE_MLD_LINK_REMOVAL_OFFLOAD);
+}
+#else
+static inline
+void wlan_hdd_set_link_removal_offload_wiphy(struct wiphy *wiphy,
+					     struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 static inline
 void wlan_hdd_set_mlo_wiphy_ext_feature(struct wiphy *wiphy,
@@ -26257,6 +26288,7 @@ void wlan_hdd_set_mlo_wiphy_ext_feature(struct wiphy *wiphy,
 		return;
 
 	wiphy->flags |= WIPHY_FLAG_SUPPORTS_MLO;
+	wlan_hdd_set_link_removal_offload_wiphy(wiphy, hdd_ctx);
 }
 #else
 static inline
@@ -30663,6 +30695,22 @@ QDF_STATUS hdd_softap_deauth_all_sta(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+					link_info->link_flags)) {
+			hdd_debug("link removal in progress,don't send deauth");
+			return true;
+		}
+	}
+	return false;
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_del_station() - delete station v2
  * @wiphy: Pointer to wiphy
@@ -30705,7 +30753,7 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 
 	if (QDF_SAP_MODE != adapter->device_mode &&
 	    QDF_P2P_GO_MODE != adapter->device_mode)
-		goto fn_end;
+		return 0;
 
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)mac)) {
 		struct wlan_objmgr_vdev *vdev;
@@ -30725,10 +30773,12 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 						hdd_ctx->psoc,
 						adapter->deflink->vdev_id);
 		}
+		if (wlan_hdd_link_removal_is_in_progress(adapter))
+			return 0;
 
 		if (!QDF_IS_STATUS_SUCCESS(hdd_softap_deauth_all_sta(adapter,
 								     param)))
-			goto fn_end;
+			return 0;
 	} else {
 		sta_info = hdd_get_sta_info_by_mac(
 						&adapter->sta_info_list,
@@ -30784,7 +30834,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 				     STA_INFO_CFG80211_DEL_STATION);
 	}
 
-fn_end:
 	return 0;
 }
 
@@ -32375,6 +32424,7 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	struct hdd_hostapd_state *hostapd_state;
 	struct wlan_hdd_link_info *link_info;
 	uint16_t csa_punct_bitmap;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -32405,6 +32455,10 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	if (!status)
 		return -EINVAL;
 
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
 				    CSA_REASON_USER_INITIATED);
 
@@ -32425,16 +32479,21 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d",
 			csa_params->chandef.chan->center_freq, ret);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return ret;
 	}
 
 	status = qdf_wait_for_event_completion(&hostapd_state->qdf_event,
 					       SME_CMD_START_BSS_TIMEOUT);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wait for qdf_event failed!!");
-	else
+	} else {
+		wlan_set_sap_user_config_freq(vdev,
+			csa_params->chandef.chan->center_freq);
 		hdd_debug("csa done");
+	}
 
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	return ret;
 }
 
@@ -34937,6 +34996,73 @@ wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	osif_vdev_sync_op_stop(vdev_sync);
 }
+
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+static int
+__wlan_hdd_cfg80211_link_reconfig_remove(struct wiphy *wiphy, struct net_device *dev,
+		const struct cfg80211_link_reconfig_removal_params *params)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_hdd_link_info *link_info;
+	uint32_t config_tbtt = 0;
+	QDF_STATUS status;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("HDD context is NULL");
+		return -EINVAL;
+	}
+
+	link_info = hdd_get_link_info_by_link_id(adapter, params->link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
+
+	config_tbtt = params->link_removal_cntdown;
+
+	hdd_debug("MLO link reconfig remove: link %u with tbtt = %u",
+		  params->link_id, config_tbtt);
+
+	status = wlan_hdd_validate_mlo_link_removal_request(link_info,
+							    config_tbtt);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		status = wlan_hdd_process_mlo_link_removal_cmd(link_info,
+							       hdd_ctx->psoc,
+							       params);
+	else
+		hdd_err("Link removal validation failed, status: %d", status);
+
+	return qdf_status_to_os_return(status);
+}
+
+/**
+ * wlan_hdd_cfg80211_link_reconfig_remove() - API to handle Multi-link reconfig
+ * remove request comes from hostapd.
+ * @wiphy: Pointer to wiphy object
+ * @dev: Netdev object pointer
+ * @params: Pointer to reconfig link removal parameters
+ *
+ * Return: 0 on success, non-zero -ve value on failure
+ */
+static int
+wlan_hdd_cfg80211_link_reconfig_remove(struct wiphy *wiphy, struct net_device *dev,
+		const struct cfg80211_link_reconfig_removal_params *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_link_reconfig_remove(wiphy, dev, params);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif
 #else
 static int
 wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
@@ -35905,6 +36031,17 @@ wlan_hdd_parse_action_oui_op_attr(struct nlattr *tb2[],
 }
 #endif
 
+/**
+ * _wlan_hdd_cfg80211_set_action_oui - Set action oui configuration
+ * @wiphy: The wiphy device
+ * @wdev: The wireless device
+ * @data: The data to be processed
+ * @data_len: The length of the data
+ *
+ * This function sets the action oui configuration for the given wiphy device.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
 static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 					     struct wireless_dev *wdev,
 					     const void *data,
@@ -35918,12 +36055,13 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_MAX + 1];
 	enum QDF_GLOBAL_MODE curr_mode;
 	uint8_t action_oui_op;
-	struct action_oui_extension action_oui_ext = {0};
+	struct action_oui_extension *action_oui_ext = NULL;
+	struct action_oui_extension *action_oui_buf = NULL;
 	uint32_t rem, action_oui_id;
 	uint8_t i = 0;
 	struct nlattr *cur_attr = NULL;
 	int8_t *nested_data;
-	uint32_t length = 0;
+	uint32_t length = 0, mem_size = 0;
 	QDF_STATUS status;
 
 	hdd_enter_dev(wdev->netdev);
@@ -35952,7 +36090,7 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 		goto exit;
 	}
 
-	/* oui id and oui op are manadatory params */
+	/* oui id and oui op are mandatory params */
 	if (!tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_ACTION] ||
 	    !tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_OP]) {
 		hdd_err("OUI or OUI OP not present");
@@ -35998,10 +36136,18 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 		goto disable_dsmps;
 	}
 
+	mem_size = MAX_ALLOWED_OUI * sizeof(struct action_oui_extension);
+	action_oui_buf = qdf_mem_malloc(mem_size);
+	if (!action_oui_buf) {
+		hdd_err("malloc %dB fail", mem_size);
+		ret = -ENOMEM;
+		goto exit;
+	}
+
+	action_oui_ext = action_oui_buf;
 	nla_for_each_nested(cur_attr,
 			    tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_LIST],
 			    rem) {
-		qdf_mem_set(&action_oui_ext, sizeof(action_oui_ext), 0);
 		if (wlan_cfg80211_nla_parse(
 				tb2,
 				QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_MAX,
@@ -36014,8 +36160,8 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 		if (i >= MAX_ALLOWED_OUI) {
 			hdd_debug("MAX OUI can be handled : %d",
 				  MAX_ALLOWED_OUI);
-			/* return success in this case with 100 stored OUI's*/
-			goto disable_dsmps;
+			ret = -EINVAL;
+			goto exit;
 		}
 
 		if (tb2[FEATURE_CONFIG_EXT_OUI]) {
@@ -36025,7 +36171,7 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 			status =
 				ucfg_action_oui_add_token(ACTION_OUI_TOKEN,
 							  nested_data, length,
-							  &action_oui_ext);
+							  action_oui_ext);
 
 			if (QDF_IS_STATUS_ERROR(status)) {
 				ret = -EINVAL;
@@ -36041,13 +36187,13 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 			status = ucfg_action_oui_add_token(
 						  ACTION_OUI_DATA_TOKEN,
 						  nested_data, length,
-						  &action_oui_ext);
+						  action_oui_ext);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				ret = -EINVAL;
 				goto exit;
 			}
 
-			/* Data mask is manadatory if data is present */
+			/* Data mask is mandatory if data is present */
 			if (!tb2[FEATURE_CONFIG_EXT_DATA_MASK]) {
 				hdd_err("data mask missing");
 				ret = -EINVAL;
@@ -36065,28 +36211,29 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 			status = ucfg_action_oui_add_token(
 						ACTION_OUI_DATA_BIT_MASK_TOKEN,
 						nested_data, length,
-						&action_oui_ext);
+						action_oui_ext);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				ret = -EINVAL;
 				goto exit;
 			}
 		}
-		ret = wlan_hdd_parse_action_oui_op_attr(tb2, &action_oui_ext);
+		ret = wlan_hdd_parse_action_oui_op_attr(tb2, action_oui_ext);
 		if (ret) {
 			ret = -EINVAL;
 			goto exit;
 		}
 
-		hdd_debug("save data for %d action oui", i);
-		status = ucfg_action_oui_extension_store(
-					hdd_ctx->psoc,
-					ACTION_OUI_ENABLE_DYNAMIC_SMPS,
-					&action_oui_ext);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			ret = -EINVAL;
-			goto exit;
-		}
 		i++;
+		action_oui_ext++;
+	}
+
+	hdd_debug("oui num %d", i);
+	status = ucfg_action_oui_extension_store(hdd_ctx->psoc,
+						 ACTION_OUI_ENABLE_DYNAMIC_SMPS,
+						 action_oui_buf, i);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		ret = -EINVAL;
+		goto exit;
 	}
 
 disable_dsmps:
@@ -36096,6 +36243,9 @@ disable_dsmps:
 				  adapter->deflink->vdev_id,
 				  QDF_STA_MODE);
 exit:
+	if (action_oui_buf)
+		qdf_mem_free(action_oui_buf);
+
 	return ret;
 }
 
@@ -36229,6 +36379,9 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 	.add_intf_link = wlan_hdd_cfg80211_add_intf_link,
 	.del_intf_link = wlan_hdd_cfg80211_del_intf_link,
+#endif
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+	.link_reconfig_remove = wlan_hdd_cfg80211_link_reconfig_remove,
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_TID_LINK_MAP_SUPPORT)
 	.get_link_tid_map_status = wlan_hdd_cfg80211_get_t2lm_mapping_status,

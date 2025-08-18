@@ -127,6 +127,9 @@
 #include "wlan_policy_mgr_ll_sap.h"
 #include <wlan_cfg80211.h>
 #include "osif_twt_ext_req.h"
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+#include "wlan_objmgr_vdev_obj.h"
+#endif
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -3712,6 +3715,7 @@ stopbss:
 		}
 
 		if (vdev) {
+			policy_mgr_reset_sap_mandatory_channels(vdev);
 			ucfg_dp_set_bss_state_start(vdev, false);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 		}
@@ -4023,6 +4027,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	int32_t keymgmt;
 	enum policy_mgr_con_mode pm_con_mode;
 	qdf_freq_t ll_sap_freq;
+	bool is_ll_lt_sap_vdev;
 
 	if (!link_info)
 		return -EINVAL;
@@ -4041,6 +4046,13 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx)
 		return -EINVAL;
+
+	if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+				link_info->link_flags)) {
+		hdd_err("CSA rejected - link removal in progress for vdev:%d",
+			link_info->vdev_id);
+		return -EINVAL;
+	}
 
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	/*
@@ -4076,17 +4088,16 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	 * vdev is ll sap.
 	 *
 	 */
-	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
-					 wlan_vdev_get_id(sap_ctx->vdev)) &&
+	is_ll_lt_sap_vdev = policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+							 link_info->vdev_id);
+	if (is_ll_lt_sap_vdev &&
 	    sap_ctx->csa_reason != CSA_REASON_DCS &&
 	    sap_ctx->csa_reason != CSA_REASON_USER_INITIATED) {
 		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
 					    CSA_REASON_LL_LT_SAP_EVENT);
-		hdd_dcs_trigger_csa_for_ll_lt_sap(
-				hdd_ctx->psoc,
-				hdd_ctx,
-				wlan_vdev_get_id(sap_ctx->vdev),
-				LL_SAP_CSA_CONCURENCY);
+		hdd_dcs_trigger_csa_for_ll_lt_sap(hdd_ctx->psoc, hdd_ctx,
+						  link_info->vdev_id,
+						  LL_SAP_CSA_CONCURENCY);
 		return ret;
 	}
 
@@ -4095,10 +4106,21 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 							   adapter->device_mode,
 							   link_info->vdev_id);
 
-	if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
+	if (is_ll_lt_sap_vdev &&
+	    !policy_mgr_is_ll_lt_freq_allowed(hdd_ctx->psoc,
+				target_chan_freq, link_info->vdev_id)) {
+		hdd_err("ll_sap %d new freq %d not allowed as it creating SCC",
+			link_info->vdev_id, target_chan_freq);
+		return -EINVAL;
+	} else if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
 	    policy_mgr_are_2_freq_on_same_mac(hdd_ctx->psoc, target_chan_freq,
 					      ll_sap_freq)) {
 		hdd_err("ll_sap freq %d and sap freq %d are on same mac",
+			ll_sap_freq, target_chan_freq);
+		return -EINVAL;
+	} else if (ll_sap_freq && pm_con_mode == PM_P2P_GO_MODE &&
+		   ll_sap_freq == target_chan_freq) {
+		hdd_err("ll_sap freq %d and GO freq %d will lead to SCC",
 			ll_sap_freq, target_chan_freq);
 		return -EINVAL;
 	}
@@ -4632,7 +4654,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		ch_params.ch_width = CH_WIDTH_MAX;
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
-		if (!policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
+		if (!policy_mgr_is_ll_lt_sap_restart_required(psoc, 0)) {
 			hdd_debug("vdev %d freq %d, LL LT SAP dont need Channel change",
 				  vdev_id, sap_context->chan_freq);
 			wlansap_context_put(sap_context);
@@ -6952,6 +6974,146 @@ QDF_STATUS hdd_multi_link_sap_vdev_attach(struct wlan_hdd_link_info *link_info,
 	config->link_id = link_id;
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+QDF_STATUS
+wlan_hdd_validate_mlo_link_removal_request(struct wlan_hdd_link_info *link_info,
+					   uint32_t config_tbtt)
+{
+	uint16_t num_links = 0;
+	uint8_t i = 0;
+	uint16_t sap_peer_count;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
+	struct wlan_objmgr_vdev *partner_vdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (config_tbtt > AP_REMOVAL_TIMER_TBTT_MAX) {
+		hdd_err("TBTT count value exceed limit");
+		return QDF_STATUS_E_RANGE;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev %d: vdev not found", link_info->vdev_id);
+		return -EINVAL;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_ap(vdev)) {
+		hdd_err("vdev is not an MLO AP");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (wlan_vdev_chan_config_valid(vdev) != QDF_STATUS_SUCCESS) {
+		hdd_err("vdev is not active");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlo_ap_get_active_vdev_list(vdev, &num_links, wlan_vdev_list);
+
+	if (num_links > QDF_ARRAY_SIZE(wlan_vdev_list)) {
+		hdd_err("VDEVs number %u under AP-MLD exceeds limit %zu,",
+			num_links, QDF_ARRAY_SIZE(wlan_vdev_list));
+		status = QDF_STATUS_E_FAILURE;
+		goto release_ref;
+	}
+
+	if (num_links <= 1) {
+		hdd_err("Link removal support MLD with at least 2 active AP");
+		status = QDF_STATUS_E_PERM;
+		goto release_ref;
+	}
+
+	sap_peer_count = wlan_vdev_get_peer_count(link_info->vdev);
+
+	if (sap_peer_count > 1) {
+		hdd_debug("link with %d client connected, reject link removal",
+			  sap_peer_count);
+		status = QDF_STATUS_E_NOSUPPORT;
+		goto release_ref;
+	}
+
+	/* Reject link removal request if it is already ongoing on any of
+	 * the links in the target MLD.
+	 */
+	for (i = 0; i < num_links; i++) {
+		partner_vdev = wlan_vdev_list[i];
+		/* if vdev is active return success, it's value is zero */
+		if (wlan_vdev_mlme_is_active(partner_vdev)) {
+			hdd_err("partner vap corresponding to vdev:%pK is null",
+				partner_vdev);
+			status = QDF_STATUS_E_FAILURE;
+			goto release_ref;
+		}
+
+		if (wlan_vdev_mlme_is_mlo_link_removal_in_progress(partner_vdev)) {
+			hdd_err("Link removal is in progress on partner link %d",
+				vdev->vdev_mlme.mlo_link_id);
+			status = QDF_STATUS_E_BUSY;
+			goto release_ref;
+		}
+	}
+
+release_ref:
+	if (num_links) {
+		for (i = 0; i < num_links; i++)
+			mlo_release_vdev_ref(wlan_vdev_list[i]);
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return status;
+}
+
+QDF_STATUS
+wlan_hdd_process_mlo_link_removal_cmd(struct wlan_hdd_link_info *link_info,
+				      struct wlan_objmgr_psoc *psoc,
+				      const struct cfg80211_link_reconfig_removal_params *params)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t mlo_sap_link_num = 0;
+	uint16_t max_reconfig_ie_len = 0;
+
+	if (params->elem_len == 0 || !params->reconfigure_elem) {
+		hdd_err("Invalid params");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev %d: vdev not found", link_info->vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlo_sap_link_num = wlan_mlme_get_mlo_sap_support_link(psoc);
+
+	max_reconfig_ie_len = WLAN_ML_RV_ELEM_COMMON_MAX_LEN +
+			      mlo_sap_link_num * WLAN_ML_RV_LINK_INFO_MAX_LEN;
+
+	if (params->elem_len > max_reconfig_ie_len) {
+		hdd_err("Element length %zu exceeds maximum allowed %d",
+			params->elem_len, max_reconfig_ie_len);
+		goto end;
+	}
+
+	qdf_atomic_set_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+			   link_info->link_flags);
+
+	status = wlan_mlme_send_mlo_sap_link_removal_cmd(vdev,
+							 params->reconfigure_elem,
+							 params->elem_len);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("vdev SM fail to deliver, status:%d", status);
+		goto end;
+	}
+end:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return status;
+}
+#endif
 #else
 static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 {
@@ -6990,6 +7152,13 @@ static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+bool wlan_hdd_mlo_sap_link_removal_cap(struct hdd_context *hdd_ctx)
+{
+	return wlan_mlo_ap_get_link_removal_cap(hdd_ctx->psoc);
 }
 #endif
 
@@ -8317,7 +8486,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	 * frequencies of new selected band can be removed in pcl
 	 * modification based on sap mandatory channel list.
 	 */
-	status = policy_mgr_reset_sap_mandatory_channels(hdd_ctx->psoc);
+	status = policy_mgr_reset_sap_mandatory_channels(link_info->vdev);
 	/* Don't go to exit in case of failure. Clean up & stop BSS */
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("failed to reset mandatory channels");
@@ -9169,6 +9338,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		hdd_err("can't get mandatory channel list");
 	if (mandt_chnl_list && intf_pm_mode == PM_SAP_MODE)
 		policy_mgr_init_sap_mandatory_chan(hdd_ctx->psoc,
+						   link_info->vdev,
 						   chandef->chan->center_freq);
 
 	sap_config->ch_params.center_freq_seg0 =

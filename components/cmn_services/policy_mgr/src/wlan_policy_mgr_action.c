@@ -4034,7 +4034,7 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 		return;
 	}
 
-	if (policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
+	if (policy_mgr_is_ll_lt_sap_restart_required(psoc, 0)) {
 		restart_sap = true;
 		goto sap_restart;
 	}

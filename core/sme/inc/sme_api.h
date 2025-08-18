@@ -1066,6 +1066,15 @@ QDF_STATUS sme_hide_ssid(mac_handle_t mac_handle, uint8_t sessionId,
 void sme_set_listen_interval(mac_handle_t mac_handle, uint8_t vdev_id);
 
 /**
+ * sme_set_eht_data_extra_ltf_tx() - Set the Extra EHT LTF param
+ * @vdev_id: vdev identifier
+ * @val: Extra EHT LTF value
+ *
+ * Return: None
+ */
+void sme_set_eht_data_extra_ltf_tx(mac_handle_t mac_handle, uint8_t vdev_id,
+				   uint8_t val);
+/**
  * sme_update_roam_scan_n_probes() - Update no.of roam scan probes
  * @mac_handle: The handle returned by mac_open
  * @vdev_id: vdev identifier

@@ -230,13 +230,15 @@ ucfg_action_oui_add_cap(uint8_t nss_bitmap,
  * @psoc: objmgr psoc object
  * @action_id: type of action to be stored
  * @oui_ext: pointer to action oui extension to save token
+ * @oui_ext_num: number of action oui extension to save token
  *
  * Return: QDF_STATUS.
  */
 static inline QDF_STATUS
 ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 				enum action_oui_id action_id,
-				struct action_oui_extension *oui_ext)
+				struct action_oui_extension *oui_ext,
+				uint8_t oui_ext_num)
 {
 	QDF_STATUS status;
 
@@ -245,7 +247,8 @@ ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	status = wlan_action_oui_extension_store(psoc, action_id, oui_ext);
+	status = wlan_action_oui_extension_store(psoc, action_id, oui_ext,
+						 oui_ext_num);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
@@ -441,7 +444,8 @@ ucfg_action_oui_add_cap(uint8_t nss_bitmap,
 static inline QDF_STATUS
 ucfg_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 				enum action_oui_id action_id,
-				struct action_oui_extension *oui_ext)
+				struct action_oui_extension *oui_ext,
+				uint8_t oui_ext_num)
 {
 	return QDF_STATUS_SUCCESS;
 }

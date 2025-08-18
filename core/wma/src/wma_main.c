@@ -3538,28 +3538,6 @@ wma_get_service_cap_per_link_mlo_stats(struct wmi_unified *wmi_handle,
 }
 #endif
 
-/**
- * wma_set_exclude_selftx_from_cca_busy_time() - Set exclude self tx time from
- * cca busy time bool
- * @exclude_selftx_from_cca_busy: Bool to update in in wma ini config
- * @wma_handle: WMA handle
- *
- * Return: None
- */
-static void
-wma_set_exclude_selftx_from_cca_busy_time(bool exclude_selftx_from_cca_busy,
-					  tp_wma_handle wma_handle)
-{
-	struct wma_ini_config *cfg = wma_get_ini_handle(wma_handle);
-
-	if (!cfg) {
-		wma_err("NULL WMA ini handle");
-		return;
-	}
-
-	cfg->exclude_selftx_from_cca_busy = exclude_selftx_from_cca_busy;
-}
-
 static void wma_deinit_pagefault_wakeup_history(tp_wma_handle wma)
 {
 	struct wma_pf_sym *pf_sym_entry;
@@ -4150,9 +4128,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wma_register_wlm_latency_level_event(wma_handle);
 	wma_register_mws_coex_events(wma_handle);
 	wma_trace_init();
-	wma_set_exclude_selftx_from_cca_busy_time(
-			cds_cfg->exclude_selftx_from_cca_busy,
-			wma_handle);
 	return QDF_STATUS_SUCCESS;
 
 err_dbglog_init:
@@ -6648,9 +6623,15 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	/*
 	 * Copy engine buffer is limited to 2K and maximum APF data send in a
 	 * WMI command depends on max bus size.
-	 * So, WMI MAX bus size is hardcoded to 2K.
+	 * So, WMI MAX bus size is hardcoded to 2K if max bus size is more
+	 * than 2K.
 	 */
-	tgt_cfg.wmi_max_len = WMI_MAX_BUS_SIZE - WMI_TLV_HEADROOM;
+	if (WMI_MAX_BUS_SIZE <= wmi_get_max_msg_len(wma_handle->wmi_handle))
+		tgt_cfg.wmi_max_len = WMI_MAX_BUS_SIZE - WMI_TLV_HEADROOM;
+	else
+		tgt_cfg.wmi_max_len =
+			wmi_get_max_msg_len(wma_handle->wmi_handle) -
+			WMI_TLV_HEADROOM;
 	tgt_cfg.tx_bfee_8ss_enabled = wma_handle->tx_bfee_8ss_enabled;
 	tgt_cfg.dynamic_nss_chains_support =
 				wma_handle->dynamic_nss_chains_support;

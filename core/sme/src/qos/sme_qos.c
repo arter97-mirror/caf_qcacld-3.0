@@ -4112,8 +4112,8 @@ static QDF_STATUS sme_qos_process_reassoc_req_ev(struct mac_context *mac, uint8_
 		    (pSession->ac_info[1].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[2].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[3].curr_state != SME_QOS_HANDOFF)) {
-			sme_err("curr_state is not HANDOFF, session %d",
-				sessionId);
+			sme_debug("curr_state is not HANDOFF, session %d",
+				  sessionId);
 			return QDF_STATUS_E_FAILURE;
 		}
 		sme_qos_process_ft_reassoc_req_ev(sessionId);
@@ -4127,8 +4127,8 @@ static QDF_STATUS sme_qos_process_reassoc_req_ev(struct mac_context *mac, uint8_
 		    (pSession->ac_info[1].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[2].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[3].curr_state != SME_QOS_HANDOFF)) {
-			sme_err("curr_state is not HANDOFF, session %d",
-				sessionId);
+			sme_debug("curr_state is not HANDOFF, session %d",
+				  sessionId);
 			return QDF_STATUS_E_FAILURE;
 		}
 
@@ -4171,8 +4171,8 @@ static QDF_STATUS sme_qos_process_reassoc_req_ev(struct mac_context *mac, uint8_
 		    (pSession->ac_info[1].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[2].curr_state != SME_QOS_HANDOFF) ||
 		    (pSession->ac_info[3].curr_state != SME_QOS_HANDOFF)) {
-			sme_err("curr_state is not HANDOFF, session %d",
-				sessionId);
+			sme_debug("curr_state is not HANDOFF, session %d",
+				  sessionId);
 			return QDF_STATUS_E_FAILURE;
 		}
 
@@ -4197,8 +4197,8 @@ static QDF_STATUS sme_qos_process_reassoc_req_ev(struct mac_context *mac, uint8_
 		case SME_QOS_CLOSED:
 		case SME_QOS_INIT:
 		default:
-			sme_err("On session %d AC %d is in wrong state %d",
-				sessionId, ac, pACInfo->curr_state);
+			sme_debug("On session %d AC %d is in wrong state %d",
+				  sessionId, ac, pACInfo->curr_state);
 			break;
 		}
 	}
@@ -4400,8 +4400,8 @@ static QDF_STATUS sme_qos_process_reassoc_success_ev(struct mac_context *mac_ctx
 		case SME_QOS_REQUESTED:
 		case SME_QOS_QOS_ON:
 		default:
-			sme_err("session %d AC %d is in wrong state %d",
-				sessionid, ac, ac_info->curr_state);
+			sme_debug("session %d AC %d is in wrong state %d",
+				  sessionid, ac, ac_info->curr_state);
 			break;
 		}
 	}
@@ -4552,8 +4552,8 @@ static QDF_STATUS sme_qos_process_handoff_assoc_req_ev(struct mac_context *mac,
 		case SME_QOS_CLOSED:
 		case SME_QOS_INIT:
 		default:
-			sme_err("On session %d AC %d is in wrong state %d",
-				sessionId, ac, pACInfo->curr_state);
+			sme_debug("On session %d AC %d is in wrong state %d",
+				  sessionId, ac, pACInfo->curr_state);
 			break;
 		}
 	}
@@ -4621,8 +4621,8 @@ static QDF_STATUS sme_qos_process_handoff_success_ev(struct mac_context *mac,
  */
 			if (pSession->ftHandoffInProgress)
 				break;
-			sme_err("On session %d AC %d is in wrong state %d",
-				sessionId, ac, pACInfo->curr_state);
+			sme_debug("On session %d AC %d is in wrong state %d",
+				  sessionId, ac, pACInfo->curr_state);
 			break;
 		}
 	}

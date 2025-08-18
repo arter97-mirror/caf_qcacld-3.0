@@ -1089,7 +1089,7 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
-	if (lim_cmp_ssid(&bcn.ssId, session)) {
+	if (bcn.ssId.length && lim_cmp_ssid(&bcn.ssId, session)) {
 		pe_debug_rl("ssid mismatch, current " QDF_SSID_FMT "Rcvd "
 			    QDF_SSID_FMT " from " QDF_MAC_ADDR_FMT,
 			    QDF_SSID_REF(session->ssId.length, session->ssId.ssId),

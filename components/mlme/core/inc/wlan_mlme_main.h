@@ -553,6 +553,21 @@ struct sap_chan_info {
 	uint8_t num_chan;
 };
 
+/*
+ * struct sap_man_chan_info - sap mandatory channel info
+ * @sap_man_chan: The user preferred master list on
+ * which SAP can be brought up. This
+ * mandatory channel freq list would be as per
+ * OEMs preference & conforming to the
+ * regulatory/other considerations
+ * @sap_man_chan_len: Length of the SAP mandatory
+ * channel list
+ */
+struct sap_man_chan_info {
+	uint32_t sap_man_chan[NUM_CHANNELS];
+	uint32_t sap_man_chan_len;
+};
+
 /**
  * struct mlme_ap_config - VDEV MLME legacy private SAP
  * related configurations
@@ -566,6 +581,7 @@ struct sap_chan_info {
  * @is_owe_conn: is owe connection
  * @acs_bandmask: Bitmap of the bands on which ACS is performed
  * @best_chan_info: best 2ghz channel
+ * @man_chan_info: sap mandatory channel info
  */
 struct mlme_ap_config {
 	qdf_freq_t user_config_sap_ch_freq;
@@ -579,6 +595,7 @@ struct mlme_ap_config {
 	bool is_owe_conn;
 	uint32_t acs_bandmask;
 	struct sap_chan_info best_chan_info;
+	struct sap_man_chan_info man_chan_info;
 };
 
 /**
@@ -900,6 +917,7 @@ struct enhance_roam_info {
  * @connect_info: mlme connect information
  * @wait_key_timer: wait key timer
  * @eht_config: Eht capability configuration
+ * @ml_reconfig_ie: link reconfig ie raw data
  * @last_delba_sent_time: Last delba sent time to handle back to back delba
  *			  requests from some IOT APs
  * @ba_2k_jump_iot_ap: This is set to true if connected to the ba 2k jump IOT AP
@@ -976,6 +994,9 @@ struct mlme_legacy_priv {
 	struct wait_for_key_timer wait_key_timer;
 #ifdef WLAN_FEATURE_11BE
 	tDot11fIEeht_cap eht_config;
+#endif
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+	uint8_t *ml_reconfig_ie;
 #endif
 	qdf_time_t last_delba_sent_time;
 	bool ba_2k_jump_iot_ap;
@@ -1836,6 +1857,14 @@ QDF_STATUS wlan_get_sap_best_channel_2ghz(struct wlan_objmgr_vdev *vdev,
 					  uint32_t **chan_list,
 					  uint8_t *num_chan);
 
+/**
+ * wlan_get_sap_man_chan_info() - get sap mandatory channel info
+ * @vdev: vdev ctx
+ *
+ * Return: sap mandatory channel info
+ */
+struct sap_man_chan_info
+*wlan_get_sap_man_chan_info(struct wlan_objmgr_vdev *vdev);
 /**
  * wlan_get_sap_ch_sw_info() - get sap channel switch info
  * @vdev: vdev ctx

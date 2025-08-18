@@ -318,6 +318,7 @@ enum hdd_adapter_flags {
  * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
  * @SOFTAP_ADD_INTF_LINK: add_intf_link is set for multi link SAP
+ * @SOFTAP_LINK_REMOVAL_IN_PROGRESS: mlo sap link remove flag
  * @WLAN_LINK_FLAG_BITS_MAX: Max bit size of this enum
  */
 enum hdd_link_flags {
@@ -326,6 +327,7 @@ enum hdd_link_flags {
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
 	SOFTAP_ADD_INTF_LINK,
+	SOFTAP_LINK_REMOVAL_IN_PROGRESS,
 	WLAN_LINK_FLAG_BITS_MAX,
 };
 

@@ -1997,6 +1997,21 @@ wlan_mlme_set_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+wlan_mlme_set_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc,
+				  bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.sta.exclude_ext_mld_cap = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 bool
 wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc)
 {
@@ -2007,6 +2022,21 @@ wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc)
 		return false;
 
 	return mlme_obj->cfg.sta.ext_mld_cap_supp;
+}
+
+bool
+wlan_mlme_get_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	mlme_debug("Exclude ext mld cap: %d",
+		   mlme_obj->cfg.sta.exclude_ext_mld_cap);
+
+	return mlme_obj->cfg.sta.exclude_ext_mld_cap;
 }
 #endif
 
@@ -3820,6 +3850,16 @@ QDF_STATUS wlan_mlme_set_enable_bcast_probe_rsp(struct wlan_objmgr_psoc *psoc,
 
 	mlme_obj->cfg.oce.enable_bcast_probe_rsp = value;
 	return QDF_STATUS_SUCCESS;
+}
+
+bool wlan_mlme_get_enable_bcast_probe_rsp(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.oce.enable_bcast_probe_rsp;
 }
 
 QDF_STATUS
@@ -9466,3 +9506,35 @@ wlan_mlme_deinit_miracast_opt(struct wlan_mlme_psoc_ext_obj *mlme_obj)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+QDF_STATUS wlan_mlme_send_mlo_sap_link_removal_cmd(struct wlan_objmgr_vdev *vdev,
+						   const uint8_t *ie,
+						   size_t elem_len)
+{
+	QDF_STATUS status;
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv->ml_reconfig_ie = qdf_mem_malloc(elem_len);
+	if (!mlme_priv->ml_reconfig_ie)
+		return QDF_STATUS_E_NOMEM;
+
+	qdf_mem_copy(mlme_priv->ml_reconfig_ie, ie, elem_len);
+
+	status = wlan_vdev_mlme_sm_deliver_evt(vdev, WLAN_VDEV_SM_EV_REMOVAL,
+					       elem_len,
+					       mlme_priv->ml_reconfig_ie);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_err("vdev SM fail to deliver");
+
+	qdf_mem_free(mlme_priv->ml_reconfig_ie);
+	mlme_priv->ml_reconfig_ie = NULL;
+	return status;
+}
+#endif

@@ -1672,12 +1672,15 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 			ch_width = QDF_MIN(ch_width, tgt_ch_params->ch_width);
 
 		if (ch_width == CH_WIDTH_320MHZ &&
-		    policy_mgr_is_conn_lead_to_bw_downgrade(mac->psoc,
-							    sap_context->vdev_id,
-							    chan_freq,
-							    ch_width))
-			ch_width = wlan_mlme_get_ap_oper_ch_width(
-							sap_context->vdev);
+		    policy_mgr_is_hw_dbs_capable(mac->psoc) &&
+		    policy_mgr_is_conn_lead_to_bw_downgrade(
+					mac->psoc,
+					sap_context->vdev_id,
+					chan_freq, ch_width)) {
+			ch_width = CH_WIDTH_160MHZ;
+			wlan_mlme_set_ap_oper_ch_width(sap_context->vdev,
+						       ch_width);
+		}
 	}
 
 	/* check for any concurrent interface with 320 and update ccfs2 */
@@ -1894,7 +1897,10 @@ wlansap_override_csa_strict_for_sap(mac_handle_t mac_handle,
 				&con_freq, &ch_width);
 	if (existing_vdev_id < WLAN_UMAC_VDEV_ID_MAX &&
 	    (existing_vdev_mode == PM_STA_MODE ||
-	     existing_vdev_mode == PM_P2P_CLIENT_MODE))
+	     existing_vdev_mode == PM_P2P_CLIENT_MODE ||
+	     existing_vdev_mode == PM_SAP_MODE ||
+	     existing_vdev_mode == PM_P2P_GO_MODE ||
+	     existing_vdev_mode == PM_LL_LT_SAP_MODE))
 		return strict;
 
 	return true;
@@ -4374,6 +4380,7 @@ void wlansap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
 	uint32_t *pcl_freqs;
 	QDF_STATUS status;
 	uint32_t pcl_len = 0;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!sap_ctx->acs_cfg || !sap_ctx->acs_cfg->master_ch_list_count)
 		return;
@@ -4392,11 +4399,21 @@ void wlansap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
 		sap_err("Invalid MAC context");
 		goto done;
 	}
-	status = policy_mgr_reset_sap_mandatory_channels(psoc);
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, sap_ctx->vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		sap_err("Invalid vdev Context");
+		return;
+	}
+	status = policy_mgr_reset_sap_mandatory_channels(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	vdev = NULL;
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sap_err("failed to reset mandatory channels");
 		goto done;
 	}
+
 	status = policy_mgr_get_pcl_for_vdev_id(mac->psoc, PM_SAP_MODE,
 						pcl_freqs, &pcl_len,
 						pcl.weight_list,
@@ -4553,7 +4570,9 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		sap_debug("channel is passive");
 		*csa_reason = CSA_REASON_CHAN_PASSIVE;
 		return wlansap_get_safe_channel_from_pcl_for_sap(sap_ctx);
-	} else if (!policy_mgr_is_sap_freq_allowed(mac->psoc,
+	} else if (((sap_ctx->acs_cfg && sap_ctx->acs_cfg->acs_mode) ||
+		   policy_mgr_restrict_sap_on_unsafe_chan(mac->psoc)) &&
+		   !policy_mgr_is_sap_freq_allowed(mac->psoc,
 			wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
 			sap_ctx->chan_freq)) {
 		sap_debug("channel is unsafe");

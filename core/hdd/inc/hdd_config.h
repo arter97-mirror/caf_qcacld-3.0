@@ -1412,25 +1412,6 @@ enum host_log_level {
 
 /*
  * <ini>
- * exclude_selftx_from_cca_busy_time - Exclude self tx time from cca busy time
- * @Default: false
- *
- * This ini is used to exclude self tx time from cca busy time.
- *
- * false: Don't exclude self tx time from cca busy time.
- * true: Deduct tx time from cca busy time.
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME CFG_INI_BOOL( \
-	"exclude_selftx_from_cca_busy_time", \
-	false, \
-	"This ini is used to exclude self tx time from CCA busy time")
-
-/*
- * <ini>
  * gEnableSmemMailbox - enable shared memory mailbox
  * @Min: 0
  * @Max: 1
@@ -1762,7 +1743,6 @@ enum host_log_level {
 	SAR_SAFETY_FEATURE_ALL \
 	CFG_GET_WIFI_FEATURES_ALL \
 	CFG_CPU_CXPC_THRESHOLD_ALL \
-	CFG(CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME) \
 	CFG_LINK_STATE_CACHE_EXPIRY_ALL \
 	CFG(CFG_ENABLE_SMEM_MAILBOX) \
 	CFG(CFG_SAP_STA_NDP_CONCURRENCY) \

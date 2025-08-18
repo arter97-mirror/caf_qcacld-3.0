@@ -59,6 +59,7 @@
 #include "os_if_dp_local_pkt_capture.h"
 #include "wlan_twt_ucfg_ext_cfg.h"
 #include "wlan_twt_ucfg_ext_api.h"
+#include "wlan_twt_ucfg_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -1666,23 +1667,15 @@ static bool wlan_hdd_p2p_is_wfd_r2_twt_enable(struct hdd_adapter *adapter,
 					      struct wlan_objmgr_psoc *psoc,
 					      uint8_t vdev_id)
 {
+	uint8_t twt_resp_cfg;
+
 	if (!wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
 		return false;
 
-	if (adapter->device_mode == QDF_P2P_GO_MODE) {
-		uint8_t twt_resp_cfg;
-
-		ucfg_twt_cfg_get_responder(psoc, &twt_resp_cfg);
-		if (!ucfg_twt_resp_check_bit(psoc, vdev_id, QDF_P2P_GO_MODE,
-					     twt_resp_cfg))
-			return false;
-	} else if (adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		bool twt_req;
-
-		hdd_get_twt_requestor(psoc, &twt_req);
-		if (!twt_req)
-			return false;
-	}
+	ucfg_twt_cfg_get_responder(psoc, &twt_resp_cfg);
+	if (!ucfg_twt_resp_check_bit(psoc, vdev_id, QDF_P2P_GO_MODE,
+				     twt_resp_cfg))
+		return false;
 
 	return true;
 }
@@ -1693,6 +1686,36 @@ wlan_hdd_p2p_is_wfd_r2_twt_enable(struct hdd_adapter *adapter,
 				  uint8_t vdev_id)
 {
 	return false;
+}
+#endif
+
+#ifdef WLAN_SUPPORT_TWT
+/**
+ * wlan_hdd_p2p_disable_twt() - disable TWT for provided VDEV ID
+ * @adapter: pointer to adapter
+ * @psoc: pointer to PSOC object
+ * @vdev_id: VDEV ID
+ *
+ * Return: none
+ */
+static void
+wlan_hdd_p2p_disable_twt(struct hdd_adapter *adapter,
+			 struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	bool twt_rsp_disable_svc;
+
+	ucfg_twt_tgt_caps_get_resp_disable_per_vdev(psoc, &twt_rsp_disable_svc);
+	if (twt_rsp_disable_svc)
+		ucfg_twt_send_responder_disable_per_vdev(psoc, vdev_id);
+	else
+		hdd_send_twt_role_disable_cmd(adapter->hdd_ctx, TWT_RESPONDER,
+					      vdev_id);
+}
+#else
+static inline void
+wlan_hdd_p2p_disable_twt(struct hdd_adapter *adapter,
+			 struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
 }
 #endif
 
@@ -1716,8 +1739,7 @@ int wlan_hdd_set_power_save(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	if (adapter->device_mode != QDF_P2P_GO_MODE &&
-	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
+	if (adapter->device_mode != QDF_P2P_GO_MODE) {
 		hdd_debug("unable to process device mode %d",
 			  adapter->device_mode);
 		return -EINVAL;
@@ -1740,15 +1762,11 @@ int wlan_hdd_set_power_save(struct hdd_adapter *adapter,
 	hdd_debug("p2p set power save, status:%d", status);
 
 	/* P2P-GO-NOA and TWT do not go hand in hand */
-	if (ps_config->duration) {
-		hdd_send_twt_role_disable_cmd(hdd_ctx, TWT_RESPONDER,
-					      adapter->deflink->vdev_id);
-	} else {
-		hdd_send_twt_requestor_enable_cmd(hdd_ctx,
-						  adapter->deflink->vdev_id);
-		hdd_send_twt_responder_enable_cmd(hdd_ctx,
-						  adapter->deflink->vdev_id);
-	}
+	if (ps_config->duration)
+		wlan_hdd_p2p_disable_twt(adapter, psoc,
+					 adapter->deflink->vdev_id);
+	else
+		wlan_twt_concurrency_update(hdd_ctx);
 
 	return qdf_status_to_os_return(status);
 }

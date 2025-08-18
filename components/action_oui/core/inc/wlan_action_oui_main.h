@@ -193,13 +193,15 @@ wlan_action_oui_add_cap(uint8_t nss_bitmap,
  * @psoc: psoc
  * @action_id: oui action id
  * @oui_ext: action oui extension to be stored
+ * @oui_ext_num: number of action oui extension to be stored
  *
  * Return: QDF_STATUS.
  */
 QDF_STATUS
 wlan_action_oui_extension_store(struct wlan_objmgr_psoc *psoc,
 				enum action_oui_id action_id,
-				struct action_oui_extension *oui_ext);
+				struct action_oui_extension *oui_ext,
+				uint8_t oui_ext_num);
 
 /**
  * wlan_action_oui_max_ext_num() - Max number of oui extensions supported in

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2386,20 +2386,11 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 	uint32_t stats_len = 0;
 	int ret;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
-	struct wma_ini_config *cfg = wma_get_ini_handle(wma_handle);
-	bool exclude_selftx_from_cca_busy;
 
 	if (!mac) {
 		wma_debug("NULL mac ptr. Exiting");
 		return -EINVAL;
 	}
-
-	if (!cfg) {
-		wma_err("NULL WMA ini handle");
-		return 0;
-	}
-
-	exclude_selftx_from_cca_busy = cfg->exclude_selftx_from_cca_busy;
 
 	if (!mac->sme.link_layer_stats_cb) {
 		wma_debug("HDD callback is null");
@@ -2564,12 +2555,6 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 		}
 
 		for (count = 0; count < radio_stats->num_channels; count++) {
-			if (exclude_selftx_from_cca_busy &&
-			    channel_stats->cca_busy_time >=
-			    channel_stats->tx_time)
-				channel_stats->cca_busy_time -=
-						channel_stats->tx_time;
-
 			ret = qdf_scnprintf(info + stats_len,
 					WMI_MAX_RADIO_STATS_LOGS - stats_len,
 					" %d[%d][%d][%d]",

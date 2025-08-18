@@ -5652,7 +5652,14 @@ QDF_STATUS
 cm_cleanup_mlo_link(struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
 
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	policy_mgr_move_vdev_from_disabled_to_connection_tbl(psoc,
+							     wlan_vdev_get_id(vdev));
 	/* Use MLO roam internal disconnect as this is for cleanup and
 	 * no need to inform OSIF, and REASON_FW_TRIGGERED_ROAM_FAILURE will
 	 * cleanup host without informing the FW

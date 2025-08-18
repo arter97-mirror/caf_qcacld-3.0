@@ -505,6 +505,7 @@ struct recv_bcn_stats {
  * @vdev_summary_stats: vdev's summary stats
  * @pmf_bcn_stats: pmf beacon protect stats
  * @vdev_extd_stats: vdev summary extended stats
+ * @num_recv_bcn_stats: number of beacon stats
  * @bcn_stats: beacon history report stats
  */
 struct vdev_mc_cp_stats {
@@ -514,7 +515,8 @@ struct vdev_mc_cp_stats {
 	struct summary_stats vdev_summary_stats;
 	struct pmf_bcn_protect_stats pmf_bcn_stats;
 	struct vdev_summary_extd_stats vdev_extd_stats;
-	struct recv_bcn_stats bcn_stats;
+	uint32_t num_recv_bcn_stats;
+	struct recv_bcn_stats bcn_stats[WLAN_UMAC_MLO_MAX_VDEVS];
 };
 
 /**

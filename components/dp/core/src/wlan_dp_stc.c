@@ -1319,14 +1319,18 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 	/* Should this indication be done from flow classify handler ? */
 	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, s_entry->tx_flow_id);
-		tx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
-		tx_flow->selected_to_sample = 0;
+		if (s_entry->tx_flow_metadata == tx_flow->guid) {
+			tx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
+			tx_flow->selected_to_sample = 0;
+		}
 	}
 
 	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, s_entry->rx_flow_id);
-		rx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
-		rx_flow->selected_to_sample = 0;
+		if (s_entry->rx_flow_metadata == rx_flow->metadata) {
+			rx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
+			rx_flow->selected_to_sample = 0;
+		}
 	}
 
 	if (!wlan_dp_stc_is_traffic_type_known(s_entry->traffic_type)) {
@@ -2779,6 +2783,13 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 	dp_ctx->dp_stc = dp_stc;
 	dp_stc->dp_ctx = dp_ctx;
 
+	/* Init timer */
+	qdf_hrtimer_init(&dp_stc->flow_sampling_timer,
+			 wlan_dp_stc_flow_sampling_timer, QDF_CLOCK_MONOTONIC,
+			 QDF_HRTIMER_MODE_REL, QDF_CONTEXT_HARDWARE);
+
+	dp_stc->sample_timer_state = WLAN_DP_STC_TIMER_INIT;
+
 	/* Init periodic work */
 	status = qdf_periodic_work_create(&dp_stc->flow_monitor_work,
 					  wlan_dp_stc_flow_monitor_work_handler,
@@ -2801,12 +2812,6 @@ QDF_STATUS wlan_dp_stc_attach(struct wlan_dp_psoc_context *dp_ctx)
 	if (dp_stc->rtpm_control)
 		hif_rtpm_register(HIF_RTPM_ID_DP_STC, NULL);
 
-	/* Init timer */
-	qdf_hrtimer_init(&dp_stc->flow_sampling_timer,
-			 wlan_dp_stc_flow_sampling_timer, QDF_CLOCK_MONOTONIC,
-			 QDF_HRTIMER_MODE_REL, QDF_CONTEXT_HARDWARE);
-
-	dp_stc->sample_timer_state = WLAN_DP_STC_TIMER_INIT;
 	dp_fisa_rx_add_tcp_flow_to_fst(dp_ctx);
 	/* Enable basic STC logs */
 	dp_stc->logmask = WLAN_DP_STC_LOGMASK_VERBOSE_L1;
@@ -2839,9 +2844,9 @@ QDF_STATUS wlan_dp_stc_detach(struct wlan_dp_psoc_context *dp_ctx)
 	}
 
 	dp_info("STC: detach");
-	qdf_hrtimer_cancel(&dp_stc->flow_sampling_timer);
 	qdf_periodic_work_stop_sync(&dp_stc->flow_monitor_work);
 	qdf_periodic_work_destroy(&dp_stc->flow_monitor_work);
+	qdf_hrtimer_cancel(&dp_stc->flow_sampling_timer);
 
 	if (dp_stc->rtpm_control) {
 		if (dp_stc->rtpm_control_flow_cnt)

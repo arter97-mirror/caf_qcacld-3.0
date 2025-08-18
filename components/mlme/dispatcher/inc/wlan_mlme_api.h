@@ -2123,6 +2123,14 @@ wlan_mlme_get_wmm_sba_ac_vo(struct wlan_objmgr_psoc *psoc, uint16_t *value);
 QDF_STATUS wlan_mlme_set_enable_bcast_probe_rsp(struct wlan_objmgr_psoc *psoc,
 						bool value);
 
+/*
+ * wlan_mlme_get_enable_bcast_probe_rsp() - Get enable bcast probe resp info
+ * @psoc: pointer to psoc object
+ *
+ * Return: Bcast probe response info
+ */
+bool wlan_mlme_get_enable_bcast_probe_rsp(struct wlan_objmgr_psoc *psoc);
+
 /**
  * wlan_mlme_get_wmm_uapsd_vo_srv_intv() - Get Uapsd service
  * interval for voice
@@ -4770,12 +4778,32 @@ QDF_STATUS wlan_mlme_set_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc,
 					  bool value);
 
 /**
+ * wlan_mlme_set_exclude_ext_mld_cap() - Exclude the Extended MLD capability in
+ * association request frame.
+ * @psoc: pointer to psoc object
+ * @value: value to exclude Extended MLD capability
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc,
+					     bool value);
+
+/**
  * wlan_mlme_get_ext_mld_cap_supp() - Check if Extended MLD capability supported
  * @psoc: pointer to psoc object
  *
  * Return: bool to check if Extended MLD capability is supported
  */
 bool wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_exclude_ext_mld_cap() - Check if Extended MLD capability
+ * needs to be excluded in association request frame.
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool to check if Extended MLD capability is excluded
+ */
+bool wlan_mlme_get_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
@@ -4853,8 +4881,21 @@ wlan_mlme_set_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
+static inline QDF_STATUS
+wlan_mlme_set_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc,
+				  bool value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline bool
 wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+wlan_mlme_get_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -5666,4 +5707,17 @@ QDF_STATUS wlan_mlme_start_miracast_opt(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS wlan_mlme_stop_miracast_opt(struct wlan_objmgr_psoc *psoc);
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/*
+ * wlan_mlme_send_mlo_sap_link_removal_cmd() - send mlo sap link removal request
+ * @vdev: pointer to vdev
+ * @ie: link reconfig ie
+ * @elem_len: link reconfig ie length
+ *
+ * Return: True if send wmi cmd to FW success, otherwise false
+ */
+QDF_STATUS wlan_mlme_send_mlo_sap_link_removal_cmd(struct wlan_objmgr_vdev *vdev,
+						   const uint8_t *ie,
+						   size_t elem_len);
+#endif
 #endif /* _WLAN_MLME_API_H_ */
