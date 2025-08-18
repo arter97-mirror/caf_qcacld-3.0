@@ -1261,6 +1261,10 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		} else if (!is_csa_needed && chan_freq) {
 			ch_switch_info->target_chan_freq = chan_freq;
 			sap_ctx->sap_radar_found_status = true;
+			if (!sap_is_dfs_cac_wait_state(sap_ctx)) {
+				sap_debug("pucture radar freq without freq change, don't need CAC again");
+				break;
+			}
 		} else {
 			ch_switch_info->target_chan_freq =
 				sap_indicate_radar(sap_ctx);
