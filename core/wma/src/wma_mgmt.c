@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3745,6 +3745,7 @@ int wma_process_rmf_frame(tp_wma_handle wma_handle,
 	uint8_t *ccmp;
 	uint8_t mic_len, hdr_len, pdev_id;
 	QDF_STATUS status;
+	struct wlan_crypto_key *key;
 
 	if ((wh)->i_fc[1] & IEEE80211_FC1_WEP) {
 		if (QDF_IS_ADDR_BROADCAST(wh->i_addr1) ||
@@ -3756,8 +3757,13 @@ int wma_process_rmf_frame(tp_wma_handle wma_handle,
 
 		if (iface->type == WMI_VDEV_TYPE_NDI ||
 		    iface->type == WMI_VDEV_TYPE_NAN) {
+			key = wlan_crypto_get_key(iface->vdev, wh->i_addr2, 0);
 			hdr_len = IEEE80211_CCMP_HEADERLEN;
-			mic_len = IEEE80211_CCMP_MICLEN;
+			if (key &&
+			    (key->keylen == WLAN_CRYPTO_KEY_GCMP_256_LEN))
+				mic_len = WLAN_IEEE80211_GCMP_MICLEN;
+			else
+				mic_len = IEEE80211_CCMP_MICLEN;
 		} else {
 			pdev_id =
 				wlan_objmgr_pdev_get_pdev_id(wma_handle->pdev);

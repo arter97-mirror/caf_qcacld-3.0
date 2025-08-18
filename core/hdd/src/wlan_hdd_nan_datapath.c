@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1226,14 +1226,14 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 		hdd_disable_rx_ol_in_concurrency(true);
 	}
 
+	sta_ctx->conn_info.conn_state = eConnectionState_NdiConnected;
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_DP_ID);
 	if (vdev) {
 		ucfg_dp_bus_bw_compute_prev_txrx_stats(vdev);
+		ucfg_nan_set_peer_mc_list(vdev, *peer_mac_addr);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	}
-
 	ucfg_dp_bus_bw_compute_timer_start(hdd_ctx->psoc);
-	sta_ctx->conn_info.conn_state = eConnectionState_NdiConnected;
 	hdd_wmm_connect(adapter, roam_info, eCSR_BSS_TYPE_NDI);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,

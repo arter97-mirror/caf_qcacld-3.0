@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4758,7 +4758,8 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	}
 
 	/* Reset the SPMK global cache for non-SAE connection */
-	if (session->connected_akm != ANI_AKM_TYPE_SAE) {
+	if (session->connected_akm != ANI_AKM_TYPE_SAE &&
+	    session->connected_akm != ANI_AKM_TYPE_SAE_EXT_KEY) {
 		wlan_mlme_set_sae_single_pmk_bss_cap(mac_ctx->psoc,
 						     session->vdev_id,
 						     false);

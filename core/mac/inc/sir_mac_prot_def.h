@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -139,7 +139,11 @@
 #define SIR_MAC_QCOM_VENDOR_SIZE     3
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
-#define SIR_MAC_MAX_ADD_IE_LENGTH       2048
+#ifdef WLAN_LARGE_MGMT_FRAMES_SUPPORT
+#define SIR_MAC_MAX_ADD_IE_LENGTH    1024
+#else
+#define SIR_MAC_MAX_ADD_IE_LENGTH    2048
+#endif
 
 /* / Minimum length of each IE */
 #define SIR_MAC_RSN_IE_MIN_LENGTH   2
@@ -266,7 +270,6 @@
 #define SIR_MAX_BEACON_SIZE     512
 #define SIR_MAX_PROBE_RESP_SIZE 512
 #endif
-
 #define SIR_MAX_FD_TMPL_SIZE    512
 
 

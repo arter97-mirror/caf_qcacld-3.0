@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -295,7 +296,6 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	ucfg_p2p_status_disconnect(vdev);
 	hdd_cfr_disconnect(vdev);
 
-	hdd_wmm_adapter_clear(adapter);
 	ucfg_cm_ft_reset(vdev);
 	ucfg_cm_reset_key(hdd_ctx->pdev, link_info->vdev_id);
 	hdd_clear_roam_profile_ie(adapter);
@@ -323,6 +323,8 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	}
 
 	if (!is_link_switch) {
+		hdd_wmm_adapter_clear(adapter);
+
 		/* Clear saved connection information in HDD */
 		hdd_conn_remove_connect_info(sta_ctx);
 

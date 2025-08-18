@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
-* Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+* Copyright (c) 2022,2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -133,7 +133,8 @@ static struct kobj_attribute dump_in_progress_attribute =
 	__ATTR(dump_in_progress, 0660, hdd_sysfs_dump_in_progress_show,
 	       hdd_sysfs_dump_in_progress_store);
 
-void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject)
+void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject,
+						 struct hdd_context *hdd_ctx)
 {
 	int error;
 
@@ -145,6 +146,9 @@ void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject)
 				  &dump_in_progress_attribute.attr);
 	if (error)
 		hdd_err("could not create dump in progress sysfs file");
+
+	if (!error)
+		hdd_ctx->is_drv_dump_in_progress_valid = true;
 }
 
 void hdd_sysfs_destroy_dump_in_progress_interface(struct kobject *wifi_kobject)
