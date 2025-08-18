@@ -801,6 +801,12 @@ lim_fill_ft_session(struct mac_context *mac,
 		goto exit;
 	}
 
+	status = lim_set_session_channel_params(mac, ft_session);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to set session channel params");
+		goto exit;
+	}
+
 	ft_session->limReassocBssQosCaps =
 		ft_session->limCurrentBssQosCaps;
 

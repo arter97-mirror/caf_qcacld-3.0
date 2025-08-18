@@ -80,17 +80,25 @@ struct pre_cac_vdev_priv {
 };
 
 /**
+ * struct pre_cac_pdev_priv - Private object to be stored in pdev
+ * @pdev: Pointer to pdev object
+ * @dnw_pdev_info: DFS NO Wait pdev information
+ */
+struct pre_cac_pdev_priv {
+	struct wlan_objmgr_pdev *pdev;
+#ifdef WLAN_FEATURE_DNW
+	struct wlan_dnw_pdev_info dnw_pdev_info;
+#endif
+};
+
+/**
  * struct pre_cac_psoc_priv - Private object to be stored in psoc
  * @pre_cac_work: pre cac work handler
  * @pre_cac_vdev_id: pre cac vdev id
- * @dnw_psoc_info: DFS NO Wait psoc information
  */
 struct pre_cac_psoc_priv {
 	qdf_work_t pre_cac_work;
 	uint8_t pre_cac_vdev_id;
-#ifdef WLAN_FEATURE_DNW
-	struct wlan_dnw_psoc_info dnw_psoc_info;
-#endif
 };
 
 /**
@@ -117,6 +125,30 @@ QDF_STATUS pre_cac_vdev_create_notification(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 pre_cac_vdev_destroy_notification(struct wlan_objmgr_vdev *vdev,
 				  void *arg);
+
+/**
+ * pre_cac_pdev_create_notification() - Handler for pdev create notify.
+ * @pdev: pdev which is going to be created by objmgr
+ * @arg: argument for notification handler.
+ *
+ * Allocate and attach pdev private object.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+pre_cac_pdev_create_notification(struct wlan_objmgr_pdev *pdev, void *arg);
+
+/**
+ * pre_cac_pdev_destroy_notification() - Handler for pdev destroy notify.
+ * @pdev: pdev which is going to be destroyed by objmgr
+ * @arg: argument for notification handler.
+ *
+ * Deallocate and detach pdev private object.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+pre_cac_pdev_destroy_notification(struct wlan_objmgr_pdev *pdev, void *arg);
 
 /**
  * pre_cac_psoc_create_notification() - Handler for psoc create notify.

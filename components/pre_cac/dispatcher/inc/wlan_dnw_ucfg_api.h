@@ -20,12 +20,12 @@
 #ifndef _WLAN_DNW_UCFG_API_H_
 #define _WLAN_DNW_UCFG_API_H_
 #include <qdf_types.h>
-struct wlan_objmgr_psoc;
+struct wlan_objmgr_pdev;
 
 #ifdef WLAN_FEATURE_DNW
 /**
  * ucfg_set_dfs_no_wait_support() - Configure DFS No Wait support
- * @psoc: Pointer to psoc object
+ * @pdev: Pointer to pdev object
  * @enable: Enable DFS No Wait support
  *
  * This function gets called When enable or disable DFS No Wait support
@@ -33,11 +33,11 @@ struct wlan_objmgr_psoc;
  *
  * Return: QDF_STATUS_SUCCESS - in case of success
  */
-QDF_STATUS ucfg_set_dfs_no_wait_support(struct wlan_objmgr_psoc *psoc,
+QDF_STATUS ucfg_set_dfs_no_wait_support(struct wlan_objmgr_pdev *pdev,
 					bool enable);
 #else
 static inline QDF_STATUS
-ucfg_set_dfs_no_wait_support(struct wlan_objmgr_psoc *psoc, bool enable)
+ucfg_set_dfs_no_wait_support(struct wlan_objmgr_pdev *pdev, bool enable)
 {
 	return QDF_STATUS_SUCCESS;
 }

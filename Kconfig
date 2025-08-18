@@ -530,6 +530,11 @@ config FEATURE_WLAN_PRE_CAC
 	bool "Enable FEATURE_WLAN_PRE_CAC"
 	default n
 
+config FEATURE_WLAN_DNW
+        bool "Enable FEATURE_WLAN_DNW"
+        depends on FEATURE_WLAN_PRE_CAC
+        default n
+
 config FEATURE_WLAN_RA_FILTERING
 	bool "Enable FEATURE_WLAN_RA_FILTERING"
 	default n
@@ -896,6 +901,10 @@ config QCOM_ESE
 
 config QCOM_LTE_COEX
 	bool "Enable QCOM LTE Coex feature"
+	default n
+
+config FEATURE_WLAN_SAP_COEX_CHECK_BW
+	bool "Enable SAP Coex check with bandwidth feature"
 	default n
 
 config QCOM_TDLS
