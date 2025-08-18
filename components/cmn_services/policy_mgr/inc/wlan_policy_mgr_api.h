@@ -6202,4 +6202,44 @@ uint32_t policy_mgr_get_conc_ml_sap_link_freq(struct wlan_objmgr_psoc *psoc,
 					      uint8_t vdev_id,
 					      bool *ml_sap_vdev);
 
+/**
+ * policy_mgr_get_conc_ml_sap_link_vdev_id()- Get concurrent ML SAP link vdev-id
+ *
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id
+ *
+ * This API returns concurrent ml sap link vdev-id if there is any.
+ *
+ * Return: concurrent ML sap vdev-id if present, otherwise INVALID_VDEV_ID
+ */
+uint8_t
+policy_mgr_get_conc_ml_sap_link_vdev_id(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
+
+/**
+ * policy_mgr_if_both_vdev_has_same_mldaddr()- Check if both vdev has same mld
+ *						address
+ * @psoc: Pointeer to psoc
+ * @vdev_id_1: vdev_id_1
+ * @vdev_id_2: vdev_id_2
+ *
+ * Return: True if both vdev's has same mldaddr, Otherwise false.
+ */
+bool
+policy_mgr_if_both_vdev_has_same_mldaddr(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id_1, uint8_t vdev_id_2);
+
+/**
+ * policy_mgr_get_conc_ml_sap_user_config_freq()- Get user configured frequency
+ *						of concurrenct ML SAP link
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev_id
+ *
+ * This API returns user configures freq of conc ML SAP link
+ *
+ * Return: User config freq of Concurrent ML SAP link if any. Otherwise 0.
+ */
+qdf_freq_t
+policy_mgr_get_conc_ml_sap_user_config_freq(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id);
 #endif /* __WLAN_POLICY_MGR_API_H */

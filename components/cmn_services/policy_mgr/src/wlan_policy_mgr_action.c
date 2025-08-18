@@ -2046,6 +2046,7 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 	uint32_t cur_sap_vdev_id = INVALID_VDEV_ID;
+	qdf_freq_t conc_ml_sap_user_freq = 0, conc_ml_sap_freq = 0;
 
 	if (intf_ch_freq)
 		*intf_ch_freq = 0;
@@ -2149,6 +2150,27 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 
 		if (!ll_sap_freq && !sta_gc_present && user_config_freq &&
 		    op_band < user_band) {
+			conc_ml_sap_freq =
+				policy_mgr_get_conc_ml_sap_link_freq(
+							psoc,
+							cur_sap_vdev_id,
+							NULL);
+			if (user_band ==
+			    wlan_reg_freq_to_band(conc_ml_sap_freq)) {
+				conc_ml_sap_user_freq =
+				policy_mgr_get_conc_ml_sap_user_config_freq(
+							psoc,
+							cur_sap_vdev_id);
+				if (!conc_ml_sap_user_freq || op_band >=
+				    wlan_reg_freq_to_band(
+						conc_ml_sap_user_freq))
+					continue;
+				user_config_freq = conc_ml_sap_user_freq;
+			}
+			if (!wlan_reg_is_enable_in_secondary_list_for_freq(
+							pm_ctx->pdev,
+							user_config_freq))
+				continue;
 			curr_sap_freq = op_ch_freq_list[i];
 			policy_mgr_debug("Move sap to user configured freq: %d",
 					 user_config_freq);
