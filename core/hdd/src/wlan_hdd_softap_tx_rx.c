@@ -53,6 +53,7 @@
 #ifdef FEATURE_WDS
 #include <net/llc_pdu.h>
 #endif
+#include "wlan_hdd_son.h"
 
 /* Preprocessor definitions and constants */
 #undef QCA_HDD_SAP_DUMP_SK_BUFF
@@ -1582,6 +1583,8 @@ static QDF_STATUS hdd_softap_change_per_sta_state(struct hdd_adapter *adapter,
 		} else {
 			hdd_err("vdev is NULL");
 		}
+
+		hdd_son_deliver_peer_authorize_event(adapter, sta_mac->bytes);
 	}
 
 	hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,

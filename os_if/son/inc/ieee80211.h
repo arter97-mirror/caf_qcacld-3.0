@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -123,6 +123,17 @@
 	 (_a)[3] == 0xff &&                         \
 	 (_a)[4] == 0xff &&                         \
 	 (_a)[5] == 0xff)
+
+#ifdef __KERNEL__
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+#include <linux/time64.h>
+typedef struct timespec64 timespec_t;
+#else
+typedef struct timespec timespec_t;
+#endif
+#else
+typedef struct timespec timespec_t;
+#endif /* __KERNEL__ */
 
 /*
  * Reason codes
@@ -306,7 +317,7 @@ struct ieee80211req_sta_info {
 	u_int8_t        isi_cipher;
 	u_int32_t       isi_assoc_time;         /* sta association time */
 	/* sta association time in timespec format */
-	struct timespec isi_tr069_assoc_time;
+	timespec_t isi_tr069_assoc_time;
 
 	u_int16_t   isi_htcap;      /* HT capabilities */
 	u_int32_t   isi_rxratekbps; /* rx rate in Kbps */

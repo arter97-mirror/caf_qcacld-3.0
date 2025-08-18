@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2568,5 +2569,16 @@ QDF_STATUS wma_send_ani_level_request(tp_wma_handle wma_handle,
  * Return: QDF status
  */
 QDF_STATUS wma_vdev_detach(struct del_vdev_params *pdel_vdev_req_param);
+
+/**
+ * wma_peer_sta_kickout() - Kickout sta for sap
+ * @cpsoc: pointer to cdp ctrl psoc object
+ * @pdev_id: pdev id
+ * @macaddr: mac address
+ *
+ * Return: 0 if success, otherwise fail
+ */
+int wma_peer_sta_kickout(struct cdp_ctrl_objmgr_psoc *cpsoc,
+			 uint16_t pdev_id, uint8_t *macaddr);
 #endif
 

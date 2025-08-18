@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -179,6 +180,7 @@ static struct ol_if_ops dp_ol_if_ops = {
 	.peer_send_wds_disconnect = cds_peer_send_wds_disconnect,
 #endif
 #endif
+	.peer_sta_kickout = wma_peer_sta_kickout,
 	/* TODO: Add any other control path calls required to OL_IF/WMA layer */
 };
 #else /* !QCA_WIFI_QCA8074 */
