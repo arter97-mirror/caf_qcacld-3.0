@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -549,7 +549,8 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 			 * If we return scan failure hostapd fails secondary AP
 			 * startup.
 			 */
-			hdd_err("##In DFS Master mode. Scan aborted");
+			hdd_err("##In DFS Master mode (DFS freq %d, BW %d). Scan aborted",
+				con_dfs_ch_freq, con_dfs_ch_width);
 			if (wlan_hdd_enqueue_blocked_scan_request(dev, request,
 								  source))
 				return -EAGAIN;
