@@ -32,6 +32,20 @@
 #include "osif_sync.h"
 #include "wlan_cp_stats_ucfg_api.h"
 
+/**
+ * __hdd_sysfs_dump_in_progress_store() - Handle sysfs write for
+ * dump_in_progress
+ * @hdd_ctx: Pointer to HDD context
+ * @attr: Pointer to kobject attribute
+ * @buf: Input buffer from sysfs write
+ * @count: Number of bytes in input buffer
+ *
+ * This function is invoked when a user writes to the dump_in_progress sysfs
+ * node. It parses the input, validates it, updates the internal state, and
+ * optionally triggers log flushing if enhanced chipset logging is enabled.
+ *
+ * Return: Number of bytes processed on success, error code otherwise.
+ */
 static ssize_t
 __hdd_sysfs_dump_in_progress_store(struct hdd_context *hdd_ctx,
 				   struct kobj_attribute *attr,
@@ -40,6 +54,7 @@ __hdd_sysfs_dump_in_progress_store(struct hdd_context *hdd_ctx,
 	char buf_local[MAX_SYSFS_USER_COMMAND_SIZE_LENGTH + 1];
 	char *sptr, *token;
 	int value, ret;
+	QDF_STATUS status;
 
 	if (!wlan_hdd_validate_modules_state(hdd_ctx))
 		return -EINVAL;
@@ -64,6 +79,23 @@ __hdd_sysfs_dump_in_progress_store(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 
 	hdd_ctx->dump_in_progress = value;
+
+	if (hdd_ctx->dump_in_progress && hdd_ctx->enhance_chipset_logging) {
+		status = cds_flush_logs(WLAN_LOG_TYPE_NON_FATAL,
+					WLAN_LOG_INDICATOR_FRAMEWORK,
+					WLAN_LOG_REASON_DUMP_IN_PROGRESS,
+					false, false);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to trigger bug report");
+			return qdf_status_to_os_return(status);
+		}
+
+		status = wlan_logging_wait_for_flush_log_completion();
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("wait for flush log timed out");
+			return qdf_status_to_os_return(status);
+		}
+	}
 
 	return count;
 }
