@@ -10793,9 +10793,8 @@ static int hdd_config_tx_rx_nss(struct wlan_hdd_link_info *link_info,
 	tx_nss = nla_get_u8(tx_attr);
 	rx_nss = nla_get_u8(rx_attr);
 	hdd_debug("tx_nss %d rx_nss %d", tx_nss, rx_nss);
-	/* Only allow NSS for tx_rx_nss for 1x1, 1x2, 2x2 */
-	if (!((tx_nss == 1 && rx_nss == 2) || (tx_nss == 1 && rx_nss == 1) ||
-	      (tx_nss == 2 && rx_nss == 2))) {
+	/* Only allow NSS tx nss is lesser or equal to rx nss*/
+	if (tx_nss > rx_nss) {
 		hdd_err("Setting tx_nss %d rx_nss %d not allowed", tx_nss,
 			rx_nss);
 		return -EINVAL;
@@ -10989,25 +10988,22 @@ static int hdd_config_tx_rx_nss_per_band(struct wlan_hdd_link_info *link_info,
 	hdd_debug("5/6GHz Band: tx_nss %d rx_nss %d", tx_nss_5g, rx_nss_5g);
 
 	/* Only allow NSS for tx_rx_nss for 1x1, 1x2, 2x2 */
-	if (!((tx_nss_2g == 1 && rx_nss_2g == 2) ||
-	      (tx_nss_2g == 1 && rx_nss_2g == 1) ||
-	      (tx_nss_2g == 2 && rx_nss_2g == 2))) {
+	if (tx_nss_2g > rx_nss_2g) {
 		hdd_err("Invalid Tx_Rx_Nss for 2.4GHz band (%d, %d)",
 			tx_nss_2g, rx_nss_2g);
 		return -EINVAL;
 	}
 
-	if (!((tx_nss_5g == 1 && rx_nss_5g == 2) ||
-	      (tx_nss_5g == 1 && rx_nss_5g == 1) ||
-	      (tx_nss_5g == 2 && rx_nss_5g == 2))) {
+	if (tx_nss_5g > rx_nss_5g) {
 		hdd_err("Invalid Tx_Rx_Nss for 5/6GHz band (%d, %d)",
 			tx_nss_5g, rx_nss_5g);
 		return -EINVAL;
 	}
 
-	if ((tx_nss_2g == 2 || rx_nss_2g || tx_nss_5g || rx_nss_5g == 2) &&
-	    hdd_ctx->num_rf_chains != 2) {
-		hdd_err("No support for 2 spatial streams");
+	if (rx_nss_2g > hdd_ctx->num_rf_chains ||
+	    rx_nss_5g > hdd_ctx->num_rf_chains) {
+		hdd_err("No support for RX NSS 2 GHz = %d , RX NSS 5 GHz = %d as num RF chains = %d",
+			rx_nss_2g, rx_nss_5g, hdd_ctx->num_rf_chains);
 		return -EINVAL;
 	}
 

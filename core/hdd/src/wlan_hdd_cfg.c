@@ -1347,8 +1347,9 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 	mac_handle_t mac_handle;
 	uint8_t vht_enable_mimo = WLAN_MIMO_CAP_DISABLE;
 
-	if ((tx_nss == 2 || rx_nss == 2) && (hdd_ctx->num_rf_chains != 2)) {
-		hdd_err("No support for 2 spatial streams");
+	if (tx_nss > hdd_ctx->num_rf_chains || rx_nss > hdd_ctx->num_rf_chains) {
+		hdd_err("Cannot support tx nss = %u, rx nss = %u greater than num rf chains = %u",
+			tx_nss, rx_nss, hdd_ctx->num_rf_chains);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1382,8 +1383,7 @@ QDF_STATUS hdd_update_nss(struct wlan_hdd_link_info *link_info,
 
 		if ((adapter->device_mode == QDF_SAP_MODE ||
 		     adapter->device_mode == QDF_P2P_GO_MODE) && restart_sap) {
-			if ((tx_nss == 2 && rx_nss == 2) ||
-			    (tx_nss == 1 && rx_nss == 1)) {
+			if (tx_nss == rx_nss) {
 				hdd_set_sap_nss_params(link_info, mac_handle,
 						       tx_nss, rx_nss);
 				return QDF_STATUS_SUCCESS;
