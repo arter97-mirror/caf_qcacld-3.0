@@ -417,12 +417,12 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		 pe_session->opmode == QDF_P2P_GO_MODE)
 		tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
 
-	if (pe_session->assoc_req) {
-		qdf_mem_free(pe_session->assoc_req);
-		pe_session->assoc_req = NULL;
-		pe_session->assocReqLen = 0;
-	}
 	if (ft_ies_length) {
+		if (pe_session->assoc_req) {
+			qdf_mem_free(pe_session->assoc_req);
+			pe_session->assoc_req = NULL;
+			pe_session->assocReqLen = 0;
+		}
 		pe_session->assoc_req = qdf_mem_malloc(ft_ies_length);
 		if (!pe_session->assoc_req) {
 			pe_session->assocReqLen = 0;
@@ -438,7 +438,6 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		}
 	} else {
 		pe_debug("FT IEs not present");
-		pe_session->assocReqLen = 0;
 	}
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,

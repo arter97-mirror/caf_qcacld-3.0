@@ -162,6 +162,18 @@ u8 ccp_rsn_oui_13[HDD_RSN_OUI_SIZE] = {0x50, 0x6F, 0x9A, 0x01};
 
 #define HDD_PEER_AUTHORIZE_WAIT 10
 
+/* Length of Capabilities Information field in Fixed parameters */
+#define WLAN_CAPAB_INFO_LEN    2
+
+/* Length of Listen Interval field in Fixed parameters */
+#define WLAN_LISTEN_INTERVAL_LEN    2
+
+/* Reassoc req IE offset: Capabilites info(2) +
+ * Listen Interval(2) + Current AP address(6)
+ */
+#define WLAN_REASSOC_REQ_IES_OFFSET \
+	(WLAN_CAPAB_INFO_LEN + WLAN_LISTEN_INTERVAL_LEN + QDF_MAC_ADDR_SIZE)
+
 /**
  * beacon_filter_table - table of IEs used for beacon filtering
  */
@@ -2442,6 +2454,30 @@ static void hdd_roam_decr_conn_count(struct hdd_adapter *adapter,
 						adapter->device_mode,
 						adapter->vdev_id);
 }
+
+static QDF_STATUS
+hdd_roam_get_reassoc_req_ie_data(struct csr_roam_info *roam_info,
+				 uint8_t **req_ies_data_ptr,
+				 uint32_t *req_ies_data_len)
+{
+	uint8_t *reassoc_req;
+	uint32_t reassoc_req_len = 0;
+
+	reassoc_req = (uint8_t *)roam_info->pbFrames + roam_info->nBeaconLength;
+	reassoc_req_len = roam_info->nAssocReqLength;
+
+	if (!reassoc_req_len ||
+	    reassoc_req_len <= WLAN_REASSOC_REQ_IES_OFFSET) {
+		hdd_info("nAssocReqLength is invalid!");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*req_ies_data_len = reassoc_req_len - WLAN_REASSOC_REQ_IES_OFFSET;
+	*req_ies_data_ptr = reassoc_req + WLAN_REASSOC_REQ_IES_OFFSET;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * hdd_send_re_assoc_event() - send reassoc event
  * @dev: pointer to net device
@@ -2460,7 +2496,7 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 	u8 *assoc_rsp = NULL;
 	uint8_t *rsp_rsn_ie = qdf_mem_malloc(IW_GENERIC_IE_MAX);
 	uint8_t *assoc_req_ies = qdf_mem_malloc(IW_GENERIC_IE_MAX);
-	uint32_t rsp_rsn_lemgth = 0;
+	uint32_t rsp_rsn_length = 0;
 	struct ieee80211_channel *chan;
 	uint8_t buf_ssid_ie[2 + WLAN_SSID_MAX_LEN]; /* 2 bytes-EID and len */
 	uint8_t *buf_ptr, ssid_ie_len;
@@ -2468,6 +2504,8 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 	uint8_t *final_req_ie = NULL;
 	tCsrRoamConnectedProfile roam_profile;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	uint8_t *reassoc_req_ies_data_ptr = NULL;
+	uint32_t reassoc_req_ies_data_len = 0;
 
 	qdf_mem_zero(&roam_profile, sizeof(roam_profile));
 
@@ -2522,7 +2560,7 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 		hdd_err("Invalid Assoc resp length %d", len);
 		goto done;
 	}
-	rsp_rsn_lemgth = len;
+	rsp_rsn_length = len;
 	qdf_mem_copy(rsp_rsn_ie, assoc_rsp, len);
 	qdf_mem_zero(rsp_rsn_ie + len, IW_GENERIC_IE_MAX - len);
 
@@ -2563,10 +2601,19 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 	hdd_debug("Req RSN IE:");
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 			   final_req_ie, (ssid_ie_len + reqRsnLength));
-	hdd_send_roamed_ind(dev, bss, final_req_ie,
-			    (ssid_ie_len + reqRsnLength), rsp_rsn_ie,
-			    rsp_rsn_lemgth);
 
+	if (QDF_STATUS_SUCCESS ==
+	    hdd_roam_get_reassoc_req_ie_data(roam_info,
+					     &reassoc_req_ies_data_ptr,
+					     &reassoc_req_ies_data_len)) {
+		hdd_send_roamed_ind(dev, bss, reassoc_req_ies_data_ptr,
+				    reassoc_req_ies_data_len, rsp_rsn_ie,
+				    rsp_rsn_length);
+	} else {
+		hdd_send_roamed_ind(dev, bss, final_req_ie,
+				    (ssid_ie_len + reqRsnLength), rsp_rsn_ie,
+				    rsp_rsn_length);
+	}
 	qdf_mem_copy(assoc_req_ies,
 		(u8 *)roam_info->pbFrames + roam_info->nBeaconLength,
 		roam_info->nAssocReqLength);
@@ -2579,7 +2626,7 @@ static void hdd_send_re_assoc_event(struct net_device *dev,
 
 	wlan_hdd_send_roam_auth_event(adapter, roam_info->bssid.bytes,
 			assoc_req_ies, roam_info->nAssocReqLength,
-			rsp_rsn_ie, rsp_rsn_lemgth,
+			rsp_rsn_ie, rsp_rsn_length,
 			roam_info);
 
 	hdd_update_hlp_info(dev, roam_info);
