@@ -534,7 +534,8 @@ QDF_STATUS dp_rx_fst_attach(struct wlan_dp_psoc_context *dp_ctx)
 	fst->soc_hdl = soc;
 	fst->dp_ctx = dp_ctx;
 	dp_ctx->rx_fst = fst;
-	dp_ctx->fisa_enable = true;
+	fst->fisa_initialized = true;
+	fst->is_fisa_aggr_enabled = dp_cfg->is_fisa_aggr_enabled;
 	dp_ctx->fisa_lru_del_enable =
 				wlan_dp_cfg_is_rx_fisa_lru_del_enabled(dp_cfg);
 
@@ -749,7 +750,7 @@ QDF_STATUS dp_rx_fst_target_config(struct wlan_dp_psoc_context *dp_ctx)
 	struct dp_rx_fst *fst = dp_ctx->rx_fst;
 
 	/* Check if it is enabled in the INI */
-	if (!dp_ctx->fisa_enable) {
+	if (!fst || !fst->fisa_initialized) {
 		dp_err("RX FISA feature is disabled");
 		return QDF_STATUS_E_NOSUPPORT;
 	}
@@ -805,10 +806,10 @@ QDF_STATUS dp_rx_fisa_config(struct wlan_dp_psoc_context *dp_ctx)
 void dp_fisa_cfg_init(struct wlan_dp_psoc_cfg *config,
 		      struct wlan_objmgr_psoc *psoc)
 {
-	config->fisa_enable = cfg_get(psoc, CFG_DP_RX_FISA_ENABLE);
 	config->is_rx_fisa_enabled = cfg_get(psoc, CFG_DP_RX_FISA_ENABLE);
 	config->is_rx_fisa_lru_del_enabled =
 				cfg_get(psoc, CFG_DP_RX_FISA_LRU_DEL_ENABLE);
+	config->is_fisa_aggr_enabled = cfg_get(psoc, CFG_DP_RX_FISA_ENABLE);
 }
 #else /* WLAN_SUPPORT_RX_FISA */
 
