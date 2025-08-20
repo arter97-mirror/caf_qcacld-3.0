@@ -2757,8 +2757,8 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 		}
 
 		/* Do not FISA aggregate IPSec packets */
-		if (fisa_flow &&
-		    fisa_flow->rx_flow_tuple_info.is_exception) {
+		if ((fisa_flow && fisa_flow->rx_flow_tuple_info.is_exception) ||
+		    !dp_fisa_rx_hdl->is_fisa_aggr_enabled) {
 			dp_rx_fisa_release_ft_lock(dp_fisa_rx_hdl, reo_id);
 			goto pull_nbuf;
 		}
