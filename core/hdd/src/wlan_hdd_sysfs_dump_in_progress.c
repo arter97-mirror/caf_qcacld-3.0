@@ -81,6 +81,8 @@ __hdd_sysfs_dump_in_progress_store(struct hdd_context *hdd_ctx,
 	hdd_ctx->dump_in_progress = value;
 
 	if (hdd_ctx->dump_in_progress && hdd_ctx->enhance_chipset_logging) {
+		ucfg_cp_stats_flush_host_buffer_if_pending(hdd_ctx->psoc);
+
 		status = cds_flush_logs(WLAN_LOG_TYPE_NON_FATAL,
 					WLAN_LOG_INDICATOR_FRAMEWORK,
 					WLAN_LOG_REASON_DUMP_IN_PROGRESS,
@@ -332,4 +334,3 @@ void hdd_sysfs_destroy_enhance_chipset_logging_interface(
 	sysfs_remove_file(wifi_kobject,
 			  &enhance_chipset_logging_attribute.attr);
 }
-
