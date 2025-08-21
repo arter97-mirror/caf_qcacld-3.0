@@ -3682,6 +3682,7 @@ mlo_parse_peer_eml_cap(tpSirAssocReq p_assoc_req, uint16_t eml_cap)
 
 /**
  * mlo_parse_peer_mld_cap: Parse mld capability info
+ * @p_assoc_req: Assoc request received
  * @mld_cap: mld capablility info
  *
  * Return: None
@@ -8292,14 +8293,6 @@ populate_dot11f_twt_he_cap(struct mac_context *mac_ctx,
 }
 #endif
 
-/**
- * populate_dot11f_he_caps() - pouldate HE Capability IE
- * @mac_ctx: Global MAC context
- * @session: PE session
- * @he_cap: pointer to HE capability IE
- *
- * Populdate the HE capability IE based on the session.
- */
 QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 				   struct pe_session *session,
 				   enum QDF_OPMODE opmode, qdf_freq_t freq,
@@ -13005,9 +12998,8 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 							opmode,
 							twt_resp_cfg);
 		p_ext_cap->twt_responder_support =
-			twt_responder && twt_get_responder_flag(
-							mac_ctx,
-							pe_session->vdev_id);
+			twt_responder && twt_get_responder_flag(mac_ctx,
+								vdev_id);
 		break;
 	default:
 		break;
