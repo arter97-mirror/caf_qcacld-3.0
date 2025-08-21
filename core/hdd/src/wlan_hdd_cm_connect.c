@@ -1373,6 +1373,7 @@ static void hdd_cm_save_connect_info(struct wlan_hdd_link_info *link_info,
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t *ie_field;
 	uint32_t ie_len, status;
+	QDF_STATUS qdf_status;
 	tDot11fBeaconIEs *bcn_ie;
 	struct s_ext_cap *p_ext_cap = NULL;
 	struct hdd_adapter *adapter = link_info->adapter;
@@ -1467,7 +1468,20 @@ static void hdd_cm_save_connect_info(struct wlan_hdd_link_info *link_info,
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_CM_ID);
 	if (vdev) {
-		sta_ctx->conn_info.nss = wlan_vdev_mlme_get_nss(vdev);
+		uint8_t cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss;
+
+		qdf_status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+							       &cap_tx_nss,
+							       &cap_rx_nss,
+							       &op_tx_nss,
+							       &op_rx_nss);
+		if (QDF_IS_STATUS_ERROR(qdf_status))
+			hdd_debug("Failed to fetch curr bss nss %d",
+				  qdf_status);
+		else
+			cap_tx_nss = WLAN_MAX_VDEV_NSS;
+
+		sta_ctx->conn_info.nss = cap_tx_nss;
 		sta_ctx->conn_info.ap_nss = wlan_mlme_get_ap_nss(vdev);
 		ucfg_wlan_vdev_mgr_get_param(vdev, WLAN_MLME_CFG_RATE_FLAGS,
 					     &sta_ctx->conn_info.rate_flags);

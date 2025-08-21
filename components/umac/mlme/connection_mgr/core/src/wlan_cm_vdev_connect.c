@@ -738,10 +738,12 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 		     struct qdf_mac_addr *bssid, struct wlan_ssid *ssid,
 		     qdf_freq_t freq)
 {
+	QDF_STATUS status;
 	struct wlan_channel *des_chan;
 	struct vdev_mlme_obj *vdev_mlme;
 	struct wlan_crypto_params *crypto_params;
-	uint8_t max_supported_nss;
+	uint8_t supp_tx_nss, supp_rx_nss;
+	uint8_t cap_tx_nss = 0, cap_rx_nss = 0, op_tx_nss, op_rx_nss;
 	enum QDF_OPMODE opmode;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_psoc *psoc;
@@ -820,8 +822,19 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 	conn_stats.reason_code = 0;
 	conn_stats.op_freq = freq;
 
-	max_supported_nss = mlme_obj->cfg.vht_caps.vht_cap_info.enable_mimo ?
-			    WLAN_MAX_VDEV_NSS : 1;
+	status = mlme_get_vdev_nss_by_freq_from_ini(vdev, freq,
+						    &supp_tx_nss, &supp_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		supp_tx_nss = WLAN_MAX_VDEV_NSS;
+		supp_rx_nss = WLAN_MAX_VDEV_NSS;
+	}
+
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &cap_tx_nss, &cap_rx_nss,
+						   &op_tx_nss, &op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_debug("Failed to fetch curr bss nss %d", status);
+
 	mlme_nofl_debug("+---------CONNECTION INFO START------------+");
 	mlme_nofl_debug("VDEV-ID: %d self_mac:"QDF_MAC_ADDR_FMT,
 			wlan_vdev_get_id(vdev),
@@ -837,8 +850,8 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 			cm_diag_get_akm_str(conn_stats.auth_type,
 					    crypto_params->key_mgmt),
 			cm_diag_get_encr_type_str(conn_stats.encryption_type));
-	mlme_nofl_debug("DUT_NSS: %d | Intersected NSS:%d",
-			max_supported_nss, wlan_vdev_mlme_get_nss(vdev));
+	mlme_nofl_debug("DUT Tx/Rx NSS: %dx%d | Intersected Tx/Rx NSS: %dx%d",
+			supp_tx_nss, supp_rx_nss, cap_tx_nss, cap_rx_nss);
 	mlme_nofl_debug("Qos enable: %d | Associated: %s",
 			conn_stats.qos_capability,
 			(conn_stats.result_code ? "yes" : "no"));
@@ -936,13 +949,14 @@ void cm_get_sta_cxn_info(struct wlan_objmgr_vdev *vdev,
 	struct wlan_crypto_params *crypto_params;
 	qdf_freq_t oper_freq;
 	int8_t rssi = 0;
-	uint32_t nss, hw_mode;
+	uint32_t hw_mode;
 	struct policy_mgr_conc_connection_info *conn_info;
 	uint32_t i = 0, len = 0, max_cxn = 0;
 	enum mgmt_ch_width ch_width;
 	enum mgmt_dot11_mode dot11mode;
 	enum mgmt_bss_type type;
 	uint8_t authtype;
+	uint8_t cap_tx_nss = 0, cap_rx_nss = 0, op_tx_nss = 0, op_rx_nss = 0;
 	enum mgmt_encrypt_type enctype;
 	enum QDF_OPMODE opmode;
 	struct wlan_objmgr_pdev *pdev;
@@ -1031,11 +1045,16 @@ void cm_get_sta_cxn_info(struct wlan_objmgr_vdev *vdev,
 			break;
 	len += qdf_scnprintf(buf + len, buf_sz - len,
 			     "\n\tmac: %d", conn_info->mac);
-	nss = wlan_vdev_mlme_get_nss(vdev);
+
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &cap_tx_nss, &cap_rx_nss,
+						   &op_tx_nss, &op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status))
+		mlme_debug("Failed to fetch curr bss nss %d", status);
+
 	len += qdf_scnprintf(buf + len, buf_sz - len,
-			     "\n\torig_nss: %dx%d neg_nss: %dx%d",
-			     conn_info->original_nss, conn_info->original_nss,
-			     nss, nss);
+			     "\n\tcap_nss: %dx%d op_nss: %dx%d",
+			     cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss);
 	hw_mode = policy_mgr_is_current_hwmode_dbs(psoc);
 	len += qdf_scnprintf(buf + len, buf_sz - len,
 			     "\n\tis_current_hw_mode_dbs: %s",

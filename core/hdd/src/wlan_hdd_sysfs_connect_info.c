@@ -92,13 +92,16 @@ wlan_hdd_add_nss_info(struct hdd_connection_info *conn_info,
 	ssize_t length = 0;
 	int ret_val;
 
-	if (!conn_info->conn_flag.ht_present &&
-	    !conn_info->conn_flag.vht_present)
+	if (!(conn_info->conn_flag.ht_present |
+	      conn_info->conn_flag.vht_present |
+	      conn_info->conn_flag.he_present |
+	      conn_info->conn_flag.eht_present))
 		return length;
 
 	ret_val = scnprintf(buf, buf_avail_len,
-			    "nss = %u\n",
-			    conn_info->txrate.nss);
+			    "Tx/Rx nss = %ux%u\n",
+			    conn_info->txrate.nss,
+			    conn_info->rxrate.nss);
 	if (ret_val <= 0)
 		return length;
 
