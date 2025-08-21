@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -713,7 +713,6 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 			  param_buf->num_partner_link_stats);
 
 	stats_ext_info = param_buf->fixed_param;
-	buf_ptr = (uint8_t *)stats_ext_info;
 
 	alloc_len += sizeof(tSirStatsExtEvent);
 	alloc_len += stats_ext_info->data_len;
@@ -743,7 +742,7 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 	if (!stats_ext_event)
 		return -ENOMEM;
 
-	buf_ptr += sizeof(wmi_stats_ext_event_fixed_param) + WMI_TLV_HDR_SIZE;
+	buf_ptr = (uint8_t *)param_buf->data;
 
 	stats_ext_event->vdev_id = stats_ext_info->vdev_id;
 	stats_ext_event->event_data_len = stats_ext_info->data_len;
@@ -817,7 +816,6 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 	}
 
 	stats_ext_info = param_buf->fixed_param;
-	buf_ptr = (uint8_t *)stats_ext_info;
 
 	alloc_len = sizeof(tSirStatsExtEvent);
 	alloc_len += stats_ext_info->data_len;
@@ -833,7 +831,7 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 	if (!stats_ext_event)
 		return -ENOMEM;
 
-	buf_ptr += sizeof(wmi_stats_ext_event_fixed_param) + WMI_TLV_HDR_SIZE;
+	buf_ptr = (uint8_t *)param_buf->data;
 
 	stats_ext_event->vdev_id = stats_ext_info->vdev_id;
 	stats_ext_event->event_data_len = stats_ext_info->data_len;
@@ -5218,3 +5216,22 @@ vht_ch_width:
 	return wma_get_vht_ch_width();
 }
 #endif
+
+QDF_STATUS wma_send_reduce_pwr_scan_mode(uint32_t pdev_id, uint32_t param_val)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct pdev_params pparam = {0};
+	QDF_STATUS status;
+
+	if (!wma)
+		return QDF_STATUS_E_FAILURE;
+
+	pparam.param_id = WMI_PDEV_PARAM_SCAN_MODE;
+	pparam.param_value = param_val;
+	status = wmi_unified_pdev_param_send(wma->wmi_handle,
+					     &pparam, pdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Unable to send reduce power scan mode");
+
+	return status;
+}
