@@ -1735,12 +1735,16 @@ struct fw_log_info {
  * @HDD_ANTENNA_MODE_INVALID: Invalid mode place holder
  * @HDD_ANTENNA_MODE_1X1: Number of TX/RX chains equals 1
  * @HDD_ANTENNA_MODE_2X2: Number of TX/RX chains equals 2
+ * @HDD_ANTENNA_MODE_3X3: Number of TX/RX chains equals 3
+ * @HDD_ANTENNA_MODE_4X4: Number of TX/RX chains equals 4
  * @HDD_ANTENNA_MODE_MAX: Place holder for max mode
  */
 enum antenna_mode {
 	HDD_ANTENNA_MODE_INVALID,
 	HDD_ANTENNA_MODE_1X1,
 	HDD_ANTENNA_MODE_2X2,
+	HDD_ANTENNA_MODE_3X3,
+	HDD_ANTENNA_MODE_4X4,
 	HDD_ANTENNA_MODE_MAX
 };
 

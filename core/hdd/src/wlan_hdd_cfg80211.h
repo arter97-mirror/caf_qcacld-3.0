@@ -723,11 +723,15 @@ enum hdd_rate_info_bw {
 /**
  * enum hdd_chain_mode : Representation of Number of chains available.
  * @HDD_CHAIN_MODE_1X1: Chain mask Not Configurable as only one chain available
- * @HDD_CHAIN_MODE_2X2: Chain mask configurable as both chains available
+ * @HDD_CHAIN_MODE_2X2: Chain mask configurable as 2X2
+ * @HDD_CHAIN_MODE_3X3: Chain mask configurable as 3X3
+ * @HDD_CHAIN_MODE_4X4: Chain mask configurable as 4x4
  */
 enum hdd_chain_mode {
 	HDD_CHAIN_MODE_1X1 = 1,
 	HDD_CHAIN_MODE_2X2 = 3,
+	HDD_CHAIN_MODE_3X3 = 7,
+	HDD_CHAIN_MODE_4X4 = 15,
 };
 
 /**

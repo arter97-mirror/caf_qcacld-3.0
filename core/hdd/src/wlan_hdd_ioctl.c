@@ -6189,6 +6189,14 @@ int hdd_set_antenna_mode(struct wlan_hdd_link_info *link_info, int mode)
 		params.num_rx_chains = 2;
 		params.num_tx_chains = 2;
 		break;
+	case HDD_ANTENNA_MODE_3X3:
+		params.num_rx_chains = 3;
+		params.num_tx_chains = 3;
+		break;
+	case HDD_ANTENNA_MODE_4X4:
+		params.num_rx_chains = 4;
+		params.num_tx_chains = 4;
+		break;
 	default:
 		hdd_err("unsupported antenna mode");
 		ret = -EINVAL;

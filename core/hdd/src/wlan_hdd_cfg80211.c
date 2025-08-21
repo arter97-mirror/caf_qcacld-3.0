@@ -34315,13 +34315,14 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	if (ret)
 		return -EINVAL;
 
-	if (hdd_ctx->num_rf_chains != HDD_ANTENNA_MODE_2X2 ||
+	if (hdd_ctx->num_rf_chains == HDD_ANTENNA_MODE_1X1 ||
 	    !ucfg_mlme_is_chain_mask_supported(hdd_ctx->psoc)) {
 		hdd_info_rl("Chainmask can't be configured, num of rf chain %d",
 			    hdd_ctx->num_rf_chains);
 		return -ENOTSUPP;
 	}
-	chains = HDD_CHAIN_MODE_2X2;
+
+	chains = hdd_ctx->num_rf_chains;
 	if (!tx_mask || tx_mask > chains || !rx_mask || rx_mask > chains) {
 		hdd_err_rl("Invalid masks. txMask: %d rxMask: %d num_rf_chains: %d",
 			   tx_mask, rx_mask, hdd_ctx->num_rf_chains);
