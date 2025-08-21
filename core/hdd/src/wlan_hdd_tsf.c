@@ -1886,8 +1886,9 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter)
 		hdd_debug("ts-pair updated: target: %llu; g_target:%llu, Qtime: %llu, hosttime:%llu",
 			  tsf->last_target_time,
 			  tsf->last_target_global_tsf_time,
-			  tsf->last_tsf_sync_soc_time,
-			  tsf->last_host_time);
+			  qdf_do_div(tsf->last_tsf_sync_soc_time,
+				     NSEC_PER_USEC),
+			  qdf_do_div(tsf->last_host_time, NSEC_PER_USEC));
 
 		qdf_event_set(&tsf_sync_get_completion_evt);
 
@@ -2024,7 +2025,7 @@ static DEVICE_ATTR(tsf, 0444, hdd_wlan_tsf_show, NULL);
 
 #if defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC) || \
 	defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ)
-static void hdd_update_host_time(struct hdd_adapter *adapter)
+static void hdd_update_host_time(struct hdd_adapter *adapter, uint64_t qtime)
 {
 	struct hdd_vdev_tsf *tsf = &adapter->tsf;
 
@@ -2033,9 +2034,9 @@ static void hdd_update_host_time(struct hdd_adapter *adapter)
 		return;
 	}
 
-	tsf->cur_tsf_sync_soc_time =
-		qdf_get_log_timestamp_usecs() * NSEC_PER_USEC;
+	tsf->cur_tsf_sync_soc_time = qtime;
 	tsf->cur_host_time = tsf->cur_tsf_sync_soc_time - adapter->delta_qtime;
+	hdd_update_timestamp(adapter);
 }
 #endif
 
@@ -2078,7 +2079,8 @@ void hdd_tsf_ext_gpio_sync_work(void *data)
 		return;
 	}
 	gpio_set_value(tsf_sync_gpio_pin, OUTPUT_HIGH);
-	hdd_update_host_time(adapter);
+	hdd_update_host_time(adapter,
+			     qdf_get_log_timestamp_usecs() * NSEC_PER_USEC);
 	usleep_range(50, 100);
 	gpio_set_value(tsf_sync_gpio_pin, OUTPUT_LOW);
 
@@ -2701,8 +2703,10 @@ static int hdd_handle_tsf_dynamic_start(struct hdd_adapter *adapter,
 	struct hdd_vdev_tsf *tsf;
 	uint32_t dynamic_tsf_sync_interval = 0;
 
-	if (!adapter)
+	if (!hdd_tsf_is_initialized(adapter)) {
+		hdd_err("tsf is not init, ignore tsf event");
 		return -EINVAL;
+	}
 
 	if (hdd_tsf_is_in_cap(adapter))
 		return -EALREADY;
@@ -2747,8 +2751,10 @@ static int hdd_handle_tsf_dynamic_stop(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
 
-	if (!adapter)
+	if (!hdd_tsf_is_initialized(adapter)) {
+		hdd_err("tsf is not init, ignore tsf event");
 		return -EINVAL;
+	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (wlan_hdd_validate_context(hdd_ctx))
@@ -3077,7 +3083,8 @@ static inline irqreturn_t hdd_tsf_captured_irq_handler(int irq, void *arg)
 	if (!adapter)
 		return IRQ_HANDLED;
 
-	hdd_update_host_time(adapter);
+	hdd_update_host_time(adapter,
+			     qdf_get_log_timestamp_usecs() * NSEC_PER_USEC);
 
 	if (adapter->dev)
 		name = adapter->dev->name;
