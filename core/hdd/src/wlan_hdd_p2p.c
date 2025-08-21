@@ -2100,6 +2100,11 @@ static int __wlan_hdd_cfg80211_p2p_send_usd_cmd(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
+	if (!ucfg_p2p_is_fw_support_usd(hdd_ctx->psoc)) {
+		hdd_debug("USD feature is not supported by FW");
+		return -EPERM;
+	}
+
 	hdd_ctx->usd_adapter = adapter;
 
 	return osif_p2p_send_usd_params(hdd_ctx->psoc,
