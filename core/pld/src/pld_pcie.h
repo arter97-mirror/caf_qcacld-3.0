@@ -250,11 +250,6 @@ pld_pcie_smmu_unmap(struct device *dev, uint32_t iova_addr, size_t size)
 	return 0;
 }
 
-static inline int pld_pcie_get_tsf_gpio(struct device *dev)
-{
-	return -EINVAL;
-}
-
 static inline int
 pld_pcie_get_fw_files_for_target(struct device *dev,
 				 struct pld_fw_files *pfw_files,
@@ -628,14 +623,6 @@ static inline int pld_pcie_set_wfc_mode(struct device *dev,
 	return 0;
 }
 #endif
-
-/**
- * pld_pcie_get_tsf_gpio() - Get GPIO pin number for GPIO IRQ based TSF sync
- * @dev: device
- *
- * Return: GPIO pin number; Negative error code for failure
- */
-int pld_pcie_get_tsf_gpio(struct device *dev);
 
 /**
  * pld_pcie_get_fw_files_for_target() - Get FW file names

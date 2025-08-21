@@ -2011,14 +2011,6 @@ int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 void pld_set_tsf_sync_period(struct device *dev, u32 val);
 
 /**
- * pld_get_tsf_gpio() - Get GPIO pin number for GPIO IRQ based TSF sync
- * @dev: device
- *
- * Return: GPIO pin number; Negative error code for failure
- */
-int pld_get_tsf_gpio(struct device *dev);
-
-/**
  * pld_reset_tsf_sync_period() - Reset TSF sync period
  * @dev: device
  *
