@@ -5524,7 +5524,7 @@ QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
 			continue;
 		}
 
-		if (original_nss == 2 &&
+		if (original_nss > NSS_1x1_MODE &&
 		    (band == POLICY_MGR_ANY ||
 		    (band == POLICY_MGR_BAND_24 &&
 		    WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq)) ||
@@ -5558,7 +5558,7 @@ QDF_STATUS policy_mgr_nss_update(struct wlan_objmgr_psoc *psoc,
 				vdev_id);
 			continue;
 		}
-		if (original_nss == 2 &&
+		if (original_nss > NSS_1x1_MODE &&
 		    (band == POLICY_MGR_ANY ||
 		    (band == POLICY_MGR_BAND_24 &&
 		    WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq)) ||

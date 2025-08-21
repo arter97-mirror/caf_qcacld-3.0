@@ -6249,10 +6249,9 @@ QDF_STATUS policy_mgr_incr_connection_count(struct wlan_objmgr_psoc *psoc,
 	uint32_t conn_index;
 	struct policy_mgr_vdev_entry_info conn_table_entry = {0};
 	enum policy_mgr_chain_mode chain_mask = POLICY_MGR_ONE_ONE;
-	uint8_t nss_2g = 0, nss_5g = 0;
+	uint8_t tx_nss = NSS_1x1_MODE, rx_nss = NSS_1x1_MODE;
 	enum policy_mgr_con_mode mode;
 	uint32_t ch_freq;
-	uint32_t nss = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	bool update_conn = true;
 
@@ -6289,33 +6288,24 @@ QDF_STATUS policy_mgr_incr_connection_count(struct wlan_objmgr_psoc *psoc,
 	mode =  policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
 
 	ch_freq = conn_table_entry.mhz;
-	status = policy_mgr_get_nss_for_vdev(psoc, mode, &nss_2g, &nss_5g);
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		if ((WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq) && nss_2g > 1) ||
-		    (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) && nss_5g > 1))
-			chain_mask = POLICY_MGR_TWO_TWO;
-		else
-			chain_mask = POLICY_MGR_ONE_ONE;
-		nss = (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq)) ? nss_2g : nss_5g;
-	} else {
+	status = policy_mgr_get_nss_for_vdev(psoc, vdev_id, &tx_nss, &rx_nss);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		chain_mask = (tx_nss > NSS_1x1_MODE) ? POLICY_MGR_TWO_TWO :
+						       POLICY_MGR_ONE_ONE;
+	else
 		policy_mgr_err("Error in getting nss");
-	}
 
 	if (mode == PM_STA_MODE || mode == PM_P2P_CLIENT_MODE)
 		update_conn = false;
 
 	/* add the entry */
-	policy_mgr_update_conc_list(psoc, conn_index,
-			mode,
-			ch_freq,
-			policy_mgr_get_bw(conn_table_entry.chan_width),
-			conn_table_entry.mac_id,
-			chain_mask,
-			nss, vdev_id, true, update_conn,
-			conn_table_entry.ch_flagext);
+	policy_mgr_update_conc_list(psoc, conn_index, mode, ch_freq,
+				    policy_mgr_get_bw(conn_table_entry.chan_width),
+				    conn_table_entry.mac_id, chain_mask, tx_nss,
+				    vdev_id, true, update_conn,
+				    conn_table_entry.ch_flagext);
 	policy_mgr_debug("Add at idx:%d vdev %d mac=%d",
-		conn_index, vdev_id,
-		conn_table_entry.mac_id);
+			 conn_index, vdev_id, conn_table_entry.mac_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -12228,31 +12218,37 @@ policy_mgr_scan_trim_chnls_for_connected_ap(struct wlan_objmgr_pdev *pdev)
 }
 
 QDF_STATUS policy_mgr_get_nss_for_vdev(struct wlan_objmgr_psoc *psoc,
-				enum policy_mgr_con_mode mode,
-				uint8_t *nss_2g, uint8_t *nss_5g)
+				       uint8_t vdev_id, uint8_t *tx_nss,
+				       uint8_t *rx_nss)
 {
-	enum QDF_OPMODE dev_mode;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss;
 
-	dev_mode = policy_mgr_get_qdf_mode_from_pm(mode);
-	if (dev_mode == QDF_MAX_NO_OF_MODE)
-		return  QDF_STATUS_E_FAILURE;
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return QDF_STATUS_E_FAILURE;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_debug("Failed to get VDEV %d", vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (pm_ctx->sme_cbacks.sme_get_nss_for_vdev) {
-		pm_ctx->sme_cbacks.sme_get_nss_for_vdev(
-			dev_mode, nss_2g, nss_5g);
-
-	} else {
-		policy_mgr_err("sme_get_nss_for_vdev callback is NULL");
-		return QDF_STATUS_E_FAILURE;
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &cap_tx_nss, &cap_rx_nss,
+						   &op_tx_nss, &op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_debug("Failed to fetch curr bss nss %d", status);
+		goto ref_rel;
 	}
 
-	return QDF_STATUS_SUCCESS;
+	*tx_nss = cap_tx_nss;
+	*rx_nss = cap_rx_nss;
+
+	status = QDF_STATUS_SUCCESS;
+
+ref_rel:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	return status;
 }
 
 void policy_mgr_dump_connection_status_info(struct wlan_objmgr_psoc *psoc)

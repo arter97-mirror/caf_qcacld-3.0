@@ -1253,7 +1253,6 @@ QDF_STATUS sme_start(mac_handle_t mac_handle)
 			sme_err("csr_start failed status: %d", status);
 			break;
 		}
-		sme_cbacks.sme_get_nss_for_vdev = sme_get_vdev_type_nss;
 		sme_cbacks.sme_nss_update_request = sme_nss_update_request;
 		sme_cbacks.sme_pdev_set_hw_mode = sme_pdev_set_hw_mode;
 		sme_cbacks.sme_soc_set_dual_mac_config =

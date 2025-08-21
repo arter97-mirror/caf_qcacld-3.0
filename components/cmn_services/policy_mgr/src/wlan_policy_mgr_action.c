@@ -431,7 +431,8 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
 	/* Is there any connection had an initial connection with 2x2 */
 	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
 		conn_index++) {
-		if ((pm_conc_connection_list[conn_index].original_nss == 2) &&
+		if ((pm_conc_connection_list[conn_index].original_nss >
+		     NSS_1x1_MODE) &&
 			pm_conc_connection_list[conn_index].in_use) {
 			upgrade = PM_SINGLE_MAC_UPGRADE;
 			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
@@ -519,9 +520,8 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	bool found = false;
 	struct policy_mgr_vdev_entry_info conn_table_entry;
 	enum policy_mgr_chain_mode chain_mask = POLICY_MGR_ONE_ONE;
-	uint8_t nss_2g, nss_5g;
+	uint8_t tx_nss = NSS_1x1_MODE, rx_nss = NSS_1x1_MODE;
 	enum policy_mgr_con_mode mode;
-	uint32_t nss = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	enum QDF_OPMODE op_mode;
 
@@ -565,26 +565,21 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
 
 	ch_freq = conn_table_entry.mhz;
-	status = policy_mgr_get_nss_for_vdev(psoc, mode, &nss_2g, &nss_5g);
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		if ((WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq) && nss_2g > 1) ||
-		    (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) && nss_5g > 1))
-			chain_mask = POLICY_MGR_TWO_TWO;
-		else
-			chain_mask = POLICY_MGR_ONE_ONE;
-		nss = (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq)) ? nss_2g : nss_5g;
-	} else {
+	status = policy_mgr_get_nss_for_vdev(psoc, vdev_id, &tx_nss, &rx_nss);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		chain_mask = (tx_nss > NSS_1x1_MODE) ? POLICY_MGR_TWO_TWO :
+						       POLICY_MGR_ONE_ONE;
+	else
 		policy_mgr_err("Error in getting nss");
-	}
 
 	policy_mgr_debug("update PM connection table for vdev:%d", vdev_id);
 
 	/* add the entry */
-	policy_mgr_update_conc_list(
-			psoc, conn_index, mode, ch_freq,
-			policy_mgr_get_bw(conn_table_entry.chan_width),
-			conn_table_entry.mac_id, chain_mask,
-			nss, vdev_id, true, true, conn_table_entry.ch_flagext);
+	policy_mgr_update_conc_list(psoc, conn_index, mode, ch_freq,
+				    policy_mgr_get_bw(conn_table_entry.chan_width),
+				    conn_table_entry.mac_id, chain_mask, tx_nss,
+				    vdev_id, true, true,
+				    conn_table_entry.ch_flagext);
 	policy_mgr_dump_current_concurrency(psoc);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 

@@ -2358,7 +2358,6 @@ typedef void (*policy_mgr_nss_update_cback)(struct wlan_objmgr_psoc *psoc,
 /**
  * struct policy_mgr_sme_cbacks - SME Callbacks to be invoked
  * from policy manager
- * @sme_get_nss_for_vdev: Get the allowed nss value for the vdev
  * @sme_soc_set_dual_mac_config: Set the dual MAC scan & FW
  *                             config
  * @sme_pdev_set_hw_mode: Set the new HW mode to FW
@@ -2372,8 +2371,6 @@ typedef void (*policy_mgr_nss_update_cback)(struct wlan_objmgr_psoc *psoc,
  *                           concurrencies
  */
 struct policy_mgr_sme_cbacks {
-	void (*sme_get_nss_for_vdev)(enum QDF_OPMODE,
-				     uint8_t *nss_2g, uint8_t *nss_5g);
 	QDF_STATUS (*sme_soc_set_dual_mac_config)(
 		struct policy_mgr_dual_mac_config msg);
 	QDF_STATUS (*sme_pdev_set_hw_mode)(struct policy_mgr_hw_mode msg);
@@ -2953,17 +2950,16 @@ QDF_STATUS policy_mgr_get_valid_chans(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_get_nss_for_vdev() - Get the allowed nss value for the
  * vdev
  * @psoc: PSOC object information
- * @mode: connection type.
- * @nss_2g: Pointer to the 2G Nss parameter.
- * @nss_5g: Pointer to the 5G Nss parameter.
+ * @vdev_id: VDEV ID
+ * @tx_nss: Pointer to save Tx NSS
+ * @rx_nss: Pointer to save Rx NSS
  *
- * Fills the 2G and 5G Nss values based on connection type.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS policy_mgr_get_nss_for_vdev(struct wlan_objmgr_psoc *psoc,
-		enum policy_mgr_con_mode mode,
-		uint8_t *nss_2g, uint8_t *nss_5g);
+				       uint8_t vdev_id, uint8_t *tx_nss,
+				       uint8_t *rx_nss);
 
 /**
  * policy_mgr_get_sap_mandatory_channel() - Get the mandatory channel for SAP
