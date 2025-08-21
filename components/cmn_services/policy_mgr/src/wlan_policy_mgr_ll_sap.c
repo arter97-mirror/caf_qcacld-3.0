@@ -119,6 +119,37 @@ bool __policy_mgr_is_ll_lt_freq_allowed(struct wlan_objmgr_psoc *psoc,
 					const char *func)
 {
 	uint8_t scc_vdev_id, inactive_scc_vdev;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return false;
+	}
+
+	if (wlan_reg_is_24ghz_ch_freq(ll_lt_sap_freq) ||
+	    wlan_reg_is_passive_for_freq(pm_ctx->pdev, ll_lt_sap_freq) ||
+	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, ll_lt_sap_freq)) {
+		policy_mgr_rl_nofl_debug("%s: LL SAP %d with freq %d not allowed due to 2.4 Ghz/indoor/dfs",
+					 func, ll_lt_sap_vdev_id,
+					 ll_lt_sap_freq);
+		return false;
+	}
+
+	if (wlan_reg_is_6ghz_chan_freq(ll_lt_sap_freq) &&
+	    !policy_mgr_is_6G_chan_valid_for_ll_sap(ll_lt_sap_freq)) {
+		policy_mgr_rl_nofl_debug("%s: LL SAP %d with freq %d not allowed on 6 Ghz as only unii5 allowed",
+					 func, ll_lt_sap_vdev_id,
+					 ll_lt_sap_freq);
+		return false;
+	}
+
+	if (wlan_ll_lt_sap_is_freq_in_avoid_list(psoc, ll_lt_sap_freq)) {
+		policy_mgr_rl_nofl_debug("%s: LL SAP %d with freq %d not allowed as it is in avoid list",
+					 func, ll_lt_sap_vdev_id,
+					 ll_lt_sap_freq);
+		return false;
+	}
 
 	inactive_scc_vdev = policy_mgr_get_inact_vdev_present_with_freq(psoc,
 							ll_lt_sap_freq,
@@ -133,6 +164,14 @@ bool __policy_mgr_is_ll_lt_freq_allowed(struct wlan_objmgr_psoc *psoc,
 					 func, ll_lt_sap_vdev_id,
 					 ll_lt_sap_freq, scc_vdev_id,
 					 inactive_scc_vdev);
+		return false;
+	}
+
+	if (policy_mgr_if_freq_n_inactive_links_freq_same(psoc,
+							  ll_lt_sap_freq)) {
+		policy_mgr_rl_nofl_debug("%s: LL SAP %d with freq %d not allowed as standby link is scc",
+					 func, ll_lt_sap_vdev_id,
+					 ll_lt_sap_freq);
 		return false;
 	}
 
