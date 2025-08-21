@@ -4452,7 +4452,7 @@ bool
 policy_mgr_if_freq_n_inactive_links_freq_same(struct wlan_objmgr_psoc *psoc,
 					      uint32_t freq)
 {
-	uint32_t sta_count;
+	uint32_t sta_count, i;
 	uint8_t sta_vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	struct wlan_objmgr_vdev *vdev;
 	bool is_same = false;
@@ -4461,19 +4461,22 @@ policy_mgr_if_freq_n_inactive_links_freq_same(struct wlan_objmgr_psoc *psoc,
 							   sta_vdev_id_list,
 							   PM_STA_MODE);
 
-	if (sta_count != 1)
-		return is_same;
+	for (i = 0; i < sta_count; i++) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    sta_vdev_id_list[i],
+							    WLAN_POLICY_MGR_ID);
+		if (!vdev) {
+			policy_mgr_err("vdev %d not found",
+				       sta_vdev_id_list[i]);
+			continue;
+		}
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, sta_vdev_id_list[0],
-						    WLAN_POLICY_MGR_ID);
-	if (!vdev) {
-		policy_mgr_err("vdev %d not found", sta_vdev_id_list[0]);
-		return is_same;
+		is_same = mlo_mgr_if_freq_n_inactive_links_freq_same(vdev,
+								     freq);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		if (is_same)
+			return is_same;
 	}
-
-	is_same = mlo_mgr_if_freq_n_inactive_links_freq_same(vdev, freq);
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	return is_same;
 }
