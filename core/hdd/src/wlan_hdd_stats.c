@@ -7622,15 +7622,17 @@ hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 
 	sinfo->signal_avg = WLAN_HDD_TGT_NOISE_FLOOR_DBM;
 	for (i = 0; i < NUM_CHAINS_MAX; i++) {
-		sinfo->chain_signal_avg[i] =
-			   link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
-		sinfo->chains |= 1 << i;
-		if (sinfo->chain_signal_avg[i] > sinfo->signal_avg &&
-		    sinfo->chain_signal_avg[i] != 0)
-			sinfo->signal_avg = sinfo->chain_signal_avg[i];
+		if (link_info->hdd_stats.per_chain_rssi_stats.rssi[i] != 0) {
+			sinfo->chain_signal_avg[i] =
+			link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
+			sinfo->chains |= 1 << i;
+			if (sinfo->chain_signal_avg[i] > sinfo->signal_avg)
+				sinfo->signal_avg = sinfo->chain_signal_avg[i];
 
-		hdd_debug("RSSI for chain %d, vdev_id %d is %d",
-			  i, link_info->vdev_id, sinfo->chain_signal_avg[i]);
+			hdd_debug("RSSI for chain %d, vdev_id %d is %d",
+				  i, link_info->vdev_id,
+				  sinfo->chain_signal_avg[i]);
+		}
 
 		if (!rssi_stats_valid && sinfo->chain_signal_avg[i])
 			rssi_stats_valid = true;

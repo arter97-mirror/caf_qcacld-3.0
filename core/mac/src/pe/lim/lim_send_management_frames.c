@@ -4466,10 +4466,10 @@ alloc_packet:
 		qdf_mem_free(mlo_ie_buf);
 	}
 
-	pe_nofl_info("Auth TX: vdev %d seq %d seq num %d status %d WEP %d to " QDF_MAC_ADDR_FMT,
-		     vdev_id, auth_frame->authTransactionSeqNumber,
-		     mac_ctx->mgmtSeqNum, auth_frame->authStatusCode,
-		     mac_hdr->fc.wep, QDF_MAC_ADDR_REF(mac_hdr->da));
+	pe_nofl_rl_info("Auth TX: vdev %d seq %d seq num %d status %d WEP %d to " QDF_MAC_ADDR_FMT,
+			vdev_id, auth_frame->authTransactionSeqNumber,
+			mac_ctx->mgmtSeqNum, auth_frame->authStatusCode,
+			mac_hdr->fc.wep, QDF_MAC_ADDR_REF(mac_hdr->da));
 
 	if ((session->ftPEContext.pFTPreAuthReq) &&
 	    (!wlan_reg_is_24ghz_ch_freq(

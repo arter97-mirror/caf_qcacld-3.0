@@ -201,6 +201,11 @@ static inline int pld_ipci_get_thermal_state(struct device *dev,
 	return 0;
 }
 
+static inline bool pld_ipci_ce_cmn_cfg_supported(struct device *dev)
+{
+	return false;
+}
+
 static inline int pld_ipci_exit_power_save(struct device *dev)
 {
 	return 0;
@@ -521,6 +526,18 @@ static inline int pld_ipci_get_thermal_state(struct device *dev,
 {
 	return icnss_get_curr_therm_cdev_state(dev, thermal_state, mon_id);
 }
+
+#ifdef CE_CMN_REG_CFG_QMI
+static inline bool pld_ipci_ce_cmn_cfg_supported(struct device *dev)
+{
+	return icnss_get_fw_cap(dev, ICNSS_FW_CAP_CE_CMN_CFG_SUPPORT);
+}
+#else
+static inline bool pld_ipci_ce_cmn_cfg_supported(struct device *dev)
+{
+	return false;
+}
+#endif
 
 static inline int pld_ipci_exit_power_save(struct device *dev)
 {

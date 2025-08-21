@@ -2694,6 +2694,18 @@
 #define HIF_CPU_PERF_AFFINE_MASK (1)
 #endif
 
+#ifdef CONFIG_CE_CMN_REG_CFG_QMI
+#define CE_CMN_REG_CFG_QMI (1)
+#endif
+
+#ifdef CONFIG_RECORD_DP_CE_EVTS
+#define RECORD_DP_CE_EVTS
+#endif
+
+#ifdef CONFIG_RECORD_DP_CE_EVTS
+#define RECORD_DP_CE_EVTS
+#endif
+
 #ifdef CONFIG_HIF_CPU_CLEAR_AFFINITY
 #define HIF_CPU_CLEAR_AFFINITY (1)
 #endif
