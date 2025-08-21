@@ -899,6 +899,21 @@ bool pld_is_direct_link_supported(struct device *dev)
 	return ret;
 }
 
+bool pld_ce_cmn_cfg_supported(struct device *dev)
+{
+	bool ret = false;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_ce_cmn_cfg_supported(dev);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
 bool pld_audio_is_direct_link_supported(struct device *dev)
 {
 	bool ret = false;

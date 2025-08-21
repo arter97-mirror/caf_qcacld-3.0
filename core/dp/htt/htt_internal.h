@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011, 2014-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -574,11 +574,12 @@ int htt_htc_attach(struct htt_pdev_t *pdev, uint16_t service_id);
 void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt);
 #ifdef WLAN_FEATURE_FASTPATH
 void htt_t2h_msg_handler_fast(void *htt_pdev, qdf_nbuf_t *cmpl_msdus,
-			      uint32_t num_cmpls);
+			      uint32_t num_cmpls, unsigned int ce_id);
 #else
 static inline void htt_t2h_msg_handler_fast(void *htt_pdev,
 					   qdf_nbuf_t *cmpl_msdus,
-					   uint32_t num_cmpls)
+					   uint32_t num_cmpls,
+					   unsigned int ce_id)
 {
 }
 #endif
