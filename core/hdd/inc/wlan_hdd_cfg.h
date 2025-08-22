@@ -529,4 +529,23 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
  */
 enum phy_ch_width
 hdd_convert_chwidth_to_phy_chwidth(enum eSirMacHTChannelWidth chwidth);
+
+#ifdef FORCE_WAKE
+/**
+ * hdd_set_hif_init_phase() - Enable/disable the
+ * init_phase flag
+ * @hif_ctx: hif opaque handle
+ * @init_phase: init phase flag
+ *
+ * Return: None
+ */
+void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
+			    bool init_phase);
+#else
+static inline
+void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
+			    bool init_phase)
+{
+}
+#endif /* FORCE_WAKE */
 #endif /* end #if !defined(HDD_CONFIG_H__) */
