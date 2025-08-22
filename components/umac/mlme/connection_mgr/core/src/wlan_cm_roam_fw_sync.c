@@ -110,20 +110,15 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (cm_is_vdev_disconnecting(vdev) ||
-	    mlo_is_any_link_disconnecting(vdev)) {
-		/*
-		 * If the VDEV is disconnecting, then:
-		 * - If the disconnect SER is active, then RSO STOP would have
-		 *   already been sent from disconnect context.
-		 * - If the ROAM SER is active, then disconnect context would
-		 *   send the RSO STOP once activated.
-		 *
-		 * Therefore, do not send RSO STOP from roam context and let
-		 * the disconnect context handle the cleanup gracefully.
-		 */
+	if ((cm_is_vdev_disconnecting(vdev) ||
+	    mlo_is_any_link_disconnecting(vdev)) &&
+	    !(MLME_IS_ROAM_STATE_STOPPED(psoc, vdev_id))) {
 		mlme_err("Roam sync for vdev %d is not handled, since vdev is disconnecting",
 			 vdev_id);
+		wlan_cm_roam_state_change(wlan_vdev_get_pdev(vdev),
+					  vdev_id,
+					  WLAN_ROAM_RSO_STOPPED,
+					  REASON_ROAM_SYNCH_FAILED);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 		return QDF_STATUS_E_INVAL;
 	}
