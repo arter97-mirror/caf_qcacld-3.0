@@ -34238,6 +34238,11 @@ wlan_hdd_cfg80211_get_channel_sap(struct wiphy *wiphy,
 	if (!vdev)
 		return -EINVAL;
 
+	if (ucfg_mlme_is_chan_switch_in_progress(vdev)) {
+		wlan_key_put_link_vdev(vdev, WLAN_OSIF_ID);
+		return -EBUSY;
+	}
+
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	chan_freq = des_chan->ch_freq;
 	chandef->center_freq1 = des_chan->ch_cfreq1;
