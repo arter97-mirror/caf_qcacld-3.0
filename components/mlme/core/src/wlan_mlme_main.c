@@ -4773,6 +4773,8 @@ void wlan_vdev_set_dot11mode(struct wlan_mlme_cfg *mac_mlme_cfg,
 	}
 
 	vdev_dot11_mode = QDF_GET_BITS(mac_dot11_mode, dot11_mode_indx, 4);
+	vdev_mlme->proto.vdev_dot11_mode = vdev_dot11_mode;
+
 	if ((device_mode != QDF_NAN_DISC_MODE && device_mode != QDF_NDI_MODE) &&
 	    (vdev_dot11_mode == MLME_VDEV_DOT11_MODE_AUTO ||
 	     vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11BE)) {
