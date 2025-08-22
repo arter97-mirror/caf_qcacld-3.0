@@ -2966,6 +2966,10 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 				return;
 
 			algo = *(uint16_t *)frm_body;
+
+			if (mac_hdr->i_fc[1] & IEEE80211_FC1_WEP)
+				algo = eSIR_SHARED_KEY;
+
 			seq = *(uint16_t *)(frm_body + SAE_AUTH_SEQ_NUM_OFFSET);
 			status =
 			*(uint16_t *)(frm_body + SAE_AUTH_STATUS_CODE_OFFSET);
