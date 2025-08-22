@@ -10739,6 +10739,18 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 						   link_info->vdev_id);
 	if (vdev)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+
+	/*
+	 * During SSR, the host performs SAP re-initialization and initializes AP mode.
+	 * For P2P-GO, the host signals the kernel to stop GO as part of SSR re-init,
+	 * but the ndo_stop for P2P-GO is processed only after re-init completes.
+	 * This can lead to a scenario where new SAP-related info in mac_ctx is cleaned up
+	 * if the old P2P-GO vdev ID matches the new vdev ID assigned to SAP during
+	 * AP mode deinitialization for P2P-GO. Hence deinit ap mode only for GO.
+	 */
+	if (mode == QDF_P2P_GO_MODE)
+		hdd_deinit_ap_mode(link_info);
+
 	hdd_vdev_destroy(link_info);
 	mutex_unlock(&hdd_ctx->sap_lock);
 }
@@ -11675,16 +11687,20 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held)
 		default:
 			break;
 		}
-		/*
-		 * Action frame registered in one adapter which will
-		 * applicable to all interfaces
-		 */
-		if (hdd_set_fw_params(adapter))
-			hdd_err("Failed to set adapter FW params after SSR!");
 
-		wlan_hdd_cfg80211_register_frames(adapter);
-		wlan_hdd_update_dbs_scan_and_fw_mode_config(adapter->deflink->vdev_id);
-		hdd_create_adapter_sysfs_files(adapter);
+		if (adapter->device_mode != QDF_P2P_GO_MODE) {
+			/*
+			 * Action frame registered in one adapter which will
+			 * applicable to all interfaces
+			 */
+			if (hdd_set_fw_params(adapter))
+				hdd_err("Failed to set adapter FW params after SSR!");
+
+			wlan_hdd_cfg80211_register_frames(adapter);
+			wlan_hdd_update_dbs_scan_and_fw_mode_config(
+						adapter->deflink->vdev_id);
+			hdd_create_adapter_sysfs_files(adapter);
+		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
