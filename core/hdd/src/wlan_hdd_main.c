@@ -258,6 +258,7 @@
 #include "wlan_hdd_tx_powerboost.h"
 #include "wifi_pos_pasn_api.h"
 #include "wlan_cp_stats_ucfg_api.h"
+#include "qdf_wakelock_debug.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -12772,6 +12773,8 @@ void hdd_wlan_exit(struct hdd_context *hdd_ctx)
 
 	unregister_netdevice_notifier(&hdd_netdev_notifier);
 
+	qdf_dbg_wake_lock_tracker_deinit();
+
 	qdf_dp_trace_deinit();
 
 	hdd_wlan_stop_modules(hdd_ctx, false);
@@ -12897,7 +12900,8 @@ struct hdd_adapter *hdd_get_first_valid_adapter(struct hdd_context *hdd_ctx)
 /* wake lock APIs for HDD */
 void hdd_prevent_suspend(uint32_t reason)
 {
-	qdf_wake_lock_acquire(&wlan_wake_lock, reason);
+	qdf_wake_lock_acquire(&wlan_wake_lock, reason,
+			      QDF_WAKE_TIME_DEFINED);
 }
 
 void hdd_allow_suspend(uint32_t reason)
@@ -21534,6 +21538,7 @@ static QDF_STATUS hdd_qdf_init(void)
 	qdf_delayed_work_feature_init();
 	qdf_periodic_work_feature_init();
 	qdf_wake_lock_feature_init();
+	qdf_dbg_wake_lock_tracker_init();
 	qdf_mc_timer_manager_init();
 	qdf_event_list_init();
 
@@ -21569,6 +21574,7 @@ talloc_deinit:
 event_deinit:
 	qdf_event_list_destroy();
 	qdf_mc_timer_manager_exit();
+	qdf_dbg_wake_lock_tracker_deinit();
 	qdf_wake_lock_feature_deinit();
 	qdf_periodic_work_feature_deinit();
 	qdf_delayed_work_feature_deinit();
@@ -21595,6 +21601,7 @@ static void hdd_qdf_deinit(void)
 	qdf_talloc_feature_deinit();
 	qdf_event_list_destroy();
 	qdf_mc_timer_manager_exit();
+	qdf_dbg_wake_lock_tracker_deinit();
 	qdf_wake_lock_feature_deinit();
 	qdf_periodic_work_feature_deinit();
 	qdf_delayed_work_feature_deinit();
@@ -21846,7 +21853,8 @@ static int __hdd_driver_mode_change(struct hdd_context *hdd_ctx,
 
 		hdd_info("Acquire wakelock for monitor mode");
 		qdf_wake_lock_acquire(&hdd_ctx->monitor_mode_wakelock,
-				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE,
+				      QDF_WAKE_TIME_UNDEFINED);
 	}
 
 	/* con_mode is a global module parameter */

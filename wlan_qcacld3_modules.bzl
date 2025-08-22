@@ -2504,6 +2504,11 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_haps.c",
         ],
     },
+    "CONFIG_QDF_WAKELOCK_DEBUG": {
+        True: [
+            "cmn/qdf/linux/src/qdf_wakelock_debug.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):

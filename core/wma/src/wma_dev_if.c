@@ -6243,7 +6243,8 @@ static void wma_sap_d3_wow_client_connect(tp_wma_handle wma)
 	if (num_clients == SAP_D3_WOW_MAX_CLIENT_HOLD_WAKE_LOCK) {
 		wmi_info("max clients connected acquire sap d3 wow wake lock");
 		qdf_wake_lock_acquire(&wma->sap_d3_wow_wake_lock,
-				      WIFI_POWER_EVENT_WAKELOCK_SAP_D3_WOW);
+				      WIFI_POWER_EVENT_WAKELOCK_SAP_D3_WOW,
+				      QDF_WAKE_TIME_UNDEFINED);
 	}
 }
 
@@ -6269,7 +6270,8 @@ static void wma_go_d3_wow_client_connect(tp_wma_handle wma)
 	if (num_clients == SAP_D3_WOW_MAX_CLIENT_HOLD_WAKE_LOCK) {
 		wmi_info("max clients connected acquire go d3 wow wake lock");
 		qdf_wake_lock_acquire(&wma->go_d3_wow_wake_lock,
-				      WIFI_POWER_EVENT_WAKELOCK_GO_D3_WOW);
+				      WIFI_POWER_EVENT_WAKELOCK_GO_D3_WOW,
+				      QDF_WAKE_TIME_UNDEFINED);
 	}
 }
 

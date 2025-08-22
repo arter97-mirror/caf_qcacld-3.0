@@ -757,7 +757,8 @@ static void tdls_prevent_suspend(struct tdls_soc_priv_obj *tdls_soc)
 		return;
 
 	qdf_wake_lock_acquire(&tdls_soc->wake_lock,
-			      WIFI_POWER_EVENT_WAKELOCK_TDLS);
+			      WIFI_POWER_EVENT_WAKELOCK_TDLS,
+			      QDF_WAKE_TIME_UNDEFINED);
 	qdf_runtime_pm_prevent_suspend(&tdls_soc->runtime_lock);
 	tdls_soc->is_prevent_suspend = true;
 	tdls_debug("Acquire WIFI_POWER_EVENT_WAKELOCK_TDLS");

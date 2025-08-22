@@ -8,6 +8,10 @@ config QCA_CLD_WLAN
 
 if QCA_CLD_WLAN != n
 
+config QDF_WAKELOCK_DEBUG
+	bool "Enable QDF wake lock debug infra"
+	default n
+
 config 160MHZ_SUPPORT
 	bool "Enable 160MHZ_SUPPORT"
 	default n

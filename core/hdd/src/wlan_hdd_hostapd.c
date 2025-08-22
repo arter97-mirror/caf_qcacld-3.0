@@ -494,7 +494,8 @@ static void hdd_hostapd_channel_prevent_suspend(struct hdd_adapter *adapter,
 		hdd_err("DFS: preventing suspend (chan_freq: %d)", chan_freq);
 		qdf_runtime_pm_prevent_suspend(&hdd_ctx->runtime_context.dfs);
 		qdf_wake_lock_acquire(&hdd_ctx->sap_dfs_wakelock,
-				      WIFI_POWER_EVENT_WAKELOCK_DFS);
+				      WIFI_POWER_EVENT_WAKELOCK_DFS,
+				      QDF_WAKE_TIME_UNDEFINED);
 	}
 
 	sap_ctx->is_dfs_wakelock_held = true;

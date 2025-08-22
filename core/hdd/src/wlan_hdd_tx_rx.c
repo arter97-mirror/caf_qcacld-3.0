@@ -1626,9 +1626,9 @@ int hdd_set_mon_rx_cb(struct net_device *dev)
 	    (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
 	     ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))) {
 		hdd_info("Acquire wakelock for STA + monitor mode");
-
 		qdf_wake_lock_acquire(&hdd_ctx->monitor_mode_wakelock,
-				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE);
+				      WIFI_POWER_EVENT_WAKELOCK_MONITOR_MODE,
+				      QDF_WAKE_TIME_UNDEFINED);
 		hdd_lpc_disable_powersave(hdd_ctx);
 		qdf_runtime_pm_prevent_suspend(
 			&hdd_ctx->runtime_context.monitor_mode);
