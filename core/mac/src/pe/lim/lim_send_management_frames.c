@@ -6090,6 +6090,7 @@ lim_ecsa_confirm_tx_complete_cnf(void *context,
  * @new_op_class: new op class
  * @new_channel: new channel to switch
  * @count: channel switch count
+ * @new_channel_freq: new channel frequency
  *
  * This function is called to send ECSA frame.
  *
@@ -6099,7 +6100,8 @@ lim_ecsa_confirm_tx_complete_cnf(void *context,
 QDF_STATUS
 lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 		tSirMacAddr peer, uint8_t mode, uint8_t new_op_class,
-		uint8_t new_channel, uint8_t count, struct pe_session *session_entry)
+		uint8_t new_channel, uint8_t count,
+		struct pe_session *session_entry, uint16_t new_channel_freq)
 {
 	tDot11fext_channel_switch_action_frame frm;
 	uint8_t                  *frame;
@@ -6212,12 +6214,12 @@ lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	    session_entry->opmode == QDF_P2P_GO_MODE)
 		txFlag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
 
-	pe_debug("ECSA frame to :"QDF_MAC_ADDR_FMT" count %d mode %d chan %d op class %d",
+	pe_debug("ECSA frame to :"QDF_MAC_ADDR_FMT" count %d mode %d chan %d freq %d op class %d",
 		 QDF_MAC_ADDR_REF(mac_hdr->da),
 		 frm.ext_chan_switch_ann_action.switch_count,
 		 frm.ext_chan_switch_ann_action.switch_mode,
 		 frm.ext_chan_switch_ann_action.new_channel,
-		 frm.ext_chan_switch_ann_action.op_class);
+		 new_channel_freq, frm.ext_chan_switch_ann_action.op_class);
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			session_entry->peSessionId, mac_hdr->fc.subType));

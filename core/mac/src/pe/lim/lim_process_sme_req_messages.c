@@ -11058,14 +11058,15 @@ void send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 			lim_send_extended_chan_switch_action_frame(
 					mac_ctx, psta->staAddr,
 					switch_mode, op_class, new_channel,
-					ch_switch->switchCount, session_entry);
+					ch_switch->switchCount, session_entry,
+					new_channel_freq);
 		}
 	} else if (LIM_IS_STA_ROLE(session_entry)) {
 		lim_send_extended_chan_switch_action_frame(mac_ctx,
 					session_entry->bssId,
 					switch_mode, op_class, new_channel,
 					ch_switch->switchCount,
-					session_entry);
+					session_entry, new_channel_freq);
 	}
 
 }
@@ -11103,7 +11104,7 @@ void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
 				lim_send_extended_chan_switch_action_frame
 					(mac_ctx, psta->staAddr, switch_mode,
 					 op_class, new_channel, switch_count,
-					 session_entry);
+					 session_entry, new_channel_freq);
 			else
 				lim_send_channel_switch_mgmt_frame
 					(mac_ctx, psta->staAddr, switch_mode,
@@ -11113,7 +11114,8 @@ void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
 	} else if (LIM_IS_STA_ROLE(session_entry)) {
 		lim_send_extended_chan_switch_action_frame
 			(mac_ctx, session_entry->bssId, switch_mode, op_class,
-			 new_channel, switch_count, session_entry);
+			 new_channel, switch_count, session_entry,
+			 new_channel_freq);
 	}
 }
 

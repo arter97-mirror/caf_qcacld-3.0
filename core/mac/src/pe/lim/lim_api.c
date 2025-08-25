@@ -615,7 +615,8 @@ QDF_STATUS lim_ll_sap_send_ecsa_action_frame(struct wlan_objmgr_vdev *vdev,
 	lim_send_extended_chan_switch_action_frame(
 			mac_ctx, macaddr,
 			switch_mode, op_class, new_channel,
-			switch_count, session_entry);
+			switch_count, session_entry,
+			new_channel_freq);
 
 	return QDF_STATUS_SUCCESS;
 }

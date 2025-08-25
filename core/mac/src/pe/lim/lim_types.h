@@ -1000,7 +1000,9 @@ QDF_STATUS lim_send_channel_switch_mgmt_frame(struct mac_context *, tSirMacAddr,
 
 QDF_STATUS lim_send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 	tSirMacAddr peer, uint8_t mode, uint8_t new_op_class,
-	uint8_t new_channel, uint8_t count, struct pe_session *session_entry);
+	uint8_t new_channel, uint8_t count, struct pe_session *session_entry,
+	uint16_t new_channel_freq);
+
 QDF_STATUS lim_p2p_oper_chan_change_confirm_action_frame(
 	struct mac_context *mac_ctx, tSirMacAddr peer,
 	struct pe_session *session_entry);
