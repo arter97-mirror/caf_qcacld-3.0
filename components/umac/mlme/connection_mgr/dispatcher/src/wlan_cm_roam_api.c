@@ -166,6 +166,8 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	if (!is_update) {
 		assoc_chan_info->assoc_ch_width = CH_WIDTH_INVALID;
 		return;
+	} else {
+		wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
 	}
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
