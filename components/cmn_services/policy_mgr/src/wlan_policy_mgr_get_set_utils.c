@@ -4805,6 +4805,7 @@ policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
 {
 	union conc_ext_flag conc_ext_flags;
 	bool is_dynamic_inactive = false;
+	qdf_freq_t ll_sap_freq, link_freq;
 
 	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
 		return false;
@@ -4823,6 +4824,13 @@ policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
 	if (peer_assoc && is_dynamic_inactive)
 		return false;
 
+	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
+	link_freq = wlan_get_operation_chan_freq(vdev);
+	if (ll_sap_freq && ll_sap_freq == link_freq) {
+		policy_mgr_debug("link vdev %d is scc with ll sap freq %d",
+				 wlan_vdev_get_id(vdev), ll_sap_freq);
+		return true;
+	}
 	conc_ext_flags.value = policy_mgr_get_conc_ext_flags(vdev, false);
 	/*
 	 * For non-assoc link vdev set link as disabled if concurrency is
@@ -6831,7 +6839,9 @@ policy_mgr_get_legacy_conn_info(struct wlan_objmgr_psoc *psoc,
 		    pm_conc_connection_list[conn_index].mode !=
 							PM_P2P_CLIENT_MODE &&
 		    pm_conc_connection_list[conn_index].mode !=
-							PM_P2P_GO_MODE) {
+							PM_P2P_GO_MODE &&
+		    pm_conc_connection_list[conn_index].mode !=
+							PM_LL_LT_SAP_MODE) {
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 			continue;
 		}
@@ -6856,6 +6866,9 @@ policy_mgr_get_legacy_conn_info(struct wlan_objmgr_psoc *psoc,
 			has_priority[j] = PRIORITY_P2P;
 		else if (pm_conc_connection_list[conn_index].mode ==
 							PM_SAP_MODE)
+			has_priority[j] = PRIORITY_SAP;
+		else if (pm_conc_connection_list[conn_index].mode ==
+							PM_LL_LT_SAP_MODE)
 			has_priority[j] = PRIORITY_SAP;
 		else
 			has_priority[j] = PRIORITY_OTHER;
