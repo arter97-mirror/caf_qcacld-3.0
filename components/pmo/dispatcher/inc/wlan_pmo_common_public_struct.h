@@ -56,6 +56,7 @@
 #define IGMP_QUERY_ADDRESS 0x10000e0
 
 #define WOW_LARGE_RX_RTPM_DELAY 1200
+#define WOW_TBTT_NACK_RETRY_RTPM_DELAY 44
 
 /**
  * enum pmo_vdev_param_id: tell vdev param id
