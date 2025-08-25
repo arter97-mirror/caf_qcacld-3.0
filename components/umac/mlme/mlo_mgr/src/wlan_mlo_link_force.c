@@ -3212,6 +3212,49 @@ ml_nlink_handle_legacy_sap_intf(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ml_nlink_handle_ll_lt_sap_intf() - Check force inactive needed
+ * with LL_LT_SAP
+ * @psoc: PSOC object information
+ * @vdev: vdev object
+ * @force_cmd: force command to be returned
+ * @ll_sap_freq: LL_LT_SAP channel frequency
+ *
+ * If LL_LT_SAP and MLO STA non-assoc link on same frequency,
+ * non-assoc link have to be force inactive with num 1.
+ *
+ * Return: void
+ */
+static void
+ml_nlink_handle_ll_lt_sap_intf(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_objmgr_vdev *vdev,
+			       struct ml_link_force_state *force_cmd,
+			       qdf_freq_t ll_sap_freq)
+{
+	uint8_t ml_num_link = 0;
+	uint32_t ml_link_bitmap = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t i = 0;
+
+	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
+			       QDF_ARRAY_SIZE(ml_linkid_lst),
+			       ml_link_info, ml_freq_lst, ml_vdev_lst,
+			       ml_linkid_lst, &ml_num_link,
+			       &ml_link_bitmap);
+
+	if (ml_num_link < 2)
+		return;
+
+	for (i = 0; i < ml_num_link; i++) {
+		if (ll_sap_freq && ll_sap_freq == ml_freq_lst[i])
+			force_cmd->force_inactive_bitmap |=
+							1 << ml_linkid_lst[i];
+	}
+}
+
+/**
  * ml_nlink_handle_legacy_p2p_intf() - Check force inactive needed
  * with p2p
  * @psoc: PSOC object information
@@ -4285,6 +4328,10 @@ ml_nlink_handle_legacy_intf(struct wlan_objmgr_psoc *psoc,
 				freq_lst[0]);
 			break;
 		case PM_NAN_DISC_MODE:
+			break;
+		case PM_LL_LT_SAP_MODE:
+			ml_nlink_handle_ll_lt_sap_intf(
+				psoc, vdev, force_cmd, freq_lst[0]);
 			break;
 		default:
 			/* unexpected legacy connection count */
