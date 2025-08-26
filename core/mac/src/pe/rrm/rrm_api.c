@@ -2561,7 +2561,8 @@ rrm_process_radio_measurement_request(struct mac_context *mac_ctx,
 
 reject:
 	if (reject) {
-		for (i = 0; i < rrm_req->num_MeasurementRequest; i++) {
+		for (i = 0; i < rrm_req->num_MeasurementRequest &&
+		     i < MAX_MEASUREMENT_REQUEST; i++) {
 			status =
 			    rrm_reject_req(&report, rrm_req, &num_report, i,
 					   rrm_req->MeasurementRequest[i].
@@ -2584,7 +2585,8 @@ reject:
 		     sizeof(uint8_t) * MAX_NUM_CHANNELS);
 	mac_ctx->rrm.rrmPEContext.beacon_rpt_chan_num = 0;
 
-	for (i = 0; i < rrm_req->num_MeasurementRequest; i++) {
+	for (i = 0; i < rrm_req->num_MeasurementRequest &&
+	     i < MAX_MEASUREMENT_REQUEST; i++) {
 		switch (rrm_req->MeasurementRequest[i].measurement_type) {
 		case SIR_MAC_RRM_CHANNEL_LOAD_TYPE:
 			/* Process channel load request */
