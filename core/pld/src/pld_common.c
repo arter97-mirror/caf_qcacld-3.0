@@ -2881,6 +2881,9 @@ int pld_register_tsf_sync_qtime(struct device *dev,
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
 	case PLD_BUS_TYPE_IPCI_FW_SIM:
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
+		return pld_pcie_fw_sim_register_tsf_sync_time(dev,
+							      handler,
+							      context);
 	case PLD_BUS_TYPE_SNOC:
 	case PLD_BUS_TYPE_IPCI:
 	case PLD_BUS_TYPE_SDIO:

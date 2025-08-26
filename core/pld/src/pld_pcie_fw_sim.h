@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -94,6 +94,14 @@ static inline int pld_pcie_fw_sim_request_irq(struct device *dev, int irq,
 					      unsigned long irqflags,
 					      const char *devname,
 					      void *dev_data)
+{
+	return 0;
+}
+
+static inline
+int pld_pcie_fw_sim_register_tsf_sync_time(struct device *dev,
+					   wlan_tsf_handler_t handler,
+					   void *context)
 {
 	return 0;
 }
@@ -204,6 +212,14 @@ static inline int pld_pcie_fw_sim_request_irq(struct device *dev, int irq,
 {
 	return cnss_fw_sim_request_irq(dev, irq, handler,
 				       irqflags, devname, dev_data);
+}
+
+static inline
+int pld_pcie_fw_sim_register_tsf_sync_time(struct device *dev,
+					   wlan_tsf_handler_t handler,
+					   void *context)
+{
+	return cnss_fw_sim_request_gpio_irq(dev, handler, context);
 }
 
 static inline int pld_pcie_fw_sim_read_config_word(struct device *dev,
