@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -739,6 +739,8 @@ wlan_dp_lb_update_cpu_mask(void *context, uint32_t cpu, bool cpu_up)
 		/* Enable this CPU only if its part of our preferred_mask */
 		qdf_cpumask_set_cpu(cpu, cur_cpu_mask);
 	} else {
+		if (!qdf_cpumask_test_cpu(cpu, preferred_mask))
+			return;
 		qdf_cpumask_clear_cpu(cpu, cur_cpu_mask);
 		if (qdf_cpumask_empty(cur_cpu_mask)) {
 			/*
