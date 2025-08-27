@@ -762,8 +762,8 @@ void wma_send_custom_dyn_ps_event(bool enable)
 
 	mon_report->type = enable ? ENABLE_DYN_POWERSAVE : DISABLE_DYN_POWERSAVE;
 	mon_report->payload_len = 0;
-	mon_report->qtime = qdf_get_log_timestamp_usecs() /
-			    USEC_PER_MSEC;
+	mon_report->qtime = qdf_do_div(qdf_get_log_timestamp_usecs(),
+				       USEC_PER_MSEC);
 
 	send_custom_packet_select(buf);
 	qdf_mem_free(buf);

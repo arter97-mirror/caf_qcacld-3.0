@@ -8540,8 +8540,8 @@ static void hdd_send_stats_cfm_event(void)
 
 	mon_report->type = STATS_CFM_EVENT;
 	mon_report->payload_len = sizeof(struct stats_cfm_event);
-	mon_report->qtime = qdf_get_log_timestamp_usecs()
-					     / USEC_PER_MSEC;
+	mon_report->qtime = qdf_do_div(qdf_get_log_timestamp_usecs(),
+				       USEC_PER_MSEC);
 
 	event->tx_pkts = g_custom_stats.tx_pkts;
 	event->tx_retrans_pkts = g_custom_stats.tx_retrans_pkts;
