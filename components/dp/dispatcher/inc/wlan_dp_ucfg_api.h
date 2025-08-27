@@ -346,6 +346,14 @@ QDF_STATUS ucfg_dp_rx_ol_init(struct wlan_objmgr_psoc *psoc,
 			      bool is_wifi3_0_target);
 
 /**
+ * ucfg_dp_get_def_link() - Get DP default link
+ * @vdev: vdev mapped to STA DP interface
+ *
+ * Return: dp default link vdev id
+ */
+uint8_t ucfg_dp_get_def_link(struct wlan_objmgr_vdev *vdev);
+
+/**
  * ucfg_dp_start_xmit() - Transmit packet on STA interface
  * @nbuf: n/w buffer to transmitted
  * @vdev: vdev mapped to STA DP interface

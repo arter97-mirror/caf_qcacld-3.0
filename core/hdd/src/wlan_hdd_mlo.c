@@ -280,6 +280,18 @@ static void hdd_mlo_update_vdev_active_flag(uint8_t vdev_id,
 	link_info->is_mlo_vdev_active = is_link_active;
 }
 
+/**
+ * hdd_get_def_dp_link_vdev - Get default dp link vdev id
+ * @vdev: vdev object
+ *
+ * Return: default dp link vdev id
+ */
+static uint8_t
+hdd_get_def_dp_link_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	return ucfg_dp_get_def_link(vdev);
+}
+
 static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_mgr_osif_update_bss_info = hdd_cm_save_connected_links_info,
 	.mlo_mgr_osif_update_mac_addr = hdd_link_switch_vdev_mac_addr_update,
@@ -293,6 +305,7 @@ static struct mlo_osif_ext_ops mlo_osif_ops = {
 					hdd_mlo_channel_switch_notify,
 	.mlo_mgr_osif_update_link_state_change =
 					hdd_mlo_update_link_state_change,
+	.mlo_mgr_osif_get_def_dp_link_vdev = hdd_get_def_dp_link_vdev,
 };
 
 QDF_STATUS hdd_mlo_mgr_register_osif_ops(void)

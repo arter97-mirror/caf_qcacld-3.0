@@ -1511,6 +1511,32 @@ QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 	return status;
 }
 
+uint8_t ucfg_dp_get_def_link(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link, *tx_dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err_rl("DP link not found");
+		return WLAN_INVALID_VDEV_ID;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (unlikely(!dp_intf)) {
+		dp_err_rl("DP dp_intf null");
+		return WLAN_INVALID_VDEV_ID;
+	}
+
+	tx_dp_link = dp_intf->def_link;
+	if (unlikely(!tx_dp_link)) {
+		dp_err_rl("DP tx_dp_link null");
+		return WLAN_INVALID_VDEV_ID;
+	}
+
+	return tx_dp_link->link_id;
+}
+
 QDF_STATUS ucfg_dp_rx_packet_cbk(struct wlan_objmgr_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	struct wlan_dp_intf *dp_intf;

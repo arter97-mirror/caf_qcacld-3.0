@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -614,29 +614,29 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context, qdf_nbuf_t buf,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
- * lim_get_assoc_link_vdev_id() - get vdev id
+ * lim_get_def_dp_link_vdev_id() - get vdev id
  * @session: pe session
  *
- * Since fw only uses assoc link vdev to transmit data packets,
+ * Since fw only uses primary (def) link vdev to transmit data packets,
  * it needs to fetch the right vdev id when transfer tdls management
  * frame for partner link.
  *
  * Return: vdev id
  */
-static uint8_t lim_get_assoc_link_vdev_id(struct pe_session *session)
+static uint8_t lim_get_def_dp_link_vdev_id(struct pe_session *session)
 {
-	struct wlan_objmgr_vdev *assoc_vdev;
+	uint8_t vdev_id;
 
 	if (wlan_vdev_mlme_is_mlo_vdev(session->vdev)) {
-		assoc_vdev = wlan_mlo_get_assoc_link_vdev(session->vdev);
-		if (assoc_vdev)
-			return wlan_vdev_get_id(assoc_vdev);
+		vdev_id = mlo_mgr_get_def_dp_link_vdev(session->vdev);
+		if (vdev_id != WLAN_INVALID_VDEV_ID)
+			return vdev_id;
 	}
 
 	return session->smeSessionId;
 }
 #else
-static uint8_t lim_get_assoc_link_vdev_id(struct pe_session *session)
+static uint8_t lim_get_def_dp_link_vdev_id(struct pe_session *session)
 {
 	return session->smeSessionId;
 }
@@ -831,7 +831,7 @@ static QDF_STATUS lim_send_tdls_dis_req_frame(struct mac_context *mac,
 		QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
-	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
+	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
 
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
 				      pe_session, QDF_STATUS_SUCCESS,
@@ -2295,7 +2295,7 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
 
-	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
+	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
 
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) frame,
 				      pe_session, QDF_STATUS_SUCCESS,
@@ -2512,7 +2512,7 @@ QDF_STATUS lim_send_tdls_teardown_frame(struct mac_context *mac,
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
 
-	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
+	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
 
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr)frame,
 				      pe_session, QDF_STATUS_SUCCESS,
@@ -2825,7 +2825,7 @@ lim_send_tdls_setup_rsp_frame(struct mac_context *mac,
 		 QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
-	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
+	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
 				      pe_session, QDF_STATUS_SUCCESS,
 				      QDF_STATUS_SUCCESS);
@@ -3092,7 +3092,7 @@ QDF_STATUS lim_send_tdls_link_setup_cnf_frame(struct mac_context *mac,
 	       QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
-	vdev_id = lim_get_assoc_link_vdev_id(pe_session);
+	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
 				      pe_session, QDF_STATUS_SUCCESS,
 				      QDF_STATUS_SUCCESS);
