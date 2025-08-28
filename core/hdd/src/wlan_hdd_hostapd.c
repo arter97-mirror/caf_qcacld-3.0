@@ -4647,6 +4647,14 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		}
 		sap_context->csa_reason = CSA_REASON_LL_LT_SAP_EVENT;
 		goto force_restart_chan;
+	} else if (ap_adapter->device_mode == QDF_SAP_MODE &&
+		   !link_info->session.ap.sap_config.acs_cfg.acs_mode &&
+		   sap_get_coex_fixed_chan_cap(psoc) &&
+		   !policy_mgr_is_safe_channel(psoc, *ch_freq)) {
+		hdd_debug("Avoid channel switch as it's allowed to operate on unsafe channel: %d",
+			  *ch_freq);
+		wlansap_context_put(sap_context);
+		return QDF_STATUS_E_FAILURE;
 	} else {
 		intf_ch_freq =
 			wlansap_get_chan_band_restrict(sap_context,

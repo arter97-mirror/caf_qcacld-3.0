@@ -1984,7 +1984,8 @@ bool policy_mgr_is_unsafe_freq_allowed(struct wlan_objmgr_psoc *psoc,
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE &&
 	    !(mlme_is_acs_sap(vdev) ||
-	      policy_mgr_restrict_sap_on_unsafe_chan(psoc))) {
+	      policy_mgr_restrict_sap_on_unsafe_chan(psoc) ||
+	      !sap_get_coex_fixed_chan_cap(psoc))) {
 		policy_mgr_debug("Fixed channel SAP freq %d is allowed",
 				 sap_freq);
 		allowed = true;
