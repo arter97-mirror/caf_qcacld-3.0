@@ -89,6 +89,11 @@ bool __ll_lt_sap_is_bs_req_valid(struct wlan_bearer_switch_request *bs_req,
 		return false;
 	}
 
+	if (bs_req->req_type == WLAN_BS_REQ_INVALID) {
+		ll_sap_err("Invalid request type %d", bs_req->req_type);
+		return false;
+	}
+
 	if (bs_req->source >= BEARER_SWITCH_REQ_MAX) {
 		ll_sap_nofl_err("Invalid source %d in BS_SM request",
 				bs_req->source);
