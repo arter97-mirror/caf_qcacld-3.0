@@ -10044,10 +10044,6 @@ int hdd_set_vdev_phy_mode(struct hdd_adapter *adapter,
 	uint8_t supported_band;
 	int ret;
 
-	if (hdd_cm_is_vdev_connected(link_info)) {
-		hdd_err("Station is connected, command is not supported");
-		return -EINVAL;
-	}
 	ret = hdd_vendor_mode_to_phymode(vendor_phy_mode, &csr_req_phymode);
 	if (ret < 0)
 		return ret;

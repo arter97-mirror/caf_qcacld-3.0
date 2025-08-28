@@ -63,6 +63,7 @@
 #include "wma_internal.h"
 #include "../../core/src/vdev_mgr_ops.h"
 #include "wlan_p2p_cfg_api.h"
+#include "wlan_mlo_mgr_sta.h"
 
 void lim_log_session_states(struct mac_context *mac);
 static void lim_process_normal_hdd_msg(struct mac_context *mac_ctx,
@@ -1273,6 +1274,28 @@ lim_is_mgmt_frame_loggable(uint8_t type, uint8_t subtype)
 }
 #endif
 
+/*
+ * In MLO roaming scenario when we try to initiate preauth to BSSID
+ * that already exists on the other vdev, then wrong vdev id is fetch
+ * resulting in preauth failure.
+ * So fetch the correct vdev in such scenario by looking up the vdev
+ * based on the DA address.
+ * After connecting using MLO (6+2), if the PHY mode is downgraded to Wi-Fi 5
+ * and self-roaming is triggered to a 2.4 GHz legacy link, the following issue
+ * occurs:
+ * Upon receiving the authentication response from the AP, the vdev0 MAC
+ * address remains the link address, while the authentication destination
+ * address is the MLD address. As a result, the system cannot locate the
+ * correct vdev0 using the MLD address. It then attempts to find the vdev
+ * by BSSID, but the 2.4 GHz BSSID is still associated with the vdev1 PE
+ * session. This leads to retrieving the wrong PE session, which is in an
+ * incorrect state. Consequently, the authentication response is dropped,
+ * authentication fails, roaming fails, and a disconnect occurs.
+ * To resolve this, when receiving an authentication response during
+ * roaming or connected state (in wow mode the ROAM_START indication
+ * won't be sent by the firmware, so vdev cm is connected),
+ * always use the associated vdev to handle authentication frames.
+ */
 static struct pe_session *
 lim_get_preauth_vdev_session(struct mac_context *mac,
 			     struct wlan_objmgr_vdev *vdev,
@@ -1281,18 +1304,21 @@ lim_get_preauth_vdev_session(struct mac_context *mac,
 	struct wlan_objmgr_vdev *preauth_vdev;
 	struct pe_session *pe_session = NULL;
 	uint8_t pdev_id;
+	struct wlan_objmgr_vdev *assoc_vdev;
+	bool is_vdev_release_ref_needed = false;
 
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(mac->pdev);
-	/*
-	 * In MLO roaming scenario when we try to initiate preauth to BSSID
-	 * that already exists on the other vdev, then wrong vdev id is fetch
-	 * resulting in preauth failure.
-	 * So fetch the correct vdev in such scenario by looking up the vdev
-	 * based on the DA address.
-	 */
-	preauth_vdev = wlan_objmgr_get_vdev_by_macaddr_from_psoc(
+
+	assoc_vdev = wlan_mlo_get_assoc_link_vdev(vdev);
+	if (wlan_cm_is_vdev_active(assoc_vdev)) {
+		preauth_vdev = assoc_vdev;
+	} else {
+		preauth_vdev = wlan_objmgr_get_vdev_by_macaddr_from_psoc(
 					mac->psoc, pdev_id,
 					hdr->da, WLAN_LEGACY_MAC_ID);
+		if (preauth_vdev)
+			is_vdev_release_ref_needed = true;
+	}
 	if (!preauth_vdev) {
 		pe_err("not able to find preauth vdev by mac " QDF_MAC_ADDR_FMT,
 		       QDF_MAC_ADDR_REF(hdr->da));
@@ -1308,7 +1334,8 @@ lim_get_preauth_vdev_session(struct mac_context *mac,
 			 wlan_vdev_get_id(preauth_vdev));
 	}
 
-	wlan_objmgr_vdev_release_ref(preauth_vdev, WLAN_LEGACY_MAC_ID);
+	if (is_vdev_release_ref_needed)
+		wlan_objmgr_vdev_release_ref(preauth_vdev, WLAN_LEGACY_MAC_ID);
 
 	return pe_session;
 }
