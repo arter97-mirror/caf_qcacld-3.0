@@ -1233,24 +1233,7 @@ static bool sap_process_liberal_scc_for_go(struct sap_context *sap_context)
 }
 #endif
 
-/**
- * sap_get_coex_fixed_chan_cap() - Wrapper to get coex fixed channel capability
- * MDM requires to start SAP on unsafe channel even through FW doesn't support
- * coex fixed channel for acs disabled case, and other platforms prefer to abort
- * the SAP. If acs disabled and allow SAP on unsafe channel, please define
- * WLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW.
- *
- * @psoc: pointer to psoc
- *
- * Return: true or false
- */
-#ifdef WLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW
-static bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
-{
-	return true;
-}
-#else
-static bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
+bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
 {
 	if (!psoc) {
 		sap_debug("null psoc");
@@ -1260,7 +1243,6 @@ static bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
 	return target_psoc_get_sap_coex_fixed_chan_cap(
 			wlan_psoc_get_tgt_if_handle(psoc));
 }
-#endif
 
 QDF_STATUS
 sap_validate_chan(struct sap_context *sap_context,
