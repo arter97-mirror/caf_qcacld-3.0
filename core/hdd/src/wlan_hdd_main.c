@@ -23432,6 +23432,10 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 						PACKET_CAPTURE_MODE_DISABLE)
 		wlan_hdd_del_p2p_interface(hdd_ctx);
 
+	if (ucfg_pkt_capture_get_full_rx_mgmt_frames(hdd_ctx->psoc) &&
+	    wlan_hdd_validate_vdev_id(sta_adapter->deflink->vdev_id))
+		return -EINVAL;
+
 	params.is_add_virtual_iface = 1;
 
 	mon_adapter = hdd_open_adapter(hdd_ctx, QDF_MONITOR_MODE, name,
