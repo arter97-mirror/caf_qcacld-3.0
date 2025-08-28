@@ -4311,9 +4311,9 @@ policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc)
 #endif
 
 /**
- * policy_mgr_is_sap_freq_allowed - Check if the channel is allowed for sap
+ * policy_mgr_is_unsafe_freq_allowed - Check if the unsafe channel is allowed
  * @psoc: PSOC object information
- * @opmode: Current op_mode, helps to check whether it's P2P_GO/SAP
+ * @vdev_id: vdev id
  * @sap_freq: channel frequency to be checked
  *
  * Check the factors as below to decide whether the channel is allowed or not:
@@ -4323,9 +4323,8 @@ policy_mgr_restrict_sap_on_unsafe_chan(struct wlan_objmgr_psoc *psoc)
  *
  * Return: true for allowed, else false
  */
-bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
-				    enum QDF_OPMODE opmode,
-				    uint32_t sap_freq);
+bool policy_mgr_is_unsafe_freq_allowed(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id, uint32_t sap_freq);
 
 #ifdef FEATURE_WLAN_SAP_COEX_CHECK_BW
 /**

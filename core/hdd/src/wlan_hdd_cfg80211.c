@@ -2655,8 +2655,10 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 		hdd_err("ACS channel select failed");
 		return -EINVAL;
 	}
-	if (sap_is_auto_channel_select(sap_ctx))
+	if (sap_is_auto_channel_select(sap_ctx)) {
 		sap_config->acs_cfg.acs_mode = true;
+		mlme_set_is_acs_sap(sap_ctx->vdev, true);
+	}
 
 	return 0;
 }
@@ -4474,6 +4476,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		hdd_err("get_external_acs_policy failed");
 
 	sap_config->acs_cfg.acs_mode = true;
+	mlme_set_is_acs_sap(link_info->vdev, true);
 
 	if (wlan_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev))
 		hdd_remove_6ghz_freq_from_acs_list(
