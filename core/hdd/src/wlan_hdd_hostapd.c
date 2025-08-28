@@ -8531,6 +8531,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	cds_flush_work(&link_info->sap_stop_bss_work);
 
 	ap_ctx->sap_config.acs_cfg.acs_mode = false;
+	mlme_set_is_acs_sap(link_info->vdev, false);
+
 	hdd_dcs_clear(adapter);
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
