@@ -362,7 +362,13 @@ enum hdd_dot11_mode {
 #ifndef REMOVE_PKT_LOG
 
 #ifdef FEATURE_PKTLOG
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+/* WIFI_EVENT_CUSTOM will trigger more ptklog
+    Disable by default. */
+#define CFG_ENABLE_PACKET_LOG_DEFAULT	0
+#else
 #define CFG_ENABLE_PACKET_LOG_DEFAULT	1
+#endif
 #else
 #define CFG_ENABLE_PACKET_LOG_DEFAULT	0
 #endif

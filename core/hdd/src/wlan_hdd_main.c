@@ -12146,9 +12146,13 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	 * Re-enable pktlog in SSR case, if pktlog is enabled in ini.
 	 */
 	if (cds_is_packet_log_enabled() ||
-	    (cds_is_driver_recovering() && hdd_ctx->is_pktlog_enabled))
+	    (cds_is_driver_recovering() && hdd_ctx->is_pktlog_enabled)) {
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+		hdd_pktlog_enable_disable(hdd_ctx, true, true, 0);
+#else
 		hdd_pktlog_enable_disable(hdd_ctx, true, 0, 0);
-
+#endif
+	}
 	hddtxlimit.txPower2g = ucfg_get_tx_power(hdd_ctx->psoc, BAND_2G);
 	hddtxlimit.txPower5g = ucfg_get_tx_power(hdd_ctx->psoc, BAND_5G);
 	status = sme_txpower_limit(mac_handle, &hddtxlimit);
