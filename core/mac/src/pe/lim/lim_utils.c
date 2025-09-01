@@ -7728,6 +7728,23 @@ void lim_copy_join_req_he_cap(struct pe_session *session)
 		session->he_config.chan_width_6 = 0;
 	}
 	lim_print_he_channel_widths(&session->he_config);
+
+	/*
+	 * 802.11 ax -2021 Table 9-322a Subfields of the HE
+	 * MAC Capabilities Information field
+	 * Minimum Fragment Size: Reserved if the Dynamic
+	 * Fragmentation Support subfield is 0.
+	 * Maximum Number Of Fragmented MSDUs/A-MSDUs
+	 * Exponent: Reserved if the Dynamic
+	 * Fragmentation Support subfield is 0.
+	 */
+	if (!session->he_config.fragmentation) {
+		pe_nofl_debug("Reset: max_num_frag_msdu_amsdu_exp %d, min_frag_size %d",
+			      session->he_config.max_num_frag_msdu_amsdu_exp,
+			      session->he_config.min_frag_size);
+		session->he_config.max_num_frag_msdu_amsdu_exp = 0;
+		session->he_config.min_frag_size = 0;
+	}
 }
 
 void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap)
