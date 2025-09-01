@@ -869,6 +869,22 @@ wlan_cm_roam_get_min_rssi_params(struct wlan_objmgr_psoc *psoc,
 	params->min_rssi_params[MIN_RSSI_2G_TO_5G_ROAM] =
 			mlme_obj->cfg.trig_min_rssi[MIN_RSSI_2G_TO_5G_ROAM];
 }
+
+void wlan_cm_set_reconnect_disallow_period(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct cm_roam_values_copy src_config = {};
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	src_config.uint_value = mlme_obj->cfg.lfr.reconnect_disallow_period;
+
+	wlan_cm_roam_cfg_set_value(psoc, vdev_id, RECONNECT_DISALLOW_PERIOD,
+				   &src_config);
+}
 #endif
 
 QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,

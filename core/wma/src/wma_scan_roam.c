@@ -3284,13 +3284,13 @@ void cm_update_phymode_on_roam(uint8_t vdev_id,
 					   &wma->interfaces[vdev_id]);
 	}
 }
+#endif
 
 enum wlan_phymode
 wlan_cm_fw_to_host_phymode(WMI_HOST_WLAN_PHY_MODE phymode)
 {
 	return wma_fw_to_host_phymode(phymode);
 }
-#endif
 
 QDF_STATUS
 wlan_update_peer_phy_mode(struct wlan_channel *des_chan,

@@ -3022,6 +3022,7 @@ static void mlme_init_roam_offload_cfg(struct wlan_objmgr_psoc *psoc,
 
 	lfr->idle_roam_band = cfg_get(psoc, CFG_LFR_IDLE_ROAM_BAND);
 	lfr->sta_roam_disable = cfg_get(psoc, CFG_STA_DISABLE_ROAM);
+	lfr->reconnect_disallow_period = DEFAULT_RECONNECT_DISALLOW_PERIOD;
 	mlme_init_sae_single_pmk_cfg(psoc, lfr);
 	qdf_mem_zero(&lfr->roam_rt_stats, sizeof(lfr->roam_rt_stats));
 }
@@ -3427,7 +3428,6 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	lfr->hs20_btm_offload_disable = cfg_get(psoc,
 						CFG_HS_20_BTM_OFFLOAD_DISABLE);
 	mlme_init_roam_periodic_scan_interval(psoc, lfr);
-	lfr->reconnect_disallow_period = DEFAULT_RECONNECT_DISALLOW_PERIOD;
 }
 
 static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,

@@ -963,10 +963,11 @@ target_if_cm_roam_scan_get_cckm_mode(struct wlan_objmgr_vdev *vdev,
 	return WMI_AUTH_CCKM;
 }
 
-static void
+static QDF_STATUS
 target_if_cm_roam_disconnect_params(wmi_unified_t wmi_handle, uint8_t command,
 				    struct wlan_roam_disconnect_params *req)
 {
+	return QDF_STATUS_E_NOSUPPORT;
 }
 
 static QDF_STATUS

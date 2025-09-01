@@ -111,9 +111,6 @@ wlan_roam_update_cfg(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  * Return: void
  */
 void wlan_cm_send_beacon_miss(uint8_t vdev_id, int32_t rssi);
-
-void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
-				    struct element_info *assoc_ie);
 #else
 static inline
 QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
@@ -151,11 +148,6 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
-
-static inline
-void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
-				    struct element_info *assoc_ie)
-{}
 #endif
 
 /**
@@ -1531,6 +1523,12 @@ bool wlan_cm_is_mbo_ap_without_pmf(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
 			     enum wlan_diag_btm_block_reason reason);
+
+void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
+				    struct element_info *assoc_ie);
+
+void wlan_cm_set_reconnect_disallow_period(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id);
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1825,6 +1823,16 @@ wlan_cm_roam_btm_block_event(uint8_t vdev_id, uint8_t token,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline
+void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
+				    struct element_info *assoc_ie)
+{}
+
+static inline
+void wlan_cm_set_reconnect_disallow_period(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id)
+{}
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)

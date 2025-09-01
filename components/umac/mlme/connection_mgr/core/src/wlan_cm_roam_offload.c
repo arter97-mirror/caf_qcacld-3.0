@@ -6415,10 +6415,8 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
 				   MIN_ROAM_SCORE_DELTA, &src_cfg);
 
-	src_cfg.uint_value =
-		mlme_obj->cfg.lfr.reconnect_disallow_period;
-	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
-				   RECONNECT_DISALLOW_PERIOD, &src_cfg);
+	wlan_cm_set_reconnect_disallow_period(psoc, vdev_id);
+
 	/*
 	 * Store the current PMK info of the AP
 	 * to the single pmk global cache if the BSS allows
