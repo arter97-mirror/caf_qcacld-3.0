@@ -2991,4 +2991,10 @@ config IPA_P2P_SUPPORT
 config WLAN_BU_DEBUG
 	bool "Enable WLAN DEBUG LOG BUFFER"
 	default n
+
+config MLO_SAP_LINK_REMOVAL
+	bool "Enable MLO SAP LINK REMOVAL"
+	depends on WLAN_FEATURE_MULTI_LINK_SAP
+	default n
+
 endif # QCA_CLD_WLAN
