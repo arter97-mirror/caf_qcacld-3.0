@@ -48,7 +48,7 @@
 struct twt_mc_cfg_params {
 	bool enable_twt;
 	uint8_t twt_responder;
-	bool twt_responder_orig;
+	uint8_t twt_responder_orig;
 	bool twt_requestor;
 	uint32_t twt_congestion_timeout;
 	bool bcast_requestor_enabled;
