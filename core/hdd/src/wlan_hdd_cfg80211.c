@@ -34487,6 +34487,7 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 						const u8 *peer,
 				       const struct cfg80211_bitrate_mask *mask)
 {
+	enum wlan_phymode phymode = WLAN_PHYMODE_AUTO;
 	enum nl80211_band band;
 	int errno;
 	struct hdd_adapter *adapter = netdev_priv(dev);
@@ -34515,6 +34516,9 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 		return errno;
 
 	vdev_id = adapter->deflink->vdev_id;
+	if (wlan_is_vdev_id_up(hdd_ctx->pdev, vdev_id))
+		phymode = ucfg_mlme_get_vdev_phy_mode(hdd_ctx->psoc,
+						      vdev_id);
 
 	for (band = NL80211_BAND_2GHZ; band <= NL80211_BAND_5GHZ; band++) {
 		/* Support configuring only one bitrate */
@@ -34560,7 +34564,9 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 			}
 		}
 
-		if (qdf_get_hweight32(mask->control[band].legacy) == 1) {
+		if (qdf_get_hweight32(mask->control[band].legacy) == 1 &&
+		    !IS_WLAN_PHYMODE_HE(phymode) &&
+		    !IS_WLAN_PHYMODE_EHT(phymode)) {
 			rate_index = (ffs(mask->control[band].legacy) - 1);
 			nss = 0;
 			if (band == NL80211_BAND_5GHZ)
@@ -34580,7 +34586,8 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 
 configure_fw:
 		if (bit_rate != -1) {
-			hdd_debug("wmi_vdev_param_fixed_rate val %d", bit_rate);
+			hdd_debug("wmi_vdev_param_fixed_rate val %d phymode %d",
+				  bit_rate, phymode);
 
 			errno = wma_cli_set_command(adapter->deflink->vdev_id,
 						    wmi_vdev_param_fixed_rate,
@@ -34589,6 +34596,8 @@ configure_fw:
 			if (errno)
 				hdd_err("Failed to set firmware, errno %d",
 					errno);
+		} else {
+			hdd_err("bit rate invalid, phymode %d", phymode);
 		}
 
 
