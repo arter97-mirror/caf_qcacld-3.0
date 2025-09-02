@@ -9044,20 +9044,30 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 		return;
 	}
 
-	if (!twt_res_svc_cap || !enable_twt || !twt_responder)
+	if (!twt_res_svc_cap || !enable_twt ||
+	    (!twt_responder && !twt_rsp_disable_svc))
 		ucfg_twt_cfg_set_responder(hdd_ctx->psoc, 0);
 
 	hdd_debug("cfg80211 TWT responder: %d, enable twt: %d, twt_res_cfg: %d",
 		  twt_responder, enable_twt, twt_res_cfg);
-	if (enable_twt && twt_responder && twt_res_cfg) {
+	if (enable_twt && twt_res_cfg &&
+	    (twt_responder || twt_rsp_disable_svc)) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
 		hdd_send_twt_responder_disable_cmd(hdd_ctx, reason, vdev_id);
 	}
 
-	osif_twt_send_responder_disable_per_vdev(hdd_ctx->psoc, vdev_id, mode,
-						 twt_res_cfg);
+	/* send the TWT responder per VDEV cmd only if SVC is advertised */
+	if (!twt_rsp_disable_svc)
+		return;
+
+	if (twt_responder)
+		osif_twt_send_responder_disable_per_vdev(hdd_ctx->psoc, vdev_id,
+							 mode, twt_res_cfg);
+	else
+		ucfg_twt_send_responder_disable_per_vdev(hdd_ctx->psoc,
+							 vdev_id);
 }
 
 static void
