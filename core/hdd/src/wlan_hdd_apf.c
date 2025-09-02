@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -616,6 +616,7 @@ __wlan_hdd_cfg80211_apf_offload(struct wiphy *wiphy,
 	struct nlattr *tb[APF_MAX + 1];
 	int ret_val = 0, apf_subcmd;
 	struct hdd_apf_context *context;
+	uint32_t apf_mode;
 
 	hdd_enter_dev(dev);
 
@@ -675,6 +676,11 @@ __wlan_hdd_cfg80211_apf_offload(struct wiphy *wiphy,
 						    adapter);
 		break;
 	case QCA_WLAN_GET_PACKET_FILTER:
+		apf_mode = ucfg_pmo_get_apf_mode(hdd_ctx->psoc);
+		ret_val = ucfg_pmo_set_apf_mode(hdd_ctx->psoc, apf_mode,
+						adapter->deflink->vdev_id);
+		if (QDF_IS_STATUS_ERROR(ret_val))
+			hdd_err("Failed to configure APF mode bitmap");
 		ret_val = hdd_get_apf_capabilities(hdd_ctx);
 		break;
 
