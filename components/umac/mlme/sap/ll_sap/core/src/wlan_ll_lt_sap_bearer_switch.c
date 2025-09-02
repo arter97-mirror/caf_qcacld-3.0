@@ -689,12 +689,33 @@ bs_wlan_request_timeout_cb(void *user_data)
 	struct bearer_switch_info *bs_ctx = user_data;
 	struct wlan_bearer_switch_request *bs_req = NULL;
 	QDF_STATUS status;
+	bool cu_greater_than_th;
+	uint8_t vdev_id = wlan_vdev_get_id(bs_ctx->vdev);
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t unused_cu;
 
-	ll_sap_debug("BS_SM bs_wlan_request_timer Timeout, vdev %d total ref count %d",
-		     wlan_vdev_get_id(bs_ctx->vdev),
-		     qdf_atomic_read(&bs_ctx->total_ref_count));
+	psoc = wlan_vdev_get_psoc(bs_ctx->vdev);
+	if (!psoc) {
+		ll_sap_err("vdev %d PSOC is NULL", vdev_id);
+		return;
+	}
 
-	if (qdf_atomic_read(&bs_ctx->total_ref_count)) {
+	unused_cu = ll_sap_get_cur_freq_unused_cu(psoc, vdev_id);
+
+	ll_sap_debug("vdev %d: BS_SM bs_wlan_request_timer Timeout, CU %d",
+		     vdev_id, unused_cu);
+
+	cu_greater_than_th =
+			wlan_ll_sap_is_cur_cu_greater_than_th(psoc, vdev_id);
+
+	/*
+	 * If some module has requested for non wlan or cu is greter than
+	 * threshold during the timer, avoid moving bearer to wlan.
+	 */
+	if (qdf_atomic_read(&bs_ctx->total_ref_count) || cu_greater_than_th) {
+		ll_sap_info("vdev %d: Flush wlan req, as nonwlan ref count is %d or cu is %d",
+			    vdev_id, qdf_atomic_read(&bs_ctx->total_ref_count),
+			    unused_cu);
 		/*
 		 * Remove switch to wlan request from the cache list if
 		 * it was cached
