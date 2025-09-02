@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2014, 2017-2019, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -192,4 +192,18 @@ hdd_disable_active_apf_mode(struct wlan_hdd_link_info *link_info)
 {
 }
 #endif
+
+/**
+ * hdd_handle_apf_mode_on_idle() - Handle APF mode on idle
+ * @hdd_ctx: Pointer to hdd context
+ * @link_info: Pointer to link info
+ * @idle_monitor: idle monitor value
+ *
+ * Handle APF mode based on vdev connection state when idle_monitor is 1
+ *
+ * Return: 0 on success else error value
+ */
+int hdd_handle_apf_mode_on_idle(struct hdd_context *hdd_ctx,
+				struct wlan_hdd_link_info *link_info,
+				uint8_t idle_monitor);
 #endif /* end #if !defined(WLAN_HDD_IOCTL_H) */

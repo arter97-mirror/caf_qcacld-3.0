@@ -93,6 +93,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "son_api.h"
 #include "wlan_hdd_tx_powerboost.h"
+#include "wlan_hdd_ioctl.h"
 
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
@@ -1150,6 +1151,7 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(net_dev);
 	struct hdd_context *hdd_ctx;
 	int errno;
+	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter_dev(net_dev);
 
@@ -1165,6 +1167,13 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
 		hdd_dhcp_v4_done_ind(hdd_ctx->mac_handle, adapter);
+
+		if (adapter->dhcp_config_setsuspend) {
+			link_info = hdd_get_link_info_by_vdev(hdd_ctx,
+						adapter->deflink->vdev_id);
+			hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, 1);
+			adapter->dhcp_config_setsuspend = false;
+		}
 
 		if (!ucfg_pmo_is_arp_offload_enabled(hdd_ctx->psoc)) {
 			hdd_debug("Offload not enabled");

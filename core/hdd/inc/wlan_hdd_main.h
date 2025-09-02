@@ -1468,6 +1468,7 @@ enum hdd_wlm_latency_level {
  *                    fetched
  * @wfd_mode: WFD mode for P2P interface
  * @enable_active_apf_mode: Enable active APF mode flag
+ * @dhcp_config_setsuspend: Enable when DHCP in progress and get setsuspend cmd
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1675,6 +1676,7 @@ struct hdd_adapter {
 	uint8_t wfd_mode;
 #endif
 	bool enable_active_apf_mode;
+	bool dhcp_config_setsuspend;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
