@@ -865,6 +865,11 @@ populate_dot11f_country(struct mac_context *mac,
 
 		if (wlan_reg_is_6ghz_chan_freq(cur_chan->center_freq) &&
 		    !six_gig_started) {
+			if (num_triplets > 80) {
+				pe_err("Triplets number exceed max size");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
+			}
 			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
 			buffer_triplets[num_triplets][1] = OP_CLASS_131;
 			num_triplets++;
@@ -884,6 +889,11 @@ populate_dot11f_country(struct mac_context *mac,
 		}
 
 		if (start && prev) {
+			if (num_triplets > 80) {
+				pe_err("Triplets number exceed max size");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
+			}
 			/* Save as entry */
 			buffer_triplets[num_triplets][0] = start->chan_num;
 			buffer_triplets[num_triplets][1] =
@@ -893,14 +903,17 @@ populate_dot11f_country(struct mac_context *mac,
 			cur_triplet_num_chans = 0;
 
 			num_triplets++;
-			if (num_triplets > 80) {
-				pe_err("Triplets number exceed max size");
-				status = QDF_STATUS_E_FAILURE;
-				goto out;
-			}
 		}
 
 		if ((chan_enum == NUM_CHANNELS - 1) && (six_gig_started)) {
+			/* Ensure space for 3 triplets (indices num_triplets,
+			 * num_triplets+1, num_triplets+2)
+			 */
+			if (num_triplets > 78) {
+				pe_err("Triplets number exceed max size for 3 entries");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
+			}
 			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
 			buffer_triplets[num_triplets][1] = OP_CLASS_132;
 			num_triplets++;
@@ -920,6 +933,11 @@ populate_dot11f_country(struct mac_context *mac,
 	}
 
 	if (start) {
+		if (num_triplets > 80) {
+			pe_err("Triplets number exceed max size");
+			status = QDF_STATUS_E_FAILURE;
+			goto out;
+		}
 		buffer_triplets[num_triplets][0] = start->chan_num;
 		buffer_triplets[num_triplets][1] = cur_triplet_num_chans + 1;
 		buffer_triplets[num_triplets][2] = start->tx_power;
