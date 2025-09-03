@@ -1674,7 +1674,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
 
 	wlan_hdd_ft_set_key_delay(vdev);
-	hdd_cm_update_rssi_snr_by_bssid(link_info);
 	hdd_cm_save_connect_status(link_info, rsp->status_code);
 
 	hdd_init_scan_reject_params(hdd_ctx);
@@ -1686,6 +1685,8 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_cm_rec_connect_info(rsp);
 
 	hdd_cm_save_connect_info(link_info, rsp);
+
+	hdd_cm_update_rssi_snr_by_bssid(link_info);
 
 	hdd_add_beacon_filter(hdd_ctx, link_info->vdev_id);
 
