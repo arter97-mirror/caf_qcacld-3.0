@@ -15,6 +15,10 @@ _target_chipset_map = {
         "qca6490",
         "qca6574au-3",
     ],
+    "sa510m.1g": [
+        "qca6574",
+        "qca6490",
+    ],
     "anorak": [
         "qca6490",
         "kiwi-v2",
@@ -2598,7 +2602,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     chipset_ipaths = _chipset_header_map[chipset]
     hw_ipaths = _hw_header_map[hw]
 
-    if target != "sa510m":
+    if target != "sa510m" and target != "sa510m.1g":
         deps = select({
             "//build/qcom_build_extensions:qtisocrepo_true": [
                 "//soc-repo:all_headers",
@@ -2626,6 +2630,8 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
             "//conditions:default": "//msm-kernel:{}".format(tv),
         })
+    elif target == "sa510m" or target == "sa510m.1g":
+        kernel_build = "//msm-kernel:{}".format(tv)
     else:
         kernel_build = select({
             "//build/qcom_build_extensions:qtisocrepo_true": "//soc-repo:{}_base_kernel".format(tv),
@@ -2697,7 +2703,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     ]
 
     cmd = 'touch "$@"\n'
-    if target != "sa510m":
+    if target != "sa510m" and target != "sa510m.1g":
         grep_path = "common"
     else:
         grep_path = "msm-kernel"
@@ -2784,7 +2790,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     if target == "sdxkova":
         out = "wlan.ko"
-    elif target == "sa510m":
+    elif target == "sa510m" or target == "sa510m.1g":
         out = "{}.ko".format(chipset)
     else:
         out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
@@ -2796,7 +2802,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
-    elif target != "sa510m":
+    elif target != "sa510m" and target != "sa510m.1g":
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
         ]
@@ -2804,7 +2810,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         deps += [
             "//wlan/platform:{}_cnss2".format(tv),
         ]
-    if target != "sa510m":
+    if target != "sa510m" and target != "sa510m.1g":
         deps = deps + [
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
@@ -2819,7 +2825,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
                 "//wlan/platform:wlan-platform-headers",
             ]
 
-    if target == "sa510m":
+    if target == "sa510m" or target == "sa510m.1g":
         deps = deps + [
             "//dataipa:include_headers",
             "//dataipa:{}_{}_ipam".format(target, variant),
