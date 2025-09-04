@@ -2058,7 +2058,7 @@ lim_get_bss_11be_mode_allowed(struct mac_context *mac_ctx,
 		wlan_scan_entry_by_bssid_and_security(mac_ctx->pdev,
 						      (struct qdf_mac_addr *)
 						       bss_desc->bssId,
-						       vdev_id);
+						       vdev_id, 0);
 
 	/*
 	 * If AP advertises multiple AKMs(WPA2 PSK + WPA3), allow connection
@@ -9529,9 +9529,18 @@ static void lim_process_set_vdev_ies_per_band(struct mac_context *mac_ctx,
 {
 	struct sir_set_vdev_ies_per_band *p_msg =
 				(struct sir_set_vdev_ies_per_band *)msg_buf;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!p_msg) {
 		pe_err("NULL p_msg");
+		return;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    p_msg->vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev) {
+		pe_err("vdev is NULL");
 		return;
 	}
 
@@ -9542,6 +9551,7 @@ static void lim_process_set_vdev_ies_per_band(struct mac_context *mac_ctx,
 				  p_msg->dot11_mode, p_msg->device_mode) !=
 	    QDF_STATUS_SUCCESS)
 		pe_err("Unable to send HT/VHT Cap to FW");
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 }
 
 /**

@@ -1145,6 +1145,7 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 	bool is_csa_needed;
 	qdf_freq_t chan_freq = 0;
 	struct sap_ch_switch_info *ch_switch_info;
+	struct if_mgr_event_data csa_complete_ev_data;
 
 	if (QDF_IS_STATUS_ERROR(wlansap_context_get(sap_ctx)))
 		return QDF_STATUS_E_FAILURE;
@@ -1311,9 +1312,10 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 	case eCSR_ROAM_DFS_CHAN_SW_NOTIFY:
 		break;
 	case eCSR_ROAM_SET_CHANNEL_RSP:
+		csa_complete_ev_data.data = &sap_ctx->csa_reason;
 		ucfg_if_mgr_deliver_event(sap_ctx->vdev,
 					  WLAN_IF_MGR_EV_AP_CSA_COMPLETE,
-					  NULL);
+					  &csa_complete_ev_data);
 		break;
 	case eCSR_ROAM_CAC_COMPLETE_IND:
 		break;
