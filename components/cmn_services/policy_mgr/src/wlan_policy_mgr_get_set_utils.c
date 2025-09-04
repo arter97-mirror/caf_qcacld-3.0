@@ -14121,7 +14121,8 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 		 * SAP can start on ap_index's home channel instead of
 		 * start failure.
 		 */
-		if (policy_mgr_get_connection_count(psoc) >= 3 && !found)
+		if (ap_index >= cc_count &&
+		    policy_mgr_get_connection_count(psoc) >= 3 && !found)
 			ap_index = 0;
 
 		if (ap_index >= cc_count)
