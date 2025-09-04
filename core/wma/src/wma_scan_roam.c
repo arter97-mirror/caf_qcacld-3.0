@@ -2734,9 +2734,11 @@ void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif,
 
 static void
 wma_handle_roam_reason_invoke_roam_fail(tp_wma_handle wma_handle,
-					uint8_t vdev_id, uint32_t notif_params)
+					uint8_t vdev_id,
+					uint32_t roam_invoke_fail_status)
 {
 	struct roam_offload_synch_ind *roam_synch_data;
+	bool is_disconnect_required = true;
 
 	roam_synch_data = qdf_mem_malloc(sizeof(*roam_synch_data));
 	if (!roam_synch_data)
@@ -2744,9 +2746,22 @@ wma_handle_roam_reason_invoke_roam_fail(tp_wma_handle wma_handle,
 
 	lim_sae_auth_cleanup_retry(wma_handle->mac_context, vdev_id);
 	roam_synch_data->roamed_vdev_id = vdev_id;
-	cm_fw_roam_invoke_fail(wma_handle->psoc, vdev_id);
+
+	if (roam_invoke_fail_status == WMI_ROAM_INVOKE_STATUS_SUSTAIN_CONN) {
+		/*
+		 * Retain the current connection for some roam invoke failures
+		 * like ML Self roaming to different links
+		 */
+		is_disconnect_required = false;
+		wma_debug("vdev:%d Roam invoke failed - Sustain connection",
+			  vdev_id);
+	}
+
+	cm_fw_roam_invoke_fail(wma_handle->psoc, vdev_id,
+			       is_disconnect_required);
+
 	wlan_cm_update_roam_states(wma_handle->psoc, vdev_id,
-				   notif_params,
+				   roam_invoke_fail_status,
 				   ROAM_INVOKE_FAIL_REASON);
 	qdf_mem_free(roam_synch_data);
 }

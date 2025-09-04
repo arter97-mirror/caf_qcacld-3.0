@@ -160,18 +160,20 @@ void cm_fw_ho_fail_req(struct wlan_objmgr_psoc *psoc,
  * cm_fw_roam_invoke_fail() - Post roam invoke fail to CM SM
  * @psoc: psoc pointer
  * @vdev_id: vdev id
+ * @is_disconnect_required: flag to indicate if disconnection needs to be
+ * initiated for the roam invoke failure.
  *
- * This function posts roam invoke fail event change to
- * connection manager state machine
+ * This function posts roam invoke fail event change to connection manager
+ * state machine
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
-				  uint8_t vdev_id);
+				  uint8_t vdev_id, bool is_disconnect_required);
 #else /*WLAN_FEATURE_ROAM_OFFLOAD */
 static inline
 QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
-				  uint8_t vdev_id)
+				  uint8_t vdev_id, bool is_disconnect_required)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

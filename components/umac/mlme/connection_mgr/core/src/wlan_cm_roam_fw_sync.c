@@ -1612,7 +1612,7 @@ cm_disconnect_roam_invoke_fail(struct wlan_objmgr_vdev *vdev,
 }
 
 QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
-				  uint8_t vdev_id)
+				  uint8_t vdev_id, bool is_disconnect_required)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
@@ -1643,7 +1643,8 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(status))
 		cm_remove_cmd(cm_ctx, &cm_id);
 
-	cm_disconnect_roam_invoke_fail(vdev, cm_id);
+	if (is_disconnect_required)
+		cm_disconnect_roam_invoke_fail(vdev, cm_id);
 error:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 	return status;
