@@ -3471,10 +3471,15 @@ static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
 	scoring_cfg->roam_score_delta = cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
 	scoring_cfg->apsd_enabled = (bool)cfg_default(CFG_APSD_ENABLED);
 
+	/* If the connection roaming INI setting is present, convert the
+	 * min_roam_score_delta value(which is in percentage) to actual
+	 * value before sending it to firmware.
+	 */
 	ucfg_mlme_get_connection_roaming_ini_present(psoc, &val);
 	if (val) {
 		scoring_cfg->min_roam_score_delta =
-			cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA) * 100;
+			(cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA) *
+			 (cfg_max(CFG_CAND_MIN_ROAM_SCORE_DELTA)/100));
 	} else {
 		scoring_cfg->min_roam_score_delta =
 			cfg_get(psoc, CFG_CAND_MIN_ROAM_SCORE_DELTA);
