@@ -1098,11 +1098,12 @@ void htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
  * @context: HTT context
  * @cmpl_msdus: netbuf completions
  * @num_cmpls: number of completions to be handled
+ * @ce_id: copy engine id
  *
  * Return: None
  */
 void htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
-			      uint32_t num_cmpls)
+			      uint32_t num_cmpls, unsigned int ce_id)
 {
 	struct htt_pdev_t *pdev = (struct htt_pdev_t *)context;
 	qdf_nbuf_t htt_t2h_msg;

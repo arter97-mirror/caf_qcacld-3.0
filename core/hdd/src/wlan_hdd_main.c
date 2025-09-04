@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -18304,6 +18304,9 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 		goto done;
 	}
 
+	cdp_display_stats(cds_get_context(QDF_MODULE_ID_SOC),
+			  CDP_TXRX_SOC_STATS,
+			  QDF_STATS_VERBOSITY_LEVEL_LOW);
 	hdd_destroy_sysfs_files();
 	hdd_debug("Closing CDS modules!");
 
