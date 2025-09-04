@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -141,7 +141,11 @@ struct dp_rx_thread {
 	struct dp_rx_tm_handle_cmn *rtm_handle_cmn;
 	qdf_napi_struct napi;
 	qdf_wait_queue_head_t wait_q;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+	qdf_dummy_netdev_t *netdev;
+#else
 	qdf_dummy_netdev_t netdev;
+#endif
 	qdf_netdev_t net_dev[WLAN_PDEV_MAX_VDEVS];
 };
 

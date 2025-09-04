@@ -1914,6 +1914,11 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 	curr_time_us = qdf_get_log_timestamp();
 	diff_us = qdf_log_timestamp_to_usecs(
 			curr_time_us - dp_ctx->bw_vote_time);
+	if (!diff_us) {
+		dp_err_rl("diff_us can't be 0 which will be used as divisor");
+		return;
+	}
+
 	dp_ctx->bw_vote_time = curr_time_us;
 
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {

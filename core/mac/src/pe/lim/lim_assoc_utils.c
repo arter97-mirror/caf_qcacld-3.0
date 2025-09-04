@@ -3763,6 +3763,29 @@ lim_limit_bw_for_iot_ap(struct mac_context *mac_ctx,
 	}
 }
 
+static void
+lim_sta_update_max_channel_width(struct pe_session *pe_session,
+				 tpSirAssocRsp pAssocRsp,
+				 struct bss_params *pAddBssParams)
+{
+	enum phy_ch_width max_ch_width;
+
+	if (lim_is_eht_connection_op_info_present(pe_session, pAssocRsp)) {
+		max_ch_width = CH_WIDTH_320MHZ;
+	} else if ((pe_session->vhtCapability && pAssocRsp->VHTCaps.present) ||
+		 (lim_is_session_he_capable(pe_session) &&
+		  pAssocRsp->he_cap.present)) {
+		max_ch_width = CH_WIDTH_160MHZ;
+	} else {
+		max_ch_width = CH_WIDTH_40MHZ;
+	}
+
+	if (pAddBssParams->ch_width > max_ch_width) {
+		pAddBssParams->ch_width = max_ch_width;
+		pAddBssParams->staContext.ch_width = max_ch_width;
+	}
+}
+
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp,
 				   tpSchBeaconStruct pBeaconStruct,
 				   struct bss_description *bssDescription,
@@ -3828,7 +3851,9 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		 * pe_session->ch_width
 		 */
 		if (lim_is_eht_connection_op_info_present(pe_session,
-							  pAssocRsp)) {
+							  pAssocRsp) ||
+		    (chan_width_support &&
+		    pAssocRsp->VHTCaps.present)) {
 			pAddBssParams->ch_width =
 					pe_session->ch_width;
 			pAddBssParams->staContext.ch_width =
@@ -3836,8 +3861,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		} else if ((chan_width_support &&
 		     ((pAssocRsp->HTCaps.supportedChannelWidthSet) ||
 		      (pBeaconStruct->HTCaps.present &&
-		       pBeaconStruct->HTCaps.supportedChannelWidthSet))) &&
-		       !pAssocRsp->VHTCaps.present) {
+		       pBeaconStruct->HTCaps.supportedChannelWidthSet)))) {
 			pAddBssParams->ch_width = CH_WIDTH_40MHZ;
 			pAddBssParams->staContext.ch_width = CH_WIDTH_40MHZ;
 		} else {
@@ -4212,6 +4236,10 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		pAddBssParams->ch_width = CH_WIDTH_10MHZ;
 		pAddBssParams->staContext.ch_width = CH_WIDTH_10MHZ;
 	}
+
+	/* check and update max channel width supported */
+	lim_sta_update_max_channel_width(pe_session, pAssocRsp, pAddBssParams);
+
 	lim_set_sta_ctx_twt(&pAddBssParams->staContext, pe_session);
 
 	if (lim_is_fils_connection(pe_session))

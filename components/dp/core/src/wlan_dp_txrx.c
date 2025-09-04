@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,6 +48,10 @@
 		defined(CONFIG_BERYLLIUM) || \
 		defined(CONFIG_RHINE))
 #include <hif_napi.h>
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
+#include <net/gro.h>
 #endif
 
 uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *link_ctx)

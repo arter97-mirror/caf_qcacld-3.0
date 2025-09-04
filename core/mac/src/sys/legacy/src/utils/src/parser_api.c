@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -723,6 +723,8 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	qdf_freq_t target_freq;
 	uint8_t ccfs0, ccfs1;
 	enum phy_ch_width ch_width;
+	uint8_t vht_ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
+
 	/*
 	 * The new country subelement is present only when
 	 * 1. AP performs Extended Channel switching to new country.
@@ -754,10 +756,10 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 	 * comes between 80 MHz and 160 MHz by presence of CCFS1 incase of
 	 * 160 MHz which is set to zero incase of 80 MHz.
 	 */
-	if (ch_width == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
-		ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+	if (ch_width == CH_WIDTH_160MHZ)
+		vht_ch_width = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
 
-	pDot11f->WiderBWChanSwitchAnn.newChanWidth = ch_width;
+	pDot11f->WiderBWChanSwitchAnn.newChanWidth = vht_ch_width;
 	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq0 = ccfs0;
 	pDot11f->WiderBWChanSwitchAnn.newCenterChanFreq1 = ccfs1;
 	pDot11f->WiderBWChanSwitchAnn.present = 1;
@@ -8177,8 +8179,12 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
 		wlan_twt_get_responder_cfg(mac->psoc, &twt_responder);
-		he_cap->twt_responder =
-			twt_responder && twt_get_responder_flag(mac);
+		if (policy_mgr_is_vdev_ll_lt_sap(mac->psoc,
+						 session->vdev_id))
+			he_cap->twt_responder = twt_responder;
+		else
+			he_cap->twt_responder = twt_responder &&
+					twt_get_responder_flag(mac);
 		he_cap->broadcast_twt = bcast_responder;
 		pe_debug("vdev:%d bcast_responder:%d twt_responder:%d",
 			 session->vdev_id, he_cap->broadcast_twt,
@@ -12821,7 +12827,11 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 	if (pe_session->opmode == QDF_SAP_MODE ||
 	    pe_session->opmode == QDF_P2P_GO_MODE) {
 		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_responder);
-		p_ext_cap->twt_responder_support =
+		if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
+						 pe_session->vdev_id))
+			p_ext_cap->twt_responder_support = twt_responder;
+		else
+			p_ext_cap->twt_responder_support =
 			twt_responder && twt_get_responder_flag(mac_ctx);
 	}
 

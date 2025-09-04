@@ -13767,6 +13767,11 @@ bool policy_mgr_any_other_vdev_on_same_mac_as_freq(
 		if (pm_conc_connection_list[conn_index].vdev_id == vdev_id)
 			continue;
 
+		if (pm_conc_connection_list[conn_index].mode == PM_NDI_MODE ||
+		    pm_conc_connection_list[conn_index].mode ==
+			PM_NAN_DISC_MODE)
+			continue;
+
 		if (policy_mgr_are_2_freq_on_same_mac(
 				psoc,
 				pm_conc_connection_list[conn_index].freq,
@@ -14555,4 +14560,25 @@ uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
 	return scc_vdev_id;
+}
+
+bool
+policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(struct wlan_objmgr_psoc *psoc)
+{
+	qdf_freq_t sap_ch_freq[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS], i, sap_count;
+	uint8_t mcc_to_scc_switch = 0;
+
+	sap_count = policy_mgr_get_mode_specific_conn_info(psoc, sap_ch_freq,
+							   vdev_id,
+							   PM_SAP_MODE);
+	policy_mgr_get_mcc_scc_switch(psoc, &mcc_to_scc_switch);
+
+	for (i = 0; i < sap_count; i++)
+		if (policy_mgr_is_restart_sap_required(psoc, vdev_id[i],
+						       sap_ch_freq[i],
+						       mcc_to_scc_switch))
+			return true;
+
+	return false;
 }

@@ -2922,6 +2922,7 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 	struct wlan_objmgr_vdev *vdev;
 	tpSirAssocReq assoc_req;
 	QDF_STATUS status;
+	bool is_key_installed;
 
 	hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
@@ -2953,6 +2954,8 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 
 		return;
 	}
+
+	is_key_installed = wlan_peer_is_key_installed(mac_ctx->psoc, hdr->sa);
 
 	/*
 	 * If a STA is already present in DPH and it is initiating a Assoc
@@ -3008,7 +3011,7 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 				QDF_MAC_ADDR_REF(hdr->sa));
 			return;
 		}
-	} else if (sta_ds && sta_ds->rmfEnabled && !sta_ds->is_key_installed) {
+	} else if (sta_ds && sta_ds->rmfEnabled && !is_key_installed) {
 		/* When PMF enabled, SA Query will be triggered
 		 * unexpectedly if duplicated assoc_req received -
 		 * 1) after pre_auth node deleted and

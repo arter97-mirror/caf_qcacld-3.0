@@ -12385,8 +12385,64 @@ static int nl_srv_bcast_cstats(struct sk_buff *skb)
 }
 #endif
 
+#define MARKER_LEN 6 /* Length of "CS_FSM" and "CS_FEM" */
+#define ANI_HDR_SIZE 2
+
+/**
+ * hdd_print_second_64_bits_cstats_fw_type() - Print the second 64 bits of the
+ * payload, which represent the timestamp of the event at which the host
+ * receives the CSTATS QMI event from the firmware.
+ * latency stats
+ * @buffer: pointer to event buffer
+ * @len: buffer length
+ *
+ * Return: None
+ */
+static void hdd_print_second_64_bits_cstats_fw_type(char *buffer,
+						    unsigned int len)
+{
+	const char *start_marker = "CS_FSM";
+	const char *end_marker = "CS_FEM";
+	uint32_t i, j, start, end, payload_len;
+	uint64_t second_64 = 0;
+
+	/* skips the 2-byte ANI HDR at the beginning */
+	for (i = ANI_HDR_SIZE; i < len - 1; i++) {
+		/* Look for start marker */
+		if (qdf_mem_cmp(&buffer[i], start_marker, MARKER_LEN) == 0) {
+			start = i + MARKER_LEN;
+			/* look for end marker */
+			for (j = start; j < len - 1; j++) {
+				if (qdf_mem_cmp(&buffer[j], end_marker,
+						MARKER_LEN) == 0) {
+					end = j;
+					payload_len = end - start;
+					if (payload_len >= 16) {
+						/*
+						 * extract second 64 bits
+						 * (bytes 8 to 15) of payload
+						 */
+						second_64 = 0;
+						qdf_mem_copy(&second_64,
+							     &buffer[start + 8],
+							     8);
+						hdd_debug("Second 64 bits:%llu",
+							  second_64);
+					} else {
+						hdd_debug("Payload too short");
+					}
+					/* move past this payload */
+					i = j + MARKER_LEN - 1;
+					break;
+				}
+			}
+		}
+	}
+}
+
 int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
-				      enum cstats_types type)
+				      enum cstats_types type,
+				      bool is_logging_enable)
 {
 	struct sk_buff *skb = NULL;
 	struct nlmsghdr *nlh;
@@ -12402,6 +12458,9 @@ int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
 		*(unsigned short *)(buff) = ANI_NL_MSG_CSTATS_FW_LOG_TYPE;
 		*(unsigned short *)(buff + 2) = len - sizeof(tAniHdr);
 	}
+
+	if (type == CSTATS_FW_TYPE && is_logging_enable)
+		hdd_print_second_64_bits_cstats_fw_type(buff, len);
 
 	skb = dev_alloc_skb(MAX_CSTATS_NODE_LENGTH);
 	if (!skb) {
