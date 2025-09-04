@@ -4102,43 +4102,6 @@ lim_update_cuflag_bpcc_each_link(struct mlo_mgmt_ml_info *cu_params)
 }
 #endif
 
-void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
-				enum phy_ch_width ch_width)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		pe_err("vdev legacy private object is NULL");
-		return;
-	}
-
-	mlme_priv->connect_info.assoc_chan_info.cur_ch_width = ch_width;
-	wlan_mlme_update_ch_width_from_ap(mlme_priv, true);
-}
-
-void lim_update_bcn_op_ch_width(struct wlan_objmgr_vdev *vdev,
-				enum phy_ch_width ch_width)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		pe_err("vdev legacy private object is NULL");
-		return;
-	}
-
-	if (mlme_priv->connect_info.assoc_chan_info.cur_ch_width != ch_width) {
-		mlme_priv->connect_info.assoc_chan_info.cur_ch_width = ch_width;
-		wlan_mlme_update_ch_width_from_ap(mlme_priv, true);
-	} else {
-		return;
-	}
-
-	pe_debug("update vdev %d bcn eht/he/vht op chn width %d",
-		 wlan_vdev_get_id(vdev), ch_width);
-}
-
 #ifdef WLAN_FEATURE_11BE_MLO
 static bool
 lim_match_link_info(uint8_t req_link_id,

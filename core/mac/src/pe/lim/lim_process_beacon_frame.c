@@ -400,7 +400,6 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 	uint8_t             ccfs1;
 	tDot11fIEeht_op *eht_op;
 	tDot11fIEhe_op *he_op;
-	uint8_t  ch_width;
 	uint8_t chan_id;
 	struct wlan_channel bss_chan = {0};
 	struct wlan_channel *current_chan = NULL;
@@ -437,7 +436,6 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 		ori_bw = wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						eht_op->channel_width);
 		pe_debug("update bcn ch width from eht op");
-		lim_update_bcn_op_ch_width(session->vdev, ori_bw);
 		ccfs0 = eht_op->ccfs0;
 		ccfs1 = eht_op->ccfs1;
 		if (eht_op->disabled_sub_chan_bitmap_present) {
@@ -476,16 +474,6 @@ void lim_process_beacon_eht_op(struct pe_session *session,
 				return;
 			}
 		}
-	} else if (he_op->oper_info_6g_present) {
-		ch_width = he_op->oper_info_6g.info.ch_width;
-		ccfs0 = he_op->oper_info_6g.info.center_freq_seg0;
-		ccfs1 = he_op->oper_info_6g.info.center_freq_seg1;
-		ori_bw = wlan_mlme_convert_he_6ghz_op_bw_to_phy_ch_width(ch_width,
-									 chan_id,
-									 ccfs0,
-									 ccfs1);
-		pe_debug("update bcn ch width from 6g he op");
-		lim_update_bcn_op_ch_width(session->vdev, ori_bw);
 	} else {
 		return;
 	}

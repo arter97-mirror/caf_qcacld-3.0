@@ -5674,6 +5674,20 @@ void wlan_mlme_update_ch_width_from_ap(struct mlme_legacy_priv *mlme_priv,
 				       bool value);
 
 /**
+ * wlan_mlme_update_cur_ch_width() - Write the current operating channel
+ * width to vdev mlme legacy priv struct
+ *
+ * @vdev: vdev
+ * @ch_width: channel width from AP or user space config
+ * @value: set false for user space config and true for beacon update
+ * Return:QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_update_cur_ch_width(struct wlan_objmgr_vdev *vdev,
+			      enum phy_ch_width ch_width,
+			      bool value);
+
+/**
  * wlan_mlme_init_miracast_opt() - Init timer and wakelock for miracast
  * optimization
  * @mlme_obj: MLME ext psoc priv object
