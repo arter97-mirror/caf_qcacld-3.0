@@ -7357,6 +7357,7 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 		}
 
 		hdd_debug("Received min roam score delta value: %d", value);
+		value *= cfg_max(CFG_CAND_MIN_ROAM_SCORE_DELTA)/100;
 		status = hdd_send_min_roam_score_delta_to_sme(hdd_ctx, vdev_id,
 							      value);
 
