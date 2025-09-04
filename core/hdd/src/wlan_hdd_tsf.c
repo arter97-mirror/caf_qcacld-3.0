@@ -3026,13 +3026,10 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 	}
 
 	adapter = link_info->adapter;
-	/* Intercept tsf report and check if it is for auto report.
-	 * If yes, return in advance and skip the legacy BSS TSF
-	 * report. Otherwise continue on to the legacy BSS TSF
-	 * report logic.
+	/* Extend TSF auto reporting for both DP delay measurement and
+	 * application use, continue on to the legacy BSS TSF report logic
 	 */
-	if (QDF_IS_STATUS_SUCCESS(hdd_set_delta_tsf(adapter, ptsf)))
-		return 0;
+	hdd_set_delta_tsf(adapter, ptsf);
 
 	if (!hdd_tsf_is_initialized(adapter)) {
 		hdd_err("tsf is not init, ignore tsf event");
