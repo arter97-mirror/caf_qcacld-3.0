@@ -50,6 +50,7 @@
 #include "parser_api.h"
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_mlme_api.h"
 
 /**
  * lim_update_stads_htcap() - Updates station Descriptor HT capability
@@ -347,13 +348,19 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 		 * OMN IE is present in the Assoc response, but the channel
 		 * width/Rx NSS update will happen through the peer_assoc cmd.
 		 */
+		QDF_STATUS status;
+
 		omn_ie_ch_width =
 			lim_get_omn_channel_width(&assoc_rsp->oper_mode_ntf);
 		pe_debug("OMN IE in (re)assoc rsp, ie width %d ch_width %d",
 			 assoc_rsp->oper_mode_ntf.chanWidth, omn_ie_ch_width);
 
-		lim_update_omn_ie_ch_width(session_entry->vdev,
-					   omn_ie_ch_width);
+		status = wlan_mlme_update_cur_ch_width(session_entry->vdev,
+						       omn_ie_ch_width, true);
+		if (status != QDF_STATUS_SUCCESS) {
+			pe_err("Failed to update channel width");
+			return;
+		}
 	}
 
 	if (lim_process_srp_ie(assoc_rsp, sta_ds) == QDF_STATUS_SUCCESS)

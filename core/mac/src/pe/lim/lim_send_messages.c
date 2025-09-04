@@ -301,8 +301,10 @@ QDF_STATUS lim_send_mode_update(struct mac_context *mac,
 				   struct pe_session *pe_session)
 {
 	tUpdateVHTOpMode *pVhtOpMode = NULL;
-	QDF_STATUS retCode = QDF_STATUS_SUCCESS;
+	QDF_STATUS retCode = QDF_STATUS_SUCCESS, status;
 	struct scheduler_msg msgQ = {0};
+	enum QDF_OPMODE op_mode;
+
 
 	pVhtOpMode = qdf_mem_malloc(sizeof(tUpdateVHTOpMode));
 	if (!pVhtOpMode)
@@ -326,6 +328,17 @@ QDF_STATUS lim_send_mode_update(struct mac_context *mac,
 		qdf_mem_free(pVhtOpMode);
 		pe_err("Posting WMA_UPDATE_OP_MODE failed, reason=%X",
 			retCode);
+	}
+
+	// Update channel width to mlme priv obj
+	op_mode = wlan_vdev_mlme_get_opmode(pe_session->vdev);
+	if (op_mode == QDF_STA_MODE) {
+		status = wlan_mlme_update_cur_ch_width(pe_session->vdev,
+						       pTempParam->chwidth,
+						       true);
+		if (status != QDF_STATUS_SUCCESS)
+			pe_err("Failed to update chwidth %d",
+			       pTempParam->chwidth);
 	}
 
 	return retCode;

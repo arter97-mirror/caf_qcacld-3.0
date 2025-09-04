@@ -5129,28 +5129,6 @@ bool lim_check_vht_op_mode_change(struct mac_context *mac,
 	struct csa_offload_params *csa_param;
 	enum QDF_OPMODE mode = wlan_vdev_mlme_get_opmode(pe_session->vdev);
 
-	if (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE) {
-		status = lim_get_update_bw_allow(pe_session, chanWidth,
-						 &update_allow);
-		if (QDF_IS_STATUS_ERROR(status))
-			return false;
-	} else {
-		update_allow = true;
-	}
-
-	if (update_allow) {
-		tUpdateVHTOpMode tempParam;
-
-		tempParam.chwidth = chanWidth;
-		tempParam.smesessionId = pe_session->smeSessionId;
-		qdf_mem_copy(tempParam.peer_mac, peerMac, sizeof(tSirMacAddr));
-
-		lim_send_mode_update(mac, &tempParam, pe_session);
-		lim_update_tdls_2g_bw(pe_session);
-
-		return true;
-	}
-
 	if (!wlan_cm_is_vdev_connected(pe_session->vdev))
 		return false;
 
@@ -5161,6 +5139,29 @@ bool lim_check_vht_op_mode_change(struct mac_context *mac,
 						pe_session->curr_op_freq,
 						0, &ch_params,
 						REG_CURRENT_PWR_MODE);
+
+	if (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE) {
+		status = lim_get_update_bw_allow(pe_session, ch_params.ch_width,
+						 &update_allow);
+		if (QDF_IS_STATUS_ERROR(status))
+			return false;
+	} else {
+		update_allow = true;
+	}
+
+	if (update_allow) {
+		tUpdateVHTOpMode tempParam;
+
+		tempParam.chwidth = ch_params.ch_width;
+		tempParam.smesessionId = pe_session->smeSessionId;
+		qdf_mem_copy(tempParam.peer_mac, peerMac, sizeof(tSirMacAddr));
+
+		lim_send_mode_update(mac, &tempParam, pe_session);
+		lim_update_tdls_2g_bw(pe_session);
+
+		return true;
+	}
+
 	csa_param = qdf_mem_malloc(sizeof(*csa_param));
 	if (!csa_param) {
 		pe_err("csa_param allocation fails");
@@ -11458,6 +11459,16 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 	mlme_obj->mgmt.generic.phy_mode = wmi_host_to_fw_phymode(chan_mode);
 	des_chan->ch_phymode = chan_mode;
 
+	if (wlan_vdev_is_restart_progress(vdev) == QDF_STATUS_SUCCESS) {
+		if (wlan_mlme_update_cur_ch_width(vdev,
+						  des_chan->ch_width, true) !=
+						  QDF_STATUS_SUCCESS) {
+			pe_err("Failed to update chwidth %d",
+			       des_chan->ch_width);
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -11812,8 +11823,6 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 	else
 		sta_ptr->htSupportedChannelWidthSet = CH_WIDTH_20MHZ;
 	*new_ch_width = ch_width;
-
-	lim_update_bcn_op_ch_width(session->vdev, ch_width);
 
 	return lim_check_vht_op_mode_change(mac_ctx, session, *new_ch_width,
 					    sta_ptr->staAddr);

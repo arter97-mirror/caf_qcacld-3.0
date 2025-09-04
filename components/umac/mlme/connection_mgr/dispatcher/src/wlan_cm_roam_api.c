@@ -166,8 +166,6 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	if (!is_update) {
 		assoc_chan_info->assoc_ch_width = CH_WIDTH_INVALID;
 		return;
-	} else {
-		wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
 	}
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
@@ -186,6 +184,15 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 		assoc_chan_info->assoc_ch_width = des_chan->ch_width;
 	else
 		assoc_chan_info->assoc_ch_width = ch_width;
+
+	status = wlan_mlme_update_cur_ch_width(vdev,
+					       assoc_chan_info->assoc_ch_width,
+					       false);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to update chwidth %d",
+			 assoc_chan_info->assoc_ch_width);
+		return;
+	}
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq) &&
 	    des_chan->ch_width == CH_WIDTH_40MHZ) {

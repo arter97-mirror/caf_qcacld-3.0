@@ -8383,6 +8383,24 @@ static QDF_STATUS wlan_mlme_update_ch_width(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+wlan_mlme_update_cur_ch_width(struct wlan_objmgr_vdev *vdev,
+			      enum phy_ch_width ch_width,
+			      bool value)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->connect_info.assoc_chan_info.cur_ch_width = ch_width;
+	wlan_mlme_update_ch_width_from_ap(mlme_priv, value);
+	return QDF_STATUS_SUCCESS;
+}
+
 static uint32_t
 wlan_mlme_get_vht_rate_flags(enum phy_ch_width ch_width)
 {
