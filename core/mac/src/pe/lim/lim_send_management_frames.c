@@ -140,6 +140,41 @@ void lim_populate_mac_header(struct mac_context *mac_ctx, uint8_t *buf,
 		mac_hdr->seqControl.seqNumHi, mac_ctx->mgmtSeqNum);
 }
 
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+static void lim_send_custom_join_req_event(tSirMacAddr bssid, uint8_t channel, int8_t rssi)
+{
+	struct join_req_event *event = NULL;
+	struct mon_report_status *mon_report= NULL;
+	uint8_t *buf = NULL;
+
+	buf = qdf_mem_malloc(sizeof(struct mon_report_status) +
+			     sizeof(struct join_req_event));
+	if (!buf) {
+		pe_err("Allocate Memory failed for buf");
+		return;
+	}
+
+	mon_report = (struct mon_report_status *)buf;
+	event = (struct join_req_event *)(mon_report->payload);
+
+	mon_report->type = JOIN_REQ_EVENT;
+	mon_report->payload_len = sizeof(struct join_req_event);
+	mon_report->qtime = qdf_do_div(qdf_get_log_timestamp_usecs(),
+			    USEC_PER_MSEC);
+
+	qdf_mem_copy(event->bssid, bssid, QDF_MAC_ADDR_SIZE);
+	event->channel = channel;
+	event->rssi = rssi;
+
+	send_custom_packet_select(buf);
+	qdf_mem_free(buf);
+}
+#else
+static void lim_send_custom_join_req_event(tSirMacAddr bssid, uint8_t channel, int8_t rssi)
+{
+}
+#endif
+
 /**
  * lim_send_probe_req_mgmt_frame() - send probe request management frame
  * @mac_ctx: Pointer to Global MAC structure
@@ -429,6 +464,9 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		/* Pkt will be freed up by the callback */
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (pesession || (pesession->limMlmState == eLIM_MLM_WT_JOIN_BEACON_STATE))
+		lim_send_custom_join_req_event(bssid, channel, pesession->rssi);
 
 	return QDF_STATUS_SUCCESS;
 } /* End lim_send_probe_req_mgmt_frame. */
