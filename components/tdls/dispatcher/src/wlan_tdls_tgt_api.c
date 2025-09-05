@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -314,7 +314,7 @@ QDF_STATUS tgt_tdls_mgmt_frame_rx_cb(
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!mgmt_rx_params || !psoc) {
+	if (!mgmt_rx_params || !psoc || !peer) {
 		tdls_err("input is NULL mgmt_rx_params:%pK psoc:%pK, peer:%pK",
 			  mgmt_rx_params, psoc, peer);
 		status = QDF_STATUS_E_INVAL;
@@ -330,9 +330,10 @@ QDF_STATUS tgt_tdls_mgmt_frame_rx_cb(
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_TDLS_SB_ID);
 
-	if (QDF_STATUS_SUCCESS != status)
 release_nbuf:
+	if (QDF_STATUS_SUCCESS != status)
 		qdf_nbuf_free(buf);
+
 	return status;
 }
 
