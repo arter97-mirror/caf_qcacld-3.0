@@ -6452,6 +6452,17 @@ policy_mgr_is_3vifs_mcc_to_scc_enabled(struct wlan_objmgr_psoc *psoc)
  */
 void policy_mgr_update_flow_pool_map(struct wlan_objmgr_psoc *psoc,
 				     struct wlan_objmgr_vdev *vdev);
+
+/**
+ * policy_mgr_update_flow_pool_unmap() - Remove flow pool map for the given vdev
+ * @psoc: Pointer to PSOC object
+ * @vdev: Pointer to object manager vdev
+ *
+ * Return: None
+ */
+void policy_mgr_update_flow_pool_unmap(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_objmgr_vdev *vdev);
+
 /**
  * policy_mgr_get_conc_ml_sap_link_freq()- Get concurrent ML SAP link frequency
  * @psoc: Pointer to Psoc
