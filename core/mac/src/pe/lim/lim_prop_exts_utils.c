@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -347,9 +347,6 @@ void lim_extract_eht_op(struct pe_session *session,
 		return;
 
 	if (!beacon_struct->eht_op.present)
-		return;
-
-	if (!beacon_struct->eht_op.eht_op_information_present)
 		return;
 
 	qdf_mem_copy(&session->eht_op, &beacon_struct->eht_op,
