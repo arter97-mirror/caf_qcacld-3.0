@@ -778,6 +778,10 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 #define WLAN_FEATURE_P2P_P2P_STA (1)
 #endif
 
+#ifdef CONFIG_CNSS_IN_CNSS2
+#define CNSS_IN_CNSS2 (1)
+#endif
+
 #if defined(CONFIG_CNSS_GENL) || defined(CONFIG_CNSS_GENL_MODULE)
 #define CNSS_GENL (1)
 #endif
@@ -1081,10 +1085,8 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 #endif
 
 #ifdef CONFIG_QCA_WIFI_SDIO
-#define CONFIG_AR6320_SUPPORT (1)
 #define SDIO_3_0 (1)
 #define HIF_SDIO (1)
-#define CONFIG_DISABLE_CDC_MAX_PERF_WAR (0)
 #define CONFIG_ATH_PROCFS_DIAG_SUPPORT (1)
 #define HIF_MBOX_SLEEP_WAR (1)
 #define DEBUG_HL_LOGGING (1)

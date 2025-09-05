@@ -26,9 +26,6 @@
 #include <linux/slab.h>
 #include <linux/pm.h>
 
-#ifdef CONFIG_PLD_SDIO_CNSS
-#include <net/cnss.h>
-#endif
 #ifdef CONFIG_PLD_PCIE_CNSS
 #ifdef CONFIG_CNSS_OUT_OF_TREE
 #include "cnss2.h"

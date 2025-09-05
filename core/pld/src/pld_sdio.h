@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -21,8 +22,13 @@
 #define __PLD_SDIO_H__
 
 #ifdef CONFIG_PLD_SDIO_CNSS
-#include <net/cnss.h>
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#include "cnss2.h"
+#else
+#include <net/cnss2.h>
 #endif
+#endif
+
 #include "pld_common.h"
 
 #ifdef DYNAMIC_SINGLE_CHIP
@@ -135,11 +141,18 @@ static inline void pld_sdio_device_crashed(struct device *dev)
 {
 	cnss_common_device_crashed(dev);
 }
+
+#if IS_ENABLED(CONFIG_MSM_SUBSYSTEM_RESTART)
 static inline bool pld_sdio_is_fw_dump_skipped(void)
 {
 	return cnss_get_restart_level() == CNSS_RESET_SUBSYS_COUPLED;
 }
-
+#else
+static inline bool pld_sdio_is_fw_dump_skipped(void)
+{
+	return true;
+}
+#endif
 static inline void pld_sdio_device_self_recovery(struct device *dev)
 {
 	cnss_common_device_self_recovery(dev);
@@ -215,6 +228,15 @@ static inline void *pld_hif_sdio_get_virt_ramdump_mem(struct device *dev,
 static inline void pld_hif_sdio_release_ramdump_mem(unsigned long *address)
 {
 }
+
+static inline int pld_sdio_wlan_enable(struct device *dev,
+				       struct pld_wlan_enable_cfg *config,
+				       enum pld_driver_mode mode,
+				       const char *host_version)
+{
+	return 0;
+}
+
 #else
 #ifdef CONFIG_PLD_SDIO_CNSS2
 #include <net/cnss2.h>

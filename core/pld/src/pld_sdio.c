@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,10 +25,19 @@
 #include <linux/slab.h>
 
 #ifdef CONFIG_PLD_SDIO_CNSS
+#ifdef CNSS_IN_CNSS2
+#include "cnss2.h"
+#else
 #include <net/cnss.h>
 #endif
+#endif
+
 #ifdef CONFIG_PLD_SDIO_CNSS2
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#include "cnss2.h"
+#else
 #include <net/cnss2.h>
+#endif
 #endif
 
 #include "pld_common.h"
@@ -136,7 +146,7 @@ out:
 	osif_psoc_sync_destroy(psoc_sync);
 }
 
-#ifdef CONFIG_PLD_SDIO_CNSS
+#if defined(CONFIG_PLD_SDIO_CNSS) && !defined(CNSS_IN_CNSS2)
 /**
  * pld_sdio_reinit() - SSR re-initialize function for SDIO device
  * @sdio_func: pointer to sdio device function
@@ -290,7 +300,7 @@ static struct sdio_device_id pld_sdio_id_table[] = {
 	{},
 };
 
-#ifdef CONFIG_PLD_SDIO_CNSS2
+#if defined(CONFIG_PLD_SDIO_CNSS2) || defined(CNSS_IN_CNSS2)
 /**
  * pld_sdio_reinit() - SSR re-initialize function for SDIO device
  * @sdio_func: pointer to sdio device function
@@ -335,6 +345,7 @@ static void pld_sdio_crash_shutdown(struct sdio_func *sdio_func)
 	/* TODO */
 }
 
+#ifdef CONFIG_PLD_SDIO_CNSS2
 static void pld_sdio_uevent(struct sdio_func *sdio_func, uint32_t status)
 {
 	struct pld_context *pld_context;
@@ -362,6 +373,7 @@ static void pld_sdio_uevent(struct sdio_func *sdio_func, uint32_t status)
 out:
 	return;
 }
+#endif
 
 struct cnss_sdio_wlan_driver pld_sdio_ops = {
 	.name       = "pld_sdio",
@@ -371,7 +383,9 @@ struct cnss_sdio_wlan_driver pld_sdio_ops = {
 	.reinit     = pld_sdio_reinit,
 	.shutdown   = pld_sdio_shutdown,
 	.crash_shutdown = pld_sdio_crash_shutdown,
+#ifdef CONFIG_PLD_SDIO_CNSS2
 	.update_status  = pld_sdio_uevent,
+#endif
 #ifdef CONFIG_PM
 	.suspend    = pld_sdio_suspend,
 	.resume     = pld_sdio_resume,
@@ -388,6 +402,7 @@ void pld_sdio_unregister_driver(void)
 	cnss_sdio_wlan_unregister_driver(&pld_sdio_ops);
 }
 
+#ifdef CONFIG_PLD_SDIO_CNSS2
 int pld_sdio_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 			 enum pld_driver_mode mode, const char *host_version)
 {
@@ -407,7 +422,7 @@ int pld_sdio_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 	}
 	return cnss_wlan_enable(dev, &cfg, cnss_mode, host_version);
 }
-
+#endif
 #else
 
 #ifdef CONFIG_PM
@@ -468,8 +483,10 @@ int pld_sdio_get_fw_files_for_target(struct pld_fw_files *pfw_files,
 		cnss_get_qca9377_fw_files(&cnss_fw_files, PLD_MAX_FILE_NAME,
 			pld_sdio_is_tufello_dual_fw_supported());
 	} else {
-		ret = cnss_get_fw_files_for_target(&cnss_fw_files,
-					   target_type, target_version);
+		ret = cnss_get_fw_files_for_target(NULL,
+						   &cnss_fw_files,
+						   target_type,
+						   target_version);
 	}
 	if (0 != ret)
 		return ret;

@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -422,11 +423,13 @@ htt_rx_mpdu_desc_pn_hl(
 			*(word_ptr + 3) = rx_desc->pn_127_96;
 			/* bits 63:0 */
 			*(word_ptr + 2) = rx_desc->pn_95_64;
+			fallthrough;
 		case 48:
 			/* bits 48:0
 			 * copy 64 bits
 			 */
 			*(word_ptr + 1) = rx_desc->u0.pn_63_32;
+			fallthrough;
 		case 24:
 			/* bits 23:0
 			 * copy 32 bits
