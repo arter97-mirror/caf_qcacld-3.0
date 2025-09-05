@@ -27514,17 +27514,114 @@ bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 #endif
 
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+static inline int
+hdd_deflink_update_mac_address(struct hdd_adapter *adapter,
+			       struct qdf_mac_addr link_addr_mac)
+{
+	int ret;
+
+	ret = hdd_dynamic_mac_address_set(adapter, link_addr_mac,
+					  adapter->mac_addr,
+					  false);
+	return ret;
+}
+
+static int
+__wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  unsigned int link_id)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct qdf_mac_addr link_addr_mac;
+	struct wlan_hdd_link_info *link_info;
+	int ret = -EINVAL;
+	/* Only support single link MLO SAP now.
+	 * So using deflink.
+	 */
+	link_info = adapter->deflink;
+	if (!link_info ||
+	    test_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags)) {
+		hdd_err(" invalid link info %u", link_id);
+		goto end;
+	}
+
+	if (link_id >= IEEE80211_MLD_MAX_NUM_LINKS) {
+		hdd_err(" invalid link_id %u", link_id);
+		goto end;
+	}
+
+	qdf_ether_addr_copy(link_addr_mac.bytes, wdev->links[link_id].addr);
+
+	hdd_debug("link id: %u link address:" QDF_MAC_ADDR_FMT,
+		  link_id, QDF_MAC_ADDR_REF(link_addr_mac.bytes));
+
+	ret = hdd_deflink_update_mac_address(adapter, link_addr_mac);
+	if (ret)
+		goto end;
+
+	if (QDF_STATUS_SUCCESS !=
+	    hdd_multi_link_sap_vdev_attach(link_info, link_id)) {
+		hdd_err("failed to attach sap vdev");
+		goto end;
+	}
+
+	set_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags);
+	return 0;
+
+end:
+	return ret;
+}
+
+static void
+__wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy,
+				  struct wireless_dev *wdev,
+				  unsigned int link_id)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_hdd_link_info *link_info;
+
+	link_info = adapter->deflink;
+	if (!link_info) {
+		hdd_err("invalid link info");
+		return;
+	}
+	clear_bit(SOFTAP_ADD_INTF_LINK, &link_info->link_flags);
+}
+
 static int
 wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
 				unsigned int link_id)
 {
-	return 0;
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_add_intf_link(wiphy, wdev, link_id);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
 }
 
 static void
 wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
 				unsigned int link_id)
 {
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return;
+
+	__wlan_hdd_cfg80211_del_intf_link(wiphy, wdev, link_id);
+
+	osif_vdev_sync_op_stop(vdev_sync);
 }
 #endif
 
