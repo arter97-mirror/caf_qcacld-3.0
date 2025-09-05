@@ -6588,11 +6588,10 @@ QDF_STATUS lim_strip_extcap_update_struct(struct mac_context *mac_ctx,
  * Return: None
  */
 void lim_merge_extcap_struct(tDot11fIEExtCap *dst,
-			     tDot11fIEExtCap *src,
-			     bool add)
+		 tDot11fIEExtCap *src,
+		 bool add)
 {
-	uint8_t *tempdst = (uint8_t *)dst->bytes;
-	uint8_t *tempsrc = (uint8_t *)src->bytes;
+	uint8_t i;
 	uint8_t structlen = member_size(tDot11fIEExtCap, bytes);
 
 	/* Return if @src not present */
@@ -6607,20 +6606,21 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst,
 	if (!dst->present && !add)
 		return;
 
-	/* Merge the capabilities info in other cases */
-	while (tempdst && tempsrc && structlen--) {
-		if (add)
-			*tempdst |= *tempsrc;
-		else
-			*tempdst &= *tempsrc;
-		tempdst++;
-		tempsrc++;
+	for (i = 0; i < structlen; i++) {
+		if (add) {
+			dst->bytes[i] |= src->bytes[i];
+		} else {
+			if (i < src->num_bytes)
+				dst->bytes[i] &= src->bytes[i];
+			else
+				dst->bytes[i] = 0;  // Clear extra bytes
+		}
 	}
+
 	dst->num_bytes = lim_compute_ext_cap_ie_length(dst);
-	if (dst->num_bytes == 0) {
-		dst->present = 0;
-	} else {
-		dst->present = 1;
+	dst->present = (dst->num_bytes == 0) ? 0 : 1;
+
+	if (dst->present) {
 		pe_debug("destination extended capabilities length: %d",
 			 dst->num_bytes);
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
