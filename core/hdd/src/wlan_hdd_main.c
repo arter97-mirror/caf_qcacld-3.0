@@ -9061,6 +9061,7 @@ void hdd_wlan_exit(struct hdd_context *hdd_ctx)
 
 	qdf_spinlock_destroy(&hdd_ctx->hdd_adapter_lock);
 	qdf_spinlock_destroy(&hdd_ctx->connection_status_lock);
+	qdf_spinlock_destroy(&hdd_ctx->roam_set_lock);
 	wlan_hdd_cache_chann_mutex_destroy(hdd_ctx);
 
 	osif_request_manager_deinit();
@@ -11665,6 +11666,9 @@ static int hdd_context_init(struct hdd_context *hdd_ctx)
 	qdf_spinlock_create(&hdd_ctx->hdd_adapter_lock);
 
 	qdf_list_create(&hdd_ctx->hdd_adapters, 0);
+
+	qdf_spinlock_create(&hdd_ctx->roam_set_lock);
+	hdd_ctx->roam_enabled = true;
 
 	ret = hdd_scan_context_init(hdd_ctx);
 	if (ret)
@@ -15165,8 +15169,39 @@ wlan_hdd_disable_roaming(struct hdd_adapter *cur_adapter,
 	struct hdd_adapter *adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 
-	if (!policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc))
+	if (rso_op_requestor == RSO_IOCTL_SET) {
+		if (!hdd_ctx->roam_enabled) {
+			hdd_info("roaming has already been disabled.");
+			return;
+		}
+		qdf_spin_lock_bh(&hdd_ctx->roam_set_lock);
+		hdd_ctx->roam_enabled = false;
+		qdf_spin_unlock_bh(&hdd_ctx->roam_set_lock);
+
+		if (hdd_is_roaming_in_progress(hdd_ctx)) {
+			hdd_info("roaming in progress, roam disable take effect later.");
+			return;
+		}
+
+		if (cur_adapter->device_mode == QDF_STA_MODE) {
+			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(cur_adapter);
+			if (hdd_conn_is_connected(sta_ctx)) {
+				hdd_debug("Disable roaming from ioctl.");
+				sme_stop_roaming(hdd_ctx->mac_handle,
+						 cur_adapter->vdev_id,
+						 REASON_DRIVER_DISABLED,
+						 rso_op_requestor);
+			} else {
+				hdd_debug("the current sta is not associated.");
+			}
+		}
+	}
+
+	if (!policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc)) {
+		if (rso_op_requestor == RSO_IOCTL_SET)
+			hdd_debug("no sta is active, roam disable take effect later.");
 		return;
+	}
 
 	hdd_for_each_adapter(hdd_ctx, adapter) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
@@ -15191,8 +15226,39 @@ wlan_hdd_enable_roaming(struct hdd_adapter *cur_adapter,
 	struct hdd_adapter *adapter = NULL;
 	struct hdd_station_ctx *sta_ctx;
 
-	if (!policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc))
+	if (rso_op_requestor == RSO_IOCTL_SET) {
+		if (hdd_ctx->roam_enabled) {
+			hdd_info("roaming has already been enabled.");
+			return;
+		}
+		qdf_spin_lock_bh(&hdd_ctx->roam_set_lock);
+		hdd_ctx->roam_enabled = true;
+		qdf_spin_unlock_bh(&hdd_ctx->roam_set_lock);
+
+		if (hdd_is_roaming_in_progress(hdd_ctx)) {
+			hdd_info("roaming in progress, roam set take effect later.");
+			return;
+		}
+
+		if (cur_adapter->device_mode == QDF_STA_MODE) {
+			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(cur_adapter);
+			if (hdd_conn_is_connected(sta_ctx)) {
+				hdd_debug("Enable roaming from ioctl.");
+				sme_start_roaming(hdd_ctx->mac_handle,
+						  cur_adapter->vdev_id,
+						  REASON_DRIVER_ENABLED,
+						  rso_op_requestor);
+			} else {
+				hdd_debug("the current sta is not associated");
+			}
+		}
+	}
+
+	if (!policy_mgr_is_sta_active_connection_exists(hdd_ctx->psoc)) {
+		if (rso_op_requestor == RSO_IOCTL_SET)
+			hdd_debug("no sta is active, roam set take effect later.");
 		return;
+	}
 
 	hdd_for_each_adapter(hdd_ctx, adapter) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);

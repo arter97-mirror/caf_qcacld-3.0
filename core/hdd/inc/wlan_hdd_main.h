@@ -2119,6 +2119,9 @@ struct hdd_context {
 #endif
 	enum hdd_ssr_src ssr_src;
 	qdf_wake_lock_t lpm_reinit_wakelock;
+
+	qdf_spinlock_t roam_set_lock;
+	bool roam_enabled;
 };
 
 /**

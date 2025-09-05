@@ -295,6 +295,18 @@ int wlan_hdd_set_btcoex_mode(struct hdd_adapter *adapter, int value);
  */
 int wlan_hdd_set_btcoex_rssi_threshold(struct hdd_adapter *adapter, int value);
 
+/**
+ * wlan_hdd_set_roam_enable_disable() - set roam enable/disable
+ * @adapter: adapter being modified
+ * @value: 0/1 for roam disable/enable
+ *
+ * This function is called to set the roam disable/enable for
+ * a connected sta.
+ *
+ * Return: 0 on success, negative errno value on error
+ */
+int wlan_hdd_set_roam_enable_disable(struct hdd_adapter *adapter, int value);
+
 struct iw_request_info;
 
 /**

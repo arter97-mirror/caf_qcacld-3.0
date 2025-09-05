@@ -234,6 +234,7 @@ enum {
 	QCASAP_SET_HE_BSS_COLOR,
 	QCSAP_SET_BTCOEX_MODE,
 	QCSAP_SET_BTCOEX_LOW_RSSI_THRESHOLD,
+	QCSAP_ENABLE_ROAM,
 };
 
 int iw_get_channel_list_with_cc(struct net_device *dev,

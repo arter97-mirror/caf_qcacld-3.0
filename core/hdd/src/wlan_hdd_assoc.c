@@ -4447,6 +4447,7 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 	struct cfg80211_bss *bss_status;
 	struct hdd_context *hdd_ctx;
 	int tx_enq_num;
+	bool roam_enabled;
 
 	hdd_debug("CSR Callback: status=%d result=%d roamID=%d",
 		  roam_status, roam_result, roam_id);
@@ -4596,6 +4597,22 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 		if (roam_info)
 			roam_info->roamSynchInProgress = false;
 #endif
+		qdf_spin_lock_bh(&hdd_ctx->roam_set_lock);
+		roam_enabled = hdd_ctx->roam_enabled;
+		qdf_spin_unlock_bh(&hdd_ctx->roam_set_lock);
+		if (!roam_enabled) {
+			hdd_debug("Disable roam after associated.");
+			sme_stop_roaming(hdd_ctx->mac_handle,
+					 adapter->vdev_id,
+					 REASON_DRIVER_DISABLED,
+					 RSO_IOCTL_SET);
+		} else {
+			hdd_debug("Enabled roam after associated.");
+			sme_start_roaming(hdd_ctx->mac_handle,
+					  adapter->vdev_id,
+					  REASON_DRIVER_ENABLED,
+					  RSO_IOCTL_SET);
+		}
 		break;
 	case eCSR_ROAM_CANCELLED:
 		hdd_debug("****eCSR_ROAM_CANCELLED****");
