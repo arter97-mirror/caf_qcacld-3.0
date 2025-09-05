@@ -266,6 +266,8 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 	     !wlan_mlme_is_aux_emlsr_support(psoc))
 		wlan_handle_emlsr_sta_concurrency(psoc, false, true);
 
+	policy_mgr_update_flow_pool_unmap(psoc, vdev);
+
 	status = if_mgr_enable_roaming_after_p2p_disconnect(pdev, vdev,
 							    RSO_CONNECT_START);
 	if (status) {

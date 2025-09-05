@@ -3927,6 +3927,7 @@ lim_create_and_fill_link_session(struct mac_context *mac_ctx,
 {
 	struct pe_session *pe_session;
 	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
@@ -3941,6 +3942,15 @@ lim_create_and_fill_link_session(struct mac_context *mac_ctx,
 					  pe_session, sync_ind, ie_len);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto fail;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev)
+		goto fail;
+
+	/* Update flow pool map as VDEV is not connected before */
+	policy_mgr_update_flow_pool_map(mac_ctx->psoc, vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 	return QDF_STATUS_SUCCESS;
 

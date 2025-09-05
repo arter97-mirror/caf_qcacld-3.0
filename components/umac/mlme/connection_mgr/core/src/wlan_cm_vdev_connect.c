@@ -1807,17 +1807,12 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 				psoc, vdev_id,
 				ml_nlink_link_switch_pre_completion_evt, NULL);
 
+		policy_mgr_update_flow_pool_map(psoc, vdev);
 		if (policy_mgr_ml_link_vdev_need_to_be_disabled(psoc, vdev,
 								false) ||
 		    (!policy_mgr_is_hw_dbs_capable(psoc) &&
 		     wlan_vdev_mlme_is_mlo_vdev(vdev) &&
 		     wlan_vdev_mlme_is_mlo_link_vdev(vdev))) {
-			/*
-			 * Update flow pool map for both the vdevs during
-			 * initial connection
-			 */
-			policy_mgr_update_flow_pool_map(psoc, vdev);
-
 			policy_mgr_move_vdev_from_connection_to_disabled_tbl(
 								psoc, vdev_id);
 

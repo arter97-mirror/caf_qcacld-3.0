@@ -5695,7 +5695,6 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t conn_6ghz_flag = 0;
 	qdf_freq_t cur_freq;
-	bool is_roam_auth_status_conn;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -5727,14 +5726,7 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 				psoc, session_id,
 				pm_ctx->no_of_active_sessions[mode]);
 
-	is_roam_auth_status_conn =
-				 mlo_roam_is_auth_status_connected(psoc,
-								   session_id);
-	if (is_roam_auth_status_conn)
-		policy_mgr_debug("Roam based connect, skip flow pool map");
-
-	if (mode != QDF_NAN_DISC_MODE &&
-	    !is_roam_auth_status_conn &&
+	if (mode != QDF_NAN_DISC_MODE && mode != QDF_STA_MODE &&
 	    pm_ctx->dp_cbacks.hdd_v2_flow_pool_map && update_flow_pool_map)
 		pm_ctx->dp_cbacks.hdd_v2_flow_pool_map(session_id);
 
@@ -5929,7 +5921,6 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 	bool mcc_mode;
 	uint32_t session_count, cur_freq;
 	enum hw_mode_bandwidth max_bw;
-	bool is_roam_auth_status_conn;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -5979,14 +5970,7 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 	session_count = pm_ctx->no_of_active_sessions[mode];
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	is_roam_auth_status_conn =
-				 mlo_roam_is_auth_status_connected(psoc,
-								   session_id);
-	if (is_roam_auth_status_conn)
-		policy_mgr_debug("Roam based disconnect, skip flow pool unmap");
-
-	if (mode != QDF_NAN_DISC_MODE &&
-	    !is_roam_auth_status_conn &&
+	if (mode != QDF_NAN_DISC_MODE && mode != QDF_STA_MODE &&
 	    pm_ctx->dp_cbacks.hdd_v2_flow_pool_unmap)
 		pm_ctx->dp_cbacks.hdd_v2_flow_pool_unmap(session_id);
 
@@ -15098,13 +15082,28 @@ void policy_mgr_update_flow_pool_map(struct wlan_objmgr_psoc *psoc,
 	if (!vdev)
 		return;
 
-	vdev_id = wlan_vdev_get_id(vdev);
-	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
-	    policy_mgr_is_set_link_in_progress(wlan_vdev_get_psoc(vdev))) {
-		policy_mgr_debug("vdev:%d Link switch/set_link is ongoing, don't update flow pool map",
-				 vdev_id);
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
 		return;
 	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+	if (op_mode == QDF_STA_MODE &&
+	    pm_ctx->dp_cbacks.hdd_v2_flow_pool_map)
+		pm_ctx->dp_cbacks.hdd_v2_flow_pool_map(vdev_id);
+}
+
+void policy_mgr_update_flow_pool_unmap(struct wlan_objmgr_psoc *psoc,
+				       struct wlan_objmgr_vdev *vdev)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	enum QDF_OPMODE op_mode;
+	uint8_t vdev_id;
+
+	if (!vdev)
+		return;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -15112,11 +15111,11 @@ void policy_mgr_update_flow_pool_map(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	vdev_id = wlan_vdev_get_id(vdev);
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
-
-	if (op_mode != QDF_NAN_DISC_MODE &&
-	    pm_ctx->dp_cbacks.hdd_v2_flow_pool_map)
-		pm_ctx->dp_cbacks.hdd_v2_flow_pool_map(vdev_id);
+	if (op_mode == QDF_STA_MODE &&
+	    pm_ctx->dp_cbacks.hdd_v2_flow_pool_unmap)
+		pm_ctx->dp_cbacks.hdd_v2_flow_pool_unmap(vdev_id);
 }
 
 uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
