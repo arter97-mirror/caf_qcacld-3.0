@@ -441,6 +441,49 @@ sch_bcn_update_he_ies(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BE)
+static void
+sch_bcn_update_eht_ies(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
+		       struct pe_session *session, tpSchBeaconStruct bcn,
+		       tpSirMacMgmtHdr mac_hdr)
+{
+	uint8_t session_bss_mcs15_disabled_flag;
+	bool anything_changed = false;
+	struct wlan_channel *des_chan;
+
+	if (!session->vdev)
+		return;
+
+	des_chan = wlan_vdev_mlme_get_des_chan(session->vdev);
+	if (!des_chan || !IS_WLAN_PHYMODE_EHT(des_chan->ch_phymode))
+		return;
+
+	if (session->eht_op.present && bcn->eht_op.present) {
+		session_bss_mcs15_disabled_flag =
+			session->eht_op.mcs15_disable;
+		if (session_bss_mcs15_disabled_flag !=
+				bcn->eht_op.mcs15_disable) {
+			pe_debug("mcs15 disabled flag changed from [%d] to [%d]",
+				 session_bss_mcs15_disabled_flag,
+				 bcn->eht_op.mcs15_disable);
+			session->eht_op.mcs15_disable =
+					bcn->eht_op.mcs15_disable;
+			anything_changed = true;
+		}
+	}
+
+	if (anything_changed)
+		lim_send_eht_ie_update(mac_ctx, session);
+}
+#else
+static void
+sch_bcn_update_eht_ies(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
+		       struct pe_session *session, tpSchBeaconStruct bcn,
+		       tpSirMacMgmtHdr mac_hdr)
+{
+}
+#endif
+
 static void
 sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 			     struct pe_session *session, tpSchBeaconStruct bcn,
@@ -570,6 +613,7 @@ sch_bcn_process_sta_opmode(struct mac_context *mac_ctx,
 		return;
 	sch_bcn_update_opmode_change(mac_ctx, sta, session, bcn, pMh);
 	sch_bcn_update_he_ies(mac_ctx, sta, session, bcn, pMh);
+	sch_bcn_update_eht_ies(mac_ctx, sta, session, bcn, pMh);
 	lim_detect_change_in_srp(mac_ctx, sta, session, bcn);
 	return;
 }
