@@ -3027,4 +3027,44 @@ config SAP_PERF_TUNING
 	bool "Enable SAP performance tuning"
 	default n
 
+config HIF_SDIO
+	bool "enable HIF SDIO"
+	default n
+
+config QCA_WIFI_SDIO
+	bool "enable WIFI SDIO"
+	default n
+
+config CLD_HL_SDIO_CORE
+	bool "enable CLD_HL_SDIO_CORE"
+	default n
+
+config SDIO_TRANSFER
+	depends on CLD_HL_SDIO_CORE
+    bool "sdio transfer type, n:mailbox, y:adma"
+	default n
+
+config TX_DESC_HI_PRIO_RESERVE
+    bool "enable TX_DESC_HI_PRIO_RESERVE"
+	default n
+
+config FEATURE_HL_GROUP_CREDIT_FLOW_CONTROL
+    bool "enable FEATURE_HL_GROUP_CREDIT_FLOW_CONTROL"
+	default n
+
+config PLD_SDIO_CNSS_FLAG
+    bool "enable CNSS"
+	default n
+
+config BMI_PCIE
+	bool "BMI run under PCIe"
+	default n
+
+config BMI_SDIO
+	bool "BMI run under SDIO"
+	default n
+
+config AR6320_PCI
+	bool "ROME with PCIe interface"
+	default n
 endif # QCA_CLD_WLAN
