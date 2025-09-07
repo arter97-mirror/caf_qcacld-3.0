@@ -2196,7 +2196,7 @@ hdd_hostapd_check_channel_post_csa(struct hdd_context *hdd_ctx,
 	}
 
 	sap_cnt = policy_mgr_get_beaconing_mode_count(hdd_ctx->psoc, NULL);
-	if (sap_cnt > 1)
+	if (sap_cnt >= 1)
 		policy_mgr_check_concurrent_intf_and_restart_sap(
 				hdd_ctx->psoc,
 				ap_ctx->sap_config.acs_cfg.acs_mode);

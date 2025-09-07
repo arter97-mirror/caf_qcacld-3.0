@@ -224,6 +224,11 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 		return true;
 	}
 
+	if (mac_ctx->mlme_cfg->dfs_cfg.dfs_disable_channel_switch) {
+		sap_debug("dfs channel switch disabled, need to csa to self");
+		return true;
+	}
+
 	ch_params = &mac_ctx->sap.SapDfsInfo.new_ch_params;
 	if (mac_ctx->sap.SapDfsInfo.orig_chanWidth == 0) {
 		ch_wd = sap_ctx->ch_width_orig;
