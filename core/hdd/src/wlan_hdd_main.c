@@ -7959,6 +7959,8 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 	hdd_mlo_t2lm_unregister_callback(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
+	qdf_flush_work(&link_info->ch_chng_info.chan_change_notify_work);
+
 	hdd_reset_vdev_info(link_info);
 	osif_cm_osif_priv_deinit(vdev);
 
@@ -10060,10 +10062,6 @@ static void __hdd_close_adapter(struct hdd_context *hdd_ctx,
 			hdd_cleanup_conn_info(link_info);
 	}
 
-	hdd_adapter_for_each_link_info(adapter, link_info)
-		qdf_flush_work(
-			&link_info->ch_chng_info.chan_change_notify_work);
-
 	qdf_list_destroy(&adapter->blocked_scan_request_q);
 	qdf_mutex_destroy(&adapter->blocked_scan_request_q_lock);
 	policy_mgr_clear_concurrency_mode(hdd_ctx->psoc, adapter->device_mode);
@@ -10514,8 +10512,10 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		vdev = hdd_objmgr_get_vdev_by_user(link_info,
 						   WLAN_INIT_DEINIT_ID);
-		if (!vdev)
+		if (!vdev) {
+			qdf_flush_work(&link_info->ch_chng_info.chan_change_notify_work);
 			continue;
+		}
 
 		if (mode == QDF_NDI_MODE)
 			hdd_stop_and_cleanup_ndi(link_info);
