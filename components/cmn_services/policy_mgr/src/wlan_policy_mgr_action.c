@@ -301,7 +301,7 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 				enum policy_mgr_conc_next_action *next_action,
 				enum policy_mgr_conn_update_reason *reason)
 {
-	enum phy_ch_width cur_bw;
+	enum phy_ch_width cur_bw, original_bw;
 	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS + 1];
 	bool eht_capab = false;
@@ -320,6 +320,9 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 
 	policy_mgr_get_mode_specific_conn_info(psoc, &freq_list[0],
 					       &vdev_id_list[0], PM_SAP_MODE);
+
+	original_bw = policy_mgr_get_bw_by_session_id(psoc, vdev_id_list[0]);
+
 	if (cur_bw == CH_WIDTH_320MHZ && ch_freq &&
 	    policy_mgr_is_conn_lead_to_dbs_sbs(psoc, vdev_id, ch_freq))
 		*next_action = PM_DOWNGRADE_BW;
@@ -329,8 +332,13 @@ policy_mgr_get_sap_ch_width_update_action(struct wlan_objmgr_psoc *psoc,
 					vdev_id_list[0], freq_list[0]) &&
 		 (reason &&
 		  (*reason == POLICY_MGR_UPDATE_REASON_TIMER_START ||
-		   *reason == POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC)))
+		   *reason == POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC)) &&
+		 original_bw == CH_WIDTH_320MHZ)
 		*next_action = PM_UPGRADE_BW;
+
+	policy_mgr_debug("cur_bw %d original bw %d next action %d reason %d",
+			 cur_bw, original_bw, *next_action,
+			 reason ? (*reason) : 255);
 }
 
 enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
