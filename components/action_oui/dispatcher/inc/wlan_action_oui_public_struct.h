@@ -137,6 +137,7 @@
  * frame for specified IoT APs.
  * @ACTION_OUI_SEND_SMPS_FRAME_WITH_OMN: Send SMPS frame along with OMN
  * frame for specified IoT APs.
+ * @ACTION_OUI_RESTRICT_SLO: Downgrade to SLO if particular AP build present.
  * @ACTION_OUI_DISABLE_AUX_LISTEN: disable Aux Listen for specified IoT APs
  * @ACTION_OUI_RESTRICT_MAX_MLO_LINKS: Downgrade MLO if particular AP
  *                                     build present.
@@ -173,7 +174,8 @@ enum action_oui_id {
 	ACTION_OUI_DISABLE_DYNAMIC_QOS_NULL_TX_RATE = 10,
 	ACTION_OUI_ENABLE_CTS2SELF_WITH_QOS_NULL = 11,
 	ACTION_OUI_SEND_SMPS_FRAME_WITH_OMN = 12,
-	ACTION_OUI_DISABLE_AUX_LISTEN = 13,
+	ACTION_OUI_RESTRICT_SLO = 13,
+	ACTION_OUI_DISABLE_AUX_LISTEN = 15,
 	ACTION_OUI_RESTRICT_MAX_MLO_LINKS = 16,
 	ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ = 17,
 	ACTION_OUI_DISABLE_DYNAMIC_SMPS = 18,
