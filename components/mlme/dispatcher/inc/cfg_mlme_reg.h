@@ -532,6 +532,49 @@ enum ignore_fw_coex_info_modes {
 #define CFG_C2C_SUPPORT
 #endif
 
+/* <ini>
+ * sta_indoor_ch_peer_scc – Support STA connected indoor channel for
+ * peer-to-peer (SAP/P2P GO/NAN) connections.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable or disable support for STA
+ * connected indoor channel for peer-to-peer connections
+ * (SAP/P2P GO/NAN) and form SCC.
+ *
+ * With sta_indoor_ch_peer_scc = 1, driver can concurrently support SAP,
+ * P2P GO, and NAN operations on STA connected indoor only channels.
+ *
+ * SAP:
+ * If sta_indoor_ch_peer_scc = 1, even with sta_sap_scc_on_indoor_chan = 0,
+ * STA+SAP SCC is allowed on Indoor only channel.
+ * This feature leverages the configuration set by ini value
+ * sta_sap_scc_on_indoor_chan, and sets its value to 1.
+ *
+ * P2P:
+ * p2p_go_on_5ghz_indoor_chan = 1, P2P GO allowed on indoor channels with or
+ * without concurrency.
+ * sta_indoor_ch_peer_scc = 1, Allow P2P GO operation only on STA connected
+ * indoor only channel.
+ *
+ * NAN:
+ * enable_nan_indoor_channel = 1, allows NAN connections on all indoor channels
+ * sta_indoor_ch_peer_scc =1, allows NAN connection only on STA connected indoor
+ * only channel.
+ *
+ * Related: sta_sap_scc_on_indoor_chan/p2p_go_on_5ghz_indoor_chan/
+ *          enable_nan_indoor_channel
+ *
+ * Supported Feature: STA + P2P/SAP/NAN
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_STA_INDOOR_CH_PEER_SCC CFG_INI_BOOL( \
+	"sta_indoor_ch_peer_scc", \
+	0, \
+	"enable/disable sta_indoor_ch_peer_scc")
+
 #define CFG_REG_ALL \
 	CFG_COEX_UNSAFE_CHAN_ALL \
 	CFG(CFG_SELF_GEN_FRM_PWR) \
@@ -548,6 +591,7 @@ enum ignore_fw_coex_info_modes {
 	CFG(CFG_RETAIN_NOL_ACROSS_REG_DOMAIN) \
 	CFG_SAP_AVOID_ACS_FREQ_LIST_ALL \
 	CFG_C2C_SUPPORT \
-	CFG(CFG_DFS_CHANNEL_SUPPORT_FOR_NAN)
+	CFG(CFG_DFS_CHANNEL_SUPPORT_FOR_NAN) \
+	CFG(CFG_ENABLE_STA_INDOOR_CH_PEER_SCC)
 
 #endif /* CFG_MLME_REG_H__ */

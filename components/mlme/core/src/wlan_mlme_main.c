@@ -4176,6 +4176,9 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	reg->enable_nan_on_dfs_channels =
 		cfg_get(psoc, CFG_DFS_CHANNEL_SUPPORT_FOR_NAN);
 
+	reg->sta_indoor_ch_peer_scc =
+		cfg_get(psoc, CFG_ENABLE_STA_INDOOR_CH_PEER_SCC);
+
 	mlme_init_afc_cfg(psoc, reg);
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 	mlme_init_coex_unsafe_chan_cfg(psoc, reg);
