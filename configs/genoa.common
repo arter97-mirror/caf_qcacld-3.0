@@ -41,6 +41,9 @@ CONFIG_FEATURE_MONITOR_MODE_SUPPORT := n
 CONFIG_DP_TRACE := y
 CONFIG_QCACLD_FEATURE_METERING := n
 
+#Flag to enable delayed peer obj free
+CONFIG_FEATURE_DELAYED_PEER_OBJ_DESTROY := y
+
 #Flag to enable Dynamic Voltage WDCVS (Config Voltage Mode)
 CONFIG_WLAN_DYNAMIC_CVM := n
 
