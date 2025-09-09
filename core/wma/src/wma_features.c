@@ -1853,6 +1853,22 @@ got_chan:
 		goto send_event;
 	}
 
+	/*
+	 * For 2.4GHz 40MHz upgrade operation, cf0 value is required. However,
+	 * the Wideband IE is not mandatory and may not be received, preventing
+	 * host from determining CF0. Consequently, STA must revert to 2.4GHz
+	 * 20MHz, which is redundant, hence reject CSA. Upon receiving beacons
+	 * corresponding to the new CSA, STA can transition to 2.4GHz 40MHz,
+	 * as cf0 info will then be available in the beacon for 40MHz channel.
+	 */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_offload_event->csa_chan_freq) &&
+	    (csa_offload_event->new_ch_width == CH_WIDTH_40MHZ)) {
+		wma_err("Defer BW upgrade to %d",
+			csa_offload_event->new_ch_width);
+		qdf_mem_free(csa_offload_event);
+		goto send_event;
+	}
+
 	wma_send_msg(wma, WMA_CSA_OFFLOAD_EVENT, (void *)csa_offload_event, 0);
 
 	return 0;
