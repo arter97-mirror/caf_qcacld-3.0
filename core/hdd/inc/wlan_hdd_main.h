@@ -1447,6 +1447,10 @@ struct hdd_adapter {
 	qdf_mutex_t sta_periodic_stats_lock;
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
 	qdf_event_t peer_cleanup_done;
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	struct tx_rx_custom_stats last_custom_stats;
+	struct tx_rx_custom_stats cur_custom_stats;
+#endif
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)

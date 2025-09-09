@@ -1267,7 +1267,6 @@ ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 	qdf_nbuf_t deliver_list_tail = NULL;
 	qdf_nbuf_t msdu;
 	bool filter = false;
-	bool is_mcast = false;
 #ifdef QCA_SUPPORT_SW_TXRX_ENCAP
 	struct ol_rx_decap_info_t info;
 
@@ -1317,7 +1316,6 @@ ol_rx_deliver(struct ol_txrx_vdev_t *vdev,
 		 */
 		if (htt_rx_msdu_first_msdu_flag(htt_pdev, rx_desc))
 			filter = ol_rx_filter(vdev, peer, msdu, rx_desc);
-		is_mcast = htt_rx_msdu_is_wlan_mcast(htt_pdev, rx_desc);
 #ifdef QCA_SUPPORT_SW_TXRX_ENCAP
 DONE:
 #endif
@@ -1353,9 +1351,6 @@ DONE:
 			TXRX_STATS_MSDU_INCR(vdev->pdev, rx.delivered, msdu);
 
 			ol_rx_timestamp(pdev->ctrl_pdev, rx_desc, msdu);
-			is_mcast = htt_rx_msdu_is_wlan_mcast(htt_pdev, rx_desc);
-			if(!is_mcast)
-				TXRX_STATS_MSDU_INCR(vdev->pdev, rx.u_delivered, msdu);
 			OL_TXRX_LIST_APPEND(deliver_list_head,
 					    deliver_list_tail, msdu);
 		}
@@ -1463,7 +1458,9 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 	qdf_nbuf_t loop_msdu;
 	uint8_t bssid[QDF_MAC_ADDR_SIZE] = {0};
 	bool offloaded_pkt;
-
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	bool is_mcast = false;
+#endif
 	if (tid >= OL_TXRX_NUM_EXT_TIDS) {
 		ol_txrx_err("invalid tid, %u", tid);
 		WARN_ON(1);
@@ -1591,6 +1588,11 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 
 		rx_desc = htt_rx_msdu_desc_retrieve(pdev->htt_pdev, loop_msdu);
 		ol_rx_timestamp(pdev->ctrl_pdev, rx_desc, msdu);
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+		is_mcast = htt_rx_msdu_is_wlan_mcast(htt_pdev, rx_desc);
+		if(!is_mcast)
+			TXRX_STATS_MSDU_INCR(vdev->pdev, rx.u_delivered, msdu);
+#endif
 		loop_msdu = qdf_nbuf_next(loop_msdu);
 	}
 

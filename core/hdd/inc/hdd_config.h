@@ -389,8 +389,29 @@ enum hdd_dot11_mode {
 			CFG_ENABLE_PACKET_LOG_DEFAULT, \
 			"Enable packet log")
 
+#define CFG_PERIODIC_STATS_CFM_TIME_DEFAULT 5
+/*
+ * <ini>
+ * gStatsCfmTime - STATS_CFM_EVENT reporting interval in seconds
+ * @Min: 1
+ * @Max: 256
+ * @Default: CFG_PERIODIC_STATS_CFM_TIME_DEFAULT
+ *
+ * This option controls how often STATS_CFM_EVENT reports are sent.
+ *
+ * </ini>
+ */
+#define CFG_PERIODIC_STATS_CFM_TIME CFG_INI_UINT( \
+			"gStatsCfmTime", \
+			1, \
+			256, \
+			CFG_PERIODIC_STATS_CFM_TIME_DEFAULT, \
+			CFG_VALUE_OR_DEFAULT, \
+			"STATS_CFM_EVENT in seconds")
+
 #define CFG_ENABLE_PACKET_LOG_ALL \
-	CFG(CFG_ENABLE_PACKET_LOG)
+	CFG(CFG_ENABLE_PACKET_LOG) \
+	CFG(CFG_PERIODIC_STATS_CFM_TIME)
 #else
 #define CFG_ENABLE_PACKET_LOG_ALL
 #endif

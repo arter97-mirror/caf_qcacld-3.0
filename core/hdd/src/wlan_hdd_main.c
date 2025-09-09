@@ -8520,39 +8520,6 @@ static int hdd_wiphy_init(struct hdd_context *hdd_ctx)
 }
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
-#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
-struct tx_rx_custom_stats g_custom_stats;
-static void hdd_send_stats_cfm_event(void)
-{
-	struct stats_cfm_event *event = NULL;
-	struct mon_report_status *mon_report = NULL;
-	uint8_t *buf = NULL;
-
-	buf = qdf_mem_malloc(sizeof(struct mon_report_status) +
-							sizeof(struct stats_cfm_event));
-	if (!buf) {
-		hdd_err("Allocate Memory failed for buf");
-		return;
-	}
-
-	mon_report = (struct mon_report_status *)buf;
-	event = (struct stats_cfm_event *)(mon_report->payload);
-
-	mon_report->type = STATS_CFM_EVENT;
-	mon_report->payload_len = sizeof(struct stats_cfm_event);
-	mon_report->qtime = qdf_do_div(qdf_get_log_timestamp_usecs(),
-				       USEC_PER_MSEC);
-
-	event->tx_pkts = g_custom_stats.tx_pkts;
-	event->tx_retrans_pkts = g_custom_stats.tx_retrans_pkts;
-	event->rx_pkts = g_custom_stats.rx_pkts;
-	event->rx_ucast_pkts = g_custom_stats.rx_ucast_pkts;
-
-	send_custom_packet_select(buf);
-
-	qdf_mem_free(buf);
-}
-#endif
 /**
  * hdd_display_periodic_stats() - Function to display periodic stats
  * @hdd_ctx - handle to hdd context
@@ -8607,14 +8574,145 @@ static void hdd_display_periodic_stats(struct hdd_context *hdd_ctx,
 			wlan_hdd_display_netif_queue_history
 				(hdd_ctx, QDF_STATS_VERBOSITY_LEVEL_LOW);
 			qdf_dp_trace_dump_stats();
-#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
-			hdd_send_stats_cfm_event();
-#endif
 		}
 		counter = 0;
 		data_in_time_period = false;
 	}
 }
+
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+static void hdd_send_stats_cfm_event(struct stats_cfm_event *custom_mon_report)
+{
+	struct stats_cfm_event *event = NULL;
+	struct mon_report_status *mon_report = NULL;
+	uint8_t *buf = NULL;
+
+	if(!custom_mon_report) {
+		hdd_err("NULL porinter");
+		return;
+	}
+
+	buf = qdf_mem_malloc(sizeof(struct mon_report_status) +
+			     sizeof(struct stats_cfm_event));
+	if (!buf) {
+		hdd_err("Allocate Memory failed for buf");
+		return;
+	}
+
+	mon_report = (struct mon_report_status *)buf;
+	event = (struct stats_cfm_event *)(mon_report->payload);
+
+	mon_report->type = STATS_CFM_EVENT;
+	mon_report->payload_len = sizeof(struct stats_cfm_event);
+	mon_report->qtime = qdf_do_div(qdf_get_log_timestamp_usecs(),
+				       USEC_PER_MSEC);
+
+	memcpy(event, custom_mon_report, sizeof(struct stats_cfm_event));
+	send_custom_packet_select(buf);
+
+	qdf_mem_free(buf);
+}
+
+static QDF_STATUS hdd_get_stats_cfm_periodic_time(struct hdd_context *hdd_ctx,
+	uint8_t* periodic_display_time)
+{
+
+	if ((!hdd_ctx) || (!hdd_ctx->config)) {
+		hdd_err("Hdd Context is Null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*periodic_display_time =
+			hdd_ctx->config->stats_cfm_periodic_time;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#ifndef UINT32_MAX
+#define UINT32_MAX ((uint32_t)-1)
+#endif
+
+static uint32_t hdd_pkt_delta(uint64_t current_pkt, uint64_t last_pkt)
+{
+	uint64_t delta = 0;
+
+	if(current_pkt >= last_pkt) {
+		delta = current_pkt - last_pkt;
+	} else {
+		delta = 0;
+		hdd_err("Warning: pkts wrap-around detected");
+	}
+
+	if(delta > UINT32_MAX) {
+		hdd_err("Warning: pkts over flow");
+		delta = UINT32_MAX;
+	}
+
+	return (uint32_t)delta;
+}
+
+static void hdd_display_periodic_custom_stats(struct hdd_context *hdd_ctx,
+	struct hdd_adapter *con_sta_adapter, bool data_in_interval)
+{
+	ol_txrx_soc_handle soc;
+	struct tx_rx_custom_stats *custom_stats;
+	struct tx_rx_custom_stats *last_custom_stats;
+	uint8_t periodic_disp_time = 0; /*5s*/
+	static bool data_in_time_period;
+	static uint32_t counter;
+	QDF_STATUS status;
+	struct stats_cfm_event stats_cfm_report;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc) {
+		hdd_err("soc is NULL");
+		return;
+	}
+
+	status = hdd_get_stats_cfm_periodic_time(hdd_ctx,
+					&periodic_disp_time);
+	if(status != QDF_STATUS_SUCCESS ||
+		periodic_disp_time == 0) {
+		hdd_err("return erro: periodic_disp_time %d",
+			periodic_disp_time);
+		return;
+	}
+
+	counter++;
+	if(data_in_interval)
+		data_in_time_period =  data_in_interval;
+
+	if (counter * hdd_ctx->config->bus_bw_compute_interval >=
+		periodic_disp_time *1000) {
+		if(data_in_time_period) {
+			custom_stats = &con_sta_adapter->cur_custom_stats;
+			last_custom_stats = &con_sta_adapter->last_custom_stats;
+
+			memcpy(last_custom_stats, custom_stats,
+					sizeof(struct tx_rx_custom_stats));
+			cdp_custom_getstats(soc, custom_stats);
+
+			stats_cfm_report.tx_pkts = hdd_pkt_delta(custom_stats->tx_pkts,
+								 last_custom_stats->tx_pkts);
+			stats_cfm_report.tx_retrans_pkts = hdd_pkt_delta(custom_stats->tx_retrans_pkts,
+									 last_custom_stats->tx_retrans_pkts);
+			stats_cfm_report.rx_pkts = hdd_pkt_delta(custom_stats->rx_pkts,
+								 last_custom_stats->rx_pkts);
+			stats_cfm_report.rx_ucast_pkts = hdd_pkt_delta(custom_stats->rx_ucast_pkts,
+								       last_custom_stats->rx_ucast_pkts);
+
+			hdd_info("periodic_disp_time %d delta in 5s: custom_stats tx/rx_packets %d/%d/%d/%d",
+					periodic_disp_time,
+					stats_cfm_report.tx_pkts, stats_cfm_report.tx_retrans_pkts,
+					stats_cfm_report.rx_pkts, stats_cfm_report.rx_ucast_pkts);
+
+			hdd_send_stats_cfm_event(&stats_cfm_report);
+		}
+		counter = 0;
+		data_in_time_period = false;
+	}
+}
+#endif
 
 /**
  * hdd_clear_rps_cpu_mask - clear RPS CPU mask for interfaces
@@ -9042,6 +9140,10 @@ static void __hdd_bus_bw_work_handler(struct hdd_context *hdd_ctx)
 	bool connected = false;
 	uint32_t ipa_tx_packets = 0, ipa_rx_packets = 0;
 	uint64_t sta_tx_bytes = 0, sap_tx_bytes = 0;
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	struct hdd_adapter *con_sta_adapter = NULL;
+	u64 total_pkts = 0;
+#endif
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		goto stop_work;
@@ -9100,7 +9202,11 @@ static void __hdd_bus_bw_work_handler(struct hdd_context *hdd_ctx)
 			con_sap_adapter = adapter;
 			sap_tx_bytes = adapter->stats.tx_bytes;
 		}
-
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+		if (adapter->device_mode == QDF_STA_MODE) {
+			con_sta_adapter = adapter;
+		}
+#endif
 		if (adapter->device_mode == QDF_STA_MODE)
 			sta_tx_bytes = adapter->stats.tx_bytes;
 
@@ -9137,6 +9243,13 @@ static void __hdd_bus_bw_work_handler(struct hdd_context *hdd_ctx)
 
 	hdd_pld_request_bus_bandwidth(hdd_ctx, tx_packets, rx_packets);
 
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	if(con_sta_adapter) {
+		total_pkts = tx_packets + rx_packets;
+		hdd_display_periodic_custom_stats(hdd_ctx, con_sta_adapter,
+						  (total_pkts > 0) ? true : false);
+	}
+#endif
 	return;
 
 stop_work:
@@ -10574,6 +10687,11 @@ static void hdd_init_packet_log(struct hdd_config *config,
 				struct wlan_objmgr_psoc *psoc)
 {
 	config->enable_packet_log = cfg_get(psoc, CFG_ENABLE_PACKET_LOG);
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	/* Custom wifi-event: STATS_CFM_EVENT*/
+	config->stats_cfm_periodic_time = cfg_get(psoc, CFG_PERIODIC_STATS_CFM_TIME);
+	hdd_debug("stats_cfm_periodic_time %d", config->stats_cfm_periodic_time);
+#endif
 }
 #else
 static void hdd_init_packet_log(struct hdd_config *config,

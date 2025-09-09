@@ -241,6 +241,10 @@ struct hdd_config {
 	uint32_t periodic_stats_timer_duration;
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
 	uint8_t nb_commands_interval;
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	/* Custom wifi-event: STATS_CFM_EVENT*/
+	uint8_t stats_cfm_periodic_time;
+#endif
 };
 
 /**
