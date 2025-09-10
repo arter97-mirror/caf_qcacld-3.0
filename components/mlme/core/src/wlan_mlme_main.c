@@ -5925,7 +5925,6 @@ wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 		mlme_debug("Cannot set user config freq for mode %d", opmode);
 		return QDF_STATUS_E_FAILURE;
 	}
-
 	mlme_priv->mlme_ap.user_config_sap_ch_freq = freq;
 	return QDF_STATUS_SUCCESS;
 }
