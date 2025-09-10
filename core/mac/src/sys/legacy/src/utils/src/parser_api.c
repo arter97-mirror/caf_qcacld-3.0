@@ -6058,7 +6058,7 @@ QDF_STATUS sir_convert_beacon_frame2_struct(struct mac_context *mac,
 					     pBeacon->he_op,
 					     pBeacon->HTInfo);
 	if (status != QDF_STATUS_SUCCESS) {
-		pe_err("Failed to extract eht op");
+		pe_err_rl("Failed to extract eht op");
 		qdf_mem_free(pBeacon);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -9349,7 +9349,7 @@ QDF_STATUS lim_ieee80211_unpack_ehtop(const uint8_t *eht_op_ie,
 	}
 
 	if (!ehtop->elem_len || ehtop->elem_len < EHTOP_FIXED_LEN) {
-		pe_err("Invalid EHT op IE len %d", ehtop->elem_len);
+		pe_err_rl("Invalid EHT op IE len %d", ehtop->elem_len);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -10467,10 +10467,8 @@ QDF_STATUS lim_strip_and_decode_eht_op(uint8_t *ie, uint16_t ie_len,
 					    dot11f_vht_op, dot11f_he_op,
 					    dot11f_ht_info);
 
-	if (status != QDF_STATUS_SUCCESS) {
-		pe_err("Failed to extract eht op");
+	if (status != QDF_STATUS_SUCCESS)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	return QDF_STATUS_SUCCESS;
 }

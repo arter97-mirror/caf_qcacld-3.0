@@ -876,7 +876,7 @@ static QDF_STATUS lim_allocate_and_get_bcn(
 	if (sir_convert_beacon_frame2_struct(mac_ctx,
 	    (uint8_t *)rx_pkt_info_l,
 	    bcn_l) != QDF_STATUS_SUCCESS) {
-		pe_err("beacon parsing failed");
+		pe_err_rl("beacon parsing failed");
 		goto free;
 	}
 
