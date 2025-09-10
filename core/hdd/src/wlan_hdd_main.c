@@ -23471,6 +23471,7 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 	uint8_t num_open_session = 0;
 	QDF_STATUS status;
 	struct hdd_adapter_create_param params = {0};
+	bool is_connection_cnt_check = true;
 
 	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 	if (!sta_adapter) {
@@ -23478,7 +23479,13 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	status = policy_mgr_check_mon_concurrency(hdd_ctx->psoc);
+	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
+		hdd_err("Skip connection count check: driver module closed");
+		is_connection_cnt_check = false;
+	}
+
+	status = policy_mgr_check_mon_concurrency(hdd_ctx->psoc,
+						  is_connection_cnt_check);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		return -EINVAL;
@@ -23488,7 +23495,7 @@ wlan_hdd_add_monitor_check(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	if (is_rx_mon) {
+	if (is_rx_mon && is_connection_cnt_check) {
 		num_open_session = policy_mgr_mode_specific_connection_count(
 						hdd_ctx->psoc,
 						PM_STA_MODE,

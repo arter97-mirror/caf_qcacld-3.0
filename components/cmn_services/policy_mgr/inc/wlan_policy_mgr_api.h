@@ -5145,11 +5145,13 @@ bool policy_mgr_is_sta_mon_concurrency(struct wlan_objmgr_psoc *psoc);
 /**
  * policy_mgr_check_mon_concurrency() - Checks if monitor intf can be added.
  * @psoc: pointer to psoc object
+ * @check_connection_count: true if need to check connection count
  *
  * Return: QDF_STATUS_SUCCESS if allowed, else send failure
  *
  */
-QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc);
+QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc,
+					    bool check_connection_count);
 
 /**
  * policy_mgr_get_hw_dbs_max_bw() - Computes DBS BW
