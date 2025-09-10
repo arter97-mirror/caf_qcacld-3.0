@@ -967,6 +967,7 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx;
 	struct hdd_station_ctx *hdd_sta_ctx;
 	qdf_freq_t ch_freq = 0;
+	uint32_t dar_config = 0;
 
 	hdd_enter();
 
@@ -1041,6 +1042,15 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 
 	hdd_update_scan_ie_for_connect(adapter, &params);
 	hdd_update_standard_for_connect(hdd_ctx, req, vdev);
+	if (hdd_ctx->dar_data.dar_stats_support_by_fw) {
+		dar_config = WFA_CAPA_RADIO_COUNTER_STATS |
+					WFA_CAPA_CONTROL_PLANE_STATS |
+					WFA_CAPA_DATA_PLANE_STATS;
+
+		ucfg_mlme_set_dar_config_bitmap(hdd_ctx->psoc,
+						adapter->deflink->vdev_id,
+						dar_config);
+	}
 
 	status = osif_cm_connect(ndev, vdev, req, &params);
 

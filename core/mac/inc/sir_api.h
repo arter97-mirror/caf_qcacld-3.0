@@ -5268,4 +5268,28 @@ struct sap_cac_chan_switch_params {
 	uint8_t sec_ch_offset;
 };
 
+/**
+ * enum wfa_capa_qos_mgmt_features - WFA QoS management features capabilities
+ * @WFA_CAPA_QOS_MGMT_DSCP_POLICY: Indicates support for DSCP policy management.
+ * @WFA_CAPA_QOS_MGMT_UNSOLICITED_DSCP: Indicates support for unsolicited DSCP.
+ * @WFA_CAPA_QOS_MGMT_SCS_TRAFFIC: Indicates support for SCS traffic.
+ * @WFA_CAPA_5GHZ_QOS_TO_WFI_QOS_MAPPING: Indicates support for 5GHz QoS to WFI
+ *                                         QoS mapping.
+ * @WFA_CAPA_DATA_PLANE_STATS: Indicates support for data plane statistics.
+ * @WFA_CAPA_RADIO_COUNTER_STATS: Indicates support for radio counter
+ *				  statistics.
+ * @WFA_CAPA_CONTROL_PLANE_STATS: Indicates support for control plane
+ *				  statistics.
+ * @WFA_CAPA_UNSOLICITED_STATS: Indicates support for unsolicited statistics.
+ */
+enum wfa_capa_qos_mgmt_features {
+	WFA_CAPA_QOS_MGMT_DSCP_POLICY = 0x1,
+	WFA_CAPA_QOS_MGMT_UNSOLICITED_DSCP = 0x2,
+	WFA_CAPA_QOS_MGMT_SCS_TRAFFIC = 0x4,
+	WFA_CAPA_5GHZ_QOS_TO_WFI_QOS_MAPPING = 0x8,
+	WFA_CAPA_DATA_PLANE_STATS = 0x10,
+	WFA_CAPA_RADIO_COUNTER_STATS = 0x20,
+	WFA_CAPA_CONTROL_PLANE_STATS = 0x40,
+	WFA_CAPA_UNSOLICITED_STATS = 0x80,
+};
 #endif /* __SIR_API_H */
