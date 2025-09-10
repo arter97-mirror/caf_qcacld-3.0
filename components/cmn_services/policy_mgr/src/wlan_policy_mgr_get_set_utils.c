@@ -1788,6 +1788,21 @@ policy_mgr_sbs_24_shared_with_low_5(struct policy_mgr_psoc_priv_obj *pm_ctx)
 }
 
 bool
+policy_mgr_2_freq_same_mac_in_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				  qdf_freq_t freq_1, qdf_freq_t freq_2)
+{
+	struct policy_mgr_freq_range *freq_range;
+
+	/* Return true if non DBS capable HW */
+	if (!policy_mgr_is_hw_dbs_capable(pm_ctx->psoc))
+		return true;
+
+	freq_range = pm_ctx->hw_mode.freq_range_caps[MODE_DBS];
+	return policy_mgr_2_freq_same_mac_in_freq_range(pm_ctx, freq_range,
+							 freq_1, freq_2);
+}
+
+bool
 policy_mgr_2_freq_same_mac_in_sbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
 				  qdf_freq_t freq_1, qdf_freq_t freq_2)
 {
@@ -1846,7 +1861,6 @@ bool policy_mgr_2_freq_always_on_same_mac(struct wlan_objmgr_psoc *psoc,
 					  qdf_freq_t freq_1, qdf_freq_t freq_2)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	struct policy_mgr_freq_range *freq_range;
 	bool is_dbs_mode_same_mac = true;
 	bool is_sbs_mode_same_mac = true;
 
@@ -1854,15 +1868,8 @@ bool policy_mgr_2_freq_always_on_same_mac(struct wlan_objmgr_psoc *psoc,
 	if (!pm_ctx)
 		return false;
 
-	/* if HW is not DBS return true*/
-	if (!policy_mgr_is_hw_dbs_capable(psoc))
-		return true;
-
-	/* Check for DBS mode first */
-	freq_range = pm_ctx->hw_mode.freq_range_caps[MODE_DBS];
 	is_dbs_mode_same_mac =
-		policy_mgr_2_freq_same_mac_in_freq_range(pm_ctx, freq_range,
-							 freq_1, freq_2);
+		policy_mgr_2_freq_same_mac_in_dbs(pm_ctx, freq_1, freq_2);
 
 	/* if DBS mode leading to same mac, check for SBS mode */
 	if (is_dbs_mode_same_mac)

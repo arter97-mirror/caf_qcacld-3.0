@@ -605,18 +605,6 @@ static void csr_handle_conc_chnl_overlap_for_sap_go(
 	}
 }
 
-
-/**
- * csr_check_concurrent_channel_overlap() - To check concurrent overlap chnls
- * @mac_ctx: Pointer to mac context
- * @sap_ch: SAP channel
- * @sap_phymode: SAP phy mode
- * @cc_switch_mode: concurrent switch mode
- *
- * This routine will be called to check concurrent overlap channels
- *
- * Return: uint16_t
- */
 uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			uint32_t sap_ch_freq, eCsrPhyMode sap_phymode,
 			uint8_t cc_switch_mode, uint8_t vdev_id)
@@ -720,9 +708,9 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 			intf_ch_freq = 0;
 	} else if (intf_ch_freq && sap_ch_freq != intf_ch_freq &&
 		   (policy_mgr_is_force_scc(mac_ctx->psoc))) {
-		policy_mgr_check_scc_sbs_channel(mac_ctx->psoc, &intf_ch_freq,
-						 sap_ch_freq, vdev_id,
-						 cc_switch_mode);
+		policy_mgr_check_scc_channel(mac_ctx->psoc, &intf_ch_freq,
+					     sap_ch_freq, vdev_id,
+					     cc_switch_mode);
 	} else if ((intf_ch_freq == sap_ch_freq) && (cc_switch_mode ==
 				QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)) {
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(intf_ch_freq) ||
@@ -1218,12 +1206,6 @@ uint16_t sme_chn_to_freq(uint8_t chanNum)
 	return 0;
 }
 
-/**
- * sme_bsstype_to_string() - converts bss type to string.
- * @bss_type: bss type enum
- *
- * Return: printable string for bss type
- */
 const char *sme_bss_type_to_string(const uint8_t bss_type)
 {
 	switch (bss_type) {

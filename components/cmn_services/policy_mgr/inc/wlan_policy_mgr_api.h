@@ -1455,25 +1455,24 @@ bool policy_mgr_allow_concurrency(struct wlan_objmgr_psoc *psoc,
 				  uint32_t ext_flags);
 
 /**
- * policy_mgr_check_scc_sbs_channel() - Check for allowed
- * concurrency combination
+ * policy_mgr_check_scc_channel() - Check if SAP/GO freq need to be updated
+ * as per exiting concurrency
  * @psoc: PSOC object information
- * @intf_ch_freq: channel frequency on which new connection is coming up
- * @sap_ch_freq: SoftAp channel frequency
- * @vdev_id: Vdev Id
+ * @intf_ch_freq: Channel frequency of existing concurrency
+ * @sap_ch_freq: Given SAP/GO channel frequency
+ * @vdev_id: Vdev id of the SAP/GO
  * @cc_mode: concurrent switch mode
  *
- * When a new connection is about to come up check if current
- * concurrency combination including the new connection is
- * allowed or not based on the HW capability, but no need to
- * invoke get_pcl
+ * When SAP/GO is starting or re-starting, check SAP/GO freq need to be
+ * aligned with the existing concurrencies. i.e. Forced to be on same freq as
+ * exiting concurrency.
  *
  * Return: True/False
  */
-void policy_mgr_check_scc_sbs_channel(struct wlan_objmgr_psoc *psoc,
-				      qdf_freq_t *intf_ch_freq,
-				      qdf_freq_t sap_ch_freq,
-				      uint8_t vdev_id, uint8_t cc_mode);
+void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
+				  qdf_freq_t *intf_ch_freq,
+				  qdf_freq_t sap_ch_freq,
+				  uint8_t vdev_id, uint8_t cc_mode);
 
 /**
  * policy_mgr_nan_sap_pre_enable_conc_check() - Check if NAN+SAP SCC is
