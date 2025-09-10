@@ -43,7 +43,14 @@ else ifneq ($(LINUX_BUILD_TOP),)
 endif
 endif
 
-include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig
+# CONFIG_QCA_CLD_WLAN_PROFILE support multiple profiles in a way that's
+# compatible with Bazel.
+# Example:
+# CONFIG_QCA_CLD_WLAN_PROFILE := "sdxecho_gki_fig sdxecho_consolidate_fig"
+# Loop through each WLAN profile defined in CONFIG_QCA_CLD_WLAN_PROFILE
+$(foreach profile,$(CONFIG_QCA_CLD_WLAN_PROFILE), \
+	$(info Including profile: $(profile)_defconfig) \
+	$(eval include $(WLAN_ROOT)/configs/$(profile)_defconfig))
 
 # add configurations in WLAN_CFG_OVERRIDE
 $(foreach cfg, $(WLAN_CFG_OVERRIDE), \
