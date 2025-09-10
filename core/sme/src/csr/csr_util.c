@@ -751,7 +751,6 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 								sap_ch_freq)) {
 			break;
 		}
-
 		if (ml_sap_vdev)
 			intf_ch_freq = 0;
 	}

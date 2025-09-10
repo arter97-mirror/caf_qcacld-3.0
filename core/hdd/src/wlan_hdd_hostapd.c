@@ -8006,20 +8006,6 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		if (config->akm_list.authType[i] == eCSR_AUTH_TYPE_OWE)
 			wlan_sap_set_owe_connection_support(vdev, true);
 
-	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(
-						hdd_ctx->psoc,
-						adapter->device_mode,
-						link_info->vdev_id);
-
-	if (!policy_mgr_is_multi_sap_allowed_on_same_band(
-						hdd_ctx->pdev,
-						pm_con_mode,
-						config->chan_freq,
-						link_info->vdev_id)) {
-		ret = -EINVAL;
-		goto error;
-	}
-
 	if (config->RSNWPAReqIELength > sizeof(config->RSNWPAReqIE)) {
 		hdd_err("RSNWPAReqIELength is too large");
 		ret = -EINVAL;
@@ -8277,6 +8263,11 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		ret = 0;
 		goto free;
 	}
+
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(
+					hdd_ctx->psoc,
+					adapter->device_mode,
+					link_info->vdev_id);
 
 	if (check_for_concurrency &&
 	    !policy_mgr_mode_specific_connection_count(
@@ -9427,6 +9418,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	channel_width = wlan_hdd_get_channel_bw(params->chandef.width);
 	freq = (qdf_freq_t)params->chandef.chan->center_freq;
 	user_config_freq = freq;
+	wlan_set_sap_user_config_freq(link_info->vdev, user_config_freq);
 
 	if (wlan_reg_is_6ghz_chan_freq(freq) &&
 	    !wlan_reg_is_6ghz_band_set(hdd_ctx->pdev)) {
