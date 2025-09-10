@@ -337,6 +337,18 @@ wlan_cm_tgt_send_roam_sync_complete_cmd(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);
 
 /**
+ * wlan_cm_tgt_allow_pm_after_roam_sync() - Allow Runtime PM after roam synch
+ * is complete
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_tgt_allow_pm_after_roam_sync(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id);
+
+/**
  * wlan_cm_tgt_send_disconnect_roam_params() - Send disconnect params
  * command to FW
  * @psoc: psoc pointer
