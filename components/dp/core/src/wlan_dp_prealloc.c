@@ -533,6 +533,8 @@ dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size)
 	struct dp_page_pool_t *pp_t;
 	int arr_size;
 	int i;
+	int pools_allocated = 0;
+	int pools_in_use = 0;
 
 	if (type == QDF_DP_PAGE_POOL_RX) {
 		base_pp = g_dp_rx_pp_allocs;
@@ -547,6 +549,12 @@ dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size)
 	for (i = 0; i < arr_size; i++) {
 		pp_t = &base_pp[i];
 
+		if (pp_t->in_use)
+			pools_in_use++;
+
+		if (pp_t->pp)
+			pools_allocated++;
+
 		if (type == pp_t->type && !pp_t->in_use &&
 		    pool_size == pp_t->pool_size) {
 			pp_t->in_use = true;
@@ -556,7 +564,11 @@ dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size)
 		}
 	}
 
-	dp_err("get page pool %d type %d size %d failed", i, type, pool_size);
+	if (pools_in_use == pools_allocated)
+		dp_info("No free page pool available for type %d size %d", type, pool_size);
+	else
+		dp_err("get page pool %d type %d size %d failed", i, type, pool_size);
+
 	return NULL;
 }
 
