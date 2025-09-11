@@ -2534,6 +2534,7 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 	hdd_ctx->roam_ch_from_fw_supported = cfg->is_roam_scan_ch_to_host;
 	hdd_ctx->ll_stats_per_chan_rx_tx_time =
 					cfg->ll_stats_per_chan_rx_tx_time;
+	hdd_ctx->dar_data.dar_stats_support_by_fw = cfg->dar_stats_support;
 
 	hdd_update_feature_cfg_club_get_sta_in_ll_stats_req(hdd_ctx, cfg);
 	hdd_ctx->is_therm_cmd_supp =

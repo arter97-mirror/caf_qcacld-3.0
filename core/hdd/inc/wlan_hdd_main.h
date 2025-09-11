@@ -2168,6 +2168,15 @@ enum wlan_state_ctrl_str_id {
 	WLAN_FORCE_DISABLE_STR
 };
 
+/**
+ * struct qos_dar_data - QoS DAR(Dynamic Analytics Report) statistics
+ *
+ * @dar_stats_support_by_fw: DAR stats support by fw
+ */
+struct qos_dar_data {
+	bool dar_stats_support_by_fw;
+};
+
 #define MAX_TGT_HW_NAME_LEN 32
 #define HDD_MAX_IFACE_TYPE 2
 
@@ -2443,6 +2452,7 @@ struct hdd_tx_powerboost {
  * @tas_enabled: Indicate if TAS has enabled
  * @tas_send_to_fw: Indicate if TAS has sent to FW
  * @passthru_cap_bitmap: passthru capability bitmap
+ * @dar_data: DAR(Dynamic Analytics Report) data
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2755,6 +2765,7 @@ struct hdd_context {
 #ifdef FEATURE_WLAN_TX_POWERBOOST
 	struct hdd_tx_powerboost tx_pb;
 #endif
+	struct qos_dar_data dar_data;
 #if defined(WLAN_SYSFS) && defined(WLAN_TAS_SYSFS)
 	bool tas_enabled;
 	bool tas_send_to_fw;

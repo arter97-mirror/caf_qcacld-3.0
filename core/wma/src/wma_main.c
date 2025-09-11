@@ -5834,6 +5834,9 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	cfg->ll_stats_per_chan_rx_tx_time =
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_ll_stats_per_chan_rx_tx_time);
+	cfg->dar_stats_support =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_sta_dar_stats_support);
 
 	cfg->enhanced_stats_support =
 		wmi_service_enabled(wmi_handle,

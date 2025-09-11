@@ -66,6 +66,7 @@
  * @en_11bn: enable 11bn
  * @is_passthru_chan_hop_supported: passthru channel hop capability
  * @is_passthru_ampdu_ra_supported: passthru ampdu and ra capability
+ * @dar_stats_support: DAR(Dynamic Analytics Report) stats support by fw
  */
 struct wma_tgt_services {
 	uint32_t sta_power_save;
@@ -136,6 +137,7 @@ struct wma_tgt_services {
 	bool is_passthru_chan_hop_supported;
 	bool is_passthru_ampdu_ra_supported;
 #endif
+	bool dar_stats_support;
 };
 
 /**
