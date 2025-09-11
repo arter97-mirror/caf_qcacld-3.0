@@ -9315,14 +9315,23 @@ QDF_STATUS wlan_mlme_send_mlo_sap_link_removal_cmd(struct wlan_objmgr_vdev *vdev
 
 	qdf_mem_copy(mlme_priv->ml_reconfig_ie, ie, elem_len);
 
+	mlme_priv->elem_len = elem_len;
+
 	status = wlan_vdev_mlme_sm_deliver_evt(vdev, WLAN_VDEV_SM_EV_REMOVAL,
-					       elem_len,
+					       mlme_priv->elem_len,
 					       mlme_priv->ml_reconfig_ie);
+
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_err("vdev SM fail to deliver");
 
+	if (mlme_priv->link_removal_delay_for_csa) {
+		mlme_err("delay link removal request, CSA is doing");
+		return QDF_STATUS_SUCCESS;
+	}
+
 	qdf_mem_free(mlme_priv->ml_reconfig_ie);
 	mlme_priv->ml_reconfig_ie = NULL;
+
 	return status;
 }
 #endif

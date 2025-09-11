@@ -2003,4 +2003,21 @@ lim_notify_channel_switch_started(struct mac_context *mac_ctx,
  */
 tSirMacHTChannelWidth
 lim_convert_channel_width_enum(enum phy_ch_width ch_width);
+
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/**
+ *lim_send_link_removal_req() - send link removal request
+ *@mac_ctx:  Pointer to mac context
+ *@vdev_id: vdev id
+ *
+ *Return: None
+ */
+void lim_send_link_removal_req(struct mac_context *mac_ctx, uint8_t vdev_id);
+#else
+static inline
+void lim_send_link_removal_req(struct mac_context *mac_ctx, uint8_t vdev_id)
+{
+}
+#endif
+
 #endif /* __LIM_TYPES_H */
