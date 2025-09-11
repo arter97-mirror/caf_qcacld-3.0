@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -536,6 +536,38 @@ wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
  */
 QDF_STATUS hdd_multi_link_sap_vdev_attach(struct wlan_hdd_link_info *link_info,
 					  unsigned int link_id);
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/**
+ * wlan_hdd_validate_mlo_link_removal_request() - check link removal request
+ * @link_info: link info structure
+ * @config_tbtt: tbtt count from use space
+ *
+ * This API use to check if link removal is allow for current state and active
+ * link number
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_hdd_validate_mlo_link_removal_request(struct wlan_hdd_link_info *link_info,
+					   uint32_t config_tbtt);
+
+/**
+ * wlan_hdd_process_mlo_link_removal_cmd() - send link removal request to FW
+ * @link_info: link info structure
+ * @psoc: PSOC object information
+ * @params: link removal params
+ *
+ * This API use to send link removal request with WMI_MLO_LINK_REMOVAL_CMDID
+ * to FW.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_hdd_process_mlo_link_removal_cmd(struct wlan_hdd_link_info *link_info,
+				      struct wlan_objmgr_psoc *psoc,
+				      const struct  cfg80211_link_reconfig_removal_params *params);
+
+#endif
 #else
 static inline QDF_STATUS
 hdd_multi_link_sap_vdev_attach(struct wlan_hdd_link_info *link_info,
