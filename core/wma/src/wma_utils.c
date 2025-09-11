@@ -4686,14 +4686,12 @@ QDF_STATUS wma_sta_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err("Failed to send vdev up cmd: vdev %d", vdev_id);
-		status = QDF_STATUS_E_FAILURE;
-	} else {
-		wma_set_vdev_mgmt_rate(wma, vdev_id);
-		if (iface->beacon_filter_enabled)
-			wma_add_beacon_filter(
-					wma,
-					&iface->beacon_filter);
+		return status;
 	}
+
+	wma_set_vdev_mgmt_rate(wma, vdev_id);
+	if (iface->beacon_filter_enabled)
+		wma_add_beacon_filter(wma, &iface->beacon_filter);
 
 	return QDF_STATUS_SUCCESS;
 }
