@@ -3609,6 +3609,8 @@ sap_dnw_request_handler(void *ctx, enum phy_ch_width ori_ch_width,
 		  vdev_id, ori_ch_width, dg_ch_width, dnw_request);
 
 	if (dnw_request == DNW_REQ_UPGRADE_BW) {
+		sap_ctx->isCacEndNotified = true;
+		sap_ctx->sap_radar_found_status = false;
 		reason = POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP;
 		sme_sap_update_ch_width(wlan_vdev_get_psoc(sap_ctx->vdev),
 					vdev_id, ori_ch_width, reason, 0, 0);
