@@ -3579,6 +3579,13 @@ static void sap_validate_chanmode_and_chwidth(struct mac_context *mac_ctx,
 			sec_ch_2g_freq = sap_ctx->chan_freq - 20;
 	}
 
+	/**
+	 * Force SAP to 20MHz if INI is enabled and country is Indonesia
+	 */
+	if (policy_mgr_get_sap_force_20mhz_for_country_id(mac_ctx->psoc,
+							  (qdf_freq_t)sap_ctx->chan_freq))
+		sap_ctx->ch_params.ch_width = CH_WIDTH_20MHZ;
+
 	if (orig_ch_width != sap_ctx->ch_params.ch_width)
 		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
 						       sap_ctx->chan_freq,
