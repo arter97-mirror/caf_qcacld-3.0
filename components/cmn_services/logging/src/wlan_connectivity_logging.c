@@ -1013,6 +1013,7 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	bool cache_sae_frame_cap, is_initial_connection;
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
+	struct qdf_mac_addr macaddr = {0};
 
 	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event, struct wlan_diag_packet_info);
 
@@ -1046,8 +1047,21 @@ wlan_connectivity_mgmt_event(struct wlan_objmgr_psoc *psoc,
 	wlan_diag_event.diag_cmn.vdev_id = vdev_id;
 	wlan_diag_event.subtype = (uint8_t)tag;
 
-	qdf_mem_copy(wlan_diag_event.diag_cmn.bssid, &mac_hdr->i_addr3[0],
-		     QDF_MAC_ADDR_SIZE);
+	/*
+	 * Extract the BSSID from the vdev provided by firmware to
+	 * ensure accurate connectivity logging.
+	 */
+	status = wlan_vdev_get_bss_peer_mac(vdev, &macaddr);
+	if ((tag == WLAN_DEAUTH_TX || tag == WLAN_DISASSOC_TX) &&
+	     QDF_IS_STATUS_SUCCESS(status)) {
+		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
+			     macaddr.bytes,
+			     QDF_MAC_ADDR_SIZE);
+	} else {
+		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
+			     &mac_hdr->i_addr3[0],
+			     QDF_MAC_ADDR_SIZE);
+	}
 
 	if (is_initial_connection) {
 		status = wlan_populate_mlo_mgmt_event_param(vdev,
