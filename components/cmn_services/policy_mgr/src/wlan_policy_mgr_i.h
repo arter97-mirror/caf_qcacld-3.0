@@ -302,6 +302,7 @@ extern enum policy_mgr_conc_next_action
  *                       BW when do restart
  * @move_sap_go_1st_on_dfs_sta_csa: Enable/Disable SAP / GO's movement
  *				    to non-DFS channel before STA
+ * @force_sap_20mhz_cc_id: Force SAP on 20Mhz for country ID
  */
 struct policy_mgr_cfg {
 	uint8_t mcc_to_scc_switch;
@@ -332,6 +333,7 @@ struct policy_mgr_cfg {
 #endif
 	bool use_sap_original_bw;
 	bool move_sap_go_1st_on_dfs_sta_csa;
+	bool force_sap_20mhz_cc_id;
 };
 
 /**
