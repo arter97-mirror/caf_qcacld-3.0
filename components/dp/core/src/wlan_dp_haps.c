@@ -313,7 +313,7 @@ void dp_clear_haps_stats(struct wlan_objmgr_psoc *psoc)
 
 		haps_ctx = &dp_intf->haps_ctx;
 
-		qdf_mem_set(&haps_ctx->stats, 0, sizeof(struct dp_haps_stats));
+		qdf_mem_set(&haps_ctx->stats, sizeof(struct dp_haps_stats), 0);
 		haps_ctx->stats.start_time =
 				US_TO_MS(qdf_get_log_timestamp_usecs());
 	}
