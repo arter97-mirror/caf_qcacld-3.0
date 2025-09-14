@@ -6484,4 +6484,43 @@ uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
 bool
 policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(
 	struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_set_sta_sap_scc_on_indoor_channel() - Set value for
+ * sta_sap_scc_on_indoor_channel.
+ *
+ * @psoc: pointer to psoc
+ * @value: value to be filled.
+ */
+QDF_STATUS
+policy_mgr_set_sta_sap_scc_on_indoor_channel(struct wlan_objmgr_psoc *psoc,
+					     bool value);
+/**
+ * policy_mgr_get_cfg_sta_indoor_ch_peer_scc() - To query current
+ * cfg_sta_indoor_ch_peer_scc value.
+ * @psoc: pointer to psoc
+ * @cfg_sta_indoor_ch_peer_scc: value to be filled
+ *
+ * Query the value of cfg_sta_indoor_ch_peer_scc
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_get_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
+					  bool *cfg_sta_indoor_ch_peer_scc);
+
+/**
+ * policy_mgr_set_cfg_sta_indoor_ch_peer_scc() - To enable/disable value of
+ * sta indoor channel peer scc.
+ *
+ * @psoc: pointer to psoc
+ * @cfg_sta_indoor_ch_peer_scc: value to be set
+ *
+ * Sets the value of enable_sta_indoor_ch_scc.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_set_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
+					  bool cfg_sta_indoor_ch_peer_scc);
 #endif /* __WLAN_POLICY_MGR_API_H */

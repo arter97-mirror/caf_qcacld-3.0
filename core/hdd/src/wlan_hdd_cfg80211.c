@@ -5686,6 +5686,15 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 					  QCA_WLAN_VENDOR_FEATURE_TWT_ASYNC_SUPPORT);
 	}
 
+	status = ucfg_mlme_get_sta_indoor_ch_peer_scc(hdd_ctx->psoc, &value);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Invalid sta_indoor_ch_peer_scc support");
+	if (value) {
+		hdd_debug("sta_indoor_ch_peer_scc is supported");
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_SUPPORT_STA_INDOOR_CH_SCC);
+	}
+
 	/* Check the kernel version for upstream commit aced43ce780dc5 that
 	 * has support for processing user cell_base hints when wiphy is
 	 * self managed or check the backport flag for the same.
@@ -9781,6 +9790,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_CHAIN_MASK_5GHZ] = {
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_POWER_LIMIT_ENABLE] = {
+		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_INDOOR_CH_SCC] = {
 		.type = NLA_U8},
 };
 
@@ -15112,6 +15123,37 @@ out:
 }
 
 /**
+ * hdd_set_cfg_sta_indoor_ch_peer_scc() - set STA connected indoor channel
+ * peer-to-peer connection scc support feature value.
+ * @link_info: hdd link info
+ * @attr: Pointer to struct nlattr
+ *
+ * Return: 0 on success, else error number
+ */
+static int
+hdd_set_cfg_sta_indoor_ch_peer_scc(struct wlan_hdd_link_info *link_info,
+				   const struct nlattr *attr)
+{
+	uint32_t val;
+	int errno = 0;
+	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+	val = nla_get_u8(attr);
+	hdd_debug("Received cfg_sta_indoor_ch_peer_scc value %d", val);
+	status = policy_mgr_set_cfg_sta_indoor_ch_peer_scc(hdd_ctx->psoc, val);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to set cfg_sta_indoor_ch_peer_scc");
+		return -EINVAL;
+	}
+
+	return errno;
+}
+
+/**
  * typedef independent_setter_fn - independent attribute handler
  * @link_info: Link info pointer in HDD adapter
  * @attr: The nl80211 attribute being applied
@@ -15272,6 +15314,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_eht_emlsr_links},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_TX_POWER_LIMIT_ENABLE,
 	 hdd_set_tx_power_limit_enable},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_INDOOR_CH_SCC,
+	 hdd_set_cfg_sta_indoor_ch_peer_scc},
 };
 
 #ifdef WLAN_FEATURE_ELNA

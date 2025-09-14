@@ -5814,7 +5814,6 @@ wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc);
 inline bool
 wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc);
 #endif
-
 /**
  * wlan_get_mode_index_from_mode() - get CCK opmode index
  * @opmode: qdf opmode
@@ -5852,4 +5851,16 @@ uint32_t wlan_get_fw_cck_cap(struct wlan_objmgr_psoc *psoc);
  * Return: QDF status
  */
 QDF_STATUS wlan_mlme_update_mcc_cck_support(struct wlan_objmgr_psoc *psoc);
+
+/*
+ * wlan_mlme_get_sta_indoor_ch_peer_scc() - Query STA connected indoor channel
+ * peer to peer connection SCC feature support value.
+ *
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_get_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
+						bool *value);
 #endif /* _WLAN_MLME_API_H_ */
