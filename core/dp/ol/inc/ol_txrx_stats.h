@@ -140,6 +140,24 @@ struct ol_txrx_stats_rx_histogram {
 	uint32_t pkts_51_60;
 	uint32_t pkts_61_plus;
 };
+
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+struct ol_txrx_stats_rx_custom_pkts {
+	uint64_t rx1mbps_pkts;
+	uint64_t rx2mbps_pkts;
+	uint64_t rx5_5mbps_pkts;
+	uint64_t rx6mbps_pkts;
+	uint64_t rx9mbps_pkts;
+	uint64_t rx11mbps_pkts;
+	uint64_t rx12mbps_pkts;
+	uint64_t rx18mbps_pkts;
+	uint64_t rx24mbps_pkts;
+	uint64_t rx36mbps_pkts;
+	uint64_t rx48mbps_pkts;
+	uint64_t rx54mbps_pkts;
+};
+#endif
+
 struct ol_txrx_stats_rx_ibss_fwd {
 	/* MSDUs forwarded to network stack */
 	u_int32_t packets_stack;
@@ -161,6 +179,7 @@ struct ol_txrx_stats_rx {
 #ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
 	/* Unicast MSDUs given to the OS shim */
 	struct ol_txrx_stats_elem u_delivered;
+	struct ol_txrx_stats_rx_custom_pkts custom_pkts;
 #endif
 };
 struct ol_txrx_stats {

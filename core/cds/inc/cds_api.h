@@ -620,6 +620,18 @@ struct tx_rx_custom_stats {
 	uint64_t rx_pkts;              /* rxframe */
 	uint64_t rx_ucast_pkts;        /* rxdfrmucastmbss */
 	uint64_t bcn_cnt;
+	uint64_t rx1mbps_pkts;
+	uint64_t rx2mbps_pkts;
+	uint64_t rx5_5mbps_pkts;
+	uint64_t rx6mbps_pkts;
+	uint64_t rx9mbps_pkts;
+	uint64_t rx11mbps_pkts;
+	uint64_t rx12mbps_pkts;
+	uint64_t rx18mbps_pkts;
+	uint64_t rx24mbps_pkts;
+	uint64_t rx36mbps_pkts;
+	uint64_t rx48mbps_pkts;
+	uint64_t rx54mbps_pkts;
 	uint32_t init_flag;
 };
 #else

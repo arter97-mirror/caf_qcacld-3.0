@@ -1437,6 +1437,75 @@ void ol_rx_frames_free(htt_pdev_handle htt_pdev, qdf_nbuf_t frames)
 }
 
 #ifdef WLAN_FULL_REORDER_OFFLOAD
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+static void
+ol_rx_custom_pkt_status_update(ol_txrx_pdev_handle pdev,
+			       struct htt_host_rx_desc_base *rx_desc)
+{
+	uint32_t l_sig_rate_select, l_sig_rate;
+
+	if(rx_desc->ppdu_start.preamble_type == 0x04) {
+		l_sig_rate_select = rx_desc->ppdu_start.l_sig_rate_select;
+		l_sig_rate = rx_desc->ppdu_start.l_sig_rate;
+		if (l_sig_rate_select == 0) {
+			switch (l_sig_rate) {
+			case 0x8:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx48mbps_pkts);
+				break;
+			case 0x9:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx24mbps_pkts);
+				break;
+			case 0xA:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx12mbps_pkts);
+				break;
+			case 0xB:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx6mbps_pkts);
+				break;
+			case 0xC:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx54mbps_pkts);
+				break;
+			case 0xD:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx36mbps_pkts);
+				break;
+			case 0xE:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx18mbps_pkts);
+				break;
+			case 0xF:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx9mbps_pkts);
+				break;
+			default:
+				break;
+			}
+		} else if (l_sig_rate_select == 1) {
+			switch (l_sig_rate) {
+			case 0x1:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx1mbps_pkts);
+				break;
+			case 0x2:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx2mbps_pkts);
+				break;
+			case 0x3:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx5_5mbps_pkts);
+				break;
+			case 0x4:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx11mbps_pkts);
+				break;
+			case 0x5:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx2mbps_pkts);
+				break;
+			case 0x6:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx5_5mbps_pkts);
+				break;
+			case 0x7:
+				TXRX_STATS_INCR(pdev, pub.rx.custom_pkts.rx11mbps_pkts);
+				break;
+			default:
+				break;
+			}
+		}
+	}
+}
+#endif
 void
 ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 				  qdf_nbuf_t rx_ind_msg,
@@ -1587,6 +1656,9 @@ ol_rx_in_order_indication_handler(ol_txrx_pdev_handle pdev,
 		qdf_nbuf_t msdu = head_msdu;
 
 		rx_desc = htt_rx_msdu_desc_retrieve(pdev->htt_pdev, loop_msdu);
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+		ol_rx_custom_pkt_status_update(pdev, rx_desc);
+#endif
 		ol_rx_timestamp(pdev->ctrl_pdev, rx_desc, msdu);
 #ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
 		is_mcast = htt_rx_msdu_is_wlan_mcast(htt_pdev, rx_desc);
