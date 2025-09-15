@@ -9041,7 +9041,7 @@ __wlan_hdd_cfg80211_get_wifi_info(struct wiphy *wiphy,
 			return -ENOMEM;
 
 		snprintf(firmware_version, SIR_VERSION_STRING_LEN,
-			 "FW:%d.%d.%d.%d.%d.%d HW:%s STT:%s",
+			 "FW:%d.%d.%d.%d.%d.%d HW:%s %s",
 			 hdd_ctx->fw_version_info.major_spid,
 			 hdd_ctx->fw_version_info.minor_spid,
 			 hdd_ctx->fw_version_info.siid,
