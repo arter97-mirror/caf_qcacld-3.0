@@ -619,6 +619,8 @@ struct tx_rx_custom_stats {
 	uint64_t tx_retrans_pkts;      /* txretrans */
 	uint64_t rx_pkts;              /* rxframe */
 	uint64_t rx_ucast_pkts;        /* rxdfrmucastmbss */
+	uint64_t bcn_cnt;
+	uint32_t init_flag;
 };
 #else
 static inline void send_custom_packet_select(void* buf)

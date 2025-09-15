@@ -8651,15 +8651,34 @@ static uint32_t hdd_pkt_delta(uint64_t current_pkt, uint64_t last_pkt)
 	return (uint32_t)delta;
 }
 
+static void hdd_update_cur_custom_stats(ol_txrx_soc_handle soc,
+					struct hdd_adapter *sta_adapter)
+{
+	struct tx_rx_custom_stats *custom_stats;
+	uint64_t bcnflt_succss;
+
+	if (!soc) {
+		hdd_err("soc is NULL");
+		return;
+	}
+
+	custom_stats = &sta_adapter->cur_custom_stats;
+	cdp_custom_getstats(soc, custom_stats);
+	wlan_hdd_get_bcnflt(sta_adapter, &bcnflt_succss);
+	custom_stats->bcn_cnt = bcnflt_succss;
+
+	return;
+}
+
 static void hdd_display_periodic_custom_stats(struct hdd_context *hdd_ctx,
 	struct hdd_adapter *con_sta_adapter, bool data_in_interval)
 {
 	ol_txrx_soc_handle soc;
 	struct tx_rx_custom_stats *custom_stats;
 	struct tx_rx_custom_stats *last_custom_stats;
-	uint8_t periodic_disp_time = 0; /*5s*/
+	uint8_t periodic_disp_time = 0;
 	static bool data_in_time_period;
-	static uint32_t counter;
+	static uint32_t counter = 0;
 	QDF_STATUS status;
 	struct stats_cfm_event stats_cfm_report;
 
@@ -8677,6 +8696,13 @@ static void hdd_display_periodic_custom_stats(struct hdd_context *hdd_ctx,
 			periodic_disp_time);
 		return;
 	}
+	/* Initialization */
+	if(con_sta_adapter->cur_custom_stats.init_flag == 0)
+	{
+		hdd_debug("Enter: Initialization");
+		counter = 0;
+		hdd_update_cur_custom_stats(soc, con_sta_adapter);
+	}
 
 	counter++;
 	if(data_in_interval)
@@ -8690,7 +8716,7 @@ static void hdd_display_periodic_custom_stats(struct hdd_context *hdd_ctx,
 
 			memcpy(last_custom_stats, custom_stats,
 					sizeof(struct tx_rx_custom_stats));
-			cdp_custom_getstats(soc, custom_stats);
+			hdd_update_cur_custom_stats(soc, con_sta_adapter);
 
 			stats_cfm_report.tx_pkts = hdd_pkt_delta(custom_stats->tx_pkts,
 								 last_custom_stats->tx_pkts);
@@ -8700,11 +8726,14 @@ static void hdd_display_periodic_custom_stats(struct hdd_context *hdd_ctx,
 								 last_custom_stats->rx_pkts);
 			stats_cfm_report.rx_ucast_pkts = hdd_pkt_delta(custom_stats->rx_ucast_pkts,
 								       last_custom_stats->rx_ucast_pkts);
+			stats_cfm_report.bcn_cnt = hdd_pkt_delta(custom_stats->bcn_cnt,
+								       last_custom_stats->bcn_cnt);
 
-			hdd_info("periodic_disp_time %d delta in 5s: custom_stats tx/rx_packets %d/%d/%d/%d",
+			hdd_debug("periodic_disp_time %d delta: tx/rx_packets %d/%d/%d/%d bcn_cnt %d",
 					periodic_disp_time,
 					stats_cfm_report.tx_pkts, stats_cfm_report.tx_retrans_pkts,
-					stats_cfm_report.rx_pkts, stats_cfm_report.rx_ucast_pkts);
+					stats_cfm_report.rx_pkts, stats_cfm_report.rx_ucast_pkts,
+					stats_cfm_report.bcn_cnt);
 
 			hdd_send_stats_cfm_event(&stats_cfm_report);
 		}

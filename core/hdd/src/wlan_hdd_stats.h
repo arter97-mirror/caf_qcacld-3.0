@@ -503,4 +503,11 @@ void wlan_hdd_register_cp_stats_cb(struct hdd_context *hdd_ctx);
  * Return: An error code or 0 on success.
  */
 QDF_STATUS hdd_update_sta_arp_stats(struct hdd_adapter *adapter);
+
+#ifdef QCA_SUPPORT_CP_STATS
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+void wlan_hdd_get_bcnflt(struct hdd_adapter *adapter, uint64_t *bcnflt_succss);
+#endif
+#endif
+
 #endif /* end #if !defined(WLAN_HDD_STATS_H) */

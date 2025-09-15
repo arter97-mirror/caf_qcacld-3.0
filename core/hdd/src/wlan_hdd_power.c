@@ -2304,6 +2304,13 @@ static void wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
 {
 	wlan_cfg80211_mc_cp_stats_get_tx_power(adapter->vdev, dbm);
 }
+
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+void wlan_hdd_get_bcnflt(struct hdd_adapter *adapter, uint64_t *bcnflt_succss)
+{
+	wlan_cfg80211_mc_cp_stats_get_bcnflt(adapter->vdev, bcnflt_succss);
+}
+#endif
 #else
 static void wlan_hdd_get_tx_power(struct hdd_adapter *adapter, int *dbm)
 {
