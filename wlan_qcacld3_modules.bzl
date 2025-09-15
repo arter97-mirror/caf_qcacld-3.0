@@ -2598,21 +2598,25 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     ]
 
     cmd = 'touch "$@"\n'
+    if target != "sa510m":
+        grep_path = "common"
+    else:
+        grep_path = "msm-kernel"
     for feature_grep in feature_grep_map:
         cmd += """
-          if grep -qF "{pattern}" $(location //common:{file}); then
-            echo "#define {flag} (1)" >> "$@"
-          fi
+            if grep -qF "{pattern}" $(location //{grep_path}:{file}); then
+                echo "#define {flag} (1)" >> "$@"
+            fi
         """.format(
             pattern = feature_grep["pattern"],
+            grep_path = grep_path,
             file = feature_grep["file"],
             flag = feature_grep["flag"],
         )
 
     grepSrcFiles = []
     for e in feature_grep_map:
-        grepSrcFiles.append("//common:{}".format(e["file"]))
-
+        grepSrcFiles.append("//{}:{}".format(grep_path, e["file"]))
     depsetSrc = depset(grepSrcFiles)
     native.genrule(
         name = "{}_grep_defines".format(tvc),
