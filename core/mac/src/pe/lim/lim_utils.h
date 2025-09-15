@@ -2158,15 +2158,6 @@ void lim_update_sta_eht_capable(struct mac_context *mac,
 				tpDphHashNode sta_ds,
 				struct pe_session *session_entry);
 
-/**
- * lim_send_eht_ie_update(); Send updated eht_op params to vdev
- * @mac_ctx: pointer to MAC context
- * @session: pointer to PE session
- *
- * Return: True, if vdev set params success. False otherwise
- */
-bool lim_send_eht_ie_update(struct mac_context *mac_ctx,
-			    struct pe_session *pe_session);
 #ifdef FEATURE_WLAN_TDLS
 /**
  * lim_update_tdls_sta_eht_capable(): Update eht_capable in add tdls sta params
@@ -2466,13 +2457,6 @@ lim_update_sta_eht_capable(struct mac_context *mac,
 			   tpDphHashNode sta_ds,
 			   struct pe_session *session_entry)
 {
-}
-
-static inline bool
-lim_send_eht_ie_update(struct mac_context *mac_ctx,
-		       struct pe_session *pe_session)
-{
-	return false;
 }
 
 static inline void

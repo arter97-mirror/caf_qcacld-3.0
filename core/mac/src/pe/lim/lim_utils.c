@@ -9219,21 +9219,6 @@ void lim_update_sta_eht_capable(struct mac_context *mac,
 	pe_debug("eht_capable: %d", add_sta_params->eht_capable);
 }
 
-bool lim_send_eht_ie_update(struct mac_context *mac_ctx,
-			    struct pe_session *pe_session)
-{
-	QDF_STATUS status;
-
-	status = wma_update_eht_ops_ie(cds_get_context(QDF_MODULE_ID_WMA),
-				       pe_session->smeSessionId,
-				       &pe_session->eht_op);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		return false;
-
-	return true;
-}
-
 void lim_update_session_eht_capable_chan_switch(struct mac_context *mac,
 						struct pe_session *session,
 						uint32_t new_chan_freq)

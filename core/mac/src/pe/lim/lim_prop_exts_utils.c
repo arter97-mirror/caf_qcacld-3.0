@@ -349,6 +349,9 @@ void lim_extract_eht_op(struct pe_session *session,
 	if (!beacon_struct->eht_op.present)
 		return;
 
+	if (!beacon_struct->eht_op.eht_op_information_present)
+		return;
+
 	qdf_mem_copy(&session->eht_op, &beacon_struct->eht_op,
 		     sizeof(session->eht_op));
 
