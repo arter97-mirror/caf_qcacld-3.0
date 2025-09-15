@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -241,7 +241,7 @@
  * gEnableHtSMPS - Enable the SM Power Save
  * @Min: 0
  * @Max: 1
- * @Default: 1
+ * @Default: 0
  *
  * This ini is used to enable SM Power Save
  *
@@ -255,7 +255,7 @@
  */
 #define CFG_ENABLE_HT_SMPS CFG_INI_BOOL( \
 	"gEnableHtSMPS", \
-	1, \
+	0, \
 	"Enable HT SM PowerSave")
 
 /*
@@ -263,7 +263,7 @@
  * gHtSMPS - SMPS Mode
  * @Min: 0
  * @Max: 3
- * @Default: 1
+ * @Default: 3
  *
  * This ini is used to set default SM Power Save Antenna mode
  * 0 - Static
@@ -283,7 +283,7 @@
 	"gHtSMPS", \
 	0, \
 	3, \
-	1, \
+	3, \
 	CFG_VALUE_OR_DEFAULT, \
 	"HT SM Power Save Config")
 

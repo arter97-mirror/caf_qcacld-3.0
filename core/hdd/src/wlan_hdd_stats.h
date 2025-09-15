@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -972,11 +972,14 @@ hdd_tx_latency_record_ingress_ts(struct hdd_adapter *adapter,
  * @buff: Buffer to be sent
  * @len: length of the buffer
  * @type: Chipset stats type
+ * @is_logging_enable: Indicates whether chipset stats debug logging is enabled
+ * via the INI configuration
  *
  * Return: 0 on success -ve value on error
  */
 int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
-				      enum cstats_types type);
+				      enum cstats_types type,
+				      bool is_logging_enable);
 
 /**
  * hdd_register_cstats_ops() - Register chipset stats ops
@@ -1026,7 +1029,8 @@ static inline void hdd_register_cstats_ops(void)
 
 static inline int
 hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
-				  enum cstats_types type)
+				  enum cstats_types type,
+				  bool is_logging_enable)
 {
 	return 0;
 }

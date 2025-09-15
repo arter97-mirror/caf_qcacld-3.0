@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6102,6 +6102,44 @@ QDF_STATUS policy_mgr_get_pcl_ch_list_for_ll_sap(
 					uint8_t *connection_count);
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * policy_mgr_get_inact_vdev_present_with_freq() - Get inactive VDEV ID present
+ * with frequency
+ * @psoc: PSOC object information
+ * @freq: Frequency to check
+ * @vdev_id: VDEV ID to check
+ *
+ * This function checks if there is an inactive VDEV ID present with the given
+ * frequency.
+ *
+ * Return: VDEV ID if found, WLAN_UMAC_VDEV_ID_MAX otherwise
+ */
+uint8_t
+policy_mgr_get_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+					    qdf_freq_t freq, uint8_t vdev_id);
+#else
+static inline uint8_t
+policy_mgr_get_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+					    qdf_freq_t freq, uint8_t vdev_id)
+{
+	return WLAN_UMAC_VDEV_ID_MAX;
+}
+#endif
+
+/**
+ * policy_mgr_get_vdev_present_with_freq() - Check if any other  vdev present
+ * with the given freq.
+ * @psoc: pointer to psoc
+ * @freq: given freq
+ * @vdev_id: current vdev id.
+ *
+ * Return: vdev id of the scc vdev
+ */
+uint8_t
+policy_mgr_get_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+				      qdf_freq_t freq, uint8_t vdev_id);
+
 /**
  * policy_mgr_mon_sbs_mac0_freq() - Check if the given frequency is
  * sbs frequency on mac0 for static and dynamic sbs case.
@@ -6204,4 +6242,15 @@ void policy_mgr_update_flow_pool_map(struct wlan_objmgr_psoc *psoc,
 uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id, uint32_t freq);
 
+/**
+ * policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans() - Check if SAP is going
+ *							 to move from MCC to SCC
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: True if there is a SAP in MCC with STA and if it's going to move to
+ *	   STA channel, i.e. SCC
+ */
+bool
+policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(
+	struct wlan_objmgr_psoc *psoc);
 #endif /* __WLAN_POLICY_MGR_API_H */

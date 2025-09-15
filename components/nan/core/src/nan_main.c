@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1520,8 +1520,32 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 	return status;
 }
 
-static QDF_STATUS nan_handle_disable_ind(struct nan_event_params *nan_event)
+static QDF_STATUS nan_handle_disable_ind(struct nan_event_params *nan_event,
+					 uint8_t evt_type, bool *is_drop_evt)
 {
+	uint8_t disable_req_type;
+	QDF_STATUS status;
+
+	status = nan_get_disable_req_info(nan_event->psoc, &disable_req_type);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("Unable to get nan disable req info");
+		*is_drop_evt = true;
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if ((disable_req_type == NAN_DISABLE_REQ_NB &&
+	     evt_type == nan_event_id_disable_ind) ||
+	    (disable_req_type == NAN_DISABLE_REQ_INTERNAL &&
+	     evt_type == nan_event_id_disable_rsp)) {
+		nan_debug("drop evt_type %d disable_req_type %d",
+			  evt_type, disable_req_type);
+		*is_drop_evt = true;
+		nan_cache_disable_req_info(nan_event->psoc,
+					   NAN_DISABLE_REQ_DEFAULT);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	*is_drop_evt = false;
 	return nan_disable_cleanup(nan_event->psoc);
 }
 
@@ -1602,6 +1626,8 @@ QDF_STATUS nan_discovery_event_handler(struct scheduler_msg *msg)
 {
 	struct nan_event_params *nan_event;
 	struct nan_psoc_priv_obj *psoc_nan_obj;
+	QDF_STATUS status;
+	bool is_drop_event;
 
 	if (!msg || !msg->bodyptr) {
 		nan_err("msg body is null");
@@ -1625,7 +1651,16 @@ QDF_STATUS nan_discovery_event_handler(struct scheduler_msg *msg)
 		nan_handle_enable_rsp(nan_event);
 		break;
 	case nan_event_id_disable_ind:
-		nan_handle_disable_ind(nan_event);
+	case nan_event_id_disable_rsp:
+		/*
+		 * drop NAN disable indication if NAN Disable Response is
+		 * already sent to the userspace
+		 */
+
+		status = nan_handle_disable_ind(nan_event, msg->type,
+						&is_drop_event);
+		if (is_drop_event)
+			return status;
 		break;
 	case nan_event_id_generic_rsp:
 	case nan_event_id_error_rsp:
@@ -2694,4 +2729,66 @@ bool nan_is_allowed(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return psoc_nan_obj->cfg_param.enable;
+}
+
+QDF_STATUS nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc,
+				      uint8_t value)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct nan_vdev_priv_obj *vdev_nan_obj;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!ucfg_nan_is_vdev_creation_allowed(psoc))
+		return QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NAN_DISC_MODE,
+							WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev_nan_obj = nan_get_vdev_priv_obj(vdev);
+	if (!vdev_nan_obj) {
+		nan_err("nan vdev priv obj is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto end;
+	}
+
+	vdev_nan_obj->nan_disable_req_info = value;
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	return status;
+}
+
+QDF_STATUS nan_get_disable_req_info(struct wlan_objmgr_psoc *psoc,
+				    uint8_t *value)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct nan_vdev_priv_obj *vdev_nan_obj;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!ucfg_nan_is_vdev_creation_allowed(psoc)) {
+		*value = NAN_DISABLE_REQ_DEFAULT;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NAN_DISC_MODE,
+							WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev_nan_obj = nan_get_vdev_priv_obj(vdev);
+	if (!vdev_nan_obj) {
+		nan_err("nan vdev priv obj is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto end;
+	}
+
+	*value = vdev_nan_obj->nan_disable_req_info;
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	return status;
 }

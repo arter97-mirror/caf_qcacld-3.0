@@ -123,7 +123,6 @@ static void wlan_p2p_rx_callback(void *user_data,
 	struct vdev_osif_priv *osif_priv;
 	struct wireless_dev *wdev;
 	enum QDF_OPMODE opmode;
-	uint32_t mgmt_frm_registration_update = 0;
 	uint8_t *dst_macaddr = NULL;
 	struct qdf_mac_addr p2p_mac_addr = {0};
 	uint8_t match[MGMT_FRAME_MATCH_LEN] = {0}, hdr_len;
@@ -141,16 +140,6 @@ static void wlan_p2p_rx_callback(void *user_data,
 	if (!vdev) {
 		osif_err("vdev is null");
 		return;
-	}
-
-	if (rx_frame->frm_type == MGMT_PROBE_REQ) {
-		mgmt_frm_registration_update =
-			ucfg_p2p_get_mgmt_frm_registration_update(psoc);
-		if (!(mgmt_frm_registration_update & BIT(MGMT_SUBTYPE_PROBE_REQ >> 4))) {
-			osif_debug("Drop mgmt frame_type %d, kernel registration is not open",
-				   rx_frame->frm_type);
-			goto fail;
-		}
 	}
 
 	assoc_vdev = vdev;

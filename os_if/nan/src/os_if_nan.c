@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2814,8 +2814,10 @@ static int os_if_process_nan_disable_req(struct wlan_objmgr_psoc *psoc,
 
 	data = nla_data(tb[QCA_WLAN_VENDOR_ATTR_NAN_CMD_DATA]);
 	data_len = nla_len(tb[QCA_WLAN_VENDOR_ATTR_NAN_CMD_DATA]);
+	status = ucfg_nan_cache_disable_req_info(psoc, NAN_DISABLE_REQ_NB);
 
-	status = ucfg_disable_nan_discovery(psoc, data, data_len);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		status = ucfg_disable_nan_discovery(psoc, data, data_len);
 
 	return qdf_status_to_os_return(status);
 }

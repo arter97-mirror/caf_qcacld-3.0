@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2006-2007, 2014-2018, 2020-2021 The Linux Foundation.
  * All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -123,6 +123,7 @@ const EID_RNR_IE                     = 201;
 const EID_VENDOR_SPECIFIC            = 221;
 const EID_FILS_INDICATION            = 240;
 const EID_FRAGMENT_IE                = 242;
+const EID_RSNXE                      = 244;
 /**
  * Extended Element ID
  *
@@ -4071,6 +4072,16 @@ IE t2lm_ie (EID_EXTN_ID_ELEMENT) OUI (0x6D)
     data[2..255];
 }
 
+IE RSNXEOpaque (EID_RSNXE)
+{
+    data[0..253];
+}
+
+IE MSCSEXTOpaque (EID_EXTN_ID_ELEMENT) OUI (0x58)
+{
+    data[0..253];
+}
+
 /////////////////////////////////////////////////////////////////////////////
 // Frames
 
@@ -4367,6 +4378,8 @@ FRAME AssocRequest                        // 7.2.3.4
     OPTIE  fils_hlp_container;
     OPTIE  bss_max_idle_period;
     OPTIE  FTInfo;
+    OPTIE  RSNXEOpaque;
+    OPTIE  MSCSEXTOpaque;
     OPTIE  he_cap;
     OPTIE  he_6ghz_band_cap;
 

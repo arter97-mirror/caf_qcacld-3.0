@@ -48,6 +48,8 @@
 #define pmo_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_PMO, params)
 
+#define pmo_debug_rl(params...) QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_PMO, params)
+
 #define pmo_enter() QDF_TRACE_ENTER(QDF_MODULE_ID_PMO, "enter")
 #define pmo_exit() QDF_TRACE_EXIT(QDF_MODULE_ID_PMO, "exit")
 
@@ -384,6 +386,15 @@ pmo_intersect_packet_filter(struct pmo_psoc_priv_obj *psoc_ctx)
 	return psoc_ctx->psoc_cfg.packet_filter_enabled &&
 		psoc_ctx->caps.packet_filter;
 }
+
+/**
+ * pmo_rate_limit_needed() - check allow or not to set mc addr list
+ * wmi cmd to fw based on pending cmds
+ * @psoc: objmgr psoc
+ *
+ * Return: bool
+ */
+bool pmo_rate_limit_needed(struct wlan_objmgr_psoc *psoc);
 
 /*
  * pmo_host_action_on_page_fault() - Returns action host will take on page fault

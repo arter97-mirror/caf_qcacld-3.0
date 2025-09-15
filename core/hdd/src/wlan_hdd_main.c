@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -254,6 +254,7 @@
 #include "wlan_p2p_ucfg_api.h"
 #include "wifi_pos_api.h"
 #include "wlan_mgmt_rx_srng_ucfg_api.h"
+#include "wifi_pos_pasn_api.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -6874,6 +6875,45 @@ hdd_set_derived_multicast_list(struct wlan_objmgr_psoc *psoc,
 	*mc_count += driver_mc_cnt;
 }
 
+static uint64_t last_set_multcast_ts;
+/* do not accept new set multcast request if less than 100 ms interval */
+#define MIN_INTERVAL_SET_MULTCAST_US 100000
+
+/**
+ * hdd_rate_limit_set_multicast_needed() - Determine whether to rate-limit
+ * multicast filter update requests.
+ * @hdd_ctx: hdd context
+ *
+ * In certain abnormal scenarios, __hdd_set_multicast_list() may be invoked
+ * very frequently by the kernel or user-space applications within a short
+ * time window. This can result in a large number of WMI commands being queued
+ * in the WMI layer, potentially leading to system instability.
+ *
+ * This API checks the current WMI pending queue length and applies rate
+ * limiting if the interval between consecutive calls is less than 100ms.
+ *
+ * Return: false if the multicast update should proceed, true if it should be
+ * rejected.
+ */
+static bool
+hdd_rate_limit_set_multicast_needed(struct hdd_context *hdd_ctx)
+{
+	uint64_t interval;
+	bool needed = false;
+
+	if (ucfg_pmo_rate_limit_needed(hdd_ctx->psoc)) {
+		interval = qdf_get_monotonic_boottime() - last_set_multcast_ts;
+		if (interval < MIN_INTERVAL_SET_MULTCAST_US) {
+			hdd_debug_rl("ignore due to interval %d",
+				     (uint32_t)interval);
+			needed = true;
+		}
+	}
+	last_set_multcast_ts = qdf_get_monotonic_boottime();
+
+	return needed;
+}
+
 /**
  * __hdd_set_multicast_list() - set the multicast address list
  * @dev: Pointer to the WLAN device.
@@ -6913,6 +6953,9 @@ static void __hdd_set_multicast_list(struct net_device *dev)
 		hdd_debug("Driver module is closed");
 		return;
 	}
+
+	if (hdd_rate_limit_set_multicast_needed(hdd_ctx))
+		return;
 
 	mc_list_request = qdf_mem_malloc(sizeof(*mc_list_request));
 	if (!mc_list_request)
@@ -7969,18 +8012,20 @@ hdd_vdev_configure_rtt_mac_randomization(struct wlan_objmgr_psoc *psoc,
 }
 
 static void
-hdd_vdev_configure_max_tdls_params(struct wlan_objmgr_psoc *psoc,
-				   struct wlan_objmgr_vdev *vdev)
+hdd_vdev_configure_max_sta_params(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_objmgr_vdev *vdev)
 {
 	uint16_t max_peer_count;
 	bool target_bigtk_support = false;
 
 	/*
-	 * Max peer can be tdls peers + self peer + bss peer +
+	 * Max peer can be tdls peers + self peer + bss peer + pasn peer +
 	 * temp bss peer for roaming create/delete peer at same time
 	 */
 	max_peer_count = cfg_tdls_get_max_peer_count(psoc);
 	max_peer_count += 3;
+	max_peer_count +=
+		wifi_pos_get_pasn_peer_max_num_per_vdev();
 	wlan_vdev_set_max_peer_count(vdev, max_peer_count);
 
 	ucfg_mlme_get_bigtk_support(psoc, &target_bigtk_support);
@@ -8070,12 +8115,12 @@ hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
 	switch (opmode) {
 	case QDF_STA_MODE:
 		hdd_vdev_configure_rtt_mac_randomization(psoc, vdev);
-		hdd_vdev_configure_max_tdls_params(psoc, vdev);
+		hdd_vdev_configure_max_sta_params(psoc, vdev);
 		hdd_vdev_configure_usr_ps_params(psoc, vdev, link_info);
 		hdd_set_default_mrsno_gen_support(vdev);
 		break;
 	case QDF_P2P_CLIENT_MODE:
-		hdd_vdev_configure_max_tdls_params(psoc, vdev);
+		hdd_vdev_configure_max_sta_params(psoc, vdev);
 		hdd_vdev_configure_usr_ps_params(psoc, vdev, link_info);
 		hdd_set_default_mrsno_gen_support(vdev);
 		break;

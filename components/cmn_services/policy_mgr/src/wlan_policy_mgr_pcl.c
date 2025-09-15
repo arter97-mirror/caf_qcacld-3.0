@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1431,27 +1431,37 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	bool safe_chan_modified_pcl = false;
 	bool mandatory_modified_pcl = false;
 	bool nol_modified_pcl = false;
 	bool dfs_modified_pcl = false;
+	bool srd_modified_pcl = false;
 	bool indoor_modified_pcl = false;
 	bool passive_modified_pcl = false;
 	bool band_6ghz_modified_pcl = false;
 	bool fourth_conc_modified_pcl = false;
-	bool modified_final_pcl = false;
+	bool mcc_modified_pcl = false;
 	bool srd_chan_enabled;
+	uint32_t pcl_len, orig_len;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid context");
 		return QDF_STATUS_E_FAILURE;
 	}
+	pcl_len = *len;
+	orig_len = pcl_len;
 
 	/* check the channel avoidance list for beaconing entities */
 	policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
 						 len, pcl_weight, weight_len);
+	if (pcl_len != *len) {
+		safe_chan_modified_pcl = true;
+		pcl_len = *len;
+	}
 
-	if (policy_mgr_is_sap_mandatory_channel_set(psoc)) {
+	if (mode == PM_SAP_MODE &&
+	    policy_mgr_is_sap_mandatory_channel_set(psoc)) {
 		status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
 				psoc, pcl_channels, pcl_weight, len, vdev_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
@@ -1459,7 +1469,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 				"failed to get mandatory modified pcl for SAP");
 			return status;
 		}
+	}
+	if (pcl_len != *len) {
 		mandatory_modified_pcl = true;
+		pcl_len = *len;
 	}
 
 	status = policy_mgr_modify_sap_pcl_based_on_nol(
@@ -1468,7 +1481,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to get nol modified pcl for SAP");
 		return status;
 	}
-	nol_modified_pcl = true;
+	if (pcl_len != *len) {
+		nol_modified_pcl = true;
+		pcl_len = *len;
+	}
 
 	status = policy_mgr_modify_sap_pcl_based_on_dfs(
 			psoc, pcl_channels, pcl_weight, len);
@@ -1476,7 +1492,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to get dfs modified pcl for SAP");
 		return status;
 	}
-	dfs_modified_pcl = true;
+	if (pcl_len != *len) {
+		dfs_modified_pcl = true;
+		pcl_len = *len;
+	}
 
 	wlan_mlme_get_srd_master_mode_for_vdev(psoc, QDF_SAP_MODE,
 					       &srd_chan_enabled);
@@ -1489,6 +1508,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 			return status;
 		}
 	}
+	if (pcl_len != *len) {
+		srd_modified_pcl = true;
+		pcl_len = *len;
+	}
 
 	status = policy_mgr_modify_pcl_based_on_indoor(psoc, pcl_channels,
 						       pcl_weight, len);
@@ -1496,7 +1519,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to get indoor modified pcl for SAP");
 		return status;
 	}
-	indoor_modified_pcl = true;
+	if (pcl_len != *len) {
+		indoor_modified_pcl = true;
+		pcl_len = *len;
+	}
 
 	status = policy_mgr_filter_passive_ch(pm_ctx->pdev,
 					      pcl_channels, len);
@@ -1505,7 +1531,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to filter passive channels");
 		return INVALID_CHANNEL_ID;
 	}
-	passive_modified_pcl = true;
+	if (pcl_len != *len) {
+		passive_modified_pcl = true;
+		pcl_len = *len;
+	}
 
 	status = policy_mgr_modify_sap_pcl_for_6G_channels(psoc,
 							   pcl_channels,
@@ -1514,7 +1543,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to modify pcl for 6G channels");
 		return status;
 	}
-	band_6ghz_modified_pcl = true;
+	if (pcl_len != *len) {
+		band_6ghz_modified_pcl = true;
+		pcl_len = *len;
+	}
 
 	status = policy_mgr_modify_sap_go_4th_conc_disallow(psoc,
 							    PM_SAP_MODE,
@@ -1524,7 +1556,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to modify pcl for 4th sap channels");
 		return status;
 	}
-	fourth_conc_modified_pcl = true;
+	if (pcl_len != *len) {
+		fourth_conc_modified_pcl = true;
+		pcl_len = *len;
+	}
 
 	status = policy_mgr_modify_sap_pcl_filter_mcc(psoc,
 						      pcl_channels,
@@ -1534,17 +1569,18 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to modify pcl for filter mcc");
 		return status;
 	}
+	if (pcl_len != *len) {
+		mcc_modified_pcl = true;
+		pcl_len = *len;
+	}
 
-	modified_final_pcl = true;
-	policy_mgr_debug("%d %d %d %d %d %d %d %d",
-			 mandatory_modified_pcl,
-			 nol_modified_pcl,
-			 dfs_modified_pcl,
-			 indoor_modified_pcl,
-			 passive_modified_pcl,
-			 band_6ghz_modified_pcl,
-			 fourth_conc_modified_pcl,
-			 modified_final_pcl);
+	if (orig_len != *len)
+		policy_mgr_debug("Modified by: safe_ch %d mandatory %d nol %d dfs %d srd %d indoor %d passive %d 6 Ghz %d 4th_conc %d mcc %d",
+				 safe_chan_modified_pcl, mandatory_modified_pcl,
+				 nol_modified_pcl, dfs_modified_pcl,
+				 srd_modified_pcl, indoor_modified_pcl,
+				 passive_modified_pcl, band_6ghz_modified_pcl,
+				 fourth_conc_modified_pcl, mcc_modified_pcl);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1556,10 +1592,22 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	bool srd_chan_enabled;
+	bool safe_chan_modified_pcl = false;
+	bool enabled_modified_pcl = false;
+	bool dfs_modified_pcl = false;
+	bool srd_modified_pcl = false;
+	bool fourth_conc_modified_pcl = false;
+	uint32_t pcl_len, orig_len;
 
+	pcl_len = *len;
+	orig_len = pcl_len;
 	/* check the channel avoidance list for beaconing entities */
 	policy_mgr_update_with_safe_channel_list(psoc, pcl_channels,
 						 len, pcl_weight, weight_len);
+	if (pcl_len != *len) {
+		safe_chan_modified_pcl = true;
+		pcl_len = *len;
+	}
 
 	status = policy_mgr_modify_pcl_based_on_enabled_channels(
 			psoc, pcl_channels, pcl_weight, len);
@@ -1567,12 +1615,20 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 		policy_mgr_err("failed to get modified pcl for GO");
 		return status;
 	}
+	if (pcl_len != *len) {
+		enabled_modified_pcl = true;
+		pcl_len = *len;
+	}
 
 	status = policy_mgr_modify_sap_pcl_based_on_dfs(
 			psoc, pcl_channels, pcl_weight, len);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get dfs modified pcl for GO");
 		return status;
+	}
+	if (pcl_len != *len) {
+		dfs_modified_pcl = true;
+		pcl_len = *len;
 	}
 
 	wlan_mlme_get_srd_master_mode_for_vdev(psoc, QDF_P2P_GO_MODE,
@@ -1586,6 +1642,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 			return status;
 		}
 	}
+	if (pcl_len != *len) {
+		srd_modified_pcl = true;
+		pcl_len = *len;
+	}
 	status = policy_mgr_modify_sap_go_4th_conc_disallow(psoc,
 							    PM_P2P_GO_MODE,
 							    pcl_channels,
@@ -1594,6 +1654,16 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 		policy_mgr_err("failed to modify pcl for 4th go channels");
 		return status;
 	}
+	if (pcl_len != *len) {
+		fourth_conc_modified_pcl = true;
+		pcl_len = *len;
+	}
+
+	if (orig_len != *len)
+		policy_mgr_debug("Modified by: safe_ch %d enabled %d dfs %d srd %d 4th_conc %d",
+				 safe_chan_modified_pcl, enabled_modified_pcl,
+				 dfs_modified_pcl, srd_modified_pcl,
+				 fourth_conc_modified_pcl);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1619,13 +1689,43 @@ static bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 
 	return false;
 }
-
-static bool
-policy_mgr_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
-				  qdf_freq_t freq, uint8_t vdev_id)
+#ifdef WLAN_FEATURE_11BE_MLO
+uint8_t
+policy_mgr_get_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+					    qdf_freq_t freq, uint8_t vdev_id)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t i;
+	uint8_t scc_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	for (i = 0; i < MAX_NUMBER_OF_DISABLE_LINK; i++) {
+		if (pm_disabled_ml_links[i].in_use &&
+		    (pm_disabled_ml_links[i].vdev_id != vdev_id) &&
+		    (pm_disabled_ml_links[i].freq == freq)) {
+			scc_vdev_id = pm_disabled_ml_links[i].vdev_id;
+			break;
+		}
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return scc_vdev_id;
+}
+#endif
+
+uint8_t
+policy_mgr_get_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+				      qdf_freq_t freq, uint8_t vdev_id)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t i;
+	uint8_t scc_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1635,16 +1735,16 @@ policy_mgr_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-		if ((pm_conc_connection_list[i].vdev_id != vdev_id) &&
-		    (pm_conc_connection_list[i].in_use) &&
+		if (pm_conc_connection_list[i].in_use &&
+		    (pm_conc_connection_list[i].vdev_id != vdev_id) &&
 		    (pm_conc_connection_list[i].freq == freq)) {
-			qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-			return true;
+			scc_vdev_id = pm_conc_connection_list[i].vdev_id;
+			break;
 		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
-	return false;
+	return scc_vdev_id;
 }
 
 /**
@@ -1670,6 +1770,8 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	bool modified_pcl_6_ghz = false;
 	bool avoid_list_modified_pcl = false;
 	bool skip_scc_modified_pcl = false;
+	bool skip_inactive_scc_modified_pcl = false;
+	uint8_t scc_vdev_id;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1703,12 +1805,21 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			continue;
 		}
 
-		if (policy_mgr_vdev_present_with_freq(psoc, pcl_channels[i],
-						      vdev_id)) {
+		scc_vdev_id = policy_mgr_get_vdev_present_with_freq(psoc,
+								pcl_channels[i],
+								vdev_id);
+		if (scc_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
 			skip_scc_modified_pcl = true;
 			continue;
 		}
 
+		scc_vdev_id = policy_mgr_get_inact_vdev_present_with_freq(psoc,
+								pcl_channels[i],
+								vdev_id);
+		if (scc_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
+			skip_inactive_scc_modified_pcl = true;
+			continue;
+		}
 		pcl_list[pcl_len] = pcl_channels[i];
 		weight_list[pcl_len++] = pcl_weight[i];
 	}
@@ -1722,9 +1833,9 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
 	*len = pcl_len;
 
-	policy_mgr_debug("Modified PCL: 6Ghz %d avoid_list %d skip scc %d",
+	policy_mgr_debug("Modified PCL: 6Ghz %d avoid_list %d scc %d inact scc %d",
 			 modified_pcl_6_ghz, avoid_list_modified_pcl,
-			 skip_scc_modified_pcl);
+			 skip_scc_modified_pcl, skip_inactive_scc_modified_pcl);
 
 	return QDF_STATUS_SUCCESS;
 }
