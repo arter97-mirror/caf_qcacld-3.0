@@ -724,6 +724,10 @@ QDF_STATUS hdd_softap_stop_bss(struct wlan_hdd_link_info *link_info)
 
 	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
 				  STA_INFO_SOFTAP_STOP_BSS) {
+		if (wlan_hdd_link_removal_is_in_progress(adapter)) {
+			hdd_debug("bypass free all sta info when link removal");
+			break;
+		}
 		status = hdd_softap_deregister_sta(adapter, &sta_info);
 		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 				     STA_INFO_SOFTAP_STOP_BSS);
