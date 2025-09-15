@@ -1788,7 +1788,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	max_rates = sizeof(peer_ht_rates.rates) /
 		    sizeof(peer_ht_rates.rates[0]);
 	rate_pos = (uint8_t *) peer_ht_rates.rates;
-	for (i = 0; i < MAX_SUPPORTED_RATES; i++) {
+	for (i = 0; i < VALID_MCS_SIZE; i++) {
 		if (params->supportedRates.supportedMCSSet[i / 8] &
 		    (1 << (i % 8))) {
 			rate_pos[peer_ht_rates.num_rates++] = i;
