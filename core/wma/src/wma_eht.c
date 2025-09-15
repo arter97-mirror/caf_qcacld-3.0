@@ -690,18 +690,6 @@ void wma_update_target_ext_eht_cap(struct target_psoc_info *tgt_hdl,
 
 void wma_update_vdev_eht_ops(uint32_t *eht_ops, tDot11fIEeht_op *eht_op)
 {
-	WMI_EHT_OPS_INFORMATION_PRESENT_SET(*eht_ops,
-					    eht_op->eht_op_information_present);
-	WMI_EHT_OPS_DISABLED_SUBCHANNEL_BITMAP_SET(*eht_ops,
-						   eht_op->disabled_sub_chan_bitmap_present);
-	WMI_EHT_OPS_PE_DURATION_SET(*eht_ops,
-				    eht_op->eht_default_pe_duration);
-	WMI_EHT_OPS_GROUP_ADDRESSED_BU_INDICATION_LIMIT_SET(*eht_ops,
-							    eht_op->group_addr_bu_indication_limit);
-	WMI_EHT_OPS_GROUP_ADDRESSED_BU_INDICATION_EXPONENT_SET(*eht_ops,
-							       eht_op->group_addr_bu_indication_exponent);
-	WMI_EHT_OPS_MCS15_DISABLE_SET(*eht_ops,
-				      eht_op->mcs15_disable);
 }
 
 void wma_print_eht_cap(tDot11fIEeht_cap *eht_cap)
@@ -871,13 +859,6 @@ void wma_print_eht_mac_cap(uint32_t *mac_cap)
 
 void wma_print_eht_op(tDot11fIEeht_op *eht_ops)
 {
-	wma_debug("eht_op %0x dis_sub_chan_bitmap %0x def_pe_dur %0x grp_addr_ind_limit %0x grp_addr_ind_expo %0x mcs15_dis %0x,",
-		  eht_ops->eht_op_information_present,
-		  eht_ops->disabled_sub_chan_bitmap_present,
-		  eht_ops->eht_default_pe_duration,
-		  eht_ops->group_addr_bu_indication_limit,
-		  eht_ops->group_addr_bu_indication_exponent,
-		  eht_ops->mcs15_disable);
 }
 
 void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
@@ -1105,29 +1086,6 @@ void wma_vdev_set_eht_bss_params(tp_wma_handle wma, uint8_t vdev_id,
 {
 	if (!eht_info->eht_ops)
 		return;
-}
-
-QDF_STATUS wma_update_eht_ops_ie(tp_wma_handle wma, uint8_t vdev_id,
-				 tDot11fIEeht_op *eht_ops)
-{
-	QDF_STATUS ret;
-	uint32_t dword_eht_op = 0;
-
-	if (wma_validate_handle(wma))
-		return QDF_STATUS_E_FAILURE;
-
-	wma_update_vdev_eht_ops(&dword_eht_op, eht_ops);
-
-	wma_debug("vdev_id: %d EHT_OPs: 0x%x", vdev_id, dword_eht_op);
-
-	ret = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-				 wmi_vdev_param_set_ehtop,
-				 dword_eht_op);
-
-	if (QDF_IS_STATUS_ERROR(ret))
-		wma_err("Failed to set EHT OPs");
-
-	return ret;
 }
 
 QDF_STATUS wma_get_eht_capabilities(struct eht_capability *eht_cap)

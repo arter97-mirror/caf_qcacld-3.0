@@ -141,20 +141,6 @@ void wma_vdev_set_eht_bss_params(tp_wma_handle wma, uint8_t vdev_id,
 				 struct vdev_mlme_eht_ops_info *eht_info);
 
 /**
- * wma_update_eht_ops_ie() - update the EHT OPS IE to firmware
- * @wma: pointer to wma context
- * @vdev_id: vdev id
- * @eht_ops: 32bit value of EHT ops
- *
- * This API is used to send updated EHT operational IE to firmware, so that
- * firmware can be in sync with host
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wma_update_eht_ops_ie(tp_wma_handle wma, uint8_t vdev_id,
-				 tDot11fIEeht_op *eht_ops);
-
-/**
  * wma_is_peer_eht_capable() - whether peer is eht capable or not
  * @params: add sta params
  *
