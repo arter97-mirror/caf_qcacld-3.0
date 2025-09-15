@@ -11916,10 +11916,13 @@ bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc,
 	if (policy_mgr_is_sta_present_on_dfs_channel(psoc, &vdev_id,
 						     &dfs_sta_frq,
 						     &ch_sta_width) &&
-	    !policy_mgr_is_hw_dbs_capable(psoc) &&
-	    sta_sap_scc_on_dfs_chnl != PM_STA_SAP_ON_DFS_DEFAULT) {
-		policymgr_nofl_err("DFS STA present vdev_id %d ch_feq %d ch_width %d",
-				   vdev_id, dfs_sta_frq, ch_sta_width);
+	    sta_sap_scc_on_dfs_chnl != PM_STA_SAP_ON_DFS_DEFAULT &&
+	    (!policy_mgr_is_hw_dbs_capable(psoc) ||
+	     (!policy_mgr_get_dfs_master_dynamic_enabled(
+					psoc, WLAN_INVALID_VDEV_ID) &&
+	      dfs_ch_frq == dfs_sta_frq))) {
+		policymgr_nofl_debug("DFS STA present vdev_id %d ch_feq %d ch_width %d",
+				     vdev_id, dfs_sta_frq, ch_sta_width);
 		return false;
 	}
 
