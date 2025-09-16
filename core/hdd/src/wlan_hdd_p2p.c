@@ -1331,7 +1331,7 @@ wlan_cfg80211_rx_mgmt_ext(struct wireless_dev *wdev,
 	struct wlan_objmgr_vdev *vdev;
 
 	info.freq = MHZ_TO_KHZ(rx_freq);
-	info.sig_dbm = rx_rssi * 100;
+	info.sig_dbm = rx_rssi;
 	info.buf = pb_frames;
 	info.len = frm_len;
 	info.flags = NL80211_RXMGMT_FLAG_ANSWERED | nl80211_flag;
@@ -1594,9 +1594,9 @@ check_adapter:
 		}
 
 		/* Indicate Frame Over Normal Interface */
-		hdd_debug_rl("vdev %d (if_idx %d): Indicate Frame type %d len %d freq %d over NL80211",
+		hdd_debug_rl("vdev %d (if_idx %d): Indicate Frame type %d len %d freq %d rx_rssi %d over NL80211",
 			     link_info->vdev_id, assoc_adapter->dev->ifindex,
-			     frame_type, frm_len, rx_freq);
+			     frame_type, frm_len, rx_freq, rx_rssi);
 
 		wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
