@@ -15887,6 +15887,8 @@ hdd_init_dhcp_server_ip(struct hdd_context *hdd_ctx)
 static void hdd_sar_cfg_update(struct hdd_config *config,
 			       struct wlan_objmgr_psoc *psoc)
 {
+	qdf_size_t sar_user_scenario_mapping_num;
+
 	config->sar_safety_timeout = cfg_get(psoc, CFG_SAR_SAFETY_TIMEOUT);
 	config->sar_safety_unsolicited_timeout =
 			cfg_get(psoc, CFG_SAR_SAFETY_UNSOLICITED_TIMEOUT);
@@ -15901,6 +15903,15 @@ static void hdd_sar_cfg_update(struct hdd_config *config,
 				cfg_get(psoc, CFG_ENABLE_SAR_SAFETY_FEATURE);
 	config->config_sar_safety_sleep_index =
 			cfg_get(psoc, CFG_CONFIG_SAR_SAFETY_SLEEP_MODE_INDEX);
+	qdf_uint8_array_parse(
+		cfg_get(psoc, CFG_ENABLE_SAR_USER_SCENARIO_TO_INDEX_MAPPING),
+		config->sar_us_to_dsi_mapping,
+		SAR_US_TO_DSI_MAPPING_STRING_LENGTH,
+		&sar_user_scenario_mapping_num);
+	config->sar_user_scenario_mapping_num =
+				(uint8_t)sar_user_scenario_mapping_num;
+	hdd_debug("Read sar array with size = %zu",
+		  sar_user_scenario_mapping_num);
 }
 
 void hdd_set_sar_init_index(struct hdd_context *hdd_ctx)

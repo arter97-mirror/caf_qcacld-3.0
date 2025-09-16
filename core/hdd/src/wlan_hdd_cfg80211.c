@@ -5547,6 +5547,33 @@ static inline void wlan_hdd_set_tx_power_feature(struct wlan_objmgr_psoc *psoc,
 				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_TX_POWER_LIMIT);
 }
 
+#ifdef SAR_SAFETY_FEATURE
+static inline void wlan_hdd_set_sar_user_scenario_to_dsi_mapping_feature(
+						struct hdd_config *config,
+						uint8_t *feature_flags)
+{
+	uint8_t flag;
+
+	flag = QCA_WLAN_VENDOR_FEATURE_SUPPORT_USER_SCENARIO_TO_DSI_MAPPING;
+
+		if (!config) {
+			hdd_err("Config is NULL");
+			return;
+		}
+
+	if (config->sar_user_scenario_mapping_num)
+		wlan_cfg80211_set_feature(feature_flags, flag);
+	else
+		hdd_err("SAR user scenario to dsi mapping is not enabled");
+}
+#else
+static inline void wlan_hdd_set_sar_user_scenario_to_dsi_mapping_feature(
+						struct hdd_config *config,
+						uint8_t *feature_flags)
+{
+}
+#endif
+
 #define MAX_CONCURRENT_CHAN_ON_24G    2
 #define MAX_CONCURRENT_CHAN_ON_5G     2
 
@@ -5683,6 +5710,8 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_wfd_r2_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_tx_power_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_pcc_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_sar_user_scenario_to_dsi_mapping_feature(hdd_ctx->config,
+							      feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +

@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -62,6 +63,12 @@ static u32 hdd_sar_wmi_to_nl_enable(uint32_t wmi_value)
 		return QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_USER;
 	case WMI_SAR_FEATURE_ON_SAR_V2_0:
 		return QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V2_0;
+	case WMI_SAR_FEATURE_ON_SAR_V3_0:
+		return QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V3_0;
+	case WMI_SAR_FEATURE_ON_SAR_V4_0:
+		return QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V4_0;
+	case WMI_SAR_FEATURE_ON_SAR_V5_0:
+		return QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V5_0;
 	}
 }
 
@@ -327,9 +334,8 @@ static u32 hdd_to_nl_sar_version(enum sar_version hdd_sar_version)
 	case (SAR_VERSION_4):
 		return QCA_WLAN_VENDOR_SAR_VERSION_4;
 	case (SAR_VERSION_5):
-		return QCA_WLAN_VENDOR_SAR_VERSION_5;
 	case (SAR_VERSION_6):
-		return QCA_WLAN_VENDOR_SAR_VERSION_1;
+		return QCA_WLAN_VENDOR_SAR_VERSION_5;
 	default:
 		hdd_err("Unexpected SAR version received :%u, sending default to userspace",
 			hdd_sar_version);
@@ -475,6 +481,8 @@ static int __wlan_hdd_get_sar_capability(struct wiphy *wiphy,
 	QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SPEC_POWER_LIMIT
 #define SAR_LIMITS_SPEC_POWER_LIMIT_INDEX \
 	QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SPEC_POWER_LIMIT_INDEX
+#define SAR_LIMITS_SPEC_USER_SCENARIO \
+	QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SPEC_USER_SCENARIO
 #define SAR_LIMITS_MAX QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_MAX
 
 const struct nla_policy
@@ -487,6 +495,7 @@ wlan_hdd_sar_limits_policy[SAR_LIMITS_MAX + 1] = {
 	[SAR_LIMITS_SPEC_MODULATION] = {.type = NLA_U32},
 	[SAR_LIMITS_SPEC_POWER_LIMIT] = {.type = NLA_U32},
 	[SAR_LIMITS_SPEC_POWER_LIMIT_INDEX] = {.type = NLA_U32},
+	[SAR_LIMITS_SPEC_USER_SCENARIO] = {.type = NLA_U32},
 };
 
 void hdd_store_sar_config(struct hdd_context *hdd_ctx,
@@ -547,6 +556,9 @@ static int wlan_hdd_cfg80211_sar_convert_limit_set(u32 nl80211_value,
 		*wmi_value = WMI_SAR_FEATURE_ON_USER_DEFINED;
 		break;
 	case QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V2_0:
+	case QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V3_0:
+	case QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V4_0:
+	case QCA_WLAN_VENDOR_ATTR_SAR_LIMITS_SELECT_V5_0:
 		*wmi_value = WMI_SAR_FEATURE_ON_SAR_V2_0;
 		break;
 
@@ -555,6 +567,69 @@ static int wlan_hdd_cfg80211_sar_convert_limit_set(u32 nl80211_value,
 	}
 	return ret;
 }
+
+#ifdef SAR_SAFETY_FEATURE
+/**
+ * hdd_populate_user_scenario() - populate user scenario to dsi for setting sar
+ * limits
+ * @hdd_ctx: The HDD global context
+ * @tb: The parsed array of netlink attributes
+ *
+ * This utility function returns the index value by fetching user scenario
+ * from the vendor command, and converting it using user scenario to DSI
+ * mapping ini.
+ *
+ * Return: index value of user scenario in the mapping table or error code
+ */
+
+static int
+hdd_populate_user_scenario(struct hdd_context *hdd_ctx,
+			   struct nlattr *tb[])
+{
+	struct hdd_config *config;
+	uint32_t user_scenario, index;
+
+	hdd_enter();
+
+	config = hdd_ctx->config;
+
+	if (!config) {
+		hdd_err("Config is NULL");
+		return -EINVAL;
+	}
+
+	if (!config->sar_user_scenario_mapping_num) {
+		hdd_err("No SAR user scenario mapping found");
+		return -EINVAL;
+	}
+
+	user_scenario = nla_get_u32(tb[SAR_LIMITS_SPEC_USER_SCENARIO]);
+	hdd_debug("Setting SAR limits for user scenario: %u", user_scenario);
+
+	if (user_scenario >= CFG_SAR_USER_SCENARIOS_MAX_LEN ||
+	    (2 * user_scenario + 1) >=
+				config->sar_user_scenario_mapping_num) {
+		hdd_err("Invalid SAR User scenario value received : user scenario : %u, mapping num : %u",
+			user_scenario, config->sar_user_scenario_mapping_num);
+		return -EINVAL;
+	}
+
+	user_scenario = 2 * user_scenario + 1;
+	index = config->sar_us_to_dsi_mapping[user_scenario];
+	hdd_debug("Fetched DSI: %u for user scenario", index);
+
+	hdd_exit();
+	return index;
+}
+#else
+static int
+hdd_populate_user_scenario(struct hdd_context *hdd_ctx,
+			   struct nlattr *tb[])
+{
+	hdd_err("SAR safety feature not enabled, not populating DSI as per user scenario");
+	return -EINVAL;
+}
+#endif
 
 #ifdef WLAN_FEATURE_SARV1_TO_SARV2
 /**
@@ -702,6 +777,7 @@ static int wlan_hdd_cfg80211_sar_convert_modulation(u32 nl80211_value,
  * hdd_extract_sar_nested_attrs() - Extract nested SAR attribute
  * @spec: nested nla attribute
  * @row: output to hold extract nested attribute
+ * @hdd_ctx: HDD context pointer
  *
  * This function extracts nested SAR attribute one at a time which means
  * for each nested attribute this has to be invoked from
@@ -711,16 +787,22 @@ static int wlan_hdd_cfg80211_sar_convert_modulation(u32 nl80211_value,
  *         On Failure - Negative value
  */
 static int hdd_extract_sar_nested_attrs(struct nlattr *spec[],
-					struct sar_limit_cmd_row *row)
+					struct sar_limit_cmd_row *row,
+					struct hdd_context *hdd_ctx)
 {
 	uint32_t limit;
 	uint32_t band;
 	uint32_t modulation;
-	int ret;
+	int ret, index = -1;
 
 	row->validity_bitmap = 0;
 
-	if (spec[SAR_LIMITS_SPEC_POWER_LIMIT]) {
+	if (spec[SAR_LIMITS_SPEC_USER_SCENARIO])
+		index = hdd_populate_user_scenario(hdd_ctx, spec);
+
+	if (index >= 0) {
+		row->limit_value = index;
+	} else if (spec[SAR_LIMITS_SPEC_POWER_LIMIT]) {
 		limit = nla_get_u32(spec[SAR_LIMITS_SPEC_POWER_LIMIT]);
 		row->limit_value = limit;
 	} else if (spec[SAR_LIMITS_SPEC_POWER_LIMIT_INDEX]) {
@@ -891,7 +973,7 @@ static int __wlan_hdd_set_sar_power_limits(struct wiphy *wiphy,
 			goto fail;
 		}
 
-		ret = hdd_extract_sar_nested_attrs(spec, row);
+		ret = hdd_extract_sar_nested_attrs(spec, row, hdd_ctx);
 		if (ret) {
 			hdd_err("Failed to extract SAR nested attrs");
 			goto fail;
@@ -942,6 +1024,7 @@ fail:
 #undef SAR_LIMITS_SPEC_MODULATION
 #undef SAR_LIMITS_SPEC_POWER_LIMIT
 #undef SAR_LIMITS_SPEC_POWER_LIMIT_INDEX
+#undef SAR_LIMITS_SPEC_USER_SCENARIO
 #undef SAR_LIMITS_MAX
 
 int wlan_hdd_cfg80211_set_sar_power_limits(struct wiphy *wiphy,

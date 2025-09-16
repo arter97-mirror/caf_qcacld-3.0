@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -261,6 +262,47 @@
 			0, \
 			"Config SAR sleep Index")
 
+/*
+ * <ini>
+ * gSarUserScenarioToIndexMapping - SAR user scenario to index mapping
+ * @Min: N/A
+ * @Max: N/A
+ * @Default: N/A
+ *
+ * This ini is used to set SAR user scenario to index mapping.
+ * SAR User scenario to Index Mapping input string format looks like below:
+ * gSarUserScenarioToIndexMapping="<User Scenario>,<Index>,..."
+ * For example:
+ * gSarUserScenarioToIndexMapping="1,0,2,1,3,2,4,3,5,4,6,5,7,6"
+ * The above input string means:
+ * For User scenario 1 enable index 0
+ * For User scenario 2 enable index 1
+ * For User scenario 3 enable index 2
+ * For User scenario 4 enable index 3
+ * For User scenario 5 enable index 4
+ * For User scenario 6 enable index 5
+ * For User scenario 7 enable index 6
+ * For valid values of user scenarios check enum qca_wifi_power_scenario
+ *
+ * Related: None
+ *
+ * Supported Feature: SAR
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define SAR_US_TO_DSI_MAPPING_STRING_LENGTH  (256)
+#define CFG_ENABLE_SAR_USER_SCENARIO_TO_INDEX_MAPPING CFG_INI_STRING( \
+	"gSarUserScenarioToIndexMapping", \
+	0, \
+	SAR_US_TO_DSI_MAPPING_STRING_LENGTH, \
+	"0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13,14,"\
+	"14,15,15,16,16,17,17,18,18,19,19,20,20,21,21,22,22,23,23,24,24,25," \
+	"25,26,26,27,27,28,28,29,29,30,30,31,31,32,32,33,33", \
+	"Map SAR user scenarios to DSI values")
+
 #define SAR_SAFETY_FEATURE_ALL \
 	CFG(CFG_SAR_SAFETY_TIMEOUT) \
 	CFG(CFG_SAR_SAFETY_UNSOLICITED_TIMEOUT) \
@@ -270,6 +312,7 @@
 	CFG(CFG_SAR_SAFETY_SLEEP_INDEX) \
 	CFG(CFG_ENABLE_SAR_SAFETY_FEATURE) \
 	CFG(CFG_CONFIG_SAR_SAFETY_SLEEP_MODE_INDEX) \
+	CFG(CFG_ENABLE_SAR_USER_SCENARIO_TO_INDEX_MAPPING) \
 
 #else
 #define SAR_SAFETY_FEATURE_ALL

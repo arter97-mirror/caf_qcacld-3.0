@@ -46,6 +46,8 @@ struct hdd_context;
 #define CFG_DP_RPS_RX_QUEUE_CPU_MAP_LIST_LEN 30
 
 #define FW_MODULE_LOG_LEVEL_STRING_LENGTH  (512)
+#define CFG_SAR_USER_SCENARIOS_MAX_LEN      (34)
+
 #define TX_SCHED_WRR_PARAMS_NUM            (5)
 
 /* Defines for all of the things we read from the configuration (registry). */
@@ -196,6 +198,8 @@ struct hdd_config {
 	uint32_t sar_safety_sleep_index;
 	uint8_t enable_sar_safety;
 	bool config_sar_safety_sleep_index;
+	uint8_t sar_us_to_dsi_mapping[SAR_US_TO_DSI_MAPPING_STRING_LENGTH];
+	uint8_t sar_user_scenario_mapping_num;
 #endif
 	uint8_t nb_commands_interval;
 
