@@ -472,6 +472,11 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 	bool nan_allowed = true;
 	bool enable_nan_on_dfs_channels = false;
 	wmi_unified_t wmi_handle;
+	uint8_t sta_count = 0;
+	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	bool cfg_sta_indoor_ch_peer_scc = false;
+	uint8_t i;
+	QDF_STATUS status;
 
 	wmi_handle = get_wmi_unified_hdl_from_pdev(pdev);
 	if (!wmi_handle) {
@@ -479,8 +484,20 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 		return false;
 	}
 
+	sta_count = policy_mgr_get_mode_specific_conn_info(wlan_pdev_get_psoc(pdev),
+							   freq_list,
+							   NULL, PM_STA_MODE);
+
 	wlan_mlme_get_support_for_nan_dfs_channel(wlan_pdev_get_psoc(pdev),
 						  &enable_nan_on_dfs_channels);
+
+	status = policy_mgr_get_cfg_sta_indoor_ch_peer_scc(wlan_pdev_get_psoc(pdev),
+							   &cfg_sta_indoor_ch_peer_scc);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("Failed to get cfg_sta_indoor_ch_peer_scc");
+		cfg_sta_indoor_ch_peer_scc = false;
+	}
 
 	/* Check for 6GHz channels */
 	if (wlan_reg_is_6ghz_chan_freq(freq)) {
@@ -501,6 +518,13 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 		} else
 			return false;
 	} else if (wlan_reg_is_freq_indoor(pdev, freq)) {
+		if (cfg_sta_indoor_ch_peer_scc) {
+			for (i = 0; i < sta_count; i++) {
+				if (freq_list[i] == freq)
+					return true;
+			}
+		}
+
 		wlan_mlme_get_indoor_support_for_nan(wlan_pdev_get_psoc(pdev),
 						     &nan_allowed);
 	} else if (wlan_reg_is_passive_for_freq(pdev, freq)) {
