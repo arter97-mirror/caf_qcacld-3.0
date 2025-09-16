@@ -85,7 +85,7 @@ void dp_haps_update_state(struct dp_haps *haps_ctx,
 		if (!qdf_hrtimer_is_queued(&haps_ctx->haps_fail_safe_timer) &&
 		    !qdf_hrtimer_callback_running(&haps_ctx->haps_fail_safe_timer))
 			dp_haps_start_timer(&haps_ctx->haps_fail_safe_timer,
-				qdf_time_ms_to_ktime(HAPS_MAX_PAUSE_TIME_MS));
+			     qdf_time_ms_to_ktime(haps_ctx->fail_safe_timeout));
 
 		dp_haps_stats_update(haps_ctx, curr_state, new_state);
 		break;
@@ -107,7 +107,7 @@ void dp_haps_update_state(struct dp_haps *haps_ctx,
 		if (is_one_shot && (curr_state == STATE_PAUSE)) {
 			haps_ctx->is_one_shot = false;
 			dp_haps_start_timer(&haps_ctx->haps_fail_safe_timer,
-				qdf_time_ms_to_ktime(HAPS_MAX_PAUSE_TIME_MS));
+			     qdf_time_ms_to_ktime(haps_ctx->fail_safe_timeout));
 			/* In the event of a one-shot upause record the
 			 * last_time since the state change will not take place,
 			 * and only a single unpause will occur from the host.
@@ -181,7 +181,7 @@ dp_haps_handle_ind(ol_osif_vdev_handle osif_vdev, enum cdp_haps_state new_state,
 		delta_us = time_rcvd - curr_time_us;
 		timeout = qdf_time_ns_to_ktime(delta_us * 1000);
 
-		if (timeout >= qdf_time_ms_to_ktime(HAPS_MAX_PAUSE_TIME_MS)) {
+		if (timeout >= qdf_time_ms_to_ktime(haps_ctx->fail_safe_timeout)) {
 			dp_err("HAPS: invalid timeout (%lu ns) received for vdev:%u",
 				timeout, haps_ctx->vdev_id);
 			return;
@@ -238,6 +238,27 @@ dp_haps_fail_safe_timer_handler(qdf_hrtimer_data_t *arg)
 		 haps_ctx->vdev_id);
 
 	return QDF_HRTIMER_NORESTART;
+}
+
+/**
+ * dp_haps_set_fail_safe_timeout() - Set fail safe timer timeout
+ * @dp_intf: wlan dp interface
+ * @is_default: if it's default or user defined
+ * @timeout: latency tolerance provided by user
+ *
+ * Returns: QDF_STATUS
+ */
+void dp_haps_set_fail_safe_timeout(struct wlan_dp_intf *dp_intf,
+				   bool is_default, uint16_t timeout)
+{
+	if (!dp_intf)
+		return;
+
+	if (is_default)
+		dp_intf->haps_ctx.fail_safe_timeout = HAPS_MAX_PAUSE_TIME_MS;
+	else
+		dp_intf->haps_ctx.fail_safe_timeout = timeout +
+						      HAPS_FAIL_SAFE_OFFSET_MS;
 }
 
 /**
@@ -348,6 +369,7 @@ void dp_vdev_haps_attach(struct cdp_soc *psoc, struct wlan_dp_intf *dp_intf,
 	haps_ctx->state = STATE_UNPAUSE;
 	haps_ctx->soc = soc;
 	haps_ctx->vdev_id = vdev_id;
+	haps_ctx->fail_safe_timeout = HAPS_MAX_PAUSE_TIME_MS;
 
 	qdf_mem_set(&haps_ctx->stats, 0, sizeof(struct dp_haps_stats));
 	haps_ctx->stats.start_time = US_TO_MS(qdf_get_log_timestamp_usecs());

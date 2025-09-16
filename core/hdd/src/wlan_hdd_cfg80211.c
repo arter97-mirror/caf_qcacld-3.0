@@ -10846,6 +10846,9 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 
 		if (ret)
 			return ret;
+
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, false,
+						   ps_params.spec_wake);
 	}
 
 	if (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED) {
@@ -10867,13 +10870,18 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 
 		if (ret)
 			return ret;
+
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, false,
+						   ps_params.spec_wake);
 	}
 
 	if ((opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) ||
-	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED))
+	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED)) {
 		ucfg_pmo_set_ps_params(vdev, &ps_params);
-	else
+	} else {
 		ucfg_pmo_core_vdev_set_ps_opm_mode(vdev, ps_params.opm_mode);
+		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, true, 0);
+	}
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	return 0;
