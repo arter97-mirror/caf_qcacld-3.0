@@ -2882,6 +2882,25 @@ void ucfg_dp_haps_clear_stats(struct wlan_objmgr_psoc *psoc)
 	return dp_clear_haps_stats(psoc);
 }
 
+void ucfg_dp_haps_set_fail_safe_timeout(qdf_netdev_t dev, bool is_default,
+					uint16_t timeout)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+	struct wlan_dp_intf *dp_intf;
+
+	dp_ctx = dp_get_context();
+	if (!dp_ctx)
+		return;
+
+	dp_intf = dp_get_intf_by_netdev(dp_ctx, dev);
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return;
+	}
+
+	return dp_haps_set_fail_safe_timeout(dp_intf, is_default, timeout);
+}
+
 QDF_STATUS ucfg_dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc,
 				     qdf_cpu_mask *new_mask)
 {

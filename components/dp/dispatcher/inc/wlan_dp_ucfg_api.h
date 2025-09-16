@@ -1611,6 +1611,16 @@ QDF_STATUS ucfg_dp_haps_dump_stats(struct wlan_objmgr_psoc *psoc);
 void ucfg_dp_haps_clear_stats(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_dp_haps_set_fail_safe_timeout - set haps fail safe timer timeout
+ * @dev: netdev
+ * @is_default: is it default or user defined
+ * @timeout: latency tolerance provided by user
+ *
+ * Return: none
+ */
+void ucfg_dp_haps_set_fail_safe_timeout(qdf_netdev_t dev, bool is_default,
+					uint16_t timeout);
+/**
  * ucfg_dp_txrx_set_cpu_mask() - set CPU mask for RX threads
  * @soc: ol_txrx_soc_handle object
  * @new_mask: New CPU mask pointer
