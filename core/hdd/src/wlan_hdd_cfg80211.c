@@ -24240,8 +24240,8 @@ static void wlan_hdd_update_lfr_wiphy(struct hdd_context *hdd_ctx)
 }
 #endif
 
-#if defined (CFG80211_SA_QUERY_OFFLOAD_SUPPORT) || \
-	    (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+#if defined(CFG80211_SA_QUERY_OFFLOAD_SUPPORT) && \
+	defined(WLAN_FEATURE_SA_QUERY_OFFLOAD)
 /**
  * wlan_hdd_set_sa_query_offload_wiphy() - set sa query offload cap in sme cap
  * @hdd_ctx: HDD context

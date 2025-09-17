@@ -4846,7 +4846,7 @@ bool lim_isconnected_on_dfs_freq(struct mac_context *mac_ctx,
 		return false;
 }
 
-#ifdef CFG80211_SA_QUERY_OFFLOAD_SUPPORT
+#ifdef WLAN_FEATURE_SA_QUERY_OFFLOAD
 static void lim_get_ap_ocv_cap(struct pe_session *session,
 			       bool *is_ap_ovc_enabled)
 {
@@ -5005,7 +5005,7 @@ void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
 		pe_debug("Post CSA OCV SA Query waiting timer started");
 	}
 }
-#endif /* CFG80211_SA_QUERY_OFFLOAD_SUPPORT */
+#endif /* WLAN_FEATURE_SA_QUERY_OFFLOAD */
 
 void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param)
 {
