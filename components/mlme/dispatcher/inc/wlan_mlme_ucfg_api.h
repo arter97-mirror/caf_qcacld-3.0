@@ -1026,6 +1026,20 @@ bool ucfg_mlme_is_chain_mask_supported(struct wlan_objmgr_psoc *psoc)
 	return wlan_mlme_is_chain_mask_supported(psoc);
 }
 
+static inline
+QDF_STATUS ucfg_mlme_set_chain_mask(struct wlan_objmgr_psoc *psoc,
+				    uint8_t tx_mask, uint8_t rx_mask)
+{
+	return wlan_mlme_set_chain_mask(psoc, tx_mask, rx_mask);
+}
+
+static inline
+QDF_STATUS ucfg_mlme_get_chain_mask(struct wlan_objmgr_psoc *psoc,
+				    uint8_t *tx_mask, uint8_t *rx_mask)
+{
+	return wlan_mlme_get_chain_mask(psoc, tx_mask, rx_mask);
+}
+
 /*
  * ucfg_mlme_get_sta_keep_alive_period() - Get the sta keep alive period
  * @psoc: pointer to psoc object

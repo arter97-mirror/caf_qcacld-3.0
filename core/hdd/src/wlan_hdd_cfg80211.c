@@ -32302,6 +32302,8 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	struct dev_set_param setparam[MAX_PDEV_TXRX_PARAMS] = {};
 	uint8_t index = 0;
 	uint8_t ll_lt_sap_vdev_id;
+	QDF_STATUS status;
+
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
@@ -32332,10 +32334,11 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	if (sme_validate_txrx_chain_mask(wmi_pdev_param_tx_chain_mask, tx_mask))
 		return -EINVAL;
 
-	ret = mlme_check_index_setparam(
-				setparam, wmi_pdev_param_tx_chain_mask,
-				tx_mask, index++, MAX_PDEV_TXRX_PARAMS);
-	if (QDF_IS_STATUS_ERROR(ret)) {
+	status = mlme_check_index_setparam(setparam,
+					   wmi_pdev_param_tx_chain_mask,
+					   tx_mask, index++,
+					   MAX_PDEV_TXRX_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed at wmi_pdev_param_tx_chain_mask");
 		return -EINVAL;
 	}
@@ -32343,21 +32346,28 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	if (sme_validate_txrx_chain_mask(wmi_pdev_param_rx_chain_mask, rx_mask))
 		return -EINVAL;
 
-	ret = mlme_check_index_setparam(
-				setparam, wmi_pdev_param_rx_chain_mask,
-				rx_mask, index++, MAX_PDEV_TXRX_PARAMS);
-	if (QDF_IS_STATUS_ERROR(ret)) {
+	status = mlme_check_index_setparam(setparam,
+					   wmi_pdev_param_rx_chain_mask,
+					   rx_mask, index++,
+					   MAX_PDEV_TXRX_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed at wmi_pdev_param_rx_chain_mask");
 		return -EINVAL;
 	}
 
-	ret = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
-						  WMI_PDEV_ID_SOC, setparam,
-						  index);
-	if (QDF_IS_STATUS_ERROR(ret))
+	status = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						     WMI_PDEV_ID_SOC, setparam,
+						     index);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed to send TX, RX chain mask params");
+		return qdf_status_to_os_return(status);
+	}
 
-	return ret;
+	status = ucfg_mlme_set_chain_mask(hdd_ctx->psoc, tx_mask, rx_mask);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("failed to send TX, RX chain mask to mlme");
+
+	return qdf_status_to_os_return(status);
 }
 
 static int wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
@@ -32384,15 +32394,18 @@ static int __wlan_hdd_cfg80211_get_chainmask(struct wiphy *wiphy,
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	int ret;
+	QDF_STATUS status;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
 		return -EINVAL;
 
-	*tx_mask = wma_cli_get_command(0, wmi_pdev_param_tx_chain_mask,
-				       PDEV_CMD);
-	*rx_mask = wma_cli_get_command(0, wmi_pdev_param_rx_chain_mask,
-				       PDEV_CMD);
+	status = ucfg_mlme_get_chain_mask(hdd_ctx->psoc, (uint8_t *)tx_mask,
+					  (uint8_t *)rx_mask);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to get TX, RX chain mask from mlme");
+		return -EINVAL;
+	}
 
 	/* if 0 return max value as 0 mean no set cmnd received yet */
 	if (!*tx_mask)
