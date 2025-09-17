@@ -1835,7 +1835,7 @@ pmo_core_config_non_li_offload_modulated_dtim(struct wlan_objmgr_vdev *vdev,
 	if (!max_dtim) {
 		pmo_err("Invalid dtim period");
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
-		return QDF_STATUS_E_INVAL;
+		return QDF_STATUS_E_NOSUPPORT;
 	}
 
 	max_mod_dtim = psoc_cfg->sta_max_li_mod_dtim /
