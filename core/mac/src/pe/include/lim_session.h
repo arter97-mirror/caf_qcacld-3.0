@@ -410,6 +410,20 @@ struct dfs_p2p_group_info {
 };
 
 /**
+ * struct punc_chan_info - Channel information
+ * @chan_width: channel width
+ * @center_freq_seg0: Center frequency segment 0
+ * @center_freq_seg1: Center frequency segment 1
+ * @present: boolean flag
+ */
+struct punc_chan_info {
+	uint8_t chan_width;
+	uint8_t center_freq_seg0;
+	uint8_t center_freq_seg1;
+	bool present;
+};
+
+/**
  * struct pe_session - per-vdev PE context
  * @available: true if the entry is available, false if it is in use
  * @cm_id:
@@ -667,6 +681,7 @@ struct dfs_p2p_group_info {
  * @he_op:
  * @he_sta_obsspd:
  * @he_6ghz_band:
+ * @he_punc_chan_info: HE punctured channel info
  * @he_bss_color_change:
  * @bss_color_info:
  * @bss_color_changing:
@@ -997,6 +1012,7 @@ struct pe_session {
 	uint8_t bss_color_changing;
 #endif
 #endif
+	struct punc_chan_info he_punc_chan_info;
 	struct deauth_retry_params deauth_retry;
 	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;

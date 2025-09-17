@@ -227,6 +227,7 @@
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_cfg80211_p2p.h"
 #include "wlan_ll_sap_api.h"
+#include "wlan_dnw_ucfg_api.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -2208,7 +2209,7 @@ static int is_driver_dfs_capable(struct wiphy *wiphy,
 /**
  * wlan_hdd_sap_cfg_dfs_override() - DFS MCC restriction check
  *
- * @adapter: SAP adapter pointer
+ * @link_info: SAP link info
  *
  * DFS in MCC is not supported for Multi bssid SAP mode due to single physical
  * radio. So in case of DFS MCC scenario override current SAP given config
@@ -2216,21 +2217,20 @@ static int is_driver_dfs_capable(struct wiphy *wiphy,
  *
  * Return: 0 - No DFS issue, 1 - Override done and negative error codes
  */
-int wlan_hdd_sap_cfg_dfs_override(struct hdd_adapter *adapter)
+int wlan_hdd_sap_cfg_dfs_override(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_adapter *con_sap_adapter;
 	struct sap_config *sap_config, *con_sap_config;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint32_t con_vdev_id, con_ch_freq;
-	struct wlan_hdd_link_info *link_info;
+	struct wlan_hdd_link_info *conc_link_info;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd context is NULL");
 		return 0;
 	}
 
-	sap_config = &adapter->deflink->session.ap.sap_config;
-
+	sap_config = &link_info->session.ap.sap_config;
 	if (!policy_mgr_is_sap_override_dfs_required(hdd_ctx->pdev,
 						     sap_config->chan_freq,
 						     sap_config->ch_width_orig,
@@ -2242,20 +2242,28 @@ int wlan_hdd_sap_cfg_dfs_override(struct hdd_adapter *adapter)
 						     &con_ch_freq))
 		return 0;
 
-	if (con_vdev_id >= WLAN_UMAC_VDEV_ID_MAX)
+	if (con_vdev_id >= WLAN_UMAC_VDEV_ID_MAX ||
+	    con_vdev_id == link_info->vdev_id)
 		return 0;
 
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, con_vdev_id);
-	if (!link_info) {
+	conc_link_info = hdd_get_link_info_by_vdev(hdd_ctx, con_vdev_id);
+	if (!conc_link_info) {
 		hdd_err("Invalid vdev");
 		return -EINVAL;
 	}
 
-	con_sap_adapter = link_info->adapter;
+	con_sap_adapter = conc_link_info->adapter;
 	if (!con_sap_adapter)
 		return 0;
 
-	con_sap_config = &con_sap_adapter->deflink->session.ap.sap_config;
+	/* channels of different link of same ML SAP should not same */
+	if (con_sap_adapter == link_info->adapter) {
+		hdd_debug("vdev %d and conc vdev %d belong to same adapter",
+			  link_info->vdev_id, con_vdev_id);
+		return 0;
+	}
+
+	con_sap_config = &conc_link_info->session.ap.sap_config;
 
 	hdd_debug("Only SCC AP-AP DFS Permitted (ch_freq=%d, con_ch_freq=%d)",
 		  sap_config->chan_freq, con_ch_freq);
@@ -2532,7 +2540,7 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 	    !(policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
 	    WLAN_REG_IS_24GHZ_CH_FREQ(sap_config->acs_cfg.end_ch_freq)) &&
 	    !wlansap_dcs_is_wlan_interference_mitigation_enabled(sap_ctx)) {
-		status = wlan_hdd_sap_cfg_dfs_override(adapter);
+		status = wlan_hdd_sap_cfg_dfs_override(link_info);
 		if (status < 0)
 			return status;
 
@@ -8837,7 +8845,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_P2P_GO_BEACON_INTERVAL] = {
 		.type = NLA_U16},
-
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_NO_WAIT_SUPPORT] = {
+		.type = NLA_U8},
 };
 
 
@@ -12901,6 +12910,40 @@ static int hdd_set_p2p_go_bcn_int(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_DNW
+/**
+ * hdd_config_dfs_no_wait_support() - Config DFS No Wait support
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_config_dfs_no_wait_support(struct wlan_hdd_link_info *link_info,
+					  const struct nlattr *attr)
+{
+	uint8_t support_dnw;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	int errno;
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+	support_dnw = nla_get_u8(attr);
+
+	hdd_debug("configure dnw %d", support_dnw);
+	ucfg_set_dfs_no_wait_support(hdd_ctx->pdev, support_dnw);
+
+	return 0;
+}
+#else
+static inline int
+hdd_config_dfs_no_wait_support(struct wlan_hdd_link_info *link_info,
+			       const struct nlattr *attr)
+{
+	return 0;
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * hdd_set_eht_emlsr_capability() - Set EMLSR capability for EHT STA
@@ -13422,6 +13465,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_reset_btm_abridge_flag},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_P2P_GO_BEACON_INTERVAL,
 	 hdd_set_p2p_go_bcn_int},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_DFS_NO_WAIT_SUPPORT,
+	 hdd_config_dfs_no_wait_support},
 };
 
 #ifdef WLAN_FEATURE_ELNA
@@ -30191,6 +30236,7 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	struct hdd_hostapd_state *hostapd_state;
 	struct wlan_hdd_link_info *link_info;
 	uint16_t csa_punct_bitmap;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -30221,6 +30267,10 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	if (!status)
 		return -EINVAL;
 
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
 				    CSA_REASON_USER_INITIATED);
 
@@ -30241,16 +30291,21 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d",
 			csa_params->chandef.chan->center_freq, ret);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return ret;
 	}
 
 	status = qdf_wait_for_event_completion(&hostapd_state->qdf_event,
 					       SME_CMD_START_BSS_TIMEOUT);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wait for qdf_event failed!!");
-	else
+	} else {
+		wlan_set_sap_user_config_freq(vdev,
+			csa_params->chandef.chan->center_freq);
 		hdd_debug("csa done");
+	}
 
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	return ret;
 }
 
@@ -30827,14 +30882,28 @@ wlan_hdd_extauth_cache_pmkid(struct hdd_adapter *adapter,
 {
 	struct wlan_crypto_pmksa *pmk_cache;
 	QDF_STATUS result;
+	struct qdf_mac_addr mld_addr;
 
 	if (params->pmkid) {
 		pmk_cache = qdf_mem_malloc(sizeof(*pmk_cache));
 		if (!pmk_cache)
 			return;
 
-		qdf_mem_copy(pmk_cache->bssid.bytes, params->bssid,
-			     QDF_MAC_ADDR_SIZE);
+		qdf_zero_macaddr(&mld_addr);
+		sme_pmkid_get_mld_addr(adapter->hdd_ctx->mac_handle,
+				       (uint8_t *)params->bssid,
+				       (uint8_t *)&mld_addr.bytes);
+
+		if (!qdf_is_macaddr_zero(&mld_addr)) {
+			hdd_debug("bssid " QDF_MAC_ADDR_FMT " new " QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(params->bssid),
+				  QDF_MAC_ADDR_REF(mld_addr.bytes));
+			qdf_copy_macaddr(&pmk_cache->bssid, &mld_addr);
+		} else {
+			qdf_mem_copy(pmk_cache->bssid.bytes, params->bssid,
+				     QDF_MAC_ADDR_SIZE);
+		}
+
 		qdf_mem_copy(pmk_cache->pmkid, params->pmkid,
 			     PMKID_LEN);
 		result = wlan_hdd_set_pmksa_cache(adapter, pmk_cache);
@@ -31694,6 +31763,8 @@ wlan_hdd_cfg80211_get_channel_sap(struct wiphy *wiphy,
 	case eCSR_DOT11_MODE_11ac_ONLY:
 	case eCSR_DOT11_MODE_11ax:
 	case eCSR_DOT11_MODE_11ax_ONLY:
+	case eCSR_DOT11_MODE_11be:
+	case eCSR_DOT11_MODE_11be_ONLY:
 		is_legacy_phymode = false;
 		break;
 	default:

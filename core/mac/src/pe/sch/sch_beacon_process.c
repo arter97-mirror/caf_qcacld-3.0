@@ -485,6 +485,15 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	bcn_vht_chwidth = lim_get_vht_ch_width(vht_caps, vht_op,
 					       &bcn->HTInfo,
 					       &bcn->OperatingMode);
+	/*
+	 * STA doesn't support 80 + 80 operation.
+	 * In lim_set_session_channel_params() the session->ch_width
+	 * is restrictd to 80 MHz if AP advertises 80 + 80.
+	 * Add similar logic here.
+	 */
+	if (bcn_vht_chwidth == CH_WIDTH_80P80MHZ)
+		bcn_vht_chwidth = CH_WIDTH_80MHZ;
+
 	lim_update_channel_width(mac_ctx, sta_ds, session,
 				 bcn_vht_chwidth, &ch_bw);
 }

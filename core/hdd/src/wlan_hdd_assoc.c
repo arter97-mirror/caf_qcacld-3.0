@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1518,7 +1518,6 @@ QDF_STATUS hdd_change_peer_state(struct wlan_hdd_link_info *link_info,
 		    WLAN_WDS_MODE_REPEATER))
 			hdd_config_wds_repeater_mode(link_info, peer_mac);
 
-		hdd_son_deliver_peer_authorize_event(link_info, peer_mac);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -1543,7 +1542,6 @@ QDF_STATUS hdd_change_peer_state(struct wlan_hdd_link_info *link_info,
 		    WLAN_WDS_MODE_REPEATER))
 			hdd_config_wds_repeater_mode(link_info, peer_mac);
 
-		hdd_son_deliver_peer_authorize_event(link_info, peer_mac);
 	}
 	return QDF_STATUS_SUCCESS;
 }

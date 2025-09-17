@@ -13299,6 +13299,26 @@ hdd_dp_register_ipa_wds_callbacks(struct wlan_dp_psoc_callbacks *cb_obj)
 }
 #endif /* IPA_WDS_EASYMESH_FEATURE */
 
+static QDF_STATUS wlan_hdd_get_netdev_by_vdev_id(uint32_t vdev_id,
+						 struct net_device **dev)
+{
+	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return QDF_STATUS_E_INVAL;
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("failed to get link info by vdev id %u", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*dev = link_info->adapter->dev;
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * hdd_dp_register_callbacks() - Register DP callbacks with HDD
  * @hdd_ctx: HDD context
@@ -13343,6 +13363,7 @@ static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.dp_gro_rx_legacy_get_napi = hdd_legacy_gro_get_napi;
 	cb_obj.link_monitoring_cb = wlan_hdd_link_speed_update;
 	cb_obj.dp_fils_hlp_rx = hdd_fils_hlp_rx;
+	cb_obj.dp_get_ndev_by_vdev_id = wlan_hdd_get_netdev_by_vdev_id;
 	hdd_dp_register_ipa_wds_callbacks(&cb_obj);
 	os_if_dp_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }
@@ -13981,7 +14002,7 @@ QDF_STATUS hdd_switch_sap_channel(struct wlan_hdd_link_info *link_info,
 						      forced);
 }
 
-QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
+QDF_STATUS hdd_switch_sap_chan_freq(struct wlan_hdd_link_info *link_info,
 				    qdf_freq_t chan_freq,
 				    enum phy_ch_width ch_width,
 				    bool forced)
@@ -13989,21 +14010,21 @@ QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
 	struct hdd_ap_ctx *hdd_ap_ctx;
 	struct hdd_context *hdd_ctx;
 
-	if (hdd_validate_adapter(adapter))
+	if (hdd_validate_adapter(link_info->adapter))
 		return QDF_STATUS_E_INVAL;
 
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 
 	if(wlan_hdd_validate_context(hdd_ctx))
 		return QDF_STATUS_E_INVAL;
 
-	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter->deflink);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 
 	hdd_debug("chan freq:%d width:%d org bw %d",
 		  chan_freq, ch_width, hdd_ap_ctx->sap_config.ch_width_orig);
 
 	return policy_mgr_change_sap_channel_with_csa(hdd_ctx->psoc,
-						      adapter->deflink->vdev_id,
+						      link_info->vdev_id,
 						      chan_freq,
 						      ch_width,
 						      forced);
@@ -14091,7 +14112,7 @@ hdd_store_sap_restart_channel(qdf_freq_t restart_chan, qdf_freq_t *restart_chan_
 /**
  * hdd_check_chn_bw_boundary_unsafe() - check channel range unsafe
  * @hdd_ctxt: hdd context pointer
- * @adapter:  hdd adapter pointer
+ * @ap_ctx:  hdd ap context pointer
  *
  * hdd_check_chn_bw_boundary_unsafe check SAP channel range with certain
  * bandwidth whether cover all unsafe channel list.
@@ -14100,7 +14121,7 @@ hdd_store_sap_restart_channel(qdf_freq_t restart_chan, qdf_freq_t *restart_chan_
  */
 static bool
 hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
-				 struct hdd_adapter *adapter)
+				 struct hdd_ap_ctx *ap_ctx)
 {
 	uint32_t freq;
 	uint32_t start_freq = 0;
@@ -14109,8 +14130,8 @@ hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
 	uint8_t ch_width;
 	const struct bonded_channel_freq *bonded_chan_ptr_ptr = NULL;
 
-	freq = adapter->deflink->session.ap.operating_chan_freq;
-	ch_width = adapter->deflink->session.ap.sap_config.acs_cfg.ch_width;
+	freq = ap_ctx->operating_chan_freq;
+	ch_width = ap_ctx->sap_config.acs_cfg.ch_width;
 
 	if (ch_width > CH_WIDTH_20MHZ)
 		bonded_chan_ptr_ptr =
@@ -14200,7 +14221,7 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 				hdd_debug("SAP allowed in unsafe SCC channel");
 			else
 				found = hdd_check_chn_bw_boundary_unsafe(hdd_ctx,
-									 adapter);
+									 ap_ctx);
 			if (!found) {
 				hdd_store_sap_restart_channel(ap_chan_freq,
 							      restart_chan_store);
@@ -14271,7 +14292,7 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
 				wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc,
 						    link_info->vdev_id,
 						    CSA_REASON_UNSAFE_CHANNEL);
-				status = hdd_switch_sap_chan_freq(adapter,
+				status = hdd_switch_sap_chan_freq(link_info,
 								  restart_freq,
 								  ch_width,
 								  true);
@@ -15339,6 +15360,9 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 
 	config->iface_change_wait_time = cfg_get(psoc,
 						 CFG_INTERFACE_CHANGE_WAIT);
+
+	config->shutdown_bootskip = cfg_get(psoc,
+					    CFG_INTERFACE_CHANGE_WAIT_BOOT_SKIP);
 
 	config->multicast_host_fw_msgs = cfg_get(psoc,
 						 CFG_MULTICAST_HOST_FW_MSGS);
@@ -18624,7 +18648,8 @@ QDF_STATUS hdd_psoc_create_vdevs(struct hdd_context *hdd_ctx)
 	ucfg_dp_try_set_rps_cpu_mask(hdd_ctx->psoc);
 
 	if (driver_mode != QDF_GLOBAL_FTM_MODE &&
-	    driver_mode != QDF_GLOBAL_EPPING_MODE)
+	    driver_mode != QDF_GLOBAL_EPPING_MODE &&
+	    !hdd_ctx->config->shutdown_bootskip)
 		hdd_psoc_idle_timer_start(hdd_ctx);
 
 	return QDF_STATUS_SUCCESS;
