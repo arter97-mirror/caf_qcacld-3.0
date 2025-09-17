@@ -1556,6 +1556,10 @@ bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
 	    qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		config = &link_info->session.ap.sap_config;
 		qdf_copy_macaddr(&info->bssid, &config->self_macaddr);
+		qdf_mem_copy(info->ssid, config->SSIDinfo.ssid.ssId,
+			     config->SSIDinfo.ssid.length);
+		/* NULL Terminate the string */
+		info->ssid[config->SSIDinfo.ssid.length] = 0;
 	}
 	wlan_reg_get_cc_and_src(adapter->hdd_ctx->psoc, info->countryStr);
 	wlan_reg_get_cc_and_src(adapter->hdd_ctx->psoc, info->apCountryStr);
