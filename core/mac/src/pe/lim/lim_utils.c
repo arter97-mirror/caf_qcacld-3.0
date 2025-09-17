@@ -2180,6 +2180,11 @@ QDF_STATUS lim_switch_primary_channel(struct mac_context *mac,
 	pe_session->ch_center_freq_seg0 = 0;
 	pe_session->ch_center_freq_seg1 = 0;
 	pe_session->ch_width = CH_WIDTH_20MHZ;
+	pe_session->htSecondaryChannelOffset = 0;
+	pe_session->htSupportedChannelWidthSet =
+		WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
+	pe_session->htRecommendedTxWidthSet =
+		pe_session->htSupportedChannelWidthSet;
 	lim_set_puncture_from_chan_switch_to_session(pe_session);
 	pe_session->limRFBand = lim_get_rf_band(pe_session->curr_req_chan_freq);
 
