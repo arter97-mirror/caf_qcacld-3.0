@@ -128,6 +128,7 @@ struct dp_rtpm_tput_policy_context {
  * @lro_enable: Enable/Disable lro
  * @gro_enable: Enable/Disable gro
  * @is_rx_fisa_enabled: flag to enable/disable FISA Rx
+ * @is_fisa_aggr_enabled: flag to check FISA aggregation enable/disable
  * @is_rx_fisa_lru_del_enabled: flag to enable/disable FST entry delete
  * @is_direct_link_enabled: indicates whether direct link is enabled or not
  * @wlm_rx_aggr_control: Control Rx aggregation based on WLM state
@@ -202,7 +203,6 @@ struct wlan_dp_psoc_cfg {
 	uint16_t pkt_bundle_size;
 #endif
 	uint32_t dp_proto_event_bitmap;
-	uint32_t fisa_enable;
 
 	int icmp_req_to_fw_mark_interval;
 
@@ -210,6 +210,7 @@ struct wlan_dp_psoc_cfg {
 	bool gro_enable;
 #ifdef WLAN_SUPPORT_RX_FISA
 	bool is_rx_fisa_enabled;
+	bool is_fisa_aggr_enabled;
 	bool is_rx_fisa_lru_del_enabled;
 #endif
 #ifdef FEATURE_DIRECT_LINK
@@ -603,6 +604,8 @@ struct fse_cache_flush_history {
  * @rx_toeplitz_hash_key: hash key
  * @rx_pkt_tlv_size: RX packet TLV size
  * @add_tcp_flow_to_fst: Add tcp flow to the FST table
+ * @fisa_initialized: flag to check FISA initialization status
+ * @is_fisa_aggr_enabled: flag to check FISA aggregation enable/disable
  */
 struct dp_rx_fst {
 	uint8_t *base;
@@ -640,6 +643,8 @@ struct dp_rx_fst {
 	uint8_t *rx_toeplitz_hash_key;
 	uint16_t rx_pkt_tlv_size;
 	bool add_tcp_flow_to_fst;
+	bool fisa_initialized;
+	bool is_fisa_aggr_enabled;
 };
 
 /**
@@ -1041,7 +1046,6 @@ struct wlan_dp_psoc_context {
 	struct dp_rx_fst *rx_fst;
 	uint64_t fst_cmem_base;
 	bool fst_in_cmem;
-	uint8_t fisa_enable;
 	uint8_t fisa_lru_del_enable;
 	bool fisa_dynamic_aggr_size_support;
 	/*

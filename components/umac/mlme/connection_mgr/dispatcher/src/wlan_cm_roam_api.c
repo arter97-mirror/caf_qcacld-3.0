@@ -166,6 +166,8 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	if (!is_update) {
 		assoc_chan_info->assoc_ch_width = CH_WIDTH_INVALID;
 		return;
+	} else {
+		wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
 	}
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
@@ -3789,10 +3791,14 @@ cm_roam_stats_print_scan_info(struct wlan_objmgr_psoc *psoc,
 		buf_cons = qdf_snprint(tmp, buf_left, "{");
 		buf_left -= buf_cons;
 		tmp += buf_cons;
-
 		for (i = 0; i < num_ch; i++) {
 			buf_cons = qdf_snprint(tmp, buf_left, "%d ",
 					       scan->chan_freq[i]);
+			if (buf_cons > buf_left) {
+				mlme_err("buf_left size insufficient");
+				qdf_mem_free(buf);
+				return;
+			}
 			buf_left -= buf_cons;
 			tmp += buf_cons;
 		}

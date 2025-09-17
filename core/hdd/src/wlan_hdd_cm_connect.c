@@ -60,6 +60,7 @@
 #include "wlan_hdd_ioctl.h"
 #include "wlan_hdd_stats.h"
 #include "wlan_cp_stats_ucfg_api.h"
+#include "wma_api.h"
 
 #define MAX_ROAM_COUNT_VALUE (999)
 
@@ -462,92 +463,54 @@ static void hdd_update_scan_ie_for_connect(struct hdd_adapter *adapter,
 	defined(CFG80211_11BE_BASIC)) && \
 	defined(WLAN_FEATURE_11BE)
 /**
- * hdd_update_action_oui_for_connect() - Update Action OUI for 802.11be AP
+ * hdd_update_standard_for_connect() - Update standard version for connect
  * @hdd_ctx: hdd context
  * @req: connect request parameter
+ * @vdev: vdev
  *
- * If user sets flag ASSOC_REQ_DISABLE_EHT in connect request, driver
- * will send action oui "ffffff 00 01" to host mlme and also firmware
- * for action id ACTION_OUI_11BE_OUI_ALLOW, so that all the AP will
- * be not matched with this OUI and 802.11be mode will not be allowed,
- * possibly downgrade to 11ax will happen.
- * If user doesn't set ASSOC_REQ_DISABLE_EHT, driver/firmware will
- * recover to default INI setting.
+ * If user sets flag ASSOC_REQ_DISABLE_EHT/ASSOC_REQ_DISABLE_HE in connect
+ * request, need limit connection/roaming Dot11 mode to wifi6/5.
  *
  * Returns: void
  */
 static void
-hdd_update_action_oui_for_connect(struct hdd_context *hdd_ctx,
-				  struct cfg80211_connect_params *req)
+hdd_update_standard_for_connect(struct hdd_context *hdd_ctx,
+				struct cfg80211_connect_params *req,
+				struct wlan_objmgr_vdev *vdev)
 {
-	QDF_STATUS status;
-	uint8_t *str;
-	bool usr_disable_eht;
+	WMI_HOST_WIFI_STANDARD std = WMI_HOST_WIFI_STANDARD_7;
+	uint8_t vdev_id;
+	int ret;
 
-	if (!ucfg_action_oui_enabled(hdd_ctx->psoc))
-		return;
-
-	usr_disable_eht = ucfg_mlme_get_usr_disable_sta_eht(hdd_ctx->psoc);
-	if (req->flags & ASSOC_REQ_DISABLE_EHT ||
-	    !(req->flags & CONNECT_REQ_MLO_SUPPORT)) {
-		if (usr_disable_eht) {
-			hdd_debug("user eht is disabled already");
-			return;
-		}
-		status = ucfg_action_oui_cleanup(
-				hdd_ctx->psoc, ACTION_OUI_11BE_OUI_ALLOW);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			hdd_err("Failed to cleanup oui id %d",
-				ACTION_OUI_11BE_OUI_ALLOW);
-			return;
-		}
-		status = ucfg_action_oui_parse(hdd_ctx->psoc,
-					       ACTION_OUI_INVALID,
-					       ACTION_OUI_11BE_OUI_ALLOW);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			hdd_err("Failed to parse action_oui str for id %d",
-				ACTION_OUI_11BE_OUI_ALLOW);
-			return;
-		}
-	} else {
-		if (!usr_disable_eht) {
-			hdd_debug("user eht is enabled already");
-			return;
-		}
-		status = ucfg_action_oui_cleanup(hdd_ctx->psoc,
-						 ACTION_OUI_11BE_OUI_ALLOW);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			hdd_err("Failed to cleanup oui id %d",
-				ACTION_OUI_11BE_OUI_ALLOW);
-			return;
-		}
-		str = ucfg_action_oui_get_config(hdd_ctx->psoc,
-						 ACTION_OUI_11BE_OUI_ALLOW);
-		if (!qdf_str_len(str))
-			goto send_oui;
-
-		status = ucfg_action_oui_parse(hdd_ctx->psoc,
-					       str, ACTION_OUI_11BE_OUI_ALLOW);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			hdd_err("Failed to parse action_oui str for id %d",
-				ACTION_OUI_11BE_OUI_ALLOW);
-			return;
-		}
+	if (req->flags & ASSOC_REQ_DISABLE_HE) {
+		hdd_debug("user he is disabled");
+		std = WMI_HOST_WIFI_STANDARD_5;
+	} else if (req->flags & ASSOC_REQ_DISABLE_EHT ||
+		!(req->flags & CONNECT_REQ_MLO_SUPPORT)) {
+		hdd_debug("user eht is disabled");
+		std = WMI_HOST_WIFI_STANDARD_6E;
 	}
 
-send_oui:
-	status = ucfg_action_oui_send_by_id(hdd_ctx->psoc,
-					    ACTION_OUI_11BE_OUI_ALLOW);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("Failed to send oui id %d", ACTION_OUI_11BE_OUI_ALLOW);
+	if (mlme_get_vdev_wifi_std(vdev) == std)
+		return;
+
+	vdev_id	= wlan_vdev_get_id(vdev);
+	ret = sme_cli_set_command(vdev_id,
+				  wmi_vdev_param_wifi_standard_version,
+				  std, VDEV_CMD);
+	if (ret) {
+		hdd_err("Failed to set vdev %d standard version %d to fw",
+			vdev_id, std);
 		return;
 	}
-	ucfg_mlme_set_usr_disable_sta_eht(hdd_ctx->psoc, !usr_disable_eht);
+
+	ucfg_mlme_set_vdev_wifi_std(hdd_ctx->psoc, vdev_id, std);
 }
 #else
 static void
-hdd_update_action_oui_for_connect(struct hdd_context *hdd_ctx,
-				  struct cfg80211_connect_params *req)
+hdd_update_standard_for_connect(struct hdd_context *hdd_ctx,
+				struct cfg80211_connect_params *req,
+				struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif
@@ -965,7 +928,7 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	params.dot11mode_filter = hdd_get_dot11mode_filter(hdd_ctx);
 
 	hdd_update_scan_ie_for_connect(adapter, &params);
-	hdd_update_action_oui_for_connect(hdd_ctx, req);
+	hdd_update_standard_for_connect(hdd_ctx, req, vdev);
 
 	status = osif_cm_connect(ndev, vdev, req, &params);
 

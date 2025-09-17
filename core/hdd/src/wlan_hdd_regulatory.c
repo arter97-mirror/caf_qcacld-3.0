@@ -41,6 +41,7 @@
 #include "wlan_p2p_ucfg_api.h"
 #include "wlan_mlo_mgr_public_api.h"
 #include <wlan_cfg80211.h>
+#include <nan_ucfg_api.h>
 
 #define REG_RULE_2412_2462    REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
 
@@ -991,6 +992,13 @@ int hdd_reg_set_band(struct net_device *dev, uint32_t band_bitmap)
 	if (QDF_IS_STATUS_ERROR(ucfg_reg_set_band(hdd_ctx->pdev,
 						  band_bitmap))) {
 		hdd_err("Failed to set the band bitmap value to %u",
+			band_bitmap);
+		return -EINVAL;
+	}
+
+	if (!(band_bitmap & BIT(REG_BAND_2G)) &&
+	    ucfg_is_nan_disc_active(hdd_ctx->psoc)) {
+		hdd_err("NAN is enabled. Failed to set the band bitmap value to %u",
 			band_bitmap);
 		return -EINVAL;
 	}
