@@ -3714,9 +3714,13 @@ stopbss:
 		 */
 		hdd_debug("vdev %d Disabling queues",
 			  adapter->deflink->vdev_id);
-		wlan_hdd_netif_queue_control(adapter,
-					WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
-					WLAN_CONTROL_PATH);
+		if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+					link_info->link_flags))
+			hdd_debug("bypass all netif queue in link_removal progress");
+		else
+			wlan_hdd_netif_queue_control(adapter,
+						     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
+						     WLAN_CONTROL_PATH);
 
 		/* reclaim all resources allocated to the BSS */
 		qdf_status = hdd_softap_stop_bss(link_info);
@@ -4028,6 +4032,13 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx)
 		return -EINVAL;
+
+	if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+				link_info->link_flags)) {
+		hdd_err("CSA rejected - link removal in progress for vdev:%d",
+			link_info->vdev_id);
+		return -EINVAL;
+	}
 
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	/*
@@ -4576,7 +4587,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (!qdf_atomic_test_bit(SOFTAP_BSS_STARTED,
-				 ap_adapter->deflink->link_flags)) {
+				 link_info->link_flags)) {
 		hdd_err("SOFTAP_BSS_STARTED not set");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -4595,6 +4606,14 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 	if (QDF_IS_STATUS_ERROR(wlansap_context_get(sap_context))) {
 		hdd_err("sap_context is invalid");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+				link_info->link_flags)) {
+		wlansap_context_put(sap_context);
+		hdd_err("removing link in vdev:%d,reject restart sap",
+			vdev_id);
+		return -EINVAL;
 	}
 
 	policy_mgr_get_original_bw_for_sap_restart(psoc, &use_sap_original_bw);
@@ -6908,6 +6927,7 @@ wlan_hdd_validate_mlo_link_removal_request(struct wlan_hdd_link_info *link_info,
 {
 	uint16_t num_links = 0;
 	uint8_t i = 0;
+	uint16_t sap_peer_count;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
 	struct wlan_objmgr_vdev *partner_vdev;
@@ -6948,6 +6968,15 @@ wlan_hdd_validate_mlo_link_removal_request(struct wlan_hdd_link_info *link_info,
 	if (num_links <= 1) {
 		hdd_err("Link removal support MLD with at least 2 active AP");
 		status = QDF_STATUS_E_PERM;
+		goto release_ref;
+	}
+
+	sap_peer_count = wlan_vdev_get_peer_count(link_info->vdev);
+
+	if (sap_peer_count > 1) {
+		hdd_debug("link with %d client connected, reject link removal",
+			  sap_peer_count);
+		status = QDF_STATUS_E_NOSUPPORT;
 		goto release_ref;
 	}
 
@@ -8449,9 +8478,13 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	hdd_dcs_clear(adapter);
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
-	wlan_hdd_netif_queue_control(adapter,
-				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
-				     WLAN_CONTROL_PATH);
+	if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+				link_info->link_flags))
+		hdd_debug("bypass all netif queue in link_removal progress");
+	else
+		wlan_hdd_netif_queue_control(adapter,
+					     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
+					     WLAN_CONTROL_PATH);
 
 	wlan_hdd_cleanup_actionframe(link_info);
 	wlan_hdd_cleanup_remain_on_channel_ctx(link_info);
@@ -9788,6 +9821,11 @@ void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter)
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (!sap_ctx) {
 		hdd_err("invalid sap context");
+		return;
+	}
+
+	if (wlan_hdd_link_removal_is_in_progress(adapter)) {
+		hdd_debug("bypass eSAP_STA_DISASSOC_EVENT when link removal");
 		return;
 	}
 
