@@ -1025,7 +1025,7 @@ struct pe_session {
 	uint8_t ht_client_cnt;
 	bool ch_switch_in_progress;
 	bool post_csa_notify_cap;
-#ifdef CFG80211_SA_QUERY_OFFLOAD_SUPPORT
+#ifdef WLAN_FEATURE_SA_QUERY_OFFLOAD
 	qdf_mc_timer_t post_csa_ocv_sa_query_timer;
 #endif
 	bool he_with_wep_tkip;

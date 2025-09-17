@@ -1670,6 +1670,10 @@ config WLAN_FEATURE_SAE
 	bool "Enable WLAN_FEATURE_SAE"
 	default n
 
+config WLAN_FEATURE_SA_QUERY_OFFLOAD
+	bool "Enable SA Query offload feature"
+	default n
+
 config WLAN_FEATURE_SAP_ACS_OPTIMIZE
 	bool "Enable WLAN_FEATURE_SAP_ACS_OPTIMIZE"
 	default n
