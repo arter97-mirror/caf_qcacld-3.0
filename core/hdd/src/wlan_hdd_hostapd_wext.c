@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -931,11 +931,28 @@ static __iw_softap_setparam(struct net_device *dev,
 
 	case QCASAP_RX_CHAINMASK_CMD:
 	{
+		uint8_t tx_mask;
+
 		hdd_debug("QCASAP_RX_CHAINMASK_CMD val %d", set_value);
 		ret = wma_cli_set_command(link_info->vdev_id,
 					  wmi_pdev_param_rx_chain_mask,
 					  set_value, PDEV_CMD);
+		if (ret)
+			break;
+
 		ret = hdd_set_antenna_mode(link_info, set_value);
+		if (ret)
+			break;
+
+		/* Save RX chain mask to MLME config for consistent reporting */
+		status = ucfg_mlme_get_chain_mask(hdd_ctx->psoc, &tx_mask,
+						  NULL);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			status = ucfg_mlme_set_chain_mask(hdd_ctx->psoc,
+							  tx_mask, set_value);
+			if (QDF_IS_STATUS_ERROR(status))
+				hdd_err("failed to save RX chain mask to mlme");
+		}
 		break;
 	}
 
@@ -1330,10 +1347,19 @@ static __iw_softap_getparam(struct net_device *dev,
 
 	case QCASAP_RX_CHAINMASK_CMD:
 	{
+		uint8_t rx_mask;
+		QDF_STATUS status;
+
 		hdd_debug("QCASAP_RX_CHAINMASK_CMD");
-		*value = wma_cli_get_command(adapter->deflink->vdev_id,
-					     wmi_pdev_param_rx_chain_mask,
-					     PDEV_CMD);
+		status = ucfg_mlme_get_chain_mask(hdd_ctx->psoc, NULL,
+						  &rx_mask);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("failed to get RX chain mask from mlme");
+			ret = -EINVAL;
+			break;
+		}
+
+		*value = rx_mask;
 		break;
 	}
 
