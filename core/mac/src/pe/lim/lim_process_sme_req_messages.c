@@ -12132,7 +12132,7 @@ void lim_send_link_removal_req(struct mac_context *mac_ctx, uint8_t vdev_id)
 
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("link removal send fail on vdev:%d ie_len:%d",
-		       vdev_id, mlme_priv->ml_reconfig_ie);
+		       vdev_id, mlme_priv->elem_len);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 }
