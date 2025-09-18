@@ -2657,6 +2657,7 @@ void cds_svc_fw_shutdown_ind(struct device *dev)
 }
 
 #ifdef WLAN_LOGGING_SOCK_SVC_ENABLE
+#define MAX_CUSTOM_PACKET_LENGTH 136
 /*
  * cds_pkt_stats_to_logger_thread() - send pktstats to user
  * @pl_hdr: Pointer to pl_hdr
@@ -2714,7 +2715,7 @@ void send_custom_packet_select( void* buf)
 {
 	struct ath_pktlog_hdr pktlog_hdr = {0};
 	struct mon_report_status* mon_report= NULL;
-	uint8_t mon_report_buf[128] = {0};
+	uint8_t mon_report_buf[MAX_CUSTOM_PACKET_LENGTH] = {0};
 	uint32_t report_hdr_len, report_payload_len;
 
 	if (!buf) {
@@ -2726,7 +2727,11 @@ void send_custom_packet_select( void* buf)
 	report_hdr_len = sizeof(struct mon_report_status);
 	report_payload_len = mon_report->payload_len;
 
-	memcpy(mon_report_buf, buf, report_hdr_len + report_payload_len);
+	if (report_hdr_len + report_payload_len > MAX_CUSTOM_PACKET_LENGTH) {
+		pr_err("%s: Invalid buf lenth.\n", __func__);
+		return;
+	}
+	qdf_mem_copy(mon_report_buf, buf, report_hdr_len + report_payload_len);
 
 #if defined(HELIUMPLUS)
 	pktlog_hdr.flags |= PKTLOG_HDR_SIZE_16;
