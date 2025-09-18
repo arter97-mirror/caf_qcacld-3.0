@@ -923,6 +923,7 @@ static void dp_rx_tm_thread_napi_deinit(struct dp_rx_thread *rx_thread)
 	struct net_device *dummy_nd;
 
 	dummy_nd = dp_rx_thread_get_dummy_netdev_ptr(rx_thread);
+	qdf_napi_disable(&rx_thread->napi);
 	qdf_netif_napi_del(&rx_thread->napi);
 	qdf_net_if_destroy_dummy_if((struct qdf_net_if *)dummy_nd);
 	dp_rx_thread_set_dummy_netdev_ptr(rx_thread, NULL);
