@@ -236,8 +236,6 @@ QDF_STATUS if_mgr_disconnect_start(struct wlan_objmgr_vdev *vdev,
 		wlan_tdls_delete_all_peers(vdev,
 					   TDLS_PEER_DEL_REASON_VDEV_REPURPOSE);
 
-	if_mgr_disable_roaming(pdev, vdev, RSO_CONNECT_START);
-
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -285,7 +283,6 @@ QDF_STATUS if_mgr_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 	}
 
 	policy_mgr_sta_post_disconnect_conc_check(psoc);
-	if_mgr_enable_roaming(pdev, vdev, RSO_CONNECT_START);
 
 	return QDF_STATUS_SUCCESS;
 }
