@@ -14866,7 +14866,7 @@ static int hdd_set_t2lm_negotiation_support(struct wlan_hdd_link_info *link_info
 	wlan_mlme_set_t2lm_negotiation_supported(hdd_ctx->psoc,
 						 t2lm_support);
 	if (mac_ctx->usr_eht_testbed_cfg &&
-	    t2lm_support != T2LM_NEGOTIATION_DISABLED) {
+	    t2lm_support != WLAN_T2LM_DISABLE) {
 		hdd_debug("clear user disabled roaming for eht testbed");
 		ucfg_clear_user_disabled_roaming(hdd_ctx->psoc,
 						 link_info->vdev_id);
