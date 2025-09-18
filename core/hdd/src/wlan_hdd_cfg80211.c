@@ -35294,7 +35294,7 @@ __wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy,
 	struct qdf_mac_addr link_addr_mac;
 	struct wlan_hdd_link_info *link_info;
 	QDF_STATUS status;
-	uint8_t link_idx;
+	uint8_t link_idx = WLAN_INVALID_LINK_ID;
 	int ret = -EINVAL;
 
 	if (!hdd_mlosap_check_support_link_num(adapter)) {

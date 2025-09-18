@@ -1110,6 +1110,7 @@ static QDF_STATUS hdd_create_chandef(struct hdd_adapter *adapter,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+static inline
 QDF_STATUS wlan_hdd_get_standby_channel(struct wlan_hdd_link_info *link_info,
 					struct wlan_channel *chan)
 {
