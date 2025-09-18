@@ -1586,6 +1586,44 @@ end:
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS policy_mgr_apply_mandatory_sap_channel_filter(
+	struct wlan_objmgr_psoc *psoc,
+	enum policy_mgr_con_mode mode,
+	uint8_t vdev_id,
+	uint32_t *pcl_channels,
+	uint8_t *pcl_weight,
+	uint32_t *len)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (mode != PM_SAP_MODE ||
+	    vdev_id == INVALID_VDEV_ID)
+		return QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+			psoc,
+			vdev_id, WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("Invalid vdev context for vdev_id %d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (policy_mgr_is_sap_mandatory_channel_set(psoc, vdev)) {
+		status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
+				psoc, vdev, pcl_channels, pcl_weight, len);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			policy_mgr_err("Failed to apply mandatory channel filter for SAP vdev_id %d",
+				       vdev_id);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			return status;
+		}
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * policy_mgr_pcl_modification_for_sap() - Modify SAPs PCL
  * @psoc: PSOC object information
@@ -1619,7 +1657,6 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 	bool dual_sap_modified_pcl = false;
 	bool srd_chan_enabled;
 	uint32_t pcl_len, orig_len;
-	struct wlan_objmgr_vdev *vdev;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1637,26 +1674,11 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		pcl_len = *len;
 	}
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_POLICY_MGR_ID);
-	if (!vdev) {
-		policy_mgr_err("Invalid vdev Context");
-		status = QDF_STATUS_E_FAILURE;
+	status = policy_mgr_apply_mandatory_sap_channel_filter(
+			psoc, mode, vdev_id, pcl_channels, pcl_weight, len);
+	if (QDF_IS_STATUS_ERROR(status))
 		return status;
-	}
-	if (mode == PM_SAP_MODE &&
-	    policy_mgr_is_sap_mandatory_channel_set(psoc, vdev)) {
-		status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
-				psoc, vdev, pcl_channels, pcl_weight,
-				len);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			policy_mgr_err("failed to get mandatory modified pcl for SAP");
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
-			return status;
-		}
-	}
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
-	vdev = NULL;
+
 	if (pcl_len != *len) {
 		mandatory_modified_pcl = true;
 		pcl_len = *len;
