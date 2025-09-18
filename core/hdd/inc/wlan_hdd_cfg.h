@@ -546,4 +546,24 @@ void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
 {
 }
 #endif /* FORCE_WAKE */
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * hdd_get_mlo_link_freq() - Retrieve the link frequency for a given link
+ * @vdev: Pointer to the objmgr vdev object
+ * @link_id: ID of the MLO link
+ * @link_freq: Pointer to store the retrieved link frequency
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+int hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
+			  uint16_t *link_freq);
+#else
+static inline int
+hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
+		      uint16_t *link_freq)
+{
+	return -EINVAL;
+}
+#endif
 #endif /* end #if !defined(HDD_CONFIG_H__) */

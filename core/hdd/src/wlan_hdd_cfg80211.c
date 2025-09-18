@@ -234,6 +234,7 @@
 #include "wlan_mlo_link_force.h"
 #include "wlan_action_oui_ucfg_api.h"
 #include "wma_api.h"
+#include "wlan_hdd_cfg.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -15467,6 +15468,53 @@ static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * hdd_get_ch_width_for_standby_link() - Get channel width for standby link,
+ * if user config channel width is less than or equal to allowed maximum width
+ * then returns user config channel width, otherwise invalid channel width.
+ * @vdev: vdev object
+ * @link_info: Link info pointer in HDD adapter
+ *
+ * Return: valid ch_width on success; invalid ch_width otherwise
+ */
+static uint8_t hdd_get_ch_width_for_standby_link(
+					struct wlan_objmgr_vdev *vdev,
+					struct wlan_hdd_link_info *link_info)
+{
+	struct hdd_station_ctx *sta_ctx;
+	struct wlan_objmgr_pdev *pdev;
+	uint16_t operating_freq = 0, max_allowed_bw, user_cfg_bw;
+	uint8_t ch_width;
+	int ret;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		hdd_debug("pdev is NULL");
+		return CH_WIDTH_INVALID;
+	}
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	ret = hdd_get_mlo_link_freq(vdev, sta_ctx->conn_info.ieee_link_id,
+				    &operating_freq);
+	if (ret) {
+		hdd_debug("failed to get MLO link freq");
+		return CH_WIDTH_INVALID;
+	}
+
+	if (operating_freq) {
+		max_allowed_bw = wlan_reg_get_max_chwidth(pdev,
+							  operating_freq);
+		ch_width = sta_ctx->user_cfg_chn_width;
+		user_cfg_bw = wlan_reg_get_bw_value(ch_width);
+
+		if (user_cfg_bw <= max_allowed_bw)
+			return ch_width;
+	}
+
+	return CH_WIDTH_INVALID;
+}
+
 /**
  * hdd_get_mlo_max_band_info() - Get channel width
  * @link_info: Link info pointer in HDD adapter
@@ -15475,7 +15523,6 @@ static int hdd_get_channel_width(struct wlan_hdd_link_info *link_info,
  *
  * Return: 0 on success; error number otherwise
  */
-#ifdef WLAN_FEATURE_11BE_MLO
 static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 				     struct sk_buff *skb,
 				     const struct nlattr *attr)
@@ -15559,7 +15606,8 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 			else
 				chn_width = bss_chan->ch_width;
 		} else if (link_info_t->vdev_id == WLAN_INVALID_VDEV_ID) {
-			chn_width = sta_ctx->user_cfg_chn_width;
+			chn_width = hdd_get_ch_width_for_standby_link(
+							vdev, link_info_t);
 		} else {
 			chn_width = CH_WIDTH_INVALID;
 		}

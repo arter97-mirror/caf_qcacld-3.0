@@ -483,6 +483,7 @@ void hdd_update_link_state_cached_timestamp(struct hdd_adapter *adapter)
 void
 hdd_mlo_update_link_state_change(uint32_t reason, uint32_t active_bmap,
 				 uint32_t inactive_bmap);
+
 #else
 static inline
 void hdd_mlo_update_link_state_change(uint32_t reason, uint32_t active_bmap,

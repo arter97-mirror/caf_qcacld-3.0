@@ -2708,17 +2708,8 @@ uint16_t hdd_convert_ht_to_reg_width(enum eSirMacHTChannelWidth ch_width)
 }
 
 #ifdef WLAN_FEATURE_11BE
-/**
- * hdd_get_mlo_link_freq() - Retrieve the link frequency for a given link
- * @vdev: Pointer to the objmgr vdev object
- * @link_id: ID of the MLO link
- * @link_freq: Pointer to store the retrieved link frequency
- *
- * Return: 0 on success, negative error code on failure
- */
-static int
-hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
-		      uint16_t *link_freq)
+int hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
+			  uint16_t *link_freq)
 {
 	struct mlo_link_info *mlo_link_info;
 
@@ -2730,13 +2721,6 @@ hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
 	*link_freq = mlo_link_info->link_chan_info->ch_freq;
 
 	return 0;
-}
-#else
-static inline int
-hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
-		      uint16_t *link_freq)
-{
-	return -EINVAL;
 }
 #endif
 
