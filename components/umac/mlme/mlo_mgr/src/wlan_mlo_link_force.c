@@ -50,6 +50,9 @@
  */
 #define MAX_LEGACY_CONCURRENCT_MODES   2
 
+/*Max allowed forced links*/
+#define MAX_FORCE_ACTIVE_LINKS         2
+
 static uint32_t
 ml_nlink_set_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
@@ -4665,6 +4668,16 @@ ml_nlink_validate_request(struct wlan_objmgr_psoc *psoc,
 			return false;
 		}
 
+		link_num =
+			convert_link_bitmap_to_link_ids(request->force_active_bitmap,
+							0, NULL);
+		/* Don't allow forcing 3 links */
+		if (link_num > MAX_FORCE_ACTIVE_LINKS) {
+			mlo_err("Invalid number of force active links %d",
+				link_num);
+			return false;
+		}
+
 		link_bitmap = ~request->force_active_bitmap &
 			combined->force_inactive_num_bitmap;
 		if (combined->force_inactive_num_bitmap) {
@@ -6066,7 +6079,7 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 		if (!ml_nlink_validate_link_request(psoc, vdev,
 						    SET_LINK_FROM_VENDOR_CMD,
 						    &req)) {
-			mlo_debug("not supported");
+			mlo_err_rl("not supported");
 			return QDF_STATUS_E_INVAL;
 		}
 		ml_nlink_update_force_link_request(psoc, vdev, &req,
@@ -6080,7 +6093,7 @@ ml_nlink_vendor_cmd_handler(struct wlan_objmgr_psoc *psoc,
 		if (!ml_nlink_validate_link_request(psoc, vdev,
 						    SET_LINK_FROM_VENDOR_CMD,
 						    &req)) {
-			mlo_debug("not supported");
+			mlo_err_rl("not supported");
 			return QDF_STATUS_E_INVAL;
 		}
 		ml_nlink_update_force_link_request(psoc, vdev, &req,
