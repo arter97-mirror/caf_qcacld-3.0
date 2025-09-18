@@ -4465,22 +4465,59 @@ static uint32_t policy_mgr_get_conc_ml_sap_link_freq(
 						uint8_t vdev_id,
 						bool *ml_sap_vdev)
 {
-	uint32_t conc_ml_sap_freq = 0, i;
+	uint32_t conc_ml_sap_freq = 0;
+	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr *mld_addr;
+	struct qdf_mac_addr target_mld_addr, current_mld_addr;
+	uint8_t i;
+	struct policy_mgr_conc_connection_info *conn;
 
-	if (policy_mgr_is_mlo_ap(psoc, vdev_id)) {
-		*ml_sap_vdev = true;
-		for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
-			if (pm_conc_connection_list[i].in_use &&
-			    pm_conc_connection_list[i].mode == PM_SAP_MODE &&
-			    pm_conc_connection_list[i].vdev_id != vdev_id &&
-			    policy_mgr_is_mlo_ap(
-					psoc,
-					pm_conc_connection_list[i].vdev_id)) {
-				conc_ml_sap_freq =
-						pm_conc_connection_list[i].freq;
-				break;
-			}
+	if (!policy_mgr_is_mlo_ap(psoc, vdev_id))
+		return 0;
+
+	*ml_sap_vdev = true;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+			psoc,
+			vdev_id, WLAN_POLICY_MGR_ID);
+	if (!vdev)
+		return 0;
+
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+	if (!mld_addr) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return 0;
+	}
+
+	qdf_mem_copy(&target_mld_addr, mld_addr, QDF_MAC_ADDR_SIZE);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		conn = &pm_conc_connection_list[i];
+
+	if (!conn->in_use || conn->mode != PM_SAP_MODE ||
+	    conn->vdev_id == vdev_id)
+		continue;
+
+	if (!policy_mgr_is_mlo_ap(psoc, conn->vdev_id))
+		continue;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, conn->vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev)
+		continue;
+
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+	if (mld_addr) {
+		qdf_mem_copy(&current_mld_addr, mld_addr, QDF_MAC_ADDR_SIZE);
+		if (qdf_is_macaddr_equal(&target_mld_addr, &current_mld_addr)) {
+			conc_ml_sap_freq = conn->freq;
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			break;
 		}
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 	}
 
 	return conc_ml_sap_freq;
