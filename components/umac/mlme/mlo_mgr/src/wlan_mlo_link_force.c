@@ -438,7 +438,7 @@ disallow_mlo_mode_table_dbs = {
 };
 
 #define HC_MAP_DATA(_HC_2G_, _HC_5GL_, _HC_5GH_) \
-	((_HC_2G_) & 0xFF | ((_HC_5GL_) & 0xFF) << 8 | \
+	(((_HC_2G_) & 0xFF) | (((_HC_5GL_) & 0xFF) << 8) | \
 				((_HC_5GH_) & 0xFF) << 16)
 
 #define HC_MAP(_HC_, _HC_2G_, _HC_5GL_, _HC_5GH_) \
