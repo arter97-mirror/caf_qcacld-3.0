@@ -323,8 +323,6 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	}
 
 	if (!is_link_switch) {
-		hdd_wmm_adapter_clear(adapter);
-
 		/* Clear saved connection information in HDD */
 		hdd_conn_remove_connect_info(sta_ctx);
 
@@ -334,10 +332,12 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 		 * valid link_info for the given adapter. So avoid this reset
 		 * for Link Switch disconnect/internal disconnect
 		 */
-		if (source != CM_MLO_ROAM_INTERNAL_DISCONNECT)
+		if (source != CM_MLO_ROAM_INTERNAL_DISCONNECT) {
+			hdd_wmm_adapter_clear(adapter);
 			hdd_adapter_reset_station_ctx(adapter);
-		else
+		} else {
 			hdd_cm_clear_ieee_link_id(link_info, false);
+		}
 	}
 
 	ucfg_dp_remove_conn_info(vdev);

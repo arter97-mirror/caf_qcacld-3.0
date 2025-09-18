@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -214,8 +214,7 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		policy_mgr_check_sap_go_force_scc(psoc, vdev,
 						  CSA_REASON_GO_BSS_STARTED);
-
-	if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
+	else if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
 		policy_mgr_ll_lt_sap_restart_concurrent_sap(
 						psoc, LL_LT_SAP_EVENT_STARTED);
 	else
@@ -331,6 +330,17 @@ if_mgr_ap_csa_complete(struct wlan_objmgr_vdev *vdev,
 	if (QDF_IS_STATUS_ERROR(status))
 		ifmgr_err("force scc failure with status: %d", status);
 
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
+		policy_mgr_check_sap_go_force_scc(psoc, vdev,
+						  CSA_REASON_GO_BSS_STARTED);
+	else if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
+		policy_mgr_ll_lt_sap_restart_concurrent_sap(
+						psoc, LL_LT_SAP_EVENT_STARTED);
+	else
+		policy_mgr_check_concurrent_intf_and_restart_sap(
+				psoc,
+				wlan_util_vdev_mgr_get_acs_mode_for_vdev(vdev));
+
 	wlan_tdls_notify_channel_switch_complete(psoc, vdev_id);
 
 	if (wlan_ll_sap_is_bearer_switch_req_on_csa(psoc, vdev_id))
@@ -373,4 +383,38 @@ if_mgr_ap_csa_start(struct wlan_objmgr_vdev *vdev,
 		status = wlan_ll_sap_switch_bearer_on_ll_sap_csa(psoc, vdev_id);
 
 	return status;
+}
+
+QDF_STATUS
+if_mgr_ap_channel_selected(struct wlan_objmgr_vdev *vdev,
+			   struct if_mgr_event_data *event_data)
+{
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t sta_count, i;
+	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t sap_freq = event_data->ap_info.ap_freq;
+	bool is_mcc = false;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	sta_count = policy_mgr_get_mode_specific_conn_info(psoc, freq_list,
+							   NULL, PM_STA_MODE);
+	if (!sta_count)
+		return QDF_STATUS_SUCCESS;
+
+	for (i = 0; i < sta_count; i++) {
+		if (freq_list[i] != sap_freq &&
+		    policy_mgr_are_2_freq_on_same_mac(psoc, freq_list[i],
+						      sap_freq)) {
+			is_mcc = true;
+			break;
+		}
+	}
+
+	if (!is_mcc)
+		return QDF_STATUS_SUCCESS;
+
+	ifmgr_debug("STA and SAP are in MCC, teardown TDLS");
+	wlan_tdls_check_and_teardown_links_sync(psoc, vdev);
+
+	return QDF_STATUS_SUCCESS;
 }

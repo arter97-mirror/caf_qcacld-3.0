@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6204,4 +6204,15 @@ void policy_mgr_update_flow_pool_map(struct wlan_objmgr_psoc *psoc,
 uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id, uint32_t freq);
 
+/**
+ * policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans() - Check if SAP is going
+ *							 to move from MCC to SCC
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: True if there is a SAP in MCC with STA and if it's going to move to
+ *	   STA channel, i.e. SCC
+ */
+bool
+policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(
+	struct wlan_objmgr_psoc *psoc);
 #endif /* __WLAN_POLICY_MGR_API_H */

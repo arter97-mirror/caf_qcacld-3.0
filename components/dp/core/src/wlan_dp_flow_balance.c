@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -257,10 +257,15 @@ wlan_dp_fb_do_flow_balance(struct wlan_dp_psoc_context *dp_ctx,
 	do_balance = wlan_dp_fb_check_flow_balance_is_needed(map_tbl,
 							     targeted_wtgs,
 							     num_rings);
-	if (!do_balance) {
-		wlan_dp_fb_update_cur_ring_wtgs(map_tbl,
-						balanced_wtgs, num_rings);
-		return;
+	if (!do_balance)
+		goto update_cur_wtgs;
+
+	mig_list =
+		(struct wlan_dp_mig_flow *)qdf_mem_malloc(rx_fst->max_entries *
+							  sizeof(*mig_list));
+	if (!mig_list) {
+		dp_err("failed to allocate mig_list for flow balance");
+		goto update_cur_wtgs;
 	}
 
 	qdf_sort(map_tbl, MAX_REO_DEST_RINGS, sizeof(*map_tbl),
@@ -268,10 +273,6 @@ wlan_dp_fb_do_flow_balance(struct wlan_dp_psoc_context *dp_ctx,
 
 	qdf_sort(targeted_wtgs, MAX_REO_DEST_RINGS, sizeof(uint32_t),
 		 wlan_dp_fb_sort_targeted_wtg_dist, NULL);
-
-	mig_list =
-		(struct wlan_dp_mig_flow *)qdf_mem_malloc(rx_fst->max_entries *
-							  sizeof(*mig_list));
 
 	/* move the weightages more than then targeted weightage of the ring
 	 * to the flow weightage table.
@@ -349,6 +350,12 @@ get_next_ring:
 		dp_fisa_update_fst_table(dp_ctx, mig_list, mig_flow_idx);
 
 	qdf_mem_free(mig_list);
+	return;
+
+update_cur_wtgs:
+	wlan_dp_fb_update_cur_ring_wtgs(map_tbl,
+					balanced_wtgs, num_rings);
+	return;
 }
 
 static inline int
