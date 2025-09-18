@@ -1399,6 +1399,7 @@ static void hdd_cm_save_connect_info(struct wlan_hdd_link_info *link_info,
 	qdf_mem_copy(&sta_ctx->conn_info.last_ssid.SSID.ssId,
 		     &rsp->ssid.ssid,
 		     rsp->ssid.length);
+	sta_ctx->conn_info.last_ssid.SSID.ssId[rsp->ssid.length] = '\0';
 	sta_ctx->conn_info.ssid.SSID.length = rsp->ssid.length;
 	sta_ctx->conn_info.last_ssid.SSID.length = rsp->ssid.length;
 
