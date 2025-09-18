@@ -2432,8 +2432,9 @@ struct policy_mgr_hdd_cbacks {
 			struct wlan_objmgr_psoc *psoc,
 			uint8_t vdev_id, uint32_t chan_freq,
 			struct ch_params *ch_params);
-	uint32_t (*wlan_get_sap_acs_band)(struct wlan_objmgr_psoc *psoc,
-					  uint8_t vdev_id, uint32_t *acs_band);
+	QDF_STATUS (*wlan_get_sap_acs_band)(struct wlan_objmgr_psoc *psoc,
+					    uint8_t vdev_id,
+					    uint32_t *acs_band);
 	QDF_STATUS (*wlan_check_cc_intf_cb)(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id,
 					    uint32_t *ch_freq);

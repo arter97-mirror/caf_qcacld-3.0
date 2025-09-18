@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -56,9 +56,9 @@ QDF_STATUS ll_lt_sap_get_freq_list(struct wlan_objmgr_psoc *psoc,
  * @curr_freq: current frequency
  * @csa_src: LL_SAP csa source
  *
- * Return: QDF_STATUS
+ * Return: qdf_freq_t
  */
-QDF_STATUS ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
+qdf_freq_t ll_lt_sap_get_valid_freq(struct wlan_objmgr_psoc *psoc,
 				    uint8_t vdev_id, qdf_freq_t curr_freq,
 				    enum ll_sap_csa_source csa_src);
 

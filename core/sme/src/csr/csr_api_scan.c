@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -62,7 +62,7 @@ static void csr_set_cfg_valid_channel_list(struct mac_context *mac,
 
 static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 				     tDblLinkList *pList,
-				     uint32_t cfgId);
+				     enum band_info band);
 
 static void csr_purge_channel_power(struct mac_context *mac,
 				    tDblLinkList *pChannelList);
