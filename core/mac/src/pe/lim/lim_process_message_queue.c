@@ -2208,6 +2208,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
+	case WNI_SME_LINK_REMOVAL_REQ:
+		lim_send_link_removal_req(mac_ctx, msg->bodyval);
+		break;
 	default:
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
