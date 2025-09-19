@@ -181,7 +181,8 @@ static bool tdls_check_wait_more(struct wlan_objmgr_vdev *vdev)
 		if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
 			continue;
 
-		expect_num++;
+		if (mlo_mgr_is_mlo_vdev_active(mlo_vdev))
+			expect_num++;
 
 		tdls_vdev =
 		     wlan_objmgr_vdev_get_comp_private_obj(mlo_vdev,
@@ -190,7 +191,7 @@ static bool tdls_check_wait_more(struct wlan_objmgr_vdev *vdev)
 			receive_num++;
 	}
 
-	/* +1 means the one received last has not been recorded */
+	/* The current rx frame is not cached in rx_mgmt yet, hence +1 */
 	if (expect_num > receive_num + 1)
 		return true;
 	else
@@ -370,8 +371,13 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 		return status;
 	}
 
-	if (qdf_atomic_read(&tdls_soc->timer_cnt) == 1)
-		waitmore = tdls_check_wait_more(vdev);
+	if (tdls_vdev->rx_mgmt) {
+		qdf_mem_free(tdls_vdev->rx_mgmt);
+		tdls_vdev->rx_mgmt = NULL;
+	}
+
+	/* Wait for discovery response from all the active links */
+	waitmore = tdls_check_wait_more(vdev);
 
 	if (waitmore) {
 		/* do not stop the timer */
@@ -380,13 +386,9 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 	} else {
 		tdls_vdev->discovery_sent_cnt = 0;
 		qdf_mc_timer_stop(&tdls_vdev->peer_discovery_timer);
-		qdf_atomic_dec(&tdls_soc->timer_cnt);
 	}
 
-	if (tdls_vdev->rx_mgmt) {
-		qdf_mem_free(tdls_vdev->rx_mgmt);
-		tdls_vdev->rx_mgmt = NULL;
-	}
+	qdf_atomic_dec(&tdls_soc->timer_cnt);
 
 	tdls_vdev->rx_mgmt = qdf_mem_malloc_atomic(sizeof(*rx_mgmt) +
 						   rx_mgmt->frame_len);
