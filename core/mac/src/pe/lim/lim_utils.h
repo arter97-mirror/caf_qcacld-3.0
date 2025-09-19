@@ -1118,7 +1118,6 @@ lim_get_bw_for_mcs_set(struct mac_context *mac_ctx,
 
 /**
  * lim_update_connect_rsn_ie() - Update the connection RSN IE
- * @mac_ctx: MAC context
  * @session: PE session
  * @rsn_ie_buf: RSN IE buffer
  * @pmksa: PMKSA entry for the connecting AP
@@ -1126,8 +1125,7 @@ lim_get_bw_for_mcs_set(struct mac_context *mac_ctx,
  * Return: None
  */
 void
-lim_update_connect_rsn_ie(struct mac_context *mac_ctx,
-			  struct pe_session *session, uint8_t *rsn_ie_buf,
+lim_update_connect_rsn_ie(struct pe_session *session, uint8_t *rsn_ie_buf,
 			  struct wlan_crypto_pmksa *pmksa);
 
 /**

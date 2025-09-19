@@ -2945,9 +2945,6 @@ static void lim_update_sae_config(struct mac_context *mac,
 {
 	struct wlan_crypto_pmksa *pmksa;
 	struct qdf_mac_addr bssid;
-	struct bss_description *bss_desc;
-	struct action_oui_search_attr ap_attr = {0};
-	bool is_vendor_ap = false;
 
 	qdf_mem_copy(bssid.bytes, session->bssId,
 		     QDF_MAC_ADDR_SIZE);
@@ -2957,16 +2954,6 @@ static void lim_update_sae_config(struct mac_context *mac,
 
 	pmksa = wlan_crypto_get_pmksa(session->vdev, &bssid);
 	if (!pmksa)
-		return;
-
-	bss_desc = &session->lim_join_req->bssDescription;
-	ap_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
-	ap_attr.ie_length =
-		wlan_get_ielen_from_bss_description(bss_desc);
-	is_vendor_ap = wlan_action_oui_search(mac->psoc,
-					      &ap_attr,
-					      ACTION_OUI_RESTRICT_MAX_MLO_LINKS);
-	if (is_vendor_ap)
 		return;
 
 	session->sae_pmk_cached = true;
@@ -4316,23 +4303,11 @@ end:
 }
 
 void
-lim_update_connect_rsn_ie(struct mac_context *mac,
-			  struct pe_session *session,
+lim_update_connect_rsn_ie(struct pe_session *session,
 			  uint8_t *rsn_ie_buf, struct wlan_crypto_pmksa *pmksa)
 {
 	uint8_t *rsn_ie_end;
 	uint16_t rsn_ie_len = 0;
-	struct bss_description *bss_desc =
-					&session->lim_join_req->bssDescription;
-	struct action_oui_search_attr ap_attr = {0};
-
-	ap_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
-	ap_attr.ie_length =
-		wlan_get_ielen_from_bss_description(bss_desc);
-	if (wlan_action_oui_search(mac->psoc,
-				   &ap_attr,
-				   ACTION_OUI_RESTRICT_MAX_MLO_LINKS))
-		pmksa = NULL;
 
 	rsn_ie_end = wlan_crypto_build_rsnie_with_pmksa(session->vdev,
 							rsn_ie_buf, pmksa);
@@ -4406,7 +4381,7 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	if (pmksa_peer)
 		pe_debug("PMKSA found");
 
-	lim_update_connect_rsn_ie(mac_ctx, session, rsn_ie, pmksa_peer);
+	lim_update_connect_rsn_ie(session, rsn_ie, pmksa_peer);
 	qdf_mem_free(rsn_ie);
 
 	/*
@@ -9581,6 +9556,7 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	uint8_t primary_channel;
 	struct ch_params ch_params = {0};
 	enum phy_ch_width non_eht_ch_width;
+	struct wlan_channel *des_chan;
 
 	if (!msg_buf) {
 		pe_err("Buffer is Pointing to NULL");
@@ -9627,6 +9603,9 @@ lim_process_sap_ch_width_update(struct mac_context *mac_ctx,
 	session->gLimChannelSwitch.legacy_ch_width = non_eht_ch_width;
 
 	wlan_mlme_set_ap_oper_ch_width(session->vdev, req->ch_width);
+
+	des_chan = wlan_vdev_mlme_get_des_chan(session->vdev);
+	des_chan->ch_width = ch_params.ch_width;
 
 	/* Send ECSA to the peers */
 	send_extended_chan_switch_action_frame(mac_ctx,
