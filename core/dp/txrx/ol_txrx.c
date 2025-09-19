@@ -4481,10 +4481,12 @@ ol_txrx_update_custom_stats(struct tx_rx_custom_stats *custom_stats)
 			  "%s: pdev is NULL", __func__);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+
 	custom_stats->tx_pkts = pdev->stats.pub.tx.delivered.pkts;
 	custom_stats->tx_retrans_pkts = pdev->stats.pub.tx.tx_retry;
 	custom_stats->rx_pkts = pdev->stats.pub.rx.delivered.pkts;
 	custom_stats->rx_ucast_pkts = pdev->stats.pub.rx.u_delivered.pkts;
+	custom_stats->init_flag = 0xff;
 
 	return status;
 }
