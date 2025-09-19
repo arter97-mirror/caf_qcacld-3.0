@@ -34605,9 +34605,13 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 		return errno;
 
 	vdev_id = adapter->deflink->vdev_id;
-	if (wlan_is_vdev_id_up(hdd_ctx->pdev, vdev_id))
+	if (wlan_is_vdev_id_up(hdd_ctx->pdev, vdev_id)) {
 		phymode = ucfg_mlme_get_vdev_phy_mode(hdd_ctx->psoc,
 						      vdev_id);
+	} else {
+		hdd_err("vdev not up");
+		return -EINVAL;
+	}
 
 	for (band = NL80211_BAND_2GHZ; band <= NL80211_BAND_5GHZ; band++) {
 		/* Support configuring only one bitrate */
