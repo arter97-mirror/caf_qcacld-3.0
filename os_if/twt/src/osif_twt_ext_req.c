@@ -1385,67 +1385,10 @@ int osif_twt_sta_teardown_req(struct wlan_objmgr_vdev *vdev,
 	return osif_send_sta_twt_teardown_req(vdev, psoc, &params);
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
+#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
 /**
- * osif_twt_is_p2p_go_wfd_r2_mode() - This function finds VDEV for P2P GO mode
- * and checks WFD mode.
- * @psoc: Pointer to PSOC object
- *
- * Return: true if P2P GO is in WFD R2 mode, otherwise false
- */
-static bool osif_twt_is_p2p_go_wfd_r2_mode(struct wlan_objmgr_psoc *psoc)
-{
-	struct wlan_objmgr_vdev *vdev;
-	uint8_t vdev_id;
-
-	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_P2P_GO_MODE,
-							WLAN_TWT_ID);
-	if (!vdev) {
-		osif_err("vdev is null for P2P Go opmode");
-		return false;
-	}
-
-	vdev_id = wlan_vdev_get_id(vdev);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
-
-	if (wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
-		return true;
-
-	return false;
-}
-
-/**
- * osif_twt_is_p2p_cli_wfd_r2_mode() - This function finds VDEV for P2P CLI mode
- * and checks WFD mode.
- * @psoc: Pointer to PSOC object
- *
- * Return: true if P2P CLI is in WFD R2 mode, otherwise false
- */
-static bool osif_twt_is_p2p_cli_wfd_r2_mode(struct wlan_objmgr_psoc *psoc)
-{
-	struct wlan_objmgr_vdev *vdev;
-	uint8_t vdev_id;
-
-	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc,
-							QDF_P2P_CLIENT_MODE,
-							WLAN_TWT_ID);
-	if (!vdev) {
-		osif_err("vdev is null for P2P GO opmode");
-		return false;
-	}
-
-	vdev_id = wlan_vdev_get_id(vdev);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
-
-	if (wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
-		return true;
-
-	return false;
-}
-
-/**
- * osif_twt_check_and_set_wfd_mode() - This function checks P2P R2 mode for
- * P2P GO and CLI and set it in TWT concurrency context.
+ * osif_twt_check_and_set_wfd_mode() - This function checks either P2P R2 mode
+ * or PCC for P2P GO and CLI and set it in TWT concurrency context.
  *
  * @pdev: Pointer to PDEV object
  * @object: pointer to object
@@ -1489,14 +1432,19 @@ static void osif_twt_check_and_set_wfd_mode(struct wlan_objmgr_pdev *pdev,
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 
-	if (is_p2p_go_conc_support &&
-	    wlan_vdev_p2p_is_wfd_r2_mode(psoc, wlan_vdev_get_id(vdev)))
-		twt_arg->p2p_r2_mode = true;
+	if (is_p2p_go_conc_support) {
+		uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+		if (wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
+			twt_arg->p2p_r2_mode = true;
+		else if (wlan_vdev_p2p_is_pcc_mode(psoc, vdev_id))
+			twt_arg->pcc_mode = true;
+	}
 }
 
 /**
  * osif_twt_iterate_all_concurrency_vdev() - This functions iterate to all VDEV
- * to check and set P2P R2 mode
+ * to check and set either P2P R2 mode or PCC mode
  *
  * @pdev: Pointer to PDEV object
  * @twt_arg: pointer to TWT concurrency context
@@ -1510,6 +1458,7 @@ osif_twt_iterate_all_concurrency_vdev(struct wlan_objmgr_pdev *pdev,
 	QDF_STATUS status;
 
 	twt_arg->p2p_r2_mode = false;
+	twt_arg->pcc_mode = false;
 	status = wlan_objmgr_pdev_iterate_obj_list(
 					pdev, WLAN_VDEV_OP,
 					osif_twt_check_and_set_wfd_mode,
@@ -1521,6 +1470,76 @@ osif_twt_iterate_all_concurrency_vdev(struct wlan_objmgr_pdev *pdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#else
+static inline QDF_STATUS
+osif_twt_iterate_all_concurrency_vdev(struct wlan_objmgr_pdev *pdev,
+				      struct twt_conc_context *twt_arg)
+{
+	twt_arg->p2p_r2_mode = false;
+	twt_arg->pcc_mode = false;
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 || FEATURE_WLAN_SUPPORT_PCC */
+
+#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
+/**
+ * osif_twt_is_p2p_go_wfd_r2_mode() - This function finds VDEV for P2P GO mode
+ * and checks WFD mode.
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: true if P2P GO is in WFD R2 mode, otherwise false
+ */
+static bool osif_twt_is_p2p_go_wfd_r2_mode(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_P2P_GO_MODE,
+							WLAN_TWT_ID);
+	if (!vdev) {
+		osif_err("vdev is null for P2P GO opmode");
+		return false;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
+
+	if (wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
+		return true;
+
+	return false;
+}
+
+/**
+ * osif_twt_is_p2p_cli_wfd_r2_mode() - This function finds VDEV for P2P CLI mode
+ * and checks WFD mode.
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: true if P2P CLI is in WFD R2 mode, otherwise false
+ */
+static bool osif_twt_is_p2p_cli_wfd_r2_mode(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc,
+							QDF_P2P_CLIENT_MODE,
+							WLAN_TWT_ID);
+	if (!vdev) {
+		osif_err("vdev is null for P2P CLI opmode");
+		return false;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
+
+	if (wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
+		return true;
+
+	return false;
+}
+
 #else
 static inline bool osif_twt_is_p2p_go_wfd_r2_mode(struct wlan_objmgr_psoc *psoc)
 {
@@ -1532,15 +1551,78 @@ osif_twt_is_p2p_cli_wfd_r2_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
-
-static inline QDF_STATUS
-osif_twt_iterate_all_concurrency_vdev(struct wlan_objmgr_pdev *pdev,
-				      struct twt_conc_context *twt_arg)
-{
-	twt_arg->p2p_r2_mode = false;
-	return QDF_STATUS_SUCCESS;
-}
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
+
+#ifdef FEATURE_WLAN_SUPPORT_PCC
+/**
+ * osif_twt_is_p2p_go_in_pcc_mode() - Check if P2P GO is in PCC mode
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: true if P2P GO is in PCC mode, otherwise false
+ */
+static bool
+osif_twt_is_p2p_go_in_pcc_mode(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_P2P_GO_MODE,
+							WLAN_TWT_ID);
+	if (!vdev) {
+		osif_err("vdev is null for P2P GO opmode");
+		return false;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
+
+	if (wlan_vdev_p2p_is_pcc_mode(psoc, vdev_id))
+		return true;
+
+	return false;
+}
+
+/**
+ * osif_twt_is_p2p_cli_pcc_mode() - Check if P2P CLI is in PCC mode
+ * @psoc: Pointer to PSOC object
+ *
+ * Return: true if P2P CLI is in PCC mode, otherwise false
+ */
+static bool osif_twt_is_p2p_cli_pcc_mode(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc,
+							QDF_P2P_CLIENT_MODE,
+							WLAN_TWT_ID);
+	if (!vdev) {
+		osif_err("vdev is null for P2P CLI opmode");
+		return false;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
+
+	if (wlan_vdev_p2p_is_pcc_mode(psoc, vdev_id))
+		return true;
+
+	return false;
+}
+
+#else
+static inline bool
+osif_twt_is_p2p_go_in_pcc_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline bool
+osif_twt_is_p2p_cli_pcc_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif /* FEATURE_WLAN_SUPPORT_PCC */
 
 #define TWT_RESPONDER_SAP_MODE       0
 #define TWT_RESPONDER_LL_LT_SAP_MODE 1
@@ -1633,7 +1715,8 @@ osif_twt_concurrency_update_on_scc_mcc(struct wlan_objmgr_pdev *pdev,
 
 	switch (opmode) {
 	case QDF_P2P_GO_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(psoc, vdev_id)))
 			return;
 		fallthrough;
 	case QDF_SAP_MODE:
@@ -1642,7 +1725,8 @@ osif_twt_concurrency_update_on_scc_mcc(struct wlan_objmgr_pdev *pdev,
 			return;
 
 		osif_debug("Concurrency exist on SAP/P2P GO vdev");
-		if (twt_arg->p2p_r2_mode || twt_rsp_disable_svc) {
+		if (twt_arg->p2p_r2_mode || twt_arg->pcc_mode ||
+		    twt_rsp_disable_svc) {
 			status = osif_twt_send_responder_enable_cmd(psoc,
 								    mac_id);
 			if (QDF_IS_STATUS_ERROR(status)) {
@@ -1681,12 +1765,13 @@ osif_twt_concurrency_update_on_scc_mcc(struct wlan_objmgr_pdev *pdev,
 		ucfg_twt_update_beacon_template();
 		break;
 	case QDF_P2P_CLIENT_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(psoc, vdev_id)))
 			return;
 		fallthrough;
 	case QDF_STA_MODE:
 		osif_debug("Concurrency exist on STA/P2P CLI vdev");
-		if (twt_arg->p2p_r2_mode) {
+		if (twt_arg->p2p_r2_mode || twt_arg->pcc_mode) {
 			status = osif_twt_send_requestor_enable_cmd(psoc,
 								    mac_id);
 		} else {
@@ -1756,7 +1841,8 @@ osif_twt_concurrency_update_on_dbs(struct wlan_objmgr_pdev *pdev,
 
 	switch (opmode) {
 	case QDF_P2P_GO_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(psoc, vdev_id)))
 			return;
 		fallthrough;
 	case QDF_SAP_MODE:
@@ -1781,7 +1867,8 @@ osif_twt_concurrency_update_on_dbs(struct wlan_objmgr_pdev *pdev,
 		ucfg_twt_update_beacon_template();
 		break;
 	case QDF_P2P_CLIENT_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(psoc, vdev_id)))
 			return;
 		fallthrough;
 	case QDF_STA_MODE:
@@ -1835,7 +1922,8 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 	switch (num_connections) {
 	case 1:
 		if (sta_count ||
-		    (p2p_cli_count && osif_twt_is_p2p_cli_wfd_r2_mode(psoc))) {
+		    (p2p_cli_count && (osif_twt_is_p2p_cli_wfd_r2_mode(psoc) ||
+		      osif_twt_is_p2p_cli_pcc_mode(psoc)))) {
 			if (sta_count)
 				policy_mgr_get_mode_specific_conn_info(
 								psoc, freq_list,
@@ -1852,7 +1940,8 @@ void osif_twt_concurrency_update_handler(struct wlan_objmgr_psoc *psoc,
 					vdev_id_list[0]);
 			osif_twt_send_requestor_enable_cmd(psoc, mac_id);
 		} else if (sap_count || (p2p_go_count &&
-			   osif_twt_is_p2p_go_wfd_r2_mode(psoc))) {
+			   (osif_twt_is_p2p_go_wfd_r2_mode(psoc) ||
+			    osif_twt_is_p2p_go_in_pcc_mode(psoc)))) {
 			if (sap_count) {
 				policy_mgr_get_sap_mode_info(psoc, freq_list,
 							     vdev_id_list);

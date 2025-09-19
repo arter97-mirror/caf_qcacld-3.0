@@ -1936,7 +1936,8 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_post_conn_clear_bcn_rssi_stats(hdd_ctx->psoc, link_info, rsp);
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    (adapter->device_mode == QDF_P2P_CLIENT_MODE &&
-	     wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, rsp->vdev_id))) {
+	     (wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, rsp->vdev_id) ||
+	      wlan_vdev_p2p_is_pcc_mode(hdd_ctx->psoc, rsp->vdev_id)))) {
 		/* Inform FTM TIME SYNC about the connection with AP */
 		if (adapter->device_mode == QDF_STA_MODE)
 			hdd_ftm_time_sync_sta_state_notify(adapter,

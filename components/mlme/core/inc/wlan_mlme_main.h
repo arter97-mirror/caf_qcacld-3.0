@@ -2329,7 +2329,7 @@ mlme_set_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev, uint16_t seq_num);
  */
 uint16_t mlme_get_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev);
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
+#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
 /**
  * wlan_get_wfd_mode_from_vdev_id() - Get WFD mode from VDEV ID
  * @psoc: pointer to PSOC object
@@ -2345,7 +2345,7 @@ wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	return 0xFF;
 }
-#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 || FEATURE_WLAN_SUPPORT_PCC*/
 
 /**
  * wlan_is_scc_tpc_power_supp_enabled() - Is FW SCC TPC support enabled

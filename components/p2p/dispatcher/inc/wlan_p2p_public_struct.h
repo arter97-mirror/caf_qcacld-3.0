@@ -527,7 +527,9 @@ struct p2p_usd_attr_params {
 	uint16_t ttl;
 };
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
+#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
+
+#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
 /**
  * enum p2p_mode_type: P2P mode type
  * @P2P_MODE_WFD_R1: Wi-Fi Direct R1 only
@@ -545,6 +547,5 @@ enum p2p_mode_type {
 	P2P_MODE_WFD_MAX,
 	P2P_MODE_WFD_INVALID = 0xFF,
 };
-#endif /* FEATURE_WLAN_SUPPORT_P2P */
-#endif /* FEATURE_WLAN_SUPPORT_USD || FEATURE_WLAN_SUPPORT_P2P_R2 */
+#endif /* FEATURE_WLAN_SUPPORT_P2P_R2 || FEATURE_WLAN_SUPPORT_PCC */
 #endif /* _WLAN_P2P_PUBLIC_STRUCT_H_ */

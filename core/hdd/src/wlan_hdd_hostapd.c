@@ -9159,7 +9159,8 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 	 */
 	mode = wlan_get_opmode_from_vdev_id(hdd_ctx->pdev, vdev_id);
 	if (mode == QDF_P2P_GO_MODE &&
-	    !wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, vdev_id)) {
+	    (!(wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, vdev_id) ||
+	     wlan_vdev_p2p_is_pcc_mode(hdd_ctx->psoc, vdev_id)))) {
 		hdd_debug(" P2P GO is in R1 mode");
 		return;
 	}
@@ -9229,7 +9230,8 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 
 	mode = wlan_get_opmode_from_vdev_id(hdd_ctx->pdev, vdev_id);
 	if (mode == QDF_P2P_GO_MODE &&
-	    !wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, vdev_id)) {
+	    (!(wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, vdev_id) ||
+	     wlan_vdev_p2p_is_pcc_mode(hdd_ctx->psoc, vdev_id)))) {
 		hdd_debug(" P2P GO is in R1 mode");
 		return;
 	}
