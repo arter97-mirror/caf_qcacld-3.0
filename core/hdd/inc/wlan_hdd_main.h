@@ -1656,7 +1656,7 @@ struct hdd_adapter {
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
 	bool wlm_ll_conn_flag;
 	struct wlan_hdd_link_info *discon_link_info;
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
+#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
 	uint8_t wfd_mode;
 #endif
 	bool enable_active_apf_mode;

@@ -8292,7 +8292,8 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 
 	switch (opmode) {
 	case QDF_P2P_CLIENT_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(mac->psoc, vdev_id)))
 			break;
 		fallthrough;
 	case QDF_STA_MODE:
@@ -8305,7 +8306,8 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 		he_cap->broadcast_twt = bcast_requestor;
 		break;
 	case QDF_P2P_GO_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(mac->psoc, vdev_id)))
 			break;
 		fallthrough;
 	case QDF_SAP_MODE:
@@ -13029,8 +13031,8 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 
 	switch (opmode) {
 	case QDF_P2P_CLIENT_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc,
-						  vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(mac_ctx->psoc, vdev_id)))
 			break;
 		fallthrough;
 	case QDF_STA_MODE:
@@ -13039,8 +13041,8 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 			twt_requestor && twt_get_requestor_flag(mac_ctx);
 		break;
 	case QDF_P2P_GO_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc,
-						  vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(mac_ctx->psoc, vdev_id)))
 			break;
 		fallthrough;
 	case QDF_SAP_MODE:
