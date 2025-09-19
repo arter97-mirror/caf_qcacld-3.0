@@ -566,6 +566,29 @@ wlan_cm_mlo_update_disconnecting_vdev_id(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
+	if (i < num_links) {
+		mlme_debug("found active disconn link vdev %d", *vdev_id);
+		goto release_mlo_ref;
+	}
+	/* if not found active disconnect in link vdev, try to find
+	 * including assoc vdev. In assoc link switch + nb disconnecting,
+	 * assoc link vdev may get disconnect request early than link
+	 * vdev (during link switch assoc link was marked as link vdev
+	 * temporally)
+	 */
+	for (i = 0; i < num_links; i++) {
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev_list[i]) &&
+		    (wlan_cm_is_vdev_disconnecting(vdev_list[i]) ||
+		     wlan_cm_is_vdev_connecting(vdev_list[i])) &&
+		    wlan_cm_get_active_req_type(vdev_list[i]) ==
+							CM_DISCONNECT_ACTIVE) {
+			*vdev_id = wlan_vdev_get_id(vdev_list[i]);
+			break;
+		}
+	}
+	if (i < num_links)
+		mlme_debug("found active disconn vdev %d", *vdev_id);
+
 release_mlo_ref:
 	for (i = 0; i < num_links; i++)
 		mlo_release_vdev_ref(vdev_list[i]);
