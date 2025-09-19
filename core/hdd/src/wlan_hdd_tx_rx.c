@@ -64,6 +64,9 @@
 #include "target_type.h"
 #include "wlan_hdd_object_manager.h"
 #include <wlan_hdd_sar_limits.h>
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+#include "cds_api.h"
+#endif
 
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
 /*
@@ -1330,12 +1333,23 @@ void hdd_tx_timeout(struct net_device *net_dev)
 QDF_STATUS hdd_init_tx_rx(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	struct tx_rx_custom_stats *custom_stats;
+	struct tx_rx_custom_stats *last_custom_stats;
+#endif
 
 	if (!adapter) {
 		hdd_err("adapter is NULL");
 		QDF_ASSERT(0);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	custom_stats = &adapter->cur_custom_stats;
+	last_custom_stats = &adapter->last_custom_stats;
+	memset(custom_stats, 0, sizeof(struct tx_rx_custom_stats));
+	memset(last_custom_stats, 0, sizeof(struct tx_rx_custom_stats));
+#endif
 
 	return status;
 }
@@ -1349,9 +1363,21 @@ QDF_STATUS hdd_init_tx_rx(struct hdd_adapter *adapter)
  */
 QDF_STATUS hdd_deinit_tx_rx(struct hdd_adapter *adapter)
 {
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	struct tx_rx_custom_stats *custom_stats;
+	struct tx_rx_custom_stats *last_custom_stats;
+#endif
+
 	QDF_BUG(adapter);
 	if (!adapter)
 		return QDF_STATUS_E_FAILURE;
+
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	custom_stats = &adapter->cur_custom_stats;
+	last_custom_stats = &adapter->last_custom_stats;
+	memset(custom_stats, 0, sizeof(struct tx_rx_custom_stats));
+	memset(last_custom_stats, 0, sizeof(struct tx_rx_custom_stats));
+#endif
 
 	adapter->txrx_vdev = NULL;
 	adapter->tx_fn = NULL;
