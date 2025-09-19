@@ -943,6 +943,42 @@ static const struct ieee80211_iface_limit
 	},
 };
 
+/* STA + STA + SAP + SAP combination */
+static const struct ieee80211_iface_limit
+	wlan_hdd_sta_sta_sap_sap_iface_limit[] = {
+	{
+		/* STA + STA */
+		.max = 2,
+		.types = BIT(NL80211_IFTYPE_STATION)
+	},
+	{
+		/* SAP + SAP */
+		.max = 2,
+		.types = BIT(NL80211_IFTYPE_AP),
+	},
+};
+
+/* STA + SAP + SAP + P2P combination */
+static const struct ieee80211_iface_limit
+	wlan_hdd_sta_sap_sap_p2p_iface_limit[] = {
+	{
+		/* STA */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_STATION)
+	},
+	{
+		/* SAP + SAP */
+		.max = 2,
+		.types = BIT(NL80211_IFTYPE_AP)
+	},
+	{
+		/* P2P */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_P2P_GO) |
+			 BIT(NL80211_IFTYPE_P2P_CLIENT),
+	},
+};
+
 static struct ieee80211_iface_combination
 	wlan_hdd_iface_combination[] = {
 	/* STA */
@@ -1072,6 +1108,22 @@ static struct ieee80211_iface_combination
 		.num_different_channels = 2,
 		.max_interfaces = 3,
 		.n_limits = ARRAY_SIZE(wlan_hdd_sap_sap_sta_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+	/* STA + STA + SAP + SAP */
+	{
+		.limits = wlan_hdd_sta_sta_sap_sap_iface_limit,
+		.num_different_channels = 2,
+		.max_interfaces = 4,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_sta_sap_sap_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+	/* STA + SAP + SAP + P2P */
+	{
+		.limits = wlan_hdd_sta_sap_sap_p2p_iface_limit,
+		.num_different_channels = 2,
+		.max_interfaces = 4,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_sap_sap_p2p_iface_limit),
 		.beacon_int_infra_match = true,
 	},
 };
@@ -25876,6 +25928,33 @@ static void wlan_hdd_update_ap_sme_cap_wiphy(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/**
+ * wlan_hdd_set_link_removal_offload_wiphy() - set link removal offload in wiphy
+ * @wiphy: WIPHY structure pointer
+ * @hdd_ctx: HDD context
+ *
+ * This function update ML SAP link removal offload capabilities in wiphy
+ *
+ * Return: void
+ */
+static inline
+void wlan_hdd_set_link_removal_offload_wiphy(struct wiphy *wiphy,
+					     struct hdd_context *hdd_ctx)
+{
+	if (!wlan_hdd_mlo_sap_link_removal_cap(hdd_ctx))
+		return;
+	wiphy_ext_feature_set(wiphy,
+			      NL80211_EXT_FEATURE_MLD_LINK_REMOVAL_OFFLOAD);
+}
+#else
+static inline
+void wlan_hdd_set_link_removal_offload_wiphy(struct wiphy *wiphy,
+					     struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 static inline
 void wlan_hdd_set_mlo_wiphy_ext_feature(struct wiphy *wiphy,
@@ -25888,6 +25967,7 @@ void wlan_hdd_set_mlo_wiphy_ext_feature(struct wiphy *wiphy,
 		return;
 
 	wiphy->flags |= WIPHY_FLAG_SUPPORTS_MLO;
+	wlan_hdd_set_link_removal_offload_wiphy(wiphy, hdd_ctx);
 }
 #else
 static inline
@@ -26051,12 +26131,64 @@ static bool wlan_hdd_is_iface_sap_sap(uint8_t idx)
  */
 static bool wlan_hdd_is_iface_sap_sap_sta(uint8_t idx)
 {
+	if (wlan_hdd_iface_combination[idx].n_limits != 2)
+		return false;
+
 	if (wlan_hdd_iface_combination[idx].limits[0].types ==
 	    BIT(NL80211_IFTYPE_STATION) &&
 	    wlan_hdd_iface_combination[idx].limits[0].max == 1 &&
 	    wlan_hdd_iface_combination[idx].limits[1].types ==
 	    BIT(NL80211_IFTYPE_AP) &&
 	    wlan_hdd_iface_combination[idx].limits[1].max == 2)
+		return true;
+
+	return false;
+}
+
+/**
+ * wlan_hdd_is_iface_sta_sta_sap_sap() - This API checks whether
+ * STA + STA + SAP + SAP present in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if STA + STA + SAP + SAP is present otherwise false
+ */
+static bool wlan_hdd_is_iface_sta_sta_sap_sap(uint8_t idx)
+{
+	if (wlan_hdd_iface_combination[idx].n_limits != 2)
+		return false;
+
+	if (wlan_hdd_iface_combination[idx].limits[0].types ==
+	    BIT(NL80211_IFTYPE_STATION) &&
+	    wlan_hdd_iface_combination[idx].limits[0].max == 2 &&
+	    wlan_hdd_iface_combination[idx].limits[1].types ==
+	    BIT(NL80211_IFTYPE_AP) &&
+	    wlan_hdd_iface_combination[idx].limits[1].max == 2)
+		return true;
+
+	return false;
+}
+
+/**
+ * wlan_hdd_is_iface_sta_sap_sap_p2p() - This API checks whether
+ * STA + SAP + SAP + P2P present in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if STA + SAP + SAP + P2P is present otherwise false
+ */
+static bool wlan_hdd_is_iface_sta_sap_sap_p2p(uint8_t idx)
+{
+	if (wlan_hdd_iface_combination[idx].n_limits != 3)
+		return false;
+
+	if (wlan_hdd_iface_combination[idx].limits[0].types ==
+	    BIT(NL80211_IFTYPE_STATION) &&
+	    wlan_hdd_iface_combination[idx].limits[0].max == 1 &&
+	    wlan_hdd_iface_combination[idx].limits[1].types ==
+	    BIT(NL80211_IFTYPE_AP) &&
+	    wlan_hdd_iface_combination[idx].limits[1].max == 2 &&
+	    (wlan_hdd_iface_combination[idx].limits[2].max == 1 &&
+	     wlan_hdd_iface_combination[idx].limits[2].types ==
+		(BIT(NL80211_IFTYPE_P2P_GO) | BIT(NL80211_IFTYPE_P2P_CLIENT))))
 		return true;
 
 	return false;
@@ -26419,6 +26551,7 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	bool no_p2p_concurrency;
 	bool sta_sap_p2p_concurrency, sta_p2p_ndp_conc;
 	bool sap_sta_nan_concurrency, sap_sap_sta_concurrency;
+	bool sta_sta_sap_sap_concurrency, sta_sap_sap_p2p_concurrency;
 	uint8_t num;
 	QDF_STATUS status;
 	bool is_nan_allowed;
@@ -26440,6 +26573,10 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	sap_sta_nan_concurrency = cfg_get(psoc,
 					  CFG_SAP_STA_NDP_CONCURRENCY);
 	sta_p2p_ndp_conc = ucfg_nan_is_sta_p2p_ndp_supported(psoc);
+	sta_sta_sap_sap_concurrency = cfg_get(psoc,
+					      CFG_STA_STA_SAP_SAP_CONCURRENCY);
+	sta_sap_sap_p2p_concurrency = cfg_get(psoc,
+					      CFG_STA_SAP_SAP_P2P_CONCURRENCY);
 
 	num = ARRAY_SIZE(wlan_hdd_iface_combination);
 	is_nan_allowed = ucfg_nan_is_allowed(psoc);
@@ -26463,6 +26600,17 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		if (!sap_sap_sta_concurrency &&
 		    wlan_hdd_is_iface_sap_sap_sta(i))
 			continue;
+
+		/* Check STA + STA + SAP + SAP concurrency is allowed or not */
+		if (!sta_sta_sap_sap_concurrency &&
+		    wlan_hdd_is_iface_sta_sta_sap_sap(i))
+			continue;
+
+		/* Check STA + SAP + SAP + P2P concurrency is allowed or not */
+		if (!sta_sap_sap_p2p_concurrency &&
+		    wlan_hdd_is_iface_sta_sap_sap_p2p(i))
+			continue;
+
 		/*
 		 * remove P2P concurrencies with following exception:
 		 * a) STA-P2P
@@ -30294,6 +30442,22 @@ QDF_STATUS hdd_softap_deauth_all_sta(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_adapter_for_each_active_link_info(adapter, link_info) {
+		if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+					link_info->link_flags)) {
+			hdd_debug("link removal in progress,don't send deauth");
+			return true;
+		}
+	}
+	return false;
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_del_station() - delete station v2
  * @wiphy: Pointer to wiphy
@@ -30336,7 +30500,7 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 
 	if (QDF_SAP_MODE != adapter->device_mode &&
 	    QDF_P2P_GO_MODE != adapter->device_mode)
-		goto fn_end;
+		return 0;
 
 	if (qdf_is_macaddr_broadcast((struct qdf_mac_addr *)mac)) {
 		struct wlan_objmgr_vdev *vdev;
@@ -30356,10 +30520,12 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 						hdd_ctx->psoc,
 						adapter->deflink->vdev_id);
 		}
+		if (wlan_hdd_link_removal_is_in_progress(adapter))
+			return 0;
 
 		if (!QDF_IS_STATUS_SUCCESS(hdd_softap_deauth_all_sta(adapter,
 								     param)))
-			goto fn_end;
+			return 0;
 	} else {
 		sta_info = hdd_get_sta_info_by_mac(
 						&adapter->sta_info_list,
@@ -30415,7 +30581,6 @@ int __wlan_hdd_cfg80211_del_station(struct wiphy *wiphy,
 				     STA_INFO_CFG80211_DEL_STATION);
 	}
 
-fn_end:
 	return 0;
 }
 
@@ -33224,6 +33389,7 @@ hdd_ml_sap_owe_fill_ml_info(struct wlan_hdd_link_info *link_info,
 			    struct cfg80211_update_owe_info *owe_info,
 			    uint8_t *peer_mac)
 {
+	owe_info->assoc_link_id = -1;
 }
 #endif
 
@@ -34483,6 +34649,61 @@ end:
 }
 
 /**
+ * wlan_hdd_sap_link_removal_check_and_reassign_deflink() - switch default link
+ * @adapter: HDD adapter
+ * @link_info: Pointer to hdd link info
+ * @link_id: link id
+ *
+ * Return: true if switch default link, otherwise false
+ */
+static bool
+wlan_hdd_sap_link_removal_check_and_reassign_deflink(struct hdd_adapter *adapter,
+						     struct wlan_hdd_link_info *link_info,
+						     unsigned int link_id)
+{
+	struct wlan_hdd_link_info *iter_link_info;
+	bool found = false;
+
+	if (link_id == WLAN_INVALID_LINK_ID) {
+		hdd_err("Invalid input parameters of link_id");
+		return false;
+	}
+
+	if (!WLAN_HDD_IS_DEFLINK(link_info)) {
+		hdd_debug("Not a default link, no reassignment needed");
+		return true;
+	}
+
+	if (!qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+				 link_info->link_flags)) {
+		hdd_debug("del default link, clear flags");
+		return found;
+	}
+
+	hdd_debug("del default link for link removal");
+	hdd_adapter_for_each_active_link_info(adapter, iter_link_info) {
+		if (qdf_atomic_test_bit(SOFTAP_ADD_INTF_LINK,
+					iter_link_info->link_flags)) {
+			if (wlan_vdev_get_link_id(iter_link_info->vdev) ==
+						  link_id) {
+				continue;
+			} else if (wlan_vdev_get_link_id(iter_link_info->vdev) !=
+					WLAN_INVALID_LINK_ID) {
+				found = true;
+				break;
+			}
+		}
+	}
+
+	if (found)
+		adapter->deflink = iter_link_info;
+	else
+		hdd_debug("no more active link");
+
+	return found;
+}
+
+/**
  * __wlan_hdd_cfg80211_del_intf_link() - to process del_intf_link
  * @wiphy: Pointer to wiphy
  * @wdev: Pointer to wireless device
@@ -34506,13 +34727,19 @@ __wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy,
 		return;
 	}
 
-	if (!WLAN_HDD_IS_DEFLINK(link_info)) {
-		hdd_stop_ap_link(link_info);
+	if (!wlan_hdd_sap_link_removal_check_and_reassign_deflink(adapter,
+								  link_info,
+								  link_id))
+		goto end;
 
+	hdd_stop_ap_link(link_info);
+
+	if (!WLAN_HDD_IS_DEFLINK(link_info)) {
 		link_idx = hdd_adapter_get_index_of_link_info(link_info);
 		qdf_atomic_clear_bit(link_idx, &adapter->active_links);
 	}
 
+end:
 	qdf_atomic_clear_bit(SOFTAP_ADD_INTF_LINK, link_info->link_flags);
 }
 
@@ -34567,6 +34794,73 @@ wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	osif_vdev_sync_op_stop(vdev_sync);
 }
+
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+static int
+__wlan_hdd_cfg80211_link_reconfig_remove(struct wiphy *wiphy, struct net_device *dev,
+		const struct cfg80211_link_reconfig_removal_params *params)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_hdd_link_info *link_info;
+	uint32_t config_tbtt = 0;
+	QDF_STATUS status;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("HDD context is NULL");
+		return -EINVAL;
+	}
+
+	link_info = hdd_get_link_info_by_link_id(adapter, params->link_id);
+	if (!link_info) {
+		hdd_err("invalid link_info");
+		return -EINVAL;
+	}
+
+	config_tbtt = params->link_removal_cntdown;
+
+	hdd_debug("MLO link reconfig remove: link %u with tbtt = %u",
+		  params->link_id, config_tbtt);
+
+	status = wlan_hdd_validate_mlo_link_removal_request(link_info,
+							    config_tbtt);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		status = wlan_hdd_process_mlo_link_removal_cmd(link_info,
+							       hdd_ctx->psoc,
+							       params);
+	else
+		hdd_err("Link removal validation failed, status: %d", status);
+
+	return qdf_status_to_os_return(status);
+}
+
+/**
+ * wlan_hdd_cfg80211_link_reconfig_remove() - API to handle Multi-link reconfig
+ * remove request comes from hostapd.
+ * @wiphy: Pointer to wiphy object
+ * @dev: Netdev object pointer
+ * @params: Pointer to reconfig link removal parameters
+ *
+ * Return: 0 on success, non-zero -ve value on failure
+ */
+static int
+wlan_hdd_cfg80211_link_reconfig_remove(struct wiphy *wiphy, struct net_device *dev,
+		const struct cfg80211_link_reconfig_removal_params *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_link_reconfig_remove(wiphy, dev, params);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif
 #else
 static int
 wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
@@ -35461,6 +35755,9 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 #ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
 	.add_intf_link = wlan_hdd_cfg80211_add_intf_link,
 	.del_intf_link = wlan_hdd_cfg80211_del_intf_link,
+#endif
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+	.link_reconfig_remove = wlan_hdd_cfg80211_link_reconfig_remove,
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_TID_LINK_MAP_SUPPORT)
 	.get_link_tid_map_status = wlan_hdd_cfg80211_get_t2lm_mapping_status,

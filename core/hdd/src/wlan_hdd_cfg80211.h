@@ -1285,4 +1285,18 @@ void wlan_hdd_save_sta_keep_alive_interval(struct hdd_adapter *adapter,
 enum nl80211_chan_width
 hdd_convert_phy_bw_to_nl_bw(enum phy_ch_width bw);
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/** wlan_hdd_link_removal_is_in_progress() - check link is removing or not
+ * @adapter: adapter pointer
+ *
+ * Return: true if link removal in progress, otherwise false
+ */
+bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter);
+#else
+static inline
+bool wlan_hdd_link_removal_is_in_progress(struct hdd_adapter *adapter)
+{
+	return false;
+}
+#endif
 #endif

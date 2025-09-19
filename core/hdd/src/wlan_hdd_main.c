@@ -16482,7 +16482,8 @@ QDF_STATUS hdd_stop_ap_link(struct wlan_hdd_link_info *link_info)
 {
 	hdd_deinit_ap_mode(link_info);
 	hdd_vdev_destroy(link_info);
-
+	qdf_atomic_clear_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
+			     link_info->link_flags);
 	return QDF_STATUS_SUCCESS;
 }
 
