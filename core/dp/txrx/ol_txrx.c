@@ -4486,6 +4486,18 @@ ol_txrx_update_custom_stats(struct tx_rx_custom_stats *custom_stats)
 	custom_stats->tx_retrans_pkts = pdev->stats.pub.tx.tx_retry;
 	custom_stats->rx_pkts = pdev->stats.pub.rx.delivered.pkts;
 	custom_stats->rx_ucast_pkts = pdev->stats.pub.rx.u_delivered.pkts;
+	custom_stats->rx1mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx1mbps_pkts;
+	custom_stats->rx2mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx2mbps_pkts;
+	custom_stats->rx5_5mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx5_5mbps_pkts;
+	custom_stats->rx6mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx6mbps_pkts;
+	custom_stats->rx9mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx9mbps_pkts;
+	custom_stats->rx11mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx11mbps_pkts;
+	custom_stats->rx12mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx12mbps_pkts;
+	custom_stats->rx18mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx18mbps_pkts;
+	custom_stats->rx24mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx24mbps_pkts;
+	custom_stats->rx36mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx36mbps_pkts;
+	custom_stats->rx48mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx48mbps_pkts;
+	custom_stats->rx54mbps_pkts = pdev->stats.pub.rx.custom_pkts.rx54mbps_pkts;
 	custom_stats->init_flag = 0xff;
 
 	return status;

@@ -8670,6 +8670,19 @@ static void hdd_update_cur_custom_stats(ol_txrx_soc_handle soc,
 	return;
 }
 
+const uint8_t hdd_custom_rate_table[12] = {2, 4, 11, 12, 18, 22, 24, 36, 48, 72, 96, 108};
+
+static void hdd_get_custom_rate_bitmap(uint32_t *bitmap, uint8_t rate_code)
+{
+	uint8_t i = 0;
+	uint8_t rate_val = rate_code & 0x7F;
+
+	for (i = 0; i < 12; i++) {
+		if (hdd_custom_rate_table[i] == rate_val)
+			*bitmap |= (1 << i);
+	}
+}
+
 static void hdd_display_periodic_custom_stats(struct hdd_context *hdd_ctx,
 	struct hdd_adapter *con_sta_adapter, bool data_in_interval)
 {
@@ -8680,11 +8693,20 @@ static void hdd_display_periodic_custom_stats(struct hdd_context *hdd_ctx,
 	static bool data_in_time_period;
 	static uint32_t counter = 0;
 	QDF_STATUS status;
-	struct stats_cfm_event stats_cfm_report;
+	struct stats_cfm_event stats_cfm_report = {};
+	struct hdd_station_ctx *sta_ctx = NULL;
+	struct pe_session *session = NULL;
+	struct mac_context *mac_ctx =NULL;
+	uint8_t sessionId, i = 0;
 
 	soc = cds_get_context(QDF_MODULE_ID_SOC);
 	if (!soc) {
 		hdd_err("soc is NULL");
+		return;
+	}
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx) {
+		hdd_err("mac_ctx is NULL");
 		return;
 	}
 
@@ -8718,6 +8740,19 @@ static void hdd_display_periodic_custom_stats(struct hdd_context *hdd_ctx,
 					sizeof(struct tx_rx_custom_stats));
 			hdd_update_cur_custom_stats(soc, con_sta_adapter);
 
+			sta_ctx = &con_sta_adapter->session.station;
+			session = pe_find_session_by_bssid(mac_ctx, sta_ctx->requested_bssid.bytes, &sessionId);
+			if (session) {
+				for (i = 0; i < session->rateSet.numRates; i++) {
+					hdd_get_custom_rate_bitmap(&stats_cfm_report.rate_bitmap,
+								   session->rateSet.rate[i]);
+				}
+				for (i = 0; i < session->extRateSet.numRates; i++) {
+					hdd_get_custom_rate_bitmap(&stats_cfm_report.rate_bitmap,
+								   session->extRateSet.rate[i]);
+				}
+			}
+
 			stats_cfm_report.tx_pkts = hdd_pkt_delta(custom_stats->tx_pkts,
 								 last_custom_stats->tx_pkts);
 			stats_cfm_report.tx_retrans_pkts = hdd_pkt_delta(custom_stats->tx_retrans_pkts,
@@ -8728,12 +8763,42 @@ static void hdd_display_periodic_custom_stats(struct hdd_context *hdd_ctx,
 								       last_custom_stats->rx_ucast_pkts);
 			stats_cfm_report.bcn_cnt = hdd_pkt_delta(custom_stats->bcn_cnt,
 								       last_custom_stats->bcn_cnt);
-
-			hdd_debug("periodic_disp_time %d delta: tx/rx_packets %d/%d/%d/%d bcn_cnt %d",
+			stats_cfm_report.rx1mbps_pkts = hdd_pkt_delta(custom_stats->rx1mbps_pkts,
+								      last_custom_stats->rx1mbps_pkts);
+			stats_cfm_report.rx2mbps_pkts = hdd_pkt_delta(custom_stats->rx2mbps_pkts,
+								      last_custom_stats->rx2mbps_pkts);
+			stats_cfm_report.rx5_5mbps_pkts = hdd_pkt_delta(custom_stats->rx5_5mbps_pkts,
+								       last_custom_stats->rx5_5mbps_pkts);
+			stats_cfm_report.rx6mbps_pkts = hdd_pkt_delta(custom_stats->rx6mbps_pkts,
+								      last_custom_stats->rx6mbps_pkts);
+			stats_cfm_report.rx9mbps_pkts = hdd_pkt_delta(custom_stats->rx9mbps_pkts,
+								      last_custom_stats->rx9mbps_pkts);
+			stats_cfm_report.rx11mbps_pkts = hdd_pkt_delta(custom_stats->rx11mbps_pkts,
+								       last_custom_stats->rx11mbps_pkts);
+			stats_cfm_report.rx12mbps_pkts = hdd_pkt_delta(custom_stats->rx12mbps_pkts,
+								       last_custom_stats->rx12mbps_pkts);
+			stats_cfm_report.rx18mbps_pkts = hdd_pkt_delta(custom_stats->rx18mbps_pkts,
+								       last_custom_stats->rx18mbps_pkts);
+			stats_cfm_report.rx24mbps_pkts = hdd_pkt_delta(custom_stats->rx24mbps_pkts,
+								       last_custom_stats->rx24mbps_pkts);
+			stats_cfm_report.rx36mbps_pkts = hdd_pkt_delta(custom_stats->rx36mbps_pkts,
+								       last_custom_stats->rx36mbps_pkts);
+			stats_cfm_report.rx48mbps_pkts = hdd_pkt_delta(custom_stats->rx48mbps_pkts,
+								       last_custom_stats->rx48mbps_pkts);
+			stats_cfm_report.rx54mbps_pkts = hdd_pkt_delta(custom_stats->rx54mbps_pkts,
+								       last_custom_stats->rx54mbps_pkts);
+			hdd_debug("periodic_disp_time %d delta: tx/rx_packets %d/%d/%d/%d bcn_cnt %d rate_bitmap 0x%x "
+				  "rx_pkts(1/2/5.5/6/9/11/12/18/24/36/48/54): %u/%u/%u/%u/%u/%u/%u/%u/%u/%u/%u/%u",
 					periodic_disp_time,
 					stats_cfm_report.tx_pkts, stats_cfm_report.tx_retrans_pkts,
 					stats_cfm_report.rx_pkts, stats_cfm_report.rx_ucast_pkts,
-					stats_cfm_report.bcn_cnt);
+					stats_cfm_report.bcn_cnt, stats_cfm_report.rate_bitmap,
+					stats_cfm_report.rx1mbps_pkts, stats_cfm_report.rx2mbps_pkts,
+					stats_cfm_report.rx5_5mbps_pkts, stats_cfm_report.rx6mbps_pkts,
+					stats_cfm_report.rx9mbps_pkts, stats_cfm_report.rx11mbps_pkts,
+					stats_cfm_report.rx12mbps_pkts, stats_cfm_report.rx18mbps_pkts,
+					stats_cfm_report.rx24mbps_pkts, stats_cfm_report.rx36mbps_pkts,
+					stats_cfm_report.rx48mbps_pkts, stats_cfm_report.rx54mbps_pkts);
 
 			hdd_send_stats_cfm_event(&stats_cfm_report);
 		}
