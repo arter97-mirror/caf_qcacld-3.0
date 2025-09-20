@@ -2413,6 +2413,14 @@ QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	return status;
 }
 
+QDF_STATUS __wlan_dp_fisa_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx = dp_get_context();
+	return wlan_dp_fisa_suspend(dp_ctx);
+}
+
 QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
 	struct wlan_dp_psoc_context *dp_ctx;

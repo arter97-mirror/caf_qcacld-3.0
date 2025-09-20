@@ -34,11 +34,6 @@
 #define TWT_WAKE_DURATION_MULTIPLICATION_FACTOR 256
 
 #if defined(WLAN_SUPPORT_TWT) && defined(WLAN_TWT_CONV_SUPPORTED)
-
-#define TWT_RESPONDER_SAP_MODE       0
-#define TWT_RESPONDER_LL_LT_SAP_MODE 1
-#define TWT_RESPONDER_P2P_GO_MODE    2
-
 /**
  * osif_twt_setup_req() - Process TWT setup operation
  * in the received vendor command and send it to firmware

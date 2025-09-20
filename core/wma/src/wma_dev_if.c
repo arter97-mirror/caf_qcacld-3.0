@@ -7451,6 +7451,16 @@ static inline bool wma_tx_is_chainmask_valid(int value,
 	return false;
 }
 
+uint8_t wma_get_txrx_default_chain_mask(struct wlan_objmgr_psoc *psoc)
+{
+	struct target_psoc_info *tgt_hdl;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl)
+		return CFG_TGT_DEFAULT_TX_CHAIN_MASK;
+	return WMA_MAX_RF_CHAINS(target_if_get_num_rf_chains(tgt_hdl));
+}
+
 QDF_STATUS
 wma_validate_txrx_chain_mask(uint32_t id, uint32_t value)
 {
@@ -7466,7 +7476,9 @@ wma_validate_txrx_chain_mask(uint32_t id, uint32_t value)
 		return QDF_STATUS_E_FAILURE;
 
 	wma_debug("pdev pid %d pval %d", id, value);
-	if (id == wmi_pdev_param_tx_chain_mask) {
+	if (id == wmi_pdev_param_tx_chain_mask ||
+	    id == wmi_pdev_param_tx_chain_mask_5g ||
+	    id == wmi_pdev_param_tx_chain_mask_2g) {
 		if (wma_check_txrx_chainmask(target_if_get_num_rf_chains(
 		    tgt_hdl), value) || !wma_tx_is_chainmask_valid(value,
 								   tgt_hdl)) {
@@ -7474,7 +7486,9 @@ wma_validate_txrx_chain_mask(uint32_t id, uint32_t value)
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
-	if (id == wmi_pdev_param_rx_chain_mask) {
+	if (id == wmi_pdev_param_rx_chain_mask ||
+	    id == wmi_pdev_param_rx_chain_mask_5g ||
+	    id == wmi_pdev_param_rx_chain_mask_2g) {
 		if (wma_check_txrx_chainmask(target_if_get_num_rf_chains(
 					     tgt_hdl), value)) {
 			wma_err("failed in validating rtx chainmask");

@@ -387,6 +387,15 @@ QDF_STATUS __wlan_dp_runtime_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
 QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
 
 /**
+ * __wlan_dp_fisa_suspend() - FISA suspend DP handler
+ * @soc: CDP SoC handle
+ * @pdev_id: DP PDEV ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS __wlan_dp_fisa_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
+
+/**
  * __wlan_dp_bus_resume() - BUS resume DP handler
  * @soc: CDP SoC handle
  * @pdev_id: DP PDEV ID

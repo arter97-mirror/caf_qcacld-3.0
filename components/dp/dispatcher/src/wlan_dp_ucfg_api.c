@@ -3116,6 +3116,11 @@ QDF_STATUS ucfg_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	return __wlan_dp_bus_suspend(soc, pdev_id);
 }
 
+QDF_STATUS ucfg_dp_fisa_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return __wlan_dp_fisa_suspend(soc, pdev_id);
+}
+
 QDF_STATUS ucfg_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
 	return __wlan_dp_bus_resume(soc, pdev_id);
