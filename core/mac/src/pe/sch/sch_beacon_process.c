@@ -634,6 +634,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						       bpcc);
 		}
 		lim_process_ml_reconfig(mac_ctx, session, rx_pkt_info);
+		lim_process_bcn_prb_rsp_t2lm(mac_ctx, session, bcn);
 	}
 
 	if (lim_is_session_eht_capable(session))
@@ -835,7 +836,6 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	}
 
 	lim_process_beacon_eht(mac_ctx, session, bcn);
-	lim_process_bcn_prb_rsp_t2lm(mac_ctx, session, bcn);
 }
 
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
