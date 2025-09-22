@@ -11302,6 +11302,43 @@ swap:
 	mon_params->bandwidth = bandwidth;
 }
 
+#ifdef BORON_MONITOR
+/**
+ * wlan_hdd_ml_320m_validate() - Check if valid 320MHz combination in
+ *                               ML monitor mode
+ * @mon_params_1: 1st monitor input parameters
+ * @mon_params_2: 2nd monitor input parameters
+ *
+ * Return: true if valid 320MHz combination in ML monitor mode,
+ *         false if not
+ */
+static inline bool
+wlan_hdd_ml_320m_validate(struct hdd_monitor_ctx *mon_params_1,
+			  struct hdd_monitor_ctx *mon_params_2)
+{
+	if (mon_params_1->bandwidth == CH_WIDTH_320MHZ &&
+	    mon_params_2->bandwidth == CH_WIDTH_320MHZ) {
+		hdd_err("Invalid 320MHz combination in ML monitor mode");
+		return false;
+	}
+
+	return true;
+}
+#else
+static inline bool
+wlan_hdd_ml_320m_validate(struct hdd_monitor_ctx *mon_params_1,
+			  struct hdd_monitor_ctx *mon_params_2)
+{
+	if (mon_params_1->bandwidth == CH_WIDTH_320MHZ ||
+	    mon_params_2->bandwidth == CH_WIDTH_320MHZ) {
+		hdd_err("320MHz not supported in ML monitor mode");
+		return false;
+	}
+
+	return true;
+}
+#endif
+
 int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter,
 				 struct hdd_monitor_ctx *mon_params,
 				 uint8_t num_params)
@@ -11345,11 +11382,8 @@ int wlan_hdd_validate_mon_params(struct hdd_adapter *adapter,
 				return -EINVAL;
 			}
 
-			if (mon_params->bandwidth == CH_WIDTH_320MHZ ||
-			    next_param->bandwidth == CH_WIDTH_320MHZ) {
-				hdd_err("320MHz not supported in ML monitor mode");
+			if (!wlan_hdd_ml_320m_validate(mon_params, next_param))
 				return -EINVAL;
-			}
 
 			if (policy_mgr_2_freq_always_on_same_mac(adapter->hdd_ctx->psoc,
 								 mon_params->freq,
