@@ -2674,6 +2674,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/net/cfg80211.h",
             "flag": "CFG80211_SETUP_LINK_RECONFIG_SUPPORT",
         },
+        {
+            "pattern": "cfg80211_link_reconfig_removal_params",
+            "file": "include/net/cfg80211.h",
+            "flag": "CONFIG_MLO_SAP_LINK_REMOVAL",
+        },
     ]
 
     cmd = 'touch "$@"\n'
