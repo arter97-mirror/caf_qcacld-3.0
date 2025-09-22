@@ -20948,7 +20948,7 @@ __wlan_hdd_cfg80211_get_radio_combination_matrix(struct wiphy *wiphy,
 					       &comb_num);
 	if (!comb_num) {
 		hdd_err("invalid combination 0");
-		return -EINVAL;
+		return -EOPNOTSUPP;
 	}
 
 	/* band and antenna */
