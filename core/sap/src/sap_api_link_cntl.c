@@ -802,13 +802,14 @@ wlansap_roam_process_dfs_radar_found(struct mac_context *mac_ctx,
 	QDF_STATUS qdf_status;
 	struct sap_sm_event sap_event;
 
+	if (!sap_ctx->sap_radar_found_status) {
+		sap_err("sapdfs: sap_radar_found_status is false");
+		return;
+	}
+
 	if (sap_is_dfs_cac_wait_state(sap_ctx)) {
 		if (mac_ctx->mlme_cfg->dfs_cfg.dfs_disable_channel_switch) {
 			sap_err("sapdfs: DFS channel switch disabled");
-			return;
-		}
-		if (!sap_ctx->sap_radar_found_status) {
-			sap_err("sapdfs: sap_radar_found_status is false");
 			return;
 		}
 		sap_debug("sapdfs:Posting event eSAP_DFS_CHANNEL_CAC_RADAR_FOUND");
@@ -1250,7 +1251,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		}
 
 		if (!is_csa_needed && !chan_freq) {
-			ch_switch_info->target_chan_freq = 0;
 			sap_ctx->sap_radar_found_status = false;
 			break;
 		} else if (!is_csa_needed && chan_freq) {
