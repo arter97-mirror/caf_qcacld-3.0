@@ -248,6 +248,12 @@ static struct dp_prealloc_context g_dp_context_allocs[] = {
 	{DP_MON_STATUS_BUF_HIST_TYPE, sizeof(struct dp_mon_status_ring_history),
 	 false, false, NULL},
 #endif
+#ifdef WLAN_FEATURE_DP_MON_DEST_RING_HISTORY
+	{DP_MON_DEST_BUF_HIST_TYPE, sizeof(struct dp_mon_dest_ring_history),
+	 false, false, NULL},
+	{DP_MON_DEST_BUF_HIST_TYPE, sizeof(struct dp_mon_dest_ring_history),
+	 false, false, NULL},
+#endif
 #ifdef DP_TX_MON_BUF_RING_HISTORY
 	{DP_TX_MON_BUF_HIST_TYPE, sizeof(struct dp_tx_mon_buf_ring_history),
 	 false, false, NULL},
