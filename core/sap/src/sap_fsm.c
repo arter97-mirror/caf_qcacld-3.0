@@ -1259,6 +1259,7 @@ static bool sap_process_liberal_scc_for_go(struct sap_context *sap_context)
 }
 #endif
 
+#ifndef WLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW
 bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
 {
 	if (!psoc) {
@@ -1269,6 +1270,7 @@ bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
 	return target_psoc_get_sap_coex_fixed_chan_cap(
 			wlan_psoc_get_tgt_if_handle(psoc));
 }
+#endif
 
 QDF_STATUS
 sap_validate_chan(struct sap_context *sap_context,
