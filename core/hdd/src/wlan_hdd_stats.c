@@ -4015,6 +4015,7 @@ __wlan_hdd_cfg80211_ll_stats_clear(struct wiphy *wiphy,
 	int errno;
 	QDF_STATUS status;
 	struct sk_buff *skb;
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_enter_dev(dev);
 
@@ -4031,6 +4032,11 @@ __wlan_hdd_cfg80211_ll_stats_clear(struct wiphy *wiphy,
 		hdd_warn("is_link_layer_stats_set : %d",
 			  adapter->is_link_layer_stats_set);
 		return -EINVAL;
+	}
+
+	if (wlan_hdd_is_link_switch_in_progress(link_info)) {
+		hdd_debug("Link Switch in progress, can't process the request");
+		return -EBUSY;
 	}
 
 	if (wlan_cfg80211_nla_parse(tb_vendor,
