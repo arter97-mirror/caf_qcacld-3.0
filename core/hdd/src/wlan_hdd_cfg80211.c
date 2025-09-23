@@ -18504,6 +18504,9 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 		[QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_MAX + 1];
 	enum log_event_host_reason_code reason_code;
 	uint8_t final_dump_in_progress_val = 0;
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_hdd_link_info *link_info = adapter->deflink;
 
 	hdd_debug("Bug report triggered by framework");
 
@@ -18515,6 +18518,11 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (status)
 		return status;
+
+	if (wlan_hdd_is_link_switch_in_progress(link_info)) {
+		hdd_debug("Link Switch in progress, can't process the request");
+		return -EBUSY;
+	}
 
 	if (wlan_cfg80211_nla_parse(tb,
 			    QCA_WLAN_VENDOR_ATTR_WIFI_LOGGER_GET_RING_DATA_MAX,
