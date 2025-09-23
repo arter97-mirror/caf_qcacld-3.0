@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -82,6 +82,14 @@ bool os_if_local_pkt_capture_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 
 	num_connections = policy_mgr_get_connection_count_with_mlo(psoc);
 	osif_debug("Total connections %d", num_connections);
+
+	/*
+	 * If local packet capture concurrency is enabled. Allow local packet
+	 * capture regardless of number connections.
+	 */
+
+	if (policy_mgr_is_lpc_concurrency_allowed(psoc))
+		return true;
 
 	/*
 	 * No connections, local packet capture is allowed

@@ -3313,6 +3313,27 @@ void ucfg_dp_recover_mon_conf_flags(struct wlan_objmgr_psoc *psoc)
 		       dp_ctx->monitor_flag, status);
 }
 
+uint8_t ucfg_dp_get_mon_conf_flags(struct wlan_objmgr_psoc *psoc)
+{
+	cdp_config_param_type val = {0};
+	QDF_STATUS status;
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx) {
+		dp_err("Failed to get flag dp_ctx NULL");
+		return false;
+	}
+
+	status = cdp_txrx_get_psoc_param(dp_ctx->cdp_soc,
+					 CDP_MONITOR_FLAG, &val);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		dp_err("Failed to get monitor flags %d status %d",
+		       dp_ctx->monitor_flag, status);
+
+	return val.cdp_monitor_flag;
+}
+
 void
 ucfg_dp_rx_aggr_dis_req(struct wlan_objmgr_vdev *vdev,
 			enum ctrl_rx_aggr_client_id id, bool disable)
