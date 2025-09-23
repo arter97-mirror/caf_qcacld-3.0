@@ -2075,6 +2075,75 @@ hdd_update_mlo_per_link_stats_capability(struct hdd_context *hdd_ctx,
 	hdd_ctx->is_mlo_per_link_stats_supported =
 				cfg->is_mlo_per_link_stats_supported;
 }
+
+static inline
+uint32_t hdd_get_mlo_link_state_change_event_len(void)
+{
+	uint32_t len = NLMSG_HDRLEN;
+
+	/* QCA_WLAN_VENDOR_ATTR_LINK_STATE_CHANGE_REASON */
+	len += nla_total_size(sizeof(u32));
+
+	/* QCA_WLAN_VENDOR_ATTR_LINK_STATE_CHANGE_ACTIVE_LINK_BITMAP */
+	len += nla_total_size(sizeof(u32));
+
+	/* QCA_WLAN_VENDOR_ATTR_LINK_STATE_CHANGE_INACTIVE_LINK_BITMAP */
+	len += nla_total_size(sizeof(u32));
+
+	return len;
+}
+
+void
+hdd_mlo_update_link_state_change(uint32_t reason, uint32_t active_bmap,
+				 uint32_t inactive_bmap)
+{
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct sk_buff *vendor_event;
+	uint32_t data_len;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is NULL");
+		return;
+	}
+
+	data_len = hdd_get_mlo_link_state_change_event_len();
+	vendor_event = wlan_cfg80211_vendor_event_alloc(
+				hdd_ctx->wiphy, NULL, data_len,
+				QCA_NL80211_VENDOR_SUBCMD_LINK_STATE_CHANGE_INDEX,
+				GFP_KERNEL);
+
+	if (!vendor_event) {
+		hdd_err("Vendor event allocation failed");
+		return;
+	}
+
+	if (nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LINK_STATE_CHANGE_REASON, reason)) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR_LINK_STATE_CHANGE_REASON put fail");
+		goto fail;
+	}
+
+	if (nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LINK_STATE_CHANGE_ACTIVE_LINK_BITMAP,
+			active_bmap)) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR_LINK_STATE_CHANGE_ACTIVE_LINK_BITMAP put fail");
+		goto fail;
+	}
+
+	if (nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LINK_STATE_CHANGE_INACTIVE_LINK_BITMAP,
+			inactive_bmap)) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR_LINK_STATE_CHANGE_INACTIVE_LINK_BITMAP put fail");
+		goto fail;
+	}
+
+	hdd_debug("Link state change event sent; reason %d active bitmap %x inactive bitmap %x",
+		  reason, active_bmap, inactive_bmap);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+	return;
+fail:
+	wlan_cfg80211_vendor_free_skb(vendor_event);
+}
 #else
 static void
 hdd_update_mlo_per_link_stats_capability(struct hdd_context *hdd_ctx,
