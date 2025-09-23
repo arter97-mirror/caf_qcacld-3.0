@@ -322,6 +322,7 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				void *event, uint32_t event_data_len)
 {
 	struct roam_offload_synch_ind *sync_ind;
+	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 	uint8_t i;
 	bool is_non_mlo_ap = false;
@@ -351,6 +352,13 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	mlo_roam_update_vdev_macaddr(psoc, sync_ind, vdev_id, is_non_mlo_ap);
 	ml_nlink_conn_change_notify(
 		psoc, vdev_id, ml_nlink_roam_sync_start_evt, NULL);
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (vdev) {
+		cm_update_scan_mlme_for_mlo_roam(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+	}
 
 	status = cm_fw_roam_sync_req(psoc, vdev_id, event, event_data_len);
 
