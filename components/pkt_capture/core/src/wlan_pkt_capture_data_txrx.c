@@ -37,7 +37,7 @@
 #include <cdp_txrx_ctrl.h>
 #endif
 
-#define RESERVE_BYTES (100)
+#define RESERVE_BYTES (512)
 
 /**
  * pkt_capture_txrx_status_map() - map Tx status for data packets
@@ -337,8 +337,10 @@ skip_ppdu_stats:
 	tx_status->tx_status = pktcapture_hdr->status;
 	tx_status->tx_retry_cnt = pktcapture_hdr->tx_retry_cnt;
 	tx_status->ppdu_id = pktcapture_hdr->ppdu_id;
+#ifndef WLAN_FEATURE_PKT_CAPTURE_V3
 	tx_status->add_rtap_ext = true;
 	tx_status->add_rtap_ext2 = true;
+#endif
 }
 #endif
 
@@ -455,8 +457,22 @@ pkt_capture_rx_convert8023to80211(uint8_t *bssid, qdf_nbuf_t msdu, void *desc)
 }
 #else
 static void
+pktcapture_get_80211_hdr(qdf_nbuf_t msdu, uint8_t *wh, uint8_t *bssid)
+{
+	struct ethernet_hdr_t *eth_hdr =
+		(struct ethernet_hdr_t *)qdf_nbuf_data(msdu);
+
+	qdf_mem_copy(((struct ieee80211_frame *)wh)->i_addr1,
+		     eth_hdr->dest_addr, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(((struct ieee80211_frame *)wh)->i_addr2,
+		     bssid, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(((struct ieee80211_frame *)wh)->i_addr3,
+		     eth_hdr->dest_addr, QDF_MAC_ADDR_SIZE);
+}
+
+static void
 pkt_capture_rx_convert8023to80211(hal_soc_handle_t hal_soc_hdl,
-				  qdf_nbuf_t msdu, void *desc)
+				  qdf_nbuf_t msdu, void *desc, uint8_t *bssid)
 {
 	struct ethernet_hdr_t *eth_hdr;
 	struct llc_snap_hdr_t *llc_hdr;
@@ -487,8 +503,16 @@ pkt_capture_rx_convert8023to80211(hal_soc_handle_t hal_soc_hdl,
 	 */
 	if (qdf_nbuf_is_rx_chfrag_start(msdu)) {
 		pwh = hal_rx_desc_get_80211_hdr(hal_soc_hdl, desc);
-		qdf_mem_copy(first_msdu_hdr, pwh,
-			     sizeof(struct ieee80211_frame));
+		if (pwh) {
+			qdf_mem_copy(first_msdu_hdr, pwh,
+				     sizeof(struct ieee80211_frame));
+		} else {
+			/*
+			 * Fallback: Allocate and construct 802.11 header
+			 * from 802.3 header
+			 */
+			pktcapture_get_80211_hdr(msdu, first_msdu_hdr, bssid);
+		}
 	}
 
 	qdf_mem_copy(localbuf, first_msdu_hdr, new_hdsize);
@@ -572,7 +596,8 @@ bool pkt_capture_rx_in_order_offloaded_pkt(qdf_nbuf_t rx_ind_msg)
 void pkt_capture_msdu_process_pkts(
 				uint8_t *bssid,
 				qdf_nbuf_t head_msdu, uint8_t vdev_id,
-				htt_pdev_handle pdev, uint16_t status)
+				htt_pdev_handle pdev, uint16_t status,
+				bool filter_en)
 {
 	qdf_nbuf_t loop_msdu, pktcapture_msdu;
 	qdf_nbuf_t msdu, prev = NULL;
@@ -609,12 +634,23 @@ void pkt_capture_msdu_process_pkts(
 }
 #else
 #define RX_OFFLOAD_PKT 1
+
+static bool pkt_capture_filter_rx_pkts(qdf_nbuf_t msdu)
+{
+	if (qdf_nbuf_is_ipv4_dhcp_pkt(msdu) ||
+	    qdf_nbuf_is_ipv6_dhcp_pkt(msdu))
+		return true;
+
+	return false;
+}
 void pkt_capture_msdu_process_pkts(
 				uint8_t *bssid, qdf_nbuf_t head_msdu,
-				uint8_t vdev_id, void *psoc, uint16_t status)
+				uint8_t vdev_id, void *psoc, uint16_t status,
+				bool filter_en)
 {
 	qdf_nbuf_t loop_msdu, pktcapture_msdu, offload_msdu = NULL;
 	qdf_nbuf_t msdu, prev = NULL;
+	bool filter_set = false;
 
 	pktcapture_msdu = NULL;
 	loop_msdu = head_msdu;
@@ -631,6 +667,9 @@ void pkt_capture_msdu_process_pkts(
 				qdf_nbuf_set_next(prev, msdu);
 				prev = msdu;
 			}
+
+			if (filter_en)
+				filter_set = pkt_capture_filter_rx_pkts(msdu);
 		}
 		if (status == RX_OFFLOAD_PKT)
 			offload_msdu = loop_msdu;
@@ -645,6 +684,11 @@ void pkt_capture_msdu_process_pkts(
 
 	if (!pktcapture_msdu)
 		return;
+
+	if (filter_en && !filter_set) {
+		qdf_nbuf_list_free(pktcapture_msdu);
+		return;
+	}
 
 	pkt_capture_datapkt_process(
 			vdev_id, pktcapture_msdu,
@@ -1079,7 +1123,8 @@ pkt_capture_rx_data_cb(
 				     QDF_MAC_ADDR_SIZE);
 		}
 
-		pkt_capture_rx_convert8023to80211(hal_soc, msdu, rx_tlv_hdr);
+		pkt_capture_rx_convert8023to80211(hal_soc, msdu, rx_tlv_hdr,
+						  bssid);
 
 		/*
 		 * Calculate the headroom and adjust head
