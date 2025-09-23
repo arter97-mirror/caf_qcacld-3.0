@@ -110,6 +110,14 @@ pkt_capture_vdev_destroy_notification(struct wlan_objmgr_vdev *vdev, void *arg);
 enum pkt_capture_mode pkt_capture_get_mode(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * pkt_capture_get_full_rx_mgmt_frames() - get full rx mgmt frames config
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if the Full RX MGMT frames config is enabled.
+ */
+bool  pkt_capture_get_full_rx_mgmt_frames(struct wlan_objmgr_psoc *psoc);
+
+/**
  * pkt_capture_psoc_create_notification() - Handler for psoc create notify.
  * @psoc: psoc which is going to be created by objmgr
  * @arg: argument for notification handler.
