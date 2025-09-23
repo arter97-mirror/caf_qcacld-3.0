@@ -1131,6 +1131,26 @@ enum wlan_epcs_frame {
 	CFG_VALUE_OR_DEFAULT, \
 	"Monitor mode concurrency supported")
 
+/*
+ * <ini>
+ * local_packet_capture_concurrency - Enable/Disable Local packet capture
+ * concurrency support
+ * @Default: false
+ *
+ * This ini is used to enable/disable local packet capture concurrency.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LOCAL_PKT_CAPTURE_CONCURRENCY \
+		CFG_INI_BOOL( \
+		"local_packet_capture_concurrency", \
+		false, \
+		"Local packet capture concurrency")
+
 #ifdef FEATURE_WDS
 /*
  * <ini>
@@ -1366,6 +1386,7 @@ enum wlan_epcs_frame {
 	CFG(CFG_SAE_CONNECION_RETRIES) \
 	CFG(CFG_WLS_6GHZ_CAPABLE) \
 	CFG(CFG_MONITOR_MODE_CONCURRENCY) \
+	CFG(CFG_LOCAL_PKT_CAPTURE_CONCURRENCY) \
 	CFG(CFG_RF_TEST_MODE_SUPP_ENABLED) \
 	CFG(CFG_RF_MODE_FORCE_PWR_TYPE) \
 	CFG_WDS_MODE_ALL \

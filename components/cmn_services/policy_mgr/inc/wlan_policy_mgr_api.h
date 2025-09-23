@@ -5010,6 +5010,15 @@ QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc,
 					    bool is_other_bss);
 
 /**
+ * policy_mgr_is_lpc_concurrency_allowed() - Checks if local packet capture
+ * concurrecy is allowed.
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF_STATUS_SUCCESS if allowed, else send failure
+ *
+ */
+bool policy_mgr_is_lpc_concurrency_allowed(struct wlan_objmgr_psoc *psoc);
+/**
  * policy_mgr_get_hw_dbs_max_bw() - Computes DBS BW
  * @psoc: PSOC object information
  * @bw_dbs: BW info of both MAC0 and MAC1
