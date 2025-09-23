@@ -106,6 +106,7 @@
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_misc.h>
 #include <cdp_txrx_ctrl.h>
+#include <cdp_txrx_mon.h>
 #include "wlan_pmo_ucfg_api.h"
 #include "os_if_wifi_pos.h"
 #include "wlan_utility.h"
@@ -21617,12 +21618,17 @@ QDF_STATUS os_if_monitor_mode_configure(struct hdd_adapter *adapter,
 	int num_active_adapter;
 	bool lpc_conc_supported;
 	struct wlan_objmgr_psoc *psoc;
+	void *soc;
 
-	psoc = adapter->hdd_ctx->psoc;
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
-
-	if (!vdev || !psoc)
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc)
 		return QDF_STATUS_E_INVAL;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DP_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	psoc = wlan_vdev_get_psoc(vdev);
 
 	/* Check if local packet capture concurrency is supported.
 	 * If supported, local packet capture configuration is allowed
@@ -21635,6 +21641,8 @@ QDF_STATUS os_if_monitor_mode_configure(struct hdd_adapter *adapter,
 	num_active_adapter = hdd_lpc_find_num_non_mon_active_adapters();
 
 	if (lpc_conc_supported || num_active_adapter == 1) {
+		cdp_set_local_pkt_concurrency(soc, OL_TXRX_PDEV_ID,
+					      lpc_conc_supported);
 		status = os_if_dp_set_lpc_configure(vdev, data, data_len);
 	} else {
 		status = QDF_STATUS_E_NOSUPPORT;

@@ -2492,6 +2492,8 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 					cb_obj->dp_lpc_acquire_wakelock;
 	dp_ctx->dp_ops.dp_lpc_release_wakelock =
 					cb_obj->dp_lpc_release_wakelock;
+	dp_ctx->dp_ops.dp_lpc_get_link_info =
+					cb_obj->dp_lpc_get_link_info;
 	ucfg_dp_register_direct_link_hdd_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_ipa_wds_hdd_cbs(dp_ctx, cb_obj);
 	ucfg_dp_register_stc_hdd_cbs(dp_ctx, cb_obj);
@@ -3432,4 +3434,16 @@ void ucfg_dp_set_ipv4_addr(struct wlan_objmgr_vdev *vdev, uint8_t *ip_addr)
 
 	qdf_mem_copy(&dp_link->dp_intf->ipv4_addr, ip_addr,
 		     QDF_IPV4_ADDR_SIZE);
+}
+
+QDF_STATUS ucfg_dp_lpc_get_link_info(struct cdp_link_info *dp_link_info)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
+
+	if (!dp_ctx) {
+		dp_err("Failed to get flag dp_ctx NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return dp_ctx->dp_ops.dp_lpc_get_link_info(dp_link_info);
 }

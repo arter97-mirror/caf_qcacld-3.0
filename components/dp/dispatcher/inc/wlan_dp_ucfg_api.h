@@ -2154,4 +2154,12 @@ int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
  * Return: void
  */
 void ucfg_dp_set_ipv4_addr(struct wlan_objmgr_vdev *vdev, uint8_t *ip_addr);
+
+/**
+ * ucfg_dp_lpc_get_link_info() - Get the link info of STA
+ * @dp_link_info: link info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_lpc_get_link_info(struct cdp_link_info *dp_link_info);
 #endif /* _WLAN_DP_UCFG_API_H_ */
