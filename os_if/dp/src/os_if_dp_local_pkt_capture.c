@@ -453,16 +453,25 @@ QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 		nla_get_u32(tb[SET_MONITOR_MODE_CONNECTED_BEACON_INTERVAL]);
 	}
 
-	if (pkt_type == 0 &&
-	    cdp_is_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID)) {
-		if (ucfg_dp_is_lpc_full_pkt_enabled(psoc))
-			ucfg_pkt_capture_suspend_mon_thread(psoc);
+	if (pkt_type == 0) {
+		/*
+		 * No need to suspend local packet capture if it is not
+		 * running
+		 */
+		if (!cdp_is_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID)) {
+			status = QDF_STATUS_E_INVAL;
+		} else {
+			if (ucfg_dp_is_lpc_full_pkt_enabled(psoc))
+				ucfg_pkt_capture_suspend_mon_thread(psoc);
 
-		status = ucfg_dp_lpc_release_wakelock();
-		if (status != QDF_STATUS_SUCCESS) {
-			osif_err("failed to release monitor mode wakelock");
+			status = ucfg_dp_lpc_release_wakelock();
+		}
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			osif_err("Failed to suspend LPC");
 			goto error;
 		}
+
 		is_lpc_suspended = true;
 		return status;
 	} else if (!cdp_is_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID) &&
