@@ -38,7 +38,10 @@
 #include "cdp_txrx_cmn_struct.h"
 
 static struct wlan_objmgr_vdev *gp_pkt_capture_vdev;
-static bool gp_dhcp_full_pkt_req;
+static struct gp_dhcp_full_pkt_req {
+	bool dhcp_tx;
+	bool dhcp_rx;
+} g_dhcp_full_pkt_req_t;
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
 wdi_event_subscribe PKT_CAPTURE_TX_SUBSCRIBER;
@@ -510,7 +513,7 @@ void pkt_capture_callback(void *soc, enum WDI_EVENT event, void *log_data,
 	{
 		struct dp_tx_desc_s *desc = log_data;
 
-		if (gp_dhcp_full_pkt_req &&
+		if (g_dhcp_full_pkt_req_t.dhcp_tx &&
 		    QDF_NBUF_CB_PACKET_TYPE_DHCP ==
 		    QDF_NBUF_CB_GET_PACKET_TYPE(desc->nbuf)) {
 			pkt_capture_process_tx_data(soc, log_data,
@@ -540,7 +543,7 @@ void pkt_capture_callback(void *soc, enum WDI_EVENT event, void *log_data,
 	{
 		qdf_nbuf_t nbuf = (qdf_nbuf_t)log_data;
 
-		if (gp_dhcp_full_pkt_req) {
+		if (g_dhcp_full_pkt_req_t.dhcp_rx) {
 			struct qdf_mac_addr connected_bssid;
 
 			wlan_vdev_get_bss_peer_mac(vdev,
@@ -587,7 +590,9 @@ void pkt_capture_callback(void *soc, enum WDI_EVENT event, void *log_data,
 	{
 		qdf_nbuf_t nbuf = (qdf_nbuf_t)log_data;
 
-		if (gp_dhcp_full_pkt_req) {
+		if (g_dhcp_full_pkt_req_t.dhcp_rx &&
+		    (qdf_nbuf_is_ipv4_dhcp_pkt(nbuf) ||
+		     qdf_nbuf_is_ipv6_dhcp_pkt(nbuf))) {
 			pkt_capture_process_rx_data_no_peer(soc, vdev_id, bssid,
 							    status, nbuf);
 
@@ -676,11 +681,6 @@ static void pkt_capture_wdi_event_unsubscribe(struct wlan_objmgr_psoc *psoc)
 struct wlan_objmgr_vdev *pkt_capture_get_vdev(void)
 {
 	return gp_pkt_capture_vdev;
-}
-
-bool pkt_capture_get_dhcp_full_pkt_req(void)
-{
-	return gp_dhcp_full_pkt_req;
 }
 
 enum pkt_capture_mode pkt_capture_get_mode(struct wlan_objmgr_psoc *psoc)
@@ -1556,6 +1556,11 @@ QDF_STATUS pkt_capture_set_filter(void *filter, struct wlan_objmgr_psoc *psoc)
 	bool send_bcn = 0;
 	QDF_STATUS status;
 
+	uint32_t dhcp_mask = PKT_CAPTURE_DATA_FRAME_TYPE_ALL |
+			     PKT_CAPTURE_DATA_FRAME_TYPE_DHCPV4 |
+			     PKT_CAPTURE_DATA_FRAME_TYPE_DHCPV6;
+
+	g_dhcp_full_pkt_req_t = (struct gp_dhcp_full_pkt_req){0};
 	frame_filter = (struct cdp_monitor_filter *)filter;
 
 	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc,
@@ -1586,7 +1591,10 @@ QDF_STATUS pkt_capture_set_filter(void *filter, struct wlan_objmgr_psoc *psoc)
 		send_bcn = 1;
 	}
 
-	gp_dhcp_full_pkt_req = true;
+	if (dhcp_mask & frame_filter->fp_subfilter.data_tx_frame_filter)
+		g_dhcp_full_pkt_req_t.dhcp_tx = true;
+	if (dhcp_mask & frame_filter->fp_subfilter.data_rx_frame_filter)
+		g_dhcp_full_pkt_req_t.dhcp_rx = true;
 	status = pkt_capture_process_filter(vdev, send_bcn);
 relese_vdev_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_PKT_CAPTURE_ID);

@@ -755,8 +755,10 @@ pkt_capture_mgmt_rx_data_cb(struct wlan_objmgr_psoc *psoc,
 
 			status = pkt_capture_process_rmf_frame(pdev, psoc,
 							       nbuf);
-			if (QDF_IS_STATUS_ERROR(status))
+			if (QDF_IS_STATUS_ERROR(status)) {
+				qdf_nbuf_free(nbuf);
 				return status;
+			}
 		}
 	}
 
