@@ -1736,9 +1736,9 @@ void lim_ps_offload_handle_missed_beacon_ind(struct mac_context *mac,
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-static void pe_set_rmf_caps(struct mac_context *mac_ctx,
-			    struct pe_session *ft_session,
-			    struct roam_offload_synch_ind *roam_synch)
+static void pe_update_crypto_params(struct mac_context *mac_ctx,
+				    struct pe_session *ft_session,
+				    struct roam_offload_synch_ind *roam_synch)
 {
 	uint8_t *assoc_body;
 	uint16_t len;
@@ -2642,7 +2642,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 			sizeof(roam_sync_ind_ptr->ssid.ssid));
 	qdf_mem_copy(roam_sync_ind_ptr->ssid.ssid, ft_session_ptr->ssId.ssId,
 		     roam_sync_ind_ptr->ssid.length);
-	pe_set_rmf_caps(mac_ctx, ft_session_ptr, roam_sync_ind_ptr);
+	pe_update_crypto_params(mac_ctx, ft_session_ptr, roam_sync_ind_ptr);
 	/* Next routine may update nss based on dot11Mode */
 
 	lim_ft_prepare_add_bss_req(mac_ctx, ft_session_ptr, bss_desc,

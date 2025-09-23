@@ -444,7 +444,8 @@ struct owe_transition_mode_info {
  * @reassoc_timer: reassoc timer
  * @ctx: reassoc timer context
  * @cm_rso_lock: RSO lock
- * @rsn_cap: original rsn caps from the connect req from supplicant
+ * @orig_sec_info: original security info coming from the connect req from
+ * supplicant, without intersection of the peer capability
  * @country_code: country code from connected AP's beacon IE
  * @disable_hi_rssi: disable high rssi
  * @roam_control_enable: Flag used to cache the status of roam control
@@ -496,7 +497,7 @@ struct rso_config {
 	struct reassoc_timer_ctx ctx;
 #endif
 	qdf_mutex_t cm_rso_lock;
-	uint16_t rsn_cap;
+	struct security_info orig_sec_info;
 	uint8_t country_code[REG_ALPHA2_LEN + 1];
 	bool disable_hi_rssi;
 	bool roam_control_enable;
@@ -746,6 +747,8 @@ struct wlan_cm_roam_vendor_btm_params {
  *                   floor in dB
  * @bg_rssi_threshold: Value of rssi threshold to trigger roaming
  *                     after background scan.
+ * @num_allowed_authmode: Number of allowerd authmode
+ * @allowed_authmode: List of allowed authmode other than connected
  */
 struct ap_profile {
 	uint32_t flags;
@@ -757,6 +760,8 @@ struct ap_profile {
 	uint32_t rsn_mcastmgmtcipherset;
 	uint32_t rssi_abs_thresh;
 	uint8_t bg_rssi_threshold;
+	uint32_t num_allowed_authmode;
+	uint32_t allowed_authmode[WLAN_CRYPTO_AUTH_MAX];
 };
 
 /**
@@ -807,6 +812,14 @@ struct ap_profile {
  * @oce_wan_scoring: OCE WAN metrics percentage information
  * @eht_caps_weightage: EHT caps weightage out of total score in %
  * @mlo_weightage: MLO weightage out of total score in %
+ * @security_weightage: Security(WPA/WPA2/WPA3) weightage out of
+ * total score in %
+ * @security_index_score: Security scoring percentage information.
+ *                BITS 0-7 :- It contains scoring percentage of WPA security
+ *                BITS 8-15  :- It contains scoring percentage of WPA2 security
+ *                BITS 16-23 :- It contains scoring percentage of WPA3 security
+ *                BITS 24-31 :- reserved
+ *                The value of each index must be 0-100
  */
 struct scoring_param {
 	uint32_t disable_bitmap;
@@ -838,6 +851,8 @@ struct scoring_param {
 	uint8_t eht_caps_weightage;
 	uint8_t mlo_weightage;
 #endif
+	int32_t security_weightage;
+	uint32_t security_index_score;
 };
 
 /**

@@ -17549,6 +17549,19 @@ wlan_hdd_update_akm_suit_info(struct wiphy *wiphy)
 }
 #endif
 
+#ifdef CFG80211_MULTI_AKM_CONNECT_SUPPORT
+static void
+wlan_hdd_update_max_connect_akm(struct wiphy *wiphy)
+{
+	wiphy->max_num_akms_connect = WLAN_CM_MAX_CONNECT_AKMS;
+}
+#else
+static void
+wlan_hdd_update_max_connect_akm(struct wiphy *wiphy)
+{
+}
+#endif
+
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -17685,6 +17698,9 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 
 	hdd_add_channel_switch_support(&wiphy->flags);
 	wiphy->max_num_csa_counters = WLAN_HDD_MAX_NUM_CSA_COUNTERS;
+
+	wlan_hdd_update_max_connect_akm(wiphy);
+
 	wlan_hdd_cfg80211_action_frame_randomization_init(wiphy);
 
 	wlan_hdd_set_nan_supported_bands(wiphy);
