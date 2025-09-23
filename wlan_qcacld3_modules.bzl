@@ -2599,6 +2599,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/net/cfg80211.h",
             "flag": "CFG80211_SETUP_LINK_RECONFIG_SUPPORT",
         },
+        {
+            "pattern": "CONFIG_CHANDEF_NO_PUNCTURE",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_BACK_COMPATIBLE_CHENDEF",
+        },
     ]
 
     cmd = 'touch "$@"\n'
