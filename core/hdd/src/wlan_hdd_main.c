@@ -3471,6 +3471,60 @@ static void hdd_mon_turn_off_ps_and_wow(struct hdd_context *hdd_ctx)
 	ucfg_pmo_set_wow_enable(hdd_ctx->psoc, PMO_WOW_DISABLE_BOTH);
 }
 
+static void hdd_register_pkt_capture_callbacks(struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct hdd_adapter *sta_adapter;
+	struct hdd_context *hdd_ctx;
+	QDF_STATUS status;
+	int ret;
+
+	hdd_ctx = adapter->hdd_ctx;
+	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	if (!sta_adapter)
+		return;
+
+	vdev = hdd_objmgr_get_vdev_by_user(sta_adapter->deflink, WLAN_OSIF_ID);
+
+	if (!vdev)
+		return;
+
+	status = ucfg_dp_register_pkt_capture_callbacks(vdev);
+	ret = qdf_status_to_os_return(status);
+	if (ret) {
+		hdd_err("Failed registering packet capture callbacks");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return;
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+}
+
+static void hdd_deregister_pkt_capture_callbacks(struct hdd_context *hdd_ctx)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct hdd_adapter *sta_adapter;
+	QDF_STATUS status;
+	int ret;
+
+	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	if (!sta_adapter)
+		return;
+
+	vdev = hdd_objmgr_get_vdev_by_user(sta_adapter->deflink, WLAN_OSIF_ID);
+
+	if (!vdev)
+		return;
+
+	status = ucfg_pkt_capture_deregister_callbacks(vdev);
+	ret = qdf_status_to_os_return(status);
+	if (ret) {
+		hdd_err("Failed registering packet capture callbacks");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return;
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+}
+
 /**
  * __hdd_mon_open() - HDD Open function
  * @dev: Pointer to net_device structure
@@ -3548,6 +3602,9 @@ static int __hdd_mon_open(struct net_device *dev)
 		ucfg_dp_set_current_throughput_level(hdd_ctx->psoc,
 						     PLD_BUS_WIDTH_VERY_HIGH);
 	}
+
+	if (ucfg_dp_is_lpc_full_pkt_enabled(hdd_ctx->psoc))
+		hdd_register_pkt_capture_callbacks(adapter);
 
 	return ret;
 }
@@ -10742,9 +10799,14 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	if (adapter->device_mode == QDF_STA_MODE &&
 	    hdd_is_pkt_capture_mon_enable(adapter) &&
 	    ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
-						PACKET_CAPTURE_MODE_DISABLE) {
+	    PACKET_CAPTURE_MODE_DISABLE) {
 		hdd_unmap_monitor_interface_vdev(adapter);
 	}
+
+	if ((adapter->device_mode == QDF_STA_MODE ||
+	     adapter->device_mode == QDF_MONITOR_MODE) &&
+	     ucfg_dp_is_lpc_full_pkt_enabled(hdd_ctx->psoc))
+		hdd_deregister_pkt_capture_callbacks(hdd_ctx);
 
 	if (link_info->vdev_id != WLAN_UMAC_VDEV_ID_MAX)
 		wlan_hdd_cfg80211_deregister_frames(adapter);
