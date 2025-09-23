@@ -24,7 +24,8 @@
 #include "qca_vendor.h"
 #include "wlan_hdd_main.h"
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
+#if defined(WLAN_FEATURE_PKT_CAPTURE) && \
+	!defined(WLAN_FEATURE_LOCAL_PKT_CAPTURE)
 
 #define os_if_pkt_enter() QDF_TRACE_ENTER(QDF_MODULE_ID_HDD, "enter")
 #define os_if_pkt_exit() QDF_TRACE_EXIT(QDF_MODULE_ID_HDD, "exit")
