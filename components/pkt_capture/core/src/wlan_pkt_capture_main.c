@@ -1529,6 +1529,25 @@ relese_vdev_ref:
 	return status;
 }
 #else
+QDF_STATUS pkt_capture_update_dp_link_ctx(void *context)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct pkt_capture_vdev_priv *vdev_priv;
+	QDF_STATUS status;
+
+	vdev = pkt_capture_get_vdev();
+	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_PKT_CAPTURE_ID);
+	if (QDF_IS_STATUS_ERROR(status))
+		return QDF_STATUS_E_FAILURE;
+
+	vdev_priv = pkt_capture_vdev_get_priv(vdev);
+	vdev_priv->cb_ctx->mon_ctx = context;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_PKT_CAPTURE_ID);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS pkt_capture_set_filter(void *filter, struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_objmgr_vdev *vdev;

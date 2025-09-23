@@ -35,3 +35,8 @@ wlan_pkt_capture_register_callbacks(struct wlan_objmgr_vdev *vdev,
 {
 	return pkt_capture_register_callbacks(vdev, mon_cb, context);
 }
+
+QDF_STATUS wlan_pkt_capture_update_dp_link_ctx(void *context)
+{
+	return pkt_capture_update_dp_link_ctx(context);
+}

@@ -3497,6 +3497,17 @@ static void hdd_register_pkt_capture_callbacks(struct hdd_adapter *adapter)
 		return;
 	}
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		return;
+
+	status = ucfg_dp_update_pkt_capture_link_ctx(vdev);
+	ret = qdf_status_to_os_return(status);
+	if (ret)
+		hdd_err("Failed to update packet capture link ctx");
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
 static void hdd_deregister_pkt_capture_callbacks(struct hdd_context *hdd_ctx)
@@ -3522,6 +3533,27 @@ static void hdd_deregister_pkt_capture_callbacks(struct hdd_context *hdd_ctx)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return;
 	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+}
+
+static void hdd_register_pkt_capture_update_ctx(struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+	int ret;
+
+	if (!(adapter->device_mode == QDF_MONITOR_MODE))
+		return;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		return;
+
+	status = ucfg_dp_update_pkt_capture_link_ctx(vdev);
+	ret = qdf_status_to_os_return(status);
+	if (ret)
+		hdd_err("Failed to update packet capture link ctx");
+
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
@@ -3591,6 +3623,9 @@ static int __hdd_mon_open(struct net_device *dev)
 	}
 
 	ret = hdd_set_mon_rx_cb(dev);
+
+	if (ucfg_dp_is_lpc_full_pkt_enabled(hdd_ctx->psoc))
+		hdd_register_pkt_capture_update_ctx(adapter);
 
 	if (!ret)
 		ret = hdd_enable_monitor_mode(dev);

@@ -48,6 +48,13 @@ wlan_pkt_capture_register_callbacks(struct wlan_objmgr_vdev *vdev,
 				    QDF_STATUS (*mon_cb)(void *, qdf_nbuf_t),
 				    void *context);
 
+/**
+ * wlan_pkt_capture_update_dp_link_ctx - Update link context
+ * @context: callback context
+ *
+ * Return: 0 in case of success, invalid in case of failure.
+ */
+QDF_STATUS wlan_pkt_capture_update_dp_link_ctx(void *context);
 #else
 static inline QDF_STATUS
 wlan_pkt_capture_register_callbacks(struct wlan_objmgr_vdev *vdev,
@@ -56,5 +63,12 @@ wlan_pkt_capture_register_callbacks(struct wlan_objmgr_vdev *vdev,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline QDF_STATUS
+wlan_pkt_capture_update_dp_link_ctx(void *context)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif /* WLAN_FEATURE_PKT_CAPTURE */
 #endif /* _WLAN_PKT_CAPTURE_API_H_ */

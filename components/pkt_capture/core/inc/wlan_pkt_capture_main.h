@@ -290,4 +290,14 @@ pkt_capture_get_pktcap_mode_v2(void);
 void pkt_capture_callback(void *soc, enum WDI_EVENT event, void *log_data,
 			  u_int16_t peer_id, uint32_t status);
 #endif
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE_V3
+QDF_STATUS pkt_capture_update_dp_link_ctx(void *context);
+#else
+static inline
+QDF_STATUS pkt_capture_update_dp_link_ctx(void *context)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif /* end of _WLAN_PKT_CAPTURE_MAIN_H_ */
