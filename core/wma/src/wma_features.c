@@ -1512,6 +1512,11 @@ QDF_STATUS wma_pktlog_wmi_send_cmd(WMA_HANDLE handle,
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
 	int ret;
 
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+	/* If pktlog is enable from ini, also force enable.*/
+	params->user_triggered = params->user_triggered
+		||params->ini_triggered;
+#endif
 	ret = wmi_unified_pktlog_wmi_send_cmd(wma_handle->wmi_handle,
 			params->pktlog_event,
 			params->cmd_id, params->user_triggered);
