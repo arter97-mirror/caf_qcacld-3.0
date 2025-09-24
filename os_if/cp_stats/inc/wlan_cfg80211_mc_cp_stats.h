@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- *
- * Copyright (c) 2022,2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -128,7 +127,6 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
  * statistics from firmware
  * @vdev:    Pointer to vdev
  * @mac_addr: mac address
- * @errno:   error type in case of failure
  *
  * Call of this API must call wlan_cfg80211_mc_cp_stats_free_stats_event
  * API when done with information provided by info.
@@ -136,8 +134,7 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
  */
 struct stats_event *
 wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
-					     const uint8_t *mac_addr,
-					     int *errno);
+					     const uint8_t *mac_addr);
 #else
 static inline int wlan_cfg80211_mc_cp_stats_get_tx_power(
 				struct wlan_objmgr_vdev *vdev,
@@ -181,8 +178,7 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
 
 static inline struct stats_event *
 wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
-					     const uint8_t *mac_addr,
-					     int *errno)
+					     const uint8_t *mac_addr)
 {
 	return NULL;
 }
