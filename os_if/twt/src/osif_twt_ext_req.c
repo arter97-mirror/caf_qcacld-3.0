@@ -416,6 +416,13 @@ osif_twt_parse_add_dialog_attrs(struct nlattr **tb,
 	else
 		params->announce_timeout_us = 0;
 
+	cmd_id = QCA_WLAN_VENDOR_ATTR_TWT_SETUP_RESPONDER_PM_MODE;
+	if (tb[cmd_id]) {
+		params->responder_pm_mode = nla_get_u32(tb[cmd_id]);
+		osif_debug("TWT_SETUP_RESPONDER_PM_MODE:%d",
+			   params->responder_pm_mode);
+	}
+
 	osif_debug("twt: dialog_id %d, vdev %d, wake intvl_us %d, min %d, max %d, mantis %d",
 		  params->dialog_id, params->vdev_id, params->wake_intvl_us,
 		  params->min_wake_intvl_us, params->max_wake_intvl_us,
