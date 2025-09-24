@@ -372,6 +372,10 @@ static void __wlan_hdd_ipv6_changed(struct net_device *net_dev,
 
 	hdd_enter_dev(net_dev);
 
+	if (net_dev->ieee80211_ptr &&
+	    wlan_hdd_wdev_is_ap_vlan(net_dev->ieee80211_ptr))
+		goto exit;
+
 	errno = hdd_validate_adapter(adapter);
 	if (errno || adapter->dev != net_dev)
 		goto exit;
@@ -1167,6 +1171,10 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 	struct wlan_hdd_link_info *link_info;
 
 	hdd_enter_dev(net_dev);
+
+	if (net_dev->ieee80211_ptr &&
+	    wlan_hdd_wdev_is_ap_vlan(net_dev->ieee80211_ptr))
+		goto exit;
 
 	errno = hdd_validate_adapter(adapter);
 	if (errno || adapter->dev != net_dev)
@@ -3514,6 +3522,9 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		hdd_err("Command not allowed in FTM mode");
 		return -EINVAL;
 	}
+
+	if (wlan_hdd_wdev_is_ap_vlan(wdev))
+		return -EINVAL;
 
 	*dbm = 0;
 
