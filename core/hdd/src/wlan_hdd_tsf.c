@@ -690,7 +690,49 @@ static inline int32_t hdd_get_targettime_from_hosttime(
  * other: fail
  *
  */
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
 int32_t hdd_get_soctime_from_tsf64time(
+	struct hdd_adapter *adapter, uint64_t tsf64_time,
+	uint64_t *soc_time)
+{
+	int32_t ret = -EINVAL;
+	bool in_cap_state;
+	int64_t delta32_tsf64;
+	int64_t normal_interval;
+
+	in_cap_state = hdd_tsf_is_in_cap(adapter);
+
+	/*
+	 * To avoid check the lock when it's not capturing tsf
+	 * (the tstamp-pair won't be changed)
+	 */
+	if (in_cap_state)
+		qdf_spin_lock_bh(&adapter->host_target_sync_lock);
+
+	/* at present, tsf64_time is only 32bit in fact */
+	delta32_tsf64 = (int64_t)((tsf64_time & U32_MAX) -
+			(adapter->last_target_global_tsf_time & U32_MAX));
+
+	normal_interval =
+		WLAN_HDD_CAPTURE_TSF_INTERVAL_SEC * USEC_PER_SEC;
+
+	if (delta32_tsf64 < (normal_interval - OVERFLOW_INDICATOR32))
+		delta32_tsf64 += OVERFLOW_INDICATOR32;
+	else if (delta32_tsf64 > (OVERFLOW_INDICATOR32 - normal_interval))
+		delta32_tsf64 -= OVERFLOW_INDICATOR32;
+
+	delta32_tsf64 *= NSEC_PER_USEC;
+	ret = hdd_64bit_plus(adapter->last_tsf_sync_soc_time,
+			     delta32_tsf64,
+			     soc_time);
+
+	if (in_cap_state)
+		qdf_spin_unlock_bh(&adapter->host_target_sync_lock);
+
+	return ret;
+}
+#else
+static inline int32_t hdd_get_soctime_from_tsf64time(
 	struct hdd_adapter *adapter, uint64_t tsf64_time,
 	uint64_t *soc_time)
 {
@@ -713,7 +755,6 @@ int32_t hdd_get_soctime_from_tsf64time(
 		delta64_tsf64time = tsf64_time -
 				    adapter->last_target_global_tsf_time;
 		delta64_soctime = delta64_tsf64time * NSEC_PER_USEC;
-
 		/* soc_time (ns)*/
 		ret = hdd_uint64_plus(adapter->last_tsf_sync_soc_time,
 				      delta64_soctime, soc_time);
@@ -721,7 +762,6 @@ int32_t hdd_get_soctime_from_tsf64time(
 		delta64_tsf64time = adapter->last_target_global_tsf_time -
 				    tsf64_time;
 		delta64_soctime = delta64_tsf64time * NSEC_PER_USEC;
-
 		/* soc_time (ns)*/
 		ret = hdd_uint64_minus(adapter->last_tsf_sync_soc_time,
 				       delta64_soctime, soc_time);
@@ -732,6 +772,7 @@ int32_t hdd_get_soctime_from_tsf64time(
 
 	return ret;
 }
+#endif
 
 static inline
 uint64_t hdd_get_monotonic_host_time(struct hdd_context *hdd_ctx)

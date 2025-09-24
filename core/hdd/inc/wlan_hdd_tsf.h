@@ -331,9 +331,11 @@ bool hdd_tsf_is_tsf64_tx_set(struct hdd_context *hdd)
 }
 #endif
 
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
 int32_t hdd_get_soctime_from_tsf64time(
         struct hdd_adapter *adapter, uint64_t tsf64_time,
         uint64_t *soc_time);
+#endif
 
 #ifdef WLAN_FEATURE_TSF_PTP
 /**
