@@ -5233,10 +5233,10 @@ policy_mgr_append_sta_freq_to_pcl(struct weighed_pcl *org_pcl, uint32_t *count,
 }
 
 static void
-policy_mger_remove_duplicate_freq_with_weight(struct weighed_pcl *pcl,
-					      uint32_t *count,
-					      uint32_t sta_freq,
-					      uint32_t weight)
+policy_mgr_remove_duplicate_freq_with_weight(struct weighed_pcl *pcl,
+					     uint32_t *count,
+					     uint32_t sta_freq,
+					     uint32_t weight)
 {
 	uint32_t i = 0;
 	struct weighed_pcl *entry;
@@ -5349,7 +5349,7 @@ policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
 		 * STA channel is added already and above API also adds
 		 * it again. Remove it to avoid duplicate entry
 		 */
-		policy_mger_remove_duplicate_freq_with_weight(new_pcl,
+		policy_mgr_remove_duplicate_freq_with_weight(new_pcl,
 						&new_num_pcl, sta_freq,
 						WEIGHT_OF_GROUP5_PCL_CHANNELS);
 	} else if (wlan_reg_is_5ghz_ch_freq(sta_freq) ||
@@ -5370,7 +5370,7 @@ policy_mgr_modify_pcl_for_p2p_ndp_concurrency(struct wlan_objmgr_psoc *psoc,
 		 * STA channel is added already and above API also adds
 		 * it again. Remove it to avoid duplicate entry
 		 */
-		policy_mger_remove_duplicate_freq_with_weight(new_pcl,
+		policy_mgr_remove_duplicate_freq_with_weight(new_pcl,
 						&new_num_pcl, sta_freq,
 						WEIGHT_OF_GROUP3_PCL_CHANNELS);
 		/* Add ch-6 */
@@ -6519,6 +6519,179 @@ QDF_STATUS policy_mgr_modify_pcl_for_vlp_channels(struct wlan_objmgr_psoc *psoc,
 		if (wlan_reg_is_vlp_depriority_freq(pdev, pcl[i].freq))
 			pcl[i].weight = WEIGHT_OF_GROUP5_PCL_CHANNELS;
 	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void
+policy_mgr_enforce_high_priority_entry(struct weighed_pcl *pcl,
+				       uint32_t *count,
+				       uint32_t freq,
+				       uint32_t weight)
+{
+	uint32_t i;
+	uint32_t write_idx = 0;
+	int32_t high_priority_idx = -1;
+	struct weighed_pcl high_priority_entry;
+
+	for (i = 0; i < *count; i++) {
+		if (pcl[i].freq == freq) {
+			if (pcl[i].weight == weight &&
+			    high_priority_idx == -1) {
+				high_priority_idx = i;
+				high_priority_entry = pcl[i];
+			}
+		} else {
+			if (i != write_idx) {
+				pcl[write_idx] = pcl[i];
+				write_idx++;
+			}
+		}
+	}
+
+	if (high_priority_idx != -1) {
+		pcl[write_idx] = high_priority_entry;
+		write_idx++;
+	}
+
+	*count = write_idx;
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+void policy_mgr_get_sta_connected_frequencies(struct wlan_objmgr_psoc *psoc,
+					      uint32_t *comb_freq_list,
+					      uint32_t *num_comb_freq_list)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t num_ml = 0, num_non_ml = 0;
+	uint8_t ml_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t non_ml_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t ml_linkid_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t ml_link_bitmap = 0;
+	struct ml_link_info ml_link_info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_num_link = 0;
+	uint8_t i;
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS];
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("context is NULL");
+		return;
+	}
+
+	*num_comb_freq_list = 0;
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml, ml_idx,
+						&num_non_ml, non_ml_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
+	for (i = 0; i < num_non_ml; i++) {
+		comb_freq_list[(*num_comb_freq_list)] =
+					freq_list[non_ml_idx[i]];
+		(*num_comb_freq_list)++;
+	}
+
+	if (num_ml) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    vdev_id_list[ml_idx[0]],
+							    WLAN_POLICY_MGR_ID);
+
+		if (!vdev) {
+			policy_mgr_err("Invalid vdev context");
+			goto release_lock;
+		}
+
+		ml_nlink_get_link_info(psoc, vdev, 0,
+				       QDF_ARRAY_SIZE(ml_linkid_lst),
+				       ml_link_info, ml_freq_lst, ml_vdev_lst,
+				       ml_linkid_lst, &ml_num_link,
+				       &ml_link_bitmap);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+		for (i = 0; i < ml_num_link; i++) {
+			comb_freq_list[(*num_comb_freq_list)] = ml_freq_lst[i];
+			(*num_comb_freq_list)++;
+		}
+	}
+
+release_lock:
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+}
+#endif
+
+QDF_STATUS
+policy_mgr_modify_pcl_sta_p2p_indoor_scc(struct wlan_objmgr_psoc *psoc,
+					 struct weighed_pcl *pcl,
+					 uint32_t *num_pcl)
+{
+	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint32_t freq_count = 0;
+	uint8_t i;
+	uint8_t count = 0;
+	uint32_t new_num_pcl = 0;
+	struct weighed_pcl new_pcl[NUM_CHANNELS] = {0};
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct wlan_objmgr_pdev *pdev;
+	qdf_freq_t sta_freq = 0;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+	pdev = pm_ctx->pdev;
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc) &&
+	    policy_mgr_is_mlo_sta_present(psoc)) {
+		policy_mgr_get_sta_connected_frequencies(psoc, freq_list,
+							 &freq_count);
+	} else {
+		freq_count = policy_mgr_get_mode_specific_conn_info(psoc,
+								    freq_list,
+								    NULL,
+								    PM_STA_MODE);
+	}
+
+	for (i = 0; i < *num_pcl; i++)
+		new_pcl[i] = pcl[i];
+	new_num_pcl = *num_pcl;
+
+	for (i = 0; i < freq_count; i++) {
+		if (!(wlan_reg_is_freq_indoor(pdev, freq_list[i]) &&
+		      WLAN_REG_IS_5GHZ_CH_FREQ(freq_list[i])))
+			continue;
+
+		sta_freq = freq_list[i];
+		policy_mgr_append_sta_freq_to_pcl(pcl, num_pcl, new_pcl,
+						  &new_num_pcl,
+						  sta_freq,
+						  WEIGHT_OF_GROUP1_PCL_CHANNELS);
+
+		policy_mgr_enforce_high_priority_entry(new_pcl,
+						       &new_num_pcl,
+						       sta_freq,
+						       WEIGHT_OF_GROUP1_PCL_CHANNELS);
+	}
+
+	for (i = 0; i < new_num_pcl; i++) {
+		if (wlan_reg_is_freq_indoor(pdev, new_pcl[i].freq) &&
+		    new_pcl[i].freq != sta_freq)
+			continue;
+		pcl[count] = new_pcl[i];
+		count++;
+	}
+
+	if (*num_pcl != count)
+		policy_mgr_debug("No.of channels are different in original(%d) and modified PCL(%d)",
+				 *num_pcl, count);
+
+	*num_pcl = count;
 
 	return QDF_STATUS_SUCCESS;
 }

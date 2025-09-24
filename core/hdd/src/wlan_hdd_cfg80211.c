@@ -19462,6 +19462,23 @@ hdd_pcl_info_dump(struct weighed_pcl *pcl, uint32_t count)
 		hdd_nofl_debug("%s", info);
 }
 
+/** wlan_hdd_modify_pcl_for_sta_p2p_indoor_scc() - modify preferred frequency
+ * list for sta_p2p_indoor_concurrency.
+ * @hdd_ctx: pointer to hdd context
+ * @pcl: Calculated PCL as per concurrency policies
+ * @num_pcl: Number of entries in @pcl
+ *
+ * Return: success or failure code
+ */
+static QDF_STATUS
+wlan_hdd_modify_pcl_for_sta_p2p_indoor_scc(struct hdd_context *hdd_ctx,
+					   struct weighed_pcl *pcl,
+					   uint32_t *num_pcl)
+{
+	return policy_mgr_modify_pcl_sta_p2p_indoor_scc(hdd_ctx->psoc, pcl,
+							num_pcl);
+}
+
 /** __wlan_hdd_cfg80211_get_preferred_freq_list() - get preferred frequency list
  * @wiphy: Pointer to wireless phy
  * @wdev: Pointer to wireless device
@@ -19493,6 +19510,7 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 	struct policy_mgr_pcl_chan_weights *chan_weights;
 	struct net_device *ndev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
+	bool cfg_sta_indoor_ch_peer_scc = false;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -19580,6 +19598,19 @@ static int __wlan_hdd_cfg80211_get_preferred_freq_list(struct wiphy *wiphy,
 	/* Modify the PCL weight for VLP channels */
 	if (intf_mode == PM_P2P_CLIENT_MODE || intf_mode == PM_P2P_GO_MODE)
 		wlan_hdd_modify_pcl_for_vlp_channels(hdd_ctx, w_pcl, pcl_len);
+
+	/* Modify the PCL for STA connected indoor channels if STA and peer SCC
+	 * is allowed on STA connected indoor channel.
+	 */
+	policy_mgr_get_cfg_sta_indoor_ch_peer_scc(hdd_ctx->psoc,
+						  &cfg_sta_indoor_ch_peer_scc);
+	if (cfg_sta_indoor_ch_peer_scc) {
+		if (intf_mode == PM_P2P_CLIENT_MODE ||
+		    intf_mode == PM_P2P_GO_MODE)
+			wlan_hdd_modify_pcl_for_sta_p2p_indoor_scc(hdd_ctx,
+								   w_pcl,
+								   &pcl_len);
+	}
 
 	for (i = 0; i < pcl_len; i++)
 		freq_list[i] = w_pcl[i].freq;

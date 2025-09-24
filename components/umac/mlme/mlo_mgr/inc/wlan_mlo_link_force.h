@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -695,3 +695,45 @@ mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * ml_nlink_get_link_info() - Get ML STA link info
+ * @psoc: PSOC object information
+ * @vdev: ml sta vdev object
+ * @flag: flag NLINK_* to specify what links should be returned
+ * @ml_num_link_sz: input array size of ml_link_info and
+ * other parameters.
+ * @ml_link_info: ml link info array
+ * @ml_freq_lst: channel frequency list
+ * @ml_vdev_lst: vdev id list
+ * @ml_linkid_lst: link id list
+ * @ml_num_link: num of links
+ * @ml_link_bitmap: link bitmaps.
+ *
+ * Return: void
+ */
+void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
+			    struct wlan_objmgr_vdev *vdev,
+			    uint8_t flag,
+			    uint8_t ml_num_link_sz,
+			    struct ml_link_info *ml_link_info,
+			    qdf_freq_t *ml_freq_lst,
+			    uint8_t *ml_vdev_lst,
+			    uint8_t *ml_linkid_lst,
+			    uint8_t *ml_num_link,
+			    uint32_t *ml_link_bitmap);
+#else
+static inline
+void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
+			    struct wlan_objmgr_vdev *vdev,
+			    uint8_t flag,
+			    uint8_t ml_num_link_sz,
+			    struct ml_link_info *ml_link_info,
+			    qdf_freq_t *ml_freq_lst,
+			    uint8_t *ml_vdev_lst,
+			    uint8_t *ml_linkid_lst,
+			    uint8_t *ml_num_link,
+			    uint32_t *ml_link_bitmap)
+{
+}
+#endif

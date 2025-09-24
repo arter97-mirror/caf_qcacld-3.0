@@ -50,18 +50,6 @@
  */
 #define MAX_LEGACY_CONCURRENCT_MODES   2
 
-static
-void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
-			    struct wlan_objmgr_vdev *vdev,
-			    uint8_t flag,
-			    uint8_t ml_num_link_sz,
-			    struct ml_link_info *ml_link_info,
-			    qdf_freq_t *ml_freq_lst,
-			    uint8_t *ml_vdev_lst,
-			    uint8_t *ml_linkid_lst,
-			    uint8_t *ml_num_link,
-			    uint32_t *ml_link_bitmap);
-
 static uint32_t
 ml_nlink_set_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
@@ -2005,6 +1993,7 @@ ml_nlink_get_standby_link_freq(struct wlan_objmgr_psoc *psoc,
 	return freq;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
 /**
  * ml_nlink_get_link_info() - Get ML STA link info
  * @psoc: PSOC object information
@@ -2021,16 +2010,16 @@ ml_nlink_get_standby_link_freq(struct wlan_objmgr_psoc *psoc,
  *
  * Return: void
  */
-static void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
-				   struct wlan_objmgr_vdev *vdev,
-				   uint8_t flag,
-				   uint8_t ml_num_link_sz,
-				   struct ml_link_info *ml_link_info,
-				   qdf_freq_t *ml_freq_lst,
-				   uint8_t *ml_vdev_lst,
-				   uint8_t *ml_linkid_lst,
-				   uint8_t *ml_num_link,
-				   uint32_t *ml_link_bitmap)
+void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
+			    struct wlan_objmgr_vdev *vdev,
+			    uint8_t flag,
+			    uint8_t ml_num_link_sz,
+			    struct ml_link_info *ml_link_info,
+			    qdf_freq_t *ml_freq_lst,
+			    uint8_t *ml_vdev_lst,
+			    uint8_t *ml_linkid_lst,
+			    uint8_t *ml_num_link,
+			    uint32_t *ml_link_bitmap)
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_mlo_sta *sta_ctx;
@@ -2129,6 +2118,7 @@ static void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 	*ml_num_link = num_link;
 	*ml_link_bitmap = link_bitmap;
 }
+#endif
 
 static uint32_t
 ml_nlink_get_available_link_bitmap(struct wlan_objmgr_psoc *psoc,

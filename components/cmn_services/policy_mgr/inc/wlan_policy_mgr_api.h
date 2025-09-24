@@ -6523,4 +6523,65 @@ policy_mgr_get_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 policy_mgr_set_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
 					  bool cfg_sta_indoor_ch_peer_scc);
+
+/**
+ * policy_mgr_enforce_high_priority_entry - Sanitizes a PCL to ensure only
+ * one high-priority entry for a specific frequency exists
+ * @pcl: Pointer to the original weighed PCL.
+ * @count: Pointer to the number of elements in the PCL.
+ * @freq: The frequency to sanitize.
+ * @weight: The only weight that should remain for the given freq.
+ *
+ * This function iterates through the PCL once. It ensures that for the given
+ * frequency, only the first occurrence with the weight passed is
+ * kept. All other entries for that same frequency (with different weight) or
+ * subsequent duplicate are discarded.
+ *
+ * Return: None.
+ */
+void policy_mgr_enforce_high_priority_entry(struct weighed_pcl *pcl,
+					    uint32_t *count,
+					    uint32_t freq,
+					    uint32_t weight);
+#ifdef WLAN_FEATURE_11BE_MLO
+/*
+ * policy_mgr_get_sta_connected_frequencies - This API returns list of all
+ * STA frequencies non-ML and ML(active/disabled/standby links).
+ *
+ * @psoc: pointer to psoc.
+ * @comb_freq_list: pointer to freq list.
+ * @num_comb_freq_list: number of entries in freq list.
+ *
+ * Return: None.
+ */
+void policy_mgr_get_sta_connected_frequencies(struct wlan_objmgr_psoc *psoc,
+					      uint32_t *comb_freq_list,
+					      uint32_t *num_comb_freq_list);
+#else
+static inline
+void policy_mgr_get_sta_connected_frequencies(struct wlan_objmgr_psoc *psoc,
+					      uint32_t *comb_freq_list,
+					      uint32_t *num_comb_freq_list)
+{
+}
+#endif
+
+/**
+ * policy_mgr_modify_pcl_sta_p2p_indoor_scc() - Modify PCL for STA+P2P indoor
+ * channel SCC.
+ *
+ * This API is used to modify the PCL to include the STA-connected indoor
+ * channel frequency with highest weight, and filter out all other indoor
+ * channel frequencies.
+ *
+ * @psoc: psoc pointer
+ * @pcl: Original PCL
+ * @num_pcl: Number of entries in @pcl
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_modify_pcl_sta_p2p_indoor_scc(struct wlan_objmgr_psoc *psoc,
+					 struct weighed_pcl *pcl,
+					 uint32_t *num_pcl);
 #endif /* __WLAN_POLICY_MGR_API_H */
