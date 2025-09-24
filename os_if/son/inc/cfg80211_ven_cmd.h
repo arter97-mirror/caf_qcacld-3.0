@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -59,6 +59,10 @@
  * @IEEE80211_PARAM_6G_SECURITY_COMP: 6G Security Compliance on/off
  * @IEEE80211_PARAM_ENABLE_SCS: Enable SCS Procedures
  * @IEEE80211_PARAM_IEEE_LINK_ID:
+ * @IEEE80211_PARAM_EMLMR_CONFIG: Configure Enhanced Multi-Link Multi-Radio mode
+ * @IEEE80211_PARAM_EMLSR_CONFIG: Configure Enhanced Multi-Link Single-Radio
+ *                                mode
+ * @IEEE80211_PARAM_STR_CONFIG: Configure Station-to-Responder Transition
  */
 enum wlan_son_ieee80211_param {
 	IEEE80211_PARAM_MACCMD         = 17,
@@ -99,6 +103,9 @@ enum wlan_son_ieee80211_param {
 	IEEE80211_PARAM_6G_SECURITY_COMP           = 714,
 	IEEE80211_PARAM_ENABLE_SCS                 = 741,
 	IEEE80211_PARAM_IEEE_LINK_ID               = 801,
+	IEEE80211_PARAM_EMLMR_CONFIG               = 808,
+	IEEE80211_PARAM_EMLSR_CONFIG               = 809,
+	IEEE80211_PARAM_STR_CONFIG                 = 810,
 };
 
 enum _ol_ath_param_t {
