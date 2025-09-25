@@ -2519,6 +2519,16 @@ config WLAN_DP_FEATURE_STC
 	bool "Enable WLAN_DP_FEATURE_STC"
 	default n
 
+config WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+	bool "Enable WLAN_DP_AFFINITY_OVERRIDE_FEATURE"
+	default n
+	help
+	This option enables support for affinity override.
+	DP Interrupts and threads are affined as per various threshold
+	levels and cpumask configured.
+
+	choose y to enable the support.
+
 config FEATURE_MGMT_RX_OVER_SRNG
 	bool "enable FEATURE_MGMT_RX_OVER_SRNG"
 	default n

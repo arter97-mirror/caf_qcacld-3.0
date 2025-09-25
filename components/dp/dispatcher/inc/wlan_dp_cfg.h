@@ -1590,6 +1590,189 @@
 #define WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK_MIN 0
 #define WLAN_CFG_DP_RX_THREAD_AFFINITY_MASK_MAX 0x3FF
 
+#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+/*
+ * <ini>
+ * dp_affn_override_enable - Control DP affinity override feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable DP affinity override feature
+ *
+ * Supported mode: All modes
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_AFFN_OVERRIDE_ENABLE \
+	CFG_INI_BOOL("dp_affn_override_enable", false, \
+		     "Enable/Disable DP affinity override feature")
+
+/*
+ * <ini>
+ * dp_affn_override_high_threshold - DP affinity override high threshold
+ *
+ * @Min: 0
+ * @Max: 4294967295UL
+ * @Default: 22000
+ *
+ * This ini specifies the affinity override high threshold
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_AFFN_OVERRIDE_HIGH_THRESHOLD \
+		CFG_INI_UINT( \
+		"dp_affn_override_high_threshold", \
+		0, \
+		4294967295UL, \
+		22000, \
+		CFG_VALUE_OR_DEFAULT, \
+		"DP affinity override high threshold")
+
+/*
+ * <ini>
+ * dp_affn_override_mid_threshold - DP affinity override medium threshold
+ *
+ * @Min: 0
+ * @Max: 4294967295UL
+ * @Default: 2000
+ *
+ * This ini specifies the affinity override medium threshold
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_AFFN_OVERRIDE_MID_THRESHOLD \
+		CFG_INI_UINT( \
+		"dp_affn_override_mid_threshold", \
+		0, \
+		4294967295UL, \
+		2000, \
+		CFG_VALUE_OR_DEFAULT, \
+		"DP affinity override mid threshold")
+
+/*
+ * <ini>
+ * dp_affn_override_low_threshold -  DP affinity override low threshold
+ *
+ * @Min: 0
+ * @Max: 4294967295UL
+ * @Default: 150
+ *
+ * This ini specifies the affinity override low threshold
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_AFFN_OVERRIDE_LOW_THRESHOLD \
+		CFG_INI_UINT( \
+		"dp_affn_override_low_threshold", \
+		0, \
+		4294967295UL, \
+		150, \
+		CFG_VALUE_OR_DEFAULT, \
+		"DP affinity override low threshold")
+
+/*
+ * <ini>
+ * dp_affn_override_low_tput_mask - DP affinity override mask for low
+ * throughput affinity
+ *
+ * @Min: 0
+ * @Max: 0xFFFFFFFF
+ * @Default: 0xFFFFFFFF
+ *
+ * This ini is used to set affinity override mask for low throughput affinity
+ * Default is kept as 0xFFFFFFFF to treat this as invalid option and affine
+ * the default affinity.
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+
+#define CFG_DP_AFFN_OVERRIDE_LOW_TPUT_MASK \
+		CFG_INI_UINT( \
+		"dp_affn_override_low_tput_mask", \
+		0, \
+		0xFFFFFFFF, \
+		0xFFFFFFFF, \
+		CFG_VALUE_OR_DEFAULT, \
+		"mask to affine rx_thread/rx_irq/tx_comp for low tput")
+
+/*
+ * <ini>
+ * dp_affn_override_medium_tput_mask - DP affinity override mask for medium
+ * throughput affinity
+ *
+ * @Min: 0
+ * @Max: 0xFFFFFFFF
+ * @Default: 0xFFFFFFFF
+ *
+ * This ini is used to set affinity override mask for medium throughput affinity
+ * Default is kept as 0xFFFFFFFF to treat this as invalid option and affine
+ * the default affinity.
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+
+#define CFG_DP_AFFN_OVERRIDE_MEDIUM_TPUT_MASK \
+		CFG_INI_UINT( \
+		"dp_affn_override_medium_tput_mask", \
+		0, \
+		0xFFFFFFFF, \
+		0xFFFFFFFF, \
+		CFG_VALUE_OR_DEFAULT, \
+		"mask to affine rx_thread/rx_irq/tx_comp for medium tput")
+
+/*
+ * <ini>
+ * dp_affn_override_high_tput_mask - DP affinity override mask for high
+ * throughput affinity
+ *
+ * @Min: 0
+ * @Max: 0xFFFFFFFF
+ * @Default: 0xFFFFFFFF
+ *
+ * This ini is used to set affinity override mask for high throughput affinity.
+ * Default is kept as 0xFFFFFFFF to treat this as invalid option and affine
+ * the default affinity.
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+
+#define CFG_DP_AFFN_OVERRIDE_HIGH_TPUT_MASK \
+		CFG_INI_UINT( \
+		"dp_affn_override_high_tput_mask", \
+		0, \
+		0xFFFFFFFF, \
+		0xFFFFFFFF, \
+		CFG_VALUE_OR_DEFAULT, \
+		"mask to affine rx_thread/rx_irq/tx_comp for high tput")
+
+#define CFG_DP_AFFN_OVERRIDE_MGMT \
+	CFG(CFG_DP_AFFN_OVERRIDE_ENABLE) \
+	CFG(CFG_DP_AFFN_OVERRIDE_HIGH_THRESHOLD) \
+	CFG(CFG_DP_AFFN_OVERRIDE_MID_THRESHOLD) \
+	CFG(CFG_DP_AFFN_OVERRIDE_LOW_THRESHOLD) \
+	CFG(CFG_DP_AFFN_OVERRIDE_LOW_TPUT_MASK) \
+	CFG(CFG_DP_AFFN_OVERRIDE_MEDIUM_TPUT_MASK) \
+	CFG(CFG_DP_AFFN_OVERRIDE_HIGH_TPUT_MASK)
+
+#else
+#define CFG_DP_AFFN_OVERRIDE_MGMT
+#endif
+
 /*
  * <ini>
  * dp_rx_thread_affinity_ctrl - Affinity control for Datapath rx threads
@@ -1672,6 +1855,7 @@
 	CFG_DP_DYNAMIC_RESOURCE_MGMT \
 	CFG(CFG_DP_IPA_DEBUG_ENABLE) \
 	CFG(CFG_DP_IRQ_AFFINITY_MASK) \
+	CFG_DP_AFFN_OVERRIDE_MGMT \
 	CFG(CFG_DP_RX_THREAD_AFFINITY_MASK) \
 	CFG_DP_HAPS
 
