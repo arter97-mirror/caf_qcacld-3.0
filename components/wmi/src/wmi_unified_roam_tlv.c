@@ -3071,23 +3071,25 @@ extract_roam_stats_with_single_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	status = wmi_unified_extract_roam_scan_stats(
 			wmi_handle, evt_buf, &stats_info->scan[0], 0, 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Roam scan stats extract failed vdev %d", vdev_id);
+		wmi_debug("Roam scan stats not present in this event vdev %d",
+			  vdev_id);
 
 	status = wmi_unified_extract_roam_11kv_stats(
 			wmi_handle, evt_buf, &stats_info->data_11kv[0], 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Roam 11kv stats extract failed vdev %d", vdev_id);
+		wmi_debug("Roam 11kv stats not present in this event vdev %d",
+			  vdev_id);
 
 	status = wmi_unified_extract_roam_trigger_stats(
 			wmi_handle, evt_buf, &stats_info->trigger[0], 0, 0);
 	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Extract roamtrigger stats failed vdev %d",
+		wmi_debug("Roamtrigger stats not present in this event vdev %d",
 			  vdev_id);
 
 	status = wmi_unified_extract_roam_btm_response(
 			wmi_handle, evt_buf, &stats_info->btm_rsp[0], 0);
 	if (QDF_IS_STATUS_ERROR(status))
-		wmi_debug("Roam btm rsp stats extract fail vdev %d",
+		wmi_debug("Roam btm rsp stats not present in this event vdev %d",
 			  vdev_id);
 
 	return QDF_STATUS_SUCCESS;
