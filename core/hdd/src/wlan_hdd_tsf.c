@@ -44,6 +44,7 @@
 #define WLAN_TSF_SYNC_GET_TIMEOUT 2000
 #define WLAN_HDD_CAPTURE_TSF_REQ_TIMEOUT_MS 500
 #define WLAN_HDD_CAPTURE_TSF_INIT_INTERVAL_MS 100
+#define WLAN_HDD_CAPTURE_TSF_POSTPONE_INTERVAL_MS 10
 #define OUTPUT_HIGH 1
 #define OUTPUT_LOW 0
 
@@ -2352,6 +2353,7 @@ static enum hdd_tsf_op_result
 hdd_capture_tsf_internal(struct hdd_adapter *adapter, uint32_t *buf, int len)
 {
 	enum hdd_tsf_op_result ret;
+	QDF_STATUS status;
 	struct hdd_context *hddctx;
 	qdf_mc_timer_t *cap_timer;
 
@@ -2384,8 +2386,15 @@ hdd_capture_tsf_internal(struct hdd_adapter *adapter, uint32_t *buf, int len)
 		return HDD_TSF_OP_SUCC;
 
 	if (qdf_atomic_inc_return(&hddctx->tsf.cap_tsf_flag) > 1) {
-		hdd_err("current in capture state");
-		*buf = TSF_CURRENT_IN_CAP_STATE;
+		hdd_debug("postpone capture request");
+		status =
+		qdf_mc_timer_start(&adapter->tsf.host_target_sync_timer,
+				   WLAN_HDD_CAPTURE_TSF_POSTPONE_INTERVAL_MS);
+		if (status != QDF_STATUS_SUCCESS &&
+		    status != QDF_STATUS_E_ALREADY) {
+			hdd_err("Failed to start timer, status: %d", status);
+			return HDD_TSF_OP_FAIL;
+		}
 		return HDD_TSF_OP_SUCC;
 	}
 
