@@ -63,6 +63,9 @@ _target_chipset_map = {
         "qca6490_cnss2",
         "kiwi-v2",
     ],
+    "hamoa": [
+        "kiwi-v2",
+    ]
 }
 
 _chipset_hw_map = {
@@ -2728,7 +2731,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//dataipa:include_headers",
             "//dataipa:{}_{}_ipam".format(target, variant),
         ]
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm":
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
