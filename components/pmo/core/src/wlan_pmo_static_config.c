@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -52,9 +52,6 @@ void pmo_register_wow_wakeup_events(struct wlan_objmgr_vdev *vdev)
 	switch (vdev_opmode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
-		pmo_set_wow_event_bitmap(WOW_BEACON_EVENT,
-					 PMO_WOW_MAX_EVENT_BM_LEN,
-					 event_bitmap);
 		/* set power on failure event only for STA and P2P_CLI mode*/
 		if (psoc_ctx->psoc_cfg.auto_power_save_fail_mode ==
 		    PMO_FW_TO_SEND_WOW_IND_ON_PWR_FAILURE){
