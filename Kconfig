@@ -2304,6 +2304,10 @@ config CNSS2_MODULE
 	bool "Enable CONFIG_CNSS2_MODULE"
 	default n
 
+config CNSS_IN_CNSS2
+	bool "support CNSS SDIO in CNSS2"
+    default n
+
 config DP_RX_DESC_COOKIE_INVALIDATE
 	bool "Enable CONFIG_DP_RX_DESC_COOKIE_INVALIDATE"
 	default n
