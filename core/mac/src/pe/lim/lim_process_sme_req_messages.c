@@ -1938,6 +1938,19 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	 */
 	if (is_vendor_ap_present)
 		lim_update_he_caps_htc(session, !is_vendor_ap_present);
+
+	/* Check if ACTION_OUI_LIMIT_BW matches for 2.4GHz to disable HT40 */
+	session->action_oui_limit_bw_2g = false;
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq)) {
+		if (wlan_action_oui_search(mac_ctx->psoc,
+					   &vendor_ap_search_attr,
+					   ACTION_OUI_LIMIT_BW)) {
+			pe_debug("Disabling HT40 for vdev %d for IoT AP " QDF_MAC_ADDR_FMT,
+				 session->vdev_id, QDF_MAC_ADDR_REF(bss_desc->bssId));
+			session->action_oui_limit_bw_2g = true;
+		}
+	}
+
 }
 
 static enum mlme_dot11_mode
@@ -3607,6 +3620,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->gLimPhyMode = bss_desc->nwType;
 	handle_ht_capabilityand_ht_info(mac_ctx, session);
 
+	if (session->action_oui_limit_bw_2g)
+		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
 	session->htSupportedChannelWidthSet = cb_mode ? 1 : 0;
 	session->htRecommendedTxWidthSet =
 		session->htSupportedChannelWidthSet;
