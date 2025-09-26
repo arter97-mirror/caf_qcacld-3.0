@@ -2059,6 +2059,66 @@ bool policy_mgr_is_sap_safe_with_bw(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+/* policy_mgr_check_go_restart_for_non_dbs() - is go restart required in
+ * in non-DBS case after sta disconnection.
+ * @pm_ctx: pointer to policy_mgr_psoc_priv_obj.
+ * @sta_count: STA count
+ * @op_ch_freq_list: operating channel frequency list
+ * @vdev_id: pointer to vdev id
+ * @cc_count: SAP/GO count
+ * @go_index_start: GO start index
+ *
+ * Return: bool
+ */
+static bool
+policy_mgr_check_go_restart_for_non_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+					uint32_t *intf_ch_freq,
+					uint32_t sta_count,
+					uint32_t *op_ch_freq_list,
+					uint8_t *vdev_id,
+					uint32_t cc_count,
+					uint32_t go_index_start)
+{
+	uint32_t i;
+	uint8_t cur_sap_vdev_id = INVALID_VDEV_ID;
+	qdf_freq_t sap_freq = 0;
+	bool cfg_sta_indoor_ch_peer_scc;
+
+	cfg_sta_indoor_ch_peer_scc = pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc;
+
+	for (i = go_index_start; i < cc_count; i++) {
+		if ((((WLAN_REG_IS_5GHZ_CH_FREQ(op_ch_freq_list[i]) &&
+		       wlan_reg_is_freq_indoor(pm_ctx->pdev,
+					       op_ch_freq_list[i])) ||
+		       wlan_reg_is_dfs_for_freq(pm_ctx->pdev,
+						op_ch_freq_list[i])) &&
+		       (!sta_count ||
+			!policy_mgr_is_sta_sap_scc(pm_ctx->psoc,
+						   op_ch_freq_list[i],
+						   true))) &&
+			cfg_sta_indoor_ch_peer_scc) {
+			cur_sap_vdev_id = vdev_id[i];
+			sap_freq = op_ch_freq_list[i];
+			break;
+		}
+	}
+
+	if (cur_sap_vdev_id != INVALID_VDEV_ID) {
+		*intf_ch_freq =
+			policy_mgr_get_alternate_channel_for_sap(
+				pm_ctx->psoc, cur_sap_vdev_id, sap_freq,
+				REG_BAND_5G);
+		if (*intf_ch_freq) {
+			policy_mgr_debug("SAP/GO(vdev_id %d) will be moved to channel %u",
+					 cur_sap_vdev_id,
+					 *intf_ch_freq);
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 			struct wlan_objmgr_psoc *psoc,
 			uint32_t sap_vdev_id, uint32_t *intf_ch_freq,
@@ -2088,6 +2148,8 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	struct wlan_objmgr_pdev *pdev;
 	uint32_t cur_sap_vdev_id = INVALID_VDEV_ID;
 	uint8_t nan_present;
+	uint32_t sta_count = 0;
+	enum policy_mgr_con_mode con_mode;
 
 	if (intf_ch_freq)
 		*intf_ch_freq = 0;
@@ -2101,10 +2163,6 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(psoc);
 	policy_mgr_get_sta_sap_scc_on_dfs_chnl(psoc, &sta_sap_scc_on_dfs_chnl_config_value);
 
-	if (!policy_mgr_is_hw_dbs_capable(psoc))
-		if (policy_mgr_get_connection_count(psoc) > 1)
-			return false;
-
 	cc_count = policy_mgr_get_mode_specific_conn_info(psoc,
 							  &op_ch_freq_list[0],
 							  &vdev_id[0],
@@ -2115,9 +2173,10 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 					psoc, &op_ch_freq_list[cc_count],
 					&vdev_id[cc_count], PM_P2P_GO_MODE);
 
-	sta_gc_present =
+	sta_count =
 		policy_mgr_mode_specific_connection_count(psoc,
-							  PM_STA_MODE, NULL) +
+							  PM_STA_MODE, NULL);
+	sta_gc_present = sta_count +
 		policy_mgr_mode_specific_connection_count(psoc,
 							  PM_P2P_CLIENT_MODE,
 							  NULL);
@@ -2129,6 +2188,27 @@ bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 		policy_mgr_mode_specific_connection_count(psoc,
 							  PM_NDI_MODE,
 							  NULL);
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc)) {
+		con_mode = policy_mgr_con_mode_by_vdev_id(psoc, sap_vdev_id);
+		if (con_mode == PM_P2P_GO_MODE &&
+		    sap_vdev_id != INVALID_VDEV_ID) {
+			if (sta_count && policy_mgr_go_scc_enforced(psoc))
+				return false;
+
+			if (policy_mgr_check_go_restart_for_non_dbs(pm_ctx,
+							     intf_ch_freq,
+							     sta_count,
+							     op_ch_freq_list,
+							     vdev_id,
+							     cc_count,
+							     go_index_start))
+				return true;
+		}
+
+		if (policy_mgr_get_connection_count(psoc) > 1)
+			return false;
+	}
 
 	for (i = 0 ; i < cc_count; i++) {
 		if (sap_vdev_id != INVALID_VDEV_ID &&
@@ -4141,7 +4221,8 @@ sap_restart:
 		}
 
 		if (policy_mgr_mode_specific_connection_count(
-					psoc, PM_P2P_GO_MODE, NULL))
+					psoc, PM_P2P_GO_MODE, NULL) ||
+					!pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc)
 			timeout_ms = MAX_NOA_TIME;
 
 		policy_mgr_debug("Queue check interface work with timeout %d",

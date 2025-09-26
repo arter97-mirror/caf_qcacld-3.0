@@ -2898,25 +2898,43 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 	uint8_t i;
 	bool force_link_required = false;
 	uint32_t mcc_to_scc_switch;
+	bool cfg_sta_indoor_ch_peer_scc = false;
+	QDF_STATUS status;
 
 	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
 			       QDF_ARRAY_SIZE(ml_linkid_lst),
 			       ml_link_info, ml_freq_lst, ml_vdev_lst,
 			       ml_linkid_lst, &ml_num_link,
 			       &ml_link_bitmap);
+
+	status = policy_mgr_get_cfg_sta_indoor_ch_peer_scc(psoc,
+							   &cfg_sta_indoor_ch_peer_scc);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_debug("Failed to get cfg_sta_indoor_ch_peer_scc");
+		cfg_sta_indoor_ch_peer_scc = false;
+	}
+
 	if (ml_num_link < 2)
 		return;
 
 	switch (pm_mode) {
 	case PM_P2P_CLIENT_MODE:
 	case PM_P2P_GO_MODE:
+		if (cfg_sta_indoor_ch_peer_scc) {
+			force_link_required = true;
+			break;
+		}
+
+		goto force_inactive_num;
 	case PM_STA_MODE:
 		goto force_inactive_num;
 	case PM_SAP_MODE:
 		mcc_to_scc_switch = policy_mgr_get_mcc_to_scc_switch_mode(psoc);
 
 		if (mcc_to_scc_switch !=
-			QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND)
+			QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND ||
+			cfg_sta_indoor_ch_peer_scc)
 			force_link_required = true;
 		break;
 	default:
@@ -2963,6 +2981,12 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 
 	if (force_inactive_link_bitmap && force_link_required)
 		force_cmd->force_inactive_bitmap = force_inactive_link_bitmap;
+
+	/* If STA & peer SCC is enabled on STA connected indoor channel
+	 * force active the ML link which has same freq as legacy_freq).
+	 */
+	if (cfg_sta_indoor_ch_peer_scc && force_link_required)
+		force_cmd->force_active_bitmap = scc_link_bitmap;
 
 	return;
 

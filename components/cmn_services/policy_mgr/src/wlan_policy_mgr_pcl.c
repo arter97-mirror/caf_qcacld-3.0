@@ -6047,6 +6047,7 @@ uint32_t policy_mgr_get_alternate_channel_for_sap(
 	uint8_t i;
 	enum policy_mgr_con_mode con_mode;
 	bool is_6ghz_cap;
+	bool cfg_sta_indoor_ch_peer_scc;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -6055,6 +6056,8 @@ uint32_t policy_mgr_get_alternate_channel_for_sap(
 	}
 	con_mode = policy_mgr_con_mode_by_vdev_id(psoc, sap_vdev_id);
 	is_6ghz_cap = policy_mgr_get_ap_6ghz_capable(psoc, sap_vdev_id, NULL);
+
+	cfg_sta_indoor_ch_peer_scc = pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc;
 	/*
 	 * Store the connection's parameter and temporarily delete it
 	 * from the concurrency table. This way the get pcl can be used as a
@@ -6079,12 +6082,22 @@ uint32_t policy_mgr_get_alternate_channel_for_sap(
 			if (!is_6ghz_cap &&
 			    WLAN_REG_IS_6GHZ_CHAN_FREQ(pcl_channels[i]))
 				continue;
-			if (policy_mgr_get_connection_count(psoc) &&
-			    policy_mgr_are_2_freq_on_same_mac(psoc,
-							      sap_ch_freq,
-							      pcl_channels[i]))
+			if ((con_mode != PM_P2P_GO_MODE &&
+			     policy_mgr_get_connection_count(psoc) &&
+			     policy_mgr_are_2_freq_on_same_mac(psoc,
+							       sap_ch_freq,
+							       pcl_channels[i])))
 				continue;
-			if (policy_mgr_get_connection_count_with_ch_freq(
+			if (cfg_sta_indoor_ch_peer_scc &&
+			    con_mode == PM_P2P_GO_MODE &&
+			    ((WLAN_REG_IS_5GHZ_CH_FREQ(pcl_channels[i]) &&
+			      wlan_reg_is_freq_indoor(pm_ctx->pdev,
+						      pcl_channels[i])) ||
+			      wlan_reg_is_dfs_for_freq(pm_ctx->pdev,
+						       pcl_channels[i])))
+				continue;
+			if (con_mode != PM_P2P_GO_MODE &&
+			    policy_mgr_get_connection_count_with_ch_freq(
 							pcl_channels[i])) {
 				ch_freq = pcl_channels[i];
 				break;

@@ -12831,6 +12831,9 @@ policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_psoc *psoc;
 	bool is_scc = false, indoor_support = false;
 	enum QDF_OPMODE mode;
+	bool cfg_sta_indoor_ch_peer_scc = false;
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
@@ -12842,6 +12845,12 @@ policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 	is_scc = policy_mgr_is_sta_sap_scc(psoc, ch_freq, true);
 	mode = wlan_get_opmode_from_vdev_id(pdev, vdev_id);
 	ucfg_mlme_get_indoor_channel_support(psoc, &indoor_support);
+	status = policy_mgr_get_cfg_sta_indoor_ch_peer_scc(psoc,
+							   &cfg_sta_indoor_ch_peer_scc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Failed to get cfg_sta_indoor_ch_peer_scc");
+		cfg_sta_indoor_ch_peer_scc = false;
+	}
 
 	/*
 	 * Rules for indoor operation:
@@ -12875,14 +12884,34 @@ policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 		return false;
 	}
 
-	if (mode == QDF_P2P_GO_MODE) {
-		if (ucfg_p2p_get_indoor_ch_support(psoc) ||
-		    (is_scc &&
-		    policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc)))
-			return true;
-		policy_mgr_rl_debug("GO operation is not allowed on indoor channel");
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("Invalid vdev");
 		return false;
 	}
+
+	if (mode == QDF_P2P_GO_MODE) {
+		if (is_scc && cfg_sta_indoor_ch_peer_scc &&
+		    wlan_vdev_mlme_is_init_state(vdev) &&
+		    policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc)) {
+			policy_mgr_rl_debug("GO operation is allowed on STA connected indoor channel");
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			return true;
+		}
+
+		if (ucfg_p2p_get_indoor_ch_support(psoc) ||
+		    (is_scc &&
+		    policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc))) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+			return true;
+		}
+		policy_mgr_rl_debug("GO operation is not allowed on indoor channel");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return false;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	policy_mgr_rl_debug("SAP operation is not allowed on indoor channel");
 	return false;
