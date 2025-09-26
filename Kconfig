@@ -3005,4 +3005,8 @@ config MLO_SAP_LINK_REMOVAL
 	depends on WLAN_FEATURE_MULTI_LINK_SAP
 	default n
 
+config WLAN_POS_GET_BY_NAME_NOT_SUPPORT
+	bool "Enable WLAN_POS_GET_BY_NAME_NOT_SUPPORT"
+	default n
+
 endif # QCA_CLD_WLAN
