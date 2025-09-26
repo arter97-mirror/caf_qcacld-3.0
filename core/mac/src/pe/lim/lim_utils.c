@@ -3910,6 +3910,14 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 		return;
 	}
 
+	/* If ACTION_OUI_LIMIT_BW matched for this 2.4GHz IoT AP, prevent HT40 switching */
+	if (pe_session->action_oui_limit_bw_2g &&
+	    WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq)) {
+		pe_debug("Preventing HT40 switch for IoT AP on vdev %d",
+			 pe_session->vdev_id);
+		return;
+	}
+
 	if (pe_session->htSecondaryChannelOffset !=
 	    (uint8_t) pHTInfo->secondaryChannelOffset
 	    || pe_session->htRecommendedTxWidthSet !=

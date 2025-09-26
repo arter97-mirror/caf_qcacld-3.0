@@ -1268,6 +1268,10 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 				pe_session->htSupportedChannelWidthSet;
 		}
 
+		/* Check ACTION_OUI_LIMIT_BW flag for 2.4GHz IoT AP compatibility */
+		if (pe_session->action_oui_limit_bw_2g)
+			pDot11f->supportedChannelWidthSet = 0;
+
 		pDot11f->advCodingCap = pe_session->ht_config.adv_coding_cap;
 		pDot11f->txSTBC = pe_session->ht_config.tx_stbc;
 		pDot11f->rxSTBC = pe_session->ht_config.rx_stbc;

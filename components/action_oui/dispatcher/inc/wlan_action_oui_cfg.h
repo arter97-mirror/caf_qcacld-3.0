@@ -895,6 +895,9 @@
  * <ini>
  * CFG_ACTION_OUI_LIMIT_BW - Used to limit BW for specified AP
  *
+ * To avoid IoT issue, limit 2.4 GHz STA connection BW to 20MHz,
+ * Limit 5/6 GHz STA connection TX BW to 40MHz
+ *
  * Example OUIs: (All values in Hex)
  * OUI 1: 00904c
  *       OUI data Len: 04
