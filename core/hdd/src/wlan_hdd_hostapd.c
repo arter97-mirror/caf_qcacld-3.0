@@ -2028,23 +2028,31 @@ hdd_hostapd_apply_action_oui(struct hdd_context *hdd_ctx,
 		hdd_err("Failed to disable aggregation for peer");
 }
 
-static void hdd_hostapd_set_sap_key(struct hdd_adapter *adapter)
+static void hdd_hostapd_set_sap_key(struct wlan_hdd_link_info *link_info)
 {
+	struct wlan_objmgr_vdev *vdev;
 	struct wlan_crypto_key *crypto_key;
 	uint8_t key_index;
 
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		return;
+	}
+
 	for (key_index = 0; key_index < WLAN_CRYPTO_TOTAL_KEYIDX; ++key_index) {
-		crypto_key = wlan_crypto_get_key(adapter->deflink->vdev,
-						 NULL, key_index);
+		crypto_key = wlan_crypto_get_key(vdev, NULL, key_index);
 		if (!crypto_key)
 			continue;
 
 		hdd_debug("key idx %d", key_index);
-		ucfg_crypto_set_key_req(adapter->deflink->vdev, crypto_key,
+		ucfg_crypto_set_key_req(vdev, crypto_key,
 					WLAN_CRYPTO_KEY_TYPE_GROUP);
-		wma_update_set_key(adapter->deflink->vdev_id, false, key_index,
+		wma_update_set_key(link_info->vdev_id, false, key_index,
 				   NULL, crypto_key->cipher_type);
 	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
 #ifdef WLAN_FEATURE_11BE
@@ -2801,7 +2809,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		}
 		hdd_setup_tsf_sync(adapter);
 
-		hdd_hostapd_set_sap_key(adapter);
+		hdd_hostapd_set_sap_key(link_info);
 
 		/* Fill the params for sending IWEVCUSTOM Event
 		 * with SOFTAP.enabled
