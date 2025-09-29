@@ -268,8 +268,8 @@ void lim_perform_ft_pre_auth(struct mac_context *mac, QDF_STATUS status,
 		return;
 	}
 
-	if (auth_type == eCSR_AUTH_TYPE_FT_SAE ||
-	    auth_type == eCSR_AUTH_TYPE_SAE) {
+	pe_debug("Entered  auth_type %d for FT ", auth_type);
+	if (auth_type == eCSR_AUTH_TYPE_SAE) {
 		struct qdf_mac_addr *pre_auth_bssid = (struct qdf_mac_addr *)
 			pe_session->ftPEContext.pFTPreAuthReq->preAuthbssId;
 
