@@ -2900,10 +2900,12 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 
 		mgmt_txrx_frame_hex_dump(link_reassoc_rsp.ptr,
 					 link_reassoc_rsp.len, false);
-
+		status =
 		lim_process_assoc_rsp_frame(mac_ctx, link_reassoc_rsp.ptr,
 					    link_reassoc_rsp.len, LIM_REASSOC,
 					    session_entry);
+		if (QDF_IS_STATUS_ERROR(status))
+			break;
 	}
 end:
 	qdf_mem_free(link_reassoc_rsp.ptr);
@@ -3259,19 +3261,16 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 						ft_session_ptr,
 						reassoc_resp,
 						roam_sync_ind_ptr->reassoc_resp_length);
-		if (ft_session_ptr->is_unexpected_peer_error)
-			status = QDF_STATUS_E_FAILURE;
-
 		if (QDF_IS_STATUS_ERROR(status)) {
 			qdf_mem_free(bss_desc);
 			goto roam_sync_fail;
 		}
 	} else {
+		status =
 		lim_process_assoc_rsp_frame(mac_ctx, reassoc_resp,
 					    roam_sync_ind_ptr->reassoc_resp_length,
 					    LIM_REASSOC, ft_session_ptr);
-		if (ft_session_ptr->is_unexpected_peer_error) {
-			status = QDF_STATUS_E_FAILURE;
+		if (QDF_IS_STATUS_ERROR(status)) {
 			qdf_mem_free(bss_desc);
 			goto roam_sync_fail;
 		}

@@ -1088,7 +1088,6 @@ struct pe_session {
 	uint8_t user_edca_set;
 	bool is_oui_auth_assoc_6mbps_2ghz_enable;
 	bool action_oui_limit_bw_2g;
-	bool is_unexpected_peer_error;
 	uint8_t join_probe_cnt;
 	bool cal_tpc_post_csa;
 	uint8_t rsno_gen_used;

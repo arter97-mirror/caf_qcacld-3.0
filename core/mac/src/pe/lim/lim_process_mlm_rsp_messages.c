@@ -2944,10 +2944,17 @@ process_assoc_rsp:
 			 session_entry->vdev_id, link_id);
 		mgmt_txrx_frame_hex_dump(link_assoc_rsp.ptr,
 					 link_assoc_rsp.len, false);
+		status =
 		lim_process_assoc_rsp_frame(mac_ctx, link_assoc_rsp.ptr,
 					    link_assoc_rsp.len, LIM_ASSOC,
 					    session_entry);
-		goto mem_free;
+		if (QDF_IS_STATUS_ERROR(status)) {
+			status = QDF_STATUS_E_INVAL;
+			pe_debug("err in assc rsp frame process vdev %d",
+				 session_entry->vdev_id);
+		} else {
+			goto mem_free;
+		}
 	}
 
 rsp_gen_fail:
@@ -3044,10 +3051,11 @@ lim_process_switch_channel_join_mlo_roam(struct pe_session *session_entry,
 	mlo_update_cache_link_assoc_rsp(session_entry->vdev,
 					link_id, &link_assoc_rsp);
 	mgmt_txrx_frame_hex_dump(link_assoc_rsp.ptr, link_assoc_rsp.len, false);
+	status =
 	lim_process_assoc_rsp_frame(mac_ctx, link_assoc_rsp.ptr,
 				    link_assoc_rsp.len, LIM_REASSOC,
 				    session_entry);
-	if (session_entry->is_unexpected_peer_error) {
+	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("MLO_ROAM: link vdev:%d link_id:%d assoc rsp process failed",
 		       session_entry->vdev_id, link_id);
 		status = QDF_STATUS_E_INVAL;
@@ -3273,10 +3281,18 @@ lim_mlo_link_recfg_add_process_assoc_rsp(struct mac_context *mac_ctx,
 		 session_entry->vdev_id, link_id, link_assoc_rsp.len);
 	mgmt_txrx_frame_hex_dump(link_assoc_rsp.ptr,
 				 link_assoc_rsp.len, false);
+	status =
 	lim_process_assoc_rsp_frame(mac_ctx, link_assoc_rsp.ptr,
 				    link_assoc_rsp.len, LIM_ASSOC,
 				    session_entry);
 	qdf_mem_free(link_assoc_rsp.ptr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		status = QDF_STATUS_E_INVAL;
+		pe_debug("err in assc rsp frame process vdev %d",
+			 session_entry->vdev_id);
+		return status;
+	}
+
 	lim_process_bcn_tpe_and_set_tpc(mac_ctx,
 					session_entry);
 	return QDF_STATUS_SUCCESS;
