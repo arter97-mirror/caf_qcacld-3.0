@@ -1094,9 +1094,9 @@ wlan_hdd_cached_link_state_request(struct hdd_adapter *adapter,
 
 		link_iter++;
 
-		hdd_debug_rl("vdev id %d sta_ctx->conn_info.ieee_link_id %d is_mlo_vdev_active %d ",
-			     link_info->vdev_id, sta_ctx->conn_info.ieee_link_id,
-			     ml_link_info->is_link_active);
+		hdd_debug("vdev id %d sta_ctx->conn_info.ieee_link_id %d is_mlo_vdev_active %d ",
+			  link_info->vdev_id, sta_ctx->conn_info.ieee_link_id,
+			  ml_link_info->is_link_active);
 	}
 
 	link_state_event.num_mlo_vdev_link_info = link_iter;
@@ -1105,10 +1105,10 @@ wlan_hdd_cached_link_state_request(struct hdd_adapter *adapter,
 	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
 	link_state_event.mldaddr = *mld_addr;
 
-	hdd_debug_rl("cached link_state_resp: vdev id %d status %d num %d MAC addr " QDF_MAC_ADDR_FMT,
-		     link_state_event.vdev_id, link_state_event.status,
-		     link_state_event.num_mlo_vdev_link_info,
-		     QDF_MAC_ADDR_REF(link_state_event.mldaddr.bytes));
+	hdd_debug("cached link_state_resp: vdev id %d status %d num %d MAC addr " QDF_MAC_ADDR_FMT,
+		  link_state_event.vdev_id, link_state_event.status,
+		  link_state_event.num_mlo_vdev_link_info,
+		  QDF_MAC_ADDR_REF(link_state_event.mldaddr.bytes));
 
 	skb_len = hdd_get_ml_link_state_response_len(&link_state_event);
 
