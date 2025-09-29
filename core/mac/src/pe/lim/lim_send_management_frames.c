@@ -5619,11 +5619,10 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 			pe_err("Failed to send De-Authentication (%X)!",
 				qdf_status);
 
-			/* Call lim_process_deauth_ack_timeout which will send
+			/* Call lim_send_deauth_cnf which will send
 			 * DeauthCnf for this frame
 			 */
-			lim_process_deauth_ack_timeout(mac,
-						       pe_session->peSessionId);
+			lim_send_deauth_cnf(mac, pe_session->vdev_id);
 			return;
 		}
 

@@ -748,7 +748,7 @@ lim_check_and_trigger_pmf_sta_deletion(struct mac_context *mac,
 		pe_debug("TODO:Ack for deauth frame is pending Issue del sta for "
 			 QDF_MAC_ADDR_FMT,
 			 QDF_MAC_ADDR_REF(mlm_deauth_req->peer_macaddr.bytes));
-		lim_process_deauth_ack_timeout(mac, pe_session->vdev_id);
+		lim_send_deauth_cnf(mac, pe_session->vdev_id);
 		is_connected = false;
 	}
 
