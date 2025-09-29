@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,108 +22,6 @@
  */
 
 #include "wlan_hdd_connectivity_logging.h"
-
-#define GET_ATTR_OFFSET(member) \
-	qdf_offsetof(struct wlan_log_record, member)
-
-#define ATTR_GET_VALUE(type, record, field_offset) \
-	(*(type *)((uint8_t *)record + field_offset))
-
-/**
- * struct connectivity_log_attr  - Connectivity logging attribute info
- * @attribute_id: Vendor attribute ID. Defined by enum qca_wlan_vendor_attr_diag
- * @attribute_type: NL type of the attribute
- * @attribute_length: Length of the attribute
- * @field_offset: Field offset
- */
-struct connectivity_log_attr {
-	enum qca_wlan_vendor_attr_diag attribute_id;
-	uint8_t attribute_type;
-	uint16_t attribute_length;
-	uint16_t field_offset;
-};
-
-#ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
-/**
- * wlan_hdd_send_connectivity_log_to_user  - Send the connectivity log buffer
- * to userspace
- * @rec: Pointer to the log record
- * @hdd_context: HDD global context
- * @num_records: Number of records
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS
-wlan_hdd_send_connectivity_log_to_user(struct wlan_log_record *rec,
-				       void *hdd_context,
-				       uint8_t num_records)
-{
-	struct hdd_context *hdd_ctx;
-	struct nlattr *attr, *attr1;
-	struct sk_buff *vendor_event;
-	uint16_t len, i = 0;
-	QDF_STATUS status;
-
-	hdd_enter();
-
-	hdd_ctx = hdd_context;
-	if (wlan_hdd_validate_context(hdd_ctx))
-		return QDF_STATUS_E_FAILURE;
-
-	len = wlan_hdd_get_connectivity_log_event_len(rec, num_records);
-
-	vendor_event = wlan_cfg80211_vendor_event_alloc(
-			hdd_ctx->wiphy, NULL, len + NLMSG_HDRLEN,
-			QCA_NL80211_VENDOR_SUBCMD_DIAG_EVENT_INDEX,
-			GFP_ATOMIC);
-	if (!vendor_event) {
-		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	attr = nla_nest_start(vendor_event,
-			      QCA_WLAN_VENDOR_ATTR_DIAG_EVENT);
-	if (!attr)
-		goto failure;
-
-	for (i = 0; i < num_records; i++) {
-		attr1 = nla_nest_start(vendor_event, i);
-		if (!attr1)
-			goto failure;
-
-		status = wlan_hdd_fill_connectivity_logging_data(vendor_event,
-								 &rec[i]);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err_rl("Failed to fill fat idx:%d subtype:%d",
-				   i, rec[i].log_subtype);
-			goto failure;
-		}
-
-		nla_nest_end(vendor_event, attr1);
-	}
-
-	nla_nest_end(vendor_event, attr);
-	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
-
-	hdd_exit();
-
-	return QDF_STATUS_SUCCESS;
-failure:
-	hdd_err("NLA fill failed num_records:%d", num_records);
-	wlan_cfg80211_vendor_free_skb(vendor_event);
-
-	return QDF_STATUS_E_FAILURE;
-}
-
-void wlan_hdd_start_connectivity_logging(struct hdd_context *hdd_ctx)
-{
-	struct wlan_cl_osif_cbks hdd_cb;
-
-	hdd_cb.wlan_connectivity_log_send_to_usr =
-			wlan_hdd_send_connectivity_log_to_user;
-	wlan_connectivity_logging_start(hdd_ctx->psoc, &hdd_cb, hdd_ctx);
-}
-#endif
 
 #ifdef CONNECTIVITY_DIAG_EVENT
 static enum wlan_diag_connect_fail_reason
