@@ -836,6 +836,17 @@ static void lim_clear_mbssid_info(struct wlan_objmgr_vdev *vdev)
 	mlme_set_mbssid_info(vdev, &mbssid_info, INVALID_CHANNEL_NUM);
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+static void lim_cleanup_log_instance_id(struct pe_session *session)
+{
+	if (!session->bRoamSynchInProgress)
+		lim_clear_log_instance_id(session);
+}
+#else
+static inline void lim_cleanup_log_instance_id(struct pe_session *session)
+{}
+#endif
+
 /**
  * pe_delete_session() - deletes the PE session given the session ID.
  * @mac_ctx: pointer to global adapter context
@@ -866,6 +877,7 @@ void pe_delete_session(struct mac_context *mac_ctx, struct pe_session *session)
 	lim_sae_auth_cleanup_retry(mac_ctx, session->vdev_id);
 	lim_cleanup_power_change(mac_ctx, session);
 	lim_clear_mbssid_info(session->vdev);
+	lim_cleanup_log_instance_id(session);
 
 	/* Restore default failure timeout */
 	if (session->defaultAuthFailureTimeout) {

@@ -2460,4 +2460,21 @@ QDF_STATUS
 wlan_update_peer_phy_mode(struct wlan_channel *des_chan,
 			  struct wlan_objmgr_vdev *vdev);
 
+#if (defined(CONNECTIVITY_DIAG_EVENT) && \
+	defined(WLAN_FEATURE_ROAM_OFFLOAD))
+/**
+ * wlan_set_log_instance_id() - Increment the log instance id for each preauth
+ * event received.
+ * @pdev: pdev object
+ * @vdev_id : Vdev id
+ *
+ * Return: QDF_STATUS
+ */
+void
+wlan_set_log_instance_id(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
+#else
+static inline void
+wlan_set_log_instance_id(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
+{}
+#endif
 #endif  /* WLAN_CM_ROAM_API_H__ */
