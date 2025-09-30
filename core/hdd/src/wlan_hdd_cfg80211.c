@@ -5439,6 +5439,26 @@ static inline void wlan_hdd_set_mrsno_feature(struct wlan_objmgr_psoc *psoc,
 				  QCA_WLAN_VENDOR_FEATURE_RSN_OVERRIDE_STA);
 }
 
+static inline void wlan_hdd_set_tx_power_feature(struct wlan_objmgr_psoc *psoc,
+						 uint8_t *feature_flags)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		hdd_err("wmi handle is NULL");
+		return;
+	}
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_tx_power_limit)) {
+		hdd_err("WMI_SERVICE_TX_POWER_LIMIT is not enabled");
+		return;
+	}
+
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_TX_POWER_LIMIT);
+}
+
 #define MAX_CONCURRENT_CHAN_ON_24G    2
 #define MAX_CONCURRENT_CHAN_ON_5G     2
 
@@ -5573,6 +5593,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_usd_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_wfd_r2_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_tx_power_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
@@ -7357,6 +7378,7 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 		}
 
 		hdd_debug("Received min roam score delta value: %d", value);
+		value *= cfg_max(CFG_CAND_MIN_ROAM_SCORE_DELTA)/100;
 		status = hdd_send_min_roam_score_delta_to_sme(hdd_ctx, vdev_id,
 							      value);
 
@@ -9348,6 +9370,8 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
 	QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINK_ID
 #define CONFIG_MLO_LINKS \
 	QCA_WLAN_VENDOR_ATTR_CONFIG_MLO_LINKS
+#define CONFIG_TX_POWER_LIMIT_ENABLE \
+	QCA_WLAN_VENDOR_ATTR_CONFIG_TX_POWER_LIMIT_ENABLE
 
 #define ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD \
 	QCA_WLAN_VENDOR_ATTR_CONFIG_ANT_DIV_PROBE_WLAN_RSSI_THRESHOLD
@@ -9556,6 +9580,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_CHAIN_MASK_5GHZ] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_POWER_LIMIT_ENABLE] = {
+		.type = NLA_U8},
 };
 
 
@@ -9731,6 +9757,8 @@ wlan_hdd_wifi_test_config_policy[
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_BTM_REQ_RESP] = {
 			.type = NLA_NESTED},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_RTWT_SUPPORT] = {
+			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_BTM_RECOMM_MULTI_AP_SUPPORT] = {
 			.type = NLA_U8},
 };
 
@@ -13015,6 +13043,36 @@ static int hdd_set_dynamic_bw(struct wlan_hdd_link_info *link_info,
 				   enable, PDEV_CMD);
 }
 
+static int hdd_set_tx_power_limit_enable(struct wlan_hdd_link_info *link_info,
+					 const struct nlattr *attr)
+{
+	uint8_t enable;
+	int errno;
+	struct wmi_unified *wmi_handle;
+	struct hdd_adapter *adapter = link_info->adapter;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(hdd_ctx->psoc);
+	if (!wmi_handle) {
+		hdd_err("wmi handle is NULL");
+		return -EINVAL;
+	}
+
+	enable = nla_get_u8(attr);
+	if (!wmi_service_enabled(wmi_handle, wmi_service_tx_power_limit)) {
+		hdd_err("WMI_SERVICE_TX_POWER_LIMIT is not enabled");
+		return -EINVAL;
+	}
+
+	return wma_cli_set_command(link_info->vdev_id,
+				   WMI_PDEV_PARAM_TEMP_TX_POWER_LIMIT,
+				   enable, PDEV_CMD);
+}
+
 /**
  * hdd_set_nss() - set the number of spatial streams supported by the adapter
  * @link_info: Link info pointer in HDD adapter
@@ -15014,6 +15072,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_config_dfs_no_wait_support},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_EHT_EMLSR_LINKS,
 	 hdd_set_eht_emlsr_links},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_TX_POWER_LIMIT_ENABLE,
+	 hdd_set_tx_power_limit_enable},
 };
 
 #ifdef WLAN_FEATURE_ELNA
@@ -18047,6 +18107,24 @@ BTM_REQ_RESP_DONE:
 
 		if (ret_val)
 			hdd_err("Failed to set EHT RTWT support");
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_BTM_RECOMM_MULTI_AP_SUPPORT;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("EHT BTM recommended Multi-AP support: %d", cfg_val);
+		if (cfg_val) {
+			ret_val = wlan_mlme_set_ext_mld_cap_supp(hdd_ctx->psoc,
+								 true);
+			if (ret_val)
+				hdd_err("Failed to set BTM rec Multi-AP supp");
+
+			ret_val =
+				wlan_mlme_set_exclude_ext_mld_cap(hdd_ctx->psoc,
+								  false);
+			if (ret_val)
+				hdd_err("Failed to set exclude ext MLD cap");
+		}
 	}
 
 	if (update_sme_cfg)
@@ -29314,7 +29392,7 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 	if (link_vdev)
 		ucfg_tdls_put_tdls_link_vdev(link_vdev, WLAN_OSIF_TDLS_ID);
 
-	if (wlan_vdev_get_link_id(adapter->deflink->vdev) == link_id) {
+	if (wlan_vdev_get_link_id(vdev) == link_id) {
 		hdd_debug("add_key for same vdev: %d",
 			  adapter->deflink->vdev_id);
 		return wlan_hdd_add_key_vdev(mac_handle, vdev, key_index,
@@ -29328,6 +29406,17 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 		errno = wlan_add_key_standby_link(adapter, vdev, link_id,
 						  key_index, pairwise, params);
 		return errno;
+	} else if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(link_vdev)) {
+		/*
+		 * Use standby link key add for link switch VDEV because the
+		 * link ID is in transitioning on that VDEV and can lead to
+		 * peer not found issue.
+		 */
+		hdd_debug("Link switch in progress for %d",
+			  wlan_vdev_get_id(link_vdev));
+		errno = wlan_add_key_standby_link(adapter, link_vdev, link_id,
+						  key_index, pairwise, params);
+		goto release_ref;
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);

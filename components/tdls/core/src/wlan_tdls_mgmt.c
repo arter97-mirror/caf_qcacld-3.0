@@ -872,7 +872,10 @@ QDF_STATUS tdls_set_link_mode(struct tdls_action_frame_request *req)
 
 
 	if (req->tdls_mgmt.frame_type == TDLS_DISCOVERY_RESPONSE ||
-	    req->tdls_mgmt.frame_type == TDLS_DISCOVERY_REQUEST) {
+	    req->tdls_mgmt.frame_type == TDLS_DISCOVERY_REQUEST ||
+	    req->tdls_mgmt.frame_type == TDLS_SETUP_REQUEST ||
+	    req->tdls_mgmt.frame_type == TDLS_SETUP_RESPONSE ||
+	    req->tdls_mgmt.frame_type == TDLS_SETUP_CONFIRM) {
 		status = policy_mgr_is_ml_links_in_mcc_allowed(
 						psoc, req->vdev,
 						ml_sta_vdev_lst,

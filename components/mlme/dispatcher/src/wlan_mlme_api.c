@@ -9411,11 +9411,13 @@ void wlan_mlme_reinit_real_time_roam_parms(struct wlan_objmgr_vdev *vdev)
 	cfg_params->roam_score_delta =
 			cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
 	mlme_obj->cfg.roam_scoring.min_roam_score_delta =
-			cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA);
+			(cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA) *
+			 (cfg_max(CFG_CAND_MIN_ROAM_SCORE_DELTA)/100));
 	mlme_obj->cfg.roam_scoring.aggre_min_roam_score_delta =
 			cfg_get(psoc, CFG_ROAM_COMMON_AGGRESIVE_MIN_ROAM_DELTA);
 	cfg_params->min_roam_score_delta =
-			cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA);
+			(cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA) *
+				 (cfg_max(CFG_CAND_MIN_ROAM_SCORE_DELTA)/100));
 	mlme_obj->cfg.lfr.reconnect_disallow_period =
 			DEFAULT_RECONNECT_DISALLOW_PERIOD;
 	cfg_params->reconnect_disallow_period =

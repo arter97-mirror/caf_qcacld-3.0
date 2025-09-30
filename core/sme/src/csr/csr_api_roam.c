@@ -5306,6 +5306,7 @@ QDF_STATUS csr_cm_update_fils_info(struct wlan_objmgr_vdev *vdev,
 				   struct bss_description *bss_desc,
 				   struct wlan_cm_vdev_connect_req *req)
 {
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

@@ -65,6 +65,16 @@ QDF_STATUS ucfg_pmo_psoc_close(struct wlan_objmgr_psoc *psoc);
 uint32_t ucfg_pmo_get_apf_instruction_size(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * ucfg_pmo_store_apf_mode() - store the APF mode
+ * @psoc: pointer to psoc object
+ * @apf_mode: apf mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
+				   uint32_t apf_mode);
+
+/**
  * ucfg_pmo_set_apf_mode() - set the APF mode
  * @psoc: pointer to psoc object
  * @apf_mode: apf mode
@@ -1591,6 +1601,13 @@ static inline QDF_STATUS
 ucfg_pmo_set_apf_mode(struct wlan_objmgr_psoc *psoc,
 		      uint32_t apf_mode,
 		      uint32_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
+			uint32_t apf_mode)
 {
 	return QDF_STATUS_SUCCESS;
 }

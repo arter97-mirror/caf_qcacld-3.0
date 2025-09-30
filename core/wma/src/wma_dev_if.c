@@ -3323,7 +3323,6 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	uint32_t sta_keep_alive;
 	enum wmi_host_active_apf_mode uc_mode, mcbc_mode;
 	uint32_t offload_bitmap;
-	uint32_t apf_mode;
 	bool is_apf_allowed;
 
 	if (!mac)
@@ -3428,17 +3427,6 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 							offload_bitmap);
 		if (QDF_IS_STATUS_ERROR(ret))
 			wma_err("Failed to configure APF supported offload bitmap");
-	}
-
-	if (is_apf_allowed &&
-	    ucfg_pmo_is_apf_mode_enabled(wma_handle->psoc)) {
-		apf_mode = ucfg_pmo_get_apf_mode(wma_handle->psoc);
-		ret = wmi_unified_set_apf_mode_bitmap_cmd(
-							wma_handle->wmi_handle,
-							vdev_id,
-							apf_mode);
-		if (QDF_IS_STATUS_ERROR(ret))
-			wma_err("Failed to configure APF mode bitmap");
 	}
 
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
@@ -7104,7 +7092,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
  * 4.wmi_vdev_param_mcc_broadcast_probe_enable
  * 5.wmi_vdev_param_rts_threshold
  * 6.wmi_vdev_param_fragmentation_threshold
- * 7.wmi_vdev_param_tx_stbc
+ * 7.wmi_vdev_param_tx_stbc or wmi_vdev_param_autorate_misc_cfg
  * 8.wmi_vdev_param_mgmt_tx_rate
  * 9.wmi_vdev_param_per_band_mgmt_tx_rate
  * 10.wmi_vdev_param_set_eht_mu_mode
@@ -7217,15 +7205,39 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 		wma_err("Fail to get val for frag threshold, leave unchanged");
 	}
 
+	/*
+	 * Use wmi_vdev_param_autorate_misc_cfg for 11be firmware as
+	 * wmi_vdev_param_tx_stbc is deprecated.
+	 */
 	ht_cap_info = &mac->mlme_cfg->ht_caps.ht_cap_info;
-	status = mlme_check_index_setparam(setparam,
-					   wmi_vdev_param_tx_stbc,
-					   ht_cap_info->tx_stbc, index++,
-					   MAX_VDEV_CREATE_PARAMS);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_debug("failed to set wmi_vdev_param_tx_stbc");
-		goto error;
+	if (IS_FEATURE_11BE_SUPPORTED_BY_FW) {
+		uint32_t set_val;
+
+		set_val = mac->he_sgi_ltf_cfg_bit_mask;
+		/* Set STBC disable bit to the opposite of tx_stbc */
+		WMI_SET_BITS(set_val, AUTO_RATE_STBC_DIS_BIT,
+			     AUTO_RATE_STBC_DIS_NUM_BITS, !ht_cap_info->tx_stbc);
+		mac->he_sgi_ltf_cfg_bit_mask = set_val;
+		status = mlme_check_index_setparam(setparam,
+						   wmi_vdev_param_autorate_misc_cfg,
+						   set_val, index++,
+						   MAX_VDEV_CREATE_PARAMS);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug("failed to set wmi_vdev_param_autorate_misc_cfg");
+			goto error;
+		}
+	} else {
+		status = mlme_check_index_setparam(setparam,
+						   wmi_vdev_param_tx_stbc,
+						   ht_cap_info->tx_stbc, index++,
+						   MAX_VDEV_CREATE_PARAMS);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug("failed to set wmi_vdev_param_tx_stbc");
+			goto error;
+		}
 	}
+
 	if (!wma_vdev_mgmt_tx_rate(&ext_val)) {
 		status = mlme_check_index_setparam(setparam, ext_val.param_id,
 						   ext_val.param_value, index++,

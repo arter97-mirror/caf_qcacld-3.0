@@ -3171,7 +3171,6 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_init(struct hdd_context *hdd_ctx)
 {
 	int ret;
 	QDF_STATUS status;
-	int tsf_gpio;
 
 	status = ucfg_fwol_get_tsf_irq_host_gpio_pin(hdd_ctx->psoc,
 						     &tsf_irq_gpio_pin);
@@ -3182,12 +3181,7 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_init(struct hdd_context *hdd_ctx)
 
 	if (tsf_irq_gpio_pin == TSF_GPIO_PIN_INVALID) {
 		hdd_err("gpio host pin cfg is invalid");
-		tsf_gpio = pld_get_tsf_gpio(hdd_ctx->parent_dev);
-		if (tsf_gpio < 0) {
-			hdd_err("gpio host pin entry is invalid");
-			goto fail;
-		}
-		tsf_irq_gpio_pin = tsf_gpio;
+		goto fail;
 	}
 
 	ret = gpio_request(tsf_irq_gpio_pin, "wlan_tsf");

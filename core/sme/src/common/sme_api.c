@@ -5262,7 +5262,7 @@ QDF_STATUS sme_vdev_post_vdev_create_setup(mac_handle_t mac_handle,
 	status = csr_setup_vdev_session(vdev_mlme);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sme_err("Failed to setup CSR layer for vdev: %d", vdev_id);
-		goto cleanup_wma;
+		return status;
 	}
 
 	wlan_vdev_set_dot11mode(mac_ctx->mlme_cfg, vdev->vdev_mlme.vdev_opmode,
@@ -5278,8 +5278,6 @@ QDF_STATUS sme_vdev_post_vdev_create_setup(mac_handle_t mac_handle,
 
 csr_cleanup_vdev_session:
 	csr_cleanup_vdev_session(mac_ctx, vdev_id);
-cleanup_wma:
-	wma_cleanup_vdev(vdev);
 	return status;
 }
 

@@ -56,6 +56,16 @@ uint32_t pmo_get_apf_mode(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS pmo_set_apf_mode(struct wlan_objmgr_psoc *psoc,
 			    uint32_t apf_mode,
 			    uint32_t vdev_id);
+
+/**
+ * pmo_store_apf_mode - store the APF mode
+ * @psoc: the psoc to query
+ * @apf_mode: apf mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
+			      uint32_t apf_mode);
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
 #endif /* __WLAN_PMO_APF_H */

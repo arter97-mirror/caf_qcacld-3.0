@@ -67,3 +67,15 @@ QDF_STATUS pmo_set_apf_mode(struct wlan_objmgr_psoc *psoc,
 
 	return pmo_tgt_set_apf_mode_req(psoc, apf_mode, vdev_id);
 }
+
+QDF_STATUS pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
+			      uint32_t apf_mode)
+{
+	struct pmo_psoc_priv_obj *psoc_ctx;
+
+	pmo_psoc_with_ctx(psoc, psoc_ctx) {
+		psoc_ctx->psoc_cfg.apf_mode = apf_mode;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}

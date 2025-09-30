@@ -74,6 +74,15 @@ QDF_STATUS ucfg_pmo_set_apf_mode(struct wlan_objmgr_psoc *psoc,
 	return pmo_set_apf_mode(psoc, apf_mode, vdev_id);
 }
 
+QDF_STATUS ucfg_pmo_store_apf_mode(struct wlan_objmgr_psoc *psoc,
+				   uint32_t apf_mode)
+{
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	return pmo_store_apf_mode(psoc, apf_mode);
+}
+
 uint8_t ucfg_pmo_get_num_wow_filters(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_BUG(psoc);

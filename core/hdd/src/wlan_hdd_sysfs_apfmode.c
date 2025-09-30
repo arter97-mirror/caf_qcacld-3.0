@@ -71,9 +71,6 @@ __hdd_sysfs_apfmode_store(struct hdd_context *hdd_ctx,
 	char buf_local[MAX_SYSFS_USER_COMMAND_SIZE_LENGTH + 1];
 	char *sptr, *token;
 	int value, ret;
-	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
-	wlan_net_dev_ref_dbgid dbgid =
-		NET_DEV_HOLD_SYSFS_APFMODE_STORE;
 
 	if (!wlan_hdd_validate_modules_state(hdd_ctx))
 		return -EINVAL;
@@ -99,16 +96,8 @@ __hdd_sysfs_apfmode_store(struct hdd_context *hdd_ctx,
 
 	hdd_debug("apfmode %d", value);
 
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
-					   dbgid) {
-		if (adapter->device_mode == QDF_STA_MODE &&
-		    ucfg_pmo_is_apf_mode_enabled(hdd_ctx->psoc)) {
-			ucfg_pmo_set_apf_mode(hdd_ctx->psoc,
-					      value,
-					      adapter->deflink->vdev_id);
-		}
-		hdd_adapter_dev_put_debug(adapter, dbgid);
-	}
+	if (ucfg_pmo_is_apf_mode_enabled(hdd_ctx->psoc))
+		ucfg_pmo_store_apf_mode(hdd_ctx->psoc, value);
 
 	return count;
 }
