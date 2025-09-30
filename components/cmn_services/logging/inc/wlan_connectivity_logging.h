@@ -1139,6 +1139,17 @@ struct wlan_diag_packet_info {
 	uint32_t reserved:24;
 } qdf_packed;
 
+/**
+ * struct wlan_diag_packet - Packets info
+ * @pkt_info: Data packets related info
+ * @instance_id: instance id of wlan_diag_packet_info
+ *
+ */
+struct wlan_diag_packet {
+	struct wlan_diag_packet_info pkt_info;
+	uint8_t instance_id;
+};
+
 #define DIAG_CONN_VERSION 1
 
 /**

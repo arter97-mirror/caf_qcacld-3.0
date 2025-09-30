@@ -896,6 +896,7 @@ struct enhance_roam_info {
  * @cm_roam: Roaming configuration
  * @auth_log: Cached log records for SAE authentication frame
  * related information.
+ * @instance: instance id for each wlan_log_record
  * @roam_info: enhanced roam information include trigger, scan and
  *  frame information.
  * @roam_cache_num: number of roam information cached in driver
@@ -965,8 +966,9 @@ struct mlme_legacy_priv {
 	struct wlan_log_record
 	    auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
 #elif defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(CONNECTIVITY_DIAG_EVENT)
-	struct wlan_diag_packet_info
+	struct wlan_diag_packet
 	    auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
+	uint8_t instance;
 #endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #ifdef WLAN_FEATURE_ROAM_INFO_STATS
@@ -2396,4 +2398,18 @@ uint32_t wlan_sap_get_acs_band_mask(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS wlan_sap_set_acs_band_mask(struct wlan_objmgr_vdev *vdev,
 				      uint32_t bitmap);
+
+#if (defined(CONNECTIVITY_DIAG_EVENT) && \
+	defined(WLAN_FEATURE_ROAM_OFFLOAD))
+/**
+ * mlme_reset_log_instance_id() - Clear log instance id
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void mlme_reset_log_instance_id(struct wlan_objmgr_vdev *vdev);
+#else
+static inline void mlme_reset_log_instance_id(struct wlan_objmgr_vdev *vdev)
+{}
+#endif
 #endif

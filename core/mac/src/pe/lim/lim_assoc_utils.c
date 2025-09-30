@@ -4992,3 +4992,16 @@ tpDphHashNode lim_get_sta_ds(struct mac_context *mac_ctx,
 	}
 	return sta_ds;
 }
+
+#if (defined(CONNECTIVITY_DIAG_EVENT) && \
+	defined(WLAN_FEATURE_ROAM_OFFLOAD))
+void lim_clear_log_instance_id(struct pe_session *session)
+{
+	if (!session) {
+		pe_err("NULL session");
+		return;
+	}
+
+	mlme_reset_log_instance_id(session->vdev);
+}
+#endif
