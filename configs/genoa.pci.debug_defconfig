@@ -134,4 +134,6 @@ endif
 CONFIG_LINUX_QCMBR :=y
 
 CONFIG_ALLOC_CONTIGUOUS_MULTI_PAGE := y
+
+WLAN_WARN_ON_ASSERT := n
 ###################################
