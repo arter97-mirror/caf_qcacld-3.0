@@ -15137,8 +15137,11 @@ policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(struct wlan_objmgr_psoc *psoc)
 							vdev_id[i],
 							sap_ch_freq[i],
 							mcc_to_scc_switch,
-							vdev_chan->ch_cfreq2))
+							vdev_chan->ch_cfreq2)) {
+			policy_mgr_debug("vdev %d SAP is in MCC, freq: %d",
+					 vdev_id[i], sap_ch_freq[i]);
 			return true;
+		}
 		vdev_chan = NULL;
 	}
 
