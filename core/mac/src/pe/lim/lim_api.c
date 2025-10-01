@@ -5053,6 +5053,7 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	uint8_t *ml_ie = NULL;
 	qdf_size_t ml_ie_total_len = 0;
 	struct mlo_partner_info partner_info;
+	struct mlo_link_info *link_info = NULL;
 	int8_t rssi;
 	uint8_t i, link_id, vdev_id, bpcc, snr, chan, opclass;
 	bool msd_cap_found = false;
@@ -5149,6 +5150,11 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 				 status);
 			continue;
 		}
+
+		link_info = &partner_info.partner_link_info[i];
+
+		lim_gen_link_specific_rnr_ie(mac_ctx, session,
+					     link_info, link_probe_rsp);
 
 		lim_add_bcn_probe(mac_ctx->pdev, link_probe_rsp.ptr,
 				  link_probe_rsp.len,
