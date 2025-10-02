@@ -1259,6 +1259,8 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			if (!sap_is_dfs_cac_wait_state(sap_ctx)) {
 				sap_debug("pucture radar freq without freq change, don't need CAC again");
 				break;
+			} else {
+				dfs_set_optimized_cac_timeout(sap_ctx);
 			}
 		} else {
 			ch_switch_info->target_chan_freq =
