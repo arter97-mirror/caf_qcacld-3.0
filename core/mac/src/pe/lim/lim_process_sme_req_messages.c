@@ -3342,9 +3342,16 @@ lim_cfg_dsmps_for_iot_ap(struct mac_context *mac_ctx,
 	if (wlan_action_oui_search(mac_ctx->psoc,
 				   &vendor_ap_search_attr,
 				   ACTION_OUI_ENABLE_DYNAMIC_SMPS)) {
-		lim_enable_ht_dynamic_smps(session);
-		lim_enable_he_dynamic_smps(session);
-		pe_debug("Enable HT and HE D-SMPS for this IOT AP");
+		if (session->ch_width == CH_WIDTH_160MHZ) {
+			lim_disable_ht_dynamic_smps(session);
+			lim_disable_he_dynamic_smps(session);
+			pe_debug("Disable HT and HE D-SMPS for IOT AP, BW: %d",
+				 session->ch_width);
+		} else {
+			lim_enable_ht_dynamic_smps(session);
+			lim_enable_he_dynamic_smps(session);
+			pe_debug("Enable HT and HE D-SMPS for this IOT AP");
+		}
 		return;
 	}
 
