@@ -67,16 +67,6 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 static void csr_purge_channel_power(struct mac_context *mac,
 				    tDblLinkList *pChannelList);
 
-/* pResult is invalid calling this function. */
-void csr_free_scan_result_entry(struct mac_context *mac,
-				struct tag_csrscan_result *pResult)
-{
-	if (pResult->Result.pvIes)
-		qdf_mem_free(pResult->Result.pvIes);
-
-	qdf_mem_free(pResult);
-}
-
 static QDF_STATUS csr_ll_scan_purge_result(struct mac_context *mac,
 					   tDblLinkList *pList)
 {
@@ -87,7 +77,7 @@ static QDF_STATUS csr_ll_scan_purge_result(struct mac_context *mac,
 	while ((pEntry = csr_ll_remove_head(pList, LL_ACCESS_NOLOCK)) != NULL) {
 		bss_desc = GET_BASE_ADDR(pEntry, struct tag_csrscan_result,
 					 Link);
-		csr_free_scan_result_entry(mac, bss_desc);
+		qdf_mem_free(bss_desc);
 	}
 
 	return status;
@@ -795,7 +785,6 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 					struct scan_cache_entry *scan_entry,
 					struct tag_csrscan_result **p_result)
 {
-	tDot11fBeaconIEs *bcn_ies;
 	struct bss_description *bss_desc;
 	tCsrScanResultInfo *result_info;
 	uint8_t *ie_ptr;
@@ -830,26 +819,19 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 	csr_fill_neg_crypto_info(bss, &scan_entry->neg_sec_info);
 
 	result_info = &bss->Result;
-	result_info->ssId.length = scan_entry->ssid.length;
-	qdf_mem_copy(result_info->ssId.ssId,
-		scan_entry->ssid.ssid,
-		result_info->ssId.length);
 	result_info->timer = scan_entry->hidden_ssid_timestamp;
 
 	bss_desc = &result_info->BssDescriptor;
-
-	wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc, scan_entry);
-
-	status = wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
-						     &bcn_ies);
+	status = wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc,
+						    scan_entry);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mem_free(bss);
 		return status;
 	}
-	result_info->pvIes = bcn_ies;
 
 	*p_result = bss;
-	return QDF_STATUS_SUCCESS;
+
+	return status;
 }
 
 static QDF_STATUS csr_parse_scan_list(struct mac_context *mac_ctx,

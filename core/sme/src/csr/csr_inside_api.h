@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -77,9 +77,6 @@ void csr_release_command_wm_status_change(struct mac_context *mac,
 					  tSmeCmd *pCommand);
 QDF_STATUS csr_scan_open(struct mac_context *mac);
 QDF_STATUS csr_scan_close(struct mac_context *mac);
-
-void csr_free_scan_result_entry(struct mac_context *mac, struct tag_csrscan_result
-				*pResult);
 
 QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t vdev_id,
 				  struct csr_roam_info *roam_info,

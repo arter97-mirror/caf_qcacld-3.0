@@ -215,12 +215,6 @@ typedef struct tagCsrBSSIDs {
 } tCsrBSSIDs;
 
 typedef struct tagCsrScanResultInfo {
-	/*
-	 * Carry the IEs for the current BSSDescription.
-	 * A pointer to tDot11fBeaconIEs. Maybe NULL for start BSS.
-	 */
-	void *pvIes;
-	tAniSSID ssId;
 	unsigned long timer;           /* timer is variable for hidden SSID timer */
 	/*
 	 * This member must be the last in the structure because the

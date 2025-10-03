@@ -5360,7 +5360,6 @@ QDF_STATUS cm_csr_handle_join_req(struct wlan_objmgr_vdev *vdev,
 	struct mac_context *mac_ctx;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	QDF_STATUS status;
-	tDot11fBeaconIEs *ie_struct;
 	struct bss_description *bss_desc;
 	uint32_t ie_len, bss_len;
 
@@ -5388,22 +5387,13 @@ QDF_STATUS cm_csr_handle_join_req(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	status = wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
-						     &ie_struct);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		sme_err("IE parsing failed vdev id %d", vdev_id);
-		qdf_mem_free(bss_desc);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	if (reassoc) {
-		csr_update_tspec_info(mac_ctx, vdev, ie_struct);
+		csr_update_tspec_info(mac_ctx, vdev, &bss_desc->bcn_ies);
 	} else {
 		status = csr_cm_update_fils_info(vdev, bss_desc, req);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			sme_err("failed to update fils info vdev id %d",
 				vdev_id);
-			qdf_mem_free(ie_struct);
 			qdf_mem_free(bss_desc);
 			return QDF_STATUS_E_FAILURE;
 		}
@@ -5411,11 +5401,10 @@ QDF_STATUS cm_csr_handle_join_req(struct wlan_objmgr_vdev *vdev,
 				      SME_QOS_CSR_JOIN_REQ, NULL);
 	}
 
-	if ((wlan_reg_11d_enabled_on_host(mac_ctx->psoc)) &&
-	     !ie_struct->Country.present)
+	if (wlan_reg_11d_enabled_on_host(mac_ctx->psoc) &&
+	    !bss_desc->bcn_ies.Country.present)
 		csr_apply_channel_power_info_wrapper(mac_ctx);
 
-	qdf_mem_free(ie_struct);
 	qdf_mem_free(bss_desc);
 
 	cm_csr_set_joining(vdev_id);
@@ -5647,9 +5636,10 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 
 	list = wlan_scan_get_result(mac_ctx->pdev, filter);
 	qdf_mem_free(filter);
-	if (!list || (list && !qdf_list_size(list)))
+	if (!list)
+		return;
+	else if (!qdf_list_size(list))
 		goto purge_list;
-
 
 	qdf_list_peek_front(list, &cur_lst);
 	if (!cur_lst)
@@ -5668,14 +5658,11 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status))
 		goto purge_list;
 
+	bcn_ies = &bss_desc->bcn_ies;
 	src_cfg.uint_value = bss_desc->mbo_oce_enabled_ap;
 	wlan_cm_roam_cfg_set_value(mac_ctx->psoc, vdev_id, MBO_OCE_ENABLED_AP,
 				   &src_cfg);
 	csr_fill_single_pmk(mac_ctx->psoc, vdev_id, bss_desc);
-	status = wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
-						     &bcn_ies);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto purge_list;
 
 	if (!bss_desc->beaconInterval)
 		sme_err("ERROR: Beacon interval is ZERO");
@@ -5712,14 +5699,11 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 		qdf_mem_zero(country_code, REG_ALPHA2_LEN + 1);
 	wlan_cm_set_country_code(mac_ctx->pdev, vdev_id, country_code);
 
-	qdf_mem_free(bcn_ies);
-
 purge_list:
 	if (bss_desc)
 		qdf_mem_free(bss_desc);
 	if (list)
 		wlan_scan_purge_results(list);
-
 }
 
 QDF_STATUS cm_csr_connect_rsp(struct wlan_objmgr_vdev *vdev,

@@ -701,12 +701,11 @@ bool lim_enable_cts_to_self_for_exempted_iot_ap(
  *
  * Return: qdf status
  */
-QDF_STATUS
-lim_fill_pe_session(struct mac_context *mac_ctx,
-		    struct pe_session *session,
-		    struct bss_description *bss_desc,
-		    enum wlan_phymode phy_mode,
-		    enum wlan_status_code *req_fail_status_code);
+QDF_STATUS lim_fill_pe_session(struct mac_context *mac_ctx,
+			       struct pe_session *session,
+			       struct bss_description *bss_desc,
+			       enum wlan_phymode phy_mode,
+			       enum wlan_status_code *req_fail_status_code);
 
 /**
  * lim_is_he_dynamic_smps_enabled() - Check if Dynamic SMPS enabled in HE caps

@@ -1387,7 +1387,6 @@ static QDF_STATUS lim_send_ft_reassoc_req(struct pe_session *session,
 
 static void lim_join_req_update_ht_vht_caps(struct mac_context *mac,
 					    struct pe_session *session,
-					    struct bss_description *bss_desc,
 					    tDot11fBeaconIEs *bcn_ie)
 {
 	struct vdev_mlme_obj *vdev_mlme;
@@ -1778,8 +1777,7 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 
 	/* Fill the Vendor AP search params */
-	vendor_ap_search_attr.ie_data =
-			(uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
 	vendor_ap_search_attr.ie_length = ie_len;
 	vendor_ap_search_attr.mac_addr = &bss_desc->bssId[0];
 	ap_nss = lim_get_nss_supported_by_sta_and_ap(
@@ -3428,18 +3426,11 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->max_amsdu_num =
 			mac_ctx->mlme_cfg->ht_caps.max_num_amsdu;
 	/* Store beaconInterval */
-	session->beaconParams.beaconInterval =
-		bss_desc->beaconInterval;
+	session->beaconParams.beaconInterval = bss_desc->beaconInterval;
 	/* Copy oper freq to the session Table */
 	session->curr_op_freq = bss_desc->chan_freq;
 
-	status = wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
-						     &ie_struct);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("IE parsing failed vdev id %d",
-		       session->vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
+	ie_struct = &bss_desc->bcn_ies;
 
 	qdf_mem_zero(&session->wmm_params, sizeof(tDot11fIEWMMParams));
 	if (ie_struct->WMMParams.present)
@@ -3507,8 +3498,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	}
 	mac_ctx->mlme_cfg->timeouts.probe_req_retry_timeout = timeout;
 
-	lim_join_req_update_ht_vht_caps(mac_ctx, session, bss_desc,
-					ie_struct);
+	lim_join_req_update_ht_vht_caps(mac_ctx, session, ie_struct);
 
 	lim_check_oui_and_update_session(mac_ctx, session, ie_struct);
 	ese_ver_present = ie_struct->ESEVersion.present;
@@ -3821,7 +3811,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	status = QDF_STATUS_SUCCESS;
 
 send:
-	qdf_mem_free(ie_struct);
 	return status;
 
 }
