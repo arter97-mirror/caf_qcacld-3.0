@@ -41,6 +41,7 @@
 #include "wmm_apsd.h"
 #include "wma.h"
 #include "wlan_cmn.h"
+#include <utils_parser.h>
 
 /*--------------------------------------------------------------------------
    Initialize the FT variables.
@@ -420,23 +421,18 @@ static uint8_t lim_calculate_dot11_mode(struct mac_context *mac_ctx,
 	case MLME_DOT11_MODE_ALL:
 		if (bcn->he_cap.present)
 			return MLME_DOT11_MODE_11AX;
-		else if ((bcn->VHTCaps.present ||
-			  bcn->vendor_vht_ie.present) &&
-			 (!(band == REG_BAND_2G &&
-			  !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band)
-			 ))
-
+		else if ((bcn->VHTCaps.present || bcn->vendor_vht_ie.present) &&
+			 !(band == REG_BAND_2G &&
+			   !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band))
 			return MLME_DOT11_MODE_11AC;
 		else if (bcn->HTCaps.present)
 			return MLME_DOT11_MODE_11N;
 		fallthrough;
 	case MLME_DOT11_MODE_11AC:
 	case MLME_DOT11_MODE_11AC_ONLY:
-		if ((bcn->VHTCaps.present ||
-		     bcn->vendor_vht_ie.present) &&
-		   (!(band == REG_BAND_2G &&
-		    !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band)
-		   ))
+		if ((bcn->VHTCaps.present || bcn->vendor_vht_ie.present) &&
+		    !(band == REG_BAND_2G &&
+		      !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.b24ghz_band))
 			return MLME_DOT11_MODE_11AC;
 		else if (bcn->HTCaps.present)
 			return MLME_DOT11_MODE_11N;
@@ -614,17 +610,17 @@ static QDF_STATUS lim_fill_session_power_info(
  * Return the newly created session entry.
  *
  *------------------------------------------------------------------*/
-QDF_STATUS
-lim_fill_ft_session(struct mac_context *mac,
-		    struct bss_description *pbssDescription,
-		    struct pe_session *ft_session,
-		    struct pe_session *pe_session,
-		    enum wlan_phymode bss_phymode)
+QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
+			       struct bss_description *bss_desc,
+			       struct pe_session *ft_session,
+			       struct pe_session *pe_session,
+			       enum wlan_phymode bss_phymode)
 {
 	uint8_t bss_chan_id;
 	tSchBeaconStruct *pBeaconStruct;
 	uint8_t cb_mode;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	QDF_STATUS status;
+	tDot11fBeaconIEs *bcn_ies = &bss_desc->bcn_ies;
 
 	pBeaconStruct = qdf_mem_malloc(sizeof(tSchBeaconStruct));
 	if (!pBeaconStruct)
@@ -642,36 +638,24 @@ lim_fill_ft_session(struct mac_context *mac,
 	ft_session->lim_join_req = NULL;
 	ft_session->smeSessionId = pe_session->smeSessionId;
 
-	lim_extract_ap_capabilities(mac, (uint8_t *) pbssDescription->ieFields,
-			lim_get_ielen_from_bss_description(pbssDescription),
+	lim_extract_ap_capabilities(mac, (uint8_t *)bss_desc->ieFields,
+			lim_get_ielen_from_bss_description(bss_desc),
 			pBeaconStruct);
 
 	qdf_mem_zero(&ft_session->wmm_params, sizeof(tDot11fIEWMMParams));
-	if (pBeaconStruct->wmm_params.present)
-		qdf_mem_copy(&ft_session->wmm_params,
-			     &pBeaconStruct->wmm_params,
+	if (bcn_ies->WMMParams.present)
+		qdf_mem_copy(&ft_session->wmm_params, &bcn_ies->WMMParams,
 			     sizeof(tDot11fIEWMMParams));
 
-	ft_session->rateSet.numRates =
-		pBeaconStruct->supportedRates.numRates;
-	qdf_mem_copy(ft_session->rateSet.rate,
-		     pBeaconStruct->supportedRates.rate,
-		     pBeaconStruct->supportedRates.numRates);
+	convert_supp_rates(mac, &ft_session->rateSet, &bcn_ies->SuppRates);
+	convert_ext_supp_rates(mac, &ft_session->extRateSet,
+			       &bcn_ies->ExtSuppRates);
+	convert_ssid(mac, &ft_session->ssId, &bcn_ies->SSID);
 
-	ft_session->extRateSet.numRates =
-		pBeaconStruct->extendedRates.numRates;
-	qdf_mem_copy(ft_session->extRateSet.rate,
-		     pBeaconStruct->extendedRates.rate,
-		     ft_session->extRateSet.numRates);
-
-	ft_session->ssId.length = pBeaconStruct->ssId.length;
-	qdf_mem_copy(ft_session->ssId.ssId, pBeaconStruct->ssId.ssId,
-		     ft_session->ssId.length);
 	/* Copy The channel Id to the session Table */
-	bss_chan_id =
-		wlan_reg_freq_to_chan(mac->pdev, pbssDescription->chan_freq);
-	ft_session->lim_reassoc_chan_freq = pbssDescription->chan_freq;
-	ft_session->curr_op_freq = pbssDescription->chan_freq;
+	bss_chan_id = wlan_reg_freq_to_chan(mac->pdev, bss_desc->chan_freq);
+	ft_session->lim_reassoc_chan_freq = bss_desc->chan_freq;
+	ft_session->curr_op_freq = bss_desc->chan_freq;
 	ft_session->limRFBand = lim_get_rf_band(ft_session->curr_op_freq);
 
 	lim_fill_dot11mode(mac, ft_session, pe_session, pBeaconStruct,
@@ -681,19 +665,19 @@ lim_fill_ft_session(struct mac_context *mac,
 
 	ft_session->vhtCapability =
 		(IS_DOT11_MODE_VHT(ft_session->dot11mode) &&
-		 (IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps) ||
-		  IS_BSS_VHT_CAPABLE(pBeaconStruct->vendor_vht_ie.VHTCaps)));
+		 (IS_BSS_VHT_CAPABLE(bcn_ies->VHTCaps) ||
+		  IS_BSS_VHT_CAPABLE(bcn_ies->vendor_vht_ie.VHTCaps)));
 	ft_session->htCapability =
-		(IS_DOT11_MODE_HT(ft_session->dot11mode)
-		 && pBeaconStruct->HTCaps.present);
+		(IS_DOT11_MODE_HT(ft_session->dot11mode) &&
+		 bcn_ies->HTCaps.present);
 
 	if (IS_DOT11_MODE_HE(ft_session->dot11mode) &&
-	    pBeaconStruct->he_cap.present) {
+	    bcn_ies->he_cap.present) {
 		lim_update_session_he_capable(mac, ft_session);
 		lim_copy_join_req_he_cap(ft_session);
 	}
 	if (IS_DOT11_MODE_EHT(ft_session->dot11mode) &&
-	    pBeaconStruct->eht_cap.present) {
+	    bcn_ies->eht_cap.present) {
 		lim_update_session_eht_capable(ft_session, true);
 		lim_copy_join_req_eht_cap(ft_session);
 	}
@@ -709,19 +693,19 @@ lim_fill_ft_session(struct mac_context *mac,
 					   ft_session->curr_op_freq);
 
 	ft_session->htSupportedChannelWidthSet =
-	    (pBeaconStruct->HTInfo.present) ?
-	    (cb_mode && pBeaconStruct->HTInfo.recommendedTxWidthSet &&
-	     pBeaconStruct->HTCaps.supportedChannelWidthSet) : 0;
+	    (bcn_ies->HTInfo.present) ?
+	    (cb_mode && bcn_ies->HTInfo.recommendedTxWidthSet &&
+	     bcn_ies->HTCaps.supportedChannelWidthSet) : 0;
 	ft_session->htRecommendedTxWidthSet =
 		ft_session->htSupportedChannelWidthSet;
 
-	if (IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps) &&
-		pBeaconStruct->VHTOperation.present &&
-		ft_session->vhtCapability) {
+	if (IS_BSS_VHT_CAPABLE(bcn_ies->VHTCaps) &&
+	    bcn_ies->VHTOperation.present &&
+	    ft_session->vhtCapability) {
 		ft_session->vhtCapabilityPresentInBeacon = 1;
-	} else if (IS_BSS_VHT_CAPABLE(pBeaconStruct->vendor_vht_ie.VHTCaps) &&
-		    pBeaconStruct->vendor_vht_ie.VHTOperation.present &&
-		    ft_session->vhtCapability){
+	} else if (IS_BSS_VHT_CAPABLE(bcn_ies->vendor_vht_ie.VHTCaps) &&
+		   bcn_ies->vendor_vht_ie.VHTOperation.present &&
+		   ft_session->vhtCapability){
 		ft_session->vhtCapabilityPresentInBeacon = 1;
 	} else {
 		ft_session->vhtCapabilityPresentInBeacon = 0;
@@ -730,28 +714,28 @@ lim_fill_ft_session(struct mac_context *mac,
 	if (ft_session->htRecommendedTxWidthSet) {
 		ft_session->ch_width = CH_WIDTH_40MHZ;
 		if (ft_session->vhtCapabilityPresentInBeacon &&
-		    pBeaconStruct->VHTOperation.chanWidth) {
+		    bcn_ies->VHTOperation.chanWidth) {
 			ft_session->ch_width =
-				pBeaconStruct->VHTOperation.chanWidth + 1;
+				bcn_ies->VHTOperation.chanWidth + 1;
 			ft_session->ch_center_freq_seg0 =
-			pBeaconStruct->VHTOperation.chan_center_freq_seg0;
+			bcn_ies->VHTOperation.chan_center_freq_seg0;
 			ft_session->ch_center_freq_seg1 =
-			pBeaconStruct->VHTOperation.chan_center_freq_seg1;
+			bcn_ies->VHTOperation.chan_center_freq_seg1;
 		} else if (ft_session->vhtCapabilityPresentInBeacon &&
-			   pBeaconStruct->vendor_vht_ie.VHTOperation.chanWidth) {
+			   bcn_ies->vendor_vht_ie.VHTOperation.chanWidth) {
 			ft_session->ch_width =
-				pBeaconStruct->vendor_vht_ie.VHTOperation.chanWidth + 1;
+				bcn_ies->vendor_vht_ie.VHTOperation.chanWidth + 1;
 			ft_session->ch_center_freq_seg0 =
-				pBeaconStruct->vendor_vht_ie.VHTOperation.chan_center_freq_seg0;
+				bcn_ies->vendor_vht_ie.VHTOperation.chan_center_freq_seg0;
 			ft_session->ch_center_freq_seg1 =
-				pBeaconStruct->vendor_vht_ie.VHTOperation.chan_center_freq_seg1;
+				bcn_ies->vendor_vht_ie.VHTOperation.chan_center_freq_seg1;
 
 		} else {
-			if (pBeaconStruct->HTInfo.secondaryChannelOffset ==
+			if (bcn_ies->HTInfo.secondaryChannelOffset ==
 					PHY_DOUBLE_CHANNEL_LOW_PRIMARY)
 				ft_session->ch_center_freq_seg0 =
 					bss_chan_id + 2;
-			else if (pBeaconStruct->HTInfo.secondaryChannelOffset ==
+			else if (bcn_ies->HTInfo.secondaryChannelOffset ==
 					PHY_DOUBLE_CHANNEL_HIGH_PRIMARY)
 				ft_session->ch_center_freq_seg0 =
 					bss_chan_id - 2;
@@ -770,30 +754,28 @@ lim_fill_ft_session(struct mac_context *mac,
 
 	sir_copy_mac_addr(ft_session->self_mac_addr,
 			  wlan_vdev_mlme_get_macaddr(pe_session->vdev));
-	sir_copy_mac_addr(ft_session->limReAssocbssId,
-			  pbssDescription->bssId);
+	sir_copy_mac_addr(ft_session->limReAssocbssId, bss_desc->bssId);
 	sir_copy_mac_addr(ft_session->prev_ap_bssid, pe_session->bssId);
 
 	/* Store beaconInterval */
-	ft_session->beaconParams.beaconInterval =
-		pbssDescription->beaconInterval;
+	ft_session->beaconParams.beaconInterval = bss_desc->beaconInterval;
 	ft_session->bssType = GET_LIM_BSS_TYPE(pe_session);
 
 	ft_session->statypeForBss = STA_ENTRY_PEER;
-	ft_session->nwType = pbssDescription->nwType;
+	ft_session->nwType = bss_desc->nwType;
 
 
 	if (!LIM_IS_STA_ROLE(ft_session))
 		pe_warn("Invalid bss type %d", GET_LIM_BSS_TYPE(ft_session));
 
-	ft_session->limCurrentBssCaps = pbssDescription->capabilityInfo;
-	ft_session->limReassocBssCaps = pbssDescription->capabilityInfo;
+	ft_session->limCurrentBssCaps = bss_desc->capabilityInfo;
+	ft_session->limReassocBssCaps = bss_desc->capabilityInfo;
 	if (mac->mlme_cfg->ht_caps.short_slot_time_enabled &&
 	    SIR_MAC_GET_SHORT_SLOT_TIME(ft_session->limReassocBssCaps)) {
 		ft_session->shortSlotTimeSupported = true;
 	}
 
-	status = lim_fill_session_power_info(mac, pbssDescription, ft_session,
+	status = lim_fill_session_power_info(mac, bss_desc, ft_session,
 					     pe_session);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to fill power info in ft session");
@@ -812,8 +794,7 @@ lim_fill_ft_session(struct mac_context *mac,
 	ft_session->is11Rconnection = pe_session->is11Rconnection;
 
 #ifdef FEATURE_WLAN_ESE
-	ft_session->is_ese_version_ie_present =
-		pBeaconStruct->is_ese_ver_ie_present;
+	ft_session->is_ese_version_ie_present = bcn_ies->ESEVersion.present;
 #endif
 
 	if (!wlan_cm_is_vdev_roam_sync_inprogress(pe_session->vdev)) {

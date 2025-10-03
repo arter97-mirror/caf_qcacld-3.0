@@ -2415,8 +2415,7 @@ end:
 static QDF_STATUS
 lim_roam_fill_bss_descr(struct mac_context *mac,
 			struct roam_offload_synch_ind *roam_synch_ind,
-			struct bss_description *bss_desc_ptr,
-			struct pe_session *session)
+			struct bss_description *bss_desc_ptr, uint8_t vdev_id)
 {
 	uint32_t ie_len = 0;
 	tpSirProbeRespBeacon parsed_frm_ptr = NULL;
@@ -2427,7 +2426,6 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	uint8_t *ie = NULL;
 	struct qdf_mac_addr bssid;
 	bool is_mlo_link;
-	uint8_t vdev_id = session->vdev_id;
 	struct element_info frame;
 	struct cm_roam_values_copy mdie_cfg = {0};
 	uint8_t *ssid_ie = NULL;
@@ -2517,10 +2515,9 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	status = lim_roam_gen_beacon_descr(mac, bcn_proberesp_ptr,
 					   bcn_proberesp_len, is_mlo_link,
 					   roam_synch_ind, parsed_frm_ptr,
-					   &ie, &ie_len,
-					   &bssid);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("Failed to parse beacon");
+					   &ie, &ie_len, &bssid);
+	if (QDF_IS_STATUS_ERROR(status) || !ie_len) {
+		pe_err("Failed to parse beacon %d", status);
 		status = QDF_STATUS_E_FAILURE;
 		goto done;
 	}
@@ -2598,15 +2595,10 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		 bss_desc_ptr->rssi, ie_len, bss_desc_ptr->mdiePresent,
 		 bss_desc_ptr->mdie[0], bss_desc_ptr->mdie[1], bss_desc_ptr->mdie[2]);
 
-	if (ie_len) {
-		qdf_mem_copy(&bss_desc_ptr->ieFields,
-			     ie, ie_len);
-		qdf_mem_free(ie);
-	} else {
-		pe_err("Beacon/Probe rsp doesn't have any IEs");
-		status = QDF_STATUS_E_FAILURE;
-		goto done;
-	}
+	qdf_mem_copy(&bss_desc_ptr->ieFields, ie, ie_len);
+	qdf_mem_free(ie);
+
+	status = wlan_parse_bss_description_ies(mac, bss_desc_ptr);
 done:
 	qdf_mem_free(frame.ptr);
 	qdf_mem_free(parsed_frm_ptr);
@@ -3241,7 +3233,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	}
 
 	status = lim_roam_fill_bss_descr(mac_ctx, roam_sync_ind_ptr,
-					 bss_desc, session_ptr);
+					 bss_desc, session_ptr->vdev_id);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("LFR3:Failed to fill Bss Descr");
 		qdf_mem_free(bss_desc);
@@ -3939,7 +3931,7 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 	bss_desc = &pe_session->lim_join_req->bssDescription;
 
 	status = lim_roam_fill_bss_descr(mac_ctx, sync_ind, bss_desc,
-					 pe_session);
+					 pe_session->vdev_id);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("LFR3:Failed to fill Bss Descr");
 		goto end;

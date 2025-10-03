@@ -1609,7 +1609,6 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 	uint8_t aRateIndex = 0;
 	uint8_t bRateIndex = 0;
 	tDot11fIEhe_cap *peer_he_caps;
-	tSchBeaconStruct *pBeaconStruct = NULL;
 
 	/* copy operational rate set from pe_session */
 	if (pe_session->rateSet.numRates <= SIR_MAC_MAX_NUMBER_OF_RATES) {
@@ -1744,20 +1743,11 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 
 	if (lim_check_valid_mcs_for_nss(pe_session, he_caps)) {
 		peer_he_caps = he_caps;
+	} else if (bss_desc) {
+		peer_he_caps = &bss_desc->bcn_ies.he_cap;
 	} else {
-		if (!bss_desc) {
-			pe_err("bssDescription is NULL");
-			return QDF_STATUS_E_INVAL;
-		}
-		pBeaconStruct = qdf_mem_malloc(sizeof(tSchBeaconStruct));
-		if (!pBeaconStruct)
-			return QDF_STATUS_E_NOMEM;
-
-		lim_extract_ap_capabilities(
-				mac, (uint8_t *)bss_desc->ieFields,
-				lim_get_ielen_from_bss_description(bss_desc),
-				pBeaconStruct);
-		peer_he_caps = &pBeaconStruct->he_cap;
+		pe_err("HE capability not found and bssDescription is NULL");
+		return QDF_STATUS_E_INVAL;
 	}
 
 	lim_populate_he_mcs_set(mac, pRates, peer_he_caps,
@@ -1768,9 +1758,6 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 
 	pe_debug("nss 1x1 %d nss %d", pe_session->supported_nss_1x1,
 		 pe_session->nss);
-
-	if (pBeaconStruct)
-		qdf_mem_free(pBeaconStruct);
 
 	return QDF_STATUS_SUCCESS;
 } /*** lim_populate_peer_rate_set() ***/
