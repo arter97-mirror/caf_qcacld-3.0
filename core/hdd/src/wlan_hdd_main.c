@@ -3026,6 +3026,40 @@ hdd_update_sub_20_config(struct hdd_context *hdd_ctx, bool sub_20_fw_support)
 	return status;
 }
 
+static QDF_STATUS
+hdd_update_host_tgt_max_chains_cfg(struct hdd_context *hdd_ctx,
+				   struct wma_tgt_cfg *cfg)
+{
+	uint8_t enable_mimo;
+	QDF_STATUS status;
+
+	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
+	if (QDF_IS_STATUS_ERROR(status) || cds_is_sub_20_mhz_enabled())
+		enable_mimo = WLAN_MIMO_CAP_DISABLE;
+
+	hdd_ctx->num_rf_chains = enable_mimo + 1;
+	if (cfg->max_tx_chains > hdd_ctx->num_rf_chains)
+		cfg->max_tx_chains = hdd_ctx->num_rf_chains;
+	if (cfg->max_rx_chains > hdd_ctx->num_rf_chains)
+		cfg->max_rx_chains = hdd_ctx->num_rf_chains;
+
+	hdd_ctx->num_rf_chains = QDF_MIN(hdd_ctx->num_rf_chains,
+					 QDF_MAX(cfg->max_tx_chains,
+						 cfg->max_rx_chains));
+
+	if (hdd_ctx->num_rf_chains < enable_mimo + 1) {
+		status = ucfg_mlme_set_vht_mimo_cap(hdd_ctx->psoc,
+						    hdd_ctx->num_rf_chains - 1);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("unable to set mimo capability");
+		hdd_debug("Intersected RF chains %d", hdd_ctx->num_rf_chains);
+	}
+
+	return ucfg_mlme_update_max_fw_chains_cfg(hdd_ctx->psoc,
+						  cfg->max_tx_chains,
+						  cfg->max_rx_chains);
+}
+
 int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 {
 	int ret;
@@ -3034,7 +3068,6 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	uint8_t antenna_mode;
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
-	uint8_t enable_mimo = WLAN_MIMO_CAP_DISABLE;
 	uint8_t value = 0;
 	uint32_t fine_time_meas_cap = 0;
 	enum nss_chains_band_info band;
@@ -3181,6 +3214,32 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 
 	hdd_ctx->ap_arpns_support = cfg->ap_arpns_support;
 
+	hdd_update_host_tgt_max_chains_cfg(hdd_ctx, cfg);
+	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX; band++) {
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_STA_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_SAP_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_P2P_CLIENT_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_P2P_GO_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_P2P_DEVICE_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_OCB_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_TDLS_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_IBSS_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_NAN_DISC_MODE, band);
+		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
+					      QDF_NDI_MODE, band);
+	}
+
+	hdd_update_vdev_nss(hdd_ctx);
+
 	hdd_update_tgt_services(hdd_ctx, &cfg->services);
 
 	hdd_update_tgt_ht_cap(hdd_ctx, &cfg->ht_cap);
@@ -3215,31 +3274,6 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	ucfg_mlme_update_dual_sap_sta_support(hdd_ctx->psoc);
 	ucfg_mlme_update_mcc_cck_support(hdd_ctx->psoc);
 
-	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX; band++) {
-		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_STA_MODE, band);
-		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_SAP_MODE, band);
-		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_P2P_CLIENT_MODE, band);
-		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_P2P_GO_MODE, band);
-		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_P2P_DEVICE_MODE, band);
-		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_OCB_MODE, band);
-		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_TDLS_MODE, band);
-		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_IBSS_MODE, band);
-		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_NAN_DISC_MODE, band);
-		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
-					      QDF_NDI_MODE, band);
-	}
-
-	hdd_update_vdev_nss(hdd_ctx);
-
 	status =
 	  ucfg_mlme_get_enable_dynamic_nss_chains_cfg(hdd_ctx->psoc,
 						      &enable_dynamic_cfg);
@@ -3273,11 +3307,7 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	hdd_ctx->fine_time_meas_cap_target = cfg->fine_time_measurement_cap;
 	hdd_debug("fine_time_meas_cap: 0x%x", fine_time_meas_cap);
 
-	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc, &enable_mimo);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("unable to get vht_enable2x2");
-
-	antenna_mode = enable_mimo ?
+	antenna_mode = hdd_ctx->num_rf_chains ?
 		       HDD_ANTENNA_MODE_2X2 : HDD_ANTENNA_MODE_1X1;
 	hdd_update_smps_antenna_mode(hdd_ctx, antenna_mode);
 	hdd_debug("Init current antenna mode: %d",

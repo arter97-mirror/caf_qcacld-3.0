@@ -3006,6 +3006,23 @@ ucfg_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_update_max_fw_chains_cfg() - Wrapper API to update Tx/Rx chains
+ * supported in psoc MLME private
+ * @psoc: Pointer to PSOC object manager
+ * @tx_chains: Supported Tx chains
+ * @rx_chains: Supported Rx chains
+ *
+ * Return: QDF_STATUS
+ */
+static inline
+QDF_STATUS ucfg_mlme_update_max_fw_chains_cfg(struct wlan_objmgr_psoc *psoc,
+					      uint8_t tx_chains,
+					      uint8_t rx_chains)
+{
+	return mlme_update_max_fw_chains_cfg(psoc, tx_chains, rx_chains);
+}
+
+/**
  * ucfg_mlme_get_cur_ch_width_update_from_ap() - UCFG API to get current
  * channel width if update is there from AP
  *

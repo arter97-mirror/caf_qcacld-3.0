@@ -223,6 +223,8 @@ struct board_info {
  * @eeprom_rd_ext: eeprom rd ext
  * @hw_macaddr: hw mcast addr
  * @services: struct wma_tgt_services
+ * @max_tx_chains: Max Tx chains supported by target
+ * @max_rx_chains: Max Rx chains supported by target
  * @ht_cap: struct wma_tgt_ht_cap
  * @vht_cap: struct wma_tgt_vht_cap
  * @max_intf_count: max interface count
@@ -255,6 +257,8 @@ struct wma_tgt_cfg {
 	uint32_t eeprom_rd_ext;
 	struct qdf_mac_addr hw_macaddr;
 	struct wma_tgt_services services;
+	uint8_t max_tx_chains;
+	uint8_t max_rx_chains;
 	struct wma_tgt_ht_cap ht_cap;
 	struct wma_tgt_vht_cap vht_cap;
 	uint8_t max_intf_count;

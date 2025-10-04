@@ -6192,6 +6192,29 @@ QDF_STATUS mlme_init_fw_chain_cfg(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS mlme_update_max_fw_chains_cfg(struct wlan_objmgr_psoc *psoc,
+					 uint8_t tx_chains, uint8_t rx_chains)
+
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	if (mlme_obj->cfg.fw_chain_cfg.max_tx_chains_2g > tx_chains)
+		mlme_obj->cfg.fw_chain_cfg.max_tx_chains_2g = tx_chains;
+	if (mlme_obj->cfg.fw_chain_cfg.max_rx_chains_2g > rx_chains)
+		mlme_obj->cfg.fw_chain_cfg.max_rx_chains_2g = rx_chains;
+
+	if (mlme_obj->cfg.fw_chain_cfg.max_tx_chains_5g > tx_chains)
+		mlme_obj->cfg.fw_chain_cfg.max_tx_chains_5g = tx_chains;
+	if (mlme_obj->cfg.fw_chain_cfg.max_rx_chains_5g > rx_chains)
+		mlme_obj->cfg.fw_chain_cfg.max_rx_chains_5g = rx_chains;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS wlan_mlme_get_sta_rx_nss(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint8_t *rx_nss)

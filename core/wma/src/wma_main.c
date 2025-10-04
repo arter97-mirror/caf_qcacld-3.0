@@ -6375,6 +6375,10 @@ static QDF_STATUS wma_fill_chain_cfg(struct wlan_objmgr_psoc *psoc,
 			fw_chain_cfg.max_rx_chains_5g = num_chain;
 	}
 
+	tgt_cfg->max_tx_chains = QDF_MAX(fw_chain_cfg.max_tx_chains_2g,
+					 fw_chain_cfg.max_tx_chains_5g);
+	tgt_cfg->max_rx_chains = QDF_MAX(fw_chain_cfg.max_rx_chains_2g,
+					 fw_chain_cfg.max_rx_chains_5g);
 	return wlan_mlme_init_fw_chain_cfg(psoc, &fw_chain_cfg);
 }
 

@@ -2077,6 +2077,21 @@ QDF_STATUS mlme_init_fw_chain_cfg(struct wlan_objmgr_psoc *psoc,
 				  struct wlan_mlme_chain_cfg *chain_cfg);
 
 /**
+ * mlme_update_max_fw_chains_cfg() - API updates the max supported FW chains
+ * in psoc mlme priv
+ * @psoc: Pointer to PSOC object manager
+ * @tx_chains: max supported Tx chains
+ * @rx_chains: max supported Rx chains
+ *
+ * Update the Tx/Rx chains from FW to the values pointed by @tx_chains and
+ * @rx_chains.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_update_max_fw_chains_cfg(struct wlan_objmgr_psoc *psoc,
+					 uint8_t tx_chains, uint8_t rx_chains);
+
+/**
  * wlan_mlme_get_cur_ch_width_update_from_ap() - API to get current channel
  * width from AP
  *

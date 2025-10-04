@@ -4821,42 +4821,22 @@ sme_fill_vdev_chain_ini_params(struct mac_context *mac_ctx,
 }
 
 static void
-sme_check_nss_chain_ini_param(struct wlan_mlme_nss_chains *vdev_ini_cfg,
-			      uint8_t rf_chains_supported,
-			      enum nss_chains_band_info band)
-{
-	vdev_ini_cfg->rx_nss[band] = QDF_MIN(vdev_ini_cfg->rx_nss[band],
-					     rf_chains_supported);
-	vdev_ini_cfg->tx_nss[band] = QDF_MIN(vdev_ini_cfg->tx_nss[band],
-					     rf_chains_supported);
-}
-
-static void
 sme_fill_nss_chain_params(struct mac_context *mac_ctx,
 			  struct wlan_mlme_nss_chains *vdev_ini_cfg,
 			  enum QDF_OPMODE device_mode,
 			  enum nss_chains_band_info band,
 			  uint8_t rf_chains_supported)
 {
+	QDF_STATUS status;
 	uint8_t nss_chain_shift;
 	uint8_t max_supported_nss;
 	enum coex_btc_chain_mode btc_chain_mode;
 	struct wlan_mlme_nss_chains *nss_chains_ini_cfg =
 					&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
-	QDF_STATUS status;
 
 	nss_chain_shift = sme_get_nss_chain_shift(device_mode);
 	max_supported_nss =
-			mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo ?
-			WLAN_MAX_VDEV_NSS : 1;
-
-	/*
-	 * If target supports Antenna sharing, set NSS to 1 for 2.4GHz band for
-	 * NDI vdev.
-	 */
-	if (device_mode == QDF_NDI_MODE && mac_ctx->mlme_cfg->gen.as_enabled &&
-	    band == NSS_CHAINS_BAND_2GHZ)
-		max_supported_nss = NSS_1x1_MODE;
+		mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo + 1;
 
 	status = ucfg_coex_psoc_get_btc_chain_mode(mac_ctx->psoc,
 						   &btc_chain_mode);
@@ -4866,9 +4846,13 @@ sme_fill_nss_chain_params(struct mac_context *mac_ctx,
 	}
 
 	if (band == NSS_CHAINS_BAND_2GHZ &&
-	    (btc_chain_mode == WLAN_COEX_BTC_CHAIN_MODE_FDD ||
-	     btc_chain_mode == WLAN_COEX_BTC_CHAIN_MODE_HYBRID))
+	    ((btc_chain_mode == WLAN_COEX_BTC_CHAIN_MODE_FDD ||
+	      btc_chain_mode == WLAN_COEX_BTC_CHAIN_MODE_HYBRID) ||
+	     (device_mode == QDF_NDI_MODE &&
+	      mac_ctx->mlme_cfg->gen.as_enabled)))
 		max_supported_nss = NSS_1x1_MODE;
+
+	max_supported_nss = QDF_MIN(max_supported_nss, rf_chains_supported);
 
 	/* If the fw doesn't support two chains, num rf chains can max be 1 */
 	vdev_ini_cfg->num_rx_chains[band] =
@@ -4913,13 +4897,6 @@ sme_fill_nss_chain_params(struct mac_context *mac_ctx,
 
 	vdev_ini_cfg->disable_tx_mrc[band] =
 				nss_chains_ini_cfg->disable_tx_mrc[band];
-	/*
-	 * Check whether the rx/tx nss is greater than the number of rf chains
-	 * supported by FW, if so downgrade the nss to the number of chains
-	 * supported, as higher nss cannot be supported with less chains.
-	 */
-	sme_check_nss_chain_ini_param(vdev_ini_cfg, rf_chains_supported,
-				      band);
 }
 
 void sme_populate_nss_chain_params(mac_handle_t mac_handle,
