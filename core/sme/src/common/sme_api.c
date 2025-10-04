@@ -5134,6 +5134,38 @@ sme_is_nss_update_allowed(struct wlan_mlme_chain_cfg chain_cfg,
 	return true;
 }
 
+static void sme_update_legacy_rate_tx_chains(mac_handle_t mac_handle,
+					     enum QDF_OPMODE vdev_op_mode)
+{
+	uint8_t nss_shift, ini_chains;
+	uint32_t num_nss_bits = 0x3;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct wlan_mlme_chain_cfg *fw_chain_cfg =
+				&mac_ctx->mlme_cfg->fw_chain_cfg;
+	struct wlan_mlme_nss_chains *ini_cfg =
+				&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
+
+	nss_shift = sme_get_nss_chain_shift(vdev_op_mode);
+
+	ini_chains = QDF_GET_BITS(ini_cfg->num_tx_chains_11b,
+				  nss_shift, num_nss_bits);
+	QDF_SET_BITS(ini_cfg->num_tx_chains_11b, nss_shift, num_nss_bits,
+		     QDF_MIN(QDF_MIN(ini_chains, WLAN_MAX_VDEV_CHAINS),
+			     fw_chain_cfg->max_tx_chains_2g));
+
+	ini_chains = QDF_GET_BITS(ini_cfg->num_tx_chains_11g,
+				  nss_shift, num_nss_bits);
+	QDF_SET_BITS(ini_cfg->num_tx_chains_11g, nss_shift, num_nss_bits,
+		     QDF_MIN(QDF_MIN(ini_chains, WLAN_MAX_VDEV_CHAINS),
+			     fw_chain_cfg->max_tx_chains_2g));
+
+	ini_chains = QDF_GET_BITS(ini_cfg->num_tx_chains_11a,
+				  nss_shift, num_nss_bits);
+	QDF_SET_BITS(ini_cfg->num_tx_chains_11a, nss_shift, num_nss_bits,
+		     QDF_MIN(QDF_MIN(ini_chains, WLAN_MAX_VDEV_CHAINS),
+			     fw_chain_cfg->max_tx_chains_5g));
+}
+
 static void sme_modify_chains_in_mlme_cfg(mac_handle_t mac_handle,
 					  uint8_t rx_chains,
 					  uint8_t tx_chains,
@@ -5258,6 +5290,11 @@ sme_modify_nss_chains_tgt_cfg(mac_handle_t mac_handle,
 	sme_modify_chains_in_mlme_cfg(mac_handle, max_supported_rx_chains,
 				      max_supported_tx_chains, vdev_op_mode,
 				      band);
+
+	/* Calling only for 2.4Ghz as all the legacy rates are updated */
+	if (band == NSS_CHAINS_BAND_2GHZ)
+		sme_update_legacy_rate_tx_chains(mac_handle, vdev_op_mode);
+
 	sme_modify_nss_in_mlme_cfg(mac_handle, max_supported_rx_nss,
 				   max_supported_tx_nss, vdev_op_mode, band);
 }

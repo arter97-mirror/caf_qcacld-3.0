@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -358,12 +358,14 @@
  * num_tx_chains_11b - Config Param to change number of tx
  * chains per vdev for 2.4ghz 11b mode connections
  * @Min: 0x01249249
- * @Max: 0x02492492
+ * @Max: 0x04924924
  * @Default: 0x02492492
  *
  * This ini is used to change the num of chains for eg:-
  * 0x01249249 - change all vdev's num chains for 11b connections to 1 each
  * 0x02492492 - change all vdev's num chains for 11b connections to 2 each
+ * 0x036DB6DB - Change all VDEVs 11b chains to 3 each
+ * 0x04924924 - Change all VDEVs 11b chains to 4 each
  * Bits          VDEV Type
  * BIT[0:2]        STA
  * BIT[3:5]        SAP
@@ -387,7 +389,7 @@
 #define CFG_NUM_TX_CHAINS_11b CFG_INI_UINT( \
 				"num_tx_chains_11b", \
 				0x01249249, \
-				0x02492492, \
+				0x04924924, \
 				0x02492492, \
 				CFG_VALUE_OR_DEFAULT, \
 				"num tx chains 11b")
@@ -397,12 +399,14 @@
  * num_tx_chains_11g - Config Param to change number of tx
  * chains per vdev for 2.4ghz 11g mode connections
  * @Min: 0x01249249
- * @Max: 0x02492492
+ * @Max: 0x04924924
  * @Default: 0x02492492
  *
  * This ini is used to change the num of chains for eg:-
  * 0x01249249 - change all vdev's num chains for 11g connections to 1 each
  * 0x02492492 - change all vdev's num chains for 11g connections to 2 each
+ * 0x036DB6DB - Change all VDEVs 11g chains to 3 each
+ * 0x04924924 - Change all VDEVs 11g chains to 4 each
  * Bits          VDEV Type
  * BIT[0:2]        STA
  * BIT[3:5]        SAP
@@ -426,7 +430,7 @@
 #define CFG_NUM_TX_CHAINS_11g CFG_INI_UINT( \
 				"num_tx_chains_11g", \
 				0x01249249, \
-				0x02492492, \
+				0x04924924, \
 				0x02492492, \
 				CFG_VALUE_OR_DEFAULT, \
 				"num tx chains 11g")
@@ -436,12 +440,14 @@
  * num_tx_chains_11a - Config Param to change number of tx
  * chains per vdev for 5ghz 11a mode connections
  * @Min: 0x01249249
- * @Max: 0x02492492
+ * @Max: 0x04924924
  * @Default: 0x02492492
  *
  * This ini is used to change the num of chains for eg:-
  * 0x01249249 - change all vdev's num chains for 11a connections to 1 each
  * 0x02492492 - change all vdev's num chains for 11a connections to 2 each
+ * 0x036DB6DB - Change all VDEVs 11a chains to 3 each
+ * 0x04924924 - Change all VDEVs 11a chains to 4 each
  * Bits          VDEV Type
  * BIT[0:2]        STA
  * BIT[3:5]        SAP
@@ -465,7 +471,7 @@
 #define CFG_NUM_TX_CHAINS_11a CFG_INI_UINT( \
 				"num_tx_chains_11a", \
 				0x01249249, \
-				0x02492492, \
+				0x04924924, \
 				0x02492492, \
 				CFG_VALUE_OR_DEFAULT, \
 				"num tx chains 11a")
