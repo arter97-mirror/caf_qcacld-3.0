@@ -1994,6 +1994,9 @@ wmi_get_converted_roam_eapol_subtype(
 #define WLAN_FRAME_INFO_AUTH_ALG_OFFSET     7
 #define WLAN_FRAME_INFO_SEQ_NUM_OFFSET      16
 
+#define DISCONNECT_TX_STATUS_OFFSET   0
+#define DISCONNECT_REASON_CODE_OFFSET 16
+
 /**
  * extract_roam_frame_info_tlv() - Extract the frame exchanges during roaming
  * info from the WMI_ROAM_STATS_EVENTID
@@ -2076,6 +2079,27 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			dst_buf->tx_status = wmi_get_host_roam_frame_tx_status(
 							src_data->status_code);
 			dst_buf->status_code = 0;
+		}
+
+		/*
+		 * For Deauth/disassoc TX frames the reason code & TX status
+		 * is filled by firmware as below:
+		 * status_code =  (reason << 16) | (TX completion_status)
+		 * Tx completion status - Lower 16 bytes
+		 * Reason - Higher 16 bytes
+		 */
+		if (!dst_buf->is_rsp &&
+		    (dst_buf->subtype == MGMT_SUBTYPE_DEAUTH ||
+		     dst_buf->subtype == MGMT_SUBTYPE_DISASSOC)) {
+			uint16_t tx_status =
+				WMI_GET_BITS(src_data->status_code,
+					     DISCONNECT_TX_STATUS_OFFSET, 16);
+
+			dst_buf->tx_status =
+				wmi_get_host_roam_frame_tx_status(tx_status);
+			dst_buf->status_code =
+				WMI_GET_BITS(src_data->status_code,
+					     DISCONNECT_REASON_CODE_OFFSET, 16);
 		}
 
 		dst_buf->retry_count = src_data->retry_count;
