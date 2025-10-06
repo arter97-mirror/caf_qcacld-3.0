@@ -37,6 +37,7 @@
 #include <wlan_mlme_twt_public_struct.h>
 #endif
 #include <wlan_mlme_api.h>
+#include <wlan_reg_services_api.h>
 
 #ifdef WLAN_SUPPORT_TWT
 
@@ -1354,10 +1355,13 @@ wlan_cp_stats_update_channel_stats(struct per_channel_stats *channel_stats,
 	if (scanned_ch_width == CH_WIDTH_20MHZ) {
 		start_freq = ev_channel_stat->channel_freq;
 		end_freq = ev_channel_stat->channel_freq;
+	} else if (scanned_ch_width == CH_WIDTH_40MHZ &&
+		   wlan_reg_is_24ghz_ch_freq(ev_channel_stat->channel_freq)) {
+		start_freq = ev_channel_stat->channel_freq - 20;
+		end_freq = ev_channel_stat->channel_freq + 20;
 	} else {
-		range =
-		   wlan_reg_get_bonded_chan_entry(ev_channel_stat->channel_freq,
-						  scanned_ch_width, 0);
+		range = wlan_reg_get_bonded_chan_entry(ev_channel_stat->channel_freq,
+						       scanned_ch_width, 0);
 		if (!range) {
 			cp_stats_debug("range is NULL for freq %d, ch_width %d",
 				       ev_channel_stat->channel_freq,
