@@ -3193,7 +3193,6 @@ ucfg_mlme_is_tgt_vht_mcs_10_11_supported(struct wlan_objmgr_psoc *psoc)
  * ucfg_mlme_update_vht_cap() - Update vht capabilities
  * @psoc: psoc context
  * @cfg: data to be set
- * @num_rf_chains: Num of RF chains supported
  *
  * Inline UCFG API to be used by HDD/OSIF callers to get the
  * ignore_peer_ht_opmode flag value
@@ -3202,10 +3201,9 @@ ucfg_mlme_is_tgt_vht_mcs_10_11_supported(struct wlan_objmgr_psoc *psoc)
  */
 static inline
 QDF_STATUS ucfg_mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
-				    struct wma_tgt_vht_cap *cfg,
-				    uint32_t num_rf_chains)
+				    struct wma_tgt_cfg *cfg)
 {
-	return mlme_update_vht_cap(psoc, cfg, num_rf_chains);
+	return mlme_update_vht_cap(psoc, cfg);
 }
 
 /**

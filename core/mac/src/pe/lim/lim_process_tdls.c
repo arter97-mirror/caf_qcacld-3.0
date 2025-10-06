@@ -3468,7 +3468,7 @@ lim_tdls_populate_matching_rate_set(struct mac_context *mac_ctx,
 		}
 	}
 	lim_populate_vht_mcs_set(mac_ctx, &stads->supportedRates, vht_caps,
-				 session_entry, nss, NULL);
+				 session_entry, nss, nss, NULL);
 
 	lim_tdls_populate_eht_mcs(mac_ctx, stads, session_entry);
 

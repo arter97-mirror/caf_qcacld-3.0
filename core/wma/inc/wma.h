@@ -903,7 +903,6 @@ struct wma_pf_sym_hist {
  * @pdevconfig: pdev related configurations
  * @wma_hold_req_queue: Queue use to serialize requests to firmware
  * @wma_hold_req_q_lock: Mutex for @wma_hold_req_queue
- * @vht_supp_mcs: VHT supported MCS
  * @is_fw_assert: is fw asserted
  * @ack_work_ctx: Context for deferred processing of TX ACK
  * @pGetRssiReq: get RSSI request
@@ -1026,7 +1025,6 @@ typedef struct {
 	pdev_cli_config_t pdevconfig;
 	qdf_list_t wma_hold_req_queue;
 	qdf_spinlock_t wma_hold_req_q_lock;
-	uint32_t vht_supp_mcs;
 	uint8_t is_fw_assert;
 	struct wma_tx_ack_work_ctx *ack_work_ctx;
 	void *pGetRssiReq;

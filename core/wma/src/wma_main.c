@@ -5705,7 +5705,7 @@ static inline void
 wma_update_target_vht_cap(struct target_psoc_info *tgt_hdl,
 			  struct wma_tgt_vht_cap *cfg)
 {
-	int vht_cap_info = target_if_get_vht_cap_info(tgt_hdl);
+	uint32_t vht_cap_info = target_if_get_vht_cap_info(tgt_hdl);
 
 	if (vht_cap_info & WMI_VHT_CAP_MAX_MPDU_LEN_11454)
 		cfg->vht_max_mpdu = WMI_VHT_CAP_MAX_MPDU_LEN_11454;
@@ -5749,14 +5749,14 @@ wma_update_target_vht_cap(struct target_psoc_info *tgt_hdl,
 	cfg->vht_mu_bformee = vht_cap_info & WMI_VHT_CAP_MU_BFORMEE;
 
 	cfg->vht_txop_ps = vht_cap_info & WMI_VHT_CAP_TXOP_PS;
+	cfg->vht_supp_mcs = target_if_get_vht_supp_mcs(tgt_hdl);
 
-	wma_nofl_debug("max_mpdu %d supp_chan_width %x rx_ldpc %x\n"
-		 "short_gi_80 %x tx_stbc %x rx_stbc %x txop_ps %x\n"
-		 "su_bformee %x mu_bformee %x max_ampdu_len_exp %d",
-		 cfg->vht_max_mpdu, cfg->supp_chan_width, cfg->vht_rx_ldpc,
-		 cfg->vht_short_gi_80, cfg->vht_tx_stbc, cfg->vht_rx_stbc,
-		 cfg->vht_txop_ps, cfg->vht_su_bformee, cfg->vht_mu_bformee,
-		 cfg->vht_max_ampdu_len_exp);
+	wma_nofl_debug("max_mpdu %d supp_chan_width %x supp_mcs 0x%x rx_ldpc %x\nshort_gi_80 %x tx_stbc %x rx_stbc %x txop_ps %x\nsu_bformee %x mu_bformee %x max_ampdu_len_exp %d",
+		       cfg->vht_max_mpdu, cfg->supp_chan_width,
+		       cfg->vht_supp_mcs, cfg->vht_rx_ldpc,
+		       cfg->vht_short_gi_80, cfg->vht_tx_stbc, cfg->vht_rx_stbc,
+		       cfg->vht_txop_ps, cfg->vht_su_bformee,
+		       cfg->vht_mu_bformee, cfg->vht_max_ampdu_len_exp);
 }
 
 /**
@@ -6020,10 +6020,11 @@ static void wma_update_target_ext_vht_cap(struct target_psoc_info *tgt_hdl,
 					  struct wma_tgt_vht_cap *vht_cap)
 {
 	int i, num_hw_modes, total_mac_phy_cnt;
-	uint32_t vht_cap_info_2g, vht_cap_info_5g;
+	uint32_t vht_cap_info_2g, vht_cap_info_5g, mcs_map_5g, mcs_map_2g;
 	struct wma_tgt_vht_cap tmp_vht_cap = {0}, tmp_cap = {0};
 	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap;
-	uint32_t vht_mcs_10_11_supp = 0;
+	bool vht_mcs_10_11_supp = false;
+	uint16_t mcs_map;
 
 	total_mac_phy_cnt = target_psoc_get_total_mac_phy_cnt(tgt_hdl);
 	num_hw_modes = target_psoc_get_num_hw_modes(tgt_hdl);
@@ -6043,41 +6044,52 @@ static void wma_update_target_ext_vht_cap(struct target_psoc_info *tgt_hdl,
 		return;
 	}
 
+	mcs_map = VHT_DISABLE_ALL_MCS_NSS;
 	for (i = 0; i < total_mac_phy_cnt; i++) {
 		vht_cap_info_2g = mac_phy_cap[i].vht_cap_info_2G;
 		vht_cap_info_5g = mac_phy_cap[i].vht_cap_info_5G;
+		mcs_map_2g = mac_phy_cap[i].vht_supp_mcs_2G;
+		mcs_map_5g = mac_phy_cap[i].vht_supp_mcs_5G;
+
 		if (vht_cap_info_2g)
-			wma_derive_ext_vht_cap(&tmp_vht_cap,
-					vht_cap_info_2g);
+			wma_derive_ext_vht_cap(&tmp_vht_cap, vht_cap_info_2g);
 		if (vht_cap_info_5g)
-			wma_derive_ext_vht_cap(&tmp_vht_cap,
-					vht_cap_info_5g);
-		if (WMI_GET_BITS(mac_phy_cap[i].vht_supp_mcs_5G, 16, 2) &&
-		    WMI_VHT_MCS_NOTIFY_EXT_SS_GET(mac_phy_cap[i].
-			    vht_supp_mcs_5G))
-			vht_mcs_10_11_supp = 1;
-		if (WMI_GET_BITS(mac_phy_cap[i].vht_supp_mcs_2G, 16, 2) &&
-		    WMI_VHT_MCS_NOTIFY_EXT_SS_GET(mac_phy_cap[i].
-			    vht_supp_mcs_2G))
-			vht_mcs_10_11_supp = 1;
+			wma_derive_ext_vht_cap(&tmp_vht_cap, vht_cap_info_5g);
+
+		if (mcs_map_5g) {
+			mcs_map = VHT_INTERSECT_MCS_MAX_ENAB(mcs_map,
+							     mcs_map_5g);
+
+			if (WMI_GET_BITS(mcs_map_5g, 16, 2) &&
+			    WMI_VHT_MCS_NOTIFY_EXT_SS_GET(mcs_map_5g))
+				vht_mcs_10_11_supp = true;
+		}
+
+		if (mcs_map_2g) {
+			mcs_map = VHT_INTERSECT_MCS_MAX_ENAB(mcs_map,
+							     mcs_map_2g);
+
+			if (WMI_GET_BITS(mcs_map_2g, 16, 2) &&
+			    WMI_VHT_MCS_NOTIFY_EXT_SS_GET(mcs_map_2g))
+				vht_mcs_10_11_supp = true;
+		}
 	}
 
 	if (qdf_mem_cmp(&tmp_cap, &tmp_vht_cap,
-				sizeof(struct wma_tgt_vht_cap))) {
-			qdf_mem_copy(vht_cap, &tmp_vht_cap,
-					sizeof(struct wma_tgt_vht_cap));
-	}
+			sizeof(struct wma_tgt_vht_cap)))
+		qdf_mem_copy(vht_cap, &tmp_vht_cap,
+			     sizeof(struct wma_tgt_vht_cap));
+
+	vht_cap->vht_supp_mcs = mcs_map;
 	vht_cap->vht_mcs_10_11_supp = vht_mcs_10_11_supp;
-	wma_nofl_debug("[ext vhtcap] max_mpdu %d supp_chan_width %x rx_ldpc %x\n"
-		"short_gi_80 %x tx_stbc %x rx_stbc %x txop_ps %x\n"
-		"su_bformee %x mu_bformee %x max_ampdu_len_exp %d\n"
-		"vht_mcs_10_11_supp %d",
-		vht_cap->vht_max_mpdu, vht_cap->supp_chan_width,
-		vht_cap->vht_rx_ldpc, vht_cap->vht_short_gi_80,
-		vht_cap->vht_tx_stbc, vht_cap->vht_rx_stbc,
-		vht_cap->vht_txop_ps, vht_cap->vht_su_bformee,
-		vht_cap->vht_mu_bformee, vht_cap->vht_max_ampdu_len_exp,
-		vht_cap->vht_mcs_10_11_supp);
+	wma_nofl_debug("[ext vhtcap] max_mpdu %d supp_chan_width %x supp_mcs 0x%x rx_ldpc %x\nshort_gi_80 %x tx_stbc %x rx_stbc %x txop_ps %x\nsu_bformee %x mu_bformee %x max_ampdu_len_exp %d\nvht_mcs_10_11_supp %d",
+		       vht_cap->vht_max_mpdu, vht_cap->supp_chan_width,
+		       vht_cap->vht_supp_mcs, vht_cap->vht_rx_ldpc,
+		       vht_cap->vht_short_gi_80, vht_cap->vht_tx_stbc,
+		       vht_cap->vht_rx_stbc, vht_cap->vht_txop_ps,
+		       vht_cap->vht_su_bformee, vht_cap->vht_mu_bformee,
+		       vht_cap->vht_max_ampdu_len_exp,
+		       vht_cap->vht_mcs_10_11_supp);
 }
 
 static void
@@ -6948,8 +6960,6 @@ int wma_rx_service_ready_event(void *handle, uint8_t *cmd_param_info,
 	qdf_mem_copy(&wma_handle->reg_cap, param_buf->hal_reg_capabilities,
 				 sizeof(HAL_REG_CAPABILITIES));
 
-	wma_handle->vht_supp_mcs = ev->vht_supp_mcs;
-
 	wma_handle->new_hw_mode_index = tgt_cap_info->default_dbs_hw_mode_index;
 	policy_mgr_update_new_hw_mode_index(wma_handle->psoc,
 	tgt_cap_info->default_dbs_hw_mode_index);
@@ -7176,7 +7186,8 @@ QDF_STATUS wma_get_caps_for_phyidx_hwmode(struct wma_caps_per_phy *caps_per_phy,
 {
 	t_wma_handle *wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 	struct target_psoc_info *tgt_hdl;
-	int ht_cap_info, vht_cap_info;
+	int ht_cap_info;
+	uint32_t vht_cap_info;
 	uint8_t our_hw_mode = hw_mode, num_hw_modes, hw_mode_config_type;
 	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap;
 	struct wlan_psoc_target_capability_info *tgt_cap_info;

@@ -5262,14 +5262,14 @@ wlan_mlme_get_vendor_vht_for_24ghz(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
-			       struct wma_tgt_vht_cap *cfg,
-			       uint32_t num_rf_chains)
+			       struct wma_tgt_cfg *cfg)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 	uint8_t idx, max_nss;
 	uint32_t value = 0;
 	bool hw_rx_ldpc_enabled;
+	struct wma_tgt_vht_cap *vht_cap = &cfg->vht_cap;
 
 	mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	if (!mlme_obj)
@@ -5282,16 +5282,12 @@ QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
 	 * override if user configured value is too high
 	 * that the target cannot support
 	 */
-	if (vht_cap_info->ampdu_len > cfg->vht_max_mpdu)
-		vht_cap_info->ampdu_len = cfg->vht_max_mpdu;
+	if (vht_cap_info->ampdu_len > vht_cap->vht_max_mpdu)
+		vht_cap_info->ampdu_len = vht_cap->vht_max_mpdu;
 	if (vht_cap_info->ampdu_len >= 1)
 		mlme_obj->cfg.ht_caps.ht_cap_info.maximal_amsdu_size = 1;
 
-	/*
-	 * Intersect INI with FW support for MIMO support, the INI
-	 * interpretation is in CFG_VHT_MIMO_CAP_FEATURE.
-	 */
-	max_nss = QDF_MIN(vht_cap_info->enable_mimo + 1, num_rf_chains);
+	max_nss = vht_cap_info->enable_mimo + 1;
 
 	/*
 	 * Prepare the MCS set for Tx/Rx till the supported NSS with atleast
@@ -5299,64 +5295,66 @@ QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
 	 */
 	value = (CFG_VHT_BASIC_MCS_SET_STADEF & VHT_MCS_1x1) |
 		vht_cap_info->basic_mcs_set | VHT_DISABLE_MCS_OVER_NSS(max_nss);
-	if (vht_cap_info->enable_mimo)
-		for (idx = NSS_2x2_MODE; idx <= max_nss; idx++)
-			VHT_SET_MCS_FOR_NSS(value, vht_cap_info->rx_mcs2x2,
-					    idx);
 	vht_cap_info->basic_mcs_set = value;
 
 	value = (CFG_VHT_RX_MCS_MAP_STADEF & VHT_MCS_1x1) |
 		vht_cap_info->rx_mcs | VHT_DISABLE_MCS_OVER_NSS(max_nss);
 	if (vht_cap_info->enable_mimo)
-		for (idx = NSS_2x2_MODE; idx <= max_nss; idx++)
+		for (idx = NSS_2x2_MODE; idx <= cfg->max_rx_chains; idx++)
 			VHT_SET_MCS_FOR_NSS(value, vht_cap_info->rx_mcs2x2,
 					    idx);
-	vht_cap_info->rx_mcs_map = value;
+	vht_cap_info->rx_mcs_map =
+			VHT_INTERSECT_MCS(value, vht_cap->vht_supp_mcs);
 
 	value = (CFG_VHT_TX_MCS_MAP_STADEF & VHT_MCS_1x1) |
 		vht_cap_info->tx_mcs | VHT_DISABLE_MCS_OVER_NSS(max_nss);
 	if (vht_cap_info->enable_mimo)
-		for (idx = NSS_2x2_MODE; idx <= max_nss; idx++)
+		for (idx = NSS_2x2_MODE; idx <= cfg->max_tx_chains; idx++)
 			VHT_SET_MCS_FOR_NSS(value, vht_cap_info->tx_mcs2x2,
 					    idx);
-	vht_cap_info->tx_mcs_map = value;
+	vht_cap_info->tx_mcs_map =
+			VHT_INTERSECT_MCS(value, vht_cap->vht_supp_mcs);
 
 	 /* Set HW RX LDPC capability */
-	hw_rx_ldpc_enabled = !!cfg->vht_rx_ldpc;
+	hw_rx_ldpc_enabled = !!vht_cap->vht_rx_ldpc;
 	if (vht_cap_info->ldpc_coding_cap && !hw_rx_ldpc_enabled)
 		vht_cap_info->ldpc_coding_cap = hw_rx_ldpc_enabled;
 
 	/* set the Guard interval 80MHz */
-	if (vht_cap_info->short_gi_80mhz && !cfg->vht_short_gi_80)
-		vht_cap_info->short_gi_80mhz = cfg->vht_short_gi_80;
+	if (vht_cap_info->short_gi_80mhz && !vht_cap->vht_short_gi_80)
+		vht_cap_info->short_gi_80mhz = vht_cap->vht_short_gi_80;
 
 	/* Set VHT TX/RX STBC cap */
 	if (vht_cap_info->enable_mimo) {
-		if (vht_cap_info->tx_stbc && !cfg->vht_tx_stbc)
-			vht_cap_info->tx_stbc = cfg->vht_tx_stbc;
+		if (vht_cap_info->tx_stbc && !vht_cap->vht_tx_stbc)
+			vht_cap_info->tx_stbc = vht_cap->vht_tx_stbc;
 
-		if (vht_cap_info->rx_stbc && !cfg->vht_rx_stbc)
-			vht_cap_info->rx_stbc = cfg->vht_rx_stbc;
+		if (vht_cap_info->rx_stbc && !vht_cap->vht_rx_stbc)
+			vht_cap_info->rx_stbc = vht_cap->vht_rx_stbc;
 	} else {
 		vht_cap_info->tx_stbc = 0;
 		vht_cap_info->rx_stbc = 0;
 	}
 
 	/* Set VHT SU Beamformer cap */
-	if (vht_cap_info->su_bformer && !cfg->vht_su_bformer)
-		vht_cap_info->su_bformer = cfg->vht_su_bformer;
+	if (vht_cap_info->su_bformer && !vht_cap->vht_su_bformer)
+		vht_cap_info->su_bformer = 0;
 
 	/* check and update SU BEAMFORMEE capabality */
-	if (vht_cap_info->su_bformee && !cfg->vht_su_bformee)
-		vht_cap_info->su_bformee = cfg->vht_su_bformee;
+	if (vht_cap_info->su_bformee && !vht_cap->vht_su_bformee)
+		vht_cap_info->su_bformee = 0;
 
 	/* Set VHT MU Beamformer cap */
-	if (vht_cap_info->mu_bformer && !cfg->vht_mu_bformer)
-		vht_cap_info->mu_bformer = cfg->vht_mu_bformer;
+	if (vht_cap_info->mu_bformer &&
+	    (!vht_cap_info->su_bformer || !vht_cap->vht_mu_bformer))
+		vht_cap_info->mu_bformer = 0;
 
 	/* Set VHT MU Beamformee cap */
-	if (vht_cap_info->enable_mu_bformee && !cfg->vht_mu_bformee)
-		vht_cap_info->enable_mu_bformee = cfg->vht_mu_bformee;
+	if (vht_cap_info->enable_mu_bformee && !vht_cap->vht_mu_bformee)
+		vht_cap_info->enable_mu_bformee = vht_cap->vht_mu_bformee;
+
+	if (!vht_cap_info->su_bformer)
+		vht_cap_info->num_soundingdim = 0;
 
 	/*
 	 * VHT max AMPDU len exp:
@@ -5365,20 +5363,21 @@ QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
 	 * Even though Rome publish ampdu_len=7, it can
 	 * only support 4 because of some h/w bug.
 	 */
-	if (vht_cap_info->ampdu_len_exponent > cfg->vht_max_ampdu_len_exp)
-		vht_cap_info->ampdu_len_exponent = cfg->vht_max_ampdu_len_exp;
+	if (vht_cap_info->ampdu_len_exponent > vht_cap->vht_max_ampdu_len_exp)
+		vht_cap_info->ampdu_len_exponent =
+					vht_cap->vht_max_ampdu_len_exp;
 
 	/* Set VHT TXOP PS CAP */
-	if (vht_cap_info->txop_ps && !cfg->vht_txop_ps)
-		vht_cap_info->txop_ps = cfg->vht_txop_ps;
+	if (vht_cap_info->txop_ps && !vht_cap->vht_txop_ps)
+		vht_cap_info->txop_ps = vht_cap->vht_txop_ps;
 
 	/* set the Guard interval 160MHz */
-	if (vht_cap_info->short_gi_160mhz && !cfg->vht_short_gi_160)
-		vht_cap_info->short_gi_160mhz = cfg->vht_short_gi_160;
+	if (vht_cap_info->short_gi_160mhz && !vht_cap->vht_short_gi_160)
+		vht_cap_info->short_gi_160mhz = vht_cap->vht_short_gi_160;
 
-	vht_cap_info->tgt_vht_mcs_10_11_supp = cfg->vht_mcs_10_11_supp;
+	vht_cap_info->tgt_vht_mcs_10_11_supp = vht_cap->vht_mcs_10_11_supp;
 	if (cfg_get(psoc, CFG_ENABLE_VHT_MCS_10_11))
-		vht_cap_info->vht_mcs_10_11_supp = cfg->vht_mcs_10_11_supp;
+		vht_cap_info->vht_mcs_10_11_supp = vht_cap->vht_mcs_10_11_supp;
 
 	mlme_legacy_debug("vht_mcs_10_11_supp %d",
 			  vht_cap_info->vht_mcs_10_11_supp);

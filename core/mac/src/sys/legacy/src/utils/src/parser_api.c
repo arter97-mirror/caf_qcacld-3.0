@@ -1608,9 +1608,9 @@ void lim_extract_vht_caps_txrx_nss(tDot11fIEVHTCaps *vht_caps, uint8_t *tx_nss,
 	}
 }
 
-QDF_STATUS
-populate_dot11f_vht_caps(struct mac_context *mac,
-			 struct pe_session *pe_session, tDot11fIEVHTCaps *pDot11f)
+QDF_STATUS populate_dot11f_vht_caps(struct mac_context *mac,
+				    struct pe_session *pe_session,
+				    tDot11fIEVHTCaps *pDot11f)
 {
 	uint8_t idx;
 	uint32_t nCfgValue = 0;
@@ -1630,20 +1630,34 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 	nCfgValue = vht_cap_info->supp_chan_width;
 	pDot11f->supportedChannelWidthSet = (nCfgValue & 0x0003);
 
-	nCfgValue = 0;
+	nCfgValue = vht_cap_info->rx_mcs_map;
+	pDot11f->rxMCSMap = (nCfgValue & 0x0000FFFF);
+
+	nCfgValue = vht_cap_info->rx_supp_data_rate;
+	pDot11f->rxHighSupDataRate = (nCfgValue & 0x00001FFF);
+
+	nCfgValue = vht_cap_info->tx_mcs_map;
+	pDot11f->txMCSMap = (nCfgValue & 0x0000FFFF);
+
+	nCfgValue = vht_cap_info->tx_supp_data_rate;
+	pDot11f->txSupDataRate = (nCfgValue & 0x00001FFF);
+
 	/* With VHT it suffices if we just examine HT */
 	if (pe_session) {
+		bool vht20_mcs9_unsupported;
+
 		if (lim_is_he_6ghz_band(pe_session)) {
 			pDot11f->present = 0;
 			return QDF_STATUS_SUCCESS;
 		}
 
-		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
+		vht20_mcs9_unsupported =
+			(pe_session->ch_width == CH_WIDTH_20MHZ &&
+			 !vht_cap_info->enable_vht20_mcs9);
+
+		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
+		    pe_session->ch_width <= CH_WIDTH_80MHZ)
 			pDot11f->supportedChannelWidthSet = 0;
-		} else {
-			if (pe_session->ch_width <= CH_WIDTH_80MHZ)
-				pDot11f->supportedChannelWidthSet = 0;
-		}
 
 		if (pe_session->ht_config.adv_coding_cap)
 			pDot11f->ldpcCodingCap =
@@ -1656,7 +1670,8 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			pDot11f->shortGI160and80plus80MHz =
 				pe_session->vht_config.shortgi160and80plus80;
 
-		if (pe_session->ht_config.tx_stbc)
+		if (pe_session->cap_tx_nss > NSS_1x1_MODE &&
+		    pe_session->ht_config.tx_stbc)
 			pDot11f->txSTBC = pe_session->vht_config.tx_stbc;
 
 		if (pe_session->ht_config.rx_stbc)
@@ -1693,6 +1708,29 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 
 		pDot11f->vhtLinkAdaptCap =
 				pe_session->vht_config.vht_link_adapt;
+
+		lim_update_dot11f_vht_caps_for_nss(pDot11f,
+						   pe_session->cap_tx_nss,
+						   pe_session->cap_rx_nss);
+		/*
+		 * Mark MCS set above current NSS as unsupported, if MCS9 is
+		 * unsupported, set max supported MCS per NSS as 0-8.
+		 */
+		if (vht20_mcs9_unsupported) {
+			for (idx = NSS_1x1_MODE; idx <= WLAN_MAX_VDEV_NSS;
+			     idx++) {
+				if (VHT_GET_MCS_FOR_NSS(pDot11f->txMCSMap,
+							idx) ==
+				    VHT_MCS_0_9)
+					VHT_SET_MCS_FOR_NSS(pDot11f->txMCSMap,
+							    VHT_MCS_0_8, idx);
+				if (VHT_GET_MCS_FOR_NSS(pDot11f->rxMCSMap,
+							idx) ==
+				    VHT_MCS_0_9)
+					VHT_SET_MCS_FOR_NSS(pDot11f->rxMCSMap,
+							    VHT_MCS_0_8, idx);
+			}
+		}
 	} else {
 		nCfgValue = vht_cap_info->ldpc_coding_cap;
 		pDot11f->ldpcCodingCap = (nCfgValue & 0x0001);
@@ -1753,55 +1791,6 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 	nCfgValue = vht_cap_info->mu_bformer;
 	pDot11f->muBeamformerCap = (nCfgValue & 0x0001);
 
-
-	nCfgValue = vht_cap_info->rx_mcs_map;
-	pDot11f->rxMCSMap = (nCfgValue & 0x0000FFFF);
-
-	nCfgValue = vht_cap_info->rx_supp_data_rate;
-	pDot11f->rxHighSupDataRate = (nCfgValue & 0x00001FFF);
-
-	nCfgValue = vht_cap_info->tx_mcs_map;
-	pDot11f->txMCSMap = (nCfgValue & 0x0000FFFF);
-
-	nCfgValue = vht_cap_info->tx_supp_data_rate;
-	pDot11f->txSupDataRate = (nCfgValue & 0x00001FFF);
-
-	if (pe_session) {
-		bool vht20_mcs9_unsupported =
-			(pe_session->ch_width == CH_WIDTH_20MHZ &&
-			 !vht_cap_info->enable_vht20_mcs9);
-
-		pDot11f->txMCSMap |=
-			VHT_DISABLE_MCS_OVER_NSS(pe_session->cap_tx_nss);
-		pDot11f->rxMCSMap |=
-			VHT_DISABLE_MCS_OVER_NSS(pe_session->cap_rx_nss);
-
-		if (pe_session->cap_tx_nss < NSS_2x2_MODE)
-			pDot11f->txSTBC = 0;
-
-		/*
-		 * Mark MCS set above current NSS as unsupported, if MCS9 is
-		 * unsupported, set max supported MCS per NSS as 0-8.
-		 */
-		for (idx = NSS_1x1_MODE; idx <= pe_session->cap_tx_nss; idx++) {
-			if (vht20_mcs9_unsupported &&
-			    (VHT_GET_MCS_FOR_NSS(pDot11f->txMCSMap, idx) ==
-			     VHT_MCS_0_9)) {
-				VHT_SET_MCS_FOR_NSS(pDot11f->txMCSMap,
-						    VHT_MCS_0_8, idx);
-				VHT_SET_MCS_FOR_NSS(pDot11f->rxMCSMap,
-						    VHT_MCS_0_8, idx);
-			}
-		}
-
-		pDot11f->txSupDataRate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(pe_session->cap_tx_nss,
-							true);
-		pDot11f->rxHighSupDataRate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(pe_session->cap_rx_nss,
-							true);
-	}
-
 	lim_log_vht_cap(mac, pDot11f);
 	return QDF_STATUS_SUCCESS;
 }
@@ -1811,7 +1800,6 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 			      struct pe_session *pe_session,
 			      tDot11fIEVHTOperation *pDot11f)
 {
-	uint32_t mcs_set;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 	enum reg_wifi_band band;
 	uint8_t band_mask;
@@ -1879,15 +1867,8 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 	}
 
 	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
-	mcs_set = vht_cap_info->basic_mcs_set;
-	mcs_set = (mcs_set & 0xFFFC) | vht_cap_info->rx_mcs;
+	pDot11f->basicMCSSet = (uint16_t)vht_cap_info->basic_mcs_set;
 
-	if (pe_session->cap_tx_nss == NSS_1x1_MODE)
-		mcs_set |= 0x000C;
-	else
-		mcs_set = (mcs_set & 0xFFF3) | (vht_cap_info->rx_mcs2x2 << 2);
-
-	pDot11f->basicMCSSet = (uint16_t)mcs_set;
 	lim_log_vht_operation(mac, pDot11f);
 
 	return QDF_STATUS_SUCCESS;

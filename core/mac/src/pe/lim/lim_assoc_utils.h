@@ -383,7 +383,8 @@ void lim_send_sme_tsm_ie_ind(struct mac_context *mac,
  * @rates: pointer to supported rate set
  * @peer_vht_caps: pointer to peer vht capabilities
  * @session_entry: pe session entry
- * @nss: number of spatial streams
+ * @tx_nss: number of Tx spatial streams
+ * @rx_nss: number of Rx spatial streams
  * @sta_ds: pointer to peer sta data structure
  *
  * Populates vht mcs rate set based on peer and self capabilities
@@ -394,7 +395,7 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEVHTCaps *peer_vht_caps,
 				    struct pe_session *session_entry,
-				    uint8_t nss,
+				    uint8_t tx_nss, uint8_t rx_nss,
 				    struct sDphHashNode *sta_ds);
 
 /**

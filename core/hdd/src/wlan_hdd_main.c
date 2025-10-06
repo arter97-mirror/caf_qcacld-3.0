@@ -2450,7 +2450,7 @@ static void hdd_update_tgt_ht_cap(struct hdd_context *hdd_ctx,
 }
 
 static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
-				   struct wma_tgt_vht_cap *cfg)
+				   struct wma_tgt_cfg *cfg)
 {
 	QDF_STATUS status;
 	struct wiphy *wiphy = hdd_ctx->wiphy;
@@ -2458,30 +2458,25 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 		wiphy->bands[HDD_NL80211_BAND_5GHZ];
 	uint32_t ch_width;
 	struct wma_caps_per_phy caps_per_phy = {0};
-	uint8_t num_chains_cap_mimo = WLAN_MIMO_CAP_DISABLE;
+	bool support_mimo;
 	uint32_t tx_highest_data_rate;
 	uint32_t rx_highest_data_rate;
+	struct wma_tgt_vht_cap *vht_cfg = &cfg->vht_cap;
 
 	if (!band_5g) {
 		hdd_debug("5GHz band disabled, skipping capability population");
 		return;
 	}
 
-	status = ucfg_mlme_update_vht_cap(hdd_ctx->psoc, cfg,
-					  hdd_ctx->num_rf_chains);
+	status = ucfg_mlme_update_vht_cap(hdd_ctx->psoc, cfg);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("could not update vht capabilities");
 
-	status = ucfg_mlme_get_vht_mimo_cap(hdd_ctx->psoc,
-					    &num_chains_cap_mimo);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("unable to get vht_enable2x2");
-
 	tx_highest_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(num_chains_cap_mimo + 1,
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(cfg->max_tx_chains,
 							true);
 	rx_highest_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(num_chains_cap_mimo + 1,
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(cfg->max_rx_chains,
 							true);
 
 	status = ucfg_mlme_cfg_set_vht_rx_supp_data_rate(hdd_ctx->psoc,
@@ -2495,28 +2490,28 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 		hdd_err("Failed to set tx_supp_data_rate");
 
 	/* Update the real highest data rate to wiphy */
-	if (cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ) {
+	if (vht_cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ) {
 		tx_highest_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(num_chains_cap_mimo + 1,
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(cfg->max_tx_chains,
 							false);
 		rx_highest_data_rate =
-			VHT_GET_DATARATE_FOR_NSS_AND_GI(num_chains_cap_mimo + 1,
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(cfg->max_rx_chains,
 							false);
 	}
 
-	if (WMI_VHT_CAP_MAX_MPDU_LEN_11454 == cfg->vht_max_mpdu)
+	if (WMI_VHT_CAP_MAX_MPDU_LEN_11454 == vht_cfg->vht_max_mpdu)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_11454;
-	else if (WMI_VHT_CAP_MAX_MPDU_LEN_7935 == cfg->vht_max_mpdu)
+	else if (WMI_VHT_CAP_MAX_MPDU_LEN_7935 == vht_cfg->vht_max_mpdu)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_7991;
 	else
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_3895;
 
 
-	if (cfg->supp_chan_width & (1 << eHT_CHANNEL_WIDTH_80P80MHZ)) {
+	if (vht_cfg->supp_chan_width & (1 << eHT_CHANNEL_WIDTH_80P80MHZ)) {
 		band_5g->vht_cap.cap |=
 			IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160_80PLUS80MHZ;
 		ch_width = VHT_CAP_160_AND_80P80_SUPP;
-	} else if (cfg->supp_chan_width & (1 << eHT_CHANNEL_WIDTH_160MHZ)) {
+	} else if (vht_cfg->supp_chan_width & (1 << eHT_CHANNEL_WIDTH_160MHZ)) {
 		band_5g->vht_cap.cap |=
 			IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160MHZ;
 		ch_width = VHT_CAP_160_SUPP;
@@ -2530,7 +2525,7 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 	else
 		hdd_debug("supported channel width %d", ch_width);
 
-	if (cfg->vht_rx_ldpc & WMI_VHT_CAP_RX_LDPC) {
+	if (vht_cfg->vht_rx_ldpc & WMI_VHT_CAP_RX_LDPC) {
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_RXLDPC;
 		hdd_debug("VHT RxLDPC capability is set");
 	} else {
@@ -2547,35 +2542,36 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 		}
 	}
 
-	if (cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ)
+	if (vht_cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_80;
-	if (cfg->vht_short_gi_160 & WMI_VHT_CAP_SGI_160MHZ)
+	if (vht_cfg->vht_short_gi_160 & WMI_VHT_CAP_SGI_160MHZ)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_160;
 
-	if (num_chains_cap_mimo && (cfg->vht_tx_stbc & WMI_VHT_CAP_TX_STBC))
+	support_mimo = hdd_ctx->num_rf_chains > NSS_1x1_MODE ? true : false;
+	if (support_mimo && (vht_cfg->vht_tx_stbc & WMI_VHT_CAP_TX_STBC))
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_TXSTBC;
 
-	if (cfg->vht_rx_stbc & WMI_VHT_CAP_RX_STBC_1SS)
+	if (vht_cfg->vht_rx_stbc & WMI_VHT_CAP_RX_STBC_1SS)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_RXSTBC_1;
-	if (num_chains_cap_mimo && (cfg->vht_rx_stbc & WMI_VHT_CAP_RX_STBC_2SS))
+	if (support_mimo && (vht_cfg->vht_rx_stbc & WMI_VHT_CAP_RX_STBC_2SS))
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_RXSTBC_2;
-	if (cfg->vht_rx_stbc & WMI_VHT_CAP_RX_STBC_3SS)
+	if (vht_cfg->vht_rx_stbc & WMI_VHT_CAP_RX_STBC_3SS)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_RXSTBC_3;
 
 	band_5g->vht_cap.cap |=
-		(cfg->vht_max_ampdu_len_exp <<
+		(vht_cfg->vht_max_ampdu_len_exp <<
 		 IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT);
 
-	if (cfg->vht_su_bformer & WMI_VHT_CAP_SU_BFORMER)
+	if (vht_cfg->vht_su_bformer & WMI_VHT_CAP_SU_BFORMER)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE;
-	if (cfg->vht_su_bformee & WMI_VHT_CAP_SU_BFORMEE)
+	if (vht_cfg->vht_su_bformee & WMI_VHT_CAP_SU_BFORMEE)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE;
-	if (cfg->vht_mu_bformer & WMI_VHT_CAP_MU_BFORMER)
+	if (vht_cfg->vht_mu_bformer & WMI_VHT_CAP_MU_BFORMER)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE;
-	if (cfg->vht_mu_bformee & WMI_VHT_CAP_MU_BFORMEE)
+	if (vht_cfg->vht_mu_bformee & WMI_VHT_CAP_MU_BFORMEE)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE;
 
-	if (cfg->vht_txop_ps & WMI_VHT_CAP_TXOP_PS)
+	if (vht_cfg->vht_txop_ps & WMI_VHT_CAP_TXOP_PS)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_VHT_TXOP_PS;
 
 	band_5g->vht_cap.vht_mcs.rx_highest = cpu_to_le16(rx_highest_data_rate);
@@ -3224,7 +3220,7 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 
 	hdd_update_tgt_ht_cap(hdd_ctx, cfg);
 
-	hdd_update_tgt_vht_cap(hdd_ctx, &cfg->vht_cap);
+	hdd_update_tgt_vht_cap(hdd_ctx, cfg);
 
 	ucfg_mlme_cfg_get_vht_tx_bfee_ant_supp(hdd_ctx->psoc, &value);
 	if ((value > MLME_VHT_CSN_BEAMFORMEE_ANT_SUPPORTED_FW_DEF) &&

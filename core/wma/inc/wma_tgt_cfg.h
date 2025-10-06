@@ -150,6 +150,7 @@ struct wma_tgt_ht_cap {
  * struct wma_tgt_vht_cap - vht capabalities
  * @vht_max_mpdu: vht max mpdu
  * @supp_chan_width: supported channel width
+ * @vht_supp_mcs: Supported MCS-NSS mapping
  * @vht_rx_ldpc: vht rx ldpc
  * @vht_short_gi_80: vht short gi 80
  * @vht_short_gi_160: vht short gi 160
@@ -166,6 +167,7 @@ struct wma_tgt_ht_cap {
 struct wma_tgt_vht_cap {
 	uint32_t vht_max_mpdu;
 	uint32_t supp_chan_width;
+	uint32_t vht_supp_mcs;
 	uint32_t vht_rx_ldpc;
 	uint32_t vht_short_gi_80;
 	uint32_t vht_short_gi_160;

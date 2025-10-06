@@ -1173,27 +1173,12 @@ lim_decide_short_slot(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	}
 }
 
-static uint8_t lim_get_nss_from_vht_mcs_map(uint16_t mcs_map)
-{
-	uint8_t nss = 0;
-	uint16_t mcs_mask = 0x3;
-
-	for (nss = 0; nss < VHT_MAX_NSS; nss++) {
-		if ((mcs_map & mcs_mask) ==  mcs_mask)
-			return nss;
-
-		mcs_mask = (mcs_mask << 2);
-	}
-
-	return nss;
-}
-
 static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 				 struct sDphHashNode *sta_ds,
 				 tDot11fIEVHTCaps *vht_caps,
 				 struct pe_session *session)
 {
-	uint8_t nss;
+	uint8_t tx_nss, rx_nss;
 
 	if (!vht_caps->vht_extended_nss_bw_cap) {
 		sta_ds->vht_160mhz_nss = 0;
@@ -1203,53 +1188,54 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 		return;
 	}
 
-	nss = lim_get_nss_from_vht_mcs_map(vht_caps->rxMCSMap);
-
-	if (!nss) {
-		pe_debug("Invalid peer VHT MCS map %0X", vht_caps->rxMCSMap);
-		nss = 1;
+	if (!sta_ds) {
+		/* As this is peer rates, take Tx nss for self Rx NSS
+		 * and vice-versa
+		 */
+		lim_extract_vht_caps_txrx_nss(vht_caps, &rx_nss, &tx_nss);
+	} else {
+		tx_nss = sta_ds->cap_tx_nss;
+		rx_nss = sta_ds->cap_rx_nss;
 	}
 
 	switch (vht_caps->supportedChannelWidthSet) {
 	case VHT_CAP_NO_160M_SUPP:
 		if (vht_caps->extended_nss_bw_supp ==
 		    VHT_EXTD_NSS_80_HALF_NSS_160) {
-			sta_ds->vht_160mhz_nss = nss / 2;
+			sta_ds->vht_160mhz_nss = tx_nss / 2;
 			sta_ds->vht_80p80mhz_nss = 0;
 		} else if (vht_caps->extended_nss_bw_supp ==
 			   VHT_EXTD_NSS_80_HALF_NSS_80P80) {
-			sta_ds->vht_160mhz_nss = nss / 2;
-			sta_ds->vht_80p80mhz_nss = nss / 2;
+			sta_ds->vht_160mhz_nss = tx_nss / 2;
+			sta_ds->vht_80p80mhz_nss = tx_nss / 2;
 		} else if (vht_caps->extended_nss_bw_supp ==
 			   VHT_EXTD_NSS_80_3QUART_NSS_80P80) {
-			sta_ds->vht_160mhz_nss = (nss * 3) / 4;
-			sta_ds->vht_80p80mhz_nss = (nss * 3) / 4;
+			sta_ds->vht_160mhz_nss = (tx_nss * 3) / 4;
+			sta_ds->vht_80p80mhz_nss = (tx_nss * 3) / 4;
 		} else {
 			sta_ds->vht_160mhz_nss = 0;
 			sta_ds->vht_80p80mhz_nss = 0;
 		}
 		break;
 	case VHT_CAP_160_SUPP:
-		sta_ds->vht_160mhz_nss = nss;
+		sta_ds->vht_160mhz_nss = tx_nss;
 		if (vht_caps->extended_nss_bw_supp ==
 		    VHT_EXTD_NSS_160_HALF_NSS_80P80) {
-			sta_ds->vht_80p80mhz_nss = nss / 2;
+			sta_ds->vht_80p80mhz_nss = tx_nss / 2;
 		} else if (vht_caps->extended_nss_bw_supp ==
 			   VHT_EXTD_NSS_160_3QUART_NSS_80P80) {
-			sta_ds->vht_80p80mhz_nss = (nss * 3) / 4;
+			sta_ds->vht_80p80mhz_nss = (tx_nss * 3) / 4;
 		} else if (vht_caps->extended_nss_bw_supp ==
 			   VHT_EXTD_NSS_2X_NSS_160_1X_NSS_80P80) {
-			if (nss > (VHT_MAX_NSS / 2)) {
+			if (tx_nss > (session->cap_tx_nss / 2)) {
 				pe_debug("Invalid extnd nss bw support val");
-				sta_ds->vht_80p80mhz_nss = nss / 2;
+				sta_ds->vht_80p80mhz_nss = tx_nss / 2;
 				break;
 			}
-			sta_ds->vht_160mhz_nss = nss * 2;
-			if (session->cap_tx_nss == WLAN_MAX_VDEV_NSS)
+			sta_ds->vht_160mhz_nss = tx_nss * 2;
+			if (session->cap_tx_nss == WLAN_MAX_VDEV_NSS ||
+			    !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo)
 				break;
-			if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo)
-				break;
-			session->cap_tx_nss *= 2;
 		} else {
 			sta_ds->vht_80p80mhz_nss = 0;
 		}
@@ -1257,18 +1243,16 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 	case VHT_CAP_160_AND_80P80_SUPP:
 		if (vht_caps->extended_nss_bw_supp ==
 		    VHT_EXTD_NSS_2X_NSS_80_1X_NSS_80P80) {
-			if (nss > (VHT_MAX_NSS / 2)) {
+			if (tx_nss > (session->cap_tx_nss / 2)) {
 				pe_debug("Invalid extnd nss bw support val");
 				break;
 			}
-			if (session->cap_tx_nss == WLAN_MAX_VDEV_NSS)
+			if (session->cap_tx_nss == WLAN_MAX_VDEV_NSS ||
+			    !mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo)
 				break;
-			if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo)
-				break;
-			session->cap_tx_nss *= 2;
 		} else {
-			sta_ds->vht_160mhz_nss = nss;
-			sta_ds->vht_80p80mhz_nss = nss;
+			sta_ds->vht_160mhz_nss = tx_nss;
+			sta_ds->vht_80p80mhz_nss = tx_nss;
 		}
 		break;
 	default:
@@ -1277,10 +1261,6 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 	}
 	pe_debug("AP Nss config: 160MHz: %d, 80P80MHz %d",
 		 sta_ds->vht_160mhz_nss, sta_ds->vht_80p80mhz_nss);
-	sta_ds->vht_160mhz_nss = QDF_MIN(sta_ds->vht_160mhz_nss,
-					 session->cap_tx_nss);
-	sta_ds->vht_80p80mhz_nss = QDF_MIN(sta_ds->vht_80p80mhz_nss,
-					   session->cap_tx_nss);
 	pe_debug("Session Nss config: 160MHz: %d, 80P80MHz %d, session Nss %d",
 		 sta_ds->vht_160mhz_nss, sta_ds->vht_80p80mhz_nss,
 		 session->cap_tx_nss);
@@ -1290,13 +1270,14 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 				    struct supported_rates *rates,
 				    tDot11fIEVHTCaps *peer_vht_caps,
 				    struct pe_session *session_entry,
-				    uint8_t nss,
+				    uint8_t tx_nss, uint8_t rx_nss,
 				    struct sDphHashNode *sta_ds)
 {
 	uint32_t self_sta_dot11mode;
 	uint8_t self_mcs, peer_mcs, idx;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 	enum phy_ch_width ch_width;
+	bool vht20_mcs9_unsupported;
 
 	self_sta_dot11mode = mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
 	if (!IS_DOT11_MODE_VHT(self_sta_dot11mode))
@@ -1310,18 +1291,14 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 	vht_cap_info = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
 
 	rates->vhtRxMCSMap = (uint16_t)(vht_cap_info->rx_mcs_map |
-					VHT_DISABLE_MCS_OVER_NSS(nss));
+					VHT_DISABLE_MCS_OVER_NSS(rx_nss));
 	rates->vhtTxMCSMap = (uint16_t)(vht_cap_info->tx_mcs_map |
-					VHT_DISABLE_MCS_OVER_NSS(nss));
+					VHT_DISABLE_MCS_OVER_NSS(tx_nss));
 
-	for (idx = NSS_1x1_MODE; idx <= nss; idx++) {
-		bool vht20_mcs9_unsupported =
-				ch_width == CH_WIDTH_20MHZ &&
-				!vht_cap_info->enable_vht20_mcs9;
-
+	vht20_mcs9_unsupported = ch_width == CH_WIDTH_20MHZ &&
+				 !vht_cap_info->enable_vht20_mcs9;
+	for (idx = NSS_1x1_MODE; idx <= tx_nss; idx++) {
 		/* Unset the NSS not supported by peer */
-		if (!VHT_MCS_IS_NSS_ENABLED(peer_vht_caps->txMCSMap, idx))
-			VHT_CLEAR_MCS_FOR_NSS(rates->vhtRxMCSMap, idx);
 		if (!VHT_MCS_IS_NSS_ENABLED(peer_vht_caps->rxMCSMap, idx))
 			VHT_CLEAR_MCS_FOR_NSS(rates->vhtTxMCSMap, idx);
 
@@ -1329,16 +1306,6 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 		 * Intersect the MCS value supported by peer and self
 		 * for both Tx/Rx.
 		 */
-		self_mcs = VHT_GET_MCS_FOR_NSS(rates->vhtRxMCSMap, idx);
-		peer_mcs = VHT_GET_MCS_FOR_NSS(peer_vht_caps->txMCSMap, idx);
-		if (self_mcs != VHT_MCS_DISABLE) {
-			if (vht20_mcs9_unsupported && peer_mcs == VHT_MCS_0_9)
-				peer_mcs = VHT_MCS_0_8;
-			if (peer_mcs < self_mcs)
-				VHT_SET_MCS_FOR_NSS(rates->vhtRxMCSMap,
-						    peer_mcs, idx);
-		}
-
 		self_mcs = VHT_GET_MCS_FOR_NSS(rates->vhtTxMCSMap, idx);
 		peer_mcs = VHT_GET_MCS_FOR_NSS(peer_vht_caps->rxMCSMap, idx);
 		if (self_mcs != VHT_MCS_DISABLE) {
@@ -1350,15 +1317,30 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 		}
 	}
 
+	for (idx = NSS_1x1_MODE; idx <= rx_nss; idx++) {
+		if (!VHT_MCS_IS_NSS_ENABLED(peer_vht_caps->txMCSMap, idx))
+			VHT_CLEAR_MCS_FOR_NSS(rates->vhtRxMCSMap, idx);
+
+		self_mcs = VHT_GET_MCS_FOR_NSS(rates->vhtRxMCSMap, idx);
+		peer_mcs = VHT_GET_MCS_FOR_NSS(peer_vht_caps->txMCSMap, idx);
+		if (self_mcs != VHT_MCS_DISABLE) {
+			if (vht20_mcs9_unsupported && peer_mcs == VHT_MCS_0_9)
+				peer_mcs = VHT_MCS_0_8;
+			if (peer_mcs < self_mcs)
+				VHT_SET_MCS_FOR_NSS(rates->vhtRxMCSMap,
+						    peer_mcs, idx);
+		}
+	}
+
 	/* Fill the supported Tx/Rx data rate based on current NSS */
-	if (peer_vht_caps->txSupDataRate)
-		rates->vhtTxHighestDataRate =
-			QDF_MIN(VHT_GET_DATARATE_FOR_NSS_AND_GI(nss, true),
-				peer_vht_caps->txSupDataRate);
 	if (peer_vht_caps->rxHighSupDataRate)
-		rates->vhtRxHighestDataRate =
-			QDF_MIN(VHT_GET_DATARATE_FOR_NSS_AND_GI(nss, true),
+		rates->vhtTxHighestDataRate =
+			QDF_MIN(VHT_GET_DATARATE_FOR_NSS_AND_GI(tx_nss, true),
 				peer_vht_caps->rxHighSupDataRate);
+	if (peer_vht_caps->txSupDataRate)
+		rates->vhtRxHighestDataRate =
+			QDF_MIN(VHT_GET_DATARATE_FOR_NSS_AND_GI(rx_nss, true),
+				peer_vht_caps->txSupDataRate);
 
 	pe_debug("RxMCSMap %x TxMCSMap %x", rates->vhtRxMCSMap,
 		 rates->vhtTxMCSMap);
@@ -1755,7 +1737,8 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 			((pRates->supportedMCSSet[1] != 0) ? false : true);
 	}
 	lim_populate_vht_mcs_set(mac, pRates, pVHTCaps, pe_session,
-				 pe_session->cap_tx_nss, sta_ds);
+				 pe_session->cap_tx_nss, pe_session->cap_rx_nss,
+				 sta_ds);
 
 	if (lim_check_valid_mcs_for_nss(pe_session, he_caps)) {
 		peer_he_caps = he_caps;
@@ -2015,7 +1998,7 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 	}
 	lim_populate_vht_mcs_set(mac_ctx, &sta_ds->supportedRates, vht_caps,
 				 session_entry, session_entry->cap_tx_nss,
-				 sta_ds);
+				 session_entry->cap_rx_nss, sta_ds);
 	lim_populate_he_mcs_set(mac_ctx, &sta_ds->supportedRates, he_caps,
 				session_entry, session_entry->cap_tx_nss);
 	lim_populate_eht_mcs_set(mac_ctx, &sta_ds->supportedRates, eht_caps,

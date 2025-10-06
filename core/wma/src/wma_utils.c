@@ -4015,10 +4015,9 @@ void wma_update_intf_hw_mode_params(uint32_t vdev_id, uint32_t mac_id,
  */
 uint32_t wma_get_vht_ch_width(void)
 {
-	uint32_t fw_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+	uint32_t vht_cap_info, fw_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
 	tp_wma_handle wm_hdl = cds_get_context(QDF_MODULE_ID_WMA);
 	struct target_psoc_info *tgt_hdl;
-	int vht_cap_info;
 
 	if (!wm_hdl)
 		return fw_ch_wd;
