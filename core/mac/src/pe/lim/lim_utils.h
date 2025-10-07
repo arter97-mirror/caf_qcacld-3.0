@@ -3631,17 +3631,6 @@ lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
 				qdf_freq_t end_freq);
 
 /**
- * @ch_width: phy channel width
- *
- * Convert the current PHY channel width to VHT speicifc BW. 320MHz is not
- * supported in VHT so return 160MHz for 320MHz input.
- *
- * Return: phy chwidth
- */
-uint8_t
-lim_convert_phy_chwidth_to_vht_chwidth(enum phy_ch_width ch_width);
-
-/**
  * lim_update_cu_flag() - Update cu flag in capability information
  * @pcap_info: pointer to return capability information
  * @pe_session: pointer to pe session

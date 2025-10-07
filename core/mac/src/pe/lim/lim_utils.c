@@ -12373,23 +12373,6 @@ next:
 	return NULL;
 }
 
-uint8_t lim_convert_phy_chwidth_to_vht_chwidth(enum phy_ch_width ch_width)
-{
-	switch (ch_width) {
-	case CH_WIDTH_80P80MHZ:
-		return WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
-	case CH_WIDTH_320MHZ:
-	case CH_WIDTH_160MHZ:
-		return WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
-	case CH_WIDTH_80MHZ:
-		return WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
-	case CH_WIDTH_40MHZ:
-	case CH_WIDTH_20MHZ:
-	default:
-		return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
-	}
-}
-
 void
 lim_configure_fd_for_existing_6ghz_sap(struct pe_session *session,
 				       bool is_sap_starting)
