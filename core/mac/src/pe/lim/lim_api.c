@@ -4097,6 +4097,11 @@ void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
+	if (ch_width >= CH_WIDTH_INVALID) {
+		pe_debug("Invalid ch width %d", ch_width);
+		return;
+	}
+
 	mlme_priv->connect_info.assoc_chan_info.omn_ie_ch_width = ch_width;
 }
 

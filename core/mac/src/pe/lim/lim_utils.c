@@ -11147,6 +11147,14 @@ void lim_overwrite_sta_puncture(struct pe_session *session,
 {
 	uint16_t new_punc = 0;
 
+	if (LIM_IS_AP_ROLE(session) && !session->ch_switch_in_progress) {
+		pe_debug("session puncture orig 0x%x, update from reg domain 0x%x",
+			 session->puncture_bitmap,
+			 ch_param->reg_punc_bitmap);
+
+		session->puncture_bitmap = ch_param->reg_punc_bitmap;
+	}
+
 	wlan_reg_extract_puncture_by_bw(session->ch_width,
 					session->puncture_bitmap,
 					session->curr_op_freq,
