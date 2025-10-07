@@ -181,6 +181,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	bool is_band_2g;
 	uint16_t mlo_ie_len = 0;
 	tSirMacAddr bcast_mac = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+	enum rateid min_rid;
 
 	if (!pesession)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -475,12 +476,14 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	    (QDF_P2P_CLIENT_MODE == pesession->opmode))
 		txflag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
 
+	min_rid = lim_get_min_session_txrate(pesession, NULL);
+
 	qdf_status =
 		wma_tx_frame(mac_ctx, packet,
 			   (uint16_t) sizeof(tSirMacMgmtHdr) + payload,
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 			   lim_tx_complete, frame, txflag, vdev_id,
-			   0, RATEID_DEFAULT, 0);
+			   0, min_rid, 0);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		pe_err("could not send Probe Request frame!");
 		/* Pkt will be freed up by the callback */
