@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -420,7 +420,8 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 					frame_len,
 					mac_ctx->lim.bss_rssi);
 
-	if (mlo_is_mld_sta(session_entry->vdev)) {
+	if (mlo_is_mld_sta(session_entry->vdev) &&
+	    wlan_cm_is_vdev_connected(session_entry->vdev)) {
 		cu_flag = false;
 		status = lim_get_bpcc_from_mlo_ie(probe_rsp, &bpcc);
 		if (QDF_IS_STATUS_SUCCESS(status)) {
