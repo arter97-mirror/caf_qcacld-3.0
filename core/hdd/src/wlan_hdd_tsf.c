@@ -53,7 +53,7 @@
 #endif
 /* unit for target time: us;  host time: ns */
 #define HOST_TO_TARGET_TIME_RATIO NSEC_PER_USEC
-#define MAX_ALLOWED_DEVIATION_NS (100 * NSEC_PER_USEC)
+#define MAX_ALLOWED_DRIFT_PER_SEC_IN_US 50
 #define MAX_CONTINUOUS_ERROR_CNT 3
 
 /* to distinguish 32-bit overflow case, this interval should:
@@ -1718,6 +1718,51 @@ static QDF_STATUS hdd_tsf_set_gpio(struct hdd_context *hdd_ctx)
 }
 #endif
 
+static inline bool hdd_check_time_drift(uint64_t last_target_time,
+					uint64_t last_sync_time,
+					uint64_t cur_target_time,
+					uint64_t cur_sync_time,
+					uint32_t threshold_ppm)
+{
+	uint64_t target_elapsed, sync_elapsed;
+	int64_t drift_scaled;
+	uint64_t drift_abs;
+	bool is_within_threshold;
+	const u64 SCALE_FACTOR = 1000000; // since ppm is in microseconds
+
+	target_elapsed = cur_target_time - last_target_time;
+	sync_elapsed = (cur_sync_time - last_sync_time) / 1000;
+
+	/*
+	 * Consider drift calculation if last sync time is within 10sec
+	 * from current sync.
+	 */
+	if (sync_elapsed > SCALE_FACTOR * 10) {
+		hdd_debug("skip validation - recent time sync is outdated");
+		return true;
+	}
+	/*
+	 * Compute the relative drift between host and TSF elapsed times.
+	 * Drift = abs((target_elapsed_us-sync_elapsed_us)/sync_elapsed_us),
+	 * equivalently: abs(target_elapsed_us/sync_elapsed_us-1).
+	 * This yields a fractional (unitless) drift. Multiply by SCALE_FACTOR
+	 * to express the drift in microseconds.
+	 */
+	drift_scaled = qdf_do_div((target_elapsed * SCALE_FACTOR),
+				  sync_elapsed) - SCALE_FACTOR;
+
+	drift_abs = (drift_scaled < 0) ? -drift_scaled : drift_scaled;
+
+	is_within_threshold = (drift_abs <= threshold_ppm);
+
+	hdd_debug("time_drift: %llu ppm (threshold: %u ppm) - %s\n",
+		  drift_abs, threshold_ppm,
+		  is_within_threshold ?
+		  "WITHIN THRESHOLD" : "EXCEEDS THRESHOLD");
+
+	return is_within_threshold;
+}
+
 /**
  * hdd_check_timestamp_status() - return the tstamp status
  * @last_target_time: the last saved target time
@@ -1742,7 +1787,7 @@ enum hdd_ts_status hdd_check_timestamp_status(uint64_t last_target_time,
 					      uint64_t cur_sync_time,
 					      bool force_sync)
 {
-	uint64_t delta_ns, delta_target_time, delta_sync_time;
+	bool is_valid;
 
 	/* one or more are not updated, need to wait */
 	if (cur_target_time == 0 || cur_sync_time == 0)
@@ -1763,21 +1808,12 @@ enum hdd_ts_status hdd_check_timestamp_status(uint64_t last_target_time,
 		return HDD_TS_STATUS_INVALID;
 	}
 
-	delta_target_time = (cur_target_time - last_target_time) *
-						NSEC_PER_USEC;
-	delta_sync_time = cur_sync_time - last_sync_time;
-
-	/*
-	 * DO NOT use abs64() , a big uint64 value might be turned to
-	 * a small int64 value
-	 */
-	delta_ns = ((delta_target_time > delta_sync_time) ?
-			(delta_target_time - delta_sync_time) :
-			(delta_sync_time - delta_target_time));
-	hdd_debug("timestamps deviation - delta: %llu ns", delta_ns);
 	/* the deviation should be smaller than a threshold */
-	if (!force_sync && delta_ns > MAX_ALLOWED_DEVIATION_NS) {
-		hdd_debug("Invalid timestamps - delta: %llu ns", delta_ns);
+	is_valid = hdd_check_time_drift(last_target_time, last_sync_time,
+					cur_target_time, cur_sync_time,
+					MAX_ALLOWED_DRIFT_PER_SEC_IN_US);
+	if (!force_sync && !is_valid) {
+		hdd_debug("Invalid timestamps");
 		return HDD_TS_STATUS_INVALID;
 	}
 	return HDD_TS_STATUS_READY;
@@ -1817,10 +1853,6 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter)
 					     tsf->cur_target_time,
 					     tsf->cur_tsf_sync_soc_time,
 					     tsf->host_target_sync_force);
-	if (sync_status == HDD_TS_STATUS_INVALID &&
-	    !hdd_get_th_sync_status(adapter))
-		sync_status = HDD_TS_STATUS_READY;
-
 	if (tsf->host_target_sync_force)
 		tsf->host_target_sync_force = false;
 
@@ -2451,7 +2483,6 @@ static void hdd_capture_tsf_timer_expired_handler(void *arg)
 
 static enum hdd_tsf_op_result hdd_tsf_sync_init(struct hdd_adapter *adapter)
 {
-	QDF_STATUS ret;
 	struct hdd_context *hddctx;
 	struct net_device *net_dev;
 	uint64_t host_time, qtime;
@@ -2492,15 +2523,6 @@ static enum hdd_tsf_op_result hdd_tsf_sync_init(struct hdd_adapter *adapter)
 		return HDD_TSF_OP_SUCC;
 	}
 
-	ret = qdf_mc_timer_init(&adapter->tsf.host_target_sync_timer,
-				QDF_TIMER_TYPE_SW,
-				hdd_capture_tsf_timer_expired_handler,
-				(void *)adapter);
-	if (ret != QDF_STATUS_SUCCESS) {
-		hdd_err("Failed to init target timer, ret: %d", ret);
-		goto fail;
-	}
-
 	hdd_tsf_regular_gpio_pulse_init(adapter);
 
 	net_dev = adapter->dev;
@@ -2509,14 +2531,10 @@ static enum hdd_tsf_op_result hdd_tsf_sync_init(struct hdd_adapter *adapter)
 	hdd_set_th_sync_status(adapter, true);
 
 	return HDD_TSF_OP_SUCC;
-fail:
-	hdd_set_th_sync_status(adapter, false);
-	return HDD_TSF_OP_FAIL;
 }
 
 static enum hdd_tsf_op_result hdd_tsf_sync_deinit(struct hdd_adapter *adapter)
 {
-	QDF_STATUS ret;
 	struct hdd_context *hddctx;
 	struct net_device *net_dev;
 
@@ -2533,10 +2551,6 @@ static enum hdd_tsf_op_result hdd_tsf_sync_deinit(struct hdd_adapter *adapter)
 	hdd_set_th_sync_status(adapter, false);
 
 	hdd_tsf_regular_gpio_pulse_deinit(adapter);
-
-	ret = qdf_mc_timer_destroy(&adapter->tsf.host_target_sync_timer);
-	if (ret != QDF_STATUS_SUCCESS)
-		hdd_err("Failed to destroy target timer, ret: %d", ret);
 
 	hddctx = WLAN_HDD_GET_CTX(adapter);
 
@@ -2612,6 +2626,10 @@ int hdd_reset_tsf_sync(struct hdd_adapter *adapter)
 	if (ret)
 		hdd_err("Failed to stop tsf sync, ret: %d", ret);
 
+	ret = qdf_mc_timer_destroy(&adapter->tsf.host_target_sync_timer);
+	if (ret != QDF_STATUS_SUCCESS)
+		hdd_err("Failed to destroy target timer, ret: %d", ret);
+
 	ret = qdf_mc_timer_stop(&adapter->tsf.host_capture_req_timer);
 	if (ret != QDF_STATUS_SUCCESS)
 		hdd_err("Failed to stop capture timer, ret: %d", ret);
@@ -2665,9 +2683,12 @@ int hdd_setup_tsf_sync(struct hdd_adapter *adapter)
 	if (adapter->tsf.tsf_capture_initialized)
 		return 0;
 
-	ret =  hdd_start_tsf_sync(adapter);
+	ret = qdf_mc_timer_init(&adapter->tsf.host_target_sync_timer,
+				QDF_TIMER_TYPE_SW,
+				hdd_capture_tsf_timer_expired_handler,
+				(void *)adapter);
 	if (ret != QDF_STATUS_SUCCESS) {
-		hdd_err("Failed to init capture timer, ret: %d", ret);
+		hdd_err("Failed to init target timer, ret: %d", ret);
 		return ret;
 	}
 
@@ -2677,7 +2698,16 @@ int hdd_setup_tsf_sync(struct hdd_adapter *adapter)
 				(void *)adapter);
 	if (ret != QDF_STATUS_SUCCESS) {
 		hdd_err("Failed to init capture timer, ret: %d", ret);
-		hdd_stop_tsf_sync(adapter);
+		qdf_mc_timer_destroy(&adapter->tsf.host_target_sync_timer);
+		return ret;
+	}
+
+	ret = hdd_start_tsf_sync(adapter);
+	if (ret != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to start tsf sync, ret: %d", ret);
+		qdf_mc_timer_destroy(&adapter->tsf.host_capture_req_timer);
+		qdf_mc_timer_destroy(&adapter->tsf.host_target_sync_timer);
+		return ret;
 	}
 
 	adapter->tsf.tsf_capture_initialized = true;
