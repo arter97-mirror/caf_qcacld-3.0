@@ -5742,4 +5742,64 @@ QDF_STATUS wlan_mlme_send_mlo_sap_link_removal_cmd(struct wlan_objmgr_vdev *vdev
 						   const uint8_t *ie,
 						   size_t elem_len);
 #endif
+
+#if defined(SAP_PERF_TUNING)
+/**
+ * wlan_mlme_get_sap_perf_tuning_enabled() - query current
+ * SAP perf tuning support.
+ * @psoc: pointer to psoc
+ *
+ * Return: true if perf tuning is enabled for SAP.
+ */
+bool
+wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_sap_perf_tuning_enabled() - Update SAP perf tuning support.
+ * @psoc: pointer to psoc
+ * @sap_perf_tuning_enable: Updated value of perf_tuning_enable
+ *
+ * Return: QDF_SUCCESS on success and any other status for failure.
+ */
+QDF_STATUS
+wlan_mlme_set_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc,
+				      bool sap_perf_tuning_enable);
+
+/**
+ * wlan_mlme_get_sap_perf_tuning_serv_cap() - Get SAP perf tuning support
+ * based on service capability bit.
+ * @psoc: pointer to psoc
+ *
+ * Return: service capability flag for SAP Performance tuning feature.
+ */
+bool
+wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_sap_perf_data_threshold() - query current SAP perf data
+ * threshold.
+ * @psoc: pointer to psoc
+ *
+ * Return: SAP performance data threshold.
+ */
+uint32_t
+wlan_mlme_get_sap_perf_data_threshold(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_sap_traffic_monitoring_time_s() - query current SAP traffic
+ * monitoring time in unit of sec.
+ * @psoc: pointer to psoc
+ *
+ * Return: SAP traffic monitoring time in second.
+ */
+uint32_t
+wlan_mlme_get_sap_traffic_monitoring_time_s(struct wlan_objmgr_psoc *psoc);
+#else
+inline bool
+wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc);
+
+inline bool
+wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc);
+#endif
+
 #endif /* _WLAN_MLME_API_H_ */
