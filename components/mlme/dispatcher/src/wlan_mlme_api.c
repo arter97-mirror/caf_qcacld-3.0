@@ -9770,3 +9770,91 @@ QDF_STATUS wlan_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *p
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#if defined(SAP_PERF_TUNING)
+bool
+wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_SAP_PERF_TUNING_ENABLE);
+	}
+
+	mlme_debug("sap_perf_tuning_enable %d",
+		   mlme_obj->cfg.gen.sap_perf_tuning_enable);
+
+	return mlme_obj->cfg.gen.sap_perf_tuning_enable;
+}
+
+QDF_STATUS
+wlan_mlme_set_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc,
+				      bool sap_perf_tuning_enable)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return QDF_STATUS_E_INVAL;
+	}
+	mlme_obj->cfg.gen.sap_perf_tuning_enable = sap_perf_tuning_enable;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint32_t
+wlan_mlme_get_sap_perf_data_threshold(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_SAP_PERF_DATA_THRESHOLD);
+	}
+
+	mlme_debug("sap_perf_data_threshold %u",
+		   mlme_obj->cfg.gen.sap_perf_data_threshold);
+
+	return mlme_obj->cfg.gen.sap_perf_data_threshold;
+}
+
+uint32_t
+wlan_mlme_get_sap_traffic_monitoring_time_s(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_SAP_TRAFFIC_MONITORING_TIME_S);
+	}
+
+	mlme_debug("sap_traffic_monitoring_time_s %u",
+		   mlme_obj->cfg.gen.sap_traffic_monitoring_time_s);
+
+	return mlme_obj->cfg.gen.sap_traffic_monitoring_time_s;
+}
+
+bool
+wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc)
+{
+	return wma_get_sap_perf_tuning_enabled(
+		get_wmi_unified_hdl_from_psoc(psoc));
+}
+#else
+inline bool
+wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+inline bool
+wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
