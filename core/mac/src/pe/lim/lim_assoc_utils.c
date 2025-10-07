@@ -2395,6 +2395,15 @@ lim_add_sta(struct mac_context *mac_ctx,
 	add_sta_params->ch_width = sta_ds->ch_width;
 	add_sta_params->mimoPS = sta_ds->htMIMOPSState;
 
+	add_sta_params->self_cap_tx_nss =
+			QDF_MAX(sta_ds->cap_tx_nss, NSS_1x1_MODE);
+	add_sta_params->self_cap_rx_nss =
+			QDF_MAX(sta_ds->cap_rx_nss, NSS_1x1_MODE);
+	add_sta_params->self_op_tx_nss =
+			QDF_MAX(sta_ds->op_tx_nss, NSS_1x1_MODE);
+	add_sta_params->self_op_rx_nss =
+			QDF_MAX(sta_ds->op_rx_nss, NSS_1x1_MODE);
+
 	if (add_sta_params->vhtCapable) {
 		if (sta_ds->vhtSupportedChannelWidthSet)
 			add_sta_params->ch_width =
@@ -4226,6 +4235,15 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 	lim_intersect_ap_emlsr_caps(mac, pe_session, pAddBssParams, pAssocRsp);
 	lim_extract_msd_caps(mac, pe_session, pAddBssParams, pAssocRsp);
 	lim_extract_ext_mld_caps(mac, pe_session, pAddBssParams, pAssocRsp);
+
+	pAddBssParams->staContext.self_cap_tx_nss =
+			QDF_MAX(sta->cap_tx_nss, NSS_1x1_MODE);
+	pAddBssParams->staContext.self_cap_rx_nss =
+			QDF_MAX(sta->cap_rx_nss, NSS_1x1_MODE);
+	pAddBssParams->staContext.self_op_tx_nss =
+			QDF_MAX(sta->op_tx_nss, NSS_1x1_MODE);
+	pAddBssParams->staContext.self_op_rx_nss =
+			QDF_MAX(sta->op_rx_nss, NSS_1x1_MODE);
 
 	pAddBssParams->staContext.smesessionId = pe_session->smeSessionId;
 	pAddBssParams->staContext.wpa_rsn =
