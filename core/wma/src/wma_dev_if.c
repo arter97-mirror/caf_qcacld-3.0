@@ -2824,6 +2824,7 @@ wma_delete_peer_on_vdev_stop(tp_wma_handle wma, uint8_t vdev_id)
 	struct wma_txrx_node *iface;
 	QDF_STATUS status;
 	struct qdf_mac_addr bssid;
+	struct wlan_objmgr_vdev *vdev;
 
 	iface = &wma->interfaces[vdev_id];
 	status = wlan_vdev_get_bss_peer_mac(iface->vdev, &bssid);
@@ -2858,9 +2859,17 @@ wma_delete_peer_on_vdev_stop(tp_wma_handle wma, uint8_t vdev_id)
 	    vdev_stop_type == WMA_SET_LINK_STATE) {
 		uint8_t type;
 
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, vdev_id,
+							    WLAN_LEGACY_WMA_ID);
+
 		/* CCA is required only for sta interface */
-		if (iface->type == WMI_VDEV_TYPE_STA)
+		if (iface->type == WMI_VDEV_TYPE_STA &&
+		    !wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev))
 			wma_get_cca_stats(wma, vdev_id);
+
+		if (vdev)
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+
 		if (vdev_stop_type == WMA_DELETE_BSS_REQ)
 			type = WMA_DELETE_PEER_RSP;
 		else
