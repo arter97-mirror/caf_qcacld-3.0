@@ -1654,11 +1654,7 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 		pe_err("more than SIR_MAC_MAX_NUMBER_OF_RATES rates");
 		return QDF_STATUS_E_FAILURE;
 	}
-	if ((pe_session->dot11mode == MLME_DOT11_MODE_11G) ||
-		(pe_session->dot11mode == MLME_DOT11_MODE_11A) ||
-		(pe_session->dot11mode == MLME_DOT11_MODE_11AC) ||
-		(pe_session->dot11mode == MLME_DOT11_MODE_11N) ||
-		(pe_session->dot11mode == MLME_DOT11_MODE_11AX)) {
+	if (pe_session->dot11mode != MLME_DOT11_MODE_11B) {
 		if (pe_session->extRateSet.numRates <=
 		    SIR_MAC_MAX_NUMBER_OF_RATES) {
 			qdf_mem_copy((uint8_t *) tempRateSet2.rate,
@@ -1732,7 +1728,7 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 				   pRates->llbRates[bRateIndex - 1])) {
 				pe_debug("Duplicate 11b rate: %d",
 					 tempRateSet.rate[min]);
-			} else {
+			} else if (!pe_session->is_oui_auth_assoc_6mbps_2ghz_enable) {
 				pRates->llbRates[bRateIndex++] =
 						tempRateSet.rate[min];
 			}
