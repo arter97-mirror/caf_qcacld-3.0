@@ -1975,20 +1975,25 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	qdf_mem_copy(cmd->peer_ht_rates.rates, peer_ht_rates.rates,
 				 peer_ht_rates.num_rates);
 
-	/* VHT Rates */
+	/* Send non-zero max peer tx nss to FW when this field is not filled */
+	cmd->peer_supp_tx_nss =
+	    params->bcn_tx_nss ? params->bcn_tx_nss : params->self_cap_rx_nss;
 
-	cmd->peer_nss = peer_nss;
+	cmd->peer_cap_ul_nss = params->self_cap_rx_nss;
+	cmd->peer_op_dl_nss = params->self_op_tx_nss;
+
 	/*
+	 * VHT _Rates:
 	 * Because of DBS a vdev may come up in any of the two MACs with
 	 * different capabilities. STBC capab should be fetched for given
 	 * hard_mode->MAC_id combo. It is planned that firmware should provide
 	 * these dev capabilities. But for now number of tx streams can be used
 	 * to identify if Tx STBC needs to be disabled.
 	 */
-	if (intr->tx_streams < 2) {
+	if (params->self_op_tx_nss < NSS_2x2_MODE) {
 		cmd->peer_vht_caps &= ~(1 << SIR_MAC_VHT_CAP_TXSTBC);
 		wma_nofl_debug("Num tx_streams: %d, Disabled txSTBC",
-			       intr->tx_streams);
+			       params->self_op_tx_nss);
 	}
 
 	cmd->vht_capable = params->vhtCapable;
@@ -2000,8 +2005,9 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 		cmd->tx_mcs_set = params->supportedRates.vhtTxMCSMap;
 
 		if (params->vht_mcs_10_11_supp) {
-			WMI_SET_BITS(cmd->tx_mcs_set, 16, cmd->peer_nss,
-				     ((1 << cmd->peer_nss) - 1));
+			WMI_SET_BITS(cmd->tx_mcs_set, 16,
+				     params->self_cap_tx_nss,
+				     (BIT(params->self_cap_tx_nss) - 1));
 			WMI_VHT_MCS_NOTIFY_EXT_SS_SET(cmd->tx_mcs_set, 1);
 		}
 		if (params->vht_extended_nss_bw_cap &&
@@ -2039,10 +2045,10 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	 * Otherwise Fw will crash
 	 */
 	wlan_mlme_get_vht_mimo_cap(mac->psoc, &enable_mimo);
-	if (cmd->peer_nss > enable_mimo + 1) {
+	if (cmd->peer_op_dl_nss > enable_mimo + 1) {
 		wma_err("peer Nss %d is more than supported %d",
-			cmd->peer_nss, enable_mimo + 1);
-		cmd->peer_nss = enable_mimo + 1;
+			cmd->peer_op_dl_nss, enable_mimo + 1);
+		cmd->peer_op_dl_nss = enable_mimo + 1;
 	}
 
 	wma_populate_peer_he_cap(cmd, params);
@@ -2051,15 +2057,11 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	wma_populate_peer_mlo_cap(cmd, params);
 
 	if (!wma_is_vdev_in_ap_mode(wma, params->smesessionId))
-		intr->nss = cmd->peer_nss;
-	wma_objmgr_set_peer_mlme_nss(wma, cmd->peer_mac, cmd->peer_nss);
+		intr->nss = cmd->peer_op_dl_nss;
+	wma_objmgr_set_peer_mlme_nss(wma, cmd->peer_mac, cmd->peer_op_dl_nss);
 
 	/* Till conversion is not done in WMI we need to fill fw phy mode */
 	cmd->peer_phymode = wmi_host_to_fw_phymode(phymode);
-
-	/* Send non-zero max peer tx nss to FW when this field is not filled */
-	cmd->peer_max_tx_nss =
-		params->bcn_tx_nss ? params->bcn_tx_nss : cmd->peer_nss;
 
 	cmd->peer_cck_rx_support_5ghz = params->peer_cck_rx_support_5ghz;
 	cmd->peer_cck_tx_support_5ghz = params->peer_cck_tx_support_5ghz;
