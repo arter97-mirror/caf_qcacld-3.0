@@ -5867,7 +5867,9 @@ static void lim_populate_mcs_set_ht_per_vdev(struct mac_context *mac_ctx,
 						      uint8_t vdev_id,
 						      uint8_t band)
 {
-	struct wlan_mlme_nss_chains *nss_chains_ini_cfg;
+	QDF_STATUS status;
+	qdf_freq_t freq;
+	uint8_t tx_nss, rx_nss;
 	struct wlan_objmgr_vdev *vdev =
 			wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 							     vdev_id,
@@ -5876,17 +5878,19 @@ static void lim_populate_mcs_set_ht_per_vdev(struct mac_context *mac_ctx,
 		pe_err("Got NULL vdev obj, returning");
 		return;
 	}
-	if (!ht_cap->supportedMCSSet[1])
-		goto end;
-	nss_chains_ini_cfg = mlme_get_ini_vdev_config(vdev);
-	if (!nss_chains_ini_cfg) {
-		pe_err("nss chain dynamic config NULL");
+
+	freq = (band == NSS_CHAINS_BAND_2GHZ) ? wlan_reg_min_24ghz_chan_freq() :
+						wlan_reg_min_5ghz_chan_freq();
+	status = mlme_get_vdev_nss_by_freq_from_ini(vdev, freq,
+						    &tx_nss, &rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to fetch NSS");
 		goto end;
 	}
 
-	/* convert from unpacked to packed structure */
-	if (nss_chains_ini_cfg->rx_nss[band] == 1)
-		ht_cap->supportedMCSSet[1] = 0;
+	wlan_mlme_set_ht_mcsset_for_nss(mac_ctx->psoc, NULL,
+					ht_cap->supportedMCSSet,
+					tx_nss, rx_nss);
 
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
@@ -5905,10 +5909,11 @@ end:
  */
 static void lim_populate_mcs_set_vht_per_vdev(struct mac_context *mac_ctx,
 					      uint8_t *vht_caps,
-					      uint8_t vdev_id,
-					      uint8_t band)
+					      uint8_t vdev_id, uint8_t band)
 {
-	struct wlan_mlme_nss_chains *nss_chains_ini_cfg;
+	QDF_STATUS status;
+	qdf_freq_t freq;
+	uint8_t tx_nss, rx_nss;
 	tSirVhtMcsInfo *vht_mcs;
 	struct wlan_objmgr_vdev *vdev =
 			wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
@@ -5919,27 +5924,22 @@ static void lim_populate_mcs_set_vht_per_vdev(struct mac_context *mac_ctx,
 		return;
 	}
 
-	nss_chains_ini_cfg = mlme_get_ini_vdev_config(vdev);
-	if (!nss_chains_ini_cfg) {
-		pe_err("nss chain dynamic config NULL");
+	freq = (band == NSS_CHAINS_BAND_2GHZ) ? wlan_reg_min_24ghz_chan_freq() :
+						wlan_reg_min_5ghz_chan_freq();
+	status = mlme_get_vdev_nss_by_freq_from_ini(vdev, freq,
+						    &tx_nss, &rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to fetch NSS");
 		goto end;
 	}
 
 	vht_mcs = (tSirVhtMcsInfo *)&vht_caps[2 +
 					sizeof(tSirMacVHTCapabilityInfo)];
 	/* Populate VHT MCS Information */
-	vht_mcs->txMcsMap |=
-		VHT_DISABLE_MCS_OVER_NSS(nss_chains_ini_cfg->tx_nss[band]);
-	vht_mcs->txHighest =
-		VHT_GET_DATARATE_FOR_NSS_AND_GI(nss_chains_ini_cfg->tx_nss[band],
-						true);
-
-	/* Populate VHT MCS Information */
-	vht_mcs->rxMcsMap |=
-		VHT_DISABLE_MCS_OVER_NSS(nss_chains_ini_cfg->rx_nss[band]);
-	vht_mcs->rxHighest =
-		VHT_GET_DATARATE_FOR_NSS_AND_GI(nss_chains_ini_cfg->rx_nss[band],
-						true);
+	vht_mcs->txMcsMap |= VHT_DISABLE_MCS_OVER_NSS(tx_nss);
+	vht_mcs->txHighest = VHT_GET_DATARATE_FOR_NSS_AND_GI(tx_nss, true);
+	vht_mcs->rxMcsMap |= VHT_DISABLE_MCS_OVER_NSS(rx_nss);
+	vht_mcs->rxHighest = VHT_GET_DATARATE_FOR_NSS_AND_GI(rx_nss, true);
 
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
@@ -7972,15 +7972,37 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
 		     uint32_t num_bytes, uint8_t band, uint8_t vdev_id)
 {
+	QDF_STATUS status;
+	qdf_freq_t freq;
+	uint8_t tx_nss, rx_nss;
 	const uint8_t *ie = NULL;
 	tDot11fIEhe_cap dot11_cap;
 	struct he_capability_info *he_cap;
 	bool is_band_2g = false;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (band == CDS_BAND_2GHZ)
 		is_band_2g = true;
 
 	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_cap, vdev_id);
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev) {
+		pe_debug("Failed to get VDEV %d", vdev_id);
+		return;
+	}
+
+	freq = is_band_2g ? wlan_reg_min_24ghz_chan_freq() :
+			    wlan_reg_min_5ghz_chan_freq();
+	status = mlme_get_vdev_nss_by_freq_from_ini(vdev, freq,
+						    &tx_nss, &rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to fetch NSS %d", vdev_id);
+		goto end;
+	}
+
+	wlan_mlme_set_he_mcsset_for_nss(mac->mlme_cfg, &dot11_cap,
+					tx_nss, rx_nss);
 
 	lim_log_he_cap(mac, &dot11_cap);
 	ie = wlan_get_ext_ie_ptr_from_ext_id(HE_CAP_OUI_TYPE,
@@ -8115,6 +8137,8 @@ void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
 			ie_start[1] += HE_CAP_80P80_MCS_MAP_LEN;
 		}
 	}
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 }
 
 static void lim_intersect_he_ch_width_2g(struct mac_context *mac,
@@ -9237,9 +9261,10 @@ void lim_set_eht_caps(struct mac_context *mac,
 		      uint8_t *ie_start, uint32_t num_bytes, uint8_t band,
 		      uint8_t vdev_id)
 {
+	QDF_STATUS status;
+	qdf_freq_t freq;
 	const uint8_t *ie = NULL;
-	uint8_t offset = 0;
-	uint8_t offset_1 = 0;
+	uint8_t tx_nss, rx_nss, offset = 0, offset_1 = 0;
 	tDot11fIEeht_cap dot11_cap;
 	tDot11fIEhe_cap dot11_he_cap;
 	struct wlan_eht_cap_info *eht_cap;
@@ -9250,6 +9275,24 @@ void lim_set_eht_caps(struct mac_context *mac,
 
 	if (band == CDS_BAND_2GHZ)
 		is_band_2g = true;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev) {
+		pe_debug("Failed to get VDEV %d", vdev_id);
+		return;
+	}
+
+	freq = is_band_2g ? wlan_reg_min_24ghz_chan_freq() :
+			    wlan_reg_min_5ghz_chan_freq();
+	status = mlme_get_vdev_nss_by_freq_from_ini(vdev, freq,
+						    &tx_nss, &rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to fetch NSS %d", vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+		return;
+	}
+	wlan_mlme_set_eht_mcsset_for_nss(&dot11_cap, tx_nss, rx_nss);
 
 	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap, NULL);
 	lim_revise_eht_caps_per_band(mac, band, &dot11_cap);
@@ -9275,15 +9318,10 @@ void lim_set_eht_caps(struct mac_context *mac,
 		/* convert from unpacked to packed structure */
 		eht_cap = (struct wlan_eht_cap_info *)&ie[2 + EHT_CAP_OUI_SIZE];
 
-		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
-							    WLAN_MLME_CM_ID);
 		if (wlan_epcs_get_config(vdev))
 			eht_cap->epcs_pri_access = 1;
 		else
 			eht_cap->epcs_pri_access = 0;
-
-		if (vdev)
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 		eht_cap->eht_om_ctl = dot11_cap.eht_om_ctl;
 		eht_cap->triggered_txop_sharing_mode1 =
@@ -9404,6 +9442,7 @@ void lim_set_eht_caps(struct mac_context *mac,
 				     EHT_CAP_20M_MCS_MAP_LEN);
 			ie_start[1] += EHT_CAP_20M_MCS_MAP_LEN;
 
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 			return;
 		}
 
@@ -9478,6 +9517,8 @@ void lim_set_eht_caps(struct mac_context *mac,
 			ie_start[1] += EHT_CAP_320M_MCS_MAP_LEN;
 		}
 	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 }
 
 QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
