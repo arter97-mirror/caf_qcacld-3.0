@@ -133,7 +133,7 @@ void policy_mgr_hw_mode_transition_cb(uint32_t old_hw_mode_index,
 					    num_mac_freq, mac_freq_range);
 
 	if (pm_ctx->mode_change_cb)
-		pm_ctx->mode_change_cb();
+		pm_ctx->mode_change_cb(true);
 
 	return;
 }

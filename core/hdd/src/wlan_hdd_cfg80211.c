@@ -24267,7 +24267,7 @@ error:
 }
 
 
-int wlan_hdd_send_mode_change_event(void)
+int wlan_hdd_send_mode_change_event(bool is_hwmode_change)
 {
 	int err;
 	struct hdd_context *hdd_ctx;
@@ -28981,7 +28981,7 @@ static int wlan_hdd_add_key_sta(struct wlan_objmgr_pdev *pdev,
 					     key_index, true);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	if (!errno && adapter->send_mode_change) {
-		wlan_hdd_send_mode_change_event();
+		wlan_hdd_send_mode_change_event(false);
 		adapter->send_mode_change = false;
 	}
 

@@ -528,7 +528,7 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 	 * as part of add key for STA and P2P client mode.
 	 */
 	if (pm_ctx->mode_change_cb && update_conn)
-		pm_ctx->mode_change_cb();
+		pm_ctx->mode_change_cb(false);
 
 	if (pm_ctx->cdp_cbacks.cdp_update_mac_id)
 		pm_ctx->cdp_cbacks.cdp_update_mac_id(psoc, vdev_id, mac);
@@ -1045,7 +1045,7 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 					    vdev_mac_map,
 					    hw_mode, 0, NULL);
 	if (pm_ctx->mode_change_cb)
-		pm_ctx->mode_change_cb();
+		pm_ctx->mode_change_cb(true);
 
 	/* Notify tdls */
 	if (pm_ctx->tdls_cbacks.tdls_notify_decrement_session)

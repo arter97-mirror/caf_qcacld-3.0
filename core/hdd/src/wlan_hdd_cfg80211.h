@@ -858,10 +858,11 @@ QDF_STATUS wlan_hdd_flush_pmksa_cache(struct wlan_hdd_link_info *link_info);
 /*
  * wlan_hdd_send_mode_change_event() - API to send hw mode change event to
  * userspace
+ * @is_hwmode_change: True if invoked to due HW mode change event, else false
  *
  * Return : 0 on success and errno on failure
  */
-int wlan_hdd_send_mode_change_event(void);
+int wlan_hdd_send_mode_change_event(bool is_hwmode_change);
 
 /**
  * wlan_hdd_restore_channels() - Restore the channels which were cached

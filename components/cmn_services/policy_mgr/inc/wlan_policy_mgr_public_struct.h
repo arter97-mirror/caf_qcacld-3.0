@@ -85,7 +85,7 @@
 /* Policy manager default request id */
 #define POLICY_MGR_DEF_REQ_ID 0
 
-typedef int (*send_mode_change_event_cb)(void);
+typedef int (*send_mode_change_event_cb)(bool is_hwmode_change);
 
 /**
  * enum sap_csa_reason_code - SAP channel switch reason code
