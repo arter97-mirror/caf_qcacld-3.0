@@ -185,6 +185,77 @@ int find_ie_location(struct mac_context *mac, tpSirRSNie pRsnIe, uint8_t EID)
 	return ret_val;
 }
 
+void lim_extract_nss_from_mcs_ies(struct sir_dot11f_nss_info *mcs_ies)
+{
+	uint8_t idx;
+	uint16_t tx_mcs, rx_mcs;
+	struct s_ext_cap *ext_cap =
+		(struct s_ext_cap *)mcs_ies->ext_caps->bytes;
+	uint8_t cap_tx_nss = NSS_1x1_MODE, cap_rx_nss = NSS_1x1_MODE;
+	uint8_t op_tx_nss  = NSS_1x1_MODE, op_rx_nss  = NSS_1x1_MODE;
+
+	if (IS_DOT11_MODE_EHT(mcs_ies->dot11mode) &&
+	    mcs_ies->eht_caps->present) {
+		if (mcs_ies->eht_caps->bw_le_80_tx_max_nss_for_mcs_0_to_9)
+			cap_tx_nss =
+			  mcs_ies->eht_caps->bw_le_80_tx_max_nss_for_mcs_0_to_9;
+		else if (mcs_ies->eht_caps->bw_20_tx_max_nss_for_mcs_0_to_7)
+			cap_tx_nss =
+			  mcs_ies->eht_caps->bw_20_tx_max_nss_for_mcs_0_to_7;
+
+		if (mcs_ies->eht_caps->bw_le_80_rx_max_nss_for_mcs_0_to_9)
+			cap_rx_nss =
+			  mcs_ies->eht_caps->bw_le_80_rx_max_nss_for_mcs_0_to_9;
+		else if (mcs_ies->eht_caps->bw_20_rx_max_nss_for_mcs_0_to_7)
+			cap_rx_nss =
+			  mcs_ies->eht_caps->bw_20_rx_max_nss_for_mcs_0_to_7;
+	} else if (IS_DOT11_MODE_HE(mcs_ies->dot11mode) &&
+		   mcs_ies->he_caps->present) {
+		tx_mcs = mcs_ies->he_caps->tx_he_mcs_map_lt_80;
+		rx_mcs = mcs_ies->he_caps->rx_he_mcs_map_lt_80;
+		for (idx = NSS_2x2_MODE; idx <= NSS_8x8_MODE; idx++) {
+			if (HE_MCS_IS_NSS_ENABLED(tx_mcs, idx))
+				cap_tx_nss = idx;
+			if (HE_MCS_IS_NSS_ENABLED(rx_mcs, idx))
+				cap_rx_nss = idx;
+		}
+	} else if (IS_DOT11_MODE_VHT(mcs_ies->dot11mode) &&
+		   (mcs_ies->vht_caps->present ||
+		    mcs_ies->vendor_vht_caps->present)) {
+		tDot11fIEVHTCaps *vht_caps =
+			mcs_ies->vht_caps->present ?
+			mcs_ies->vht_caps : &mcs_ies->vendor_vht_caps->VHTCaps;
+
+		lim_extract_vht_caps_txrx_nss(vht_caps,
+					      &cap_tx_nss, &cap_rx_nss);
+	} else if (IS_DOT11_MODE_HT(mcs_ies->dot11mode) &&
+		   mcs_ies->ht_caps->present) {
+		uint8_t *mcs = &mcs_ies->ht_caps->supportedMCSSet[0];
+
+		lim_extract_ht_caps_txrx_nss(mcs, &cap_tx_nss, &cap_rx_nss);
+	} else {
+		mcs_ies->cap_tx_nss = cap_tx_nss;
+		mcs_ies->cap_rx_nss = cap_rx_nss;
+		mcs_ies->op_tx_nss = op_tx_nss;
+		mcs_ies->op_rx_nss = op_rx_nss;
+		return;
+	}
+
+	if (mcs_ies->ext_caps->present && ext_cap->oper_mode_notification &&
+	    mcs_ies->operating_mode->present) {
+		op_rx_nss = mcs_ies->operating_mode->rxNSS + 1;
+		op_tx_nss = op_rx_nss;
+	} else {
+		op_tx_nss = cap_tx_nss;
+		op_rx_nss = cap_rx_nss;
+	}
+
+	mcs_ies->cap_tx_nss = cap_tx_nss;
+	mcs_ies->cap_rx_nss = cap_rx_nss;
+	mcs_ies->op_tx_nss = QDF_MIN(cap_tx_nss, op_tx_nss);
+	mcs_ies->op_rx_nss = QDF_MIN(cap_rx_nss, op_rx_nss);
+}
+
 QDF_STATUS
 populate_dot11f_capabilities(struct mac_context *mac,
 			     tDot11fFfCapabilities *pDot11f,

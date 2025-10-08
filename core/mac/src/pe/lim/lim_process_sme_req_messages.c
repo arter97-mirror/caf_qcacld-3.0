@@ -1502,65 +1502,6 @@ lim_get_vdev_rmf_capable(struct mac_context *mac, struct pe_session *session)
 	return peer_rmf_capable;
 }
 
-void lim_get_nss_supported_by_sta_and_ap(tDot11fBeaconIEs *bcn_ies,
-					 enum mlme_dot11_mode dot11_mode,
-					 uint8_t *tx_nss, uint8_t *rx_nss)
-{
-	uint8_t idx;
-	uint16_t tx_mcs, rx_mcs;
-
-	*tx_nss = NSS_1x1_MODE;
-	*rx_nss = NSS_1x1_MODE;
-	if (IS_DOT11_MODE_EHT(dot11_mode) && bcn_ies->eht_cap.present) {
-		if (bcn_ies->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9)
-			*tx_nss = bcn_ies->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9;
-		else if (bcn_ies->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7)
-			*tx_nss = bcn_ies->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7;
-
-		if (bcn_ies->eht_cap.bw_le_80_rx_max_nss_for_mcs_0_to_9)
-			*rx_nss = bcn_ies->eht_cap.bw_le_80_rx_max_nss_for_mcs_0_to_9;
-		else if (bcn_ies->eht_cap.bw_20_rx_max_nss_for_mcs_0_to_7)
-			*rx_nss = bcn_ies->eht_cap.bw_20_rx_max_nss_for_mcs_0_to_7;
-	} else if (IS_DOT11_MODE_HE(dot11_mode) && bcn_ies->he_cap.present) {
-		tx_mcs = bcn_ies->he_cap.tx_he_mcs_map_lt_80;
-		rx_mcs = bcn_ies->he_cap.rx_he_mcs_map_lt_80;
-		for (idx = NSS_2x2_MODE; idx <= NSS_8x8_MODE; idx++) {
-			if (HE_MCS_IS_NSS_ENABLED(tx_mcs, idx))
-				*tx_nss = idx;
-			if (HE_MCS_IS_NSS_ENABLED(rx_mcs, idx))
-				*rx_nss = idx;
-		}
-	} else if (IS_DOT11_MODE_VHT(dot11_mode) && bcn_ies->VHTCaps.present) {
-		tx_mcs = bcn_ies->VHTCaps.txMCSMap;
-		rx_mcs = bcn_ies->VHTCaps.rxMCSMap;
-		for (idx = NSS_2x2_MODE; idx <= NSS_8x8_MODE; idx++) {
-			if (VHT_MCS_IS_NSS_ENABLED(tx_mcs, idx))
-				*tx_nss = idx;
-			if (VHT_MCS_IS_NSS_ENABLED(rx_mcs, idx))
-				*rx_nss = idx;
-		}
-	} else if (IS_DOT11_MODE_HT(dot11_mode) && bcn_ies->HTCaps.present) {
-		uint8_t *mcs = &bcn_ies->HTCaps.supportedMCSSet[0];
-
-		for (idx = NSS_2x2_MODE; idx <= NSS_4x4_MODE; idx++)
-			if  (mcs[idx - 1])
-				*rx_nss = idx;
-
-		if (QDF_GET_BITS(mcs[WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS /
-				     BITS_IN_A_BYTE],
-				 (WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS %
-				  BITS_IN_A_BYTE), 2) == 0x3) {
-			*tx_nss = QDF_GET_BITS(mcs[WLAN_HT_CAP_TX_MAX_NSS_POS /
-						   BITS_IN_A_BYTE],
-					       (WLAN_HT_CAP_TX_MAX_NSS_POS %
-						BITS_IN_A_BYTE), 2) + 1;
-			*tx_nss = QDF_MIN(*tx_nss, WLAN_MAX_VDEV_NSS);
-		} else {
-			*tx_nss = *rx_nss;
-		}
-	}
-}
-
 /**
  * lim_check_vendor_ap_3_present() - Check if Vendor AP 3 is present
  * @mac_ctx: Pointer to Global MAC structure
@@ -1671,8 +1612,8 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	struct bss_description *bss_desc =
 					&session->lim_join_req->bssDescription;
 	bool is_vendor_ap_present;
-	uint8_t ap_tx_nss, ap_rx_nss;
 	struct vdev_type_nss *vdev_type_nss;
+	struct sir_dot11f_nss_info nss_ies;
 
 	if (wlan_reg_is_24ghz_ch_freq(bss_desc->chan_freq))
 		vdev_type_nss = &mac_ctx->vdev_type_nss_2g;
@@ -1687,14 +1628,13 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	session->cap_rx_nss = session->vdev_nss;
 
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, ie_struct, session->dot11mode);
 
 	/* Fill the Vendor AP search params */
 	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
 	vendor_ap_search_attr.ie_length = ie_len;
 	vendor_ap_search_attr.mac_addr = &bss_desc->bssId[0];
-	lim_get_nss_supported_by_sta_and_ap(ie_struct, session->dot11mode,
-					    &ap_tx_nss, &ap_rx_nss);
-	vendor_ap_search_attr.nss = ap_rx_nss;
+	vendor_ap_search_attr.nss = nss_ies.cap_rx_nss;
 	vendor_ap_search_attr.ht_cap = ie_struct->HTCaps.present;
 	vendor_ap_search_attr.vht_cap = ie_struct->VHTCaps.present;
 	vendor_ap_search_attr.enable_2g =

@@ -303,20 +303,6 @@ void lim_prepare_and_send_del_sta_cnf(struct mac_context *mac,
 				      tSirResultCodes status_code,
 				      struct pe_session *pe_session);
 
-/**
- * lim_get_nss_supported_by_sta_and_ap() - finds out nss from session
- * and beacon from AP
- * @bcn_ies: Pointer to beacon IES
- * @dot11_mode: dot11 mode
- * @tx_nss: Pointer to store retrieved Tx NSS
- * @rx_nss: Pointer to store retrieved Rx NSS
- *
- * Return: void
- */
-void lim_get_nss_supported_by_sta_and_ap(tDot11fBeaconIEs *bcn_ies,
-					 enum mlme_dot11_mode dot11_mode,
-					 uint8_t *tx_nss, uint8_t *rx_nss);
-
 void lim_init_pre_auth_timer_table(struct mac_context *mac,
 				   tpLimPreAuthTable pPreAuthTimerTable);
 tpLimPreAuthNode lim_acquire_free_pre_auth_node(struct mac_context *mac,

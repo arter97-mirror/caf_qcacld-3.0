@@ -3661,45 +3661,6 @@ lim_limit_bw_for_iot_ap(struct mac_context *mac_ctx,
 	}
 }
 
-static uint8_t lim_get_peer_supported_tx_nss(tDot11fBeaconIEs *bcn_ies)
-{
-	uint8_t idx, tx_mcs_def_pos, tx_mcs_pos, *ht_mcs;
-
-	if (bcn_ies->eht_cap.present) {
-		if (bcn_ies->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9)
-			return bcn_ies->eht_cap.bw_le_80_tx_max_nss_for_mcs_0_to_9;
-		if (bcn_ies->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7)
-			return bcn_ies->eht_cap.bw_20_tx_max_nss_for_mcs_0_to_7;
-	} else if (bcn_ies->he_cap.present) {
-		for (idx = NSS_8x8_MODE; idx >= NSS_1x1_MODE; idx--)
-			if (HE_MCS_IS_NSS_ENABLED(bcn_ies->he_cap.tx_he_mcs_map_lt_80,
-						  idx))
-				return idx;
-	} else if (bcn_ies->VHTCaps.present) {
-		for (idx = NSS_8x8_MODE; idx >= NSS_1x1_MODE; idx--)
-			if (VHT_MCS_IS_NSS_ENABLED(bcn_ies->VHTCaps.txMCSMap,
-						   idx))
-				return idx;
-	} else if (bcn_ies->HTCaps.present) {
-		ht_mcs = bcn_ies->HTCaps.supportedMCSSet;
-		tx_mcs_pos = WLAN_HT_CAP_TX_MAX_NSS_POS;
-		tx_mcs_def_pos = WLAN_HT_CAP_TX_MCS_SET_DEFINED_POS;
-
-		if ((QDF_GET_BITS(ht_mcs[tx_mcs_def_pos / BITS_IN_A_BYTE],
-				  tx_mcs_def_pos % BITS_IN_A_BYTE, 2) == 0x3) &&
-		    QDF_GET_BITS(ht_mcs[tx_mcs_pos / BITS_IN_A_BYTE],
-				 tx_mcs_pos % BITS_IN_A_BYTE, 2))
-			return QDF_GET_BITS(ht_mcs[tx_mcs_pos / BITS_IN_A_BYTE],
-					    tx_mcs_pos % BITS_IN_A_BYTE, 2);
-
-		for (idx = NSS_4x4_MODE; idx >= NSS_1x1_MODE; idx--)
-			if (ht_mcs[idx - 1])
-				return idx;
-	}
-
-	return NSS_1x1_MODE;
-}
-
 static void
 lim_sta_update_max_channel_width(struct pe_session *pe_session,
 				 tpSirAssocRsp pAssocRsp,
@@ -3767,6 +3728,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	tDot11fIEVHTOperation *vht_oper = NULL;
 	tAddStaParams *sta_context;
+	struct sir_dot11f_nss_info nss_ies;
 	uint32_t listen_interval = MLME_CFG_LISTEN_INTERVAL;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 	tDot11fBeaconIEs *bcn_ies = &bss_desc->bcn_ies;
@@ -4114,8 +4076,8 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 						  bcn_ies, pAssocRsp);
 	}
 
-	pAddBssParams->staContext.bcn_tx_nss =
-				lim_get_peer_supported_tx_nss(bcn_ies);
+	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, bcn_ies, MLME_DOT11_MODE_ALL);
+	pAddBssParams->staContext.bcn_tx_nss = nss_ies.cap_tx_nss;
 	lim_extract_per_link_id(pe_session, pAddBssParams, pAssocRsp);
 	lim_extract_ml_info(pe_session, pAddBssParams, pAssocRsp);
 	lim_intersect_ap_emlsr_caps(mac, pe_session, pAddBssParams, pAssocRsp);

@@ -795,6 +795,47 @@ sir_convert_meas_req_frame2_struct(struct mac_context *, uint8_t *,
 #endif
 
 /**
+ * lim_extract_nss_from_mcs_ies() - Extract NSS (Number of Spatial Streams)
+ * information from various MCS (Modulation and Coding Scheme) IEs
+ * @mcs_ies: Pointer to structure containing various MCS IEs and dot11 mode
+ *
+ * This function extracts the capability and operational NSS values for both
+ * transmit and receive from HT, VHT, HE, or EHT capability IEs based on the
+ * dot11 mode. It also considers operating mode notification if present.
+ * The extracted values are stored in the provided mcs_ies structure.
+ *
+ * Return: None
+ */
+void lim_extract_nss_from_mcs_ies(struct sir_dot11f_nss_info *mcs_ies);
+
+#define LIM_PARSE_MCS_IES_FOR_NSS(_mcs_ies, _ptr, _dot11mode) \
+	do { \
+		(_mcs_ies)->dot11mode = _dot11mode; \
+		(_mcs_ies)->ht_caps = \
+			(void *)((uint8_t *)(_ptr) + offsetof(typeof(*(_ptr)), \
+							      HTCaps)); \
+		(_mcs_ies)->vht_caps = \
+			(void *)((uint8_t *)(_ptr) + offsetof(typeof(*(_ptr)), \
+							      VHTCaps));\
+		(_mcs_ies)->vendor_vht_caps = \
+			(void *)((uint8_t *)(_ptr) + offsetof(typeof(*(_ptr)), \
+							      vendor_vht_ie)); \
+		(_mcs_ies)->he_caps = \
+			(void *)((uint8_t *)(_ptr) + offsetof(typeof(*(_ptr)), \
+							      he_cap)); \
+		(_mcs_ies)->eht_caps = \
+			(void *)((uint8_t *)(_ptr) + offsetof(typeof(*(_ptr)), \
+							      eht_cap));\
+		(_mcs_ies)->ext_caps = \
+			(void *)((uint8_t *)(_ptr) + offsetof(typeof(*(_ptr)), \
+							      ExtCap)); \
+		(_mcs_ies)->operating_mode = \
+			(void *)((uint8_t *)(_ptr) + offsetof(typeof(*(_ptr)), \
+							      OperatingMode)); \
+		lim_extract_nss_from_mcs_ies((_mcs_ies)); \
+	} while (0)
+
+/**
  * populate_dot11f_capabilities() -Populated a tDot11fFfCapabilities
  * @mac: Pointer to the global MAC data structure
  * @pDot11f: Address of a tDot11fFfCapabilities to be filled in
