@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2011-2015, 2017-2019, 2021 The Linux Foundation.
  * All rights reserved.
- * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -69,8 +69,24 @@
 	  (dot11Mode ==  MLME_DOT11_MODE_11BE_ONLY) || \
 	  (dot11Mode ==  MLME_DOT11_MODE_ALL)) ? true:false)
 
+#define IS_DOT11_MODE_11A(dot11mode) \
+	((dot11mode == MLME_DOT11_MODE_11A) ? true : false)
+
 #define IS_DOT11_MODE_11B(dot11Mode)  \
-	((dot11Mode == MLME_DOT11_MODE_11B) ? true:false)
+	((dot11Mode == MLME_DOT11_MODE_11B) ? true : false)
+
+#define IS_DOT11_MODE_11G(dot11mode) \
+	((dot11mode == MLME_DOT11_MODE_11G || \
+	  dot11mode == MLME_DOT11_MODE_11G_ONLY) ? true : false)
+
+#define IS_DOT11_MODE_LEGACY(dot11mode) \
+	((dot11mode == MLME_DOT11_MODE_ABG || IS_DOT11_MODE_11A(dot11mode) || \
+	  IS_DOT11_MODE_11B(dot11mode) || \
+	  IS_DOT11_MODE_11G(dot11mode)) ? true : false)
+
+#define IS_DOT11_MODE_HT_ONLY(dot11mode) \
+	(!(IS_DOT11_MODE_LEGACY(dot11mode) || IS_DOT11_MODE_VHT(dot11mode) || \
+	   IS_DOT11_MODE_HE(dot11mode)))
 
 #define IS_BSS_VHT_CAPABLE(vhtCaps) \
 	((vhtCaps).present && \

@@ -1220,7 +1220,8 @@ static QDF_STATUS lim_fill_sta_session_nss_params(struct mac_context *mac_ctx,
 	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, &bss_desc->bcn_ies,
 				  session->dot11mode);
 
-	if (lim_check_vendor_oui_for_siso_only(mac_ctx, bss_desc,
+	if (IS_DOT11_MODE_LEGACY(session->dot11mode) ||
+	    lim_check_vendor_oui_for_siso_only(mac_ctx, bss_desc,
 					       nss_ies.cap_rx_nss)) {
 		cap_tx_nss = NSS_1x1_MODE;
 		cap_rx_nss = NSS_1x1_MODE;
@@ -1244,6 +1245,21 @@ static QDF_STATUS lim_fill_sta_session_nss_params(struct mac_context *mac_ctx,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_debug("Failed to get VDEV nss");
 			return status;
+		}
+
+		if (IS_DOT11_MODE_HT_ONLY(session->dot11mode)) {
+			uint8_t tx_nss, rx_nss;
+
+			status = policy_mgr_fetch_min_nss_across_hw_modes(mac_ctx->psoc,
+									  &tx_nss,
+									  &rx_nss);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				pe_debug("Failed to get NSS from policy mgr");
+				return status;
+			}
+
+			cap_tx_nss = QDF_MIN(tx_nss, cap_tx_nss);
+			cap_rx_nss = QDF_MIN(rx_nss, cap_rx_nss);
 		}
 
 		cap_tx_nss = QDF_MIN(cap_tx_nss, nss_ies.cap_rx_nss);
@@ -1323,10 +1339,23 @@ QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
 		status = lim_fill_sta_session_nss_params(mac_ctx, session);
 		return status;
 	case eSIR_INFRA_AP_MODE:
-		if (policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
+		if (IS_DOT11_MODE_LEGACY(session->dot11mode) ||
+		    policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
 						 session->vdev_id)) {
 			session->cap_tx_nss = NSS_1x1_MODE;
 			session->cap_rx_nss = NSS_1x1_MODE;
+			break;
+		} else if (IS_DOT11_MODE_HT_ONLY(session->dot11mode)) {
+			status = policy_mgr_fetch_min_nss_across_hw_modes(mac_ctx->psoc,
+									  &tx_nss,
+									  &rx_nss);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				pe_debug("Failed to get NSS from policy mgr");
+				return status;
+			}
+
+			session->cap_tx_nss = QDF_MIN(tx_nss, vdev_tx_nss);
+			session->cap_rx_nss = QDF_MIN(rx_nss, vdev_rx_nss);
 			break;
 		}
 		fallthrough;
