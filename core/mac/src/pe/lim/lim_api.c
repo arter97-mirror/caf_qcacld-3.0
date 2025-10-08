@@ -4398,6 +4398,7 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 				   uint8_t link_id, uint16_t freq)
 {
 	uint16_t bss_len;
+	bool use_cur_mode;
 	QDF_STATUS status;
 	uint8_t cap_tx_nss, cap_rx_nss;
 	bool is_security_allowed;
@@ -4443,6 +4444,21 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_debug("Failed to get self NSS");
 		goto mem_free;
+	}
+
+	status = wlan_mlme_cfg_get_prefer_curr_hw_mode_nss(mac_ctx->psoc,
+							   &use_cur_mode);
+	if (QDF_IS_STATUS_SUCCESS(status) && use_cur_mode) {
+		uint8_t hw_tx_nss, hw_rx_nss;
+
+		status = policy_mgr_curr_hwmode_fetch_chains_for_freq(mac_ctx->psoc,
+								      bss_desc->chan_freq,
+								      &hw_tx_nss,
+								      &hw_rx_nss);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			cap_tx_nss = QDF_MIN(cap_tx_nss, hw_tx_nss);
+			cap_rx_nss = QDF_MIN(cap_rx_nss, hw_rx_nss);
+		}
 	}
 
 	cap_tx_nss = QDF_MIN(cap_tx_nss, nss_ies.cap_rx_nss);

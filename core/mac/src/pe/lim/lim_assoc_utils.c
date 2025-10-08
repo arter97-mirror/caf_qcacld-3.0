@@ -3171,9 +3171,11 @@ lim_delete_dph_hash_entry(struct mac_context *mac_ctx, tSirMacAddr sta_addr,
 void lim_update_session_nss_for_state(struct pe_session *session,
 				      struct sir_dot11f_nss_info *nss_ies)
 {
+	bool use_cur_mode;
 	QDF_STATUS status;
 	tpDphHashNode sta_ds;
 	uint8_t cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss;
+	uint8_t hw_tx_nss, hw_rx_nss;
 	struct mac_context *mac = session->mac_ctx;
 
 	if (session->nss_forced_1x1)
@@ -3195,6 +3197,20 @@ void lim_update_session_nss_for_state(struct pe_session *session,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_debug("Failed to fetch nss %d", status);
 			return;
+		}
+
+		status = wlan_mlme_cfg_get_prefer_curr_hw_mode_nss(mac->psoc,
+								   &use_cur_mode);
+		if (QDF_IS_STATUS_ERROR(status) || !use_cur_mode)
+			break;
+
+		status = policy_mgr_curr_hwmode_fetch_chains_for_freq(mac->psoc,
+								      session->curr_op_freq,
+								      &hw_tx_nss,
+								      &hw_rx_nss);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			cap_tx_nss = QDF_MIN(cap_tx_nss, hw_tx_nss);
+			cap_rx_nss = QDF_MIN(cap_rx_nss, hw_rx_nss);
 		}
 
 		break;
