@@ -3668,6 +3668,8 @@ static void mlme_init_nss_chains(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_FAST_CHAIN_SELECTION_CONFIG);
 	nss_chains->better_chain_rssi_threshold =
 			cfg_get(psoc, CFG_BETTER_CHAIN_RSSI_THRESHOLD_CONFIG);
+	nss_chains->prefer_curr_hw_mode_nss =
+			!!cfg_get(psoc, CFG_PREFER_CURR_HW_MODE_NSS_CONFIG);
 }
 
 static void mlme_init_wep_cfg(struct wlan_mlme_wep_cfg *wep_params)

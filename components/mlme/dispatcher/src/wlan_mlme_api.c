@@ -5115,6 +5115,38 @@ wlan_mlme_cfg_set_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
+wlan_mlme_cfg_set_prefer_curr_hw_mode_nss(struct wlan_objmgr_psoc *psoc,
+					  bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.nss_chains_ini_cfg.prefer_curr_hw_mode_nss = value;
+
+	mlme_rl_debug("prefer_curr_hw_mode_nss set to %u", value);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_cfg_get_prefer_curr_hw_mode_nss(struct wlan_objmgr_psoc *psoc,
+					  bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.nss_chains_ini_cfg.prefer_curr_hw_mode_nss;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_get_vht_mimo_cap(struct wlan_objmgr_psoc *psoc, uint8_t *value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;

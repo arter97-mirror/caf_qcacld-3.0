@@ -2768,6 +2768,28 @@ wlan_mlme_cfg_set_dynamic_nss_chains_support(struct wlan_objmgr_psoc *psoc,
 					     bool value);
 
 /**
+ * wlan_mlme_cfg_set_prefer_curr_hw_mode_nss() - Set prefer current HW mode NSS
+ * @psoc: psoc object
+ * @value: true to prefer current HW mode NSS over max NSS
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_cfg_set_prefer_curr_hw_mode_nss(struct wlan_objmgr_psoc *psoc,
+					  bool value);
+
+/**
+ * wlan_mlme_cfg_get_prefer_curr_hw_mode_nss() - Get prefer current HW mode NSS
+ * @psoc: psoc object
+ * @value: output pointer to receive the current setting
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_cfg_get_prefer_curr_hw_mode_nss(struct wlan_objmgr_psoc *psoc,
+					  bool *value);
+
+/**
  * wlan_mlme_cfg_get_dynamic_nss_chains_support() - API to get current value of
  * dynamic_nss_chains_support
  *

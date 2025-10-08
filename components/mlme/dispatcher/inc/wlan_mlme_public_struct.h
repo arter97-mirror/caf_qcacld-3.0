@@ -1828,6 +1828,9 @@ enum dot11p_mode {
  * @restart_sap_on_dyn_nss_chains_cfg: restart SAP on dynamic NSS chains
  * update
  * @fast_chain_selection:	     enable fast chain selection config to FW
+ * @prefer_curr_hw_mode_nss: true if STA/P2P-CLI should prefer the
+ * current HW-mode NSS over the maximum supported NSS when selecting the
+ * effective NSS
  * @better_chain_rssi_threshold:     rssi threshold for better chain selection
  */
 struct wlan_mlme_nss_chains {
@@ -1843,6 +1846,7 @@ struct wlan_mlme_nss_chains {
 	bool enable_dynamic_nss_chains_cfg;
 	bool restart_sap_on_dyn_nss_chains_cfg;
 	bool fast_chain_selection;
+	bool prefer_curr_hw_mode_nss;
 	uint32_t better_chain_rssi_threshold;
 };
 

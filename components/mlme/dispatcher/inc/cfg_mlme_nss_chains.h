@@ -640,6 +640,31 @@
 				CFG_VALUE_OR_DEFAULT, \
 				"RSSI delta threshold to determine better chain")
 
+/*
+ * <ini>
+ * prefer_curr_hw_mode_nss - Config Param to prefer current hardware mode NSS
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to determine whether to prefer current hardware mode NSS
+ * configuration.
+ * If set, the device will use NSS for connection based on current HW mode
+ * else will use the max NSS value that is supported across all HW modes.
+ *
+ * Related: NSS configuration
+ *
+ * Supported Feature: Dynamic NSS selection
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_PREFER_CURR_HW_MODE_NSS_CONFIG CFG_INI_UINT( \
+			"prefer_curr_hw_mode_nss", \
+			0, 1, 0, CFG_VALUE_OR_DEFAULT, \
+			"Prefer current HW modes NSS on connection start")
+
 #define CFG_NSS_CHAINS_ALL \
 	CFG(CFG_NUM_TX_CHAINS_2G) \
 	CFG(CFG_NUM_TX_CHAINS_5G) \
@@ -659,7 +684,8 @@
 	CFG(CFG_ENABLE_DYNAMIC_NSS_CHAIN_CONFIG) \
 	CFG(CFG_RESTART_SAP_ON_DYNAMIC_NSS_CHAINS_CONFIG) \
 	CFG(CFG_FAST_CHAIN_SELECTION_CONFIG) \
-	CFG(CFG_BETTER_CHAIN_RSSI_THRESHOLD_CONFIG)
+	CFG(CFG_BETTER_CHAIN_RSSI_THRESHOLD_CONFIG) \
+	CFG(CFG_PREFER_CURR_HW_MODE_NSS_CONFIG)
 
 #endif /* __CFG_MLME_NSS_CHAINS */
 
