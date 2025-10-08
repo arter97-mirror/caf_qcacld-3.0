@@ -3438,7 +3438,7 @@ uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset);
  * lim_update_nss() - Function to update NSS
  * @mac_ctx: pointer to Global Mac structure
  * @sta_ds: pointer to tpDphHashNode
- * @rx_nss: Rx NSS in operating mode notification
+ * @peer_rx_nss: Rx NSS extracted from operating mode notification
  * @session: pointer to pe_session
  *
  * function to update NSS
@@ -3446,7 +3446,7 @@ uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset);
  * Return: None
  */
 void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
-		    uint8_t rx_nss, struct pe_session *session);
+		    uint8_t peer_rx_nss, struct pe_session *session);
 
 /*
  * lim_convert_phy_width_to_vht_width() - Function to convert the

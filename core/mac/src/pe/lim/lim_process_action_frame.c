@@ -342,7 +342,7 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 	}
 
 	lim_update_nss(mac_ctx, sta_ptr,
-		       operating_mode_frm->OperatingMode.rxNSS, session);
+		       operating_mode_frm->OperatingMode.rxNSS + 1, session);
 
 
 	omn_ch_width = operating_mode_frm->OperatingMode.chanWidth;
@@ -358,7 +358,7 @@ static void __lim_process_operating_mode_action_frame(struct mac_context *mac_ct
 	if (lim_update_channel_width(mac_ctx, sta_ptr, session, omn_ch_width,
 				     &ch_bw))
 		wlan_son_deliver_opmode(session->vdev, ch_bw,
-					sta_ptr->vhtSupportedRxNss,
+					sta_ptr->op_tx_nss,
 					mac_hdr->sa);
 
 end:

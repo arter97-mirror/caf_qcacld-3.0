@@ -2400,11 +2400,6 @@ lim_add_sta(struct mac_context *mac_ctx,
 			add_sta_params->ch_width =
 				sta_ds->vhtSupportedChannelWidthSet + 1;
 
-		add_sta_params->vhtSupportedRxNss = sta_ds->vhtSupportedRxNss;
-		if (LIM_IS_AP_ROLE(session_entry))
-			add_sta_params->vhtSupportedRxNss =
-				QDF_MIN(add_sta_params->vhtSupportedRxNss,
-					session_entry->cap_tx_nss);
 		add_sta_params->vhtTxBFCapable =
 #ifdef FEATURE_WLAN_TDLS
 			((STA_ENTRY_PEER == sta_ds->staType)
@@ -4069,8 +4064,6 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 			pAddBssParams->staContext.vht_mcs_10_11_supp =
 				sta->vht_mcs_10_11_supp;
 
-			pAddBssParams->staContext.vhtSupportedRxNss =
-				sta->vhtSupportedRxNss;
 			if (pAssocRsp->VHTCaps.present)
 				vht_caps = &pAssocRsp->VHTCaps;
 			else if (pAssocRsp->vendor_vht_ie.VHTCaps.present) {

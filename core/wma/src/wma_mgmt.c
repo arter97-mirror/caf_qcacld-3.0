@@ -1998,23 +1998,6 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 		cmd->rx_mcs_set = params->supportedRates.vhtRxMCSMap;
 		cmd->tx_max_rate = params->supportedRates.vhtTxHighestDataRate;
 		cmd->tx_mcs_set = params->supportedRates.vhtTxMCSMap;
-		/*
-		 *  tx_mcs_set is intersection of self tx NSS and peer rx mcs map
-		 */
-		if (params->vhtSupportedRxNss) {
-			cmd->peer_nss = params->vhtSupportedRxNss;
-		} else {
-			uint8_t j;
-
-			cmd->peer_nss = NSS_1x1_MODE;
-			for (j = WLAN_MAX_VDEV_NSS; j >= NSS_2x2_MODE;
-			     j--) {
-				if (VHT_MCS_IS_NSS_ENABLED(cmd->tx_mcs_set, j)) {
-					cmd->peer_nss = j;
-					break;
-				}
-			}
-		}
 
 		if (params->vht_mcs_10_11_supp) {
 			WMI_SET_BITS(cmd->tx_mcs_set, 16, cmd->peer_nss,

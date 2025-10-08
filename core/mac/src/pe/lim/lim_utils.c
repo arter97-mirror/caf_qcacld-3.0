@@ -11663,18 +11663,32 @@ uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset)
 }
 
 void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
-		    uint8_t rx_nss, struct pe_session *session)
+		    uint8_t peer_rx_nss, struct pe_session *session)
 {
-	if (sta_ds->vhtSupportedRxNss != (rx_nss + 1)) {
-		if (session->nss_forced_1x1) {
-			pe_debug("Not Updating NSS for special AP");
-			return;
-		}
-		sta_ds->vhtSupportedRxNss = rx_nss + 1;
-		lim_set_nss_change(mac_ctx, session,
-				   sta_ds->vhtSupportedRxNss,
-				   sta_ds->staAddr);
+	QDF_STATUS status;
+
+	if (sta_ds->cap_tx_nss < peer_rx_nss ||
+	    sta_ds->op_tx_nss == peer_rx_nss)
+		return;
+
+	if (session->nss_forced_1x1) {
+		pe_debug("Not Updating NSS for special AP");
+		return;
 	}
+
+	sta_ds->op_tx_nss = peer_rx_nss;
+	lim_set_nss_change(mac_ctx, session, peer_rx_nss, sta_ds->staAddr);
+
+	if (!LIM_IS_STA_ROLE(session))
+		return;
+
+	status = wlan_vdev_mlme_set_bss_nss_params(session->vdev,
+						   sta_ds->cap_tx_nss,
+						   sta_ds->cap_rx_nss,
+						   sta_ds->op_tx_nss,
+						   sta_ds->op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_debug("Failed to set curr bss nss %d", status);
 }
 
 

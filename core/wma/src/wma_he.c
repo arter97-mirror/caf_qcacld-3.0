@@ -1232,15 +1232,6 @@ void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
 
 #define HE2x2MCSMASK 0xc
 
-	peer->peer_nss = NSS_1x1_MODE;
-	for (i = WLAN_MAX_VDEV_NSS; i >= NSS_2x2_MODE; i--) {
-		if (HE_MCS_IS_NSS_ENABLED(params->supportedRates.rx_he_mcs_map_lt_80,
-					  i)) {
-			peer->peer_nss = i;
-			break;
-		}
-	}
-
 	for (i = 0; i < peer->peer_he_mcs_count; i++)
 		wma_debug("[HE - MCS Map: %d] rx_mcs: 0x%x, tx_mcs: 0x%x", i,
 			peer->peer_he_rx_mcs_set[i],

@@ -130,7 +130,6 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 				struct pe_session *session_entry,
 				struct bss_description *bss_desc)
 {
-	uint8_t idx;
 	uint32_t phy_mode;
 	bool qos_mode;
 	tDot11fIEVHTCaps *vht_caps = NULL;
@@ -214,15 +213,6 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 				       bss_desc) != QDF_STATUS_SUCCESS) {
 		pe_err("could not get rateset and extended rate set");
 		return;
-	}
-
-	sta_ds->vhtSupportedRxNss = NSS_1x1_MODE;
-	for (idx = WLAN_MAX_VDEV_NSS; idx >= NSS_2x2_MODE; idx--) {
-		if (VHT_MCS_IS_NSS_ENABLED(sta_ds->supportedRates.vhtTxMCSMap,
-					   idx)) {
-			sta_ds->vhtSupportedRxNss = idx;
-			break;
-		}
 	}
 
 	/* If one of the rates is 11g rates, set the ERP mode. */
