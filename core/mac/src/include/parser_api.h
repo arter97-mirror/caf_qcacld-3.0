@@ -211,6 +211,38 @@ enum operating_extension_identifier {
 	OP_CLASS_ID_201,
 };
 
+/**
+ * struct sir_dot11f_nss_info - This structure holds pointers to various
+ * capability IEs and the parsed NSS (Number of Spatial Streams) information.
+ * @dot11mode: 802.11 mode (a/b/g/n/ac/ax/be)
+ * @ht_caps: Pointer to HT capabilities IE
+ * @vht_caps: Pointer to VHT capabilities IE
+ * @vendor_vht_caps: Pointer to vendor specific VHT capabilities IE
+ * @he_caps: Pointer to HE capabilities IE
+ * @eht_caps: Pointer to EHT capabilities IE
+ * @ext_caps: Pointer to Extended capabilities IE
+ * @operating_mode: Pointer to Operating mode IE
+ * @cap_tx_nss: Supported Tx NSS capability
+ * @cap_rx_nss: Supported Rx NSS capability
+ * @op_tx_nss: Operating Tx NSS
+ * @op_rx_nss: Operating Rx NSS
+ *
+ */
+struct sir_dot11f_nss_info {
+	enum mlme_dot11_mode dot11mode;
+	tDot11fIEHTCaps *ht_caps;
+	tDot11fIEVHTCaps *vht_caps;
+	tDot11fIEvendor_vht_ie *vendor_vht_caps;
+	tDot11fIEhe_cap *he_caps;
+	tDot11fIEeht_cap *eht_caps;
+	tDot11fIEExtCap *ext_caps;
+	tDot11fIEOperatingMode *operating_mode;
+	uint8_t cap_tx_nss;
+	uint8_t cap_rx_nss;
+	uint8_t op_tx_nss;
+	uint8_t op_rx_nss;
+};
+
 #ifdef WLAN_FEATURE_11BE_MLO
 struct sir_multi_link_ie {
 	uint8_t num_of_mlo_ie;

@@ -671,11 +671,15 @@ struct punc_chan_info {
  * @vendor_vht_sap:
  * @hs20vendor_ie: HS 2.0 Indication
  * @country_info_present: flag to indicate country code in beacon
- * @nss:
- * @nss_forced_1x1:
  * @add_bss_failed:
  * @obss_ht40_scanparam: OBSS Scan IE Parameters
  * @vdev_nss:
+ * @nss:
+ * @cap_tx_nss: Session's Tx NSS capability, will be intersected NSS for
+ * STA/P2P-CLI mode and will be current operating Tx NSS for SAP/P2P-GO.
+ * @cap_rx_nss: Session's Rx NSS capability, will be intersected NSS for
+ * STA/P2P-CLI mode and will be current operating Rx NSS for SAP/P2P-GO.
+ * @nss_forced_1x1: Is NSS forced for this session
  * @supported_nss_1x1: Supported NSS is intersection of self and peer NSS
  * @is_ext_caps_present:
  * @beacon_tx_rate:
@@ -993,11 +997,13 @@ struct pe_session {
 	bool vendor_vht_sap;
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
 	uint8_t country_info_present;
-	uint8_t nss;
-	bool nss_forced_1x1;
 	bool add_bss_failed;
 	struct obss_scanparam obss_ht40_scanparam;
 	uint8_t vdev_nss;
+	uint8_t nss;
+	uint8_t cap_tx_nss;
+	uint8_t cap_rx_nss;
+	bool nss_forced_1x1;
 	bool supported_nss_1x1;
 	bool is_ext_caps_present;
 	uint16_t beacon_tx_rate;

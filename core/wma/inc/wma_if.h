@@ -210,6 +210,10 @@ struct peer_ml_info {
  * @maxTxPower: max tx power
  * @bcn_tx_nss: Tx NSS from beacon
  * @nss: Return the number of spatial streams supported
+ * @self_cap_tx_nss: Intersected DUT Tx capability NSS to be used with this peer
+ * @self_cap_rx_nss: Intersected DUT Rx capability NSS to be used with this peer
+ * @self_op_tx_nss: Intersected DUT Tx operating NSS to be used with this peer.
+ * @self_op_rx_nss: Intersected DUT Rx operating NSS to be used with this peer.
  * @stbc_capable: stbc capable
  * @no_ptk_4_way: Do not need 4-way handshake
  * @eht_capable: is EHT capabale or not
@@ -293,6 +297,10 @@ typedef struct {
 	uint8_t nonRoamReassoc;
 	uint8_t bcn_tx_nss;
 	uint8_t nss;
+	uint8_t self_cap_tx_nss;
+	uint8_t self_cap_rx_nss;
+	uint8_t self_op_tx_nss;
+	uint8_t self_op_rx_nss;
 #ifdef WLAN_FEATURE_11AX
 	bool he_capable;
 	tDot11fIEhe_cap he_config;

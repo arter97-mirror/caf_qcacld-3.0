@@ -151,6 +151,14 @@ typedef struct sDphHashNode {
 	uint8_t is_disassoc_deauth_in_progress;
 
 	uint8_t nss;
+	/* Intersected capability Tx NSS for this session */
+	uint8_t cap_tx_nss;
+	/* Intersected capability Rx NSS for this session */
+	uint8_t cap_rx_nss;
+	/* Intersected operating Tx NSS for this session */
+	uint8_t op_tx_nss;
+	/* Intersected operating Rx NSS for this session */
+	uint8_t op_rx_nss;
 	int8_t del_sta_ctx_rssi;
 	bool sta_deletion_in_progress;
 	/* Flag indicating connected STA doesn't support ECSA */

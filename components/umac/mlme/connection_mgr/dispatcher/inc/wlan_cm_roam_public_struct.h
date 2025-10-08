@@ -3083,6 +3083,10 @@ struct cm_hw_mode_trans_ind {
  * @flags: link flags
  * @link_addr: link mac address
  * @self_link_addr: VDEV link mac address
+ * @cap_tx_nss: Tx NSS capability of self extracted from roam-sync
+ * reassoc request, only to hold till the roam sync is completed.
+ * @cap_rx_nss: Rx NSS capability of self extracted from roam-sync
+ * reassoc request, only to hold till the roam sync is completed.
  */
 struct ml_setup_link_param {
 	uint32_t vdev_id;
@@ -3091,6 +3095,8 @@ struct ml_setup_link_param {
 	uint32_t flags;
 	struct qdf_mac_addr link_addr;
 	struct qdf_mac_addr self_link_addr;
+	uint8_t cap_tx_nss;
+	uint8_t cap_rx_nss;
 };
 
 /**
