@@ -1306,6 +1306,7 @@ update_session:
 QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
 						 struct pe_session *session)
 {
+	bool band_nss_differ;
 	QDF_STATUS status;
 	uint8_t tx_nss, rx_nss;
 	uint8_t vdev_tx_nss, vdev_rx_nss;
@@ -1339,11 +1340,15 @@ QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
 		status = lim_fill_sta_session_nss_params(mac_ctx, session);
 		return status;
 	case eSIR_INFRA_AP_MODE:
+		band_nss_differ =
+			mlme_is_vdev_nss_differs_across_bands_from_dyn(session->vdev);
 		if (IS_DOT11_MODE_LEGACY(session->dot11mode) ||
 		    policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc,
 						 session->vdev_id)) {
 			session->cap_tx_nss = NSS_1x1_MODE;
 			session->cap_rx_nss = NSS_1x1_MODE;
+			wlan_mlme_set_sap_supports_nss_change(session->vdev,
+							      false);
 			break;
 		} else if (IS_DOT11_MODE_HT_ONLY(session->dot11mode)) {
 			status = policy_mgr_fetch_min_nss_across_hw_modes(mac_ctx->psoc,
@@ -1356,8 +1361,15 @@ QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
 
 			session->cap_tx_nss = QDF_MIN(tx_nss, vdev_tx_nss);
 			session->cap_rx_nss = QDF_MIN(rx_nss, vdev_rx_nss);
+			wlan_mlme_set_sap_supports_nss_change(session->vdev,
+							      false);
 			break;
 		}
+		/*
+		 * TODO: Need to have logic when bands support same NSS at max.
+		 */
+		wlan_mlme_set_sap_supports_nss_change(session->vdev,
+						      true & band_nss_differ);
 		fallthrough;
 	case eSIR_NDI_MODE:
 		session->cap_tx_nss = tx_nss;
