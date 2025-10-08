@@ -3168,6 +3168,30 @@ lim_delete_dph_hash_entry(struct mac_context *mac_ctx, tSirMacAddr sta_addr,
 	lim_ap_check_6g_compatible_peer(mac_ctx, session_entry);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void lim_sta_update_nss_for_partner_links(struct pe_session *session)
+{
+	uint8_t i;
+	struct mlo_partner_info *partner_info;
+	struct mlo_link_info *link_info;
+
+	partner_info = &session->lim_join_req->partner_info;
+	for (i = 0; i < partner_info->num_partner_links; i++) {
+		link_info = &partner_info->partner_link_info[i];
+
+		lim_update_mlo_mgr_info(session->mac_ctx, session->vdev,
+					&link_info->link_addr,
+					link_info->link_id,
+					link_info->chan_freq);
+	}
+}
+#else
+static inline
+void lim_sta_update_nss_for_partner_links(struct pe_session *session)
+{
+}
+#endif
+
 void lim_update_session_nss_for_state(struct pe_session *session,
 				      struct sir_dot11f_nss_info *nss_ies)
 {
@@ -3183,6 +3207,7 @@ void lim_update_session_nss_for_state(struct pe_session *session,
 
 	switch (session->limMlmState) {
 	case eLIM_MLM_WT_JOIN_BEACON_STATE:
+	case eLIM_MLM_JOINED_STATE:
 		/*
 		 * HT NSS can't change from create (unless for assoc response),
 		 * as it uses the minimum NSS from all the HW modes.
@@ -3213,6 +3238,17 @@ void lim_update_session_nss_for_state(struct pe_session *session,
 			cap_rx_nss = QDF_MIN(cap_rx_nss, hw_rx_nss);
 		}
 
+		/*
+		 * In lim_update_session_nss_for_state():
+		 * When JOINED on an MLO vdev, refresh partner link information
+		 * so that per-link NSS/state is coherent before we proceed
+		 * with further operations
+		 * (e.g., assoc retry after PMF comeback).
+		 */
+
+		if (session->limMlmState == eLIM_MLM_JOINED_STATE &&
+		    wlan_vdev_mlme_is_mlo_vdev(session->vdev))
+			lim_sta_update_nss_for_partner_links(session);
 		break;
 	case eLIM_MLM_WT_ASSOC_RSP_STATE:
 		status = wlan_vdev_mlme_get_bss_nss_params(session->vdev,

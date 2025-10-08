@@ -469,6 +469,7 @@ void lim_pmf_comeback_timer_callback(void *context)
 			(struct comeback_timer_info *)context;
 	struct mac_context *mac_ctx = info->mac;
 	struct pe_session *session;
+	struct sir_dot11f_nss_info nss_ies;
 
 	session = pe_find_session_by_vdev_id(mac_ctx, info->vdev_id);
 	if (!session) {
@@ -488,6 +489,13 @@ void lim_pmf_comeback_timer_callback(void *context)
 	/* set MLM state such that ASSOC REQ packet will be sent out */
 	session->limPrevMlmState = info->lim_prev_mlm_state;
 	session->limMlmState = info->lim_mlm_state;
+
+	if (session->lim_join_req) {
+		LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies,
+					  &session->lim_join_req->bssDescription.bcn_ies,
+					  session->dot11mode);
+		lim_update_session_nss_for_state(session, &nss_ies);
+	}
 	lim_send_mlm_assoc_req(mac_ctx, session);
 }
 
