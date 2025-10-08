@@ -3250,6 +3250,15 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		qdf_mem_free(bss_desc);
 		return status;
 	}
+
+	status = lim_roam_store_nss_from_reassoc_req(mac_ctx, vdev_id,
+						     roam_sync_ind_ptr);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to store NSS from reassoc req");
+		qdf_mem_free(bss_desc);
+		return status;
+	}
+
 	/* Update the beacon/probe filter in mac_ctx */
 	lim_set_bcn_probe_filter(mac_ctx, ft_session_ptr, 0);
 	sir_copy_mac_addr(ft_session_ptr->limReAssocbssId, bss_desc->bssId);
@@ -3336,6 +3345,8 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 			roam_sync_ind_ptr->reassoc_resp_offset;
 	mgmt_txrx_frame_hex_dump(reassoc_resp,
 				 roam_sync_ind_ptr->reassoc_resp_length, false);
+	ft_session_ptr->limPrevMlmState = ft_session_ptr->limMlmState;
+	ft_session_ptr->limMlmState = eLIM_MLM_WT_REASSOC_RSP_STATE;
 	if (wlan_vdev_mlme_get_is_mlo_link(mac_ctx->psoc, vdev_id)) {
 		status = lim_gen_link_specific_assoc_rsp(mac_ctx,
 						ft_session_ptr,

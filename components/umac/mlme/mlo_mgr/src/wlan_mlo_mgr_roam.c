@@ -435,12 +435,16 @@ void mlo_mgr_roam_update_ap_link_info(struct wlan_objmgr_vdev *vdev,
 	}
 
 	link_info->link_id = src_link_info->link_id;
+	link_info->cnx_tx_nss = src_link_info->cap_tx_nss;
+	link_info->cnx_rx_nss = src_link_info->cap_rx_nss;
+
 	qdf_copy_macaddr(&link_info->ap_link_addr, &src_link_info->link_addr);
 	qdf_mem_copy(link_info->link_chan_info, channel, sizeof(*channel));
 
-	mlo_debug("link_id: %d, vdev_id:%d freq:%d ap_link_addr: "QDF_MAC_ADDR_FMT", self_link_addr: "QDF_MAC_ADDR_FMT,
+	mlo_debug("link_id: %d, vdev_id:%d freq:%d Tx/Rx NSS %dx%d ap_link_addr: "QDF_MAC_ADDR_FMT", self_link_addr: "QDF_MAC_ADDR_FMT,
 		  link_info->link_id, link_info->vdev_id,
 		  link_info->link_chan_info->ch_freq,
+		  link_info->cnx_tx_nss, link_info->cnx_rx_nss,
 		  QDF_MAC_ADDR_REF(link_info->ap_link_addr.bytes),
 		  QDF_MAC_ADDR_REF(link_info->link_addr.bytes));
 }

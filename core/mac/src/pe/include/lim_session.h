@@ -1251,6 +1251,38 @@ struct pe_session *pe_find_session_by_scan_id(struct mac_context *mac_ctx,
 uint8_t pe_get_active_session_count(struct mac_context *mac_ctx);
 
 /**
+ * lim_roam_store_nss_from_reassoc_req() - Store NSS parameters from
+ * reassoc request
+ * @mac_ctx: Pointer to global MAC context
+ * @cur_vdev_id: Current VDEV ID
+ * @roam_sync: Pointer to roam sync indication structure
+ *
+ * This function extracts and stores the Number of Spatial Streams (NSS)
+ * parameters from the reassociation request during roaming. It handles both
+ * MLO and non-MLO scenarios, parsing the reassoc frame to determine appropriate
+ * TX and RX NSS values.
+ * For non-MLO devices, it calculates NSS based on self capabilities
+ * and AP capabilities.
+ * For MLO devices, it delegates to a specialized MLO function.
+ *
+ * Return: QDF_STATUS - QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+QDF_STATUS
+lim_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
+				    uint8_t cur_vdev_id,
+				    struct roam_offload_synch_ind *roam_sync);
+#else
+static inline QDF_STATUS
+lim_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
+				    uint8_t cur_vdev_id,
+				    struct roam_offload_synch_ind *roam_sync)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+/**
  * lim_fill_session_nss_params_on_create() - Fill NSS parameters for a session
  * @mac_ctx: Pointer to global MAC context
  * @session: PE session entry

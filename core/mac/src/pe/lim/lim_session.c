@@ -42,6 +42,7 @@
 #include <lim_assoc_utils.h>
 #include <lim_process_fils.h>
 #include <wlan_action_oui_main.h>
+#include <lim_mlo.h>
 
 #ifdef WLAN_ALLOCATE_GLOBAL_BUFFERS_DYNAMICALLY
 static struct sDphHashNode *g_dph_node_array;
@@ -1108,6 +1109,92 @@ struct pe_session *pe_find_session_by_scan_id(struct mac_context *mac_ctx,
 	return NULL;
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+QDF_STATUS
+lim_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
+				    uint8_t cur_vdev_id,
+				    struct roam_offload_synch_ind *roam_sync)
+{
+	QDF_STATUS status;
+	enum wlan_status_code parse_status;
+	tpSirAssocReq assoc_req;
+	tpSirMacMgmtHdr mac_hdr;
+	uint8_t *frame, subtype;
+	qdf_size_t frame_len;
+	uint8_t tx_nss, rx_nss;
+	struct sir_dot11f_nss_info nss_ies;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, cur_vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_debug("VDEV not found for %d", cur_vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	assoc_req = qdf_mem_malloc(sizeof(*assoc_req));
+	if (!assoc_req) {
+		status = QDF_STATUS_E_NOMEM;
+		goto cleanup;
+	}
+
+	frame = (uint8_t *)roam_sync + roam_sync->reassoc_req_offset;
+	frame_len = roam_sync->reassoc_req_length;
+
+	mac_hdr = (tpSirMacMgmtHdr)frame;
+	subtype = mac_hdr->fc.subType == SIR_MAC_MGMT_ASSOC_REQ ? LIM_ASSOC :
+								  LIM_REASSOC;
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		status = mlme_get_vdev_nss_by_freq_from_ini(vdev,
+							    roam_sync->chan_freq,
+							    &tx_nss, &rx_nss);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Failed to fetch vdev %d nss for freq %d",
+				 roam_sync->roamed_vdev_id,
+				 roam_sync->chan_freq);
+			goto cleanup;
+		}
+
+		frame += sizeof(*mac_hdr);
+		frame_len -= sizeof(*mac_hdr);
+		parse_status =
+		    lim_convert_assoc_req_frame_to_struct(mac_ctx, frame,
+							  frame_len, subtype,
+							  roam_sync->chan_freq,
+							  assoc_req);
+		if (parse_status != STATUS_SUCCESS) {
+			pe_debug("Failed to convert assoc req to struct");
+			status = QDF_STATUS_E_FAILURE;
+			goto cleanup;
+		}
+
+		LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, assoc_req,
+					  MLME_DOT11_MODE_ALL);
+		tx_nss = QDF_MIN(tx_nss, nss_ies.cap_tx_nss);
+		rx_nss = QDF_MIN(rx_nss, nss_ies.cap_rx_nss);
+		status = wlan_vdev_mlme_set_bss_nss_params(vdev, tx_nss, rx_nss,
+							   tx_nss, rx_nss);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_debug("Failed to set curr bss nss %d", status);
+	} else if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+		   (roam_sync->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED &&
+		    cur_vdev_id == roam_sync->roamed_vdev_id)) {
+		status = lim_mlo_roam_store_nss_from_reassoc_req(mac_ctx,
+								 roam_sync,
+								 subtype,
+								 assoc_req);
+	} else {
+		status = QDF_STATUS_SUCCESS;
+	}
+
+cleanup:
+	qdf_mem_free(assoc_req);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	return status;
+}
+#endif
+
 /**
  * lim_check_vendor_ap_3_present() - Check if Vendor AP 3 is present
  * @ie: Pointer to starting IE in Beacon/Probe Response
@@ -1213,8 +1300,22 @@ static QDF_STATUS lim_fill_sta_session_nss_params(struct mac_context *mac_ctx,
 	uint8_t cap_tx_nss = NSS_1x1_MODE, cap_rx_nss = NSS_1x1_MODE;
 	uint8_t op_tx_nss = NSS_1x1_MODE, op_rx_nss = NSS_1x1_MODE;
 
-	if (wlan_cm_is_vdev_roam_sync_inprogress(session->vdev))
-		goto update_session;
+	if (wlan_cm_is_vdev_roam_sync_inprogress(session->vdev)) {
+		status = wlan_vdev_mlme_get_bss_nss_params(session->vdev,
+							   &cap_tx_nss,
+							   &cap_rx_nss,
+							   &op_tx_nss,
+							   &op_rx_nss);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Failed to fetch curr bss nss %d", status);
+			return status;
+		}
+
+		session->cap_tx_nss = cap_tx_nss;
+		session->cap_rx_nss = cap_rx_nss;
+
+		return QDF_STATUS_SUCCESS;
+	}
 
 	bss_desc = &session->lim_join_req->bssDescription;
 	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, &bss_desc->bcn_ies,
@@ -1290,7 +1391,6 @@ static QDF_STATUS lim_fill_sta_session_nss_params(struct mac_context *mac_ctx,
 		 session->nss_forced_1x1 ? "[SISO forced]" : NULL,
 		 bcn_with_omn_ie ? buf : NULL);
 
-update_session:
 	session->cap_tx_nss = cap_tx_nss;
 	session->cap_rx_nss = cap_rx_nss;
 	status = wlan_vdev_mlme_set_bss_nss_params(session->vdev,

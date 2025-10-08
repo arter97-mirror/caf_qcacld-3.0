@@ -3263,6 +3263,8 @@ void lim_update_session_nss_for_state(struct pe_session *session,
 			lim_sta_update_nss_for_partner_links(session);
 		break;
 	case eLIM_MLM_WT_ASSOC_RSP_STATE:
+	case eLIM_MLM_WT_FT_REASSOC_RSP_STATE:
+	case eLIM_MLM_WT_REASSOC_RSP_STATE:
 		status = wlan_vdev_mlme_get_bss_nss_params(session->vdev,
 							   &cap_tx_nss,
 							   &cap_rx_nss,

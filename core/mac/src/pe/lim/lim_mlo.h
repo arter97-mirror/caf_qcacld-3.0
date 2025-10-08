@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -71,6 +71,38 @@ struct pe_session *pe_find_partner_session_by_link_id(
  */
 void lim_get_mlo_vdev_list(struct pe_session *session, uint16_t *vdev_count,
 			   struct wlan_objmgr_vdev **wlan_vdev_list);
+
+/**
+ * lim_mlo_roam_store_nss_from_reassoc_req() - Store NSS values from reassoc req
+ * @mac_ctx: Pointer to global MAC context
+ * @roam_sync: Pointer to roam sync indication structure
+ * @subtype: Subtype of the frame (assoc or reassoc)
+ * @assoc_req: Pointer to (re)association request structure
+ *
+ * This function extracts NSS (Number of Spatial Streams) information
+ * from reassociation request frame for each link in an MLO connection
+ * during roaming. It processes each link, parses the frame to get NSS
+ * capabilities, and updates the corresponding link parameters with the
+ * negotiated NSS values.
+ *
+ * Return: QDF_STATUS - QDF_STATUS_SUCCESS on success, error values otherwise
+ */
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+QDF_STATUS
+lim_mlo_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
+					struct roam_offload_synch_ind *roam_sync,
+					uint8_t subtype,
+					tpSirAssocReq assoc_req);
+#else
+static inline
+lim_mlo_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
+					struct roam_offload_synch_ind *roam_sync,
+					uint8_t subtype,
+					tpSirAssocReq assoc_req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 
 /**
  * lim_mlo_roam_peer_disconn_del - trigger mlo to delete partner peer
@@ -425,6 +457,15 @@ QDF_STATUS lim_get_bpcc_from_mlo_ie(tSchBeaconStruct *bcn,
 bool lim_check_cu_happens(struct wlan_objmgr_vdev *vdev,
 			  uint8_t link_id, uint8_t new_bpcc);
 #else
+static inline QDF_STATUS
+lim_mlo_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
+					struct roam_offload_synch_ind *roam_sync,
+					uint8_t subtype,
+					tpSirAssocReq assoc_req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline void lim_mlo_roam_peer_disconn_del(struct wlan_objmgr_vdev *vdev)
 {
 }

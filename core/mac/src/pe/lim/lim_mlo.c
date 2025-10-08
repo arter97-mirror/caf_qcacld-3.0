@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -443,6 +443,114 @@ void lim_mlo_sta_notify_peer_disconn(struct pe_session *pe_session)
 		wlan_mlo_partner_peer_disconnect_notify(peer);
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+}
+
+QDF_STATUS
+lim_mlo_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
+					struct roam_offload_synch_ind *roam_sync,
+					uint8_t subtype,
+					tpSirAssocReq assoc_req)
+{
+	QDF_STATUS st = QDF_STATUS_SUCCESS;
+	enum wlan_status_code parse_status;
+	uint8_t idx, tx_nss, rx_nss, *frame, *orig_frame;
+	struct wlan_objmgr_vdev *vdev, *roam_vdev;
+	struct sir_dot11f_nss_info nss_ies;
+	struct ml_setup_link_param *ml_link;
+	qdf_size_t frame_len, orig_frame_len = roam_sync->reassoc_req_length;
+	uint16_t hdr_len = sizeof(tSirMacMgmtHdr);
+
+	frame = qdf_mem_malloc(orig_frame_len);
+	if (!frame)
+		return QDF_STATUS_E_NOMEM;
+
+	roam_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+							 roam_sync->roamed_vdev_id,
+							 WLAN_LEGACY_MAC_ID);
+	if (!roam_vdev) {
+		qdf_mem_free(frame);
+		pe_debug("VDEV not found for %d", roam_sync->roamed_vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	orig_frame = (uint8_t *)roam_sync + roam_sync->reassoc_req_offset;
+
+	for (idx = 0; idx < roam_sync->num_setup_links; idx++) {
+		ml_link = &roam_sync->ml_link[idx];
+		if (roam_sync->roamed_vdev_id == ml_link->vdev_id) {
+			frame_len = orig_frame_len;
+			qdf_mem_copy(frame, orig_frame, frame_len);
+		} else {
+			st = util_gen_link_assoc_req(orig_frame + hdr_len,
+						     orig_frame_len - hdr_len,
+						     subtype == LIM_REASSOC,
+						     ml_link->link_id,
+						     ml_link->self_link_addr,
+						     frame, orig_frame_len,
+						     &frame_len);
+			if (QDF_IS_STATUS_ERROR(st))
+				goto cleanup;
+		}
+
+		parse_status =
+		    lim_convert_assoc_req_frame_to_struct(mac_ctx,
+							  frame + hdr_len,
+							  frame_len - hdr_len,
+							  subtype,
+							  ml_link->channel.mhz,
+							  assoc_req);
+		if (parse_status != STATUS_SUCCESS) {
+			st = QDF_STATUS_E_FAILURE;
+			goto cleanup;
+		}
+
+		st = mlme_get_vdev_nss_by_freq_from_ini(roam_vdev,
+							ml_link->channel.mhz,
+							&tx_nss, &rx_nss);
+		if (QDF_IS_STATUS_ERROR(st)) {
+			pe_debug("Failed to fetch vdev %d nss for freq %d",
+				 roam_sync->roamed_vdev_id,
+				 ml_link->channel.mhz);
+			st = QDF_STATUS_E_FAILURE;
+			goto cleanup;
+		}
+
+		LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, assoc_req,
+					  MLME_DOT11_MODE_11BE);
+		tx_nss = QDF_MIN(tx_nss, nss_ies.cap_tx_nss);
+		rx_nss = QDF_MIN(rx_nss, nss_ies.cap_rx_nss);
+		ml_link->cap_tx_nss = tx_nss;
+		ml_link->cap_rx_nss = rx_nss;
+
+		if (ml_link->vdev_id == WLAN_INVALID_VDEV_ID)
+			continue;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+							    ml_link->vdev_id,
+							    WLAN_LEGACY_MAC_ID);
+		if (!vdev) {
+			pe_debug("Failed to get VDEV for %d", ml_link->vdev_id);
+			st = QDF_STATUS_E_NULL_VALUE;
+			goto cleanup;
+		}
+
+		st = wlan_vdev_mlme_set_bss_nss_params(vdev, tx_nss, rx_nss,
+						       tx_nss, rx_nss);
+		if (QDF_IS_STATUS_ERROR(st)) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+			pe_debug("VDEV %d failed to set curr bss nss %d",
+				 ml_link->vdev_id, st);
+			goto cleanup;
+		}
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
+
+cleanup:
+	qdf_mem_free(frame);
+	wlan_objmgr_vdev_release_ref(roam_vdev, WLAN_LEGACY_MAC_ID);
+
+	return st;
 }
 
 void lim_mlo_roam_peer_disconn_del(struct wlan_objmgr_vdev *vdev)
