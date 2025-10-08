@@ -4217,9 +4217,10 @@ QDF_STATUS wma_send_vdev_stop_to_fw(t_wma_handle *wma, uint8_t vdev_id)
 	 * and we dont want the config of previous connection to affect the
 	 * current connection.
 	 */
-	qdf_mem_copy(mlme_get_dynamic_vdev_config(iface->vdev),
-		     mlme_get_ini_vdev_config(iface->vdev),
-		     sizeof(struct wlan_mlme_nss_chains));
+	if (wlan_vdev_mlme_get_opmode(iface->vdev) != QDF_STA_MODE)
+		qdf_mem_copy(mlme_get_dynamic_vdev_config(iface->vdev),
+			     mlme_get_ini_vdev_config(iface->vdev),
+			     sizeof(struct wlan_mlme_nss_chains));
 
 	status = vdev_mgr_stop_send(vdev_mlme);
 
