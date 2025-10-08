@@ -1270,6 +1270,21 @@ QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
 						 struct pe_session *session);
 
 /**
+ * lim_update_ap_session_nss() - Update NSS parameters for AP session
+ * @session: PE session entry
+ *
+ * This function updates the NSS (Number of Spatial Streams) parameters for
+ * an AP session based on current hardware mode and vdev capabilities.
+ * It checks if the session supports NSS change, fetches the current NSS values
+ * from MLME and policy manager, and updates the session parameters if there's
+ * a change in NSS values.
+ * It also updates HE and EHT MCS sets according to the new NSS values.
+ *
+ * Return: true if NSS was updated and vdev is in active state, false otherwise
+ */
+bool lim_update_ap_session_nss(struct pe_session *session);
+
+/**
  * lim_dump_session_info() - Dump the key parameters of PE session
  * @mac_ctx: Global MAC context
  * @pe_session: PE session

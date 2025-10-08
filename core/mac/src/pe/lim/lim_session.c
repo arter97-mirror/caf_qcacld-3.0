@@ -1393,6 +1393,72 @@ QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
 	return status;
 }
 
+bool lim_update_ap_session_nss(struct pe_session *session)
+{
+	QDF_STATUS status;
+	struct mac_context *mac;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev = session->vdev;
+	uint8_t vdev_tx_nss, vdev_rx_nss, hwmode_tx_nss, hwmode_rx_nss;
+
+	if (!LIM_IS_AP_ROLE(session) ||
+	    !wlan_mlme_get_sap_supports_nss_change(vdev))
+		return false;
+
+	psoc = wlan_vdev_get_psoc(session->vdev);
+	if (!psoc) {
+		pe_debug("PSOC NULL");
+		return false;
+	}
+
+	mac = session->mac_ctx;
+	status = mlme_get_vdev_nss_by_freq_from_dyn(vdev, session->curr_op_freq,
+						    &vdev_tx_nss, &vdev_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to fetch vdev nss %d", status);
+		return false;
+	}
+
+	status = policy_mgr_curr_hwmode_fetch_chains_for_freq(psoc,
+							      session->curr_op_freq,
+							      &hwmode_tx_nss,
+							      &hwmode_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to fetch hwmode nss %d", status);
+		return false;
+	}
+
+	vdev_tx_nss = QDF_MIN(vdev_tx_nss, hwmode_tx_nss);
+	vdev_rx_nss = QDF_MIN(vdev_rx_nss, hwmode_rx_nss);
+
+	if (session->cap_tx_nss == vdev_tx_nss &&
+	    session->cap_rx_nss == vdev_rx_nss)
+		return false;
+
+	pe_debug("BSSID: " QDF_MAC_ADDR_FMT "NSS change from %dx%d to %dx%d",
+		 QDF_MAC_ADDR_REF(session->bssId),
+		 session->cap_tx_nss, session->cap_rx_nss,
+		 vdev_tx_nss, vdev_rx_nss);
+
+	session->cap_tx_nss = vdev_tx_nss;
+	session->cap_rx_nss = vdev_rx_nss;
+
+	status = wlan_vdev_mlme_set_bss_nss_params(vdev,
+						   vdev_tx_nss, vdev_rx_nss,
+						   vdev_tx_nss, vdev_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to set curr bss nss %d", status);
+		return false;
+	}
+
+	lim_update_session_he_config_nss(mac, session,
+					 vdev_tx_nss, vdev_rx_nss);
+
+	lim_update_session_eht_config_nss(session, vdev_tx_nss, vdev_rx_nss);
+
+	return QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up_active_state(vdev));
+}
+
 void lim_dump_session_info(struct mac_context *mac_ctx,
 			   struct pe_session *pe_session)
 {
