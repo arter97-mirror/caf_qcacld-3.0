@@ -477,12 +477,6 @@ void lim_handle_ft_pre_auth_rsp(struct mac_context *mac, QDF_STATUS status,
 		ft_session->ht_config = pe_session->ht_config;
 		ft_session->limSmeState = eLIM_SME_WT_REASSOC_STATE;
 
-		if (wlan_reg_is_24ghz_ch_freq(pe_session->ftPEContext.
-		    pFTPreAuthReq->pre_auth_channel_freq))
-			ft_session->vdev_nss = mac->vdev_type_nss_2g.sta;
-		else
-			ft_session->vdev_nss = mac->vdev_type_nss_5g.sta;
-
 		/* Update the ReAssoc BSSID of the current session */
 		sir_copy_mac_addr(pe_session->limReAssocbssId,
 				  pbssDescription->bssId);

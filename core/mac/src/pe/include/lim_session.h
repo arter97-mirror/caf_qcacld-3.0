@@ -1255,6 +1255,21 @@ struct pe_session *pe_find_session_by_scan_id(struct mac_context *mac_ctx,
 uint8_t pe_get_active_session_count(struct mac_context *mac_ctx);
 
 /**
+ * lim_fill_session_nss_params_on_create() - Fill NSS parameters for a session
+ * @mac_ctx: Pointer to global MAC context
+ * @session: PE session entry
+ *
+ * This function fills the NSS (Number of Spatial Streams) parameters for a
+ * session during its creation. It handles different BSS types (Infrastructure,
+ * AP, NDI) and sets appropriate TX and RX NSS values based on hardware
+ * capabilities and policy manager decisions.
+ *
+ * Return: QDF_STATUS - QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
+						 struct pe_session *session);
+
+/**
  * lim_dump_session_info() - Dump the key parameters of PE session
  * @mac_ctx: Global MAC context
  * @pe_session: PE session
