@@ -12074,6 +12074,8 @@ int sme_send_he_om_ctrl_update(mac_handle_t mac_handle, uint8_t session_id,
 	qdf_freq_t freq_seg_0;
 	enum phy_ch_width ch_width;
 	struct qdf_mac_addr connected_bssid;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma_handle)
@@ -12093,17 +12095,34 @@ int sme_send_he_om_ctrl_update(mac_handle_t mac_handle, uint8_t session_id,
 		return -EIO;
 	}
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, session_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("Failed to get VDEV %d", session_id);
+		return -EINVAL;
+	}
+
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &cap_tx_nss, &cap_rx_nss,
+						   &op_tx_nss, &op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		sme_debug("Failed to fetch curr bss nss %d", status);
+		return qdf_status_to_os_return(status);
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
 	omi_data->a_ctrl_id = A_CTRL_ID_OMI;
 
 	if (mac_ctx->he_om_ctrl_cfg_nss_set)
 		omi_data->rx_nss = mac_ctx->he_om_ctrl_cfg_nss;
 	else
-		omi_data->rx_nss = session->nss - 1;
+		omi_data->rx_nss = op_rx_nss - 1;
 
 	if (mac_ctx->he_om_ctrl_cfg_tx_nsts_set)
 		omi_data->tx_nsts = mac_ctx->he_om_ctrl_cfg_tx_nsts;
 	else
-		omi_data->tx_nsts = session->nss - 1;
+		omi_data->tx_nsts = op_tx_nss - 1;
 
 	if (mac_ctx->he_om_ctrl_cfg_bw_set)
 		omi_data->ch_bw = mac_ctx->he_om_ctrl_cfg_bw;
@@ -12149,6 +12168,8 @@ int sme_set_he_om_ctrl_param(mac_handle_t mac_handle, uint8_t session_id,
 	qdf_freq_t op_chan_freq;
 	qdf_freq_t freq_seg_0;
 	enum phy_ch_width ch_width;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss;
 
 	status = sme_validate_session_for_cap_update(mac_ctx, session_id,
 						     session);
@@ -12159,15 +12180,32 @@ int sme_set_he_om_ctrl_param(mac_handle_t mac_handle, uint8_t session_id,
 					    &op_chan_freq, &freq_seg_0,
 					    &ch_width);
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, session_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("Failed to get VDEV %d", session_id);
+		return -EINVAL;
+	}
+
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &cap_tx_nss, &cap_rx_nss,
+						   &op_tx_nss, &op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		sme_debug("Failed to fetch curr bss nss %d", status);
+		return qdf_status_to_os_return(status);
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
 	switch(param) {
 		case QCA_WLAN_VENDOR_ATTR_HE_OMI_ULMU_DISABLE:
 			sme_debug("Set OM ctrl UL MU dis to %d", cfg_val);
 			mac_ctx->he_om_ctrl_cfg_ul_mu_dis = cfg_val;
 			break;
 		case QCA_WLAN_VENDOR_ATTR_HE_OMI_RX_NSS:
-			if ((cfg_val + 1)  > session->nss) {
+			if ((cfg_val + 1)  > cap_rx_nss) {
 				sme_debug("OMI Nss %d is > connected Nss %d",
-					  cfg_val, session->nss);
+					  cfg_val, cap_rx_nss);
 				mac_ctx->he_om_ctrl_cfg_nss_set = false;
 				return 0;
 			}
@@ -12187,9 +12225,9 @@ int sme_set_he_om_ctrl_param(mac_handle_t mac_handle, uint8_t session_id,
 			mac_ctx->he_om_ctrl_cfg_bw = cfg_val;
 			break;
 		case QCA_WLAN_VENDOR_ATTR_HE_OMI_TX_NSTS:
-			if ((cfg_val + 1) > session->nss) {
+			if ((cfg_val + 1) > cap_tx_nss) {
 				sme_debug("OMI NSTS %d is > connected Nss %d",
-					  cfg_val, session->nss);
+					  cfg_val, cap_tx_nss);
 				mac_ctx->he_om_ctrl_cfg_tx_nsts_set = false;
 				return 0;
 			}
