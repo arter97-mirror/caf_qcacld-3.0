@@ -182,9 +182,11 @@ uint8_t ccp_wapi_oui02[HDD_WAPI_OUI_SIZE] = { 0x00, 0x14, 0x72, 0x02 };
 static const int beacon_filter_table[] = {
 	WLAN_ELEMID_DSPARMS,
 	WLAN_ELEMID_EDCAPARMS,
+	WLAN_ELEMID_HTCAP_ANA,
 	WLAN_ELEMID_QOS_CAPABILITY,
 	WLAN_ELEMID_HTINFO_ANA,
 	WLAN_ELEMID_OP_MODE_NOTIFY,
+	WLAN_ELEMID_VHTCAP,
 	WLAN_ELEMID_VHTOP,
 	WLAN_ELEMID_QUIET_CHANNEL,
 	WLAN_ELEMID_TWT,
@@ -196,11 +198,15 @@ static const int beacon_filter_table[] = {
  * beacon_filter_extn_table - table of extn IEs used for beacon filtering
  */
 static const int beacon_filter_extn_table[] = {
+#ifdef WLAN_FEATURE_11AX
+	WLAN_EXTN_ELEMID_HECAP,
 	WLAN_EXTN_ELEMID_HEOP,
+#endif
 	WLAN_EXTN_ELEMID_UORA,
 	WLAN_EXTN_ELEMID_MUEDCA,
 #ifdef WLAN_FEATURE_11BE
 	WLAN_EXTN_ELEMID_EHTOP,
+	WLAN_EXTN_ELEMID_EHTCAP,
 #endif
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
 	WLAN_EXTN_ELEMID_BSS_COLOR_CHANGE_ANNOUNCE,
