@@ -475,10 +475,6 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	    !(vht_op && vht_op->present && vht_caps))
 		return;
 
-	if (bcn->OperatingMode.present)
-		lim_update_nss(mac_ctx, sta_ds, bcn->OperatingMode.rxNSS,
-			       session);
-
 	bcn_vht_chwidth = lim_get_vht_ch_width(vht_caps, vht_op,
 					       &bcn->HTInfo,
 					       &bcn->HTCaps,
@@ -542,8 +538,9 @@ sch_bcn_process_sta_opmode(struct mac_context *mac_ctx,
 			    tUpdateBeaconParams *beaconParams,
 			    uint8_t *sendProbeReq, tpSirMacMgmtHdr pMh)
 {
-	tpDphHashNode sta = NULL;
+	tpDphHashNode sta;
 	uint16_t aid;
+	struct sir_dot11f_nss_info nss_ies;
 
 	/* check for VHT capability */
 	sta = dph_lookup_hash_entry(mac_ctx, pMh->sa, &aid,
@@ -553,6 +550,10 @@ sch_bcn_process_sta_opmode(struct mac_context *mac_ctx,
 	sch_bcn_update_opmode_change(mac_ctx, sta, session, bcn, pMh);
 	sch_bcn_update_he_ies(mac_ctx, sta, session, bcn, pMh);
 	lim_detect_change_in_srp(mac_ctx, sta, session, bcn);
+
+	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, bcn, session->dot11mode);
+	lim_update_nss(mac_ctx, sta, nss_ies.op_rx_nss, session);
+
 	return;
 }
 

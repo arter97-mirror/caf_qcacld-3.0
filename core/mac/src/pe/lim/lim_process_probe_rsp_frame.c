@@ -102,65 +102,69 @@ lim_process_updated_ies_in_probe_rsp(struct mac_context *mac_ctx,
 	bool wme_enabled;
 	tpDphHashNode sta_ds;
 	QDF_STATUS status;
+	struct sir_dot11f_nss_info nss_ies;
 
-	if (session_entry->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE) {
-		/*
-		 * Now Process EDCA Parameters, if EDCAParamSet
-		 * count is different.
-		 * -- While processing beacons in link established
-		 * state if it is determined that
-		 * QoS Info IE has a different count for EDCA Params,
-		 * and EDCA IE is not present in beacon,
-		 * then probe req is sent out to get the EDCA params.
-		 */
-		sta_ds = dph_get_hash_entry(mac_ctx, DPH_STA_HASH_INDEX_PEER,
-					    &session_entry->dph.dphHashTable);
+	if (session_entry->limMlmState != eLIM_MLM_LINK_ESTABLISHED_STATE)
+		return;
+	/*
+	 * Now Process EDCA Parameters, if EDCAParamSet
+	 * count is different.
+	 * -- While processing beacons in link established
+	 * state if it is determined that
+	 * QoS Info IE has a different count for EDCA Params,
+	 * and EDCA IE is not present in beacon,
+	 * then probe req is sent out to get the EDCA params.
+	 */
+	sta_ds = dph_get_hash_entry(mac_ctx, DPH_STA_HASH_INDEX_PEER,
+				    &session_entry->dph.dphHashTable);
 
-		limGetQosMode(session_entry, &qos_enabled);
-		limGetWmeMode(session_entry, &wme_enabled);
-		pe_debug("Vdev_id: %d mac: "QDF_MAC_ADDR_FMT" wmeEdcaPresent: %d wme_enabled: %d edcaPresent: %d, qos_enabled: %d edcaParams.qosInfo.count: %d schObject.gLimEdcaParamSetCount: %d",
-			 session_entry->vdev_id,
-			 QDF_MAC_ADDR_REF(session_entry->bssId),
-			 probe_rsp->wmeEdcaPresent, wme_enabled,
-			 probe_rsp->edcaPresent, qos_enabled,
-			 probe_rsp->edcaParams.qosInfo.count,
-			 session_entry->gLimEdcaParamSetCount);
+	limGetQosMode(session_entry, &qos_enabled);
+	limGetWmeMode(session_entry, &wme_enabled);
+	pe_debug("Vdev_id: %d mac: "QDF_MAC_ADDR_FMT" wmeEdcaPresent: %d wme_enabled: %d edcaPresent: %d, qos_enabled: %d edcaParams.qosInfo.count: %d schObject.gLimEdcaParamSetCount: %d",
+		 session_entry->vdev_id,
+		 QDF_MAC_ADDR_REF(session_entry->bssId),
+		 probe_rsp->wmeEdcaPresent, wme_enabled,
+		 probe_rsp->edcaPresent, qos_enabled,
+		 probe_rsp->edcaParams.qosInfo.count,
+		 session_entry->gLimEdcaParamSetCount);
 
-		if (((probe_rsp->wmeEdcaPresent && wme_enabled) ||
-		     (probe_rsp->edcaPresent && qos_enabled)) &&
-		    (probe_rsp->edcaParams.qosInfo.count !=
-		     session_entry->gLimEdcaParamSetCount)) {
-			status = sch_beacon_edca_process(mac_ctx,
-						    &probe_rsp->edcaParams,
-						    session_entry);
-			if (QDF_IS_STATUS_ERROR(status)) {
-				pe_err("EDCA param process error");
-			} else if (sta_ds) {
-				qdf_mem_copy(&sta_ds->qos.peer_edca_params,
-					     &probe_rsp->edcaParams,
-					     sizeof(probe_rsp->edcaParams));
-				/*
-				 * If needed, downgrade the
-				 * EDCA parameters
-				 */
-				lim_set_active_edca_params(mac_ctx,
-						session_entry->gLimEdcaParams,
-						session_entry);
-				lim_send_edca_params(mac_ctx,
-					session_entry->gLimEdcaParamsActive,
-					session_entry->vdev_id, false);
-				sch_qos_concurrency_update();
-			} else {
-				pe_err("SelfEntry missing in Hash");
-			}
-		}
-		if (session_entry->fWaitForProbeRsp) {
-			pe_warn("Check probe resp for caps change");
-			lim_detect_change_in_ap_capabilities(mac_ctx, probe_rsp,
-							     session_entry,
-							     false);
+	if (((probe_rsp->wmeEdcaPresent && wme_enabled) ||
+	     (probe_rsp->edcaPresent && qos_enabled)) &&
+	    (probe_rsp->edcaParams.qosInfo.count !=
+	     session_entry->gLimEdcaParamSetCount)) {
+		status = sch_beacon_edca_process(mac_ctx,
+						 &probe_rsp->edcaParams,
+						 session_entry);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("EDCA param process error");
+		} else if (sta_ds) {
+			qdf_mem_copy(&sta_ds->qos.peer_edca_params,
+				     &probe_rsp->edcaParams,
+				     sizeof(probe_rsp->edcaParams));
+			/*
+			 * If needed, downgrade the
+			 * EDCA parameters
+			 */
+			lim_set_active_edca_params(mac_ctx,
+						   session_entry->gLimEdcaParams,
+						   session_entry);
+			lim_send_edca_params(mac_ctx,
+					     session_entry->gLimEdcaParamsActive,
+					     session_entry->vdev_id, false);
+			sch_qos_concurrency_update();
+		} else {
+			pe_err("SelfEntry missing in Hash");
 		}
 	}
+	if (session_entry->fWaitForProbeRsp) {
+		pe_warn("Check probe resp for caps change");
+		lim_detect_change_in_ap_capabilities(mac_ctx, probe_rsp,
+						     session_entry, false);
+	}
+
+	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, probe_rsp,
+				  session_entry->dot11mode);
+	lim_update_nss(mac_ctx, sta_ds, nss_ies.op_rx_nss, session_entry);
 }
 
 void lim_process_gen_probe_rsp_frame(struct mac_context *mac_ctx,
