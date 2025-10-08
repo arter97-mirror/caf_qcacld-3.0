@@ -757,11 +757,11 @@ lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
  *
  * Return: qdf_status
  */
-QDF_STATUS
-lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
-			struct wlan_objmgr_vdev *vdev,
-			struct qdf_mac_addr *link_addr, uint8_t link_id,
-			uint16_t freq);
+QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
+				   struct wlan_objmgr_vdev *vdev,
+				   struct qdf_mac_addr *link_addr,
+				   uint8_t link_id, uint16_t freq);
+
 /**
  * lim_gen_link_specific_probe_rsp() - Generate link specific prb response
  * @mac_ctx: Pointer to mac context
@@ -815,11 +815,10 @@ lim_add_bcn_probe(struct wlan_objmgr_pdev *pdev, uint8_t *bcn_probe,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
-static inline QDF_STATUS
-lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
-			struct wlan_objmgr_vdev *vdev,
-			struct qdf_mac_addr *link_addr, uint8_t link_id,
-			uint16_t freq)
+static inline QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
+						 struct wlan_objmgr_vdev *vdev,
+						 struct qdf_mac_addr *link_addr,
+						 uint8_t link_id, uint16_t freq)
 {
 	return QDF_STATUS_SUCCESS;
 }

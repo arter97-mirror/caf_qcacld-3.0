@@ -4397,11 +4397,16 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 				   struct qdf_mac_addr *link_addr,
 				   uint8_t link_id, uint16_t freq)
 {
-	struct wlan_objmgr_pdev *pdev;
-	struct scan_cache_entry *cache_entry;
-	struct wlan_channel channel;
+	uint16_t bss_len;
+	QDF_STATUS status;
+	uint8_t cap_tx_nss, cap_rx_nss;
 	bool is_security_allowed;
-	struct mlo_link_info link_info;
+	struct wlan_channel channel;
+	struct wlan_objmgr_pdev *pdev;
+	struct bss_description *bss_desc;
+	struct scan_cache_entry *cache_entry;
+	struct sir_dot11f_nss_info nss_ies;
+	struct mlo_link_info link_info = {0};
 
 	pdev = mac_ctx->pdev;
 	if (!pdev) {
@@ -4415,6 +4420,33 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 						      freq);
 	if (!cache_entry)
 		return QDF_STATUS_E_FAILURE;
+
+	bss_len = offsetof(struct bss_description, ieFields[0]) +
+		  util_scan_entry_ie_len(cache_entry);
+	bss_desc = qdf_mem_malloc(bss_len);
+	if (!bss_desc) {
+		status = QDF_STATUS_E_NOMEM;
+		goto mem_free;
+	}
+
+	status = wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc,
+						    cache_entry);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to fill BSS desc");
+		goto mem_free;
+	}
+
+	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, &bss_desc->bcn_ies,
+				  MLME_DOT11_MODE_11BE);
+	status = mlme_get_vdev_nss_by_freq_from_dyn(vdev, bss_desc->chan_freq,
+						    &cap_tx_nss, &cap_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to get self NSS");
+		goto mem_free;
+	}
+
+	cap_tx_nss = QDF_MIN(cap_tx_nss, nss_ies.cap_rx_nss);
+	cap_rx_nss = QDF_MIN(cap_rx_nss, nss_ies.cap_tx_nss);
 
 	channel.ch_freq = cache_entry->channel.chan_freq;
 	channel.ch_ieee = wlan_reg_freq_to_chan(pdev, channel.ch_freq);
@@ -4434,6 +4466,8 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 
 	link_info.link_chan_info = &channel;
 	link_info.link_id = link_id;
+	link_info.cnx_tx_nss = cap_tx_nss;
+	link_info.cnx_rx_nss = cap_rx_nss;
 	qdf_copy_macaddr(&link_info.ap_link_addr, link_addr);
 
 	mlo_mgr_update_ap_link_info(vdev, &link_info);
@@ -4444,18 +4478,22 @@ QDF_STATUS lim_update_mlo_mgr_info(struct mac_context *mac_ctx,
 	 */
 	is_security_allowed =
 		wlan_cm_is_eht_allowed_for_current_security(
-					wlan_pdev_get_psoc(mac_ctx->pdev),
+					wlan_pdev_get_psoc(pdev),
 					cache_entry, true);
 
 	if (!is_security_allowed) {
 		mlme_debug("current security is not valid for partner link link_addr:" QDF_MAC_ADDR_FMT,
 			   QDF_MAC_ADDR_REF(link_addr->bytes));
-		util_scan_free_cache_entry(cache_entry);
-		return QDF_STATUS_E_FAILURE;
+		status = QDF_STATUS_E_FAILURE;
+	} else {
+		status = QDF_STATUS_SUCCESS;
 	}
+
+mem_free:
+	qdf_mem_free(bss_desc);
 	util_scan_free_cache_entry(cache_entry);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 #else
 static inline void
