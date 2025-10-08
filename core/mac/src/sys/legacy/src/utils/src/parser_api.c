@@ -1304,7 +1304,7 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 	}
 
 	if (pe_session) {
-		if (pe_session->nss < NSS_2x2_MODE) {
+		if (pe_session->cap_tx_nss < NSS_2x2_MODE) {
 			pDot11f->txSTBC = 0;
 		} else {
 			disable_high_ht_mcs_2x2 =
@@ -1321,9 +1321,9 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 							disable_high_ht_mcs_2x2;
 
 			/* Reset all higher MCS, means NSS3 and NSS4 */
-			max_nss = QDF_MIN(NSS_2x2_MODE, pe_session->nss);
+			max_nss = QDF_MIN(NSS_2x2_MODE, pe_session->cap_tx_nss);
 		} else {
-			max_nss = pe_session->nss;
+			max_nss = pe_session->cap_tx_nss;
 		}
 
 		for (i = max_nss; i < WLAN_MAX_VDEV_NSS; i++)
@@ -1719,17 +1719,19 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			(pe_session->ch_width == CH_WIDTH_20MHZ &&
 			 !vht_cap_info->enable_vht20_mcs9);
 
-		pDot11f->txMCSMap |= VHT_DISABLE_MCS_OVER_NSS(pe_session->nss);
-		pDot11f->rxMCSMap |= VHT_DISABLE_MCS_OVER_NSS(pe_session->nss);
+		pDot11f->txMCSMap |=
+			VHT_DISABLE_MCS_OVER_NSS(pe_session->cap_tx_nss);
+		pDot11f->rxMCSMap |=
+			VHT_DISABLE_MCS_OVER_NSS(pe_session->cap_rx_nss);
 
-		if (pe_session->nss < NSS_2x2_MODE)
+		if (pe_session->cap_tx_nss < NSS_2x2_MODE)
 			pDot11f->txSTBC = 0;
 
 		/*
 		 * Mark MCS set above current NSS as unsupported, if MCS9 is
 		 * unsupported, set max supported MCS per NSS as 0-8.
 		 */
-		for (idx = NSS_1x1_MODE; idx <= pe_session->nss; idx++) {
+		for (idx = NSS_1x1_MODE; idx <= pe_session->cap_tx_nss; idx++) {
 			if (vht20_mcs9_unsupported &&
 			    (VHT_GET_MCS_FOR_NSS(pDot11f->txMCSMap, idx) ==
 			     VHT_MCS_0_9)) {
@@ -1741,11 +1743,11 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 		}
 
 		pDot11f->txSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(pe_session->nss,
-								true);
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(pe_session->cap_tx_nss,
+							true);
 		pDot11f->rxHighSupDataRate =
-				VHT_GET_DATARATE_FOR_NSS_AND_GI(pe_session->nss,
-								true);
+			VHT_GET_DATARATE_FOR_NSS_AND_GI(pe_session->cap_rx_nss,
+							true);
 	}
 
 	lim_log_vht_cap(mac, pDot11f);
@@ -1828,7 +1830,7 @@ populate_dot11f_vht_operation(struct mac_context *mac,
 	mcs_set = vht_cap_info->basic_mcs_set;
 	mcs_set = (mcs_set & 0xFFFC) | vht_cap_info->rx_mcs;
 
-	if (pe_session->nss == NSS_1x1_MODE)
+	if (pe_session->cap_tx_nss == NSS_1x1_MODE)
 		mcs_set |= 0x000C;
 	else
 		mcs_set = (mcs_set & 0xFFF3) | (vht_cap_info->rx_mcs2x2 << 2);
@@ -8394,7 +8396,7 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 	enum phy_ch_width max_ch_width;
 
 	he_cap->present = 1;
-	nss = session ? session->nss : WLAN_MAX_VDEV_NSS;
+	nss = session ? session->cap_tx_nss : WLAN_MAX_VDEV_NSS;
 
 	if (!session) {
 		qdf_mem_copy(he_cap, &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,

@@ -7094,10 +7094,10 @@ static bool lim_check_is_bss_greater_than_4_nss_supp(struct pe_session *session,
 bool lim_check_he_80_mcs11_supp(struct pe_session *session,
 				tDot11fIEhe_cap *he_cap)
 {
-	if ((HE_GET_MCS_FOR_NSS(he_cap->rx_he_mcs_map_lt_80, session->nss) ==
-	     HE_MCS_0_11) ||
-	    (HE_GET_MCS_FOR_NSS(he_cap->tx_he_mcs_map_lt_80, session->nss) ==
-	     HE_MCS_0_11))
+	if ((HE_GET_MCS_FOR_NSS(he_cap->rx_he_mcs_map_lt_80,
+				session->cap_tx_nss) == HE_MCS_0_11) ||
+	    (HE_GET_MCS_FOR_NSS(he_cap->tx_he_mcs_map_lt_80,
+				session->cap_rx_nss) == HE_MCS_0_11))
 		return true;
 
 	return false;
@@ -8935,7 +8935,7 @@ lim_revise_req_eht_cap_per_band(struct mlme_legacy_priv *mlme_priv,
 static void lim_revise_req_eht_cap_per_mode(struct mlme_legacy_priv *mlme_priv,
 					    struct pe_session *session)
 {
-	uint8_t nss = session->nss;
+	uint8_t nss = session->cap_tx_nss;
 
 	if (session->opmode == QDF_SAP_MODE ||
 	    session->opmode == QDF_P2P_GO_MODE) {
@@ -11643,8 +11643,8 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 	mlme_obj->mgmt.rate_info.quarter_rate = cds_is_5_mhz_enabled();
 	mlme_obj->mgmt.rate_info.half_rate = cds_is_10_mhz_enabled();
 
-	mlme_obj->mgmt.chainmask_info.num_rx_chain = session->nss;
-	mlme_obj->mgmt.chainmask_info.num_tx_chain = session->nss;
+	mlme_obj->mgmt.chainmask_info.num_rx_chain = session->cap_rx_nss;
+	mlme_obj->mgmt.chainmask_info.num_tx_chain = session->cap_tx_nss;
 	wlan_vdev_mlme_set_ssid(mlme_obj->vdev, session->ssId.ssId,
 				session->ssId.length);
 

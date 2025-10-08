@@ -1615,12 +1615,14 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			goto assocReject;
 		}
 
-		if (ap_nss < session_entry->nss)
-			session_entry->nss = ap_nss;
+		if (ap_nss < session_entry->cap_tx_nss) {
+			session_entry->cap_tx_nss = ap_nss;
+			session_entry->cap_rx_nss = session_entry->cap_tx_nss;
+		}
 
 		lim_objmgr_update_vdev_nss(mac_ctx->psoc,
 					   session_entry->smeSessionId,
-					   session_entry->nss);
+					   session_entry->cap_tx_nss);
 		lim_update_vdev_rate_set(mac_ctx->psoc,
 					 session_entry->smeSessionId,
 					 assoc_rsp);
@@ -1727,12 +1729,14 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (lim_search_pre_auth_list(mac_ctx, hdr->sa))
 		lim_delete_pre_auth_node(mac_ctx, hdr->sa);
 
-	if (ap_nss < session_entry->nss)
-		session_entry->nss = ap_nss;
+	if (ap_nss < session_entry->cap_tx_nss) {
+		session_entry->cap_tx_nss = ap_nss;
+		session_entry->cap_rx_nss = session_entry->cap_tx_nss;
+	}
 
 	lim_objmgr_update_vdev_nss(mac_ctx->psoc,
 				   session_entry->smeSessionId,
-				   session_entry->nss);
+				   session_entry->cap_tx_nss);
 	lim_update_vdev_rate_set(mac_ctx->psoc, session_entry->smeSessionId,
 				 assoc_rsp);
 	if (QDF_IS_STATUS_ERROR(lim_update_sta_vdev_punc(

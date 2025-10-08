@@ -268,13 +268,13 @@ static void lim_populate_fd_capability(struct pe_session *pe_session,
 	}
 
 	/* Max Num of Spatial Steam */
-	switch (pe_session->nss) {
+	switch (pe_session->cap_tx_nss) {
 	case WLAN_FD_CAP_NSS_MODE_1:
 	case WLAN_FD_CAP_NSS_MODE_2:
-		fd_cap[0] |= ((pe_session->nss - 1) << WLAN_FD_CAP_NSS_S);
-		break;
 	case WLAN_FD_CAP_NSS_MODE_3:
 	case WLAN_FD_CAP_NSS_MODE_4:
+		fd_cap[0] |= (pe_session->cap_tx_nss - 1) << WLAN_FD_CAP_NSS_S;
+		break;
 	case WLAN_FD_CAP_NSS_MODE_5:
 	case WLAN_FD_CAP_NSS_MODE_6:
 	case WLAN_FD_CAP_NSS_MODE_7:
@@ -282,7 +282,8 @@ static void lim_populate_fd_capability(struct pe_session *pe_session,
 		fd_cap[0] |= (WLAN_FD_CAP_NSS_GTE_5 << WLAN_FD_CAP_NSS_S);
 		break;
 	default:
-		pe_err("NSS value: %d is not supported", pe_session->nss);
+		pe_err("NSS value: %d is not supported",
+		       pe_session->cap_tx_nss);
 		break;
 	}
 

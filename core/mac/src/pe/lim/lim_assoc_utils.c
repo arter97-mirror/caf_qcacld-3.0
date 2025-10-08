@@ -1248,11 +1248,11 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 				break;
 			}
 			sta_ds->vht_160mhz_nss = nss * 2;
-			if (session->nss == WLAN_MAX_VDEV_NSS)
+			if (session->cap_tx_nss == WLAN_MAX_VDEV_NSS)
 				break;
 			if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo)
 				break;
-			session->nss *= 2;
+			session->cap_tx_nss *= 2;
 		} else {
 			sta_ds->vht_80p80mhz_nss = 0;
 		}
@@ -1264,11 +1264,11 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 				pe_debug("Invalid extnd nss bw support val");
 				break;
 			}
-			if (session->nss == WLAN_MAX_VDEV_NSS)
+			if (session->cap_tx_nss == WLAN_MAX_VDEV_NSS)
 				break;
 			if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo)
 				break;
-			session->nss *= 2;
+			session->cap_tx_nss *= 2;
 		} else {
 			sta_ds->vht_160mhz_nss = nss;
 			sta_ds->vht_80p80mhz_nss = nss;
@@ -1280,12 +1280,13 @@ static void lim_get_vht_gt80_nss(struct mac_context *mac_ctx,
 	}
 	pe_debug("AP Nss config: 160MHz: %d, 80P80MHz %d",
 		 sta_ds->vht_160mhz_nss, sta_ds->vht_80p80mhz_nss);
-	sta_ds->vht_160mhz_nss = QDF_MIN(sta_ds->vht_160mhz_nss, session->nss);
+	sta_ds->vht_160mhz_nss = QDF_MIN(sta_ds->vht_160mhz_nss,
+					 session->cap_tx_nss);
 	sta_ds->vht_80p80mhz_nss = QDF_MIN(sta_ds->vht_80p80mhz_nss,
-					   session->nss);
+					   session->cap_tx_nss);
 	pe_debug("Session Nss config: 160MHz: %d, 80P80MHz %d, session Nss %d",
 		 sta_ds->vht_160mhz_nss, sta_ds->vht_80p80mhz_nss,
-		 session->nss);
+		 session->cap_tx_nss);
 }
 
 QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
@@ -1516,7 +1517,7 @@ QDF_STATUS lim_populate_own_rate_set(struct mac_context *mac_ctx,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		if (session_entry->nss == NSS_1x1_MODE)
+		if (session_entry->cap_tx_nss == NSS_1x1_MODE)
 			rates->supportedMCSSet[1] = 0;
 
 		lim_dump_ht_mcs_mask(rates->supportedMCSSet, NULL);
@@ -1534,7 +1535,7 @@ static bool lim_check_valid_mcs_for_nss(struct pe_session *session,
 	if (!session->he_capable || !he_caps || !he_caps->present)
 		return true;
 
-	for (i = NSS_1x1_MODE; i <= session->nss; i++)
+	for (i = NSS_1x1_MODE; i <= session->cap_tx_nss; i++)
 		if (!HE_MCS_IS_NSS_ENABLED(he_caps->rx_he_mcs_map_lt_80, i) ||
 		    !HE_MCS_IS_NSS_ENABLED(he_caps->tx_he_mcs_map_lt_80, i))
 			return false;
@@ -1716,7 +1717,8 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		for (idx = pe_session->nss; idx < WLAN_MAX_VDEV_NSS; idx++)
+		for (idx = pe_session->cap_tx_nss;
+		     idx < WLAN_MAX_VDEV_NSS; idx++)
 			pRates->supportedMCSSet[idx] = 0;
 
 		/* if supported MCS Set of the peer is passed in, then do the
@@ -1739,7 +1741,7 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 			((pRates->supportedMCSSet[1] != 0) ? false : true);
 	}
 	lim_populate_vht_mcs_set(mac, pRates, pVHTCaps, pe_session,
-				 pe_session->nss, sta_ds);
+				 pe_session->cap_tx_nss, sta_ds);
 
 	if (lim_check_valid_mcs_for_nss(pe_session, he_caps)) {
 		peer_he_caps = he_caps;
@@ -1750,14 +1752,14 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	lim_populate_he_mcs_set(mac, pRates, peer_he_caps,
-			pe_session, pe_session->nss);
+	lim_populate_he_mcs_set(mac, pRates, peer_he_caps, pe_session,
+				pe_session->cap_tx_nss);
 	lim_populate_eht_mcs_set(mac, pRates, eht_caps,
 				 pe_session, pe_session->ch_width,
 				 wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq));
 
 	pe_debug("nss 1x1 %d nss %d", pe_session->supported_nss_1x1,
-		 pe_session->nss);
+		 pe_session->cap_tx_nss);
 
 	return QDF_STATUS_SUCCESS;
 } /*** lim_populate_peer_rate_set() ***/
@@ -1974,7 +1976,8 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 			return QDF_STATUS_E_FAILURE;
 		}
 
-		for (idx = session_entry->nss; idx < WLAN_MAX_VDEV_NSS; idx++)
+		for (idx = session_entry->cap_tx_nss;
+		     idx < WLAN_MAX_VDEV_NSS; idx++)
 			mcs_set[idx] = 0;
 
 		wlan_ll_lt_sap_get_mcs(mac_ctx->psoc, session_entry->vdev_id,
@@ -1988,9 +1991,10 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 				     sta_ds->supportedRates.supportedMCSSet);
 	}
 	lim_populate_vht_mcs_set(mac_ctx, &sta_ds->supportedRates, vht_caps,
-				 session_entry, session_entry->nss, sta_ds);
+				 session_entry, session_entry->cap_tx_nss,
+				 sta_ds);
 	lim_populate_he_mcs_set(mac_ctx, &sta_ds->supportedRates, he_caps,
-				session_entry, session_entry->nss);
+				session_entry, session_entry->cap_tx_nss);
 	lim_populate_eht_mcs_set(mac_ctx, &sta_ds->supportedRates, eht_caps,
 				 session_entry, sta_ds->ch_width,
 				 wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq));
@@ -2337,7 +2341,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 		LIM_IS_AP_ROLE(session_entry) &&
 		(STA_ENTRY_PEER == sta_ds->staType) &&
 		!add_sta_params->vhtCapable &&
-		(session_entry->nss == 2)) {
+		(session_entry->cap_tx_nss > NSS_1x1_MODE)) {
 		session_entry->ht_client_cnt++;
 		if (session_entry->ht_client_cnt == 1) {
 			wma_cli_set_command(session_entry->smeSessionId,
@@ -2371,9 +2375,9 @@ lim_add_sta(struct mac_context *mac_ctx,
 
 		add_sta_params->vhtSupportedRxNss = sta_ds->vhtSupportedRxNss;
 		if (LIM_IS_AP_ROLE(session_entry))
-			add_sta_params->vhtSupportedRxNss = QDF_MIN(
-					add_sta_params->vhtSupportedRxNss,
-					session_entry->nss);
+			add_sta_params->vhtSupportedRxNss =
+				QDF_MIN(add_sta_params->vhtSupportedRxNss,
+					session_entry->cap_tx_nss);
 		add_sta_params->vhtTxBFCapable =
 #ifdef FEATURE_WLAN_TDLS
 			((STA_ENTRY_PEER == sta_ds->staType)
@@ -2717,7 +2721,7 @@ lim_del_sta(struct mac_context *mac,
 		LIM_IS_AP_ROLE(pe_session) &&
 		(sta->staType == STA_ENTRY_PEER) &&
 		!sta->mlmStaContext.vhtCapability &&
-		(pe_session->nss == 2)) {
+		(pe_session->cap_tx_nss > NSS_1x1_MODE)) {
 		pe_session->ht_client_cnt--;
 		if (pe_session->ht_client_cnt == 0) {
 			pe_debug("clearing SMPS intolrent vdev_param");

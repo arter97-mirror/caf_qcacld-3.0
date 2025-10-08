@@ -199,7 +199,7 @@ static void lim_check_is_he_mcs_valid(struct pe_session *session,
 		goto downgrade_11ac;
 
 	mcs_map = bcn_ies->he_cap.rx_he_mcs_map_lt_80;
-	for (i = 0; i < session->nss; i++) {
+	for (i = 0; i < session->cap_tx_nss; i++) {
 		if (((mcs_map >> (i * 2)) & 0x3) != 0x3)
 			return;
 	}
@@ -211,7 +211,8 @@ downgrade_11ac:
 	else
 		session->dot11mode = MLME_DOT11_MODE_11N;
 	pe_err("vdev %d: Invalid LT80 MCS map 0x%x with NSS %d, falback to dot11mode %d",
-	       session->vdev_id, mcs_map, session->nss, session->dot11mode);
+	       session->vdev_id, mcs_map, session->cap_tx_nss,
+	       session->dot11mode);
 }
 
 void lim_update_he_bw_cap_mcs(struct pe_session *session,
@@ -234,7 +235,7 @@ void lim_update_he_bw_cap_mcs(struct pe_session *session,
 			 !lim_validate_he160_mcs_map(session->mac_ctx,
 			   *((uint16_t *)bcn_ies->he_cap.rx_he_mcs_map_160),
 			   *((uint16_t *)bcn_ies->he_cap.tx_he_mcs_map_160),
-						     session->nss)) {
+						     session->cap_tx_nss)) {
 			is_80mhz = 1;
 			if (session->ch_width == CH_WIDTH_160MHZ) {
 				pe_debug("HE160 Rx/Tx MCS is not valid, falling back to 80MHz");
@@ -804,7 +805,7 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 				session->gLimOperatingMode.rxNSS = self_nss - 1;
 			else
 				session->gLimOperatingMode.rxNSS =
-							session->nss - 1;
+							session->cap_rx_nss - 1;
 		} else {
 			pe_err("AP does not support op_mode rx");
 		}
@@ -857,7 +858,7 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 	}
 
 	lim_objmgr_update_vdev_nss(mac_ctx->psoc, session->smeSessionId,
-				   session->nss);
+				   session->cap_tx_nss);
 
 	session->is_adaptive_11r_connection =
 			lim_extract_adaptive_11r_cap(ie, ie_len);

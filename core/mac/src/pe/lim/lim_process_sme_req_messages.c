@@ -1041,11 +1041,12 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			session->vdev_nss = vdev_type_nss->ndi;
 		}
 
-		session->nss = session->vdev_nss;
+		session->cap_tx_nss = session->vdev_nss;
 		if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo ||
 		    policy_mgr_is_vdev_ll_lt_sap(mac_ctx->psoc, vdev_id))
-			session->nss = 1;
+			session->cap_tx_nss = 1;
 
+		session->cap_rx_nss = session->cap_tx_nss;
 		session->htCapability =
 			IS_DOT11_MODE_HT(session->dot11mode);
 		session->vhtCapability =
@@ -1679,7 +1680,7 @@ lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
 	eht_config = &mlme_priv->eht_config;
 	dot11_eht_cap = &mlme_cfg->eht_caps.dot11_eht_cap;
 
-	if (session->nss == 1) {
+	if (session->cap_tx_nss == 1) {
 		tx_nss = 1;
 		rx_nss = 1;
 	} else {
@@ -1762,7 +1763,8 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 		session->vdev_nss = vdev_type_nss->p2p_cli;
 	else
 		session->vdev_nss = vdev_type_nss->sta;
-	session->nss = session->vdev_nss;
+	session->cap_tx_nss = session->vdev_nss;
+	session->cap_rx_nss = session->vdev_nss;
 
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 
@@ -1781,7 +1783,8 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 				wlan_reg_is_5ghz_ch_freq(bss_desc->chan_freq);
 
 	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_mimo) {
-		session->nss = 1;
+		session->cap_tx_nss = 1;
+		session->cap_rx_nss = 1;
 		session->vdev_nss = 1;
 	}
 
@@ -1864,11 +1867,12 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	    mac_ctx->roam.configParam.is_force_1x1 ==
 	    FORCE_1X1_ENABLED_FORCED)) {
 		session->vdev_nss = 1;
-		session->nss = 1;
+		session->cap_tx_nss = 1;
+		session->cap_rx_nss = 1;
 		session->nss_forced_1x1 = true;
 		pe_debug("For special ap, NSS: %d force 1x1 %d",
-			  session->nss,
-			  mac_ctx->roam.configParam.is_force_1x1);
+			 session->cap_tx_nss,
+			 mac_ctx->roam.configParam.is_force_1x1);
 	}
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
@@ -3612,7 +3616,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->txLdpcIniFeatureEnabled =
 		mac_ctx->mlme_cfg->ht_caps.tx_ldpc_enable;
 
-	if (session->nss == 1)
+	if (session->cap_tx_nss == NSS_1x1_MODE)
 		session->supported_nss_1x1 = true;
 
 	session->limCurrentBssCaps = bss_desc->capabilityInfo;
@@ -5453,7 +5457,7 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 			mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_gid;
 	}
 
-	if (session_entry->nss == 1)
+	if (session_entry->cap_tx_nss == NSS_1x1_MODE)
 		session_entry->supported_nss_1x1 = true;
 
 	lim_check_oui_and_update_session(mac_ctx, session_entry, ie_struct);
@@ -9641,8 +9645,8 @@ lim_update_bcn_with_new_ch_width(struct mac_context *mac_ctx,
 
 	session->gLimOperatingMode.present = 1;
 	session->gLimOperatingMode.chanWidth = ch_width;
-	if (session->nss)
-		session->gLimOperatingMode.rxNSS = session->nss - 1;
+	if (session->cap_rx_nss)
+		session->gLimOperatingMode.rxNSS = session->cap_rx_nss - 1;
 
 	pe_debug("ch width %d nss %d",
 		 session->gLimOperatingMode.chanWidth,

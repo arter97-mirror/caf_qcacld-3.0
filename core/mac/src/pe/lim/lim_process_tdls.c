@@ -1201,7 +1201,7 @@ static void lim_tdls_populate_he_operations(struct mac_context *mac,
 		he_op->bss_col_disabled = 1;
 
 	mcs_set = (uint16_t)he_cap_info->he_ops_basic_mcs_nss;
-	if (pe_session->nss == NSS_1x1_MODE)
+	if (pe_session->cap_tx_nss == NSS_1x1_MODE)
 		mcs_set |= 0xFFFC;
 	else
 		mcs_set |= 0xFFF0;

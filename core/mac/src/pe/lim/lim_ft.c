@@ -660,7 +660,8 @@ QDF_STATUS lim_fill_ft_session(struct mac_context *mac,
 	else
 		ft_session->vdev_nss = mac->vdev_type_nss_2g.sta;
 
-	ft_session->nss = ft_session ->vdev_nss;
+	ft_session->cap_tx_nss = ft_session->vdev_nss;
+	ft_session->cap_rx_nss = ft_session->vdev_nss;
 
 	cb_mode = lim_get_cb_mode_for_freq(mac, ft_session,
 					   ft_session->curr_op_freq);

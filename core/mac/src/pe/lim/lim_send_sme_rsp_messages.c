@@ -306,7 +306,7 @@ static void lim_send_smps_intolerent(struct mac_context *mac_ctx,
 						SIR_MAC_VENDOR_AP_1_OUI_LEN,
 						bcn_ie_ptr, bcn_ie_len);
 	if (mac_ctx->roam.configParam.is_force_1x1 &&
-	    vendor_ap_1 && (pe_session->nss == 2) &&
+	    vendor_ap_1 && (pe_session->cap_tx_nss > NSS_1x1_MODE) &&
 	    (!mac_ctx->mlme_cfg->gen.as_enabled ||
 	     wlan_reg_is_5ghz_ch_freq(pe_session->curr_op_freq))) {
 		/* SET vdev param */

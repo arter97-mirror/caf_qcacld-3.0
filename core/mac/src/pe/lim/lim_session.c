@@ -1113,7 +1113,7 @@ void lim_dump_session_info(struct mac_context *mac_ctx,
 	if (!mac_ctx || !pe_session)
 		return;
 
-	pe_nofl_debug("vdev_id %d freq %d ch_bw %d freq0 %d freq1 %d, smps %d mode %d action %d, nss_1x1 %d vdev_nss %d nss %d, cbMode %d, dot11Mode %d, subfer %d subfee %d csn %d, is_cisco %d, WPS %d OSEN %d FILS %d AKM %d",
+	pe_nofl_debug("vdev_id %d freq %d ch_bw %d freq0 %d freq1 %d, smps %d mode %d action %d, nss_1x1 %d vdev_nss %d Tx/Rx nss %dx%d, cbMode %d, dot11Mode %d, subfer %d subfee %d csn %d, is_cisco %d, WPS %d OSEN %d FILS %d AKM %d",
 		      pe_session->vdev_id, pe_session->curr_op_freq,
 		      pe_session->ch_width, pe_session->ch_center_freq_seg0,
 		      pe_session->ch_center_freq_seg1,
@@ -1121,7 +1121,8 @@ void lim_dump_session_info(struct mac_context *mac_ctx,
 		      mac_ctx->mlme_cfg->ht_caps.smps,
 		      pe_session->send_smps_action,
 		      pe_session->supported_nss_1x1, pe_session->vdev_nss,
-		      pe_session->nss, pe_session->htSupportedChannelWidthSet,
+		      pe_session->cap_tx_nss, pe_session->cap_rx_nss,
+		      pe_session->htSupportedChannelWidthSet,
 		      pe_session->dot11mode,
 		      pe_session->vht_config.su_beam_former,
 		      pe_session->vht_config.su_beam_formee,
