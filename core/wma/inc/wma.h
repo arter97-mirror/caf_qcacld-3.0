@@ -152,7 +152,6 @@
 
 #define WMA_MAX_RF_CHAINS(x)    ((1 << x) - 1)
 #define WMA_MIN_RF_CHAINS               (1)
-#define WMA_MAX_NSS               (2)
 
 #define WMA_NOA_IE_SIZE(num_desc) (2 + (13 * (num_desc)))
 #define WMA_MAX_NOA_DESCRIPTORS 4

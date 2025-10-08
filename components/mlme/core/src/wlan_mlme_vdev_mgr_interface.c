@@ -2460,6 +2460,14 @@ vdevmgr_vdev_reconfig_timer_complete(struct vdev_mlme_obj *vdev_mlme)
 }
 #endif
 
+static inline QDF_STATUS
+vdevmgr_peer_oper_mode_notify(struct wlan_objmgr_vdev *vdev,
+			      struct peer_oper_mode_event *data)
+{
+	return lim_handle_peer_oper_mode_notify_event(wlan_vdev_get_id(vdev),
+						      data);
+}
+
 QDF_STATUS mlme_vdev_self_peer_create(struct wlan_objmgr_vdev *vdev)
 {
 	struct vdev_mlme_obj *vdev_mlme;
@@ -2680,6 +2688,7 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 			vdevmgr_vdev_reconfig_notify_standby,
 
 #endif
+	.mlme_vdev_peer_oper_mode_notify = vdevmgr_peer_oper_mode_notify,
 };
 
 static struct vdev_mlme_ops ap_mlme_ops = {
@@ -2705,6 +2714,7 @@ static struct vdev_mlme_ops ap_mlme_ops = {
 	.mlme_vdev_csa_complete = ap_mlme_vdev_csa_complete,
 	.mlme_vdev_link_reconfig_remove = ap_mlme_vdev_send_link_removal,
 	.mlme_vdev_set_link_remove_delay = ap_mlme_vdev_set_link_removal_delay,
+	.mlme_vdev_peer_oper_mode_notify = vdevmgr_peer_oper_mode_notify,
 };
 
 static struct vdev_mlme_ops mon_mlme_ops = {

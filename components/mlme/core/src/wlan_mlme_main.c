@@ -67,7 +67,7 @@ mlme_get_rx_ops(struct wlan_objmgr_psoc *psoc)
 
 void wlan_mlme_register_rx_ops(struct wlan_mlme_rx_ops *rx_ops)
 {
-	rx_ops->peer_oper_mode_eventid = wlan_mlme_set_peer_indicated_ch_width;
+	rx_ops->peer_oper_mode_eventid = wlan_mlme_update_peer_oper_mode_params;
 }
 
 struct wlan_mlme_psoc_ext_obj *mlme_get_psoc_ext_obj_fl(

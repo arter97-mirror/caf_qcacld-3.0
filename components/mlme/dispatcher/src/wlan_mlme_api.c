@@ -6298,12 +6298,13 @@ done:
 }
 
 QDF_STATUS
-wlan_mlme_set_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
-				      struct peer_oper_mode_event *data)
+wlan_mlme_update_peer_oper_mode_params(struct wlan_objmgr_psoc *psoc,
+				       struct peer_oper_mode_event *data)
 {
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_peer *peer;
-	struct peer_mlme_priv_obj *peer_priv;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct vdev_mlme_obj *vdev_mlme;
 
 	if (!data) {
 		mlme_err("Data params is NULL");
@@ -6318,22 +6319,45 @@ wlan_mlme_set_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	status = wlan_mlme_set_peer_indicated_ch_width(peer, data);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to update peer ch width %d", status);
+		goto end;
+	}
+
+	vdev = wlan_peer_get_vdev(peer);
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlme_err("vdev component object is NULL for %d",
+			 wlan_vdev_get_id(vdev));
+		goto end;
+	}
+
+	if (vdev_mlme->ops && vdev_mlme->ops->mlme_vdev_peer_oper_mode_notify)
+		status = vdev_mlme->ops->mlme_vdev_peer_oper_mode_notify(vdev,
+									 data);
+end:
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_NB_ID);
+	return status;
+}
+
+QDF_STATUS
+wlan_mlme_set_peer_indicated_ch_width(struct wlan_objmgr_peer *peer,
+				      struct peer_oper_mode_event *data)
+{
+	struct peer_mlme_priv_obj *peer_priv;
+
 	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
 							  WLAN_UMAC_COMP_MLME);
 	if (!peer_priv) {
 		mlme_err("peer priv not found for mac: " QDF_MAC_ADDR_FMT,
 			 QDF_MAC_ADDR_REF(peer->macaddr));
-		status = QDF_STATUS_E_NULL_VALUE;
-		goto done;
+		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	peer_priv->peer_ind_bw =
 			target_if_wmi_chan_width_to_phy_ch_width(data->new_bw);
-
-done:
-	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_NB_ID);
-
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS

@@ -3435,6 +3435,26 @@ uint8_t lim_get_ht_max_mcs_idx(tDot11fIEHTCaps *ht_cap);
 uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset);
 
 /**
+ * lim_handle_peer_oper_mode_notify_event() - Handle peer operation mode notify
+ * event
+ * @vdev_id: Virtual device ID
+ * @data: Peer operation mode event data
+ *
+ * This function processes the peer operation mode notification event received
+ * from the firmware. It updates the peer's transmit and receive NSS (Number of
+ * Spatial Streams) capabilities based on the received notification.
+ *
+ * For STA role, it also updates the BSS NSS parameters in the VDEV MLME.
+ *
+ * Return: QDF_STATUS_SUCCESS if processed successfully
+ *         QDF_STATUS_E_NULL_VALUE if mac context is NULL
+ *         QDF_STATUS_E_NOENT if session or peer entry is not found
+ */
+QDF_STATUS
+lim_handle_peer_oper_mode_notify_event(uint8_t vdev_id,
+				       struct peer_oper_mode_event *data);
+
+/**
  * lim_update_nss() - Function to update NSS
  * @mac_ctx: pointer to Global Mac structure
  * @sta_ds: pointer to tpDphHashNode

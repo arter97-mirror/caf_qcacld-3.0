@@ -11702,6 +11702,70 @@ uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset)
 	return maxidx;
 }
 
+QDF_STATUS
+lim_handle_peer_oper_mode_notify_event(uint8_t vdev_id,
+				       struct peer_oper_mode_event *data)
+{
+	uint8_t peer_tx_nss, peer_rx_nss;
+	uint16_t aid;
+	QDF_STATUS status;
+	tSirMacAddr peer_mac;
+	tpDphHashNode sta_ptr;
+	struct pe_session *session;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac_ctx) {
+		pe_debug("mac_ctx NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_debug("Failed to find session with %d", vdev_id);
+		return QDF_STATUS_E_NOENT;
+	}
+
+	qdf_mem_copy(&peer_mac, data->peer_mac_address.bytes,
+		     sizeof(tSirMacAddr));
+	sta_ptr = dph_lookup_hash_entry(mac_ctx, peer_mac, &aid,
+					&session->dph.dphHashTable);
+	if (!sta_ptr) {
+		pe_debug("Failed to find entry for " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(data->peer_mac_address.bytes));
+		return QDF_STATUS_E_NOENT;
+	}
+
+	peer_rx_nss = data->new_rxnss + 1;
+	if (sta_ptr->cap_tx_nss >= peer_rx_nss &&
+	    sta_ptr->op_tx_nss != peer_rx_nss)
+		sta_ptr->op_tx_nss = peer_rx_nss;
+
+	if (data->ind_type != mlme_peer_ind_omi)
+		peer_tx_nss = peer_rx_nss;
+	else
+		peer_tx_nss = data->new_txnss + 1;
+
+	if (sta_ptr->cap_rx_nss >= peer_tx_nss &&
+	    sta_ptr->op_rx_nss != peer_tx_nss)
+		sta_ptr->op_rx_nss = peer_tx_nss;
+
+	pe_debug("Tx/Rx NSS %dx%d for peer " QDF_MAC_ADDR_FMT,
+		 sta_ptr->op_tx_nss, sta_ptr->op_rx_nss,
+		 QDF_MAC_ADDR_REF(data->peer_mac_address.bytes));
+
+	if (!LIM_IS_STA_ROLE(session))
+		return QDF_STATUS_SUCCESS;
+
+	status = wlan_vdev_mlme_set_bss_nss_params(session->vdev,
+						   sta_ptr->cap_tx_nss,
+						   sta_ptr->cap_rx_nss,
+						   sta_ptr->op_tx_nss,
+						   sta_ptr->op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_debug("Failed to set curr bss nss %d", status);
+
+	return status;
+}
 void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 		    uint8_t peer_rx_nss, struct pe_session *session)
 {
@@ -11716,7 +11780,12 @@ void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 		return;
 	}
 
+	/* Assume peer uses same NSS for its Tx/Rx */
 	sta_ds->op_tx_nss = peer_rx_nss;
+	if (sta_ds->cap_rx_nss >= peer_rx_nss &&
+	    sta_ds->op_rx_nss != peer_rx_nss)
+		sta_ds->op_rx_nss = peer_rx_nss;
+
 	lim_set_nss_change(mac_ctx, session, peer_rx_nss, sta_ds->staAddr);
 
 	if (!LIM_IS_STA_ROLE(session))

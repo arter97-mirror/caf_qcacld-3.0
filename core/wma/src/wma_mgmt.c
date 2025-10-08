@@ -3567,8 +3567,8 @@ void wma_process_update_rx_nss(tp_wma_handle wma_handle,
 	}
 
 	num_rf_chains = target_if_get_num_rf_chains(tgt_hdl);
-	if (rx_nss > num_rf_chains || rx_nss > WMA_MAX_NSS)
-		rx_nss = QDF_MIN(num_rf_chains, WMA_MAX_NSS);
+	if (rx_nss > num_rf_chains || rx_nss > WLAN_MAX_VDEV_NSS)
+		rx_nss = QDF_MIN(num_rf_chains, WLAN_MAX_VDEV_NSS);
 
 	update_rx_nss->rxNss = (uint32_t)rx_nss;
 

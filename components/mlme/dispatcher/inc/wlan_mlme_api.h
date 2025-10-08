@@ -4056,14 +4056,28 @@ wlan_mlme_get_roaming_offload(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * wlan_mlme_update_peer_oper_mode_params() - Update peer oper mode params
+ * @psoc: Pointer to psoc object
+ * @data: Peer operational mode event data
+ *
+ * This function updates the peer operation mode parameters including channel
+ * width and notifies the VDEV MLME component about the change.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code on failure
+ */
+QDF_STATUS
+wlan_mlme_update_peer_oper_mode_params(struct wlan_objmgr_psoc *psoc,
+				       struct peer_oper_mode_event *data);
+
+/**
  * wlan_mlme_set_peer_indicated_ch_width() - Set peer indicated channel width
- * @psoc: pointer to psoc object
+ * @peer: pointer to peer object
  * @data: Pointer to peer operating mode change event status
  *
  * Return: QDF Status
  */
 QDF_STATUS
-wlan_mlme_set_peer_indicated_ch_width(struct wlan_objmgr_psoc *psoc,
+wlan_mlme_set_peer_indicated_ch_width(struct wlan_objmgr_peer *peer,
 				      struct peer_oper_mode_event *data);
 
 /**

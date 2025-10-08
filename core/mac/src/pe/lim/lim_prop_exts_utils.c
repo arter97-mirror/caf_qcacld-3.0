@@ -760,12 +760,12 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 		session->gLimOperatingMode.present =
 					ext_cap->oper_mode_notification;
 		if (ext_cap->oper_mode_notification) {
-			uint8_t self_nss = 0;
+			uint8_t self_tx_nss, self_rx_nss = session->cap_rx_nss;
 
-			if (!wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
-				self_nss = mac_ctx->vdev_type_nss_5g.sta;
-			else
-				self_nss = mac_ctx->vdev_type_nss_2g.sta;
+			mlme_get_vdev_nss_by_freq_from_ini(session->vdev,
+							   session->curr_op_freq,
+							   &self_tx_nss,
+							   &self_rx_nss);
 
 			if (CH_WIDTH_160MHZ > session->ch_width)
 				session->gLimOperatingMode.chanWidth =
@@ -783,7 +783,8 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 					&bcn_ies->VHTCaps,
 					&bcn_ies->HTCaps,
 					&bcn_ies->he_cap) == NSS_1x1_MODE)
-				session->gLimOperatingMode.rxNSS = self_nss - 1;
+				session->gLimOperatingMode.rxNSS =
+							self_rx_nss - 1;
 			else
 				session->gLimOperatingMode.rxNSS =
 							session->cap_rx_nss - 1;
