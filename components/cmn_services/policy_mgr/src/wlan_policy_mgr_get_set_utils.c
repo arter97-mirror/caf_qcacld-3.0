@@ -1762,9 +1762,6 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 	qdf_mem_zero(pm_ctx->radio_combinations,
 		     sizeof(pm_ctx->radio_combinations));
 
-	policy_mgr_debug("Updated HW mode list: Num modes:%d",
-		pm_ctx->num_dbs_hw_modes);
-
 	for (i = 0; i < pm_ctx->num_dbs_hw_modes; i++) {
 		/* Update for MAC0 */
 		tmp = &info->mac_phy_cap[j++];
@@ -1846,10 +1843,22 @@ QDF_STATUS policy_mgr_update_hw_mode_list(struct wlan_objmgr_psoc *psoc,
 	pm_ctx->cfg.min_tx_chains = min_tx_chains;
 	pm_ctx->cfg.min_rx_chains = min_rx_chains;
 
+	policy_mgr_debug("Updated HW mode list: Num modes:%d, min chains Tx/Rx %dx%d",
+			 pm_ctx->num_dbs_hw_modes,
+			 pm_ctx->cfg.min_tx_chains,
+			 pm_ctx->cfg.min_rx_chains);
+
 	/*
-	 * Initializing Current frequency with SMM frequency.
+	 * Initializing Current frequency with SMM/DBS frequency based on
+	 * HW support.
 	 */
-	policy_mgr_fill_curr_mac_freq_by_hwmode(pm_ctx, MODE_SMM);
+	if (policy_mgr_is_hw_smm_capable(psoc))
+		policy_mgr_fill_curr_mac_freq_by_hwmode(pm_ctx, MODE_SMM);
+	else if (policy_mgr_is_hw_dbs_capable(psoc))
+		policy_mgr_fill_curr_mac_freq_by_hwmode(pm_ctx, MODE_DBS);
+	else
+		policy_mgr_fill_curr_mac_freq_by_hwmode(pm_ctx, MODE_SMM);
+
 	policy_mgr_dump_freq_range(pm_ctx);
 
 	return QDF_STATUS_SUCCESS;
@@ -2479,21 +2488,20 @@ policy_mgr_is_supported_hw_mode(struct wlan_objmgr_psoc *psoc,
 				struct policy_mgr_psoc_priv_obj *pm_ctx,
 				enum policy_mgr_mode hw_mode)
 {
-	if (hw_mode == MODE_SMM)
-		return true;
-
-	if (hw_mode == MODE_DBS)
+	switch (hw_mode) {
+	case MODE_SMM:
+		return policy_mgr_is_hw_smm_capable(psoc);
+	case MODE_DBS:
 		return policy_mgr_is_hw_dbs_capable(psoc);
-
-	if (hw_mode == MODE_SBS_UPPER_SHARE ||
-	    hw_mode == MODE_SBS_LOWER_SHARE)
+	case MODE_SBS_UPPER_SHARE:
+	case MODE_SBS_LOWER_SHARE:
 		return policy_mgr_is_hw_sbs_capable(psoc) &&
-			pm_ctx->hw_mode.sbs_lower_band_end_freq;
-
-	if (hw_mode == MODE_SBS)
+		       pm_ctx->hw_mode.sbs_lower_band_end_freq;
+	case MODE_SBS:
 		return policy_mgr_is_hw_sbs_capable(psoc);
-
-	return false;
+	default:
+		return false;
+	}
 }
 
 static bool
@@ -3150,7 +3158,7 @@ bool policy_mgr_find_if_hwlist_has_smm(struct wlan_objmgr_psoc *psoc)
 bool policy_mgr_find_if_hwlist_has_dbs(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	uint32_t param, i, found = 0;
+	uint32_t param, i;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 
@@ -3160,13 +3168,9 @@ bool policy_mgr_find_if_hwlist_has_dbs(struct wlan_objmgr_psoc *psoc)
 	}
 	for (i = 0; i < pm_ctx->num_dbs_hw_modes; i++) {
 		param = pm_ctx->hw_mode.hw_mode_list[i];
-		if (POLICY_MGR_HW_MODE_DBS_MODE_GET(param)) {
-			found = 1;
-			break;
-		}
+		if (POLICY_MGR_HW_MODE_DBS_MODE_GET(param))
+			return true;
 	}
-	if (found)
-		return true;
 
 	return false;
 }
@@ -3184,9 +3188,8 @@ static bool policy_mgr_find_if_hwlist_has_sbs(struct wlan_objmgr_psoc *psoc)
 	}
 	for (i = 0; i < pm_ctx->num_dbs_hw_modes; i++) {
 		param = pm_ctx->hw_mode.hw_mode_list[i];
-		if (POLICY_MGR_HW_MODE_SBS_MODE_GET(param)) {
+		if (POLICY_MGR_HW_MODE_SBS_MODE_GET(param))
 			return true;
-		}
 	}
 
 	return false;
