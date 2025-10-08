@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -51,6 +52,7 @@ uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc);
  * __policy_mgr_is_ll_lt_sap_restart_required() - Check in ll_lt_sap restart is
  * required
  * @psoc: PSOC object
+ * @ll_lt_sap_start_freq: starting LL LT SAP freq.
  * @func: Function pointer of the caller function.
  *
  * This API checks if ll_lt_sap restart is required or not
@@ -58,10 +60,32 @@ uint8_t wlan_policy_mgr_get_ll_lt_sap_vdev_id(struct wlan_objmgr_psoc *psoc);
  * Return: true/false
  */
 bool __policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
+						qdf_freq_t ll_lt_sap_start_freq,
 						const char *func);
 
-#define policy_mgr_is_ll_lt_sap_restart_required(psoc) \
-	__policy_mgr_is_ll_lt_sap_restart_required(psoc, __func__)
+#define policy_mgr_is_ll_lt_sap_restart_required(psoc, ll_sap_freq) \
+	__policy_mgr_is_ll_lt_sap_restart_required(psoc, ll_sap_freq, __func__)
+
+/**
+ * __policy_mgr_is_ll_lt_freq_allowed() - Check if ll_lt_sap given freq
+ * can be allowed
+ * @psoc: PSOC object
+ * @ll_lt_sap_freq: LL LT SAP freq to check
+ * @ll_lt_sap_vdev_id: LL LT SAP vdev id
+ * @func: Function pointer of the caller function.
+ *
+ * This API checks if ll_lt_sap restart is required or not
+ *
+ * Return: true if frequency is allowed, false otherwise
+ */
+bool __policy_mgr_is_ll_lt_freq_allowed(struct wlan_objmgr_psoc *psoc,
+					qdf_freq_t ll_lt_sap_freq,
+					uint8_t ll_lt_sap_vdev_id,
+					const char *func);
+
+#define policy_mgr_is_ll_lt_freq_allowed(psoc, ll_sap_freq, ll_lt_sap_vdev_id) \
+	__policy_mgr_is_ll_lt_freq_allowed(psoc, ll_sap_freq, \
+					ll_lt_sap_vdev_id, __func__)
 
 /**
  * policy_mgr_ll_lt_sap_restart_concurrent_sap() - Check and restart
@@ -88,7 +112,16 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
 #else
 
 static inline bool
-policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc)
+policy_mgr_is_ll_lt_sap_restart_required(struct wlan_objmgr_psoc *psoc,
+					 qdf_freq_t ll_lt_sap_start_freq)
+{
+	return false;
+}
+
+static inline bool
+policy_mgr_is_ll_lt_freq_allowed(struct wlan_objmgr_psoc *psoc,
+				 qdf_freq_t ll_lt_sap_freq,
+				 uint8_t ll_lt_sap_vdev_id)
 {
 	return false;
 }
