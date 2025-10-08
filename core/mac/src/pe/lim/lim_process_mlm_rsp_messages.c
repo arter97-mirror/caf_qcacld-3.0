@@ -3390,6 +3390,7 @@ static void lim_process_switch_channel_join_req(
 	uint8_t nontx_bss_id = 0;
 	struct bss_description *bss;
 	QDF_STATUS mlo_status;
+	struct sir_dot11f_nss_info nss_ies;
 
 	if (status != QDF_STATUS_SUCCESS) {
 		pe_err("Change channel failed!!");
@@ -3481,6 +3482,18 @@ static void lim_process_switch_channel_join_req(
 	 */
 	if (nontx_bss_id) {
 		pe_debug("Skip sending join probe for MBSS candidate");
+
+		/*
+		 * For non-Tx MBSSID, use the NSS from session create as there
+		 * is not active probing implemented which can override in this
+		 * path, the reason to call update NSS API is to handle any
+		 * HW mode change related NSS downgrade to take effect.
+		 */
+		nss_ies.cap_tx_nss = WLAN_MAX_VDEV_NSS;
+		nss_ies.cap_rx_nss = WLAN_MAX_VDEV_NSS;
+		nss_ies.op_tx_nss = WLAN_MAX_VDEV_NSS;
+		nss_ies.op_rx_nss = WLAN_MAX_VDEV_NSS;
+		lim_update_session_nss_for_state(session_entry, &nss_ies);
 
 		mlo_status =
 		lim_update_mlo_mgr_ap_link_info_mbssid_connect(mac_ctx,

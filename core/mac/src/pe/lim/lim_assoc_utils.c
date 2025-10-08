@@ -3168,6 +3168,92 @@ lim_delete_dph_hash_entry(struct mac_context *mac_ctx, tSirMacAddr sta_addr,
 	lim_ap_check_6g_compatible_peer(mac_ctx, session_entry);
 }
 
+void lim_update_session_nss_for_state(struct pe_session *session,
+				      struct sir_dot11f_nss_info *nss_ies)
+{
+	QDF_STATUS status;
+	tpDphHashNode sta_ds;
+	uint8_t cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss;
+	struct mac_context *mac = session->mac_ctx;
+
+	if (session->nss_forced_1x1)
+		return;
+
+	switch (session->limMlmState) {
+	case eLIM_MLM_WT_JOIN_BEACON_STATE:
+		/*
+		 * HT NSS can't change from create (unless for assoc response),
+		 * as it uses the minimum NSS from all the HW modes.
+		 */
+		if (IS_DOT11_MODE_HT_ONLY(session->dot11mode))
+			return;
+
+		status = mlme_get_vdev_nss_by_freq_from_dyn(session->vdev,
+							    session->curr_op_freq,
+							    &cap_tx_nss,
+							    &cap_rx_nss);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Failed to fetch nss %d", status);
+			return;
+		}
+
+		break;
+	case eLIM_MLM_WT_ASSOC_RSP_STATE:
+		status = wlan_vdev_mlme_get_bss_nss_params(session->vdev,
+							   &cap_tx_nss,
+							   &cap_rx_nss,
+							   &op_tx_nss,
+							   &op_rx_nss);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Failed to fetch curr bss nss %d", status);
+			return;
+		}
+		break;
+	default:
+		pe_debug("Unexpected call to update session in %d for %d",
+			 session->limMlmState, session->vdev_id);
+		return;
+	}
+
+	cap_tx_nss = QDF_MIN(cap_tx_nss, nss_ies->cap_rx_nss);
+	cap_rx_nss = QDF_MIN(cap_rx_nss, nss_ies->cap_tx_nss);
+
+	if (session->cap_tx_nss != cap_tx_nss)
+		session->cap_tx_nss = cap_tx_nss;
+	if (session->cap_rx_nss != cap_rx_nss)
+		session->cap_rx_nss = cap_rx_nss;
+	op_tx_nss = QDF_MIN(session->cap_tx_nss, nss_ies->op_rx_nss);
+	op_rx_nss = QDF_MIN(session->cap_rx_nss, nss_ies->op_tx_nss);
+
+	status = wlan_vdev_mlme_set_bss_nss_params(session->vdev,
+						   cap_tx_nss, cap_rx_nss,
+						   op_tx_nss, op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to set curr bss nss %d", status);
+		return;
+	}
+
+	pe_debug("BSSID: " QDF_MAC_ADDR_FMT ", state %d, cap nss %dx%d op nss %dx%d",
+		 QDF_MAC_ADDR_REF(session->bssId), session->limMlmState,
+		 cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss);
+
+	lim_update_session_he_config_nss(mac, session,
+					 session->cap_tx_nss,
+					 session->cap_rx_nss);
+
+	lim_update_session_eht_config_nss(session, session->cap_tx_nss,
+					  session->cap_rx_nss);
+
+	sta_ds = dph_get_hash_entry(mac, DPH_STA_HASH_INDEX_PEER,
+				    &session->dph.dphHashTable);
+	if (sta_ds) {
+		sta_ds->cap_tx_nss = cap_tx_nss;
+		sta_ds->cap_rx_nss = cap_rx_nss;
+		sta_ds->op_tx_nss = op_tx_nss;
+		sta_ds->op_rx_nss = op_rx_nss;
+	}
+}
+
 /**
  * lim_check_and_announce_join_success()- function to check if the received
  * Beacon/Probe Response is from the BSS that we're attempting to join.
@@ -3201,6 +3287,7 @@ lim_check_and_announce_join_success(struct mac_context *mac_ctx,
 	uint32_t total_num_noa_desc = 0;
 	uint16_t aid;
 	bool check_assoc_disallowed;
+	struct sir_dot11f_nss_info nss_ies;
 
 	qdf_mem_copy(current_ssid.ssId,
 		     session_entry->ssId.ssId, session_entry->ssId.length);
@@ -3306,8 +3393,11 @@ lim_check_and_announce_join_success(struct mac_context *mac_ctx,
 		return;
 	}
 
-	/* Update Beacon Interval at CFG database */
+	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, beacon_probe_rsp,
+				  session_entry->dot11mode);
+	lim_update_session_nss_for_state(session_entry, &nss_ies);
 
+	/* Update Beacon Interval at CFG database */
 	if (beacon_probe_rsp->HTCaps.present)
 		lim_update_sta_run_time_ht_capability(mac_ctx,
 			 &beacon_probe_rsp->HTCaps);

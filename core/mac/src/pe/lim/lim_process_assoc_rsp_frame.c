@@ -1183,7 +1183,6 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	tpDphHashNode sta_ds;
 	tpSirAssocRsp assoc_rsp;
 	tLimMlmAssocCnf assoc_cnf;
-	uint8_t ap_nss;
 	uint16_t aid;
 	int8_t rssi;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -1191,6 +1190,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	bool sha384_akm, twt_req_ht_vht = false;
 	struct s_ext_cap *ext_cap;
 	struct bss_description *bss_desc;
+	struct sir_dot11f_nss_info nss_ies;
 
 	assoc_cnf.resultCode = eSIR_SME_SUCCESS;
 	/* Update PE session Id */
@@ -1569,11 +1569,33 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			      (assoc_rsp->status_code ? QDF_STATUS_E_FAILURE :
 			       QDF_STATUS_SUCCESS), assoc_rsp->status_code);
 
-	ap_nss = lim_get_nss_supported_by_ap(&assoc_rsp->VHTCaps,
-					     &assoc_rsp->HTCaps,
-					     &assoc_rsp->he_cap);
-	wlan_mlme_set_ap_nss(session_entry->vdev, ap_nss);
-	pe_debug("AP supported NSS = %u", ap_nss);
+	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, assoc_rsp,
+				  session_entry->dot11mode);
+	if (subtype == LIM_ASSOC &&
+	    wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
+		uint8_t cap_ap_tx_nss, cap_ap_rx_nss;
+
+		/*
+		 * Use assoc response to determine capability NSS and use
+		 * current beacon NSS for operating NSS as beacon might have
+		 * different NSS which to be considered as APs current
+		 * operating NSS than what is notified in assoc response.
+		 */
+		cap_ap_tx_nss = nss_ies.cap_tx_nss;
+		cap_ap_rx_nss = nss_ies.cap_rx_nss;
+		bss_desc = &session_entry->lim_join_req->bssDescription;
+		LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, &bss_desc->bcn_ies,
+					  session_entry->dot11mode);
+
+		nss_ies.cap_tx_nss = cap_ap_tx_nss;
+		nss_ies.cap_rx_nss = cap_ap_rx_nss;
+		nss_ies.op_tx_nss = QDF_MIN(nss_ies.op_tx_nss, cap_ap_tx_nss);
+		nss_ies.op_rx_nss = QDF_MIN(nss_ies.op_rx_nss, cap_ap_rx_nss);
+	}
+
+	pe_debug("AP supported NSS = %dx%d, OP %dx%d",
+		 nss_ies.cap_tx_nss, nss_ies.cap_rx_nss,
+		 nss_ies.op_tx_nss, nss_ies.op_rx_nss);
 
 	if (subtype == LIM_REASSOC) {
 		pe_debug("Successfully Reassociated with BSS");
@@ -1615,14 +1637,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			goto assocReject;
 		}
 
-		if (ap_nss < session_entry->cap_tx_nss) {
-			session_entry->cap_tx_nss = ap_nss;
-			session_entry->cap_rx_nss = session_entry->cap_tx_nss;
-		}
-
-		lim_objmgr_update_vdev_nss(mac_ctx->psoc,
-					   session_entry->smeSessionId,
-					   session_entry->cap_tx_nss);
+		lim_update_session_nss_for_state(session_entry, &nss_ies);
 		lim_update_vdev_rate_set(mac_ctx->psoc,
 					 session_entry->smeSessionId,
 					 assoc_rsp);
@@ -1729,14 +1744,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	if (lim_search_pre_auth_list(mac_ctx, hdr->sa))
 		lim_delete_pre_auth_node(mac_ctx, hdr->sa);
 
-	if (ap_nss < session_entry->cap_tx_nss) {
-		session_entry->cap_tx_nss = ap_nss;
-		session_entry->cap_rx_nss = session_entry->cap_tx_nss;
-	}
-
-	lim_objmgr_update_vdev_nss(mac_ctx->psoc,
-				   session_entry->smeSessionId,
-				   session_entry->cap_tx_nss);
+	lim_update_session_nss_for_state(session_entry, &nss_ies);
 	lim_update_vdev_rate_set(mac_ctx->psoc, session_entry->smeSessionId,
 				 assoc_rsp);
 	if (QDF_IS_STATUS_ERROR(lim_update_sta_vdev_punc(

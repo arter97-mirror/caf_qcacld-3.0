@@ -855,9 +855,6 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 				     sizeof(bcn_ies->hs20vendor_ie.hs_id));
 	}
 
-	lim_objmgr_update_vdev_nss(mac_ctx->psoc, session->smeSessionId,
-				   session->cap_tx_nss);
-
 	session->is_adaptive_11r_connection =
 			lim_extract_adaptive_11r_cap(ie, ie_len);
 

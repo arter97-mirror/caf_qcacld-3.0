@@ -227,6 +227,26 @@ void lim_delete_dph_hash_entry(struct mac_context *, tSirMacAddr, uint16_t, stru
 void lim_check_and_announce_join_success(struct mac_context *,
 					 tSirProbeRespBeacon *,
 					 tpSirMacMgmtHdr, struct pe_session *);
+
+/**
+ * lim_update_session_nss_for_state() - Update session NSS based on state
+ * @session: PE session entry
+ * @nss_ies: NSS information from IEs
+ *
+ * This function updates the session's NSS (Number of Spatial Streams)
+ * parameters based on the current LIM MLM state. It handles different
+ * states like eLIM_MLM_WT_JOIN_BEACON_STATE and eLIM_MLM_WT_ASSOC_RSP_STATE
+ * differently.
+ * The function calculates and sets the capability and operational NSS values
+ * for both Tx and Rx, considering the NSS values from IEs and
+ * self capabilities.
+ * It also updates the HE and EHT MCS sets based on the new NSS values.
+ *
+ * Return: None
+ */
+void lim_update_session_nss_for_state(struct pe_session *session,
+				      struct sir_dot11f_nss_info *nss_ies);
+
 void lim_update_re_assoc_globals(struct mac_context *mac,
 				 tpSirAssocRsp pAssocRsp,
 				 struct pe_session *pe_session);
