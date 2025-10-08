@@ -579,6 +579,8 @@ struct sap_man_chan_info {
  * @psd_20mhz: PSD power(dBm/MHz) of SAP operating in 20 MHz
  * @ch_switch_info: channel switch info
  * @is_owe_conn: is owe connection
+ * @supports_nss_change: Set to true if current SAP/P2P-GO session can upgrade
+ * or downgrade NSS on HW mode change, else false
  * @acs_bandmask: Bitmap of the bands on which ACS is performed
  * @best_chan_info: best 2ghz channel
  * @man_chan_info: sap mandatory channel info
@@ -593,6 +595,7 @@ struct mlme_ap_config {
 	uint8_t psd_20mhz;
 	struct sap_ch_switch_info ch_switch_info;
 	bool is_owe_conn;
+	bool supports_nss_change;
 	uint32_t acs_bandmask;
 	struct sap_chan_info best_chan_info;
 	struct sap_man_chan_info man_chan_info;

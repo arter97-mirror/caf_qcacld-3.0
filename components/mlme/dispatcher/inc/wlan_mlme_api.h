@@ -5440,6 +5440,32 @@ enum phy_ch_width
 wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * wlan_mlme_get_sap_supports_nss_change() - Check if SAP supports
+ * NSS change
+ * @vdev: Pointer to vdev object
+ *
+ * This function checks if the SAP supports NSS (Number of Spatial Streams)
+ * change by retrieving the value from the MLME private object.
+ *
+ * Return: true if SAP supports NSS change, false otherwise
+ */
+bool wlan_mlme_get_sap_supports_nss_change(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlme_set_sap_supports_nss_change() - Set whether SAP supports
+ * NSS change
+ * @vdev: VDEV object
+ * @can_nss_change: Boolean indicating whether NSS change is supported
+ *
+ * This function sets the flag that indicates whether SAP supports NSS change
+ * for the specified VDEV.
+ *
+ * Return: None
+ */
+void wlan_mlme_set_sap_supports_nss_change(struct wlan_objmgr_vdev *vdev,
+					   bool can_nss_change);
+
+/**
  * wlan_mlme_set_ap_nss() - Set AP advertised NSS
  * @vdev: VDEV object
  * @ap_nss: AP advertised NSS

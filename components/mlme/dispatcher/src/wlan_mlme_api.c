@@ -9040,6 +9040,35 @@ wlan_mlme_get_ap_oper_ch_width(struct wlan_objmgr_vdev *vdev)
 	return mlme_priv->mlme_ap.oper_ch_width;
 }
 
+bool wlan_mlme_get_sap_supports_nss_change(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev %d legacy private object is NULL",
+				wlan_vdev_get_id(vdev));
+		return false;
+	}
+
+	return mlme_priv->mlme_ap.supports_nss_change;
+}
+
+void wlan_mlme_set_sap_supports_nss_change(struct wlan_objmgr_vdev *vdev,
+					   bool can_nss_change)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev %d legacy private object is NULL",
+				wlan_vdev_get_id(vdev));
+		return;
+	}
+
+	mlme_priv->mlme_ap.supports_nss_change = can_nss_change;
+}
+
 void wlan_mlme_set_ap_nss(struct wlan_objmgr_vdev *vdev, uint8_t ap_nss)
 {
 	struct mlme_legacy_priv *mlme_priv;
