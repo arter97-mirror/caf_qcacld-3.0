@@ -5929,6 +5929,7 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 	bool mcc_mode;
 	uint32_t session_count, cur_freq;
 	enum hw_mode_bandwidth max_bw;
+	struct wlan_objmgr_vdev *vdev;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -6046,9 +6047,20 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 							     pm_ctx->pdev);
 	}
 
-	if (wlan_reg_get_keep_6ghz_sta_cli_connection(pm_ctx->pdev) &&
-	    (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE))
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    session_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev is NULL");
+		return QDF_STATUS_E_EMPTY;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) &&
+	    wlan_reg_get_keep_6ghz_sta_cli_connection(pm_ctx->pdev) &&
+	    (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE)) {
 		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	if (mode == QDF_STA_MODE &&
 	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, cur_freq) &&
