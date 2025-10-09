@@ -2422,6 +2422,7 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 	struct ch_params *ch_params;
 	struct channel_change_req *ch_change_req;
 	struct sap_ch_switch_info *ch_switch_info;
+	enum phy_ch_width phymode_max_bw;
 
 	if (!target_chan_freq) {
 		sap_err("channel 0 requested");
@@ -2469,6 +2470,13 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 	}
 
 	ch_params = &ch_switch_info->new_ch_params;
+	phymode_max_bw = wlansap_get_max_bw_by_phymode(sap_ctx);
+	if (ch_params->ch_width > phymode_max_bw) {
+		sap_debug("phymode 0x%x max bw %d less than %d, limit it",
+			  sap_ctx->phyMode, phymode_max_bw,
+			  ch_params->ch_width);
+		ch_params->ch_width = phymode_max_bw;
+	}
 	if (sap_phymode_is_eht(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev, target_chan_freq,
@@ -2547,6 +2555,7 @@ QDF_STATUS wlansap_dfs_send_csa_ie_request(struct sap_context *sap_ctx)
 	struct ch_params *ch_params;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct sap_ch_switch_info *ch_switch_info;
+	enum phy_ch_width phymode_max_bw;
 
 	if (!sap_ctx) {
 		sap_err("Invalid SAP pointer");
@@ -2567,6 +2576,13 @@ QDF_STATUS wlansap_dfs_send_csa_ie_request(struct sap_context *sap_ctx)
 
 	ch_params = &ch_switch_info->new_ch_params;
 	ch_params->ch_width = ch_switch_info->new_chan_width;
+	phymode_max_bw = wlansap_get_max_bw_by_phymode(sap_ctx);
+	if (ch_params->ch_width > phymode_max_bw) {
+		sap_debug("phymode 0x%x max bw %d less than %d, limit it",
+			  sap_ctx->phyMode, phymode_max_bw,
+			  ch_params->ch_width);
+		ch_params->ch_width = phymode_max_bw;
+	}
 	input_punc =
 		wlan_reg_get_input_punc_bitmap(
 				&ch_switch_info->new_ch_params);
