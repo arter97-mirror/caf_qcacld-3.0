@@ -107,14 +107,9 @@ QDF_STATUS lim_populate_own_rate_set(struct mac_context *mac_ctx,
 				     struct pe_session *session_entry);
 
 QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
-					  tpDphHashNode sta_ds,
-					  tSirMacRateSet *oper_rate_set,
-					  tSirMacRateSet *ext_rate_set,
-					  uint8_t *supported_mcs_set,
 					  struct pe_session *session_entry,
-					  tDot11fIEVHTCaps *vht_caps,
-					  tDot11fIEhe_cap *he_caps,
-					  tDot11fIEeht_cap *eht_caps);
+					  tpDphHashNode sta_ds,
+					  tpSirAssocReq assoc_req);
 
 QDF_STATUS lim_add_sta(struct mac_context *, tpDphHashNode, uint8_t, struct pe_session *);
 QDF_STATUS lim_del_bss(struct mac_context *, tpDphHashNode, uint16_t, struct pe_session *);

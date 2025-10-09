@@ -1625,6 +1625,120 @@ lim_mlo_save_mld_info(tpDphHashNode sta_ds,
 }
 #endif
 
+static enum mlme_dot11_mode lim_get_sta_ds_dot11mode(tpDphHashNode sta_ds,
+						     qdf_freq_t freq)
+{
+	if (lim_is_sta_eht_capable(sta_ds))
+		return MLME_DOT11_MODE_11BE;
+	else if (lim_is_sta_he_capable(sta_ds))
+		return MLME_DOT11_MODE_11AX;
+	else if (sta_ds->mlmStaContext.vhtCapability)
+		return MLME_DOT11_MODE_11AC;
+	else if (sta_ds->mlmStaContext.htCapability)
+		return MLME_DOT11_MODE_11N;
+
+	return wlan_reg_is_24ghz_ch_freq(freq) ? MLME_DOT11_MODE_11G :
+						 MLME_DOT11_MODE_11A;
+}
+
+/**
+ * lim_ap_determine_nss_for_sta_ds() - Determine NSS for client's sta_ds
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session: Pointer to PE session entry
+ * @sta_ds: Station DPH entry
+ * @assoc_req: Pointer to ASSOC/REASSOC Request frame
+ *
+ * This function determines the Number of Spatial Streams (NSS) for the sta_ds
+ * data structure based on the capabilities of both the AP and the
+ * incoming client.
+ * It considers:
+ * 1. The dot11 mode of both AP and STA (EHT/HE/VHT)
+ * 2. Operating Mode Notification capability
+ * 3. Channel width restrictions
+ * 4. Hardware NSS capabilities
+ *
+ * The function sets both capability NSS and operational NSS values in the
+ * sta_ds.
+ *
+ * Return: QDF_STATUS - QDF_STATUS_SUCCESS on success, error values otherwise
+ */
+static QDF_STATUS lim_ap_determine_nss_for_sta_ds(struct mac_context *mac_ctx,
+						  struct pe_session *session,
+						  tpDphHashNode sta_ds,
+						  tpSirAssocReq assoc_req)
+{
+	QDF_STATUS status;
+	bool limit_to_min_nss;
+	uint8_t min_tx_nss, min_rx_nss;
+	struct s_ext_cap *ext_cap;
+	enum mlme_dot11_mode sta_ds_dot11mode;
+	struct sir_dot11f_nss_info nss_ies;
+
+	sta_ds_dot11mode =
+		lim_get_sta_ds_dot11mode(sta_ds, session->curr_op_freq);
+	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, assoc_req, sta_ds_dot11mode);
+
+	/* For EHT, only 320 check for EHT OMI support
+	 * for HE check always
+	 * for VHT check always
+	 *
+	 * Need to fetch the NSS from policy mgr api and intersect with
+	 * session that will be session's side new nss and intersect that
+	 * again with assoc req nss.
+	 *
+	 */
+	if (IS_DOT11_MODE_EHT(sta_ds_dot11mode) &&
+	    assoc_req->eht_cap.support_320mhz_6ghz &&
+	    IS_DOT11_MODE_EHT(session->dot11mode) &&
+	    wlan_reg_is_6ghz_chan_freq(session->curr_op_freq) &&
+	    session->ch_width == CH_WIDTH_320MHZ) {
+		limit_to_min_nss = !assoc_req->eht_cap.eht_om_ctl;
+	} else if (IS_DOT11_MODE_HE(sta_ds_dot11mode) &&
+		   IS_DOT11_MODE_HE(session->dot11mode)) {
+		limit_to_min_nss = !assoc_req->he_cap.omi_a_ctrl;
+	} else if (IS_DOT11_MODE_VHT(sta_ds_dot11mode) &&
+		   IS_DOT11_MODE_VHT(session->dot11mode) &&
+		   assoc_req->ExtCap.present) {
+		ext_cap = (struct s_ext_cap *)assoc_req->ExtCap.bytes;
+		limit_to_min_nss = !ext_cap->oper_mode_notification;
+	} else {
+		limit_to_min_nss = true;
+	}
+
+	min_tx_nss = session->cap_tx_nss;
+	min_rx_nss = session->cap_rx_nss;
+	if (limit_to_min_nss) {
+		uint8_t hw_min_tx_nss, hw_min_rx_nss;
+
+		status = policy_mgr_fetch_min_nss_across_hw_modes(mac_ctx->psoc,
+								  &hw_min_tx_nss,
+								  &hw_min_rx_nss);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
+
+		min_tx_nss = QDF_MIN(hw_min_tx_nss, min_tx_nss);
+		min_rx_nss = QDF_MIN(hw_min_rx_nss, min_rx_nss);
+	}
+
+	sta_ds->cap_tx_nss = QDF_MIN(nss_ies.cap_rx_nss, min_tx_nss);
+	sta_ds->cap_rx_nss = QDF_MIN(nss_ies.cap_tx_nss, min_rx_nss);
+	sta_ds->op_tx_nss = QDF_MIN(nss_ies.op_rx_nss, sta_ds->cap_tx_nss);
+	sta_ds->op_rx_nss = QDF_MIN(nss_ies.op_tx_nss, sta_ds->cap_rx_nss);
+
+	/*
+	 * sta_ds holds the NSS fields of self hence logging the peer's
+	 * Tx/Rx NSS using the sta_ds's Rx/Tx nss respectively.
+	 */
+	pe_debug("Peer: " QDF_MAC_ADDR_FMT " connect nss cap Tx/Rx %dx%d, op Tx/Rx %dx%d, nss restricted: %s",
+		 QDF_MAC_ADDR_REF(sta_ds->staAddr),
+		 sta_ds->cap_rx_nss, sta_ds->cap_tx_nss,
+		 sta_ds->op_rx_nss, sta_ds->op_tx_nss,
+		 limit_to_min_nss ? "yes" : "no");
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * lim_update_sta_ds() - updates ds dph entry
  * @mac_ctx: pointer to Global MAC structure
@@ -1656,6 +1770,7 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 			      tHalBitVal qos_mode, bool pmf_connection,
 			      bool force_1x1)
 {
+	QDF_STATUS status;
 	tHalBitVal wme_mode, wsm_mode;
 	uint8_t *ht_cap_ie = NULL;
 	tPmfSaQueryTimerId timer_id;
@@ -1889,53 +2004,22 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 	lim_update_sta_ds_op_classes(assoc_req, sta_ds);
 	lim_update_stads_eht_bw_320mhz(session, sta_ds);
 
-	if (lim_populate_matching_rate_set(mac_ctx, sta_ds,
-			&(assoc_req->supportedRates),
-			&(assoc_req->extendedRates),
-			assoc_req->HTCaps.supportedMCSSet,
-			session, vht_caps, &assoc_req->he_cap,
-			&assoc_req->eht_cap) != QDF_STATUS_SUCCESS) {
+	status = lim_ap_determine_nss_for_sta_ds(mac_ctx, session,
+						 sta_ds, assoc_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to determine NSS for client " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(sa));
+		goto handle_failure;
+	}
+
+	status = lim_populate_matching_rate_set(mac_ctx, session,
+						sta_ds, assoc_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		/* Could not update hash table entry at DPH with rateset */
 		pe_err("Couldn't update hash entry for aid: %d MacAddr: "
 		       QDF_MAC_ADDR_FMT,
 		       peer_idx, QDF_MAC_ADDR_REF(sa));
-
-		/* Release AID */
-		if (lim_is_mlo_conn(session, sta_ds)) {
-			if (lim_is_mlo_recv_assoc(sta_ds))
-				lim_release_mlo_conn_idx(mac_ctx, peer_idx,
-							 session, true);
-			else
-				lim_release_mlo_conn_idx(mac_ctx, peer_idx,
-							 session, false);
-		} else {
-			lim_release_peer_idx(mac_ctx, peer_idx, session);
-		}
-
-		lim_reject_association(mac_ctx, sa, sub_type, true,
-				       auth_type, peer_idx, false,
-				       STATUS_UNSPECIFIED_FAILURE, session);
-		pe_err("Delete dph hash entry");
-		if (dph_delete_hash_entry(mac_ctx, sa, sta_ds->assocId,
-					  &session->dph.dphHashTable) !=
-		    QDF_STATUS_SUCCESS)
-			pe_err("error deleting hash entry");
-		return false;
-	}
-
-	if (assoc_req->OperatingMode.present) {
-		sta_ds->vhtSupportedRxNss = assoc_req->OperatingMode.rxNSS + 1;
-	} else {
-		uint8_t idx;
-
-		sta_ds->vhtSupportedRxNss = NSS_1x1_MODE;
-		for (idx = WLAN_MAX_VDEV_NSS; idx >= NSS_2x2_MODE; idx--) {
-			if (VHT_MCS_IS_NSS_ENABLED(sta_ds->supportedRates.vhtTxMCSMap,
-						   idx)) {
-				sta_ds->vhtSupportedRxNss = idx;
-				break;
-			}
-		}
+		goto handle_failure;
 	}
 
 	/* Add STA context at MAC HW (BMU, RHP & TFP) */
@@ -2036,7 +2120,31 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 		pe_debug("ExtCap not present");
 	}
 	lim_ap_check_6g_compatible_peer(mac_ctx, session);
+
 	return true;
+
+handle_failure:
+	/* Release AID */
+	if (lim_is_mlo_conn(session, sta_ds)) {
+		if (lim_is_mlo_recv_assoc(sta_ds))
+			lim_release_mlo_conn_idx(mac_ctx, peer_idx,
+						 session, true);
+		else
+			lim_release_mlo_conn_idx(mac_ctx, peer_idx,
+						 session, false);
+	} else {
+		lim_release_peer_idx(mac_ctx, peer_idx, session);
+	}
+
+	lim_reject_association(mac_ctx, sa, sub_type, true, auth_type, peer_idx,
+			       false, STATUS_UNSPECIFIED_FAILURE, session);
+	pe_err("Delete dph hash entry");
+	status = dph_delete_hash_entry(mac_ctx, sa, sta_ds->assocId,
+				       &session->dph.dphHashTable);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("error deleting hash entry");
+
+	return false;
 }
 
 /**

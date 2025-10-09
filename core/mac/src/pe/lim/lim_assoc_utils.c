@@ -1775,14 +1775,9 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
  * lim_populate_matching_rate_set() -process the CFG rate sets and
  *          the rate sets received in the Assoc request on AP.
  * @mac_ctx: pointer to global mac structure
- * @sta_ds: station node
- * @oper_rate_set: pointer to operating rate set
- * @ext_rate_set: pointer to extended rate set
- * @supported_mcs_set: pointer to supported rate set
  * @session_entry: pointer to pe session entry
- * @vht_caps: pointer to vht capabilities
- * @he_caps: pointer to he capabilities
- * @eht_caps: pointer to eht capabilities
+ * @sta_ds: station node
+ * @assoc_req: Pointer to assoc request from peer
  *
  * This is called at the time of Association Request
  * processing on AP and while adding peer's context
@@ -1803,28 +1798,42 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
  * Return: QDF_STATUS_SUCCESS on success else QDF_STATUS_E_FAILURE
  */
 QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
-					  tpDphHashNode sta_ds,
-					  tSirMacRateSet *oper_rate_set,
-					  tSirMacRateSet *ext_rate_set,
-					  uint8_t *supported_mcs_set,
 					  struct pe_session *session_entry,
-					  tDot11fIEVHTCaps *vht_caps,
-					  tDot11fIEhe_cap *he_caps,
-					  tDot11fIEeht_cap *eht_caps)
+					  tpDphHashNode sta_ds,
+					  tpSirAssocReq assoc_req)
 {
+	tSirMacRateSet *oper_rate_set;
+	tSirMacRateSet *ext_rate_set;
+	uint8_t *supported_mcs_set;
+	tDot11fIEVHTCaps *vht_caps;
+	tDot11fIEhe_cap *he_caps;
+	tDot11fIEeht_cap *eht_caps;
 	tSirMacRateSet temp_rate_set;
 	tSirMacRateSet temp_rate_set2 = {0};
 	uint32_t i, j, val, min, is_arate;
 	uint32_t phy_mode;
 	uint8_t mcs_set[SIZE_OF_SUPPORTED_MCS_SET];
 	struct supported_rates *rates;
-	uint8_t a_rate_index = 0;
-	uint8_t b_rate_index = 0;
+	uint8_t a_rate_index = 0, b_rate_index = 0;
 	qdf_size_t val_len;
 
 	is_arate = 0;
 
 	lim_get_phy_mode(mac_ctx, &phy_mode, session_entry);
+
+	oper_rate_set = &assoc_req->supportedRates;
+	ext_rate_set = &assoc_req->extendedRates;
+	supported_mcs_set = assoc_req->HTCaps.supportedMCSSet;
+	he_caps = &assoc_req->he_cap;
+	eht_caps = &assoc_req->eht_cap;
+
+	if (assoc_req->VHTCaps.present)
+		vht_caps = &assoc_req->VHTCaps;
+	else if (assoc_req->vendor_vht_ie.VHTCaps.present &&
+		 session_entry->vendor_vht_sap)
+		vht_caps = &assoc_req->vendor_vht_ie.VHTCaps;
+	else
+		vht_caps = NULL;
 
 	/* copy operational rate set from session_entry */
 	qdf_mem_copy((temp_rate_set.rate), (session_entry->rateSet.rate),
@@ -1992,9 +2001,9 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 			sta_ds->supportedRates.supportedMCSSet[i] =
 				mcs_set[i] & supported_mcs_set[i];
 
-		self_tx_nss = QDF_MIN(session_entry->cap_tx_nss,
+		self_tx_nss = QDF_MIN(sta_ds->cap_tx_nss,
 				      QDF_MIN(self_tx_nss, peer_rx_nss));
-		self_rx_nss = QDF_MIN(session_entry->cap_rx_nss,
+		self_rx_nss = QDF_MIN(sta_ds->cap_rx_nss,
 				      QDF_MIN(self_rx_nss, peer_tx_nss));
 
 		wlan_mlme_set_ht_mcsset_for_nss(mac_ctx->psoc, NULL,
@@ -2007,15 +2016,14 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 				     sta_ds->supportedRates.supportedMCSSet);
 	}
 	lim_populate_vht_mcs_set(mac_ctx, &sta_ds->supportedRates, vht_caps,
-				 session_entry, session_entry->cap_tx_nss,
-				 session_entry->cap_rx_nss, sta_ds);
+				 session_entry, sta_ds->cap_tx_nss,
+				 sta_ds->cap_rx_nss, sta_ds);
 	lim_populate_he_mcs_set(mac_ctx, &sta_ds->supportedRates, he_caps,
-				session_entry, session_entry->cap_tx_nss,
-				session_entry->cap_rx_nss);
+				session_entry, sta_ds->cap_tx_nss,
+				sta_ds->cap_rx_nss);
 	lim_populate_eht_mcs_set(mac_ctx, &sta_ds->supportedRates, eht_caps,
 				 session_entry, sta_ds->ch_width,
-				 session_entry->cap_tx_nss,
-				 session_entry->cap_rx_nss,
+				 sta_ds->cap_tx_nss, sta_ds->cap_rx_nss,
 				 wlan_reg_is_24ghz_ch_freq(session_entry->curr_op_freq));
 	/*
 	 * Set the erpEnabled bit if the phy is in G mode and at least

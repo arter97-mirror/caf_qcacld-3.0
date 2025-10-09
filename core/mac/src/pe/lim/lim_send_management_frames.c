@@ -2313,6 +2313,10 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			if (!frm.HTCaps.supportedChannelWidthSet)
 				frm.HTCaps.shortGI40MHz = 0;
 
+			wlan_mlme_set_ht_mcsset_for_nss(mac_ctx->psoc,
+							&frm.HTCaps, NULL,
+							sta->cap_tx_nss,
+							sta->cap_rx_nss);
 			populate_dot11f_ht_info(mac_ctx, &frm.HTInfo,
 						pe_session);
 		}
@@ -2320,7 +2324,10 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		if (sta->mlmStaContext.vhtCapability &&
 		    pe_session->vhtCapability) {
 			populate_dot11f_vht_caps(mac_ctx, pe_session,
-				&frm.VHTCaps);
+						 &frm.VHTCaps);
+			lim_update_dot11f_vht_caps_for_nss(&frm.VHTCaps,
+							   sta->cap_tx_nss,
+							   sta->cap_rx_nss);
 			populate_dot11f_vht_operation(mac_ctx, pe_session,
 					&frm.VHTOperation);
 			is_vht = true;
@@ -2375,6 +2382,11 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 						pe_session->curr_op_freq,
 						pe_session->ch_width,
 						&frm.he_cap);
+
+			wlan_mlme_set_he_mcsset_for_nss(mac_ctx->mlme_cfg,
+							&frm.he_cap,
+							sta->cap_tx_nss,
+							sta->cap_rx_nss);
 			populate_dot11f_sr_info(mac_ctx, pe_session,
 						&frm.spatial_reuse);
 			populate_dot11f_he_operation(mac_ctx, pe_session,
@@ -2387,6 +2399,9 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		    lim_is_session_eht_capable(pe_session)) {
 			populate_dot11f_eht_caps(mac_ctx, pe_session,
 						 &frm.eht_cap);
+			wlan_mlme_set_eht_mcsset_for_nss(&frm.eht_cap,
+							 sta->cap_tx_nss,
+							 sta->cap_rx_nss);
 			populate_dot11f_eht_operation(mac_ctx, pe_session,
 						      &frm.eht_op);
 		}
