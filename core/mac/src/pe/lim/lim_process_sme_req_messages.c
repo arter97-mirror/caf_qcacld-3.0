@@ -9564,6 +9564,47 @@ fail:
 }
 
 /**
+ * lim_process_hw_mode_change_notify() - Process hardware mode change
+ * notification
+ * @mac_ctx: Pointer to Global MAC structure
+ *
+ * This function processes hardware mode change notification for all valid
+ * PE sessions. For each valid session, it updates the NSS (Number of Spatial
+ * Streams) parameters based on the new hardware mode, updates the beacon
+ * template with the new parameters, and sends the updated beacon template
+ * to the firmware.
+ *
+ * Return: None
+ */
+static void lim_process_hw_mode_change_notify(struct mac_context *mac_ctx)
+{
+	uint8_t idx;
+	QDF_STATUS status;
+	struct pe_session *session;
+
+	for (idx = 0; idx < mac_ctx->lim.maxBssId; idx++) {
+		if (!mac_ctx->lim.gpSession[idx].valid)
+			continue;
+		session = &mac_ctx->lim.gpSession[idx];
+		if (!lim_update_ap_session_nss(session))
+			continue;
+
+		status = sch_set_fixed_beacon_fields(mac_ctx, session);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Failed to fill beacon fields for %d",
+				 session->vdev_id);
+			continue;
+		}
+
+		status = lim_send_beacon_ind(mac_ctx, session,
+					     REASON_HW_MODE_CHANGE);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_debug("Failed to update beacon tmp for %d",
+				 session->vdev_id);
+	}
+}
+
+/**
  * lim_process_sme_req_messages()
  *
  ***FUNCTION:
@@ -9770,6 +9811,9 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 		break;
 	case WNI_SME_UPDATE_RNR_IES:
 		lim_process_update_rnr_ies(mac, msg_buf);
+		break;
+	case WNI_SME_HW_MODE_CHANGE_NOTIF:
+		lim_process_hw_mode_change_notify(mac);
 		break;
 	default:
 		qdf_mem_free((void *)pMsg->bodyptr);

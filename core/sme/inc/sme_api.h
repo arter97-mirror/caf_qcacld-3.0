@@ -3609,6 +3609,16 @@ struct omi_ctrl_tx {
 	uint32_t reserved:11;
 };
 
+/**
+ * sme_notify_hw_mode_change() - Notify hardware mode change
+ *
+ * This function sends a notification message to PE module about hardware
+ * mode change.
+ *
+ * Return: None
+ */
+void sme_notify_hw_mode_change(void);
+
 #ifdef WLAN_FEATURE_11AX
 /**
  * sme_update_tgt_he_cap() - sets the HE caps to pmac

@@ -546,6 +546,7 @@ static bool def_msg_decision(struct mac_context *mac_ctx,
 		    (lim_msg->type != WMA_AGGR_QOS_RSP) &&
 		    (lim_msg->type != WMA_SET_MIMOPS_RSP) &&
 		    (lim_msg->type != WMA_ADD_TS_RSP) &&
+		    (lim_msg->type != WNI_SME_HW_MODE_CHANGE_NOTIF) &&
 		    /*
 		     * LIM won't process any defer queue commands if gLimAddtsSent is
 		     * set to TRUE. gLimAddtsSent will be set TRUE to while sending
@@ -1888,6 +1889,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case WNI_SME_CFG_ACTION_FRM_HE_TB_PPDU:
 	case eWNI_SME_VDEV_PAUSE_IND:
 	case WNI_SME_UPDATE_EDCA_PARAMS:
+	case WNI_SME_HW_MODE_CHANGE_NOTIF:
 		/* These messages are from HDD.No need to respond to HDD */
 		lim_process_normal_hdd_msg(mac_ctx, msg, false);
 		break;
@@ -2340,7 +2342,8 @@ static void lim_process_normal_hdd_msg(struct mac_context *mac_ctx,
 	 */
 	if (msg->type == eWNI_SME_START_BSS_REQ ||
 	    msg->type == eWNI_SME_STOP_BSS_REQ ||
-	    msg->type == eWNI_SME_SWITCH_CHL_IND)
+	    msg->type == eWNI_SME_SWITCH_CHL_IND ||
+	    msg->type == WNI_SME_HW_MODE_CHANGE_NOTIF)
 		defer_msg = false;
 
 	if (mac_ctx->lim.gLimAddtsSent && defer_msg) {

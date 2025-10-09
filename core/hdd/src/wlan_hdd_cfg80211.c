@@ -24287,6 +24287,9 @@ int wlan_hdd_send_mode_change_event(bool is_hwmode_change)
 	if (0 != err)
 		return err;
 
+	if (is_hwmode_change)
+		sme_notify_hw_mode_change();
+
 	conn_count = policy_mgr_get_connection_info(hdd_ctx->psoc, info);
 	if (!conn_count)
 		return -EINVAL;

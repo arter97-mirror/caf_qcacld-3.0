@@ -11576,6 +11576,18 @@ int sme_update_eht_scs_traffic_desc_support(mac_handle_t mac_handle,
 }
 #endif
 
+void sme_notify_hw_mode_change(void)
+{
+	QDF_STATUS status;
+	struct scheduler_msg msg = {0};
+
+	msg.type = WNI_SME_HW_MODE_CHANGE_NOTIF;
+	status = scheduler_post_message(QDF_MODULE_ID_SME, QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE, &msg);
+	if (QDF_IS_STATUS_ERROR(status))
+		sme_debug("Failed to send hw mode change %d", status);
+}
+
 #ifdef WLAN_FEATURE_11AX
 static void sme_update_tgt_he_nss_cap(struct mac_context *mac_ctx,
 				      tDot11fIEhe_cap *he_cap,
