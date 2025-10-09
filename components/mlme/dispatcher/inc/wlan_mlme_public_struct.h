@@ -1171,6 +1171,7 @@ struct mlme_tgt_caps {
  * @supported_mcs_set: supported MCS set
  * @basic_mcs_set: basic MCS set
  * @current_mcs_set: current MCS set
+ * @cck_rx_tx_support_mode: cck rx tx support enable modes
  */
 struct wlan_mlme_rates {
 	uint8_t cfp_period;
@@ -1184,6 +1185,7 @@ struct wlan_mlme_rates {
 	struct mlme_cfg_str supported_mcs_set;
 	struct mlme_cfg_str basic_mcs_set;
 	struct mlme_cfg_str current_mcs_set;
+	uint32_t cck_rx_tx_support_mode;
 };
 
 

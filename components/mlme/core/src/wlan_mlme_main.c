@@ -47,7 +47,6 @@
 /* Time to passive scan dwell for scan to get channel stats, in milliseconds */
 #define MLME_GET_CHAN_STATS_PASSIVE_SCAN_TIME 40
 #define MLME_GET_CHAN_STATS_WIDE_BAND_PASSIVE_SCAN_TIME 110
-
 struct wlan_mlme_rx_ops *
 mlme_get_rx_ops(struct wlan_objmgr_psoc *psoc)
 {
@@ -1963,6 +1962,8 @@ static void mlme_init_rates_in_cfg(struct wlan_objmgr_psoc *psoc,
 			      rates->current_mcs_set.data,
 			      sizeof(rates->current_mcs_set.data),
 			      &rates->current_mcs_set.len);
+	rates->cck_rx_tx_support_mode = cfg_get(psoc,
+						CFG_RX_TX_SUPPORT_MODE);
 }
 
 static void mlme_init_passive_enable_in_cfg(struct wlan_objmgr_psoc *psoc,
