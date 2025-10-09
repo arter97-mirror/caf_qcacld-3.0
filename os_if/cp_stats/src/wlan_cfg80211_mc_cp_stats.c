@@ -164,6 +164,7 @@ static void wlan_cfg80211_mc_cp_stats_dealloc(void *priv)
 	wlan_cfg80211_mc_cp_stats_free_peer_stats_info_ext(stats);
 	wlan_free_mib_stats(stats);
 	qdf_mem_free(stats->vdev_extd_stats);
+	qdf_mem_free(stats->bcn_stats);
 }
 
 #define QCA_WLAN_VENDOR_ATTR_TOTAL_DRIVER_FW_LOCAL_WAKE \
@@ -588,7 +589,7 @@ static void get_station_stats_cb(struct stats_event *ev, void *cookie)
 	struct stats_event *priv;
 	struct osif_request *request;
 	uint32_t summary_size, rssi_size, peer_adv_size = 0, pdev_size;
-	uint32_t vdev_extd_size;
+	uint32_t vdev_extd_size, recv_bcn_size;
 
 	request = osif_request_get(cookie);
 	if (!request) {
@@ -656,6 +657,16 @@ static void get_station_stats_cb(struct stats_event *ev, void *cookie)
 
 		qdf_mem_copy(priv->vdev_extd_stats, ev->vdev_extd_stats,
 			     vdev_extd_size);
+	}
+
+	if (ev->num_recv_bcn_stats && ev->bcn_stats) {
+		recv_bcn_size = sizeof(*ev->bcn_stats) * ev->num_recv_bcn_stats;
+		priv->bcn_stats = qdf_mem_malloc(recv_bcn_size);
+		if (!priv->bcn_stats)
+			goto station_stats_cb_fail;
+
+		priv->num_recv_bcn_stats = ev->num_recv_bcn_stats;
+		qdf_mem_copy(priv->bcn_stats, ev->bcn_stats, recv_bcn_size);
 	}
 
 	priv->num_summary_stats = ev->num_summary_stats;
@@ -1179,6 +1190,9 @@ wlan_cfg80211_mc_cp_stats_get_station_stats(struct wlan_objmgr_vdev *vdev,
 	priv->vdev_extd_stats = NULL;
 
 	out->bcn_protect_stats = priv->bcn_protect_stats;
+	out->num_recv_bcn_stats = priv->num_recv_bcn_stats;
+	out->bcn_stats = priv->bcn_stats;
+	priv->bcn_stats = NULL;
 	osif_request_put(request);
 
 	osif_debug("Exit");
@@ -1726,6 +1740,7 @@ void wlan_cfg80211_mc_cp_stats_free_stats_event(struct stats_event *stats)
 	wlan_free_mib_stats(stats);
 	wlan_cfg80211_mc_cp_stats_free_peer_stats_info_ext(stats);
 	qdf_mem_free(stats->vdev_extd_stats);
+	qdf_mem_free(stats->bcn_stats);
 	qdf_mem_free(stats);
 }
 

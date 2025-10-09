@@ -1681,7 +1681,7 @@ bool policy_mgr_is_dynamic_sbs_enabled(struct wlan_objmgr_psoc *psoc)
 }
 
 #ifdef WLAN_FEATURE_LL_LT_SAP
-static bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
+bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq)
 {
 	if (wlan_reg_is_6ghz_psc_chan_freq(freq) &&
 	    wlan_reg_is_6ghz_unii5_chan_freq(freq))
@@ -1771,6 +1771,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	bool avoid_list_modified_pcl = false;
 	bool skip_scc_modified_pcl = false;
 	bool skip_inactive_scc_modified_pcl = false;
+	bool skip_standby_scc_modified_pcl = false;
 	uint8_t scc_vdev_id;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -1820,6 +1821,13 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 			skip_inactive_scc_modified_pcl = true;
 			continue;
 		}
+
+		if (policy_mgr_if_freq_n_inactive_links_freq_same(psoc,
+								  pcl_channels[i])) {
+			skip_standby_scc_modified_pcl = true;
+			continue;
+		}
+
 		pcl_list[pcl_len] = pcl_channels[i];
 		weight_list[pcl_len++] = pcl_weight[i];
 	}
@@ -1833,9 +1841,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_ll_lt_sap(
 	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
 	*len = pcl_len;
 
-	policy_mgr_debug("Modified PCL: 6Ghz %d avoid_list %d scc %d inact scc %d",
+	policy_mgr_debug("Modified PCL: 6Ghz %d avoid_list %d scc %d inact scc %d standby scc %d",
 			 modified_pcl_6_ghz, avoid_list_modified_pcl,
-			 skip_scc_modified_pcl, skip_inactive_scc_modified_pcl);
+			 skip_scc_modified_pcl, skip_inactive_scc_modified_pcl,
+			 skip_standby_scc_modified_pcl);
 
 	return QDF_STATUS_SUCCESS;
 }

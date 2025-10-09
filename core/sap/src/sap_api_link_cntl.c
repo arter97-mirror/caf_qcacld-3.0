@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1121,6 +1121,7 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 	uint8_t intf;
 	bool is_csa_needed;
 	qdf_freq_t chan_freq = 0;
+	struct if_mgr_event_data csa_complete_ev_data;
 
 	if (QDF_IS_STATUS_ERROR(wlansap_context_get(sap_ctx)))
 		return QDF_STATUS_E_FAILURE;
@@ -1214,10 +1215,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			break;
 		}
 
-		sap_debug("sapdfs: Indicate eSAP_DFS_RADAR_DETECT to HDD");
-		sap_signal_hdd_event(sap_ctx, NULL, eSAP_DFS_RADAR_DETECT,
-				     (void *) eSAP_STATUS_SUCCESS);
-
 		is_csa_needed =
 			sap_is_chan_change_needed_for_radar(sap_ctx,
 							    &chan_freq);
@@ -1233,6 +1230,10 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			mac_ctx->sap.SapDfsInfo.target_chan_freq =
 						sap_indicate_radar(sap_ctx);
 		}
+
+		sap_debug("sapdfs: Indicate eSAP_DFS_RADAR_DETECT to HDD");
+		sap_signal_hdd_event(sap_ctx, NULL, eSAP_DFS_RADAR_DETECT,
+				     (void *) eSAP_STATUS_SUCCESS);
 
 		/* if there is an assigned next channel hopping */
 		if (0 < mac_ctx->sap.SapDfsInfo.user_provided_target_chan_freq) {
@@ -1281,9 +1282,10 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 	case eCSR_ROAM_DFS_CHAN_SW_NOTIFY:
 		break;
 	case eCSR_ROAM_SET_CHANNEL_RSP:
+		csa_complete_ev_data.data = &sap_ctx->csa_reason;
 		ucfg_if_mgr_deliver_event(sap_ctx->vdev,
 					  WLAN_IF_MGR_EV_AP_CSA_COMPLETE,
-					  NULL);
+					  &csa_complete_ev_data);
 		break;
 	case eCSR_ROAM_CAC_COMPLETE_IND:
 		break;

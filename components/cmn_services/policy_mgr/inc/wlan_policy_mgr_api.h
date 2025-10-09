@@ -6096,6 +6096,16 @@ policy_mgr_sap_on_non_psc_channel(struct wlan_objmgr_psoc *psoc,
 				  uint8_t sap_vdev_id);
 
 #ifdef WLAN_FEATURE_LL_LT_SAP
+/*
+ * policy_mgr_is_6G_chan_valid_for_ll_sap() - check if 6 Ghz freq allowed for
+ * ll lt SAP
+ * @freq: freq
+ *
+ * Return: true if 6 Ghz freq is allowed for ll lt sap ie unii5.
+ * Otherwise false.
+ */
+bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq);
+
 /**
  * policy_mgr_get_pcl_ch_list_for_ll_sap() - Get PCL channel list for LL_LT_SAP
  * @psoc: psoc object
