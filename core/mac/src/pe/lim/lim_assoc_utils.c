@@ -4225,57 +4225,47 @@ returnFailure:
 QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 					  struct pe_session *pe_session)
 {
-	struct bss_params *pAddBssParams = NULL;
-	uint32_t retCode;
-	tSchBeaconStruct *pBeaconStruct;
+	QDF_STATUS status;
+	struct bss_params *pAddBssParams;
 	bool chan_width_support = false;
 	tDot11fIEVHTOperation *vht_oper = NULL;
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	uint32_t listen_interval = MLME_CFG_LISTEN_INTERVAL;
-	struct bss_description *bssDescription = NULL;
+	struct bss_description *bss_desc;
 	struct mlme_vht_capabilities_info *vht_cap_info;
+	tDot11fBeaconIEs *bcn_ies;
 
 	if (!pe_session->lim_join_req) {
 		pe_err("Lim Join request is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	bssDescription = &pe_session->lim_join_req->bssDescription;
+	bss_desc = &pe_session->lim_join_req->bssDescription;
+	bcn_ies = &bss_desc->bcn_ies;
 	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
-
-	pBeaconStruct = qdf_mem_malloc(sizeof(tSchBeaconStruct));
-	if (!pBeaconStruct)
-		return QDF_STATUS_E_NOMEM;
 
 	/* Package SIR_HAL_ADD_BSS_REQ message parameters */
 	pAddBssParams = qdf_mem_malloc(sizeof(struct bss_params));
-	if (!pAddBssParams) {
-		retCode = QDF_STATUS_E_NOMEM;
-		goto returnFailure;
-	}
-
-	lim_extract_ap_capabilities(mac, (uint8_t *) bssDescription->ieFields,
-			lim_get_ielen_from_bss_description(bssDescription),
-			pBeaconStruct);
+	if (!pAddBssParams)
+		return QDF_STATUS_E_NOMEM;
 
 	if (mac->lim.gLimProtectionControl !=
 	    MLME_FORCE_POLICY_PROTECTION_DISABLE)
-		lim_decide_sta_protection_on_assoc(mac, pe_session,
-						   bssDescription);
-	qdf_mem_copy(pAddBssParams->bssId, bssDescription->bssId,
+		lim_decide_sta_protection_on_assoc(mac, pe_session, bss_desc);
+	qdf_mem_copy(pAddBssParams->bssId, bss_desc->bssId,
 		     sizeof(tSirMacAddr));
 
-	pAddBssParams->beaconInterval = bssDescription->beaconInterval;
+	pAddBssParams->beaconInterval = bss_desc->beaconInterval;
 
-	pAddBssParams->dtimPeriod = pBeaconStruct->tim.dtimPeriod;
+	pAddBssParams->dtimPeriod = bcn_ies->TIM.dtim_period;
 	pAddBssParams->updateBss = false;
 
-	pAddBssParams->nwType = bssDescription->nwType;
+	pAddBssParams->nwType = bss_desc->nwType;
 
 	pAddBssParams->shortSlotTimeSupported =
-		(uint8_t) pBeaconStruct->capabilityInfo.shortSlotTime;
+		!!(bss_desc->capabilityInfo & LIM_SHORT_SLOT_TIME_MASK);
 	pAddBssParams->llbCoexist =
-		(uint8_t) pe_session->beaconParams.llbCoexist;
+		(uint8_t)pe_session->beaconParams.llbCoexist;
 
 	/* Use the advertised capabilities from the received beacon/PR */
 	if (IS_DOT11_MODE_HT(pe_session->dot11mode)) {
@@ -4283,22 +4273,21 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 			lim_get_ht_capability(mac,
 					      eHT_SUPPORTED_CHANNEL_WIDTH_SET,
 					      pe_session);
-		lim_sta_add_bss_update_ht_parameter(bssDescription->chan_freq,
-						    &pBeaconStruct->HTCaps,
-						    &pBeaconStruct->HTInfo,
+		lim_sta_add_bss_update_ht_parameter(bss_desc->chan_freq,
+						    &bcn_ies->HTCaps,
+						    &bcn_ies->HTInfo,
 						    chan_width_support,
 						    pAddBssParams);
 	}
 
 	if (pe_session->vhtCapability &&
-		(IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps) ||
-		 IS_BSS_VHT_CAPABLE(pBeaconStruct->vendor_vht_ie.VHTCaps))) {
-
+	    (IS_BSS_VHT_CAPABLE(bcn_ies->VHTCaps) ||
+	     IS_BSS_VHT_CAPABLE(bcn_ies->vendor_vht_ie.VHTCaps))) {
 		pAddBssParams->vhtCapable = 1;
-		if (pBeaconStruct->VHTOperation.present)
-			vht_oper = &pBeaconStruct->VHTOperation;
-		else if (pBeaconStruct->vendor_vht_ie.VHTOperation.present) {
-			vht_oper = &pBeaconStruct->vendor_vht_ie.VHTOperation;
+		if (bcn_ies->VHTOperation.present) {
+			vht_oper = &bcn_ies->VHTOperation;
+		} else if (bcn_ies->vendor_vht_ie.VHTOperation.present) {
+			vht_oper = &bcn_ies->vendor_vht_ie.VHTOperation;
 			pe_debug("VHT Operation is present in vendor Specific IE");
 		}
 
@@ -4318,13 +4307,13 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 	}
 
 	if (lim_is_session_he_capable(pe_session) &&
-	    pBeaconStruct->he_cap.present) {
+	    bcn_ies->he_cap.present) {
 		lim_update_bss_he_capable(mac, pAddBssParams);
 		lim_add_bss_he_cfg(pAddBssParams, pe_session);
 	}
 
 	if (lim_is_session_eht_capable(pe_session) &&
-	    pBeaconStruct->eht_cap.present) {
+	    bcn_ies->eht_cap.present) {
 		lim_update_bss_eht_capable(mac, pAddBssParams);
 		lim_add_bss_eht_cfg(pAddBssParams, pe_session);
 	}
@@ -4337,7 +4326,7 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 	pAddBssParams->staContext.staType = STA_ENTRY_OTHER;
 
 	qdf_mem_copy(pAddBssParams->staContext.bssId,
-			bssDescription->bssId, sizeof(tSirMacAddr));
+		     bss_desc->bssId, sizeof(tSirMacAddr));
 
 	listen_interval = mac->mlme_cfg->sap_cfg.listen_interval;
 	pAddBssParams->staContext.listenInterval = listen_interval;
@@ -4346,19 +4335,17 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 	pAddBssParams->staContext.maxSPLen = 0;
 	pAddBssParams->staContext.updateSta = false;
 
-	if (IS_DOT11_MODE_HT(pe_session->dot11mode)
-			&& (pBeaconStruct->HTCaps.present)) {
+	if (IS_DOT11_MODE_HT(pe_session->dot11mode) &&
+	    bcn_ies->HTCaps.present) {
 		pAddBssParams->staContext.htCapable = 1;
 		if (pe_session->vhtCapability &&
-			(IS_BSS_VHT_CAPABLE(pBeaconStruct->VHTCaps) ||
-			 IS_BSS_VHT_CAPABLE(
-				 pBeaconStruct->vendor_vht_ie.VHTCaps))) {
+		    (IS_BSS_VHT_CAPABLE(bcn_ies->VHTCaps) ||
+		     IS_BSS_VHT_CAPABLE(bcn_ies->vendor_vht_ie.VHTCaps))) {
 			pAddBssParams->staContext.vhtCapable = 1;
-			if (pBeaconStruct->VHTCaps.present)
-				vht_caps = &pBeaconStruct->VHTCaps;
-			else if (pBeaconStruct->vendor_vht_ie.VHTCaps.present)
-				vht_caps = &pBeaconStruct->
-						vendor_vht_ie.VHTCaps;
+			if (bcn_ies->VHTCaps.present)
+				vht_caps = &bcn_ies->VHTCaps;
+			else if (bcn_ies->vendor_vht_ie.VHTCaps.present)
+				vht_caps = &bcn_ies->vendor_vht_ie.VHTCaps;
 
 			if ((vht_caps) && (vht_caps->suBeamFormerCap ||
 				vht_caps->muBeamformerCap) &&
@@ -4376,21 +4363,19 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 						= 1;
 		}
 		if (lim_is_session_he_capable(pe_session) &&
-			pBeaconStruct->he_cap.present)
+		    bcn_ies->he_cap.present)
 			lim_intersect_ap_he_caps(pe_session, pAddBssParams,
-						 NULL, bssDescription);
+						 NULL, bss_desc);
 
 		if (lim_is_session_eht_capable(pe_session) &&
-		    pBeaconStruct->eht_cap.present)
+		    bcn_ies->eht_cap.present)
 			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
-						  &bssDescription->bcn_ies,
-						  NULL);
+						  bcn_ies, NULL);
 
-		if (pBeaconStruct->HTCaps.supportedChannelWidthSet &&
+		if (bcn_ies->HTCaps.supportedChannelWidthSet &&
 		    chan_width_support) {
 			pAddBssParams->staContext.ch_width =
-				(uint8_t) pBeaconStruct->HTInfo.
-				recommendedTxWidthSet;
+				(uint8_t)bcn_ies->HTInfo.recommendedTxWidthSet;
 			if ((vht_oper) &&
 					pAddBssParams->staContext.vhtCapable &&
 					vht_oper->chanWidth)
@@ -4401,10 +4386,9 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 				CH_WIDTH_20MHZ;
 		}
 		pAddBssParams->staContext.mimoPS =
-			(tSirMacHTMIMOPowerSaveState) pBeaconStruct->HTCaps.
-			mimoPowerSave;
+			(tSirMacHTMIMOPowerSaveState)bcn_ies->HTCaps.mimoPowerSave;
 		pAddBssParams->staContext.maxAmpduDensity =
-			pBeaconStruct->HTCaps.mpduDensity;
+					bcn_ies->HTCaps.mpduDensity;
 		/*
 		 * We will check gShortGI20Mhz and gShortGI40Mhz from ini file.
 		 * if they are set then we will use what ever Beacon coming
@@ -4413,18 +4397,18 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 		 */
 		if (pe_session->ht_config.short_gi_20_mhz)
 			pAddBssParams->staContext.fShortGI20Mhz =
-				(uint8_t)pBeaconStruct->HTCaps.shortGI20MHz;
+				(uint8_t)bcn_ies->HTCaps.shortGI20MHz;
 		else
 			pAddBssParams->staContext.fShortGI20Mhz = false;
 
 		if (pe_session->ht_config.short_gi_40_mhz)
 			pAddBssParams->staContext.fShortGI40Mhz =
-				(uint8_t) pBeaconStruct->HTCaps.shortGI40MHz;
+				(uint8_t)bcn_ies->HTCaps.shortGI40MHz;
 		else
 			pAddBssParams->staContext.fShortGI40Mhz = false;
 
 		pAddBssParams->staContext.maxAmpduSize =
-			pBeaconStruct->HTCaps.maxRxAMPDUFactor;
+			bcn_ies->HTCaps.maxRxAMPDUFactor;
 		if (pAddBssParams->staContext.vhtTxBFCapable
 		    && vht_cap_info->disable_ldpc_with_txbf_ap) {
 			pAddBssParams->staContext.htLdpcCapable = 0;
@@ -4432,21 +4416,19 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 		} else {
 			if (pe_session->txLdpcIniFeatureEnabled & 0x1)
 				pAddBssParams->staContext.htLdpcCapable =
-					(uint8_t) pBeaconStruct->HTCaps.
-						advCodingCap;
+					(uint8_t)bcn_ies->HTCaps.advCodingCap;
 			else
 				pAddBssParams->staContext.htLdpcCapable = 0;
 
-			if (pBeaconStruct->VHTCaps.present)
-				vht_caps = &pBeaconStruct->VHTCaps;
-			else if (pBeaconStruct->vendor_vht_ie.VHTCaps.present) {
-				vht_caps =
-					&pBeaconStruct->vendor_vht_ie.VHTCaps;
-			}
+			if (bcn_ies->VHTCaps.present)
+				vht_caps = &bcn_ies->VHTCaps;
+			else if (bcn_ies->vendor_vht_ie.VHTCaps.present)
+				vht_caps = &bcn_ies->vendor_vht_ie.VHTCaps;
+
 			if (vht_caps &&
-				(pe_session->txLdpcIniFeatureEnabled & 0x2))
+			    (pe_session->txLdpcIniFeatureEnabled & 0x2))
 				pAddBssParams->staContext.vhtLdpcCapable =
-					(uint8_t) vht_caps->ldpcCodingCap;
+					(uint8_t)vht_caps->ldpcCodingCap;
 			else
 				pAddBssParams->staContext.vhtLdpcCapable = 0;
 		}
@@ -4455,11 +4437,12 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 	 * If WMM IE or 802.11E IE is not present
 	 * and AP is HT AP then enable WMM
 	 */
-	if ((pe_session->limWmeEnabled && (pBeaconStruct->wmeEdcaPresent ||
-			pAddBssParams->staContext.htCapable)) ||
-			(pe_session->limQosEnabled &&
-			 (pBeaconStruct->edcaPresent ||
-			  pAddBssParams->staContext.htCapable)))
+	if ((pe_session->limWmeEnabled &&
+	     (bcn_ies->WMMParams.present ||
+	      pAddBssParams->staContext.htCapable)) ||
+	    (pe_session->limQosEnabled &&
+	     (bcn_ies->EDCAParamSet.present ||
+	      pAddBssParams->staContext.htCapable)))
 		pAddBssParams->staContext.wmmEnabled = 1;
 	else
 		pAddBssParams->staContext.wmmEnabled = 0;
@@ -4467,11 +4450,9 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 	/* Update the rates */
 	lim_populate_peer_rate_set(mac,
 				   &pAddBssParams->staContext.supportedRates,
-				   pBeaconStruct->HTCaps.supportedMCSSet,
-				   pe_session, &pBeaconStruct->VHTCaps,
-				   &pBeaconStruct->he_cap,
-				   &pBeaconStruct->eht_cap, NULL,
-				   bssDescription);
+				   bcn_ies->HTCaps.supportedMCSSet, pe_session,
+				   &bcn_ies->VHTCaps, &bcn_ies->he_cap,
+				   &bcn_ies->eht_cap, NULL, bss_desc);
 
 	pAddBssParams->staContext.encryptType = pe_session->encryptType;
 
@@ -4501,20 +4482,16 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 	if (lim_is_fils_connection(pe_session))
 		pAddBssParams->no_ptk_4_way = true;
 
-	retCode = wma_pre_assoc_req(pAddBssParams);
+	status = wma_pre_assoc_req(pAddBssParams);
 	lim_process_sta_add_bss_rsp_pre_assoc(mac, pAddBssParams,
-					      pe_session, retCode);
+					      pe_session, status);
 	qdf_mem_free(pAddBssParams);
 	/*
-	 * Set retCode success as lim_process_sta_add_bss_rsp_pre_assoc take
+	 * Return success as lim_process_sta_add_bss_rsp_pre_assoc take
 	 * care of failure
 	 */
-	retCode = QDF_STATUS_SUCCESS;
+	return QDF_STATUS_SUCCESS;
 
-returnFailure:
-	/* Clean-up will be done by the caller... */
-	qdf_mem_free(pBeaconStruct);
-	return retCode;
 }
 
 /**
