@@ -654,6 +654,16 @@ QDF_STATUS wlan_hdd_get_rssi(struct wlan_hdd_link_info *link_info,
 QDF_STATUS wlan_hdd_get_snr(struct wlan_hdd_link_info *link_info, int8_t *snr);
 
 /**
+ * wlan_hdd_get_station_ch_load() - Get latest channel load
+ * @link_info: Pointer to link_info in adapter
+ * @ch_load: pointer to where the channel load should be returned
+ *
+ * Return: 0 on success, negative errno on error
+ */
+int wlan_hdd_get_station_ch_load(struct wlan_hdd_link_info *link_info,
+				 int8_t *ch_load);
+
+/**
  * wlan_hdd_get_linkspeed_for_peermac() - Get link speed for a peer
  * @link_info: Link info pointer in adapter
  * @mac_address: MAC address of the peer

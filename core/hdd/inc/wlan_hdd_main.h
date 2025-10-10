@@ -741,6 +741,24 @@ struct bcn_his_info_stats {
 	struct bcn_his_info bcn_history[MAX_BCN_HISTORY];
 };
 
+/**
+ * struct hdd_channel_stats - channel stats
+ * @rx_time: store recent rx time in msecs
+ * @tx_time: store recent tx time in msecs
+ * @on_time: store recent on time in msecs
+ * @cca_time: store recent cca time in msecs
+ * @ch_freq: channel frequency of statistics stored for
+ * @ch_load: latest channel loading [0-100] or [-1] if link inactive
+ */
+struct hdd_channel_stats {
+	uint32_t rx_time;
+	uint32_t tx_time;
+	uint32_t on_time;
+	uint32_t cca_time;
+	uint32_t ch_freq;
+	int8_t ch_load;
+};
+
 #define MAX_SUBTYPES_TRACKED	4
 
 struct hdd_stats {
@@ -753,6 +771,7 @@ struct hdd_stats {
 	struct hdd_pmf_stats hdd_pmf_stats;
 	struct pmf_bcn_protect_stats bcn_protect_stats;
 	struct bcn_his_info_stats bcn_rssi_his_stats;
+	struct hdd_channel_stats ch_stats;
 };
 
 /**

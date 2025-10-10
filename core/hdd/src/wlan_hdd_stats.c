@@ -383,6 +383,166 @@ copy_station_bcn_rssi_stats(struct wlan_objmgr_psoc *psoc,
 	hdd_dump_bcn_rssi_history(adapter);
 }
 
+/**
+ * hdd_calc_ch_load() - Calculate channel loading
+ * @link_info: Pointer to link_info in adapter
+ * @stats: Pointer to stats event from firmware
+ *
+ * This function calculates channel loading using the formula cca_time/on_time
+ * Handles MLO inactive state, channel change, and uint32 overflow scenarios
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error status on failure
+ */
+static QDF_STATUS hdd_calc_ch_load(struct wlan_hdd_link_info *link_info,
+				   struct stats_event *stats)
+{
+	int8_t ch_load = 0;
+	uint32_t ch_freq;
+	uint32_t cca_new, on_new;
+	uint32_t cca_delta, on_delta;
+	uint64_t overflow_val;
+	struct hdd_stats *hdd_stats;
+
+	if (!link_info || !stats || !stats->vdev_extd_stats) {
+		hdd_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	hdd_stats = &link_info->hdd_stats;
+
+	/* MLO link inactive state */
+	if (wlan_hdd_is_mlo_connection(link_info) &&
+	    !stats->vdev_extd_stats[0].is_mlo_vdev_active) {
+		ch_load = -1;
+		/* Reset stored values for inactive link */
+		hdd_stats->ch_stats.rx_time = 0;
+		hdd_stats->ch_stats.tx_time = 0;
+		hdd_stats->ch_stats.cca_time = 0;
+		hdd_stats->ch_stats.on_time = 0;
+		hdd_stats->ch_stats.ch_freq = 0;
+		hdd_stats->ch_stats.ch_load = ch_load;
+		hdd_debug("MLO link (vdev:%d) inactive state ch_load = -1",
+			  link_info->vdev_id);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	/* Get current values from firmware stats */
+	cca_new = stats->vdev_extd_stats[0].cca_time;
+	on_new = stats->vdev_extd_stats[0].on_time;
+	hdd_debug("vdev:%d cca_new=%u on_new=%u", link_info->vdev_id,
+		  cca_new, on_new);
+
+	/* Avoid division by zero */
+	if (on_new == 0) {
+		hdd_debug("on_time is zero, can't calculate channel load");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ch_freq = hdd_get_link_info_home_channel(link_info);
+
+	/* Channel changed, calculate channel loading with new stats */
+	if (ch_freq != hdd_stats->ch_stats.ch_freq) {
+		ch_load = (cca_new * 100) / on_new;
+		hdd_debug("Channel changed from %u to %u, ch_load = %d%%",
+			  hdd_stats->ch_stats.ch_freq, ch_freq, ch_load);
+	} else {
+		/* Channel loading calculated with delta of new - stored */
+		/* If FW returns stale data, keep previous channel loading */
+		if (hdd_stats->ch_stats.on_time == on_new &&
+		    hdd_stats->ch_stats.cca_time == cca_new) {
+			hdd_debug("Stale FW data,keep prev ch_load = %d%%",
+				  hdd_stats->ch_stats.ch_load);
+			return QDF_STATUS_SUCCESS;
+		}
+
+		/* Handle uint32 overflow for on_time */
+		if (on_new < hdd_stats->ch_stats.on_time) {
+			overflow_val = (uint64_t)on_new + 0x100000000ULL;
+			on_delta = (uint32_t)(overflow_val - (uint64_t)
+					      hdd_stats->ch_stats.on_time);
+		} else {
+			on_delta = on_new - hdd_stats->ch_stats.on_time;
+		}
+
+		/* Handle uint32 overflow for cca_time */
+		if (cca_new < hdd_stats->ch_stats.cca_time) {
+			overflow_val = (uint64_t)cca_new + 0x100000000ULL;
+			cca_delta = (uint32_t)(overflow_val - (uint64_t)
+					       hdd_stats->ch_stats.cca_time);
+		} else {
+			cca_delta = cca_new - hdd_stats->ch_stats.cca_time;
+		}
+
+		/* Avoid division by zero */
+		if (on_delta == 0) {
+			hdd_debug("on_delta is zero,keep prev ch_load = %d%%",
+				  hdd_stats->ch_stats.ch_load);
+			return QDF_STATUS_SUCCESS;
+		}
+		/* On_time increases in awake, doesn't increase in dozen */
+		/* To avoid calculation inaccuracy,skip small denominator */
+		if (on_delta < 50) {
+			hdd_debug("on_delta(%d) small,keep prev ch_load = %d%%",
+				  on_delta, hdd_stats->ch_stats.ch_load);
+			return QDF_STATUS_SUCCESS;
+		}
+
+		/* Calculate channel load percentage */
+		ch_load = (cca_delta * 100) / on_delta;
+
+		hdd_debug("calculated ch_load = %d%% cca_delta=%u,on_delta=%u",
+			  ch_load, cca_delta, on_delta);
+	}
+
+	/* Ensure channel load is within valid range (0-100) */
+	if (ch_load > 100) {
+		hdd_debug("calculated ch_load = %d%%, capping to 100",
+			  ch_load);
+		ch_load = 100;
+	} else if (ch_load < 0) {
+		hdd_debug("calculated ch_load = %d%% is negative, setting to 0",
+			  ch_load);
+		ch_load = 0;
+	}
+
+	/* Store current values for next calculation */
+	hdd_stats->ch_stats.cca_time = cca_new;
+	hdd_stats->ch_stats.on_time = on_new;
+	hdd_stats->ch_stats.rx_time = stats->vdev_extd_stats[0].rx_time;
+	hdd_stats->ch_stats.tx_time = stats->vdev_extd_stats[0].tx_time;
+	hdd_stats->ch_stats.ch_freq = ch_freq;
+	hdd_stats->ch_stats.ch_load = ch_load;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/*
+ * wlan_hdd_get_station_ch_load() - Get latest channel load
+ * @link_info: Pointer to link_info in adapter
+ * @ch_load: Possible values are 0-100 and -1 while link in inactive state
+ *
+ * Return: 0 if success, non-zero for failure
+ */
+int wlan_hdd_get_station_ch_load(struct wlan_hdd_link_info *link_info,
+				 int8_t *ch_load)
+{
+	/* Input validation */
+	if (!link_info) {
+		hdd_err("Invalid link_info");
+		return -EINVAL;
+	}
+
+	if (!ch_load) {
+		hdd_err("Invalid ch_load pointer");
+		return -EINVAL;
+	}
+
+	/* Return the cached channel load value */
+	*ch_load = link_info->hdd_stats.ch_stats.ch_load;
+
+	return 0;
+}
+
 /*
  * copy_station_stats_to_adapter() - Copy station stats to adapter
  * @link_info: Pointer to link_info in adapter
@@ -443,10 +603,11 @@ static int copy_station_stats_to_adapter(struct wlan_hdd_link_info *link_info,
 	adapter->tx_power.tx_pwr_cached_timestamp =
 			qdf_system_ticks_to_msecs(qdf_system_ticks());
 	/* Copy vdev status info sent by FW */
-	if (stats->vdev_extd_stats)
+	if (stats->vdev_extd_stats) {
 		link_info->is_mlo_vdev_active =
 			stats->vdev_extd_stats[0].is_mlo_vdev_active;
-
+		hdd_calc_ch_load(link_info, stats);
+	}
 	/* save per chain rssi to legacy location */
 	qdf_mem_copy(hdd_stats->per_chain_rssi_stats.rssi,
 		     stats->vdev_chain_rssi[0].chain_rssi,
