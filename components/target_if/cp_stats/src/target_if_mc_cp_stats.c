@@ -947,6 +947,12 @@ target_if_cp_stats_extract_vdev_extd_stats(struct wmi_unified *wmi_hdl,
 		ev->vdev_extd_stats[i].is_mlo_vdev_active =
 						stats[0].is_mlo_vdev_active;
 		ev->vdev_extd_stats[i].vdev_tx_power = stats[0].vdev_tx_power;
+
+		/*Copy and pass rx/tx/cca/on time stats from wmi to hdd */
+		ev->vdev_extd_stats[i].rx_time = stats[0].rx_time;
+		ev->vdev_extd_stats[i].tx_time = stats[0].tx_time;
+		ev->vdev_extd_stats[i].cca_time = stats[0].cca_time;
+		ev->vdev_extd_stats[i].on_time = stats[0].on_time;
 	}
 
 	qdf_mem_free(stats);

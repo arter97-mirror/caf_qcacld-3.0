@@ -470,11 +470,19 @@ struct pmf_bcn_protect_stats {
  * @vdev_id: vdev_id of the event
  * @is_mlo_vdev_active: is the mlo vdev currently active
  * @vdev_tx_power: vdev tx power
+ * @rx_time: msecs the radio is in active receive
+ * @tx_time: msecs the radio is is transmitting
+ * @on_time: msecs the radio is awake
+ * @cca_time:msecs the CCA register is busy
  */
 struct vdev_summary_extd_stats {
 	uint8_t vdev_id;
 	bool is_mlo_vdev_active;
 	uint32_t vdev_tx_power;
+	uint32_t rx_time;
+	uint32_t tx_time;
+	uint32_t on_time;
+	uint32_t cca_time;
 };
 
 /**
