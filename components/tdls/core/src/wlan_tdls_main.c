@@ -1865,6 +1865,7 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 			       false, false, notify->session_id);
 
 	tdls_timers_stop(tdls_vdev_obj);
+	tdls_allow_suspend(tdls_soc_obj);
 
 	/*
 	 * If concurrency is not marked, then we have to
@@ -1938,12 +1939,20 @@ QDF_STATUS tdls_notify_sta_disconnect(struct tdls_sta_notify_params *notify)
 
 static void tdls_process_reset_adapter(struct wlan_objmgr_vdev *vdev)
 {
+	struct tdls_soc_priv_obj *tdls_soc;
 	struct tdls_vdev_priv_obj *tdls_vdev;
 
 	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
 	if (!tdls_vdev)
 		return;
+
 	tdls_timers_stop(tdls_vdev);
+
+	tdls_soc = wlan_vdev_get_tdls_soc_obj(vdev);
+	if (!tdls_soc)
+		return;
+
+	tdls_allow_suspend(tdls_soc);
 }
 
 void tdls_notify_reset_adapter(struct wlan_objmgr_vdev *vdev)
