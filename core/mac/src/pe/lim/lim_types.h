@@ -1936,6 +1936,29 @@ QDF_STATUS lim_sta_mlme_vdev_disconnect_bss(struct vdev_mlme_obj *vdev_mlme,
 					    uint16_t data_len, void *data);
 
 /**
+ * lim_convert_assoc_req_frame_to_struct() - Convert assoc req frame to struct
+ * @mac_ctx: Pointer to Global MAC structure
+ * @frame_buf: Pointer to the association request frame
+ * @frame_len: Length of the association request frame
+ * @sub_type: Indicates whether it is Association Request(=0) or Reassociation
+ *            Request(=1) frame
+ * @freq: Operating frequency
+ * @assoc_req: Pointer to the structure to be filled
+ *
+ * This function parses the Association/Reassociation Request frame and fills
+ * the relevant fields in the tpSirAssocReq structure. It also extracts and
+ * decodes the EHT capabilities from the frame if present.
+ *
+ * Return: STATUS_SUCCESS if parsing is successful, appropriate error code
+ *         otherwise
+ */
+enum wlan_status_code
+lim_convert_assoc_req_frame_to_struct(struct mac_context *mac_ctx,
+				      uint8_t *frame_buf, uint16_t frame_len,
+				      uint8_t sub_type, qdf_freq_t freq,
+				      tpSirAssocReq assoc_req);
+
+/**
  * lim_process_assoc_cleanup() - frees up resources used in function
  * lim_process_assoc_req_frame()
  * @mac_ctx: pointer to Global MAC structure

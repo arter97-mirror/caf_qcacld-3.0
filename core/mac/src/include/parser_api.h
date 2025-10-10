@@ -701,10 +701,9 @@ sir_convert_probe_frame2_struct(struct mac_context *mac, uint8_t *frame,
 
 enum wlan_status_code
 sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
-				    struct pe_session *session,
-				    uint8_t *frame, uint32_t len,
-				    tpSirAssocReq assoc,
-				    tSirMacAddr peer_mac_addr);
+				    uint8_t *pFrame, uint32_t nFrame,
+				    tpSirAssocReq pAssocReq);
+
 /**
  * wlan_parse_ftie_sha384() - Parse the FT IE if akm uses sha384 KDF
  * @frame: Pointer to the association response frame

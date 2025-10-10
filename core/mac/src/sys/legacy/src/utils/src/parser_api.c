@@ -3976,34 +3976,15 @@ sir_convert_assoc_req_frame2_mlo_struct(uint8_t *pFrame,
 
 enum wlan_status_code
 sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
-				    struct pe_session *session,
-				    uint8_t *pFrame,
-				    uint32_t nFrame, tpSirAssocReq pAssocReq,
-				    tSirMacAddr peer_mac_addr)
+				    uint8_t *pFrame, uint32_t nFrame,
+				    tpSirAssocReq pAssocReq)
 {
 	tDot11fAssocRequest *ar;
 	uint32_t status;
-	struct pe_fils_session *fils_info;
 
 	ar = qdf_mem_malloc(sizeof(tDot11fAssocRequest));
 	if (!ar)
 		return STATUS_UNSPECIFIED_FAILURE;
-
-	/*
-	 * Decrypt the cipher text of Assoc Request
-	 * using AEAD decryption
-	 */
-	fils_info = lim_get_fils_info(session, peer_mac_addr);
-	if (fils_info && fils_info->is_fils_connection) {
-		status = aead_decrypt_assoc_req(mac, session,
-						ar, pFrame, &nFrame,
-						peer_mac_addr);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			pe_err("FILS Assoc Rsp AEAD decrypt fails");
-			qdf_mem_free(ar);
-			return STATUS_UNSPECIFIED_FAILURE;
-		}
-	}
 
 	/* delegate to the framesc-generated code, */
 	status = dot11f_unpack_assoc_request(mac, pFrame, nFrame, ar, false);

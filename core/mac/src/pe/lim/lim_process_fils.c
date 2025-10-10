@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2879,7 +2879,6 @@ QDF_STATUS aead_decrypt_assoc_rsp(struct mac_context *mac_ctx,
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 QDF_STATUS aead_decrypt_assoc_req(struct mac_context *mac_ctx,
 				  struct pe_session *session,
-				  tDot11fAssocRequest *ar,
 				  uint8_t *p_frame, uint32_t *n_frame,
 				  tSirMacAddr peer_mac_addr)
 {

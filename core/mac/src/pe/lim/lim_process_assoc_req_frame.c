@@ -240,6 +240,45 @@ static bool lim_chk_sa_da(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
 	return false;
 }
 
+enum wlan_status_code
+lim_convert_assoc_req_frame_to_struct(struct mac_context *mac_ctx,
+				      uint8_t *frame_buf, uint16_t frame_len,
+				      uint8_t sub_type, qdf_freq_t freq,
+				      tpSirAssocReq assoc_req)
+{
+	QDF_STATUS status;
+	enum wlan_status_code wlan_status;
+	uint32_t offset;
+
+	if (sub_type == LIM_ASSOC) {
+		offset = WLAN_ASSOC_REQ_IES_OFFSET;
+		wlan_status = sir_convert_assoc_req_frame2_struct(mac_ctx,
+								  frame_buf,
+								  frame_len,
+								  assoc_req);
+	} else {
+		offset = WLAN_REASSOC_REQ_IES_OFFSET;
+		wlan_status = sir_convert_reassoc_req_frame2_struct(mac_ctx,
+								    frame_buf,
+								    frame_len,
+								    assoc_req);
+	}
+
+	if (wlan_status != STATUS_SUCCESS)
+		return wlan_status;
+
+	status = lim_strip_and_decode_eht_cap(frame_buf + offset,
+					      frame_len - offset,
+					      &assoc_req->eht_cap,
+					      assoc_req->he_cap, freq, true);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to extract eht cap");
+		return STATUS_DENIED_EHT_NOT_SUPPORTED;
+	}
+
+	return STATUS_SUCCESS;
+}
+
 /**
  * lim_chk_assoc_req_parse_error() - checks for error in frame parsing
  * @mac_ctx: pointer to Global MAC structure
@@ -261,58 +300,56 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 					  uint8_t sub_type, uint8_t *frm_body,
 					  uint32_t frame_len)
 {
-	QDF_STATUS qdf_status;
-	enum wlan_status_code wlan_status;
+	enum wlan_status_code parse_status;
+	QDF_STATUS status;
+	struct pe_fils_session *fils_info;
 	struct qdf_mac_addr *mld_mac;
-	uint32_t offset = WLAN_ASSOC_REQ_IES_OFFSET;
+	uint32_t parser_frame_len = frame_len;
 
 	if (sub_type == LIM_ASSOC) {
-		wlan_status = sir_convert_assoc_req_frame2_struct(mac_ctx,
-								  session,
-								  frm_body,
-								  frame_len,
-								  assoc_req,
-								  sa);
-	} else {
-		wlan_status = sir_convert_reassoc_req_frame2_struct(mac_ctx,
-						frm_body, frame_len, assoc_req);
-		offset = WLAN_REASSOC_REQ_IES_OFFSET;
-	}
-	if (wlan_status == STATUS_SUCCESS) {
-		qdf_status = lim_strip_and_decode_eht_cap(frm_body + offset,
-							  frame_len - offset,
-							  &assoc_req->eht_cap,
-							  assoc_req->he_cap,
-							  session->curr_op_freq,
-							  true);
-		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			pe_err("Failed to extract eht cap");
-			return false;
+		fils_info = lim_get_fils_info(session, sa);
+		if (fils_info && fils_info->is_fils_connection) {
+			status = aead_decrypt_assoc_req(mac_ctx, session,
+							frm_body,
+							&parser_frame_len, sa);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				pe_err("FILS Assoc Req AEAD decrypt fails");
+				parse_status = STATUS_UNSPECIFIED_FAILURE;
+				goto parse_fail;
+			}
 		}
-
-		/*
-		 * If EHT capability is not present but MLO is parsed
-		 * suceesssfully, remove the ML info from assoc request.
-		 */
-		mld_mac = (struct qdf_mac_addr *)assoc_req->mld_mac;
-		if (!assoc_req->eht_cap.present &&
-		    !qdf_is_macaddr_zero(mld_mac)) {
-			pe_warn("Assoc Req rejected: missing ETH IE "
-				QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(sa));
-
-			lim_send_assoc_rsp_mgmt_frame(mac_ctx,
-						      STATUS_DENIED_EHT_NOT_SUPPORTED,
-						      1, sa, sub_type, 0,
-						      session, false,
-						      mld_mac);
-			return false;
-		}
-		return true;
 	}
 
-	pe_warn("Assoc Req rejected: frame parsing error. source addr:"
-			QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(sa));
-	lim_send_assoc_rsp_mgmt_frame(mac_ctx, wlan_status,
+	parse_status = lim_convert_assoc_req_frame_to_struct(mac_ctx,
+							     frm_body,
+							     parser_frame_len,
+							     sub_type,
+							     session->curr_op_freq,
+							     assoc_req);
+	if (parse_status != STATUS_SUCCESS)
+		goto parse_fail;
+
+	/*
+	 * If EHT capability is not present but MLO is parsed
+	 * successfully, remove the ML info from assoc request.
+	 */
+	mld_mac = (struct qdf_mac_addr *)assoc_req->mld_mac;
+	if (!assoc_req->eht_cap.present && !qdf_is_macaddr_zero(mld_mac)) {
+		pe_warn("Assoc Req rejected: missing EHT IE " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(sa));
+		lim_send_assoc_rsp_mgmt_frame(mac_ctx,
+					      STATUS_DENIED_EHT_NOT_SUPPORTED,
+					      1, sa, sub_type, 0, session,
+					      false, mld_mac);
+		return false;
+	}
+
+	return true;
+
+parse_fail:
+	pe_warn("Assoc Req rejected: frame parsing error. source addr:" QDF_MAC_ADDR_FMT,
+		QDF_MAC_ADDR_REF(sa));
+	lim_send_assoc_rsp_mgmt_frame(mac_ctx, parse_status,
 				      1, sa, sub_type, 0, session, false,
 				      (struct qdf_mac_addr *)assoc_req->mld_mac);
 	return false;

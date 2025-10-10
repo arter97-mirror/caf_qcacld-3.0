@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -444,7 +444,6 @@ QDF_STATUS aead_encrypt_assoc_rsp(struct mac_context *mac_ctx,
  * aead_decrypt_assoc_req() - API for AEAD decryption in FILS connection
  * @mac_ctx: MAC context
  * @session: PE session
- * @assoc_req: Assoc Request frame structure
  * @p_frame: frame buffer received
  * @n_frame: length of @p_frame
  * @peer_addr Peer Mac Address of STA
@@ -456,7 +455,6 @@ QDF_STATUS aead_encrypt_assoc_rsp(struct mac_context *mac_ctx,
  */
 QDF_STATUS aead_decrypt_assoc_req(struct mac_context *mac_ctx,
 				  struct pe_session *session,
-				  tDot11fAssocRequest *assoc_req,
 				  uint8_t *p_frame, uint32_t *n_frame,
 				  tSirMacAddr peer_mac_addr);
 /**
@@ -508,7 +506,6 @@ static inline QDF_STATUS aead_encrypt_assoc_rsp(struct mac_context *mac_ctx,
 
 static inline QDF_STATUS aead_decrypt_assoc_req(struct mac_context *mac_ctx,
 						struct pe_session *session,
-						tDot11fAssocRequest *assoc_req,
 						uint8_t *p_frame,
 						uint32_t *n_frame,
 						tSirMacAddr peer_addr)
