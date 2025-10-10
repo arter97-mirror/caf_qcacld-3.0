@@ -255,6 +255,7 @@
 #include "wifi_pos_api.h"
 #include "wlan_mgmt_rx_srng_ucfg_api.h"
 #include "wifi_pos_pasn_api.h"
+#include "wlan_cp_stats_ucfg_api.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -16648,6 +16649,9 @@ static int hdd_update_cds_config(struct hdd_context *hdd_ctx)
 	hdd_lpass_populate_cds_config(cds_cfg, hdd_ctx);
 	cds_cfg->is_pm_fw_debug_enable =
 				ucfg_pmo_is_fw_debug_enable(hdd_ctx->psoc);
+	cds_cfg->enable_bcn_rssi_history_report =
+		ucfg_cp_stats_is_bcn_rssi_history_report_cfg_enable(
+								hdd_ctx->psoc);
 	cds_init_ini_config(cds_cfg);
 	return 0;
 

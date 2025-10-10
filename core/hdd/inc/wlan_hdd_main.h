@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -669,6 +669,16 @@ struct wlan_hdd_peer_info {
 };
 #endif
 
+#define MAX_BCN_HISTORY 10
+
+/**
+ * struct bcn_his_info_stats - beacon rssi history stats
+ * @bcn_history: Beacon real RSSI history array
+ */
+struct bcn_his_info_stats {
+	struct bcn_his_info bcn_history[MAX_BCN_HISTORY];
+};
+
 #define MAX_SUBTYPES_TRACKED	4
 
 struct hdd_stats {
@@ -680,6 +690,7 @@ struct hdd_stats {
 	struct hdd_peer_stats peer_stats;
 	struct hdd_pmf_stats hdd_pmf_stats;
 	struct pmf_bcn_protect_stats bcn_protect_stats;
+	struct bcn_his_info_stats bcn_rssi_his_stats;
 };
 
 /**
