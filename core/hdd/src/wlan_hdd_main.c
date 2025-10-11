@@ -6302,7 +6302,8 @@ hdd_is_dynamic_set_mac_addr_supported(struct hdd_context *hdd_ctx)
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
 QDF_STATUS
 hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
-					struct wlan_hdd_link_info *new_link_info)
+					struct wlan_hdd_link_info *new_link_info,
+					bool is_roam)
 {
 	unsigned long link_flags;
 	struct wlan_objmgr_vdev *vdev;
@@ -6310,6 +6311,7 @@ hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info
 	uint8_t cur_old_pos, cur_new_pos;
 	struct vdev_osif_priv *vdev_priv;
 	struct hdd_adapter *adapter = cur_link_info->adapter;
+	struct hdd_station_ctx *sta_ctx;
 
 	/* Update the new position of current and new link info
 	 * in the link info array.
@@ -6345,6 +6347,11 @@ hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info
 	/* Update VDEV-OSIF priv pointer to new link info */
 	vdev_priv = wlan_vdev_get_ospriv(new_link_info->vdev);
 	vdev_priv->legacy_osif_priv = new_link_info;
+
+	if (is_roam) {
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(cur_link_info);
+		sta_ctx->conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -6420,7 +6427,8 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 	}
 
 	status = hdd_adapter_update_links_on_link_switch(cur_link_info,
-							 new_link_info);
+							 new_link_info,
+							 false);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to update adapter link info");
 		goto release_ref;
@@ -6485,7 +6493,8 @@ QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 		QDF_MAC_ADDR_REF(new_self_mac->bytes));
 
 	status = hdd_adapter_update_links_on_link_switch(cur_link_info,
-							 new_link_info);
+							 new_link_info,
+							 true);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to update adapter link info, status %d",
 			status);
@@ -6543,7 +6552,8 @@ QDF_STATUS hdd_link_recfg_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 		  QDF_MAC_ADDR_REF(new_self_mac->bytes));
 
 	status = hdd_adapter_update_links_on_link_switch(cur_link_info,
-							 new_link_info);
+							 new_link_info,
+							 false);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to update adapter link info, status %d",
 			status);
