@@ -5849,7 +5849,8 @@ hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
 
 QDF_STATUS
 hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
-					struct wlan_hdd_link_info *new_link_info);
+					struct wlan_hdd_link_info *new_link_info,
+					bool is_roam);
 #else
 static inline struct wlan_hdd_link_info *
 hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
@@ -5860,7 +5861,8 @@ hdd_get_link_info_by_ieee_link_id(struct hdd_adapter *adapter,
 
 static inline QDF_STATUS
 hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
-					struct wlan_hdd_link_info *new_link_info)
+					struct wlan_hdd_link_info *new_link_info,
+					bool is_roam)
 {
 	return QDF_STATUS_SUCCESS;
 }
