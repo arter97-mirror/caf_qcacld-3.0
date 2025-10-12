@@ -785,20 +785,9 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		}
 
 		len = scnprintf(buf + length, buf_avail_len - length,
-				"freq: %u\n"
-				"ch_width: %s\n"
-				"signal: %ddBm\n"
-				"tx_bit_rate: %u\n"
-				"rx_bit_rate: %u\n"
-				"last_auth_type: %s\n"
-				"dot11mode: %s\n",
-				chan_freq,
-				hdd_ch_width_str(ch_width),
-				rssi,
-				tx_bit_rate,
-				rx_bit_rate,
-				hdd_auth_type_str(conn_info->last_auth_type),
-				hdd_dot11_mode_str(conn_info->dot11mode));
+				"freq: %u\nch_width: %s\nsignal: %ddBm\ntx_bit_rate: %u\nrx_bit_rate: %u\n",
+				chan_freq, hdd_ch_width_str(ch_width), rssi,
+				tx_bit_rate, rx_bit_rate);
 
 		if (len <= 0)
 			return length;
