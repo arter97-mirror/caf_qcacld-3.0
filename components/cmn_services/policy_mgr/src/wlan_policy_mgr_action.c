@@ -472,6 +472,7 @@ policy_mgr_get_connection_table_entry_info(struct wlan_objmgr_pdev *pdev,
 	struct wlan_channel *chan;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct vdev_mlme_obj *vdev_mlme;
+	uint32_t mac_id;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 			WLAN_POLICY_MGR_ID);
@@ -490,13 +491,19 @@ policy_mgr_get_connection_table_entry_info(struct wlan_objmgr_pdev *pdev,
 		goto rel_ref;
 	}
 
+	mac_id = wlan_mlme_get_vdev_mac_id(vdev);
+	if (mac_id > MAX_MAC) {
+		policy_mgr_err("Invalid mac for vdev %d", vdev_id);
+		goto rel_ref;
+	}
+
 	conn_table_entry->type = vdev_mlme->mgmt.generic.type;
 	conn_table_entry->sub_type = vdev_mlme->mgmt.generic.subtype;
 	conn_table_entry->vdev_id = vdev_id;
 	conn_table_entry->mhz = chan->ch_freq;
 	conn_table_entry->chan_width = chan->ch_width;
 	conn_table_entry->ch_flagext = chan->ch_flagext;
-	conn_table_entry->mac_id = wlan_mlme_get_vdev_mac_id(pdev, vdev_id);
+	conn_table_entry->mac_id = mac_id;
 
 	status = QDF_STATUS_SUCCESS;
 rel_ref:
