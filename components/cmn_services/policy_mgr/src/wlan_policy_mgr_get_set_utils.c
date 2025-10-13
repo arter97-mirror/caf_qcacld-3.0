@@ -14380,6 +14380,79 @@ qdf_freq_t policy_mgr_get_ll_lt_sap_freq(struct wlan_objmgr_psoc *psoc)
 	return _policy_mgr_get_ll_sap_freq(psoc, LL_AP_TYPE_LT);
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO_ADV_FEATURE) && defined(WLAN_FEATURE_11BE_MLO)
+/*
+ * policy_mgr_check_partner_links_for_indoor_freq - TO check the ML STA partner
+ * links for 5GHz indoor channel frequencies.
+ *
+ * @psoc: pointer to psoc object.
+ * @vdev_id: vdev_id
+ * @ch_freq: Channel frequency
+ * @ch_width: Channel width
+ *
+ * Return: None
+ */
+static void
+policy_mgr_check_partner_links_for_indoor_freq(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id,
+					       uint32_t *ch_freq,
+					       enum phy_ch_width *ch_width)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct ml_link_info ml_link_info[WLAN_MAX_ML_BSS_LINKS + 1];
+	uint8_t ml_num_link = 0;
+	uint8_t i;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid pm context");
+		return;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("Invalid vdev_id");
+		return;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return;
+	}
+
+	ml_num_link = mlo_get_ml_links_info(psoc, vdev_id, ml_link_info);
+	if (!ml_num_link) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return;
+	}
+
+	for (i = 0; i < ml_num_link; i++) {
+		if (!(WLAN_REG_IS_5GHZ_CH_FREQ(ml_link_info[i].chan_freq) &&
+		      wlan_reg_is_freq_indoor(pm_ctx->pdev,
+					    ml_link_info[i].chan_freq)))
+			continue;
+		*ch_freq = ml_link_info[i].chan_freq;
+		*ch_width = policy_mgr_get_bw_by_session_id(psoc,
+							    ml_link_info[i].vdev_id);
+		policy_mgr_debug("Found partner link with indoor freq %d",
+				 *ch_freq);
+		break;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+}
+#else
+static inline void
+policy_mgr_check_partner_links_for_indoor_freq(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id,
+					       uint32_t *ch_freq,
+					       enum phy_ch_width *ch_width)
+{
+}
+#endif
+
 bool
 policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id,
@@ -14391,6 +14464,7 @@ policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	enum phy_ch_width ch_width = CH_WIDTH_INVALID;
 	bool indoor_support = false;
+	bool cfg_sta_indoor_ch_peer_scc;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -14423,6 +14497,25 @@ policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,
 	case SWITCH_WITH_CONCURRENCY:
 		policy_mgr_get_chan_by_session_id(psoc, vdev_id, &ch_freq);
 		ch_width = policy_mgr_get_bw_by_session_id(psoc, vdev_id);
+
+		/* For ML STA cfg_sta_indoor_ch_peer_scc is enabled and
+		 * if active link frequency is not 5GHz indoor frequency then
+		 * check if any of the partner link frequencies is 5GHz indoor
+		 * frequency. For non ML STA the ch_freq and ch_width remain
+		 * unchanged.
+		 */
+		cfg_sta_indoor_ch_peer_scc =
+			pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc;
+		if (mode == QDF_STA_MODE && cfg_sta_indoor_ch_peer_scc &&
+		    !(WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq)) &&
+		    !(wlan_reg_is_freq_indoor(pm_ctx->pdev, ch_freq))) {
+			policy_mgr_debug("Active link freq is not indoor checking partner links");
+			policy_mgr_check_partner_links_for_indoor_freq(psoc,
+								       vdev_id,
+								       &ch_freq,
+								       &ch_width);
+		}
+
 		break;
 	case DISCONNECT_WITHOUT_CONCURRENCY:
 	case DISCONNECT_WITH_CONCURRENCY:
