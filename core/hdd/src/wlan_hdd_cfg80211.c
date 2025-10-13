@@ -34275,6 +34275,7 @@ hdd_ml_sap_owe_fill_ml_info(struct wlan_hdd_link_info *link_info,
 	wlan_objmgr_peer_release_ref(peer, WLAN_HDD_ID_OBJ_MGR);
 }
 #else
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0))
 static void
 hdd_ml_sap_owe_fill_ml_info(struct wlan_hdd_link_info *link_info,
 			    struct cfg80211_update_owe_info *owe_info,
@@ -34282,6 +34283,14 @@ hdd_ml_sap_owe_fill_ml_info(struct wlan_hdd_link_info *link_info,
 {
 	owe_info->assoc_link_id = -1;
 }
+#else
+static void
+hdd_ml_sap_owe_fill_ml_info(struct wlan_hdd_link_info *link_info,
+			    struct cfg80211_update_owe_info *owe_info,
+			    uint8_t *peer_mac)
+{
+}
+#endif
 #endif
 
 void hdd_send_update_owe_info_event(struct wlan_hdd_link_info *link_info,
