@@ -2305,6 +2305,10 @@ config CNSS2_MODULE
 	bool "Enable CONFIG_CNSS2_MODULE"
 	default n
 
+config CNSS_IN_CNSS2
+	bool "support CNSS SDIO in CNSS2"
+    default n
+
 config DP_RX_DESC_COOKIE_INVALIDATE
 	bool "Enable CONFIG_DP_RX_DESC_COOKIE_INVALIDATE"
 	default n
@@ -2941,4 +2945,52 @@ config QCACLD_FEATURE_COEX_CONFIG
 config IPA_P2P_SUPPORT
 	bool "support p2p when IPA is enabled"
 	default n
+
+config HIF_SDIO
+	bool "enable HIF SDIO"
+	default n
+
+config QCA_WIFI_SDIO
+	bool "enable WIFI SDIO"
+	default n
+
+config CLD_HL_SDIO_CORE
+	bool "enable CLD_HL_SDIO_CORE"
+	default n
+
+config SDIO_TRANSFER
+	depends on CLD_HL_SDIO_CORE
+    bool "sdio transfer type, n:mailbox, y:adma"
+	default n
+
+config TX_DESC_HI_PRIO_RESERVE
+    bool "enable TX_DESC_HI_PRIO_RESERVE"
+	default n
+
+config FEATURE_HL_GROUP_CREDIT_FLOW_CONTROL
+    bool "enable FEATURE_HL_GROUP_CREDIT_FLOW_CONTROL"
+	default n
+
+config PLD_SDIO_CNSS_FLAG
+    bool "enable CNSS"
+	default n
+
+if WLAN_FEATURE_BMI && HIF_PCI
+config BMI_PCIE
+	bool "BMI run under PCIe"
+	default y
+endif
+
+if WLAN_FEATURE_BMI && HIF_SDIO
+config BMI_SDIO
+	bool "BMI run under SDIO"
+	default y
+endif
+
+if AR6320_SUPPORT && HIF_PCI
+config AR6320_PCI
+	bool "ROME with PCIe interface"
+	default y
+endif
+
 endif # QCA_CLD_WLAN

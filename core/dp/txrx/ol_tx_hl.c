@@ -554,8 +554,10 @@ ol_tx_hl_base(
 			tx_msdu_info.htt.info.frame_type = htt_frm_type_data;
 			tx_msdu_info.htt.info.l2_hdr_type = pdev->htt_pkt_type;
 
-			if (QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(msdu)
-									== 1) {
+			if ((QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(msdu)
+			      == 1) &&
+			    (QDF_NBUF_CB_GET_PACKET_TYPE(msdu) ==
+			     QDF_NBUF_CB_PACKET_TYPE_DHCP)) {
 				tx_msdu_info.htt.action.tx_comp_req = 1;
 				tx_desc->pkt_type = OL_TX_FRM_NO_FREE;
 			} else {
