@@ -5231,13 +5231,14 @@ policy_mgr_check_scc_channel_non_dbs_sap_sap(struct wlan_objmgr_psoc *psoc,
 							      &num_cxn_del);
 
 	for (i = 0; i < MAX_NUMBER_OF_CONC_CONNECTIONS; i++) {
+		if (!pm_conc_connection_list[i].in_use)
+			continue;
 		policy_mgr_debug("vdev_%d: mode=%d, freq=%d",
 				 pm_conc_connection_list[i].vdev_id,
 				 pm_conc_connection_list[i].mode,
 				 pm_conc_connection_list[i].freq);
 		/* check if sap channel break scc with existing ap */
-		if (pm_conc_connection_list[i].in_use &&
-		    pm_conc_connection_list[i].freq != sap_ch_freq) {
+		if (pm_conc_connection_list[i].freq != sap_ch_freq) {
 			*intf_ch_freq = pm_conc_connection_list[i].freq;
 			break;
 		}
@@ -5283,7 +5284,11 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 							      NULL);
 
 	if (!is_dbs) {
-		if (!sta_count) {
+		/*
+		 * Check only for SAP/GO + SAP/GO, skip if sta or ll lt SAP
+		 * present.
+		 */
+		if (!sta_count && !policy_mgr_get_ll_lt_sap_freq(psoc)) {
 			policy_mgr_check_scc_channel_non_dbs_sap_sap(
 								psoc,
 								intf_ch_freq,
@@ -5291,7 +5296,6 @@ void policy_mgr_check_scc_channel(struct wlan_objmgr_psoc *psoc,
 								vdev_id);
 			return;
 		}
-
 		/* Fetch new freq using PCL */
 	}
 
