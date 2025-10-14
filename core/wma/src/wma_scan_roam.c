@@ -798,6 +798,9 @@ wma_roam_update_vdev(tp_wma_handle wma,
 					   WLAN_CRYPTO_PARAM_CIPHER_CAP);
 	wma_set_peer_ucast_cipher(mac_addr.bytes, uc_cipher,
 				  cipher_cap);
+	if (roam_synch_ind_ptr->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
+		wlan_peer_set_key_install_flag(wma->psoc, mac_addr.bytes, true);
+
 	wma_add_bss_lfr3(wma, roam_synch_ind_ptr->add_bss_params);
 	wma_add_sta(wma, add_sta_params);
 	qdf_mem_copy(bssid, mac_addr.bytes,
