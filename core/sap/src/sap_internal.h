@@ -391,8 +391,6 @@ bool
 sap_search_mac_list(struct qdf_mac_addr *macList, uint16_t num_mac,
 		    uint8_t *peerMac, uint16_t *index);
 
-QDF_STATUS sap_init_dfs_channel_nol_list(struct sap_context *sap_ctx);
-
 bool sap_dfs_is_channel_in_nol_list(struct sap_context *sap_ctx,
 				    qdf_freq_t chan_freq,
 				    ePhyChanBondState chanBondState);
