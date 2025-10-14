@@ -141,6 +141,7 @@
 #include "wlan_reg_ucfg_api.h"
 #include "wlan_hdd_afc.h"
 #include "wlan_dfs_ucfg_api.h"
+#include "wlan_dfs_utils_api.h"
 #include "wlan_hdd_rx_monitor.h"
 #include "sme_power_save_api.h"
 #include "enet.h"
@@ -5434,6 +5435,9 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			hdd_send_thermal_mitigation_val(hdd_ctx, thermal_state,
 							THERMAL_MONITOR_WPSS);
 	}
+
+	utils_dfs_init_nol(hdd_ctx->pdev);
+
 	hdd_register_get_port_status_notifier(hdd_ctx);
 
 	hdd_exit();
