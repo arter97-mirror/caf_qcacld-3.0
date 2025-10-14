@@ -1595,6 +1595,11 @@ wlan_cfg80211_mc_cp_stats_get_peer_stats_ext(struct wlan_objmgr_vdev *vdev,
 		.dealloc = wlan_cfg80211_mc_cp_stats_dealloc,
 	};
 
+	if (!vdev) {
+		osif_err("VDEV is NULL");
+		return NULL;
+	}
+
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
 		osif_err("Failed to get psoc");
