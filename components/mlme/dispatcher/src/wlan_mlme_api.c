@@ -5343,6 +5343,7 @@ QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
 	if (vht_cap_info->short_gi_160mhz && !cfg->vht_short_gi_160)
 		vht_cap_info->short_gi_160mhz = cfg->vht_short_gi_160;
 
+	vht_cap_info->tgt_vht_mcs_10_11_supp = cfg->vht_mcs_10_11_supp;
 	if (cfg_get(psoc, CFG_ENABLE_VHT_MCS_10_11))
 		vht_cap_info->vht_mcs_10_11_supp = cfg->vht_mcs_10_11_supp;
 
@@ -5392,6 +5393,19 @@ QDF_STATUS mlme_update_nss_vht_cap(struct wlan_objmgr_psoc *psoc)
 	vht_cap_info->tx_mcs_map = temp;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+bool wlan_mlme_is_tgt_vht_mcs_10_11_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct mlme_vht_capabilities_info *vht_cap_info;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	vht_cap_info = &mlme_obj->cfg.vht_caps.vht_cap_info;
+	return vht_cap_info->tgt_vht_mcs_10_11_supp;
 }
 
 #ifdef WLAN_FEATURE_11BE

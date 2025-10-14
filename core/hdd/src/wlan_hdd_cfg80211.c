@@ -8255,6 +8255,81 @@ hdd_set_ratemask_for_mlo(uint8_t link_id, struct hdd_adapter *adapter,
 	return ret;
 }
 
+/* VHT MCS bitmap conversion constants */
+#define VHT_MCS_0_9_MASK		0x3FF	/* All MCS 0-9 bits (10 bits) */
+#define VHT_MCS_10_11_MASK		0x3	/* MCS 10-11 bits (2 bits) */
+#define VHT_MCS_BITS_PER_NSS_VENDOR	10	/* MCS bits per NSS in vendor format */
+#define VHT_MCS_BITS_PER_NSS_FW	12	/* MCS bits per NSS in firmware format */
+#define VHT_NSS1_VENDOR_START_BIT	0	/* NSS1 start bit in vendor format */
+#define VHT_NSS2_VENDOR_START_BIT	10	/* NSS2 start bit in vendor format */
+#define VHT_NSS1_FW_MCS_10_11_START_BIT	10	/* NSS1 MCS 10-11 start bit in FW format */
+#define VHT_NSS2_FW_START_BIT		12	/* NSS2 start bit in FW format */
+#define VHT_NSS2_FW_MCS_10_11_START_BIT	22	/* NSS2 MCS 10-11 start bit in FW format */
+
+/**
+ * hdd_convert_vht_mcs_bitmap_to_fw_format() - Convert VHT MCS bitmap from vendor to FW format
+ * @bitmap: Pointer to the bitmap array to be converted
+ *
+ * Vendor command format (MCS 0-9):
+ * b0-9   => NSS1, MCS 0-9
+ * b10-19 => NSS2, MCS 0-9
+ *
+ * Firmware expected format (MCS 0-11):
+ * b0-11  => NSS1, MCS 0-11
+ * b12-23 => NSS2, MCS 0-11
+ *
+ * This function converts the bitmap and automatically enables MCS 10-11
+ * when all MCS 0-9 are enabled for each NSS.
+ *
+ * Return: None
+ */
+static void hdd_convert_vht_mcs_bitmap_to_fw_format(uint32_t *bitmap)
+{
+	uint32_t nss1_mask, nss2_mask;
+
+	if (!bitmap) {
+		hdd_err("Invalid bitmap pointer");
+		return;
+	}
+
+	/* Ensure bitmap has at least one element */
+	if (!bitmap[0]) {
+		hdd_debug("Empty bitmap, nothing to convert");
+		return;
+	}
+
+	/* Extract NSS1 and NSS2 masks from vendor format */
+	nss1_mask = QDF_GET_BITS(bitmap[0], VHT_NSS1_VENDOR_START_BIT,
+				 VHT_MCS_BITS_PER_NSS_VENDOR);
+	nss2_mask = QDF_GET_BITS(bitmap[0], VHT_NSS2_VENDOR_START_BIT,
+				 VHT_MCS_BITS_PER_NSS_VENDOR);
+
+	/* Clear the old NSS2 position (bits 10-31) and restructure for FW format */
+	QDF_SET_BITS(bitmap[0], VHT_NSS2_VENDOR_START_BIT, 22, 0);
+
+	/* Set NSS2 at the new position (bits 12-21) */
+	QDF_SET_BITS(bitmap[0], VHT_NSS2_FW_START_BIT,
+		     VHT_MCS_BITS_PER_NSS_VENDOR, nss2_mask);
+
+	/* Enable MCS 10-11 if all MCS 0-9 are enabled for NSS1 */
+	if (nss1_mask == VHT_MCS_0_9_MASK) {
+		QDF_SET_BITS(bitmap[0], VHT_NSS1_FW_MCS_10_11_START_BIT,
+			     2, VHT_MCS_10_11_MASK);
+		hdd_debug("Enabled MCS 10-11 for NSS1");
+	}
+
+	/* Enable MCS 10-11 if all MCS 0-9 are enabled for NSS2 */
+	if (nss2_mask == VHT_MCS_0_9_MASK) {
+		QDF_SET_BITS(bitmap[0], VHT_NSS2_FW_MCS_10_11_START_BIT,
+			     2, VHT_MCS_10_11_MASK);
+		hdd_debug("Enabled MCS 10-11 for NSS2");
+	}
+
+	hdd_debug("VHT MCS bitmap conversion: original=0x%x, converted=0x%x",
+		  (nss2_mask << VHT_NSS2_VENDOR_START_BIT) | nss1_mask,
+		  bitmap[0]);
+}
+
 /**
  * hdd_set_ratemask_params() - parse ratemask params
  * @adapter: HDD adapter
@@ -8334,6 +8409,13 @@ static int hdd_set_ratemask_params(struct hdd_adapter *adapter,
 		nla_memcpy(bitmap,
 			   tb2[QCA_WLAN_VENDOR_ATTR_RATEMASK_PARAMS_BITMAP],
 			   len);
+
+		/* Convert VHT MCS bitmap from vendor format to firmware format */
+		if (ratemask_type == RATEMASK_PARAMS_TYPE_VHT &&
+		    ucfg_mlme_is_tgt_vht_mcs_10_11_supported(adapter->hdd_ctx->psoc)) {
+			hdd_debug("Converting VHT MCS bitmap to FW format");
+			hdd_convert_vht_mcs_bitmap_to_fw_format(bitmap);
+		}
 
 		hdd_debug("rate_type:%d, lower32 0x%x, lower32_2 0x%x, higher32 0x%x, higher32_2 0x%x",
 			  ratemask_type, bitmap[0], bitmap[1],

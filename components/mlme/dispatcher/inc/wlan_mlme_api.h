@@ -2860,6 +2860,14 @@ QDF_STATUS mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS mlme_update_nss_vht_cap(struct wlan_objmgr_psoc *psoc);
 
+/**
+ * wlan_mlme_is_tgt_vht_mcs_10_11_supported() - Check whether target supports VHT MCS 10-11
+ * @psoc: psoc context
+ *
+ * Return: true if target supports VHT MCS 10-11
+ */
+bool wlan_mlme_is_tgt_vht_mcs_10_11_supported(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * mlme_get_bss_11be_allowed() - Check BSS allowed in 11be mode

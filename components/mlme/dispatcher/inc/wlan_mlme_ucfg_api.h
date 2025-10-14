@@ -3140,6 +3140,18 @@ ucfg_mlme_get_vendor_vht_for_24ghz(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 /**
+ * ucfg_mlme_is_tgt_vht_mcs_10_11_supported() - Check whether target supports VHT MCS 10-11
+ * @psoc: psoc context
+ *
+ * Return: true if target supports VHT MCS 10-11
+ */
+static inline bool
+ucfg_mlme_is_tgt_vht_mcs_10_11_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_is_tgt_vht_mcs_10_11_supported(psoc);
+}
+
+/**
  * ucfg_mlme_update_vht_cap() - Update vht capabilities
  * @psoc: psoc context
  * @cfg: data to be set

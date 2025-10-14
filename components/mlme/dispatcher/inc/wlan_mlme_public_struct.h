@@ -917,6 +917,7 @@ struct wlan_mlme_powersave {
  * @as_cap: Antenna sharing capability info
  * @disable_ldpc_with_txbf_ap: Disable ldpc capability
  * @vht_mcs_10_11_supp: VHT MCS 10 & 11 support
+ * @tgt_vht_mcs_10_11_supp: Target VHT MCS 10 & 11 support
  * @extended_nss_bw_supp:
  * @vht_extended_nss_bw_cap:
  * @max_nsts_total:
@@ -965,6 +966,7 @@ struct mlme_vht_capabilities_info {
 	uint8_t as_cap;
 	bool disable_ldpc_with_txbf_ap;
 	bool vht_mcs_10_11_supp;
+	bool tgt_vht_mcs_10_11_supp;
 	uint8_t extended_nss_bw_supp;
 	uint8_t vht_extended_nss_bw_cap;
 	uint8_t max_nsts_total;
