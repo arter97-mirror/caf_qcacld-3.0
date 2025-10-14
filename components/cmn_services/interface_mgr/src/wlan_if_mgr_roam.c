@@ -93,17 +93,26 @@ static void if_mgr_enable_roaming_on_vdev(struct wlan_objmgr_pdev *pdev,
 	    if_mgr_is_assoc_link_of_vdev(pdev, vdev, curr_vdev_id))
 		return;
 
-	if (curr_vdev_id != vdev_id &&
-	    vdev->vdev_mlme.mlme_state == WLAN_VDEV_S_UP) {
-		ifmgr_debug("Enable roaming for vdev_id %d, requestor %d",
-			    vdev_id, roam_arg->requestor);
-		mlme_set_rso_pending_disable_req_bitmap(psoc, vdev_id,
-							roam_arg->requestor,
-							true);
-		wlan_cm_enable_rso(pdev, vdev_id,
-				   roam_arg->requestor,
-				   REASON_DRIVER_ENABLED);
-	}
+	if (curr_vdev_id == vdev_id ||
+	    vdev->vdev_mlme.mlme_state != WLAN_VDEV_S_UP)
+		return;
+
+	ifmgr_debug("Enable roaming for vdev_id %d, requestor %d",
+		    vdev_id, roam_arg->requestor);
+
+	mlme_set_rso_pending_disable_req_bitmap(psoc, vdev_id,
+						roam_arg->requestor, true);
+	/*
+	 * When link switch is in progress, don't send RSO Enable before
+	 * vdev is up. Just reset the requestor bit and RSO Enable will
+	 * be sent as part of install keys once link switch connect
+	 * sequence is complete.
+	 */
+	if (mlo_mgr_is_link_switch_in_progress(vdev))
+		return;
+
+	wlan_cm_enable_rso(pdev, vdev_id, roam_arg->requestor,
+			   REASON_DRIVER_ENABLED);
 }
 
 QDF_STATUS if_mgr_enable_roaming(struct wlan_objmgr_pdev *pdev,
