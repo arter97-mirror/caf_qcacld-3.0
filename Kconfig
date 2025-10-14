@@ -151,4 +151,8 @@ config WLAN_FEATURE_SARV1_TO_SARV2
 	bool "Enable conversion of SAR v1 to v2 feature"
 	default n
 
+config WLAN_POS_GET_BY_NAME_NOT_SUPPORT
+	bool "Enable WLAN_POS_GET_BY_NAME_NOT_SUPPORT"
+	default n
+
 endif # QCA_CLD_WLAN
