@@ -1184,6 +1184,9 @@ static void __wlan_hdd_ipv4_changed(struct net_device *net_dev)
 		if (adapter->dhcp_config_setsuspend) {
 			link_info = hdd_get_link_info_by_vdev(hdd_ctx,
 						adapter->deflink->vdev_id);
+			if (!link_info)
+				goto exit;
+
 			hdd_handle_apf_mode_on_idle(hdd_ctx, link_info, 1);
 			adapter->dhcp_config_setsuspend = false;
 		}
