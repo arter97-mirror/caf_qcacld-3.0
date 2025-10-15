@@ -2937,6 +2937,7 @@ const TLV_HE_DL_MUMIMO_SUPPP_ATTR_ID      = 8;
 const TLV_HE_MCS_11_12_ATTR_ID            = 9;
 const TLV_EDCA_PIFS_PARAM_ATTR_ID         = 13;
 const TLV_ECSA_TARGET_TSF_INFO_ATTR_ID    = 14;
+const TLV_TARGET_CCK_SUPPORT_ATTR_ID      = 15;
 
 TLV qcn_version(TLV_VERSION_ATTR_ID) ( 1 : 1 ) LSB
 {
@@ -2998,6 +2999,15 @@ TLV ecsa_target_tsf_info_attr (TLV_ECSA_TARGET_TSF_INFO_ATTR_ID) ( 1 : 1 ) LSB
     target_tsf, 8;
 }
 
+TLV target_cck_support_attr (TLV_TARGET_CCK_SUPPORT_ATTR_ID) ( 1 : 1 ) LSB
+{
+  {
+	target_cck_rx_supp_5g: 1;
+	target_cck_tx_supp_5g: 1;
+	target_cck_unused: 6;
+  }
+}
+
 MULTIIE qcn_ie (EID_VENDOR_SPECIFIC) OUI ( 0x8C, 0xFD, 0xF0, 0x01 )
 {
    OPTIONALTLV qcn_version;
@@ -3011,6 +3021,7 @@ MULTIIE qcn_ie (EID_VENDOR_SPECIFIC) OUI ( 0x8C, 0xFD, 0xF0, 0x01 )
    OPTIONALTLV he_mcs13_attr;
    OPTIONALTLV edca_pifs_param_attr;
    OPTIONALTLV ecsa_target_tsf_info_attr;
+   OPTIONALTLV target_cck_support_attr;
 }
 
 IE esp_information (EID_EXTN_ID_ELEMENT) OUI ( 0x0B )
