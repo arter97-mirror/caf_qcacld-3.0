@@ -3301,6 +3301,8 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_ROAM_BG_SCAN_CLIENT_BITMAP);
 	lfr->roam_bg_scan_bad_rssi_offset_2g =
 		cfg_get(psoc, CFG_LFR_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G);
+	lfr->bg_roam_scan_flag =
+		cfg_get(psoc, CFG_LFR_BG_ROAM_SCAN_FLAG);
 	lfr->roam_data_rssi_threshold_triggers =
 		cfg_get(psoc, CFG_ROAM_DATA_RSSI_THRESHOLD_TRIGGERS);
 	lfr->roam_data_rssi_threshold =

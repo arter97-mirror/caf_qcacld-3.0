@@ -2091,6 +2091,7 @@ struct fw_scan_channels {
  * @roam_bg_scan_bad_rssi_threshold:RSSI threshold for background roam
  * @roam_bg_scan_client_bitmap: Bitmap used to identify the scan clients
  * @roam_bg_scan_bad_rssi_offset_2g:RSSI threshold offset for 2G to 5G roam
+ * @bg_roam_scan_flag: bg_roam_scan Enable/Disable
  * @roam_data_rssi_threshold_triggers: triggers of bad data RSSI threshold to
  *                                     roam
  * @roam_data_rssi_threshold: Bad data RSSI threshold to roam
@@ -2238,6 +2239,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_bg_scan_bad_rssi_threshold;
 	uint32_t roam_bg_scan_client_bitmap;
 	uint32_t roam_bg_scan_bad_rssi_offset_2g;
+	bool bg_roam_scan_flag;
 	uint32_t roam_data_rssi_threshold_triggers;
 	int32_t roam_data_rssi_threshold;
 	uint32_t rx_data_inactivity_time;
