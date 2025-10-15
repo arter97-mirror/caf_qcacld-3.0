@@ -1272,7 +1272,7 @@ QDF_STATUS populate_dot11f_ext_cap(struct mac_context *mac, bool isVHTEnabled,
 void populate_dot11f_qcn_ie(struct mac_context *mac,
 			    struct pe_session *pe_session,
 			    tDot11fIEqcn_ie *qcn_ie,
-			    uint8_t attr_id);
+			    uint8_t attr_id, enum mgmt_frame_type);
 
 void populate_dot11f_bss_max_idle(struct mac_context *mac,
 				  struct pe_session *session,

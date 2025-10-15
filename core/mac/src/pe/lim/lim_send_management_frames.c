@@ -362,10 +362,11 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	/* Add qcn_ie only if qcn ie is not present in additional_ie */
 	if (!qcn_ie)
 		populate_dot11f_qcn_ie(mac_ctx, pesession, &pr->qcn_ie,
-				       QCN_IE_ATTR_ID_ALL);
+				       QCN_IE_ATTR_ID_ALL, MGMT_PROBE_REQ);
 	else
 		populate_dot11f_qcn_ie(mac_ctx, pesession, &pr->qcn_ie,
-				       QCN_IE_ATTR_ID_VHT_MCS11);
+				       QCN_IE_ATTR_ID_VHT_MCS11,
+				       MGMT_PROBE_REQ);
 
 	/*
 	 * Extcap IE now support variable length, merge Extcap IE from addn_ie
@@ -2364,7 +2365,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 					pe_session->vdev_id);
 
 		populate_dot11f_qcn_ie(mac_ctx, pe_session, &frm.qcn_ie,
-				       QCN_IE_ATTR_ID_ALL);
+				       QCN_IE_ATTR_ID_ALL, MGMT_ASSOC_RESP);
 
 		if (lim_is_sta_he_capable(sta) &&
 		    lim_is_session_he_capable(pe_session)) {
@@ -3436,7 +3437,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 					pe_session->vdev_id);
 
 	populate_dot11f_qcn_ie(mac_ctx, pe_session,
-			       &frm->qcn_ie, QCN_IE_ATTR_ID_ALL);
+			       &frm->qcn_ie, QCN_IE_ATTR_ID_ALL,
+			       MGMT_ASSOC_REQ);
 
 	populate_dot11f_bss_max_idle(mac_ctx, pe_session,
 				     &frm->bss_max_idle_period);

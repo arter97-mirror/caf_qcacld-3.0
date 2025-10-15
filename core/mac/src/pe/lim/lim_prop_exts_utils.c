@@ -664,6 +664,9 @@ lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 		session->vhtCapabilityPresentInBeacon = 0;
 	}
 
+	if (beacon_struct->qcn_ie.present)
+		session->qcn_ie_present_in_beacon = true;
+
 	if (session->vhtCapabilityPresentInBeacon == 1 &&
 	    !session->htSupportedChannelWidthSet) {
 		if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable_txbf_20mhz)

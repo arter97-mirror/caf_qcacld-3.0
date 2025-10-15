@@ -56,6 +56,19 @@
 #define BAND_MASK_FIRST_FREQ  0x3000000
 #define BAND_MASK_SECOND_FREQ 0xC000000
 
+#define NUM_CCK_BITS 2
+#define CCK_RX_BIT 0
+#define CCK_TX_BIT 1
+
+enum cck_mode_index {
+	STA_CCK_IDX = 0,
+	SAP_CCK_IDX = 1,
+	XPAN_CCK_IDX = 2,
+	P2P_GO_CCK_IDX = 3,
+	P2P_CLI_CCK_IDX = 4,
+	MAX_CCK_IDX,
+};
+
 #ifdef FEATURE_SET
 /**
  * wlan_mlme_get_feature_info() - Get mlme features
@@ -5802,4 +5815,25 @@ inline bool
 wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc);
 #endif
 
+/**
+ * wlan_get_mode_index_from_mode() - get CCK opmode index
+ * @opmode: qdf opmode
+ *
+ * Return: cck_mode_index
+ */
+enum cck_mode_index wlan_get_mode_index_from_mode(enum QDF_OPMODE opmode);
+
+/**
+ * wlan_get_rx_tx_cck_5g_support_for_mode() - get CCK TX/RX support
+ * @psoc: psoc
+ * @opmode: qdf opmode
+ * @rx_support: to hold rx support
+ * @tx_support: told hold tx_suuport
+ *
+ * Return: true if rx or tx support enabled
+ */
+bool
+wlan_get_rx_tx_cck_5g_support_for_mode(struct wlan_objmgr_psoc *psoc,
+				       enum QDF_OPMODE opmode,
+				       bool *rx_support, bool *tx_support);
 #endif /* _WLAN_MLME_API_H_ */

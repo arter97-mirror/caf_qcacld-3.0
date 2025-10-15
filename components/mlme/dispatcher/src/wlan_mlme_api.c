@@ -9669,3 +9669,52 @@ wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 #endif
+enum cck_mode_index wlan_get_mode_index_from_mode(enum QDF_OPMODE opmode)
+{
+	switch (opmode) {
+	case QDF_STA_MODE:
+		return STA_CCK_IDX;
+	case QDF_SAP_MODE:
+		return SAP_CCK_IDX;
+	case QDF_P2P_CLIENT_MODE:
+		return P2P_CLI_CCK_IDX;
+	case QDF_P2P_GO_MODE:
+		return P2P_GO_CCK_IDX;
+	/* Todo update for XPAN SAP */
+	default:
+		return MAX_CCK_IDX;
+	}
+}
+
+bool
+wlan_get_rx_tx_cck_5g_support_for_mode(struct wlan_objmgr_psoc *psoc,
+				       enum QDF_OPMODE opmode, bool *rx_value,
+				       bool *tx_value)
+{
+	enum cck_mode_index cck_mode_index;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_mlme_cfg *mlme_cfg;
+	uint8_t cck_support, cck_rx_tx_per_mode = 0;
+
+        mlme_obj = mlme_get_psoc_ext_obj(psoc);
+        if (!mlme_obj) {
+		mlme_err("Failed to get MLME Obj");
+		return false;
+	}
+	mlme_cfg = &mlme_obj->cfg;
+
+	cck_support = mlme_cfg->rates.cck_rx_tx_support_mode;
+	cck_mode_index = wlan_get_mode_index_from_mode(opmode);
+
+	if (cck_mode_index >= MAX_CCK_IDX)
+		return false;
+
+	cck_rx_tx_per_mode = QDF_GET_BITS(cck_support,
+					  cck_mode_index * NUM_CCK_BITS,
+					  NUM_CCK_BITS);
+
+	*tx_value = cck_rx_tx_per_mode & BIT(CCK_TX_BIT);
+	*rx_value = cck_rx_tx_per_mode & BIT(CCK_RX_BIT);
+
+	return (*tx_value || *rx_value);
+}
