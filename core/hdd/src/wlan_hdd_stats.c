@@ -12948,21 +12948,38 @@ static void hdd_print_second_64_bits_cstats_fw_type(char *buffer,
 {
 	const char *start_marker = "CS_FSM";
 	const char *end_marker = "CS_FEM";
-	uint32_t i, j, start, end, payload_len;
+	uint32_t i, j, start, payload_len;
+	bool end_found = false;
 	uint64_t second_64 = 0;
 
-	/* skips the 2-byte ANI HDR at the beginning */
-	for (i = ANI_HDR_SIZE; i < len - 1; i++) {
+	if (!buffer) {
+		hdd_debug("Buffer is NULL");
+		return;
+	}
+
+	if (len < ANI_HDR_SIZE + MARKER_LEN) {
+		hdd_debug("Buffer too short for markers");
+		return;
+	}
+
+	/* skip the 2-byte ANI HDR at the beginning */
+	i = ANI_HDR_SIZE;
+
+	while (i + MARKER_LEN <= len) {
 		/* Look for start marker */
 		if (qdf_mem_cmp(&buffer[i], start_marker, MARKER_LEN) == 0) {
 			start = i + MARKER_LEN;
+			end_found = false;
 			/* look for end marker */
-			for (j = start; j < len - 1; j++) {
+			j = start;
+			while (j + MARKER_LEN <= len) {
 				if (qdf_mem_cmp(&buffer[j], end_marker,
 						MARKER_LEN) == 0) {
-					end = j;
-					payload_len = end - start;
-					if (payload_len >= 16) {
+					payload_len = j - start;
+
+					/* Verify bounds before extraction */
+					if (payload_len >= 16 &&
+					    (start + 16) <= len) {
 						/*
 						 * extract second 64 bits
 						 * (bytes 8 to 15) of payload
@@ -12977,12 +12994,25 @@ static void hdd_print_second_64_bits_cstats_fw_type(char *buffer,
 						hdd_debug("Payload too short");
 					}
 					/* move past this payload */
-					i = j + MARKER_LEN - 1;
+					i = j + MARKER_LEN;
+					end_found = true;
 					break;
 				}
+
+				j++;
 			}
+
+			if (!end_found) {
+				hdd_debug("End marker not found after start marker");
+				i++;
+			}
+
+			continue;
 		}
+
+		i++;
 	}
+
 }
 
 int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
