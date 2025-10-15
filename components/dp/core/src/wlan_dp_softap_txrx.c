@@ -662,21 +662,17 @@ void dp_softap_fils_hlp_rx(struct wlan_dp_intf *dp_intf,
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_MULTI_LINK_SAP) && \
 	(defined(WLAN_MCAST_MLO) || defined(WLAN_MCAST_MLO_SAP))
 /**
- * dp_softap_init_exception_metadata() - Update parameter for exception metadata
+ * dp_softap_init_exc_metadata_mlo_mcast() - Init MLO mcast exception metadata
  * @nbuf: skb buffer
  * @param: pointer to exception metadata
  *
  * Return: None
  */
 static inline void
-dp_softap_init_exception_metadata(qdf_nbuf_t nbuf,
-				  struct cdp_tx_exception_metadata *param)
+dp_softap_init_exc_metadata_mlo_mcast(qdf_nbuf_t nbuf,
+				      struct cdp_tx_exception_metadata *param)
 {
 	qdf_nbuf_set_tx_ftype(nbuf, CB_FTYPE_MLO_MCAST);
-	param->tx_encap_type = CDP_INVALID_TX_ENCAP_TYPE;
-	param->sec_type = CDP_INVALID_SEC_TYPE;
-	param->peer_id = CDP_INVALID_PEER;
-	param->tid = CDP_INVALID_TID;
 	param->is_mlo_mcast = 1;
 }
 
@@ -697,11 +693,11 @@ dp_softap_is_exception_path(struct wlan_dp_link *dp_link,
 		/* mlo sap broadcast/multicast case */
 		if (QDF_NBUF_CB_GET_IS_BCAST(nbuf) ||
 		    QDF_NBUF_CB_GET_IS_MCAST(nbuf)) {
-			dp_softap_init_exception_metadata(nbuf,
-							  param);
+			dp_softap_init_exc_metadata_mlo_mcast(nbuf, param);
 			return true;
 		}
 	}
+
 	return false;
 }
 
@@ -747,14 +743,22 @@ struct wlan_dp_link *dp_link_override(struct wlan_dp_intf *dp_intf,
 }
 #endif
 
-/**
- * dp_softap_start_xmit() - Transmit a frame
- * @nbuf: pointer to Network buffer
- * @dp_link: DP link handle
- *
- * Return: QDF_STATUS_SUCCESS on successful transmission
- */
-QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
+bool dp_softap_init_tx_exc_metadata(struct wlan_dp_link *dp_link,
+				    qdf_nbuf_t nbuf,
+				    struct cdp_tx_exception_metadata *tem)
+{
+	qdf_mem_zero(tem, sizeof(*tem));
+	tem->tx_encap_type = CDP_INVALID_TX_ENCAP_TYPE;
+	tem->sec_type = CDP_INVALID_SEC_TYPE;
+	tem->peer_id = CDP_INVALID_PEER;
+	tem->tid = CDP_INVALID_TID;
+
+	return dp_softap_is_exception_path(dp_link, nbuf, tem);
+}
+
+QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link,
+				struct cdp_tx_exception_metadata *tx_exc_param,
+				bool exception)
 {
 	struct wlan_dp_intf *dp_intf = dp_link->dp_intf;
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
@@ -764,8 +768,6 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 	struct dp_tx_rx_stats *stats = &dp_intf->dp_stats.tx_rx_stats;
 	int cpu = qdf_get_smp_processor_id();
 	uint8_t link_id = dp_link->link_id;
-	struct cdp_tx_exception_metadata tx_exc_metadata = {0};
-	bool except;
 
 	dest_mac_addr = (struct qdf_mac_addr *)(qdf_nbuf_data(nbuf) +
 						QDF_NBUF_DEST_MAC_OFFSET);
@@ -826,10 +828,7 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 		goto drop_pkt_and_release_skb;
 	}
 
-	except = dp_softap_is_exception_path(dp_link, nbuf,
-					     &tx_exc_metadata);
-
-	if (qdf_likely(!except)) {
+	if (qdf_likely(!exception)) {
 		if (dp_intf->txrx_ops.tx.tx(soc, dp_link->link_id, nbuf)) {
 			dp_err_rl("Failed to send packet to txrx for sta: "
 				 QDF_MAC_ADDR_FMT,
@@ -840,7 +839,7 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link)
 		if (dp_intf->txrx_ops.tx.tx_exception(soc,
 						      dp_link->link_id,
 						      nbuf,
-						      &tx_exc_metadata)) {
+						      tx_exc_param)) {
 			dp_err("Except path failed to send packet to txrx for sta: "
 				 QDF_MAC_ADDR_FMT,
 				 QDF_MAC_ADDR_REF(dest_mac_addr->bytes));

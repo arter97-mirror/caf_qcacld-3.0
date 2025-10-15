@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -160,13 +161,31 @@ int dp_softap_inspect_dhcp_packet(struct wlan_dp_link *dp_link,
 QDF_STATUS dp_rx_flush_packet_cbk(void *dp_link_context, uint8_t link_id);
 
 /**
+ * dp_softap_init_tx_exc_metadata() - Init tx exception metadata during xmit
+ * @dp_link: DP link handle for SAP interface
+ * @nbuf: pointer to network socket buffer
+ * @tem: pointer of struct cdp_tx_exception_metadata
+ *
+ * Return: true if xmit exception with tx exception metadata being set. False
+ *	   for regular xmit.
+ */
+bool dp_softap_init_tx_exc_metadata(struct wlan_dp_link *dp_link,
+				    qdf_nbuf_t nbuf,
+				    struct cdp_tx_exception_metadata *tem);
+
+/**
  * dp_softap_start_xmit() - Transmit a frame for SAP interface
  * @nbuf: pointer to Network buffer
  * @dp_link: DP link handle
+ * @tx_exc_param: pointer of struct cdp_tx_exception_metadata
+ * @exception: boolean flag to indicate whether @nbuf is transmitted as an
+ *	       exception packet
  *
  * Return: QDF_STATUS_SUCCESS on successful transmission
  */
-QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link);
+QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_link *dp_link,
+				struct cdp_tx_exception_metadata *tx_exc_param,
+				bool exception);
 
 /**
  * dp_softap_tx_timeout() - TX timeout handler

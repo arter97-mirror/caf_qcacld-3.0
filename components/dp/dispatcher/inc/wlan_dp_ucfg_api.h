@@ -390,14 +390,32 @@ void ucfg_dp_tx_timeout(struct wlan_objmgr_vdev *vdev);
 void ucfg_dp_softap_tx_timeout(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * ucfg_dp_softap_init_tx_exc_metadata() - Init tx exception metadata for xmit
+ * @vdev: vdev mapped to SAP DP interface
+ * @nbuf: network socket buffer to xmit
+ * @tem: pointer of struct cdp_tx_exception_metadata
+ *
+ * Return: true if xmit exception with tx exception metadata being set. False
+ *	   for regular xmit.
+ */
+bool ucfg_dp_softap_init_tx_exc_metadata(struct wlan_objmgr_vdev *vdev,
+					 qdf_nbuf_t nbuf,
+					 struct cdp_tx_exception_metadata *tem);
+
+/**
  * ucfg_dp_softap_start_xmit() - Transmit packet on SAP interface
  * @nbuf: n/w buffer to transmitted
  * @vdev: vdev mapped to SAP DP interface
+ * @tx_exc_param: struct cdp_tx_exception_metadata
+ * @exception: boolean flag to indicate whether @nbuf is transmitted as an
+ *	       exception packet
  *
  * Return: 0 on success and non zero on failure.
  */
 QDF_STATUS
-ucfg_dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev);
+ucfg_dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev,
+			  struct cdp_tx_exception_metadata *tx_exc_param,
+			  bool exception);
 
 /**
  * ucfg_dp_get_dev_stats() - Get netdev stats info
