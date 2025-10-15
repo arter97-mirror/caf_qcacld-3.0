@@ -55,6 +55,9 @@
 #include "wlan_nan_api_i.h"
 #include "wlan_tdls_api.h"
 #include <wlan_p2p_api.h>
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+#include "wlan_mlo_mgr_ap.h"
+#endif
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -675,6 +678,172 @@ void wlan_handle_emlsr_sta_concurrency(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+/**
+ * ap_mlme_vdev_send_link_removal() - callback to send link removal wmi
+ * @vdev_mlme: vdev mlme object
+ * @data_len: event data length
+ * @data: event data
+ *
+ * This function is called to indicate link is going be removed
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+ap_mlme_vdev_send_link_removal(struct vdev_mlme_obj *vdev_mlme,
+			       uint16_t data_len, void *data)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t vdev_id;
+
+	if (!vdev_mlme || !vdev_mlme->vdev) {
+		mlme_legacy_err("vdev_mlme or vdev is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev_mlme->vdev);
+	if (vdev_id == WLAN_INVALID_VDEV_ID) {
+		mlme_legacy_err("Invalid vdev ID");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev_mlme->vdev);
+	if (!psoc) {
+		mlme_legacy_err("invalid psoc for vdev: %d", vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!data || !data_len) {
+		mlme_legacy_err("Invalid data parameters for vdev: %d",
+				wlan_vdev_get_id(vdev_mlme->vdev));
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mlme_legacy_debug("Vdev:%d is going to be removed",
+			  wlan_vdev_get_id(vdev_mlme->vdev));
+
+	status = wlan_mlo_link_removal_cmd(vdev_mlme->vdev, psoc,
+					   data, data_len);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_legacy_err("Failed to send link removal cmd for vdev: %d, status: %d",
+				wlan_vdev_get_id(vdev_mlme->vdev), status);
+	}
+	return status;
+}
+
+static QDF_STATUS wlan_vdev_mlme_send_link_removal_req(uint8_t vdev_id)
+{
+	struct scheduler_msg message = {0};
+	QDF_STATUS status;
+
+	/* Serialize the req through MC thread */
+	message.bodyval = vdev_id;
+	message.type    = WNI_SME_LINK_REMOVAL_REQ;
+	status = scheduler_post_message(QDF_MODULE_ID_SME, QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE, &message);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		sme_err("scheduler_post_msg failed!(err=%d)", status);
+
+	return status;
+}
+
+/**
+ * ap_mlme_vdev_notify_up_complete() - callback to notify up completion
+ * @vdev_mlme: vdev mlme object
+ * @data_len: event data length
+ * @data: event data
+ *
+ * This function is called to indicate up is completed when MLO SAP
+ * support link removal, and maybe handle delay work
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+ap_mlme_vdev_notify_up_complete(struct vdev_mlme_obj *vdev_mlme,
+				uint16_t data_len, void *data)
+{
+	QDF_STATUS status;
+	struct mlme_legacy_priv *mlme_priv;
+	uint8_t vdev_id;
+
+	if (!vdev_mlme) {
+		mlme_legacy_err("data is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+	vdev_id = wlan_vdev_get_id(vdev_mlme->vdev);
+	pe_debug("Vdev %d is up", vdev_id);
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev_mlme->vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev: %d legacy private object is NULL",
+				vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!mlme_priv->link_removal_delay_for_csa) {
+		mlme_legacy_err("no link removal delay work on vdev:%d",
+				vdev_id);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	mlme_legacy_debug("link removal delay work is starting");
+
+	status = wlan_vdev_mlme_send_link_removal_req(vdev_id);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_legacy_err("send link removal request fail on vdev:%d",
+				vdev_id);
+		status =  QDF_STATUS_E_FAILURE;
+	}
+
+	return status;
+}
+
+/**
+ * ap_mlme_vdev_set_link_removal_delay() - callback to set link removal delay
+ * @vdev_mlme: vdev mlme object
+ * @data_len: event data length
+ * @data: event data
+ *
+ * This function is called to indicate link is going be removed when vdev is
+ * CSA_RESTART or RESTART_PROG.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+ap_mlme_vdev_set_link_removal_delay(struct vdev_mlme_obj *vdev_mlme,
+				    uint16_t data_len, void *data)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	if (!vdev_mlme) {
+		mlme_legacy_err("vdev_mlme is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev_mlme->vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->link_removal_delay_for_csa = true;
+
+	mlme_legacy_debug("Vdev %d is not in up-active, delay link removal",
+			  wlan_vdev_get_id(vdev_mlme->vdev));
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline
+QDF_STATUS ap_mlme_vdev_send_link_removal(struct vdev_mlme_obj *vdev_mlme,
+					  uint16_t data_len, void *data)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * ap_mlme_vdev_notify_up_complete() - callback to notify up completion
  * @vdev_mlme: vdev mlme object
@@ -690,14 +859,22 @@ ap_mlme_vdev_notify_up_complete(struct vdev_mlme_obj *vdev_mlme,
 				uint16_t data_len, void *data)
 {
 	if (!vdev_mlme) {
-		mlme_legacy_err("data is NULL");
+		mlme_legacy_err("vdev_mlme is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	pe_debug("Vdev %d is up", wlan_vdev_get_id(vdev_mlme->vdev));
+	mlme_legacy_debug("Vdev %d is up", wlan_vdev_get_id(vdev_mlme->vdev));
 
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline
+QDF_STATUS ap_mlme_vdev_set_link_removal_delay(struct vdev_mlme_obj *vdev_mlme,
+					       uint16_t data_len, void *data)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * ap_mlme_vdev_disconnect_peers() - callback to disconnect all connected peers
@@ -2484,6 +2661,8 @@ static struct vdev_mlme_ops ap_mlme_ops = {
 	.mlme_vdev_ext_peer_delete_all_rsp =
 				vdevmgr_vdev_peer_delete_all_rsp_handle,
 	.mlme_vdev_csa_complete = ap_mlme_vdev_csa_complete,
+	.mlme_vdev_link_reconfig_remove = ap_mlme_vdev_send_link_removal,
+	.mlme_vdev_set_link_remove_delay = ap_mlme_vdev_set_link_removal_delay,
 };
 
 static struct vdev_mlme_ops mon_mlme_ops = {

@@ -26,6 +26,7 @@ le_targets = [
 le_32_targets = [
     # keep sorted
     "sa510m",
+    "sa510m.1g",
 ]
 
 le_variants = [
