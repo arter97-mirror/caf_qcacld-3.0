@@ -1451,6 +1451,7 @@ cm_roam_scan_offload_rssi_thresh(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	params->bg_scan_client_bitmap = lfr_cfg->roam_bg_scan_client_bitmap;
 	params->roam_bad_rssi_thresh_offset_2g =
 			lfr_cfg->roam_bg_scan_bad_rssi_offset_2g;
+	params->bg_roam_scan_flag = lfr_cfg->bg_roam_scan_flag;
 	params->roam_data_rssi_threshold_triggers =
 		lfr_cfg->roam_data_rssi_threshold_triggers;
 	params->roam_data_rssi_threshold = lfr_cfg->roam_data_rssi_threshold;

@@ -629,6 +629,40 @@
 	40, \
 	CFG_VALUE_OR_DEFAULT, \
 	"RSSI threshold offset for 2G to 5G roam")
+/**
+ * enum roam_bg_scan - Background roam scan from 2.4 GHz to 2.4 GHz/5 GHz/6 GHz
+ * @BG_ROAM_SCAN_ALLOW_ALL_BANDS: Allow background roam scan from 2.4 GHz to
+ * 2.4 GHz/5 GHz/6 GHz
+ * @BG_ROAM_SCAN_ALLOW_2G_TO_OTHER: Allow background roam scan from 2.4 GHz to
+ * 5 GHz/6 GHz, 2.4 GHz to 2.4 GHz is not allowed.
+ */
+enum roam_bg_scan {
+	BG_ROAM_SCAN_ALLOW_ALL_BANDS = 0,
+	BG_ROAM_SCAN_ALLOW_2G_TO_OTHER = 1,
+};
+
+/*
+ * <ini>
+ * bg_roam_scan_flag - Enable/Disable background roam scan from 2.4 GHz to
+ * 2.4 GHz
+ * @Min: 0 - BG_ROAM_SCAN_ALLOW_ALL_BANDS
+ * @Max: 1 - BG_ROAM_SCAN_ALLOW_2G_TO_OTHER
+ * @Default: BG_ROAM_SCAN_ALLOW_2G_TO_OTHER
+ *
+ * This ini is used to enable or disable roaming from 2.4 GHz band to 2.4 GHz
+ * band. When enabled, the firmware will consider 5 GHz/6 GHz band APs as
+ * roaming candidates when performing background roam scans while connected to
+ * a 2.4 GHz AP. When disabled, background roam scans will consider
+ * 2.4 GHz/5 GHz/6 GHz band APs as candidates.
+ *
+ * Supported Feature: Roaming
+ *
+ * </ini>
+ */
+#define CFG_LFR_BG_ROAM_SCAN_FLAG CFG_INI_BOOL( \
+	"bg_roam_scan_flag", \
+	BG_ROAM_SCAN_ALLOW_2G_TO_OTHER, \
+	"Enable/Disable background roam scan from 2G to 5G")
 
 /*
  * <ini>
@@ -3484,6 +3518,7 @@
 	CFG(CFG_LFR_ROAM_BG_SCAN_BAD_RSSI_THRESHOLD) \
 	CFG(CFG_LFR_ROAM_BG_SCAN_CLIENT_BITMAP) \
 	CFG(CFG_LFR_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G) \
+	CFG(CFG_LFR_BG_ROAM_SCAN_FLAG) \
 	CFG(CFG_ROAM_DATA_RSSI_THRESHOLD_TRIGGERS) \
 	CFG(CFG_ROAM_DATA_RSSI_THRESHOLD) \
 	CFG(CFG_RX_DATA_INACTIVITY_TIME) \

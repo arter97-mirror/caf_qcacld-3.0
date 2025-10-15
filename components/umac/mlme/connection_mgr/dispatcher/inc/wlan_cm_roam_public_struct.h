@@ -1996,6 +1996,8 @@ enum wlan_roam_offload_scan_rssi_flags {
  * @roam_data_rssi_threshold: Bad data RSSI threshold to roam
  * @rx_data_inactivity_time: Rx duration to check data RSSI
  * @flags: Flags for roam scan RSSI threshold params
+ * @bg_roam_scan_flag: To set bg_roam_scan flag
+ *		       WMI_ROAM_BG_SCAN_FLAGS_2G_TO_5G_ONLY
  */
 struct wlan_roam_offload_scan_rssi_params {
 	int8_t rssi_thresh;
@@ -2028,6 +2030,7 @@ struct wlan_roam_offload_scan_rssi_params {
 	int32_t roam_data_rssi_threshold;
 	uint32_t rx_data_inactivity_time;
 	uint32_t flags;
+	bool bg_roam_scan_flag;
 };
 
 /**

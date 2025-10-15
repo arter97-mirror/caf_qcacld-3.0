@@ -299,7 +299,7 @@ static QDF_STATUS send_roam_scan_offload_rssi_thresh_cmd_tlv(
 		roam_req->roam_bad_rssi_thresh_offset_2g;
 
 	bg_scan_params->flags = 0;
-	if (roam_req->roam_bad_rssi_thresh_offset_2g)
+	if (roam_req->bg_roam_scan_flag)
 		bg_scan_params->flags |= WMI_ROAM_BG_SCAN_FLAGS_2G_TO_5G_ONLY;
 	WMITLV_SET_HDR(&bg_scan_params->tlv_header,
 		       WMITLV_TAG_STRUC_wmi_roam_bg_scan_roaming_param,
