@@ -211,6 +211,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 				&adapter->deflink->hdd_stats.tx_rx_stats;
 	int cpu = qdf_get_smp_processor_id();
 	QDF_STATUS status;
+	struct cdp_tx_exception_metadata tx_exc_param = {0};
+	bool exception;
 
 	osif_dp_mark_pkt_type(skb);
 	hdd_tx_latency_record_ingress_ts(adapter, skb);
@@ -219,8 +221,14 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	ac = hdd_qdisc_ac_to_tl_ac[skb->queue_mapping];
 	++stats->per_cpu[cpu].tx_classified_ac[ac];
 
+	exception = ucfg_dp_softap_init_tx_exc_metadata(adapter->deflink->vdev,
+							(qdf_nbuf_t)skb,
+							&tx_exc_param);
+
 	status = ucfg_dp_softap_start_xmit((qdf_nbuf_t)skb,
-					   adapter->deflink->vdev);
+					   adapter->deflink->vdev,
+					   &tx_exc_param,
+					   exception);
 	if (QDF_IS_STATUS_ERROR(status))
 		++stats->per_cpu[cpu].tx_dropped_ac[ac];
 
