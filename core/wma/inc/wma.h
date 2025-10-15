@@ -2800,5 +2800,24 @@ wma_get_mlo_sap_emlsr(struct wmi_unified *wmi_handle)
  */
 int wma_peer_sta_kickout(struct cdp_ctrl_objmgr_psoc *cpsoc,
 			 uint16_t pdev_id, uint8_t *macaddr);
+
+#ifdef SAP_PERF_TUNING
+/**
+ * wma_get_sap_perf_tuning_enabled() - Get sap perf tuning service capability.
+ * @wmi_handle: wmi handler
+ *
+ * The API will return if fw support sap perf tuning feature or not.
+ *
+ * Return: true if support sap perf tuning feature otherwise false.
+ */
+bool
+wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle);
+#else
+static inline bool
+wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle)
+{
+	return false;
+}
 #endif
 
+#endif
