@@ -851,7 +851,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		populate_dot11f_erp_info(mac_ctx, &bcn_2->ERPInfo, session);
 
 	populate_dot11f_qcn_ie(mac_ctx, session, &bcn_2->qcn_ie,
-			       QCN_IE_ATTR_ID_ALL);
+			       QCN_IE_ATTR_ID_ALL, MGMT_BEACON);
 
 	if (session->htCapability) {
 		populate_dot11f_ht_caps(mac_ctx, session, &bcn_2->HTCaps);
