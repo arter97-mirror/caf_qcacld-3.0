@@ -695,7 +695,6 @@ is_wlansap_cac_required_for_chan(struct mac_context *mac_ctx,
 	return cac_required;
 }
 
-#ifdef WLAN_FEATURE_MULTI_LINK_SAP
 bool
 is_sap_cac_required_for_chan(struct sap_context *sap_ctx)
 {
@@ -712,7 +711,6 @@ is_sap_cac_required_for_chan(struct sap_context *sap_ctx)
 					 sap_ctx->chan_freq,
 					 &sap_ctx->ch_params);
 }
-#endif
 
 void sap_get_cac_dur_dfs_region(struct sap_context *sap_ctx,
 				uint32_t *cac_duration_ms,
