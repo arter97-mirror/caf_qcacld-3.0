@@ -3310,6 +3310,11 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 #define FEATURE_ENABLE_CE_DP_IRQ_AFFINE (1)
 #endif
 
+#ifdef CONFIG_SAP_PERF_TUNING
+#define SAP_PERF_TUNING (1)
+#endif
+
+
 #ifdef CONFIG_WLAN_TAS_SYSFS
 #define WLAN_TAS_SYSFS (1)
 #endif

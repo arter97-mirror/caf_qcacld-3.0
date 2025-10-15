@@ -3091,4 +3091,8 @@ config WLAN_TAS_SYSFS
 	bool "Enable TAS sysfs"
 	default n
 
+config SAP_PERF_TUNING
+	bool "Enable SAP performance tuning"
+	default n
+
 endif # QCA_CLD_WLAN
