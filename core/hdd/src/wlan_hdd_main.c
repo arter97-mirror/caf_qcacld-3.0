@@ -169,6 +169,7 @@
 #include "qdf_func_tracker.h"
 #include "pld_common.h"
 #include "wlan_hdd_pre_cac.h"
+#include "wlan_mlme_api.h"
 
 #include "sme_api.h"
 

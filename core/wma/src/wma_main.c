@@ -10640,3 +10640,15 @@ wma_get_mlo_sap_emlsr(struct wmi_unified *wmi_handle)
 				   wmi_service_mlo_sap_emlsr_support);
 }
 #endif
+
+#ifdef SAP_PERF_TUNING
+bool
+wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle)
+{
+	if (!wmi_handle)
+		return false;
+
+	return wmi_service_enabled(wmi_handle,
+				   wmi_service_vdev_traffic_monitoring);
+}
+#endif
