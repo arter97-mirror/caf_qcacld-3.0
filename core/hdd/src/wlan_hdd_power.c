@@ -1940,16 +1940,19 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct wlan_hdd_link_info *link_info;
 	bool ignore_cac_updated = false;
-	bool restart_due_to_cac_pending = false;
+	bool restart_due_to_cac_pending;
+	bool re_iterate = false;
 
 	hdd_enter();
+
+restart_post_cac_links:
+	restart_due_to_cac_pending = false;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   NET_DEV_HOLD_SSR_RESTART_SAP) {
 		if (adapter->device_mode != QDF_SAP_MODE)
 			goto next_adapter;
-restart_post_cac_links:
-		restart_due_to_cac_pending = false;
+
 		hdd_adapter_for_each_active_link_info(adapter, link_info) {
 			if (!qdf_atomic_test_bit(
 						SOFTAP_INIT_DONE,
@@ -1964,7 +1967,8 @@ restart_post_cac_links:
 				hdd_restore_ignore_cac(hdd_ctx);
 				ignore_cac_updated = true;
 			}
-			if (hdd_ssr_restart_sap_cac_link(adapter, link_info)) {
+			if (!re_iterate &&
+			    hdd_ssr_restart_sap_cac_link(adapter, link_info)) {
 				restart_due_to_cac_pending = true;
 				continue;
 			}
@@ -1977,11 +1981,13 @@ restart_post_cac_links:
 			wlan_hdd_start_sap(link_info, true);
 			hdd_apctx_set_ap_suspend(hdd_ctx, link_info);
 		}
-		if (restart_due_to_cac_pending)
-			goto restart_post_cac_links;
 next_adapter:
 		hdd_adapter_dev_put_debug(adapter,
 					  NET_DEV_HOLD_SSR_RESTART_SAP);
+	}
+	if (restart_due_to_cac_pending) {
+		re_iterate = true;
+		goto restart_post_cac_links;
 	}
 
 	hdd_exit();
