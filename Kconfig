@@ -3009,4 +3009,8 @@ config WLAN_POS_GET_BY_NAME_NOT_SUPPORT
 	bool "Enable WLAN_POS_GET_BY_NAME_NOT_SUPPORT"
 	default n
 
+config SAP_PERF_TUNING
+	bool "Enable SAP performance tuning"
+	default n
+
 endif # QCA_CLD_WLAN
