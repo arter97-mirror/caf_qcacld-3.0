@@ -113,6 +113,8 @@
 
 #define MAX_HT_MCS_INDEX 7
 
+#define MAX_HE_MCS_IDX 13
+
 /* 11B, 11G Rate table include Basic rate and Extended rate
  * The IDX field is the rate index
  * The HI field is the rate when RSSI is strong or being ignored
@@ -6463,6 +6465,9 @@ static void hdd_get_max_rate_he(struct hdd_station_info *stainfo,
 			if (mcsidx < stats->tx_rate.mcs)
 				mcsidx = stats->tx_rate.mcs;
 		}
+
+		if (mcsidx > MAX_HT_MCS_INDEX)
+			mcsidx = MAX_HT_MCS_INDEX;
 
 		if (rate_flags & TX_RATE_HE160)
 			tmprate =
