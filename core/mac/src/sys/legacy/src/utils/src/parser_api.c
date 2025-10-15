@@ -14114,6 +14114,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 	attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
 	attr.ie_length = ie_len;
+	attr.mac_addr = &bss_desc->bssId[0];
 
 	/*
 	 * Include Ext MLD caps if the support is set in MLME or if the AP

@@ -8964,6 +8964,7 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx, uint8_t vdev_id,
 				if (WLAN_REG_IS_24GHZ_CH_FREQ(channel_freq)) {
 					attr.ie_data = util_scan_entry_ie_data(scan_entry);
 					attr.ie_length = util_scan_entry_ie_len(scan_entry);
+					attr.mac_addr = scan_entry->bssid.bytes;
 					if (wlan_action_oui_search(mac_ctx->psoc, &attr,
 								   ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ)) {
 						pe_debug("Send pre-auth with 6Mbps on freq %d",
