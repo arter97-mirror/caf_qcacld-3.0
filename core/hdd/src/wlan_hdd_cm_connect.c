@@ -453,6 +453,44 @@ static void hdd_update_scan_ie_for_connect(struct hdd_adapter *adapter,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static int
+hdd_get_partner_link_freqs_from_scan_res(struct scan_cache_node *cur_node,
+					 qdf_freq_t **partner_freqs)
+{
+	int i = 0;
+	qdf_freq_t *freqs;
+	int num_links;
+
+	if (!cur_node || !cur_node->entry)
+		return 0;
+
+	num_links = cur_node->entry->ml_info.num_links;
+
+	if (!num_links)
+		return 0;
+
+	freqs = qdf_mem_malloc(sizeof(*freqs) * num_links);
+
+	if (!freqs)
+		return 0;
+
+	for (i = 0; i < num_links; i++)
+		freqs[i] = cur_node->entry->ml_info.link_info[i].freq;
+
+	*partner_freqs = freqs;
+	return num_links;
+}
+
+#else
+static int
+hdd_get_partner_link_freqs_from_scan_res(struct scan_cache_node *cur_node,
+					 qdf_freq_t **partner_freqs)
+{
+	return 0;
+}
+#endif
+
 #if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)) || \
 	defined(CFG80211_11BE_BASIC)) && \
 	defined(WLAN_FEATURE_11BE)
@@ -692,9 +730,11 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 	qdf_list_node_t *cur_lst = NULL;
 	struct scan_cache_node *cur_node = NULL;
 	bool is_6ghz_cap = false;
-	int ret;
+	int ret, i;
 	struct wlan_hdd_link_info *link_info;
 	enum policy_mgr_con_mode dfs_con_mode = PM_SAP_MODE;
+	int num_partner_freq = 0;
+	qdf_freq_t *freqs = NULL;
 
 	link_info = hdd_get_sap_link_info_of_dfs(hdd_ctx);
 	/* probably no dfs sap running, no handling required */
@@ -762,6 +802,24 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 
 	cur_node = qdf_container_of(cur_lst, struct scan_cache_node, node);
 	ch_freq = cur_node->entry->channel.chan_freq;
+
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq))
+		goto purge_list;
+
+	num_partner_freq = hdd_get_partner_link_freqs_from_scan_res(cur_node,
+								    &freqs);
+	for (i = 0; i < num_partner_freq; i++) {
+		if (WLAN_REG_IS_5GHZ_CH_FREQ(freqs[i])) {
+			ch_freq = freqs[i];
+			break;
+		}
+
+		if (ch_freq < freqs[i])
+			ch_freq = freqs[i];
+	}
+	if (freqs)
+		qdf_mem_free(freqs);
+
 purge_list:
 	if (list)
 		ucfg_scan_purge_results(list);
@@ -777,9 +835,11 @@ def_chan:
 
 	if (policy_mgr_is_hw_sbs_capable(hdd_ctx->psoc) &&
 	    ch_freq &&
+	    !policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc) &&
 	    policy_mgr_are_sbs_chan(hdd_ctx->psoc,
 				    ch_freq,
-				    hdd_ap_ctx->operating_chan_freq)) {
+				    hdd_ap_ctx->operating_chan_freq) &&
+	    !num_partner_freq) {
 		hdd_debug("sta freq %d sap freq %d in sbs mode is allowed",
 			  ch_freq, hdd_ap_ctx->operating_chan_freq);
 		return true;
