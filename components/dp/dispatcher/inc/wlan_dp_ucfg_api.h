@@ -2289,4 +2289,19 @@ ucfg_dp_update_bss_peer_info_for_tdls_ctrl(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* CONFIG_BORON */
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * ucfg_dp_softap_wds_ext_rx_handler() - Rx handler for wds_ext interface
+ * @vdev: pointer of vdev objmgr
+ * @dev: pointer of net_device struct
+ * @nbuf: RX socket buffer
+ *
+ * Return: QDF_STATUS_SUCCESS for success and otherwise failure
+ */
+QDF_STATUS ucfg_dp_softap_wds_ext_rx_handler(struct wlan_objmgr_vdev *vdev,
+					     struct net_device *dev,
+					     qdf_nbuf_t nbuf);
+#endif /* QCA_SUPPORT_WDS_EXTENDED */
+
 #endif /* _WLAN_DP_UCFG_API_H_ */

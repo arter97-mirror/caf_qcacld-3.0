@@ -110,6 +110,20 @@ QDF_STATUS hdd_softap_ipa_start_xmit(qdf_nbuf_t nbuf, qdf_netdev_t dev);
  */
 netdev_tx_t hdd_softap_wds_ext_start_xmit(struct sk_buff *skb,
 					  struct net_device *dev);
+
+/**
+ * hdd_softap_wds_ext_rx_handler() - Passing RX packets to network stack
+ * @osif_dev: pointer of hdd_wds_ext structure
+ * @rxbuf: pointer of RX socket buffeir
+ *
+ * This function passes rx packets to network stack via the wds_ext interface.
+ * ucfg_dp_softap_wds_ext_rx_handler() is invoked, with net device pointing to
+ * the new virtual per-repeater wds_ext interface.
+ *
+ * Return: QDF_STATUS_STATUS for success otherwise failure
+ */
+QDF_STATUS hdd_softap_wds_ext_rx_handler(void *osif_dev, qdf_nbuf_t rxbuf);
+
 #endif /* QCA_SUPPORT_WDS_EXTENDED */
 
 /**

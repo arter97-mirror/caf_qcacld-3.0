@@ -721,4 +721,19 @@ void dp_set_peer_txpt_idx(qdf_nbuf_t nbuf,
 }
 #endif /* CONFIG_BORON */
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * dp_softap_wds_ext_rx_handler() - RX handler for wds_ext interface
+ * @link: pointer to DP link
+ * @dev: pointer to wds_ext net interface
+ * @rxbuf: pointer to rx socket buffer
+ *
+ * Return: QDF_STATUS_E_FAILURE if any errors encountered,
+ *	   QDF_STATUS_SUCCESS otherwise
+ */
+QDF_STATUS dp_softap_wds_ext_rx_handler(struct wlan_dp_link *link,
+					struct net_device *dev,
+					qdf_nbuf_t rxbuf);
+#endif /* QCA_SUPPORT_WDS_EXTENDED */
+
 #endif
