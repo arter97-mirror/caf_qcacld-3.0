@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -730,6 +730,7 @@ struct tdls_osif_cb {
  * @tdls_add_sta_req: pass eWNI_SME_TDLS_ADD_STA_REQ value
  * @tdls_del_sta_req: pass eWNI_SME_TDLS_DEL_STA_REQ value
  * @tdls_update_peer_state: pass WMA_UPDATE_TDLS_PEER_STATE value
+ * @tdls_update_offchan_mode: pass WMA_UPDATE_TDLS_OFF_CHAN value
  * @tdls_del_all_peers: pass eWNI_SME_DEL_ALL_TDLS_PEERS
  * @tdls_update_dp_vdev_flags: pass CDP_UPDATE_TDLS_FLAGS
  * @tdls_rx_cb: TDLS RX callback
@@ -751,6 +752,7 @@ struct tdls_start_params {
 	uint16_t tdls_add_sta_req;
 	uint16_t tdls_del_sta_req;
 	uint16_t tdls_update_peer_state;
+	uint16_t tdls_update_offchan_mode;
 	uint16_t tdls_del_all_peers;
 	uint32_t tdls_update_dp_vdev_flags;
 	tdls_rx_callback tdls_rx_cb;

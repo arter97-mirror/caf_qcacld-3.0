@@ -1484,8 +1484,7 @@ tdls_process_decrement_active_session(struct wlan_objmgr_psoc *psoc)
 	else
 		tdls_process_enable_for_vdev(tdls_obj_vdev);
 
-	if (tdls_check_if_offchannel_allowed(tdls_obj_vdev) &&
-	    tdls_priv_soc->tdls_fw_off_chan_mode != ENABLE_CHANSWITCH &&
+	if (tdls_priv_soc->tdls_fw_off_chan_mode != ENABLE_CHANSWITCH &&
 	    tdls_priv_soc->connected_peer_count == 1)
 		tdls_set_tdls_offchannelmode(tdls_obj_vdev,  ENABLE_CHANSWITCH);
 

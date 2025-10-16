@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -227,6 +227,7 @@ enum wmamsgtype {
 
 #ifdef FEATURE_WLAN_TDLS
 	WMA_UPDATE_TDLS_PEER_STATE = SIR_HAL_UPDATE_TDLS_PEER_STATE,
+	WMA_UPDATE_TDLS_OFF_CHAN = SIR_HAL_UPDATE_TDLS_OFF_CHAN_MODE,
 #endif
 	WMA_SET_SAP_INTRABSS_DIS = SIR_HAL_SET_SAP_INTRABSS_DIS,
 

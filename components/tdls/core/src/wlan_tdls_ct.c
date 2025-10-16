@@ -1374,6 +1374,12 @@ int tdls_set_tdls_offchannelmode(struct wlan_objmgr_vdev *vdev,
 		return -EPERM;
 	}
 
+	if (offchanmode == ENABLE_CHANSWITCH &&
+	    !tdls_check_if_offchannel_allowed(vdev)) {
+		tdls_err("TDLS Offchannel is not allowed");
+		return -EPERM;
+	}
+
 	tdls_feature_flags = tdls_soc->tdls_configs.tdls_feature_flags;
 	if (!TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags) ||
 	    TDLS_SUPPORT_SUSPENDED >= tdls_soc->tdls_current_mode) {
