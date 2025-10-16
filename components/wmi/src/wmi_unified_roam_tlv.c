@@ -4207,6 +4207,7 @@ free_entries:
 	qdf_mem_zero(*entries,
 		     WLAN_MAX_ML_BSS_LINKS * sizeof(**entries));
 	qdf_mem_free(*entries);
+	*entries = NULL;
 
 free_keys:
 	for (k = 0; k < WMI_NUM_KEYS_ALLOCATED; k++) {
