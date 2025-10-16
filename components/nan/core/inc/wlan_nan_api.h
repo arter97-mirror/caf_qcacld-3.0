@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -260,6 +260,18 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq);
 bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * nan_set_ndi_state() - Set NDI state
+ * @vdev: vdev context
+ * @state: state
+ * @func: caller function address
+ *
+ * Return:  SUCCESS if state is set, else failure.
+ */
+
+QDF_STATUS nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
+			     enum nan_datapath_state state,
+			     const char *func);
+/**
  * nan_handle_emlsr_concurrency()- Handle NAN+eMLSR concurrency
  * @psoc: pointer to psoc object
  * @nan_enable: Carries true if NAN is getting enabled.
@@ -389,6 +401,13 @@ static inline
 bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
+}
+
+static inline QDF_STATUS nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
+					   enum nan_datapath_state state,
+					   const char *func)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 static inline void

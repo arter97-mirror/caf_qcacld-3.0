@@ -522,6 +522,27 @@ bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc)
 	return nan_obj->cfg_param.disable_6g_nan;
 }
 
+QDF_STATUS nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
+			     enum nan_datapath_state state,
+			     const char *func)
+{
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+	enum nan_datapath_state current_state;
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+	qdf_spin_lock_bh(&priv_obj->lock);
+	current_state = priv_obj->state;
+	priv_obj->state = state;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+	nan_nofl_debug("%s: ndi state: current: %u, new: %u", func,
+		       current_state, state);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 bool wlan_is_mlo_sta_nan_ndi_allowed(struct wlan_objmgr_psoc *psoc)
 {

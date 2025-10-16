@@ -62,21 +62,7 @@ inline QDF_STATUS __ucfg_nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
 					   enum nan_datapath_state state,
 					   const char *func)
 {
-	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
-	enum nan_datapath_state current_state;
-
-	if (!priv_obj) {
-		nan_err("priv_obj is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-	qdf_spin_lock_bh(&priv_obj->lock);
-	current_state = priv_obj->state;
-	priv_obj->state = state;
-	qdf_spin_unlock_bh(&priv_obj->lock);
-	nan_nofl_debug("%s: ndi state: current: %u, new: %u", func,
-		       current_state, state);
-
-	return QDF_STATUS_SUCCESS;
+	return nan_set_ndi_state(vdev, state, func);
 }
 
 inline enum nan_datapath_state ucfg_nan_get_ndi_state(
