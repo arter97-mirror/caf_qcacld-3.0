@@ -14065,13 +14065,17 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	uint8_t *eht_cap_ie = NULL;
 	bool sta_prof_he_ie = false;
 	bool set_ext_mld_cap = false;
-	struct bss_description *bss_desc =
-			&pe_session->lim_join_req->bssDescription;
+	struct bss_description *bss_desc;
 	struct action_oui_search_attr attr = {0};
 	uint16_t ie_len;
 
 	if (!mac_ctx || !pe_session || !frm)
 		return QDF_STATUS_E_NULL_VALUE;
+
+	if (!pe_session->lim_join_req)
+		return QDF_STATUS_E_FAILURE;
+
+	bss_desc = &pe_session->lim_join_req->bssDescription;
 
 	psoc = wlan_vdev_get_psoc(pe_session->vdev);
 	if (!psoc) {
