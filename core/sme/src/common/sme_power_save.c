@@ -251,7 +251,7 @@ static QDF_STATUS sme_ps_disable_uapsd_req_params(struct mac_context *mac_ctx,
 
 	sme_get_ps_state(mac_ctx, session_id, &ps_state);
 	if (ps_state != UAPSD_MODE) {
-		sme_err("UAPSD is already disabled");
+		sme_debug("UAPSD is already disabled");
 		return QDF_STATUS_SUCCESS;
 	}
 	disable_uapsd_req_params =
