@@ -1883,6 +1883,68 @@ tdls_wma_update_peer_state(struct tdls_soc_priv_obj *soc_obj,
 	return status;
 }
 
+static QDF_STATUS
+tdls_wma_update_off_chan_mode(struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_channel_switch_params *chan_switch_params;
+	struct tdls_vdev_priv_obj *tdls_vdev;
+	struct tdls_soc_priv_obj *tdls_soc;
+	struct tdls_peer *conn_peer = NULL;
+	struct scheduler_msg msg = {0,};
+	QDF_STATUS status;
+
+	status = tdls_get_vdev_objects(vdev, &tdls_vdev, &tdls_soc);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		tdls_err("vdev:%d Unable to fetch vdev objects",
+			 wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	conn_peer = tdls_find_first_connected_peer(tdls_vdev);
+	if (!conn_peer) {
+		tdls_debug("vdev:%d No TDLS Connected Peer",
+			   wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	chan_switch_params = qdf_mem_malloc(sizeof(*chan_switch_params));
+	if (!chan_switch_params)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mem_zero(chan_switch_params, sizeof(*chan_switch_params));
+	chan_switch_params->vdev_id = tdls_vdev->session_id;
+	chan_switch_params->tdls_sw_mode = DISABLE_ACTIVE_CHANSWITCH;
+	chan_switch_params->is_responder = conn_peer->is_responder;
+	qdf_mem_copy(&chan_switch_params->peer_mac_addr,
+		     &conn_peer->peer_mac.bytes, QDF_MAC_ADDR_SIZE);
+
+	tdls_notice("Peer " QDF_MAC_ADDR_FMT " vdevId: %d, off channel: %d, offset: %d, num_allowed_off_chan:%d mode:%d, is_responder: %d",
+		    QDF_MAC_ADDR_REF(chan_switch_params->peer_mac_addr),
+		    chan_switch_params->vdev_id,
+		    chan_switch_params->tdls_off_ch,
+		    chan_switch_params->tdls_off_ch_bw_offset,
+		    chan_switch_params->num_off_channels,
+		    chan_switch_params->tdls_sw_mode,
+		    chan_switch_params->is_responder);
+
+	tdls_soc->tdls_fw_off_chan_mode = DISABLE_ACTIVE_CHANSWITCH;
+
+	msg.type = tdls_soc->tdls_update_offchan_mode;
+	msg.reserved = 0;
+	msg.bodyptr = chan_switch_params;
+
+	status = scheduler_post_message(QDF_MODULE_ID_TDLS,
+					QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_WMA, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(chan_switch_params);
+		tdls_err("scheduler_post_msg failed");
+		status = QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS tdls_process_enable_link(struct tdls_oper_request *req)
 {
 	struct tdls_peer *peer;
@@ -1974,6 +2036,10 @@ QDF_STATUS tdls_process_enable_link(struct tdls_oper_request *req)
 
 	tdls_update_6g_power(vdev, soc_obj, true);
 	tdls_increment_peer_count(soc_obj);
+
+	if (!tdls_check_if_offchannel_allowed(vdev))
+		tdls_wma_update_off_chan_mode(vdev);
+
 	/* Need to update osif params when first peer gets connected */
 	if (soc_obj->connected_peer_count == 1 &&
 	    soc_obj->tdls_osif_update_cb.tdls_osif_conn_update)

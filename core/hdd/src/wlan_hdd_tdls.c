@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1333,6 +1333,7 @@ void hdd_init_tdls_config(struct tdls_start_params *tdls_cfg)
 	tdls_cfg->tdls_add_sta_req = eWNI_SME_TDLS_ADD_STA_REQ;
 	tdls_cfg->tdls_del_sta_req = eWNI_SME_TDLS_DEL_STA_REQ;
 	tdls_cfg->tdls_update_peer_state = WMA_UPDATE_TDLS_PEER_STATE;
+	tdls_cfg->tdls_update_offchan_mode = WMA_UPDATE_TDLS_OFF_CHAN;
 }
 
 void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx)
