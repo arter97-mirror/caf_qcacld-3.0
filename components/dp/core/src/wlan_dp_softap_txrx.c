@@ -1170,3 +1170,72 @@ QDF_STATUS dp_softap_rx_packet_cbk(void *link_ctx, qdf_nbuf_t rx_buf)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+QDF_STATUS dp_softap_wds_ext_rx_handler(struct wlan_dp_link *link,
+					struct net_device *dev,
+					qdf_nbuf_t rxbuf)
+{
+	struct dp_tx_rx_stats *stats;
+	struct wlan_dp_intf *intf;
+	QDF_STATUS status;
+	qdf_nbuf_t next;
+	qdf_nbuf_t nbuf;
+	int cpu;
+
+	if (qdf_unlikely(!link || !rxbuf)) {
+		dp_err_rl("Invalid RX params");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	intf = link->dp_intf;
+
+	stats = &intf->dp_stats.tx_rx_stats;
+	cpu = qdf_get_cpu();
+
+	next = rxbuf;
+
+	while (next) {
+		nbuf = next;
+		next = qdf_nbuf_next(nbuf);
+		qdf_nbuf_set_next(nbuf, NULL);
+
+		++stats->per_cpu[cpu].rx_packets;
+		qdf_net_stats_add_rx_pkts(&intf->stats, 1);
+		/* count aggregated RX frame into stats */
+		qdf_net_stats_add_rx_pkts(&intf->stats,
+					  qdf_nbuf_get_gso_segs(nbuf));
+		qdf_net_stats_add_rx_bytes(&intf->stats,
+					   qdf_nbuf_len(nbuf));
+
+		qdf_nbuf_set_dev(nbuf, dev);
+
+		dp_event_eapol_log(nbuf, QDF_RX);
+		qdf_dp_trace_log_pkt(link->link_id,
+				     nbuf, QDF_RX, QDF_TRACE_DEFAULT_PDEV_ID,
+				     intf->device_mode);
+		DPTRACE(qdf_dp_trace(nbuf,
+				     QDF_DP_TRACE_RX_PACKET_PTR_RECORD,
+				     QDF_TRACE_DEFAULT_PDEV_ID,
+				     qdf_nbuf_data_addr(nbuf),
+				     sizeof(qdf_nbuf_data(nbuf)), QDF_RX));
+		DPTRACE(qdf_dp_trace_data_pkt(nbuf, QDF_TRACE_DEFAULT_PDEV_ID,
+					      QDF_DP_TRACE_RX_PACKET_RECORD,
+					      0, QDF_RX));
+
+		if (dp_rx_pkt_tracepoints_enabled())
+			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0, 0);
+
+		qdf_nbuf_set_protocol_eth_tye_trans(nbuf);
+
+		status = wlan_dp_rx_deliver_to_stack(intf, nbuf);
+
+		if (QDF_IS_STATUS_SUCCESS(status))
+			++stats->per_cpu[cpu].rx_delivered;
+		else
+			++stats->per_cpu[cpu].rx_refused;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* QCA_SUPPORT_WDS_EXTENDED */

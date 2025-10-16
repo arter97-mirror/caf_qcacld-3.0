@@ -302,6 +302,24 @@ netdev_tx_t hdd_softap_wds_ext_start_xmit(struct sk_buff *skb,
 
 	return NETDEV_TX_OK;
 }
+
+QDF_STATUS hdd_softap_wds_ext_rx_handler(void *osif_dev, qdf_nbuf_t rxbuf)
+{
+	struct net_device *parent_dev;
+	struct hdd_adapter *adapter;
+	struct hdd_wds_ext *wds_ext;
+	struct net_device *dev;
+
+	wds_ext = (struct hdd_wds_ext *)osif_dev;
+
+	parent_dev = wds_ext->parent_netdev;
+	adapter = netdev_priv(parent_dev);
+
+	dev = wds_ext->netdev; /* points to the wds_ext interface */
+
+	return ucfg_dp_softap_wds_ext_rx_handler(adapter->deflink->vdev, dev,
+						 rxbuf);
+}
 #endif /* QCA_SUPPORT_WDS_EXTENDED */
 
 static void __hdd_softap_tx_timeout(struct net_device *dev)

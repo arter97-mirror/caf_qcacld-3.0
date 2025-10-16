@@ -2129,4 +2129,18 @@ ucfg_dp_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
 int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
 				uint32_t pri);
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * ucfg_dp_softap_wds_ext_rx_handler() - Rx handler for wds_ext interface
+ * @vdev: pointer of vdev objmgr
+ * @dev: pointer of net_device struct
+ * @nbuf: RX socket buffer
+ *
+ * Return: QDF_STATUS_SUCCESS for success and otherwise failure
+ */
+QDF_STATUS ucfg_dp_softap_wds_ext_rx_handler(struct wlan_objmgr_vdev *vdev,
+					     struct net_device *dev,
+					     qdf_nbuf_t nbuf);
+#endif /* QCA_SUPPORT_WDS_EXTENDED */
+
 #endif /* _WLAN_DP_UCFG_API_H_ */

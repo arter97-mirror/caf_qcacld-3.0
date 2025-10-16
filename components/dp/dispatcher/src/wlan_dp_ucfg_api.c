@@ -3332,3 +3332,20 @@ int ucfg_dp_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
 
 	return qdf_status_to_os_return(status);
 }
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+QDF_STATUS ucfg_dp_softap_wds_ext_rx_handler(struct wlan_objmgr_vdev *vdev,
+					     struct net_device *dev,
+					     qdf_nbuf_t nbuf)
+{
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err_rl("DP link not found");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return dp_softap_wds_ext_rx_handler(dp_link, dev, nbuf);
+}
+#endif /* QCA_SUPPORT_WDS_EXTENDED */
