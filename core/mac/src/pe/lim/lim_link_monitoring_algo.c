@@ -350,35 +350,6 @@ lim_trigger_sta_deletion(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	lim_send_sme_disassoc_ind(mac_ctx, sta_ds, session_entry);
 } /*** end lim_trigger_st_adeletion() ***/
 
-static void
-lim_connectivity_bmiss_disconn_event(tpDphHashNode sta,
-				     struct wlan_objmgr_psoc *psoc,
-				     enum wlan_reason_code reason_code,
-				     uint32_t vdev_id)
-{
-	if (!(reason_code == REASON_BEACON_MISSED))
-		return;
-
-	/*
-	 * Firmware sends final bmiss indication as part of roam scan stats
-	 * event. Disconn log is sent as part of the final bmiss indication
-	 * from  roam scan stats event with specific reason. But if RSO stop
-	 * or RSO deinit happens after first bmiss due to concurrent interface
-	 * connection, then firmware doesn't send the final bmiss indication
-	 * to driver since roam scan will be disabled. But final bmiss
-	 * heartbeat failure will be indicated as part of WMI_ROAM_EVENTID with
-	 * reason as BMISS. So generate DISCONN log in this case from host based
-	 * on RSO state and final bmiss HB failure teardown.
-	 */
-	if (!(MLME_IS_ROAM_STATE_STOPPED(psoc, vdev_id) ||
-	      MLME_IS_ROAM_STATE_DEINIT(psoc, vdev_id)))
-		return;
-
-	cm_roam_beacon_loss_disconnect_event(psoc,
-					     *(struct qdf_mac_addr *)sta->staAddr,
-					     vdev_id);
-}
-
 void
 lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 			   enum wlan_reason_code reasonCode,
@@ -470,9 +441,6 @@ lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 
 	if (LIM_IS_STA_ROLE(pe_session)) {
 		lim_mlo_sta_notify_peer_disconn(pe_session);
-
-		lim_connectivity_bmiss_disconn_event(sta, mac->psoc, reasonCode,
-						     pe_session->vdev_id);
 
 		lim_post_sme_message(mac, LIM_MLM_DEAUTH_IND,
 				     (uint32_t *)&mlmDeauthInd);

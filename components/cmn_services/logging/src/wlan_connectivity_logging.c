@@ -1200,6 +1200,9 @@ wlan_connectivity_discon_reason_to_diag_reason(uint32_t reason,
 	case REASON_IFACE_DOWN:
 		discon_reason = WLAN_DIAG_DISCONNECT_REASON_USERSPACE;
 		break;
+	case REASON_BEACON_MISSED:
+		discon_reason = WLAN_DIAG_DISCONNECT_REASON_BEACON_LOSS;
+		break;
 	default:
 		logging_err("No diag code for the qca reason code: %d", reason);
 		discon_reason = WLAN_DIAG_DISCONNECT_REASON_OTHER;
@@ -1239,13 +1242,6 @@ void wlan_connectivity_disconnect_event(struct wlan_objmgr_vdev *vdev,
 			      wlan_vdev_get_id(vdev), reason);
 		return;
 	}
-
-	/*
-	 * Skipping BEACON_MISSED disconnect event
-	 * since it has already been reported to userspace by the LIM layer
-	 */
-	if (reason == REASON_BEACON_MISSED)
-		return;
 
 	qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
 		     peer_mac, QDF_MAC_ADDR_SIZE);
