@@ -33323,14 +33323,14 @@ wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
 	osif_vdev_sync_op_stop(vdev_sync);
 }
 #else
-static int
+static inline int
 wlan_hdd_cfg80211_add_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
 				unsigned int link_id)
 {
 	return 0;
 }
 
-static void
+static inline void
 wlan_hdd_cfg80211_del_intf_link(struct wiphy *wiphy, struct wireless_dev *wdev,
 				unsigned int link_id)
 {
