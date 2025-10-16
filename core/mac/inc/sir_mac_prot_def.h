@@ -270,8 +270,8 @@ static const uint32_t vht_supported_datarate_bw80_gi800ns[] = {
 #define SIR_MAC_BAD_HTC_HE_VENDOR_OUI_LEN         4
 
 /* Maximum allowable size of a beacon,probe rsp and fils discovery frame */
-#define SIR_MAX_BEACON_SIZE     512
-#define SIR_MAX_PROBE_RESP_SIZE 512
+#define SIR_MAX_BEACON_SIZE     1024
+#define SIR_MAX_PROBE_RESP_SIZE 1024
 #define SIR_MAX_FD_TMPL_SIZE    512
 
 

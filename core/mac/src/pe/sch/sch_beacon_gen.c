@@ -561,8 +561,10 @@ sch_append_addn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 		/* get NoA attribute stream P2P IE */
 		noa_len = lim_get_noa_attr_stream(mac_ctx, noa_strm, session);
 		if (noa_len) {
-			if ((noa_len + addn_ielen) <=
-			    WNI_CFG_PROBE_RSP_BCN_ADDNIE_DATA_LEN) {
+			if (((noa_len + addn_ielen) <=
+			    WNI_CFG_PROBE_RSP_BCN_ADDNIE_DATA_LEN) &&
+					((p2p_ie[1] + (uint16_t)noa_len) <=
+					 WNI_CFG_P2P_ADDNIE_DATA_LEN)) {
 				qdf_mem_copy(&add_ie[addn_ielen], noa_strm,
 					     noa_len);
 				addn_ielen += noa_len;

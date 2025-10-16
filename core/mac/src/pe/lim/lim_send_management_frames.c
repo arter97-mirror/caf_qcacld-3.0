@@ -887,8 +887,8 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			noalen = lim_get_noa_attr_stream(mac_ctx,
 					noa_stream, pe_session);
 			if (noalen) {
-				if ((p2p_ie[1] + noalen) >
-				    WNI_CFG_PROBE_RSP_BCN_ADDNIE_DATA_LEN) {
+				if ((p2p_ie[1] + (uint16_t)noalen) >
+						WNI_CFG_P2P_ADDNIE_DATA_LEN) {
 					total_noalen = lim_build_p2p_ie(
 								mac_ctx,
 								&noa_ie[0],
