@@ -1,6 +1,6 @@
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
-load("//soc-repo:target_variants.bzl", "all_target_variants")
+load(":target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
         "blair":[
@@ -19,12 +19,18 @@ _target_chipset_map = {
                 "qca6750",
                 "adrastea",
         ],
+        "lahaina":[
+                "qca6490",
+                "qca6750",
+                "wlan",
+        ],
 }
 
 _chipset_hw_map = {
         "wlan"   : "ADRASTEA",
         "adrastea" : "ADRASTEA",
         "qca6750": "MOSELLE",
+        "qca6490": "LITHIUM",
 }
 
 _chipset_header_map = {
@@ -36,12 +42,19 @@ _chipset_header_map = {
         "api/hw/qca6750/v1",
         "cmn/hal/wifi3.0/qca6750",
     ],
+    "qca6490": [
+        "api/hw/qca6490/v1",
+        "cmn/hal/wifi3.0/qca6490",
+    ],
 }
 
 _hw_header_map = {
-        "ADRASTEA" : [
-        ],
-        "MOSELLE" : [
+    "ADRASTEA" : [
+    ],
+    "MOSELLE" : [
+        "cmn/hal/wifi3.0/li",
+    ],
+    "LITHIUM": [
         "cmn/hal/wifi3.0/li",
     ],
 }
@@ -1049,6 +1062,12 @@ _conditional_srcs = {
             "cmn/hif/src/qca6750def.c",
         ],
     },
+    "CONFIG_QCA6490_HEADERS_DEF": {
+        True: [
+            "cmn/hal/wifi3.0/qca6490/hal_6490.c",
+            "cmn/hif/src/qca6490def.c",
+        ],
+    },
     "CONFIG_OCB_UT_FRAMEWORK": {
         True: [
             "cmn/wmi/src/wmi_unified_ocb_ut.c",
@@ -1210,7 +1229,7 @@ _conditional_srcs = {
             "components/cmn_services/logging/src/wlan_connectivity_logging.c",
         ],
     },
-    "CONFIG_QCACLD_WLAN_CONNECTIVITY_DIAG_LOGGING": {
+    "CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING": {
         True: [
             "core/hdd/src/wlan_hdd_connectivity_logging.c",
             "components/cmn_services/logging/src/wlan_connectivity_logging.c",
@@ -1865,6 +1884,11 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_sysfs_thermal_cfg.c",
         ],
     },
+    "CONFIG_WLAN_SYSFS_BITRATES": {
+        True: [
+            "core/hdd/src/wlan_hdd_sysfs_bitrates.c",
+        ],
+    },
     "CONFIG_WLAN_TRACEPOINTS": {
         True: [
             "cmn/qdf/linux/src/qdf_tracepoint.c",
@@ -1962,11 +1986,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     feature_grep_map = [
         {
-            "pattern": "walt_get_cpus_taken",
-            "file": "kernel/sched/walt/walt.c",
-            "flag": "WALT_GET_CPU_TAKEN_SUPPORT",
-        },
-        {
             "pattern": "nl80211_validate_key_link_id",
             "file": "net/wireless/nl80211.c",
             "flag": "CFG80211_MLO_KEY_OPERATION_SUPPORT",
@@ -2017,6 +2036,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         cmd = cmd,
     )
 
+    copts.append("-Wunused-but-set-parameter")
     copts.append("-include")
     copts.append("$(location :{}_grep_defines)".format(tvc))
 
@@ -2048,12 +2068,53 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
-    if chipset == "wlan":
-        out = "{}.ko".format(chipset.replace("-", "_"))
+    if target == "monaco" or target == "blair":
+        out = "wlan.ko"
     else:
         out = "qca_cld3_{}.ko".format(chipset.replace("-", "_"))
+
+
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
+
+    deps = select({
+        "//build/kernel/kleaf:socrepo_true": [
+            "//soc-repo:all_headers",
+            "//soc-repo:{}/net/wireless/cfg80211".format(tv),
+            "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(tv),
+            "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
+            "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
+            "//soc-repo:{}/kernel/sched/walt/sched-walt".format(tv),
+        ],
+        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"],
+    })
+
+    if chipset == "qca6750" or chipset == "wlan" or chipset == "adrastea":
+        deps += [
+            "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
+        ]
+    else:
+        deps += [
+            "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
+        ]
+
+    deps = deps + [
+        "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
+        "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
+        "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
+        "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
+    ]
+
+    if target != "lahaina":
+        deps = deps + [
+            "//vendor/qcom/opensource/dataipa:include_headers",
+            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
+        ]
+
+    kernel_build = select({
+        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
+        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
+    })
 
     print("name= ", name)
     print("hw= ", hw)
@@ -2075,23 +2136,8 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         conditional_srcs = _conditional_srcs,
         copts = copts,
         out = out,
-        kernel_build = "//soc-repo:{}_base_kernel".format(tv),
-        deps = [
-            "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_utils".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:{}_cnss_nl".format(tv),
-            "//soc-repo:all_headers",
-            "//soc-repo:{}/net/wireless/cfg80211".format(tv),
-            "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(tv),
-            "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
-            "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
-            "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
-            "//vendor/qcom/opensource/dataipa:include_headers",
-            "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
-            "//soc-repo:{}/kernel/sched/walt/sched-walt".format(tv),
-        ],
+        kernel_build = kernel_build,
+        deps = deps,
     )
 
 def define_dist(target, variant, chipsets):
@@ -2125,7 +2171,7 @@ def define_dist(target, variant, chipsets):
     )
 
 def define_modules():
-    for (t, v) in all_target_variants():
+    for (t, v) in get_all_variants():
         chipsets = _target_chipset_map.get(t)
         if chipsets:
             for c in chipsets:
