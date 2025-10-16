@@ -2369,6 +2369,53 @@ lim_roam_gen_beacon_descr(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline QDF_STATUS
+lim_roam_get_candidate_scan_entry(struct wlan_objmgr_pdev *pdev,
+				  struct qdf_mac_addr *bssid,
+				  uint8_t *ssid_ie,
+				  struct element_info *frame)
+{
+	qdf_list_t *scan_list;
+	struct scan_filter *filter;
+	qdf_list_node_t *cur_node = NULL;
+	struct scan_cache_node *scan_node = NULL;
+
+	filter = qdf_mem_malloc(sizeof(*filter));
+	if (!filter)
+		return QDF_STATUS_E_FAILURE;
+
+	filter->num_of_bssid = 1;
+	qdf_copy_macaddr(&filter->bssid_list[0], bssid);
+	filter->num_of_ssid = 1;
+	qdf_mem_copy(filter->ssid_list[0].ssid, &ssid_ie[2], ssid_ie[1]);
+	filter->ssid_list[0].length = ssid_ie[1];
+
+	scan_list = wlan_scan_get_result(pdev, filter);
+	qdf_mem_free(filter);
+	if (!scan_list || !qdf_list_size(scan_list))
+		goto end;
+
+	qdf_list_peek_front(scan_list, &cur_node);
+	scan_node = qdf_container_of(cur_node, struct scan_cache_node, node);
+
+	if (scan_node && scan_node->entry) {
+		frame->len = scan_node->entry->raw_frame.len;
+		frame->ptr = qdf_mem_malloc(frame->len);
+		if (!frame->ptr)
+			goto end;
+		qdf_mem_copy(frame->ptr, scan_node->entry->raw_frame.ptr,
+			     frame->len);
+	}
+
+	scm_purge_scan_results(scan_list);
+	return QDF_STATUS_SUCCESS;
+
+end:
+	if (scan_list)
+		scm_purge_scan_results(scan_list);
+
+	return QDF_STATUS_E_FAILURE;
+}
 static QDF_STATUS
 lim_roam_fill_bss_descr(struct mac_context *mac,
 			struct roam_offload_synch_ind *roam_synch_ind,
@@ -2378,8 +2425,8 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	uint32_t ie_len = 0;
 	tpSirProbeRespBeacon parsed_frm_ptr = NULL;
 	tpSirMacMgmtHdr mac_hdr;
-	uint8_t *bcn_proberesp_ptr = NULL;
-	uint16_t bcn_proberesp_len = 0;
+	uint8_t *bcn_proberesp_ptr = NULL, *reassoc_req_ies = NULL;
+	uint16_t bcn_proberesp_len = 0, reassoc_req_ies_len = 0;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t *ie = NULL;
 	struct qdf_mac_addr bssid;
@@ -2387,10 +2434,23 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	uint8_t vdev_id = session->vdev_id;
 	struct element_info frame;
 	struct cm_roam_values_copy mdie_cfg = {0};
+	uint8_t *ssid_ie = NULL;
 
 	bcn_proberesp_ptr = (uint8_t *)roam_synch_ind +
 		roam_synch_ind->beacon_probe_resp_offset;
 	bcn_proberesp_len = roam_synch_ind->beacon_probe_resp_length;
+
+	reassoc_req_ies = (uint8_t *)roam_synch_ind +
+			roam_synch_ind->reassoc_req_offset +
+			sizeof(tSirMacMgmtHdr) + WLAN_REASSOC_REQ_IES_OFFSET;
+	reassoc_req_ies_len = roam_synch_ind->reassoc_req_length -
+			sizeof(tSirMacMgmtHdr) - WLAN_REASSOC_REQ_IES_OFFSET;
+
+	ssid_ie = (uint8_t *)wlan_get_ie_ptr_from_eid(WLAN_ELEMID_SSID,
+						      reassoc_req_ies,
+						      reassoc_req_ies_len);
+	if (!ssid_ie)
+		return QDF_STATUS_E_FAILURE;
 
 	frame.ptr = NULL;
 	frame.len = 0;
@@ -2398,8 +2458,8 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		mlo_get_sta_link_mac_addr(vdev_id, roam_synch_ind, &bssid);
 		is_mlo_link = wlan_vdev_mlme_get_is_mlo_link(mac->psoc, vdev_id);
 
-		status = wlan_scan_get_entry_by_mac_addr(mac->pdev, &bssid,
-							 &frame);
+		status = lim_roam_get_candidate_scan_entry(mac->pdev, &bssid,
+							   ssid_ie, &frame);
 		if (QDF_IS_STATUS_ERROR(status) || !frame.len) {
 			pe_err("Failed to get scan entry for " QDF_MAC_ADDR_FMT,
 			       QDF_MAC_ADDR_REF(bssid.bytes));

@@ -1937,8 +1937,6 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 		ucfg_policy_mgr_post_sta_p2p_start_failed(wlan_vdev_get_psoc(vdev),
 							  wlan_vdev_get_id(vdev));
 
-	mlo_roam_connect_complete(vdev);
-
 	if (op_mode == QDF_STA_MODE &&
 		(wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
 	    !wlan_vdev_mlme_is_mlo_vdev(vdev)))
