@@ -465,7 +465,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (pesession || (pesession->limMlmState == eLIM_MLM_WT_JOIN_BEACON_STATE))
+	if (pesession && (pesession->limMlmState == eLIM_MLM_WT_JOIN_BEACON_STATE))
 		lim_send_custom_join_req_event(bssid, channel, pesession->rssi);
 
 	return QDF_STATUS_SUCCESS;
