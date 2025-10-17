@@ -4669,6 +4669,52 @@ QDF_STATUS wma_pre_vdev_start_setup(uint8_t vdev_id,
 	return status;
 }
 
+/**
+ * wma_vdev_set_cck_param - set vdev CCK param
+ * @wma: wma handle
+ * @vdev_id: vdev id
+ *
+ * Return: NA
+ */
+static
+void wma_vdev_set_cck_param(tp_wma_handle wma, uint8_t vdev_id)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wma_txrx_node *intr;
+	struct wlan_mlme_psoc_ext_obj *mlme_psoc_obj = NULL;
+	enum QDF_OPMODE op_mode;
+	enum cck_mode_index cck_idx;
+	uint32_t cck_support = 0;
+
+	intr = &wma->interfaces[vdev_id];
+	if (!intr || !intr->vdev) {
+		wma_err("Invalid interface or vdev");
+		return;
+	}
+
+	psoc = wma->psoc;
+
+	mlme_psoc_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_psoc_obj) {
+		wma_err("Failed to get MLME Obj");
+		return;
+	}
+
+	op_mode = wlan_vdev_mlme_get_opmode(intr->vdev);
+
+	cck_idx = wlan_get_mode_index_from_mode(op_mode);
+	if (cck_idx >= MAX_CCK_IDX) {
+		wma_err("invalid index %d", cck_idx);
+		return;
+	}
+	cck_support = QDF_GET_BITS(
+				mlme_psoc_obj->cfg.rates.cck_rx_tx_support_mode,
+				cck_idx * NUM_CCK_BITS,
+				NUM_CCK_BITS);
+	wma_vdev_set_param(wma->wmi_handle, vdev_id, wmi_vdev_param_cck_support,
+			    cck_support);
+}
+
 QDF_STATUS wma_post_vdev_start_setup(uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -4725,6 +4771,7 @@ QDF_STATUS wma_post_vdev_start_setup(uint8_t vdev_id)
 
 	wma_vdev_set_he_bss_params(wma, vdev_id,
 				   &mlme_obj->proto.he_ops_info);
+
 #if defined(WLAN_FEATURE_11BE)
 	wma_vdev_set_eht_bss_params(wma, vdev_id,
 				    &mlme_obj->proto.eht_ops_info);
@@ -7133,6 +7180,11 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 	bool disable_twt_info_frame;
 	bool is_twt_disabled_on_scan;
 	enum QDF_OPMODE opmode;
+	tp_wma_handle wma;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma)
+		return QDF_STATUS_E_FAILURE;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -7445,6 +7497,8 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 		status = QDF_STATUS_E_FAILURE;
 		goto error;
 	}
+
+	wma_vdev_set_cck_param(wma, vdev_id);
 error:
 	return status;
 }
