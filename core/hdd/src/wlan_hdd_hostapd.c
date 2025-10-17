@@ -1427,6 +1427,7 @@ static QDF_STATUS hdd_handle_acs_scan_event(struct sap_event *sap_event,
 				     freq_list_size);
 			hdd_ctx->num_of_channels = comp_evt->num_of_channels;
 		}
+		qdf_mem_free(comp_evt->freq_list);
 	}
 	qdf_spin_unlock(&hdd_ctx->acs_skip_lock);
 
