@@ -4238,6 +4238,9 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	reg->sta_indoor_ch_peer_scc =
 		cfg_get(psoc, CFG_ENABLE_STA_INDOOR_CH_PEER_SCC);
 
+	reg->sta_dfs_ch_peer_scc =
+		cfg_get(psoc, CFG_ENABLE_STA_DFS_CH_PEER_SCC);
+
 	mlme_init_afc_cfg(psoc, reg);
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 	mlme_init_coex_unsafe_chan_cfg(psoc, reg);

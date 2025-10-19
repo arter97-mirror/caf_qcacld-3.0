@@ -575,6 +575,31 @@ enum ignore_fw_coex_info_modes {
 	0, \
 	"enable/disable sta_indoor_ch_peer_scc")
 
+/* <ini>
+ * sta_dfs_ch_peer_scc – Support STA connected DFS channel for
+ * peer to peer connections and form SCC.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to indicate feature support for STA connected DFS channel
+ * for peer-to-peer connections and form SCC.
+ *
+ * Note: Currently this ini supports just P2P connections in SCC with STA
+ * connected DFS channel. In future, if support gets enabled for NAN and SAP
+ * same ini can be used.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA + P2P
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_STA_DFS_CH_PEER_SCC CFG_INI_BOOL( \
+	"sta_dfs_ch_peer_scc", \
+	0, \
+	"enable/disable sta_dfs_ch_peer_scc")
+
 #define CFG_REG_ALL \
 	CFG_COEX_UNSAFE_CHAN_ALL \
 	CFG(CFG_SELF_GEN_FRM_PWR) \
@@ -592,6 +617,7 @@ enum ignore_fw_coex_info_modes {
 	CFG_SAP_AVOID_ACS_FREQ_LIST_ALL \
 	CFG_C2C_SUPPORT \
 	CFG(CFG_DFS_CHANNEL_SUPPORT_FOR_NAN) \
-	CFG(CFG_ENABLE_STA_INDOOR_CH_PEER_SCC)
+	CFG(CFG_ENABLE_STA_INDOOR_CH_PEER_SCC) \
+	CFG(CFG_ENABLE_STA_DFS_CH_PEER_SCC)
 
 #endif /* CFG_MLME_REG_H__ */
