@@ -4143,14 +4143,7 @@ static void sap_check_and_update_vdev_ch_params(struct sap_context *sap_ctx)
 		  orig_ch_width, sap_ctx->ch_params.ch_width);
 }
 
-/**
- * sap_fsm_send_csa_restart_req() - send csa start event
- * @mac_ctx: mac ctx
- * @sap_ctx: SAP context
- *
- * Return: QDF_STATUS
- */
-static inline QDF_STATUS
+QDF_STATUS
 sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
 			     struct sap_context *sap_ctx)
 {

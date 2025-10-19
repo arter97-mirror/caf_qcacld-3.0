@@ -1311,6 +1311,19 @@ static QDF_STATUS dfs_msg_processor(struct mac_context *mac,
 		sme_debug("sapdfs: Radar indication event occurred");
 		break;
 	}
+	case eWNI_SME_DFS_NOL_REMOVE:
+	{
+		session_id = policy_mgr_get_dfs_beaconing_session_id(mac->psoc);
+		if (!CSR_IS_SESSION_VALID(mac, session_id)) {
+			sme_err("Invalid vdev %d", session_id);
+			qdf_mem_free(roam_info);
+			return QDF_STATUS_E_FAILURE;
+		}
+		roam_status = eCSR_ROAM_DFS_NOL_REMOVE;
+		roam_result = eCSR_ROAM_RESULT_NONE;
+		sme_debug("sapdfs: nol remove occurred");
+		break;
+	}
 	case eWNI_SME_DFS_CSAIE_TX_COMPLETE_IND:
 	{
 		csa_ie_tx_complete_rsp =
@@ -2954,6 +2967,7 @@ QDF_STATUS sme_process_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 		break;
 #endif
 	case eWNI_SME_DFS_RADAR_FOUND:
+	case eWNI_SME_DFS_NOL_REMOVE:
 	case eWNI_SME_DFS_CAC_COMPLETE:
 	case eWNI_SME_DFS_CSAIE_TX_COMPLETE_IND:
 	case eWNI_SME_CSA_RESTART_RSP:

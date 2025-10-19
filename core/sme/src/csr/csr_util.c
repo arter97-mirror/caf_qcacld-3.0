@@ -72,6 +72,7 @@ const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 		CASE_RETURN_STR(eCSR_ROAM_SAE_COMPUTE);
 		CASE_RETURN_STR(eCSR_ROAM_CHANNEL_INFO_EVENT_IND);
 		CASE_RETURN_STR(eCSR_ROAM_CHANNEL_SWITCH_STARTED_IND);
+		CASE_RETURN_STR(eCSR_ROAM_DFS_NOL_REMOVE);
 	default:
 		return "unknown";
 	}

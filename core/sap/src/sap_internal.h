@@ -620,7 +620,6 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
  * Return: Optimized CAC timeout in seconds.
  */
 int dfs_set_optimized_cac_timeout(struct sap_context *sap_ctx);
-
 #else
 static inline bool
 sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
@@ -635,4 +634,14 @@ int dfs_set_optimized_cac_timeout(struct sap_context *sap_ctx)
 	return 0;
 }
 #endif
+/**
+ * sap_fsm_send_csa_restart_req() - send csa start event
+ * @mac_ctx: mac ctx
+ * @sap_ctx: SAP context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
+			     struct sap_context *sap_ctx);
 #endif
