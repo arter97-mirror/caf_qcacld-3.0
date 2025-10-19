@@ -1221,10 +1221,12 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 				break;
 			} else {
 				dfs_set_optimized_cac_timeout(sap_ctx);
+				sap_ctx->csa_reason = CSA_REASON_PUNCTURE_UPDATE_FOR_NOL;
 			}
 		} else {
 			mac_ctx->sap.SapDfsInfo.target_chan_freq =
 						sap_indicate_radar(sap_ctx);
+			sap_ctx->csa_reason = CSA_REASON_RADAR_DETECT;
 		}
 
 		sap_debug("sapdfs: Indicate eSAP_DFS_RADAR_DETECT to HDD");
@@ -1273,6 +1275,16 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 					eSAP_STOP_BSS_DUE_TO_NO_CHNL,
 					(void *) eSAP_STATUS_SUCCESS);
 			}
+		}
+		break;
+	case eCSR_ROAM_DFS_NOL_REMOVE:
+		is_csa_needed =
+			sap_is_chan_change_needed_for_radar(sap_ctx,
+							    &chan_freq);
+		if (!is_csa_needed && chan_freq) {
+			mac_ctx->sap.SapDfsInfo.target_chan_freq = chan_freq;
+			sap_ctx->csa_reason = CSA_REASON_PUNCTURE_UPDATE_FOR_NOL;
+			qdf_status = sap_fsm_send_csa_restart_req(mac_ctx, sap_ctx);
 		}
 		break;
 	case eCSR_ROAM_DFS_CHAN_SW_NOTIFY:

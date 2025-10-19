@@ -4652,3 +4652,19 @@ QDF_STATUS wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+enum sap_csa_reason_code
+wlansap_get_sap_csa_reason(struct mac_context *mac, uint8_t vdev_id)
+{
+	struct sap_context *sap_ctx;
+
+	sap_ctx = mac->sap.sapCtxList[vdev_id].sap_context;
+	if (sap_ctx) {
+		sap_debug("vdev %d CSA reason %d %s",
+			  vdev_id, sap_ctx->csa_reason,
+			  sap_get_csa_reason_str(sap_ctx->csa_reason));
+		return sap_ctx->csa_reason;
+	}
+	return CSA_REASON_UNKNOWN;
+}
+
