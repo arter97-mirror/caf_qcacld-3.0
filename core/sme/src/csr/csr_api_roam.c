@@ -4108,6 +4108,12 @@ QDF_STATUS csr_roam_prepare_bss_config(struct mac_context *mac,
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, sessionId,
 						    WLAN_LEGACY_SME_ID);
 	if (vdev) {
+		if (pProfile->negotiatedAuthType == eCSR_AUTH_TYPE_FT_SAE)
+			CSR_SET_BIT(set_val, WLAN_CRYPTO_KEY_MGMT_FT_SAE);
+		if (pProfile->negotiatedAuthType == eCSR_AUTH_TYPE_FT_RSN_PSK)
+			CSR_SET_BIT(set_val, WLAN_CRYPTO_KEY_MGMT_FT_PSK);
+		if (pProfile->negotiatedAuthType == eCSR_AUTH_TYPE_FT_RSN)
+			CSR_SET_BIT(set_val, WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X);
 		if (pProfile->negotiatedAuthType == eCSR_AUTH_TYPE_SAE)
 			CSR_SET_BIT(set_val, WLAN_CRYPTO_KEY_MGMT_SAE);
 		if (pProfile->negotiatedAuthType == eCSR_AUTH_TYPE_RSN_PSK)
