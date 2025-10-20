@@ -127,15 +127,47 @@ void dp_event_eapol_log(qdf_nbuf_t nbuf, enum qdf_proto_dir dir)
 }
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 
+#ifdef CONFIG_BORON
+static inline
+void dp_get_bss_peer_on_active_tdls(void *soc, uint8_t *peer_mac,
+				    struct wlan_dp_link *dp_link,
+				    struct cdp_peer_output_param *peer_info)
+{
+	struct qdf_mac_addr mac_addr_tx_allowed = QDF_MAC_ADDR_ZERO_INIT;
+
+	if (qdf_unlikely(peer_info->state == OL_TXRX_PEER_STATE_INVALID)) {
+		/* Peer corresponding to dest_mac_addr is not found */
+		if (qdf_likely(dp_link->dp_intf->tdls_link_up)) {
+			/* Get BSS peer mac address */
+			qdf_copy_macaddr(&mac_addr_tx_allowed,
+					 &dp_link->conn_info.bssid);
+
+			cdp_peer_get_info_by_peer_addr(soc,
+						mac_addr_tx_allowed.bytes,
+						dp_link->link_id, peer_info);
+		}
+	}
+}
+#else /* CONFIG_BORON */
+static inline
+void dp_get_bss_peer_on_active_tdls(void *soc, uint8_t *peer_mac,
+				    struct wlan_dp_link *dp_link,
+				    struct cdp_peer_output_param *peer_info)
+{
+}
+#endif /* !CONFIG_BORON */
+
 static int dp_intf_is_tx_allowed(qdf_nbuf_t nbuf,
-				 uint8_t link_id, void *soc,
+				 struct wlan_dp_link *dp_link, void *soc,
 				 uint8_t *peer_mac,
 				 struct cdp_peer_output_param *peer_info)
 {
 	enum ol_txrx_peer_state peer_state;
 
-	cdp_peer_get_info_by_peer_addr(soc, peer_mac, link_id,
+	cdp_peer_get_info_by_peer_addr(soc, peer_mac, dp_link->link_id,
 				       peer_info);
+	dp_get_bss_peer_on_active_tdls(soc, peer_mac, dp_link, peer_info);
+
 	dp_set_peer_txpt_idx(nbuf, peer_info);
 
 	peer_state = peer_info->state;
@@ -420,6 +452,41 @@ dp_tx_rx_collect_connectivity_stats_info(qdf_nbuf_t nbuf, void *context,
 	}
 }
 
+#ifdef CONFIG_BORON
+/**
+ * dp_get_tdls_mac_addr_if_active() - Get the mac address to validate the xmit
+ * @dp_link: DP link handle
+ * @nbuf: The network buffer
+ * @mac_addr_tx_allowed: Destination peer mac address
+ *
+ * Return: None
+ */
+static
+void dp_get_tdls_mac_addr_if_active(struct wlan_dp_link *dp_link,
+				    qdf_nbuf_t nbuf,
+				    struct qdf_mac_addr *mac_addr_tx_allowed)
+{
+	if (qdf_likely(wlan_cm_is_vdev_active(dp_link->vdev))) {
+		if (qdf_unlikely(dp_link->dp_intf->tdls_link_up))
+			/* Destination address peer mac_addr */
+			qdf_copy_macaddr(mac_addr_tx_allowed,
+				(struct qdf_mac_addr *)qdf_nbuf_data(nbuf));
+		else
+			qdf_copy_macaddr(mac_addr_tx_allowed,
+					 &dp_link->conn_info.bssid);
+	}
+}
+#else /* CONFIG_BORON */
+static
+void dp_get_tdls_mac_addr_if_active(struct wlan_dp_link *dp_link,
+				    qdf_nbuf_t nbuf,
+				    struct qdf_mac_addr *mac_addr_tx_allowed)
+{
+	if (wlan_cm_is_vdev_active(dp_link->vdev))
+		qdf_copy_macaddr(mac_addr_tx_allowed,
+				 &dp_link->conn_info.bssid);
+}
+#endif /* !CONFIG_BORON */
 /**
  * dp_get_transmit_mac_addr() - Get the mac address to validate the xmit
  * @dp_link: DP link handle
@@ -467,6 +534,9 @@ void dp_get_transmit_mac_addr(struct wlan_dp_link *dp_link,
 		}
 		break;
 	case QDF_STA_MODE:
+		dp_get_tdls_mac_addr_if_active(dp_link, nbuf,
+					       mac_addr_tx_allowed);
+		break;
 	case QDF_P2P_CLIENT_MODE:
 		if (wlan_cm_is_vdev_active(dp_link->vdev))
 			qdf_copy_macaddr(mac_addr_tx_allowed,
@@ -705,7 +775,7 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf)
 			     sizeof(qdf_nbuf_data(nbuf)),
 			     QDF_TX));
 
-	if (!dp_intf_is_tx_allowed(nbuf, dp_link->link_id, soc,
+	if (!dp_intf_is_tx_allowed(nbuf, dp_link, soc,
 				   mac_addr_tx_allowed.bytes,
 				   &peer_info)) {
 		dp_info("Tx not allowed for sta:" QDF_MAC_ADDR_FMT,

@@ -442,6 +442,17 @@ void ucfg_dp_register_rx_mic_error_ind_handler(void *soc);
  */
 QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * ucfg_dp_txrx_set_vdev_param() - Cache number active tdls link
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev_id of vdev object
+ * @is_link_up: true for tdls link setup and false for teardown
+ *
+ * Return: None
+ */
+void ucfg_dp_txrx_set_vdev_param(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+				 int is_link_up);
+
 #ifdef FEATURE_WLAN_TDLS
 /**
  * ucfg_dp_tdlsta_register_txrx_ops() - Register ops for TX/RX operations

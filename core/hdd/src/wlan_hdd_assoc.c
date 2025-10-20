@@ -2502,6 +2502,7 @@ QDF_STATUS hdd_update_dp_vdev_flags(void *cbk_data,
 		return status;
 	}
 
+	ucfg_dp_txrx_set_vdev_param(*psoc, vdev_id, is_link_up);
 	val.cdp_vdev_param_tdls_flags = is_link_up;
 	cdp_txrx_set_vdev_param(soc, vdev_id, vdev_param, val);
 

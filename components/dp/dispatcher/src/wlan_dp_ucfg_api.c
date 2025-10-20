@@ -3179,6 +3179,34 @@ ucfg_dp_get_per_link_peer_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
 						num_link);
 }
 
+void
+ucfg_dp_txrx_set_vdev_param(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    int is_link_up)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_dp_intf *dp_intf;
+	struct wlan_dp_link *dp_link;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_DP_ID);
+	if (vdev) {
+		dp_link = dp_get_vdev_priv_obj(vdev);
+
+		if (!dp_link) {
+			dp_err("Unable to get DP link");
+			goto end;
+		}
+
+		dp_intf = dp_link->dp_intf;
+
+		if (is_link_up)
+			dp_intf->tdls_link_up++;
+		else
+			dp_intf->tdls_link_up--;
+end:
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_DP_ID);
+	}
+}
+
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 bool ucfg_dp_is_local_pkt_capture_enabled(struct wlan_objmgr_psoc *psoc)
 {

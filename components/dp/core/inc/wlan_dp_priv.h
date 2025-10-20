@@ -713,6 +713,7 @@ struct dp_rx_fst {
  * @opm_stats_work: OPM stats work
  * @ipv4_addr: IPv4 address
  * @haps_ctx: HAPS context
+ * @tdls_link_up: Is tdls link up
  */
 struct wlan_dp_intf {
 	struct wlan_dp_psoc_context *dp_ctx;
@@ -806,6 +807,7 @@ struct wlan_dp_intf {
 #ifdef WLAN_HAPS_ENABLE
 	struct dp_haps haps_ctx;
 #endif
+	int tdls_link_up;
 };
 
 #define WLAN_DP_LINK_MAGIC 0x5F44505F4C494E4B	/* "_DP_LINK" in ASCII */
