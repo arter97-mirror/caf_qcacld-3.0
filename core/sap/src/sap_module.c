@@ -2085,6 +2085,14 @@ wlansap_fill_channel_change_request(struct sap_context *sap_ctx,
 	mlme_set_cac_required(sap_ctx->vdev,
 			      !!req->cac_duration_ms);
 
+	/* Use remaining CAC time if available for punctured radar scenarios */
+	if (req->cac_duration_ms && sap_ctx->dfs_cac_remaining_time > 0) {
+		req->cac_duration_ms = sap_ctx->dfs_cac_remaining_time;
+		sap_debug("Using remaining CAC time: %d ms", req->cac_duration_ms);
+		/* Reset after use */
+		sap_ctx->dfs_cac_remaining_time = 0;
+	}
+
 	/* Update the rates in sap_bss_cfg for subsequent channel switch */
 	if (dot11_cfg.opr_rates.numRates) {
 		qdf_mem_copy(req->opr_rates.rate,

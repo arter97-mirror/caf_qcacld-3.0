@@ -278,6 +278,32 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 
 	return true;
 }
+
+int dfs_set_optimized_cac_timeout(struct sap_context *sap_ctx)
+{
+	/* Calculate remaining CAC time for punctured radar scenarios */
+	if (sap_ctx->dfs_cac_start_time > 0) {
+		uint64_t current_time =
+			qdf_system_ticks_to_msecs(qdf_system_ticks());
+		uint64_t elapsed_time =
+			(current_time - sap_ctx->dfs_cac_start_time) / 1000;
+		uint32_t original_cac_duration =
+			sap_ctx->sap_bss_cfg.cac_duration_ms / 1000;
+
+		if (original_cac_duration > elapsed_time) {
+			sap_ctx->dfs_cac_remaining_time =
+				(original_cac_duration - elapsed_time) * 1000;
+			sap_debug("Remaining CAC time: %d ms (elapsed: %llu s, original: %d s)",
+				  sap_ctx->dfs_cac_remaining_time, elapsed_time,
+				  original_cac_duration);
+		} else {
+			sap_ctx->dfs_cac_remaining_time = 0;
+		}
+	}
+
+	return sap_ctx->dfs_cac_remaining_time;
+}
+
 #endif
 
 #ifdef DFS_COMPONENT_ENABLE
@@ -3721,6 +3747,8 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 
 	mlme_set_cac_required(sap_ctx->vdev,
 			      !!sap_ctx->sap_bss_cfg.cac_duration_ms);
+	if (sap_ctx->sap_bss_cfg.cac_duration_ms)
+		sap_ctx->dfs_cac_start_time = qdf_system_ticks_to_msecs(qdf_system_ticks());
 
 	sap_ctx->sap_bss_cfg.oper_ch_freq = sap_ctx->chan_freq;
 	sap_ctx->sap_bss_cfg.vht_channel_width = sap_ctx->ch_params.ch_width;
@@ -3902,6 +3930,7 @@ static QDF_STATUS sap_fsm_handle_radar_during_cac(struct sap_context *sap_ctx,
 		    t_sap_ctx && t_sap_ctx->fsm_state != SAP_INIT) {
 			if (!sap_operating_on_dfs(mac_ctx, t_sap_ctx))
 				continue;
+
 			t_sap_ctx->is_chan_change_inprogress = true;
 			/*
 			 * eSAP_DFS_CHANNEL_CAC_RADAR_FOUND:
