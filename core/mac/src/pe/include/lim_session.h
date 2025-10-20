@@ -433,16 +433,6 @@ struct punc_chan_info {
 	bool present;
 };
 
-#define WFA_CAPABILITIES_IE_LENGTH		0x0B
-#define WFA_CAPABILITIES_OUI			"\x50\x6F\x9A"
-#define WFA_CAPABILITIES_OUI_LENGTH		0x03
-#define WFA_CAPABILITIES_OUI_TYPE		0x23
-#define WFA_CAPABILITIES_LENGTH			0x00
-#define WIFI_GENERATION_CAPABILITY_ATTR_ID	0x01
-#define WIFI_GENERATION_CAPABILITY_ATTR_LENGTH	0x04
-#define WIFI_SUPPORTED_GENERATIONS_LENGTH	0x01
-#define WIFI_CERTIFIED_GENERATIONS_LENGTH	0x01
-
 /**
  * struct pe_session - per-vdev PE context
  * @available: true if the entry is available, false if it is in use
