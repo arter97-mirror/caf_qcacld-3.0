@@ -3456,6 +3456,7 @@ static void csr_send_custom_ap_info_event(struct mac_context *mac_ctx,
 	struct ap_info_event *event = NULL;
 	struct mon_report_status *mon_report= NULL;
 	uint8_t *buf = NULL;
+	int8_t rssi = 0;
 
 	if (!session || !session->pCurRoamProfile || !roam_info) {
 		return;
@@ -3485,7 +3486,9 @@ static void csr_send_custom_ap_info_event(struct mac_context *mac_ctx,
 	sme_get_rssi_snr_by_bssid(MAC_HANDLE(mac_ctx),
 				  session->pCurRoamProfile,
 				  &event->bssid[0],
-				  &event->rssi, NULL);
+				  &rssi, NULL);
+
+	event->abs_rssi = (uint8_t)abs((int)rssi);
 	event->channel = conn_profile->operationChannel;
 
 	send_custom_packet_select(buf);

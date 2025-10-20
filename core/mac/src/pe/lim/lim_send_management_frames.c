@@ -164,7 +164,7 @@ static void lim_send_custom_join_req_event(tSirMacAddr bssid, uint8_t channel, i
 
 	qdf_mem_copy(event->bssid, bssid, QDF_MAC_ADDR_SIZE);
 	event->channel = channel;
-	event->rssi = rssi;
+	event->abs_rssi = (uint8_t)abs((int)rssi);
 
 	send_custom_packet_select(buf);
 	qdf_mem_free(buf);
