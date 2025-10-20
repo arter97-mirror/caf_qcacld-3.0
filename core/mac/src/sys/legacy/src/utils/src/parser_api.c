@@ -12000,8 +12000,9 @@ release_ref:
 				WLAN_EXTN_ELEMID_EHTOP;
 		}
 		if ((link_ie->link_eht_cap.present && frm->eht_cap.present &&
+		    ((session->ch_width != link_session->ch_width) ||
 		     qdf_mem_cmp(&link_ie->link_eht_cap, &frm->eht_cap,
-				 sizeof(frm->eht_cap))) ||
+				 sizeof(frm->eht_cap)))) ||
 		    (link_ie->link_eht_cap.present && !frm->eht_cap.present)) {
 			sta_len_consumed = 0;
 			dot11f_pack_ie_eht_cap(
