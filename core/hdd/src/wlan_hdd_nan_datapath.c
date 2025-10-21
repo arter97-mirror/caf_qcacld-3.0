@@ -1038,7 +1038,6 @@ hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 			return;
 		}
 
-		os_if_nan_set_ndp_create_transaction_id(vdev, 0);
 		os_if_nan_set_ndi_state(vdev, NAN_DATA_NDI_CREATED_STATE);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
 
