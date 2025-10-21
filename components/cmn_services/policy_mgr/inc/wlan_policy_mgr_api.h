@@ -6628,4 +6628,40 @@ QDF_STATUS
 policy_mgr_modify_pcl_sta_p2p_indoor_scc(struct wlan_objmgr_psoc *psoc,
 					 struct weighed_pcl *pcl,
 					 uint32_t *num_pcl);
+
+/**
+ * policy_mgr_set_move_sap_go_1st_on_dfs_sta_csa() - Set value for
+ * move_sap_go_1st_on_dfs_sta_csa.
+ *
+ * @psoc: pointer to psoc
+ * @value: value to be set.
+ */
+QDF_STATUS
+policy_mgr_set_move_sap_go_1st_on_dfs_sta_csa(struct wlan_objmgr_psoc *psoc,
+					      bool value);
+
+/**
+ * policy_mgr_get_cfg_sta_dfs_ch_peer_scc() - To query the current
+ * cfg_sta_dfs_ch_peer_scc value.
+ *
+ * @psoc: psoc pointer
+ * @cfg_sta_dfs_ch_peer_scc: value to be filled
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_get_cfg_sta_dfs_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
+				       bool *cfg_sta_dfs_ch_peer_scc);
+
+/**
+ * policy_mgr_set_cfg_sta_dfs_ch_peer_scc() - Set STA and P2P SCC on DFS channel
+ * value
+ * @psoc: psoc pointer
+ * @cfg_sta_dfs_ch_peer_scc: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_set_cfg_sta_dfs_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
+				       bool cfg_sta_dfs_ch_peer_scc);
 #endif /* __WLAN_POLICY_MGR_API_H */

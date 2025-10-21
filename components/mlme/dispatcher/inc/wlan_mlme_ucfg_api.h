@@ -5947,8 +5947,28 @@ ucfg_mlme_update_mcc_cck_support(struct wlan_objmgr_psoc *psoc)
  * Return: QDF_STATUS
  */
 static inline QDF_STATUS
-ucfg_mlme_get_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc, bool *value)
+ucfg_mlme_get_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
+				     bool *value)
 {
 	return wlan_mlme_get_sta_indoor_ch_peer_scc(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_sta_dfs_ch_peer_scc() - Query STA connected DFS channel
+ * support for P2P connection SCC feature support value.
+ *
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled for the caller
+ *
+ * Query if STA connected DFS channel support for peer to peer connection
+ * SCC feature support value.
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_sta_dfs_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
+				  bool *value)
+{
+	return wlan_mlme_get_sta_dfs_ch_peer_scc(psoc, value);
 }
 #endif /* _WLAN_MLME_UCFG_API_H_ */

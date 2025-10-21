@@ -15512,3 +15512,77 @@ policy_mgr_set_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+policy_mgr_set_move_sap_go_1st_on_dfs_sta_csa(struct wlan_objmgr_psoc *psoc,
+					      bool value)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pm_ctx->cfg.move_sap_go_1st_on_dfs_sta_csa = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+policy_mgr_get_cfg_sta_dfs_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
+				       bool *cfg_sta_dfs_ch_peer_scc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*cfg_sta_dfs_ch_peer_scc = pm_ctx->cfg.cfg_sta_dfs_ch_peer_scc;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+policy_mgr_set_cfg_sta_dfs_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
+				       bool cfg_sta_dfs_ch_peer_scc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint8_t num_connections = 0;
+	uint8_t sap_cnt = 0;
+	bool move_sap_go_1st_on_dfs_sta_csa = false;
+
+	num_connections = policy_mgr_get_connection_count(psoc);
+
+	sap_cnt = policy_mgr_mode_specific_connection_count(psoc,
+							    PM_SAP_MODE, NULL);
+
+	/* Accept command only if there is a standalone SAP or no
+	 * connection is present.
+	 */
+
+	if (num_connections - sap_cnt)
+		return QDF_STATUS_E_FAILURE;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pm_ctx->cfg.cfg_sta_dfs_ch_peer_scc = cfg_sta_dfs_ch_peer_scc;
+	if (cfg_sta_dfs_ch_peer_scc) {
+		move_sap_go_1st_on_dfs_sta_csa = true;
+		policy_mgr_set_move_sap_go_1st_on_dfs_sta_csa(psoc,
+							      move_sap_go_1st_on_dfs_sta_csa);
+	} else {
+		policy_mgr_set_move_sap_go_1st_on_dfs_sta_csa(psoc,
+							      move_sap_go_1st_on_dfs_sta_csa);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}

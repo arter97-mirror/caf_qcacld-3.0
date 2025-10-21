@@ -5961,4 +5961,15 @@ QDF_STATUS wlan_mlme_update_mcc_cck_support(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS wlan_mlme_get_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
 						bool *value);
+
+/**
+ * wlan_mlme_get_sta_dfs_ch_peer_scc() - Query STA connected DFS channel
+ * peer to peer connection SCC feature support value.
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_get_sta_dfs_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
+					     bool *value);
 #endif /* _WLAN_MLME_API_H_ */
