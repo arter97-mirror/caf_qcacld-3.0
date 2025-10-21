@@ -771,6 +771,47 @@ is_sap_cac_required_for_chan(struct sap_context *sap_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_DNW
+static QDF_STATUS
+sap_dnw_request_handler(void *ctx, enum phy_ch_width ori_ch_width,
+			enum phy_ch_width dg_ch_width,
+			enum wlan_dnw_request dnw_request)
+{
+	uint8_t vdev_id;
+	struct sap_context *sap_ctx = ctx;
+	enum policy_mgr_conn_update_reason reason;
+
+	if (!sap_ctx || !sap_ctx->vdev) {
+		sap_err("NULL vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_id = wlan_vdev_get_id(sap_ctx->vdev);
+	sap_debug("dnw request vdev %d bw ori %d down %d, request %d",
+		  vdev_id, ori_ch_width, dg_ch_width, dnw_request);
+
+	if (dnw_request == DNW_REQ_UPGRADE_BW) {
+		sap_ctx->isCacEndNotified = true;
+		sap_ctx->sap_radar_found_status = false;
+		reason = POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP;
+		sme_sap_update_ch_width(wlan_vdev_get_psoc(sap_ctx->vdev),
+					vdev_id, ori_ch_width, reason, 0, 0);
+	} else if (dnw_request == DNW_REQ_DOWNGRADE_BW) {
+		sap_dnw_downgrade_channel_width(sap_ctx, dg_ch_width);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+sap_dnw_request_handler(void *ctx, enum phy_ch_width ori_ch_width,
+			enum phy_ch_width dg_ch_width,
+			enum wlan_dnw_request dnw_request)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 void sap_get_cac_dur_dfs_region(struct sap_context *sap_ctx,
 				uint32_t *cac_duration_ms,
 				uint32_t *dfs_region,
@@ -782,6 +823,7 @@ void sap_get_cac_dur_dfs_region(struct sap_context *sap_ctx,
 	uint8_t num_freq;
 	struct mac_context *mac;
 	bool cac_required;
+	QDF_STATUS qdf_status;
 
 	*cac_duration_ms = 0;
 	if (!sap_ctx) {
@@ -807,14 +849,14 @@ void sap_get_cac_dur_dfs_region(struct sap_context *sap_ctx,
 
 	if (*dfs_region != DFS_ETSI_REGION) {
 		sap_debug("sapdfs: default cac duration");
-		return;
+		goto dnw_check;
 	}
 
 	if (sap_is_channel_bonding_etsi_weather_channel(sap_ctx, chan_freq,
 							ch_params)) {
 		*cac_duration_ms = ETSI_WEATHER_CH_CAC_TIMEOUT;
 		sap_debug("sapdfs: bonding_etsi_weather_channel");
-		return;
+		goto dnw_check;
 	}
 
 	qdf_mem_zero(freq_list, sizeof(freq_list));
@@ -824,10 +866,22 @@ void sap_get_cac_dur_dfs_region(struct sap_context *sap_ctx,
 			*cac_duration_ms = ETSI_WEATHER_CH_CAC_TIMEOUT;
 			sap_debug("sapdfs: ch freq=%d is etsi weather channel",
 				  freq_list[i]);
-			return;
+			goto dnw_check;
 		}
 	}
 
+dnw_check:
+	/* Verify if DFS No Wait is applicable */
+	qdf_status = wlan_dnw_set_info(mac->pdev, sap_ctx->vdev_id,
+				       chan_freq,
+				       ch_params->ch_width,
+				       *cac_duration_ms,
+				       mac->sap.SapDfsInfo.ignore_cac,
+				       sap_dnw_request_handler, sap_ctx);
+	if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		*cac_duration_ms = 0;
+		sap_debug("Force set cac duration to 0 since DFS No Wait");
+	}
 }
 
 void sap_dfs_set_current_channel(void *ctx)
@@ -3670,47 +3724,6 @@ wlansap_is_power_change_required(struct mac_context *mac_ctx,
 	return state & CHANNEL_STATE_ENABLE;
 }
 
-#ifdef WLAN_FEATURE_DNW
-static QDF_STATUS
-sap_dnw_request_handler(void *ctx, enum phy_ch_width ori_ch_width,
-			enum phy_ch_width dg_ch_width,
-			enum wlan_dnw_request dnw_request)
-{
-	uint8_t vdev_id;
-	struct sap_context *sap_ctx = ctx;
-	enum policy_mgr_conn_update_reason reason;
-
-	if (!sap_ctx || !sap_ctx->vdev) {
-		sap_err("NULL vdev");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	vdev_id = wlan_vdev_get_id(sap_ctx->vdev);
-	sap_debug("dnw request vdev %d bw ori %d down %d, request %d",
-		  vdev_id, ori_ch_width, dg_ch_width, dnw_request);
-
-	if (dnw_request == DNW_REQ_UPGRADE_BW) {
-		sap_ctx->isCacEndNotified = true;
-		sap_ctx->sap_radar_found_status = false;
-		reason = POLICY_MGR_UPDATE_REASON_CHANNEL_SWITCH_SAP;
-		sme_sap_update_ch_width(wlan_vdev_get_psoc(sap_ctx->vdev),
-					vdev_id, ori_ch_width, reason, 0, 0);
-	} else if (dnw_request == DNW_REQ_DOWNGRADE_BW) {
-		sap_dnw_downgrade_channel_width(sap_ctx, dg_ch_width);
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-#else
-static QDF_STATUS
-sap_dnw_request_handler(void *ctx, enum phy_ch_width ori_ch_width,
-			enum phy_ch_width dg_ch_width,
-			enum wlan_dnw_request dnw_request)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 /**
  * sap_goto_starting() - Trigger softap start
  * @sap_ctx: SAP context
@@ -3790,18 +3803,6 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 				   &sap_ctx->sap_bss_cfg.dfs_regdomain,
 				   sap_ctx->chan_freq,
 				   &sap_ctx->ch_params);
-
-	/* Verify if DFS No Wait is applicable */
-	qdf_status = wlan_dnw_set_info(mac_ctx->pdev, sap_ctx->vdev_id,
-				       sap_ctx->chan_freq,
-				       sap_ctx->ch_params.ch_width,
-				       sap_ctx->sap_bss_cfg.cac_duration_ms,
-				       mac_ctx->sap.SapDfsInfo.ignore_cac,
-				       sap_dnw_request_handler, sap_ctx);
-	if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		sap_ctx->sap_bss_cfg.cac_duration_ms = 0;
-		sap_debug("Start SAP with DFS No Wait");
-	}
 
 	mlme_set_cac_required(sap_ctx->vdev,
 			      !!sap_ctx->sap_bss_cfg.cac_duration_ms);

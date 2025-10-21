@@ -79,6 +79,7 @@
 #include <wlan_mlo_mgr_peer.h>
 #endif
 #include <wlan_ll_sap_api.h>
+#include <wlan_dnw_api.h>
 
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(struct mac_context *, uint32_t *);
@@ -11132,6 +11133,11 @@ static void lim_process_sme_dfs_csa_ie_request(struct mac_context *mac_ctx,
 	/* Remove the existing puncturing if any */
 	if (LIM_IS_AP_ROLE(session_entry))
 		lim_remove_puncture(mac_ctx, session_entry);
+
+	/* Downdgrade bandwidth for DFS No Wait enabled case */
+	if (wlan_is_dnw_in_progress(mac_ctx->pdev, session_id) &&
+	    (dfs_csa_ie_req->ch_params.ch_width == CH_WIDTH_160MHZ))
+		dfs_csa_ie_req->ch_params.ch_width = CH_WIDTH_80MHZ;
 
 	punct_bitmap =
 		wlan_reg_get_input_punc_bitmap(&dfs_csa_ie_req->ch_params);

@@ -57,7 +57,7 @@
 #include <wlan_hdd_hostapd.h>
 #include "wlan_if_mgr_ucfg_api.h"
 #include "wlan_ll_sap_api.h"
-
+#include <wlan_dnw_api.h>
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -588,6 +588,7 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 			cac_state = eSAP_DFS_SKIP_CAC;
 		if ((false == mac_ctx->sap.SapDfsInfo.ignore_cac) &&
 		    (cac_state == eSAP_DFS_DO_NOT_SKIP_CAC) &&
+		    !wlan_is_dnw_in_progress(mac_ctx->pdev, sap_ctx->vdev_id) &&
 		    policy_mgr_get_dfs_master_dynamic_enabled(
 					mac_ctx->psoc,
 					sap_ctx->sessionId)) {
