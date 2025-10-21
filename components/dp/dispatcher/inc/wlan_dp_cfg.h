@@ -1286,6 +1286,43 @@
 #define CFG_DP_FISA
 #endif
 
+#ifdef WLAN_HAPS_ENABLE
+#define WLAN_CFG_HAPS_CONFIG         (0)
+#define WLAN_CFG_HAPS_CONFIG_MIN     (0)
+#define WLAN_CFG_HAPS_CONFIG_MAX     (0xFFFFFFFF)
+
+/*
+ * <ini>
+ * dp_haps_config - Power save configuration for HAPS
+ *
+ * @min: 0x0
+ * @max: 0xffffffff
+ * @default: 0x0
+ *
+ * |31                         2|        1          |     0      |
+ * +----------------------------+-------------------+------------+
+ * |           RSVD             |       sync        |    E/D     |
+ * +----------------------------+-------------------+------------+
+ *
+ * bit 0    : Enable/Disable haps feature
+ * bit 1    : Sync and update qtime cnss timestamp
+ * bit 2-31 : Reserved for future usage
+ *
+ * </ini>
+ */
+#define CFG_HAPS_CONFIG \
+	CFG_INI_UINT("dp_haps_config", \
+		     WLAN_CFG_HAPS_CONFIG_MIN, \
+		     WLAN_CFG_HAPS_CONFIG_MAX, \
+		     WLAN_CFG_HAPS_CONFIG, \
+		     CFG_VALUE_OR_DEFAULT, \
+		     "HAPS flags for power save")
+
+#define CFG_DP_HAPS CFG(CFG_HAPS_CONFIG)
+#else
+#define CFG_DP_HAPS
+#endif
+
 /*TODO Flow control part to be moved to DP later*/
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
@@ -1359,6 +1396,7 @@
 	CFG_DP_ENABLE_NUD_TRACKING_ALL \
 	CFG_DP_CONFIG_DP_TRACE_ALL \
 	CFG_DP_HL_BUNDLE \
-	CFG_DP_FISA
+	CFG_DP_FISA \
+	CFG_DP_HAPS
 
 #endif /* WLAN_DP_CFG_H__ */

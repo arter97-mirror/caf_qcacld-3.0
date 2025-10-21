@@ -1816,6 +1816,12 @@ config WLAN_SUPPORT_LAPB
 	bool "enable CONFIG_WLAN_SUPPORT_LAPB"
 	default n
 
+config WLAN_HAPS_ENABLE
+	bool "Enable CONFIG_WLAN_HAPS_ENABLE"
+	default n
+	help
+	This option enables the Host Aware Power Save feature.
+
 config WLAN_CTRL_NAME
 	string "Enable CONFIG_WLAN_CTRL_NAME"
 	default \"wlan\"
