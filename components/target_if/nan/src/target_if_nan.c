@@ -1116,7 +1116,10 @@ static QDF_STATUS target_if_nan_disable_req(struct nan_disable_req *nan_req)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	return wmi_unified_nan_disable_req_cmd(wmi_handle, nan_req);
+	if (ucfg_nan_is_fw_support_standard_mode(psoc))
+		return wmi_unified_nan_stop_req_cmd(wmi_handle, nan_req);
+	else
+		return wmi_unified_nan_disable_req_cmd(wmi_handle, nan_req);
 }
 
 static QDF_STATUS target_if_nan_discovery_req(void *req, uint32_t req_type)

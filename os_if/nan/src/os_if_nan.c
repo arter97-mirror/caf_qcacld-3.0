@@ -3205,6 +3205,40 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_pdev *pdev,
 	return qdf_status_to_os_return(status);
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+int os_if_nan_stop(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	struct nan_disable_req *nan_req;
+	struct wlan_objmgr_pdev *pdev;
+	QDF_STATUS status;
+
+	nan_req = qdf_mem_malloc(sizeof(*nan_req));
+	if (!nan_req)
+		return -ENOMEM;
+
+	nan_req->psoc = psoc;
+	nan_req->vdev_id = vdev_id;
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_NAN_ID);
+	if (!pdev) {
+		qdf_mem_free(nan_req);
+		return -EINVAL;
+	}
+
+	status = ucfg_nan_discovery_req(nan_req, NAN_DISABLE_REQ);
+
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		osif_debug("Successfully sent NAN Disable request");
+		os_if_cstats_log_disable_nan_disc_evt(pdev, vdev_id);
+	} else {
+		osif_err("Unable to send NAN Disable request");
+	}
+
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
+	qdf_mem_free(nan_req);
+	return qdf_status_to_os_return(status);
+}
+#endif
+
 int os_if_process_nan_req(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			  const void *data, int data_len)
 {

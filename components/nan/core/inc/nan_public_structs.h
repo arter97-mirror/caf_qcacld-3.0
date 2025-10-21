@@ -747,11 +747,15 @@ struct nan_generic_req {
  * @disable_2g_discovery: Flag for disabling Discovery in 2G band
  * @disable_5g_discovery: Flag for disabling Discovery in 5G band
  * @params: NAN request structure containing message for the target
+ * @vdev_id: virtual device id
  */
 struct nan_disable_req {
 	struct wlan_objmgr_psoc *psoc;
 	bool disable_2g_discovery;
 	bool disable_5g_discovery;
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+	uint8_t vdev_id;
+#endif
 	/* Variable length, do not add anything after this */
 	struct nan_msg_params params;
 };

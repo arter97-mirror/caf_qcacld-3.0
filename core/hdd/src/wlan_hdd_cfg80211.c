@@ -37496,10 +37496,88 @@ wlan_hdd_cfg80211_start_nan(struct wiphy *wiphy, struct wireless_dev *wdev,
 	return -EOPNOTSUPP;
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * __wlan_hdd_cfg80211_stop_nan() - Stop NAN discovery (internal implementation)
+ * @wiphy: Pointer to wireless phy structure
+ * @wdev: Pointer to wireless device structure
+ *
+ * This is the internal implementation function that stops NAN discovery.
+ * It performs validation checks and calls the lower layer os_if_nan_stop()
+ * function to stop NAN on the specified vdev.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int __wlan_hdd_cfg80211_stop_nan(struct wiphy *wiphy,
+					struct wireless_dev *wdev)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev = hdd_wdev_get_netdev(wdev);
+	struct hdd_adapter *adapter;
+
+	if (!dev) {
+		hdd_err("Failed to get netdev from wdev");
+		return -EINVAL;
+	}
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (!adapter) {
+		hdd_err("Failed to get adapter from netdev");
+		return -EINVAL;
+	}
+
+	hdd_enter_dev(dev);
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return -EINVAL;
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam())
+		return -EPERM;
+
+	if (!wlan_hdd_nan_is_supported(hdd_ctx))
+		return -EPERM;
+
+	if (hdd_is_connection_in_progress(NULL, NULL))
+		return -EAGAIN;
+
+	return os_if_nan_stop(hdd_ctx->psoc, adapter->deflink->vdev_id);
+}
+
+/**
+ * wlan_hdd_cfg80211_stop_nan() - Stop NAN discovery (cfg80211 callback)
+ * @wiphy: Pointer to wireless phy structure
+ * @wdev: Pointer to wireless device structure
+ *
+ * This is the cfg80211 callback function for stopping NAN discovery.
+ * It provides synchronization protection using osif_vdev_sync operations
+ * and calls the internal __wlan_hdd_cfg80211_stop_nan() function to
+ * perform the actual stop operation.
+ *
+ * Return: None
+ */
+static void
+wlan_hdd_cfg80211_stop_nan(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+	struct net_device *dev = hdd_wdev_get_netdev(wdev);
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return;
+
+	errno = __wlan_hdd_cfg80211_stop_nan(wiphy, wdev);
+	if (errno)
+		hdd_err("stop_nan failed with errno: %d", errno);
+	osif_vdev_sync_op_stop(vdev_sync);
+}
+
+#else
 static void
 wlan_hdd_cfg80211_stop_nan(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
 }
+#endif
 
 static int wlan_hdd_cfg80211_add_nan_func(struct wiphy *wiphy,
 					  struct wireless_dev *wdev,
