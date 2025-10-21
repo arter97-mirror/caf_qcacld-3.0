@@ -86,6 +86,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_fw_offload_main.h"
 #include "target_if_fwol.h"
+#include "wlan_dp_ucfg_api.h"
 
 struct wma_search_rate {
 	int32_t rate;
@@ -2545,6 +2546,12 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		cdp_hl_tdls_flag_reset(soc,
 			vdev_id, tdls_flag);
 
+		if (ucfg_dp_update_bss_peer_info_for_tdls_ctrl(wma_handle->psoc,
+							       vdev_id, skb)) {
+			wma_err("peer_info_get error");
+			goto tx_error;
+		}
+
 		ret = cdp_tx_non_std(soc,
 			vdev_id,
 			OL_TX_SPEC_NO_FREE, skb);
@@ -2554,14 +2561,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 
 		if (ret) {
 			wma_err("TxRx Rejected. Fail to do Tx");
-			/* Call Download Cb so that umac can free the buffer */
-			if (tx_frm_download_comp_cb)
-				tx_frm_download_comp_cb(wma_handle->mac_context,
-						tx_frame,
-						WMA_TX_FRAME_BUFFER_FREE);
-			wma_handle->umac_data_ota_ack_cb = NULL;
-			wma_handle->last_umac_data_nbuf = NULL;
-			return QDF_STATUS_E_FAILURE;
+			goto tx_error;
 		}
 
 		/* Call Download Callback if passed */
@@ -2571,6 +2571,15 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 						WMA_TX_FRAME_BUFFER_NO_FREE);
 
 		return QDF_STATUS_SUCCESS;
+tx_error:
+		/* Call Download Cb so that umac can free the buffer */
+		if (tx_frm_download_comp_cb)
+			tx_frm_download_comp_cb(wma_handle->mac_context,
+						tx_frame,
+						WMA_TX_FRAME_BUFFER_FREE);
+		wma_handle->umac_data_ota_ack_cb = NULL;
+		wma_handle->last_umac_data_nbuf = NULL;
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	ctrl_pdev = cdp_get_ctrl_pdev_from_vdev(soc, vdev_id);

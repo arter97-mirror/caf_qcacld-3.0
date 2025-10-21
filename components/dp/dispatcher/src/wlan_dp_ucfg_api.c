@@ -1480,6 +1480,41 @@ QDF_STATUS ucfg_dp_register_pkt_capture_callbacks(struct wlan_objmgr_vdev *vdev)
 						   dp_intf);
 }
 
+#ifdef CONFIG_BORON
+QDF_STATUS
+ucfg_dp_update_bss_peer_info_for_tdls_ctrl(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id, qdf_nbuf_t nbuf)
+{
+	struct wlan_dp_link *dp_link;
+	struct cdp_peer_output_param peer_info = {0};
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct qdf_mac_addr bss_mac_addr = QDF_MAC_ADDR_ZERO_INIT;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_DP_ID);
+	if (!vdev) {
+		dp_err("vdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err("DP link not found");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_DP_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_DP_ID);
+
+	qdf_copy_macaddr(&bss_mac_addr, &dp_link->conn_info.bssid);
+	cdp_peer_get_info_by_peer_addr(soc, bss_mac_addr.bytes,
+				       dp_link->link_id, &peer_info);
+	dp_set_peer_txpt_idx(nbuf, &peer_info);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* CONFIG_BORON */
+
 QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_dp_intf *dp_intf;

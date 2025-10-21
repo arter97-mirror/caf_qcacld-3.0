@@ -2213,4 +2213,28 @@ QDF_STATUS ucfg_dp_qos_latency_stats_request(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 ucfg_dp_qos_latency_get_stats(struct wlan_objmgr_vdev *vdev,
 			      struct cdp_qos_latency_stats_req *stats);
+
+#ifdef CONFIG_BORON
+/**
+ * ucfg_dp_update_bss_peer_info_for_tdls_ctrl() - For tdls control frames use
+ *	bss peer's Tx flow queues
+ * @psoc: pointer to psoc object
+ * @vdev_id: vdev_id of vdev object
+ * @nbuf: n/w buffer to transmitted
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS
+ucfg_dp_update_bss_peer_info_for_tdls_ctrl(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id, qdf_nbuf_t nbuf);
+#else
+
+static inline QDF_STATUS
+ucfg_dp_update_bss_peer_info_for_tdls_ctrl(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id, qdf_nbuf_t nbuf)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* CONFIG_BORON */
 #endif /* _WLAN_DP_UCFG_API_H_ */
