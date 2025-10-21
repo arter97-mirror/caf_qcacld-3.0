@@ -1284,6 +1284,39 @@ static inline void
 wlan_dp_sync_prealloc_with_profile_cfg(struct wlan_dp_prealloc_cfg *cfg) {}
 #endif
 
+#ifdef WLAN_DP_FEATURE_STC
+static inline bool
+wlan_cfg_is_stc_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
+{
+	return !!cfg_get(ctrl_psoc, CFG_DP_STC_ENABLE);
+}
+#else
+static inline bool
+wlan_cfg_is_stc_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
+{
+	return false;
+}
+#endif
+
+static bool
+dp_is_prealloc_ctx_mem_required(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
+				enum dp_ctxt_type ctxt_type)
+{
+	switch (ctxt_type) {
+	case DP_STC_CONTEXT_TYPE:
+	case DP_STC_SAMPLING_TABLE_TYPE:
+	case DP_STC_RX_FLOW_TABLE_TYPE:
+	case DP_STC_TX_FLOW_TABLE_TYPE:
+	case DP_STC_CLASSIFIED_FLOW_TABLE_TYPE:
+		/* Change the int value to bool */
+		return wlan_cfg_is_stc_enabled(ctrl_psoc);
+	default:
+		break;
+	}
+
+	return true;
+}
+
 QDF_STATUS dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 {
 	int i;
@@ -1305,6 +1338,13 @@ QDF_STATUS dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	/*Context pre-alloc*/
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_context_allocs); i++) {
 		cp = &g_dp_context_allocs[i];
+		if (!dp_is_prealloc_ctx_mem_required(ctrl_psoc,
+						     cp->ctxt_type)) {
+			dp_info("Skip context mem prealloc for type %d",
+				cp->ctxt_type);
+			continue;
+		}
+
 		dp_update_mem_size_by_ctx_type(&cfg, cp->ctxt_type,
 					       &cp->size);
 		cp->addr = qdf_mem_malloc(cp->size);
