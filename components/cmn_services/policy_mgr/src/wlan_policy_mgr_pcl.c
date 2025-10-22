@@ -1880,6 +1880,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 	bool srd_modified_pcl = false;
 	bool fourth_conc_modified_pcl = false;
 	uint32_t pcl_len, orig_len;
+	bool cfg_sta_dfs_ch_peer_scc = false;
 
 	pcl_len = *len;
 	orig_len = pcl_len;
@@ -1902,15 +1903,30 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 		pcl_len = *len;
 	}
 
-	status = policy_mgr_modify_sap_pcl_based_on_dfs(
-			psoc, pcl_channels, pcl_weight, len);
+	status = policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc,
+							&cfg_sta_dfs_ch_peer_scc);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		policy_mgr_err("failed to get dfs modified pcl for GO");
-		return status;
+		policy_mgr_err("failed to get cfg_sta_dfs_ch_peer_scc");
+		cfg_sta_dfs_ch_peer_scc = false;
 	}
-	if (pcl_len != *len) {
-		dfs_modified_pcl = true;
-		pcl_len = *len;
+
+	/* If STA connected DFS channel peer SCC is enabled then only the STA
+	 * connected DFS channels are included and all the other DFS channels
+	 * are filtered out before returning the PCL to userspace.
+	 */
+	if (!cfg_sta_dfs_ch_peer_scc) {
+		status = policy_mgr_modify_sap_pcl_based_on_dfs(psoc,
+								pcl_channels,
+								pcl_weight,
+								len);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			policy_mgr_err("failed to get dfs modified pcl for GO");
+			return status;
+		}
+		if (pcl_len != *len) {
+			dfs_modified_pcl = true;
+			pcl_len = *len;
+		}
 	}
 
 	wlan_mlme_get_srd_master_mode_for_vdev(psoc, QDF_P2P_GO_MODE,
@@ -6700,9 +6716,9 @@ release_lock:
 #endif
 
 QDF_STATUS
-policy_mgr_modify_pcl_sta_p2p_indoor_scc(struct wlan_objmgr_psoc *psoc,
-					 struct weighed_pcl *pcl,
-					 uint32_t *num_pcl)
+policy_mgr_modify_pcl_sta_p2p_indoor_dfs_scc(struct wlan_objmgr_psoc *psoc,
+					     struct weighed_pcl *pcl,
+					     uint32_t *num_pcl)
 {
 	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint32_t freq_count = 0;
@@ -6713,6 +6729,18 @@ policy_mgr_modify_pcl_sta_p2p_indoor_scc(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct wlan_objmgr_pdev *pdev;
 	qdf_freq_t sta_freq = 0;
+	bool cfg_sta_indoor_ch_peer_scc = false;
+	bool cfg_sta_dfs_ch_peer_scc = false;
+	bool is_indoor, is_dfs;
+
+	policy_mgr_get_cfg_sta_indoor_ch_peer_scc(psoc,
+						  &cfg_sta_indoor_ch_peer_scc);
+
+	policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc,
+					       &cfg_sta_dfs_ch_peer_scc);
+
+	if (!cfg_sta_indoor_ch_peer_scc && !cfg_sta_dfs_ch_peer_scc)
+		return QDF_STATUS_SUCCESS;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -6737,8 +6765,21 @@ policy_mgr_modify_pcl_sta_p2p_indoor_scc(struct wlan_objmgr_psoc *psoc,
 	new_num_pcl = *num_pcl;
 
 	for (i = 0; i < freq_count; i++) {
-		if (!(wlan_reg_is_freq_indoor(pdev, freq_list[i]) &&
-		      WLAN_REG_IS_5GHZ_CH_FREQ(freq_list[i])))
+		if (!WLAN_REG_IS_5GHZ_CH_FREQ(freq_list[i]))
+			continue;
+
+		is_indoor = wlan_reg_is_freq_indoor(pdev, freq_list[i]);
+		is_dfs = wlan_reg_is_dfs_for_freq(pdev, freq_list[i]);
+		if (!is_indoor && !is_dfs)
+			continue;
+
+		policy_mgr_debug("freq %d, indoor %d dfs %d, CFG: indoor %d dfs %d",
+				 freq_list[i],
+				 is_indoor, is_dfs, cfg_sta_indoor_ch_peer_scc,
+				 cfg_sta_dfs_ch_peer_scc);
+
+		if (!((cfg_sta_indoor_ch_peer_scc && is_indoor) ||
+		      (cfg_sta_dfs_ch_peer_scc && is_dfs)))
 			continue;
 
 		sta_freq = freq_list[i];
@@ -6751,19 +6792,23 @@ policy_mgr_modify_pcl_sta_p2p_indoor_scc(struct wlan_objmgr_psoc *psoc,
 						       &new_num_pcl,
 						       sta_freq,
 						       WEIGHT_OF_GROUP1_PCL_CHANNELS);
+		break;
 	}
 
 	for (i = 0; i < new_num_pcl; i++) {
-		if (wlan_reg_is_freq_indoor(pdev, new_pcl[i].freq) &&
-		    new_pcl[i].freq != sta_freq)
+		if ((wlan_reg_is_freq_indoor(pdev, new_pcl[i].freq) ||
+		     wlan_reg_is_dfs_for_freq(pdev, new_pcl[i].freq)) &&
+		    (new_pcl[i].freq != sta_freq))
 			continue;
 		pcl[count] = new_pcl[i];
 		count++;
 	}
 
 	if (*num_pcl != count)
-		policy_mgr_debug("No.of channels are different in original(%d) and modified PCL(%d)",
-				 *num_pcl, count);
+		policy_mgr_debug("PCL len: original(%d)/modified PCL(%d), sta freq %d, CFG: indoor %d dfs %d",
+				 *num_pcl, count, sta_freq,
+				 cfg_sta_indoor_ch_peer_scc,
+				 cfg_sta_dfs_ch_peer_scc);
 
 	*num_pcl = count;
 

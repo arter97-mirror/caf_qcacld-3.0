@@ -6611,11 +6611,11 @@ void policy_mgr_get_sta_connected_frequencies(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
- * policy_mgr_modify_pcl_sta_p2p_indoor_scc() - Modify PCL for STA+P2P indoor
- * channel SCC.
+ * policy_mgr_modify_pcl_sta_p2p_indoor_dfs_scc() - Modify PCL for STA and P2P
+ * indoor/dfs channel SCC.
  *
- * This API is used to modify the PCL to include the STA-connected indoor
- * channel frequency with highest weight, and filter out all other indoor
+ * This API is used to modify the PCL to include the STA-connected indoor/dfs
+ * channel frequency with highest weight, and filter out all other indoor/dfs
  * channel frequencies.
  *
  * @psoc: psoc pointer
@@ -6625,9 +6625,9 @@ void policy_mgr_get_sta_connected_frequencies(struct wlan_objmgr_psoc *psoc,
  * Return: QDF_STATUS
  */
 QDF_STATUS
-policy_mgr_modify_pcl_sta_p2p_indoor_scc(struct wlan_objmgr_psoc *psoc,
-					 struct weighed_pcl *pcl,
-					 uint32_t *num_pcl);
+policy_mgr_modify_pcl_sta_p2p_indoor_dfs_scc(struct wlan_objmgr_psoc *psoc,
+					     struct weighed_pcl *pcl,
+					     uint32_t *num_pcl);
 
 /**
  * policy_mgr_set_move_sap_go_1st_on_dfs_sta_csa() - Set value for
