@@ -35,6 +35,7 @@
 #include "wlan_psoc_mlme_api.h"
 #include "wlan_action_oui_main.h"
 #include "target_if.h"
+#include "target_if_mlme.h"
 #include "wlan_vdev_mgr_tgt_if_tx_api.h"
 #include "wmi_unified_vdev_api.h"
 #include "wlan_mlme_api.h"
@@ -9696,8 +9697,8 @@ wlan_get_rx_tx_cck_5g_support_for_mode(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlme_cfg *mlme_cfg;
 	uint8_t cck_support, cck_rx_tx_per_mode = 0;
 
-        mlme_obj = mlme_get_psoc_ext_obj(psoc);
-        if (!mlme_obj) {
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
 		mlme_err("Failed to get MLME Obj");
 		return false;
 	}
@@ -9718,3 +9719,43 @@ wlan_get_rx_tx_cck_5g_support_for_mode(struct wlan_objmgr_psoc *psoc,
 
 	return (*tx_value || *rx_value);
 }
+
+QDF_STATUS wlan_mlme_update_mcc_cck_support(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_psoc_obj;
+	struct wlan_mlme_cfg *mlme_cfg;
+	uint32_t fw_cck_support = 0, i;
+	uint8_t host_cck_support = 0, per_mode_cck_support = 0;
+
+        mlme_psoc_obj = mlme_get_psoc_ext_obj(psoc);
+        if (!mlme_psoc_obj) {
+		mlme_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_cfg = &mlme_psoc_obj->cfg;
+
+	fw_cck_support = wlan_get_fw_cck_cap(psoc);
+	host_cck_support = mlme_cfg->rates.cck_rx_tx_support_mode;
+	for (i = 0; i < MAX_CCK_IDX; i++) {
+		host_cck_support = QDF_GET_BITS(
+				mlme_psoc_obj->cfg.rates.cck_rx_tx_support_mode,
+				i * NUM_CCK_BITS,
+				NUM_CCK_BITS);
+
+		per_mode_cck_support = host_cck_support & fw_cck_support;
+
+		QDF_SET_BITS(mlme_psoc_obj->cfg.rates.cck_rx_tx_support_mode,
+			     i * NUM_CCK_BITS,
+			     per_mode_cck_support,
+			     NUM_CCK_BITS);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint32_t wlan_get_fw_cck_cap(struct wlan_objmgr_psoc *psoc)
+{
+        return target_if_fw_cck_support(psoc);
+}
+
