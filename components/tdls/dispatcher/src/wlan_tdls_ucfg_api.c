@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,6 +37,7 @@
 #include "wlan_mlo_mgr_sta.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_tdls_api.h"
+#include <wlan_mlme_ucfg_api.h>
 
 QDF_STATUS ucfg_tdls_init(void)
 {
@@ -154,6 +155,27 @@ tdls_update_feature_flag(struct tdls_soc_priv_obj *tdls_soc_obj)
 }
 
 /**
+ * wlan_tdls_get_mlme_cfg_he_cap() - Get mlme cfg he caps
+ * @psoc: pointer to psoc
+ * @he_cap_cfg: HE cap
+ *
+ * Return: QDF_STATUS
+ */
+#ifdef WLAN_FEATURE_11AX
+static QDF_STATUS wlan_tdls_get_mlme_cfg_he_cap(struct wlan_objmgr_psoc *psoc,
+						tDot11fIEhe_cap *he_cap_cfg)
+{
+	return ucfg_mlme_cfg_get_he_caps(psoc, he_cap_cfg);
+}
+#else
+static QDF_STATUS wlan_tdls_get_mlme_cfg_he_cap(struct wlan_objmgr_psoc *psoc,
+						tDot11fIEhe_cap *he_cap_cfg)
+{
+	return QDF_STATUS_E_INVAL;
+}
+#endif /*WLAN_FEATURE_11AX*/
+
+/**
  * tdls_object_init_params() - init parameters for tdls object
  * @tdls_soc_obj: pointer to tdls psoc object
  *
@@ -163,6 +185,8 @@ static QDF_STATUS tdls_object_init_params(
 	struct tdls_soc_priv_obj *tdls_soc_obj)
 {
 	struct wlan_objmgr_psoc *psoc;
+	tDot11fIEhe_cap he_cap_cfg;
+	QDF_STATUS status;
 
 	if (!tdls_soc_obj) {
 		tdls_err("invalid param");
@@ -207,6 +231,21 @@ static QDF_STATUS tdls_object_init_params(
 			cfg_get(psoc, CFG_TDLS_PREFERRED_OFF_CHANNEL_FREQ_6G);
 	tdls_soc_obj->tdls_configs.tdls_pre_off_chan_bw =
 			cfg_get(psoc, CFG_TDLS_PREFERRED_OFF_CHANNEL_BW);
+
+	tdls_debug("tdls_pre_off_chan_bw: %d",
+		   tdls_soc_obj->tdls_configs.tdls_pre_off_chan_bw);
+
+	status = wlan_tdls_get_mlme_cfg_he_cap(psoc, &he_cap_cfg);
+
+	/* If HW does not support 160 MHz*/
+	if (QDF_IS_STATUS_SUCCESS(status) && !he_cap_cfg.chan_width_3) {
+		tdls_soc_obj->tdls_configs.tdls_pre_off_chan_bw =
+			tdls_soc_obj->tdls_configs.tdls_pre_off_chan_bw &
+					~(1 << BW_160_OFFSET_BIT);
+		tdls_debug("updated tdls_pre_off_chan_bw: %d",
+			   tdls_soc_obj->tdls_configs.tdls_pre_off_chan_bw);
+	}
+
 	tdls_soc_obj->tdls_configs.tdls_peer_kickout_threshold =
 			cfg_get(psoc, CFG_TDLS_PEER_KICKOUT_THRESHOLD);
 	tdls_soc_obj->tdls_configs.tdls_discovery_wake_timeout =

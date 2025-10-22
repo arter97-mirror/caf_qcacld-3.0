@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -633,7 +633,6 @@ struct wlan_mlo_ie_info {
  * @bss_color_info:
  * @bss_color_changing:
  * @deauth_retry:
- * @enable_bcast_probe_rsp:
  * @ht_client_cnt:
  * @ch_switch_in_progress:
  * @he_with_wep_tkip:
@@ -655,7 +654,6 @@ struct wlan_mlo_ie_info {
  * @mu_edca_present:
  * @def_max_tx_pwr:
  * @active_ba_64_session:
- * @is_mbssid_enabled:
  * @peer_twt_requestor:
  * @peer_twt_responder:
  * @enable_session_twt_support:
@@ -955,7 +953,6 @@ struct pe_session {
 #endif
 #endif
 	struct deauth_retry_params deauth_retry;
-	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
 	bool ch_switch_in_progress;
 	bool he_with_wep_tkip;
@@ -979,7 +976,6 @@ struct pe_session {
 	bool mu_edca_present;
 	int8_t def_max_tx_pwr;
 	bool active_ba_64_session;
-	bool is_mbssid_enabled;
 #ifdef WLAN_SUPPORT_TWT
 	uint8_t peer_twt_requestor;
 	uint8_t peer_twt_responder;

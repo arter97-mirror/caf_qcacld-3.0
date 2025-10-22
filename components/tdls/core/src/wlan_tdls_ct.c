@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -312,9 +312,9 @@ static void tdls_ct_sampling_tx_rx(struct tdls_vdev_priv_obj *tdls_vdev,
 		curr_peer = tdls_get_peer(tdls_vdev, mac);
 		if (curr_peer) {
 			curr_peer->tx_pkt =
-			mac_table[mac_cnt].tx_packet_cnt;
+				mac_table[mac_cnt].tx_packet_cnt;
 			curr_peer->rx_pkt =
-			mac_table[mac_cnt].rx_packet_cnt;
+				mac_table[mac_cnt].rx_packet_cnt;
 		}
 	}
 }
@@ -516,7 +516,7 @@ tdls_implicit_send_discovery_request(struct tdls_vdev_priv_obj *tdls_vdev_obj)
 		goto done;
 	}
 
-	if (TDLS_CAP_UNKNOWN != curr_peer->tdls_support)
+	if (TDLS_CAP_NOT_SUPPORTED != curr_peer->tdls_support)
 		tdls_set_peer_link_status(curr_peer,
 					  TDLS_LINK_DISCOVERING,
 					  TDLS_LINK_SUCCESS);
@@ -870,15 +870,21 @@ static void tdls_ct_process_connected_link(
 				struct tdls_vdev_priv_obj *tdls_vdev,
 				struct tdls_soc_priv_obj *tdls_soc)
 {
-	/* Don't trigger low rssi tear down here since FW will do it */
-	/* Only teardown based on non zero idle packet threshold, to address
+	/*
+	 * Don't trigger low rssi tear down here since FW will do it
+	 * Only teardown based on non zero idle packet threshold, to address
 	 * a use case where this threshold does not get consider for TEAR DOWN
 	 */
-	if ((0 != tdls_vdev->threshold_config.idle_packet_n) &&
-	    ((curr_peer->tx_pkt <
-	      tdls_vdev->threshold_config.idle_packet_n) &&
-	     (curr_peer->rx_pkt <
-	      tdls_vdev->threshold_config.idle_packet_n))) {
+
+	tdls_debug("Peer: " QDF_MAC_ADDR_FMT " idle_packet_n:%d tx_pkt:%d rx_pkt:%d idle_timer_initialised:%d",
+		   QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes),
+		   tdls_vdev->threshold_config.idle_packet_n,
+		   curr_peer->tx_pkt, curr_peer->rx_pkt,
+		   curr_peer->is_peer_idle_timer_initialised);
+
+	if (tdls_vdev->threshold_config.idle_packet_n &&
+	    (curr_peer->tx_pkt < tdls_vdev->threshold_config.idle_packet_n &&
+	     curr_peer->rx_pkt < tdls_vdev->threshold_config.idle_packet_n)) {
 		if (!curr_peer->is_peer_idle_timer_initialised) {
 			struct tdls_conn_info *tdls_info;
 			tdls_info = tdls_get_conn_info(tdls_soc,
@@ -889,19 +895,19 @@ static void tdls_ct_process_connected_link(
 					  (void *)tdls_info);
 			curr_peer->is_peer_idle_timer_initialised = true;
 		}
+
 		if (QDF_TIMER_STATE_RUNNING !=
 		    curr_peer->peer_idle_timer.state) {
-			tdls_warn("Tx/Rx Idle timer start: "
-				QDF_MAC_ADDR_FMT "!",
-				QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
+			tdls_warn("Tx/Rx Idle timer start: " QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
 			tdls_timer_restart(tdls_vdev->vdev,
 				&curr_peer->peer_idle_timer,
 				tdls_vdev->threshold_config.idle_timeout_t);
 		}
 	} else if (QDF_TIMER_STATE_RUNNING ==
 		   curr_peer->peer_idle_timer.state) {
-		tdls_warn("Tx/Rx Idle timer stop: " QDF_MAC_ADDR_FMT "!",
-			 QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
+		tdls_warn("Tx/Rx Idle timer stop: " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(curr_peer->peer_mac.bytes));
 		qdf_mc_timer_stop(&curr_peer->peer_idle_timer);
 	}
 }
@@ -1053,7 +1059,8 @@ static void tdls_ct_process_handler(struct wlan_objmgr_vdev *vdev)
 
 	/* If any concurrency is detected */
 	if (!tdls_soc_obj->enable_tdls_connection_tracker) {
-		tdls_notice("Connection tracker is disabled");
+		tdls_notice("vdev:%d Connection tracker is disabled",
+			    wlan_vdev_get_id(vdev));
 		return;
 	}
 

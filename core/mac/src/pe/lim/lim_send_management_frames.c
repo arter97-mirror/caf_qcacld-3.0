@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -342,7 +342,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 	if (pesession)
 		populate_dot11f_ext_cap(mac_ctx, is_vht_enabled, &pr->ExtCap,
-					pesession);
+					pesession->vdev_id);
 
 	if (IS_DOT11_MODE_HE(dot11mode) && pesession)
 		lim_update_session_he_capable(mac_ctx, pesession);
@@ -840,7 +840,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	populate_dot11f_ext_cap(mac_ctx, is_vht_enabled, &frm->ExtCap,
-		pe_session);
+				pe_session->vdev_id);
 
 	if (pe_session->pLimStartBssReq) {
 		populate_dot11f_wpa(mac_ctx,
@@ -927,9 +927,19 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	 * may change the frame size. Therefore, MUST merge ExtCap IE before
 	 * dot11f get packed payload size.
 	 */
-	if (extracted_ext_cap_flag)
+	if (extracted_ext_cap_flag) {
 		lim_merge_extcap_struct(&frm->ExtCap, &extracted_ext_cap,
 					true);
+		/*
+		 * TWT extended capabilities should be populated after the
+		 * intersection of beacon caps and self caps is done because
+		 * the bits for TWT are unique to STA and AP and cannot be
+		 * intersected.
+		 */
+		populate_dot11f_twt_extended_caps(mac_ctx, pe_session->vdev_id,
+						  &frm->ExtCap);
+	}
+
 	populate_dot11f_bcn_prot_extcaps(mac_ctx, pe_session, &frm->ExtCap);
 
 	status = dot11f_get_packed_probe_response_size(mac_ctx, frm, &payload);
@@ -1695,7 +1705,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			is_vht = true;
 		}
 		populate_dot11f_ext_cap(mac_ctx, is_vht, &frm.ExtCap,
-			pe_session);
+					pe_session->vdev_id);
 
 		populate_dot11f_qcn_ie(mac_ctx, pe_session, &frm.qcn_ie,
 				       QCN_IE_ATTR_ID_ALL);
@@ -1807,9 +1817,20 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	 * may change the frame size. Therefore, MUST merge ExtCap IE before
 	 * dot11f get packed payload size.
 	 */
-	if (extracted_flag)
+	if (extracted_flag) {
 		lim_merge_extcap_struct(&(frm.ExtCap), &extracted_ext_cap,
 					true);
+
+		/*
+		 * TWT extended capabilities should be populated after the
+		 * intersection of beacon caps and self caps is done because
+		 * the bits for TWT are unique to STA and AP and cannot be
+		 * intersected.
+		 */
+		populate_dot11f_twt_extended_caps(mac_ctx, pe_session->vdev_id,
+						  &frm.ExtCap);
+	}
+
 	populate_dot11f_bcn_prot_extcaps(mac_ctx, pe_session, &(frm.ExtCap));
 	if (sta && lim_is_sta_eht_capable(sta) &&
 	    lim_is_mlo_conn(pe_session, sta) &&
@@ -2416,6 +2437,23 @@ QDF_STATUS lim_fill_adaptive_11r_ie(struct pe_session *pe_session,
 }
 #endif
 
+static void
+lim_override_extcap_struct(struct mac_context *mac_ctx,
+			   tDot11fIEExtCap *bcn_ext_cap)
+{
+	struct s_ext_cap *p_ext_cap =
+		(struct s_ext_cap *)bcn_ext_cap->bytes;
+
+	/*
+	 * The AP and STA caps would be intersected in
+	 * assoc request. Therefore, override the STA-
+	 * only caps in the beacon ext caps, inorder to
+	 * retain the STA's original caps.
+	 */
+	p_ext_cap->multi_bssid = 1;
+	p_ext_cap->twt_requestor_support = 1;
+}
+
 /**
  * lim_send_assoc_req_mgmt_frame() - Send association request
  * @mac_ctx: Handle to MAC context
@@ -2678,8 +2716,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		vht_enabled = true;
 	}
 	if (pe_session->is_ext_caps_present)
-		populate_dot11f_ext_cap(mac_ctx, vht_enabled,
-				&frm->ExtCap, pe_session);
+		populate_dot11f_ext_cap(mac_ctx, vht_enabled, &frm->ExtCap,
+					pe_session->vdev_id);
 
 	populate_dot11f_qcn_ie(mac_ctx, pe_session,
 			       &frm->qcn_ie, QCN_IE_ATTR_ID_ALL);
@@ -2784,6 +2822,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 							bcn_ie, bcn_ie_len);
 			lim_update_extcap_struct(mac_ctx, p_ext_cap,
 							&bcn_ext_cap);
+			lim_override_extcap_struct(mac_ctx, &bcn_ext_cap);
 			lim_merge_extcap_struct(&frm->ExtCap, &bcn_ext_cap,
 							false);
 		}
@@ -2796,7 +2835,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		 * the bits for TWT are unique to STA and AP and cannot be
 		 * intersected.
 		 */
-		populate_dot11f_twt_extended_caps(mac_ctx, pe_session,
+		populate_dot11f_twt_extended_caps(mac_ctx, vdev_id,
 						  &frm->ExtCap);
 	} else {
 		wlan_cm_set_assoc_btm_cap(pe_session->vdev, false);
@@ -3763,10 +3802,10 @@ alloc_packet:
 		qdf_mem_free(mlo_ie_buf);
 	}
 
-	pe_nofl_info("Auth TX: vdev %d seq %d seq num %d status %d WEP %d to " QDF_MAC_ADDR_FMT,
-		     vdev_id, auth_frame->authTransactionSeqNumber,
-		     mac_ctx->mgmtSeqNum, auth_frame->authStatusCode,
-		     mac_hdr->fc.wep, QDF_MAC_ADDR_REF(mac_hdr->da));
+	pe_nofl_rl_info("Auth TX: vdev %d seq %d seq num %d status %d WEP %d to " QDF_MAC_ADDR_FMT,
+			vdev_id, auth_frame->authTransactionSeqNumber,
+			mac_ctx->mgmtSeqNum, auth_frame->authStatusCode,
+			mac_hdr->fc.wep, QDF_MAC_ADDR_REF(mac_hdr->da));
 
 	if ((session->ftPEContext.pFTPreAuthReq) &&
 	    (!wlan_reg_is_24ghz_ch_freq(

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -865,6 +865,21 @@ static void dp_fisa_rx_fst_update(struct dp_rx_fst *fisa_hdl,
 			break;
 		}
 		/* else */
+
+		/*
+		 * For packets belonging to a flow (which just got added to FISA
+		 * table), the flow_idx_valid=0, since they passed through FSE
+		 * before the HW table update.
+		 * For such packets, is_same_flow has already been checked
+		 * against entry at hashed_flow_idx before queuing the work,
+		 * but if the entry was added at skid the flow tuple check is
+		 * not done. Hence do the flow tuple check here before
+		 * consuming another entry.
+		 */
+		if (is_same_flow(&sw_ft_entry->rx_flow_tuple_info,
+				 rx_flow_tuple_info))
+			break;
+
 		/* hash collision move to the next FT entry */
 		dp_fisa_debug("Hash collision %d",
 			      fisa_hdl->hash_collision_cnt);

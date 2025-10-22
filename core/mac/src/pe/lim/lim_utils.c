@@ -6208,7 +6208,7 @@ QDF_STATUS lim_send_ext_cap_ie(struct mac_context *mac_ctx,
 		vht_enabled = true;
 
 	status = populate_dot11f_ext_cap(mac_ctx, vht_enabled, &ext_cap_data,
-					 NULL);
+					 vdev_id);
 	if (QDF_STATUS_SUCCESS != status) {
 		pe_err("Failed to populate ext cap IE");
 		return QDF_STATUS_E_FAILURE;
@@ -7860,7 +7860,7 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 }
 
 void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
-		     uint32_t num_bytes, uint8_t band)
+		     uint32_t num_bytes, uint8_t band, uint8_t vdev_id)
 {
 	const uint8_t *ie = NULL;
 	tDot11fIEhe_cap dot11_cap;
@@ -7870,8 +7870,8 @@ void lim_set_he_caps(struct mac_context *mac, uint8_t *ie_start,
 	if (band == CDS_BAND_2GHZ)
 		is_band_2g = true;
 
-	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_cap,
-					NULL);
+	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_cap, vdev_id);
+
 	lim_log_he_cap(mac, &dot11_cap);
 	ie = wlan_get_ext_ie_ptr_from_ext_id(HE_CAP_OUI_TYPE,
 			HE_CAP_OUI_SIZE, ie_start, num_bytes);
@@ -8077,7 +8077,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	he_caps[1] = SIR_MAC_HE_CAP_MIN_LEN;
 	qdf_mem_copy(&he_caps[2], HE_CAP_OUI_TYPE, HE_CAP_OUI_SIZE);
 	lim_set_he_caps(mac_ctx, he_caps, he_cap_total_len,
-			CDS_BAND_5GHZ);
+			CDS_BAND_5GHZ, vdev_id);
 	he_cap = (struct he_capability_info *) (&he_caps[2 + HE_CAP_OUI_SIZE]);
 
 	nan_beamforming_supported =
@@ -8143,7 +8143,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 	he_caps[1] = SIR_MAC_HE_CAP_MIN_LEN;
 	qdf_mem_copy(&he_caps[2], HE_CAP_OUI_TYPE, HE_CAP_OUI_SIZE);
 	lim_set_he_caps(mac_ctx, he_caps, he_cap_total_len,
-			CDS_BAND_2GHZ);
+			CDS_BAND_2GHZ, vdev_id);
 	he_cap = (struct he_capability_info *)(&he_caps[2 + HE_CAP_OUI_SIZE]);
 
 	/*
@@ -9123,7 +9123,8 @@ void lim_set_eht_caps(struct mac_context *mac,
 	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap, NULL);
 	lim_revise_eht_caps_per_band(mac, band, &dot11_cap);
 	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap,
-					NULL);
+					vdev_id);
+
 	lim_log_eht_cap(mac, &dot11_cap);
 
 	if (is_band_2g) {

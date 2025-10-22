@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4699,9 +4699,9 @@ policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	uint32_t freq;
-	uint8_t sap_vdev_id;
+	uint8_t sap_vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	enum phy_ch_width target_bw;
+	uint32_t sap_cnt;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -4711,22 +4711,27 @@ policy_mgr_sap_ch_width_update(struct wlan_objmgr_psoc *psoc,
 
 	policy_mgr_debug("action: %d reason: %d", next_action, reason);
 
-	policy_mgr_get_mode_specific_conn_info(psoc, &freq,
-					       &sap_vdev_id,
-					       PM_SAP_MODE);
+	sap_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
+							 sap_vdev_id,
+							 PM_SAP_MODE);
+	if (!sap_cnt) {
+		policy_mgr_err("sap count is 0!");
+		return status;
+	}
+
 	if (next_action == PM_DOWNGRADE_BW)
 		target_bw = CH_WIDTH_160MHZ;
 	else
 		target_bw = CH_WIDTH_320MHZ;
 
 	status = pm_ctx->sme_cbacks.sme_sap_update_ch_width(psoc,
-							    sap_vdev_id,
+							    sap_vdev_id[0],
 							    target_bw, reason,
 							    conc_vdev_id,
 							    request_id);
 	if (QDF_IS_STATUS_ERROR(status))
 		policy_mgr_err("vdev %d failed to set BW to %d",
-			       sap_vdev_id, target_bw);
+			       sap_vdev_id[0], target_bw);
 
 	return status;
 }

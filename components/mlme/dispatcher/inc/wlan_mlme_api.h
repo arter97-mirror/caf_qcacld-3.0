@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1971,6 +1971,14 @@ wlan_mlme_get_wmm_sba_ac_vo(struct wlan_objmgr_psoc *psoc, uint16_t *value);
  */
 QDF_STATUS wlan_mlme_set_enable_bcast_probe_rsp(struct wlan_objmgr_psoc *psoc,
 						bool value);
+
+/*
+ * wlan_mlme_get_enable_bcast_probe_rsp() - Get enable bcast probe resp info
+ * @psoc: pointer to psoc object
+ *
+ * Return: Bcast probe response info
+ */
+bool wlan_mlme_get_enable_bcast_probe_rsp(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_mlme_get_wmm_uapsd_vo_srv_intv() - Get Uapsd service

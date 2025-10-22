@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2928,9 +2928,6 @@ static void lim_update_sae_config(struct mac_context *mac,
 {
 	struct wlan_crypto_pmksa *pmksa;
 	struct qdf_mac_addr bssid;
-	struct bss_description *bss_desc;
-	struct action_oui_search_attr ap_attr = {0};
-	bool is_vendor_ap = false;
 
 	qdf_mem_copy(bssid.bytes, session->bssId,
 		     QDF_MAC_ADDR_SIZE);
@@ -2940,16 +2937,6 @@ static void lim_update_sae_config(struct mac_context *mac,
 
 	pmksa = wlan_crypto_get_pmksa(session->vdev, &bssid);
 	if (!pmksa)
-		return;
-
-	bss_desc = &session->lim_join_req->bssDescription;
-	ap_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
-	ap_attr.ie_length =
-		wlan_get_ielen_from_bss_description(bss_desc);
-	is_vendor_ap = wlan_action_oui_search(mac->psoc,
-					      &ap_attr,
-					      ACTION_OUI_RESTRICT_MAX_MLO_LINKS);
-	if (is_vendor_ap)
 		return;
 
 	session->sae_pmk_cached = true;
@@ -3399,10 +3386,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 			  bss_desc->chan_freq, bss_desc->rssi);
 	}
 
-	if (session->opmode == QDF_STA_MODE)
-		session->enable_bcast_probe_rsp =
-			mac_ctx->mlme_cfg->oce.enable_bcast_probe_rsp;
-
 	/* Store vendor specific IE for CISCO AP */
 	ie_len = (bss_desc->length + sizeof(bss_desc->length) -
 		 GET_FIELD_OFFSET(struct bss_description, ieFields));
@@ -3569,9 +3552,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_SME_STATE,
 			session->peSessionId,
 			session->limSmeState));
-
-	/* Enable MBSSID only for station */
-	session->is_mbssid_enabled = wma_is_mbssid_enabled();
 
 	/* Enable the spectrum management if this is a DFS channel */
 	if (session->country_info_present &&
@@ -4248,23 +4228,11 @@ end:
 }
 
 void
-lim_update_connect_rsn_ie(struct mac_context *mac,
-			  struct pe_session *session,
+lim_update_connect_rsn_ie(struct pe_session *session,
 			  uint8_t *rsn_ie_buf, struct wlan_crypto_pmksa *pmksa)
 {
 	uint8_t *rsn_ie_end;
 	uint16_t rsn_ie_len = 0;
-	struct bss_description *bss_desc =
-					&session->lim_join_req->bssDescription;
-	struct action_oui_search_attr ap_attr = {0};
-
-	ap_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
-	ap_attr.ie_length =
-		wlan_get_ielen_from_bss_description(bss_desc);
-	if (wlan_action_oui_search(mac->psoc,
-				   &ap_attr,
-				   ACTION_OUI_RESTRICT_MAX_MLO_LINKS))
-		pmksa = NULL;
 
 	rsn_ie_end = wlan_crypto_build_rsnie_with_pmksa(session->vdev,
 							rsn_ie_buf, pmksa);
@@ -4338,7 +4306,7 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	if (pmksa_peer)
 		pe_debug("PMKSA found");
 
-	lim_update_connect_rsn_ie(mac_ctx, session, rsn_ie, pmksa_peer);
+	lim_update_connect_rsn_ie(session, rsn_ie, pmksa_peer);
 	qdf_mem_free(rsn_ie);
 
 	/*
@@ -4605,7 +4573,8 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 		     session->ssId.length);
 	session->ssidHidden = req->is_ssid_hidden;
 
-	status = lim_fill_pe_session(mac_ctx, session, bss_desc, NULL);
+	status = lim_fill_pe_session(mac_ctx, session, bss_desc,
+				     &req_fail_status_code);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to fill pe session vdev id %d",
 		       session->vdev_id);

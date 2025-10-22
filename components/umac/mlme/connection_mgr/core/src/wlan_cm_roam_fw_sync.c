@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -50,6 +50,7 @@
 #include "wlan_mlo_link_force.h"
 #include <wlan_psoc_mlme_api.h>
 #include <wma.h>
+#include "wlan_twt_cfg_ext_api.h"
 
 /*
  * cm_is_peer_preset_on_other_sta() - Check if peer exists on other STA
@@ -1725,4 +1726,33 @@ QDF_STATUS wlan_cm_free_roam_synch_frame_ind(struct rso_config *rso_cfg)
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void cm_update_ext_cap_ie_at_source(struct wlan_objmgr_psoc *psoc,
+				    struct element_info *assoc_ie)
+{
+	struct wmi_unified *wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	const uint8_t *ext_cap_ie;
+	struct s_ext_cap *extcap;
+	bool twt_requestor = false, twt_req_support = false;
+
+	if (!wmi_handle)
+		return;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_infra_mbssid))
+		return;
+
+	ext_cap_ie  = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_XCAPS,
+					       assoc_ie->ptr, assoc_ie->len);
+	if (!ext_cap_ie)
+		return;
+
+	extcap = (struct s_ext_cap *)&ext_cap_ie[2];
+	/* MBSSID */
+	extcap->multi_bssid = 1;
+	/* TWT requestor */
+	wlan_twt_get_requestor_cfg(psoc, &twt_requestor);
+	wlan_twt_cfg_get_req_flag(psoc, &twt_req_support);
+	extcap->twt_requestor_support = twt_requestor && twt_req_support;
+
 }

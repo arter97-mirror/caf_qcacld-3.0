@@ -2017,6 +2017,15 @@ config CE_CMN_REG_CFG_QMI
 
 	choose y to enable the support.
 
+config RECORD_DP_CE_EVTS
+	bool "Enable RECORD_DP_CE_EVTS"
+	default n
+	help
+	This option enables support for recording data path owned
+	copy engine history events.
+
+	choose y to enable the support.
+
 config WLAN_DP_PROFILE_SUPPORT
 	bool "Enable WLAN_DP_PROFILE_SUPPORT"
 	default n

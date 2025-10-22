@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2646,6 +2646,10 @@
 
 #ifdef CONFIG_CE_CMN_REG_CFG_QMI
 #define CE_CMN_REG_CFG_QMI (1)
+#endif
+
+#ifdef CONFIG_RECORD_DP_CE_EVTS
+#define RECORD_DP_CE_EVTS
 #endif
 
 #ifdef CONFIG_HIF_CPU_CLEAR_AFFINITY

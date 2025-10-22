@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -120,8 +120,7 @@ static void lim_process_sae_msg_sta(struct mac_context *mac,
 
 			qdf_mem_zero(session->lim_join_req->rsnIE.rsnIEdata,
 				     WLAN_MAX_IE_LEN + 2);
-			lim_update_connect_rsn_ie(mac, session, rsn_ie_buf,
-						  pmksa);
+			lim_update_connect_rsn_ie(session, rsn_ie_buf, pmksa);
 
 			qdf_mem_free(pmksa);
 			qdf_mem_free(rsn_ie_buf);
@@ -445,7 +444,6 @@ static void lim_process_set_default_scan_ie_request(struct mac_context *mac_ctx,
 	uint16_t local_ie_len;
 	struct scheduler_msg msg_q = {0};
 	QDF_STATUS ret_code;
-	struct pe_session *pe_session;
 
 	if (!msg_buf) {
 		pe_err("msg_buf is NULL");
@@ -459,11 +457,9 @@ static void lim_process_set_default_scan_ie_request(struct mac_context *mac_ctx,
 	if (!local_ie_buf)
 		return;
 
-	pe_session = pe_find_session_by_vdev_id(mac_ctx,
-						set_ie_params->vdev_id);
 	if (lim_update_ext_cap_ie(mac_ctx,
 			(uint8_t *)set_ie_params->ie_data,
-			local_ie_buf, &local_ie_len, pe_session)) {
+			local_ie_buf, &local_ie_len, set_ie_params->vdev_id)) {
 		pe_err("Update ext cap IEs fails");
 		goto scan_ie_send_fail;
 	}

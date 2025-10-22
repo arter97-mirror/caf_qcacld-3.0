@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -833,6 +833,15 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 					true);
 		populate_dot11f_bcn_prot_extcaps(mac, pe_session,
 						 &prb_rsp_frm->ExtCap);
+
+		/*
+		 * TWT extended capabilities should be populated after the
+		 * intersection of beacon caps and self caps is done because
+		 * the bits for TWT are unique to STA and AP and cannot be
+		 * intersected.
+		 */
+		populate_dot11f_twt_extended_caps(mac, pe_session->vdev_id,
+						  &prb_rsp_frm->ExtCap);
 	}
 
 	nStatus = dot11f_get_packed_probe_response_size(mac,

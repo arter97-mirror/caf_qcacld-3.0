@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1735,8 +1735,7 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (pe_session->prev_auth_seq_num == curr_seq_num &&
 	    !qdf_mem_cmp(pe_session->prev_auth_mac_addr, &mac_hdr->sa,
-			 ETH_ALEN) &&
-	    mac_hdr->fc.retry) {
+			 ETH_ALEN)) {
 		pe_debug("auth frame, seq num: %d is already processed, drop it",
 			 curr_seq_num);
 		return;
@@ -1745,8 +1744,8 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	/* Duplicate Auth frame from peer */
 	auth_node = lim_search_pre_auth_list(mac_ctx, mac_hdr->sa);
 	if (auth_node && (auth_node->seq_num == curr_seq_num)) {
-		pe_err("Received an already processed auth frame with seq_num : %d",
-		       curr_seq_num);
+		pe_debug("Received an already processed auth frame with seq_num : %d",
+			 curr_seq_num);
 		return;
 	}
 

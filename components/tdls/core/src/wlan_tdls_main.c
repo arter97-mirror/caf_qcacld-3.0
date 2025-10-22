@@ -1990,6 +1990,11 @@ static void tdls_set_current_mode(struct tdls_soc_priv_obj *tdls_soc,
 							QDF_STA_MODE,
 							WLAN_TDLS_NB_ID);
 	if (vdev) {
+		if (!wlan_cm_is_vdev_connected(vdev)) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+			goto lookup_p2p_client;
+		}
+
 		tdls_debug("set mode in tdls STA vdev:%d",
 			   wlan_vdev_get_id(vdev));
 		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
@@ -1997,15 +2002,20 @@ static void tdls_set_current_mode(struct tdls_soc_priv_obj *tdls_soc,
 			tdls_set_mode_in_vdev(tdls_vdev, tdls_soc,
 					      tdls_mode, source);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
-
 		goto exit;
 	}
 
+lookup_p2p_client:
 	/* get p2p client vdev */
 	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(tdls_soc->soc,
 							QDF_P2P_CLIENT_MODE,
 							WLAN_TDLS_NB_ID);
 	if (vdev) {
+		if (!wlan_cm_is_vdev_connected(vdev)) {
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
+			goto exit;
+		}
+
 		tdls_debug("set mode in tdls P2P cli vdev:%d",
 			   wlan_vdev_get_id(vdev));
 		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
