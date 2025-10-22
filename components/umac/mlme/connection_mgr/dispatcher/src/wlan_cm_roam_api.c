@@ -3580,7 +3580,7 @@ cm_roam_stats_print_trigger_info(struct wlan_objmgr_psoc *psoc,
 	/* Update roam trigger info to userspace */
 	cm_roam_trigger_info_event(data, scan_data, vdev_id, is_full_scan);
 
-	mlme_rl_nofl_info("%s [ROAM_TRIGGER]: VDEV[%d] %s", time, vdev_id, buf);
+	mlme_nofl_info("%s [ROAM_TRIGGER]: VDEV[%d] %s", time, vdev_id, buf);
 	qdf_mem_free(buf);
 
 	status = wlan_cm_update_roam_states(psoc, vdev_id, data->trigger_reason,
@@ -3873,12 +3873,12 @@ cm_roam_stats_print_roam_result(struct wlan_objmgr_psoc *psoc,
 	mlme_get_converted_timestamp(res->timestamp, time);
 
 	if (res->fail_reason == ROAM_FAIL_REASON_CURR_AP_STILL_OK)
-		mlme_rl_nofl_info("%s [ROAM_RESULT]: VDEV[%d] %s",
-				  time, vdev_id, buf);
+		mlme_nofl_info("%s [ROAM_RESULT]: VDEV[%d] %s",
+			       time, vdev_id, buf);
 	else
-		mlme_rl_nofl_info("%s [ROAM_RESULT]: VDEV[%d] %s %s",
-				  time, vdev_id,
-				  mlme_get_roam_status_str(res->status), buf);
+		mlme_nofl_info("%s [ROAM_RESULT]: VDEV[%d] %s %s",
+			       time, vdev_id,
+			       mlme_get_roam_status_str(res->status), buf);
 	qdf_mem_free(buf);
 
 	status = wlan_cm_update_roam_states(psoc, vdev_id, res->fail_reason,
