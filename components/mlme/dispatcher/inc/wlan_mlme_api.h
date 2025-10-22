@@ -5769,4 +5769,20 @@ bool
 wlan_get_rx_tx_cck_5g_support_for_mode(struct wlan_objmgr_psoc *psoc,
 				       enum QDF_OPMODE opmode,
 				       bool *rx_support, bool *tx_support);
+
+/**
+ * wlan_get_fw_cck_cap() - get FW CCK RX/TX support
+ * @psoc: psoc
+ *
+ * Return: FW CCK support
+ */
+uint32_t wlan_get_fw_cck_cap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_update_mcc_cck_support() - update MCC CCK support
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wlan_mlme_update_mcc_cck_support(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_MLME_API_H_ */

@@ -5875,4 +5875,15 @@ QDF_STATUS ucfg_mlme_stop_miracast_opt(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_mlme_stop_miracast_opt(psoc);
 }
+
+/**
+ * ucfg_mlme_update_mcc_cck_support() - Update MCC CCK support
+ * @psoc: psoc
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_mlme_update_mcc_cck_support(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_update_mcc_cck_support(psoc);
+}
 #endif /* _WLAN_MLME_UCFG_API_H_ */
