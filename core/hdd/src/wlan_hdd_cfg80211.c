@@ -25277,7 +25277,8 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		 * if non-DBS is present.
 		 */
 		if (sap_sta_nan_concurrency &&
-		    ucfg_policy_mgr_is_fw_supports_dbs(psoc)) {
+		    ucfg_policy_mgr_is_fw_supports_dbs(psoc) &&
+		    dbs_two_by_two) {
 			/* remove STA NAN concurrency */
 			if (wlan_hdd_is_sta_nan_concurrency_present(
 					wlan_hdd_iface_combination, i))
