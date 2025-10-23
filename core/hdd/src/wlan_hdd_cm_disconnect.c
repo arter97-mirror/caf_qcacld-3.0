@@ -718,17 +718,6 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 		  max_bw);
 }
 
-static void
-hdd_cm_reset_idle_roaming_bitmap(struct wlan_hdd_link_info *link_info)
-{
-	qdf_atomic_clear_bit(IDLE_ROAM_POWER_SAVE_CMD,
-			     link_info->link_idle_roam_bitmap);
-	qdf_atomic_clear_bit(IDLE_ROAM_SETSUSPEND_CMD,
-			     link_info->link_idle_roam_bitmap);
-	qdf_atomic_clear_bit(IDLE_ROAM_ENABLED,
-			     link_info->link_idle_roam_bitmap);
-}
-
 static QDF_STATUS
 hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 					    struct wlan_cm_discon_rsp *rsp)
@@ -776,7 +765,6 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_cm_reset_udp_qos_upgrade_config(adapter);
 	ucfg_mlme_set_ml_link_control_mode(hdd_ctx->psoc,
 					   vdev->vdev_objmgr.vdev_id, 0);
-	hdd_cm_reset_idle_roaming_bitmap(link_info);
 
 	return QDF_STATUS_SUCCESS;
 }

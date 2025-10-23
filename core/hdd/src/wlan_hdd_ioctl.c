@@ -3280,7 +3280,6 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 	int errno;
 	uint8_t *value = command;
 	uint8_t idle_monitor;
-	QDF_STATUS status;
 
 	if (QDF_STA_MODE != adapter->device_mode) {
 		hdd_debug("Non-STA interface");
@@ -3305,15 +3304,6 @@ static int drv_cmd_set_suspend_mode(struct wlan_hdd_link_info *link_info,
 		  idle_monitor,
 		  ucfg_pmo_is_configure_apf_per_screen_state(hdd_ctx->psoc));
 
-	status = hdd_update_send_idle_roam_bitmap(link_info, hdd_ctx,
-						  idle_monitor,
-						  IDLE_ROAM_SETSUSPEND_CMD);
-
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_debug("Send suspend mode to fw failed");
-		return -EINVAL;
-	}
-
 	if (sme_get_dhcp_status(hdd_ctx->mac_handle, link_info->vdev_id) &&
 	    idle_monitor == 1) {
 		hdd_nofl_debug("DHCP in progress. Ignore SETSUSPEND command");
@@ -3328,6 +3318,7 @@ int hdd_handle_apf_mode_on_idle(struct hdd_context *hdd_ctx,
 				struct wlan_hdd_link_info *link_info,
 				uint8_t idle_monitor)
 {
+	QDF_STATUS status;
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct wlan_objmgr_vdev *vdev;
 
@@ -3356,6 +3347,12 @@ int hdd_handle_apf_mode_on_idle(struct hdd_context *hdd_ctx,
 		}
 	}
 
+	status = ucfg_pmo_tgt_psoc_send_idle_roam_suspend_mode(hdd_ctx->psoc,
+							       idle_monitor);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_debug("Send suspend mode to fw failed");
+		return -EINVAL;
+	}
 	return 0;
 }
 
