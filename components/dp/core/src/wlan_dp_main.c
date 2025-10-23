@@ -877,6 +877,56 @@ static void dp_set_rx_mode_value(struct wlan_dp_psoc_context *dp_ctx)
 		dp_ctx->rps, dp_ctx->dynamic_rps);
 }
 
+#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+
+/**
+ * dp_affn_override_cfg_init() - DP affinity override cfg init
+ * @config: SoC CFG config
+ * @psoc: Objmgr PSoC handle
+ *
+ * Return: None
+ */
+void dp_affn_override_cfg_init(
+	struct wlan_dp_psoc_cfg *config,
+	struct wlan_objmgr_psoc *psoc)
+{
+	config->dp_affn_override_enabled = cfg_get(
+						psoc,
+						CFG_DP_AFFN_OVERRIDE_ENABLE);
+
+	config->dp_affn_override_high_threshold =
+					cfg_get(
+					psoc,
+					CFG_DP_AFFN_OVERRIDE_HIGH_THRESHOLD);
+	config->dp_affn_override_mid_threshold =
+				cfg_get(
+				psoc,
+				CFG_DP_AFFN_OVERRIDE_MID_THRESHOLD);
+	config->dp_affn_override_low_threshold =
+					cfg_get(
+					psoc,
+					CFG_DP_AFFN_OVERRIDE_LOW_THRESHOLD);
+
+	config->dp_affn_override_low_tput_mask =
+					cfg_get(
+					psoc,
+					CFG_DP_AFFN_OVERRIDE_LOW_TPUT_MASK);
+	config->dp_affn_override_mid_tput_mask =
+					cfg_get(
+					psoc,
+					CFG_DP_AFFN_OVERRIDE_MEDIUM_TPUT_MASK);
+	config->dp_affn_override_high_tput_mask =
+					cfg_get(
+					psoc,
+					CFG_DP_AFFN_OVERRIDE_HIGH_TPUT_MASK);
+}
+
+#else
+void dp_affn_override_cfg_init(
+	struct wlan_dp_psoc_cfg *config,
+	struct wlan_objmgr_psoc *psoc)
+{}
+#endif /*WLAN_DP_AFFINITY_OVERRIDE_FEATURE*/
 #ifdef FEATURE_DIRECT_LINK
 static
 void dp_direct_link_cfg_init(struct wlan_dp_psoc_cfg *config,
@@ -965,6 +1015,7 @@ static void dp_cfg_init(struct wlan_dp_psoc_context *ctx)
 	dp_nud_tracking_cfg_update(config, psoc);
 	dp_trace_cfg_update(config, psoc);
 	dp_fisa_cfg_init(config, psoc);
+	dp_affn_override_cfg_init(config, psoc);
 	dp_direct_link_cfg_init(config, psoc);
 	wlan_dp_stc_cfg_init(config, psoc);
 	dp_ndp_bw_flow_ctrl_cfg_init(config, psoc);
