@@ -1264,6 +1264,32 @@ static inline void dp_affn_override_set_rx_thread_affinity(
 }
 
 /**
+ * dp_affn_override_compute_tput_level() - Function to compute tput level
+ * based on total number of packets received.
+ * @dp_ctx: Dp context
+ * @total_packets: total packets(tx+rx)
+ *
+ * Return: dp affinity override throughput level calculated based on threshold
+ */
+static inline enum dp_affn_override_tput_level dp_affn_override_compute_tput_level(
+	struct wlan_dp_psoc_context *dp_ctx,
+	uint64_t total_packets)
+{
+	enum dp_affn_override_tput_level tput_level;
+
+	if (total_packets > dp_ctx->dp_cfg.dp_affn_override_high_threshold)
+		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH;
+	else if (total_packets > dp_ctx->dp_cfg.dp_affn_override_mid_threshold)
+		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_MID;
+	else if (total_packets > dp_ctx->dp_cfg.dp_affn_override_low_threshold)
+		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW;
+	else
+		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE;
+
+	return tput_level;
+}
+
+/**
  * dp_set_affinity_override() - Function to set affinity based on throughput
  * level.
  * @dp_ctx: Dp context
