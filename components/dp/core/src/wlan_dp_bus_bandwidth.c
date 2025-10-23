@@ -1536,6 +1536,38 @@ static inline void dp_set_tx_irq_affinity(struct wlan_dp_psoc_context *dp_ctx,
 	}
 }
 
+/**
+ * dp_set_affinity_wrapper() - Wrapper function to set affinities
+ * @dp_ctx: handle to DP context
+ * @total_packets: Total Tx and Rx packets
+ * @tput_level: throughput level
+ * @prev_tput_level: previous throughput level
+ * @next_vote_level: next vote level
+ *
+ * The function sets the affinities according to throughput level
+ * and next vote level.
+ *
+ * Returns: None
+ */
+static inline void dp_set_affinity_wrapper(
+	struct wlan_dp_psoc_context *dp_ctx,
+	uint64_t total_packets,
+	enum tput_level tput_level,
+	enum tput_level prev_tput_level,
+	enum pld_bus_width_type next_vote_level)
+{
+	if (wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg)) {
+		wlan_dp_affn_override_handler(dp_ctx, total_packets);
+	} else {
+		if (dp_ctx->cur_vote_level != next_vote_level) {
+			dp_set_rx_thread_affinity(
+				dp_ctx, tput_level, prev_tput_level);
+			dp_set_tx_irq_affinity(
+				dp_ctx, tput_level, prev_tput_level);
+		}
+	}
+}
+
 #ifdef IPA_OPT_WIFI_DP
 static inline
 bool dp_ipa_is_fw_wdi_activated(struct wlan_dp_psoc_context *dp_ctx)
@@ -1652,10 +1684,12 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	dp_low_tput_gro_flush_skip_handler(dp_ctx, next_vote_level,
 					   legacy_client);
 
+	/* Set affinity for wlan interrupts and rx threads*/
+	dp_set_affinity_wrapper(
+		dp_ctx, total_pkts,
+		tput_level, prev_tput_level,
+		next_vote_level);
 	if (dp_ctx->cur_vote_level != next_vote_level) {
-		/* Set affinity for tx completion grp interrupts */
-		dp_set_tx_irq_affinity(dp_ctx, tput_level, prev_tput_level);
-		dp_set_rx_thread_affinity(dp_ctx, tput_level, prev_tput_level);
 		prev_tput_level = tput_level;
 		dp_ctx->cur_vote_level = next_vote_level;
 		vote_level_change = true;
@@ -1796,9 +1830,14 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 					  true : false);
 		dp_periodic_sta_stats_display(dp_ctx);
 	}
-
-	hif_affinity_mgr_set_affinity(hif_ctx);
-	wlan_dp_lb_compute_stats_average(dp_ctx, tput_level);
+	/* If DP affinity override feature is enabled, setting affinity
+	 * via affinity manager and load balancer is to be
+	 * avoided.
+	 */
+	if (!wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg)) {
+		hif_affinity_mgr_set_affinity(hif_ctx);
+		wlan_dp_lb_compute_stats_average(dp_ctx, tput_level);
+	}
 
 }
 
