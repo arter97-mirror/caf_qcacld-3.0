@@ -10,6 +10,7 @@ targets = [
     "pineapple",
     "seraph",
     "hamoa",
+    "art",
 ]
 
 la_variants = [
