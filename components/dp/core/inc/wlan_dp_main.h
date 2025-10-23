@@ -203,6 +203,21 @@ dp_get_intf_by_macaddr(struct wlan_dp_psoc_context *dp_ctx,
 	(((affinity) >> CPU_CONFIG_SHIFT) & CPU_CONFIG_MASK)
 
 /**
+ * wlan_dp_affn_override_handler() - Function to set affinities according to
+ * DP affinity override threshold levels
+ * @dp_ctx: handle to DP context
+ * @total_packets: Total Tx and Rx packets
+ *
+ * The function sets the affinities according to throughput level
+ * and next vote level.
+ *
+ * Return: None
+ */
+void wlan_dp_affn_override_handler(
+	struct wlan_dp_psoc_context *dp_ctx,
+	uint64_t total_packets);
+
+/**
  * wlan_dp_cfg_is_affn_override_enabled() - Get DP affn override enabled flag
  * @dp_cfg: soc configuration context
  *
@@ -228,6 +243,11 @@ bool wlan_dp_cfg_is_affn_override_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
 {
 	return false;
 }
+
+static inline void wlan_dp_affn_override_handler(
+	struct wlan_dp_psoc_context *dp_ctx,
+	uint64_t total_packets)
+{}
 
 static inline void dp_affn_override_init(struct wlan_objmgr_psoc *psoc)
 {}

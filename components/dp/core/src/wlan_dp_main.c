@@ -38,6 +38,7 @@
 #include <htc_api.h>
 #include <cdp_txrx_cmn_reg.h>
 #include <cdp_txrx_bus.h>
+#include <cdp_txrx_misc.h>
 #if defined(WLAN_DP_PROFILE_SUPPORT) || defined(FEATURE_DIRECT_LINK)
 #include "cdp_txrx_ctrl.h"
 #endif
@@ -1224,6 +1225,108 @@ void dp_affn_override_cfg_init(
 					cfg_get(
 					psoc,
 					CFG_DP_AFFN_OVERRIDE_HIGH_TPUT_MASK);
+}
+
+/**
+ * dp_affn_override_set_rx_thread_affinity() - Wrapper Function to set affinity
+ * for dp rx threads.
+ * @dp_ctx: DP context
+ * @cpu_mask: cpu bit mask
+ *
+ * Return: None
+ */
+static inline void dp_affn_override_set_rx_thread_affinity(
+	struct wlan_dp_psoc_context *dp_ctx,
+	uint32_t cpu_mask)
+{
+	qdf_cpu_mask new_cpu_mask;
+	unsigned int cpus;
+
+	if (!cpu_mask)
+		return;
+
+	qdf_cpumask_clear(&new_cpu_mask);
+
+	qdf_for_each_possible_cpu(cpus) {
+		if (BIT(cpus) & cpu_mask)
+			qdf_cpumask_set_cpu(cpus, &new_cpu_mask);
+		}
+
+	if (!qdf_cpumask_equal(&dp_ctx->rx_thread_cpu_mask, &new_cpu_mask)) {
+		dp_debug("Affining DP RX threads to cpumask %*pbl",
+			 qdf_cpumask_pr_args(&new_cpu_mask));
+		qdf_cpumask_copy(&dp_ctx->rx_thread_cpu_mask, &new_cpu_mask);
+		dp_txrx_set_cpu_mask(dp_ctx->cdp_soc, &new_cpu_mask);
+	} else {
+		dp_info_rl("Skip affining dp rx threads same mask %*pbl",
+			   qdf_cpumask_pr_args(&new_cpu_mask));
+	}
+}
+
+/**
+ * dp_set_affinity_override() - Function to set affinity based on throughput
+ * level.
+ * @dp_ctx: Dp context
+ * @dp_affn_override_tput_lvl: DP affinity override throughput level
+ *
+ * Return: None
+ */
+static inline void dp_set_affinity_override(
+	struct wlan_dp_psoc_context *dp_ctx,
+	enum dp_affn_override_tput_level dp_affn_override_tput_lvl)
+{
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct dp_affn_override_params *affn_param =
+					&dp_ctx->dp_affn_override_params;
+
+	if (!(dp_affn_override_tput_lvl >= DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE &&
+	      dp_affn_override_tput_lvl < DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS))
+		return;
+
+	uint32_t rx_intr_affn_mask =
+			affn_param->dp_affn_override_rx_intr_mask[
+					dp_affn_override_tput_lvl];
+	uint32_t tx_comp_affn_mask =
+			affn_param->dp_affn_override_tx_comp_mask[
+					dp_affn_override_tput_lvl];
+	uint32_t rx_thread_affn_mask =
+			affn_param->dp_affn_override_rx_thread_mask[
+					dp_affn_override_tput_lvl];
+	uint32_t napi_rx_thread_affn_mask =
+			affn_param->dp_affn_override_napi_rx_thread_mask[
+					dp_affn_override_tput_lvl];
+
+	/* Set RX interrupt affinity */
+	hif_set_grp_affinity_cpumaskwise(
+		dp_ctx->hif_handle, cdp_get_rx_rings_grp_bitmap(soc),
+		rx_intr_affn_mask, napi_rx_thread_affn_mask);
+	/* Set tx completion interrupt affinity */
+	hif_set_grp_affinity_cpumaskwise(
+		dp_ctx->hif_handle, cdp_get_tx_rings_grp_bitmap(soc),
+		tx_comp_affn_mask, 0);
+	/* Set RX thread affinity */
+	dp_affn_override_set_rx_thread_affinity(dp_ctx, rx_thread_affn_mask);
+}
+
+void wlan_dp_affn_override_handler(
+	struct wlan_dp_psoc_context *dp_ctx,
+	uint64_t total_packets)
+{
+	enum dp_affn_override_tput_level tput_level_calc;
+	static enum dp_affn_override_tput_level prev_tput_level =
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE;
+
+	tput_level_calc = dp_affn_override_compute_tput_level(
+					dp_ctx, total_packets);
+	if (dp_ctx->dp_affn_override_curr_tput_level != tput_level_calc) {
+		dp_info("total packets: %llu, tput level: %s ",
+			total_packets,
+			dp_affn_override_tput_lvl_to_str(tput_level_calc));
+		dp_set_affinity_override(dp_ctx,
+					 tput_level_calc);
+		prev_tput_level = tput_level_calc;
+		dp_ctx->dp_affn_override_curr_tput_level = tput_level_calc;
+	}
 }
 
 #else
