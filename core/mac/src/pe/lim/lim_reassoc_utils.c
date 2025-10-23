@@ -402,6 +402,8 @@ QDF_STATUS lim_add_ft_sta_self(struct mac_context *mac_ctx, uint16_t assoc_id,
 	add_sta_params = session_entry->ftPEContext.pAddStaReq;
 	add_sta_params->assocId = assoc_id;
 	add_sta_params->smesessionId = session_entry->smeSessionId;
+	if (session_entry->limRmfEnabled)
+		add_sta_params->rmfEnabled = true;
 
 	qdf_mem_copy(add_sta_params->supportedRates.supportedMCSSet,
 		     sta_ds->supportedRates.supportedMCSSet,

@@ -531,6 +531,40 @@ end:
 			     (uint32_t *) &mlmReassocCnf);
 }
 
+#ifdef WLAN_FEATURE_11W
+/**
+  * lim_update_rmf_for_ft_reassoc() - Update reassoc rmf
+  * @pMac: Global MAC context
+  * @session: PE Session
+  *
+  * This function is used to update reassoc rmf when reassoc
+  * occur in wpa2/wpa3 mixed mode
+  *
+  *  Return: None
+  */
+static void lim_update_rmf_for_ft_reassoc(struct mac_context *mac,
+					  struct pe_session *session)
+{
+	struct bss_params *add_bss;
+
+	session->limRmfEnabled =
+			lim_get_vdev_rmf_capable(mac, session);
+
+	if (session->ftPEContext.pAddBssReq) {
+		add_bss = (struct bss_params *)
+				session->ftPEContext.pAddBssReq;
+
+		if (session->limRmfEnabled) {
+			add_bss->rmfEnabled = 1;
+			add_bss->staContext.rmfEnabled = 1;
+		} else {
+			add_bss->rmfEnabled = 0;
+			add_bss->staContext.rmfEnabled = 0;
+		}
+	}
+}
+#endif
+
 void lim_process_mlm_ft_reassoc_req(struct mac_context *mac,
 				    tLimMlmReassocReq *reassoc_req)
 {
@@ -573,6 +607,10 @@ void lim_process_mlm_ft_reassoc_req(struct mac_context *mac,
 
 	qdf_mem_copy(reassoc_req->peerMacAddr,
 		     session->bssId, sizeof(tSirMacAddr));
+
+#ifdef WLAN_FEATURE_11W
+	lim_update_rmf_for_ft_reassoc(mac, session);
+#endif
 
 	if (lim_get_capability_info(mac, &caps, session) !=
 			QDF_STATUS_SUCCESS) {

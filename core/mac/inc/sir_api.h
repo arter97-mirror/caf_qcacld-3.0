@@ -2341,6 +2341,8 @@ struct roam_offload_scan_req {
 	struct roam_trigger_min_rssi min_rssi_params[NUM_OF_ROAM_TRIGGERS];
 	struct roam_trigger_score_delta score_delta_param[NUM_OF_ROAM_TRIGGERS];
 	uint32_t full_roam_scan_period;
+	uint32_t num_allowed_authmode;
+	uint32_t allowed_authmode[WLAN_NUM_OF_SUPPORT_AUTH_TYPE];
 };
 
 struct roam_offload_scan_rsp {
