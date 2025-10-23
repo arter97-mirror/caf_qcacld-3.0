@@ -335,6 +335,11 @@ static void wlan_dp_lb_handler(struct wlan_dp_psoc_context *dp_ctx)
 	uint8_t targeted_load_per_cpu;
 	uint8_t non_wlan_avg_load = 0;
 	bool do_load_balance = true;
+	/* If DP affinity override is enabled skip
+	 * other affinity settings
+	 */
+	if (wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg))
+		return;
 
 	dp_info("cpu mask for load balance %*pbl ",
 		qdf_cpumask_pr_args(cpu_mask));
