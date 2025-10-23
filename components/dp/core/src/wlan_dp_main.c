@@ -878,6 +878,133 @@ static void dp_set_rx_mode_value(struct wlan_dp_psoc_context *dp_ctx)
 }
 
 #ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+/**
+ * enum dp_affinity_type - DP affinity type
+ * @DP_RX_INTR_AFFN: RX Interrupt affinity
+ * @DP_TX_COMP_INTR_AFFN: TX completion affinity
+ * @DP_RX_THREAD_AFFN: Rx Thread affinity
+ * @DP_NAPI_RX_THREAD_AFFN: NAPI Rx Thread affinity
+ * @DP_AFFINITY_TYPE_MAX: Max count of affinity type
+ */
+enum dp_affinity_type {
+	DP_RX_INTR_AFFN,
+	DP_TX_COMP_INTR_AFFN,
+	DP_RX_THREAD_AFFN,
+	DP_NAPI_RX_THREAD_AFFN,
+	DP_AFFINITY_TYPE_MAX
+};
+
+static const uint8_t dp_affn_type_shifts[DP_AFFINITY_TYPE_MAX] = {
+	/*RX INTR shift*/
+	0,
+	/*TX completion INTR shift*/
+	8,
+	/*RX thread affinity shift*/
+	16,
+	/*NAPI RX thread affinity shift*/
+	24
+};
+
+/**
+ * dp_affn_type_to_str() - Function to get dp affinity type string
+ * @affn_type: affinity type
+ *
+ * Return: affinity type string.
+ */
+static const char *dp_affn_type_to_str(enum dp_affinity_type affn_type)
+{
+	switch (affn_type) {
+	case DP_RX_INTR_AFFN:
+		return "RX_INTR";
+	case DP_TX_COMP_INTR_AFFN:
+		return "TX_COMP_INTR";
+	case DP_RX_THREAD_AFFN:
+		return "RX_THREAD";
+	case DP_NAPI_RX_THREAD_AFFN:
+		return "NAPI_RX_THREAD";
+	default:
+		return "INVALID AFFN";
+	}
+}
+
+/**
+ * dp_affn_override_tput_lvl_to_str() - Function to get dp afffinity override
+ * throughput level string
+ * @tput_level: Throughput level
+ *
+ * Return: DP affinity override throughput level string.
+ */
+static const char *dp_affn_override_tput_lvl_to_str(
+	enum dp_affn_override_tput_level tput_level)
+{
+	switch (tput_level) {
+	case DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE:
+		return "IDLE";
+	case DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW:
+		return "LOW";
+	case DP_AFFN_OVERRIDE_TPUT_LEVEL_MID:
+		return "MID";
+	case DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH:
+		return "HIGH";
+	default:
+		return "INVALID";
+	}
+}
+
+/**
+ * dp_affn_override_print_params() - Function to print dp affinity override
+ * parameters.
+ * @dp_ctx: DP context
+ *
+ * Return: None
+ */
+static inline void dp_affn_override_print_params(
+	struct wlan_dp_psoc_context *dp_ctx)
+{
+	uint8_t t_lvl, affn_type;
+
+	struct dp_affn_override_params *affn_param =
+					&dp_ctx->dp_affn_override_params;
+	uint32_t cpu_mask;
+
+	for (affn_type = 0; affn_type < DP_AFFINITY_TYPE_MAX;
+			affn_type++) {
+		dp_info("DP affinity type %s", dp_affn_type_to_str(affn_type));
+		for (t_lvl = 0; t_lvl < DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS;
+			t_lvl++) {
+			dp_info("DP AFFN override tput level %s",
+				dp_affn_override_tput_lvl_to_str(t_lvl));
+			switch (affn_type) {
+			case DP_RX_INTR_AFFN:
+				cpu_mask =
+				affn_param->dp_affn_override_rx_intr_mask[
+									t_lvl];
+				dp_info("CPU MASK: 0x%x", cpu_mask);
+				break;
+			case DP_TX_COMP_INTR_AFFN:
+				cpu_mask =
+				affn_param->dp_affn_override_tx_comp_mask[
+									t_lvl];
+				dp_info("CPU MASK: 0x%x", cpu_mask);
+				break;
+			case DP_RX_THREAD_AFFN:
+				cpu_mask =
+				affn_param->dp_affn_override_rx_thread_mask[
+									t_lvl];
+				dp_info("CPU MASK: 0x%x", cpu_mask);
+				break;
+			case DP_NAPI_RX_THREAD_AFFN:
+				cpu_mask =
+				affn_param->dp_affn_override_napi_rx_thread_mask
+									[t_lvl];
+				dp_info("CPU MASK: 0x%x", cpu_mask);
+				break;
+			default:
+				dp_info("Error: Other DP affinity type\n");
+			}
+		}
+	}
+}
 
 /**
  * dp_configure_affn_override_mask() - Function to extract and construct
@@ -1051,6 +1178,7 @@ void dp_affn_override_init(struct wlan_objmgr_psoc *psoc)
 	}
 
 	dp_affinity_override_params_init(dp_ctx);
+	dp_affn_override_print_params(dp_ctx);
 
 	dp_ctx->dp_affn_override_curr_tput_level = -1;
 	qdf_cpumask_clear(&dp_ctx->rx_thread_cpu_mask);
