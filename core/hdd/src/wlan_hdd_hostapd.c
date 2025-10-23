@@ -3566,8 +3566,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			}
 		}
 
-		/* Check any other sap need restart */
-		if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+		/* Check any SAP need restart, if initiater was not LL SAP */
+		if (sap_ctx->csa_reason != CSA_REASON_LL_LT_SAP_EVENT &&
+		    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
 						  link_info->vdev_id))
 			hdd_hostapd_check_channel_post_csa(hdd_ctx, adapter);
 
@@ -3910,7 +3911,7 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	bool capable, is_wps;
 	int32_t keymgmt;
 	enum policy_mgr_con_mode pm_con_mode;
-	qdf_freq_t ll_sap_freq;
+	bool is_ll_lt_sap_vdev;
 
 	if (!link_info)
 		return -EINVAL;
@@ -3952,30 +3953,27 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	 * vdev is ll sap.
 	 *
 	 */
-	if (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
-					 wlan_vdev_get_id(sap_ctx->vdev)) &&
+	is_ll_lt_sap_vdev = policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc,
+							 link_info->vdev_id);
+	if (is_ll_lt_sap_vdev &&
 	    sap_ctx->csa_reason != CSA_REASON_DCS &&
 	    sap_ctx->csa_reason != CSA_REASON_USER_INITIATED) {
 		wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
 					    CSA_REASON_LL_LT_SAP_EVENT);
-		hdd_dcs_trigger_csa_for_ll_lt_sap(
-				hdd_ctx->psoc,
-				hdd_ctx,
-				wlan_vdev_get_id(sap_ctx->vdev),
-				LL_SAP_CSA_CONCURENCY);
+		hdd_dcs_trigger_csa_for_ll_lt_sap(hdd_ctx->psoc, hdd_ctx,
+						  link_info->vdev_id,
+						  LL_SAP_CSA_CONCURENCY);
 		return ret;
 	}
 
-	ll_sap_freq = policy_mgr_get_ll_lt_sap_freq(hdd_ctx->psoc);
 	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(hdd_ctx->psoc,
 							   adapter->device_mode,
 							   link_info->vdev_id);
 
-	if (ll_sap_freq && pm_con_mode == PM_SAP_MODE &&
-	    policy_mgr_are_2_freq_on_same_mac(hdd_ctx->psoc, target_chan_freq,
-					      ll_sap_freq)) {
-		hdd_err("ll_sap freq %d and sap freq %d are on same mac",
-			ll_sap_freq, target_chan_freq);
+	if (!policy_mgr_ll_lt_sap_allow_csa(hdd_ctx->psoc, link_info->vdev_id,
+					    target_chan_freq, pm_con_mode)) {
+		hdd_err("vdev %d Reject CSA on %d, due to LL LT SAP concurecny",
+			link_info->vdev_id, target_chan_freq);
 		return -EINVAL;
 	}
 
@@ -4490,7 +4488,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		ch_params.ch_width = CH_WIDTH_MAX;
 
 	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id)) {
-		if (!policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
+		if (!policy_mgr_is_ll_lt_sap_restart_required(psoc, 0)) {
 			hdd_debug("vdev %d freq %d, LL LT SAP dont need Channel change",
 				  vdev_id, sap_context->chan_freq);
 			wlansap_context_put(sap_context);
@@ -7873,8 +7871,10 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		goto error;
 	}
 
-	/* Cancel all ongoing/pending no sap scan requests */
-	hdd_abort_non_sap_scan_all_adapters(hdd_ctx);
+	if (!policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, link_info->vdev_id)) {
+		/* Cancel all ongoing/pending no sap scan requests */
+		hdd_abort_non_sap_scan_all_adapters(hdd_ctx);
+	}
 
 	status = wlansap_start_bss(sap_ctx, sap_event_callback, config);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {

@@ -43,6 +43,8 @@ QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status;
+	bool is_ll_lt_sap;
+	uint8_t vdev_id;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -51,15 +53,19 @@ QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
+	vdev_id = wlan_vdev_get_id(vdev);
 
 	wlan_tdls_notify_start_bss(psoc, vdev);
+	is_ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id);
 
+	if (is_ll_lt_sap)
+		wlan_ll_sap_set_start_bss_in_progress(psoc, vdev_id, true);
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE ||
 	    wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE) {
 		if (wlan_mlme_is_aux_emlsr_support(psoc))
-			ml_nlink_conn_change_notify(
-					psoc, wlan_vdev_get_id(vdev),
-					ml_nlink_ap_start_evt, NULL);
+			ml_nlink_conn_change_notify(psoc, vdev_id,
+						    ml_nlink_ap_start_evt,
+						    NULL);
 		else
 			wlan_handle_emlsr_sta_concurrency(psoc, true, false);
 	}
@@ -71,6 +77,7 @@ QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
+
 	if (policy_mgr_is_chan_switch_in_progress(psoc)) {
 		status = policy_mgr_wait_chan_switch_complete_evt(psoc);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -82,6 +89,12 @@ QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 	if (policy_mgr_is_sta_active_connection_exists(psoc))
 		/* Disable Roaming on all vdev's before starting bss */
 		if_mgr_disable_roaming(pdev, vdev, RSO_START_BSS);
+
+	/* Things may get change from ACS to start bss so recheck */
+	if (is_ll_lt_sap)
+		policy_mgr_ll_lt_sap_restart_concurrent_sap(
+						psoc,
+						LL_LT_SAP_EVENT_STARTING);
 
 	/* abort p2p roc before starting the BSS for sync event */
 	ucfg_p2p_cleanup_roc_by_psoc(psoc);
@@ -153,6 +166,8 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status;
+	bool is_ll_lt_sap;
+	uint8_t vdev_id;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -161,13 +176,15 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
+	vdev_id = wlan_vdev_get_id(vdev);
+	is_ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id);
 
 	if (event_data &&
 	    event_data->status != QDF_STATUS_SUCCESS &&
 	    (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE ||
 	     wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE) &&
 	    wlan_mlme_is_aux_emlsr_support(psoc))
-		ml_nlink_conn_change_notify(psoc, wlan_vdev_get_id(vdev),
+		ml_nlink_conn_change_notify(psoc, vdev_id,
 					    ml_nlink_ap_start_failed_evt, NULL);
 
 	/*
@@ -193,7 +210,7 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 		 * the roam handoff sequence, resulting in a firmware assertion.
 		 */
 		ifmgr_debug("vdev: %d link switch in progress, Dont enable roaming",
-			    wlan_vdev_get_id(vdev));
+			    vdev_id);
 		/*
 		 * After START_BSS completes, the host avoids enabling roaming
 		 * in the firmware if a link switch is in progress. It is the
@@ -210,11 +227,13 @@ if_mgr_ap_start_bss_complete(struct wlan_objmgr_vdev *vdev,
 		ifmgr_debug("Enable Roaming after start bss complete");
 		if_mgr_enable_roaming(pdev, vdev, RSO_START_BSS);
 	}
+	if (is_ll_lt_sap)
+		wlan_ll_sap_set_start_bss_in_progress(psoc, vdev_id, false);
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		policy_mgr_check_sap_go_force_scc(psoc, vdev,
 						  CSA_REASON_GO_BSS_STARTED);
-	else if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
+	else if (is_ll_lt_sap)
 		policy_mgr_ll_lt_sap_restart_concurrent_sap(
 						psoc, LL_LT_SAP_EVENT_STARTED);
 	else
@@ -315,6 +334,8 @@ if_mgr_ap_csa_complete(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_pdev *pdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t vdev_id;
+	enum sap_csa_reason_code csa_reason = CSA_REASON_UNKNOWN;
+	bool is_ll_sap;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev)
@@ -324,16 +345,26 @@ if_mgr_ap_csa_complete(struct wlan_objmgr_vdev *vdev,
 	if (!psoc)
 		return QDF_STATUS_E_FAILURE;
 
+	if (event_data)
+		csa_reason = *((enum sap_csa_reason_code *)event_data->data);
+
 	vdev_id = wlan_vdev_get_id(vdev);
 
 	status = wlan_p2p_check_and_force_scc_go_plus_go(psoc, vdev);
 	if (QDF_IS_STATUS_ERROR(status))
 		ifmgr_err("force scc failure with status: %d", status);
 
+	is_ll_sap = policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id);
+	if (!is_ll_sap && csa_reason == CSA_REASON_LL_LT_SAP_EVENT) {
+		ifmgr_info("For reason %d Skip check for channel change",
+			   csa_reason);
+		goto skip_restart_check;
+	}
+
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		policy_mgr_check_sap_go_force_scc(psoc, vdev,
 						  CSA_REASON_GO_BSS_STARTED);
-	else if (policy_mgr_is_vdev_ll_lt_sap(psoc, wlan_vdev_get_id(vdev)))
+	else if (is_ll_sap)
 		policy_mgr_ll_lt_sap_restart_concurrent_sap(
 						psoc, LL_LT_SAP_EVENT_STARTED);
 	else
@@ -341,6 +372,7 @@ if_mgr_ap_csa_complete(struct wlan_objmgr_vdev *vdev,
 				psoc,
 				wlan_util_vdev_mgr_get_acs_mode_for_vdev(vdev));
 
+skip_restart_check:
 	wlan_tdls_notify_channel_switch_complete(psoc, vdev_id);
 
 	if (wlan_ll_sap_is_bearer_switch_req_on_csa(psoc, vdev_id))

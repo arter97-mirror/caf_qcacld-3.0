@@ -46,6 +46,7 @@
 #include "wlan_psoc_mlme_api.h"
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_cm_roam_api.h"
+#include "wlan_ll_sap_api.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -3917,7 +3918,7 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 		return;
 	}
 
-	if (policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
+	if (policy_mgr_is_ll_lt_sap_restart_required(psoc, 0)) {
 		restart_sap = true;
 		goto sap_restart;
 	}
@@ -4391,21 +4392,37 @@ static void __policy_mgr_is_ap_start_in_progress(struct wlan_objmgr_pdev *pdev,
 	uint32_t *ap_starting_vdev_id = (uint32_t *)arg;
 	enum wlan_serialization_cmd_type cmd_type;
 	enum QDF_OPMODE op_mode;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t vdev_id;
 
 	if (!vdev || !ap_starting_vdev_id)
 		return;
 	if (*ap_starting_vdev_id != WLAN_INVALID_VDEV_ID)
 		return;
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return;
+
 	op_mode = wlan_vdev_mlme_get_opmode(vdev);
 	if (op_mode != QDF_SAP_MODE && op_mode != QDF_P2P_GO_MODE &&
 	    op_mode != QDF_NDI_MODE)
 		return;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	if (policy_mgr_is_vdev_ll_lt_sap(psoc, vdev_id) &&
+	    wlan_ll_sap_is_start_bss_in_progress(psoc, vdev_id)) {
+		*ap_starting_vdev_id = vdev_id;
+		policy_mgr_debug("LL SAP vdev %d op mode %d start bss in progress",
+				 *ap_starting_vdev_id, op_mode);
+		return;
+	}
+
 	/* Check AP start is present in active and pending queue or not */
 	cmd_type = wlan_serialization_get_vdev_active_cmd_type(vdev);
 	if (cmd_type == WLAN_SER_CMD_VDEV_START_BSS ||
 	    wlan_ser_is_non_scan_cmd_type_in_vdev_queue(
 			vdev, WLAN_SER_CMD_VDEV_START_BSS)) {
-		*ap_starting_vdev_id = wlan_vdev_get_id(vdev);
+		*ap_starting_vdev_id = vdev_id;
 		policy_mgr_debug("vdev %d op mode %d start bss is pending",
 				 *ap_starting_vdev_id, op_mode);
 	}

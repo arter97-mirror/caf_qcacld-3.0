@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -143,4 +143,17 @@ wmi_extract_big_data_stats_param(wmi_unified_t wmi_handle, void *evt_buf,
 				 struct big_data_stats_event *stats_param);
 #endif
 
+/**
+ * wmi_extract_recv_bcn_stats() - extract receive beacon stats from event
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @index: index into recv bcn stats
+ * @recv_bcn_stats: pointer to hold recv bcn stats
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_extract_recv_bcn_stats(wmi_unified_t wmi_handle, void *evt_buf,
+			   uint32_t index,
+			   struct wmi_host_recv_bcn_stats *recv_bcn_stats);
 #endif /* _WMI_UNIFIED_MC_CP_STATS_API_H_ */

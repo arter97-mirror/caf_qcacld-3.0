@@ -3455,9 +3455,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		}
 		/*fill rsnx opaque*/
 		frm->RSNXEOpaque.present = 1;
-		frm->RSNXEOpaque.num_data = rsnx_ie[1];
-		qdf_mem_copy(frm->RSNXEOpaque.data, rsnx_ie + 2, /* EID, len */
-			     rsnx_ie[1]);
+		frm->RSNXEOpaque.num_data = rsnx_ie[TAG_LEN_POS];
+		qdf_mem_copy(frm->RSNXEOpaque.data, rsnx_ie + MIN_IE_LEN,
+			     rsnx_ie[TAG_LEN_POS]);
 
 	}
 
@@ -3479,9 +3479,11 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		}
 		/*fill mscs opaque*/
 		frm->MSCSEXTOpaque.present = 1;
-		frm->MSCSEXTOpaque.num_data = mscs_ext_ie[1];
-		qdf_mem_copy(frm->MSCSEXTOpaque.data, mscs_ext_ie + 2,
-			     mscs_ext_ie[1]);
+		frm->MSCSEXTOpaque.num_data =
+			mscs_ext_ie[TAG_LEN_POS] - MSCS_OUI_SIZE;
+		qdf_mem_copy(frm->MSCSEXTOpaque.data,
+			     mscs_ext_ie + MIN_IE_LEN + MSCS_OUI_SIZE,
+			     mscs_ext_ie[TAG_LEN_POS] - MSCS_OUI_SIZE);
 	}
 
 	/*

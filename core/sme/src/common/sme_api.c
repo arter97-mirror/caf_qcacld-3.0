@@ -90,6 +90,7 @@
 #include "wlan_vdev_mgr_ucfg_api.h"
 #include "wlan_vdev_mlme_main.h"
 #include "wlan_tdls_api.h"
+#include "wlan_ll_sap_api.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -17180,6 +17181,39 @@ p2p_self_peer_create:
 }
 #endif
 
+/**
+ * sme_validate_n_update_ll_lt_sap_freq() - Validate and update the LL_LT_SAP
+ * frequency.
+ *
+ * This function checks if the LL_LT_SAP can start on the current frequency.
+ * If not, it updates the frequency from the valid frequency list.
+ *
+ * @mac: Pointer to the MAC context.
+ * @con_mode: The connection mode.
+ * @cfg: Pointer to the start BSS configuration.
+ *
+ * Return: None
+ */
+static void sme_validate_n_update_ll_lt_sap_freq(struct mac_context *mac,
+					enum policy_mgr_con_mode con_mode,
+					struct start_bss_config *cfg)
+{
+	enum sap_csa_reason_code csa_reason;
+	qdf_freq_t new_freq;
+
+	if (con_mode != PM_LL_LT_SAP_MODE)
+		return;
+
+	new_freq = wlan_get_ll_lt_sap_restart_freq(mac->pdev, cfg->oper_ch_freq,
+						   cfg->vdev_id, &csa_reason);
+	if (new_freq == cfg->oper_ch_freq)
+		return;
+
+	sme_debug("LL_LT_SAP %d: concurrency updated freq %d => %d",
+		  cfg->vdev_id, cfg->oper_ch_freq, new_freq);
+	cfg->oper_ch_freq = new_freq;
+}
+
 static QDF_STATUS sme_send_start_bss_msg(struct mac_context *mac,
 					 struct start_bss_config *cfg)
 {
@@ -17203,8 +17237,7 @@ static QDF_STATUS sme_send_start_bss_msg(struct mac_context *mac,
 	 * condition case.
 	 */
 	conn_count = policy_mgr_get_connection_count(mac->psoc);
-	if ((pm_con_mode == PM_SAP_MODE ||
-	     pm_con_mode == PM_P2P_GO_MODE) &&
+	if (policy_mgr_is_beaconing_mode(pm_con_mode) &&
 	    conn_count != cfg->curr_conn_count &&
 	    conn_count > 1 &&
 	    !policy_mgr_allow_concurrency(mac->psoc,
@@ -17216,6 +17249,9 @@ static QDF_STATUS sme_send_start_bss_msg(struct mac_context *mac,
 			  cfg->oper_ch_freq, cfg->vdev_id, op_mode);
 		goto failure;
 	}
+
+	if (pm_con_mode == PM_LL_LT_SAP_MODE)
+		sme_validate_n_update_ll_lt_sap_freq(mac, pm_con_mode, cfg);
 
 	csr_roam_state_change(mac, eCSR_ROAMING_STATE_JOINING, cfg->vdev_id);
 	csr_roam_substate_change(mac, eCSR_ROAM_SUBSTATE_START_BSS_REQ,
