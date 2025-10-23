@@ -3550,7 +3550,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		curr_seq_num = ((pHdr->seqControl.seqNumHi << 4) |
 				(pHdr->seqControl.seqNumLo));
 		auth_node = lim_search_pre_auth_list(mac, pHdr->sa);
-		if (auth_node && pHdr->fc.retry &&
+		if (auth_node &&
 		    (auth_node->seq_num == curr_seq_num)) {
 			pe_err_rl("auth frame, seq num: %d is already processed, drop it",
 				  curr_seq_num);
