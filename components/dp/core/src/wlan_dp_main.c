@@ -880,6 +880,183 @@ static void dp_set_rx_mode_value(struct wlan_dp_psoc_context *dp_ctx)
 #ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
 
 /**
+ * dp_configure_affn_override_mask() - Function to extract and construct
+ * cpu bitmask for DP affinity override mask
+ * @dp_affn_mask: 32 bit affinity mask
+ * @shift: shift value based on affinity type
+ * @cpu_mask: pointer to cpu mask for a particular affinity
+ * @affn_type: affinity type
+ * @tput_level: throughput level
+ *
+ * Return: None
+ */
+static inline void dp_configure_affn_override_mask(
+	uint32_t dp_affn_mask,
+	uint8_t shift,
+	uint32_t *cpu_mask,
+	enum dp_affinity_type affn_type,
+	enum dp_affn_override_tput_level tput_level)
+{
+	unsigned int cpus;
+	uint32_t cpu_bitmask_new = 0;
+	uint32_t default_mask = 0;
+	int package_id;
+	uint8_t cluster_id, affinity;
+	uint32_t cpu_clusterwise_mask, start_cpu_id;
+	bool use_default = (tput_level == DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE);
+	qdf_cpu_mask *temp_cpu_mask;
+
+	if (!use_default) {
+		affinity = GET_AFFINITY(dp_affn_mask, shift);
+		cluster_id = GET_CLUSTER_CONFIG(affinity);
+		cpu_clusterwise_mask = GET_CPU_CONFIG(affinity);
+	}
+
+	qdf_for_each_possible_cpu(cpus) {
+		package_id = qdf_topology_physical_package_id(cpus);
+		if (package_id < 0)
+			continue;
+
+		/* Build default mask (little cluster) for irqs,
+		 * for dp rx threads affine to all cpus.
+		 */
+		if (affn_type == DP_RX_THREAD_AFFN)
+			default_mask |= BIT(cpus);
+		else if (package_id == CPU_CLUSTER_TYPE_LITTLE)
+			default_mask |= BIT(cpus);
+
+		if (!use_default && package_id == cluster_id) {
+			/* If cpu_clusterwise_mask is 0,
+			 * set all CPUs belonging to this cluster
+			 */
+			if (cpu_clusterwise_mask == 0) {
+				cpu_bitmask_new |= BIT(cpus);
+			} else {
+				temp_cpu_mask =
+					qdf_topology_cluster_cpumask(cpus);
+				start_cpu_id =
+					qdf_cpumask_first(temp_cpu_mask);
+
+				if ((cpu_clusterwise_mask << start_cpu_id) &
+				    BIT(cpus))
+					cpu_bitmask_new |= BIT(cpus);
+			}
+		}
+	}
+
+	/* Use default mask if mask is empty */
+	if (!cpu_bitmask_new) {
+		if (!use_default) {
+			dp_info("Invalid cluster %u for affn %s tput_lvl %s",
+				cluster_id, dp_affn_type_to_str(affn_type),
+				dp_affn_override_tput_lvl_to_str(tput_level));
+		}
+		cpu_bitmask_new = default_mask;
+	}
+
+	*cpu_mask = cpu_bitmask_new;
+}
+
+/**
+ * dp_affinity_override_params_init() - Function to init DP affinity
+ * override parameters
+ * @dp_ctx: DP psoc context
+ *
+ * Return: None
+ */
+static inline void dp_affinity_override_params_init(
+	struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct wlan_dp_psoc_cfg *dp_cfg = &dp_ctx->dp_cfg;
+	uint8_t tput_lvl, affn_type;
+	uint32_t dp_affn_override_masks[
+			DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS] = {
+		0,
+		dp_cfg->dp_affn_override_low_tput_mask,
+		dp_cfg->dp_affn_override_mid_tput_mask,
+		dp_cfg->dp_affn_override_high_tput_mask
+	};
+
+	struct dp_affn_override_params *dp_affn_param =
+					&dp_ctx->dp_affn_override_params;
+
+	uint32_t *cpu_mask_params[DP_AFFINITY_TYPE_MAX][
+					DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS] = {
+		{
+			&dp_affn_param->dp_affn_override_rx_intr_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE],
+			&dp_affn_param->dp_affn_override_rx_intr_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW],
+			&dp_affn_param->dp_affn_override_rx_intr_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_MID],
+			&dp_affn_param->dp_affn_override_rx_intr_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH]
+		},
+		{
+			&dp_affn_param->dp_affn_override_tx_comp_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE],
+			&dp_affn_param->dp_affn_override_tx_comp_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW],
+			&dp_affn_param->dp_affn_override_tx_comp_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_MID],
+			&dp_affn_param->dp_affn_override_tx_comp_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH],
+		},
+		{
+			&dp_affn_param->dp_affn_override_rx_thread_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE],
+			&dp_affn_param->dp_affn_override_rx_thread_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW],
+			&dp_affn_param->dp_affn_override_rx_thread_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_MID],
+			&dp_affn_param->dp_affn_override_rx_thread_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH],
+		},
+		{
+			&dp_affn_param->dp_affn_override_napi_rx_thread_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE],
+			&dp_affn_param->dp_affn_override_napi_rx_thread_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW],
+			&dp_affn_param->dp_affn_override_napi_rx_thread_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_MID],
+			&dp_affn_param->dp_affn_override_napi_rx_thread_mask[
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH],
+		}
+
+	};
+	for (affn_type = 0; affn_type < DP_AFFINITY_TYPE_MAX;
+		affn_type++) {
+		for (tput_lvl = 0;
+		     tput_lvl < DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS; tput_lvl++) {
+			dp_configure_affn_override_mask(
+				dp_affn_override_masks[tput_lvl],
+				dp_affn_type_shifts[affn_type],
+				cpu_mask_params[affn_type][tput_lvl],
+				affn_type, tput_lvl);
+			}
+	}
+}
+
+void dp_affn_override_init(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (wlan_dp_cfg_is_affn_override_enabled(&dp_ctx->dp_cfg)) {
+		dp_info("DP affinity override is enabled\n");
+		hif_set_affn_override_enabled(dp_ctx->hif_handle, true);
+	} else {
+		dp_info("DP affinity override is disabled\n");
+		hif_set_affn_override_enabled(dp_ctx->hif_handle, false);
+		return;
+	}
+
+	dp_affinity_override_params_init(dp_ctx);
+
+	dp_ctx->dp_affn_override_curr_tput_level = -1;
+	qdf_cpumask_clear(&dp_ctx->rx_thread_cpu_mask);
+}
+
+/**
  * dp_affn_override_cfg_init() - DP affinity override cfg init
  * @config: SoC CFG config
  * @psoc: Objmgr PSoC handle

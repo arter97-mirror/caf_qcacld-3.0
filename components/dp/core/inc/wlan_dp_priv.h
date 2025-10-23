@@ -65,6 +65,46 @@ struct dp_rtpm_tput_policy_context {
 };
 #endif
 
+#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+/**
+ * enum dp_affn_override_tput_level - DP affn override throughput levels
+ * @DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE : dp affinity Idle throughput level
+ * @DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW: dp affinity low throughput level
+ * @DP_AFFN_OVERRIDE_TPUT_LEVEL_MID: dp affinity mid throughput level
+ * @DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH: dp affinity high throughput level
+ * @DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS: max throughput levels
+ */
+enum dp_affn_override_tput_level {
+	DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE,
+	DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW,
+	DP_AFFN_OVERRIDE_TPUT_LEVEL_MID,
+	DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH,
+	DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS,
+};
+
+/**
+ * struct dp_affn_override_params - DP affinity override parameters
+ * @dp_affn_override_rx_intr_mask: Cpu mask parameters for dp rx interrupts
+ * @dp_affn_override_tx_comp_mask: Cpu mask parameters for dp tx completion
+ * interrupts
+ * @dp_affn_override_rx_thread_mask: Cpu mask parameters for dp rx
+ * threads
+ * @dp_affn_override_napi_rx_thread_mask: Cpu mask parameters for napi
+ * rx threads
+ */
+struct dp_affn_override_params {
+	uint32_t dp_affn_override_rx_intr_mask[
+					DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS];
+	uint32_t dp_affn_override_tx_comp_mask[
+					DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS];
+	uint32_t dp_affn_override_rx_thread_mask[
+					DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS];
+	uint32_t dp_affn_override_napi_rx_thread_mask[
+					DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS];
+};
+
+#endif
+
 #define FISA_FLOW_MAX_AGGR_COUNT        16 /* max flow aggregate count */
 
 /**
@@ -102,6 +142,18 @@ struct dp_rtpm_tput_policy_context {
  * @enable_tcp_param_update: enable tcp parameter update
  * @bus_low_cnt_threshold: Threshold count to trigger low Tput GRO flush skip
  * @enable_latency_crit_clients: Enable the handling of latency critical clients
+ * @dp_affn_override_enabled: Flag to check if DP affinity override is enabled
+ * @dp_affn_override_low_threshold: Low throughput threshold for affinity
+ * override
+ * @dp_affn_override_mid_threshold: Mid throughput threshold for affinity
+ * @dp_affn_override_high_threshold: High throughput threshold for affinity
+ * override
+ * @dp_affn_override_low_tput_mask: DP affinity low throughput level affinity
+ * mask
+ * @dp_affn_override_mid_tput_mask: DP affinity mid throughput level affinity
+ * mask
+ * @dp_affn_override_high_tput_mask: DP affinity high throughput level affinity
+ * mask
  * * @del_ack_enable: enable Dynamic Configuration of Tcp Delayed Ack
  * @del_ack_threshold_high: High Threshold inorder to trigger TCP delay ack
  * @del_ack_threshold_low: Low Threshold inorder to trigger TCP delay ack
@@ -175,6 +227,15 @@ struct wlan_dp_psoc_cfg {
 	bool     enable_tcp_param_update;
 	uint32_t bus_low_cnt_threshold;
 	bool enable_latency_crit_clients;
+#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+	bool dp_affn_override_enabled;
+	uint32_t dp_affn_override_low_threshold;
+	uint32_t dp_affn_override_mid_threshold;
+	uint32_t dp_affn_override_high_threshold;
+	uint32_t dp_affn_override_low_tput_mask;
+	uint32_t dp_affn_override_mid_tput_mask;
+	uint32_t dp_affn_override_high_tput_mask;
+#endif /*WLAN_DP_AFFINITY_OVERRIDE_FEATURE*/
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
 #ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
@@ -931,6 +992,8 @@ struct wlan_dp_stc;
  * @dp_agg_param.tc_based_dyn_gro:
  * @dp_agg_param.tc_ingress_prio:
  * @rtpm_tput_policy_ctx: Runtime Tput policy context
+ * @dp_affn_override_params: DP affinity override parameters
+ * @dp_affn_override_curr_tput_level: DP affinity override throughput level
  * @txrx_hist: TxRx histogram
  * @bbm_ctx: bus bandwidth manager context
  * @dp_direct_link_lock: Direct link mutex lock
@@ -1012,6 +1075,10 @@ struct wlan_dp_psoc_context {
 #ifdef FEATURE_RUNTIME_PM
 	struct dp_rtpm_tput_policy_context rtpm_tput_policy_ctx;
 #endif
+#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+	int dp_affn_override_curr_tput_level;
+	struct dp_affn_override_params dp_affn_override_params;
+#endif /*WLAN_DP_AFFINITY_OVERRIDE_FEATURE*/
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 	qdf_atomic_t disable_rx_ol_in_concurrency;
 	qdf_atomic_t disable_rx_ol_in_low_tput;

@@ -169,6 +169,70 @@ struct wlan_dp_intf*
 dp_get_intf_by_macaddr(struct wlan_dp_psoc_context *dp_ctx,
 		       struct qdf_mac_addr *addr);
 
+#ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+
+/*
+ * +----------------+----------------+----------------+-------------+----------+
+ * | Bit Range      |  31 ... 24     |  23 ... 16     |  15 ... 8   |  7 ... 0 |
+ * +----------------+----------------+----------------+-------------+----------+
+ * | Affinity Type  | NAPI Thread    | DP Rx Thread   | TX Compl IRQ| RX IRQ   |
+ * +----------------+----------------+----------------+-------------+----------+
+ * | Field bits     | [0-7]          | [0-7]          | [0-7]       | [0-7]    |
+ * | Cluster Config | [2:0]          | [2:0]          | [2:0]       | [2:0]    |
+ * | CPU Mask       | [7:3]          | [7:3]          | [7:3]       | [7:3]    |
+ * +----------------+----------------+----------------+-------------+----------+
+ *
+ * Legend:
+ * - Each 8-bit field encodes affinity.
+ * - Bits [2:0] (3 bits): Cluster config (values 0–7).
+ * - Bits [7:3] (5 bits): CPU mask within selected cluster (values 0–31).
+ */
+
+/* Macros for extracting affinity fields from 32 bit affinity mask*/
+#define AFFINITY_BIT_MASK	 0xFF
+#define CLUSTER_CONFIG_SHIFT     0
+#define CLUSTER_CONFIG_MASK      0x07
+#define CPU_CONFIG_SHIFT         3
+#define CPU_CONFIG_MASK          0x1F
+
+#define GET_AFFINITY(mask, shift) \
+	(((mask) >> (shift)) & AFFINITY_BIT_MASK)
+#define GET_CLUSTER_CONFIG(affinity) \
+	(((affinity) >> CLUSTER_CONFIG_SHIFT) & CLUSTER_CONFIG_MASK)
+#define GET_CPU_CONFIG(affinity) \
+	(((affinity) >> CPU_CONFIG_SHIFT) & CPU_CONFIG_MASK)
+
+/**
+ * wlan_dp_cfg_is_affn_override_enabled() - Get DP affn override enabled flag
+ * @dp_cfg: soc configuration context
+ *
+ * Return: true if enabled, false otherwise.
+ */
+static inline
+bool wlan_dp_cfg_is_affn_override_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return dp_cfg->dp_affn_override_enabled;
+}
+
+/**
+ * dp_affn_override_init() - Function to initialize dp affinity override
+ * parameters based on ini for various thresholds
+ * @psoc: psoc context
+ *
+ * Return: None
+ */
+void dp_affn_override_init(struct wlan_objmgr_psoc *psoc);
+#else
+static inline
+bool wlan_dp_cfg_is_affn_override_enabled(struct wlan_dp_psoc_cfg *dp_cfg)
+{
+	return false;
+}
+
+static inline void dp_affn_override_init(struct wlan_objmgr_psoc *psoc)
+{}
+#endif /*WLAN_DP_AFFINITY_OVERRIDE_FEATURE*/
+
 #ifdef WLAN_FEATURE_FILS_SK_SAP
 /**
  * dp_get_hlp_by_peeraddr() - API to Get HLP node from MAC address

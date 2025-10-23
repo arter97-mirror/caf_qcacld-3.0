@@ -685,6 +685,7 @@ QDF_STATUS ucfg_dp_psoc_open(struct wlan_objmgr_psoc *psoc)
 	dp_trace_init(psoc);
 	dp_bus_bandwidth_init(psoc);
 	wlan_dp_load_balancer_init(psoc);
+	dp_affn_override_init(psoc);
 	dp_haps_init(psoc);
 	qdf_wake_lock_create(&dp_ctx->rx_wake_lock, "qcom_rx_wakelock");
 
