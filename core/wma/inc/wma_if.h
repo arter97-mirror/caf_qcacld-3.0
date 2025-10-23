@@ -327,6 +327,8 @@ typedef struct {
 	struct wlan_mlo_ext_mld_cap ext_mld_cap;
 #endif
 	struct security_info sec_info;
+	uint8_t peer_cck_rx_support_5ghz : 1,
+	peer_cck_tx_support_5ghz : 1;
 } tAddStaParams, *tpAddStaParams;
 
 /**

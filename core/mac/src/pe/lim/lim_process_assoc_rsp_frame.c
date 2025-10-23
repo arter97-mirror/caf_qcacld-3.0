@@ -124,6 +124,30 @@ static void lim_update_stads_htcap(struct mac_context *mac_ctx,
 			sta_ds->htShortGI40Mhz = false;
 	}
 }
+static void
+lim_update_stads_cck_5g_support(struct mac_context *mac_ctx,
+				tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
+				struct pe_session *session_entry)
+{
+	bool cck_5g_rx = false, cck_5g_tx = false;
+
+	if (!session_entry->qcn_ie_present_in_beacon ||
+	    !wlan_get_rx_tx_cck_5g_support_for_mode(mac_ctx->psoc, QDF_STA_MODE,
+						    &cck_5g_rx, &cck_5g_tx)||
+	    !assoc_rsp->qcn_ie.present ||
+	    !assoc_rsp->qcn_ie.target_cck_support_attr.present) {
+		pe_debug("CCK rates not supported");
+		return;
+	}
+
+	if (assoc_rsp->qcn_ie.target_cck_support_attr.target_cck_rx_supp_5g &&
+	    cck_5g_tx)
+		sta_ds->peer_cck_rx_support_5ghz = 1;
+
+	if (assoc_rsp->qcn_ie.target_cck_support_attr.target_cck_tx_supp_5g &&
+	    cck_5g_rx)
+		sta_ds->peer_cck_tx_support_5ghz = 1;
+}
 
 void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 				tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
@@ -201,7 +225,8 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 				 (bss_desc ? &bss_desc->bcn_ies.he_cap : NULL));
 
 	lim_update_stads_eht_caps(mac_ctx, sta_ds, assoc_rsp, session_entry);
-
+	lim_update_stads_cck_5g_support(mac_ctx, sta_ds, assoc_rsp,
+					session_entry);
 	if (lim_is_sta_he_capable(sta_ds))
 		he_cap = &assoc_rsp->he_cap;
 

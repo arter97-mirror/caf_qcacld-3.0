@@ -2301,6 +2301,11 @@ lim_add_sta(struct mac_context *mac_ctx,
 
 	add_sta_params->status = QDF_STATUS_SUCCESS;
 
+	add_sta_params->peer_cck_rx_support_5ghz =
+				sta_ds->peer_cck_rx_support_5ghz;
+	add_sta_params->peer_cck_tx_support_5ghz =
+				sta_ds->peer_cck_tx_support_5ghz;
+
 	/* Update VHT/HT Capability */
 	if (LIM_IS_AP_ROLE(session_entry)) {
 		add_sta_params->htCapable =
