@@ -1719,6 +1719,7 @@ enum wlan_state_ctrl_str_id {
  * @hdd_dual_sta_policy: Concurrent STA policy configuration
  * @is_wlan_disabled: if wlan is disabled by userspace
  * @pm_notifier: PM notifier of hdd modules
+ * @cached_txpower_valid: Indicate if tx power in driver cache is valid
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2049,6 +2050,7 @@ struct hdd_context {
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	enum coex_dbam_config_mode dbam_mode;
 #endif
+	bool cached_txpower_valid;
 };
 
 /**

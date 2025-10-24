@@ -3043,6 +3043,20 @@ int wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 }
 
 /**
+ * wlan_hdd_set_cached_txpower_valid() - Set if tx power cache is valid
+ * @hdd_ctx: hdd_ctx
+ * @is_valid: Is tx power cache valid
+ *
+ * Return: None
+ */
+static inline void
+wlan_hdd_set_cached_txpower_valid(struct hdd_context *hdd_ctx,
+				  bool is_valid)
+{
+	hdd_ctx->cached_txpower_valid = is_valid;
+}
+
+/**
  * __wlan_hdd_cfg80211_set_txpower() - set TX power
  * @wiphy: Pointer to wiphy
  * @wdev: Pointer to network device
@@ -3121,6 +3135,7 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 			dbm, status);
 		return -EIO;
 	}
+	wlan_hdd_set_cached_txpower_valid(hdd_ctx, false);
 
 	hdd_debug("Set tx power level %d dbm", dbm);
 
@@ -3376,10 +3391,9 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 
 	HDD_IS_RATE_LIMIT_REQ(is_rate_limited,
 			      hdd_ctx->config->nb_commands_interval);
-	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED ||
-	    is_rate_limited) {
-		hdd_debug("Modules not enabled/rate limited, use cached stats");
-		/* Send cached data to upperlayer*/
+
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
+		/* Send cached data to upperlayer */
 		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
 		if (!vdev) {
 			hdd_err("vdev is NULL");
@@ -3387,6 +3401,20 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		}
 		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+		hdd_debug("Modules not enabled, cached tx power = %d", *dbm);
+		return 0;
+	}
+
+	if (is_rate_limited && hdd_ctx->cached_txpower_valid) {
+		/* Send cached data to upperlayer */
+		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+		if (!vdev) {
+			hdd_err("vdev is NULL");
+			return -EINVAL;
+		}
+		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+		hdd_debug("Rate limited, cached tx power = %d", *dbm);
 		return 0;
 	}
 
@@ -3394,7 +3422,9 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 		   TRACE_CODE_HDD_CFG80211_GET_TXPOWER,
 		   adapter->vdev_id, adapter->device_mode);
 
-	return wlan_hdd_get_tx_power(adapter, dbm);
+	status = wlan_hdd_get_tx_power(adapter, dbm);
+	wlan_hdd_set_cached_txpower_valid(hdd_ctx, true);
+	return status;
 }
 
 int wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
