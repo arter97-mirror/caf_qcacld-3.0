@@ -523,6 +523,7 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_con_mode mode;
 	uint32_t nss = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	enum QDF_OPMODE op_mode;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -559,13 +560,9 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 	}
 
 	cur_freq = pm_conc_connection_list[conn_index].freq;
+	op_mode = wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id);
 
-	mode = policy_mgr_qdf_opmode_to_pm_con_mode(
-					psoc,
-					wlan_get_opmode_from_vdev_id(
-								pm_ctx->pdev,
-								vdev_id),
-					vdev_id);
+	mode = policy_mgr_qdf_opmode_to_pm_con_mode(psoc, op_mode, vdev_id);
 
 	ch_freq = conn_table_entry.mhz;
 	status = policy_mgr_get_nss_for_vdev(psoc, mode, &nss_2g, &nss_5g);
@@ -593,9 +590,8 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 
 	if (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE ||
 	    mode == PM_STA_MODE || mode == PM_P2P_CLIENT_MODE)
-		policy_mgr_update_dfs_master_dynamic_enabled(psoc,
-							     false,
-							     NULL);
+		policy_mgr_update_dfs_master_dynamic_enabled(psoc, false,
+							     op_mode, NULL);
 
 	/* do we need to change the HW mode */
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
@@ -2082,9 +2078,11 @@ policy_mgr_check_go_restart_for_non_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
 	uint32_t i;
 	uint8_t cur_sap_vdev_id = INVALID_VDEV_ID;
 	qdf_freq_t sap_freq = 0;
-	bool cfg_sta_indoor_ch_peer_scc;
+	bool cfg_sta_indoor_ch_peer_scc = false;
+	bool cfg_sta_dfs_ch_peer_scc = false;
 
 	cfg_sta_indoor_ch_peer_scc = pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc;
+	cfg_sta_dfs_ch_peer_scc = pm_ctx->cfg.cfg_sta_dfs_ch_peer_scc;
 
 	for (i = go_index_start; i < cc_count; i++) {
 		if ((((WLAN_REG_IS_5GHZ_CH_FREQ(op_ch_freq_list[i]) &&
@@ -2096,7 +2094,8 @@ policy_mgr_check_go_restart_for_non_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
 			!policy_mgr_is_sta_sap_scc(pm_ctx->psoc,
 						   op_ch_freq_list[i],
 						   true))) &&
-			cfg_sta_indoor_ch_peer_scc) {
+			(cfg_sta_indoor_ch_peer_scc ||
+			 cfg_sta_dfs_ch_peer_scc)) {
 			cur_sap_vdev_id = vdev_id[i];
 			sap_freq = op_ch_freq_list[i];
 			break;
@@ -4222,7 +4221,8 @@ sap_restart:
 
 		if (policy_mgr_mode_specific_connection_count(
 					psoc, PM_P2P_GO_MODE, NULL) ||
-					!pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc)
+					(!pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc ||
+					 !pm_ctx->cfg.cfg_sta_dfs_ch_peer_scc))
 			timeout_ms = MAX_NOA_TIME;
 
 		policy_mgr_debug("Queue check interface work with timeout %d",

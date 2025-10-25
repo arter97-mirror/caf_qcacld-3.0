@@ -2899,6 +2899,7 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 	bool force_link_required = false;
 	uint32_t mcc_to_scc_switch;
 	bool cfg_sta_indoor_ch_peer_scc = false;
+	bool cfg_sta_dfs_ch_peer_scc = false;
 	QDF_STATUS status;
 
 	ml_nlink_get_link_info(psoc, vdev, NLINK_EXCLUDE_REMOVED_LINK,
@@ -2915,13 +2916,21 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 		cfg_sta_indoor_ch_peer_scc = false;
 	}
 
+	status = policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc,
+							&cfg_sta_dfs_ch_peer_scc);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_debug("Failed to get cfg_sta_dfs_ch_peer_scc");
+		cfg_sta_dfs_ch_peer_scc = false;
+	}
+
 	if (ml_num_link < 2)
 		return;
 
 	switch (pm_mode) {
 	case PM_P2P_CLIENT_MODE:
 	case PM_P2P_GO_MODE:
-		if (cfg_sta_indoor_ch_peer_scc) {
+		if (cfg_sta_indoor_ch_peer_scc || cfg_sta_dfs_ch_peer_scc) {
 			force_link_required = true;
 			break;
 		}
@@ -2983,9 +2992,11 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 		force_cmd->force_inactive_bitmap = force_inactive_link_bitmap;
 
 	/* If STA & peer SCC is enabled on STA connected indoor channel
+	 * or STA & peer SCC is enabled on STA connected DFS channel,
 	 * force active the ML link which has same freq as legacy_freq).
 	 */
-	if (cfg_sta_indoor_ch_peer_scc && force_link_required)
+	if ((cfg_sta_indoor_ch_peer_scc || cfg_sta_dfs_ch_peer_scc) &&
+	    force_link_required)
 		force_cmd->force_active_bitmap = scc_link_bitmap;
 
 	return;

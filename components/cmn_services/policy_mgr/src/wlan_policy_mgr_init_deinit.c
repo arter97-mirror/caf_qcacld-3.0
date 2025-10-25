@@ -882,7 +882,8 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 			 policy_mgr_is_2x2_2G_1x1_5G_dbs_capable(psoc));
 	policy_mgr_init_5g_low_high_cut_freq(psoc);
 	policy_mgr_init_rd_type(psoc);
-	policy_mgr_update_dfs_master_dynamic_enabled(psoc, true, NULL);
+	policy_mgr_update_dfs_master_dynamic_enabled(psoc, true,
+						     QDF_MAX_NO_OF_MODE, NULL);
 
 	return QDF_STATUS_SUCCESS;
 }

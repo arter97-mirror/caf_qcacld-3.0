@@ -314,6 +314,7 @@ policy_mgr_get_dfs_sta_sap_go_scc_movement(struct wlan_objmgr_psoc *psoc,
 bool
 policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
 					     bool always_update_target,
+					     enum QDF_OPMODE mode,
 					     struct wlan_channel *des_chan)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -327,11 +328,20 @@ policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
 	uint32_t i, j;
 	bool enable = true;
 	bool curr_enabled;
+	bool cfg_sta_dfs_ch_peer_scc = false;
+
+	policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc, &cfg_sta_dfs_ch_peer_scc);
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("pm_ctx is NULL");
 		return true;
+	}
+
+	if (mode == QDF_P2P_GO_MODE && cfg_sta_dfs_ch_peer_scc) {
+		policy_mgr_debug("FOR GO check concurrency as cfg_sta_dfs_ch_peer_scc %d",
+				 cfg_sta_dfs_ch_peer_scc);
+		goto check_concurrency;
 	}
 
 	if (!pm_ctx->cfg.sta_sap_scc_on_dfs_chnl) {
@@ -351,6 +361,7 @@ policy_mgr_update_dfs_master_dynamic_enabled(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
+check_concurrency:
 	if (des_chan && WLAN_REG_IS_5GHZ_CH_FREQ(des_chan->ch_freq)) {
 		ap_5g_freqs[num_5g_ap] = des_chan->ch_freq;
 		ap_ch_flagext[num_5g_ap++] = des_chan->ch_flagext;
@@ -5864,7 +5875,8 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 						conn_6ghz_flag);
 	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE ||
 	    mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE)
-		policy_mgr_update_dfs_master_dynamic_enabled(psoc, false, NULL);
+		policy_mgr_update_dfs_master_dynamic_enabled(psoc, false, mode,
+							     NULL);
 
 	policy_mgr_dump_current_concurrency(psoc);
 
@@ -6119,7 +6131,8 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 
 	if (mode == QDF_SAP_MODE || mode == QDF_P2P_GO_MODE ||
 	    mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE)
-		policy_mgr_update_dfs_master_dynamic_enabled(psoc, false, NULL);
+		policy_mgr_update_dfs_master_dynamic_enabled(psoc, false, mode,
+							     NULL);
 
 	if (!pm_ctx->last_disconn_sta_freq) {
 		if (policy_mgr_update_indoor_concurrency(psoc, session_id,
@@ -12788,6 +12801,10 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	uint32_t sta_cnt, gc_cnt, idx;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	struct wlan_objmgr_vdev *vdev;
+	bool cfg_sta_dfs_ch_peer_scc = false;
+	enum QDF_OPMODE mode;
+	bool vdev_in_init_state = false;
+	bool vdev_in_up_state = false;
 
 	if (!wlan_reg_is_dfs_for_freq(pdev, ch_freq))
 		return true;
@@ -12801,9 +12818,34 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	sta_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							 vdev_id_list,
 							 PM_STA_MODE);
+	policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc,
+					       &cfg_sta_dfs_ch_peer_scc);
+	mode = wlan_get_opmode_from_vdev_id(pdev, vdev_id);
 
 	if (sta_cnt >= MAX_NUMBER_OF_CONC_CONNECTIONS)
 		return false;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("Invalid vdev");
+		return false;
+	}
+
+	if (QDF_IS_STATUS_SUCCESS(wlan_vdev_mlme_is_init_state(vdev)))
+		vdev_in_init_state = true;
+	else if (QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up_active_state(vdev)))
+		vdev_in_up_state = true;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	vdev = NULL;
+
+	if (mode == QDF_P2P_GO_MODE && cfg_sta_dfs_ch_peer_scc && sta_cnt > 0 &&
+	    vdev_in_init_state) {
+		policy_mgr_debug("Allow P2P/GO on STA DFS freq: %d chan due to cfg_sta_dfs_ch_peer_scc %d",
+				 ch_freq, cfg_sta_dfs_ch_peer_scc);
+		return true;
+	}
 
 	gc_cnt = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
 							&vdev_id_list[sta_cnt],
@@ -12823,24 +12865,15 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 		return false;
 	}
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
-						    vdev_id,
-						    WLAN_POLICY_MGR_ID);
-	if (!vdev) {
-		policy_mgr_err("Invalid vdev");
-		return false;
-	}
-	/* Allow the current CSA to continue if it's already started. This is
+	/*
+	 * Allow the current CSA to continue if it's already started. This is
 	 * possible when SAP CSA started to move to STA channel but STA got
 	 * disconnected.
 	 */
-	if (!wlan_vdev_mlme_is_init_state(vdev) &&
-	    !wlan_vdev_is_up_active_state(vdev)) {
+	if (!vdev_in_init_state && !vdev_in_up_state) {
 		policy_mgr_debug("SAP is not yet UP: vdev %d", vdev_id);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 		return true;
 	}
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	/*
 	 * Check if any of the concurrent STA/ML-STA link/P2P client are in
