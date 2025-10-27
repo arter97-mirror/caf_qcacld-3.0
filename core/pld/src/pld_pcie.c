@@ -305,6 +305,9 @@ static void pld_pcie_uevent(struct pci_dev *pdev,
 	case CNSS_FW_DOWN:
 		data.uevent = PLD_FW_DOWN;
 		break;
+	case CNSS_BUS_EVENT:
+		data.uevent = PLD_BUS_EVENT;
+		break;
 	default:
 		goto out;
 	}
