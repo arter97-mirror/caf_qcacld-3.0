@@ -18,10 +18,15 @@
 
 #define WLAN_DP_RESOURCE_MGR_DEFAULT_RX_NSS 2
 
-/*DP resource MAP used in resource level selection*/
+/*DP resource MAP used in resource level selection - Extended to 5 levels*/
 static struct wlan_dp_resource_map dp_resource_map[] = {
 	{RESOURCE_LVL_1, RESOURCE_LVL_1_TPUT_MBPS, RESOURCE_LVL_1_RX_BUFFERS},
 	{RESOURCE_LVL_2, RESOURCE_LVL_2_TPUT_MBPS, RESOURCE_LVL_2_RX_BUFFERS},
+#if defined(CONFIG_BORON) && defined(DP_FEATURE_DIRECT_REFILL)
+	{RESOURCE_LVL_3, RESOURCE_LVL_3_TPUT_MBPS, RESOURCE_LVL_3_RX_BUFFERS},
+	{RESOURCE_LVL_4, RESOURCE_LVL_4_TPUT_MBPS, RESOURCE_LVL_4_RX_BUFFERS},
+	{RESOURCE_LVL_5, RESOURCE_LVL_5_TPUT_MBPS, RESOURCE_LVL_5_RX_BUFFERS},
+#endif
 };
 
 static uint64_t
@@ -281,7 +286,7 @@ void wlan_dp_resource_mgr_downscale_resources(void)
 
 	rsrc_level = rsrc_ctx->cur_resource_level;
 	req_rx_buff_descs = rsrc_ctx->cur_rsrc_map[rsrc_level].num_rx_buffers;
-	dp_rsrc_mgr_debug("rsrc_level:%u cur:%u in_use:%u req:%u",
+	dp_rsrc_mgr_debug("rsrc_level:%u cur:%llu in_use:%llu req:%llu",
 			  rsrc_level, cur_req_rx_buff_descs,
 			  in_use_rx_buff_descs, req_rx_buff_descs);
 
@@ -306,6 +311,7 @@ void wlan_dp_resource_mgr_upscale_resources(
 	uint64_t in_use_rx_buff_descs;
 	uint64_t additional_rx_buffers = 0, batch_count = 0;
 	uint32_t num_alloc_buff;
+	uint32_t retry_count = 0;
 	QDF_STATUS status;
 
 	if (!rsrc_ctx)
@@ -340,27 +346,51 @@ void wlan_dp_resource_mgr_upscale_resources(
 			additional_rx_buffers);
 	}
 
-	dp_rsrc_mgr_debug("cur:%u req:%u in_use:%u additional_req:%u",
+	dp_rsrc_mgr_debug("cur:%llu req:%llu in_use:%llu additional_req:%llu",
 			  cur_req_rx_buff_descs, req_rx_buff_descs,
 			  in_use_rx_buff_descs, additional_rx_buffers);
-	batch_count = RX_RESOURCE_ALLOC_BATCH_COUNT;
+
+	/* Adaptive batch sizing based on allocation requirement */
+	if (additional_rx_buffers >= UPSCALE_AGGRESSIVE_THRESHOLD)
+		batch_count = RX_RESOURCE_ALLOC_LARGE_BATCH_COUNT;
+	else if (additional_rx_buffers >= RX_RESOURCE_ALLOC_BATCH_COUNT)
+		batch_count = RX_RESOURCE_ALLOC_BATCH_COUNT;
+	else
+		batch_count = RX_RESOURCE_ALLOC_SMALL_BATCH_COUNT;
+
 	while (additional_rx_buffers) {
-		if (additional_rx_buffers < RX_RESOURCE_ALLOC_BATCH_COUNT)
+		if (additional_rx_buffers < batch_count)
 			batch_count = additional_rx_buffers;
+
 		num_alloc_buff = cdp_buffers_replenish_on_demand(cdp_soc,
 							 batch_count, 0);
 		if (!num_alloc_buff) {
-			dp_err("failed to allocate rx buffers, count:%llu",
+			/* Intelligent retry with reduced batch size */
+			if (retry_count < 3 &&
+			    batch_count > RX_RESOURCE_ALLOC_SMALL_BATCH_COUNT) {
+				batch_count = batch_count / 2;
+				retry_count++;
+				dp_rsrc_mgr_debug("Retry alloc batch:%llu retry:%u",
+						  batch_count, retry_count);
+				continue;
+			}
+			dp_err("Failed to allocate rx buffers after retries, count:%llu",
 			       batch_count);
 			break;
 		}
+
+		/* Reset retry count on successful allocation */
+		retry_count = 0;
+
+		/* Check for downscale interrupt */
 		if (qdf_atomic_test_and_clear_bit(
 					RX_RESOURCE_DOWNSCALE_EVENT,
 					&refill_thread->event_flag)) {
-			dp_info("DOWNSCALE request posted, stopping uspcale");
+			dp_info("DOWNSCALE request posted, stopping upscale");
 			wlan_dp_resource_mgr_downscale_resources();
 			break;
 		}
+
 		additional_rx_buffers -= num_alloc_buff;
 	}
 
@@ -588,6 +618,8 @@ wlan_dp_resource_mgr_select_resource_level(
 	struct wlan_dp_resource_vote_node *vote_node;
 	uint64_t total_tput = 0;
 	enum wlan_dp_resource_level prev_level;
+	enum wlan_dp_resource_level new_level;
+	bool aggressive_upscale = false;
 	int i;
 
 	dp_rsrc_mgr_debug("Select resource level called");
@@ -609,16 +641,27 @@ wlan_dp_resource_mgr_select_resource_level(
 	if (i >= RESOURCE_LVL_MAX)
 		i = (RESOURCE_LVL_MAX - 1);
 
+	new_level = i;
 	prev_level = rsrc_ctx->cur_resource_level;
-	rsrc_ctx->cur_resource_level = i;
+	/* Check for aggressive upscale (jumping 2+ levels) */
+	if (new_level > prev_level &&
+	    (new_level - prev_level) >= RESOURCE_LEVEL_JUMP_THRESHOLD)
+		aggressive_upscale = true;
+
+	rsrc_ctx->cur_resource_level = new_level;
 	rsrc_ctx->cur_max_tput = total_tput;
-	if (prev_level < rsrc_ctx->cur_resource_level)
+
+	if (prev_level < rsrc_ctx->cur_resource_level) {
+		if (aggressive_upscale)
+			dp_info("Aggressive upscale detected: level %u -> %u",
+				prev_level, rsrc_ctx->cur_resource_level);
 		wlan_dp_resource_mgr_post_upscale_resource_req(rsrc_ctx);
-	else if (prev_level > rsrc_ctx->cur_resource_level)
+	} else if (prev_level > rsrc_ctx->cur_resource_level) {
 		wlan_dp_resource_mgr_post_downscale_resource_req(rsrc_ctx,
 								 true);
-	else
+	} else {
 		dp_info("Resource level change not required");
+	}
 
 	dp_info("Resource level:%u selected for tput:%llu req_tput:%llu",
 		rsrc_ctx->cur_resource_level, rsrc_ctx->cur_max_tput,
@@ -1220,7 +1263,7 @@ wlan_dp_resource_mgr_set_req_resources(
 		wlan_dp_resource_mgr_detach(rsrc_ctx->dp_ctx);
 		dp_err("Unable to set req DP rx desc");
 	}
-	dp_rsrc_mgr_debug("req_rx_buffer_desc:%u set", req_rx_buff_descs);
+	dp_rsrc_mgr_debug("req_rx_buffer_desc:%llu set", req_rx_buff_descs);
 }
 
 void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
@@ -1257,7 +1300,7 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 		     (sizeof(struct wlan_dp_resource_map) * RESOURCE_LVL_MAX));
 
 	status = cdp_txrx_get_psoc_param(cdp_soc,
-					 CDP_CFG_RXDMA_REFILL_RING_SIZE, &val);
+					 CDP_CFG_REPLENISH_RING_SIZE, &val);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("Failed to fetch Refill ring config status:%u", status);
 		goto attach_err;
@@ -1270,18 +1313,18 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 	 * If config value greater than default resources, than
 	 * use that value for max reource level selection.
 	 */
-	if (val.cdp_rxdma_refill_ring_size <=
+	if (val.cdp_replenish_ring_size <=
 	    dp_resource_map[RESOURCE_LVL_1].num_rx_buffers) {
 		dp_info("Unsupported RX buffers config:%u, disabling rsrc mgr",
-			val.cdp_rxdma_refill_ring_size);
+			val.cdp_replenish_ring_size);
 		goto attach_err;
-	} else if ((val.cdp_rxdma_refill_ring_size - 1) !=
-		   dp_resource_map[RESOURCE_LVL_2].num_rx_buffers) {
-		dp_info("Adjusting Resource lvl_2 rx buffers map_val:%u cfg_val:%u",
-			dp_resource_map[RESOURCE_LVL_2].num_rx_buffers,
-			val.cdp_rxdma_refill_ring_size);
-		rsrc_ctx->cur_rsrc_map[RESOURCE_LVL_2].num_rx_buffers =
-			(val.cdp_rxdma_refill_ring_size - 1);
+	} else if ((val.cdp_replenish_ring_size - 1) !=
+		   dp_resource_map[RESOURCE_LVL_MAX - 1].num_rx_buffers) {
+		dp_info("Adjusting Resource lvl_5 rx buffers map_val:%u cfg_val:%u",
+			dp_resource_map[RESOURCE_LVL_MAX - 1].num_rx_buffers,
+			val.cdp_replenish_ring_size);
+		rsrc_ctx->cur_rsrc_map[RESOURCE_LVL_MAX - 1].num_rx_buffers =
+			(val.cdp_replenish_ring_size - 1);
 	}
 
 	for (i = 0; i < RESOURCE_LVL_MAX; i++) {

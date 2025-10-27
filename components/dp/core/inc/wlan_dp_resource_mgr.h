@@ -14,7 +14,25 @@
 #define dp_rsrc_mgr_debug(params...)
 #endif
 
+#ifdef DP_FEATURE_DIRECT_REFILL
 /*Max throughput(Mbps) supported in different resource levels*/
+#define RESOURCE_LVL_1_TPUT_MBPS  900
+#define RESOURCE_LVL_2_TPUT_MBPS  1800
+#define RESOURCE_LVL_3_TPUT_MBPS  2400
+#define RESOURCE_LVL_4_TPUT_MBPS  5900
+#define RESOURCE_LVL_5_TPUT_MBPS  11800
+
+/* RX buffers required in different resource levels */
+#define RESOURCE_LVL_1_RX_BUFFERS 1024
+#define RESOURCE_LVL_2_RX_BUFFERS (2 * 1024)
+#define RESOURCE_LVL_3_RX_BUFFERS (4 * 1024)
+#define RESOURCE_LVL_4_RX_BUFFERS (10 * 1024)
+#define RESOURCE_LVL_5_RX_BUFFERS ((16 * 1024) - 1)
+
+#define MAX_MAC_RESOURCES 2
+
+#else /* DP_FEATURE_DIRECT_REFILL */
+
 #define RESOURCE_LVL_1_TPUT_MBPS  2400
 #define RESOURCE_LVL_2_TPUT_MBPS  5900
 
@@ -29,19 +47,29 @@
 #define RESOURCE_LVL_1_RX_BUFFERS (10 * 1024)
 #endif
 #define RESOURCE_LVL_2_RX_BUFFERS ((16 * 1024) - 1)
+#endif /* DP_FEATURE_DIRECT_REFILL */
+
 #define UNKNOWN_MAC_ID 0xf
 
 #define DP_RSRC_MGR_TIMER_MS	1000
 
 /**
  * enum wlan_dp_resource_level - DP Resource levels
- * @RESOURCE_LVL_1: Default Resource level
- * @RESOURCE_LVL_2: Higher resource level in peak tput
+ * @RESOURCE_LVL_1: Minimal Resource level for low throughput
+ * @RESOURCE_LVL_2: Low Resource level for moderate throughput
+ * @RESOURCE_LVL_3: Medium Resource level for high throughput
+ * @RESOURCE_LVL_4: High Resource level for very high throughput
+ * @RESOURCE_LVL_5: Maximum Resource level for peak throughput
  * @RESOURCE_LVL_MAX: MAX resource level undefined
  */
 enum wlan_dp_resource_level {
 	RESOURCE_LVL_1,
 	RESOURCE_LVL_2,
+#ifdef DP_FEATURE_DIRECT_REFILL
+	RESOURCE_LVL_3,
+	RESOURCE_LVL_4,
+	RESOURCE_LVL_5,
+#endif
 	RESOURCE_LVL_MAX
 };
 
@@ -140,8 +168,14 @@ struct wlan_dp_resource_mgr_ctx {
 
 #ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
 
-/*RX buffers replenished based on batch manner*/
-#define RX_RESOURCE_ALLOC_BATCH_COUNT			64
+/*RX buffers replenished based on batch manner - optimized for 5 levels*/
+#define RX_RESOURCE_ALLOC_BATCH_COUNT			128
+#define RX_RESOURCE_ALLOC_LARGE_BATCH_COUNT		256
+#define RX_RESOURCE_ALLOC_SMALL_BATCH_COUNT		64
+
+/* Performance optimization thresholds */
+#define RESOURCE_LEVEL_JUMP_THRESHOLD			2
+#define UPSCALE_AGGRESSIVE_THRESHOLD			(8 * 1024)
 
 #define  WLAN_PHYMODE_11A_TPUT_MBPS			27
 #define  WLAN_PHYMODE_11B_TPUT_MBPS			6
