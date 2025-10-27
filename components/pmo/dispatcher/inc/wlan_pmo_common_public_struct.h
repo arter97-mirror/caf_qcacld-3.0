@@ -444,6 +444,7 @@ enum pmo_page_fault_action {
  * per screen off/on state
  * @apfv6_disable_offload_bitmap: Offload bitmap in APFv6
  * @is_ap_mode_enable: apf mode configuration enable/disable
+ * @apf_instruction_size: apf instruction size
  */
 struct pmo_psoc_cfg {
 	bool ptrn_match_enable_all_vdev;
@@ -540,6 +541,7 @@ struct pmo_psoc_cfg {
 	bool is_apf_configure_per_screen_state;
 	uint32_t apfv6_disable_offload_bitmap;
 	bool is_ap_mode_enable;
+	uint32_t apf_instruction_size;
 };
 
 /**

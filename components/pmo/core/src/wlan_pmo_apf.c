@@ -26,21 +26,20 @@
 #include "wlan_pmo_apf.h"
 #include "wlan_pmo_main.h"
 #include "wlan_pmo_tgt_api.h"
-
-
-#define PMO_APF_SIZE_AUTO	0
-#define PMO_APF_SIZE_DISABLE	0xffffffff
+#include "wlan_pmo_apf_cfg.h"
 
 uint32_t pmo_get_apf_instruction_size(struct wlan_objmgr_psoc *psoc)
 {
 	struct pmo_psoc_priv_obj *psoc_ctx;
-	bool apf = false;
+	uint32_t apf_instruction_size = PMO_APF_SIZE_DISABLE;
 
 	pmo_psoc_with_ctx(psoc, psoc_ctx) {
-		apf = pmo_intersect_apf(psoc_ctx);
+		if (pmo_intersect_apf(psoc_ctx))
+		    apf_instruction_size =
+			psoc_ctx->psoc_cfg.apf_instruction_size;
 	}
 
-	return apf ? PMO_APF_SIZE_AUTO : PMO_APF_SIZE_DISABLE;
+	return apf_instruction_size;
 }
 
 uint32_t pmo_get_apf_mode(struct wlan_objmgr_psoc *psoc)
