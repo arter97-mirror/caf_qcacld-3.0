@@ -11759,6 +11759,7 @@ bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t vdev_id;
 	uint32_t conc_ml_sap_freq = 0;
+	bool ml_sap_vdev = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -11771,7 +11772,7 @@ bool policy_mgr_is_any_nondfs_chnl_present(struct wlan_objmgr_psoc *psoc,
 		conc_ml_sap_freq = policy_mgr_get_conc_ml_sap_link_freq(
 								psoc,
 								sap_vdev_id,
-								NULL);
+								&ml_sap_vdev);
 	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
 			conn_index++) {
 		vdev_id = pm_conc_connection_list[conn_index].vdev_id;

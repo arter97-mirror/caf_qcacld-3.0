@@ -410,7 +410,7 @@ static void process_reorder(ol_txrx_pdev_handle pdev,
 			    qdf_nbuf_t tail_msdu,
 			    int num_mpdu_ranges,
 			    int num_mpdus,
-			    bool rx_ind_release)
+			    bool *rx_ind_release)
 {
 	htt_pdev_handle htt_pdev = pdev->htt_pdev;
 	enum htt_rx_status mpdu_status;
@@ -470,7 +470,7 @@ static void process_reorder(ol_txrx_pdev_handle pdev,
 		 * The MPDU was not stored in the rx reorder array, so
 		 * there's nothing to release.
 		 */
-		rx_ind_release = false;
+		*rx_ind_release = false;
 	} else {
 		ol_rx_reorder_store(pdev, peer, tid,
 				    reorder_idx, head_msdu, tail_msdu);
@@ -685,7 +685,7 @@ ol_rx_indication_handler(ol_txrx_pdev_handle pdev,
 							head_msdu, tail_msdu,
 							num_mpdu_ranges,
 							num_mpdus,
-							rx_ind_release);
+							&rx_ind_release);
 				}
 
 			}

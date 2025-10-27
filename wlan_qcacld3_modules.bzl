@@ -12,6 +12,7 @@ _target_chipset_map = {
     "sa510m": [
         "qca6574",
         "qca6490",
+        "qca6574au-3",
     ],
     "sa510m.1g": [
         "qca6574",
@@ -83,6 +84,7 @@ _chipset_hw_map = {
     "fig": "BORON",
     "wcn7760": "BERYLLIUM",
     "qca6574": "ROME",
+    "qca6574au-3": "ROME-SDIO",
 }
 
 _chipset_header_map = {
@@ -95,8 +97,8 @@ _chipset_header_map = {
         "cmn/hal/wifi3.0/peach",
     ],
     "fig": [
-	"api/hw/fig/v1",
-	"cmn/hal/wifi3.0/fig",
+        "api/hw/fig/v1",
+        "cmn/hal/wifi3.0/fig",
     ],
     "kiwi-v2": [
         "api/hw/kiwi/v2",
@@ -134,12 +136,14 @@ _chipset_header_map = {
     ],
     "qca6574": [
     ],
+    "qca6574au-3": [
+    ],
 }
 
 _hw_header_map = {
     "BORON": [
-	"cmn/hal/wifi3.0/be",
-	"cmn/hal/wifi3.0/bn",
+        "cmn/hal/wifi3.0/be",
+        "cmn/hal/wifi3.0/bn",
     ],
     "BERYLLIUM": [
         "cmn/hal/wifi3.0/be",
@@ -156,6 +160,8 @@ _hw_header_map = {
     "HELIUMPLUS": [
     ],
     "ROME": [
+    ],
+    "ROME-SDIO": [
     ],
 }
 
@@ -189,6 +195,9 @@ _fixed_ipaths = [
     "cmn/hif/src/dispatcher",
     "cmn/hif/src/pcie",
     "cmn/hif/src/ipcie",
+    "cmn/hif/src/sdio",
+    "cmn/hif/src/sdio/native_sdio/include",
+    "cmn/hif/src/sdio/transfer",
     "cmn/htc",
     "cmn/init_deinit/dispatcher/inc",
     "cmn/ipa/core/inc",
@@ -443,17 +452,12 @@ _fixed_srcs = [
     "cmn/cfg/src/cfg.c",
     "cmn/global_lmac_if/src/wlan_global_lmac_if.c",
     "cmn/hif/src/ath_procfs.c",
-    "cmn/hif/src/ce/ce_diag.c",
-    "cmn/hif/src/ce/ce_main.c",
-    "cmn/hif/src/ce/ce_service.c",
-    "cmn/hif/src/ce/ce_tasklet.c",
     "cmn/hif/src/dispatcher/dummy.c",
     "cmn/hif/src/dispatcher/multibus.c",
     "cmn/hif/src/hif_exec.c",
     "cmn/hif/src/hif_main.c",
     "cmn/hif/src/hif_runtime_pm.c",
     "cmn/hif/src/mp_dev.c",
-    "cmn/hif/src/regtable.c",
     "cmn/htc/htc.c",
     "cmn/htc/htc_recv.c",
     "cmn/htc/htc_send.c",
@@ -1181,6 +1185,11 @@ _conditional_srcs = {
         True: [
             "cmn/hif/src/dispatcher/multibus_ipci.c",
             "cmn/hif/src/ipcie/if_ipci.c",
+            "cmn/hif/src/ce/ce_diag.c",
+            "cmn/hif/src/ce/ce_main.c",
+            "cmn/hif/src/ce/ce_service.c",
+            "cmn/hif/src/ce/ce_tasklet.c",
+            "cmn/hif/src/regtable.c",
         ],
     },
     "CONFIG_HIF_PCI": {
@@ -1188,16 +1197,43 @@ _conditional_srcs = {
             "cmn/hif/src/dispatcher/multibus_pci.c",
             "cmn/hif/src/pcie/if_pci.c",
             "core/pld/src/pld_pcie.c",
+            "cmn/hif/src/ce/ce_diag.c",
+            "cmn/hif/src/ce/ce_main.c",
+            "cmn/hif/src/ce/ce_service.c",
+            "cmn/hif/src/ce/ce_tasklet.c",
+            "cmn/hif/src/regtable.c",
         ],
     },
     "CONFIG_HIF_SDIO": {
         True: [
             "cmn/hif/src/dispatcher/multibus_sdio.c",
+            "cmn/hif/src/sdio/hif_diag_reg_access.c",
+            "cmn/hif/src/sdio/hif_sdio_dev.c",
+            "cmn/hif/src/sdio/hif_sdio.c",
+            "cmn/hif/src/sdio/if_sdio.c",
+            "cmn/hif/src/sdio/regtable_sdio.c",
+            "cmn/hif/src/sdio/transfer/transfer.c",
+            "cmn/hif/src/sdio/native_sdio/src/hif.c",
+            "cmn/hif/src/sdio/native_sdio/src/hif_scatter.c",
+            "cmn/hif/src/sdio/native_sdio/src/dev_quirks.c",
+        ],
+    },
+    "CONFIG_SDIO_TRANSFER": {
+        True: [
+            "cmn/hif/src/sdio/transfer/adma.c",
+        ],
+        False: [
+            "cmn/hif/src/sdio/transfer/mailbox.c",
         ],
     },
     "CONFIG_HIF_SNOC": {
         True: [
             "cmn/hif/src/dispatcher/multibus_snoc.c",
+            "cmn/hif/src/ce/ce_diag.c",
+            "cmn/hif/src/ce/ce_main.c",
+            "cmn/hif/src/ce/ce_service.c",
+            "cmn/hif/src/ce/ce_tasklet.c",
+            "cmn/hif/src/regtable.c",
         ],
     },
     "CONFIG_HIF_USB": {
@@ -1212,6 +1248,7 @@ _conditional_srcs = {
             "core/dp/txrx/ol_tx_hl.c",
             "core/dp/txrx/ol_tx_queue.c",
             "core/dp/txrx/ol_tx_sched.c",
+            "core/dp/htt/htt_rx_hl.c"
         ],
     },
     "CONFIG_HOST_11D_SCAN": {
@@ -1236,9 +1273,9 @@ _conditional_srcs = {
         ],
     },
     "CONFIG_IPA_OPT_WIFI_DP_LOGGING": {
-	    True: [
-		"cmn/ipa/core/src/wlan_ipa_logging.c"
-	    ],
+        True: [
+            "cmn/ipa/core/src/wlan_ipa_logging.c"
+        ],
     },
     "CONFIG_LEGACY_IPA_OFFLOAD": {
         True: [
@@ -1273,7 +1310,6 @@ _conditional_srcs = {
     },
     "CONFIG_AR6320_SUPPORT": {
         True: [
-            "cmn/hif/src/ce/ce_service_legacy.c",
             "core/dp/txrx/ol_cfg.c",
             "core/dp/txrx/ol_rx.c",
             "core/dp/txrx/ol_rx_defrag.c",
@@ -1294,6 +1330,11 @@ _conditional_srcs = {
             "core/dp/htt/htt_t2h.c",
             "core/dp/htt/htt_tx.c",
         ],
+    },
+    "CONFIG_AR6320_PCI": {
+        True: [
+            "cmn/hif/src/ce/ce_service_legacy.c",
+        ]
     },
     "CONFIG_AR6320_TX_THROTTLE": {
         True: [
@@ -1849,7 +1890,7 @@ _conditional_srcs = {
             "core/hdd/src/wlan_hdd_mlo.c",
             "core/mac/src/pe/lim/lim_mlo.c",
             "cmn/target_if/mlo_mgr/src/target_if_mlo_mgr.c",
-	    "cmn/os_if/linux/mlme/src/osif_link_reconfig.c",
+            "cmn/os_if/linux/mlme/src/osif_link_reconfig.c",
             "cmn/umac/mlo_mgr/src/utils_mlo.c",
             "cmn/umac/mlo_mgr/src/wlan_mlo_mgr_aid.c",
             "cmn/umac/mlo_mgr/src/wlan_mlo_mgr_ap.c",
@@ -1871,7 +1912,7 @@ _conditional_srcs = {
             "components/umac/mlme/mlo_mgr/src/wlan_mlo_mgr_roam.c",
             "components/umac/mlme/mlo_mgr/src/wlan_t2lm_api.c",
             "components/umac/mlme/mlo_mgr/src/wlan_mlo_link_force.c",
-			"cmn/umac/mlo_mgr/src/wlan_mlo_link_recfg.c",
+            "cmn/umac/mlo_mgr/src/wlan_mlo_link_recfg.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_ACTION_OUI": {
@@ -1886,11 +1927,20 @@ _conditional_srcs = {
     },
     "CONFIG_WLAN_FEATURE_BMI": {
         True: [
-            "cmn/hif/src/ce/ce_bmi.c",
             "core/bmi/src/bmi.c",
             "core/bmi/src/bmi_1.c",
             "core/bmi/src/ol_fw.c",
             "core/bmi/src/ol_fw_common.c",
+        ],
+    },
+    "CONFIG_BMI_PCIE": {
+        True: [
+            "cmn/hif/src/ce/ce_bmi.c",
+        ],
+    },
+    "CONFIG_BMI_SDIO": {
+        True: [
+            "cmn/hif/src/sdio/hif_bmi_reg_access.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_COAP": {
@@ -2599,6 +2649,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/net/cfg80211.h",
             "flag": "CFG80211_SETUP_LINK_RECONFIG_SUPPORT",
         },
+        {
+            "pattern": "CONFIG_CHANDEF_NO_PUNCTURE",
+            "file": "include/net/cfg80211.h",
+            "flag": "CFG80211_BACK_COMPATIBLE_CHENDEF",
+        },
     ]
 
     cmd = 'touch "$@"\n'
@@ -2698,9 +2753,10 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//vendor/qcom/opensource/wlan/platform:{}_cnss2".format(tv),
         ]
     else:
-        deps = [
+        deps += [
             "//wlan/platform:{}_cnss2".format(tv),
         ]
+
     if target != "sa510m" and target != "sa510m.1g":
         deps = deps + [
             "//vendor/qcom/opensource/wlan/platform:{}_cnss_prealloc".format(tv),
@@ -2713,7 +2769,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
                 "//wlan/platform:{}_cnss_prealloc".format(tv),
                 "//wlan/platform:{}_cnss_utils".format(tv),
                 "//wlan/platform:{}_cnss_nl".format(tv),
-                "//msm-kernel:all_headers_arm",
                 "//wlan/platform:wlan-platform-headers",
             ]
 
