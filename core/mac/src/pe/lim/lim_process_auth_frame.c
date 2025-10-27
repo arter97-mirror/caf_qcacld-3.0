@@ -2141,9 +2141,21 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		if (QDF_IS_STATUS_SUCCESS(qdf_status) && pe_session->opmode == QDF_SAP_MODE &&
 		    rx_auth_frame->authTransactionSeqNumber != SIR_MAC_AUTH_FRAME_1 &&
 		    rx_auth_frame->authTransactionSeqNumber != SIR_MAC_AUTH_FRAME_3) {
-			pe_debug("received Authentication frame from peer with wrong seq num %d: "
-			       QDF_MAC_ADDR_FMT, rx_auth_frame->authTransactionSeqNumber,
-			       QDF_MAC_ADDR_REF(mac_hdr->sa));
+			pe_debug("received Authentication frame from peer with wrong seq num %d vdev %d: "
+				 QDF_MAC_ADDR_FMT,
+				 rx_auth_frame->authTransactionSeqNumber,
+				 pe_session->vdev_id,
+				 QDF_MAC_ADDR_REF(mac_hdr->sa));
+			wlan_connectivity_mgmt_event(
+				mac_ctx->psoc,
+				(struct wlan_frame_hdr *)mac_hdr,
+				pe_session->vdev_id,
+				rx_auth_frame->authStatusCode,
+				0, WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
+				auth_alg, 0,
+				rx_auth_frame->authTransactionSeqNumber,
+				0, WLAN_AUTH_RESP);
+
 			auth_frame->authTransactionSeqNumber = SIR_MAC_AUTH_FRAME_2;
 			auth_frame->authStatusCode = STATUS_UNKNOWN_AUTH_TRANSACTION;
 			lim_send_auth_mgmt_frame(mac_ctx, auth_frame, mac_hdr->sa,
@@ -2152,7 +2164,17 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		}
 		if (qdf_status != QDF_STATUS_SUCCESS ||
 		    !is_auth_valid(mac_ctx, rx_auth_frame, pe_session)) {
-			pe_err("failed to convert Auth Frame to structure or Auth is not valid");
+			pe_err("failed to convert Auth Frame to structure or Auth is not valid, vdev %d",
+			       pe_session->vdev_id);
+			wlan_connectivity_mgmt_event(
+				mac_ctx->psoc,
+				(struct wlan_frame_hdr *)mac_hdr,
+				pe_session->vdev_id,
+				rx_auth_frame->authStatusCode,
+				0, WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
+				auth_alg, 0,
+				rx_auth_frame->authTransactionSeqNumber,
+				0, WLAN_AUTH_RESP);
 			goto free;
 		}
 	}
@@ -2160,7 +2182,17 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (!lim_is_valid_fils_auth_frame(mac_ctx, pe_session,
 			rx_auth_frm_body)) {
-		pe_err("Received invalid FILS auth packet");
+		pe_err("Received invalid FILS auth packet, vdev %d",
+		       pe_session->vdev_id);
+		wlan_connectivity_mgmt_event(
+				mac_ctx->psoc,
+				(struct wlan_frame_hdr *)mac_hdr,
+				pe_session->vdev_id,
+				rx_auth_frame->authStatusCode,
+				0, WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
+				auth_alg, 0,
+				rx_auth_frame->authTransactionSeqNumber,
+				0, WLAN_AUTH_RESP);
 		goto free;
 	}
 
