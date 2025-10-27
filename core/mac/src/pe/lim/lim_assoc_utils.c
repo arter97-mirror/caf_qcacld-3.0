@@ -3744,6 +3744,36 @@ lim_sta_update_max_channel_width(struct pe_session *pe_session,
 	}
 }
 
+void
+lim_update_add_sta_cck_5g_support(struct mac_context *mac_ctx,
+				  tAddStaParams *add_sta,
+				  tpSirAssocRsp assoc_rsp,
+				  struct pe_session *session_entry)
+{
+	bool cck_5g_rx = false, cck_5g_tx = false;
+
+	if (!session_entry->qcn_ie_present_in_beacon ||
+	    !wlan_get_rx_tx_cck_5g_support_for_mode(mac_ctx->psoc, QDF_STA_MODE,
+						    &cck_5g_rx, &cck_5g_tx) ||
+	    !assoc_rsp->qcn_ie.present ||
+	    !assoc_rsp->qcn_ie.target_cck_support_attr.present) {
+		return;
+	}
+
+	pe_debug("Self 5 GHz CCK: self: TX %d RX %d, peer : Tx %d Rx %d",
+		 cck_5g_tx, cck_5g_rx,
+		 assoc_rsp->qcn_ie.target_cck_support_attr.target_cck_tx_supp_5g,
+		 assoc_rsp->qcn_ie.target_cck_support_attr.target_cck_rx_supp_5g);
+
+	if (assoc_rsp->qcn_ie.target_cck_support_attr.target_cck_rx_supp_5g &&
+	    cck_5g_tx)
+		add_sta->peer_cck_rx_support_5ghz = 1;
+
+	if (assoc_rsp->qcn_ie.target_cck_support_attr.target_cck_tx_supp_5g &&
+	    cck_5g_rx)
+		add_sta->peer_cck_tx_support_5ghz = 1;
+}
+
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 				tpSirAssocRsp pAssocRsp,
 				struct bss_description *bss_desc,
@@ -4194,6 +4224,9 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 	lim_sta_update_max_channel_width(pe_session, pAssocRsp, pAddBssParams);
 
 	lim_set_sta_ctx_twt(&pAddBssParams->staContext, pe_session);
+
+	lim_update_add_sta_cck_5g_support(mac, sta_context,
+					  pAssocRsp, pe_session);
 
 	if (lim_is_fils_connection(pe_session))
 		pAddBssParams->no_ptk_4_way = true;

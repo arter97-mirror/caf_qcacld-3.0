@@ -451,4 +451,18 @@ void lim_clear_log_instance_id(struct pe_session *session);
 static inline void lim_clear_log_instance_id(struct pe_session *session)
 {}
 #endif
+
+/**
+ * lim_update_add_sta_cck_5g_support() - update add sta CCK RX/TX
+ * @mac_ctx: mac context
+ * @add_sta: pointer to tAddStaParams
+ * @assoc_rsp: Assoc response
+ * @session_entry: pe session
+ *
+ * Return: NA
+ */
+void
+lim_update_add_sta_cck_5g_support(struct mac_context *mac_ctx,
+				  tAddStaParams *add_sta, tpSirAssocRsp assoc_rsp,
+				  struct pe_session *session_entry);
 #endif /* __LIM_ASSOC_UTILS_H */
