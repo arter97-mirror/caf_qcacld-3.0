@@ -1050,6 +1050,7 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 close_adapter:
 	if (device_address)
 		wlan_hdd_release_intf_addr(hdd_ctx, device_address);
+	adapter->is_virtual_iface = true;
 	hdd_close_adapter(hdd_ctx, adapter, true);
 
 	return ERR_PTR(-EINVAL);
