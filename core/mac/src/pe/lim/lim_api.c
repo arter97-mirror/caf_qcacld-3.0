@@ -2442,8 +2442,8 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	hdr = (tpSirMacMgmtHdr)(uint8_t *)roam_synch_ind +
-					roam_synch_ind->reassoc_req_offset;
+	hdr = (tpSirMacMgmtHdr)((uint8_t *)roam_synch_ind +
+					roam_synch_ind->reassoc_req_offset);
 	if (hdr->fc.type == WLAN_FC0_TYPE_MGMT &&
 	    hdr->fc.subType == SIR_MAC_MGMT_ASSOC_REQ)
 		ies_offset = WLAN_ASSOC_REQ_IES_OFFSET;
