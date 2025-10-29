@@ -981,12 +981,13 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 	uint32_t count, j;
 	int tmp;
 	size_t len, ie_len = 0;
-	struct ieee80211_channel *chan;
+	struct ieee80211_channel *chan, **chan_ptr;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
 	int ret;
 	struct wlan_hdd_link_info *link_info;
 	int link_id = -1;
+	u8 *ptr = NULL;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -1046,17 +1047,24 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 	request = qdf_mem_malloc(len);
 	if (!request)
 		goto error;
+
+	ptr = ((u8 *)request + offsetof(struct cfg80211_scan_request, channels));
+	chan_ptr = (struct ieee80211_channel **)ptr;
+
 	if (n_ssid)
-		request->ssids = (void *)&request->channels[n_channels];
+		request->ssids = (struct cfg80211_ssid *)
+				  (ptr + sizeof(*chan_ptr) * n_channels);
 	request->n_ssids = n_ssid;
+
 	if (ie_len) {
 		if (request->ssids)
-			request->ie = (void *)(request->ssids + n_ssid);
+			request->ie = (u8 *)request->ssids +
+				       sizeof(*request->ssids) * n_ssid;
 		else
-			request->ie = (void *)(request->channels + n_channels);
+			request->ie = ptr + sizeof(*chan_ptr) * n_channels;
 	}
-
 	request->ie_len = ie_len;
+
 	count = 0;
 	if (tb[QCA_WLAN_VENDOR_ATTR_SCAN_FREQUENCIES]) {
 		nla_for_each_nested(attr,
@@ -1072,7 +1080,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 				goto error;
 			if (chan->flags & IEEE80211_CHAN_DISABLED)
 				continue;
-			request->channels[count] = chan;
+			*(chan_ptr + count) = chan;
 			count++;
 		}
 	} else {
@@ -1084,7 +1092,7 @@ static int __wlan_hdd_cfg80211_vendor_scan(struct wiphy *wiphy,
 				chan = &wiphy->bands[band]->channels[j];
 				if (chan->flags & IEEE80211_CHAN_DISABLED)
 					continue;
-				request->channels[count] = chan;
+				*(chan_ptr + count) = chan;
 				count++;
 			}
 		}
