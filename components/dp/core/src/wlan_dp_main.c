@@ -1192,6 +1192,7 @@ void dp_affn_override_init(struct wlan_objmgr_psoc *psoc)
  *
  * Return: None
  */
+static inline
 void dp_affn_override_cfg_init(
 	struct wlan_dp_psoc_cfg *config,
 	struct wlan_objmgr_psoc *psoc)
@@ -1356,6 +1357,7 @@ void wlan_dp_affn_override_handler(
 }
 
 #else
+static inline
 void dp_affn_override_cfg_init(
 	struct wlan_dp_psoc_cfg *config,
 	struct wlan_objmgr_psoc *psoc)
