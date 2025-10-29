@@ -5912,6 +5912,16 @@ wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc);
 inline bool
 wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc);
 #endif
+
+/**
+ * wlan_mlme_get_edca_txop_duration_ms() - query TXOP duration in unit of ms.
+ * @psoc: pointer to psoc
+ *
+ * Return: TXOP duration in unit of ms.
+ */
+uint32_t
+wlan_mlme_get_edca_txop_duration_ms(struct wlan_objmgr_psoc *psoc);
+
 /**
  * wlan_get_mode_index_from_mode() - get CCK opmode index
  * @opmode: qdf opmode
