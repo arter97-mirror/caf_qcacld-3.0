@@ -23,6 +23,8 @@
 #define WLAN_DP_SPM_S_TBL_IDX_MASK 0xFF
 #define WLAN_DP_SPM_S_TBL_RETIRE_TIME_DELTA_NS (200 * QDF_NSEC_PER_MSEC)
 #define WLAN_DP_SPM_S_ENTRY_FLAG_ACCESS_BIT 0
+#define WLAN_DP_SPM_NUM_FLOW_ENTRIES_MASK 0xFF
+#define WLAN_DP_SPM_SKID_MAX 4
 
 /* No packets received for this flow in last 2 seconds, window did not move*/
 #define WLAN_DP_SPM_MAX_LAST_WIN_START_NS (2 * QDF_NSEC_PER_SEC)
@@ -77,60 +79,59 @@ struct wlan_dp_spm_flow_tbl_stats {
 
 /**
  * struct wlan_dp_spm_flow_info - Record of flow which will be tracked
- * @node: List node
- * @hnode: hash list node
- * @rcu: internal rcu lock for the structure
- * @id: Flow ID
- * @is_populated: Is flow valid
- * @is_reserved: Is flow already reserved
- * @info: Flow details
- * @is_ipv4: Is flow IPV4
- * @guid: Global unique identifier
- * @peer_id: Peer ID
- * @vdev_id: Vdev ID
- * @svc_id: Service ID
- * @svc_metadata: Service metadata
- * @cookie: sock address or skb hash
- * @flags: flow flags
- * @flow_add_ts: Flow add timestamp
  * @active_ts: last active timestamp
  * @num_pkts: Num of packets for this flow
- * @c_flow_id: STC classification table ID
+ * @hash: hash of the flow
+ * @guid: Global unique identifier
+ * @flags: flow flags
+ * @id: Flow ID
+ * @peer_id: Peer ID
+ * @is_populated: Is flow valid
+ * @is_ipv4: Is flow IPV4
+ * @vdev_id: Vdev ID
+ * @svc_metadata: Service metadata
  * @track_flow_stats: is stats tracking enabled for flow
- * @selected_to_sample: Selected for classification stats collection
  * @classified: Classification done
- * @reserved: unused
+ * @c_flow_id: STC classification table ID
+ * @selected_to_sample: Selected for classification stats collection
+ * @ul_tid: Uplink TID id for the flow
+ * @svc_id: Service ID
+ * @cookie: sock address or skb hash
+ * @flow_add_ts: Flow add timestamp
  * @flow_tuple_hash: flow_tuple_hash to identify bi-directional flow
  * @inactivity_timeout: inactivity timeout to be tested for STC interested flows
- * @ul_tid: Uplink TID id for the flow
+ * @info: Flow details
+ * @node: List node
  */
 struct wlan_dp_spm_flow_info {
-	qdf_list_node_t node;
-	struct qdf_ht_entry hnode;
-	qdf_rcu_head_t rcu;
-	uint16_t id;
-	uint8_t is_populated;
-	uint8_t is_reserved;
-	struct flow_info info;
-	bool is_ipv4;
-	uint32_t guid;
-	uint16_t peer_id;
-	uint8_t vdev_id;
-	uint16_t svc_id;
-	uint8_t svc_metadata;
-	uint64_t cookie;
-	uint32_t flags;
-	uint64_t flow_add_ts;
 	uint64_t active_ts;
 	uint64_t num_pkts;
+	uint32_t hash;
+	uint32_t guid;
+	uint32_t flags;
+	uint16_t id;
+	uint16_t peer_id;
+	uint8_t is_populated;
+	uint8_t is_ipv4;
+	uint8_t vdev_id;
+	uint8_t svc_metadata;
 #ifdef WLAN_DP_FEATURE_STC
-	uint8_t c_flow_id;
 	uint8_t track_flow_stats;
-	uint8_t selected_to_sample;
 	uint8_t classified;
+	uint8_t c_flow_id;
+	uint8_t selected_to_sample;
+	uint8_t ul_tid;
+#endif
+	uint16_t svc_id;
+	uint64_t cookie;
+	uint64_t flow_add_ts;
+#ifdef WLAN_DP_FEATURE_STC
 	uint64_t flow_tuple_hash;
 	uint64_t inactivity_timeout;
-	uint8_t ul_tid;
+#endif
+	struct flow_info info;
+#ifdef WLAN_FEATURE_SAWFISH
+	qdf_list_node_t node;
 #endif
 };
 
@@ -461,6 +462,46 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 					  struct flow_info *flow_info,
 					  uint64_t cookie_sk, uint16_t peer_id);
 
+/**
+ * dp_spm_get_tx_flow_id() - Get TX flow ID using hash-based lookup
+ * @dp_intf: DP interface context
+ * @nbuf: Network buffer containing the packet
+ * @flow_info: Flow information extracted from the packet
+ *
+ * This function performs hash-based lookup to find an existing TX flow
+ * that matches the given flow information. It uses the packet hash and
+ * SKID (collision resolution) mechanism to efficiently locate flows
+ * without relying on socket cookies.
+ *
+ * The function calculates a hash index from the packet and searches
+ * through potential collision slots (SKID) to find a matching flow
+ * based on exact flow tuple comparison.
+ *
+ * Return: Valid flow ID if found, SAWFISH_INVALID_FLOW_ID if not found
+ */
+uint16_t dp_spm_get_tx_flow_id(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
+			       struct flow_info *flow_info);
+
+/**
+ * dp_spm_add_tx_flow() - Add new TX flow using hash-based approach
+ * @dp_intf: DP interface context
+ * @nbuf: Network buffer containing the packet
+ * @tx_flow_id: Pointer to store the allocated flow ID
+ * @flow_info: Flow information to be stored
+ * @peer_id: Peer ID associated with this flow
+ *
+ * This function adds a new TX flow entry using hash-based placement
+ * strategy. It addresses the socket reuse ambiguity problem where
+ * multiple flows sharing the same socket can degrade classification
+ * accuracy.
+ *
+ * Return: QDF_STATUS_SUCCESS on success,
+ *         QDF_STATUS_E_EMPTY if no flow entry available,
+ */
+QDF_STATUS dp_spm_add_tx_flow(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
+			      uint16_t *tx_flow_id, struct flow_info *flow_info,
+			      uint16_t peer_id);
+
 #else
 static inline void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx)
 {
@@ -508,6 +549,21 @@ QDF_STATUS wlan_dp_spm_get_flow_id_origin(struct wlan_dp_intf *dp_intf,
 					  uint64_t cookie_sk, uint16_t peer_id)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+uint16_t dp_spm_get_tx_flow_id(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
+			       struct flow_info *flow_info)
+{
+	return SAWFISH_INVALID_FLOW_ID;
+}
+
+static inline
+QDF_STATUS dp_spm_add_tx_flow(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
+			      uint16_t *tx_flow_id, struct flow_info *flow,
+			      uint16_t peer_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 #endif
