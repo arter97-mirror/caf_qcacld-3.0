@@ -1536,6 +1536,7 @@ struct wlan_mlme_aux_dev_caps {
  * TX/RX bytes.
  * @sap_traffic_monitoring_time_s: Duration of traffic monitoring
  * in unit of sec
+ * @edca_txop_limit: EDCA TXOP limit in milliseconds.
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1615,6 +1616,7 @@ struct wlan_mlme_generic {
 	uint32_t sap_perf_data_threshold;
 	uint32_t sap_traffic_monitoring_time_s;
 #endif
+	uint32_t edca_txop_limit;
 };
 
 /**
