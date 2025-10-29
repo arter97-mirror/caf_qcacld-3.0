@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -59,14 +59,6 @@ uint32_t csr_get_rts_thresh(struct mac_context *mac_ctx);
 
 bool csr_is_bssid_match(struct qdf_mac_addr *pProfBssid,
 			struct qdf_mac_addr *BssBssid);
-/*
- * This function will allocate memory for the parsed IEs to the caller.
- * Caller must free the memory. after it is done with the data only if
- * this function succeeds
- */
-QDF_STATUS csr_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
-					      struct bss_description *bss_desc,
-					      tDot11fBeaconIEs **ppIEStruct);
 
 /**
  * csr_is_auth_type_ese() - Checks whether Auth type is ESE or not

@@ -1989,11 +1989,6 @@ static inline uint32_t lim_truncate_ppet(uint8_t *ppet, uint32_t max_len)
 QDF_STATUS wlan_parse_bss_description_ies(struct mac_context *mac_ctx,
 					  struct bss_description *bss_desc);
 
-QDF_STATUS
-wlan_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
-				    struct bss_description *bss_desc,
-				    tDot11fBeaconIEs **ie_struct);
-
 void wlan_populate_basic_rates(tSirMacRateSet *rate_set, bool is_ofdm_rates,
 			       bool is_basic_rates);
 

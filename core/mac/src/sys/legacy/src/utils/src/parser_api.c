@@ -13188,32 +13188,6 @@ QDF_STATUS wlan_parse_bss_description_ies(struct mac_context *mac_ctx,
 	return status;
 }
 
-QDF_STATUS wlan_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
-					       struct bss_description *bss_desc,
-					       tDot11fBeaconIEs **ie_struct)
-{
-	QDF_STATUS status;
-	tDot11fBeaconIEs *bcn_struct;
-
-	if (!bss_desc || !ie_struct)
-		return QDF_STATUS_E_INVAL;
-
-	bcn_struct = qdf_mem_malloc(sizeof(tDot11fBeaconIEs));
-	if (!bcn_struct)
-		return QDF_STATUS_E_NOMEM;
-
-	status = wlan_parse_bss_description_ies(mac_ctx, bss_desc);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		qdf_mem_free(bcn_struct);
-		return status;
-	}
-
-	*ie_struct = bcn_struct;
-	qdf_mem_copy(bcn_struct, &bss_desc->bcn_ies, sizeof(tDot11fBeaconIEs));
-
-	return status;
-}
-
 void wlan_populate_basic_rates(tSirMacRateSet *rate_set, bool is_ofdm_rates,
 			       bool is_basic_rates)
 {

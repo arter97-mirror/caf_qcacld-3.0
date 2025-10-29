@@ -900,18 +900,6 @@ bool csr_is_wmm_supported(struct mac_context *mac)
 		return true;
 }
 
-/* This function will allocate memory for the parsed IEs to the caller.
- * Caller must free the memory after it is done with the data only if
- * this function succeeds
- */
-QDF_STATUS csr_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
-					      struct bss_description *bss_desc,
-					      tDot11fBeaconIEs **ppIEStruct)
-{
-	return wlan_get_parsed_bss_description_ies(mac_ctx, bss_desc,
-						   ppIEStruct);
-}
-
 uint32_t csr_get_frag_thresh(struct mac_context *mac_ctx)
 {
 	return mac_ctx->mlme_cfg->threshold.frag_threshold;
