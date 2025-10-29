@@ -4643,6 +4643,7 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  transmit_power_env[0..8];
     OPTIE  ChannelSwitchWrapper;
     OPTIE  VHTExtBssLoad;
+    OPTIE  OperatingMode;
     OPTIE  fils_indication;
     OPTIE  max_chan_switch_time;
     OPTIE  esp_information;

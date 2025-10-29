@@ -3652,6 +3652,11 @@ QDF_STATUS sir_convert_probe_frame2_struct(struct mac_context *mac,
 				&pr->vendor_vht_ie.VHTOperation,
 				sizeof(tDot11fIEVHTOperation));
 	}
+
+	if (pr->OperatingMode.present)
+		qdf_mem_copy(&pProbeResp->OperatingMode, &pr->OperatingMode,
+			     sizeof(tDot11fIEOperatingMode));
+
 	/* Update HS 2.0 Information Element */
 	if (pr->hs20vendor_ie.present) {
 		pe_debug("HS20 Indication Element Present, rel#:%u, id:%u",
