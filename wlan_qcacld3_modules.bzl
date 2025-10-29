@@ -46,6 +46,7 @@ _target_chipset_map = {
         "peach-v2",
         "kiwi-v2",
         "wcn7750",
+	"wcn6450",
     ],
     "alor-le": [
         "wcn7750",
