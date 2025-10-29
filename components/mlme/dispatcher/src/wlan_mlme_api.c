@@ -9559,6 +9559,24 @@ QDF_STATUS wlan_mlme_send_mlo_sap_link_removal_cmd(struct wlan_objmgr_vdev *vdev
 	return status;
 }
 #endif
+
+uint32_t
+wlan_mlme_get_edca_txop_duration_ms(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_EDCA_TXOP_LIMIT);
+	}
+
+	mlme_debug("txop limit ms = %u",
+		   mlme_obj->cfg.gen.edca_txop_limit);
+
+	return mlme_obj->cfg.gen.edca_txop_limit;
+}
+
 enum cck_mode_index wlan_get_mode_index_from_mode(enum QDF_OPMODE opmode)
 {
 	switch (opmode) {

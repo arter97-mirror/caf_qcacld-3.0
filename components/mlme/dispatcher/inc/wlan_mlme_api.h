@@ -5749,6 +5749,15 @@ QDF_STATUS wlan_mlme_send_mlo_sap_link_removal_cmd(struct wlan_objmgr_vdev *vdev
 #endif
 
 /**
+ * wlan_mlme_get_edca_txop_duration_ms() - query TXOP duration in unit of ms.
+ * @psoc: pointer to psoc
+ *
+ * Return: TXOP duration in unit of ms.
+ */
+uint32_t
+wlan_mlme_get_edca_txop_duration_ms(struct wlan_objmgr_psoc *psoc);
+
+/**
  * wlan_get_mode_index_from_mode() - get CCK opmode index
  * @opmode: qdf opmode
  *

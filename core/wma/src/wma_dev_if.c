@@ -7136,7 +7136,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
 	return QDF_STATUS_SUCCESS;
 }
 
-#define MAX_VDEV_CREATE_PARAMS 23
+#define MAX_VDEV_CREATE_PARAMS 24
 /* params being sent:
  * 1.wmi_vdev_param_wmm_txop_enable
  * 2.wmi_vdev_param_disconnect_th
@@ -7161,6 +7161,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
  * 21.wmi_vdev_param_disable_2g_twt
  * 22.wmi_vdev_param_disable_twt_info_frame
  * 23.wmi_vdev_param_disable_scan_start_twt
+ * 24.wmi_vdev_param_su_txop_burst_limit_us
  */
 
 QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
@@ -7181,6 +7182,7 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 	bool is_twt_disabled_on_scan;
 	enum QDF_OPMODE opmode;
 	tp_wma_handle wma;
+	uint32_t edca_txop_duration_us;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma)
@@ -7488,6 +7490,20 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_debug("failed to set wmi_vdev_param_disable_scan_start_twt");
 		goto error;
+	}
+
+	if (opmode == QDF_STA_MODE) {
+		edca_txop_duration_us =
+			wlan_mlme_get_edca_txop_duration_ms(mac->psoc) * 1024;
+		status = mlme_check_index_setparam(
+				setparam,
+				wmi_vdev_param_su_txop_burst_limit_us,
+				edca_txop_duration_us,
+				index++, MAX_VDEV_CREATE_PARAMS);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug("failed to set wmi_vdev_param_su_txop_burst_limit_us");
+			goto error;
+		}
 	}
 
 	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
