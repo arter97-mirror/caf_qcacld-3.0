@@ -55,6 +55,7 @@ _target_chipset_map = {
         "wcn7750",
         "fig",
         "fig-v2",
+        "wcn6450",
     ],
     "alor-le": [
         "wcn7750",
