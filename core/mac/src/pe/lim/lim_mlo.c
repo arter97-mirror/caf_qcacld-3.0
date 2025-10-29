@@ -1114,6 +1114,93 @@ void lim_mlo_delete_link_peer(struct pe_session *pe_session,
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
 
+QDF_STATUS lim_mlo_link_add_fetch_nss(uint8_t vdev_id,
+				      struct scan_cache_entry *scan_entry,
+				      uint8_t *tx_nss, uint8_t *rx_nss)
+{
+	bool use_cur_mode;
+	uint16_t bss_len;
+	qdf_freq_t freq;
+	QDF_STATUS st;
+	uint8_t hw_tx_nss, hw_rx_nss;
+	uint8_t vdev_tx_nss, vdev_rx_nss;
+	uint8_t self_tx_nss, self_rx_nss;
+	struct mac_context *mac;
+	struct wlan_objmgr_vdev *vdev;
+	struct bss_description *bss_desc;
+	struct sir_dot11f_nss_info nss_ies = {0};
+
+	mac = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac) {
+		pe_debug("MAC ctx NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_debug("Failed to get vdev %d", vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	freq = scan_entry->channel.chan_freq;
+
+	st = mlme_get_vdev_nss_by_freq_from_dyn(vdev, freq,
+						&vdev_tx_nss, &vdev_rx_nss);
+	if (QDF_IS_STATUS_ERROR(st)) {
+		pe_debug("Failed to fetch nss %d", st);
+		goto end;
+	}
+
+	st = wlan_mlme_cfg_get_prefer_curr_hw_mode_nss(mac->psoc,
+						       &use_cur_mode);
+	if (QDF_IS_STATUS_ERROR(st)) {
+		pe_debug("Failed to get INI config from MLME %d", st);
+		goto end;
+	}
+
+	if (use_cur_mode) {
+		st = policy_mgr_curr_hwmode_fetch_chains_for_freq(mac->psoc,
+								  freq,
+								  &hw_tx_nss,
+								  &hw_rx_nss);
+		if (QDF_IS_STATUS_ERROR(st)) {
+			pe_debug("Failed to get curr HW mode SS %d", st);
+			goto end;
+		}
+
+		self_tx_nss = QDF_MIN(vdev_tx_nss, hw_tx_nss);
+		self_rx_nss = QDF_MIN(vdev_rx_nss, hw_rx_nss);
+	} else {
+		self_tx_nss = vdev_tx_nss;
+		self_rx_nss = vdev_rx_nss;
+	}
+
+	bss_len = offsetof(struct bss_description, ieFields[0]) +
+		  util_scan_entry_ie_len(scan_entry);
+	bss_desc = qdf_mem_malloc(bss_len);
+	if (!bss_desc) {
+		st = QDF_STATUS_E_NOMEM;
+		goto end;
+	}
+
+	st = wlan_fill_bss_desc_from_scan_entry(mac, bss_desc, scan_entry);
+	if (QDF_IS_STATUS_ERROR(st)) {
+		qdf_mem_free(bss_desc);
+		pe_debug("Failed to fill BSS desc %d", st);
+		goto end;
+	}
+
+	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, &bss_desc->bcn_ies,
+				  MLME_DOT11_MODE_11BE);
+	*tx_nss = QDF_MIN(self_tx_nss, nss_ies.cap_rx_nss);
+	*rx_nss = QDF_MIN(self_rx_nss, nss_ies.cap_tx_nss);
+	qdf_mem_free(bss_desc);
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	return st;
+}
+
 #if defined(SAP_MULTI_LINK_EMULATION)
 QDF_STATUS lim_mlo_assoc_ind_upper_layer(struct mac_context *mac,
 					 struct pe_session *pe_session,

@@ -2768,5 +2768,6 @@ static struct mlo_mlme_ext_ops mlo_ext_ops = {
 	.mlo_mlme_ext_handle_sta_csa_param = lim_handle_mlo_sta_csa_param,
 	.mlo_mlme_ext_teardown_tdls = wlan_tdls_teardown_links_for_non_dbs,
 	.mlo_mlme_ext_link_add_join_continue = lim_mlo_link_add_join_continue,
+	.mlo_mlme_ext_link_add_fetch_nss = lim_mlo_link_add_fetch_nss,
 };
 #endif

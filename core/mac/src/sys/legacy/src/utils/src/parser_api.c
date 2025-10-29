@@ -14994,6 +14994,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 	uint8_t *ppet, cb_mode;
 	uint8_t *eht_cap_ie = NULL;
 	bool sta_prof_he_ie = false;
+	struct wlan_mlo_link_recfg_bss_info *cur_link;
 
 	if (!vdev || !pe_session)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -15182,26 +15183,26 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 		struct mlo_link_info *ml_link_info;
 		struct qdf_mac_addr *self_link_addr;
 
+		cur_link = &req->del_link_info.link[link];
 		sta_prof = &mlo_ie->sta_profile[num_sta_prof];
 		p_sta_prof = sta_prof->data;
 		len_remaining = sizeof(sta_prof->data);
 		ml_link_info =
 			mlo_mgr_get_ap_link_by_link_id(
 					pe_session->vdev->mlo_dev_ctx,
-					req->del_link_info.link[link].link_id);
+					cur_link->link_id);
 		if (ml_link_info) {
 			self_link_addr = &ml_link_info->link_addr;
 		} else {
 			/* in non-common link case, link info may be overwritten
 			 * before send action frame
 			 */
-			self_link_addr =
-				&req->del_link_info.link[link].self_link_addr;
+			self_link_addr = &cur_link->self_link_addr;
 		}
 
 		pe_debug("Del link id %d ap link addr : " QDF_MAC_ADDR_FMT " self: " QDF_MAC_ADDR_FMT "",
-			 req->del_link_info.link[link].link_id,
-			 QDF_MAC_ADDR_REF(req->del_link_info.link[link].ap_link_addr.bytes),
+			 cur_link->link_id,
+			 QDF_MAC_ADDR_REF(cur_link->ap_link_addr.bytes),
 			 QDF_MAC_ADDR_REF(self_link_addr->bytes));
 
 		/* subelement ID 0, length(sta_prof->num_data - 2) */
@@ -15212,7 +15213,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 		QDF_SET_BITS(*(uint16_t *)(sta_prof->data + MIN_IE_LEN),
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS,
-			     req->del_link_info.link[link].link_id);
+			     cur_link->link_id);
 		QDF_SET_BITS(*(uint16_t *)(sta_prof->data + MIN_IE_LEN),
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_IDX,
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_BITS,
@@ -15284,10 +15285,11 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 		p_sta_prof = sta_prof->data;
 		len_remaining = sizeof(sta_prof->data);
 
+		cur_link = &req->add_link_info.link[link];
 		pe_debug("Add link id %d link addr : " QDF_MAC_ADDR_FMT " self: " QDF_MAC_ADDR_FMT "",
-			 req->add_link_info.link[link].link_id,
-			 QDF_MAC_ADDR_REF(req->add_link_info.link[link].ap_link_addr.bytes),
-			 QDF_MAC_ADDR_REF(req->add_link_info.link[link].self_link_addr.bytes));
+			 cur_link->link_id,
+			 QDF_MAC_ADDR_REF(cur_link->ap_link_addr.bytes),
+			 QDF_MAC_ADDR_REF(cur_link->self_link_addr.bytes));
 
 		/* subelement ID 0, length(sta_prof->num_data - 2) */
 		*p_sta_prof++ = WLAN_ML_LINFO_SUBELEMID_PERSTAPROFILE;
@@ -15297,7 +15299,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 		QDF_SET_BITS(*(uint16_t *)(sta_prof->data + MIN_IE_LEN),
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX,
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS,
-			     req->add_link_info.link[link].link_id);
+			     cur_link->link_id);
 		QDF_SET_BITS(*(uint16_t *)(sta_prof->data + MIN_IE_LEN),
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_IDX,
 			     WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_BITS,
@@ -15339,8 +15341,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 			WLAN_ML_BV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE;
 
 		/* Copying sta mac address in sta info field */
-		qdf_mem_copy(p_sta_prof,
-			     &req->add_link_info.link[link].self_link_addr.bytes,
+		qdf_mem_copy(p_sta_prof, &cur_link->self_link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 		p_sta_prof += QDF_MAC_ADDR_SIZE;
 		len_remaining -= QDF_MAC_ADDR_SIZE;
@@ -15372,7 +15373,7 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 		p_sta_prof += WLAN_CAPABILITYINFO_LEN;
 		len_remaining -= WLAN_CAPABILITYINFO_LEN;
 
-		chan_freq = req->add_link_info.link[link].freq;
+		chan_freq = cur_link->freq;
 
 		if (!chan_freq) {
 			pe_debug_rl("Invalid channel freq %d", chan_freq);
@@ -15411,6 +15412,11 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 				ht_caps.supportedChannelWidthSet = 1;
 				ht_caps.shortGI40MHz = 1;
 			}
+			wlan_mlme_set_ht_mcsset_for_nss(mac_ctx->psoc, &ht_caps,
+							NULL,
+							cur_link->cap_tx_nss,
+							cur_link->cap_rx_nss);
+
 		}
 
 		if (ht_caps.present) {
@@ -15451,8 +15457,12 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 			len_remaining -= len_consumed;
 		}
 
-		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
+		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq)) {
 			populate_dot11f_vht_caps(mac_ctx, NULL, &vht_caps);
+			lim_update_dot11f_vht_caps_for_nss(&vht_caps,
+							   cur_link->cap_tx_nss,
+							   cur_link->cap_rx_nss);
+		}
 		if (vht_caps.present) {
 			len_consumed = 0;
 			dot11f_pack_ie_vht_caps(mac_ctx, &vht_caps, p_sta_prof,
@@ -15463,6 +15473,9 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 
 		populate_dot11f_he_caps_by_band(mac_ctx, is_2g, &he_caps,
 						pe_session->vdev_id);
+		wlan_mlme_set_he_mcsset_for_nss(mac_ctx->mlme_cfg, &he_caps,
+						cur_link->cap_tx_nss,
+						cur_link->cap_rx_nss);
 		if (he_caps.ppet_present) {
 			value = WNI_CFG_HE_PPET_LEN;
 			if (!is_2g)
@@ -15503,6 +15516,9 @@ QDF_STATUS populate_rv_mlo_ie(struct wlan_objmgr_vdev *vdev,
 
 		populate_dot11f_eht_caps_by_band(mac_ctx, is_2g, &eht_caps,
 						 NULL);
+		wlan_mlme_set_eht_mcsset_for_nss(&eht_caps,
+						 cur_link->cap_tx_nss,
+						 cur_link->cap_rx_nss);
 		if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
 			eht_caps.support_320mhz_6ghz = 0;
 

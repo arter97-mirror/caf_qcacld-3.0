@@ -437,6 +437,31 @@ QDF_STATUS lim_mlo_link_add_join_continue(struct wlan_objmgr_psoc *psoc,
 					  QDF_STATUS recfg_rsp_status);
 
 /**
+ * lim_mlo_link_add_fetch_nss() - Fetch NSS values for MLO link addition
+ * @vdev_id: VDEV ID for which NSS values are being fetched
+ * @scan_entry: Scan cache entry containing BSS information
+ * @tx_nss: Pointer to store the calculated TX NSS value
+ * @rx_nss: Pointer to store the calculated RX NSS value
+ *
+ * This function calculates the appropriate TX and RX NSS (Number of
+ * Spatial Streams) values for an MLO link by considering:
+ * - VDEV's configured NSS capabilities
+ * - Current hardware mode chain capabilities (if configured to use)
+ * - BSS's advertised capabilities from scan entry
+ *
+ * The final NSS values are determined by taking the minimum of local
+ * capabilities and what the AP supports.
+ *
+ * Return: QDF_STATUS_SUCCESS if NSS values were successfully calculated
+ *         QDF_STATUS_E_NULL_VALUE if required objects are NULL
+ *         QDF_STATUS_E_NOMEM if memory allocation fails
+ *         Other error codes for specific failures
+ */
+QDF_STATUS lim_mlo_link_add_fetch_nss(uint8_t vdev_id,
+				      struct scan_cache_entry *scan_entry,
+				      uint8_t *tx_nss, uint8_t *rx_nss);
+
+/**
  * lim_get_bpcc_from_mlo_ie() - get the bpcc from mlo_ie info
  * @bcn: the pointer to tSchBeaconStruct
  * @bpcc: pbcc pointer to save the fetched value
