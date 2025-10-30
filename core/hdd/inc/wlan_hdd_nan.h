@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * Copyright (c) 2022, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -112,4 +113,13 @@ static inline bool wlan_hdd_nan_is_supported(struct hdd_context *hdd_ctx)
  */
 void hdd_nan_concurrency_update(void);
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * hdd_nan_vdev_destroy() - NAN vdev delete
+ * @psoc: psoc
+ *
+ * Return: None
+ */
+void hdd_nan_vdev_destroy(struct wlan_objmgr_psoc *psoc);
+#endif
 #endif /* __WLAN_HDD_NAN_H */

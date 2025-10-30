@@ -970,6 +970,7 @@ struct nan_pasn_peer_ops {
  * @os_if_ndp_event_handler: OS IF Callback for handling NAN Datapath events
  * @os_if_nan_next_dw_notif_handler: OS IF Callback for NAN next DW notification
  * @os_if_nan_process_cluster_event: OS IF Callback for NAN cluster notification
+ * @nan_vdev_destroy_cb: Callback to handle NAN vdev deletion
  * @ucfg_nan_request_process_cb: Callback to indicate NAN enable/disable
  * request processing is complete
  * @ndi_open: HDD callback for creating the NAN Datapath Interface
@@ -1003,6 +1004,7 @@ struct nan_callbacks {
 						struct nan_next_dw_info_event *event);
 	void (*os_if_nan_process_cluster_event)(struct wlan_objmgr_vdev *vdev,
 						struct nan_cluster_event *event);
+	void (*nan_vdev_destroy_cb)(struct wlan_objmgr_psoc *psoc);
 #endif
 	void (*ucfg_nan_request_process_cb)(void *cookie);
 	int (*ndi_open)(const char *iface_name, bool is_add_virtual_iface);

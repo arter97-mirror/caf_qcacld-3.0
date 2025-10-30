@@ -563,6 +563,32 @@ ref_rel:
 	return status;
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+QDF_STATUS nan_vdev_delete(struct wlan_objmgr_psoc *psoc)
+{
+	struct nan_psoc_priv_obj *psoc_nan_obj;
+
+	if (!ucfg_nan_is_fw_support_standard_mode(psoc))
+		return QDF_STATUS_SUCCESS;
+
+	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
+	if (!psoc_nan_obj) {
+		nan_err("psoc_nan_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (psoc_nan_obj->cb_obj.nan_vdev_destroy_cb)
+		psoc_nan_obj->cb_obj.nan_vdev_destroy_cb(psoc);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+QDF_STATUS nan_vdev_delete(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS nan_set_discovery_state(struct wlan_objmgr_psoc *psoc,
 				   enum nan_disc_state new_state)
 {
