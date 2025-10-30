@@ -398,11 +398,11 @@ copy_station_bcn_rssi_stats(struct wlan_objmgr_psoc *psoc,
 static QDF_STATUS hdd_calc_ch_load(struct wlan_hdd_link_info *link_info,
 				   struct stats_event *stats)
 {
-	int8_t ch_load = 0;
+	int32_t ch_load = 0;
 	uint32_t ch_freq;
 	uint32_t cca_new, on_new;
 	uint32_t cca_delta, on_delta;
-	uint64_t overflow_val;
+	uint64_t overflow_val, overflow_val1;
 	struct hdd_stats *hdd_stats;
 
 	if (!link_info || !stats || !stats->vdev_extd_stats) {
@@ -415,14 +415,13 @@ static QDF_STATUS hdd_calc_ch_load(struct wlan_hdd_link_info *link_info,
 	/* MLO link inactive state */
 	if (wlan_hdd_is_mlo_connection(link_info) &&
 	    !stats->vdev_extd_stats[0].is_mlo_vdev_active) {
-		ch_load = -1;
 		/* Reset stored values for inactive link */
 		hdd_stats->ch_stats.rx_time = 0;
 		hdd_stats->ch_stats.tx_time = 0;
 		hdd_stats->ch_stats.cca_time = 0;
 		hdd_stats->ch_stats.on_time = 0;
 		hdd_stats->ch_stats.ch_freq = 0;
-		hdd_stats->ch_stats.ch_load = ch_load;
+		hdd_stats->ch_stats.ch_load = -1;
 		hdd_debug("MLO link (vdev:%d) inactive state ch_load = -1",
 			  link_info->vdev_id);
 		return QDF_STATUS_SUCCESS;
@@ -444,7 +443,10 @@ static QDF_STATUS hdd_calc_ch_load(struct wlan_hdd_link_info *link_info,
 
 	/* Channel changed, calculate channel loading with new stats */
 	if (ch_freq != hdd_stats->ch_stats.ch_freq) {
-		ch_load = (cca_new * 100) / on_new;
+		/* to avoid overflow after multiply 100 */
+		overflow_val = (uint64_t)cca_new * 100;
+		overflow_val1 = (uint64_t)on_new;
+		ch_load = overflow_val / overflow_val1;
 		hdd_debug("Channel changed from %u to %u, ch_load = %d%%",
 			  hdd_stats->ch_stats.ch_freq, ch_freq, ch_load);
 	} else {
@@ -490,7 +492,10 @@ static QDF_STATUS hdd_calc_ch_load(struct wlan_hdd_link_info *link_info,
 		}
 
 		/* Calculate channel load percentage */
-		ch_load = (cca_delta * 100) / on_delta;
+		/* to avoid overflow after multiply 100 */
+		overflow_val = (uint64_t)cca_delta * 100;
+		overflow_val1 = (uint64_t)on_delta;
+		ch_load = overflow_val / overflow_val1;
 
 		hdd_debug("calculated ch_load = %d%% cca_delta=%u,on_delta=%u",
 			  ch_load, cca_delta, on_delta);
