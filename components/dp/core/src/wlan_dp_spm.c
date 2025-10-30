@@ -1025,27 +1025,24 @@ uint16_t wlan_dp_spm_svc_get_metadata(struct wlan_dp_intf *dp_intf,
 				      qdf_nbuf_t nbuf, uint16_t flow_id,
 				      uint64_t cookie)
 {
-	struct wlan_dp_spm_intf_context *spm_intf = dp_intf->spm_intf_ctx;
-	struct qdf_ht *ht_node = &spm_intf->origin_aft_hlist[flow_id];
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
 	struct wlan_dp_spm_flow_info *flow;
+	uint32_t hash = qdf_nbuf_get_hash(nbuf);
 
-	qdf_rcu_read_lock_bh();
-	qdf_hl_for_each_entry_rcu(flow, ht_node, hnode) {
-		if (flow->cookie == cookie) {
-			qdf_rcu_read_unlock_bh();
-			wlan_dp_spm_update_flow_features(dp_intf, flow, nbuf);
-			if (DP_STC_IS_CLASSIFIED_KNOWN(flow->classified) &&
-			    flow->ul_tid != WLAN_DP_STC_UL_TID_INVALID) {
-				nbuf->mark =
-				      WLAN_DP_STC_ENCRYPT_UL_TID(flow->ul_tid);
-				return QDF_STATUS_SUCCESS;
-			}
-			return QDF_STATUS_E_CANCELED;
-		}
+	flow = &dp_ctx->gl_flow_recs[flow_id];
+
+	if (qdf_unlikely(flow->hash != hash))
+		return QDF_STATUS_E_INVAL;
+
+	wlan_dp_spm_update_flow_features(dp_intf, flow, nbuf);
+
+	if (DP_STC_IS_CLASSIFIED_KNOWN(flow->classified) &&
+	    flow->ul_tid != WLAN_DP_STC_UL_TID_INVALID) {
+		nbuf->mark = WLAN_DP_STC_ENCRYPT_UL_TID(flow->ul_tid);
+		return QDF_STATUS_SUCCESS;
 	}
-	qdf_rcu_read_unlock_bh();
 
-	return QDF_STATUS_E_NOENT;
+	return QDF_STATUS_E_CANCELED;
 }
 #endif
 

@@ -33,6 +33,7 @@
 #endif
 
 #ifdef WLAN_DP_FEATURE_STC
+#include <wlan_dp_stc.h>
 /**
  * wlan_dp_sawfish_update_metadata() - Parse flow info from skb and update svc
  *				       data
@@ -47,10 +48,8 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 	struct sock *sk = NULL;
 	struct flow_info flow = {0};
 	uint16_t peer_id;
-	uint16_t sk_tx_flow_id;
+	uint16_t tx_flow_id;
 	int status = QDF_STATUS_E_INVAL;
-	union generic_ethhdr *eth_hdr;
-	uint8_t *pkt;
 
 	if (!dp_intf->spm_intf_ctx)
 		return QDF_STATUS_E_NOSUPPORT;
@@ -65,53 +64,47 @@ int wlan_dp_sawfish_update_metadata(struct wlan_dp_intf *dp_intf,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	sk_tx_flow_id = sk->sk_txtime_unused;
+	if (qdf_nbuf_data_is_ipv6_pkt(skb->data) ||
+	    qdf_nbuf_data_is_dns_query(skb) ||
+	    qdf_nbuf_data_is_dns_response(skb) ||
+	    qdf_nbuf_data_is_ipv4_dhcp_pkt(skb->data) ||
+	    !qdf_nbuf_is_ipv4_first_fragment(skb)) {
+		skb->mark = FLOW_INVALID_METADATA;
+		return QDF_STATUS_E_INVAL;
+	}
 
-	/* sk_tx_flow_id != 0 means flow_id valid */
-	if (qdf_unlikely(!sk_tx_flow_id)) {
-		/* Bypass special packets so that it does not
-		 * consume TX flow table entries.
-		 */
-		if (qdf_nbuf_data_is_ipv6_pkt(skb->data) ||
-		    qdf_nbuf_data_is_dns_query(skb) ||
-		    qdf_nbuf_data_is_dns_response(skb) ||
-		    qdf_nbuf_data_is_ipv4_dhcp_pkt(skb->data) ||
-		    !qdf_nbuf_is_ipv4_first_fragment(skb)) {
-			skb->mark = FLOW_INVALID_METADATA;
-			return QDF_STATUS_E_INVAL;
-		}
+	dp_fim_parse_skb_flow_info(skb, &flow);
+	if (qdf_unlikely(!flow.flags ||
+			 flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT)) {
+		skb->mark = FLOW_INVALID_METADATA;
+		return QDF_STATUS_E_INVAL;
+	}
 
-		dp_fim_parse_skb_flow_info(skb, &flow);
-		if (qdf_unlikely(!flow.flags ||
-				 flow.flags & FLOW_INFO_PRESENT_IP_FRAGMENT)) {
-			skb->mark = FLOW_INVALID_METADATA;
-			return QDF_STATUS_E_INVAL;
-		}
+	tx_flow_id = dp_spm_get_tx_flow_id(dp_intf, skb, &flow);
+	if (tx_flow_id == SAWFISH_INVALID_FLOW_ID) {
+		/* Tx flow not found, add it */
+		union generic_ethhdr *eth_hdr;
+		uint8_t *pkt;
+
 		pkt = skb->data;
 		eth_hdr = (union generic_ethhdr *)pkt;
 		peer_id = cdp_get_peer_id(dp_intf->dp_ctx->cdp_soc,
 					  CDP_VDEV_ALL, eth_hdr->eth_II.h_dest);
 
-		status = wlan_dp_spm_get_flow_id_origin(dp_intf, &sk_tx_flow_id,
-							&flow, (uint64_t)sk,
-							peer_id);
-		/* Check status */
-		if (qdf_unlikely(sk_tx_flow_id > SAWFISH_FLOW_ID_MAX)) {
-			/* skb->mark with svc_metadata, lapb_metadata */
-			return QDF_STATUS_E_INVAL;
-		}
-		sk->sk_txtime_unused = sk_tx_flow_id;
+		status = dp_spm_add_tx_flow(dp_intf, skb, &tx_flow_id, &flow,
+					    peer_id);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
 	}
 
-	status = wlan_dp_spm_svc_get_metadata(dp_intf, skb, sk_tx_flow_id,
+	/* Tx flow found, update stats */
+	status = wlan_dp_spm_svc_get_metadata(dp_intf, skb, tx_flow_id,
 					      (uint64_t)sk);
 	if (qdf_unlikely(status == QDF_STATUS_E_NOENT)) {
 		/*
 		 * Flow is possibly evicted, so mark for invalid flow.
 		 * Subsequent packets of flow will have new flow allocated.
 		 */
-		sk->sk_txtime_unused = 0;
-
 		return QDF_STATUS_E_NOENT;
 	}
 
