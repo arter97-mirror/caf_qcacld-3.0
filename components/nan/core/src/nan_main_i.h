@@ -177,7 +177,6 @@ struct nan_psoc_priv_obj {
 	uint8_t num_ndp_peers;
 };
 
-#define MAX_NAN_MIGRATED_PEERS 5
 /**
  * struct nan_vdev_priv_obj - nan private vdev obj
  * @lock: lock to be acquired before reading or writing to object
@@ -214,7 +213,7 @@ struct nan_vdev_priv_obj {
 	uint8_t num_pasn_peers;
 	bool is_delete_all_pasn_peer_in_progress;
 	uint8_t num_peer_migrated;
-	struct qdf_mac_addr peer_migrated_addr_list[MAX_NAN_MIGRATED_PEERS];
+	struct qdf_mac_addr peer_migrated_addr_list[MAX_NDP_SESSIONS];
 	uint8_t nan_disable_req_info;
 };
 

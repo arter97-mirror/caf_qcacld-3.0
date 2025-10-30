@@ -43,6 +43,7 @@
 #include "wlan_if_mgr_public_struct.h"
 #include "wlan_if_mgr_api.h"
 #include "wlan_mlme_api.h"
+#include "cfg_nan_api.h"
 
 bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc)
 {
@@ -136,6 +137,7 @@ nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t idx;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t max_ndp_sessions = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
 	if (!vdev) {
@@ -150,8 +152,10 @@ nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 		goto ref_rel;
 	}
 
+	cfg_nan_get_ndp_max_sessions(psoc, &max_ndp_sessions);
+
 	idx = nan_vdev_priv->num_peer_migrated;
-	if (idx >= MAX_NAN_MIGRATED_PEERS) {
+	if (idx >= max_ndp_sessions) {
 		nan_err("num migrated peers %d more than max migrated peers",
 			nan_vdev_priv->num_peer_migrated);
 		status = QDF_STATUS_E_FAILURE;
@@ -187,6 +191,7 @@ nan_remove_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 	struct nan_vdev_priv_obj *nan_vdev_priv;
 	uint8_t i = 0, idx;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t max_ndp_sessions = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
 	if (!vdev) {
@@ -201,8 +206,10 @@ nan_remove_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 		goto ref_rel;
 	}
 
+	cfg_nan_get_ndp_max_sessions(psoc, &max_ndp_sessions);
+
 	idx = nan_vdev_priv->num_peer_migrated;
-	if (idx > MAX_NAN_MIGRATED_PEERS) {
+	if (idx > max_ndp_sessions) {
 		nan_err("idx %d more than max migrated peers", idx);
 		status = QDF_STATUS_E_FAILURE;
 		goto ref_rel;
@@ -254,6 +261,7 @@ nan_is_peer_migrated(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct nan_vdev_priv_obj *nan_vdev_priv;
 	uint8_t i;
 	bool is_peer_migrated = false;
+	uint32_t max_ndp_sessions = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
 	if (!vdev) {
@@ -267,8 +275,10 @@ nan_is_peer_migrated(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		goto ref_rel;
 	}
 
-	if (!nan_vdev_priv->num_peer_migrated &&
-	    nan_vdev_priv->num_peer_migrated > MAX_NAN_MIGRATED_PEERS)
+	cfg_nan_get_ndp_max_sessions(psoc, &max_ndp_sessions);
+
+	if (!nan_vdev_priv->num_peer_migrated ||
+	    nan_vdev_priv->num_peer_migrated > max_ndp_sessions)
 		goto ref_rel;
 
 	for (i = 0; i < nan_vdev_priv->num_peer_migrated; i++) {
