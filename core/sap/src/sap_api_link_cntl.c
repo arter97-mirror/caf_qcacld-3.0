@@ -1205,10 +1205,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			break;
 		}
 
-		sap_debug("sapdfs: Indicate eSAP_DFS_RADAR_DETECT to HDD");
-		sap_signal_hdd_event(sap_ctx, NULL, eSAP_DFS_RADAR_DETECT,
-				     (void *) eSAP_STATUS_SUCCESS);
-
 		is_csa_needed =
 			sap_is_chan_change_needed_for_radar(sap_ctx,
 							    &chan_freq);
@@ -1228,6 +1224,10 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			mac_ctx->sap.SapDfsInfo.target_chan_freq =
 						sap_indicate_radar(sap_ctx);
 		}
+
+		sap_debug("sapdfs: Indicate eSAP_DFS_RADAR_DETECT to HDD");
+		sap_signal_hdd_event(sap_ctx, NULL, eSAP_DFS_RADAR_DETECT,
+				     (void *) eSAP_STATUS_SUCCESS);
 
 		/* if there is an assigned next channel hopping */
 		if (0 < mac_ctx->sap.SapDfsInfo.user_provided_target_chan_freq) {
