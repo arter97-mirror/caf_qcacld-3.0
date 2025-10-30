@@ -75,6 +75,10 @@
 		(WLAN_CFG_NUM_TX_DESC_MAX * MAX_TXDESC_POOLS + \
 			WLAN_CFG_RX_SW_DESC_NUM_SIZE_MAX * MAX_RXDESC_POOLS)
 
+/* Pool sizing policy: add 25% headroom and align to 16 */
+#define TX_POOL_HEADROOM_PERCENT     25
+#define TX_POOL_ALIGNMENT            16
+
 /**
  * struct dp_consistent_prealloc - element representing DP pre-alloc memory
  * @ring_type: HAL ring type
@@ -806,6 +810,14 @@ tx_pp_alloc:
 			dp_info("TX page pool %d already initialized", i);
 			continue;
 		}
+
+		/* Calculate pool size with 25% headroom and round to nearest
+		 * multiple of 16
+		 */
+		pp_t->pool_size =
+			qdf_align(wlan_cfg_psoc_get_num_tx_desc(ctrl_psoc) *
+				  (100 + TX_POOL_HEADROOM_PERCENT) / 100,
+				  TX_POOL_ALIGNMENT);
 
 		pp_t->pp = dp_prealloc_page_pool_create(qdf_ctx,
 							pp_t->pool_size,
