@@ -45,6 +45,12 @@
 #include "pld_common.h"
 #endif
 
+#ifdef CONFIG_BORON
+#define REO_GET_QUEUE_STATS_STATUS_SZ 0
+#else
+#define REO_GET_QUEUE_STATS_STATUS_SZ sizeof(struct reo_get_queue_stats_status)
+#endif
+
 #ifdef DP_MEM_PRE_ALLOC
 
 /* Max entries in FISA Flow table */
@@ -1171,7 +1177,7 @@ dp_update_mem_size_by_ring_type(struct wlan_dp_prealloc_cfg *cfg,
 		return;
 	case REO_STATUS:
 		*mem_size = (sizeof(struct tlv_32_hdr) +
-			     sizeof(struct reo_get_queue_stats_status)) *
+			     REO_GET_QUEUE_STATS_STATUS_SZ) *
 			    cfg->num_reo_status_ring_entries;
 		return;
 	case RXDMA_MONITOR_STATUS:
