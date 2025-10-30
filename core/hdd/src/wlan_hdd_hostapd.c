@@ -4614,6 +4614,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
 	QDF_STATUS status;
 	bool use_sap_original_bw = false;
+	bool cfg_sta_dfs_ch_peer_scc = false;
 
 	if (!ch_freq) {
 		hdd_err("Null parameters");
@@ -4820,6 +4821,20 @@ sap_restart:
 							ch_params.ch_width))) {
 		hdd_debug("SAP bw shrink to 20M for unsafe from %d", ch_params.ch_width);
 		ch_params.ch_width = CH_WIDTH_20MHZ;
+	}
+	/*
+	 * Downgrade to 80 Mhz from 160 for 5 Ghz, if channel is changing from
+	 * DFS to non DFS, to avoid standalone DFS for
+	 * cfg_sta_dfs_ch_peer_scc feature.
+	 */
+	policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc, &cfg_sta_dfs_ch_peer_scc);
+	if (ap_adapter->device_mode == QDF_P2P_GO_MODE &&
+	    WLAN_REG_IS_5GHZ_CH_FREQ(intf_ch_freq) &&
+	    ch_params.ch_width > CH_WIDTH_80MHZ && cfg_sta_dfs_ch_peer_scc &&
+	    wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, hdd_ap_ctx->sap_config.chan_freq)) {
+		hdd_debug("GO Vdev %d Downgrade BW to 80M to avoid DFS standalone",
+			  vdev_id);
+		ch_params.ch_width = CH_WIDTH_80MHZ;
 	}
 
 	hdd_debug("SAP CSA vdev %d, Freq: %d -> %d bw %d freq0 %d",
