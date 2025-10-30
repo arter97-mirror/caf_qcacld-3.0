@@ -134,7 +134,6 @@ struct wma_tgt_services {
  * @ht_rx_ldpc: ht rx ldpc
  * @ht_sgi_20: ht sgi 20
  * @ht_sgi_40: ht sgi 40
- * @num_rf_chains: num of rf chains
  * @dynamic_smps: Dynamic MIMO powersave
  */
 struct wma_tgt_ht_cap {
@@ -144,7 +143,6 @@ struct wma_tgt_ht_cap {
 	bool ht_rx_ldpc;
 	bool ht_sgi_20;
 	bool ht_sgi_40;
-	uint32_t num_rf_chains;
 	bool dynamic_smps;
 };
 

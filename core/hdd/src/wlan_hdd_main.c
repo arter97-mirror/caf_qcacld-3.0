@@ -13088,10 +13088,10 @@ static int hdd_wiphy_init(struct hdd_context *hdd_ctx)
 		wiphy->features |= NL80211_FEATURE_NEED_OBSS_SCAN;
 	}
 
-	if (hdd_ctx->num_rf_chains == HDD_ANTENNA_MODE_2X2 &&
+	if (hdd_ctx->num_rf_chains >= HDD_ANTENNA_MODE_2X2 &&
 	    ucfg_mlme_is_chain_mask_supported(hdd_ctx->psoc)) {
-		wiphy->available_antennas_tx = HDD_CHAIN_MODE_2X2;
-		wiphy->available_antennas_rx = HDD_CHAIN_MODE_2X2;
+		wiphy->available_antennas_tx = BIT(hdd_ctx->num_rf_chains) - 1;
+		wiphy->available_antennas_rx = BIT(hdd_ctx->num_rf_chains) - 1;
 	}
 	/* registration of wiphy dev with cfg80211 */
 	ret_val = wlan_hdd_cfg80211_register(wiphy);

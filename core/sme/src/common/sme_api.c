@@ -5468,13 +5468,11 @@ void sme_update_bfer_caps_as_per_nss_chains(mac_handle_t mac_handle,
 	if (tx_chains > NSS_1x1_MODE)
 		return;
 
-	sme_debug("MIMO not supported for SAP mode");
+	sme_debug("MIMO not supported, disable Beamformer");
 	cfg->vht_cap.vht_su_bformer = 0;
+	cfg->vht_cap.vht_mu_bformer = 0;
 	sme_update_bfer_he_cap(cfg);
 	sme_update_bfer_eht_cap(cfg);
-	mac_ctx->mlme_cfg->vht_caps.vht_cap_info.su_bformer = 0;
-	mac_ctx->mlme_cfg->vht_caps.vht_cap_info.num_soundingdim = 0;
-	mac_ctx->mlme_cfg->vht_caps.vht_cap_info.mu_bformer = 0;
 }
 
 QDF_STATUS sme_vdev_post_vdev_create_setup(mac_handle_t mac_handle,

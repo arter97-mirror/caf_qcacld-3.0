@@ -5688,17 +5688,10 @@ wma_update_target_ht_cap(struct target_psoc_info *tgt_hdl,
 
 	cfg->dynamic_smps = !!(ht_cap_info & WMI_HT_CAP_DYNAMIC_SMPS);
 
-	/* RF chains */
-	cfg->num_rf_chains = target_if_get_num_rf_chains(tgt_hdl);
-
-	wma_nofl_debug("ht_cap_info - %x ht_rx_stbc - %d, ht_tx_stbc - %d\n"
-		 "mpdu_density - %d ht_rx_ldpc - %d ht_sgi_20 - %d\n"
-		 "ht_sgi_40 - %d num_rf_chains - %d dynamic_smps - %d",
-		 ht_cap_info,
-		 cfg->ht_rx_stbc, cfg->ht_tx_stbc, cfg->mpdu_density,
-		 cfg->ht_rx_ldpc, cfg->ht_sgi_20, cfg->ht_sgi_40,
-		 cfg->num_rf_chains, cfg->dynamic_smps);
-
+	wma_nofl_debug("ht_cap_info - %x ht_rx_stbc - %d, ht_tx_stbc - %d\nmpdu_density - %d ht_rx_ldpc - %d ht_sgi_20 - %d\nht_sgi_40 - %d dynamic_smps - %d",
+		       ht_cap_info, cfg->ht_rx_stbc, cfg->ht_tx_stbc,
+		       cfg->mpdu_density, cfg->ht_rx_ldpc, cfg->ht_sgi_20,
+		       cfg->ht_sgi_40, cfg->dynamic_smps);
 }
 
 /**
@@ -5806,8 +5799,6 @@ static QDF_STATUS wma_update_supported_bands(
  * wma_derive_ext_ht_cap() - Derive HT caps based on given value
  * @ht_cap: given pointer to HT caps which needs to be updated
  * @value: new HT cap info provided in form of bitmask
- * @tx_chain: given tx chainmask value
- * @rx_chain: given rx chainmask value
  *
  * This function takes the value provided in form of bitmask and decodes
  * it. After decoding, what ever value it gets, it takes the union(max) or
@@ -5816,9 +5807,7 @@ static QDF_STATUS wma_update_supported_bands(
  * Return: none
  *
  */
-static void wma_derive_ext_ht_cap(
-			struct wma_tgt_ht_cap *ht_cap, uint32_t value,
-			uint32_t tx_chain, uint32_t rx_chain)
+static void wma_derive_ext_ht_cap(struct wma_tgt_ht_cap *ht_cap, uint32_t value)
 {
 	struct wma_tgt_ht_cap tmp = {0};
 
@@ -5833,9 +5822,6 @@ static void wma_derive_ext_ht_cap(
 		ht_cap->ht_sgi_20 = (!!(value & WMI_HT_CAP_HT20_SGI));
 		ht_cap->ht_sgi_40 = (!!(value & WMI_HT_CAP_HT40_SGI));
 		ht_cap->dynamic_smps = (!!(value & WMI_HT_CAP_DYNAMIC_SMPS));
-		ht_cap->num_rf_chains =
-			QDF_MAX(wma_get_num_of_setbits_from_bitmask(tx_chain),
-				wma_get_num_of_setbits_from_bitmask(rx_chain));
 	} else {
 		ht_cap->ht_rx_stbc = QDF_MIN(ht_cap->ht_rx_stbc,
 					(!!(value & WMI_HT_CAP_RX_STBC)));
@@ -5851,13 +5837,6 @@ static void wma_derive_ext_ht_cap(
 					(!!(value & WMI_HT_CAP_HT40_SGI)));
 		ht_cap->dynamic_smps = QDF_MIN(ht_cap->dynamic_smps,
 					(!!(value & WMI_HT_CAP_DYNAMIC_SMPS)));
-
-		ht_cap->num_rf_chains =
-			QDF_MAX(ht_cap->num_rf_chains,
-				QDF_MAX(wma_get_num_of_setbits_from_bitmask(
-								tx_chain),
-					wma_get_num_of_setbits_from_bitmask(
-								rx_chain)));
 	}
 }
 
@@ -5904,30 +5883,20 @@ static void wma_update_target_ext_ht_cap(struct target_psoc_info *tgt_hdl,
 		ht_2g = mac_phy_cap[i].ht_cap_info_2G;
 		ht_5g = mac_phy_cap[i].ht_cap_info_5G;
 		if (ht_2g)
-			wma_derive_ext_ht_cap(&tmp_ht_cap,
-					ht_2g,
-					mac_phy_cap[i].tx_chain_mask_2G,
-					mac_phy_cap[i].rx_chain_mask_2G);
+			wma_derive_ext_ht_cap(&tmp_ht_cap, ht_2g);
 		if (ht_5g)
-			wma_derive_ext_ht_cap(&tmp_ht_cap,
-					      ht_5g,
-					      mac_phy_cap[i].tx_chain_mask_5G,
-					      mac_phy_cap[i].rx_chain_mask_5G);
+			wma_derive_ext_ht_cap(&tmp_ht_cap, ht_5g);
 	}
 
-	if (qdf_mem_cmp(&tmp_cap, &tmp_ht_cap,
-				sizeof(struct wma_tgt_ht_cap))) {
+	if (qdf_mem_cmp(&tmp_cap, &tmp_ht_cap, sizeof(struct wma_tgt_ht_cap)))
 		qdf_mem_copy(ht_cap, &tmp_ht_cap,
-				sizeof(struct wma_tgt_ht_cap));
-	}
+			     sizeof(struct wma_tgt_ht_cap));
 
-	wma_nofl_debug("[ext ht cap] ht_rx_stbc - %d, ht_tx_stbc - %d\n"
-			"mpdu_density - %d ht_rx_ldpc - %d ht_sgi_20 - %d\n"
-			"ht_sgi_40 - %d num_rf_chains - %d dynamic_smps - %d",
-			ht_cap->ht_rx_stbc, ht_cap->ht_tx_stbc,
-			ht_cap->mpdu_density, ht_cap->ht_rx_ldpc,
-			ht_cap->ht_sgi_20, ht_cap->ht_sgi_40,
-			ht_cap->num_rf_chains, ht_cap->dynamic_smps);
+	wma_nofl_debug("[ext ht cap] ht_rx_stbc - %d, ht_tx_stbc - %d\nmpdu_density - %d ht_rx_ldpc - %d ht_sgi_20 - %d\nht_sgi_40 - %d dynamic_smps - %d",
+		       ht_cap->ht_rx_stbc, ht_cap->ht_tx_stbc,
+		       ht_cap->mpdu_density, ht_cap->ht_rx_ldpc,
+		       ht_cap->ht_sgi_20, ht_cap->ht_sgi_40,
+		       ht_cap->dynamic_smps);
 }
 
 /**
