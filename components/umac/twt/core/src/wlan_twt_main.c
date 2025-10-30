@@ -31,6 +31,7 @@
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_twt_cfg.h"
+#include <cdp_txrx_ctrl.h>
 
 #define TWT_COMMAND_PENDING_FLAG_SET	1
 #define TWT_COMMAND_PENDING_FLAG_RESET	0
@@ -1579,6 +1580,80 @@ wlan_twt_teardown_req(struct wlan_objmgr_psoc *psoc,
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_TWT_ID);
 	return status;
 }
+
+#if defined(WLAN_TWT_CONV_SUPPORTED)
+QDF_STATUS
+wlan_twt_early_terminate_ind(struct wlan_objmgr_vdev *vdev,
+			     struct twt_early_terminate_param *req,
+			     void *context)
+{
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	ol_txrx_soc_handle soc;
+	struct wlan_objmgr_peer *peer;
+	struct twt_peer_priv_obj *peer_priv;
+	uint8_t i = 0;
+	enum QDF_OPMODE mode = wlan_vdev_mlme_get_opmode(vdev);
+	bool session_found = false;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		twt_err("Failed to get psoc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc) {
+		twt_err("Failed to get SOC context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, req->peer_macaddr.bytes,
+					   WLAN_TWT_ID);
+	if (!peer) {
+		twt_err("Peer object not found " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(req->peer_macaddr.bytes));
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_TWT);
+	if (!peer_priv) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
+		twt_err(" peer twt component object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mutex_acquire(&peer_priv->twt_peer_lock);
+	for (i = 0; i < peer_priv->num_twt_sessions; i++) {
+		if (peer_priv->session_info[i].dialog_id == req->dialog_id &&
+		    ((mode == QDF_STA_MODE &&
+		      peer_priv->session_info[i].setup_done) ||
+		     mode == QDF_SAP_MODE)) {
+			/* Validate session is properly established for SAP
+			 * and STA modes for the requested dialog ID
+			 */
+			session_found = true;
+			break;
+		}
+	}
+	qdf_mutex_release(&peer_priv->twt_peer_lock);
+
+	if (!session_found) {
+		twt_err("No matching TWT session found for dialog_id %d",
+			req->dialog_id);
+		status = QDF_STATUS_E_INVAL;
+	} else {
+		status = cdp_tx_traffic_end_ind(soc, req->vdev_id,
+					  &req->peer_macaddr);
+		if (QDF_IS_STATUS_ERROR(status))
+			twt_err("Sending failed, status=%d", status);
+	}
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
+	return status;
+}
+#endif
 
 QDF_STATUS
 wlan_twt_ack_event_handler(struct wlan_objmgr_psoc *psoc,

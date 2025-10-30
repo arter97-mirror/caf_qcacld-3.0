@@ -18,6 +18,8 @@
 
 #if defined(WLAN_SUPPORT_TWT)
 
+#include <wlan_twt_ext_defs.h>
+
 /**
  * wlan_twt_is_max_sessions_reached() - Check if the maximum number of
  * TWT sessions reached or not excluding the given dialog_id
@@ -78,6 +80,21 @@ QDF_STATUS
 wlan_twt_teardown_req(struct wlan_objmgr_psoc *psoc,
 		      struct twt_del_dialog_param *req,
 		      void *context);
+
+#if defined(WLAN_TWT_CONV_SUPPORTED)
+/**
+ * wlan_twt_early_terminate_ind() - Early TWT end indication
+ * @vdev: Pointer to vdev object
+ * @req: twt_early_terminate_param
+ * @context: context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_twt_early_terminate_ind(struct wlan_objmgr_vdev *vdev,
+			     struct twt_early_terminate_param *req,
+			     void *context);
+#endif
 
 /**
  * wlan_twt_pause_req() - Process TWT pause req

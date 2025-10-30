@@ -55,6 +55,13 @@ wlan_hdd_wifi_twt_config_policy[
 			.type = NLA_NESTED},
 };
 
+static const struct nla_policy
+wlan_twt_early_end_policy[QCA_WLAN_VENDOR_ATTR_TWT_EARLY_TERM_FLOW_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_TWT_EARLY_TERM_FLOW_ID] = {.type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_TWT_EARLY_TERM_PEER_MAC_ADDR] =
+		VENDOR_NLA_POLICY_MAC_ADDR,
+};
+
 #if defined(WLAN_SUPPORT_TWT) && defined(WLAN_TWT_CONV_SUPPORTED)
 QDF_STATUS hdd_get_twt_requestor(struct wlan_objmgr_psoc *psoc, bool *val)
 {
@@ -210,6 +217,71 @@ static int hdd_twt_terminate_session(struct hdd_adapter *adapter,
 }
 
 /**
+ * hdd_twt_early_terminate - Process TWT early terminate
+ * SP operation in the received vendor command and
+ * send it to firmware
+ * @adapter: adapter pointer
+ * @vdev: associated vdev object
+ * @twt_param_attr: nl attributes
+ *
+ * Handles QCA_WLAN_TWT_EARLY_TERMINATION_IND
+ *
+ * Return: 0 on success, negative value on failure
+ */
+static int hdd_twt_early_terminate(struct hdd_adapter *adapter,
+				   struct wlan_objmgr_vdev *vdev,
+				   struct nlattr *twt_param_attr)
+{
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_TWT_EARLY_TERM_FLOW_MAX + 1];
+	int id, ret = 0;
+	uint8_t vdev_id;
+	struct twt_early_terminate_param params = {0};
+	QDF_STATUS status;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	params.vdev_id = vdev_id;
+
+	ret =
+	wlan_cfg80211_nla_parse_nested(tb,
+				   QCA_WLAN_VENDOR_ATTR_TWT_EARLY_TERM_FLOW_MAX,
+				       twt_param_attr,
+				       wlan_twt_early_end_policy);
+	if (ret)
+		return ret;
+
+	id = QCA_WLAN_VENDOR_ATTR_TWT_EARLY_TERM_FLOW_ID;
+	if (!tb[id]) {
+		osif_err_rl("dialog_id is missing");
+		return -EINVAL;
+	}
+
+	params.dialog_id = nla_get_u8(tb[id]);
+
+	id = QCA_WLAN_VENDOR_ATTR_TWT_EARLY_TERM_PEER_MAC_ADDR;
+	if (tb[id]) {
+		nla_memcpy(params.peer_macaddr.bytes, tb[id],
+			   QDF_MAC_ADDR_SIZE);
+	} else if (adapter->device_mode == QDF_SAP_MODE) {
+		osif_err_rl("peer_mac is missing");
+		return -EINVAL;
+	} else {
+		ret = osif_fill_peer_macaddr(vdev, params.peer_macaddr.bytes);
+		if (ret) {
+			osif_err("Failed to retrieve peer MAC, ret=%d", ret);
+			return ret;
+		}
+	}
+
+	status = ucfg_twt_early_terminate_ind(vdev, &params, NULL);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to send early terminate command");
+		ret = qdf_status_to_os_return(status);
+	}
+
+	return ret;
+}
+
+/**
  * hdd_twt_configure - Process the TWT
  * operation in the received vendor command
  * @adapter: adapter pointer
@@ -288,6 +360,9 @@ static int hdd_twt_configure(struct hdd_adapter *adapter,
 		break;
 	case QCA_WLAN_TWT_SET_PARAM:
 		ret = osif_twt_set_param(vdev, twt_param_attr);
+		break;
+	case QCA_WLAN_TWT_EARLY_TERMINATION_IND:
+		ret = hdd_twt_early_terminate(adapter, vdev, twt_param_attr);
 		break;
 	default:
 		hdd_err("Invalid TWT Operation");

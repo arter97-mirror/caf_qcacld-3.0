@@ -89,6 +89,16 @@ QDF_STATUS ucfg_twt_teardown_req(struct wlan_objmgr_psoc *psoc,
 	return wlan_twt_teardown_req(psoc, params, context);
 }
 
+#if defined(WLAN_SUPPORT_TWT) && defined(WLAN_TWT_CONV_SUPPORTED)
+QDF_STATUS
+ucfg_twt_early_terminate_ind(struct wlan_objmgr_vdev *vdev,
+			     struct twt_early_terminate_param *params,
+			     void *context)
+{
+	return wlan_twt_early_terminate_ind(vdev, params, context);
+}
+#endif
+
 QDF_STATUS
 ucfg_twt_pause_req(struct wlan_objmgr_psoc *psoc,
 		   struct twt_pause_dialog_cmd_param *params,

@@ -23,6 +23,7 @@
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_twt_public_structs.h>
 #include <include/wlan_mlme_cmn.h>
+#include <wlan_twt_ext_defs.h>
 
 /* dialog_id used to get all peer's twt session parameters */
 #define TWT_GET_ALL_PEER_PARAMS_DIALOG_ID (0xFF)
@@ -80,6 +81,19 @@ QDF_STATUS ucfg_twt_setup_req(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS ucfg_twt_teardown_req(struct wlan_objmgr_psoc *psoc,
 				 struct twt_del_dialog_param *params,
 				 void *context);
+
+/**
+ * ucfg_twt_early_terminate_ind() - Early TWT end indication
+ * @vdev: Pointer to vdev object
+ * @params: twt_early_terminate_param
+ * @context: twt context
+ *
+ * Return: QDF_STATUS_SUCCESS
+ */
+QDF_STATUS
+ucfg_twt_early_terminate_ind(struct wlan_objmgr_vdev *vdev,
+			     struct twt_early_terminate_param *params,
+			     void *context);
 
 /**
  * ucfg_twt_pause_req() - Process TWT pause req

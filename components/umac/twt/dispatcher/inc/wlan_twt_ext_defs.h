@@ -63,5 +63,17 @@ struct twt_mc_cfg_params {
 	bool twt_res_ht_vht;
 };
 
+/**
+ * struct twt_early_terminate_param - SP early termination params
+ * @vdev_id: VDEV identifier
+ * @dialog_id: TWT dialog ID
+ * @peer_macaddr: Peer mac address
+ */
+struct twt_early_terminate_param {
+	uint32_t vdev_id;
+	uint8_t dialog_id;
+	struct qdf_mac_addr peer_macaddr;
+};
+
 #endif /* __WLAN_TWT_EXT_DEFS_H__ */
 
