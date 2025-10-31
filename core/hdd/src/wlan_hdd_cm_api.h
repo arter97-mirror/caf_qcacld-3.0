@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -476,6 +476,17 @@ void hdd_cm_save_conn_info_mld_addr(struct wlan_hdd_link_info *link_info,
  */
 void hdd_cm_clear_conn_info_mld_addr(struct hdd_station_ctx *sta_ctx);
 
+/**
+ * hdd_cm_clear_link_info() - Clear existing link information
+ * @vdev_id: vdev ID
+ *
+ * This function clears the existing link information for all links
+ * associated with the given vdev before updating with new connection info.
+ *
+ * Return: None
+ */
+void hdd_cm_clear_link_info(uint8_t vdev_id);
+
 #else
 static inline void
 hdd_cm_set_ieee_link_id(struct wlan_hdd_link_info *link_info, uint8_t link_id,
@@ -510,6 +521,11 @@ hdd_cm_save_conn_info_mld_addr(struct wlan_hdd_link_info *link_info,
 
 static inline void
 hdd_cm_clear_conn_info_mld_addr(struct hdd_station_ctx *sta_ctx)
+{
+}
+
+static inline void
+hdd_cm_clear_link_info(uint8_t vdev_id)
 {
 }
 #endif /* WLAN_FEATURE_11BE_MLO */

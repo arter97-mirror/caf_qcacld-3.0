@@ -294,6 +294,7 @@ hdd_get_def_dp_link_vdev(struct wlan_objmgr_vdev *vdev)
 
 static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_mgr_osif_update_bss_info = hdd_cm_save_connected_links_info,
+	.mlo_mgr_osif_clear_link_info = hdd_cm_clear_link_info,
 	.mlo_mgr_osif_update_mac_addr = hdd_link_switch_vdev_mac_addr_update,
 	.mlo_roam_osif_update_mac_addr = hdd_roam_vdev_mac_addr_update,
 	.mlo_mgr_osif_link_rej_update_mac_addr = hdd_link_rej_mac_addr_update,
