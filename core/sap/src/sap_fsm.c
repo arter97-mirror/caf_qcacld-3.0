@@ -3869,9 +3869,6 @@ static QDF_STATUS sap_fsm_state_init(struct sap_context *sap_ctx,
 	QDF_STATUS qdf_status = QDF_STATUS_E_FAILURE;
 
 	if (msg == eSAP_HDD_START_INFRA_BSS) {
-		/* init dfs channel nol */
-		sap_init_dfs_channel_nol_list(sap_ctx);
-
 		/*
 		 * Perform sme_ScanRequest. This scan request is post start bss
 		 * request so, set the third to false.
@@ -5255,31 +5252,6 @@ destroy_timer:
 	qdf_mc_timer_destroy(&mac->sap.SapDfsInfo.sap_dfs_cac_timer);
 
 	return 1;
-}
-
-/*
- * This function initializes the NOL list
- * parameters required to track the radar
- * found DFS channels in the current Reg. Domain .
- */
-QDF_STATUS sap_init_dfs_channel_nol_list(struct sap_context *sap_ctx)
-{
-	struct mac_context *mac;
-
-	if (!sap_ctx) {
-		sap_err("Invalid SAP context");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	mac = sap_get_mac_context();
-	if (!mac) {
-		sap_err("Invalid MAC context");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	utils_dfs_init_nol(mac->pdev);
-
-	return QDF_STATUS_SUCCESS;
 }
 
 /**
