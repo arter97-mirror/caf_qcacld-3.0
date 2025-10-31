@@ -658,44 +658,7 @@ ml_nlink_clr_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
 uint32_t
 ml_nlink_get_emlsr_mode_disable_req(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev);
-#else
-static inline QDF_STATUS
-ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
-			    uint8_t vdev_id,
-			    enum ml_nlink_change_event_type evt,
-			    struct ml_nlink_change_event *data)
-{
-	return QDF_STATUS_SUCCESS;
-}
 
-static inline bool
-ml_is_nlink_service_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-#endif
-#endif
-
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(FEATURE_DENYLIST_MGR)
-/**
- * mlo_get_curr_link_combination: Get current tried link combination
- * @vdev: vdev
- *
- * This API gets current tried mlo partner link combination.
- *
- * Return: curr link combination bit map
- */
-uint8_t
-mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev);
-#else
-static inline uint8_t
-mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
-{
-	return 0;
-}
-#endif
-
-#ifdef WLAN_FEATURE_11BE_MLO
 /**
  * ml_nlink_get_link_info() - Get ML STA link info
  * @psoc: PSOC object information
@@ -723,6 +686,21 @@ void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 			    uint8_t *ml_num_link,
 			    uint32_t *ml_link_bitmap);
 #else
+static inline QDF_STATUS
+ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
+			    uint8_t vdev_id,
+			    enum ml_nlink_change_event_type evt,
+			    struct ml_nlink_change_event *data)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline bool
+ml_is_nlink_service_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
 static inline
 void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 			    struct wlan_objmgr_vdev *vdev,
@@ -736,4 +714,24 @@ void ml_nlink_get_link_info(struct wlan_objmgr_psoc *psoc,
 			    uint32_t *ml_link_bitmap)
 {
 }
+#endif
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(FEATURE_DENYLIST_MGR)
+/**
+ * mlo_get_curr_link_combination: Get current tried link combination
+ * @vdev: vdev
+ *
+ * This API gets current tried mlo partner link combination.
+ *
+ * Return: curr link combination bit map
+ */
+uint8_t
+mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev);
+#else
+static inline uint8_t
+mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
+{
+	return 0;
+}
+#endif
 #endif
