@@ -1101,5 +1101,56 @@ QDF_STATUS lim_ll_sap_notify_chan_switch_started(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+/**
+ * lim_cfg_dsmps_for_iot_ap() - Configure dynamic SMPS for IOT AP
+ * @mac_ctx: mac context
+ * @session: pe session
+ * @bss_desc: bss descriptor
+ * @is_roaming: is roaming
+ *
+ * Configure DSMPS based on allowlist and denylist.
+ *
+ * Configuration Priority:
+ * - If allowlist is configured (non-empty), use allowlist logic
+ * - If allowlist is not configured (empty), use denylist logic
+ *
+ * Allowlist Solution:
+ * ==================
+ * Initial Connection:
+ *   1. AP not in allowlist:
+ *      - Send VDEV param 0x0 to disable DSMPS
+ *
+ *   2. AP in allowlist AND in vendor RSSI OUI list:
+ *      - Send VDEV param DSMPS_EN | DSMPS_BASE_ON_RSSI_EN to enable DSMPS with
+ *      - RSSI-based control
+ *
+ *   3. AP in allowlist AND NOT in vendor RSSI OUI list:
+ *      - Send VDEV param DSMPS_EN to enable DSMPS without RSSI-based control
+ *
+ * Roaming:
+ *   - Always send VDEV param 0x0 to disable DSMPS after roaming
+ *     (regardless of AP's presence in allowlist or RSSI OUI list)
+ *
+ * Denylist Solution:
+ * ==================
+ * Initial Connection or Roaming:
+ *   1. AP in denylist:
+ *      - Send VDEV param 0x0 to disable DSMPS
+ *
+ *   2. AP not in denylist AND in vendor RSSI OUI list:
+ *      - Send VDEV param DSMPS_EN | DSMPS_BASE_ON_RSSI_EN to enable DSMPS with
+ *      - RSSI-based control
+ *
+ *   3. AP not in denylist AND NOT in vendor RSSI OUI list:
+ *      - Send VDEV param DSMPS_EN to enable DSMPS without RSSI-based control
+ *
+ * Return: None
+ */
+void
+lim_cfg_dsmps_for_iot_ap(struct mac_context *mac_ctx,
+			 struct pe_session *session,
+			 struct bss_description *bss_desc,
+			 bool is_roaming);
 /************************************************************/
 #endif /* __LIM_API_H */
