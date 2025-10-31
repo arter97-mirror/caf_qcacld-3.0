@@ -3281,6 +3281,9 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	lim_enable_cts_to_self_for_exempted_iot_ap(mac_ctx,
 						   ft_session_ptr,
 						   oui_ie_ptr, oui_ie_len);
+
+	lim_cfg_dsmps_for_iot_ap(mac_ctx, ft_session_ptr, bss_desc, true);
+
 	qdf_mem_free(bss_desc);
 	oui_ie_len = 0;
 	oui_ie_ptr = NULL;
