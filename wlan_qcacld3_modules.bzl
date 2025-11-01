@@ -47,6 +47,9 @@ _target_chipset_map = {
         "kiwi-v2",
         "wcn7750",
     ],
+    "alor-le": [
+        "wcn7750",
+    ],
     "sdxkova": [
         "kiwi-v2",
     ],
@@ -2731,7 +2734,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//dataipa:include_headers",
             "//dataipa:{}_{}_ipam".format(target, variant),
         ]
-    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa":
+    elif target != "x1e80100" and target != "anorak" and target != "neo-la" and target != "seraph" and target != "autogvm" and target != "autoghgvm" and target != "hamoa" and target != "alor-le":
         deps = deps + [
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
@@ -2791,7 +2794,7 @@ def define_dist(target, variant, chipsets):
             mode_overrides = {"**/*": "644"},
             log = "info",
         )
-    if target != "sdxkova":
+    if target != "sdxkova" and target != "alor-le":
         copy_to_dist_dir(
             name = "{}_all_modules_dist".format(tv),
             data = dataList,
