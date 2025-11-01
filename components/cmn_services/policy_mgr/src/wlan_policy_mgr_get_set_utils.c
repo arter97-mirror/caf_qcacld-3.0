@@ -12576,7 +12576,16 @@ policy_mgr_curr_hwmode_fetch_chains_for_freq(struct wlan_objmgr_psoc *psoc,
 		*rx_chains = hw_mode.mac1_rx_ss;
 	}
 
-	return QDF_STATUS_SUCCESS;
+	if (!*tx_chains || !*rx_chains) {
+		policy_mgr_debug("HW Mode %d MAC%d with wrong Tx/Rx NSS %dx%d",
+				 pm_ctx->new_hw_mode_index, mac_id,
+				 *tx_chains, *rx_chains);
+		status = policy_mgr_fetch_min_nss_across_hw_modes(psoc,
+								  tx_chains,
+								  rx_chains);
+	}
+
+	return status;
 }
 
 uint32_t policy_mgr_get_hw_dbs_nss(struct wlan_objmgr_psoc *psoc,
