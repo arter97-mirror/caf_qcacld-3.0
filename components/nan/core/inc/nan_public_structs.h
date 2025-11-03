@@ -773,6 +773,22 @@ struct nan_enable_req {
 	struct nan_msg_params params;
 };
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * struct nan_enable_rsp_params - nan enable response params
+ * @vdev_id: virtual device id
+ * @status: status
+ * @mac_id: mac id
+ *
+ * Return: none
+ */
+struct nan_enable_rsp_params {
+	uint32_t vdev_id;
+	uint32_t status;
+	uint32_t mac_id;
+};
+#endif
+
 /**
  * struct nan_datapath_end_rsp_event  - firmware response to ndp end request
  * @vdev: pointer to vdev object
