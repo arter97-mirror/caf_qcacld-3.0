@@ -801,6 +801,33 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 			}
 			break;
 		}
+	case NAN_CHANGE_CONF_REQ: {
+			struct nan_change_conf_req *req = in_req;
+
+			psoc = req->psoc;
+			psoc_priv = nan_get_psoc_priv_obj(psoc);
+			if (!psoc_priv) {
+				nan_err("nan psoc priv object is NULL");
+				return QDF_STATUS_E_INVAL;
+			}
+
+			if (policy_mgr_is_sta_mon_concurrency(psoc))
+				return QDF_STATUS_E_INVAL;
+
+			/*
+			 * Take a psoc reference while it is being used by the
+			 * NAN requests.
+			 */
+			status =  wlan_objmgr_psoc_try_get_ref(psoc,
+							       WLAN_NAN_ID);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				nan_err("Couldn't obtain psoc ref");
+				return status;
+			}
+
+			len = sizeof(struct nan_change_conf_req);
+			break;
+		}
 	case NAN_DISABLE_REQ: {
 			struct nan_disable_req *req = in_req;
 
@@ -867,7 +894,7 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 	msg.callback = nan_discovery_scheduled_handler;
 	msg.flush_callback = nan_discovery_flush_callback;
 
-	if (req_type == NAN_GENERIC_REQ)
+	if (req_type == NAN_GENERIC_REQ || req_type == NAN_CHANGE_CONF_REQ)
 		goto post_msg;
 
 	request = osif_request_alloc(&params);
@@ -891,7 +918,7 @@ post_msg:
 		nan_discovery_flush_callback(&msg);
 	}
 
-	if (req_type != NAN_GENERIC_REQ) {
+	if (req_type != NAN_GENERIC_REQ && req_type != NAN_CHANGE_CONF_REQ) {
 		recovery = cds_is_driver_recovering();
 		if (!recovery)
 			err = osif_request_wait_for_response(request);

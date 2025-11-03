@@ -37647,6 +37647,100 @@ static int wlan_hdd_cfg80211_start_nan(struct wiphy *wiphy,
 	return errno;
 }
 
+/**
+ * __wlan_hdd_cfg80211_nan_change_conf() - Change NAN configuration
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @conf: Pointer to NAN configuration
+ * @changes: Bitmap of changes to apply
+ *
+ * This function handles the NAN configuration change request from cfg80211.
+ * It validates the context, checks if NAN is supported, and forwards the
+ * configuration change request to the OS interface layer.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int __wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
+					       struct wireless_dev *wdev,
+					       struct cfg80211_nan_conf *conf,
+					       u32 changes)
+{
+	int ret_val;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev = hdd_wdev_get_netdev(wdev);
+	struct hdd_adapter *adapter;
+
+	/* Validate hdd_ctx first */
+	ret_val = wlan_hdd_validate_context(hdd_ctx);
+	if (ret_val)
+		return ret_val;
+
+	/* Validate dev */
+	if (!dev) {
+		hdd_err("Invalid net device");
+		return -EINVAL;
+	}
+
+	hdd_enter_dev(dev);
+
+	/* Get and validate adapter */
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (!adapter) {
+		hdd_err("Invalid adapter");
+		return -EINVAL;
+	}
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err_rl("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	if (!wlan_hdd_nan_is_supported(hdd_ctx)) {
+		hdd_debug_rl("NAN is not supported");
+		return -EPERM;
+	}
+
+	if (hdd_is_connection_in_progress(NULL, NULL)) {
+		hdd_err("Connection refused: conn in progress");
+		return -EAGAIN;
+	}
+
+	return os_if_nan_change_conf(hdd_ctx->psoc,  hdd_ctx->pdev,
+				     adapter->deflink->vdev_id, conf, changes);
+}
+
+/**
+ * wlan_hdd_cfg80211_nan_change_conf() - Change NAN configuration wrapper
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @conf: Pointer to NAN configuration
+ * @changes: Bitmap of changes to apply
+ *
+ * This is a wrapper function that provides synchronization for the NAN
+ * configuration change operation. It ensures proper VDEV synchronization
+ * before calling the actual implementation function.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     struct cfg80211_nan_conf *conf,
+					     u32 changes)
+{
+	struct net_device *dev = hdd_wdev_get_netdev(wdev);
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_nan_change_conf(wiphy, wdev, conf, changes);
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 #else
 static void
 wlan_hdd_cfg80211_stop_nan(struct wiphy *wiphy, struct wireless_dev *wdev)
@@ -37656,6 +37750,14 @@ wlan_hdd_cfg80211_stop_nan(struct wiphy *wiphy, struct wireless_dev *wdev)
 static int wlan_hdd_cfg80211_start_nan(struct wiphy *wiphy,
 				       struct wireless_dev *wdev,
 				       struct cfg80211_nan_conf *conf)
+{
+	return -EOPNOTSUPP;
+}
+
+static int wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     struct cfg80211_nan_conf *conf,
+					     u32 changes)
 {
 	return -EOPNOTSUPP;
 }
@@ -37672,14 +37774,6 @@ static void wlan_hdd_cfg80211_del_nan_func(struct wiphy *wiphy,
 					   struct wireless_dev *wdev,
 					   u64 cookie)
 {
-}
-
-static int wlan_hdd_cfg80211_nan_change_conf(struct wiphy *wiphy,
-					     struct wireless_dev *wdev,
-					     struct cfg80211_nan_conf *conf,
-					     u32 changes)
-{
-	return -EOPNOTSUPP;
 }
 #endif
 

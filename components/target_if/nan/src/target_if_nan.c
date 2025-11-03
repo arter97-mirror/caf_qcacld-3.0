@@ -1107,6 +1107,7 @@ static QDF_STATUS target_if_nan_standard_req(struct wlan_objmgr_psoc *psoc,
 		target_if_err("Invalid req.");
 		return QDF_STATUS_E_INVAL;
 	}
+
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 	if (!wmi_handle) {
 		target_if_err("wmi_handle is null.");
@@ -1114,9 +1115,44 @@ static QDF_STATUS target_if_nan_standard_req(struct wlan_objmgr_psoc *psoc,
 	}
 	return wmi_unified_nan_start_req(wmi_handle, nan_req);
 }
+
+static QDF_STATUS
+target_if_nan_change_conf_req(struct nan_change_conf_req *nan_req)
+{
+	struct wmi_unified *wmi_handle;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!nan_req) {
+		target_if_err("Invalid req.");
+		return QDF_STATUS_E_INVAL;
+	}
+	psoc = nan_req->psoc;
+
+	if (!psoc) {
+		target_if_err("psoc is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (ucfg_nan_is_fw_support_standard_mode(psoc))
+		return wmi_unified_nan_change_conf_req(wmi_handle, nan_req);
+	else
+		return QDF_STATUS_E_INVAL;
+}
 #else
 static QDF_STATUS target_if_nan_standard_req(struct wlan_objmgr_psoc *psoc,
 					     void *nan_req)
+{
+	return QDF_STATUS_E_INVAL;
+}
+
+static QDF_STATUS
+target_if_nan_change_conf_req(struct nan_change_conf_req *nan_req)
 {
 	return QDF_STATUS_E_INVAL;
 }
@@ -1182,6 +1218,9 @@ static QDF_STATUS target_if_nan_discovery_req(void *req, uint32_t req_type)
 							&nan_req->params);
 			break;
 		}
+	case NAN_CHANGE_CONF_REQ:
+		status = target_if_nan_change_conf_req(req);
+		break;
 	default:
 		target_if_err("Invalid NAN req type");
 		status = QDF_STATUS_E_INVAL;

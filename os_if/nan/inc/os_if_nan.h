@@ -184,6 +184,21 @@ int os_if_nan_stop(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 int os_if_nan_start(struct wlan_objmgr_psoc *psoc,
 		    struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		    struct cfg80211_nan_conf *conf);
+
+/**
+ * os_if_nan_change_conf() - nan change config
+ * @psoc: psoc object
+ * @pdev: pointer to pdev object
+ * @vdev_id: NAN vdev id
+ * @conf: nan config
+ * @changes: nan config changes
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+int os_if_nan_change_conf(struct wlan_objmgr_psoc *psoc,
+			  struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+			  struct cfg80211_nan_conf *conf,
+			  u32 changes);
 #endif
 
 /**

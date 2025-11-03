@@ -99,6 +99,8 @@ enum nan_opmode_bit {
 
 #define NAN_S3_SUPPORT_BIT 4
 
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
+
 #define NAN_MAX_BANDS 6  /* Matches NUM_NL80211_BANDS */
 #define NAN_CLUSTER_ID_LEN 6
 #define NAN_MAX_EXTRA_ATTRS_LEN 512
@@ -150,7 +152,21 @@ struct nan_conf {
 	uint16_t vendor_elems_len;
 };
 
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
+/**
+ * struct nan_change_conf_req - NAN configuration change request
+ * @psoc: Pointer to the psoc object
+ * @pdev: Pointer to the pdev object
+ * @vdev_id: vdev id
+ * @nan_conf: NAN configuration to be changed (internal struct, not kernel)
+ * @param_bit_map: bitmap identifying which params changed
+ */
+struct nan_change_conf_req {
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+	uint8_t vdev_id;
+	struct nan_conf nan_conf;
+	uint32_t param_bit_map;
+};
 
 /*
  * The NAN Cluster ID is a MAC address that takes a value from
@@ -179,11 +195,13 @@ enum nan_disable_req_type {
  * @NAN_GENERIC_REQ: Type for all the NAN requests other than enable/disable
  * @NAN_ENABLE_REQ: Request type for enabling the NAN Discovery
  * @NAN_DISABLE_REQ: Request type for disabling the NAN Discovery
+ * @NAN_CHANGE_CONF_REQ: Request type for changing NAN configuration
  */
 enum nan_discovery_msg_type {
 	NAN_GENERIC_REQ = 0,
 	NAN_ENABLE_REQ  = 1,
 	NAN_DISABLE_REQ = 2,
+	NAN_CHANGE_CONF_REQ = 3,
 };
 
 /**
@@ -804,9 +822,7 @@ struct nan_disable_req {
 	struct wlan_objmgr_psoc *psoc;
 	bool disable_2g_discovery;
 	bool disable_5g_discovery;
-#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 	uint8_t vdev_id;
-#endif
 	/* Variable length, do not add anything after this */
 	struct nan_msg_params params;
 };
@@ -849,7 +865,6 @@ struct nan_enable_rsp_params {
 	uint32_t mac_id;
 };
 #endif
-
 /**
  * struct nan_datapath_end_rsp_event  - firmware response to ndp end request
  * @vdev: pointer to vdev object
