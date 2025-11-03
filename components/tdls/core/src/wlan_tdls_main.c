@@ -1875,6 +1875,26 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 	if (notify->lfr_roam)
 		return status;
 
+	/*
+	 * If the disconnect is due to link switch, then the other TDLS vdev
+	 * could be either of the following:
+	 * a) The ML-STA Partner vdev
+	 * b) In the case of ML-STA + P2P-CLI concurrency, it could be
+	 * P2P-CLI vdev (if the other partner link is in disabled table)
+	 *
+	 * The TDLS for both these VDEVs should not be enabled back during
+	 * link switch.
+	 *
+	 * The TDLS will be enabled for these VDEVs:
+	 * a) For ML-partner: At MLD level, when the ongoing link switch
+	 * completes.
+	 * b) For P2P-CLI: When the ML-STA disconnects completely.
+	 */
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(notify->vdev)) {
+		tdls_debug("Do not enable TDLS for the other vdev for link switch disconnects");
+		return status;
+	}
+
 	temp_vdev = tdls_get_vdev(tdls_soc_obj->soc, WLAN_TDLS_NB_ID);
 	if (!temp_vdev)
 		return status;
