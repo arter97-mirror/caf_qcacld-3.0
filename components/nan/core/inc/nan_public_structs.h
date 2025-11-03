@@ -32,7 +32,6 @@
 #else
 #include "wlan_tgt_def_config.h"
 #endif
-
 struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
 
@@ -99,6 +98,58 @@ enum nan_opmode_bit {
 #define NAN_RX_ANT_BIT 4
 
 #define NAN_S3_SUPPORT_BIT 4
+
+#define NAN_MAX_BANDS 6  /* Matches NUM_NL80211_BANDS */
+#define NAN_CLUSTER_ID_LEN 6
+#define NAN_MAX_EXTRA_ATTRS_LEN 512
+#define NAN_MAX_VENDOR_ELEMS_LEN 512
+
+/**
+ * struct nan_band_config - NAN band configuration
+ * @freq: Channel frequency in MHz
+ * @rssi_close: RSSI threshold for close range
+ * @rssi_middle: RSSI threshold for middle range
+ * @awake_dw_interval: Awake discovery window interval
+ * @disable_scan: Flag to disable scan on this band
+ */
+struct nan_band_config {
+	uint32_t freq;
+	int8_t rssi_close;
+	int8_t rssi_middle;
+	uint8_t awake_dw_interval;
+	bool disable_scan;
+};
+
+/**
+ * struct nan_conf - Internal NAN configuration structure
+ * @master_pref: Master preference value
+ * @bands: Bitmask of bands to enable
+ * @cluster_id: Cluster ID (6 bytes)
+ * @cluster_id_len: Length of cluster ID
+ * @scan_period: Scan period in milliseconds
+ * @scan_dwell_time: Scan dwell time in milliseconds
+ * @discovery_beacon_interval: Discovery beacon interval
+ * @band_cfgs: Per-band configuration
+ * @extra_nan_attrs: Extra NAN attributes
+ * @extra_nan_attrs_len: Length of extra NAN attributes
+ * @vendor_elems: Vendor specific elements
+ * @vendor_elems_len: Length of vendor elements
+ */
+struct nan_conf {
+	uint8_t master_pref;
+	uint8_t bands;
+	uint8_t cluster_id[NAN_CLUSTER_ID_LEN];
+	uint8_t cluster_id_len;
+	uint16_t scan_period;
+	uint16_t scan_dwell_time;
+	uint8_t discovery_beacon_interval;
+	struct nan_band_config band_cfgs[NAN_MAX_BANDS];
+	uint8_t extra_nan_attrs[NAN_MAX_EXTRA_ATTRS_LEN];
+	uint16_t extra_nan_attrs_len;
+	uint8_t vendor_elems[NAN_MAX_VENDOR_ELEMS_LEN];
+	uint16_t vendor_elems_len;
+};
+
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 
 /*
@@ -766,6 +817,8 @@ struct nan_disable_req {
  * @social_chan_2g_freq: Social channel in 2G band for the NAN Discovery
  * @social_chan_5g_freq: Social channel in 5G band for the NAN Discovery
  * @pdev: Pointer to the pdev object
+ * @vdev_id: vdev id
+ * @nan_conf: internal nan configuration
  * @params: NAN request structure containing message for the target
  */
 struct nan_enable_req {
@@ -773,6 +826,10 @@ struct nan_enable_req {
 	uint32_t social_chan_2g_freq;
 	uint32_t social_chan_5g_freq;
 	struct wlan_objmgr_pdev *pdev;
+#ifdef FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE
+	uint8_t vdev_id;
+	struct nan_conf nan_conf;
+#endif
 	/* Variable length, do not add anything after this */
 	struct nan_msg_params params;
 };

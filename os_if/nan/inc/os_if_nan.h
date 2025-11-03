@@ -171,6 +171,19 @@ static inline QDF_STATUS os_if_nan_set_ndp_delete_transaction_id(
  * Return: 0 on success, negative error code on failure
  */
 int os_if_nan_stop(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+/**
+ * os_if_nan_start() - start nan
+ * @psoc: Pointer to psoc
+ * @pdev: pointer to pdev object
+ * @vdev_id: NAN vdev id
+ * @conf: nan configuration
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+int os_if_nan_start(struct wlan_objmgr_psoc *psoc,
+		    struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+		    struct cfg80211_nan_conf *conf);
 #endif
 
 /**

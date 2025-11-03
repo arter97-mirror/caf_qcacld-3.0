@@ -28,6 +28,7 @@
 #include "os_if_nan.h"
 #include "wlan_nan_api.h"
 #include "nan_ucfg_api.h"
+#include "nan_public_structs.h"
 #include "wlan_osif_priv.h"
 #include <net/cfg80211.h>
 #include "wlan_cfg80211.h"
@@ -3206,6 +3207,74 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_pdev *pdev,
 }
 
 #if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * os_if_nan_copy_cfg80211_to_internal() - Copy kernel NAN config to internal
+ * @internal_cfg: Pointer to internal nan_config structure
+ * @kernel_cfg: Pointer to kernel cfg80211_nan_conf structure
+ *
+ * This function copies NAN configuration from kernel structure to internal
+ * structure, avoiding direct kernel structure usage in NAN module.
+ *
+ * Return: None
+ */
+static void os_if_nan_copy_cfg80211_to_internal(struct nan_conf *internal_cfg,
+						struct cfg80211_nan_conf *kernel_cfg)
+{
+	int i;
+
+	/* Copy basic fields */
+	internal_cfg->master_pref = kernel_cfg->master_pref;
+	internal_cfg->bands = kernel_cfg->bands;
+
+	/* Copy cluster ID if present */
+	if (kernel_cfg->cluster_id) {
+		qdf_mem_copy(internal_cfg->cluster_id, kernel_cfg->cluster_id,
+			     NAN_CLUSTER_ID_LEN);
+	}
+
+	/* Copy scan parameters */
+	internal_cfg->scan_period = kernel_cfg->scan_period;
+	internal_cfg->scan_dwell_time = kernel_cfg->scan_dwell_time;
+	internal_cfg->discovery_beacon_interval =
+		kernel_cfg->discovery_beacon_interval;
+
+	/* Copy band configurations */
+	for (i = 0; i < NAN_MAX_BANDS; i++) {
+		if (kernel_cfg->band_cfgs[i].chan) {
+			internal_cfg->band_cfgs[i].freq =
+				kernel_cfg->band_cfgs[i].chan->center_freq;
+		}
+		internal_cfg->band_cfgs[i].rssi_close =
+			kernel_cfg->band_cfgs[i].rssi_close;
+		internal_cfg->band_cfgs[i].rssi_middle =
+			kernel_cfg->band_cfgs[i].rssi_middle;
+		internal_cfg->band_cfgs[i].awake_dw_interval =
+			kernel_cfg->band_cfgs[i].awake_dw_interval;
+		internal_cfg->band_cfgs[i].disable_scan =
+			kernel_cfg->band_cfgs[i].disable_scan;
+	}
+
+	/* Copy extra NAN attributes */
+	if (kernel_cfg->extra_nan_attrs && kernel_cfg->extra_nan_attrs_len > 0) {
+		internal_cfg->extra_nan_attrs_len =
+			QDF_MIN(kernel_cfg->extra_nan_attrs_len,
+				NAN_MAX_EXTRA_ATTRS_LEN);
+		qdf_mem_copy(internal_cfg->extra_nan_attrs,
+			     kernel_cfg->extra_nan_attrs,
+			     internal_cfg->extra_nan_attrs_len);
+	}
+
+	/* Copy vendor elements */
+	if (kernel_cfg->vendor_elems && kernel_cfg->vendor_elems_len > 0) {
+		internal_cfg->vendor_elems_len =
+			QDF_MIN(kernel_cfg->vendor_elems_len,
+				NAN_MAX_VENDOR_ELEMS_LEN);
+		qdf_mem_copy(internal_cfg->vendor_elems,
+			     kernel_cfg->vendor_elems,
+			     internal_cfg->vendor_elems_len);
+	}
+}
+
 int os_if_nan_stop(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	struct nan_disable_req *nan_req;
@@ -3234,6 +3303,44 @@ int os_if_nan_stop(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	}
 
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_NAN_ID);
+	qdf_mem_free(nan_req);
+	return qdf_status_to_os_return(status);
+}
+
+int os_if_nan_start(struct wlan_objmgr_psoc *psoc,
+		    struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+		    struct cfg80211_nan_conf *conf)
+{
+	struct nan_enable_req *nan_req;
+	QDF_STATUS status;
+
+	if (!psoc || !pdev || !conf) {
+		osif_err("Invalid parameters: psoc/pdev/conf is NULL");
+		return -EINVAL;
+	}
+
+	nan_req = qdf_mem_malloc(sizeof(*nan_req));
+	if (!nan_req)
+		return -ENOMEM;
+
+	nan_req->psoc = psoc;
+	nan_req->pdev = pdev;
+	nan_req->vdev_id = vdev_id;
+	nan_req->social_chan_2g_freq = 0;
+	nan_req->social_chan_5g_freq = 0;
+
+	/* Copy from kernel cfg80211_nan_conf to internal nan_config */
+	os_if_nan_copy_cfg80211_to_internal(&nan_req->nan_conf, conf);
+
+	status = ucfg_nan_discovery_req(nan_req, NAN_ENABLE_REQ);
+
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		osif_debug("Successfully sent NAN Enable request");
+		os_if_cstats_log_nan_disc_enable_req_evt(vdev_id, nan_req);
+	} else {
+		osif_err("Unable to send NAN Enable request");
+	}
+
 	qdf_mem_free(nan_req);
 	return qdf_status_to_os_return(status);
 }
