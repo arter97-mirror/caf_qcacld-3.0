@@ -5254,6 +5254,9 @@ static int wma_oem_smem_event_handler(tp_wma_handle wma,
 				      struct mac_context *pmac,
 				      struct oem_data *oem_event_data)
 {
+	wma_debug("Received OEM smem event, suspend type: %d",
+		  pmo_get_wow_suspend_type(wma->psoc));
+
 	if (!cfg_get(wma->psoc, CFG_ENABLE_SMEM_MAILBOX)) {
 		QDF_DEBUG_PANIC("SMEM MAILBOX support not enabled");
 		return QDF_STATUS_E_FAILURE;
