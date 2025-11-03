@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -323,6 +323,15 @@ QDF_STATUS ucfg_get_enable_dtim_1chrx(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS ucfg_get_dynamic_bw_switch_value(struct wlan_objmgr_psoc *psoc,
 					    bool *dynamic_bw_switch);
 
+/**
+ * ucfg_get_dynamic_mode_switch_value() - Assigns dynamic_mode_switch value
+ * @psoc: pointer to the psoc object
+ * @dynamic_mode_switch: pointer to return dynamic_mode_switch value
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_get_dynamic_mode_switch_value(struct wlan_objmgr_psoc *psoc,
+					      bool *dynamic_mode_switch);
 /**
  * ucfg_get_alternative_chainmask_enabled() - Assigns alt chainmask_enabled
  *                                            value

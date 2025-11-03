@@ -250,6 +250,7 @@ struct wlan_fwol_tsf_accuracy_configs {
  * @lower_brssi_thresh: Lower BRSSI threshold
  * @enable_dtim_1chrx: Enable/disable DTIM 1 CHRX
  * @dynamic_bw_switch: Enable/Disable dynamic bandwidth switch
+ * @dynamic_mode_switch: Enable/Disable dynamic mode switch
  * @alternative_chainmask_enabled: Alternate chainmask
  * @smart_chainmask_enabled: Enable/disable chainmask
  * @get_rts_profile: Set the RTS profile
@@ -298,6 +299,7 @@ struct wlan_fwol_cfg {
 	uint16_t lower_brssi_thresh;
 	bool enable_dtim_1chrx;
 	bool dynamic_bw_switch;
+	bool dynamic_mode_switch;
 	bool alternative_chainmask_enabled;
 	bool smart_chainmask_enabled;
 	uint16_t get_rts_profile;

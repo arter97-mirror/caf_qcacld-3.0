@@ -1853,6 +1853,8 @@ struct suspend_resume_stats {
  * for those vdev whose bw is greater than 80Mhz(160Mhz/320 Mhz) when
  * there is no traffic going on. If traffic comes up then fw will restore
  * the original bandwidth
+ * @HDD_STA_SMPS_PARAM_DYNAMIC_MODE_SWITCH: Enable/Disable dynamic mode
+ * switch.
  */
 enum hdd_sta_smps_param {
 	HDD_STA_SMPS_PARAM_UPPER_RSSI_THRESH = 0,
@@ -1861,7 +1863,8 @@ enum hdd_sta_smps_param {
 	HDD_STA_SMPS_PARAM_UPPER_BRSSI_THRESH = 3,
 	HDD_STA_SMPS_PARAM_LOWER_BRSSI_THRESH = 4,
 	HDD_STA_SMPS_PARAM_DTIM_1CHRX_ENABLE = 5,
-	HDD_STA_SMPS_PARAM_DYNAMIC_BW_SWITCH = 6
+	HDD_STA_SMPS_PARAM_DYNAMIC_BW_SWITCH = 6,
+	HDD_STA_SMPS_PARAM_DYNAMIC_MODE_SWITCH = 7
 };
 
 /**

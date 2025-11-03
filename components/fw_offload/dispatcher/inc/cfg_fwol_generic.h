@@ -1011,6 +1011,27 @@
 				CFG_VALUE_OR_DEFAULT, \
 				"to control pcie gen and lane")
 
+/*
+ * <ini>
+ * dynamic_mode_switch - Enable/Disable Dynamic Mode Switch
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini enable/disable the Dynamic Mode Switch feature for STA
+ * in FW.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DYNAMIC_MODE_SWITCH CFG_INI_BOOL( \
+		"dynamic_mode_switch", \
+		1, \
+		"Enable/Disable Dynamic Mode Switch")
+
 #define CFG_FWOL_GENERIC_ALL \
 	CFG_FWOL_DHCP \
 	CFG(CFG_ENABLE_ANI) \
@@ -1046,6 +1067,7 @@
 	CFG(CFG_DISABLE_HW_ASSIST) \
 	CFG(CFG_ENABLE_PCI_GEN) \
 	CFG(CFG_PCIE_CONFIG) \
+	CFG(CFG_DYNAMIC_MODE_SWITCH)\
 	ENABLE_OFDM_SCRAMBLER_SEED
 
 #endif
