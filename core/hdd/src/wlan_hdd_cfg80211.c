@@ -8560,6 +8560,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_REDUCED_POWER_SCAN_MODE] = {
+		.type = NLA_U8},
 };
 
 #define WLAN_MAX_LINK_ID 15
@@ -11727,6 +11729,63 @@ hdd_test_config_emlsr_action_mode(struct hdd_adapter *adapter,
 }
 #endif
 
+#define REDUCE_POWER_SCAN_MODE_DISABLE 0
+#define REDUCE_POWER_SCAN_MODE_ENABLE 1
+/**
+ * hdd_set_reduce_power_scan_mode() - Set reduce power scan mode to allow
+ * lower level to optimize power consumption for given interface.
+ * @link_info: Link info pointer in HDD adapter
+ * @attr: pointer to nla attr
+ *
+ * Return: 0 on success, negative on failure
+ */
+static int hdd_set_reduce_power_scan_mode(struct wlan_hdd_link_info *link_info,
+					  const struct nlattr *attr)
+{
+	struct hdd_context *hdd_ctx = NULL;
+	QDF_STATUS status;
+	bool scan_mode;
+	uint8_t cfg_val;
+	uint32_t param_val;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	cfg_val = nla_get_u8(attr);
+
+	status = ucfg_mlme_get_reduce_power_scan_mode(hdd_ctx->psoc,
+						      &scan_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("get scan only mode failed");
+		return -EINVAL;
+	}
+
+	hdd_debug("vdev_id %d scan_mode %d cfg_val %d",
+		  link_info->vdev_id, scan_mode, cfg_val);
+
+	switch (cfg_val) {
+	case REDUCE_POWER_SCAN_MODE_DISABLE:
+		param_val = REDUCE_POWER_SCAN_MODE_DISABLE;
+		break;
+	case REDUCE_POWER_SCAN_MODE_ENABLE:
+		param_val = REDUCE_POWER_SCAN_MODE_ENABLE;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (scan_mode) {
+		if (wma_send_reduce_pwr_scan_mode(
+				hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id,
+				param_val)) {
+			hdd_err("Set Scan only mode failed");
+			return -EINVAL;
+		}
+	} else {
+		hdd_debug("enable_reduce_pwr_mode INI is not enabled");
+		return -EINVAL;
+	}
+	return 0;
+}
+
 #ifdef WLAN_FEATURE_11BE
 /**
  * hdd_set_eht_emlsr_capability() - Set EMLSR capability for EHT STA
@@ -12242,6 +12301,8 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_t2lm_negotiation_support},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_COEX_TRAFFIC_SHAPING_MODE,
 	 hdd_set_coex_traffic_shaping_mode},
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_REDUCED_POWER_SCAN_MODE,
+	 hdd_set_reduce_power_scan_mode},
 };
 
 #ifdef WLAN_FEATURE_ELNA
@@ -17186,7 +17247,7 @@ __wlan_hdd_cfg80211_get_radio_combination_matrix(struct wiphy *wiphy,
 					       &comb_num);
 	if (!comb_num) {
 		hdd_err("invalid combination 0");
-		return -EINVAL;
+		return -EOPNOTSUPP;
 	}
 
 	/* band and antenna */

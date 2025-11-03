@@ -3645,7 +3645,7 @@ static int hdd_twt_get_capabilities(struct hdd_adapter *adapter,
 	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
 		hdd_err_rl("vdev %d not in connected state, mode %d",
 			   adapter->deflink->vdev_id, adapter->device_mode);
-		return -EAGAIN;
+		return -EOPNOTSUPP;
 	}
 
 	if (hdd_is_roaming_in_progress(hdd_ctx))
