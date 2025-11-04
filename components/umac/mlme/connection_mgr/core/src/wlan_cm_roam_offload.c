@@ -4831,7 +4831,8 @@ cm_roam_switch_to_roam_sync(struct wlan_objmgr_pdev *pdev,
 		* In this case host should send RSO STOP with scan mode = 0
 		* to allow FW to move into RSO STOP state
 		*/
-		status = cm_roam_stop_req(psoc, vdev_id, REASON_ROAM_ABORT,
+		status = cm_roam_stop_req(psoc, vdev_id,
+					  REASON_ROAM_SYNCH_FAILED,
 					  NULL, false);
 		if (QDF_IS_STATUS_ERROR(status))
 			mlme_err("ROAM: Unable to process RSO STOP req");
