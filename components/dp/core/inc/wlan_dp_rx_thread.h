@@ -34,8 +34,15 @@
 
 /* Maximum number of REO rings supported (for stats tracking) */
 #define DP_RX_TM_MAX_REO_RINGS WLAN_CFG_NUM_REO_DEST_RING
+#ifdef FEATURE_DAL_DP_SUPPORT
+/* Number of DAL DP RX threads */
+#define DAL_DP_RX_THREADS 4
+/* Number of DP RX threads supported */
+#define DP_MAX_RX_THREADS (WLAN_CFG_NUM_REO_DEST_RING + DAL_DP_RX_THREADS)
+#else
 /* Number of DP RX threads supported */
 #define DP_MAX_RX_THREADS WLAN_CFG_NUM_REO_DEST_RING
+#endif
 
 /*
  * struct dp_rx_tm_handle_cmn - Opaque handle for rx_threads to store
@@ -199,6 +206,8 @@ enum dp_rx_thread_state {
  * @state: state of the rx_threads. All of them should be in the same state.
  * @rx_thread: array of pointers of type struct dp_rx_thread
  * @allow_dropping: flag to indicate frame dropping is enabled
+ * @dal_dp_rx_thread_start_id: thread id from which DAL threads start
+ * @dal_dp_enabled: dal data path feature enabled
  */
 struct dp_rx_tm_handle {
 	uint8_t num_dp_rx_threads;
@@ -206,6 +215,10 @@ struct dp_rx_tm_handle {
 	enum dp_rx_thread_state state;
 	struct dp_rx_thread **rx_thread;
 	qdf_atomic_t allow_dropping;
+#ifdef FEATURE_DAL_DP_SUPPORT
+	uint8_t dal_dp_rx_thread_start_id;
+	bool dal_dp_enabled;
+#endif
 };
 
 /**
@@ -774,4 +787,32 @@ QDF_STATUS dp_txrx_set_cpu_mask(ol_txrx_soc_handle soc, qdf_cpu_mask *new_mask)
  * Return: number of frames
  */
 int dp_rx_tm_get_pending(ol_txrx_soc_handle soc);
+
+#ifdef FEATURE_DAL_DP_SUPPORT
+static inline uint8_t
+dp_get_dal_rx_threads_num(struct dp_rx_tm_handle *rx_tm_hdl)
+{
+	if (!rx_tm_hdl->dal_dp_enabled)
+		return 0;
+
+	return DAL_DP_RX_THREADS;
+}
+
+static inline void dp_rx_tm_set_dal_start_id(struct dp_rx_tm_handle *hdl,
+					     uint8_t start_id)
+{
+	hdl->dal_dp_rx_thread_start_id = start_id;
+}
+#else
+static inline uint8_t
+dp_get_dal_rx_threads_num(struct dp_rx_tm_handle *rx_tm_hdl)
+{
+	return 0;
+}
+
+static inline void dp_rx_tm_set_dal_start_id(struct dp_rx_tm_handle *hdl,
+					     uint8_t start_id)
+{
+}
+#endif
 #endif /* __WLAN_DP_RX_THREAD_H */

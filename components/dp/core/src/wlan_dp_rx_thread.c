@@ -1542,6 +1542,22 @@ static uint8_t dp_rx_tm_select_thread(struct dp_rx_tm_handle *rx_tm_hdl,
 	return selected_rx_thread;
 }
 
+#ifdef FEATURE_DAL_DP_SUPPORT
+static inline void dp_dal_update_dal_config(ol_txrx_soc_handle soc,
+					    struct dp_rx_tm_handle *rx_tm_hdl)
+{
+	if (!soc || !rx_tm_hdl)
+		return;
+
+	rx_tm_hdl->dal_dp_enabled = cdp_is_dal_dp_enabled(soc);
+}
+#else
+static inline void dp_dal_update_dal_config(ol_txrx_soc_handle soc,
+					    struct dp_rx_tm_handle *rx_tm_hdl)
+{
+}
+#endif
+
 QDF_STATUS dp_rx_tm_enqueue_pkt(struct dp_rx_tm_handle *rx_tm_hdl,
 				qdf_nbuf_t nbuf_list)
 {
@@ -1677,11 +1693,18 @@ QDF_STATUS dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 	dp_ext_hdl->refill_thread.enabled = true;
 	cdp_register_rx_refill_thread_sched_handler(soc,
 						    dp_rx_refill_thread_schedule);
+	dp_dal_update_dal_config(soc, &dp_ext_hdl->rx_tm_hdl);
 
 	num_dp_rx_threads = dp_get_rx_threads_num(soc);
-	dp_info("%d RX threads in use", num_dp_rx_threads);
+	dp_info("%d RX threads in use",
+		num_dp_rx_threads +
+		dp_get_dal_rx_threads_num(&dp_ext_hdl->rx_tm_hdl));
 
 	if (dp_ext_hdl->config.enable_rx_threads) {
+		dp_rx_tm_set_dal_start_id(&dp_ext_hdl->rx_tm_hdl,
+					  num_dp_rx_threads);
+		num_dp_rx_threads +=
+			dp_get_dal_rx_threads_num(&dp_ext_hdl->rx_tm_hdl);
 		qdf_status = dp_rx_tm_init(&dp_ext_hdl->rx_tm_hdl,
 					   num_dp_rx_threads);
 	}
