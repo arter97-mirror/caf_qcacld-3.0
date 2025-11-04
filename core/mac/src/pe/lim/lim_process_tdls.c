@@ -3461,6 +3461,12 @@ lim_tdls_populate_matching_rate_set(struct mac_context *mac_ctx,
 				stads->supportedRates.supportedMCSSet[i]);
 		}
 	}
+
+	stads->cap_tx_nss = nss;
+	stads->cap_rx_nss = nss;
+	stads->op_tx_nss = nss;
+	stads->op_rx_nss = nss;
+
 	lim_populate_vht_mcs_set(mac_ctx, &stads->supportedRates, vht_caps,
 				 session_entry, nss, nss, NULL);
 
