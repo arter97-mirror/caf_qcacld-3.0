@@ -2342,6 +2342,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//soc-repo:{}/drivers/iommu/qcom_iommu_util".format(tv),
             "//soc-repo:{}/drivers/remoteproc/rproc_qcom_common".format(tv),
             "//soc-repo:{}/drivers/soc/qcom/qmi_helpers".format(tv),
+	    "//soc-repo:{}/drivers/soc/qcom/qcom_va_minidump".format(tv),
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
