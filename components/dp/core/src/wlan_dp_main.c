@@ -1050,9 +1050,10 @@ static inline void dp_configure_affn_override_mask(
 			continue;
 
 		/* Build default mask (little cluster) for irqs,
-		 * for dp rx threads affine to all cpus.
+		 * for threads affine to all cpus.
 		 */
-		if (affn_type == DP_RX_THREAD_AFFN)
+		if (affn_type == DP_RX_THREAD_AFFN ||
+		    affn_type == DP_NAPI_RX_THREAD_AFFN)
 			default_mask |= BIT(cpus);
 		else if (package_id == CPU_CLUSTER_TYPE_LITTLE)
 			default_mask |= BIT(cpus);
