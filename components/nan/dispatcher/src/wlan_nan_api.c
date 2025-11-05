@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,7 @@
 #include "wlan_nan_api_i.h"
 #include "cfg_nan_api.h"
 #include "wlan_vdev_mgr_tgt_if_tx_api.h"
+#include "target_if_nan.h"
 
 inline enum nan_datapath_state wlan_nan_get_ndi_state(
 					struct wlan_objmgr_vdev *vdev)
@@ -136,3 +137,9 @@ qdf_freq_t wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev)
 	return freq;
 }
 
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+bool tgt_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return target_if_nan_is_fw_support_standard_mode(psoc);
+}
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

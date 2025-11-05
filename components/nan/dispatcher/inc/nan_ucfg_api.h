@@ -872,4 +872,21 @@ ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* WLAN_FEATURE_NAN */
+
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+/**
+ * ucfg_nan_is_fw_support_standard_mode() - wrapper API for function
+ * nan_is_fw_support_standard_mode()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if NAN standard mode supported by FW otherwise false
+ */
+bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
+#else
+static inline
+bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /* _NAN_UCFG_API_H_ */

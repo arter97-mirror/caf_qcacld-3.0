@@ -1884,3 +1884,10 @@ ucfg_nan_cache_disable_req_info(struct wlan_objmgr_psoc *psoc, uint8_t value)
 {
 	return nan_cache_disable_req_info(psoc, value);
 }
+
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+bool ucfg_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return nan_is_fw_support_standard_mode(psoc);
+}
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

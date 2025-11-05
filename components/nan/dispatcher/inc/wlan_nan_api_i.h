@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -139,6 +139,17 @@ bool wlan_nan_is_sta_p2p_ndp_supported(struct wlan_objmgr_psoc *psoc);
  */
 qdf_freq_t
 wlan_nan_get_24ghz_social_ch_freq(struct wlan_objmgr_pdev *pdev);
+
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+/**
+ * tgt_nan_is_fw_support_standard_mode() - wrapper API for function
+ * target_if_nan_is_fw_support_standard_mode()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if NAN standard mode supported by FW otherwise false
+ */
+bool tgt_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #else
 static inline
 enum nan_datapath_state wlan_nan_get_ndi_state(struct wlan_objmgr_vdev *vdev)

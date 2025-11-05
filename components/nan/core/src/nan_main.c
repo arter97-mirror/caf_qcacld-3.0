@@ -44,6 +44,7 @@
 #include "wlan_if_mgr_api.h"
 #include "wlan_mlme_api.h"
 #include "cfg_nan_api.h"
+#include "wlan_nan_api_i.h"
 
 bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc)
 {
@@ -2958,3 +2959,10 @@ end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 	return status;
 }
+
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+bool nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return tgt_nan_is_fw_support_standard_mode(psoc);
+}
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */

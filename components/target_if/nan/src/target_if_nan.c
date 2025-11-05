@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023,2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1230,3 +1230,18 @@ void target_if_nan_set_vdev_feature_config(struct wlan_objmgr_psoc *psoc,
 		target_if_err("failed to set NAN_CONFIG_FEATURES(status = %d)",
 			      status);
 }
+
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+bool target_if_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
+{
+	wmi_unified_t wmi_handle = lmac_get_wmi_unified_hdl(psoc);
+
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return false;
+	}
+
+	return wmi_service_enabled(wmi_handle,
+				   wmi_service_nan_standard_mode_support);
+}
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
