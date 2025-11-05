@@ -3273,6 +3273,8 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_ROAM_BG_SCAN_CLIENT_BITMAP);
 	lfr->roam_bg_scan_bad_rssi_offset_2g =
 		cfg_get(psoc, CFG_LFR_ROAM_BG_SCAN_BAD_RSSI_OFFSET_2G);
+	lfr->bg_roam_scan_flag =
+		cfg_get(psoc, CFG_LFR_BG_ROAM_SCAN_FLAG);
 	lfr->roam_data_rssi_threshold_triggers =
 		cfg_get(psoc, CFG_ROAM_DATA_RSSI_THRESHOLD_TRIGGERS);
 	lfr->roam_data_rssi_threshold =
@@ -5923,7 +5925,6 @@ wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 		mlme_debug("Cannot set user config freq for mode %d", opmode);
 		return QDF_STATUS_E_FAILURE;
 	}
-
 	mlme_priv->mlme_ap.user_config_sap_ch_freq = freq;
 	return QDF_STATUS_SUCCESS;
 }
@@ -6356,29 +6357,24 @@ rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
 
-uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
-				   uint8_t vdev_id)
+uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_objmgr_vdev *vdev;
 	struct mlme_legacy_priv *vdev_mlme_priv;
-	uint32_t mac_id = 0;
+	uint32_t mac_id = 0xFF;
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
-						    WLAN_LEGACY_MAC_ID);
-	if (!vdev)
+	if (!vdev) {
+		mlme_legacy_err("Invalid VDEV");
 		return mac_id;
+	}
 
 	vdev_mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!vdev_mlme_priv) {
-		mlme_legacy_err("vdev %d private object is NULL", vdev_id);
-		goto rel_ref;
+		mlme_legacy_err("vdev %d private object is NULL",
+				wlan_vdev_get_id(vdev));
+		return mac_id;
 	}
 
-	mac_id = vdev_mlme_priv->mac_id;
-rel_ref:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-
-	return mac_id;
+	return vdev_mlme_priv->mac_id;
 }
 
 uint8_t
@@ -6656,3 +6652,19 @@ QDF_STATUS wlan_sap_set_acs_band_mask(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#if (defined(CONNECTIVITY_DIAG_EVENT) && \
+	defined(WLAN_FEATURE_ROAM_OFFLOAD))
+void mlme_reset_log_instance_id(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return;
+	}
+
+	mlme_priv->instance = 0;
+}
+#endif

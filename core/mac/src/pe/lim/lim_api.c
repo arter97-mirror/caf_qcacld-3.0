@@ -2900,10 +2900,12 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 
 		mgmt_txrx_frame_hex_dump(link_reassoc_rsp.ptr,
 					 link_reassoc_rsp.len, false);
-
+		status =
 		lim_process_assoc_rsp_frame(mac_ctx, link_reassoc_rsp.ptr,
 					    link_reassoc_rsp.len, LIM_REASSOC,
 					    session_entry);
+		if (QDF_IS_STATUS_ERROR(status))
+			break;
 	}
 end:
 	qdf_mem_free(link_reassoc_rsp.ptr);
@@ -3259,19 +3261,16 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 						ft_session_ptr,
 						reassoc_resp,
 						roam_sync_ind_ptr->reassoc_resp_length);
-		if (ft_session_ptr->is_unexpected_peer_error)
-			status = QDF_STATUS_E_FAILURE;
-
 		if (QDF_IS_STATUS_ERROR(status)) {
 			qdf_mem_free(bss_desc);
 			goto roam_sync_fail;
 		}
 	} else {
+		status =
 		lim_process_assoc_rsp_frame(mac_ctx, reassoc_resp,
 					    roam_sync_ind_ptr->reassoc_resp_length,
 					    LIM_REASSOC, ft_session_ptr);
-		if (ft_session_ptr->is_unexpected_peer_error) {
-			status = QDF_STATUS_E_FAILURE;
+		if (QDF_IS_STATUS_ERROR(status)) {
 			qdf_mem_free(bss_desc);
 			goto roam_sync_fail;
 		}
@@ -3927,6 +3926,7 @@ lim_create_and_fill_link_session(struct mac_context *mac_ctx,
 {
 	struct pe_session *pe_session;
 	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
@@ -3941,6 +3941,15 @@ lim_create_and_fill_link_session(struct mac_context *mac_ctx,
 					  pe_session, sync_ind, ie_len);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto fail;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev)
+		goto fail;
+
+	/* Update flow pool map as VDEV is not connected before */
+	policy_mgr_update_flow_pool_map(mac_ctx->psoc, vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 	return QDF_STATUS_SUCCESS;
 
@@ -4091,43 +4100,6 @@ lim_update_cuflag_bpcc_each_link(struct mlo_mgmt_ml_info *cu_params)
 	}
 }
 #endif
-
-void lim_update_omn_ie_ch_width(struct wlan_objmgr_vdev *vdev,
-				enum phy_ch_width ch_width)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		pe_err("vdev legacy private object is NULL");
-		return;
-	}
-
-	mlme_priv->connect_info.assoc_chan_info.cur_ch_width = ch_width;
-	wlan_mlme_update_ch_width_from_ap(mlme_priv, true);
-}
-
-void lim_update_bcn_op_ch_width(struct wlan_objmgr_vdev *vdev,
-				enum phy_ch_width ch_width)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		pe_err("vdev legacy private object is NULL");
-		return;
-	}
-
-	if (mlme_priv->connect_info.assoc_chan_info.cur_ch_width != ch_width) {
-		mlme_priv->connect_info.assoc_chan_info.cur_ch_width = ch_width;
-		wlan_mlme_update_ch_width_from_ap(mlme_priv, true);
-	} else {
-		return;
-	}
-
-	pe_debug("update vdev %d bcn eht/he/vht op chn width %d",
-		 wlan_vdev_get_id(vdev), ch_width);
-}
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static bool

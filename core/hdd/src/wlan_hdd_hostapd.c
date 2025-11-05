@@ -1109,25 +1109,28 @@ static QDF_STATUS hdd_create_chandef(struct hdd_adapter *adapter,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static struct wlan_channel *wlan_hdd_get_standby_channel(
-					struct wlan_hdd_link_info *link_info)
+QDF_STATUS wlan_hdd_get_standby_channel(struct wlan_hdd_link_info *link_info,
+					struct wlan_channel *chan)
 {
 	struct wlan_mlo_dev_context *ml_dev_ctx;
 	uint8_t link_id;
 	struct mlo_link_info *ml_link_info;
-	struct wlan_channel *chan;
 	struct hdd_station_ctx *sta_ctx =
 				WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	struct wlan_objmgr_vdev *vdev;
 
-	if (!sta_ctx) {
-		hdd_err("Invalid station context");
-		return NULL;
+	vdev = hdd_objmgr_get_vdev_by_user(link_info->adapter->deflink,
+					   WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Invalid vdev");
+		return QDF_STATUS_E_INVAL;
 	}
 
-	ml_dev_ctx = link_info->adapter->deflink->vdev->mlo_dev_ctx;
+	ml_dev_ctx = vdev->mlo_dev_ctx;
 	if (!ml_dev_ctx) {
 		hdd_err("Invalid mlo dev context");
-		return NULL;
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return QDF_STATUS_E_INVAL;
 	}
 
 	link_id = sta_ctx->conn_info.ieee_link_id;
@@ -1135,17 +1138,15 @@ static struct wlan_channel *wlan_hdd_get_standby_channel(
 	if (!ml_link_info) {
 		hdd_debug("mlo link info is NULL for standby link id: %d",
 			  link_id);
-		return NULL;
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return QDF_STATUS_E_INVAL;
 	}
 
-	chan = ml_link_info->link_chan_info;
-	if (!chan) {
-		hdd_debug("link chan info for standby link id: %d is NULL",
-			  link_id);
-		return NULL;
-	}
+	*chan = *ml_link_info->link_chan_info;
 
-	return chan;
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 static uint16_t wlan_hdd_get_link_id_from_sta_ctx(
@@ -1158,10 +1159,11 @@ static uint16_t wlan_hdd_get_link_id_from_sta_ctx(
 }
 
 #else
-static inline struct
-wlan_channel *wlan_hdd_get_standby_channel(struct wlan_hdd_link_info *link_info)
+static inline
+QDF_STATUS wlan_hdd_get_standby_channel(struct wlan_hdd_link_info *link_info,
+					struct wlan_channel *chan)
 {
-	return NULL;
+	return QDF_STATUS_E_INVAL;
 }
 
 static inline uint16_t
@@ -1174,34 +1176,31 @@ wlan_hdd_get_link_id_from_sta_ctx(struct wlan_hdd_link_info *link_info)
 static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_adapter *adapter = link_info->adapter;
-	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
 	struct wlan_objmgr_vdev *vdev;
 	uint16_t link_id = 0;
 	struct hdd_adapter *assoc_adapter;
-	struct wlan_channel *chan;
+	struct wlan_channel chan, *chan_ptr;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct net_device *dev;
 	struct cfg80211_chan_def chandef;
 	uint16_t puncture_bitmap = 0;
 	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 
-	if (!mac_handle) {
-		hdd_err("mac_handle is NULL");
-		return;
-	}
-
 	dev = adapter->dev;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
+		if (adapter->device_mode != QDF_STA_MODE)
+			return;
+
 		osif_wiphy_lock(NULL, dev->ieee80211_ptr);
-		link_id = wlan_hdd_get_link_id_from_sta_ctx(link_info);
 
 		/* Update chan info for standby link to user space*/
-		chan = wlan_hdd_get_standby_channel(link_info);
-		if (!chan)
+		status = wlan_hdd_get_standby_channel(link_info, &chan);
+		if (QDF_IS_STATUS_ERROR(status))
 			goto exit;
 
+		link_id = wlan_hdd_get_link_id_from_sta_ctx(link_info);
 		goto notify;
 	}
 
@@ -1237,12 +1236,14 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 		link_id = wlan_vdev_get_link_id(vdev);
 
-	chan = wlan_vdev_get_active_channel(vdev);
+	chan_ptr = wlan_vdev_get_active_channel(vdev);
 
-	if (!chan)
+	if (!chan_ptr)
 		goto exit;
+	else
+		chan = *chan_ptr;
 notify:
-	status = hdd_create_chandef(adapter, chan, &chandef);
+	status = hdd_create_chandef(adapter, &chan, &chandef);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("Vdev %d failed to create channel def", vdev_id);
 		goto exit;
@@ -3810,15 +3811,23 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		QDF_MAX(DOT11F_IE_RSN_MAX_LEN, DOT11F_IE_WPA_MAX_LEN)))
 		return -EINVAL;
 	/* Type check */
-	if (gen_ie[0] == DOT11F_EID_RSN) {
+	if (gen_ie[0] == DOT11F_EID_RSN || gen_ie[0] == DOT11F_EID_VENDOR1IE) {
 		/* Validity checks */
 		if ((gen_ie_len < DOT11F_IE_RSN_MIN_LEN) ||
 		    (gen_ie_len > DOT11F_IE_RSN_MAX_LEN)) {
 			return QDF_STATUS_E_FAILURE;
 		}
 		/* Skip past the EID byte and length byte */
-		rsn_ie = gen_ie + 2;
-		rsn_ie_len = gen_ie_len - 2;
+		if (gen_ie[0] == DOT11F_EID_RSN) {
+			rsn_ie = gen_ie + 2;
+			rsn_ie_len = gen_ie_len - 2;
+		} else if (gen_ie[0] == DOT11F_EID_VENDOR1IE) {
+			rsn_ie = gen_ie + 6;
+			rsn_ie_len = gen_ie_len - 6;
+		} else {
+			return -EINVAL;
+		}
+
 		/* Unpack the RSN IE */
 		memset(&dot11_rsn_ie, 0, sizeof(tDot11fIERSN));
 		ret = sme_unpack_rsn_ie(mac_handle, rsn_ie, rsn_ie_len,
@@ -4647,6 +4656,14 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(struct wlan_objmgr_psoc *psoc,
 		}
 		sap_context->csa_reason = CSA_REASON_LL_LT_SAP_EVENT;
 		goto force_restart_chan;
+	} else if (ap_adapter->device_mode == QDF_SAP_MODE &&
+		   !link_info->session.ap.sap_config.acs_cfg.acs_mode &&
+		   sap_get_coex_fixed_chan_cap(psoc) &&
+		   !policy_mgr_is_safe_channel(psoc, *ch_freq)) {
+		hdd_debug("Avoid channel switch as it's allowed to operate on unsafe channel: %d",
+			  *ch_freq);
+		wlansap_context_put(sap_context);
+		return QDF_STATUS_E_FAILURE;
 	} else {
 		intf_ch_freq =
 			wlansap_get_chan_band_restrict(sap_context,
@@ -5891,6 +5908,47 @@ static int hdd_update_11be_apies(struct wlan_hdd_link_info *link_info,
 }
 #endif
 
+static void wlan_hdd_add_mrsno_ies(struct wlan_hdd_link_info *link_info,
+				   uint8_t *genie, uint16_t *total_ielen)
+{
+	struct hdd_beacon_data *beacon = link_info->session.ap.beacon;
+	int left = beacon->tail_len;
+	uint8_t *ptr = beacon->tail;
+	uint8_t elem_id, elem_len;
+	uint16_t ielen = 0;
+
+	if (!ptr || 0 == left)
+		return;
+
+	while (left >= 2) {
+		elem_id = ptr[0];
+		elem_len = ptr[1];
+		left -= 2;
+		if (elem_len > left) {
+			hdd_err("**Invalid IEs eid: %d elem_len: %d left: %d**",
+				elem_id, elem_len, left);
+			return;
+		}
+
+		if (elem_id == WLAN_EID_VENDOR_SPECIFIC &&
+		    (!qdf_mem_cmp(&ptr[2], RSNO_OUI_WIFI6_RSN, RSNO_OUI_SIZE) ||
+		     !qdf_mem_cmp(&ptr[2], RSNO_OUI_WIFI7_RSN, RSNO_OUI_SIZE) ||
+		     !qdf_mem_cmp(&ptr[2], RSNO_OUI_RSNXE, RSNO_OUI_SIZE))) {
+			ielen = ptr[1] + 2;
+			if ((*total_ielen + ielen) <= MAX_GENIE_LEN) {
+				qdf_mem_copy(&genie[*total_ielen], ptr, ielen);
+				*total_ielen += ielen;
+			} else {
+				hdd_err("IE Length is too big IEs eid: %d elem_len: %d total_ie_len: %d",
+					elem_id, elem_len, *total_ielen);
+			}
+		}
+
+		left -= elem_len;
+		ptr += (elem_len + 2);
+	}
+}
+
 int
 wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info)
 {
@@ -5984,6 +6042,7 @@ wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info)
 			      &proberesp_ies_len, WLAN_ELEMID_RSNXE);
 	wlan_hdd_add_extra_ie(link_info, proberesp_ies,
 			      &proberesp_ies_len, WLAN_ELEMID_MOBILITY_DOMAIN);
+	wlan_hdd_add_mrsno_ies(link_info, proberesp_ies, &proberesp_ies_len);
 
 	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
 		update_ie.ieBufferlength = proberesp_ies_len;
@@ -7835,6 +7894,65 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		}
 	}
 
+	config->mrsno_ie_len = 0;
+	memset(&config->mrsno_ie[0], 0, sizeof(config->mrsno_ie));
+	ie = wlan_get_vendor_ie_ptr_from_oui(RSNO_OUI_WIFI6_RSN, RSNO_OUI_SIZE,
+					     beacon->tail, beacon->tail_len);
+	if (ie && ie[1] && config->RSNWPAReqIELength &&
+	    (config->RSNWPAReqIE[0] == WLAN_EID_RSN)) {
+		config->mrsno_ie_len = ie[1] + 2;
+		if (config->mrsno_ie_len < sizeof(config->mrsno_ie)) {
+			memcpy(&config->mrsno_ie, ie, config->mrsno_ie_len);
+		} else {
+			ret = -EINVAL;
+			hdd_err("Unable to save wifi-6 RSNO in the buffer");
+			goto error;
+		}
+		status =
+			 hdd_softap_unpack_ie(cds_get_context(QDF_MODULE_ID_SME),
+					      &rsn_encrypt_type,
+					      &mc_rsn_encrypt_type,
+					      &config->akm_list,
+					      &mfp_capable, &mfp_required,
+					      config->mrsno_ie_len,
+					      config->mrsno_ie);
+		if (status != QDF_STATUS_SUCCESS) {
+			ret = -EINVAL;
+			hdd_err("Parsing of RSNO1 failed");
+			goto error;
+		}
+	}
+
+	ie = wlan_get_vendor_ie_ptr_from_oui(RSNO_OUI_WIFI7_RSN, RSNO_OUI_SIZE,
+					     beacon->tail, beacon->tail_len);
+	if (ie && ie[1] && config->RSNWPAReqIELength &&
+	    (config->RSNWPAReqIE[0] == WLAN_EID_RSN)) {
+		if (config->mrsno_ie_len + ie[1] + 2 < sizeof(config->mrsno_ie)) {
+			prev_rsn_length = config->mrsno_ie_len;
+			config->mrsno_ie_len += ie[1] + 2;
+			memcpy(&config->mrsno_ie[0] + prev_rsn_length,
+			       ie, ie[1] + 2);
+		} else {
+			ret = -EINVAL;
+			hdd_err("Unable to save wifi-7 RSNO in the buffer");
+			goto error;
+		}
+		status =
+			hdd_softap_unpack_ie(cds_get_context(QDF_MODULE_ID_SME),
+					     &rsn_encrypt_type,
+					     &mc_rsn_encrypt_type,
+					     &config->akm_list,
+					     &mfp_capable, &mfp_required,
+					     config->mrsno_ie_len -
+					     prev_rsn_length,
+					     &config->mrsno_ie[prev_rsn_length]);
+		if (status != QDF_STATUS_SUCCESS) {
+			ret = -EINVAL;
+			hdd_err("Parsing of RSNO2 failed");
+			goto error;
+		}
+	}
+
 	ie = wlan_get_vendor_ie_ptr_from_oui(WPA_OUI_TYPE, WPA_OUI_TYPE_SIZE,
 					     beacon->tail, beacon->tail_len);
 
@@ -7887,20 +8005,6 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	for (i = 0; i < config->akm_list.numEntries; i++)
 		if (config->akm_list.authType[i] == eCSR_AUTH_TYPE_OWE)
 			wlan_sap_set_owe_connection_support(vdev, true);
-
-	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(
-						hdd_ctx->psoc,
-						adapter->device_mode,
-						link_info->vdev_id);
-
-	if (!policy_mgr_is_multi_sap_allowed_on_same_band(
-						hdd_ctx->pdev,
-						pm_con_mode,
-						config->chan_freq,
-						link_info->vdev_id)) {
-		ret = -EINVAL;
-		goto error;
-	}
 
 	if (config->RSNWPAReqIELength > sizeof(config->RSNWPAReqIE)) {
 		hdd_err("RSNWPAReqIELength is too large");
@@ -8159,6 +8263,11 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		ret = 0;
 		goto free;
 	}
+
+	pm_con_mode = policy_mgr_qdf_opmode_to_pm_con_mode(
+					hdd_ctx->psoc,
+					adapter->device_mode,
+					link_info->vdev_id);
 
 	if (check_for_concurrency &&
 	    !policy_mgr_mode_specific_connection_count(
@@ -8517,6 +8626,8 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	cds_flush_work(&link_info->sap_stop_bss_work);
 
 	ap_ctx->sap_config.acs_cfg.acs_mode = false;
+	mlme_set_is_acs_sap(link_info->vdev, false);
+
 	hdd_dcs_clear(adapter);
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 	hdd_debug("vdev %d Disabling queues", adapter->deflink->vdev_id);
@@ -9307,6 +9418,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	channel_width = wlan_hdd_get_channel_bw(params->chandef.width);
 	freq = (qdf_freq_t)params->chandef.chan->center_freq;
 	user_config_freq = freq;
+	wlan_set_sap_user_config_freq(link_info->vdev, user_config_freq);
 
 	if (wlan_reg_is_6ghz_chan_freq(freq) &&
 	    !wlan_reg_is_6ghz_band_set(hdd_ctx->pdev)) {

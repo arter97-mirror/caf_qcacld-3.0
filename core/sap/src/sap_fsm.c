@@ -1233,24 +1233,7 @@ static bool sap_process_liberal_scc_for_go(struct sap_context *sap_context)
 }
 #endif
 
-/**
- * sap_get_coex_fixed_chan_cap() - Wrapper to get coex fixed channel capability
- * MDM requires to start SAP on unsafe channel even through FW doesn't support
- * coex fixed channel for acs disabled case, and other platforms prefer to abort
- * the SAP. If acs disabled and allow SAP on unsafe channel, please define
- * WLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW.
- *
- * @psoc: pointer to psoc
- *
- * Return: true or false
- */
-#ifdef WLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW
-static bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
-{
-	return true;
-}
-#else
-static bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
+bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
 {
 	if (!psoc) {
 		sap_debug("null psoc");
@@ -1260,7 +1243,6 @@ static bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
 	return target_psoc_get_sap_coex_fixed_chan_cap(
 			wlan_psoc_get_tgt_if_handle(psoc));
 }
-#endif
 
 QDF_STATUS
 sap_validate_chan(struct sap_context *sap_context,
@@ -1280,6 +1262,7 @@ sap_validate_chan(struct sap_context *sap_context,
 	bool is_go_scc_strict = false;
 	bool start_sap_on_provided_freq = false;
 	enum QDF_OPMODE opmode = QDF_SAP_MODE;
+	bool force_go_chan_change  = false;
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
 	mac_ctx = MAC_CONTEXT(mac_handle);
@@ -1309,7 +1292,20 @@ sap_validate_chan(struct sap_context *sap_context,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (opmode == QDF_P2P_GO_MODE) {
+	/*
+	 * For AUTO GO mode. PCL is not taken into consideration so it can
+	 * send start req in LL LT SAP channel, in such case, do a force
+	 * channel change for GO.
+	 */
+	if (opmode == QDF_P2P_GO_MODE &&
+	    policy_mgr_get_ll_lt_sap_freq(mac_ctx->psoc) ==
+	    sap_context->chan_freq) {
+		sap_debug("GO freq %d causing scc with ll lt sap, get new freq",
+			  sap_context->chan_freq);
+		force_go_chan_change = true;
+	}
+
+	if (opmode == QDF_P2P_GO_MODE && !force_go_chan_change) {
 	       /*
 		* check whether go_force_scc is enabled or not.
 		* If it not enabled then don't any force scc on existing go and
@@ -1437,8 +1433,9 @@ validation_done:
 	if ((sap_context->acs_cfg->acs_mode ||
 	     !sap_get_coex_fixed_chan_cap(mac_ctx->psoc) ||
 	     policy_mgr_restrict_sap_on_unsafe_chan(mac_ctx->psoc)) &&
-	    !policy_mgr_is_sap_freq_allowed(mac_ctx->psoc, opmode,
-					    sap_context->chan_freq)) {
+	    !policy_mgr_is_unsafe_freq_allowed(mac_ctx->psoc,
+					       sap_context->vdev_id,
+					       sap_context->chan_freq)) {
 		sap_warn("Abort SAP start due to unsafe channel");
 		return QDF_STATUS_E_ABORTED;
 	}
@@ -3579,6 +3576,13 @@ static void sap_validate_chanmode_and_chwidth(struct mac_context *mac_ctx,
 			sec_ch_2g_freq = sap_ctx->chan_freq - 20;
 	}
 
+	/**
+	 * Force SAP to 20MHz if INI is enabled and country is Indonesia
+	 */
+	if (policy_mgr_get_sap_force_20mhz_for_country_id(mac_ctx->psoc,
+							  (qdf_freq_t)sap_ctx->chan_freq))
+		sap_ctx->ch_params.ch_width = CH_WIDTH_20MHZ;
+
 	if (orig_ch_width != sap_ctx->ch_params.ch_width)
 		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
 						       sap_ctx->chan_freq,
@@ -4166,9 +4170,8 @@ bool wlansap_validate_channel_post_csa(mac_handle_t mac_handle,
 	     (!policy_mgr_restrict_sap_on_unsafe_chan(mac_ctx->psoc) ||
 	      target_psoc_get_sap_coex_fixed_chan_cap(
 		      wlan_psoc_get_tgt_if_handle(mac_ctx->psoc)))) ||
-	    (policy_mgr_is_sap_freq_allowed(mac_ctx->psoc,
-				wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
-				sap_ctx->chan_freq) &&
+	    (policy_mgr_is_unsafe_freq_allowed(mac_ctx->psoc, sap_ctx->vdev_id,
+					       sap_ctx->chan_freq) &&
 	     !wlan_reg_is_disable_for_pwrmode(mac_ctx->pdev, sap_ctx->chan_freq,
 					      REG_CURRENT_PWR_MODE)))
 		return true;

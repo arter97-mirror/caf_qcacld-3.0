@@ -1051,6 +1051,16 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		sap_debug("Failed to set crypto params from IE");
 
+	if (config->mrsno_ie_len) {
+		sap_debug("Configure the crypto params for RSNO");
+		qdf_status =
+			wlan_set_crypto_params_from_mrsno(sap_ctx->vdev,
+							  config->mrsno_ie,
+							  config->mrsno_ie_len);
+		if (QDF_IS_STATUS_ERROR(qdf_status))
+			sap_err("Failed to set MRSNO crypto params");
+	}
+
 	/* Channel selection is auto or configured */
 	sap_ctx->chan_freq = config->chan_freq;
 	sap_ctx->dfs_mode = config->acs_dfs_mode;
@@ -1657,7 +1667,9 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 		if (policy_mgr_is_vdev_ll_lt_sap(mac->psoc,
 						 sap_context->vdev_id) ||
 		    (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
-		     !channel_bonding_mode))
+		     !channel_bonding_mode) ||
+		    (policy_mgr_get_sap_force_20mhz_for_country_id(mac->psoc,
+								   (qdf_freq_t)chan_freq)))
 			ch_width = CH_WIDTH_20MHZ;
 		else
 			ch_width = wlansap_get_max_bw_by_phymode(sap_context);
@@ -1940,9 +1952,8 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 	if (((sap_ctx->acs_cfg && sap_ctx->acs_cfg->acs_mode) ||
 	     policy_mgr_restrict_sap_on_unsafe_chan(mac->psoc) ||
 	     sap_ctx->csa_reason != CSA_REASON_USER_INITIATED) &&
-	    !policy_mgr_is_sap_freq_allowed(mac->psoc,
-			wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
-			target_chan_freq)) {
+	    !policy_mgr_is_unsafe_freq_allowed(mac->psoc, sap_ctx->vdev_id,
+					       target_chan_freq)) {
 		sap_err("%u is unsafe channel freq", target_chan_freq);
 		return QDF_STATUS_E_FAULT;
 	}
@@ -3285,6 +3296,7 @@ void sap_undo_acs(struct sap_context *sap_ctx, struct sap_config *sap_cfg)
 	acs_cfg->ch_list_count = 0;
 	acs_cfg->master_ch_list_count = 0;
 	acs_cfg->acs_mode = false;
+	mlme_set_is_acs_sap(sap_ctx->vdev, false);
 	acs_cfg->master_ch_list_updated = false;
 	sap_ctx->num_of_channel = 0;
 	wlansap_dcs_set_vdev_wlan_interference_mitigation(sap_ctx, false);
@@ -4570,11 +4582,9 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		sap_debug("channel is passive");
 		*csa_reason = CSA_REASON_CHAN_PASSIVE;
 		return wlansap_get_safe_channel_from_pcl_for_sap(sap_ctx);
-	} else if (((sap_ctx->acs_cfg && sap_ctx->acs_cfg->acs_mode) ||
-		   policy_mgr_restrict_sap_on_unsafe_chan(mac->psoc)) &&
-		   !policy_mgr_is_sap_freq_allowed(mac->psoc,
-			wlan_vdev_mlme_get_opmode(sap_ctx->vdev),
-			sap_ctx->chan_freq)) {
+	} else if (!policy_mgr_is_unsafe_freq_allowed(mac->psoc,
+						      sap_ctx->vdev_id,
+						      sap_ctx->chan_freq)) {
 		sap_debug("channel is unsafe");
 		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
 		return wlansap_get_safe_channel_from_pcl_and_acs_range(sap_ctx,

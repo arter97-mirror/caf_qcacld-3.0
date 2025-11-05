@@ -889,6 +889,9 @@ check_for_vendor_ap_mac(struct action_oui_extension *extension,
 	uint8_t mac_mask = 0x80;
 	uint8_t *mac_addr = attr->mac_addr;
 
+	if (!mac_addr)
+		return true;
+
 	for (i = 0; i < QDF_MAC_ADDR_SIZE; i++) {
 		if ((*extension->mac_mask & mac_mask) &&
 		    !(extension->mac_addr[i] == mac_addr[i]))
@@ -1102,7 +1105,7 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 		if (!check_for_vendor_ap_capabilities(extension, attr))
 			goto next;
 
-		action_oui_debug("Vendor AP/STA found for OUI");
+		action_oui_debug("action id %d vendor AP/STA found for OUI", action_id);
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   extension->oui, extension->oui_length);
 		oui_matched = true;

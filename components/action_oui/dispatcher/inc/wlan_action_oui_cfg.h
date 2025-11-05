@@ -895,6 +895,9 @@
  * <ini>
  * CFG_ACTION_OUI_LIMIT_BW - Used to limit BW for specified AP
  *
+ * To avoid IoT issue, limit 2.4 GHz STA connection BW to 20MHz,
+ * Limit 5/6 GHz STA connection TX BW to 40MHz
+ *
  * Example OUIs: (All values in Hex)
  * OUI 1: 00904c
  *       OUI data Len: 04
@@ -1029,6 +1032,34 @@
 
 /*
  * <ini>
+ * g_force_tx_null_frame_on_p2p – Used to avoid disconnecting p2p Go of no
+ * beacon.
+ *
+ * Indicate sending qos null frames on p2p interface when final bmiss is
+ * detected if specific vendor OUI is in beacon.
+ * If an ACK is received, suppress reporting the final bmiss to the host for
+ * avoiding a disconnect.
+ *
+ * If the INI is set to "ffffff 00 01", always send qos null frames on p2p
+ * interface when final bmiss is detected.
+ *
+ * Related: None
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P CFG_INI_STRING( \
+	"g_force_tx_null_frame_on_p2p", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"", \
+	"Allow connection to APs without beacon frames")
+
+/*
+ * <ini>
  * CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2 - Used to disable Dynamic SMPS
  * capability for specified AP.
  *
@@ -1081,6 +1112,7 @@
 	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS) \
 	CFG(CFG_ACTION_OUI_EXT_MLD_CAP_OP) \
 	CFG(CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK) \
+	CFG(CFG_ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P) \
 	CFG(CFG_ENABLE_ACTION_OUI)
 
 /* Action OUI V2 ini use different name format XXX_V2, support operator

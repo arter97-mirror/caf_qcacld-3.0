@@ -224,6 +224,10 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 		      cfg_get(psoc, CFG_ACTION_OUI_EXT_MLD_CAP_OP),
 		      ACTION_OUI_MAX_STR_LEN);
 	qdf_str_lcopy(psoc_priv->action_oui_str
+		      [ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P],
+		      cfg_get(psoc, CFG_ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P),
+		      ACTION_OUI_MAX_STR_LEN);
+	qdf_str_lcopy(psoc_priv->action_oui_str
 		      [ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK],
 		      cfg_get(psoc, CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK),
 		      ACTION_OUI_MAX_STR_LEN);

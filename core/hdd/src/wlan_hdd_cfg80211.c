@@ -2655,8 +2655,10 @@ int wlan_hdd_cfg80211_start_acs(struct wlan_hdd_link_info *link_info)
 		hdd_err("ACS channel select failed");
 		return -EINVAL;
 	}
-	if (sap_is_auto_channel_select(sap_ctx))
+	if (sap_is_auto_channel_select(sap_ctx)) {
 		sap_config->acs_cfg.acs_mode = true;
+		mlme_set_is_acs_sap(sap_ctx->vdev, true);
+	}
 
 	return 0;
 }
@@ -4474,6 +4476,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		hdd_err("get_external_acs_policy failed");
 
 	sap_config->acs_cfg.acs_mode = true;
+	mlme_set_is_acs_sap(link_info->vdev, true);
 
 	if (wlan_reg_get_keep_6ghz_sta_cli_connection(hdd_ctx->pdev))
 		hdd_remove_6ghz_freq_from_acs_list(
@@ -12918,11 +12921,12 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	uint8_t link_id = WLAN_INVALID_LINK_ID;
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_CONFIG_MAX + 1];
 	struct nlattr *curr_attr, *chn_bd = NULL, *mlo_link_id;
-	enum eSirMacHTChannelWidth chwidth;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 	bool update_cw_allowed;
+	/* Default or safe chan width fallback */
+	enum eSirMacHTChannelWidth chwidth = eHT_CHANNEL_WIDTH_20MHZ;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
@@ -18124,6 +18128,10 @@ BTM_REQ_RESP_DONE:
 								  false);
 			if (ret_val)
 				hdd_err("Failed to set exclude ext MLD cap");
+
+			sme_send_ext_mld_cap_wfatest_cmd(mac_handle,
+							 link_info->vdev_id,
+							 true);
 		}
 	}
 
@@ -34197,6 +34205,11 @@ wlan_hdd_cfg80211_get_channel_sap(struct wiphy *wiphy,
 	vdev = wlan_key_get_link_vdev(adapter, WLAN_OSIF_ID, link_id);
 	if (!vdev)
 		return -EINVAL;
+
+	if (ucfg_mlme_is_chan_switch_in_progress(vdev)) {
+		wlan_key_put_link_vdev(vdev, WLAN_OSIF_ID);
+		return -EBUSY;
+	}
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 	chan_freq = des_chan->ch_freq;

@@ -166,8 +166,6 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 	if (!is_update) {
 		assoc_chan_info->assoc_ch_width = CH_WIDTH_INVALID;
 		return;
-	} else {
-		wlan_mlme_update_ch_width_from_ap(mlme_priv, false);
 	}
 
 	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
@@ -186,6 +184,15 @@ cm_update_associated_ch_info(struct wlan_objmgr_vdev *vdev, bool is_update)
 		assoc_chan_info->assoc_ch_width = des_chan->ch_width;
 	else
 		assoc_chan_info->assoc_ch_width = ch_width;
+
+	status = wlan_mlme_update_cur_ch_width(vdev,
+					       assoc_chan_info->assoc_ch_width,
+					       false);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("Failed to update chwidth %d",
+			 assoc_chan_info->assoc_ch_width);
+		return;
+	}
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq) &&
 	    des_chan->ch_width == CH_WIDTH_40MHZ) {
@@ -4025,13 +4032,21 @@ cm_roam_print_frame_info(struct wlan_objmgr_psoc *psoc,
 		 * frames, its cached in the TX/RX path and the cached
 		 * frames are printed from here.
 		 */
-		if (frame_info->auth_algo == WLAN_SAE_AUTH_ALGO &&
-		    wlan_is_sae_auth_log_present_for_bssid(psoc,
-							   &frame_info->bssid,
-							   &cached_vdev_id)) {
-			wlan_print_cached_sae_auth_logs(psoc,
+		if (frame_info->auth_algo == WLAN_SAE_AUTH_ALGO) {
+			if (wlan_is_sae_auth_log_present_for_bssid(
+							psoc,
+							&frame_info->bssid,
+							&cached_vdev_id))
+				wlan_print_cached_sae_auth_logs(
+							psoc,
 							&frame_info->bssid,
 							cached_vdev_id);
+			else
+				mlme_rl_nofl_info("VDEV[%d] bssid: "
+						  QDF_MAC_ADDR_FMT,
+						  vdev_id,
+						  QDF_MAC_ADDR_REF(
+						  frame_info->bssid.bytes));
 			continue;
 		}
 
@@ -6305,3 +6320,30 @@ uint32_t cm_roam_get_roam_score_algo(struct wlan_objmgr_psoc *psoc)
 
 	return score_config->vendor_roam_score_algorithm;
 }
+
+#if (defined(CONNECTIVITY_DIAG_EVENT) && \
+	defined(WLAN_FEATURE_ROAM_OFFLOAD))
+void
+wlan_set_log_instance_id(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!pdev)
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev)
+		return;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return;
+	}
+	mlme_priv->instance++;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+}
+#endif

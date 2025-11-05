@@ -1250,12 +1250,17 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 				pe_session->htSupportedChannelWidthSet;
 		}
 
+		/* Check ACTION_OUI_LIMIT_BW flag for 2.4GHz IoT AP compatibility */
+		if (pe_session->action_oui_limit_bw_2g)
+			pDot11f->supportedChannelWidthSet = 0;
+
 		pDot11f->advCodingCap = pe_session->ht_config.adv_coding_cap;
 		pDot11f->txSTBC = pe_session->ht_config.tx_stbc;
 		pDot11f->rxSTBC = pe_session->ht_config.rx_stbc;
 		pDot11f->shortGI20MHz = pe_session->ht_config.short_gi_20_mhz;
 		pDot11f->shortGI40MHz = pe_session->ht_config.short_gi_40_mhz;
 		pDot11f->mimoPowerSave = pe_session->ht_config.mimo_power_save;
+		mac->mlme_cfg->ht_caps.smps = pe_session->ht_config.mimo_power_save;
 	}
 
 	/* Ensure that shortGI40MHz is Disabled if supportedChannelWidthSet is
@@ -8301,6 +8306,16 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		if (!freq)
 			goto fill_nss;
 	} else {
+		/* Update HE Dynamic SMPS based on HT SMPS INI config */
+		if (LIM_IS_STA_ROLE(session)) {
+			if (mac_ctx->mlme_cfg->ht_caps.smps ==
+			    SMPS_MODE_DISABLED)
+				session->he_config.he_dynamic_smps = 0;
+			else if (mac_ctx->mlme_cfg->ht_caps.smps ==
+				 DYNAMIC_SMPS_MODE)
+				session->he_config.he_dynamic_smps = 1;
+		}
+
 		/** TODO: String items needs attention. **/
 		qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
 		populate_dot11f_twt_he_cap(mac_ctx, session->vdev_id, he_cap);
@@ -14099,6 +14114,7 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 	attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
 	attr.ie_length = ie_len;
+	attr.mac_addr = &bss_desc->bssId[0];
 
 	/*
 	 * Include Ext MLD caps if the support is set in MLME or if the AP

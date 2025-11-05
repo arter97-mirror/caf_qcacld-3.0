@@ -208,11 +208,11 @@ QDF_STATUS wlan_print_cached_sae_auth_logs(struct wlan_objmgr_psoc *psoc,
 	 * that bssid
 	 */
 	for (i = 0; i < MAX_ROAM_CANDIDATE_AP; i++) {
-		if (!mlme_priv->auth_log[i][0].diag_cmn.ktime_us)
+		if (!mlme_priv->auth_log[i][0].pkt_info.diag_cmn.ktime_us)
 			continue;
 
 		if (qdf_is_macaddr_equal(bssid,
-					 (struct qdf_mac_addr *)mlme_priv->auth_log[i][0].diag_cmn.bssid))
+					 (struct qdf_mac_addr *)mlme_priv->auth_log[i][0].pkt_info.diag_cmn.bssid))
 			break;
 	}
 
@@ -227,12 +227,12 @@ QDF_STATUS wlan_print_cached_sae_auth_logs(struct wlan_objmgr_psoc *psoc,
 	}
 
 	for (j = 0; j < WLAN_ROAM_MAX_CACHED_AUTH_FRAMES; j++) {
-		if (!mlme_priv->auth_log[i][j].diag_cmn.ktime_us)
+		if (!mlme_priv->auth_log[i][j].pkt_info.diag_cmn.ktime_us)
 			continue;
 
-		WLAN_HOST_DIAG_EVENT_REPORT(&mlme_priv->auth_log[i][j],
+		WLAN_HOST_DIAG_EVENT_REPORT(&mlme_priv->auth_log[i][j].pkt_info,
 					    EVENT_WLAN_MGMT);
-		qdf_mem_zero(&mlme_priv->auth_log[i][j],
+		qdf_mem_zero(&mlme_priv->auth_log[i][j].pkt_info,
 			     sizeof(struct wlan_diag_packet_info));
 	}
 
@@ -265,7 +265,7 @@ bool wlan_is_log_record_present_for_bssid(struct wlan_objmgr_psoc *psoc,
 	}
 
 	for (i = 0; i < MAX_ROAM_CANDIDATE_AP; i++) {
-		pkt_info = &mlme_priv->auth_log[i][0];
+		pkt_info = &mlme_priv->auth_log[i][0].pkt_info;
 		if (!pkt_info->diag_cmn.ktime_us)
 			continue;
 
@@ -373,32 +373,32 @@ wlan_add_sae_log_record_to_available_slot(struct wlan_objmgr_psoc *psoc,
 
 	for (i = 0; i < MAX_ROAM_CANDIDATE_AP; i++) {
 		if (is_entry_exist &&
-		    mlme_priv->auth_log[i][0].diag_cmn.ktime_us &&
+		    mlme_priv->auth_log[i][0].pkt_info.diag_cmn.ktime_us &&
 		    qdf_is_macaddr_equal((struct qdf_mac_addr *)pkt_info->diag_cmn.bssid,
-					 (struct qdf_mac_addr *)mlme_priv->auth_log[i][0].diag_cmn.bssid)) {
+					 (struct qdf_mac_addr *)mlme_priv->auth_log[i][0].pkt_info.diag_cmn.bssid)) {
 			/*
 			 * Frames for given bssid already exists store the new
 			 * frame in corresponding array in empty slot
 			 */
 			for (j = 0; j < WLAN_ROAM_MAX_CACHED_AUTH_FRAMES; j++) {
-				if (mlme_priv->auth_log[i][j].diag_cmn.ktime_us)
+				if (mlme_priv->auth_log[i][j].pkt_info.diag_cmn.ktime_us)
 					continue;
 
 				logging_debug("vdev:%d added at [i][j]:[%d][%d]",
 					      vdev_id, i, j);
-				mlme_priv->auth_log[i][j] = *pkt_info;
+				mlme_priv->auth_log[i][j].pkt_info = *pkt_info;
 				break;
 			}
 
 		} else if (!is_entry_exist &&
-			   !mlme_priv->auth_log[i][0].diag_cmn.ktime_us) {
+			   !mlme_priv->auth_log[i][0].pkt_info.diag_cmn.ktime_us) {
 			/*
 			 * For given record, there is no existing bssid
 			 * so add the entry at first available slot
 			 */
 			logging_debug("vdev:%d added entry at [i][j]:[%d][%d]",
 				      vdev_id, i, 0);
-			mlme_priv->auth_log[i][0] = *pkt_info;
+			mlme_priv->auth_log[i][0].pkt_info = *pkt_info;
 			break;
 		}
 	}

@@ -1853,6 +1853,22 @@ got_chan:
 		goto send_event;
 	}
 
+	/*
+	 * For 2.4GHz 40MHz upgrade operation, cf0 value is required. However,
+	 * the Wideband IE is not mandatory and may not be received, preventing
+	 * host from determining CF0. Consequently, STA must revert to 2.4GHz
+	 * 20MHz, which is redundant, hence reject CSA. Upon receiving beacons
+	 * corresponding to the new CSA, STA can transition to 2.4GHz 40MHz,
+	 * as cf0 info will then be available in the beacon for 40MHz channel.
+	 */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(csa_offload_event->csa_chan_freq) &&
+	    (csa_offload_event->new_ch_width == CH_WIDTH_40MHZ)) {
+		wma_err("Defer BW upgrade to %d",
+			csa_offload_event->new_ch_width);
+		qdf_mem_free(csa_offload_event);
+		goto send_event;
+	}
+
 	wma_send_msg(wma, WMA_CSA_OFFLOAD_EVENT, (void *)csa_offload_event, 0);
 
 	return 0;
@@ -2183,6 +2199,44 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 		return "VDEV_REPURPOSE";
 	case WOW_REASON_TDLS_PACKET_RX:
 		return "TDLS PKT Rx";
+	case WOW_REASON_MLO_LINK_SWITCH_EVENT:
+		return "MLO_LINK_SWITCH_EVENT";
+	case WOW_REASON_THERMAL_CHANGE:
+		return "THERMAL_CHANGE";
+	case WOW_REASON_OIC_PING_OFFLOAD:
+		return "OIC_PING_OFFLOAD";
+	case WOW_REASON_WLAN_DHCP_RENEW:
+		return "WLAN_DHCP_RENEW";
+	case WOW_REASON_TKIP_MIC_ERR_FRAME_RECVD_DETECT:
+		return "TKIP_MIC_ERR_FRAME_RECVD_DETECT";
+	case WOW_REASON_NTH_BCN_OFLD:
+		return "NTH_BCN_OFLD";
+	case WOW_REASON_PKT_CAPTURE_MODE_WAKE:
+		return "PKT_CAPTURE_MODE_WAKE";
+	case WOW_REASON_RFKILL:
+		return "RFKILL";
+	case WOW_REASON_DFS_CAC:
+		return "DFS_CAC";
+	case WOW_REASON_ERR_PKT_TRIGGERED_WAKEUP:
+		return "ERR_PKT_TRIGGERED_WAKEUP";
+	case WOW_REASON_MDNS_WAKEUP:
+		return "MDNS_WAKEUP";
+	case WOW_REASON_P2P_NOA_UPDATE:
+		return "P2P_NOA_UPDATE";
+	case WOW_REASON_SCHED_PM_TERMINATED:
+		return "SCHED_PM_TERMINATED";
+	case WOW_REASON_COEX_CHAVD:
+		return "COEX_CHAVD";
+	case WOW_REASON_STX_WOW_HIGH_DUTY_CYCLE:
+		return "STX_WOW_HIGH_DUTY_CYCLE";
+	case WOW_REASON_MCC_LITE:
+		return "MCC_LITE";
+	case WOW_REASON_P2P_CLI_DFS_AP_BMISS_DETECTED:
+		return "P2P_CLI_DFS_AP_BMISS_DETECTED";
+	case WOW_REASON_C2C_DETECT_EVENT:
+		return "C2C_DETECT_EVENT";
+	case WOW_REASON_USD:
+		return "USD";
 	default:
 		return "unknown";
 	}

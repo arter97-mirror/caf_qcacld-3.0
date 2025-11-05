@@ -464,6 +464,7 @@ policy_mgr_get_connection_table_entry_info(struct wlan_objmgr_pdev *pdev,
 	struct wlan_channel *chan;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct vdev_mlme_obj *vdev_mlme;
+	uint32_t mac_id;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 			WLAN_POLICY_MGR_ID);
@@ -482,13 +483,19 @@ policy_mgr_get_connection_table_entry_info(struct wlan_objmgr_pdev *pdev,
 		goto rel_ref;
 	}
 
+	mac_id = wlan_mlme_get_vdev_mac_id(vdev);
+	if (mac_id > MAX_MAC) {
+		policy_mgr_err("Invalid mac for vdev %d", vdev_id);
+		goto rel_ref;
+	}
+
 	conn_table_entry->type = vdev_mlme->mgmt.generic.type;
 	conn_table_entry->sub_type = vdev_mlme->mgmt.generic.subtype;
 	conn_table_entry->vdev_id = vdev_id;
 	conn_table_entry->mhz = chan->ch_freq;
 	conn_table_entry->chan_width = chan->ch_width;
 	conn_table_entry->ch_flagext = chan->ch_flagext;
-	conn_table_entry->mac_id = wlan_mlme_get_vdev_mac_id(pdev, vdev_id);
+	conn_table_entry->mac_id = mac_id;
 
 	status = QDF_STATUS_SUCCESS;
 rel_ref:
@@ -1946,27 +1953,30 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
-bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
-				    enum QDF_OPMODE opmode,
-				    uint32_t sap_freq)
+bool policy_mgr_is_unsafe_freq_allowed(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id, uint32_t sap_freq)
 {
 	uint32_t nan_2g_freq, nan_5g_freq;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	bool allowed = false;
 
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("context is NULL");
-		return QDF_STATUS_E_INVAL;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		policy_mgr_err("Invalid vdev Context");
+		return false;
 	}
 
 	/*
 	 * Ignore safe channel validation when the mode is P2P_GO and user
 	 * configures the corresponding bit in ini coex_unsafe_chan_nb_user_prefer.
 	 */
-	if ((opmode == QDF_P2P_GO_MODE &&
+	if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE &&
 	     wlan_mlme_get_coex_unsafe_chan_nb_user_prefer_for_p2p_go(psoc)) ||
-	    policy_mgr_is_safe_channel(psoc, sap_freq))
-		return true;
+	    policy_mgr_is_safe_channel(psoc, sap_freq)) {
+		allowed = true;
+		goto done;
+	}
 
 	/*
 	 * Return true if it's STA+SAP SCC and
@@ -1975,7 +1985,18 @@ bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 	if (policy_mgr_sta_sap_scc_on_lte_coex_chan(psoc) &&
 	    policy_mgr_is_sta_sap_scc(psoc, sap_freq, false)) {
 		policy_mgr_debug("unsafe freq %d for sap is allowed", sap_freq);
-		return true;
+		allowed = true;
+		goto done;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE &&
+	    !(mlme_is_acs_sap(vdev) ||
+	      policy_mgr_restrict_sap_on_unsafe_chan(psoc) ||
+	      !sap_get_coex_fixed_chan_cap(psoc))) {
+		policy_mgr_debug("Fixed channel SAP freq %d is allowed",
+				 sap_freq);
+		allowed = true;
+		goto done;
 	}
 
 	/*
@@ -1983,11 +2004,12 @@ bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 	 * concurrency when NAN is not presetn.
 	 */
 	if (!wlan_nan_is_disc_active(psoc))
-		return false;
+		goto done;
 
 	nan_2g_freq =
 		policy_mgr_mode_specific_get_channel(psoc, PM_NAN_DISC_MODE);
-	nan_5g_freq = wlan_nan_get_5ghz_social_ch_freq(pm_ctx->pdev);
+	nan_5g_freq =
+		wlan_nan_get_5ghz_social_ch_freq(wlan_vdev_get_pdev(vdev));
 
 	if ((WLAN_REG_IS_SAME_BAND_FREQS(nan_2g_freq, sap_freq) ||
 	     WLAN_REG_IS_SAME_BAND_FREQS(nan_5g_freq, sap_freq)) &&
@@ -1995,10 +2017,14 @@ bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 	    policy_mgr_get_nan_sap_scc_on_lte_coex_chnl(psoc)) {
 		policy_mgr_debug("NAN+SAP SCC on unsafe freq %d is allowed",
 				  sap_freq);
-		return true;
+		allowed = true;
+		goto done;
 	}
 
-	return false;
+done:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	return allowed;
 }
 
 #ifdef FEATURE_WLAN_SAP_COEX_CHECK_BW
@@ -3981,17 +4007,6 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 				     ch_params->mhz_freq_seg1,
 				     sap_ch_freq, old_ch_width,
 				     old_mhz_freq_seg1);
-	}
-
-	if (*con_ch_freq != 0 &&
-	    con_mode == PM_SAP_MODE &&
-	    !policy_mgr_is_multi_sap_allowed_on_same_band(
-					pm_ctx->pdev,
-					PM_SAP_MODE, *con_ch_freq,
-					sap_vdev_id)) {
-		policymgr_nofl_debug("Terminating multi sap on same band, con_ch_freq %d sap_ch_freq %d",
-				     ch_freq, sap_ch_freq);
-		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (*con_ch_freq &&

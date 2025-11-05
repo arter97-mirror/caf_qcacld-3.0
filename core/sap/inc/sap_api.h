@@ -606,6 +606,9 @@ struct sap_config {
 #endif
 	qdf_freq_t last_acs_freq;
 	qdf_time_t last_acs_complete_time;
+	/* RSNO MAX *2 + 2(EID size + LEN size) */
+	uint8_t mrsno_ie[(WLAN_MAX_IE_LEN * 2) + 4];
+	uint16_t mrsno_ie_len;
 };
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
@@ -2093,6 +2096,27 @@ void wlansap_free_chan_info(struct sap_sel_ch_info *ch_param);
  */
 QDF_STATUS wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
 					       struct scan_filter *filter);
+
+/**
+ * sap_get_coex_fixed_chan_cap() - Wrapper to get coex fixed channel capability
+ * MDM requires to start SAP on unsafe channel even through FW doesn't support
+ * coex fixed channel for acs disabled case, and other platforms prefer to abort
+ * the SAP. If acs disabled and allow SAP on unsafe channel, please define
+ * WLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW.
+ *
+ * @psoc: pointer to psoc
+ *
+ * Return: true or false
+ */
+#ifdef WLAN_SAP_UNSAFE_FIXED_CHAN_ALLOW
+static inline bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
+#else
+bool sap_get_coex_fixed_chan_cap(struct wlan_objmgr_psoc *psoc);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

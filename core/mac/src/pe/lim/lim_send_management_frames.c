@@ -181,6 +181,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	bool is_band_2g;
 	uint16_t mlo_ie_len = 0;
 	tSirMacAddr bcast_mac = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+	enum rateid min_rid;
 
 	if (!pesession)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -475,12 +476,14 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	    (QDF_P2P_CLIENT_MODE == pesession->opmode))
 		txflag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
 
+	min_rid = lim_get_min_session_txrate(pesession, NULL);
+
 	qdf_status =
 		wma_tx_frame(mac_ctx, packet,
 			   (uint16_t) sizeof(tSirMacMgmtHdr) + payload,
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 			   lim_tx_complete, frame, txflag, vdev_id,
-			   0, RATEID_DEFAULT, 0);
+			   0, min_rid, 0);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		pe_err("could not send Probe Request frame!");
 		/* Pkt will be freed up by the callback */
@@ -2963,6 +2966,10 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 				return;
 
 			algo = *(uint16_t *)frm_body;
+
+			if (mac_hdr->i_fc[1] & IEEE80211_FC1_WEP)
+				algo = eSIR_SHARED_KEY;
+
 			seq = *(uint16_t *)(frm_body + SAE_AUTH_SEQ_NUM_OFFSET);
 			status =
 			*(uint16_t *)(frm_body + SAE_AUTH_STATUS_CODE_OFFSET);
@@ -5616,11 +5623,10 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 			pe_err("Failed to send De-Authentication (%X)!",
 				qdf_status);
 
-			/* Call lim_process_deauth_ack_timeout which will send
+			/* Call lim_send_deauth_cnf which will send
 			 * DeauthCnf for this frame
 			 */
-			lim_process_deauth_ack_timeout(mac,
-						       pe_session->peSessionId);
+			lim_send_deauth_cnf(mac, pe_session->vdev_id);
 			return;
 		}
 
@@ -8958,6 +8964,7 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx, uint8_t vdev_id,
 				if (WLAN_REG_IS_24GHZ_CH_FREQ(channel_freq)) {
 					attr.ie_data = util_scan_entry_ie_data(scan_entry);
 					attr.ie_length = util_scan_entry_ie_len(scan_entry);
+					attr.mac_addr = scan_entry->bssid.bytes;
 					if (wlan_action_oui_search(mac_ctx->psoc, &attr,
 								   ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ)) {
 						pe_debug("Send pre-auth with 6Mbps on freq %d",

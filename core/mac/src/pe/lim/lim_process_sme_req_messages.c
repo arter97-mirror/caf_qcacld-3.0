@@ -882,7 +882,6 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 	int32_t ucast_cipher;
 	int32_t auth_mode;
 	int32_t akm;
-	int32_t rsn_caps;
 	enum QDF_OPMODE opmode;
 	ePhyChanBondState cb_mode;
 	enum bss_type bss_type;
@@ -1101,10 +1100,6 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 
 		session->txLdpcIniFeatureEnabled =
 				mac_ctx->mlme_cfg->ht_caps.tx_ldpc_enable;
-		rsn_caps = wlan_crypto_get_param(session->vdev,
-						 WLAN_CRYPTO_PARAM_RSN_CAP);
-		session->limRmfEnabled =
-			rsn_caps & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED ? 1 : 0;
 
 		qdf_mem_copy((void *)&session->rateSet,
 			     (void *)&sme_start_bss_req->operationalRateSet,
@@ -1938,6 +1933,19 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	 */
 	if (is_vendor_ap_present)
 		lim_update_he_caps_htc(session, !is_vendor_ap_present);
+
+	/* Check if ACTION_OUI_LIMIT_BW matches for 2.4GHz to disable HT40 */
+	session->action_oui_limit_bw_2g = false;
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq)) {
+		if (wlan_action_oui_search(mac_ctx->psoc,
+					   &vendor_ap_search_attr,
+					   ACTION_OUI_LIMIT_BW)) {
+			pe_debug("Disabling HT40 for vdev %d for IoT AP " QDF_MAC_ADDR_FMT,
+				 session->vdev_id, QDF_MAC_ADDR_REF(bss_desc->bssId));
+			session->action_oui_limit_bw_2g = true;
+		}
+	}
+
 }
 
 static enum mlme_dot11_mode
@@ -3254,6 +3262,7 @@ lim_disable_bformee_for_iot_ap(struct mac_context *mac_ctx,
 
 	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
 	vendor_ap_search_attr.ie_length = ie_len;
+	vendor_ap_search_attr.mac_addr = &bss_desc->bssId[0];
 
 	if (wlan_action_oui_search(mac_ctx->psoc,
 				   &vendor_ap_search_attr,
@@ -3329,6 +3338,7 @@ lim_cfg_dsmps_for_iot_ap(struct mac_context *mac_ctx,
 
 	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
 	vendor_ap_search_attr.ie_length = ie_len;
+	vendor_ap_search_attr.mac_addr = &bss_desc->bssId[0];
 
 	if (wlan_action_oui_search(mac_ctx->psoc,
 				   &vendor_ap_search_attr,
@@ -3607,6 +3617,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->gLimPhyMode = bss_desc->nwType;
 	handle_ht_capabilityand_ht_info(mac_ctx, session);
 
+	if (session->action_oui_limit_bw_2g)
+		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
 	session->htSupportedChannelWidthSet = cb_mode ? 1 : 0;
 	session->htRecommendedTxWidthSet =
 		session->htSupportedChannelWidthSet;

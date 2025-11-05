@@ -288,6 +288,8 @@ char *lim_msg_str(uint32_t msgType)
 		return "SIR_LIM_AUTH_RSP_TIMEOUT";
 	case SIR_LIM_ASSOC_FAIL_TIMEOUT:
 		return "SIR_LIM_ASSOC_FAIL_TIMEOUT";
+	case SIR_LIM_DEAUTH_ACK_TIMEOUT:
+		return "SIR_LIM_DEAUTH_ACK_TIMEOUT";
 	case SIR_LIM_REASSOC_FAIL_TIMEOUT:
 		return "SIR_LIM_REASSOC_FAIL_TIMEOUT";
 	case SIR_LIM_HEART_BEAT_TIMEOUT:
@@ -2180,6 +2182,11 @@ QDF_STATUS lim_switch_primary_channel(struct mac_context *mac,
 	pe_session->ch_center_freq_seg0 = 0;
 	pe_session->ch_center_freq_seg1 = 0;
 	pe_session->ch_width = CH_WIDTH_20MHZ;
+	pe_session->htSecondaryChannelOffset = 0;
+	pe_session->htSupportedChannelWidthSet =
+		WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
+	pe_session->htRecommendedTxWidthSet =
+		pe_session->htSupportedChannelWidthSet;
 	lim_set_puncture_from_chan_switch_to_session(pe_session);
 	pe_session->limRFBand = lim_get_rf_band(pe_session->curr_req_chan_freq);
 
@@ -3905,6 +3912,14 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 		return;
 	}
 
+	/* If ACTION_OUI_LIMIT_BW matched for this 2.4GHz IoT AP, prevent HT40 switching */
+	if (pe_session->action_oui_limit_bw_2g &&
+	    WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq)) {
+		pe_debug("Preventing HT40 switch for IoT AP on vdev %d",
+			 pe_session->vdev_id);
+		return;
+	}
+
 	if (pe_session->htSecondaryChannelOffset !=
 	    (uint8_t) pHTInfo->secondaryChannelOffset
 	    || pe_session->htRecommendedTxWidthSet !=
@@ -5124,28 +5139,6 @@ bool lim_check_vht_op_mode_change(struct mac_context *mac,
 	struct csa_offload_params *csa_param;
 	enum QDF_OPMODE mode = wlan_vdev_mlme_get_opmode(pe_session->vdev);
 
-	if (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE) {
-		status = lim_get_update_bw_allow(pe_session, chanWidth,
-						 &update_allow);
-		if (QDF_IS_STATUS_ERROR(status))
-			return false;
-	} else {
-		update_allow = true;
-	}
-
-	if (update_allow) {
-		tUpdateVHTOpMode tempParam;
-
-		tempParam.chwidth = chanWidth;
-		tempParam.smesessionId = pe_session->smeSessionId;
-		qdf_mem_copy(tempParam.peer_mac, peerMac, sizeof(tSirMacAddr));
-
-		lim_send_mode_update(mac, &tempParam, pe_session);
-		lim_update_tdls_2g_bw(pe_session);
-
-		return true;
-	}
-
 	if (!wlan_cm_is_vdev_connected(pe_session->vdev))
 		return false;
 
@@ -5156,6 +5149,29 @@ bool lim_check_vht_op_mode_change(struct mac_context *mac,
 						pe_session->curr_op_freq,
 						0, &ch_params,
 						REG_CURRENT_PWR_MODE);
+
+	if (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE) {
+		status = lim_get_update_bw_allow(pe_session, ch_params.ch_width,
+						 &update_allow);
+		if (QDF_IS_STATUS_ERROR(status))
+			return false;
+	} else {
+		update_allow = true;
+	}
+
+	if (update_allow) {
+		tUpdateVHTOpMode tempParam;
+
+		tempParam.chwidth = ch_params.ch_width;
+		tempParam.smesessionId = pe_session->smeSessionId;
+		qdf_mem_copy(tempParam.peer_mac, peerMac, sizeof(tSirMacAddr));
+
+		lim_send_mode_update(mac, &tempParam, pe_session);
+		lim_update_tdls_2g_bw(pe_session);
+
+		return true;
+	}
+
 	csa_param = qdf_mem_malloc(sizeof(*csa_param));
 	if (!csa_param) {
 		pe_err("csa_param allocation fails");
@@ -11450,6 +11466,16 @@ QDF_STATUS lim_set_ch_phy_mode(struct wlan_objmgr_vdev *vdev, uint8_t dot11mode)
 	mlme_obj->mgmt.generic.phy_mode = wmi_host_to_fw_phymode(chan_mode);
 	des_chan->ch_phymode = chan_mode;
 
+	if (wlan_vdev_is_restart_progress(vdev) == QDF_STATUS_SUCCESS) {
+		if (wlan_mlme_update_cur_ch_width(vdev,
+						  des_chan->ch_width, true) !=
+						  QDF_STATUS_SUCCESS) {
+			pe_err("Failed to update chwidth %d",
+			       des_chan->ch_width);
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -11796,8 +11822,6 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 	else
 		sta_ptr->htSupportedChannelWidthSet = CH_WIDTH_20MHZ;
 	*new_ch_width = ch_width;
-
-	lim_update_bcn_op_ch_width(session->vdev, ch_width);
 
 	return lim_check_vht_op_mode_change(mac_ctx, session, *new_ch_width,
 					    sta_ptr->staAddr);

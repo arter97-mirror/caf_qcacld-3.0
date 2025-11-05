@@ -6302,7 +6302,8 @@ hdd_is_dynamic_set_mac_addr_supported(struct hdd_context *hdd_ctx)
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
 QDF_STATUS
 hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
-					struct wlan_hdd_link_info *new_link_info)
+					struct wlan_hdd_link_info *new_link_info,
+					bool is_roam)
 {
 	unsigned long link_flags;
 	struct wlan_objmgr_vdev *vdev;
@@ -6310,6 +6311,7 @@ hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info
 	uint8_t cur_old_pos, cur_new_pos;
 	struct vdev_osif_priv *vdev_priv;
 	struct hdd_adapter *adapter = cur_link_info->adapter;
+	struct hdd_station_ctx *sta_ctx;
 
 	/* Update the new position of current and new link info
 	 * in the link info array.
@@ -6345,6 +6347,11 @@ hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info
 	/* Update VDEV-OSIF priv pointer to new link info */
 	vdev_priv = wlan_vdev_get_ospriv(new_link_info->vdev);
 	vdev_priv->legacy_osif_priv = new_link_info;
+
+	if (is_roam) {
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(cur_link_info);
+		sta_ctx->conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -6420,7 +6427,8 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 	}
 
 	status = hdd_adapter_update_links_on_link_switch(cur_link_info,
-							 new_link_info);
+							 new_link_info,
+							 false);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to update adapter link info");
 		goto release_ref;
@@ -6485,7 +6493,8 @@ QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 		QDF_MAC_ADDR_REF(new_self_mac->bytes));
 
 	status = hdd_adapter_update_links_on_link_switch(cur_link_info,
-							 new_link_info);
+							 new_link_info,
+							 true);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to update adapter link info, status %d",
 			status);
@@ -6543,7 +6552,8 @@ QDF_STATUS hdd_link_recfg_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 		  QDF_MAC_ADDR_REF(new_self_mac->bytes));
 
 	status = hdd_adapter_update_links_on_link_switch(cur_link_info,
-							 new_link_info);
+							 new_link_info,
+							 false);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to update adapter link info, status %d",
 			status);
@@ -7847,6 +7857,8 @@ int hdd_vdev_destroy(struct wlan_hdd_link_info *link_info)
 	hdd_vdev_deinit_components(vdev);
 	hdd_mlo_t2lm_unregister_callback(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	qdf_flush_work(&link_info->ch_chng_info.chan_change_notify_work);
 
 	hdd_reset_vdev_info(link_info);
 	osif_cm_osif_priv_deinit(vdev);
@@ -9949,10 +9961,6 @@ static void __hdd_close_adapter(struct hdd_context *hdd_ctx,
 			hdd_cleanup_conn_info(link_info);
 	}
 
-	hdd_adapter_for_each_link_info(adapter, link_info)
-		qdf_flush_work(
-			&link_info->ch_chng_info.chan_change_notify_work);
-
 	qdf_list_destroy(&adapter->blocked_scan_request_q);
 	qdf_mutex_destroy(&adapter->blocked_scan_request_q_lock);
 	policy_mgr_clear_concurrency_mode(hdd_ctx->psoc, adapter->device_mode);
@@ -10403,8 +10411,10 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		vdev = hdd_objmgr_get_vdev_by_user(link_info,
 						   WLAN_INIT_DEINIT_ID);
-		if (!vdev)
+		if (!vdev) {
+			qdf_flush_work(&link_info->ch_chng_info.chan_change_notify_work);
 			continue;
+		}
 
 		if (mode == QDF_NDI_MODE)
 			hdd_stop_and_cleanup_ndi(link_info);
@@ -10628,6 +10638,18 @@ static void hdd_stop_sap_go_per_link(struct wlan_hdd_link_info *link_info)
 						   link_info->vdev_id);
 	if (vdev)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
+
+	/*
+	 * During SSR, the host performs SAP re-initialization and initializes AP mode.
+	 * For P2P-GO, the host signals the kernel to stop GO as part of SSR re-init,
+	 * but the ndo_stop for P2P-GO is processed only after re-init completes.
+	 * This can lead to a scenario where new SAP-related info in mac_ctx is cleaned up
+	 * if the old P2P-GO vdev ID matches the new vdev ID assigned to SAP during
+	 * AP mode deinitialization for P2P-GO. Hence deinit ap mode only for GO.
+	 */
+	if (mode == QDF_P2P_GO_MODE)
+		hdd_deinit_ap_mode(link_info);
+
 	hdd_vdev_destroy(link_info);
 	mutex_unlock(&hdd_ctx->sap_lock);
 }
@@ -11564,16 +11586,20 @@ QDF_STATUS hdd_start_all_adapters(struct hdd_context *hdd_ctx, bool rtnl_held)
 		default:
 			break;
 		}
-		/*
-		 * Action frame registered in one adapter which will
-		 * applicable to all interfaces
-		 */
-		if (hdd_set_fw_params(adapter))
-			hdd_err("Failed to set adapter FW params after SSR!");
 
-		wlan_hdd_cfg80211_register_frames(adapter);
-		wlan_hdd_update_dbs_scan_and_fw_mode_config(adapter->deflink->vdev_id);
-		hdd_create_adapter_sysfs_files(adapter);
+		if (adapter->device_mode != QDF_P2P_GO_MODE) {
+			/*
+			 * Action frame registered in one adapter which will
+			 * applicable to all interfaces
+			 */
+			if (hdd_set_fw_params(adapter))
+				hdd_err("Failed to set adapter FW params after SSR!");
+
+			wlan_hdd_cfg80211_register_frames(adapter);
+			wlan_hdd_update_dbs_scan_and_fw_mode_config(
+						adapter->deflink->vdev_id);
+			hdd_create_adapter_sysfs_files(adapter);
+		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
@@ -17956,9 +17982,8 @@ static void hdd_v2_flow_pool_map(int vdev_id)
 		return;
 	}
 
-	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
-	    policy_mgr_is_set_link_in_progress(wlan_vdev_get_psoc(vdev))) {
-		hdd_info_rl("Link switch/set_link is ongoing, do not invoke flow pool map");
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
+		hdd_info_rl("Link switch is ongoing, do not invoke flow pool map");
 		goto release_ref;
 	}
 
@@ -18002,9 +18027,8 @@ static void hdd_v2_flow_pool_unmap(int vdev_id)
 		return;
 	}
 
-	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) ||
-	    policy_mgr_is_set_link_in_progress(wlan_vdev_get_psoc(vdev))) {
-		hdd_info("vdev:%d Link switch/set_link is ongoing do not invoke flow pool unmap",
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
+		hdd_info("vdev:%d Link switch is ongoing do not invoke flow pool unmap",
 			 vdev_id);
 		goto release_ref;
 	}

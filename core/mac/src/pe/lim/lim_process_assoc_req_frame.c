@@ -922,6 +922,8 @@ enum wlan_status_code lim_check_rsn_ie(struct pe_session *session,
 	struct wlan_crypto_params peer_crypto_params;
 	enum wlan_status_code status_code = STATUS_SUCCESS;
 	QDF_STATUS status;
+	uint8_t rsno_sel_id = 0;
+	const uint8_t *rsno_sel_ie;
 
 	if (!vdev) {
 		pe_err("pe session vdev is null!");
@@ -932,22 +934,35 @@ enum wlan_status_code lim_check_rsn_ie(struct pe_session *session,
 	if (!rsn_ie)
 		return STATUS_UNSPECIFIED_FAILURE;
 
+	rsno_sel_ie =
+		wlan_get_rsn_sel_ie_from_ie_ptr(assoc_req->assocReqFrame +
+						LIM_ASSOC_REQ_IE_OFFSET,
+						assoc_req->assocReqFrameLength -
+						LIM_ASSOC_REQ_IE_OFFSET);
+	if (!rsno_sel_ie || rsno_sel_ie[1] < 5) {
+		rsno_sel_id = 0;
+	} else if (rsno_sel_ie[RSN_SEL_ID_OFFSET]) {
+		rsno_sel_id = rsno_sel_ie[RSN_SEL_ID_OFFSET] + 1;
+		pe_debug("RSN selector ID in assoc request is %d",
+			 rsno_sel_ie[RSN_SEL_ID_OFFSET]);
+	}
+
+	assoc_req->rsno_gen = rsno_sel_id;
+
 	rsn_ie->info[0] = WLAN_ELEMID_RSN;
 	rsn_ie->info[1] = assoc_req->rsn.length;
 
 	rsn_ie->length = assoc_req->rsn.length + 2;
 	qdf_mem_copy(&rsn_ie->info[2], assoc_req->rsn.info,
 		     assoc_req->rsn.length);
-	status = wlan_crypto_check_rsn_match(mac_ctx->psoc,
-					     session->vdev_id,
-					     &rsn_ie->info[0],
+	status = wlan_crypto_check_rsn_match(vdev, &rsn_ie->info[0],
 					     rsn_ie->length,
 					     &peer_crypto_params,
-					     &status_code);
+					     &status_code, rsno_sel_id);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		if ((peer_crypto_params.rsn_caps &
 		    WLAN_CRYPTO_RSN_CAP_MFP_ENABLED) &&
-		    wlan_crypto_vdev_is_pmf_enabled(vdev))
+		    wlan_crypto_vdev_is_pmf_enabled(vdev, rsno_sel_id))
 			*pmf_connection = true;
 
 		qdf_mem_free(rsn_ie);
@@ -1012,6 +1027,7 @@ static enum wlan_status_code lim_check_wpa_ie(struct pe_session *session,
   * @session: pointer to pe session entry
   * @rsn: pointer to RSN
   * @akm_type: AKM type
+  * @rsno_gen: RSN(O) generation
   *
   * This function checks if SAE STA is pmf capable when SAE SAP is pmf
   * capable. Reject with eSIR_MAC_ROBUST_MGMT_FRAMES_POLICY_VIOLATION
@@ -1022,13 +1038,13 @@ static enum wlan_status_code lim_check_wpa_ie(struct pe_session *session,
 #if defined(WLAN_FEATURE_SAE)
 static enum wlan_status_code lim_check_sae_pmf_cap(struct pe_session *session,
 						  tDot11fIERSN *rsn,
-						  enum ani_akm_type akm_type)
+						  uint8_t rsno_gen)
 {
 	enum wlan_status_code status = STATUS_SUCCESS;
 
-	if (session->limRmfEnabled &&
-	    (rsn->RSN_Cap[0] & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED) == 0 &&
-	    akm_type == ANI_AKM_TYPE_SAE)
+	pe_debug("RSN generation is %d", rsno_gen);
+	if (wlan_crypto_vdev_is_pmf_enabled(session->vdev, rsno_gen) &&
+	    ((rsn->RSN_Cap[0] & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED) == 0))
 		status = STATUS_ROBUST_MGMT_FRAME_POLICY_VIOLATION;
 
 	return status;
@@ -1144,8 +1160,12 @@ static bool lim_check_wpa_rsn_ie(struct pe_session *session,
 		*akm_type = lim_translate_rsn_oui_to_akm_type(
 						    dot11f_ie_rsn.akm_suite[0]);
 
-		status = lim_check_sae_pmf_cap(session, &dot11f_ie_rsn,
-					       *akm_type);
+		if (*akm_type == ANI_AKM_TYPE_SAE_EXT_KEY ||
+		    *akm_type == ANI_AKM_TYPE_FT_SAE_EXT_KEY ||
+		    *akm_type == ANI_AKM_TYPE_SAE ||
+		    *akm_type == ANI_AKM_TYPE_FT_SAE)
+			status = lim_check_sae_pmf_cap(session, &dot11f_ie_rsn,
+						       assoc_req->rsno_gen);
 		if (status != STATUS_SUCCESS) {
 			/* Reject pmf disable SAE STA */
 			pe_warn("Re/Assoc rejected from: " QDF_MAC_ADDR_FMT,

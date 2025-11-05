@@ -148,6 +148,9 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 			goto update_link_status_and_unforce;
 		}
 
+		tdls_debug("Choose vdev %d as tdls vdev",
+			   wlan_vdev_get_id(select_vdev));
+
 		tdls_vdev = wlan_vdev_get_tdls_vdev_obj(select_vdev);
 		if (!tdls_vdev)
 			return;

@@ -447,7 +447,6 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 			     tpSirMacMgmtHdr mac_hdr)
 {
 	enum phy_ch_width ch_bw;
-	enum phy_ch_width ch_width = CH_WIDTH_20MHZ;
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	tDot11fIEVHTOperation *vht_op = NULL;
 	uint8_t bcn_vht_chwidth = 0;
@@ -476,15 +475,9 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 	    !(vht_op && vht_op->present && vht_caps))
 		return;
 
-	if (bcn->OperatingMode.present) {
+	if (bcn->OperatingMode.present)
 		lim_update_nss(mac_ctx, sta_ds, bcn->OperatingMode.rxNSS,
 			       session);
-		ch_width = lim_get_omn_channel_width(&bcn->OperatingMode);
-		pe_debug("OMN IE present in bcn/probe rsp, ie width: %d ch_width: %d",
-			 bcn->OperatingMode.chanWidth, ch_width);
-		lim_update_omn_ie_ch_width(session->vdev, ch_width);
-
-	}
 
 	bcn_vht_chwidth = lim_get_vht_ch_width(vht_caps, vht_op,
 					       &bcn->HTInfo,

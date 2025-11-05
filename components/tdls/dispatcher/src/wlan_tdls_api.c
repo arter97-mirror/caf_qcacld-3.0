@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -226,7 +226,10 @@ void wlan_tdls_notify_channel_switch_complete(struct wlan_objmgr_psoc *psoc,
 								true);
 		else
 			tdls_process_enable_for_vdev(tdls_vdev);
-		tdls_set_tdls_offchannelmode(tdls_vdev, ENABLE_CHANSWITCH);
+
+		if (tdls_check_if_offchannel_allowed(tdls_vdev))
+			tdls_set_tdls_offchannelmode(tdls_vdev,
+						     ENABLE_CHANSWITCH);
 	}
 
 exit:

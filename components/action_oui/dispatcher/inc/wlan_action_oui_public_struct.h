@@ -142,6 +142,7 @@
  * @ACTION_OUI_RESTRICT_MAX_MLO_LINKS: Downgrade MLO if particular AP
  *                                     build present.
  * @ACTION_OUI_DISABLE_DYNAMIC_SMPS: Disable Dynamic SMPS for specified AP
+ * @ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P: Force tx null frame on p2p Go
  * @ACTION_OUI_HOST_ONLY: host only action id start - placeholder.
  * New Firmware related "ACTION" needs to be added before this placeholder.
  * @ACTION_OUI_HOST_RECONN: reconnect to the same BSSID when wait for
@@ -179,6 +180,7 @@ enum action_oui_id {
 	ACTION_OUI_RESTRICT_MAX_MLO_LINKS = 16,
 	ACTION_OUI_AUTH_ASSOC_6MBPS_2GHZ = 17,
 	ACTION_OUI_DISABLE_DYNAMIC_SMPS = 18,
+	ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P = 19,
 
 	/* host&fw interface add above here */
 	ACTION_OUI_HOST_ONLY,

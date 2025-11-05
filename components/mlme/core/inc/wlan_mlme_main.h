@@ -896,6 +896,7 @@ struct enhance_roam_info {
  * @cm_roam: Roaming configuration
  * @auth_log: Cached log records for SAE authentication frame
  * related information.
+ * @instance: instance id for each wlan_log_record
  * @roam_info: enhanced roam information include trigger, scan and
  *  frame information.
  * @roam_cache_num: number of roam information cached in driver
@@ -942,6 +943,7 @@ struct enhance_roam_info {
  * @peer_set_key_wakelock: wakelock to protect peer set key op with firmware
  * @peer_set_key_rt_wakelock: runtime pm wakelock for set key
  * @set_key_wakelock_counter: Counter for runtime pm wakelock
+ * @is_acs_sap: Sets to true if this is an ACS SAP
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -964,8 +966,9 @@ struct mlme_legacy_priv {
 	struct wlan_log_record
 	    auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
 #elif defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(CONNECTIVITY_DIAG_EVENT)
-	struct wlan_diag_packet_info
+	struct wlan_diag_packet
 	    auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
+	uint8_t instance;
 #endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #ifdef WLAN_FEATURE_ROAM_INFO_STATS
@@ -1024,6 +1027,7 @@ struct mlme_legacy_priv {
 	qdf_wake_lock_t peer_set_key_wakelock;
 	qdf_runtime_lock_t peer_set_key_rt_wakelock;
 	qdf_atomic_t set_key_wakelock_counter;
+	bool is_acs_sap;
 };
 
 /**
@@ -2238,13 +2242,11 @@ void wlan_mlme_set_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
 
 /**
  * wlan_mlme_get_vdev_mac_id() - get mac id for the vdev
- * @pdev: pdev obj
- * @vdev_id: vdev id
+ * @vdev: vdev obj
  *
  *  Return: mac_id on which vdev is present
  */
-uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_pdev *pdev,
-				   uint8_t vdev_id);
+uint32_t wlan_mlme_get_vdev_mac_id(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_mlme_get_sap_psd_for_20mhz() - Get the PSD power for 20 MHz
@@ -2394,4 +2396,18 @@ uint32_t wlan_sap_get_acs_band_mask(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS wlan_sap_set_acs_band_mask(struct wlan_objmgr_vdev *vdev,
 				      uint32_t bitmap);
+
+#if (defined(CONNECTIVITY_DIAG_EVENT) && \
+	defined(WLAN_FEATURE_ROAM_OFFLOAD))
+/**
+ * mlme_reset_log_instance_id() - Clear log instance id
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void mlme_reset_log_instance_id(struct wlan_objmgr_vdev *vdev);
+#else
+static inline void mlme_reset_log_instance_id(struct wlan_objmgr_vdev *vdev)
+{}
+#endif
 #endif
