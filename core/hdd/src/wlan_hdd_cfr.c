@@ -34,30 +34,68 @@
 #include "wlan_cmn.h"
 #include "wlan_policy_mgr_ll_sap.h"
 
+#define WLAN_CFR_DATA_MAX_LEN 32768
+
 const struct nla_policy cfr_config_policy[
 		QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR] =
 		VENDOR_NLA_POLICY_MAC_ADDR,
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE] = {.type = NLA_FLAG},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH] = {.type = NLA_U8},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD] = {.type = NLA_U8},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_VERSION] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE] = {
+					.type = NLA_FLAG,
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_VERSION] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PERIODIC_CFR_CAPTURE_ENABLE] = {
-						.type = NLA_FLAG},
+					.type = NLA_FLAG,
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE_GROUP_BITMAP] = {
-						.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DURATION] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_INTERVAL] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_TYPE] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_UL_MU_MASK] = {.type = NLA_U64},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DURATION] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_INTERVAL] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_TYPE] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_UL_MU_MASK] = {
+					.type = NLA_U64,
+					.len = sizeof(uint64_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREEZE_TLV_DELAY_COUNT] = {
-						.type = NLA_U32},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_TABLE] = {
-						.type = NLA_NESTED},
+					.type = NLA_NESTED,
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_ENTRY] = {
-						.type = NLA_NESTED},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_NUMBER] = {.type = NLA_U32},
+					.type = NLA_NESTED,
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_NUMBER] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_TA] =
 		VENDOR_NLA_POLICY_MAC_ADDR,
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_RA] =
@@ -66,18 +104,107 @@ const struct nla_policy cfr_config_policy[
 		VENDOR_NLA_POLICY_MAC_ADDR,
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_RA_MASK] =
 		VENDOR_NLA_POLICY_MAC_ADDR,
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_NSS] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_NSS] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_MGMT_FILTER] = {
-						.type = NLA_U32},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_CTRL_FILTER] = {
-						.type = NLA_U32},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_DATA_FILTER] = {
-						.type = NLA_U32},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_TRANSPORT_MODE] = {
-						.type = NLA_U8},
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_RECEIVER_PID] = {
-						.type = NLA_U32},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA] = {
+					.type = NLA_BINARY,
+					.len = WLAN_CFR_DATA_MAX_LEN
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREQ] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_TYPE] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SUBTYPE] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_INTERVAL] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI] = {
+					.type = NLA_BINARY
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_TIMESTAMP_US] = {
+					.type = NLA_U64,
+					.len = sizeof(uint64_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INFO] = {
+					.type = NLA_NESTED,
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INDEX] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_RSSI] = {
+					.type = NLA_S8,
+					.len = sizeof(int8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_AGC] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_IS_LAST_REPORT] = {
+					.type = NLA_FLAG,
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SEQUENCE_NUMBER] = {
+					.type = NLA_U16,
+					.len = sizeof(uint16_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CHIP_ID] = {
+					.type = NLA_U16,
+					.len = sizeof(uint16_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_TSF] = {
+					.type = NLA_U64,
+					.len = sizeof(uint64_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CFO] = {
+					.type = NLA_S16,
+					.len = sizeof(int16_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CSI_LTF_TYPE] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_NUM_SPATIAL_STREAMS] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
 };
 
 #ifdef WLAN_ENH_CFR_ENABLE
