@@ -11425,6 +11425,7 @@ bool policy_mgr_will_freq_lead_to_mcc(struct wlan_objmgr_psoc *psoc,
 	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
 	     conn_index++) {
 		if (pm_conc_connection_list[conn_index].in_use &&
+		    (freq != pm_conc_connection_list[conn_index].freq) &&
 		    policy_mgr_2_freq_always_on_same_mac(psoc, freq,
 		     pm_conc_connection_list[conn_index].freq)) {
 			is_mcc = true;
