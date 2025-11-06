@@ -1260,7 +1260,6 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 		pDot11f->shortGI20MHz = pe_session->ht_config.short_gi_20_mhz;
 		pDot11f->shortGI40MHz = pe_session->ht_config.short_gi_40_mhz;
 		pDot11f->mimoPowerSave = pe_session->ht_config.mimo_power_save;
-		mac->mlme_cfg->ht_caps.smps = pe_session->ht_config.mimo_power_save;
 	}
 
 	/* Ensure that shortGI40MHz is Disabled if supportedChannelWidthSet is
@@ -8357,16 +8356,6 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		if (!freq)
 			goto fill_nss;
 	} else {
-		/* Update HE Dynamic SMPS based on HT SMPS INI config */
-		if (LIM_IS_STA_ROLE(session)) {
-			if (mac_ctx->mlme_cfg->ht_caps.smps ==
-			    SMPS_MODE_DISABLED)
-				session->he_config.he_dynamic_smps = 0;
-			else if (mac_ctx->mlme_cfg->ht_caps.smps ==
-				 DYNAMIC_SMPS_MODE)
-				session->he_config.he_dynamic_smps = 1;
-		}
-
 		/** TODO: String items needs attention. **/
 		qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
 		populate_dot11f_twt_he_cap(mac_ctx, session->vdev_id, he_cap);

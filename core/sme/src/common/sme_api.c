@@ -11412,6 +11412,17 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 	if (cfg_in_range(CFG_HE_FRAGMENTATION, value))
 		mac_ctx->he_cap_5g.fragmentation = value;
 
+	/*
+	 * HE SMPS follows HT SMPS configuration (gEnableHtSMPS).
+	 * If HT SMPS is disabled, HE SMPS is also disabled for consistency.
+	 */
+	mac_ctx->he_cap_2g.he_dynamic_smps =
+		mac_ctx->mlme_cfg->ht_caps.enable_smps ? cfg->he_cap_2g.he_dynamic_smps : 0;
+	mac_ctx->he_cap_5g.he_dynamic_smps =
+		mac_ctx->mlme_cfg->ht_caps.enable_smps ? cfg->he_cap_5g.he_dynamic_smps : 0;
+	mlme_debug("he smps 2g %d 5g %d", mac_ctx->he_cap_2g.he_dynamic_smps,
+		   mac_ctx->he_cap_5g.he_dynamic_smps);
+
 	qdf_mem_copy(&mac_ctx->he_cap_2g_orig,
 		     &mac_ctx->he_cap_2g,
 		     sizeof(tDot11fIEhe_cap));
