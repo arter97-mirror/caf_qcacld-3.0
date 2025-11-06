@@ -1115,7 +1115,13 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_he_cap->ul_2x996_tone_ru_supp = he_cap->ul_2x996_tone_ru_supp;
 	mlme_he_cap->om_ctrl_ul_mu_data_dis_rx =
 				he_cap->om_ctrl_ul_mu_data_dis_rx;
-	mlme_he_cap->he_dynamic_smps = he_cap->he_dynamic_smps;
+
+	/*
+	 * HE SMPS follows HT SMPS configuration (gEnableHtSMPS).
+	 * If HT SMPS is disabled, HE SMPS is also disabled for consistency.
+	 */
+	mlme_he_cap->he_dynamic_smps =
+		mlme_obj->cfg.ht_caps.enable_smps ? he_cap->he_dynamic_smps : 0;
 	mlme_he_cap->punctured_sounding_supp = he_cap->punctured_sounding_supp;
 	mlme_he_cap->ht_vht_trg_frm_rx_supp = he_cap->ht_vht_trg_frm_rx_supp;
 
