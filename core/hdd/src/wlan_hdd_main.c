@@ -1422,11 +1422,6 @@ static void wlan_hdd_set_nan_if_type(struct hdd_adapter *adapter)
 {
 	adapter->wdev.iftype = NL80211_IFTYPE_NAN;
 }
-
-static bool wlan_hdd_is_vdev_creation_allowed(struct wlan_objmgr_psoc *psoc)
-{
-	return ucfg_nan_is_vdev_creation_allowed(psoc);
-}
 #else
 static QDF_STATUS wlan_hdd_convert_nan_type(enum nl80211_iftype nl_type,
 					    enum QDF_OPMODE *out_qdf_type)
@@ -1443,11 +1438,6 @@ static QDF_STATUS wlan_hdd_convert_nan_qdf_mode_to_nl_type(
 
 static void wlan_hdd_set_nan_if_type(struct hdd_adapter *adapter)
 {
-}
-
-static bool wlan_hdd_is_vdev_creation_allowed(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
 }
 #endif
 
@@ -19481,6 +19471,67 @@ hdd_adapter_open_set_max_active_links(struct hdd_adapter_create_param *params)
 }
 #endif
 
+#ifndef FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE
+#if defined(WLAN_FEATURE_NAN) && \
+	   (KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE)
+/**
+ * wlan_hdd_is_vdev_creation_allowed() - wrapper API for function
+ * "ucfg_nan_is_vdev_creation_allowed"
+ *
+ * @psoc: PSOC object
+ *
+ * Return: true if NAN VDEV creation is allowed otherwise false.
+ */
+static bool wlan_hdd_is_vdev_creation_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return ucfg_nan_is_vdev_creation_allowed(psoc);
+}
+#else
+static bool wlan_hdd_is_vdev_creation_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
+
+/**
+ * hdd_open_nan_interface - Open NAN interface
+ * @hdd_ctx: HDD context
+ *
+ * This function open NAN interface when NAN standard mode is not supported.
+ * When NAN standard mode is supported, kernel will add NAN interface with help
+ * of add virtual interface operation.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+hdd_open_nan_interface(struct hdd_context *hdd_ctx)
+{
+	uint8_t *mac_addr;
+	struct hdd_adapter_create_param params = {0};
+	QDF_STATUS status;
+
+	if (!wlan_hdd_is_vdev_creation_allowed(hdd_ctx->psoc))
+		return QDF_STATUS_SUCCESS;
+
+	mac_addr = wlan_hdd_get_intf_addr(hdd_ctx, QDF_NAN_DISC_MODE);
+	if (!mac_addr)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	status = hdd_open_adapter_no_trans(hdd_ctx, QDF_NAN_DISC_MODE,
+					   "wifi-aware%d", mac_addr, &params);
+	if (QDF_IS_STATUS_ERROR(status))
+		wlan_hdd_release_intf_addr(hdd_ctx, mac_addr);
+
+	return status;
+}
+#else
+static inline QDF_STATUS
+hdd_open_nan_interface(struct hdd_context *hdd_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static QDF_STATUS
 hdd_open_adapters_for_mission_mode(struct hdd_context *hdd_ctx)
 {
@@ -19525,20 +19576,13 @@ hdd_open_adapters_for_mission_mode(struct hdd_context *hdd_ctx)
 	 * Create separate interface (wifi-aware0) for NAN. All NAN commands
 	 * should go on this new interface.
 	 */
-	if (wlan_hdd_is_vdev_creation_allowed(hdd_ctx->psoc)) {
-		qdf_mem_zero(&params, sizeof(params));
-		mac_addr = wlan_hdd_get_intf_addr(hdd_ctx, QDF_NAN_DISC_MODE);
-		if (!mac_addr)
+	if (!ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc)) {
+		hdd_debug("NAN standard mode not supported");
+		status = hdd_open_nan_interface(hdd_ctx);
+		if (QDF_IS_STATUS_ERROR(status))
 			goto err_close_adapters;
-
-		status = hdd_open_adapter_no_trans(hdd_ctx, QDF_NAN_DISC_MODE,
-						   "wifi-aware%d", mac_addr,
-						   &params);
-		if (status) {
-			wlan_hdd_release_intf_addr(hdd_ctx, mac_addr);
-			goto err_close_adapters;
-		}
 	}
+
 	/* Open 802.11p Interface */
 	if (dot11p_mode == CFG_11P_CONCURRENT) {
 		status = hdd_open_ocb_interface(hdd_ctx);
