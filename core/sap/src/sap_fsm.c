@@ -5185,15 +5185,15 @@ qdf_freq_t sap_indicate_radar(struct sap_context *sap_ctx)
 	if (sap_ctx->fsm_state == SAP_STARTED)
 		ch_switch_info->csa_ie_required = true;
 
+	/* set the Radar Found flag in SapDfsInfo */
+	sap_ctx->sap_radar_found_status = true;
+
 	if (mac->mlme_cfg->dfs_cfg.dfs_disable_channel_switch) {
 		ch_switch_info->new_chan_width = sap_ctx->ch_params.ch_width;
 		sap_debug("DFS channel switch disabled, CSA to same ch %d wd %d",
 			  sap_ctx->chan_freq, sap_ctx->ch_params.ch_width);
 		return sap_ctx->chan_freq;
 	}
-
-	/* set the Radar Found flag in SapDfsInfo */
-	sap_ctx->sap_radar_found_status = true;
 
 	chan_freq = wlan_pre_cac_get_freq_before_pre_cac(sap_ctx->vdev);
 	if (chan_freq) {
