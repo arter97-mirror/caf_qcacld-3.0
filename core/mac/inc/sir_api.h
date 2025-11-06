@@ -2115,6 +2115,7 @@ typedef struct sSirScanOffloadEvent {
  * @half_rate: is the channel operating at 10MHz
  * @quarter_rate: is the channel operating at 5MHz
  * @nan_disabled: is NAN disabled on @freq
+ * @is_passive: is indoor frequency
  */
 typedef struct sSirUpdateChanParam {
 	uint32_t freq;
@@ -2123,6 +2124,7 @@ typedef struct sSirUpdateChanParam {
 	bool half_rate;
 	bool quarter_rate;
 	bool nan_disabled;
+	bool is_passive;
 } tSirUpdateChanParam, *tpSirUpdateChanParam;
 
 typedef struct sSirUpdateChan {
