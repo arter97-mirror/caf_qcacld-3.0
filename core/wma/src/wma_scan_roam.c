@@ -183,10 +183,11 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 		wma_handle->saved_chan.ch_freq_list[i] =
 					chan_list->chanParam[i].freq;
 
-		if (chan_list->chanParam[i].dfsSet) {
-			chan_p->is_chan_passive = 1;
+		if (chan_list->chanParam[i].dfsSet)
 			chan_p->dfs_set = 1;
-		}
+
+		if (chan_list->chanParam[i].is_passive)
+			chan_p->is_chan_passive = 1;
 
 		if (chan_list->chanParam[i].nan_disabled)
 			chan_p->nan_disabled = 1;

@@ -1104,9 +1104,21 @@ QDF_STATUS csr_update_channel_list(struct mac_context *mac)
 				pChanList->chanParam[num_channel].nan_disabled =
 					true;
 
-			if (CHANNEL_STATE_DFS == channel_state)
-				pChanList->chanParam[num_channel].dfsSet =
-					true;
+			if (wlan_reg_is_6ghz_chan_freq(
+				pChanList->chanParam[num_channel].freq)) {
+				if (wlan_reg_is_6g_freq_indoor(mac->pdev,
+					pChanList->chanParam[num_channel].freq))
+					pChanList->chanParam[num_channel].is_passive = true;
+			} else {
+				if (wlan_reg_is_dfs_for_freq(mac->pdev,
+					pChanList->chanParam[num_channel].freq))
+					pChanList->chanParam[num_channel].dfsSet = true;
+
+				if (wlan_reg_is_freq_indoor(mac->pdev,
+					pChanList->chanParam[num_channel].freq))
+					pChanList->chanParam[num_channel].is_passive = true;
+			}
+
 
 			pChanList->chanParam[num_channel].quarter_rate =
 							is_5mhz_enabled;
