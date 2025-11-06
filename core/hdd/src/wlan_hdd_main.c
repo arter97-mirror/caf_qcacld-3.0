@@ -8703,6 +8703,7 @@ static char *net_dev_ref_debug_string_from_id(wlan_net_dev_ref_dbgid dbgid)
 		"NET_DEV_HOLD_GET_STA_CONNECTIONS",
 		"NET_DEV_HOLD_LOCAL_PKT_CAPTURE",
 		"NET_DEV_HOLD_SYSFS_APFMODE_STORE",
+		"NET_DEV_HOLD_CH_AVOID_UPDATED",
 		"NET_DEV_HOLD_ID_MAX"};
 	int32_t num_dbg_strings = QDF_ARRAY_SIZE(strings);
 
@@ -14861,6 +14862,89 @@ hdd_check_chn_bw_boundary_unsafe(struct hdd_context *hdd_ctxt,
 	}
 
 	return false;
+}
+
+void hdd_ch_avoid_safe_ch_sap_update(struct hdd_context *hdd_ctx,
+				     bool schedule_wk)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	struct hdd_ap_ctx *ap_ctx;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CH_AVOID_UPDATED;
+	struct wlan_hdd_link_info *link_info;
+	qdf_freq_t new_freq, ap_chan_freq;
+	bool found = false, found_5g_safe_ch;
+	uint8_t i;
+	struct sap_config *sap_config;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (adapter->device_mode != QDF_SAP_MODE) {
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			continue;
+		}
+
+		hdd_adapter_for_each_active_link_info(adapter, link_info) {
+			if (!qdf_atomic_test_bit(SME_SESSION_OPENED,
+						 link_info->link_flags))
+				continue;
+
+			ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
+			sap_config = &ap_ctx->sap_config;
+			if (!sap_config->acs_cfg.acs_mode ||
+			    policy_mgr_is_vdev_ll_lt_sap(
+						hdd_ctx->psoc,
+						link_info->vdev_id))
+				continue;
+
+			found_5g_safe_ch = false;
+			for (i = 0; i <
+			     sap_config->acs_cfg.master_ch_list_count; i++) {
+				if (sap_config->acs_cfg.master_freq_list &&
+				    WLAN_REG_IS_5GHZ_CH_FREQ(
+				    sap_config->acs_cfg.master_freq_list[i]) &&
+				    policy_mgr_is_safe_channel(
+					hdd_ctx->psoc,
+					sap_config->acs_cfg.master_freq_list[i])) {
+					found_5g_safe_ch = true;
+					break;
+				}
+			}
+			if (!found_5g_safe_ch)
+				continue;
+
+			ap_chan_freq = ap_ctx->operating_chan_freq;
+			if (!ap_chan_freq) {
+				sap_config->acs_cfg.master_ch_avoid_updated =
+									true;
+				hdd_debug("sap vid %d not started when ch avoid comes",
+					  link_info->vdev_id);
+				continue;
+			}
+			if (!WLAN_REG_IS_24GHZ_CH_FREQ(ap_chan_freq) ||
+			    !policy_mgr_is_safe_channel(hdd_ctx->psoc,
+							ap_chan_freq))
+				continue;
+
+			new_freq =
+				wlansap_find_master_safe_ch_on_5g_band(
+					hdd_ctx->psoc,
+					WLAN_HDD_GET_SAP_CTX_PTR(link_info));
+			if (new_freq) {
+				sap_config->acs_cfg.master_ch_avoid_updated =
+								true;
+				hdd_debug("sap vid %d chan %d needs updated",
+					  link_info->vdev_id, ap_chan_freq);
+				found = true;
+				break;
+			}
+		}
+		/* dev_put has to be done here */
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+
+	if (found && schedule_wk)
+		policy_mgr_check_concurrent_intf_and_restart_sap(
+					hdd_ctx->psoc, true);
 }
 
 /**

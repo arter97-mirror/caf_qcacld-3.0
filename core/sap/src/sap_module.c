@@ -1793,6 +1793,12 @@ const char *sap_get_csa_reason_str(enum sap_csa_reason_code reason)
 		return "SAP_FIX_CH_CONC_WITH_GO";
 	case CSA_REASON_LL_LT_SAP_EVENT:
 		return "LL_LT_SAP_EVENT";
+	case CSA_REASON_PUNCTURE_UPDATE_FOR_NOL:
+		return "PUNCTURE_UPDATE_FOR_NOL";
+	case CSA_REASON_RADAR_DETECT:
+		return "RADAR_DETECT";
+	case CSA_REASON_LTE_MARK_SAFE:
+		return "LTE_MARK_SAFE";
 	default:
 		return "UNKNOWN";
 	}
@@ -3330,6 +3336,7 @@ void sap_undo_acs(struct sap_context *sap_ctx, struct sap_config *sap_cfg)
 	acs_cfg->acs_mode = false;
 	mlme_set_is_acs_sap(sap_ctx->vdev, false);
 	acs_cfg->master_ch_list_updated = false;
+	acs_cfg->master_ch_avoid_updated = false;
 	sap_ctx->num_of_channel = 0;
 	wlansap_dcs_set_vdev_wlan_interference_mitigation(sap_ctx, false);
 }
@@ -4487,6 +4494,25 @@ done:
 	pcl_freqs = NULL;
 }
 
+qdf_freq_t wlansap_find_master_safe_ch_on_5g_band(
+			struct wlan_objmgr_psoc *psoc,
+			struct sap_context *sap_ctx)
+{
+	qdf_freq_t new_freq = 0;
+
+	if (!sap_ctx)
+		return 0;
+
+	if (!WLAN_REG_IS_24GHZ_CH_FREQ(sap_ctx->chan_freq))
+		return 0;
+	new_freq = wlansap_get_safe_channel_from_pcl_and_acs_range(
+				sap_ctx, NULL);
+	if (!WLAN_REG_IS_5GHZ_CH_FREQ(new_freq))
+		return 0;
+
+	return new_freq;
+}
+
 qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 					  enum sap_csa_reason_code *csa_reason,
 					  enum phy_ch_width *ch_width)
@@ -4647,6 +4673,24 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 			sap_debug("No need switch SAP/Go channel");
 			return sap_ctx->chan_freq;
 		}
+	} else if (sap_ctx->acs_cfg &&
+			sap_ctx->acs_cfg->master_ch_avoid_updated) {
+		sap_ctx->acs_cfg->master_ch_avoid_updated = false;
+		/*
+		 * We are sure the ch avoid event has mark safe for
+		 * 5 GHz channels in master channel.
+		 * And current sap is on 2.4 GHz, now SAP could now
+		 * choose a better/higher frequency on 5 GHz.
+		 */
+		freq =
+		wlansap_find_master_safe_ch_on_5g_band(mac->psoc, sap_ctx);
+		if (!freq)
+			return 0;
+
+		restart_freq = freq;
+		sap_debug("restart SAP on freq %d after ch avoid mark 5g safe",
+			  restart_freq);
+		*csa_reason = CSA_REASON_LTE_MARK_SAFE;
 	} else {
 		sap_debug("No need switch SAP/Go channel");
 		return sap_ctx->chan_freq;

@@ -497,6 +497,7 @@ struct sap_acs_cfg {
 	qdf_freq_t   *master_freq_list;
 	uint8_t    master_ch_list_count;
 	bool master_ch_list_updated;
+	bool master_ch_avoid_updated;
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 	uint8_t    skip_scan_status;
 	uint32_t    skip_scan_range1_stch;
@@ -1658,6 +1659,23 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx);
 uint32_t
 wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx,
 						enum phy_ch_width *ch_width);
+
+/**
+ * wlansap_find_master_safe_ch_on_5g_band() - Get safe channel on 5 GHz
+ * for SAP when ch avoid event marks 5 GHz ACS range to be safe
+ * restart
+ * @psoc: psoc
+ * @sap_ctx: sap context
+ *
+ * Get a 5 GHz safe channel to restart SAP. PCL already takes into account the
+ * unsafe channels. So, the PCL is validated with the ACS range to provide
+ * a safe channel for the SAP to restart on 5 GHz.
+ *
+ * Return: Chan freq
+ */
+qdf_freq_t wlansap_find_master_safe_ch_on_5g_band(
+			struct wlan_objmgr_psoc *psoc,
+			struct sap_context *sap_ctx);
 
 /**
  * wlansap_get_2g_first_safe_chan_freq() - Get safe and active 2 GHz channel

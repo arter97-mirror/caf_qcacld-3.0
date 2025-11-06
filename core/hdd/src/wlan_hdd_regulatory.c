@@ -1360,6 +1360,7 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 	uint16_t local_unsafe_list_count;
 	uint32_t restriction_mask;
 	uint8_t i;
+	QDF_STATUS status;
 
 	/* Basic sanity */
 	if (!hdd_ctxt) {
@@ -1426,15 +1427,20 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 	wlan_hdd_send_avoid_freq_event(hdd_ctxt, avoid_freq_list);
 
 	if (!hdd_ctxt->unsafe_channel_count) {
-		hdd_debug("no unsafe channels - not restarting SAP");
+		hdd_debug("no unsafe channel");
 		qdf_mem_free(local_unsafe_list);
+		hdd_ch_avoid_safe_ch_sap_update(hdd_ctxt, true);
 		return;
 	}
 	if (hdd_local_unsafe_channel_updated(hdd_ctxt,
 					    local_unsafe_list,
 					    local_unsafe_list_count,
-					    restriction_mask))
-		hdd_unsafe_channel_restart_sap(hdd_ctxt);
+					    restriction_mask)) {
+		status = hdd_unsafe_channel_restart_sap(hdd_ctxt);
+		hdd_ch_avoid_safe_ch_sap_update(
+				hdd_ctxt,
+				status != QDF_STATUS_E_PENDING);
+	}
 	qdf_mem_free(local_unsafe_list);
 
 }

@@ -589,6 +589,7 @@ typedef enum {
 	NET_DEV_HOLD_LOCAL_PKT_CAPTURE = 65,
 	NET_DEV_HOLD_SENT_FRAME_TO_USERSPACE = 66,
 	NET_DEV_HOLD_SYSFS_APFMODE_STORE = 67,
+	NET_DEV_HOLD_CH_AVOID_UPDATED = 68,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX
@@ -3982,6 +3983,22 @@ QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
 void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 		      struct unsafe_ch_list *unsafe_chan_list,
 		      struct ch_avoid_ind_type *avoid_freq_list);
+
+/**
+ * hdd_ch_avoid_safe_ch_sap_update() - check restart sap or not if sap is
+ * on safe channel
+ * @hdd_ctx: hdd context pointer
+ * @schedule_wk: schedule csa workqueue or not
+ *
+ * This API will be called after ch avoid event indicated to driver,
+ * it will check all safe channel sap on 2.4 GHz and if 5 GHz ACS range is
+ * marked to safe again by ch avoid event, then trigger sap channel change
+ * workqueue to do CSA to 5 GHz band
+ *
+ * Return - none
+ */
+void hdd_ch_avoid_safe_ch_sap_update(struct hdd_context *hdd_ctx,
+				     bool schedule_wk);
 #else
 static inline
 QDF_STATUS hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx)
@@ -3993,6 +4010,12 @@ static inline
 void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 		      struct unsafe_ch_list *unsafe_chan_list,
 		      struct ch_avoid_ind_type *avoid_freq_list)
+{
+}
+
+static inline
+void hdd_ch_avoid_safe_ch_sap_update(struct hdd_context *hdd_ctx,
+				     bool schedule_wk)
 {
 }
 #endif
