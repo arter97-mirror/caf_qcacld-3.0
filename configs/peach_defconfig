@@ -613,6 +613,15 @@ else
 CONFIG_IPA_OFFLOAD := n
 endif
 
+#Enable IPA offload for WHUNT
+ifeq ($(CONFIG_IPA_SIM), y)
+CONFIG_IPA_OFFLOAD := y
+CONFIG_IPA_OPT_WIFI_DP := y
+CONFIG_IPA_OPT_WIFI_DP_CTRL := y
+CONFIG_IPA_OPT_WIFI_DP_LOGGING :=y
+CONFIG_ENABLE_SMMU_S1_TRANSLATION := y
+endif
+
 #Enable Signed firmware support for split binary format
 CONFIG_QCA_SIGNED_SPLIT_BINARY_SUPPORT := n
 
