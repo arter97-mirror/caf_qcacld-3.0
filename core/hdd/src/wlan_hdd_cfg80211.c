@@ -9525,11 +9525,8 @@ static int hdd_config_power(struct hdd_adapter *adapter,
 			return ret;
 	}
 
-	if ((opm_mode == QCA_WLAN_VENDOR_OPM_MODE_USER_DEFINED) ||
-	    (opm_mode == QCA_WLAN_VENDOR_OPM_MODE_LATENCY_BASED)) {
-		ucfg_pmo_set_ps_params(vdev, &ps_params);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
-	}
+	ucfg_pmo_set_ps_params(vdev, &ps_params);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 
 	return 0;
 }
