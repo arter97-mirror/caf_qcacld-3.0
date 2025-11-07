@@ -1455,6 +1455,12 @@ QDF_STATUS hdd_nl_to_qdf_iface_type(enum nl80211_iftype nl_type,
 				    enum QDF_OPMODE *out_qdf_type)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	if (!hdd_ctx) {
+		hdd_err("hdd ctx is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
 
 	switch (nl_type) {
 	case NL80211_IFTYPE_AP:
@@ -1481,6 +1487,12 @@ QDF_STATUS hdd_nl_to_qdf_iface_type(enum nl80211_iftype nl_type,
 	case NL80211_IFTYPE_WDS:
 		*out_qdf_type = QDF_WDS_MODE;
 		break;
+	case NL80211_IFTYPE_NAN:
+		if (ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc)) {
+			*out_qdf_type = QDF_NAN_DISC_MODE;
+			break;
+		}
+		fallthrough;
 	default:
 		status = wlan_hdd_convert_nan_type(nl_type, out_qdf_type);
 		if (QDF_IS_STATUS_SUCCESS(status))
@@ -7800,7 +7812,16 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 	dev->ieee80211_ptr = &adapter->wdev;
 	dev->tx_queue_len = HDD_NETDEV_TX_QUEUE_LEN;
 	adapter->wdev.wiphy = hdd_ctx->wiphy;
-	adapter->wdev.netdev = dev;
+
+	if (ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc) &&
+	    session_type == QDF_NAN_DISC_MODE) {
+		adapter->wdev.netdev = NULL;
+		qdf_mem_copy(adapter->wdev.address, mac_addr,
+			     sizeof(tSirMacAddr));
+	} else {
+		adapter->wdev.netdev = dev;
+	}
+
 	qdf_status = ucfg_mlme_cfg_get_wlm_level(hdd_ctx->psoc, &latency_level);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		hdd_debug("Can't get latency level");
@@ -10104,10 +10125,15 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 
 		ndev = adapter->dev;
 
-		status = ucfg_dp_create_intf(hdd_ctx->psoc, &adapter->mac_addr,
-					     (qdf_netdev_t)adapter->dev);
-		if (QDF_IS_STATUS_ERROR(status))
-			goto err_free_netdev;
+		if (session_type != QDF_NAN_DISC_MODE ||
+		    !ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc)) {
+			status = ucfg_dp_create_intf(
+						hdd_ctx->psoc,
+						&adapter->mac_addr,
+						(qdf_netdev_t)adapter->dev);
+			if (QDF_IS_STATUS_ERROR(status))
+				goto err_free_netdev;
+		}
 
 		if (QDF_P2P_CLIENT_MODE == session_type)
 			adapter->wdev.iftype = NL80211_IFTYPE_P2P_CLIENT;
@@ -10123,6 +10149,9 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 
 		adapter->device_mode = session_type;
 
+		if (session_type == QDF_NAN_DISC_MODE &&
+		    ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc))
+			goto update_adapter;
 
 		/*
 		 * Workqueue which gets scheduled in IPv4 notification
@@ -10245,6 +10274,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 		return NULL;
 	}
 
+update_adapter:
 	hdd_adapter_init_link_info(adapter);
 	hdd_adapter_enable_links(adapter, params);
 

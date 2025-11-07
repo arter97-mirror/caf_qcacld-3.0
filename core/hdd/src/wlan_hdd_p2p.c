@@ -938,6 +938,10 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	case QDF_STA_MODE:
 	case QDF_MONITOR_MODE:
 		break;
+	case QDF_NAN_DISC_MODE:
+		if (ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc))
+			break;
+		fallthrough;
 	default:
 		mode = QDF_STA_MODE;
 		break;
