@@ -56,37 +56,44 @@ static bus_bw_table_type bus_bw_table_default = {
 				      BUS_BW_LEVEL_2, BUS_BW_LEVEL_3,
 				      BUS_BW_LEVEL_4, BUS_BW_LEVEL_6,
 				      BUS_BW_LEVEL_7, BUS_BW_LEVEL_8,
-				      BUS_BW_LEVEL_9},
+				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_10,
+				      BUS_BW_LEVEL_11},
 	[QCA_WLAN_802_11_MODE_11G] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_5,
 				      BUS_BW_LEVEL_5, BUS_BW_LEVEL_5,
 				      BUS_BW_LEVEL_5, BUS_BW_LEVEL_5,
 				      BUS_BW_LEVEL_5, BUS_BW_LEVEL_5,
-				      BUS_BW_LEVEL_5},
+				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_10,
+				      BUS_BW_LEVEL_11},
 	[QCA_WLAN_802_11_MODE_11A] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_5,
 				      BUS_BW_LEVEL_5, BUS_BW_LEVEL_5,
 				      BUS_BW_LEVEL_5, BUS_BW_LEVEL_5,
 				      BUS_BW_LEVEL_5, BUS_BW_LEVEL_5,
-				      BUS_BW_LEVEL_5},
+				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_10,
+				      BUS_BW_LEVEL_11},
 	[QCA_WLAN_802_11_MODE_11N] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_1,
 				      BUS_BW_LEVEL_2, BUS_BW_LEVEL_3,
 				      BUS_BW_LEVEL_4, BUS_BW_LEVEL_6,
 				      BUS_BW_LEVEL_7, BUS_BW_LEVEL_8,
-				      BUS_BW_LEVEL_9},
+				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_10,
+				      BUS_BW_LEVEL_11},
 	[QCA_WLAN_802_11_MODE_11AC] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_1,
 				       BUS_BW_LEVEL_2, BUS_BW_LEVEL_3,
 				       BUS_BW_LEVEL_4, BUS_BW_LEVEL_6,
 				       BUS_BW_LEVEL_7, BUS_BW_LEVEL_8,
-				       BUS_BW_LEVEL_9},
+				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_10,
+				       BUS_BW_LEVEL_11},
 	[QCA_WLAN_802_11_MODE_11AX] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_1,
 				       BUS_BW_LEVEL_2, BUS_BW_LEVEL_3,
 				       BUS_BW_LEVEL_4, BUS_BW_LEVEL_6,
 				       BUS_BW_LEVEL_7, BUS_BW_LEVEL_8,
-				       BUS_BW_LEVEL_9},
+				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_10,
+				       BUS_BW_LEVEL_11},
 	[QCA_WLAN_802_11_MODE_11BE] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_1,
 				       BUS_BW_LEVEL_2, BUS_BW_LEVEL_3,
 				       BUS_BW_LEVEL_4, BUS_BW_LEVEL_6,
 				       BUS_BW_LEVEL_7, BUS_BW_LEVEL_8,
-				       BUS_BW_LEVEL_9},
+				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_10,
+				       BUS_BW_LEVEL_11},
 };
 
 /*
@@ -95,41 +102,48 @@ static bus_bw_table_type bus_bw_table_default = {
  * level in low latency setting.
  */
 static bus_bw_table_type bus_bw_table_low_latency = {
-	[QCA_WLAN_802_11_MODE_11B] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9},
-	[QCA_WLAN_802_11_MODE_11G] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9},
-	[QCA_WLAN_802_11_MODE_11A] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9},
-	[QCA_WLAN_802_11_MODE_11N] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				      BUS_BW_LEVEL_9},
-	[QCA_WLAN_802_11_MODE_11AC] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9},
-	[QCA_WLAN_802_11_MODE_11AX] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9},
-	[QCA_WLAN_802_11_MODE_11BE] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9, BUS_BW_LEVEL_9,
-				       BUS_BW_LEVEL_9},
+	[QCA_WLAN_802_11_MODE_11B] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11},
+	[QCA_WLAN_802_11_MODE_11G] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11},
+	[QCA_WLAN_802_11_MODE_11A] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11},
+	[QCA_WLAN_802_11_MODE_11N] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				      BUS_BW_LEVEL_11},
+	[QCA_WLAN_802_11_MODE_11AC] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11},
+	[QCA_WLAN_802_11_MODE_11AX] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11},
+	[QCA_WLAN_802_11_MODE_11BE] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11, BUS_BW_LEVEL_11,
+				       BUS_BW_LEVEL_11},
 };
 
 /**
@@ -160,6 +174,10 @@ bbm_convert_to_pld_bus_lvl(enum bus_bw_level vote_lvl)
 	case BUS_BW_LEVEL_8:
 		return PLD_BUS_WIDTH_ULTRA_HIGH;
 	case BUS_BW_LEVEL_9:
+		return PLD_BUS_WIDTH_FAST;
+	case BUS_BW_LEVEL_10:
+		return PLD_BUS_WIDTH_SUPER_FAST;
+	case BUS_BW_LEVEL_11:
 		return PLD_BUS_WIDTH_MAX;
 	case BUS_BW_LEVEL_NONE:
 	default:
@@ -1629,6 +1647,12 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	if (dp_ctx->high_bus_bw_request) {
 		next_vote_level = PLD_BUS_WIDTH_VERY_HIGH;
 		tput_level = TPUT_LEVEL_VERY_HIGH;
+	} else if (total_pkts > dp_ctx->dp_cfg.bus_bw_super_fast_threshold) {
+		next_vote_level = PLD_BUS_WIDTH_SUPER_FAST;
+		tput_level = TPUT_LEVEL_SUPER_HIGH;
+	} else if (total_pkts > dp_ctx->dp_cfg.bus_bw_fast_threshold) {
+		next_vote_level = PLD_BUS_WIDTH_FAST;
+		tput_level = TPUT_LEVEL_SUPER_HIGH;
 	} else if (total_pkts > dp_ctx->dp_cfg.bus_bw_super_high_threshold) {
 		next_vote_level = PLD_BUS_WIDTH_MAX;
 		tput_level = TPUT_LEVEL_SUPER_HIGH;

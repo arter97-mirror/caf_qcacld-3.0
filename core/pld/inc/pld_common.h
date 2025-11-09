@@ -118,6 +118,8 @@ enum pld_bus_type {
  * @PLD_BUS_WIDTH_MID_HIGH: vote for mid high bus bandwidth
  * @PLD_BUS_WIDTH_VERY_HIGH: vote for very high bus bandwidth
  * @PLD_BUS_WIDTH_ULTRA_HIGH: vote for ultra high bus bandwidth
+ * @PLD_BUS_WIDTH_FAST: vote for fast bus bandwidth
+ * @PLD_BUS_WIDTH_SUPER_FAST: vote for super fast bus bandwidth
  * @PLD_BUS_WIDTH_LOW_LATENCY: vote for low latency bus bandwidth
  * @PLD_BUS_WIDTH_MAX:
  */
@@ -129,6 +131,8 @@ enum pld_bus_width_type {
 	PLD_BUS_WIDTH_HIGH,
 	PLD_BUS_WIDTH_VERY_HIGH,
 	PLD_BUS_WIDTH_ULTRA_HIGH,
+	PLD_BUS_WIDTH_FAST,
+	PLD_BUS_WIDTH_SUPER_FAST,
 	PLD_BUS_WIDTH_MAX,
 	PLD_BUS_WIDTH_LOW_LATENCY,
 	PLD_BUS_WIDTH_MID_HIGH,

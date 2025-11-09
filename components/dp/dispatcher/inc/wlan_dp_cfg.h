@@ -110,6 +110,52 @@
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 /*
  * <ini>
+ * gBusBandwidthSuperFastThreshold - bus bandwidth super fast threshold
+ *
+ * @Min: 0
+ * @Max: 4294967295UL
+ * @Default: 62500
+ *
+ * This ini specifies the bus bandwidth super fast threshold
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_BUS_BANDWIDTH_SUPER_FAST_THRESHOLD \
+		CFG_INI_UINT( \
+		"gBusBandwidthSuperFastThreshold", \
+		0, \
+		4294967295UL, \
+		62500, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Bus bandwidth super fast threshold")
+
+/*
+ * <ini>
+ * gBusBandwidthFastThreshold - bus bandwidth fast threshold
+ *
+ * @Min: 0
+ * @Max: 4294967295UL
+ * @Default: 41667
+ *
+ * This ini specifies the bus bandwidth fast threshold
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_BUS_BANDWIDTH_FAST_THRESHOLD \
+		CFG_INI_UINT( \
+		"gBusBandwidthFastThreshold", \
+		0, \
+		4294967295UL, \
+		41667, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Bus bandwidth fast threshold")
+
+/*
+ * <ini>
  * gBusBandwidthSuperHighThreshold - bus bandwidth super high threshold
  *
  * @Min: 0
@@ -127,7 +173,7 @@
 		"gBusBandwidthSuperHighThreshold", \
 		0, \
 		4294967295UL, \
-		22000, \
+		83334, \
 		CFG_VALUE_OR_DEFAULT, \
 		"Bus bandwidth super high threshold")
 
@@ -1341,6 +1387,8 @@
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 #define CFG_DP_BUS_BANDWIDTH \
+	CFG(CFG_DP_BUS_BANDWIDTH_SUPER_FAST_THRESHOLD) \
+	CFG(CFG_DP_BUS_BANDWIDTH_FAST_THRESHOLD) \
 	CFG(CFG_DP_BUS_BANDWIDTH_SUPER_HIGH_THRESHOLD) \
 	CFG(CFG_DP_BUS_BANDWIDTH_ULTRA_HIGH_THRESHOLD) \
 	CFG(CFG_DP_BUS_BANDWIDTH_VERY_HIGH_THRESHOLD) \

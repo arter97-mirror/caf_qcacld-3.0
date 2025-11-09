@@ -118,6 +118,8 @@ struct dp_affn_override_params {
  * @periodic_stats_timer_interval: Print selective stats on this specified
  * interval
  * @periodic_stats_timer_duration: duration for which periodic timer should run
+ * @bus_bw_super_fast_threshold: bus bandwidth super fast threshold
+ * @bus_bw_fast_threshold: bus bandwidth fast threshold
  * @bus_bw_super_high_threshold: bus bandwidth super high threshold
  * @bus_bw_ultra_high_threshold: bus bandwidth ultra high threshold
  * @bus_bw_very_high_threshold: bus bandwidth very high threshold
@@ -207,6 +209,8 @@ struct wlan_dp_psoc_cfg {
 	uint32_t periodic_stats_timer_duration;
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
+	uint32_t bus_bw_super_fast_threshold;
+	uint32_t bus_bw_fast_threshold;
 	uint32_t bus_bw_super_high_threshold;
 	uint32_t bus_bw_ultra_high_threshold;
 	uint32_t bus_bw_very_high_threshold;

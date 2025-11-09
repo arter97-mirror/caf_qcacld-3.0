@@ -601,6 +601,10 @@ void dp_set_dump_dp_trace(uint16_t cmd_type, uint16_t count)
 static void dp_ini_bus_bandwidth(struct wlan_dp_psoc_cfg *config,
 				 struct wlan_objmgr_psoc *psoc)
 {
+	config->bus_bw_super_fast_threshold =
+		cfg_get(psoc, CFG_DP_BUS_BANDWIDTH_SUPER_FAST_THRESHOLD);
+	config->bus_bw_fast_threshold =
+		cfg_get(psoc, CFG_DP_BUS_BANDWIDTH_FAST_THRESHOLD);
 	config->bus_bw_super_high_threshold =
 		cfg_get(psoc, CFG_DP_BUS_BANDWIDTH_SUPER_HIGH_THRESHOLD);
 	config->bus_bw_ultra_high_threshold =

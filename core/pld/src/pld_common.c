@@ -2770,13 +2770,18 @@ const char *pld_bus_width_type_to_str(enum pld_bus_width_type level)
 		return "VERY_HIGH";
 	case PLD_BUS_WIDTH_ULTRA_HIGH:
 		return "ULTRA_HIGH";
+	case PLD_BUS_WIDTH_FAST:
+		return "FAST";
+	case PLD_BUS_WIDTH_SUPER_FAST:
+		return "SUPER_FAST";
 	case PLD_BUS_WIDTH_LOW_LATENCY:
 		return "LOW_LAT";
 	default:
-		if (level > PLD_BUS_WIDTH_ULTRA_HIGH)
-			return "SUPER_HIGH";
+		if (level > PLD_BUS_WIDTH_SUPER_FAST)
+			return "SUPER_FAST";
 		else
 			return "INVAL";
+
 	}
 }
 
