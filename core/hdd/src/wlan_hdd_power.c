@@ -1885,11 +1885,14 @@ static void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
 				       struct hdd_adapter *adapter)
 {
 	bool twt_responder;
+	eCsrPhyMode sap_hw_mode;
 
 	twt_responder =
 		adapter->deflink->session.ap.sap_config.cfg80211_twt_responder;
+	sap_hw_mode = adapter->deflink->session.ap.sap_config.SapHw_mode;
 	wlan_hdd_configure_twt_responder(hdd_ctx, twt_responder,
-					 adapter->deflink->vdev_id);
+					 adapter->deflink->vdev_id,
+					 sap_hw_mode);
 }
 #else
 static inline void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,

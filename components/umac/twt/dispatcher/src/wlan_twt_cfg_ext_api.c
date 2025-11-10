@@ -47,6 +47,13 @@ wlan_twt_cfg_get_req_support_for_ht_vht(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
+wlan_twt_cfg_get_res_support_for_ht_vht(struct wlan_objmgr_psoc *psoc,
+					bool *val)
+{
+	return wlan_twt_get_responder_support_for_ht_vht_mode(psoc, val);
+}
+
+QDF_STATUS
 wlan_twt_get_requestor_cfg(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return wlan_twt_cfg_get_requestor(psoc, val);
