@@ -318,13 +318,6 @@ wlan_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, uint8_t val)
 	return QDF_STATUS_SUCCESS;
 }
 
-static inline QDF_STATUS
-wlan_twt_get_responder_for_ht_vht_mode(struct wlan_objmgr_psoc *psoc,
-				       bool *val)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
 static inline bool
 wlan_twt_cfg_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
 {
@@ -391,6 +384,13 @@ wlan_twt_cfg_get_bcast_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 
 static inline QDF_STATUS
 wlan_twt_get_requestor_support_for_ht_vht_mode(struct wlan_objmgr_psoc *psoc,
+					       bool *val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_twt_get_responder_support_for_ht_vht_mode(struct wlan_objmgr_psoc *psoc,
 					       bool *val)
 {
 	return QDF_STATUS_SUCCESS;

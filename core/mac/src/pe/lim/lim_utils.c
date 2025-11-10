@@ -5825,12 +5825,27 @@ void lim_set_stads_rtt_cap(tpDphHashNode sta_ds, struct s_ext_cap *ext_cap,
 #ifdef WLAN_SUPPORT_TWT
 void lim_set_peer_twt_cap(struct pe_session *session, struct s_ext_cap *ext_cap)
 {
+	struct wlan_objmgr_psoc *psoc;
+	bool twt_ht_vht_sup = false;
+
+	psoc = wlan_vdev_get_psoc(session->vdev);
+	if (!psoc)
+		return;
+
 	if (session->enable_session_twt_support) {
-		session->peer_twt_requestor = ext_cap->twt_requestor_support;
+		wlan_twt_cfg_get_req_support_for_ht_vht(psoc, &twt_ht_vht_sup);
+		if (session->dot11mode < MLME_DOT11_MODE_11AX &&
+		    !twt_ht_vht_sup)
+			session->peer_twt_requestor = 0;
+		else
+			session->peer_twt_requestor =
+					ext_cap->twt_requestor_support;
+
 		session->peer_twt_responder = ext_cap->twt_responder_support;
 	}
 
-	pe_debug("Ext Cap peer TWT requestor: %d, responder: %d, enable_twt %d",
+	pe_debug("Dot11mode: %d, Ext Cap peer TWT requestor: %d, responder: %d, enable_twt %d",
+		 session->dot11mode,
 		 ext_cap->twt_requestor_support,
 		 ext_cap->twt_responder_support,
 		 session->enable_session_twt_support);
