@@ -6084,6 +6084,16 @@ policy_mgr_sap_on_non_psc_channel(struct wlan_objmgr_psoc *psoc,
 				  uint8_t sap_vdev_id);
 
 #ifdef WLAN_FEATURE_LL_LT_SAP
+/*
+ * policy_mgr_is_6G_chan_valid_for_ll_sap() - check if 6 Ghz freq allowed for
+ * ll lt SAP
+ * @freq: freq
+ *
+ * Return: true if 6 Ghz freq is allowed for ll lt sap ie unii5.
+ * Otherwise false.
+ */
+bool policy_mgr_is_6G_chan_valid_for_ll_sap(qdf_freq_t freq);
+
 /**
  * policy_mgr_get_pcl_ch_list_for_ll_sap() - Get PCL channel list for LL_LT_SAP
  * @psoc: psoc object
@@ -6101,6 +6111,44 @@ QDF_STATUS policy_mgr_get_pcl_ch_list_for_ll_sap(
 					struct connection_info *info,
 					uint8_t *connection_count);
 #endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * policy_mgr_get_inact_vdev_present_with_freq() - Get inactive VDEV ID present
+ * with frequency
+ * @psoc: PSOC object information
+ * @freq: Frequency to check
+ * @vdev_id: VDEV ID to check
+ *
+ * This function checks if there is an inactive VDEV ID present with the given
+ * frequency.
+ *
+ * Return: VDEV ID if found, WLAN_UMAC_VDEV_ID_MAX otherwise
+ */
+uint8_t
+policy_mgr_get_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+					    qdf_freq_t freq, uint8_t vdev_id);
+#else
+static inline uint8_t
+policy_mgr_get_inact_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+					    qdf_freq_t freq, uint8_t vdev_id)
+{
+	return WLAN_UMAC_VDEV_ID_MAX;
+}
+#endif
+
+/**
+ * policy_mgr_get_vdev_present_with_freq() - Check if any other  vdev present
+ * with the given freq.
+ * @psoc: pointer to psoc
+ * @freq: given freq
+ * @vdev_id: current vdev id.
+ *
+ * Return: vdev id of the scc vdev
+ */
+uint8_t
+policy_mgr_get_vdev_present_with_freq(struct wlan_objmgr_psoc *psoc,
+				      qdf_freq_t freq, uint8_t vdev_id);
 
 /**
  * policy_mgr_mon_sbs_mac0_freq() - Check if the given frequency is

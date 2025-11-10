@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -298,7 +298,7 @@ qdf_freq_t wlan_get_ll_lt_sap_restart_freq(struct wlan_objmgr_pdev *pdev,
 				chan_freq)) {
 		*csa_reason = CSA_REASON_UNSAFE_CHANNEL;
 		goto get_new_ll_lt_sap_freq;
-	} else if (policy_mgr_is_ll_lt_sap_restart_required(psoc)) {
+	} else if (policy_mgr_is_ll_lt_sap_restart_required(psoc, chan_freq)) {
 		*csa_reason = CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
 		goto get_new_ll_lt_sap_freq;
 	}
@@ -349,8 +349,13 @@ wlan_ll_sap_fw_bearer_switch_req(struct wlan_objmgr_psoc *psoc,
 	else
 		status = ll_lt_sap_switch_bearer_to_ble(psoc, &bs_request);
 
-	if (QDF_IS_STATUS_ERROR(status))
-		return QDF_STATUS_E_ALREADY;
+	if (QDF_IS_STATUS_ERROR(status)) {
+		ll_sap_err("vdev %d Bearer req failed type %d",
+			   ll_lt_sap_vdev_id, req_type);
+		ll_lt_sap_deliver_audio_transport_switch_resp_to_fw(psoc,
+					req_type, WLAN_BS_STATUS_REJECTED);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -506,6 +511,20 @@ wlan_ll_sap_set_cur_freq_unused_cu(struct wlan_objmgr_psoc *psoc,
 				   uint8_t vdev_id, uint32_t unused_cu)
 {
 	return ll_sap_set_cur_freq_unused_cu(psoc, vdev_id, unused_cu);
+}
+
+bool
+wlan_ll_sap_is_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id)
+{
+	return ll_sap_is_start_bss_in_progress(psoc, vdev_id);
+}
+
+QDF_STATUS
+wlan_ll_sap_set_start_bss_in_progress(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id, bool start_bss)
+{
+	return ll_sap_set_start_bss_in_progress(psoc, vdev_id, start_bss);
 }
 
 uint64_t
