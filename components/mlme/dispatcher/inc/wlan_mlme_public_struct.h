@@ -1529,6 +1529,7 @@ struct wlan_mlme_aux_dev_caps {
  * @wlan_mlme_aux0_dev_caps: capability for aux0
  * @bt_profile_con: Bluetooth connection profile
  * @relaxed_lpi_conn_policy: Relaxed LPI connection policy flag
+ * @edca_txop_limit: EDCA TXOP limit in milliseconds.
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1603,6 +1604,7 @@ struct wlan_mlme_generic {
 		wlan_mlme_aux0_dev_caps[WLAN_MLME_HW_MODE_MAX];
 	bool bt_profile_con;
 	bool relaxed_lpi_conn_policy;
+	uint32_t edca_txop_limit;
 };
 
 /**
