@@ -4378,7 +4378,8 @@ void wma_hold_req_timer(void *data)
 					  (uint8_t *)tgt_req->user_data);
 		qdf_mem_free(tgt_req->user_data);
 	} else if ((tgt_req->msg_type == WMA_PEER_CREATE_REQ) &&
-		   (tgt_req->type == WMA_PASN_PEER_CREATE_RESPONSE)) {
+		   (tgt_req->type == WMA_PASN_PEER_CREATE_RESPONSE ||
+		    tgt_req->type == WMA_NAN_PASN_PEER_CREATE_RESPONSE)) {
 		struct peer_create_rsp_params *peer_create_rsp;
 		struct qdf_mac_addr *peer_mac;
 
