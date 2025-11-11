@@ -6185,6 +6185,91 @@ static uint8_t lim_get_num_tpe_octets(uint8_t max_transmit_power_count)
 	return 1 << (max_transmit_power_count - 1);
 }
 
+static
+void lim_parse_eirp_tpe(struct mac_context *mac, struct pe_session *session,
+			struct vdev_mlme_obj *vdev_mlme,
+			tDot11fIEtransmit_power_env *single_tpe)
+{
+	struct ch_params ch_params = {0};
+	uint8_t expect_num;
+	uint8_t bw_num;
+	uint8_t eirp_pwr;
+	uint8_t i;
+	struct chan_power_info *chan_eirp_power_info;
+
+	if (!vdev_mlme || !single_tpe) {
+		pe_err("Invalid parameters");
+		return;
+	}
+
+	if (single_tpe->max_tx_pwr_count >
+	    MAX_TX_PWR_COUNT_FOR_160MHZ) {
+		pe_debug("Invalid max tx pwr count: %d",
+			 single_tpe->max_tx_pwr_count);
+		single_tpe->max_tx_pwr_count =
+			MAX_TX_PWR_COUNT_FOR_160MHZ;
+	}
+
+	expect_num = lim_get_num_pwr_levels(false, session->ch_width);
+	if (expect_num > 0)
+		single_tpe->max_tx_pwr_count =
+			QDF_MIN(single_tpe->max_tx_pwr_count, expect_num - 1);
+
+	bw_num = sizeof(get_next_higher_bw) /
+			sizeof(get_next_higher_bw[0]);
+	if (single_tpe->max_tx_pwr_count >= bw_num) {
+		pe_debug("tx pwr count: %d, larger than bw num: %d",
+			 single_tpe->max_tx_pwr_count, bw_num);
+		single_tpe->max_tx_pwr_count = bw_num - 1;
+	}
+	vdev_mlme->reg_tpc_obj.num_eirp_pwr_levels = 0;
+	ch_params.ch_width = CH_WIDTH_20MHZ;
+	/*
+	 * Update tpe power till 160 MHZ, 320 MHZ power will be
+	 * advertised via ext_max_tx_power param of TPE IE.
+	 */
+	for (i = 0; i < single_tpe->max_tx_pwr_count + 1 &&
+	     (ch_params.ch_width != CH_WIDTH_320MHZ); i++) {
+		wlan_reg_set_channel_params_for_pwrmode(
+						mac->pdev,
+						session->curr_op_freq, 0,
+						&ch_params,
+						REG_CURRENT_PWR_MODE);
+		chan_eirp_power_info =
+			&vdev_mlme->reg_tpc_obj.chan_eirp_power_info[i];
+		chan_eirp_power_info->chan_cfreq =
+					ch_params.mhz_freq_seg0;
+		chan_eirp_power_info->tx_power =
+				single_tpe->tx_power[i];
+		if (ch_params.ch_width != CH_WIDTH_INVALID)
+			ch_params.ch_width =
+				get_next_higher_bw[ch_params.ch_width];
+		vdev_mlme->reg_tpc_obj.num_eirp_pwr_levels++;
+	}
+
+	if (ch_params.ch_width == CH_WIDTH_320MHZ &&
+	    vdev_mlme->reg_tpc_obj.num_eirp_pwr_levels <
+		MAX_NUM_EIRP_PWR_LEVEL) {
+		qdf_mem_zero(&ch_params, sizeof(ch_params));
+		ch_params.ch_width = CH_WIDTH_320MHZ;
+		ch_params.mhz_freq_seg1 =
+			wlan_reg_compute_6g_center_freq_from_cfi(
+					session->ch_center_freq_seg1);
+		eirp_pwr = lim_get_eirp_320_power_from_tpe_ie(single_tpe);
+		if (eirp_pwr == INVALID_TPE_POWER)
+			return;
+		wlan_reg_set_channel_params_for_pwrmode(
+				mac->pdev, session->curr_op_freq, 0,
+				&ch_params, REG_CURRENT_PWR_MODE);
+		chan_eirp_power_info =
+			&vdev_mlme->reg_tpc_obj.chan_eirp_power_info[
+			vdev_mlme->reg_tpc_obj.num_eirp_pwr_levels];
+		chan_eirp_power_info->chan_cfreq = ch_params.mhz_freq_seg0;
+		chan_eirp_power_info->tx_power = eirp_pwr;
+		vdev_mlme->reg_tpc_obj.num_eirp_pwr_levels++;
+	}
+}
+
 void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		      tDot11fIEtransmit_power_env *tpe_ies, uint8_t num_tpe_ies,
 		      tDot11fIEhe_op *he_op, bool *has_tpe_updated)
@@ -6614,6 +6699,16 @@ parse_eirp_tpe:
 		pe_debug("eirp_power %d", vdev_mlme->reg_tpc_obj.eirp_power);
 		if (!psd_set)
 			vdev_mlme->reg_tpc_obj.is_psd_power = false;
+		/* For SP power type, host needs populated both PSD and
+		 * EIRP power tpe to target. If num_eirp_pwr_levels is
+		 * not extracted due to psd mode (psd_set = true),
+		 * then update it here
+		 */
+		if (!vdev_mlme->reg_tpc_obj.num_eirp_pwr_levels &&
+		    vdev_mlme->reg_tpc_obj.num_psd_pwr_levels &&
+		    conn_pwr_type_sp)
+			lim_parse_eirp_tpe(mac, session, vdev_mlme,
+					   &single_tpe);
 	}
 
 parse_both_tpe_present:
