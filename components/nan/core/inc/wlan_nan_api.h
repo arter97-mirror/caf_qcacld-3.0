@@ -509,4 +509,16 @@ nan_cstats_log_nan_disable_resp_evt(uint8_t vdev_id,
 {
 }
 #endif /* WLAN_FEATURE_NAN && WLAN_CHIPSET_STATS */
+
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+/**
+ * nan_get_device_caps() - This API get NAN capabilities from firmware
+ * @psoc: pointer to PSOC object
+ * @caps: NAN capabilities
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS nan_get_device_caps(struct wlan_objmgr_psoc *psoc,
+			       struct nan_capabilities *caps);
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
 #endif /* _WLAN_NAN_API_H_ */

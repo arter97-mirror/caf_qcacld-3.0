@@ -66,6 +66,41 @@ enum phy_ch_width;
 
 #define NAN_PARING_BIT 1
 
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+#define NAN_SET_CONFIGURATION_FLAG 1
+#define NAN_CONFIGURATION_BIT_NUM  1
+#define NAN_CONFIGURATION_BIT_ANTENNA_NUM 4
+
+/**
+ * enum nan_flag_bit - NAN flag bit enumeration
+ * @NAN_FLAGS_CONFIGURABLE_SYNC_BIT: Configurable SYNC bit
+ * @NAN_FLAGS_USERSPACE_DE_BIT: USERSPACE DE bit
+ */
+enum nan_flag_bit {
+	NAN_FLAGS_CONFIGURABLE_SYNC_BIT = 0,
+	NAN_FLAGS_USERSPACE_DE_BIT = 1,
+};
+
+/**
+ * enum nan_opmode_bit NAN OPMODE bit enumeration
+ * @NAN_VHT_OPMODE_BIT: VHT OPMODE bit
+ * @NAN_HE_VHT_80_80_OPMODE_BIT: HE/VHT 80-80 OPMODE bit
+ * @NAN_HE_VHT_160_OPMODE_BIT: HE/VHT 160 OPMODE bit
+ * @NAN_HE_OPMODE_BIT: HE OPMODE bit
+ */
+enum nan_opmode_bit {
+	NAN_VHT_OPMODE_BIT = 0,
+	NAN_HE_VHT_80_80_OPMODE_BIT = 1,
+	NAN_HE_VHT_160_OPMODE_BIT = 2,
+	NAN_HE_OPMODE_BIT = 3,
+};
+
+#define NAN_TX_ANT_BIT 0
+#define NAN_RX_ANT_BIT 4
+
+#define NAN_S3_SUPPORT_BIT 4
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
+
 /**
  * enum nan_disable_req_type - NAN disable request type
  * @NAN_DISABLE_REQ_DEFAULT: Default NAN disable request
@@ -1015,4 +1050,29 @@ struct nan_tgt_caps {
 	};
 };
 
-#endif
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * struct nan_capabilities - NAN capabilities
+ *
+ * This structure describes the NAN capabilities
+ *
+ * @flags: NAN capabilities flags, see &enum wiphy_nan_flags
+ * @op_mode: NAN operation mode, as defined in Wi-Fi Aware (TM) specification
+ *     Table 81.
+ * @n_antennas: number of antennas supported by the device for Tx/Rx. Lower
+ *     nibble indicates the number of TX antennas and upper nibble indicates the
+ *     number of RX antennas. Value 0 indicates the information is not
+ *     available.
+ * @max_channel_switch_time: maximum channel switch time in milliseconds.
+ * @dev_capabilities: NAN device capabilities as defined in Wi-Fi Aware (TM)
+ *     specification Table 79 (Capabilities field).
+ */
+struct nan_capabilities {
+	u32 flags;
+	u8 op_mode;
+	u8 n_antennas;
+	u16 max_channel_switch_time;
+	u8 dev_capabilities;
+} qdf_packed;
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+#endif /* _NAN_PUBLIC_STRUCTS_H_ */

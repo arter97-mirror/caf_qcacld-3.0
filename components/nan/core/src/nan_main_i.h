@@ -575,7 +575,7 @@ QDF_STATUS nan_get_disable_req_info(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS nan_wait_for_peer_migration_complete(struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id);
 
-#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE) && defined(WLAN_FEATURE_NAN)
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 /**
  * nan_is_fw_support_standard_mode() - wrapper API for function
  * tgt_nan_is_fw_support_standard_mode()
@@ -584,6 +584,6 @@ QDF_STATUS nan_wait_for_peer_migration_complete(struct wlan_objmgr_psoc *psoc,
  * Return: true if NAN standard mode supported by FW otherwise false
  */
 bool nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
 #endif /* _WLAN_NAN_MAIN_I_H_ */
 #endif /* WLAN_FEATURE_NAN */

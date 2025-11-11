@@ -236,6 +236,10 @@
 #include <wlan_mlo_mgr_public_api.h>
 #include <wlan_tdls_api.h>
 
+#ifdef WLAN_FEATURE_NAN
+#include "wlan_nan_api.h"
+#endif
+
 /*
  * A value of 100 (milliseconds) can be sent to FW.
  * FW would enable Tx beamforming based on this.
@@ -28172,6 +28176,44 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 					 wiphy->iface_combinations);
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * wlan_hdd_set_nan_cap() - set NAN capabilities in wiphy structure
+ * @hdd_ctx: HDD context
+ *
+ * Return: void
+ */
+static void wlan_hdd_set_nan_cap(struct hdd_context *hdd_ctx)
+{
+	struct wiphy_nan_capa *nan_caps;
+	struct nan_capabilities caps = {0};
+	QDF_STATUS status;
+	uint32_t size;
+
+	if (!ucfg_nan_is_fw_support_standard_mode(hdd_ctx->psoc)) {
+		hdd_debug("NAN standard mode not supported");
+		return;
+	}
+
+	nan_caps = &hdd_ctx->wiphy->nan_capa;
+	status = nan_get_device_caps(hdd_ctx->psoc, &caps);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get NAN device capabilities");
+		return;
+	}
+
+	nan_caps->flags = caps.flags;
+	nan_caps->op_mode = caps.op_mode;
+	nan_caps->n_antennas = caps.n_antennas;
+	nan_caps->max_channel_switch_time = caps.max_channel_switch_time;
+	nan_caps->dev_capabilities = caps.dev_capabilities;
+}
+#else
+static inline void wlan_hdd_set_nan_cap(struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 /*
  * In this function, wiphy structure is updated after QDF
  * initialization. In wlan_hdd_cfg80211_init, only the
@@ -28257,6 +28299,7 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 	if (wlan_hdd_check_probe_peer_feature(hdd_ctx->psoc))
 		wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_PROBE_AP);
 #endif
+	wlan_hdd_set_nan_cap(hdd_ctx);
 }
 
 /**

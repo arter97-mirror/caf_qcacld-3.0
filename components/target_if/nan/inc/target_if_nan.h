@@ -119,5 +119,15 @@ void target_if_nan_set_vdev_feature_config(struct wlan_objmgr_psoc *psoc,
  * Return: true if NAN standard mode supported by FW otherwise false
  */
 bool target_if_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc);
-#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
+/**
+ * target_if_nan_set_device_caps() - set NAN capabilities from firmware
+ * @psoc: pointer to PSOC object
+ * @caps: NAN capabilities to be filled
+ *
+ * Return: QDF status
+ */
+QDF_STATUS target_if_nan_set_device_caps(struct wlan_objmgr_psoc *psoc,
+					 struct nan_capabilities *caps);
+#endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE  && WLAN_FEATURE_NAN */
 #endif /* _WLAN_NAN_TGT_IF_H_ */

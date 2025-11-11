@@ -1244,4 +1244,46 @@ bool target_if_nan_is_fw_support_standard_mode(struct wlan_objmgr_psoc *psoc)
 	return wmi_service_enabled(wmi_handle,
 				   wmi_service_nan_standard_mode_support);
 }
+
+QDF_STATUS target_if_nan_set_device_caps(struct wlan_objmgr_psoc *psoc,
+					 struct nan_capabilities *caps)
+{
+	struct device_nan_capabilities *device_caps;
+	struct target_psoc_info *tgt_hdl;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		target_if_err("tgt_hdl is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	device_caps = &tgt_hdl->info.service_ext2_param.nan_caps;
+
+	QDF_SET_BITS(caps->flags, NAN_FLAGS_CONFIGURABLE_SYNC_BIT,
+		     NAN_CONFIGURATION_BIT_NUM, NAN_SET_CONFIGURATION_FLAG);
+	QDF_SET_BITS(caps->flags, NAN_FLAGS_USERSPACE_DE_BIT,
+		     NAN_CONFIGURATION_BIT_NUM, NAN_SET_CONFIGURATION_FLAG);
+
+	QDF_SET_BITS(caps->op_mode, NAN_VHT_OPMODE_BIT,
+		     NAN_CONFIGURATION_BIT_NUM, device_caps->vht_phy_mode);
+	QDF_SET_BITS(caps->op_mode, NAN_HE_OPMODE_BIT,
+		     NAN_CONFIGURATION_BIT_NUM, device_caps->he_phy_mode);
+	QDF_SET_BITS(caps->op_mode, NAN_HE_VHT_80_80_OPMODE_BIT,
+		     NAN_CONFIGURATION_BIT_NUM, device_caps->he_vht_80_80);
+	QDF_SET_BITS(caps->op_mode, NAN_HE_VHT_160_OPMODE_BIT,
+		     NAN_CONFIGURATION_BIT_NUM, device_caps->he_vht_160);
+
+	QDF_SET_BITS(caps->n_antennas, NAN_TX_ANT_BIT,
+		     NAN_CONFIGURATION_BIT_ANTENNA_NUM,
+		     device_caps->num_tx_ant);
+	QDF_SET_BITS(caps->n_antennas, NAN_RX_ANT_BIT,
+		     NAN_CONFIGURATION_BIT_ANTENNA_NUM,
+		     device_caps->num_rx_ant);
+
+	caps->max_channel_switch_time = device_caps->max_chan_switch_time;
+	QDF_SET_BITS(caps->dev_capabilities, NAN_S3_SUPPORT_BIT,
+		     NAN_CONFIGURATION_BIT_NUM, device_caps->s3_support);
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE && WLAN_FEATURE_NAN */

@@ -701,3 +701,11 @@ void nan_cstats_log_nan_disable_resp_evt(uint8_t vdev_id,
 			       &stat);
 }
 #endif /* WLAN_CHIPSET_STATS */
+
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+QDF_STATUS nan_get_device_caps(struct wlan_objmgr_psoc *psoc,
+			       struct nan_capabilities *caps)
+{
+	return target_if_nan_set_device_caps(psoc, caps);
+}
+#endif
