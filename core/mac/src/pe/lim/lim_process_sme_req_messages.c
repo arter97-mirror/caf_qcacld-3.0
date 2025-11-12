@@ -2987,6 +2987,23 @@ void lim_enable_he_dynamic_smps(struct pe_session *session)
 {}
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static bool
+lim_is_single_link_mlo_sta(struct pe_session *session)
+{
+	if (session && !session->ml_partner_info.num_partner_links)
+		return true;
+
+	return false;
+}
+#else
+static inline bool
+lim_is_single_link_mlo_sta(struct pe_session *session)
+{
+	return false;
+}
+#endif
+
 #define DSMPS_EN BIT(0)
 #define DSMPS_BASE_ON_RSSI_EN BIT(1)
 void
@@ -2997,11 +3014,34 @@ lim_cfg_dsmps_for_iot_ap(struct mac_context *mac_ctx,
 {
 	struct action_oui_search_attr vendor_ap_search_attr = {0};
 	uint16_t ie_len;
-	bool oui_matched, no_allow_list;
+	bool oui_matched = false;
+	bool no_allow_list = false;
 	uint8_t vdev_param = 0;
 
-	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+	/* Handle non-STA modes first */
+	if (session->opmode != QDF_STA_MODE) {
+		lim_disable_ht_dynamic_smps(session);
+		lim_disable_he_dynamic_smps(session);
+		vdev_param = 0;
+		goto set_param;
+	}
 
+	/*
+	 * Check if this is a 2G-only STA connection.
+	 * 2 GHz aux listen is not supported, so DSMPS must be disabled
+	 * for all 2G connections, even if the AP is in the allowlist.
+	 */
+	if (wlan_reg_is_24ghz_ch_freq(bss_desc->chan_freq)) {
+		if (!IS_DOT11_MODE_EHT(session->dot11mode) ||
+		    lim_is_single_link_mlo_sta(session)) {
+			lim_disable_ht_dynamic_smps(session);
+			lim_disable_he_dynamic_smps(session);
+			vdev_param = 0;
+			goto set_param;
+		}
+	}
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
 	vendor_ap_search_attr.ie_length = ie_len;
 	vendor_ap_search_attr.mac_addr = &bss_desc->bssId[0];
@@ -3057,23 +3097,6 @@ set_param:
 			    wmi_vdev_param_dsmps_control,
 			    vdev_param, VDEV_CMD);
 }
-
-#ifdef WLAN_FEATURE_11BE_MLO
-static bool
-lim_is_single_link_mlo_sta(struct pe_session *session)
-{
-	if (session && !session->ml_partner_info.num_partner_links)
-		return true;
-
-	return false;
-}
-#else
-static inline bool
-lim_is_single_link_mlo_sta(struct pe_session *session)
-{
-	return false;
-}
-#endif
 
 void
 lim_disable_ht_he_dynamic_smps(struct pe_session *session,
@@ -4470,7 +4493,6 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 		goto mem_free;
 	}
 
-	lim_disable_ht_he_dynamic_smps(session, bss_desc->chan_freq);
 	lim_cfg_dsmps_for_iot_ap(mac_ctx, session, bss_desc, false);
 
 	lim_copy_ml_partner_info_to_session(session, req);
