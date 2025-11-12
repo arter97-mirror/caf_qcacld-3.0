@@ -695,23 +695,31 @@ struct flow_info {
 	uint32_t flow_label;
 };
 
+#define DP_STC_TXRX_SAMPLES_MAX 5
+#define DP_TXRX_SAMPLES_WINDOW_MAX 2
+#define DP_STC_BURST_STAGE_MAX 2
+
 /*
  * struct wlan_dp_stc_flow_classify_result - Flow classification result
  * @flow_tuple: tuple of the flow which is classified
  * @cookie: cookie/identifier
  * @traffic_type: traffic type classified
  * @ul_tid: Uplink TID id for the flow
+ * @insight_count: Number of insights (0 if no results)
+ * Note: Traffic types are saved for each window individually
+ * (maximum 5 windows) across different sampling stages
+ * @probable_types: Array of probable traffic types
+ * @probabilities: Array of probability scores
  */
 struct wlan_dp_stc_flow_classify_result {
 	struct flow_info flow_tuple;
 	uint32_t cookie;
 	uint8_t traffic_type;
 	uint8_t ul_tid;
+	uint8_t insight_count;
+	uint8_t probable_types[DP_STC_TXRX_SAMPLES_MAX];
+	uint8_t probabilities[DP_STC_TXRX_SAMPLES_MAX];
 };
-
-#define DP_STC_TXRX_SAMPLES_MAX 5
-#define DP_TXRX_SAMPLES_WINDOW_MAX 2
-#define DP_STC_BURST_STAGE_MAX 2
 
 /**
  * struct wlan_dp_stc_txrx_min_max_stats - MIN/MAX stats
