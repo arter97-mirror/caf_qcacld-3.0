@@ -2447,12 +2447,18 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		 * The classification result is for this flow only.
 		 */
 		s_entry->traffic_type = flow_classify_result->traffic_type;
-		dp_info("STC: sampling flow %d tuple (%s) result %d ul_tid %u sample_start_ts %llu current stage %u",
+
+		/* Save classification insights for different stages */
+		wlan_dp_stc_save_classify_insights(dp_stc, flow_classify_result,
+						   s_entry, flow_tuple);
+
+		dp_info("STC: sampling flow %d tuple (%s) result %d ul_tid %u sample_start_ts %llu current stage %u samples %d",
 			i, dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
 			flow_classify_result->traffic_type,
 			flow_classify_result->ul_tid,
 			s_entry->sampling_start_ts,
-			s_entry->flow_samples.curr_stats_stage);
+			s_entry->flow_samples.curr_stats_stage,
+			flow_classify_result->insight_count);
 		/*
 		 * 1) Indicate to TX and RX flow
 		 * 2) Change state to classified,
