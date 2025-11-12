@@ -3184,6 +3184,52 @@ lim_delete_dph_hash_entry(struct mac_context *mac_ctx, tSirMacAddr sta_addr,
 		pe_err("error deleting hash entry");
 }
 
+#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
+static void lim_send_custom_join_resp_event(tSirProbeRespBeacon *beacon_probe_rsp,
+		struct pe_session *session_entry)
+{
+	struct join_resp_event *event = NULL;
+	struct mon_report_status *mon_report = NULL;
+	uint8_t *buf = NULL;
+	uint16_t reason;
+	uint16_t status_code;
+
+	if (!session_entry->ignore_assoc_disallowed &&
+	    beacon_probe_rsp->assoc_disallowed) {
+		reason = eSIR_SME_ASSOC_REFUSED;
+		status_code = eSIR_MAC_UNSPEC_FAILURE_STATUS;
+	} else {
+		reason = eSIR_SME_SUCCESS;
+		status_code =  eSIR_MAC_SUCCESS_STATUS;
+	}
+
+	buf = qdf_mem_malloc(sizeof(struct mon_report_status) +
+			     sizeof(struct join_resp_event));
+	if (!buf) {
+		pe_err("Allocate Memory failed for buf");
+		return;
+	}
+
+	mon_report = (struct mon_report_status *)buf;
+	event = (struct join_resp_event *)(mon_report->payload);
+
+	mon_report->type = JOIN_RESP_EVENT;
+	mon_report->payload_len = sizeof(struct join_resp_event);
+	mon_report->qtime = qdf_do_div(qdf_get_log_timestamp_usecs(),
+			    USEC_PER_MSEC);
+
+	event->reason = reason;
+	event->status_code = status_code;
+	send_custom_packet_select(buf);
+	qdf_mem_free(buf);
+}
+#else
+static void lim_send_custom_join_resp_event(tSirProbeRespBeacon *beacon_probe_rsp,
+		struct pe_session *session_entry)
+{
+}
+#endif
+
 /**
  * lim_check_and_announce_join_success()- function to check if the received
  * Beacon/Probe Response is from the BSS that we're attempting to join.
@@ -3247,6 +3293,8 @@ lim_check_and_announce_join_success(struct mac_context *mac_ctx,
 	pe_debug("Received Beacon/PR with BSSID:%pM pe session %d vdev %d",
 		 session_entry->bssId, session_entry->peSessionId,
 		 session_entry->vdev_id);
+
+	lim_send_custom_join_resp_event(beacon_probe_rsp, session_entry);
 
 	/* Deactivate Join Failure timer */
 	lim_deactivate_and_change_timer(mac_ctx, eLIM_JOIN_FAIL_TIMER);
