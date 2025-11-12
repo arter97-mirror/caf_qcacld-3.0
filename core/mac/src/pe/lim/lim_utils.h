@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -811,7 +812,7 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst, tDot11fIEExtCap *src,
 void lim_del_pmf_sa_query_timer(struct mac_context *mac_ctx, struct pe_session *pe_session);
 
 /**
- * lim_get_bss_rmf_capable() - get rmf capable - MFPC
+ * lim_get_vdev_rmf_capable() - get rmf capable - MFPC
  * @mac: mac context
  * @session: pe session
  *
@@ -820,8 +821,8 @@ void lim_del_pmf_sa_query_timer(struct mac_context *mac_ctx, struct pe_session *
  *
  * Return: bool
  */
-bool lim_get_bss_rmf_capable(struct mac_context *mac,
-			     struct pe_session *session);
+bool lim_get_vdev_rmf_capable(struct mac_context *mac,
+			      struct pe_session *session);
 #else
 /**
  * lim_del_pmf_sa_query_timer() - This function deletes SA query timer
@@ -838,8 +839,8 @@ lim_del_pmf_sa_query_timer(struct mac_context *mac_ctx, struct pe_session *pe_se
 }
 
 static inline
-bool lim_get_bss_rmf_capable(struct mac_context *mac,
-			     struct pe_session *session)
+bool lim_get_vdev_rmf_capable(struct mac_context *mac,
+			      struct pe_session *session)
 {
 	return false;
 }

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2208,7 +2209,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 
 		if (!is_open_auth) {
 			bss_mfp_capable =
-				lim_get_bss_rmf_capable(mac_ctx, pe_session);
+				lim_get_vdev_rmf_capable(mac_ctx, pe_session);
 			if (!bss_mfp_capable) {
 				pe_debug("Peer doesn't support PMF, Don't add MBO IE");
 				qdf_mem_free(mbo_ie);
