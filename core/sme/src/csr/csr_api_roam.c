@@ -15240,30 +15240,6 @@ QDF_STATUS csr_roam_set_psk_pmk(struct mac_context *mac, uint32_t sessionId,
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
-#ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
-static void
-csr_roam_diag_set_pmkid(struct csr_roam_session *pSession)
-{
-	WLAN_HOST_DIAG_EVENT_DEF(secEvent,
-				 host_event_wlan_security_payload_type);
-	qdf_mem_zero(&secEvent,
-	    sizeof(host_event_wlan_security_payload_type));
-	secEvent.eventId = WLAN_SECURITY_EVENT_PMKID_UPDATE;
-	secEvent.encryptionModeMulticast =
-		(uint8_t) diag_enc_type_from_csr_type(
-			pSession->connectedProfile.mcEncryptionType);
-	secEvent.encryptionModeUnicast =
-		(uint8_t) diag_enc_type_from_csr_type(
-			pSession->connectedProfile.EncryptionType);
-	qdf_mem_copy(secEvent.bssid,
-		     pSession->connectedProfile.bssid.bytes,
-			QDF_MAC_ADDR_SIZE);
-	secEvent.authMode = (uint8_t) diag_auth_type_from_csr_type(
-				pSession->connectedProfile.AuthType);
-	WLAN_HOST_DIAG_EVENT_REPORT(&secEvent, EVENT_WLAN_SECURITY);
-}
-#endif /* FEATURE_WLAN_DIAG_SUPPORT_CSR */
-
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * csr_update_session_psk_pmk - API to update PMK in csr session
@@ -15350,64 +15326,6 @@ static void csr_update_pmk_cache(struct csr_roam_session *session,
 			CSR_MAX_PMKID_ALLOWED);
 		session->NumPmkidCache = CSR_MAX_PMKID_ALLOWED;
 	}
-}
-
-QDF_STATUS
-csr_roam_set_pmkid_cache(struct mac_context *mac, uint32_t sessionId,
-			 tPmkidCacheInfo *pPMKIDCache, uint32_t numItems,
-			 bool update_entire_cache)
-{
-	struct csr_roam_session *pSession = CSR_GET_SESSION(mac, sessionId);
-	uint32_t i = 0;
-	tPmkidCacheInfo *pmksa;
-	enum csr_akm_type akm_type;
-
-	if (!pSession) {
-		sme_err("session %d not found", sessionId);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	sme_debug("numItems = %d", numItems);
-
-	if (numItems > CSR_MAX_PMKID_ALLOWED)
-		return QDF_STATUS_E_INVAL;
-
-#ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
-	csr_roam_diag_set_pmkid(pSession);
-#endif /* FEATURE_WLAN_DIAG_SUPPORT_CSR */
-
-	if (update_entire_cache) {
-		if (numItems && pPMKIDCache) {
-			pSession->NumPmkidCache = (uint16_t) numItems;
-			qdf_mem_copy(pSession->PmkidCacheInfo, pPMKIDCache,
-				sizeof(tPmkidCacheInfo) * numItems);
-			pSession->curr_cache_idx = (uint16_t)numItems;
-		}
-		return QDF_STATUS_SUCCESS;
-	}
-
-	for (i = 0; i < numItems; i++) {
-		pmksa = &pPMKIDCache[i];
-
-		/* Delete the entry if present */
-		csr_roam_del_pmkid_from_cache(mac, sessionId,
-				pmksa, false);
-		/* Update new entry */
-		csr_update_pmk_cache(pSession, pmksa);
-
-		akm_type = pSession->connectedProfile.AuthType;
-		if ((akm_type == eCSR_AUTH_TYPE_FT_RSN ||
-		     akm_type == eCSR_AUTH_TYPE_FT_FILS_SHA256 ||
-		     akm_type == eCSR_AUTH_TYPE_FT_FILS_SHA384 ||
-		     akm_type == eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384) &&
-		    pSession->connectedProfile.mdid.mdie_present) {
-			sme_debug("Auth type is %d update the MDID in cache",
-				  akm_type);
-			csr_update_pmk_cache_ft(mac,
-						sessionId, pmksa->cache_id);
-		}
-	}
-	return QDF_STATUS_SUCCESS;
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD

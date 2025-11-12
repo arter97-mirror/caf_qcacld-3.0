@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -240,18 +241,8 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 			     struct csr_roam_profile *pProfile,
 			     struct bss_description *pSirBssDesc,
 			     tDot11fBeaconIEs *pIes, tCsrRSNIe *pRSNIe);
-
-#ifdef WLAN_CONV_CRYPTO_IE_SUPPORT
-static inline
-bool csr_lookup_pmkid(struct mac_context *mac, uint32_t sessionId,
-		      tPmkidCacheInfo *pmk_cache)
-{
-	return false;
-}
-#else
 bool csr_lookup_pmkid(struct mac_context *mac, uint32_t sessionId,
 		      tPmkidCacheInfo *pmk_cache);
-#endif
 
 uint8_t csr_construct_wpa_ie(struct mac_context *mac, uint8_t session_id,
 			     struct csr_roam_profile *pProfile,
@@ -308,12 +299,6 @@ tAniEdType csr_translate_encrypt_type_to_ed_type(
  * pIes shall contain IEs from pSirBssDesc.
  * It shall be returned from function csr_get_parsed_bss_description_ies
  */
-bool csr_is_security_match(struct mac_context *mac_ctx, tCsrAuthList *auth_type,
-			   tCsrEncryptionList *uc_enc_type,
-			   tCsrEncryptionList *mc_enc_type, bool *mfp_enabled,
-			   uint8_t *mfp_required, uint8_t *mfp_capable,
-			   struct bss_description *bss_desc,
-			   tDot11fBeaconIEs *ies_ptr, uint8_t session_id);
 bool csr_is_bss_type_ibss(eCsrRoamBssType bssType);
 bool csr_is_bssid_match(struct qdf_mac_addr *pProfBssid,
 			struct qdf_mac_addr *BssBssid);
