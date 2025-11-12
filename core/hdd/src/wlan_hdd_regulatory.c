@@ -1746,6 +1746,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	struct wlan_objmgr_pdev *pdev = NULL;
 	uint32_t new_phy_mode;
 	bool freq_changed, phy_changed, width_changed;
+	bool sync_sta_disconnect;
 	qdf_freq_t oper_freq;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_STA;
 	struct wlan_hdd_link_info *link_info;
@@ -1801,6 +1802,14 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 							    new_phy_mode))
 					phy_changed = true;
 
+				sync_sta_disconnect = false;
+				if (freq_changed &&
+				    !policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
+				    policy_mgr_is_sta_sap_scc(hdd_ctx->psoc, oper_freq, false)) {
+					hdd_debug("disconnect STA synchronously");
+					sync_sta_disconnect = true;
+				}
+
 				if (phy_changed || freq_changed ||
 				    width_changed) {
 					hdd_debug("changed: phy %d, freq %d, width %d",
@@ -1814,7 +1823,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 						wlan_hdd_cm_issue_disconnect(
 								link_info,
 								REASON_UNSPEC_FAILURE,
-								false);
+								sync_sta_disconnect);
 					hdd_set_vdev_phy_mode(adapter,
 							      vendor_phy_mode);
 					sta_ctx->reg_phymode = new_phy_mode;
