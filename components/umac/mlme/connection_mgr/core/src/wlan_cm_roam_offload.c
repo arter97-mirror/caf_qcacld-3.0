@@ -5352,6 +5352,12 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 	if (!vdev)
 		return status;
 
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev)) {
+		mlme_debug("link switch in progress. skip roam state change");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return status;
+	}
+
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 		is_up = mlo_check_if_all_vdev_up(vdev);
 	else
