@@ -395,6 +395,32 @@ wlan_dp_get_free_sampling_table_entry(struct wlan_dp_stc *dp_stc)
 	return NULL;
 }
 
+struct wlan_dp_stc_flow_table_entry *
+wlan_dp_stc_get_flow_entry_from_sampling_entry(struct wlan_dp_stc *dp_stc,
+					       struct wlan_dp_stc_sampling_table_entry *s_entry)
+{
+	/* Get flow entry from either TX or RX flow table */
+	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID)
+		return &dp_stc->rx_flow_table->entries[s_entry->rx_flow_id];
+	else if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID)
+		return &dp_stc->tx_flow_table->entries[s_entry->tx_flow_id];
+
+	return NULL;
+}
+
+static inline bool
+wlan_dp_stc_is_stage_2_traffic_type(enum qca_traffic_type traffic_type)
+{
+	return (traffic_type == QCA_TRAFFIC_TYPE_BROWSING ||
+		traffic_type == QCA_TRAFFIC_TYPE_APERIODIC_BURSTS);
+}
+
+static inline bool
+wlan_dp_stc_is_stage_3_traffic_type(enum qca_traffic_type traffic_type)
+{
+	return (traffic_type == QCA_TRAFFIC_TYPE_STREAMING);
+}
+
 static inline bool
 wlan_dp_txrx_samples_ready(struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
