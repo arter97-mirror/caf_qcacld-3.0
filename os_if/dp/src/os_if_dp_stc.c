@@ -27,6 +27,8 @@
 		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE
 #define FLOW_CLASSIFY_RESULT_UL_TID		\
 		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_UL_TID
+#define FLOW_CLASSIFY_RESULT_INSIGHTS		\
+		QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_INSIGHTS
 
 const struct nla_policy
 flow_tuple_policy[QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_MAX + 1] = {
@@ -42,10 +44,20 @@ flow_tuple_policy[QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_MAX + 1] = {
 };
 
 const struct nla_policy
+classify_insight_results_policy[
+	QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_PROBABLE_TRAFFIC_TYPE] = {
+		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_PROBABILITY] = {
+		.type = NLA_U8},
+};
+
+const struct nla_policy
 flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1] = {
 	[FLOW_CLASSIFY_RESULT_FLOW_TUPLE] = {.type = NLA_NESTED },
 	[FLOW_CLASSIFY_RESULT_TRAFFIC_TYPE] = {.type = NLA_U8},
 	[FLOW_CLASSIFY_RESULT_UL_TID] = {.type = NLA_U8},
+	[FLOW_CLASSIFY_RESULT_INSIGHTS] = {.type = NLA_NESTED},
 };
 
 #define NS_PER_MS 1000000
@@ -53,6 +65,75 @@ flow_classify_result_policy[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX  + 1] 
 
 #define NS_TO_MS(t) ((t) / NS_PER_MS)
 #define NS_TO_US(t) ((t) / NS_PER_US)
+#define BUF_LEN_MAX 256
+
+static QDF_STATUS
+os_if_dp_parse_classify_insights(struct nlattr *tb_attr,
+				 struct wlan_dp_stc_flow_classify_result *result)
+{
+	struct nlattr *tb_sample_attr;
+	uint8_t insight_count = 0;
+	int rem, ret;
+
+	/* Parse each nested sample attribute */
+	nla_for_each_nested(tb_sample_attr, tb_attr, rem) {
+		struct nlattr *sample_attrs[
+			QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_MAX + 1];
+		uint32_t prob_type_attr, prob_attr;
+
+		/* It is used to avoid out of bound access */
+		if (insight_count >= DP_STC_TXRX_SAMPLES_MAX)
+			break;
+
+		ret = wlan_cfg80211_nla_parse_nested(sample_attrs,
+						     QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_MAX,
+						     tb_sample_attr,
+						     classify_insight_results_policy);
+
+		if (ret) {
+			osif_err("STC: Sample %d parsing failed",
+				 insight_count);
+			continue;
+		}
+
+		prob_type_attr = QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_PROBABLE_TRAFFIC_TYPE;
+		if (sample_attrs[prob_type_attr]) {
+			result->probable_types[insight_count] =
+				nla_get_u8(sample_attrs[prob_type_attr]);
+		}
+
+		prob_attr =
+			QCA_WLAN_VENDOR_ATTR_CLASSIFY_INSIGHTS_PROBABILITY;
+		if (sample_attrs[prob_attr]) {
+			result->probabilities[insight_count] =
+				nla_get_u8(sample_attrs[prob_attr]);
+		}
+
+		insight_count++;
+	}
+
+	result->insight_count = insight_count;
+
+	if (insight_count > 0) {
+		char samples_str[BUF_LEN_MAX];
+		uint16_t len = 0;
+		int i;
+
+		/* Build samples string */
+		for (i = 0; i < insight_count; i++) {
+			len += scnprintf(samples_str + len,
+					 sizeof(samples_str) - len,
+					 " [%d: Type=%d Prob=%d%%]", i,
+					 result->probable_types[i],
+					 result->probabilities[i]);
+		}
+
+		osif_nofl_debug("STC: Classify Results - Count: %d %s",
+				insight_count, samples_str);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 
 QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,
 					 int data_len)
@@ -157,6 +238,14 @@ QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,
 	} else {
 		flow_classify_result.ul_tid = WLAN_DP_STC_UL_TID_INVALID;
 	}
+
+	/* Parse classify results insights if present (optional) */
+	attr_id = FLOW_CLASSIFY_RESULT_INSIGHTS;
+	if (tb[attr_id])
+		os_if_dp_parse_classify_insights(tb[attr_id], &flow_classify_result);
+	else
+		flow_classify_result.insight_count = 0;
+
 	ucfg_dp_flow_classify_result(&flow_classify_result);
 
 	return QDF_STATUS_SUCCESS;
