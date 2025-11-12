@@ -331,6 +331,32 @@ struct wlan_dp_stc_sampling_table {
 #define WLAN_DP_STC_TRANSITION_FLAG_SAMPLE 0
 #define WLAN_DP_STC_TRANSITION_FLAG_WIN 1
 
+#define WLAN_DP_STC_NUM_STAGES 3
+#define MAX_STAGE_SAMPLES 5
+
+/* Bit flags for stage validity in wlan_dp_stc_classify_insights */
+#define WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_1_VALID BIT(0)
+#define WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_2_VALID BIT(1)
+#define WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_3_VALID BIT(2)
+
+/**
+ * struct wlan_dp_stc_classify_insights - classify results for all stages
+ * @stage_valid_flags: Bit flags indicating which stages have valid results
+ *                     (use WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_*_VALID macros)
+ * @sample_count: Number of samples for each stage (index 0=Stage1, 1=Stage2,
+ *                2=Stage3)
+ * @probable_types: Probable traffic type results for each stage's samples
+ *                  Stage 1 uses all 5 slots, Stages 2 & 3 use only index [0]
+ * @probabilities: Probability scores for each stage's samples
+ *                 Stage 1 uses all 5 slots, Stages 2 & 3 use only index [0]
+ */
+struct wlan_dp_stc_classify_insights {
+	uint8_t stage_valid_flags;
+	uint8_t sample_count[WLAN_DP_STC_NUM_STAGES];
+	uint8_t probable_types[WLAN_DP_STC_NUM_STAGES][MAX_STAGE_SAMPLES];
+	uint8_t probabilities[WLAN_DP_STC_NUM_STAGES][MAX_STAGE_SAMPLES];
+};
+
 /**
  * struct wlan_dp_stc_flow_table_entry - Flow table maintained in per pkt path
  * @prev_pkt_arrival_ts: previous packet arrival time
@@ -350,6 +376,7 @@ struct wlan_dp_stc_sampling_table {
  * @txrx_min_max_stats: placeholder for stats which needs per window
  *			min/max values
  * @burst_stats: burst stats
+ * @classify_results: classify results from all stages
  */
 struct wlan_dp_stc_flow_table_entry {
 	uint64_t prev_pkt_arrival_ts;
@@ -370,6 +397,7 @@ struct wlan_dp_stc_flow_table_entry {
 	struct wlan_dp_stc_txrx_stats txrx_stats;
 	struct wlan_dp_stc_txrx_min_max_stats txrx_min_max_stats[DP_STC_TXRX_SAMPLES_MAX][DP_TXRX_SAMPLES_WINDOW_MAX];
 	struct wlan_dp_stc_burst_stats burst_stats;
+	struct wlan_dp_stc_classify_insights classify_results;
 };
 
 #define DP_STC_FLOW_TABLE_ENTRIES_MAX 256
