@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -83,6 +83,7 @@
 #include <wlan_hdd_sysfs_add_timestamp.h>
 #include "wma_api.h"
 #include "wlan_hdd_eht.h"
+#include <wlan_hdd_sysfs_antenna_chainmask.h>
 #include <wlan_hdd_sysfs_bmiss.h>
 #include <wlan_hdd_sysfs_get_freq_for_pwr.h>
 #include <wlan_hdd_sysfs_dp_tx_delay_stats.h>
@@ -1202,6 +1203,7 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_range_ext_create(adapter);
 	hdd_sysfs_dl_modes_create(adapter);
 	hdd_sysfs_11be_rate_create(adapter);
+	hdd_sysfs_antenna_chainmask_create(adapter);
 	hdd_sysfs_bmiss_create(adapter);
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
@@ -1217,6 +1219,7 @@ hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
 	hdd_sysfs_bmiss_destroy(adapter);
+	hdd_sysfs_antenna_chainmask_destroy(adapter);
 	hdd_sysfs_11be_rate_destroy(adapter);
 	hdd_sysfs_dl_modes_destroy(adapter);
 	hdd_sysfs_range_ext_destroy(adapter);
@@ -1268,6 +1271,7 @@ hdd_sysfs_create_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_ipa_create(adapter);
 	hdd_sysfs_dl_modes_create(adapter);
 	hdd_sysfs_11be_rate_create(adapter);
+	hdd_sysfs_antenna_chainmask_create(adapter);
 	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 	hdd_sysfs_dp_traffic_end_indication_create(adapter);
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
@@ -1283,6 +1287,7 @@ hdd_sysfs_destroy_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_direct_link_ut_destroy(adapter);
 	hdd_sysfs_dp_traffic_end_indication_destroy(adapter);
 	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
+	hdd_sysfs_antenna_chainmask_destroy(adapter);
 	hdd_sysfs_11be_rate_destroy(adapter);
 	hdd_sysfs_dl_modes_destroy(adapter);
 	hdd_sysfs_ipa_destroy(adapter);
