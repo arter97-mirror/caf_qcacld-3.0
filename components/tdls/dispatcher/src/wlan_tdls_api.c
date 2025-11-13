@@ -32,6 +32,7 @@
 #include "wlan_tdls_cfg_api.h"
 #include "wlan_policy_mgr_api.h"
 #include "wlan_mlo_mgr_sta.h"
+#include <wlan_mlo_mgr_link_switch.h>
 
 void wlan_tdls_register_lim_callbacks(struct wlan_objmgr_psoc *psoc,
 				      struct tdls_callbacks *cbs)
@@ -425,10 +426,24 @@ void wlan_tdls_notify_sta_disconnect(uint8_t vdev_id,
 				     struct wlan_objmgr_vdev *vdev)
 {
 	struct tdls_sta_notify_params notify_info = {0};
+	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status;
 
 	if (!vdev) {
 		tdls_err("vdev is NULL");
+		return;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		tdls_err("psoc not found");
+		return;
+	}
+
+	if (mlo_mgr_is_link_switch_in_progress(vdev) &&
+	    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(psoc)) {
+		tdls_debug("Link Switch is in progress for vdev id %d, skipping tdls notification",
+			   vdev_id);
 		return;
 	}
 
