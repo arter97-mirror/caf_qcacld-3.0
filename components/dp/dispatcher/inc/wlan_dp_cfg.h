@@ -1299,14 +1299,15 @@
  * @max: 0xffffffff
  * @default: 0x0
  *
- * |31                         2|        1          |     0      |
- * +----------------------------+-------------------+------------+
- * |           RSVD             |       sync        |    E/D     |
- * +----------------------------+-------------------+------------+
+ * |31                       3|             2|           1|     0      |
+ * +--------------------------+--------------+------------+------------+
+ * |          RSVD            |  Enable TWT  | Sync qtime |    E/D     |
+ * +--------------------------+--------------+------------+------------+
  *
  * bit 0    : Enable/Disable haps feature
  * bit 1    : Sync and update qtime cnss timestamp
- * bit 2-31 : Reserved for future usage
+ * bit 2    : Enable Target Wake Time (TWT)
+ * bit 3-31 : Reserved for future usage
  *
  * </ini>
  */
