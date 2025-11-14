@@ -55,6 +55,9 @@
 #include "cdp_txrx_ctrl.h"
 #include "wlan_dp_load_balance.h"
 #include "wlan_dp_flow_balance.h"
+#ifdef FEATURE_DAL_DP_SUPPORT
+#include "cdp_txrx_bus.h"
+#endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline
@@ -3147,6 +3150,36 @@ QDF_STATUS ucfg_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
 	return __wlan_dp_bus_resume(soc, pdev_id);
 }
+
+#ifdef FEATURE_DAL_DP_SUPPORT
+/**
+ * ucfg_dp_dal_notify_suspend() - DAL suspend notification wrapper
+ * @soc: CDP SoC handle
+ *
+ * This is a ucfg wrapper for cdp_dal_notify_suspend() to maintain
+ * the layering between HDD and DP components.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_dal_notify_suspend(ol_txrx_soc_handle soc)
+{
+	return cdp_dal_notify_suspend(soc);
+}
+
+/**
+ * ucfg_dp_dal_notify_resume() - DAL resume notification wrapper
+ * @soc: CDP SoC handle
+ *
+ * This is a ucfg wrapper for cdp_dal_notify_resume() to maintain
+ * the layering between HDD and DP components.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_dal_notify_resume(ol_txrx_soc_handle soc)
+{
+	return cdp_dal_notify_resume(soc);
+}
+#endif /* FEATURE_DAL_DP_SUPPORT */
 
 void *ucfg_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 			      bool *is_wifi3_0_target)

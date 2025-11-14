@@ -1643,6 +1643,40 @@ QDF_STATUS ucfg_dp_fisa_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id);
  */
 QDF_STATUS ucfg_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id);
 
+#ifdef FEATURE_DAL_DP_SUPPORT
+/**
+ * ucfg_dp_dal_notify_suspend() - DAL suspend notification wrapper
+ * @soc: CDP SoC handle
+ *
+ * This is a ucfg wrapper for cdp_dal_notify_suspend() to maintain
+ * the layering between HDD and DP components.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_dal_notify_suspend(ol_txrx_soc_handle soc);
+
+/**
+ * ucfg_dp_dal_notify_resume() - DAL resume notification wrapper
+ * @soc: CDP SoC handle
+ *
+ * This is a ucfg wrapper for cdp_dal_notify_resume() to maintain
+ * the layering between HDD and DP components.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_dp_dal_notify_resume(ol_txrx_soc_handle soc);
+#else
+static inline QDF_STATUS ucfg_dp_dal_notify_suspend(ol_txrx_soc_handle soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS ucfg_dp_dal_notify_resume(ol_txrx_soc_handle soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* FEATURE_DAL_DP_SUPPORT */
+
 /**
  * ucfg_dp_txrx_soc_attach() - Datapath soc attach
  * @params: SoC attach params

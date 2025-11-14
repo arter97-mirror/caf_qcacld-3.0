@@ -1245,14 +1245,22 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 		hif_process_runtime_suspend_success();
 	}
 
+	status = cdp_dal_notify_suspend(cds_get_context(QDF_MODULE_ID_SOC));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pmo_debug("Prevent suspend, dal suspend rejected");
+		goto resume_txrx;
+	}
+
 	if (hif_try_prevent_ep_vote_access(hif_ctx)) {
 		pmo_debug("Prevent suspend, ep work pending");
 		status = QDF_STATUS_E_BUSY;
-		goto resume_txrx;
+		goto resume_dal;
 	}
 
 	goto dec_psoc_ref;
 
+resume_dal:
+	cdp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
 resume_txrx:
 	PMO_CORE_PSOC_RUNTIME_PM_QDF_BUG(QDF_STATUS_SUCCESS !=
 		pmo_core_txrx_resume(psoc));
@@ -1378,6 +1386,11 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 	if (status != QDF_STATUS_SUCCESS)
 		goto fail;
 
+	status = cdp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pmo_debug("Prevent resume, dal resume rejected");
+		goto fail;
+	}
 fail:
 	if (status != QDF_STATUS_SUCCESS)
 		qdf_trigger_self_recovery(psoc, QDF_RESUME_TIMEOUT);

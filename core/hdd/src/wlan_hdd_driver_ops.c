@@ -1393,10 +1393,16 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 		goto resume_txrx;
 	}
 
+	status = ucfg_dp_dal_notify_suspend(cds_get_context(QDF_MODULE_ID_SOC));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Prevent suspend, dal suspend rejected");
+		goto resume_txrx;
+	}
+
 	if (hif_try_prevent_ep_vote_access(hif_ctx)) {
 		hdd_debug("Prevent suspend, ep work pending");
 		err = -EBUSY;
-		goto resume_txrx;
+		goto resume_dal;
 	}
 
 	/*
@@ -1409,6 +1415,13 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 
 	hdd_info("bus suspend succeeded");
 	return 0;
+
+resume_dal:
+	status = ucfg_dp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_hdd_trigger_cds_recovery(QDF_RESUME_TIMEOUT);
+		return qdf_status_to_os_return(status);
+	}
 
 resume_txrx:
 	status = ucfg_pmo_core_txrx_resume(hdd_ctx->psoc);
@@ -1624,6 +1637,12 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 	status = qdf_status_to_os_return(qdf_status);
 	if (status) {
 		hdd_err("Failed cdp bus resume");
+		goto out;
+	}
+
+	status = ucfg_dp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Prevent resume, dal resume rejected");
 		goto out;
 	}
 
