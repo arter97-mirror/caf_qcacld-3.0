@@ -1327,7 +1327,7 @@ static void wlan_hdd_phc_deinit(struct hdd_context *hdd_ctx)
 
 #ifdef WLAN_FEATURE_UL_JITTER
 #define TX_RX_NSS_VENDOR_SIZE 3
-#define SS_COUNT_JITTER 2
+#define SS_COUNT_JITTER 4
 #define TX_NSS_CNT_IDX 0
 #define RX_NSS_CNT_IDX 1
 

@@ -2613,6 +2613,14 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	nl_buf_len += hdd_get_uplink_delay_len(adapter);
 	if (stainfo)
 		nl_buf_len += hdd_add_peer_stats_get_len(stainfo);
+
+	/* Add length for QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_NSS_PKT_COUNT */
+	nl_buf_len += NLA_HDRLEN * SS_COUNT_JITTER;
+	nl_buf_len += nla_total_size(0) +
+		      SS_COUNT_JITTER * (nla_total_size(sizeof(uint8_t)) +
+					 nla_total_size(sizeof(uint64_t)) +
+					 nla_total_size(sizeof(uint64_t)));
+
 	if (!nl_buf_len) {
 		hdd_err_rl("Failed to get bcn pmf stats");
 		goto free_sta_info;
