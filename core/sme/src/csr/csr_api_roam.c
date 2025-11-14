@@ -3447,61 +3447,6 @@ static void csr_dump_connection_stats(struct mac_context *mac_ctx,
 
 #endif
 
-#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
-static void csr_send_custom_ap_info_event(struct mac_context *mac_ctx,
-		struct csr_roam_session *session,
-		struct csr_roam_info *roam_info)
-{
-	struct tagCsrRoamConnectedProfile *conn_profile = NULL;
-	struct ap_info_event *event = NULL;
-	struct mon_report_status *mon_report= NULL;
-	uint8_t *buf = NULL;
-	int8_t rssi = 0;
-
-	if (!session || !session->pCurRoamProfile || !roam_info) {
-		return;
-	}
-	conn_profile = roam_info->u.pConnectedProfile;
-	if (!conn_profile) {
-		return;
-	}
-
-	buf = qdf_mem_malloc(sizeof(struct mon_report_status) +
-			     sizeof(struct ap_info_event));
-	if (!buf) {
-		pe_err("Allocate Memory failed for buf");
-		return;
-	}
-
-	mon_report = (struct mon_report_status *)buf;
-	event = (struct ap_info_event *)(mon_report->payload);
-
-	mon_report->type = AP_INFO_EVENT;
-	mon_report->payload_len = sizeof(struct ap_info_event);
-	mon_report->qtime = qdf_do_div(qdf_get_log_timestamp_usecs(),
-				       USEC_PER_MSEC);
-
-	qdf_mem_copy(event->bssid, conn_profile->bssid.bytes,
-		     QDF_MAC_ADDR_SIZE);
-	sme_get_rssi_snr_by_bssid(MAC_HANDLE(mac_ctx),
-				  session->pCurRoamProfile,
-				  &event->bssid[0],
-				  &rssi, NULL);
-
-	event->abs_rssi = (uint8_t)abs((int)rssi);
-	event->channel = conn_profile->operationChannel;
-
-	send_custom_packet_select(buf);
-	qdf_mem_free(buf);
-}
-#else
-static void csr_send_custom_ap_info_event(struct mac_context *mac_ctx,
-		struct csr_roam_session *session,
-		struct csr_roam_info *roam_info)
-{
-}
-#endif
-
 QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t sessionId,
 				  struct csr_roam_info *roam_info,
 				  uint32_t roamId,
@@ -3592,10 +3537,8 @@ QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t sessionId,
 		else
 			sme_err("session_open_cb is not registered");
 	}
-	if (eCSR_ROAM_ASSOCIATION_COMPLETION == u1) {
+	if (eCSR_ROAM_ASSOCIATION_COMPLETION == u1)
 		csr_dump_connection_stats(mac, pSession, roam_info, u1, u2);
-		csr_send_custom_ap_info_event(mac, pSession, roam_info);
-	}
 
 	if (pSession->callback) {
 		if (roam_info)
