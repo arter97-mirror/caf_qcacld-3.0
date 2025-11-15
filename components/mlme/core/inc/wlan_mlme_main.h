@@ -879,6 +879,14 @@ struct enhance_roam_info {
 };
 
 /**
+ * struct dar_config - Dynamic Analytics Report (DAR) configuration and state
+ * @dar_feature_bitmap: Bitmap indicating enabled DAR features.
+ */
+struct dar_config {
+	uint32_t dar_feature_bitmap;
+};
+
+/**
  * struct mlme_legacy_priv - VDEV MLME legacy priv object
  * @chan_switch_in_progress: flag to indicate that channel switch is in progress
  * @hidden_ssid_restart_in_progress: flag to indicate hidden ssid restart is
@@ -946,6 +954,7 @@ struct enhance_roam_info {
  * @keep_alive_period: KEEPALIVE period in seconds
  * @is_acs_sap: Sets to true if this is an ACS SAP
  * @uhr_config: UHR capability configuration
+ * @dar_info: DAR feature info, e.g. DAR feature bitmap
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -1033,6 +1042,7 @@ struct mlme_legacy_priv {
 #ifdef WLAN_FEATURE_11BN
 	struct wlan_mlme_uhr_caps uhr_config;
 #endif
+	struct dar_config dar_info;
 };
 
 /**

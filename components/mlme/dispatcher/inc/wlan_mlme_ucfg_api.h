@@ -6214,6 +6214,35 @@ ucfg_mlme_set_p2p_gc_keep_awake_during_noa(struct wlan_objmgr_psoc *psoc,
 {
 	return wlan_mlme_set_p2p_gc_keep_awake_during_noa(psoc, value);
 }
+/*
+ * ucfg_mlme_set_dar_config_bitmap() - ucfg wrapper for mlme API
+ * @psoc: pointer to psoc object
+ * @vdev_id: Vdev id on which the DAR is configured
+ * @bitmap: DAR feature bitmap
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_dar_config_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+				uint32_t bitmap)
+{
+	return wlan_mlme_set_dar_config_bitmap(psoc, vdev_id, bitmap);
+}
+
+/*
+ * ucfg_mlme_get_dar_config_bitmap() - ucfg wrapper for mlme API
+ * @psoc: pointer to psoc object
+ * @vdev_id: Vdev id on which the DAR is configured
+ * @bitmap: Buffer to get DAR feature bitmap
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_get_dar_config_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+				uint32_t *bitmap)
+{
+	return wlan_mlme_get_dar_config_bitmap(psoc, vdev_id, bitmap);
+}
 
 /**
  * ucfg_mlme_get_enable_social_channels_on_2g_disable() - get social
