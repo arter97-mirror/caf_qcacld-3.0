@@ -2435,22 +2435,46 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	struct element_info frame;
 	struct cm_roam_values_copy mdie_cfg = {0};
 	uint8_t *ssid_ie = NULL;
+	uint8_t ies_offset =  WLAN_REASSOC_REQ_IES_OFFSET;
+	tpSirMacMgmtHdr hdr;
 
 	bcn_proberesp_ptr = (uint8_t *)roam_synch_ind +
 		roam_synch_ind->beacon_probe_resp_offset;
 	bcn_proberesp_len = roam_synch_ind->beacon_probe_resp_length;
 
+	if (roam_synch_ind->reassoc_req_length <= sizeof(tSirMacMgmtHdr)) {
+		pe_err("Invalid reassoc req with length %d",
+		       roam_synch_ind->reassoc_req_length);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	hdr = (tpSirMacMgmtHdr)((uint8_t *)roam_synch_ind +
+					roam_synch_ind->reassoc_req_offset);
+	if (hdr->fc.type == WLAN_FC0_TYPE_MGMT &&
+	    hdr->fc.subType == SIR_MAC_MGMT_ASSOC_REQ)
+		ies_offset = WLAN_ASSOC_REQ_IES_OFFSET;
+
 	reassoc_req_ies = (uint8_t *)roam_synch_ind +
-			roam_synch_ind->reassoc_req_offset +
-			sizeof(tSirMacMgmtHdr) + WLAN_REASSOC_REQ_IES_OFFSET;
+				roam_synch_ind->reassoc_req_offset +
+				sizeof(tSirMacMgmtHdr) + ies_offset;
+
+	if (roam_synch_ind->reassoc_req_length <=
+				sizeof(tSirMacMgmtHdr) + ies_offset) {
+		pe_err("Invalid reassoc req with length %d",
+		       roam_synch_ind->reassoc_req_length);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	reassoc_req_ies_len = roam_synch_ind->reassoc_req_length -
-			sizeof(tSirMacMgmtHdr) - WLAN_REASSOC_REQ_IES_OFFSET;
+				sizeof(tSirMacMgmtHdr) - ies_offset;
 
 	ssid_ie = (uint8_t *)wlan_get_ie_ptr_from_eid(WLAN_ELEMID_SSID,
 						      reassoc_req_ies,
 						      reassoc_req_ies_len);
-	if (!ssid_ie)
+	if (!ssid_ie) {
+		pe_err("SSID IE is missing in (re)assoc request frame");
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	frame.ptr = NULL;
 	frame.len = 0;
@@ -3308,10 +3332,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 		goto roam_sync_fail;
 	}
 
-	if (roam_sync_ind_ptr->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
-		wlan_peer_set_key_install_flag(mac_ctx->psoc, bssid.bytes,
-					       true);
-
 	lim_mlo_roam_copy_partner_info_to_session(ft_session_ptr,
 						  roam_sync_ind_ptr);
 
@@ -3550,7 +3570,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 		curr_seq_num = ((pHdr->seqControl.seqNumHi << 4) |
 				(pHdr->seqControl.seqNumLo));
 		auth_node = lim_search_pre_auth_list(mac, pHdr->sa);
-		if (auth_node && pHdr->fc.retry &&
+		if (auth_node &&
 		    (auth_node->seq_num == curr_seq_num)) {
 			pe_err_rl("auth frame, seq num: %d is already processed, drop it",
 				  curr_seq_num);

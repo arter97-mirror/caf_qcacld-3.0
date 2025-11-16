@@ -1231,6 +1231,7 @@ sap_validate_chan(struct sap_context *sap_context,
 	bool is_go_scc_strict = false;
 	bool start_sap_on_provided_freq = false;
 	enum QDF_OPMODE opmode = QDF_SAP_MODE;
+	bool force_go_chan_change  = false;
 
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
 	mac_ctx = MAC_CONTEXT(mac_handle);
@@ -1260,7 +1261,20 @@ sap_validate_chan(struct sap_context *sap_context,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (opmode == QDF_P2P_GO_MODE) {
+	/*
+	 * For AUTO GO mode. PCL is not taken into consideration so it can
+	 * send start req in LL LT SAP channel, in such case, do a force
+	 * channel change for GO.
+	 */
+	if (opmode == QDF_P2P_GO_MODE &&
+	    policy_mgr_get_ll_lt_sap_freq(mac_ctx->psoc) ==
+	    sap_context->chan_freq) {
+		sap_debug("GO freq %d causing scc with ll lt sap, get new freq",
+			  sap_context->chan_freq);
+		force_go_chan_change = true;
+	}
+
+	if (opmode == QDF_P2P_GO_MODE && !force_go_chan_change) {
 	       /*
 		* check whether go_force_scc is enabled or not.
 		* If it not enabled then don't any force scc on existing go and

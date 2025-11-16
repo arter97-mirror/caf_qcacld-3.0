@@ -207,7 +207,11 @@ static int rssi_mcs_tbl[][MAX_RSSI_MCS_INDEX] = {
 	/* 40 */
 	{-79, -76, -74, -71, -67, -63, -62, -61, -56, -54, -49, -45, -43, -39},
 	/* 80 */
-	{-76, -73, -71, -68, -64, -60, -59, -58, -53, -51, -46, -42, -46, -36}
+	{-76, -73, -71, -68, -64, -60, -59, -58, -53, -51, -46, -42, -46, -36},
+	/* 160 */
+	{-73, -70, -68, -65, -61, -57, -56, -55, -50, -48, -43, -39, -43, -33},
+	/* 320 */
+	{-70, -67, -65, -62, -58, -54, -53, -52, -47, -45, -40, -36, -40, -30}
 };
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
@@ -7747,15 +7751,17 @@ hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 
 	sinfo->signal_avg = WLAN_HDD_TGT_NOISE_FLOOR_DBM;
 	for (i = 0; i < NUM_CHAINS_MAX; i++) {
-		sinfo->chain_signal_avg[i] =
-			   link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
-		sinfo->chains |= 1 << i;
-		if (sinfo->chain_signal_avg[i] > sinfo->signal_avg &&
-		    sinfo->chain_signal_avg[i] != 0)
-			sinfo->signal_avg = sinfo->chain_signal_avg[i];
+		if (link_info->hdd_stats.per_chain_rssi_stats.rssi[i] != 0) {
+			sinfo->chain_signal_avg[i] =
+			link_info->hdd_stats.per_chain_rssi_stats.rssi[i];
+			sinfo->chains |= 1 << i;
+			if (sinfo->chain_signal_avg[i] > sinfo->signal_avg)
+				sinfo->signal_avg = sinfo->chain_signal_avg[i];
 
-		hdd_debug("RSSI for chain %d, vdev_id %d is %d",
-			  i, link_info->vdev_id, sinfo->chain_signal_avg[i]);
+			hdd_debug("RSSI for chain %d, vdev_id %d is %d",
+				  i, link_info->vdev_id,
+				  sinfo->chain_signal_avg[i]);
+		}
 
 		if (!rssi_stats_valid && sinfo->chain_signal_avg[i])
 			rssi_stats_valid = true;
