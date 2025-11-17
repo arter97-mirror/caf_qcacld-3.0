@@ -104,6 +104,8 @@ typedef int (*send_mode_change_event_cb)(void);
  * @CSA_REASON_SAP_FIX_CH_CONC_WITH_GO: SAP fix channel start
  * @CSA_REASON_LL_LT_SAP_EVENT: LL_LT_SAP csa event
  *  and move GO to other band
+ * @CSA_REASON_PUNCTURE_UPDATE_FOR_NOL: puncture bitmap update for NOL
+ * @CSA_REASON_RADAR_DETECT: radar detect
  */
 enum sap_csa_reason_code {
 	CSA_REASON_UNKNOWN,
@@ -122,7 +124,9 @@ enum sap_csa_reason_code {
 	CSA_REASON_GO_BSS_STARTED,
 	CSA_REASON_SAP_ACS,
 	CSA_REASON_SAP_FIX_CH_CONC_WITH_GO,
-	CSA_REASON_LL_LT_SAP_EVENT
+	CSA_REASON_LL_LT_SAP_EVENT,
+	CSA_REASON_PUNCTURE_UPDATE_FOR_NOL,
+	CSA_REASON_RADAR_DETECT
 };
 
 /*

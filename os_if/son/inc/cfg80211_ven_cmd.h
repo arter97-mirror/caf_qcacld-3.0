@@ -59,6 +59,9 @@
  * @IEEE80211_PARAM_6G_SECURITY_COMP: 6G Security Compliance on/off
  * @IEEE80211_PARAM_ENABLE_SCS: Enable SCS Procedures
  * @IEEE80211_PARAM_IEEE_LINK_ID:
+ * @IEEE80211_PARAM_EMLMR_CONFIG:
+ * @IEEE80211_PARAM_EMLSR_CONFIG:
+ * @IEEE80211_PARAM_STR_CONFIG:
  */
 enum wlan_son_ieee80211_param {
 	IEEE80211_PARAM_MACCMD         = 17,
@@ -99,6 +102,9 @@ enum wlan_son_ieee80211_param {
 	IEEE80211_PARAM_6G_SECURITY_COMP           = 714,
 	IEEE80211_PARAM_ENABLE_SCS                 = 741,
 	IEEE80211_PARAM_IEEE_LINK_ID               = 801,
+	IEEE80211_PARAM_EMLMR_CONFIG               = 808,
+	IEEE80211_PARAM_EMLSR_CONFIG               = 809,
+	IEEE80211_PARAM_STR_CONFIG                 = 810,
 };
 
 enum _ol_ath_param_t {

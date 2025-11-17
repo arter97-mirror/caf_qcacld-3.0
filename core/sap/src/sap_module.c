@@ -2085,6 +2085,14 @@ wlansap_fill_channel_change_request(struct sap_context *sap_ctx,
 	mlme_set_cac_required(sap_ctx->vdev,
 			      !!req->cac_duration_ms);
 
+	/* Use remaining CAC time if available for punctured radar scenarios */
+	if (req->cac_duration_ms && sap_ctx->dfs_cac_remaining_time > 0) {
+		req->cac_duration_ms = sap_ctx->dfs_cac_remaining_time;
+		sap_debug("Using remaining CAC time: %d ms", req->cac_duration_ms);
+		/* Reset after use */
+		sap_ctx->dfs_cac_remaining_time = 0;
+	}
+
 	/* Update the rates in sap_bss_cfg for subsequent channel switch */
 	if (dot11_cfg.opr_rates.numRates) {
 		qdf_mem_copy(req->opr_rates.rate,
@@ -4644,3 +4652,19 @@ QDF_STATUS wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+enum sap_csa_reason_code
+wlansap_get_sap_csa_reason(struct mac_context *mac, uint8_t vdev_id)
+{
+	struct sap_context *sap_ctx;
+
+	sap_ctx = mac->sap.sapCtxList[vdev_id].sap_context;
+	if (sap_ctx) {
+		sap_debug("vdev %d CSA reason %d %s",
+			  vdev_id, sap_ctx->csa_reason,
+			  sap_get_csa_reason_str(sap_ctx->csa_reason));
+		return sap_ctx->csa_reason;
+	}
+	return CSA_REASON_UNKNOWN;
+}
+
