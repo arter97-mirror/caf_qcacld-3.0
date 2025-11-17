@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -69,4 +70,45 @@ hdd_sysfs_stats_destroy(struct hdd_adapter *adapter)
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+/**
+ * hdd_sysfs_dump_periodic_custom_stats_create() - API to create sysfs entry
+ *						   dump_periodic_custom_stats
+ * @adapter: hdd adapter
+ *
+ * file path: /sys/class/net/wlanxx/dump_periodic_custom_stats
+ * This sysfs entry is created per adapter
+ *
+ * usage:
+ *      echo [0/1] > dump_periodic_custom_stats
+ *      cat dump_periodic_custom_stats
+ *
+ * Return: 0 on success and errno on failure
+ */
+int
+hdd_sysfs_dump_periodic_custom_stats_create(struct hdd_adapter *adapter);
+
+/**
+ * hdd_sysfs_dump_periodic_custom_stats_destroy() - API to destroy sysfs entry
+ *						    dump_periodic_custom_stats
+ * @adapter: hdd adapter
+ *
+ * Return: None
+ */
+void
+hdd_sysfs_dump_periodic_custom_stats_destroy(struct hdd_adapter *adapter);
+#else
+static inline int
+hdd_sysfs_dump_periodic_custom_stats_create(struct hdd_adapter *adapter)
+{
+	return 0;
+}
+
+static inline void
+hdd_sysfs_dump_periodic_custom_stats_destroy(struct hdd_adapter *adapter)
+{
+}
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
+
 #endif /* #ifndef _WLAN_HDD_SYSFS_STATS_H */

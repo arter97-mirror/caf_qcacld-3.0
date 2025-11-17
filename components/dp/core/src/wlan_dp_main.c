@@ -3213,3 +3213,38 @@ void wlan_dp_rx_aggr_dis_req(struct wlan_dp_intf *dp_intf,
 	dp_info("Module: %u disable: %u", id, disable);
 }
 #endif
+
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+void wlan_dp_dump_periodic_custom_stats_enable_req(struct wlan_dp_link *dp_link,
+						   bool enable)
+{
+	struct wlan_dp_intf *dp_intf;
+	ol_txrx_soc_handle soc;
+
+	if (!dp_link) {
+		dp_err("dp_intf is NULL");
+		return;
+	}
+
+	dp_intf = dp_link->dp_intf;
+	if (dp_intf->dump_periodic_custom_stats == enable) {
+		dp_debug("dump_periodic_custom_stats already %s",
+			 enable ? "enabled" : "disabled");
+		return;
+	}
+
+	dp_intf->dump_periodic_custom_stats = enable;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc) {
+		dp_err("SOC context is NULL");
+		return;
+	}
+
+	/* Call CDP API to enable/disable UL delay */
+	cdp_enable_ul_delay(soc, dp_link->link_id, enable);
+
+	dp_info("dump_periodic_custom_stats %s for vdev_id: %u",
+		enable ? "enabled" : "disabled", dp_link->link_id);
+}
+#endif

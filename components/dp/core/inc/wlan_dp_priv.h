@@ -709,6 +709,8 @@ struct dp_rx_fst {
  * @hlp_list_lock: Lock to protect hlp link_list operation
  * @hlp_list: List of HLP peers for HLP response handling
  * @disable_rx_aggr: Disable Rx aggregation
+ * @dump_periodic_custom_stats: Flag to indicate if the DP internal stats
+ *				should be dumped periodically.
  * @spm_intf_ctx: SPM interface context
  * @opm_stats_work: OPM stats work
  * @ipv4_addr: IPv4 address
@@ -796,6 +798,9 @@ struct wlan_dp_intf {
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
 	bool disable_rx_aggr[CTRL_RX_AGGR_ID_MAX];
+#endif
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+	bool dump_periodic_custom_stats;
 #endif
 #if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
 	struct wlan_dp_spm_intf_context *spm_intf_ctx;

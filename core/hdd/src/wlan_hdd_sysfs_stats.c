@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -388,12 +388,171 @@ int hdd_sysfs_stats_create(struct hdd_adapter *adapter)
 	if (error)
 		hdd_err("could not create stats sysfs file");
 
+	error = hdd_sysfs_dump_periodic_custom_stats_create(adapter);
+	if (error)
+		hdd_err("could not create dump_periodic_custom_stats sysfs file");
+
 	return error;
 }
 
 void hdd_sysfs_stats_destroy(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_dump_periodic_custom_stats_destroy(adapter);
 	device_remove_file(&adapter->dev->dev, &dev_attr_dump_stats);
 	device_remove_file(&adapter->dev->dev, &dev_attr_clear_stats);
 	device_remove_file(&adapter->dev->dev, &dev_attr_stats);
 }
+
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+static ssize_t
+__hdd_sysfs_dump_periodic_custom_stats_show(struct net_device *net_dev,
+					    char *buf)
+{
+	struct hdd_adapter *adapter = netdev_priv(net_dev);
+	struct hdd_context *hdd_ctx;
+	struct wlan_objmgr_vdev *vdev;
+	ssize_t ret;
+
+	if (hdd_validate_adapter(adapter))
+		return -EINVAL;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	ret = scnprintf(buf, PAGE_SIZE, "%d\n",
+			ucfg_dp_get_dump_periodic_custom_stats_enable(vdev));
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return ret;
+}
+
+static ssize_t
+hdd_sysfs_dump_periodic_custom_stats_show(struct device *dev,
+					  struct device_attribute *attr,
+					  char *buf)
+{
+	struct net_device *net_dev = container_of(dev, struct net_device, dev);
+	struct osif_vdev_sync *vdev_sync;
+	ssize_t err_size;
+
+	err_size = osif_vdev_sync_op_start(net_dev, &vdev_sync);
+	if (err_size)
+		return err_size;
+
+	err_size = __hdd_sysfs_dump_periodic_custom_stats_show(net_dev, buf);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return err_size;
+}
+
+static ssize_t
+__hdd_sysfs_dump_periodic_custom_stats_store(struct net_device *net_dev,
+					     const char *buf, size_t count)
+{
+	struct hdd_adapter *adapter = netdev_priv(net_dev);
+	struct hdd_context *hdd_ctx;
+	char buf_local[MAX_SYSFS_USER_COMMAND_SIZE_LENGTH + 1];
+	struct wlan_objmgr_vdev *vdev;
+	char *sptr, *token;
+	uint8_t value;
+	int ret;
+
+	if (hdd_validate_adapter(adapter))
+		return -EINVAL;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	ret = hdd_sysfs_validate_and_copy_buf(buf_local, sizeof(buf_local),
+					      buf, count);
+	if (ret) {
+		hdd_err_rl("invalid input");
+		return ret;
+	}
+
+	sptr = buf_local;
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou8(token, 0, &value))
+		return -EINVAL;
+
+	if (value > 1) {
+		hdd_err_rl("invalid value %d", value);
+		return -EINVAL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	hdd_debug("vdev_id: %d dump_periodic_custom_stats: %d",
+		  adapter->deflink->vdev_id, value);
+
+	ucfg_dp_dump_periodic_custom_stats_enable_req(vdev, value);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	return count;
+}
+
+static ssize_t
+hdd_sysfs_dump_periodic_custom_stats_store(struct device *dev,
+					   struct device_attribute *attr,
+					   const char *buf, size_t count)
+{
+	struct net_device *net_dev = container_of(dev, struct net_device, dev);
+	struct osif_vdev_sync *vdev_sync;
+	ssize_t errno_size;
+
+	errno_size = osif_vdev_sync_op_start(net_dev, &vdev_sync);
+	if (errno_size)
+		return errno_size;
+
+	errno_size = __hdd_sysfs_dump_periodic_custom_stats_store(net_dev, buf,
+								  count);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno_size;
+}
+
+static DEVICE_ATTR(dump_periodic_custom_stats, 0660,
+		   hdd_sysfs_dump_periodic_custom_stats_show,
+		   hdd_sysfs_dump_periodic_custom_stats_store);
+
+int hdd_sysfs_dump_periodic_custom_stats_create(struct hdd_adapter *adapter)
+{
+	int error;
+
+	error = device_create_file(&adapter->dev->dev,
+				   &dev_attr_dump_periodic_custom_stats);
+	if (error)
+		hdd_err("could not create dump_periodic_custom_stats sysfs file");
+
+	return error;
+}
+
+void
+hdd_sysfs_dump_periodic_custom_stats_destroy(struct hdd_adapter *adapter)
+{
+	device_remove_file(&adapter->dev->dev,
+			   &dev_attr_dump_periodic_custom_stats);
+}
+#endif
