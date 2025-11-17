@@ -1083,16 +1083,48 @@ fail:
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 7, 0))
-static inline int32_t remote_station_put_u64(struct sk_buff *skb,
-					     int32_t attrtype,
-					     uint64_t value)
+static inline
+int32_t remote_station_put_u64(struct sk_buff *skb,
+			       int32_t attrtype,
+			       uint64_t value)
 {
 	return nla_put_u64_64bit(skb, attrtype, value, REMOTE_PAD);
+}
+
+/**
+ * remote_station_put_mcs_pkt_u64 - Add a 64-bit MCS packet count to netlink skb
+ * @skb: Pointer to netlink socket buffer
+ * @attrtype: Netlink attribute type for this value
+ * @value: 64-bit value to report (typically per-MCS packet statistics)
+ *
+ * Helper for reporting 64-bit values (e.g. MCS packet counts) to userspace,
+ * using proper padding required by nl80211 vendor extensions. The padding is
+ * QCA_WLAN_VENDOR_ATTR_MCS_PKT_PAD for newer kernels (>= 4.7.0), allowing
+ * 64-bit values to be properly aligned in netlink messages. For older kernels,
+ * no special padding is applied.
+ *
+ * Returns: 0 on success, negative errno on failure.
+ */
+static inline
+int32_t remote_station_put_mcs_pkt_u64(struct sk_buff *skb,
+				       int32_t attrtype,
+				       uint64_t value)
+{
+	return nla_put_u64_64bit(skb, attrtype, value,
+				 QCA_WLAN_VENDOR_ATTR_MCS_PKT_PAD);
 }
 #else
 static inline int32_t remote_station_put_u64(struct sk_buff *skb,
 					     int32_t attrtype,
 					     uint64_t value)
+{
+	return nla_put_u64(skb, attrtype, value);
+}
+
+static inline
+int32_t remote_station_put_mcs_pkt_u64(struct sk_buff *skb,
+				       int32_t attrtype,
+				       uint64_t value)
 {
 	return nla_put_u64(skb, attrtype, value);
 }
@@ -2538,6 +2570,8 @@ static int hdd_get_station_remote_ex(struct hdd_context *hdd_ctx,
 	return status;
 }
 
+#define MCS_COUNT_MAX 16
+
 /**
  * hdd_get_station_info_ex() - send STA info to userspace, for STA mode only
  * @link_info: Pointer of link info in HDD adapter.
@@ -2620,6 +2654,14 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 		      SS_COUNT_JITTER * (nla_total_size(sizeof(uint8_t)) +
 					 nla_total_size(sizeof(uint64_t)) +
 					 nla_total_size(sizeof(uint64_t)));
+
+	/* Add length for QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MCS_PKT_COUNT */
+	nl_buf_len += NLA_HDRLEN * MCS_COUNT_MAX;
+	nl_buf_len += nla_total_size(0) +
+		      MCS_COUNT_MAX * (nla_total_size(sizeof(uint8_t)) +
+				       nla_total_size(sizeof(uint64_t)) +
+				       nla_total_size(sizeof(uint64_t)) +
+				       nla_total_size(sizeof(uint64_t)));
 
 	if (!nl_buf_len) {
 		hdd_err_rl("Failed to get bcn pmf stats");
@@ -2795,4 +2837,3 @@ end:
 
 	return errno;
 }
-
