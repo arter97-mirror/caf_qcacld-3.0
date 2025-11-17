@@ -1113,6 +1113,15 @@ int32_t remote_station_put_mcs_pkt_u64(struct sk_buff *skb,
 	return nla_put_u64_64bit(skb, attrtype, value,
 				 QCA_WLAN_VENDOR_ATTR_MCS_PKT_PAD);
 }
+
+static inline
+int32_t remote_station_put_bw_pkt_u64(struct sk_buff *skb,
+				      int32_t attrtype,
+				      uint64_t value)
+{
+	return nla_put_u64_64bit(skb, attrtype, value,
+				 QCA_WLAN_VENDOR_ATTR_BW_PKT_PAD);
+}
 #else
 static inline int32_t remote_station_put_u64(struct sk_buff *skb,
 					     int32_t attrtype,
@@ -1125,6 +1134,14 @@ static inline
 int32_t remote_station_put_mcs_pkt_u64(struct sk_buff *skb,
 				       int32_t attrtype,
 				       uint64_t value)
+{
+	return nla_put_u64(skb, attrtype, value);
+}
+
+static inline
+int32_t remote_station_put_bw_pkt_u64(struct sk_buff *skb,
+				      int32_t attrtype,
+				      uint64_t value)
 {
 	return nla_put_u64(skb, attrtype, value);
 }
@@ -2571,6 +2588,7 @@ static int hdd_get_station_remote_ex(struct hdd_context *hdd_ctx,
 }
 
 #define MCS_COUNT_MAX 16
+#define BW_COUNT_MAX 5
 
 /**
  * hdd_get_station_info_ex() - send STA info to userspace, for STA mode only
@@ -2662,6 +2680,14 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 				       nla_total_size(sizeof(uint64_t)) +
 				       nla_total_size(sizeof(uint64_t)) +
 				       nla_total_size(sizeof(uint64_t)));
+
+	/* Add length for QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_BW_PKT_COUNT */
+	nl_buf_len += NLA_HDRLEN * BW_COUNT_MAX;
+	nl_buf_len += nla_total_size(0) +
+		      BW_COUNT_MAX * (nla_total_size(sizeof(uint8_t)) +
+				      nla_total_size(sizeof(uint64_t)) +
+				      nla_total_size(sizeof(uint64_t)) +
+				      nla_total_size(sizeof(uint64_t)));
 
 	if (!nl_buf_len) {
 		hdd_err_rl("Failed to get bcn pmf stats");
