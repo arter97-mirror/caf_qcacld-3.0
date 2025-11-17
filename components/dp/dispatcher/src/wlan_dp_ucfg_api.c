@@ -3355,6 +3355,39 @@ ucfg_dp_rx_aggr_dis_req(struct wlan_objmgr_vdev *vdev,
 	wlan_dp_rx_aggr_dis_req(dp_link->dp_intf, id, disable);
 }
 
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+void
+ucfg_dp_dump_periodic_custom_stats_enable_req(struct wlan_objmgr_vdev *vdev,
+					      bool enable)
+{
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err("DP link Null, vdev_id: %u enable:%u",
+		       wlan_vdev_get_id(vdev), enable);
+		return;
+	}
+
+	wlan_dp_dump_periodic_custom_stats_enable_req(dp_link, enable);
+}
+
+bool
+ucfg_dp_get_dump_periodic_custom_stats_enable(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err("DP link Null, vdev_id: %u",
+		       wlan_vdev_get_id(vdev));
+		return false;
+	}
+
+	return dp_link->dp_intf->dump_periodic_custom_stats;
+}
+#endif
+
 bool ucfg_dp_ipa_ctrl_debug_supported(struct wlan_objmgr_psoc *psoc)
 {
 	uint8_t is_ipa_ctrl_debug_supported =
