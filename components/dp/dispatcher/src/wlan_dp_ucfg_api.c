@@ -3179,6 +3179,11 @@ QDF_STATUS ucfg_dp_dal_notify_resume(ol_txrx_soc_handle soc)
 {
 	return cdp_dal_notify_resume(soc);
 }
+
+void ucfg_dp_dal_ssr_notify(void *soc)
+{
+	cdp_dal_ssr_notify(soc);
+}
 #endif /* FEATURE_DAL_DP_SUPPORT */
 
 void *ucfg_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,

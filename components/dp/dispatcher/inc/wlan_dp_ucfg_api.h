@@ -1665,6 +1665,17 @@ QDF_STATUS ucfg_dp_dal_notify_suspend(ol_txrx_soc_handle soc);
  * Return: QDF_STATUS
  */
 QDF_STATUS ucfg_dp_dal_notify_resume(ol_txrx_soc_handle soc);
+
+/**
+ * ucfg_dp_dal_ssr_notify() - DAL SSR notification wrapper
+ * @soc: CDP SoC handle
+ *
+ * This is a ucfg wrapper for cdp_dal_ssr_notify() to maintain
+ * the layering between HDD and DP components.
+ *
+ * Return: None
+ */
+void ucfg_dp_dal_ssr_notify(void *soc);
 #else
 static inline QDF_STATUS ucfg_dp_dal_notify_suspend(ol_txrx_soc_handle soc)
 {
@@ -1674,6 +1685,10 @@ static inline QDF_STATUS ucfg_dp_dal_notify_suspend(ol_txrx_soc_handle soc)
 static inline QDF_STATUS ucfg_dp_dal_notify_resume(ol_txrx_soc_handle soc)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline void ucfg_dp_dal_ssr_notify(ol_txrx_soc_handle soc)
+{
 }
 #endif /* FEATURE_DAL_DP_SUPPORT */
 

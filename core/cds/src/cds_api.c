@@ -1037,6 +1037,28 @@ err_dispatcher_disable:
 	return status;
 } /* cds_open() */
 
+#ifdef FEATURE_DAL_DP_SUPPORT
+/**
+ * cds_dal_register_shutdown_notifier() - Register DAL shutdown notifier
+ * @soc: CDP SoC handle
+ *
+ * Return: success/failure
+ */
+static QDF_STATUS
+cds_dal_register_shutdown_notifier(ol_txrx_soc_handle soc)
+{
+	return cds_shutdown_notifier_register(
+				ucfg_dp_dal_ssr_notify,
+				soc);
+}
+#else
+static QDF_STATUS
+cds_dal_register_shutdown_notifier(ol_txrx_soc_handle soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS qdf_status;
@@ -1114,6 +1136,13 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 
 	ucfg_dp_set_tc_ingress_prio(psoc, cdp_cfg_get(gp_cds_context->dp_soc,
 						      cfg_dp_tc_ingress_prio));
+
+	qdf_status = cds_dal_register_shutdown_notifier(gp_cds_context->dp_soc);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		cds_err("Failed to register DAL shutdown notifier: %d",
+			qdf_status);
+		goto intr_close;
+	}
 
 	return 0;
 
