@@ -501,6 +501,22 @@ int os_if_son_set_chan(struct wlan_objmgr_vdev *vdev,
 }
 qdf_export_symbol(os_if_son_set_chan);
 
+int os_if_son_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev, uint32_t pri)
+{
+	int ret;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return -EINVAL;
+	}
+
+	ret = g_son_os_if_cb.os_if_set_def_tidmap_prty(vdev, pri);
+	osif_debug("vdev %d pri %d ", wlan_vdev_get_id(vdev), pri);
+
+	return ret;
+}
+qdf_export_symbol(os_if_son_set_def_tidmap_prty);
+
 int os_if_son_set_cac_timeout(struct wlan_objmgr_vdev *vdev,
 			      int cac_timeout)
 {
