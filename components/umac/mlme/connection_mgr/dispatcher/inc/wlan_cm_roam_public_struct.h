@@ -2318,7 +2318,6 @@ struct wlan_roam_update_config {
  * transitioned after candidate selection is done at fw and preauth to
  * the AP is started.
  * @WLAN_ROAM_SYNCH_IN_PROG: Roaming handoff complete
- * @WLAN_MLO_ROAM_SYNCH_IN_PROG: MLO Roam sync is ongoing,
  * only used for ml links.
  */
 enum roam_offload_state {
@@ -2328,7 +2327,6 @@ enum roam_offload_state {
 	WLAN_ROAM_RSO_STOPPED,
 	WLAN_ROAMING_IN_PROG,
 	WLAN_ROAM_SYNCH_IN_PROG,
-	WLAN_MLO_ROAM_SYNCH_IN_PROG,
 };
 
 /**

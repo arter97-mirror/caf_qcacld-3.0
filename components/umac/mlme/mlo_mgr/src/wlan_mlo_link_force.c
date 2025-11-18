@@ -6804,8 +6804,7 @@ ml_nlink_conn_change_notify(struct wlan_objmgr_psoc *psoc,
 	case ml_nlink_connection_updated_evt:
 	case ml_nlink_post_set_link_evt:
 		if (mode == QDF_STA_MODE &&
-		    (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) ||
-		     MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))) {
+		    (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))) {
 			mlo_debug("vdev id %d in roam sync", vdev_id);
 			break;
 		}

@@ -1937,13 +1937,6 @@ QDF_STATUS mlme_get_cfg_wlm_reset(struct wlan_objmgr_psoc *psoc,
 #define MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) (false)
 #endif
 
-#if defined (WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
-#define MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) \
-		(mlme_get_roam_state(psoc, vdev_id) == WLAN_MLO_ROAM_SYNCH_IN_PROG)
-#else
-#define MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) (false)
-#endif
-
 /**
  * mlme_reinit_control_config_lfr_params() - Reinitialize roam control config
  * @psoc: PSOC pointer

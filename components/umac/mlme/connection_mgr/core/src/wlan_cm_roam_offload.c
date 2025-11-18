@@ -4579,10 +4579,6 @@ cm_roam_switch_to_deinit(struct wlan_objmgr_pdev *pdev,
 	case WLAN_ROAM_INIT:
 		break;
 
-	case WLAN_MLO_ROAM_SYNCH_IN_PROG:
-		mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_DEINIT);
-		break;
-
 	case WLAN_ROAM_DEINIT:
 	/*
 	 * Already the roaming module is de-initialized at fw,
@@ -5270,10 +5266,7 @@ cm_mlo_roam_switch_for_link(struct wlan_objmgr_pdev *pdev,
 	switch (cur_state) {
 	case WLAN_ROAM_DEINIT:
 		/* Only used for link vdev during MLO roaming */
-		mlme_set_roam_state(psoc, vdev_id, WLAN_MLO_ROAM_SYNCH_IN_PROG);
-		break;
-	case WLAN_MLO_ROAM_SYNCH_IN_PROG:
-		mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_DEINIT);
+		mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_SYNCH_IN_PROG);
 		break;
 	default:
 		mlme_err("ROAM: vdev:%d MLO Roam synch not allowed in [%d] state reason:%d",

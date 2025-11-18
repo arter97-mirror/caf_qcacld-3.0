@@ -1221,7 +1221,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		(session_entry->limMlmState != eLIM_MLM_WT_ASSOC_RSP_STATE)) ||
 		((subtype == LIM_REASSOC) &&
 		 !wlan_cm_is_vdev_roam_sync_inprogress(session_entry->vdev) &&
-		 !MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(mac_ctx->psoc,
+		 !MLME_IS_ROAM_SYNCH_IN_PROGRESS(mac_ctx->psoc,
 						     session_entry->vdev_id) &&
 		((session_entry->limMlmState != eLIM_MLM_WT_REASSOC_RSP_STATE)
 		&& (session_entry->limMlmState !=

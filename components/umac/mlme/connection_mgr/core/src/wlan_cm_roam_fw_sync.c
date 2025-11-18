@@ -222,11 +222,6 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 					sync_ind->roamed_vdev_id,
 					WLAN_ROAM_SYNCH_IN_PROG,
 					REASON_ROAM_HANDOFF_DONE);
-
-		status = wlan_cm_roam_state_change(pdev,
-					vdev_id,
-					WLAN_MLO_ROAM_SYNCH_IN_PROG,
-					REASON_ROAM_HANDOFF_DONE);
 		return status;
 	}
 
