@@ -655,8 +655,8 @@ QDF_STATUS dp_wfds_new_server(void)
 	qdf_atomic_set(&dl_wfds->wfds_state, DP_WFDS_SVC_CONNECTED);
 
 	htc_vote_link_up(htc_handle, HTC_LINK_VOTE_DIRECT_LINK_USER_ID);
-	dp_debug("Connected to WFDS QMI service, state: 0x%x",
-		 qdf_atomic_read(&dl_wfds->wfds_state));
+	dp_info("Connected to WFDS QMI service, state: 0x%x",
+		qdf_atomic_read(&dl_wfds->wfds_state));
 
 	dp_rx_handle_buf_pool_audio_smmu_mapping(wlan_psoc_get_dp_handle(dp_ctx->psoc),
 						 wlan_objmgr_pdev_get_pdev_id(dp_ctx->pdev),
@@ -705,7 +705,7 @@ void dp_wfds_del_server(void)
 	if (!dl_wfds || !qdf_ctx || !hif_ctx || !htc_handle)
 		return;
 
-	dp_debug("WFDS QMI server exiting");
+	dp_info("WFDS QMI server exiting");
 
 	dl_wfds_state = qdf_atomic_read(&dl_wfds->wfds_state);
 	qdf_atomic_set(&dl_wfds->wfds_state,
@@ -851,7 +851,7 @@ QDF_STATUS dp_wfds_init(struct dp_direct_link_context *dp_direct_link_ctx)
 	gp_dl_wfds_ctx = dl_wfds;
 	dl_wfds->is_audio_shared_iommu_group =
 			pld_is_audio_shared_iommu_group(qdf_dev->dev);
-	dp_debug("WFDS QMI init successful");
+	dp_info("WFDS QMI init successful");
 
 	return status;
 
@@ -882,7 +882,7 @@ void dp_wfds_deinit(struct dp_direct_link_context *dp_direct_link_ctx,
 
 	dl_wfds = dp_direct_link_ctx->dl_wfds;
 
-	dp_debug("WFDS QMI deinit");
+	dp_info("WFDS QMI deinit");
 
 	if (qdf_atomic_read(&dl_wfds->wfds_state) !=
 	    DP_WFDS_SVC_DISCONNECTED)
