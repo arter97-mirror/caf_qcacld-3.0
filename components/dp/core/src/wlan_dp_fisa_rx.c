@@ -1377,6 +1377,11 @@ void dp_fisa_rx_fst_update_work(void *arg)
 	}
 
 	if (hif_force_wake_request(((struct hal_soc *)hal_soc_hdl)->hif_handle)) {
+		if (qdf_atomic_read(&fisa_hdl->pm_suspended)) {
+			dp_err_rl("WQ failed due to suspend stage");
+			DP_STATS_INC(fisa_hdl, update_deferred, 1);
+			return;
+		}
 		dp_err("Wake up request failed");
 		qdf_check_state_before_panic(__func__, __LINE__);
 		return;
