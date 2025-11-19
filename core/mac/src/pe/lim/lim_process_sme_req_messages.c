@@ -3106,6 +3106,49 @@ set_param:
 }
 
 void
+lim_cfg_early_rx_check_oui(struct mac_context *mac_ctx,
+			   struct pe_session *session,
+			   struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr vendor_ap_search_attr = {0};
+	uint16_t ie_len = 0;
+	uint8_t drift;
+	QDF_STATUS status;
+	bool oui_match = false;
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+	vendor_ap_search_attr.mac_addr = &bss_desc->bssId[0];
+
+	status = wlan_psoc_mlme_get_early_rx(mac_ctx->psoc, &drift);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Unable to get early rx drift");
+		return;
+	}
+
+	oui_match = wlan_action_oui_search(mac_ctx->psoc,
+					   &vendor_ap_search_attr,
+					   ACTION_OUI_EARLY_RX);
+
+	pe_debug("Early_rx vdev_id=%d drift=%d, oui_match=%d",
+		 session->vdev_id, drift, oui_match);
+
+	if (!oui_match)
+		return;
+
+	status = wma_cli_set_command
+			(session->vdev_id,
+			wmi_pdev_param_adaptive_early_rx_extra_sleep_slop,
+			drift, PDEV_CMD);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("Unable to configure early RX drift in FW");
+}
+
+void
 lim_disable_ht_he_dynamic_smps(struct pe_session *session,
 			       qdf_freq_t chan_freq)
 {
@@ -4506,6 +4549,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 
 	lim_cfg_dsmps_for_iot_ap(mac_ctx, session, bss_desc, false);
 	lim_set_amsdu_for_2g_oui(mac_ctx, session, bss_desc);
+	lim_cfg_early_rx_check_oui(mac_ctx, session, bss_desc);
 
 	lim_copy_ml_partner_info_to_session(session, req);
 

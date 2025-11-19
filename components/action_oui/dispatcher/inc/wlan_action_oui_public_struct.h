@@ -161,6 +161,7 @@
  * priority higher than ACTION_OUI_DISABLE_DYNAMIC_SMPS
  * @ACTION_OUI_ENABLE_DSMPS_BY_RSSI: Enable DSMPS based on AP RSSI
  * @ACTION_OUI_ENABLE_AMSDU_2G: Enable AMSDU for 2.4 GHz STA connections with specified APs
+ * @ACTION_OUI_EARLY_RX: Enable early RX based on specified AP
  * @ACTION_OUI_MAXIMUM_ID: maximum number of action oui types
  */
 enum action_oui_id {
@@ -197,6 +198,7 @@ enum action_oui_id {
 	ACTION_OUI_ENABLE_DYNAMIC_SMPS,
 	ACTION_OUI_ENABLE_DSMPS_BY_RSSI,
 	ACTION_OUI_ENABLE_AMSDU_2G,
+	ACTION_OUI_EARLY_RX,
 	ACTION_OUI_MAXIMUM_ID
 };
 

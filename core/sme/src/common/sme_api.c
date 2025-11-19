@@ -16859,6 +16859,9 @@ void sme_update_score_config(mac_handle_t mac_handle, eCsrPhyMode phy_mode,
 					   &channel_bonding_mode);
 	config.bw_above_20_5ghz = channel_bonding_mode;
 	config.max_chan_switch_ie = mlme_max_chan_switch_is_set(mac_ctx->psoc);
+	status = wlan_psoc_mlme_get_early_rx(mac_ctx->psoc, &config.early_rx);
+	if (QDF_IS_STATUS_ERROR(status))
+		sme_err("unable to get early rx drift");
 
 	wlan_psoc_set_phy_config(mac_ctx->psoc, &config);
 }

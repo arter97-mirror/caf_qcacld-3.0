@@ -1119,6 +1119,37 @@
 	"F832E4 00 01", \
 	"disable dynamic SMPS capability for specified AP")
 
+/*
+ * <ini>
+ * CFG_ACTION_OUI_EARLY_RX - Used to enable early RX feature for specified APs
+ *
+ * This ini is used to specify AP OUIs for which early RX feature should be
+ * enabled to account for the drift in beacon reception.
+ *
+ * Default OUIs: (All values in Hex)
+ * OUI 1: 000ce7
+ *  OUI data Len: 00
+ *  Info Mask : 03 - 0000 0011 - OUI and mac address present in Info mask
+ *  Mac address : 3E:D2:E5:xx:xx:xx
+ *  Mac mask : E0 - 1110 0000 - First three bytes of AP mac address
+ *
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_EARLY_RX CFG_INI_STRING( \
+	"gActionOUIEarlyRx", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"000CE7 00 03 3ED2E5000000 E0", \
+	"Used to enable early RX feature for specified APs")
+
 #define CFG_ACTION_OUI \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
 	CFG(CFG_ACTION_OUI_CONNECT_1X1) \
@@ -1148,6 +1179,7 @@
 	CFG(CFG_ACTION_OUI_ENABLE_AMSDU_2G) \
 	CFG(CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK) \
 	CFG(CFG_ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P) \
+	CFG(CFG_ACTION_OUI_EARLY_RX) \
 	CFG(CFG_ENABLE_ACTION_OUI)
 
 /* Action OUI V2 ini use different name format XXX_V2, support operator

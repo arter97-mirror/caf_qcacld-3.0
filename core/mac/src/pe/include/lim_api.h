@@ -1165,4 +1165,21 @@ lim_cfg_dsmps_for_iot_ap(struct mac_context *mac_ctx,
 void lim_set_amsdu_for_2g_oui(struct mac_context *mac_ctx,
 			      struct pe_session *session,
 			      struct bss_description *bss_desc);
+
+/**
+ * lim_cfg_early_rx_check_oui() - Configure early RX for AP with beacon drift
+ * @mac_ctx: mac context
+ * @session: pe session
+ * @bss_desc: bss descriptor
+ *
+ * Configure adaptive early RX for AP with beacon drift as per action OUI
+ *
+ * Send pdev param for early RX if OUI search is successful
+ *
+ * Return: None
+ */
+void
+lim_cfg_early_rx_check_oui(struct mac_context *mac_ctx,
+			   struct pe_session *session,
+			   struct bss_description *bss_desc);
 #endif /* __LIM_API_H */

@@ -235,6 +235,10 @@ static void action_oui_load_config(struct action_oui_psoc_priv *psoc_priv)
 		      [ACTION_OUI_ENABLE_AMSDU_2G],
 		      cfg_get(psoc, CFG_ACTION_OUI_ENABLE_AMSDU_2G),
 		      ACTION_OUI_MAX_STR_LEN);
+	qdf_str_lcopy(psoc_priv->action_oui_str
+		      [ACTION_OUI_EARLY_RX],
+		      cfg_get(psoc, CFG_ACTION_OUI_EARLY_RX),
+		      ACTION_OUI_MAX_STR_LEN);
 
 	if (psoc_priv->is_action_oui_v2_enabled) {
 		qdf_str_lcopy(psoc_priv->action_oui_str
