@@ -5028,6 +5028,7 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 	char buf[MAX_FEATURES_STR_LEN];
 	size_t pos = 0, buf_len = MAX_FEATURES_STR_LEN;
 	uint8_t i;
+	bool is_ie_allowlist_enable = false;
 
 	/* ENTER_DEV() intentionally not used in a frequently invoked API */
 
@@ -5167,6 +5168,13 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 		/* Support for aggressive roaming */
 		wlan_hdd_set_supported_features_extn(fset_extn,
 						     WIFI_FEATURE_ROAMING_MODE_CONTROL);
+	}
+
+	ucfg_fwol_get_ie_allowlist(hdd_ctx->psoc, &is_ie_allowlist_enable);
+	if (is_ie_allowlist_enable) {
+		fset |= WIFI_FEATURE_IE_ALLOWLIST;
+		wlan_hdd_set_supported_features_extn(fset_extn,
+						     WIFI_FEATURE_IE_ALLOWLIST);
 	}
 
 	if (hdd_scan_random_mac_addr_supported()) {
