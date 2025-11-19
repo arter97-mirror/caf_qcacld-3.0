@@ -13076,13 +13076,12 @@ int hdd_cstats_send_data_to_userspace(char *buff, unsigned int len,
 	if (type == CSTATS_FW_TYPE && is_logging_enable)
 		hdd_print_second_64_bits_cstats_fw_type(buff, len);
 
-	skb = dev_alloc_skb(MAX_CSTATS_NODE_LENGTH);
+	tot_msg_len = NLMSG_SPACE(len + sizeof(wnl->radio));
+	skb = dev_alloc_skb(tot_msg_len);
 	if (!skb) {
-		qdf_err("dev_alloc_skb() failed");
+		qdf_err("dev_alloc_skb() failed for msg size[%d]", tot_msg_len);
 		return -ENOMEM;
 	}
-
-	tot_msg_len = NLMSG_SPACE(len + sizeof(wnl->radio));
 
 	nlh = nlmsg_put(skb, 0, nlmsg_seq++,
 			ANI_NL_MSG_LOG,
