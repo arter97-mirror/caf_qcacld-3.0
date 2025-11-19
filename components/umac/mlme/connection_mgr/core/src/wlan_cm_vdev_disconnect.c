@@ -226,7 +226,9 @@ cm_handle_disconnect_req(struct wlan_objmgr_vdev *vdev,
 		cm_roam_restore_default_config(pdev, vdev_id);
 
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	if (opmode == QDF_STA_MODE && !wlan_vdev_mlme_is_link_sta_vdev(vdev))
+	if (opmode == QDF_STA_MODE &&
+	    !wlan_vdev_mlme_is_link_sta_vdev(vdev) &&
+	    req->req.source != CM_MLO_ROAM_INTERNAL_DISCONNECT)
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_DEINIT,
 					  REASON_DISCONNECTED);

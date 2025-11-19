@@ -5808,6 +5808,15 @@ void mlme_set_roam_state(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 		return;
 	}
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) &&
+	    !wlan_vdev_mlme_is_assoc_sta_vdev(vdev) &&
+	    new_state != WLAN_ROAMING_IN_PROG) {
+		mlme_debug("vdev%d: Blocked RSO SM state change non assoc vdev, "
+			   "requested new_state:%d",
+			   vdev_id, new_state);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
 
 	if (!mlme_priv->mlme_roam) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
