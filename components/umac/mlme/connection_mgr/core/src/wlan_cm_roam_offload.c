@@ -5399,6 +5399,7 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 	bool is_rso_skip = false;
 	enum roam_offload_state cur_state;
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+	bool is_cross_vdev_roam = false;
 
 	if (!psoc)
 		return QDF_STATUS_E_INVAL;
@@ -5412,10 +5413,13 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		is_up = mlo_check_if_all_vdev_up(vdev);
 	else
 		is_up = QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(vdev));
+
+	is_cross_vdev_roam = wlan_cm_is_cross_vdev_roaming(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 
 	if ((requested_state != WLAN_ROAM_DEINIT &&
-	     requested_state != WLAN_ROAM_RSO_STOPPED) && !is_up) {
+	     requested_state != WLAN_ROAM_RSO_STOPPED) &&
+	     !is_up && !is_cross_vdev_roam) {
 		mlme_debug("ROAM: roam state(%d) change requested in non-connected state",
 			   requested_state);
 		goto end;

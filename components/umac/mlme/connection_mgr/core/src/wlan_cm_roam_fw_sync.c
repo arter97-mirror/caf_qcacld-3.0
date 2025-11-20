@@ -1253,7 +1253,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 	wlan_rec_conn_info(vdev_id, DEBUG_CONN_ROAMING,
 			   roam_synch_data->bssid.bytes, 0, 0);
-
+	wlan_cm_clear_cross_vdev_roam(vdev);
 	cm_roam_update_mlo_mgr_info(vdev, roam_synch_data);
 	cm_delete_crypto_keys_for_all_links(vdev);
 

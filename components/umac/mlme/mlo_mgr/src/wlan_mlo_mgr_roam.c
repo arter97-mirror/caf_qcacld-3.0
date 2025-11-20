@@ -360,6 +360,7 @@ QDF_STATUS mlo_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 	}
 
+	wlan_cm_set_cross_vdev_roam(vdev);
 	status = cm_fw_roam_sync_req(psoc, vdev_id, event, event_data_len);
 
 	if (QDF_IS_STATUS_ERROR(status))

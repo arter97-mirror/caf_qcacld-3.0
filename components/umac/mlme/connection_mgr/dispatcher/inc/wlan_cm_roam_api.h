@@ -1846,6 +1846,30 @@ void wlan_cm_set_reconnect_disallow_period(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  struct wlan_crypto_key_entry *keys,
 					  uint8_t num_keys);
+
+/**
+ * wlan_cm_set_cross_vdev_roam - set cross_vdev_roam flag in mlo sta ctx
+ * @vdev: pointer to vdev
+ *
+ * Return: None
+ */
+void wlan_cm_set_cross_vdev_roam(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_cm_clear_cross_vdev_roam - clears cross_vdev_roam flag in mlo sta ctx
+ * @vdev: pointer to vdev
+ *
+ * Return: None
+ */
+void wlan_cm_clear_cross_vdev_roam(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_cm_is_cross_vdev_roaming - Check weather ROAM events received on non-assoc vdev
+ * @vdev: pointer to vdev
+ *
+ * Return: returns true on cross-vdev roam case, false otherwise
+ */
+bool wlan_cm_is_cross_vdev_roaming(struct wlan_objmgr_vdev *vdev);
 #else
 static inline
 QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
@@ -1853,6 +1877,20 @@ QDF_STATUS cm_roam_sync_key_event_handler(struct wlan_objmgr_psoc *psoc,
 					  uint8_t num_keys)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+void wlan_cm_set_cross_vdev_roam(struct wlan_objmgr_vdev *vdev)
+{}
+
+static inline
+void wlan_cm_clear_cross_vdev_roam(struct wlan_objmgr_vdev *vdev)
+{}
+
+static inline
+bool wlan_cm_is_cross_vdev_roaming(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
 }
 #endif
 

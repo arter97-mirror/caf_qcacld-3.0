@@ -45,6 +45,7 @@
 #endif
 #include "wlan_mlo_link_recfg.h"
 #include <../../core/src/wlan_cm_roam_offload.h>
+#include "wlan_mlo_mgr_sta.h"
 
 /* Support for "Fast roaming" (i.e., ESE, LFR, or 802.11r.) */
 #define BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN 15
@@ -6280,6 +6281,67 @@ wlan_cm_add_all_link_probe_rsp_to_scan_db(struct wlan_objmgr_psoc *psoc,
 	return mlo_add_all_link_probe_rsp_to_scan_db(psoc, candidate);
 }
 
+void wlan_cm_set_cross_vdev_roam(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev;
+	struct wlan_mlo_sta *sta_ctx;
+	struct wlan_objmgr_vdev *assoc_vdev;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+	ml_dev = vdev->mlo_dev_ctx;
+	if (!ml_dev)
+		return;
+
+	sta_ctx = ml_dev->sta_ctx;
+	if (!sta_ctx)
+		return;
+
+	assoc_vdev = mlo_get_assoc_vdev_from_idle_link(vdev);
+	if (assoc_vdev && assoc_vdev != vdev) {
+		sta_ctx->is_cross_vdev_roam = true;
+		wlan_vdev_mlme_set_mlo_vdev(vdev);
+		wlan_vdev_mlme_clear_mlo_link_vdev(vdev);
+		mlme_debug("vdev_id %d: Cross-vdev roaming started, assoc_vdev %d",
+			   vdev_id, wlan_vdev_get_id(assoc_vdev));
+		return;
+	}
+
+	sta_ctx->is_cross_vdev_roam = false;
+}
+
+void wlan_cm_clear_cross_vdev_roam(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev = vdev->mlo_dev_ctx;
+	struct wlan_mlo_sta *sta_ctx;
+
+	if (!ml_dev)
+		return;
+
+	sta_ctx = ml_dev->sta_ctx;
+	if (!sta_ctx)
+		return;
+
+	if (sta_ctx->is_cross_vdev_roam) {
+		mlme_debug("vdev_id %d: Clearing cross-vdev roam flag",
+			   wlan_vdev_get_id(vdev));
+		sta_ctx->is_cross_vdev_roam = false;
+	}
+}
+
+bool wlan_cm_is_cross_vdev_roaming(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *ml_dev = vdev->mlo_dev_ctx;
+	struct wlan_mlo_sta *sta_ctx;
+
+	if (!ml_dev)
+		return false;
+
+	sta_ctx = ml_dev->sta_ctx;
+	if (!sta_ctx)
+		return false;
+
+	return sta_ctx->is_cross_vdev_roam;
+}
 #elif defined(WLAN_FEATURE_ROAM_OFFLOAD) /* end WLAN_FEATURE_11BE_MLO */
 QDF_STATUS
 cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,

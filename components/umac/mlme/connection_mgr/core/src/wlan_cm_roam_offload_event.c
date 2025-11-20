@@ -220,6 +220,7 @@ QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	wlan_cm_set_cross_vdev_roam(vdev);
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_START,
 				     0, NULL);
 
@@ -324,6 +325,7 @@ QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	wlan_cm_clear_cross_vdev_roam(vdev);
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
 		mlme_err("Failed to find pdev for vdev id %d",
