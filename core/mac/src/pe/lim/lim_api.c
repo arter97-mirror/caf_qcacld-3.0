@@ -3896,6 +3896,7 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 	struct bss_description *bss_desc = NULL;
 	uint32_t bss_len;
 	struct join_req *pe_join_req;
+	bool is_cross_vdev_roam = false;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 						    vdev_id,
@@ -3915,6 +3916,11 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 		status = QDF_STATUS_E_FAILURE;
 		goto end;
 	}
+
+	is_cross_vdev_roam = wlan_cm_is_cross_vdev_roaming(vdev);
+	if (is_cross_vdev_roam &&
+	    (sync_ind->num_setup_links < 2))
+		wlan_vdev_mlme_clear_mlo_vdev(assoc_vdev);
 
 	status = wlan_vdev_mlme_get_ssid(assoc_vdev,
 					 pe_session->ssId.ssId,
@@ -3980,16 +3986,27 @@ lim_cm_roam_create_session(struct mac_context *mac_ctx,
 	bool is_link_vdev = false;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint8_t session_id;
+	bool is_cross_vdev_roam = false;
+	struct wlan_objmgr_vdev *vdev;
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_err("Vdev is NULL");
+		return NULL;
+	}
+
+	is_cross_vdev_roam = wlan_cm_is_cross_vdev_roaming(vdev);
 	is_link_vdev = wlan_vdev_mlme_get_is_mlo_link(mac_ctx->psoc, vdev_id);
 	status = mlo_get_sta_link_mac_addr(vdev_id, sync_ind,
 					   &link_mac_addr);
 
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 	if (QDF_IS_STATUS_ERROR(status))
 		return NULL;
 
-	/* In case of legacy to mlo roaming, create pe session */
-	if (!pe_session && is_link_vdev) {
+	/* In case of legacy to mlo roaming or cross vdev slo to slo, create pe session */
+	if (!pe_session && (is_link_vdev || is_cross_vdev_roam)) {
 		pe_session = pe_create_session(mac_ctx, &link_mac_addr.bytes[0],
 					       &session_id,
 					       eSIR_INFRASTRUCTURE_MODE,
@@ -4000,8 +4017,10 @@ lim_cm_roam_create_session(struct mac_context *mac_ctx,
 			       QDF_MAC_ADDR_REF(link_mac_addr.bytes));
 			return NULL;
 		}
+		if (is_cross_vdev_roam)
+			pe_debug("vdev_id %d: Created PE session for cross-vdev roaming",
+				 vdev_id);
 	}
-
 	return pe_session;
 }
 

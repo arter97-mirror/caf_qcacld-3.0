@@ -90,7 +90,8 @@ end:
 }
 
 static void
-mlo_cleanup_link(struct wlan_objmgr_vdev *vdev, uint8_t num_setup_links)
+mlo_cleanup_link(struct wlan_objmgr_vdev *vdev,
+		 uint8_t num_setup_links, bool is_roaming_vdev)
 {
 	/*
 	 * Cleanup the non-assoc link link in below cases,
@@ -98,9 +99,12 @@ mlo_cleanup_link(struct wlan_objmgr_vdev *vdev, uint8_t num_setup_links)
 	 * 2. Roamed to an MLO AP but 4-way handshake is offloaded to
 	 *    userspace, i.e.auth_status = ROAM_AUTH_STATUS_CONNECTED
 	 * 3. Roamed to non-MLO AP(num_setup_links = 0)
+	 * 4. Cross-vdev Roaming cleanup the old assoc vdev
+	 *    to clear the MLO vdev that is not ROAMING
 	 * This covers all supported combinations. So cleanup the link always.
 	 */
-	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) ||
+	    (!is_roaming_vdev && wlan_vdev_mlme_is_mlo_vdev(vdev)))
 		cm_cleanup_mlo_link(vdev);
 	/*
 	 * Clear the MLO vdev flag when roam to a non-MLO AP to prepare the
@@ -118,6 +122,7 @@ mlo_update_vdev_after_roam(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	uint8_t i;
 	struct wlan_objmgr_vdev *vdev, *tmp_vdev;
+	bool is_roaming_vdev = false;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
 						    vdev_id,
@@ -136,7 +141,9 @@ mlo_update_vdev_after_roam(struct wlan_objmgr_psoc *psoc,
 			continue;
 
 		tmp_vdev = mlo_dev_ctx->wlan_vdev_list[i];
-		mlo_cleanup_link(tmp_vdev, num_setup_links);
+		is_roaming_vdev = (wlan_vdev_get_id(tmp_vdev) == vdev_id);
+		mlo_cleanup_link(tmp_vdev, num_setup_links,
+				 is_roaming_vdev);
 	}
 
 end:
@@ -188,7 +195,8 @@ mlo_update_vdev_after_roam(struct wlan_objmgr_psoc *psoc,
 {}
 
 static inline void
-mlo_cleanup_link(struct wlan_objmgr_vdev *vdev, uint8_t num_setup_links)
+mlo_cleanup_link(struct wlan_objmgr_vdev *vdev,
+		 uint8_t num_setup_links, bool is_roaming_vdev)
 {}
 
 static inline void
