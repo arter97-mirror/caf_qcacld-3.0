@@ -12051,3 +12051,43 @@ void lim_continue_sta_csa_req(struct mac_context *mac_ctx, uint8_t vdev_id)
 	pe_info("Continue CSA for STA vdev id %d", vdev_id);
 	lim_process_channel_switch(mac_ctx, vdev_id);
 }
+
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+void lim_send_link_removal_req(struct mac_context *mac_ctx, uint8_t vdev_id)
+{
+	QDF_STATUS status;
+	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_objmgr_vdev *vdev = NULL;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		pe_err("get vdev from vdev_id:%d failed", vdev_id);
+		return;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		wlan_objmgr_psoc_release_ref(mac_ctx->psoc, WLAN_LEGACY_SME_ID);
+		pe_err("get mlme_priv failed on vdev:%d", vdev_id);
+		return;
+	}
+
+	status = wlan_vdev_mlme_sm_deliver_evt(vdev,
+					       WLAN_VDEV_SM_EV_REMOVAL,
+					       mlme_priv->elem_len,
+					       mlme_priv->ml_reconfig_ie);
+
+	if (mlme_priv->ml_reconfig_ie) {
+		qdf_mem_free(mlme_priv->ml_reconfig_ie);
+		mlme_priv->ml_reconfig_ie = NULL;
+	}
+
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("link removal send fail on vdev:%d ie_len:%d",
+		       vdev_id, mlme_priv->elem_len);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+}
+#endif

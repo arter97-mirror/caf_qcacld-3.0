@@ -318,6 +318,7 @@ enum hdd_adapter_flags {
  * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
  * @SOFTAP_ADD_INTF_LINK: add_intf_link is set for multi link SAP
+ * @SOFTAP_LINK_REMOVAL_IN_PROGRESS: mlo sap link remove flag
  * @WLAN_LINK_FLAG_BITS_MAX: Max bit size of this enum
  */
 enum hdd_link_flags {
@@ -326,6 +327,7 @@ enum hdd_link_flags {
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
 	SOFTAP_ADD_INTF_LINK,
+	SOFTAP_LINK_REMOVAL_IN_PROGRESS,
 	WLAN_LINK_FLAG_BITS_MAX,
 };
 
@@ -2258,6 +2260,7 @@ struct hdd_tx_powerboost {
  * @more_peer_data: more mlo peer data in peer stats
  * @lpc_info: Local packet capture info
  * @is_lpc_ps_disabled: Indicate if LPC has disabled power save
+ * @cached_txpower_valid: Indicate if tx power in driver cache is valid
  * @combination: interface combination register to wiphy
  * @wlan_hdd_akm_suites: Supported AKM suites for various interfaces
  * @sta_akms: Station mode supported AKMs
@@ -2559,6 +2562,8 @@ struct hdd_context {
 	struct hdd_lpc_info lpc_info;
 	bool is_lpc_ps_disabled;
 #endif
+
+	bool cached_txpower_valid;
 
 	struct ieee80211_iface_combination *combination;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)) || \

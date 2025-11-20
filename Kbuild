@@ -1632,10 +1632,7 @@ endif
 
 ifeq ($(CONFIG_QCACLD_WLAN_LFR2), y)
 # Add LFR2/host roam specific connection manager files here
-MLME_OBJS +=    $(CM_TGT_IF_DIR)/src/target_if_cm_roam_event.o \
-		$(CM_DIR)/core/src/wlan_cm_roam_fw_sync.o \
-		$(CM_DIR)/core/src/wlan_cm_roam_offload_event.o \
-		$(CM_DIR)/core/src/wlan_cm_host_roam_preauth.o \
+MLME_OBJS +=    $(CM_DIR)/core/src/wlan_cm_host_roam_preauth.o \
 		$(CM_DIR)/core/src/wlan_cm_host_util.o
 endif
 
@@ -3550,6 +3547,10 @@ CONFIG_WLAN_DP_MLO_DEV_CTX := y
 CONFIG_QCA_DP_TX_FW_METADATA_V2 := y
 CONFIG_WLAN_DP_TXPOOL_SHARE := y
 CONFIG_WLAN_MCAST_MLO_SAP := y
+found = $(shell if grep -qF "cfg80211_link_reconfig_removal_params" $(srctree)/include/net/cfg80211.h; then echo "yes" ;else echo "no" ;fi;)
+ifeq ($(findstring yes, $(found)), yes)
+CONFIG_MLO_SAP_LINK_REMOVAL := y
+endif
 endif
 
 ifeq (qca_cld3, $(WLAN_WEAR_CHIPSET))
@@ -3916,7 +3917,6 @@ ccflags-y += -DFEATURE_CM_UTF_ENABLE
 endif
 
 ccflags-$(CONFIG_QCACLD_WLAN_LFR3) += -DWLAN_FEATURE_ROAM_OFFLOAD
-ccflags-$(CONFIG_QCACLD_WLAN_LFR2) += -DWLAN_FEATURE_ROAM_OFFLOAD
 ccflags-$(CONFIG_WLAN_FEATURE_ROAM_INFO_STATS) += -DWLAN_FEATURE_ROAM_INFO_STATS
 ccflags-$(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING) += -DWLAN_FEATURE_CONNECTIVITY_LOGGING
 ccflags-$(CONFIG_QCACLD_WLAN_CONNECTIVITY_DIAG_EVENT) += -DCONNECTIVITY_DIAG_EVENT
@@ -4173,6 +4173,7 @@ ifeq ($(CONFIG_IPA_OFFLOAD), y)
 ccflags-$(CONFIG_IPA_WDS_EASYMESH) += -DIPA_WDS_EASYMESH_FEATURE
 ccflags-$(CONFIG_IPA_WDI3_VLAN_SUPPORT) += -DIPA_WDI3_VLAN_SUPPORT
 ccflags-$(CONFIG_IPA_HANDLE_MLO_DEF_LINK_REG) += -DIPA_HANDLE_MLO_DEF_LINK_REG
+ccflags-$(CONFIG_IPA_WDI_UNIFIED_API) += -DCONFIG_IPA_WDI_UNIFIED_API
 endif
 
 #Enable IPA optional Wifi datapath
@@ -4551,6 +4552,7 @@ ccflags-$(CONFIG_WLAN_HDD_MULTI_VDEV_SINGLE_NDEV) += -DWLAN_HDD_MULTI_VDEV_SINGL
 ccflags-$(CONFIG_DP_FEATURE_RX_BUFFER_RECYCLE) += -DDP_FEATURE_RX_BUFFER_RECYCLE
 ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 ccflags-$(CONFIG_WLAN_FEATURE_MULTI_LINK_SAP) += -DWLAN_FEATURE_MULTI_LINK_SAP
+ccflags-$(CONFIG_MLO_SAP_LINK_REMOVAL) += -DWLAN_FEATURE_MLO_SAP_LINK_REMOVAL
 endif
 ccflags-$(CONFIG_WLAN_FEATURE_11BE_MLO) += -DWLAN_SUPPORT_11BE_D3_0
 ccflags-$(CONFIG_WLAN_MCAST_MLO_SAP) += -DWLAN_MCAST_MLO_SAP

@@ -884,6 +884,11 @@ struct enhance_roam_info {
  * @connect_info: mlme connect information
  * @wait_key_timer: wait key timer
  * @eht_config: Eht capability configuration
+ * @ml_reconfig_ie: link reconfig ie raw data
+ * @elem_len: link reconfig ie length
+ * @link_removal_delay_for_csa: link removal when SAP is doing CSA, wait for
+ *                              CSA and vdev restart completed, send link
+ *                              removal wmi to fw
  * @last_delba_sent_time: Last delba sent time to handle back to back delba
  *			  requests from some IOT APs
  * @ba_2k_jump_iot_ap: This is set to true if connected to the ba 2k jump IOT AP
@@ -960,6 +965,11 @@ struct mlme_legacy_priv {
 	struct wait_for_key_timer wait_key_timer;
 #ifdef WLAN_FEATURE_11BE
 	tDot11fIEeht_cap eht_config;
+#endif
+#ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
+	uint8_t *ml_reconfig_ie;
+	uint16_t elem_len;
+	bool link_removal_delay_for_csa;
 #endif
 	qdf_time_t last_delba_sent_time;
 	bool ba_2k_jump_iot_ap;
