@@ -301,6 +301,7 @@ static struct mlo_osif_ext_ops mlo_osif_ops = {
 	.mlo_link_recfg_osif_update_mac_addr = hdd_link_recfg_mac_addr_update,
 	.mlo_mgr_osif_link_switch_notification =
 					hdd_adapter_link_switch_notification,
+	.mlo_roam_osif_update_deflink = hdd_mlo_roam_deflink_update,
 	.mlo_mgr_osif_update_link_state = hdd_mlo_update_vdev_active_flag,
 	.mlo_mgr_osif_chan_switch_notification =
 					hdd_mlo_channel_switch_notify,
@@ -385,6 +386,55 @@ QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 	}
 
 	return found ? QDF_STATUS_SUCCESS : QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS hdd_mlo_roam_deflink_update(struct wlan_objmgr_vdev *vdev,
+				       uint8_t roamed_vdev_id)
+{
+	struct wlan_hdd_link_info *link_info, *new_link_info = NULL;
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx;
+	struct vdev_osif_priv *osif_priv;
+
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv) {
+		hdd_err("osif_priv is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	link_info = osif_priv->legacy_osif_priv;
+	if (!link_info) {
+		hdd_err("link_info is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	adapter = link_info->adapter;
+	if (!adapter) {
+		hdd_err("adapter is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	hdd_adapter_for_each_link_info(adapter, new_link_info) {
+		if (new_link_info->vdev_id == roamed_vdev_id) {
+			hdd_debug("Found link_info for new vdev_id: %d",
+				  roamed_vdev_id);
+			adapter->deflink = new_link_info;
+			break;
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

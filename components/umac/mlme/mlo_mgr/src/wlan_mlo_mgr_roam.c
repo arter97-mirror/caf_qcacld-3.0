@@ -467,6 +467,13 @@ QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_vdev *link_vdev = NULL;
 	uint8_t i;
 	uint8_t vdev_id;
+	bool is_cross_vdev_roam = false;
+	struct mlo_mgr_context *g_mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!g_mlo_ctx) {
+		mlo_err("Invalid mlo ctx");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	sync_ind = (struct roam_offload_synch_ind *)event;
 	vdev_id = wlan_vdev_get_id(vdev);
@@ -484,6 +491,11 @@ QDF_STATUS mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
 					   sync_ind->num_setup_links);
 	}
 
+	is_cross_vdev_roam = wlan_cm_is_cross_vdev_roaming(vdev);
+	if (is_cross_vdev_roam && g_mlo_ctx->osif_ops &&
+	    g_mlo_ctx->osif_ops->mlo_roam_osif_update_deflink)
+		g_mlo_ctx->osif_ops->mlo_roam_osif_update_deflink(vdev,
+								  vdev_id);
 	/* If EAPOL is offloaded to supplicant, link vdev/s are not up
 	 * at FW, in that case complete roam sync on assoc vdev
 	 * link vdev will be initialized after set key is complete.

@@ -253,6 +253,15 @@ void hdd_adapter_set_ml_adapter(struct hdd_adapter *adapter);
 QDF_STATUS hdd_adapter_link_switch_notification(struct wlan_objmgr_vdev *vdev,
 						uint8_t non_trans_vdev_id,
 						bool is_start_notify);
+/**
+ * hdd_mlo_roam_deflink_update() - Update default link after cross-VDEV roaming
+ * @vdev: VDEV object that initiated the roam
+ * @roamed_vdev_id: VDEV ID of the link that completed roaming
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS hdd_mlo_roam_deflink_update(struct wlan_objmgr_vdev *vdev,
+				       uint8_t roamed_vdev_id);
 
 /**
  * hdd_mlo_t2lm_register_callback() - Register T2LM callback
