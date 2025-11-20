@@ -6672,4 +6672,14 @@ policy_mgr_get_cfg_sta_dfs_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 policy_mgr_set_cfg_sta_dfs_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
 				       bool cfg_sta_dfs_ch_peer_scc);
+/**
+ * policy_mgr_is_cfr_allowed() - check if CFR is allowed
+ * value
+ * @psoc: psoc pointer
+ *
+ * Return: true if allowed
+ */
+bool
+policy_mgr_is_cfr_allowed(struct wlan_objmgr_psoc *psoc);
+
 #endif /* __WLAN_POLICY_MGR_API_H */
