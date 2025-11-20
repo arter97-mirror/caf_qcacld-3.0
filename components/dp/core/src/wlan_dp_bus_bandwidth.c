@@ -1954,6 +1954,28 @@ dp_link_monitoring(struct wlan_dp_psoc_context *dp_ctx,
 	qdf_mem_free(peer_stats);
 }
 
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+static inline void
+dp_dump_periodic_stats(struct wlan_dp_intf *dp_intf,
+		       struct wlan_dp_psoc_context *dp_ctx)
+{
+	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	struct wlan_dp_psoc_callbacks *dp_ops = &dp_ctx->dp_ops;
+	hdd_cb_handle ctx = dp_ctx->dp_ops.callback_ctx;
+
+	if (dp_intf->dump_periodic_custom_stats &&
+	    !dp_ops->dp_is_roaming_in_progress(ctx))
+		cdp_dump_custom_stats(soc, dp_intf->def_link->link_id);
+}
+#else
+
+static inline void
+dp_dump_periodic_stats(struct wlan_dp_intf *dp_intf,
+		       struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+#endif
+
 /**
  * __dp_bus_bw_work_handler() - Bus bandwidth work handler
  * @dp_ctx: handle to DP context
@@ -2047,6 +2069,7 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 		}
 
 		cdp_process_ul_delay(soc, dp_intf->def_link->link_id);
+		dp_dump_periodic_stats(dp_intf, dp_ctx);
 
 		ret = A_ERROR;
 		fwd_tx_packets = 0;
