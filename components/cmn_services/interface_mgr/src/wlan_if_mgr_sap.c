@@ -36,6 +36,7 @@
 #include "wlan_mlme_api.h"
 #include "wlan_mlo_link_force.h"
 #include "wlan_ll_sap_api.h"
+#include <wlan_cfr_ucfg_api.h>
 
 QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 			       struct if_mgr_event_data *event_data)
@@ -98,6 +99,7 @@ QDF_STATUS if_mgr_ap_start_bss(struct wlan_objmgr_vdev *vdev,
 
 	/* abort p2p roc before starting the BSS for sync event */
 	ucfg_p2p_cleanup_roc_by_psoc(psoc);
+	ucfg_cfr_send_stop(vdev, 0);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -432,6 +434,8 @@ if_mgr_ap_csa_start(struct wlan_objmgr_vdev *vdev,
 
 	if (wlan_ll_sap_is_bearer_switch_req_on_csa(psoc, vdev_id))
 		status = wlan_ll_sap_switch_bearer_on_ll_sap_csa(psoc, vdev_id);
+
+	ucfg_cfr_send_stop(vdev, 0);
 
 	return status;
 }
