@@ -6455,6 +6455,11 @@ void wma_delete_bss(tp_wma_handle wma, uint8_t vdev_id)
 	status = wlan_vdev_get_bss_peer_mac(iface->vdev, &bssid);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err("vdev id %d : failed to get bssid", vdev_id);
+		if (cm_get_ho_disconnect_pending(iface->vdev)) {
+			wma_err("handle by ho fail");
+			wma_delete_bss_ho_fail(wma, vdev_id);
+			return;
+		}
 		goto out;
 	}
 
