@@ -3154,7 +3154,12 @@ wlan_mlme_defer_pmk_set_in_roaming(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	mlme_priv->mlme_roam.set_pmk_pending = set_pmk_pending;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	mlme_priv->mlme_roam->set_pmk_pending = set_pmk_pending;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
 
@@ -3182,7 +3187,12 @@ wlan_mlme_is_pmk_set_deferred(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
-	set_pmk_pending = mlme_priv->mlme_roam.set_pmk_pending;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return false;
+	}
+
+	set_pmk_pending = mlme_priv->mlme_roam->set_pmk_pending;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return set_pmk_pending;
@@ -5345,7 +5355,12 @@ mlme_get_supplicant_disabled_roaming(struct wlan_objmgr_psoc *psoc,
 		return 0;
 	}
 
-	value = mlme_priv->mlme_roam.roam_cfg.supplicant_disabled_roaming;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return 0;
+	}
+
+	value = mlme_priv->mlme_roam->roam_cfg.supplicant_disabled_roaming;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return value;
@@ -5372,7 +5387,12 @@ void mlme_set_supplicant_disabled_roaming(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	mlme_priv->mlme_roam.roam_cfg.supplicant_disabled_roaming = val;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	mlme_priv->mlme_roam->roam_cfg.supplicant_disabled_roaming = val;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
 
@@ -5398,7 +5418,11 @@ mlme_get_roam_trigger_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return 0;
 	}
 
-	roam_bitmap = mlme_priv->mlme_roam.roam_cfg.roam_trigger_bitmap;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return 0;
+	}
+	roam_bitmap = mlme_priv->mlme_roam->roam_cfg.roam_trigger_bitmap;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return roam_bitmap;
@@ -5424,7 +5448,12 @@ void mlme_set_roam_trigger_bitmap(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	mlme_priv->mlme_roam.roam_cfg.roam_trigger_bitmap = val;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	mlme_priv->mlme_roam->roam_cfg.roam_trigger_bitmap = val;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
 
@@ -5450,9 +5479,14 @@ mlme_get_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return 0xFF;
 	}
 
-	bitmap = mlme_priv->mlme_roam.roam_sm.rso_disabled_status_bitmap;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return 0xFF;
+	}
+
+	bitmap = mlme_priv->mlme_roam->roam_sm.rso_disabled_status_bitmap;
 	mlme_legacy_debug("vdev[%d] bitmap[0x%x]", vdev_id,
-		mlme_priv->mlme_roam.roam_sm.rso_disabled_status_bitmap);
+		mlme_priv->mlme_roam->roam_sm.rso_disabled_status_bitmap);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return bitmap;
@@ -5481,8 +5515,13 @@ mlme_set_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return;
 	}
 
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
 	rso_disabled_status_bitmap =
-		&mlme_priv->mlme_roam.roam_sm.rso_disabled_status_bitmap;
+		&mlme_priv->mlme_roam->roam_sm.rso_disabled_status_bitmap;
 	if (clear)
 		*rso_disabled_status_bitmap &= ~reqs;
 	else
@@ -5514,7 +5553,12 @@ mlme_clear_rso_disabled_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return;
 	}
 
-	mlme_priv->mlme_roam.roam_sm.rso_disabled_status_bitmap = 0;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	mlme_priv->mlme_roam->roam_sm.rso_disabled_status_bitmap = 0;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
 
@@ -5541,7 +5585,12 @@ mlme_get_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
 		return 0;
 	}
 
-	bitmap = mlme_priv->mlme_roam.roam_sm.rso_pending_disable_req_bitmap;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return 0;
+	}
+
+	bitmap = mlme_priv->mlme_roam->roam_sm.rso_pending_disable_req_bitmap;
 	mlme_legacy_debug("vdev[%d] rso_disable req bitmap[0x%x]", vdev_id,
 			  bitmap);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
@@ -5573,7 +5622,12 @@ mlme_set_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	bitmap = mlme_priv->mlme_roam.roam_sm.rso_pending_disable_req_bitmap;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	bitmap = mlme_priv->mlme_roam->roam_sm.rso_pending_disable_req_bitmap;
 
 	if (clear)
 		bitmap &= ~reqs;
@@ -5583,7 +5637,7 @@ mlme_set_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
 	mlme_legacy_debug("vdev[%d] req bitmap[0x%x], reqs: %d, clear: %d",
 			  vdev_id, bitmap, reqs, clear);
 
-	mlme_priv->mlme_roam.roam_sm.rso_pending_disable_req_bitmap = bitmap;
+	mlme_priv->mlme_roam->roam_sm.rso_pending_disable_req_bitmap = bitmap;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
 
@@ -5608,7 +5662,12 @@ mlme_clear_rso_pending_disable_req_bitmap(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	mlme_priv->mlme_roam.roam_sm.rso_pending_disable_req_bitmap = 0;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	mlme_priv->mlme_roam->roam_sm.rso_pending_disable_req_bitmap = 0;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
 
@@ -5660,7 +5719,12 @@ mlme_get_roam_state(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return WLAN_ROAM_DEINIT;
 	}
 
-	roam_state = mlme_priv->mlme_roam.roam_sm.state;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return WLAN_ROAM_DEINIT;
+	}
+
+	roam_state = mlme_priv->mlme_roam->roam_sm.state;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return roam_state;
@@ -5687,7 +5751,12 @@ void mlme_set_roam_policy(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return;
 	}
 
-	mlme_priv->mlme_roam.roam_cfg.roam_policy = roam_policy;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	mlme_priv->mlme_roam->roam_cfg.roam_policy = roam_policy;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
 
@@ -5712,8 +5781,13 @@ enum wlan_roam_policy mlme_get_roam_policy(struct wlan_objmgr_psoc *psoc,
 		return WLAN_ROAMING_NOT_ALLOWED;
 	}
 
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return WLAN_ROAMING_NOT_ALLOWED;
+	}
+
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
-	return mlme_priv->mlme_roam.roam_cfg.roam_policy;
+	return mlme_priv->mlme_roam->roam_cfg.roam_policy;
 }
 
 void mlme_set_roam_state(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
@@ -5737,9 +5811,14 @@ void mlme_set_roam_state(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return;
 	}
 
-	mlme_print_roaming_state(vdev_id, mlme_priv->mlme_roam.roam_sm.state,
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	mlme_print_roaming_state(vdev_id, mlme_priv->mlme_roam->roam_sm.state,
 				 new_state);
-	mlme_priv->mlme_roam.roam_sm.state = new_state;
+	mlme_priv->mlme_roam->roam_sm.state = new_state;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
 

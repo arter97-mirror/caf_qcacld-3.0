@@ -5764,7 +5764,12 @@ void wlan_mlme_set_sae_single_pmk_bss_cap(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	mlme_priv->mlme_roam.sae_single_pmk.sae_single_pmk_ap = val;
+	if (!mlme_priv->mlme_roam) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		return;
+	}
+
+	mlme_priv->mlme_roam->sae_single_pmk.sae_single_pmk_ap = val;
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 }
@@ -5782,6 +5787,9 @@ void wlan_mlme_update_sae_single_pmk(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
+	if (!mlme_priv->mlme_roam)
+		return;
+
 	keymgmt = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
 	if (keymgmt < 0) {
 		mlme_legacy_err("Invalid mgmt cipher");
@@ -5793,12 +5801,12 @@ void wlan_mlme_update_sae_single_pmk(struct wlan_objmgr_vdev *vdev,
 		is_sae_connection = true;
 
 	mlme_legacy_debug("SAE_SPMK: single_pmk_ap:%d, is_sae_connection:%d, pmk_len:%d",
-			  mlme_priv->mlme_roam.sae_single_pmk.sae_single_pmk_ap,
+			  mlme_priv->mlme_roam->sae_single_pmk.sae_single_pmk_ap,
 			  is_sae_connection, sae_single_pmk->pmk_len);
 
-	if (mlme_priv->mlme_roam.sae_single_pmk.sae_single_pmk_ap &&
+	if (mlme_priv->mlme_roam->sae_single_pmk.sae_single_pmk_ap &&
 	    is_sae_connection)
-		mlme_priv->mlme_roam.sae_single_pmk.pmk_info = *sae_single_pmk;
+		mlme_priv->mlme_roam->sae_single_pmk.pmk_info = *sae_single_pmk;
 }
 
 bool wlan_mlme_is_sae_single_pmk_enabled(struct wlan_objmgr_psoc *psoc)
@@ -5824,10 +5832,13 @@ void wlan_mlme_get_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	pmk_info = &mlme_priv->mlme_roam.sae_single_pmk.pmk_info;
+	if (!mlme_priv->mlme_roam)
+		return;
+
+	pmk_info = &mlme_priv->mlme_roam->sae_single_pmk.pmk_info;
 
 	pmksa->sae_single_pmk_ap =
-		mlme_priv->mlme_roam.sae_single_pmk.sae_single_pmk_ap;
+		mlme_priv->mlme_roam->sae_single_pmk.sae_single_pmk_ap;
 	pmksa->pmk_info.spmk_timeout_period = pmk_info->spmk_timeout_period;
 	pmksa->pmk_info.spmk_timestamp = pmk_info->spmk_timestamp;
 
@@ -5854,7 +5865,10 @@ void wlan_mlme_clear_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	sae_single_pmk = &mlme_priv->mlme_roam.sae_single_pmk;
+	if (!mlme_priv->mlme_roam)
+		return;
+
+	sae_single_pmk = &mlme_priv->mlme_roam->sae_single_pmk;
 
 	if (!pmk_recv) {
 		/* Process flush pmk cmd */
