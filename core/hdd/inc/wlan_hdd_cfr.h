@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,6 +33,38 @@
 #define HDD_INVALID_GROUP_ID MAX_TA_RA_ENTRIES
 #define LEGACY_CFR_VERSION 1
 #define ENHANCED_CFR_VERSION 2
+
+/**
+ * struct cfr_v3_params - CFR v3 configuration parameters
+ * @is_start_capture: Flag to start/stop CFR capture
+ * @tx_capture: Flag indicating TX capture mode
+ * @rx_capture: Flag indicating RX capture mode
+ * @method: CFR capture method
+ * @frame_type: Frame type for CFR capture
+ * @frame_subtype: Frame subtype for CFR capture
+ * @freq: Frequency for CFR capture
+ * @report_interval: Report interval in milliseconds
+ * @bandwidth: Capture bandwidth
+ * @transport_mode: Data transport mode
+ * @oui_length: OUI length
+ * @oui: vendor OUI
+ * @format_version: Format version
+ */
+struct cfr_v3_params {
+	bool is_start_capture;
+	bool tx_capture;
+	bool rx_capture;
+	uint8_t method;
+	uint8_t frame_type;
+	uint8_t frame_subtype;
+	uint32_t freq;
+	uint32_t report_interval;
+	uint8_t bandwidth;
+	uint8_t transport_mode;
+	uint8_t oui_length;
+	uint8_t oui[MAX_CFR_OUI_LEN];
+	uint8_t format_version;
+};
 
 /**
  * wlan_hdd_cfg80211_peer_cfr_capture_cfg() - configure peer cfr capture
