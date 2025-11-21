@@ -266,15 +266,13 @@ bbm_apply_tput_policy(struct wlan_dp_psoc_context *dp_ctx,
 	enum bus_bw_level next_vote = BUS_BW_LEVEL_NONE;
 	enum bus_bw_level tmp_vote;
 	struct bbm_context *bbm_ctx = dp_ctx->bbm_ctx;
-	hdd_cb_handle ctx = dp_ctx->dp_ops.callback_ctx;
 
 	if (tput_level == TPUT_LEVEL_NONE) {
 		/*
 		 * This is to handle the scenario where bus bw periodic work
 		 * is force cancelled
 		 */
-		if (dp_ctx->dp_ops.dp_any_adapter_connected(ctx))
-			bbm_ctx->per_policy_vote[BBM_TPUT_POLICY] = next_vote;
+		bbm_ctx->per_policy_vote[BBM_TPUT_POLICY] = next_vote;
 		return;
 	}
 
