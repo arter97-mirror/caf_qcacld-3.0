@@ -1883,7 +1883,7 @@ _conditional_srcs = {
             "cmn/target_if/cfr/src/target_if_cfr_enh.c",
         ],
     },
-    "CONFIG_WLAN_FASTPATH": {
+    "CONFIG_WLAN_FASTPATH_AND_NOT_RHINE": {
         True: [
             "core/dp/txrx/ol_tx_ll_fastpath.c",
         ],
