@@ -1099,7 +1099,7 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	struct nlattr *tb2[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAX + 1];
 	struct wlan_objmgr_psoc *psoc;
 	int ret = 0;
-	uint8_t vdev_id, pdev_id;
+	uint8_t vdev_id, mac_id;
 	struct twt_add_dialog_param params = {0};
 	enum QDF_OPMODE mode = wlan_vdev_mlme_get_opmode(vdev);
 	uint32_t congestion_timeout = 0, reason;
@@ -1123,7 +1123,7 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	params.vdev_id = vdev_id;
-	pdev_id = wlan_get_pdev_id_from_vdev_id(psoc, vdev_id, WLAN_TWT_ID);
+	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, vdev_id);
 
 	ret = osif_twt_parse_add_dialog_attrs(tb2, &params);
 	if (ret)
@@ -1195,7 +1195,7 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	ucfg_twt_cfg_get_congestion_timeout(psoc, &congestion_timeout);
 	if (congestion_timeout) {
 		reason = HOST_TWT_DISABLE_REASON_CHANGE_CONGESTION_TIMEOUT;
-		ret = osif_twt_send_requestor_disable_cmd(psoc, pdev_id,
+		ret = osif_twt_send_requestor_disable_cmd(psoc, mac_id,
 							  reason);
 		if (ret) {
 			osif_err("Failed to disable TWT");
@@ -1204,7 +1204,7 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	}
 	ucfg_twt_cfg_set_congestion_timeout(psoc, 0);
 
-	ret = osif_twt_send_requestor_enable_cmd(psoc, pdev_id);
+	ret = osif_twt_send_requestor_enable_cmd(psoc, mac_id);
 	if (ret) {
 		osif_err("Failed to Enable TWT");
 		return -EOPNOTSUPP;

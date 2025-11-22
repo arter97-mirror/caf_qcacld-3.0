@@ -174,7 +174,7 @@ QDF_STATUS hdd_send_twt_responder_disable_cmd(struct hdd_context *hdd_ctx,
 
 void wlan_hdd_twt_init(struct hdd_context *hdd_ctx)
 {
-	osif_twt_send_requestor_enable_cmd(hdd_ctx->psoc, 0);
+	osif_twt_send_requestor_enable_cmd(hdd_ctx->psoc, INVALID_PDEV_ID);
 	qdf_create_work(0, &hdd_ctx->twt_en_dis_work,
 			hdd_twt_update_work_handler, hdd_ctx);
 }
@@ -4443,4 +4443,3 @@ bool wlan_hdd_is_twt_pmo_allowed(struct hdd_context *hdd_ctx)
 
 	return twt_pmo_allowed;
 }
-
