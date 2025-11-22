@@ -9437,60 +9437,6 @@ end:
 }
 #endif
 
-#ifdef WLAN_CFR_ENABLE
-void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
-				const void *data, uint32_t data_len)
-{
-	uint32_t len, ret;
-	struct sk_buff *vendor_event;
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct wlan_hdd_link_info *link_info;
-	struct nlmsghdr *nlhdr;
-
-	if (!hdd_ctx) {
-		hdd_err("HDD context is NULL");
-		return;
-	}
-
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info) {
-		hdd_err("adapter NULL for vdev id %d", vdev_id);
-		return;
-	}
-
-	hdd_debug("vdev id %d pid %d data len %d", vdev_id, pid, data_len);
-	len = nla_total_size(data_len) + NLMSG_HDRLEN;
-	vendor_event = wlan_cfg80211_vendor_event_alloc(
-			hdd_ctx->wiphy, &link_info->adapter->wdev, len,
-			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
-			qdf_mem_malloc_flags());
-
-	if (!vendor_event) {
-		hdd_err("wlan_cfg80211_vendor_event_alloc failed vdev id %d, data len %d",
-			vdev_id, data_len);
-		return;
-	}
-
-	ret = nla_put(vendor_event,
-		      QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA,
-		      data_len, data);
-	if (ret) {
-		hdd_err("CFR event put fails status %d", ret);
-		wlan_cfg80211_vendor_free_skb(vendor_event);
-		return;
-	}
-
-	if (pid) {
-		nlhdr = nlmsg_hdr(vendor_event);
-		if (nlhdr)
-			nlhdr->nlmsg_pid = pid;
-		else
-			hdd_err_rl("nlhdr is null");
-	}
-
-	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
-}
-#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
