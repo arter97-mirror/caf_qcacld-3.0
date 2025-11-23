@@ -1940,8 +1940,7 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
-void wlan_cm_rso_config_deinit(struct wlan_objmgr_vdev *vdev,
-			       struct rso_config *rso_cfg)
+void wlan_cm_rso_config_deinit(struct rso_config *rso_cfg)
 {
 	struct rso_cfg_params *cfg_params;
 

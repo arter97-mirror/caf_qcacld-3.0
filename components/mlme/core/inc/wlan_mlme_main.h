@@ -964,7 +964,7 @@ struct mlme_legacy_priv {
 	uint8_t sta_dynamic_oce_value;
 	struct wlan_disconnect_info disconnect_info;
 	uint32_t vdev_stop_type;
-	struct wlan_mlme_roam mlme_roam;
+	struct wlan_mlme_roam *mlme_roam;
 	struct wlan_cm_roam cm_roam;
 #if defined(WLAN_FEATURE_ROAM_OFFLOAD) && \
 		defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)

@@ -315,6 +315,14 @@ static inline QDF_STATUS
 cm_ext_hdl_create(struct wlan_objmgr_vdev *vdev, cm_ext_t **ext_cm_ptr)
 {
 	struct cm_ext_obj *cm_obj;
+	struct qdf_mac_addr *mld_addr;
+
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+	if (!qdf_is_macaddr_zero(mld_addr)) {
+		mlme_debug("vdev_id:%d MLO vdev, skipping cm_ext allocation",
+			   wlan_vdev_get_id(vdev));
+		return QDF_STATUS_SUCCESS;
+	}
 
 	*ext_cm_ptr = qdf_mem_malloc(sizeof(struct cm_ext_obj));
 	if (!*ext_cm_ptr)
@@ -329,7 +337,12 @@ cm_ext_hdl_create(struct wlan_objmgr_vdev *vdev, cm_ext_t **ext_cm_ptr)
 static inline QDF_STATUS
 cm_ext_hdl_destroy(struct wlan_objmgr_vdev *vdev, cm_ext_t *ext_cm_ptr)
 {
-	wlan_cm_rso_config_deinit(vdev, &ext_cm_ptr->rso_cfg);
+	if (!ext_cm_ptr) {
+		mlme_debug("vdev_id:%d ext_cm_ptr is NULL, skipping cleanup",
+			   wlan_vdev_get_id(vdev));
+		return QDF_STATUS_SUCCESS;
+	}
+	wlan_cm_rso_config_deinit(&ext_cm_ptr->rso_cfg);
 	qdf_mem_free(ext_cm_ptr);
 
 	return QDF_STATUS_SUCCESS;

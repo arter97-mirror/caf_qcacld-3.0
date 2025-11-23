@@ -1819,6 +1819,8 @@ static void mlme_ext_handler_destroy(struct vdev_mlme_obj *vdev_mlme)
 {
 	if (!vdev_mlme || !vdev_mlme->ext_vdev_ptr)
 		return;
+
+	qdf_mem_common_free(vdev_mlme->ext_vdev_ptr->mlme_roam);
 	qdf_runtime_lock_deinit(
 		&vdev_mlme->ext_vdev_ptr->bss_color_change_runtime_lock);
 	qdf_wake_lock_destroy(
@@ -1912,6 +1914,7 @@ static
 QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 {
 	QDF_STATUS status;
+	struct qdf_mac_addr *mld_addr;
 
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
@@ -1919,6 +1922,22 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 		qdf_mem_common_alloc(sizeof(struct mlme_legacy_priv));
 	if (!vdev_mlme->ext_vdev_ptr)
 		return QDF_STATUS_E_NOMEM;
+
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev_mlme->vdev);
+	if (!qdf_is_macaddr_zero(mld_addr)) {
+		mlme_debug("vdev_id:%d MLO vdev, skipping mlme_roam allocation",
+			   wlan_vdev_get_id(vdev_mlme->vdev));
+	} else {
+		vdev_mlme->ext_vdev_ptr->mlme_roam =
+			qdf_mem_common_alloc(sizeof(struct wlan_mlme_roam));
+		if (!vdev_mlme->ext_vdev_ptr->mlme_roam) {
+			qdf_mem_free(vdev_mlme->ext_vdev_ptr);
+			vdev_mlme->ext_vdev_ptr = NULL;
+			return QDF_STATUS_E_NOMEM;
+		}
+		mlme_debug("vdev_id:%d, mlme_roam allocated",
+			   wlan_vdev_get_id(vdev_mlme->vdev));
+	}
 
 	mlme_init_rate_config(vdev_mlme);
 	mlme_init_connect_chan_info_config(vdev_mlme);

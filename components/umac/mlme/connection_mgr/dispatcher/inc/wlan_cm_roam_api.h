@@ -419,13 +419,11 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 
 /**
  * wlan_cm_rso_config_deinit  - deinit RSO config
- * @vdev: vdev pointer
  * @rso_cfg: rso config to deinit
  *
  * Return: void
  */
-void wlan_cm_rso_config_deinit(struct wlan_objmgr_vdev *vdev,
-			       struct rso_config *rso_cfg);
+void wlan_cm_rso_config_deinit(struct rso_config *rso_cfg);
 
 /**
  * wlan_cm_fill_crypto_filter_from_vdev() - fill scan filter crypto from vdev
