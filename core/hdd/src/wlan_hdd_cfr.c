@@ -388,6 +388,105 @@ free_skb:
 	wlan_cfg80211_vendor_free_skb(vendor_event);
 }
 
+void hdd_cfr_indicate_last_report_interval(uint8_t vdev_id)
+{
+	uint32_t total_len;
+	struct sk_buff *vendor_event;
+	struct wlan_objmgr_vdev *vdev;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+	struct pdev_cfr *pcfr = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		cfr_err("HDD context is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		cfr_err("adapter NULL for vdev id %d", vdev_id);
+		return;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_CFR_ID);
+	if (!vdev) {
+		cfr_err("Invalid vdev");
+		return;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cfr_err("Failed to get pdev object");
+		goto put_vdev;
+	}
+
+	pcfr = wlan_objmgr_pdev_get_comp_private_obj(pdev, WLAN_UMAC_COMP_CFR);
+	if (!pcfr) {
+		cfr_err("CFR private object is NULL");
+		goto put_vdev;
+	}
+
+	cfr_debug("vdev id %d", vdev_id);
+	total_len = NLMSG_HDRLEN;
+	total_len += nla_total_size(sizeof(u8)); /* vesrion attribute*/
+	total_len += nla_total_size(0); /* flag attribute */
+
+	if (pcfr->oui_length) {
+		total_len += nla_total_size(pcfr->oui_length * sizeof(u8));
+		total_len += nla_total_size(sizeof(u8));
+	}
+
+	vendor_event = wlan_cfg80211_vendor_event_alloc(
+			hdd_ctx->wiphy, &link_info->adapter->wdev, total_len,
+			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
+			qdf_mem_malloc_flags());
+
+	if (!vendor_event) {
+		cfr_err("wlan_cfg80211_vendor_event_alloc failed vdev id %d",
+			vdev_id);
+		goto put_vdev;
+	}
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_VERSION,
+		       ENHANCED_CFR_VERSION_V3)) {
+		cfr_err("Failed to put format version");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		goto put_vdev;
+	}
+
+	if (pcfr->oui_length &&
+	    nla_put(vendor_event,
+		    QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI,
+		    pcfr->oui_length, pcfr->oui)) {
+		cfr_err("Failed to put oui");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		goto put_vdev;
+	}
+
+	if (pcfr->oui_length &&
+	    nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION,
+		       pcfr->format_version)) {
+		cfr_err("Failed to put data format version");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		goto put_vdev;
+	}
+
+	if (nla_put_flag(vendor_event,
+			 QCA_WLAN_VENDOR_ATTR_PEER_CFR_IS_LAST_REPORT)) {
+		cfr_err("Failed to put last report flag");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		goto put_vdev;
+	}
+
+	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
+
+put_vdev:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CFR_ID);
+}
+
 const struct nla_policy cfr_config_policy[
 		QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR] =

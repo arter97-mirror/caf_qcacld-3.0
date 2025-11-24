@@ -53,6 +53,12 @@ void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
 },
 
 /**
+ * hdd_cfr_indicate_last_report_interval() - send last report event to userspace
+ * @vdev_id: vdev id
+ */
+void hdd_cfr_indicate_last_report_interval(uint8_t vdev_id);
+
+/**
  * struct cfr_v3_params - CFR v3 configuration parameters
  * @is_start_capture: Flag to start/stop CFR capture
  * @tx_capture: Flag indicating TX capture mode
