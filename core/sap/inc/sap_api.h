@@ -2060,6 +2060,17 @@ void wlansap_free_chan_info(struct sap_sel_ch_info *ch_param);
  */
 QDF_STATUS wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
 					       struct scan_filter *filter);
+
+/**
+ * wlansap_get_sap_csa_reason() - Get sap csa reason
+ * @mac: pointer to mac
+ * @vdev_id: Vdev Id
+ *
+ * Return: csa reason
+ */
+enum sap_csa_reason_code
+wlansap_get_sap_csa_reason(struct mac_context *mac, uint8_t vdev_id);
+
 #ifdef __cplusplus
 }
 #endif

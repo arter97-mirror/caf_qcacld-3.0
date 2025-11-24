@@ -407,6 +407,12 @@ dnw_set_info(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id, uint32_t ch_freq,
 		goto release_vdev_ref;
 	}
 
+	if (dnw_vdev_info->dnw_in_progress) {
+		pre_cac_err("dnw vdev in progress");
+		status = QDF_STATUS_SUCCESS;
+		goto release_vdev_ref;
+	}
+
 	pre_cac_debug("vdev %d freq %d bw %d cac duration %d ignore cac %d",
 		      vdev_id, ch_freq, ch_width, cac_duration_ms, ignore_cac);
 
