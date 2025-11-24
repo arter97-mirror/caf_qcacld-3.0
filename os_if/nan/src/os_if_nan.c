@@ -2806,7 +2806,7 @@ static int os_if_nan_generic_req(struct wlan_objmgr_psoc *psoc,
 }
 
 static int os_if_process_nan_disable_req(struct wlan_objmgr_psoc *psoc,
-					 struct nlattr **tb)
+					 struct nlattr **tb, uint8_t vdev_id)
 {
 	uint8_t *data;
 	uint32_t data_len;
@@ -2817,7 +2817,8 @@ static int os_if_process_nan_disable_req(struct wlan_objmgr_psoc *psoc,
 	status = ucfg_nan_cache_disable_req_info(psoc, NAN_DISABLE_REQ_NB);
 
 	if (QDF_IS_STATUS_SUCCESS(status))
-		status = ucfg_disable_nan_discovery(psoc, data, data_len);
+		status = ucfg_disable_nan_discovery(psoc, data, data_len,
+						    vdev_id);
 
 	return qdf_status_to_os_return(status);
 }
@@ -2928,7 +2929,7 @@ int os_if_process_nan_req(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 		return os_if_process_nan_enable_req(pdev, tb, vdev_id);
 	case QCA_WLAN_NAN_EXT_SUBCMD_TYPE_DISABLE_REQ:
 		os_if_cstats_log_disable_nan_disc_evt(pdev, vdev_id);
-		return os_if_process_nan_disable_req(psoc, tb);
+		return os_if_process_nan_disable_req(psoc, tb, vdev_id);
 	default:
 		osif_err("Unrecognized NAN subcmd type(%d)", nan_subcmd);
 		return -EINVAL;
