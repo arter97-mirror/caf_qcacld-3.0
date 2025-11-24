@@ -35,7 +35,6 @@
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_hdd_cfg80211.h"
 
-#ifdef WLAN_CFR_ENABLE
 void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
 				const void *data, uint32_t data_len)
 {
@@ -88,7 +87,79 @@ void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
 
 	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
 }
-#endif
+
+static uint32_t
+hdd_get_cfr_nl_event_len(struct cfr_enhanced_event_data event_data,
+			 uint32_t data_len)
+{
+	uint32_t total_len;
+
+	total_len = data_len;
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_TIMESTAMP_US].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_TYPE].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SUBTYPE].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SEQUENCE_NUMBER].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR].len);
+
+	/* QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INFO */
+	total_len += NLA_HDRLEN;
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INDEX].len) *
+		HOST_MAX_CHAINS;
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_RSSI].len) *
+		HOST_MAX_CHAINS;
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_AGC].len) *
+		HOST_MAX_CHAINS;
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_NUM_SPATIAL_STREAMS].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREQ].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_CHIP_ID].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+	       QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_TSF].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_CFO].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_VERSION].len);
+
+	/* QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI */
+	if (event_data.oui_length) {
+		total_len += nla_total_size(
+			event_data.oui_length * sizeof(u8));
+		total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION].len);
+	}
+
+	total_len += nla_total_size(cfr_config_policy[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_CSI_LTF_TYPE].len);
+
+	return total_len;
+}
 
 const struct nla_policy cfr_config_policy[
 		QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1] = {
