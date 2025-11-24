@@ -34,6 +34,18 @@
 #define LEGACY_CFR_VERSION 1
 #define ENHANCED_CFR_VERSION 2
 
+/* IEEE 802.11 Frame Type and Subtype definitions for CFR */
+#define CFR_MAX_FRAME_TYPE 2        /* 0=Management, 1=Control, 2=Data */
+#define CFR_MAX_FRAME_SUBTYPE 15    /* Frame subtype range: 0-15 */
+
+/* CFR Report Interval limits in milliseconds */
+#define CFR_MIN_REPORT_INTERVAL 100     /* Minimum report interval: 100ms */
+#define CFR_MAX_REPORT_INTERVAL 10000   /* Maximum report interval: 10000ms */
+
+/* CFR Format Version limits */
+#define CFR_MIN_FORMAT_VERSION 1        /* Minimum format version: 1 */
+#define CFR_MAX_FORMAT_VERSION 255      /* Maximum format version: 255 */
+
 /*
  * hdd_cfr_data_send_nl_event() - send cfr data through nl event
  * @vdev_id: vdev id
@@ -57,6 +69,27 @@ void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
  * @vdev_id: vdev id
  */
 void hdd_cfr_indicate_last_report_interval(uint8_t vdev_id);
+
+/*
+ * hdd_cfr_data_send_nl_event_v3() - send cfr data through nl event
+ * for version v3
+ * @vdev_id: vdev id
+ * @struct cfr_enhanced_event_data: cfr enhanced data
+ * @data: pointer to the cfr data
+ * @data_len: length of data
+ *
+ * Return: void
+ */
+void hdd_cfr_data_send_nl_event_v3(uint8_t vdev_id,
+				   struct cfr_enhanced_event_data event_data,
+				  const void *data, uint32_t data_len);
+
+/**
+ * wlan_hdd_stop_cfr() - stop cfr
+ * @vdev_id: vdev id
+ * @reason: reason
+ */
+void wlan_hdd_stop_cfr(uint8_t vdev_id, uint32_t reason);
 
 /**
  * struct cfr_v3_params - CFR v3 configuration parameters
