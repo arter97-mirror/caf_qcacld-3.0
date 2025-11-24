@@ -7458,10 +7458,14 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	    ((IS_PE_SESSION_HE_MODE(session) &&
 	      WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq)) ||
 	     !WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq) ||
-	     lim_tdls_peer_support_he(sta_ds)))
+	     lim_tdls_peer_support_he(sta_ds))) {
 		frm.addba_param_set.amsdu_supp = amsdu_support;
-	else
+	} else if (session->is_amsdu_2g_enabled) {
+		pe_debug("Enabling AMSDU for 2.4 GHz STA connection with OUI-matched AP");
+		frm.addba_param_set.amsdu_supp = amsdu_support;
+	} else {
 		frm.addba_param_set.amsdu_supp = 0;
+	}
 
 	frm.addba_param_set.policy = SIR_MAC_BA_POLICY_IMMEDIATE;
 	frm.ba_timeout.timeout = batimeout;
