@@ -211,7 +211,8 @@ wma_pasn_peer_create(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	param.peer_addr = peer_addr->bytes;
+	qdf_mem_copy(param.peer_addr.bytes, peer_addr->bytes,
+		     QDF_MAC_ADDR_SIZE);
 	param.peer_type = WMI_PEER_TYPE_PASN;
 	param.vdev_id = vdev_id;
 	if (wmi_unified_peer_create_send(wma->wmi_handle,
