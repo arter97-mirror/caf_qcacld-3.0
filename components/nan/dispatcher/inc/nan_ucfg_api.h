@@ -473,6 +473,7 @@ bool ucfg_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
  * @psoc: pointer to psoc object
  * @data: Data to be sent to NAN discovery engine, which runs in firmware
  * @data_len: Length of the data
+ * @vdev_id: Vdev ID
  *
  * Send NAN disable request to firmware by setting the mandatory
  * params(disable_2g_discovery, disable_5g_discovery) along
@@ -481,7 +482,8 @@ bool ucfg_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
  * Return: status of operation
  */
 QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
-				      uint8_t *data, uint32_t data_len);
+				      uint8_t *data, uint32_t data_len,
+				      uint8_t vdev_id);
 
 /**
  * ucfg_nan_disable_ndi() - Disable the NDI with given vdev_id
@@ -757,7 +759,8 @@ bool ucfg_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 
 static inline
 QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
-				      uint8_t *data, uint32_t data_len)
+				      uint8_t *data, uint32_t data_len,
+				      uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
 }
