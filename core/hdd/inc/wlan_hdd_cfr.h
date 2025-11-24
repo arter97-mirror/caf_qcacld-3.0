@@ -34,6 +34,24 @@
 #define LEGACY_CFR_VERSION 1
 #define ENHANCED_CFR_VERSION 2
 
+/*
+ * hdd_cfr_data_send_nl_event() - send cfr data through nl event
+ * @vdev_id: vdev id
+ * @pid: process pid to which send data event unicast way
+ * @data: pointer to the cfr data
+ * @data_len: length of data
+ *
+ * Return: void
+ */
+void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
+				const void *data, uint32_t data_len);
+
+#define FEATURE_CFR_DATA_VENDOR_EVENTS                                  \
+[QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX] = {              \
+	.vendor_id = QCA_NL80211_VENDOR_ID,                             \
+	.subcmd = QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG,       \
+},
+
 /**
  * struct cfr_v3_params - CFR v3 configuration parameters
  * @is_start_capture: Flag to start/stop CFR capture
@@ -122,6 +140,8 @@ hdd_cfr_disconnect(struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+#define FEATURE_CFR_DATA_VENDOR_EVENTS
 #endif /* WLAN_CFR_ENABLE */
 #endif /* _WLAN_HDD_CFR_H */
 
