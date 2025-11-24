@@ -948,9 +948,385 @@ static QDF_STATUS hdd_stop_enh_cfr(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_SUCCESS;
 }
 
+static enum
+phy_ch_width convert_capture_bw(enum nl80211_chan_width capture_bw)
+{
+	switch (capture_bw) {
+	case NL80211_CHAN_WIDTH_20_NOHT:
+	case NL80211_CHAN_WIDTH_20:
+		return CH_WIDTH_20MHZ;
+	case NL80211_CHAN_WIDTH_40:
+		return CH_WIDTH_40MHZ;
+	case NL80211_CHAN_WIDTH_80:
+		return CH_WIDTH_80MHZ;
+	case NL80211_CHAN_WIDTH_80P80:
+		return CH_WIDTH_80P80MHZ;
+	case NL80211_CHAN_WIDTH_160:
+		return CH_WIDTH_160MHZ;
+	case NL80211_CHAN_WIDTH_5:
+		return CH_WIDTH_5MHZ;
+	case NL80211_CHAN_WIDTH_10:
+		return CH_WIDTH_10MHZ;
+	case NL80211_CHAN_WIDTH_320:
+		return CH_WIDTH_320MHZ;
+	default:
+		cfr_err("invalid capture bw");
+		return CH_WIDTH_INVALID;
+	}
+}
+
+static QDF_STATUS wlan_cfg80211_stop_enh_cfr_v3(
+			struct wlan_objmgr_vdev *vdev,
+			uint8_t value)
+{
+	struct pdev_cfr *pcfr = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	bool pdev_ref_taken = false;
+
+	if (!vdev) {
+		cfr_err("Invalid vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cfr_err("Failed to get pdev object");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wlan_objmgr_pdev_try_get_ref(pdev, WLAN_CFR_ID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cfr_err("Failed to get pdev reference");
+		return status;
+	}
+	pdev_ref_taken = true;
+
+	pcfr = wlan_objmgr_pdev_get_comp_private_obj(pdev, WLAN_UMAC_COMP_CFR);
+	if (!pcfr) {
+		cfr_err("CFR private object is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto cleanup;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		cfr_err("Failed to get psoc");
+		status = QDF_STATUS_E_INVAL;
+		goto cleanup;
+	}
+
+	ucfg_cfr_stop_report_interval_timer(vdev);
+
+	/* Handle TX CFR capture cleanup */
+	if (pcfr->is_cfr_tx &&
+	    !qdf_is_macaddr_zero((struct qdf_mac_addr *)pcfr->peer_addr)) {
+		peer = wlan_objmgr_get_peer_by_mac(psoc, pcfr->peer_addr,
+						   WLAN_CFR_ID);
+		if (!peer) {
+			cfr_err("No peer object found for TX CFR cleanup");
+			/* Continue with cleanup even if peer not found */
+		} else {
+			cfr_debug("clean up CFR TX");
+			ucfg_cfr_stop_capture(pdev, peer);
+			wlan_objmgr_peer_release_ref(peer, WLAN_CFR_ID);
+		}
+
+		pcfr->is_cfr_tx = value;
+		memset(pcfr->peer_addr, value, QDF_MAC_ADDR_SIZE);
+	}
+
+	/* Handle RX CFR capture cleanup */
+	if (pcfr->is_cfr_rx) {
+		pcfr->is_cfr_rx = value;
+		cfr_debug("clean up CFR RX");
+		status = hdd_stop_enh_cfr(vdev);
+		if (QDF_IS_STATUS_ERROR(status))
+			cfr_err("Failed to stop enhanced CFR RX capture");
+	}
+
+	pcfr->is_associated = value;
+	pcfr->freq = value;
+	pcfr->report_interval = value;
+	pcfr->format_version = value;
+	pcfr->oui_length = value;
+	qdf_mem_zero(pcfr->oui, MAX_CFR_OUI_LEN);
+	pcfr->is_cfr_version_v3 = value;
+	pcfr->frame_type = value;
+	pcfr->frame_sub_type = value;
+	pcfr->unassoc_capture_config = value;
+	pcfr->unassoc_channel_mhz = value;
+	pcfr->unassoc_phy_mode = value;
+	pcfr->bandwidth = value;
+	pcfr->is_cfr_data_present = value;
+
+cleanup:
+	if (pdev_ref_taken)
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_CFR_ID);
+
+	return status;
+}
+
 QDF_STATUS hdd_cfr_disconnect(struct wlan_objmgr_vdev *vdev)
 {
-	return hdd_stop_enh_cfr(vdev);
+	struct pdev_cfr *pcfr = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!vdev) {
+		cfr_err("Invalid vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cfr_err("Failed to get pdev object");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pcfr = wlan_objmgr_pdev_get_comp_private_obj(pdev, WLAN_UMAC_COMP_CFR);
+	if (!pcfr) {
+		cfr_err("CFR private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	cfr_debug("Disconnecting CFR capture, version_v3: %s",
+		  pcfr->is_cfr_version_v3 ? "true" : "false");
+
+	if (pcfr->is_cfr_version_v3) {
+		status = wlan_cfg80211_stop_enh_cfr_v3(vdev, 0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			cfr_err("Failed to stop enhanced CFR v3, status: %d",
+				status);
+		}
+	} else {
+		status = hdd_stop_enh_cfr(vdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			cfr_err("Failed to stop enhanced CFR, status: %d",
+				status);
+		}
+	}
+
+	return status;
+}
+
+void wlan_hdd_stop_cfr(uint8_t vdev_id, uint32_t reason)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		cfr_err("HDD context is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		cfr_err("adapter NULL for vdev id %d", vdev_id);
+		return;
+	}
+
+	cfr_debug("stop CFR vdev id %d reason %d ", vdev_id, reason);
+
+	status = hdd_cfr_disconnect(link_info->vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cfr_err("Failed to stop CFR V3, status: %d",
+			status);
+	}
+}
+
+static void wlan_cfg80211_register_stop_cfr(struct pdev_cfr *pcfr,
+					    uint8_t vdev_id)
+{
+	if (!pcfr) {
+		cfr_err("Invalid pcfr");
+		return;
+	}
+
+	pcfr->cfr_stop_cb = wlan_hdd_stop_cfr;
+	pcfr->vdev_id = vdev_id;
+}
+
+static int wlan_enh_cfr_capture_v3_tx(struct hdd_adapter *adapter,
+				      struct nlattr **tb,
+				      struct wlan_objmgr_vdev *vdev,
+				      struct wlan_objmgr_pdev *pdev,
+				      struct pdev_cfr *pcfr)
+{
+	struct cfr_capture_params params = { 0 };
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	struct qdf_mac_addr peer_addr = { 0 };
+	QDF_STATUS status;
+	int ret = 0;
+
+	if (!adapter) {
+		cfr_err("Invalid adapter pointer");
+		return -EINVAL;
+	}
+
+	if (!tb) {
+		cfr_err("Invalid netlink attribute array");
+		return -EINVAL;
+	}
+
+	if (!vdev) {
+		cfr_err("Invalid vdev pointer");
+		return -EINVAL;
+	}
+
+	if (!pdev) {
+		cfr_err("Invalid pdev pointer");
+		return -EINVAL;
+	}
+
+	if (!pcfr) {
+		cfr_err("Invalid CFR private object pointer");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR]) {
+		cfr_err("Peer MAC address attribute not provided");
+		return -EINVAL;
+	}
+
+	nla_memcpy(peer_addr.bytes, tb[QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR],
+		   QDF_MAC_ADDR_SIZE);
+
+	if (qdf_is_macaddr_zero(&peer_addr)) {
+		cfr_err("Invalid zero MAC address provided");
+		return -EINVAL;
+	}
+
+	if (qdf_is_macaddr_broadcast(&peer_addr)) {
+		cfr_err("Broadcast MAC address not allowed for TX capture");
+		return -EINVAL;
+	}
+
+	qdf_mem_copy(pcfr->peer_addr, peer_addr.bytes, QDF_MAC_ADDR_SIZE);
+
+	cfr_debug("CFR TX capture for peer " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(peer_addr.bytes));
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		cfr_err("Failed to get PSOC object from vdev");
+		return -EINVAL;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_addr.bytes, WLAN_CFR_ID);
+	if (!peer) {
+		cfr_err("No peer object found for MAC " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_addr.bytes));
+		return -ENOENT;
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY]) {
+		params.period = nla_get_u32(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY]);
+		cfr_debug("CFR capture periodicity: %u ms", params.period);
+
+		if (params.period > 0 && params.period < 10) {
+			cfr_err("Invalid periodicity %u ms, minimum is 10ms",
+				params.period);
+			ret = -EINVAL;
+			goto release_peer;
+		}
+	}
+
+	params.method = pcfr->method;
+	params.bandwidth = pcfr->bandwidth;
+
+	cfr_debug("Starting CFR TX capture with method: %u, bandwidth: %u",
+		  params.method, params.bandwidth);
+
+	wlan_hdd_transport_mode_cfg(pdev, vdev->vdev_objmgr.vdev_id,
+				    0, QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS);
+
+	status = ucfg_cfr_start_capture(pdev, peer, &params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cfr_err("Failed to start CFR capture, status: %d", status);
+		ret = qdf_status_to_os_return(status);
+		goto release_peer;
+	}
+
+	pcfr->is_cfr_tx = true;
+
+	cfr_debug("CFR TX capture started for peer " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(peer_addr.bytes));
+
+release_peer:
+	wlan_objmgr_peer_release_ref(peer, WLAN_CFR_ID);
+
+	return ret;
+}
+
+static bool cfr_validate_method_tx(uint8_t method)
+{
+	switch (method) {
+	case QCA_WLAN_VENDOR_CFR_METHOD_QOS_NULL:
+		return true;
+	default:
+		cfr_err("Invalid CFR method: %d", method);
+		return false;
+	}
+}
+
+static bool cfr_validate_transport_mode(uint8_t transport_mode)
+{
+	switch (transport_mode) {
+	case QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS:
+		return true;
+	default:
+		cfr_err("Invalid CFR transport mode: %d", transport_mode);
+		return false;
+	}
+}
+
+static int cfr_extract_enable_flag(struct nlattr **tb,
+				   struct cfr_v3_params *cfr_params)
+{
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE])
+		return 0;
+
+	cfr_params->is_start_capture = nla_get_flag(tb[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE]);
+	cfr_debug("CFR capture %s",
+		  cfr_params->is_start_capture ? "enable" : "disable");
+	return 0;
+}
+
+static int cfr_extract_method_tx(struct nlattr **tb,
+				 struct cfr_v3_params *cfr_params)
+{
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD]) {
+		cfr_params->rx_capture = true;
+		return 0;
+	}
+
+	cfr_params->method = nla_get_u8(tb[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD]);
+
+	if (!cfr_validate_method_tx(cfr_params->method)) {
+		cfr_err("CFR method validation failed: %d",
+			cfr_params->method);
+		return -EINVAL;
+	}
+
+	cfr_params->tx_capture = (cfr_params->method ==
+				  QCA_WLAN_VENDOR_CFR_METHOD_QOS_NULL);
+
+	cfr_debug("CFR method: %d (%s), TX capture: %s",
+		  cfr_params->method,
+		  (cfr_params->method ==
+		   QCA_WLAN_VENDOR_CFR_METHOD_QOS_NULL) ?
+		  "QoS NULL" : "Probe Response",
+		  cfr_params->tx_capture ? "start" : "stop");
+
+	return 0;
 }
 
 static int
