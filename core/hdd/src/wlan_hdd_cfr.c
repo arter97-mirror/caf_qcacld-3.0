@@ -161,6 +161,233 @@ hdd_get_cfr_nl_event_len(struct cfr_enhanced_event_data event_data,
 	return total_len;
 }
 
+static int
+hdd_cfr_nl_put_common_info(struct sk_buff *vendor_event,
+			   struct cfr_enhanced_event_data *event_data)
+{
+	if (nla_put_u64_64bit(vendor_event,
+			      QCA_WLAN_VENDOR_ATTR_PEER_CFR_TIMESTAMP_US,
+			      event_data->timestamp_us, NL80211_ATTR_PAD)) {
+		cfr_err("Failed to put timestamp");
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_TYPE,
+		       event_data->frame_type)) {
+		cfr_err("Failed to put frame type");
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SUBTYPE,
+		       event_data->frame_sub_type)) {
+		cfr_err("Failed to put frame subtype");
+		return -EINVAL;
+	}
+
+	if (nla_put_u16(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SEQUENCE_NUMBER,
+			event_data->frame_sequence_number)) {
+		cfr_err("Failed to put sequence number");
+		return -EINVAL;
+	}
+
+	if (nla_put(vendor_event, QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR,
+		    QDF_MAC_ADDR_SIZE, event_data->peer_mac_addr)) {
+		cfr_err("Failed to put peer mac addr");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int
+hdd_cfr_nl_put_phy_info(struct sk_buff *vendor_event,
+			struct cfr_enhanced_event_data *event_data)
+{
+	struct nlattr *info, *entry;
+	uint8_t i;
+
+	info = nla_nest_start(vendor_event,
+			      QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INFO);
+	if (!info) {
+		cfr_err("Failed to start antenna info nesting");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < event_data->antenna_count && i < HOST_MAX_CHAINS; i++) {
+		entry = nla_nest_start(vendor_event, i);
+		if (!entry) {
+			cfr_err("Failed to start antenna entry %d", i);
+			nla_nest_cancel(vendor_event, info);
+			return -EINVAL;
+		}
+
+		if (nla_put_u8(vendor_event,
+			       QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INDEX,
+			       i)) {
+			cfr_err("Failed to add antenna %d index", i);
+			goto err_phy_info;
+		}
+
+		if (nla_put_s8(vendor_event,
+			       QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_RSSI,
+			       event_data->antenna_info[i].rssi)) {
+			cfr_err("Failed to add antenna %d rssi", i);
+			goto err_phy_info;
+		}
+
+		if (nla_put_u8(vendor_event,
+			       QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_AGC,
+			       event_data->antenna_info[i].agc)) {
+			cfr_err("Failed to add antenna %d agc", i);
+			goto err_phy_info;
+		}
+
+		nla_nest_end(vendor_event, entry);
+	}
+
+	nla_nest_end(vendor_event, info);
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_NUM_SPATIAL_STREAMS,
+		       event_data->num_spatial_streams)) {
+		cfr_err("Failed to put num spatial streams");
+		return -EINVAL;
+	}
+
+	if (nla_put_u32(vendor_event, QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREQ,
+			event_data->freq)) {
+		cfr_err("Failed to put freq");
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH,
+		       event_data->bandwidth)) {
+		cfr_err("Failed to put bandwidth");
+		return -EINVAL;
+	}
+
+	if (nla_put_u16(vendor_event, QCA_WLAN_VENDOR_ATTR_PEER_CFR_CHIP_ID,
+			event_data->chip_id)) {
+		cfr_err("Failed to put chip id");
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_CSI_LTF_TYPE,
+		       event_data->ltf_type)) {
+		cfr_err("Failed to put ltf_type");
+		return -EINVAL;
+	}
+
+	return 0;
+
+err_phy_info:
+	nla_nest_cancel(vendor_event, entry);
+	nla_nest_cancel(vendor_event, info);
+	return -EINVAL;
+}
+
+static int
+hdd_cfr_nl_put_vendor_info(struct sk_buff *vendor_event,
+			   struct cfr_enhanced_event_data *event_data)
+{
+	if (nla_put_u64_64bit(vendor_event,
+			      QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_TSF,
+			      event_data->capture_tsf, NL80211_ATTR_PAD)) {
+		cfr_err("Failed to put capture tsf");
+		return -EINVAL;
+	}
+
+	if (nla_put_s16(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_CFO,
+			event_data->cfo)) {
+		cfr_err("Failed to put cfo");
+		return -EINVAL;
+	}
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_VERSION,
+		       event_data->cfr_version)) {
+		cfr_err("Failed to put format version");
+		return -EINVAL;
+	}
+
+	if (event_data->oui_length &&
+	    event_data->oui_length < MAX_CFR_OUI_LEN &&
+	    nla_put(vendor_event,
+		    QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI,
+		    event_data->oui_length, event_data->oui)) {
+		cfr_err("Failed to put oui");
+		return -EINVAL;
+	}
+
+	if (event_data->oui_length &&
+	    nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION,
+		       event_data->format_version)) {
+		cfr_err("Failed to put data format version");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+void hdd_cfr_data_send_nl_event_v3(uint8_t vdev_id,
+				   struct cfr_enhanced_event_data event_data,
+				   const void *data, uint32_t data_len)
+{
+	uint32_t len;
+	struct sk_buff *vendor_event;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		cfr_err("HDD context is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		cfr_err("adapter NULL for vdev id %d", vdev_id);
+		return;
+	}
+
+	len = hdd_get_cfr_nl_event_len(event_data, data_len);
+	cfr_debug("vdev id %d data_len %d total_len %d",
+		  vdev_id, data_len, len);
+	len = nla_total_size(len + NLMSG_HDRLEN);
+
+	vendor_event = wlan_cfg80211_vendor_event_alloc(
+			hdd_ctx->wiphy, &link_info->adapter->wdev, len,
+			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
+			qdf_mem_malloc_flags());
+
+	if (!vendor_event) {
+		cfr_err("alloc failed vdev id %d, total_len %d",
+			vdev_id, len);
+		return;
+	}
+
+	if (hdd_cfr_nl_put_common_info(vendor_event, &event_data) ||
+	    hdd_cfr_nl_put_phy_info(vendor_event, &event_data) ||
+	    hdd_cfr_nl_put_vendor_info(vendor_event, &event_data))
+		goto free_skb;
+
+	if (nla_put(vendor_event,
+		    QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA,
+		    data_len, data)) {
+		cfr_err("CFR event put fails");
+		goto free_skb;
+	}
+
+	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
+	return;
+
+free_skb:
+	wlan_cfg80211_vendor_free_skb(vendor_event);
+}
+
 const struct nla_policy cfr_config_policy[
 		QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR] =
