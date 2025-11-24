@@ -2975,7 +2975,8 @@ static int os_if_process_nan_disable_req(struct wlan_objmgr_psoc *psoc,
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 
 	if (QDF_IS_STATUS_SUCCESS(status))
-		status = ucfg_disable_nan_discovery(psoc, data, data_len);
+		status = ucfg_disable_nan_discovery(psoc, data, data_len,
+						    vdev_id);
 
 end:
 	return qdf_status_to_os_return(status);

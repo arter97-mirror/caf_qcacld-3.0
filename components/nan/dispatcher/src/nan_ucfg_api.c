@@ -1405,12 +1405,19 @@ error:
 }
 
 QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
-				      uint8_t *data, uint32_t data_len)
+				      uint8_t *data, uint32_t data_len,
+				      uint8_t vdev_id)
 {
 	struct nan_disable_req *nan_req;
 	QDF_STATUS status;
 
 	ucfg_nan_cleanup_all_ndps(psoc);
+
+	status = nan_wait_for_peer_migration_complete(psoc, vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		nan_err("Failed waiting for peer migration : %u", status);
+		return status;
+	}
 
 	nan_req = qdf_mem_malloc(sizeof(*nan_req) + data_len);
 	if (!nan_req)

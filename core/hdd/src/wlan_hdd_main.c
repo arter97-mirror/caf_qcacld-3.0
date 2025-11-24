@@ -10396,7 +10396,8 @@ hdd_sta_disconnect_and_cleanup(struct wlan_hdd_link_info *link_info)
 }
 
 static void
-hdd_disable_nan_active_disc(struct hdd_adapter *adapter)
+hdd_disable_nan_active_disc(struct hdd_adapter *adapter,
+			    struct wlan_hdd_link_info *link_info)
 {
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	enum QDF_OPMODE device_mode = adapter->device_mode;
@@ -10406,7 +10407,8 @@ hdd_disable_nan_active_disc(struct hdd_adapter *adapter)
 	      !ucfg_nan_is_vdev_creation_allowed(hdd_ctx->psoc))) &&
 	    ucfg_is_nan_conc_control_supported(hdd_ctx->psoc) &&
 	    ucfg_is_nan_disc_active(hdd_ctx->psoc))
-		ucfg_disable_nan_discovery(hdd_ctx->psoc, NULL, 0);
+		ucfg_disable_nan_discovery(hdd_ctx->psoc, NULL, 0,
+					   link_info->vdev_id);
 }
 
 static void
@@ -10509,7 +10511,7 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 		}
 
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
-		hdd_disable_nan_active_disc(adapter);
+		hdd_disable_nan_active_disc(adapter, link_info);
 
 		hdd_vdev_destroy(link_info);
 	}
