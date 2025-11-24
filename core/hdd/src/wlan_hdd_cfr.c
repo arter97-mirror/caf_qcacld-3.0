@@ -2074,6 +2074,9 @@ wlan_cfg80211_peer_cfr_capture_cfg(struct wiphy *wiphy,
 			status = wlan_cfg80211_peer_cfr_capture_cfg_adrastea(
 								adapter, tb);
 			return qdf_status_to_os_return(status);
+		} else if (version == ENHANCED_CFR_VERSION_V3) {
+			hdd_debug("CFR V3 capture");
+			return wlan_cfg80211_enh_cfr_capture_v3(adapter, tb);
 		} else if (version != ENHANCED_CFR_VERSION) {
 			hdd_err("unsupported version");
 			return -EFAULT;
