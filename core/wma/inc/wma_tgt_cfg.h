@@ -107,6 +107,7 @@ struct wma_tgt_services {
 	bool bcn_reception_stats;
 	bool is_roam_scan_ch_to_host;
 	bool ll_stats_per_chan_rx_tx_time;
+	bool enhanced_stats_support;
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
 	bool is_get_station_clubbed_in_ll_stats_req;
 #endif

@@ -5637,6 +5637,10 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_ll_stats_per_chan_rx_tx_time);
 
+	cfg->enhanced_stats_support =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_enhanced_stats_support);
+
 	wma_get_service_cap_club_get_sta_in_ll_stats_req(wmi_handle, cfg);
 
 	wma_get_igmp_offload_enable(wmi_handle, cfg);
