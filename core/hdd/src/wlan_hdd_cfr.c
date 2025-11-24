@@ -680,10 +680,21 @@ wlan_hdd_transport_mode_cfg(struct wlan_objmgr_pdev *pdev,
 	}
 	pa->nl_cb.vdev_id = vdev_id;
 	pa->nl_cb.pid = pid;
-	if (tx_mode == QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS)
+	if (tx_mode != QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS)
+		return;
+
+	pa->nl_cb.cfr_nl_cb = NULL;
+	pa->nl_cb.cfr_nl_cb_v3 = NULL;
+	pa->nl_cb.cfr_nl_cb_report_interval = NULL;
+
+	if (pa->is_cfr_version_v3) {
+		pa->nl_cb.cfr_nl_cb_v3 =
+			hdd_cfr_data_send_nl_event_v3;
+		pa->nl_cb.cfr_nl_cb_report_interval =
+			hdd_cfr_indicate_last_report_interval;
+	} else {
 		pa->nl_cb.cfr_nl_cb = hdd_cfr_data_send_nl_event;
-	else
-		pa->nl_cb.cfr_nl_cb = NULL;
+	}
 }
 
 #define DEFAULT_CFR_NSS 0xff
