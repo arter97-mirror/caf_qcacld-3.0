@@ -319,6 +319,20 @@ static void hdd_disable_gtk_offload(struct hdd_adapter *adapter,
 {
 	struct pmo_gtk_rsp_req gtk_rsp_request;
 	QDF_STATUS status;
+	uint8_t vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	vdev_id =  wlan_vdev_get_id(vdev);
+
+	if (ucfg_pmo_is_wow_optimization_enabled(psoc)) {
+		hdd_debug("WOW enhanced offload enabled- skip GTK DISABLE, vdev_id: %d",
+			  vdev_id);
+		return;
+	}
 
 	if (wlan_vdev_is_open_mode(vdev))
 		return;
