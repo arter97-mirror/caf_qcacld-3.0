@@ -4494,6 +4494,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	}
 
 	lim_cfg_dsmps_for_iot_ap(mac_ctx, session, bss_desc, false);
+	lim_set_amsdu_for_2g_oui(mac_ctx, session, bss_desc);
 
 	lim_copy_ml_partner_info_to_session(session, req);
 

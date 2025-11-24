@@ -1060,6 +1060,40 @@
 
 /*
  * <ini>
+ * gActionOUIEnableAmsdu2G - Used to enable AMSDU for 2.4 GHz STA connections
+ * with specified APs
+ * @Default: ""
+ *
+ * This ini is used to specify AP OUIs for which AMSDU should be enabled
+ * in ADDBA response frames for 2.4 GHz STA connections. By default, AMSDU is
+ * only enabled for HE mode on 2.4 GHz or all modes on 5GHz. This action OUI
+ * allows enabling AMSDU for HT/VHT (non-HE) STA connections on 2.4 GHz with
+ * specific APs.
+ *
+ * Example:
+ * To enable AMSDU for AP with OUI 00-11-22:
+ * gActionOUIEnableAmsdu2G="001122 00 01"
+ *
+ * To enable AMSDU for multiple APs:
+ * gActionOUIEnableAmsdu2G="001122 00 01 334455 00 01"
+ *
+ * Related: None
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_ENABLE_AMSDU_2G CFG_INI_STRING( \
+	"gActionOUIEnableAmsdu2G", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"", \
+	"Enable AMSDU for 2.4 GHz STA connections with specified APs")
+
+/*
+ * <ini>
  * CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS_V2 - Used to disable Dynamic SMPS
  * capability for specified AP.
  *
@@ -1111,6 +1145,7 @@
 	CFG(CFG_ACTION_OUI_DISABLE_AUX_LISTEN) \
 	CFG(CFG_ACTION_OUI_DISABLE_DYNAMIC_SMPS) \
 	CFG(CFG_ACTION_OUI_EXT_MLD_CAP_OP) \
+	CFG(CFG_ACTION_OUI_ENABLE_AMSDU_2G) \
 	CFG(CFG_ACTION_OUI_SKIP_BCN_CH_MISMATCH_CHK) \
 	CFG(CFG_ACTION_OUI_FORCE_TX_NULL_FRAME_ON_P2P) \
 	CFG(CFG_ENABLE_ACTION_OUI)

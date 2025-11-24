@@ -743,6 +743,7 @@ struct punc_chan_info {
  * @action_oui_limit_bw_2g: Disable 40 MHz BW when connect 2 GHz IoT AP
  * @is_unexpected_peer_error: true if unexpected peer error
  * on 2.4 GHz
+ * @is_amsdu_2g_enabled: Is amsdu enabled for 2g connection with IoT AP
  * @join_probe_cnt: join probe request count
  * @cal_tpc_post_csa: Recalculate tx power power csa
  * @rsno_gen_used: rsno gen used for connection
@@ -1077,6 +1078,7 @@ struct pe_session {
 	uint8_t user_edca_set;
 	bool is_oui_auth_assoc_6mbps_2ghz_enable;
 	bool action_oui_limit_bw_2g;
+	bool is_amsdu_2g_enabled;
 	uint8_t join_probe_cnt;
 	bool cal_tpc_post_csa;
 	uint8_t rsno_gen_used;

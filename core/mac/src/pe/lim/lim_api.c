@@ -91,6 +91,7 @@
 #include "wlan_cm_api.h"
 #include "wlan_mlme_api.h"
 #include <wlan_p2p_api.h>
+#include "wlan_action_oui_main.h"
 
 struct pe_hang_event_fixed_param {
 	uint16_t tlv_header;
@@ -3370,6 +3371,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 						   oui_ie_ptr, oui_ie_len);
 
 	lim_cfg_dsmps_for_iot_ap(mac_ctx, ft_session_ptr, bss_desc, true);
+	lim_set_amsdu_for_2g_oui(mac_ctx, ft_session_ptr, bss_desc);
 
 	qdf_mem_free(bss_desc);
 	oui_ie_len = 0;
@@ -5319,3 +5321,24 @@ void lim_update_vdev_sr_elements(struct pe_session *session_entry,
 
 }
 #endif
+
+void lim_set_amsdu_for_2g_oui(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      struct bss_description *bss_desc)
+{
+	struct action_oui_search_attr attr = {0};
+
+	if (!LIM_IS_STA_ROLE(session) ||
+	    !WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq) ||
+	    !bss_desc)
+		return;
+
+	attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	attr.ie_length = wlan_get_ielen_from_bss_description(bss_desc);
+	attr.mac_addr = &bss_desc->bssId[0];
+
+	session->is_amsdu_2g_enabled =
+			wlan_action_oui_search(mac_ctx->psoc, &attr,
+					       ACTION_OUI_ENABLE_AMSDU_2G);
+}
+
