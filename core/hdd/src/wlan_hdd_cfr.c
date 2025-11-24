@@ -34,6 +34,7 @@
 #include "wlan_cmn.h"
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_hdd_cfg80211.h"
+#include "target_if.h"
 
 void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
 				const void *data, uint32_t data_len)
@@ -1329,6 +1330,418 @@ static int cfr_extract_method_tx(struct nlattr **tb,
 	return 0;
 }
 
+static int cfr_extract_frame_info(struct nlattr **tb,
+				  struct cfr_v3_params *cfr_params)
+{
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_TYPE]) {
+		cfr_params->frame_type = nla_get_u8(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_TYPE]);
+		cfr_debug("CFR Frame type: %d", cfr_params->frame_type);
+
+		/* Validate frame type (0=Management, 1=Control, 2=Data) */
+		if (cfr_params->frame_type > CFR_MAX_FRAME_TYPE) {
+			cfr_err("Invalid frame type: %d",
+				cfr_params->frame_type);
+			return -EINVAL;
+		}
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SUBTYPE]) {
+		cfr_params->frame_subtype = nla_get_u8(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SUBTYPE]);
+		cfr_debug("CFR Frame subtype: %d", cfr_params->frame_subtype);
+
+		if (cfr_params->frame_subtype > CFR_MAX_FRAME_SUBTYPE) {
+			cfr_err("Invalid frame subtype: %d",
+				cfr_params->frame_subtype);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+static int cfr_extract_rf_params(struct nlattr **tb,
+				 struct cfr_v3_params *cfr_params,
+				 struct wlan_objmgr_pdev *pdev)
+{
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREQ]) {
+		cfr_params->freq = nla_get_u32(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREQ]);
+
+		if (!wlan_reg_is_freq_enabled(pdev, cfr_params->freq,
+					      REG_CURRENT_PWR_MODE)) {
+			cfr_err("CFR frequency validation failed: %d MHz",
+				cfr_params->freq);
+			return -EINVAL;
+		}
+
+		cfr_debug("CFR Frequency: %d MHz", cfr_params->freq);
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH]) {
+		cfr_params->bandwidth = nla_get_u8(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH]);
+		cfr_params->bandwidth =
+			convert_capture_bw(cfr_params->bandwidth);
+		if (cfr_params->bandwidth == CH_WIDTH_INVALID) {
+			cfr_err("CFR bandwidth validation failed: %d",
+				cfr_params->bandwidth);
+			return -EINVAL;
+		}
+		cfr_debug("CFR Capture bandwidth: %d", cfr_params->bandwidth);
+	}
+
+	return 0;
+}
+
+static int cfr_extract_transport_params(struct nlattr **tb,
+					struct cfr_v3_params *cfr_params)
+{
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_INTERVAL]) {
+		cfr_params->report_interval = nla_get_u32(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_INTERVAL]);
+
+		if (cfr_params->report_interval < CFR_MIN_REPORT_INTERVAL ||
+		    cfr_params->report_interval > CFR_MAX_REPORT_INTERVAL) {
+			cfr_err("Invalid report interval: %d ms (valid range: %d-%d)",
+				cfr_params->report_interval,
+				CFR_MIN_REPORT_INTERVAL,
+				CFR_MAX_REPORT_INTERVAL);
+			return -EINVAL;
+		}
+
+		cfr_debug("CFR Report interval: %d ms",
+			  cfr_params->report_interval);
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_TRANSPORT_MODE]) {
+		cfr_params->transport_mode = nla_get_u8(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_TRANSPORT_MODE]);
+
+		if (!cfr_validate_transport_mode(cfr_params->transport_mode)) {
+			cfr_err("CFR transport mode validation failed: %d",
+				cfr_params->transport_mode);
+			return -EINVAL;
+		}
+
+		cfr_debug("CFR Transport mode: %d (%s)",
+			  cfr_params->transport_mode,
+			  (cfr_params->transport_mode ==
+			   QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS) ?
+			  "Netlink Events" : "Relay FS");
+	}
+
+	return 0;
+}
+
+static int cfr_extract_format_params(struct nlattr **tb,
+				     struct cfr_v3_params *cfr_params)
+{
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION]) {
+		cfr_params->format_version = nla_get_u8(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION]);
+
+		if (cfr_params->format_version < CFR_MIN_FORMAT_VERSION ||
+		    cfr_params->format_version > CFR_MAX_FORMAT_VERSION) {
+			cfr_err("Invalid format version: %d (valid range: %d-%d)",
+				cfr_params->format_version,
+				CFR_MIN_FORMAT_VERSION, CFR_MAX_FORMAT_VERSION);
+			return -EINVAL;
+		}
+
+		cfr_debug("CFR Format version: %d", cfr_params->format_version);
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI]) {
+		cfr_params->oui_length = nla_len(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI]);
+
+		if (cfr_params->oui_length == 0) {
+			cfr_err("Empty OUI provided");
+			return -EINVAL;
+		}
+
+		if (cfr_params->oui_length > MAX_CFR_OUI_LEN) {
+			cfr_err("OUI length %d exceeds maximum %d, truncating",
+				cfr_params->oui_length, MAX_CFR_OUI_LEN);
+			cfr_params->oui_length = MAX_CFR_OUI_LEN;
+		}
+
+		nla_memcpy(cfr_params->oui,
+			   tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI],
+			   cfr_params->oui_length);
+
+		cfr_debug("CFR OUI length: %d bytes", cfr_params->oui_length);
+	}
+
+	return 0;
+}
+
+static int wlan_cfg80211_extract_cfr_params(struct nlattr **tb,
+					    struct cfr_v3_params *cfr_params,
+					    struct wlan_objmgr_pdev *pdev)
+{
+	int ret = 0;
+
+	if (!tb) {
+		cfr_err("Invalid netlink attribute array pointer");
+		return -EINVAL;
+	}
+
+	if (!cfr_params) {
+		cfr_err("Invalid CFR parameters structure pointer");
+		return -EINVAL;
+	}
+
+	qdf_mem_zero(cfr_params, sizeof(*cfr_params));
+
+	ret = cfr_extract_enable_flag(tb, cfr_params);
+	if (ret) {
+		cfr_err("Failed to extract enable flag, ret: %d", ret);
+		return ret;
+	}
+
+	ret = cfr_extract_method_tx(tb, cfr_params);
+	if (ret) {
+		cfr_err("Failed to extract method, ret: %d", ret);
+		return ret;
+	}
+
+	ret = cfr_extract_frame_info(tb, cfr_params);
+	if (ret) {
+		cfr_err("Failed to extract frame info, ret: %d", ret);
+		return ret;
+	}
+
+	ret = cfr_extract_rf_params(tb, cfr_params, pdev);
+	if (ret) {
+		cfr_err("Failed to extract RF parameters, ret: %d", ret);
+		return ret;
+	}
+
+	ret = cfr_extract_transport_params(tb, cfr_params);
+	if (ret) {
+		cfr_err("Failed to extract transport parameters, ret: %d", ret);
+		return ret;
+	}
+
+	ret = cfr_extract_format_params(tb, cfr_params);
+	if (ret) {
+		cfr_err("Failed to extract format parameters, ret: %d", ret);
+		return ret;
+	}
+
+	cfr_debug("CFR v3 parameters extracted successfully: enable=%d, method=%d, tx_capture=%d, freq=%d, bw=%d, interval=%d",
+		  cfr_params->is_start_capture, cfr_params->method,
+		  cfr_params->tx_capture, cfr_params->freq,
+		  cfr_params->bandwidth, cfr_params->report_interval);
+
+	return 0;
+}
+
+static void wlan_cfg80211_configure_cfr_v3(
+		struct pdev_cfr *pcfr,
+		const struct cfr_v3_params *cfr_params,
+		bool is_sta_connected)
+{
+	if (!pcfr || !cfr_params) {
+		cfr_err("Invalid input parameters");
+		return;
+	}
+
+	pcfr->frame_type = cfr_params->frame_type;
+	pcfr->frame_sub_type = cfr_params->frame_subtype;
+	pcfr->is_cfr_version_v3 = true;
+	pcfr->report_interval = cfr_params->report_interval;
+	pcfr->is_associated = is_sta_connected;
+	pcfr->is_cfr_tx = cfr_params->tx_capture;
+	pcfr->is_cfr_rx = cfr_params->rx_capture;
+	pcfr->method = cfr_params->method;
+	pcfr->bandwidth = cfr_params->bandwidth;
+	pcfr->freq = cfr_params->freq;
+	pcfr->oui_length = cfr_params->oui_length;
+	pcfr->format_version = cfr_params->format_version;
+	qdf_mem_copy(pcfr->oui, cfr_params->oui, cfr_params->oui_length);
+	cfr_debug("CFR v3 configured: frame_type=%d, frame_subtype=%d, report_interval=%d, bandwidth=%d, freq=%d, associated=%d",
+		  pcfr->frame_type, pcfr->frame_sub_type, pcfr->report_interval,
+		  pcfr->bandwidth, pcfr->freq, pcfr->is_associated);
+}
+
+static int wlan_cfg80211_start_cfr_rx_capture(struct wlan_objmgr_vdev *vdev,
+					      struct nlattr **tb)
+{
+	struct cfr_wlanconfig_param params = { 0 };
+	int ret;
+
+	if (!vdev || !tb) {
+		cfr_err("Invalid input parameters");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE_GROUP_BITMAP]) {
+		cfr_err("Group bitmap required for CFR RX capture start");
+		return -EINVAL;
+	}
+
+	ret = wlan_cfg80211_cfr_set_config(vdev, tb);
+	if (ret) {
+		cfr_err("Failed to set CFR config, ret: %d", ret);
+		return ret;
+	}
+
+	params.en_cfg = nla_get_u32(tb[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE_GROUP_BITMAP]);
+
+	if (!params.en_cfg) {
+		cfr_err("Invalid group bitmap value: 0x%x", params.en_cfg);
+		return -EINVAL;
+	}
+
+	cfr_debug("Enable bitmap: 0x%x", params.en_cfg);
+
+	/* Start CFR RX capture */
+	ucfg_cfr_set_en_bitmap(vdev, &params);
+	ucfg_cfr_resume(wlan_vdev_get_pdev(vdev));
+	ucfg_cfr_subscribe_ppdu_desc(wlan_vdev_get_pdev(vdev), true);
+	ucfg_cfr_committed_rcc_config(vdev);
+
+	cfr_debug("CFR RX capture started successfully");
+	return 0;
+}
+
+static int
+wlan_cfg80211_enh_cfr_capture_v3(struct hdd_adapter *adapter,
+				 struct nlattr **tb)
+{
+	struct cfr_v3_params cfr_params = { 0 };
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wmi_unified *wmi_handle = NULL;
+	struct pdev_cfr *pcfr = NULL;
+	bool is_sta_connected = false;
+	int ret = 0;
+
+	if (!adapter) {
+		cfr_err("Invalid adapter pointer");
+		return -EINVAL;
+	}
+
+	if (!tb) {
+		cfr_err("Invalid netlink attribute array");
+		return -EINVAL;
+	}
+
+	if (!adapter->hdd_ctx) {
+		cfr_err("Invalid HDD context pointer");
+		return -EINVAL;
+	}
+
+	if (!adapter->hdd_ctx->psoc) {
+		cfr_err("Invalid PSOC pointer");
+		return -EINVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(adapter->hdd_ctx->psoc);
+	if (!wmi_handle) {
+		cfr_err("wmi handle is NULL");
+		return -EINVAL;
+	}
+
+	if (!wmi_service_enabled(wmi_handle,
+				 wmi_service_cfr_assoc_tx_capture_support) &&
+	    !wmi_service_enabled(wmi_handle,
+				 wmi_service_cfr_unassoc_rx_capture_support)) {
+		cfr_err("CFR V3 not supported by fw");
+		return -EINVAL;
+	}
+
+	if (!policy_mgr_is_cfr_allowed(adapter->hdd_ctx->psoc)) {
+		cfr_err("CFR V3 rejected due to concurrency");
+		return -EINVAL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_CFR_ID);
+	if (!vdev) {
+		cfr_err("Failed to get vdev object");
+		return -EINVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cfr_err("Failed to get pdev object");
+		ret = -EINVAL;
+		goto release_vdev;
+	}
+
+	pcfr = wlan_objmgr_pdev_get_comp_private_obj(pdev, WLAN_UMAC_COMP_CFR);
+	if (!pcfr) {
+		cfr_err("CFR private object is NULL");
+		ret = -EINVAL;
+		goto release_vdev;
+	}
+
+	ret = wlan_cfg80211_extract_cfr_params(tb, &cfr_params, pdev);
+	if (ret) {
+		cfr_err("Failed to extract CFR parameters, ret: %d", ret);
+		goto release_vdev;
+	}
+
+	if (!cfr_params.is_start_capture) {
+		cfr_debug("Stopping CFR v3 capture");
+		ret = wlan_cfg80211_stop_enh_cfr_v3(vdev, 0);
+		goto release_vdev;
+	}
+
+	/* Check if CFR capture is already active */
+	if (pcfr->is_cfr_tx || pcfr->is_cfr_rx) {
+		cfr_err("CFR capture already active: TX=%d, RX=%d",
+			pcfr->is_cfr_tx, pcfr->is_cfr_rx);
+		ret = -EBUSY;
+		goto release_vdev;
+	}
+
+	is_sta_connected = hdd_is_any_sta_connected(adapter->hdd_ctx);
+	cfr_debug("STA connected: %d", is_sta_connected);
+
+	wlan_cfg80211_configure_cfr_v3(pcfr, &cfr_params, is_sta_connected);
+
+	wlan_cfg80211_register_stop_cfr(pcfr, vdev->vdev_objmgr.vdev_id);
+
+	ucfg_tdls_teardown_links_sync(adapter->hdd_ctx->psoc, vdev);
+
+	if (cfr_params.tx_capture) {
+		if (!is_sta_connected) {
+			cfr_err("TX capture requires STA to be connected");
+			ret = -ENOTCONN;
+			goto release_vdev;
+		}
+
+		cfr_debug("Starting CFR TX capture");
+		ret = wlan_enh_cfr_capture_v3_tx(adapter, tb, vdev, pdev, pcfr);
+		goto release_vdev;
+	}
+
+	cfr_debug("Starting CFR RX capture");
+
+	if (!is_sta_connected) {
+		cfr_debug("Configuring unassociated capture mode");
+		pcfr->unassoc_capture_config = 1;
+		pcfr->unassoc_phy_mode = WLAN_PHYMODE_11NA_HT20;
+		pcfr->unassoc_channel_mhz = cfr_params.freq;
+	}
+
+	ret = wlan_cfg80211_start_cfr_rx_capture(vdev, tb);
+	if (ret) {
+		cfr_err("Failed to start CFR RX capture, ret: %d", ret);
+		goto release_vdev;
+	}
+
+release_vdev:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CFR_ID);
+	return ret;
+}
+
 static int
 wlan_cfg80211_peer_enh_cfr_capture(struct hdd_adapter *adapter,
 				   struct nlattr **tb)
@@ -1380,6 +1793,13 @@ out:
 static int
 wlan_cfg80211_peer_enh_cfr_capture(struct hdd_adapter *adapter,
 				   struct nlattr **tb)
+{
+	return 0;
+}
+
+static int
+wlan_cfg80211_enh_cfr_capture_v3(struct hdd_adapter *adapter,
+				 struct nlattr **tb)
 {
 	return 0;
 }
