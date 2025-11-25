@@ -1863,7 +1863,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	    ) {
 		if (!params->no_ptk_4_way) {
 			cmd->need_ptk_4_way = 1;
-			wlan_acquire_peer_key_wakelock(wma->pdev,
+			wlan_acquire_peer_key_wakelock(intr->vdev,
 						       cmd->peer_mac);
 		}
 	}
