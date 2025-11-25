@@ -2520,6 +2520,11 @@ _conditional_srcs = {
             "components/dp/core/src/wlan_dp_haps.c",
         ],
     },
+    "CONFIG_DRIVER_PASSTHRU_MODE": {
+        True: [
+            "core/hdd/src/wlan_hdd_wondertap.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
