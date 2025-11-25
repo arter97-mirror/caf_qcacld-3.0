@@ -3585,7 +3585,7 @@ static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 {
 	struct scheduler_msg message = {0};
 
-	if (!LIM_IS_MONITOR_ROLE(session))
+	if (!(LIM_IS_MONITOR_ROLE(session) || LIM_IS_PASSTHRU_ROLE(session)))
 		return;
 
 	if (QDF_IS_STATUS_ERROR(status)) {

@@ -11583,6 +11583,9 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 	session->ch_center_freq_seg0 = ch_params.center_freq_seg0;
 	session->ch_center_freq_seg1 = ch_params.center_freq_seg1;
 
+	if (LIM_IS_PASSTHRU_ROLE(session))
+		lim_fill_session_nss_params_on_create(mac, session);
+
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!mlme_obj) {
 		pe_err("vdev component object is NULL");

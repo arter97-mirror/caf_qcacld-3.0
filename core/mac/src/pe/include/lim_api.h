@@ -59,6 +59,9 @@
 	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_NDI_MODE)
 #define LIM_IS_MONITOR_ROLE(_pe_session) \
 	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_MONITOR_MODE)
+#define LIM_IS_PASSTHRU_ROLE(_pe_session) \
+	(GET_LIM_BSS_TYPE(_pe_session) == eSIR_PASSTHRU_MODE)
+
 /* gLimSmeState */
 #define GET_LIM_SME_STATE(mac)                 (mac->lim.gLimSmeState)
 #define SET_LIM_SME_STATE(mac, state)          (mac->lim.gLimSmeState = state)
@@ -1182,4 +1185,44 @@ void
 lim_cfg_early_rx_check_oui(struct mac_context *mac_ctx,
 			   struct pe_session *session,
 			   struct bss_description *bss_desc);
+
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * lim_passthrough_init_session() - Initialize PE session for passthrough mode
+ * @mac_ptr: Pointer to global MAC context
+ * @msg: Pointer to session creation message containing BSSID and vdev ID
+ *
+ * This function creates a new PE session for passthrough mode operation.
+ *
+ * Return: None
+ */
+void lim_passthrough_init_session(struct mac_context *mac_ptr,
+				  struct sir_create_session *msg);
+
+/**
+ * lim_passthrough_deinit_session() - Delete PE session for passthrough mode
+ * @mac_ptr: Pointer to global MAC context
+ * @msg: Pointer to session deletion message containing vdev ID
+ *
+ * This function deletes an existing PE session that was created for
+ * passthrough mode operation. It triggers the VDEV state machine to
+ * transition to DOWN state and then removes the session from PE.
+ *
+ * Return: None
+ */
+void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
+				    struct sir_delete_session *msg);
+#else
+static inline
+void lim_passthrough_init_session(struct mac_context *mac_ptr,
+				  struct sir_create_session *msg)
+{
+}
+
+static inline
+void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
+				    struct sir_delete_session *msg)
+{
+}
+#endif
 #endif /* __LIM_API_H */

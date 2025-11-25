@@ -538,6 +538,11 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 	    policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc)) {
 		hdd_err("STA + MON exist, STA scan is not allowed");
 		return -EINVAL;
+	} else if (policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
+							     PM_PASSTHRU_MODE,
+							     NULL)) {
+		hdd_err("Passthru mode active - rejecting scan req");
+		return -EINVAL;
 	}
 
 	enable_connected_scan = ucfg_scan_is_connected_scan_enabled(
@@ -556,7 +561,8 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 	 * connection and it does not support scan request either.
 	 */
 	if (QDF_NDI_MODE == adapter->device_mode ||
-	    QDF_MONITOR_MODE == adapter->device_mode) {
+	    QDF_MONITOR_MODE == adapter->device_mode ||
+	    QDF_PASSTHRU_MODE == adapter->device_mode) {
 		hdd_err("Scan not supported for %s",
 			qdf_opmode_str(adapter->device_mode));
 		return -EINVAL;

@@ -261,6 +261,7 @@
 #include "wifi_pos_pasn_api.h"
 #include "wlan_cp_stats_ucfg_api.h"
 #include "qdf_wakelock_debug.h"
+#include "wlan_hdd_wondertap.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -10681,7 +10682,8 @@ wlan_hdd_delete_mon_link(struct hdd_adapter *adapter,
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("failed to reinit vdev stop event");
 
-	sme_delete_mon_session(hdd_ctx->mac_handle, link_info->vdev_id);
+	sme_delete_pe_session(hdd_ctx->mac_handle, link_info->vdev_id,
+			      QDF_MONITOR_MODE);
 
 	/* block until vdev stop success*/
 	status =
@@ -19809,8 +19811,9 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 					   hdd_common_roam_callback);
 
 	sme_set_roam_scan_ch_event_cb(mac_handle, hdd_get_roam_scan_ch_cb);
-	status = sme_set_monitor_mode_cb(mac_handle,
-					 hdd_sme_monitor_mode_callback);
+	status = sme_set_op_mode_cb(mac_handle,
+				    hdd_sme_monitor_mode_callback,
+				    hdd_sme_passthrough_mode_callback);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("Register monitor mode callback failed");
 

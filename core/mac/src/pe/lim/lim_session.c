@@ -573,7 +573,8 @@ struct pe_session *pe_create_session(struct mac_context *mac, uint8_t *bssid,
 	session_ptr->gLimPhyMode = WNI_CFG_PHY_MODE_11G;
 	/* Copy the BSSID to the session table */
 	sir_copy_mac_addr(session_ptr->bssId, bssid);
-	if (LIM_IS_MONITOR_ROLE(session_ptr))
+	if (LIM_IS_MONITOR_ROLE(session_ptr) ||
+	    LIM_IS_PASSTHRU_ROLE(session_ptr))
 		sir_copy_mac_addr(session_ptr->self_mac_addr, bssid);
 	/* Initialize CB mode variables when session is created */
 	session_ptr->htSupportedChannelWidthSet = 0;
@@ -1472,6 +1473,7 @@ QDF_STATUS lim_fill_session_nss_params_on_create(struct mac_context *mac_ctx,
 						      true & band_nss_differ);
 		fallthrough;
 	case eSIR_NDI_MODE:
+	case eSIR_PASSTHRU_MODE:
 		session->cap_tx_nss = tx_nss;
 		session->cap_rx_nss = rx_nss;
 		break;

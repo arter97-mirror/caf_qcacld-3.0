@@ -2234,6 +2234,16 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case WNI_SME_LINK_REMOVAL_REQ:
 		lim_send_link_removal_req(mac_ctx, msg->bodyval);
 		break;
+	case eWNI_SME_PASSTHRU_INIT_SESSION:
+		lim_passthrough_init_session(mac_ctx, msg->bodyptr);
+		qdf_mem_free((void *)msg->bodyptr);
+		msg->bodyptr = NULL;
+		break;
+	case eWNI_SME_PASSTHRU_DEINIT_SESSION:
+		lim_passthrough_deinit_session(mac_ctx, msg->bodyptr);
+		qdf_mem_free((void *)msg->bodyptr);
+		msg->bodyptr = NULL;
+		break;
 	default:
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
