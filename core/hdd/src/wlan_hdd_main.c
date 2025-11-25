@@ -3946,6 +3946,7 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 
 	switch (device_mode) {
 	case QDF_MONITOR_MODE:
+	case QDF_PASSTHRU_MODE:
 		ret = hdd_start_station_adapter(adapter);
 		if (ret)
 			goto err_start_adapter;
@@ -7374,6 +7375,23 @@ static void hdd_set_mon_ops(struct net_device *dev)
 }
 #endif
 
+#ifdef DRIVER_PASSTHRU_MODE
+static const struct net_device_ops wlan_passthrough_ops = {
+		.ndo_start_xmit = hdd_hard_start_xmit,
+		.ndo_tx_timeout = hdd_tx_timeout,
+		.ndo_get_stats = hdd_get_stats,
+};
+
+static inline void hdd_set_passthrough_ops(struct net_device *dev)
+{
+	dev->netdev_ops = &wlan_passthrough_ops;
+}
+#else
+static inline void hdd_set_passthrough_ops(struct net_device *dev)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_PKT_CAPTURE
 /* Packet Capture mode net_device_ops, does not Tx and most of operations. */
 static const struct net_device_ops wlan_pktcapture_drv_ops = {
@@ -7444,6 +7462,19 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 	struct hdd_adapter *adapter;
 	QDF_STATUS qdf_status;
 	uint8_t latency_level;
+	unsigned int num_tx_queues;
+
+	switch (session_type) {
+	case QDF_STA_MODE:
+		num_tx_queues = NDP_NUM_TX_QUEUES;
+		break;
+	case QDF_PASSTHRU_MODE:
+		num_tx_queues = 1;
+		break;
+	default:
+		num_tx_queues = NUM_TX_QUEUES;
+		break;
+	}
 
 	/* cfg80211 initialization and registration */
 	dev = alloc_netdev_mqs(sizeof(*adapter), name,
@@ -7451,10 +7482,10 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 			      name_assign_type,
 #endif
 			      ((cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE ||
-			       wlan_hdd_is_session_type_monitor(session_type)) ?
+			       wlan_hdd_is_session_type_monitor(session_type) ||
+			       session_type == QDF_PASSTHRU_MODE) ?
 			       hdd_mon_mode_ether_setup : ether_setup),
-			      ((session_type == QDF_STA_MODE) ?
-			       NDP_NUM_TX_QUEUES : NUM_TX_QUEUES),
+			      num_tx_queues,
 			      NUM_RX_QUEUES);
 
 	if (!dev) {
@@ -7498,6 +7529,8 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 		if (ucfg_mlme_is_sta_mon_conc_supported(hdd_ctx->psoc) ||
 		    ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))
 			hdd_set_mon_ops(adapter->dev);
+	} else if (session_type == QDF_PASSTHRU_MODE) {
+		hdd_set_passthrough_ops(adapter->dev);
 	} else {
 		hdd_set_station_ops(adapter->dev);
 	}
@@ -8630,6 +8663,7 @@ void hdd_deinit_session(struct hdd_adapter *adapter)
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_NDI_MODE:
 	case QDF_NAN_DISC_MODE:
+	case QDF_PASSTHRU_MODE:
 	{
 		hdd_deinit_station_mode(adapter);
 		break;
@@ -9728,6 +9762,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 	case QDF_NDI_MODE:
 	case QDF_MONITOR_MODE:
 	case QDF_NAN_DISC_MODE:
+	case QDF_PASSTHRU_MODE:
 		adapter = hdd_alloc_station_adapter(hdd_ctx, mac_addr,
 						    name_assign_type,
 						    iface_name, session_type);
@@ -10420,7 +10455,8 @@ static void hdd_stop_station_adapter(struct hdd_adapter *adapter)
 
 		if (mode == QDF_NDI_MODE)
 			hdd_stop_and_cleanup_ndi(link_info);
-		else if (!hdd_cm_is_disconnected(link_info))
+		else if (!hdd_cm_is_disconnected(link_info) &&
+			 mode != QDF_PASSTHRU_MODE)
 			hdd_sta_disconnect_and_cleanup(link_info);
 
 		hdd_reset_scan_operation(link_info);
@@ -10737,7 +10773,11 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 	case QDF_NDI_MODE:
 	case QDF_P2P_DEVICE_MODE:
 	case QDF_NAN_DISC_MODE:
+	case QDF_PASSTHRU_MODE:
 		hdd_stop_station_adapter(adapter);
+
+		if (adapter->device_mode == QDF_PASSTHRU_MODE)
+			hdd_set_idle_ps_config(hdd_ctx, true);
 		break;
 	case QDF_MONITOR_MODE:
 		status = hdd_stop_mon_adapter(adapter);
