@@ -10423,7 +10423,7 @@ static void lim_process_sme_start_beacon_req(struct mac_context *mac, uint32_t *
 	}
 }
 
-static void lim_mon_change_channel(
+static void lim_non_bss_change_channel(
 	struct mac_context *mac_ctx,
 	struct pe_session *session_entry)
 {
@@ -10448,8 +10448,9 @@ static void lim_change_channel(
 	struct mac_context *mac_ctx,
 	struct pe_session *session_entry)
 {
-	if (session_entry->bssType == eSIR_MONITOR_MODE)
-		return lim_mon_change_channel(mac_ctx, session_entry);
+	if (session_entry->bssType == eSIR_MONITOR_MODE ||
+	    session_entry->bssType == eSIR_PASSTHRU_MODE)
+		return lim_non_bss_change_channel(mac_ctx, session_entry);
 
 	mlme_set_chan_switch_in_progress(session_entry->vdev, true);
 
@@ -10708,6 +10709,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 			 session_entry->dot11mode);
 	} else if (IS_DOT11_MODE_HE(ch_change_req->dot11mode) &&
 	     (session_entry->opmode == QDF_MONITOR_MODE ||
+	      session_entry->opmode == QDF_PASSTHRU_MODE ||
 	      lim_is_session_he_capable(session_entry))) {
 		lim_update_session_he_capable_chan_switch
 			(mac_ctx, session_entry, target_freq);
@@ -10739,6 +10741,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 
 	if (IS_DOT11_MODE_EHT(ch_change_req->dot11mode) &&
 	    ((QDF_MONITOR_MODE == session_entry->opmode) ||
+	     session_entry->opmode == QDF_PASSTHRU_MODE ||
 	     lim_is_session_eht_capable(session_entry))) {
 		lim_update_session_eht_capable_chan_switch(
 				mac_ctx, session_entry, target_freq);

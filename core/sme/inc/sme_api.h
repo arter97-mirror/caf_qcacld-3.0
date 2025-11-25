@@ -2251,18 +2251,20 @@ sme_apf_read_work_memory(mac_handle_t mac_handle,
 #endif /* FEATURE_WLAN_APF */
 
 uint32_t sme_get_wni_dot11_mode(mac_handle_t mac_handle);
-QDF_STATUS sme_create_mon_session(mac_handle_t mac_handle, uint8_t *bssid,
-				  uint8_t vdev_id);
+
+QDF_STATUS sme_create_pe_session(mac_handle_t mac_handle, uint8_t *bssid,
+				 uint8_t vdev_id, enum QDF_OPMODE op_mode);
 
 /**
- * sme_delete_mon_session() - post message to delete PE session for mon_mode
- * operation
+ * sme_delete_pe_session() - post message to delete PE session
  * @mac_handle: Opaque handle to the global MAC context
  * @vdev_id: sme session id
+ * @op_mode: vdev operating mode
  *
  * Return: QDF_STATUS_SUCCESS on success, non-zero error code on failure.
  */
-QDF_STATUS sme_delete_mon_session(mac_handle_t mac_handle, uint8_t vdev_id);
+QDF_STATUS sme_delete_pe_session(mac_handle_t mac_handle, uint8_t vdev_id,
+				 enum QDF_OPMODE op_mode);
 
 /**
  * sme_set_vdev_ies_per_band() - sends the per band IEs to vdev
@@ -4818,17 +4820,20 @@ QDF_STATUS sme_vdev_self_peer_delete_resp(struct del_vdev_params *param);
  */
 void sme_vdev_del_resp(uint8_t vdev_id);
 
-#ifdef FEATURE_MONITOR_MODE_SUPPORT
+#if defined(FEATURE_MONITOR_MODE_SUPPORT) || defined(DRIVER_PASSTHRU_MODE)
 /**
- * sme_set_monitor_mode_cb() - Register monitor mode vdev up operation callback
+ * sme_set_op_mode_cb() - Register mode specific vdev up operation callback
  * @mac_handle: Opaque handle to the MAC context
- * @monitor_mode_cb: callback to be registered
+ * @monitor_mode_cb: callback to be registered for monitor vdev
+ * @passthrough_mode_cb: callback to be registered for passthrough vdev
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS sme_set_monitor_mode_cb(mac_handle_t mac_handle,
-				   void (*monitor_mode_cb)(uint8_t vdev_id,
-							   bool is_up));
+QDF_STATUS sme_set_op_mode_cb(mac_handle_t mac_handle,
+			      void (*monitor_mode_cb)(uint8_t vdev_id,
+						      bool is_up),
+			      void (*passthrough_mode_cb)(uint8_t vdev_id,
+							  bool is_up));
 
 /*
  * sme_process_monitor_mode_vdev_evt() - Handle vdev up completion

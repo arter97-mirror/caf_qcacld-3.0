@@ -1614,9 +1614,10 @@ QDF_STATUS wlan_hdd_init_mon_link(struct hdd_context *hdd_ctx,
 		return qdf_status;
 	}
 
-	qdf_status = sme_create_mon_session(hdd_ctx->mac_handle,
-					    sta_desc.peer_addr.bytes,
-					    link_info->vdev_id);
+	qdf_status = sme_create_pe_session(hdd_ctx->mac_handle,
+					   sta_desc.peer_addr.bytes,
+					   link_info->vdev_id,
+					   QDF_MONITOR_MODE);
 	if (QDF_STATUS_SUCCESS != qdf_status) {
 		hdd_err("sme_create_mon_session() failed to register. Status= %d [0x%08X]",
 			qdf_status, qdf_status);
