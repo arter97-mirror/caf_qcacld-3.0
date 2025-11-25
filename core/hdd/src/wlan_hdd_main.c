@@ -7359,7 +7359,7 @@ static void hdd_set_mon_ops(struct net_device *dev)
 
 #ifdef DRIVER_PASSTHRU_MODE
 static const struct net_device_ops wlan_passthrough_ops = {
-		.ndo_start_xmit = hdd_hard_start_xmit,
+		.ndo_start_xmit = hdd_hard_start_xmit_passthru,
 		.ndo_tx_timeout = hdd_tx_timeout,
 		.ndo_get_stats = hdd_get_stats,
 };

@@ -1540,7 +1540,10 @@ QDF_STATUS ucfg_dp_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 	 */
 	tx_dp_link = dp_intf->def_link;
 	qdf_atomic_inc(&dp_intf->num_active_task);
-	status = dp_start_xmit(tx_dp_link, nbuf);
+	if (qdf_likely(wlan_vdev_mlme_get_opmode(vdev) != QDF_PASSTHRU_MODE))
+		status = dp_start_xmit(tx_dp_link, nbuf);
+	else
+		status = dp_start_xmit_passthru(tx_dp_link, nbuf);
 	qdf_atomic_dec(&dp_intf->num_active_task);
 
 	return status;
