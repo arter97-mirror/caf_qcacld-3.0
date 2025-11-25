@@ -3168,4 +3168,7 @@
 #define DELAYED_REG_FORCE_WRITE (1)
 #endif
 
+#ifdef CONFIG_DRIVER_PASSTHRU_MODE
+#define DRIVER_PASSTHRU_MODE (1)
+#endif
 #endif /* CONFIG_TO_FEATURE_H */
