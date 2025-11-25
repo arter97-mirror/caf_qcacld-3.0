@@ -2592,6 +2592,11 @@ _conditional_srcs = {
             "cmn/qdf/linux/src/qdf_wakelock_debug.c",
         ],
     },
+    "CONFIG_DRIVER_PASSTHRU_MODE": {
+        True: [
+            "core/hdd/src/wlan_hdd_wondertap.c",
+        ],
+    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):

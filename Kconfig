@@ -3104,4 +3104,8 @@ config TARGET_DUMP_FOR_NON_QC_PLATFORM
 	bool "dump control when msm subsystem is not defined"
 	default n
 
+config DRIVER_PASSTHRU_MODE
+	bool "Enable Driver Passthrough mode"
+	default n
+
 endif # QCA_CLD_WLAN
