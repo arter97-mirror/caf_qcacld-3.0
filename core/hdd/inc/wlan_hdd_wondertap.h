@@ -12,8 +12,34 @@
 #if !defined(WLAN_HDD_WONDERTAP_H)
 #define WLAN_HDD_WONDERTAP_H
 
+#include <qdf_event.h>
+
 #ifdef DRIVER_PASSTHRU_MODE
 #include <qdf_wondertap.h>
+
+#define WLAN_WONDERTAP_VDEV_OP_TIMEOUT_MS 10000
+
+/**
+ * struct hdd_wondertap_context - hdd wondertap context
+ * @hdd_ctx: global hdd context
+ * @wt_adapter: pointer to wondertap adapter
+ * @wondertap_vdev_event: wondertap vdev event
+ * @wondertap_wakelock: wondertap wakelock
+ * @wondertap_rtpm_lock: wondertap rtpm lock
+ * @is_frame_filter_set: is frame filter configured
+ * @frame_filter: frame filter value
+ * @magic: handle for external entity
+ */
+struct hdd_wondertap_context {
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *wt_adapter;
+	qdf_event_t wondertap_vdev_event;
+	qdf_wake_lock_t wondertap_wakelock;
+	qdf_runtime_lock_t wondertap_rtpm_lock;
+	bool is_frame_filter_set;
+	uint8_t frame_filter;
+	uint64_t magic;
+};
 
 /**
  * wlan_hdd_wondertap_register_ops() - Register wondertap operations

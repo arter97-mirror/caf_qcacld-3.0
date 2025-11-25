@@ -473,6 +473,23 @@ QDF_STATUS ucfg_dp_mon_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 }
 #endif
 
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * ucfg_dp_passthrough_register_txrx_ops() - Register ops for Passthrough
+ *  TX/RX operations
+ * @vdev: vdev mapped to Passthrough mode DP interface
+ *
+ * Return: 0 on success and non zero on failure.
+ */
+QDF_STATUS ucfg_dp_passthrough_register_txrx_ops(struct wlan_objmgr_vdev *vdev);
+#else
+static inline
+QDF_STATUS ucfg_dp_passthrough_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
 /**
  * ucfg_dp_softap_register_txrx_ops() - Register ops for TX/RX operations
  * @vdev: vdev mapped to SAP mode DP interface
