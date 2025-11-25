@@ -118,7 +118,8 @@ int wlan_hdd_set_filter(struct hdd_context *hdd_ctx,
 	int i = 0;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	if (!ucfg_pmo_is_pkt_filter_enabled(hdd_ctx->psoc)) {
+	if (!ucfg_pmo_is_pkt_filter_enabled(hdd_ctx->psoc) &&
+	    hdd_get_device_mode(vdev_id) != QDF_PASSTHRU_MODE) {
 		hdd_warn("Packet filtering disabled in ini");
 		return 0;
 	}
