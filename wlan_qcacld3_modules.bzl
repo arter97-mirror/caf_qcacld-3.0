@@ -467,7 +467,6 @@ _fixed_srcs = [
     "cmn/hif/src/hif_exec.c",
     "cmn/hif/src/hif_main.c",
     "cmn/hif/src/hif_runtime_pm.c",
-    "cmn/hif/src/mp_dev.c",
     "cmn/htc/htc.c",
     "cmn/htc/htc_recv.c",
     "cmn/htc/htc_send.c",

@@ -2991,7 +2991,6 @@ HIF_CE_OBJS :=  $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_diag.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_main.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_service.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_tasklet.o \
-                $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/mp_dev.o \
                 $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/regtable.o
 
 ifeq ($(CONFIG_WLAN_FEATURE_BMI), y)
