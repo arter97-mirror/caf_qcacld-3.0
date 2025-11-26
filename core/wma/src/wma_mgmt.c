@@ -3080,6 +3080,10 @@ void wma_process_update_opmode(tp_wma_handle wma_handle,
 	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
 			   WMI_PEER_CHWIDTH, update_vht_opmode->opMode,
 			   update_vht_opmode->smesessionId);
+
+	wma_set_peer_param(wma_handle, update_vht_opmode->peer_mac,
+			   WMI_HOST_PEER_PHYMODE,
+			   fw_phymode, update_vht_opmode->smesessionId);
 }
 
 /**
