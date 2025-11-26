@@ -5915,6 +5915,12 @@ static void lim_populate_mcs_set_vht_per_vdev(struct mac_context *mac_ctx,
 	qdf_freq_t freq;
 	uint8_t tx_nss, rx_nss;
 	tSirVhtMcsInfo *vht_mcs;
+	union {
+		uint16_t		       u_value;
+		tSirMacVHTRxSupDataRateInfo    vht_rx_supp_rate;
+		tSirMacVHTTxSupDataRateInfo    vht_tx_supp_rate;
+	} u_vht_data_rate_info;
+
 	struct wlan_objmgr_vdev *vdev =
 			wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
 							     vdev_id,
@@ -5937,9 +5943,16 @@ static void lim_populate_mcs_set_vht_per_vdev(struct mac_context *mac_ctx,
 					sizeof(tSirMacVHTCapabilityInfo)];
 	/* Populate VHT MCS Information */
 	vht_mcs->txMcsMap |= VHT_DISABLE_MCS_OVER_NSS(tx_nss);
-	vht_mcs->txHighest = VHT_GET_DATARATE_FOR_NSS_AND_GI(tx_nss, true);
+	u_vht_data_rate_info.u_value = vht_mcs->txHighest;
+	u_vht_data_rate_info.vht_tx_supp_rate.txSupDataRate =
+		VHT_GET_DATARATE_FOR_NSS_AND_GI(tx_nss, true);
+	vht_mcs->txHighest = u_vht_data_rate_info.u_value;
+
 	vht_mcs->rxMcsMap |= VHT_DISABLE_MCS_OVER_NSS(rx_nss);
-	vht_mcs->rxHighest = VHT_GET_DATARATE_FOR_NSS_AND_GI(rx_nss, true);
+	u_vht_data_rate_info.u_value = vht_mcs->rxHighest;
+	u_vht_data_rate_info.vht_rx_supp_rate.rxSupDataRate =
+		VHT_GET_DATARATE_FOR_NSS_AND_GI(rx_nss, true);
+	vht_mcs->rxHighest = u_vht_data_rate_info.u_value;
 
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
