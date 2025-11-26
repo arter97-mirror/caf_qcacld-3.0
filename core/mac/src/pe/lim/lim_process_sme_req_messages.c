@@ -2669,6 +2669,7 @@ static void lim_update_sae_config(struct mac_context *mac,
 {
 	struct wlan_crypto_pmksa *pmksa;
 	struct qdf_mac_addr bssid;
+	uint8_t zero_pmkid[PMKID_LEN] = {0};
 
 	qdf_mem_copy(bssid.bytes, session->bssId,
 		     QDF_MAC_ADDR_SIZE);
@@ -2680,8 +2681,14 @@ static void lim_update_sae_config(struct mac_context *mac,
 	if (!pmksa)
 		return;
 
+	if (!qdf_mem_cmp(pmksa->pmkid, zero_pmkid, PMKID_LEN)) {
+		pe_debug("PMKSA found but pmkid is all 0 for BSSID " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(bssid.bytes));
+		return;
+	}
+
 	session->sae_pmk_cached = true;
-	pe_debug("PMKSA Found for BSSID=" QDF_MAC_ADDR_FMT,
+	pe_debug("PMKSA Found for BSSID " QDF_MAC_ADDR_FMT,
 		 QDF_MAC_ADDR_REF(bssid.bytes));
 }
 #else
@@ -4158,7 +4165,7 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	QDF_STATUS status;
 	uint8_t *rsn_ie;
 	uint8_t rsn_ie_len = 0;
-	struct wlan_crypto_pmksa pmksa, *pmksa_peer;
+	struct wlan_crypto_pmksa pmksa, *pmksa_peer, fill_pmksa;
 	struct bss_description *bss_desc;
 	int32_t akm;
 
@@ -4207,19 +4214,23 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 		lim_get_mld_peer(session->vdev, &pmksa.bssid);
 	}
 
+	qdf_mem_zero(&fill_pmksa, sizeof(fill_pmksa));
 	pmksa_peer = wlan_crypto_get_peer_pmksa(session->vdev, &pmksa);
-	if (pmksa_peer)
+	if (pmksa_peer) {
 		pe_debug("PMKSA found");
+		qdf_mem_copy(&fill_pmksa, pmksa_peer, sizeof(fill_pmksa));
+	}
 
 	akm = wlan_crypto_get_param(session->vdev,
 				    WLAN_CRYPTO_PARAM_KEY_MGMT);
 	if (pmksa_peer && WLAN_CRYPTO_IS_WPA2(akm)) {
 		pe_debug("vdev:%d WPA2 does not support PMKID",
 			 session->vdev_id);
-		qdf_mem_zero(pmksa_peer->pmkid, sizeof(pmksa_peer->pmkid));
+		qdf_mem_zero(fill_pmksa.pmkid, sizeof(fill_pmksa.pmkid));
 	}
 
-	lim_update_connect_rsn_ie(session, rsn_ie, pmksa_peer);
+	lim_update_connect_rsn_ie(session, rsn_ie,
+				  pmksa_peer ? &fill_pmksa : NULL);
 	qdf_mem_free(rsn_ie);
 
 	/*
@@ -4229,8 +4240,8 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	 */
 	if (pmksa_peer) {
 		wlan_cm_set_psk_pmk(mac_ctx->pdev, session->vdev_id,
-				    pmksa_peer->pmk, pmksa_peer->pmk_len);
-		lim_update_pmksa_to_profile(session->vdev, pmksa_peer);
+				    fill_pmksa.pmk, fill_pmksa.pmk_len);
+		lim_update_pmksa_to_profile(session->vdev, &fill_pmksa);
 	}
 
 	return QDF_STATUS_SUCCESS;
