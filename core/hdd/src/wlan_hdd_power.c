@@ -284,6 +284,20 @@ static void hdd_disable_igmp_offload(struct hdd_adapter *adapter,
 {
 	QDF_STATUS status;
 
+	uint8_t vdev_id;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return;
+
+	vdev_id =  wlan_vdev_get_id(vdev);
+
+	if (ucfg_pmo_is_wow_optimization_enabled(psoc)) {
+		hdd_debug("WOW enhanced cap enabled- skip IGMP DISABLE, vdev_id: %d",
+			  vdev_id);
+		return;
+	}
 	status = hdd_send_igmp_offload_params(adapter, vdev, false);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_debug("Failed to disable igmp offload");

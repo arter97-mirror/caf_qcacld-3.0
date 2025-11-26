@@ -1808,6 +1808,7 @@ pmo_core_enable_igmp_offload(struct wlan_objmgr_vdev *vdev,
 	enum QDF_OPMODE op_mode;
 	struct pmo_vdev_priv_obj *vdev_ctx;
 	uint32_t version_support;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS)
 		return QDF_STATUS_E_INVAL;
@@ -1819,6 +1820,9 @@ pmo_core_enable_igmp_offload(struct wlan_objmgr_vdev *vdev,
 	}
 
 	vdev_ctx = pmo_vdev_get_priv(vdev);
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
 	qdf_spin_lock_bh(&vdev_ctx->pmo_vdev_lock);
 	if (!vdev_ctx->pmo_psoc_ctx->psoc_cfg.igmp_offload_enable) {
 		pmo_debug("igmp offload not supported");
@@ -1831,6 +1835,27 @@ pmo_core_enable_igmp_offload(struct wlan_objmgr_vdev *vdev,
 	vdev_id = pmo_vdev_get_id(vdev);
 	pmo_igmp_req->vdev_id = vdev_id;
 	pmo_igmp_req->version_support = version_support;
+
+	if (pmo_core_is_wow_optimization_enabled(psoc)) {
+		if (!pmo_igmp_req->enable) {
+			pmo_debug("IGMP offload disable - FW handles on resume");
+			return QDF_STATUS_SUCCESS;
+		}
+
+		if (vdev_ctx->vdev_igmp_req.enable &&
+		    vdev_ctx->vdev_igmp_req.num_grp_ip_address ==
+				pmo_igmp_req->num_grp_ip_address &&
+		    !qdf_mem_cmp(vdev_ctx->vdev_igmp_req.grp_ip_address,
+				 pmo_igmp_req->grp_ip_address,
+				 pmo_igmp_req->num_grp_ip_address *
+							sizeof(uint32_t))) {
+			pmo_debug("IGMP offload request unchanged, using cache");
+			return QDF_STATUS_SUCCESS;
+		}
+		qdf_mem_copy(&vdev_ctx->vdev_igmp_req, pmo_igmp_req,
+			     sizeof(struct pmo_igmp_offload_req));
+		pmo_debug("IGMP offload config changed, updating cache and FW");
+	}
 	status = pmo_tgt_send_igmp_offload_req(vdev, pmo_igmp_req);
 
 	return status;

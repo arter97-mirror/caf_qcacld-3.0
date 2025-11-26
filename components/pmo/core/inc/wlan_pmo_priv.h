@@ -126,6 +126,7 @@ struct wlan_pmo_ctx {
  * @dyn_arp_ns_offload_rt_lock: wake lock which prevent runtime pm happen if
  *                              arp/ns offload is disable
  * @bridgeaddr: Bridge MAC address
+ * @vdev_igmp_req: cached IGMP offload request for wow optimization
  */
 struct pmo_vdev_priv_obj {
 	struct pmo_psoc_priv_obj *pmo_psoc_ctx;
@@ -156,6 +157,7 @@ struct pmo_vdev_priv_obj {
 	qdf_runtime_lock_t dyn_arp_ns_offload_rt_lock;
 #endif
 	uint8_t bridgeaddr[QDF_MAC_ADDR_SIZE];
+	struct pmo_igmp_offload_req vdev_igmp_req;
 };
 
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
