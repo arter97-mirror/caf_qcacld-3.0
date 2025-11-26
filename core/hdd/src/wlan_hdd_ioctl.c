@@ -6712,6 +6712,8 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 	uint32_t chan_number = 0, chan_bw = 0;
 	uint8_t *value = command;
 	enum phy_ch_width width;
+	struct hdd_hostapd_state *hostapd_state;
+	struct wlan_objmgr_vdev *vdev;
 
 	if ((adapter->device_mode != QDF_P2P_GO_MODE) &&
 		(adapter->device_mode != QDF_SAP_MODE)) {
@@ -6749,6 +6751,10 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 
 	hdd_debug("CH:%d BW:%d", chan_number, chan_bw);
 
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, link_info->vdev_id,
 				    CSA_REASON_USER_INITIATED);
 
@@ -6756,12 +6762,27 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 		chan_number = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
 							   chan_number);
 
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(link_info);
+	qdf_event_reset(&hostapd_state->qdf_event);
+
 	status = hdd_softap_set_channel_change(link_info, chan_number, 0, width,
 					       NO_SCHANS_PUNC, false, true);
 	if (status) {
 		hdd_err("Set channel change fail");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return status;
 	}
+
+	status = qdf_wait_for_event_completion(&hostapd_state->qdf_event,
+					       SME_CMD_START_BSS_TIMEOUT);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("CSA event wait failed %d", status);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return qdf_status_to_os_return(status);
+	}
+
+	wlan_set_sap_user_config_freq(vdev, chan_number);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	return 0;
 }
