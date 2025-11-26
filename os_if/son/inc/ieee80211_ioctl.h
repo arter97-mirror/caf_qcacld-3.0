@@ -333,7 +333,7 @@ struct  ieee80211req_athdbg {
 	    ieee80211req_rrmstats_t        rrmstats_req;
 	    ieee80211req_acs_t             acs_rep;
 	    ieee80211req_tr069_t           tr069_req;
-	    struct timespec t_spec;
+	    timespec_t t_spec;
 	    ieee80211req_fips_t fips_req;
 	    struct ieee80211_qos_map       qos_map;
 #if defined(QCA_SUPPORT_SON) && (QCA_SUPPORT_SON != 0)

@@ -1065,6 +1065,15 @@ void lim_update_probe_rsp_template_ie_bitmap_beacon2(struct mac_context *mac,
 			sizeof(beacon2->ext_chan_switch_ann));
 	}
 
+	/* RRM Enable Cap */
+	if (beacon2->RRMEnabledCap.present) {
+		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap,
+					WLAN_ELEMID_RRM);
+		qdf_mem_copy((void *)&prb_rsp->RRMEnabledCap,
+			     (void *)&beacon2->RRMEnabledCap,
+			     sizeof(beacon2->RRMEnabledCap));
+	}
+
 	/* Supported operating class */
 	if (beacon2->SuppOperatingClasses.present) {
 		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap,
