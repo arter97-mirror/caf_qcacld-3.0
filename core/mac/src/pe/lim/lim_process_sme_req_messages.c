@@ -9630,6 +9630,11 @@ static void lim_set_pdev_vht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 	tSirMacVHTCapabilityInfo *vht_cap;
 	int i;
 	tSirVhtMcsInfo *vht_mcs;
+	union {
+		uint16_t		       u_value;
+		tSirMacVHTRxSupDataRateInfo    vht_rx_supp_rate;
+		tSirMacVHTTxSupDataRateInfo    vht_tx_supp_rate;
+	} u_vht_data_rate_info;
 
 	for (i = 1; i <= nss; i++) {
 		ie_params = qdf_mem_malloc(sizeof(*ie_params));
@@ -9665,11 +9670,15 @@ static void lim_set_pdev_vht_ie(struct mac_context *mac_ctx, uint8_t pdev_id,
 				(tSirVhtMcsInfo *)&p_ie[2 +
 				sizeof(tSirMacVHTCapabilityInfo)];
 			vht_mcs->rxMcsMap |= VHT_DISABLE_MCS_OVER_NSS(i);
-			vht_mcs->rxHighest =
+			u_vht_data_rate_info.u_value = vht_mcs->rxHighest;
+			u_vht_data_rate_info.vht_rx_supp_rate.rxSupDataRate =
 				VHT_GET_DATARATE_FOR_NSS_AND_GI(i, true);
+			vht_mcs->rxHighest = u_vht_data_rate_info.u_value;
 			vht_mcs->txMcsMap |= VHT_DISABLE_MCS_OVER_NSS(i);
-			vht_mcs->txHighest =
+			u_vht_data_rate_info.u_value = vht_mcs->txHighest;
+			u_vht_data_rate_info.vht_tx_supp_rate.txSupDataRate =
 				VHT_GET_DATARATE_FOR_NSS_AND_GI(i, true);
+			vht_mcs->txHighest = u_vht_data_rate_info.u_value;
 		}
 		msg.type = WMA_SET_PDEV_IE_REQ;
 		msg.bodyptr = ie_params;
