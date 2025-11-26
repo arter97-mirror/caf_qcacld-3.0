@@ -18,6 +18,15 @@ defined(FEATURE_DAL_DP_SUPPORT)
  * hdd_sysfs_dp_dal_create() - create DAL SIM mode sysfs file
  * @driver_kobject: sysfs driver kobject
  *
+ * file path: /sys/kernel/wcn7760/dal_sim_mode
+ *
+ * usage:
+ *      mode switch:
+ *      0 - bypass mode , 1 - offload mode
+ *      echo 0/1 > /sys/kernel/wcn7760/dal_sim_mode
+ *
+ *      Get current dal sim mode:
+ *      cat /sys/kernel/wcn7760/dal_sim_mode
  * Return: 0 on success, errno on failure
  */
 int hdd_sysfs_dp_dal_create(struct kobject *driver_kobject);

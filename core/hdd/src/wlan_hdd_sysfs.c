@@ -78,6 +78,7 @@
 #include <wlan_hdd_sysfs_dp_stc.h>
 #include <wlan_hdd_sysfs_dl_modes.h>
 #include <wlan_hdd_sysfs_swlm.h>
+#include <wlan_hdd_sysfs_dp_dal.h>
 #include <wlan_hdd_sysfs_dump_in_progress.h>
 #include <wlan_hdd_sysfs_txrx_stats_console.h>
 #include <wlan_hdd_sysfs_add_timestamp.h>
@@ -1375,6 +1376,7 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_ipa_opt_dp_ctrl_create(driver_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_rm_create(driver_kobject);
 		hdd_sysfs_apfmode_create(driver_kobject);
+		hdd_sysfs_dp_dal_create(driver_kobject);
 	}
 }
 
@@ -1416,6 +1418,7 @@ void hdd_destroy_sysfs_files(void)
 		hdd_sysfs_destroy_max_chipset_log_size_interface(wifi_kobject);
 		hdd_sysfs_destroy_powerstats_interface();
 		hdd_sysfs_apfmode_destroy(driver_kobject);
+		hdd_sysfs_dp_dal_destroy(driver_kobject);
 
 	}
 	hdd_sysfs_mem_stats_destroy(wlan_kobject);
