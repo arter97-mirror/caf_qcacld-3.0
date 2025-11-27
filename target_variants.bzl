@@ -20,6 +20,11 @@ la_variants = [
     "perf",
 ]
 
+lv_variants = [
+    "debug-defconfig",
+    "defconfig",
+]
+
 le_targets = [
     # keep sorted
     "alor-le",
@@ -65,6 +70,9 @@ vm_variants = [
 def get_all_la_variants():
     return [(t, v) for t in targets for v in la_variants]
 
+def get_all_lv_variants():
+    return [(t, v) for t in targets for v in lv_variants]
+
 def get_all_le_variants():
     return [(t, v) for t in le_targets for v in le_variants]
 
@@ -78,4 +86,4 @@ def get_all_non_la_variants():
     return get_all_le_variants() + get_all_vm_variants()
 
 def get_all_variants():
-    return get_all_la_variants() + get_all_le_variants() + get_all_vm_variants() + get_all_le_32_variants()
+    return get_all_la_variants() + get_all_lv_variants() + get_all_le_variants() + get_all_vm_variants() + get_all_le_32_variants()
