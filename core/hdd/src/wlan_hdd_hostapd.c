@@ -718,10 +718,20 @@ static void hdd_wiphy_lock(struct wireless_dev *dev_ptr)
 {
 	mutex_lock(&dev_ptr->mtx);
 }
+
+static void hdd_wiphy_unlock(struct wireless_dev *dev_ptr)
+{
+	mutex_unlock(&dev_ptr->mtx);
+}
 #else
 static void hdd_wiphy_lock(struct wireless_dev *dev_ptr)
 {
 	mutex_lock(&dev_ptr->wiphy->mtx);
+}
+
+static void hdd_wiphy_unlock(struct wireless_dev *dev_ptr)
+{
+	mutex_unlock(&dev_ptr->wiphy->mtx);
 }
 #endif
 
@@ -1154,7 +1164,7 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id, puncture_bitmap);
 
 exit:
-	hdd_wiphy_lock(dev->ieee80211_ptr);
+	hdd_wiphy_unlock(dev->ieee80211_ptr);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
