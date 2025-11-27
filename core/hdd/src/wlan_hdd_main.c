@@ -490,6 +490,24 @@ static void wlan_hdd_auto_shutdown_cb(void);
 
 static void hdd_dp_register_callbacks(struct hdd_context *hdd_ctx);
 
+struct net_device *hdd_wdev_get_netdev(struct wireless_dev *wdev)
+{
+	struct hdd_adapter *adapter;
+
+	if (!wdev)
+		return NULL;
+
+	if (wdev->netdev)
+		return wdev->netdev;
+
+	/* Fallback: wireless_dev is embedded in hdd_adapter */
+	adapter = container_of(wdev, struct hdd_adapter, wdev);
+	if (adapter && adapter->dev)
+		return adapter->dev;
+
+	return NULL;
+}
+
 /**
  * wlan_hdd_deinit_port_id_info()- Initialize/deinitialize
  * the get station client info table
