@@ -2700,6 +2700,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "file": "include/net/cfg80211.h",
             "flag": "CONFIG_MLO_SAP_LINK_REMOVAL",
         },
+        {
+            "pattern": "NL80211_EXT_FEATURE_PROBE_AP",
+            "file": "include/uapi/linux/nl80211.h",
+            "flag": "NL80211_EXT_FEATURE_PROBE_AP_SUPPORT",
+        },
     ]
 
     cmd = 'touch "$@"\n'

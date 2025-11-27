@@ -10102,6 +10102,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 		qdf_atomic_init(
 			&adapter->net_dev_hold_ref_count[NET_DEV_HOLD_ID_MAX]);
 
+	qdf_atomic_init(&adapter->is_probe_peer_pending);
 	/* Add it to the hdd's session list. */
 	status = hdd_add_adapter_back(hdd_ctx, adapter);
 	if (QDF_STATUS_SUCCESS != status)

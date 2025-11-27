@@ -5559,6 +5559,28 @@ static inline void wlan_hdd_set_sar_user_scenario_to_dsi_mapping_feature(
 }
 #endif
 
+#if defined NL80211_EXT_FEATURE_PROBE_AP_SUPPORT
+static inline bool wlan_hdd_check_probe_peer_feature(struct wlan_objmgr_psoc
+						     *psoc)
+{
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		hdd_err("wmi handle is NULL");
+		return false;
+	}
+
+	if (!wmi_service_enabled(wmi_handle,
+				 wmi_service_qos_null_frame_tx_support)) {
+		hdd_err("QoS null frame tx over wmi is not enabled");
+		return false;
+	}
+
+	return true;
+}
+#endif
+
 #define MAX_CONCURRENT_CHAN_ON_24G    2
 #define MAX_CONCURRENT_CHAN_ON_5G     2
 
@@ -26561,7 +26583,10 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 
 	wlan_hdd_set_auth_deauth_random_ta_feature_flag(wiphy);
 	wlan_hdd_set_ext_feature_punct(wiphy);
-
+#if defined NL80211_EXT_FEATURE_PROBE_AP_SUPPORT
+	if (wlan_hdd_check_probe_peer_feature(hdd_ctx->psoc))
+		wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_PROBE_AP);
+#endif
 	hdd_exit();
 	return 0;
 
@@ -31072,6 +31097,130 @@ static int wlan_hdd_set_default_mgmt_key(struct wiphy *wiphy,
 		return errno;
 
 	errno = __wlan_hdd_set_default_mgmt_key(wiphy, netdev, key_index);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif
+
+#if defined NL80211_EXT_FEATURE_PROBE_AP_SUPPORT
+/**
+ * __wlan_hdd_cfg80211_probe_peer() - Probe a peer station
+ * @wiphy: Pointer to wiphy
+ * @dev: Pointer to net device
+ * @peer: MAC address of peer to probe
+ * @cookie: Cookie for tracking this request
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int __wlan_hdd_cfg80211_probe_peer(struct wiphy *wiphy,
+					  struct net_device *dev,
+					  const u8 *peer, u64 *cookie)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct hdd_station_ctx *sta_ctx;
+	uint8_t *peer_bssid;
+	u64 generated_cookie;
+	QDF_STATUS status;
+	int ret = 0;
+
+	if (!wlan_hdd_check_probe_peer_feature(hdd_ctx->psoc)) {
+		hdd_err("Qos null frame tx over wmi not enabled");
+		return -EOPNOTSUPP;
+	}
+
+	hdd_enter();
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter->deflink);
+	peer_bssid = sta_ctx->conn_info.bssid.bytes;
+
+	if (!cookie) {
+		hdd_err("Invalid parameter: cookie pointer is NULL");
+		return -EINVAL;
+	}
+
+	if (!peer_bssid) {
+		hdd_err("Failed to retrieve peer mac");
+		return -ENOTCONN;
+	}
+
+	if (qdf_is_macaddr_zero(&sta_ctx->conn_info.bssid)) {
+		hdd_err("Connected BSSID is all zeros " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_bssid));
+		return -ENOTCONN;
+	}
+
+	if (qdf_is_macaddr_broadcast(&sta_ctx->conn_info.bssid)) {
+		hdd_err("Connected BSSID is broadcast " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_bssid));
+		return -ENOTCONN;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
+		hdd_err("Probe peer not supported in mode %d",
+			adapter->device_mode);
+		return -EOPNOTSUPP;
+	}
+
+	if (!hdd_cm_is_vdev_associated(adapter->deflink)) {
+		hdd_err("STA/P2P_CLIENT not in connected state");
+		return -ENOTCONN;
+	}
+
+	if (qdf_atomic_inc_return(&adapter->is_probe_peer_pending) != 1) {
+		qdf_atomic_dec(&adapter->is_probe_peer_pending);
+		hdd_err("Probe already in progress on %s", adapter->dev->name);
+		return -EBUSY;
+	}
+
+	generated_cookie = qdf_get_monotonic_boottime_ns();
+	*cookie = generated_cookie;
+
+	/* Store cookie in adapter for correlation with completion event */
+	adapter->probe_peer_cookie = generated_cookie;
+
+	hdd_debug("Generated probe cookie=0x%llx for peer " QDF_MAC_ADDR_FMT
+		  " on %s", generated_cookie, QDF_MAC_ADDR_REF(peer_bssid),
+		  adapter->dev->name);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send probe peer request to SME: %d", status);
+		qdf_atomic_dec(&adapter->is_probe_peer_pending);
+		return qdf_status_to_os_return(status);
+	}
+
+	hdd_debug("Probe request sent successfully: cookie=0x%llx",
+		  generated_cookie);
+	hdd_exit();
+	return 0;
+}
+
+/**
+ * wlan_hdd_cfg80211_probe_peer() - Probe by sending NULL QoS frame to a peer
+ * @wiphy: Pointer to wiphy
+ * @dev: Pointer to net device
+ * @peer: MAC address of peer to probe
+ * @cookie: Cookie for tracking the request
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int wlan_hdd_cfg80211_probe_peer(struct wiphy *wiphy, struct net_device *dev,
+				 const u8 *peer, u64 *cookie)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_probe_peer(wiphy, dev, peer, cookie);
 
 	osif_vdev_sync_op_stop(vdev_sync);
 
@@ -37147,6 +37296,9 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 	.mgmt_tx = wlan_hdd_mgmt_tx,
 	.mgmt_tx_cancel_wait = wlan_hdd_cfg80211_mgmt_tx_cancel_wait,
 	.set_default_mgmt_key = wlan_hdd_set_default_mgmt_key,
+#if defined NL80211_EXT_FEATURE_PROBE_AP_SUPPORT
+	.probe_peer = wlan_hdd_cfg80211_probe_peer,
+#endif
 #if defined (CFG80211_BIGTK_CONFIGURATION_SUPPORT) || \
 	    (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0))
 	.set_default_beacon_key = wlan_hdd_cfg80211_set_default_beacon_key,

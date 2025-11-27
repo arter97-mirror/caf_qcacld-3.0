@@ -1472,6 +1472,8 @@ enum hdd_wlm_latency_level {
  * @wfd_mode: WFD mode for P2P interface
  * @enable_active_apf_mode: Enable active APF mode flag
  * @dhcp_config_setsuspend: Enable when DHCP in progress and get setsuspend cmd
+ * @is_probe_peer_pending: Enable if a probe peer command is pending
+ * @probe_peer_cookie: Cookie for correlating probe peer request with completion
  */
 struct hdd_adapter {
 	uint32_t magic;
@@ -1677,6 +1679,8 @@ struct hdd_adapter {
 #endif
 	bool enable_active_apf_mode;
 	bool dhcp_config_setsuspend;
+	qdf_atomic_t is_probe_peer_pending;
+	u64 probe_peer_cookie;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(link_info) (&(link_info)->session.station)
