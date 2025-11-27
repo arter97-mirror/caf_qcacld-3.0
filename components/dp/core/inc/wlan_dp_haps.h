@@ -10,6 +10,7 @@
 
 #ifdef WLAN_HAPS_ENABLE
 
+#define HAPS_FAIL_SAFE_OFFSET_MS 100
 #define HAPS_TRY_AGAIN_TIME_NS 200000
 #define HAPS_MAX_PAUSE_TIME_MS 200
 #define QTIME_SYNC_PERIOD      3000
@@ -33,6 +34,9 @@ void dp_haps_init(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS dp_print_haps_stats(struct wlan_objmgr_psoc *psoc);
 
 void dp_clear_haps_stats(struct wlan_objmgr_psoc *psoc);
+
+void dp_haps_set_fail_safe_timeout(struct wlan_dp_intf *dp_intf,
+				   bool is_default, uint16_t timeout);
 
 static inline void dp_haps_kill_timer(qdf_hrtimer_data_t *timer)
 {
@@ -118,6 +122,12 @@ static inline QDF_STATUS dp_print_haps_stats(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline void dp_clear_haps_stats(struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static inline
+void dp_haps_set_fail_safe_timeout(struct wlan_dp_intf *dp_intf,
+				   bool is_default, uint16_t timeout)
 {
 }
 #endif
