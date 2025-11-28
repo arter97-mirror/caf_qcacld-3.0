@@ -3108,10 +3108,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		wrqu.addr.sa_family = ARPHRD_ETHER;
 		memcpy(wrqu.addr.sa_data,
 		       &event->staMac, QDF_MAC_ADDR_SIZE);
-		hdd_info("Vdev %d, STA " QDF_MAC_ADDR_FMT " with mld mac " QDF_MAC_ADDR_FMT " associated",
-			 link_info->vdev_id,
-			 QDF_MAC_ADDR_REF(wrqu.addr.sa_data),
-			 QDF_MAC_ADDR_REF(event->sta_mld.bytes));
+		hdd_nofl_info("SAP(%d), Peer associated: " QDF_MAC_ADDR_FMT " with mld mac " QDF_MAC_ADDR_FMT,
+			      link_info->vdev_id,
+			      QDF_MAC_ADDR_REF(wrqu.addr.sa_data),
+			      QDF_MAC_ADDR_REF(event->sta_mld.bytes));
 		hdd_place_marker(adapter, "CLIENT ASSOCIATED",
 				 wrqu.addr.sa_data);
 		we_event = IWEVREGISTERED;
@@ -3330,7 +3330,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		hdd_nofl_info("SAP(%d) Peer " QDF_MAC_ADDR_FMT " with mld " QDF_MAC_ADDR_FMT " disassociated %sreason %d status code %d",
+		hdd_nofl_info("SAP(%d), Peer disassociated: " QDF_MAC_ADDR_FMT " with mld " QDF_MAC_ADDR_FMT " : %sreason %d status code %d",
 			      link_info->vdev_id,
 			      QDF_MAC_ADDR_REF(stainfo->sta_mac.bytes),
 			      QDF_MAC_ADDR_REF(stainfo->mld_addr.bytes),
