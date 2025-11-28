@@ -19278,7 +19278,7 @@ QDF_STATUS hdd_open_adapter_no_trans(struct hdd_context *hdd_ctx,
 		goto destroy_sync;
 	}
 
-	osif_vdev_sync_register(adapter->dev, vdev_sync);
+	osif_vdev_sync_register(adapter->dev, &adapter->wdev, vdev_sync);
 
 	return QDF_STATUS_SUCCESS;
 

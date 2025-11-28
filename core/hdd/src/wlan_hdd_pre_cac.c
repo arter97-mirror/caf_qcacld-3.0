@@ -529,7 +529,8 @@ int wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx, uint32_t chan_freq)
 		goto destroy_sync;
 
 	if (is_vdev_sync_created)
-		osif_vdev_sync_register(adapter->dev, vdev_sync);
+		osif_vdev_sync_register(adapter->dev, &adapter->wdev,
+					vdev_sync);
 	osif_vdev_sync_trans_stop(vdev_sync);
 
 	return 0;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -22,16 +22,19 @@
 
 #include "linux/device.h"
 #include "linux/netdevice.h"
+#include "net/cfg80211.h"
 #include "qdf_types.h"
 
 /**
  * struct osif_vdev_sync - vdev synchronization context
  * @net_dev: the net_device used as a lookup key
+ * @wdev: the wireless_dev used as an alternate lookup key
  * @dsc_vdev: the dsc_vdev used for synchronization
  * @in_use: indicates if the context is being used
  */
 struct osif_vdev_sync {
 	struct net_device *net_dev;
+	struct wireless_dev *wdev;
 	struct dsc_vdev *dsc_vdev;
 	bool in_use;
 };
@@ -75,11 +78,13 @@ void osif_vdev_sync_destroy(struct osif_vdev_sync *vdev_sync);
 /**
  * osif_vdev_sync_register() - register a vdev for operations/transitions
  * @net_dev: the net_device to use as the operation/transition lookup key
+ * @wdev: the wireless_device to use as the operation/transition lookup key
  * @vdev_sync: the vdev synchronization context to register
  *
  * Return: none
  */
 void osif_vdev_sync_register(struct net_device *net_dev,
+			     struct wireless_dev *wdev,
 			     struct osif_vdev_sync *vdev_sync);
 
 /**
@@ -206,5 +211,53 @@ void osif_vdev_cache_command(struct osif_vdev_sync *vdev_sync, uint8_t cmd_id);
  */
 struct osif_vdev_sync *osif_get_vdev_sync_arr(void);
 
-#endif /* __OSIF_VDEV_SYNC_H */
+/**
+ * osif_vdev_sync_wdev_op_start() - attempt to start an operation on @wdev
+ * @wdev: the wireless_dev to operate against
+ * @out_vdev_sync: out parameter for the synchronization context registered with
+ *	@wdev, populated on success
+ *
+ * Return: Errno
+ */
+#define osif_vdev_sync_wdev_op_start(wdev, out_vdev_sync) \
+	__osif_vdev_sync_wdev_op_start(wdev, out_vdev_sync, __func__)
 
+qdf_must_check int
+__osif_vdev_sync_wdev_op_start(struct wireless_dev *wdev,
+			       struct osif_vdev_sync **out_vdev_sync,
+			       const char *func);
+
+/**
+ * osif_vdev_sync_wdev_trans_start() - attempt to start a transition on @wdev
+ * @wdev: the wireless_dev to transition
+ * @out_vdev_sync: out parameter for the synchronization context registered with
+ *	@wdev, populated on success
+ *
+ * Return: Errno
+ */
+#define osif_vdev_sync_wdev_trans_start(wdev, out_vdev_sync) \
+	__osif_vdev_sync_wdev_trans_start(wdev, out_vdev_sync, __func__)
+
+qdf_must_check int
+__osif_vdev_sync_wdev_trans_start(struct wireless_dev *wdev,
+				  struct osif_vdev_sync **out_vdev_sync,
+				  const char *desc);
+
+/**
+ * osif_vdev_sync_wdev_trans_start_wait() - attempt to start a transition on
+ *	@wdev, blocking if a conflicting transition is in flight
+ * @wdev: the wireless_dev to transition
+ * @out_vdev_sync: out parameter for the synchronization context registered with
+ *	@wdev, populated on success
+ *
+ * Return: Errno
+ */
+#define osif_vdev_sync_wdev_trans_start_wait(wdev, out_vdev_sync) \
+	__osif_vdev_sync_wdev_trans_start_wait(wdev, out_vdev_sync, __func__)
+
+qdf_must_check int
+__osif_vdev_sync_wdev_trans_start_wait(struct wireless_dev *wdev,
+				       struct osif_vdev_sync **out_vdev_sync,
+				       const char *desc);
+
+#endif /* __OSIF_VDEV_SYNC_H */

@@ -495,7 +495,7 @@ static int os_if_nan_process_ndi_create(struct wlan_objmgr_psoc *psoc,
 	if (errno)
 		goto destroy_sync;
 
-	osif_vdev_sync_register(net_dev, vdev_sync);
+	osif_vdev_sync_register(net_dev, wdev, vdev_sync);
 	osif_vdev_sync_trans_stop(vdev_sync);
 
 	return 0;
@@ -627,7 +627,7 @@ static int os_if_nan_process_ndi_delete(struct wlan_objmgr_psoc *psoc,
 	return 0;
 
 reregister:
-	osif_vdev_sync_register(net_dev, vdev_sync);
+	osif_vdev_sync_register(net_dev, wdev, vdev_sync);
 	osif_vdev_sync_trans_stop(vdev_sync);
 
 	return errno;

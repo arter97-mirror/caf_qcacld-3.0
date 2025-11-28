@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -49,6 +49,40 @@ static struct osif_vdev_sync *osif_vdev_sync_lookup(struct net_device *net_dev)
 			continue;
 
 		if (vdev_sync->net_dev == net_dev)
+			return vdev_sync;
+	}
+
+	return NULL;
+}
+
+/**
+ * osif_vdev_sync_lookup_by_wdev() - look up the vdev sync context for @wdev
+ * @wdev: the wireless_dev to look up
+ *
+ * First attempts an exact match on the registered wireless_dev pointer.
+ * Falls back to matching via the associated net_device if @wdev carries one.
+ *
+ * Caller must hold __osif_vdev_sync_lock.
+ *
+ * Return: the vdev synchronization context registered for @wdev, or NULL
+ */
+static struct osif_vdev_sync *osif_vdev_sync_lookup_by_wdev(
+						struct wireless_dev *wdev)
+{
+	int i;
+
+	for (i = 0; i < QDF_ARRAY_SIZE(__osif_vdev_sync_arr); i++) {
+		struct osif_vdev_sync *vdev_sync = __osif_vdev_sync_arr + i;
+
+		if (!vdev_sync->in_use)
+			continue;
+
+		/* First try exact wdev match */
+		if (vdev_sync->wdev == wdev)
+			return vdev_sync;
+
+		/* Fallback: if wdev has netdev, try netdev match */
+		if (wdev->netdev && vdev_sync->net_dev == wdev->netdev)
 			return vdev_sync;
 	}
 
@@ -157,15 +191,18 @@ void osif_vdev_sync_destroy(struct osif_vdev_sync *vdev_sync)
 }
 
 void osif_vdev_sync_register(struct net_device *net_dev,
+			     struct wireless_dev *wdev,
 			     struct osif_vdev_sync *vdev_sync)
 {
 	QDF_BUG(net_dev);
+	QDF_BUG(wdev);
 	QDF_BUG(vdev_sync);
 	if (!vdev_sync)
 		return;
 
 	osif_vdev_sync_lock();
 	vdev_sync->net_dev = net_dev;
+	vdev_sync->wdev = wdev;
 	osif_vdev_sync_unlock();
 }
 
@@ -179,8 +216,11 @@ struct osif_vdev_sync *osif_vdev_sync_unregister(struct net_device *net_dev)
 
 	osif_vdev_sync_lock();
 	vdev_sync = osif_vdev_sync_lookup(net_dev);
-	if (vdev_sync)
+	if (vdev_sync) {
 		vdev_sync->net_dev = NULL;
+		vdev_sync->wdev = NULL;
+	}
+
 	osif_vdev_sync_unlock();
 
 	return vdev_sync;
@@ -364,3 +404,187 @@ void osif_vdev_cache_command(struct osif_vdev_sync *vdev_sync, uint8_t cmd_id)
 	osif_debug("Set cache cmd to %d", cmd_id);
 }
 
+/**
+ * __osif_vdev_sync_wdev_start_callback() - internal helper to start a vdev
+ *	operation or transition on @wdev using a caller-supplied start function
+ * @wdev: the wireless_dev to operate/transition against
+ * @out_vdev_sync: out parameter for the synchronization context, populated
+ *	on success
+ * @desc: description string passed to the DSC start function
+ * @vdev_start_cb: the DSC vdev start function to invoke
+ *
+ * Looks up the vdev sync context associated with @wdev and invokes
+ * @vdev_start_cb to start the operation or transition.
+ *
+ * Caller must hold __osif_vdev_sync_lock.
+ *
+ * Return: 0 on success, -EAGAIN if no context is registered for @wdev,
+ *	or a negative errno from @vdev_start_cb on failure
+ */
+static int
+__osif_vdev_sync_wdev_start_callback(struct wireless_dev *wdev,
+				     struct osif_vdev_sync **out_vdev_sync,
+				     const char *desc,
+				     vdev_start_func vdev_start_cb)
+{
+	QDF_STATUS status;
+	struct osif_vdev_sync *vdev_sync;
+
+	*out_vdev_sync = NULL;
+
+	vdev_sync = osif_vdev_sync_lookup_by_wdev(wdev);
+	if (!vdev_sync)
+		return -EAGAIN;
+
+	*out_vdev_sync = vdev_sync;
+
+	status = vdev_start_cb(vdev_sync->dsc_vdev, desc);
+	if (QDF_IS_STATUS_ERROR(status))
+		return qdf_status_to_os_return(status);
+
+	return 0;
+}
+
+/**
+ * __osif_vdev_sync_wdev_start_wait_callback() - internal helper to start a
+ *	vdev operation or transition on @wdev, potentially blocking until the
+ *	start function succeeds
+ * @wdev: the wireless_dev to operate/transition against
+ * @out_vdev_sync: out parameter for the synchronization context, populated
+ *	on success
+ * @desc: description string passed to the DSC start function
+ * @vdev_start_cb: the DSC vdev start function to invoke (may sleep)
+ *
+ * Looks up the vdev sync context associated with @wdev under the spinlock,
+ * then releases the lock before invoking @vdev_start_cb, which may block.
+ *
+ * Return: 0 on success, -EAGAIN if no context is registered for @wdev,
+ *	or a negative errno from @vdev_start_cb on failure
+ */
+static int
+__osif_vdev_sync_wdev_start_wait_callback(struct wireless_dev *wdev,
+					  struct osif_vdev_sync **out_vdev_sync,
+					  const char *desc,
+					  vdev_start_func vdev_start_cb)
+{
+	QDF_STATUS status;
+	struct osif_vdev_sync *vdev_sync;
+
+	*out_vdev_sync = NULL;
+
+	osif_vdev_sync_lock();
+	vdev_sync = osif_vdev_sync_lookup_by_wdev(wdev);
+	osif_vdev_sync_unlock();
+	if (!vdev_sync)
+		return -EAGAIN;
+
+	status = vdev_start_cb(vdev_sync->dsc_vdev, desc);
+	if (QDF_IS_STATUS_ERROR(status))
+		return qdf_status_to_os_return(status);
+
+	*out_vdev_sync = vdev_sync;
+
+	return 0;
+}
+
+/**
+ * __osif_vdev_sync_wdev_op_start() - attempt to start an operation on @wdev
+ * @wdev: the wireless_dev to operate against
+ * @out_vdev_sync: out parameter for the synchronization context registered
+ *	with @wdev, populated on success
+ * @func: name of the calling function, used for debug tracking
+ *
+ * Acquires the vdev sync spinlock and attempts to start a DSC operation on
+ * the vdev sync context registered for @wdev.  This is the underlying
+ * implementation invoked by the osif_vdev_sync_wdev_op_start() macro.
+ *
+ * Return: 0 on success, -EAGAIN if @wdev is not yet registered, or a
+ *	negative errno on other failures
+ */
+int __osif_vdev_sync_wdev_op_start(struct wireless_dev *wdev,
+				   struct osif_vdev_sync **out_vdev_sync,
+				   const char *func)
+{
+	int errno;
+
+	osif_vdev_sync_lock();
+	errno = __osif_vdev_sync_wdev_start_callback(wdev, out_vdev_sync, func,
+						     _dsc_vdev_op_start);
+	osif_vdev_sync_unlock();
+
+	return errno;
+}
+
+/**
+ * __osif_vdev_sync_wdev_trans_start() - attempt to start a transition on @wdev
+ * @wdev: the wireless_dev to transition
+ * @out_vdev_sync: out parameter for the synchronization context registered
+ *	with @wdev, populated on success
+ * @desc: description of the transition, used for debug tracking
+ *
+ * Acquires the vdev sync spinlock and attempts to start a DSC transition on
+ * the vdev sync context registered for @wdev.  On success, waits for any
+ * in-flight operations and uptree (psoc/driver) operations to complete before
+ * returning.  This is the underlying implementation invoked by the
+ * osif_vdev_sync_wdev_trans_start() macro.
+ *
+ * Return: 0 on success, -EAGAIN if @wdev is not yet registered, or a
+ *	negative errno on other failures
+ */
+int __osif_vdev_sync_wdev_trans_start(struct wireless_dev *wdev,
+				      struct osif_vdev_sync **out_vdev_sync,
+				      const char *desc)
+{
+	int errno;
+
+	osif_vdev_sync_lock();
+	errno = __osif_vdev_sync_wdev_start_callback(wdev, out_vdev_sync, desc,
+						     dsc_vdev_trans_start);
+	osif_vdev_sync_unlock();
+
+	if (!errno) {
+		osif_vdev_sync_wait_for_ops(*out_vdev_sync);
+		osif_vdev_sync_wait_for_uptree_ops(*out_vdev_sync);
+	}
+
+	return errno;
+}
+
+/**
+ * __osif_vdev_sync_wdev_trans_start_wait() - attempt to start a transition on
+ *	@wdev, blocking if a conflicting transition is in flight
+ * @wdev: the wireless_dev to transition
+ * @out_vdev_sync: out parameter for the synchronization context registered
+ *	with @wdev, populated on success
+ * @desc: description of the transition, used for debug tracking
+ *
+ * Attempts to start a DSC transition on the vdev sync context registered for
+ * @wdev.  Unlike __osif_vdev_sync_wdev_trans_start(), the spinlock is NOT held
+ * while invoking the DSC start function because dsc_vdev_trans_start_wait()
+ * may sleep.  On success, waits for any in-flight operations and uptree
+ * (psoc/driver) operations to complete before returning.  This is the
+ * underlying implementation invoked by the
+ * osif_vdev_sync_wdev_trans_start_wait() macro.
+ *
+ * Return: 0 on success, -EAGAIN if @wdev is not yet registered, or a
+ *	negative errno on other failures
+ */
+int __osif_vdev_sync_wdev_trans_start_wait(
+					struct wireless_dev *wdev,
+					struct osif_vdev_sync **out_vdev_sync,
+					const char *desc)
+{
+	int errno;
+
+	/* since dsc_vdev_trans_start_wait may sleep do not take lock here */
+	errno = __osif_vdev_sync_wdev_start_wait_callback(
+						wdev, out_vdev_sync, desc,
+						dsc_vdev_trans_start_wait);
+
+	if (!errno) {
+		osif_vdev_sync_wait_for_ops(*out_vdev_sync);
+		osif_vdev_sync_wait_for_uptree_ops(*out_vdev_sync);
+	}
+
+	return errno;
+}

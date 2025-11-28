@@ -1079,6 +1079,7 @@ _wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	struct wireless_dev *wdev;
 	struct osif_vdev_sync *vdev_sync;
 	int errno;
+	struct net_device *dev;
 
 	errno = osif_vdev_sync_create_and_trans(wiphy_dev(wiphy), &vdev_sync);
 	if (errno)
@@ -1090,7 +1091,8 @@ _wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	if (IS_ERR_OR_NULL(wdev))
 		goto destroy_sync;
 
-	osif_vdev_sync_register(wdev->netdev, vdev_sync);
+	dev = hdd_wdev_get_netdev(wdev);
+	osif_vdev_sync_register(dev, wdev, vdev_sync);
 	osif_vdev_sync_trans_stop(vdev_sync);
 
 	return wdev;
