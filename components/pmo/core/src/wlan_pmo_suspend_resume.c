@@ -2036,3 +2036,24 @@ void pmo_core_system_resume(struct wlan_objmgr_psoc *psoc)
 	pmo_psoc_put_ref(psoc);
 }
 #endif
+
+#ifdef FEATURE_WLAN_WOW_OPTIMIZATION_SUPPORT
+bool pmo_core_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	wmi_unified_t wmi_handle;
+
+	if (!psoc) {
+		pmo_err("psoc is NULL");
+		return false;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		pmo_err("wmi_handle is null");
+		return false;
+	}
+
+	return wmi_service_enabled(wmi_handle,
+			wmi_service_wow_timeline_optimization_support);
+}
+#endif

@@ -2657,4 +2657,20 @@ void
 ucfg_pmo_set_ns_offload_enable_dynamic(struct wlan_objmgr_vdev *vdev,
 				       enum pmo_offload_trigger trigger,
 				       bool ns_offload_enable_dyn);
+
+#ifdef FEATURE_WLAN_WOW_OPTIMIZATION_SUPPORT
+/**
+ * ucfg_pmo_is_wow_optimization_enabled() - Check if WoW optimization is enabled
+ * @psoc: psoc objmgr handle
+ *
+ * Return: true if WoW timeline optimization is supported, false otherwise
+ */
+bool ucfg_pmo_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+ucfg_pmo_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
 #endif /* end  of _WLAN_PMO_UCFG_API_H_ */

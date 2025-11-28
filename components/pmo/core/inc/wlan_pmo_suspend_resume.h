@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2018, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -623,6 +623,22 @@ void pmo_core_vdev_set_moddtim_user(struct wlan_objmgr_vdev *vdev,
 	vdev_ctx->dyn_modulated_dtim = value;
 	qdf_spin_unlock_bh(&vdev_ctx->pmo_vdev_lock);
 }
+
+#ifdef FEATURE_WLAN_WOW_OPTIMIZATION_SUPPORT
+/**
+ * pmo_core_is_wow_optimization_enabled() - Check if WoW optimization is enabled
+ * @psoc: psoc objmgr handle
+ *
+ * Return: true if WoW timeline optimization is supported, false otherwise
+ */
+bool pmo_core_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+pmo_core_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
 #endif /* end  of _WLAN_PMO_SUSPEND_RESUME_H_ */
