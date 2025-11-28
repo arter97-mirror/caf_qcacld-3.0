@@ -59,7 +59,7 @@ QDF_STATUS os_if_dp_flow_classify_result(struct wiphy *wiphy, const void *data,
 {
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FLOW_CLASSIFY_RESULT_MAX + 1];
 	struct nlattr *flow_tuple_tb[QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_MAX + 1];
-	struct wlan_dp_stc_flow_classify_result flow_classify_result;
+	struct wlan_dp_stc_flow_classify_result flow_classify_result = {0};
 	uint32_t ipv4_src_attr = QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_IPV4_SRC_ADDR;
 	uint32_t ipv4_dst_attr = QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_IPV4_DST_ADDR;
 	uint32_t ipv6_src_attr = QCA_WLAN_VENDOR_ATTR_FLOW_TUPLE_IPV6_SRC_ADDR;
