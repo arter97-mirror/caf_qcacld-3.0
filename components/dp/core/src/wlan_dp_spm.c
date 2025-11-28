@@ -833,7 +833,6 @@ dp_spm_flow_retire_nolock(struct wlan_dp_spm_intf_context *spm_intf,
 	struct wlan_dp_psoc_context *dp_ctx = dp_get_context();
 	struct wlan_dp_spm_flow_info *flow_rec;
 	uint16_t flow_id;
-	uint8_t buf[BUF_LEN_MAX];
 	uint8_t flow_evict_success_code;
 
 	if (flow_idx == SAWFISH_INVALID_FLOW_ID)
@@ -842,9 +841,6 @@ dp_spm_flow_retire_nolock(struct wlan_dp_spm_intf_context *spm_intf,
 	flow_rec = &dp_ctx->gl_flow_recs[flow_idx];
 	flow_evict_success_code = wlan_dp_spm_flow_evict_check(flow_rec);
 	if (clear_table || flow_evict_success_code) {
-		dp_info("STC: DELETE flow (%s) at idx %u",
-			dp_print_tuple_to_str(&flow_rec->info, buf,
-					      BUF_LEN_MAX), flow_rec->id);
 		wlan_dp_stc_tx_flow_retire_ind(dp_ctx, flow_rec->classified,
 					       flow_rec->c_flow_id,
 					       flow_evict_success_code);
