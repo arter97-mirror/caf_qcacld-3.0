@@ -3100,4 +3100,8 @@ config SCAN_RANDOM_MAC_ADDR
        bool "Enable SCAN Random MAC addr"
        default n
 
+config TARGET_DUMP_FOR_NON_QC_PLATFORM
+	bool "dump control when msm subsystem is not defined"
+	default n
+
 endif # QCA_CLD_WLAN
