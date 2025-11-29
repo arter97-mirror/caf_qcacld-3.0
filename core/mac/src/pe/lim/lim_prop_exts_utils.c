@@ -593,6 +593,98 @@ void lim_update_ch_width_for_p2p_client(struct mac_context *mac,
 		 session->ch_center_freq_seg0, session->ch_center_freq_seg1);
 }
 
+/**
+ * lim_configure_operating_mode_notification() - Configure Operating Mode
+ *                                                Notification parameters
+ * @session: Pointer to PE session
+ * @bcn_ies: Pointer to parsed beacon IEs from AP
+ *
+ * This function configures the Operating Mode Notification (OMN) parameters
+ * that will be included in the Association Request frame sent to the AP.
+ * The OMN IE allows the STA to inform the AP about its intended operating
+ * channel width and number of spatial streams (NSS).
+ *
+ * The function performs the following operations:
+ * 1. Checks if the AP supports Operating Mode Notification by examining the
+ *    Extended Capability IE in the beacon
+ * 2. Configures the operating channel width, capping it at 160MHz even if
+ *    the session supports higher bandwidths
+ * 3. Configures the RX NSS with special handling for WFA certification
+ *    test scenarios
+ *
+ * Special WFA CERT Handling:
+ * When the AP advertises beacon protection capability and operates in 1x1
+ * NSS mode, the function uses the vdev's configured NSS (from INI settings)
+ * instead of the session's capability NSS. This ensures proper behavior
+ * during WFA certification tests where the STA needs to advertise its full
+ * NSS capability even when connecting to a 1x1 AP.
+ *
+ * Normal Operation:
+ * In standard scenarios, the function uses the session's RX NSS capability
+ * to populate the OMN IE.
+ *
+ * Prerequisites:
+ * - Session must have VHT capability enabled
+ * - AP must advertise VHT capability in beacon
+ * - Extended Capability IE must be present in beacon
+ *
+ * Context: This function is called during AP capability extraction phase
+ *          when processing beacon/probe response from the target AP
+ *
+ * Return: None (void function - updates session structure directly)
+ */
+static void lim_configure_operating_mode_notification(
+					struct pe_session *session,
+					tDot11fBeaconIEs *bcn_ies)
+{
+	struct s_ext_cap *ext_cap;
+	uint8_t self_tx_nss, self_rx_nss = session->cap_rx_nss;
+
+	if (!session->vhtCapability || !session->vhtCapabilityPresentInBeacon ||
+	    !bcn_ies->ExtCap.present)
+		return;
+
+	ext_cap = (struct s_ext_cap *)bcn_ies->ExtCap.bytes;
+	session->gLimOperatingMode.present = ext_cap->oper_mode_notification;
+
+	if (ext_cap->oper_mode_notification) {
+		mlme_get_vdev_nss_by_freq_from_ini(session->vdev,
+						   session->curr_op_freq,
+						   &self_tx_nss,
+						   &self_rx_nss);
+
+		/* Configure channel width, capping at 160MHz */
+		if (CH_WIDTH_160MHZ > session->ch_width)
+			session->gLimOperatingMode.chanWidth =
+					session->ch_width;
+		else
+			session->gLimOperatingMode.chanWidth =
+				CH_WIDTH_160MHZ;
+
+		/**
+		 * Populate vdev NSS in OMN IE of assoc request for
+		 * WFA CERT test scenario.
+		 * Use vdev NSS when:
+		 * - AP has beacon protection enabled
+		 * - Operating in STA mode
+		 * - NSS not forced to 1x1
+		 * - AP supports only 1x1 NSS
+		 */
+		if (ext_cap->beacon_protection_enable &&
+		    session->opmode == QDF_STA_MODE &&
+		    !session->nss_forced_1x1 &&
+		    lim_get_nss_supported_by_ap(&bcn_ies->VHTCaps,
+					&bcn_ies->HTCaps,
+					&bcn_ies->he_cap) == NSS_1x1_MODE)
+			session->gLimOperatingMode.rxNSS = self_rx_nss - 1;
+		else
+			session->gLimOperatingMode.rxNSS =
+					session->cap_rx_nss - 1;
+	} else {
+		pe_err("AP does not support op_mode rx");
+	}
+}
+
 QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 				     struct pe_session *session,
 				     struct bss_description *bss_desc,
@@ -602,7 +694,6 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 {
 	bool new_ch_width_dfn = false;
 	tDot11fIEVHTOperation *vht_op;
-	struct s_ext_cap *ext_cap;
 	tDot11fIEVHTCaps *vht_caps;
 	uint8_t fw_vht_ch_wd, vht_ch_wd, center_freq_diff;
 	uint8_t channel, chan_center_freq_seg1, ap_bcon_ch_width;
@@ -775,44 +866,8 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 		session->ap_ch_width = session->ch_width;
 	}
 
-	if (session->vhtCapability && session->vhtCapabilityPresentInBeacon &&
-	    bcn_ies->ExtCap.present) {
-		ext_cap = (struct s_ext_cap *)bcn_ies->ExtCap.bytes;
-		session->gLimOperatingMode.present =
-					ext_cap->oper_mode_notification;
-		if (ext_cap->oper_mode_notification) {
-			uint8_t self_tx_nss, self_rx_nss = session->cap_rx_nss;
-
-			mlme_get_vdev_nss_by_freq_from_ini(session->vdev,
-							   session->curr_op_freq,
-							   &self_tx_nss,
-							   &self_rx_nss);
-
-			if (CH_WIDTH_160MHZ > session->ch_width)
-				session->gLimOperatingMode.chanWidth =
-						session->ch_width;
-			else
-				session->gLimOperatingMode.chanWidth =
-					CH_WIDTH_160MHZ;
-			/** Populate vdev nss in OMN ie of assoc requse for
-			 *  WFA CERT test scenario.
-			 */
-			if (ext_cap->beacon_protection_enable &&
-			    session->opmode == QDF_STA_MODE &&
-			    !session->nss_forced_1x1 &&
-			     lim_get_nss_supported_by_ap(
-					&bcn_ies->VHTCaps,
-					&bcn_ies->HTCaps,
-					&bcn_ies->he_cap) == NSS_1x1_MODE)
-				session->gLimOperatingMode.rxNSS =
-							self_rx_nss - 1;
-			else
-				session->gLimOperatingMode.rxNSS =
-							session->cap_rx_nss - 1;
-		} else {
-			pe_err("AP does not support op_mode rx");
-		}
-	}
+	/* Configure Operating Mode Notification parameters */
+	lim_configure_operating_mode_notification(session, bcn_ies);
 
 	lim_check_is_he_mcs_valid(session, bcn_ies);
 	lim_check_peer_ldpc_and_update(session, bcn_ies);
