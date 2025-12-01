@@ -1422,6 +1422,80 @@ wlan_dp_stc_get_avg_pkt_rate(struct wlan_dp_stc_flow_table_entry *flow_entry)
 	return (uint32_t)((total_pkts * QDF_NSEC_PER_SEC) / total_time_ns);
 }
 
+/**
+ * wlan_dp_stc_determine_reclass_stages() - Determine which stages to attempt
+ * for reclassification
+ * @flow_entry: Flow table entry containing ML results
+ * @stage_flags: Output parameter for stage flags to set
+ *
+ * Logic:
+ * 1. Initialize with all stages enabled
+ * 2. For each stage, check if confidence is above threshold
+ * 3. Remove stages that don't meet the confidence threshold
+ * 4. Use stage-to-bit mapping array for generalized bit alignment
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+wlan_dp_stc_determine_reclass_stages(struct wlan_dp_stc_flow_table_entry *flow_entry,
+				     uint32_t *stage_flags)
+{
+	struct wlan_dp_stc_classify_insights *classify_results;
+	uint8_t stage;
+	uint8_t i;
+	uint8_t max_confidence;
+	uint32_t stage_flags_cached;
+
+	/* Mapping array for stage enum to corresponding bit flags */
+	static const uint32_t stage_valid_bits[] = {
+		/* stage 0 -> BIT(5) */
+		WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_1_VALID,
+		/* stage 1 -> BIT(6) */
+		WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_2_VALID,
+		/* stage 2 -> BIT(7) */
+		WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_3_VALID
+	};
+
+	classify_results = &flow_entry->classify_results;
+
+	/* Initialize with all stages enabled */
+	stage_flags_cached = WLAN_DP_SAMPLING_FLAGS_STAGE_1 |
+			     WLAN_DP_SAMPLING_FLAGS_STAGE_2 |
+			     WLAN_DP_SAMPLING_FLAGS_STAGE_3;
+
+	/* Check each stage and remove if confidence is below threshold */
+	for (stage = WLAN_DP_STC_CLASSIFY_STAGE_1;
+	     stage < WLAN_DP_STC_CLASSIFY_STAGE_MAX;
+	     stage++) {
+		/* Use mapping array for generalized bit access */
+		if (!(classify_results->stage_valid_flags &
+		      stage_valid_bits[stage]))
+			continue;
+
+		max_confidence = 0;
+		for (i = 0; i < classify_results->sample_count[stage] &&
+		     i < MAX_STAGE_SAMPLES; i++) {
+			if (classify_results->probabilities[stage][i] >
+			    max_confidence) {
+				max_confidence =
+				classify_results->probabilities[stage][i];
+			}
+		}
+
+		if (max_confidence <=
+		    DP_STC_RECLASSIFICATION_CONFIDENCE_THRESHOLD)
+			stage_flags_cached &= ~stage_valid_bits[stage];
+	}
+
+	/*
+	 * If no stages remain after confidence filtering, don't set any flags.
+	 * We don't want to reclassify if the probability is below threshold.
+	 */
+	if (stage_flags_cached)
+		*stage_flags = stage_flags_cached;
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline bool
 wlan_dp_stc_is_traffic_type_known(enum qca_traffic_type traffic_type)
 {

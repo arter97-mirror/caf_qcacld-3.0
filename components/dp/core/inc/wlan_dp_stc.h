@@ -348,9 +348,9 @@ struct wlan_dp_stc_sampling_table {
 #define MAX_STAGE_SAMPLES 5
 
 /* Bit flags for stage validity in wlan_dp_stc_classify_insights */
-#define WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_1_VALID BIT(0)
-#define WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_2_VALID BIT(1)
-#define WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_3_VALID BIT(2)
+#define WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_1_VALID BIT(5)
+#define WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_2_VALID BIT(6)
+#define WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_3_VALID BIT(7)
 
 /**
  * enum wlan_dp_stc_classify_stage - Classification stage indices
