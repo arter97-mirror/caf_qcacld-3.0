@@ -1704,6 +1704,25 @@ static int hdd_get_station_remote(struct wlan_hdd_link_info *link_info,
 					mac_addr.bytes,
 					STA_INFO_HDD_GET_STATION_REMOTE,
 					STA_INFO_MATCH_STA_OR_MLD_MAC);
+	struct wlan_objmgr_peer *peer = NULL;
+
+	if (stainfo) {
+		/* Fetch cached remote sta info if peer object not present */
+		peer = wlan_objmgr_get_peer_by_mac(hdd_ctx->psoc,
+						   stainfo->sta_mac.bytes,
+						   WLAN_OSIF_STATS_ID);
+		if (!peer) {
+			hdd_err("Peer not found with MAC " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(stainfo->sta_mac.bytes));
+			hdd_put_sta_info_ref(&adapter->sta_info_list,
+					     &stainfo, true,
+					     STA_INFO_HDD_GET_STATION_REMOTE);
+			stainfo = NULL;
+		} else {
+			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_STATS_ID);
+		}
+	}
+
 
 	if (!stainfo) {
 		status = hdd_get_cached_station_remote(hdd_ctx, adapter,
