@@ -332,14 +332,9 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 
 	s_entry->peer_id = candidate->peer_id;
 	s_entry->flags |= candidate->flags &
-				WLAN_DP_SAMPLING_CANDIDATE_STAGE_1 ?
-					WLAN_DP_SAMPLING_FLAGS_STAGE_1 : 0;
-	s_entry->flags |= candidate->flags &
-				WLAN_DP_SAMPLING_CANDIDATE_STAGE_2 ?
-					WLAN_DP_SAMPLING_FLAGS_STAGE_2 : 0;
-	s_entry->flags |= candidate->flags &
-				WLAN_DP_SAMPLING_CANDIDATE_STAGE_3 ?
-					WLAN_DP_SAMPLING_FLAGS_STAGE_3 : 0;
+			  (WLAN_DP_SAMPLING_CANDIDATE_STAGE_1 |
+			   WLAN_DP_SAMPLING_CANDIDATE_STAGE_2 |
+			   WLAN_DP_SAMPLING_CANDIDATE_STAGE_3);
 
 	if (candidate->flags & WLAN_DP_SAMPLING_CANDIDATE_TX_FLOW_VALID) {
 		struct wlan_dp_spm_flow_info *tx_flow;
@@ -1494,6 +1489,81 @@ wlan_dp_stc_determine_reclass_stages(struct wlan_dp_stc_flow_table_entry *flow_e
 	if (stage_flags_cached)
 		*stage_flags = stage_flags_cached;
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_dp_stc_check_reclass_eligibility() - Check if flow is eligible for
+ * reclassification
+ * @dp_stc: STC context
+ * @rx_flow_id: RX flow ID
+ * @max_allowed_stages: Output parameter for allowed sampling stages
+ *
+ * Return: true if flow is eligible for reclassification, false otherwise
+ */
+static inline bool
+wlan_dp_stc_check_reclass_eligibility(struct wlan_dp_stc *dp_stc,
+				      uint16_t rx_flow_id,
+				      uint8_t *max_allowed_stages)
+{
+	struct wlan_dp_stc_flow_table_entry *flow_entry;
+	struct wlan_dp_stc_classify_insights *classify_results;
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct dp_fisa_rx_sw_ft *rx_flow;
+	bool quota_available, rate_sufficient;
+	uint32_t avg_pkt_rate, sampling_stages;
+
+	flow_entry = &dp_stc->rx_flow_table->entries[rx_flow_id];
+	classify_results = &flow_entry->classify_results;
+
+	/* Check both conditions atomically */
+	quota_available = wlan_dp_stc_is_rcl_quota_available(dp_stc);
+	avg_pkt_rate = wlan_dp_stc_get_avg_pkt_rate(flow_entry);
+	rate_sufficient = (avg_pkt_rate >=
+				DP_STC_RECLASSIFICATION_PKT_RATE_THRESHOLD);
+
+	if (!quota_available || !rate_sufficient)
+		return false;
+
+	/* Clear pending flag */
+	flow_entry->flags &= ~WLAN_DP_STC_RECLASS_PENDING;
+
+	/* Determine stages based on ML results */
+	wlan_dp_stc_determine_reclass_stages(flow_entry, &sampling_stages);
+
+	/*
+	 * If no stages meet the confidence threshold, mark flow as classified
+	 * and reject
+	 */
+	if (!sampling_stages) {
+		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
+		if (rx_flow->metadata == flow_entry->metadata) {
+			rx_flow->classified = DP_STC_CLASSIFIED_UNKNOWN;
+			dp_stc_info(dp_stc->logmask,
+				    "STC: Reclass flow rx_id %u rejected - no stages meet confidence threshold, marking as UNKNOWN",
+				    rx_flow_id);
+		}
+		return false;
+	}
+
+	/* Clear the reclassification stage flag to save probability */
+	classify_results->stage_valid_flags &=
+				~(WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_1_VALID |
+				  WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_2_VALID |
+				  WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_3_VALID);
+
+	/* Mark as reclassification candidate - direct bit mapping from
+	 * sampling flags to candidate flags
+	 */
+	*max_allowed_stages = sampling_stages &
+			      (WLAN_DP_SAMPLING_FLAGS_STAGE_1 |
+			       WLAN_DP_SAMPLING_FLAGS_STAGE_2 |
+			       WLAN_DP_SAMPLING_FLAGS_STAGE_3);
+
+	dp_stc_info(dp_stc->logmask,
+		    "STC: Reclass flow rx_id %u eligible (quota avail, rate %u pps, candidate_stages: %x)",
+		    rx_flow_id, avg_pkt_rate, *max_allowed_stages);
+
+	return true;
 }
 
 static inline bool
