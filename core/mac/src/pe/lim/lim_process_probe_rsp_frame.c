@@ -83,52 +83,6 @@ lim_validate_ie_information_in_probe_rsp_frame(struct mac_context *mac_ctx,
 	return status;
 }
 
-#ifdef WLAN_FEATURE_WIFI_EVENT_CUSTOM
-static void lim_send_custom_join_resp_event(tSirProbeRespBeacon *beacon_probe_rsp,
-		struct pe_session *session_entry)
-{
-	struct join_resp_event *event = NULL;
-	struct mon_report_status *mon_report = NULL;
-	uint8_t *buf = NULL;
-	uint16_t reason;
-	uint16_t status_code;
-
-	if (!session_entry->ignore_assoc_disallowed &&
-	    beacon_probe_rsp->assoc_disallowed) {
-		reason = eSIR_SME_ASSOC_REFUSED;
-		status_code = eSIR_MAC_UNSPEC_FAILURE_STATUS;
-	} else {
-		reason = eSIR_SME_SUCCESS;
-		status_code =  eSIR_MAC_SUCCESS_STATUS;
-	}
-
-	buf = qdf_mem_malloc(sizeof(struct mon_report_status) +
-			     sizeof(struct join_resp_event));
-	if (!buf) {
-		pe_err("Allocate Memory failed for buf");
-		return;
-	}
-
-	mon_report = (struct mon_report_status *)buf;
-	event = (struct join_resp_event *)(mon_report->payload);
-
-	mon_report->type = JOIN_RESP_EVENT;
-	mon_report->payload_len = sizeof(struct join_resp_event);
-	mon_report->qtime = qdf_do_div(qdf_get_log_timestamp_usecs(),
-			    USEC_PER_MSEC);
-
-	event->reason = reason;
-	event->status_code = status_code;
-	send_custom_packet_select(buf);
-	qdf_mem_free(buf);
-}
-#else
-static void lim_send_custom_join_resp_event(tSirProbeRespBeacon *beacon_probe_rsp,
-		struct pe_session *session_entry)
-{
-}
-#endif
-
 /**
  * lim_process_probe_rsp_frame() - processes received Probe Response frame
  * @mac_ctx: Pointer to Global MAC structure
@@ -224,7 +178,6 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 					     (rx_Packet_info),
 				     session_entry->bcnLen);
 		}
-		lim_send_custom_join_resp_event(probe_rsp, session_entry);
 			/* STA in WT_JOIN_BEACON_STATE */
 		lim_check_and_announce_join_success(mac_ctx, probe_rsp,
 						header,
