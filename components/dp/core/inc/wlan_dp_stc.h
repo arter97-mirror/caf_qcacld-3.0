@@ -96,6 +96,14 @@
 #define BURST_END_TIME_THRESHOLD_NS 1500000000
 #define FLOW_CLASSIFY_WAIT_TIME_NS 10000000000
 
+/* Reclassification configuration */
+#define DP_STC_RECLASSIFICATION_LIMIT 3
+#define DP_STC_RECLASSIFICATION_PKT_RATE_THRESHOLD 10
+#define DP_STC_RECLASSIFICATION_CONFIDENCE_THRESHOLD 50
+#define DP_STC_PKT_RATE_WINDOW_COUNT 3
+
+#define WLAN_DP_STC_RECLASS_PENDING BIT(0)
+
 #define WLAN_DP_STC_TX_FLOW_ID_INTF_ID_SHIFT 6
 #define WLAN_DP_STC_TX_FLOW_ID_INTF_ID_MASK 0x3
 #define WLAN_DP_STC_TX_FLOW_ID_MASK 0x3f
@@ -391,6 +399,11 @@ struct wlan_dp_stc_classify_insights {
  *			min/max values
  * @burst_stats: burst stats
  * @classify_results: classify results from all stages
+ * @reclassification_count: Number of reclassification attempts for this flow
+ * @flags: Flag for reclassification
+ * @pkt_count_last_3sec: Packet count for last 3 seconds (circular buffer)
+ * @pkt_rate_last_update_ts: Last timestamp when packet rate buffer was updated
+ * @last_tracked_pkt_count: Reference packet count for rate calculation
  */
 struct wlan_dp_stc_flow_table_entry {
 	uint64_t prev_pkt_arrival_ts;
@@ -411,6 +424,11 @@ struct wlan_dp_stc_flow_table_entry {
 	struct wlan_dp_stc_txrx_stats txrx_stats;
 	struct wlan_dp_stc_txrx_min_max_stats txrx_min_max_stats[DP_STC_TXRX_SAMPLES_MAX][DP_TXRX_SAMPLES_WINDOW_MAX];
 	struct wlan_dp_stc_burst_stats burst_stats;
+	uint8_t reclassification_count;
+	uint8_t flags;
+	uint32_t pkt_count_last_3sec[DP_STC_PKT_RATE_WINDOW_COUNT];
+	uint64_t pkt_rate_last_update_ts;
+	uint64_t last_tracked_pkt_count;
 	struct wlan_dp_stc_classify_insights classify_results;
 };
 
