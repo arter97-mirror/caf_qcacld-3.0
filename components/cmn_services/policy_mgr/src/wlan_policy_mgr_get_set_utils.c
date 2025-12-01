@@ -14574,11 +14574,14 @@ policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(struct wlan_objmgr_psoc *psoc)
 							   PM_SAP_MODE);
 	policy_mgr_get_mcc_scc_switch(psoc, &mcc_to_scc_switch);
 
-	for (i = 0; i < sap_count; i++)
+	for (i = 0; i < sap_count; i++) {
 		if (policy_mgr_is_restart_sap_required(psoc, vdev_id[i],
 						       sap_ch_freq[i],
-						       mcc_to_scc_switch))
+						       mcc_to_scc_switch)) {
+			policy_mgr_debug("vdev %d SAP is in MCC, freq: %d",
+					 vdev_id[i], sap_ch_freq[i]);
 			return true;
-
+		}
+	}
 	return false;
 }

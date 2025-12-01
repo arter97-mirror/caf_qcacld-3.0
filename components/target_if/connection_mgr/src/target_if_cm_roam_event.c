@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -757,7 +757,7 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 	struct wlan_objmgr_psoc *psoc;
 	struct wmi_unified *wmi_handle;
 	struct wlan_cm_roam_rx_ops *roam_rx_ops;
-	struct wlan_crypto_key_entry *keys;
+	struct wlan_crypto_key_entry *keys = NULL;
 	struct qdf_mac_addr mld_addr;
 	struct wlan_mlo_dev_context *ml_ctx = NULL;
 	struct wlan_objmgr_vdev *vdev_list;
@@ -872,9 +872,10 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 		ret = 0;
 	}
 done:
-	qdf_mem_zero(keys, WLAN_MAX_ML_BSS_LINKS * sizeof(*keys));
-	qdf_mem_free(keys);
-
+	if (keys) {
+		qdf_mem_zero(keys, WLAN_MAX_ML_BSS_LINKS * sizeof(*keys));
+		qdf_mem_free(keys);
+	}
 	return ret;
 }
 #endif
