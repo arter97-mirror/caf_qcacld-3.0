@@ -1566,6 +1566,73 @@ wlan_dp_stc_check_reclass_eligibility(struct wlan_dp_stc *dp_stc,
 	return true;
 }
 
+/**
+ * wlan_dp_stc_check_and_trigger_reclassification() - Check and trigger
+ * reclassification
+ * @dp_stc: STC context
+ * @s_entry: Sampling table entry
+ *
+ * Return: true if reclassification was triggered, false otherwise
+ */
+static inline bool
+wlan_dp_stc_check_and_trigger_reclassification(struct wlan_dp_stc *dp_stc,
+					       struct wlan_dp_stc_sampling_table_entry *s_entry)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct wlan_dp_stc_flow_table_entry *flow_entry;
+	uint8_t flow_tuple_str[BUF_LEN_MAX];
+
+	/* Get flow entry (TX or RX) */
+	flow_entry = wlan_dp_stc_get_flow_entry_from_sampling_entry(dp_stc,
+								    s_entry);
+	if (!flow_entry)
+		return false;
+
+	flow_entry->reclassification_count++;
+
+	dp_stc_info(dp_stc->logmask,
+		    "STC: Flow %d tuple (%s) reclassification limit (%u/%u)",
+		    s_entry->id,
+		    dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
+					  flow_tuple_str, BUF_LEN_MAX),
+		    flow_entry->reclassification_count,
+		    DP_STC_RECLASSIFICATION_LIMIT);
+
+	if (flow_entry->reclassification_count >=
+					DP_STC_RECLASSIFICATION_LIMIT) {
+		flow_entry->flags &= ~WLAN_DP_STC_RECLASS_PENDING;
+		return false;
+	}
+
+	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
+		struct wlan_dp_spm_flow_info *tx_flow;
+
+		tx_flow = wlan_dp_get_tx_flow_hdl(dp_ctx, s_entry->tx_flow_id);
+
+		if (tx_flow->guid == s_entry->tx_flow_metadata) {
+			tx_flow->classified = DP_STC_CLASSIFIED_INIT;
+			tx_flow->selected_to_sample = 0;
+			tx_flow->track_flow_stats = 0;
+		}
+	}
+
+	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
+		struct dp_fisa_rx_sw_ft *rx_flow;
+
+		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, s_entry->rx_flow_id);
+
+		if (rx_flow->metadata == s_entry->rx_flow_metadata) {
+			rx_flow->classified = DP_STC_CLASSIFIED_INIT;
+			rx_flow->selected_to_sample = 0;
+			rx_flow->track_flow_stats = 0;
+		}
+	}
+
+	flow_entry->flags |= WLAN_DP_STC_RECLASS_PENDING;
+
+	return false;
+}
+
 static inline bool
 wlan_dp_stc_is_traffic_type_known(enum qca_traffic_type traffic_type)
 {
@@ -1640,7 +1707,10 @@ wlan_dp_stc_move_to_classified_table(struct wlan_dp_stc *dp_stc,
 	}
 
 	if (!wlan_dp_stc_is_traffic_type_known(s_entry->traffic_type)) {
-		wlan_dp_stc_remove_sampling_table_entry(dp_stc, s_entry);
+		if (!wlan_dp_stc_check_and_trigger_reclassification(dp_stc,
+								    s_entry))
+			wlan_dp_stc_remove_sampling_table_entry(dp_stc,
+								s_entry);
 		return;
 	}
 
@@ -1744,6 +1814,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 	struct wlan_dp_stc_sampling_table_entry *s_entry;
 	struct wlan_dp_stc_classified_flow_table *c_table =
 						dp_stc->classified_flow_table;
+	struct wlan_dp_stc_flow_table_entry *flow_entry;
 	uint64_t cur_ts = dp_stc_get_timestamp();
 	uint64_t tx_flow_metadata;
 	QDF_STATUS status;
@@ -1781,6 +1852,17 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 		if (rx_flow->selected_to_sample || rx_flow->classified)
 			continue;
 
+		flow_entry = &dp_stc->rx_flow_table->entries[rx_flow_id];
+		if (flow_entry->flags & WLAN_DP_STC_RECLASS_PENDING) {
+			if (wlan_dp_stc_check_reclass_eligibility(dp_stc,
+								  rx_flow_id,
+								  &max_allowed_stages)) {
+				goto process_flow;
+			} else {
+				continue;
+			}
+		}
+
 		if (cur_ts - rx_flow->flow_init_ts <
 						FLOW_TRACK_ELIGIBLE_THRESH_NS)
 			continue;
@@ -1798,6 +1880,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 				~WLAN_DP_SAMPLING_CANDIDATE_STAGE_3;
 		}
 
+process_flow:
 		rx_flow_tuple_hash = wlan_dp_fisa_get_flow_tuple_hash(rx_flow);
 		/*
 		 * This function should search and mark the flow id in
@@ -1931,8 +2014,10 @@ other_checks:
 		if (s_entry->last_stats_report_ts &&
 		    cur_ts - s_entry->last_stats_report_ts >
 						FLOW_CLASSIFY_WAIT_TIME_NS) {
-			wlan_dp_stc_remove_sampling_table_entry(dp_stc,
-								s_entry);
+			if (!wlan_dp_stc_check_and_trigger_reclassification(dp_stc,
+									    s_entry))
+				wlan_dp_stc_remove_sampling_table_entry(dp_stc,
+									s_entry);
 		}
 
 		if (s_entry->state == WLAN_DP_SAMPLING_STATE_CLASSIFIED) {
@@ -2253,7 +2338,9 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID) {
 			flow_id = s_entry->tx_flow_id;
 			flow = &dp_stc->tx_flow_table->entries[flow_id];
-			qdf_mem_zero(flow, sizeof(*flow));
+
+			qdf_mem_zero(flow, offsetof(struct wlan_dp_stc_flow_table_entry,
+						    reclassification_count));
 			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1,
 						     QDF_TX);
 #ifdef METADATA_CHECK_NEEDED_DURING_ADD
@@ -2278,7 +2365,9 @@ sample:
 		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 			flow_id = s_entry->rx_flow_id;
 			flow = &dp_stc->rx_flow_table->entries[flow_id];
-			qdf_mem_zero(flow, sizeof(*flow));
+
+			qdf_mem_zero(flow, offsetof(struct wlan_dp_stc_flow_table_entry,
+						    reclassification_count));
 			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1,
 						     QDF_RX);
 #ifdef METADATA_CHECK_NEEDED_DURING_ADD
