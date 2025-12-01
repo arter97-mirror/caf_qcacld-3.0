@@ -19259,6 +19259,13 @@ __wlan_hdd_cfg80211_set_ns_offload(struct wiphy *wiphy,
 
 	hdd_enter_dev(wdev->netdev);
 
+	/* Flush any scheduled inet change notifier work
+	 * This is to make sure set NS offload params
+	 * sent to FW are serialized to avoid race condition
+	 */
+	flush_work(&adapter->ipv4_notifier_work);
+	hdd_adapter_flush_ipv6_notifier_work(adapter);
+
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EPERM;
