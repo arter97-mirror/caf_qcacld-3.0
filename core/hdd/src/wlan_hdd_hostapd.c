@@ -1862,23 +1862,31 @@ hdd_hostapd_apply_action_oui(struct hdd_context *hdd_ctx,
 		hdd_err("Failed to disable aggregation for peer");
 }
 
-static void hdd_hostapd_set_sap_key(struct hdd_adapter *adapter)
+static void hdd_hostapd_set_sap_key(struct wlan_hdd_link_info *link_info)
 {
+	struct wlan_objmgr_vdev *vdev;
 	struct wlan_crypto_key *crypto_key;
 	uint8_t key_index;
 
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev is null");
+		return;
+	}
+
 	for (key_index = 0; key_index < WLAN_CRYPTO_TOTAL_KEYIDX; ++key_index) {
-		crypto_key = wlan_crypto_get_key(adapter->deflink->vdev,
-						 NULL, key_index);
+		crypto_key = wlan_crypto_get_key(vdev, NULL, key_index);
 		if (!crypto_key)
 			continue;
 
 		hdd_debug("key idx %d", key_index);
-		ucfg_crypto_set_key_req(adapter->deflink->vdev, crypto_key,
+		ucfg_crypto_set_key_req(vdev, crypto_key,
 					WLAN_CRYPTO_KEY_TYPE_GROUP);
-		wma_update_set_key(adapter->deflink->vdev_id, false, key_index,
+		wma_update_set_key(link_info->vdev_id, false, key_index,
 				   NULL, crypto_key->cipher_type);
 	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
 #ifdef WLAN_FEATURE_11BE
@@ -2633,7 +2641,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 		}
 		hdd_start_tsf_sync(adapter);
 
-		hdd_hostapd_set_sap_key(adapter);
+		hdd_hostapd_set_sap_key(link_info);
 
 		/* Fill the params for sending IWEVCUSTOM Event
 		 * with SOFTAP.enabled
@@ -6988,59 +6996,16 @@ static void wlan_hdd_update_ll_lt_sap_configs(struct wlan_objmgr_psoc *psoc,
 	config->ch_width_orig = CH_WIDTH_20MHZ;
 }
 
-#ifdef WLAN_FEATURE_MULTI_LINK_SAP
-/**
- * hdd_ssr_get_sap_link_num() - Get total link number and active number
- * under the adapter
- * @adapter: adapter context
- * @created_sap: total created bss number under adapter
- * @started_sap: total started bss number under adapter
- *
- * Return: None
- */
-static void
-hdd_ssr_get_sap_link_num(struct hdd_adapter *adapter,
-			 uint8_t *created_sap,
-			 uint8_t *started_sap)
-{
-	struct wlan_hdd_link_info *link_info;
-	uint8_t created = 0;
-	uint8_t started = 0;
-
-	hdd_adapter_for_each_active_link_info(adapter, link_info) {
-		if (!test_bit(SOFTAP_INIT_DONE, &link_info->link_flags))
-			continue;
-		if (test_bit(SOFTAP_BSS_STARTED, &link_info->link_flags))
-			started++;
-		created++;
-	}
-
-	*created_sap = created;
-	*started_sap = started;
-	hdd_debug("total created num %d started num %d", created, started);
-}
-
 bool
 hdd_ssr_restart_sap_cac_link(struct hdd_adapter *adapter,
 			     struct wlan_hdd_link_info *link_info)
 {
 	struct sap_context *sap_ctx;
-	struct sap_context *sap_ctx_tmp;
-	bool cac_require = false;
-	struct wlan_hdd_link_info *link_tmp;
-	uint8_t created_sap;
-	uint8_t started_sap;
+	bool cac_require;
 
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (!sap_ctx) {
 		hdd_err("null sap_ctx");
-		return false;
-	}
-
-	hdd_ssr_get_sap_link_num(adapter, &created_sap, &started_sap);
-
-	if (created_sap <= 1 || (created_sap - started_sap) <= 1) {
-		hdd_debug("only itself need recover, skip pending");
 		return false;
 	}
 
@@ -7050,32 +7015,8 @@ hdd_ssr_restart_sap_cac_link(struct hdd_adapter *adapter,
 		return false;
 	}
 
-	hdd_adapter_for_each_active_link_info(adapter, link_tmp) {
-		if (link_info == link_tmp)
-			continue;
-
-		sap_ctx_tmp = WLAN_HDD_GET_SAP_CTX_PTR(link_tmp);
-		if (!sap_ctx_tmp)
-			continue;
-
-		/* if has partner link with SBS, pending dfs link */
-		if (wlan_reg_is_6ghz_chan_freq(sap_ctx_tmp->chan_freq)) {
-			hdd_debug("partner is 6GHz frequency, pending itself");
-			return true;
-		}
-	}
-
-	return false;
+	return true;
 }
-
-#else
-bool
-hdd_ssr_restart_sap_cac_link(struct hdd_adapter *adapter,
-			     struct wlan_hdd_link_info *link_info)
-{
-	return false;
-}
-#endif
 
 /**
  * wlan_hdd_cfg80211_start_bss() - start bss

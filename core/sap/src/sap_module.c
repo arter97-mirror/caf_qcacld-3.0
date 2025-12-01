@@ -2085,6 +2085,14 @@ wlansap_fill_channel_change_request(struct sap_context *sap_ctx,
 	mlme_set_cac_required(sap_ctx->vdev,
 			      !!req->cac_duration_ms);
 
+	/* Use remaining CAC time if available for punctured radar scenarios */
+	if (req->cac_duration_ms && sap_ctx->dfs_cac_remaining_time > 0) {
+		req->cac_duration_ms = sap_ctx->dfs_cac_remaining_time;
+		sap_debug("Using remaining CAC time: %d ms", req->cac_duration_ms);
+		/* Reset after use */
+		sap_ctx->dfs_cac_remaining_time = 0;
+	}
+
 	/* Update the rates in sap_bss_cfg for subsequent channel switch */
 	if (dot11_cfg.opr_rates.numRates) {
 		qdf_mem_copy(req->opr_rates.rate,
@@ -2143,6 +2151,7 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 	eCsrPhyMode phy_mode;
 	struct ch_params *ch_params;
 	struct channel_change_req *ch_change_req;
+	enum phy_ch_width phymode_max_bw;
 
 	if (!target_chan_freq) {
 		sap_err("channel 0 requested");
@@ -2182,6 +2191,13 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 	 * which will result in channel width changing dynamically.
 	 */
 	ch_params = &mac_ctx->sap.SapDfsInfo.new_ch_params;
+	phymode_max_bw = wlansap_get_max_bw_by_phymode(sap_ctx);
+	if (ch_params->ch_width > phymode_max_bw) {
+		sap_debug("phymode 0x%x max bw %d less than %d, limit it",
+			  sap_ctx->phyMode, phymode_max_bw,
+			  ch_params->ch_width);
+		ch_params->ch_width = phymode_max_bw;
+	}
 	if (sap_phymode_is_eht(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev, target_chan_freq,
@@ -2257,6 +2273,7 @@ QDF_STATUS wlansap_dfs_send_csa_ie_request(struct sap_context *sap_ctx)
 	uint32_t new_cac_ms;
 	uint32_t dfs_region;
 	uint16_t input_punc;
+	enum phy_ch_width phymode_max_bw;
 
 	if (!sap_ctx) {
 		sap_err("Invalid SAP pointer");
@@ -2271,6 +2288,13 @@ QDF_STATUS wlansap_dfs_send_csa_ie_request(struct sap_context *sap_ctx)
 
 	mac->sap.SapDfsInfo.new_ch_params.ch_width =
 				mac->sap.SapDfsInfo.new_chanWidth;
+	phymode_max_bw = wlansap_get_max_bw_by_phymode(sap_ctx);
+	if (mac->sap.SapDfsInfo.new_ch_params.ch_width > phymode_max_bw) {
+		sap_debug("phymode 0x%x max bw %d less than %d, limit it",
+			  sap_ctx->phyMode, phymode_max_bw,
+			  mac->sap.SapDfsInfo.new_ch_params.ch_width);
+		mac->sap.SapDfsInfo.new_ch_params.ch_width = phymode_max_bw;
+	}
 	input_punc =
 		wlan_reg_get_input_punc_bitmap(&mac->sap.SapDfsInfo.new_ch_params);
 	wlan_reg_set_input_punc_bitmap(&mac->sap.SapDfsInfo.new_ch_params,
@@ -4644,3 +4668,19 @@ QDF_STATUS wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+enum sap_csa_reason_code
+wlansap_get_sap_csa_reason(struct mac_context *mac, uint8_t vdev_id)
+{
+	struct sap_context *sap_ctx;
+
+	sap_ctx = mac->sap.sapCtxList[vdev_id].sap_context;
+	if (sap_ctx) {
+		sap_debug("vdev %d CSA reason %d %s",
+			  vdev_id, sap_ctx->csa_reason,
+			  sap_get_csa_reason_str(sap_ctx->csa_reason));
+		return sap_ctx->csa_reason;
+	}
+	return CSA_REASON_UNKNOWN;
+}
+

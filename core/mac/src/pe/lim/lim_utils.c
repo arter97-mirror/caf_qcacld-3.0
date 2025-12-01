@@ -11177,6 +11177,7 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 	struct ch_params ch_params = {0};
 	qdf_freq_t sec_chan_freq = 0;
 	struct vdev_mlme_obj *mlme_obj;
+	enum sap_csa_reason_code csa_reason;
 
 	band = wlan_reg_freq_to_band(session->curr_op_freq);
 	band_mask = 1 << band;
@@ -11200,7 +11201,18 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
 			sec_chan_freq = session->curr_op_freq - 20;
 	}
 
-	if (LIM_IS_AP_ROLE(session))
+	csa_reason = wlansap_get_sap_csa_reason(mac, session->vdev_id);
+
+	/* Only apply static puncture from SAP start or CSA from user space,
+	 * puncture caused by NOL don't apply static puncture, so when NOL
+	 * timeout, don't need remove static puncture before use the freq
+	 * again.
+	 * when new CSA from user space comes, remove static puncture from SAP
+	 * start or new CSA from user space
+	 */
+	if (LIM_IS_AP_ROLE(session) &&
+	    (!session->ch_switch_in_progress ||
+	     csa_reason == CSA_REASON_USER_INITIATED))
 		lim_apply_puncture(mac, session, ch_params.mhz_freq_seg1);
 
 	if (IS_DOT11_MODE_EHT(session->dot11mode) &&

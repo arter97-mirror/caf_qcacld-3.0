@@ -136,6 +136,10 @@ struct sap_context {
 		uint8_t vdev_id;
 	};
 	uint8_t sap_radar_found_status;
+	/* CAC start time in milliseconds */
+	uint64_t dfs_cac_start_time;
+	/* Remaining CAC time in milliseconds */
+	uint32_t dfs_cac_remaining_time;
 
 	/* vdev object corresponding to sessionId */
 	struct wlan_objmgr_vdev *vdev;
@@ -384,8 +388,6 @@ bool
 sap_search_mac_list(struct qdf_mac_addr *macList, uint16_t num_mac,
 		    uint8_t *peerMac, uint16_t *index);
 
-QDF_STATUS sap_init_dfs_channel_nol_list(struct sap_context *sap_ctx);
-
 bool sap_dfs_is_channel_in_nol_list(struct sap_context *sap_ctx,
 				    qdf_freq_t chan_freq,
 				    ePhyChanBondState chanBondState);
@@ -585,6 +587,17 @@ sap_build_start_bss_config(struct start_bss_config *sap_bss_cfg,
 bool
 sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 				    qdf_freq_t *freq);
+
+/**
+ * dfs_set_optimized_cac_timeout() - Set optimized CAC timeout for punctured channels
+ * @sap_ctx: sap context.
+ *
+ * When radar is detected on punctured channels during CAC, calculate the
+ * remaining CAC time to avoid restarting the full CAC duration.
+ *
+ * Return: Optimized CAC timeout in seconds.
+ */
+int dfs_set_optimized_cac_timeout(struct sap_context *sap_ctx);
 #else
 static inline bool
 sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
@@ -592,5 +605,21 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 {
 	return true;
 }
+
+static inline
+int dfs_set_optimized_cac_timeout(struct sap_context *sap_ctx)
+{
+	return 0;
+}
 #endif
+/**
+ * sap_fsm_send_csa_restart_req() - send csa start event
+ * @mac_ctx: mac ctx
+ * @sap_ctx: SAP context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+sap_fsm_send_csa_restart_req(struct mac_context *mac_ctx,
+			     struct sap_context *sap_ctx);
 #endif

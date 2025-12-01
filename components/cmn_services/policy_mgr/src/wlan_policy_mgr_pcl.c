@@ -1343,8 +1343,70 @@ policy_mgr_modify_sap_pcl_filter_mcc(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#if defined(FEATURE_FIFTH_CONNECTION) || defined(FEATURE_SIXTH_CONNECTION)
 /**
- * policy_mgr_modify_sap_go_4th_conc_disallow() - filter out channel that
+ * policy_mgr_allow_4more_new_freq() - function to check if new channel
+ * frequency is allowed when connection number is equal or greater than 4
+ * @psoc: pointer to soc
+ * @ch_freq: input channel frequency to check
+ * @mode: operating mode of new connection
+ *
+ * Return: true if allowed otherwise false
+ */
+static bool
+policy_mgr_allow_4more_new_freq(struct wlan_objmgr_psoc *psoc,
+				qdf_freq_t ch_freq,
+				enum policy_mgr_con_mode mode)
+{
+	uint32_t idx;
+	bool mcc;
+	qdf_freq_t conn_freq;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	if (mode != PM_SAP_MODE)
+		return true;
+
+	/* mutex already hold by outside */
+	for (idx = 0; idx < MAX_NUMBER_OF_CONC_CONNECTIONS; idx++) {
+		if (!pm_conc_connection_list[idx].in_use)
+			continue;
+
+		conn_freq = pm_conc_connection_list[idx].freq;
+		if (ch_freq == conn_freq)
+			continue;
+
+		if (policy_mgr_is_current_hwmode_sbs(psoc))
+			mcc = policy_mgr_2_freq_same_mac_in_sbs(pm_ctx,
+								ch_freq,
+								conn_freq);
+		else
+			mcc = policy_mgr_2_freq_same_mac_in_dbs(psoc,
+								ch_freq,
+								conn_freq);
+		if (mcc)
+			return false;
+	}
+
+	return true;
+}
+#else
+static inline bool
+policy_mgr_allow_4more_new_freq(struct wlan_objmgr_psoc *psoc,
+				qdf_freq_t ch_freq,
+				enum policy_mgr_con_mode mode)
+{
+	return false;
+}
+#endif
+
+/**
+ * policy_mgr_modify_sap_go_conc_disallow() - filter out channel that
  * is not allowed for 4th sap/go connection
  * @psoc: pointer to soc
  * @mode: interface mode
@@ -1354,7 +1416,7 @@ policy_mgr_modify_sap_pcl_filter_mcc(struct wlan_objmgr_psoc *psoc,
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS policy_mgr_modify_sap_go_4th_conc_disallow(
+static QDF_STATUS policy_mgr_modify_sap_go_conc_disallow(
 		struct wlan_objmgr_psoc *psoc,
 		enum policy_mgr_con_mode mode,
 		uint32_t *pcl_list_org,
@@ -1380,6 +1442,12 @@ static QDF_STATUS policy_mgr_modify_sap_go_4th_conc_disallow(
 		goto end;
 
 	for (i = 0; i < *pcl_len_org; i++) {
+		if (num_connections >= 4 &&
+		    !policy_mgr_allow_4more_new_freq(psoc,
+						     pcl_list_org[i],
+						     mode))
+			continue;
+
 		if (policy_mgr_allow_4th_new_freq(psoc, pcl_list_org[i],
 						  mode, 0)) {
 			pcl_list_org[pcl_len] = pcl_list_org[i];
@@ -1499,10 +1567,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 	}
 	band_6ghz_modified_pcl = true;
 
-	status = policy_mgr_modify_sap_go_4th_conc_disallow(psoc,
-							    PM_SAP_MODE,
-							    pcl_channels,
-							    pcl_weight, len);
+	status = policy_mgr_modify_sap_go_conc_disallow(psoc,
+							PM_SAP_MODE,
+							pcl_channels,
+							pcl_weight, len);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to modify pcl for 4th sap channels");
 		return status;
@@ -1569,10 +1637,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 			return status;
 		}
 	}
-	status = policy_mgr_modify_sap_go_4th_conc_disallow(psoc,
-							    PM_P2P_GO_MODE,
-							    pcl_channels,
-							    pcl_weight, len);
+	status = policy_mgr_modify_sap_go_conc_disallow(psoc,
+							PM_P2P_GO_MODE,
+							pcl_channels,
+							pcl_weight, len);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to modify pcl for 4th go channels");
 		return status;

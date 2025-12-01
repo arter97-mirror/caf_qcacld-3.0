@@ -1535,7 +1535,6 @@ QDF_STATUS wlansap_set_invalid_session(struct sap_context *sap_ctx);
  */
 QDF_STATUS wlansap_release_vdev_ref(struct sap_context *sap_ctx);
 
-#ifdef WLAN_FEATURE_MULTI_LINK_SAP
 /*
  * is_sap_cac_required_for_chan() - Check whether need do cac for specific sap
  * @sap_ctx: pointer to the SAP context
@@ -1544,7 +1543,6 @@ QDF_STATUS wlansap_release_vdev_ref(struct sap_context *sap_ctx);
  */
 bool
 is_sap_cac_required_for_chan(struct sap_context *sap_ctx);
-#endif
 
 /**
  * sap_get_cac_dur_dfs_region() - get cac duration and dfs region.
@@ -2060,6 +2058,17 @@ void wlansap_free_chan_info(struct sap_sel_ch_info *ch_param);
  */
 QDF_STATUS wlansap_get_user_config_acs_ch_list(uint8_t vdev_id,
 					       struct scan_filter *filter);
+
+/**
+ * wlansap_get_sap_csa_reason() - Get sap csa reason
+ * @mac: pointer to mac
+ * @vdev_id: Vdev Id
+ *
+ * Return: csa reason
+ */
+enum sap_csa_reason_code
+wlansap_get_sap_csa_reason(struct mac_context *mac, uint8_t vdev_id);
+
 #ifdef __cplusplus
 }
 #endif

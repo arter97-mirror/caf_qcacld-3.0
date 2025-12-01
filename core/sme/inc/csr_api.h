@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -291,6 +291,8 @@ typedef enum {
 	eCSR_ROAM_CHANNEL_INFO_EVENT_IND = 50,
 	/* Channel switch started indication from lower layers */
 	eCSR_ROAM_CHANNEL_SWITCH_STARTED_IND = 51,
+	eCSR_ROAM_DFS_NOL_REMOVE = 52,
+
 } eRoamCmdStatus;
 
 /* comment inside indicates what roaming callback gets */
