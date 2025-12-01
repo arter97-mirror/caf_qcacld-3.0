@@ -1286,6 +1286,55 @@ wlan_dp_stc_process_classified_flow(struct wlan_dp_stc *dp_stc,
 	}
 }
 
+/**
+ * wlan_dp_stc_update_flow_pkt_rate() - Update packet rate for a flow
+ * @dp_ctx: DP context
+ * @rx_flow_id: RX flow ID
+ * @curr_pkt_ts: Current packet timestamp
+ *
+ * Updates the 3-second sliding window packet rate tracking for
+ * reclassification. The circular buffer pkt_count_last_3sec[] stores packet
+ * counts for each of the last 3 seconds, with index [0] being the most
+ * recent second.
+ *
+ * Return: None
+ */
+static inline void
+wlan_dp_stc_update_flow_pkt_rate(struct wlan_dp_psoc_context *dp_ctx,
+				 uint16_t rx_flow_id,
+				 uint64_t curr_pkt_ts)
+{
+	struct wlan_dp_stc *dp_stc = dp_ctx->dp_stc;
+	struct dp_fisa_rx_sw_ft *rx_flow;
+	struct wlan_dp_stc_flow_table_entry *flow_entry;
+	uint64_t time_delta;
+	uint64_t current_pkt_count;
+	uint32_t pkts_in_last_period;
+
+	rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
+	flow_entry = &dp_stc->rx_flow_table->entries[rx_flow_id];
+
+	current_pkt_count = rx_flow->num_pkts;
+
+	time_delta = curr_pkt_ts - flow_entry->pkt_rate_last_update_ts;
+
+	/* Rotate buffer every second */
+	if (time_delta >= QDF_NSEC_PER_SEC) {
+		pkts_in_last_period = current_pkt_count -
+					flow_entry->last_tracked_pkt_count;
+
+		/* Shift the buffer: [2] = [1], [1] = [0], [0] = new count */
+		flow_entry->pkt_count_last_3sec[2] =
+					flow_entry->pkt_count_last_3sec[1];
+		flow_entry->pkt_count_last_3sec[1] =
+					flow_entry->pkt_count_last_3sec[0];
+		flow_entry->pkt_count_last_3sec[0] = pkts_in_last_period;
+
+		flow_entry->pkt_rate_last_update_ts = curr_pkt_ts;
+		flow_entry->last_tracked_pkt_count = current_pkt_count;
+	}
+}
+
 static inline bool
 wlan_dp_stc_is_traffic_type_known(enum qca_traffic_type traffic_type)
 {
@@ -1493,9 +1542,12 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 		/* loop through entire FISA table */
 		rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
 		if (!rx_flow->is_populated ||
-		    rx_flow->selected_to_sample ||
-		    rx_flow->classified ||
 		    rx_flow->peer_id == DP_STC_INVALID_PEER_ID)
+			continue;
+
+		wlan_dp_stc_update_flow_pkt_rate(dp_ctx, rx_flow_id, cur_ts);
+
+		if (rx_flow->selected_to_sample || rx_flow->classified)
 			continue;
 
 		if (cur_ts - rx_flow->flow_init_ts <
