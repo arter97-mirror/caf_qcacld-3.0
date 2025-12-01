@@ -44,6 +44,12 @@
 #define DP_STC_CLASSIFIED_RT_FLOW_RM_INACTIVE_TIME_NS (7 * QDF_NSEC_PER_SEC)
 #define DP_STC_SAMPLING_FLOW_RM_INACTIVE_TIME_NS (30 * QDF_NSEC_PER_SEC)
 
+/* Hardcoded quota values to avoid costly division operations */
+#define DP_STC_BASE_QUOTA 16
+#define DP_STC_QUOTA_HIGH_USAGE 4
+#define DP_STC_QUOTA_MEDIUM_USAGE 8
+#define DP_STC_QUOTA_LOW_USAGE 24
+
 /*
  * Value of WLAN_DP_STC_BK_PKT_THRESH is dependent on the value of
  * WLAN_DP_STC_BK_TPUT_TEST_THRESH_NS.
@@ -1292,10 +1298,12 @@ wlan_dp_stc_process_classified_flow(struct wlan_dp_stc *dp_stc,
  * @rx_flow_id: RX flow ID
  * @curr_pkt_ts: Current packet timestamp
  *
- * Updates the 3-second sliding window packet rate tracking for
- * reclassification. The circular buffer pkt_count_last_3sec[] stores packet
- * counts for each of the last 3 seconds, with index [0] being the most
- * recent second.
+ * Updates the N-second sliding window packet rate tracking for
+ * reclassification using a circular buffer approach. The circular buffer
+ * pkt_count_last_3sec[] stores packet counts and time_delta_last_3sec[]
+ * stores actual time elapsed for each window. The pkt_rate_circular_idx
+ * rotates through the buffer using modulo arithmetic to avoid expensive
+ * array shifting operations.
  *
  * Return: None
  */
@@ -1310,6 +1318,7 @@ wlan_dp_stc_update_flow_pkt_rate(struct wlan_dp_psoc_context *dp_ctx,
 	uint64_t time_delta;
 	uint64_t current_pkt_count;
 	uint32_t pkts_in_last_period;
+	uint8_t idx;
 
 	rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
 	flow_entry = &dp_stc->rx_flow_table->entries[rx_flow_id];
@@ -1323,16 +1332,94 @@ wlan_dp_stc_update_flow_pkt_rate(struct wlan_dp_psoc_context *dp_ctx,
 		pkts_in_last_period = current_pkt_count -
 					flow_entry->last_tracked_pkt_count;
 
-		/* Shift the buffer: [2] = [1], [1] = [0], [0] = new count */
-		flow_entry->pkt_count_last_3sec[2] =
-					flow_entry->pkt_count_last_3sec[1];
-		flow_entry->pkt_count_last_3sec[1] =
-					flow_entry->pkt_count_last_3sec[0];
-		flow_entry->pkt_count_last_3sec[0] = pkts_in_last_period;
+		/* Store new values at current circular index */
+		idx = flow_entry->pkt_rate_circular_idx;
+		flow_entry->pkt_count_last_3sec[idx] = pkts_in_last_period;
+		flow_entry->time_delta_last_3sec[idx] = time_delta;
+
+		/* Move to next position in circular buffer for next update */
+		flow_entry->pkt_rate_circular_idx = (idx + 1) %
+						DP_STC_PKT_RATE_WINDOW_COUNT;
 
 		flow_entry->pkt_rate_last_update_ts = curr_pkt_ts;
 		flow_entry->last_tracked_pkt_count = current_pkt_count;
 	}
+}
+
+/**
+ * wlan_dp_stc_is_rcl_quota_available() - Check if reclassification quota
+ * is available
+ * @dp_stc: STC context
+ *
+ * Dynamic quota based on sampling table usage:
+ * - Usage < 25%: Allow 150% of base quota (18.75% of table)
+ * - Usage 25-50%: Allow base quota (12.5% of table)
+ * - Usage 50-75%: Allow 50% of base quota (6.25% of table)
+ * - Usage > 75%: Allow 25% of base quota (3.125% of table)
+ *
+ * Return: true if quota is available for reclassification
+ */
+static inline bool
+wlan_dp_stc_is_rcl_quota_available(struct wlan_dp_stc *dp_stc)
+{
+	uint32_t sampling_table_usage =
+		qdf_atomic_read(&dp_stc->sampling_flow_table->num_valid_entries);
+	uint32_t sampling_table_capacity = DP_STC_SAMPLE_FLOWS_MAX;
+	uint32_t usage_percentage = (sampling_table_usage * 100) /
+						sampling_table_capacity;
+	uint32_t dynamic_quota;
+
+	if (usage_percentage > 75)
+		dynamic_quota = DP_STC_QUOTA_HIGH_USAGE;
+	else if (usage_percentage > 50)
+		dynamic_quota = DP_STC_QUOTA_MEDIUM_USAGE;
+	else if (usage_percentage < 25)
+		dynamic_quota = DP_STC_QUOTA_LOW_USAGE;
+	else
+		dynamic_quota = DP_STC_BASE_QUOTA;
+
+	return (sampling_table_usage <
+			(sampling_table_capacity - dynamic_quota));
+}
+
+/**
+ * wlan_dp_stc_get_avg_pkt_rate() - Calculate average packet rate over
+ * last N seconds
+ * @flow_entry: Flow table entry
+ *
+ * Calculates the average packet rate by summing packets from the last N
+ * seconds (where N = DP_STC_PKT_RATE_WINDOW_COUNT) and dividing by the
+ * actual total time elapsed. The circular buffer pkt_count_last_3sec[] stores
+ * packet counts and time_delta_last_3sec[] stores actual time deltas for each
+ * window. The pkt_rate_circular_idx tracks the current position in the buffer.
+ *
+ * Return: Average packets per second over the tracking window
+ */
+static inline uint32_t
+wlan_dp_stc_get_avg_pkt_rate(struct wlan_dp_stc_flow_table_entry *flow_entry)
+{
+	uint32_t total_pkts = 0;
+	uint64_t total_time_ns = 0;
+	uint8_t i;
+	uint8_t last_idx;
+
+	/* Get the last updated index in circular buffer */
+	last_idx = (flow_entry->pkt_rate_circular_idx +
+		    DP_STC_PKT_RATE_WINDOW_COUNT - 1) %
+		    DP_STC_PKT_RATE_WINDOW_COUNT;
+
+	/* Avoid division by zero */
+	if (flow_entry->time_delta_last_3sec[last_idx] == 0)
+		return 0;
+
+	/* Sum packets and time from all windows in circular buffer */
+	for (i = 0; i < DP_STC_PKT_RATE_WINDOW_COUNT; i++) {
+		total_pkts += flow_entry->pkt_count_last_3sec[i];
+		total_time_ns += flow_entry->time_delta_last_3sec[i];
+	}
+
+	/* Calculate rate: (total_pkts * 1_second) / actual_time_elapsed */
+	return (uint32_t)((total_pkts * QDF_NSEC_PER_SEC) / total_time_ns);
 }
 
 static inline bool

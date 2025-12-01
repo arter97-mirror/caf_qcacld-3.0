@@ -162,6 +162,11 @@ enum wlan_dp_stc_evict_code {
 	DP_EVICT_SUCCESS_CODE_3,
 };
 
+/*
+ * NOTE: When updating this value, also update the hardcoded quota macros
+ * in wlan_dp_stc.c: DP_STC_BASE_QUOTA, DP_STC_QUOTA_HIGH_USAGE,
+ * DP_STC_QUOTA_MEDIUM_USAGE, DP_STC_QUOTA_LOW_USAGE
+ */
 #define DP_STC_SAMPLE_FLOWS_MAX 128
 #define DP_STC_SAMPLE_BIDI_FLOW_MAX 96
 #define DP_STC_SAMPLE_RX_FLOW_MAX 32
@@ -349,7 +354,7 @@ struct wlan_dp_stc_sampling_table {
 
 /**
  * enum wlan_dp_stc_classify_stage - Classification stage indices
- * @WLAN_DP_STC_CLASSIFY_STAGE_1: Valid resuls for stage 1
+ * @WLAN_DP_STC_CLASSIFY_STAGE_1: Valid results for stage 1
  * @WLAN_DP_STC_CLASSIFY_STAGE_2: Valid results for stage 2
  * @WLAN_DP_STC_CLASSIFY_STAGE_3: Valid results for stage 3
  * @WLAN_DP_STC_CLASSIFY_STAGE_MAX: Maximum stage count
@@ -402,8 +407,10 @@ struct wlan_dp_stc_classify_insights {
  * @reclassification_count: Number of reclassification attempts for this flow
  * @flags: Flag for reclassification
  * @pkt_count_last_3sec: Packet count for last 3 seconds (circular buffer)
+ * @time_delta_last_3sec: Time delta for each window in the circular buffer (ns)
  * @pkt_rate_last_update_ts: Last timestamp when packet rate buffer was updated
  * @last_tracked_pkt_count: Reference packet count for rate calculation
+ * @pkt_rate_circular_idx: Circular buffer index for packet rate tracking
  */
 struct wlan_dp_stc_flow_table_entry {
 	uint64_t prev_pkt_arrival_ts;
@@ -427,8 +434,10 @@ struct wlan_dp_stc_flow_table_entry {
 	uint8_t reclassification_count;
 	uint8_t flags;
 	uint32_t pkt_count_last_3sec[DP_STC_PKT_RATE_WINDOW_COUNT];
+	uint64_t time_delta_last_3sec[DP_STC_PKT_RATE_WINDOW_COUNT];
 	uint64_t pkt_rate_last_update_ts;
 	uint64_t last_tracked_pkt_count;
+	uint8_t pkt_rate_circular_idx;
 	struct wlan_dp_stc_classify_insights classify_results;
 };
 
