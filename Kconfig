@@ -2262,6 +2262,10 @@ config DYNAMIC_DEBUG
 	bool "enable CONFIG_DYNAMIC_DEBUG"
 	default n
 
+config WLAN_DIAG_DEBUG_FEATURE
+	bool "enable DEBUG diag events"
+	default n
+
 config CONFIG_WLAN_DUMP_IN_PROGRESS
 	bool "enable WLAN_DUMP_IN_PROGRESS"
 	default n
