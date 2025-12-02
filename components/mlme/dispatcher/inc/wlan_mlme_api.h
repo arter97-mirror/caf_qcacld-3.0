@@ -4921,6 +4921,29 @@ bool wlan_mlme_get_ext_mld_cap_supp(struct wlan_objmgr_psoc *psoc);
  * Return: bool to check if Extended MLD capability is excluded
  */
 bool wlan_mlme_get_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_eht_mlo_reserved_fields() - Set the reserved fields in
+ * the Multi-Link element in both Multi-Link Probe Request and Association
+ * Request frames.
+ * @psoc: pointer to psoc object
+ * @value: value to set reserved fields in Multi-Link element
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_set_eht_mlo_reserved_fields(struct wlan_objmgr_psoc *psoc,
+				      bool value);
+
+/**
+ * wlan_mlme_get_eht_mlo_reserved_fields() - Check if the reserved fields in
+ * the Multi-Link element in both Multi-Link Probe Request and Association
+ * Request frames are to be set.
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool to check if MLE reserved fields are to be set
+ */
+bool
+wlan_mlme_get_eht_mlo_reserved_fields(struct wlan_objmgr_psoc *psoc);
 #else
 static inline
 void wlan_mlme_set_ml_link_control_mode(struct wlan_objmgr_psoc *psoc,
@@ -5032,6 +5055,18 @@ wlan_mlme_set_sta_mlo_unified_connect_disconnect(
 	return false;
 }
 
+static inline QDF_STATUS
+wlan_mlme_set_eht_mlo_reserved_fields(struct wlan_objmgr_psoc *psoc,
+				      bool value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool
+wlan_mlme_get_eht_mlo_reserved_fields(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif
 
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP

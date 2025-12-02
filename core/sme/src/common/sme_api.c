@@ -16439,6 +16439,7 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	wlan_mlme_set_ext_mld_cap_supp(mac_ctx->psoc, true);
 	wlan_mlme_set_exclude_ext_mld_cap(mac_ctx->psoc, false);
 	sme_send_ext_mld_cap_wfatest_cmd(mac_handle, vdev_id, true);
+	wlan_mlme_set_eht_mlo_reserved_fields(mac_ctx->psoc, false);
 }
 
 void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t vdev_id,

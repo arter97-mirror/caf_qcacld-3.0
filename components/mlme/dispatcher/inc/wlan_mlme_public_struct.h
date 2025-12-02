@@ -1919,6 +1919,7 @@ enum station_prefer_bw {
  * @exclude_ext_mld_cap:            Exclude Extended MLD caps in assoc req
  * @mlo_unified_connect_disconnect: MLO unified connect disconnect config
  * @epcs_capability:                epcs capability enable or disable flag
+ * @set_mlo_reserved_fields:        Set reserved fields in Multi-Link element
  * @usr_disable_eht:                user disable the eht for STA
  * @eht_disable_punct_in_us_lpi:    Disable eht puncture in us lpi mode
  * @exclude_qcn_ie_support:         Exclude QCN vendor IE support
@@ -1960,6 +1961,7 @@ struct wlan_mlme_sta_cfg {
 	bool ext_mld_cap_supp;
 	bool exclude_ext_mld_cap;
 	bool mlo_unified_connect_disconnect;
+	bool set_mlo_reserved_fields;
 #endif
 #ifdef WLAN_FEATURE_11BE
 	bool epcs_capability;

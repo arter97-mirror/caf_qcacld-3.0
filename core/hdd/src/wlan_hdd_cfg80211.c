@@ -9913,6 +9913,8 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_BTM_RECOMM_MULTI_AP_SUPPORT] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_SET_MLE_RESERVED_FIELDS] = {
+			.type = NLA_U8},
 
 };
 
@@ -18427,6 +18429,19 @@ BTM_REQ_RESP_DONE:
 			sme_send_ext_mld_cap_wfatest_cmd(mac_handle,
 							 link_info->vdev_id,
 							 true);
+		}
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_SET_MLE_RESERVED_FIELDS;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("Set reserved fields in MLO IE: %d", cfg_val);
+		if (cfg_val) {
+			ret_val =
+			wlan_mlme_set_eht_mlo_reserved_fields(hdd_ctx->psoc,
+							      true);
+			if (ret_val)
+				hdd_err("Failed to set MLO IE reserved fields");
 		}
 	}
 
