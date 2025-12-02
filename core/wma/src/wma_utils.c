@@ -2426,7 +2426,7 @@ static int __wma_unified_radio_tx_power_level_stats_event_handler(
 		goto post_stats;
 	}
 
-	if ((fixed_param->power_level_offset >
+	if ((fixed_param->power_level_offset >=
 	    rs_results->total_num_tx_power_levels) ||
 	    (fixed_param->num_tx_power_levels >
 	    rs_results->total_num_tx_power_levels -
