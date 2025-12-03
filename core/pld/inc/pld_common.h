@@ -1508,6 +1508,14 @@ int pld_athdiag_write(struct device *dev, uint32_t offset, uint32_t memtype,
  * Return: Pointer to the domain
  */
 void *pld_smmu_get_domain(struct device *dev);
+
+/**
+ * pld_smmu_s1_enabled() - Check if SMMU s1 is enabled
+ * @dev: device
+ *
+ * Return: true if SMMU s1 is enabled, false otherwise
+ */
+bool pld_smmu_s1_enabled(struct device *dev);
 #else
 /**
  * pld_smmu_get_mapping() - Get SMMU mapping context
