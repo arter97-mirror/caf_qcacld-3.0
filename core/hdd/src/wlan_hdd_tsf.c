@@ -2618,6 +2618,7 @@ static int hdd_stop_tsf_sync(struct hdd_adapter *adapter)
 
 int hdd_reset_tsf_sync(struct hdd_adapter *adapter)
 {
+	QDF_STATUS status;
 	int ret;
 
 	if (!adapter->tsf.tsf_capture_initialized)
@@ -2627,20 +2628,21 @@ int hdd_reset_tsf_sync(struct hdd_adapter *adapter)
 	if (ret)
 		hdd_err("Failed to stop tsf sync, ret: %d", ret);
 
-	ret = qdf_mc_timer_destroy(&adapter->tsf.host_target_sync_timer);
-	if (ret != QDF_STATUS_SUCCESS)
-		hdd_err("Failed to destroy target timer, ret: %d", ret);
+	status = qdf_mc_timer_destroy(&adapter->tsf.host_target_sync_timer);
+	if (status != QDF_STATUS_SUCCESS)
+		hdd_err("Failed to destroy target timer, status: %d", status);
 
-	ret = qdf_mc_timer_stop(&adapter->tsf.host_capture_req_timer);
-	if (ret != QDF_STATUS_SUCCESS)
-		hdd_err("Failed to stop capture timer, ret: %d", ret);
+	status = qdf_mc_timer_stop(&adapter->tsf.host_capture_req_timer);
+	if (status != QDF_STATUS_SUCCESS)
+		hdd_err("Failed to stop capture timer, status: %d", status);
 
-	ret = qdf_mc_timer_destroy(&adapter->tsf.host_capture_req_timer);
-	if (ret != QDF_STATUS_SUCCESS)
-		hdd_err("Failed to destroy capture timer, ret: %d", ret);
+	status = qdf_mc_timer_destroy(&adapter->tsf.host_capture_req_timer);
+	if (status != QDF_STATUS_SUCCESS)
+		hdd_err("Failed to destroy capture timer, status: %d", status);
 
 	adapter->tsf.tsf_capture_initialized = false;
-	return ret;
+
+	return qdf_status_to_os_return(status);
 }
 
 static
@@ -2679,32 +2681,45 @@ static int hdd_start_tsf_sync(struct hdd_adapter *adapter)
 
 int hdd_setup_tsf_sync(struct hdd_adapter *adapter)
 {
+	struct hdd_context *hddctx;
+	QDF_STATUS status;
 	int ret;
 
 	if (adapter->tsf.tsf_capture_initialized)
 		return 0;
 
-	ret = qdf_mc_timer_init(&adapter->tsf.host_target_sync_timer,
-				QDF_TIMER_TYPE_SW,
-				hdd_capture_tsf_timer_expired_handler,
-				(void *)adapter);
-	if (ret != QDF_STATUS_SUCCESS) {
-		hdd_err("Failed to init target timer, ret: %d", ret);
-		return ret;
+	hddctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hddctx) {
+		hdd_err("invalid hdd context");
+		return -EINVAL;
 	}
 
-	ret = qdf_mc_timer_init(&adapter->tsf.host_capture_req_timer,
-				QDF_TIMER_TYPE_SW,
-				hdd_capture_req_timer_expired_handler,
-				(void *)adapter);
-	if (ret != QDF_STATUS_SUCCESS) {
-		hdd_err("Failed to init capture timer, ret: %d", ret);
+	if (!qdf_atomic_read(&hddctx->tsf.tsf_ready_flag)) {
+		hdd_err("TSF feature has NOT been initialized");
+		return -EINVAL;
+	}
+
+	status = qdf_mc_timer_init(&adapter->tsf.host_target_sync_timer,
+				   QDF_TIMER_TYPE_SW,
+				   hdd_capture_tsf_timer_expired_handler,
+				   (void *)adapter);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to init target timer, status: %d", status);
+		return qdf_status_to_os_return(status);
+	}
+
+	status = qdf_mc_timer_init(&adapter->tsf.host_capture_req_timer,
+				   QDF_TIMER_TYPE_SW,
+				   hdd_capture_req_timer_expired_handler,
+				   (void *)adapter);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to init capture timer, status: %d", status);
 		qdf_mc_timer_destroy(&adapter->tsf.host_target_sync_timer);
-		return ret;
+		return qdf_status_to_os_return(status);
 	}
 
 	ret = hdd_start_tsf_sync(adapter);
-	if (ret != QDF_STATUS_SUCCESS) {
+	if (ret) {
 		hdd_err("Failed to start tsf sync, ret: %d", ret);
 		qdf_mc_timer_destroy(&adapter->tsf.host_capture_req_timer);
 		qdf_mc_timer_destroy(&adapter->tsf.host_target_sync_timer);
