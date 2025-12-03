@@ -802,6 +802,28 @@ QDF_STATUS wlan_mlme_configure_chain_mask(struct wlan_objmgr_psoc *psoc,
 bool wlan_mlme_is_chain_mask_supported(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * wlan_mlme_set_chain_mask() - configure chainmask
+ * @psoc: pointer to psoc object
+ * @tx_mask: tx chain mask
+ * @rx_mask: tx chain mask
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_set_chain_mask(struct wlan_objmgr_psoc *psoc,
+				    uint8_t tx_mask, uint8_t rx_mask);
+
+/**
+ * wlan_mlme_get_chain_mask() - get configured chainmask
+ * @psoc: pointer to psoc object
+ * @tx_mask: tx chain mask
+ * @rx_mask: tx chain mask
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_get_chain_mask(struct wlan_objmgr_psoc *psoc,
+				    uint8_t *tx_mask, uint8_t *rx_mask);
+
+/**
  * wlan_mlme_get_listen_interval() - Get listen interval
  * @psoc: pointer to psoc object
  * @value: Pointer to value that needs to be filled by MLME
