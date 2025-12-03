@@ -3453,11 +3453,11 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		    wlan_reg_is_indoor_ap_detected(mac_ctx->pdev))
 			session->ap_defined_power_type_6g = REG_INDOOR_ENABLED_AP;
 
-		status = wlan_reg_get_best_6g_power_type(
-				mac_ctx->psoc, mac_ctx->pdev,
-				&power_type_6g,
-				session->ap_defined_power_type_6g,
-				bss_desc->chan_freq);
+		status = lim_get_6g_power_type_with_bw(
+						mac_ctx,
+						session,
+						bss_desc->chan_freq,
+						&power_type_6g);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			if (req_fail_status_code)
 				*req_fail_status_code =
