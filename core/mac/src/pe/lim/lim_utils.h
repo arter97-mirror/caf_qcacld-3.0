@@ -1100,7 +1100,7 @@ void lim_clean_up_disassoc_deauth_req(struct mac_context *mac, uint8_t *staMac,
 bool lim_check_disassoc_deauth_ack_pending(struct mac_context *mac,
 		uint8_t *staMac);
 
-#ifdef CFG80211_SA_QUERY_OFFLOAD_SUPPORT
+#ifdef WLAN_FEATURE_SA_QUERY_OFFLOAD
 QDF_STATUS lim_post_csa_ocv_sa_query_timer_init(struct pe_session *pe_session);
 void lim_post_csa_ocv_sa_query_timer_destroy(struct pe_session *pe_session);
 void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
@@ -1121,7 +1121,7 @@ static inline void lim_post_csa_ocv_sa_query_check(struct mac_context *mac,
 		struct pe_session *pe_session, bool csa_done)
 {
 }
-#endif /* CFG80211_SA_QUERY_OFFLOAD_SUPPORT */
+#endif /* WLAN_FEATURE_SA_QUERY_OFFLOAD */
 
 void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param);
 void lim_pmf_comeback_timer_callback(void *context);
