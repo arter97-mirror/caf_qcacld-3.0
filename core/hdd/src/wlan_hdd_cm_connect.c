@@ -2000,6 +2000,43 @@ static void hdd_post_conn_clear_bcn_rssi_stats(
 }
 #endif
 
+static void hdd_configure_wow_commands(struct wlan_objmgr_vdev *vdev,
+				       struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+	enum QDF_OPMODE opmode;
+	uint8_t vdev_id;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("psoc is NULL");
+		return;
+	}
+
+	if (!ucfg_pmo_is_wow_optimization_enabled(psoc)) {
+		hdd_debug("WoW optimization not enabled");
+		return;
+	}
+
+	if (!ucfg_pmo_is_vdev_supports_offload(vdev)) {
+		hdd_debug("offload not supported for this vdev opmode");
+		return;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	vdev_id = wlan_vdev_get_id(vdev);
+
+	if (opmode != QDF_NDI_MODE) {
+		status = ucfg_pmo_enable_hw_filter_in_fwr(vdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to enable HW filter: %d", status);
+			return;
+		}
+		hdd_debug("HW filter enabled for opmode: %d", opmode);
+	}
+}
+
 static void
 hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 					struct wlan_cm_connect_resp *rsp)
@@ -2050,6 +2087,7 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 
 	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev))
 		hdd_send_ps_config_to_fw(adapter);
+	hdd_configure_wow_commands(vdev, hdd_ctx);
 	hdd_clear_disconnect_receive(adapter);
 }
 

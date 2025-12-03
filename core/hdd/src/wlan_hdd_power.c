@@ -94,6 +94,7 @@
 #include "son_api.h"
 #include "wlan_hdd_tx_powerboost.h"
 #include "wlan_hdd_ioctl.h"
+#include "wlan_pmo_ucfg_api.h"
 
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
@@ -881,6 +882,7 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger)
 {
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
 
 	hdd_enter();
 
@@ -902,16 +904,24 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 		goto put_vdev;
 	}
 
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("psoc is NULL");
+		goto put_vdev;
+	}
+
 	hdd_debug("enable offloads");
 	hdd_enable_arp_offload(adapter, vdev, trigger);
 	hdd_enable_ns_offload(adapter, vdev, trigger);
 	hdd_enable_mc_addr_filtering(adapter, trigger);
 	if (adapter->device_mode == QDF_STA_MODE)
 		hdd_enable_igmp_offload(adapter, vdev);
-
-	if (adapter->device_mode != QDF_NDI_MODE)
-		hdd_enable_hw_filter(vdev);
 	hdd_enable_action_frame_patterns(vdev);
+
+	if (!ucfg_pmo_is_wow_optimization_enabled(psoc)) {
+		if (adapter->device_mode != QDF_NDI_MODE)
+			hdd_enable_hw_filter(vdev);
+	}
 put_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 out:
@@ -923,6 +933,7 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 	enum pmo_offload_trigger trigger)
 {
 	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
 
 	hdd_enter();
 
@@ -944,6 +955,12 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 		goto put_vdev;
 	}
 
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("psoc is NULL");
+		goto put_vdev;
+	}
+
 	hdd_debug("disable offloads");
 	hdd_disable_gtk_offload(adapter, vdev);
 	hdd_disable_arp_offload(adapter, vdev, trigger);
@@ -951,9 +968,12 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 	hdd_disable_mc_addr_filtering(adapter, trigger);
 	if (adapter->device_mode == QDF_STA_MODE)
 		hdd_disable_igmp_offload(adapter, vdev);
-	if (adapter->device_mode != QDF_NDI_MODE)
-		hdd_disable_hw_filter(vdev);
 	hdd_disable_action_frame_patterns(vdev);
+
+	if (!ucfg_pmo_is_wow_optimization_enabled(psoc)) {
+		if (adapter->device_mode != QDF_NDI_MODE)
+			hdd_disable_hw_filter(vdev);
+	}
 
 put_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
