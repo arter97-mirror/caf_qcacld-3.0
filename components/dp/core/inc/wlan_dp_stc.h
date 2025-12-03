@@ -89,7 +89,11 @@
 	} while (0)
 
 /* TODO - This macro needs to be same as the max peers in CMN DP */
+#ifdef CONFIG_PLD_PCIE_FW_SIM
+#define DP_STC_MAX_PEERS 128
+#else
 #define DP_STC_MAX_PEERS 64
+#endif
 
 #define BURST_START_TIME_THRESHOLD_NS 10000000
 #define BURST_START_BYTES_THRESHOLD 5000
