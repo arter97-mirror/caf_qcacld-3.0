@@ -4165,6 +4165,133 @@ static void lim_update_add_bss_ht_params(struct mac_context *mac,
 	lim_store_bw_in_peer_mlme(pe_session, pAssocRsp, pAddBssParams,
 				  final_bw);
 }
+
+/**
+ * lim_sta_configure_vht_capability() - Configure VHT capability
+ *                                       for STA connection
+ * @mac: Pointer to MAC context
+ * @pe_session: Pointer to PE session
+ * @pAssocRsp: Pointer to Association Response frame
+ * @pAddBssParams: Pointer to Add BSS parameters structure
+ *
+ * This function detects and configures VHT capability from the
+ * Association Response. It supports both standard VHT IEs and
+ * vendor-specific VHT IEs for backward compatibility with
+ * proprietary AP implementations.
+ *
+ * The function performs the following:
+ * 1. Checks if session supports VHT capability
+ * 2. Detects VHT IEs in Association Response:
+ *    - First tries standard VHT Caps/Operation IEs
+ *    - Falls back to vendor-specific VHT IEs if standard
+ *      not present
+ * 3. Sets VHT capable flag in BSS parameters
+ * 4. Updates VHT operation parameters (channel width,
+ *    center freq)
+ * 5. Updates VHT capability parameters (MCS, beamforming,
+ *    STBC, etc.)
+ *
+ * VHT IE Detection Priority:
+ * 1. Standard VHT IEs (Element ID 191/192) - Preferred
+ * 2. Vendor-specific VHT IEs (Element ID 221) - Fallback
+ * 3. No VHT - Disables VHT capability
+ *
+ * Context: Called during STA association processing in
+ *          lim_sta_send_add_bss()
+ *
+ * Return: None (updates pAddBssParams and pe_session in-place)
+ */
+static void
+lim_sta_configure_vht_capability(struct mac_context *mac,
+				 struct pe_session *pe_session,
+				 tpSirAssocRsp pAssocRsp,
+				 struct bss_params *pAddBssParams)
+{
+	tDot11fIEVHTCaps *vht_caps = NULL;
+	tDot11fIEVHTOperation *vht_oper = NULL;
+	struct mlme_vht_capabilities_info *vht_cap_info;
+
+	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
+
+	/*
+	 * Check if session supports VHT and detect VHT IEs in
+	 * Association Response
+	 */
+	if (pe_session->vhtCapability &&
+	    pAssocRsp->VHTCaps.present) {
+		/*
+		 * Standard VHT IEs present in Association Response
+		 * This is the preferred and most common case
+		 */
+		pAddBssParams->vhtCapable =
+			pAssocRsp->VHTCaps.present;
+		vht_caps = &pAssocRsp->VHTCaps;
+		vht_oper = &pAssocRsp->VHTOperation;
+
+	} else if (pe_session->vhtCapability &&
+		   pAssocRsp->vendor_vht_ie.VHTCaps.present) {
+		/*
+		 * VHT IEs present in Vendor Specific IE
+		 * Some APs (especially older or proprietary ones)
+		 * encapsulate VHT IEs in vendor-specific IE
+		 * (Element ID 221) for backward compatibility
+		 */
+		pAddBssParams->vhtCapable =
+			pAssocRsp->vendor_vht_ie.VHTCaps.present;
+		pe_debug("VHT Caps and Operation are present in vendor Specific IE");
+		vht_caps = &pAssocRsp->vendor_vht_ie.VHTCaps;
+		vht_oper = &pAssocRsp->vendor_vht_ie.VHTOperation;
+
+	} else {
+		/*
+		 * No VHT capability in Association Response
+		 * Connection will operate in HT or legacy mode
+		 */
+		pAddBssParams->vhtCapable = 0;
+		pe_session->vhtCapability = false;
+		return;
+	}
+
+	/*
+	 * Update VHT parameters if VHT is capable
+	 * This configures VHT operation and capability parameters
+	 * in BSS parameters and STA context
+	 */
+	if (pAddBssParams->vhtCapable) {
+		/*
+		 * Update VHT operation parameters:
+		 * - Channel width (80/160/80+80 MHz)
+		 * - Center frequency segment 0 and 1
+		 * - Basic VHT MCS set
+		 */
+		if (vht_oper && vht_oper->present)
+			lim_update_vht_oper_assoc_resp(mac,
+						       pAddBssParams,
+						       pAssocRsp,
+						       pe_session);
+
+		/*
+		 * Update VHT capability parameters:
+		 * - Max MPDU length
+		 * - Supported channel width set
+		 * - RX/TX LDPC
+		 * - Short GI for 80/160 MHz
+		 * - TX/RX STBC
+		 * - SU/MU beamformer/beamformee capabilities
+		 * - VHT MCS sets
+		 */
+		if (vht_caps)
+			lim_update_vhtcaps_assoc_resp(mac,
+						      pAddBssParams,
+						      vht_caps,
+						      pe_session);
+	} else {
+		/* VHT not capable: Check VHT TxBF 20MHz setting */
+		if (!vht_cap_info->enable_txbf_20mhz)
+			pAddBssParams->staContext.vhtTxBFCapable = 0;
+	}
+}
+
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 				tpSirAssocRsp pAssocRsp,
 				struct bss_description *bss_desc,
@@ -4176,7 +4303,6 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 	tpDphHashNode sta = NULL;
 	bool is_vht_cap_in_vendor_ie = false;
 	tDot11fIEVHTCaps *vht_caps = NULL;
-	tDot11fIEVHTOperation *vht_oper = NULL;
 	tAddStaParams *sta_context;
 	struct sir_dot11f_nss_info nss_ies;
 	uint32_t listen_interval = MLME_CFG_LISTEN_INTERVAL;
@@ -4216,35 +4342,9 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 	lim_update_add_bss_ht_params(mac, pe_session, pAssocRsp,
 				     bss_desc, pAddBssParams);
 
-	if (pe_session->vhtCapability && (pAssocRsp->VHTCaps.present)) {
-		pAddBssParams->vhtCapable = pAssocRsp->VHTCaps.present;
-		vht_caps =  &pAssocRsp->VHTCaps;
-		vht_oper = &pAssocRsp->VHTOperation;
-	} else if (pe_session->vhtCapability &&
-			pAssocRsp->vendor_vht_ie.VHTCaps.present){
-		pAddBssParams->vhtCapable =
-			pAssocRsp->vendor_vht_ie.VHTCaps.present;
-		pe_debug("VHT Caps and Operation are present in vendor Specific IE");
-		vht_caps = &pAssocRsp->vendor_vht_ie.VHTCaps;
-		vht_oper = &pAssocRsp->vendor_vht_ie.VHTOperation;
-	} else {
-		pAddBssParams->vhtCapable = 0;
-		pe_session->vhtCapability = false;
-	}
-
-	if (pAddBssParams->vhtCapable) {
-		if (vht_oper)
-			lim_update_vht_oper_assoc_resp(mac, pAddBssParams,
-						       pAssocRsp,
-						       pe_session);
-		if (vht_caps)
-			lim_update_vhtcaps_assoc_resp(mac, pAddBssParams,
-						      vht_caps, pe_session);
-	} else {
-		/* VHT not capable: Check VHT TxBF 20MHz setting */
-		if (!vht_cap_info->enable_txbf_20mhz)
-			pAddBssParams->staContext.vhtTxBFCapable = 0;
-	}
+	/* Configure VHT capability */
+	lim_sta_configure_vht_capability(mac, pe_session, pAssocRsp,
+					 pAddBssParams);
 
 	if (lim_is_session_he_capable(pe_session) &&
 	    pAssocRsp->he_cap.present) {
