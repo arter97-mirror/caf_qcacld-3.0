@@ -8266,7 +8266,8 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 
 	if ((device_mode == QDF_STA_MODE) ||
 	    (device_mode == QDF_P2P_CLIENT_MODE &&
-	     wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id))) {
+	     (wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id) ||
+	      wlan_vdev_p2p_is_pcc_mode(mac_ctx->psoc, vdev_id)))) {
 		ucfg_twt_cfg_get_requestor(mac_ctx->psoc, &value);
 		if (!value) {
 			he_cap->twt_request = false;
@@ -8275,7 +8276,8 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 		he_cap->twt_responder = false;
 	} else if ((device_mode == QDF_SAP_MODE) ||
 		    (device_mode == QDF_P2P_GO_MODE &&
-		     wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id))) {
+		     (wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(mac_ctx->psoc, vdev_id)))) {
 		wlan_twt_get_responder_cfg(mac_ctx->psoc, &twt_resp_cfg);
 		if (!wlan_twt_check_responder_bit(mac_ctx->psoc, vdev_id,
 						  device_mode, twt_resp_cfg)) {

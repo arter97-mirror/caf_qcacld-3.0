@@ -755,6 +755,17 @@ static inline bool p2p_is_vdev_wfd_r2_mode(struct wlan_objmgr_vdev *vdev)
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
+#ifdef FEATURE_WLAN_SUPPORT_PCC
+/**
+ * p2p_is_fw_support_pcc() - wrapper API of
+ * tgt_p2p_is_fw_support_pcc()
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if PCC is supported by FW else false
+ */
+bool p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc);
+#endif /* FEATURE_WLAN_SUPPORT_PCC */
+
 /**
  * p2p_extract_ap_assist_dfs_params() - Extract P2P2 IE for assisted AP
  * operation info

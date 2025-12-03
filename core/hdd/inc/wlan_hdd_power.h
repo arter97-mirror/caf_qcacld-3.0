@@ -746,8 +746,4 @@ int wlan_hdd_set_mlo_ps(struct hdd_adapter *adapter,
         return 0;
 }
 #endif
-QDF_STATUS
-hdd_update_send_idle_roam_bitmap(struct wlan_hdd_link_info *link_info,
-				 struct hdd_context *hdd_ctx,
-				 bool enable, uint8_t bit);
 #endif /* __WLAN_HDD_POWER_H */

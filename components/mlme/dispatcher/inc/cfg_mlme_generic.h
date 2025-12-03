@@ -1329,6 +1329,28 @@ enum wlan_epcs_frame {
 	1, \
 	"Reduce power scan mode")
 
+/*
+ * <ini>
+ * gEdcaTxopLimit - EDCA TXOP limit in milliseconds
+ * @Min: 4
+ * @Max: 16
+ * @Default: 4
+ *
+ * This ini is used to set the TXOP limit in firmware. The value is
+ * specified in milliseconds.
+ *
+ * Related: None
+ *
+ * Supported Feature: General
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_EDCA_TXOP_LIMIT \
+CFG_INI_UINT("gEdcaTxopLimit", 4, 16, 4, \
+	     CFG_VALUE_OR_DEFAULT, "TXOP limit in milliseconds")
+
 #define CFG_GENERIC_ALL \
 	CFG(CFG_ENABLE_DEBUG_PACKET_LOG) \
 	CFG(CFG_PMF_SA_QUERY_MAX_RETRIES) \
@@ -1375,5 +1397,6 @@ enum wlan_epcs_frame {
 	CFG_T2LM_NEGOTIATION_SUPPORTED \
 	CFG_LINK_RECFG_SUPPORTED \
 	CFG_RELAXED_LPI_CONN_POLICY \
-	CFG(CFG_REDUCE_PWR_SCAN_MODE)
+	CFG(CFG_REDUCE_PWR_SCAN_MODE) \
+	CFG(CFG_EDCA_TXOP_LIMIT)
 #endif /* __CFG_MLME_GENERIC_H */

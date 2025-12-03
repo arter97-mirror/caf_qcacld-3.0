@@ -1231,23 +1231,18 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_SB_ID);
-	if (!vdev) {
-		mlme_err("vdev object is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
+	vdev = session->vdev;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
 		status = QDF_STATUS_E_FAILURE;
-		goto rel_ref;
+		goto end;
 	}
 
 	cm_ctx = cm_get_cm_ctx(vdev);
 	if (!cm_ctx) {
 		status = QDF_STATUS_E_FAILURE;
-		goto rel_ref;
+		goto end;
 	}
 
 	roam_req = cm_get_first_roam_command(vdev);
@@ -1338,6 +1333,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err(CM_PREFIX_FMT " fail to post WLAN_CM_SM_EV_ROAM_DONE",
 			 CM_PREFIX_REF(vdev_id, cm_id));
+		wlan_cm_tgt_allow_pm_after_roam_sync(psoc, vdev_id);
 		goto error;
 	}
 
@@ -1349,6 +1345,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlme_err(CM_PREFIX_FMT " fail to copy reassoc resp status %d",
 				 CM_PREFIX_REF(vdev_id, cm_id), status);
+			wlan_cm_tgt_allow_pm_after_roam_sync(psoc, vdev_id);
 			goto error;
 		}
 	}
@@ -1357,6 +1354,8 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
 	lim_set_tpc_power(mac_ctx, session, NULL, false);
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
+		wlan_cm_tgt_allow_pm_after_roam_sync(psoc, vdev_id);
 
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	cm_remove_cmd(cm_ctx, &cm_id);
@@ -1380,9 +1379,7 @@ error:
 
 	if (QDF_IS_STATUS_ERROR(status))
 		mlo_update_connected_links(vdev, 0);
-rel_ref:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
-
+end:
 	return status;
 }
 
@@ -1435,6 +1432,7 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t vdev_id;
 	uint8_t rso_stop_req_bitmap;
+	enum roam_offload_state rso_cmd = WLAN_ROAM_RSO_ENABLED;
 
 	roam_synch_data = (struct roam_offload_synch_ind *)data;
 	vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
@@ -1540,18 +1538,20 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 
 	wlan_cm_handle_sta_sta_roaming_enablement(psoc, vdev_id);
 
-	if (wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev)) {
+	if (wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev))
 		status = wlan_cm_roam_state_change(pdev,
 						   vdev_id,
 						   WLAN_ROAM_DEINIT,
 						   REASON_ROAM_HANDOFF_DONE);
-	}
 
-	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
+	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED) {
+		if (policy_mgr_is_chan_switch_in_progress(psoc) ||
+		    policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc))
+			rso_cmd = WLAN_ROAM_RSO_STOPPED;
+
 		wlan_cm_roam_state_change(pdev, vdev_id,
-					  WLAN_ROAM_RSO_ENABLED,
-					  REASON_CONNECT);
-	else
+					  rso_cmd, REASON_CONNECT);
+	} else
 		/*
 		 * STA is just in associated state here, RSO
 		 * enable will be sent once EAP & EAPOL will be done by

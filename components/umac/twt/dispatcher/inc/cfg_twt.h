@@ -75,7 +75,7 @@
 		"twt_responder", \
 		0, \
 		0xFF, \
-		0x06, \
+		0x07, \
 		CFG_VALUE_OR_DEFAULT, \
 		"TWT responder")
 

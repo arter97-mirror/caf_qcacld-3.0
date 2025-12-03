@@ -5060,7 +5060,8 @@ cm_roam_switch_to_roam_sync(struct wlan_objmgr_pdev *pdev,
 		* In this case host should send RSO STOP with scan mode = 0
 		* to allow FW to move into RSO STOP state
 		*/
-		status = cm_roam_stop_req(psoc, vdev_id, REASON_ROAM_ABORT,
+		status = cm_roam_stop_req(psoc, vdev_id,
+					  REASON_ROAM_SYNCH_FAILED,
 					  NULL, false);
 		if (QDF_IS_STATUS_ERROR(status))
 			mlme_err("ROAM: Unable to process RSO STOP req");
@@ -5416,14 +5417,6 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 	if ((requested_state != WLAN_ROAM_DEINIT &&
 	     requested_state != WLAN_ROAM_RSO_STOPPED) && !is_up) {
 		mlme_debug("ROAM: roam state(%d) change requested in non-connected state",
-			   requested_state);
-		goto end;
-	}
-
-	if (requested_state == WLAN_ROAM_RSO_ENABLED &&
-	    (policy_mgr_is_chan_switch_in_progress(psoc) ||
-	     policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc))) {
-		mlme_debug("ROAM: roam state(%d) change requested when a concurrent SAP is in MCC or CSA is in progress",
 			   requested_state);
 		goto end;
 	}

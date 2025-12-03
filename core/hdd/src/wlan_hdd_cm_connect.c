@@ -425,6 +425,27 @@ void hdd_cm_clear_conn_info_mld_addr(struct hdd_station_ctx *sta_ctx)
 {
 	qdf_mem_zero(&sta_ctx->conn_info.mld_addr, QDF_MAC_ADDR_SIZE);
 }
+
+void hdd_cm_clear_link_info(uint8_t vdev_id)
+{
+	struct hdd_context *hdd_ctx;
+	struct wlan_hdd_link_info *link_info;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("HDD context NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("No link info for vdev_id: %d", vdev_id);
+		return;
+	}
+
+	hdd_debug("Clearing link info for vdev_id: %d", vdev_id);
+	hdd_adapter_reset_station_ctx(link_info->adapter);
+}
 #endif /* WLAN_FEATURE_11BE_MLO */
 
 #ifdef FEATURE_WLAN_WAPI
@@ -1935,7 +1956,8 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_post_conn_clear_bcn_rssi_stats(hdd_ctx->psoc, link_info, rsp);
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    (adapter->device_mode == QDF_P2P_CLIENT_MODE &&
-	     wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, rsp->vdev_id))) {
+	     (wlan_vdev_p2p_is_wfd_r2_mode(hdd_ctx->psoc, rsp->vdev_id) ||
+	      wlan_vdev_p2p_is_pcc_mode(hdd_ctx->psoc, rsp->vdev_id)))) {
 		/* Inform FTM TIME SYNC about the connection with AP */
 		if (adapter->device_mode == QDF_STA_MODE)
 			hdd_ftm_time_sync_sta_state_notify(adapter,

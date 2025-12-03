@@ -1260,7 +1260,6 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 		pDot11f->shortGI20MHz = pe_session->ht_config.short_gi_20_mhz;
 		pDot11f->shortGI40MHz = pe_session->ht_config.short_gi_40_mhz;
 		pDot11f->mimoPowerSave = pe_session->ht_config.mimo_power_save;
-		mac->mlme_cfg->ht_caps.smps = pe_session->ht_config.mimo_power_save;
 	}
 
 	/* Ensure that shortGI40MHz is Disabled if supportedChannelWidthSet is
@@ -1954,6 +1953,52 @@ void populate_dot11f_bss_max_idle(struct mac_context *mac,
 	}
 }
 
+/**
+ * populate_dot11f_ds_params() - To populate QCN IE params
+ * @mac_ctx: Pointer to global mac context
+ * @qcn_ie: pointer to QCN IE
+ * @frame_type: frame type
+ *
+ * This routine will populate CCK param in QCN IE of Assoc req
+ * management frame.
+ *
+ * Return: NA
+ */
+static
+void populate_dot11f_5g_cck_support_param(struct mac_context *mac,
+					  struct pe_session *pe_session,
+					  tDot11fIEqcn_ie *qcn_ie,
+					  enum mgmt_frame_type frame_type)
+{
+	bool cck_tx_5g = false, cck_rx_5g = false;
+
+	/*
+	 * Add Ie only if QCN Ie is advertised in beacon and
+	 * don't add Ie for probe req.
+	 */
+	if ((frame_type == MGMT_ASSOC_REQ &&
+	   !pe_session->qcn_ie_present_in_beacon) ||
+	   frame_type == MGMT_PROBE_REQ)
+		return;
+	/*
+	 * for other modes frame check required.
+	 * As of now ini is enabled only for STA, so
+	 * Ie will not added for other frames
+	 */
+
+	if (!(wlan_get_rx_tx_cck_5g_support_for_mode(
+					mac->psoc, pe_session->opmode,
+					&cck_rx_5g, &cck_tx_5g)))
+		return;
+
+	qcn_ie->present = 1;
+	qcn_ie->target_cck_support_attr.present = 1;
+
+	qcn_ie->target_cck_support_attr.target_cck_rx_supp_5g = cck_rx_5g;
+
+	qcn_ie->target_cck_support_attr.target_cck_tx_supp_5g = cck_tx_5g;
+}
+
 void populate_dot11f_edca_pifs_param_set(struct mac_context *mac,
 					 tDot11fIEqcn_ie *qcn_ie)
 {
@@ -2008,7 +2053,7 @@ void populate_dot11f_ecsa_param_set_for_ll_sap(
 void populate_dot11f_qcn_ie(struct mac_context *mac,
 			    struct pe_session *pe_session,
 			    tDot11fIEqcn_ie *qcn_ie,
-			    uint8_t attr_id)
+			    uint8_t attr_id, enum mgmt_frame_type frame_type)
 {
 	qcn_ie->present = 0;
 	if (mac->mlme_cfg->sta.qcn_ie_support &&
@@ -2031,6 +2076,9 @@ void populate_dot11f_qcn_ie(struct mac_context *mac,
 		pe_debug("Populate edca/pifs param ie for ll sap");
 		populate_dot11f_edca_pifs_param_set(mac, qcn_ie);
 	}
+
+	populate_dot11f_5g_cck_support_param(mac, pe_session,
+					     qcn_ie, frame_type);
 }
 
 QDF_STATUS
@@ -8243,7 +8291,8 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 
 	switch (opmode) {
 	case QDF_P2P_CLIENT_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(mac->psoc, vdev_id)))
 			break;
 		fallthrough;
 	case QDF_STA_MODE:
@@ -8256,7 +8305,8 @@ populate_dot11f_twt_he_cap(struct mac_context *mac,
 		he_cap->broadcast_twt = bcast_requestor;
 		break;
 	case QDF_P2P_GO_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(mac->psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(mac->psoc, vdev_id)))
 			break;
 		fallthrough;
 	case QDF_SAP_MODE:
@@ -8306,16 +8356,6 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx,
 		if (!freq)
 			goto fill_nss;
 	} else {
-		/* Update HE Dynamic SMPS based on HT SMPS INI config */
-		if (LIM_IS_STA_ROLE(session)) {
-			if (mac_ctx->mlme_cfg->ht_caps.smps ==
-			    SMPS_MODE_DISABLED)
-				session->he_config.he_dynamic_smps = 0;
-			else if (mac_ctx->mlme_cfg->ht_caps.smps ==
-				 DYNAMIC_SMPS_MODE)
-				session->he_config.he_dynamic_smps = 1;
-		}
-
 		/** TODO: String items needs attention. **/
 		qdf_mem_copy(he_cap, &session->he_config, sizeof(*he_cap));
 		populate_dot11f_twt_he_cap(mac_ctx, session->vdev_id, he_cap);
@@ -12980,8 +13020,8 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 
 	switch (opmode) {
 	case QDF_P2P_CLIENT_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc,
-						  vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(mac_ctx->psoc, vdev_id)))
 			break;
 		fallthrough;
 	case QDF_STA_MODE:
@@ -12990,8 +13030,8 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 			twt_requestor && twt_get_requestor_flag(mac_ctx);
 		break;
 	case QDF_P2P_GO_MODE:
-		if (!wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc,
-						  vdev_id))
+		if (!(wlan_vdev_p2p_is_wfd_r2_mode(mac_ctx->psoc, vdev_id) ||
+		      wlan_vdev_p2p_is_pcc_mode(mac_ctx->psoc, vdev_id)))
 			break;
 		fallthrough;
 	case QDF_SAP_MODE:

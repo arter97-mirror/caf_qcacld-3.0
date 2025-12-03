@@ -47,7 +47,6 @@
 /* Time to passive scan dwell for scan to get channel stats, in milliseconds */
 #define MLME_GET_CHAN_STATS_PASSIVE_SCAN_TIME 40
 #define MLME_GET_CHAN_STATS_WIDE_BAND_PASSIVE_SCAN_TIME 110
-
 struct wlan_mlme_rx_ops *
 mlme_get_rx_ops(struct wlan_objmgr_psoc *psoc)
 {
@@ -1354,6 +1353,20 @@ static void mlme_init_link_recfg_support(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+/**
+ * mlme_init_txop_ini_cfg() - initialize edca txop limit ini
+ * @psoc: Pointer to PSOC
+ * @gen: pointer to generic CFG items
+ *
+ * Return: None
+ */
+static void mlme_init_txop_ini_cfg(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_mlme_generic *gen)
+{
+	gen->edca_txop_limit =
+		cfg_get(psoc, CFG_EDCA_TXOP_LIMIT);
+}
+
 #if defined(WLAN_FEATURE_SR)
 /**
  * mlme_init_sr_ini_cfg() - initialize SR(Spatial Reuse) ini
@@ -1439,6 +1452,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	gen->tx_retry_multiplier = cfg_get(psoc, CFG_TX_RETRY_MULTIPLIER);
 	gen->enable_he_mcs0_for_6ghz_mgmt =
 		cfg_get(psoc, CFG_ENABLE_HE_MCS0_MGMT_6GHZ);
+	mlme_init_txop_ini_cfg(psoc, gen);
 	mlme_init_sr_ini_cfg(psoc, gen);
 	mlme_init_wds_config_cfg(psoc, gen);
 	mlme_init_mgmt_hw_tx_retry_count_cfg(psoc, gen);
@@ -1963,6 +1977,8 @@ static void mlme_init_rates_in_cfg(struct wlan_objmgr_psoc *psoc,
 			      rates->current_mcs_set.data,
 			      sizeof(rates->current_mcs_set.data),
 			      &rates->current_mcs_set.len);
+	rates->cck_rx_tx_support_mode = cfg_get(psoc,
+						CFG_RX_TX_SUPPORT_MODE);
 }
 
 static void mlme_init_passive_enable_in_cfg(struct wlan_objmgr_psoc *psoc,
@@ -6549,7 +6565,7 @@ uint16_t mlme_get_p2p_device_seq_num(struct wlan_objmgr_vdev *vdev)
 	return vdev_mlme->p2p_dev_data.seq_num;
 }
 
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
+#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
 uint8_t wlan_get_wfd_mode_from_vdev_id(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id)
 {

@@ -885,3 +885,31 @@ wlan_cm_tgt_send_roam_sync_complete_cmd(struct wlan_objmgr_psoc *psoc,
 
 	return status;
 }
+
+QDF_STATUS
+wlan_cm_tgt_allow_pm_after_roam_sync(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id)
+{
+	struct wlan_cm_roam_tx_ops *roam_tx_ops;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_NB_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	roam_tx_ops = wlan_cm_roam_get_tx_ops_from_vdev(vdev);
+
+	if (!roam_tx_ops || !roam_tx_ops->allow_pm_after_roam_sync) {
+		mlme_err("CM_RSO: vdev %d allow_pm_after_roam_sync is NULL",
+			 vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	roam_tx_ops->allow_pm_after_roam_sync(psoc);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+
+	return QDF_STATUS_SUCCESS;
+}

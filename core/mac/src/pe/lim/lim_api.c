@@ -3281,6 +3281,9 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	lim_enable_cts_to_self_for_exempted_iot_ap(mac_ctx,
 						   ft_session_ptr,
 						   oui_ie_ptr, oui_ie_len);
+
+	lim_cfg_dsmps_for_iot_ap(mac_ctx, ft_session_ptr, bss_desc, true);
+
 	qdf_mem_free(bss_desc);
 	oui_ie_len = 0;
 	oui_ie_ptr = NULL;
@@ -4986,6 +4989,7 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	uint8_t *ml_ie = NULL;
 	qdf_size_t ml_ie_total_len = 0;
 	struct mlo_partner_info partner_info;
+	struct mlo_link_info *link_info = NULL;
 	int8_t rssi;
 	uint8_t i, link_id, vdev_id, bpcc, snr, chan, opclass;
 	bool msd_cap_found = false;
@@ -4993,6 +4997,7 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 	qdf_freq_t chan_freq;
 	struct wlan_country_ie *cc_ie;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct pe_session *partner_session;
 
 	vdev = session->vdev;
 	if (!vdev || !wlan_vdev_mlme_is_mlo_vdev(vdev))
@@ -5083,6 +5088,11 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 			continue;
 		}
 
+		link_info = &partner_info.partner_link_info[i];
+
+		lim_gen_link_specific_rnr_ie(mac_ctx, session,
+					     link_info, link_probe_rsp);
+
 		lim_add_bcn_probe(mac_ctx->pdev, link_probe_rsp.ptr,
 				  link_probe_rsp.len,
 				  true, chan_freq, rssi, snr, 0);
@@ -5095,9 +5105,10 @@ QDF_STATUS lim_process_cu_for_probe_rsp(struct mac_context *mac_ctx,
 		}
 
 		vdev_id = wlan_vdev_get_id(partner_vdev);
-		session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
-		if (session) {
-			lim_process_gen_probe_rsp_frame(mac_ctx, session,
+		partner_session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+		if (partner_session) {
+			lim_process_gen_probe_rsp_frame(mac_ctx,
+							partner_session,
 							link_probe_rsp.ptr,
 							link_probe_rsp.len);
 		}

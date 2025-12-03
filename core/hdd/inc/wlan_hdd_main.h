@@ -341,20 +341,6 @@ enum hdd_nb_cmd_id {
 	INTERFACE_DOWN
 };
 
-/**
- * enum hdd_idle_roam_flags - Bitmap flags for idle roaming behavior
- * @IDLE_ROAM_POWER_SAVE_CMD: Indication for power save mode when idle roaming.
- * @IDLE_ROAM_SETSUSPEND_CMD: Indication to set suspend mode when idle roaming.
- * @IDLE_ROAM_ENABLED: Flag indicating idle roaming functionality is enabled.
- * @IDLE_ROAM_FLAG_BITS_MAX: Maximum bit position for idle roaming flags.
- */
-enum hdd_idle_roam_flags {
-	IDLE_ROAM_POWER_SAVE_CMD = 0,
-	IDLE_ROAM_SETSUSPEND_CMD,
-	IDLE_ROAM_ENABLED,
-	IDLE_ROAM_FLAG_BITS_MAX,
-};
-
 #define WLAN_WAIT_TIME_STATS       800
 #define WLAN_WAIT_TIME_LINK_STATUS 800
 
@@ -1234,7 +1220,6 @@ struct hdd_monitor_ctx {
  * @mscs_prev_tx_vo_pkts: count of prev VO AC packets transmitted
  * @mscs_counter: Counter on MSCS action frames sent
  * @link_flags: a bitmap of hdd_link_flags
- * @link_idle_roam_bitmap: a bitmap of hdd_idle_roam_flags
  * @ch_chng_info: Channel change info
  * @sap_stop_bss_work: stop sap work
  */
@@ -1278,7 +1263,6 @@ struct wlan_hdd_link_info {
 #endif /* WLAN_FEATURE_MSCS */
 
 	qdf_bitmap(link_flags, WLAN_LINK_FLAG_BITS_MAX);
-	qdf_bitmap(link_idle_roam_bitmap, IDLE_ROAM_FLAG_BITS_MAX);
 	struct freq_change_info ch_chng_info;
 	struct work_struct  sap_stop_bss_work;
 };
@@ -1672,7 +1656,7 @@ struct hdd_adapter {
 	struct get_station_client_info sta_client_info[GET_STA_MAX_HOST_CLIENT];
 	bool wlm_ll_conn_flag;
 	struct wlan_hdd_link_info *discon_link_info;
-#ifdef FEATURE_WLAN_SUPPORT_P2P_R2
+#if defined(FEATURE_WLAN_SUPPORT_P2P_R2) || defined(FEATURE_WLAN_SUPPORT_PCC)
 	uint8_t wfd_mode;
 #endif
 	bool enable_active_apf_mode;

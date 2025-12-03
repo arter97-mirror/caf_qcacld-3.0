@@ -1171,6 +1171,7 @@ struct mlme_tgt_caps {
  * @supported_mcs_set: supported MCS set
  * @basic_mcs_set: basic MCS set
  * @current_mcs_set: current MCS set
+ * @cck_rx_tx_support_mode: cck rx tx support enable modes
  */
 struct wlan_mlme_rates {
 	uint8_t cfp_period;
@@ -1184,6 +1185,7 @@ struct wlan_mlme_rates {
 	struct mlme_cfg_str supported_mcs_set;
 	struct mlme_cfg_str basic_mcs_set;
 	struct mlme_cfg_str current_mcs_set;
+	uint32_t cck_rx_tx_support_mode;
 };
 
 
@@ -1527,6 +1529,7 @@ struct wlan_mlme_aux_dev_caps {
  * @wlan_mlme_aux0_dev_caps: capability for aux0
  * @bt_profile_con: Bluetooth connection profile
  * @relaxed_lpi_conn_policy: Relaxed LPI connection policy flag
+ * @edca_txop_limit: EDCA TXOP limit in milliseconds.
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1601,6 +1604,7 @@ struct wlan_mlme_generic {
 		wlan_mlme_aux0_dev_caps[WLAN_MLME_HW_MODE_MAX];
 	bool bt_profile_con;
 	bool relaxed_lpi_conn_policy;
+	uint32_t edca_txop_limit;
 };
 
 /**

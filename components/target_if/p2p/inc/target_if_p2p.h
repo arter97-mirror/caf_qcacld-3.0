@@ -168,4 +168,15 @@ bool target_if_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
  */
 bool target_if_p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
+
+#ifdef FEATURE_WLAN_SUPPORT_PCC
+/**
+ * target_if_p2p_is_fw_support_pcc() - return PCC service capability
+ * from FW.
+ * @psoc: pointer to PSOC object
+ *
+ * Return: true if PCC supported by FW otherwise false
+ */
+bool target_if_p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc);
+#endif /* FEATURE_WLAN_SUPPORT_PCC */
 #endif /* _TARGET_IF_P2P_H_ */

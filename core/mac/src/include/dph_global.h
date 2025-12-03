@@ -220,6 +220,8 @@ typedef struct sDphHashNode {
 	struct wlan_mlo_eml_cap eml_info;
 	struct wlan_mlo_mld_cap mld_info;
 #endif
+	uint8_t peer_cck_rx_support_5ghz: 1,
+		peer_cck_tx_support_5ghz: 1;
 } tDphHashNode, *tpDphHashNode;
 
 #include "dph_hash_table.h"

@@ -2006,6 +2006,13 @@ bool p2p_is_fw_support_wfd_r2(struct wlan_objmgr_psoc *psoc)
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
+#ifdef FEATURE_WLAN_SUPPORT_PCC
+bool p2p_is_fw_support_pcc(struct wlan_objmgr_psoc *psoc)
+{
+	return tgt_p2p_is_fw_support_pcc(psoc);
+}
+#endif  /* FEATURE_WLAN_SUPPORT_PCC */
+
 bool p2p_fw_support_ap_assist_dfs_group(struct wlan_objmgr_psoc *psoc)
 {
 	wmi_unified_t wmi_handle;

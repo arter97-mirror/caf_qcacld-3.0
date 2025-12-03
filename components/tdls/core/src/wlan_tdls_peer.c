@@ -742,6 +742,21 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 			peer->supported_oper_classes[i];
 }
 
+static inline char *
+tdls_link_status_str(enum tdls_link_state link_status)
+{
+	switch (link_status) {
+	CASE_RETURN_STRING(TDLS_LINK_IDLE);
+	CASE_RETURN_STRING(TDLS_LINK_DISCOVERING);
+	CASE_RETURN_STRING(TDLS_LINK_DISCOVERED);
+	CASE_RETURN_STRING(TDLS_LINK_CONNECTING);
+	CASE_RETURN_STRING(TDLS_LINK_CONNECTED);
+	CASE_RETURN_STRING(TDLS_LINK_TEARING);
+	default:
+		return "UNKNOWN";
+	}
+}
+
 #ifdef TDLS_WOW_ENABLED
 /**
  * tdls_prevent_suspend(): Prevent suspend for TDLS
@@ -760,7 +775,7 @@ static void tdls_prevent_suspend(struct tdls_soc_priv_obj *tdls_soc)
 			      WIFI_POWER_EVENT_WAKELOCK_TDLS);
 	qdf_runtime_pm_prevent_suspend(&tdls_soc->runtime_lock);
 	tdls_soc->is_prevent_suspend = true;
-	tdls_debug("Acquire WIFI_POWER_EVENT_WAKELOCK_TDLS");
+	tdls_notice_rl("Acquire WIFI_POWER_EVENT_WAKELOCK_TDLS");
 }
 
 /**
@@ -771,7 +786,7 @@ static void tdls_prevent_suspend(struct tdls_soc_priv_obj *tdls_soc)
  *
  * Return None
  */
-static void tdls_allow_suspend(struct tdls_soc_priv_obj *tdls_soc)
+void tdls_allow_suspend(struct tdls_soc_priv_obj *tdls_soc)
 {
 	if (!tdls_soc->is_prevent_suspend)
 		return;
@@ -780,7 +795,7 @@ static void tdls_allow_suspend(struct tdls_soc_priv_obj *tdls_soc)
 			      WIFI_POWER_EVENT_WAKELOCK_TDLS);
 	qdf_runtime_pm_allow_suspend(&tdls_soc->runtime_lock);
 	tdls_soc->is_prevent_suspend = false;
-	tdls_debug("Release WIFI_POWER_EVENT_WAKELOCK_TDLS");
+	tdls_notice_rl("Release WIFI_POWER_EVENT_WAKELOCK_TDLS");
 }
 
 /**
@@ -805,6 +820,11 @@ static void tdls_update_pmo_status(struct tdls_vdev_priv_obj *tdls_vdev,
 
 	if (tdls_soc->is_drv_supported)
 		return;
+
+	tdls_debug("vdev:%d old_status:%s new_status:%s",
+		   wlan_vdev_get_id(tdls_vdev->vdev),
+		   tdls_link_status_str(old_status),
+		   tdls_link_status_str(new_status));
 
 	if ((old_status < TDLS_LINK_CONNECTING) &&
 	    (new_status == TDLS_LINK_CONNECTING))
@@ -865,21 +885,6 @@ void tdls_set_link_status(struct tdls_vdev_priv_obj *vdev_obj,
 		tdls_get_wifi_hal_state(peer, &state, &res);
 		peer->state_change_notification(mac, op_class, channel,
 						state, res, soc_obj->soc);
-	}
-}
-
-static inline char *
-tdls_link_status_str(enum tdls_link_state link_status)
-{
-	switch (link_status) {
-	CASE_RETURN_STRING(TDLS_LINK_IDLE);
-	CASE_RETURN_STRING(TDLS_LINK_DISCOVERING);
-	CASE_RETURN_STRING(TDLS_LINK_DISCOVERED);
-	CASE_RETURN_STRING(TDLS_LINK_CONNECTING);
-	CASE_RETURN_STRING(TDLS_LINK_CONNECTED);
-	CASE_RETURN_STRING(TDLS_LINK_TEARING);
-	default:
-		return "UNKNOWN";
 	}
 }
 

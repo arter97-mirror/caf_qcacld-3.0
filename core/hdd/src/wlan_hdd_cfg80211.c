@@ -5428,6 +5428,25 @@ static inline void wlan_hdd_set_wfd_r2_feature(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
+#ifdef FEATURE_WLAN_SUPPORT_PCC
+static inline void wlan_hdd_set_pcc_feature(struct wlan_objmgr_psoc *psoc,
+					    uint8_t *feature_flags)
+{
+	if (!ucfg_p2p_is_fw_support_pcc(psoc)) {
+		hdd_debug("PCC feature is not supported by FW");
+		return;
+	}
+
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_PCC_MODE);
+}
+#else
+static inline void wlan_hdd_set_pcc_feature(struct wlan_objmgr_psoc *psoc,
+					    uint8_t *feature_flags)
+{
+}
+#endif /* FEATURE_WLAN_SUPPORT_PCC */
+
 static inline void wlan_hdd_set_mrsno_feature(struct wlan_objmgr_psoc *psoc,
 					      uint8_t *feature_flags)
 {
@@ -5597,6 +5616,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_wfd_r2_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_tx_power_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_pcc_feature(hdd_ctx->psoc, feature_flags);
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 						       sizeof(feature_flags) +
@@ -36306,6 +36326,7 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 	int8_t *nested_data;
 	uint32_t length = 0, mem_size = 0;
 	QDF_STATUS status;
+	enum action_oui_id oui_id = ACTION_OUI_MAXIMUM_ID;
 
 	hdd_enter_dev(wdev->netdev);
 	curr_mode = hdd_get_conparam();
@@ -36345,26 +36366,29 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 			tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_ACTION]);
 	action_oui_op = nla_get_u8(
 			tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_OP]);
-	if (action_oui_id >
-	    QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_DISABLE_DSMPS ||
-	    action_oui_op > QCA_WLAN_VENDOR_FEATURE_CONFIG_DATA_CLEAR) {
-		hdd_err("Invalid oui id %d or oui op %d",
-			action_oui_id, action_oui_op);
-		ret = -EINVAL;
+
+	if (action_oui_id != QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ENABLE_DSMPS &&
+	    action_oui_id != QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ADAPTIVE_DSMPS_BY_RSSI)
+	{
+		hdd_err("Invalid id %d", action_oui_id);
+		ret = -EOPNOTSUPP;
 		goto exit;
 	}
+	if (action_oui_id == QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ENABLE_DSMPS)
+		oui_id = ACTION_OUI_ENABLE_DYNAMIC_SMPS;
+	else if (action_oui_id == QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ADAPTIVE_DSMPS_BY_RSSI)
+		oui_id = ACTION_OUI_ENABLE_DSMPS_BY_RSSI;
 
-	if (action_oui_id != QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ENABLE_DSMPS)
-	{
-		hdd_debug("only ID type enable is supported");
-		ret = -EOPNOTSUPP;
+	if (action_oui_op > QCA_WLAN_VENDOR_FEATURE_CONFIG_DATA_CLEAR) {
+		hdd_err("Invalid oui op %d", action_oui_op);
+		ret = -EINVAL;
 		goto exit;
 	}
 
 	if (action_oui_op == QCA_WLAN_VENDOR_FEATURE_CONFIG_DATA_CLEAR) {
 		status = ucfg_action_oui_cleanup(
 					hdd_ctx->psoc,
-					ACTION_OUI_ENABLE_DYNAMIC_SMPS);
+					oui_id);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_debug("action oui cleanup failure");
 			ret = -EINVAL;
@@ -36372,11 +36396,10 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 		goto exit;
 	}
 
-	/* OUI EXT List is optional param */
 	if (!tb[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_LIST]) {
-		hdd_debug("oui extension list not present");
-		/* return success in this case but disable DSMPS*/
-		goto disable_dsmps;
+		hdd_err("oui extension list not present");
+		ret = -EINVAL;
+		goto exit;
 	}
 
 	mem_size = MAX_ALLOWED_OUI * sizeof(struct action_oui_extension);
@@ -36470,21 +36493,23 @@ static int _wlan_hdd_cfg80211_set_action_oui(struct wiphy *wiphy,
 		action_oui_ext++;
 	}
 
-	hdd_debug("oui num %d", i);
+	hdd_debug("oui_id %d oui num %d", oui_id, i);
 	status = ucfg_action_oui_extension_store(hdd_ctx->psoc,
-						 ACTION_OUI_ENABLE_DYNAMIC_SMPS,
+						 oui_id,
 						 action_oui_buf, i);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		ret = -EINVAL;
 		goto exit;
 	}
 
-disable_dsmps:
-	ucfg_disable_dynamic_smps(hdd_ctx->psoc);
+	if (action_oui_id == QCA_WLAN_VENDOR_FEATURE_CONFIG_ACTION_ENABLE_DSMPS) {
+		ucfg_disable_dynamic_smps(hdd_ctx->psoc);
 
-	sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
-				  adapter->deflink->vdev_id,
-				  QDF_STA_MODE);
+		sme_set_vdev_ies_per_band(hdd_ctx->mac_handle,
+					  adapter->deflink->vdev_id,
+					  QDF_STA_MODE);
+	}
+
 exit:
 	if (action_oui_buf)
 		qdf_mem_free(action_oui_buf);

@@ -4748,6 +4748,34 @@ int wma_tdls_event_handler(void *handle, uint8_t *event, uint32_t len)
 	return 0;
 }
 
+int wma_update_tdls_off_chan_mode(WMA_HANDLE handle,
+				  struct tdls_channel_switch_params *ch_params)
+{
+	int ret = 0;
+	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+
+	if (wma_validate_handle(wma_handle)) {
+		ret = -EINVAL;
+		goto free_mem;
+	}
+
+	if (wmi_validate_handle(wma_handle->wmi_handle)) {
+		ret = -EINVAL;
+		goto free_mem;
+	}
+
+	if (wmi_unified_set_tdls_offchan_mode_cmd(wma_handle->wmi_handle,
+						  ch_params)) {
+		wma_err("Failed to send tdls offchan mode");
+		goto free_mem;
+	}
+
+free_mem:
+	if (ch_params)
+		qdf_mem_free(ch_params);
+	return ret;
+}
+
 /**
  * wma_update_tdls_peer_state() - update TDLS peer state
  * @handle: wma handle

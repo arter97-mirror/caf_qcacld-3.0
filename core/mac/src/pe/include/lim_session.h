@@ -433,16 +433,6 @@ struct punc_chan_info {
 	bool present;
 };
 
-#define WFA_CAPABILITIES_IE_LENGTH		0x0B
-#define WFA_CAPABILITIES_OUI			"\x50\x6F\x9A"
-#define WFA_CAPABILITIES_OUI_LENGTH		0x03
-#define WFA_CAPABILITIES_OUI_TYPE		0x23
-#define WFA_CAPABILITIES_LENGTH			0x00
-#define WIFI_GENERATION_CAPABILITY_ATTR_ID	0x01
-#define WIFI_GENERATION_CAPABILITY_ATTR_LENGTH	0x04
-#define WIFI_SUPPORTED_GENERATIONS_LENGTH	0x01
-#define WIFI_CERTIFIED_GENERATIONS_LENGTH	0x01
-
 /**
  * struct pe_session - per-vdev PE context
  * @available: true if the entry is available, false if it is in use
@@ -758,6 +748,7 @@ struct punc_chan_info {
  * @rsno_gen_used: rsno gen used for connection
  * @wnm_action_dialog_token: Dialog token for WNM action frames.
  * @dfs_p2p_info: DFS P2P group operation info.
+ * @qcn_ie_present_in_beacon: QCN Ie Present in beacon
  */
 struct pe_session {
 	uint8_t available;
@@ -1093,6 +1084,7 @@ struct pe_session {
 	uint8_t rsno_gen_used;
 	uint8_t wnm_action_dialog_token;
 	struct dfs_p2p_group_info dfs_p2p_info;
+	uint8_t qcn_ie_present_in_beacon;
 };
 
 /*-------------------------------------------------------------------------

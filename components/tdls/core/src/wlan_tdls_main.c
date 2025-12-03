@@ -1484,8 +1484,7 @@ tdls_process_decrement_active_session(struct wlan_objmgr_psoc *psoc)
 	else
 		tdls_process_enable_for_vdev(tdls_obj_vdev);
 
-	if (tdls_check_if_offchannel_allowed(tdls_obj_vdev) &&
-	    tdls_priv_soc->tdls_fw_off_chan_mode != ENABLE_CHANSWITCH &&
+	if (tdls_priv_soc->tdls_fw_off_chan_mode != ENABLE_CHANSWITCH &&
 	    tdls_priv_soc->connected_peer_count == 1)
 		tdls_set_tdls_offchannelmode(tdls_obj_vdev,  ENABLE_CHANSWITCH);
 
@@ -1866,6 +1865,7 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 			       false, false, notify->session_id);
 
 	tdls_timers_stop(tdls_vdev_obj);
+	tdls_allow_suspend(tdls_soc_obj);
 
 	/*
 	 * If concurrency is not marked, then we have to
@@ -1874,6 +1874,26 @@ tdls_process_sta_disconnect(struct tdls_sta_notify_params *notify)
 	 */
 	if (notify->lfr_roam)
 		return status;
+
+	/*
+	 * If the disconnect is due to link switch, then the other TDLS vdev
+	 * could be either of the following:
+	 * a) The ML-STA Partner vdev
+	 * b) In the case of ML-STA + P2P-CLI concurrency, it could be
+	 * P2P-CLI vdev (if the other partner link is in disabled table)
+	 *
+	 * The TDLS for both these VDEVs should not be enabled back during
+	 * link switch.
+	 *
+	 * The TDLS will be enabled for these VDEVs:
+	 * a) For ML-partner: At MLD level, when the ongoing link switch
+	 * completes.
+	 * b) For P2P-CLI: When the ML-STA disconnects completely.
+	 */
+	if (wlan_vdev_mlme_is_mlo_link_switch_in_progress(notify->vdev)) {
+		tdls_debug("Do not enable TDLS for the other vdev for link switch disconnects");
+		return status;
+	}
 
 	temp_vdev = tdls_get_vdev(tdls_soc_obj->soc, WLAN_TDLS_NB_ID);
 	if (!temp_vdev)
@@ -1939,12 +1959,20 @@ QDF_STATUS tdls_notify_sta_disconnect(struct tdls_sta_notify_params *notify)
 
 static void tdls_process_reset_adapter(struct wlan_objmgr_vdev *vdev)
 {
+	struct tdls_soc_priv_obj *tdls_soc;
 	struct tdls_vdev_priv_obj *tdls_vdev;
 
 	tdls_vdev = wlan_vdev_get_tdls_vdev_obj(vdev);
 	if (!tdls_vdev)
 		return;
+
 	tdls_timers_stop(tdls_vdev);
+
+	tdls_soc = wlan_vdev_get_tdls_soc_obj(vdev);
+	if (!tdls_soc)
+		return;
+
+	tdls_allow_suspend(tdls_soc);
 }
 
 void tdls_notify_reset_adapter(struct wlan_objmgr_vdev *vdev)

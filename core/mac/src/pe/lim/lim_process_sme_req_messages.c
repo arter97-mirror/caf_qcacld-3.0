@@ -3313,56 +3313,6 @@ void lim_enable_he_dynamic_smps(struct pe_session *session)
 {}
 #endif
 
-/**
- * lim_cfg_dsmps_for_iot_ap() - Configure dynamic SMPS for IOT AP
- *@mac_ctx: mac context
- *@session: pe session
- *@bss_desc: bss descriptor
- *
- * When connecting to specific IOT AP, Configure STA HT and HE dynamic SMPS
- * capabilities base on whitelist and blacklist.
- * if while list exist, ignore blacklist, else check blacklist.
- *
- * Return: None
- */
-static void
-lim_cfg_dsmps_for_iot_ap(struct mac_context *mac_ctx,
-			 struct pe_session *session,
-			 struct bss_description *bss_desc)
-{
-	struct action_oui_search_attr vendor_ap_search_attr = {0};
-	uint16_t ie_len;
-	bool is_empty;
-
-	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
-
-	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
-	vendor_ap_search_attr.ie_length = ie_len;
-	vendor_ap_search_attr.mac_addr = &bss_desc->bssId[0];
-
-	if (wlan_action_oui_search(mac_ctx->psoc,
-				   &vendor_ap_search_attr,
-				   ACTION_OUI_ENABLE_DYNAMIC_SMPS)) {
-		lim_enable_ht_dynamic_smps(session);
-		lim_enable_he_dynamic_smps(session);
-		pe_debug("Enable HT and HE D-SMPS for this IOT AP");
-		return;
-	}
-
-	is_empty = wlan_action_oui_is_empty(mac_ctx->psoc,
-					    ACTION_OUI_ENABLE_DYNAMIC_SMPS);
-	if (!is_empty)
-		return;
-
-	if (wlan_action_oui_search(mac_ctx->psoc,
-				   &vendor_ap_search_attr,
-				   ACTION_OUI_DISABLE_DYNAMIC_SMPS)) {
-		lim_disable_ht_dynamic_smps(session);
-		lim_disable_he_dynamic_smps(session);
-		pe_debug("Disable HT and HE D-SMPS for this IOT AP");
-	}
-}
-
 #ifdef WLAN_FEATURE_11BE_MLO
 static bool
 lim_is_single_link_mlo_sta(struct pe_session *session)
@@ -3379,6 +3329,100 @@ lim_is_single_link_mlo_sta(struct pe_session *session)
 	return false;
 }
 #endif
+
+#define DSMPS_EN BIT(0)
+#define DSMPS_BASE_ON_RSSI_EN BIT(1)
+void
+lim_cfg_dsmps_for_iot_ap(struct mac_context *mac_ctx,
+			 struct pe_session *session,
+			 struct bss_description *bss_desc,
+			 bool is_roaming)
+{
+	struct action_oui_search_attr vendor_ap_search_attr = {0};
+	uint16_t ie_len;
+	bool oui_matched = false;
+	bool no_allow_list = false;
+	uint8_t vdev_param = 0;
+
+	/* Handle non-STA modes first */
+	if (session->opmode != QDF_STA_MODE) {
+		lim_disable_ht_dynamic_smps(session);
+		lim_disable_he_dynamic_smps(session);
+		vdev_param = 0;
+		goto set_param;
+	}
+
+	/*
+	 * Check if this is a 2G-only STA connection.
+	 * 2 GHz aux listen is not supported, so DSMPS must be disabled
+	 * for all 2G connections, even if the AP is in the allowlist.
+	 */
+	if (wlan_reg_is_24ghz_ch_freq(bss_desc->chan_freq)) {
+		if (!IS_DOT11_MODE_EHT(session->dot11mode) ||
+		    lim_is_single_link_mlo_sta(session)) {
+			lim_disable_ht_dynamic_smps(session);
+			lim_disable_he_dynamic_smps(session);
+			vdev_param = 0;
+			goto set_param;
+		}
+	}
+
+	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
+	vendor_ap_search_attr.ie_data = (uint8_t *)&bss_desc->ieFields[0];
+	vendor_ap_search_attr.ie_length = ie_len;
+	vendor_ap_search_attr.mac_addr = &bss_desc->bssId[0];
+
+	no_allow_list = wlan_action_oui_is_empty(mac_ctx->psoc,
+						 ACTION_OUI_ENABLE_DYNAMIC_SMPS);
+	if (no_allow_list) {
+		pe_debug("allowlist not enabled");
+		goto denylist;
+	}
+
+	oui_matched = wlan_action_oui_search(mac_ctx->psoc,
+					     &vendor_ap_search_attr,
+					     ACTION_OUI_ENABLE_DYNAMIC_SMPS);
+	if (!is_roaming && oui_matched) {
+		lim_enable_ht_dynamic_smps(session);
+		lim_enable_he_dynamic_smps(session);
+		pe_debug("Enable HT and HE D-SMPS for this IOT AP");
+
+		if (wlan_action_oui_search(mac_ctx->psoc,
+					   &vendor_ap_search_attr,
+					   ACTION_OUI_ENABLE_DSMPS_BY_RSSI))
+			vdev_param = DSMPS_EN | DSMPS_BASE_ON_RSSI_EN;
+		else
+			vdev_param = DSMPS_EN;
+	} else {
+		vdev_param = 0;
+	}
+	goto set_param;
+
+denylist:
+	if (wlan_action_oui_search(mac_ctx->psoc,
+				   &vendor_ap_search_attr,
+				   ACTION_OUI_DISABLE_DYNAMIC_SMPS)) {
+		lim_disable_ht_dynamic_smps(session);
+		lim_disable_he_dynamic_smps(session);
+		pe_debug("Disable HT and HE D-SMPS for this IOT AP");
+		vdev_param = 0;
+	} else {
+		if (wlan_action_oui_search(mac_ctx->psoc,
+					   &vendor_ap_search_attr,
+					   ACTION_OUI_ENABLE_DSMPS_BY_RSSI))
+			vdev_param = DSMPS_EN | DSMPS_BASE_ON_RSSI_EN;
+		else
+			vdev_param = DSMPS_EN;
+	}
+
+set_param:
+	pe_debug("DSMPS vdev_param=0x%x vdev_id=%d roaming=%d %s used",
+		 vdev_param, session->vdev_id, is_roaming,
+		 no_allow_list ? "denylist" : "allowlist");
+	wma_cli_set_command(session->vdev_id,
+			    wmi_vdev_param_dsmps_control,
+			    vdev_param, VDEV_CMD);
+}
 
 void
 lim_disable_ht_he_dynamic_smps(struct pe_session *session,
@@ -3682,9 +3726,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	}
 
 	lim_disable_bformee_for_iot_ap(mac_ctx, session, bss_desc);
-
-	lim_disable_ht_he_dynamic_smps(session, bss_desc->chan_freq);
-	lim_cfg_dsmps_for_iot_ap(mac_ctx, session, bss_desc);
 
 	mlme_obj->reg_tpc_obj.is_power_constraint_abs =
 						!is_pwr_constraint;
@@ -4475,6 +4516,7 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	uint8_t rsn_ie_len = 0;
 	struct wlan_crypto_pmksa pmksa, *pmksa_peer;
 	struct bss_description *bss_desc;
+	int32_t akm;
 
 	rsn_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
 	if (!rsn_ie)
@@ -4524,6 +4566,14 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	pmksa_peer = wlan_crypto_get_peer_pmksa(session->vdev, &pmksa);
 	if (pmksa_peer)
 		pe_debug("PMKSA found");
+
+	akm = wlan_crypto_get_param(session->vdev,
+				    WLAN_CRYPTO_PARAM_KEY_MGMT);
+	if (pmksa_peer && WLAN_CRYPTO_IS_WPA2(akm)) {
+		pe_debug("vdev:%d WPA2 does not support PMKID",
+			 session->vdev_id);
+		qdf_mem_zero(pmksa_peer->pmkid, sizeof(pmksa_peer->pmkid));
+	}
 
 	lim_update_connect_rsn_ie(session, rsn_ie, pmksa_peer);
 	qdf_mem_free(rsn_ie);
@@ -4803,6 +4853,8 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 		req->req_fail_status_code = req_fail_status_code;
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	lim_cfg_dsmps_for_iot_ap(mac_ctx, session, bss_desc, false);
 
 	lim_copy_ml_partner_info_to_session(session, req);
 

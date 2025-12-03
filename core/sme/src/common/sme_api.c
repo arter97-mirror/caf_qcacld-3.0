@@ -9284,16 +9284,15 @@ QDF_STATUS sme_update_connect_debug(mac_handle_t mac_handle, uint32_t set_value)
  * Return QDF_STATUS
  */
 QDF_STATUS sme_ap_disable_intra_bss_fwd(mac_handle_t mac_handle,
-					uint8_t sessionId,
-					bool disablefwd)
+					 uint8_t sessionId,
+					 bool disablefwd)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	int status = QDF_STATUS_SUCCESS;
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	QDF_STATUS status;
 	struct scheduler_msg message = {0};
-	tpDisableIntraBssFwd pSapDisableIntraFwd = NULL;
+	tpDisableIntraBssFwd pSapDisableIntraFwd;
 
-	/* Prepare the request to send to SME. */
+	/* Prepare the request to send to SME */
 	pSapDisableIntraFwd = qdf_mem_malloc(sizeof(tDisableIntraBssFwd));
 	if (!pSapDisableIntraFwd)
 		return QDF_STATUS_E_NOMEM;
@@ -9302,22 +9301,21 @@ QDF_STATUS sme_ap_disable_intra_bss_fwd(mac_handle_t mac_handle,
 	pSapDisableIntraFwd->disableintrabssfwd = disablefwd;
 
 	status = sme_acquire_global_lock(&mac->sme);
-
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mem_free(pSapDisableIntraFwd);
-		return QDF_STATUS_E_FAILURE;
+		return status;
 	}
-	/* serialize the req through MC thread */
+
+	/* Serialize the req through MC thread */
 	message.bodyptr = pSapDisableIntraFwd;
 	message.type = WMA_SET_SAP_INTRABSS_DIS;
-	qdf_status = scheduler_post_message(QDF_MODULE_ID_SME,
-					    QDF_MODULE_ID_WMA,
-					    QDF_MODULE_ID_WMA,
-					    &message);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		status = QDF_STATUS_E_FAILURE;
+	status = scheduler_post_message(QDF_MODULE_ID_SME,
+					QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_WMA,
+					&message);
+	if (QDF_IS_STATUS_ERROR(status))
 		qdf_mem_free(pSapDisableIntraFwd);
-	}
+
 	sme_release_global_lock(&mac->sme);
 
 	return status;
@@ -11413,6 +11411,17 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 
 	if (cfg_in_range(CFG_HE_FRAGMENTATION, value))
 		mac_ctx->he_cap_5g.fragmentation = value;
+
+	/*
+	 * HE SMPS follows HT SMPS configuration (gEnableHtSMPS).
+	 * If HT SMPS is disabled, HE SMPS is also disabled for consistency.
+	 */
+	mac_ctx->he_cap_2g.he_dynamic_smps =
+		mac_ctx->mlme_cfg->ht_caps.enable_smps ? cfg->he_cap_2g.he_dynamic_smps : 0;
+	mac_ctx->he_cap_5g.he_dynamic_smps =
+		mac_ctx->mlme_cfg->ht_caps.enable_smps ? cfg->he_cap_5g.he_dynamic_smps : 0;
+	mlme_debug("he smps 2g %d 5g %d", mac_ctx->he_cap_2g.he_dynamic_smps,
+		   mac_ctx->he_cap_5g.he_dynamic_smps);
 
 	qdf_mem_copy(&mac_ctx->he_cap_2g_orig,
 		     &mac_ctx->he_cap_2g,

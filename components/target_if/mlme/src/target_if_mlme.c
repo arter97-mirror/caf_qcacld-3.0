@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -70,5 +71,26 @@ target_if_mlme_register_tx_ops(struct wlan_mlme_tx_ops *tx_ops)
 
 	tx_ops->send_csa_event_status_ind =
 		target_if_mlme_send_csa_event_status_ind;
+}
+
+uint32_t target_if_fw_cck_support(struct wlan_objmgr_psoc *psoc)
+{
+	uint32_t cck_rx_tx_support = 0;
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi handle is NULL");
+		return cck_rx_tx_support;
+	}
+
+	if (wmi_service_enabled(wmi_handle,
+				wmi_service_cck_rx_support_5g))
+		cck_rx_tx_support |= BIT(CCK_RX_BIT);
+	if (wmi_service_enabled(wmi_handle,
+				wmi_service_cck_tx_support_5g))
+		cck_rx_tx_support |= BIT(CCK_TX_BIT);
+
+	return cck_rx_tx_support;
 }
 
