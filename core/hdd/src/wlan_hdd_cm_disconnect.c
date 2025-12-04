@@ -360,7 +360,6 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 
 	ucfg_dp_reset_cont_txtimeout_cnt(vdev);
 
-	ucfg_dp_clear_net_dev_stats(adapter->dev);
 	ucfg_dp_nud_reset_tracking(vdev);
 	hdd_reset_limit_off_chan(adapter);
 
