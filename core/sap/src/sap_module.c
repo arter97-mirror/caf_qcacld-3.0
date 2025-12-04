@@ -4148,6 +4148,8 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		   sap_ctx->chan_freq_before_switch_band) {
 		if (!wlan_reg_is_disable_in_secondary_list_for_freq(
 				mac->pdev,
+				sap_ctx->chan_freq_before_switch_band) &&
+		    !wlan_reg_is_passive_for_freq(mac->pdev,
 				sap_ctx->chan_freq_before_switch_band)) {
 			restart_freq = sap_ctx->chan_freq_before_switch_band;
 			sap_debug("Restore chan freq: %d", restart_freq);
