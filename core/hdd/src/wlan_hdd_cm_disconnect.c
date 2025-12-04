@@ -368,6 +368,8 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 	ucfg_clear_user_disabled_roaming(hdd_ctx->psoc, link_info->vdev_id);
 	/* Clear Extended MLD capability support flag of current connection */
 	wlan_mlme_set_ext_mld_cap_supp(hdd_ctx->psoc, false);
+	/* Clear psoc MLO config that includes partner link info */
+	wlan_cm_clear_mlo_allowed_bss_links(hdd_ctx->psoc);
 }
 
 #ifdef WLAN_FEATURE_MSCS
