@@ -6949,6 +6949,8 @@ QDF_STATUS wma_wait_for_ready_event(WMA_HANDLE handle)
 		wma_err("Error in pdev creation");
 		if (!cds_is_driver_recovering() || !cds_is_fw_down())
 			QDF_DEBUG_PANIC("FW ready event timed out");
+		cds_trigger_recovery(QDF_REASON_UNSPECIFIED);
+		msleep(10000);
 		return QDF_STATUS_E_INVAL;
 	}
 
