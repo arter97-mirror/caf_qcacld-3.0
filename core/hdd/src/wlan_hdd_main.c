@@ -10511,6 +10511,7 @@ static int hdd_stop_mon_adapter(struct hdd_adapter *adapter)
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_hdd_link_info *link_info;
 	int status;
+	bool is_imps_enabled;
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		status = wlan_hdd_delete_mon_link(adapter, link_info);
@@ -10523,7 +10524,8 @@ static int hdd_stop_mon_adapter(struct hdd_adapter *adapter)
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err_rl("datapath reset failed for montior mode");
 
-	hdd_set_idle_ps_config(hdd_ctx, true);
+	ucfg_mlme_is_imps_enabled(hdd_ctx->psoc, &is_imps_enabled);
+	hdd_set_idle_ps_config(hdd_ctx, is_imps_enabled);
 
 	return 0;
 }
