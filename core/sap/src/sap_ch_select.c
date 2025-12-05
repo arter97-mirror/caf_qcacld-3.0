@@ -2419,6 +2419,56 @@ sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 
 #if defined(WLAN_FEATURE_11BE)
 /**
+ * sap_is_psc_channel_support_320_mhz() - Check if PSC channel supports 320 MHz
+ * @mac_ctx: Pointer to MAC context
+ * @sap_ctx: Pointer to SAP context
+ * @ch_freq: Channel frequency to check
+ * @pwr_type: 6 GHz power type (LPI/SP/VLP)
+ *
+ * This function checks whether a given channel frequency is a 6 GHz Preferred
+ * Scanning Channel (PSC) and whether it supports 320 MHz channel bandwidth.
+ * PSC channels are specific channels in the 6 GHz band that are preferred for
+ * initial scanning operations.
+ *
+ * Return: true if the channel is a 6 GHz PSC channel that supports 320 MHz
+ *         bandwidth, false otherwise
+ */
+static bool
+sap_is_psc_channel_support_320_mhz(struct mac_context *mac_ctx,
+				   struct sap_context *sap_ctx,
+				   qdf_freq_t ch_freq,
+				   enum supported_6g_pwr_types pwr_type)
+{
+	struct ch_params ch_params = {0};
+
+	if (!wlan_reg_is_6ghz_chan_freq(ch_freq) ||
+	    !wlan_reg_is_6ghz_psc_chan_freq(ch_freq))
+		return false;
+
+	if (!policy_mgr_is_unsafe_freq_allowed(mac_ctx->psoc,
+					       sap_ctx->vdev_id,
+					       ch_freq))
+		return false;
+
+	if (!wlansap_is_channel_present_in_acs_list(
+				ch_freq,
+				sap_ctx->acs_cfg->freq_list,
+				sap_ctx->acs_cfg->ch_list_count))
+		return false;
+
+	qdf_mem_zero(&ch_params, sizeof(ch_params));
+	ch_params.ch_width = CH_WIDTH_320MHZ;
+	sap_acs_set_puncture_support(sap_ctx, &ch_params);
+
+	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+						ch_freq,
+						0, &ch_params,
+						pwr_type);
+
+	return (ch_params.ch_width == CH_WIDTH_320MHZ);
+}
+
+/**
  * sap_sort_chl_weight_320_mhz() - to sort the channels with the least weight
  * @mac_ctx: pointer to max context
  * @sap_ctx: Pointer to the struct sap_context *structure
@@ -2666,7 +2716,15 @@ sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 			}
 
 			if (chan_info[j + i].num_bonded_pairs == 0) {
-				chan_info[j + i].weight =
+				if (chan_info[j + i].valid &&
+				    sap_is_psc_channel_support_320_mhz(
+					mac_ctx, sap_ctx,
+					chan_info[j + i].chan_freq,
+					supported_ap_pwr_type))
+					chan_info[j + i].weight =
+						combined_weight;
+				else
+					chan_info[j + i].weight =
 						SAP_ACS_WEIGHT_MAX * 16;
 				chan_info[j + i].weight_calc_done = true;
 			}
