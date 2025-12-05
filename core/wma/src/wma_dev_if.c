@@ -3872,6 +3872,73 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 }
 
 /**
+ * wma_handle_peer_assoc_conf() - handle peer assoc conf
+ * @wma: wma handle
+ * @vdev_id: vdev id
+ * @status: status
+ * @macaddr: peer mac address
+ *
+ * This function handles the peer assoc conf event by finding the
+ * request message and sending the appropriate response.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_handle_peer_assoc_conf(tp_wma_handle wma, uint8_t vdev_id,
+				      uint8_t status, uint8_t *macaddr)
+{
+	struct wma_target_req *req_msg;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *vdev;
+
+	req_msg = wma_find_req(wma, vdev_id, WMA_PEER_ASSOC_CNF_START, NULL);
+
+	if (!req_msg) {
+		vdev = wma->interfaces[vdev_id].vdev;
+		if (vdev && mlo_mgr_is_link_switch_in_progress(vdev) &&
+		    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(
+								wma->psoc)) {
+			wma_send_add_bss_resp(wma, vdev_id, status);
+			return QDF_STATUS_SUCCESS;
+		}
+		wma_err("Failed to lookup request message for vdev %d",
+			vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mc_timer_stop(&req_msg->event_timeout);
+
+	if (req_msg->msg_type == WMA_ADD_STA_REQ) {
+		tpAddStaParams params = (tpAddStaParams)req_msg->user_data;
+
+		if (!params) {
+			wma_err("add STA params is NULL for vdev %d", vdev_id);
+			qdf_status = QDF_STATUS_E_FAILURE;
+			goto free_req_msg;
+		}
+
+		/* peer assoc conf event means the cmd succeeds */
+		params->status = status;
+		wma_debug("Send ADD_STA_RSP: statype %d vdev_id %d aid %d bssid "QDF_MAC_ADDR_FMT" status %d",
+			 params->staType, params->smesessionId,
+			 params->assocId, QDF_MAC_ADDR_REF(params->bssId),
+			 params->status);
+		wma_send_msg_high_priority(wma, WMA_ADD_STA_RSP,
+					   (void *)params, 0);
+	} else if (req_msg->msg_type == WMA_ADD_BSS_REQ) {
+		wma_send_add_bss_resp(wma, vdev_id, status);
+	} else {
+		wma_err("Unhandled request message type: %d", req_msg->msg_type);
+		qdf_status = QDF_STATUS_E_FAILURE;
+	}
+
+free_req_msg:
+	qdf_mc_timer_destroy(&req_msg->event_timeout);
+	qdf_mem_free(req_msg);
+
+	return qdf_status;
+}
+
+/**
  * wma_peer_assoc_conf_handler() - peer assoc conf handler
  * @handle: wma handle
  * @cmd_param_info: event buffer
@@ -3885,9 +3952,8 @@ int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 	tp_wma_handle wma = (tp_wma_handle) handle;
 	WMI_PEER_ASSOC_CONF_EVENTID_param_tlvs *param_buf;
 	wmi_peer_assoc_conf_event_fixed_param *event;
-	struct wma_target_req *req_msg;
 	uint8_t macaddr[QDF_MAC_ADDR_SIZE];
-	int status = 0;
+	QDF_STATUS status;
 
 	param_buf = (WMI_PEER_ASSOC_CONF_EVENTID_param_tlvs *) cmd_param_info;
 	if (!param_buf) {
@@ -3902,49 +3968,15 @@ int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 	}
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&event->peer_macaddr, macaddr);
-	wma_debug("peer assoc conf for vdev:%d mac="QDF_MAC_ADDR_FMT,
-		 event->vdev_id, QDF_MAC_ADDR_REF(macaddr));
+	wma_debug("peer assoc conf for vdev:%d mac=" QDF_MAC_ADDR_FMT,
+		  event->vdev_id, QDF_MAC_ADDR_REF(macaddr));
 
-	req_msg = wma_find_req(wma, event->vdev_id,
-			       WMA_PEER_ASSOC_CNF_START, NULL);
-
-	if (!req_msg) {
-		wma_err("Failed to lookup request message for vdev %d",
-			event->vdev_id);
+	status = wma_handle_peer_assoc_conf(wma, event->vdev_id, event->status,
+					    macaddr);
+	if (QDF_IS_STATUS_ERROR(status))
 		return -EINVAL;
-	}
 
-	qdf_mc_timer_stop(&req_msg->event_timeout);
-
-	if (req_msg->msg_type == WMA_ADD_STA_REQ) {
-		tpAddStaParams params = (tpAddStaParams)req_msg->user_data;
-
-		if (!params) {
-			wma_err("add STA params is NULL for vdev %d",
-				 event->vdev_id);
-			status = -EINVAL;
-			goto free_req_msg;
-		}
-
-		/* peer assoc conf event means the cmd succeeds */
-		params->status = event->status;
-		wma_debug("Send ADD_STA_RSP: statype %d vdev_id %d aid %d bssid "QDF_MAC_ADDR_FMT" status %d",
-			 params->staType, params->smesessionId,
-			 params->assocId, QDF_MAC_ADDR_REF(params->bssId),
-			 params->status);
-		wma_send_msg_high_priority(wma, WMA_ADD_STA_RSP,
-					   (void *)params, 0);
-	} else if (req_msg->msg_type == WMA_ADD_BSS_REQ) {
-		wma_send_add_bss_resp(wma, event->vdev_id, event->status);
-	} else {
-		wma_err("Unhandled request message type: %d", req_msg->msg_type);
-	}
-
-free_req_msg:
-	qdf_mc_timer_destroy(&req_msg->event_timeout);
-	qdf_mem_free(req_msg);
-
-	return status;
+	return 0;
 }
 
 int wma_peer_create_confirm_handler(void *handle, uint8_t *evt_param_info,
@@ -5136,6 +5168,7 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 	struct vdev_mlme_obj *mlme_obj;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	bool skip_hold_req = false;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma || !mac || !soc)
@@ -5162,6 +5195,9 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 		goto send_resp;
 	}
 
+	if (iface->vdev && mlo_mgr_is_link_switch_in_progress(iface->vdev) &&
+	    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(wma->psoc))
+		skip_hold_req = true;
 
 	if (add_bss->staContext.encryptType == eSIR_ED_NONE) {
 		wma_debug("Update peer("QDF_MAC_ADDR_FMT") state into auth",
@@ -5239,14 +5275,17 @@ QDF_STATUS wma_send_peer_assoc_req(struct bss_params *add_bss)
 		goto send_resp;
 	}
 
-	msg = wma_fill_hold_req(wma, vdev_id, WMA_ADD_BSS_REQ,
-				WMA_PEER_ASSOC_CNF_START, NULL,
-				NULL, WMA_PEER_ASSOC_TIMEOUT);
-	if (!msg) {
-		wma_err("Failed to allocate request for vdev_id %d", vdev_id);
-		wma_remove_req(wma, vdev_id, WMA_PEER_ASSOC_CNF_START);
-		status = QDF_STATUS_E_FAILURE;
-		goto send_resp;
+	if (!skip_hold_req) {
+		msg = wma_fill_hold_req(wma, vdev_id, WMA_ADD_BSS_REQ,
+					WMA_PEER_ASSOC_CNF_START, NULL,
+					NULL, WMA_PEER_ASSOC_TIMEOUT);
+		if (!msg) {
+			wma_err("Failed to allocate request for vdev_id %d",
+				vdev_id);
+			wma_remove_req(wma, vdev_id, WMA_PEER_ASSOC_CNF_START);
+			status = QDF_STATUS_E_FAILURE;
+			goto send_resp;
+		}
 	}
 
 	return QDF_STATUS_SUCCESS;

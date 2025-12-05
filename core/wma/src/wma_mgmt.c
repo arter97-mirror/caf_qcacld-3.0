@@ -1641,14 +1641,62 @@ static inline void wma_set_mlo_assoc_vdev(struct wlan_objmgr_vdev *vdev,
 /**
  * wmi_unified_send_peer_assoc() - send peer assoc command to fw
  * @wma: wma handle
- * @nw_type: nw type
  * @params: add sta params
+ * @cmd: pointer to peer_assoc_params
  *
  * This function send peer assoc command to firmware with
  * different parameters.
  *
  * Return: QDF_STATUS
  */
+static QDF_STATUS wma_handle_peer_assoc_send(tp_wma_handle wma,
+					     tpAddStaParams params,
+					     struct peer_assoc_params *cmd)
+{
+	QDF_STATUS status;
+	struct wma_txrx_node *intr;
+
+	intr = &wma->interfaces[params->smesessionId];
+
+	/* Skip sending peer assoc during MLO link switch in progress */
+	if (mlo_mgr_is_link_switch_in_progress(intr->vdev) &&
+	    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(wma->psoc)) {
+		wma_debug("vdev:%d skip peer assoc WMI command during link switch in progress",
+			  params->smesessionId);
+
+		/*
+		 * NOTE: Do NOT release wakelock here if it was acquired for
+		 * 4-way handshake. The wakelock will be maintained across the
+		 * link switch and will be released when the cached peer assoc
+		 * params are sent to firmware after link switch completes, or
+		 * when the key setting flow completes normally.
+		 *
+		 * Releasing the wakelock here would cause a synchronization
+		 * issue where the system could suspend during the 4-way
+		 * handshake after link switch completes.
+		 */
+
+		status = mlo_mgr_cache_peer_assoc_params(intr->vdev, cmd);
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
+
+		wma_handle_peer_assoc_conf(
+			wma, params->smesessionId,
+			QDF_STATUS_SUCCESS,
+			wma_is_vdev_in_ap_mode(wma, params->smesessionId) ?
+			params->staMac : params->bssId);
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+	status = wmi_unified_peer_assoc_send(wma->wmi_handle, cmd);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to send peer assoc command status = %d",
+			status);
+
+	return status;
+}
+
 QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 				    tSirNwType nw_type,
 				    tpAddStaParams params)
@@ -2033,13 +2081,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	wma_debug("vdev:%d AKM: 0x%x auth_mode:0x%x uc_cipher:0x%x",
 		  params->smesessionId, cmd->akm, authmode, uccipher);
 
-	status = wmi_unified_peer_assoc_send(wma->wmi_handle,
-					 cmd);
-	if (QDF_IS_STATUS_ERROR(status))
-		wma_alert("Failed to send peer assoc command status = %d",
-			 status);
+	status = wma_handle_peer_assoc_send(wma, params, cmd);
 	qdf_mem_free(cmd);
-
 	return status;
 }
 

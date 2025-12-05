@@ -1344,6 +1344,18 @@ int wma_peer_assoc_conf_handler(void *handle, uint8_t *cmd_param_info,
 				uint32_t len);
 
 /**
+ * wma_handle_peer_assoc_conf() - handle peer assoc confirmation
+ * @wma: WMA handle
+ * @vdev_id: VDEV id
+ * @status: peer assoc status
+ * @macaddr: peer MAC address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_handle_peer_assoc_conf(tp_wma_handle wma, uint8_t vdev_id,
+				      uint8_t status, uint8_t *macaddr);
+
+/**
  * wma_peer_create_confirm_handler  - Handle peer create confirmation
  * result
  * @handle: wma_handle
