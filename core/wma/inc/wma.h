@@ -2839,4 +2839,21 @@ wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle)
 }
 #endif
 
+/**
+ * wma_register_qos_null_hdd_cb() - Register QoS NULL TX event hdd callback
+ * @callback: Callback function pointer
+ * @context: Context to pass back in callback
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_register_qos_null_hdd_cb(qos_null_tx_compl_cb callback,
+					void *context);
+
+/**
+ * wma_deregister_qos_null_hdd_cb() - Deregister QoS NULL TX hdd callback
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_deregister_qos_null_hdd_cb(void);
+
 #endif

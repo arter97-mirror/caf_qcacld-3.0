@@ -19872,6 +19872,12 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 
 	sme_register_set_disconnect_cb(mac_handle,
 				       hdd_set_disconnect_link_info_cb);
+
+	status = wma_register_qos_null_hdd_cb(wlan_hdd_qos_null_tx_compl_cb,
+					      hdd_ctx);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to get WMA handle for QoS null callback");
+
 	hdd_exit();
 
 	return ret;
@@ -19925,6 +19931,10 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 	hdd_thermal_unregister_callbacks(hdd_ctx);
 	sme_deregister_oem_data_rsp_callback(mac_handle);
 	sme_multi_client_ll_rsp_deregister_callback(mac_handle);
+
+	status = wma_deregister_qos_null_hdd_cb();
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("QoS null callback de-register failed");
 
 	hdd_exit();
 }

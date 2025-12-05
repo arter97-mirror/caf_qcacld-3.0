@@ -31228,6 +31228,74 @@ int wlan_hdd_cfg80211_probe_peer(struct wiphy *wiphy, struct net_device *dev,
 }
 #endif
 
+#if defined NL80211_EXT_FEATURE_PROBE_AP_SUPPORT
+void wlan_hdd_qos_null_tx_compl_cb(uint8_t vdev_id, uint32_t status,
+				   int32_t ack_rssi, uint32_t ppdu_id,
+				   uint32_t ieee_link_id_valid,
+				   uint32_t ieee_link_id, void *context)
+{
+	struct hdd_context *hdd_ctx = (struct hdd_context *)context;
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *link_info;
+	struct cfg80211_probe_status_info probe_info = {0};
+	bool acked;
+	uint8_t link_idx = 0;
+
+	if (!hdd_ctx) {
+		hdd_err("Invalid HDD context");
+		return;
+	}
+
+	link_info = wlan_hdd_get_link_info_from_vdev(hdd_ctx->psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("No link_info found for vdev_id=%d", vdev_id);
+		return;
+	}
+
+	adapter = link_info->adapter;
+
+	if (!adapter) {
+		hdd_err("No adapter found for vdev_id=%d", vdev_id);
+		return;
+	}
+
+	if (!qdf_atomic_dec_and_test(&adapter->is_probe_peer_pending)) {
+		qdf_atomic_inc(&adapter->is_probe_peer_pending);
+		hdd_debug("No probe pending for vdev_id=%d", vdev_id);
+		return;
+	}
+
+	if (ieee_link_id_valid && ieee_link_id < IEEE80211_MLD_MAX_NUM_LINKS) {
+		probe_info.valid_links = BIT(ieee_link_id);
+		link_idx = ieee_link_id;
+	} else {
+		probe_info.valid_links = 0;
+		link_idx = 0;
+	}
+
+	acked = (status == WMI_MGMT_TX_COMP_TYPE_COMPLETE_OK);
+
+	probe_info.cookie = adapter->probe_peer_cookie;
+	probe_info.peer_addr = NULL;
+	probe_info.links[link_idx].acked = acked;
+	probe_info.links[link_idx].ack_signal = ack_rssi;
+	probe_info.links[link_idx].is_valid_ack_signal = acked;
+
+	cfg80211_probe_status(adapter->dev, &probe_info, GFP_KERNEL);
+
+	hdd_debug("Reported ack rssi for vdev_id=%d link_idx=%u", vdev_id,
+		  link_idx);
+
+	adapter->probe_peer_cookie = 0;
+}
+#else
+void wlan_hdd_qos_null_tx_compl_cb(uint8_t vdev_id, uint32_t status,
+				   int32_t ack_rssi, uint32_t ppdu_id,
+				   uint32_t ieee_link_id_valid,
+				   uint32_t ieee_link_id, void *context)
+{
+}
+#endif
 /*
  * Default val of cwmin, this value is used to override the
  * incorrect user set value

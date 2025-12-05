@@ -440,4 +440,22 @@ void wlan_hdd_get_txq_info_for_ac(struct hdd_adapter *adapter,
 	*txq_base_idx = TX_GET_NON_HI_PRIO_QUEUE_IDX(ac, 0);
 }
 #endif
+
+/**
+ * wlan_hdd_qos_null_tx_compl_cb() - QoS NULL TX completion callback
+ * @vdev_id: vdev id
+ * @status: TX completion status
+ * @ack_rssi: ACK RSSI in dBm
+ * @ppdu_id: Hardware PPDU ID
+ * @ieee_link_id_valid: IEEE link ID valid flag, true for valid for MLO
+ * @ieee_link_id: IEEE link ID for MLO
+ * @context: Callback context
+ *
+ * Return: void
+ */
+void wlan_hdd_qos_null_tx_compl_cb(uint8_t vdev_id, uint32_t status,
+				   int32_t ack_rssi, uint32_t ppdu_id,
+				   uint32_t ieee_link_id_valid,
+				   uint32_t ieee_link_id, void *context);
+
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */

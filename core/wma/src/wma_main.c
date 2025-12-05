@@ -10552,3 +10552,30 @@ wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle)
 				   wmi_service_vdev_traffic_monitoring);
 }
 #endif
+
+QDF_STATUS wma_register_qos_null_hdd_cb(qos_null_tx_compl_cb callback,
+					void *context)
+{
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma_handle)
+		return QDF_STATUS_E_INVAL;
+
+	wma_handle->qos_null_tx_compl_cb = callback;
+	wma_handle->qos_null_tx_compl_cb_context = context;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wma_deregister_qos_null_hdd_cb(void)
+{
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma_handle)
+		return QDF_STATUS_E_INVAL;
+
+	wma_handle->qos_null_tx_compl_cb = NULL;
+	wma_handle->qos_null_tx_compl_cb_context = NULL;
+
+	return QDF_STATUS_SUCCESS;
+}
