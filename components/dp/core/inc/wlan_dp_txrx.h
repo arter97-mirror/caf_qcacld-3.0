@@ -228,10 +228,44 @@ dp_start_xmit(struct wlan_dp_link *dp_link, qdf_nbuf_t nbuf);
  */
 QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link,
 				  qdf_nbuf_t nbuf);
+
+/**
+ * dp_rx_packet_cbk_passthru() - Receive packet handler
+ * @dp_link_context: pointer to DP link context
+ * @rx_buf: pointer to rx qdf_nbuf
+ *
+ * Receive callback registered with data path.  DP will call this to notify
+ * when one or more packets were received for a registered
+ * STA.
+ *
+ * Return: QDF_STATUS_E_FAILURE if any errors encountered,
+ *	   QDF_STATUS_SUCCESS otherwise
+ */
+QDF_STATUS dp_rx_packet_cbk_passthru(void *dp_link_context, qdf_nbuf_t rx_buf);
+
+/**
+ * wlan_dp_rx_deliver_to_stack_passthru() - DP helper function to deliver RX
+ *  pkts to stack.
+ * @dp_intf: pointer to DP interface context
+ * @nbuf: pointer to nbuf
+ *
+ * The function calls the appropriate stack function to push to the stack
+ *
+ * Return: QDF_STATUS_E_FAILURE if any errors encountered,
+ *	   QDF_STATUS_SUCCESS otherwise
+ */
+QDF_STATUS wlan_dp_rx_deliver_to_stack_passthru(struct wlan_dp_intf *dp_intf,
+						qdf_nbuf_t nbuf);
 #else
 static inline
 QDF_STATUS dp_start_xmit_passthru(struct wlan_dp_link *dp_link,
 				  qdf_nbuf_t nbuf)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS dp_rx_packet_cbk_passthru(void *dp_link_context, qdf_nbuf_t rx_buf)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
