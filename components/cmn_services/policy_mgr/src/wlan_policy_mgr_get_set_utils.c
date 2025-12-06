@@ -4351,6 +4351,7 @@ void policy_mgr_set_concurrency_mode(struct wlan_objmgr_psoc *psoc,
 	case QDF_P2P_GO_MODE:
 	case QDF_SAP_MODE:
 	case QDF_MONITOR_MODE:
+	case QDF_PASSTHRU_MODE:
 		pm_ctx->concurrency_mode |= (1 << mode);
 		pm_ctx->no_of_open_sessions[mode]++;
 		break;
@@ -4389,6 +4390,7 @@ void policy_mgr_clear_concurrency_mode(struct wlan_objmgr_psoc *psoc,
 	case QDF_P2P_GO_MODE:
 	case QDF_SAP_MODE:
 	case QDF_MONITOR_MODE:
+	case QDF_PASSTHRU_MODE:
 		pm_ctx->no_of_open_sessions[mode]--;
 		if (!(pm_ctx->no_of_open_sessions[mode]))
 			pm_ctx->concurrency_mode &= (~(1 << mode));
@@ -5722,6 +5724,7 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 	case QDF_SAP_MODE:
 	case QDF_NAN_DISC_MODE:
 	case QDF_NDI_MODE:
+	case QDF_PASSTHRU_MODE:
 		pm_ctx->no_of_active_sessions[mode]++;
 		break;
 	default:
@@ -5966,6 +5969,7 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 	case QDF_SAP_MODE:
 	case QDF_NAN_DISC_MODE:
 	case QDF_NDI_MODE:
+	case QDF_PASSTHRU_MODE:
 		if (pm_ctx->no_of_active_sessions[mode])
 			pm_ctx->no_of_active_sessions[mode]--;
 		break;
@@ -11545,6 +11549,9 @@ policy_mgr_qdf_opmode_to_pm_con_mode(struct wlan_objmgr_psoc *psoc,
 	case QDF_NDI_MODE:
 		mode = PM_NDI_MODE;
 		break;
+	case QDF_PASSTHRU_MODE:
+		mode = PM_PASSTHRU_MODE;
+		break;
 	default:
 		policy_mgr_debug("Unsupported mode (%d)",
 				 device_mode);
@@ -11577,6 +11584,9 @@ enum QDF_OPMODE policy_mgr_get_qdf_mode_from_pm(
 		break;
 	case PM_NDI_MODE:
 		mode = QDF_NDI_MODE;
+		break;
+	case PM_PASSTHRU_MODE:
+		mode = QDF_PASSTHRU_MODE;
 		break;
 	default:
 		policy_mgr_debug("Unsupported policy mgr mode (%d)",
@@ -15212,3 +15222,32 @@ policy_mgr_is_cfr_allowed(struct wlan_objmgr_psoc *psoc)
 
 	return true;
 }
+
+#ifdef DRIVER_PASSTHRU_MODE
+bool
+policy_mgr_is_chan_change_allowed_for_passthru(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id, uint32_t freq,
+					       enum hw_mode_bandwidth bw)
+{
+	struct policy_mgr_conc_connection_info info;
+	uint8_t num_cxn_del = 0;
+	bool allow = false;
+
+	if (!policy_mgr_is_hw_dbs_capable(psoc) ||
+	    policy_mgr_get_connection_count(psoc) == 1)
+		return true;
+
+	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc,
+						      vdev_id,
+						      &info,
+						      &num_cxn_del);
+
+	allow = policy_mgr_allow_concurrency(psoc, PM_PASSTHRU_MODE, freq, bw,
+					     0, vdev_id);
+
+	if (num_cxn_del)
+		policy_mgr_restore_deleted_conn_info(psoc, &info, num_cxn_del);
+
+	return allow;
+}
+#endif

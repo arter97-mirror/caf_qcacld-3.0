@@ -157,6 +157,7 @@ static inline const char *device_mode_to_string(uint32_t idx)
 	CASE_RETURN_STRING(PM_NDI_MODE);
 	CASE_RETURN_STRING(PM_NAN_DISC_MODE);
 	CASE_RETURN_STRING(PM_LL_LT_SAP_MODE);
+	CASE_RETURN_STRING(PM_PASSTHRU_MODE);
 	default:
 		return "Unknown";
 	}
@@ -6492,4 +6493,20 @@ policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(
 bool
 policy_mgr_is_cfr_allowed(struct wlan_objmgr_psoc *psoc);
 
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * policy_mgr_is_chan_change_allowed_for_passthru() - check if channel change
+ *  is allowed for passthru vdev
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @freq: channel frequency
+ * @bw: bandwidth
+ *
+ * Return: true if allowed else false
+ */
+bool
+policy_mgr_is_chan_change_allowed_for_passthru(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id, uint32_t freq,
+					       enum hw_mode_bandwidth bw);
+#endif
 #endif /* __WLAN_POLICY_MGR_API_H */
