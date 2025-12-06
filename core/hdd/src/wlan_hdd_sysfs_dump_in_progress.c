@@ -173,6 +173,10 @@ void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject,
 						 struct hdd_context *hdd_ctx)
 {
 	int error;
+	kuid_t uid;
+	kgid_t gid;
+
+	hdd_enter();
 
 	if (!wifi_kobject) {
 		hdd_err("could not get wifi kobject!");
@@ -183,8 +187,29 @@ void hdd_sysfs_create_dump_in_progress_interface(struct kobject *wifi_kobject,
 	if (error)
 		hdd_err("could not create dump in progress sysfs file");
 
-	if (!error)
+	if (!error) {
 		hdd_ctx->is_drv_dump_in_progress_valid = true;
+
+		uid = make_kuid(current_user_ns(), 1010);
+		if (!uid_valid(uid))
+			hdd_err("uid is invalid\n");
+
+		gid = make_kgid(current_user_ns(), 1010);
+		if (!gid_valid(gid))
+			hdd_err("gid is invalid\n");
+
+		error = sysfs_file_change_owner(wifi_kobject,
+						"dump_in_progress", uid, gid);
+		if (error)
+			hdd_err("sysfs change owner failed with error: %d",
+				error);
+		else
+			hdd_err("sysfs change owner success");
+	}
+
+	hdd_exit();
+
+
 }
 
 void hdd_sysfs_destroy_dump_in_progress_interface(struct kobject *wifi_kobject)
@@ -313,6 +338,8 @@ hdd_sysfs_create_enhance_chipset_logging_interface(struct kobject *wifi_kobject,
 						   struct hdd_context *hdd_ctx)
 {
 	int error;
+	kuid_t uid;
+	kgid_t gid;
 
 	if (!wifi_kobject) {
 		hdd_err("could not get wifi kobject!");
@@ -321,8 +348,26 @@ hdd_sysfs_create_enhance_chipset_logging_interface(struct kobject *wifi_kobject,
 
 	error = sysfs_create_file(wifi_kobject,
 				  &enhance_chipset_logging_attribute.attr);
-	if (error)
+	if (error) {
 		hdd_err("could not create enhance_chipset_logging sysfs file");
+		return;
+	}
+
+	uid = make_kuid(current_user_ns(), 1010);
+	if (!uid_valid(uid))
+		hdd_err("uid is invalid\n");
+
+	gid = make_kgid(current_user_ns(), 1010);
+	if (!gid_valid(gid))
+		hdd_err("gid is invalid\n");
+
+	error = sysfs_file_change_owner(wifi_kobject,
+					"enhance_chipset_logging", uid, gid);
+	if (error)
+		hdd_err("sysfs change owner failed with error: %d", error);
+	else
+		hdd_err("sysfs change owner success");
+
 }
 
 void hdd_sysfs_destroy_enhance_chipset_logging_interface(
