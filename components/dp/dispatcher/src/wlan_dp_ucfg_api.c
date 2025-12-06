@@ -1431,7 +1431,7 @@ QDF_STATUS ucfg_dp_passthrough_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	/* Register the vdev transmit and receive functions */
 	qdf_mem_zero(&txrx_ops, sizeof(txrx_ops));
 
-	txrx_ops.rx.rx = dp_rx_packet_cbk;
+	txrx_ops.rx.rx = dp_rx_packet_cbk_passthru;
 	txrx_ops.vdev_del_notify = wlan_dp_link_cdp_vdev_delete_notification;
 	cdp_vdev = cdp_vdev_register(soc, dp_link->link_id,
 				     (ol_osif_vdev_handle)dp_link, &txrx_ops);
