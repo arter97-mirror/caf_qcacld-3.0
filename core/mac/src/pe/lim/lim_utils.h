@@ -3478,6 +3478,15 @@ void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 uint8_t lim_convert_phy_width_to_vht_width(enum phy_ch_width ch_width);
 
 /**
+ * lim_convert_vht_width_to_phy_width() - Convert FW/CFG VHT channel width
+ * definition to enum phy_ch_width.
+ * @vht_ch_width: FW/CFG VHT channel width value (WNI_CFG_VHT_CHANNEL_WIDTH_*)
+ *
+ * Return: enum phy_ch_width corresponding to @vht_ch_width
+ */
+enum phy_ch_width lim_convert_vht_width_to_phy_width(uint32_t vht_ch_width);
+
+/**
  * lim_update_channel_width() - Function to update channel width
  * @mac_ctx: pointer to Global Mac structure
  * @sta_ptr: pointer to tpDphHashNode

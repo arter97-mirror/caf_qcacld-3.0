@@ -11848,6 +11848,28 @@ uint8_t lim_convert_phy_width_to_vht_width(enum phy_ch_width ch_width)
 	return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
 }
 
+/**
+ * lim_convert_vht_width_to_phy_width() - Convert FW/CFG VHT channel width
+ * definition to enum phy_ch_width.
+ * @vht_ch_width: FW/CFG VHT channel width value (WNI_CFG_VHT_CHANNEL_WIDTH_*)
+ *
+ * Return: enum phy_ch_width corresponding to @vht_ch_width
+ */
+enum phy_ch_width lim_convert_vht_width_to_phy_width(uint32_t vht_ch_width)
+{
+	switch (vht_ch_width) {
+	case WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ:
+		return CH_WIDTH_80MHZ;
+	case WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ:
+		return CH_WIDTH_160MHZ;
+	case WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ:
+		return CH_WIDTH_80P80MHZ;
+	case WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ:
+	default:
+		return CH_WIDTH_20MHZ;
+	}
+}
+
 bool lim_update_channel_width(struct mac_context *mac_ctx,
 			      tpDphHashNode sta_ptr,
 			      struct pe_session *session,

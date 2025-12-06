@@ -3600,19 +3600,82 @@ lim_del_bss(struct mac_context *mac, tpDphHashNode sta, uint16_t bss_idx,
 }
 
 /**
- * lim_update_vhtcaps_assoc_resp : Update VHT caps in assoc response.
- * @mac_ctx Pointer to Global MAC structure
- * @pAddBssParams: parameters required for add bss params.
- * @vht_caps: VHT capabilities.
- * @pe_session : session entry.
+ * lim_validate_vht_mcs_for_bw() - Validate VHT MCS support for bandwidth
+ * @rx_mcs_map: RX MCS map to validate
+ * @tx_mcs_map: TX MCS map to validate
  *
- * Return : void
+ * This helper function checks if the MCS maps have at least one valid
+ * spatial stream with MCS support. If all spatial streams are disabled
+ * (0xFFFF), the bandwidth is not usable.
+ *
+ * Return: true if MCS maps are valid, false otherwise
+ */
+static bool lim_validate_vht_mcs_for_bw(uint16_t rx_mcs_map,
+						uint16_t tx_mcs_map)
+{
+	/*
+	 * MCS map format: 2 bits per spatial stream
+	 * 0: MCS 0-7, 1: MCS 0-8, 2: MCS 0-9, 3: Not supported
+	 * 0xFFFF means all spatial streams are not supported
+	 */
+	if (rx_mcs_map == 0xFFFF || tx_mcs_map == 0xFFFF) {
+		pe_debug("Invalid MCS map: rx=0x%x tx=0x%x", rx_mcs_map,
+			 tx_mcs_map);
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * lim_get_min_ch_width() - Get minimum of two channel widths
+ * @ch_width1: First channel width
+ * @ch_width2: Second channel width
+ *
+ * Return: Minimum channel width
+ */
+static enum phy_ch_width lim_get_min_ch_width(enum phy_ch_width ch_width1,
+					      enum phy_ch_width ch_width2)
+{
+	/* Channel width priority: 20 < 40 < 80 < 80+80 < 160 < 320 */
+	if (ch_width1 == CH_WIDTH_INVALID || ch_width2 == CH_WIDTH_INVALID)
+		return CH_WIDTH_20MHZ;
+
+	return (wlan_reg_get_bw_value(ch_width1) <
+		wlan_reg_get_bw_value(ch_width2)) ? ch_width1 : ch_width2;
+}
+
+/**
+ * lim_update_vhtcaps_assoc_resp() - Update VHT capabilities from Assoc Rsp
+ * @mac_ctx: Pointer to Global MAC structure
+ * @pAddBssParams: Parameters required for add bss params
+ * @vht_caps: VHT capabilities from association response
+ *
+ * This function processes the VHT Capability IE from the AP's association
+ * response frame. It validates the claimed bandwidth against the VHT
+ * Supported MCS Set to ensure the AP has valid MCS support. The result
+ * is stored in pAddBssParams->staContext.ap_max_ch_width.
+ *
+ * Return: void
  */
 void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 				   struct bss_params *pAddBssParams,
-				   tDot11fIEVHTCaps *vht_caps,
-				   struct pe_session *pe_session)
+				   tDot11fIEVHTCaps *vht_caps)
 {
+	uint8_t claimed_ch_width;
+	bool mcs_valid;
+
+	pAddBssParams->staContext.ap_max_ch_width = 0;
+
+	if (!vht_caps) {
+		pe_err("vht_caps is NULL, vht ap max ch width stays 0");
+		return;
+	}
+
+	pe_debug("VHT caps present: claimed supportedChannelWidthSet=%d rxMCSMap=0x%x txMCSMap=0x%x",
+		 vht_caps->supportedChannelWidthSet, vht_caps->rxMCSMap,
+		 vht_caps->txMCSMap);
+
 	pAddBssParams->staContext.vht_caps =
 		((vht_caps->maxMPDULen <<
 		  SIR_MAC_VHT_CAP_MAX_MPDU_LEN) |
@@ -3658,48 +3721,116 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 	pAddBssParams->staContext.maxAmpduSize =
 		SIR_MAC_GET_VHT_MAX_AMPDU_EXPO(
 				pAddBssParams->staContext.vht_caps);
+
+	claimed_ch_width = vht_caps->supportedChannelWidthSet;
+
+	switch (claimed_ch_width) {
+	case 0:
+		mcs_valid = lim_validate_vht_mcs_for_bw(vht_caps->rxMCSMap,
+							vht_caps->txMCSMap);
+		if (mcs_valid) {
+			pAddBssParams->staContext.ap_max_ch_width =
+				CH_WIDTH_80MHZ;
+		} else {
+			pe_debug("VHT BW fallback: claimed 80MHz but MCS invalid");
+		}
+		break;
+	case 1:
+		mcs_valid = lim_validate_vht_mcs_for_bw(vht_caps->rxMCSMap,
+							vht_caps->txMCSMap);
+		if (mcs_valid) {
+			pAddBssParams->staContext.ap_max_ch_width =
+				CH_WIDTH_160MHZ;
+		} else {
+			pe_debug("VHT BW fallback: claimed 160MHz but MCS invalid");
+		}
+		break;
+	case 2:
+		mcs_valid = lim_validate_vht_mcs_for_bw(vht_caps->rxMCSMap,
+							vht_caps->txMCSMap);
+		if (mcs_valid) {
+			pAddBssParams->staContext.ap_max_ch_width =
+				CH_WIDTH_80P80MHZ;
+		} else {
+			pe_debug("VHT BW fallback: claimed 80+80MHz but MCS invalid");
+		}
+		break;
+	default:
+		pe_debug("VHT BW fallback: unknown supportedChannelWidthSet=%d, setting ap_max_ch_width=0",
+			 claimed_ch_width);
+		break;
+	}
+
+	pe_debug("VHT caps BW result: ap_max_ch_width=%d",
+		 pAddBssParams->staContext.ap_max_ch_width);
 }
 
 /**
- * lim_update_vht_oper_assoc_resp : Update VHT Operations in assoc response.
- * @mac_ctx Pointer to Global MAC structure
- * @pAddBssParams: parameters required for add bss params.
- * @assoc_rsp: assoc response from AP.
- * @pe_session : session entry.
+ * lim_update_vht_oper_assoc_resp() - Update VHT OP from Assoc Rsp
+ * @mac_ctx: Pointer to Global MAC structure
+ * @pAddBssParams: Parameters required for add bss params
+ * @assoc_rsp: Association response from AP
  *
- * Return : void
+ * This function processes the VHT Operation IE from the association
+ * response and calculates the final channel width. It uses the AP's
+ * max capability, current operational state, and firmware capability
+ * to make the best bandwidth decision.
+ *
+ * Return: void
  */
 static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 					   struct bss_params *pAddBssParams,
-					   tpSirAssocRsp assoc_rsp,
-					   struct pe_session *pe_session)
+					   tpSirAssocRsp assoc_rsp)
 {
-	tDot11fIEVHTOperation *vht_oper = NULL;
+	tDot11fIEVHTOperation *vht_oper_ie = NULL;
 	tDot11fIEVHTCaps *vht_caps = NULL;
-	enum phy_ch_width ch_width;
+	enum phy_ch_width ap_bcon_ch_width;
+	enum phy_ch_width final_ch_width;
+	enum phy_ch_width fw_vht_ch_wd;
+	uint32_t fw_vht_ch_wd_cfg;
 
-	ch_width = pAddBssParams->ch_width;
-
-	if (assoc_rsp->VHTCaps.present) {
-		vht_caps = &assoc_rsp->VHTCaps;
-		vht_oper = &assoc_rsp->VHTOperation;
-	} else if (assoc_rsp->vendor_vht_ie.VHTCaps.present) {
-		vht_caps = &assoc_rsp->vendor_vht_ie.VHTCaps;
-		vht_oper = &assoc_rsp->vendor_vht_ie.VHTOperation;
+	if (pAddBssParams->staContext.ap_max_ch_width == 0) {
+		pe_debug("VHT ops BW fallback: VHT disabled in caps processing");
+		return;
 	}
 
-	if (vht_oper && vht_caps && pe_session->ch_width &&
-	    vht_oper->chanWidth == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
-		ch_width = lim_get_vht_ch_width(vht_caps, vht_oper,
-						&assoc_rsp->HTInfo,
-						&assoc_rsp->HTCaps,
-						&assoc_rsp->OperatingMode);
+	if (assoc_rsp->VHTOperation.present)
+		vht_oper_ie = &assoc_rsp->VHTOperation;
+	else if (assoc_rsp->vendor_vht_ie.VHTOperation.present)
+		vht_oper_ie = &assoc_rsp->vendor_vht_ie.VHTOperation;
 
-	if (ch_width > pe_session->ch_width)
-		ch_width = pe_session->ch_width;
+	if (assoc_rsp->VHTCaps.present)
+		vht_caps = &assoc_rsp->VHTCaps;
+	else if (assoc_rsp->vendor_vht_ie.VHTCaps.present)
+		vht_caps = &assoc_rsp->vendor_vht_ie.VHTCaps;
 
-	pAddBssParams->ch_width = ch_width;
-	pAddBssParams->staContext.ch_width = ch_width;
+	if (vht_oper_ie && vht_caps) {
+		ap_bcon_ch_width = lim_get_vht_ch_width(vht_caps, vht_oper_ie,
+							&assoc_rsp->HTInfo,
+							&assoc_rsp->HTCaps,
+							&assoc_rsp->OperatingMode);
+	} else if (vht_oper_ie) {
+		ap_bcon_ch_width = vht_oper_ie->chanWidth;
+		pe_debug("VHT ops BW fallback: missing vht_caps");
+	} else {
+		pe_debug("VHT ops BW fallback: missing VHT Operation IE");
+		return;
+	}
+
+	fw_vht_ch_wd_cfg = wma_get_vht_ch_width();
+	fw_vht_ch_wd = lim_convert_vht_width_to_phy_width(fw_vht_ch_wd_cfg);
+
+	final_ch_width = lim_get_min_ch_width(
+				fw_vht_ch_wd,
+				pAddBssParams->staContext.ap_max_ch_width);
+	final_ch_width = lim_get_min_ch_width(final_ch_width, ap_bcon_ch_width);
+
+	pe_debug("VHT BW calc: fw_vht_ch_wd=%d ap_max_ch_width=%d ap_bcon_ch_width=%d final=%d",
+		 fw_vht_ch_wd, pAddBssParams->staContext.ap_max_ch_width,
+		 ap_bcon_ch_width, final_ch_width);
+
+	pAddBssParams->ch_width = final_ch_width;
+	pAddBssParams->staContext.ch_width = final_ch_width;
 }
 
 #ifdef WLAN_FEATURE_11BE
@@ -3888,24 +4019,6 @@ static enum phy_ch_width lim_get_bw_from_ht_caps(tDot11fIEHTCaps *ht_cap)
 		return CH_WIDTH_40MHZ;
 
 	return CH_WIDTH_20MHZ;
-}
-
-/**
- * lim_get_min_ch_width() - Get minimum of two channel widths
- * @ch_width1: First channel width
- * @ch_width2: Second channel width
- *
- * Return: Minimum channel width
- */
-static enum phy_ch_width lim_get_min_ch_width(enum phy_ch_width ch_width1,
-					       enum phy_ch_width ch_width2)
-{
-	/* Channel width priority: 20 < 40 < 80 < 80+80 < 160 < 320 */
-	if (ch_width1 == CH_WIDTH_INVALID || ch_width2 == CH_WIDTH_INVALID)
-		return CH_WIDTH_20MHZ;
-
-	return (wlan_reg_get_bw_value(ch_width1) <
-		wlan_reg_get_bw_value(ch_width2)) ? ch_width1 : ch_width2;
 }
 
 /**
@@ -4167,39 +4280,18 @@ static void lim_update_add_bss_ht_params(struct mac_context *mac,
 }
 
 /**
- * lim_sta_configure_vht_capability() - Configure VHT capability
- *                                       for STA connection
+ * lim_sta_configure_vht_capability() - Configure VHT capability for STA
  * @mac: Pointer to MAC context
  * @pe_session: Pointer to PE session
  * @pAssocRsp: Pointer to Association Response frame
  * @pAddBssParams: Pointer to Add BSS parameters structure
  *
  * This function detects and configures VHT capability from the
- * Association Response. It supports both standard VHT IEs and
- * vendor-specific VHT IEs for backward compatibility with
- * proprietary AP implementations.
+ * Association Response. It orchestrates the parsing of VHT
+ * Capabilities and VHT Operation IEs to determine the final
+ * supported channel width for the connection.
  *
- * The function performs the following:
- * 1. Checks if session supports VHT capability
- * 2. Detects VHT IEs in Association Response:
- *    - First tries standard VHT Caps/Operation IEs
- *    - Falls back to vendor-specific VHT IEs if standard
- *      not present
- * 3. Sets VHT capable flag in BSS parameters
- * 4. Updates VHT operation parameters (channel width,
- *    center freq)
- * 5. Updates VHT capability parameters (MCS, beamforming,
- *    STBC, etc.)
- *
- * VHT IE Detection Priority:
- * 1. Standard VHT IEs (Element ID 191/192) - Preferred
- * 2. Vendor-specific VHT IEs (Element ID 221) - Fallback
- * 3. No VHT - Disables VHT capability
- *
- * Context: Called during STA association processing in
- *          lim_sta_send_add_bss()
- *
- * Return: None (updates pAddBssParams and pe_session in-place)
+ * Return: None
  */
 static void
 lim_sta_configure_vht_capability(struct mac_context *mac,
@@ -4208,40 +4300,27 @@ lim_sta_configure_vht_capability(struct mac_context *mac,
 				 struct bss_params *pAddBssParams)
 {
 	tDot11fIEVHTCaps *vht_caps = NULL;
-	tDot11fIEVHTOperation *vht_oper = NULL;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 
 	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
 
-	/*
-	 * Check if session supports VHT and detect VHT IEs in
-	 * Association Response
-	 */
 	if (pe_session->vhtCapability &&
 	    pAssocRsp->VHTCaps.present) {
-		/*
-		 * Standard VHT IEs present in Association Response
-		 * This is the preferred and most common case
-		 */
 		pAddBssParams->vhtCapable =
 			pAssocRsp->VHTCaps.present;
 		vht_caps = &pAssocRsp->VHTCaps;
-		vht_oper = &pAssocRsp->VHTOperation;
-
 	} else if (pe_session->vhtCapability &&
 		   pAssocRsp->vendor_vht_ie.VHTCaps.present) {
+
+		pAddBssParams->vhtCapable =
+			pAssocRsp->vendor_vht_ie.VHTCaps.present;
 		/*
 		 * VHT IEs present in Vendor Specific IE
 		 * Some APs (especially older or proprietary ones)
 		 * encapsulate VHT IEs in vendor-specific IE
 		 * (Element ID 221) for backward compatibility
 		 */
-		pAddBssParams->vhtCapable =
-			pAssocRsp->vendor_vht_ie.VHTCaps.present;
-		pe_debug("VHT Caps and Operation are present in vendor Specific IE");
 		vht_caps = &pAssocRsp->vendor_vht_ie.VHTCaps;
-		vht_oper = &pAssocRsp->vendor_vht_ie.VHTOperation;
-
 	} else {
 		/*
 		 * No VHT capability in Association Response
@@ -4249,46 +4328,28 @@ lim_sta_configure_vht_capability(struct mac_context *mac,
 		 */
 		pAddBssParams->vhtCapable = 0;
 		pe_session->vhtCapability = false;
+		pe_debug("No VHT capability, disabling VHT");
 		return;
 	}
 
-	/*
-	 * Update VHT parameters if VHT is capable
-	 * This configures VHT operation and capability parameters
-	 * in BSS parameters and STA context
-	 */
 	if (pAddBssParams->vhtCapable) {
-		/*
-		 * Update VHT operation parameters:
-		 * - Channel width (80/160/80+80 MHz)
-		 * - Center frequency segment 0 and 1
-		 * - Basic VHT MCS set
-		 */
-		if (vht_oper && vht_oper->present)
-			lim_update_vht_oper_assoc_resp(mac,
-						       pAddBssParams,
-						       pAssocRsp,
-						       pe_session);
-
-		/*
-		 * Update VHT capability parameters:
-		 * - Max MPDU length
-		 * - Supported channel width set
-		 * - RX/TX LDPC
-		 * - Short GI for 80/160 MHz
-		 * - TX/RX STBC
-		 * - SU/MU beamformer/beamformee capabilities
-		 * - VHT MCS sets
-		 */
 		if (vht_caps)
 			lim_update_vhtcaps_assoc_resp(mac,
 						      pAddBssParams,
-						      vht_caps,
-						      pe_session);
+						      vht_caps);
+
+		lim_update_vht_oper_assoc_resp(mac,
+					       pAddBssParams,
+					       pAssocRsp);
 	} else {
 		/* VHT not capable: Check VHT TxBF 20MHz setting */
 		if (!vht_cap_info->enable_txbf_20mhz)
 			pAddBssParams->staContext.vhtTxBFCapable = 0;
+	}
+
+	if (pAddBssParams->ch_width > pe_session->ch_width) {
+		pAddBssParams->ch_width = pe_session->ch_width;
+		pAddBssParams->staContext.ch_width = pe_session->ch_width;
 	}
 }
 
