@@ -3070,6 +3070,28 @@ QDF_STATUS
 wlan_mlme_get_rf_mode_force_pwr_type(struct wlan_objmgr_psoc *psoc,
 				     int8_t *value);
 
+/**
+ * wlan_mlme_set_exclude_qcn_ie_support() - Set exclude QCN IE support
+ * @psoc: psoc context
+ * @value: Enable/Disable value.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_exclude_qcn_ie_support(struct wlan_objmgr_psoc *psoc,
+				     bool value);
+
+/**
+ * wlan_mlme_get_exclude_qcn_ie_support() - Get exclude QCN IE support
+ * @psoc: psoc context
+ * @value: Enable/Disable value.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_exclude_qcn_ie_support(struct wlan_objmgr_psoc *psoc,
+				     bool *value);
+
 #ifdef CONFIG_BAND_6GHZ
 /**
  * wlan_mlme_is_standard_6ghz_conn_policy_enabled() - Get the 6 GHz standard

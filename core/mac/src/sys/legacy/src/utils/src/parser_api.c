@@ -2176,6 +2176,16 @@ void populate_dot11f_qcn_ie(struct mac_context *mac,
 			    tDot11fIEqcn_ie *qcn_ie,
 			    uint8_t attr_id, enum mgmt_frame_type frame_type)
 {
+	bool exclude_qcn_ie_support = false;
+	QDF_STATUS status;
+
+	status = wlan_mlme_get_exclude_qcn_ie_support(mac->psoc,
+						      &exclude_qcn_ie_support);
+	if (QDF_IS_STATUS_SUCCESS(status) && exclude_qcn_ie_support) {
+		pe_debug("Exclude QCN IE");
+		return;
+	}
+
 	qcn_ie->present = 0;
 	if (mac->mlme_cfg->sta.qcn_ie_support &&
 	    ((attr_id == QCN_IE_ATTR_ID_ALL) ||

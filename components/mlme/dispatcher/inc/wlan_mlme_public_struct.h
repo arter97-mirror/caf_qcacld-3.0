@@ -1921,6 +1921,7 @@ enum station_prefer_bw {
  * @epcs_capability:                epcs capability enable or disable flag
  * @usr_disable_eht:                user disable the eht for STA
  * @eht_disable_punct_in_us_lpi:    Disable eht puncture in us lpi mode
+ * @exclude_qcn_ie_support:         Exclude QCN vendor IE support
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
@@ -1965,6 +1966,7 @@ struct wlan_mlme_sta_cfg {
 	bool usr_disable_eht;
 	bool eht_disable_punct_in_us_lpi;
 #endif
+	bool exclude_qcn_ie_support;
 };
 
 /**
