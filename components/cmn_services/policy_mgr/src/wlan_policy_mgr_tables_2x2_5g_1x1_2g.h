@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -45,6 +45,8 @@ static policy_mgr_next_action_two_connection_table_type
 	[PM_SAP_24_2x2] = {PM_NOP,		PM_DBS1_DOWNGRADE},
 	[PM_SAP_5_1x1] = {PM_DBS1,		PM_NOP},
 	[PM_SAP_5_2x2] = {PM_DBS1,		PM_NOP},
+	[PM_PASSTHRU_24_1x1_2x2] = {PM_NOP,        PM_DBS1},
+	[PM_PASSTHRU_5_1x1_2x2] = {PM_DBS1,        PM_NOP},
 };
 
 /*
