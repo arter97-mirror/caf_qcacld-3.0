@@ -2998,4 +2998,8 @@ config MLO_SAP_LINK_REMOVAL
 	depends on WLAN_FEATURE_MULTI_LINK_SAP
 	default n
 
+config TARGET_DUMP_FOR_NON_QC_PLATFORM
+	bool "dump control when msm subsystem is not defined"
+	default n
+
 endif # QCA_CLD_WLAN
