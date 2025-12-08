@@ -4717,6 +4717,26 @@ wlan_mlme_get_bt_profile_con(struct wlan_objmgr_psoc *psoc);
  * Return: max number of links that sta mlo connection can support
  */
 uint8_t wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc);
+/**
+ * wlan_mlme_get_sta_mlo_unified_connect_disconnect() - Get unified
+ * connect/disconnect for MLO config value
+ * @psoc: pointer to psoc object
+ *
+ * Return: Boolean value of unified connect/disconnect config (false by default)
+ */
+bool wlan_mlme_get_sta_mlo_unified_connect_disconnect(
+						struct wlan_objmgr_psoc *psoc);
+/**
+ * wlan_mlme_set_sta_mlo_unified_connect_disconnect() - Set unified
+ * connect/disconnect for MLO config value
+ * @psoc: pointer to psoc object
+ * @value: Boolean value to set
+ *
+ * Return: QDF_STATUS_SUCCESS on success or QDF_STATUS_E_FAILURE
+ */
+QDF_STATUS wlan_mlme_set_sta_mlo_unified_connect_disconnect(
+						struct wlan_objmgr_psoc *psoc,
+						bool value);
 
 /**
  * wlan_mlme_is_5gl_5gh_mlsr_supported() - check 5GH_5GL MLSR supported
@@ -4974,6 +4994,22 @@ wlan_mlme_get_exclude_ext_mld_cap(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
+
+static inline bool
+wlan_mlme_get_sta_mlo_unified_connect_disconnect(
+					struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline QDF_STATUS
+wlan_mlme_set_sta_mlo_unified_connect_disconnect(
+					struct wlan_objmgr_psoc *psoc,
+					bool value)
+{
+	return false;
+}
+
 #endif
 
 #ifdef WLAN_FEATURE_MULTI_LINK_SAP

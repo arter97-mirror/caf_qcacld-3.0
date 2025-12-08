@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -690,11 +690,39 @@
 
 #define CFG_MLO_PREFER_PERCENTAGE_CFG CFG(CFG_MLO_PREFER_PERCENTAGE)
 
+/*
+ * <cfg>
+ * mlo_unified_connect_disconnect - Enable unified connect/disconnect for MLO
+ * @Default: false
+ *
+ * This cfg is used to enable unified connect/disconnect functionality for MLO
+ * during link switch. In this case, driver will club the major connect command
+ * i.e peer_create, vdev_start, peer_assoc and vdev_up and disconnect command
+ * i.e peer_delete, vdev_stop into single command and send it to firmware.
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal
+ *
+ *
+ * </cfg>
+ */
+#define CFG_MLO_UNIFIED_CONNECT_DISCONNECT CFG_BOOL( \
+		"mlo_unified_connect_disconnect",\
+		0, \
+		"unified connect/disconnect for MLO")
+
+#define CFG_MLO_UNIFIED_CONNECT_DISCONNECT_CFG \
+	CFG(CFG_MLO_UNIFIED_CONNECT_DISCONNECT)
+
 #else
 #define CFG_MLO_SUPPORT_LINK_NUM_CFG
 #define CFG_MLO_SUPPORT_LINK_BAND_CFG
 #define CFG_MLO_MAX_SIMULTANEOUS_LINKS_CFG
 #define CFG_MLO_PREFER_PERCENTAGE_CFG
+#define CFG_MLO_UNIFIED_CONNECT_DISCONNECT_CFG
 #endif
 
 /*
@@ -803,5 +831,6 @@
 	CFG_MLO_PREFER_PERCENTAGE_CFG \
 	CFG_MLO_SAME_LINK_MLD_ADDR_CFG \
 	CFG_MLO_MLO_5GL_5GH_MLSR_CFG \
-	CFG_MLO_EPCS_SUPPORT_ENABLE_CFG
+	CFG_MLO_EPCS_SUPPORT_ENABLE_CFG \
+	CFG_MLO_UNIFIED_CONNECT_DISCONNECT_CFG
 #endif /* CFG_MLME_STA_H__ */

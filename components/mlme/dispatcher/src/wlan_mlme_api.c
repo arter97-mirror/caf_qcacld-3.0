@@ -1623,6 +1623,33 @@ wlan_mlme_get_bt_profile_con(struct wlan_objmgr_psoc *psoc)
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+bool wlan_mlme_get_sta_mlo_unified_connect_disconnect(
+						struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.sta.mlo_unified_connect_disconnect;
+}
+
+QDF_STATUS wlan_mlme_set_sta_mlo_unified_connect_disconnect(
+						struct wlan_objmgr_psoc *psoc,
+						bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.sta.mlo_unified_connect_disconnect = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
