@@ -4380,6 +4380,169 @@ lim_update_add_bss_vht_params(struct mac_context *mac,
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
 
+#ifdef WLAN_FEATURE_11AX
+/**
+ * lim_sta_process_he_capability() - Process HE capability from
+ *                                   Association Response
+ * @mac: Pointer to MAC context
+ * @pAssocRsp: Pointer to Association Response frame
+ * @pAddBssParams: Pointer to Add BSS parameters
+ * @pe_session: Pointer to PE session
+ *
+ * This function processes the HE Capability IE from the AP's
+ * association response frame.
+ *
+ * Return: None
+ */
+static void lim_sta_process_he_capability(struct mac_context *mac,
+					  tpSirAssocRsp pAssocRsp,
+					  struct bss_params *pAddBssParams,
+					  struct pe_session *pe_session)
+{
+	tpDphHashNode sta = NULL;
+	struct bss_description *bss_desc;
+
+	if (!pe_session->lim_join_req) {
+		pe_err("lim_join_req is NULL");
+		return;
+	}
+
+	bss_desc = &pe_session->lim_join_req->bssDescription;
+
+	/* Handle HE capability not present case first */
+	if (!(lim_is_session_he_capable(pe_session) &&
+	      pAssocRsp->he_cap.present)) {
+		lim_reset_session_he_capable(pe_session);
+		pAddBssParams->staContext.he_capable = 0;
+		pe_debug("HE capability not present, disabling HE");
+		return;
+	}
+
+	/* HE capability is present - process it */
+	/* Use STA SMPS capability as AP's SMPS value is not
+	 * valid, and use p2p GO's assoc response value to
+	 * avoid IOT issue.
+	 */
+	if (pe_session->opmode != QDF_P2P_CLIENT_MODE) {
+		pAssocRsp->he_cap.he_dynamic_smps =
+			lim_is_he_dynamic_smps_enabled(pe_session);
+		if (lim_is_he_6ghz_band(pe_session))
+			pAssocRsp->he_6ghz_band_cap.sm_pow_save =
+				pe_session->ht_config.mimo_power_save;
+	}
+	lim_add_bss_he_cap(pAddBssParams, pAssocRsp);
+	lim_add_bss_he_cfg(pAddBssParams, pe_session);
+
+	if (!lim_is_he_6ghz_band(pe_session))
+		return;
+
+	/* Process HE 6GHz specific capabilities */
+	if (lim_is_he_6ghz_band(pe_session)) {
+		sta = dph_get_hash_entry(mac,
+					 DPH_STA_HASH_INDEX_PEER,
+					 &pe_session->dph.dphHashTable);
+		if (sta) {
+			lim_intersect_ap_he_caps(pe_session,
+						 pAddBssParams,
+						 pAssocRsp, bss_desc);
+			lim_update_he_stbc_capable(
+				&pAddBssParams->staContext);
+			lim_update_he_mcs_12_13(
+				&pAddBssParams->staContext, sta);
+		}
+
+		lim_update_he_6ghz_band_caps(mac,
+				&pAssocRsp->he_6ghz_band_cap,
+				&pAddBssParams->staContext);
+	}
+}
+
+/**
+ * lim_sta_process_he_operation() - Process HE operation from
+ *                                  Association Response
+ * @mac: Pointer to MAC context
+ * @pAssocRsp: Pointer to Association Response frame
+ * @pAddBssParams: Pointer to Add BSS parameters
+ * @pe_session: Pointer to PE session
+ *
+ * This function processes the HE Operation IE from the association
+ * response for 6 GHz band operations and EHT capabilities.
+ *
+ * Return: None
+ */
+static void lim_sta_process_he_operation(struct mac_context *mac,
+					 tpSirAssocRsp pAssocRsp,
+					 struct bss_params *pAddBssParams,
+					 struct pe_session *pe_session)
+{
+	struct bss_description *bss_desc =
+		&pe_session->lim_join_req->bssDescription;
+	tDot11fBeaconIEs *bcn_ies = &bss_desc->bcn_ies;
+
+	if (!lim_is_he_6ghz_band(pe_session))
+		return;
+
+	if (lim_is_he_6ghz_band(pe_session)) {
+		/* Process HE Operation IE for 6 GHz only */
+		if (lim_is_session_he_capable(pe_session) &&
+		    pAssocRsp->he_cap.present) {
+			if (!lim_is_eht_connection_op_info_present(
+					pe_session, pAssocRsp))
+				lim_update_he_6gop_assoc_resp(pAddBssParams,
+							      &pAssocRsp->he_op,
+							      pe_session);
+		}
+
+		/* Update BSS HE capabilities for 6GHz band */
+		lim_update_bss_he_capable(mac, pAddBssParams);
+
+		/* Process EHT capabilities for 6 GHz */
+		if (lim_is_session_eht_capable(pe_session) &&
+		    pAssocRsp->eht_cap.present)
+			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
+						  bcn_ies, pAssocRsp);
+	}
+}
+
+/**
+ * lim_sta_configure_he_capability() - Configure HE capability for
+ *                                     STA connection
+ * @mac: Pointer to MAC context
+ * @pAssocRsp: Pointer to Association Response frame
+ * @pAddBssParams: Pointer to Add BSS parameters structure
+ * @pe_session: Pointer to PE session
+ *
+ * This function orchestrates the parsing of HE Capabilities and HE
+ * Operation IEs to determine the final supported parameters for the
+ * connection. It processes both HE Capability IE and HE Operation IE
+ * (6 GHz only) and does NOT modify EHT related functions.
+ *
+ * Return: None
+ */
+static void lim_sta_configure_he_capability(struct mac_context *mac,
+					    tpSirAssocRsp pAssocRsp,
+					    struct bss_params *pAddBssParams,
+					    struct pe_session *pe_session)
+{
+	lim_sta_process_he_capability(mac, pAssocRsp, pAddBssParams,
+				      pe_session);
+	lim_sta_process_he_operation(mac, pAssocRsp, pAddBssParams,
+				     pe_session);
+}
+
+#else /* !WLAN_FEATURE_11AX */
+
+
+static inline void
+lim_sta_configure_he_capability(struct mac_context *mac,
+				tpSirAssocRsp pAssocRsp,
+				struct bss_params *pAddBssParams,
+				struct pe_session *pe_session)
+{
+}
+
+#endif /* WLAN_FEATURE_11AX */
+
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 				tpSirAssocRsp pAssocRsp,
 				struct bss_description *bss_desc,
@@ -4434,19 +4597,8 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 	lim_update_add_bss_vht_params(mac, pe_session, pAssocRsp,
 				      pAddBssParams);
 
-	if (lim_is_session_he_capable(pe_session) &&
-	    pAssocRsp->he_cap.present) {
-		/* Use STA SMPS capability as AP's SMPS value is not valid,
-		 * and use p2p GO's assoc response value to avoid IOT issue.
-		 */
-		if (pe_session->opmode != QDF_P2P_CLIENT_MODE)
-			pAssocRsp->he_cap.he_dynamic_smps =
-				lim_is_he_dynamic_smps_enabled(pe_session);
-		lim_add_bss_he_cap(pAddBssParams, pAssocRsp);
-		lim_add_bss_he_cfg(pAddBssParams, pe_session);
-	} else {
-		lim_reset_session_he_capable(pe_session);
-	}
+	lim_sta_configure_he_capability(mac, pAssocRsp, pAddBssParams,
+					pe_session);
 
 	if (lim_is_session_eht_capable(pe_session) &&
 	    (pAssocRsp->eht_cap.present)) {
@@ -4560,19 +4712,6 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 				sta_context->vht_extended_nss_bw_cap = 0;
 			}
 		}
-		if (lim_is_session_he_capable(pe_session) &&
-		    pAssocRsp->he_cap.present) {
-			lim_intersect_ap_he_caps(pe_session, pAddBssParams,
-						 pAssocRsp, bss_desc);
-			lim_update_he_stbc_capable(&pAddBssParams->staContext);
-			lim_update_he_mcs_12_13(&pAddBssParams->staContext,
-						sta);
-		}
-
-		if (lim_is_session_eht_capable(pe_session) &&
-		    pAssocRsp->eht_cap.present)
-			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
-						  bcn_ies, pAssocRsp);
 
 		/* Use STA SMPS capability as AP's SMPS value is not valid,
 		 * and use p2p GO's assoc response value to avoid IOT issue.
@@ -4646,35 +4785,6 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 				pAddBssParams->staContext.vhtLdpcCapable = 0;
 			}
 		}
-
-	}
-	if (lim_is_he_6ghz_band(pe_session)) {
-		if (lim_is_session_he_capable(pe_session) &&
-		    pAssocRsp->he_cap.present) {
-			lim_intersect_ap_he_caps(pe_session, pAddBssParams,
-						 pAssocRsp, bss_desc);
-			lim_update_he_stbc_capable(&pAddBssParams->staContext);
-			lim_update_he_mcs_12_13(&pAddBssParams->staContext,
-						sta);
-			if (!lim_is_eht_connection_op_info_present(pe_session,
-								   pAssocRsp))
-				lim_update_he_6gop_assoc_resp(pAddBssParams,
-							      &pAssocRsp->he_op,
-							      pe_session);
-			/* Use STA SMPS cap as AP's SMPS value is not valid,
-			 * and use p2p GO's assoc response value to avoid IOT issue.
-			 */
-			if (pe_session->opmode != QDF_P2P_CLIENT_MODE)
-				pAssocRsp->he_6ghz_band_cap.sm_pow_save =
-					pe_session->ht_config.mimo_power_save;
-			lim_update_he_6ghz_band_caps(mac,
-						&pAssocRsp->he_6ghz_band_cap,
-						&pAddBssParams->staContext);
-		}
-		if (lim_is_session_eht_capable(pe_session) &&
-		    pAssocRsp->eht_cap.present)
-			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
-						  bcn_ies, pAssocRsp);
 	}
 
 	LIM_PARSE_MCS_IES_FOR_NSS(&nss_ies, bcn_ies, MLME_DOT11_MODE_ALL);
