@@ -166,7 +166,10 @@ static bool tdls_check_wait_more(struct wlan_objmgr_vdev *vdev)
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_objmgr_vdev *mlo_vdev;
 	struct tdls_vdev_priv_obj *tdls_vdev;
-	/* expect response number */
+	/*
+	 * expect response number - only count vdevs with
+	 * active discovery timers
+	 */
 	int expect_num = 0;
 	/* received response number */
 	int receive_num = 0;
@@ -178,24 +181,38 @@ static bool tdls_check_wait_more(struct wlan_objmgr_vdev *vdev)
 		if (!mlo_vdev)
 			continue;
 
-		if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE)
+		if (wlan_vdev_mlme_get_opmode(mlo_vdev) != QDF_STA_MODE)
 			continue;
 
-		if (mlo_mgr_is_mlo_vdev_active(mlo_vdev))
-			expect_num++;
+		if (!wlan_cm_is_vdev_connected(mlo_vdev))
+			continue;
 
 		tdls_vdev =
 		     wlan_objmgr_vdev_get_comp_private_obj(mlo_vdev,
 							   WLAN_UMAC_COMP_TDLS);
-		if (tdls_vdev->rx_mgmt)
+		if (!tdls_vdev)
+			continue;
+
+		/*
+		 * Only count vdevs that have discovery timer running
+		 * (i.e., sent discovery request)
+		 */
+		if (QDF_TIMER_STATE_RUNNING ==
+		    qdf_mc_timer_get_current_state(&tdls_vdev->peer_discovery_timer)) {
+			tdls_debug("vdev:%d peer discovery timer is running",
+				   wlan_vdev_get_id(mlo_vdev));
+			expect_num++;
+		}
+
+		if (tdls_vdev->rx_mgmt) {
+			tdls_debug("vdev:%d Discovery response cached",
+				   wlan_vdev_get_id(mlo_vdev));
 			receive_num++;
+		}
 	}
 
 	/* The current rx frame is not cached in rx_mgmt yet, hence +1 */
-	if (expect_num > receive_num + 1)
-		return true;
-	else
-		return false;
+	return (expect_num > (receive_num + 1));
 }
 
 struct wlan_objmgr_vdev *
@@ -324,7 +341,7 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 	struct wlan_objmgr_vdev *mlo_vdev;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	bool peer_mlo;
-	bool waitmore = false;
+	bool wait_further = false;
 	uint8_t i;
 
 	vdev = tdls_vdev->vdev;
@@ -371,15 +388,12 @@ tdls_process_mlo_rx_mgmt_sync(struct tdls_soc_priv_obj *tdls_soc,
 		return status;
 	}
 
-	if (tdls_vdev->rx_mgmt) {
-		qdf_mem_free(tdls_vdev->rx_mgmt);
-		tdls_vdev->rx_mgmt = NULL;
-	}
+	qdf_mem_free(tdls_vdev->rx_mgmt);
+	tdls_vdev->rx_mgmt = NULL;
 
 	/* Wait for discovery response from all the active links */
-	waitmore = tdls_check_wait_more(vdev);
-
-	if (waitmore) {
+	wait_further = tdls_check_wait_more(vdev);
+	if (wait_further) {
 		/* do not stop the timer */
 		tdls_debug("vdev:%d wait further for tdls response",
 			   wlan_vdev_get_id(vdev));
@@ -710,7 +724,7 @@ tdls_activate_send_mgmt_request(struct tdls_action_frame_request *action_req)
 		goto release_cmd;
 	}
 
-	tdls_debug("session_id %d "
+	tdls_debug("vdev_id %d "
 		   "tdls_mgmt.dialog %d "
 		   "tdls_mgmt.frame_type %d "
 		   "tdls_mgmt.status_code %d "
@@ -781,7 +795,8 @@ tdls_activate_send_mgmt_request(struct tdls_action_frame_request *action_req)
 	/* Send the request to PE. */
 	qdf_mem_zero(&msg, sizeof(msg));
 
-	tdls_debug("sending TDLS Mgmt Frame req to PE ");
+	tdls_debug("vdev:%d sending TDLS Mgmt Frame req to PE",
+		   action_req->vdev_id);
 	tdls_mgmt_req->message_type = tdls_soc_obj->tdls_send_mgmt_req;
 
 	msg.type = tdls_soc_obj->tdls_send_mgmt_req;

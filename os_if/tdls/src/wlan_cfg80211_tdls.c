@@ -1382,6 +1382,9 @@ wlan_cfg80211_tdls_mgmt_mlo(struct hdd_adapter *adapter, const uint8_t *peer,
 				continue;
 			}
 
+			osif_debug("ML vdev:%d link_id:%d token:%d transmit TDLS discovery request",
+				   wlan_vdev_get_id(mlo_vdev), link_id, dialog_token);
+
 			ret = wlan_cfg80211_tdls_mgmt(mlo_vdev, peer,
 						      action_code,
 						      dialog_token, status_code,

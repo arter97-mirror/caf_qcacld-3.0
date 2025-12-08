@@ -761,6 +761,8 @@ void tdls_timer_restart(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
+	tdls_debug("vdev:%d expiration_time:%d start TDLS discovery timer",
+		   wlan_vdev_get_id(vdev), expiration_time);
 	if (QDF_TIMER_STATE_RUNNING !=
 	    qdf_mc_timer_get_current_state(timer))
 		qdf_mc_timer_start(timer, expiration_time);

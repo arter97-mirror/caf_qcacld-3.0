@@ -92,6 +92,68 @@ static int32_t tdls_peer_reset_discovery_processed(
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static QDF_STATUS
+tdls_vdev_cleanup_cached_rx_frame(struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_vdev_priv_obj *tdls_vdev;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct wlan_objmgr_vdev *mlo_vdev;
+	int i;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		tdls_vdev = wlan_objmgr_vdev_get_comp_private_obj(
+					vdev, WLAN_UMAC_COMP_TDLS);
+		if (!tdls_vdev)
+			return QDF_STATUS_E_FAILURE;
+
+		qdf_mem_free(tdls_vdev->rx_mgmt);
+		tdls_vdev->rx_mgmt = NULL;
+		tdls_vdev->link_score = 0;
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!mlo_vdev)
+			continue;
+
+		if (wlan_vdev_mlme_get_opmode(mlo_vdev) != QDF_STA_MODE)
+			continue;
+
+		tdls_vdev = wlan_objmgr_vdev_get_comp_private_obj(
+					mlo_vdev, WLAN_UMAC_COMP_TDLS);
+		if (!tdls_vdev)
+			continue;
+
+		qdf_mem_free(tdls_vdev->rx_mgmt);
+		tdls_vdev->rx_mgmt = NULL;
+		tdls_vdev->link_score = 0;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+tdls_vdev_cleanup_cached_rx_frame(struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_vdev_priv_obj *tdls_vdev;
+
+	tdls_vdev = wlan_objmgr_vdev_get_comp_private_obj(
+					vdev, WLAN_UMAC_COMP_TDLS);
+	if (!tdls_vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mem_free(tdls_vdev->rx_mgmt);
+	tdls_vdev->rx_mgmt = NULL;
+	tdls_vdev->link_score = 0;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 void tdls_discovery_timeout_peer_cb(void *user_data)
 {
 	int i;
@@ -191,9 +253,8 @@ void tdls_discovery_timeout_peer_cb(void *user_data)
 		tdls_set_rssi(tdls_vdev->vdev, mac, rx_mgmt->rx_rssi);
 
 cleanup:
-		qdf_mem_free(tdls_vdev->rx_mgmt);
-		tdls_vdev->rx_mgmt = NULL;
-		tdls_vdev->link_score = 0;
+		/* cleanup rx_mgmt for all the ML vdevs */
+		tdls_vdev_cleanup_cached_rx_frame(vdev);
 
 		return;
 

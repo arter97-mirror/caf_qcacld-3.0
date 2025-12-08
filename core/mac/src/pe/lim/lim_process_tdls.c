@@ -825,10 +825,10 @@ static QDF_STATUS lim_send_tdls_dis_req_frame(struct mac_context *mac,
 	}
 #endif
 
-	pe_debug("[TDLS] action: %d (%s) -AP-> OTA peer="QDF_MAC_ADDR_FMT,
-		TDLS_DISCOVERY_REQUEST,
-		lim_trace_tdls_action_string(TDLS_DISCOVERY_REQUEST),
-		QDF_MAC_ADDR_REF(peer_mac.bytes));
+	pe_debug("[TDLS] vdev:%d action: %d (%s) -AP-> OTA peer="QDF_MAC_ADDR_FMT,
+		 pe_session->vdev_id, TDLS_DISCOVERY_REQUEST,
+		 lim_trace_tdls_action_string(TDLS_DISCOVERY_REQUEST),
+		 QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
 	vdev_id = lim_get_def_dp_link_vdev_id(pe_session);
@@ -1837,10 +1837,10 @@ static QDF_STATUS lim_send_tdls_dis_rsp_frame(struct mac_context *mac,
 		qdf_mem_copy(pFrame + sizeof(tSirMacMgmtHdr) + nPayload, addIe,
 			     addIeLen);
 	}
-	pe_debug("[TDLS] action: %d (%s) -DIRECT-> OTA peer="QDF_MAC_ADDR_FMT,
-		TDLS_DISCOVERY_RESPONSE,
-		lim_trace_tdls_action_string(TDLS_DISCOVERY_RESPONSE),
-		QDF_MAC_ADDR_REF(peer_mac.bytes));
+	pe_debug("[TDLS] vdev:%d action: %d (%s) -DIRECT-> OTA peer="QDF_MAC_ADDR_FMT,
+		 pe_session->vdev_id, TDLS_DISCOVERY_RESPONSE,
+		 lim_trace_tdls_action_string(TDLS_DISCOVERY_RESPONSE),
+		 QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
 	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
@@ -2280,10 +2280,10 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 		payload += mlo_ie_len;
 	}
 
-	pe_debug("[TDLS] action: %d (%s) -AP-> OTA peer="QDF_MAC_ADDR_FMT,
-		TDLS_SETUP_REQUEST,
-		lim_trace_tdls_action_string(TDLS_SETUP_REQUEST),
-		QDF_MAC_ADDR_REF(peer_mac.bytes));
+	pe_debug("[TDLS] vdev:%d action: %d (%s) -AP-> OTA peer="QDF_MAC_ADDR_FMT,
+		 pe_session->vdev_id, TDLS_SETUP_REQUEST,
+		 lim_trace_tdls_action_string(TDLS_SETUP_REQUEST),
+		 QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
 
