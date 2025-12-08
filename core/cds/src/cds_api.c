@@ -3006,7 +3006,7 @@ cds_dp_get_vdev_stats(uint8_t vdev_id, struct cds_vdev_dp_stats *stats)
 #ifdef IPA_SIM
 QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
 {
-	osdev->smmu_s1_enabled = true;
+	osdev->smmu_s1_enabled = qdf_get_ipa_smmu_enabled();
 	return QDF_STATUS_SUCCESS;
 }
 #else
