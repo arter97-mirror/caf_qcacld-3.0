@@ -3886,12 +3886,6 @@ static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
 	pAddBssParams->ch_width = ch_width;
 	pAddBssParams->staContext.ch_width = ch_width;
 }
-#else
-static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
-					   struct bss_params *pAddBssParams,
-					   tDot11fIEeht_op *eht_op)
-{
-}
 #endif
 
 #ifdef WLAN_SUPPORT_TWT
@@ -4857,6 +4851,108 @@ lim_update_add_bss_he_params(struct mac_context *mac,
 {
 }
 #endif /* WLAN_FEATURE_11AX */
+#ifdef WLAN_FEATURE_11BE
+/**
+ * lim_sta_process_eht_capability() - Process EHT capability from
+ *                                    Association Response
+ * @mac: Pointer to MAC context
+ * @pAssocRsp: Pointer to Association Response frame
+ * @pAddBssParams: Pointer to Add BSS parameters
+ * @pe_session: Pointer to PE session
+ *
+ * This function processes the EHT Capability IE from the AP's
+ * association response frame. It validates both EHT capability
+ * and operation information are present before enabling EHT.
+ *
+ * Return: None
+ */
+static void lim_sta_process_eht_capability(struct mac_context *mac,
+					   tpSirAssocRsp pAssocRsp,
+					   struct bss_params *pAddBssParams,
+					   struct pe_session *pe_session)
+{
+	struct bss_description *bss_desc;
+	tDot11fBeaconIEs *bcn_ies;
+
+	if (!pAssocRsp || !pAddBssParams || !pe_session) {
+		pe_err("NULL pointer passed to lim_sta_process_eht_capability");
+		return;
+	}
+
+	/* Validate EHT capability is present */
+	if (lim_is_session_eht_capable(pe_session) &&
+	    pAssocRsp->eht_cap.present) {
+		lim_add_bss_eht_cap(pAddBssParams, pAssocRsp);
+		lim_add_bss_eht_cfg(pAddBssParams, pe_session);
+
+		/* Process EHT capabilities intersection for 6 GHz */
+		if (pe_session->lim_join_req) {
+			bss_desc = &pe_session->lim_join_req->bssDescription;
+			bcn_ies = &bss_desc->bcn_ies;
+			if (lim_is_he_6ghz_band(pe_session))
+				lim_intersect_ap_eht_caps(pe_session,
+							  pAddBssParams,
+							  bcn_ies, pAssocRsp);
+		}
+
+		/* Log warning if operation info is missing but continue with EHT */
+		if (!pAssocRsp->eht_op.present ||
+		    !pAssocRsp->eht_op.eht_op_information_present) {
+			pe_debug("vdev %d: EHT cap present but operation info missing for " QDF_MAC_ADDR_FMT ", using default parameters",
+				 pe_session->vdev_id,
+				 QDF_MAC_ADDR_REF(pe_session->bssId));
+		}
+	} else {
+		lim_update_session_eht_capable(pe_session, false);
+	}
+}
+
+/**
+ * lim_sta_process_eht_operation() - Process EHT operation from
+ *                                   Association Response
+ * @mac: Pointer to MAC context
+ * @pAssocRsp: Pointer to Association Response frame
+ * @pAddBssParams: Pointer to Add BSS parameters
+ * @pe_session: Pointer to PE session
+ *
+ * This function processes the EHT Operation IE from the association
+ * response and updates BSS parameters accordingly.
+ *
+ * Return: None
+ */
+static void lim_sta_process_eht_operation(struct mac_context *mac,
+					  tpSirAssocRsp pAssocRsp,
+					  struct bss_params *pAddBssParams,
+					  struct pe_session *pe_session)
+{
+	/* Validate both EHT capability and operation are present */
+	if (lim_is_session_eht_capable(pe_session) &&
+	    pAssocRsp->eht_cap.present &&
+	    pAssocRsp->eht_op.present &&
+	    pAssocRsp->eht_op.eht_op_information_present)
+		lim_update_eht_oper_assoc_resp(pe_session, pAddBssParams,
+					       &pAssocRsp->eht_op);
+}
+
+#else /* !WLAN_FEATURE_11BE */
+
+static inline void
+lim_sta_process_eht_capability(struct mac_context *mac,
+			       tpSirAssocRsp pAssocRsp,
+			       struct bss_params *pAddBssParams,
+			       struct pe_session *pe_session)
+{
+}
+
+static inline void
+lim_sta_process_eht_operation(struct mac_context *mac,
+			      tpSirAssocRsp pAssocRsp,
+			      struct bss_params *pAddBssParams,
+			      struct pe_session *pe_session)
+{
+}
+
+#endif /* WLAN_FEATURE_11BE */
 
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 				tpSirAssocRsp pAssocRsp,
@@ -4914,23 +5010,11 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 
 	lim_update_add_bss_he_params(mac, pAssocRsp, pAddBssParams, pe_session);
 
-	if (lim_is_session_eht_capable(pe_session) &&
-	    (pAssocRsp->eht_cap.present)) {
-		lim_add_bss_eht_cap(pAddBssParams, pAssocRsp);
-		lim_add_bss_eht_cfg(pAddBssParams, pe_session);
-		/* Process EHT capabilities intersection for 6 GHz */
-		if (lim_is_he_6ghz_band(pe_session))
-			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
-						  bcn_ies, pAssocRsp);
-	} else {
-		lim_update_session_eht_capable(pe_session, false);
-	}
-
-	if (lim_is_session_eht_capable(pe_session) &&
-	    pAssocRsp->eht_op.present &&
-	    pAssocRsp->eht_op.eht_op_information_present)
-		lim_update_eht_oper_assoc_resp(pe_session, pAddBssParams,
-					       &pAssocRsp->eht_op);
+	/* Configure EHT capability */
+	lim_sta_process_eht_capability(mac, pAssocRsp, pAddBssParams,
+				       pe_session);
+	lim_sta_process_eht_operation(mac, pAssocRsp, pAddBssParams,
+				      pe_session);
 
 	if (pAssocRsp->bss_max_idle_period.present) {
 		pAddBssParams->bss_max_idle_period =
