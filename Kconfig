@@ -3083,4 +3083,9 @@ config BMI_SDIO
 config AR6320_PCI
 	bool "ROME with PCIe interface"
 	default n
+
+config SCAN_RANDOM_MAC_ADDR
+       bool "Enable SCAN Random MAC addr"
+       default n
+
 endif # QCA_CLD_WLAN
