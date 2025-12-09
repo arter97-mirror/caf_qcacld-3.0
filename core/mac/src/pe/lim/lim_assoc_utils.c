@@ -3855,36 +3855,74 @@ static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 
 #ifdef WLAN_FEATURE_11BE
 /**
- * lim_update_eht_oper_assoc_resp : Update BW based on EHT operation IE.
- * @pe_session : session entry.
- * @pAddBssParams: parameters required for add bss params.
- * @eht_op: EHT Oper IE to update.
+ * lim_update_eht_oper_assoc_resp() - Update BW based on EHT operation IE
+ * @pe_session: Pointer to PE session
+ * @pAddBssParams: Pointer to Add BSS parameters
+ * @eht_op: Pointer to EHT operation IE
  *
- * Return : void
+ * This function validates the channel width derived from EHT Operation
+ * IE against the Center Frequency Segments (CCFS0/CCFS1) and updates
+ * the BSS parameters.
+ *
+ * Return: None
  */
 static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
 					   struct bss_params *pAddBssParams,
 					   tDot11fIEeht_op *eht_op)
 {
-	enum phy_ch_width ch_width;
+	enum phy_ch_width op_ch_width;
+	uint8_t center_freq_diff;
+	uint8_t ap_max_ch_width;
 
-	ch_width = wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
+	op_ch_width = wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						eht_op->channel_width);
 
-	/* Due to puncturing, EHT AP's send seg1 in VHT IE as zero which causes
-	 * downgrade to 80 MHz, check EHT IE and if EHT IE supports 160MHz
-	 * then stick to 160MHz only
-	 */
+	ap_max_ch_width = pAddBssParams->staContext.ap_max_ch_width;
 
-	if (ch_width > pAddBssParams->ch_width &&
-	    ch_width >= pe_session->ch_width) {
-		pe_debug("eht ch_width %d and ch_width of add bss param %d",
-			 ch_width, pAddBssParams->ch_width);
-		ch_width = pe_session->ch_width;
+	/*
+	 * Correct CCFS0/CCFS1 interpretation based on IEEE 802.11be:
+	 *
+	 * If CCFS1 is missing:
+	 *    - AP cannot encode >80 MHz -> clamp to <= 80 MHz
+	 *
+	 * If CCFS1 is present:
+	 *    Let diff = |CCFS1 - CCFS0|
+	 *
+	 *    diff == 16    -> 320 MHz (primary 160 MHz segment is +/-16)
+	 *    diff == 8    -> 160 MHz
+	 *    diff < 8    -> 80 MHz
+	 *    diff > 16    -> 80+80 MHz (non-contiguous channels)
+	 *
+	 * Matches 11be channelization Table 9-417e & section 36.3.24.2.
+	 */
+	if (!eht_op->ccfs1 && op_ch_width > CH_WIDTH_80MHZ) {
+		pe_debug("vdev %d: EHT oper IE: CCFS1 absent -> forcing 80 MHz, AP " QDF_MAC_ADDR_FMT,
+			 pe_session->vdev_id,
+			 QDF_MAC_ADDR_REF(pe_session->bssId));
+		op_ch_width = CH_WIDTH_80MHZ;
 	}
 
-	pAddBssParams->ch_width = ch_width;
-	pAddBssParams->staContext.ch_width = ch_width;
+	center_freq_diff = abs(eht_op->ccfs1 - eht_op->ccfs0);
+
+	if (center_freq_diff == 16) {
+		op_ch_width = CH_WIDTH_320MHZ;
+	} else if (center_freq_diff == 8) {
+		op_ch_width = CH_WIDTH_160MHZ;
+	} else if (center_freq_diff > 16) {
+		op_ch_width = CH_WIDTH_80P80MHZ;
+	} else {
+		op_ch_width = CH_WIDTH_80MHZ;
+	}
+
+	/*
+	 * Ensure oper BW does not exceed AP max BW and
+	 * host initiated VDEV start BW
+	 */
+	pAddBssParams->ch_width = QDF_MIN(op_ch_width, ap_max_ch_width);
+	pAddBssParams->ch_width = QDF_MIN(pAddBssParams->ch_width,
+					  pe_session->ch_width);
+
+	pAddBssParams->staContext.ch_width = pAddBssParams->ch_width;
 }
 #endif
 

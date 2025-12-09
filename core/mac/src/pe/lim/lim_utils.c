@@ -9133,7 +9133,19 @@ void lim_add_bss_eht_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
 
 	eht_cap = &assoc_rsp->eht_cap;
 	eht_op = &assoc_rsp->eht_op;
+
+	/*
+	 * - add_bss->eht_capable is used for vdev/bss level decisions.
+	 * - add_bss->staContext.eht_capable is consumed by WMA peer assoc
+	 *   (tpAddStaParams->eht_capable) via wma_send_peer_assoc().
+	 *
+	 * If staContext.eht_capable is not set for 2G/5G, FW peer assoc will
+	 * not populate EHT caps even when assoc_rsp->eht_cap is present,
+	 * causing STA to associate as non-EHT (often falling back to 11ax/ac).
+	 */
 	add_bss->eht_capable = eht_cap->present;
+	add_bss->staContext.eht_capable = eht_cap->present;
+
 	if (eht_cap)
 		qdf_mem_copy(&add_bss->staContext.eht_config,
 			     eht_cap, sizeof(*eht_cap));
@@ -9297,7 +9309,13 @@ void lim_update_session_eht_capable_chan_switch(struct mac_context *mac,
 void lim_update_bss_eht_capable(struct mac_context *mac,
 				struct bss_params *add_bss)
 {
+	/*
+	 * Keep bss/vdev and peer-assoc (staContext) EHT capability in sync.
+	 * make sure peer assoc sees it too.
+	 */
 	add_bss->eht_capable = true;
+	add_bss->staContext.eht_capable = true;
+
 	pe_debug("eht_capable: %d", add_bss->eht_capable);
 }
 
