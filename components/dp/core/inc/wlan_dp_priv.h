@@ -66,6 +66,11 @@ struct dp_rtpm_tput_policy_context {
 #endif
 
 #ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
+/*Define sample count for affinity override */
+#define DP_AFFN_OVERRIDE_SAMPLE_COUNT		5
+/* Define window count (number of window periods for final decision) */
+#define AFFN_OVERRIDE_WINDOW_COUNT	3
+
 /**
  * enum dp_affn_override_tput_level - DP affn override throughput levels
  * @DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE : dp affinity Idle throughput level
@@ -1002,6 +1007,10 @@ struct wlan_dp_stc;
  * @dp_agg_param.tc_ingress_prio:
  * @rtpm_tput_policy_ctx: Runtime Tput policy context
  * @dp_affn_override_params: DP affinity override parameters
+ * @dp_affn_pkt_count_samples: packet count per sample
+ * @dp_affn_sample_count: sample count for applying affinity
+ * @dp_affn_sample_winners: decision window winner throughput level
+ * @dp_affn_decision_sample_idx: decision sample index
  * @dp_affn_override_curr_tput_level: DP affinity override throughput level
  * @txrx_hist: TxRx histogram
  * @bbm_ctx: bus bandwidth manager context
@@ -1087,6 +1096,10 @@ struct wlan_dp_psoc_context {
 #ifdef WLAN_DP_AFFINITY_OVERRIDE_FEATURE
 	int dp_affn_override_curr_tput_level;
 	struct dp_affn_override_params dp_affn_override_params;
+	uint64_t dp_affn_pkt_count_samples[DP_AFFN_OVERRIDE_SAMPLE_COUNT];
+	uint64_t dp_affn_sample_count;
+	uint8_t dp_affn_sample_winners[AFFN_OVERRIDE_WINDOW_COUNT];
+	uint8_t dp_affn_decision_sample_idx;
 #endif /*WLAN_DP_AFFINITY_OVERRIDE_FEATURE*/
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 	qdf_atomic_t disable_rx_ol_in_concurrency;

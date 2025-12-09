@@ -1187,6 +1187,12 @@ void dp_affn_override_init(struct wlan_objmgr_psoc *psoc)
 	dp_affn_override_print_params(dp_ctx);
 
 	dp_ctx->dp_affn_override_curr_tput_level = -1;
+	dp_ctx->dp_affn_sample_count = 0;
+	qdf_mem_zero(dp_ctx->dp_affn_pkt_count_samples,
+		     sizeof(dp_ctx->dp_affn_pkt_count_samples));
+	qdf_mem_zero(dp_ctx->dp_affn_sample_winners,
+		     sizeof(dp_ctx->dp_affn_sample_winners));
+	dp_ctx->dp_affn_decision_sample_idx = 0;
 	qdf_cpumask_clear(&dp_ctx->rx_thread_cpu_mask);
 }
 
@@ -1271,10 +1277,9 @@ static inline void dp_affn_override_set_rx_thread_affinity(
 
 /**
  * dp_affn_override_compute_tput_level() - Function to compute tput level
- * based on total number of packets received.
+ * based on total number of packets received/transmitted.
  * @dp_ctx: Dp context
  * @total_packets: total packets(tx+rx)
- *
  * Return: dp affinity override throughput level calculated based on threshold
  */
 static inline enum dp_affn_override_tput_level dp_affn_override_compute_tput_level(
@@ -1282,17 +1287,67 @@ static inline enum dp_affn_override_tput_level dp_affn_override_compute_tput_lev
 	uint64_t total_packets)
 {
 	enum dp_affn_override_tput_level tput_level;
+	uint64_t high_thld, mid_thld, low_thld;
 
-	if (total_packets > dp_ctx->dp_cfg.dp_affn_override_high_threshold)
+	high_thld = (uint64_t)dp_ctx->dp_cfg.dp_affn_override_high_threshold;
+	mid_thld = (uint64_t)dp_ctx->dp_cfg.dp_affn_override_mid_threshold;
+	low_thld = (uint64_t)dp_ctx->dp_cfg.dp_affn_override_low_threshold;
+
+	if (total_packets > high_thld)
 		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH;
-	else if (total_packets > dp_ctx->dp_cfg.dp_affn_override_mid_threshold)
+	else if (total_packets > mid_thld)
 		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_MID;
-	else if (total_packets > dp_ctx->dp_cfg.dp_affn_override_low_threshold)
+	else if (total_packets > low_thld)
 		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW;
 	else
 		tput_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE;
 
 	return tput_level;
+}
+
+/**
+ * dp_affn_print_samples() - Helper function to safely print packet samples
+ * @dp_ctx: DP context
+ * @window_idx: Window index for logging
+ * @winner_level: Winner throughput level
+ * @winner_count: Number of samples at winner level
+ *
+ * This function safely prints the packet count samples for a window,
+ * handling buffer overflow and array bounds checking.
+ *
+ * Return: None
+ */
+static inline void
+dp_affn_print_samples(struct wlan_dp_psoc_context *dp_ctx,
+		      uint8_t window_idx,
+		      uint8_t winner_level,
+		      uint8_t winner_count)
+{
+	char samples_str[256];
+	int offset = 0;
+	int written;
+	uint8_t idx;
+
+	/* Build samples string with overflow protection */
+	for (idx = 0; idx < DP_AFFN_OVERRIDE_SAMPLE_COUNT; idx++) {
+		written = snprintf(samples_str + offset,
+				   sizeof(samples_str) - offset,
+				   "%s%llu",
+				   (idx == 0) ? "" : " ",
+				   dp_ctx->dp_affn_pkt_count_samples[idx]);
+
+		/* Check for buffer overflow */
+		if (written < 0 || offset + written >= sizeof(samples_str)) {
+			dp_warn("string truncated at index %u", idx);
+			break;
+		}
+		offset += written;
+	}
+
+	dp_info("Window %u samples: [%s], winner: %s (count: %u/%u)",
+		window_idx, samples_str,
+		dp_affn_override_tput_lvl_to_str(winner_level),
+		winner_count, DP_AFFN_OVERRIDE_SAMPLE_COUNT);
 }
 
 /**
@@ -1340,25 +1395,242 @@ static inline void dp_set_affinity_override(
 	dp_affn_override_set_rx_thread_affinity(dp_ctx, rx_thread_affn_mask);
 }
 
+#define AFFN_OVERRIDE_BELOW_MARGIN_PERCENT 2
+
+/**
+ * dp_affn_get_threshold_for_level() - Get threshold value for a given level
+ * @dp_ctx: DP context
+ * @level: Throughput level
+ *
+ * Return: Threshold value for the given level
+ */
+static inline uint64_t
+dp_affn_get_threshold_for_level(struct wlan_dp_psoc_context *dp_ctx,
+				enum dp_affn_override_tput_level level)
+{
+	switch (level) {
+	case DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW:
+		return dp_ctx->dp_cfg.dp_affn_override_low_threshold;
+	case DP_AFFN_OVERRIDE_TPUT_LEVEL_MID:
+		return dp_ctx->dp_cfg.dp_affn_override_mid_threshold;
+	case DP_AFFN_OVERRIDE_TPUT_LEVEL_HIGH:
+		return dp_ctx->dp_cfg.dp_affn_override_high_threshold;
+	case DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE:
+	default:
+		return 0;
+	}
+}
+
+/**
+ * dp_affn_find_target_level() - Find target level for upgrade or downgrade
+ * @dp_ctx: DP context
+ * @curr_level: Current throughput level
+ * @is_upgrade: true for upgrade, false for downgrade
+ *
+ * This function finds which level has the most votes among windows
+ * that voted for upgrade (winner > curr_level) or downgrade
+ * (winner < curr_level) based on the is_upgrade parameter.
+ *
+ * Return: Target level for upgrade or downgrade
+ */
+static inline enum dp_affn_override_tput_level
+dp_affn_find_target_level(struct wlan_dp_psoc_context *dp_ctx,
+			  int curr_level, bool is_upgrade)
+{
+	uint8_t level_votes[DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS] = {0};
+	enum dp_affn_override_tput_level target =
+				DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE;
+	uint8_t max_votes = 0;
+	uint8_t i;
+	uint8_t winner_level;
+
+	/* Count votes for each level based on upgrade/downgrade direction */
+	for (i = 0; i < AFFN_OVERRIDE_WINDOW_COUNT; i++) {
+		winner_level = dp_ctx->dp_affn_sample_winners[i];
+
+		/* Bounds check to prevent OOB access */
+		if (winner_level >= DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS) {
+			dp_err("Invalid winner level %u at index %u",
+			       winner_level, i);
+			continue;
+		}
+
+		if (is_upgrade) {
+			if (winner_level > curr_level)
+				level_votes[winner_level]++;
+		} else {
+			if (winner_level < curr_level)
+				level_votes[winner_level]++;
+		}
+	}
+
+	/* Find level with most votes */
+	for (i = 0; i < DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS; i++) {
+		if (level_votes[i] > max_votes) {
+			max_votes = level_votes[i];
+			target = i;
+		}
+	}
+
+	return target;
+}
+
 void wlan_dp_affn_override_handler(
 	struct wlan_dp_psoc_context *dp_ctx,
 	uint64_t total_packets)
 {
-	enum dp_affn_override_tput_level tput_level_calc;
-	static enum dp_affn_override_tput_level prev_tput_level =
-					DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE;
+	enum dp_affn_override_tput_level curr_level, winner_level, sample_level;
+	enum dp_affn_override_tput_level upgrade_target;
+	enum dp_affn_override_tput_level downgrade_target;
+	uint8_t i, sample_idx;
+	uint8_t up_count = 0, down_count = 0;
+	uint8_t level_counts[DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS] = {0};
+	uint8_t max_count = 0, winner_count = 0;
+	uint64_t threshold, threshold_margin;
+	uint64_t avg_pkt_count = 0;
 
-	tput_level_calc = dp_affn_override_compute_tput_level(
-					dp_ctx, total_packets);
-	if (dp_ctx->dp_affn_override_curr_tput_level != tput_level_calc) {
-		dp_info("total packets: %llu, tput level: %s ",
-			total_packets,
-			dp_affn_override_tput_lvl_to_str(tput_level_calc));
-		dp_set_affinity_override(dp_ctx,
-					 tput_level_calc);
-		prev_tput_level = tput_level_calc;
-		dp_ctx->dp_affn_override_curr_tput_level = tput_level_calc;
+	/* Store packet count for this sample */
+	sample_idx = dp_ctx->dp_affn_sample_count %
+			DP_AFFN_OVERRIDE_SAMPLE_COUNT;
+	dp_ctx->dp_affn_pkt_count_samples[sample_idx] = total_packets;
+
+	/* Increment sample count */
+	dp_ctx->dp_affn_sample_count++;
+
+	/* Check if we've completed 1 window of 5 samples */
+	if ((dp_ctx->dp_affn_sample_count % DP_AFFN_OVERRIDE_SAMPLE_COUNT) != 0)
+		return;
+
+	/* Count occurrences of each throughput level in this window */
+	for (i = 0; i < DP_AFFN_OVERRIDE_SAMPLE_COUNT; i++) {
+		sample_level = dp_affn_override_compute_tput_level(
+				dp_ctx, dp_ctx->dp_affn_pkt_count_samples[i]);
+		level_counts[sample_level]++;
 	}
+
+	/* Find the level with maximum count (winner) */
+	winner_level = DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE;
+	for (i = 0; i < DP_AFFN_OVERRIDE_MAX_TPUT_LEVELS; i++) {
+		if (level_counts[i] > max_count) {
+			max_count = level_counts[i];
+			winner_level = i;
+		}
+	}
+	winner_count = max_count;
+
+	/* Store the winner for this window */
+	dp_ctx->dp_affn_sample_winners[dp_ctx->dp_affn_decision_sample_idx] =
+			winner_level;
+	/* Increment the decision sample idx count*/
+	dp_ctx->dp_affn_decision_sample_idx++;
+
+	/* Get current throughput level */
+	curr_level = dp_ctx->dp_affn_override_curr_tput_level;
+
+	/* Wait until we have 3 windows */
+	if (dp_ctx->dp_affn_decision_sample_idx < AFFN_OVERRIDE_WINDOW_COUNT)
+		return;
+
+	/* On first state -1, apply winner directly */
+	if (curr_level == -1) {
+		dp_info("Initial state (INVALID). setting to : %s",
+			dp_affn_override_tput_lvl_to_str(winner_level));
+		dp_set_affinity_override(dp_ctx, winner_level);
+		dp_ctx->dp_affn_override_curr_tput_level = winner_level;
+		goto exit;
+	}
+
+	/* Calculate average packet count for this window */
+	for (i = 0; i < DP_AFFN_OVERRIDE_SAMPLE_COUNT; i++)
+		avg_pkt_count += dp_ctx->dp_affn_pkt_count_samples[i];
+	avg_pkt_count /= DP_AFFN_OVERRIDE_SAMPLE_COUNT;
+
+	/* Check UPGRADE logic: 2 out of 3 windows voting for upgrade */
+	for (i = 0; i < AFFN_OVERRIDE_WINDOW_COUNT; i++) {
+		if (dp_ctx->dp_affn_sample_winners[i] > curr_level)
+			up_count++;
+	}
+
+	if (up_count >= AFFN_OVERRIDE_WINDOW_COUNT - 1) {
+		/* Find which level has most votes for upgrade */
+		upgrade_target = dp_affn_find_target_level(dp_ctx,
+							   curr_level, true);
+
+		/* Check if traffic is high enough for the target level */
+		threshold = dp_affn_get_threshold_for_level(dp_ctx,
+							    upgrade_target);
+		threshold_margin = (threshold *
+				    AFFN_OVERRIDE_BELOW_MARGIN_PERCENT) / 100;
+
+		if (threshold > 0 &&
+		    avg_pkt_count >= (threshold - threshold_margin)) {
+			/* Print samples for the last window */
+			dp_affn_print_samples(
+					dp_ctx,
+					dp_ctx->dp_affn_decision_sample_idx,
+					winner_level, winner_count);
+			dp_info(
+			"UPGRADE: %s -> %s (avg:%llu >= up_thresh:%llu)",
+			dp_affn_override_tput_lvl_to_str(curr_level),
+			dp_affn_override_tput_lvl_to_str(upgrade_target),
+			avg_pkt_count, (threshold - threshold_margin));
+
+			dp_set_affinity_override(dp_ctx, upgrade_target);
+			dp_ctx->dp_affn_override_curr_tput_level =
+							upgrade_target;
+			goto exit;
+		}
+	}
+
+	/* Check DOWNGRADE logic: 3 consecutive down windows */
+	for (i = 0; i < AFFN_OVERRIDE_WINDOW_COUNT; i++) {
+		if (dp_ctx->dp_affn_sample_winners[i] < curr_level)
+			down_count++;
+	}
+	if (down_count >= AFFN_OVERRIDE_WINDOW_COUNT) {
+		/* Find which level has most votes for downgrade */
+		downgrade_target = dp_affn_find_target_level(dp_ctx,
+							     curr_level, false);
+
+		/* For downgrade to IDLE, use LOW threshold as reference */
+		if (downgrade_target == DP_AFFN_OVERRIDE_TPUT_LEVEL_IDLE) {
+			threshold =
+				dp_affn_get_threshold_for_level(
+					dp_ctx,
+					DP_AFFN_OVERRIDE_TPUT_LEVEL_LOW);
+		} else {
+			/* For other downgrades, use current level threshold */
+			threshold = dp_affn_get_threshold_for_level(dp_ctx,
+								    curr_level);
+		}
+
+		threshold_margin = (threshold *
+				    AFFN_OVERRIDE_BELOW_MARGIN_PERCENT) / 100;
+
+		if (avg_pkt_count <= (threshold - 2 * threshold_margin)) {
+			/* Print samples for the last window */
+			dp_affn_print_samples(
+					dp_ctx,
+					dp_ctx->dp_affn_decision_sample_idx,
+					winner_level, winner_count);
+			/* Apply downgrade */
+			dp_info(
+			"DOWNGRADE: %s -> %s (avg_pkt:%llu <= down_thresh:%llu)",
+			dp_affn_override_tput_lvl_to_str(curr_level),
+			dp_affn_override_tput_lvl_to_str(downgrade_target),
+			avg_pkt_count, (threshold - 2 * threshold_margin));
+
+			dp_set_affinity_override(dp_ctx, downgrade_target);
+			dp_ctx->dp_affn_override_curr_tput_level =
+							downgrade_target;
+			goto exit;
+		}
+	}
+exit:
+	dp_ctx->dp_affn_decision_sample_idx = 0;
+	dp_ctx->dp_affn_sample_count = 0;
+	qdf_mem_zero(dp_ctx->dp_affn_sample_winners,
+		     sizeof(dp_ctx->dp_affn_sample_winners));
 }
 
 #else
