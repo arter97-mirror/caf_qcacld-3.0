@@ -7321,7 +7321,20 @@ void lim_add_bss_he_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
 
 	he_cap = &assoc_rsp->he_cap;
 	he_op = &assoc_rsp->he_op;
+
+	/*
+	 * IMPORTANT:
+	 * - add_bss->he_capable is used for vdev/bss level decisions.
+	 * - add_bss->staContext.he_capable is consumed by WMA peer assoc
+	 *   (tpAddStaParams->he_capable) via wma_send_peer_assoc().
+	 *
+	 * If staContext.he_capable is not set for 2G/5G, FW peer assoc will
+	 * not populate HE caps even when assoc_rsp->he_cap is present, causing
+	 * STA to associate as non-HE (often falling back to 11ac).
+	 */
 	add_bss->he_capable = he_cap->present;
+	add_bss->staContext.he_capable = he_cap->present;
+
 	if (he_cap)
 		qdf_mem_copy(&add_bss->staContext.he_config,
 			     he_cap, sizeof(*he_cap));
@@ -7335,10 +7348,16 @@ void lim_add_bss_he_cfg(struct bss_params *add_bss, struct pe_session *session)
 	add_bss->he_sta_obsspd = session->he_sta_obsspd;
 }
 
+#ifdef WLAN_FEATURE_11AX
 void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
-				   tDot11fIEhe_op *he_op,
-				   struct pe_session *pe_session)
+				  tDot11fIEhe_op *he_op,
+				  struct pe_session *pe_session,
+				  struct wlan_objmgr_peer *peer)
 {
+	uint8_t op_ch_width;
+	uint8_t ap_max_ch_width;
+
+	/* Applicable only for HE 6 GHz */
 	if (!pe_session->he_6ghz_band)
 		return;
 
@@ -7346,16 +7365,58 @@ void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
 		pe_debug("6G operation info not present in beacon");
 		return;
 	}
+
 	if (!pe_session->ch_width)
 		return;
 
-	pAddBssParams->ch_width = QDF_MIN(he_op->oper_info_6g.info.ch_width,
-					  pe_session->ch_width);
+	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
 
-	if (pAddBssParams->ch_width == CH_WIDTH_160MHZ)
-		pAddBssParams->ch_width = pe_session->ch_width;
-	pAddBssParams->staContext.ch_width = pAddBssParams->ch_width;
+	/*
+	 * HE 6 GHz rule:
+	 * HE Operation ch_width is authoritative
+	 */
+	op_ch_width = he_op->oper_info_6g.info.ch_width;
+
+	/*
+	 * Validate CCFS1 presence:
+	 * - 160 MHz / 80+80 MHz require CCFS1
+	 * - If missing, fall back to 80 MHz
+	 */
+	if ((op_ch_width == CH_WIDTH_160MHZ ||
+	     op_ch_width == CH_WIDTH_80P80MHZ) &&
+	    !he_op->oper_info_6g.info.center_freq_seg1) {
+		op_ch_width = CH_WIDTH_80MHZ;
+	}
+
+	/*
+	 * Defensive fallback if AP advertises invalid/zero BW
+	 */
+	if (!op_ch_width) {
+		op_ch_width = QDF_MIN(pe_session->ch_width,
+				      ap_max_ch_width);
+	}
+
+	/*
+	 * Ensure operational BW does not exceed:
+	 *  - AP max supported BW
+	 *  - Host initiated VDEV start BW
+	 */
+	op_ch_width = QDF_MIN(op_ch_width, ap_max_ch_width);
+	op_ch_width = QDF_MIN(op_ch_width, pe_session->ch_width);
+
+	wlan_peer_set_op_ch_width(peer, op_ch_width);
+
+	/*
+	 * Center frequency segments are descriptive only.
+	 * Copied as advertised; never used for BW derivation.
+	 */
+	wlan_peer_set_center_freq_seg0(peer,
+				he_op->oper_info_6g.info.center_freq_seg0);
+
+	wlan_peer_set_center_freq_seg1(peer,
+				he_op->oper_info_6g.info.center_freq_seg1);
 }
+#endif
 
 void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 			      tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
@@ -7924,7 +7985,14 @@ void lim_update_sta_he_capable(struct mac_context *mac,
 void lim_update_bss_he_capable(struct mac_context *mac,
 			       struct bss_params *add_bss)
 {
+	/*
+	 * Keep bss/vdev and peer-assoc (staContext) HE capability in sync.
+	 * Some call sites (e.g. 6 GHz HE operation handling) "force enable"
+	 * HE at BSS level via this helper; make sure peer assoc sees it too.
+	 */
 	add_bss->he_capable = true;
+	add_bss->staContext.he_capable = true;
+
 	pe_debug("he_capable: %d", add_bss->he_capable);
 }
 

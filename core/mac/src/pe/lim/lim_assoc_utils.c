@@ -4736,10 +4736,15 @@ static void lim_sta_process_he_operation(struct mac_context *mac,
 							      &pAssocRsp->he_op,
 							      pe_session);
 		}
+	}
 
-		/* Update BSS HE capabilities for 6GHz band */
+	if (lim_is_session_he_capable(pe_session) &&
+	    (pAssocRsp->he_cap.present || bcn_ies->he_cap.present)) {
+		/* Update BSS HE capabilities */
 		lim_update_bss_he_capable(mac, pAddBssParams);
+	}
 
+	if (lim_is_he_6ghz_band(pe_session)) {
 		/* Process EHT capabilities for 6 GHz */
 		if (lim_is_session_eht_capable(pe_session) &&
 		    pAssocRsp->eht_cap.present)

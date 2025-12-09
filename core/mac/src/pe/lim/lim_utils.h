@@ -1463,10 +1463,28 @@ void lim_add_bss_he_cfg(struct bss_params *add_bss, struct pe_session *session);
 void lim_copy_bss_he_cap(struct pe_session *session);
 
 /**
- * lim_update_he_6gop_assoc_resp() - Update HE 6GHz op info to BSS params
- * @add_bss: pointer to add bss params
- * @he_op: Pointer to HE operation info IE
- * @session: Pointer to Session entry struct
+ * lim_update_he_6gop_assoc_resp() - Update HE 6 GHz operation parameters
+ * @pAddBssParams: Pointer to BSS parameters to be updated
+ * @he_op: Pointer to HE operation IE (from beacon/assoc response)
+ * @pe_session: Pointer to PE session
+ *
+ * This function validates and updates the HE 6 GHz operation fields in the
+ * BSS (add_bss) context based on the HE Operation element:
+ *
+ * - Only applies when the session is in 6 GHz HE mode
+ * - Derives the operational channel width from he_op and the current session
+ *   configuration
+ * - Ensures the resulting channel width does not exceed the session's
+ *   configured channel width
+ * - Updates the session's HE operation (he_op) structure so it reflects the
+ *   final operating bandwidth and center frequency segments
+ * - Programs the per-peer MLME state with the negotiated bandwidth so FW
+ *   uses consistent HE 6 GHz operating parameters
+ *
+ * This helper does not return a value; it directly updates:
+ * - pAddBssParams->staContext.he_op
+ * - pe_session->he_op
+ * and associated bandwidth fields in the session.
  *
  * Return: None
  */

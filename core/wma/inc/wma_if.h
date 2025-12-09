@@ -252,6 +252,8 @@ typedef struct {
 	 * (ch_width) which may be capped by STA/session/firmware constraints.
 	 */
 	enum phy_ch_width ap_max_ch_width;
+	uint8_t center_freq_seg0;
+	uint8_t center_freq_seg1;
 	tSirMacHTMIMOPowerSaveState mimoPS;
 	uint8_t maxAmpduSize;
 	uint8_t maxAmpduDensity;
