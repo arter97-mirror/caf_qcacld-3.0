@@ -4853,19 +4853,129 @@ lim_update_add_bss_he_params(struct mac_context *mac,
 #endif /* WLAN_FEATURE_11AX */
 #ifdef WLAN_FEATURE_11BE
 /**
- * lim_sta_process_eht_capability() - Process EHT capability from
- *                                    Association Response
- * @mac: Pointer to MAC context
- * @pAssocRsp: Pointer to Association Response frame
- * @pAddBssParams: Pointer to Add BSS parameters
- * @pe_session: Pointer to PE session
+ * lim_validate_eht_mcs_160() - Validate EHT 160 MHz MCS map
+ * @eht_cap: Pointer to EHT capability IE
  *
- * This function processes the EHT Capability IE from the AP's
- * association response frame. It validates both EHT capability
- * and operation information are present before enabling EHT.
+ * Checks if at least one spatial stream is supported for 160 MHz.
+ *
+ * Return: true if valid, false otherwise
+ */
+static bool lim_validate_eht_mcs_160(tDot11fIEeht_cap *eht_cap)
+{
+	/* Check if any spatial stream supports Rx or Tx for 160 MHz */
+	if (eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 ||
+	    eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 ||
+	    eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 ||
+	    eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 ||
+	    eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 ||
+	    eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13)
+		return true;
+
+	return false;
+}
+
+/**
+ * lim_validate_eht_mcs_320() - Validate EHT 320 MHz MCS map
+ * @eht_cap: Pointer to EHT capability IE
+ *
+ * Checks if at least one spatial stream is supported for 320 MHz.
+ *
+ * Return: true if valid, false otherwise
+ */
+static bool lim_validate_eht_mcs_320(tDot11fIEeht_cap *eht_cap)
+{
+	if (eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 ||
+	    eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 ||
+	    eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 ||
+	    eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 ||
+	    eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 ||
+	    eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13)
+		return true;
+
+	return false;
+}
+
+/**
+ * lim_validate_eht_mcs_le_80() - Validate EHT <= 80 MHz MCS map
+ * @eht_cap: Pointer to EHT capability IE
+ *
+ * Checks if at least one spatial stream is supported for <= 80 MHz.
+ *
+ * Return: true if valid, false otherwise
+ */
+static bool lim_validate_eht_mcs_le_80(tDot11fIEeht_cap *eht_cap)
+{
+	if (eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9 ||
+	    eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9 ||
+	    eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 ||
+	    eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 ||
+	    eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 ||
+	    eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13)
+		return true;
+
+	return false;
+}
+
+/**
+ * lim_update_ap_max_eht_ch_width() - Calculate AP max supported EHT width
+ * @mac: Pointer to Global MAC structure
+ * @pAssocRsp: Pointer to Association Response
+ * @pAddBssParams: Pointer to Add BSS parameters
+ * @pe_session: PE session entry
+ *
+ * This function validates the EHT MCS maps and calculates the maximum
+ * supported channel width.
  *
  * Return: None
  */
+static void lim_update_ap_max_eht_ch_width(struct mac_context *mac,
+					   tpSirAssocRsp pAssocRsp,
+					   struct bss_params *pAddBssParams,
+					   struct pe_session *pe_session)
+{
+	tDot11fIEeht_cap *eht_cap;
+
+	if (!pAssocRsp->eht_cap.present)
+		return;
+
+	eht_cap = &pAssocRsp->eht_cap;
+
+	/* Step 1: Baseline validation (<= 80 MHz) */
+	if (!lim_validate_eht_mcs_le_80(eht_cap)) {
+		pe_debug("vdev %d: Invalid EHT MCS for <= 80MHz, AP " QDF_MAC_ADDR_FMT,
+			 pe_session->vdev_id,
+			 QDF_MAC_ADDR_REF(pe_session->bssId));
+		/*
+		 * Baseline invalid, cannot support EHT.
+		 * Don't modify ap_max_ch_width - it retains value from
+		 * VHT/HE processing, allowing fallback to those modes.
+		 */
+		return;
+	}
+
+	/* Step 2: Band-specific validation for wider channels */
+	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq) &&
+	    eht_cap->support_320mhz_6ghz &&
+	    lim_validate_eht_mcs_320(eht_cap)) {
+		pAddBssParams->staContext.ap_max_ch_width =
+						CH_WIDTH_320MHZ;
+	} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(pe_session->curr_op_freq) ||
+		    WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq)) &&
+		   pAssocRsp->he_cap.chan_width_2 &&
+		   lim_validate_eht_mcs_160(eht_cap)) {
+		/* 160 MHz support indicated in HE Cap, validated in EHT Cap */
+		pAddBssParams->staContext.ap_max_ch_width =
+						CH_WIDTH_160MHZ;
+	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq)) {
+		pAddBssParams->staContext.ap_max_ch_width =
+						CH_WIDTH_40MHZ;
+	} else {
+		/* Fallback to 80 MHz for 5/6 GHz */
+		pAddBssParams->staContext.ap_max_ch_width =
+						CH_WIDTH_80MHZ;
+	}
+}
+
 static void lim_sta_process_eht_capability(struct mac_context *mac,
 					   tpSirAssocRsp pAssocRsp,
 					   struct bss_params *pAddBssParams,
@@ -4884,7 +4994,6 @@ static void lim_sta_process_eht_capability(struct mac_context *mac,
 	    pAssocRsp->eht_cap.present) {
 		lim_add_bss_eht_cap(pAddBssParams, pAssocRsp);
 		lim_add_bss_eht_cfg(pAddBssParams, pe_session);
-
 		/* Process EHT capabilities intersection for 6 GHz */
 		if (pe_session->lim_join_req) {
 			bss_desc = &pe_session->lim_join_req->bssDescription;
@@ -4895,13 +5004,8 @@ static void lim_sta_process_eht_capability(struct mac_context *mac,
 							  bcn_ies, pAssocRsp);
 		}
 
-		/* Log warning if operation info is missing but continue with EHT */
-		if (!pAssocRsp->eht_op.present ||
-		    !pAssocRsp->eht_op.eht_op_information_present) {
-			pe_debug("vdev %d: EHT cap present but operation info missing for " QDF_MAC_ADDR_FMT ", using default parameters",
-				 pe_session->vdev_id,
-				 QDF_MAC_ADDR_REF(pe_session->bssId));
-		}
+		lim_update_ap_max_eht_ch_width(mac, pAssocRsp,
+					       pAddBssParams, pe_session);
 	} else {
 		lim_update_session_eht_capable(pe_session, false);
 	}
@@ -4952,6 +5056,13 @@ lim_sta_process_eht_operation(struct mac_context *mac,
 {
 }
 
+static inline void
+lim_update_ap_max_eht_ch_width(struct mac_context *mac,
+			       tpSirAssocRsp pAssocRsp,
+			       struct bss_params *pAddBssParams,
+			       struct pe_session *pe_session)
+{
+}
 #endif /* WLAN_FEATURE_11BE */
 
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
