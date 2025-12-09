@@ -40,6 +40,7 @@
 #include "wlan_mlme_api.h"
 #include "wlan_dp_txrx.h"
 #include "cdp_txrx_host_stats.h"
+#include "cdp_txrx_ctrl.h"
 #include "wlan_cm_roam_api.h"
 #include "hif_main.h"
 #include "wlan_dp_stc.h"
@@ -2106,6 +2107,9 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 
 	if (dp_ctx->is_suspend)
 		return;
+
+	if (soc)
+		cdp_trigger_page_pool_shrink(soc, OL_TXRX_PDEV_ID);
 
 	bw_interval_us = dp_ctx->dp_cfg.bus_bw_compute_interval * 1000;
 
