@@ -734,6 +734,9 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	int max_rx_pp_alloc;
 	int align;
 	int i;
+	uint32_t pp_size = 0;
+	uint32_t pp_buf_count;
+	bool dynamic_pp_enabled;
 
 	if (!qdf_ctx)
 		return;
@@ -803,6 +806,31 @@ tx_pp_alloc:
 	if (!tx_pp_en)
 		return;
 
+	dynamic_pp_enabled = wlan_cfg_get_tx_dynamic_pp_enabled(ctrl_psoc);
+	if (dynamic_pp_enabled) {
+		/* Get prealloc buffer count from configuration */
+		pp_buf_count =
+			wlan_cfg_get_tx_dynamic_pp_prealloc_buf(ctrl_psoc);
+		if (pp_buf_count) {
+			/* If ini is set, use ini value rounded to nearest
+			 * multiple of 16 for prealloc pool
+			 */
+			pp_size = qdf_align(pp_buf_count, TX_POOL_ALIGNMENT);
+		}
+	} else {
+		/* Calculate pool size with 25% headroom and round to nearest
+		 * multiple of 16
+		 */
+		pp_size = qdf_align(wlan_cfg_psoc_get_num_tx_desc(ctrl_psoc) *
+				  (100 + TX_POOL_HEADROOM_PERCENT) / 100,
+				  TX_POOL_ALIGNMENT);
+	}
+
+	if (!pp_size) {
+		dp_info("Skip Tx prealloc pool");
+		return;
+	}
+
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_tx_pp_allocs); i++) {
 		pp_t = &g_dp_tx_pp_allocs[i];
 
@@ -811,14 +839,7 @@ tx_pp_alloc:
 			continue;
 		}
 
-		/* Calculate pool size with 25% headroom and round to nearest
-		 * multiple of 16
-		 */
-		pp_t->pool_size =
-			qdf_align(wlan_cfg_psoc_get_num_tx_desc(ctrl_psoc) *
-				  (100 + TX_POOL_HEADROOM_PERCENT) / 100,
-				  TX_POOL_ALIGNMENT);
-
+		pp_t->pool_size = pp_size;
 		pp_t->pp = dp_prealloc_page_pool_create(qdf_ctx,
 							pp_t->pool_size,
 							DP_TX_PAGE_POOL_BUFSIZE,
