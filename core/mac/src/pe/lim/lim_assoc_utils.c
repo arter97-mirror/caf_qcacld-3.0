@@ -4382,15 +4382,256 @@ lim_update_add_bss_vht_params(struct mac_context *mac,
 
 #ifdef WLAN_FEATURE_11AX
 /**
- * lim_sta_process_he_capability() - Process HE capability from
- *                                   Association Response
- * @mac: Pointer to MAC context
- * @pAssocRsp: Pointer to Association Response frame
+ * lim_validate_he_mcs_for_bw() - Validate HE MCS support for bandwidth
+ * @rx_he_mcs_map: RX HE MCS map to validate
+ * @tx_he_mcs_map: TX HE MCS map to validate
+ *
+ * This function validates the HE-MCS and NSS Set fields as defined in
+ * IEEE 802.11ax-2021 Section 9.4.2.247.4 (Supported HE-MCS and NSS Set).
+ *
+ * The HE-MCS map is 2 octets in length and indicates the MCS values
+ * supported for each number of spatial streams. Each 2-bit subfield
+ * represents support for a specific NSS:
+ *   - 0: MCS 0-7 supported
+ *   - 1: MCS 0-9 supported
+ *   - 2: MCS 0-11 supported
+ *   - 3: NSS not supported
+ *
+ * Per IEEE 802.11ax-2021 Table 9-322a, a value of 0xFFFF (all NSS set to 3)
+ * indicates that no spatial streams are supported for the given bandwidth,
+ * making the bandwidth unusable.
+ *
+ * This validation ensures at least one valid spatial stream with MCS support
+ * exists before enabling the corresponding bandwidth.
+ *
+ * Connection Maintenance Strategy:
+ * To ensure the connection is maintained in all but the absolute worst cases,
+ * this function employs a lenient validation strategy. It rejects the bandwidth
+ * only if BOTH the Rx and Tx MCS maps indicate that no spatial streams are
+ * supported (0xFFFF). If at least one direction (Rx or Tx) supports HE MCS,
+ * the configuration is considered valid. This prevents disconnection or
+ * forced downgrade for peers with asymmetric or partially invalid capabilities,
+ * prioritizing connectivity over strict symmetry.
+ *
+ * IEEE 802.11 Reference:
+ *   - IEEE 802.11ax-2021, Section 9.4.2.247.4: Supported HE-MCS and NSS Set
+ *   - IEEE 802.11ax-2021, Table 9-322a: HE-MCS Map encoding
+ *
+ * Return: true if MCS maps are valid (at least one NSS supported),
+ *         false if all spatial streams are disabled (0xFFFF)
+ */
+static bool lim_validate_he_mcs_for_bw(uint16_t rx_he_mcs_map,
+				       uint16_t tx_he_mcs_map)
+{
+	/*
+	 * IEEE 802.11ax-2021 Section 9.4.2.247.4:
+	 * HE MCS map format: 2 bits per spatial stream (8 NSS total)
+	 *   Bits [1:0]   - NSS 1 MCS support
+	 *   Bits [3:2]   - NSS 2 MCS support
+	 *   ...
+	 *   Bits [15:14] - NSS 8 MCS support
+	 *
+	 * Per Table 9-322a, each 2-bit field encoding:
+	 *   0: MCS 0-7 supported
+	 *   1: MCS 0-9 supported
+	 *   2: MCS 0-11 supported
+	 *   3: NSS not supported
+	 *
+	 * HE_MCS_ALL_DISABLED (0xFFFF) means all 8 spatial streams
+	 * are set to "not supported" (value 3), indicating no MCS
+	 * support for this bandwidth.
+	 *
+	 * Regression-Free & Backward Compatibility Note:
+	 * To maintain connection as much as possible, only return false
+	 * if BOTH Rx and Tx MCS maps are disabled. If at least one
+	 * direction is supported, we allow the connection/bandwidth.
+	 * This ensures that we fallback/reject only in the worst-case
+	 * scenario where communication is impossible in both directions.
+	 */
+	if (rx_he_mcs_map == HE_MCS_ALL_DISABLED &&
+	    tx_he_mcs_map == HE_MCS_ALL_DISABLED) {
+		pe_debug("Invalid HE MCS map : rx=0x%x tx=0x%x",
+			 rx_he_mcs_map, tx_he_mcs_map);
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * lim_update_ap_max_ch_width() - Calculate AP max supported channel width
+ * @mac: Pointer to Global MAC structure
+ * @pAssocRsp: Pointer to Association Response
  * @pAddBssParams: Pointer to Add BSS parameters
- * @pe_session: Pointer to PE session
+ * @pe_session: PE session entry
+ *
+ * This function validates the HE MCS maps in the association response
+ * and calculates the final maximum supported channel width. It updates
+ * the ap_max_ch_width in the station context.
+ *
+ * Return: None
+ */
+static void lim_update_ap_max_ch_width(struct mac_context *mac,
+				       tpSirAssocRsp pAssocRsp,
+				       struct bss_params *pAddBssParams,
+				       struct pe_session *pe_session)
+{
+	tDot11fIEhe_cap *he_cap;
+	uint16_t rx_mcs_160, tx_mcs_160;
+	bool mcs_valid;
+
+	/* Initialize to safe default */
+	pAddBssParams->staContext.ap_max_ch_width = CH_WIDTH_20MHZ;
+
+	/* Validate input parameters */
+	if (!pAssocRsp || !pAddBssParams || !pe_session) {
+		pe_debug("Invalid parameters: pAssocRsp=%pK pAddBssParams=%pK pe_session=%pK",
+			 pAssocRsp, pAddBssParams, pe_session);
+		return;
+	}
+
+	/* Check if HE capability is present */
+	if (!pAssocRsp->he_cap.present) {
+		pe_debug("HE capability not present, using default 20MHz");
+		return;
+	}
+
+	he_cap = &pAssocRsp->he_cap;
+
+	/*
+	 * Step 1: Baseline validation. Check the mandatory MCS map for
+	 * bandwidths <= 80 MHz.
+	 */
+	mcs_valid = lim_validate_he_mcs_for_bw(
+			he_cap->rx_he_mcs_map_lt_80,
+			he_cap->tx_he_mcs_map_lt_80);
+
+	if (!mcs_valid) {
+		pe_debug("Invalid HE MCS for <= 80MHz, using 20MHz");
+		return;
+	}
+
+	/* Set minimum supported bandwidth after baseline validation */
+	pAddBssParams->staContext.ap_max_ch_width = CH_WIDTH_80MHZ;
+
+	/*
+	 * Step 2: Band-specific validation.
+	 * As per 802.11ax spec, Supported Channel Width Set applies to
+	 * 5 GHz and 6 GHz bands for determining 160 MHz support.
+	 */
+	/*
+	 * Bandwidth Selection & Fallback Logic (maintain connection):
+	 * 1. 80+80 MHz: Checked first (highest BW). If supported but
+	 *    MCS invalid, FALL THROUGH to check 160 MHz.
+	 * 2. 160 MHz: Checked next. If supported but MCS invalid,
+	 *    DOWNGRADE to 80 MHz immediately (standard fallback).
+	 * 3. 80 MHz: Checked if higher BWs not supported.
+	 * 4. 40 MHz: Default fallback if 80 MHz not supported (B1=0).
+	 *
+	 * This ensures we select the highest usable bandwidth while
+	 * preserving backward compatibility and avoiding connection
+	 * failures.
+	 */
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(pe_session->curr_op_freq) ||
+	    lim_is_he_6ghz_band(pe_session)) {
+		/* Try 80+80MHz first (highest bandwidth) */
+		if (he_cap->chan_width_3) {
+			/* Safely extract MCS maps with bounds checking */
+			if (sizeof(he_cap->rx_he_mcs_map_80_80) >=
+			    sizeof(uint16_t) &&
+			    sizeof(he_cap->tx_he_mcs_map_80_80) >=
+			    sizeof(uint16_t)) {
+				qdf_mem_copy(&rx_mcs_160,
+					     he_cap->rx_he_mcs_map_80_80,
+					     sizeof(uint16_t));
+				qdf_mem_copy(&tx_mcs_160,
+					     he_cap->tx_he_mcs_map_80_80,
+					     sizeof(uint16_t));
+
+				if (lim_validate_he_mcs_for_bw(rx_mcs_160,
+							       tx_mcs_160)) {
+					pAddBssParams->staContext.
+						ap_max_ch_width =
+							CH_WIDTH_80P80MHZ;
+					pe_debug("AP supports 80+80MHz");
+					goto log_final_bw;
+				}
+			}
+			pe_debug("Invalid HE MCS for 80+80MHz, trying 160MHz");
+		}
+
+		/* Try 160MHz */
+		if (he_cap->chan_width_2) {
+			/* Safely extract MCS maps with bounds checking */
+			if (sizeof(he_cap->rx_he_mcs_map_160) >=
+			    sizeof(uint16_t) &&
+			    sizeof(he_cap->tx_he_mcs_map_160) >=
+			    sizeof(uint16_t)) {
+				qdf_mem_copy(&rx_mcs_160,
+					     he_cap->rx_he_mcs_map_160,
+					     sizeof(uint16_t));
+				qdf_mem_copy(&tx_mcs_160,
+					     he_cap->tx_he_mcs_map_160,
+					     sizeof(uint16_t));
+
+				if (lim_validate_he_mcs_for_bw(rx_mcs_160,
+							       tx_mcs_160)) {
+					pAddBssParams->staContext.
+						ap_max_ch_width =
+							CH_WIDTH_160MHZ;
+					pe_debug("AP supports 160MHz");
+				} else {
+					pe_debug("Invalid HE MCS for 160MHz, falling back to 80MHz");
+					pAddBssParams->staContext.
+						ap_max_ch_width =
+							CH_WIDTH_80MHZ;
+				}
+			} else {
+				pe_debug("Invalid HE MCS map size for 160MHz, falling back to 80MHz");
+				pAddBssParams->staContext.
+					ap_max_ch_width =
+						CH_WIDTH_80MHZ;
+			}
+		} else if (he_cap->chan_width_1) {
+			/* 80MHz support */
+			pAddBssParams->staContext.ap_max_ch_width =
+							CH_WIDTH_80MHZ;
+			pe_debug("AP supports 80MHz");
+		} else {
+			/* Fallback to 40MHz */
+			pAddBssParams->staContext.ap_max_ch_width =
+							CH_WIDTH_40MHZ;
+			pe_debug("AP supports 40MHz (5GHz/6GHz)");
+		}
+	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq)) {
+		/* 2.4GHz band: Check for 40MHz support */
+		if (he_cap->chan_width_0) {
+			pAddBssParams->staContext.ap_max_ch_width =
+							CH_WIDTH_40MHZ;
+			pe_debug("AP supports 40MHz (2.4GHz)");
+		} else {
+			pe_debug("AP supports 20MHz (2.4GHz)");
+		}
+	} else {
+		pe_debug("Unknown frequency band, using 20MHz");
+	}
+
+log_final_bw:
+	pe_debug("Final AP max channel width: %d for vdev %d",
+		 pAddBssParams->staContext.ap_max_ch_width,
+		 pe_session->vdev_id);
+}
+
+/**
+ * lim_sta_process_he_capability() - Process HE capability from assoc resp
+ * @mac: Pointer to Global MAC structure
+ * @pAssocRsp: Pointer to Association Response
+ * @pAddBssParams: Pointer to Add BSS parameters
+ * @pe_session: PE session entry
  *
  * This function processes the HE Capability IE from the AP's
- * association response frame.
+ * association response frame and invokes validation for maximum
+ * supported channel width.
  *
  * Return: None
  */
@@ -4455,6 +4696,9 @@ static void lim_sta_process_he_capability(struct mac_context *mac,
 				&pAssocRsp->he_6ghz_band_cap,
 				&pAddBssParams->staContext);
 	}
+
+	lim_update_ap_max_ch_width(mac, pAssocRsp, pAddBssParams,
+				   pe_session);
 }
 
 /**
