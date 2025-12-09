@@ -152,11 +152,13 @@ void dp_prealloc_put_consistent_mem_unaligned(void *va_unaligned);
  * dp_prealloc_get_page_pool() - get page pool from pre-alloc pool
  * @type: page pool type whether tx or rx page pool
  * @pool_size: requested page pool size
+ * @dynamic_pp_request: Dynamic Page pool request
  *
  * Return: pointer to dp_page_pool_t on success or NULL on failure
  */
 struct dp_page_pool_t*
-dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size);
+dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size,
+			  bool dynamic_pp_request);
 
 /**
  * dp_prealloc_put_page_pool() - put page pool reference back to pre-alloc pool

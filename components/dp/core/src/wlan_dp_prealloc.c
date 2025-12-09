@@ -543,7 +543,8 @@ static struct dp_page_pool_t g_dp_tx_pp_allocs[] = {
 };
 
 struct dp_page_pool_t*
-dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size)
+dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size,
+			  bool dynamic_pp_request)
 {
 	struct dp_page_pool_t *base_pp;
 	struct dp_page_pool_t *pp_t;
@@ -572,7 +573,7 @@ dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size)
 			pools_allocated++;
 
 		if (type == pp_t->type && !pp_t->in_use &&
-		    pool_size == pp_t->pool_size) {
+		    (dynamic_pp_request || pool_size == pp_t->pool_size)) {
 			pp_t->in_use = true;
 			dp_info("get page pool %d type %d size %d success",
 				i, type, pp_t->pool_size);
