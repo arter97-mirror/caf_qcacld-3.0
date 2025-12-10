@@ -916,11 +916,11 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
 	hdd_enable_mc_addr_filtering(adapter, trigger);
 	if (adapter->device_mode == QDF_STA_MODE)
 		hdd_enable_igmp_offload(adapter, vdev);
-	hdd_enable_action_frame_patterns(vdev);
 
 	if (!ucfg_pmo_is_wow_optimization_enabled(psoc)) {
 		if (adapter->device_mode != QDF_NDI_MODE)
 			hdd_enable_hw_filter(vdev);
+		hdd_enable_action_frame_patterns(vdev);
 	}
 put_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
@@ -968,11 +968,11 @@ void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 	hdd_disable_mc_addr_filtering(adapter, trigger);
 	if (adapter->device_mode == QDF_STA_MODE)
 		hdd_disable_igmp_offload(adapter, vdev);
-	hdd_disable_action_frame_patterns(vdev);
 
 	if (!ucfg_pmo_is_wow_optimization_enabled(psoc)) {
 		if (adapter->device_mode != QDF_NDI_MODE)
 			hdd_disable_hw_filter(vdev);
+		hdd_disable_action_frame_patterns(vdev);
 	}
 
 put_vdev:

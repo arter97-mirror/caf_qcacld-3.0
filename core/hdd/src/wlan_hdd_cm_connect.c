@@ -2045,6 +2045,13 @@ static void hdd_configure_wow_commands(struct wlan_objmgr_vdev *vdev,
 		}
 		hdd_debug("Packet filter enabled in STA mode");
 	}
+
+	status = ucfg_pmo_enable_action_frame_patterns(vdev,
+						       QDF_SYSTEM_SUSPEND);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to enable action frame: %d", status);
+		return;
+	}
 }
 
 static void
