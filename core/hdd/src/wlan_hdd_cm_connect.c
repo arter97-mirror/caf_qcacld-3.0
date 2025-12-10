@@ -61,6 +61,7 @@
 #include "wlan_hdd_stats.h"
 #include "wlan_cp_stats_ucfg_api.h"
 #include "wma_api.h"
+#include "wlan_hdd_packet_filter_api.h"
 
 #define MAX_ROAM_COUNT_VALUE (999)
 
@@ -2034,6 +2035,15 @@ static void hdd_configure_wow_commands(struct wlan_objmgr_vdev *vdev,
 			return;
 		}
 		hdd_debug("HW filter enabled for opmode: %d", opmode);
+	}
+
+	if (opmode == QDF_STA_MODE) {
+		status = hdd_enable_default_pkt_filters(hdd_ctx, vdev_id);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to enable packet filter: %d", status);
+			return;
+		}
+		hdd_debug("Packet filter enabled in STA mode");
 	}
 }
 
