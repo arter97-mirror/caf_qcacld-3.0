@@ -4545,12 +4545,11 @@ lim_clear_ml_partner_info(struct pe_session *session_entry, int8_t idx)
 {
 }
 
-static QDF_STATUS
-lim_check_db_for_join_req_partner_info(struct pe_session *session_entry,
-				       struct mac_context *mac_ctx)
+static inline QDF_STATUS
+lim_check_scan_db_for_join_req_partner_info(struct pe_session *session_entry,
+					    struct mac_context *mac_ctx)
 {
-
-	return QDF_STATUS_E_FAILURE;
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
