@@ -1560,8 +1560,25 @@ void ucfg_dp_tx_timeout(struct wlan_objmgr_vdev *vdev)
 	dp_tx_timeout(dp_intf);
 }
 
+bool ucfg_dp_softap_init_tx_exc_metadata(struct wlan_objmgr_vdev *vdev,
+					 qdf_nbuf_t nbuf,
+					 struct cdp_tx_exception_metadata *tem)
+{
+	struct wlan_dp_link *dp_link;
+
+	dp_link = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_link)) {
+		dp_err_rl("DP link not found");
+		return false;
+	}
+
+	return dp_softap_init_tx_exc_metadata(dp_link, nbuf, tem);
+}
+
 QDF_STATUS
-ucfg_dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
+ucfg_dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev,
+			  struct cdp_tx_exception_metadata *tx_exc_param,
+			  bool exception)
 {
 	struct wlan_dp_intf *dp_intf;
 	struct wlan_dp_link *dp_link;
@@ -1575,7 +1592,7 @@ ucfg_dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev)
 
 	dp_intf = dp_link->dp_intf;
 	qdf_atomic_inc(&dp_intf->num_active_task);
-	status = dp_softap_start_xmit(nbuf, dp_link);
+	status = dp_softap_start_xmit(nbuf, dp_link, tx_exc_param, exception);
 	qdf_atomic_dec(&dp_intf->num_active_task);
 
 	return status;
