@@ -1941,6 +1941,8 @@ static void mlme_init_feature_flag_in_cfg(
 			cfg_get(psoc, CFG_CHANNEL_BONDING_MODE_24GHZ);
 	feature_flags->channel_bonding_mode_5ghz =
 			cfg_get(psoc, CFG_CHANNEL_BONDING_MODE_5GHZ);
+	feature_flags->cb_mode_override =
+			cfg_get(psoc, CFG_CHANNEL_BONDING_MODE_OVERRIDE);
 	feature_flags->update_cw_allowed =
 			cfg_get(psoc, CFG_ALLOW_UPDATE_CHANNEL_WIDTH);
 }
