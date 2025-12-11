@@ -47,6 +47,28 @@ uint8_t lim_check_rx_basic_rates(struct mac_context *, tSirMacRateSet, struct pe
 uint8_t lim_check_mcs_set(struct mac_context *mac, uint8_t *supportedMCSSet);
 
 /**
+ * lim_validate_he_mcs_for_bw() - Validate HE MCS maps for configured bandwidth
+ * @rx_he_mcs_map: HE Rx MCS map (for the bandwidth being validated)
+ * @tx_he_mcs_map: HE Tx MCS map (for the bandwidth being validated)
+ *
+ * This helper checks that the HE MCS maps for a given bandwidth are usable
+ * for both directions (Rx/Tx). It is typically used when negotiating HE
+ * bandwidth (e.g. 20/40/80/160 MHz) to ensure:
+ *
+ * - At least one spatial stream is enabled with a valid MCS in both
+ *   rx_he_mcs_map and tx_he_mcs_map
+ * - The Rx/Tx MCS maps are consistent for the selected bandwidth, so that
+ *   the negotiated bandwidth does not result in an unusable MCS configuration
+ *
+ * The function does not modify any state; it only inspects the two maps.
+ *
+ * Return:
+ * true  - if HE MCS configuration for this bandwidth is valid
+ * false - if no usable NSS/MCS combination exists or maps are inconsistent
+ */
+bool lim_validate_he_mcs_for_bw(uint16_t rx_he_mcs_map, uint16_t tx_he_mcs_map);
+
+/**
  * lim_cleanup_rx_path() - Called to cleanup STA state at SP & RFP.
  * @mac: Pointer to Global MAC structure
  * @sta: Pointer to the per STA data structure initialized by LIM

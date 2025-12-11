@@ -266,12 +266,61 @@ downgrade_11ac:
 	       session->dot11mode);
 }
 
+
+/**
+ * lim_process_he_capability_validation() - Process and validate HE capability
+ * @session: Pointer to PE session
+ * @bcn_ies: Pointer to parsed beacon IEs from AP
+ *
+ * This function processes the HE Capability IE from the AP's beacon/probe
+ * response and determines the AP's maximum supported HE channel width cap.
+ * It validates the claimed bandwidth against the HE MCS maps per IEEE 802.11ax.
+ *
+ * HE Channel Width Bits per Band:
+ * - 2.4 GHz: chan_width_0 for 40 MHz
+ * - 5 GHz: chan_width_1 for 40/80 MHz, chan_width_2 for 160 MHz
+ * - 6 GHz: chan_width_5 for 160 MHz, chan_width_6 for 80 MHz
+ *
+ * The function stores the validated maximum bandwidth in session->ap_ch_width.
+ * Non-bandwidth-related parameters remain unchanged.
+ *
+ * Note: This function assumes HE capability and LDPC validation have already
+ * been performed by lim_check_is_he_mcs_valid() and
+ * lim_check_peer_ldpc_and_update().
+ * It only determines the AP's maximum channel width capability.
+ *
+ * Context: Called during HE capability processing after initial validations
+ *
+ * Return: None (void function - updates session structure directly)
+ */
+static void lim_process_he_capability_validation(struct pe_session *session,
+						 tDot11fBeaconIEs *bcn_ies)
+{
+	enum phy_ch_width ap_ch_width;
+	tDot11fIEhe_cap *he_cap;
+
+	if (!session->he_capable || !bcn_ies->he_cap.present)
+		return;
+
+	he_cap = &bcn_ies->he_cap;
+
+	ap_ch_width = lim_get_he_max_ch_width(he_cap, session);
+	if (ap_ch_width == CH_WIDTH_INVALID) {
+		pe_debug("vdev %d: AP " QDF_MAC_ADDR_FMT " Invalid HE channel width, keeping existing value",
+			 session->vdev_id, QDF_MAC_ADDR_REF(session->bssId));
+		return;
+	}
+
+	session->ap_ch_width = ap_ch_width;
+}
+
 void lim_update_he_bw_cap_mcs(struct pe_session *session,
 			      tDot11fBeaconIEs *bcn_ies)
 {
 	uint8_t is_80mhz;
 	uint8_t sta_prefer_80mhz_over_160mhz;
 
+	/* session->he_capable reflects the STA’s own HE capability */
 	if (!session->he_capable)
 		return;
 
@@ -954,6 +1003,9 @@ static void lim_configure_he_eht_params(struct mac_context *mac_ctx,
 	lim_check_peer_ldpc_and_update(session, bcn_ies);
 	lim_extract_he_op(mac_ctx, session, bcn_ies);
 	lim_extract_eht_op(mac_ctx, session, bcn_ies);
+
+	lim_process_he_capability_validation(session, bcn_ies);
+
 	if (!mac_ctx->usr_eht_testbed_cfg)
 		lim_update_he_bw_cap_mcs(session, bcn_ies);
 	lim_update_eht_bw_cap_mcs(session, bcn_ies);

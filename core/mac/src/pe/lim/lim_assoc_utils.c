@@ -4241,65 +4241,12 @@ static void lim_update_add_bss_vht_params(struct mac_context *mac,
  * This function validates the HE-MCS and NSS Set fields as defined in
  * IEEE 802.11ax-2021 Section 9.4.2.247.4 (Supported HE-MCS and NSS Set).
  *
- * The HE-MCS map is 2 octets in length and indicates the MCS values
- * supported for each number of spatial streams. Each 2-bit subfield
- * represents support for a specific NSS:
- *   - 0: MCS 0-7 supported
- *   - 1: MCS 0-9 supported
- *   - 2: MCS 0-11 supported
- *   - 3: NSS not supported
- *
- * Per IEEE 802.11ax-2021 Table 9-322a, a value of 0xFFFF (all NSS set to 3)
- * indicates that no spatial streams are supported for the given bandwidth,
- * making the bandwidth unusable.
- *
- * This validation ensures at least one valid spatial stream with MCS support
- * exists before enabling the corresponding bandwidth.
- *
- * Connection Maintenance Strategy:
- * To ensure the connection is maintained in all but the absolute worst cases,
- * this function employs a lenient validation strategy. It rejects the bandwidth
- * only if BOTH the Rx and Tx MCS maps indicate that no spatial streams are
- * supported (0xFFFF). If at least one direction (Rx or Tx) supports HE MCS,
- * the configuration is considered valid. This prevents disconnection or
- * forced downgrade for peers with asymmetric or partially invalid capabilities,
- * prioritizing connectivity over strict symmetry.
- *
- * IEEE 802.11 Reference:
- *   - IEEE 802.11ax-2021, Section 9.4.2.247.4: Supported HE-MCS and NSS Set
- *   - IEEE 802.11ax-2021, Table 9-322a: HE-MCS Map encoding
- *
  * Return: true if MCS maps are valid (at least one NSS supported),
  *         false if all spatial streams are disabled (0xFFFF)
  */
-static bool lim_validate_he_mcs_for_bw(uint16_t rx_he_mcs_map,
-				       uint16_t tx_he_mcs_map)
+bool lim_validate_he_mcs_for_bw(uint16_t rx_he_mcs_map,
+				uint16_t tx_he_mcs_map)
 {
-	/*
-	 * IEEE 802.11ax-2021 Section 9.4.2.247.4:
-	 * HE MCS map format: 2 bits per spatial stream (8 NSS total)
-	 *   Bits [1:0]   - NSS 1 MCS support
-	 *   Bits [3:2]   - NSS 2 MCS support
-	 *   ...
-	 *   Bits [15:14] - NSS 8 MCS support
-	 *
-	 * Per Table 9-322a, each 2-bit field encoding:
-	 *   0: MCS 0-7 supported
-	 *   1: MCS 0-9 supported
-	 *   2: MCS 0-11 supported
-	 *   3: NSS not supported
-	 *
-	 * HE_MCS_ALL_DISABLED (0xFFFF) means all 8 spatial streams
-	 * are set to "not supported" (value 3), indicating no MCS
-	 * support for this bandwidth.
-	 *
-	 * Regression-Free & Backward Compatibility Note:
-	 * To maintain connection as much as possible, only return false
-	 * if BOTH Rx and Tx MCS maps are disabled. If at least one
-	 * direction is supported, we allow the connection/bandwidth.
-	 * This ensures that we fallback/reject only in the worst-case
-	 * scenario where communication is impossible in both directions.
-	 */
 	if (rx_he_mcs_map == HE_MCS_ALL_DISABLED &&
 	    tx_he_mcs_map == HE_MCS_ALL_DISABLED) {
 		pe_debug("Invalid HE MCS map : rx=0x%x tx=0x%x",
@@ -4345,168 +4292,14 @@ static void lim_update_ap_max_ch_width(struct mac_context *mac,
 				       struct pe_session *pe_session,
 				       struct wlan_objmgr_peer *peer)
 {
-	tDot11fIEhe_cap *he_cap;
-	uint16_t rx_mcs_160, tx_mcs_160;
-	bool mcs_valid;
 	enum phy_ch_width ap_max_ch_width;
 
 	if (!pAssocRsp || !pe_session || !peer)
 		return;
 
-	/*
-	 * Default to the peer stored value so that even if HE caps are not
-	 * present/valid in this call, we still persist a consistent value.
-	 */
-	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
-	if (!ap_max_ch_width)
-		ap_max_ch_width = CH_WIDTH_20MHZ;
+	ap_max_ch_width = lim_get_he_max_ch_width(&pAssocRsp->he_cap,
+						  pe_session);
 
-	/* Check if HE capability is present */
-	if (!pAssocRsp->he_cap.present) {
-		pe_debug("HE capability not present, using ap_max_ch_width %d",
-			 ap_max_ch_width);
-		goto out;
-	}
-
-	he_cap = &pAssocRsp->he_cap;
-
-	/*
-	 * Step 1: Baseline validation. Check the mandatory MCS map for
-	 * bandwidths <= 80 MHz.
-	 */
-	mcs_valid = lim_validate_he_mcs_for_bw(
-			he_cap->rx_he_mcs_map_lt_80,
-			he_cap->tx_he_mcs_map_lt_80);
-
-	if (!mcs_valid) {
-		pe_debug("Invalid HE MCS for <= 80MHz, using 20MHz");
-		goto out;
-	}
-
-	/* Set minimum supported bandwidth after baseline validation */
-	ap_max_ch_width = CH_WIDTH_80MHZ;
-
-	/*
-	 * Step 2: Band-specific validation.
-	 * Process bandwidth capabilities based on frequency band.
-	 */
-
-	/* 2.4 GHz band: Only 20/40 MHz supported */
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq)) {
-		if (he_cap->chan_width_0) {
-			ap_max_ch_width = CH_WIDTH_40MHZ;
-		} else {
-			ap_max_ch_width = CH_WIDTH_20MHZ;
-		}
-		pe_debug("HE 2.4GHz AP max ch width: %d", ap_max_ch_width);
-	}
-	/* 5 GHz and 6 GHz bands: Support up to 160/80+80 MHz */
-	else if (WLAN_REG_IS_5GHZ_CH_FREQ(pe_session->curr_op_freq) ||
-		 WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq) ||
-		 lim_is_he_6ghz_band(pe_session)) {
-		/*
-		 * Bandwidth Selection & Fallback Logic (maintain connection):
-		 * 1. 80+80 MHz: Non-contiguous, checked first (highest BW)
-		 * 2. 160 MHz: Contiguous, checked if 80+80 not supported
-		 * 3. 80 MHz: Also implies 40 MHz support
-		 * 4. 20 MHz: HE mandatory fallback
-		 *
-		 * MCS validation strategy:
-		 * - For 160 MHz: If MCS invalid, check 80 MHz MCS
-		 *   - If 80 MHz MCS valid, fallback to 80 MHz
-		 *   - If 80 MHz MCS also invalid, fallback to 20 MHz
-		 * - For 80 MHz: If MCS invalid, fallback to 20 MHz
-		 */
-
-		/* Try 80+80MHz first (non-contiguous, highest bandwidth) */
-		if (he_cap->chan_width_3) {
-			qdf_mem_copy(&rx_mcs_160,
-				     he_cap->rx_he_mcs_map_80_80,
-				     sizeof(uint16_t));
-			qdf_mem_copy(&tx_mcs_160,
-				     he_cap->tx_he_mcs_map_80_80,
-				     sizeof(uint16_t));
-
-			if (lim_validate_he_mcs_for_bw(rx_mcs_160,
-						       tx_mcs_160)) {
-				ap_max_ch_width = CH_WIDTH_80P80MHZ;
-				pe_debug("HE 5/6GHz AP max ch width: 80+80MHz");
-				goto out;
-			}
-			pe_debug("Invalid HE MCS 80+80MHz, check 160MHz");
-		}
-
-		/*
-		 * Try 160MHz (contiguous) - handle both 5GHz (B2) and
-		 * 6GHz (B5) style
-		 */
-		if (he_cap->chan_width_5 || he_cap->chan_width_2) {
-			qdf_mem_copy(&rx_mcs_160,
-				     he_cap->rx_he_mcs_map_160,
-				     sizeof(uint16_t));
-			qdf_mem_copy(&tx_mcs_160,
-				     he_cap->tx_he_mcs_map_160,
-				     sizeof(uint16_t));
-
-			/* Check if 160 MHz MCS is valid */
-			if (lim_validate_he_mcs_for_bw(rx_mcs_160,
-						       tx_mcs_160)) {
-				ap_max_ch_width = CH_WIDTH_160MHZ;
-			} else {
-				/*
-				 * 160 MHz MCS invalid, check 80 MHz MCS
-				 * Use mandatory <= 80 MHz MCS map
-				 */
-				pe_debug("Invalid HE MCS 160MHz, check 80MHz");
-				mcs_valid = lim_validate_he_mcs_for_bw(
-						he_cap->rx_he_mcs_map_lt_80,
-						he_cap->tx_he_mcs_map_lt_80);
-				if (mcs_valid) {
-					pe_debug("80MHz MCS valid, fallback to 80MHz");
-					ap_max_ch_width = CH_WIDTH_80MHZ;
-				} else {
-					pe_debug("Both 160MHz and 80MHz MCS invalid, fallback to 20MHz");
-					ap_max_ch_width = CH_WIDTH_20MHZ;
-				}
-			}
-		}
-		/*
-		 * 80MHz (also implies 40MHz) - handle both 6GHz (B6) and
-		 * 5GHz (B1) style
-		 */
-		else if (he_cap->chan_width_1) {
-			/* Check if 80 MHz MCS is valid */
-			mcs_valid = lim_validate_he_mcs_for_bw(
-					he_cap->rx_he_mcs_map_lt_80,
-					he_cap->tx_he_mcs_map_lt_80);
-			if (mcs_valid) {
-				ap_max_ch_width = CH_WIDTH_80MHZ;
-			} else {
-				pe_debug("80MHz MCS invalid, fallback to 20MHz");
-				ap_max_ch_width = CH_WIDTH_20MHZ;
-			}
-		}
-		/* HE mandatory fallback */
-		else {
-			ap_max_ch_width = CH_WIDTH_20MHZ;
-		}
-
-		pe_debug("HE 5/6GHz AP max ch width: %d", ap_max_ch_width);
-	}
-	/* Unknown band */
-	else {
-		pe_debug("Unknown frequency band, using 20MHz");
-	}
-
-out:
-	/*
-	 * Persist into peer MLME (single source of truth).
-	 *
-	 * Update peer irrespective of whether ap_max_ch_width was derived in
-	 * this call (e.g., he_cap not present or validation failure). This
-	 * makes peer the authoritative store and avoids conditional update
-	 * behavior.
-	 */
 	wlan_peer_set_ap_max_ch_width(peer, ap_max_ch_width);
 }
 

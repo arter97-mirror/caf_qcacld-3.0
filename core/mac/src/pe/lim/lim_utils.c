@@ -94,6 +94,132 @@
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_dnw_api.h"
 
+enum phy_ch_width
+lim_get_he_max_ch_width(tDot11fIEhe_cap *he_cap, struct pe_session *session)
+{
+	enum phy_ch_width ap_max_ch_width = CH_WIDTH_20MHZ;
+	bool mcs_valid;
+	uint16_t rx_mcs_160;
+	uint16_t tx_mcs_160;
+
+	if (!he_cap || !session)
+		return CH_WIDTH_INVALID;
+
+	/*
+	 * Step 1: Baseline validation. Check the mandatory MCS map for
+	 * bandwidths <= 80 MHz.
+	 */
+	mcs_valid = lim_validate_he_mcs_for_bw(he_cap->rx_he_mcs_map_lt_80,
+					      he_cap->tx_he_mcs_map_lt_80);
+	if (!mcs_valid)
+		goto out;
+
+	/* Set minimum supported bandwidth after baseline validation */
+	ap_max_ch_width = CH_WIDTH_80MHZ;
+
+	/*
+	 * Step 2: Band-specific validation.
+	 * Process bandwidth capabilities based on frequency band.
+	 */
+
+	/* 2.4 GHz band: Only 20/40 MHz supported */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq)) {
+		if (he_cap->chan_width_0)
+			ap_max_ch_width = CH_WIDTH_40MHZ;
+		else
+			ap_max_ch_width = CH_WIDTH_20MHZ;
+
+		goto out;
+	}
+
+	/* 5 GHz and 6 GHz bands: Support up to 160/80+80 MHz */
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(session->curr_op_freq) ||
+	    WLAN_REG_IS_6GHZ_CHAN_FREQ(session->curr_op_freq) ||
+	    lim_is_he_6ghz_band(session)) {
+		/*
+		 * Bandwidth Selection & Fallback Logic (maintain connection):
+		 * 1. 80+80 MHz: Non-contiguous, checked first (highest BW)
+		 * 2. 160 MHz: Contiguous, checked if 80+80 not supported
+		 * 3. 80 MHz: Also implies 40 MHz support
+		 * 4. 20 MHz: HE mandatory fallback
+		 *
+		 * MCS validation strategy:
+		 * - For 160 MHz: If MCS invalid, check 80 MHz MCS
+		 *   - If 80 MHz MCS valid, fallback to 80 MHz
+		 *   - If 80 MHz MCS also invalid, fallback to 20 MHz
+		 * - For 80 MHz: If MCS invalid, fallback to 20 MHz
+		 */
+
+		/* Try 80+80MHz first (non-contiguous, highest bandwidth) */
+		if (he_cap->chan_width_3) {
+			qdf_mem_copy(&rx_mcs_160, he_cap->rx_he_mcs_map_80_80,
+				     sizeof(uint16_t));
+			qdf_mem_copy(&tx_mcs_160, he_cap->tx_he_mcs_map_80_80,
+				     sizeof(uint16_t));
+
+			if (lim_validate_he_mcs_for_bw(rx_mcs_160,
+						       tx_mcs_160)) {
+				ap_max_ch_width = CH_WIDTH_80P80MHZ;
+				goto out;
+			}
+		}
+
+		/*
+		 * Try 160MHz (contiguous) - handle both 5GHz (B2) and
+		 * 6GHz (B5) style
+		 */
+		if (he_cap->chan_width_5 || he_cap->chan_width_2) {
+			qdf_mem_copy(&rx_mcs_160, he_cap->rx_he_mcs_map_160,
+				     sizeof(uint16_t));
+			qdf_mem_copy(&tx_mcs_160, he_cap->tx_he_mcs_map_160,
+				     sizeof(uint16_t));
+
+			/* Check if 160 MHz MCS is valid */
+			if (lim_validate_he_mcs_for_bw(rx_mcs_160,
+						       tx_mcs_160)) {
+				ap_max_ch_width = CH_WIDTH_160MHZ;
+			} else {
+				/*
+				 * 160 MHz MCS invalid, check 80 MHz MCS
+				 * Use mandatory <= 80 MHz MCS map
+				 */
+				mcs_valid = lim_validate_he_mcs_for_bw(
+						he_cap->rx_he_mcs_map_lt_80,
+						he_cap->tx_he_mcs_map_lt_80);
+				if (mcs_valid)
+					ap_max_ch_width = CH_WIDTH_80MHZ;
+				else
+					ap_max_ch_width = CH_WIDTH_20MHZ;
+			}
+		}
+		/*
+		 * 80MHz (also implies 40MHz) - handle both 6GHz (B6) and
+		 * 5GHz (B1) style
+		 */
+		else if (he_cap->chan_width_1) {
+			/* Check if 80 MHz MCS is valid */
+			mcs_valid = lim_validate_he_mcs_for_bw(
+					he_cap->rx_he_mcs_map_lt_80,
+					he_cap->tx_he_mcs_map_lt_80);
+			if (mcs_valid)
+				ap_max_ch_width = CH_WIDTH_80MHZ;
+			else
+				ap_max_ch_width = CH_WIDTH_20MHZ;
+		}
+		/* HE mandatory fallback */
+		else {
+			ap_max_ch_width = CH_WIDTH_20MHZ;
+		}
+
+		goto out;
+	}
+
+	ap_max_ch_width = CH_WIDTH_20MHZ;
+
+out:
+	return ap_max_ch_width;
+}
+
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
    \brief deletes the complete lim dialogue token linked list.

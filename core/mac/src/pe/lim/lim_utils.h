@@ -429,6 +429,7 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
 				 uint16_t vdev_id, uint32_t rx_freq,
 				 int8_t rx_rssi, enum rxmgmt_flags rx_flags);
 
+
 /*
  * lim_deactivate_timers() - Function to deactivate lim timers
  * @mac_ctx: Pointer to global mac structure
@@ -1563,6 +1564,32 @@ void lim_log_he_bss_color(struct mac_context *mac,
 void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap);
 
 /**
+ * lim_get_he_max_ch_width() - Get AP's maximum HE channel width
+ * @he_cap: Pointer to HE capability IE from the AP
+ * @session: Pointer to PE session
+ *
+ * This function calculates the AP's maximum supported HE channel width by
+ * analyzing the HE capability IE and validating it against the HE MCS maps.
+ * It implements the bandwidth selection and fallback logic for all bands.
+ *
+ * The function performs the following operations:
+ * 1. Validates base HE MCS maps (<= 80 MHz)
+ * 2. For 5GHz/6GHz: Checks 80+80MHz, 160MHz, 80MHz support with MCS validation
+ * 3. For 2.4GHz: Checks 40MHz support
+ * 4. Falls back to lower bandwidths based on MCS validation
+ *
+ * Bandwidth selection priority for 5GHz/6GHz:
+ * - 80+80MHz (CH_WIDTH_80P80MHZ) - if chan_width_3 is set and MCS valid
+ * - 160MHz (CH_WIDTH_160MHZ) - if chan_width_2/5 is set and MCS valid
+ * - 80MHz (CH_WIDTH_80MHZ) - if chan_width_1/6 is set and MCS valid
+ * - 20MHz (CH_WIDTH_20MHZ) - mandatory fallback
+ *
+ * Return: enum phy_ch_width representing AP's maximum HE bandwidth
+ */
+enum phy_ch_width
+lim_get_he_max_ch_width(tDot11fIEhe_cap *he_cap, struct pe_session *session);
+
+/**
  * lim_check_he_80_mcs11_supp() - Check whether MCS 0-11 rates are supported
  * @session: pointer to PE session
  * @he_cap: pointer to HE capabilities
@@ -1927,6 +1954,12 @@ static inline void lim_log_he_op(struct mac_context *mac,
 static inline void lim_log_he_cap(struct mac_context *mac,
 	tDot11fIEhe_cap *he_cap)
 {
+}
+
+static inline enum phy_ch_width
+lim_get_he_max_ch_width(tDot11fIEhe_cap *he_cap, struct pe_session *session)
+{
+	return CH_WIDTH_INVALID;
 }
 
 static inline void lim_update_sta_he_capable(struct mac_context *mac,
