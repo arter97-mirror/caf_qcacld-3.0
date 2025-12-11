@@ -11,6 +11,7 @@ targets = [
     "seraph",
     "sun",
     "vienna",
+    "chora",
 ]
 
 target_16k = [
@@ -63,6 +64,7 @@ vm_target_bases = [
     "sun",
     "canoe",
     "hamoa",
+    "chora",
 ]
 
 vm_targets = ["{}-{}".format(t, vt) for t in vm_target_bases for vt in vm_types]
