@@ -5063,6 +5063,18 @@ ucfg_mlme_set_channel_bonding_5ghz(struct wlan_objmgr_psoc *psoc,
 				   uint32_t value);
 
 /**
+ * ucfg_mlme_get_channel_bonding_override() - get channel bonding mode
+ * override setting
+ * @psoc:   pointer to psoc object
+ * @value:  pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_get_channel_bonding_override(struct wlan_objmgr_psoc *psoc,
+				       bool *value);
+
+/**
  * ucfg_mlme_get_scan_probe_unicast_ra() - Get scan probe unicast RA cfg
  *
  * @psoc: pointer to psoc object

@@ -1900,6 +1900,22 @@ bool ucfg_mlme_get_restricted_80p80_bw_supp(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS
+ucfg_mlme_get_channel_bonding_override(struct wlan_objmgr_psoc *psoc,
+				       bool *val)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*val = cfg_default(CFG_CHANNEL_BONDING_MODE_OVERRIDE);
+		return QDF_STATUS_E_INVAL;
+	}
+	*val = mlme_obj->cfg.feature_flags.cb_mode_override;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 ucfg_mlme_get_channel_bonding_24ghz(struct wlan_objmgr_psoc *psoc,
 				    uint32_t *val)
 {

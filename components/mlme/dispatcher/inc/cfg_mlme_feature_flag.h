@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -161,6 +161,34 @@
 
 /*
  * <ini>
+ * gChannelBondingModeOverride - Configures Channel Bonding mode override
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to set default channel bonding mode whether allow override
+ *
+ * 0 - user space not allow override cb mode
+ * 1 - user space allow override cb mode
+ *
+ * Related: None
+ *
+ * Supported Feature: STA/SAP
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_CHANNEL_BONDING_MODE_OVERRIDE CFG_INI_UINT( \
+	"gChannelBondingModeOverride", \
+	0, \
+	1, \
+	1, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Configures Channel Bonding Override")
+
+/*
+ * <ini>
  * gChannelBondingMode24GHz - Configures Channel Bonding in 24 GHz
  * @Min: 0
  * @Max: 10
@@ -258,6 +286,7 @@
 	CFG(CFG_CHANNEL_BONDING_MODE) \
 	CFG(CFG_BLOCK_ACK_ENABLED) \
 	CFG(CFG_ENABLE_AMPDUPS) \
+	CFG(CFG_CHANNEL_BONDING_MODE_OVERRIDE) \
 	CFG(CFG_CHANNEL_BONDING_MODE_24GHZ) \
 	CFG(CFG_CHANNEL_BONDING_MODE_5GHZ) \
 	CFG(CFG_ALLOW_UPDATE_CHANNEL_WIDTH)
