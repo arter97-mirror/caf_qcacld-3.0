@@ -3172,6 +3172,71 @@ lim_disable_ht_he_dynamic_smps(struct pe_session *session,
 	}
 }
 
+/**
+ * lim_validate_and_update_session_ht_bw_params() - Validate HT IEs and update
+ * session BW params
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session: PE session entry
+ * @bss_desc: BSS description
+ *
+ * Determines the HT channel bonding mode via wlan_get_cb_mode(), which
+ * validates HT Capabilities IE (Supported Channel Width Set), HT Operation
+ * IE (STA Channel Width + Secondary Channel Offset), and regulatory
+ * constraints. An action-OUI policy override is applied after HT IE
+ * validation. Session HT BW parameters are updated accordingly.
+ *
+ * On any validation failure, falls back to safe 20 MHz operation.
+ *
+ * Return: None
+ */
+static void
+lim_validate_and_update_session_ht_bw_params(struct mac_context *mac_ctx,
+					     struct pe_session *session,
+					     struct bss_description *bss_desc)
+{
+	tDot11fBeaconIEs *ie_struct;
+	ePhyChanBondState cb_mode;
+
+	ie_struct = &bss_desc->bcn_ies;
+
+	cb_mode = wlan_get_cb_mode(mac_ctx, session->curr_op_freq, ie_struct,
+				   session);
+
+	/* Force 20MHz in 2.4GHz if policy requires it */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
+	    wlan_cm_get_force_20mhz_in_24ghz(session->vdev))
+		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
+
+	/*
+	 * Keep action-oui based BW limiting as an explicit policy override.
+	 * (Not part of HT IE consistency validation.)
+	 */
+	if (session->action_oui_limit_bw_2g)
+		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
+
+	session->htSupportedChannelWidthSet = cb_mode ? 1 : 0;
+	session->htRecommendedTxWidthSet = session->htSupportedChannelWidthSet;
+	session->htSecondaryChannelOffset = cb_mode;
+
+	if (cb_mode == PHY_DOUBLE_CHANNEL_HIGH_PRIMARY) {
+		session->ch_center_freq_seg0 =
+			wlan_reg_freq_to_chan(mac_ctx->pdev,
+					      session->curr_op_freq) - 2;
+		session->ch_width = CH_WIDTH_40MHZ;
+	} else if (cb_mode == PHY_DOUBLE_CHANNEL_LOW_PRIMARY) {
+		session->ch_center_freq_seg0 =
+			wlan_reg_freq_to_chan(mac_ctx->pdev,
+					      session->curr_op_freq) + 2;
+		session->ch_width = CH_WIDTH_40MHZ;
+	} else {
+		session->ch_center_freq_seg0 = 0;
+		session->ch_width = CH_WIDTH_20MHZ;
+	}
+
+	session->ap_ch_width = session->ch_width;
+	session->ch_center_freq_seg1 = 0;
+}
+
 QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		    struct bss_description *bss_desc,
@@ -3181,7 +3246,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	uint8_t bss_chan_id;
 	tDot11fBeaconIEs *ie_struct;
 	QDF_STATUS status;
-	ePhyChanBondState cb_mode;
 	const uint8_t *vendor_ie;
 	uint16_t ie_len;
 	int8_t local_power_constraint = 0;
@@ -3242,13 +3306,6 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	status = lim_fill_dot11_mode(mac_ctx, session, phy_mode);
 	if (QDF_IS_STATUS_ERROR(status))
 		return QDF_STATUS_E_FAILURE;
-
-	cb_mode = wlan_get_cb_mode(mac_ctx, session->curr_op_freq, ie_struct,
-				   session);
-
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
-	    wlan_cm_get_force_20mhz_in_24ghz(session->vdev))
-		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
 
 	status = wlan_get_rate_set(mac_ctx, ie_struct, session);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -3380,28 +3437,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->gLimPhyMode = bss_desc->nwType;
 	handle_ht_capabilityand_ht_info(mac_ctx, session);
 
-	if (session->action_oui_limit_bw_2g)
-		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
-	session->htSupportedChannelWidthSet = cb_mode ? 1 : 0;
-	session->htRecommendedTxWidthSet =
-		session->htSupportedChannelWidthSet;
-	session->htSecondaryChannelOffset = cb_mode;
-
-	if (cb_mode == PHY_DOUBLE_CHANNEL_HIGH_PRIMARY) {
-		session->ch_center_freq_seg0 =
-			wlan_reg_freq_to_chan(
-			mac_ctx->pdev, session->curr_op_freq) - 2;
-		session->ch_width = CH_WIDTH_40MHZ;
-	} else if (cb_mode == PHY_DOUBLE_CHANNEL_LOW_PRIMARY) {
-		session->ch_center_freq_seg0 =
-			wlan_reg_freq_to_chan(
-			mac_ctx->pdev, session->curr_op_freq) + 2;
-		session->ch_width = CH_WIDTH_40MHZ;
-	} else {
-		session->ch_center_freq_seg0 = 0;
-		session->ch_width = CH_WIDTH_20MHZ;
-	}
-	session->ap_ch_width = session->ch_width;
+	lim_validate_and_update_session_ht_bw_params(mac_ctx, session,
+						     bss_desc);
 
 	if (IS_DOT11_MODE_HE(session->dot11mode)) {
 		lim_update_session_he_capable(mac_ctx, session);
