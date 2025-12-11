@@ -51,6 +51,7 @@
 #include "wlan_dp_spm.h"
 #include "wlan_dp_telemetry_priv.h"
 #include "wlan_dp_haps.h"
+#include "wlan_ipa_ucfg_api.h"
 
 #ifdef WLAN_DP_PROFILE_SUPPORT
 /* Memory profile table based on supported caps */
@@ -3174,6 +3175,8 @@ QDF_STATUS __wlan_dp_bus_suspend(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
+	ucfg_ipa_ps_suspend_resume(true);
+
 	return status;
 }
 
@@ -3199,6 +3202,8 @@ QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	status = wlan_dp_fisa_resume(dp_ctx);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+
+	ucfg_ipa_ps_suspend_resume(false);
 
 	return status;
 }
