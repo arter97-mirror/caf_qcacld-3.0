@@ -1631,11 +1631,30 @@ static inline bool lim_is_session_he_capable(struct pe_session *session)
 }
 
 /**
- * lim_update_he_bw_cap_mcs(): Update he mcs map per bandwidth
- * @session_entry: pointer to PE session
- * @bcn_ies: Pointer to beacon IEs
+ * lim_update_he_bw_cap_mcs() - Update HE bandwidth capabilities and MCS maps
+ * @session: Pointer to PE session
+ * @bcn_ies: Pointer to parsed beacon IEs from AP
  *
- * Return: None
+ * This function updates the session's HE bandwidth capabilities and MCS maps
+ * based on the AP's advertised capabilities, user preferences, and the
+ * negotiated channel width. It performs the following operations:
+ *
+ * 1. Validates HE 160MHz MCS map compatibility between STA and AP
+ * 2. Applies user preference for 80MHz over 160MHz if configured
+ * 3. Adjusts HE capability bits based on the final negotiated bandwidth:
+ *    - Disables >80MHz capabilities if operating at 80MHz or below
+ *    - Disables 80+80MHz capabilities if not using that mode
+ *    - Clears all >20MHz capabilities for 20MHz connections
+ * 4. Applies band-specific capability adjustments (2.4GHz vs 5/6GHz)
+ * 5. Disables 160MHz-specific features if not operating in 160MHz mode
+ *
+ * The function ensures that the STA advertises only the capabilities that are
+ * relevant for the actual operating bandwidth, preventing capability mismatch
+ * issues with the AP.
+ *
+ * Context: Called during AP capability extraction after bandwidth negotiation
+ *
+ * Return: None (void function - updates session HE configuration)
  */
 void lim_update_he_bw_cap_mcs(struct pe_session *session,
 			      tDot11fBeaconIEs *bcn_ies);
@@ -2087,11 +2106,31 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 				    uint8_t tx_nss, uint8_t rx_nss, bool is_2g);
 
 /**
- * lim_update_eht_bw_cap_mcs(): Update eht mcs map per bandwidth
- * @session_entry: pointer to PE session
- * @bcn_ies: Pointer to beacon IEs
+ * lim_update_eht_bw_cap_mcs() - Update EHT bandwidth capabilities and MCS maps
+ * @session: Pointer to PE session
+ * @bcn_ies: Pointer to parsed beacon IEs from AP
  *
- * Return: None
+ * This function updates the session's EHT (802.11be) bandwidth capabilities
+ * based on the AP's advertised EHT capabilities. It performs the following:
+ *
+ * 1. Validates and adjusts 320MHz support in 6GHz band:
+ *    - Disables 320MHz capability if AP doesn't support it
+ *    - This ensures the STA doesn't advertise 320MHz support when connecting
+ *      to an AP that only supports up to 160MHz
+ *
+ * 2. Adjusts beamforming capabilities for 320MHz:
+ *    - Disables number of sounding dimensions for 320MHz if either:
+ *      a) AP doesn't support 320MHz, OR
+ *      b) AP doesn't support SU beamformer capability
+ *    - This prevents advertising beamforming capabilities that cannot be used
+ *
+ * The function ensures capability alignment between STA and AP for EHT
+ * features, particularly for the new 320MHz bandwidth introduced in 802.11be.
+ *
+ * Context: Called during AP capability extraction for EHT-capable connections
+ *          in STA or P2P client mode
+ *
+ * Return: None (void function - updates session EHT configuration)
  */
 void lim_update_eht_bw_cap_mcs(struct pe_session *session,
 			       tDot11fBeaconIEs *bcn_ies);

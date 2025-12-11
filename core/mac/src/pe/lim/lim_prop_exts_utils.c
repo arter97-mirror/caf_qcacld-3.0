@@ -100,6 +100,30 @@ void get_ese_version_ie_probe_response(struct mac_context *mac_ctx,
 #endif
 
 #ifdef WLAN_FEATURE_11AX
+/**
+ * lim_extract_he_op() - Extract and process HE Operation IE parameters
+ * @mac: Pointer to MAC context
+ * @session: Pointer to PE session
+ * @bcn_ies: Pointer to parsed beacon IEs from AP
+ *
+ * This function extracts HE Operation IE parameters from the AP's beacon and
+ * updates the session's operating parameters accordingly. It handles special
+ * processing for 6GHz band operations including:
+ * - Channel width determination (20/40/80/160/80+80 MHz)
+ * - Center frequency segment configuration
+ * - AP power type extraction for 6GHz regulatory compliance
+ * - Firmware capability validation and bandwidth adjustment
+ *
+ * For 6GHz band, the function extracts the 6GHz Operation Information field
+ * which contains channel width, center frequencies, and regulatory information.
+ * It validates the configuration against firmware capabilities and adjusts
+ * bandwidth if necessary (e.g., downgrading from 160MHz to 80MHz if firmware
+ * doesn't support wider bandwidths).
+ *
+ * Context: Called during AP capability extraction for HE-capable connections
+ *
+ * Return: None (void function - updates session structure with HE parameters)
+ */
 static void lim_extract_he_op(struct mac_context *mac,
 			      struct pe_session *session,
 			      tDot11fBeaconIEs *bcn_ies)
@@ -194,6 +218,23 @@ static bool lim_validate_he160_mcs_map(struct pe_session *session,
 		(tx_he_mcs_map != HE_MCS_ALL_DISABLED));
 }
 
+/**
+ * lim_check_is_he_mcs_valid() - Validate HE MCS map compatibility
+ * @session: Pointer to PE session
+ * @bcn_ies: Pointer to parsed beacon IEs from AP
+ *
+ * This function validates whether the AP's advertised HE MCS map is compatible
+ * with the STA's transmit NSS capability. It checks if there is at least one
+ * valid MCS rate available for communication in the <80MHz bandwidth.
+ *
+ * If the AP doesn't support HE or if all MCS rates are disabled for the STA's
+ * NSS capability, the function downgrades the connection mode to VHT (11ac) or
+ * HT (11n) depending on VHT capability.
+ *
+ * Context: Called during AP capability extraction to ensure HE mode viability
+ *
+ * Return: None (void function - updates session structure on validation failure)
+ */
 static void lim_check_is_he_mcs_valid(struct pe_session *session,
 				      tDot11fBeaconIEs *bcn_ies)
 {
@@ -522,6 +563,24 @@ static inline bool lim_extract_adaptive_11r_cap(uint8_t *ie, uint16_t ie_len)
 #endif
 
 #ifdef WLAN_FEATURE_11AX
+/**
+ * lim_check_peer_ldpc_and_update() - Validate LDPC support for HE in 2.4GHz
+ * @session: Pointer to PE session
+ * @bcn_ies: Pointer to parsed beacon IEs from AP
+ *
+ * This function performs LDPC (Low-Density Parity Check) validation for HE
+ * connections in the 2.4GHz band. In 2.4GHz, if the AP supports HE with MCS
+ * rates up to MCS 11 but does not advertise LDPC support, the connection is
+ * downgraded to VHT (11ac) or HT (11n) mode.
+ *
+ * LDPC is a forward error correction technique that improves link reliability,
+ * especially at higher MCS rates. This check ensures robust communication by
+ * preventing HE mode when LDPC is not available for high MCS rates in 2.4GHz.
+ *
+ * Context: Called during AP capability extraction for 2.4GHz band connections
+ *
+ * Return: None (void function - updates session structure on validation failure)
+ */
 static void lim_check_peer_ldpc_and_update(struct pe_session *session,
 					   tDot11fBeaconIEs *bcn_ies)
 {
@@ -876,6 +935,30 @@ static void lim_extract_vht_bw_params(struct mac_context *mac_ctx,
 	}
 }
 
+/**
+ * lim_configure_he_eht_params() - Configure HE and EHT parameters
+ * @mac_ctx: Pointer to MAC context
+ * @session: Pointer to PE session
+ * @bcn_ies: Pointer to parsed beacon IEs from AP
+ *
+ * Processes HE/EHT capabilities and operations from AP beacon, validates
+ * MCS maps, checks LDPC support, and updates session bandwidth capabilities.
+ *
+ * Return: None
+ */
+static void lim_configure_he_eht_params(struct mac_context *mac_ctx,
+					struct pe_session *session,
+					tDot11fBeaconIEs *bcn_ies)
+{
+	lim_check_is_he_mcs_valid(session, bcn_ies);
+	lim_check_peer_ldpc_and_update(session, bcn_ies);
+	lim_extract_he_op(mac_ctx, session, bcn_ies);
+	lim_extract_eht_op(mac_ctx, session, bcn_ies);
+	if (!mac_ctx->usr_eht_testbed_cfg)
+		lim_update_he_bw_cap_mcs(session, bcn_ies);
+	lim_update_eht_bw_cap_mcs(session, bcn_ies);
+}
+
 QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 				     struct pe_session *session,
 				     struct bss_description *bss_desc,
@@ -942,13 +1025,9 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 	/* Configure Operating Mode Notification parameters */
 	lim_configure_operating_mode_notification(session, bcn_ies);
 
-	lim_check_is_he_mcs_valid(session, bcn_ies);
-	lim_check_peer_ldpc_and_update(session, bcn_ies);
-	lim_extract_he_op(mac_ctx, session, bcn_ies);
-	lim_extract_eht_op(mac_ctx, session, bcn_ies);
-	if (!mac_ctx->usr_eht_testbed_cfg)
-		lim_update_he_bw_cap_mcs(session, bcn_ies);
-	lim_update_eht_bw_cap_mcs(session, bcn_ies);
+	/* Configure HE and EHT parameters */
+	lim_configure_he_eht_params(mac_ctx, session, bcn_ies);
+
 	/* Extract the UAPSD flag from WMM Parameter element */
 	if (bcn_ies->WMMParams.present)
 		*uapsd = bcn_ies->WMMParams.qosInfo & LIM_QOS_AP_SUPPORTS_APSD;

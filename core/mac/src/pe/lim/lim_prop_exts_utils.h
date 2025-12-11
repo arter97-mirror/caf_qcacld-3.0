@@ -59,13 +59,29 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 
 #ifdef WLAN_FEATURE_11BE
 /**
- * lim_extract_eht_op() - Extract EHT operation IE into session
- * @mac: mac context
- * @session: Pointer to pe_session
- * @bcn_ies: Pointer to beacon IEs
- * AP
+ * lim_extract_eht_op() - Extract and process EHT Operation IE parameters
+ * @mac: Pointer to MAC context
+ * @session: Pointer to PE session
+ * @bcn_ies: Pointer to parsed beacon IEs from AP
  *
- * Return: None
+ * This function extracts EHT (Extremely High Throughput / 802.11be) Operation
+ * IE parameters from the AP's beacon and configures the session's operating
+ * bandwidth accordingly. It handles:
+ * - Channel width determination (20/40/80/160/320 MHz)
+ * - Center frequency segment configuration (CCFS0 and CCFS1)
+ * - Firmware capability validation and bandwidth adjustment
+ *
+ * The function validates the AP's advertised EHT channel width against the
+ * firmware's maximum supported bandwidth and adjusts downward if necessary.
+ * For example, if the AP advertises 320MHz but firmware only supports 160MHz,
+ * the session will be configured for 160MHz operation.
+ *
+ * EHT introduces support for 320MHz bandwidth in the 6GHz band, which is
+ * handled by this function along with legacy bandwidths.
+ *
+ * Context: Called during AP capability extraction for EHT-capable connections
+ *
+ * Return: None (void function - updates session structure with EHT parameters)
  */
 void lim_extract_eht_op(struct mac_context *mac,
 			struct pe_session *session,
