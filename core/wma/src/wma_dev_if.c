@@ -1887,6 +1887,114 @@ wma_remove_existing_pasn_peer(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * wma_check_peer_delete_for_link_switch() - Check if peer delete should be
+ * skipped due to link switch in progress
+ * @wma: wma handle
+ * @iface: wma txrx node interface
+ * @peer_addr: peer mac address
+ *
+ * This function checks if MLO link switch is in progress and handles
+ * peer delete accordingly. If link switch is in progress, it copies
+ * peer delete parameters and sends delete response notification.
+ *
+ * Return: QDF_STATUS_SUCCESS if peer delete should be skipped,
+ *         QDF_STATUS_E_NOSUPPORT if normal peer delete should continue
+ */
+static QDF_STATUS
+wma_check_peer_delete_for_link_switch(tp_wma_handle wma,
+				      struct wma_txrx_node *iface,
+				      uint8_t *peer_addr)
+{
+	uint8_t vdev_id;
+	struct wma_target_req *req_msg;
+	struct del_bss_resp *del_bss_rsp;
+
+	/* Validate input parameters */
+	if (!wma || !iface || !peer_addr) {
+		wma_err("Invalid parameters: wma=%pK iface=%pK peer_addr=%pK",
+			wma, iface, peer_addr);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!iface->vdev) {
+		wma_err("vdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_id = wlan_vdev_get_id(iface->vdev);
+
+	wma_debug("vdev:%d Link switch in progress, skip peer delete for peer "
+		  QDF_MAC_ADDR_FMT, vdev_id, QDF_MAC_ADDR_REF(peer_addr));
+	mlo_mgr_copy_peer_delete_param_for_link_switch(iface->vdev,
+						       peer_addr);
+
+	/* Create a synthetic request message for peer delete
+	 * response notification
+	 */
+	req_msg = qdf_mem_malloc(sizeof(struct wma_target_req));
+	if (!req_msg) {
+		wma_err("Failed to allocate memory for synthetic request");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	/* Initialize the synthetic request */
+	qdf_mem_zero(req_msg, sizeof(struct wma_target_req));
+	req_msg->vdev_id = vdev_id;
+	req_msg->msg_type = WMA_DELETE_STA_REQ;
+	req_msg->type = WMA_DELETE_PEER_RSP;
+	qdf_mem_copy(&req_msg->addr.bytes, peer_addr, QDF_MAC_ADDR_SIZE);
+
+	/* Create synthetic del_bss_resp for user_data */
+	del_bss_rsp = qdf_mem_malloc(sizeof(struct del_bss_resp));
+	if (!del_bss_rsp) {
+		wma_err("Failed to allocate memory for del_bss_resp");
+		qdf_mem_free(req_msg);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	/* Initialize the synthetic del_bss_resp */
+	del_bss_rsp->status = QDF_STATUS_SUCCESS;
+	del_bss_rsp->vdev_id = vdev_id;
+
+	/* Set user_data in the request */
+	req_msg->user_data = del_bss_rsp;
+
+	/* Call peer delete response notification */
+	wma_info("vdev:%d calling peer delete response for link switch peer "
+		 QDF_MAC_ADDR_FMT, vdev_id, QDF_MAC_ADDR_REF(peer_addr));
+
+	return wma_peer_delete_resp_notify(wma, req_msg);
+}
+
+/**
+ * wma_peer_delete_request() - Send peer delete request based on link switch
+ * status
+ * @wma: wma handle
+ * @iface: wma interface
+ * @peer_addr: peer mac address
+ * @del_param: peer delete command parameters
+ *
+ * This function checks if MLO link switch is in progress and unified
+ * connect/disconnect is enabled, then calls appropriate peer delete
+ * function accordingly.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+wma_peer_delete_request(tp_wma_handle wma, struct wma_txrx_node *iface,
+			uint8_t *peer_addr,
+			struct peer_delete_cmd_params *del_param)
+{
+	if (mlo_mgr_is_link_switch_in_progress(iface->vdev) &&
+	    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(wma->psoc))
+		return wma_check_peer_delete_for_link_switch(wma, iface,
+							     peer_addr);
+
+	return wmi_unified_peer_delete_send(wma->wmi_handle, peer_addr,
+					    del_param);
+}
+
+/**
 * wma_remove_peer() - remove peer information from host driver and fw
 * @wma: wma handle
  * @mac_addr: peer mac address, to be removed
@@ -1920,6 +2028,7 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 	qdf_mem_copy(peer_addr, mac_addr, QDF_MAC_ADDR_SIZE);
 
 	iface = &wma->interfaces[vdev_id];
+
 	if (!iface->peer_count) {
 		wma_err("Can't remove peer with peer_addr "QDF_MAC_ADDR_FMT" vdevid %d peer_count %d",
 			QDF_MAC_ADDR_REF(peer_addr), vdev_id,
@@ -1977,8 +2086,7 @@ QDF_STATUS wma_remove_peer(tp_wma_handle wma, uint8_t *mac_addr,
 	del_param.vdev_id = vdev_id;
 	del_param.is_mlo_link_switch =
 		wlan_vdev_mlme_is_mlo_link_switch_in_progress(iface->vdev);
-	qdf_status = wmi_unified_peer_delete_send(wma->wmi_handle, peer_addr,
-						  &del_param);
+	qdf_status = wma_peer_delete_request(wma, iface, peer_addr, &del_param);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		wma_err("Peer delete could not be sent to firmware %d",
 			qdf_status);
@@ -2802,6 +2910,7 @@ static int wma_remove_bss_peer(tp_wma_handle wma, uint32_t vdev_id,
 	int ret_value = 0;
 	QDF_STATUS qdf_status;
 	struct qdf_mac_addr bssid;
+	struct wlan_objmgr_vdev *vdev;
 
 	if (WMA_IS_VDEV_IN_NDI_MODE(wma->interfaces, vdev_id)) {
 		mac_addr = cdp_get_vdev_mac_addr(soc, vdev_id);
@@ -2829,6 +2938,15 @@ static int wma_remove_bss_peer(tp_wma_handle wma, uint32_t vdev_id,
 
 	if (cds_is_driver_recovering())
 		return -EINVAL;
+	vdev = wma->interfaces[vdev_id].vdev;
+
+	if (vdev && mlo_mgr_is_link_switch_in_progress(vdev) &&
+	    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(wma->psoc)) {
+		wma_debug("vdev:%d link switch in progress, skip timer/wakelock for peer delete",
+			  vdev_id);
+		wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+		return qdf_status;
+	}
 
 	if (wmi_service_enabled(wma->wmi_handle,
 				wmi_service_sync_delete_cmds)) {
@@ -4115,66 +4233,18 @@ wma_cdp_cp_peer_del_response(struct wlan_objmgr_psoc *psoc,
 			     uint8_t *peer_mac, uint8_t vdev_id)
 {
 }
-#endif
 
-/**
- * wma_peer_delete_handler() - peer delete response handler
- * @handle: wma handle
- * @cmd_param_info: event buffer
- * @len: buffer length
- *
- * Return: 0 for success or error code
- */
-int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
-				uint32_t len)
+QDF_STATUS wma_peer_delete_resp_notify(tp_wma_handle wma,
+				       struct wma_target_req *req_msg)
 {
-	tp_wma_handle wma = (tp_wma_handle) handle;
-	WMI_PEER_DELETE_RESP_EVENTID_param_tlvs *param_buf;
-	wmi_peer_delete_cmd_fixed_param *event;
-	struct wma_target_req *req_msg;
 	tDeleteStaParams *del_sta;
-	uint8_t macaddr[QDF_MAC_ADDR_SIZE];
-	struct qdf_mac_addr peer_mac;
-	int status = 0;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 	struct del_sta_self_rsp_params *data;
 
 	if (!mac) {
 		wma_err("mac context is null");
-		return -EINVAL;
+		return QDF_STATUS_E_INVAL;
 	}
-	param_buf = (WMI_PEER_DELETE_RESP_EVENTID_param_tlvs *)cmd_param_info;
-	if (!param_buf) {
-		wma_err("Invalid vdev delete event buffer");
-		return -EINVAL;
-	}
-
-	event = (wmi_peer_delete_cmd_fixed_param *)param_buf->fixed_param;
-	if (!event) {
-		wma_err("Invalid vdev delete event buffer");
-		return -EINVAL;
-	}
-
-	WMI_MAC_ADDR_TO_CHAR_ARRAY(&event->peer_macaddr, macaddr);
-	wma_debug("Peer Delete Response, vdev %d Peer "QDF_MAC_ADDR_FMT,
-			event->vdev_id, QDF_MAC_ADDR_REF(macaddr));
-	wlan_roam_debug_log(event->vdev_id, DEBUG_PEER_DELETE_RESP,
-			    DEBUG_INVALID_PEER_ID, macaddr, NULL, 0, 0);
-
-	qdf_mem_copy(peer_mac.bytes, macaddr, QDF_MAC_ADDR_SIZE);
-
-	req_msg = wma_find_remove_req_msgtype(wma, event->vdev_id, &peer_mac,
-					      WMA_DELETE_STA_REQ);
-	if (!req_msg) {
-		wma_debug("Peer Delete response is not handled");
-		return -EINVAL;
-	}
-
-	wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
-
-	/* Cleanup timeout handler */
-	qdf_mc_timer_stop(&req_msg->event_timeout);
-	qdf_mc_timer_destroy(&req_msg->event_timeout);
 
 	switch (req_msg->type) {
 	case WMA_DELETE_STA_RSP_START:
@@ -4207,7 +4277,8 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 		cm_free_join_req(req_msg->user_data);
 		break;
 	case WMA_NAN_PASN_PEER_DELETE_RESPONSE:
-		wma_pasn_peer_delete_handler(wma->psoc, macaddr, event->vdev_id,
+		wma_pasn_peer_delete_handler(wma->psoc, req_msg->addr.bytes,
+					     req_msg->vdev_id,
 					     req_msg->user_data);
 		break;
 	case WMA_DELETE_NDP_PEER_RSP:
@@ -4222,10 +4293,68 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 		break;
 	}
 
-	wma_cdp_cp_peer_del_response(wma->psoc, macaddr, event->vdev_id);
+	wma_cdp_cp_peer_del_response(wma->psoc, req_msg->addr.bytes,
+				     req_msg->vdev_id);
 	qdf_mem_free(req_msg);
 
-	return status;
+	return QDF_STATUS_SUCCESS;
+}
+
+#endif
+
+/**
+ * wma_peer_delete_handler() - peer delete response handler
+ * @handle: wma handle
+ * @cmd_param_info: event buffer
+ * @len: buffer length
+ *
+ * This function handles peer delete response from firmware. It parses
+ * the firmware event and calls wma_peer_delete_resp_notify() to handle
+ * the response notification to upper layers.
+ *
+ * Return: 0 for success or error code
+ */
+int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
+			    uint32_t len)
+{
+	tp_wma_handle wma = (tp_wma_handle) handle;
+	WMI_PEER_DELETE_RESP_EVENTID_param_tlvs *param_buf;
+	wmi_peer_delete_cmd_fixed_param *event;
+	struct wma_target_req *req_msg;
+	uint8_t macaddr[QDF_MAC_ADDR_SIZE];
+	struct qdf_mac_addr peer_mac;
+
+	param_buf = (WMI_PEER_DELETE_RESP_EVENTID_param_tlvs *)cmd_param_info;
+	if (!param_buf) {
+		wma_err("Invalid vdev delete event buffer");
+		return -EINVAL;
+	}
+
+	event = (wmi_peer_delete_cmd_fixed_param *)param_buf->fixed_param;
+	if (!event) {
+		wma_err("Invalid vdev delete event buffer");
+		return -EINVAL;
+	}
+
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&event->peer_macaddr, peer_mac.bytes);
+	wma_debug("vdev:%d peer delete response for peer " QDF_MAC_ADDR_FMT,
+		  event->vdev_id, QDF_MAC_ADDR_REF(peer_mac.bytes));
+	wlan_roam_debug_log(event->vdev_id, DEBUG_PEER_DELETE_RESP,
+			    DEBUG_INVALID_PEER_ID, macaddr, NULL, 0, 0);
+
+	req_msg = wma_find_remove_req_msgtype(wma, event->vdev_id, &peer_mac,
+					      WMA_DELETE_STA_REQ);
+	if (!req_msg) {
+		wma_debug("peer delete response is not handled");
+		return -EINVAL;
+	}
+
+	wma_release_wakelock(&wma->wmi_cmd_rsp_wake_lock);
+	qdf_mc_timer_stop(&req_msg->event_timeout);
+	qdf_mc_timer_destroy(&req_msg->event_timeout);
+
+	/* Handle response notification (non-FW dependent code) */
+	return wma_peer_delete_resp_notify(wma, req_msg);
 }
 
 static

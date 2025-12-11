@@ -2880,4 +2880,20 @@ wma_set_vdev_mac_id_from_response(struct vdev_unified_connect_response *rsp);
 void wma_qos_null_tx_timeout_handler(tp_wma_handle wma,
                                      struct wma_target_req *req);
 
+/*
+ * wma_peer_delete_resp_notify() - peer delete response notification
+ * @wma: pointer to wma handle
+ * @vdev_id: vdev id
+ * @macaddr: peer mac address
+ * @req_msg: target request message
+ *
+ * This function handles peer delete response notification to upper layers.
+ * It processes the response based on request type and notifies appropriate
+ * modules. This contains non-firmware-dependent code extracted from
+ * wma_peer_delete_handler for better modularity.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_peer_delete_resp_notify(tp_wma_handle wma,
+				       struct wma_target_req *req_msg);
 #endif
