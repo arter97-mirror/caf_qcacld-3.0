@@ -969,6 +969,25 @@ static const struct ieee80211_iface_limit
 		.types = BIT(NL80211_IFTYPE_NAN),
 	},
 };
+
+#if defined(CFG80211_NAN_STANDARD_SUPPORT) || \
+    defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE)
+/* STA + STA + NAN combination */
+static const struct ieee80211_iface_limit
+	wlan_hdd_sta_sta_nan_iface_limit[] = {
+	{
+		/* STA + STA */
+		.max = 2,
+		.types = BIT(NL80211_IFTYPE_STATION)
+	},
+	{
+		/* NAN */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_NAN),
+	},
+};
+#endif
+
 /* STA + NAN disc combination */
 static const struct ieee80211_iface_limit
 	wlan_hdd_sta_nan_iface_limit[] = {
@@ -1231,6 +1250,18 @@ static struct ieee80211_iface_combination
 		.n_limits = ARRAY_SIZE(wlan_hdd_sta_sta_sap_nan_iface_limit),
 		.beacon_int_infra_match = true,
 	},
+
+#if defined(CFG80211_NAN_STANDARD_SUPPORT) || \
+    defined(FEATURE_WLAN_SUPPORT_NAN_OFFLOAD_MODE)
+	/* STA + STA + NAN */
+	{
+		.limits = wlan_hdd_sta_sta_nan_iface_limit,
+		.num_different_channels = 3,
+		.max_interfaces = 3,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_sta_nan_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+#endif
 	/* NAN + STA */
 	{
 		.limits = wlan_hdd_sta_nan_iface_limit,
