@@ -10774,7 +10774,7 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LEVEL];
 	struct nlattr *ps_latency_tolerance_attr =
 		tb[QCA_WLAN_VENDOR_ATTR_CONFIG_OPM_LATENCY_TOLERANCE];
-	int ret;
+	int ret = 0;
 
 	hdd_enter_dev(adapter->dev);
 
@@ -10832,8 +10832,10 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		ps_params.spec_wake = nla_get_u16(spec_wake_attr);
 		ps_params.ps_opm_level = curr_ps_params.ps_opm_level;
 
-		if (!ps_params.ps_ito)
-			return -EINVAL;
+		if (!ps_params.ps_ito) {
+			ret = -EINVAL;
+			goto err;
+		}
 
 		hdd_debug("ps_ito %d spec_wake %d opm_mode %d",
 			  ps_params.ps_ito, ps_params.spec_wake,
@@ -10845,7 +10847,7 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 						  ps_params.spec_wake);
 
 		if (ret)
-			return ret;
+			goto err;
 
 		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, false,
 						   ps_params.spec_wake);
@@ -10856,8 +10858,10 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		ps_params.spec_wake = nla_get_u16(ps_latency_tolerance_attr);
 		ps_params.ps_ito = curr_ps_params.ps_ito;
 
-		if (!ps_params.ps_opm_level)
-			return -EINVAL;
+		if (!ps_params.ps_opm_level) {
+			ret = -EINVAL;
+			goto err;
+		}
 
 		hdd_debug("ps_opm_level %d latency_tolerance %d opm_mode %d",
 			  ps_params.ps_opm_level, ps_params.spec_wake,
@@ -10869,7 +10873,7 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 						  ps_params.spec_wake);
 
 		if (ret)
-			return ret;
+			goto err;
 
 		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, false,
 						   ps_params.spec_wake);
@@ -10883,8 +10887,9 @@ static int hdd_config_power(struct wlan_hdd_link_info *link_info,
 		ucfg_dp_haps_set_fail_safe_timeout(adapter->dev, true, 0);
 	}
 
+err:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
-	return 0;
+	return ret;
 }
 
 static int hdd_config_stats_avg_factor(struct wlan_hdd_link_info *link_info,
