@@ -69,6 +69,10 @@ _target_chipset_map = {
     ],
     "hamoa": [
         "kiwi-v2",
+    ],
+    "chora": [
+	"wcn7750",
+	"wcn6450",
     ]
 }
 
