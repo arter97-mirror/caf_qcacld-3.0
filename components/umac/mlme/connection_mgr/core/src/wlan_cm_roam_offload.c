@@ -5228,55 +5228,6 @@ cm_record_state_change(struct wlan_objmgr_pdev *pdev,
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/**
- * cm_mlo_roam_switch_for_link() - roam state handling during mlo roam
- *  for link/s.
- * @pdev: pdev pointer
- * @vdev_id: vdev id
- * @reason: reason for changing roam state for the requested vdev id
- *
- * This function is used for WLAN_MLO_ROAM_SYNCH_IN_PROG roam state handling
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS
-cm_mlo_roam_switch_for_link(struct wlan_objmgr_pdev *pdev,
-			    uint8_t vdev_id, uint8_t reason)
-{
-	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
-	enum roam_offload_state cur_state = mlme_get_roam_state(psoc, vdev_id);
-
-	if (reason != REASON_ROAM_HANDOFF_DONE &&
-	    reason != REASON_ROAM_ABORT &&
-	    reason != REASON_ROAM_LINK_SWITCH_ASSOC_VDEV_CHANGE) {
-		mlo_debug("CM_RSO: link vdev:%d state switch received with invalid reason:%d",
-			  vdev_id, reason);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/*
-	 * change roam state to deinit for assoc vdev that has now changed to
-	 * link vdev
-	 */
-	if (reason == REASON_ROAM_LINK_SWITCH_ASSOC_VDEV_CHANGE) {
-		mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_DEINIT);
-		return QDF_STATUS_SUCCESS;
-	}
-
-	switch (cur_state) {
-	case WLAN_ROAM_DEINIT:
-		/* Only used for link vdev during MLO roaming */
-		mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_SYNCH_IN_PROG);
-		break;
-	default:
-		mlme_err("ROAM: vdev:%d MLO Roam synch not allowed in [%d] state reason:%d",
-			 vdev_id, cur_state, reason);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS
 cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
 			       enum roam_offload_state requested_state,
@@ -5350,10 +5301,9 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev, uint8_t *vdev_id,
 		goto end;
 
 	if (reason == REASON_ROAM_HANDOFF_DONE || reason == REASON_ROAM_ABORT) {
-		status = cm_mlo_roam_switch_for_link(pdev, *vdev_id, reason);
-		mlme_debug("MLO ROAM: update rso state on link vdev %d",
-			   *vdev_id);
-			*is_rso_skip = true;
+		mlme_debug("MLO ROAM: update rso state on link vdev %d for reason %d",
+			   *vdev_id, reason);
+		*is_rso_skip = true;
 	} else if ((reason == REASON_DISCONNECTED ||
 		    reason == REASON_DRIVER_DISABLED) &&
 		   cm_is_vdev_disconnecting(vdev)) {
