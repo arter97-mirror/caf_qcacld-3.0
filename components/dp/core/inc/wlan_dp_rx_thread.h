@@ -383,15 +383,14 @@ dp_rx_thread_get_txrx_handle(struct dp_rx_tm_handle_cmn *rx_tm_handle_cmn)
 
 /**
  * dp_rx_tm_get_napi_context() - get NAPI context for a RX CTX ID
- * @rx_ctx_id: RX context ID (RX thread ID) corresponding to which NAPI is
- *             needed
  * @rx_tm_hdl: dp_rx_tm_handle containing the overall thread
  *             infrastructure
+ * @nbuf: buffer pointer
  *
  * Return: NULL on failure, else pointer to NAPI corresponding to rx_ctx_id
  */
 qdf_napi_struct *dp_rx_tm_get_napi_context(struct dp_rx_tm_handle *rx_tm_hdl,
-					   uint8_t rx_ctx_id);
+					   qdf_nbuf_t nbuf);
 
 /**
  * dp_rx_tm_set_cpu_mask() - set CPU mask for RX threads
@@ -660,14 +659,13 @@ static inline QDF_STATUS dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 /**
  * dp_rx_get_napi_context() - get NAPI context for a RX CTX ID
  * @soc: ol_txrx_soc_handle object
- * @rx_ctx_id: RX context ID (RX thread ID) corresponding to which NAPI is
- *             needed
+ * @nbuf: nbuf pointer
  *
  * Return: NULL on failure, else pointer to NAPI corresponding to rx_ctx_id
  */
 static inline
 qdf_napi_struct *dp_rx_get_napi_context(ol_txrx_soc_handle soc,
-					uint8_t rx_ctx_id)
+					qdf_nbuf_t nbuf)
 {
 	struct dp_txrx_handle *dp_ext_hdl;
 
@@ -682,7 +680,7 @@ qdf_napi_struct *dp_rx_get_napi_context(ol_txrx_soc_handle soc,
 		return NULL;
 	}
 
-	return dp_rx_tm_get_napi_context(&dp_ext_hdl->rx_tm_hdl, rx_ctx_id);
+	return dp_rx_tm_get_napi_context(&dp_ext_hdl->rx_tm_hdl, nbuf);
 }
 
 /**
@@ -766,7 +764,7 @@ static inline QDF_STATUS dp_txrx_ext_dump_stats(ol_txrx_soc_handle soc,
 
 static inline
 qdf_napi_struct *dp_rx_get_napi_context(ol_txrx_soc_handle soc,
-					uint8_t rx_ctx_id)
+					qdf_nbuf_t nbuf)
 {
 	return NULL;
 }

@@ -1636,6 +1636,27 @@ dp_rx_tm_gro_flush_ind_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
 
 	return true;
 }
+
+static inline uint8_t
+dp_rx_tm_select_dal_thread(struct dp_rx_tm_handle *rx_tm_hdl,
+			   qdf_nbuf_t nbuf)
+{
+	uint32_t hash = QDF_NBUF_CB_RX_FLOW_ID(nbuf);
+
+	return (hash % DAL_DP_RX_THREADS) +
+		rx_tm_hdl->dal_dp_rx_thread_start_id;
+}
+
+static inline uint8_t
+dp_rx_tm_select_thread_wrapper(struct dp_rx_tm_handle *rx_tm_hdl,
+			       qdf_nbuf_t nbuf)
+{
+	if (rx_tm_hdl->dal_dp_enabled && qdf_nbuf_dal_owned_get(nbuf))
+		return dp_rx_tm_select_dal_thread(rx_tm_hdl, nbuf);
+	else
+		return dp_rx_tm_select_thread(rx_tm_hdl,
+					      QDF_NBUF_CB_RX_CTX_ID(nbuf));
+}
 #else
 static inline void dp_dal_update_dal_config(ol_txrx_soc_handle soc,
 					    struct dp_rx_tm_handle *rx_tm_hdl)
@@ -1655,6 +1676,13 @@ dp_rx_tm_gro_flush_ind_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
 				   enum dp_rx_gro_flush_code flush_code)
 {
 	return false;
+}
+
+static inline uint8_t
+dp_rx_tm_select_thread_wrapper(struct dp_rx_tm_handle *rx_tm_hdl,
+			       qdf_nbuf_t nbuf)
+{
+	return dp_rx_tm_select_thread(rx_tm_hdl, QDF_NBUF_CB_RX_CTX_ID(nbuf));
 }
 #endif
 
@@ -1692,11 +1720,11 @@ dp_rx_tm_gro_flush_ind(struct dp_rx_tm_handle *rx_tm_hdl, int rx_ctx_id,
 }
 
 qdf_napi_struct *dp_rx_tm_get_napi_context(struct dp_rx_tm_handle *rx_tm_hdl,
-					   uint8_t rx_ctx_id)
+					   qdf_nbuf_t nbuf)
 {
 	uint8_t selected_thread_id;
 
-	selected_thread_id = dp_rx_tm_select_thread(rx_tm_hdl, rx_ctx_id);
+	selected_thread_id = dp_rx_tm_select_thread_wrapper(rx_tm_hdl, nbuf);
 
 	return &rx_tm_hdl->rx_thread[selected_thread_id]->napi;
 }

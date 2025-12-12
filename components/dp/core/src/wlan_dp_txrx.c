@@ -1307,7 +1307,7 @@ static QDF_STATUS dp_gro_rx(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 	    !dp_intf->runtime_disable_rx_thread &&
 	    !wlan_dp_rx_is_ring_latency_sensitive_reo(ring_id)) {
 		napi_to_use =
-			(qdf_napi_struct *)dp_rx_get_napi_context(soc, ring_id);
+			(qdf_napi_struct *)dp_rx_get_napi_context(soc, nbuf);
 	} else {
 		napi_to_use = dp_gro_rx_get_napi_from_id(ring_id);
 	}
