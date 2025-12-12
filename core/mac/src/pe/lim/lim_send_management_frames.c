@@ -3420,6 +3420,48 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	else if (pe_session->he_with_wep_tkip)
 		populate_dot11f_ht_caps(mac_ctx, NULL, &frm->HTCaps);
 
+	/*
+	 * Advertise STA's maximum bandwidth capability in Association Request
+	 * (for dynamic upgrade and AP decision making) but still honor the
+	 * effective channel bonding policy for the current band.
+	 *
+	 * Save current (intersected/operational) bandwidth values and
+	 * temporarily set to STA's maximum capability for advertisement.
+	 */
+	enum phy_ch_width saved_ch_width = pe_session->ch_width;
+	uint8_t saved_ht_supported_ch_width =
+		pe_session->htSupportedChannelWidthSet;
+
+	/* Temporarily set to STA's maximum capability for advertisement */
+	pe_session->ch_width = pe_session->sta_max_ch_width;
+
+	/*
+	 * Set HT channel width based on STA maximum capability, while
+	 * respecting the effective channel bonding policy for the current
+	 * operating frequency (e.g. user channel bonding INI or force-20MHz).
+	 *
+	 * htSupportedChannelWidthSet controls the HT Capabilities "Supported
+	 * Channel Width Set" bit:
+	 *  - 0 = 20 MHz only
+	 *  - 1 = both 20 MHz and 40 MHz supported
+	 *
+	 * If the STA is capable of >= 40MHz, advertise HT40 only when the
+	 * policy for this band allows bonding (via lim_get_cb_mode_for_freq()).
+	 */
+	if (pe_session->sta_max_ch_width >= CH_WIDTH_40MHZ) {
+		pe_session->htSupportedChannelWidthSet =
+			(lim_get_cb_mode_for_freq(mac_ctx, pe_session,
+						  pe_session->curr_op_freq) ==
+			 WNI_CFG_CHANNEL_BONDING_MODE_DISABLE) ? 0 : 1;
+	} else {
+		pe_session->htSupportedChannelWidthSet = 0;
+	}
+
+	pe_debug("Advertising STA max capability: sta_max_ch_width=%d adv_ch_width=%d ht40_adv=%d (saved: oper_ch_width=%d oper_ht40=%d)",
+		 pe_session->sta_max_ch_width, pe_session->ch_width,
+		 pe_session->htSupportedChannelWidthSet, saved_ch_width,
+		 saved_ht_supported_ch_width);
+
 	if (pe_session->vhtCapability &&
 	    pe_session->vhtCapabilityPresentInBeacon) {
 		populate_dot11f_vht_caps(mac_ctx, pe_session, &frm->VHTCaps);
@@ -3480,6 +3522,23 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_eht_caps(mac_ctx, pe_session, &frm->eht_cap);
 		lim_strip_mlo_ie(mac_ctx, add_ie, &add_ie_len);
 	}
+
+	/*
+	 * Restore original (intersected) bandwidth values.
+	 * pe_session maintains the operational parameters for the connection.
+	 * While we temporarily modify them to advertise the STA's
+	 * *capabilities*
+	 * in the Association Request, we must revert them immediately after
+	 * populating the frame so that the driver continues to operate with the
+	 * negotiated parameters (intersection of STA and AP capabilities).
+	 * The AP may later decide to switch to a wider bandwidth (e.g. via
+	 * Channel Switch Announcement) based on the advertised capabilities.
+	 */
+	pe_session->ch_width = saved_ch_width;
+	pe_session->htSupportedChannelWidthSet = saved_ht_supported_ch_width;
+
+	pe_debug("Restored operating bandwidth: ch_width=%d ht_width=%d",
+		 saved_ch_width, saved_ht_supported_ch_width);
 
 	/* Populate Non-AP STA Regulatory connectivity element */
 	if (IS_DOT11_MODE_HE(pe_session->dot11mode))

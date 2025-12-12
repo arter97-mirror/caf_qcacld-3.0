@@ -903,6 +903,14 @@ struct pe_session {
 	uint8_t ch_center_freq_seg0;
 	enum phy_ch_width ch_width;
 	enum phy_ch_width ap_ch_width;
+	/**
+	 * @sta_max_ch_width: STA's maximum supported channel width
+	 * capability This represents the STA's true maximum bandwidth
+	 * capability independent of AP's current operational bandwidth.
+	 * Used for advertising in Association
+	 * Request to allow AP to make informed bandwidth decisions.
+	 */
+	enum phy_ch_width sta_max_ch_width;
 #ifdef WLAN_FEATURE_11BE
 	uint16_t puncture_bitmap;
 #endif

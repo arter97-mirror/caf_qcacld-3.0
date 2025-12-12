@@ -809,6 +809,133 @@ void lim_update_ch_width_for_p2p_client(struct mac_context *mac,
 		 session->ch_center_freq_seg0, session->ch_center_freq_seg1);
 }
 
+#ifdef WLAN_FEATURE_11AX
+/**
+ * lim_store_sta_he_max_capability() - Store STA's HE maximum capability
+ * @session: Pointer to PE session
+ * @fw_vht_ch_wd: Firmware VHT channel width capability
+ *
+ * This function stores the STA's HE maximum bandwidth capability.
+ * HE can support the same bandwidth as VHT in 5GHz, or 40MHz in 2.4GHz.
+ *
+ * Context: Called from lim_store_sta_max_capabilities() to handle
+ *          HE-specific capability storage
+ *
+ * Return: None
+ */
+static void lim_store_sta_he_max_capability(struct pe_session *session,
+					    uint8_t fw_vht_ch_wd)
+{
+	if (!session->he_capable)
+		return;
+
+	/* HE can support same as VHT in 5GHz, or 40MHz in 2.4GHz */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq)) {
+		if (fw_vht_ch_wd >= WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ)
+			session->sta_max_ch_width = CH_WIDTH_40MHZ;
+	} else if (fw_vht_ch_wd >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
+		session->sta_max_ch_width = CH_WIDTH_160MHZ;
+	}
+}
+#else
+static inline void lim_store_sta_he_max_capability(struct pe_session *session,
+						   uint8_t fw_vht_ch_wd)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * lim_store_sta_eht_max_capability() - Store STA's EHT maximum capability
+ * @session: Pointer to PE session
+ *
+ * This function stores the STA's EHT maximum bandwidth capability.
+ * EHT can support up to 320MHz in 6GHz band.
+ *
+ * Context: Called from lim_store_sta_max_capabilities() to handle
+ *          EHT-specific capability storage
+ *
+ * Return: None
+ */
+static void lim_store_sta_eht_max_capability(struct pe_session *session)
+{
+	uint32_t fw_eht_ch_wd;
+
+	if (!session->eht_capable)
+		return;
+
+	fw_eht_ch_wd = wma_get_eht_ch_width();
+
+	/* EHT can support up to 320MHz in 6GHz */
+	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(session->curr_op_freq)) {
+		if (fw_eht_ch_wd == WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ)
+			session->sta_max_ch_width = CH_WIDTH_320MHZ;
+		else if (fw_eht_ch_wd >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+			session->sta_max_ch_width = CH_WIDTH_160MHZ;
+	}
+}
+#else
+static inline void lim_store_sta_eht_max_capability(struct pe_session *session)
+{
+}
+#endif
+
+/**
+ * lim_store_sta_max_capabilities() - Store STA's maximum capabilities
+ * @mac_ctx: Pointer to MAC context
+ * @session: Pointer to PE session
+ *
+ * This function stores the STA's maximum bandwidth capabilities before
+ * they are intersected with AP capabilities. These preserved values will
+ * be used when constructing Association Request frame to advertise STA's
+ * true maximum capabilities to the AP.
+ *
+ * The function queries firmware for maximum supported bandwidth and stores:
+ * - VHT maximum capability
+ * - HE maximum capability (via lim_store_sta_he_max_capability)
+ * - EHT maximum capability (via lim_store_sta_eht_max_capability)
+ * - Overall maximum channel width
+ *
+ * Context: Called before AP capability extraction to preserve STA's
+ *          maximum capabilities
+ *
+ * Return: None
+ */
+static void lim_store_sta_max_capabilities(struct mac_context *mac_ctx,
+					   struct pe_session *session)
+{
+	uint8_t fw_vht_ch_wd;
+
+	/* Initialize to zero */
+	session->sta_max_ch_width = CH_WIDTH_20MHZ;
+
+	/* Get firmware VHT/HE capabilities */
+	fw_vht_ch_wd = wma_get_vht_ch_width();
+
+	/* Store VHT maximum capability */
+	if (session->vhtCapability) {
+		/* Convert to enum phy_ch_width */
+		if (fw_vht_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ ||
+		    fw_vht_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
+			session->sta_max_ch_width = CH_WIDTH_160MHZ;
+		else if (fw_vht_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
+			session->sta_max_ch_width = CH_WIDTH_80MHZ;
+		else if (fw_vht_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ)
+			session->sta_max_ch_width = CH_WIDTH_40MHZ;
+		else
+			session->sta_max_ch_width = CH_WIDTH_20MHZ;
+	}
+
+	/* Store HE maximum capability */
+	lim_store_sta_he_max_capability(session, fw_vht_ch_wd);
+
+	/* Store EHT maximum capability */
+	lim_store_sta_eht_max_capability(session);
+
+	pe_debug("STA Max Capabilities: ch_width=%d freq=%d",
+		 session->sta_max_ch_width, session->curr_op_freq);
+}
+
 /**
  * lim_configure_operating_mode_notification() - Configure Operating Mode
  *                                                Notification parameters
@@ -1172,6 +1299,13 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 	} else {
 		session->vhtCapabilityPresentInBeacon = 0;
 	}
+
+	/*
+	 * Store STA's maximum capabilities before intersection with AP
+	 * This allows STA to advertise its true maximum capability in
+	 * Association Request, enabling AP to make informed bandwidth decisions
+	 */
+	lim_store_sta_max_capabilities(mac_ctx, session);
 
 	if (bcn_ies->qcn_ie.present)
 		session->qcn_ie_present_in_beacon = true;
