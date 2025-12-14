@@ -801,7 +801,35 @@ static inline void dp_rx_tm_set_dal_start_id(struct dp_rx_tm_handle *hdl,
 {
 	hdl->dal_dp_rx_thread_start_id = start_id;
 }
+
+void dp_rx_tm_gro_flush_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
+				    enum dp_rx_gro_flush_code flush_code);
+
+static inline void
+dp_rx_gro_flush_dal_threads(ol_txrx_soc_handle soc,
+			    enum dp_rx_gro_flush_code flush_code)
+{
+	struct dp_txrx_handle *dp_ext_hdl;
+
+	if (!soc) {
+		dp_err("invalid input param soc %pK", soc);
+		return;
+	}
+
+	dp_ext_hdl = cdp_soc_get_dp_txrx_handle(soc);
+	if (!dp_ext_hdl)
+		return;
+
+	dp_rx_tm_gro_flush_dal_threads(&dp_ext_hdl->rx_tm_hdl,
+				       flush_code);
+}
 #else
+static inline void
+dp_rx_gro_flush_dal_threads(ol_txrx_soc_handle soc,
+			    enum dp_rx_gro_flush_code flush_code)
+{
+}
+
 static inline uint8_t
 dp_get_dal_rx_threads_num(struct dp_rx_tm_handle *rx_tm_hdl)
 {

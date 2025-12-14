@@ -1546,6 +1546,28 @@ static uint8_t dp_rx_tm_select_thread(struct dp_rx_tm_handle *rx_tm_hdl,
 }
 
 #ifdef FEATURE_DAL_DP_SUPPORT
+void dp_rx_tm_gro_flush_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
+				    enum dp_rx_gro_flush_code flush_code)
+{
+	int i;
+	uint8_t id;
+
+	if (!rx_tm_hdl->dal_dp_enabled)
+		return;
+
+	for (i = 0; i < DAL_DP_RX_THREADS; i++) {
+		id = rx_tm_hdl->dal_dp_rx_thread_start_id + i;
+		if (id >= rx_tm_hdl->num_dp_rx_threads) {
+			dp_err("Invalid DAL thread id %u, max %u",
+			       id, rx_tm_hdl->num_dp_rx_threads);
+			break;
+		}
+
+		dp_rx_tm_thread_gro_flush_ind(rx_tm_hdl->rx_thread[id],
+					      flush_code);
+	}
+}
+
 static inline void dp_dal_update_dal_config(ol_txrx_soc_handle soc,
 					    struct dp_rx_tm_handle *rx_tm_hdl)
 {

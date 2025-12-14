@@ -799,6 +799,9 @@ static inline void dp_low_tput_gro_flush_skip_handler(
 				dp_rx_gro_flush_ind(soc, i,
 						    DP_RX_GRO_NORMAL_FLUSH);
 			}
+
+			dp_rx_gro_flush_dal_threads(soc,
+						    DP_RX_GRO_NORMAL_FLUSH);
 		}
 
 		dp_ctx->bus_low_vote_cnt = 0;
