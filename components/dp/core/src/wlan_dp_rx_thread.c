@@ -34,6 +34,9 @@
 #include "qdf_nbuf.h"
 #include "qdf_threads.h"
 #include "qdf_net_if.h"
+#ifdef FEATURE_DAL_DP_SUPPORT
+#include "dp_dal.h"
+#endif
 
 /* Timeout in ms to wait for a DP rx thread */
 #ifdef HAL_CONFIG_SLUB_DEBUG_ON
@@ -1611,6 +1614,28 @@ dp_rx_tm_check_dal_owned_pkt(struct dp_rx_tm_handle *rx_tm_hdl,
 	dp_rx_tm_enqueue_pkt_dal_threads(rx_tm_hdl, nbuf_list);
 	return true;
 }
+
+static inline bool
+dp_rx_tm_gro_flush_ind_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
+				   int rx_ctx_id,
+				   enum dp_rx_gro_flush_code flush_code)
+{
+	int i;
+	uint8_t id;
+
+	if (!rx_tm_hdl->dal_dp_enabled ||
+	    !(BIT(rx_ctx_id) & DAL_DP_REO_RING_MASK))
+		return false;
+
+	/* flush all dal dp rx threads if flush is for dal rings */
+	for (i = 0; i < DAL_DP_RX_THREADS; i++) {
+		id = rx_tm_hdl->dal_dp_rx_thread_start_id + i;
+		dp_rx_tm_thread_gro_flush_ind(rx_tm_hdl->rx_thread[id],
+					      flush_code);
+	}
+
+	return true;
+}
 #else
 static inline void dp_dal_update_dal_config(ol_txrx_soc_handle soc,
 					    struct dp_rx_tm_handle *rx_tm_hdl)
@@ -1620,6 +1645,14 @@ static inline void dp_dal_update_dal_config(ol_txrx_soc_handle soc,
 static inline bool
 dp_rx_tm_check_dal_owned_pkt(struct dp_rx_tm_handle *rx_tm_hdl,
 			     qdf_nbuf_t nbuf_list)
+{
+	return false;
+}
+
+static inline bool
+dp_rx_tm_gro_flush_ind_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
+				   int rx_ctx_id,
+				   enum dp_rx_gro_flush_code flush_code)
 {
 	return false;
 }
@@ -1646,6 +1679,10 @@ dp_rx_tm_gro_flush_ind(struct dp_rx_tm_handle *rx_tm_hdl, int rx_ctx_id,
 		       enum dp_rx_gro_flush_code flush_code)
 {
 	uint8_t selected_thread_id;
+
+	if (dp_rx_tm_gro_flush_ind_dal_threads(rx_tm_hdl,
+					       rx_ctx_id, flush_code))
+		return QDF_STATUS_SUCCESS;
 
 	selected_thread_id = dp_rx_tm_select_thread(rx_tm_hdl, rx_ctx_id);
 	dp_rx_tm_thread_gro_flush_ind(rx_tm_hdl->rx_thread[selected_thread_id],
