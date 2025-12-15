@@ -2665,4 +2665,17 @@ ucfg_pmo_set_ns_offload_enable_dynamic(struct wlan_objmgr_vdev *vdev,
  * Return: true if WoW timeline optimization is supported, false otherwise
  */
 bool ucfg_pmo_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_send_vdev_sta_ps_param() - Send STA power save parameter to firmware
+ * @vdev: vdev objmgr handle
+ * @ps_param: power save parameter type
+ * @param_value: parameter value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_pmo_send_vdev_sta_ps_param(struct wlan_objmgr_vdev *vdev,
+				enum pmo_sta_powersave_param ps_param,
+				uint32_t param_value);
 #endif /* end  of _WLAN_PMO_UCFG_API_H_ */

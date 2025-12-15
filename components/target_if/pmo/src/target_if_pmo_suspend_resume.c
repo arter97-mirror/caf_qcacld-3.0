@@ -168,6 +168,9 @@ QDF_STATUS target_if_pmo_send_vdev_ps_param_req(
 	case pmo_sta_ps_param_spec_wake_interval:
 		param_id = WMI_STA_PS_PARAM_SPEC_WAKE_INTERVAL;
 		break;
+	case pmo_sta_ps_param_inactivity_time_wow:
+		param_id = WMI_STA_PS_PARAM_INACTIVITY_TIME_WOW;
+		break;
 	default:
 		target_if_err("invalid vdev param id %d", param_id);
 		return QDF_STATUS_E_INVAL;

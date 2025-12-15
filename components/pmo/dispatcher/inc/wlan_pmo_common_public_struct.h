@@ -104,6 +104,8 @@ enum pmo_beacon_dtim_policy {
  * @pmo_sta_ps_param_ito_repeat_count: Indicates ito repeated count
  * @pmo_sta_ps_param_spec_wake_interval: OPM speculative wake interval
  * @pmo_sta_ps_param_opm_level: OPM power save level
+ * @pmo_sta_ps_param_inactivity_time_wow : inactivity timeout for wow command
+ * optimization.
  */
 enum pmo_sta_powersave_param {
 	pmo_sta_ps_param_rx_wake_policy = 0,
@@ -117,6 +119,7 @@ enum pmo_sta_powersave_param {
 	pmo_sta_ps_param_ito_repeat_count = 8,
 	pmo_sta_ps_param_spec_wake_interval = 9,
 	pmo_sta_ps_param_opm_level = 10,
+	pmo_sta_ps_param_inactivity_time_wow = 11,
 };
 
 /**
@@ -411,6 +414,8 @@ enum pmo_page_fault_action {
  * @wow_data_inactivity_timeout: power save wow data inactivity timeout
  *  wow mode
  * @wow_spec_wake_interval: OPM speculatvie wkae interval in wow mode
+ * @wow_data_inactivity_timeout_wow: power save wow data inactivity timeout
+ *  wow command optimization
  * @active_uc_apf_mode: Setting that determines how APF is applied in active
  *	mode for uc packets
  * @active_mc_bc_apf_mode: Setting that determines how APF is applied in
@@ -512,6 +517,7 @@ struct pmo_psoc_cfg {
 	bool enable_sap_suspend;
 	uint8_t wow_data_inactivity_timeout;
 	uint8_t wow_spec_wake_interval;
+	uint8_t wow_data_inactivity_timeout_wow;
 	enum active_apf_mode active_uc_apf_mode;
 	enum active_apf_mode active_mc_bc_apf_mode;
 	uint32_t apf_mode;

@@ -2052,6 +2052,29 @@ static void hdd_configure_wow_commands(struct wlan_objmgr_vdev *vdev,
 		hdd_err("Failed to enable action frame: %d", status);
 		return;
 	}
+
+	if (opmode == QDF_STA_MODE || opmode == QDF_P2P_CLIENT_MODE) {
+		uint32_t suspend_inactivity_time;
+		struct pmo_psoc_cfg psoc_cfg;
+
+		status = ucfg_pmo_get_psoc_config(psoc, &psoc_cfg);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to get PMO config: %d", status);
+			return;
+		}
+		suspend_inactivity_time = psoc_cfg.wow_data_inactivity_timeout;
+
+		hdd_debug("Configuring STA PS params: vdev=%d inactivity=%d",
+			  vdev_id, suspend_inactivity_time);
+
+		status = ucfg_pmo_send_vdev_sta_ps_param(vdev,
+					pmo_sta_ps_param_inactivity_time_wow,
+					suspend_inactivity_time);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to send wow inactivity time: %d", status);
+		else
+			hdd_debug("wow inactivity time configured");
+	}
 }
 
 static void

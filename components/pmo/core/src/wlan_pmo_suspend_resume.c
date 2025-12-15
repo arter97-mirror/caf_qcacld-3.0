@@ -198,6 +198,12 @@ static void pmo_configure_vdev_suspend_params(
 	vdev_id = pmo_vdev_get_id(vdev);
 	if (!PMO_VDEV_IN_STA_MODE(opmode))
 		return;
+
+	if (pmo_core_is_wow_optimization_enabled(psoc)) {
+		pmo_debug("wow optimization enabled, skipping suspend params for vdev %d",
+			  vdev_id);
+		return;
+	}
 	ret = pmo_tgt_send_vdev_sta_ps_param(vdev,
 					pmo_sta_ps_param_inactivity_time,
 					psoc_cfg->wow_data_inactivity_timeout);
@@ -248,6 +254,12 @@ static void pmo_configure_vdev_resume_params(
 	vdev_id = pmo_vdev_get_id(vdev);
 	if (!PMO_VDEV_IN_STA_MODE(opmode))
 		return;
+
+	if (pmo_core_is_wow_optimization_enabled(psoc)) {
+		pmo_debug("wow optimization enabled, skipping resume params for vdev %d",
+			  vdev_id);
+		return;
+	}
 	ret = pmo_tgt_send_vdev_sta_ps_param(vdev,
 					 pmo_sta_ps_param_inactivity_time,
 					 vdev_ctx->ps_params.ps_ito);

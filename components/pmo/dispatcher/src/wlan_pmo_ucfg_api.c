@@ -1211,3 +1211,11 @@ bool ucfg_pmo_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return pmo_core_is_wow_optimization_enabled(psoc);
 }
+
+QDF_STATUS
+ucfg_pmo_send_vdev_sta_ps_param(struct wlan_objmgr_vdev *vdev,
+				enum pmo_sta_powersave_param ps_param,
+				uint32_t param_value)
+{
+	return pmo_tgt_send_vdev_sta_ps_param(vdev, ps_param, param_value);
+}
