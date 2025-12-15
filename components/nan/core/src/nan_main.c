@@ -43,6 +43,7 @@
 #include "wlan_if_mgr_public_struct.h"
 #include "wlan_if_mgr_api.h"
 #include "wlan_mlme_api.h"
+#include "cfg_nan_api.h"
 
 bool nan_is_pairing_allowed(struct wlan_objmgr_psoc *psoc)
 {
@@ -136,6 +137,7 @@ nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t idx;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t max_ndp_sessions = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
 	if (!vdev) {
@@ -150,8 +152,10 @@ nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 		goto ref_rel;
 	}
 
+	cfg_nan_get_ndp_max_sessions(psoc, &max_ndp_sessions);
+
 	idx = nan_vdev_priv->num_peer_migrated;
-	if (idx >= MAX_NAN_MIGRATED_PEERS) {
+	if (idx >= max_ndp_sessions) {
 		nan_err("num migrated peers %d more than max migrated peers",
 			nan_vdev_priv->num_peer_migrated);
 		status = QDF_STATUS_E_FAILURE;
@@ -162,6 +166,11 @@ nan_add_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 		     peer_mac_addr->bytes, QDF_MAC_ADDR_SIZE);
 
 	nan_debug("add peer to migrated list at index %d", idx);
+
+	if (!nan_vdev_priv->num_peer_migrated) {
+		qdf_event_reset(&nan_vdev_priv->migration_complete_event);
+		nan_debug("peer migration event reset vdev_id %d", vdev_id);
+	}
 
 	nan_vdev_priv->num_peer_migrated++;
 ref_rel:
@@ -187,6 +196,7 @@ nan_remove_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 	struct nan_vdev_priv_obj *nan_vdev_priv;
 	uint8_t i = 0, idx;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t max_ndp_sessions = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
 	if (!vdev) {
@@ -201,8 +211,10 @@ nan_remove_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 		goto ref_rel;
 	}
 
+	cfg_nan_get_ndp_max_sessions(psoc, &max_ndp_sessions);
+
 	idx = nan_vdev_priv->num_peer_migrated;
-	if (idx > MAX_NAN_MIGRATED_PEERS) {
+	if (idx > max_ndp_sessions) {
 		nan_err("idx %d more than max migrated peers", idx);
 		status = QDF_STATUS_E_FAILURE;
 		goto ref_rel;
@@ -233,6 +245,44 @@ nan_remove_peer_in_migrated_addr_list(struct wlan_objmgr_psoc *psoc,
 		  i, idx);
 	nan_vdev_priv->num_peer_migrated--;
 
+	if (!nan_vdev_priv->num_peer_migrated) {
+		qdf_event_set(&nan_vdev_priv->migration_complete_event);
+		nan_debug("peer migration completed for vdev_id %d", vdev_id);
+	}
+
+ref_rel:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+	return status;
+}
+
+QDF_STATUS
+nan_wait_for_peer_migration_complete(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct nan_vdev_priv_obj *nan_vdev_priv;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
+	if (!vdev) {
+		nan_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	nan_vdev_priv = nan_get_vdev_priv_obj(vdev);
+	if (!nan_vdev_priv) {
+		nan_err("NAN vdev priv obj is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto ref_rel;
+	}
+
+	if (nan_vdev_priv->num_peer_migrated) {
+		nan_info("NAN Waiting for peer migration to complete");
+		status = qdf_wait_for_event_completion(
+				&nan_vdev_priv->migration_complete_event, 5000);
+		if (QDF_IS_STATUS_ERROR(status))
+			nan_err("peer migration completion failed");
+	}
 ref_rel:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
 	return status;
@@ -254,6 +304,7 @@ nan_is_peer_migrated(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct nan_vdev_priv_obj *nan_vdev_priv;
 	uint8_t i;
 	bool is_peer_migrated = false;
+	uint32_t max_ndp_sessions = 0;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_NAN_ID);
 	if (!vdev) {
@@ -267,8 +318,10 @@ nan_is_peer_migrated(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		goto ref_rel;
 	}
 
-	if (!nan_vdev_priv->num_peer_migrated &&
-	    nan_vdev_priv->num_peer_migrated > MAX_NAN_MIGRATED_PEERS)
+	cfg_nan_get_ndp_max_sessions(psoc, &max_ndp_sessions);
+
+	if (!nan_vdev_priv->num_peer_migrated ||
+	    nan_vdev_priv->num_peer_migrated > max_ndp_sessions)
 		goto ref_rel;
 
 	for (i = 0; i < nan_vdev_priv->num_peer_migrated; i++) {

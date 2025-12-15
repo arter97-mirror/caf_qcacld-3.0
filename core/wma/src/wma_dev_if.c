@@ -4117,7 +4117,8 @@ void wma_hold_req_timer(void *data)
 					  (uint8_t *)tgt_req->user_data);
 		qdf_mem_free(tgt_req->user_data);
 	} else if ((tgt_req->msg_type == WMA_PEER_CREATE_REQ) &&
-		   (tgt_req->type == WMA_PASN_PEER_CREATE_RESPONSE)) {
+		   (tgt_req->type == WMA_PASN_PEER_CREATE_RESPONSE ||
+		    tgt_req->type == WMA_NAN_PASN_PEER_CREATE_RESPONSE)) {
 		struct peer_create_rsp_params *peer_create_rsp;
 		struct qdf_mac_addr *peer_mac;
 
@@ -6455,6 +6456,11 @@ void wma_delete_bss(tp_wma_handle wma, uint8_t vdev_id)
 	status = wlan_vdev_get_bss_peer_mac(iface->vdev, &bssid);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err("vdev id %d : failed to get bssid", vdev_id);
+		if (cm_get_ho_disconnect_pending(iface->vdev)) {
+			wma_err("handle by ho fail");
+			wma_delete_bss_ho_fail(wma, vdev_id);
+			return;
+		}
 		goto out;
 	}
 

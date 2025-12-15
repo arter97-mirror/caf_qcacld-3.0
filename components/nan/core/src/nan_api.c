@@ -129,6 +129,7 @@ static QDF_STATUS nan_vdev_obj_created_notification(
 		return QDF_STATUS_E_NOMEM;
 
 	qdf_spinlock_create(&nan_obj->lock);
+	qdf_event_create(&nan_obj->migration_complete_event);
 	status = wlan_objmgr_vdev_component_obj_attach(vdev, WLAN_UMAC_COMP_NAN,
 						       (void *)nan_obj,
 						       QDF_STATUS_SUCCESS);
@@ -141,6 +142,7 @@ static QDF_STATUS nan_vdev_obj_created_notification(
 
 nan_vdev_notif_failed:
 
+	qdf_event_destroy(&nan_obj->migration_complete_event);
 	qdf_spinlock_destroy(&nan_obj->lock);
 	qdf_mem_free(nan_obj);
 	return status;
@@ -182,6 +184,7 @@ static QDF_STATUS nan_vdev_obj_destroyed_notification(
 		nan_err("nan_obj detach failed");
 
 	nan_debug("nan_obj deleted with status %d", status);
+	qdf_event_destroy(&nan_obj->migration_complete_event);
 	qdf_spinlock_destroy(&nan_obj->lock);
 	qdf_mem_free(nan_obj);
 
