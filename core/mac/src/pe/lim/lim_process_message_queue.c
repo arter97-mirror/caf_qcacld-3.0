@@ -2244,6 +2244,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
+	case eWNI_SME_QOS_NULL_REQ:
+		lim_process_qos_null_req(msg);
+		break;
 	default:
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;

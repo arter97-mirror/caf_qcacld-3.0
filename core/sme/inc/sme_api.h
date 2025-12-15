@@ -238,6 +238,18 @@ enum {
 	MBO_TRANSITION_REASON_TRANSITIONING_TO_PREMIUM_AP,
 };
 
+/**
+ * struct sme_qos_null_req - QoS null frame request structure
+ * @vdev_id: VDEV ID
+ * @peer_addr: Peer MAC address
+ *
+ * Used for scheduler message from SME to LIM
+ */
+struct sme_qos_null_req {
+	uint8_t vdev_id;
+	uint8_t peer_addr[QDF_MAC_ADDR_SIZE];
+};
+
 /*-------------------------------------------------------------------------
   Function declarations and documentation
   ------------------------------------------------------------------------*/
@@ -5353,4 +5365,14 @@ void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
 {
 }
 #endif
+/**
+ * sme_probe_peer_req() - Schedule probe peer request to MLME layer
+ * @mac_handle: MAC handle for the device
+ * @vdev_id: Virtual device ID on which to probe the peer
+ * @peer_addr: MAC address of the peer to probe
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code on failure
+ */
+QDF_STATUS sme_probe_peer_req(mac_handle_t mac_handle, uint8_t vdev_id,
+			      uint8_t *peer_addr);
 #endif /* #if !defined( __SME_API_H ) */

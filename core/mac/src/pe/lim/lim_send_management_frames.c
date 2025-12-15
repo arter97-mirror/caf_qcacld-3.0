@@ -65,7 +65,8 @@
 #include "wlan_mlo_mgr_ap.h"
 #include "wlan_scan_api.h"
 #include "wlan_action_oui_main.h"
-
+#include "wlan_objmgr_pdev_obj.h"
+#include "wlan_mgmt_txrx_utils_api.h"
 /**
  *
  * \brief This function is called to add the sequence number to the
@@ -9184,4 +9185,145 @@ void lim_send_mgmt_frame_tx(struct mac_context *mac_ctx,
 	}
 	mac_ctx->auth_ack_status = LIM_ACK_NOT_RCD;
 	lim_send_frame(mac_ctx, vdev_id, mb_msg->data, msg_len);
+}
+
+static QDF_STATUS lim_build_qos_null_frame(struct mac_context *mac,
+					   struct pe_session *session,
+					   uint8_t *peer_addr, qdf_nbuf_t frame)
+{
+	uint8_t *pFrame;
+	tpSirMacDataHdr3a pMacHdr;
+
+	if (!mac || !session || !peer_addr || !frame) {
+		pe_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pFrame = qdf_nbuf_data(frame);
+	if (!pFrame) {
+		pe_err("Failed to get frame data pointer");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_mem_zero(pFrame, sizeof(tSirMacDataHdr3a));
+	pMacHdr = (tpSirMacDataHdr3a)pFrame;
+
+	pMacHdr->fc.protVer = SIR_MAC_PROTOCOL_VERSION;
+	pMacHdr->fc.type = WLAN_FC0_TYPE_DATA;
+	pMacHdr->fc.subType = WLAN_FC0_STYPE_QOS_NULL;
+	pMacHdr->fc.toDS = 1;
+
+	qdf_mem_copy(pMacHdr->addr1, peer_addr, QDF_MAC_ADDR_SIZE);
+
+	qdf_mem_copy(pMacHdr->addr2, session->self_mac_addr, QDF_MAC_ADDR_SIZE);
+
+	qdf_mem_copy(pMacHdr->addr3, session->bssId, QDF_MAC_ADDR_SIZE);
+
+	qdf_nbuf_set_pktlen(frame, sizeof(tSirMacDataHdr3a));
+
+	pe_debug("Allocated QoS null frame: DA=" QDF_MAC_ADDR_FMT " SA=" QDF_MAC_ADDR_FMT,
+		 QDF_MAC_ADDR_REF(pMacHdr->addr1),
+		 QDF_MAC_ADDR_REF(pMacHdr->addr2));
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS lim_process_qos_null_req(struct scheduler_msg *msg)
+{
+	struct sme_qos_null_req *req;
+	struct mac_context *mac;
+	struct pe_session *session;
+	struct wlan_objmgr_pdev *pdev;
+	qdf_nbuf_t frame = NULL;
+	uint32_t desc_id, frame_len = 26;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	if (!msg || !msg->bodyptr) {
+		pe_err("Invalid scheduler message");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	req = (struct sme_qos_null_req *)msg->bodyptr;
+
+	mac = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac) {
+		pe_err("MAC context is NULL");
+		goto cleanup;
+	}
+
+	pe_debug("Processing QoS null req: vdev_id=%d peer=" QDF_MAC_ADDR_FMT,
+		 req->vdev_id, QDF_MAC_ADDR_REF(req->peer_addr));
+
+	session = pe_find_session_by_vdev_id(mac, req->vdev_id);
+	if (!session) {
+		pe_err("Session not found for vdev_id=%d", req->vdev_id);
+		goto cleanup;
+	}
+
+	if (!LIM_IS_STA_ROLE(session)) {
+		pe_err("QoS null frame only supported in STA mode");
+		status = QDF_STATUS_E_INVAL;
+		goto cleanup;
+	}
+
+	if (session->limMlmState != eLIM_MLM_LINK_ESTABLISHED_STATE) {
+		pe_err("Session not in connected state");
+		status = QDF_STATUS_E_INVAL;
+		goto cleanup;
+	}
+
+	/* Allocate frame buffer (26 bytes for QoS null frame) */
+	frame = qdf_nbuf_alloc(NULL, frame_len, 0, 4, false);
+	if (!frame) {
+		pe_err("Failed to allocate frame buffer");
+		goto cleanup;
+	}
+
+	status = lim_build_qos_null_frame(mac, session, req->peer_addr, frame);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to build QoS null frame: %d", status);
+		qdf_nbuf_free(frame);
+		goto cleanup;
+	}
+
+	qdf_nbuf_set_pktlen(frame, frame_len);
+
+	pdev = wlan_vdev_get_pdev(session->vdev);
+	if (!pdev) {
+		status = QDF_STATUS_E_FAILURE;
+		pe_err("PDEV is NULL for session");
+		goto cleanup;
+	}
+
+	status = wlan_mgmt_txrx_desc_id_allocate(pdev, req->vdev_id, frame,
+						 &desc_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to allocate mgmt descriptor");
+		status = QDF_STATUS_E_RESOURCES;
+		goto cleanup;
+	}
+
+	pe_debug("Allocated descriptor: desc_id=%d", desc_id);
+
+	status = wma_send_qos_null_frame(mac, session->vdev_id, frame,
+					 frame_len, req->peer_addr, desc_id);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to send QoS null frame to WMA: %d", status);
+		wlan_mgmt_txrx_desc_id_free(pdev, desc_id, frame, NULL);
+		if (status != QDF_STATUS_E_PENDING)
+			qdf_nbuf_free(frame);
+		frame = NULL;
+		goto cleanup;
+	}
+
+	pe_debug("QoS null frame sent successfully via WMA with desc_id=%d",
+		 desc_id);
+	status = QDF_STATUS_SUCCESS;
+
+cleanup:
+	if (frame && QDF_IS_STATUS_ERROR(status))
+		qdf_nbuf_free(frame);
+	qdf_mem_free(req);
+	return status;
 }

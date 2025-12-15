@@ -3170,3 +3170,43 @@ bool wma_is_roam_in_progress(uint32_t vdev_id)
 
 	return wlan_cm_is_vdev_roam_started(wma->interfaces[vdev_id].vdev);
 }
+
+QDF_STATUS wma_send_qos_null_frame(struct mac_context *mac, uint8_t vdev_id,
+				   qdf_nbuf_t frame, uint32_t frame_len,
+				   uint8_t *peer_addr, uint32_t desc_id)
+{
+	tp_wma_handle wma_handle;
+	struct qos_null_frame_tx_params param;
+	QDF_STATUS status;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle || !frame || !peer_addr) {
+		wma_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (vdev_id >= wma_handle->max_bssid) {
+		wma_err("Invalid vdev_id: %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_zero(&param, sizeof(param));
+	param.vdev_id = vdev_id;
+	param.frame = frame;
+	param.desc_id = desc_id;
+	param.frame_len = frame_len;
+	param.qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	qdf_mem_copy(param.peer_addr, peer_addr, QDF_MAC_ADDR_SIZE);
+
+	wma_debug("QoS null frame Tx: vdev_id=%d peer=" QDF_MAC_ADDR_FMT,
+		  vdev_id, QDF_MAC_ADDR_REF(peer_addr));
+
+	status = wmi_unified_send_qos_null_frame_tx_cmd(wma_handle->wmi_handle,
+							&param);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("WMI send_qos_null_frame_cmd failed: %d", status);
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}

@@ -2057,4 +2057,12 @@ void lim_send_link_removal_req(struct mac_context *mac_ctx, uint8_t vdev_id)
 }
 #endif
 
+/**
+ * lim_process_qos_null_req() - Process QoS null frame request in LIM context
+ * @msg: Scheduler message containing sme qos null req
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_process_qos_null_req(struct scheduler_msg *msg);
+
 #endif /* __LIM_TYPES_H */

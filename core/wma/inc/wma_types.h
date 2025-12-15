@@ -686,4 +686,18 @@ static inline QDF_STATUS wma_register_roaming_callbacks(
 }
 #endif
 
+/**
+ * wma_send_qos_null_frame() - Send QoS null frame to WMI
+ * @mac: MAC context
+ * @vdev_id: VDEV ID
+ * @frame: Frame buffer (qdf_nbuf)
+ * @frame_len: Length of qos null frame
+ * @peer_addr: Peer MAC address
+ * @desc_id: Management descriptor ID for tracking
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wma_send_qos_null_frame(struct mac_context *mac, uint8_t vdev_id,
+				   qdf_nbuf_t frame, uint32_t frame_len,
+				   uint8_t *peer_addr, uint32_t desc_id);
 #endif

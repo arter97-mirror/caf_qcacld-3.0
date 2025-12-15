@@ -18268,3 +18268,49 @@ void sme_pmkid_get_mld_addr(mac_handle_t mac_handle,
 	return cm_get_pre_auth_mld_addr(mac, peer_addr, mld_addr);
 }
 #endif
+
+QDF_STATUS sme_probe_peer_req(mac_handle_t mac_handle, uint8_t vdev_id,
+			      uint8_t *peer_addr)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct scheduler_msg msg = {0};
+	struct sme_qos_null_req *req;
+	QDF_STATUS status;
+
+	if (!mac_ctx) {
+		sme_err("Invalid mac ctx");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!peer_addr) {
+		sme_err("Invalid Peer Address");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	req = qdf_mem_malloc(sizeof(*req));
+	if (!req) {
+		sme_err("Failed to allocate buffer for qos null req");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	req->vdev_id = vdev_id;
+	qdf_mem_copy(req->peer_addr, peer_addr, QDF_MAC_ADDR_SIZE);
+
+	msg.type = eWNI_SME_QOS_NULL_REQ;
+	msg.bodyptr = req;
+	msg.callback = lim_process_qos_null_req;
+
+	sme_debug("QoS null request to LIM: vdev_id=%d peer=" QDF_MAC_ADDR_FMT,
+		  vdev_id, QDF_MAC_ADDR_REF(peer_addr));
+
+	status = scheduler_post_message(QDF_MODULE_ID_SME, QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE, &msg);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("Failed to post message to LIM: %d", status);
+		qdf_mem_free(req);
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}

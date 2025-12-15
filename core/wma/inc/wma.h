@@ -711,6 +711,7 @@ struct wma_invalid_peer_params {
  * @roam_scan_stats_req: cached roam scan stats request
  * @wma_invalid_peer_params: structure storing invalid peer params
  * @invalid_peer_idx: invalid peer index
+ * @qos_null_desc_id: descriptor id for qos null frame tx
  * It stores parameters per vdev in wma.
  */
 struct wma_txrx_node {
@@ -758,6 +759,7 @@ struct wma_txrx_node {
 	struct wma_invalid_peer_params invalid_peers[INVALID_PEER_MAX_NUM];
 	uint8_t invalid_peer_idx;
 	uint16_t bss_max_idle_period;
+	uint32_t qos_null_desc_id;
 };
 
 /**
