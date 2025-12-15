@@ -61,6 +61,7 @@
 #define ACTION_OUI_MAX_ADDNL_EXTENSIONS 10
 
 #define ACTION_OUI_MAX_OUI_LENGTH 5
+
 #define ACTION_OUI_MAX_DATA_LENGTH 20
 #define ACTION_OUI_MAX_DATA_MASK_LENGTH 3
 
@@ -112,6 +113,19 @@
 
 /* Invalid OUI ID action */
 #define ACTION_OUI_INVALID "ffffff 00 01"
+
+/**
+ * struct action_oui_mac_exclusion - MAC address exclusion entry
+ * @mac_addr: MAC address bytes to match (up to 6 bytes)
+ * @mac_addr_mask: Bit mask for MAC address comparison
+ *
+ * This structure represents a single MAC address exclusion entry.
+ * The mask allows flexible matching of any combination of MAC address bytes.
+ */
+struct action_oui_mac_exclusion {
+	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t mac_addr_mask;
+};
 
 #define ACTION_OUI_OPERATOR_AND "&&"
 #define ACTION_OUI_OPERATOR_OR  "||"
@@ -212,6 +226,7 @@ enum action_oui_id {
  * @ACTION_OUI_INFO_AP_CAPABILITY_HT: to indicate presence of HT cap
  * @ACTION_OUI_INFO_AP_CAPABILITY_VHT: to indicate presence of VHT cap
  * @ACTION_OUI_INFO_AP_CAPABILITY_BAND: to indicate presence of band info
+ * @ACTION_OUI_INFO_MAC_EXCLUSION: to indicate presence of MAC exclusion
  */
 enum action_oui_info {
 	/*
@@ -224,10 +239,11 @@ enum action_oui_info {
 	ACTION_OUI_INFO_AP_CAPABILITY_HT = 1 << 3,
 	ACTION_OUI_INFO_AP_CAPABILITY_VHT = 1 << 4,
 	ACTION_OUI_INFO_AP_CAPABILITY_BAND = 1 << 5,
+	ACTION_OUI_INFO_MAC_EXCLUSION = 1 << 6,
 };
 
 /* Total mask of all enum action_oui_info IDs */
-#define ACTION_OUI_INFO_MASK 0x3F
+#define ACTION_OUI_INFO_MASK 0x7F
 
 /**
  * struct action_oui_extension - action oui extension contents
@@ -237,6 +253,8 @@ enum action_oui_info {
  * @data_mask_length: length of the data mask
  * @mac_addr_length: length of the mac addr
  * @mac_mask_length: length of the mac mask
+ * @mac_exclusion_length: length of the MAC exclusion address
+ * @mac_exclusion_mask_length: length of the MAC exclusion mask
  * @capability_length: length of the capability
  * @oui: oui value
  * @data: data buffer
@@ -246,6 +264,7 @@ enum action_oui_info {
  * @capability: capability buffer
  * @and_oui_index: and oui index, 0 means first of and oui,
  * OUI0 || OUI1 && OUI2, and_oui_index of OUI0, OUI1 and OUI2 are 0, 0, 1
+ * @mac_exclusion: MAC address exclusion entry
  */
 struct action_oui_extension {
 	uint32_t info_mask;
@@ -254,6 +273,8 @@ struct action_oui_extension {
 	uint32_t data_mask_length;
 	uint32_t mac_addr_length;
 	uint32_t mac_mask_length;
+	uint32_t mac_exclusion_length;
+	uint32_t mac_exclusion_mask_length;
 	uint32_t capability_length;
 	uint8_t oui[ACTION_OUI_MAX_OUI_LENGTH];
 	uint8_t data[ACTION_OUI_MAX_DATA_LENGTH_HOST_ONLY];
@@ -262,6 +283,7 @@ struct action_oui_extension {
 	uint8_t mac_mask[ACTION_OUI_MAC_MASK_LENGTH];
 	uint8_t capability[ACTION_OUI_MAX_CAPABILITY_LENGTH];
 	uint8_t and_oui_index;
+	struct action_oui_mac_exclusion mac_exclusion;
 };
 
 /**
@@ -318,6 +340,8 @@ struct action_oui_search_attr {
  * @ACTION_OUI_CAPABILITY_TOKEN: capability
  * @ACTION_OUI_DATA_BIT_MASK_TOKEN: data bit mask
  * @ACTION_OUI_MAC_BIT_MASK_TOKEN: mac bit mask
+ * @ACTION_OUI_MAC_EXCLUSION_TOKEN: MAC address exclusion
+ * @ACTION_OUI_MAC_EXCLUSION_MASK_TOKEN: MAC address exclusion mask
  * @ACTION_OUI_END_TOKEN: end of one oui extension
  */
 enum action_oui_token_type {
@@ -331,7 +355,9 @@ enum action_oui_token_type {
 	ACTION_OUI_CAPABILITY_TOKEN = 1 << 7,
 	ACTION_OUI_DATA_BIT_MASK_TOKEN = 1 << 8,
 	ACTION_OUI_MAC_BIT_MASK_TOKEN = 1 << 9,
-	ACTION_OUI_END_TOKEN = 1 << 10,
+	ACTION_OUI_MAC_EXCLUSION_TOKEN = 1 << 10,
+	ACTION_OUI_MAC_EXCLUSION_MASK_TOKEN = 1 << 11,
+	ACTION_OUI_END_TOKEN = 1 << 12,
 };
 
 #ifdef ACTION_OUI_OP_ATTR

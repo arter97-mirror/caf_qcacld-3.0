@@ -76,11 +76,60 @@
  *   HT check – bit 3
  *   VHT check – bit 4
  *   Band info – bit 5
- *   reserved – bit 6 (should always be zero)
+ *   MAC exclusion – bit 6 (set to 1 to enable MAC address exclusion)
  *   reserved – bit 7 (should always be zero)
  * and should be constructed from right to left (b7b6b5b4b3b2b1b0)
  *
  * <Mac_Address_Mask> for <Mac_Address> should be constructed from left to right
+ *
+ * MAC Address Exclusion Feature (bit 6 of Info_Presence_Bit):
+ * When bit 6 is set in Info_Presence_Bit, two additional tokens are expected:
+ *   Token9 = MAC_Exclusion_Address (12 hex characters, 6 bytes)
+ *   Token10 = MAC_Exclusion_Mask (2 hex characters, 1 byte)
+ *
+ * The MAC exclusion feature allows excluding specific MAC addresses from an OUI
+ * configuration match. When an AP matches the OUI and other criteria, but its
+ * MAC address matches the exclusion pattern, the action OUI will NOT be
+ * applied.
+ *
+ * <MAC_Exclusion_Address> is 6 bytes (12 hex characters) representing the MAC
+ * address pattern to exclude. This is typically the OUI (first 3 bytes) plus
+ * additional bytes for more specific matching.
+ *
+ * <MAC_Exclusion_Mask> is 1 byte (2 hex characters) that controls which bytes
+ * of the MAC address are checked:
+ *   bit 7 (0x80) - Check first byte of MAC address
+ *   bit 6 (0x40) - Check second byte of MAC address
+ *   bit 5 (0x20) - Check third byte of MAC address
+ *   bit 4 (0x10) - Check fourth byte of MAC address
+ *   bit 3 (0x08) - Check fifth byte of MAC address
+ *   bit 2 (0x04) - Check sixth byte of MAC address
+ *   bits 0-1 - Reserved (should be 0)
+ *
+ * Common MAC_Exclusion_Mask values:
+ *   0xE0 (11100000) - Match only first 3 bytes (OUI match)
+ *   0xF8 (11111000) - Match all bytes except last byte
+ *   0xFC (11111100) - Match all 6 bytes (exact MAC match)
+ *
+ * IMPORTANT: Each OUI configuration can have at most ONE MAC exclusion.
+ * Multiple exclusions for the same OUI are not supported.
+ *
+ * Example with MAC Exclusion:
+ * OUI is 00-10-18, no data, no capability, but exclude MAC 00-11-22-00-00-00
+ * with OUI-level matching (first 3 bytes):
+ *
+ * gActionOUIExample=001018 00 41 001122000000 E0
+ *
+ * Explanation:
+ *   001018 - OUI to match
+ *   00 - Data length is 0 (no data)
+ *   41 - Info mask: bit 0 (OUI check) + bit 6 (MAC exclusion) =
+ *        0x01 + 0x40 = 0x41
+ *   001122000000 - MAC address to exclude
+ *   E0 - MAC mask: check first 3 bytes only (0x80 + 0x40 + 0x20 = 0xE0)
+ *
+ * In this example, the action OUI will match all APs with OUI 00-10-18,
+ * EXCEPT those with MAC addresses starting with 00-11-22.
  *
  * <Capability> is 1 byte long and it contains the below info
  *   NSS – 4 bits starting from LSB (b0 – b3)

@@ -836,5 +836,36 @@ void wlan_action_oui_extension_dump(struct action_oui_extension *oui_ext)
 				   QDF_TRACE_LEVEL_TRACE,
 				   oui_ext->data_mask,
 				   oui_ext->data_mask_length);
-}
 
+	if (oui_ext->mac_addr_length) {
+		action_oui_trace("mac");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_ACTION_OUI,
+				   QDF_TRACE_LEVEL_TRACE,
+				   oui_ext->mac_addr,
+				   oui_ext->mac_addr_length);
+	}
+
+	if (oui_ext->mac_mask_length) {
+		action_oui_trace("mac mask");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_ACTION_OUI,
+				   QDF_TRACE_LEVEL_TRACE,
+				   oui_ext->mac_mask,
+				   oui_ext->mac_mask_length);
+	}
+
+	if (oui_ext->mac_exclusion_length) {
+		action_oui_trace("mac exclusion");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_ACTION_OUI,
+				   QDF_TRACE_LEVEL_TRACE,
+				   oui_ext->mac_exclusion.mac_addr,
+				   QDF_MAC_ADDR_SIZE);
+	}
+
+	if (oui_ext->mac_exclusion_mask_length) {
+		action_oui_trace("mac exclusion mask");
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_ACTION_OUI,
+				   QDF_TRACE_LEVEL_TRACE,
+				   &oui_ext->mac_exclusion.mac_addr_mask,
+				   1);
+	}
+}

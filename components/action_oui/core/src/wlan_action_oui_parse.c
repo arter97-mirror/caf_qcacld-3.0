@@ -101,6 +101,8 @@ uint8_t *action_oui_token_string(enum action_oui_token_type token_id)
 		CASE_RETURN_STRING(ACTION_OUI_CAPABILITY_TOKEN);
 		CASE_RETURN_STRING(ACTION_OUI_DATA_BIT_MASK_TOKEN);
 		CASE_RETURN_STRING(ACTION_OUI_MAC_BIT_MASK_TOKEN);
+		CASE_RETURN_STRING(ACTION_OUI_MAC_EXCLUSION_TOKEN);
+		CASE_RETURN_STRING(ACTION_OUI_MAC_EXCLUSION_MASK_TOKEN);
 		CASE_RETURN_STRING(ACTION_OUI_END_TOKEN);
 	}
 
@@ -327,8 +329,16 @@ validate_and_convert_info_mask(uint8_t *token,
 		*action_token = ACTION_OUI_MAC_ADDR_TOKEN;
 		return true;
 	}
+	if ((info_mask & ACTION_OUI_INFO_AP_CAPABILITY_NSS) ||
+	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_HT) ||
+	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_VHT) ||
+	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_BAND))
+		*action_token = ACTION_OUI_CAPABILITY_TOKEN;
+	else if (info_mask & ACTION_OUI_INFO_MAC_EXCLUSION)
+		*action_token = ACTION_OUI_MAC_EXCLUSION_TOKEN;
+	else
+		*action_token = ACTION_OUI_END_TOKEN;
 
-	*action_token = ACTION_OUI_CAPABILITY_TOKEN;
 	return true;
 }
 
@@ -405,12 +415,95 @@ validate_and_convert_mac_mask(uint8_t *token,
 	if ((info_mask & ACTION_OUI_INFO_AP_CAPABILITY_NSS) ||
 	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_HT) ||
 	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_VHT) ||
-	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_BAND)) {
+	    (info_mask & ACTION_OUI_INFO_AP_CAPABILITY_BAND))
 		*action_token = ACTION_OUI_CAPABILITY_TOKEN;
-		return true;
+	else if (info_mask & ACTION_OUI_INFO_MAC_EXCLUSION)
+		*action_token = ACTION_OUI_MAC_EXCLUSION_TOKEN;
+	else
+		*action_token = ACTION_OUI_END_TOKEN;
+
+	return true;
+}
+
+/**
+ * validate_and_convert_mac_exclusion() - validate and convert MAC exclusion
+ * @token: MAC exclusion address string
+ * @ext: pointer to container which holds converted hex array
+ * @action_token: next action to be parsed
+ *
+ * This is an internal function invoked from action_oui_parse to validate
+ * the MAC exclusion address string for action OUI inis, convert it to hex
+ * array and store in action_oui extension. After successful parsing update
+ * the @action_token to hold the next expected string.
+ *
+ * Return: If conversion is successful return true else false
+ */
+static bool
+validate_and_convert_mac_exclusion(uint8_t *token,
+				   struct action_oui_extension *ext,
+				   enum action_oui_token_type *action_token)
+{
+	uint32_t expected_token_len[1] = {2 * QDF_MAC_ADDR_SIZE};
+	bool valid;
+
+	valid = action_oui_string_to_hex(token, ext->mac_exclusion.mac_addr, 1,
+					 expected_token_len);
+	if (!valid) {
+		action_oui_err("Failed to parse MAC exclusion address");
+		return false;
 	}
 
+	action_oui_debug("Parsed MAC exclusion address: " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(ext->mac_exclusion.mac_addr));
+
+	ext->mac_exclusion_length = QDF_MAC_ADDR_SIZE;
+	*action_token = ACTION_OUI_MAC_EXCLUSION_MASK_TOKEN;
+
+	return true;
+}
+
+/**
+ * validate_and_convert_mac_exclusion_mask() - validate and convert MAC
+ * exclusion mask
+ * @token: MAC exclusion mask string
+ * @ext: pointer to container which holds converted hex value
+ * @action_token: next action to be parsed
+ *
+ * This is an internal function invoked from action_oui_parse to validate
+ * the MAC exclusion mask string for action OUI inis, convert it to hex value
+ * and store in action_oui extension. After successful parsing update the
+ * @action_token to hold the next expected string.
+ *
+ * Return: If conversion is successful return true else false
+ */
+static bool
+validate_and_convert_mac_exclusion_mask(uint8_t *token,
+					struct action_oui_extension *ext,
+					enum action_oui_token_type *action_token)
+{
+	uint32_t expected_token_len[1] = {2};
+	bool valid;
+
+	valid = action_oui_string_to_hex(token,
+					 &ext->mac_exclusion.mac_addr_mask,
+					 1, expected_token_len);
+	if (!valid) {
+		action_oui_err("Failed to parse MAC exclusion mask");
+		return false;
+	}
+
+	action_oui_debug("Parsed MAC exclusion mask: 0x%02X (bits: %s%s%s%s%s%s)",
+			 ext->mac_exclusion.mac_addr_mask,
+			 (ext->mac_exclusion.mac_addr_mask & 0x80) ? "B0 " : "",
+			 (ext->mac_exclusion.mac_addr_mask & 0x40) ? "B1 " : "",
+			 (ext->mac_exclusion.mac_addr_mask & 0x20) ? "B2 " : "",
+			 (ext->mac_exclusion.mac_addr_mask & 0x10) ? "B3 " : "",
+			 (ext->mac_exclusion.mac_addr_mask & 0x08) ? "B4 " : "",
+			 (ext->mac_exclusion.mac_addr_mask & 0x04) ? "B5" : "");
+	ext->mac_exclusion_mask_length = 1;
+
 	*action_token = ACTION_OUI_END_TOKEN;
+
 	return true;
 }
 
@@ -466,7 +559,10 @@ validate_and_convert_capability(uint8_t *token,
 
 	ext->capability_length = capability_length;
 
-	*action_token = ACTION_OUI_END_TOKEN;
+	if (info_mask & ACTION_OUI_INFO_MAC_EXCLUSION)
+		*action_token = ACTION_OUI_MAC_EXCLUSION_TOKEN;
+	else
+		*action_token = ACTION_OUI_END_TOKEN;
 
 	return true;
 }
@@ -491,6 +587,7 @@ action_oui_extension_store(struct action_oui_psoc_priv *psoc_priv,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	action_oui_debug("id %d", oui_priv->id);
 	for (i = 0; i < oui_ext_num; i++) {
 		ext_priv = qdf_mem_malloc(sizeof(*ext_priv));
 		if (!ext_priv) {
@@ -607,6 +704,18 @@ action_oui_parse(struct action_oui_psoc_priv *psoc_priv,
 		case ACTION_OUI_CAPABILITY_TOKEN:
 			valid = validate_and_convert_capability(token, &ext,
 							&action_token);
+			break;
+
+		case ACTION_OUI_MAC_EXCLUSION_TOKEN:
+			valid = validate_and_convert_mac_exclusion(token,
+								   &ext,
+								   &action_token);
+			break;
+
+		case ACTION_OUI_MAC_EXCLUSION_MASK_TOKEN:
+			valid = validate_and_convert_mac_exclusion_mask(token,
+									&ext,
+									&action_token);
 			break;
 
 		default:
@@ -903,6 +1012,56 @@ check_for_vendor_ap_mac(struct action_oui_extension *extension,
 }
 
 /**
+ * check_for_mac_exclusion() - checks if AP MAC matches exclusion pattern
+ * @extension: pointer to action oui extension data
+ * @attr: pointer to structure containing mac_addr (bssid) of AP
+ *
+ * This function checks if the AP's MAC address matches the exclusion pattern
+ * specified in the extension. If it matches, the AP should be excluded from
+ * the action OUI configuration.
+ *
+ * Return: true if MAC matches exclusion (should be excluded), false otherwise
+ */
+static bool
+check_for_mac_exclusion(struct action_oui_extension *extension,
+			struct action_oui_search_attr *attr)
+{
+	uint8_t i;
+	uint8_t mac_mask = 0x80;
+	uint8_t *mac_addr = attr->mac_addr;
+
+	if (!mac_addr)
+		return false;
+
+	/* If no MAC exclusion is configured, don't exclude */
+	if (!(extension->info_mask & ACTION_OUI_INFO_MAC_EXCLUSION))
+		return false;
+
+	action_oui_debug("Checking MAC exclusion: AP MAC=" QDF_MAC_ADDR_FMT
+			 " Exclusion=" QDF_MAC_ADDR_FMT " Mask=0x%02X",
+			 QDF_MAC_ADDR_REF(mac_addr),
+			 QDF_MAC_ADDR_REF(extension->mac_exclusion.mac_addr),
+			 extension->mac_exclusion.mac_addr_mask);
+
+	/* Check if MAC matches the exclusion pattern */
+	for (i = 0; i < QDF_MAC_ADDR_SIZE; i++) {
+		if ((extension->mac_exclusion.mac_addr_mask & mac_mask) &&
+		    !(extension->mac_exclusion.mac_addr[i] == mac_addr[i])) {
+			action_oui_debug("MAC exclusion check failed at byte %d: AP=0x%02X Exclusion=0x%02X (mask bit set)",
+					 i, mac_addr[i],
+					 extension->mac_exclusion.mac_addr[i]);
+			return false;
+		}
+		mac_mask = mac_mask >> 1;
+	}
+
+	action_oui_debug("MAC exclusion matches " QDF_MAC_ADDR_FMT,
+			 QDF_MAC_ADDR_REF(mac_addr));
+
+	return true;
+}
+
+/**
  * check_for_vendor_ap_capabilities() - Compares various Vendor AP
  * capabilities like NSS, HT, VHT, Band from the ini with the AP's capability
  * from the beacon and returns true if all the capability matches
@@ -1100,6 +1259,10 @@ action_oui_search(struct action_oui_psoc_priv *psoc_priv,
 
 		if ((extension->info_mask & ACTION_OUI_INFO_MAC_ADDRESS) &&
 		    !check_for_vendor_ap_mac(extension, attr))
+			goto next;
+
+		/* Check if AP MAC matches exclusion pattern */
+		if (check_for_mac_exclusion(extension, attr))
 			goto next;
 
 		if (!check_for_vendor_ap_capabilities(extension, attr))
