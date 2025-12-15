@@ -45,10 +45,10 @@
 #define LIM_AUTH_RETRY_TIMER_MS   60
 
 /*
- * SAE auth timer of 5secs. This is required for duration of entire SAE
+ * SAE auth timer of 3secs. This is required for duration of entire SAE
  * authentication.
  */
-#define LIM_AUTH_SAE_TIMER_MS 5000
+#define LIM_AUTH_SAE_TIMER_MS 3000
 #define LIM_CHANNEL_VACATE_TIMER_MS 5000
 
 /*
