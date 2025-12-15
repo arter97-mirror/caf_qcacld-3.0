@@ -1551,10 +1551,77 @@ static inline void dp_dal_update_dal_config(ol_txrx_soc_handle soc,
 
 	rx_tm_hdl->dal_dp_enabled = cdp_is_dal_dp_enabled(soc);
 }
+
+static void
+dp_rx_tm_enqueue_pkt_dal_threads(struct dp_rx_tm_handle *rx_tm_hdl,
+				 qdf_nbuf_t nbuf_list)
+{
+	qdf_nbuf_t list_head[DAL_DP_RX_THREADS] = {NULL};
+	qdf_nbuf_t list_tail[DAL_DP_RX_THREADS] = {NULL};
+	qdf_nbuf_t head_ptr;
+	qdf_nbuf_t next;
+	uint32_t hash;
+	uint8_t id;
+	uint8_t start_id;
+
+	start_id = rx_tm_hdl->dal_dp_rx_thread_start_id;
+	if (start_id + DAL_DP_RX_THREADS > rx_tm_hdl->num_dp_rx_threads) {
+		dp_err("Invalid DAL thread start %d dal_threads %d total %d",
+		       start_id, DAL_DP_RX_THREADS,
+		       rx_tm_hdl->num_dp_rx_threads);
+		qdf_nbuf_list_free(nbuf_list);
+		return;
+	}
+
+	head_ptr = nbuf_list;
+	while (head_ptr) {
+		next = qdf_nbuf_next(head_ptr);
+		hash = QDF_NBUF_CB_RX_FLOW_ID(head_ptr);
+		id = hash % DAL_DP_RX_THREADS;
+
+		if (!list_head[id]) {
+			list_head[id] = head_ptr;
+			QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(list_head[id]) = 1;
+		} else {
+			qdf_nbuf_set_next(list_tail[id], head_ptr);
+			QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(list_head[id])++;
+		}
+
+		list_tail[id] = head_ptr;
+		qdf_nbuf_set_next(list_tail[id], NULL);
+		head_ptr = next;
+	}
+
+	for (id = 0; id < DAL_DP_RX_THREADS; id++) {
+		if (!list_head[id])
+			continue;
+
+		dp_rx_tm_thread_enqueue(rx_tm_hdl->rx_thread[id + start_id],
+					list_head[id]);
+	}
+}
+
+static inline bool
+dp_rx_tm_check_dal_owned_pkt(struct dp_rx_tm_handle *rx_tm_hdl,
+			     qdf_nbuf_t nbuf_list)
+{
+	if (!rx_tm_hdl->dal_dp_enabled || !qdf_nbuf_dal_owned_get(nbuf_list))
+		return false;
+
+	dp_rx_tm_enqueue_pkt_dal_threads(rx_tm_hdl, nbuf_list);
+	return true;
+}
 #else
 static inline void dp_dal_update_dal_config(ol_txrx_soc_handle soc,
 					    struct dp_rx_tm_handle *rx_tm_hdl)
 {
+}
+
+static inline bool
+dp_rx_tm_check_dal_owned_pkt(struct dp_rx_tm_handle *rx_tm_hdl,
+			     qdf_nbuf_t nbuf_list)
+{
+	return false;
 }
 #endif
 
@@ -1562,6 +1629,9 @@ QDF_STATUS dp_rx_tm_enqueue_pkt(struct dp_rx_tm_handle *rx_tm_hdl,
 				qdf_nbuf_t nbuf_list)
 {
 	uint8_t selected_thread_id;
+
+	if (dp_rx_tm_check_dal_owned_pkt(rx_tm_hdl, nbuf_list))
+		return QDF_STATUS_SUCCESS;
 
 	selected_thread_id =
 		dp_rx_tm_select_thread(rx_tm_hdl,
