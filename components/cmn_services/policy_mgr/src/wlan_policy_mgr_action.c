@@ -4213,7 +4213,8 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 	if (cc_count == 1 && !is_acs_mode &&
 	    target_psoc_get_sap_coex_fixed_chan_cap(
 			wlan_psoc_get_tgt_if_handle(psoc)) &&
-	    !policy_mgr_is_safe_channel(psoc, op_ch_freq_list[0])) {
+	    !policy_mgr_is_safe_channel(psoc, op_ch_freq_list[0]) &&
+	    !policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc)) {
 		policy_mgr_debug("Avoid channel switch as it's allowed to operate on unsafe channel: %d",
 				 op_ch_freq_list[0]);
 		return;
