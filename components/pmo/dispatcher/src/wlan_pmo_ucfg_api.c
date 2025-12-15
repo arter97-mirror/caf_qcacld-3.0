@@ -1207,9 +1207,7 @@ ucfg_pmo_set_ns_offload_enable_dynamic(struct wlan_objmgr_vdev *vdev,
 						      ns_offload_enable_dyn);
 }
 
-#ifdef FEATURE_WLAN_WOW_OPTIMIZATION_SUPPORT
 bool ucfg_pmo_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return pmo_core_is_wow_optimization_enabled(psoc);
 }
-#endif

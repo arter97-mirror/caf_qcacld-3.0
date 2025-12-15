@@ -45,6 +45,7 @@
 #include "wlan_pmo_ucfg_api.h"
 #include "hif.h"
 #include "target_type.h"
+#include "target_if.h"
 
 /**
  * pmo_core_get_vdev_dtim_period() - Get vdev dtim period
@@ -2037,7 +2038,6 @@ void pmo_core_system_resume(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
-#ifdef FEATURE_WLAN_WOW_OPTIMIZATION_SUPPORT
 bool pmo_core_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	wmi_unified_t wmi_handle;
@@ -2054,6 +2054,5 @@ bool pmo_core_is_wow_optimization_enabled(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return wmi_service_enabled(wmi_handle,
-			wmi_service_wow_timeline_optimization_support);
+			wmi_service_wow_sta_ps_param_cache_support);
 }
-#endif
