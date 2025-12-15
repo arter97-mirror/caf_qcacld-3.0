@@ -1461,7 +1461,13 @@ static bool put_host_link_stats(struct wifi_host_link_stats *stats,
 			stats->msdu_tx_fw_drop) ||
 	    nla_put_u32(vendor_event,
 			QCA_WLAN_VENDOR_ATTR_LL_STATS_TX_DRIVER_DROP_MSDU_CNT,
-			stats->msdu_tx_driver_drop)) {
+			stats->msdu_tx_driver_drop) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_RX_DRIVER_MSDU_CNT,
+			stats->msdu_rx_driver_rcvd) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_RX_DRIVER_MPDU_CNT,
+			stats->mpdu_rx_driver_rcvd)) {
 		hdd_err("host link stats put fail");
 		return false;
 	}
@@ -1630,6 +1636,7 @@ void hdd_get_host_link_stats(struct wlan_hdd_link_info *link_info,
 	uint8_t *peer_mac;
 	struct cdp_peer_stats *peer_stats;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	uint8_t i = 0;
 
 	soc = cds_get_context(QDF_MODULE_ID_SOC);
 	if (!soc) {
@@ -1673,6 +1680,12 @@ void hdd_get_host_link_stats(struct wlan_hdd_link_info *link_info,
 	stats->msdu_tx_retry = peer_stats->tx.retries;
 	stats->msdu_tx_fw_drop = peer_stats->tx.tx_failed;
 
+	stats->msdu_rx_driver_rcvd = 0;
+	for (i = 0; i < CDP_MAX_RX_RINGS; i++)
+		stats->msdu_rx_driver_rcvd +=
+			(uint32_t)peer_stats->rx.rcvd_reo[i].num;
+	stats->mpdu_rx_driver_rcvd = peer_stats->rx.mpdu_cnt;
+
 	qdf_mem_free(peer_stats);
 
 	if (cds_dp_get_vdev_stats(link_info->vdev_id, &dp_stats))
@@ -1681,11 +1694,13 @@ void hdd_get_host_link_stats(struct wlan_hdd_link_info *link_info,
 		stats->msdu_tx_driver_drop = 0;
 
 	hdd_debug("vdev id %d peer mac " QDF_MAC_ADDR_FMT
-		  " tx_succ %d tx_retry %d tx_fw_drop %d tx_driver_drop %d",
+		  " tx_succ %d tx_retry %d tx_fw_drop %d tx_driver_drop %d"
+		  " rx_msdu %d rx_mpdu %d",
 		  link_info->vdev_id,
 		  QDF_MAC_ADDR_REF(peer_mac),
 		  stats->msdu_tx_succ, stats->msdu_tx_retry,
-		  stats->msdu_tx_fw_drop, stats->msdu_tx_driver_drop);
+		  stats->msdu_tx_fw_drop, stats->msdu_tx_driver_drop,
+		  stats->msdu_rx_driver_rcvd, stats->mpdu_rx_driver_rcvd);
 }
 
 bool hdd_get_interface_info(struct wlan_hdd_link_info *link_info,
@@ -1858,6 +1873,10 @@ wlan_hdd_update_iface_stats_info(struct wlan_hdd_link_info *link_info,
 			host_link_stats->msdu_tx_fw_drop;
 		if_stat->host_link_stats.msdu_tx_driver_drop +=
 			host_link_stats->msdu_tx_driver_drop;
+		if_stat->host_link_stats.msdu_rx_driver_rcvd +=
+			host_link_stats->msdu_rx_driver_rcvd;
+		if_stat->host_link_stats.mpdu_rx_driver_rcvd +=
+			host_link_stats->mpdu_rx_driver_rcvd;
 	}
 
 	if (!update_stats) {

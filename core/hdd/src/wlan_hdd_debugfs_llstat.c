@@ -176,11 +176,14 @@ void hdd_debugfs_process_iface_stats(struct wlan_hdd_link_info *link_info,
 	hdd_get_host_link_stats(link_info, host_link_stats);
 	if (host_link_stats->valid) {
 		len = scnprintf(buffer, DEBUGFS_LLSTATS_BUF_SIZE - ll_stats.len,
-				"\n\nMSDU TX stats(Sent by HOST): retry: %u, success: %u, fw drop: %u, driver drop: %u",
+				"\n\nMSDU TX stats(Sent by HOST): retry: %u, success: %u, fw drop: %u,"
+				"driver drop: %u, msdu driver rcvd %u, mpdu driver rcvd %u",
 				host_link_stats->msdu_tx_retry,
 				host_link_stats->msdu_tx_succ,
 				host_link_stats->msdu_tx_fw_drop,
-				host_link_stats->msdu_tx_driver_drop);
+				host_link_stats->msdu_tx_driver_drop,
+				host_link_stats->msdu_rx_driver_rcvd,
+				host_link_stats->mpdu_rx_driver_rcvd);
 		buffer += len;
 		ll_stats.len += len;
 	}

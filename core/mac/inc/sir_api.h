@@ -3104,6 +3104,8 @@ struct wifi_peer_info {
  *  transmission but were ultimately dropped by the firmware.
  * @msdu_tx_driver_drop: The number of MSDUs that were intended for transmission
  *  but were dropped by the driver before being handed off to the firmware.
+ * @msdu_rx_driver_rcvd: The number of MSDUs received from REO path
+ * @mpdu_rx_driver_rcvd: The number of MPDUs received from REO path
  */
 struct wifi_host_link_stats {
 	bool valid;
@@ -3111,6 +3113,8 @@ struct wifi_host_link_stats {
 	uint32_t msdu_tx_succ;
 	uint32_t msdu_tx_fw_drop;
 	uint32_t msdu_tx_driver_drop;
+	uint32_t msdu_rx_driver_rcvd;
+	uint32_t mpdu_rx_driver_rcvd;
 };
 
 /**
