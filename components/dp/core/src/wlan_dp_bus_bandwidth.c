@@ -1650,10 +1650,10 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 		tput_level = TPUT_LEVEL_VERY_HIGH;
 	} else if (total_pkts > dp_ctx->dp_cfg.bus_bw_super_fast_threshold) {
 		next_vote_level = PLD_BUS_WIDTH_SUPER_FAST;
-		tput_level = TPUT_LEVEL_SUPER_HIGH;
+		tput_level = TPUT_LEVEL_SUPER_FAST;
 	} else if (total_pkts > dp_ctx->dp_cfg.bus_bw_fast_threshold) {
 		next_vote_level = PLD_BUS_WIDTH_FAST;
-		tput_level = TPUT_LEVEL_SUPER_HIGH;
+		tput_level = TPUT_LEVEL_FAST;
 	} else if (total_pkts > dp_ctx->dp_cfg.bus_bw_super_high_threshold) {
 		next_vote_level = PLD_BUS_WIDTH_MAX;
 		tput_level = TPUT_LEVEL_SUPER_HIGH;
@@ -1699,6 +1699,21 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	dp_bbm_apply_independent_policy(dp_ctx->psoc, &param);
 
 	dp_rtpm_tput_policy_apply(dp_ctx, tput_level);
+
+	/* PCIe LP voting for FAST throughput transitions */
+	if (tput_level >= TPUT_LEVEL_FAST &&
+	    prev_tput_level < TPUT_LEVEL_FAST) {
+		/* Vote for PCIe LP prevent when transitioning to FAST TPUT */
+		if (hif_prevent_link_low_power_states(hif_ctx))
+			dp_info("Failed to prevent PCIe link low power states");
+		else
+			dp_info("PCIe LP prevent vote applied for FAST TPUT");
+	} else if (tput_level < TPUT_LEVEL_FAST &&
+		   prev_tput_level >= TPUT_LEVEL_FAST) {
+		/* Remove PCIe LP vote when transitioning below FAST TPUT */
+		hif_allow_link_low_power_states(hif_ctx);
+		dp_info("PCIe LP vote removed for below FAST TPUT");
+	}
 
 	dptrace_high_tput_req =
 			next_vote_level > PLD_BUS_WIDTH_IDLE ? true : false;
