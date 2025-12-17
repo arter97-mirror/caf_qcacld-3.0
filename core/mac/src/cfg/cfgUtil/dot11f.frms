@@ -3732,6 +3732,16 @@ IE reg_connect (EID_EXTN_ID_ELEMENT) OUI (0x89)
     }
 }
 
+IE uhr_cap (EID_EXTN_ID_ELEMENT) OUI (0x98)
+{
+    data[5..8];
+}
+
+IE uhr_op (EID_EXTN_ID_ELEMENT) OUI (0x97)
+{
+    data[2];
+}
+
 /////////////////////////////////////////////////////////////////////////////
 //                                MULTIIEs                                 //
 /////////////////////////////////////////////////////////////////////////////
@@ -4159,6 +4169,7 @@ FRAME Beacon                              // C.f. Sec. 7.2.3.1
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
+    OPTIE  uhr_op;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
@@ -4265,6 +4276,7 @@ FRAME Beacon2
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
+    OPTIE  uhr_op;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
@@ -4345,6 +4357,7 @@ FRAME BeaconIEs
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
+    OPTIE  uhr_op;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
@@ -4409,6 +4422,7 @@ FRAME AssocRequest                        // 7.2.3.4
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
     OPTIE  reg_connect;
+    OPTIE  uhr_cap;
 
     OPTIE  WPAOpaque;
     OPTIE  WMMCaps;
@@ -4468,6 +4482,8 @@ FRAME AssocResponse                       // 7.2.3.5
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
+    OPTIE  uhr_cap;
+    OPTIE  uhr_op;
 
     OPTIE  WPA;
     OPTIE  WMMParams;
@@ -4516,6 +4532,7 @@ FRAME ReAssocRequest                      // 7.2.3.6
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
     OPTIE  reg_connect;
+    OPTIE  uhr_cap;
 
     OPTIE  WPAOpaque;
     OPTIE  WMMCaps;
@@ -4570,6 +4587,8 @@ FRAME ReAssocResponse                     // 7.2.3.7
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
+    OPTIE  uhr_cap;
+    OPTIE  uhr_op;
 
     OPTIE  WPA;
     OPTIE  WMMParams;
@@ -4601,6 +4620,7 @@ FRAME ProbeRequest                        // 7.2.3.8
     OPTIE  mlo_ie;
 
     OPTIE  reg_connect;
+    OPTIE  uhr_cap;
     OPTIE  WscProbeReq;
     OPTIE  WFATPC;
     OPTIE  P2PProbeReq;
@@ -4661,6 +4681,8 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  eht_op;
     OPTIE  mlo_ie;
     OPTIE  t2lm_ie[0..2];
+    OPTIE  uhr_cap;
+    OPTIE  uhr_op;
 
     OPTIE  WPA;
     OPTIE  WMMInfoAp;
