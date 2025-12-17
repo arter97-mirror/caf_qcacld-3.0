@@ -3078,3 +3078,20 @@ int pld_get_iova_info(struct device *dev, uint64_t *addr, uint64_t *size)
 	return ret;
 }
 #endif
+
+#ifdef DRIVER_PASSTHRU_MODE
+int pld_set_vendor_wonder_priv_data(struct device *dev, const void *priv_data)
+{
+	int ret;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_set_vendor_wonder_priv_data(priv_data);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return ret;
+}
+#endif
