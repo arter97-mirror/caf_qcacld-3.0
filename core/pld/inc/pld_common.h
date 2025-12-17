@@ -2241,4 +2241,21 @@ pld_get_cpumask_for_wlan_tx_comp_interrupts(struct device *dev,
 {
 }
 #endif
+
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * pld_set_vendor_wonder_priv_data()- Set vendor wondertap priv data
+ * @dev: pointer to device
+ * @priv_data: pointer to private data
+ *
+ * Return: 0 on success else failure code
+ */
+int pld_set_vendor_wonder_priv_data(struct device *dev, const void *priv_data);
+#else
+static inline
+int pld_set_vendor_wonder_priv_data(struct device *dev, const void *priv_data)
+{
+	return 0;
+}
+#endif
 #endif
