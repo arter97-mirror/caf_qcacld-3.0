@@ -100,10 +100,12 @@ static inline const char *pcl_type_to_string(uint32_t idx)
 	CASE_RETURN_STRING(PM_SCC_CH_5G);
 	CASE_RETURN_STRING(PM_24G_SCC_CH);
 	CASE_RETURN_STRING(PM_5G_SCC_CH);
+	CASE_RETURN_STRING(PM_SCC_ON_5_CH_5G);
 	CASE_RETURN_STRING(PM_SCC_ON_5_SCC_ON_24_24G);
 	CASE_RETURN_STRING(PM_SCC_ON_5_SCC_ON_24_5G);
 	CASE_RETURN_STRING(PM_SCC_ON_24_SCC_ON_5_24G);
 	CASE_RETURN_STRING(PM_SCC_ON_24_SCC_ON_5_5G);
+	CASE_RETURN_STRING(PM_SCC_ON_24_CH_24G);
 	CASE_RETURN_STRING(PM_SCC_ON_5_SCC_ON_24);
 	CASE_RETURN_STRING(PM_SCC_ON_24_SCC_ON_5);
 	CASE_RETURN_STRING(PM_MCC_CH_24G);
@@ -1134,6 +1136,42 @@ enum policy_mgr_two_connection_mode
 enum policy_mgr_three_connection_mode
 	policy_mgr_get_fourth_connection_pcl_table_index(
 		struct wlan_objmgr_psoc *psoc);
+#endif
+
+#ifdef FEATURE_FIFTH_CONNECTION
+/**
+ * policy_mgr_get_fifth_connection_pcl_table_index() - provides the
+ * row index to fifthConnectionPclTable to get to the correct
+ * pcl
+ * @psoc: PSOC object information
+ *
+ * This function provides the row index to
+ * fifthConnectionPclTable. The index is derived based on
+ * current connection, band on which it is on & chain mask it is
+ * using, as obtained from pm_conc_connection_list.
+ *
+ * Return: table index
+ */
+enum policy_mgr_four_connection_mode
+		policy_mgr_get_fifth_connection_pcl_table_index(
+		struct wlan_objmgr_psoc *psoc);
+#endif
+
+#ifdef FEATURE_SIXTH_CONNECTION
+/**
+ * policy_mgr_get_sixth_connection_pcl_table_index() - provides the row index
+ * to sixthConnectionPclTable to get to the correct pcl
+ * @psoc: PSOC object information
+ *
+ * This function provides the row index to
+ * sixthConnectionPclTable. The index is derived based on
+ * current connection, band on which it is on & chain mask it is
+ * using, as obtained from pm_conc_connection_list.
+ *
+ * Return: table index
+ */
+enum policy_mgr_five_connection_mode
+policy_mgr_get_sixth_connection_pcl_table_index(struct wlan_objmgr_psoc *psoc);
 #endif
 
 /**
