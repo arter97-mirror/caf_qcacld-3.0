@@ -6406,8 +6406,7 @@ hdd_is_dynamic_set_mac_addr_supported(struct hdd_context *hdd_ctx)
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_HDD_MULTI_VDEV_SINGLE_NDEV)
 QDF_STATUS
 hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info,
-					struct wlan_hdd_link_info *new_link_info,
-					bool is_roam)
+					struct wlan_hdd_link_info *new_link_info)
 {
 	unsigned long link_flags;
 	struct wlan_objmgr_vdev *vdev;
@@ -6415,7 +6414,6 @@ hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info
 	uint8_t cur_old_pos, cur_new_pos;
 	struct vdev_osif_priv *vdev_priv;
 	struct hdd_adapter *adapter = cur_link_info->adapter;
-	struct hdd_station_ctx *sta_ctx;
 
 	/* Update the new position of current and new link info
 	 * in the link info array.
@@ -6451,11 +6449,6 @@ hdd_adapter_update_links_on_link_switch(struct wlan_hdd_link_info *cur_link_info
 	/* Update VDEV-OSIF priv pointer to new link info */
 	vdev_priv = wlan_vdev_get_ospriv(new_link_info->vdev);
 	vdev_priv->legacy_osif_priv = new_link_info;
-
-	if (is_roam) {
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(cur_link_info);
-		sta_ctx->conn_info.ieee_link_id = WLAN_INVALID_LINK_ID;
-	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -6531,8 +6524,7 @@ hdd_link_switch_vdev_mac_addr_update(int32_t ieee_old_link_id,
 	}
 
 	status = hdd_adapter_update_links_on_link_switch(cur_link_info,
-							 new_link_info,
-							 false);
+							 new_link_info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to update adapter link info");
 		goto release_ref;
@@ -6548,64 +6540,55 @@ release_ref:
 	return status;
 }
 
-QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *vdev,
+QDF_STATUS hdd_roam_vdev_mac_addr_update(struct wlan_objmgr_vdev *primary_vdev,
+					 uint8_t vdev_id,
 					 struct qdf_mac_addr *old_self_mac,
 					 struct qdf_mac_addr *new_self_mac)
 {
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct wlan_hdd_link_info *cur_link_info, *new_link_info;
-	QDF_STATUS status = QDF_STATUS_E_INVAL;
-	uint8_t vdev_id;
+	QDF_STATUS status;
+	struct hdd_adapter *adapter;
+	struct wlan_hdd_link_info *cur_link_info, *primary_link_info;
+	struct vdev_osif_priv *osif_priv;
+	struct wlan_objmgr_vdev *link_vdev;
 
-	cur_link_info = hdd_get_link_info_by_link_addr(hdd_ctx, old_self_mac);
+	osif_priv = wlan_vdev_get_ospriv(primary_vdev);
+	if (!osif_priv) {
+		hdd_err("Invalid osif priv");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	primary_link_info = osif_priv->legacy_osif_priv;
+	adapter = primary_link_info->adapter;
+
+	cur_link_info =
+		hdd_get_link_info_by_mac_and_vdev_for_adapter(adapter,
+							      old_self_mac,
+							      vdev_id);
 	if (!cur_link_info) {
-		hdd_err("no hdd link with mac " QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(old_self_mac->bytes));
+		hdd_err("No entry with MAC " QDF_MAC_ADDR_FMT " and VDEV %d",
+			QDF_MAC_ADDR_REF(old_self_mac->bytes), vdev_id);
 		cds_trigger_recovery(QDF_VDEV_LINK_MISMATCH);
-		return status;
-	}
-	vdev_id = wlan_vdev_get_id(vdev);
-	if (cur_link_info->vdev_id != vdev_id) {
-		hdd_err("vdev id mismatch %d %d", cur_link_info->vdev_id,
-			vdev_id);
-		cds_trigger_recovery(QDF_VDEV_LINK_MISMATCH);
-		return status;
+		return QDF_STATUS_E_NOENT;
 	}
 
-	new_link_info = hdd_get_link_info_by_link_addr(hdd_ctx, new_self_mac);
-	if (!new_link_info) {
-		hdd_err("no hdd link with mac " QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(new_self_mac->bytes));
-		cds_trigger_recovery(QDF_VDEV_LINK_MISMATCH);
-		return status;
+	link_vdev = cur_link_info->vdev;
+	if (link_vdev) {
+		status = ucfg_dp_update_link_mac_addr(link_vdev, new_self_mac,
+						      true);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_debug("Failed to update DP link mac for vdev %d",
+				  vdev_id);
+			return status;
+		}
+
+		wlan_vdev_mlme_set_linkaddr(link_vdev, new_self_mac->bytes);
+		wlan_vdev_mlme_set_macaddr(link_vdev, new_self_mac->bytes);
 	}
 
-	if (cur_link_info == cur_link_info->adapter->deflink ||
-	    new_link_info == new_link_info->adapter->deflink) {
-		hdd_err("deflink switched");
-		cds_trigger_recovery(QDF_VDEV_LINK_MISMATCH);
-		return status;
-	}
+	qdf_copy_macaddr(&cur_link_info->link_addr, new_self_mac);
+	hdd_cm_clear_ieee_link_id(cur_link_info, false);
 
-	status = ucfg_dp_update_link_mac_addr(vdev,
-					      new_self_mac,
-					      true);
-
-	hdd_debug("vdev id %d change self mac " QDF_MAC_ADDR_FMT " to "
-		QDF_MAC_ADDR_FMT, vdev_id,
-		QDF_MAC_ADDR_REF(old_self_mac->bytes),
-		QDF_MAC_ADDR_REF(new_self_mac->bytes));
-
-	status = hdd_adapter_update_links_on_link_switch(cur_link_info,
-							 new_link_info,
-							 true);
-	if (QDF_IS_STATUS_ERROR(status))
-		hdd_err("Failed to update adapter link info, status %d",
-			status);
-
-	hdd_adapter_update_mlo_mgr_mac_addr(cur_link_info->adapter);
-
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS hdd_link_recfg_mac_addr_update(struct wlan_objmgr_vdev *vdev,
@@ -6656,8 +6639,7 @@ QDF_STATUS hdd_link_recfg_mac_addr_update(struct wlan_objmgr_vdev *vdev,
 		  QDF_MAC_ADDR_REF(new_self_mac->bytes));
 
 	status = hdd_adapter_update_links_on_link_switch(cur_link_info,
-							 new_link_info,
-							 false);
+							 new_link_info);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to update adapter link info, status %d",
 			status);
@@ -12243,6 +12225,30 @@ hdd_get_link_info_by_link_addr(struct hdd_context *hdd_ctx,
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
+
+	return NULL;
+}
+
+struct wlan_hdd_link_info *
+hdd_get_link_info_by_mac_and_vdev_for_adapter(struct hdd_adapter *adapter,
+					      struct qdf_mac_addr *mac_addr,
+					      uint8_t vdev_id)
+{
+	struct wlan_hdd_link_info *link_info;
+
+	/*
+	 * Only sanitizing the mac address and not VDEV ID as it can be invalid
+	 * VDEV_ID as well.
+	 */
+	if (!mac_addr || qdf_is_macaddr_zero(mac_addr)) {
+		hdd_debug("Invalid parameters");
+		return NULL;
+	}
+
+	hdd_adapter_for_each_link_info(adapter, link_info)
+		if (qdf_is_macaddr_equal(mac_addr, &link_info->link_addr) &&
+		    link_info->vdev_id == vdev_id)
+			return link_info;
 
 	return NULL;
 }
