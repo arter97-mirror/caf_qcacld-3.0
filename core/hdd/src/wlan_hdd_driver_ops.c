@@ -830,7 +830,7 @@ static int __hdd_soc_probe(struct device *dev,
 
 	hdd_set_sar_init_index(hdd_ctx);
 	hdd_soc_load_unlock(dev);
-	wlan_hdd_wondertap_register_ops();
+	wlan_hdd_wondertap_register_ops(dev);
 
 	return 0;
 
@@ -1025,7 +1025,7 @@ static void __hdd_soc_remove(struct device *dev)
 	pr_info("%s: Removing driver v%s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR);
 
-	wlan_hdd_wondertap_unregister_ops();
+	wlan_hdd_wondertap_unregister_ops(dev);
 	qdf_rtpm_sync_resume();
 	cds_set_driver_loaded(false);
 	cds_set_unload_in_progress(true);
@@ -2221,7 +2221,7 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		hdd_dump_log_buffer(NULL, NULL);
 		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
-		wlan_hdd_wondertap_unregister_ops();
+		wlan_hdd_wondertap_unregister_ops(dev);
 		hdd_init_start_completion();
 
 		/* Notify external threads currently waiting on firmware
@@ -2283,7 +2283,6 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		 * if need later.
 		 */
 		cds_set_recovery_in_progress(true);
-		wlan_hdd_wondertap_unregister_ops();
 		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_DOWN)
 			host_log_device_status(WLAN_STATUS_BUS_EXCEPTION);
 		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_RESUME_FAIL)
