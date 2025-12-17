@@ -2996,4 +2996,13 @@ config AR6320_PCI
 	default y
 endif
 
+config MLO_SAP_LINK_REMOVAL
+	bool "Enable MLO SAP LINK REMOVAL"
+	depends on WLAN_FEATURE_MULTI_LINK_SAP
+	default n
+
+config TARGET_DUMP_FOR_NON_QC_PLATFORM
+	bool "dump control when msm subsystem is not defined"
+	default n
+
 endif # QCA_CLD_WLAN
