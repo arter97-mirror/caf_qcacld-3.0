@@ -19656,9 +19656,18 @@ csr_create_roam_scan_offload_request(struct mac_context *mac_ctx,
 	bool ese_neighbor_list_recvd = false;
 	uint8_t ch_cache_str[128] = { 0 };
 	struct roam_offload_scan_req *req_buf = NULL;
+	uint16_t rsn_caps = 0;
 	tpCsrChannelInfo curr_ch_lst_info =
 		&roam_info->roamChannelInfo.currentChannelListInfo;
 	tCsrChannelInfo *specific_chan_info;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+			session_id, WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("Invalid vdev");
+		return NULL;
+	}
 
 	specific_chan_info = &roam_info->cfgParams.specific_chan_info;
 #ifdef FEATURE_WLAN_ESE
@@ -19673,8 +19682,10 @@ csr_create_roam_scan_offload_request(struct mac_context *mac_ctx,
 #endif /* FEATURE_WLAN_ESE */
 
 	req_buf = qdf_mem_malloc(sizeof(struct roam_offload_scan_req));
-	if (!req_buf)
+	if (!req_buf) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 		return NULL;
+	}
 
 	req_buf->Command = command;
 	/*
@@ -19719,9 +19730,12 @@ csr_create_roam_scan_offload_request(struct mac_context *mac_ctx,
 	req_buf->ConnectedNetwork.mcencryption =
 		mac_ctx->roam.roamSession[session_id].
 		connectedProfile.mcEncryptionType;
-	/* Copy the RSN capabilities in roam offload request from session*/
-	req_buf->rsn_caps = session->rsn_caps;
 
+	/* get AP RSN cap */
+	rsn_caps = (uint16_t)wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP);
+
+	/* Copy the RSN capabilities in roam offload request */
+	qdf_mem_copy(&req_buf->rsn_caps, &rsn_caps, sizeof(req_buf->rsn_caps));
 	csr_rso_command_fill_11w_params(mac_ctx, session_id, req_buf);
 
 	req_buf->delay_before_vdev_stop =
@@ -19804,6 +19818,7 @@ csr_create_roam_scan_offload_request(struct mac_context *mac_ctx,
 					  QDF_TRACE_LEVEL_DEBUG,
 					  "Fetch channel list from ini failed");
 				qdf_mem_free(req_buf);
+				wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 				return NULL;
 			}
 		} else if (reason == REASON_FLUSH_CHANNEL_LIST) {
@@ -19841,6 +19856,7 @@ csr_create_roam_scan_offload_request(struct mac_context *mac_ctx,
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			sme_err("Fetch channel list fail");
 			qdf_mem_free(req_buf);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 			return NULL;
 		}
 	}
@@ -19854,9 +19870,10 @@ csr_create_roam_scan_offload_request(struct mac_context *mac_ctx,
 		} else
 			break;
 	}
-	sme_debug("ChnlCacheType:%d, No of Chnls:%d,Channels: %s",
+	sme_debug("ChnlCacheType:%d, No of Chnls:%d,Channels: %s rsn_caps %d",
 		  req_buf->ChannelCacheType,
-		  req_buf->ConnectedNetwork.ChannelCount, ch_cache_str);
+		  req_buf->ConnectedNetwork.ChannelCount, ch_cache_str,
+		  req_buf->rsn_caps);
 
 	req_buf->mdid =
 		mac_ctx->roam.roamSession[session_id].connectedProfile.mdid;
@@ -19919,6 +19936,7 @@ csr_create_roam_scan_offload_request(struct mac_context *mac_ctx,
 
 	csr_update_roam_scan_offload_request(mac_ctx, req_buf, session);
 
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 	return req_buf;
 }
 
