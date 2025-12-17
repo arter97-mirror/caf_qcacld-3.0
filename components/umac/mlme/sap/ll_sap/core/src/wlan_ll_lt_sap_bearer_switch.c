@@ -2020,7 +2020,8 @@ ll_lt_sap_request_for_audio_transport_switch(
 		return QDF_STATUS_SUCCESS;
 	} else if (req_type == WLAN_BS_REQ_TO_WLAN) {
 		uint32_t coch_int_thrsld =
-			wlan_dcs_get_trnsprt_switch_rjt_th_cu(psoc, pdev_id);
+			wlan_dcs_get_trnsprt_switch_rjt_th_cu(
+					psoc, wlan_vdev_get_id(vdev));
 		QDF_TIMER_STATE timer_state =
 			qdf_mc_timer_get_current_state(
 				&bearer_switch_ctx->bs_wlan_request_timer);

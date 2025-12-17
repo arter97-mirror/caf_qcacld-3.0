@@ -966,8 +966,6 @@ uint8_t os_if_son_get_chan_util(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_host_dcs_ch_util_stats dcs_son_stats = {};
 	struct wlan_objmgr_psoc *psoc;
-	uint8_t mac_id;
-	QDF_STATUS status;
 
 	if (!vdev) {
 		osif_err("null vdev");
@@ -979,15 +977,8 @@ uint8_t os_if_son_get_chan_util(struct wlan_objmgr_vdev *vdev)
 		osif_err("null psoc");
 		return 0;
 	}
-	status = policy_mgr_get_mac_id_by_session_id(psoc,
-						     wlan_vdev_get_id(vdev),
-						     &mac_id);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("Failed to get mac_id");
-		return 0;
-	}
 
-	ucfg_dcs_get_ch_util(psoc, mac_id, &dcs_son_stats);
+	ucfg_dcs_get_ch_util(psoc, wlan_vdev_get_id(vdev), &dcs_son_stats);
 	osif_debug("get_chan_util %d", dcs_son_stats.total_cu);
 
 	return dcs_son_stats.total_cu;
@@ -999,8 +990,6 @@ void os_if_son_get_phy_stats(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_host_dcs_ch_util_stats dcs_son_stats = {};
 	struct wlan_objmgr_psoc *psoc;
-	uint8_t mac_id;
-	QDF_STATUS status;
 
 	if (!vdev) {
 		osif_err("null vdev");
@@ -1012,15 +1001,8 @@ void os_if_son_get_phy_stats(struct wlan_objmgr_vdev *vdev,
 		osif_err("null psoc");
 		return;
 	}
-	status = policy_mgr_get_mac_id_by_session_id(psoc,
-						     wlan_vdev_get_id(vdev),
-						     &mac_id);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("Failed to get mac_id");
-		return;
-	}
 
-	ucfg_dcs_get_ch_util(psoc, mac_id, &dcs_son_stats);
+	ucfg_dcs_get_ch_util(psoc, wlan_vdev_get_id(vdev), &dcs_son_stats);
 
 	phy_stats->ap_rx_util = dcs_son_stats.rx_cu;
 	phy_stats->ap_tx_util = dcs_son_stats.tx_cu;

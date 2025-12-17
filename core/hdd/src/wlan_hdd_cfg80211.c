@@ -232,6 +232,7 @@
 #include "wlan_action_oui_ucfg_api.h"
 #include "wma_api.h"
 #include "wlan_hdd_cfg.h"
+#include "wlan_hdd_dcs.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -20562,6 +20563,7 @@ static int __wlan_hdd_cfg80211_ap_policy(struct hdd_adapter *adapter,
 	uint8_t ap_config =
 		QCA_WLAN_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING;
 	enum host_concurrent_ap_policy current_ap_policy;
+	struct hdd_context *hdd_ctx;
 
 	vdev_id = wlan_vdev_get_id(adapter->deflink->vdev);
 	device_mode = hdd_get_device_mode(vdev_id);
@@ -20617,6 +20619,15 @@ static int __wlan_hdd_cfg80211_ap_policy(struct hdd_adapter *adapter,
 	wlan_mlme_ll_lt_sap_send_oce_flags_fw(adapter->deflink->vdev);
 	wlan_vdev_mlme_feat_ext_cap_clear(adapter->deflink->vdev,
 					  WLAN_VDEV_FEXT_FILS_DISC_6G_SAP);
+
+	hdd_ctx = adapter->hdd_ctx;
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (0 != ret)
+		return ret;
+
+	ucfg_dcs_set_mode_config(hdd_ctx->psoc, vdev_id, device_mode,
+				 ap_cfg_policy);
+
 	return 0;
 }
 

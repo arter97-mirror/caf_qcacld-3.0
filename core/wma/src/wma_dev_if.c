@@ -1211,22 +1211,11 @@ static void wma_dcs_clear_vdev_starting(struct mac_context *mac_ctx,
  *
  * Return: None
  */
-#ifdef WLAN_FEATURE_VDEV_DCS
 static void wma_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 			     uint32_t mac_id, uint8_t vdev_id)
 {
-	if (target_if_vdev_level_dcs_is_supported(psoc))
-		ucfg_wlan_dcs_cmd_for_vdev(psoc, mac_id, vdev_id);
-	else
-		ucfg_wlan_dcs_cmd(psoc, mac_id, true);
+	ucfg_wlan_dcs_cmd(psoc, mac_id, vdev_id);
 }
-#else
-static void wma_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
-			     uint32_t mac_id, uint8_t vdev_id)
-{
-	ucfg_wlan_dcs_cmd(psoc, mac_id, true);
-}
-#endif
 
 /**
  * wma_dcs_wlan_interference_mitigation_enable() - enable wlan
@@ -1268,11 +1257,12 @@ static void wma_dcs_wlan_interference_mitigation_enable(
 	}
 
 	if (wlan_interference_mitigation_enable)
-		ucfg_config_dcs_event_data(mac_ctx->psoc, mac_id, true);
+		ucfg_config_dcs_event_data(mac_ctx->psoc, (uint8_t)mac_id,
+					   rsp->vdev_id, true);
 
 	if (rsp->resp_type == WMI_HOST_VDEV_START_RESP_EVENT) {
 		ucfg_config_dcs_enable(mac_ctx->psoc, mac_id,
-				       WLAN_HOST_DCS_WLANIM);
+				       rsp->vdev_id, WLAN_HOST_DCS_WLANIM);
 
 		wma_send_dcs_cmd(mac_ctx->psoc, mac_id, rsp->vdev_id);
 	}

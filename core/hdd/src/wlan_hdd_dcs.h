@@ -91,7 +91,6 @@ void hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id,
 				       enum ll_sap_csa_source src);
 
-#ifdef WLAN_FEATURE_VDEV_DCS
 /**
  * hdd_send_dcs_cmd() - Send dcs command to firmware
  * @psoc: pointer to psoc
@@ -100,16 +99,12 @@ void hdd_dcs_trigger_csa_for_ll_lt_sap(struct wlan_objmgr_psoc *psoc,
  *
  * Return: None
  */
-void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
-		      uint32_t mac_id, uint8_t vdev_id);
-#else
 static inline
 void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 		      uint32_t mac_id, uint8_t vdev_id)
 {
-	ucfg_wlan_dcs_cmd(psoc, mac_id, true);
+	ucfg_wlan_dcs_cmd(psoc, mac_id, vdev_id);
 }
-#endif
 #else
 static inline void hdd_dcs_register_cb(struct hdd_context *hdd_ctx)
 {

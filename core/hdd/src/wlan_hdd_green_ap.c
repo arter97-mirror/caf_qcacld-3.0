@@ -215,9 +215,10 @@ static void wlan_hdd_enable_disable_dcs_cmd(struct wlan_objmgr_psoc *psoc,
 					    uint8_t lp_flags)
 {
 	if (lp_flags == QCA_WLAN_DOZED_AP_ENABLE)
-		ucfg_config_dcs_disable(psoc, mac_id, WLAN_HOST_DCS_WLANIM);
+		ucfg_config_dcs_disable(psoc, vdev_id, WLAN_HOST_DCS_WLANIM);
 	else
-		ucfg_config_dcs_enable(psoc, mac_id, WLAN_HOST_DCS_WLANIM);
+		ucfg_config_dcs_enable(psoc, mac_id, vdev_id,
+				       WLAN_HOST_DCS_WLANIM);
 
 	hdd_send_dcs_cmd(psoc, mac_id, vdev_id);
 }

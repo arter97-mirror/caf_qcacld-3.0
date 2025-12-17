@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -336,7 +336,8 @@ hdd_dcs_continue_csa_for_ll_lt_sap_post_bearer_switch(
 								hdd_ctx->psoc,
 								vdev_id);
 		/* enable DCS handling again */
-		ucfg_config_dcs_event_data(hdd_ctx->psoc, mac_id, true);
+		ucfg_config_dcs_event_data(hdd_ctx->psoc, mac_id,
+					   vdev_id, true);
 	}
 }
 
@@ -473,7 +474,8 @@ static void hdd_dcs_cb(struct wlan_objmgr_psoc *psoc, struct dcs_param *param,
 							 LL_SAP_CSA_DCS);
 	if (policy_mgr_is_force_scc(psoc) &&
 	    policy_mgr_is_sta_gc_active_on_mac(psoc, param->mac_id)) {
-		ucfg_config_dcs_event_data(psoc, param->mac_id, true);
+		ucfg_config_dcs_event_data(psoc, param->mac_id,
+					   param->vdev_id, true);
 
 		hdd_debug("force scc %d, mac id %d sta gc count %d",
 			  policy_mgr_is_force_scc(psoc), param->mac_id,
@@ -611,13 +613,14 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 							 dcs_ch_freq);
 			coch_intfr_threshold =
 			wlan_dcs_get_trnsprt_switch_rjt_th_cu(hdd_ctx->psoc,
-							      mac_id);
+							      vdev_id);
 			if (cu && cu > coch_intfr_threshold) {
 				hdd_info("Congested channel cu %d > coch_intfr_threshold %d, no need to do CSA",
 					 cu, coch_intfr_threshold);
 				/* enable DCS handling again */
 				ucfg_config_dcs_event_data(hdd_ctx->psoc,
-							   mac_id, true);
+							   mac_id, vdev_id,
+							   true);
 				return QDF_STATUS_E_INVAL;
 			}
 		}
@@ -715,7 +718,8 @@ static void hdd_dcs_hostapd_enable_wlan_interference_mitigation(
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (wlansap_dcs_is_wlan_interference_mitigation_enabled(sap_ctx) &&
 	    !WLAN_REG_IS_24GHZ_CH_FREQ(ap_ctx->operating_chan_freq))
-		ucfg_config_dcs_event_data(hdd_ctx->psoc, mac_id, true);
+		ucfg_config_dcs_event_data(hdd_ctx->psoc, mac_id,
+					   vdev_id, true);
 }
 
 void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
@@ -744,25 +748,6 @@ void hdd_dcs_chan_select_complete(struct hdd_adapter *adapter)
 	qdf_atomic_set(&ap_ctx->acs_in_progress, 0);
 }
 
-/**
- * hdd_send_dcs_cmd() - Send DCS command
- * @psoc: pointer to psoc object
- * @mac_id: mac_id
- * @vdev_id: vdev_id
- *
- * Return: None
- */
-#ifdef WLAN_FEATURE_VDEV_DCS
-void hdd_send_dcs_cmd(struct wlan_objmgr_psoc *psoc,
-		      uint32_t mac_id, uint8_t vdev_id)
-{
-	if (ucfg_is_vdev_level_dcs_supported(psoc))
-		ucfg_wlan_dcs_cmd_for_vdev(psoc, mac_id, vdev_id);
-	else
-		ucfg_wlan_dcs_cmd(psoc, mac_id, true);
-}
-#endif
-
 void hdd_dcs_clear(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
@@ -790,10 +775,11 @@ void hdd_dcs_clear(struct hdd_adapter *adapter)
 
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter->deflink);
 	if (policy_mgr_get_sap_go_count_on_mac(psoc, list, mac_id) <= 1) {
-		ucfg_config_dcs_disable(psoc, mac_id, WLAN_HOST_DCS_WLANIM);
+		ucfg_config_dcs_disable(psoc, adapter->deflink->vdev_id,
+					WLAN_HOST_DCS_WLANIM);
 		hdd_send_dcs_cmd(psoc, mac_id, adapter->deflink->vdev_id);
 		if (wlansap_dcs_is_wlan_interference_mitigation_enabled(sap_ctx))
-			ucfg_dcs_clear(psoc, mac_id);
+			ucfg_dcs_clear(psoc, adapter->deflink->vdev_id);
 	}
 
 	wlansap_dcs_set_vdev_wlan_interference_mitigation(sap_ctx, false);

@@ -661,7 +661,7 @@ bool wlan_ll_sap_is_cur_cu_greater_than_th(struct wlan_objmgr_psoc *psoc,
 
 	cu = ll_sap_get_cur_freq_unused_cu(psoc, vdev_id);
 	coch_intfr_threshold = wlan_dcs_get_trnsprt_switch_rjt_th_cu(psoc,
-								     mac_id);
+								     vdev_id);
 	if (cu && cu > coch_intfr_threshold)
 		return true;
 

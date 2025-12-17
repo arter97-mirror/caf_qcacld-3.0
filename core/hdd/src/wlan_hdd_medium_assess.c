@@ -186,24 +186,14 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 {
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t cca_period = DEFAULT_CCA_PERIOD;
-	uint8_t mac_id, dcs_enable;
-	QDF_STATUS status;
+	uint8_t dcs_enable;
 	int errno = 0;
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_DCS_ID);
 	if (!vdev)
 		return -EINVAL;
 
-	status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc,
-						     adapter->deflink->vdev_id,
-						     &mac_id);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err_rl("Failed to get mac_id");
-		errno = -EINVAL;
-		goto out;
-	}
-
-	dcs_enable = ucfg_get_dcs_enable(hdd_ctx->psoc, mac_id);
+	dcs_enable = ucfg_get_dcs_enable(hdd_ctx->psoc, wlan_vdev_get_id(vdev));
 	if (!(dcs_enable & WLAN_HOST_DCS_WLANIM)) {
 		hdd_err_rl("DCS_WLANIM is not enabled");
 		errno = -EINVAL;
@@ -221,14 +211,15 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 	if (cca_period == 0)
 		cca_period = DEFAULT_CCA_PERIOD;
 
-	ucfg_dcs_reset_user_stats(hdd_ctx->psoc, mac_id);
-	ucfg_dcs_register_user_cb(hdd_ctx->psoc, mac_id,
+	ucfg_dcs_reset_user_stats(hdd_ctx->psoc, adapter->deflink->vdev_id);
+	ucfg_dcs_register_user_cb(hdd_ctx->psoc,
 				  adapter->deflink->vdev_id,
 				  hdd_cca_notification_cb);
 	/* dcs is already enabled and dcs event is reported every second
 	 * set the user request counter to collect user stats
 	 */
-	ucfg_dcs_set_user_request(hdd_ctx->psoc, mac_id, cca_period);
+	ucfg_dcs_set_user_request(hdd_ctx->psoc, adapter->deflink->vdev_id,
+				  cca_period);
 
 out:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DCS_ID);
