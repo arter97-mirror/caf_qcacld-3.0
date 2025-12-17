@@ -135,16 +135,35 @@ channel_change_req_failed:
 	return status;
 }
 
+static WMI_RATE_PREAMBLE
+wlan_hdd_convert_wonder_preamble_to_wmi(qdf_wondertap_rate_preamble_t preamble)
+{
+	switch (preamble) {
+	case WONDERTAP_RATE_PREAMBLE_HT:
+		return WMI_RATE_PREAMBLE_HT;
+	case WONDERTAP_RATE_PREAMBLE_VHT:
+		return WMI_RATE_PREAMBLE_VHT;
+	case WONDERTAP_RATE_PREAMBLE_HE:
+		return WMI_RATE_PREAMBLE_HE;
+	case WONDERTAP_RATE_PREAMBLE_EHT:
+		return WMI_RATE_PREAMBLE_EHT;
+	case WONDERTAP_RATE_PREAMBLE_LEGACY:
+	default:
+		return WMI_RATE_PREAMBLE_CCK;
+	}
+}
+
 static int
 __wlan_hdd_wondertap_set_fixed_tx_rate(struct hdd_adapter *adapter,
 				       const qdf_wondertap_tx_rate_params_t *params)
 {
+	WMI_RATE_PREAMBLE preamble;
 	uint32_t rate_code;
 	uint8_t gi;
 	int ret;
 
-	rate_code = hdd_assemble_rate_code(params->preamble,
-					   params->nss - 1,
+	preamble = wlan_hdd_convert_wonder_preamble_to_wmi(params->preamble);
+	rate_code = hdd_assemble_rate_code(preamble, params->nss - 1,
 					   params->mcs);
 
 	ret = wma_cli_set_command(adapter->deflink->vdev_id,
@@ -910,7 +929,7 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
  * provides to the wondertap framework. It includes callbacks for
  * initialization, configuration, and feature queries.
  */
-static qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
+static const qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
 	.init = wlan_hdd_wondertap_init,
 	.deinit = wlan_hdd_wondertap_deinit,
 	.set_freq = wlan_hdd_wondertap_set_freq,
@@ -920,14 +939,25 @@ static qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
 	.get_capabilities = wlan_hdd_wondertap_get_capabilities,
 };
 
-int wlan_hdd_wondertap_register_ops(void)
+/**
+ * wlan_drv_wondertap_priv - Wondertap private data structure
+ *
+ * wondertap private data structure that holds the wonder
+ * version supported and the operations table.
+ */
+static const qdf_wondertap_priv_t wlan_drv_wondertap_priv = {
+	.ver = WONDER_VERSION_1_4,
+	.wonder_ops = &wlan_drv_wondertap_ops,
+};
+
+int wlan_hdd_wondertap_register_ops(struct device *dev)
 {
-	return qdf_wondertap_register_ops(&wlan_drv_wondertap_ops);
+	return pld_set_vendor_wonder_priv_data(dev, &wlan_drv_wondertap_priv);
 }
 
-void wlan_hdd_wondertap_unregister_ops(void)
+void wlan_hdd_wondertap_unregister_ops(struct device *dev)
 {
-	qdf_wondertap_unregister_ops(&wlan_drv_wondertap_ops);
+	pld_set_vendor_wonder_priv_data(dev, NULL);
 }
 
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
