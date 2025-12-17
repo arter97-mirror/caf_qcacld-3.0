@@ -1717,12 +1717,10 @@ QDF_STATUS hdd_wlan_re_init(void)
 	if (!adapter)
 		hdd_err("Failed to get adapter");
 
-	hdd_dp_trace_init(hdd_ctx->config);
-
 	ret = hdd_wlan_start_modules(hdd_ctx, true);
 	if (ret) {
 		hdd_err("Failed to start wlan after error");
-		goto err_re_init;
+		goto err_ctx_null;
 	}
 
 	hdd_update_hw_sw_info(hdd_ctx);
@@ -1760,9 +1758,6 @@ QDF_STATUS hdd_wlan_re_init(void)
 	full_power_down_status_reset(hdd_ctx);
 
 	return QDF_STATUS_SUCCESS;
-
-err_re_init:
-	qdf_dp_trace_deinit();
 
 err_ctx_null:
 	/* Allow the phone to go to sleep */
