@@ -340,6 +340,20 @@ struct wlan_dp_stc_sampling_table {
 #define WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_3_VALID BIT(2)
 
 /**
+ * enum wlan_dp_stc_classify_stage - Classification stage indices
+ * @WLAN_DP_STC_CLASSIFY_STAGE_1: Valid resuls for stage 1
+ * @WLAN_DP_STC_CLASSIFY_STAGE_2: Valid results for stage 2
+ * @WLAN_DP_STC_CLASSIFY_STAGE_3: Valid results for stage 3
+ * @WLAN_DP_STC_CLASSIFY_STAGE_MAX: Maximum stage count
+ */
+enum wlan_dp_stc_classify_stage {
+	WLAN_DP_STC_CLASSIFY_STAGE_1 = 0,
+	WLAN_DP_STC_CLASSIFY_STAGE_2 = 1,
+	WLAN_DP_STC_CLASSIFY_STAGE_3 = 2,
+	WLAN_DP_STC_CLASSIFY_STAGE_MAX
+};
+
+/**
  * struct wlan_dp_stc_classify_insights - classify results for all stages
  * @stage_valid_flags: Bit flags indicating which stages have valid results
  *                     (use WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_*_VALID macros)

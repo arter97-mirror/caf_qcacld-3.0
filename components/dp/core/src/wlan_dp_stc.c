@@ -2300,6 +2300,108 @@ static inline bool wlan_dp_is_flow_exact_match(struct flow_info *tuple1,
 	return true;
 }
 
+static inline void
+wlan_dp_stc_save_classify_insights(struct wlan_dp_stc *dp_stc,
+				   struct wlan_dp_stc_flow_classify_result *flow_classify_result,
+				   struct wlan_dp_stc_sampling_table_entry *s_entry,
+				   struct flow_info *flow_tuple)
+{
+	struct wlan_dp_stc_flow_table_entry *flow_entry;
+	struct wlan_dp_stc_classify_insights *classify_results;
+	uint8_t buf[BUF_LEN_MAX];
+	uint8_t stage_idx;
+	uint8_t stage_flag;
+	uint8_t i;
+
+	if (flow_classify_result->insight_count == 0)
+		return;
+
+	/* Get flow entry using helper API */
+	flow_entry = wlan_dp_stc_get_flow_entry_from_sampling_entry(dp_stc,
+								    s_entry);
+	if (!flow_entry)
+		return;
+
+	classify_results = &flow_entry->classify_results;
+
+	/*
+	 * Determine stage based on insight_count and traffic type:
+	 * - Stage 1: Multiple samples (insight_count > 1)
+	 * - Stage 2: Single sample with Stage 2 traffic type
+	 * - Stage 3: Single sample with Stage 3 traffic type
+	 */
+	if (flow_classify_result->insight_count > 1) {
+		stage_idx = WLAN_DP_STC_CLASSIFY_STAGE_1;
+		stage_flag = WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_1_VALID;
+	} else if (flow_classify_result->insight_count == 1) {
+		if (wlan_dp_stc_is_stage_2_traffic_type(
+		    flow_classify_result->probable_types[0])) {
+			stage_idx = WLAN_DP_STC_CLASSIFY_STAGE_2;
+			stage_flag =
+				WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_2_VALID;
+		} else if (wlan_dp_stc_is_stage_3_traffic_type(
+			   flow_classify_result->probable_types[0])) {
+			stage_idx = WLAN_DP_STC_CLASSIFY_STAGE_3;
+			stage_flag =
+				WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_3_VALID;
+		} else {
+			dp_info("STC: Unmatched traffic type %u for tuple (%s)",
+				flow_classify_result->probable_types[0],
+				dp_print_tuple_to_str(flow_tuple, buf,
+						      BUF_LEN_MAX));
+			return;
+		}
+	} else {
+		return;
+	}
+
+	/* Check if this stage is already processed */
+	if (classify_results->stage_valid_flags & stage_flag)
+		return;
+
+	/* Mark stage as valid and save sample count */
+	classify_results->stage_valid_flags |= stage_flag;
+	classify_results->sample_count[stage_idx] =
+					flow_classify_result->insight_count;
+
+	/* Loop through all insights and save them */
+	for (i = 0; i < flow_classify_result->insight_count &&
+	     i < MAX_STAGE_SAMPLES; i++) {
+		classify_results->probable_types[stage_idx][i] =
+			flow_classify_result->probable_types[i];
+		classify_results->probabilities[stage_idx][i] =
+			flow_classify_result->probabilities[i];
+	}
+
+	/* Log the saved results */
+	if (flow_classify_result->insight_count > 1) {
+		uint8_t samples_str[BUF_LEN_MAX];
+		uint16_t len = 0;
+
+		/* Build samples string for multiple insights */
+		for (i = 0; i < flow_classify_result->insight_count &&
+		     i < MAX_STAGE_SAMPLES; i++) {
+			len += scnprintf(samples_str + len,
+					 sizeof(samples_str) - len,
+					 " [%u: Type=%u Prob=%u%%]",
+					 i,
+					 flow_classify_result->probable_types[i],
+					 flow_classify_result->probabilities[i]);
+		}
+
+		dp_info("STC: Saved Stage %u results for tuple (%s) - Sample Count: %u Samples:%s",
+			stage_idx + 1,
+			dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
+			flow_classify_result->insight_count, samples_str);
+	} else if (flow_classify_result->insight_count == 1) {
+		dp_info("STC: Saved Stage %u results for tuple (%s) - Type: %u, Probability: %u",
+			stage_idx + 1,
+			dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
+			classify_results->probable_types[stage_idx][0],
+			classify_results->probabilities[stage_idx][0]);
+	}
+}
+
 void
 wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result *flow_classify_result)
 {
