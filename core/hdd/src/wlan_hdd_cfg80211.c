@@ -14695,6 +14695,9 @@ __wlan_hdd_cfg80211_wifi_configuration_set(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
+	if (wlan_hdd_wdev_is_ap_vlan(wdev))
+		return -EPERM;
+
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno)
 		return errno;
@@ -14792,6 +14795,9 @@ __wlan_hdd_cfg80211_wifi_configuration_get(struct wiphy *wiphy,
 		hdd_err("Command not allowed in FTM mode");
 		return -EPERM;
 	}
+
+	if (wlan_hdd_wdev_is_ap_vlan(wdev))
+		return -EPERM;
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno)
@@ -23802,6 +23808,50 @@ static void wlan_hdd_set_ap_pmksa_caching_feature_flag(struct wiphy *wiphy)
 }
 #endif
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * wlan_hdd_set_ap_vlan_mode() - Configure AP VLAN mode support in wiphy
+ * @psoc: Pointer to PSOC object
+ * @wiphy: Pointer to wiphy structure
+ *
+ * This function configures the wiphy to support AP VLAN interface mode
+ * when WDS (Wireless Distribution System) extended functionality is enabled.
+ * It sets the necessary flags to enable 4-address frame format support
+ * and adds AP VLAN to the supported interface modes.
+ *
+ * The function checks if WDS extended mode is enabled via configuration
+ * before enabling AP VLAN support. AP VLAN interfaces are used to support
+ * bridging functionality in wireless networks.
+ *
+ * Return: None
+ */
+static inline void wlan_hdd_set_ap_vlan_mode(struct wlan_objmgr_psoc *psoc,
+					     struct wiphy *wiphy)
+{
+	if (!cfg_get(psoc, CFG_SAP_ENABLE_WDS_EXT))
+		return;
+
+	wiphy->flags |= WIPHY_FLAG_4ADDR_AP;
+	wiphy->interface_modes |= BIT(NL80211_IFTYPE_AP_VLAN);
+}
+#else
+/**
+ * wlan_hdd_set_ap_vlan_mode() - Configure AP VLAN mode support in wiphy
+ * @psoc: Pointer to PSOC object
+ * @wiphy: Pointer to wiphy structure
+ *
+ * This function is a stub implementation when QCA_SUPPORT_WDS_EXTENDED
+ * is not enabled. In this case, AP VLAN functionality is not supported
+ * and no configuration changes are made to the wiphy.
+ *
+ * Return: None
+ */
+static inline void wlan_hdd_set_ap_vlan_mode(struct wlan_objmgr_psoc *psoc,
+					     struct wiphy *wiphy)
+{
+}
+#endif
+
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -23863,6 +23913,8 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 				 | BIT(NL80211_IFTYPE_MONITOR);
 
 	wlan_hdd_set_nan_if_mode(wiphy);
+
+	wlan_hdd_set_ap_vlan_mode(hdd_ctx->psoc, wiphy);
 
 	/*
 	 * In case of static linked driver at the time of driver unload,
@@ -31996,6 +32048,9 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
 	int ret = 0;
+
+	if (wlan_hdd_wdev_is_ap_vlan(wdev))
+		return -EINVAL;
 
 	if (hdd_validate_adapter(adapter))
 		return -EINVAL;

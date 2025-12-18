@@ -41,6 +41,34 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 				      unsigned char name_assign_type,
 				      uint8_t *name);
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * hdd_create_wds_ext_dev() - Create WDS extended device
+ * @wiphy: Pointer to wiphy structure
+ * @name: Interface name for the WDS extension device
+ * @name_assign_type: Name assignment type for the network device
+ * @type: Interface type (must be NL80211_IFTYPE_AP_VLAN)
+ *
+ * This function creates and registers a WDS extended device. It allocates
+ * the network device, sets up the device operations, and registers it with
+ * the kernel networking subsystem.
+ *
+ * Return: Pointer to wireless_dev on success, ERR_PTR on failure
+ */
+struct wireless_dev *hdd_create_wds_ext_dev(struct wiphy *wiphy,
+					    const char *name,
+					    unsigned char name_assign_type,
+					    enum nl80211_iftype type);
+#else
+static inline struct wireless_dev *
+hdd_create_wds_ext_dev(struct wiphy *wiphy, const char *name,
+		       unsigned char name_assign_type,
+		       enum nl80211_iftype type)
+{
+	return ERR_PTR(-EINVAL);
+}
+#endif
+
 enum csr_akm_type
 hdd_translate_rsn_to_csr_auth_type(uint8_t auth_suite[4]);
 

@@ -36,6 +36,7 @@
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_power.h"
 #include "wlan_hdd_tsf.h"
+#include "wlan_hdd_wds.h"
 #include <linux/vmalloc.h>
 #if (defined(__ANDROID_COMMON_KERNEL__) && \
 	(LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)) && \
@@ -113,6 +114,45 @@ struct cds_hang_event_fixed_param {
 	char hang_event_version[HANG_EVENT_VER_LEN];
 } qdf_packed;
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * cds_wds_ext_peer_learn() - Handle WDS extended peer learning
+ * @ctrl_psoc: Control path PSOC object manager pointer
+ * @peer_id: Peer ID of the learned peer
+ * @vdev_id: VDEV ID on which the peer was learned
+ * @peer_mac_addr: MAC address of the learned peer
+ *
+ * This function handles WDS (Wireless Distribution System) extended peer
+ * learning by notifying the kernel about an unexpected 4-address frame
+ * reception. When a 4-address frame is received from an unknown peer in
+ * WDS mode, this function is called to inform the networking stack about
+ * the new peer discovery.
+ *
+ * Return: None
+ */
+static void cds_wds_ext_peer_learn(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
+				   uint16_t peer_id, uint8_t vdev_id,
+				   uint8_t *peer_mac_addr)
+{
+	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)ctrl_psoc;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_WDS_ID);
+	if (!vdev) {
+		cds_err("vdev (id %d) is null", vdev_id);
+		return;
+	}
+
+	cds_debug("vdev %d, peer mac addr " QDF_MAC_ADDR_FMT,
+		  vdev_id, QDF_MAC_ADDR_REF(peer_mac_addr));
+
+	hdd_wds_ext_peer_learn(vdev, peer_mac_addr);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_WDS_ID);
+}
+#endif
+
 #ifdef QCA_WIFI_QCA8074
 static inline int
 cds_send_delba(struct cdp_ctrl_objmgr_psoc *psoc,
@@ -165,6 +205,9 @@ static struct ol_if_ops dp_ol_if_ops = {
 	.peer_map_event = wlan_dp_send_ipa_wds_peer_map_event,
 	.peer_unmap_event = wlan_dp_send_ipa_wds_peer_unmap_event,
 	.peer_send_wds_disconnect = wlan_dp_send_ipa_wds_peer_disconnect,
+#endif
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	.rx_wds_ext_peer_learn = cds_wds_ext_peer_learn,
 #endif
 #ifdef WLAN_DP_FEATURE_STC
 	.dp_peer_event_notify = wlan_dp_stc_peer_event_notify,

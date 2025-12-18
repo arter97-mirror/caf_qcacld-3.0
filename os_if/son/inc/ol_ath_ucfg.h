@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,5 +29,15 @@ enum {
 	HE_SRP_IE_SRG_BSS_COLOR_BITMAP                 = 1,
 	HE_SRP_IE_SRG_PARTIAL_BSSID_BITMAP             = 2,
 };
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+void wlan_hdd_enable_wds_ext(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_objmgr_vdev *vdev);
+#else
+static inline void wlan_hdd_enable_wds_ext(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
 
 #endif /* OL_ATH_UCFG_H_ */
