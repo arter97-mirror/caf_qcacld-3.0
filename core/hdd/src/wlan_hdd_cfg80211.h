@@ -1062,7 +1062,7 @@ int hdd_set_phy_mode(struct hdd_adapter *adapter,
  * Return: 0 on success, negative errno on failure
  */
 int hdd_set_mac_chan_width(struct wlan_hdd_link_info *link_info,
-			   enum eSirMacHTChannelWidth chwidth,
+			   enum phy_ch_width chwidth,
 			   uint8_t link_id, bool is_restore);
 
 /**

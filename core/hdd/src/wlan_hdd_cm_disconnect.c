@@ -619,20 +619,20 @@ static void hdd_cm_reset_udp_qos_upgrade_config(struct hdd_adapter *adapter)
 }
 
 #ifdef WLAN_FEATURE_11BE
-static inline enum eSirMacHTChannelWidth get_max_bw(void)
+static inline enum phy_ch_width get_max_bw(void)
 {
 	uint32_t max_bw = wma_get_orig_eht_ch_width();
 
 	if (max_bw == WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ)
-		return eHT_CHANNEL_WIDTH_320MHZ;
+		return CH_WIDTH_320MHZ;
 	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
-		return eHT_CHANNEL_WIDTH_160MHZ;
+		return CH_WIDTH_160MHZ;
 	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
-		return eHT_CHANNEL_WIDTH_80P80MHZ;
+		return CH_WIDTH_80P80MHZ;
 	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
-		return eHT_CHANNEL_WIDTH_80MHZ;
+		return CH_WIDTH_80MHZ;
 	else
-		return eHT_CHANNEL_WIDTH_40MHZ;
+		return CH_WIDTH_40MHZ;
 }
 
 static
@@ -656,18 +656,18 @@ void wlan_hdd_re_enable_320mhz_6g_conection(struct hdd_context *hdd_ctx,
 		mlme_obj->cfg.eht_caps.dot11_eht_cap.support_320mhz_6ghz = 1;
 }
 #else
-static inline enum eSirMacHTChannelWidth get_max_bw(void)
+static inline enum phy_ch_width get_max_bw(void)
 {
 	uint32_t max_bw = wma_get_vht_ch_width();
 
 	if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
-		return eHT_CHANNEL_WIDTH_160MHZ;
+		return CH_WIDTH_160MHZ;
 	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
-		return eHT_CHANNEL_WIDTH_80P80MHZ;
+		return CH_WIDTH_80P80MHZ;
 	else if (max_bw == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
-		return eHT_CHANNEL_WIDTH_80MHZ;
+		return CH_WIDTH_80MHZ;
 	else
-		return eHT_CHANNEL_WIDTH_40MHZ;
+		return CH_WIDTH_40MHZ;
 }
 
 static
@@ -682,7 +682,7 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	struct mlme_legacy_priv *mlme_priv;
-	enum eSirMacHTChannelWidth max_bw;
+	enum phy_ch_width max_bw;
 	struct wlan_channel *des_chan;
 	uint8_t link_id = 0xFF;
 	int ret;
@@ -711,8 +711,9 @@ static void hdd_cm_restore_ch_width(struct wlan_objmgr_vdev *vdev,
 		wlan_hdd_re_enable_320mhz_6g_conection(hdd_ctx, assoc_ch_width);
 
 	wlan_mlme_get_channel_bonding_5ghz(hdd_ctx->psoc, &cb_mode);
-	if (cb_mode == 0 && !wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq))
-		max_bw = cb_mode;
+	if (cb_mode == 0 &&
+	    !wlan_reg_is_24ghz_ch_freq(des_chan->ch_freq))
+		max_bw = CH_WIDTH_20MHZ;
 	else
 		max_bw = get_max_bw();
 

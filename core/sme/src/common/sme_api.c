@@ -11476,7 +11476,7 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 }
 
 void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
-			enum eSirMacHTChannelWidth chwidth)
+			enum phy_ch_width chwidth)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
@@ -11487,7 +11487,7 @@ void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		return;
 	}
 
-	if (chwidth < eHT_CHANNEL_WIDTH_320MHZ) {
+	if (chwidth < CH_WIDTH_320MHZ) {
 		sme_debug("Reset 320M support as chan width is %d", chwidth);
 		mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap.support_320mhz_6ghz = 0;
 	} else {
@@ -15871,7 +15871,7 @@ static void sme_set_eht_mcs_info(struct mac_context *mac_ctx)
 
 #ifdef WLAN_FEATURE_11AX
 void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
-		       enum eSirMacHTChannelWidth chwidth)
+		       enum phy_ch_width chwidth)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
@@ -15907,8 +15907,8 @@ void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 	mac_ctx->he_cap_5g.chan_width_6 = 0;
 
 	switch (chwidth) {
-	case eHT_CHANNEL_WIDTH_160MHZ:
-	case eHT_CHANNEL_WIDTH_320MHZ:
+	case CH_WIDTH_160MHZ:
+	case CH_WIDTH_320MHZ:
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_2 = 1;
 		*((uint16_t *)
@@ -15926,18 +15926,18 @@ void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
 		mac_ctx->he_cap_5g.chan_width_1 = 1;
 		mac_ctx->he_cap_5g.chan_width_2 = 1;
 		fallthrough;
-	case eHT_CHANNEL_WIDTH_80MHZ:
+	case CH_WIDTH_80MHZ:
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
 		mac_ctx->he_cap_5g.chan_width_1 = 1;
 		fallthrough;
-	case eHT_CHANNEL_WIDTH_40MHZ:
+	case CH_WIDTH_40MHZ:
 		sme_set_eht_mcs_info(mac_ctx);
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 1;
 		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
 		mac_ctx->he_cap_2g.chan_width_0 = 1;
 		mac_ctx->he_cap_5g.chan_width_1 = 1;
 		fallthrough;
-	case eHT_CHANNEL_WIDTH_20MHZ:
+	case CH_WIDTH_20MHZ:
 		break;
 	default:
 		sme_debug("Config BW %d not handled", chwidth);

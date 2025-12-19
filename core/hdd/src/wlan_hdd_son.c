@@ -107,29 +107,29 @@ static uint32_t hdd_son_is_acs_in_progress(struct wlan_objmgr_vdev *vdev)
  *
  * Return: mac chan width
  */
-static enum eSirMacHTChannelWidth hdd_son_chan_width_to_chan_width(
+static enum phy_ch_width hdd_son_chan_width_to_chan_width(
 				enum ieee80211_cwm_width son_chwidth)
 {
-	enum eSirMacHTChannelWidth chwidth;
+	enum phy_ch_width chwidth;
 
 	switch (son_chwidth) {
 	case IEEE80211_CWM_WIDTH20:
-		chwidth = eHT_CHANNEL_WIDTH_20MHZ;
+		chwidth = CH_WIDTH_20MHZ;
 		break;
 	case IEEE80211_CWM_WIDTH40:
-		chwidth = eHT_CHANNEL_WIDTH_40MHZ;
+		chwidth = CH_WIDTH_40MHZ;
 		break;
 	case IEEE80211_CWM_WIDTH80:
-		chwidth = eHT_CHANNEL_WIDTH_80MHZ;
+		chwidth = CH_WIDTH_80MHZ;
 		break;
 	case IEEE80211_CWM_WIDTH160:
-		chwidth = eHT_CHANNEL_WIDTH_160MHZ;
+		chwidth = CH_WIDTH_160MHZ;
 		break;
 	case IEEE80211_CWM_WIDTH80_80:
-		chwidth = eHT_CHANNEL_WIDTH_80P80MHZ;
+		chwidth = CH_WIDTH_80P80MHZ;
 		break;
 	default:
-		chwidth = eHT_MAX_CHANNEL_WIDTH;
+		chwidth = CH_WIDTH_MAX;
 	}
 
 	return chwidth;
@@ -145,7 +145,7 @@ static enum eSirMacHTChannelWidth hdd_son_chan_width_to_chan_width(
 static int hdd_son_set_chwidth(struct wlan_objmgr_vdev *vdev,
 			       enum ieee80211_cwm_width son_chwidth)
 {
-	enum eSirMacHTChannelWidth chwidth;
+	enum phy_ch_width chwidth;
 	struct wlan_hdd_link_info *link_info;
 	uint8_t link_id = 0xFF;
 

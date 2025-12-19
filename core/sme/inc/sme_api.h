@@ -3536,7 +3536,7 @@ void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
  * Return: None
  */
 void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
-			enum eSirMacHTChannelWidth chwidth);
+			enum phy_ch_width chwidth);
 
 /**
  * sme_update_eht_cap_mcs() - updates EHT MCS capability based on user request
@@ -3583,7 +3583,7 @@ static inline void sme_update_eht_cap_nss(mac_handle_t mac_handle,
 {}
 
 static inline void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
-				      enum eSirMacHTChannelWidth chwidth)
+				      enum phy_ch_width chwidth)
 {}
 static inline void sme_update_eht_cap_mcs(mac_handle_t mac_handle,
 					  uint8_t session_id,
@@ -4110,7 +4110,7 @@ void sme_set_bss_max_idle_period(mac_handle_t mac_handle, uint16_t cfg_val);
 void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id);
 void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id);
 void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
-		       enum eSirMacHTChannelWidth chwidth);
+		       enum phy_ch_width chwidth);
 /**
  * sme_set_ru_242_tone_tx_cfg() - set ru 242 tone tx user cfg
  * @mac_handle: Opaque handle to the global MAC context
@@ -4147,7 +4147,7 @@ static inline void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 }
 
 static inline void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
-				     enum eSirMacHTChannelWidth chwidth)
+				     enum phy_ch_width chwidth)
 {
 }
 static inline void sme_check_enable_ru_242_tx(mac_handle_t mac_handle,

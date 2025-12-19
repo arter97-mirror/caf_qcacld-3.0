@@ -5855,21 +5855,13 @@ void wlan_hdd_set_pm_qos_request(struct hdd_context *hdd_ctx,
 #endif
 
 /**
- * hdd_nl80211_chwidth_to_chwidth - Get sir chan width from nl chan width
+ * hdd_nl80211_chwidth_to_phychwidth - Get phy chan width from nl chan width
  * @nl80211_chwidth: enum nl80211_chan_width
  *
- * Return: enum eSirMacHTChannelWidth or -INVAL for unsupported nl chan width
+ * Return: enum phy_ch_width  or -INVAL for unsupported nl chan width
  */
-enum eSirMacHTChannelWidth
-hdd_nl80211_chwidth_to_chwidth(uint8_t nl80211_chwidth);
-
-/**
- * hdd_chwidth_to_nl80211_chwidth - Get nl chan width from sir chan width
- * @chwidth: enum eSirMacHTChannelWidth
- *
- * Return: enum nl80211_chan_width or 0xFF for unsupported sir chan width
- */
-uint8_t hdd_chwidth_to_nl80211_chwidth(enum eSirMacHTChannelWidth chwidth);
+enum phy_ch_width
+hdd_nl80211_chwidth_to_phychwidth(uint8_t nl80211_chwidth);
 
 /**
  * hdd_phy_chwidth_to_nl80211_chwidth() - Get nl chan width from phy chan width

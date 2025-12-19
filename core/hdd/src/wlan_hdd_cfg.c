@@ -2431,45 +2431,6 @@ int hdd_set_rx_stbc(struct wlan_hdd_link_info *link_info, int value)
 }
 
 /**
- * hdd_convert_chwidth_to_phy_chwidth() - convert channel width of type enum
- * eSirMacHTChannelWidth to enum phy_ch_width
- * @chwidth: channel width of type enum eSirMacHTChannelWidth
- *
- * Return: channel width of type enum phy_ch_width
- */
-enum phy_ch_width
-hdd_convert_chwidth_to_phy_chwidth(enum eSirMacHTChannelWidth chwidth)
-{
-	enum phy_ch_width ch_width = CH_WIDTH_INVALID;
-
-	switch (chwidth) {
-	case eHT_CHANNEL_WIDTH_20MHZ:
-		ch_width = CH_WIDTH_20MHZ;
-		break;
-	case eHT_CHANNEL_WIDTH_40MHZ:
-		ch_width = CH_WIDTH_40MHZ;
-		break;
-	case eHT_CHANNEL_WIDTH_80MHZ:
-		ch_width = CH_WIDTH_80MHZ;
-		break;
-	case eHT_CHANNEL_WIDTH_160MHZ:
-		ch_width = CH_WIDTH_160MHZ;
-		break;
-	case eHT_CHANNEL_WIDTH_80P80MHZ:
-		ch_width = CH_WIDTH_80P80MHZ;
-		break;
-	case eHT_CHANNEL_WIDTH_320MHZ:
-		ch_width = CH_WIDTH_320MHZ;
-		break;
-	default:
-		hdd_debug("Invalid channel width %d", chwidth);
-		break;
-	}
-
-	return ch_width;
-}
-
-/**
  * hdd_update_bss_rate_flags() - update bss rate flag as per new channel width
  * @link_info: Link info in HDD adapter
  * @psoc: psoc common object
@@ -2505,7 +2466,7 @@ hdd_update_bss_rate_flags(struct wlan_hdd_link_info *link_info,
  */
 struct sme_config_msg_ctx {
 	struct wlan_objmgr_vdev *vdev;
-	enum eSirMacHTChannelWidth chwidth;
+	enum phy_ch_width  chwidth;
 	bool is_restore;
 	uint32_t bonding_mode;
 };
@@ -2632,7 +2593,7 @@ static QDF_STATUS hdd_restore_sme_config_flush_cb(struct scheduler_msg *msg)
  * Return: void
  */
 static void hdd_restore_sme_config(struct wlan_hdd_link_info *link_info,
-				   enum eSirMacHTChannelWidth chwidth,
+				   enum phy_ch_width chwidth,
 				   bool is_restore, uint32_t bonding_mode)
 {
 	struct scheduler_msg msg = {0};
@@ -2713,23 +2674,6 @@ wlan_update_mlo_link_chn_width(struct hdd_adapter *adapter,
 }
 #endif
 
-/**
- * hdd_convert_ht_to_reg_width() - convert HT channel width to regulatory
- * channel width
- * @ch_width: HT channel width
- *
- * Return: corresponding regulatory channel width
- */
-static
-uint16_t hdd_convert_ht_to_reg_width(enum eSirMacHTChannelWidth ch_width)
-{
-	enum phy_ch_width phy_ch_width;
-
-	phy_ch_width = hdd_convert_chwidth_to_phy_chwidth(ch_width);
-
-	return wlan_reg_get_bw_value(phy_ch_width);
-}
-
 #ifdef WLAN_FEATURE_11BE
 int hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
 			  uint16_t *link_freq)
@@ -2748,13 +2692,13 @@ int hdd_get_mlo_link_freq(struct wlan_objmgr_vdev *vdev, uint8_t link_id,
 #endif
 
 int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
-			     enum eSirMacHTChannelWidth chwidth,
+			     enum phy_ch_width ch_width,
 			     uint32_t bonding_mode, uint8_t link_id,
 			     bool is_restore)
 {
 	struct hdd_context *hdd_ctx;
 	int ret;
-	enum phy_ch_width ch_width, new_ch_width;
+	enum phy_ch_width new_ch_width;
 	struct wlan_objmgr_vdev *link_vdev, *vdev;
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_hdd_link_info *link_info_t;
@@ -2789,8 +2733,6 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return -EINVAL;
 	}
-
-	ch_width = hdd_convert_chwidth_to_phy_chwidth(chwidth);
 
 	/**
 	 * Link_id check is for disconnect restore process.
@@ -2855,7 +2797,7 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 	if (operating_freq) {
 		/* Regulatory bandwidth check for a valid operating_freq */
 		max_allowed_bw = wlan_reg_get_max_chwidth(pdev, operating_freq);
-		bw_to_update = hdd_convert_ht_to_reg_width(chwidth);
+		bw_to_update = wlan_reg_get_bw_value(ch_width);
 
 		hdd_debug("op_freq: %d, max_allowed_bw: %d, bw_to_update: %d",
 			  operating_freq, max_allowed_bw, bw_to_update);
@@ -2868,7 +2810,6 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 
 	if (ucfg_mlme_is_chwidth_with_notify_supported(hdd_ctx->psoc) &&
 	    hdd_cm_is_vdev_connected(link_info_t)) {
-		ch_width = hdd_convert_chwidth_to_phy_chwidth(chwidth);
 		hdd_debug("vdev %d : process update ch width request to %d",
 			  link_vdev_id, ch_width);
 		status = ucfg_mlme_send_ch_width_update_with_notify(hdd_ctx->psoc,
@@ -2895,11 +2836,11 @@ set_command:
 	hdd_objmgr_put_vdev_by_user(link_vdev, WLAN_OSIF_ID);
 
 	ret = wma_cli_set_command(link_vdev_id, wmi_vdev_param_chwidth,
-				  chwidth, VDEV_CMD);
+				  ch_width, VDEV_CMD);
 	if (ret)
 		return ret;
 
-	hdd_restore_sme_config(link_info_t, chwidth, is_restore, bonding_mode);
+	hdd_restore_sme_config(link_info_t, ch_width, is_restore, bonding_mode);
 
 	return 0;
 }

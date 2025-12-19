@@ -24053,30 +24053,16 @@ static const struct hdd_chwidth_info chwidth_info[] = {
 #endif
 };
 
-enum eSirMacHTChannelWidth
-hdd_nl80211_chwidth_to_chwidth(uint8_t nl80211_chwidth)
+enum phy_ch_width
+hdd_nl80211_chwidth_to_phychwidth(uint8_t nl80211_chwidth)
 {
 	if (nl80211_chwidth >= ARRAY_SIZE(chwidth_info) ||
-	    !chwidth_info[nl80211_chwidth].sir_chwidth_valid) {
+	    !chwidth_info[nl80211_chwidth].phy_chwidth) {
 		hdd_err("Unsupported channel width %d", nl80211_chwidth);
 		return -EINVAL;
 	}
 
-	return chwidth_info[nl80211_chwidth].sir_chwidth;
-}
-
-uint8_t hdd_chwidth_to_nl80211_chwidth(enum eSirMacHTChannelWidth chwidth)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(chwidth_info); i++) {
-		if (chwidth_info[i].sir_chwidth_valid &&
-		    chwidth_info[i].sir_chwidth == chwidth)
-			return i;
-	}
-
-	hdd_err("Unsupported channel width %d", chwidth);
-	return 0xFF;
+	return chwidth_info[nl80211_chwidth].phy_chwidth;
 }
 
 uint8_t hdd_phy_chwidth_to_nl80211_chwidth(enum phy_ch_width chwidth)

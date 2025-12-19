@@ -3813,7 +3813,7 @@ lim_limit_bw_for_iot_ap(struct mac_context *mac_ctx,
 				   ACTION_OUI_LIMIT_BW)) {
 		pe_debug("Limit vdev %d bw to 40M for IoT AP",
 			 session->vdev_id);
-		wma_set_vdev_bw(session->vdev_id, eHT_CHANNEL_WIDTH_40MHZ);
+		wma_set_vdev_bw(session->vdev_id, CH_WIDTH_40MHZ);
 	}
 }
 

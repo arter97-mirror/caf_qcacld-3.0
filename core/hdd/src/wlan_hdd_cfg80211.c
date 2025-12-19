@@ -13085,13 +13085,12 @@ static int hdd_set_elna_bypass(struct wlan_hdd_link_info *link_info,
  *
  * Return: bonding mode
  */
-static uint32_t hdd_mac_chwidth_to_bonding_mode(
-			enum eSirMacHTChannelWidth chwidth)
+static uint32_t hdd_mac_chwidth_to_bonding_mode(enum phy_ch_width chwidth)
 {
 	uint32_t bonding_mode;
 
 	switch (chwidth) {
-	case eHT_CHANNEL_WIDTH_20MHZ:
+	case CH_WIDTH_20MHZ:
 		bonding_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
 		break;
 	default:
@@ -13102,7 +13101,7 @@ static uint32_t hdd_mac_chwidth_to_bonding_mode(
 }
 
 int hdd_set_mac_chan_width(struct wlan_hdd_link_info *link_info,
-			   enum eSirMacHTChannelWidth chwidth,
+			   enum phy_ch_width chwidth,
 			   uint8_t link_id, bool is_restore)
 {
 	uint32_t bonding_mode;
@@ -13133,7 +13132,7 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 	struct wlan_objmgr_pdev *pdev;
 	bool update_cw_allowed;
 	/* Default or safe chan width fallback */
-	enum eSirMacHTChannelWidth chwidth = eHT_CHANNEL_WIDTH_20MHZ;
+	enum phy_ch_width chwidth = CH_WIDTH_20MHZ;
 
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
@@ -13171,9 +13170,9 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		}
 
 		nl80211_chwidth = nla_get_u8(chn_bd);
-		chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
-		if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
-		    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
+		chwidth = hdd_nl80211_chwidth_to_phychwidth(nl80211_chwidth);
+		if (chwidth < CH_WIDTH_20MHZ ||
+		    chwidth >= CH_WIDTH_INVALID) {
 			hdd_err("[non-MLO] Invalid channel width %u", chwidth);
 			ret = -EINVAL;
 			goto end;
@@ -13203,9 +13202,9 @@ static int hdd_set_channel_width(struct wlan_hdd_link_info *link_info,
 		}
 
 		nl80211_chwidth = nla_get_u8(chn_bd);
-		chwidth = hdd_nl80211_chwidth_to_chwidth(nl80211_chwidth);
-		if (chwidth < eHT_CHANNEL_WIDTH_20MHZ ||
-		    chwidth >= eHT_MAX_CHANNEL_WIDTH) {
+		chwidth = hdd_nl80211_chwidth_to_phychwidth(nl80211_chwidth);
+		if (chwidth < CH_WIDTH_20MHZ ||
+		    chwidth >= CH_WIDTH_INVALID) {
 			hdd_err("[MLO] invalid channel width:%u", chwidth);
 			ret = -EINVAL;
 			goto end;
@@ -15718,7 +15717,7 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 				     struct sk_buff *skb,
 				     const struct nlattr *attr)
 {
-	enum eSirMacHTChannelWidth chwidth;
+	enum phy_ch_width chwidth;
 	struct nlattr *mlo_bd = NULL;
 	struct nlattr *mlo_bd_info = NULL;
 	uint32_t i = 0;
@@ -15730,7 +15729,7 @@ static int hdd_get_mlo_max_band_info(struct wlan_hdd_link_info *link_info,
 	struct mlme_legacy_priv *mlme_priv;
 	struct hdd_station_ctx *sta_ctx;
 	uint8_t nl80211_chwidth;
-	uint8_t chn_width;
+	enum phy_ch_width chn_width;
 	int8_t ret = 0;
 
 	chwidth = wma_cli_get_command(link_info->vdev_id,
@@ -17806,7 +17805,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		sme_set_ru_242_tone_tx_cfg(hdd_ctx->mac_handle, cfg_val);
 		if (cfg_val)
 			hdd_update_channel_width(
-					link_info, eHT_CHANNEL_WIDTH_20MHZ,
+					link_info, CH_WIDTH_20MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
 					link_id, false);
 	}
@@ -17817,7 +17816,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		hdd_debug("EU SU PPDU type Tx enable: %d", cfg_val);
 		if (cfg_val) {
 			hdd_update_channel_width(
-					link_info, eHT_CHANNEL_WIDTH_20MHZ,
+					link_info, CH_WIDTH_20MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
 					link_id, false);
 			hdd_set_tx_stbc(link_info, 0);
@@ -17838,7 +17837,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 					status);
 		} else {
 			hdd_update_channel_width(
-					link_info, eHT_CHANNEL_WIDTH_160MHZ,
+					link_info, CH_WIDTH_160MHZ,
 					WNI_CFG_CHANNEL_BONDING_MODE_ENABLE,
 					link_id, false);
 			hdd_set_tx_stbc(link_info, 1);

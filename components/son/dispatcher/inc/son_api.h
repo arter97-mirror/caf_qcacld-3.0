@@ -398,7 +398,7 @@ int wlan_son_deliver_inst_rssi(struct wlan_objmgr_vdev *vdev,
 /**
  * wlan_son_deliver_opmode() - notify user app of opmode
  * @vdev: vdev objmgr
- * @bw: channel width defined in enum eSirMacHTChannelWidth
+ * @bw: channel width defined in enum phy_ch_width
  * @nss: supported rx nss
  * @addr: source addr
  *
