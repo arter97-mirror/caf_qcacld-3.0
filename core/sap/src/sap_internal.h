@@ -179,7 +179,7 @@ struct sap_context {
 	eCsrPhyMode phyMode;
 	uint32_t *freq_list;
 	uint8_t num_of_channel;
-	uint16_t ch_width_orig;
+	enum phy_ch_width ch_width_orig;
 	struct ch_params ch_params;
 	uint32_t chan_freq_before_switch_band;
 	enum phy_ch_width chan_width_before_switch_band;

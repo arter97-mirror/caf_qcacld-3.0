@@ -592,7 +592,7 @@ QDF_STATUS hdd_dcs_hostapd_set_chan(struct hdd_context *hdd_ctx,
 	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint32_t conn_idx, count;
 	struct wlan_hdd_link_info *link_info;
-	uint16_t dcs_ch_width;
+	enum phy_ch_width dcs_ch_width;
 
 	status = policy_mgr_get_mac_id_by_session_id(hdd_ctx->psoc, vdev_id,
 						     &mac_id);

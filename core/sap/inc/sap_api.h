@@ -372,7 +372,7 @@ struct sap_ch_selected_s {
 	uint32_t ht_sec_ch_freq;
 	uint16_t vht_seg0_center_ch_freq;
 	uint16_t vht_seg1_center_ch_freq;
-	uint16_t ch_width;
+	enum phy_ch_width ch_width;
 };
 
 /**
@@ -506,7 +506,7 @@ struct sap_acs_cfg {
 	uint32_t    skip_scan_range2_endch;
 #endif
 
-	uint16_t   ch_width;
+	enum phy_ch_width ch_width;
 	uint32_t   pcl_chan_freq[NUM_CHANNELS];
 	uint8_t    pcl_channels_weight_list[NUM_CHANNELS];
 	uint32_t   pcl_ch_count;

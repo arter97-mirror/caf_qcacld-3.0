@@ -2389,7 +2389,7 @@ int wlan_hdd_sap_cfg_dfs_override(struct wlan_hdd_link_info *link_info)
 				sizeof(uint32_t));
 	} else {
 		sap_config->acs_cfg.pri_ch_freq = con_ch_freq;
-		if (sap_config->acs_cfg.ch_width > eHT_CHANNEL_WIDTH_20MHZ)
+		if (sap_config->acs_cfg.ch_width > CH_WIDTH_20MHZ)
 			sap_config->acs_cfg.ht_sec_ch_freq =
 						con_sap_config->sec_ch_freq;
 	}
@@ -3736,7 +3736,7 @@ static void wlan_hdd_acs_set_eht_enabled(struct sap_config *sap_config,
 static uint16_t wlan_hdd_update_bw_from_mlme(struct hdd_context *hdd_ctx,
 					     struct sap_config *sap_config)
 {
-	uint16_t ch_width, temp_ch_width = 0;
+	enum phy_ch_width ch_width, temp_ch_width = 0;
 	QDF_STATUS status;
 	uint8_t hw_mode = HW_MODE_DBS;
 	struct wma_caps_per_phy caps_per_phy = {0};
@@ -4593,10 +4593,10 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	/* Check 2.4ghz cbmode and update BW if only 2.4 channels are present */
 	if (sap_config->acs_cfg.end_ch_freq <=
 	    WLAN_REG_CH_TO_FREQ(CHAN_ENUM_2484) &&
-	    sap_config->acs_cfg.ch_width >= eHT_CHANNEL_WIDTH_40MHZ) {
+	    sap_config->acs_cfg.ch_width >= CH_WIDTH_40MHZ) {
 
 		sap_config->acs_cfg.ch_width = channel_bonding_mode_2g ?
-			eHT_CHANNEL_WIDTH_40MHZ : eHT_CHANNEL_WIDTH_20MHZ;
+			CH_WIDTH_40MHZ : CH_WIDTH_20MHZ;
 
 		hdd_debug("Only 2.4ghz channels, resetting BW to %d 2.4 cbmode %d",
 			  sap_config->acs_cfg.ch_width,
