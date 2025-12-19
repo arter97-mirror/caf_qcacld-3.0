@@ -15,6 +15,7 @@
 #include <wlan_vdev_mgr_ucfg_api.h>
 #include <wlan_fwol_ucfg_api.h>
 #include <wma_api.h>
+#include "cds_api.h"
 
 static struct hdd_wondertap_context *g_wt_ctx;
 
@@ -931,5 +932,8 @@ void wlan_hdd_wondertap_unregister_ops(void)
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
 {
 	hdd_debug("Channel change successful for wondertap");
+	if (cds_is_driver_recovering())
+		return;
+
 	qdf_event_set(&g_wt_ctx->wondertap_vdev_event);
 }
