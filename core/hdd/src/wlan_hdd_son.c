@@ -495,7 +495,7 @@ static int hdd_son_set_bandwidth(struct wlan_objmgr_vdev *vdev,
  * hdd_phymode_chwidth_to_son_bandwidth() - get son bandwidth from
  *                                          phymode and chwidth
  * @phymode: eCsrPhyMode
- * @chwidth: eSirMacHTChannelWidth
+ * @chwidth: phy_ch_width
  *
  * Return: son bandwidth
  */

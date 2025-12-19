@@ -512,7 +512,7 @@ struct csr_roam_info {
 	bool sgi_enable;
 	bool tx_stbc;
 	bool rx_stbc;
-	tSirMacHTChannelWidth ch_width;
+	enum phy_ch_width ch_width;
 	enum sir_sme_phy_mode mode;
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
@@ -566,7 +566,7 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	bool ampdu;
 	bool sgi_enable;
 	bool tx_stbc;
-	tSirMacHTChannelWidth ch_width;
+	enum phy_ch_width ch_width;
 	enum sir_sme_phy_mode mode;
 	bool rx_stbc;
 	uint8_t max_supp_idx;

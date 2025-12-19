@@ -3595,43 +3595,13 @@ static void fill_mlm_assoc_ind_vht(tpSirAssocReq assocreq,
 		assocind->rx_stbc = assocreq->VHTCaps.rxSTBC;
 
 		/* ch width */
-		assocind->ch_width = lim_convert_channel_width_enum(
-							stads->ch_width);
+		assocind->ch_width = stads->ch_width;
 
 		/* mode */
 		assocind->mode = SIR_SME_PHY_MODE_VHT;
 		assocind->rx_mcs_map = assocreq->VHTCaps.rxMCSMap & 0xff;
 		assocind->tx_mcs_map = assocreq->VHTCaps.txMCSMap & 0xff;
 	}
-}
-
-tSirMacHTChannelWidth
-lim_convert_channel_width_enum(enum phy_ch_width ch_width)
-{
-	switch (ch_width) {
-	case CH_WIDTH_20MHZ:
-		return eHT_CHANNEL_WIDTH_20MHZ;
-	case CH_WIDTH_40MHZ:
-		return eHT_CHANNEL_WIDTH_40MHZ;
-	case CH_WIDTH_80MHZ:
-		return eHT_CHANNEL_WIDTH_80MHZ;
-	case CH_WIDTH_160MHZ:
-		return eHT_CHANNEL_WIDTH_160MHZ;
-	case CH_WIDTH_80P80MHZ:
-		return eHT_CHANNEL_WIDTH_80P80MHZ;
-	case CH_WIDTH_320MHZ:
-		return eHT_CHANNEL_WIDTH_320MHZ;
-	case CH_WIDTH_MAX:
-		return eHT_MAX_CHANNEL_WIDTH;
-	case CH_WIDTH_5MHZ:
-		break;
-	case CH_WIDTH_10MHZ:
-		break;
-	case CH_WIDTH_INVALID:
-		break;
-	}
-	pe_debug("invalid enum: %d", ch_width);
-	return eHT_CHANNEL_WIDTH_20MHZ;
 }
 
 /**
@@ -3732,8 +3702,7 @@ static void lim_fill_assoc_ind_he_bw_info(tpLimMlmAssocInd assoc_ind,
 {
 	if (lim_is_sta_he_capable(sta_ds) &&
 	    lim_is_session_he_capable(session_entry)) {
-		assoc_ind->ch_width =
-			lim_convert_channel_width_enum(sta_ds->ch_width);
+		assoc_ind->ch_width = sta_ds->ch_width;
 		assoc_ind->chan_info.rate_flags =
 		    lim_convert_rate_flags_enum(assoc_ind->chan_info.rate_flags,
 						sta_ds->ch_width);
@@ -3959,7 +3928,7 @@ bool lim_fill_lim_assoc_ind_params(
 	assoc_ind->sgi_enable = false;
 	assoc_ind->tx_stbc = false;
 	assoc_ind->rx_stbc = false;
-	assoc_ind->ch_width = eHT_CHANNEL_WIDTH_20MHZ;
+	assoc_ind->ch_width = CH_WIDTH_20MHZ;
 	assoc_ind->mode = SIR_SME_PHY_MODE_LEGACY;
 	assoc_ind->max_supp_idx = INVALID_MCS_NSS_INDEX;
 	assoc_ind->max_ext_idx = INVALID_MCS_NSS_INDEX;
@@ -3989,8 +3958,8 @@ bool lim_fill_lim_assoc_ind_params(
 		/* ch width */
 		assoc_ind->ch_width =
 			sta_ds->htSupportedChannelWidthSet ?
-			eHT_CHANNEL_WIDTH_40MHZ :
-			eHT_CHANNEL_WIDTH_20MHZ;
+			CH_WIDTH_40MHZ :
+			CH_WIDTH_20MHZ;
 		/* mode */
 		assoc_ind->mode = SIR_SME_PHY_MODE_HT;
 		assoc_ind->max_mcs_idx = lim_get_ht_max_mcs_idx(

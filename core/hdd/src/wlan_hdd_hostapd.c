@@ -1746,6 +1746,38 @@ enum qca_wlan_802_11_mode hdd_convert_dot11mode_from_phymode(int phymode)
 
 }
 
+static enum eSirMacHTChannelWidth
+hdd_convert_phy_chwidth_to_chwidth(enum phy_ch_width chwidth)
+{
+	enum eSirMacHTChannelWidth ch_width = eHT_MAX_CHANNEL_WIDTH;
+
+	switch (chwidth) {
+	case CH_WIDTH_20MHZ:
+		ch_width = eHT_CHANNEL_WIDTH_20MHZ;
+		break;
+	case CH_WIDTH_40MHZ:
+		ch_width = eHT_CHANNEL_WIDTH_40MHZ;
+		break;
+	case CH_WIDTH_80MHZ:
+		ch_width = eHT_CHANNEL_WIDTH_80MHZ;
+		break;
+	case CH_WIDTH_160MHZ:
+		ch_width = eHT_CHANNEL_WIDTH_160MHZ;
+		break;
+	case CH_WIDTH_80P80MHZ:
+		ch_width = eHT_CHANNEL_WIDTH_80P80MHZ;
+		break;
+	case CH_WIDTH_320MHZ:
+		ch_width = eHT_CHANNEL_WIDTH_320MHZ;
+		break;
+	default:
+		hdd_debug("Invalid channel width %d", chwidth);
+		break;
+	}
+
+	return ch_width;
+}
+
 /**
  * hdd_fill_station_info() - fill stainfo once connected
  * @adapter: pointer to hdd adapter
@@ -1786,7 +1818,7 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 	stainfo->sgi_enable = event->sgi_enable;
 	stainfo->tx_stbc = event->tx_stbc;
 	stainfo->rx_stbc = event->rx_stbc;
-	stainfo->ch_width = event->ch_width;
+	stainfo->ch_width = hdd_convert_phy_chwidth_to_chwidth(event->ch_width);
 	stainfo->mode = event->mode;
 	stainfo->max_supp_idx = event->max_supp_idx;
 	stainfo->max_ext_idx = event->max_ext_idx;
@@ -1990,13 +2022,13 @@ hdd_hostapd_apply_action_oui(struct hdd_context *hdd_ctx,
 {
 	bool found;
 	uint32_t freq;
-	tSirMacHTChannelWidth ch_width;
+	enum phy_ch_width ch_width;
 	enum sir_sme_phy_mode mode;
 	struct action_oui_search_attr attr = {0};
 	QDF_STATUS status;
 
 	ch_width = event->ch_width;
-	if (ch_width != eHT_CHANNEL_WIDTH_20MHZ)
+	if (ch_width != CH_WIDTH_20MHZ)
 		return;
 
 	freq = event->chan_info.mhz;

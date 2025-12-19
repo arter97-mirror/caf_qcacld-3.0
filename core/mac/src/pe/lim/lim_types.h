@@ -224,7 +224,7 @@ typedef struct sLimMlmAssocInd {
 	bool sgi_enable;
 	bool tx_stbc;
 	bool rx_stbc;
-	tSirMacHTChannelWidth ch_width;
+	enum phy_ch_width ch_width;
 	enum sir_sme_phy_mode mode;
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
@@ -2031,15 +2031,6 @@ void lim_process_sta_add_bss_rsp_pre_assoc(struct mac_context *mac_ctx,
 void
 lim_notify_channel_switch_started(struct mac_context *mac_ctx,
 				  struct pe_session *session);
-
-/**
- *lim_convert_channel_width_enum() - map between two channel width enums
- *@ch_width: channel width of enum type phy_ch_width
- *
- *Return: channel width of enum type tSirMacHTChannelWidth
- */
-tSirMacHTChannelWidth
-lim_convert_channel_width_enum(enum phy_ch_width ch_width);
 
 #ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
 /**
