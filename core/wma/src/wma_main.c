@@ -5721,12 +5721,12 @@ wma_update_target_vht_cap(struct target_psoc_info *tgt_hdl,
 
 
 	if (vht_cap_info & WMI_VHT_CAP_CH_WIDTH_80P80_160MHZ) {
-		cfg->supp_chan_width = 1 << eHT_CHANNEL_WIDTH_80P80MHZ;
-		cfg->supp_chan_width |= 1 << eHT_CHANNEL_WIDTH_160MHZ;
+		cfg->supp_chan_width = 1 << CH_WIDTH_80P80MHZ;
+		cfg->supp_chan_width |= 1 << CH_WIDTH_160MHZ;
 	} else if (vht_cap_info & WMI_VHT_CAP_CH_WIDTH_160MHZ) {
-		cfg->supp_chan_width = 1 << eHT_CHANNEL_WIDTH_160MHZ;
+		cfg->supp_chan_width = 1 << CH_WIDTH_160MHZ;
 	} else {
-		cfg->supp_chan_width = 1 << eHT_CHANNEL_WIDTH_80MHZ;
+		cfg->supp_chan_width = 1 << CH_WIDTH_80MHZ;
 	}
 
 	cfg->vht_rx_ldpc = vht_cap_info & WMI_VHT_CAP_RX_LDPC;
@@ -5936,14 +5936,14 @@ static void wma_derive_ext_vht_cap(
 
 		if (value & WMI_VHT_CAP_CH_WIDTH_80P80_160MHZ) {
 			vht_cap->supp_chan_width =
-				1 << eHT_CHANNEL_WIDTH_80P80MHZ;
+				1 << CH_WIDTH_80P80MHZ;
 			vht_cap->supp_chan_width |=
-				1 << eHT_CHANNEL_WIDTH_160MHZ;
+				1 << CH_WIDTH_160MHZ;
 		} else if (value & WMI_VHT_CAP_CH_WIDTH_160MHZ) {
 			vht_cap->supp_chan_width =
-				1 << eHT_CHANNEL_WIDTH_160MHZ;
+				1 << CH_WIDTH_160MHZ;
 		} else {
-			vht_cap->supp_chan_width = 1 << eHT_CHANNEL_WIDTH_80MHZ;
+			vht_cap->supp_chan_width = 1 << CH_WIDTH_80MHZ;
 		}
 		vht_cap->vht_rx_ldpc = value & WMI_VHT_CAP_RX_LDPC;
 		vht_cap->vht_short_gi_80 = value & WMI_VHT_CAP_SGI_80MHZ;
@@ -5971,12 +5971,12 @@ static void wma_derive_ext_vht_cap(
 		vht_cap->vht_max_mpdu = QDF_MIN(vht_cap->vht_max_mpdu, tmp);
 
 		if ((value & WMI_VHT_CAP_CH_WIDTH_80P80_160MHZ)) {
-			tmp = (1 << eHT_CHANNEL_WIDTH_80P80MHZ) |
-				(1 << eHT_CHANNEL_WIDTH_160MHZ);
+			tmp = (1 << CH_WIDTH_80P80MHZ) |
+				(1 << CH_WIDTH_160MHZ);
 		} else if (value & WMI_VHT_CAP_CH_WIDTH_160MHZ) {
-			tmp = 1 << eHT_CHANNEL_WIDTH_160MHZ;
+			tmp = 1 << CH_WIDTH_160MHZ;
 		} else {
-			tmp = 1 << eHT_CHANNEL_WIDTH_80MHZ;
+			tmp = 1 << CH_WIDTH_80MHZ;
 		}
 		vht_cap->supp_chan_width =
 			QDF_MAX(vht_cap->supp_chan_width, tmp);

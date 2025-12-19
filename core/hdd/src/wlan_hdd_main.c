@@ -2530,11 +2530,11 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_3895;
 
 
-	if (vht_cfg->supp_chan_width & (1 << eHT_CHANNEL_WIDTH_80P80MHZ)) {
+	if (vht_cfg->supp_chan_width & (1 << CH_WIDTH_80P80MHZ)) {
 		band_5g->vht_cap.cap |=
 			IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160_80PLUS80MHZ;
 		ch_width = VHT_CAP_160_AND_80P80_SUPP;
-	} else if (vht_cfg->supp_chan_width & (1 << eHT_CHANNEL_WIDTH_160MHZ)) {
+	} else if (vht_cfg->supp_chan_width & (1 << CH_WIDTH_160MHZ)) {
 		band_5g->vht_cap.cap |=
 			IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160MHZ;
 		ch_width = VHT_CAP_160_SUPP;
