@@ -173,7 +173,7 @@
 		"gBusBandwidthSuperHighThreshold", \
 		0, \
 		4294967295UL, \
-		83334, \
+		22000, \
 		CFG_VALUE_OR_DEFAULT, \
 		"Bus bandwidth super high threshold")
 

@@ -503,9 +503,9 @@ typedef struct opaque_hdd_callback_handle *hdd_cb_handle;
  * @BUS_BW_LEVEL_6: vote for level-6 bus bandwidth
  * @BUS_BW_LEVEL_7: vote for level-7 bus bandwidth
  * @BUS_BW_LEVEL_8: vote for level-8 bus bandwidth
- * @BUS_BW_LEVEL_9: vote for level-9 bus bandwidth (fast)
- * @BUS_BW_LEVEL_10: vote for level-10 bus bandwidth (super fast)
- * @BUS_BW_LEVEL_11: vote for level-11 bus bandwidth (max)
+ * @BUS_BW_LEVEL_9: vote for level-9 bus bandwidth
+ * @BUS_BW_LEVEL_10: vote for level-10 bus bandwidth (fast)
+ * @BUS_BW_LEVEL_11: vote for level-11 bus bandwidth (supper fast)
  * @BUS_BW_LEVEL_MAX: vote for max level bus bandwidth
  */
 enum bus_bw_level {
@@ -537,9 +537,9 @@ enum bus_bw_level {
  * @TPUT_LEVEL_MID_HIGH: mid high throughput level
  * @TPUT_LEVEL_VERY_HIGH: very high throughput level
  * @TPUT_LEVEL_ULTRA_HIGH: ultra high throughput level
+ * @TPUT_LEVEL_SUPER_HIGH: super high throughput level
  * @TPUT_LEVEL_FAST: fast throughput level
  * @TPUT_LEVEL_SUPER_FAST: super fast throughput level
- * @TPUT_LEVEL_SUPER_HIGH: super high throughput level
  * @TPUT_LEVEL_MAX: maximum throughput level
  */
 enum tput_level {
@@ -551,9 +551,9 @@ enum tput_level {
 	TPUT_LEVEL_MID_HIGH,
 	TPUT_LEVEL_VERY_HIGH,
 	TPUT_LEVEL_ULTRA_HIGH,
+	TPUT_LEVEL_SUPER_HIGH,
 	TPUT_LEVEL_FAST,
 	TPUT_LEVEL_SUPER_FAST,
-	TPUT_LEVEL_SUPER_HIGH,
 	TPUT_LEVEL_MAX,
 };
 
