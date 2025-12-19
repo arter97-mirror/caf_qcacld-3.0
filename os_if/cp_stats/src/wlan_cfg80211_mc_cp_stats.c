@@ -1577,7 +1577,8 @@ void infra_cp_stats_bmiss_response_cb(struct infra_cp_stats_event *ev,
 
 struct infra_cp_stats_event *
 wlan_cfg80211_mc_bmiss_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
-					  uint8_t *bmiss_peer_mac, int *errno)
+					  uint8_t mac[QDF_MAC_ADDR_SIZE],
+					  int *errno)
 {
 	void *cookie;
 	int idx = 0;
@@ -1639,7 +1640,7 @@ wlan_cfg80211_mc_bmiss_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
 	info.num_mac_addr_list = MAX_TWT_STAT_MAC_ADDR_ENTRIES;
 	info.num_pdev_ids = 0;
 
-	qdf_mem_copy(&info.peer_mac_addr[0], bmiss_peer_mac, QDF_MAC_ADDR_SIZE);
+	qdf_mem_copy(&info.peer_mac_addr[0], mac, QDF_MAC_ADDR_SIZE);
 	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_CP_STATS_ID);
 	if (!peer) {
 		osif_err("peer is null");
@@ -1699,7 +1700,7 @@ wlan_cfg80211_mc_bmiss_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
 	out->bmiss_infra_cp_stats->cons_bmiss_stats.num_bcn_hist_lost =
 			bmiss_event->cons_bmiss_stats.num_bcn_hist_lost;
 
-	qdf_mem_copy(&out->bmiss_infra_cp_stats->peer_macaddr, bmiss_peer_mac,
+	qdf_mem_copy(&out->bmiss_infra_cp_stats->peer_macaddr, mac,
 		     QDF_MAC_ADDR_SIZE);
 	osif_request_put(request);
 	osif_debug("Exit");
