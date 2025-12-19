@@ -5117,16 +5117,16 @@ static int __iw_get_char_setnone(struct net_device *dev,
 							   &value);
 			if (!QDF_IS_STATUS_SUCCESS(status))
 				hdd_err("Failed to set channel_width");
-			if (value == eHT_CHANNEL_WIDTH_20MHZ)
+			if (value == CH_WIDTH_20MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11ACVHT20");
-			else if (value == eHT_CHANNEL_WIDTH_40MHZ)
+			else if (value == CH_WIDTH_40MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11ACVHT40");
-			else if (value == eHT_CHANNEL_WIDTH_80MHZ)
+			else if (value == CH_WIDTH_80MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11ACVHT80");
-			else if (value == eHT_CHANNEL_WIDTH_160MHZ)
+			else if (value == CH_WIDTH_160MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11ACVHT160");
 			break;
@@ -5139,16 +5139,16 @@ static int __iw_get_char_setnone(struct net_device *dev,
 				hdd_err("Failed to set channel_width");
 
 			/* currently using vhtChannelWidth */
-			if (value == eHT_CHANNEL_WIDTH_20MHZ)
+			if (value == CH_WIDTH_20MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11AX_HE_20");
-			else if (value == eHT_CHANNEL_WIDTH_40MHZ)
+			else if (value == CH_WIDTH_40MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11AX_HE_40");
-			else if (value == eHT_CHANNEL_WIDTH_80MHZ)
+			else if (value == CH_WIDTH_80MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11AX_HE_80");
-			else if (value == eHT_CHANNEL_WIDTH_160MHZ)
+			else if (value == CH_WIDTH_160MHZ)
 				snprintf(extra, WE_MAX_STR_LEN,
 					 "11AX_HE_160");
 			break;

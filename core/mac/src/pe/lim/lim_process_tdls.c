@@ -3164,9 +3164,8 @@ lim_tdls_populate_dot11f_ht_caps(struct mac_context *mac,
 
 	/* Ensure that shortGI40MHz is Disabled if supportedChannelWidthSet is
 	   eHT_CHANNEL_WIDTH_20MHZ */
-	if (pDot11f->supportedChannelWidthSet == eHT_CHANNEL_WIDTH_20MHZ) {
+	if (pDot11f->supportedChannelWidthSet == CH_WIDTH_20MHZ)
 		pDot11f->shortGI40MHz = 0;
-	}
 
 	pe_debug("SupportedChnlWidth: %d, mimoPS: %d, GF: %d, shortGI20:%d, shortGI40: %d, dsssCck: %d",
 		pDot11f->supportedChannelWidthSet,

@@ -985,8 +985,7 @@ lim_decide_ap_protection_on_delete(struct mac_context *mac_ctx,
 	 * HT 20Mhz station leaving
 	 */
 	if (session_entry->beaconParams.ht20Coexist &&
-		(eHT_CHANNEL_WIDTH_20MHZ ==
-			 sta_ds->htSupportedChannelWidthSet)) {
+	    (sta_ds->htSupportedChannelWidthSet == CH_WIDTH_20MHZ)) {
 		lim_decide_ap_protection_on_ht20_delete(mac_ctx, sta_ds,
 					beacon_params, session_entry);
 	}

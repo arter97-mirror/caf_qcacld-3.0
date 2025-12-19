@@ -292,11 +292,11 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		if (mac_ctx->roam.configParam.channelBondingMode24GHz
 		    == PHY_SINGLE_CHANNEL_CENTERED) {
 			pr->HTCaps.supportedChannelWidthSet =
-				eHT_CHANNEL_WIDTH_20MHZ;
+				CH_WIDTH_20MHZ;
 			pr->HTCaps.shortGI40MHz = 0;
 		} else {
 			pr->HTCaps.supportedChannelWidthSet =
-				eHT_CHANNEL_WIDTH_40MHZ;
+				CH_WIDTH_40MHZ;
 		}
 	}
 

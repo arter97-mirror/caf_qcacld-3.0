@@ -1463,7 +1463,7 @@ QDF_STATUS populate_dot11f_ht_caps(struct mac_context *mac,
 	 * Ensure that shortGI40MHz is Disabled if supportedChannelWidthSet is
 	 * eHT_CHANNEL_WIDTH_20MHZ
 	 */
-	if (pDot11f->supportedChannelWidthSet == eHT_CHANNEL_WIDTH_20MHZ)
+	if (pDot11f->supportedChannelWidthSet == CH_WIDTH_20MHZ)
 		pDot11f->shortGI40MHz = 0;
 
 	pDot11f->maxRxAMPDUFactor =
@@ -1553,8 +1553,8 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 	    pe_session->dot11mode == MLME_DOT11_MODE_11B)
 		return PHY_SINGLE_CHANNEL_CENTERED;
 
-	if (!(ie_struct->HTCaps.present && (eHT_CHANNEL_WIDTH_40MHZ ==
-		ie_struct->HTCaps.supportedChannelWidthSet))) {
+	if (!(ie_struct->HTCaps.present &&
+	      (ie_struct->HTCaps.supportedChannelWidthSet == CH_WIDTH_40MHZ))) {
 		return PHY_SINGLE_CHANNEL_CENTERED;
 	}
 
@@ -1575,7 +1575,7 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 		 ie_struct->HTInfo.recommendedTxWidthSet,
 		 ie_struct->HTInfo.secondaryChannelOffset);
 
-	if (ie_struct->HTInfo.recommendedTxWidthSet == eHT_CHANNEL_WIDTH_40MHZ)
+	if (ie_struct->HTInfo.recommendedTxWidthSet == CH_WIDTH_40MHZ)
 		cb_mode = ie_struct->HTInfo.secondaryChannelOffset;
 	else
 		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;

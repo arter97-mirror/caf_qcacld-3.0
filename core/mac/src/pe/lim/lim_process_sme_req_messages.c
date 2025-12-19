@@ -8823,10 +8823,10 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 		pe_session->htRecommendedTxWidthSet = 0;
 		if (pSetHT2040Mode->obssEnabled)
 			pe_session->htSupportedChannelWidthSet
-					= eHT_CHANNEL_WIDTH_40MHZ;
+					= CH_WIDTH_40MHZ;
 		else
 			pe_session->htSupportedChannelWidthSet
-					= eHT_CHANNEL_WIDTH_20MHZ;
+					= CH_WIDTH_20MHZ;
 		break;
 	case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
 		pe_session->htSecondaryChannelOffset =

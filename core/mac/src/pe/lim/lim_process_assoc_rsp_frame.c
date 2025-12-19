@@ -85,7 +85,7 @@ static void lim_update_stads_htcap(struct mac_context *mac_ctx,
 				ht_caps->supportedChannelWidthSet);
 		} else
 			sta_ds->htSupportedChannelWidthSet =
-				eHT_CHANNEL_WIDTH_20MHZ;
+				CH_WIDTH_20MHZ;
 		sta_ds->htLsigTXOPProtection =
 			(uint8_t) ht_caps->lsigTXOPProtection;
 		sta_ds->htMIMOPSState =

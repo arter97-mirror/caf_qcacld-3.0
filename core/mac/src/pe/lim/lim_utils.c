@@ -1193,10 +1193,8 @@ lim_decide_ap_protection(struct mac_context *mac, tSirMacAddr peerMacAddr,
 			gfSupported = eHAL_CLEAR;
 		}
 		/* Station joining is HT 20Mhz */
-		if ((eHT_CHANNEL_WIDTH_20MHZ ==
-		sta->htSupportedChannelWidthSet) &&
-		(eHT_CHANNEL_WIDTH_20MHZ !=
-		 pe_session->htSupportedChannelWidthSet)){
+		if ((sta->htSupportedChannelWidthSet == CH_WIDTH_20MHZ) &&
+		    (pe_session->htSupportedChannelWidthSet != CH_WIDTH_20MHZ)) {
 			protStaCacheType = eLIM_PROT_STA_CACHE_TYPE_HT20;
 			lim_enable_ht20_protection(mac, true, false,
 						   pBeaconParams, pe_session);
@@ -2780,8 +2778,8 @@ lim_handle_11g_protection_for_11bcoexist(struct mac_context *mac_ctx,
 					overlap, beaconparams, session_entry);
 				if (session_entry->gLimHt20Params.
 						protectionEnabled) {
-				if (eHT_CHANNEL_WIDTH_20MHZ ==
-					session_entry->htSupportedChannelWidthSet)
+				if (session_entry->htSupportedChannelWidthSet ==
+				    CH_WIDTH_20MHZ)
 					session_entry->htOperMode =
 						eSIR_HT_OP_MODE_PURE;
 				else
@@ -3039,8 +3037,8 @@ lim_enable_ht_protection_from11g(struct mac_context *mac, uint8_t enable,
 									      pe_session);
 
 						if (pe_session->gLimHt20Params.protectionEnabled) {
-						if (eHT_CHANNEL_WIDTH_20MHZ ==
-							pe_session->htSupportedChannelWidthSet)
+						if (pe_session->htSupportedChannelWidthSet ==
+						    CH_WIDTH_20MHZ)
 							pe_session->htOperMode =
 								eSIR_HT_OP_MODE_PURE;
 						else
@@ -3246,8 +3244,8 @@ static void lim_handle_ht20protection_enabled(struct mac_context *mac_ctx,
 		session_entry->gLimHt20Params.protectionEnabled = true;
 		if (eSIR_HT_OP_MODE_PURE == session_entry->htOperMode) {
 			if (session_entry->htSupportedChannelWidthSet !=
-					eHT_CHANNEL_WIDTH_20MHZ)
-				 session_entry->htOperMode =
+			    CH_WIDTH_20MHZ)
+				session_entry->htOperMode =
 					eSIR_HT_OP_MODE_NO_LEGACY_20MHZ_HT;
 			lim_enable_ht_rifs_protection(mac_ctx, false,
 				overlap, beaconparams, session_entry);
@@ -3306,9 +3304,7 @@ static void lim_handle_ht20coexist_ht20protection(struct mac_context *mac_ctx,
 				session_entry->htOperMode)) {
 			if (session_entry->gLimHt20Params.
 				protectionEnabled) {
-				if (eHT_CHANNEL_WIDTH_20MHZ ==
-					session_entry->
-					htSupportedChannelWidthSet)
+				if (session_entry->htSupportedChannelWidthSet == CH_WIDTH_20MHZ)
 					session_entry->htOperMode =
 						eSIR_HT_OP_MODE_PURE;
 				else
@@ -3750,8 +3746,7 @@ lim_ht_switch_chnl_params(struct pe_session *pe_session)
 
 	primary_channel = wlan_reg_freq_to_chan(mac->pdev,
 						 pe_session->curr_op_freq);
-	if (eHT_CHANNEL_WIDTH_40MHZ ==
-	    pe_session->htRecommendedTxWidthSet) {
+	if (pe_session->htRecommendedTxWidthSet == CH_WIDTH_40MHZ) {
 		ch_width = CH_WIDTH_40MHZ;
 		if (PHY_DOUBLE_CHANNEL_LOW_PRIMARY ==
 		    pe_session->htSecondaryChannelOffset)
