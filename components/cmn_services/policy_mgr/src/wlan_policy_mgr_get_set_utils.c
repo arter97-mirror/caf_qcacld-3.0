@@ -10906,6 +10906,69 @@ static bool policy_mgr_is_third_conn_sta_p2p_p2p_valid(
 	return true;
 }
 
+#ifdef DRIVER_PASSTHRU_MODE
+static bool
+policy_mgr_allow_passthru_concurrency(struct wlan_objmgr_psoc *psoc,
+				      enum policy_mgr_con_mode mode,
+				      uint32_t ch_freq,
+				      struct policy_mgr_pcl_list *pcl)
+{
+	uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t conn_count;
+	uint32_t i;
+
+	conn_count =
+		policy_mgr_mode_specific_connection_count(psoc,
+							  PM_PASSTHRU_MODE,
+							  list);
+
+	if (mode != PM_PASSTHRU_MODE && !conn_count)
+		return true;
+
+	if (mode == PM_PASSTHRU_MODE) {
+		if (!pcl || !pcl->pcl_len)
+			return true;
+
+		for (i = 0; i < pcl->pcl_len; i++) {
+			if (pcl->pcl_list[i] == ch_freq) {
+				policy_mgr_debug("Passthrough mode allowed on %dMhz",
+						 ch_freq);
+				return true;
+			}
+		}
+	}
+
+	if (!conn_count) {
+		policy_mgr_debug("Passthrough mode not allowed on %dMhz",
+				 ch_freq);
+		return false;
+	}
+
+	/*
+	 * This would only happen for DBS hw as we would reject inital
+	 * STA connection in case of non-DBS hw.
+	 */
+	if (mode == PM_STA_MODE &&
+	    policy_mgr_2_freq_same_mac_in_dbs(psoc,
+					      pm_conc_connection_list[list[0]].freq,
+					      ch_freq)) {
+		policy_mgr_debug("STA CSA to %dMHz not allowed", ch_freq);
+		return false;
+	}
+
+	return true;
+}
+#else
+static inline bool
+policy_mgr_allow_passthru_concurrency(struct wlan_objmgr_psoc *psoc,
+				      enum policy_mgr_con_mode mode,
+				      uint32_t ch_freq,
+				      struct policy_mgr_pcl_list *pcl)
+{
+	return true;
+}
+#endif
+
 bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 				       enum policy_mgr_con_mode mode,
 				       uint32_t ch_freq,
@@ -10944,6 +11007,10 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (ch_freq) {
+		if (!policy_mgr_allow_passthru_concurrency(psoc, mode, ch_freq,
+							   pcl))
+			return status;
+
 		if (wlan_reg_is_5ghz_ch_freq(ch_freq)) {
 			qdf_mem_zero(&ch_params, sizeof(ch_params));
 			ch_params.ch_width = policy_mgr_get_ch_width(bw);
