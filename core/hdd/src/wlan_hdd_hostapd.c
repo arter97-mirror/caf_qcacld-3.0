@@ -4056,6 +4056,12 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	if (!sap_ctx)
 		return -EINVAL;
 
+	if (sap_ctx->fsm_state != SAP_STARTED) {
+		hdd_err("CSA rejected - SAP not in STARTED state, current state:%d vdev:%d",
+			sap_ctx->fsm_state, link_info->vdev_id);
+		return -EINVAL;
+	}
+
 	if (qdf_atomic_test_bit(SOFTAP_LINK_REMOVAL_IN_PROGRESS,
 				link_info->link_flags)) {
 		hdd_err("CSA rejected - link removal in progress for vdev:%d",
