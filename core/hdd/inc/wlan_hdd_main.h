@@ -2737,8 +2737,6 @@ struct hdd_channel_info {
 
 /**
  * struct hdd_chwidth_info - channel width related info
- * @sir_chwidth_valid: If nl_chan_width is valid in Sir
- * @sir_chwidth: enum eSirMacHTChannelWidth
  * @ch_bw: enum hw_mode_bandwidth
  * @ch_bw_str: ch_bw in string format
  * @phy_chwidth: enum phy_ch_width
@@ -2746,8 +2744,6 @@ struct hdd_channel_info {
  *		  WNI_CFG_CHANNEL_BONDING_MODE_ENABLE
  */
 struct hdd_chwidth_info {
-	bool sir_chwidth_valid;
-	enum eSirMacHTChannelWidth sir_chwidth;
 	enum hw_mode_bandwidth ch_bw;
 	char *ch_bw_str;
 	enum phy_ch_width phy_chwidth;

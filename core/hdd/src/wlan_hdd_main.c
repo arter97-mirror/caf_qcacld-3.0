@@ -24005,40 +24005,30 @@ static const struct hdd_chwidth_info chwidth_info[] = {
 		.phy_chwidth = CH_WIDTH_20MHZ,
 	},
 	[NL80211_CHAN_WIDTH_20] = {
-		.sir_chwidth_valid = true,
-		.sir_chwidth = eHT_CHANNEL_WIDTH_20MHZ,
 		.ch_bw = HW_MODE_20_MHZ,
 		.ch_bw_str = "20MHz",
 		.phy_chwidth = CH_WIDTH_20MHZ,
 		.bonding_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE,
 	},
 	[NL80211_CHAN_WIDTH_40] = {
-		.sir_chwidth_valid = true,
-		.sir_chwidth = eHT_CHANNEL_WIDTH_40MHZ,
 		.ch_bw = HW_MODE_40_MHZ,
 		.ch_bw_str = "40MHz",
 		.phy_chwidth = CH_WIDTH_40MHZ,
 		.bonding_mode = WNI_CFG_CHANNEL_BONDING_MODE_ENABLE,
 	},
 	[NL80211_CHAN_WIDTH_80] = {
-		.sir_chwidth_valid = true,
-		.sir_chwidth = eHT_CHANNEL_WIDTH_80MHZ,
 		.ch_bw = HW_MODE_80_MHZ,
 		.ch_bw_str = "80MHz",
 		.phy_chwidth = CH_WIDTH_80MHZ,
 		.bonding_mode = WNI_CFG_CHANNEL_BONDING_MODE_ENABLE,
 	},
 	[NL80211_CHAN_WIDTH_80P80] = {
-		.sir_chwidth_valid = true,
-		.sir_chwidth = eHT_CHANNEL_WIDTH_80P80MHZ,
 		.ch_bw = HW_MODE_80_PLUS_80_MHZ,
 		.ch_bw_str = "(80 + 80)MHz",
 		.phy_chwidth = CH_WIDTH_80P80MHZ,
 		.bonding_mode = WNI_CFG_CHANNEL_BONDING_MODE_ENABLE,
 	},
 	[NL80211_CHAN_WIDTH_160] = {
-		.sir_chwidth_valid = true,
-		.sir_chwidth = eHT_CHANNEL_WIDTH_160MHZ,
 		.ch_bw = HW_MODE_160_MHZ,
 		.ch_bw_str = "160MHz",
 		.phy_chwidth = CH_WIDTH_160MHZ,
@@ -24056,8 +24046,6 @@ static const struct hdd_chwidth_info chwidth_info[] = {
 	},
 #if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC)
 	[NL80211_CHAN_WIDTH_320] = {
-		.sir_chwidth_valid = true,
-		.sir_chwidth = eHT_CHANNEL_WIDTH_320MHZ,
 		.ch_bw = HW_MODE_320_MHZ,
 		.ch_bw_str = "320MHz",
 		.phy_chwidth = CH_WIDTH_320MHZ,
@@ -24083,8 +24071,7 @@ uint8_t hdd_phy_chwidth_to_nl80211_chwidth(enum phy_ch_width chwidth)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(chwidth_info); i++) {
-		if (chwidth_info[i].sir_chwidth_valid &&
-		    chwidth_info[i].phy_chwidth == chwidth)
+		if (chwidth_info[i].phy_chwidth == chwidth)
 			return i;
 	}
 
