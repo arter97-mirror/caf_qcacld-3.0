@@ -913,16 +913,6 @@ typedef enum eSirMacHTMIMOPowerSaveState {
 	eSIR_HT_MIMO_PS_NO_LIMIT = 3    /* SM Power Save disabled */
 } tSirMacHTMIMOPowerSaveState;
 
-typedef enum eSirMacHTChannelWidth {
-	eHT_CHANNEL_WIDTH_20MHZ = 0,
-	eHT_CHANNEL_WIDTH_40MHZ = 1,
-	eHT_CHANNEL_WIDTH_80MHZ = 2,
-	eHT_CHANNEL_WIDTH_160MHZ = 3,
-	eHT_CHANNEL_WIDTH_80P80MHZ = 4,
-	eHT_CHANNEL_WIDTH_320MHZ = 5,
-	eHT_MAX_CHANNEL_WIDTH
-} tSirMacHTChannelWidth;
-
 typedef enum eSirMacHTChannelType {
 	eHT_CHAN_NO_HT = 0,
 	eHT_CHAN_HT20 = 1,
