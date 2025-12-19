@@ -8795,7 +8795,6 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 	tUpdateVHTOpMode *pHtOpMode = NULL;
 	uint16_t staId = 0;
 	tpDphHashNode sta = NULL;
-	tSirMacHTChannelWidth opmode_chwidth;
 
 	pe_debug("received Set HT 20/40 mode message");
 	if (!msg_buf) {
@@ -8859,12 +8858,9 @@ static void __lim_process_sme_set_ht2040_mode(struct mac_context *mac,
 			pHtOpMode = qdf_mem_malloc(sizeof(tUpdateVHTOpMode));
 			if (!pHtOpMode)
 				return;
-			opmode_chwidth =
+			pHtOpMode->chwidth =
 				(pe_session->htSecondaryChannelOffset ==
 				 PHY_SINGLE_CHANNEL_CENTERED) ?
-				eHT_CHANNEL_WIDTH_20MHZ : eHT_CHANNEL_WIDTH_40MHZ;
-			pHtOpMode->chwidth =
-				opmode_chwidth == eHT_CHANNEL_WIDTH_20MHZ ?
 				CH_WIDTH_20MHZ : CH_WIDTH_40MHZ;
 
 			qdf_mem_copy(pHtOpMode->peer_mac, &sta->staAddr,

@@ -1106,7 +1106,7 @@ static void sap_update_rssi_bsscount_vht_5G(
  */
 
 static void sap_interference_rssi_count_5G(struct sap_ch_info *spect_ch,
-					   uint16_t chan_width,
+					   enum phy_ch_width chan_width,
 					   uint16_t sec_chan_offset,
 					   uint32_t ch_freq0,
 					   uint32_t ch_freq1,
@@ -1118,7 +1118,7 @@ static void sap_interference_rssi_count_5G(struct sap_ch_info *spect_ch,
 	int32_t offset = 0;
 
 	switch (chan_width) {
-	case eHT_CHANNEL_WIDTH_40MHZ:
+	case CH_WIDTH_40MHZ:
 		switch (sec_chan_offset) {
 		/* Above the Primary Channel */
 		case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
@@ -1133,8 +1133,8 @@ static void sap_interference_rssi_count_5G(struct sap_ch_info *spect_ch,
 			return;
 		}
 		return;
-	case eHT_CHANNEL_WIDTH_80MHZ:
-	case eHT_CHANNEL_WIDTH_80P80MHZ:
+	case CH_WIDTH_80MHZ:
+	case CH_WIDTH_80P80MHZ:
 		num_ch = 3;
 		if ((ch_freq0 - op_chan_freq) == 30) {
 			offset = 1;
@@ -1146,7 +1146,7 @@ static void sap_interference_rssi_count_5G(struct sap_ch_info *spect_ch,
 			offset = -3;
 		}
 		break;
-	case eHT_CHANNEL_WIDTH_160MHZ:
+	case CH_WIDTH_160MHZ:
 		num_ch = 7;
 		if ((ch_freq0 - op_chan_freq) == 70)
 			offset = 1;
@@ -1165,7 +1165,7 @@ static void sap_interference_rssi_count_5G(struct sap_ch_info *spect_ch,
 		else if ((ch_freq0 - op_chan_freq) == -70)
 			offset = -7;
 		break;
-	case eHT_CHANNEL_WIDTH_320MHZ:
+	case CH_WIDTH_320MHZ:
 		num_ch = 15;
 		if ((ch_freq0 - op_chan_freq) == 150)
 			offset = 1;
@@ -1411,7 +1411,7 @@ static bool ch_in_pcl(struct sap_context *sap_ctx, uint32_t ch_freq)
  */
 static void
 sap_upd_chan_spec_params(struct scan_cache_node *scan_entry,
-			 tSirMacHTChannelWidth *ch_width,
+			 enum phy_ch_width  *ch_width,
 			 uint16_t *sec_ch_offset,
 			 uint32_t *center_freq0,
 			 uint32_t *center_freq1)
@@ -1425,11 +1425,11 @@ sap_upd_chan_spec_params(struct scan_cache_node *scan_entry,
 	if (IS_WLAN_PHYMODE_160MHZ(phy_mode)) {
 		if (phy_mode == WLAN_PHYMODE_11AC_VHT80_80 ||
 		    phy_mode == WLAN_PHYMODE_11AXA_HE80_80) {
-			*ch_width = eHT_CHANNEL_WIDTH_80P80MHZ;
+			*ch_width = CH_WIDTH_80P80MHZ;
 			*center_freq0 = chan->cfreq0;
 			*center_freq1 = chan->cfreq1;
 		} else {
-			*ch_width = eHT_CHANNEL_WIDTH_160MHZ;
+			*ch_width = CH_WIDTH_160MHZ;
 			if (chan->cfreq1)
 				*center_freq0 = chan->cfreq1;
 			else
@@ -1437,17 +1437,17 @@ sap_upd_chan_spec_params(struct scan_cache_node *scan_entry,
 		}
 
 	} else if (IS_WLAN_PHYMODE_80MHZ(phy_mode)) {
-		*ch_width = eHT_CHANNEL_WIDTH_80MHZ;
+		*ch_width = CH_WIDTH_80MHZ;
 		*center_freq0 = chan->cfreq0;
 	} else if (IS_WLAN_PHYMODE_40MHZ(phy_mode)) {
 		if (chan->cfreq0 > chan->chan_freq)
 			*sec_ch_offset = PHY_DOUBLE_CHANNEL_LOW_PRIMARY;
 		else
 			*sec_ch_offset = PHY_DOUBLE_CHANNEL_HIGH_PRIMARY;
-		*ch_width = eHT_CHANNEL_WIDTH_40MHZ;
+		*ch_width = CH_WIDTH_40MHZ;
 		*center_freq0 = chan->cfreq0;
 	} else {
-		*ch_width = eHT_CHANNEL_WIDTH_20MHZ;
+		*ch_width = CH_WIDTH_20MHZ;
 	}
 }
 
@@ -1693,7 +1693,7 @@ static void sap_compute_spect_weight(struct sap_sel_ch_info *ch_info_params,
 	int8_t rssi = 0;
 	uint8_t chn_num = 0;
 	struct sap_ch_info *ch_info = ch_info_params->ch_info;
-	tSirMacHTChannelWidth ch_width = 0;
+	enum phy_ch_width ch_width = CH_WIDTH_20MHZ;
 	uint16_t secondaryChannelOffset;
 	uint32_t center_freq0, center_freq1, chan_freq;
 	uint8_t i;
