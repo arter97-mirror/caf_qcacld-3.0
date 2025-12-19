@@ -173,24 +173,24 @@ static int hdd_son_set_chwidth(struct wlan_objmgr_vdev *vdev,
  * Return: son chan width
  */
 static enum ieee80211_cwm_width hdd_chan_width_to_son_chwidth(
-				enum eSirMacHTChannelWidth chwidth)
+				enum phy_ch_width chwidth)
 {
 	enum ieee80211_cwm_width son_chwidth;
 
 	switch (chwidth) {
-	case eHT_CHANNEL_WIDTH_20MHZ:
+	case CH_WIDTH_20MHZ:
 		son_chwidth = IEEE80211_CWM_WIDTH20;
 		break;
-	case eHT_CHANNEL_WIDTH_40MHZ:
+	case CH_WIDTH_40MHZ:
 		son_chwidth = IEEE80211_CWM_WIDTH40;
 		break;
-	case eHT_CHANNEL_WIDTH_80MHZ:
+	case CH_WIDTH_80MHZ:
 		son_chwidth = IEEE80211_CWM_WIDTH80;
 		break;
-	case eHT_CHANNEL_WIDTH_160MHZ:
+	case CH_WIDTH_160MHZ:
 		son_chwidth = IEEE80211_CWM_WIDTH160;
 		break;
-	case eHT_CHANNEL_WIDTH_80P80MHZ:
+	case CH_WIDTH_80P80MHZ:
 		son_chwidth = IEEE80211_CWM_WIDTH80_80;
 		break;
 	default:

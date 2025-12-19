@@ -1459,8 +1459,8 @@ static QDF_STATUS hdd_handle_acs_scan_event(struct sap_event *sap_event,
  *
  * Return: max rate
  */
-static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map,
-			    int vht_mcs_10_11_supp)
+static int get_max_rate_vht(int nss, enum phy_ch_width ch_width, int sgi,
+			    int vht_mcs_map, int vht_mcs_10_11_supp)
 {
 	const struct index_vht_data_rate_type *supported_vht_mcs_rate;
 	enum data_rate_11ac_max_mcs vht_max_mcs;
@@ -1487,7 +1487,7 @@ static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map,
 	} else if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_8) {
 		maxidx = 8;
 	} else if (vht_max_mcs == DATA_RATE_11AC_MAX_MCS_9) {
-		if (ch_width == eHT_CHANNEL_WIDTH_20MHZ)
+		if (ch_width == CH_WIDTH_20MHZ)
 			/* MCS9 is not valid for VHT20 when nss=1,2 */
 			maxidx = 8;
 		else
@@ -1498,13 +1498,13 @@ static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map,
 		return maxrate;
 	}
 
-	if (ch_width == eHT_CHANNEL_WIDTH_20MHZ) {
+	if (ch_width == CH_WIDTH_20MHZ) {
 		maxrate =
 		supported_vht_mcs_rate[maxidx].supported_VHT20_rate[sgi];
-	} else if (ch_width == eHT_CHANNEL_WIDTH_40MHZ) {
+	} else if (ch_width == CH_WIDTH_40MHZ) {
 		maxrate =
 		supported_vht_mcs_rate[maxidx].supported_VHT40_rate[sgi];
-	} else if (ch_width == eHT_CHANNEL_WIDTH_80MHZ) {
+	} else if (ch_width == CH_WIDTH_80MHZ) {
 		maxrate =
 		supported_vht_mcs_rate[maxidx].supported_VHT80_rate[sgi];
 	} else {
@@ -1527,7 +1527,7 @@ static int get_max_rate_vht(int nss, int ch_width, int sgi, int vht_mcs_map,
  *
  * Return: max rate
  */
-static int get_max_rate_he(int nss, int ch_width, int sgi_enable,
+static int get_max_rate_he(int nss, enum phy_ch_width ch_width, int sgi_enable,
 			   int he_mcs_map, int he_mcs_12_13_map)
 {
 	const struct index_he_data_rate_type *supported_he_mcs_rate;
@@ -1565,17 +1565,17 @@ static int get_max_rate_he(int nss, int ch_width, int sgi_enable,
 		return maxrate;
 	}
 
-	if (ch_width == eHT_CHANNEL_WIDTH_20MHZ) {
+	if (ch_width == CH_WIDTH_20MHZ) {
 		maxrate =
 		supported_he_mcs_rate[maxidx].supported_HE20_rate[0][sgi];
-	} else if (ch_width == eHT_CHANNEL_WIDTH_40MHZ) {
+	} else if (ch_width == CH_WIDTH_40MHZ) {
 		maxrate =
 		supported_he_mcs_rate[maxidx].supported_HE40_rate[0][sgi];
-	} else if (ch_width == eHT_CHANNEL_WIDTH_80MHZ) {
+	} else if (ch_width == CH_WIDTH_80MHZ) {
 		maxrate =
 		supported_he_mcs_rate[maxidx].supported_HE80_rate[0][sgi];
-	} else if ((ch_width == eHT_CHANNEL_WIDTH_160MHZ) ||
-			ch_width == eHT_CHANNEL_WIDTH_80P80MHZ) {
+	} else if ((ch_width == CH_WIDTH_160MHZ) ||
+			ch_width == CH_WIDTH_80P80MHZ) {
 		maxrate =
 		supported_he_mcs_rate[maxidx].supported_HE160_rate[0][sgi];
 	} else {
@@ -1600,7 +1600,7 @@ static int calculate_max_phy_rate(struct hdd_station_info *stainfo)
 	int i;
 	int mode = stainfo->mode;
 	int nss = stainfo->nss;
-	int ch_width = stainfo->ch_width;
+	enum phy_ch_width ch_width = stainfo->ch_width;
 	int sgi = stainfo->sgi_enable;
 	int supp_idx = stainfo->max_supp_idx;
 	int ext_idx = stainfo->max_ext_idx;
@@ -1637,11 +1637,11 @@ static int calculate_max_phy_rate(struct hdd_station_info *stainfo)
 			return maxrate;
 		}
 
-		if (ch_width == eHT_CHANNEL_WIDTH_20MHZ) {
+		if (ch_width == CH_WIDTH_20MHZ) {
 			tmprate = sgi ?
 				supported_mcs_rate[maxidx].supported_rate[2] :
 				supported_mcs_rate[maxidx].supported_rate[0];
-		} else if (ch_width == eHT_CHANNEL_WIDTH_40MHZ) {
+		} else if (ch_width == CH_WIDTH_40MHZ) {
 			tmprate = sgi ?
 				supported_mcs_rate[maxidx].supported_rate[3] :
 				supported_mcs_rate[maxidx].supported_rate[1];
@@ -1746,38 +1746,6 @@ enum qca_wlan_802_11_mode hdd_convert_dot11mode_from_phymode(int phymode)
 
 }
 
-static enum eSirMacHTChannelWidth
-hdd_convert_phy_chwidth_to_chwidth(enum phy_ch_width chwidth)
-{
-	enum eSirMacHTChannelWidth ch_width = eHT_MAX_CHANNEL_WIDTH;
-
-	switch (chwidth) {
-	case CH_WIDTH_20MHZ:
-		ch_width = eHT_CHANNEL_WIDTH_20MHZ;
-		break;
-	case CH_WIDTH_40MHZ:
-		ch_width = eHT_CHANNEL_WIDTH_40MHZ;
-		break;
-	case CH_WIDTH_80MHZ:
-		ch_width = eHT_CHANNEL_WIDTH_80MHZ;
-		break;
-	case CH_WIDTH_160MHZ:
-		ch_width = eHT_CHANNEL_WIDTH_160MHZ;
-		break;
-	case CH_WIDTH_80P80MHZ:
-		ch_width = eHT_CHANNEL_WIDTH_80P80MHZ;
-		break;
-	case CH_WIDTH_320MHZ:
-		ch_width = eHT_CHANNEL_WIDTH_320MHZ;
-		break;
-	default:
-		hdd_debug("Invalid channel width %d", chwidth);
-		break;
-	}
-
-	return ch_width;
-}
-
 /**
  * hdd_fill_station_info() - fill stainfo once connected
  * @adapter: pointer to hdd adapter
@@ -1818,7 +1786,7 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 	stainfo->sgi_enable = event->sgi_enable;
 	stainfo->tx_stbc = event->tx_stbc;
 	stainfo->rx_stbc = event->rx_stbc;
-	stainfo->ch_width = hdd_convert_phy_chwidth_to_chwidth(event->ch_width);
+	stainfo->ch_width = event->ch_width;
 	stainfo->mode = event->mode;
 	stainfo->max_supp_idx = event->max_supp_idx;
 	stainfo->max_ext_idx = event->max_ext_idx;

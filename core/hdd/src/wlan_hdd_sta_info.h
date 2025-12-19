@@ -310,7 +310,7 @@ struct hdd_station_info {
 	enum txrate_gi guard_interval;
 	bool tx_stbc;
 	bool rx_stbc;
-	tSirMacHTChannelWidth ch_width;
+	enum phy_ch_width ch_width;
 	uint8_t mode;
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;

@@ -1428,19 +1428,19 @@ fail:
  *
  * Returns: decoded channel band width.
  */
-static uint16_t hdd_decode_ch_width(tSirMacHTChannelWidth ch_width)
+static uint16_t hdd_decode_ch_width(enum phy_ch_width ch_width)
 {
 	switch (ch_width) {
-	case 0:
+	case CH_WIDTH_20MHZ:
 		return 20;
-	case 1:
+	case CH_WIDTH_40MHZ:
 		return 40;
-	case 2:
+	case CH_WIDTH_80MHZ:
 		return 80;
-	case 3:
-	case 4:
+	case CH_WIDTH_160MHZ:
+	case CH_WIDTH_80P80MHZ:
 		return 160;
-	case 5:
+	case CH_WIDTH_320MHZ:
 		return 320;
 	default:
 		hdd_debug("invalid enum: %d", ch_width);

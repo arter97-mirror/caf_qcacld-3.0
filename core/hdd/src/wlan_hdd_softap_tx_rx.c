@@ -417,7 +417,7 @@ hdd_reset_sta_info_during_reattach(struct hdd_station_info *sta_info)
 	sta_info->sgi_enable = 0;
 	sta_info->tx_stbc = 0;
 	sta_info->rx_stbc = 0;
-	sta_info->ch_width = 0;
+	sta_info->ch_width = CH_WIDTH_20MHZ;
 	sta_info->mode = 0;
 	sta_info->max_supp_idx = 0;
 	sta_info->max_ext_idx = 0;
