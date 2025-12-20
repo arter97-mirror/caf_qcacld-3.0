@@ -94,6 +94,7 @@
 #include "son_api.h"
 #include "wlan_hdd_tx_powerboost.h"
 #include "wlan_hdd_ioctl.h"
+#include "wlan_hdd_wondertap.h"
 
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
@@ -2011,6 +2012,8 @@ QDF_STATUS hdd_wlan_shutdown(void)
 					       QDF_SYSTEM_SUSPEND);
 	}
 
+
+	wlan_hdd_wondertap_unregister_ops(hdd_ctx->parent_dev, true);
 	wlan_hdd_rx_thread_resume(hdd_ctx);
 
 	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
@@ -2300,6 +2303,8 @@ QDF_STATUS hdd_wlan_re_init(void)
 
 	if (hdd_ctx->hdd_wlan_suspended)
 		hdd_ctx->hdd_wlan_suspended = false;
+
+	wlan_hdd_wondertap_register_ops(hdd_ctx->parent_dev);
 
 	return QDF_STATUS_SUCCESS;
 
