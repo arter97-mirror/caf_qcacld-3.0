@@ -1025,7 +1025,7 @@ static void __hdd_soc_remove(struct device *dev)
 	pr_info("%s: Removing driver v%s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR);
 
-	wlan_hdd_wondertap_unregister_ops(dev);
+	wlan_hdd_wondertap_unregister_ops(dev, false);
 	qdf_rtpm_sync_resume();
 	cds_set_driver_loaded(false);
 	cds_set_unload_in_progress(true);
@@ -2246,7 +2246,6 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 
 		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
-		wlan_hdd_wondertap_unregister_ops(dev);
 		hdd_init_start_completion();
 
 		/* Notify external threads currently waiting on firmware

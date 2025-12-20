@@ -56,6 +56,7 @@ int wlan_hdd_wondertap_register_ops(struct device *dev);
 /**
  * wlan_hdd_wondertap_unregister_ops() - Unregister wondertap operations
  * @dev: device handle
+ * @force_cleanup: force cleanup wondertap resources
  *
  * This function unregisters the WLAN driver's wondertap operations from the
  * wondertap framework. It should be called during driver cleanup to
@@ -63,7 +64,7 @@ int wlan_hdd_wondertap_register_ops(struct device *dev);
  *
  * Return: void
  */
-void wlan_hdd_wondertap_unregister_ops(struct device *dev);
+void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup);
 
 /**
  * hdd_sme_passthrough_mode_callback() - Callback triggered by SME layer on
@@ -80,7 +81,8 @@ static inline int wlan_hdd_wondertap_register_ops(struct device *dev)
 	return 0;
 }
 
-static inline void wlan_hdd_wondertap_unregister_ops(struct device *dev)
+static inline
+void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 {
 }
 

@@ -2139,6 +2139,14 @@ static QDF_STATUS mon_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 	return wma_mon_mlme_vdev_stop_send(vdev_mlme, data_len, data);
 }
 
+static QDF_STATUS mon_mlme_vdev_stop_resp(struct vdev_mlme_obj *vdev_mlme,
+					  struct vdev_stop_response *rsp)
+{
+	mlme_legacy_debug("vdev id = %d",
+			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+	return wma_mon_mlme_vdev_stop_resp(vdev_mlme);
+}
+
 /**
  * mon_mlme_vdev_down_send() - callback to send vdev down req
  * @vdev_mlme: vdev mlme object
@@ -2152,17 +2160,18 @@ static QDF_STATUS mon_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 static QDF_STATUS mon_mlme_vdev_down_send(struct vdev_mlme_obj *vdev_mlme,
 					  uint16_t data_len, void *data)
 {
-	mlme_legacy_debug("vdev id = %d",
-			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
-	return wma_mon_mlme_vdev_down_send(vdev_mlme, data_len, data);
-}
+	QDF_STATUS status;
 
-static QDF_STATUS mon_mlme_vdev_stop_resp(struct vdev_mlme_obj *vdev_mlme,
-					  struct vdev_stop_response *rsp)
-{
 	mlme_legacy_debug("vdev id = %d",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
-	return wma_mon_mlme_vdev_stop_resp(vdev_mlme);
+
+	status = wma_mon_mlme_vdev_down_send(vdev_mlme, data_len, data);
+
+	if (QDF_IS_STATUS_ERROR(status) &&
+	    wlan_vdev_mlme_get_opmode(vdev_mlme->vdev))
+		mon_mlme_vdev_stop_resp(vdev_mlme, NULL);
+
+	return status;
 }
 
 static void mon_mlme_vdev_down(struct vdev_mlme_obj *vdev_mlme)

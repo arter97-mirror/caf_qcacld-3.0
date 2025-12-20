@@ -266,6 +266,8 @@ int __wlan_hdd_stop_wondertap_intf(struct hdd_context *hdd_ctx,
 
 	hdd_stop_no_trans(adapter->dev);
 
+	ucfg_fwol_configure_global_params(hdd_ctx->psoc, hdd_ctx->pdev);
+
 	wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 1);
 
 done:
@@ -337,6 +339,14 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 	ret = __wlan_hdd_wondertap_set_fixed_tx_rate(adapter, &params->tx_rate);
 	if (ret)
 		goto delete_pe_session;
+
+	sme_set_vdev_sw_retry(adapter->deflink->vdev_id,
+			      params->data_retry_limit,
+			      WMI_VDEV_CUSTOM_SW_RETRY_TYPE_AGGR);
+
+	sme_set_vdev_sw_retry(adapter->deflink->vdev_id,
+			      params->data_retry_limit,
+			      WMI_VDEV_CUSTOM_SW_RETRY_TYPE_NONAGGR);
 
 	policy_mgr_incr_active_session(hdd_ctx->psoc, QDF_PASSTHRU_MODE,
 				       adapter->deflink->vdev_id,
@@ -425,6 +435,7 @@ int wlan_hdd_wondertap_init(void **handle,
 	struct osif_vdev_sync *vdev_sync;
 	struct hdd_adapter *adapter;
 	struct hdd_wondertap_context *wt_ctx;
+	uint8_t curr_cc[REG_ALPHA2_LEN + 1] = {0};
 	QDF_STATUS status;
 	int errno;
 
@@ -477,17 +488,22 @@ int wlan_hdd_wondertap_init(void **handle,
 		goto destroy_sync;
 	}
 
-	hdd_info("set regulatory cc:%s", params->country_code);
+	ucfg_reg_get_current_country(hdd_ctx->psoc, curr_cc);
+
+	hdd_info("set regulatory cc:%s curr_cc:%s", params->country_code,
+		 curr_cc);
 
 	errno = hdd_reg_set_country(hdd_ctx, (char *)params->country_code);
-	if (errno)
+	if (errno) {
 		hdd_info("set country code failed:%d", errno);
+		goto destroy_sync;
+	}
 
 	wt_ctx = qdf_mem_malloc(sizeof(*wt_ctx));
 	if (!wt_ctx) {
 		hdd_err("wondertap memory alloc failed");
 		errno = -ENOMEM;
-		goto destroy_sync;
+		goto mem_malloc_failed;
 	}
 
 	status = qdf_event_create(&wt_ctx->wondertap_vdev_event);
@@ -559,6 +575,9 @@ create_rtpm_lock_failed:
 
 create_wondertap_event_failed:
 	qdf_mem_free(wt_ctx);
+
+mem_malloc_failed:
+	hdd_reg_set_country(hdd_ctx, curr_cc);
 
 destroy_sync:
 	osif_vdev_sync_trans_stop(vdev_sync);
@@ -632,11 +651,6 @@ void wlan_hdd_wondertap_deinit(void *handle,
 	errno = hdd_reg_set_country(hdd_ctx, (char *)params->country_code);
 	if (errno)
 		hdd_info("set country code failed:%d", errno);
-
-	ucfg_fwol_configure_global_params(hdd_ctx->psoc, hdd_ctx->pdev);
-
-	if (wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 1))
-		hdd_err("IMPS feature enable failed");
 
 	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 	if (sta_adapter) {
@@ -955,9 +969,58 @@ int wlan_hdd_wondertap_register_ops(struct device *dev)
 	return pld_set_vendor_wonder_priv_data(dev, &wlan_drv_wondertap_priv);
 }
 
-void wlan_hdd_wondertap_unregister_ops(struct device *dev)
+void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 {
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
+	struct osif_vdev_sync *vdev_sync;
+	QDF_STATUS status;
+
 	pld_set_vendor_wonder_priv_data(dev, NULL);
+
+	hdd_hold_rtnl_lock();
+
+	if (force_cleanup && g_wt_ctx) {
+		hdd_ctx = g_wt_ctx->hdd_ctx;
+		adapter = g_wt_ctx->wt_adapter;
+
+		wlan_hdd_netif_queue_control(adapter,
+				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
+				     WLAN_CONTROL_PATH);
+
+		dev_close(adapter->dev);
+
+		qdf_event_reset(&g_wt_ctx->wondertap_vdev_event);
+		sme_delete_pe_session(hdd_ctx->mac_handle, adapter->deflink->vdev_id,
+				      QDF_PASSTHRU_MODE);
+
+		status = qdf_wait_for_event_completion(&g_wt_ctx->wondertap_vdev_event,
+						       WLAN_WONDERTAP_VDEV_OP_TIMEOUT_MS);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("wondertap vdev teardown failed:%d", status);
+
+		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc, QDF_PASSTHRU_MODE,
+						adapter->deflink->vdev_id);
+
+		hdd_stop_adapter(hdd_ctx, adapter);
+		hdd_deinit_adapter(hdd_ctx, adapter, true);
+
+		vdev_sync = osif_vdev_sync_unregister(adapter->dev);
+		osif_vdev_sync_destroy(vdev_sync);
+
+		__wlan_hdd_destroy_wondertap_intf(hdd_ctx, adapter);
+
+		qdf_runtime_pm_allow_suspend(&g_wt_ctx->wondertap_rtpm_lock);
+		qdf_wake_lock_release(&g_wt_ctx->wondertap_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
+		qdf_wake_lock_destroy(&g_wt_ctx->wondertap_wakelock);
+		qdf_runtime_lock_deinit(&g_wt_ctx->wondertap_rtpm_lock);
+		qdf_event_destroy(&g_wt_ctx->wondertap_vdev_event);
+		qdf_mem_free(g_wt_ctx);
+		g_wt_ctx = NULL;
+	}
+
+	hdd_release_rtnl_lock();
 }
 
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
