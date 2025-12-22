@@ -2265,9 +2265,9 @@ enum roam_bg_scan {
 /*
  * <ini>
  * gDelayBeforeVdevStop - wait time for tx complete before vdev stop
- * @Min: 2
+ * @Min: 0
  * @Max: 200
- * @Default: 20
+ * @Default: 0
  *
  * This INI is used to set wait time for tx complete before vdev stop.
  *
@@ -2279,9 +2279,9 @@ enum roam_bg_scan {
  */
 #define CFG_LFR_DELAY_BEFORE_VDEV_STOP CFG_INI_UINT( \
 	"gDelayBeforeVdevStop", \
-	2, \
+	0, \
 	200, \
-	10, \
+	0, \
 	CFG_VALUE_OR_DEFAULT, \
 	"wait time for tx complete before vdev stop")
 /*

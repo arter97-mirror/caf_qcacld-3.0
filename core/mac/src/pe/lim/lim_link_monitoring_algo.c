@@ -367,9 +367,9 @@ lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 		return;
 	}
 
-	pe_info("Session %d Vdev %d reason code %d trigger %d",
-		pe_session->peSessionId, pe_session->vdev_id, reasonCode,
-		trigger);
+	pe_debug("Session %d Vdev %d reason code %d trigger %d",
+		 pe_session->peSessionId, pe_session->vdev_id, reasonCode,
+		 trigger);
 
 	/* Add the check here in case caller missed the check */
 	if (!lim_is_sb_disconnect_allowed(pe_session))

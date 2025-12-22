@@ -2843,8 +2843,8 @@ int hdd_update_channel_width(struct wlan_hdd_link_info *link_info,
 		 */
 		comp_vdev_chan = wlan_vdev_get_active_channel(vdev);
 		if (!comp_vdev_chan) {
-			hdd_err("vdev %d: comp_vdev_chan is NULL",
-				link_info->vdev_id);
+			hdd_debug("vdev %d: comp_vdev_chan is NULL",
+				  link_info->vdev_id);
 			/* Send legacy cmd to FW if the VDEV is not active */
 			goto set_command;
 		}

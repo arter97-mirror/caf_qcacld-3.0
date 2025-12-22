@@ -411,7 +411,7 @@ void mlme_sr_update(struct wlan_objmgr_vdev *vdev, bool enable)
 	}
 
 	if (!wlan_vdev_mlme_get_he_spr_enabled(vdev)) {
-		mlme_err("Spatial Reuse disabled for vdev_id: %d", vdev_id);
+		mlme_debug("Spatial Reuse disabled for vdev_id: %d", vdev_id);
 		goto err;
 	}
 
@@ -1056,8 +1056,8 @@ QDF_STATUS mlme_set_chan_switch_in_progress(struct wlan_objmgr_vdev *vdev,
 	mlme_priv->chan_switch_in_progress = val;
 	mlo_set_chan_switch_in_progress(vdev, val);
 
-	mlme_legacy_info("Set chan_switch_in_progress: %d vdev %d",
-			 val, wlan_vdev_get_id(vdev));
+	mlme_legacy_debug("Set chan_switch_in_progress: %d vdev %d",
+			  val, wlan_vdev_get_id(vdev));
 
 	return QDF_STATUS_SUCCESS;
 }

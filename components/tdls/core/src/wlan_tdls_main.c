@@ -1632,8 +1632,8 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 
 	if (!wlan_cm_is_vdev_connected(tdls_vdev_obj->vdev) &&
 	    sta_connect_event && current_mode != TDLS_SUPPORT_DISABLED) {
-		tdls_notice_rl("Vdev:%d is not connected. Don't enable TDLS",
-			       wlan_vdev_get_id(tdls_vdev_obj->vdev));
+		tdls_debug_rl("Vdev:%d is not connected. Don't enable TDLS",
+			      wlan_vdev_get_id(tdls_vdev_obj->vdev));
 		return;
 	}
 

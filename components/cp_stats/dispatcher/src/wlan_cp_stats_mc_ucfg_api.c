@@ -1476,8 +1476,8 @@ void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
 				     sizeof(*channel_status_list));
 			channel_stats->total_channel = total_channel;
 		} else {
-			cp_stats_err("Chan cnt exceed, channel_id=%d",
-				     ev_channel_stat->channel_id);
+			cp_stats_debug("Chan cnt exceed, channel_id=%d",
+				       ev_channel_stat->channel_id);
 		}
 	}
 
