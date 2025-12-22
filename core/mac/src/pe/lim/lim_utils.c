@@ -7550,6 +7550,8 @@ void lim_decide_he_op(struct mac_context *mac_ctx, uint32_t *mlme_he_ops,
 
 	if (he_ops_from_ie->bss_color) {
 		he_ops.bss_color = he_ops_from_ie->bss_color;
+		pe_debug("BSS color value from HE OP IE 0x%x",
+			 he_ops_from_ie->bss_color);
 	} else {
 		qdf_get_random_bytes(&color, sizeof(color));
 		/* make sure color is within 1-63*/
