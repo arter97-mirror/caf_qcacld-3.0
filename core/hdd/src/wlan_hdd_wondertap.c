@@ -16,6 +16,7 @@
 #include <wlan_fwol_ucfg_api.h>
 #include <wma_api.h>
 #include "cds_api.h"
+#include "cdp_txrx_ctrl.h"
 
 static struct hdd_wondertap_context *g_wt_ctx;
 
@@ -66,6 +67,7 @@ __wlan_hdd_set_wondertap_channel(struct hdd_context *hdd_ctx,
 	struct channel_change_req req = {0};
 	struct ch_params ch_params = {0};
 	enum phy_ch_width ch_width;
+	cdp_config_param_type val;
 	QDF_STATUS status;
 	int ret;
 
@@ -127,8 +129,14 @@ __wlan_hdd_set_wondertap_channel(struct hdd_context *hdd_ctx,
 
 	status = qdf_wait_for_event_completion(&g_wt_ctx->wondertap_vdev_event,
 					       WLAN_WONDERTAP_VDEV_OP_TIMEOUT_MS);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wondertap vdev up failed:%d", status);
+	} else {
+		val.cdp_passthru_vdev_freq = params->freq;
+		cdp_txrx_set_vdev_param(cds_get_context(QDF_MODULE_ID_SOC),
+					adapter->deflink->vdev_id,
+					CDP_VDEV_SET_PASSTHRU_FREQ, val);
+	}
 
 channel_change_req_failed:
 
@@ -345,7 +353,7 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 			      WMI_VDEV_CUSTOM_SW_RETRY_TYPE_AGGR);
 
 	sme_set_vdev_sw_retry(adapter->deflink->vdev_id,
-			      params->data_retry_limit,
+			      params->mgmt_retry_limit,
 			      WMI_VDEV_CUSTOM_SW_RETRY_TYPE_NONAGGR);
 
 	policy_mgr_incr_active_session(hdd_ctx->psoc, QDF_PASSTHRU_MODE,
