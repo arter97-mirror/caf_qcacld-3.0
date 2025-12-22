@@ -9289,6 +9289,26 @@ wlan_is_mlo_aggregated_stats_allowed(struct hdd_adapter *adapter,
 	return false;
 }
 
+static inline bool
+wlan_hdd_validate_legacy_bssid(struct wlan_hdd_link_info *link_info,
+			       const uint8_t *mac)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr bssid;
+	bool ret = false;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_STATS_ID);
+	if (!vdev)
+		return ret;
+
+	wlan_vdev_get_bss_peer_mac(vdev, &bssid);
+	if (qdf_is_macaddr_equal(&bssid, (struct qdf_mac_addr *)mac))
+		ret = true;
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+
+	return ret;
+}
 /**
  * wlan_hdd_send_mlo_station_stats() - send station stats to userspace
  * @adapter: Pointer to hdd adapter
@@ -9306,6 +9326,11 @@ static int wlan_hdd_send_mlo_station_stats(struct hdd_adapter *adapter,
 	struct wlan_hdd_link_info *link_info;
 
 	if (!wlan_hdd_is_mlo_connection(adapter->deflink)) {
+		if (!wlan_hdd_validate_legacy_bssid(adapter->deflink, mac)) {
+			hdd_debug_rl("Invalid legacy BSSID");
+			return -EINVAL;
+		}
+
 		hdd_nofl_debug("Fetching station stats for legacy connection");
 		return wlan_hdd_get_sta_stats(adapter->deflink, mac, sinfo);
 	}
