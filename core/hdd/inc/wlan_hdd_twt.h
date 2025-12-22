@@ -277,41 +277,6 @@ void hdd_send_twt_role_disable_cmd(struct hdd_context *hdd_ctx,
 void
 hdd_send_twt_del_all_sessions_to_userspace(struct wlan_hdd_link_info *link_info);
 
-/**
- * hdd_twt_concurrency_update_on_scc() - Send TWT disable command to fw if
- * SCC exists in two vdevs
- * @pdev: pdev pointer
- * @object: object pointer
- * @arg: argument pointer
- *
- * Return: None
- */
-void hdd_twt_concurrency_update_on_scc(struct wlan_objmgr_pdev *pdev,
-				       void *object, void *arg);
-
-/**
- * hdd_twt_concurrency_update_on_mcc() - Send TWT disable command to fw if
- * MCC exists in two vdevs
- * @pdev: pdev pointer
- * @object: object pointer
- * @arg: argument pointer
- *
- * Return: None
- */
-void hdd_twt_concurrency_update_on_mcc(struct wlan_objmgr_pdev *pdev,
-				       void *object, void *arg);
-
-/**
- * hdd_twt_concurrency_update_on_dbs() - Send TWT enable command to fw if DBS
- * exists in two vdevs
- * @pdev: pdev pointer
- * @object: object pointer
- * @arg: argument pointer
- *
- * Return: None
- */
-void hdd_twt_concurrency_update_on_dbs(struct wlan_objmgr_pdev *pdev,
-				       void *object, void *arg);
 
 /**
  * __hdd_twt_update_work_handler() - TWT work handler to send TWT enable/disable
@@ -483,23 +448,6 @@ hdd_send_twt_del_all_sessions_to_userspace(struct wlan_hdd_link_info *link_info)
 {
 }
 
-static inline
-void hdd_twt_concurrency_update_on_scc(struct wlan_objmgr_pdev *pdev,
-				       void *object, void *arg)
-{
-}
-
-static inline
-void hdd_twt_concurrency_update_on_mcc(struct wlan_objmgr_pdev *pdev,
-				       void *object, void *arg)
-{
-}
-
-static inline
-void hdd_twt_concurrency_update_on_dbs(struct wlan_objmgr_pdev *pdev,
-				       void *object, void *arg)
-{
-}
 
 static inline
 void __hdd_twt_update_work_handler(struct hdd_context *hdd_ctx)
