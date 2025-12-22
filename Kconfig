@@ -159,4 +159,8 @@ config FEATURE_WLAN_HOST_TXRX_STATS
     bool "Enable FEATURE_WLAN_HOST_TXRX_STATS"
     default n
 
+config FEATURE_IPA_RING_STATS
+    bool "Enable FEATURE_IPA_RING_STATS"
+    default n
+
 endif # QCA_CLD_WLAN
