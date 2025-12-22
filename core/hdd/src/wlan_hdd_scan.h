@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -169,6 +169,14 @@ void wlan_hdd_cfg80211_abort_scan(struct wiphy *wiphy,
  * Return: None
  */
 void hdd_init_scan_reject_params(struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_reset_scan_reject_params - API to reset scan reject params.
+ * @vdev: Pointer to vdev object
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS hdd_reset_scan_reject_params(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_hdd_cfg80211_scan_block() - scan block handler
