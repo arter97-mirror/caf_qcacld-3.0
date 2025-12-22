@@ -49,6 +49,8 @@
 #include "wlan_hdd_object_manager.h"
 #include "nan_ucfg_api.h"
 #include "wlan_dp_api.h"
+#include "wlan_osif_priv.h"
+#include "wlan_hdd_main.h"
 
 #define SCAN_DONE_EVENT_BUF_SIZE 4096
 #define RATE_MASK 0x7f
@@ -311,6 +313,41 @@ void hdd_init_scan_reject_params(struct hdd_context *hdd_ctx)
 		hdd_ctx->last_scan_reject_reason = 0;
 		hdd_ctx->scan_reject_cnt = 0;
 	}
+}
+
+QDF_STATUS hdd_reset_scan_reject_params(struct wlan_objmgr_vdev *vdev)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
+	struct vdev_osif_priv *osif_priv = wlan_vdev_get_ospriv(vdev);
+	struct wlan_hdd_link_info *link_info;
+
+	if (!osif_priv) {
+		hdd_err("osif_priv is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	link_info = osif_priv->legacy_osif_priv;
+	if (!link_info) {
+		hdd_err("link_info is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	adapter = link_info->adapter;
+	if (!adapter) {
+		hdd_err("adapter is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	hdd_init_scan_reject_params(hdd_ctx);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /*
