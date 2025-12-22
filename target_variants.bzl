@@ -40,6 +40,7 @@ le_variants = [
     # keep sorted
     "debug-defconfig",
     "perf-defconfig",
+    "defconfig",
 ]
 
 le_32_variants = [
