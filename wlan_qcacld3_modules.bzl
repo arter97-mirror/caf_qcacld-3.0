@@ -1,6 +1,6 @@
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
-load("//soc-repo:target_variants.bzl", "get_all_variants")
+load(":target_variants.bzl", "get_all_variants")
 
 _target_chipset_map = {
     "niobe": [
@@ -2362,7 +2362,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//vendor/qcom/opensource/wlan/platform:wlan-platform-headers",
             "//vendor/qcom/opensource/dataipa:include_headers",
             "//vendor/qcom/opensource/dataipa:{}_{}_ipam".format(target, variant),
-            "//soc-repo:{}/kernel/sched/walt/sched-walt".format(tv),
         ]
 
     print("name=", name)
