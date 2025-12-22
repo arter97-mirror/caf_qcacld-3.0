@@ -12964,7 +12964,8 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	 */
 	if ((wlan_reg_get_channel_state_for_pwrmode(
 		pdev, ch_freq, REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS) &&
-	    !sta_cnt && !gc_cnt && sta_sap_scc_on_dfs_chan &&
+	    !policy_mgr_is_sta_sap_scc(psoc, ch_freq, false) &&
+	    sta_sap_scc_on_dfs_chan &&
 	    !policy_mgr_get_dfs_master_dynamic_enabled(psoc, vdev_id)) {
 		policy_mgr_err("SAP not allowed on DFS channel if no dfs master capability!!");
 		return false;
