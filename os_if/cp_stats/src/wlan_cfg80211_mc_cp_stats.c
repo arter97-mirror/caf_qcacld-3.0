@@ -86,6 +86,27 @@ static void wlan_cfg80211_infra_cp_stats_bmiss_dealloc(void *priv)
 {
 }
 #endif /* CONFIG_WLAN_BMISS */
+
+static void wlan_cfg80211_infra_cp_stats_enhance_dealloc(void *priv)
+{
+	struct infra_cp_stats_event *stats = priv;
+
+	if (stats->vdev_beacon_stats) {
+		qdf_mem_free(stats->vdev_beacon_stats);
+		stats->vdev_beacon_stats = NULL;
+	}
+
+	if (stats->vdev_congestion_stats) {
+		qdf_mem_free(stats->vdev_congestion_stats);
+		stats->vdev_congestion_stats = NULL;
+	}
+
+	if (stats->vdev_data_stats) {
+		qdf_mem_free(stats->vdev_data_stats);
+		stats->vdev_data_stats = NULL;
+	}
+}
+
 /**
  * wlan_cfg80211_mc_infra_cp_stats_dealloc() - callback to free priv
  * allocations for infra cp stats
@@ -104,6 +125,7 @@ void wlan_cfg80211_mc_infra_cp_stats_dealloc(void *priv)
 	}
 	wlan_cfg80211_infra_cp_stats_twt_dealloc(priv);
 	wlan_cfg80211_infra_cp_stats_bmiss_dealloc(priv);
+	wlan_cfg80211_infra_cp_stats_enhance_dealloc(priv);
 }
 #endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
 
@@ -720,7 +742,10 @@ static void get_twt_infra_cp_stats(struct infra_cp_stats_event *ev,
 static void
 wlan_cfg80211_mc_infra_cp_free_twt_stats(struct infra_cp_stats_event *stats)
 {
-	qdf_mem_free(stats->twt_infra_cp_stats);
+	if (stats->twt_infra_cp_stats) {
+		qdf_mem_free(stats->twt_infra_cp_stats);
+		stats->twt_infra_cp_stats = NULL;
+	}
 }
 #else
 static void get_twt_infra_cp_stats(struct infra_cp_stats_event *ev,
@@ -749,6 +774,25 @@ wlan_cfg80211_mc_infra_cp_free_bmiss_stats(struct infra_cp_stats_event *stats)
 {
 }
 #endif/* CONFIG_WLAN_BMISS */
+
+static inline
+void wlan_cfg80211_mc_infra_cp_free_enhance_stats(struct infra_cp_stats_event *stats)
+{
+	if (stats->vdev_beacon_stats) {
+		qdf_mem_free(stats->vdev_beacon_stats);
+		stats->vdev_beacon_stats = NULL;
+	}
+
+	if (stats->vdev_congestion_stats) {
+		qdf_mem_free(stats->vdev_congestion_stats);
+		stats->vdev_congestion_stats = NULL;
+	}
+
+	if (stats->vdev_data_stats) {
+		qdf_mem_free(stats->vdev_data_stats);
+		stats->vdev_data_stats = NULL;
+	}
+}
 static inline void
 wlan_cfg80211_mc_infra_cp_stats_free_stats_event(
 					struct infra_cp_stats_event *stats)
@@ -757,6 +801,7 @@ wlan_cfg80211_mc_infra_cp_stats_free_stats_event(
 		return;
 	wlan_cfg80211_mc_infra_cp_free_twt_stats(stats);
 	wlan_cfg80211_mc_infra_cp_free_bmiss_stats(stats);
+	wlan_cfg80211_mc_infra_cp_free_enhance_stats(stats);
 	qdf_mem_free(stats);
 }
 
@@ -1118,6 +1163,7 @@ void wlan_get_vdev_list(struct wlan_objmgr_psoc *psoc,
 		for (link = 0; link < vdev_count; link++) {
 			info->vdev_id[link] =
 				wlan_vdev_get_id(wlan_vdev_list[link]);
+			mlo_release_vdev_ref(wlan_vdev_list[link]);
 		}
 		info->num_vdev_ids = vdev_count;
 	}
@@ -1129,6 +1175,7 @@ void infra_enchance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
 {
 	struct osif_request *request = osif_request_get(context);
 	struct infra_cp_stats_event *priv = osif_request_priv(request);
+	int i, j;
 
 	if (!request)
 		return;
@@ -1146,7 +1193,7 @@ void infra_enchance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
 
 	// Fill vdev_beacon_stats from infra_event to priv
 	priv->num_vdev_beacon_stats = infra_event->num_vdev_beacon_stats;
-	for (int i = 0; i < priv->num_vdev_beacon_stats; i++) {
+	for (i = 0; i < priv->num_vdev_beacon_stats; i++) {
 		priv->vdev_beacon_stats[i].vdev_id =
 			infra_event->vdev_beacon_stats[i].vdev_id;
 		priv->vdev_beacon_stats[i].length =
@@ -1159,7 +1206,7 @@ void infra_enchance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
 	// Fill vdev_congestion_stats from infra_event to priv
 	priv->num_vdev_congestion_stats =
 		infra_event->num_vdev_congestion_stats;
-	for (int i = 0; i < priv->num_vdev_congestion_stats; i++) {
+	for (i = 0; i < priv->num_vdev_congestion_stats; i++) {
 		priv->vdev_congestion_stats[i].vdev_id =
 			infra_event->vdev_congestion_stats[i].vdev_id;
 		priv->vdev_congestion_stats[i].cca_busy_time =
@@ -1170,7 +1217,7 @@ void infra_enchance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
 
 	// Fill vdev_data_stats from infra_event to priv
 	priv->num_vdev_data_stats = infra_event->num_vdev_data_stats;
-	for (int i = 0; i < priv->num_vdev_data_stats; i++) {
+	for (i = 0; i < priv->num_vdev_data_stats; i++) {
 		priv->vdev_data_stats[i].vdev_id =
 			infra_event->vdev_data_stats[i].vdev_id;
 		qdf_mem_copy(priv->vdev_data_stats[i].tx_mcs_data_ppdu,
@@ -1185,6 +1232,52 @@ void infra_enchance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
 		qdf_mem_copy(priv->vdev_data_stats[i].rx_bw_data_ppdu,
 			     infra_event->vdev_data_stats[i].rx_bw_data_ppdu,
 			     sizeof(priv->vdev_data_stats[i].rx_bw_data_ppdu));
+	}
+
+	hdd_debug("Qdata Priv info status: %d action: %d num_vdev_beacon_stats: %d num_vdev_congestion_stats: %d num_vdev_data_stats:%d",
+		  priv->status, priv->action, priv->num_vdev_beacon_stats,
+		  priv->num_vdev_congestion_stats, priv->num_vdev_data_stats);
+	hdd_debug("Vdev beacon stats");
+	for (i = 0; i < priv->num_vdev_beacon_stats; i++) {
+		hdd_debug("vdev_id: %d length: %d",
+			  priv->vdev_beacon_stats[i].vdev_id,
+			  priv->vdev_beacon_stats[i].length);
+		for (j = 0; j < BCN_MAX_HISTORY_LENGTH; j++) {
+			hdd_debug("vdev_beacon_stats[%d].bmiss_bitmask[%d]: %d",
+				  i, j,
+				  priv->vdev_beacon_stats[i].bmiss_bitmask[j]);
+		}
+	}
+
+	hdd_debug("Vdev congestion stats");
+	for (i = 0; i < priv->num_vdev_congestion_stats; i++) {
+		hdd_debug("vdev: %d cca_busy_time: %d on_time: %d",
+			  priv->vdev_congestion_stats[i].vdev_id,
+			  priv->vdev_congestion_stats[i].cca_busy_time,
+			  priv->vdev_congestion_stats[i].on_time);
+	}
+
+	hdd_debug("Vdev data stats");
+	for (i = 0; i < priv->num_vdev_data_stats; i++) {
+		hdd_debug("vdev_id: %d", priv->vdev_data_stats[i].vdev_id);
+		for (j = 0; j < ENHANCE_STATS_MAX_MCS_COUNTERS; j++) {
+			hdd_debug("vdev_data_stats[%d].tx_mcs_data_ppdu[%d]: %d",
+				  i, j,
+				  priv->vdev_data_stats[i].tx_mcs_data_ppdu[j]);
+			hdd_debug("vdev_data_stats[%d].rx_mcs_data_ppdu[%d]: %d",
+				  i, j,
+				  priv->vdev_data_stats[i].rx_mcs_data_ppdu[j]);
+		}
+
+		for (j = 0; j <= STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_320MHz;
+		     j++) {
+			hdd_debug("vdev_data_stats[%d].tx_bw_data_ppdu[%d]: %d",
+				  i, j,
+				  priv->vdev_data_stats[i].tx_bw_data_ppdu[j]);
+			hdd_debug("vdev_data_stats[%d].rx_bw_data_ppdu[%d]: %d",
+				  i, j,
+				  priv->vdev_data_stats[i].rx_bw_data_ppdu[j]);
+		}
 	}
 
 	osif_request_complete(request);
@@ -1208,11 +1301,11 @@ wlan_send_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 	struct vdev_data_stats_event *vdev_data_stats;
 	get_infra_cp_stats_cb resp_cb = NULL;
 	void *cookie;
-	int ret, i;
+	int i;
 	static const struct osif_request_params params = {
 		.priv_size = sizeof(struct infra_cp_stats_event),
 		.timeout_ms = WLAN_WAIT_TIME_CP_STATS,
-		.dealloc = NULL,
+		.dealloc = wlan_cfg80211_mc_infra_cp_stats_dealloc,
 	};
 
 	status = wlan_cp_stats_infra_cp_get_context(psoc, &resp_cb, &cookie);
@@ -1234,11 +1327,14 @@ wlan_send_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 	}
 
 	out->vdev_beacon_stats =
-		qdf_mem_malloc(sizeof(*out->vdev_beacon_stats));
+		qdf_mem_malloc(sizeof(*out->vdev_beacon_stats) *
+			       CTRL_PATH_STATS_MAX_VDEV_ID);
 	out->vdev_congestion_stats =
-		qdf_mem_malloc(sizeof(*out->vdev_congestion_stats));
+		qdf_mem_malloc(sizeof(*out->vdev_congestion_stats) *
+			       CTRL_PATH_STATS_MAX_VDEV_ID);
 	out->vdev_data_stats =
-		qdf_mem_malloc(sizeof(*out->vdev_data_stats));
+		qdf_mem_malloc(sizeof(*out->vdev_data_stats) *
+			       CTRL_PATH_STATS_MAX_VDEV_ID);
 
 	if (!out->vdev_beacon_stats || !out->vdev_congestion_stats ||
 	    !out->vdev_data_stats) {
@@ -1261,11 +1357,14 @@ wlan_send_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 	priv->status = QDF_STATUS_E_FAILURE;
 
 	priv->vdev_beacon_stats =
-		qdf_mem_malloc(sizeof(*priv->vdev_beacon_stats));
+		qdf_mem_malloc(sizeof(*priv->vdev_beacon_stats) *
+			       CTRL_PATH_STATS_MAX_VDEV_ID);
 	priv->vdev_congestion_stats =
-		qdf_mem_malloc(sizeof(*priv->vdev_congestion_stats));
+		qdf_mem_malloc(sizeof(*priv->vdev_congestion_stats) *
+			       CTRL_PATH_STATS_MAX_VDEV_ID);
 	priv->vdev_data_stats =
-		qdf_mem_malloc(sizeof(*priv->vdev_data_stats));
+		qdf_mem_malloc(sizeof(*priv->vdev_data_stats) *
+			       CTRL_PATH_STATS_MAX_VDEV_ID);
 	if (!priv->vdev_beacon_stats || !priv->vdev_congestion_stats ||
 	    !priv->vdev_data_stats) {
 		*errno = -ENOMEM;
@@ -1279,8 +1378,15 @@ wlan_send_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 	info.request_cookie = cookie;
 	info.stats_id = TYPE_REQ_CTRL_PATH_ENHANCED_STAT;
 	info.action = ACTION_REQ_CTRL_PATH_STAT_GET;
+	info.request_id = ENHANCED_REQUEST_ID;
+
 	info.infra_cp_stats_resp_cb = infra_enchance_cp_stats_resp_cb;
 	wlan_get_vdev_list(psoc, vdev, &info);
+
+	hdd_debug("Send enchance info.stats_id: %d, info.action: %d",
+		  info.stats_id, info.action);
+	for (i = 0; i < info.num_vdev_ids; i++)
+		hdd_debug("vdev_id: %d", info.vdev_id[i]);
 
 	// Register callback/cookie for response
 	status = ucfg_infra_cp_stats_register_resp_cb(psoc, &info);
@@ -1294,16 +1400,14 @@ wlan_send_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 	status = ucfg_send_infra_cp_stats_request(vdev, &info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to send cp stats req");
-		osif_request_put(request);
 		*errno = qdf_status_to_os_return(status);
 		goto get_cp_stats_fail;
 	}
 
 	// Wait for response callback
-	ret = osif_request_wait_for_response(request);
-	if (ret) {
-		osif_err("wait failed or timed out ret: %d", ret);
-		*errno = qdf_status_to_os_return(status);
+	*errno = osif_request_wait_for_response(request);
+	if (*errno) {
+		osif_err("wait failed or timed out ret: %d", *errno);
 		goto get_cp_stats_fail;
 	}
 
@@ -1370,20 +1474,309 @@ free_stats_event:
 }
 
 static inline QDF_STATUS
-wlan_fill_mcs_pkt_value(struct wlan_objmgr_psoc *psoc,
-			struct wlan_objmgr_vdev *vdev,
-			struct sk_buff *skb,
-			struct infra_cp_stats_event *event)
+wlan_fill_mcs_pkt_value(struct sk_buff *skb,
+			struct vdev_data_stats_event *vdev_data_stats,
+			uint32_t num_vdev_data_stats)
 {
-	return QDF_STATUS_SUCCESS;
+	struct nlattr *nss_nest, *nss;
+	int nestid, i, mcs_index, attr;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t mcs_pkt_tx;
+	uint32_t mcs_pkt_rx;
+
+	nestid = QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MCS_PKT_COUNT;
+	nss_nest = nla_nest_start(skb, nestid);
+
+	if (!nss_nest) {
+		hdd_err("nla_nest_start failed");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (mcs_index = 0; mcs_index < ENHANCE_STATS_MAX_MCS_COUNTERS;
+	     mcs_index++) {
+		nss = nla_nest_start(skb, mcs_index + 1);
+		if (!nss) {
+			hdd_err("nla_nest_start failed");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		mcs_pkt_tx = 0;
+		mcs_pkt_rx = 0;
+		for (i = 0; i < num_vdev_data_stats; i++) {
+			mcs_pkt_tx += vdev_data_stats[i].tx_mcs_data_ppdu[mcs_index];
+			mcs_pkt_rx += vdev_data_stats[i].rx_mcs_data_ppdu[mcs_index];
+		}
+
+		hdd_debug("MCS index: %d, mcs_pkt_tx: %d, mcs_pkt_rx: %d",
+			  mcs_index + 1, mcs_pkt_tx, mcs_pkt_rx);
+		attr = QCA_WLAN_VENDOR_ATTR_MCS_PKT_MCS_INDEX;
+		if (nla_put_u8(skb, attr, mcs_index + 1)) {
+			hdd_err("failed to put MCS_index: %d", mcs_index + 1);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		attr = QCA_WLAN_VENDOR_ATTR_MCS_PKT_TX_PACKET_COUNT;
+		if (wlan_cfg80211_nla_put_u64_64bit(
+					skb, attr, mcs_pkt_tx,
+					QCA_WLAN_VENDOR_ATTR_MCS_PKT_PAD)) {
+			hdd_err("failed to put MCS PKT TX");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		attr = QCA_WLAN_VENDOR_ATTR_MCS_PKT_RX_PACKET_COUNT;
+		if (wlan_cfg80211_nla_put_u64_64bit(
+					skb, attr, mcs_pkt_rx,
+					QCA_WLAN_VENDOR_ATTR_MCS_PKT_PAD)) {
+			hdd_err("failed to put MCS PKT RX");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		nla_nest_end(skb, nss);
+	}
+
+	nla_nest_end(skb, nss_nest);
+
+	return status;
+}
+
+#if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC)
+static enum nl80211_chan_width
+wlan_get_nl80211_chanwidth(uint8_t chan)
+{
+	switch (chan) {
+	case 0:
+		return NL80211_CHAN_WIDTH_20;
+	case 1:
+		return NL80211_CHAN_WIDTH_40;
+	case 2:
+		return NL80211_CHAN_WIDTH_80;
+	case 3:
+		return NL80211_CHAN_WIDTH_160;
+	case 4:
+		return NL80211_CHAN_WIDTH_320;
+	default:
+		hdd_err("Invalid channel width %u", chan);
+		return NL80211_CHAN_WIDTH_20;
+	}
+}
+#else
+static inline enum nl80211_chan_width
+wlan_get_nl80211_chanwidth(uint8_t chan)
+{
+	switch (chan) {
+	case 0:
+		return NL80211_CHAN_WIDTH_20;
+	case 1:
+		return NL80211_CHAN_WIDTH_40;
+	case 2:
+		return NL80211_CHAN_WIDTH_80;
+	case 3:
+		return NL80211_CHAN_WIDTH_160;
+	default:
+		hdd_err("Invalid channel width %u", chan);
+		return NL80211_CHAN_WIDTH_20;
+	}
+}
+#endif
+
+static inline QDF_STATUS
+wlan_fill_bw_pkt_value(struct sk_buff *skb,
+		       struct vdev_data_stats_event *vdev_data_stats,
+		       uint32_t num_vdev_data_stats)
+{
+	struct nlattr *nss_nest, *nss;
+	int nestid, i, bw_chan, attr;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t bw_pkt_tx;
+	uint32_t bw_pkt_rx;
+	enum nl80211_chan_width nl_chwidth;
+
+	nestid = QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_BW_PKT_COUNT;
+	nss_nest = nla_nest_start(skb, nestid);
+	if (!nss_nest) {
+		hdd_err("nla_nest_start failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	for (bw_chan = 0;
+	     bw_chan <= STATS_EXT_EVENT_VDEV_EXT_BW_COUNTERS_320MHz;
+	     bw_chan++) {
+		nss = nla_nest_start(skb, bw_chan + 1);
+		if (!nss) {
+			hdd_err("nla_nest_start failed");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		bw_pkt_tx = 0;
+		bw_pkt_rx = 0;
+		for (i = 0; i < num_vdev_data_stats; i++) {
+			bw_pkt_tx += vdev_data_stats[i].tx_bw_data_ppdu[bw_chan];
+			bw_pkt_rx += vdev_data_stats[i].rx_bw_data_ppdu[bw_chan];
+		}
+
+		nl_chwidth = wlan_get_nl80211_chanwidth(bw_chan);
+		hdd_debug("BW chan: %d bw_pkt_tx: %d bw_pkt_rx: %d",
+			  nl_chwidth, bw_pkt_tx, bw_pkt_rx);
+
+		attr = QCA_WLAN_VENDOR_ATTR_BW_PKT_BW_CHAN_WIDTH;
+		if (nla_put_u8(skb, attr, nl_chwidth)) {
+			hdd_err("failed to put BW chan width");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		attr = QCA_WLAN_VENDOR_ATTR_BW_PKT_TX_PACKET_COUNT;
+		if (wlan_cfg80211_nla_put_u64_64bit(
+					skb, attr, bw_pkt_tx,
+					QCA_WLAN_VENDOR_ATTR_BW_PKT_PAD)) {
+			hdd_err("failed to put BW PKT TX");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		attr = QCA_WLAN_VENDOR_ATTR_BW_PKT_RX_PACKET_COUNT;
+		if (wlan_cfg80211_nla_put_u64_64bit(
+					skb, attr, bw_pkt_rx,
+					QCA_WLAN_VENDOR_ATTR_BW_PKT_PAD)) {
+			hdd_err("failed to put BW PKT RX");
+			return QDF_STATUS_E_INVAL;
+		}
+		nla_nest_end(skb, nss);
+	}
+	nla_nest_end(skb, nss_nest);
+
+	return status;
 }
 
 static inline QDF_STATUS
-wlan_fill_bw_pkt_value(struct wlan_objmgr_psoc *psoc,
-		       struct wlan_objmgr_vdev *vdev,
-		       struct sk_buff *skb,
-		       struct infra_cp_stats_event *event)
+wlan_fill_cca_stats_value(struct wlan_objmgr_psoc *psoc,
+			  struct sk_buff *skb,
+			  struct vdev_congestion_stats_event *vdev_congestion_stats,
+			  uint32_t num_vdev_congestion_stats)
 {
+	struct nlattr *nss_nest, *nss;
+	int nestid, i, attr;
+	uint8_t link_id;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	bool is_mlo;
+	struct wlan_objmgr_vdev *vdev;
+
+	nestid = QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_CCA_STAT;
+	nss_nest = nla_nest_start(skb, nestid);
+
+	if (!nss_nest) {
+		hdd_err("nla_nest_start failed");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 0; i < num_vdev_congestion_stats; i++) {
+		nss = nla_nest_start(skb, i + 1);
+		if (!nss) {
+			hdd_err("nla_nest_start failed");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+					psoc, vdev_congestion_stats[i].vdev_id,
+					WLAN_OSIF_ID);
+		if (!vdev) {
+			hdd_err("Invalid VDEV %d",
+				vdev_congestion_stats[i].vdev_id);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		link_id = wlan_vdev_get_link_id(vdev);
+		is_mlo = wlan_vdev_mlme_is_mlo_vdev(vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
+
+		hdd_debug("CCA link_id: %d on_time: %d cca_busy_time: %d",
+			  link_id, vdev_congestion_stats[i].on_time,
+			  vdev_congestion_stats[i].cca_busy_time);
+		if (is_mlo) {
+			attr = QCA_WLAN_VENDOR_ATTR_CCA_STAT_LINK_ID;
+			if (nla_put_u8(skb, attr, link_id)) {
+				hdd_err("Failed to put link id");
+				return QDF_STATUS_E_INVAL;
+			}
+		}
+
+		attr = QCA_WLAN_VENDOR_ATTR_CCA_STAT_ON_TIME;
+		if (nla_put_u32(skb, attr, vdev_congestion_stats[i].on_time)) {
+			hdd_err("failed to put on_time");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		attr = QCA_WLAN_VENDOR_ATTR_CCA_STAT_BUSY_TIME;
+		if (nla_put_u32(skb, attr,
+				vdev_congestion_stats[i].cca_busy_time)) {
+			hdd_err("failed to put busy_time");
+			return QDF_STATUS_E_INVAL;
+		}
+		nla_nest_end(skb, nss);
+	}
+
+	nla_nest_end(skb, nss_nest);
+	return status;
+}
+
+static inline QDF_STATUS
+wlan_fill_beacon_miss_stats_value(struct wlan_objmgr_psoc *psoc,
+				  struct sk_buff *skb,
+				  struct vdev_beacon_stats_event *vdev_beacon_stats,
+				  uint32_t num_vdev_beacon_stats)
+{
+	struct nlattr *nss_nest, *nss;
+	int nestid, i, attr, j;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t link_id;
+	bool is_mlo;
+
+	nestid = QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_BEACON_MISS_STAT;
+	nss_nest = nla_nest_start(skb, nestid);
+
+	for (i = 0; i < num_vdev_beacon_stats; i++) {
+		nss = nla_nest_start(skb, i + 1);
+		if (!nss) {
+			hdd_err("nla_nest_start failed");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+					psoc,
+					vdev_beacon_stats[i].vdev_id,
+					WLAN_OSIF_ID);
+		if (!vdev) {
+			hdd_err("Invalid VDEV %d",
+				vdev_beacon_stats[i].vdev_id);
+			return QDF_STATUS_E_INVAL;
+		}
+
+		link_id = wlan_vdev_get_link_id(vdev);
+		is_mlo = wlan_vdev_mlme_is_mlo_vdev(vdev);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
+
+		hdd_debug("Beacon miss link_id: %d", link_id);
+		for (j = 0; j < vdev_beacon_stats[i].length; j++)
+			hdd_debug("Bmiss_bitmask[%d]: %d", j,
+				  vdev_beacon_stats[i].bmiss_bitmask[j]);
+
+		if (is_mlo) {
+			attr = QCA_WLAN_VENDOR_ATTR_BEACON_MISS_STAT_LINK_ID;
+			if (nla_put_u8(skb, attr, link_id)) {
+				hdd_err("Failed to put link id");
+				return QDF_STATUS_E_INVAL;
+			}
+		}
+
+		attr = QCA_WLAN_VENDOR_ATTR_BEACON_MISS_STAT_DATA;
+		if (vdev_beacon_stats[i].length &&
+		    nla_put(skb, attr, vdev_beacon_stats[i].length,
+			    vdev_beacon_stats[i].bmiss_bitmask)) {
+			hdd_err("Failed to put beacon miss bitmask");
+			return QDF_STATUS_E_INVAL;
+		}
+		nla_nest_end(skb, nss);
+	}
+	nla_nest_end(skb, nss_nest);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1399,25 +1792,51 @@ QDF_STATUS wlan_cfg80211_enchance_cp_stats(struct wlan_objmgr_psoc *psoc,
 	if (!event)
 		return errno;
 
-	status = wlan_fill_mcs_pkt_value(psoc, vdev, skb, event);
+	status = wlan_fill_mcs_pkt_value(skb, event->vdev_data_stats,
+					 event->num_vdev_data_stats);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("MCS packet failed status: %d", status);
 		goto free_mem;
 	}
 
-	status = wlan_fill_bw_pkt_value(psoc, vdev, skb, event);
+	status = wlan_fill_bw_pkt_value(skb, event->vdev_data_stats,
+					event->num_vdev_data_stats);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("BW packet failed status: %d", status);
 		goto free_mem;
 	}
 
+	status = wlan_fill_cca_stats_value(psoc, skb,
+					   event->vdev_congestion_stats,
+					   event->num_vdev_congestion_stats);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("CCA stats failed status: %d", status);
+		goto free_mem;
+	}
+
+	status = wlan_fill_beacon_miss_stats_value(psoc, skb,
+						   event->vdev_beacon_stats,
+						   event->num_vdev_beacon_stats);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Beacon miss stats failed status: %d", status);
+		goto free_mem;
+	}
+
 free_mem:
-	qdf_mem_free(event->twt_infra_cp_stats);
+	if (!event)
+		return status;
+
+	if (event->vdev_data_stats)
+		qdf_mem_free(event->vdev_data_stats);
+	if (event->vdev_congestion_stats)
+		qdf_mem_free(event->vdev_congestion_stats);
+	if (event->vdev_beacon_stats)
+		qdf_mem_free(event->vdev_beacon_stats);
+
 	qdf_mem_free(event);
 
 	return status;
 }
-
 #endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
 
 struct stats_event *
