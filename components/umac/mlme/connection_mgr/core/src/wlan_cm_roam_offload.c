@@ -6513,7 +6513,8 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 		goto send_evt;
 	}
 
-	if (cm_dlm_is_bssid_in_reject_list(psoc, bssid, vdev_id)) {
+	if (source != CM_ROAMING_USER &&
+	    cm_dlm_is_bssid_in_reject_list(psoc, bssid, vdev_id)) {
 		mlme_debug("BSSID is in reject list, aborting roam invoke");
 		qdf_mem_free(cm_req);
 		return QDF_STATUS_E_FAILURE;
