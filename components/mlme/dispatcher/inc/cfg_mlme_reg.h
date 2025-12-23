@@ -485,6 +485,32 @@ enum ignore_fw_coex_info_modes {
 #define CFG_COEX_UNSAFE_CHAN_ALL
 #endif
 
+#ifdef AUTO_PLATFORM
+/*
+ * <ini>
+ * disable_5ghz_high_channel_from_165 - Used to disable 5ghz
+ * high channel from channel 165
+ *
+ * @Min: 0
+ * @Max: 1
+ * Default: 0
+ *
+ * This ini is used to disable 5ghz high channel from channel
+ * 165 when it's set to 1
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_DISABLE_5GHZ_HIGH_CHANNEL_FROM_165 CFG_INI_BOOL( \
+		"disable_5ghz_high_channel_from_165", \
+		0, \
+		"Disable 5ghz high channel from channel 165")
+#define CFG_DISABLE_5GHZ_HIGH_CHANNEL \
+		CFG(CFG_DISABLE_5GHZ_HIGH_CHANNEL_FROM_165)
+#else
+#define CFG_DISABLE_5GHZ_HIGH_CHANNEL
+#endif
+
 #define CFG_REG_ALL \
 	CFG_COEX_UNSAFE_CHAN_ALL \
 	CFG(CFG_SELF_GEN_FRM_PWR) \
@@ -499,6 +525,7 @@ enum ignore_fw_coex_info_modes {
 	CFG(CFG_IGNORE_FW_REG_OFFLOAD_IND) \
 	CFG_AFC_REG_ALL \
 	CFG(CFG_RETAIN_NOL_ACROSS_REG_DOMAIN) \
-	CFG_SAP_AVOID_ACS_FREQ_LIST_ALL
+	CFG_SAP_AVOID_ACS_FREQ_LIST_ALL \
+	CFG_DISABLE_5GHZ_HIGH_CHANNEL
 
 #endif /* CFG_MLME_REG_H__ */

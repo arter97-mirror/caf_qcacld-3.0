@@ -2793,6 +2793,8 @@ enum mlme_reg_srd_master_modes {
  * or not
  * @coex_unsafe_chan_reg_disable: To disable reg channels for received coex
  * unsafe channels list
+ * @disable_5ghz_high_channel_from_165: Disable 5ghz high channel from channel
+ * 165
  */
 struct wlan_mlme_reg {
 	uint32_t self_gen_frm_pwr;
@@ -2822,6 +2824,9 @@ struct wlan_mlme_reg {
 #ifdef FEATURE_WLAN_CH_AVOID_EXT
 	uint32_t coex_unsafe_chan_nb_user_prefer;
 	bool coex_unsafe_chan_reg_disable;
+#endif
+#ifdef AUTO_PLATFORM
+	bool disable_5ghz_high_channel_from_165;
 #endif
 };
 

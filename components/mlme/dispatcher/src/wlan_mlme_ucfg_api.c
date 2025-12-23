@@ -1642,6 +1642,23 @@ ucfg_mlme_get_indoor_channel_support(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef AUTO_PLATFORM
+bool ucfg_mlme_get_disable_5ghz_high_channel_from_165(
+				struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("Failed to get MLME Obj");
+		return cfg_default(CFG_DISABLE_5GHZ_HIGH_CHANNEL_FROM_165);
+	}
+
+	return mlme_obj->cfg.reg.disable_5ghz_high_channel_from_165;
+
+}
+#endif
+
 QDF_STATUS
 ucfg_mlme_get_scan_11d_interval(struct wlan_objmgr_psoc *psoc,
 				uint32_t *value)
