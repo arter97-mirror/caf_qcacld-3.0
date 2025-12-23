@@ -45,7 +45,7 @@
 #include <cdp_txrx_peer_ops.h>
 #include <cdp_txrx_host_stats.h>
 #include <osif_cm_util.h>
-
+#include <wlan_cp_stats_ucfg_api.h>
 #include "wlan_hdd_stats.h"
 
 /*
@@ -2610,6 +2610,7 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	struct hdd_station_info *stainfo = NULL;
 	struct qdf_mac_addr *peer_mac_addr;
 	struct wlan_objmgr_vdev *vdev;
+	bool is_enhanced_stats_support;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ucfg_mc_cp_get_big_data_fw_support(hdd_ctx->psoc, &big_data_fw_support);
@@ -2730,13 +2731,16 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 		goto error;
 	}
 
-	if (hdd_ctx->is_enhanced_stats_support) {
-		if (QDF_IS_STATUS_ERROR(
-			wlan_cfg80211_enchance_cp_stats(hdd_ctx->psoc,
-							vdev, skb))) {
+	is_enhanced_stats_support =
+		ucfg_cp_stats_get_enhanced_stats_support(hdd_ctx->psoc);
+	if (is_enhanced_stats_support) {
+		if (QDF_IS_STATUS_ERROR(wlan_cfg80211_enhance_cp_stats(
+						hdd_ctx->psoc, vdev, skb))) {
 			hdd_err_rl("hdd_get_mcs_bw_pkt_count fail");
 			goto error;
 		}
+	} else {
+		hdd_debug("FW enhanced_stats_support is disabled");
 	}
 
 	if (stainfo && QDF_IS_STATUS_ERROR(hdd_add_peer_stats(skb, stainfo))) {

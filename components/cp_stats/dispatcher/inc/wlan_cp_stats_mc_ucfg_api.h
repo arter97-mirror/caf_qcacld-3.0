@@ -180,15 +180,15 @@ wlan_cfg80211_mc_twt_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
 					int *errno);
 
 /**
- * wlan_cfg80211_enchance_cp_stats() - send enchance CP stats request
+ * wlan_cfg80211_enhance_cp_stats() - send enhance CP stats request
  * @psoc: pointer to psoc object
  * @vdev: pointer to vdev object
  * @skb: nbuf
  */
 QDF_STATUS
-wlan_cfg80211_enchance_cp_stats(struct wlan_objmgr_psoc *psoc,
-				struct wlan_objmgr_vdev *vdev,
-				struct sk_buff *skb);
+wlan_cfg80211_enhance_cp_stats(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_objmgr_vdev *vdev,
+			       struct sk_buff *skb);
 
 /**
  * ucfg_mc_cp_stats_get_tx_power() - API to fetch tx_power

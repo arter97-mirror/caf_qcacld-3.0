@@ -3143,10 +3143,9 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	hdd_ctx->config->is_11k_offload_supported =
 			cfg->services.is_11k_offload_supported;
 
-	hdd_ctx->is_enhanced_stats_support =
-			cfg->services.enhanced_stats_support;
-	hdd_debug("fw is_enhanced_stats_support: %d",
-		  hdd_ctx->is_enhanced_stats_support);
+	status = ucfg_cp_stats_set_enhanced_stats_support(
+				hdd_ctx->psoc,
+				cfg->services.enhanced_stats_support);
 
 	/*
 	 * merge the target band capability with INI setting if the merge has

@@ -1170,8 +1170,8 @@ void wlan_get_vdev_list(struct wlan_objmgr_psoc *psoc,
 }
 
 static
-void infra_enchance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
-				     void *context)
+void infra_enhance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
+				    void *context)
 {
 	struct osif_request *request = osif_request_get(context);
 	struct infra_cp_stats_event *priv = osif_request_priv(request);
@@ -1380,10 +1380,10 @@ wlan_send_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 	info.action = ACTION_REQ_CTRL_PATH_STAT_GET;
 	info.request_id = ENHANCED_REQUEST_ID;
 
-	info.infra_cp_stats_resp_cb = infra_enchance_cp_stats_resp_cb;
+	info.infra_cp_stats_resp_cb = infra_enhance_cp_stats_resp_cb;
 	wlan_get_vdev_list(psoc, vdev, &info);
 
-	hdd_debug("Send enchance info.stats_id: %d, info.action: %d",
+	hdd_debug("Send enhance info.stats_id: %d, info.action: %d",
 		  info.stats_id, info.action);
 	for (i = 0; i < info.num_vdev_ids; i++)
 		hdd_debug("vdev_id: %d", info.vdev_id[i]);
@@ -1780,9 +1780,9 @@ wlan_fill_beacon_miss_stats_value(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS wlan_cfg80211_enchance_cp_stats(struct wlan_objmgr_psoc *psoc,
-					   struct wlan_objmgr_vdev *vdev,
-					   struct sk_buff *skb)
+QDF_STATUS wlan_cfg80211_enhance_cp_stats(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_objmgr_vdev *vdev,
+					  struct sk_buff *skb)
 {
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	int errno;
