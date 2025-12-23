@@ -690,6 +690,27 @@ tgt_mc_infra_cp_stats_extract_twt_stats(struct wlan_objmgr_psoc *psoc,
 {
 }
 #endif
+static void
+tgt_mc_infra_cp_stats_extract_enhanced_stats(struct wlan_objmgr_psoc *psoc,
+					     struct infra_cp_stats_event *ev)
+{
+	QDF_STATUS status;
+	get_infra_cp_stats_cb resp_cb = NULL;
+	void *context = NULL;
+
+	status = wlan_cp_stats_infra_cp_get_context(psoc, &resp_cb, &context);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("ucfg_get_infra_cp_stats_context failed");
+		return;
+	}
+
+	cp_stats_debug("num_vdev_beacon_stats: %d num_vdev_congestion_stats: %d  num_vdev_data_stats: %d action %d",
+		       ev->num_vdev_beacon_stats, ev->num_vdev_congestion_stats,
+		       ev->num_vdev_data_stats, ev->action);
+
+	if (resp_cb)
+		resp_cb(ev, context);
+}
 #endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
 
 #ifdef WLAN_FEATURE_MEDIUM_ASSESS
@@ -1657,6 +1678,7 @@ QDF_STATUS tgt_mc_cp_stats_process_infra_stats_event(
 		return QDF_STATUS_E_NULL_VALUE;
 
 	tgt_mc_infra_cp_stats_extract_twt_stats(psoc, infra_event);
+	tgt_mc_infra_cp_stats_extract_enhanced_stats(psoc, infra_event);
 
 	return QDF_STATUS_SUCCESS;
 }

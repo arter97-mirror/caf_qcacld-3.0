@@ -1133,78 +1133,288 @@ void infra_enchance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
 	if (!request)
 		return;
 
-	priv->status = QDF_STATUS_SUCCESS;
 	// Copy other response data to priv as necessary
+	if (infra_event && infra_event->request_id != priv->request_id) {
+		hdd_err("Request_id is not same as expected infra_event request_id: %d and priv request_id: %d",
+			infra_event->request_id, priv->request_id);
+		osif_request_put(request);
+		return;
+	}
+
+	priv->status = QDF_STATUS_SUCCESS;
+	priv->action = infra_event->action;
+
+	// Fill vdev_beacon_stats from infra_event to priv
+	priv->num_vdev_beacon_stats = infra_event->num_vdev_beacon_stats;
+	for (int i = 0; i < priv->num_vdev_beacon_stats; i++) {
+		priv->vdev_beacon_stats[i].vdev_id =
+			infra_event->vdev_beacon_stats[i].vdev_id;
+		priv->vdev_beacon_stats[i].length =
+			infra_event->vdev_beacon_stats[i].length;
+		qdf_mem_copy(priv->vdev_beacon_stats[i].bmiss_bitmask,
+			     infra_event->vdev_beacon_stats[i].bmiss_bitmask,
+			     sizeof(priv->vdev_beacon_stats[i].bmiss_bitmask));
+	}
+
+	// Fill vdev_congestion_stats from infra_event to priv
+	priv->num_vdev_congestion_stats =
+		infra_event->num_vdev_congestion_stats;
+	for (int i = 0; i < priv->num_vdev_congestion_stats; i++) {
+		priv->vdev_congestion_stats[i].vdev_id =
+			infra_event->vdev_congestion_stats[i].vdev_id;
+		priv->vdev_congestion_stats[i].cca_busy_time =
+			infra_event->vdev_congestion_stats[i].cca_busy_time;
+		priv->vdev_congestion_stats[i].on_time =
+			infra_event->vdev_congestion_stats[i].on_time;
+	}
+
+	// Fill vdev_data_stats from infra_event to priv
+	priv->num_vdev_data_stats = infra_event->num_vdev_data_stats;
+	for (int i = 0; i < priv->num_vdev_data_stats; i++) {
+		priv->vdev_data_stats[i].vdev_id =
+			infra_event->vdev_data_stats[i].vdev_id;
+		qdf_mem_copy(priv->vdev_data_stats[i].tx_mcs_data_ppdu,
+			     infra_event->vdev_data_stats[i].tx_mcs_data_ppdu,
+			     sizeof(priv->vdev_data_stats[i].tx_mcs_data_ppdu));
+		qdf_mem_copy(priv->vdev_data_stats[i].tx_bw_data_ppdu,
+			     infra_event->vdev_data_stats[i].tx_bw_data_ppdu,
+			     sizeof(priv->vdev_data_stats[i].tx_bw_data_ppdu));
+		qdf_mem_copy(priv->vdev_data_stats[i].rx_mcs_data_ppdu,
+			     infra_event->vdev_data_stats[i].rx_mcs_data_ppdu,
+			     sizeof(priv->vdev_data_stats[i].rx_mcs_data_ppdu));
+		qdf_mem_copy(priv->vdev_data_stats[i].rx_bw_data_ppdu,
+			     infra_event->vdev_data_stats[i].rx_bw_data_ppdu,
+			     sizeof(priv->vdev_data_stats[i].rx_bw_data_ppdu));
+	}
 
 	osif_request_complete(request);
 	osif_request_put(request);
 }
 
 #define WLAN_WAIT_TIME_CP_STATS 4000
-static inline QDF_STATUS
-wlan_send_cp_stats_req(struct wlan_objmgr_psoc *psoc, struct wlan_objmgr_vdev *vdev)
+#define ENHANCED_REQUEST_ID 127
+
+static inline
+struct infra_cp_stats_event *
+wlan_send_cp_stats_req(struct wlan_objmgr_psoc *psoc,
+		       struct wlan_objmgr_vdev *vdev, int *errno)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct infra_cp_stats_cmd_info info = {0};
 	struct osif_request *request;
-	struct infra_cp_stats_event *priv;
+	struct infra_cp_stats_event *priv, *out;
+	struct vdev_beacon_stats_event *vdev_beacon_stats;
+	struct vdev_congestion_stats_event *vdev_congestion_stats;
+	struct vdev_data_stats_event *vdev_data_stats;
+	get_infra_cp_stats_cb resp_cb = NULL;
 	void *cookie;
+	int ret, i;
 	static const struct osif_request_params params = {
 		.priv_size = sizeof(struct infra_cp_stats_event),
 		.timeout_ms = WLAN_WAIT_TIME_CP_STATS,
 		.dealloc = NULL,
 	};
 
+	status = wlan_cp_stats_infra_cp_get_context(psoc, &resp_cb, &cookie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		*errno = qdf_status_to_os_return(status);
+		return NULL;
+	}
+
+	if (resp_cb) {
+		osif_debug("another request already in progress");
+		*errno = -EBUSY;
+		return NULL;
+	}
+
+	out = qdf_mem_malloc(sizeof(*out));
+	if (!out) {
+		*errno = -ENOMEM;
+		return NULL;
+	}
+
+	out->vdev_beacon_stats =
+		qdf_mem_malloc(sizeof(*out->vdev_beacon_stats));
+	out->vdev_congestion_stats =
+		qdf_mem_malloc(sizeof(*out->vdev_congestion_stats));
+	out->vdev_data_stats =
+		qdf_mem_malloc(sizeof(*out->vdev_data_stats));
+
+	if (!out->vdev_beacon_stats || !out->vdev_congestion_stats ||
+	    !out->vdev_data_stats) {
+		wlan_cfg80211_mc_infra_cp_stats_free_stats_event(out);
+		*errno = -ENOMEM;
+		return NULL;
+	}
+
 	// Allocate OSIF request
 	request = osif_request_alloc(&params);
-	if (!request)
-		return QDF_STATUS_E_NOMEM;
+	if (!request) {
+		wlan_cfg80211_mc_infra_cp_stats_free_stats_event(out);
+		*errno = -ENOMEM;
+		return NULL;
+	}
 
 	cookie = osif_request_cookie(request);
 	priv = osif_request_priv(request);
+	priv->request_id = ENHANCED_REQUEST_ID;
 	priv->status = QDF_STATUS_E_FAILURE;
 
-	info.stats_id = TYPE_REQ_CTRL_PATH_ENHANCED_STAT;
-	info.action = ACTION_REQ_CTRL_PATH_STAT_GET;
-	wlan_get_vdev_list(psoc, vdev, &info);
+	priv->vdev_beacon_stats =
+		qdf_mem_malloc(sizeof(*priv->vdev_beacon_stats));
+	priv->vdev_congestion_stats =
+		qdf_mem_malloc(sizeof(*priv->vdev_congestion_stats));
+	priv->vdev_data_stats =
+		qdf_mem_malloc(sizeof(*priv->vdev_data_stats));
+	if (!priv->vdev_beacon_stats || !priv->vdev_congestion_stats ||
+	    !priv->vdev_data_stats) {
+		*errno = -ENOMEM;
+		goto free_stats_event;
+	}
+
+	vdev_beacon_stats = priv->vdev_beacon_stats;
+	vdev_congestion_stats = priv->vdev_congestion_stats;
+	vdev_data_stats = priv->vdev_data_stats;
 
 	info.request_cookie = cookie;
+	info.stats_id = TYPE_REQ_CTRL_PATH_ENHANCED_STAT;
+	info.action = ACTION_REQ_CTRL_PATH_STAT_GET;
 	info.infra_cp_stats_resp_cb = infra_enchance_cp_stats_resp_cb;
+	wlan_get_vdev_list(psoc, vdev, &info);
 
 	// Register callback/cookie for response
-	ucfg_infra_cp_stats_register_resp_cb(psoc, &info);
+	status = ucfg_infra_cp_stats_register_resp_cb(psoc, &info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to register resp callback: %d", status);
+		*errno = qdf_status_to_os_return(status);
+		goto free_stats_event;
+	}
 
 	// Send command
 	status = ucfg_send_infra_cp_stats_request(vdev, &info);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to send cp stats req");
 		osif_request_put(request);
-		return status;
+		*errno = qdf_status_to_os_return(status);
+		goto get_cp_stats_fail;
 	}
 
 	// Wait for response callback
-	int ret = osif_request_wait_for_response(request);
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		osif_err("wait failed or timed out ret: %d", ret);
+		*errno = qdf_status_to_os_return(status);
+		goto get_cp_stats_fail;
+	}
 
-	if (!ret)
-		status = priv->status;
-	else
-		status = QDF_STATUS_E_TIMEOUT;
+	out->num_vdev_beacon_stats = priv->num_vdev_beacon_stats;
+	out->num_vdev_congestion_stats = priv->num_vdev_congestion_stats;
+	out->num_vdev_data_stats = priv->num_vdev_data_stats;
+	out->request_id = priv->request_id;
+
+	// Fill vdev_beacon_stats
+	for (i = 0; i < out->num_vdev_beacon_stats; i++) {
+		out->vdev_beacon_stats[i].vdev_id =
+			priv->vdev_beacon_stats[i].vdev_id;
+		out->vdev_beacon_stats[i].length =
+			priv->vdev_beacon_stats[i].length;
+		qdf_mem_copy(out->vdev_beacon_stats[i].bmiss_bitmask,
+			     priv->vdev_beacon_stats[i].bmiss_bitmask,
+			     sizeof(out->vdev_beacon_stats[i].bmiss_bitmask));
+	}
+
+	for (i = 0; i < out->num_vdev_congestion_stats; i++) {
+		out->vdev_congestion_stats[i].vdev_id =
+			priv->vdev_congestion_stats[i].vdev_id;
+		out->vdev_congestion_stats[i].cca_busy_time =
+			priv->vdev_congestion_stats[i].cca_busy_time;
+		out->vdev_congestion_stats[i].on_time =
+			priv->vdev_congestion_stats[i].on_time;
+	}
+
+	// Fill vdev_data_stats
+	for (i = 0; i < out->num_vdev_data_stats; i++) {
+		out->vdev_data_stats[i].vdev_id =
+			priv->vdev_data_stats[i].vdev_id;
+		qdf_mem_copy(out->vdev_data_stats[i].tx_mcs_data_ppdu,
+			     priv->vdev_data_stats[i].tx_mcs_data_ppdu,
+			     sizeof(out->vdev_data_stats[i].tx_mcs_data_ppdu));
+		qdf_mem_copy(out->vdev_data_stats[i].tx_bw_data_ppdu,
+			     priv->vdev_data_stats[i].tx_bw_data_ppdu,
+			     sizeof(out->vdev_data_stats[i].tx_bw_data_ppdu));
+		qdf_mem_copy(out->vdev_data_stats[i].rx_mcs_data_ppdu,
+			     priv->vdev_data_stats[i].rx_mcs_data_ppdu,
+			     sizeof(out->vdev_data_stats[i].rx_mcs_data_ppdu));
+		qdf_mem_copy(out->vdev_data_stats[i].rx_bw_data_ppdu,
+			     priv->vdev_data_stats[i].rx_bw_data_ppdu,
+			     sizeof(out->vdev_data_stats[i].rx_bw_data_ppdu));
+	}
 
 	osif_request_put(request);
 
-	// Optionally deregister the response callback
-	// ucfg_infra_cp_stats_deregister_resp_cb(psoc);
+	status = ucfg_infra_cp_stats_deregister_resp_cb(psoc);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to deregister resp callback: %d", status);
 
-	return status;
+	return out;
+get_cp_stats_fail:
+	// Optionally deregister the response callback
+	status = ucfg_infra_cp_stats_deregister_resp_cb(psoc);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to deregister resp callback: %d", status);
+
+free_stats_event:
+	osif_request_put(request);
+	wlan_cfg80211_mc_infra_cp_stats_free_stats_event(out);
+	return NULL;
+}
+
+static inline QDF_STATUS
+wlan_fill_mcs_pkt_value(struct wlan_objmgr_psoc *psoc,
+			struct wlan_objmgr_vdev *vdev,
+			struct sk_buff *skb,
+			struct infra_cp_stats_event *event)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_fill_bw_pkt_value(struct wlan_objmgr_psoc *psoc,
+		       struct wlan_objmgr_vdev *vdev,
+		       struct sk_buff *skb,
+		       struct infra_cp_stats_event *event)
+{
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS wlan_cfg80211_enchance_cp_stats(struct wlan_objmgr_psoc *psoc,
 					   struct wlan_objmgr_vdev *vdev,
 					   struct sk_buff *skb)
 {
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	int errno;
+	struct infra_cp_stats_event *event;
 
-	status = wlan_send_cp_stats_req(psoc, vdev);
+	event = wlan_send_cp_stats_req(psoc, vdev, &errno);
+	if (!event)
+		return errno;
+
+	status = wlan_fill_mcs_pkt_value(psoc, vdev, skb, event);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("MCS packet failed status: %d", status);
+		goto free_mem;
+	}
+
+	status = wlan_fill_bw_pkt_value(psoc, vdev, skb, event);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("BW packet failed status: %d", status);
+		goto free_mem;
+	}
+
+free_mem:
+	qdf_mem_free(event->twt_infra_cp_stats);
+	qdf_mem_free(event);
+
 	return status;
 }
 
