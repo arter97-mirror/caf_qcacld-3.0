@@ -2339,6 +2339,7 @@ struct hdd_tx_powerboost {
  *			userspace application close/abort
  * @usd_adapter: adapter on which USD frames to be forwarded to userspace
  * @tx_pb: Tx powerboost context
+ * @is_enhanced_stats_support: enhanced_stats_support is supported or not
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2649,6 +2650,7 @@ struct hdd_context {
 #ifdef FEATURE_WLAN_TX_POWERBOOST
 	struct hdd_tx_powerboost tx_pb;
 #endif
+	bool is_enhanced_stats_support;
 };
 
 /**

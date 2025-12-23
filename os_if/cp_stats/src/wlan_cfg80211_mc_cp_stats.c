@@ -35,7 +35,7 @@
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_stats.h"
 #include "../../core/src/wlan_cp_stats_obj_mgr_handler.h"
-
+#include "wlan_mlo_mgr_sta.h"
 
 /* max time in ms, caller may wait for stats request get serviced */
 #define CP_STATS_WAIT_TIME_STAT 800
@@ -1096,6 +1096,118 @@ clear_twt_stats_fail:
 	return ret;
 }
 #endif
+
+static inline
+void wlan_get_vdev_list(struct wlan_objmgr_psoc *psoc,
+			struct wlan_objmgr_vdev *vdev,
+			struct infra_cp_stats_cmd_info *info)
+{
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint16_t vdev_count = 0, link;
+	bool is_ml;
+	uint8_t vdev_id;
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	is_ml = wlan_vdev_mlme_get_is_mlo_vdev(psoc, vdev_id);
+
+	if (!is_ml) {
+		info->num_vdev_ids = 1;
+		info->vdev_id[0] = vdev_id;
+	} else {
+		mlo_sta_get_vdev_list(vdev, &vdev_count, wlan_vdev_list);
+		for (link = 0; link < vdev_count; link++) {
+			info->vdev_id[link] =
+				wlan_vdev_get_id(wlan_vdev_list[link]);
+		}
+		info->num_vdev_ids = vdev_count;
+	}
+}
+
+static
+void infra_enchance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
+				     void *context)
+{
+	struct osif_request *request = osif_request_get(context);
+	struct infra_cp_stats_event *priv = osif_request_priv(request);
+
+	if (!request)
+		return;
+
+	priv->status = QDF_STATUS_SUCCESS;
+	// Copy other response data to priv as necessary
+
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+
+#define WLAN_WAIT_TIME_CP_STATS 4000
+static inline QDF_STATUS
+wlan_send_cp_stats_req(struct wlan_objmgr_psoc *psoc, struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct infra_cp_stats_cmd_info info = {0};
+	struct osif_request *request;
+	struct infra_cp_stats_event *priv;
+	void *cookie;
+	static const struct osif_request_params params = {
+		.priv_size = sizeof(struct infra_cp_stats_event),
+		.timeout_ms = WLAN_WAIT_TIME_CP_STATS,
+		.dealloc = NULL,
+	};
+
+	// Allocate OSIF request
+	request = osif_request_alloc(&params);
+	if (!request)
+		return QDF_STATUS_E_NOMEM;
+
+	cookie = osif_request_cookie(request);
+	priv = osif_request_priv(request);
+	priv->status = QDF_STATUS_E_FAILURE;
+
+	info.stats_id = TYPE_REQ_CTRL_PATH_ENHANCED_STAT;
+	info.action = ACTION_REQ_CTRL_PATH_STAT_GET;
+	wlan_get_vdev_list(psoc, vdev, &info);
+
+	info.request_cookie = cookie;
+	info.infra_cp_stats_resp_cb = infra_enchance_cp_stats_resp_cb;
+
+	// Register callback/cookie for response
+	ucfg_infra_cp_stats_register_resp_cb(psoc, &info);
+
+	// Send command
+	status = ucfg_send_infra_cp_stats_request(vdev, &info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send cp stats req");
+		osif_request_put(request);
+		return status;
+	}
+
+	// Wait for response callback
+	int ret = osif_request_wait_for_response(request);
+
+	if (!ret)
+		status = priv->status;
+	else
+		status = QDF_STATUS_E_TIMEOUT;
+
+	osif_request_put(request);
+
+	// Optionally deregister the response callback
+	// ucfg_infra_cp_stats_deregister_resp_cb(psoc);
+
+	return status;
+}
+
+QDF_STATUS wlan_cfg80211_enchance_cp_stats(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev,
+					   struct sk_buff *skb)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	status = wlan_send_cp_stats_req(psoc, vdev);
+	return status;
+}
+
 #endif /* WLAN_SUPPORT_INFRA_CTRL_PATH_STATS */
 
 struct stats_event *

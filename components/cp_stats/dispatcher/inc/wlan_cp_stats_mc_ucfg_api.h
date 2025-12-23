@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -178,6 +178,18 @@ wlan_cfg80211_mc_twt_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
 					uint32_t dialog_id,
 					uint8_t twt_peer_mac[QDF_MAC_ADDR_SIZE],
 					int *errno);
+
+/**
+ * wlan_cfg80211_enchance_cp_stats() - send enchance CP stats request
+ * @psoc: pointer to psoc object
+ * @vdev: pointer to vdev object
+ * @skb: nbuf
+ */
+QDF_STATUS
+wlan_cfg80211_enchance_cp_stats(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct sk_buff *skb);
+
 /**
  * ucfg_mc_cp_stats_get_tx_power() - API to fetch tx_power
  * @vdev: pointer to vdev object

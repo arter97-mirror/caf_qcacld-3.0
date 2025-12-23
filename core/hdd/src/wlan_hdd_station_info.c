@@ -2589,6 +2589,7 @@ static int hdd_get_station_remote_ex(struct hdd_context *hdd_ctx,
 
 #define MCS_COUNT_MAX 16
 #define BW_COUNT_MAX 5
+#define SS_COUNT_JITTER 4
 
 /**
  * hdd_get_station_info_ex() - send STA info to userspace, for STA mode only
@@ -2633,7 +2634,6 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return -EBUSY;
 	}
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 
 	if (wlan_hdd_get_station_stats(link_info))
 		hdd_err_rl("wlan_hdd_get_station_stats fail");
@@ -2730,6 +2730,15 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 		goto error;
 	}
 
+	if (hdd_ctx->is_enhanced_stats_support) {
+		if (QDF_IS_STATUS_ERROR(
+			wlan_cfg80211_enchance_cp_stats(hdd_ctx->psoc,
+							vdev, skb))) {
+			hdd_err_rl("hdd_get_mcs_bw_pkt_count fail");
+			goto error;
+		}
+	}
+
 	if (stainfo && QDF_IS_STATUS_ERROR(hdd_add_peer_stats(skb, stainfo))) {
 		hdd_err_rl("hdd_add_peer_stats fail");
 		goto error;
@@ -2745,6 +2754,7 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	if (stainfo)
 		qdf_mem_free(stainfo);
 
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	return ret;
 
 error:
@@ -2755,6 +2765,8 @@ free_sta_info:
 		hdd_free_tx_rx_pkts_per_mcs(stainfo);
 		qdf_mem_free(stainfo);
 	}
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	return -EINVAL;
 }
 
