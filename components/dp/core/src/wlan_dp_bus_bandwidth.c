@@ -1687,7 +1687,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 	 * for other cases, follow general voting logic
 	 */
 	if (!dp_ipa_is_fw_wdi_activated(dp_ctx) &&
-	    policy_mgr_is_current_hwmode_dbs(dp_ctx->psoc) &&
+	    policy_mgr_dbs_multi_vdev_on_diff_mac(dp_ctx->psoc) &&
 	    (total_pkts > dp_ctx->dp_cfg.bus_bw_dbs_threshold) &&
 	    (tput_level < TPUT_LEVEL_SUPER_HIGH)) {
 		next_vote_level = PLD_BUS_WIDTH_SUPER_HIGH;
