@@ -288,6 +288,34 @@ void hdd_update_afc_config(struct hdd_context *hdd_ctx,
 }
 #endif
 
+/**
+ * hdd_update_disable_5ghz_high_channel_from_165() - update
+ * whether it's needed to disable 5ghz high channel from 165
+ * @hdd_ctx: hdd context
+ * @config_vars: reg config
+ *
+ * Return: void
+ */
+#ifdef AUTO_PLATFORM
+static inline
+void hdd_update_disable_5ghz_high_channel_from_165(
+			struct hdd_context *hdd_ctx,
+			struct reg_config_vars *config_vars)
+{
+	config_vars->disable_5ghz_high_channel_from_165 =
+		ucfg_mlme_get_disable_5ghz_high_channel_from_165(
+					hdd_ctx->psoc);
+}
+
+#else
+static inline
+void hdd_update_disable_5ghz_high_channel_from_165(
+			struct hdd_context *hdd_ctx,
+			struct reg_config_vars *config_vars)
+{
+}
+#endif
+
 static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 				    struct reg_config_vars *config_vars)
 {
@@ -360,6 +388,7 @@ static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 		ucfg_policy_mgr_get_sta_sap_scc_on_indoor_chnl(hdd_ctx->psoc);
 	config_vars->p2p_indoor_ch_support =
 		ucfg_p2p_get_indoor_ch_support(hdd_ctx->psoc);
+	hdd_update_disable_5ghz_high_channel_from_165(hdd_ctx, config_vars);
 }
 
 /**

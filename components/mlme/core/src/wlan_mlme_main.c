@@ -3924,6 +3924,30 @@ static void mlme_init_coex_unsafe_chan_reg_disable_cfg(
 }
 #endif
 
+#ifdef AUTO_PLATFORM
+/**
+ * mlme_init_disable_5ghz_high_channel_from_165() - Disable 5ghz high
+ * channel from channel 165
+ * @psoc: Pointer to psoc
+ * @reg: Pointer to mlme regulatory struct
+ *
+ * Return: None
+ */
+static void mlme_init_disable_5ghz_high_channel_from_165(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_mlme_reg *reg)
+{
+	reg->disable_5ghz_high_channel_from_165 =
+		cfg_get(psoc, CFG_DISABLE_5GHZ_HIGH_CHANNEL_FROM_165);
+}
+#else
+static inline void mlme_init_disable_5ghz_high_channel_from_165(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_mlme_reg *reg)
+{
+}
+#endif
+
 static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_reg *reg)
 {
@@ -3953,6 +3977,7 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 	mlme_init_coex_unsafe_chan_cfg(psoc, reg);
 	mlme_init_coex_unsafe_chan_reg_disable_cfg(psoc, reg);
+	mlme_init_disable_5ghz_high_channel_from_165(psoc, reg);
 }
 
 static void

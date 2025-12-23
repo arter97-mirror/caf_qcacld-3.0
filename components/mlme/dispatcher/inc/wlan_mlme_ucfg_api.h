@@ -5648,4 +5648,16 @@ ucfg_mlme_set_mrsno_support(struct wlan_objmgr_psoc *psoc, bool val);
  */
 QDF_STATUS
 ucfg_mlme_get_mrsno_support(struct wlan_objmgr_psoc *psoc, bool *val);
+
+#ifdef AUTO_PLATFORM
+/**
+ * ucfg_mlme_get_disable_5ghz_high_channel_from_165() - get
+ * disable_5ghz_high_channel_from_165 is set or not
+ * @psoc:   pointer to psoc object
+ *
+ * Return: disable_5ghz_high_channel_from_165
+ */
+bool ucfg_mlme_get_disable_5ghz_high_channel_from_165(
+				struct wlan_objmgr_psoc *psoc);
+#endif
 #endif /* _WLAN_MLME_UCFG_API_H_ */
