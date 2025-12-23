@@ -3757,6 +3757,17 @@ bool policy_mgr_is_current_hwmode_sbs(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_curr_hwmode_emlsr(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_dbs_multi_vdev_on_diff_mac() - if multiple vdevs are active
+ * on different mac in DBS
+ * @psoc: PSOC object information
+ * This API is for Data Path to mutltiple vdev active on different
+ * mac or not.
+ *
+ * Return: bool
+ */
+bool policy_mgr_dbs_multi_vdev_on_diff_mac(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_is_dp_hw_dbs_capable() - if hardware is capable of dbs 2x2
  * or 1X1 for Data Path (HW mode)
  * @psoc: PSOC object information

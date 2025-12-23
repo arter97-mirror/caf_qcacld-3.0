@@ -3299,6 +3299,37 @@ bool policy_mgr_is_current_hwmode_dbs(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
+bool policy_mgr_dbs_multi_vdev_on_diff_mac(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_conc_connection_info	*conn_info;
+	uint32_t len = 0, i;
+	bool mac_id_set = false;
+	uint8_t mac_id;
+	uint8_t vdev_count_on_mac_id = 0;
+	uint8_t vdev_count_on_other_mac_id = 0;
+
+	if (!policy_mgr_is_current_hwmode_dbs(psoc))
+		return false;
+
+	conn_info = policy_mgr_get_conn_info(&len);
+	for (i = 0; i < len; i++, conn_info++) {
+		if (!conn_info->in_use)
+			break;
+		if (!mac_id_set) {
+			mac_id = conn_info->mac;
+			mac_id_set = true;
+		}
+		if (conn_info->mac == mac_id)
+			vdev_count_on_mac_id++;
+		else
+			vdev_count_on_other_mac_id++;
+		if (vdev_count_on_mac_id && vdev_count_on_other_mac_id)
+			return true;
+	}
+
+	return false;
+}
+
 bool policy_mgr_is_pcl_weightage_required(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
