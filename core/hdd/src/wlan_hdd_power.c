@@ -1995,8 +1995,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	if (soc)
 		cdp_flush_cache_rx_queue(soc);
 
-	/* De-register the HDD callbacks */
-	hdd_deregister_cb(hdd_ctx);
 
 	hdd_wlan_stop_modules(hdd_ctx, false);
 
