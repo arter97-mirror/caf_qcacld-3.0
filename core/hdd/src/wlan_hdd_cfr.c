@@ -202,6 +202,26 @@ hdd_cfr_nl_put_common_info(struct sk_buff *vendor_event,
 	return 0;
 }
 
+static enum
+nl80211_chan_width convert_ucode_bw_to_nl_bw(uint8_t bw)
+{
+	switch (bw) {
+	case 0:
+		return NL80211_CHAN_WIDTH_20;
+	case 1:
+		return NL80211_CHAN_WIDTH_40;
+	case 2:
+		return NL80211_CHAN_WIDTH_80;
+	case 3:
+		return NL80211_CHAN_WIDTH_160;
+	case 4:
+		return NL80211_CHAN_WIDTH_320;
+	default:
+		hdd_err("invalid capture bw");
+		return NL80211_CHAN_WIDTH_20;
+	}
+}
+
 static int
 hdd_cfr_nl_put_phy_info(struct sk_buff *vendor_event,
 			struct cfr_enhanced_event_data *event_data)
@@ -215,6 +235,10 @@ hdd_cfr_nl_put_phy_info(struct sk_buff *vendor_event,
 		cfr_err("Failed to start antenna info nesting");
 		return -EINVAL;
 	}
+
+	/* convert ucode bw to nl bw */
+	event_data->bandwidth =
+		convert_ucode_bw_to_nl_bw(event_data->bandwidth);
 
 	for (i = 0; i < event_data->antenna_count && i < HOST_MAX_CHAINS; i++) {
 		entry = nla_nest_start(vendor_event, i);
