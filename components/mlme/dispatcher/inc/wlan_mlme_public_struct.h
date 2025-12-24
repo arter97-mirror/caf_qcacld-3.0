@@ -1923,6 +1923,9 @@ enum station_prefer_bw {
  * @usr_disable_eht:                user disable the eht for STA
  * @eht_disable_punct_in_us_lpi:    Disable eht puncture in us lpi mode
  * @exclude_qcn_ie_support:         Exclude QCN vendor IE support
+ * @enable_high_band_roaming:       Enable/disable high band roaming
+ * @high_band_roaming_threshold_time_ms: High band roaming threshold time in ms
+ * @high_band_roaming_data_threshold: High band roaming data threshold in KBps
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
@@ -1969,6 +1972,9 @@ struct wlan_mlme_sta_cfg {
 	bool eht_disable_punct_in_us_lpi;
 #endif
 	bool exclude_qcn_ie_support;
+	bool enable_high_band_roaming;
+	uint32_t high_band_roaming_threshold_time_ms;
+	uint32_t high_band_roaming_data_threshold;
 };
 
 /**
