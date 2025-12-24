@@ -5983,7 +5983,6 @@ QDF_STATUS wlan_mlme_send_mlo_sap_link_removal_cmd(struct wlan_objmgr_vdev *vdev
 						   size_t elem_len);
 #endif
 
-#if defined(SAP_PERF_TUNING)
 /**
  * wlan_mlme_get_sap_perf_tuning_enabled() - query current
  * SAP perf tuning support.
@@ -6034,13 +6033,6 @@ wlan_mlme_get_sap_perf_data_threshold(struct wlan_objmgr_psoc *psoc);
  */
 uint32_t
 wlan_mlme_get_sap_traffic_monitoring_time_s(struct wlan_objmgr_psoc *psoc);
-#else
-inline bool
-wlan_mlme_get_sap_perf_tuning_enabled(struct wlan_objmgr_psoc *psoc);
-
-inline bool
-wlan_mlme_get_sap_perf_tuning_serv_cap(struct wlan_objmgr_psoc *psoc);
-#endif
 
 /**
  * wlan_mlme_get_edca_txop_duration_ms() - query TXOP duration in unit of ms.

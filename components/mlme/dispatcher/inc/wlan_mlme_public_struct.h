@@ -1613,11 +1613,9 @@ struct wlan_mlme_generic {
 		wlan_mlme_aux0_dev_caps[WLAN_MLME_HW_MODE_MAX];
 	bool bt_profile_con;
 	bool relaxed_lpi_conn_policy;
-#if defined(SAP_PERF_TUNING)
 	bool sap_perf_tuning_enable;
 	uint32_t sap_perf_data_threshold;
 	uint32_t sap_traffic_monitoring_time_s;
-#endif
 	uint32_t edca_txop_limit;
 };
 

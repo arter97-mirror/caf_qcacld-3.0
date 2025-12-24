@@ -2820,7 +2820,6 @@ wma_get_mlo_sap_emlsr(struct wmi_unified *wmi_handle)
 int wma_peer_sta_kickout(struct cdp_ctrl_objmgr_psoc *cpsoc,
 			 uint16_t pdev_id, uint8_t *macaddr);
 
-#ifdef SAP_PERF_TUNING
 /**
  * wma_get_sap_perf_tuning_enabled() - Get sap perf tuning service capability.
  * @wmi_handle: wmi handler
@@ -2831,13 +2830,6 @@ int wma_peer_sta_kickout(struct cdp_ctrl_objmgr_psoc *cpsoc,
  */
 bool
 wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle);
-#else
-static inline bool
-wma_get_sap_perf_tuning_enabled(struct wmi_unified *wmi_handle)
-{
-	return false;
-}
-#endif
 
 /**
  * wma_register_qos_null_hdd_cb() - Register QoS NULL TX event hdd callback
