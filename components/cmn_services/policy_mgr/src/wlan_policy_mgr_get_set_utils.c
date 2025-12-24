@@ -15779,7 +15779,7 @@ policy_mgr_is_cfr_allowed(struct wlan_objmgr_psoc *psoc)
 	total_count = count_sap + count_ndi + count_nan_disc;
 
 	/* CFR is only allowed with single STA MLO/Legacy */
-	if (total_count || num_ml_sta + num_non_ml_sta > 1)
+	if (total_count || (num_ml_sta && num_non_ml_sta))
 		return false;
 
 	return true;
