@@ -9889,3 +9889,55 @@ QDF_STATUS wlan_mlme_get_sta_dfs_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+uint32_t
+wlan_mlme_get_high_band_roaming_threshold_time_ms(
+				struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_HIGH_BAND_ROAMING_THRESHOLD_TIME_MS);
+	}
+
+	mlme_debug("high_band_roaming_threshold_time_ms %u",
+		   mlme_obj->cfg.sta.high_band_roaming_threshold_time_ms);
+
+	return mlme_obj->cfg.sta.high_band_roaming_threshold_time_ms;
+}
+
+uint32_t
+wlan_mlme_get_high_band_roaming_data_threshold(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_HIGH_BAND_ROAMING_DATA_THRESHOLD);
+	}
+
+	mlme_debug("high_band_roaming_data_threshold %u",
+		   mlme_obj->cfg.sta.high_band_roaming_data_threshold);
+
+	return mlme_obj->cfg.sta.high_band_roaming_data_threshold;
+}
+
+bool
+wlan_mlme_get_enable_high_band_roaming(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_legacy_err("No psoc object");
+		return cfg_get(psoc, CFG_ENABLE_HIGH_BAND_ROAMING);
+	}
+
+	mlme_debug("enable_high_band_roaming %u",
+		   mlme_obj->cfg.sta.enable_high_band_roaming);
+
+	return mlme_obj->cfg.sta.enable_high_band_roaming;
+}

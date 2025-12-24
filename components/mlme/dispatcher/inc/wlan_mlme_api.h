@@ -6103,4 +6103,36 @@ QDF_STATUS wlan_mlme_get_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS wlan_mlme_get_sta_dfs_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
 					     bool *value);
+
+/**
+ * wlan_mlme_get_high_band_roaming_threshold_time_ms() - Get high band roaming
+ * threshold time in millisecond.
+ * @psoc: pointer to psoc
+ *
+ * Return: High band roaming threshold time in millisecond.
+ */
+uint32_t
+wlan_mlme_get_high_band_roaming_threshold_time_ms(
+				struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_high_band_roaming_data_threshold() - Get high band roaming
+ * data threshold in KBps.
+ * @psoc: pointer to psoc
+ *
+ * Return: High band roaming data threshold in KBps.
+ */
+uint32_t
+wlan_mlme_get_high_band_roaming_data_threshold(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_enable_high_band_roaming() - Get enable high band roaming
+ * support
+ * @psoc: pointer to psoc
+ *
+ * Return: true if high band roaming is enabled, false otherwise
+ */
+bool
+wlan_mlme_get_enable_high_band_roaming(struct wlan_objmgr_psoc *psoc);
+
 #endif /* _WLAN_MLME_API_H_ */
