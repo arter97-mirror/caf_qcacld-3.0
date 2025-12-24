@@ -2743,6 +2743,10 @@ defined(CONFIG_WLAN_TX_FLOW_CONTROL_V2)
 #define IPA_P2P_SUPPORT (1)
 #endif
 
+#ifdef CONFIG_IPA_NAN_SUPPORT
+#define IPA_NAN_SUPPORT (1)
+#endif
+
 #ifdef CONFIG_WLAN_CUSTOM_DSCP_UP_MAP
 #define WLAN_CUSTOM_DSCP_UP_MAP (1)
 #endif

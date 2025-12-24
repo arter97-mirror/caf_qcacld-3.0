@@ -47,6 +47,7 @@
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_hdd_sysfs.h"
 #include "wlan_hdd_stats.h"
+#include <wlan_ipa_ucfg_api.h>
 
 /**
  * hdd_nan_datapath_target_config() - Configure NAN datapath features
@@ -989,6 +990,48 @@ int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
 	return ret;
 }
 
+#ifdef IPA_NAN_SUPPORT
+/**
+ * hdd_ndi_ipa_event_deliver() - send NDI event to ipa component.
+ * @hdd_ctx: hdd context pointer.
+ * @adapter: adapter context.
+ * @vdev_id: vdev id.
+ * @ipa_event_type: NDI create/delete event.
+ *
+ * Return: void
+ */
+
+static inline void
+hdd_ndi_ipa_event_deliver(struct hdd_context *hdd_ctx,
+			  struct hdd_adapter *adapter,
+			  uint8_t vdev_id,
+			  enum wlan_ipa_wlan_event ipa_event_type)
+{
+	QDF_STATUS status;
+
+	if (!ucfg_ipa_is_enabled())
+		return;
+
+	status = ucfg_ipa_wlan_evt(hdd_ctx->pdev,
+				   adapter->dev,
+				   adapter->device_mode,
+				   vdev_id,
+				   ipa_event_type,
+				   adapter->dev->dev_addr,
+				   false);
+	if (status)
+		hdd_err("NAN %d event failed", ipa_event_type);
+}
+#else
+static inline void
+hdd_ndi_ipa_event_deliver(struct hdd_context *hdd_ctx,
+			  struct hdd_adapter *adapter,
+			  uint8_t vdev_id,
+			  enum wlan_ipa_wlan_event ipa_event_type)
+{
+}
+#endif
+
 #define MAX_VDEV_NDP_PARAMS 2
 /* params being sent:
  * wmi_vdev_param_ndp_inactivity_timeout
@@ -1076,6 +1119,9 @@ hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 							     setparam, index);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("failed to send vdev set params");
+
+		hdd_ndi_ipa_event_deliver(hdd_ctx, adapter,
+					  vdev_id, WLAN_IPA_AP_CONNECT);
 	} else {
 		hdd_alert("NDI interface creation failed with reason %d",
 			ndi_rsp->reason /* create_reason */);
@@ -1143,8 +1189,12 @@ void hdd_ndi_drv_ndi_delete_rsp_handler(uint8_t vdev_id)
 	 * For NAN Data interface, the close session results in the final
 	 * indication to the userspace
 	 */
-	if (adapter->device_mode == QDF_NDI_MODE)
+	if (adapter->device_mode == QDF_NDI_MODE) {
+		hdd_ndi_ipa_event_deliver(hdd_ctx, adapter,
+					  vdev_id,
+					  WLAN_IPA_AP_DISCONNECT);
 		hdd_ndp_session_end_handler(adapter);
+	}
 
 	complete(&adapter->disconnect_comp_var);
 }
