@@ -947,6 +947,9 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 	features->bits.dynamic_freq = 1;
 	features->bits.dynamic_fixed_tx_rate = 1;
 	features->bits.frame_type_filter = 1;
+	features->bits.custom_mgmt_retry_limit = 1;
+	features->bits.custom_data_retry_limit = 1;
+	features->bits.frame_type_filter = 1;
 	if (policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc))
 		features->bits.sta_coexist = 1;
 
@@ -977,7 +980,7 @@ static const qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
  * version supported and the operations table.
  */
 static const qdf_wondertap_priv_t wlan_drv_wondertap_priv = {
-	.ver = WONDER_VERSION_1_4,
+	.ver = WONDER_VERSION_1_4_1,
 	.wonder_ops = &wlan_drv_wondertap_ops,
 };
 
