@@ -2501,7 +2501,7 @@ static QDF_STATUS hdd_son_get_peer_capability(struct wlan_objmgr_vdev *vdev,
 {
 	struct hdd_station_info *sta_info;
 	struct hdd_adapter *adapter;
-	bool b_meas_supported;
+	bool b_meas_supported = false;
 	QDF_STATUS status;
 
 	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
