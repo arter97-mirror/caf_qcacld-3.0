@@ -57,6 +57,8 @@
 #ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
 #include "wlan_mlo_mgr_ap.h"
 #endif
+#include "wlan_mlo_mgr_link_switch.h"
+#include "lim_send_sme_rsp_messages.h"
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
@@ -2335,6 +2337,53 @@ vdevmgr_vdev_start_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 }
 
 /**
+ * vdevmgr_vdev_unified_connect_rsp_handle() - callback to handle unified
+ * connect response
+ * @vdev: pointer to vdev
+ * @rsp: pointer to vdev unified connect response
+ * @status: status received from firmware as part of the event
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+vdevmgr_vdev_unified_connect_rsp_handle(
+				struct wlan_objmgr_vdev *vdev,
+				struct vdev_unified_connect_response *rsp,
+				QDF_STATUS status)
+{
+	struct mac_context *mac_ctx;
+
+	if (!vdev || !rsp) {
+		mlme_legacy_err("Invalid input parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wma_set_vdev_mac_id_from_response(rsp);
+
+	/* Get MAC context */
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx) {
+		mlme_legacy_err("MAC context is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	 /* Validate vdev_id */
+	if (rsp->vdev_id >= WLAN_MAX_VDEVS) {
+		mlme_legacy_err("Invalid vdev_id: %d", rsp->vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wma_set_vdev_mac_id_from_response(rsp);
+
+	/* Send unified connect response */
+	lim_send_unified_connect_rsp(mac_ctx, rsp->vdev_id, status);
+
+	/* Clear the unified connect in progress flag */
+	mlo_mgr_set_unified_connect_in_progress(vdev, false);
+
+	return status;
+}
+/**
  * vdevmgr_vdev_peer_delete_all_rsp_handle() - callback to handle vdev delete
  *                                             all response
  * @vdev_mlme: vdev mlme object
@@ -2709,6 +2758,8 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_notify_down_complete = vdevmgr_notify_down_complete,
 	.mlme_vdev_ext_stop_rsp = vdevmgr_vdev_stop_rsp_handle,
 	.mlme_vdev_ext_start_rsp = vdevmgr_vdev_start_rsp_handle,
+	.mlme_vdev_ext_unified_connect_rsp =
+				vdevmgr_vdev_unified_connect_rsp_handle,
 	.mlme_vdev_sta_disconn_start = sta_mlme_vdev_sta_disconnect_start,
 	.mlme_vdev_ext_peer_delete_all_rsp =
 			vdevmgr_vdev_peer_delete_all_rsp_handle,

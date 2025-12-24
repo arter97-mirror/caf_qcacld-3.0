@@ -93,6 +93,23 @@ void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
 				   uint8_t vdev_id);
 
 /**
+ * lim_send_unified_connect_rsp() - Send unified connect response
+ * @mac_ctx: Pointer to Global MAC structure
+ * @vdev_id: vdev_id
+ * @evt_status: status received from firmware
+ *
+ * This function is a unified API that internally calls
+ * lim_send_sme_join_reassoc_rsp() to send join response
+ * to applications above MAC Software.
+ * It will determine the appropriate parameters based on the vdev_id.
+ *
+ * Return: None
+ */
+void lim_send_unified_connect_rsp(struct mac_context *mac_ctx,
+				  uint8_t vdev_id,
+				  QDF_STATUS evt_status);
+
+/**
  * lim_cm_send_connect_rsp() - Send Response to Upper Layers
  * @mac_ctx: Pointer to Global MAC structure
  * @pe_session: PE Session Info

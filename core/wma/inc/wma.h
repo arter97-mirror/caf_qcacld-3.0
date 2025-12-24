@@ -2846,4 +2846,18 @@ QDF_STATUS wma_register_qos_null_hdd_cb(qos_null_tx_compl_cb callback,
  */
 QDF_STATUS wma_deregister_qos_null_hdd_cb(void);
 
+/**
+ * wma_set_vdev_mac_id_from_response() - Set vdev MAC ID from unified connect
+ * response
+ * @rsp: pointer to vdev unified connect response
+ *
+ * This function handles MAC ID configuration and mapping logic. It gets the
+ * target resource configuration, determines the correct MAC ID based on
+ * use_pdev_id flag, and sets the vdev MAC ID accordingly.
+ *
+ * Return: QDF_STATUS - QDF_STATUS_SUCCESS on success, error code on failure
+ */
+QDF_STATUS
+wma_set_vdev_mac_id_from_response(struct vdev_unified_connect_response *rsp);
+
 #endif

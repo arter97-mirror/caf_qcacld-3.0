@@ -1437,6 +1437,19 @@ void lim_handle_sme_join_result(struct mac_context *mac_ctx,
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_START_SUCCESS,
 					      0, NULL);
+
+		if (mlo_mgr_is_unified_connect_in_progress(session->vdev) &&
+		    mlo_mgr_is_link_switch_in_progress(session->vdev) &&
+		    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(
+							mac_ctx->psoc)) {
+			/*
+			 * For the unified connect command, the response to
+			 * the connection manager will be sent after the unified
+			 * connect event is received.
+			 */
+			return;
+		}
+
 		return lim_send_sme_join_reassoc_rsp(mac_ctx, false,
 						     result_code,
 						     prot_status_code, session,

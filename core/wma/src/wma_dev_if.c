@@ -861,6 +861,40 @@ send_fail_resp:
 	wma_send_start_resp(wma, add_bss_rsp, rsp);
 }
 
+QDF_STATUS
+wma_set_vdev_mac_id_from_response(struct vdev_unified_connect_response *rsp)
+{
+	tp_wma_handle wma;
+	target_resource_config *wlan_res_cfg;
+	uint8_t mac_id, rsp_mac_id;
+
+	/* Get WMA handle and validate */
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma)
+		return QDF_STATUS_E_FAILURE;
+
+	wlan_res_cfg = lmac_get_tgt_res_cfg(wma->psoc);
+	if (!wlan_res_cfg) {
+		wma_err("Wlan resource config is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	rsp_mac_id = rsp->vdev_start_resp.mac_id;
+	if (wlan_res_cfg->use_pdev_id) {
+		if (rsp_mac_id == OL_TXRX_PDEV_ID) {
+			wma_err("soc level id received for mac id");
+			return QDF_STATUS_E_INVAL;
+		}
+		mac_id = WMA_PDEV_TO_MAC_MAP(rsp_mac_id);
+	} else {
+		mac_id = rsp_mac_id;
+	}
+
+	wlan_mlme_set_vdev_mac_id(wma->pdev, rsp->vdev_id, mac_id);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 /**
  * wma_find_mcc_ap() - finds if device is operating AP in MCC mode or not

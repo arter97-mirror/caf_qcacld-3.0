@@ -727,6 +727,58 @@ void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
 	/* add reassoc resp API */
 }
 
+void lim_send_unified_connect_rsp(struct mac_context *mac_ctx,
+				  uint8_t vdev_id,
+				  QDF_STATUS evt_status)
+{
+	struct pe_session *session_entry;
+	tSirResultCodes result_code = eSIR_SME_SUCCESS;
+	uint16_t prot_status_code = STATUS_SUCCESS;
+
+	pe_debug("Unified connect response for vdev_id: %d, evt_status: %d",
+		 vdev_id, evt_status);
+
+	/* Find the PE session for this vdev */
+	session_entry = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!session_entry) {
+		pe_err("Session not found for vdev_id: %d", vdev_id);
+		result_code = eSIR_SME_INVALID_SESSION;
+	} else {
+		/* Map firmware status to result codes */
+		switch (evt_status) {
+		case QDF_STATUS_SUCCESS:
+			result_code = eSIR_SME_SUCCESS;
+			prot_status_code = STATUS_SUCCESS;
+			break;
+		case QDF_STATUS_E_TIMEOUT:
+			/*
+			 * Timeout when firmware didn't send unified command
+			 * response to host
+			 */
+			result_code = eSIR_SME_JOIN_TIMEOUT_RESULT_CODE;
+			prot_status_code = STATUS_UNSPECIFIED_FAILURE;
+			break;
+		case QDF_STATUS_E_FAILURE:
+		case QDF_STATUS_E_NOMEM:
+		default:
+			/* Failure when firmware sent evt_status as failed */
+			if (session_entry->result_code != eSIR_SME_SUCCESS) {
+				result_code = session_entry->result_code;
+				prot_status_code =
+					session_entry->prot_status_code;
+			} else {
+				result_code = eSIR_SME_ASSOC_REFUSED;
+				prot_status_code = STATUS_UNSPECIFIED_FAILURE;
+			}
+			break;
+		}
+	}
+
+	/* Call the existing lim_send_sme_join_reassoc_rsp function */
+	lim_send_sme_join_reassoc_rsp(mac_ctx, false, result_code,
+				      prot_status_code, session_entry, vdev_id);
+}
+
 void lim_send_sme_start_bss_rsp(struct mac_context *mac,
 				tSirResultCodes resultCode,
 				struct pe_session *pe_session,
