@@ -711,7 +711,6 @@ struct wma_invalid_peer_params {
  * @roam_scan_stats_req: cached roam scan stats request
  * @wma_invalid_peer_params: structure storing invalid peer params
  * @invalid_peer_idx: invalid peer index
- * @qos_null_desc_id: descriptor id for qos null frame tx
  * It stores parameters per vdev in wma.
  */
 struct wma_txrx_node {
@@ -759,7 +758,6 @@ struct wma_txrx_node {
 	struct wma_invalid_peer_params invalid_peers[INVALID_PEER_MAX_NUM];
 	uint8_t invalid_peer_idx;
 	uint16_t bss_max_idle_period;
-	uint32_t qos_null_desc_id;
 };
 
 /**
@@ -864,6 +862,24 @@ struct wma_pf_sym_hist {
 	uint32_t pf_notify_buf_len;
 	qdf_spinlock_t lock;
 };
+
+/**
+ * typedef qos_null_tx_compl_cb - QoS NULL TX completion callback
+ * @vdev_id: vdev id
+ * @status: TX completion status
+ * @ack_rssi: ACK RSSI in dBm
+ * @ppdu_id: Hardware PPDU ID
+ * @ieee_link_id_valid: IEEE link ID valid flag true for valid for MLO
+ * @ieee_link_id: IEEE link ID
+ * @context: Callback context
+ *
+ * This callback is invoked by WMA when QoS NULL frame TX completion
+ * event is received from firmware.
+ */
+typedef void (*qos_null_tx_compl_cb)(uint8_t vdev_id, uint32_t status,
+				     int32_t ack_rssi, uint32_t ppdu_id,
+				     uint32_t ieee_link_id_valid,
+				     uint32_t ieee_link_id, void *context);
 
 /**
  * struct t_wma_handle - wma context
@@ -984,6 +1000,8 @@ struct wma_pf_sym_hist {
  * @eht_cap: 802.11be capabilities
  * @set_hw_mode_resp_status: Set HW mode response status
  * @wma_pf_hist: PF symbol history
+ * @qos_null_tx_compl_cb: QoS NULL frame TX completion callback
+ * @qos_null_tx_compl_cb_context: Context for QoS NULL TX completion callback
  *
  * This structure is the global wma context.  It contains global wma
  * module parameters and handles of other modules.
@@ -1121,6 +1139,8 @@ typedef struct {
 	qdf_wake_lock_t go_d3_wow_wake_lock;
 	enum set_hw_mode_status set_hw_mode_resp_status;
 	struct wma_pf_sym_hist wma_pf_hist;
+	qos_null_tx_compl_cb qos_null_tx_compl_cb;
+	void *qos_null_tx_compl_cb_context;
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -1542,6 +1562,10 @@ struct wma_target_req *wma_fill_hold_req(tp_wma_handle wma,
 
 int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 				   uint32_t len);
+
+int wma_qos_null_tx_compl_event_handler(void *handle, uint8_t *event_buff,
+					uint32_t len);
+
 int wma_mgmt_tx_bundle_completion_handler(void *handle,
 	uint8_t *cmpl_event_params, uint32_t len);
 uint32_t wma_get_vht_ch_width(void);

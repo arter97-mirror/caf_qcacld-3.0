@@ -2065,4 +2065,16 @@ void lim_send_link_removal_req(struct mac_context *mac_ctx, uint8_t vdev_id)
  */
 QDF_STATUS lim_process_qos_null_req(struct scheduler_msg *msg);
 
+/**
+ * lim_process_qos_null_tx_completion() - Process QoS NULL TX completion
+ * @mac_ctx: MAC context
+ * @desc_id: Descriptor ID from completion event
+ * @vdev_id: Output parameter to return vdev_id
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code on failure
+ */
+QDF_STATUS lim_process_qos_null_tx_completion(struct mac_context *mac_ctx,
+					      uint32_t desc_id,
+					      uint8_t *vdev_id);
+
 #endif /* __LIM_TYPES_H */

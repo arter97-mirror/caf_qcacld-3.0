@@ -4116,6 +4116,11 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 			wma_vdev_bss_color_collision_info_handler,
 			WMA_RX_WORK_CTX);
 
+	wmi_unified_register_event_handler(wma_handle->wmi_handle,
+			wmi_qos_null_frame_tx_completion_event_id,
+			wma_qos_null_tx_compl_event_handler,
+			WMA_RX_SERIALIZER_CTX);
+
 	wma_register_twt_events(wma_handle);
 
 	wma_register_apf_events(wma_handle);

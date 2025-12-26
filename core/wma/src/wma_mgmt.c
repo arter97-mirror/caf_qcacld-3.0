@@ -4856,3 +4856,52 @@ cm_send_ies_for_roam_invoke(struct wlan_objmgr_vdev *vdev, uint16_t dot11_mode)
 					op_mode);
 	return status;
 }
+
+int wma_qos_null_tx_compl_event_handler(void *handle, uint8_t *event_buff,
+					uint32_t len)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+	struct qos_null_frame_tx_compl_params event = {0};
+	uint8_t vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	QDF_STATUS status;
+
+	if (!wma_handle) {
+		wma_err("Invalid WMA handle");
+		return -EINVAL;
+	}
+
+	if (wmi_extract_qos_null_frame_tx_compl_event(wma_handle->wmi_handle,
+						      event_buff, &event)) {
+		wma_err("Failed to extract QoS null completion event");
+		return -EINVAL;
+	}
+
+	wma_debug("QoS NULL TX event: desc_id=%u status=%u pdev_id=%u ppdu=%u "
+		  "ack_rssi=%d ieee_link_id_valid=%u ieee_link_id=%u",
+		  event.desc_id, event.status, event.pdev_id, event.ppdu_id,
+		  event.ack_rssi, event.ieee_link_id_valid, event.ieee_link_id);
+
+	status = lim_process_qos_null_tx_completion(wma_handle->mac_context,
+						    event.desc_id, &vdev_id);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("QoS null completion failed: desc_id=%u status=%d",
+			event.desc_id, status);
+		return -EINVAL;
+	}
+
+	if (wma_handle->qos_null_tx_compl_cb) {
+		wma_handle->qos_null_tx_compl_cb(vdev_id, event.status,
+						 event.ack_rssi, event.ppdu_id,
+						 event.ieee_link_id_valid,
+						 event.ieee_link_id,
+						 wma_handle->qos_null_tx_compl_cb_context);
+
+		wma_debug("Invoked HDD callback: vdev_id=%u status=%u", vdev_id,
+			  event.status);
+	} else {
+		wma_debug("No HDD callback registered");
+	}
+
+	return 0;
+}
