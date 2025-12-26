@@ -2172,8 +2172,8 @@ static int __wlan_hdd_cfg80211_peer_cfr_capture_cfg(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	wlan_cfg80211_peer_cfr_capture_cfg(wiphy, adapter,
-					   data, data_len);
+	ret = wlan_cfg80211_peer_cfr_capture_cfg(wiphy, adapter,
+						 data, data_len);
 
 	hdd_exit();
 
