@@ -36,6 +36,9 @@
 #include "wlan_hdd_cfg80211.h"
 #include "target_if.h"
 
+#define FRAME_CTRL 2
+#define SUB_TYPE_QOS_NULL 8
+
 void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
 				const void *data, uint32_t data_len)
 {
@@ -1011,6 +1014,26 @@ phy_ch_width convert_capture_bw(enum nl80211_chan_width capture_bw)
 	}
 }
 
+static void wlan_cfg80211_reset_cfr(struct pdev_cfr *pcfr, uint8_t value)
+{
+	if (!pcfr)
+		return;
+	pcfr->is_associated = value;
+	pcfr->freq = value;
+	pcfr->report_interval = value;
+	pcfr->format_version = value;
+	pcfr->oui_length = value;
+	qdf_mem_zero(pcfr->oui, MAX_CFR_OUI_LEN);
+	pcfr->is_cfr_version_v3 = value;
+	pcfr->frame_type = value;
+	pcfr->frame_sub_type = value;
+	pcfr->unassoc_capture_config = value;
+	pcfr->unassoc_channel_mhz = value;
+	pcfr->unassoc_phy_mode = value;
+	pcfr->bandwidth = value;
+	pcfr->is_cfr_data_present = value;
+}
+
 static QDF_STATUS wlan_cfg80211_stop_enh_cfr_v3(
 			struct wlan_objmgr_vdev *vdev,
 			uint8_t value)
@@ -1083,21 +1106,7 @@ static QDF_STATUS wlan_cfg80211_stop_enh_cfr_v3(
 			cfr_err("Failed to stop enhanced CFR RX capture");
 	}
 
-	pcfr->is_associated = value;
-	pcfr->freq = value;
-	pcfr->report_interval = value;
-	pcfr->format_version = value;
-	pcfr->oui_length = value;
-	qdf_mem_zero(pcfr->oui, MAX_CFR_OUI_LEN);
-	pcfr->is_cfr_version_v3 = value;
-	pcfr->frame_type = value;
-	pcfr->frame_sub_type = value;
-	pcfr->unassoc_capture_config = value;
-	pcfr->unassoc_channel_mhz = value;
-	pcfr->unassoc_phy_mode = value;
-	pcfr->bandwidth = value;
-	pcfr->is_cfr_data_present = value;
-
+	wlan_cfg80211_reset_cfr(pcfr, 0);
 cleanup:
 	if (pdev_ref_taken)
 		wlan_objmgr_pdev_release_ref(pdev, WLAN_CFR_ID);
@@ -1275,6 +1284,13 @@ static int wlan_enh_cfr_capture_v3_tx(struct hdd_adapter *adapter,
 
 	params.method = pcfr->method;
 	params.bandwidth = pcfr->bandwidth;
+
+	/* Check frame type and subtype QOS is only valid for TX CFR */
+	if (pcfr->frame_type != FRAME_CTRL &&
+	    pcfr->frame_sub_type != SUB_TYPE_QOS_NULL) {
+		ret = -EINVAL;
+		goto release_peer;
+	}
 
 	cfr_debug("Starting CFR TX capture with method: %u, bandwidth: %u",
 		  params.method, params.bandwidth);
@@ -1774,6 +1790,7 @@ wlan_cfg80211_enh_cfr_capture_v3(struct hdd_adapter *adapter,
 
 release_vdev:
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CFR_ID);
+	wlan_cfg80211_reset_cfr(pcfr, 0);
 	return ret;
 }
 
