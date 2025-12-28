@@ -1205,8 +1205,11 @@ static int wlan_enh_cfr_capture_v3_tx(struct hdd_adapter *adapter,
 	struct wlan_objmgr_peer *peer = NULL;
 	struct wlan_objmgr_psoc *psoc = NULL;
 	struct qdf_mac_addr peer_addr = { 0 };
+	enum phy_ch_width peer_bw;
+	enum wlan_phymode peer_phymode;
 	QDF_STATUS status;
 	int ret = 0;
+	struct wlan_channel *bss_chan;
 
 	if (!adapter) {
 		cfr_err("Invalid adapter pointer");
@@ -1269,6 +1272,29 @@ static int wlan_enh_cfr_capture_v3_tx(struct hdd_adapter *adapter,
 		return -ENOENT;
 	}
 
+	peer_phymode = wlan_peer_get_phymode(peer);
+	peer_bw = wlan_mlme_get_ch_width_from_phymode(peer_phymode);
+	if (pcfr->bandwidth > peer_bw) {
+		cfr_err("Invalid peer bw %d cfr bw %d", peer_bw,
+			pcfr->bandwidth);
+		ret = -EINVAL;
+		goto release_peer;
+	}
+
+	bss_chan = wlan_vdev_mlme_get_bss_chan(wlan_peer_get_vdev(peer));
+	if (!bss_chan) {
+		cfr_err("Invalid bss chan");
+		ret = -EINVAL;
+		goto release_peer;
+	}
+
+	if (pcfr->freq != bss_chan->ch_freq) {
+		cfr_err("Invalid CFR freq %d bss freq %d",
+			pcfr->freq, bss_chan->ch_freq);
+		ret = -EINVAL;
+		goto release_peer;
+	}
+
 	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY]) {
 		params.period = nla_get_u32(tb[
 			QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY]);
@@ -1286,8 +1312,10 @@ static int wlan_enh_cfr_capture_v3_tx(struct hdd_adapter *adapter,
 	params.bandwidth = pcfr->bandwidth;
 
 	/* Check frame type and subtype QOS is only valid for TX CFR */
-	if (pcfr->frame_type != FRAME_CTRL &&
+	if (pcfr->frame_type != FRAME_CTRL ||
 	    pcfr->frame_sub_type != SUB_TYPE_QOS_NULL) {
+		cfr_err("Invalid frame_type %d frame_subtype %d",
+			pcfr->frame_type, pcfr->frame_sub_type);
 		ret = -EINVAL;
 		goto release_peer;
 	}
@@ -1623,42 +1651,124 @@ static int wlan_cfg80211_start_cfr_rx_capture(struct wlan_objmgr_vdev *vdev,
 					      struct nlattr **tb)
 {
 	struct cfr_wlanconfig_param params = { 0 };
-	int ret;
+	struct pdev_cfr *pcfr = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	int status = 0;
+	uint8_t grp_id, grp_id_supported = 0;
+	bool pdev_ref_taken = false;
+	enum phy_ch_width peer_bw;
+	uint32_t bss_freq;
 
 	if (!vdev || !tb) {
 		cfr_err("Invalid input parameters");
 		return -EINVAL;
 	}
 
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cfr_err("Failed to get pdev object");
+		return -ENODEV;
+	}
+
+	status = wlan_objmgr_pdev_try_get_ref(pdev, WLAN_CFR_ID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cfr_err("Failed to get pdev reference");
+		return -EBUSY;
+	}
+	pdev_ref_taken = true;
+
+	pcfr = wlan_objmgr_pdev_get_comp_private_obj(pdev, WLAN_UMAC_COMP_CFR);
+	if (!pcfr) {
+		cfr_err("CFR private object is NULL");
+		status = -ENOENT;
+		goto cleanup;
+	}
+
 	if (!tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE_GROUP_BITMAP]) {
-		cfr_err("Group bitmap required for CFR RX capture start");
-		return -EINVAL;
+		cfr_err("Group bitmap attribute missing for CFR RX capture start");
+		status = -EINVAL;
+		goto cleanup;
 	}
 
-	ret = wlan_cfg80211_cfr_set_config(vdev, tb);
-	if (ret) {
-		cfr_err("Failed to set CFR config, ret: %d", ret);
-		return ret;
+	/* Set CFR configuration */
+	status = wlan_cfg80211_cfr_set_config(vdev, tb);
+	if (status) {
+		cfr_err("Failed to set CFR config, status=%d", status);
+		status = -EINVAL;
+		goto cleanup;
 	}
 
-	params.en_cfg = nla_get_u32(tb[
-		QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE_GROUP_BITMAP]);
+	ucfg_cfr_get_peer_info(vdev, &peer_bw, &bss_freq);
 
+	/* Count supported group IDs */
+	for (grp_id = 0; grp_id < MAX_TA_RA_ENTRIES; grp_id++) {
+		if (qdf_atomic_test_bit(
+				grp_id,
+				pcfr->rcc_param.modified_in_curr_session)) {
+			grp_id_supported++;
+		}
+	}
+
+	/* if more than one mac is there its RX un assoc */
+	if (pcfr->is_associated && grp_id_supported > 1)
+		pcfr->is_associated = false;
+
+	/* Validate bandwidth for unassociated mode */
+	if (!pcfr->is_associated && pcfr->bandwidth != CH_WIDTH_20MHZ) {
+		cfr_err("Invalid bandwidth %d for unassociated RX mode",
+			pcfr->bandwidth);
+		status = -EINVAL;
+		goto cleanup;
+	}
+
+	/* Validate bandwidth for associated mode */
+	if (pcfr->is_associated && pcfr->bandwidth > peer_bw) {
+		cfr_err("Invalid peer bw %d  cfr bw %d for assoc RX mode",
+			peer_bw, pcfr->bandwidth);
+		status = -EINVAL;
+		goto cleanup;
+	}
+
+	 /* Validate freq for associated mode */
+	if (pcfr->is_associated && pcfr->freq != bss_freq) {
+		cfr_err("Invalid bss freq %d cfr freq %d for assoc RX mode",
+			bss_freq, pcfr->freq);
+		status = -EINVAL;
+		goto cleanup;
+	}
+
+	if (!pcfr->is_associated) {
+		pcfr->unassoc_capture_config = 1;
+		pcfr->unassoc_channel_mhz = pcfr->freq;
+		cfr_debug("Configured unassociated capture: freq=%d MHz",
+			  pcfr->freq);
+	}
+
+	params.en_cfg =
+	nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE_GROUP_BITMAP]);
 	if (!params.en_cfg) {
 		cfr_err("Invalid group bitmap value: 0x%x", params.en_cfg);
-		return -EINVAL;
+		status = -EINVAL;
+		goto cleanup;
 	}
 
-	cfr_debug("Enable bitmap: 0x%x", params.en_cfg);
+	cfr_debug("Starting CFR RX capture with bitmap: 0x%x", params.en_cfg);
 
-	/* Start CFR RX capture */
+	/* Start CFR RX capture sequence */
 	ucfg_cfr_set_en_bitmap(vdev, &params);
 	ucfg_cfr_resume(wlan_vdev_get_pdev(vdev));
 	ucfg_cfr_subscribe_ppdu_desc(wlan_vdev_get_pdev(vdev), true);
 	ucfg_cfr_committed_rcc_config(vdev);
 
-	cfr_debug("CFR RX capture started successfully");
-	return 0;
+	cfr_info("CFR RX capture started: mode=%s, groups=%d, bitmap=0x%x",
+		 pcfr->is_associated ? "associated" : "unassociated",
+		 grp_id_supported, params.en_cfg);
+
+cleanup:
+	if (pdev_ref_taken)
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_CFR_ID);
+
+	return status;
 }
 
 static int
@@ -1778,8 +1888,14 @@ wlan_cfg80211_enh_cfr_capture_v3(struct hdd_adapter *adapter,
 	if (!is_sta_connected) {
 		cfr_debug("Configuring unassociated capture mode");
 		pcfr->unassoc_capture_config = 1;
-		pcfr->unassoc_phy_mode = WLAN_PHYMODE_11NA_HT20;
 		pcfr->unassoc_channel_mhz = cfr_params.freq;
+	}
+
+	if (!is_sta_connected &&
+	    pcfr->bandwidth != CH_WIDTH_20MHZ) {
+		cfr_err("Invalid bw for rx un associated");
+			ret = -EINVAL;
+			goto release_vdev;
 	}
 
 	ret = wlan_cfg80211_start_cfr_rx_capture(vdev, tb);
