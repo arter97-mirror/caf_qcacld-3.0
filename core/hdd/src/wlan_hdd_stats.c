@@ -8182,7 +8182,7 @@ hdd_wlan_fill_per_chain_rssi_stats(struct station_info *sinfo,
 	uint8_t i;
 
 	sinfo->signal_avg = WLAN_HDD_TGT_NOISE_FLOOR_DBM;
-	for (i = 0; i < NUM_CHAINS_MAX; i++) {
+	for (i = 0; i < WLAN_MAX_VDEV_CHAINS; i++) {
 		if (link_info->hdd_stats.per_chain_rssi_stats.rssi[i] != 0) {
 			sinfo->chain_signal_avg[i] =
 			link_info->hdd_stats.per_chain_rssi_stats.rssi[i];

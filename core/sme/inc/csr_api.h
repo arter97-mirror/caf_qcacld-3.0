@@ -665,7 +665,7 @@ typedef struct tagCsrGlobalClassDStatsInfo {
  * @peer_mac_addr: peer mac address
  */
 struct csr_per_chain_rssi_stats_info {
-	int8_t rssi[NUM_CHAINS_MAX];
+	int8_t rssi[WLAN_MAX_VDEV_CHAINS];
 	tSirMacAddr peer_mac_addr;
 };
 

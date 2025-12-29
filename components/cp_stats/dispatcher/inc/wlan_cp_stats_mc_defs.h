@@ -45,8 +45,6 @@
 
 #endif /* WLAN_SUPPORT_TWT */
 
-#define MAX_NUM_CHAINS              4
-
 #define MAX_MIB_STATS               1
 
 #define IS_MSB_SET(__num) ((__num) & BIT(31))
@@ -519,7 +517,7 @@ struct recv_bcn_stats {
 struct vdev_mc_cp_stats {
 	struct cca_stats cca;
 	uint32_t tx_rate_flags;
-	int8_t chain_rssi[MAX_NUM_CHAINS];
+	int8_t chain_rssi[WLAN_MAX_VDEV_CHAINS];
 	struct summary_stats vdev_summary_stats;
 	struct pmf_bcn_protect_stats pmf_bcn_stats;
 	struct vdev_summary_extd_stats vdev_extd_stats;
@@ -743,7 +741,7 @@ struct summary_stats_event {
  */
 struct chain_rssi_event {
 	uint8_t vdev_id;
-	int8_t chain_rssi[MAX_NUM_CHAINS];
+	int8_t chain_rssi[WLAN_MAX_VDEV_CHAINS];
 };
 
 /**

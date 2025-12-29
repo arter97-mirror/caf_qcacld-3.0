@@ -880,7 +880,7 @@ static QDF_STATUS target_if_cp_stats_extract_vdev_chain_rssi_stats(
 			continue;
 		ev->vdev_chain_rssi[i].vdev_id = rssi_stats.vdev_id;
 
-		for (j = 0; j < MAX_NUM_CHAINS; j++) {
+		for (j = 0; j < WLAN_MAX_VDEV_CHAINS; j++) {
 			dat_snr = rssi_stats.rssi_avg_data[j];
 			bcn_snr = rssi_stats.rssi_avg_beacon[j];
 			cp_stats_nofl_debug("vdev %d Chain %d %s bcn: %d data: %d",

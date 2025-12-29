@@ -1006,7 +1006,7 @@ static void tgt_mc_cp_stats_extract_vdev_chain_rssi_stats(
 
 		wlan_cp_stats_vdev_obj_lock(vdev_cp_stats_priv);
 		vdev_mc_stats = vdev_cp_stats_priv->vdev_stats;
-		for (j = 0; j < MAX_NUM_CHAINS; j++) {
+		for (j = 0; j < WLAN_MAX_VDEV_CHAINS; j++) {
 			vdev_mc_stats->chain_rssi[j] =
 					ev->vdev_chain_rssi[i].chain_rssi[j];
 		}
