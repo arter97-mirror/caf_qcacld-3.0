@@ -2549,18 +2549,6 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 			flow_id = s_entry->tx_flow_id;
 			flow = &dp_stc->tx_flow_table->entries[flow_id];
 
-			qdf_mem_zero(flow, offsetof(struct wlan_dp_stc_flow_table_entry,
-						    reclassification_count));
-			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1,
-						     QDF_TX);
-#ifdef METADATA_CHECK_NEEDED_DURING_ADD
-			if (s_entry->tx_flow_metadata != flow->guid) {
-				qdf_assert_always(0);
-				goto rx_flow_sample;
-			}
-#endif
-			flow->metadata = s_entry->tx_flow_metadata;
-
 			flow->idx.sample_win_idx =
 					(s_entry->next_sample_idx << 16) |
 					(s_entry->next_win_idx);
@@ -2569,25 +2557,10 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 				     sizeof(s_entry->tx_stats_ref));
 		}
 
-#ifdef METADATA_CHECK_NEEDED_DURING_ADD
-sample:
-#endif
 		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
 			flow_id = s_entry->rx_flow_id;
 			flow = &dp_stc->rx_flow_table->entries[flow_id];
 
-			qdf_mem_zero(flow, offsetof(struct wlan_dp_stc_flow_table_entry,
-						    reclassification_count));
-			wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1,
-						     QDF_RX);
-#ifdef METADATA_CHECK_NEEDED_DURING_ADD
-			if (s_entry->rx_flow_metadata != flow->metadata) {
-				qdf_assert_always(0);
-				goto fail;
-			}
-#endif
-
-			flow->metadata = s_entry->rx_flow_metadata;
 			flow->idx.sample_win_idx =
 					(s_entry->next_sample_idx << 16) |
 					(s_entry->next_win_idx);
@@ -2598,9 +2571,9 @@ sample:
 
 		wlan_dp_stc_burst_samples_txrx_ref_store(s_entry);
 
-		s_entry->curr_sample_attempt = 0;
 		s_entry->state = WLAN_DP_SAMPLING_STATE_SAMPLING_START;
 		sampling_pending = true;
+		s_entry->curr_sample_attempt++;
 		break;
 	}
 	case WLAN_DP_SAMPLING_STATE_SAMPLING_START:
