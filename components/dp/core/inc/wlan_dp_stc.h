@@ -205,6 +205,7 @@ enum dp_stc_classified_state {
 /**
  * enum wlan_stc_sampling_state - Sampling state
  * @WLAN_DP_SAMPLING_STATE_INIT: init state
+ * @WLAN_DP_SAMPLING_STATE_PROVISIONAL: provisional state (0.5s-3s settling)
  * @WLAN_DP_SAMPLING_STATE_FLOW_ADDED: flow added for sampling
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_START: sampling started
  * @WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1: Sampling burst stats stage 1
@@ -216,6 +217,7 @@ enum dp_stc_classified_state {
  */
 enum wlan_stc_sampling_state {
 	WLAN_DP_SAMPLING_STATE_INIT,
+	WLAN_DP_SAMPLING_STATE_PROVISIONAL,
 	WLAN_DP_SAMPLING_STATE_FLOW_ADDED,
 	WLAN_DP_SAMPLING_STATE_SAMPLING_START,
 	WLAN_DP_SAMPLING_STATE_SAMPLING_BURST_STATS_1,
@@ -276,6 +278,7 @@ struct wlan_dp_stc_sampling_candidate {
 #define WLAN_DP_SAMPLING_FLAGS1_TXRX_SAMPLES_SENT BIT(1)
 #define WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_1_SENT BIT(2)
 #define WLAN_DP_SAMPLING_FLAGS1_BURST_SAMPLES_2_SENT BIT(3)
+#define WLAN_DP_SAMPLING_FLAGS1_PROVISIONAL_INIT_DONE BIT(4)
 
 /*
  * struct wlan_dp_stc_sampling_table_entry - Sampling table entry
@@ -343,6 +346,7 @@ struct wlan_dp_stc_sampling_table {
 
 #define WLAN_DP_STC_TRANSITION_FLAG_SAMPLE 0
 #define WLAN_DP_STC_TRANSITION_FLAG_WIN 1
+#define WLAN_DP_STC_BURST_ONLY_MODE_MARKER 0xFFFF
 
 #define WLAN_DP_STC_NUM_STAGES 3
 #define MAX_STAGE_SAMPLES 5
