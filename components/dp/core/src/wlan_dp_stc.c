@@ -1336,8 +1336,21 @@ wlan_dp_stc_update_flow_pkt_rate(struct wlan_dp_psoc_context *dp_ctx,
 	rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, rx_flow_id);
 	flow_entry = &dp_stc->rx_flow_table->entries[rx_flow_id];
 
-	current_pkt_count = rx_flow->num_pkts;
+	/* Check for flow reuse by comparing metadata */
+	if (flow_entry->metadata != rx_flow->metadata) {
+		/* Flow has been reused - reset packet rate tracking state */
+		flow_entry->metadata = rx_flow->metadata;
+		flow_entry->last_tracked_pkt_count = 0;
+		flow_entry->pkt_rate_last_update_ts = 0;
+		flow_entry->pkt_rate_circular_idx = 0;
+		qdf_mem_zero(flow_entry->pkt_count_last_3sec,
+			     sizeof(flow_entry->pkt_count_last_3sec));
+		qdf_mem_zero(flow_entry->time_delta_last_3sec,
+			     sizeof(flow_entry->time_delta_last_3sec));
+		return;
+	}
 
+	current_pkt_count = rx_flow->num_pkts;
 	time_delta = curr_pkt_ts - flow_entry->pkt_rate_last_update_ts;
 
 	/* Rotate buffer every second */
@@ -1443,9 +1456,10 @@ wlan_dp_stc_get_avg_pkt_rate(struct wlan_dp_stc_flow_table_entry *flow_entry)
  *
  * Logic:
  * 1. Initialize with all stages enabled
- * 2. For each stage, check if confidence is above threshold
- * 3. Remove stages that don't meet the confidence threshold
- * 4. Use stage-to-bit mapping array for generalized bit alignment
+ * 2. Process stages from highest (3) to lowest (1)
+ * 3. If stage passes confidence threshold: keep all stages up to current one
+ * 4. If stage fails threshold: clear only that stage's flag
+ * 5. Ensures only valid combinations: 1, 1+2, or 1+2+3
  *
  * Return: QDF_STATUS
  */
@@ -1454,12 +1468,16 @@ wlan_dp_stc_determine_reclass_stages(struct wlan_dp_stc_flow_table_entry *flow_e
 				     uint32_t *stage_flags)
 {
 	struct wlan_dp_stc_classify_insights *classify_results;
-	uint8_t stage;
+	int stage;
 	uint8_t i;
 	uint8_t max_confidence;
-	uint32_t stage_flags_cached;
 
-	/* Mapping array for stage enum to corresponding bit flags */
+	/*
+	 * Mapping array for stage enum to corresponding bit flags.
+	 * Note: The classify insight flags and sampling flags are aligned
+	 * with the same bit positions, allowing us to use stage_valid_bits
+	 * directly with stage_flags.
+	 */
 	static const uint32_t stage_valid_bits[] = {
 		/* stage 0 -> BIT(5) */
 		WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_1_VALID,
@@ -1469,21 +1487,27 @@ wlan_dp_stc_determine_reclass_stages(struct wlan_dp_stc_flow_table_entry *flow_e
 		WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_3_VALID
 	};
 
+	/* Initialize with all stages enabled */
+	*stage_flags = WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_1_VALID |
+		       WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_2_VALID |
+		       WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_3_VALID;
 	classify_results = &flow_entry->classify_results;
 
-	/* Initialize with all stages enabled */
-	stage_flags_cached = WLAN_DP_SAMPLING_FLAGS_STAGE_1 |
-			     WLAN_DP_SAMPLING_FLAGS_STAGE_2 |
-			     WLAN_DP_SAMPLING_FLAGS_STAGE_3;
-
-	/* Check each stage and remove if confidence is below threshold */
-	for (stage = WLAN_DP_STC_CLASSIFY_STAGE_1;
-	     stage < WLAN_DP_STC_CLASSIFY_STAGE_MAX;
-	     stage++) {
-		/* Use mapping array for generalized bit access */
+	/*
+	 * Process stages from highest (3) to lowest (1) to ensure sequential
+	 * stage enabling. This prevents invalid combinations like 1+3
+	 * without 2.
+	 */
+	for (stage = WLAN_DP_STC_CLASSIFY_STAGE_MAX - 1;
+	     stage >= WLAN_DP_STC_CLASSIFY_STAGE_1;
+	     stage--) {
+		/* Skip stages that don't have valid classification results */
 		if (!(classify_results->stage_valid_flags &
-		      stage_valid_bits[stage]))
+		      stage_valid_bits[stage])) {
+			/* Clear this stage's flag */
+			*stage_flags &= ~stage_valid_bits[stage];
 			continue;
+		}
 
 		max_confidence = 0;
 		for (i = 0; i < classify_results->sample_count[stage] &&
@@ -1495,17 +1519,20 @@ wlan_dp_stc_determine_reclass_stages(struct wlan_dp_stc_flow_table_entry *flow_e
 			}
 		}
 
-		if (max_confidence <=
-		    DP_STC_RECLASSIFICATION_CONFIDENCE_THRESHOLD)
-			stage_flags_cached &= ~stage_valid_bits[stage];
+		/*
+		 * If this stage meets the confidence threshold, keep all stages
+		 * up to this one enabled and break. Otherwise,
+		 * clear this stage's flag.
+		 */
+		if (max_confidence >=
+		    DP_STC_RECLASSIFICATION_CONFIDENCE_THRESHOLD) {
+			break;
+		} else {
+			/* Clear this stage's flag */
+			*stage_flags &= ~stage_valid_bits[stage];
+		}
 	}
 
-	/*
-	 * If no stages remain after confidence filtering, don't set any flags.
-	 * We don't want to reclassify if the probability is below threshold.
-	 */
-	if (stage_flags_cached)
-		*stage_flags = stage_flags_cached;
 	return QDF_STATUS_SUCCESS;
 }
 

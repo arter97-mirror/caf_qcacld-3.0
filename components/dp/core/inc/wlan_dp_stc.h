@@ -435,13 +435,17 @@ struct wlan_dp_stc_flow_table_entry {
 	struct wlan_dp_stc_txrx_stats txrx_stats;
 	struct wlan_dp_stc_txrx_min_max_stats txrx_min_max_stats[DP_STC_TXRX_SAMPLES_MAX][DP_TXRX_SAMPLES_WINDOW_MAX];
 	struct wlan_dp_stc_burst_stats burst_stats;
-	uint8_t reclassification_count;
 	uint8_t flags;
+	/*
+	 * Fields from reclassification_count onwards are preserved during
+	 * first sampling period and used for the reclassification feature
+	 */
+	uint8_t reclassification_count;
+	uint8_t pkt_rate_circular_idx;
 	uint32_t pkt_count_last_3sec[DP_STC_PKT_RATE_WINDOW_COUNT];
 	uint64_t time_delta_last_3sec[DP_STC_PKT_RATE_WINDOW_COUNT];
 	uint64_t pkt_rate_last_update_ts;
 	uint64_t last_tracked_pkt_count;
-	uint8_t pkt_rate_circular_idx;
 	struct wlan_dp_stc_classify_insights classify_results;
 };
 
@@ -956,6 +960,8 @@ wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 
 	switch (dir) {
 	case WLAN_DP_FLOW_DIR_TX:
+		qdf_mem_zero(&dp_stc->tx_flow_table->entries[flow_id],
+			     sizeof(struct wlan_dp_stc_flow_table_entry));
 		dp_stc_debug(dp_stc->logmask, "STC: Add TX flow [%u] %s [%s]",
 			     flow_id, dp_print_tuple_to_str(flow_tuple, buf,
 							    BUF_LEN_MAX),
@@ -964,6 +970,8 @@ wlan_dp_indicate_flow_add(struct wlan_dp_psoc_context *dp_ctx,
 							  BUF_LEN_MAX));
 		break;
 	case WLAN_DP_FLOW_DIR_RX:
+		qdf_mem_zero(&dp_stc->rx_flow_table->entries[flow_id],
+			     sizeof(struct wlan_dp_stc_flow_table_entry));
 		dp_stc_debug(dp_stc->logmask, "STC: Add RX flow [%u] %s [%s]",
 			     flow_id, dp_print_tuple_to_str(flow_tuple, buf,
 							    BUF_LEN_MAX),
