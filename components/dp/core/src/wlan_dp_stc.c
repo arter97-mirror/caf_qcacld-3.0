@@ -2291,6 +2291,183 @@ void wlan_dp_stc_burst_samples_txrx_ref_store(
 	}
 }
 
+/**
+ * wlan_dp_stc_init_provisional_flow() - Initialize a single flow for
+ * provisional state
+ * @dp_stc: STC context
+ * @flow_id: Flow ID to initialize
+ * @flow_metadata: Flow metadata for validation
+ * @dir: Flow direction (TX or RX)
+ *
+ * Return: None
+ */
+static inline void
+wlan_dp_stc_init_provisional_flow(struct wlan_dp_stc *dp_stc,
+				  uint32_t flow_id,
+				  uint32_t flow_metadata,
+				  enum qdf_proto_dir dir)
+{
+	struct wlan_dp_stc_flow_table_entry *flow;
+
+	if (dir == QDF_TX)
+		flow = &dp_stc->tx_flow_table->entries[flow_id];
+	else
+		flow = &dp_stc->rx_flow_table->entries[flow_id];
+
+	/* Zero flow up to reclassification_count to preserve reclass stats */
+	qdf_mem_zero(flow, offsetof(struct wlan_dp_stc_flow_table_entry,
+				    reclassification_count));
+
+	/* Enable tracking flag so per-packet path processes this flow */
+	wlan_dp_stc_trigger_sampling(dp_stc, flow_id, 1, dir);
+
+	flow->metadata = flow_metadata;
+
+	/* Set special marker: "burst only" mode */
+	flow->idx.sample_win_idx = WLAN_DP_STC_BURST_ONLY_MODE_MARKER;
+
+	dp_stc_debug(dp_stc->logmask,
+		     "STC: %s flow %d provisional tracking (burst only)",
+		     (dir == QDF_TX) ? "TX" : "RX", flow_id);
+}
+
+/**
+ * wlan_dp_stc_provisional_init_flows() - Initialize flows for provisional
+ * state
+ * @dp_stc: STC context
+ * @s_entry: Sampling table entry
+ *
+ * Return: None
+ */
+static inline void
+wlan_dp_stc_provisional_init_flows(struct wlan_dp_stc *dp_stc,
+				   struct wlan_dp_stc_sampling_table_entry
+				   *s_entry)
+{
+	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_TX_FLOW_VALID)
+		wlan_dp_stc_init_provisional_flow(dp_stc,
+						  s_entry->tx_flow_id,
+						  s_entry->tx_flow_metadata,
+						  QDF_TX);
+
+	if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID)
+		wlan_dp_stc_init_provisional_flow(dp_stc,
+						  s_entry->rx_flow_id,
+						  s_entry->rx_flow_metadata,
+						  QDF_RX);
+
+	/* Mark initialization as done using dedicated flag */
+	s_entry->flags1 |= WLAN_DP_SAMPLING_FLAGS1_PROVISIONAL_INIT_DONE;
+	s_entry->curr_sample_attempt = 0;
+}
+
+/**
+ * wlan_dp_stc_set_sampling_stages() - Set sampling stages based on packet rate
+ * @dp_stc: STC context
+ * @s_entry: Sampling table entry
+ * @pkt_rate: Packet rate in packets per second
+ *
+ * Return: None
+ */
+static inline void
+wlan_dp_stc_set_sampling_stages(struct wlan_dp_stc *dp_stc,
+				struct wlan_dp_stc_sampling_table_entry
+				*s_entry, uint32_t pkt_rate)
+{
+	/* Check if stage flags are already set (reclassification flow) */
+	if (s_entry->flags & (WLAN_DP_SAMPLING_FLAGS_STAGE_1 |
+			      WLAN_DP_SAMPLING_FLAGS_STAGE_2 |
+			      WLAN_DP_SAMPLING_FLAGS_STAGE_3)) {
+		/* Stage flags already set - keep existing stages */
+		dp_stc_debug(dp_stc->logmask,
+			     "STC: Reclass flow %d keeping ML-determined stages: %s%s%s",
+			     s_entry->id,
+			     (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_STAGE_1) ?
+			     "1" : "",
+			     (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_STAGE_2) ?
+			     "+2" : "",
+			     (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_STAGE_3) ?
+			     "+3" : "");
+		return;
+	}
+
+	s_entry->flags |= WLAN_DP_SAMPLING_FLAGS_STAGE_1;
+	s_entry->flags |= WLAN_DP_SAMPLING_FLAGS_STAGE_2;
+
+	if (pkt_rate > FLOW_SHORTLIST_BURST_PKT_RATE_PER_SEC_THRESH)
+		s_entry->flags |= WLAN_DP_SAMPLING_FLAGS_STAGE_3;
+
+	dp_stc_debug(dp_stc->logmask,
+		     "STC: New flow %d committed with rate %u pps, stages: %s",
+		     s_entry->id, pkt_rate,
+		     (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_STAGE_3) ?
+		     "1+2+3" : "1+2");
+}
+
+/**
+ * wlan_dp_stc_check_provisional_transition() - Check if flow should transition
+ * from provisional to committed
+ * @dp_stc: STC context
+ * @s_entry: Sampling table entry
+ * @cur_ts: Current timestamp
+ *
+ * Return: true if transition should occur, false otherwise
+ */
+static inline bool
+wlan_dp_stc_check_provisional_transition(struct wlan_dp_stc *dp_stc,
+					 struct wlan_dp_stc_sampling_table_entry *s_entry,
+					 uint64_t cur_ts)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_stc->dp_ctx;
+	struct dp_fisa_rx_sw_ft *rx_flow;
+	uint64_t flow_age;
+	uint32_t pkt_rate;
+	uint8_t buf[BUF_LEN_MAX];
+
+	if (!(s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID))
+		return false;
+
+	rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx, s_entry->rx_flow_id);
+	flow_age = cur_ts - rx_flow->flow_init_ts;
+
+	if (flow_age < WLAN_DP_STC_COMMITTED_TIMEOUT_NS)
+		return false;
+
+	/* Calculate packet rate */
+	pkt_rate = (rx_flow->num_pkts * QDF_NSEC_PER_SEC) / flow_age;
+
+	if (pkt_rate < FLOW_SHORTLIST_TXRX_PKT_RATE_PER_SEC_THRESH) {
+		/*
+		 * REJECT: Low packet rate - Mark flow as rejected to prevent
+		 * re-selection
+		 */
+		if (s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID) {
+			rx_flow = wlan_dp_get_rx_flow_hdl(dp_ctx,
+							  s_entry->rx_flow_id);
+			if (s_entry->rx_flow_metadata == rx_flow->metadata) {
+				rx_flow->classified =
+						DP_STC_CLASSIFIED_UNKNOWN;
+				dp_stc_debug(dp_stc->logmask, "STC: Rejecting provisional flow %d tuple (%s) - Low rate %u pps (threshold %u pps) - Marked RX flow %d as REJECTED",
+					     s_entry->id,
+					     dp_print_tuple_to_str(&s_entry->flow_samples.flow_tuple,
+								   buf,
+								   BUF_LEN_MAX),
+					     pkt_rate,
+					     FLOW_SHORTLIST_TXRX_PKT_RATE_PER_SEC_THRESH,
+					     s_entry->rx_flow_id);
+			}
+		}
+		s_entry->state = WLAN_DP_SAMPLING_STATE_SAMPLING_FAIL;
+		return false;
+	}
+
+	wlan_dp_stc_set_sampling_stages(dp_stc, s_entry, pkt_rate);
+
+	/* Transition to FLOW_ADDED state */
+	s_entry->state = WLAN_DP_SAMPLING_STATE_FLOW_ADDED;
+	return true;
+}
+
 static inline bool
 dp_stc_is_s_entry_flow_valid(struct wlan_dp_stc *dp_stc,
 			     struct wlan_dp_stc_sampling_table_entry *s_entry)
@@ -2337,6 +2514,26 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 	case WLAN_DP_SAMPLING_STATE_INIT:
 		/* Skip this entry, since no flow is added here */
 		break;
+	case WLAN_DP_SAMPLING_STATE_PROVISIONAL:
+	{
+		uint64_t cur_ts = dp_stc_get_timestamp();
+
+		/* Initialize flow entries ONCE for burst-only tracking */
+		if (!(s_entry->flags1 &
+		      WLAN_DP_SAMPLING_FLAGS1_PROVISIONAL_INIT_DONE))
+			wlan_dp_stc_provisional_init_flows(dp_stc, s_entry);
+
+		/*
+		 * Provisional flows: Track ONLY burst stats (not TxRx stats)
+		 * Check if 3 seconds have elapsed for transition to committed
+		 */
+		wlan_dp_stc_check_provisional_transition(dp_stc, s_entry,
+							 cur_ts);
+
+		sampling_pending = true;
+		s_entry->curr_sample_attempt++;
+		break;
+	}
 	case WLAN_DP_SAMPLING_STATE_FLOW_ADDED:
 	{
 		s_entry->sampling_start_ts = dp_stc_get_timestamp();
