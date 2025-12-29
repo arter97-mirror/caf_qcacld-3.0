@@ -567,6 +567,14 @@ config FEATURE_TSO
 	bool "Enable TCP Segmentation Offload"
 	default n
 
+config FEATURE_DAL_DP_SUPPORT
+	bool "enable FEATURE_DAL_DP_SUPPORT"
+	default n
+
+config FEATURE_DP_DAL_OE_SUPPORT
+	bool "enable FEATURE_DAL_DP_SUPPORT"
+	default n
+
 config FEATURE_TSO_DEBUG
 	bool "Enable TCP Segmentation Offload with debug"
 	depends on FEATURE_TSO

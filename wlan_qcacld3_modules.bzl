@@ -199,6 +199,8 @@ _fixed_ipaths = [
     "cmn/gpio/core/inc",
     "cmn/gpio/dispatcher/inc",
     "cmn/hal/wifi3.0",
+    "cmn/hal/wifi3.0/dal",
+    "cmn/hal/wifi3.0/dal/be",
     "cmn/hif/inc",
     "cmn/hif/src",
     "cmn/hif/src/ce",
@@ -814,6 +816,15 @@ _conditional_srcs = {
         True: [
             #TODO: need SYSFS-specific flag
             "core/hdd/src/wlan_hdd_sysfs_runtime_pm.c",
+        ],
+    },
+    "CONFIG_FEATURE_DAL_DP_SUPPORT": {
+        True: [
+            "cmn/dp/wifi3.0/dal/dp_dal.c",
+            "cmn/dp/wifi3.0/dal/dp_dal_rx.c",
+            "cmn/dp/wifi3.0/dal/dp_dal_tx.c",
+	    "cmn/hal/wifi3.0/dal/dal_vndr_hal_api.c",
+	    "cmn/hal/wifi3.0/dal/be/dal_vndr_hal_be.c",
         ],
     },
     "CONFIG_CM_UTF_ENABLE": {
