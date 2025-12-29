@@ -3502,6 +3502,125 @@ static void lim_update_assoc_req_mcs_nss(struct pe_session *pe_session,
 	lim_sym_assoc_req_eht_mcs_nss(&frm->eht_cap, tx_nss, rx_nss);
 }
 
+/* EID(1) + LEN(1) + EXT_EID(1) + nonce data */
+#define LIM_NONCE_IE_LEN (1 + 1 + 1 + SIR_FILS_NONCE_LENGTH)
+
+#ifdef WLAN_FEATURE_11BI_SECURITY
+/*
+ * PMKSA Privacy (bit 29) lives in capability octet index 3;
+ * the IE must carry at least 4 capability octets.
+ */
+#define RSNXE_CAP_PMKSA_PRIVACY_MIN_OCTETS 4
+
+/**
+ * lim_is_pmksa_privacy_set() - check if PMKSA Privacy bit is set in AP RSNXE
+ * @rsnxe: pointer to the RSNXE IE (including EID and length fields)
+ *
+ * Parses the RSNXE capability octets and checks whether the AP has advertised
+ * PMKSA Privacy (bit 29), which indicates that the AP requires a Nonce element
+ * in the association request for IEEE 802.11bi EPPKE authentication.
+ *
+ * Return: true if PMKSA Privacy bit is set, false otherwise
+ */
+static bool lim_is_pmksa_privacy_set(const uint8_t *rsnxe)
+{
+	const uint8_t *cap;
+	uint8_t cap_len;
+	int avail_octets;
+	uint32_t cap_bits;
+
+	cap = wlan_crypto_parse_rsnxe_ie(rsnxe, &cap_len);
+	if (!cap)
+		return false;
+
+	/*
+	 * cap_len (ie[0] & 0xf) is the AP-declared "field length minus 1" and
+	 * is untrusted input; it must not be used to bound the read on its own.
+	 * Derive the number of capability octets actually present in the
+	 * element from its length byte, which wlan_get_rsnxe_data_from_ie_ptr()
+	 * has already validated to lie within the beacon buffer:
+	 *   rsnxe[1]      = element length (body bytes after the length byte)
+	 *   (cap - rsnxe) = header bytes consumed before the capability field
+	 *                   (2 for plain RSNXE, 2 + OUI for the WFA variant)
+	 * so avail_octets = rsnxe[1] + 2 - (cap - rsnxe).
+	 *
+	 * Require both the real available length and the AP-declared length to
+	 * cover octet index 3 before testing PMKSA Privacy (bit 29).
+	 */
+	avail_octets = (int)rsnxe[1] + 2 - (int)(cap - rsnxe);
+	if (avail_octets < RSNXE_CAP_PMKSA_PRIVACY_MIN_OCTETS)
+		return false;
+
+	if ((uint8_t)(cap_len + 1) < RSNXE_CAP_PMKSA_PRIVACY_MIN_OCTETS)
+		return false;
+
+	/*
+	 * RSNXE capability octets are transmitted LSB-first (octet 0 holds
+	 * bits 0-7, octet 1 bits 8-15, ...), matching how the
+	 * WLAN_CRYPTO_RSNX_CAP_* enum encodes each capability via BIT(n).
+	 * Assemble the field as a little-endian word and test the bit mask
+	 * directly, so the octet index and shift stay derived from the macro
+	 * instead of being hard-coded.
+	 */
+	cap_bits = (uint32_t)cap[0] | ((uint32_t)cap[1] << 8) |
+		   ((uint32_t)cap[2] << 16) | ((uint32_t)cap[3] << 24);
+
+	return !!(cap_bits & WLAN_CRYPTO_RSNX_CAP_PMKSA_PRIVACY);
+}
+
+/**
+ * lim_build_nonce_ie() - Build a Nonce IE if AP requires PMKSA Privacy
+ * @pe_session: PE session containing the stored AP beacon
+ * @nonce_ie: caller-allocated buffer of at least LIM_NONCE_IE_LEN bytes
+ *
+ * Scans the AP beacon IEs for an RSNXE that advertises PMKSA Privacy (bit 29).
+ * If found, fills @nonce_ie with a FILS Nonce extended element and returns
+ * LIM_NONCE_IE_LEN; otherwise returns 0.
+ *
+ * Return: number of bytes written into @nonce_ie (0 or LIM_NONCE_IE_LEN)
+ */
+static uint8_t lim_build_nonce_ie(struct pe_session *pe_session,
+				  uint8_t *nonce_ie)
+{
+	const uint8_t *ap_rsnxe;
+	uint8_t *bcn_ie;
+	int bcn_ie_len;
+	uint32_t bcn_ie_offset = DOT11F_FF_TIMESTAMP_LEN +
+				 DOT11F_FF_BEACONINTERVAL_LEN +
+				 DOT11F_FF_CAPABILITIES_LEN +
+				 sizeof(struct wlan_frame_hdr);
+
+	if (!pe_session->beacon)
+		return 0;
+
+	if (pe_session->bcnLen <= bcn_ie_offset) {
+		pe_debug("AP beacon len:%d less than IE offset:%d",
+			 pe_session->bcnLen, bcn_ie_offset);
+		return 0;
+	}
+
+	bcn_ie = pe_session->beacon + bcn_ie_offset;
+	bcn_ie_len = (int)(pe_session->bcnLen - bcn_ie_offset);
+
+	ap_rsnxe = wlan_get_rsnxe_data_from_ie_ptr(bcn_ie, bcn_ie_len);
+	if (!lim_is_pmksa_privacy_set(ap_rsnxe))
+		return 0;
+
+	nonce_ie[0] = WLAN_MAC_EID_EXT;
+	nonce_ie[1] = 1 + SIR_FILS_NONCE_LENGTH;
+	nonce_ie[2] = SIR_FILS_NONCE_EXT_EID;
+	qdf_get_random_bytes(&nonce_ie[3], SIR_FILS_NONCE_LENGTH);
+
+	return LIM_NONCE_IE_LEN;
+}
+#else
+static inline uint8_t lim_build_nonce_ie(struct pe_session *pe_session,
+					 uint8_t *nonce_ie)
+{
+	return 0;
+}
+#endif /* WLAN_FEATURE_11BI_SECURITY */
+
 /**
  * lim_send_assoc_req_mgmt_frame() - Send association request
  * @mac_ctx: Handle to MAC context
@@ -3549,6 +3668,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
 	bool bss_mfp_capable, frag_ie_present = false;
 	int8_t peer_rssi = 0;
+	uint8_t nonce_ie[LIM_NONCE_IE_LEN];
+	uint8_t nonce_ie_len = 0;
 	bool is_band_2g, is_ml_ap = false;
 	uint16_t mlo_ie_len = 0, fils_hlp_ie_len = 0, rsn_sel_ie_len = 0;
 	uint8_t *fils_hlp_ie = NULL;
@@ -4220,6 +4341,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		frm->eht_cap.present = false;
 	}
 
+	/*
+	 * If AP advertises PMKSA Privacy (bit 29) in RSNXE, add a Nonce
+	 * element to the association request as required by 802.11bi.
+	 */
+	nonce_ie_len = lim_build_nonce_ie(pe_session, nonce_ie);
+
 	status = dot11f_get_packed_assoc_request_size(mac_ctx, frm, &payload);
 	if (DOT11F_FAILED(status)) {
 		pe_err("Association Request packet size failure(0x%08x)",
@@ -4234,7 +4361,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
 		mbo_ie_len + adaptive_11r_ie_len +
 		vendor_ie_len + mlo_ie_len + fils_hlp_ie_len +
-		eht_cap_ie_len + rsn_sel_ie_len + uhr_cap_ie_len;
+		eht_cap_ie_len + rsn_sel_ie_len + uhr_cap_ie_len + nonce_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -4322,6 +4449,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		payload += uhr_cap_ie_len;
 	}
 
+	if (nonce_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     nonce_ie, nonce_ie_len);
+		payload += nonce_ie_len;
+	}
+
 	/* Copy the MBO IE to the end of the frame */
 	qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 		     mbo_ie, mbo_ie_len);
@@ -4386,7 +4519,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
 
-	pe_debug("Assoc Req IEs: dot11mode %d, extcap %d, open %d, IE len:: mbo %d vendor %d, rsn_sel %d, ft11r %d, mlo %d, eht %d, fils %d",
+	pe_debug("Assoc Req IEs: dot11mode %d, extcap %d, open %d, IE len:: mbo %d vendor %d, rsn_sel %d, ft11r %d, mlo %d, eht %d, fils %d nonce:%d",
 		 pe_session->dot11mode, extr_ext_flag,
 		 is_open_auth, mbo_ie_len,
 		 vendor_ie_len,
@@ -4394,7 +4527,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		 adaptive_11r_ie_len,
 		 mlo_ie_len,
 		 eht_cap_ie_len,
-		 fils_hlp_ie_len);
+		 fils_hlp_ie_len, nonce_ie_len);
 
 	pe_nofl_info("Assoc req TX: vdev %d to "QDF_MAC_ADDR_FMT" seq num %d",
 		     pe_session->vdev_id, QDF_MAC_ADDR_REF(pe_session->bssId),
