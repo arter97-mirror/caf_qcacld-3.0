@@ -395,7 +395,7 @@ wlan_dp_move_candidate_to_sample_table(struct wlan_dp_stc *dp_stc,
 		rx_flow_valid ? rx_flow_str : empty_str,
 		s_entry->flags, dp_stc_get_timestamp());
 
-	s_entry->state = WLAN_DP_SAMPLING_STATE_FLOW_ADDED;
+	s_entry->state = WLAN_DP_SAMPLING_STATE_PROVISIONAL;
 	candidate->flags = 0;
 }
 
@@ -1839,7 +1839,7 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 	int i;
 	uint16_t peer_id;
 	bool start_timer = false, candidate_selected = false;
-	uint8_t max_allowed_stages;
+	uint8_t max_allowed_stages = 0;
 
 	/*
 	 * 1) Monitor TX/RX flows
@@ -1853,7 +1853,6 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 	wlan_dp_stc_get_avail_flow_quota(dp_stc, &bidi, &tx, &rx);
 
 	for (rx_flow_id = 0; rx_flow_id < fst->max_entries; rx_flow_id++) {
-		uint64_t pkt_rate;
 
 		if (candidate_idx >= DP_STC_SAMPLE_FLOWS_MAX ||
 		    (!rx && !bidi))
@@ -1881,22 +1880,14 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 			}
 		}
 
-		if (cur_ts - rx_flow->flow_init_ts <
-						FLOW_TRACK_ELIGIBLE_THRESH_NS)
+		/* Skip flows that are too young (< 0.5s) */
+		if ((cur_ts - rx_flow->flow_init_ts) <
+		    WLAN_DP_STC_PROVISIONAL_TIMEOUT_NS)
 			continue;
 
-		max_allowed_stages = WLAN_DP_SAMPLING_CANDIDATE_STAGE_1 |
-					WLAN_DP_SAMPLING_CANDIDATE_STAGE_2 |
-					WLAN_DP_SAMPLING_CANDIDATE_STAGE_3;
-		pkt_rate = (rx_flow->num_pkts * QDF_NSEC_PER_SEC) /
-				(cur_ts - rx_flow->flow_init_ts);
-		if (pkt_rate < FLOW_SHORTLIST_TXRX_PKT_RATE_PER_SEC_THRESH)
-			continue;
-		else if (pkt_rate <
-			 FLOW_SHORTLIST_BURST_PKT_RATE_PER_SEC_THRESH){
-			max_allowed_stages &=
-				~WLAN_DP_SAMPLING_CANDIDATE_STAGE_3;
-		}
+		dp_stc_info(dp_stc->logmask,
+			    "STC: Flow admission for rx_flow %u at age %llu ns",
+			    rx_flow_id, cur_ts - rx_flow->flow_init_ts);
 
 process_flow:
 		rx_flow_tuple_hash = wlan_dp_fisa_get_flow_tuple_hash(rx_flow);
@@ -1960,6 +1951,10 @@ process_flow:
 
 		wlan_dp_move_candidate_to_sample_table(dp_stc, &candidates[i],
 						       s_entry);
+
+		dp_info("STC: Flow %d admitted in PROVISIONAL state at %llu ns",
+			s_entry->id, cur_ts);
+
 		/*
 		 * Set the indication in tx & rx flows,
 		 * for us to not shortlist them again.
