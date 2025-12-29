@@ -92,6 +92,22 @@ wlan_dp_stc_track_flow_features(struct wlan_dp_stc *dp_stc, qdf_nbuf_t nbuf,
 	DP_STC_UPDATE_MIN_MAX_STATS(flow_entry->txrx_stats.pkt_size,
 				    pkt_len);
 
+	/* Check if in burst-only mode (provisional state)
+	 * Skip TxRx stats if in burst-only mode
+	 */
+	if (flow_entry->idx.sample_win_idx ==
+	    WLAN_DP_STC_BURST_ONLY_MODE_MARKER) {
+		/* Burst-only mode: Still need prev_pkt_arrival_ts for IAT */
+		if (flow_entry->prev_pkt_arrival_ts)
+			pkt_iat = curr_pkt_ts - flow_entry->prev_pkt_arrival_ts;
+
+		dp_stc_log(dp_stc->logmask, WLAN_DP_STC_LOGMASK_BURST,
+			   "STC: PROVISIONAL mdata 0x%x len %u iat %llu burst_state %u",
+			   flow_entry->metadata, pkt_len, pkt_iat,
+			   flow_entry->burst_state);
+		goto check_burst;
+	}
+
 	s = flow_entry->idx.s.sample_idx;
 	w = flow_entry->idx.s.win_idx;
 	if (s < DP_STC_TXRX_SAMPLES_MAX && w < DP_TXRX_SAMPLES_WINDOW_MAX) {
