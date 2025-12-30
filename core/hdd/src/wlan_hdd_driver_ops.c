@@ -1617,6 +1617,12 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 		goto out;
 	}
 
+	status = ucfg_dp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Prevent resume, dal resume rejected");
+		goto out;
+	}
+
 	qdf_status = ucfg_pmo_core_txrx_resume(hdd_ctx->psoc);
 	status = qdf_status_to_os_return(qdf_status);
 	if (status) {
@@ -1637,12 +1643,6 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 	status = qdf_status_to_os_return(qdf_status);
 	if (status) {
 		hdd_err("Failed cdp bus resume");
-		goto out;
-	}
-
-	status = ucfg_dp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Prevent resume, dal resume rejected");
 		goto out;
 	}
 

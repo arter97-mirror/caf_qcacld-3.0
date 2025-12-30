@@ -1212,6 +1212,12 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 		goto resume_txrx;
 	}
 
+	status = cdp_dal_notify_suspend(cds_get_context(QDF_MODULE_ID_SOC));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pmo_debug("Prevent suspend, dal suspend rejected");
+		goto resume_txrx;
+	}
+
 	if (pld_cb) {
 		begin = qdf_get_log_timestamp_usecs();
 		ret = pld_cb();
@@ -1221,7 +1227,7 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 
 		if (ret) {
 			status = qdf_status_from_os_return(ret);
-			goto resume_txrx;
+			goto resume_dal;
 		}
 	}
 
@@ -1237,18 +1243,12 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 			hif_rtpm_suspend_unlock();
 			pmo_err("Target wake up received before suspend completion");
 			status = QDF_STATUS_E_BUSY;
-			goto resume_txrx;
+			goto resume_dal;
 		}
 		hif_process_runtime_suspend_success();
 		hif_rtpm_suspend_unlock();
 	} else {
 		hif_process_runtime_suspend_success();
-	}
-
-	status = cdp_dal_notify_suspend(cds_get_context(QDF_MODULE_ID_SOC));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pmo_debug("Prevent suspend, dal suspend rejected");
-		goto resume_txrx;
 	}
 
 	if (hif_try_prevent_ep_vote_access(hif_ctx)) {
@@ -1361,6 +1361,12 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 	if (status != QDF_STATUS_SUCCESS)
 		goto fail;
 
+	status = cdp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pmo_debug("Prevent resume, dal resume rejected");
+		goto fail;
+	}
+
 	status = pmo_core_txrx_resume(psoc);
 	if (QDF_IS_STATUS_ERROR(status))
 		goto fail;
@@ -1385,12 +1391,6 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 	status = wlan_dp_runtime_resume(dp_soc, pdev_id);
 	if (status != QDF_STATUS_SUCCESS)
 		goto fail;
-
-	status = cdp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pmo_debug("Prevent resume, dal resume rejected");
-		goto fail;
-	}
 fail:
 	if (status != QDF_STATUS_SUCCESS)
 		qdf_trigger_self_recovery(psoc, QDF_RESUME_TIMEOUT);
