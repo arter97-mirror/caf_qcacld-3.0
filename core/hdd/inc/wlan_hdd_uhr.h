@@ -65,5 +65,23 @@ static inline void hdd_update_wiphy_uhr_cap(struct hdd_context *hdd_ctx)
 {
 }
 #endif
+
+#if defined(WLAN_FEATURE_11BN_TEST_SAP)
+/**
+ * wlan_hdd_check_11bn_support() - Check if 11bn supported
+ * @beacon: Pointer to beacon data
+ * @config: Pointer to SAP configuration
+ *
+ *
+ * Return: None.
+ */
+void wlan_hdd_check_11bn_support(struct hdd_beacon_data *beacon,
+				 struct sap_config *config);
+#else
+static inline void wlan_hdd_check_11bn_support(struct hdd_beacon_data *beacon,
+					       struct sap_config *config)
+{
+}
+#endif
 #endif /* WLAN_HDD_UHR_H */
 

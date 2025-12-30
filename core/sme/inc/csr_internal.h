@@ -75,6 +75,8 @@ enum csr_cfgdot11mode {
 	eCSR_CFG_DOT11_MODE_11AX_ONLY,
 	eCSR_CFG_DOT11_MODE_11BE,
 	eCSR_CFG_DOT11_MODE_11BE_ONLY,
+	eCSR_CFG_DOT11_MODE_11BN,
+	eCSR_CFG_DOT11_MODE_11BN_ONLY,
 	eCSR_CFG_DOT11_MODE_MAX,
 };
 
@@ -351,6 +353,17 @@ struct csr_roamstruct {
 #define CSR_IS_CFG_DOT11_PHY_MODE_11BE(dot11mode) 0
 #define CSR_IS_CFG_DOT11_PHY_MODE_11BE_ONLY(dot11mode) 0
 #endif
+
+#ifdef WLAN_FEATURE_11BN
+#define CSR_IS_CFG_DOT11_PHY_MODE_11BN(dot11mode) \
+	((dot11mode) == eCSR_CFG_DOT11_MODE_11BN)
+#define CSR_IS_CFG_DOT11_PHY_MODE_11BN_ONLY(dot11mode) \
+	((dot11mode) == eCSR_CFG_DOT11_MODE_11BN_ONLY)
+#else
+#define CSR_IS_CFG_DOT11_PHY_MODE_11BN(dot11mode) 0
+#define CSR_IS_CFG_DOT11_PHY_MODE_11BN_ONLY(dot11mode) 0
+#endif
+
 /*
  * this function returns true if the NIC is operating exclusively in
  * the 2.4 GHz band, meaning. it is NOT operating in the 5.0 GHz band.

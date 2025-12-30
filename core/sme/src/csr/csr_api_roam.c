@@ -5015,7 +5015,8 @@ csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac_ctx,
 	    ((eCSR_CFG_DOT11_MODE_11N == cfg_dot11_mode) ||
 	    (eCSR_CFG_DOT11_MODE_11AC == cfg_dot11_mode) ||
 	    (eCSR_CFG_DOT11_MODE_11AX == cfg_dot11_mode) ||
-	    CSR_IS_CFG_DOT11_PHY_MODE_11BE(cfg_dot11_mode))) {
+	    CSR_IS_CFG_DOT11_PHY_MODE_11BE(cfg_dot11_mode) ||
+	    CSR_IS_CFG_DOT11_PHY_MODE_11BN(cfg_dot11_mode))) {
 		/* We cannot do 11n here */
 		if (wlan_reg_is_24ghz_ch_freq(opr_freq))
 			cfg_dot11_mode = eCSR_CFG_DOT11_MODE_11G;
@@ -5029,6 +5030,9 @@ csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac_ctx,
 
 #ifdef WLAN_FEATURE_11BE
 	sme_debug("BE :%d", IS_FEATURE_SUPPORTED_BY_FW(DOT11BE));
+#endif
+#ifdef WLAN_FEATURE_11BN_TEST_SAP
+	sme_debug("BN :%d", IS_FEATURE_11BN_SUPPORTED_BY_FW);
 #endif
 	return cfg_dot11_mode;
 }

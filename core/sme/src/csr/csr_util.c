@@ -915,6 +915,11 @@ uint32_t csr_translate_to_wni_cfg_dot11_mode(struct mac_context *mac,
 
 	switch (csrDot11Mode) {
 	case eCSR_CFG_DOT11_MODE_AUTO:
+#ifdef WLAN_FEATURE_11BN
+		if (IS_FEATURE_11BN_SUPPORTED_BY_FW)
+			ret = MLME_DOT11_MODE_11BN;
+		else
+#endif
 #ifdef WLAN_FEATURE_11BE
 		if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
 			ret = MLME_DOT11_MODE_11BE;
@@ -995,6 +1000,32 @@ uint32_t csr_translate_to_wni_cfg_dot11_mode(struct mac_context *mac,
 			ret = MLME_DOT11_MODE_11N;
 		break;
 #endif
+#ifdef WLAN_FEATURE_11BN
+	case eCSR_CFG_DOT11_MODE_11BN_ONLY:
+		if (IS_FEATURE_11BN_SUPPORTED_BY_FW)
+			ret = MLME_DOT11_MODE_11BN_ONLY;
+		else if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
+			ret = MLME_DOT11_MODE_11BE_ONLY;
+		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
+			ret = MLME_DOT11_MODE_11AX_ONLY;
+		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
+			ret = MLME_DOT11_MODE_11AC;
+		else
+			ret = MLME_DOT11_MODE_11N;
+		break;
+	case eCSR_CFG_DOT11_MODE_11BN:
+		if (IS_FEATURE_11BN_SUPPORTED_BY_FW)
+			ret = MLME_DOT11_MODE_11BN;
+		else if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
+			ret = MLME_DOT11_MODE_11BE;
+		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
+			ret = MLME_DOT11_MODE_11AX;
+		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
+			ret = MLME_DOT11_MODE_11AC;
+		else
+			ret = MLME_DOT11_MODE_11N;
+		break;
+#endif
 	case eCSR_CFG_DOT11_MODE_ABG:
 		ret = MLME_DOT11_MODE_ABG;
 		break;
@@ -1015,6 +1046,11 @@ enum reg_phymode csr_convert_to_reg_phy_mode(eCsrPhyMode csr_phy_mode,
 #ifdef WLAN_FEATURE_11BE
 	else if (CSR_IS_DOT11_PHY_MODE_11BE(csr_phy_mode) ||
 		 CSR_IS_DOT11_PHY_MODE_11BE_ONLY(csr_phy_mode))
+		return REG_PHYMODE_11BE;
+#endif
+#ifdef WLAN_FEATURE_11BN
+	else if (CSR_IS_DOT11_PHY_MODE_11BN(csr_phy_mode) ||
+		 CSR_IS_DOT11_PHY_MODE_11BN_ONLY(csr_phy_mode))
 		return REG_PHYMODE_11BE;
 #endif
 	else if (csr_phy_mode == eCSR_DOT11_MODE_11ax ||
@@ -1065,6 +1101,10 @@ eCsrPhyMode csr_convert_from_reg_phy_mode(enum reg_phymode phymode)
 #ifdef WLAN_FEATURE_11BE
 	case REG_PHYMODE_11BE:
 		return eCSR_DOT11_MODE_11be;
+#endif
+#ifdef WLAN_FEATURE_11BN
+	case REG_PHYMODE_11BN:
+		return eCSR_DOT11_MODE_11bn;
 #endif
 	case REG_PHYMODE_MAX:
 		return eCSR_DOT11_MODE_AUTO;
@@ -1234,6 +1274,32 @@ csr_get_cfg_dot11_mode_from_csr_phy_mode(bool is_ap, eCsrPhyMode phyMode)
 		break;
 	case eCSR_DOT11_MODE_11be_ONLY:
 		if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
+			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BE_ONLY;
+		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
+			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AX_ONLY;
+		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
+			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AC;
+		else
+			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
+		break;
+#endif
+#ifdef WLAN_FEATURE_11BN
+	case eCSR_DOT11_MODE_11bn:
+		if (IS_FEATURE_11BN_SUPPORTED_BY_FW)
+			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BN;
+		else if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
+			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BE;
+		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
+			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AX;
+		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC))
+			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AC;
+		else
+			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
+		break;
+	case eCSR_DOT11_MODE_11bn_ONLY:
+		if (IS_FEATURE_11BN_SUPPORTED_BY_FW)
+			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BN_ONLY;
+		else if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BE_ONLY;
 		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AX_ONLY;

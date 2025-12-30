@@ -250,6 +250,8 @@ struct mlme_edca_ac_vo {
  * @MLME_DOT11_MODE_11AX_ONLY: vdev just supports 11AX mode
  * @MLME_DOT11_MODE_11BE: vdev supports 11BE mode, and modes above it
  * @MLME_DOT11_MODE_11BE_ONLY: vdev just supports 11BE mode
+ * @MLME_DOT11_MODE_11BN: vdev supports 11BN mode, and modes above it
+ * @MLME_DOT11_MODE_11BN_ONLY: vdev just supports 11N mode
  * @MLME_DOT11_MODE_MAX: dot11 mode max
  */
 enum mlme_dot11_mode {
@@ -268,6 +270,8 @@ enum mlme_dot11_mode {
 	MLME_DOT11_MODE_11AX_ONLY,
 	MLME_DOT11_MODE_11BE,
 	MLME_DOT11_MODE_11BE_ONLY,
+	MLME_DOT11_MODE_11BN,
+	MLME_DOT11_MODE_11BN_ONLY,
 	MLME_DOT11_MODE_MAX,
 };
 

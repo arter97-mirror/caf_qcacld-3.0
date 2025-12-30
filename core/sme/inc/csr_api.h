@@ -131,6 +131,8 @@ typedef enum {
 	eCSR_DOT11_MODE_11ax_ONLY = 0x1000,
 	eCSR_DOT11_MODE_11be = 0x2000,
 	eCSR_DOT11_MODE_11be_ONLY = 0x4000,
+	eCSR_DOT11_MODE_11bn = 0x8000,
+	eCSR_DOT11_MODE_11bn_ONLY = 0x10000,
 
 	/* specify the number of maximum bits for phyMode */
 	eCSR_NUM_PHY_MODE = 18,
@@ -144,6 +146,16 @@ typedef enum {
 #else
 #define CSR_IS_DOT11_PHY_MODE_11BE(dot11mode) 0
 #define CSR_IS_DOT11_PHY_MODE_11BE_ONLY(dot11mode) 0
+#endif
+
+#ifdef WLAN_FEATURE_11BN
+#define CSR_IS_DOT11_PHY_MODE_11BN(dot11mode) \
+	((dot11mode) == eCSR_DOT11_MODE_11bn)
+#define CSR_IS_DOT11_PHY_MODE_11BN_ONLY(dot11mode) \
+	((dot11mode) == eCSR_DOT11_MODE_11bn_ONLY)
+#else
+#define CSR_IS_DOT11_PHY_MODE_11BN(dot11mode) 0
+#define CSR_IS_DOT11_PHY_MODE_11BN_ONLY(dot11mode) 0
 #endif
 
 /**

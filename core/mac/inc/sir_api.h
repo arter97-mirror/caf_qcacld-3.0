@@ -4632,6 +4632,14 @@ struct he_capability {
 #define HE_MCS_IS_NSS_ENABLED(mcs_set, nss) (false)
 #endif
 
+#ifdef WLAN_FEATURE_11BN
+#define UHR_OP_OUI_TYPE "\x97"
+#define UHR_OP_OUI_SIZE 1
+
+#define UHR_CAP_OUI_TYPE "\x98"
+#define UHR_CAP_OUI_SIZE 1
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 #define EHT_MAX_PHY_CAP_SIZE 3
 #define EHT_OP_OUI_TYPE "\x6a"

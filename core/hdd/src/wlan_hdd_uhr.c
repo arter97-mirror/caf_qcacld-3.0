@@ -48,8 +48,7 @@ hdd_update_wiphy_uhr_caps_6ghz(struct hdd_context *hdd_ctx,
 {
 	struct ieee80211_supported_band *band_6g =
 		   hdd_ctx->wiphy->bands[HDD_NL80211_BAND_6GHZ];
-	uint8_t *phy_info =
-		    hdd_ctx->iftype_data_6g->uhr_cap.uhr_cap_elem.phy_cap_info;
+	uint8_t *phy_info = &hdd_ctx->iftype_data_6g->uhr_cap.phy.cap;
 	struct ieee80211_sband_iftype_data *iftype_sta;
 	struct ieee80211_sband_iftype_data *iftype_ap;
 
@@ -147,5 +146,18 @@ band_6ghz:
 	hdd_update_wiphy_uhr_caps_6ghz(hdd_ctx, &uhr_cap_cfg);
 
 	hdd_exit();
+}
+#endif
+
+#if defined(WLAN_FEATURE_11BN_TEST_SAP)
+void wlan_hdd_check_11bn_support(struct hdd_beacon_data *beacon,
+				 struct sap_config *config)
+{
+	const uint8_t *ie;
+
+	ie = wlan_get_ext_ie_ptr_from_ext_id(UHR_CAP_OUI_TYPE, UHR_CAP_OUI_SIZE,
+					     beacon->tail, beacon->tail_len);
+	if (ie)
+		config->SapHw_mode = eCSR_DOT11_MODE_11bn;
 }
 #endif

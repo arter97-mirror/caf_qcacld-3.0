@@ -130,6 +130,7 @@
 #ifdef WLAN_FEATURE_MLO_SAP_LINK_REMOVAL
 #include "wlan_objmgr_vdev_obj.h"
 #endif
+#include "wlan_hdd_uhr.h"
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -2123,6 +2124,8 @@ static QDF_STATUS hdd_hostapd_chan_change(struct wlan_hdd_link_info *link_info,
 	case eCSR_DOT11_MODE_11ax_ONLY:
 	case eCSR_DOT11_MODE_11be:
 	case eCSR_DOT11_MODE_11be_ONLY:
+	case eCSR_DOT11_MODE_11bn:
+	case eCSR_DOT11_MODE_11bn_ONLY:
 		legacy_phymode = false;
 		break;
 	default:
@@ -6719,6 +6722,8 @@ static void wlan_hdd_set_sap_hwmode(struct wlan_hdd_link_info *link_info)
 
 	wlan_hdd_check_11be_support(beacon, config);
 
+	wlan_hdd_check_11bn_support(beacon, config);
+
 	hdd_debug("SAP hw_mode: %d", config->SapHw_mode);
 }
 
@@ -7695,13 +7700,16 @@ static QDF_STATUS wlan_hdd_mlo_update(struct wlan_hdd_link_info *link_info)
 	struct hdd_beacon_data *beacon = link_info->session.ap.beacon;
 
 	if (config->SapHw_mode == eCSR_DOT11_MODE_11be ||
-	    config->SapHw_mode == eCSR_DOT11_MODE_11be_ONLY) {
+	    config->SapHw_mode == eCSR_DOT11_MODE_11be_ONLY ||
+	    config->SapHw_mode == eCSR_DOT11_MODE_11bn ||
+	    config->SapHw_mode == eCSR_DOT11_MODE_11bn_ONLY) {
 		wlan_hdd_get_mlo_link_id(beacon, &link_id, &num_link);
 		hdd_debug("MLO SAP vdev id %d, link id %d total link %d",
 			  link_info->vdev_id, link_id, num_link);
 		if (!num_link || !link_info->vdev->mlo_dev_ctx ||
 		    !link_info->vdev->mlo_dev_ctx->ap_ctx) {
-			hdd_debug("start 11be AP without mlo");
+			hdd_debug("start %d AP without mlo",
+				  config->SapHw_mode);
 			return QDF_STATUS_SUCCESS;
 		}
 		if (!mlo_ap_vdev_attach(link_info->vdev, link_id, num_link)) {

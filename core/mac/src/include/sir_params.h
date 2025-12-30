@@ -97,7 +97,7 @@ typedef enum {
  * This definition is independent of any other modules.
  * We can use any unused numbers.
  */
-#define MAX_SUPPORTED_FEATURE 32
+#define MAX_SUPPORTED_FEATURE 33
 enum cap_bitmap {
 	MCC = 0,
 	P2P = 1,
@@ -130,8 +130,11 @@ enum cap_bitmap {
 	TDLS_OFF_CHANNEL = 30,
 #endif
 	VDEV_LATENCY_CONFIG = 31,
+#ifdef WLAN_FEATURE_11BN
+	DOT11BN = 32
+#endif
 
-	/* MAX_FEATURE_SUPPORTED = 32 */
+	/* MAX_FEATURE_SUPPORTED = 33 */
 };
 
 /* / Mailbox Message Structure Define */

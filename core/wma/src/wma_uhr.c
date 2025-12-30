@@ -199,6 +199,7 @@ void wma_uhr_update_tgt_services(struct wmi_unified *wmi_handle,
 	if (wmi_service_enabled(wmi_handle, wmi_service_11bn)) {
 		cfg->en_11bn = true;
 		wma_debug("11bn is enabled");
+		wma_set_fw_wlan_feat_caps(DOT11BN);
 	} else {
 		cfg->en_11bn = false;
 		wma_debug("11bn is not enabled");
