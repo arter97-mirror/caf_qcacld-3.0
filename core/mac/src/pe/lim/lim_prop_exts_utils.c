@@ -100,18 +100,25 @@ void get_ese_version_ie_probe_response(struct mac_context *mac_ctx,
 #endif
 
 #ifdef WLAN_FEATURE_11AX
-static void lim_extract_he_op(struct pe_session *session,
+static void lim_extract_he_op(struct mac_context *mac,
+			      struct pe_session *session,
 			      tDot11fBeaconIEs *bcn_ies)
 {
 	uint8_t fw_vht_ch_wd;
 	uint8_t ap_bcon_ch_width;
 	uint8_t center_freq_diff;
+	uint32_t self_cb_mode;
 
 	if (!session->he_capable || !bcn_ies->he_op.present)
 		return;
 
 	qdf_mem_copy(&session->he_op, &bcn_ies->he_op, sizeof(session->he_op));
 	if (!session->he_6ghz_band)
+		return;
+
+	self_cb_mode = lim_get_cb_mode_for_freq(mac, session,
+						session->curr_op_freq);
+	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
 		return;
 
 	if (!session->he_op.oper_info_6g_present) {
@@ -324,7 +331,8 @@ void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
 #else
-static inline void lim_extract_he_op(struct pe_session *session,
+static inline void lim_extract_he_op(struct mac_context *mac,
+				     struct pe_session *session,
 				     tDot11fBeaconIEs *bcn_ies)
 {}
 
@@ -340,9 +348,12 @@ void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #ifdef WLAN_FEATURE_11BE
-void lim_extract_eht_op(struct pe_session *session, tDot11fBeaconIEs *bcn_ies)
+void lim_extract_eht_op(struct mac_context *mac,
+			struct pe_session *session,
+			tDot11fBeaconIEs *bcn_ies)
 {
 	uint32_t max_eht_bw;
+	uint32_t self_cb_mode;
 
 	if (!session->eht_capable || !bcn_ies->eht_op.present ||
 	    !bcn_ies->eht_op.eht_op_information_present)
@@ -350,6 +361,11 @@ void lim_extract_eht_op(struct pe_session *session, tDot11fBeaconIEs *bcn_ies)
 
 	qdf_mem_copy(&session->eht_op, &bcn_ies->eht_op,
 		     sizeof(session->eht_op));
+
+	self_cb_mode = lim_get_cb_mode_for_freq(mac, session,
+						session->curr_op_freq);
+	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
+		return;
 
 	max_eht_bw = wma_get_eht_ch_width();
 
@@ -399,6 +415,7 @@ void lim_update_eht_bw_cap_mcs(struct pe_session *session,
 		    !bcn_ies->eht_cap.su_beamformer)
 			session->eht_config.num_sounding_dim_320mhz = 0;
 	}
+
 }
 #endif
 
@@ -795,8 +812,8 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 
 	lim_check_is_he_mcs_valid(session, bcn_ies);
 	lim_check_peer_ldpc_and_update(session, bcn_ies);
-	lim_extract_he_op(session, bcn_ies);
-	lim_extract_eht_op(session, bcn_ies);
+	lim_extract_he_op(mac_ctx, session, bcn_ies);
+	lim_extract_eht_op(mac_ctx, session, bcn_ies);
 	if (!mac_ctx->usr_eht_testbed_cfg)
 		lim_update_he_bw_cap_mcs(session, bcn_ies);
 	lim_update_eht_bw_cap_mcs(session, bcn_ies);

@@ -60,16 +60,21 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 #ifdef WLAN_FEATURE_11BE
 /**
  * lim_extract_eht_op() - Extract EHT operation IE into session
+ * @mac: mac context
  * @session: Pointer to pe_session
  * @bcn_ies: Pointer to beacon IEs
  * AP
  *
  * Return: None
  */
-void lim_extract_eht_op(struct pe_session *session, tDot11fBeaconIEs *bcn_ies);
+void lim_extract_eht_op(struct mac_context *mac,
+			struct pe_session *session,
+			tDot11fBeaconIEs *bcn_ies);
 #else
 static inline
-void lim_extract_eht_op(struct pe_session *session, tDot11fBeaconIEs *bcn_ies)
+void lim_extract_eht_op(struct mac_context *mac,
+			struct pe_session *session,
+			tDot11fBeaconIEs *bcn_ies)
 {}
 #endif
 

@@ -18482,6 +18482,30 @@ BTM_REQ_RESP_DONE:
 		}
 	}
 
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_20MHZ_ONLY_STA;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("STA 20Mhz only support: %d for vdev:%d", cfg_val, link_info->vdev_id);
+		if (cfg_val) {
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
+							   WLAN_OSIF_ID);
+			if (vdev) {
+				status =
+					wlan_vdev_mlme_set_sta_in_20mhz(
+								vdev,
+								true);
+				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+				ret_val = qdf_status_to_os_return(status);
+			} else {
+				ret_val = qdf_status_to_os_return(
+							QDF_STATUS_E_INVAL);
+			}
+
+			if (ret_val)
+				hdd_err("Failed to set STA 20 MHz only support");
+		}
+	}
+
 	if (update_sme_cfg)
 		sme_update_config(mac_handle, sme_config);
 
