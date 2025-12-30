@@ -1444,6 +1444,14 @@ config WLAN_FASTPATH
 	bool "Enable fastpath for datapackets"
 	default n
 
+config WLAN_FASTPATH_NON_RHINE
+	bool "Enable fastpath for non-Rhine chipsets"
+	depends on WLAN_FASTPATH && !RHINE
+	default y if WLAN_FASTPATH && !RHINE
+	help
+	  Enable fastpath compilation only when CONFIG_WLAN_FASTPATH is enabled
+	  and CONFIG_RHINE is NOT enabled.
+
 config WLAN_FASTPATH_LEGACY
 	bool "WLAN_FASTPATH_LEGACY"
 	default n

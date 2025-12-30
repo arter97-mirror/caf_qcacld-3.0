@@ -2189,17 +2189,45 @@ bool wlan_mlme_is_chain_mask_supported(struct wlan_objmgr_psoc *psoc)
 	if (!wlan_mlme_configure_chain_mask_supported(psoc))
 		return false;
 
-	/* If user has configured 1x1 from INI */
+	/* If user has configured 1x1 */
 	if (mlme_obj->cfg.chainmask_cfg.txchainmask1x1 != 3 ||
 	    mlme_obj->cfg.chainmask_cfg.rxchainmask1x1 != 3) {
 		mlme_legacy_debug("txchainmask1x1 %d rxchainmask1x1 %d",
 				  mlme_obj->cfg.chainmask_cfg.txchainmask1x1,
 				  mlme_obj->cfg.chainmask_cfg.rxchainmask1x1);
-		return false;
 	}
 
 	return true;
 
+}
+
+QDF_STATUS wlan_mlme_set_chain_mask(struct wlan_objmgr_psoc *psoc,
+				    uint8_t tx_mask, uint8_t rx_mask)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
+	mlme_obj->cfg.chainmask_cfg.txchainmask1x1 = tx_mask;
+	mlme_obj->cfg.chainmask_cfg.rxchainmask1x1 = rx_mask;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_get_chain_mask(struct wlan_objmgr_psoc *psoc,
+				    uint8_t *tx_mask, uint8_t *rx_mask)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+	if (tx_mask)
+		*tx_mask = mlme_obj->cfg.chainmask_cfg.txchainmask1x1;
+	if (rx_mask)
+		*rx_mask = mlme_obj->cfg.chainmask_cfg.rxchainmask1x1;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 #define MAX_PDEV_CHAIN_MASK_PARAMS 6

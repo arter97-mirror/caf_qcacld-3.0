@@ -5929,6 +5929,7 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 	bool mcc_mode;
 	uint32_t session_count, cur_freq;
 	enum hw_mode_bandwidth max_bw;
+	struct wlan_objmgr_vdev *vdev;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -6046,9 +6047,20 @@ QDF_STATUS policy_mgr_decr_active_session(struct wlan_objmgr_psoc *psoc,
 							     pm_ctx->pdev);
 	}
 
-	if (wlan_reg_get_keep_6ghz_sta_cli_connection(pm_ctx->pdev) &&
-	    (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE))
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    session_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev is NULL");
+		return QDF_STATUS_E_EMPTY;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_link_switch_in_progress(vdev) &&
+	    wlan_reg_get_keep_6ghz_sta_cli_connection(pm_ctx->pdev) &&
+	    (mode == QDF_STA_MODE || mode == QDF_P2P_CLIENT_MODE)) {
 		wlan_reg_recompute_current_chan_list(psoc, pm_ctx->pdev);
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	if (mode == QDF_STA_MODE &&
 	    wlan_reg_is_dfs_for_freq(pm_ctx->pdev, cur_freq) &&
@@ -15139,4 +15151,63 @@ policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return false;
+}
+
+bool
+policy_mgr_is_cfr_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t count_sap = 0, count_p2p = 0;
+	uint32_t count_sta = 0;
+	uint32_t count_ndi = 0;
+	uint32_t count_nan_disc = 0;
+	uint8_t num_ml_sta = 0, num_non_ml_sta = 0;
+	uint32_t list_sap[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t list_sta[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t list_ndi[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t list_nan_disc[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t non_ml_sta_idx[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t total_count = 0;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+
+	count_sap += policy_mgr_mode_specific_connection_count(
+				psoc, PM_SAP_MODE, &list_sap[count_sap]);
+	count_p2p = policy_mgr_mode_specific_connection_count(
+				psoc, PM_P2P_GO_MODE, &list_sap[count_sap]);
+	count_p2p += policy_mgr_mode_specific_connection_count(
+				psoc, PM_P2P_CLIENT_MODE,
+				&list_sap[count_sap + count_p2p]);
+	count_sap += count_p2p;
+	count_sta = policy_mgr_mode_specific_connection_count(
+				psoc, PM_STA_MODE, list_sta);
+	policy_mgr_get_ml_and_non_ml_mode_count(psoc, &num_ml_sta, ml_sta_idx,
+						&num_non_ml_sta, non_ml_sta_idx,
+						freq_list, vdev_id_list,
+						PM_STA_MODE);
+
+	count_ndi = policy_mgr_mode_specific_connection_count(
+				psoc, PM_NDI_MODE, list_ndi);
+	count_nan_disc = policy_mgr_mode_specific_connection_count(
+				psoc, PM_NAN_DISC_MODE, list_nan_disc);
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	policy_mgr_debug("sap/go/cli:%d sta:%d ndi:%d nan disc:%d ml_sta:%d",
+			 count_sap, count_sta, count_ndi, count_nan_disc,
+			 num_ml_sta);
+	total_count = count_sap + count_ndi + count_nan_disc;
+
+	/* CFR is only allowed with single STA MLO/Legacy */
+	if (total_count || num_ml_sta + num_non_ml_sta > 1)
+		return false;
+
+	return true;
 }

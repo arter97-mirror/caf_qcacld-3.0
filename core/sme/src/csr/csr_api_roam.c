@@ -5396,6 +5396,10 @@ QDF_STATUS cm_csr_handle_join_req(struct wlan_objmgr_vdev *vdev,
 	status = wlan_fill_bss_desc_from_scan_entry(mac_ctx, bss_desc,
 						    join_req->entry);
 	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_txrx_frame_hex_dump(
+			util_scan_entry_frame_ptr(join_req->entry),
+			util_scan_entry_frame_len(join_req->entry),
+			false);
 		qdf_mem_free(bss_desc);
 		return QDF_STATUS_E_FAILURE;
 	}

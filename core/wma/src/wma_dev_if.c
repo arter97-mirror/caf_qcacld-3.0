@@ -4450,13 +4450,14 @@ void wma_remove_req(tp_wma_handle wma, uint8_t vdev_id,
 	qdf_mem_free(req_msg);
 }
 
-#define MAX_VDEV_SET_BSS_PARAMS 5
+#define MAX_VDEV_SET_BSS_PARAMS 6
 /* params being sent:
  * 1.wmi_vdev_param_beacon_interval
  * 2.wmi_vdev_param_dtim_period
  * 3.wmi_vdev_param_tx_pwrlimit
  * 4.wmi_vdev_param_slot_time
  * 5.wmi_vdev_param_protection_mode
+ * 6.wmi_vdev_param_su_txop_burst_limit_us
  */
 
 /**
@@ -4483,9 +4484,24 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 	uint8_t index = 0;
 	enum ieee80211_protmode prot_mode;
 	uint32_t keep_alive_period, keep_alive_method;
+	uint32_t edca_txop_duration_us;
 	QDF_STATUS ret;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	struct wlan_objmgr_vdev *vdev;
 
 	ret = QDF_STATUS_E_FAILURE;
+
+	if (!mac_ctx) {
+		wma_err("Failed to get mac_ctx");
+		goto error;
+	}
+
+	vdev = intr[vdev_id].vdev;
+	if (!vdev) {
+		wma_err("vdev is NULL for vdev_id: %d", vdev_id);
+		goto error;
+	}
+
 	/* Beacon Interval setting */
 	ret = mlme_check_index_setparam(setparam,
 					wmi_vdev_param_beacon_interval,
@@ -4553,6 +4569,24 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 		wma_debug("failed to send wmi_vdev_param_protection_mode to fw");
 		goto error;
 	}
+
+	/* Send su_txop_burst_limit_us parameter for STA mode on 5GHz */
+	if (intr[vdev_id].type == WMI_VDEV_TYPE_STA &&
+	    WLAN_REG_IS_5GHZ_CH_FREQ(vdev->vdev_mlme.bss_chan->ch_freq)) {
+		edca_txop_duration_us =
+		    wlan_mlme_get_edca_txop_duration_ms(mac_ctx->psoc) * 1024;
+
+		ret = mlme_check_index_setparam(
+					setparam,
+					wmi_vdev_param_su_txop_burst_limit_us,
+					edca_txop_duration_us, index++,
+					MAX_VDEV_SET_BSS_PARAMS);
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			wma_debug("failed to set wmi_vdev_param_su_txop_burst_limit_us");
+			goto error;
+		}
+	}
+
 	ret = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
 						  vdev_id, setparam, index);
 	if (QDF_IS_STATUS_ERROR(ret)) {
@@ -7136,7 +7170,7 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
 	return QDF_STATUS_SUCCESS;
 }
 
-#define MAX_VDEV_CREATE_PARAMS 24
+#define MAX_VDEV_CREATE_PARAMS 23
 /* params being sent:
  * 1.wmi_vdev_param_wmm_txop_enable
  * 2.wmi_vdev_param_disconnect_th
@@ -7161,7 +7195,6 @@ static QDF_STATUS wma_vdev_mgmt_perband_tx_rate(struct dev_set_param *info)
  * 21.wmi_vdev_param_disable_2g_twt
  * 22.wmi_vdev_param_disable_twt_info_frame
  * 23.wmi_vdev_param_disable_scan_start_twt
- * 24.wmi_vdev_param_su_txop_burst_limit_us
  */
 
 QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
@@ -7182,7 +7215,6 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 	bool is_twt_disabled_on_scan;
 	enum QDF_OPMODE opmode;
 	tp_wma_handle wma;
-	uint32_t edca_txop_duration_us;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma)
@@ -7492,19 +7524,6 @@ QDF_STATUS wma_vdev_create_set_param(struct wlan_objmgr_vdev *vdev)
 		goto error;
 	}
 
-	if (opmode == QDF_STA_MODE) {
-		edca_txop_duration_us =
-			wlan_mlme_get_edca_txop_duration_ms(mac->psoc) * 1024;
-		status = mlme_check_index_setparam(
-				setparam,
-				wmi_vdev_param_su_txop_burst_limit_us,
-				edca_txop_duration_us,
-				index++, MAX_VDEV_CREATE_PARAMS);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_debug("failed to set wmi_vdev_param_su_txop_burst_limit_us");
-			goto error;
-		}
-	}
 
 	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
 						     vdev_id, setparam, index);

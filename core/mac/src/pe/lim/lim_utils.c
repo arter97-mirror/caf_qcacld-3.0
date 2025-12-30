@@ -81,6 +81,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <lim_mlo.h>
 #endif
+#include "wlan_mlo_mgr_sta.h"
 #include "wlan_cmn_ieee80211.h"
 #include <wlan_cm_api.h>
 #include <wlan_vdev_mgr_utils_api.h>
@@ -12329,6 +12330,7 @@ lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
 				qdf_freq_t end_freq)
 {
 	struct wlan_channel *des_chan;
+	struct wlan_channel *standby_chan;
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t vdev_id;
 
@@ -12359,6 +12361,20 @@ lim_get_connected_chan_for_mode(struct wlan_objmgr_psoc *psoc,
 		return des_chan;
 next:
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
+
+	/*
+	 *No active vdev found - check for standby MLO links
+	 *Only check for STA mode
+	 */
+	if (device_mode == QDF_STA_MODE) {
+		standby_chan =
+		mlo_get_standby_mlo_link_chan_in_freq_range(psoc,
+							    device_mode,
+							    start_freq,
+							    end_freq);
+		if (standby_chan)
+			return standby_chan;
 	}
 
 	return NULL;

@@ -810,7 +810,6 @@ wlan_hdd_p2p_p2p_iface_limit[] = {
 };
 
 /* STA + AP + AP combination */
-#ifdef WLAN_FEATURE_LL_LT_SAP
 static const struct ieee80211_iface_limit
 wlan_hdd_sta_ap_ap_iface_limit[] = {
 	{
@@ -822,7 +821,6 @@ wlan_hdd_sta_ap_ap_iface_limit[] = {
 	   .types = BIT(NL80211_IFTYPE_AP)
 	},
 };
-#endif /* WLAN_FEATURE_LL_LT_SAP */
 
 /* STA + AP combination */
 static const struct ieee80211_iface_limit
@@ -933,21 +931,6 @@ static const struct ieee80211_iface_limit
 };
 #endif /* WLAN_FEATURE_NAN */
 
-/* SAP + SAP + STA combination */
-static const struct ieee80211_iface_limit
-	wlan_hdd_sap_sap_sta_iface_limit[] = {
-	{
-		/* SAP + SAP */
-		.max = 2,
-		.types = BIT(NL80211_IFTYPE_AP)
-	},
-	{
-		/* STA */
-		.max = 1,
-		.types = BIT(NL80211_IFTYPE_STATION),
-	},
-};
-
 static struct ieee80211_iface_combination
 	wlan_hdd_iface_combination[] = {
 	/* STA */
@@ -1015,7 +998,6 @@ static struct ieee80211_iface_combination
 		.beacon_int_infra_match = true,
 	},
 
-#ifdef WLAN_FEATURE_LL_LT_SAP
 	/* STA + SAP + SAP */
 	{
 		.limits = wlan_hdd_sta_ap_ap_iface_limit,
@@ -1024,7 +1006,6 @@ static struct ieee80211_iface_combination
 		.n_limits = ARRAY_SIZE(wlan_hdd_sta_ap_ap_iface_limit),
 		.beacon_int_infra_match = true,
 	},
-#endif
 	/* STA + SAP */
 	{
 		.limits = wlan_hdd_sta_ap_iface_limit,
@@ -1073,14 +1054,6 @@ static struct ieee80211_iface_combination
 		.beacon_int_infra_match = true,
 	},
 #endif /* WLAN_FEATURE_NAN */
-	/* SAP + SAP + STA */
-	{
-		.limits = wlan_hdd_sap_sap_sta_iface_limit,
-		.num_different_channels = 2,
-		.max_interfaces = 3,
-		.n_limits = ARRAY_SIZE(wlan_hdd_sap_sap_sta_iface_limit),
-		.beacon_int_infra_match = true,
-	},
 };
 
 static struct cfg80211_ops wlan_hdd_cfg80211_ops;
@@ -9242,60 +9215,6 @@ end:
 }
 #endif
 
-#ifdef WLAN_CFR_ENABLE
-void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
-				const void *data, uint32_t data_len)
-{
-	uint32_t len, ret;
-	struct sk_buff *vendor_event;
-	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct wlan_hdd_link_info *link_info;
-	struct nlmsghdr *nlhdr;
-
-	if (!hdd_ctx) {
-		hdd_err("HDD context is NULL");
-		return;
-	}
-
-	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
-	if (!link_info) {
-		hdd_err("adapter NULL for vdev id %d", vdev_id);
-		return;
-	}
-
-	hdd_debug("vdev id %d pid %d data len %d", vdev_id, pid, data_len);
-	len = nla_total_size(data_len) + NLMSG_HDRLEN;
-	vendor_event = wlan_cfg80211_vendor_event_alloc(
-			hdd_ctx->wiphy, &link_info->adapter->wdev, len,
-			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
-			qdf_mem_malloc_flags());
-
-	if (!vendor_event) {
-		hdd_err("wlan_cfg80211_vendor_event_alloc failed vdev id %d, data len %d",
-			vdev_id, data_len);
-		return;
-	}
-
-	ret = nla_put(vendor_event,
-		      QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA,
-		      data_len, data);
-	if (ret) {
-		hdd_err("CFR event put fails status %d", ret);
-		wlan_cfg80211_vendor_free_skb(vendor_event);
-		return;
-	}
-
-	if (pid) {
-		nlhdr = nlmsg_hdr(vendor_event);
-		if (nlhdr)
-			nlhdr->nlmsg_pid = pid;
-		else
-			hdd_err_rl("nlhdr is null");
-	}
-
-	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
-}
-#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
@@ -33938,6 +33857,8 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	struct dev_set_param setparam[MAX_PDEV_TXRX_PARAMS] = {};
 	uint8_t index = 0;
 	uint8_t ll_lt_sap_vdev_id;
+	QDF_STATUS status;
+
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
@@ -33968,10 +33889,11 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	if (sme_validate_txrx_chain_mask(wmi_pdev_param_tx_chain_mask, tx_mask))
 		return -EINVAL;
 
-	ret = mlme_check_index_setparam(
-				setparam, wmi_pdev_param_tx_chain_mask,
-				tx_mask, index++, MAX_PDEV_TXRX_PARAMS);
-	if (QDF_IS_STATUS_ERROR(ret)) {
+	status = mlme_check_index_setparam(setparam,
+					   wmi_pdev_param_tx_chain_mask,
+					   tx_mask, index++,
+					   MAX_PDEV_TXRX_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed at wmi_pdev_param_tx_chain_mask");
 		return -EINVAL;
 	}
@@ -33979,21 +33901,28 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	if (sme_validate_txrx_chain_mask(wmi_pdev_param_rx_chain_mask, rx_mask))
 		return -EINVAL;
 
-	ret = mlme_check_index_setparam(
-				setparam, wmi_pdev_param_rx_chain_mask,
-				rx_mask, index++, MAX_PDEV_TXRX_PARAMS);
-	if (QDF_IS_STATUS_ERROR(ret)) {
+	status = mlme_check_index_setparam(setparam,
+					   wmi_pdev_param_rx_chain_mask,
+					   rx_mask, index++,
+					   MAX_PDEV_TXRX_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed at wmi_pdev_param_rx_chain_mask");
 		return -EINVAL;
 	}
 
-	ret = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
-						  WMI_PDEV_ID_SOC, setparam,
-						  index);
-	if (QDF_IS_STATUS_ERROR(ret))
+	status = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						     WMI_PDEV_ID_SOC, setparam,
+						     index);
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed to send TX, RX chain mask params");
+		return qdf_status_to_os_return(status);
+	}
 
-	return ret;
+	status = ucfg_mlme_set_chain_mask(hdd_ctx->psoc, tx_mask, rx_mask);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("failed to send TX, RX chain mask to mlme");
+
+	return qdf_status_to_os_return(status);
 }
 
 static int wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
@@ -34020,15 +33949,18 @@ static int __wlan_hdd_cfg80211_get_chainmask(struct wiphy *wiphy,
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	int ret;
+	QDF_STATUS status;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
 		return -EINVAL;
 
-	*tx_mask = wma_cli_get_command(0, wmi_pdev_param_tx_chain_mask,
-				       PDEV_CMD);
-	*rx_mask = wma_cli_get_command(0, wmi_pdev_param_rx_chain_mask,
-				       PDEV_CMD);
+	status = ucfg_mlme_get_chain_mask(hdd_ctx->psoc, (uint8_t *)tx_mask,
+					  (uint8_t *)rx_mask);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("failed to get TX, RX chain mask from mlme");
+		return -EINVAL;
+	}
 
 	/* if 0 return max value as 0 mean no set cmnd received yet */
 	if (!*tx_mask)

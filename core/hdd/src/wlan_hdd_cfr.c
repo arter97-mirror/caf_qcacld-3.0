@@ -33,31 +33,521 @@
 #include "wlan_hdd_object_manager.h"
 #include "wlan_cmn.h"
 #include "wlan_policy_mgr_ll_sap.h"
+#include "wlan_hdd_cfg80211.h"
+#include "target_if.h"
+
+void hdd_cfr_data_send_nl_event(uint8_t vdev_id, uint32_t pid,
+				const void *data, uint32_t data_len)
+{
+	uint32_t len, ret;
+	struct sk_buff *vendor_event;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+	struct nlmsghdr *nlhdr;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		hdd_err("HDD context is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		hdd_err("adapter NULL for vdev id %d", vdev_id);
+		return;
+	}
+
+	hdd_debug("vdev id %d pid %d data len %d", vdev_id, pid, data_len);
+	len = nla_total_size(data_len) + NLMSG_HDRLEN;
+	vendor_event = wlan_cfg80211_vendor_event_alloc(
+			hdd_ctx->wiphy, &link_info->adapter->wdev, len,
+			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
+			qdf_mem_malloc_flags());
+
+	if (!vendor_event) {
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed vdev id %d, data len %d",
+			vdev_id, data_len);
+		return;
+	}
+
+	ret = nla_put(vendor_event,
+		      QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA,
+		      data_len, data);
+	if (ret) {
+		hdd_err("CFR event put fails status %d", ret);
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		return;
+	}
+
+	if (pid) {
+		nlhdr = nlmsg_hdr(vendor_event);
+		if (nlhdr)
+			nlhdr->nlmsg_pid = pid;
+		else
+			hdd_err_rl("nlhdr is null");
+	}
+
+	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
+}
+
+static uint32_t
+hdd_get_cfr_nl_event_len(struct cfr_enhanced_event_data event_data,
+			 uint32_t data_len)
+{
+	uint32_t total_len;
+
+	total_len = data_len;
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_TIMESTAMP_US].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_TYPE].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SUBTYPE].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SEQUENCE_NUMBER].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR].len);
+
+	/* QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INFO */
+	total_len += NLA_HDRLEN;
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INDEX].len) *
+		HOST_MAX_CHAINS;
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_RSSI].len) *
+		HOST_MAX_CHAINS;
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_AGC].len) *
+		HOST_MAX_CHAINS;
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_NUM_SPATIAL_STREAMS].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREQ].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_CHIP_ID].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+	       QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_TSF].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_CFO].len);
+
+	total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_VERSION].len);
+
+	/* QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI */
+	if (event_data.oui_length) {
+		total_len += nla_total_size(
+			event_data.oui_length * sizeof(u8));
+		total_len += nla_total_size(cfr_config_policy[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION].len);
+	}
+
+	total_len += nla_total_size(cfr_config_policy[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_CSI_LTF_TYPE].len);
+
+	return total_len;
+}
+
+static int
+hdd_cfr_nl_put_common_info(struct sk_buff *vendor_event,
+			   struct cfr_enhanced_event_data *event_data)
+{
+	if (nla_put_u64_64bit(vendor_event,
+			      QCA_WLAN_VENDOR_ATTR_PEER_CFR_TIMESTAMP_US,
+			      event_data->timestamp_us, NL80211_ATTR_PAD)) {
+		cfr_err("Failed to put timestamp");
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_TYPE,
+		       event_data->frame_type)) {
+		cfr_err("Failed to put frame type");
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SUBTYPE,
+		       event_data->frame_sub_type)) {
+		cfr_err("Failed to put frame subtype");
+		return -EINVAL;
+	}
+
+	if (nla_put_u16(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SEQUENCE_NUMBER,
+			event_data->frame_sequence_number)) {
+		cfr_err("Failed to put sequence number");
+		return -EINVAL;
+	}
+
+	if (nla_put(vendor_event, QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR,
+		    QDF_MAC_ADDR_SIZE, event_data->peer_mac_addr)) {
+		cfr_err("Failed to put peer mac addr");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int
+hdd_cfr_nl_put_phy_info(struct sk_buff *vendor_event,
+			struct cfr_enhanced_event_data *event_data)
+{
+	struct nlattr *info, *entry;
+	uint8_t i;
+
+	info = nla_nest_start(vendor_event,
+			      QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INFO);
+	if (!info) {
+		cfr_err("Failed to start antenna info nesting");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < event_data->antenna_count && i < HOST_MAX_CHAINS; i++) {
+		entry = nla_nest_start(vendor_event, i);
+		if (!entry) {
+			cfr_err("Failed to start antenna entry %d", i);
+			nla_nest_cancel(vendor_event, info);
+			return -EINVAL;
+		}
+
+		if (nla_put_u8(vendor_event,
+			       QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INDEX,
+			       i)) {
+			cfr_err("Failed to add antenna %d index", i);
+			goto err_phy_info;
+		}
+
+		if (nla_put_s8(vendor_event,
+			       QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_RSSI,
+			       event_data->antenna_info[i].rssi)) {
+			cfr_err("Failed to add antenna %d rssi", i);
+			goto err_phy_info;
+		}
+
+		if (nla_put_u8(vendor_event,
+			       QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_AGC,
+			       event_data->antenna_info[i].agc)) {
+			cfr_err("Failed to add antenna %d agc", i);
+			goto err_phy_info;
+		}
+
+		nla_nest_end(vendor_event, entry);
+	}
+
+	nla_nest_end(vendor_event, info);
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_NUM_SPATIAL_STREAMS,
+		       event_data->num_spatial_streams)) {
+		cfr_err("Failed to put num spatial streams");
+		return -EINVAL;
+	}
+
+	if (nla_put_u32(vendor_event, QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREQ,
+			event_data->freq)) {
+		cfr_err("Failed to put freq");
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH,
+		       event_data->bandwidth)) {
+		cfr_err("Failed to put bandwidth");
+		return -EINVAL;
+	}
+
+	if (nla_put_u16(vendor_event, QCA_WLAN_VENDOR_ATTR_PEER_CFR_CHIP_ID,
+			event_data->chip_id)) {
+		cfr_err("Failed to put chip id");
+		return -EINVAL;
+	}
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_CSI_LTF_TYPE,
+		       event_data->ltf_type)) {
+		cfr_err("Failed to put ltf_type");
+		return -EINVAL;
+	}
+
+	return 0;
+
+err_phy_info:
+	nla_nest_cancel(vendor_event, entry);
+	nla_nest_cancel(vendor_event, info);
+	return -EINVAL;
+}
+
+static int
+hdd_cfr_nl_put_vendor_info(struct sk_buff *vendor_event,
+			   struct cfr_enhanced_event_data *event_data)
+{
+	if (nla_put_u64_64bit(vendor_event,
+			      QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_TSF,
+			      event_data->capture_tsf, NL80211_ATTR_PAD)) {
+		cfr_err("Failed to put capture tsf");
+		return -EINVAL;
+	}
+
+	if (nla_put_s16(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_CFO,
+			event_data->cfo)) {
+		cfr_err("Failed to put cfo");
+		return -EINVAL;
+	}
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_VERSION,
+		       event_data->cfr_version)) {
+		cfr_err("Failed to put format version");
+		return -EINVAL;
+	}
+
+	if (event_data->oui_length &&
+	    event_data->oui_length < MAX_CFR_OUI_LEN &&
+	    nla_put(vendor_event,
+		    QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI,
+		    event_data->oui_length, event_data->oui)) {
+		cfr_err("Failed to put oui");
+		return -EINVAL;
+	}
+
+	if (event_data->oui_length &&
+	    nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION,
+		       event_data->format_version)) {
+		cfr_err("Failed to put data format version");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+void hdd_cfr_data_send_nl_event_v3(uint8_t vdev_id,
+				   struct cfr_enhanced_event_data event_data,
+				   const void *data, uint32_t data_len)
+{
+	uint32_t len;
+	struct sk_buff *vendor_event;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		cfr_err("HDD context is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		cfr_err("adapter NULL for vdev id %d", vdev_id);
+		return;
+	}
+
+	len = hdd_get_cfr_nl_event_len(event_data, data_len);
+	cfr_debug("vdev id %d data_len %d total_len %d",
+		  vdev_id, data_len, len);
+	len = nla_total_size(len + NLMSG_HDRLEN);
+
+	vendor_event = wlan_cfg80211_vendor_event_alloc(
+			hdd_ctx->wiphy, &link_info->adapter->wdev, len,
+			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
+			qdf_mem_malloc_flags());
+
+	if (!vendor_event) {
+		cfr_err("alloc failed vdev id %d, total_len %d",
+			vdev_id, len);
+		return;
+	}
+
+	if (hdd_cfr_nl_put_common_info(vendor_event, &event_data) ||
+	    hdd_cfr_nl_put_phy_info(vendor_event, &event_data) ||
+	    hdd_cfr_nl_put_vendor_info(vendor_event, &event_data))
+		goto free_skb;
+
+	if (nla_put(vendor_event,
+		    QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA,
+		    data_len, data)) {
+		cfr_err("CFR event put fails");
+		goto free_skb;
+	}
+
+	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
+	return;
+
+free_skb:
+	wlan_cfg80211_vendor_free_skb(vendor_event);
+}
+
+void hdd_cfr_indicate_last_report_interval(uint8_t vdev_id)
+{
+	uint32_t total_len;
+	struct sk_buff *vendor_event;
+	struct wlan_objmgr_vdev *vdev;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+	struct pdev_cfr *pcfr = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		cfr_err("HDD context is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		cfr_err("adapter NULL for vdev id %d", vdev_id);
+		return;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_CFR_ID);
+	if (!vdev) {
+		cfr_err("Invalid vdev");
+		return;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cfr_err("Failed to get pdev object");
+		goto put_vdev;
+	}
+
+	pcfr = wlan_objmgr_pdev_get_comp_private_obj(pdev, WLAN_UMAC_COMP_CFR);
+	if (!pcfr) {
+		cfr_err("CFR private object is NULL");
+		goto put_vdev;
+	}
+
+	cfr_debug("vdev id %d", vdev_id);
+	total_len = NLMSG_HDRLEN;
+	total_len += nla_total_size(sizeof(u8)); /* vesrion attribute*/
+	total_len += nla_total_size(0); /* flag attribute */
+
+	if (pcfr->oui_length) {
+		total_len += nla_total_size(pcfr->oui_length * sizeof(u8));
+		total_len += nla_total_size(sizeof(u8));
+	}
+
+	vendor_event = wlan_cfg80211_vendor_event_alloc(
+			hdd_ctx->wiphy, &link_info->adapter->wdev, total_len,
+			QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG_INDEX,
+			qdf_mem_malloc_flags());
+
+	if (!vendor_event) {
+		cfr_err("wlan_cfg80211_vendor_event_alloc failed vdev id %d",
+			vdev_id);
+		goto put_vdev;
+	}
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_VERSION,
+		       ENHANCED_CFR_VERSION_V3)) {
+		cfr_err("Failed to put format version");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		goto put_vdev;
+	}
+
+	if (pcfr->oui_length &&
+	    nla_put(vendor_event,
+		    QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI,
+		    pcfr->oui_length, pcfr->oui)) {
+		cfr_err("Failed to put oui");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		goto put_vdev;
+	}
+
+	if (pcfr->oui_length &&
+	    nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION,
+		       pcfr->format_version)) {
+		cfr_err("Failed to put data format version");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		goto put_vdev;
+	}
+
+	if (nla_put_flag(vendor_event,
+			 QCA_WLAN_VENDOR_ATTR_PEER_CFR_IS_LAST_REPORT)) {
+		cfr_err("Failed to put last report flag");
+		wlan_cfg80211_vendor_free_skb(vendor_event);
+		goto put_vdev;
+	}
+
+	wlan_cfg80211_vendor_event(vendor_event, qdf_mem_malloc_flags());
+
+put_vdev:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CFR_ID);
+}
 
 const struct nla_policy cfr_config_policy[
 		QCA_WLAN_VENDOR_ATTR_PEER_CFR_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR] =
 		VENDOR_NLA_POLICY_MAC_ADDR,
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE] = {.type = NLA_FLAG},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH] = {.type = NLA_U8},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD] = {.type = NLA_U8},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_VERSION] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE] = {
+					.type = NLA_FLAG,
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_VERSION] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PERIODIC_CFR_CAPTURE_ENABLE] = {
-						.type = NLA_FLAG},
+					.type = NLA_FLAG,
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE_GROUP_BITMAP] = {
-						.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DURATION] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_INTERVAL] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_TYPE] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_UL_MU_MASK] = {.type = NLA_U64},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DURATION] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_INTERVAL] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_TYPE] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_UL_MU_MASK] = {
+					.type = NLA_U64,
+					.len = sizeof(uint64_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREEZE_TLV_DELAY_COUNT] = {
-						.type = NLA_U32},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_TABLE] = {
-						.type = NLA_NESTED},
+					.type = NLA_NESTED,
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_ENTRY] = {
-						.type = NLA_NESTED},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_NUMBER] = {.type = NLA_U32},
+					.type = NLA_NESTED,
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_NUMBER] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_TA] =
 		VENDOR_NLA_POLICY_MAC_ADDR,
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_RA] =
@@ -66,18 +556,107 @@ const struct nla_policy cfr_config_policy[
 		VENDOR_NLA_POLICY_MAC_ADDR,
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_RA_MASK] =
 		VENDOR_NLA_POLICY_MAC_ADDR,
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_NSS] = {.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_NSS] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_BW] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_MGMT_FILTER] = {
-						.type = NLA_U32},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_CTRL_FILTER] = {
-						.type = NLA_U32},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_GROUP_DATA_FILTER] = {
-						.type = NLA_U32},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_TRANSPORT_MODE] = {
-						.type = NLA_U8},
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
 	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_RECEIVER_PID] = {
-						.type = NLA_U32},
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA] = {
+					.type = NLA_BINARY,
+					.len = WLAN_CFR_DATA_MAX_LEN
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREQ] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_TYPE] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SUBTYPE] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_INTERVAL] = {
+					.type = NLA_U32,
+					.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI] = {
+					.type = NLA_BINARY
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_TIMESTAMP_US] = {
+					.type = NLA_U64,
+					.len = sizeof(uint64_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INFO] = {
+					.type = NLA_NESTED,
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_INDEX] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_RSSI] = {
+					.type = NLA_S8,
+					.len = sizeof(int8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_RX_ANTENNA_AGC] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_IS_LAST_REPORT] = {
+					.type = NLA_FLAG,
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SEQUENCE_NUMBER] = {
+					.type = NLA_U16,
+					.len = sizeof(uint16_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CHIP_ID] = {
+					.type = NLA_U16,
+					.len = sizeof(uint16_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CAPTURE_TSF] = {
+					.type = NLA_U64,
+					.len = sizeof(uint64_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CFO] = {
+					.type = NLA_S16,
+					.len = sizeof(int16_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_CSI_LTF_TYPE] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_NUM_SPATIAL_STREAMS] = {
+					.type = NLA_U8,
+					.len = sizeof(uint8_t)
+	},
 };
 
 #ifdef WLAN_ENH_CFR_ENABLE
@@ -101,10 +680,21 @@ wlan_hdd_transport_mode_cfg(struct wlan_objmgr_pdev *pdev,
 	}
 	pa->nl_cb.vdev_id = vdev_id;
 	pa->nl_cb.pid = pid;
-	if (tx_mode == QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS)
+	if (tx_mode != QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS)
+		return;
+
+	pa->nl_cb.cfr_nl_cb = NULL;
+	pa->nl_cb.cfr_nl_cb_v3 = NULL;
+	pa->nl_cb.cfr_nl_cb_report_interval = NULL;
+
+	if (pa->is_cfr_version_v3) {
+		pa->nl_cb.cfr_nl_cb_v3 =
+			hdd_cfr_data_send_nl_event_v3;
+		pa->nl_cb.cfr_nl_cb_report_interval =
+			hdd_cfr_indicate_last_report_interval;
+	} else {
 		pa->nl_cb.cfr_nl_cb = hdd_cfr_data_send_nl_event;
-	else
-		pa->nl_cb.cfr_nl_cb = NULL;
+	}
 }
 
 #define DEFAULT_CFR_NSS 0xff
@@ -370,9 +960,797 @@ static QDF_STATUS hdd_stop_enh_cfr(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_SUCCESS;
 }
 
+static enum
+phy_ch_width convert_capture_bw(enum nl80211_chan_width capture_bw)
+{
+	switch (capture_bw) {
+	case NL80211_CHAN_WIDTH_20_NOHT:
+	case NL80211_CHAN_WIDTH_20:
+		return CH_WIDTH_20MHZ;
+	case NL80211_CHAN_WIDTH_40:
+		return CH_WIDTH_40MHZ;
+	case NL80211_CHAN_WIDTH_80:
+		return CH_WIDTH_80MHZ;
+	case NL80211_CHAN_WIDTH_80P80:
+		return CH_WIDTH_80P80MHZ;
+	case NL80211_CHAN_WIDTH_160:
+		return CH_WIDTH_160MHZ;
+	case NL80211_CHAN_WIDTH_5:
+		return CH_WIDTH_5MHZ;
+	case NL80211_CHAN_WIDTH_10:
+		return CH_WIDTH_10MHZ;
+	case NL80211_CHAN_WIDTH_320:
+		return CH_WIDTH_320MHZ;
+	default:
+		cfr_err("invalid capture bw");
+		return CH_WIDTH_INVALID;
+	}
+}
+
+static QDF_STATUS wlan_cfg80211_stop_enh_cfr_v3(
+			struct wlan_objmgr_vdev *vdev,
+			uint8_t value)
+{
+	struct pdev_cfr *pcfr = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	bool pdev_ref_taken = false;
+
+	if (!vdev) {
+		cfr_err("Invalid vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cfr_err("Failed to get pdev object");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wlan_objmgr_pdev_try_get_ref(pdev, WLAN_CFR_ID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cfr_err("Failed to get pdev reference");
+		return status;
+	}
+	pdev_ref_taken = true;
+
+	pcfr = wlan_objmgr_pdev_get_comp_private_obj(pdev, WLAN_UMAC_COMP_CFR);
+	if (!pcfr) {
+		cfr_err("CFR private object is NULL");
+		status = QDF_STATUS_E_INVAL;
+		goto cleanup;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		cfr_err("Failed to get psoc");
+		status = QDF_STATUS_E_INVAL;
+		goto cleanup;
+	}
+
+	ucfg_cfr_stop_report_interval_timer(vdev);
+
+	/* Handle TX CFR capture cleanup */
+	if (pcfr->is_cfr_tx &&
+	    !qdf_is_macaddr_zero((struct qdf_mac_addr *)pcfr->peer_addr)) {
+		peer = wlan_objmgr_get_peer_by_mac(psoc, pcfr->peer_addr,
+						   WLAN_CFR_ID);
+		if (!peer) {
+			cfr_err("No peer object found for TX CFR cleanup");
+			/* Continue with cleanup even if peer not found */
+		} else {
+			cfr_debug("clean up CFR TX");
+			ucfg_cfr_stop_capture(pdev, peer);
+			wlan_objmgr_peer_release_ref(peer, WLAN_CFR_ID);
+		}
+
+		pcfr->is_cfr_tx = value;
+		memset(pcfr->peer_addr, value, QDF_MAC_ADDR_SIZE);
+	}
+
+	/* Handle RX CFR capture cleanup */
+	if (pcfr->is_cfr_rx) {
+		pcfr->is_cfr_rx = value;
+		cfr_debug("clean up CFR RX");
+		status = hdd_stop_enh_cfr(vdev);
+		if (QDF_IS_STATUS_ERROR(status))
+			cfr_err("Failed to stop enhanced CFR RX capture");
+	}
+
+	pcfr->is_associated = value;
+	pcfr->freq = value;
+	pcfr->report_interval = value;
+	pcfr->format_version = value;
+	pcfr->oui_length = value;
+	qdf_mem_zero(pcfr->oui, MAX_CFR_OUI_LEN);
+	pcfr->is_cfr_version_v3 = value;
+	pcfr->frame_type = value;
+	pcfr->frame_sub_type = value;
+	pcfr->unassoc_capture_config = value;
+	pcfr->unassoc_channel_mhz = value;
+	pcfr->unassoc_phy_mode = value;
+	pcfr->bandwidth = value;
+	pcfr->is_cfr_data_present = value;
+
+cleanup:
+	if (pdev_ref_taken)
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_CFR_ID);
+
+	return status;
+}
+
 QDF_STATUS hdd_cfr_disconnect(struct wlan_objmgr_vdev *vdev)
 {
-	return hdd_stop_enh_cfr(vdev);
+	struct pdev_cfr *pcfr = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!vdev) {
+		cfr_err("Invalid vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cfr_err("Failed to get pdev object");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pcfr = wlan_objmgr_pdev_get_comp_private_obj(pdev, WLAN_UMAC_COMP_CFR);
+	if (!pcfr) {
+		cfr_err("CFR private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	cfr_debug("Disconnecting CFR capture, version_v3: %s",
+		  pcfr->is_cfr_version_v3 ? "true" : "false");
+
+	if (pcfr->is_cfr_version_v3) {
+		status = wlan_cfg80211_stop_enh_cfr_v3(vdev, 0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			cfr_err("Failed to stop enhanced CFR v3, status: %d",
+				status);
+		}
+	} else {
+		status = hdd_stop_enh_cfr(vdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			cfr_err("Failed to stop enhanced CFR, status: %d",
+				status);
+		}
+	}
+
+	return status;
+}
+
+void wlan_hdd_stop_cfr(uint8_t vdev_id, uint32_t reason)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct wlan_hdd_link_info *link_info;
+
+	if (wlan_hdd_validate_context(hdd_ctx)) {
+		cfr_err("HDD context is NULL");
+		return;
+	}
+
+	link_info = hdd_get_link_info_by_vdev(hdd_ctx, vdev_id);
+	if (!link_info) {
+		cfr_err("adapter NULL for vdev id %d", vdev_id);
+		return;
+	}
+
+	cfr_debug("stop CFR vdev id %d reason %d ", vdev_id, reason);
+
+	status = hdd_cfr_disconnect(link_info->vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cfr_err("Failed to stop CFR V3, status: %d",
+			status);
+	}
+}
+
+static void wlan_cfg80211_register_stop_cfr(struct pdev_cfr *pcfr,
+					    uint8_t vdev_id)
+{
+	if (!pcfr) {
+		cfr_err("Invalid pcfr");
+		return;
+	}
+
+	pcfr->cfr_stop_cb = wlan_hdd_stop_cfr;
+	pcfr->vdev_id = vdev_id;
+}
+
+static int wlan_enh_cfr_capture_v3_tx(struct hdd_adapter *adapter,
+				      struct nlattr **tb,
+				      struct wlan_objmgr_vdev *vdev,
+				      struct wlan_objmgr_pdev *pdev,
+				      struct pdev_cfr *pcfr)
+{
+	struct cfr_capture_params params = { 0 };
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	struct qdf_mac_addr peer_addr = { 0 };
+	QDF_STATUS status;
+	int ret = 0;
+
+	if (!adapter) {
+		cfr_err("Invalid adapter pointer");
+		return -EINVAL;
+	}
+
+	if (!tb) {
+		cfr_err("Invalid netlink attribute array");
+		return -EINVAL;
+	}
+
+	if (!vdev) {
+		cfr_err("Invalid vdev pointer");
+		return -EINVAL;
+	}
+
+	if (!pdev) {
+		cfr_err("Invalid pdev pointer");
+		return -EINVAL;
+	}
+
+	if (!pcfr) {
+		cfr_err("Invalid CFR private object pointer");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR]) {
+		cfr_err("Peer MAC address attribute not provided");
+		return -EINVAL;
+	}
+
+	nla_memcpy(peer_addr.bytes, tb[QCA_WLAN_VENDOR_ATTR_CFR_PEER_MAC_ADDR],
+		   QDF_MAC_ADDR_SIZE);
+
+	if (qdf_is_macaddr_zero(&peer_addr)) {
+		cfr_err("Invalid zero MAC address provided");
+		return -EINVAL;
+	}
+
+	if (qdf_is_macaddr_broadcast(&peer_addr)) {
+		cfr_err("Broadcast MAC address not allowed for TX capture");
+		return -EINVAL;
+	}
+
+	qdf_mem_copy(pcfr->peer_addr, peer_addr.bytes, QDF_MAC_ADDR_SIZE);
+
+	cfr_debug("CFR TX capture for peer " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(peer_addr.bytes));
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		cfr_err("Failed to get PSOC object from vdev");
+		return -EINVAL;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_addr.bytes, WLAN_CFR_ID);
+	if (!peer) {
+		cfr_err("No peer object found for MAC " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_addr.bytes));
+		return -ENOENT;
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY]) {
+		params.period = nla_get_u32(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_PERIODICITY]);
+		cfr_debug("CFR capture periodicity: %u ms", params.period);
+
+		if (params.period > 0 && params.period < 10) {
+			cfr_err("Invalid periodicity %u ms, minimum is 10ms",
+				params.period);
+			ret = -EINVAL;
+			goto release_peer;
+		}
+	}
+
+	params.method = pcfr->method;
+	params.bandwidth = pcfr->bandwidth;
+
+	cfr_debug("Starting CFR TX capture with method: %u, bandwidth: %u",
+		  params.method, params.bandwidth);
+
+	wlan_hdd_transport_mode_cfg(pdev, vdev->vdev_objmgr.vdev_id,
+				    0, QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS);
+
+	status = ucfg_cfr_start_capture(pdev, peer, &params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cfr_err("Failed to start CFR capture, status: %d", status);
+		ret = qdf_status_to_os_return(status);
+		goto release_peer;
+	}
+
+	pcfr->is_cfr_tx = true;
+
+	cfr_debug("CFR TX capture started for peer " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(peer_addr.bytes));
+
+release_peer:
+	wlan_objmgr_peer_release_ref(peer, WLAN_CFR_ID);
+
+	return ret;
+}
+
+static bool cfr_validate_method_tx(uint8_t method)
+{
+	switch (method) {
+	case QCA_WLAN_VENDOR_CFR_METHOD_QOS_NULL:
+		return true;
+	default:
+		cfr_err("Invalid CFR method: %d", method);
+		return false;
+	}
+}
+
+static bool cfr_validate_transport_mode(uint8_t transport_mode)
+{
+	switch (transport_mode) {
+	case QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS:
+		return true;
+	default:
+		cfr_err("Invalid CFR transport mode: %d", transport_mode);
+		return false;
+	}
+}
+
+static int cfr_extract_enable_flag(struct nlattr **tb,
+				   struct cfr_v3_params *cfr_params)
+{
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE])
+		return 0;
+
+	cfr_params->is_start_capture = nla_get_flag(tb[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE]);
+	cfr_debug("CFR capture %s",
+		  cfr_params->is_start_capture ? "enable" : "disable");
+	return 0;
+}
+
+static int cfr_extract_method_tx(struct nlattr **tb,
+				 struct cfr_v3_params *cfr_params)
+{
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD]) {
+		cfr_params->rx_capture = true;
+		return 0;
+	}
+
+	cfr_params->method = nla_get_u8(tb[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_METHOD]);
+
+	if (!cfr_validate_method_tx(cfr_params->method)) {
+		cfr_err("CFR method validation failed: %d",
+			cfr_params->method);
+		return -EINVAL;
+	}
+
+	cfr_params->tx_capture = (cfr_params->method ==
+				  QCA_WLAN_VENDOR_CFR_METHOD_QOS_NULL);
+
+	cfr_debug("CFR method: %d (%s), TX capture: %s",
+		  cfr_params->method,
+		  (cfr_params->method ==
+		   QCA_WLAN_VENDOR_CFR_METHOD_QOS_NULL) ?
+		  "QoS NULL" : "Probe Response",
+		  cfr_params->tx_capture ? "start" : "stop");
+
+	return 0;
+}
+
+static int cfr_extract_frame_info(struct nlattr **tb,
+				  struct cfr_v3_params *cfr_params)
+{
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_TYPE]) {
+		cfr_params->frame_type = nla_get_u8(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_TYPE]);
+		cfr_debug("CFR Frame type: %d", cfr_params->frame_type);
+
+		/* Validate frame type (0=Management, 1=Control, 2=Data) */
+		if (cfr_params->frame_type > CFR_MAX_FRAME_TYPE) {
+			cfr_err("Invalid frame type: %d",
+				cfr_params->frame_type);
+			return -EINVAL;
+		}
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SUBTYPE]) {
+		cfr_params->frame_subtype = nla_get_u8(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_FRAME_SUBTYPE]);
+		cfr_debug("CFR Frame subtype: %d", cfr_params->frame_subtype);
+
+		if (cfr_params->frame_subtype > CFR_MAX_FRAME_SUBTYPE) {
+			cfr_err("Invalid frame subtype: %d",
+				cfr_params->frame_subtype);
+			return -EINVAL;
+		}
+	}
+
+	return 0;
+}
+
+static int cfr_extract_rf_params(struct nlattr **tb,
+				 struct cfr_v3_params *cfr_params,
+				 struct wlan_objmgr_pdev *pdev)
+{
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREQ]) {
+		cfr_params->freq = nla_get_u32(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_FREQ]);
+
+		if (!wlan_reg_is_freq_enabled(pdev, cfr_params->freq,
+					      REG_CURRENT_PWR_MODE)) {
+			cfr_err("CFR frequency validation failed: %d MHz",
+				cfr_params->freq);
+			return -EINVAL;
+		}
+
+		cfr_debug("CFR Frequency: %d MHz", cfr_params->freq);
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH]) {
+		cfr_params->bandwidth = nla_get_u8(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_BANDWIDTH]);
+		cfr_params->bandwidth =
+			convert_capture_bw(cfr_params->bandwidth);
+		if (cfr_params->bandwidth == CH_WIDTH_INVALID) {
+			cfr_err("CFR bandwidth validation failed: %d",
+				cfr_params->bandwidth);
+			return -EINVAL;
+		}
+		cfr_debug("CFR Capture bandwidth: %d", cfr_params->bandwidth);
+	}
+
+	return 0;
+}
+
+static int cfr_extract_transport_params(struct nlattr **tb,
+					struct cfr_v3_params *cfr_params)
+{
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_INTERVAL]) {
+		cfr_params->report_interval = nla_get_u32(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_REPORT_INTERVAL]);
+
+		if (cfr_params->report_interval < CFR_MIN_REPORT_INTERVAL ||
+		    cfr_params->report_interval > CFR_MAX_REPORT_INTERVAL) {
+			cfr_err("Invalid report interval: %d ms (valid range: %d-%d)",
+				cfr_params->report_interval,
+				CFR_MIN_REPORT_INTERVAL,
+				CFR_MAX_REPORT_INTERVAL);
+			return -EINVAL;
+		}
+
+		cfr_debug("CFR Report interval: %d ms",
+			  cfr_params->report_interval);
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_TRANSPORT_MODE]) {
+		cfr_params->transport_mode = nla_get_u8(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_TRANSPORT_MODE]);
+
+		if (!cfr_validate_transport_mode(cfr_params->transport_mode)) {
+			cfr_err("CFR transport mode validation failed: %d",
+				cfr_params->transport_mode);
+			return -EINVAL;
+		}
+
+		cfr_debug("CFR Transport mode: %d (%s)",
+			  cfr_params->transport_mode,
+			  (cfr_params->transport_mode ==
+			   QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS) ?
+			  "Netlink Events" : "Relay FS");
+	}
+
+	return 0;
+}
+
+static int cfr_extract_format_params(struct nlattr **tb,
+				     struct cfr_v3_params *cfr_params)
+{
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION]) {
+		cfr_params->format_version = nla_get_u8(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_VERSION]);
+
+		if (cfr_params->format_version < CFR_MIN_FORMAT_VERSION ||
+		    cfr_params->format_version > CFR_MAX_FORMAT_VERSION) {
+			cfr_err("Invalid format version: %d (valid range: %d-%d)",
+				cfr_params->format_version,
+				CFR_MIN_FORMAT_VERSION, CFR_MAX_FORMAT_VERSION);
+			return -EINVAL;
+		}
+
+		cfr_debug("CFR Format version: %d", cfr_params->format_version);
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI]) {
+		cfr_params->oui_length = nla_len(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI]);
+
+		if (cfr_params->oui_length == 0) {
+			cfr_err("Empty OUI provided");
+			return -EINVAL;
+		}
+
+		if (cfr_params->oui_length > MAX_CFR_OUI_LEN) {
+			cfr_err("OUI length %d exceeds maximum %d, truncating",
+				cfr_params->oui_length, MAX_CFR_OUI_LEN);
+			cfr_params->oui_length = MAX_CFR_OUI_LEN;
+		}
+
+		nla_memcpy(cfr_params->oui,
+			   tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_DATA_FORMAT_OUI],
+			   cfr_params->oui_length);
+
+		cfr_debug("CFR OUI length: %d bytes", cfr_params->oui_length);
+	}
+
+	return 0;
+}
+
+static int wlan_cfg80211_extract_cfr_params(struct nlattr **tb,
+					    struct cfr_v3_params *cfr_params,
+					    struct wlan_objmgr_pdev *pdev)
+{
+	int ret = 0;
+
+	if (!tb) {
+		cfr_err("Invalid netlink attribute array pointer");
+		return -EINVAL;
+	}
+
+	if (!cfr_params) {
+		cfr_err("Invalid CFR parameters structure pointer");
+		return -EINVAL;
+	}
+
+	qdf_mem_zero(cfr_params, sizeof(*cfr_params));
+
+	ret = cfr_extract_enable_flag(tb, cfr_params);
+	if (ret) {
+		cfr_err("Failed to extract enable flag, ret: %d", ret);
+		return ret;
+	}
+
+	ret = cfr_extract_method_tx(tb, cfr_params);
+	if (ret) {
+		cfr_err("Failed to extract method, ret: %d", ret);
+		return ret;
+	}
+
+	ret = cfr_extract_frame_info(tb, cfr_params);
+	if (ret) {
+		cfr_err("Failed to extract frame info, ret: %d", ret);
+		return ret;
+	}
+
+	ret = cfr_extract_rf_params(tb, cfr_params, pdev);
+	if (ret) {
+		cfr_err("Failed to extract RF parameters, ret: %d", ret);
+		return ret;
+	}
+
+	ret = cfr_extract_transport_params(tb, cfr_params);
+	if (ret) {
+		cfr_err("Failed to extract transport parameters, ret: %d", ret);
+		return ret;
+	}
+
+	ret = cfr_extract_format_params(tb, cfr_params);
+	if (ret) {
+		cfr_err("Failed to extract format parameters, ret: %d", ret);
+		return ret;
+	}
+
+	cfr_debug("CFR v3 parameters extracted successfully: enable=%d, method=%d, tx_capture=%d, freq=%d, bw=%d, interval=%d",
+		  cfr_params->is_start_capture, cfr_params->method,
+		  cfr_params->tx_capture, cfr_params->freq,
+		  cfr_params->bandwidth, cfr_params->report_interval);
+
+	return 0;
+}
+
+static void wlan_cfg80211_configure_cfr_v3(
+		struct pdev_cfr *pcfr,
+		const struct cfr_v3_params *cfr_params,
+		bool is_sta_connected)
+{
+	if (!pcfr || !cfr_params) {
+		cfr_err("Invalid input parameters");
+		return;
+	}
+
+	pcfr->frame_type = cfr_params->frame_type;
+	pcfr->frame_sub_type = cfr_params->frame_subtype;
+	pcfr->is_cfr_version_v3 = true;
+	pcfr->report_interval = cfr_params->report_interval;
+	pcfr->is_associated = is_sta_connected;
+	pcfr->is_cfr_tx = cfr_params->tx_capture;
+	pcfr->is_cfr_rx = cfr_params->rx_capture;
+	pcfr->method = cfr_params->method;
+	pcfr->bandwidth = cfr_params->bandwidth;
+	pcfr->freq = cfr_params->freq;
+	pcfr->oui_length = cfr_params->oui_length;
+	pcfr->format_version = cfr_params->format_version;
+	qdf_mem_copy(pcfr->oui, cfr_params->oui, cfr_params->oui_length);
+	cfr_debug("CFR v3 configured: frame_type=%d, frame_subtype=%d, report_interval=%d, bandwidth=%d, freq=%d, associated=%d",
+		  pcfr->frame_type, pcfr->frame_sub_type, pcfr->report_interval,
+		  pcfr->bandwidth, pcfr->freq, pcfr->is_associated);
+}
+
+static int wlan_cfg80211_start_cfr_rx_capture(struct wlan_objmgr_vdev *vdev,
+					      struct nlattr **tb)
+{
+	struct cfr_wlanconfig_param params = { 0 };
+	int ret;
+
+	if (!vdev || !tb) {
+		cfr_err("Invalid input parameters");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE_GROUP_BITMAP]) {
+		cfr_err("Group bitmap required for CFR RX capture start");
+		return -EINVAL;
+	}
+
+	ret = wlan_cfg80211_cfr_set_config(vdev, tb);
+	if (ret) {
+		cfr_err("Failed to set CFR config, ret: %d", ret);
+		return ret;
+	}
+
+	params.en_cfg = nla_get_u32(tb[
+		QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE_GROUP_BITMAP]);
+
+	if (!params.en_cfg) {
+		cfr_err("Invalid group bitmap value: 0x%x", params.en_cfg);
+		return -EINVAL;
+	}
+
+	cfr_debug("Enable bitmap: 0x%x", params.en_cfg);
+
+	/* Start CFR RX capture */
+	ucfg_cfr_set_en_bitmap(vdev, &params);
+	ucfg_cfr_resume(wlan_vdev_get_pdev(vdev));
+	ucfg_cfr_subscribe_ppdu_desc(wlan_vdev_get_pdev(vdev), true);
+	ucfg_cfr_committed_rcc_config(vdev);
+
+	cfr_debug("CFR RX capture started successfully");
+	return 0;
+}
+
+static int
+wlan_cfg80211_enh_cfr_capture_v3(struct hdd_adapter *adapter,
+				 struct nlattr **tb)
+{
+	struct cfr_v3_params cfr_params = { 0 };
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wmi_unified *wmi_handle = NULL;
+	struct pdev_cfr *pcfr = NULL;
+	bool is_sta_connected = false;
+	int ret = 0;
+
+	if (!adapter) {
+		cfr_err("Invalid adapter pointer");
+		return -EINVAL;
+	}
+
+	if (!tb) {
+		cfr_err("Invalid netlink attribute array");
+		return -EINVAL;
+	}
+
+	if (!adapter->hdd_ctx) {
+		cfr_err("Invalid HDD context pointer");
+		return -EINVAL;
+	}
+
+	if (!adapter->hdd_ctx->psoc) {
+		cfr_err("Invalid PSOC pointer");
+		return -EINVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(adapter->hdd_ctx->psoc);
+	if (!wmi_handle) {
+		cfr_err("wmi handle is NULL");
+		return -EINVAL;
+	}
+
+	if (!wmi_service_enabled(wmi_handle,
+				 wmi_service_cfr_assoc_tx_capture_support) &&
+	    !wmi_service_enabled(wmi_handle,
+				 wmi_service_cfr_unassoc_rx_capture_support)) {
+		cfr_err("CFR V3 not supported by fw");
+		return -EINVAL;
+	}
+
+	if (!policy_mgr_is_cfr_allowed(adapter->hdd_ctx->psoc)) {
+		cfr_err("CFR V3 rejected due to concurrency");
+		return -EINVAL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_CFR_ID);
+	if (!vdev) {
+		cfr_err("Failed to get vdev object");
+		return -EINVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		cfr_err("Failed to get pdev object");
+		ret = -EINVAL;
+		goto release_vdev;
+	}
+
+	pcfr = wlan_objmgr_pdev_get_comp_private_obj(pdev, WLAN_UMAC_COMP_CFR);
+	if (!pcfr) {
+		cfr_err("CFR private object is NULL");
+		ret = -EINVAL;
+		goto release_vdev;
+	}
+
+	ret = wlan_cfg80211_extract_cfr_params(tb, &cfr_params, pdev);
+	if (ret) {
+		cfr_err("Failed to extract CFR parameters, ret: %d", ret);
+		goto release_vdev;
+	}
+
+	if (!cfr_params.is_start_capture) {
+		cfr_debug("Stopping CFR v3 capture");
+		ret = wlan_cfg80211_stop_enh_cfr_v3(vdev, 0);
+		goto release_vdev;
+	}
+
+	/* Check if CFR capture is already active */
+	if (pcfr->is_cfr_tx || pcfr->is_cfr_rx) {
+		cfr_err("CFR capture already active: TX=%d, RX=%d",
+			pcfr->is_cfr_tx, pcfr->is_cfr_rx);
+		ret = -EBUSY;
+		goto release_vdev;
+	}
+
+	is_sta_connected = hdd_is_any_sta_connected(adapter->hdd_ctx);
+	cfr_debug("STA connected: %d", is_sta_connected);
+
+	wlan_cfg80211_configure_cfr_v3(pcfr, &cfr_params, is_sta_connected);
+
+	wlan_cfg80211_register_stop_cfr(pcfr, vdev->vdev_objmgr.vdev_id);
+
+	ucfg_tdls_teardown_links_sync(adapter->hdd_ctx->psoc, vdev);
+
+	if (cfr_params.tx_capture) {
+		if (!is_sta_connected) {
+			cfr_err("TX capture requires STA to be connected");
+			ret = -ENOTCONN;
+			goto release_vdev;
+		}
+
+		cfr_debug("Starting CFR TX capture");
+		ret = wlan_enh_cfr_capture_v3_tx(adapter, tb, vdev, pdev, pcfr);
+		goto release_vdev;
+	}
+
+	cfr_debug("Starting CFR RX capture");
+
+	if (!is_sta_connected) {
+		cfr_debug("Configuring unassociated capture mode");
+		pcfr->unassoc_capture_config = 1;
+		pcfr->unassoc_phy_mode = WLAN_PHYMODE_11NA_HT20;
+		pcfr->unassoc_channel_mhz = cfr_params.freq;
+	}
+
+	ret = wlan_cfg80211_start_cfr_rx_capture(vdev, tb);
+	if (ret) {
+		cfr_err("Failed to start CFR RX capture, ret: %d", ret);
+		goto release_vdev;
+	}
+
+release_vdev:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_CFR_ID);
+	return ret;
 }
 
 static int
@@ -426,6 +1804,13 @@ out:
 static int
 wlan_cfg80211_peer_enh_cfr_capture(struct hdd_adapter *adapter,
 				   struct nlattr **tb)
+{
+	return 0;
+}
+
+static int
+wlan_cfg80211_enh_cfr_capture_v3(struct hdd_adapter *adapter,
+				 struct nlattr **tb)
 {
 	return 0;
 }
@@ -700,6 +2085,9 @@ wlan_cfg80211_peer_cfr_capture_cfg(struct wiphy *wiphy,
 			status = wlan_cfg80211_peer_cfr_capture_cfg_adrastea(
 								adapter, tb);
 			return qdf_status_to_os_return(status);
+		} else if (version == ENHANCED_CFR_VERSION_V3) {
+			hdd_debug("CFR V3 capture");
+			return wlan_cfg80211_enh_cfr_capture_v3(adapter, tb);
 		} else if (version != ENHANCED_CFR_VERSION) {
 			hdd_err("unsupported version");
 			return -EFAULT;

@@ -2087,6 +2087,30 @@ void
 ucfg_dp_rx_aggr_dis_req(struct wlan_objmgr_vdev *vdev,
 			enum ctrl_rx_aggr_client_id id, bool disable);
 
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+/**
+ * ucfg_dp_dump_periodic_custom_stats_enable_req() - Request dump periodic
+ *						     custom stats enable/disable
+ * @vdev: vdev mapped to DP interface
+ * @enable: Enable or disable dump periodic custom stats
+ *
+ * Return: None
+ */
+void
+ucfg_dp_dump_periodic_custom_stats_enable_req(struct wlan_objmgr_vdev *vdev,
+					      bool enable);
+
+/**
+ * ucfg_dp_get_dump_periodic_custom_stats_enable() - Get dump periodic custom
+ *						     stats enable status
+ * @vdev: vdev mapped to DP interface
+ *
+ * Return: true if dump periodic custom stats is enabled, false otherwise
+ */
+bool
+ucfg_dp_get_dump_periodic_custom_stats_enable(struct wlan_objmgr_vdev *vdev);
+#endif
+
 #ifdef WLAN_DP_FEATURE_STC
 /**
  * ucfg_dp_flow_classify_result() - Indicate Flow classify result

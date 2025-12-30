@@ -3003,7 +3003,9 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_pdev *pdev,
 			nla_get_u32(tb[
 				QCA_WLAN_VENDOR_ATTR_NAN_DISC_5GHZ_BAND_FREQ]);
 
-	if (!ucfg_is_nan_enable_allowed(psoc, chan_freq_2g, vdev_id)) {
+	if (!wlan_reg_is_24ghz_ch_freq(chan_freq_2g) ||
+	    !wlan_reg_is_freq_enabled(pdev, chan_freq_2g, REG_CURRENT_PWR_MODE) ||
+	    !ucfg_is_nan_enable_allowed(psoc, chan_freq_2g, vdev_id)) {
 		osif_err("NAN Enable not allowed at this moment for channel %d",
 			 chan_freq_2g);
 		return -EINVAL;

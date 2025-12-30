@@ -40,6 +40,7 @@
 #include "wlan_tdls_api.h"
 #include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_ll_sap_api.h"
+#include <wlan_cfr_ucfg_api.h>
 
 QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 				struct if_mgr_event_data *event_data)
@@ -112,6 +113,7 @@ QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,
 	if (!ucfg_nan_is_sta_nan_ndi_4_port_allowed(psoc))
 		ucfg_nan_check_and_disable_unsupported_ndi(psoc,
 							   false);
+	ucfg_cfr_send_stop(vdev, 0);
 
 	return QDF_STATUS_SUCCESS;
 }

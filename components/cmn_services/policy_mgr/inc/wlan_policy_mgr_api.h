@@ -6481,4 +6481,15 @@ uint8_t policy_mgr_fetch_scc_vdev_id(struct wlan_objmgr_psoc *psoc,
 bool
 policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(
 	struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_is_cfr_allowed() - check if CFR is allowed
+ * value
+ * @psoc: psoc pointer
+ *
+ * Return: true if allowed
+ */
+bool
+policy_mgr_is_cfr_allowed(struct wlan_objmgr_psoc *psoc);
+
 #endif /* __WLAN_POLICY_MGR_API_H */
