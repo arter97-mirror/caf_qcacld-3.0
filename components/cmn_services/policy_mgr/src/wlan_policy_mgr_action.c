@@ -4245,8 +4245,8 @@ sap_restart:
 		}
 
 		if (policy_mgr_mode_specific_connection_count(
-					psoc, PM_P2P_GO_MODE, NULL) ||
-					(!pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc ||
+					psoc, PM_P2P_GO_MODE, NULL) &&
+					(!pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc &&
 					 !pm_ctx->cfg.cfg_sta_dfs_ch_peer_scc))
 			timeout_ms = MAX_NOA_TIME;
 
