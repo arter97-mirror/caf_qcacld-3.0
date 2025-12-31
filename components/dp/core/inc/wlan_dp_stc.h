@@ -300,6 +300,9 @@ struct wlan_dp_stc_sampling_candidate {
  * @tx_flow_metadata: tx flow metadata
  * @rx_flow_metadata: rx flow metadata
  * @tuple_hash: Flow tuple hash
+ * @sampling_start_ts: Timestamp when committed sampling started
+ * @burst_sampling_start_ts: Timestamp when burst sampling started in
+ *                           provisional state
  * @tx_stats_ref: tx window stats reference
  * @rx_stats_ref: rx window stats reference
  * @flow_samples: flow samples
@@ -323,6 +326,7 @@ struct wlan_dp_stc_sampling_table_entry {
 	uint32_t rx_flow_metadata;
 	uint64_t tuple_hash;
 	uint64_t sampling_start_ts;
+	uint64_t burst_sampling_start_ts;
 	struct wlan_dp_stc_txrx_stats tx_stats_ref;
 	struct wlan_dp_stc_txrx_stats rx_stats_ref;
 	struct wlan_dp_stc_flow_samples flow_samples;

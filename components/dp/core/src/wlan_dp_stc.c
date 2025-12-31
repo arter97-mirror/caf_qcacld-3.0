@@ -2384,6 +2384,7 @@ wlan_dp_stc_provisional_init_flows(struct wlan_dp_stc *dp_stc,
 						  QDF_RX);
 
 	/* Mark initialization as done using dedicated flag */
+	s_entry->burst_sampling_start_ts = dp_stc_get_timestamp();
 	s_entry->flags1 |= WLAN_DP_SAMPLING_FLAGS1_PROVISIONAL_INIT_DONE;
 	s_entry->curr_sample_attempt = 0;
 }
@@ -3034,11 +3035,12 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		wlan_dp_stc_save_classify_insights(dp_stc, flow_classify_result,
 						   s_entry, flow_tuple);
 
-		dp_info("STC: sampling flow %d tuple (%s) result %d ul_tid %u sample_start_ts %llu current stage %u samples %d",
+		dp_info("STC: sampling flow %d tuple (%s) result %d ul_tid %u sample_start_ts %llu burst_sampling_start_ts %llu current stage %u samples %d",
 			i, dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
 			flow_classify_result->traffic_type,
 			flow_classify_result->ul_tid,
 			s_entry->sampling_start_ts,
+			s_entry->burst_sampling_start_ts,
 			s_entry->flow_samples.curr_stats_stage,
 			flow_classify_result->insight_count);
 		/*
