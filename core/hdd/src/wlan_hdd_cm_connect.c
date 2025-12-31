@@ -2001,8 +2001,8 @@ static void hdd_post_conn_clear_bcn_rssi_stats(
 }
 #endif
 
-static void hdd_configure_wow_commands(struct wlan_objmgr_vdev *vdev,
-				       struct hdd_context *hdd_ctx)
+void hdd_configure_wow_commands(struct wlan_objmgr_vdev *vdev,
+				struct hdd_context *hdd_ctx)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_psoc *psoc;

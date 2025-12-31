@@ -529,4 +529,16 @@ hdd_cm_clear_link_info(uint8_t vdev_id)
 {
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
+
+/**
+ * hdd_configure_wow_commands() - Configure WoW commands for vdev
+ * @vdev: Pointer to vdev object
+ * @hdd_ctx: pointer to hdd context
+ *
+ * This function configures WoW (Wake on Wireless) commands for the given vdev.
+ *
+ * Return: None
+ */
+void hdd_configure_wow_commands(struct wlan_objmgr_vdev *vdev,
+				struct hdd_context *hdd_ctx);
 #endif /* __WLAN_HDD_CM_API_H */

@@ -48,6 +48,7 @@
 #include "wlan_hdd_sysfs.h"
 #include "wlan_hdd_stats.h"
 #include <wlan_ipa_ucfg_api.h>
+#include "wlan_hdd_cm_api.h"
 
 /**
  * hdd_nan_datapath_target_config() - Configure NAN datapath features
@@ -1135,6 +1136,14 @@ hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 			      &roam_info->bssid,
 			      roam_info->fAuthRequired);
 
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_NAN_ID);
+	if (!vdev) {
+		qdf_mem_free(roam_info);
+		hdd_err("vdev is NULL");
+		return;
+	}
+	hdd_configure_wow_commands(vdev, hdd_ctx);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
 error:
 	qdf_mem_free(roam_info);
 }
