@@ -100,6 +100,7 @@ void *hdd_filter_ft_info(const uint8_t *frame,
  * Disabled Subchannel Bitmap in 802.11be EHT-OP IE
  * @forced: Force to switch channel, ignore SCC/MCC check
  * @allow_blocking: the calling thread allows be blocked
+ * @csa_params: CSA user configurations
  *
  * Return: 0 for success, non zero for failure
  */
@@ -108,7 +109,8 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 				  enum phy_ch_width target_bw,
 				  uint32_t punct_bitmap,
 				  bool forced,
-				  bool allow_blocking);
+				  bool allow_blocking,
+				  struct cfg80211_csa_settings *csa_params);
 /**
  * hdd_stop_sap_set_tx_power() - Function to set tx power
  * for unsafe channel if restriction bit mask is set else stop the SAP.

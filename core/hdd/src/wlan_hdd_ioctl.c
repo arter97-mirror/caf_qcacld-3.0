@@ -6766,7 +6766,8 @@ static int drv_cmd_set_channel_switch(struct wlan_hdd_link_info *link_info,
 	qdf_event_reset(&hostapd_state->qdf_event);
 
 	status = hdd_softap_set_channel_change(link_info, chan_number, 0, width,
-					       NO_SCHANS_PUNC, false, true);
+					       NO_SCHANS_PUNC, false, true,
+					       NULL);
 	if (status) {
 		hdd_err("Set channel change fail");
 		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);

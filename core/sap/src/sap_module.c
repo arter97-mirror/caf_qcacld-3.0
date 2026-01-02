@@ -1938,7 +1938,9 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 					       uint32_t ccfs1,
 					       enum phy_ch_width target_bw,
 					       uint32_t punct_bitmap,
-					       bool strict)
+					       bool strict,
+					       uint32_t beacon_cnt,
+					       bool block_tx)
 {
 	struct mac_context *mac;
 	mac_handle_t mac_handle;
@@ -2111,9 +2113,11 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 
 			/*
 			 * Set the CSA IE required flag.
+			 * Set channel switch beacon count and switch mode.
 			 */
 			ch_switch_info->csa_ie_required = true;
-
+			ch_switch_info->sap_ch_switch_beacon_cnt = beacon_cnt;
+			ch_switch_info->sap_ch_switch_mode = block_tx;
 			/*
 			 * Set the radar found status to allow the channel
 			 * change to happen same as in the case of a radar

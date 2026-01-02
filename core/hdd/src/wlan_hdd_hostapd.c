@@ -3616,7 +3616,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_context *sap_ctx,
 
 		if (hdd_softap_set_channel_change(link_info, new_chan_freq, 0,
 						  CH_WIDTH_MAX, NO_SCHANS_PUNC,
-						  false, false))
+						  false, false, NULL))
 			return QDF_STATUS_E_FAILURE;
 		else
 			return QDF_STATUS_SUCCESS;
@@ -4023,11 +4023,60 @@ next_adapter:
 	return false;
 }
 
+static QDF_STATUS
+hdd_softap_set_channel_user_params(struct wlan_objmgr_vdev *vdev,
+				   struct cfg80211_csa_settings *csa_params,
+				   uint32_t *beacon_cnt, bool *block_tx)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mac_context *pmac;
+	struct wlan_channel *channel_info;
+	bool is_dfs = false;
+
+	if (!vdev)
+		return QDF_STATUS_E_FAULT;
+
+	pmac = sap_get_mac_context();
+	if (!pmac) {
+		sap_err("Invalid sap MAC context");
+		status = QDF_STATUS_E_INVAL;
+		return status;
+	}
+
+	if (csa_params) {
+		channel_info = wlan_vdev_get_active_channel(vdev);
+		if (!channel_info) {
+			status = QDF_STATUS_E_INVAL;
+			return status;
+		}
+		is_dfs = wlan_reg_is_dfs_for_freq(wlan_vdev_get_pdev(vdev),
+					(qdf_freq_t)channel_info->ch_freq);
+		*beacon_cnt = csa_params->count;
+		if (!is_dfs)
+			*block_tx = csa_params->block_tx;
+		else
+			status = wlan_mlme_get_sap_chn_switch_mode(pmac->psoc,
+								   block_tx);
+	} else {
+		status = wlan_mlme_get_sap_chn_switch_bcn_count(pmac->psoc,
+								beacon_cnt);
+		if (!QDF_IS_STATUS_SUCCESS(status))
+			hdd_err("wlan_mlme_get_sap_chn_switch_bcn_count fail");
+		status = wlan_mlme_get_sap_chn_switch_mode(pmac->psoc,
+							   block_tx);
+		if (!QDF_IS_STATUS_SUCCESS(status))
+			hdd_err("wlan_mlme_get_sap_chn_switch_mode fail");
+	}
+
+	return status;
+}
+
 int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 				  int target_chan_freq, uint32_t ccfs1,
 				  enum phy_ch_width target_bw,
 				  uint32_t punct_bitmap, bool forced,
-				  bool allow_blocking)
+				  bool allow_blocking,
+				  struct cfg80211_csa_settings *csa_params)
 {
 	QDF_STATUS status;
 	int ret = 0;
@@ -4051,6 +4100,8 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	int32_t keymgmt;
 	enum policy_mgr_con_mode pm_con_mode;
 	bool is_ll_lt_sap_vdev;
+	uint32_t beacon_cnt = 0;
+	bool block_tx = true;
 
 	if (!link_info)
 		return -EINVAL;
@@ -4350,9 +4401,19 @@ int hdd_softap_set_channel_change(struct wlan_hdd_link_info *link_info,
 	strict = strict || forced;
 	hdd_place_marker(adapter, "CHANNEL CHANGE", NULL);
 
+	status = hdd_softap_set_channel_user_params(vdev, csa_params,
+						    &beacon_cnt, &block_tx);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		qdf_atomic_set(&ap_ctx->ch_switch_in_progress, 0);
+		wlan_hdd_set_roaming_state(link_info, RSO_SAP_CHANNEL_CHANGE,
+					   true);
+		ret = -EINVAL;
+		goto end;
+	}
 	status = wlansap_set_channel_change_with_csa(
 		WLAN_HDD_GET_SAP_CTX_PTR(link_info),
-		target_chan_freq, ccfs1, target_bw, punct_bitmap, strict);
+		target_chan_freq, ccfs1, target_bw, punct_bitmap, strict,
+		beacon_cnt, block_tx);
 
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("SAP set channel failed for channel freq: %d, bw: %d",
@@ -4521,7 +4582,7 @@ QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
 
 	ret = hdd_softap_set_channel_change(link_info, target_chan_freq, 0,
 					    target_bw, NO_SCHANS_PUNC,
-					    forced, false);
+					    forced, false, NULL);
 	if (ret && ret != -EBUSY) {
 		hdd_err("Vdev %d channel switch failed", link_info->vdev_id);
 
@@ -7057,7 +7118,8 @@ hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
 	qdf_event_reset(&hostapd_state->qdf_event);
 	go_bw = wlansap_get_chan_width(WLAN_HDD_GET_SAP_CTX_PTR(go_link_info));
 	ret = hdd_softap_set_channel_change(go_link_info, go_new_ch_freq, 0,
-					    go_bw, NO_SCHANS_PUNC, false, true);
+					    go_bw, NO_SCHANS_PUNC, false, true,
+					    NULL);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d", go_new_ch_freq, ret);
 		return;
@@ -7155,7 +7217,7 @@ hdd_handle_p2p_go_for_3rd_ap_conc(struct hdd_context *hdd_ctx,
 
 	ret = hdd_softap_set_channel_change(go_link_info, go_new_ch_freq, 0,
 					    CH_WIDTH_80MHZ, NO_SCHANS_PUNC,
-					    false, true);
+					    false, true, NULL);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d", go_new_ch_freq, ret);
 		return false;

@@ -987,6 +987,8 @@ QDF_STATUS wlansap_deauth_sta(struct sap_context *sap_ctx,
  * @target_bw: Target bandwidth
  * @strict: if true switch to the requested channel always, fail
  *        otherwise
+ * @beacon_cnt: Beacon channel switch count
+ * @block_tx: Flag to block transmission
  *
  * This api function does a channel change to the target channel specified.
  * CSA IE is included in the beacons before doing a channel change.
@@ -998,7 +1000,9 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 					       uint32_t ccfs1,
 					       enum phy_ch_width target_bw,
 					       uint32_t punct_bitmap,
-					       bool strict);
+					       bool strict,
+					       uint32_t beacon_cnt,
+					       bool block_tx);
 
 
 #ifdef WLAN_FEATURE_DNW

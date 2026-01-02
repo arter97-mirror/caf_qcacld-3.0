@@ -359,7 +359,7 @@ static __iw_softap_setparam(struct net_device *dev,
 							    set_value, 0,
 							    CH_WIDTH_MAX,
 							    NO_SCHANS_PUNC,
-							    false, true);
+							    false, true, NULL);
 		} else {
 			hdd_err("Channel Change Failed, Device in test mode");
 			ret = -EINVAL;

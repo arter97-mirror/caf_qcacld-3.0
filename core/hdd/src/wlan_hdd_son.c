@@ -679,7 +679,8 @@ static int hdd_son_set_chan(struct wlan_objmgr_vdev *vdev, int chan,
 				    CSA_REASON_USER_INITIATED);
 
 	return hdd_softap_set_channel_change(link_info, freq, 0, CH_WIDTH_MAX,
-					     NO_SCHANS_PUNC, false, false);
+					     NO_SCHANS_PUNC, false, false,
+					     NULL);
 }
 
 /**

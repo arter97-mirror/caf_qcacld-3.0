@@ -33463,7 +33463,8 @@ static int __wlan_hdd_cfg80211_channel_switch(struct wiphy *wiphy,
 	hdd_softap_set_channel_change(link_info,
 				      csa_params->chandef.chan->center_freq,
 				      csa_params->chandef.center_freq1,
-				      ch_width, csa_punct_bitmap, false, true);
+				      ch_width, csa_punct_bitmap, false, true,
+				      csa_params);
 	if (ret) {
 		hdd_err("CSA failed to %d, ret %d",
 			csa_params->chandef.chan->center_freq, ret);
