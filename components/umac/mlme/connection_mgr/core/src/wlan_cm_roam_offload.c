@@ -8019,7 +8019,7 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 	wlan_diag_event.status = frame_data->status_code;
 	wlan_diag_event.assoc_id = frame_data->assoc_id;
 
-	if (scan_data->present) {
+	if (!frame_data->rssi && scan_data->present) {
 		for (i = 0; i < scan_data->num_ap; i++) {
 			if (i >= MAX_ROAM_CANDIDATE_AP)
 				break;
