@@ -3924,7 +3924,7 @@ lim_is_non_default_rsnxe_cap_set(struct mac_context *mac_ctx,
 {
 	const uint8_t *rsnxe, *rsnxe_cap;
 	uint8_t cap_len = 0, cap_index;
-	uint32_t cap_mask;
+	uint32_t cap_mask[2];
 
 	rsnxe = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE,
 					 req->assoc_ie.ptr,
@@ -3947,23 +3947,34 @@ lim_is_non_default_rsnxe_cap_set(struct mac_context *mac_ctx,
 	 * by the STA transmitting the element. The length of the Extended
 	 * RSN Capabilities field is a variable n, in octets, as indicated by
 	 * the first 4 bits in the field.
-	 * Let's consider a uint32_t cap_mask which can accommodate 28(32-4)
-	 * bits to check if those bits are set or not. This is to keep it
-	 * simple as current supported bits are only 11.
-	 * TODO: If spec supports more than this range in future, this needs to
-	 * be an array to hold the complete bitmap/bitmask.
+	 * Let's consider a uint32_t cap_mask array which can accommodate
+	 * 60(64-4) bits to check if those bits are set or not.
+	 * This is to keep it simple as current supported bits are only 11.
 	 */
-	cap_mask = ~(0xF | WLAN_CRYPTO_RSNX_CAP_SAE_H2E |
-		     WLAN_CRYPTO_RSNX_CAP_SAE_PK |
-		     WLAN_CRYPTO_RSNX_CAP_SECURE_LTF |
-		     WLAN_CRYPTO_RSNX_CAP_SECURE_RTT |
-		     WLAN_CRYPTO_RSNX_CAP_URNM_MFPR);
+	cap_mask[0] = ~((uint32_t)(0xF | WLAN_CRYPTO_RSNX_CAP_SAE_H2E |
+			WLAN_CRYPTO_RSNX_CAP_SAE_PK |
+			WLAN_CRYPTO_RSNX_CAP_SECURE_LTF |
+			WLAN_CRYPTO_RSNX_CAP_SECURE_RTT |
+			WLAN_CRYPTO_RSNX_CAP_URNM_MFPR));
+	cap_mask[1] = 0xFFFFFFFF;
 
 	/* Check if any other bits are set than cap_mask */
 	for (cap_index = 0; cap_index <= cap_len; cap_index++) {
-		if (rsnxe_cap[cap_index] & (cap_mask & 0xFF))
+		uint8_t mask_val;
+
+		if (cap_index >= 8) {
+			/* No mask for these bytes, check all bits */
+			mask_val = 0xFF;
+		} else {
+			/* Extract relevant byte from the 32-bit mask word */
+			uint32_t mask_word = cap_mask[cap_index / 4];
+			uint8_t shift = (cap_index % 4) * 8;
+
+			mask_val = (uint8_t)(mask_word >> shift);
+		}
+
+		if (rsnxe_cap[cap_index] & mask_val)
 			return true;
-		cap_mask >>= 8;
 	}
 
 	return false;
