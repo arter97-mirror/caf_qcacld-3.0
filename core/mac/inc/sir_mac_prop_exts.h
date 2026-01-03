@@ -39,35 +39,49 @@
 
 #define IS_DOT11_MODE_HT(dot11Mode) \
 	(((dot11Mode == MLME_DOT11_MODE_11N) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11N_ONLY) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11AC) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11AC_ONLY) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11AX) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11AX_ONLY) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11BE) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11BE_ONLY) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_ALL)) ? true:false)
+	  (dot11Mode == MLME_DOT11_MODE_11N_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_11AC) || \
+	  (dot11Mode == MLME_DOT11_MODE_11AC_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_11AX) || \
+	  (dot11Mode == MLME_DOT11_MODE_11AX_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BE) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BE_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BN) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BN_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_ALL)) ? true : false)
 
 #define IS_DOT11_MODE_VHT(dot11Mode) \
 	(((dot11Mode == MLME_DOT11_MODE_11AC) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11AC_ONLY) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11AX) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11AX_ONLY) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11BE) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11BE_ONLY) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_ALL)) ? true:false)
+	  (dot11Mode == MLME_DOT11_MODE_11AC_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_11AX) || \
+	  (dot11Mode == MLME_DOT11_MODE_11AX_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BE) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BE_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BN) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BN_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_ALL)) ? true : false)
 
 #define IS_DOT11_MODE_HE(dot11Mode) \
 	(((dot11Mode == MLME_DOT11_MODE_11AX) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11AX_ONLY) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11BE) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11BE_ONLY) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_ALL)) ? true:false)
+	  (dot11Mode == MLME_DOT11_MODE_11AX_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BE) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BE_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BN) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BN_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_ALL)) ? true : false)
 
 #define IS_DOT11_MODE_EHT(dot11Mode) \
 	(((dot11Mode == MLME_DOT11_MODE_11BE) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_11BE_ONLY) || \
-	  (dot11Mode ==  MLME_DOT11_MODE_ALL)) ? true:false)
+	  (dot11Mode == MLME_DOT11_MODE_11BE_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BN) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BN_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_ALL)) ? true : false)
+
+/* UHR (11bn) specific */
+#define IS_DOT11_MODE_UHR(dot11Mode) \
+	(((dot11Mode == MLME_DOT11_MODE_11BN) || \
+	  (dot11Mode == MLME_DOT11_MODE_11BN_ONLY) || \
+	  (dot11Mode == MLME_DOT11_MODE_ALL)) ? true : false)
 
 #define IS_DOT11_MODE_11A(dot11mode) \
 	((dot11mode == MLME_DOT11_MODE_11A) ? true : false)

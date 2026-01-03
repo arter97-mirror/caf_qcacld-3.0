@@ -855,6 +855,134 @@ lim_save_max_mcs_idx(struct mac_context *mac_ctx, struct pe_session *session)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN
+/**
+ * lim_update_session_uhr_capable() - Update session UHR capable
+ * @session: PE session entry
+ * @val: UHR capable status
+ *
+ * Return: None
+ */
+static void lim_update_session_uhr_capable(struct pe_session *session, bool val)
+{
+	session->uhr_capable = val;
+}
+
+/**
+ * lim_is_session_uhr_capable() - Check if session is UHR capable
+ * @session: PE session entry
+ *
+ * Return: true if session is UHR capable, false otherwise
+ */
+static bool lim_is_session_uhr_capable(struct pe_session *session)
+{
+	return session->uhr_capable;
+}
+
+/**
+ * lim_copy_bss_uhr_cap() - Copy UHR capability to session
+ * @session: PE session entry
+ *
+ * Return: None
+ */
+static void lim_copy_bss_uhr_cap(struct pe_session *session)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session->vdev);
+	if (!mlme_priv)
+		return;
+
+	lim_revise_req_uhr_cap_per_band(mlme_priv, session);
+
+	qdf_mem_copy(&session->uhr_config, &mlme_priv->uhr_config,
+		     sizeof(session->uhr_config));
+}
+
+/**
+ * lim_strip_uhr_ies_from_add_ies() - Strip UHR IEs from additional IEs
+ * @mac_ctx: Mac context
+ * @session: PE session entry
+ *
+ * Return: None
+ */
+static void lim_strip_uhr_ies_from_add_ies(struct mac_context *mac_ctx,
+					   struct pe_session *session)
+{
+	struct add_ie_params *add_ie = &session->add_ie_params;
+	QDF_STATUS status;
+	uint8_t uhr_cap_buff[WLAN_UHR_CAP_IE_MAX_LEN + 2];
+	uint8_t uhr_op_buff[WLAN_UHR_OP_IE_MAX_LEN + 2];
+
+	qdf_mem_zero(uhr_cap_buff, sizeof(uhr_cap_buff));
+	qdf_mem_zero(uhr_op_buff, sizeof(uhr_op_buff));
+
+	status = lim_strip_ie(mac_ctx, add_ie->probeRespBCNData_buff,
+			      &add_ie->probeRespBCNDataLen,
+			      WLAN_ELEMID_EXTN_ELEM, ONE_BYTE,
+			      UHR_CAP_OUI_TYPE, (uint8_t)UHR_CAP_OUI_SIZE,
+			      uhr_cap_buff, WLAN_UHR_CAP_IE_MAX_LEN);
+	if (status != QDF_STATUS_SUCCESS)
+		pe_debug("Failed to strip UHR cap IE status: %d", status);
+
+	status = lim_strip_ie(mac_ctx, add_ie->probeRespBCNData_buff,
+			      &add_ie->probeRespBCNDataLen,
+			      WLAN_ELEMID_EXTN_ELEM, ONE_BYTE,
+			      UHR_OP_OUI_TYPE, (uint8_t)UHR_OP_OUI_SIZE,
+			      uhr_op_buff, WLAN_UHR_OP_IE_MAX_LEN);
+	if (status != QDF_STATUS_SUCCESS)
+		pe_debug("Failed to strip UHR op IE status: %d", status);
+}
+
+/**
+ * lim_dump_uhr_info() - Dump UHR info
+ * @session: PE session entry
+ *
+ * Return: None
+ */
+static void lim_dump_uhr_info(struct pe_session *session)
+{
+	if (!session->uhr_capable)
+		return;
+	pe_nofl_debug(" 802.11bn UHR capable");
+}
+
+/**
+ * lim_handle_uhr_session_update() - Handle UHR session update
+ * @mac_ctx: Mac context
+ * @session: PE session entry
+ *
+ * This function updates UHR capability if 11BN mode is enabled,
+ * otherwise strips UHR IEs.
+ *
+ * Return: None
+ */
+static void lim_handle_uhr_session_update(struct mac_context *mac_ctx,
+					  struct pe_session *session)
+{
+	if (IS_DOT11_MODE_UHR(session->dot11mode)) {
+		lim_update_session_uhr_capable(session, true);
+		lim_copy_bss_uhr_cap(session);
+	} else {
+		lim_strip_uhr_ies_from_add_ies(mac_ctx, session);
+	}
+}
+#else
+static void lim_handle_uhr_session_update(struct mac_context *mac_ctx,
+					  struct pe_session *session)
+{
+}
+
+static void lim_dump_uhr_info(struct pe_session *session)
+{
+}
+
+static bool lim_is_session_uhr_capable(struct pe_session *session)
+{
+	return false;
+}
+#endif
+
 /**
  * __lim_handle_sme_start_bss_request() - process SME_START_BSS_REQ message
  *@mac_ctx: Pointer to Global MAC structure
@@ -1064,6 +1192,8 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			lim_strip_eht_ies_from_add_ies(mac_ctx, session);
 		}
 
+		lim_handle_uhr_session_update(mac_ctx, session);
+
 		session->txLdpcIniFeatureEnabled =
 				mac_ctx->mlme_cfg->ht_caps.tx_ldpc_enable;
 
@@ -1108,6 +1238,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			(session->htSecondaryChannelOffset) ? 1 : 0;
 		if (lim_is_session_he_capable(session) ||
 		    lim_is_session_eht_capable(session) ||
+		    lim_is_session_uhr_capable(session) ||
 		    session->vhtCapability || session->htCapability) {
 			chanwidth = sme_start_bss_req->vht_channel_width;
 			session->ch_width = chanwidth;
@@ -1173,6 +1304,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		lim_dump_session_info(mac_ctx, session);
 		lim_dump_he_info(mac_ctx, session);
 		lim_dump_eht_info(session);
+		lim_dump_uhr_info(session);
 
 		MTRACE(mac_trace
 			(mac_ctx, TRACE_CODE_SME_STATE,
