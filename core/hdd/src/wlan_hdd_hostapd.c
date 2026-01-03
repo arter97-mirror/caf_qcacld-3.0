@@ -2104,7 +2104,8 @@ static QDF_STATUS hdd_hostapd_chan_change(struct wlan_hdd_link_info *link_info,
 	sap_ch_param.mhz_freq_seg1 =
 		sap_chan_selected->vht_seg1_center_ch_freq;
 
-	if (sap_phymode_is_eht(sap_config->SapHw_mode))
+	if (sap_phymode_is_eht(sap_config->SapHw_mode) ||
+	    sap_phymode_is_uhr(sap_config->SapHw_mode))
 		wlan_reg_set_create_punc_bitmap(&sap_ch_param, true);
 	wlan_reg_set_channel_params_for_pwrmode(
 		hdd_ctx->pdev,
@@ -8719,7 +8720,8 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	}
 
 	config->ch_params.ch_width = config->ch_width_orig;
-	if (sap_phymode_is_eht(config->SapHw_mode))
+	if (sap_phymode_is_eht(config->SapHw_mode) ||
+	    sap_phymode_is_uhr(config->SapHw_mode))
 		wlan_reg_set_create_punc_bitmap(&config->ch_params, true);
 	if ((config->ch_params.ch_width == CH_WIDTH_80P80MHZ) &&
 	    ucfg_mlme_get_restricted_80p80_bw_supp(hdd_ctx->psoc)) {

@@ -212,7 +212,8 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 	struct sap_ch_switch_info *ch_switch_info;
 	struct ch_params *ch_params;
 
-	if (!sap_phymode_is_eht(sap_ctx->phyMode)) {
+	if (!sap_phymode_is_eht(sap_ctx->phyMode) &&
+	    !sap_phymode_is_uhr(sap_ctx->phyMode)) {
 		sap_debug("phy mode: 0x%x", sap_ctx->phyMode);
 		return true;
 	}
@@ -250,7 +251,8 @@ sap_is_chan_change_needed_for_radar(struct sap_context *sap_ctx,
 
 	ch_params->ch_width = ch_wd;
 
-	if (sap_phymode_is_eht(sap_ctx->phyMode))
+	if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+	    sap_phymode_is_uhr(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
 						sap_ctx->chan_freq,
@@ -399,7 +401,8 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 	    sap_ctx->chan_freq != sap_ctx->candidate_freq &&
 	    !utils_dfs_is_freq_in_nol(pdev, sap_ctx->candidate_freq)) {
 		chan_freq = sap_ctx->candidate_freq;
-		if (sap_phymode_is_eht(sap_ctx->phyMode))
+		if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+		    sap_phymode_is_uhr(sap_ctx->phyMode))
 			wlan_reg_set_create_punc_bitmap(ch_params, true);
 		wlan_reg_set_channel_params_for_pwrmode(pdev, chan_freq, 0,
 							ch_params,
@@ -3573,7 +3576,8 @@ static QDF_STATUS sap_validate_dfs_nol(struct sap_context *sap_ctx,
 	 * has leakage to the channels in NOL
 	 */
 
-	if (sap_phymode_is_eht(sap_ctx->phyMode)) {
+	if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+	    sap_phymode_is_uhr(sap_ctx->phyMode)) {
 		ch_state =
 			wlan_reg_get_channel_state_from_secondary_list_for_freq(
 						mac_ctx->pdev, sap_freq);
@@ -3607,7 +3611,8 @@ static QDF_STATUS sap_validate_dfs_nol(struct sap_context *sap_ctx,
 			  sap_ctx->chan_freq, chan_freq);
 
 		sap_ctx->chan_freq = chan_freq;
-		if (sap_phymode_is_eht(sap_ctx->phyMode))
+		if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+		    sap_phymode_is_uhr(sap_ctx->phyMode))
 			wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params,
 							true);
 		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
@@ -3755,6 +3760,7 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	uint8_t h2e;
 	uint32_t con_ch_freq, con_vdev_id;
 	struct if_mgr_event_data evt_data = {0};
+	bool puncture_enable = false;
 
 	/*
 	 * check if channel is in DFS_NOL or if the channel
@@ -3778,16 +3784,17 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	 * ACS check if AP1 ACS resulting channel is DFS and if yes
 	 * override AP2 ACS scan result with AP1 DFS channel
 	 */
+	puncture_enable = sap_phymode_is_eht(sap_ctx->phyMode) ||
+				sap_phymode_is_uhr(sap_ctx->phyMode);
 	if (policy_mgr_is_sap_override_dfs_required(mac_ctx->pdev,
 						    sap_ctx->chan_freq,
 						    sap_ctx->ch_width_orig,
-						    0, 0,
-						    sap_phymode_is_eht(
-						    sap_ctx->phyMode),
+						    0, 0, puncture_enable,
 						    &con_vdev_id,
 						    &con_ch_freq)) {
 		sap_ctx->chan_freq = con_ch_freq;
-		if (sap_phymode_is_eht(sap_ctx->phyMode))
+		if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+		    sap_phymode_is_uhr(sap_ctx->phyMode))
 			wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params,
 							true);
 		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
@@ -3984,7 +3991,8 @@ static QDF_STATUS sap_fsm_handle_radar_during_cac(struct sap_context *sap_ctx,
 	}
 
 	if (ch_switch_info->target_chan_freq) {
-		if (sap_phymode_is_eht(sap_ctx->phyMode))
+		if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+		    sap_phymode_is_uhr(sap_ctx->phyMode))
 			wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params,
 							true);
 		wlan_reg_set_channel_params_for_pwrmode(

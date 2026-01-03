@@ -1717,7 +1717,8 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 	if (tgt_ch_params)
 		ch_params.mhz_freq_seg1 = tgt_ch_params->mhz_freq_seg1;
 
-	if (sap_phymode_is_eht(sap_context->phyMode))
+	if (sap_phymode_is_eht(sap_context->phyMode) ||
+	    sap_phymode_is_uhr(sap_context->phyMode))
 		wlan_reg_set_create_punc_bitmap(&ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac->pdev, chan_freq,
 						sec_ch_freq, &ch_params,
@@ -1879,7 +1880,8 @@ wlansap_set_chan_params_for_csa(struct mac_context *mac,
 				target_bw);
 	}
 
-	if (sap_phymode_is_eht(sap_ctx->phyMode))
+	if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+	    sap_phymode_is_uhr(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(
 		mac->pdev, target_chan_freq, 0,
@@ -1976,7 +1978,8 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 		return QDF_STATUS_E_FAULT;
 	}
 
-	if (sap_phymode_is_eht(sap_ctx->phyMode))
+	if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+	    sap_phymode_is_uhr(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac->pdev,
 						sap_ctx->chan_freq,
@@ -2017,7 +2020,8 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 			       tmp_ch_params.ch_width);
 	}
 
-	if (sap_phymode_is_eht(sap_ctx->phyMode))
+	if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+	    sap_phymode_is_uhr(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(&tmp_ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac->pdev, target_chan_freq, 0,
 						&tmp_ch_params,
@@ -2489,7 +2493,8 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 			  ch_params->ch_width);
 		ch_params->ch_width = phymode_max_bw;
 	}
-	if (sap_phymode_is_eht(sap_ctx->phyMode))
+	if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+	    sap_phymode_is_uhr(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev, target_chan_freq,
 						0, ch_params,
@@ -2600,7 +2605,8 @@ QDF_STATUS wlansap_dfs_send_csa_ie_request(struct sap_context *sap_ctx)
 				&ch_switch_info->new_ch_params);
 	wlan_reg_set_input_punc_bitmap(&ch_switch_info->new_ch_params,
 				       NO_SCHANS_PUNC);
-	if (sap_phymode_is_eht(sap_ctx->phyMode))
+	if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+	    sap_phymode_is_uhr(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(
 			&ch_switch_info->new_ch_params, true);
 	wlan_reg_set_channel_params_for_pwrmode(mac->pdev,
@@ -3052,7 +3058,8 @@ wlansap_son_update_sap_config_phymode(struct wlan_objmgr_vdev *vdev,
 		break;
 	}
 
-	if (sap_phymode_is_eht(config->SapHw_mode))
+	if (sap_phymode_is_eht(config->SapHw_mode) ||
+	    sap_phymode_is_uhr(config->SapHw_mode))
 		wlan_reg_set_create_punc_bitmap(&config->ch_params, true);
 	if (config->ch_params.ch_width == CH_WIDTH_80P80MHZ &&
 	    ucfg_mlme_get_restricted_80p80_bw_supp(psoc)) {
@@ -5011,6 +5018,14 @@ void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
 
 	if (sap_acs_is_puncture_applicable(sap_ctx->acs_cfg))
 		ch_params->is_create_punc_bitmap = true;
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BN_TEST_SAP
+bool sap_phymode_is_uhr(eCsrPhyMode phymode)
+{
+	return CSR_IS_DOT11_PHY_MODE_11BN(phymode) ||
+	       CSR_IS_DOT11_PHY_MODE_11BN_ONLY(phymode);
 }
 #endif
 

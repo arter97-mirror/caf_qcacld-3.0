@@ -2297,6 +2297,7 @@ int wlan_hdd_sap_cfg_dfs_override(struct wlan_hdd_link_info *link_info)
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
 	uint32_t con_vdev_id, con_ch_freq;
 	struct wlan_hdd_link_info *conc_link_info;
+	bool puncture_enable = false;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd context is NULL");
@@ -2304,13 +2305,14 @@ int wlan_hdd_sap_cfg_dfs_override(struct wlan_hdd_link_info *link_info)
 	}
 
 	sap_config = &link_info->session.ap.sap_config;
+	puncture_enable = sap_phymode_is_eht(sap_config->SapHw_mode) ||
+				sap_phymode_is_uhr(sap_config->SapHw_mode);
 	if (!policy_mgr_is_sap_override_dfs_required(hdd_ctx->pdev,
 						     sap_config->chan_freq,
 						     sap_config->ch_width_orig,
 						     sap_config->acs_cfg.start_ch_freq,
 						     sap_config->acs_cfg.end_ch_freq,
-						     sap_phymode_is_eht(
-						     sap_config->SapHw_mode),
+						     puncture_enable,
 						     &con_vdev_id,
 						     &con_ch_freq))
 		return 0;
@@ -2787,7 +2789,8 @@ hdd_update_reg_chan_info(struct hdd_adapter *adapter,
 			wlan_hdd_find_opclass(mac_handle, chan, bw_offset);
 
 		if (WLAN_REG_IS_5GHZ_CH_FREQ(freq_list[i])) {
-			if (sap_phymode_is_eht(sap_config->SapHw_mode))
+			if (sap_phymode_is_eht(sap_config->SapHw_mode) ||
+			    sap_phymode_is_uhr(sap_config->SapHw_mode))
 				wlan_reg_set_create_punc_bitmap(&ch_params,
 								true);
 			ch_params.ch_width = sap_config->acs_cfg.ch_width;
@@ -21266,7 +21269,8 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 					ap_ctx->sap_config.ch_width_orig;
 		ap_ctx->bss_stop_reason = BSS_STOP_DUE_TO_VENDOR_CONFIG_CHAN;
 
-		if (sap_phymode_is_eht(ap_ctx->sap_config.SapHw_mode))
+		if (sap_phymode_is_eht(ap_ctx->sap_config.SapHw_mode) ||
+		    sap_phymode_is_uhr(ap_ctx->sap_config.SapHw_mode))
 			wlan_reg_set_create_punc_bitmap(
 				&ap_ctx->sap_config.ch_params, true);
 		wlan_reg_set_channel_params_for_pwrmode(

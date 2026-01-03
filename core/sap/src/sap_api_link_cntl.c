@@ -138,7 +138,8 @@ void sap_config_acs_result(mac_handle_t mac_handle,
 	enum phy_ch_width new_ch_width;
 
 	ch_params.ch_width = sap_ctx->acs_cfg->ch_width;
-	if (sap_phymode_is_eht(sap_ctx->phyMode))
+	if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+	    sap_phymode_is_uhr(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(&ch_params, true);
 
 	new_ch_width =
@@ -686,7 +687,8 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	 * currently. For e.g. 20/40/80 MHz operation
 	 */
 	if (ch_switch_info->target_chan_freq) {
-		if (sap_phymode_is_eht(sap_ctx->phyMode))
+		if (sap_phymode_is_eht(sap_ctx->phyMode) ||
+		    sap_phymode_is_uhr(sap_ctx->phyMode))
 			wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params,
 							true);
 		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,

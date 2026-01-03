@@ -2007,6 +2007,21 @@ static inline void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
 }
 #endif /* WLAN_FEATURE_11BE */
 
+#ifdef WLAN_FEATURE_11BN_TEST_SAP
+/**
+ * sap_phymode_is_uhr() - Is sap phymode UHR
+ * @phymode: phy mode
+ *
+ * Return: true if phy mode is UHR
+ */
+bool sap_phymode_is_uhr(eCsrPhyMode phymode);
+#else
+static inline bool sap_phymode_is_uhr(eCsrPhyMode phymode)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BN_TEST_SAP */
+
 /**
  * sap_cac_end_notify() - Notify CAC end to HDD
  * @mac_handle: Opaque handle to the global MAC context
