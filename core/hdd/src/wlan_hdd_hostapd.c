@@ -6438,6 +6438,43 @@ static int hdd_update_11be_apies(struct wlan_hdd_link_info *link_info,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_TEST_SAP
+/**
+ * hdd_update_11bn_apies() - update 11bn IEs
+ * @link_info: pointer to link_info
+ * @genie: pointer to ie buffer
+ * @total_ielen: pointer to store total ie length
+ *
+ * This function adds 11bn (UHR) related IEs to the AP beacon/probe response.
+ * It adds both UHR Operation IE and UHR Capability IE.
+ *
+ * Return: 0 on success, -EINVAL on failure
+ */
+static int hdd_update_11bn_apies(struct wlan_hdd_link_info *link_info,
+				 uint8_t *genie, uint16_t *total_ielen)
+{
+	if (wlan_hdd_add_extn_ie(link_info, genie, total_ielen,
+				 UHR_OP_OUI_TYPE, UHR_OP_OUI_SIZE)) {
+		hdd_err("Adding UHR Op IE failed");
+		return -EINVAL;
+	}
+
+	if (wlan_hdd_add_extn_ie(link_info, genie, total_ielen,
+				 UHR_CAP_OUI_TYPE, UHR_CAP_OUI_SIZE)) {
+		hdd_err("Adding UHR Cap IE failed");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+#else
+static int hdd_update_11bn_apies(struct wlan_hdd_link_info *link_info,
+				 uint8_t *genie, uint16_t *total_ielen)
+{
+	return 0;
+}
+#endif
+
 static void wlan_hdd_add_mrsno_ies(struct wlan_hdd_link_info *link_info,
 				   uint8_t *genie, uint16_t *total_ielen)
 {
@@ -6540,6 +6577,10 @@ wlan_hdd_cfg80211_update_apies(struct wlan_hdd_link_info *link_info)
 		goto done;
 
 	ret = hdd_update_11be_apies(link_info, genie, &total_ielen);
+	if (ret)
+		goto done;
+
+	ret = hdd_update_11bn_apies(link_info, genie, &total_ielen);
 	if (ret)
 		goto done;
 
