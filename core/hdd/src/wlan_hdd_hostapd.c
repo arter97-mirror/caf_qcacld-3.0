@@ -9181,7 +9181,7 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 	enum QDF_OPMODE mode;
 	uint8_t twt_res_cfg;
 	bool twt_rsp_disable_svc;
-	bool twt_ht_vht_sup = false;
+	bool twt_ht_vht_sup = false, ll_lt_sap;
 
 	/* This is a temporary fix to disable twt_responder for sap
 	 * interface. Later the changes will come to enable/disable
@@ -9200,10 +9200,10 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 	ucfg_twt_tgt_caps_get_resp_disable_per_vdev(hdd_ctx->psoc,
 						    &twt_rsp_disable_svc);
 
+	ll_lt_sap = policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id);
 	if (!twt_rsp_disable_svc &&
 	    !policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
-	    mode == QDF_SAP_MODE &&
-	    !policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id))
+	    mode == QDF_SAP_MODE && !ll_lt_sap)
 		ucfg_twt_cfg_set_responder(hdd_ctx->psoc, false);
 
 	ucfg_twt_cfg_get_responder(hdd_ctx->psoc, &twt_res_cfg);
@@ -9214,16 +9214,22 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 
 	ucfg_twt_get_responder_support_for_ht_vht_mode(hdd_ctx->psoc,
 						       &twt_ht_vht_sup);
-	if (!twt_res_svc_cap || !enable_twt ||
-	    (!twt_responder && !twt_rsp_disable_svc) ||
-	    (sap_hw_mode < eCSR_DOT11_MODE_11ax && !twt_ht_vht_sup))
+	/* Only disable TWT globally when per-vdev support is not available
+	 * With per-vdev support, individual vdevs can be controlled separately
+	 * without affecting other vdevs (e.g., XPAN TWT functionality)
+	 */
+	if (!twt_rsp_disable_svc &&
+	    (!twt_res_svc_cap || !enable_twt || !twt_responder ||
+	     (!ll_lt_sap && sap_hw_mode < eCSR_DOT11_MODE_11ax &&
+	      !twt_ht_vht_sup)))
 		ucfg_twt_cfg_set_responder(hdd_ctx->psoc, 0);
 
 	hdd_debug("cfg80211 TWT responder: %d, enable twt: %d, twt_res_cfg: %d",
 		  twt_responder, enable_twt, twt_res_cfg);
 	if (enable_twt && twt_res_cfg &&
 	    (twt_responder || twt_rsp_disable_svc) &&
-	    (sap_hw_mode >= eCSR_DOT11_MODE_11ax || twt_ht_vht_sup)) {
+	    (ll_lt_sap || sap_hw_mode >= eCSR_DOT11_MODE_11ax ||
+	     twt_ht_vht_sup)) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;
@@ -9235,7 +9241,8 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 		return;
 
 	if (twt_responder &&
-	    (sap_hw_mode >= eCSR_DOT11_MODE_11ax || twt_ht_vht_sup))
+	    (ll_lt_sap || sap_hw_mode >= eCSR_DOT11_MODE_11ax ||
+	     twt_ht_vht_sup))
 		osif_twt_send_responder_disable_per_vdev(hdd_ctx->psoc, vdev_id,
 							 mode, twt_res_cfg);
 	else
@@ -9271,7 +9278,9 @@ void wlan_hdd_configure_twt_responder(struct hdd_context *hdd_ctx,
 						       &twt_ht_vht_sup);
 
 	if (enable_twt && twt_responder &&
-	    (sap_hw_mode >= eCSR_DOT11_MODE_11ax || twt_ht_vht_sup)) {
+	    (policy_mgr_is_vdev_ll_lt_sap(hdd_ctx->psoc, vdev_id) ||
+	     sap_hw_mode >= eCSR_DOT11_MODE_11ax ||
+	     twt_ht_vht_sup)) {
 		hdd_send_twt_responder_enable_cmd(hdd_ctx, vdev_id);
 	} else {
 		reason = HOST_TWT_DISABLE_REASON_NONE;

@@ -2734,7 +2734,8 @@ static void lim_set_sap_peer_twt_cap(struct pe_session *session,
 		return;
 
 	wlan_twt_cfg_get_res_support_for_ht_vht(psoc, &twt_ht_vht_sup);
-	if (session->dot11mode < MLME_DOT11_MODE_11AX && !twt_ht_vht_sup)
+	if (!policy_mgr_is_vdev_ll_lt_sap(psoc, session->vdev_id) &&
+	    session->dot11mode < MLME_DOT11_MODE_11AX && !twt_ht_vht_sup)
 		session->peer_twt_responder = 0;
 	else
 		session->peer_twt_responder = ext_cap->twt_responder_support;
