@@ -357,6 +357,15 @@ lim_mlm_add_bss(struct mac_context *mac_ctx,
 	}
 #endif
 
+#ifdef WLAN_FEATURE_11BN_TEST_SAP
+	if (lim_is_session_uhr_capable(session)) {
+		lim_decide_uhr_op(mac_ctx,
+				  &mlme_obj->proto.uhr_ops_info.uhr_ops,
+				  session);
+		lim_update_usr_uhr_cap(mac_ctx, session);
+	}
+#endif
+
 	/* Set a new state for MLME */
 	session->limMlmState = eLIM_MLM_WT_ADD_BSS_RSP_STATE;
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE, session->peSessionId,

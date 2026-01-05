@@ -9489,6 +9489,74 @@ void lim_add_bss_uhr_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
 		qdf_mem_copy(&add_bss->staContext.uhr_op_ie,
 			     uhr_op, sizeof(*uhr_op));
 }
+
+#define UHR_OP_LEN (WLAN_UHR_UHR_OP_MAX_LEN + UHR_OP_OUI_SIZE * 2 + ONE_BYTE)
+void lim_decide_uhr_op(struct mac_context *mac_ctx, uint32_t *mlme_uhr_ops,
+		       struct pe_session *session)
+{
+	struct add_ie_params *add_ie = &session->add_ie_params;
+	uint8_t extracted_buff[UHR_OP_LEN + 2];
+	QDF_STATUS status;
+	struct wlan_uhr_op_ie *uhr_op_ie;
+
+	if (!session)
+		return;
+
+	uhr_op_ie = &session->uhr_op_ie;
+	pe_debug("beacon ie:");
+	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   add_ie->probeRespBCNData_buff,
+			   add_ie->probeRespBCNDataLen);
+
+	qdf_mem_zero(extracted_buff, sizeof(extracted_buff));
+	status = lim_strip_ie(mac_ctx, add_ie->probeRespBCNData_buff,
+			      &add_ie->probeRespBCNDataLen,
+			      WLAN_ELEMID_EXTN_ELEM, ONE_BYTE,
+			      UHR_OP_OUI_TYPE, (uint8_t)UHR_OP_OUI_SIZE,
+			      extracted_buff, UHR_OP_LEN);
+	if (QDF_STATUS_SUCCESS != status) {
+		pe_debug("Failed to strip UHR OP IE status: %d", status);
+		return;
+	}
+
+	pe_debug("uhr op:");
+	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   extracted_buff, UHR_OP_LEN);
+
+	status = lim_unpack_ieee80211_uhr_op_payload(
+			extracted_buff,
+			UHR_OP_LEN, uhr_op_ie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("lim_unpack_ieee80211_uhr_op_payload failed: %d",
+			 status);
+		qdf_mem_zero(uhr_op_ie, sizeof(*uhr_op_ie));
+		return;
+	}
+
+	pe_debug("UHR parsed: dps:%d npca:%d pedca:%d dbe:%d dbe_bw:%u opinfo_len:%u",
+		 uhr_op_ie->dps_enabled, uhr_op_ie->npca_enabled,
+		 uhr_op_ie->p_edca_enabled, uhr_op_ie->dbe_enabled,
+		 uhr_op_ie->dbe_bandwidth, uhr_op_ie->uhr_op_info_len);
+}
+
+void lim_update_usr_uhr_cap(struct mac_context *mac_ctx,
+			    struct pe_session *session)
+{
+	struct add_ie_params *add_ie = &session->add_ie_params;
+	uint8_t extracted_buff[WLAN_UHR_CAP_IE_MAX_LEN + 2];
+	QDF_STATUS status;
+
+	qdf_mem_zero(extracted_buff, sizeof(extracted_buff));
+	status = lim_strip_ie(mac_ctx, add_ie->probeRespBCNData_buff,
+			      &add_ie->probeRespBCNDataLen,
+			      WLAN_ELEMID_EXTN_ELEM, ONE_BYTE,
+			      UHR_CAP_OUI_TYPE, (uint8_t)UHR_CAP_OUI_SIZE,
+			      extracted_buff, WLAN_UHR_CAP_IE_MAX_LEN);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("Failed to strip UHR cap IE status: %d", status);
+		return;
+	}
+}
 #endif
 
 void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)

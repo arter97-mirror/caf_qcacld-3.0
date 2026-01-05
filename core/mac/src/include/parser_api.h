@@ -2254,6 +2254,11 @@ void
 sir_convert_beacon_frame2_uhr_op_struct(uint8_t *pframe, uint32_t nframe,
 					tDot11fBeacon *bcn_frm,
 					tpSirProbeRespBeacon bcn_struct);
+
+QDF_STATUS
+lim_unpack_ieee80211_uhr_op_payload(uint8_t *uhr_op_payload,
+				    qdf_size_t uhr_op_payload_len,
+				    struct wlan_uhr_op_ie *uhr);
 #else
 static inline void
 sir_convert_assoc_resp_frame2_uhr_op_struct(uint8_t *frame,
@@ -2276,6 +2281,14 @@ sir_convert_beacon_frame2_uhr_op_struct(uint8_t *pframe, uint32_t nframe,
 					tDot11fBeacon *bcn_frm,
 					tpSirProbeRespBeacon bcn_struct)
 {
+}
+
+static inline QDF_STATUS
+lim_unpack_ieee80211_uhr_op_payload(uint8_t *uhr_op_payload,
+				    qdf_size_t uhr_op_payload_len,
+				    struct wlan_uhr_op_ie *uhr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
 #endif /* __PARSE_H__ */

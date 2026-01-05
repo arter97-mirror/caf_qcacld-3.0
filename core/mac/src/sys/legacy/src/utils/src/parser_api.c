@@ -16329,7 +16329,7 @@ finalize:
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS
+QDF_STATUS
 lim_unpack_ieee80211_uhr_op_payload(uint8_t *uhr_op_payload,
 				    qdf_size_t uhr_op_payload_len,
 				    struct wlan_uhr_op_ie *uhr_op)

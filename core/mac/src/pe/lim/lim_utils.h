@@ -4244,6 +4244,29 @@ static inline bool lim_is_sta_uhr_capable(tpDphHashNode sta_ds)
 {
 	return sta_ds->mlmStaContext.uhr_capable;
 }
+
+/**
+ * lim_decide_uhr_op() - Determine UHR operation elements
+ * @mac_ctx: global mac context
+ * @uhr_ops: mlme uhr ops
+ * @session: PE session entry
+ *
+ * Parse the UHR Operation IE and populate the fields to be
+ * sent to FW as part of add bss.
+ */
+void lim_decide_uhr_op(struct mac_context *mac_ctx, uint32_t *mlme_uhr_ops,
+		       struct pe_session *session);
+
+/**
+ * lim_update_usr_uhr_cap() - Update UHR capability based on userspace
+ * @mac_ctx: global mac context
+ * @session: PE session entry
+ *
+ * Parse the UHR Capability IE and populate the fields to be
+ * sent to FW as part of add bss and update PE session.
+ */
+void lim_update_usr_uhr_cap(struct mac_context *mac_ctx,
+			    struct pe_session *session);
 #else
 static inline void
 lim_update_sta_uhr_capable(struct mac_context *mac,
@@ -4280,6 +4303,18 @@ static inline bool lim_is_session_uhr_capable(struct pe_session *session)
 static inline bool lim_is_sta_uhr_capable(tpDphHashNode sta_ds)
 {
 	return false;
+}
+
+static inline void
+lim_decide_uhr_op(struct mac_context *mac_ctx, uint32_t *mlme_uhr_ops,
+		  struct pe_session *session)
+{
+}
+
+static inline void
+lim_update_usr_uhr_cap(struct mac_context *mac_ctx,
+		       struct pe_session *session)
+{
 }
 #endif
 

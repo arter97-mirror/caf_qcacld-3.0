@@ -1051,7 +1051,7 @@ enum reg_phymode csr_convert_to_reg_phy_mode(eCsrPhyMode csr_phy_mode,
 #ifdef WLAN_FEATURE_11BN
 	else if (CSR_IS_DOT11_PHY_MODE_11BN(csr_phy_mode) ||
 		 CSR_IS_DOT11_PHY_MODE_11BN_ONLY(csr_phy_mode))
-		return REG_PHYMODE_11BE;
+		return REG_PHYMODE_11BN;
 #endif
 	else if (csr_phy_mode == eCSR_DOT11_MODE_11ax ||
 		 csr_phy_mode == eCSR_DOT11_MODE_11ax_ONLY)

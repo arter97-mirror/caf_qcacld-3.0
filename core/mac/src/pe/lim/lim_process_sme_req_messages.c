@@ -863,7 +863,7 @@ lim_save_max_mcs_idx(struct mac_context *mac_ctx, struct pe_session *session)
  *
  * Return: None
  */
-static void lim_update_session_uhr_capable(struct pe_session *session, bool val)
+void lim_update_session_uhr_capable(struct pe_session *session, bool val)
 {
 	session->uhr_capable = val;
 }
