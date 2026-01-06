@@ -474,9 +474,6 @@ wlansap_scan_complete_event_handler(struct wlan_objmgr_vdev *vdev,
 
 	wlansap_filter_non_2ghz_freq(freq_list, &num_of_channels);
 
-	sap_ctx->freq_list = freq_list;
-	sap_ctx->num_of_channel = num_of_channels;
-
 	filter = qdf_mem_malloc(sizeof(*filter));
 	if (!filter)
 		goto cleanup;
@@ -513,10 +510,9 @@ cleanup:
 	if (ch_info.ch_info)
 		qdf_mem_free(ch_info.ch_info);
 
-	if (sap_ctx->freq_list) {
-		qdf_mem_free(sap_ctx->freq_list);
-		sap_ctx->freq_list = NULL;
-		sap_ctx->num_of_channel = 0;
+	if (freq_list) {
+		qdf_mem_free(freq_list);
+		freq_list = NULL;
 	}
 
 	if (list)
