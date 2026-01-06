@@ -175,6 +175,7 @@
 #include "wlan_pkt_capture_ucfg_api.h"
 #include "os_if_pkt_capture.h"
 #include "wlan_hdd_son.h"
+#include "wlan_hdd_host_txrx_stats.h"
 
 #define g_mode_rates_size (12)
 #define a_mode_rates_size (8)
@@ -17537,6 +17538,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_RADAR_HISTORY_VENDOR_COMMANDS
 	FEATURE_AVOID_FREQ_EXT_VENDOR_COMMANDS
 	FEATURE_MDNS_OFFLOAD_VENDOR_COMMANDS
+	FEATURE_WLAN_HOST_TXRX_STATS_VENDOR_COMMANDS
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE
 	FEATURE_MONITOR_MODE_VENDOR_COMMANDS
