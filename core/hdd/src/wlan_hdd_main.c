@@ -15858,6 +15858,8 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 			cfg_get(psoc, CFG_EXCLUDE_SELFTX_FROM_CCA_BUSY_TIME);
 	hdd_init_link_state_cfg(config, psoc);
 	config->sub_20_ch_width = cfg_get(psoc, CFG_SUB_20_CHANNEL_WIDTH);
+	config->enable_primary_sta_mlo_cap =
+			cfg_get(psoc, CFG_ENABLE_PRIMARY_STA_MLO_CAP);
 }
 
 #ifdef CONNECTION_ROAMING_CFG
@@ -18828,7 +18830,7 @@ hdd_open_adapters_for_mission_mode(struct hdd_context *hdd_ctx)
 	if (!mac_addr)
 		return QDF_STATUS_E_INVAL;
 
-	if (eht_capab) {
+	if (eht_capab && hdd_ctx->config->enable_primary_sta_mlo_cap) {
 		params.is_ml_adapter = true;
 		hdd_adapter_open_set_max_active_links(&params);
 	}

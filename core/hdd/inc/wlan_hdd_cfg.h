@@ -214,6 +214,7 @@ struct hdd_config {
 	/* ml link state cache expiry time*/
 	qdf_time_t link_state_cache_expiry_time;
 #endif
+	bool enable_primary_sta_mlo_cap;
 	enum cfg_sub_20_channel_width sub_20_ch_width;
 };
 
