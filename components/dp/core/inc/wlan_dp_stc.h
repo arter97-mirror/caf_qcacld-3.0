@@ -505,6 +505,7 @@ enum wlan_dp_stc_timer_state {
  * @num_video_call: Number of video call flows on this peer
  * @num_browsing: Number of web browsing flows on this peer
  * @num_aperiodic_bursts: Number of aperiodic bursty traffic flows on this peer
+ * @num_livecast_rt: Number of livecast RT flows on this peer
  * @non_flow_traffic: BITMAP to indicate active non-TCP/UDP traffic on the peer
  * @send_fw_ind: Flag to mark if traffic_map indication is to be sent to FW
  */
@@ -525,6 +526,7 @@ struct wlan_dp_stc_peer_traffic_context {
 	qdf_atomic_t num_video_call;
 	qdf_atomic_t num_browsing;
 	qdf_atomic_t num_aperiodic_bursts;
+	qdf_atomic_t num_livecast_rt;
 	unsigned long non_flow_traffic;
 	qdf_atomic_t send_fw_ind;
 };

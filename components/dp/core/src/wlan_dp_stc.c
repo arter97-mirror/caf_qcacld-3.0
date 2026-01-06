@@ -913,6 +913,9 @@ wlan_dp_stc_inc_traffic_type(struct wlan_dp_stc *dp_stc,
 		is_rtpm_flow = true;
 		val = qdf_atomic_inc_return(&peer_tc->num_aperiodic_bursts);
 		break;
+	case QCA_TRAFFIC_TYPE_LIVESTREAM:
+		val = qdf_atomic_inc_return(&peer_tc->num_livecast_rt);
+		break;
 	default:
 		break;
 	}
@@ -954,6 +957,9 @@ wlan_dp_stc_dec_traffic_type(struct wlan_dp_stc *dp_stc,
 	case QCA_TRAFFIC_TYPE_APERIODIC_BURSTS:
 		is_rtpm_flow = true;
 		val = qdf_atomic_dec_and_test(&peer_tc->num_aperiodic_bursts);
+		break;
+	case QCA_TRAFFIC_TYPE_LIVESTREAM:
+		val = qdf_atomic_dec_and_test(&peer_tc->num_livecast_rt);
 		break;
 	default:
 		break;
@@ -1257,6 +1263,9 @@ wlan_dp_stc_send_active_traffic_map_ind(struct wlan_dp_stc *dp_stc,
 	if (qdf_atomic_read(&peer_tc->num_aperiodic_bursts))
 		wmi_active_traffic_map |=
 		      WMI_PEER_ACTIVE_TRAFFIC_TYPE_APERIODIC_BURST_TRAFFIC_1_M;
+	if (qdf_atomic_read(&peer_tc->num_livecast_rt))
+		wmi_active_traffic_map |=
+				WMI_PEER_ACTIVE_TRAFFIC_TYPE_LIVECAST_M;
 
 	req_buf.vdev_id = peer_tc->vdev_id;
 	qdf_mem_copy(&req_buf.mac.bytes,
@@ -1693,7 +1702,8 @@ wlan_dp_stc_check_n_mark_rt_flow(struct wlan_dp_stc_classified_flow_entry *flow)
 {
 	if (flow->traffic_type == QCA_TRAFFIC_TYPE_GAMING ||
 	    flow->traffic_type == QCA_TRAFFIC_TYPE_VIDEO_CALL ||
-	    flow->traffic_type == QCA_TRAFFIC_TYPE_VOICE_CALL) {
+	    flow->traffic_type == QCA_TRAFFIC_TYPE_VOICE_CALL ||
+	    flow->traffic_type == QCA_TRAFFIC_TYPE_LIVESTREAM) {
 		qdf_atomic_set_bit(
 			WLAN_DP_CLASSIFIED_FLAGS_RT_FLOW_BIT,
 			&flow->flags);
@@ -3323,7 +3333,7 @@ wlan_dp_stc_print_peer_active_traffic_map(struct wlan_dp_stc *dp_stc,
 					  struct wlan_dp_stc_peer_traffic_context *peer_tc)
 {
 	dp_stc_info(dp_stc->logmask,
-		    "STC: peer_id %u bursty traffic: [%u %u %u] RT traffic: [%u %u %u] non flow traffic: [%u %u]",
+		    "STC: peer_id %u bursty traffic: [%u %u %u] RT traffic: [%u %u %u %u] non flow traffic: [%u %u]",
 		    peer_tc->peer_id,
 		    qdf_atomic_read(&peer_tc->num_streaming),
 		    qdf_atomic_read(&peer_tc->num_browsing),
@@ -3331,6 +3341,7 @@ wlan_dp_stc_print_peer_active_traffic_map(struct wlan_dp_stc *dp_stc,
 		    qdf_atomic_read(&peer_tc->num_gaming),
 		    qdf_atomic_read(&peer_tc->num_voice_call),
 		    qdf_atomic_read(&peer_tc->num_video_call),
+		    qdf_atomic_read(&peer_tc->num_livecast_rt),
 		    qdf_atomic_test_bit(WLAN_DP_STC_TRAFFIC_PING,
 					&peer_tc->non_flow_traffic),
 		    qdf_atomic_test_bit(WLAN_DP_STC_TRAFFIC_BK,
