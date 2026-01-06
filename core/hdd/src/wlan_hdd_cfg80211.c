@@ -251,6 +251,7 @@
 #include "osif_twt_internal.h"
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_hdd_eht.h"
+#include "wlan_hdd_host_txrx_stats.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -29615,6 +29616,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_RADAR_HISTORY_VENDOR_COMMANDS
 	FEATURE_AVOID_FREQ_EXT_VENDOR_COMMANDS
 	FEATURE_MDNS_OFFLOAD_VENDOR_COMMANDS
+	FEATURE_WLAN_HOST_TXRX_STATS_VENDOR_COMMANDS
 
 	FEATURE_GREEN_AP_LOW_LATENCY_PWR_SAVE_COMMANDS
 

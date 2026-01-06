@@ -3613,4 +3613,8 @@ config FEATURE_DAL_DP_SUPPORT
 config WLAN_SURVEY_NOISE_FLOOR
 	int "Survey noise floor value reported in dBm"
 	default -96
+
+config FEATURE_WLAN_HOST_TXRX_STATS
+	bool "Enable FEATURE_WLAN_HOST_TXRX_STATS"
+	default n
 endif # QCA_CLD_WLAN
