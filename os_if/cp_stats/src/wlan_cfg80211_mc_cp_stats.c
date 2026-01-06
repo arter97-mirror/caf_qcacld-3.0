@@ -1188,6 +1188,18 @@ void infra_enhance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
 		return;
 	}
 
+	if (!infra_event->num_vdev_beacon_stats ||
+	    !infra_event->num_vdev_congestion_stats ||
+	    !infra_event->num_vdev_data_stats) {
+		hdd_debug("Enhanced stats is zero num_vdev_beacon_stats: %d num_vdev_congestion_stats: %d num_vdev_data_stats: %d",
+			  infra_event->num_vdev_beacon_stats,
+			  infra_event->num_vdev_congestion_stats,
+			  infra_event->num_vdev_data_stats);
+		osif_request_complete(request);
+		osif_request_put(request);
+		return;
+	}
+
 	priv->status = QDF_STATUS_SUCCESS;
 	priv->action = infra_event->action;
 
@@ -1285,7 +1297,6 @@ void infra_enhance_cp_stats_resp_cb(struct infra_cp_stats_event *infra_event,
 }
 
 #define WLAN_WAIT_TIME_CP_STATS 4000
-#define ENHANCED_REQUEST_ID 127
 
 static inline
 struct infra_cp_stats_event *
@@ -1408,6 +1419,11 @@ wlan_send_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 	*errno = osif_request_wait_for_response(request);
 	if (*errno) {
 		osif_err("wait failed or timed out ret: %d", *errno);
+		goto get_cp_stats_fail;
+	}
+
+	if (QDF_IS_STATUS_ERROR(priv->status)) {
+		osif_err("Stat is missing");
 		goto get_cp_stats_fail;
 	}
 

@@ -1677,8 +1677,10 @@ QDF_STATUS tgt_mc_cp_stats_process_infra_stats_event(
 	if (!infra_event)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	tgt_mc_infra_cp_stats_extract_twt_stats(psoc, infra_event);
-	tgt_mc_infra_cp_stats_extract_enhanced_stats(psoc, infra_event);
+	if (infra_event->request_id == ENHANCED_REQUEST_ID)
+		tgt_mc_infra_cp_stats_extract_enhanced_stats(psoc, infra_event);
+	else
+		tgt_mc_infra_cp_stats_extract_twt_stats(psoc, infra_event);
 
 	return QDF_STATUS_SUCCESS;
 }
