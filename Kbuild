@@ -1626,10 +1626,7 @@ endif
 
 ifeq ($(CONFIG_QCACLD_WLAN_LFR2), y)
 # Add LFR2/host roam specific connection manager files here
-MLME_OBJS +=    $(CM_TGT_IF_DIR)/src/target_if_cm_roam_event.o \
-		$(CM_DIR)/core/src/wlan_cm_roam_fw_sync.o \
-		$(CM_DIR)/core/src/wlan_cm_roam_offload_event.o \
-		$(CM_DIR)/core/src/wlan_cm_host_roam_preauth.o \
+MLME_OBJS +=    $(CM_DIR)/core/src/wlan_cm_host_roam_preauth.o \
 		$(CM_DIR)/core/src/wlan_cm_host_util.o
 endif
 
@@ -3859,7 +3856,6 @@ ifeq ($(CONFIG_CM_UTF_ENABLE), y)
 ccflags-y += -DFEATURE_CM_UTF_ENABLE
 endif
 
-ccflags-$(CONFIG_QCACLD_WLAN_LFR2) += -DWLAN_FEATURE_ROAM_OFFLOAD
 ccflags-$(CONFIG_QCACLD_WLAN_LFR3) += -DWLAN_FEATURE_ROAM_OFFLOAD
 ccflags-$(CONFIG_QCACLD_WLAN_LFR3) += -DWLAN_FEATURE_LFR3
 ccflags-$(CONFIG_WLAN_FEATURE_ROAM_INFO_STATS) += -DWLAN_FEATURE_ROAM_INFO_STATS
@@ -4207,6 +4203,9 @@ ccflags-$(CONFIG_WLAN_FEATURE_VDEV_DCS) += -DWLAN_FEATURE_VDEV_DCS
 
 #Enable 4address scheme
 ccflags-$(CONFIG_FEATURE_WLAN_STA_4ADDR_SCHEME) += -DFEATURE_WLAN_STA_4ADDR_SCHEME
+
+#Enable check RSN/BIP IE for SAP
+ccflags-$(CONFIG_WLAN_FEATURE_CHECK_RSN_BIP) += -DWLAN_FEATURE_CHECK_RSN_BIP
 
 #Optimize GC connection speed by skipping JOIN
 ccflags-$(CONFIG_FEATURE_WLAN_GC_SKIP_JOIN) += -DFEATURE_WLAN_GC_SKIP_JOIN
