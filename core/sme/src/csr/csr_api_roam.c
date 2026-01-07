@@ -5707,7 +5707,7 @@ cm_update_rsn_ocv_cap(int32_t *rsn_cap,
 			     offsetof(struct wlan_bcn_frame, ie));
 
 	status = wlan_get_crypto_params_from_rsn_ie(&crypto_params, ie_ptr,
-						    ie_len);
+						    ie_len, NULL);
 	if (QDF_IS_STATUS_ERROR(status))
 		return;
 

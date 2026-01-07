@@ -1209,6 +1209,7 @@ struct wlan_mlme_rates {
  * @channel_bonding_mode_24ghz: configures Channel Bonding in 24 GHz
  * @channel_bonding_mode_5ghz:  configures Channel Bonding in 5 GHz
  * @update_cw_allowed: to check update chan width allowed or not
+ * @cb_mode_override: to check channel bonding mode allowed override or not
  */
 struct wlan_mlme_feature_flag {
 	bool accept_short_slot_assoc;
@@ -1225,6 +1226,7 @@ struct wlan_mlme_feature_flag {
 	uint32_t channel_bonding_mode_24ghz;
 	uint32_t channel_bonding_mode_5ghz;
 	bool update_cw_allowed;
+	bool cb_mode_override;
 };
 
 /**

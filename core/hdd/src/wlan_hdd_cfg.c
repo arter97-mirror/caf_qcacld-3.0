@@ -2134,6 +2134,8 @@ int hdd_update_phymode(struct hdd_adapter *adapter, eCsrPhyMode phymode,
 	enum hdd_dot11_mode hdd_dot11mode;
 	int ret = 0;
 	QDF_STATUS status;
+	uint32_t cbm_24ghz, cbm_5ghz;
+	bool cbm_override;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret < 0)
@@ -2163,7 +2165,14 @@ int hdd_update_phymode(struct hdd_adapter *adapter, eCsrPhyMode phymode,
 	csr_config = &sme_config->csr_config;
 	csr_config->phyMode = phymode;
 
-	status = hdd_set_ht2040_mode(adapter, csr_config, bonding_mode);
+	ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc,
+					    &cbm_24ghz);
+	ucfg_mlme_get_channel_bonding_5ghz(hdd_ctx->psoc,
+					   &cbm_5ghz);
+	ucfg_mlme_get_channel_bonding_override(hdd_ctx->psoc,
+					       &cbm_override);
+	status = hdd_set_ht2040_mode(adapter, csr_config,
+				     cbm_override ? bonding_mode : cbm_24ghz);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to set ht2040 mode");
 		ret = -EIO;
@@ -2186,10 +2195,10 @@ int hdd_update_phymode(struct hdd_adapter *adapter, eCsrPhyMode phymode,
 		}
 	}
 	if (supported_band & BIT(REG_BAND_2G))
-		csr_config->channelBondingMode24GHz = bonding_mode;
+		csr_config->channelBondingMode24GHz = cbm_override ? bonding_mode : cbm_24ghz;
 
 	if (supported_band & BIT(REG_BAND_5G))
-		csr_config->channelBondingMode5GHz = bonding_mode;
+		csr_config->channelBondingMode5GHz = cbm_override ? bonding_mode : cbm_5ghz;
 
 	sme_update_config(hdd_ctx->mac_handle, sme_config);
 

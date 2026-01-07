@@ -924,6 +924,42 @@ static const struct ieee80211_iface_limit
 };
 #endif /* WLAN_FEATURE_NAN */
 
+/* STA + STA + SAP + SAP combination */
+static const struct ieee80211_iface_limit
+	wlan_hdd_sta_sta_sap_sap_iface_limit[] = {
+	{
+		/* STA + STA */
+		.max = 2,
+		.types = BIT(NL80211_IFTYPE_STATION)
+	},
+	{
+		/* SAP + SAP */
+		.max = 2,
+		.types = BIT(NL80211_IFTYPE_AP),
+	},
+};
+
+/* STA + SAP + SAP + P2P combination */
+static const struct ieee80211_iface_limit
+	wlan_hdd_sta_sap_sap_p2p_iface_limit[] = {
+	{
+		/* STA */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_STATION)
+	},
+	{
+		/* SAP + SAP */
+		.max = 2,
+		.types = BIT(NL80211_IFTYPE_AP)
+	},
+	{
+		/* P2P */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_P2P_GO) |
+			 BIT(NL80211_IFTYPE_P2P_CLIENT),
+	},
+};
+
 static struct ieee80211_iface_combination
 	wlan_hdd_iface_combination[] = {
 	/* STA */
@@ -1047,6 +1083,22 @@ static struct ieee80211_iface_combination
 		.beacon_int_infra_match = true,
 	},
 #endif /* WLAN_FEATURE_NAN */
+	/* STA + STA + SAP + SAP */
+	{
+		.limits = wlan_hdd_sta_sta_sap_sap_iface_limit,
+		.num_different_channels = 2,
+		.max_interfaces = 4,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_sta_sap_sap_iface_limit),
+		.beacon_int_infra_match = true,
+	},
+	/* STA + SAP + SAP + P2P */
+	{
+		.limits = wlan_hdd_sta_sap_sap_p2p_iface_limit,
+		.num_different_channels = 2,
+		.max_interfaces = 4,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_sap_sap_p2p_iface_limit),
+		.beacon_int_infra_match = true,
+	},
 };
 
 static struct cfg80211_ops wlan_hdd_cfg80211_ops;
@@ -18888,7 +18940,7 @@ __wlan_hdd_cfg80211_get_radio_combination_matrix(struct wiphy *wiphy,
 					       &comb_num);
 	if (!comb_num) {
 		hdd_err("invalid combination 0");
-		return -EINVAL;
+		return -EOPNOTSUPP;
 	}
 
 	/* band and antenna */
@@ -24444,12 +24496,64 @@ static bool wlan_hdd_is_iface_sap_sap(uint8_t idx)
  */
 static bool wlan_hdd_is_iface_sap_sap_sta(uint8_t idx)
 {
+	if (wlan_hdd_iface_combination[idx].n_limits != 2)
+		return false;
+
 	if (wlan_hdd_iface_combination[idx].limits[0].types ==
 	    BIT(NL80211_IFTYPE_STATION) &&
 	    wlan_hdd_iface_combination[idx].limits[0].max == 1 &&
 	    wlan_hdd_iface_combination[idx].limits[1].types ==
 	    BIT(NL80211_IFTYPE_AP) &&
 	    wlan_hdd_iface_combination[idx].limits[1].max == 2)
+		return true;
+
+	return false;
+}
+
+/**
+ * wlan_hdd_is_iface_sta_sta_sap_sap() - This API checks whether
+ * STA + STA + SAP + SAP present in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if STA + STA + SAP + SAP is present otherwise false
+ */
+static bool wlan_hdd_is_iface_sta_sta_sap_sap(uint8_t idx)
+{
+	if (wlan_hdd_iface_combination[idx].n_limits != 2)
+		return false;
+
+	if (wlan_hdd_iface_combination[idx].limits[0].types ==
+	    BIT(NL80211_IFTYPE_STATION) &&
+	    wlan_hdd_iface_combination[idx].limits[0].max == 2 &&
+	    wlan_hdd_iface_combination[idx].limits[1].types ==
+	    BIT(NL80211_IFTYPE_AP) &&
+	    wlan_hdd_iface_combination[idx].limits[1].max == 2)
+		return true;
+
+	return false;
+}
+
+/**
+ * wlan_hdd_is_iface_sta_sap_sap_p2p() - This API checks whether
+ * STA + SAP + SAP + P2P present in the interface combination
+ * @idx: index for interface combination array
+ *
+ * Return: true if STA + SAP + SAP + P2P is present otherwise false
+ */
+static bool wlan_hdd_is_iface_sta_sap_sap_p2p(uint8_t idx)
+{
+	if (wlan_hdd_iface_combination[idx].n_limits != 3)
+		return false;
+
+	if (wlan_hdd_iface_combination[idx].limits[0].types ==
+	    BIT(NL80211_IFTYPE_STATION) &&
+	    wlan_hdd_iface_combination[idx].limits[0].max == 1 &&
+	    wlan_hdd_iface_combination[idx].limits[1].types ==
+	    BIT(NL80211_IFTYPE_AP) &&
+	    wlan_hdd_iface_combination[idx].limits[1].max == 2 &&
+	    (wlan_hdd_iface_combination[idx].limits[2].max == 1 &&
+	     wlan_hdd_iface_combination[idx].limits[2].types ==
+		(BIT(NL80211_IFTYPE_P2P_GO) | BIT(NL80211_IFTYPE_P2P_CLIENT))))
 		return true;
 
 	return false;
@@ -24792,6 +24896,7 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	bool no_p2p_concurrency, no_sap_nan_concurrency, no_sta_sap_concurrency;
 	bool no_sta_nan_concurrency, sta_sap_p2p_concurrency, sta_p2p_ndp_conc;
 	bool sap_sta_nan_concurrency, sap_sap_sta_concurrency;
+	bool sta_sta_sap_sap_concurrency, sta_sap_sap_p2p_concurrency;
 	uint8_t num;
 	QDF_STATUS status;
 
@@ -24815,7 +24920,10 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	sap_sta_nan_concurrency = cfg_get(psoc,
 					  CFG_SAP_STA_NDP_CONCURRENCY);
 	sta_p2p_ndp_conc = ucfg_nan_is_sta_p2p_ndp_supported(psoc);
-
+	sta_sta_sap_sap_concurrency = cfg_get(psoc,
+					      CFG_STA_STA_SAP_SAP_CONCURRENCY);
+	sta_sap_sap_p2p_concurrency = cfg_get(psoc,
+					      CFG_STA_SAP_SAP_P2P_CONCURRENCY);
 	num = ARRAY_SIZE(wlan_hdd_iface_combination);
 
 	for (i = 0; i < num; i++) {
@@ -24835,6 +24943,17 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		if (!sap_sap_sta_concurrency &&
 		    wlan_hdd_is_iface_sap_sap_sta(i))
 			continue;
+
+		/* Check STA + STA + SAP + SAP concurrency is allowed or not */
+		if (!sta_sta_sap_sap_concurrency &&
+		    wlan_hdd_is_iface_sta_sta_sap_sap(i))
+			continue;
+
+		/* Check STA + SAP + SAP + P2P concurrency is allowed or not */
+		if (!sta_sap_sap_p2p_concurrency &&
+		    wlan_hdd_is_iface_sta_sap_sap_p2p(i))
+			continue;
+
 		/*
 		 * remove P2P concurrencies with following exception:
 		 * a) STA-P2P
