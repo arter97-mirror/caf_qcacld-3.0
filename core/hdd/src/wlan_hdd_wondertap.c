@@ -397,6 +397,13 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 	hdd_change_peer_state(adapter->deflink, adapter->mac_addr.bytes,
 			      OL_TXRX_PEER_STATE_AUTH);
 
+	/*
+	 * Stop and restart of bus bw periodic work would happen
+	 * as part of close adapter so no need to explicitly invoke
+	 * ucfg_dp_bus_bw_compute_timer_try_stop API in cleanup.
+	 */
+	ucfg_dp_bus_bw_compute_timer_start(hdd_ctx->psoc);
+
 	hdd_debug("Enabling queues");
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,

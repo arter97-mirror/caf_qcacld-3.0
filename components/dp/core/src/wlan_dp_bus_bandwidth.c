@@ -241,6 +241,8 @@ bbm_get_bus_bw_level_vote(struct wlan_dp_intf *dp_intf,
 			return BUS_BW_LEVEL_5;
 		else
 			return (*lkp_table)[QCA_WLAN_802_11_MODE_11AX][tput_level];
+	case QDF_PASSTHRU_MODE:
+		return (*lkp_table)[QCA_WLAN_802_11_MODE_11BE][tput_level];
 	default:
 		break;
 	}
