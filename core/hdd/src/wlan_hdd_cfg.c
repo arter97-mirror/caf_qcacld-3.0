@@ -1869,8 +1869,6 @@ int hdd_phymode_to_vendor_mode(eCsrPhyMode csr_phy_mode,
 {
 	switch (csr_phy_mode) {
 	case eCSR_DOT11_MODE_AUTO:
-	case eCSR_DOT11_MODE_11be:
-	case eCSR_DOT11_MODE_11be_ONLY:
 		*vendor_phy_mode = QCA_WLAN_VENDOR_PHY_MODE_AUTO;
 		break;
 	case eCSR_DOT11_MODE_11a:
@@ -1895,6 +1893,10 @@ int hdd_phymode_to_vendor_mode(eCsrPhyMode csr_phy_mode,
 	case eCSR_DOT11_MODE_11ax:
 	case eCSR_DOT11_MODE_11ax_ONLY:
 		*vendor_phy_mode = QCA_WLAN_VENDOR_PHY_MODE_11AX_HE160;
+		break;
+	case eCSR_DOT11_MODE_11be:
+	case eCSR_DOT11_MODE_11be_ONLY:
+		*vendor_phy_mode = QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT320;
 		break;
 	case eCSR_DOT11_MODE_abg:
 	default:
@@ -1952,6 +1954,16 @@ int hdd_vendor_mode_to_phymode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE160:
 		*csr_phy_mode = eCSR_DOT11_MODE_11ax;
 		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT20:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT40:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT40PLUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT40MINUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT80:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT80P80:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT160:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT320:
+		*csr_phy_mode = eCSR_DOT11_MODE_11be;
+		break;
 	default:
 		hdd_err("Not supported mode %d", vendor_phy_mode);
 		return -EINVAL;
@@ -1988,6 +2000,19 @@ int hdd_vendor_mode_to_band(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE80P80:
 	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE160:
 	case QCA_WLAN_VENDOR_PHY_MODE_11AGN:
+		if (is_6ghz_supported)
+			*supported_band = REG_BAND_MASK_ALL;
+		else
+			*supported_band = BIT(REG_BAND_2G) | BIT(REG_BAND_5G);
+		break;
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT20:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT40:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT40PLUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT40MINUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT80:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT80P80:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT160:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT320:
 		if (is_6ghz_supported)
 			*supported_band = REG_BAND_MASK_ALL;
 		else
@@ -2042,6 +2067,13 @@ hdd_vendor_mode_to_bonding_mode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE80:
 	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE80P80:
 	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE160:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT40:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT40PLUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT40MINUS:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT80:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT80P80:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT160:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT320:
 	case QCA_WLAN_VENDOR_PHY_MODE_2G_AUTO:
 	case QCA_WLAN_VENDOR_PHY_MODE_5G_AUTO:
 	case QCA_WLAN_VENDOR_PHY_MODE_11AGN:
@@ -2054,6 +2086,7 @@ hdd_vendor_mode_to_bonding_mode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 	case QCA_WLAN_VENDOR_PHY_MODE_11NG_HT20:
 	case QCA_WLAN_VENDOR_PHY_MODE_11AC_VHT20:
 	case QCA_WLAN_VENDOR_PHY_MODE_11AX_HE20:
+	case QCA_WLAN_VENDOR_PHY_MODE_11BE_EHT20:
 		*bonding_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
 		break;
 	default:
@@ -2064,12 +2097,29 @@ hdd_vendor_mode_to_bonding_mode(enum qca_wlan_vendor_phy_mode vendor_phy_mode,
 	return 0;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static int hdd_phymode_11be_to_dot11mode(eCsrPhyMode phymode,
+					 enum hdd_dot11_mode *dot11_mode)
+{
+	if (phymode != eCSR_DOT11_MODE_11be)
+		return -EINVAL;
+
+	*dot11_mode = eHDD_DOT11_MODE_11be;
+	return 0;
+}
+#else
+static int hdd_phymode_11be_to_dot11mode(eCsrPhyMode phymode,
+					 enum hdd_dot11_mode *dot11_mode)
+{
+	return -EINVAL;
+}
+#endif
+
 int hdd_phymode_to_dot11_mode(eCsrPhyMode phymode,
 			      enum hdd_dot11_mode *dot11_mode)
 {
 	switch (phymode) {
 	case eCSR_DOT11_MODE_AUTO:
-	case eCSR_DOT11_MODE_11be:
 		*dot11_mode = eHDD_DOT11_MODE_AUTO;
 		break;
 	case eCSR_DOT11_MODE_11a:
@@ -2091,6 +2141,9 @@ int hdd_phymode_to_dot11_mode(eCsrPhyMode phymode,
 		*dot11_mode = eHDD_DOT11_MODE_11ax;
 		break;
 	default:
+		if (!hdd_phymode_11be_to_dot11mode(phymode, dot11_mode))
+			break;
+
 		hdd_err("Not supported mode %d", phymode);
 		return -EINVAL;
 	}
