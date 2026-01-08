@@ -624,6 +624,7 @@ void wlan_hdd_wondertap_deinit(void *handle,
 	struct osif_vdev_sync *vdev_sync;
 	int errno;
 
+	hdd_enter();
 	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic) {
 		hdd_debug("Incorrect handle received - rejecting deinit");
 		return;
@@ -687,6 +688,7 @@ void wlan_hdd_wondertap_deinit(void *handle,
 destroy_sync:
 	osif_vdev_sync_trans_stop(vdev_sync);
 	osif_vdev_sync_destroy(vdev_sync);
+	hdd_exit();
 
 	return;
 }
@@ -991,7 +993,10 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 	struct osif_vdev_sync *vdev_sync;
 	QDF_STATUS status;
 
+	hdd_enter();
 	pld_set_vendor_wonder_priv_data(dev, NULL);
+	hdd_debug("g_wt_ctx_valid %d force %d",
+		  g_wt_ctx ? 1 : 0, force_cleanup);
 
 	hdd_hold_rtnl_lock();
 
@@ -1036,6 +1041,7 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 	}
 
 	hdd_release_rtnl_lock();
+	hdd_exit();
 }
 
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
