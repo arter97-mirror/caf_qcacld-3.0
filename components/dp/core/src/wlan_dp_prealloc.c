@@ -527,6 +527,7 @@ static struct dp_consistent_prealloc_unaligned
 #define DP_TX_PAGE_POOL_SIZE 10240
 #define DP_TX_PAGE_POOL_BUFSIZE 2048
 
+#ifdef DP_FEATURE_RX_BUFFER_RECYCLE
 static struct dp_page_pool_t g_dp_rx_pp_allocs[] = {
 	/* Keep RX AUX pool always at the top */
 	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PP_AUX_POOL_SIZE, 0, 0, false},
@@ -536,11 +537,51 @@ static struct dp_page_pool_t g_dp_rx_pp_allocs[] = {
 	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false},
 };
 
+static struct dp_page_pool_t *dp_prealloc_get_rx_base_pp(int *arr_size)
+{
+	*arr_size = QDF_ARRAY_SIZE(g_dp_rx_pp_allocs);
+
+	return g_dp_rx_pp_allocs;
+}
+#else
+static struct dp_page_pool_t *dp_prealloc_get_rx_base_pp(int *arr_size)
+{
+	return NULL;
+}
+#endif
+
+#ifdef DP_FEATURE_TX_PAGE_POOL
 static struct dp_page_pool_t g_dp_tx_pp_allocs[] = {
 	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
 	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
 	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
 };
+
+static struct dp_page_pool_t *dp_prealloc_get_tx_base_pp(int *arr_size)
+{
+	*arr_size = QDF_ARRAY_SIZE(g_dp_tx_pp_allocs);
+
+	return g_dp_tx_pp_allocs;
+}
+#else
+static struct dp_page_pool_t *dp_prealloc_get_tx_base_pp(int *arr_size)
+{
+	return NULL;
+}
+#endif
+
+static void
+dp_prealloc_get_base_pp(enum qdf_dp_tx_pp_type type,
+			struct dp_page_pool_t **base_pp, int *arr_size)
+{
+	if (type == QDF_DP_PAGE_POOL_RX) {
+		*base_pp = dp_prealloc_get_rx_base_pp(arr_size);
+	} else if (type == QDF_DP_PAGE_POOL_TX) {
+		*base_pp = dp_prealloc_get_tx_base_pp(arr_size);
+	} else {
+		*base_pp = NULL;
+	}
+}
 
 struct dp_page_pool_t*
 dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size,
@@ -548,20 +589,14 @@ dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size,
 {
 	struct dp_page_pool_t *base_pp;
 	struct dp_page_pool_t *pp_t;
-	int arr_size;
+	int arr_size = 0;
 	int i;
 	int pools_allocated = 0;
 	int pools_in_use = 0;
 
-	if (type == QDF_DP_PAGE_POOL_RX) {
-		base_pp = g_dp_rx_pp_allocs;
-		arr_size = QDF_ARRAY_SIZE(g_dp_rx_pp_allocs);
-	} else if (type == QDF_DP_PAGE_POOL_TX) {
-		base_pp = g_dp_tx_pp_allocs;
-		arr_size = QDF_ARRAY_SIZE(g_dp_tx_pp_allocs);
-	} else {
+	dp_prealloc_get_base_pp(type, &base_pp, &arr_size);
+	if (!base_pp)
 		return NULL;
-	}
 
 	for (i = 0; i < arr_size; i++) {
 		pp_t = &base_pp[i];
@@ -596,15 +631,10 @@ void dp_prealloc_put_page_pool(qdf_page_pool_t pp, enum qdf_dp_tx_pp_type type)
 	int arr_size;
 	int i;
 
-	if (type == QDF_DP_PAGE_POOL_RX) {
-		base_pp = g_dp_rx_pp_allocs;
-		arr_size = QDF_ARRAY_SIZE(g_dp_rx_pp_allocs);
-	} else if (type == QDF_DP_PAGE_POOL_TX) {
-		base_pp = g_dp_tx_pp_allocs;
-		arr_size = QDF_ARRAY_SIZE(g_dp_tx_pp_allocs);
-	} else {
+	dp_prealloc_get_base_pp(type, &base_pp, &arr_size);
+
+	if (!base_pp)
 		return;
-	}
 
 	for (i = 0; i < arr_size; i++) {
 		pp_t = &base_pp[i];
@@ -708,6 +738,7 @@ alloc_page_pool:
 	return pp;
 }
 
+#ifdef DP_FEATURE_RX_BUFFER_RECYCLE
 #ifdef WLAN_DP_DYNAMIC_RESOURCE_MGMT
 static bool
 dp_prealloc_is_dynamic_rsc_mgmt_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
@@ -721,31 +752,23 @@ dp_prealloc_is_dynamic_rsc_mgmt_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	return false;
 }
 #endif
-
-void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
+static void dp_prealloc_rx_pp_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
+				   qdf_device_t qdf_ctx)
 {
 	struct dp_page_pool_t *pp_t;
-	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	size_t rx_buf_size = 0;
 	uint32_t rx_pool_size;
 	bool rx_pp_en = false;
-	bool tx_pp_en = false;
 	bool dyn_rx_buf_alloc = false;
 	int base_pool_size;
 	int max_rx_pp_alloc;
 	int align;
 	int i;
-	uint32_t pp_size = 0;
-	uint32_t pp_buf_count;
-	bool dynamic_pp_enabled;
-
-	if (!qdf_ctx)
-		return;
 
 	wlan_cfg_get_rx_pp_cfg(ctrl_psoc, &rx_pp_en, &rx_buf_size,
 			       &rx_pool_size);
 	if (!rx_pp_en)
-		goto tx_pp_alloc;
+		return;
 
 	dyn_rx_buf_alloc = dp_prealloc_is_dynamic_rsc_mgmt_enabled(ctrl_psoc);
 	dp_rx_page_pool_get_buf_params(&rx_buf_size, &align);
@@ -770,7 +793,7 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	if (max_rx_pp_alloc > QDF_ARRAY_SIZE(g_dp_rx_pp_allocs)) {
 		dp_warn("No space in the prealloc RX pool, actual size %lu required size %d",
 			QDF_ARRAY_SIZE(g_dp_rx_pp_allocs), max_rx_pp_alloc);
-		goto tx_pp_alloc;
+		return;
 	}
 
 	for (i = 0; i < max_rx_pp_alloc; i++) {
@@ -801,9 +824,50 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 			pp_t->pp_size = 0;
 		}
 	}
+}
 
-tx_pp_alloc:
+static void dp_prealloc_rx_pp_deinit(void)
+{
+	struct dp_page_pool_t *pp_t;
+	int i;
+
+	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_rx_pp_allocs); i++) {
+		pp_t = &g_dp_rx_pp_allocs[i];
+		if (pp_t->in_use)
+			dp_warn("RX page pool %d in use while free", i);
+
+		if (pp_t->pp) {
+			qdf_page_pool_destroy(pp_t->pp);
+			pp_t->in_use = false;
+			pp_t->pp = NULL;
+			dp_info("RX page pool %d pre-alloc pool free succ", i);
+		}
+	}
+}
+#else
+static void dp_prealloc_rx_pp_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
+				   qdf_device_t qdf_ctx)
+{
+}
+
+static void dp_prealloc_rx_pp_deinit(void)
+{
+}
+#endif /* DP_FEATURE_RX_BUFFER_RECYCLE */
+
+#ifdef DP_FEATURE_TX_PAGE_POOL
+static void dp_prealloc_tx_pp_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
+				   qdf_device_t qdf_ctx)
+{
+	struct dp_page_pool_t *pp_t;
+	bool tx_pp_en = false;
+	int i;
+	uint32_t pp_size = 0;
+	uint32_t pp_buf_count;
+	bool dynamic_pp_enabled;
+
 	wlan_cfg_get_tx_pp_cfg(ctrl_psoc, &tx_pp_en);
+
 	if (!tx_pp_en)
 		return;
 
@@ -811,7 +875,7 @@ tx_pp_alloc:
 	if (dynamic_pp_enabled) {
 		/* Get prealloc buffer count from configuration */
 		pp_buf_count =
-			wlan_cfg_get_tx_dynamic_pp_prealloc_buf(ctrl_psoc);
+		wlan_cfg_get_tx_dynamic_pp_prealloc_buf(ctrl_psoc);
 		if (pp_buf_count) {
 			/* If ini is set, use ini value rounded to nearest
 			 * multiple of 16 for prealloc pool
@@ -860,24 +924,10 @@ tx_pp_alloc:
 	}
 }
 
-static void dp_prealloc_page_pool_deinit(void)
+static void dp_prealloc_tx_pp_deinit(void)
 {
 	struct dp_page_pool_t *pp_t;
 	int i;
-
-	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_rx_pp_allocs); i++) {
-		pp_t = &g_dp_rx_pp_allocs[i];
-
-		if (pp_t->in_use)
-			dp_warn("RX page pool %d in use while free", i);
-
-		if (pp_t->pp) {
-			qdf_page_pool_destroy(pp_t->pp);
-			pp_t->in_use = false;
-			pp_t->pp = NULL;
-			dp_info("RX page pool %d pre-alloc pool free succ", i);
-		}
-	}
 
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_tx_pp_allocs); i++) {
 		pp_t = &g_dp_tx_pp_allocs[i];
@@ -892,6 +942,35 @@ static void dp_prealloc_page_pool_deinit(void)
 			dp_info("TX page pool %d pre-alloc pool free succ", i);
 		}
 	}
+}
+#else
+static void dp_prealloc_tx_pp_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
+				   qdf_device_t qdf_ctx)
+{
+}
+
+static void dp_prealloc_tx_pp_deinit(void)
+{
+}
+#endif /* DP_FEATURE_TX_PAGE_POOL */
+
+void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
+{
+	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+
+	if (!qdf_ctx)
+		return;
+
+	dp_prealloc_rx_pp_init(ctrl_psoc, qdf_ctx);
+
+	dp_prealloc_tx_pp_init(ctrl_psoc, qdf_ctx);
+}
+
+static void dp_prealloc_page_pool_deinit(void)
+{
+	dp_prealloc_rx_pp_deinit();
+
+	dp_prealloc_tx_pp_deinit();
 }
 #else
 static inline void
