@@ -163,7 +163,7 @@ struct p2p_noa_event {
 };
 
 /**
- * struct p2p_mac_filter_rsp - p2p set mac filter respone
+ * struct p2p_mac_filter_rsp - p2p set mac filter response
  * @p2p_soc_obj: p2p soc private object
  * @vdev_id: vdev id
  * @status: successfully(1) or not (0)
@@ -701,7 +701,7 @@ p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
 
 /**
  * p2p_parse_assoc_ie_for_device_info() - This function finds P2P interface
- * address from assocaition IE
+ * address from association IE
  * @assoc_ie: Association request IE
  * @assoc_ie_len: Association IE length
  *

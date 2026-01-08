@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -22,14 +23,14 @@
 /**
  * DOC: wlan_hdd_bootup_marker.h
  *
- * WLAN Host Device Driver Bootup Marker header file
+ * WLAN Host Device Driver Boot-up Marker header file
  */
 
 #include "wlan_hdd_main.h"
 
 #ifdef WLAN_BOOTUP_MARKER
 /**
- * hdd_place_marker() - record bootup marker for some events
+ * hdd_place_marker() - record boot-up marker for some events
  * @adapter: hdd adapter pointer
  * @format: The strings of the events
  * @mac: mac address of peer device

@@ -548,7 +548,7 @@
 
 /*
  * <ini>
- * gEnableApRandomBssid - Create ramdom BSSID
+ * gEnableApRandomBssid - Create random BSSID
  * @Min: 0
  * @Max: 1
  * @Default: 0
@@ -567,7 +567,7 @@
 #define CFG_AP_ENABLE_RANDOM_BSSID CFG_INI_BOOL( \
 	"gEnableApRandomBssid", \
 	0, \
-	"Create ramdom BSSID")
+	"Create random BSSID")
 
 /*
  * <ini>

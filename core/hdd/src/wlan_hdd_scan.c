@@ -398,7 +398,7 @@ static int wlan_hdd_update_scan_ies(struct hdd_adapter *adapter,
 				add_ie = true;
 			break;
 		case WLAN_ELEMID_VENDOR:
-			/* Donot add MBO IE if its already present */
+			/* Do not add MBO IE if its already present */
 			if ((!mbo_ie &&
 			     0 == qdf_mem_cmp(&temp_ie[0], MBO_OUI_TYPE,
 					      MBO_OUI_TYPE_SIZE)) ||

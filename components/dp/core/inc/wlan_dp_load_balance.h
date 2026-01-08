@@ -80,7 +80,7 @@ struct cpu_irq_load {
  * @audio_taken_cpumask: cpu mask which is being used by audio
  * @cpu_mask_change_time: time in ns at which cpu mask changed last time
  * subset of preferred_cpu_mask
- * @load_balance_lock: lock to protect load balace from multiple contexts
+ * @load_balance_lock: lock to protect load balance from multiple contexts
  * @last_stats_avg_comp_time: time since previous stats average computed in ns
  * @last_load_balanced_time: time since when the previous load balance is done
  *	in nanoseconds

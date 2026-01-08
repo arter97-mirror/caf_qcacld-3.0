@@ -228,7 +228,7 @@ QDF_STATUS
 wlan_twt_cfg_get_rtwt_requestor(struct wlan_objmgr_psoc *psoc, bool *val);
 
 /**
- * wlan_twt_cfg_get_twt_disabled_on_scan() - get wt_disabled_on_scan vlue
+ * wlan_twt_cfg_get_twt_disabled_on_scan() - get twt_disabled_on_scan value
  * @psoc: Pointer to global psoc
  * @val: pointer to output variable
  *

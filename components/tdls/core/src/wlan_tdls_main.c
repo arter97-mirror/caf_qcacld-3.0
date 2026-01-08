@@ -489,7 +489,7 @@ static void tdls_get_all_peers_from_list(
  * @vdev: vdev object
  *
  * This function is called to reset all tdls peers and
- * notify upper layers of teardown inidcation
+ * notify upper layers of teardown indication
  *
  * Return: QDF_STATUS
  */
@@ -560,7 +560,7 @@ static QDF_STATUS tdls_process_reset_all_peers(struct wlan_objmgr_vdev *vdev)
  * @delete_all_peers_ind: Delete all peers indication
  *
  * This function is called to reset all tdls peers and
- * notify upper layers of teardown inidcation
+ * notify upper layers of teardown indication
  *
  * Return: QDF_STATUS
  */

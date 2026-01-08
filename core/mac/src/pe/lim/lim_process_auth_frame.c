@@ -247,7 +247,7 @@ static void lim_process_auth_shared_system_algo(struct mac_context *mac_ctx,
 			     challenge_txt_arr,
 			     sizeof(challenge_txt_arr));
 		/*
-		 * Sending Authenticaton frame with challenge.
+		 * Sending Authentication frame with challenge.
 		 */
 		auth_frame->authAlgoNumber = rx_auth_frm_body->authAlgoNumber;
 		auth_frame->authTransactionSeqNumber =
@@ -302,7 +302,7 @@ static void lim_process_auth_open_system_algo(struct mac_context *mac_ctx,
 
 	lim_add_pre_auth_node(mac_ctx, auth_node);
 	/*
-	 * Send Authenticaton frame with Success
+	 * Send Authentication frame with Success
 	 * status code.
 	 */
 	auth_frame->authAlgoNumber = rx_auth_frm_body->authAlgoNumber;
@@ -366,7 +366,7 @@ lim_process_fils_auth_req_frame(struct mac_context *mac_ctx,
 		lim_delete_pre_auth_node(mac_ctx, mac_hdr->sa);
 
 		/*
-		 * Send Authenticaton frame with Failure status code
+		 * Send Authentication frame with Failure status code
 		 */
 		auth_frame->authAlgoNumber = rx_auth_frm_body->authAlgoNumber;
 		auth_frame->authTransactionSeqNumber =
@@ -378,7 +378,7 @@ lim_process_fils_auth_req_frame(struct mac_context *mac_ctx,
 	}
 
 	/*
-	 * Send Authenticaton frame with Success status code.
+	 * Send Authentication frame with Success status code.
 	 */
 	auth_frame->authAlgoNumber = rx_auth_frm_body->authAlgoNumber;
 	auth_frame->authTransactionSeqNumber =
@@ -1560,7 +1560,7 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 			/*
 			 * Received Auth Frame3 after Auth Response timeout.
 			 * Reject by sending Auth Frame4 with
-			 * Auth respone timeout Status Code.
+			 * Auth response timeout Status Code.
 			 */
 			auth_frame->authAlgoNumber = eSIR_SHARED_KEY;
 			auth_frame->authTransactionSeqNumber =
@@ -1767,7 +1767,7 @@ static void lim_process_auth_frame_type4(struct mac_context *mac_ctx,
  *    table 14 says that status code field is 'reserved' for frame3 !
  *    In the current implementation, Auth frame3 is returned with status
  *    code 15 overriding section 7.2.3.10.
- * 4. If number pre-authentications reach configrable max limit,
+ * 4. If number pre-authentications reach configurable max limit,
  *    Authentication frame with 'unspecified failure' status code is
  *    returned to requesting entity.
  *
@@ -2031,7 +2031,7 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			/*
 			 * Should not have received Authentication frame
 			 * with WEP bit set in FC in other states.
-			 * Reject by sending Authenticaton frame with
+			 * Reject by sending Authentication frame with
 			 * out of sequence Auth frame status code.
 			 */
 			auth_frame->authAlgoNumber = eSIR_SHARED_KEY;

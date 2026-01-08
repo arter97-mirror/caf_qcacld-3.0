@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,7 +34,7 @@
 
 /**
  * enum pmo_rcv_pkt_fltr_type: Receive Filter Parameters
- * @PMO_RCV_FILTER_TYPE_INVALID: invalied filter type
+ * @PMO_RCV_FILTER_TYPE_INVALID: invalid filter type
  * @PMO_RCV_FILTER_TYPE_FILTER_PKT: packet filter
  * @PMO_RCV_FILTER_TYPE_BUFFER_PKT: buffer packet
  * @PMO_RCV_FILTER_TYPE_MAX_ENUM_SIZE: max filter
@@ -48,7 +48,7 @@ enum pmo_rcv_pkt_fltr_type {
 
 /**
  * enum pmo_rcv_pkt_fltr_flag_type: Receive Filter flags
- * @PMO_FILTER_CMP_TYPE_INVALID: invalied flag
+ * @PMO_FILTER_CMP_TYPE_INVALID: invalid flag
  * @PMO_FILTER_CMP_TYPE_EQUAL: equal
  * @PMO_FILTER_CMP_TYPE_MASK_EQUAL: mask
  * @PMO_FILTER_CMP_TYPE_NOT_EQUAL: not equal
@@ -66,7 +66,7 @@ enum pmo_rcv_pkt_fltr_flag_type {
 
 /**
  * enum pmo_rcv_pkt_fltr_protocol_params: Receive Filter protocol parameters
- * @PMO_FILTER_HDR_TYPE_INVALID: invalied type
+ * @PMO_FILTER_HDR_TYPE_INVALID: invalid type
  * @PMO_FILTER_HDR_TYPE_MAC: mac protocol
  * @PMO_FILTER_HDR_TYPE_ARP: arp protocol
  * @PMO_FILTER_HDR_TYPE_IPV4: ipv4 protocol

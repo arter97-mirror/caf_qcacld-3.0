@@ -999,7 +999,7 @@ struct wlan_mlme_vht_caps {
  * @vht_txops: TXOP power save
  * @htc_vhtcap: HTC VHT capability
  * @max_ampdu_lenexp: AMPDU length
- * @vht_link_adapt: VHT link adapatation capable
+ * @vht_link_adapt: VHT link adaptation capable
  * @rx_antpattern: RX antenna pattern
  * @tx_antpattern: TX antenna pattern
  * @extended_nss_bw_supp:
@@ -2987,13 +2987,13 @@ struct wlan_mlme_iot {
  * @wep_params:  WEP related config items
  * @wifi_pos_cfg: WIFI POS config
  * @wmm_params: WMM related CFG & INI Items
- * @wps_params: WPS related CFG itmes
- * @btm: BTM related CFG itmes
+ * @wps_params: WPS related CFG items
+ * @btm: BTM related CFG items
  * @wlm_config: WLM related CFG items
  * @rrm_config: RRM related CFG items
  * @mwc: MWC related CFG items
  * @dot11_mode: dot11 mode supported
- * @reg: REG related CFG itmes
+ * @reg: REG related CFG items
  * @trig_score_delta: Roam score delta value for various roam triggers
  * @trig_min_rssi: Expected minimum RSSI value of candidate AP for
  * various roam triggers

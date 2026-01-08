@@ -209,7 +209,7 @@ downgrade_11ac:
 		session->dot11mode = MLME_DOT11_MODE_11AC;
 	else
 		session->dot11mode = MLME_DOT11_MODE_11N;
-	pe_err("vdev %d: Invalid LT80 MCS map 0x%x with NSS %d, falback to dot11mode %d",
+	pe_err("vdev %d: Invalid LT80 MCS map 0x%x with NSS %d, fallback to dot11mode %d",
 	       session->vdev_id, mcs_map, session->cap_tx_nss,
 	       session->dot11mode);
 }

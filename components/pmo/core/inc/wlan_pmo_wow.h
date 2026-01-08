@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -75,7 +75,7 @@
  *  2) Unicast Pattern
  *
  * However note that WoWL will not be enabled by default by PMO. WoWL
- * needs to enabled explcitly by exercising the iwpriv command.
+ * needs to enabled explicitly by exercising the iwpriv command.
  *
  * PMO will expose an API that accepts patterns as Hex string in the
  * following format:
@@ -540,7 +540,7 @@ void pmo_core_update_wow_initial_wake_up(struct pmo_psoc_priv_obj *psoc_ctx,
  * @psoc_ctx: Pointer to objmgr psoc handle
  *
  * Return:  1 if wow initial wake up is received;
- *          0 if wow iniital wake up is not received;
+ *          0 if wow initial wake up is not received;
  */
 static inline
 int pmo_core_get_wow_initial_wake_up(struct pmo_psoc_priv_obj *psoc_ctx)

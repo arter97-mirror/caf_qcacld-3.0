@@ -2907,7 +2907,7 @@ lim_enable11g_protection(struct mac_context *mac_ctx, uint8_t enable,
 
 /** -------------------------------------------------------------
    \fn lim_enable_ht_protection_from11g
-   \brief based on cofig enables\disables protection from 11g.
+   \brief based on config enables\disables protection from 11g.
    \param      uint8_t enable : 1=> enable protection, 0=> disable protection.
    \param      uint8_t overlap: 1=> called from overlap context, 0 => called from assoc context.
    \param      tpUpdateBeaconParams pBeaconParams
@@ -3137,7 +3137,7 @@ lim_enable_ht_protection_from11g(struct mac_context *mac, uint8_t enable,
 
 /** -------------------------------------------------------------
    \fn limEnableHtObssProtection
-   \brief based on cofig enables\disables obss protection.
+   \brief based on config enables\disables obss protection.
    \param      uint8_t enable : 1=> enable protection, 0=> disable protection.
    \param      uint8_t overlap: 1=> called from overlap context, 0 => called from assoc context.
    \param      tpUpdateBeaconParams pBeaconParams
@@ -3365,7 +3365,7 @@ static void lim_handle_ht20coexist_ht20protection(struct mac_context *mac_ctx,
  * @beaconparams: pointer to tpUpdateBeaconParams
  * @session_entry: pointer to struct pe_session *
  *
- * based on cofig enables\disables protection from Ht20
+ * based on config enables\disables protection from Ht20
  *
  * Return: 0 - success
  */
@@ -3406,7 +3406,7 @@ QDF_STATUS lim_enable_ht20_protection(struct mac_context *mac_ctx, uint8_t enabl
 
 /** -------------------------------------------------------------
    \fn lim_enable_ht_non_gf_protection
-   \brief based on cofig enables\disables protection from NonGf.
+   \brief based on config enables\disables protection from NonGf.
    \param      uint8_t enable : 1=> enable protection, 0=> disable protection.
    \param      uint8_t overlap: 1=> called from overlap context, 0 => called from assoc context.
    \param      tpUpdateBeaconParams pBeaconParams
@@ -3479,7 +3479,7 @@ lim_enable_ht_non_gf_protection(struct mac_context *mac, uint8_t enable,
 
 /** -------------------------------------------------------------
    \fn lim_enable_ht_lsig_txop_protection
-   \brief based on cofig enables\disables LsigTxop protection.
+   \brief based on config enables\disables LsigTxop protection.
    \param      uint8_t enable : 1=> enable protection, 0=> disable protection.
    \param      uint8_t overlap: 1=> called from overlap context, 0 => called from assoc context.
    \param      tpUpdateBeaconParams pBeaconParams
@@ -3565,7 +3565,7 @@ lim_enable_ht_lsig_txop_protection(struct mac_context *mac, uint8_t enable,
 /* This check will be done at the caller. */
 /** -------------------------------------------------------------
    \fn lim_enable_ht_rifs_protection
-   \brief based on cofig enables\disables Rifs protection.
+   \brief based on config enables\disables Rifs protection.
    \param      uint8_t enable : 1=> enable protection, 0=> disable protection.
    \param      uint8_t overlap: 1=> called from overlap context, 0 => called from assoc context.
    \param      tpUpdateBeaconParams pBeaconParams
@@ -5053,7 +5053,7 @@ void lim_pmf_sa_query_timer_handler(void *pMacGlobal, uint32_t param)
 /**
  * lim_get_update_bw_allow() whether bw can be sent to target directly
  * @session: pe session
- * @new_bw: bandwdith to set
+ * @new_bw: bandwidth to set
  * @update_allow: return true if bw and puncture can be updated directly
  *
  * Return: QDF_STATUS
@@ -7777,7 +7777,7 @@ void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap)
 		      he_cap->max_ampdu_len_exp_ext, he_cap->amsdu_frag,
 		      he_cap->flex_twt_sched, he_cap->rx_ctrl_frame,
 		      he_cap->bsrp_ampdu_aggr, he_cap->qtp, he_cap->a_bqr);
-	pe_nofl_debug("\tSR Reponder 0x%x ndp_feedback 0x%x ops_supp 0x%x amsdu_in_ampdu 0x%x multi_tid_aggr_tx 0x%x he_sub_ch_sel_tx 0x%x",
+	pe_nofl_debug("\tSR Responder 0x%x ndp_feedback 0x%x ops_supp 0x%x amsdu_in_ampdu 0x%x multi_tid_aggr_tx 0x%x he_sub_ch_sel_tx 0x%x",
 		      he_cap->spatial_reuse_param_rspder,
 		      he_cap->ndp_feedback_supp,
 		      he_cap->ops_supp, he_cap->amsdu_in_ampdu,
@@ -12315,7 +12315,7 @@ set_tpc:
 }
 
 /**
- * lim_recompute_sta_cli_tpc() - Recompute TPC for STA and P2P clinet
+ * lim_recompute_sta_cli_tpc() - Recompute TPC for STA and P2P client
  * @mac: Mac context pointer
  * @session: PE session pointer
  *

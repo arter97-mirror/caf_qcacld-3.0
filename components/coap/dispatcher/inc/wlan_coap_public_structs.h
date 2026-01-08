@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -86,7 +86,7 @@ struct coap_offload_periodic_tx_param {
 /**
  * struct coap_buf_node - CoAP message info entry
  * @node: List entry element
- * @tsf: TSF of the CoAP meesage
+ * @tsf: TSF of the CoAP message
  * @src_ip: source IPv4 address of the CoAP message
  * @len: length of the payload
  * @payload: pointer to buffer holding UDP payload of the CoAP message

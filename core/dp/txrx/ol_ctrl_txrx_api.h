@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2017, 2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -83,7 +83,7 @@ void ol_rx_err_statistics(struct cdp_cfg *cfg_pdev,
  * @param peer_mac_addr - MAC address of the peer that sent the erroneous
  *      rx frame
  * @param tid - which TID within the peer sent the erroneous rx frame
- * @param tsf32  - the timstamp in TSF units of the erroneous rx frame, or
+ * @param tsf32  - the timestamp in TSF units of the erroneous rx frame, or
  *      one of the fragments that when reassembled, constitute the rx frame
  * @param err_type - what kind of error occurred
  * @param rx_frame - the rx frame that had an error
@@ -129,7 +129,7 @@ enum ol_rx_notify_type {
  * @param vdev_id - ID of the virtual device received the special data
  * @param peer_mac_addr - MAC address of the peer that sent the special data
  * @param tid - which TID within the peer sent the special data
- * @param tsf32  - the timstamp in TSF units of the special data
+ * @param tsf32  - the timestamp in TSF units of the special data
  * @param notify_type - what kind of special data was received
  * @param rx_frame - the rx frame containing the special data
  */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -174,7 +174,7 @@ typedef struct sBcnReportFields {
 
 /* struct ssirrnrie - RNR IE
  * @length: rnrie data buffer actual length
- * @rnriedata: ponit to rnrie data buffer
+ * @rnriedata: point to rnrie data buffer
  */
 struct ssirrnrie {
 	uint16_t length;

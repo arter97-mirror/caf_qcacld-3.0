@@ -796,7 +796,7 @@ QDF_STATUS ucfg_fwol_send_get_thermal_stats_cmd(struct wlan_objmgr_psoc *psoc,
  * @pdev: pointer to pdev object
  *
  * Used to configure global firmware params. This is invoked from hdd during
- * bootup.
+ * boot-up.
  *
  * Return: QDF Status
  */

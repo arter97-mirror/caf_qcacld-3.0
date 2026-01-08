@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011, 2014-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -79,7 +80,7 @@ void ol_txrx_stats_clear(ol_txrx_pdev_handle pdev);
 
 /*--- txrx protocol analyzer debug feature ---*/
 
-/* uncomment this to enable the protocol analzyer feature */
+/* uncomment this to enable the protocol analyzer feature */
 /* #define ENABLE_TXRX_PROT_ANALYZE 1 */
 
 #if defined(ENABLE_TXRX_PROT_ANALYZE)

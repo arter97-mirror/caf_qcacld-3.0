@@ -3324,7 +3324,7 @@ void lim_update_session_nss_for_state(struct pe_session *session,
  * lim_check_and_announce_join_success()- function to check if the received
  * Beacon/Probe Response is from the BSS that we're attempting to join.
  * @mac: pointer to global mac structure
- * @beacon_probe_rsp: pointer to reveived beacon/probe response frame
+ * @beacon_probe_rsp: pointer to received beacon/probe response frame
  * @header: pointer to received management frame header
  * @session_entry: pe session entry
  *

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -779,7 +779,7 @@ static qdf_nbuf_t htt_rx_qdf_noclone_buf(qdf_nbuf_t buf)
 	return buf;
 }
 
-/* This function is used by montior mode code to restitch an MSDU list
+/* This function is used by monitor mode code to restitch an MSDU list
  * corresponding to an MPDU back into an MPDU by linking up the skbs.
  */
 qdf_nbuf_t

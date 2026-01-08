@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,7 +35,7 @@
  *
  * This ini is used to specify the time after which the BSSID which is in the
  * avoid list should be moved to monitor list, assuming that the AP or the
- * gateway with which the data stall happenend might have recovered, and now
+ * gateway with which the data stall happened might have recovered, and now
  * the STA can give another chance to connect to the AP.
  *
  * Supported Feature: Data Stall Recovery
@@ -61,7 +61,7 @@
  *
  * This ini is used to specify the threshld after which the BSSID which is in
  * the avoid list should be moved to deny list, assuming that the AP or the
- * gateway with which the data stall happenend has no recovered, and now
+ * gateway with which the data stall happened has no recovered, and now
  * the STA got the NUD failure again with the BSSID
  *
  * Supported Feature: Data Stall Recovery
@@ -88,7 +88,7 @@
  *
  * This ini is used to specify the time after which the BSSID which is in the
  * deny list should be moved to monitor list, assuming that the AP or the
- * gateway with which the data stall happenend might have recovered, and now
+ * gateway with which the data stall happened might have recovered, and now
  * the STA can give another chance to connect to the AP.
  *
  * Supported Feature: Data Stall Recovery

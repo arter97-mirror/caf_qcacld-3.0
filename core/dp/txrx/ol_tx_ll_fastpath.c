@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -131,7 +131,7 @@ ol_tx_tso_adjust_pkt_dnld_len(qdf_nbuf_t msdu,
 /**
  * ol_tx_prepare_ll_fast() Alloc and prepare Tx descriptor
  *
- * Allocate and prepare Tx descriptor with msdu and fragment descritor
+ * Allocate and prepare Tx descriptor with msdu and fragment descriptor
  * information.
  *
  * @pdev: pointer to ol pdev handle

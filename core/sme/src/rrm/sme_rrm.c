@@ -684,7 +684,7 @@ static QDF_STATUS sme_rrm_scan_request_callback(struct mac_context *mac,
 
 	/*
 	 * Even if RRM scan response is received after roaming to different AP
-	 * the messege shall be posted to PE for rrm cleanup.
+	 * the message shall be posted to PE for rrm cleanup.
 	 */
 
 	freq_list = pSmeRrmContext->channelList.freq_list;

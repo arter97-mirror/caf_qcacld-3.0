@@ -890,7 +890,7 @@ void htt_rx_dbg_rxbuf_indupd(struct htt_pdev_t *pdev, int alloc_index)
 	}
 }
 /**
- * htt_rx_dbg_rxbuf_httrxind() - add a record for recipt of htt rx_ind msg
+ * htt_rx_dbg_rxbuf_httrxind() - add a record for receipt of htt rx_ind msg
  * @pdev: pdev handle
  *
  * Return: none

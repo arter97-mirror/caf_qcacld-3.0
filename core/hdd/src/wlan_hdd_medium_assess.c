@@ -550,7 +550,7 @@ static void hdd_medium_assess_expire_handler(void *arg)
 			pdev_id = medium_assess_info[i].pdev_id;
 			hdd_congestion_notification_report_multi(pdev_id);
 
-			/* ensure events are reveived at the 'same' time */
+			/* ensure events are received at the 'same' time */
 			index = medium_assess_info[i].index;
 			medium_assess_info[i].data[index].part1_valid = false;
 			medium_assess_info[i].data[index].part2_valid = false;

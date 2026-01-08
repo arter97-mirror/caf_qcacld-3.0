@@ -771,7 +771,7 @@ void policy_mgr_restore_deleted_conn_info(struct wlan_objmgr_psoc *psoc,
 		     num_cxn_del * sizeof(*info));
 	pm_ctx->no_of_active_sessions[info->mode] += num_cxn_del;
 	for (i = 0; i < num_cxn_del; i++)
-		policy_mgr_debug("Restored the deleleted conn info, vdev:%d, index:%d",
+		policy_mgr_debug("Restored the deleted conn info, vdev:%d, index:%d",
 				 info[i].vdev_id, conn_index++);
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 }

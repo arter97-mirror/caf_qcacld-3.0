@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -515,7 +515,7 @@
  * Cwmin value for QCA_WLAN_AC_VO. CWVomin = 2^gEdcaVoCwmin -1
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin etc
- * are aplicable
+ * are applicable
  *
  * Supported Feature: STA
  *
@@ -542,7 +542,7 @@
  * Cwmax value for QCA_WLAN_AC_VO. CWVomax = 2^gEdcaVoCwmax -1
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *
@@ -568,7 +568,7 @@
  * This ini is used to set default Aifs value for QCA_WLAN_AC_VO
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *
@@ -595,7 +595,7 @@
  * Cwmin value for QCA_WLAN_AC_VI. CWVimin = 2^gEdcaViCwmin -1
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *
@@ -622,7 +622,7 @@
  * Cwmax value for QCA_WLAN_AC_VI. CWVimax = 2^gEdcaViCwmax -1
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *
@@ -648,7 +648,7 @@
  * This ini is used to set default Aifs value for QCA_WLAN_AC_VI
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *
@@ -675,7 +675,7 @@
  * Cwmin value for QCA_WLAN_AC_BK. CWBkmin = 2^gEdcaBkCwmin -1
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *
@@ -701,7 +701,7 @@
  * Cwmax value for QCA_WLAN_AC_BK. CWBkmax = 2^gEdcaBkCwmax -1
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *
@@ -727,7 +727,7 @@
  * This ini is used to set default Aifs value for QCA_WLAN_AC_BK
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *
@@ -754,7 +754,7 @@
  * Cwmin value for QCA_WLAN_AC_BE. CWBemin = 2^gEdcaBeCwmin
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *
@@ -781,7 +781,7 @@
  * Cwmax value for QCA_WLAN_AC_BE. CWBemax = 2^gEdcaBeCwmax -1
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *
@@ -808,7 +808,7 @@
  * This ini is used to set default Aifs value for QCA_WLAN_AC_BE
  *
  * Related: If gEnableEdcaParams is set to 1, params gEdcaVoCwmin
- * etc are aplicable
+ * etc are applicable
  *
  * Supported Feature: STA
  *

@@ -3328,7 +3328,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	wme_enabled = (pe_session->limWmeEnabled) &&
 		      LIM_BSS_CAPS_GET(WME, pe_session->limCurrentBssQosCaps);
 
-	/* We prefer .11e asociations: */
+	/* We prefer .11e associations: */
 	if (qos_enabled)
 		wme_enabled = false;
 
@@ -4376,7 +4376,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 		/*
 		 * Auth frame3 to be sent with encrypted framebody
 		 *
-		 * Allocate buffer for Authenticaton frame of size
+		 * Allocate buffer for Authentication frame of size
 		 * equal to management frame header length plus 2 bytes
 		 * each for auth algorithm number, transaction number,
 		 * status code, 128 bytes for challenge text and
@@ -4391,7 +4391,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 	switch (auth_frame->authTransactionSeqNumber) {
 	case SIR_MAC_AUTH_FRAME_1:
 		/*
-		 * Allocate buffer for Authenticaton frame of size
+		 * Allocate buffer for Authentication frame of size
 		 * equal to management frame header length plus 2 bytes
 		 * each for auth algorithm number, transaction number
 		 * and status code.
@@ -4433,7 +4433,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 		if ((auth_frame->authAlgoNumber == eSIR_OPEN_SYSTEM) ||
 		    (auth_frame->authStatusCode != STATUS_SUCCESS)) {
 			/*
-			 * Allocate buffer for Authenticaton frame of size
+			 * Allocate buffer for Authentication frame of size
 			 * equal to management frame header length plus
 			 * 2 bytes each for auth algorithm number,
 			 * transaction number and status code.
@@ -4462,7 +4462,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 			 * Shared Key algorithm with challenge text
 			 * to be sent.
 			 *
-			 * Allocate buffer for Authenticaton frame of size
+			 * Allocate buffer for Authentication frame of size
 			 * equal to management frame header length plus
 			 * 2 bytes each for auth algorithm number,
 			 * transaction number, status code and 128 bytes
@@ -4481,7 +4481,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 		/*
 		 * Auth frame3 to be sent without encrypted framebody
 		 *
-		 * Allocate buffer for Authenticaton frame of size equal
+		 * Allocate buffer for Authentication frame of size equal
 		 * to management frame header length plus 2 bytes each
 		 * for auth algorithm number, transaction number and
 		 * status code.
@@ -4493,7 +4493,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 
 	case SIR_MAC_AUTH_FRAME_4:
 		/*
-		 * Allocate buffer for Authenticaton frame of size equal
+		 * Allocate buffer for Authentication frame of size equal
 		 * to management frame header length plus 2 bytes each
 		 * for auth algorithm number, transaction number and
 		 * status code.
@@ -7513,7 +7513,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		 tid, frm.DialogToken.token, frm.Status.status,
 		 frm.addba_param_set.buff_size,
 		 frm.addba_param_set.amsdu_supp);
-	pe_debug("addba_extn %d he_capable %d no_frag %d he_frag %d, exted buff size %d",
+	pe_debug("addba_extn %d he_capable %d no_frag %d he_frag %d, extend buff size %d",
 		 addba_extn_present,
 		 lim_is_session_he_capable(session),
 		 frm.addba_extn_element.no_fragmentation,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -156,7 +156,7 @@ struct bmi_info {
  * @fw_indication_work: Work for Fw indication
  * @fw_dl_wakelock: Firmware download wakelock
  * @scn: HIF Context
- * @tgt_def: Target Defnition pointer
+ * @tgt_def: Target Definition pointer
  * @fw_crashed_cb: Callback for firmware crashed ind
  *
  * Structure to hold all ol BMI/Ramdump info

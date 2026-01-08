@@ -264,7 +264,7 @@
  * A bit value of 0 represents rate is disabled
  *
  * [b31-b0],[b63-b32],[b95-b64],[b127-b96]
- * For HE targets, 12 bits correpond to one NSS setting. Ex:
+ * For HE targets, 12 bits correspond to one NSS setting. Ex:
  * b0-13  => NSS1, MCS 0-13
  * b14-27 => NSS2, MCS 0-13 and so on for other NSS.
  * Note that the bit representation is continuous.

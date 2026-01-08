@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -607,7 +607,7 @@ uint8_t os_if_son_get_rx_streams(struct wlan_objmgr_vdev *vdev);
 
 /**
  * os_if_son_cfg80211_reply() - replies to cfg80211
- * @sk_buf: sk_buff to uper layer
+ * @sk_buf: sk_buff to upper layer
  *
  * Return: QDF_STATUS_SUCCESS on success
  */

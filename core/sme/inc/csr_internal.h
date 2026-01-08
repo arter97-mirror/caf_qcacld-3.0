@@ -205,7 +205,7 @@ struct csr_roam_connectedinfo {
 /**
  * struct csr_disconnect_stats - Disconnect Stats per session
  * @disconnection_cnt: total no. of disconnections
- * @disconnection_by_app: diconnections triggered by application
+ * @disconnection_by_app: disconnections triggered by application
  * @disassoc_by_peer: disassoc sent by peer
  * @deauth_by_peer: deauth sent by peer
  * @bmiss: disconnect triggered by beacon miss

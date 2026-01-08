@@ -4146,7 +4146,7 @@ hdd_wait_for_other_ap_acs_complete(struct hdd_context *hdd_ctx,
 #endif
 
 /**
- * hdd_remove_6ghz_freq_from_acs_list(): Removed 6 GHz frequecies from ACS list
+ * hdd_remove_6ghz_freq_from_acs_list(): Removed 6 GHz frequencies from ACS list
  * @org_freq_list: ACS frequecny list
  * @org_ch_list_count: Number of frequencies in ACS list
  *
@@ -4223,7 +4223,7 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	struct wlan_hdd_link_info *link_info;
 	int link_id = -1;
 
-	/* ***Note*** Donot set SME config related to ACS operation here because
+	/* ***Note*** Do not set SME config related to ACS operation here because
 	 * ACS operation is not synchronouse and ACS for Second AP may come when
 	 * ACS operation for first AP is going on. So only do_acs is split to
 	 * separate start_acs routine. Also SME-PMAC struct that is used to

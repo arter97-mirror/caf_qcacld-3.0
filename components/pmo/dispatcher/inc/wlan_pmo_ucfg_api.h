@@ -155,7 +155,7 @@ QDF_STATUS ucfg_pmo_update_psoc_config(struct wlan_objmgr_psoc *psoc,
 /**
  * ucfg_pmo_psoc_set_caps() - overwrite configured device capability flags
  * @psoc: the psoc for which the capabilities apply
- * @caps: the cabability information to configure
+ * @caps: the capability information to configure
  *
  * Return: QDF_STATUS
  */

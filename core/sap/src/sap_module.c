@@ -2755,7 +2755,7 @@ wlansap_set_dfs_preferred_channel_location(mac_handle_t mac_handle)
 
 	/*
 	 * The Indoor/Outdoor only random channel selection
-	 * restriction is currently enforeced only for
+	 * restriction is currently enforced only for
 	 * JAPAN regulatory domain.
 	 */
 	ucfg_mlme_get_pref_chan_location(mac->psoc,
@@ -3398,7 +3398,7 @@ QDF_STATUS wlansap_acs_chselect(struct sap_context *sap_context,
 	} else if (QDF_STATUS_E_CANCELED == qdf_status) {
 		/*
 		* ERROR is returned when either the SME scan request
-		* failed or ACS is overridden due to other constrainst
+		* failed or ACS is overridden due to other constraints
 		* So send selected channel to HDD
 		*/
 		sap_err("Scan Req Failed/ACS Overridden");
@@ -3974,7 +3974,7 @@ next_lower_bw:
 /**
  * wlansap_get_safe_channel() - Get safe channel from current regulatory
  * @sap_ctx: Pointer to SAP context
- * @ch_width: selected channel bandwdith
+ * @ch_width: selected channel bandwidth
  * @pref_band: Preferred channel band for sap
  *
  * This function is used to get safe channel from current regulatory valid
@@ -5107,4 +5107,3 @@ wlansap_get_sap_csa_reason(struct mac_context *mac, uint8_t vdev_id)
 	}
 	return CSA_REASON_UNKNOWN;
 }
-

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2964,7 +2964,7 @@ p2p_is_vdev_support_rand_mac_by_id(struct wlan_objmgr_psoc *soc,
  * @rnd_cookie: cookie to be returned
  *
  * This function will post msg to p2p core to set random mac addr rx filter.
- * It will wait the respone and return the result to caller.
+ * It will wait the response and return the result to caller.
  *
  * Return: true: set successfully
  *             false: failed

@@ -331,7 +331,7 @@ lim_validate_rsn_ie(const uint8_t *ie_ptr, uint16_t ie_len)
  * lim_get_update_eht_bw_puncture_allow() - whether bw and puncture can be
  *                                          sent to target directly
  * @session: pe session
- * @ori_bw: bandwdith from beacon
+ * @ori_bw: bandwidth from beacon
  * @new_bw: bandwidth intersection between reference AP and STA
  * @update_allow: return true if bw and puncture can be updated directly
  * @phy_mode: update the value of phy_mode

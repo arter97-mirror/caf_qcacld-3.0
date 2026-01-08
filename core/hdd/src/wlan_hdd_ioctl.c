@@ -3368,7 +3368,7 @@ static int drv_cmd_get_roam_mode(struct wlan_hdd_link_info *link_info,
 	uint8_t len;
 
 	/*
-	 * roamMode value shall be inverted because the sementics is different.
+	 * roamMode value shall be inverted because the semantics is different.
 	 */
 	if (roam_mode)
 		roam_mode = cfg_min(CFG_LFR_FEATURE_ENABLED);
