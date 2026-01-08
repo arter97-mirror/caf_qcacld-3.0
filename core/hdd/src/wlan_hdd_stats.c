@@ -6537,6 +6537,8 @@ static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
 		info->tx_failed += stats->fail_cnt[i];
 	}
 
+	info->rx_dropped_misc = stats->rx_error_cnt;
+
 	if (cds_dp_get_vdev_stats(vdev_id, &dp_stats)) {
 		orig_cnt = info->tx_retries;
 		orig_fail_cnt = info->tx_failed;
@@ -6550,7 +6552,9 @@ static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
 
 	info->filled |= HDD_INFO_TX_PACKETS |
 			HDD_INFO_TX_RETRIES |
-			HDD_INFO_TX_FAILED;
+			HDD_INFO_TX_FAILED  |
+			HDD_INFO_RX_PACKETS |
+			HDD_INFO_RX_DROP_MISC;
 }
 
 /**
@@ -7462,6 +7466,10 @@ static void wlan_hdd_fill_station_info(struct wlan_objmgr_psoc *psoc,
 	sinfo->filled |= HDD_INFO_TX_FAILED;
 	sinfo->tx_retries = stats->tx_retries;
 	sinfo->filled |= HDD_INFO_TX_RETRIES;
+	sinfo->fcs_err_count = stats->fcs_count;
+	sinfo->filled |= HDD_INFO_FCS_ERROR_COUNT;
+	sinfo->rx_mpdu_count = stats->rx_mpdu_count;
+	sinfo->filled |= HDD_INFO_RX_MPDUS;
 
 	/* sta flags */
 	hdd_fill_sta_flags(sinfo, stainfo);
@@ -7824,6 +7832,8 @@ wlan_hdd_get_link_peer_stats_sap(struct hdd_adapter *adapter,
 	txrx_stats.tx_failed = stats->peer_stats_info_ext->tx_failed;
 	txrx_stats.tx_succeed = stats->peer_stats_info_ext->tx_succeed;
 	txrx_stats.rssi = stats->peer_stats_info_ext->rssi;
+	txrx_stats.fcs_count = stats->peer_adv_stats->fcs_count;
+	txrx_stats.rx_mpdu_count = stats->peer_adv_stats->rx_count;
 
 	wlan_hdd_fill_rate_info(&txrx_stats, stats->peer_stats_info_ext);
 	link = hdd_get_link_info_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
