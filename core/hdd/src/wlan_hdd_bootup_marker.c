@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -19,7 +20,7 @@
 /**
  *  DOC: wlan_hdd_bootup_marker.c
  *
- *  WLAN Host Device Driver bootup marker implementation
+ *  WLAN Host Device Driver boot-up marker implementation
  *
  */
 

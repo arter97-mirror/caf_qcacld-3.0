@@ -5035,7 +5035,7 @@ QDF_STATUS wma_get_apf_capabilities(tp_wma_handle wma)
 		return QDF_STATUS_E_INVAL;
 
 	if (!wmi_service_enabled(wmi_handle, wmi_service_apf_offload)) {
-		wma_err("APF cababilities feature bit not enabled");
+		wma_err("APF capabilities feature bit not enabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -5163,7 +5163,7 @@ QDF_STATUS wma_send_apf_enable_cmd(WMA_HANDLE handle, uint8_t vdev_id,
 
 	if (!WMI_SERVICE_IS_ENABLED(wma->wmi_service_bitmap,
 		WMI_SERVICE_BPF_OFFLOAD)) {
-		wma_err("APF cababilities feature bit not enabled");
+		wma_err("APF capabilities feature bit not enabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -5200,7 +5200,7 @@ wma_send_apf_write_work_memory_cmd(WMA_HANDLE handle,
 
 	if (!WMI_SERVICE_IS_ENABLED(wma->wmi_service_bitmap,
 		WMI_SERVICE_BPF_OFFLOAD)) {
-		wma_err("APF cababilities feature bit not enabled");
+		wma_err("APF capabilities feature bit not enabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -5270,7 +5270,7 @@ QDF_STATUS wma_send_apf_read_work_memory_cmd(WMA_HANDLE handle,
 
 	if (!WMI_SERVICE_IS_ENABLED(wma->wmi_service_bitmap,
 		WMI_SERVICE_BPF_OFFLOAD)) {
-		wma_err("APF cababilities feature bit not enabled");
+		wma_err("APF capabilities feature bit not enabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -205,7 +205,7 @@ struct csr_roam_connectedinfo {
 /**
  * struct csr_disconnect_stats - Disconnect Stats per session
  * @disconnection_cnt: total no. of disconnections
- * @disconnection_by_app: diconnections triggered by application
+ * @disconnection_by_app: disconnections triggered by application
  * @disassoc_by_peer: disassoc sent by peer
  * @deauth_by_peer: deauth sent by peer
  * @bmiss: disconnect triggered by beacon miss

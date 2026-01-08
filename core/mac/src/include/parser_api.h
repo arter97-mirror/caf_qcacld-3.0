@@ -179,7 +179,7 @@ struct fils_realm_identifier {
  * @is_fils_sk_auth_supported: if fils sk suppprted
  * @is_fils_sk_auth_pfs_supported: if fils sk with pfs supported
  * @is_pk_auth_supported: if fils public key supported
- * @cache_identifier: fils cache idenfier info
+ * @cache_identifier: fils cache identifier info
  * @hessid: fils hessid info
  * @realm_identifier: fils realm info
  * @key_identifier: fils key identifier info

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1032,7 +1032,7 @@ static QDF_STATUS lim_process_auth_wrapped_data(struct pe_session *pe_session,
 	if (!fils_info)
 		return QDF_STATUS_E_FAILURE;
 
-	pe_debug("trying to process the wrappped data");
+	pe_debug("trying to process the wrapped data");
 
 	code = *wrapped_data;
 	wrapped_data++;
@@ -1142,7 +1142,7 @@ bool lim_is_valid_fils_auth_frame(struct mac_context *mac_ctx,
 }
 
 /**
- * lim_create_fils_wrapper_data()- This API create warpped data which will be
+ * lim_create_fils_wrapper_data()- This API create wrapped data which will be
  * sent in auth request.
  * @fils_info: fils session info
  *

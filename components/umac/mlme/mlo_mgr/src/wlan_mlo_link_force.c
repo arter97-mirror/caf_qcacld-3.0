@@ -5315,7 +5315,7 @@ end:
  * and compute a new force command based on current connection table.
  * If any difference between "current" and "new", driver sends update
  * command to target. Driver will update the current force command
- * record after get successful respone from target.
+ * record after get successful response from target.
  *
  * Return: QDF_STATUS_SUCCESS if no new command updated to target.
  *	   QDF_STATUS_E_PENDING if new command is sent to target.
@@ -5485,7 +5485,7 @@ end:
  * and compute a new force command based on current connection table.
  * If any difference between "current" and "new", driver sends update
  * command to target. Driver will update the current force command
- * record after get successful respone from target.
+ * record after get successful response from target.
  *
  * Return: QDF_STATUS_SUCCESS if no new command updated to target.
  *	   QDF_STATUS_E_PENDING if new command is sent to target.
@@ -6978,4 +6978,3 @@ mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
 	return curr_link_comb;
 }
 #endif
-

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -253,7 +253,7 @@ typedef struct sDialogueToken {
 
 typedef struct sLimTimers {
 	/* TIMERS IN LIM ARE NOT SUPPOSED TO BE ZEROED OUT DURING RESET. */
-	/* DURING lim_initialize DONOT ZERO THEM OUT. */
+	/* DURING lim_initialize DO NOT ZERO THEM OUT. */
 
 /* STA SPECIFIC TIMERS */
 

@@ -681,7 +681,7 @@ void lim_process_mlm_assoc_cnf(struct mac_context *mac_ctx,
 	if (session_entry->limSmeState != eLIM_SME_WT_ASSOC_STATE ||
 		 LIM_IS_AP_ROLE(session_entry)) {
 		/*
-		 * Should not have received Assocication confirm
+		 * Should not have received Association confirm
 		 * from MLM in other states OR on AP.
 		 * Log error
 		 */
@@ -1885,7 +1885,7 @@ void lim_process_mlm_del_sta_rsp(struct mac_context *mac_ctx,
  *
  * Process WMA_DEL_STA_RSP for AP role
  *
- * Retunrn: None
+ * Return: None
  */
 void lim_process_ap_mlm_del_sta_rsp(struct mac_context *mac_ctx,
 					   struct scheduler_msg *msg,
@@ -3645,7 +3645,7 @@ static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 	    scheduler_post_message(QDF_MODULE_ID_PE,
 				   QDF_MODULE_ID_SME,
 				   QDF_MODULE_ID_SME, &message)) {
-		pe_err("Failed to post message montior mode vdev up");
+		pe_err("Failed to post message monitor mode vdev up");
 	}
 }
 

@@ -3692,7 +3692,7 @@ sir_convert_assoc_req_frame2_eht_struct(tDot11fAssocRequest *ar,
 /**
  * mlo_parse_peer_eml_cap: Parse eml capability info
  * @p_assoc_req: assoc req buffer pointer
- * @eml_cap: eml capablility info
+ * @eml_cap: eml capability info
  *
  * Return: None
  */
@@ -3725,7 +3725,7 @@ mlo_parse_peer_eml_cap(tpSirAssocReq p_assoc_req, uint16_t eml_cap)
 /**
  * mlo_parse_peer_mld_cap: Parse mld capability info
  * @p_assoc_req: Assoc request received
- * @mld_cap: mld capablility info
+ * @mld_cap: mld capability info
  *
  * Return: None
  */

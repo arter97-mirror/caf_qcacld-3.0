@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -91,7 +91,7 @@ struct driver_version {
  * @driver_version: Host software version
  * @allowed_dwell_time_min: Channel dwell time - allowed minimum
  * @allowed_dwell_time_max: Channel dwell time - allowed maximum
- * @curr_dwell_time_min: Channel dwell time - current minimim
+ * @curr_dwell_time_min: Channel dwell time - current minimum
  * @curr_dwell_time_max: Channel dwell time - current maximum
  * @supported_bands: Supported bands, 2.4G or 5G Hz
  * @num_channels: Num of channels IDs to follow

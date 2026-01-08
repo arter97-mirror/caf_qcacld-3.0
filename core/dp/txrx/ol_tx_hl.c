@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2077,7 +2077,7 @@ void ol_txrx_update_tx_queue_groups(
 	qdf_spin_lock_bh(&pdev->tx_queue_spinlock);
 	/*
 	 * if the membership (vdev id mask and ac mask)
-	 * matches then no need to update tx qeue groups.
+	 * matches then no need to update tx queue groups.
 	 */
 	if (group->membership == membership)
 		/* Update Credit Only */

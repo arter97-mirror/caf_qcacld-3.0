@@ -757,7 +757,7 @@
  * Ref - Kernel/Documentation/networking/scaling.txt
  * RPS CPU map for a particular RX queue, selects CPU(s) for bottom half
  * processing of RX packets. For example, for a system with 4 CPUs,
- * 0xe: Use CPU1 - CPU3 and donot use CPU0.
+ * 0xe: Use CPU1 - CPU3 and do not use CPU0.
  * 0x0: RPS is disabled, packets are processed on the interrupting CPU.
 .*
  * WLAN driver registers NUM_TX_QUEUES queues for tx and rx each during
@@ -944,7 +944,7 @@
  *
  * This ini item configures the amount of time, in milliseconds, that the driver
  * should prevent system power collapse after receiving an RX unicast packet.
- * A conigured value of 0 disables the RX Wakelock feature completely.
+ * A configured value of 0 disables the RX Wakelock feature completely.
  *
  * Related: None.
  *

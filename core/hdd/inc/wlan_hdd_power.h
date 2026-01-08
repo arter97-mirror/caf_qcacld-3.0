@@ -190,7 +190,7 @@ QDF_STATUS hdd_wlan_re_init(void);
 /**
  * hdd_handle_cached_commands() - Handle north bound commands during SSR
  *
- * This api will be invoked afte SSR re-initialization to execute the north
+ * This api will be invoked after SSR re-initialization to execute the north
  * bound commands received during SSR.
  *
  * Return: None

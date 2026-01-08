@@ -342,7 +342,7 @@ sap_process_avoid_ie(struct mac_context *mac_ctx,
 							 avoid_ch_ie->channel);
 			/*
 			 * Mark weight of these channel present in IE to MAX
-			 * so that ACS logic will to avoid thse channels
+			 * so that ACS logic will to avoid those channels
 			 */
 			for (i = 0; i < spect_info->num_ch; i++) {
 				if (spect_ch[i].chan_freq != chan_freq)

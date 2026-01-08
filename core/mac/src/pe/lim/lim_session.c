@@ -129,7 +129,7 @@ static void pe_init_beacon_params(struct mac_context *mac,
  * @ptr:        pointer to pe_session
  *
  * This function resets protection structs so that when an AP causing use of
- * protection goes away, corresponding protection bit can be reset. This allowes
+ * protection goes away, corresponding protection bit can be reset. This allows
  * protection bits to be reset once legacy overlapping APs are gone.
  *
  * Return: void

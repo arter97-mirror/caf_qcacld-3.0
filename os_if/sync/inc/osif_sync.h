@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,7 +26,7 @@
  * synchronization primitives and behavior.
  *
  * While DSC is great at doing the required synchronization, it (by design) does
- * not address the gap between receiving a callback and involing the appropriate
+ * not address the gap between receiving a callback and involving the appropriate
  * DSC protections. For example, given an input net_device pointer from the
  * kernel, how does one safely acquire the appropriate DSC context? osif_sync
  * implements this logic via wrapping DSC APIs with a registration mechanism.
@@ -63,4 +63,3 @@ void osif_sync_init(void);
 void osif_sync_deinit(void);
 
 #endif /* __OSIF_SYNC_H */
-

@@ -115,7 +115,7 @@ void policy_mgr_ll_lt_sap_restart_concurrent_sap(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_ll_lt_sap_allow_csa() - Check if CSA can be allowed for the given
  * vdev for the given freq.
  * @psoc: PSOC object
- * @vdev_id: vdev id whic initiated CSA
+ * @vdev_id: vdev id which initiated CSA
  * @target_freq: target freq for CSA
  * @pm_con_mode: con mode for vdev
  *

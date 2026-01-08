@@ -178,7 +178,7 @@
 #define WMA_PEER_CREATE_RESPONSE 0x08
 #define WMA_PEER_CREATE_RESPONSE_TIMEOUT SIR_PEER_CREATE_RESPONSE_TIMEOUT
 
-/* send connect respone after bss peer is deleted */
+/* send connect response after bss peer is deleted */
 #define WMA_DELETE_STA_CONNECT_RSP 0x09
 
 /* Peer create response for 11az PASN peer */
@@ -213,7 +213,7 @@
 
 /*
  * Setting the Tx Comp Timeout to 1 secs.
- * TODO: Need to Revist the Timing
+ * TODO: Need to Revisit the Timing
  */
 #define WMA_TX_FRAME_COMPLETE_TIMEOUT  1000
 #define WMA_TX_FRAME_BUFFER_NO_FREE    0
@@ -2390,7 +2390,7 @@ int wma_chip_power_save_failure_detected_handler(void *handle,
 /**
  * wma_get_chain_rssi() - send wmi cmd to get chain rssi
  * @wma_handle: wma handler
- * @req_params: requset params
+ * @req_params: request params
  *
  * Return: Return QDF_STATUS
  */

@@ -1198,7 +1198,7 @@ void mlme_set_peer_disconnect_ies(struct wlan_objmgr_vdev *vdev,
 				  struct element_info *ie);
 
 /**
- * mlme_free_peer_disconnect_ies() - Free the peer diconnect IEs
+ * mlme_free_peer_disconnect_ies() - Free the peer disconnect IEs
  * @vdev: vdev pointer
  *
  * Return: None
@@ -1264,7 +1264,7 @@ bool mlme_get_reconn_after_assoc_timeout_flag(struct wlan_objmgr_psoc *psoc,
 					      uint8_t vdev_id);
 
 /**
- * mlme_get_peer_disconnect_ies() - Get diconnect IEs from vdev object
+ * mlme_get_peer_disconnect_ies() - Get disconnect IEs from vdev object
  * @vdev: vdev pointer
  *
  * Return: Returns a pointer to the peer disconnect IEs present in vdev object

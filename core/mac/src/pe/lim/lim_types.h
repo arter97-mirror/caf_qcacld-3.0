@@ -360,7 +360,7 @@ void lim_process_mlm_start_cnf(struct mac_context *mac_ctx, uint32_t *msg_buf);
 
 void lim_get_random_bssid(struct mac_context *mac, uint8_t *data);
 
-/* Function to handle HT and HT IE CFG parameter intializations */
+/* Function to handle HT and HT IE CFG parameter initializations */
 void handle_ht_capabilityand_ht_info(struct mac_context *mac,
 				     struct pe_session *pe_session);
 

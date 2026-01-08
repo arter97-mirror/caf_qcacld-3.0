@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -67,7 +67,7 @@
  * @rs_tstamp: Received timestamp
  * @rs_full_chan: Detail channel structure of recv frame.
  *                It could be NULL if not available
- * @rs_isaggr: Is Aggreggated?
+ * @rs_isaggr: Is Aggregated?
  * @rs_isapsd: Is APSD?
  * @rs_noisefloor: Noise floor
  * @rs_channel: Channel

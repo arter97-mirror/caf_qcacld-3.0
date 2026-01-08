@@ -1675,7 +1675,7 @@ int wma_extscan_hotlist_match_event_handler(void *handle,
 		return -EINVAL;
 	}
 	if (numap > param_buf->num_hotlist_match) {
-		wma_err("Invalid no of total enteries %d", numap);
+		wma_err("Invalid no of total entries %d", numap);
 		return -EINVAL;
 	}
 	if (numap > WMA_EXTSCAN_MAX_HOTLIST_ENTRIES) {

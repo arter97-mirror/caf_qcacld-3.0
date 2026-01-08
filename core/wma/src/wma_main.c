@@ -1316,7 +1316,7 @@ static inline wmi_traffic_ac wma_convert_ac_value(uint32_t ac_value)
  * wma_set_per_link_amsdu_cap() - Set AMSDU/AMPDU capability per link to FW.
  * @wma: wma handle
  * @privcmd: pointer to set command parameters
- * @aggr_type: aggregration type
+ * @aggr_type: aggregation type
  *
  * Return: QDF_STATUS_SUCCESS if set command is sent successfully, else
  * QDF_STATUS_E_FAILURE

@@ -4119,7 +4119,7 @@ static void mlme_init_coex_unsafe_chan_reg_disable_cfg(
 #ifdef CONFIG_BAND_6GHZ
 /**
  * mlme_init_enable_c2c_support() - Populate enable_c2c_support INI in mlme
- * regulatory sturct
+ * regulatory struct
  * @psoc: Pointer to psoc
  * @reg: Pointer to mlme regulatory struct
  *

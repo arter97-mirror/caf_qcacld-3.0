@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -210,7 +210,7 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  * @ecsa_capable: Extended CSA capabilities
  * @ext_cap: The first 4 bytes of Extended capabilities IE
  * @supported_band: sta band capabilities bitmap from supporting opclass
- * @max_phy_rate: Calcuated maximum phy rate based on mode, nss, mcs etc.
+ * @max_phy_rate: Calculated maximum phy rate based on mode, nss, mcs etc.
  * @tx_packets: The number of frames from host to firmware
  * @tx_bytes: Bytes send to current station
  * @rx_packets: Packets received from current station

@@ -3298,7 +3298,7 @@ uint32_t policy_mgr_mode_get_macid_by_vdev_id(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_mode_specific_vdev_id() - provides the
- * vdev id of the pecific mode
+ * vdev id of the specific mode
  * @psoc: PSOC object information
  * @mode: type of connection
  *
@@ -4055,7 +4055,7 @@ bool policy_mgr_is_scan_simultaneous_capable(struct wlan_objmgr_psoc *psoc);
  * policy_mgr_set_user_cfg() - Function to set user cfg variables
  * required by policy manager component
  * @psoc: PSOC object information
- * @user_cfg: User config valiables structure pointer
+ * @user_cfg: User config variables structure pointer
  *
  * This function sets the user cfg variables required by policy
  * manager
@@ -5278,7 +5278,7 @@ QDF_STATUS policy_mgr_stop_emlsr_opportunistic_timer(
  * restart.
  * The API may queue the CSA request to run the CSA in workqueue thread.
  * If always_wait_set_link flag is true, the API will only set link and
- * wait for respone, it will not queue the CSA request.
+ * wait for response, it will not queue the CSA request.
  *
  * Return: QDF_STATUS_E_PENDING - CSA is postponed to work thread.
  * QDF_STATUS_SUCCESS - CSA can execute as normal.
@@ -5355,7 +5355,7 @@ policy_mgr_is_ml_links_in_mcc_allowed(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_is_vdev_high_tput_or_low_latency() - Check vdev has
- * high througput or low latency flag
+ * high throughput or low latency flag
  * @psoc: PSOC object information
  * @vdev_id: vdev id
  *
@@ -5998,7 +5998,7 @@ QDF_STATUS policy_mgr_get_sbs_cfg(struct wlan_objmgr_psoc *psoc, bool *sbs);
  *
  * Based on vdev id ap profile set via vendor command is get and compared with
  * ll_type_any AP type and return freq for that SAP if profile set is latency
- * sensitive or throghput sensitive.
+ * sensitive or throughput sensitive.
  *
  * Return: freq if it's LL SAP otherwise 0
  *
@@ -6025,7 +6025,7 @@ qdf_freq_t policy_mgr_get_ll_lt_sap_freq(struct wlan_objmgr_psoc *psoc);
  * @psoc: PSOC object
  *
  * Based on vdev id ap profile set via vendor command is get and compared with
- * ll_ht_type AP type and return freq for that SAP if profile set is throghput
+ * ll_ht_type AP type and return freq for that SAP if profile set is throughput
  * sensitive.
  *
  * Return: freq if it's HT LL SAP otherwise 0
@@ -6066,7 +6066,7 @@ policy_mgr_is_conc_sap_present_on_sta_freq(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_get_connection_count_with_ch_freq() - Get number of active
- * connections on the channel frequecy
+ * connections on the channel frequency
  * @ch_freq: channel frequency
  *
  * Return: number of active connection on the specific frequency

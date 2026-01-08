@@ -1295,7 +1295,7 @@ static void ucfg_nan_cleanup_all_ndps(struct wlan_objmgr_psoc *psoc)
 #define NAN_PASN_PEER_DELETE_ALL_TIMEOUT_MS 4000
 /**
  * ucfg_nan_pasn_peer_delete_all() - This API post NAN peer delete all
- * meessage to the scheduler and wait for NAN peer delete response.
+ * message to the scheduler and wait for NAN peer delete response.
  * @psoc: pointer to PSOC object
  *
  * Return: status of operation

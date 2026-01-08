@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -202,7 +202,7 @@ ol_rx_seq_num_check(struct ol_txrx_pdev_t *pdev,
 		 * b) Mcast packets are not aggregated & hence single
 		 * c) Result of b) is that, flush / release bit is set
 		 *    always on the mcast packets, so likely to be
-		 *    immediatedly released.
+		 *    immediately released.
 		 */
 		peer->tids_mcast_last_seq[pkt_tid] = seq_num;
 		return htt_rx_status_ok;

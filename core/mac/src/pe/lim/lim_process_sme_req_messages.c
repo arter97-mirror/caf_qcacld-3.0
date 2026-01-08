@@ -1288,7 +1288,7 @@ static bool __lim_process_sme_start_bss_req(struct mac_context *mac,
  * ASSUMPTIONS:
  *
  * NOTE:
- * 1. geneartes the unique random number for bssid in ibss
+ * 1. generates the unique random number for bssid in ibss
  *
  *  @param  mac      Pointer to Global MAC structure
  *  @param  *data      Pointer to  bssid  buffer
