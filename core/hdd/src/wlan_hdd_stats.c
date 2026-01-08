@@ -79,6 +79,7 @@
 #define HDD_INFO_EXPECTED_THROUGHPUT  BIT(NL80211_STA_INFO_EXPECTED_THROUGHPUT)
 #define HDD_INFO_RX_BYTES               BIT(NL80211_STA_INFO_RX_BYTES)
 #define HDD_INFO_RX_PACKETS             BIT(NL80211_STA_INFO_RX_PACKETS)
+#define HDD_INFO_RX_DROP_MISC           BIT(NL80211_STA_INFO_RX_DROP_MISC)
 #define HDD_INFO_TX_BYTES64             BIT(NL80211_STA_INFO_TX_BYTES64)
 #define HDD_INFO_RX_BYTES64             BIT(NL80211_STA_INFO_RX_BYTES64)
 #define HDD_INFO_INACTIVE_TIME          BIT(NL80211_STA_INFO_INACTIVE_TIME)
@@ -4287,6 +4288,8 @@ static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
 		info->tx_failed += stats->fail_cnt[i];
 	}
 
+	info->rx_dropped_misc = stats->rx_error_cnt;
+
 	if (cds_dp_get_vdev_stats(vdev_id, &dp_stats)) {
 		orig_cnt = info->tx_retries;
 		orig_fail_cnt = info->tx_failed;
@@ -4301,7 +4304,8 @@ static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
 	info->filled |= HDD_INFO_TX_PACKETS |
 			HDD_INFO_TX_RETRIES |
 			HDD_INFO_TX_FAILED  |
-			HDD_INFO_RX_PACKETS;
+			HDD_INFO_RX_PACKETS |
+			HDD_INFO_RX_DROP_MISC;
 }
 
 /**
@@ -4984,6 +4988,10 @@ static void wlan_hdd_fill_station_info(struct wlan_objmgr_psoc *psoc,
 	sinfo->tx_failed = stats->tx_failed;
 	sinfo->filled |= HDD_INFO_TX_FAILED;
 	sinfo->tx_retries = stats->tx_retries;
+	sinfo->fcs_err_count = stats->fcs_count;
+	sinfo->filled |= HDD_INFO_FCS_ERROR_COUNT;
+	sinfo->rx_mpdu_count = stats->rx_mpdu_count;
+	sinfo->filled |= HDD_INFO_RX_MPDUS;
 
 	/* sta flags */
 	hdd_fill_sta_flags(sinfo, stainfo);
@@ -5248,6 +5256,8 @@ static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
 	txrx_stats.tx_succeed = stats->peer_stats_info_ext->tx_succeed;
 	txrx_stats.rssi = stats->peer_stats_info_ext->rssi
 			+ WLAN_HDD_TGT_NOISE_FLOOR_DBM;
+	txrx_stats.fcs_count = stats->peer_adv_stats->fcs_count;
+	txrx_stats.rx_mpdu_count = stats->peer_adv_stats->rx_count;
 	wlan_hdd_fill_rate_info(&txrx_stats, stats->peer_stats_info_ext);
 	wlan_hdd_fill_station_info(hddctx->psoc, adapter,
 				   sinfo, stainfo, &txrx_stats);
