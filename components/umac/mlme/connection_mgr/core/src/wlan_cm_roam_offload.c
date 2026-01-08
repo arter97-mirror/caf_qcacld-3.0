@@ -1419,10 +1419,11 @@ cm_roam_scan_offload_rssi_thresh(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 		roam_high_rssi_delta =
 			wlan_cm_get_roam_scan_high_rssi_offset(psoc);
+
+		params->hi_rssi_scan_rssi_delta = roam_high_rssi_delta;
 		if (roam_high_rssi_delta) {
 			qdf_freq_t op_freq;
 
-			params->hi_rssi_scan_rssi_delta = roam_high_rssi_delta;
 			op_freq = wlan_get_operation_chan_freq(vdev);
 			/*
 			 * Firmware will use this flag to enable 5 to 6 GHz
