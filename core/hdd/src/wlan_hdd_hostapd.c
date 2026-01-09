@@ -7948,6 +7948,29 @@ static inline bool wlan_hdd_get_twt_responder_value(struct sap_config *config)
 }
 #endif
 
+static uint32_t set_sap_band_mask(uint32_t chan_freq)
+{
+	uint32_t mask = 0;
+	uint32_t band = wlan_reg_freq_to_band(chan_freq);
+
+	switch (band) {
+	case REG_BAND_2G:
+		mask = BIT(REG_BAND_2G);
+		break;
+	case REG_BAND_5G:
+		mask = BIT(REG_BAND_2G) | BIT(REG_BAND_5G);
+		break;
+	case REG_BAND_6G:
+		mask = BIT(REG_BAND_2G) | BIT(REG_BAND_5G) | BIT(REG_BAND_6G);
+		break;
+	default:
+		mask = BIT(REG_BAND_2G);
+		break;
+	}
+
+	return mask;
+}
+
 /**
  * wlan_hdd_cfg80211_start_bss() - start bss
  * @link_info: Link info pointer in HDD adapter
@@ -8002,7 +8025,7 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 	enum policy_mgr_con_mode pm_con_mode;
 	struct qdf_mac_addr *link_mac;
 	bool twt_resp = false;
-
+	uint32_t band_mask;
 	hdd_enter();
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -8132,7 +8155,10 @@ int wlan_hdd_cfg80211_start_bss(struct wlan_hdd_link_info *link_info,
 		mode = hdd_ctx->acs_policy.acs_dfs_mode;
 		config->acs_dfs_mode = wlan_hdd_get_dfs_mode(mode);
 	} else {
-		wlan_sap_set_acs_band_mask(link_info->vdev, REG_BAND_MASK_ALL);
+		band_mask = set_sap_band_mask(config->chan_freq);
+		wlan_sap_set_acs_band_mask(link_info->vdev, band_mask);
+		hdd_debug("update band mask %u freq %d",
+			  band_mask, config->chan_freq);
 	}
 
 	ucfg_util_vdev_mgr_set_acs_mode_for_vdev(vdev,
