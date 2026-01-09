@@ -907,7 +907,9 @@ populate_dot11f_country(struct mac_context *mac,
 
 		if ((chan_enum == NUM_CHANNELS - 1) && (six_gig_started)) {
 			/* Ensure space for 3 triplets (indices num_triplets,
-			 * num_triplets+1, num_triplets+2)
+			 * num_triplets+1, num_triplets+2). triplet for 320 MHz
+			 * is optional, so different check for one triplet space
+			 * is for that.
 			 */
 			if (num_triplets > 78) {
 				pe_err("Triplets number exceed max size for 3 entries");
@@ -925,6 +927,22 @@ populate_dot11f_country(struct mac_context *mac,
 			buffer_triplets[num_triplets][0] = OP_CLASS_ID_201;
 			buffer_triplets[num_triplets][1] = OP_CLASS_134;
 			num_triplets++;
+			/* Add OP_CLASS_137 when 6 GHz is present and operating BW is 320 MHz */
+			if (pe_session && (pe_session->ch_width == CH_WIDTH_320MHZ)) {
+				/* Ensure space for 1 triplet
+				 * (indices num_triplets)
+				 */
+				if (num_triplets > 80) {
+					pe_err("Triplets number exceed max size");
+					status = QDF_STATUS_E_FAILURE;
+					goto out;
+				}
+				buffer_triplets[num_triplets][0] =
+							OP_CLASS_ID_202;
+				buffer_triplets[num_triplets][1] =
+							OP_CLASS_137;
+				num_triplets++;
+			}
 		}
 
 		/* Start new group */
@@ -950,6 +968,7 @@ populate_dot11f_country(struct mac_context *mac,
 		status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
+
 
 	ctry_ie->num_more_triplets = num_triplets - 1;
 	ctry_ie->first_triplet[0] = buffer_triplets[0][0];
