@@ -12,7 +12,7 @@
 #include <wlan_hdd_object_manager.h>
 #include <wlan_hdd_packet_filter_api.h>
 #include <wlan_dp_ucfg_api.h>
-#include <wlan_vdev_mgr_ucfg_api.h>
+#include <wlan_vdev_mgr_api.h>
 #include <wlan_fwol_ucfg_api.h>
 #include <wma_api.h>
 #include "cds_api.h"
@@ -317,7 +317,7 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 		goto stop_adapter;
 	}
 
-	status = ucfg_wlan_vdev_mgr_set_param_bssid(vdev, &params->bssid[0]);
+	status = wlan_vdev_mgr_set_param_bssid(vdev, &params->bssid[0]);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		ret = qdf_status_to_os_return(status);
 		goto stop_adapter;
@@ -737,6 +737,7 @@ int wlan_hdd_wondertap_set_freq(void *handle,
 							    wlan_hdd_wondertap_bw_to_hw_mode_bw(params->bandwidth))) {
 		hdd_debug("Channel change not allowed freq:%d bw:%d",
 			  params->freq, params->bandwidth);
+		errno = -EINVAL;
 		goto stop_trans;
 	}
 
@@ -955,6 +956,15 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 	return ret;
 }
 
+void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
+{
+	hdd_debug("Channel change successful for wondertap");
+	if (cds_is_driver_recovering())
+		return;
+
+	qdf_event_set(&g_wt_ctx->wondertap_vdev_event);
+}
+
 /**
  * wlan_drv_wondertap_ops - Wondertap operations structure
  *
@@ -1044,13 +1054,4 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 
 	hdd_release_rtnl_lock();
 	hdd_exit();
-}
-
-void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
-{
-	hdd_debug("Channel change successful for wondertap");
-	if (cds_is_driver_recovering())
-		return;
-
-	qdf_event_set(&g_wt_ctx->wondertap_vdev_event);
 }
