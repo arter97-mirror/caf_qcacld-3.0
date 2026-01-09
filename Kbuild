@@ -590,6 +590,10 @@ HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_wifi_pos_pasn.o
 endif
 endif
 
+ifeq ($(CONFIG_DRIVER_PASSTHRU_MODE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_wondertap.o
+endif
+
 $(call add-wlan-objs,hdd,$(HDD_OBJS))
 
 ###### OSIF_SYNC ########
@@ -3749,6 +3753,7 @@ ccflags-$(CONFIG_WLAN_RESIDENT_DRIVER) += -DFEATURE_WLAN_RESIDENT_DRIVER
 ccflags-$(CONFIG_FEATURE_GPIO_CFG) += -DWLAN_FEATURE_GPIO_CFG
 ccflags-$(CONFIG_FEATURE_BUS_BANDWIDTH_MGR) += -DFEATURE_BUS_BANDWIDTH_MGR
 ccflags-$(CONFIG_DP_BE_WAR) += -DDP_BE_WAR
+ccflags-$(CONFIG_DRIVER_PASSTHRU_MODE) += -DDRIVER_PASSTHRU_MODE
 
 ifeq ($(CONFIG_IPCIE_FW_SIM), y)
 ccflags-y += -DCONFIG_PLD_IPCIE_FW_SIM

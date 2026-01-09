@@ -10246,6 +10246,37 @@ lim_update_eht_capable(struct pe_session *session, uint8_t dot11mode)
 {}
 #endif
 
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * lim_send_passthru_channel_change_rsp() - Send Passthru channel change
+ *  response
+ * @session : pointer to PE session
+ *
+ * This function is called to send channel change response for
+ * Passthru interface when the new request matches the existing config.
+ *
+ * Return: None
+ */
+static
+void lim_send_passthru_channel_change_rsp(struct pe_session *session)
+{
+	struct scheduler_msg msg = {0};
+
+	msg.type = eWNI_SME_MONITOR_MODE_VDEV_UP;
+	msg.bodyval = session->vdev_id;
+
+	if (QDF_STATUS_SUCCESS !=
+	    scheduler_post_message(QDF_MODULE_ID_PE,
+				   QDF_MODULE_ID_SME,
+				   QDF_MODULE_ID_SME, &msg))
+		pe_err("Failed to post channel change rsp msg");
+}
+#else
+static inline
+void lim_send_passthru_channel_change_rsp(struct pe_session *session)
+{
+}
+#endif
 
 /**
  * lim_process_sme_channel_change_request() - process sme ch change req
@@ -10321,7 +10352,13 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 						    ch_change_req))) {
 		pe_err("Target channel and mode is same as current channel and mode channel freq %d and mode %d",
 		       session_entry->curr_op_freq, session_entry->ch_width);
-		lim_abort_channel_change(mac_ctx, ch_change_req->vdev_id);
+
+		if (LIM_IS_PASSTHRU_ROLE(session_entry))
+			lim_send_passthru_channel_change_rsp(session_entry);
+		else
+			lim_abort_channel_change(mac_ctx,
+						 ch_change_req->vdev_id);
+
 		return;
 	}
 
