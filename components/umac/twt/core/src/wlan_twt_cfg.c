@@ -22,6 +22,7 @@
 #include "wlan_twt_cfg.h"
 #include "twt/core/src/wlan_twt_priv.h"
 #include "wlan_mlme_twt_ucfg_api.h"
+#include <wlan_policy_mgr_public_struct.h>
 
 QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 {
@@ -29,6 +30,7 @@ QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 	psoc_twt_ext_cfg_params_t *twt_cfg;
 	uint32_t bcast_conf;
 	uint32_t rtwt_conf, twt_req_res_ht_vht;
+	uint8_t i;
 
 	if (!psoc) {
 		twt_err("null psoc");
@@ -53,6 +55,11 @@ QDF_STATUS wlan_twt_cfg_init(struct wlan_objmgr_psoc *psoc)
 	twt_cfg->twt_responder_orig = cfg_get(psoc, CFG_TWT_RESPONDER);
 	twt_cfg->twt_congestion_timeout =
 				cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
+	/* Initialize per-MAC congestion timeout with INI value */
+	for (i = 0; i < MAX_MAC; i++)
+		twt_psoc->twt_congestion_timeout[i] =
+					twt_cfg->twt_congestion_timeout;
+
 	twt_cfg->bcast_requestor_enabled = CFG_TWT_GET_BCAST_REQ(bcast_conf);
 	twt_cfg->bcast_responder_enabled = CFG_TWT_GET_BCAST_RES(bcast_conf);
 	twt_cfg->enable_twt_24ghz = cfg_get(psoc, CFG_ENABLE_TWT_24GHZ);
@@ -267,6 +274,88 @@ wlan_twt_cfg_set_congestion_timeout(struct wlan_objmgr_psoc *psoc, uint32_t val)
 	twt_psoc_obj->cfg_params.twt_congestion_timeout = val;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_get_congestion_timeout_per_mac(struct wlan_objmgr_psoc *psoc,
+					    uint8_t mac_id,
+					    uint32_t *val)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj) {
+		*val = cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (mac_id >= MAX_MAC) {
+		twt_err("Invalid mac_id: %d", mac_id);
+		*val = cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*val = twt_psoc_obj->twt_congestion_timeout[mac_id];
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_set_congestion_timeout_per_mac(struct wlan_objmgr_psoc *psoc,
+					    uint8_t mac_id,
+					    uint32_t val)
+{
+	struct twt_psoc_priv_obj *twt_psoc_obj;
+
+	twt_psoc_obj = wlan_twt_psoc_get_comp_private_obj(psoc);
+	if (!twt_psoc_obj)
+		return QDF_STATUS_E_INVAL;
+
+	if (mac_id == DEFAULT_MAC_ID) {
+		uint8_t i;
+
+		for (i = 0; i < MAX_MAC; i++)
+			twt_psoc_obj->twt_congestion_timeout[i] = val;
+
+		twt_debug("Set congestion_timeout for all MAC %u", val);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (mac_id >= MAX_MAC) {
+		twt_err("Invalid mac_id: %d", mac_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	twt_psoc_obj->twt_congestion_timeout[mac_id] = val;
+	twt_debug("Set congestion_timeout for MAC%d: %u", mac_id, val);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t mac_id)
+{
+	uint32_t ini_congestion_timeout;
+	QDF_STATUS status;
+
+	if (mac_id >= MAX_MAC) {
+		twt_err("Invalid mac_id: %d", mac_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ini_congestion_timeout = cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
+	status = wlan_twt_cfg_set_congestion_timeout_per_mac(
+							psoc, mac_id,
+							ini_congestion_timeout);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		twt_debug("Reset congestion_timeout for MAC%d to INI value: %u",
+			  mac_id, ini_congestion_timeout);
+	else
+		twt_err("Failed to reset congestion_timeout for MAC%d", mac_id);
+
+	return status;
 }
 
 QDF_STATUS

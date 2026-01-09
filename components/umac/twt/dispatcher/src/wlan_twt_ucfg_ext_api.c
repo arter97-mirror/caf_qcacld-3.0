@@ -149,19 +149,6 @@ bool ucfg_twt_cfg_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS
-ucfg_twt_cfg_get_congestion_timeout(struct wlan_objmgr_psoc *psoc,
-				    uint32_t *val)
-{
-	return wlan_twt_cfg_get_congestion_timeout(psoc, val);
-}
-
-QDF_STATUS
-ucfg_twt_cfg_set_congestion_timeout(struct wlan_objmgr_psoc *psoc, uint32_t val)
-{
-	return wlan_twt_cfg_set_congestion_timeout(psoc, val);
-}
-
-QDF_STATUS
 ucfg_twt_cfg_get_24ghz_enabled(struct wlan_objmgr_psoc *psoc, bool *val)
 {
 	return wlan_twt_cfg_get_24ghz_enabled(psoc, val);
@@ -315,4 +302,29 @@ ucfg_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id)
 {
 	return wlan_twt_send_responder_disable_per_vdev(psoc, vdev_id);
+}
+
+QDF_STATUS
+ucfg_twt_cfg_get_congestion_timeout_per_mac(struct wlan_objmgr_psoc *psoc,
+					    uint8_t mac_id,
+					    uint32_t *val)
+{
+	return wlan_twt_cfg_get_congestion_timeout_per_mac(psoc, mac_id, val);
+}
+
+QDF_STATUS
+ucfg_twt_cfg_set_congestion_timeout_per_mac(struct wlan_objmgr_psoc *psoc,
+					    uint8_t mac_id,
+					    uint32_t val)
+{
+	return wlan_twt_cfg_set_congestion_timeout_per_mac(psoc, mac_id, val);
+}
+
+QDF_STATUS
+ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t mac_id)
+{
+	return wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(psoc,
+								     mac_id);
 }

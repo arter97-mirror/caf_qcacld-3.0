@@ -354,6 +354,50 @@ QDF_STATUS
 ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, uint8_t val);
 
 /**
+ * ucfg_twt_cfg_get_congestion_timeout_per_mac() - Get congestion timeout
+ * for specific MAC
+ * @psoc: Pointer to global PSOC object
+ * @mac_id: MAC ID (0 or 1)
+ * @val: pointer to output variable
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_cfg_get_congestion_timeout_per_mac(struct wlan_objmgr_psoc *psoc,
+					    uint8_t mac_id,
+					    uint32_t *val);
+
+/**
+ * ucfg_twt_cfg_set_congestion_timeout_per_mac() - Set congestion timeout
+ * for specific MAC
+ * @psoc: Pointer to global PSOC object
+ * @mac_id: MAC ID (0 or 1)
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_cfg_set_congestion_timeout_per_mac(struct wlan_objmgr_psoc *psoc,
+					    uint8_t mac_id,
+					    uint32_t val);
+
+/**
+ * ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini() - Reset congestion
+ * timeout for specific MAC to INI configured value
+ * @psoc: Pointer to global PSOC object
+ * @mac_id: MAC ID (0 or 1)
+ *
+ * This function resets the twt_congestion_timeout parameter for the specified
+ * MAC to the value configured in INI (CFG_TWT_CONGESTION_TIMEOUT).
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t mac_id);
+
+/**
  * ucfg_twt_cfg_reset_responder() - Reset cfg responder
  * @psoc: psoc
  *

@@ -1192,7 +1192,8 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	if (mode == QDF_P2P_GO_MODE || mode == QDF_SAP_MODE)
 		return osif_send_twt_setup_req(vdev, psoc, &params);
 
-	ucfg_twt_cfg_get_congestion_timeout(psoc, &congestion_timeout);
+	ucfg_twt_cfg_get_congestion_timeout_per_mac(psoc, mac_id,
+						    &congestion_timeout);
 	if (congestion_timeout) {
 		reason = HOST_TWT_DISABLE_REASON_CHANGE_CONGESTION_TIMEOUT;
 		ret = osif_twt_send_requestor_disable_cmd(psoc, mac_id,
@@ -1202,7 +1203,7 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 			return -EOPNOTSUPP;
 		}
 	}
-	ucfg_twt_cfg_set_congestion_timeout(psoc, 0);
+	ucfg_twt_cfg_set_congestion_timeout_per_mac(psoc, mac_id, 0);
 
 	ret = osif_twt_send_requestor_enable_cmd(psoc, mac_id);
 	if (ret) {
