@@ -51,6 +51,7 @@
 #include "wlan_hdd_hostapd.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wma.h"
+#include "wlan_hdd_apf.h"
 #ifdef WLAN_BOOST_CPU_FREQ_IN_ROAM
 #include "hif_main.h"
 #endif
@@ -525,6 +526,8 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 						   rsp->req.req.reason_code,
 						   link_info->rssi_on_disconnect,
 						   is_locally_generated);
+
+	hdd_apf_reset_history(adapter);
 
 	return QDF_STATUS_SUCCESS;
 }
