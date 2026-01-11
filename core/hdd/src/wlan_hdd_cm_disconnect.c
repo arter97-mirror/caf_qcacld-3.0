@@ -51,6 +51,7 @@
 #include "wlan_hdd_hostapd.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wma.h"
+#include "wlan_hdd_apf.h"
 
 void hdd_handle_disassociation_event(struct wlan_hdd_link_info *link_info,
 				     struct qdf_mac_addr *peer_macaddr)
@@ -520,6 +521,8 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 						   rsp->req.req.reason_code,
 						   link_info->rssi_on_disconnect,
 						   is_locally_generated);
+
+	hdd_apf_reset_history(adapter);
 
 	return QDF_STATUS_SUCCESS;
 }
