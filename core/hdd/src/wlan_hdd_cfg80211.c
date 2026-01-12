@@ -26583,10 +26583,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 
 	wlan_hdd_set_auth_deauth_random_ta_feature_flag(wiphy);
 	wlan_hdd_set_ext_feature_punct(wiphy);
-#if defined NL80211_EXT_FEATURE_PROBE_AP_SUPPORT
-	if (wlan_hdd_check_probe_peer_feature(hdd_ctx->psoc))
-		wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_PROBE_AP);
-#endif
+
 	hdd_exit();
 	return 0;
 
@@ -27711,6 +27708,10 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 	wlan_hdd_set_nan_secure_mode(wiphy);
 	wlan_hdd_set_vlan_offload(hdd_ctx);
 	wlan_hdd_set_mfp_optional(wiphy);
+#if defined NL80211_EXT_FEATURE_PROBE_AP_SUPPORT
+	if (wlan_hdd_check_probe_peer_feature(hdd_ctx->psoc))
+		wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_PROBE_AP);
+#endif
 }
 
 /**
@@ -31123,7 +31124,7 @@ static int __wlan_hdd_cfg80211_probe_peer(struct wiphy *wiphy,
 	struct hdd_station_ctx *sta_ctx;
 	uint8_t *peer_bssid;
 	u64 generated_cookie;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	int ret = 0;
 
 	if (!wlan_hdd_check_probe_peer_feature(hdd_ctx->psoc)) {
@@ -31188,6 +31189,9 @@ static int __wlan_hdd_cfg80211_probe_peer(struct wiphy *wiphy,
 	hdd_debug("Generated probe cookie=0x%llx for peer " QDF_MAC_ADDR_FMT
 		  " on %s", generated_cookie, QDF_MAC_ADDR_REF(peer_bssid),
 		  adapter->dev->name);
+
+	status = sme_probe_peer_req(hdd_ctx->mac_handle,
+				    adapter->deflink->vdev_id, peer_bssid);
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to send probe peer request to SME: %d", status);
