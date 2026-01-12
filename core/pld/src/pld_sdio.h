@@ -149,7 +149,7 @@ static inline bool pld_sdio_is_fw_dump_skipped(void)
 #else
 static inline bool pld_sdio_is_fw_dump_skipped(void)
 {
-	return true;
+	return false;
 }
 #endif
 static inline void pld_sdio_device_self_recovery(struct device *dev)

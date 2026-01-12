@@ -4829,6 +4829,7 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	struct sap_config *sap_config;
 	uint32_t capable = 0;
 	enum policy_mgr_con_mode con_mode;
+	bool con_6ghz_usr_allowed = false;
 
 	if (!psoc) {
 		hdd_err("PSOC is NULL");
@@ -4870,20 +4871,22 @@ uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	/* SAP is allowed on 6GHz with explicit indication from user space:
 	 * a. SAP is started on 6Ghz already.
 	 * b. SAP is configured on 6Ghz fixed channel from userspace.
-	 * c. SAP is configured by ACS range which includes any 6Ghz channel.
+	 * c. SAP is MLO
+	 * d. SAP is configured by ACS range which includes any 6Ghz channel.
 	 */
 	if (qdf_atomic_test_bit(SOFTAP_BSS_STARTED, link_info->link_flags)) {
-		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(
-				ap_ctx->operating_chan_freq))
-			capable |= CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED;
+		con_6ghz_usr_allowed =
+			WLAN_REG_IS_6GHZ_CHAN_FREQ(ap_ctx->operating_chan_freq);
 	} else {
-		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_config->chan_freq))
-			capable |= CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED;
-		else if (sap_context && WLAN_REG_IS_6GHZ_CHAN_FREQ(
-				sap_context->chan_freq))
-			capable |= CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED;
+		con_6ghz_usr_allowed =
+			WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_config->chan_freq) ||
+			(sap_context &&
+			 WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_context->chan_freq));
 	}
-	if (wlansap_is_6ghz_included_in_acs_range(sap_context))
+	con_6ghz_usr_allowed = con_6ghz_usr_allowed ||
+			wlan_vdev_mlme_is_mlo_vdev(vdev) ||
+			wlansap_is_6ghz_included_in_acs_range(sap_context);
+	if (con_6ghz_usr_allowed)
 		capable |= CONN_6GHZ_FLAG_ACS_OR_USR_ALLOWED;
 
 	keymgmt = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
