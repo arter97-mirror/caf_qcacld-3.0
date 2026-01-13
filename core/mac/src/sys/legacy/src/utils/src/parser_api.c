@@ -816,9 +816,44 @@ populate_dot11f_avoid_channel_ie(struct mac_context *mac_ctx,
 }
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
+/**
+ * adjacent_same_band() - To check if band is same or not
+ * @prev: prev channel
+ * @cur: curr channel
+ * @chan_spacing_for_2ghz: 2 GHz chan spacing
+ * @chan_spacing_for_5ghz_6ghz: 5/6 GHz chan spacing
+ *
+ * Return: true/false
+ */
+static inline bool adjacent_same_band(const struct regulatory_channel *prev,
+				      const struct regulatory_channel *cur,
+				      uint16_t chan_spacing_for_2ghz,
+				      uint16_t chan_spacing_for_5ghz_6ghz)
+{
+	enum reg_wifi_band b_prev = wlan_reg_freq_to_band(prev->center_freq);
+	enum reg_wifi_band b_cur  = wlan_reg_freq_to_band(cur->center_freq);
+
+	if (b_prev == REG_BAND_UNKNOWN || b_cur == REG_BAND_UNKNOWN)
+		return false; /* Be conservative */
+
+	if (b_prev != b_cur)
+		return false; /* Different band*/
+
+	/*
+	 * Within the same band, apply proper spacing rule using
+	 * channel numbers.
+	 */
+	if (b_prev == REG_BAND_2G)
+		return (prev->chan_num + chan_spacing_for_2ghz) ==
+								cur->chan_num;
+
+	/* For 5/6 GHz, use the shared spacing constant. */
+	return (prev->chan_num + chan_spacing_for_5ghz_6ghz) == cur->chan_num;
+}
+
 QDF_STATUS
-populate_dot11f_country(struct mac_context *mac,
-			tDot11fIECountry *ctry_ie, struct pe_session *pe_session)
+populate_dot11f_country(struct mac_context *mac, tDot11fIECountry *ctry_ie,
+			struct pe_session *pe_session)
 {
 	uint8_t code[REG_ALPHA2_LEN + 1];
 	uint8_t cur_triplet_num_chans = 0;
@@ -848,7 +883,6 @@ populate_dot11f_country(struct mac_context *mac,
 			goto out;
 		}
 	}
-
 	if (!pe_session ||
 	    (mlme_priv && mlme_priv->country_ie_for_all_band)) {
 		status = wlan_mlme_get_band_capability(mac->psoc,
@@ -904,16 +938,20 @@ populate_dot11f_country(struct mac_context *mac,
 			six_gig_started = true;
 		}
 
-		if (start && prev &&
-		    ((prev->chan_num + chan_spacing_for_2ghz ==
-		      cur_chan->chan_num) ||
-		     (prev->chan_num + chan_spacing_for_5ghz_6ghz ==
-		      cur_chan->chan_num)) &&
-		    start->tx_power == cur_chan->tx_power) {
-			/* Can use same entry */
+		/* Continue only if band is not same, tx power is different
+		 * or channel is not the last channel.
+		 */
+		if ((start && prev &&
+		     adjacent_same_band(prev, cur_chan, chan_spacing_for_2ghz,
+					chan_spacing_for_5ghz_6ghz)) &&
+		    (start->tx_power == cur_chan->tx_power)) {
+			/* Can use same entry within the same band */
 			prev = cur_chan;
 			cur_triplet_num_chans++;
 			continue;
+		} else {
+			/* Different band or not adjacent or tx power changed */
+			pe_debug("new triplet (band change or non-adjacent or tx power mismatch or last chan)");
 		}
 
 		if (start && prev) {
@@ -933,7 +971,7 @@ populate_dot11f_country(struct mac_context *mac,
 			num_triplets++;
 		}
 
-		if ((chan_enum == NUM_CHANNELS - 1) && (six_gig_started)) {
+		if (six_gig_started) {
 			/* Ensure space for 3 triplets (indices num_triplets,
 			 * num_triplets+1, num_triplets+2). triplet for 320 MHz
 			 * is optional, so different check for one triplet space
