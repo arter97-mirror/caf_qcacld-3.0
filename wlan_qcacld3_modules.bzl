@@ -2592,11 +2592,6 @@ _conditional_srcs = {
             "cmn/qdf/linux/src/qdf_wakelock_debug.c",
         ],
     },
-    "CONFIG_DRIVER_PASSTHRU_MODE": {
-        True: [
-            "core/hdd/src/wlan_hdd_wondertap.c",
-        ],
-    },
 }
 
 def _define_module_for_target_variant_chipset(target, variant, chipset):
@@ -2859,10 +2854,28 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//build_dir/{}/linux-{}/dataipa-{}:{}_{}_ipam".format(tgt, board, ipa_ver, target, variant),
         ]
 
+    wonder_srcs = []
+    if (target == "canoe" and chipset in ["peach-v2", "kiwi-v2"]) \
+       or (target == "sun" and chipset == "wcn7760"):
+        deps = deps + select({
+            ":wonder_enabled": [
+                "//vendor/qcom/proprietary/wlan/noship/passthru-test-suite-internal:{}_passthru_test".format(tv),
+                "//vendor/qcom/proprietary/wlan/noship/passthru-test-suite-internal:passthru_test_headers",
+            ],
+            "//conditions:default": [],
+        })
+        wonder_srcs = select({
+            ":wonder_enabled": [
+                "core/hdd/src/wlan_hdd_wondertap.c",
+            ],
+            "//conditions:default": [],
+        })
+
     print("name=", name)
     print("hw=", hw)
     print("ipaths=", ipaths)
     print("srcs=", srcs)
+    print("wonder_srcs=", wonder_srcs)
     print("out=", out)
     print("iglobs=", iglobs)
     print("copts=", copts)
@@ -2872,7 +2885,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     ddk_module(
         name = name,
-        srcs = srcs + [":{}_grep_defines".format(tvc)],
+        srcs = srcs + wonder_srcs + [":{}_grep_defines".format(tvc)],
         includes = ipaths + ["."],
         kconfig = kconfig,
         defconfig = defconfig,
