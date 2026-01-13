@@ -210,6 +210,8 @@ QDF_STATUS if_mgr_connect_complete(struct wlan_objmgr_vdev *vdev,
 
 	wlan_ll_sap_switch_bearer_on_sta_connect_complete(psoc, vdev_id);
 
+	ucfg_cfr_send_stop(vdev, 0);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -308,6 +310,7 @@ if_mgr_sta_csa_complete(struct wlan_objmgr_vdev *vdev,
 
 	wlan_tdls_notify_channel_switch_complete(psoc, wlan_vdev_get_id(vdev));
 	policy_mgr_trigger_roam_for_sta_sap_mcc_non_dbs(psoc);
+	ucfg_cfr_send_stop(vdev, 0);
 
 	return QDF_STATUS_SUCCESS;
 }
