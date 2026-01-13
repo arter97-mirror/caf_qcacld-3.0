@@ -400,6 +400,7 @@ static void dp_wfds_work(void *arg)
 				     &wfds_evt->list_node);
 		qdf_spinlock_release(&dl_wfds->wfds_event_list_lock);
 
+		dp_info("Received WFDS evt: %u", wfds_evt->wfds_evt_type);
 		switch (wfds_evt->wfds_evt_type) {
 		case DP_WFDS_NEW_SERVER:
 			dp_wfds_send_config_msg(dl_wfds);
