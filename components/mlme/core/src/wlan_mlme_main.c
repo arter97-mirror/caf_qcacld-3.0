@@ -2024,6 +2024,8 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR3_ROAM_PREAUTH_RETRY_COUNT);
 	lfr->roam_rssi_diff = cfg_get(psoc, CFG_LFR_ROAM_RSSI_DIFF);
 	lfr->roam_rssi_diff_6ghz = cfg_get(psoc, CFG_LFR_ROAM_RSSI_DIFF_6GHZ);
+	lfr->roam_rssi_delta_6ghz_to_non_6ghz =
+		cfg_get(psoc, CFG_LFR_ROAM_RSSI_DELTA_6GHZ_TO_NON_6GHZ);
 	lfr->bg_rssi_threshold = cfg_get(psoc, CFG_LFR_ROAM_BG_RSSI_TH);
 	lfr->roam_scan_offload_enabled =
 		cfg_get(psoc, CFG_LFR_ROAM_SCAN_OFFLOAD_ENABLED);
@@ -2821,6 +2823,20 @@ mlme_init_dual_sta_config(struct wlan_mlme_generic *gen)
 				QCA_WLAN_CONCURRENT_STA_POLICY_UNBIASED;
 }
 
+/**
+ * mlme_init_is_reduced_pwr_scan_mode - Update INI reduced power scan mode
+ * enable/disable
+ * @psoc: PSOC pointer
+ * @scan_mode: scan mode
+ *
+ * Return: None
+ */
+static void mlme_init_is_reduced_pwr_scan_mode(struct wlan_objmgr_psoc *psoc,
+					       bool *scan_mode)
+{
+	*scan_mode = cfg_get(psoc, CFG_REDUCE_PWR_SCAN_MODE);
+}
+
 QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -2876,6 +2892,8 @@ QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	mlme_init_ratemask_cfg(psoc, &mlme_cfg->ratemask_cfg);
 	mlme_init_iot_cfg(psoc, &mlme_cfg->iot);
 	mlme_init_dual_sta_config(&mlme_cfg->gen);
+	mlme_init_is_reduced_pwr_scan_mode(psoc,
+					   &mlme_cfg->reduce_pwr_scan_mode);
 
 	return status;
 }
