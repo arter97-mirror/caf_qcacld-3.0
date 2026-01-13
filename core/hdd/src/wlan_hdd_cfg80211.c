@@ -5401,6 +5401,20 @@ static inline void wlan_hdd_set_wfd_r2_feature(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
+static inline void wlan_hdd_set_cancel_noa_feature(struct wlan_objmgr_psoc *psoc,
+						   uint8_t *feature_flags)
+{
+	if (!ucfg_p2p_is_fw_cancel_one_shot_noa_supported(psoc)) {
+		hdd_debug("cancel one shot noa feature is not supported by FW");
+		return;
+	}
+
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GO_CANCEL_ONE_SHOT_NOA);
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA);
+}
+
 #ifdef FEATURE_WLAN_SUPPORT_PCC
 static inline void wlan_hdd_set_pcc_feature(struct wlan_objmgr_psoc *psoc,
 					    uint8_t *feature_flags)
@@ -5588,6 +5602,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_usd_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_wfd_r2_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_cancel_noa_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_tx_power_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_pcc_feature(hdd_ctx->psoc, feature_flags);
 
