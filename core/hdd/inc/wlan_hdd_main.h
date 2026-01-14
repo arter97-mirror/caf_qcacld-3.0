@@ -133,6 +133,7 @@
 #define HDD_MAX_OEM_DATA_LEN 1024
 #define HDD_MAX_FILE_NAME_LEN 64
 #ifdef FEATURE_WLAN_APF
+#define APF_HISTORY_LEN 5
 /**
  * struct hdd_apf_context - hdd Context for apf
  * @magic: magic number
@@ -150,7 +151,6 @@
  * @apf_inst_index: Index of the current active slot (circular buffer)
  * @apf_inst_timestamp: Timestamp when instruction was stored (microseconds)
  */
-#define APF_HISTORY_LEN 5
 struct hdd_apf_context {
 	unsigned int magic;
 	qdf_event_t qdf_apf_event;
@@ -2355,6 +2355,8 @@ struct hdd_tx_powerboost {
  *			userspace application close/abort
  * @usd_adapter: adapter on which USD frames to be forwarded to userspace
  * @tx_pb: Tx powerboost context
+ * @tas_enabled: Indicate if TAS has enabled
+ * @tas_send_to_fw: Indicate if TAS has sent to FW
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -4493,6 +4495,17 @@ static inline void hdd_set_sg_flags(struct hdd_context *hdd_ctx,
  */
 void hdd_set_netdev_flags(struct hdd_adapter *adapter);
 
+#if defined(FEATURE_TSO) && defined(DP_FEATURE_USO)
+/*
+ * UDP Segment Offload (USO) is enabled only when TSO is enabled,
+ * as USO is built on top of TSO and reuses most of the TSO-related
+ * functions and data structures.
+ */
+#define USO_FEATURE_FLAGS (NETIF_F_GSO_UDP_L4 | NETIF_F_SG)
+#else
+#define USO_FEATURE_FLAGS 0
+#endif
+
 #ifdef FEATURE_TSO
 /**
  * hdd_get_tso_csum_feature_flags() - Return TSO and csum flags if enabled
@@ -4519,6 +4532,8 @@ static inline netdev_features_t hdd_get_tso_csum_feature_flags(void)
 			 */
 			netdev_features |= NETIF_F_TSO | NETIF_F_TSO6 |
 					   NETIF_F_SG;
+			if (cdp_cfg_get(soc, cfg_dp_uso_enable))
+				netdev_features |= USO_FEATURE_FLAGS;
 		}
 	}
 	return netdev_features;

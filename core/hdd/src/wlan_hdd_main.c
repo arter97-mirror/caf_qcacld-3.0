@@ -11290,6 +11290,8 @@ void hdd_set_netdev_flags(struct hdd_adapter *adapter)
 
 	if (cdp_cfg_get(soc, cfg_dp_tso_enable) && enable_csum) {
 		adapter->dev->features |= TSO_FEATURE_FLAGS;
+		if (cdp_cfg_get(soc, cfg_dp_uso_enable))
+			adapter->dev->features |= USO_FEATURE_FLAGS;
 		adapter->tso_csum_feature_enabled = 1;
 	}
 
