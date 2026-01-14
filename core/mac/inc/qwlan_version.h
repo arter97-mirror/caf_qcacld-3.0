@@ -32,7 +32,7 @@
 #define QWLAN_VERSION_MAJOR            5
 #define QWLAN_VERSION_MINOR            2
 #define QWLAN_VERSION_PATCH            1
-#define QWLAN_VERSION_EXTRA            "PostCS-10"
+#define QWLAN_VERSION_EXTRA            "PostCS-11"
 #define QWLAN_VERSION_BUILD            131
 
 #define QWLAN_VERSIONSTR               "5.2.1.131-"QWLAN_VERSION_EXTRA
