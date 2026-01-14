@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -163,6 +163,17 @@ void wlan_tdls_notify_start_bss_failure(struct wlan_objmgr_psoc *psoc);
  */
 void wlan_tdls_notify_start_bss(struct wlan_objmgr_psoc *psoc,
 				struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_tdls_find_peer() - find TDLS peer in TDLS vdev object
+ * @vdev_obj: TDLS vdev object
+ * @macaddr: MAC address of peer
+ *
+ * Return: If peer is found, then it returns pointer to tdls_peer;
+ *         otherwise, it returns NULL.
+ */
+struct tdls_peer *wlan_tdls_find_peer(struct tdls_vdev_priv_obj *vdev_obj,
+				      const uint8_t *macaddr);
 
 #ifdef WLAN_FEATURE_TDLS_CONCURRENCIES
 /**
