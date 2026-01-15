@@ -1409,27 +1409,32 @@ QDF_STATUS wma_vdev_start_resp_handler(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	if (rsp->status == QDF_STATUS_SUCCESS) {
-		if (wlan_res_cfg->use_pdev_id) {
-			if (rsp->mac_id == OL_TXRX_PDEV_ID) {
-				wma_err("soc level id received for mac id");
-				return -QDF_STATUS_E_INVAL;
-			}
-			mac_id = WMA_PDEV_TO_MAC_MAP(rsp->mac_id);
-		} else {
-			mac_id = rsp->mac_id;
-		}
-
-		wma_debug("vdev:%d tx ss=%d rx ss=%d chain mask=%d mac=%d",
-			  rsp->vdev_id, rsp->cfgd_tx_streams,
-			  rsp->cfgd_rx_streams, rsp->chain_mask, mac_id);
-
 		/* Fill bss_chan after vdev start */
 		qdf_mem_copy(iface->vdev->vdev_mlme.bss_chan,
 			     iface->vdev->vdev_mlme.des_chan,
 			     sizeof(struct wlan_channel));
 
-		wma_set_and_update_mac_id(wma, mac_ctx, vdev_mlme, rsp, dp_soc,
-					  mac_id);
+		if (!(mlo_mgr_is_link_switch_in_progress(iface->vdev) &&
+		      mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(
+								wma->psoc))) {
+			if (wlan_res_cfg->use_pdev_id) {
+				if (rsp->mac_id == OL_TXRX_PDEV_ID) {
+					wma_err("soc level id received for mac id");
+					return -QDF_STATUS_E_INVAL;
+				}
+				mac_id = WMA_PDEV_TO_MAC_MAP(rsp->mac_id);
+			} else {
+				mac_id = rsp->mac_id;
+			}
+
+			wma_debug("vdev:%d tx ss=%d rx ss=%d chain mask=%d mac=%d",
+				  rsp->vdev_id, rsp->cfgd_tx_streams,
+				  rsp->cfgd_rx_streams, rsp->chain_mask,
+				  mac_id);
+
+			wma_set_and_update_mac_id(wma, mac_ctx, vdev_mlme, rsp,
+						  dp_soc, mac_id);
+		}
 	}
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
