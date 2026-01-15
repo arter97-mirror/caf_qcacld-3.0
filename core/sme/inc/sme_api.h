@@ -3083,6 +3083,22 @@ QDF_STATUS sme_handle_sae_msg(mac_handle_t mac_handle,
 			      uint8_t sae_status,
 			      struct qdf_mac_addr peer_mac_addr,
 			      const uint8_t *pmkid);
+
+/**
+ * sme_sae_roam_preauth_scan_offload() - Send scan command to handle
+ * sae preauth.
+ * @mac_handle: The handle returned by mac_open
+ * @vdev_id: vdev id
+ *
+ * Builds a single channel scan request and sends it to scan module.
+ * Scan dwell time is the time allocated to go to preauth candidate
+ * channel for auth frame exchange.
+ *
+ * Return: Status of sending message to scan module.
+ */
+QDF_STATUS
+sme_sae_roam_preauth_scan_offload(struct mac_context *mac_ctx,
+				  uint8_t vdev_id);
 #else
 static inline
 QDF_STATUS sme_handle_sae_msg(mac_handle_t mac_handle,
@@ -3090,6 +3106,13 @@ QDF_STATUS sme_handle_sae_msg(mac_handle_t mac_handle,
 			      uint8_t sae_status,
 			      struct qdf_mac_addr peer_mac_addr,
 			      const uint8_t *pmkid)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+sme_sae_roam_preauth_scan_offload(struct mac_context *mac_ctx,
+				  uint8_t vdev_id)
 {
 	return QDF_STATUS_SUCCESS;
 }

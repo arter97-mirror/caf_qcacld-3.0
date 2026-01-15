@@ -5736,4 +5736,14 @@ struct sir_update_session_txq_edca_param {
 	uint8_t vdev_id;
 	tSirMacEdcaParamRecord txq_edca_params;
 };
+
+/**
+ * struct sir_preauth_scan_offload
+ * @type: Message type
+ * @vdev_id: vdev id
+ */
+struct sir_preauth_scan_offload {
+	uint16_t type;
+	uint8_t vdev_id;
+};
 #endif /* __SIR_API_H */
