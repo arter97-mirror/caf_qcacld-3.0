@@ -245,7 +245,7 @@ static int wlan_cfg80211_set_pasn_key(struct hdd_adapter *adapter,
 				      struct nlattr **tb)
 {
 	struct wlan_crypto_key *crypto_key;
-	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_vdev *vdev = NULL;
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_psoc *psoc =
 			adapter->hdd_ctx->psoc;
@@ -256,22 +256,13 @@ static int wlan_cfg80211_set_pasn_key(struct hdd_adapter *adapter,
 	int ret = 0;
 	int cipher_len;
 	uint32_t cipher;
-
-	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
-					   WLAN_WIFI_POS_CORE_ID);
-	if (!vdev) {
-		hdd_err("Key params is NULL");
-		return -EINVAL;
-	}
+	uint8_t vdev_id;
 
 	crypto_key = qdf_mem_malloc(sizeof(*crypto_key));
-	if (!crypto_key) {
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_WIFI_POS_CORE_ID);
+	if (!crypto_key)
 		return -ENOMEM;
-	}
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_SECURE_RANGING_CTX_CIPHER]) {
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_WIFI_POS_CORE_ID);
 		qdf_mem_free(crypto_key);
 		return -EINVAL;
 	}
@@ -287,7 +278,6 @@ static int wlan_cfg80211_set_pasn_key(struct hdd_adapter *adapter,
 	    (crypto_key->keylen >
 	     (WLAN_CRYPTO_KEYBUF_SIZE + WLAN_CRYPTO_MICBUF_SIZE))) {
 		hdd_err_rl("Invalid key length %d", crypto_key->keylen);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_WIFI_POS_CORE_ID);
 		qdf_mem_free(crypto_key);
 		return -EINVAL;
 	}
@@ -299,7 +289,6 @@ static int wlan_cfg80211_set_pasn_key(struct hdd_adapter *adapter,
 
 	if (!tb[QCA_WLAN_VENDOR_ATTR_SECURE_RANGING_CTX_PEER_MAC_ADDR]) {
 		hdd_err_rl("BSSID is not present");
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_WIFI_POS_CORE_ID);
 		qdf_mem_free(crypto_key);
 		return -EINVAL;
 	}
@@ -311,27 +300,46 @@ static int wlan_cfg80211_set_pasn_key(struct hdd_adapter *adapter,
 		     nla_data(tb[QCA_WLAN_VENDOR_ATTR_SECURE_RANGING_CTX_PEER_MAC_ADDR]),
 		     QDF_MAC_ADDR_SIZE);
 
-	hdd_debug("PASN unicast key opmode %d, key_len %d",
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac.bytes,
+					   WLAN_WIFI_POS_CORE_ID);
+	if (!peer) {
+		hdd_err("PASN peer is not found");
+		qdf_mem_free(crypto_key);
+		return -EFAULT;
+	}
+
+	vdev = wlan_peer_get_vdev(peer);
+	if (!vdev) {
+		hdd_err("Vdev is NULL for PASN peer");
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_CORE_ID);
+		qdf_mem_free(crypto_key);
+		return -EINVAL;
+	}
+
+	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_WIFI_POS_CORE_ID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get vdev reference");
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_CORE_ID);
+		qdf_mem_free(crypto_key);
+		return -EFAULT;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	hdd_debug("PASN unicast key opmode %d, key_len %d, vdev_id %d",
 		  vdev->vdev_mlme.vdev_opmode,
-		  crypto_key->keylen);
+		  crypto_key->keylen,
+		  vdev_id);
 
 	status = ucfg_crypto_set_key_req(vdev, crypto_key,
 					 WLAN_CRYPTO_KEY_TYPE_UNICAST);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("PASN set_key failed");
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_WIFI_POS_CORE_ID);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_WIFI_POS_CORE_ID);
+		wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_CORE_ID);
 		qdf_mem_free(crypto_key);
 		return -EFAULT;
 	}
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_WIFI_POS_CORE_ID);
 	qdf_mem_free(crypto_key);
-
-	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac.bytes,
-					   WLAN_WIFI_POS_CORE_ID);
-	if (!peer) {
-		hdd_err("PASN peer is not found");
-		return -EFAULT;
-	}
 
 	/*
 	 * If LTF key seed is not required for the peer, then update
@@ -342,6 +350,7 @@ static int wlan_cfg80211_set_pasn_key(struct hdd_adapter *adapter,
 	 */
 	is_ltf_keyseed_required =
 			ucfg_wifi_pos_is_ltf_keyseed_required_for_peer(peer);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_WIFI_POS_CORE_ID);
 	wlan_objmgr_peer_release_ref(peer, WLAN_WIFI_POS_CORE_ID);
 	if (is_ltf_keyseed_required)
 		return 0;
@@ -350,7 +359,7 @@ static int wlan_cfg80211_set_pasn_key(struct hdd_adapter *adapter,
 	if (!pasn_status)
 		return -ENOMEM;
 
-	pasn_status->vdev_id = adapter->deflink->vdev_id;
+	pasn_status->vdev_id = vdev_id;
 	pasn_status->num_peers = 1;
 
 	qdf_mem_copy(pasn_status->auth_status[0].peer_mac.bytes,
