@@ -172,7 +172,7 @@ static QDF_STATUS sme_process_set_hw_mode_resp(struct mac_context *mac, uint8_t 
 		 */
 	}
 
-	entry = csr_nonscan_active_ll_peek_head(mac, LL_ACCESS_LOCK);
+	entry = csr_sme_umac_ser_active_ll_peek_head(mac);
 	if (!entry) {
 		sme_err("No cmd found in active list");
 		return QDF_STATUS_E_FAILURE;
@@ -255,8 +255,7 @@ static QDF_STATUS sme_process_set_hw_mode_resp(struct mac_context *mac, uint8_t 
 	}
 
 end:
-	found = csr_nonscan_active_ll_remove_entry(mac, entry,
-			LL_ACCESS_LOCK);
+	found = csr_sme_umac_ser_active_ll_remove_entry(mac, entry);
 	if (found)
 		/* Now put this command back on the available command list */
 		csr_release_command(mac, command);
@@ -430,7 +429,7 @@ tSmeCmd *sme_get_command_buffer(struct mac_context *mac)
 		int idx = 1;
 
 		/* Cannot change pRetCmd here since it needs to return later. */
-		pEntry = csr_nonscan_active_ll_peek_head(mac, LL_ACCESS_LOCK);
+		pEntry = csr_sme_umac_ser_active_ll_peek_head(mac);
 		if (pEntry)
 			pTempCmd = GET_BASE_ADDR(pEntry, tSmeCmd, Link);
 
@@ -445,9 +444,7 @@ tSmeCmd *sme_get_command_buffer(struct mac_context *mac)
 		} /* if(pTempCmd) */
 
 		/* dump what is in the pending queue */
-		pEntry =
-			csr_nonscan_pending_ll_peek_head(mac,
-					 LL_ACCESS_NOLOCK);
+		pEntry = csr_sme_umac_ser_pending_ll_peek_head(mac);
 		while (pEntry && !sme_command_queue_full) {
 			pTempCmd = GET_BASE_ADDR(pEntry, tSmeCmd, Link);
 			/* Print only 1st five commands from pending queue. */
@@ -460,8 +457,7 @@ tSmeCmd *sme_get_command_buffer(struct mac_context *mac)
 				 * code is for that command
 				 */
 				dump_csr_command_info(mac, pTempCmd);
-			pEntry = csr_nonscan_pending_ll_next(mac, pEntry,
-					    LL_ACCESS_NOLOCK);
+			pEntry = csr_sme_umac_ser_pending_ll_next(mac, pEntry);
 		}
 
 		if (mac->mlme_cfg->gen.fatal_event_trigger)
@@ -686,7 +682,7 @@ static uint32_t sme_get_sessionid_from_activelist(struct mac_context *mac)
 	tSmeCmd *command;
 	uint32_t vdev_id = WLAN_UMAC_VDEV_ID_MAX;
 
-	entry = csr_nonscan_active_ll_peek_head(mac, LL_ACCESS_LOCK);
+	entry = csr_sme_umac_ser_active_ll_peek_head(mac);
 	if (entry) {
 		command = GET_BASE_ADDR(entry, tSmeCmd, Link);
 		vdev_id = command->vdev_id;
@@ -1815,7 +1811,7 @@ static QDF_STATUS sme_process_dual_mac_config_resp(struct mac_context *mac,
 		 */
 	}
 
-	entry = csr_nonscan_active_ll_peek_head(mac, LL_ACCESS_LOCK);
+	entry = csr_sme_umac_ser_active_ll_peek_head(mac);
 	if (!entry) {
 		sme_err("No cmd found in active list");
 		return QDF_STATUS_E_FAILURE;
@@ -1846,7 +1842,7 @@ static QDF_STATUS sme_process_dual_mac_config_resp(struct mac_context *mac,
 		sme_err("Callback does not exist");
 	}
 
-	found = csr_nonscan_active_ll_remove_entry(mac, entry, LL_ACCESS_LOCK);
+	found = csr_sme_umac_ser_active_ll_remove_entry(mac, entry);
 	if (found)
 		/* Now put this command back on the available command list */
 		csr_release_command(mac, command);
@@ -1929,7 +1925,7 @@ static QDF_STATUS sme_process_antenna_mode_resp(struct mac_context *mac,
 		 * needs to be freed
 		 */
 
-	entry = csr_nonscan_active_ll_peek_head(mac, LL_ACCESS_LOCK);
+	entry = csr_sme_umac_ser_active_ll_peek_head(mac);
 	if (!entry) {
 		sme_err("No cmd found in active list");
 		return QDF_STATUS_E_FAILURE;
@@ -1957,7 +1953,7 @@ static QDF_STATUS sme_process_antenna_mode_resp(struct mac_context *mac,
 		sme_err("Callback does not exist");
 	}
 
-	found = csr_nonscan_active_ll_remove_entry(mac, entry, LL_ACCESS_LOCK);
+	found = csr_sme_umac_ser_active_ll_remove_entry(mac, entry);
 	if (found)
 		/* Now put this command back on the available command list */
 		csr_release_command(mac, command);
@@ -2741,7 +2737,7 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 		sme_err("reason not ch_width update");
 		return QDF_STATUS_E_INVAL;
 	}
-	entry = csr_nonscan_active_ll_peek_head(mac, LL_ACCESS_LOCK);
+	entry = csr_sme_umac_ser_active_ll_peek_head(mac);
 	if (!entry) {
 		sme_err("No cmd found in active list");
 		return QDF_STATUS_E_FAILURE;
@@ -2778,7 +2774,7 @@ sme_process_sap_ch_width_update_rsp(struct mac_context *mac, uint8_t *msg)
 
 	policy_mgr_set_connection_update(mac->psoc);
 
-	found = csr_nonscan_active_ll_remove_entry(mac, entry, LL_ACCESS_LOCK);
+	found = csr_sme_umac_ser_active_ll_remove_entry(mac, entry);
 	if (found) {
 		/* Now put this command back on the available command list */
 		csr_release_command(mac, command);
@@ -3265,7 +3261,7 @@ static QDF_STATUS sme_process_nss_update_resp(struct mac_context *mac, uint8_t *
 		sme_err("reason not NSS update");
 		return QDF_STATUS_E_INVAL;
 	}
-	entry = csr_nonscan_active_ll_peek_head(mac, LL_ACCESS_LOCK);
+	entry = csr_sme_umac_ser_active_ll_peek_head(mac);
 	if (!entry) {
 		sme_err("No cmd found in active list");
 		return QDF_STATUS_E_FAILURE;
@@ -3298,7 +3294,7 @@ static QDF_STATUS sme_process_nss_update_resp(struct mac_context *mac, uint8_t *
 		sme_err("Callback does not exist");
 	}
 
-	found = csr_nonscan_active_ll_remove_entry(mac, entry, LL_ACCESS_LOCK);
+	found = csr_sme_umac_ser_active_ll_remove_entry(mac, entry);
 	if (found) {
 		/* Now put this command back on the available command list */
 		csr_release_command(mac, command);

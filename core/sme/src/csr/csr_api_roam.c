@@ -2424,15 +2424,14 @@ csr_is_deauth_disassoc_in_pending_q(struct mac_context *mac_ctx,
 	tListElem *entry = NULL;
 	tSmeCmd *sme_cmd;
 
-	entry = csr_nonscan_pending_ll_peek_head(mac_ctx, LL_ACCESS_NOLOCK);
+	entry = csr_sme_umac_ser_pending_ll_peek_head(mac_ctx);
 	while (entry) {
 		sme_cmd = GET_BASE_ADDR(entry, tSmeCmd, Link);
 		if ((sme_cmd->vdev_id == vdev_id) &&
 		    csr_peer_mac_match_cmd(sme_cmd, false, peer_macaddr,
 					   peer_mld_addr, vdev_id))
 			return true;
-		entry = csr_nonscan_pending_ll_next(mac_ctx, entry,
-						    LL_ACCESS_NOLOCK);
+		entry = csr_sme_umac_ser_pending_ll_next(mac_ctx, entry);
 	}
 
 	return false;
@@ -4673,14 +4672,14 @@ void csr_roam_wm_status_change_complete(struct mac_context *mac,
 	tListElem *pEntry;
 	tSmeCmd *pCommand;
 
-	pEntry = csr_nonscan_active_ll_peek_head(mac, LL_ACCESS_LOCK);
+	pEntry = csr_sme_umac_ser_active_ll_peek_head(mac);
 	if (pEntry) {
 		pCommand = GET_BASE_ADDR(pEntry, tSmeCmd, Link);
 		if (eSmeCommandWmStatusChange == pCommand->command) {
 			/* Nothing to process in a Lost Link completion....  It just kicks off a */
 			/* roaming sequence. */
-			if (csr_nonscan_active_ll_remove_entry(mac, pEntry,
-				    LL_ACCESS_LOCK)) {
+			if (csr_sme_umac_ser_active_ll_remove_entry(mac,
+								    pEntry)) {
 				csr_release_command(mac, pCommand);
 			} else {
 				sme_err("vdev %d Failed to release command",

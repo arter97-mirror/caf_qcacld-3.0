@@ -824,29 +824,27 @@ QDF_STATUS sme_qos_msg_processor(struct mac_context *mac_ctx,
 	/* switch on the msg type & make the state transition accordingly */
 	switch (msg_type) {
 	case eWNI_SME_ADDTS_RSP:
-		entry = csr_nonscan_active_ll_peek_head(mac_ctx,
-				LL_ACCESS_LOCK);
+		entry = csr_sme_umac_ser_active_ll_peek_head(mac_ctx);
 		if (!entry)
 			break;
 		command = GET_BASE_ADDR(entry, tSmeCmd, Link);
 		if (eSmeCommandAddTs == command->command) {
 			status = sme_qos_process_add_ts_rsp(mac_ctx, msg);
-			if (csr_nonscan_active_ll_remove_entry(mac_ctx, entry,
-					LL_ACCESS_LOCK)) {
+			if (csr_sme_umac_ser_active_ll_remove_entry(mac_ctx,
+								    entry)) {
 				qos_release_command(mac_ctx, command);
 			}
 		}
 		break;
 	case eWNI_SME_DELTS_RSP:
-		entry = csr_nonscan_active_ll_peek_head(mac_ctx,
-				LL_ACCESS_LOCK);
+		entry = csr_sme_umac_ser_active_ll_peek_head(mac_ctx);
 		if (!entry)
 			break;
 		command = GET_BASE_ADDR(entry, tSmeCmd, Link);
 		if (eSmeCommandDelTs == command->command) {
 			status = sme_qos_process_del_ts_rsp(mac_ctx, msg);
-			if (csr_nonscan_active_ll_remove_entry(mac_ctx, entry,
-					LL_ACCESS_LOCK)) {
+			if (csr_sme_umac_ser_active_ll_remove_entry(mac_ctx,
+								    entry)) {
 				qos_release_command(mac_ctx, command);
 			}
 		}

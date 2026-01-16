@@ -560,18 +560,44 @@ QDF_STATUS
 csr_roam_update_rnr_ies(struct mac_context *mac,
 			struct ssirupdaternrie *updateie);
 
-bool csr_nonscan_active_ll_remove_entry(
-			struct mac_context *mac_ctx,
-			tListElem *pEntryToRemove, bool inter_locked);
-tListElem *csr_nonscan_active_ll_peek_head(
-			struct mac_context *mac_ctx,
-			bool inter_locked);
-tListElem *csr_nonscan_pending_ll_peek_head(
-			struct mac_context *mac_ctx,
-			bool inter_locked);
-tListElem *csr_nonscan_pending_ll_next(
-			struct mac_context *mac_ctx,
-		tListElem *entry, bool inter_locked);
+/*
+ * csr_sme_umac_ser_active_ll_remove_entry() - Peek and remove sme active cmd
+ * @mac_ctx: mac global structure
+ * @pEntryToRemove: node to remove
+ *
+ * Return: true if cmd found else false
+ */
+bool csr_sme_umac_ser_active_ll_remove_entry(struct mac_context *mac_ctx,
+					     tListElem *pEntryToRemove);
+
+/*
+ * csr_sme_umac_ser_active_ll_peek_head() - Peek ser active cmd to check for
+ * any active sme umac cmd
+ * @mac_ctx: mac global structure
+ *
+ * Return: sme_cmd pointer if active cmd is sme umac cmd else null
+ */
+tListElem *csr_sme_umac_ser_active_ll_peek_head(struct mac_context *mac_ctx);
+
+/*
+ * csr_sme_umac_ser_pending_ll_peek_head() - Peek ser pending cmd list to
+ * get first sme umac cmd
+ * @mac_ctx: mac global structure
+ *
+ * Return: sme_cmd pointer if pending cmd is sme umac cmd else null
+ */
+tListElem *csr_sme_umac_ser_pending_ll_peek_head(struct mac_context *mac_ctx);
+
+/*
+ * csr_sme_umac_ser_pending_ll_next() - Peek next sme umac cmd from pending cmd
+ * list
+ * @mac_ctx: mac global structure
+ * @entry: Entry of prev node
+ *
+ * Return: sme_cmd pointer of next sme umac pending cmd else null
+ */
+tListElem *csr_sme_umac_ser_pending_ll_next(struct mac_context *mac_ctx,
+					    tListElem *entry);
 
 /**
  * csr_purge_pdev_all_ser_cmd_list() - purge all scan and non-scan
