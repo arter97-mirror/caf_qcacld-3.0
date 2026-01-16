@@ -145,7 +145,7 @@ out:
 	osif_psoc_sync_destroy(psoc_sync);
 }
 
-#if defined(CONFIG_PLD_SDIO_CNSS) && !defined(CNSS_IN_CNSS2)
+#ifdef CONFIG_PLD_SDIO_CNSS
 /**
  * pld_sdio_reinit() - SSR re-initialize function for SDIO device
  * @sdio_func: pointer to sdio device function
@@ -206,8 +206,6 @@ static void pld_sdio_crash_shutdown(struct sdio_func *sdio_func)
 	if (pld_context->ops->crash_shutdown)
 		pld_context->ops->crash_shutdown(dev, PLD_BUS_TYPE_SDIO);
 }
-
-#endif
 
 #ifdef CONFIG_PM
 /**
@@ -299,7 +297,7 @@ static struct sdio_device_id pld_sdio_id_table[] = {
 	{},
 };
 
-#if defined(CONFIG_PLD_SDIO_CNSS2) || defined(CNSS_IN_CNSS2)
+#ifdef CONFIG_PLD_SDIO_CNSS2
 /**
  * pld_sdio_reinit() - SSR re-initialize function for SDIO device
  * @sdio_func: pointer to sdio device function
@@ -344,7 +342,6 @@ static void pld_sdio_crash_shutdown(struct sdio_func *sdio_func)
 	/* TODO */
 }
 
-#ifdef CONFIG_PLD_SDIO_CNSS2
 static void pld_sdio_uevent(struct sdio_func *sdio_func, uint32_t status)
 {
 	struct pld_context *pld_context;
