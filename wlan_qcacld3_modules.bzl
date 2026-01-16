@@ -1978,6 +1978,11 @@ _conditional_srcs = {
             "core/wma/src/wma_uhr.c",
         ],
     },
+    "CONFIG_WLAN_FEATURE_11BN_SMD": {
+        True: [
+            "components/umac/mlme/mlo_mgr/src/wlan_smd_roam.c",
+        ],
+    },
     "CONFIG_WLAN_FEATURE_ACTION_OUI": {
         True: [
             "components/action_oui/core/src/wlan_action_oui_main.c",
