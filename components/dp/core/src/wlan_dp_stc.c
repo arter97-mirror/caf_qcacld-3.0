@@ -177,7 +177,7 @@ check_burst:
 		 */
 		uint32_t bytes = flow_entry->burst_start_detect_bytes;
 
-		if (time_delta < BURST_START_TIME_THRESHOLD_NS &&
+		if (time_delta <= BURST_START_TIME_THRESHOLD_NS &&
 		    (bytes + pkt_len) < BURST_START_BYTES_THRESHOLD) {
 			/* BURST not started, but continue detection */
 			flow_entry->burst_start_detect_bytes += pkt_len;
@@ -188,8 +188,8 @@ check_burst:
 			flow_entry->burst_start_detect_bytes = 0;
 			flow_entry->cur_burst_bytes = 0;
 			goto check_burst;
-		} else if (time_delta < BURST_START_TIME_THRESHOLD_NS &&
-			   (bytes + pkt_len) > BURST_START_BYTES_THRESHOLD) {
+		} else if (time_delta <= BURST_START_TIME_THRESHOLD_NS &&
+			   (bytes + pkt_len) >= BURST_START_BYTES_THRESHOLD) {
 			/* Valid burst start */
 			flow_entry->burst_start_detect_bytes += pkt_len;
 			flow_entry->burst_state = BURST_DETECTION_BURST_START;
