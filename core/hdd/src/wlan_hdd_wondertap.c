@@ -272,11 +272,16 @@ int __wlan_hdd_stop_wondertap_intf(struct hdd_context *hdd_ctx,
 	policy_mgr_decr_session_set_pcl(hdd_ctx->psoc, QDF_PASSTHRU_MODE,
 					adapter->deflink->vdev_id);
 
-	hdd_stop_no_trans(adapter->dev);
+	hdd_stop_adapter(hdd_ctx, adapter);
+	hdd_deinit_adapter(hdd_ctx, adapter, true);
+	clear_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 
 	ucfg_fwol_configure_global_params(hdd_ctx->psoc, hdd_ctx->pdev);
 
 	wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 1);
+
+	if (!hdd_is_any_interface_open(hdd_ctx))
+		hdd_psoc_idle_timer_start(hdd_ctx);
 
 done:
 	return qdf_status_to_os_return(status);
