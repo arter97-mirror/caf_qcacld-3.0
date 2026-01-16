@@ -344,6 +344,7 @@ typedef struct sSirProbeRespBeacon {
 	tDot11fIEWMMParams wmm_params;
 #ifdef WLAN_FEATURE_11BN
 	struct wlan_uhr_op_ie uhr_op_ie;
+	struct wlan_uhr_cap_info uhr_cap_ie;
 #endif
 } tSirProbeRespBeacon, *tpSirProbeRespBeacon;
 
@@ -434,6 +435,9 @@ typedef struct sSirAssocReq {
 	struct qdf_mac_addr src_mac;
 	uint16_t hlp_data_len;
 	uint8_t hlp_data[FILS_MAX_HLP_DATA_LEN];
+#endif
+#ifdef WLAN_FEATURE_11BN
+	struct wlan_uhr_cap_info uhr_cap_ie;
 #endif
 } tSirAssocReq, *tpSirAssocReq;
 
@@ -560,6 +564,7 @@ typedef struct sSirAssocRsp {
 #endif
 #ifdef WLAN_FEATURE_11BN
 	struct wlan_uhr_op_ie uhr_op_ie;
+	struct wlan_uhr_cap_info uhr_cap_ie;
 #endif
 } tSirAssocRsp, *tpSirAssocRsp;
 
@@ -2024,6 +2029,26 @@ populate_oci_ie(struct mac_context *mac,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BN
+/**
+ * populate_dot11f_uhr_caps() - populate UHR capabilities IE
+ * @mac_ctx: Global MAC context
+ * @session: PE session
+ *
+ * Return: UHR CAP IE len
+ */
+uint16_t populate_dot11f_uhr_caps(struct mac_context *mac,
+				  struct pe_session *session);
+#else
+static inline uint16_t
+populate_dot11f_uhr_caps(struct mac_context *mac,
+			 struct pe_session *session)
+{
+	return 0;
+}
+#endif
+
 /**
  * populate_dot11f_btm_extended_caps() - populate btm extended capabilities
  * @mac_ctx: Global MAC context.
@@ -2259,6 +2284,24 @@ QDF_STATUS
 lim_unpack_ieee80211_uhr_op_payload(uint8_t *uhr_op_payload,
 				    qdf_size_t uhr_op_payload_len,
 				    struct wlan_uhr_op_ie *uhr);
+
+void
+sir_convert_assoc_resp_frame2_uhr_cap_struct(uint8_t *frame,
+					     uint32_t frame_len,
+					     tDot11fAssocResponse *ar,
+					     tpSirAssocRsp p_assoc_rsp);
+
+void
+sir_convert_assoc_req_frame2_uhr_cap_struct(uint8_t *pframe,
+					    uint32_t nframe,
+					    tDot11fAssocRequest *ar,
+					    tpSirAssocReq p_assoc_req);
+
+void
+sir_convert_probe_frame2_uhr_cap_struct(uint8_t *pframe,
+					uint32_t nframe,
+					tDot11fProbeResponse *pr,
+					tpSirProbeRespBeacon p_probe_resp);
 #else
 static inline void
 sir_convert_assoc_resp_frame2_uhr_op_struct(uint8_t *frame,
@@ -2283,12 +2326,28 @@ sir_convert_beacon_frame2_uhr_op_struct(uint8_t *pframe, uint32_t nframe,
 {
 }
 
-static inline QDF_STATUS
-lim_unpack_ieee80211_uhr_op_payload(uint8_t *uhr_op_payload,
-				    qdf_size_t uhr_op_payload_len,
-				    struct wlan_uhr_op_ie *uhr)
+static inline void
+sir_convert_assoc_resp_frame2_uhr_cap_struct(uint8_t *frame,
+					     uint32_t frame_len,
+					     tDot11fAssocResponse *ar,
+					     tpSirAssocRsp p_assoc_rsp)
 {
-	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+sir_convert_assoc_req_frame2_uhr_cap_struct(uint8_t *pframe,
+					    uint32_t nframe,
+					    tDot11fAssocRequest *ar,
+					    tpSirAssocReq p_assoc_req)
+{
+}
+
+static inline void
+sir_convert_probe_frame2_uhr_cap_struct(uint8_t *pframe,
+					uint32_t nframe,
+					tDot11fProbeResponse *pr,
+					tpSirProbeRespBeacon p_probe_resp)
+{
 }
 #endif
 #endif /* __PARSE_H__ */

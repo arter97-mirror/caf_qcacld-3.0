@@ -186,6 +186,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint16_t mlo_ie_len = 0;
 	tSirMacAddr bcast_mac = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 	enum rateid min_rid;
+	uint8_t uhr_cap_ie_len = 0;
 
 	if (!pesession)
 		return QDF_STATUS_E_NULL_VALUE;
@@ -396,6 +397,12 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		pr->eht_cap.present = false;
 	}
 
+	if (IS_DOT11_MODE_UHR(dot11mode) && pesession->lim_join_req &&
+	    !qdf_is_macaddr_broadcast((struct qdf_mac_addr *)&bssid)) {
+		lim_update_session_uhr_capable(pesession, true);
+		uhr_cap_ie_len = populate_dot11f_uhr_caps(mac_ctx, pesession);
+	}
+
 	/* That's it-- now we pack it.  First, how much space are we going to */
 	status = dot11f_get_packed_probe_request_size(mac_ctx, pr, &payload);
 	if (DOT11F_FAILED(status)) {
@@ -409,7 +416,7 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	bytes = payload + sizeof(tSirMacMgmtHdr) + addn_ielen + mlo_ie_len +
-		eht_cap_ie_len;
+		eht_cap_ie_len + uhr_cap_ie_len;
 
 	/* Ok-- try to allocate some memory: */
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
@@ -461,6 +468,17 @@ QDF_STATUS lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		}
 
 		payload += mlo_ie_len;
+	}
+
+	if (uhr_cap_ie_len) {
+		qdf_status = lim_fill_complete_uhr_cap_ie(
+				pesession, uhr_cap_ie_len,
+				frame + sizeof(tSirMacMgmtHdr) + payload);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_debug("assemble uhr cap ie error");
+			uhr_cap_ie_len = 0;
+		}
+		payload += uhr_cap_ie_len;
 	}
 
 	pe_nofl_debug("Probe req TX: vdev %d seq num %d to " QDF_MAC_ADDR_FMT " len %d",
@@ -655,7 +673,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	uint16_t tpe_ie_len = 0;
 	tDot11fIEtransmit_power_env *transmit_power_env = NULL;
 	uint16_t num_transmit_power_env = 0;
-	uint16_t uhr_op_ie_len;
+	uint16_t uhr_op_ie_len = 0, uhr_cap_ie_len = 0;
 
 	/* We don't answer requests in this case*/
 	if (ANI_DRIVER_TYPE(mac_ctx) == QDF_DRIVER_TYPE_MFG)
@@ -823,9 +841,12 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 					      &frm->eht_op);
 	}
 
-	if (lim_is_session_uhr_capable(pe_session))
+	if (lim_is_session_uhr_capable(pe_session)) {
 		uhr_op_ie_len = populate_dot11f_assoc_probe_rsp_uhr_op_ie(
 					mac_ctx, pe_session);
+
+		uhr_cap_ie_len = populate_dot11f_uhr_caps(mac_ctx, pe_session);
+	}
 
 	populate_dot11f_ext_cap(mac_ctx, is_vht_enabled, &frm->ExtCap,
 				pe_session->vdev_id);
@@ -942,7 +963,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	bytes += payload + sizeof(tSirMacMgmtHdr) + mlo_ie_len + tpe_ie_len +
-		 uhr_op_ie_len;
+		 uhr_op_ie_len + uhr_cap_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				      (void **)&packet);
@@ -1007,6 +1028,17 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			uhr_op_ie_len = 0;
 		}
 		payload += uhr_op_ie_len;
+	}
+
+	if (uhr_cap_ie_len) {
+		qdf_status = lim_fill_complete_uhr_cap_ie(
+				pe_session, uhr_cap_ie_len,
+				frame + sizeof(tSirMacMgmtHdr) + payload);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_debug("assemble uhr cap ie error");
+			uhr_cap_ie_len = 0;
+		}
+		payload += uhr_cap_ie_len;
 	}
 
 	pe_debug("Sending Probe Response frame to: "QDF_MAC_ADDR_FMT,
@@ -2246,7 +2278,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	tpDphHashNode sta = NULL;
 	struct pe_session *pe_session;
 	uint8_t out_vdevid = 0xff;
-	uint16_t uhr_op_ie_len = 0;
+	uint16_t uhr_op_ie_len = 0, uhr_cap_ie_len = 0;
 
 	sta = lim_pickup_correct_link_and_dest_addr(mac_ctx, in_pe_session,
 						    in_sta, peer_addr,
@@ -2551,10 +2583,12 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	if (sta && lim_is_sta_uhr_capable(sta) &&
-	    lim_is_session_uhr_capable(pe_session))
+	    lim_is_session_uhr_capable(pe_session)) {
 		uhr_op_ie_len =
 			populate_dot11f_assoc_probe_rsp_uhr_op_ie(mac_ctx,
 								  pe_session);
+		uhr_cap_ie_len = populate_dot11f_uhr_caps(mac_ctx, pe_session);
+	}
 
 	fils_info = lim_get_fils_info(pe_session, peer_addr);
 
@@ -2615,7 +2649,8 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	bytes += sizeof(tSirMacMgmtHdr) + payload + mlo_ie_len + eht_op_ie_len +
-		eht_cap_ie_len + aes_block_size_len + uhr_op_ie_len;
+		 eht_cap_ie_len + aes_block_size_len + uhr_op_ie_len +
+		 uhr_cap_ie_len;
 
 	if (sta) {
 		bytes += sta->mlmStaContext.owe_ie_len;
@@ -2705,6 +2740,17 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			uhr_op_ie_len = 0;
 		}
 		payload += uhr_op_ie_len;
+	}
+
+	if (sta && uhr_cap_ie_len) {
+		qdf_status = lim_fill_complete_uhr_cap_ie(
+				pe_session, uhr_cap_ie_len,
+				frame + sizeof(tSirMacMgmtHdr) + payload);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_debug("assemble uhr op ie error");
+			uhr_op_ie_len = 0;
+		}
+		payload += uhr_cap_ie_len;
 	}
 
 	if (fils_info && fils_info->is_fils_connection) {
@@ -3279,6 +3325,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	struct cm_roam_values_copy mdie_cfg = {0};
 	uint8_t rsn_sel_ie[] = {0xdd, 0x5, 0x50, 0x6f, 0x9a, 0x2c, 0x00};
 	bool eht_capable = false;
+	uint8_t uhr_cap_ie_len = 0;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -3578,6 +3625,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	pe_debug("Restored operating bandwidth: ch_width=%d ht_width=%d",
 		 saved_ch_width, saved_ht_supported_ch_width);
+
+	if (IS_DOT11_MODE_UHR(pe_session->dot11mode))
+		lim_update_session_uhr_capable(pe_session, true);
+
+	if (lim_is_session_uhr_capable(pe_session))
+		uhr_cap_ie_len = populate_dot11f_uhr_caps(mac_ctx, pe_session);
 
 	/* Populate Non-AP STA Regulatory connectivity element */
 	if (IS_DOT11_MODE_HE(pe_session->dot11mode))
@@ -3932,7 +3985,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
 		mbo_ie_len + adaptive_11r_ie_len +
 		vendor_ie_len + mlo_ie_len + fils_hlp_ie_len +
-		eht_cap_ie_len + rsn_sel_ie_len;
+		eht_cap_ie_len + rsn_sel_ie_len + uhr_cap_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				(void **)&packet);
@@ -4000,6 +4053,17 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     rsn_sel_ie, rsn_sel_ie_len);
 		payload = payload + rsn_sel_ie_len;
+	}
+
+	if (uhr_cap_ie_len) {
+		qdf_status = lim_fill_complete_uhr_cap_ie(
+				pe_session, uhr_cap_ie_len,
+				frame + sizeof(tSirMacMgmtHdr) + payload);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_debug("assemble uhr cap ie error");
+			uhr_cap_ie_len = 0;
+		}
+		payload += uhr_cap_ie_len;
 	}
 
 	/* Copy the MBO IE to the end of the frame */

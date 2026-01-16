@@ -813,7 +813,7 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	uint16_t next_tpe_offset, next_tpe_ie_len_rem;
 	uint16_t addn_ielen = 0, mlo_ie_len, cur_ie_len;
 	uint16_t prb_rsp_ie_len, prb_rsp_ie_max_len;
-	uint16_t uhr_op_ie_len;
+	uint16_t uhr_op_ie_len = 0, uhr_cap_ie_len = 0;
 
 	/* Check if probe response IE is present or not */
 	addnIEPresent = (pe_session->add_ie_params.probeRespDataLen != 0);
@@ -940,13 +940,15 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 
 	mlo_ie_len = lim_get_frame_mlo_ie_len(pe_session);
 
-	if (lim_is_session_uhr_capable(pe_session))
+	if (lim_is_session_uhr_capable(pe_session)) {
 		uhr_op_ie_len =
 			populate_dot11f_assoc_probe_rsp_uhr_op_ie(mac,
 								  pe_session);
+		uhr_cap_ie_len = populate_dot11f_uhr_caps(mac, pe_session);
+	}
 
 	nBytes += nPayload + sizeof(tSirMacMgmtHdr) +
-		  mlo_ie_len + tpe_ie_buf_cons + uhr_op_ie_len;
+		  mlo_ie_len + tpe_ie_buf_cons + uhr_op_ie_len + uhr_cap_ie_len;
 
 	if (addnIEPresent) {
 		if ((nBytes + addn_ielen) <= SIR_MAX_PROBE_RESP_SIZE)
@@ -1029,7 +1031,7 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 	qdf_mem_free(tpe_ie_buf);
 
 	if (uhr_op_ie_len &&
-	    ((prb_rsp_ie_len + mlo_ie_len) <= prb_rsp_ie_max_len)) {
+	    ((prb_rsp_ie_len + uhr_op_ie_len) <= prb_rsp_ie_max_len)) {
 		status = lim_fill_complete_uhr_op_ie(
 				pe_session, uhr_op_ie_len,
 				prb_rsp_ie_ptr + prb_rsp_ie_len);
@@ -1038,6 +1040,18 @@ uint32_t lim_send_probe_rsp_template_to_hal(struct mac_context *mac,
 			uhr_op_ie_len = 0;
 		}
 		prb_rsp_ie_len += uhr_op_ie_len;
+	}
+
+	if (uhr_cap_ie_len &&
+	    ((prb_rsp_ie_len + uhr_cap_ie_len) <= prb_rsp_ie_max_len)) {
+		status = lim_fill_complete_uhr_cap_ie(
+				pe_session, uhr_cap_ie_len,
+				prb_rsp_ie_ptr + prb_rsp_ie_len);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("assemble uhr op ie error");
+			uhr_op_ie_len = 0;
+		}
+		prb_rsp_ie_len += uhr_cap_ie_len;
 	}
 
 	if (addnIEPresent &&

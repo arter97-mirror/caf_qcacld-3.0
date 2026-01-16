@@ -750,10 +750,11 @@ struct punc_chan_info {
  * @wnm_action_dialog_token: Dialog token for WNM action frames.
  * @dfs_p2p_info: DFS P2P group operation info.
  * @qcn_ie_present_in_beacon: QCN Ie Present in beacon
- * @uhr_capable: UHR capable flag
- * @uhr_config: UHR CAP
+ * @uhr_capable: UHR capability flag
+ * @uhr_config: UHR cap
  * @uhr_op_ie: UHR op
  * @uhr_op_ie_len: UHR OP IE len
+ * @uhr_cap_ie_len: Length of UHR capability IE
  */
 struct pe_session {
 	uint8_t available;
@@ -1102,7 +1103,8 @@ struct pe_session {
 	struct wlan_uhr_cap_info uhr_config;
 	struct wlan_uhr_op_ie uhr_op_ie;
 	uint16_t uhr_op_ie_len;
-#endif /* WLAN_FEATURE_11BN */
+	uint16_t uhr_cap_ie_len;
+#endif
 };
 
 /*-------------------------------------------------------------------------

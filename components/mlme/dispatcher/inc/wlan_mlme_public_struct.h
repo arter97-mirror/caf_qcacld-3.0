@@ -1145,7 +1145,7 @@ struct wlan_mlme_eht_caps {
 /**
  * struct wlan_mlme_uhr_caps - UHR (Ultra High Reliability) capability info
  * @present: UHR capability IE present
- * @dps_support: Dynamic Power Save support
+ * @dps_present: Dynamic Power Save support
  * @dps_assist_support: Dynamic Power Save assist support
  * @ap_static_hcm_support: AP static HCM (Host Connection Manager) support
  * @ml_power_mgmt: Multi-link power management
@@ -1194,7 +1194,7 @@ struct wlan_mlme_eht_caps {
  */
 struct wlan_mlme_uhr_caps {
 	bool                   present;
-	uint16_t          dps_support:1;
+	uint16_t          dps_present:1;
 	uint16_t   dps_assist_support:1;
 	uint16_t ap_static_hcm_support:1;
 	uint16_t        ml_power_mgmt:1;

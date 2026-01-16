@@ -4267,6 +4267,45 @@ void lim_decide_uhr_op(struct mac_context *mac_ctx, uint32_t *mlme_uhr_ops,
  */
 void lim_update_usr_uhr_cap(struct mac_context *mac_ctx,
 			    struct pe_session *session);
+
+/**
+ * lim_copy_join_req_uhr_cap() - Copy UHR capability to PE session from Join req
+ * and update as per bandwidth supported
+ * @session: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_copy_join_req_uhr_cap(struct pe_session *session);
+
+/**
+ * lim_add_self_uhr_cap() - Copy UHR capability into add sta from PE session
+ * @add_sta_params: pointer to add sta params
+ * @session: pointer to PE Session
+ *
+ * Return: None
+ */
+void lim_add_self_uhr_cap(tpAddStaParams add_sta_params,
+			  struct pe_session *session);
+
+/**
+ * lim_update_session_uhr_capable(): Update uhr_capable in PE session
+ * @session: pointer to PE session
+ * @val: UHR capability
+ *
+ * Return: None
+ */
+void lim_update_session_uhr_capable(struct pe_session *session, bool val);
+
+/**
+ * lim_fill_complete_uhr_cap_ie() - Fill complete UHR capability IE
+ * @session: pointer to PE session
+ * @total_len: total length of the IE
+ * @target: pointer to the target buffer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_fill_complete_uhr_cap_ie(struct pe_session *session,
+					uint16_t total_len, uint8_t *target);
 #else
 static inline void
 lim_update_sta_uhr_capable(struct mac_context *mac,
@@ -4316,7 +4355,28 @@ lim_update_usr_uhr_cap(struct mac_context *mac_ctx,
 		       struct pe_session *session)
 {
 }
-#endif
+
+static inline void lim_copy_join_req_uhr_cap(struct pe_session *session)
+{
+}
+
+static inline void lim_add_self_uhr_cap(tpAddStaParams add_sta_params,
+					struct pe_session *session)
+{
+}
+
+static inline void
+lim_update_session_uhr_capable(struct pe_session *session, bool val)
+{
+}
+
+static inline QDF_STATUS
+lim_fill_complete_uhr_cap_ie(struct pe_session *session,
+			     uint16_t total_len, uint8_t *target)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_11BN */
 
 #ifdef WLAN_FEATURE_11BN_TEST_SAP
 /**
@@ -4335,6 +4395,9 @@ QDF_STATUS lim_fill_complete_uhr_op_ie(struct pe_session *session,
 static inline QDF_STATUS
 lim_fill_complete_uhr_op_ie(struct pe_session *session,
 			    uint16_t total_len,
-			    uint8_t *target);
-#endif
+			    uint8_t *target)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_11BN_TEST_SAP */
 #endif /* __LIM_UTILS_H */

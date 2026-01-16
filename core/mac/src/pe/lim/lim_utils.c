@@ -9557,6 +9557,87 @@ void lim_update_usr_uhr_cap(struct mac_context *mac_ctx,
 		return;
 	}
 }
+
+void
+lim_revise_req_uhr_cap_per_band(struct mlme_legacy_priv *mlme_priv,
+				struct pe_session *session)
+{
+	struct mac_context *mac = session->mac_ctx;
+
+	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
+		qdf_mem_copy(&mlme_priv->uhr_config, &mac->uhr_cap_2g,
+			     sizeof(struct wlan_mlme_uhr_caps));
+	else
+		qdf_mem_copy(&mlme_priv->uhr_config, &mac->uhr_cap_5g,
+			     sizeof(struct wlan_mlme_uhr_caps));
+}
+
+void lim_copy_join_req_uhr_cap(struct pe_session *session)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session->vdev);
+	if (!mlme_priv)
+		return;
+
+	lim_revise_req_uhr_cap_per_band(mlme_priv, session);
+	qdf_mem_copy(&session->uhr_config, &mlme_priv->uhr_config,
+		     sizeof(session->uhr_config));
+}
+
+void lim_add_self_uhr_cap(tpAddStaParams add_sta_params,
+			  struct pe_session *session)
+{
+	if (!session)
+		return;
+
+	add_sta_params->uhr_capable = true;
+
+	qdf_mem_copy(&add_sta_params->uhr_config, &session->uhr_config,
+		     sizeof(add_sta_params->uhr_config));
+	/* TODO: Copy UHR OP */
+}
+
+QDF_STATUS lim_fill_complete_uhr_cap_ie(struct pe_session *session,
+					uint16_t total_len, uint8_t *target)
+{
+	struct wlan_uhr_cap_info *uhr_config;
+	uint16_t ie_len;
+
+	if (!session || !target || total_len < MIN_IE_LEN)
+		return QDF_STATUS_E_INVAL;
+
+	uhr_config = &session->uhr_config;
+
+	/* Must have at least EID + LEN */
+	if (uhr_config->num_data < MIN_IE_LEN)
+		return QDF_STATUS_E_INVAL;
+
+	/*
+	 * The UHR CAP IE is sent unfragmented.
+	 * Ensure its on-air Length (data[1]) equals (num_data - 2),
+	 * and that it does not exceed WLAN_MAX_IE_LEN (sanity).
+	 */
+	ie_len = (uint16_t)(uhr_config->num_data - MIN_IE_LEN);
+	if (ie_len > WLAN_MAX_IE_LEN)
+		return QDF_STATUS_E_INVAL;
+
+	uhr_config->data[TAG_LEN_POS] = (uint8_t)ie_len;
+
+	/* Ensure caller's buffer is large enough for the entire IE */
+	if (total_len < uhr_config->num_data)
+		return QDF_STATUS_E_INVAL;
+
+	/* Copy the complete (unfragmented) UHR Operation IE */
+	qdf_mem_copy(target, uhr_config->data, uhr_config->num_data);
+
+	pe_debug("pack uhr cap ie %u bytes (unfragmented)",
+		 uhr_config->num_data);
+	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   target, uhr_config->num_data);
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
@@ -10342,48 +10423,6 @@ void lim_extract_ext_mld_caps(struct mac_context *mac_ctx,
 	pe_debug("Ext mld caps: %d, single link emlsr support: %d",
 		 add_bss->staContext.ext_mld_caps_present,
 		 add_bss->staContext.ext_mld_cap.emlsr_one_link_support);
-}
-#endif
-
-#ifdef WLAN_FEATURE_11BN
-void lim_add_self_uhr_cap(tpAddStaParams add_sta_params,
-			  struct pe_session *session)
-{
-	if (!session)
-		return;
-
-	add_sta_params->uhr_capable = true;
-
-	qdf_mem_copy(&add_sta_params->uhr_config, &session->uhr_config,
-		     sizeof(add_sta_params->uhr_config));
-	/* TODO: Copy UHR OP */
-}
-
-void
-lim_revise_req_uhr_cap_per_band(struct mlme_legacy_priv *mlme_priv,
-				struct pe_session *session)
-{
-	struct mac_context *mac = session->mac_ctx;
-
-	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
-		qdf_mem_copy(&mlme_priv->uhr_config, &mac->uhr_cap_2g,
-			     sizeof(struct wlan_mlme_uhr_caps));
-	else
-		qdf_mem_copy(&mlme_priv->uhr_config, &mac->uhr_cap_5g,
-			     sizeof(struct wlan_mlme_uhr_caps));
-}
-
-void lim_copy_join_req_uhr_cap(struct pe_session *session)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session->vdev);
-	if (!mlme_priv)
-		return;
-
-	lim_revise_req_uhr_cap_per_band(mlme_priv, session);
-	qdf_mem_copy(&session->uhr_config, &mlme_priv->uhr_config,
-		     sizeof(session->uhr_config));
 }
 #endif
 

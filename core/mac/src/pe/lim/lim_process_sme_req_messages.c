@@ -1783,7 +1783,7 @@ lim_get_user_dot11_mode(struct wlan_objmgr_vdev *vdev)
 		return MLME_DOT11_MODE_11AX;
 	case WMI_HOST_WIFI_STANDARD_7:
 	default:
-		return MLME_DOT11_MODE_11BE;
+		return MLME_DOT11_MODE_11BN;
 	}
 }
 
@@ -1864,6 +1864,10 @@ lim_get_self_dot11_mode(struct mac_context *mac_ctx, enum QDF_OPMODE opmode,
 	if (IS_DOT11_MODE_EHT(self_dot11_mode) &&
 	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11BE)
 		return MLME_DOT11_MODE_11BE;
+
+	if (IS_DOT11_MODE_UHR(self_dot11_mode) &&
+	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11BN)
+		return MLME_DOT11_MODE_11BN;
 
 	return self_dot11_mode;
 }
