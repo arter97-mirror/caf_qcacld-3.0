@@ -5108,31 +5108,6 @@ sme_validate_nss_chains_config(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-static bool
-sme_is_nss_update_allowed(struct wlan_mlme_chain_cfg chain_cfg,
-			  uint8_t rx_nss, uint8_t tx_nss,
-			  enum nss_chains_band_info band)
-{
-	switch (band) {
-	case NSS_CHAINS_BAND_2GHZ:
-		if (rx_nss > chain_cfg.max_rx_chains_2g)
-			return false;
-		if (tx_nss > chain_cfg.max_tx_chains_2g)
-			return false;
-		break;
-	case NSS_CHAINS_BAND_5GHZ:
-		if (rx_nss > chain_cfg.max_rx_chains_5g)
-			return false;
-		if (tx_nss > chain_cfg.max_tx_chains_5g)
-			return false;
-		break;
-	default:
-		sme_err("Unknown Band nss change not allowed");
-		return false;
-	}
-	return true;
-}
-
 static void sme_update_legacy_rate_tx_chains(mac_handle_t mac_handle,
 					     enum QDF_OPMODE vdev_op_mode)
 {
@@ -5195,29 +5170,31 @@ sme_modify_nss_in_mlme_cfg(mac_handle_t mac_handle,
 			   enum QDF_OPMODE vdev_op_mode,
 			   enum nss_chains_band_info band)
 {
-	uint8_t nss_shift;
+	uint8_t nss_shift, max_tx_nss, max_rx_nss;
 	uint32_t nss_mask = 0x7;
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-
-	if (!sme_is_nss_update_allowed(mac_ctx->mlme_cfg->fw_chain_cfg,
-				       rx_nss, tx_nss, band)) {
-		sme_debug("Nss modification failed, fw doesn't support this nss %d",
-			  rx_nss);
-		return;
-	}
+	struct wlan_mlme_nss_chains *nss_chains_ini_cfg =
+					&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
 
 	nss_shift = sme_get_nss_chain_shift(vdev_op_mode);
 
-	mac_ctx->mlme_cfg->nss_chains_ini_cfg.rx_nss[band] &=
-						~(nss_mask << nss_shift);
-	mac_ctx->mlme_cfg->nss_chains_ini_cfg.rx_nss[band] |=
-			 (QDF_MIN(rx_nss, WLAN_MAX_VDEV_NSS) << nss_shift);
-	mac_ctx->mlme_cfg->nss_chains_ini_cfg.tx_nss[band] &=
-						~(nss_mask << nss_shift);
-	mac_ctx->mlme_cfg->nss_chains_ini_cfg.tx_nss[band] |=
-			 (QDF_MIN(tx_nss, WLAN_MAX_VDEV_NSS) << nss_shift);
+	max_tx_nss =
+		QDF_MIN(tx_nss,
+			GET_VDEV_NSS_CHAIN(nss_chains_ini_cfg->num_tx_chains[band],
+					   nss_shift));
+	max_rx_nss =
+		QDF_MIN(rx_nss,
+			GET_VDEV_NSS_CHAIN(nss_chains_ini_cfg->num_rx_chains[band],
+					   nss_shift));
+
+	nss_chains_ini_cfg->tx_nss[band] &= ~(nss_mask << nss_shift);
+	nss_chains_ini_cfg->tx_nss[band] |=
+			 (QDF_MIN(max_tx_nss, WLAN_MAX_VDEV_NSS) << nss_shift);
+	nss_chains_ini_cfg->rx_nss[band] &= ~(nss_mask << nss_shift);
+	nss_chains_ini_cfg->rx_nss[band] |=
+			 (QDF_MIN(max_rx_nss, WLAN_MAX_VDEV_NSS) << nss_shift);
 	sme_debug("rx nss %d tx nss %d changed for vdev mode %d for band %d",
-		  rx_nss, tx_nss, vdev_op_mode, band);
+		  max_rx_nss, max_tx_nss, vdev_op_mode, band);
 }
 
 void
