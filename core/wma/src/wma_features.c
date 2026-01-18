@@ -5342,6 +5342,7 @@ QDF_STATUS wma_set_tx_rx_aggr_size(uint8_t vdev_id,
 	    (tx_size != ADDBA_TXAGGR_SIZE_512) &&
 	    (tx_size != ADDBA_TXAGGR_SIZE_BERYLLIUM)) {
 		wma_err("Invalid AMPDU Size");
+		wmi_buf_free(buf);
 		return QDF_STATUS_E_INVAL;
 	}
 
