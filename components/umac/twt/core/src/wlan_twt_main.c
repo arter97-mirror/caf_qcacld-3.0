@@ -30,6 +30,7 @@
 #include "cfg_twt.h"
 #include "wlan_twt_cfg_ext_api.h"
 #include "wlan_dp_ucfg_api.h"
+#include "wlan_twt_cfg.h"
 
 #define TWT_COMMAND_PENDING_FLAG_SET	1
 #define TWT_COMMAND_PENDING_FLAG_RESET	0
@@ -2105,6 +2106,171 @@ wlan_is_twt_teardown_failed(enum HOST_TWT_DEL_STATUS teardown_status)
 	return false;
 }
 
+/**
+ * wlan_twt_check_vdev_active_session() - Check if vdev has any active TWT
+ * session
+ * @vdev: Pointer to vdev object
+ * @vdev_id: Vdev ID for logging
+ * @mac_id: MAC ID for logging
+ *
+ * This helper function checks if the given vdev has any active TWT sessions
+ * by iterating through all peers and their TWT sessions.
+ *
+ * Return: true if any TWT session is active, false otherwise
+ */
+static bool
+wlan_twt_check_vdev_active_session(struct wlan_objmgr_vdev *vdev,
+				   uint8_t vdev_id, uint8_t mac_id)
+{
+	qdf_list_t *peer_list;
+	struct wlan_objmgr_peer *peer, *peer_next;
+	struct twt_peer_priv_obj *peer_priv;
+	uint8_t i;
+
+	peer_list = &vdev->vdev_objmgr.wlan_peer_list;
+	if (!peer_list)
+		return false;
+
+	peer = wlan_vdev_peer_list_peek_active_head(vdev, peer_list,
+						    WLAN_TWT_ID);
+	while (peer) {
+		peer_priv = wlan_objmgr_peer_get_comp_private_obj(
+					peer, WLAN_UMAC_COMP_TWT);
+		if (peer_priv && peer_priv->num_twt_sessions) {
+			qdf_mutex_acquire(&peer_priv->twt_peer_lock);
+			for (i = 0; i < peer_priv->num_twt_sessions; i++) {
+				if (peer_priv->session_info[i].dialog_id !=
+				    TWT_ALL_SESSIONS_DIALOG_ID &&
+				    peer_priv->session_info[i].setup_done) {
+					qdf_mutex_release(
+						&peer_priv->twt_peer_lock);
+					wlan_objmgr_peer_release_ref(
+								peer,
+								WLAN_TWT_ID);
+					twt_debug("TWT session active on vdev:%d mac_id:%d",
+						  vdev_id, mac_id);
+					return true;
+				}
+			}
+			qdf_mutex_release(&peer_priv->twt_peer_lock);
+		}
+
+		peer_next = wlan_peer_get_next_active_peer_of_vdev(
+					vdev, peer_list, peer,
+					WLAN_TWT_ID);
+		wlan_objmgr_peer_release_ref(peer, WLAN_TWT_ID);
+		peer = peer_next;
+	}
+
+	return false;
+}
+
+/**
+ * wlan_twt_is_any_session_active_on_mac() - Check if any TWT session is
+ * active on the given MAC
+ * @psoc: Pointer to psoc object
+ * @mac_id: MAC ID to check
+ * @vdev_id: Current vdev ID
+ *
+ * This function checks if any TWT session is active on any vdev that is
+ * operating on the given MAC ID.
+ *
+ * Return: true if any TWT session is active, false otherwise
+ */
+static bool
+wlan_twt_is_any_session_active_on_mac(struct wlan_objmgr_psoc *psoc,
+				      uint8_t mac_id, uint8_t vdev_id)
+{
+	uint32_t conc_vdev_id;
+	struct wlan_objmgr_vdev *vdev;
+	bool session_active = false;
+
+	/* Check current vdev first */
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_TWT_ID);
+	if (!vdev) {
+		twt_err("vdev is NULL for vdev_id: %d", vdev_id);
+		return false;
+	}
+
+	session_active = wlan_twt_check_vdev_active_session(vdev, vdev_id,
+							    mac_id);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
+
+	if (session_active)
+		return true;
+
+	/* Check concurrent vdev on same MAC if exists */
+	conc_vdev_id = policy_mgr_get_conc_vdev_on_same_mac(psoc, vdev_id,
+							    mac_id);
+	if (conc_vdev_id == WLAN_INVALID_VDEV_ID ||
+	    conc_vdev_id == vdev_id)
+		return false;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, conc_vdev_id,
+						    WLAN_TWT_ID);
+	if (!vdev) {
+		twt_debug("Concurrent vdev is NULL for vdev_id: %d",
+			  conc_vdev_id);
+		return false;
+	}
+
+	session_active = wlan_twt_check_vdev_active_session(vdev, conc_vdev_id,
+							    mac_id);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
+
+	return session_active;
+}
+
+/**
+ * wlan_twt_reset_congestion_timeout_on_teardown() - Reset congestion timeout
+ * when no TWT sessions remain on the MAC
+ * @psoc: Pointer to psoc object
+ * @event: Pointer to TWT del dialog complete event parameters
+ *
+ * This function resets the congestion timeout to INI value for the MAC
+ * associated with the vdev, but only if there are no remaining TWT sessions
+ * running on that MAC (across all vdevs on that MAC).
+ *
+ * Return: None
+ */
+static void
+wlan_twt_reset_congestion_timeout_on_teardown(
+			struct wlan_objmgr_psoc *psoc,
+			struct twt_del_dialog_complete_event_param *event)
+{
+	QDF_STATUS status;
+	bool twt_session_active;
+	uint8_t mac_id;
+
+	mac_id = policy_mgr_mode_get_macid_by_vdev_id(psoc, event->vdev_id);
+	if (mac_id >= MAX_MAC) {
+		twt_err("Invalid mac_id: %d for vdev_id: %d",
+			mac_id, event->vdev_id);
+		return;
+	}
+
+	/* Check if any TWT session is running on this MAC */
+	twt_session_active = wlan_twt_is_any_session_active_on_mac(
+								psoc, mac_id,
+								event->vdev_id);
+	if (twt_session_active) {
+		twt_debug("TWT session still active on MAC%d, not resetting congestion timeout",
+			  mac_id);
+		return;
+	}
+
+	/* No TWT sessions on this MAC, reset congestion timeout */
+	status = wlan_twt_cfg_reset_congestion_timeout_per_mac_to_ini(psoc,
+								      mac_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		twt_err("Failed to reset congestion_timeout for MAC%d dialog_id:%d",
+			mac_id, event->dialog_id);
+	else
+		twt_debug("Reset congestion_timeout for MAC%d as no TWT sessions active",
+			  mac_id);
+}
+
 static void
 wlan_twt_handle_sta_del_dialog_event(struct wlan_objmgr_psoc *psoc,
 			      struct twt_del_dialog_complete_event_param *event)
@@ -2151,6 +2317,12 @@ wlan_twt_handle_sta_del_dialog_event(struct wlan_objmgr_psoc *psoc,
 	wlan_twt_set_session_state(psoc, &event->peer_macaddr, event->dialog_id,
 				   WLAN_TWT_SETUP_STATE_NOT_ESTABLISHED);
 	wlan_twt_init_context(psoc, &event->peer_macaddr, event->dialog_id);
+
+	/* Update twt_congestion_timeout with INI value on successful teardown
+	 * only if there are no TWT sessions running on that MAC
+	 */
+	if (event->status == HOST_TWT_DEL_STATUS_OK)
+		wlan_twt_reset_congestion_timeout_on_teardown(psoc, event);
 }
 
 QDF_STATUS
