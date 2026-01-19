@@ -2157,6 +2157,8 @@ QDF_STATUS dp_rx_packet_cbk_passthru(void *dp_link_context, qdf_nbuf_t rx_nbuf)
 			qdf_trace_dp_packet(nbuf, QDF_RX, NULL, 0, 0);
 
 		qdf_nbuf_set_dev(nbuf, dp_intf->dev);
+		qdf_nbuf_set_protocol(nbuf, htons(ETH_P_802_2));
+		qdf_nbuf_set_mac_header(nbuf, 0);
 		++stats->per_cpu[cpu_index].rx_packets;
 		qdf_net_stats_add_rx_pkts(&dp_intf->stats, 1);
 		/* count aggregated RX frame into stats */

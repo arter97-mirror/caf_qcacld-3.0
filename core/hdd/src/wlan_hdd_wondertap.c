@@ -16,6 +16,7 @@
 #include <wlan_fwol_ucfg_api.h>
 #include <wma_api.h>
 #include "cds_api.h"
+#include "cdp_txrx_ctrl.h"
 
 static struct hdd_wondertap_context *g_wt_ctx;
 
@@ -66,6 +67,7 @@ __wlan_hdd_set_wondertap_channel(struct hdd_context *hdd_ctx,
 	struct channel_change_req req = {0};
 	struct ch_params ch_params = {0};
 	enum phy_ch_width ch_width;
+	cdp_config_param_type val;
 	QDF_STATUS status;
 	int ret;
 
@@ -127,24 +129,49 @@ __wlan_hdd_set_wondertap_channel(struct hdd_context *hdd_ctx,
 
 	status = qdf_wait_for_event_completion(&g_wt_ctx->wondertap_vdev_event,
 					       WLAN_WONDERTAP_VDEV_OP_TIMEOUT_MS);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("wondertap vdev up failed:%d", status);
+	} else {
+		val.cdp_passthru_vdev_freq = params->freq;
+		cdp_txrx_set_vdev_param(cds_get_context(QDF_MODULE_ID_SOC),
+					adapter->deflink->vdev_id,
+					CDP_VDEV_SET_PASSTHRU_FREQ, val);
+	}
 
 channel_change_req_failed:
 
 	return status;
 }
 
+static WMI_RATE_PREAMBLE
+wlan_hdd_convert_wonder_preamble_to_wmi(qdf_wondertap_rate_preamble_t preamble)
+{
+	switch (preamble) {
+	case WONDERTAP_RATE_PREAMBLE_HT:
+		return WMI_RATE_PREAMBLE_HT;
+	case WONDERTAP_RATE_PREAMBLE_VHT:
+		return WMI_RATE_PREAMBLE_VHT;
+	case WONDERTAP_RATE_PREAMBLE_HE:
+		return WMI_RATE_PREAMBLE_HE;
+	case WONDERTAP_RATE_PREAMBLE_EHT:
+		return WMI_RATE_PREAMBLE_EHT;
+	case WONDERTAP_RATE_PREAMBLE_LEGACY:
+	default:
+		return WMI_RATE_PREAMBLE_CCK;
+	}
+}
+
 static int
 __wlan_hdd_wondertap_set_fixed_tx_rate(struct hdd_adapter *adapter,
 				       const qdf_wondertap_tx_rate_params_t *params)
 {
+	WMI_RATE_PREAMBLE preamble;
 	uint32_t rate_code;
 	uint8_t gi;
 	int ret;
 
-	rate_code = hdd_assemble_rate_code(params->preamble,
-					   params->nss - 1,
+	preamble = wlan_hdd_convert_wonder_preamble_to_wmi(params->preamble);
+	rate_code = hdd_assemble_rate_code(preamble, params->nss - 1,
 					   params->mcs);
 
 	ret = wma_cli_set_command(adapter->deflink->vdev_id,
@@ -247,6 +274,8 @@ int __wlan_hdd_stop_wondertap_intf(struct hdd_context *hdd_ctx,
 
 	hdd_stop_no_trans(adapter->dev);
 
+	ucfg_fwol_configure_global_params(hdd_ctx->psoc, hdd_ctx->pdev);
+
 	wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 1);
 
 done:
@@ -319,6 +348,14 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 	if (ret)
 		goto delete_pe_session;
 
+	sme_set_vdev_sw_retry(adapter->deflink->vdev_id,
+			      params->data_retry_limit,
+			      WMI_VDEV_CUSTOM_SW_RETRY_TYPE_AGGR);
+
+	sme_set_vdev_sw_retry(adapter->deflink->vdev_id,
+			      params->mgmt_retry_limit,
+			      WMI_VDEV_CUSTOM_SW_RETRY_TYPE_NONAGGR);
+
 	policy_mgr_incr_active_session(hdd_ctx->psoc, QDF_PASSTHRU_MODE,
 				       adapter->deflink->vdev_id,
 				       true);
@@ -359,6 +396,13 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 
 	hdd_change_peer_state(adapter->deflink, adapter->mac_addr.bytes,
 			      OL_TXRX_PEER_STATE_AUTH);
+
+	/*
+	 * Stop and restart of bus bw periodic work would happen
+	 * as part of close adapter so no need to explicitly invoke
+	 * ucfg_dp_bus_bw_compute_timer_try_stop API in cleanup.
+	 */
+	ucfg_dp_bus_bw_compute_timer_start(hdd_ctx->psoc);
 
 	hdd_debug("Enabling queues");
 	wlan_hdd_netif_queue_control(adapter,
@@ -406,6 +450,7 @@ int wlan_hdd_wondertap_init(void **handle,
 	struct osif_vdev_sync *vdev_sync;
 	struct hdd_adapter *adapter;
 	struct hdd_wondertap_context *wt_ctx;
+	uint8_t curr_cc[REG_ALPHA2_LEN + 1] = {0};
 	QDF_STATUS status;
 	int errno;
 
@@ -458,17 +503,22 @@ int wlan_hdd_wondertap_init(void **handle,
 		goto destroy_sync;
 	}
 
-	hdd_info("set regulatory cc:%s", params->country_code);
+	ucfg_reg_get_current_country(hdd_ctx->psoc, curr_cc);
+
+	hdd_info("set regulatory cc:%s curr_cc:%s", params->country_code,
+		 curr_cc);
 
 	errno = hdd_reg_set_country(hdd_ctx, (char *)params->country_code);
-	if (errno)
+	if (errno) {
 		hdd_info("set country code failed:%d", errno);
+		goto destroy_sync;
+	}
 
 	wt_ctx = qdf_mem_malloc(sizeof(*wt_ctx));
 	if (!wt_ctx) {
 		hdd_err("wondertap memory alloc failed");
 		errno = -ENOMEM;
-		goto destroy_sync;
+		goto mem_malloc_failed;
 	}
 
 	status = qdf_event_create(&wt_ctx->wondertap_vdev_event);
@@ -540,6 +590,9 @@ create_rtpm_lock_failed:
 create_wondertap_event_failed:
 	qdf_mem_free(wt_ctx);
 
+mem_malloc_failed:
+	hdd_reg_set_country(hdd_ctx, curr_cc);
+
 destroy_sync:
 	osif_vdev_sync_trans_stop(vdev_sync);
 	osif_vdev_sync_destroy(vdev_sync);
@@ -570,6 +623,7 @@ void wlan_hdd_wondertap_deinit(void *handle,
 	struct osif_vdev_sync *vdev_sync;
 	int errno;
 
+	hdd_enter();
 	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic) {
 		hdd_debug("Incorrect handle received - rejecting deinit");
 		return;
@@ -613,11 +667,6 @@ void wlan_hdd_wondertap_deinit(void *handle,
 	if (errno)
 		hdd_info("set country code failed:%d", errno);
 
-	ucfg_fwol_configure_global_params(hdd_ctx->psoc, hdd_ctx->pdev);
-
-	if (wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 1))
-		hdd_err("IMPS feature enable failed");
-
 	sta_adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
 	if (sta_adapter) {
 		hdd_adapter_for_each_active_link_info(sta_adapter,
@@ -638,6 +687,7 @@ void wlan_hdd_wondertap_deinit(void *handle,
 destroy_sync:
 	osif_vdev_sync_trans_stop(vdev_sync);
 	osif_vdev_sync_destroy(vdev_sync);
+	hdd_exit();
 
 	return;
 }
@@ -896,6 +946,9 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 	features->bits.dynamic_freq = 1;
 	features->bits.dynamic_fixed_tx_rate = 1;
 	features->bits.frame_type_filter = 1;
+	features->bits.custom_mgmt_retry_limit = 1;
+	features->bits.custom_data_retry_limit = 1;
+	features->bits.frame_type_filter = 1;
 	if (policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc))
 		features->bits.sta_coexist = 1;
 
@@ -909,7 +962,7 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
  * provides to the wondertap framework. It includes callbacks for
  * initialization, configuration, and feature queries.
  */
-static qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
+static const qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
 	.init = wlan_hdd_wondertap_init,
 	.deinit = wlan_hdd_wondertap_deinit,
 	.set_freq = wlan_hdd_wondertap_set_freq,
@@ -919,14 +972,78 @@ static qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
 	.get_capabilities = wlan_hdd_wondertap_get_capabilities,
 };
 
-int wlan_hdd_wondertap_register_ops(void)
+/**
+ * wlan_drv_wondertap_priv - Wondertap private data structure
+ *
+ * wondertap private data structure that holds the wonder
+ * version supported and the operations table.
+ */
+static const qdf_wondertap_priv_t wlan_drv_wondertap_priv = {
+	.ver = WONDER_VERSION_1_4_1,
+	.wonder_ops = &wlan_drv_wondertap_ops,
+};
+
+int wlan_hdd_wondertap_register_ops(struct device *dev)
 {
-	return qdf_wondertap_register_ops(&wlan_drv_wondertap_ops);
+	return pld_set_vendor_wonder_priv_data(dev, &wlan_drv_wondertap_priv);
 }
 
-void wlan_hdd_wondertap_unregister_ops(void)
+void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 {
-	qdf_wondertap_unregister_ops(&wlan_drv_wondertap_ops);
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
+	struct osif_vdev_sync *vdev_sync;
+	QDF_STATUS status;
+
+	hdd_enter();
+	pld_set_vendor_wonder_priv_data(dev, NULL);
+	hdd_debug("g_wt_ctx_valid %d force %d",
+		  g_wt_ctx ? 1 : 0, force_cleanup);
+
+	hdd_hold_rtnl_lock();
+
+	if (force_cleanup && g_wt_ctx) {
+		hdd_ctx = g_wt_ctx->hdd_ctx;
+		adapter = g_wt_ctx->wt_adapter;
+
+		wlan_hdd_netif_queue_control(adapter,
+				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
+				     WLAN_CONTROL_PATH);
+
+		dev_close(adapter->dev);
+
+		qdf_event_reset(&g_wt_ctx->wondertap_vdev_event);
+		sme_delete_pe_session(hdd_ctx->mac_handle, adapter->deflink->vdev_id,
+				      QDF_PASSTHRU_MODE);
+
+		status = qdf_wait_for_event_completion(&g_wt_ctx->wondertap_vdev_event,
+						       WLAN_WONDERTAP_VDEV_OP_TIMEOUT_MS);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("wondertap vdev teardown failed:%d", status);
+
+		policy_mgr_decr_session_set_pcl(hdd_ctx->psoc, QDF_PASSTHRU_MODE,
+						adapter->deflink->vdev_id);
+
+		hdd_stop_adapter(hdd_ctx, adapter);
+		hdd_deinit_adapter(hdd_ctx, adapter, true);
+
+		vdev_sync = osif_vdev_sync_unregister(adapter->dev);
+		osif_vdev_sync_destroy(vdev_sync);
+
+		__wlan_hdd_destroy_wondertap_intf(hdd_ctx, adapter);
+
+		qdf_runtime_pm_allow_suspend(&g_wt_ctx->wondertap_rtpm_lock);
+		qdf_wake_lock_release(&g_wt_ctx->wondertap_wakelock,
+				      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
+		qdf_wake_lock_destroy(&g_wt_ctx->wondertap_wakelock);
+		qdf_runtime_lock_deinit(&g_wt_ctx->wondertap_rtpm_lock);
+		qdf_event_destroy(&g_wt_ctx->wondertap_vdev_event);
+		qdf_mem_free(g_wt_ctx);
+		g_wt_ctx = NULL;
+	}
+
+	hdd_release_rtnl_lock();
+	hdd_exit();
 }
 
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
