@@ -2054,7 +2054,10 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 	tpSirMacActionFrameHdr action_hdr = (tpSirMacActionFrameHdr) pBody;
 	tpSirMacVendorSpecificPublicActionFrameHdr vendor_specific;
 
-	pe_debug("Received an Action frame -- no session");
+
+	pe_debug("Received an action frame category: %d action_id: %d",
+		 action_hdr->category, action_hdr->category ==
+		 ACTION_CATEGORY_PUBLIC ? action_hdr->actionID : 255);
 
 	if (frame_len < sizeof(*action_hdr)) {
 		pe_debug("frame_len %d less than action frame header len",
@@ -2064,8 +2067,7 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 
 	switch (action_hdr->category) {
 	case ACTION_CATEGORY_PUBLIC:
-		switch (action_hdr->actionID) {
-		case PUB_ACTION_VENDOR_SPECIFIC:
+		if (action_hdr->actionID == PUB_ACTION_VENDOR_SPECIFIC) {
 			vendor_specific =
 				(tpSirMacVendorSpecificPublicActionFrameHdr)
 				action_hdr;
@@ -2075,45 +2077,32 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 					 frame_len);
 				return;
 			}
-			/*
-			 * Check if it is a DPP public action frame and fall
-			 * thru, else drop the frame.
-			 */
+
+			/* Check if it is a DPP public action frame */
 			if (qdf_mem_cmp(vendor_specific->Oui, dpp_oui, 4)) {
-				pe_debug("Unhandled public action frame (Vendor specific) OUI: %x %x %x %x",
-					vendor_specific->Oui[0],
-					vendor_specific->Oui[1],
-					vendor_specific->Oui[2],
-					vendor_specific->Oui[3]);
-				break;
+				pe_debug("public action frame (Vendor specific) OUI: %x %x %x %x",
+					 vendor_specific->Oui[0],
+					 vendor_specific->Oui[1],
+					 vendor_specific->Oui[2],
+					 vendor_specific->Oui[3]);
 			}
-			/* fallthrough */
-		case PUB_ACTION_GAS_INITIAL_REQUEST:
-		case PUB_ACTION_GAS_INITIAL_RESPONSE:
-		case PUB_ACTION_GAS_COMEBACK_REQUEST:
-		case PUB_ACTION_GAS_COMEBACK_RESPONSE:
-			/*
-			 * Forward the GAS frames to  wpa_supplicant
-			 * type is ACTION
-			 */
-			lim_send_sme_mgmt_frame_ind(mac,
-					mac_hdr->fc.subType,
-					(uint8_t *) mac_hdr,
-					frame_len + sizeof(tSirMacMgmtHdr), 0,
-					WMA_GET_RX_FREQ(pBd), NULL,
-					WMA_GET_RX_RSSI_NORMALIZED(pBd),
-					RXMGMT_FLAG_NONE);
-			break;
-		default:
-			pe_warn("Unhandled public action frame: %x",
-				       action_hdr->actionID);
-			break;
 		}
+
+		/*
+		 * Forward all public action frame with no session to
+		 * wpa_supplicant
+		 */
+		lim_send_sme_mgmt_frame_ind(mac, mac_hdr->fc.subType,
+					    (uint8_t *)mac_hdr,
+					    frame_len + sizeof(tSirMacMgmtHdr),
+					    0, WMA_GET_RX_FREQ(pBd), NULL,
+					    WMA_GET_RX_RSSI_NORMALIZED(pBd),
+					    RXMGMT_FLAG_NONE);
+
 		break;
 	default:
-		pe_warn("Unhandled action frame without session: %x",
-			       action_hdr->category);
+		pe_info_rl("Unhandled action frame without session: %x",
+			   action_hdr->category);
 		break;
-
 	}
 }
