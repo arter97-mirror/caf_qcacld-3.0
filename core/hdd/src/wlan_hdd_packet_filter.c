@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -98,7 +98,8 @@ int wlan_hdd_set_filter(struct hdd_context *hdd_ctx,
 	int i = 0;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	if (!ucfg_pmo_is_pkt_filter_enabled(hdd_ctx->psoc)) {
+	if (!ucfg_pmo_is_pkt_filter_enabled(hdd_ctx->psoc) &&
+	    hdd_get_device_mode(vdev_id) != QDF_PASSTHRU_MODE) {
 		hdd_warn("Packet filtering disabled in ini");
 		return 0;
 	}

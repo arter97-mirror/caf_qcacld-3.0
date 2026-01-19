@@ -6427,6 +6427,7 @@ void csr_get_vdev_type_nss(enum QDF_OPMODE dev_mode, uint8_t *nss_2g,
 
 	switch (dev_mode) {
 	case QDF_STA_MODE:
+	case QDF_PASSTHRU_MODE:
 		*nss_2g = mac_ctx->vdev_type_nss_2g.sta;
 		*nss_5g = mac_ctx->vdev_type_nss_5g.sta;
 		break;

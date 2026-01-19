@@ -157,7 +157,8 @@ QDF_STATUS mlme_register_vdev_mgr_ops(struct vdev_mlme_obj *vdev_mlme)
 
 	if (mlme_is_vdev_in_beaconning_mode(vdev->vdev_mlme.vdev_opmode))
 		vdev_mlme->ops = &ap_mlme_ops;
-	else if (vdev->vdev_mlme.vdev_opmode == QDF_MONITOR_MODE)
+	else if (vdev->vdev_mlme.vdev_opmode == QDF_MONITOR_MODE ||
+		 vdev->vdev_mlme.vdev_opmode == QDF_PASSTHRU_MODE)
 		vdev_mlme->ops = &mon_mlme_ops;
 	else
 		vdev_mlme->ops = &sta_mlme_ops;
@@ -1655,6 +1656,9 @@ static QDF_STATUS mlme_get_vdev_types(enum QDF_OPMODE mode, uint8_t *type,
 	case QDF_NAN_DISC_MODE:
 		*type = WLAN_VDEV_MLME_TYPE_NAN;
 		break;
+	case QDF_PASSTHRU_MODE:
+		*type = WLAN_VDEV_MLME_TYPE_PASSTHRU;
+		break;
 	default:
 		mlme_err("Invalid device mode %d", mode);
 		status = QDF_STATUS_E_INVAL;
@@ -2376,6 +2380,7 @@ bool mlme_vdev_uses_self_peer(uint32_t vdev_type, uint32_t vdev_subtype)
 
 	case WMI_VDEV_TYPE_MONITOR:
 	case WMI_VDEV_TYPE_OCB:
+	case WMI_VDEV_TYPE_WIFI_PASSTHRU:
 		return true;
 
 	default:

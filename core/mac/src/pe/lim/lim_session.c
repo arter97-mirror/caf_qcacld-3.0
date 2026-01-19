@@ -561,7 +561,7 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 
 	/* Copy the BSSID to the session table */
 	sir_copy_mac_addr(session_ptr->bssId, bssid);
-	if (bssType == eSIR_MONITOR_MODE)
+	if (bssType == eSIR_MONITOR_MODE || bssType == eSIR_PASSTHRU_MODE)
 		sir_copy_mac_addr(mac->lim.gpSession[i].self_mac_addr, bssid);
 	session_ptr->valid = true;
 	/* Initialize the SME and MLM states to IDLE */
@@ -627,6 +627,9 @@ struct pe_session *pe_create_session(struct mac_context *mac,
 		session_ptr,
 		lim_get_peer_idxpool_size(numSta, bssType)))
 		goto free_session_attrs;
+
+	if (eSIR_PASSTHRU_MODE == bssType)
+		session_ptr->limSystemRole = eLIM_PASSTHRU_ROLE;
 
 	if (eSIR_INFRASTRUCTURE_MODE == bssType)
 		lim_ft_open(mac, &mac->lim.gpSession[i]);
