@@ -9773,6 +9773,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_DFS_CH_SCC_P2P] = {
 		.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_QSH_SCAN_CTRL] = {
+		.type = NLA_U8},
 };
 
 
@@ -15187,6 +15189,72 @@ hdd_set_cfg_sta_dfs_ch_peer_scc(struct wlan_hdd_link_info *link_info,
 	return errno;
 }
 
+#ifdef WLAN_FEATURE_QSH_SCAN
+/**
+ * hdd_set_cfg_qsh_scan_ctrl() - Control QSH scan suppression
+ * @link_info: hdd link info
+ * @attr: Pointer to struct nlattr with qsh_scan_ctrl value (0 or 1)
+ *
+ * This function controls scan suppression for QSH
+ * (Qualcomm Sensor Hub).
+ * When qsh_scan_ctrl is 1 (enable), scans are allowed (suppress_scan=0).
+ * When qsh_scan_ctrl is 0 (disable), scans are suppressed (suppress_scan=1).
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+hdd_set_cfg_qsh_scan_ctrl(struct wlan_hdd_link_info *link_info,
+			  const struct nlattr *attr)
+{
+	uint8_t qsh_scan_ctrl_val;
+	int errno = 0;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(link_info->adapter);
+	wmi_unified_t wmi_handle;
+	struct suppress_scan_param params = {0};
+	QDF_STATUS status;
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	qsh_scan_ctrl_val = nla_get_u8(attr);
+
+	/* Validate: only 0 (disable) or 1 (enable) allowed */
+	if (qsh_scan_ctrl_val > 1) {
+		hdd_err("Invalid qsh_scan_ctrl value %d, must be 0 or 1",
+			qsh_scan_ctrl_val);
+		return -EINVAL;
+	}
+
+	hdd_debug("Received qsh_scan_ctrl value %d (0=disable, 1=enable)",
+		  qsh_scan_ctrl_val);
+
+	/* Get WMI handle from psoc */
+	wmi_handle = get_wmi_unified_hdl_from_psoc(hdd_ctx->psoc);
+	if (!wmi_handle) {
+		hdd_err("Failed to get WMI handle");
+		return -EINVAL;
+	}
+	params.scan_req_id = WMI_SCAN_CLIENT_LPI;
+	params.suppress_scan = !qsh_scan_ctrl_val;
+
+	/* Send scan suppress command to firmware */
+	status = wmi_unified_scan_suppress_cmd_send(wmi_handle,
+						    link_info->vdev_id,
+						    &params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send scan suppress command, status: %d",
+			status);
+		return -EINVAL;
+	}
+
+	hdd_debug("Successfully sent scan suppress command for vdev %d with value %d",
+		  link_info->vdev_id, qsh_scan_ctrl_val);
+
+	return 0;
+}
+#endif /* WLAN_FEATURE_QSH_SCAN */
+
 /**
  * typedef independent_setter_fn - independent attribute handler
  * @link_info: Link info pointer in HDD adapter
@@ -15352,6 +15420,10 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_cfg_sta_indoor_ch_peer_scc},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_DFS_CH_SCC_P2P,
 	 hdd_set_cfg_sta_dfs_ch_peer_scc},
+#ifdef WLAN_FEATURE_QSH_SCAN
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_QSH_SCAN_CTRL,
+	 hdd_set_cfg_qsh_scan_ctrl},
+#endif
 };
 
 #ifdef WLAN_FEATURE_ELNA
