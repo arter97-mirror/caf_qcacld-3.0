@@ -10936,9 +10936,7 @@ policy_mgr_allow_passthru_concurrency(struct wlan_objmgr_psoc *psoc,
 				return true;
 			}
 		}
-	}
 
-	if (!conn_count) {
 		policy_mgr_debug("Passthrough mode not allowed on %dMhz",
 				 ch_freq);
 		return false;
@@ -15298,10 +15296,6 @@ policy_mgr_is_chan_change_allowed_for_passthru(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_conc_connection_info info;
 	uint8_t num_cxn_del = 0;
 	bool allow = false;
-
-	if (!policy_mgr_is_hw_dbs_capable(psoc) ||
-	    policy_mgr_get_connection_count(psoc) == 1)
-		return true;
 
 	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc,
 						      vdev_id,
