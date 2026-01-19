@@ -2945,8 +2945,7 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 		mcc_to_scc_switch = policy_mgr_get_mcc_to_scc_switch_mode(psoc);
 
 		if (mcc_to_scc_switch !=
-			QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND ||
-			cfg_sta_indoor_ch_peer_scc)
+			QDF_MCC_TO_SCC_WITH_SAME_LOWER_BAND_MCC_WITH_HIGHER_BAND)
 			force_link_required = true;
 		break;
 	default:
