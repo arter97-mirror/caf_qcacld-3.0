@@ -705,6 +705,9 @@ const struct nla_policy cfr_config_policy[
 					.type = NLA_U8,
 					.len = sizeof(uint8_t)
 	},
+	[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC] = {
+					.type = NLA_FLAG,
+	},
 };
 
 #ifdef WLAN_ENH_CFR_ENABLE
@@ -852,6 +855,13 @@ wlan_cfg80211_cfr_set_group_config(struct wlan_objmgr_vdev *vdev,
 		!params.expected_data_subtype) {
 		hdd_debug("set frame type");
 		ucfg_cfr_set_frame_type_subtype(vdev, &params);
+	}
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC]) {
+		params.agc_gain_fixed = nla_get_flag(tb[
+			QCA_WLAN_VENDOR_ATTR_PEER_CFR_FIXED_AGC]);
+		ucfg_cfr_set_capture_agc(vdev, &params);
+		hdd_debug("params.agc %d", params.agc_gain_fixed);
 	}
 
 	return QDF_STATUS_SUCCESS;
