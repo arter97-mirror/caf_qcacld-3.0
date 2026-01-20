@@ -74,18 +74,7 @@ inline enum nan_datapath_state ucfg_nan_get_ndi_state(
 inline QDF_STATUS ucfg_nan_set_active_peers(struct wlan_objmgr_vdev *vdev,
 				     uint32_t val)
 {
-	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
-
-	if (!priv_obj) {
-		nan_err("priv_obj is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	qdf_spin_lock_bh(&priv_obj->lock);
-	priv_obj->active_ndp_peers = val;
-	qdf_spin_unlock_bh(&priv_obj->lock);
-
-	return QDF_STATUS_SUCCESS;
+	return nan_set_active_peers(vdev, val);
 }
 
 /**

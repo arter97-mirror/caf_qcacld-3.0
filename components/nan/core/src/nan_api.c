@@ -567,6 +567,23 @@ QDF_STATUS nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS nan_set_active_peers(struct wlan_objmgr_vdev *vdev,
+				uint32_t val)
+{
+	struct nan_vdev_priv_obj *priv_obj = nan_get_vdev_priv_obj(vdev);
+
+	if (!priv_obj) {
+		nan_err("priv_obj is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	qdf_spin_lock_bh(&priv_obj->lock);
+	priv_obj->active_ndp_peers = val;
+	qdf_spin_unlock_bh(&priv_obj->lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 bool wlan_is_mlo_sta_nan_ndi_allowed(struct wlan_objmgr_psoc *psoc)
 {

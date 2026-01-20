@@ -271,6 +271,17 @@ bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
 			     enum nan_datapath_state state,
 			     const char *func);
+
+/**
+ * nan_set_active_peers: set active ndi peer
+ * @vdev: pointer to vdev object
+ * @val: value to set
+ *
+ * Return: status of operation
+ */
+QDF_STATUS nan_set_active_peers(struct wlan_objmgr_vdev *vdev,
+				uint32_t val);
+
 /**
  * nan_handle_emlsr_concurrency()- Handle NAN+eMLSR concurrency
  * @psoc: pointer to psoc object
@@ -406,6 +417,12 @@ bool wlan_get_disable_6g_nan(struct wlan_objmgr_psoc *psoc)
 static inline QDF_STATUS nan_set_ndi_state(struct wlan_objmgr_vdev *vdev,
 					   enum nan_datapath_state state,
 					   const char *func)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS nan_set_active_peers(struct wlan_objmgr_vdev *vdev,
+					      uint32_t val)
 {
 	return QDF_STATUS_SUCCESS;
 }
