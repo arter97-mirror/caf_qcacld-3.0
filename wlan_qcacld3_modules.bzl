@@ -2758,28 +2758,40 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//build_dir/{}/linux-{}/dataipa-{}:{}_{}_ipam".format(tgt, board, ipa_ver, target, variant),
         ]
 
-    wonder_srcs = []
-    if (target == "canoe" and chipset in ["peach-v2", "kiwi-v2"]) \
-       or (target == "sun" and chipset == "wcn7760"):
-        deps = deps + select({
-            ":wonder_enabled": [
-                "//vendor/qcom/proprietary/wlan/noship/passthru-test-suite-internal:{}_passthru_test".format(tv),
-                "//vendor/qcom/proprietary/wlan/noship/passthru-test-suite-internal:passthru_test_headers",
-            ],
-            "//conditions:default": [],
-        })
-        wonder_srcs = select({
+    deps = deps + select({
+        ":wonder_enabled": [
+	    # Add dependency of wonder here
+        ],
+        "//conditions:default": [],
+    })
+
+    wonder_srcs = "wonder_srcs_{}".format(tvc)
+    native.filegroup(
+        name = wonder_srcs,
+        srcs = select({
             ":wonder_enabled": [
                 "core/hdd/src/wlan_hdd_wondertap.c",
             ],
-            "//conditions:default": [],
-        })
+            "//conditions:default": ["core/hdd/inc/wlan_hdd_wondertap.h"],
+        }),
+        visibility = ["//visibility:private"],
+    )
+
+    combined_conditional_srcs = dict(_conditional_srcs)
+    wonder_kcfg_key = "CONFIG_DRIVER_PASSTHRU_MODE"
+    existing_inner = combined_conditional_srcs.get(wonder_kcfg_key, {})
+    existing_true_list = existing_inner.get(True, [])
+    existing_true_list = existing_true_list + [
+            ":{}".format(wonder_srcs),
+    ]
+    existing_inner = dict(existing_inner)
+    existing_inner[True] = existing_true_list
+    combined_conditional_srcs[wonder_kcfg_key] = existing_inner
 
     print("name=", name)
     print("hw=", hw)
     print("ipaths=", ipaths)
     print("srcs=", srcs)
-    print("wonder_srcs=", wonder_srcs)
     print("out=", out)
     print("iglobs=", iglobs)
     print("copts=", copts)
@@ -2789,11 +2801,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
 
     ddk_module(
         name = name,
-        srcs = srcs + wonder_srcs + [":{}_grep_defines".format(tvc)],
+        srcs = srcs + [":{}_grep_defines".format(tvc)],
         includes = ipaths + ["."],
         kconfig = kconfig,
         defconfig = defconfig,
-        conditional_srcs = _conditional_srcs,
+        conditional_srcs = combined_conditional_srcs,
         copts = copts,
         out = out,
         kernel_build = kernel_build,
