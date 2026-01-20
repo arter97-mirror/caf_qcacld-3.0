@@ -147,6 +147,14 @@ QDF_STATUS mac_open(struct wlan_objmgr_psoc *psoc, mac_handle_t *mac_handle,
 	mac->he_sgi_ltf_cfg_bit_mask = DEF_HE_AUTO_SGI_LTF;
 	mac->is_usr_cfg_amsdu_enabled = true;
 
+	mac->sta_sae_roam_preauth.flag = false;
+	status = qdf_event_create(&mac->sta_sae_roam_preauth.event);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("sae roam preauth evt init failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	status = pe_open(mac, cds_cfg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("failed to open PE; status:%u", status);
@@ -172,6 +180,7 @@ QDF_STATUS mac_close(mac_handle_t mac_handle)
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
 
+	qdf_event_destroy(&mac->sta_sae_roam_preauth.event);
 	pe_close(mac);
 
 	if (mac->pdev) {

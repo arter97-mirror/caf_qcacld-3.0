@@ -58,6 +58,8 @@
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
 #define MAX_MUS_VAL       (INT_MAX / 1024)
 
+#define MAX_WAIT_FOREIGN_CHAN_SWITCH_TIME 200  //ms
+
 #ifdef WLAN_FEATURE_P2P_DEBUG
 #define MAX_P2P_ACTION_FRAME_TYPE 9
 const char *p2p_action_frame_type[] = { "GO Negotiation Request",
@@ -310,6 +312,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	uint8_t sub_type;
 	QDF_STATUS qdf_status;
 	int ret;
+	struct mac_context *mac = MAC_CONTEXT(hdd_ctx->mac_handle);
 
 	hdd_enter();
 
@@ -339,7 +342,24 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	    sub_type == SIR_MAC_MGMT_AUTH)) {
 		qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_SME,
 			   TRACE_CODE_HDD_SEND_MGMT_TX, adapter->vdev_id, 0);
+		if (adapter->device_mode == QDF_STA_MODE &&
+		    mac && mac->sta_sae_roam_preauth.flag) {
+			qdf_event_reset(&mac->sta_sae_roam_preauth.event);
+			status = sme_sae_roam_preauth_scan_offload(mac, adapter->vdev_id);
+			if (QDF_IS_STATUS_SUCCESS(status)) {
+				hdd_debug("wait foreign chan swith for sae roam auth...");
+				status = qdf_wait_single_event(
+						&mac->sta_sae_roam_preauth.event,
+						MAX_WAIT_FOREIGN_CHAN_SWITCH_TIME);
+				if (!QDF_IS_STATUS_SUCCESS(status))
+					hdd_debug("timeout to wait foreign chan swith event!");
+				else
+					hdd_debug("sae roam auth foreign chan swith completed!");
 
+			} else {
+				hdd_info("send message to scan module fail!");
+			}
+		}
 		qdf_status = sme_send_mgmt_tx(hdd_ctx->mac_handle,
 					      adapter->vdev_id, buf, len);
 

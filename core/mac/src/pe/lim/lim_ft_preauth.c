@@ -109,6 +109,41 @@ void lim_ft_cleanup_pre_auth_info(struct mac_context *mac,
 	}
 }
 
+/**
+ * lim_is_sae_roaming_auth_req() - check whether is sae roam auth req
+ * @mac: Global MAC context
+ * @pe_session: PE Session
+ *
+ * Return: true if frame is sae roam auth req, false otherwise
+ */
+static bool lim_is_sae_roaming_auth_req(struct mac_context *mac,
+			struct pe_session *pe_session)
+{
+	unsigned int session_id;
+	enum csr_akm_type auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
+	tpCsrNeighborRoamControlInfo neighbor_roam_info = NULL;
+
+	if (!pe_session) {
+		pe_err("pe_session is NULL");
+		return false;
+	}
+
+	session_id = pe_session->smeSessionId;
+	neighbor_roam_info = &mac->roam.neighborRoamInfo[session_id];
+
+	if (neighbor_roam_info &&
+	    neighbor_roam_info->handoffReqInfo.src == REASSOC)
+		auth_type =
+			neighbor_roam_info->handoff_crypto_info.negotiatedAuthType;
+
+	if (auth_type == eCSR_AUTH_TYPE_FT_SAE ||
+	    auth_type == eCSR_AUTH_TYPE_SAE)
+		return true;
+	else
+		return false;
+
+}
+
 /*
  * lim_process_ft_pre_auth_req() - process ft pre auth req
  *
@@ -186,24 +221,33 @@ int lim_process_ft_pre_auth_req(struct mac_context *mac_ctx,
 			      session, 0, 0);
 #endif
 
-	/*
-	 * Dont need to suspend if APs are in same channel and DUT
-	 * is not in MCC state
-	 */
-	if ((session->curr_op_freq !=
-	     session->ftPEContext.pFTPreAuthReq->pre_auth_channel_freq)
-	    || lim_is_in_mcc(mac_ctx)) {
-		/* Need to suspend link only if the channels are different */
-		pe_debug("Performing pre-auth on diff channel(session %pK)",
-			session);
-		lim_send_preauth_scan_offload(mac_ctx, session,
-					session->ftPEContext.pFTPreAuthReq);
-	} else {
-		pe_debug("Performing pre-auth on same channel (session %pK)",
-			session);
-		/* We are in the same channel. Perform pre-auth */
+	if (lim_is_sae_roaming_auth_req(mac_ctx, session) &&
+	    (session->curr_op_freq !=
+	    session->ftPEContext.pFTPreAuthReq->pre_auth_channel_freq)) {
+		mac_ctx->sta_sae_roam_preauth.flag = true;
+		pe_debug("sae preauth scan will start after sae auth commit msg is ready.");
 		lim_perform_ft_pre_auth(mac_ctx, QDF_STATUS_SUCCESS, NULL,
 					session);
+	} else {
+		/*
+		 * Dont need to suspend if APs are in same channel and DUT
+		 * is not in MCC state
+		 */
+		if ((session->curr_op_freq !=
+		     session->ftPEContext.pFTPreAuthReq->pre_auth_channel_freq)
+		    || lim_is_in_mcc(mac_ctx)) {
+			/* Need to suspend link only if the channels are different */
+			pe_debug("Performing pre-auth on diff channel(session %pK)",
+				session);
+			lim_send_preauth_scan_offload(mac_ctx, session,
+						session->ftPEContext.pFTPreAuthReq);
+		} else {
+			pe_debug("Performing pre-auth on same channel (session %pK)",
+				session);
+			/* We are in the same channel. Perform pre-auth */
+			lim_perform_ft_pre_auth(mac_ctx, QDF_STATUS_SUCCESS, NULL,
+						session);
+		}
 	}
 
 	return buf_consumed;
@@ -756,6 +800,7 @@ void lim_preauth_scan_event_handler(struct mac_context *mac_ctx,
 				    uint8_t vdev_id, uint32_t scan_id)
 {
 	struct pe_session *session_entry;
+	QDF_STATUS status;
 
 	session_entry = pe_find_session_by_scan_id(mac_ctx, scan_id);
 	/* Pre-auth request is sent */
@@ -797,9 +842,17 @@ void lim_preauth_scan_event_handler(struct mac_context *mac_ctx,
 		break;
 
 	case SIR_SCAN_EVENT_FOREIGN_CHANNEL:
-		/* Sta is on candidate channel. Send auth */
-		lim_perform_ft_pre_auth(mac_ctx, QDF_STATUS_SUCCESS, NULL,
-					session_entry);
+		if (mac_ctx->sta_sae_roam_preauth.flag) {
+			pe_debug("set sae roam preauth foreign chan swith event.");
+			status = qdf_event_set(&mac_ctx->sta_sae_roam_preauth.event);
+			if (QDF_IS_STATUS_ERROR(status))
+				pe_err("set sae_roam_auth_evt failed");
+			mac_ctx->sta_sae_roam_preauth.flag = false;
+		} else {
+			/* Sta is on candidate channel. Send auth */
+			lim_perform_ft_pre_auth(mac_ctx, QDF_STATUS_SUCCESS, NULL,
+						session_entry);
+		}
 		break;
 	default:
 		/* Don't print message for scan events that are ignored */

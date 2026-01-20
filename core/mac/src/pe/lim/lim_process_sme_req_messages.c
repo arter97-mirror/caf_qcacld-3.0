@@ -3394,6 +3394,42 @@ lim_process_sme_update_session_edca_txq_params(struct mac_context *mac_ctx,
 			     pe_session->vdev_id, false);
 }
 
+/**
+ * lim_process_sme_send_preauth_scan_offload()
+ * process sme send preauth scan offload for sae preauth
+ *
+ * @mac_ctx: Pointer to Global MAC structure
+ * @msg_buf: Pointer to SME message buffer
+ *
+ * Return: None
+ */
+static void
+lim_process_sme_send_preauth_scan_offload(struct mac_context *mac_ctx,
+				struct sir_preauth_scan_offload *msg_buf)
+{
+	struct pe_session *pe_session;
+
+	if (!msg_buf) {
+		pe_err("Buffer is Pointing to NULL");
+		return;
+	}
+
+	pe_session = pe_find_session_by_vdev_id(mac_ctx, msg_buf->vdev_id);
+	if (!pe_session) {
+		pe_warn("Session does not exist for given vdev_id %d",
+			msg_buf->vdev_id);
+		return;
+	}
+
+	if (!pe_session->ftPEContext.pFTPreAuthReq) {
+		pe_warn("pe_session->ftPEContext.pFTPreAuthReq is NULL");
+		return;
+	}
+
+	lim_send_preauth_scan_offload(mac_ctx, pe_session,
+				pe_session->ftPEContext.pFTPreAuthReq);
+}
+
 static void lim_process_sme_update_mu_edca_params(struct mac_context *mac_ctx,
 						  uint32_t vdev_id)
 {
@@ -4869,6 +4905,10 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 	case WNI_SME_CFG_ACTION_FRM_HE_TB_PPDU:
 		lim_process_sme_cfg_action_frm_in_tb_ppdu(mac,
 				(struct  sir_cfg_action_frm_tb_ppdu *)msg_buf);
+		break;
+	case eWNI_SME_SEND_PREAUTH_SCAN_OFFLOAD:
+		lim_process_sme_send_preauth_scan_offload(mac,
+				(struct sir_preauth_scan_offload *)msg_buf);
 		break;
 	default:
 		qdf_mem_free((void *)pMsg->bodyptr);

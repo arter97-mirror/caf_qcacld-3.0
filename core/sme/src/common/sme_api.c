@@ -15430,6 +15430,36 @@ error:
 
 	return qdf_status;
 }
+
+QDF_STATUS
+sme_sae_roam_preauth_scan_offload(struct mac_context *mac_ctx,
+				  uint8_t vdev_id)
+{
+
+	QDF_STATUS status;
+	struct scheduler_msg msg = {0};
+	struct sir_preauth_scan_offload *sir_msg;
+
+	sir_msg = qdf_mem_malloc(sizeof(*sir_msg));
+	if (!sir_msg)
+		return QDF_STATUS_E_NOMEM;
+
+	sir_msg->type = eWNI_SME_SEND_PREAUTH_SCAN_OFFLOAD;
+	sir_msg->vdev_id = vdev_id;
+
+	msg.bodyptr = sir_msg;
+	msg.type = eWNI_SME_SEND_PREAUTH_SCAN_OFFLOAD;
+	status = scheduler_post_message(QDF_MODULE_ID_SME, QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE, &msg);
+	if (QDF_STATUS_SUCCESS != status) {
+		sme_err("Failed to send eWNI_SME_SEND_PREAUTH_SCAN_OFFLOAD to PE %d",
+			status);
+		qdf_mem_free(sir_msg);
+		return QDF_STATUS_E_IO;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 bool sme_is_sta_key_exchange_in_progress(mac_handle_t mac_handle,

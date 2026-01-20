@@ -36,7 +36,7 @@
 
 /* Time to dwell on preauth channel during roaming, in milliseconds */
 #define LIM_FT_PREAUTH_ACTIVE_SCAN_TIME 50
-#define LIM_FT_PREAUTH_PASSIVE_SCAN_TIME 150
+#define LIM_FT_PREAUTH_PASSIVE_SCAN_TIME 500
 
 /*--------------------------------------------------------------------------
    Type declarations

@@ -732,6 +732,11 @@ struct ani_level_params {
 };
 #endif
 
+struct sae_roam_preauth_info {
+	bool flag;
+	qdf_event_t event;
+};
+
 /**
  * struct mac_context - Global MAC context
  */
@@ -805,6 +810,7 @@ struct mac_context {
 #endif
 	bool obss_scan_offload;
 	bool bcn_reception_stats;
+	struct sae_roam_preauth_info sta_sae_roam_preauth;
 	csr_session_close_cb session_close_cb;
 	csr_roam_complete_cb session_roam_complete_cb;
 #ifdef FEATURE_ANI_LEVEL_REQUEST
