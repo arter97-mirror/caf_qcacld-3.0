@@ -1104,6 +1104,13 @@ QDF_STATUS csr_update_channel_list(struct mac_context *mac)
 				pChanList->chanParam[num_channel].nan_disabled =
 					true;
 
+			/* Channel flags to be set by HOST
+			 *
+			 * DFS channel: is_passive + dfsSet
+			 * Indoor channel: is_passive
+			 * DFS + Indoor channel: is_passive + dfsSet
+			 */
+
 			if (wlan_reg_is_6ghz_chan_freq(
 				pChanList->chanParam[num_channel].freq)) {
 				if (wlan_reg_is_6g_freq_indoor(mac->pdev,
@@ -1111,8 +1118,10 @@ QDF_STATUS csr_update_channel_list(struct mac_context *mac)
 					pChanList->chanParam[num_channel].is_passive = true;
 			} else {
 				if (wlan_reg_is_dfs_for_freq(mac->pdev,
-					pChanList->chanParam[num_channel].freq))
+					pChanList->chanParam[num_channel].freq)) {
 					pChanList->chanParam[num_channel].dfsSet = true;
+					pChanList->chanParam[num_channel].is_passive = true;
+				}
 
 				if (wlan_reg_is_freq_indoor(mac->pdev,
 					pChanList->chanParam[num_channel].freq))
