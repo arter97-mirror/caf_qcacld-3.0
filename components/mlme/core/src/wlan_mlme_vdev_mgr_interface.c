@@ -2782,6 +2782,16 @@ vdevmgr_vdev_bss_oper_res_change(struct vdev_mlme_obj *vdev_mlme,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+vdevmgr_vdev_unified_disconnect_rsp_handle(
+				struct vdev_mlme_obj *vdev_mlme,
+				struct vdev_unified_disconnect_response *rsp)
+{
+	mlme_legacy_debug("vdev id = %d ",
+			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+	return wma_vdev_unified_disconnect_rsp_handler(vdev_mlme, rsp);
+}
+
 static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_start_send = sta_mlme_vdev_start_send,
 	.mlme_vdev_restart_send = sta_mlme_vdev_restart_send,
@@ -2814,6 +2824,8 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 #endif
 	.mlme_vdev_peer_oper_mode_notify = vdevmgr_peer_oper_mode_notify,
 	.mlme_vdev_op_res_chg_evt = vdevmgr_vdev_bss_oper_res_change,
+	.mlme_vdev_ext_unified_disconnect_rsp =
+			vdevmgr_vdev_unified_disconnect_rsp_handle,
 };
 
 static struct vdev_mlme_ops ap_mlme_ops = {

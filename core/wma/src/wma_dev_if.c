@@ -3068,6 +3068,7 @@ wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 	struct wma_txrx_node *iface = &wma->interfaces[resp->vdev_id];
 	uint32_t vdev_stop_type;
 	QDF_STATUS status;
+	bool unified_disconnect_support;
 
 	if (!resp) {
 		wma_err("resp is NULL");
@@ -3075,6 +3076,11 @@ wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 	}
 
 	vdev_id = resp->vdev_id;
+	if (!iface || !iface->vdev) {
+		wma_err("vdev id %d is already deleted", vdev_id);
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
 	status = mlme_get_vdev_stop_type(iface->vdev, &vdev_stop_type);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err("Failed to get vdev stop type");
@@ -3090,9 +3096,19 @@ wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 			wma_check_and_find_mcc_ap(wma, vdev_id);
 	}
 
-	wlan_vdev_mlme_sm_deliver_evt(iface->vdev,
-				      WLAN_VDEV_SM_EV_DOWN_COMPLETE,
-				      sizeof(*resp), resp);
+	unified_disconnect_support =
+		(mlo_mgr_is_link_switch_in_progress(iface->vdev) &&
+		mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(
+								wma->psoc));
+
+	if (!unified_disconnect_support) {
+		wlan_vdev_mlme_sm_deliver_evt(iface->vdev,
+					      WLAN_VDEV_SM_EV_DOWN_COMPLETE,
+					      sizeof(*resp), resp);
+	} else {
+		qdf_mem_free(resp);
+	}
+
 	return status;
 }
 
@@ -3121,6 +3137,46 @@ static void wma_send_vdev_down_req(tp_wma_handle wma,
 	wlan_vdev_mlme_sm_deliver_evt(iface->vdev,
 				      WLAN_VDEV_SM_EV_MLME_DOWN_REQ,
 				      sizeof(*resp), resp);
+}
+
+QDF_STATUS
+wma_vdev_unified_disconnect_rsp_handler(
+				struct vdev_mlme_obj *vdev_mlme,
+				struct vdev_unified_disconnect_response *rsp)
+{
+	tp_wma_handle wma;
+	struct wma_txrx_node *iface = NULL;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct wlan_objmgr_psoc *psoc;
+	struct del_bss_resp *del_resp;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma)
+		return status;
+
+	iface = &wma->interfaces[rsp->vdev_id];
+	if (rsp->vdev_id >= wma->max_bssid) {
+		wma_err("Invalid vdev_id %d from FW", rsp->vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(iface->vdev);
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	del_resp = qdf_mem_malloc(sizeof(*del_resp));
+	if (!del_resp)
+		return QDF_STATUS_E_NOMEM;
+
+	del_resp->vdev_id = rsp->vdev_id;
+	del_resp->status = rsp->status;
+
+	wlan_vdev_mlme_sm_deliver_evt(
+				iface->vdev, WLAN_VDEV_SM_EV_DOWN_COMPLETE,
+				sizeof(*del_resp),
+				del_resp);
+
+	return status;
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO

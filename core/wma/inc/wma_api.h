@@ -1055,4 +1055,21 @@ wma_get_fw_active_apf_mode(enum active_apf_mode mode)
 	return WMI_HOST_ACTIVE_APF_DISABLED;
 }
 #endif /* FEATURE_WLAN_APF */
+
+/**
+ * wma_vdev_unified_disconnect_rsp_handler() - Handle unified disconnect
+ * response
+ * @vdev_mlme: vdev mlme obj
+ * @rsp: unified disconnect response
+ *
+ * This function handles the unified disconnect response when MLO link switching
+ * is in progress and unified connect/disconnect is enabled. It processes the
+ * response and updates the vdev state accordingly.
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wma_vdev_unified_disconnect_rsp_handler(
+				struct vdev_mlme_obj *vdev_mlme,
+				struct vdev_unified_disconnect_response *rsp);
 #endif /* WMA_API_H */
