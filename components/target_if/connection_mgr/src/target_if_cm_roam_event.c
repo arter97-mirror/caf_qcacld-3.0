@@ -130,6 +130,15 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 	    roam_event->reason == ROAM_REASON_HO_FAILED)
 		target_if_stop_rso_stop_timer(roam_event);
 
+	if (roam_event->reason == ROAM_REASON_INVALID) {
+		if (roam_event->notif == CM_ROAM_NOTIF_ROAM_START)
+			target_if_prevent_pm_during_roam(psoc);
+		else if (roam_event->notif == CM_ROAM_NOTIF_ROAM_ABORT)
+			target_if_allow_pm_after_roam(psoc);
+	} else if (roam_event->reason == ROAM_REASON_HO_FAILED) {
+		target_if_allow_pm_after_roam(psoc);
+	}
+
 	roam_rx_ops = target_if_cm_get_roam_rx_ops(psoc);
 	if (!roam_rx_ops || !roam_rx_ops->roam_event_rx) {
 		target_if_err("No valid roam rx ops");
@@ -287,7 +296,7 @@ int target_if_cm_roam_sync_event(ol_scn_t scn, uint8_t *event,
 		return -EINVAL;
 	}
 
-	target_if_prevent_pm_during_roam_sync(psoc);
+	target_if_prevent_pm_during_roam(psoc);
 
 	qdf_status = wmi_extract_roam_sync_event(wmi_handle, event,
 						 len, &sync_ind);
@@ -315,7 +324,7 @@ int target_if_cm_roam_sync_event(ol_scn_t scn, uint8_t *event,
 
 err:
 	if (status == -EINVAL)
-		target_if_allow_pm_after_roam_sync(psoc);
+		target_if_allow_pm_after_roam(psoc);
 
 	if (sync_ind && sync_ind->ric_tspec_data)
 		qdf_mem_free(sync_ind->ric_tspec_data);

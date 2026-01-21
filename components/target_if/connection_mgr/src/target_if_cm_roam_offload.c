@@ -553,7 +553,7 @@ target_if_cm_roam_register_lfr3_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 				target_if_cm_roam_full_scan_6ghz_on_disc;
 	tx_ops->send_roam_scan_offload_rssi_params =
 				target_if_cm_roam_scan_offload_rssi_params;
-	tx_ops->allow_pm_after_roam_sync = target_if_allow_pm_after_roam_sync;
+	tx_ops->allow_pm_after_roam = target_if_allow_pm_after_roam;
 	target_if_cm_roam_register_vendor_handoff_ops(tx_ops);
 	target_if_cm_roam_register_linkspeed_state(tx_ops);
 }

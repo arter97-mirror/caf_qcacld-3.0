@@ -2863,8 +2863,8 @@ struct roam_pmkid_req_event {
  * @send_roam_frequencies: send roam frequencies to FW
  * @send_roam_idle_trigger: Send roam idle params to FW
  * @send_roam_disconnect_params: Send roam disconnect params to FW
- * @allow_pm_after_roam_sync: Allow runtime PM suspernd after roam synch
- * is complete
+ * @allow_pm_after_roam: Allow runtime PM suspernd after roam synch
+ * is complete or after roam abort/ho-failure
  */
 struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_vdev_set_pcl_cmd)(struct wlan_objmgr_vdev *vdev,
@@ -2932,7 +2932,7 @@ struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_roam_disconnect_params)(wmi_unified_t wmi_handle,
 						  uint8_t command,
 						  struct wlan_roam_disconnect_params *req);
-	void (*allow_pm_after_roam_sync)(struct wlan_objmgr_psoc *psoc);
+	void (*allow_pm_after_roam)(struct wlan_objmgr_psoc *psoc);
 };
 
 /**

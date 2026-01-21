@@ -900,14 +900,14 @@ wlan_cm_tgt_allow_pm_after_roam_sync(struct wlan_objmgr_psoc *psoc,
 
 	roam_tx_ops = wlan_cm_roam_get_tx_ops_from_vdev(vdev);
 
-	if (!roam_tx_ops || !roam_tx_ops->allow_pm_after_roam_sync) {
+	if (!roam_tx_ops || !roam_tx_ops->allow_pm_after_roam) {
 		mlme_err("CM_RSO: vdev %d allow_pm_after_roam_sync is NULL",
 			 vdev_id);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	roam_tx_ops->allow_pm_after_roam_sync(psoc);
+	roam_tx_ops->allow_pm_after_roam(psoc);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 
