@@ -964,6 +964,8 @@ wmi_convert_fw_notif_to_cm_notif(uint32_t fw_notif)
 		return CM_ROAM_NOTIF_HO_FAIL;
 	case WMI_ROAM_NOTIF_SCAN_END:
 		return CM_ROAM_NOTIF_SCAN_END;
+	case WMI_ROAM_NOTIF_ROAM_SMD_START:
+		return CM_ROAM_NOTIF_ROAM_SMD_START;
 	default:
 		return CM_ROAM_NOTIF_INVALID;
 	}
@@ -1050,6 +1052,277 @@ wmi_extract_pdev_hw_mode_trans_ind(
 	}
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * wmi_extract_vdev_repurpose_tlvs() - Extract VDEV repurpose TLVs
+ * @wmi_handle: WMI handle
+ * @req_tlv: Pointer to vdev repurpose request TLV array
+ * @num_tlvs: Number of TLVs
+ * @vdev_repurpose_req: Output array to populate
+ * @num_vdev_repurpose_req: Output count
+ *
+ * This function extracts wmi_vdev_repurpose_request_tlv_param TLVs and
+ * populates the vdev_repurpose_req array. Up to 3 TLVs can be present
+ * (for MLO scenarios). This is a common helper used by both roam event
+ * and roam sync event handlers.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+static QDF_STATUS
+wmi_extract_vdev_repurpose_tlvs(wmi_unified_t wmi_handle,
+				wmi_vdev_repurpose_request_tlv_param *req_tlv,
+				uint32_t num_tlvs,
+				struct smd_vdev_repurpose_req *vdev_repurpose_req,
+				uint8_t *num_vdev_repurpose_req)
+{
+	uint32_t i;
+
+	if (!wmi_handle || !vdev_repurpose_req || !num_vdev_repurpose_req) {
+		wmi_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Initialize output */
+	*num_vdev_repurpose_req = 0;
+	qdf_mem_zero(vdev_repurpose_req,
+		     WLAN_MAX_ML_BSS_LINKS * sizeof(struct smd_vdev_repurpose_req));
+
+	/* TLVs are optional, return success if not present */
+	if (!req_tlv || !num_tlvs) {
+		wmi_debug("No VDEV repurpose request TLVs present");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	/* Validate TLV count */
+	if (num_tlvs > WLAN_MAX_ML_BSS_LINKS) {
+		wmi_err("Too many VDEV repurpose TLVs: %u, max: %u",
+			num_tlvs, WLAN_MAX_ML_BSS_LINKS);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Extract each TLV */
+	for (i = 0; i < num_tlvs; i++) {
+		struct smd_vdev_repurpose_req *req = &vdev_repurpose_req[i];
+
+		/* Extract vdev_id */
+		req->vdev_id = req_tlv[i].repurpose_vdev_id;
+
+		/* Parse flag bits using WMI macros */
+		req->inactive_link_pre_stop =
+			WMI_VDEV_REPURPOSE_REQ_TLV_FLAGS_GET_REQUEST_INACTIVE(req_tlv[i].flags);
+		req->cleanup_vdev =
+			WMI_VDEV_REPURPOSE_REQ_TLV_FLAGS_GET_REQUEST_DISCONNECT(req_tlv[i].flags);
+		req->bringup_vdev =
+			WMI_VDEV_REPURPOSE_REQ_TLV_FLAGS_GET_REQUEST_CONNECT(req_tlv[i].flags);
+
+		/* Copy MAC addresses */
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(&req_tlv[i].bssid, req->bssid.bytes);
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(&req_tlv[i].mld_addr, req->mld_addr.bytes);
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(&req_tlv[i].smd_addr, req->smd_addr.bytes);
+
+		/* Mark as valid */
+		req->is_valid = true;
+
+		wmi_debug("VDEV Repurpose TLV[%u]: vdev_id=%u flags=0x%x inactive=%u cleanup=%u bringup=%u",
+			  i, req->vdev_id, req_tlv[i].flags,
+			  req->inactive_link_pre_stop,
+			  req->cleanup_vdev,
+			  req->bringup_vdev);
+		wmi_debug("  BSSID: " QDF_MAC_ADDR_FMT " MLD: " QDF_MAC_ADDR_FMT " SMD: " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(req->bssid.bytes),
+			  QDF_MAC_ADDR_REF(req->mld_addr.bytes),
+			  QDF_MAC_ADDR_REF(req->smd_addr.bytes));
+	}
+
+	*num_vdev_repurpose_req = num_tlvs;
+	wmi_info("Extracted %u VDEV repurpose request TLVs", num_tlvs);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wmi_extract_smd_transition_ie() - Extract SMD Transition IE
+ * @wmi_handle: WMI handle
+ * @evt_buf: Event buffer
+ * @smd_ie_info: Output SMD IE structure to fill
+ *
+ * This function extracts the SMD Transition IE from the roam event.
+ * FW populates its capabilities (B0 and B1 set to '0').
+ * Host will later append its capabilities (Listen Interval, SCS List).
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+static QDF_STATUS
+wmi_extract_smd_transition_ie(wmi_unified_t wmi_handle,
+			      void *evt_buf,
+			      struct smd_transition_ie_info *smd_ie_info)
+{
+	WMI_ROAM_EVENTID_param_tlvs *param_buf;
+	uint8_t *smd_ie;
+	uint32_t ie_len;
+
+	if (!wmi_handle || !evt_buf || !smd_ie_info) {
+		wmi_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	param_buf = (WMI_ROAM_EVENTID_param_tlvs *)evt_buf;
+	smd_ie = param_buf->smd_transition_ie;
+	ie_len = param_buf->num_smd_transition_ie;
+
+	/* Initialize output */
+	qdf_mem_zero(smd_ie_info, sizeof(*smd_ie_info));
+
+	/* IE is optional, return success if not present */
+	if (!smd_ie || !ie_len) {
+		wmi_debug("SMD Transition IE not present");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	/* Validate IE length */
+	if (ie_len > sizeof(smd_ie_info->ie_data)) {
+		wmi_err("SMD IE too large: %u, max: %zu",
+			ie_len, sizeof(smd_ie_info->ie_data));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Copy IE data */
+	smd_ie_info->ie_len = ie_len;
+	qdf_mem_copy(smd_ie_info->ie_data, smd_ie, ie_len);
+
+	wmi_debug("Extracted SMD Transition IE: len=%u", ie_len);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+wmi_fill_smd_roam_info(wmi_unified_t wmi_handle,
+		       WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
+		       struct roam_offload_synch_ind *roam_sync_ind)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	wmi_roam_synch_event_fixed_param *synch_event = NULL;
+
+	if (!param_buf) {
+		wmi_debug("received null buf from target");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	synch_event = param_buf->fixed_param;
+	if (!synch_event) {
+		wmi_debug("received null event data from target");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Extract vdev repurpose request TLV if SMD BSS transition (bit 16 set) */
+	if (WMI_GET_ROAM_SMD_BSS_TRANSITION(synch_event->roam_reason)) {
+		status = wmi_extract_vdev_repurpose_tlvs(
+				wmi_handle,
+				param_buf->vdev_repurpose_request_tlv,
+				param_buf->num_vdev_repurpose_request_tlv,
+				roam_sync_ind->vdev_repurpose_req,
+				&roam_sync_ind->num_vdev_repurpose_req);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wmi_err("Failed to extract vdev repurpose TLVs: %d",
+				status);
+			/* Log error but continue - TLVs are optional */
+		} else if (roam_sync_ind->num_vdev_repurpose_req > 0) {
+			wmi_info("SMD BSS Transition: Extracted %u vdev repurpose TLVs",
+				 roam_sync_ind->num_vdev_repurpose_req);
+		}
+	}
+	return status;
+}
+
+static QDF_STATUS
+wmi_fill_smd_roam_ies(wmi_unified_t wmi_handle,
+		      WMI_ROAM_EVENTID_param_tlvs *param_buf,
+		      struct roam_offload_roam_event *roam_event)
+{
+	struct smd_transition_ie_info *smd_transition_ie = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!param_buf) {
+		wmi_debug("received null buf from target");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Extract VDEV repurpose TLVs (up to 3) if present for SMD roaming events */
+	if (roam_event->notif == CM_ROAM_NOTIF_ROAM_SMD_START ||
+	    roam_event->notif == CM_ROAM_NOTIF_ROAM_ABORT) {
+		status = wmi_extract_vdev_repurpose_tlvs(wmi_handle,
+							 param_buf->vdev_repurpose_request_tlv,
+							 param_buf->num_vdev_repurpose_request_tlv,
+							 roam_event->vdev_repurpose_req,
+							 &roam_event->num_vdev_repurpose_req);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wmi_err("Failed to extract VDEV repurpose TLVs: %d", status);
+			goto end;
+		} else if (roam_event->num_vdev_repurpose_req > 0) {
+			if (roam_event->notif == CM_ROAM_NOTIF_ROAM_SMD_START) {
+				wmi_debug("SMD Roaming Started: Extracted %u vdev repurpose TLVs",
+					 roam_event->num_vdev_repurpose_req);
+			} else {
+				wmi_debug("Roam Abort: Extracted %u vdev repurpose TLVs to restore old AP",
+					 roam_event->num_vdev_repurpose_req);
+			}
+		}
+	}
+
+	if (param_buf->smd_transition_ie) {
+		smd_transition_ie = qdf_mem_malloc(sizeof(*smd_transition_ie));
+		if (!smd_transition_ie) {
+			status = QDF_STATUS_E_NOMEM;
+			goto end;
+		}
+		status = wmi_extract_smd_transition_ie(wmi_handle, param_buf, smd_transition_ie);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wmi_err("Failed to extract SMD transition IE %d", status);
+			qdf_mem_free(smd_transition_ie);
+			goto end;
+		}
+		roam_event->smd_transition_ie = smd_transition_ie;
+	}
+
+end:
+	return status;
+}
+
+#else
+static inline QDF_STATUS
+wmi_extract_vdev_repurpose_tlvs(wmi_unified_t wmi_handle,
+				wmi_vdev_repurpose_request_tlv_param *req_tlv,
+				uint32_t num_tlvs,
+				struct smd_vdev_repurpose_req *vdev_repurpose_req,
+				uint8_t *num_vdev_repurpose_req)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wmi_extract_smd_transition_ie(wmi_unified_t wmi_handle,
+			      void *evt_buf,
+			      struct smd_transition_ie_info *smd_ie_info)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wmi_fill_smd_roam_info(wmi_unified_t wmi_handle,
+		       WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
+		       struct roam_offload_synch_ind *roam_sync_ind)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wmi_fill_smd_roam_ies(wmi_unified_t wmi_handle,
+		      WMI_ROAM_EVENTID_param_tlvs *param_buf,
+		      struct roam_offload_roam_event *roam_event)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 /**
  * extract_roam_event_tlv() - Extract the roam event
  * @wmi_handle: wmi handle
@@ -1142,7 +1415,14 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 		roam_event->hw_mode_trans_ind = hw_mode_trans_ind;
 	}
 
-	if (wmi_event->notif_params1)
+	status = wmi_fill_smd_roam_ies(wmi_handle, param_buf, roam_event);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wmi_err("Failed to extract SMD Roam IEs: %d", status);
+		goto end;
+	}
+
+	if (wmi_event->notif_params1 &&
+		roam_event->reason == ROAM_REASON_DEAUTH)
 		roam_event->deauth_disassoc_frame =
 			param_buf->deauth_disassoc_frame;
 end:
@@ -2566,6 +2846,13 @@ wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
 		wmi_err("Failed to fill roam mlo info");
 		return status;
 	}
+
+	status = wmi_fill_smd_roam_info(wmi_handle, param_buf, roam_sync_ind);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wmi_err("Failed to fill SMD Roam info");
+		return status;
+	}
+
 	wlan_cm_free_roam_synch_frame_ind(rso_cfg);
 	return QDF_STATUS_SUCCESS;
 }

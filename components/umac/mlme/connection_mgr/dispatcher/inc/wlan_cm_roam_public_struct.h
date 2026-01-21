@@ -2622,6 +2622,10 @@ struct roam_invoke_req {
  *			   WMI_ROAM_REASON_HO_FAILED is event expected
  * @CM_ROAM_NOTIF_SCAN_END: indicate roam scan end, notif_params to be sent
  *			    as WMI_ROAM_TRIGGER_REASON_ID
+ * @CM_ROAM_NOTIF_ROAM_SMD_START: indicate that SMD (Simultaneous Multi-link
+ *				  Device) roaming has started. notif_params1
+ *				  contains the requested setup IEEE links
+ *				  bitmap for target AP MLD
  */
 enum cm_roam_notif {
 	CM_ROAM_NOTIF_INVALID = 0,
@@ -2637,6 +2641,7 @@ enum cm_roam_notif {
 	CM_ROAM_NOTIF_DISASSOC_RECV,
 	CM_ROAM_NOTIF_HO_FAIL,
 	CM_ROAM_NOTIF_SCAN_END,
+	CM_ROAM_NOTIF_ROAM_SMD_START,
 };
 
 /**
@@ -2758,6 +2763,40 @@ enum roam_dispatcher_events {
 };
 
 /**
+ * struct smd_vdev_repurpose_req - SMD VDEV repurpose request
+ * @vdev_id: Target vdev_id for BSS repurpose
+ * @inactive_link_pre_stop: B0 - inactive link pre-vdev_stop
+ * @cleanup_vdev: B1 - cleanup vdev
+ * @bringup_vdev: B2 - bringup vdev
+ * @bssid: Repurposed AP's BSSID
+ * @mld_addr: Repurposed AP's MLD address
+ * @smd_addr: Repurposed AP's SMD address
+ * @is_valid: Flag indicating if this structure contains valid data
+ */
+struct smd_vdev_repurpose_req {
+	uint32_t vdev_id;
+	bool inactive_link_pre_stop;
+	bool cleanup_vdev;
+	bool bringup_vdev;
+	struct qdf_mac_addr bssid;
+	struct qdf_mac_addr mld_addr;
+	struct qdf_mac_addr smd_addr;
+	bool is_valid;
+};
+
+/**
+ * struct smd_transition_ie_info - SMD Transition IE information
+ * @ie_len: Length of SMD transition IE
+ * @ie_data: SMD transition IE data
+ *           FW populates its capabilities (B0 and B1 set to '0')
+ *           Host appends its capabilities (Listen Interval, SCS List)
+ */
+struct smd_transition_ie_info {
+	uint32_t ie_len;
+	uint8_t ie_data[256];  /* Max IE size */
+};
+
+/**
  * struct roam_offload_roam_event: Data carried by roam event
  * @vdev_id: vdev id
  * @psoc: psoc object
@@ -2767,11 +2806,17 @@ enum roam_dispatcher_events {
  * @notif: roam notification
  * @notif_params: Contains roam invoke fail reason from wmi_roam_invoke_error_t
  *		  if reason is WMI_ROAM_REASON_INVOKE_ROAM_FAIL.
- * @notif_params1: notif_params1 is exact frame length of deauth or disassoc if
- *		   reason is WMI_ROAM_REASON_DEAUTH.
+ * @notif_params1: Context-dependent:
+ *		   - For SMD (WMI_ROAM_NOTIF_ROAM_SMD_START/ABORT):
+ *		     Requested setup IEEE links bitmap for target AP MLD
+ *		   - For DEAUTH (WMI_ROAM_REASON_DEAUTH):
+ *		     Exact frame length of deauth/disassoc frame
  * @hw_mode_trans_ind: HW mode transition indication
  * @deauth_disassoc_frame: Deauth/disassoc frame received from AP
  * @rso_timer_stopped: RSO timer stopped
+ * @num_vdev_repurpose_req: Number of vdev repurpose TLVs (priority ordered)
+ * @vdev_repurpose_req: Array to handle up to 3 TLVs
+ * @smd_transition_ie: SMD Transition IE from FW
  */
 struct roam_offload_roam_event {
 	uint8_t vdev_id;
@@ -2784,6 +2829,11 @@ struct roam_offload_roam_event {
 	struct cm_hw_mode_trans_ind *hw_mode_trans_ind;
 	uint8_t *deauth_disassoc_frame;
 	bool rso_timer_stopped;
+#ifdef WLAN_FEATURE_11BN_SMD
+	uint8_t num_vdev_repurpose_req;
+	struct smd_vdev_repurpose_req vdev_repurpose_req[WLAN_MAX_ML_BSS_LINKS];
+	struct smd_transition_ie_info *smd_transition_ie;
+#endif
 };
 
 /**
@@ -3203,6 +3253,10 @@ struct roam_offload_synch_ind {
 	struct ml_setup_link_param ml_link[WLAN_MAX_ML_BSS_LINKS];
 	uint8_t num_ml_key_material;
 	struct ml_key_material_param ml_key[WLAN_MAX_ML_BSS_LINKS];
+#endif
+#ifdef WLAN_FEATURE_11BN_SMD
+	uint8_t num_vdev_repurpose_req;
+	struct smd_vdev_repurpose_req vdev_repurpose_req[WLAN_MAX_ML_BSS_LINKS];
 #endif
 };
 

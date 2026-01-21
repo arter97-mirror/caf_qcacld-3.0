@@ -164,6 +164,23 @@ target_if_cm_roam_reset_ipa_sw_routing_setting(
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+static void
+target_if_smd_roam_free_ies(struct roam_offload_roam_event *roam_event)
+{
+	if (roam_event->smd_transition_ie) {
+		roam_event->smd_transition_ie->ie_len = 0;
+		qdf_mem_free(roam_event->smd_transition_ie);
+	}
+}
+#else
+static inline void
+target_if_smd_roam_free_ies(struct roam_offload_roam_event *roam_event)
+{
+}
+#endif
+
+
 int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 {
 	QDF_STATUS qdf_status;
@@ -236,7 +253,14 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 	qdf_status = roam_rx_ops->roam_event_rx(roam_event);
 
 done:
-	qdf_mem_free(roam_event);
+	if (roam_event) {
+		/* Free dynamically allocated subfields before freeing the main structure */
+		if (roam_event->hw_mode_trans_ind)
+			qdf_mem_free(roam_event->hw_mode_trans_ind);
+
+		target_if_smd_roam_free_ies(roam_event);
+		qdf_mem_free(roam_event);
+	}
 	return qdf_status_to_os_return(qdf_status);
 }
 
