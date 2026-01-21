@@ -20881,7 +20881,7 @@ nla_put_failure:
 	return -EINVAL;
 }
 
-#ifdef QCA_SUPPORT_CP_STATS
+#if defined(QCA_SUPPORT_CP_STATS) && defined(WLAN_GET_CHAIN_RSSI_BY_CP_STATS)
 /**
  * hdd_process_peer_chain_rssi_req() - fetch per chain rssi of a connected peer
  * @adapter: Pointer to adapter
