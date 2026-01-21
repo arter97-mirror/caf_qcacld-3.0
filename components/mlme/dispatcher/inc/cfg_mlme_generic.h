@@ -1348,7 +1348,7 @@ enum wlan_epcs_frame {
  */
  #define CFG_PARTNER_BRINGUP_OFFLOAD_TO_HOST CFG_INI_BOOL( \
 				"offload_ml_roam_partner_bringup_to_host", \
-				0, \
+				1, \
 				"Enable disable MLO roaming optimization")
 
 #define CFG_GENERIC_ALL \

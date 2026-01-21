@@ -876,7 +876,8 @@ uint16_t hdd_cm_get_perf_cpu_mask(void)
 
 	qdf_for_each_online_cpu(cpus) {
 		package_id = qdf_topology_physical_package_id(cpus);
-		if (package_id >= 0 && BIT(package_id) & perf_cpu_cluster)
+		if (package_id >= 0 &&
+		    QDF_HAS_PARAM(perf_cpu_cluster, package_id))
 			cpu_mask |= (uint16_t)(1u << cpus);
 	}
 
