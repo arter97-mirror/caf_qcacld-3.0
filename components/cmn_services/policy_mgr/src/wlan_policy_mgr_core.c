@@ -4696,7 +4696,8 @@ policy_mgr_get_pref_force_scc_freq(struct wlan_objmgr_psoc *psoc,
 
 	if ((acs_band == QCA_ACS_MODE_IEEE80211B ||
 	     acs_band == QCA_ACS_MODE_IEEE80211G) &&
-	     WLAN_REG_IS_24GHZ_CH_FREQ(sap_ch_freq))
+	     WLAN_REG_IS_24GHZ_CH_FREQ(sap_ch_freq) &&
+	     !policy_mgr_get_ap_6ghz_capable(psoc, vdev_id, NULL))
 		allow_2ghz_only = true;
 
 	ll_lt_sap_freq = policy_mgr_get_ll_sap_freq(psoc);

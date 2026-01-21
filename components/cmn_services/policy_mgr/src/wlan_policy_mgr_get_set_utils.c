@@ -8545,6 +8545,15 @@ policy_mgr_check_2ghz_only_sap_affected_link(
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(ml_freq_lst[i]))
 			return false;
 
+	/* For this 4 interface concurrency, one MLO SAP on 2 ghz,
+	 * one MLO SAP scc with one MLO STA on 5 ghz, one MLO STA
+	 * on 6 ghz. If the vdev have 6 ghz capability, give a chance
+	 * for 2 ghz only sap to do scc with 6 ghz band instead of
+	 * disabling one MLO STA directly.
+	 */
+	if (policy_mgr_get_ap_6ghz_capable(psoc, sap_vdev_id, NULL))
+		return false;
+
 	/* If All ml STA are 5/6 band, force SCC will not happen
 	 * for 2G only SAP, so return true to indicate one
 	 * link get affected.
