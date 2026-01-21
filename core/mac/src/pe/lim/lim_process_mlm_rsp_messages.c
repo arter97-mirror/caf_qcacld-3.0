@@ -2601,7 +2601,6 @@ void lim_process_mlm_set_sta_key_rsp(struct mac_context *mac_ctx,
 	tSetStaKeyParams *set_key_params;
 	tLimMlmStates mlm_state = eLIM_MLM_OFFLINE_STATE;
 
-	SET_LIM_PROCESS_DEFD_MESGS(mac_ctx, true);
 	qdf_mem_zero((void *)&mlm_set_key_cnf, sizeof(tLimMlmSetKeysCnf));
 	if (!msg->bodyptr) {
 		pe_err("msg bodyptr is NULL");
@@ -2674,7 +2673,6 @@ void lim_process_mlm_set_bss_key_rsp(struct mac_context *mac_ctx,
 	uint16_t key_len;
 	tSetBssKeyParams *bss_key;
 
-	SET_LIM_PROCESS_DEFD_MESGS(mac_ctx, true);
 	qdf_mem_zero((void *)&set_key_cnf, sizeof(tLimMlmSetKeysCnf));
 	if (!msg->bodyptr) {
 		pe_err("msg bodyptr is null");
