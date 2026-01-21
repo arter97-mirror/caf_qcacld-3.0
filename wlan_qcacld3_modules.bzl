@@ -2763,12 +2763,6 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//build_dir/{}/linux-{}/dataipa-{}:{}_{}_ipam".format(tgt, board, ipa_ver, target, variant),
         ]
 
-    if target == "canoe":
-        deps = deps + [
-            "//vendor/qcom/opensource/wlan/wonder:wonder",
-            "//vendor/qcom/opensource/wlan/wonder:wonder_headers",
-        ]
-
     print("name=", name)
     print("hw=", hw)
     print("ipaths=", ipaths)
