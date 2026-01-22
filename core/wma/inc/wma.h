@@ -918,7 +918,6 @@ typedef void (*qos_null_tx_compl_cb)(uint8_t vdev_id, uint32_t status,
  * @pdevconfig: pdev related configurations
  * @wma_hold_req_queue: Queue use to serialize requests to firmware
  * @wma_hold_req_q_lock: Mutex for @wma_hold_req_queue
- * @is_fw_assert: is fw asserted
  * @ack_work_ctx: Context for deferred processing of TX ACK
  * @pGetRssiReq: get RSSI request
  * @get_one_peer_info: When a "get peer info" request is active, is
@@ -1042,7 +1041,6 @@ typedef struct {
 	pdev_cli_config_t pdevconfig;
 	qdf_list_t wma_hold_req_queue;
 	qdf_spinlock_t wma_hold_req_q_lock;
-	uint8_t is_fw_assert;
 	struct wma_tx_ack_work_ctx *ack_work_ctx;
 	void *pGetRssiReq;
 	bool get_one_peer_info;
