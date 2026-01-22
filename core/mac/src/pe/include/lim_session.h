@@ -752,6 +752,8 @@ struct punc_chan_info {
  * @qcn_ie_present_in_beacon: QCN Ie Present in beacon
  * @uhr_capable: UHR capable flag
  * @uhr_config: UHR CAP
+ * @uhr_op_ie: UHR op
+ * @uhr_op_ie_len: UHR OP IE len
  */
 struct pe_session {
 	uint8_t available;
@@ -1098,6 +1100,8 @@ struct pe_session {
 #ifdef WLAN_FEATURE_11BN
 	bool uhr_capable;
 	struct wlan_uhr_cap_info uhr_config;
+	struct wlan_uhr_op_ie uhr_op_ie;
+	uint16_t uhr_op_ie_len;
 #endif /* WLAN_FEATURE_11BN */
 };
 

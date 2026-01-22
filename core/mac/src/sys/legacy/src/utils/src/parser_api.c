@@ -15989,4 +15989,247 @@ QDF_STATUS populate_dot11f_bcn_prot_extcaps(struct mac_context *mac_ctx,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_11BN_TEST_SAP
+uint16_t
+populate_dot11f_assoc_probe_rsp_uhr_op_ie(struct mac_context *mac_ctx,
+					  struct pe_session *session)
+{
+	struct wlan_uhr_op_ie *uhr_op_ie;
+	uint8_t *p_uhr_ie;
+	uint16_t len_remaining;
+	uint8_t control[2] = { 0, 0 }; /* UHR Operation Parameters (2 octets) */
+	uint8_t dps[WLAN_UHR_DPS_OP_PARAM_LEN] = {0};
+	struct wlan_uhr_dps_op_params *dp;
+	uint8_t npca[WLAN_UHR_NPCA_OP_PARAM_LEN] = {0};
+	struct wlan_uhr_npca_op_params *np;
+	uint8_t pedca[WLAN_UHR_PEDCA_OP_PARAM_LEN] = {0};
+	struct wlan_uhr_pedca_op_params *pe;
+	uint8_t dbe[WLAN_UHR_DBE_OP_PARAM_LEN] = {0};
+	struct wlan_uhr_dbe_op_params *db;
+
+	if (!session || !mac_ctx)
+		return 0;
+
+	uhr_op_ie = &session->uhr_op_ie;
+	p_uhr_ie = uhr_op_ie->data;
+	len_remaining = sizeof(uhr_op_ie->data);
+
+	/* ---- Element header ---- */
+	if (len_remaining < 3)
+		return 0;
+
+	/* Element ID (Extension IE) */
+	*p_uhr_ie++ = WLAN_ELEMID_EXTN_ELEM;  /* 1 byte */
+	len_remaining--;
+
+	/* Length (to be back-filled later) */
+	*p_uhr_ie++ = 0x00;                    /* 1 byte placeholder */
+	len_remaining--;
+
+	/* Element ID Extension for UHR Operation IE */
+	*p_uhr_ie++ = WLAN_EXTN_ELEMID_UHROP;  /* 1 byte */
+	len_remaining--;
+
+	/* ---- UHR Operation Parameters (2 octets) ----
+	 * B0:  DPS enabled
+	 * B1:  NPCA enabled
+	 * B2:  DBE enabled
+	 * B3:  P-EDCA enabled
+	 * B6..B4: DBE bandwidth
+	 * B15..B7: reserved (0)
+	 */
+	if (uhr_op_ie->dps_enabled)
+		control[0] |= 0x01;
+	if (uhr_op_ie->npca_enabled)
+		control[0] |= 0x02;
+	if (uhr_op_ie->dbe_enabled)
+		control[0] |= 0x04;
+	if (uhr_op_ie->p_edca_enabled)
+		control[0] |= 0x08;
+
+	/* DBE bandwidth in bits [6:4] */
+	control[0] |= (uint8_t)((uhr_op_ie->dbe_bandwidth & 0x07) << 4);
+
+	if (len_remaining < 2)
+		goto finalize;
+	qdf_mem_copy(p_uhr_ie, control, sizeof(control));
+	p_uhr_ie += sizeof(control);
+	len_remaining -= sizeof(control);
+
+	/* ---- Basic UHR‑MCS And NSS Set (4 octets) ---- */
+	if (len_remaining < WLAN_UHR_BASIC_MCS_NSS_SET_LEN)
+		goto finalize;
+	qdf_mem_copy(p_uhr_ie, uhr_op_ie->basic_uhr_mcs_nss_set,
+		     WLAN_UHR_BASIC_MCS_NSS_SET_LEN);
+	p_uhr_ie += WLAN_UHR_BASIC_MCS_NSS_SET_LEN;
+	len_remaining -= WLAN_UHR_BASIC_MCS_NSS_SET_LEN;
+
+	/* ---- UHR Operation Information (0/3/5 octets) ---- */
+	if (uhr_op_ie->uhr_op_info_present &&
+	    (uhr_op_ie->uhr_op_info_len == 3 ||
+	      uhr_op_ie->uhr_op_info_len == 5)) {
+		if (len_remaining < uhr_op_ie->uhr_op_info_len)
+			goto finalize;
+		qdf_mem_copy(p_uhr_ie, uhr_op_ie->uhr_op_info,
+			     uhr_op_ie->uhr_op_info_len);
+		p_uhr_ie += uhr_op_ie->uhr_op_info_len;
+		len_remaining -= uhr_op_ie->uhr_op_info_len;
+	}
+
+	/* ---- Optional parameter blocks ---- */
+
+	/* DPS Operation Parameters (4 octets) */
+	if (uhr_op_ie->dps_enabled && uhr_op_ie->dps_params.present) {
+		dp = &uhr_op_ie->dps_params;
+
+		if (len_remaining < sizeof(dps))
+			goto finalize;
+
+		/* Byte 0: B5..B0 padding_delay, B7..B6 reserved=0 */
+		dps[0] = (uint8_t)(dp->dps_padding_delay & 0x3F);
+
+		/* Byte 1: B13..B8 transition_delay -> bits [5:0], [7:6]
+		 * reserved
+		 */
+		dps[1] = (uint8_t)(dp->dps_transition_delay & 0x3F);
+
+		/* Byte 2: B16..B23
+		 *  bit0: icf_required
+		 *  bit1: parameterize_mode
+		 *  bits4..2: lc_mode_bandwidth[2:0]
+		 *  bits7..5: lc_mode_nss[2:0] (low 3 bits, MSB in next
+		 *                              byte bit0)
+		 */
+		dps[2] = (uint8_t)(((dp->icf_required & 0x1) << 0) |
+				   ((dp->parameterize_mode & 0x1) << 1) |
+				   ((dp->lc_mode_bandwidth & 0x7) << 2) |
+				   ((dp->lc_mode_nss & 0x7) << 5));
+
+		/* Byte 3: B31..B24
+		 *  bit0: lc_mode_nss MSB (bit3)
+		 *  bits4..1: lc_mode_mcs[3:0]
+		 *  bit5: mobile_ap_dps_static_hcm
+		 *  bits7..6: reserved=0
+		 */
+		dps[3] = (uint8_t)(
+				((dp->lc_mode_nss >> 3) & 0x01) |
+				((dp->lc_mode_mcs & 0x0F) << 1) |
+				((dp->mobile_ap_dps_static_hcm & 0x01) << 5));
+
+		qdf_mem_copy(p_uhr_ie, dps, sizeof(dps));
+		p_uhr_ie += sizeof(dps);
+		len_remaining -= sizeof(dps);
+	}
+
+	/* NPCA Operation Parameters (6 octets) */
+	if (uhr_op_ie->npca_enabled && uhr_op_ie->npca_params.present) {
+		np = &uhr_op_ie->npca_params;
+
+		if (len_remaining < sizeof(npca))
+			goto finalize;
+
+		/* Byte0: primary[3:0], min_duration_thr[7:4] */
+		npca[0] = (uint8_t)(
+			(np->npca_primary_channel & 0x0F) |
+			((np->npca_min_duration_threshold & 0x0F) << 4));
+
+		/* Byte1: switch_delay[5:0], switch_back_delay(low2)[7:6] */
+		npca[1] = (uint8_t)(
+				(np->npca_switch_delay & 0x3F) |
+				((np->npca_switch_back_delay & 0x03) << 6));
+
+		/* Byte2: switch_back_delay(high4)[3:0], initial_qsrc[5:4],
+		 *        moplen[6], bitmap_present[7]
+		 */
+		npca[2] = (uint8_t)(
+			((np->npca_switch_back_delay >> 2) & 0x0F) |
+			((np->initial_npca_qsrc & 0x03) << 4) |
+			((np->moplen_npca & 0x01) << 6) |
+			((np->disabled_subchan_bmap_present & 0x01) << 7));
+
+		/* Byte3: Reserved (B24..B31) */
+		npca[3] = 0x00;
+
+		/* Byte4-5: disabled_subchannel_bitmap (16b) if present,
+		 * else 0
+		 */
+		if (np->disabled_subchan_bmap_present) {
+			npca[4] = (uint8_t)(
+					np->disabled_subchannel_bitmap & 0xFF);
+			npca[5] = (uint8_t)(
+				(np->disabled_subchannel_bitmap >> 8) & 0xFF);
+		} else {
+			npca[4] = 0x00;
+			npca[5] = 0x00;
+		}
+
+		qdf_mem_copy(p_uhr_ie, npca, sizeof(npca));
+		p_uhr_ie += sizeof(npca);
+		len_remaining -= sizeof(npca);
+	}
+
+	/* P‑EDCA Operation Parameters (3 octets) */
+	if (uhr_op_ie->p_edca_enabled && uhr_op_ie->pedca_params.present) {
+		pe = &uhr_op_ie->pedca_params;
+
+		if (len_remaining < sizeof(pedca))
+			goto finalize;
+
+		/* Byte0: ECWmin[3:0], ECWmax[7:4] */
+		pedca[0] = (uint8_t)((pe->ecw_min & 0x0F) |
+				     ((pe->ecw_max & 0x0F) << 4));
+
+		/* Byte1: AIFSN[3:0], CW_DS[5:4], PSRC[1:0] -> [7:6] */
+		pedca[1] = (uint8_t)((pe->aifsn & 0x0F) |
+				     ((pe->cw_ds & 0x03) << 4) |
+				     ((pe->psrc_threshold & 0x03) << 6));
+
+		/* Byte2: PSRC bit2 -> bit0, QSRC[1:0] -> bits[2:1],
+		 * Reserved[7:3]=0
+		 */
+		pedca[2] = (uint8_t)(((pe->psrc_threshold >> 2) & 0x01) |
+				     ((pe->qsrc_threshold & 0x03) << 1));
+
+		qdf_mem_copy(p_uhr_ie, pedca, sizeof(pedca));
+		p_uhr_ie += sizeof(pedca);
+		len_remaining -= sizeof(pedca);
+	}
+
+	/* DBE Operation Parameters (3 octets) */
+	if (uhr_op_ie->dbe_enabled && uhr_op_ie->dbe_params.present) {
+		db = &uhr_op_ie->dbe_params;
+
+		if (len_remaining < sizeof(dbe))
+			goto finalize;
+
+		/* Byte0: bandwidth[2:0], bitmap_present[3], reserved[7:4]=0 */
+		dbe[0] = (uint8_t)(
+			(db->dbe_bandwidth & 0x07) |
+			((db->disabled_subchan_bmap_present & 0x01) << 3));
+
+		/* Byte1-2: disabled_subchannel_bitmap if present, else 0 */
+		if (db->disabled_subchan_bmap_present) {
+			dbe[1] = (uint8_t)(db->disabled_subchannel_bitmap & 0xFF);
+			dbe[2] = (uint8_t)((db->disabled_subchannel_bitmap >> 8) & 0xFF);
+		} else {
+			dbe[1] = 0x00;
+			dbe[2] = 0x00;
+		}
+
+		qdf_mem_copy(p_uhr_ie, dbe, sizeof(dbe));
+		p_uhr_ie += sizeof(dbe);
+		len_remaining -= sizeof(dbe);
+	}
+
+finalize:
+	/* Finalize IE length fields */
+	uhr_op_ie->num_data = (uint16_t)(p_uhr_ie - uhr_op_ie->data);
+	if (uhr_op_ie->num_data >= 2) {
+		/* Length excludes Element ID and Length fields */
+		uhr_op_ie->data[1] = (uint8_t)(uhr_op_ie->num_data - 2);
+	}
+	return uhr_op_ie->num_data;
+}
+#endif
 /* parser_api.c ends here. */

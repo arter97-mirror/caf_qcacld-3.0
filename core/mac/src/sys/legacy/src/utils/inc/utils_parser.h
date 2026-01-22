@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -97,4 +97,31 @@ QDF_STATUS convert_wfd_opaque(struct mac_context *, tSirAddie *,
 void convert_qos_mapset_frame(struct mac_context *, struct qos_map_set *,
 			      tDot11fIEQosMapSet *);
 
+#ifdef WLAN_FEATURE_11BN_TEST_SAP
+
+/**
+ * populate_dot11f_assoc_probe_rsp_uhr_op_ie - Build UHR Operation IE
+ * @mac_ctx: MAC context
+ * @session: PE session containing uhr_op_ie configuration
+ *
+ * Builds the UHR Operation Extended IE into session->uhr_op_ie.data:
+ *   [ID][LEN][ExtID][fields...]
+ *
+ * Notes:
+ * - The function back-fills LEN at data[1] with (total_bytes - 2).
+ * - Optional sub-IEs are appended based on <feature>_enabled flags.
+ *
+ * Return: total IE bytes written (including ID and LEN), or 0 on error.
+ */
+uint16_t
+populate_dot11f_assoc_probe_rsp_uhr_op_ie(struct mac_context *mac_ctx,
+					  struct pe_session *session);
+#else
+static inline uint16_t
+populate_dot11f_assoc_probe_rsp_uhr_op_ie(struct mac_context *mac_ctx,
+					  struct pe_session *session)
+{
+	return 0;
+}
+#endif
 #endif
