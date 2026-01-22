@@ -2395,7 +2395,6 @@ wlan_dp_stc_provisional_init_flows(struct wlan_dp_stc *dp_stc,
 
 	/* Mark initialization as done using dedicated flag */
 	s_entry->burst_sampling_start_ts = dp_stc_get_timestamp();
-	s_entry->flags1 |= WLAN_DP_SAMPLING_FLAGS1_PROVISIONAL_INIT_DONE;
 	s_entry->curr_sample_attempt = 0;
 }
 
@@ -2554,12 +2553,18 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 		break;
 	case WLAN_DP_SAMPLING_STATE_PROVISIONAL:
 	{
-		uint64_t cur_ts = dp_stc_get_timestamp();
-
 		/* Initialize flow entries ONCE for burst-only tracking */
-		if (!(s_entry->flags1 &
-		      WLAN_DP_SAMPLING_FLAGS1_PROVISIONAL_INIT_DONE))
-			wlan_dp_stc_provisional_init_flows(dp_stc, s_entry);
+		wlan_dp_stc_provisional_init_flows(dp_stc, s_entry);
+
+		/* Transition to PROVISIONAL_CONFIRMED after initialization */
+		s_entry->state = WLAN_DP_SAMPLING_STATE_PROVISIONAL_CONFIRMED;
+		sampling_pending = true;
+		break;
+	}
+	case WLAN_DP_SAMPLING_STATE_PROVISIONAL_CONFIRMED:
+	{
+		uint64_t cur_ts = dp_stc_get_timestamp();
+		s_entry->curr_sample_attempt++;
 
 		/*
 		 * Provisional flows: Track ONLY burst stats (not TxRx stats)
@@ -2567,14 +2572,13 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 		 */
 		wlan_dp_stc_check_provisional_transition(dp_stc, s_entry,
 							 cur_ts);
-
 		sampling_pending = true;
-		s_entry->curr_sample_attempt++;
 		break;
 	}
 	case WLAN_DP_SAMPLING_STATE_FLOW_ADDED:
 	{
 		s_entry->sampling_start_ts = dp_stc_get_timestamp();
+		s_entry->curr_sample_attempt++;
 		/* Send an indication to TX and RX flow to start tracking */
 		/*
 		 * Flow is just added, so take the stats snapshot and
@@ -2611,7 +2615,6 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 
 		s_entry->state = WLAN_DP_SAMPLING_STATE_SAMPLING_START;
 		sampling_pending = true;
-		s_entry->curr_sample_attempt++;
 		break;
 	}
 	case WLAN_DP_SAMPLING_STATE_SAMPLING_START:
