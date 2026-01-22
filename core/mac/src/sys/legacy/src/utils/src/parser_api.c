@@ -16231,5 +16231,81 @@ finalize:
 	}
 	return uhr_op_ie->num_data;
 }
+
+uint16_t
+populate_dot11f_bcn_uhr_op_ie(struct mac_context *mac_ctx,
+			      struct pe_session *session)
+{
+	struct wlan_uhr_op_ie *uhr_op_ie;
+	uint8_t *p_uhr_ie;
+	uint16_t len_remaining;
+	uint8_t control[2] = { 0, 0 }; /* UHR Operation Parameters (2 octets) */
+
+	if (!session || !mac_ctx)
+		return 0;
+
+	uhr_op_ie = &session->uhr_op_ie;
+	p_uhr_ie = uhr_op_ie->data;
+	len_remaining = sizeof(uhr_op_ie->data);
+
+	/* ---- Element header ---- */
+	if (len_remaining < 3)
+		return 0;
+
+	/* Element ID (Extension IE) */
+	*p_uhr_ie++ = WLAN_ELEMID_EXTN_ELEM;  /* 1 byte */
+	len_remaining--;
+
+	/* Length (to be back-filled later) */
+	*p_uhr_ie++ = 0x00;                    /* 1 byte placeholder */
+	len_remaining--;
+
+	/* Element ID Extension for UHR Operation IE */
+	*p_uhr_ie++ = WLAN_EXTN_ELEMID_UHROP;  /* 1 byte */
+	len_remaining--;
+
+	/* ---- UHR Operation Parameters (2 octets) ----
+	 * B0:  DPS enabled
+	 * B1:  NPCA enabled
+	 * B2:  DBE enabled
+	 * B3:  P-EDCA enabled
+	 * B6..B4: DBE bandwidth
+	 * B15..B7: reserved (0)
+	 */
+	if (uhr_op_ie->dps_enabled)
+		control[0] |= 0x01;
+	if (uhr_op_ie->npca_enabled)
+		control[0] |= 0x02;
+	if (uhr_op_ie->dbe_enabled)
+		control[0] |= 0x04;
+	if (uhr_op_ie->p_edca_enabled)
+		control[0] |= 0x08;
+
+	/* DBE bandwidth in bits [6:4] */
+	control[0] |= (uint8_t)((uhr_op_ie->dbe_bandwidth & 0x07) << 4);
+
+	if (len_remaining < 2)
+		goto finalize;
+	qdf_mem_copy(p_uhr_ie, control, sizeof(control));
+	p_uhr_ie += sizeof(control);
+	len_remaining -= sizeof(control);
+
+	/* ---- Basic UHR‑MCS And NSS Set (4 octets) ---- */
+	if (len_remaining < WLAN_UHR_BASIC_MCS_NSS_SET_LEN)
+		goto finalize;
+	qdf_mem_copy(p_uhr_ie, uhr_op_ie->basic_uhr_mcs_nss_set,
+		     WLAN_UHR_BASIC_MCS_NSS_SET_LEN);
+	p_uhr_ie += WLAN_UHR_BASIC_MCS_NSS_SET_LEN;
+	len_remaining -= WLAN_UHR_BASIC_MCS_NSS_SET_LEN;
+
+finalize:
+	/* Finalize IE length fields */
+	uhr_op_ie->num_data = (uint16_t)(p_uhr_ie - uhr_op_ie->data);
+	if (uhr_op_ie->num_data >= 2) {
+		/* Length excludes Element ID and Length fields */
+		uhr_op_ie->data[1] = (uint8_t)(uhr_op_ie->num_data - 2);
+	}
+	return uhr_op_ie->num_data;
+}
 #endif
 /* parser_api.c ends here. */

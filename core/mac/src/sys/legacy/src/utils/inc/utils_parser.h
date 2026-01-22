@@ -116,10 +116,39 @@ void convert_qos_mapset_frame(struct mac_context *, struct qos_map_set *,
 uint16_t
 populate_dot11f_assoc_probe_rsp_uhr_op_ie(struct mac_context *mac_ctx,
 					  struct pe_session *session);
+
+/**
+ * populate_dot11f_bcn_uhr_op_ie - Build UHR Operation IE for Beacon
+ * @mac_ctx: MAC context
+ * @session: PE session containing UHR OP IE configuration
+ *
+ * Builds the UHR Operation Extended IE for Beacon frames. The IE is
+ * encoded as:
+ *     [ID][LEN][ExtID][control][mcs_nss][...]
+ *
+ * Fields included:
+ *  - UHR Operation Control (DPS/NPCA/DBE/P-EDCA flags + DBE BW)
+ *  - Basic UHR MCS/NSS info (EHT layout as placeholder)
+ *
+ * The function writes into session->uhr_op_ie.data and back-fills the
+ * IE length (data[1]) as (total_bytes - 2).
+ *
+ * Return: total bytes written including ID and LEN, or 0 on error.
+ */
+uint16_t
+populate_dot11f_bcn_uhr_op_ie(struct mac_context *mac_ctx,
+			      struct pe_session *session);
 #else
 static inline uint16_t
 populate_dot11f_assoc_probe_rsp_uhr_op_ie(struct mac_context *mac_ctx,
 					  struct pe_session *session)
+{
+	return 0;
+}
+
+static inline uint16_t
+populate_dot11f_bcn_uhr_op_ie(struct mac_context *mac_ctx,
+			      struct pe_session *session)
 {
 	return 0;
 }
