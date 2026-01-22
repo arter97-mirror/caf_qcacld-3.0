@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1627,7 +1627,7 @@ void dp_send_rps_ind(struct wlan_dp_intf *dp_intf)
 			i, rps_data.cpu_map_list[i]);
 	}
 
-	strlcpy(rps_data.ifname, qdf_netdev_get_devname(dp_intf->dev),
+	strscpy(rps_data.ifname, qdf_netdev_get_devname(dp_intf->dev),
 		sizeof(rps_data.ifname));
 	dp_ctx->dp_ops.dp_send_svc_nlink_msg(cds_get_radio_index(),
 					     WLAN_SVC_RPS_ENABLE_IND,
@@ -1675,7 +1675,7 @@ void dp_send_rps_disable_ind(struct wlan_dp_intf *dp_intf)
 
 	qdf_mem_zero(&rps_data.cpu_map_list, sizeof(rps_data.cpu_map_list));
 
-	strlcpy(rps_data.ifname, qdf_netdev_get_devname(dp_intf->dev),
+	strscpy(rps_data.ifname, qdf_netdev_get_devname(dp_intf->dev),
 		sizeof(rps_data.ifname));
 	dp_intf->dp_ctx->dp_ops.dp_send_svc_nlink_msg(cds_get_radio_index(),
 				    WLAN_SVC_RPS_ENABLE_IND,

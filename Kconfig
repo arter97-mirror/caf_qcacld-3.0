@@ -1794,7 +1794,7 @@ config FEATURE_PKTLOG_EN_NON_LEGACY
 
 config WLAN_CTRL_NAME
 	string "Enable CONFIG_WLAN_CTRL_NAME"
-	default \"wlan\"
+	default "wlan"
 
 config LL_DP_SUPPORT_NON_LITH
 	bool "ENABLE CONFIG_LL_DP_SUPPORT_NON_LITH"
@@ -1902,7 +1902,7 @@ config DP_MLO_LINK_STATS_SUPPORT
 
 config MULTI_IF_NAME
 	string "set MULTI_IF_NAME"
-	default \"wlan\"
+	default "wlan"
 
 config CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA
 	bool "enable CFG80211_EXT_FEATURE_AUTH_AND_DEAUTH_RANDOM_TA"

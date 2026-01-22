@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -713,6 +713,28 @@ static int hdd_hostapd_change_mtu(struct net_device *net_dev, int new_mtu)
 	return errno;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0)
+static void hdd_wiphy_lock(struct wireless_dev *dev_ptr)
+{
+	mutex_lock(&dev_ptr->mtx);
+}
+
+static void hdd_wiphy_unlock(struct wireless_dev *dev_ptr)
+{
+	mutex_unlock(&dev_ptr->mtx);
+}
+#else
+static void hdd_wiphy_lock(struct wireless_dev *dev_ptr)
+{
+	mutex_lock(&dev_ptr->wiphy->mtx);
+}
+
+static void hdd_wiphy_unlock(struct wireless_dev *dev_ptr)
+{
+	mutex_unlock(&dev_ptr->wiphy->mtx);
+}
+#endif
+
 #ifdef QCA_HT_2040_COEX
 QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
 				   uint8_t channel_type)
@@ -1104,7 +1126,7 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 		dev = assoc_adapter->dev;
 	}
 
-	mutex_lock(&dev->ieee80211_ptr->mtx);
+	hdd_wiphy_lock(dev->ieee80211_ptr);
 	if (wlan_vdev_mlme_is_active(vdev) != QDF_STATUS_SUCCESS) {
 		hdd_debug("Vdev %d mode %d not UP", vdev_id,
 			  adapter->device_mode);
@@ -1142,7 +1164,7 @@ static void hdd_chan_change_notify_update(struct wlan_hdd_link_info *link_info)
 	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id, puncture_bitmap);
 
 exit:
-	mutex_unlock(&dev->ieee80211_ptr->mtx);
+	hdd_wiphy_unlock(dev->ieee80211_ptr);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
@@ -4662,7 +4684,7 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 		(int)policy_mgr_get_concurrency_mode(hdd_ctx->psoc));
 
 	/* Init the net_device structure */
-	strlcpy(dev->name, (const char *)iface_name, IFNAMSIZ);
+	strscpy(dev->name, (const char *)iface_name, IFNAMSIZ);
 
 	hdd_set_ap_ops(dev);
 
@@ -8382,6 +8404,33 @@ static int __wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 	return status;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
+/**
+ * wlan_hdd_cfg80211_change_beacon() - change beacon content in sap mode
+ * @wiphy: Pointer to wiphy
+ * @dev: Pointer to netdev
+ * @params: Pointer to ap update parameters
+ *
+ * Return: zero for success non-zero for failure
+ */
+int wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
+				    struct net_device *dev,
+				    struct cfg80211_ap_update *params)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_change_beacon(wiphy, dev, &params->beacon);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#else
 /**
  * wlan_hdd_cfg80211_change_beacon() - change beacon content in sap mode
  * @wiphy: Pointer to wiphy
@@ -8407,6 +8456,7 @@ int wlan_hdd_cfg80211_change_beacon(struct wiphy *wiphy,
 
 	return errno;
 }
+#endif
 
 /**
  * hdd_sap_indicate_disconnect_for_sta() - Indicate disconnect indication
