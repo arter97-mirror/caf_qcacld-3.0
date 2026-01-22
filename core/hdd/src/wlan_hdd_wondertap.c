@@ -14,6 +14,7 @@
 #include <wlan_dp_ucfg_api.h>
 #include <wlan_vdev_mgr_api.h>
 #include <wlan_fwol_ucfg_api.h>
+#include "wlan_tdls_cfg_api.h"
 #include <wma_api.h>
 #include "cds_api.h"
 #include "cdp_txrx_ctrl.h"
@@ -447,6 +448,35 @@ stop_adapter:
 	return ret;
 }
 
+static inline QDF_STATUS
+wlan_hdd_disable_offchan_tdls(struct hdd_context *hdd_ctx, int offchmode)
+{
+	struct wlan_objmgr_vdev *tdls_obj_vdev;
+	bool tdls_off_ch;
+	QDF_STATUS status;
+
+	status = cfg_tdls_get_off_channel_enable(hdd_ctx->psoc, &tdls_off_ch);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("cfg get tdls off ch failed");
+		return status;
+	}
+
+	if (!tdls_off_ch) {
+		hdd_debug("tdls off ch is false, do nothing");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (!hdd_ctx->tdls_umac_comp_active)
+		return QDF_STATUS_SUCCESS;
+
+	tdls_obj_vdev = ucfg_get_tdls_vdev(hdd_ctx->psoc, WLAN_TDLS_NB_ID);
+	if (tdls_obj_vdev) {
+		status = ucfg_set_tdls_offchan_mode(tdls_obj_vdev, offchmode);
+		wlan_objmgr_vdev_release_ref(tdls_obj_vdev, WLAN_TDLS_NB_ID);
+	}
+
+	return status;
+}
 /**
  * wlan_hdd_wondertap_init() - Initialize wondertap interface
  * @handle: Pointer to store the wondertap handle
@@ -571,6 +601,14 @@ int wlan_hdd_wondertap_init(void **handle,
 			      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
 	qdf_runtime_pm_prevent_suspend_sync(&wt_ctx->wondertap_rtpm_lock);
 
+	hdd_info("Disabling TDLS off channel");
+	status = wlan_hdd_disable_offchan_tdls(hdd_ctx,
+					       DISABLE_ACTIVE_CHANSWITCH);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to disable off-channel TDLS");
+		goto offchan_tdls_disable_fail;
+	}
+
 	adapter = __wlan_hdd_create_wondertap_intf(hdd_ctx, handle, params);
 	if (IS_ERR_OR_NULL(adapter)) {
 		errno = qdf_status_to_os_return(QDF_STATUS_E_FAILURE);
@@ -598,6 +636,9 @@ start_wondertap_intf_failed:
 	__wlan_hdd_destroy_wondertap_intf(hdd_ctx, adapter);
 
 create_wondertap_intf_failed:
+	wlan_hdd_disable_offchan_tdls(hdd_ctx, ENABLE_CHANSWITCH);
+
+offchan_tdls_disable_fail:
 	qdf_runtime_pm_allow_suspend(&wt_ctx->wondertap_rtpm_lock);
 	qdf_wake_lock_release(&wt_ctx->wondertap_wakelock,
 			      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
@@ -708,6 +749,8 @@ void wlan_hdd_wondertap_deinit(void *handle,
 			wlan_hdd_set_powersave(sta_link_info, true, 0);
 	}
 
+	hdd_info("Enabling TDLS off channel");
+	wlan_hdd_disable_offchan_tdls(hdd_ctx, ENABLE_CHANSWITCH);
 	qdf_runtime_pm_allow_suspend(&wt_ctx->wondertap_rtpm_lock);
 	qdf_wake_lock_release(&wt_ctx->wondertap_wakelock,
 			      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);

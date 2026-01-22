@@ -1269,6 +1269,12 @@ bool tdls_check_if_offchannel_allowed(struct wlan_objmgr_vdev *vdev)
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
 	uint32_t mac_id = wlan_mlme_get_vdev_mac_id(vdev);
 
+	if (policy_mgr_mode_specific_connection_count(psoc, PM_PASSTHRU_MODE,
+						      NULL)) {
+		tdls_debug("TDLS offchannel disallowed: wondertap concurrency");
+		return false;
+	}
+
 	if (policy_mgr_is_hw_dbs_capable(psoc))
 		return true;
 
