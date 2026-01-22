@@ -1023,8 +1023,8 @@ wma_data_tx_ack_comp_hdlr(void *wma_context, qdf_nbuf_t netbuf, int32_t status)
 	 * netbuf and do not call ack cb
 	 */
 	if (wma_handle->last_umac_data_nbuf != netbuf) {
-		wma_err("nbuf does not match but umac_data_ota_ack_cb is %s null",
-			wma_handle->umac_data_ota_ack_cb ? "not" : "");
+		/*wma_err("nbuf does not match but umac_data_ota_ack_cb is %s null",
+			wma_handle->umac_data_ota_ack_cb ? "not" : "");*/
 		goto free_nbuf;
 	}
 
