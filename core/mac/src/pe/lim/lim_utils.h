@@ -4225,6 +4225,25 @@ void lim_update_stads_uhr_caps(struct mac_context *mac_ctx,
 void lim_intersect_ap_uhr_caps(struct pe_session *session,
 			       struct bss_params *add_bss,
 			       tpSirAssocRsp assoc_rsp);
+
+/**
+ * lim_is_session_uhr_capable() - Check if session is UHR capable
+ * @session: PE session entry
+ *
+ * Return: true if session is UHR capable, false otherwise
+ */
+static inline bool lim_is_session_uhr_capable(struct pe_session *session)
+{
+	if (!session)
+		return false;
+
+	return session->uhr_capable;
+}
+
+static inline bool lim_is_sta_uhr_capable(tpDphHashNode sta_ds)
+{
+	return sta_ds->mlmStaContext.uhr_capable;
+}
 #else
 static inline void
 lim_update_sta_uhr_capable(struct mac_context *mac,
@@ -4252,9 +4271,19 @@ void lim_intersect_ap_uhr_caps(struct pe_session *session,
 			       tpSirAssocRsp assoc_rsp)
 {
 }
+
+static inline bool lim_is_session_uhr_capable(struct pe_session *session)
+{
+	return false;
+}
+
+static inline bool lim_is_sta_uhr_capable(tpDphHashNode sta_ds)
+{
+	return false;
+}
 #endif
 
-#ifdef FEATURE_WLAN_11BN_TEST_SAP
+#ifdef WLAN_FEATURE_11BN_TEST_SAP
 /**
  * lim_fill_complete_uhr_op_ie - Pack UHR Operation IE with fragmentation
  * @session: PE session containing prebuilt UHR Operation IE
@@ -4273,5 +4302,4 @@ lim_fill_complete_uhr_op_ie(struct pe_session *session,
 			    uint16_t total_len,
 			    uint8_t *target);
 #endif
-
 #endif /* __LIM_UTILS_H */

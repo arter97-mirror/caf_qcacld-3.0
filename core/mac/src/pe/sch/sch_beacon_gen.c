@@ -43,6 +43,7 @@
 #include "parser_api.h"
 #include "wlan_utility.h"
 #include "lim_mlo.h"
+#include "utils_parser.h"
 
 /* Offset of Channel Switch count field in CSA/ECSA IE */
 #define SCH_CSA_SWITCH_COUNT_OFFSET 2
@@ -694,6 +695,7 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 	uint16_t tpe_ie_len = 0;
 	tDot11fIEtransmit_power_env *transmit_power_env = NULL;
 	uint16_t num_transmit_power_env = 0;
+	uint16_t uhr_op_ie_len;
 
 	tim_size = sch_get_tim_size(HAL_NUM_STA);
 
@@ -1067,6 +1069,10 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 
 	omit_caps_for_2link_sap(bcn_2);
 
+	if (lim_is_session_uhr_capable(session))
+		uhr_op_ie_len = populate_dot11f_bcn_uhr_op_ie(
+						mac_ctx, session);
+
 	n_status = dot11f_pack_beacon2(mac_ctx, bcn_2,
 				       session->pSchBeaconFrameEnd,
 				       SIR_MAX_BEACON_SIZE, &n_bytes);
@@ -1166,6 +1172,17 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 			mlo_ie_len = 0;
 		}
 		n_bytes += mlo_ie_len;
+	}
+
+	if (uhr_op_ie_len) {
+		status = lim_fill_complete_uhr_op_ie(
+				session, uhr_op_ie_len,
+				session->pSchBeaconFrameEnd + n_bytes);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("assemble uhr op ie error");
+			uhr_op_ie_len = 0;
+		}
+		n_bytes += uhr_op_ie_len;
 	}
 
 	/* Fill the CSA/ECSA count offsets if the IEs are present */

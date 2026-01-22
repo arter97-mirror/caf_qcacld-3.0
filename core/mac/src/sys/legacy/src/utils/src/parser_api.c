@@ -16011,6 +16011,7 @@ populate_dot11f_assoc_probe_rsp_uhr_op_ie(struct mac_context *mac_ctx,
 	if (!session || !mac_ctx)
 		return 0;
 
+	session->uhr_op_ie_len = 0;
 	uhr_op_ie = &session->uhr_op_ie;
 	p_uhr_ie = uhr_op_ie->data;
 	len_remaining = sizeof(uhr_op_ie->data);
@@ -16229,6 +16230,8 @@ finalize:
 		/* Length excludes Element ID and Length fields */
 		uhr_op_ie->data[1] = (uint8_t)(uhr_op_ie->num_data - 2);
 	}
+
+	session->uhr_op_ie_len = uhr_op_ie->num_data;
 	return uhr_op_ie->num_data;
 }
 
@@ -16244,6 +16247,7 @@ populate_dot11f_bcn_uhr_op_ie(struct mac_context *mac_ctx,
 	if (!session || !mac_ctx)
 		return 0;
 
+	session->uhr_op_ie_len = 0;
 	uhr_op_ie = &session->uhr_op_ie;
 	p_uhr_ie = uhr_op_ie->data;
 	len_remaining = sizeof(uhr_op_ie->data);
@@ -16305,6 +16309,8 @@ finalize:
 		/* Length excludes Element ID and Length fields */
 		uhr_op_ie->data[1] = (uint8_t)(uhr_op_ie->num_data - 2);
 	}
+
+	session->uhr_op_ie_len = uhr_op_ie->num_data;
 	return uhr_op_ie->num_data;
 }
 #endif

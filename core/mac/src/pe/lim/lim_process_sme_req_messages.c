@@ -976,11 +976,6 @@ static void lim_handle_uhr_session_update(struct mac_context *mac_ctx,
 static void lim_dump_uhr_info(struct pe_session *session)
 {
 }
-
-static bool lim_is_session_uhr_capable(struct pe_session *session)
-{
-	return false;
-}
 #endif
 
 /**
