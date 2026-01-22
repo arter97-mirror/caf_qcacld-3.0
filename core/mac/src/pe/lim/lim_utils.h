@@ -4253,4 +4253,25 @@ void lim_intersect_ap_uhr_caps(struct pe_session *session,
 {
 }
 #endif
+
+#ifdef FEATURE_WLAN_11BN_TEST_SAP
+/**
+ * lim_fill_complete_uhr_op_ie - Pack UHR Operation IE with fragmentation
+ * @session: PE session containing prebuilt UHR Operation IE
+ * @total_len: total bytes expected to copy (including ID/LEN and any
+ *             fragmentation headers)
+ * @target: output buffer to receive the packed IE bytes
+ *
+ * Return: QDF_STATUS_SUCCESS on success, or an error code on failures.
+ */
+QDF_STATUS lim_fill_complete_uhr_op_ie(struct pe_session *session,
+				       uint16_t total_len,
+				       uint8_t *target);
+#else
+static inline QDF_STATUS
+lim_fill_complete_uhr_op_ie(struct pe_session *session,
+			    uint16_t total_len,
+			    uint8_t *target);
+#endif
+
 #endif /* __LIM_UTILS_H */

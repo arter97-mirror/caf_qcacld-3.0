@@ -13570,3 +13570,46 @@ bool lim_mismatch_bssid_da(tpSirMacMgmtHdr hdr)
 	}
 	return false;
 }
+
+#ifdef WLAN_FEATURE_11BN_TEST_SAP
+QDF_STATUS lim_fill_complete_uhr_op_ie(struct pe_session *session,
+				       uint16_t total_len, uint8_t *target)
+{
+	struct wlan_uhr_op_ie *uhr_op_ie;
+	uint16_t ie_len;
+
+	if (!session || !target || total_len < MIN_IE_LEN)
+		return QDF_STATUS_E_INVAL;
+
+	uhr_op_ie = &session->uhr_op_ie;
+
+	/* Must have at least EID + LEN */
+	if (uhr_op_ie->num_data < MIN_IE_LEN)
+		return QDF_STATUS_E_INVAL;
+
+	/*
+	 * The UHR Op IE is sent unfragmented.
+	 * Ensure its on-air Length (data[1]) equals (num_data - 2),
+	 * and that it does not exceed WLAN_MAX_IE_LEN (sanity).
+	 */
+	ie_len = (uint16_t)(uhr_op_ie->num_data - MIN_IE_LEN);
+	if (ie_len > WLAN_MAX_IE_LEN)
+		return QDF_STATUS_E_INVAL;
+
+	uhr_op_ie->data[TAG_LEN_POS] = (uint8_t)ie_len;
+
+	/* Ensure caller's buffer is large enough for the entire IE */
+	if (total_len < uhr_op_ie->num_data)
+		return QDF_STATUS_E_INVAL;
+
+	/* Copy the complete (unfragmented) UHR Operation IE */
+	qdf_mem_copy(target, uhr_op_ie->data, uhr_op_ie->num_data);
+
+	pe_debug("pack uhr op ie %u bytes (unfragmented)",
+		 uhr_op_ie->num_data);
+	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   target, uhr_op_ie->num_data);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
