@@ -409,6 +409,72 @@ struct per_channel_stats {
 		 channel_status_list[NUM_CHANNELS];
 };
 
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+/**
+ * struct cp_stats_power_info - CP stats power information
+ * @core_index: Core index (PDEV ID)
+ * @radio_on_time: Time radio was on (ms)
+ * @radio_off_time: Time radio was off (ms)
+ * @wlan_pwr_on_time: WLAN power on time (ms)
+ * @tx_time: ms duration radio is in continuous transmit state
+ * @rx_time: ms duration radio is in continuous receiving state
+ * @sleep_levels_num: Number of sleep levels being sent to host
+ * @sleep_time_per_levels: Sleep time per level array (ms)
+ */
+struct cp_stats_power_info {
+	uint32_t core_index;
+	uint32_t radio_on_time;
+	uint32_t radio_off_time;
+	uint32_t wlan_pwr_on_time;
+	uint32_t tx_time;
+	uint32_t rx_time;
+	uint32_t sleep_levels_num;
+	uint32_t sleep_time_per_levels[WMI_MAX_SLEEP_LEVELS];
+};
+
+/**
+ * struct cp_stats_tx_rate_info - CP stats TX rate information
+ * @core_index: Core index
+ * @rate_index: Rate index
+ * @band: Band (2.4GHz/5GHz/6GHz)
+ * @bw: Bandwidth
+ * @nss: Number of spatial streams
+ * @count: Packet count
+ * @tx_retry_count: TX retry count (accumulated over time)
+ */
+struct cp_stats_tx_rate_info {
+	uint32_t core_index;
+	uint32_t rate_index;
+	uint32_t band;
+	uint32_t bw;
+	uint32_t nss;
+	uint32_t count;
+	uint32_t tx_retry_count;
+};
+
+/**
+ * struct cp_stats_power_datapath_info - CP stats power and datapath info
+ * @status: Status from firmware (0 = success, non-zero = error)
+ * @stats_type_bitmap: Stats type bitmap indicating which stats are included
+ * @num_power_stats: Number of power stats entries (num_cores)
+ * @num_tx_rate_stats: Number of TX rate stats entries
+ * @power_stats: Power statistics array (dynamically allocated)
+ * @power_stats_valid: Indicates if power_stats is valid
+ * @tx_rate_stats: TX rate statistics array (dynamically allocated)
+ * @tx_rate_stats_valid: Indicates if tx_rate_stats is valid
+ */
+struct cp_stats_power_datapath_info {
+	uint32_t status;
+	uint32_t stats_type_bitmap;
+	uint32_t num_power_stats;
+	uint32_t num_tx_rate_stats;
+	struct cp_stats_power_info *power_stats;
+	bool power_stats_valid;
+	struct cp_stats_tx_rate_info *tx_rate_stats;
+	bool tx_rate_stats_valid;
+};
+#endif
+
 /**
  * struct pdev_mc_cp_stats: pdev specific stats
  * @max_pwr: max tx power for pdev
@@ -417,6 +483,8 @@ struct per_channel_stats {
  * @cycle_count: accumulative cycle count (total time) of pdev
  * @tx_frame_count: accumulative tx frame count (total time) of pdev
  * @chan_stats: per channel info stats
+ * @power_datapath_stats: power and datapath statistics from firmware
+ * @power_datapath_stats_valid: indicates if power_datapath_stats is valid
  */
 struct pdev_mc_cp_stats {
 	int32_t max_pwr;
@@ -425,6 +493,10 @@ struct pdev_mc_cp_stats {
 	uint32_t cycle_count;
 	uint32_t tx_frame_count;
 	struct per_channel_stats chan_stats;
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+	struct cp_stats_power_datapath_info power_datapath_stats;
+	bool power_datapath_stats_valid;
+#endif
 };
 
 /**

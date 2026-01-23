@@ -43,6 +43,12 @@
  */
 #define TARGET_MAX_TX_POWER    63
 
+/* Maximum number of power stats entries to prevent memory exhaustion */
+#define MAX_POWER_STATS_ENTRIES 16
+
+/* Maximum number of TX rate stats entries to prevent memory exhaustion */
+#define MAX_TX_RATE_STATS_ENTRIES 32
+
 /**
  * target_if_mc_cp_get_mac_id(): API to get mac id
  * @vdev_mlme: vdev mlme pointer
@@ -91,6 +97,21 @@ QDF_STATUS
 tgt_mc_cp_stats_process_big_data_stats_event(
 				struct wlan_objmgr_psoc *psoc,
 				struct big_data_stats_event *event);
+#endif
+
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+/**
+ * tgt_mc_cp_stats_process_power_datapath_stats_event(): API to process power
+ * datapath stats event
+ * @psoc: pointer to psoc object
+ * @event: power datapath stats event parameters
+ *
+ * Return: status of operation
+ */
+QDF_STATUS
+tgt_mc_cp_stats_process_power_datapath_stats_event(
+				struct wlan_objmgr_psoc *psoc,
+				struct cp_stats_power_datapath_info *event);
 #endif
 
 /**

@@ -103,12 +103,27 @@ send_big_data_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
 }
 #endif
 
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+static void
+tgt_cp_stats_register_power_datapath_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	rx_ops->cp_stats_rx_ops.process_power_datapath_stats_event =
+			tgt_mc_cp_stats_process_power_datapath_stats_event;
+}
+#else
+static void
+tgt_cp_stats_register_power_datapath_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+}
+#endif
+
 void tgt_cp_stats_register_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
 {
 	rx_ops->cp_stats_rx_ops.process_stats_event =
 					tgt_mc_cp_stats_process_stats_event;
 	tgt_cp_stats_register_infra_cp_stats_rx_ops(rx_ops);
 	tgt_cp_stats_register_big_data_rx_ops(rx_ops);
+	tgt_cp_stats_register_power_datapath_rx_ops(rx_ops);
 }
 
 static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
@@ -1771,6 +1786,166 @@ send_power_datapath_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
 {
 	cp_stats_err("Power datapath stats feature not supported");
 	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+/**
+ * tgt_mc_cp_stats_process_power_datapath_stats_event() - Process power
+ * datapath stats event
+ * @psoc: psoc object
+ * @event: power datapath stats event from WMI
+ *
+ * This function processes the power datapath stats event received from
+ * firmware and stores the data in the CP stats framework.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code on failure
+ */
+QDF_STATUS
+tgt_mc_cp_stats_process_power_datapath_stats_event(
+	struct wlan_objmgr_psoc *psoc,
+	struct cp_stats_power_datapath_info *event)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct pdev_cp_stats *pdev_cp_stats_priv;
+	struct pdev_mc_cp_stats *pdev_mc_stats;
+	uint32_t i;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!psoc || !event) {
+		cp_stats_err("Invalid input: psoc=%pK, event=%pK", psoc, event);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/*
+	 * Get pdev object - assuming pdev_id 0 for now,
+	 * may need to be dynamic
+	 */
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_CP_STATS_ID);
+	if (!pdev) {
+		cp_stats_err("Failed to get pdev object");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Get CP stats private object */
+	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
+	if (!pdev_cp_stats_priv) {
+		cp_stats_err("Failed to get pdev cp stats object");
+		status = QDF_STATUS_E_FAILURE;
+		goto release_pdev_ref;
+	}
+
+	/* Get MC stats object */
+	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
+	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
+	if (!pdev_mc_stats) {
+		cp_stats_err("pdev mc stats is null");
+		status = QDF_STATUS_E_FAILURE;
+		goto unlock_pdev;
+	}
+
+	/* Free existing arrays if allocated */
+	if (pdev_mc_stats->power_datapath_stats.power_stats) {
+		qdf_mem_free(pdev_mc_stats->power_datapath_stats.power_stats);
+		pdev_mc_stats->power_datapath_stats.power_stats = NULL;
+	}
+	if (pdev_mc_stats->power_datapath_stats.tx_rate_stats) {
+		qdf_mem_free(pdev_mc_stats->power_datapath_stats.tx_rate_stats);
+		pdev_mc_stats->power_datapath_stats.tx_rate_stats = NULL;
+	}
+
+	/* Update basic fields */
+	pdev_mc_stats->power_datapath_stats.status = event->status;
+	pdev_mc_stats->power_datapath_stats.stats_type_bitmap =
+		event->stats_type_bitmap;
+	pdev_mc_stats->power_datapath_stats.num_power_stats =
+		event->num_power_stats;
+	pdev_mc_stats->power_datapath_stats.num_tx_rate_stats =
+		event->num_tx_rate_stats;
+
+	/*
+	 * Validate array counts before allocation to prevent
+	 * memory exhaustion
+	 */
+	if (event->num_power_stats > MAX_POWER_STATS_ENTRIES) {
+		cp_stats_err("Invalid num_power_stats: %u (max: %u)",
+			     event->num_power_stats, MAX_POWER_STATS_ENTRIES);
+		status = QDF_STATUS_E_INVAL;
+		goto free_power_stats;
+	}
+
+	if (event->num_tx_rate_stats > MAX_TX_RATE_STATS_ENTRIES) {
+		cp_stats_err("Invalid num_tx_rate_stats: %u (max: %u)",
+			     event->num_tx_rate_stats,
+			     MAX_TX_RATE_STATS_ENTRIES);
+		status = QDF_STATUS_E_INVAL;
+		goto free_power_stats;
+	}
+
+	/* Allocate and copy power stats */
+	if (event->power_stats && event->num_power_stats > 0) {
+		size_t power_size;
+
+		power_size = sizeof(struct cp_stats_power_info) *
+			     event->num_power_stats;
+		pdev_mc_stats->power_datapath_stats.power_stats =
+			qdf_mem_malloc(power_size);
+
+		if (!pdev_mc_stats->power_datapath_stats.power_stats) {
+			cp_stats_err("Failed to allocate memory for power stats");
+			status = QDF_STATUS_E_NOMEM;
+			goto free_power_stats;
+		}
+
+		for (i = 0; i < event->num_power_stats; i++)
+			pdev_mc_stats->power_datapath_stats.power_stats[i] =
+				event->power_stats[i];
+	}
+
+	/* Allocate and copy TX rate stats */
+	if (event->tx_rate_stats && event->num_tx_rate_stats > 0) {
+		size_t tx_rate_size;
+
+		tx_rate_size = sizeof(struct cp_stats_tx_rate_info) *
+			       event->num_tx_rate_stats;
+		pdev_mc_stats->power_datapath_stats.tx_rate_stats =
+			qdf_mem_malloc(tx_rate_size);
+
+		if (!pdev_mc_stats->power_datapath_stats.tx_rate_stats) {
+			cp_stats_err("Failed to allocate memory for TX rate stats");
+			status = QDF_STATUS_E_NOMEM;
+			goto free_rate_stats;
+		}
+
+		for (i = 0; i < event->num_tx_rate_stats; i++)
+			pdev_mc_stats->power_datapath_stats.tx_rate_stats[i] =
+				event->tx_rate_stats[i];
+	}
+	/* Mark stats as valid */
+	pdev_mc_stats->power_datapath_stats_valid = true;
+
+	cp_stats_debug("Updated power datapath stats: %u power cores, %u tx rates",
+		       event->num_power_stats, event->num_tx_rate_stats);
+	goto unlock_pdev;
+
+free_rate_stats:
+	/* Free power stats if already allocated */
+	if (pdev_mc_stats->power_datapath_stats.power_stats) {
+		qdf_mem_free(pdev_mc_stats->power_datapath_stats.power_stats);
+		pdev_mc_stats->power_datapath_stats.power_stats = NULL;
+	}
+free_power_stats:
+	/* Clear count fields and mark as invalid on allocation failure */
+	pdev_mc_stats->power_datapath_stats.num_power_stats = 0;
+	pdev_mc_stats->power_datapath_stats.num_tx_rate_stats = 0;
+	pdev_mc_stats->power_datapath_stats_valid = false;
+unlock_pdev:
+	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
+
+release_pdev_ref:
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_CP_STATS_ID);
+
+	return status;
 }
 #endif
 

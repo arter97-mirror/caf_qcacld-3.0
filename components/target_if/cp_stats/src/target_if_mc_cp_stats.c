@@ -1273,6 +1273,66 @@ static QDF_STATUS target_if_cp_stats_send_big_data_stats_req(
 #endif
 
 #ifdef WLAN_FEATURE_POWER_STATISTICS
+static int
+target_if_mc_cp_stats_power_datapath_stats_event_handler(
+	ol_scn_t scn,
+	uint8_t *data,
+	uint32_t datalen)
+{
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct cp_stats_power_datapath_info ev = {0};
+	struct wlan_objmgr_psoc *psoc;
+	struct wmi_unified *wmi_handle;
+	struct wlan_lmac_if_cp_stats_rx_ops *rx_ops;
+
+	if (!scn || !data) {
+		cp_stats_err("scn: 0x%pK, data: 0x%pK", scn, data);
+		goto end;
+	}
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		cp_stats_err("null psoc");
+		goto end;
+	}
+
+	rx_ops = target_if_cp_stats_get_rx_ops(psoc);
+	if (!rx_ops || !rx_ops->process_power_datapath_stats_event) {
+		cp_stats_err("callback not registered");
+		status = QDF_STATUS_E_NOSUPPORT;
+		goto end;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		cp_stats_err("wmi_handle is null");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto end;
+	}
+
+	status = wmi_extract_power_datapath_stats_event(wmi_handle, data, &ev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("extract event failed");
+		goto end;
+	}
+
+	status = rx_ops->process_power_datapath_stats_event(psoc, &ev);
+
+end:
+	/* Free allocated memory for power stats array */
+	if (ev.power_stats) {
+		qdf_mem_free(ev.power_stats);
+		ev.power_stats = NULL;
+	}
+
+	/* Free allocated memory for TX rate stats array */
+	if (ev.tx_rate_stats) {
+		qdf_mem_free(ev.tx_rate_stats);
+		ev.tx_rate_stats = NULL;
+	}
+
+	return qdf_status_to_os_return(status);
+}
+
 /**
  * target_if_cp_stats_send_power_datapath_stats_req() - Send stats request
  * @psoc: pointer to psoc object
@@ -1618,6 +1678,25 @@ target_if_big_data_stats_unregister_tx_ops(struct wlan_lmac_if_cp_stats_tx_ops
 
 #ifdef WLAN_FEATURE_POWER_STATISTICS
 static QDF_STATUS
+target_if_register_power_datapath_event_handler(
+	struct wmi_unified *wmi_handle)
+{
+	return wmi_unified_register_event_handler(
+		wmi_handle, wmi_pdev_power_datapath_stats_eventid,
+		target_if_mc_cp_stats_power_datapath_stats_event_handler,
+		WMI_RX_WORK_CTX);
+}
+
+static void
+target_if_unregister_power_datapath_event_handler(
+	struct wmi_unified *wmi_handle)
+{
+	wmi_unified_unregister_event_handler(
+		wmi_handle,
+		wmi_pdev_power_datapath_stats_eventid);
+}
+
+static QDF_STATUS
 target_if_power_datapath_stats_register_tx_ops(
 			struct wlan_lmac_if_cp_stats_tx_ops *cp_stats_tx_ops)
 {
@@ -1638,6 +1717,17 @@ target_if_power_datapath_stats_unregister_tx_ops(
 	cp_stats_tx_ops->send_req_power_datapath_stats = NULL;
 }
 #else
+static QDF_STATUS
+target_if_register_power_datapath_event_handler(struct wmi_unified *wmi_handle)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+target_if_unregister_power_datapath_event_handler(
+			struct wmi_unified *wmi_handle)
+{}
+
 static QDF_STATUS
 target_if_power_datapath_stats_register_tx_ops(
 			struct wlan_lmac_if_cp_stats_tx_ops *cp_stats_tx_ops)
@@ -1766,6 +1856,10 @@ target_if_mc_cp_stats_register_event_handler(struct wlan_objmgr_psoc *psoc)
 	if (QDF_IS_STATUS_ERROR(ret_val))
 		cp_stats_err("Failed to register big data stats info event cb");
 
+	ret_val = target_if_register_power_datapath_event_handler(wmi_handle);
+	if (QDF_IS_STATUS_ERROR(ret_val))
+		cp_stats_err("Failed to register power datapath stats event cb");
+
 	ret_val = target_if_register_inst_rssi_event_handler(wmi_handle);
 	if (QDF_IS_STATUS_ERROR(ret_val))
 		cp_stats_err("Failed to register inst rssi stats event cb");
@@ -1790,6 +1884,7 @@ target_if_mc_cp_stats_unregister_event_handler(struct wlan_objmgr_psoc *psoc)
 	}
 
 	target_if_unregister_inst_rssi_event_handler(wmi_handle);
+	target_if_unregister_power_datapath_event_handler(wmi_handle);
 	target_if_unregister_big_data_event_handler(wmi_handle);
 
 	wmi_unified_unregister_event_handler(wmi_handle,
