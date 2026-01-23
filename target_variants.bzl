@@ -19,10 +19,12 @@ la_variants = [
 le_targets = [
     # keep sorted
     "sun-allyes",
+    "taycan",
 ]
 
 le_variants = [
     # keep sorted
+    "debug-defconfig",
     "perf-defconfig",
 ]
 

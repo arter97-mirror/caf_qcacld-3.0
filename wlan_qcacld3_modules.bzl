@@ -27,7 +27,11 @@ _target_chipset_map = {
         ],
 	"bengal":[
 		"wlan",
-	]
+	],
+	"taycan":[
+		"adrastea",
+		"qca6750",
+	],
 }
 
 _chipset_hw_map = {
@@ -2069,6 +2073,23 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         ],
         cmd = "cat $(SRCS) > $@",
     )
+    native.genrule(
+        name = "configs/{}_defconfig_generate_perf-defconfig".format(tvc),
+        outs = ["configs/{}_defconfig.generated_perf-defconfig".format(tvc)],
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
+    native.genrule(
+        name = "configs/{}_defconfig_generate_debug-defconfig".format(tvc),
+        outs = ["configs/{}_defconfig.generated_debug-defconfig".format(tvc)],
+        srcs = [
+            "configs/{}_gki_{}_defconfig".format(target, chipset),
+            "configs/{}_consolidate_{}_defconfig".format(target, chipset),
+        ],
+        cmd = "cat $(SRCS) > $@",
+    )
 
     srcs = native.glob(iglobs) + _fixed_srcs
 
@@ -2119,6 +2140,20 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_base_kernel".format(tv),
         "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}".format(tv),
     })
+
+    if target == "taycan":
+        kernel_build = "//msm-kernel:{}".format(tv)
+        tgt = "target-aarch64_kryo300_musl"
+        board = "qmb415"
+        deps = [
+            "//msm-kernel:all_headers",
+            "//build_dir/{}/linux-{}/wlan-icnss2:wlan-platform-headers".format(tgt, board),
+            "//build_dir/{}/linux-{}/wlan-icnss2:{}_icnss2".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/wlan-icnss2:{}_cnss_utils".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/wlan-icnss2:{}_cnss_prealloc".format(tgt, board, tv),
+            "//build_dir/{}/linux-{}/wlan-icnss2:{}_cnss_nl".format(tgt, board, tv),
+        ]
+
 
     print("name= ", name)
     print("hw= ", hw)
