@@ -143,6 +143,22 @@ wmi_extract_big_data_stats_param(wmi_unified_t wmi_handle, void *evt_buf,
 				 struct big_data_stats_event *stats_param);
 #endif
 
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+/**
+ * wmi_extract_power_datapath_stats_event() - Extract power/datapath stats event
+ * @wmi_handle: WMI handle
+ * @evt_buf: Event buffer
+ * @event: Pointer to store extracted event data
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS
+wmi_extract_power_datapath_stats_event(
+				wmi_unified_t wmi_handle,
+				void *evt_buf,
+				struct cp_stats_power_datapath_info *event);
+#endif
+
 /**
  * wmi_extract_recv_bcn_stats() - extract receive beacon stats from event
  * @wmi_handle: wmi handle

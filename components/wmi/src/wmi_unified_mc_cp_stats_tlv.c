@@ -579,6 +579,186 @@ extract_big_data_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 }
 #endif
 
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+/* Maximum entries based on hardware constraints */
+#define WMI_MAX_POWER_STATS_ENTRIES     10  /* Max pdevs + buffer */
+#define WMI_MAX_TX_RATE_STATS_ENTRIES   20  /* Max rates + buffer */
+
+/**
+ * extract_power_datapath_stats_event_tlv() - Extract power/datapath stats event
+ * @wmi_handle: WMI handle
+ * @evt_buf: Event buffer
+ * @event: Pointer to store extracted event data
+ *
+ * This function extracts power and datapath statistics from the event buffer.
+ * It allocates memory for the stats arrays which must be freed by the caller.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+ */
+static QDF_STATUS
+extract_power_datapath_stats_event_tlv(
+				wmi_unified_t wmi_handle,
+				void *evt_buf,
+				struct cp_stats_power_datapath_info *event)
+{
+	WMI_PDEV_POWER_DATAPATH_STATS_EVENTID_param_tlvs *param_buf;
+	wmi_pdev_power_datapath_stats_event_fixed_param *ev;
+	wmi_pdev_power_stats_info *power_stats_tlv;
+	wmi_pdev_tx_rate_info *tx_rate_stats_tlv;
+	uint32_t i;
+
+	if (!evt_buf || !event) {
+		wmi_err("Invalid parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	param_buf = (WMI_PDEV_POWER_DATAPATH_STATS_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf) {
+		wmi_err("Invalid param_buf");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ev = param_buf->fixed_param;
+	if (!ev) {
+		wmi_err("Invalid fixed_param");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Initialize event structure */
+	qdf_mem_zero(event, sizeof(*event));
+
+	/* Extract fixed parameters */
+	event->status = ev->status;
+	event->stats_type_bitmap = ev->stats_type_bitmap;
+
+	wmi_debug("status %d, stats_type 0x%x",
+		  ev->status, ev->stats_type_bitmap);
+
+	/* Extract power stats if present */
+	power_stats_tlv = param_buf->power_stats;
+
+	if (param_buf->num_power_stats > WMI_MAX_POWER_STATS_ENTRIES) {
+		wmi_err("num_power_stats too large: %u (max: %u)",
+			param_buf->num_power_stats,
+			WMI_MAX_POWER_STATS_ENTRIES);
+		event->num_power_stats = 0;
+		event->power_stats_valid = false;
+		return QDF_STATUS_E_INVAL;
+	}
+	event->num_power_stats = param_buf->num_power_stats;
+
+	if (power_stats_tlv && param_buf->num_power_stats > 0) {
+		event->power_stats =
+			qdf_mem_malloc(sizeof(struct cp_stats_power_info) *
+				       param_buf->num_power_stats);
+
+		if (!event->power_stats) {
+			wmi_err("Failed to allocate memory for power stats");
+			event->num_power_stats = 0;
+			event->power_stats_valid = false;
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		for (i = 0; i < param_buf->num_power_stats; i++) {
+			event->power_stats[i].core_index =
+				power_stats_tlv[i].core_index;
+			event->power_stats[i].radio_on_time =
+				power_stats_tlv[i].radio_on_time;
+			event->power_stats[i].radio_off_time =
+				power_stats_tlv[i].radio_off_time;
+			event->power_stats[i].wlan_pwr_on_time =
+				power_stats_tlv[i].wlan_pwr_on_time;
+			event->power_stats[i].tx_time =
+				power_stats_tlv[i].tx_time;
+			event->power_stats[i].rx_time =
+				power_stats_tlv[i].rx_time;
+			event->power_stats[i].sleep_levels_num =
+				power_stats_tlv[i].sleep_levels_num;
+
+			qdf_mem_copy(
+				event->power_stats[i].sleep_time_per_levels,
+				power_stats_tlv[i].sleep_time_per_levels,
+				sizeof(event->power_stats[i]
+				       .sleep_time_per_levels));
+		}
+
+		event->power_stats_valid = true;
+		wmi_debug("Extracted %u power stats entries",
+			  param_buf->num_power_stats);
+	} else {
+		event->power_stats_valid = false;
+		wmi_debug("No power stats in event");
+	}
+
+	/* Extract tx rate stats if present */
+	tx_rate_stats_tlv = param_buf->tx_rate_stats;
+	if (param_buf->num_tx_rate_stats > WMI_MAX_TX_RATE_STATS_ENTRIES) {
+		wmi_err("num_tx_rate_stats too large: %u (max: %u)",
+			param_buf->num_tx_rate_stats,
+			WMI_MAX_TX_RATE_STATS_ENTRIES);
+		/* Clean up previously allocated power stats */
+		if (event->power_stats) {
+			qdf_mem_free(event->power_stats);
+			event->power_stats = NULL;
+			event->num_power_stats = 0;
+			event->power_stats_valid = false;
+		}
+		event->num_tx_rate_stats = 0;
+		event->tx_rate_stats_valid = false;
+		return QDF_STATUS_E_INVAL;
+	}
+	event->num_tx_rate_stats = param_buf->num_tx_rate_stats;
+
+	if (tx_rate_stats_tlv && param_buf->num_tx_rate_stats > 0) {
+		event->tx_rate_stats =
+			qdf_mem_malloc(sizeof(struct cp_stats_tx_rate_info) *
+				       param_buf->num_tx_rate_stats);
+
+		if (!event->tx_rate_stats) {
+			wmi_err("Failed to allocate memory for tx rate stats");
+			/* Complete cleanup with proper state reset */
+			if (event->power_stats) {
+				qdf_mem_free(event->power_stats);
+				event->power_stats = NULL;
+				event->num_power_stats = 0;
+				event->power_stats_valid = false;
+			}
+			event->num_tx_rate_stats = 0;
+			event->tx_rate_stats_valid = false;
+			event->tx_rate_stats = NULL;
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		for (i = 0; i < param_buf->num_tx_rate_stats; i++) {
+			event->tx_rate_stats[i].core_index =
+				tx_rate_stats_tlv[i].core_index;
+			event->tx_rate_stats[i].rate_index =
+				tx_rate_stats_tlv[i].rate_index;
+			event->tx_rate_stats[i].band =
+				tx_rate_stats_tlv[i].band;
+			event->tx_rate_stats[i].bw =
+				tx_rate_stats_tlv[i].bw;
+			event->tx_rate_stats[i].nss =
+				tx_rate_stats_tlv[i].nss;
+			event->tx_rate_stats[i].count =
+				tx_rate_stats_tlv[i].count;
+			event->tx_rate_stats[i].tx_retry_count =
+				tx_rate_stats_tlv[i].tx_retry_count;
+		}
+
+		event->tx_rate_stats_valid = true;
+		wmi_debug("Extracted %d tx rate stats entries",
+			  param_buf->num_tx_rate_stats);
+	} else {
+		event->tx_rate_stats = NULL;
+		event->tx_rate_stats_valid = false;
+		wmi_debug("No tx rate stats in event");
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * extract_recv_bcn_stats_tlv() - extract receive beacon stats from event
  * @wmi_handle: wmi handle
@@ -625,6 +805,28 @@ wmi_attach_big_data_stats_handler(struct wmi_ops *ops)
 {}
 #endif
 
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+/**
+ * wmi_attach_power_datapath_stats_handler() - Attach power/datapath
+ *						stats handlers
+ * @ops: WMI ops structure
+ *
+ * This function registers the power and datapath stats extract handler.
+ *
+ * Return: None
+ */
+static void
+wmi_attach_power_datapath_stats_handler(struct wmi_ops *ops)
+{
+	ops->extract_power_datapath_stats_event =
+		extract_power_datapath_stats_event_tlv;
+}
+#else
+static void
+wmi_attach_power_datapath_stats_handler(struct wmi_ops *ops)
+{}
+#endif /* WLAN_FEATURE_POWER_STATISTICS */
+
 void wmi_mc_cp_stats_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -642,4 +844,5 @@ void wmi_mc_cp_stats_attach_tlv(wmi_unified_t wmi_handle)
 	wmi_handle->ops->extract_peer_rx_pkt_per_mcs =
 					extract_peer_rx_pkt_per_mcs_tlv;
 	wmi_attach_big_data_stats_handler(ops);
+	wmi_attach_power_datapath_stats_handler(ops);
 }

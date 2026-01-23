@@ -129,6 +129,21 @@ wmi_extract_big_data_stats_param(wmi_unified_t wmi_handle, void *evt_buf,
 }
 #endif
 
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+QDF_STATUS
+wmi_extract_power_datapath_stats_event(
+				wmi_unified_t wmi_handle,
+				void *evt_buf,
+				struct cp_stats_power_datapath_info *event)
+{
+	if (wmi_handle->ops->extract_power_datapath_stats_event)
+		return wmi_handle->ops->extract_power_datapath_stats_event(
+				wmi_handle, evt_buf, event);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 QDF_STATUS
 wmi_extract_recv_bcn_stats(wmi_unified_t wmi_handle, void *evt_buf,
 			   uint32_t index,
