@@ -32,6 +32,7 @@
 #include "wlan_mlme_twt_public_struct.h"
 #include "cfg_mlme_generic.h"
 #include "host_diag_core_event.h"
+#include "wlan_cmn_ieee80211.h"
 
 #define OWE_TRANSITION_OUI_TYPE "\x50\x6f\x9a\x1c"
 #define OWE_TRANSITION_OUI_SIZE 4
@@ -1131,6 +1132,107 @@ struct wlan_mlme_eht_caps {
 	tDot11fIEeht_cap dot11_eht_cap;
 	tDot11fIEeht_cap eht_cap_orig;
 	/* Add members to store INI configuration corresponding to 11be */
+};
+#endif
+
+#ifdef WLAN_FEATURE_11BN
+#define WLAN_UHR_CAP_IE_MAX_LEN 16
+
+/**
+ * struct wlan_mlme_uhr_caps - UHR (Ultra High Reliability) capability info
+ * @present: UHR capability IE present
+ * @dps_support: Dynamic Power Save support
+ * @dps_assist_support: Dynamic Power Save assist support
+ * @ap_static_hcm_support: AP static HCM (Host Connection Manager) support
+ * @ml_power_mgmt: Multi-link power management
+ * @npca_support: NPCA (Network-based Power Control Algorithm) support
+ * @bsr_support: BSR (Buffer Status Report) support
+ * @addn_mapped_tid_support: Additional mapped TID support
+ * @eotsp_support: EOTSP (End of Transmission Service Period) support
+ * @dso_support: DSO (Dynamic Spatial reuse Operation) support
+ * @p_edca_support: Prioritized EDCA support
+ * @dbe_support: DBE (Dual Band Enhancement) support
+ * @ul_lli_support: Uplink LLI (Low Latency Interface) support
+ * @p2p_lli_support: P2P LLI (Low Latency Interface) support
+ * @puo_support: PUO (Punctured Uplink OFDMA) support
+ * @ap_puo_support: AP PUO (Punctured Uplink OFDMA) support
+ * @duo_support: DUO (Downlink Uplink OFDMA) support
+ * @ul_mu_data_disable_rx_support: Uplink MU data disable RX support
+ * @aom_support: AOM (Adaptive OFDMA Management) support
+ * @ifcs_support: IFCS (Interference Free Channel Selection) support
+ * @uhr_trs_support: UHR TRS (Triggered Response Scheduling) support
+ * @txspg_support: TXSPG (Transmit Spatial Reuse Parameter Group) support
+ * @txop_return_support_intxspg: TXOP return support in TXSPG
+ * @uhr_op_mode_param_update_timeout: UHR operating mode parameter
+ *                                    update timeout
+ * @param_update_adv_notify: Parameter update advance notification
+ * @unused: Unused bits
+ * @update_ind_in_tim: Update indication in TIM (Traffic Indication Map)
+ * @bounded_ess: Bounded ESS (Extended Service Set)
+ * @btm_assurance: BTM (BSS Transition Management) assurance
+ * @cobf_support: COBF (Coordinated beamforming) support
+ * @reserved: Reserved bits
+ * @dbe_param: DBE parameters array
+ * @num_data: Length of data
+ * @data: UHR capability IE data. Element ID + length + extension element ID +
+ *        UHR capability information
+ * @max_nss_rx_ndp_sounding_80mhz: Maximum NSS for RX NDP sounding in 80MHz
+ * @max_nss_rx_dl_mumimo_80mhz: Maximum NSS for RX downlink MU-MIMO in 80MHz
+ * @max_nss_rx_ndp_sounding_160mhz: Maximum NSS for RX NDP sounding in 160MHz
+ * @max_nss_total_rx_dl_mumimo_160mhz: Maximum total NSS for RX downlink
+ *                                     MU-MIMO in 160MHz
+ * @max_nss_rx_ndp_sounding_320mhz: Maximum NSS for RX NDP sounding in 320MHz
+ * @max_nss_total_rx_dl_mumimo_320mhz: Maximum total NSS for RX downlink
+ *                                     MU-MIMO in 320MHz
+ * @elr_rx_support: Extended Long Range RX support
+ * @elr_tx_support: Extended Long Range TX support
+ * @reserved2: Reserved bits
+ */
+struct wlan_mlme_uhr_caps {
+	bool                   present;
+	uint16_t          dps_support:1;
+	uint16_t   dps_assist_support:1;
+	uint16_t ap_static_hcm_support:1;
+	uint16_t        ml_power_mgmt:1;
+	uint16_t         npca_support:1;
+	uint16_t          bsr_support:1;
+	uint16_t addn_mapped_tid_support:1;
+	uint16_t        eotsp_support:1;
+	uint16_t          dso_support:1;
+	uint16_t       p_edca_support:1;
+	uint16_t          dbe_support:1;
+	uint16_t       ul_lli_support:1;
+	uint16_t      p2p_lli_support:1;
+	uint16_t          puo_support:1;
+	uint16_t       ap_puo_support:1;
+	uint16_t          duo_support:1;
+	uint16_t ul_mu_data_disable_rx_support:1;
+	uint16_t          aom_support:1;
+	uint16_t         ifcs_support:1;
+	uint16_t      uhr_trs_support:1;
+	uint16_t        txspg_support:1;
+	uint16_t txop_return_support_intxspg:1;
+	uint16_t uhr_op_mode_param_update_timeout:4;
+	uint16_t param_update_adv_notify:3;
+	uint16_t               unused:3;
+
+	uint16_t    update_ind_in_tim:5;
+	uint16_t          bounded_ess:1;
+	uint16_t        btm_assurance:1;
+	uint16_t         cobf_support:1;
+	uint8_t  dbe_param[8];
+
+	uint16_t max_nss_rx_ndp_sounding_80mhz:1;
+	uint16_t max_nss_rx_dl_mumimo_80mhz:1;
+	uint16_t max_nss_rx_ndp_sounding_160mhz:1;
+	uint16_t max_nss_total_rx_dl_mumimo_160mhz:1;
+	uint16_t max_nss_rx_ndp_sounding_320mhz:1;
+	uint16_t max_nss_total_rx_dl_mumimo_320mhz:1;
+	uint16_t       elr_rx_support:1;
+	uint16_t       elr_tx_support:1;
+	uint16_t             reserved2:8;
+	uint16_t num_data;
+	uint8_t data[WLAN_UHR_CAP_IE_MAX_LEN];
 };
 #endif
 
@@ -3021,6 +3123,7 @@ struct wlan_mlme_iot {
  *				 dynamic NSS chain support
  * @reduce_pwr_scan_mode : reduce power scan mode enable/disable
  * @passive_chan_discard_mode: discard passive channels
+ * @mlme_uhr_caps: UHR related cfg items
  */
 struct wlan_mlme_cfg {
 	struct wlan_mlme_chainmask chainmask_cfg;
@@ -3076,6 +3179,9 @@ struct wlan_mlme_cfg {
 	bool dynamic_nss_chains_support;
 	bool reduce_pwr_scan_mode;
 	uint8_t passive_chan_discard_mode;
+#ifdef WLAN_FEATURE_11BN
+	struct wlan_mlme_uhr_caps mlme_uhr_caps;
+#endif
 };
 
 /**

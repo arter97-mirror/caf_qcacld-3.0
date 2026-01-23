@@ -3606,6 +3606,22 @@ int sme_update_eht_scs_traffic_desc_support(mac_handle_t mac_handle,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN
+/**
+ * sme_update_tgt_uhr_cap() - sets the UHR caps to pmac
+ * @mac_handle: Pointer to MAC handle
+ * @cfg: Pointer to WMA target CFG
+ *
+ * Return: None
+ */
+void sme_update_tgt_uhr_cap(mac_handle_t mac_handle,
+			    struct wma_tgt_cfg *cfg);
+#else
+static inline void sme_update_tgt_uhr_cap(mac_handle_t mac_handle,
+					  struct wma_tgt_cfg *cfg)
+{}
+#endif
+
 struct omi_ctrl_tx {
 	uint32_t omi_in_vht:1;
 	uint32_t omi_in_he:1;

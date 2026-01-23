@@ -42,6 +42,7 @@
 #include <lim_ft_defs.h>
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_mlme_public_struct.h"
+#include "wlan_cmn_ieee80211.h"
 
 /**
  * MAC_CONTEXT() - Convert an opaque mac handle into a mac context
@@ -758,6 +759,12 @@ struct mac_context {
 #endif
 #ifdef WLAN_FEATURE_CAL_FAILURE_TRIGGER
 	void (*cal_failure_event_cb)(uint8_t cal_type, uint8_t reason);
+#endif
+#ifdef WLAN_FEATURE_11BN
+	struct wlan_uhr_cap_info uhr_cap_2g;
+	struct wlan_uhr_cap_info uhr_cap_5g;
+	struct wlan_uhr_cap_info uhr_cap_2g_orig;
+	struct wlan_uhr_cap_info uhr_cap_5g_orig;
 #endif
 };
 

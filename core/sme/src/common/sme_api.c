@@ -93,6 +93,7 @@
 #include "wlan_twt_ucfg_ext_api.h"
 #include "wlan_ll_sap_api.h"
 #include "wlan_wfa_tgt_if_tx_api.h"
+#include "wlan_cmn_ieee80211.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -11543,6 +11544,30 @@ int sme_update_eht_scs_traffic_desc_support(mac_handle_t mac_handle,
 	csr_update_session_eht_cap(mac_ctx, session);
 
 	return 0;
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BN
+void sme_update_tgt_uhr_cap(mac_handle_t mac_handle,
+			    struct wma_tgt_cfg *cfg)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+
+	qdf_mem_copy(&mac_ctx->uhr_cap_2g,
+		     &cfg->uhr_cap_2g,
+		     sizeof(struct wlan_uhr_cap_info));
+
+	qdf_mem_copy(&mac_ctx->uhr_cap_5g,
+		     &cfg->uhr_cap_5g,
+		     sizeof(struct wlan_uhr_cap_info));
+
+	qdf_mem_copy(&mac_ctx->uhr_cap_2g_orig,
+		     &mac_ctx->uhr_cap_2g,
+		     sizeof(struct wlan_uhr_cap_info));
+
+	qdf_mem_copy(&mac_ctx->uhr_cap_5g_orig,
+		     &mac_ctx->uhr_cap_5g,
+		     sizeof(struct wlan_uhr_cap_info));
 }
 #endif
 

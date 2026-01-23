@@ -127,6 +127,7 @@
 #include "wma_pasn_peer_api.h"
 #include "target_if_mgmt_rx_srng.h"
 #include "wlan_cp_stats_utils_api.h"
+#include "wma_uhr.h"
 
 #define WMA_LOG_COMPLETION_TIMER 500 /* 500 msecs */
 #define WMI_TLV_HEADROOM 128
@@ -5609,6 +5610,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 
 	wma_he_update_tgt_services(wmi_handle, cfg);
 	wma_eht_update_tgt_services(wmi_handle, cfg);
+	wma_uhr_update_tgt_services(wmi_handle, cfg);
 
 	cfg->get_peer_info_enabled =
 		wmi_service_enabled(wmi_handle,
@@ -6567,6 +6569,7 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 
 	wma_update_target_ext_he_cap(tgt_hdl, &tgt_cfg);
 	wma_update_target_ext_eht_cap(tgt_hdl, &tgt_cfg);
+	wma_update_target_ext_uhr_cap(tgt_hdl, &tgt_cfg);
 
 	tgt_cfg.target_fw_version = target_if_get_fw_version(tgt_hdl);
 	if (service_ext_param)

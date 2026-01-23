@@ -27,6 +27,7 @@
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_cmn.h>
 #include "sme_api.h"
+#include "wlan_cmn_ieee80211.h"
 
 #define DISABLE_MCS_12_13_2G_40M 1
 
@@ -1619,6 +1620,30 @@ wlan_mlme_get_bw_no_punct(struct wlan_objmgr_psoc *psoc,
 {
 	return QDF_STATUS_E_INVAL;
 }
+#endif
+
+#ifdef WLAN_FEATURE_11BN
+/**
+ * mlme_update_tgt_uhr_caps_in_cfg() - Update tgt uhr cap in mlme component
+ * @psoc: pointer to psoc object
+ * @cfg: pointer to config params from target
+ *
+ * This api to be used by callers to update UHR caps in mlme.
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+QDF_STATUS mlme_update_tgt_uhr_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
+					  struct wma_tgt_cfg *cfg);
+
+/**
+ * mlme_cfg_get_uhr_caps() - Get the UHR capability info
+ * @psoc: pointer to psoc object
+ * @uhr_cap: Caps that needs to be filled.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS mlme_cfg_get_uhr_caps(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_mlme_uhr_caps *uhr_cap);
 #endif
 
 /**

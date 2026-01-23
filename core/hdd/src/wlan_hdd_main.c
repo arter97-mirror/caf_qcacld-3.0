@@ -170,6 +170,7 @@
 #include "pld_common.h"
 #include "wlan_hdd_pre_cac.h"
 #include "wlan_mlme_api.h"
+#include "wlan_psoc_mlme_api.h"
 
 #include "sme_api.h"
 
@@ -244,7 +245,6 @@
 #include "wlan_psoc_mlme_ucfg_api.h"
 #include "os_if_qmi.h"
 #include "wlan_qmi_ucfg_api.h"
-#include "wlan_psoc_mlme_ucfg_api.h"
 #include "wlan_ll_sap_ucfg_api.h"
 #include "wlan_hdd_tx_rx.h"
 
@@ -262,6 +262,7 @@
 #include "wlan_cp_stats_ucfg_api.h"
 #include "qdf_wakelock_debug.h"
 #include "wlan_hdd_wondertap.h"
+#include "wlan_hdd_uhr.h"
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 #define WLAM_WLM_HOST_DRIVER_PORT_ID 0xFFFFFF
@@ -2336,6 +2337,7 @@ static void hdd_update_tgt_services(struct hdd_context *hdd_ctx,
 	hdd_update_fw_tdls_wideband_capability(hdd_ctx, cfg);
 	ucfg_psoc_mlme_set_11be_capab(hdd_ctx->psoc, cfg->en_11be);
 	hdd_update_mlo_per_link_stats_capability(hdd_ctx, cfg);
+	wlan_psoc_mlme_set_11bn_capab(hdd_ctx->psoc, cfg->en_11bn);
 }
 
 /**
@@ -3351,6 +3353,8 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	ucfg_mlme_update_tgt_mlo_cap(hdd_ctx->psoc);
 	ucfg_mlme_update_dual_sap_sta_support(hdd_ctx->psoc);
 	ucfg_mlme_update_mcc_cck_support(hdd_ctx->psoc);
+	hdd_update_tgt_uhr_cap(hdd_ctx, cfg);
+	hdd_update_wiphy_uhr_cap(hdd_ctx);
 
 	status =
 	  ucfg_mlme_get_enable_dynamic_nss_chains_cfg(hdd_ctx->psoc,
@@ -3451,6 +3455,8 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	hdd_update_multi_client_thermal_support(hdd_ctx);
 
 	ucfg_psoc_mlme_set_11be_capab(hdd_ctx->psoc, cfg->services.en_11be);
+	wlan_psoc_mlme_set_11bn_capab(hdd_ctx->psoc, cfg->services.en_11bn);
+
 	return 0;
 
 dispatcher_close:

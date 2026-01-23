@@ -22,6 +22,7 @@
 
 #include "wma_sar_public_structs.h"
 #include "nan_public_structs.h"
+#include "wlan_cmn_ieee80211.h"
 
 /**
  * struct wma_tgt_services - target services
@@ -61,6 +62,7 @@
  *                                supported or not
  * @is_mlo_per_link_stats_supported: Per link mlo stats is supported or not
  * @en_mlo_tid_to_link_support: Get tid to link fw support
+ * @en_11bn: enable 11bn
  */
 struct wma_tgt_services {
 	uint32_t sta_power_save;
@@ -125,6 +127,7 @@ struct wma_tgt_services {
 #ifdef WLAN_FEATURE_11BE
 	bool en_mlo_tid_to_link_support;
 #endif
+	bool en_11bn;
 };
 
 /**
@@ -249,6 +252,9 @@ struct board_info {
  * @all_twt_enabled: all twt enabled
  * @twt_stats_enabled: twt stats enabled
  * @tx_powerboost: tx powerboost enabled
+ * @uhr_cap: is UHR capability
+ * @uhr_cap_2g: 2.4 GHz UHR capability
+ * @uhr_cap_5g: 5 GHz UHR capability
  */
 struct wma_tgt_cfg {
 	uint32_t target_fw_version;
@@ -310,6 +316,11 @@ struct wma_tgt_cfg {
 	struct wma_tgt_aux_dev_caps wma_aux0_dev_caps[WMI_HOST_HW_MODE_MAX];
 #ifdef FEATURE_WLAN_TX_POWERBOOST
 	bool tx_powerboost;
+#endif
+#ifdef WLAN_FEATURE_11BN
+	struct wlan_uhr_cap_info uhr_cap;
+	struct wlan_uhr_cap_info uhr_cap_2g;
+	struct wlan_uhr_cap_info uhr_cap_5g;
 #endif
 };
 #endif /* WMA_TGT_CFG_H */

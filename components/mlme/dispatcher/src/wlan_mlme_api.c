@@ -42,6 +42,7 @@
 #include "../../core/src/wlan_cp_stats_defs.h"
 #include "wlan_reg_services_api.h"
 #include "wlan_policy_mgr_api.h"
+#include "wlan_cmn_ieee80211.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -7291,6 +7292,44 @@ QDF_STATUS mlme_cfg_get_eht_caps(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 
 	*eht_cap = mlme_obj->cfg.eht_caps.dot11_eht_cap;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BN
+QDF_STATUS mlme_update_tgt_uhr_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
+					   struct wma_tgt_cfg *wma_cfg)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	struct wlan_uhr_cap_info *uhr_cap = &wma_cfg->uhr_cap;
+	bool uhr_capab;
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mlme_obj || !mac_ctx || !wma_cfg)
+		return QDF_STATUS_E_FAILURE;
+
+	wlan_psoc_mlme_get_11bn_capab(psoc, &uhr_capab);
+	if (!uhr_capab)
+		return QDF_STATUS_SUCCESS;
+
+	mlme_obj->cfg.mlme_uhr_caps.present = 1;
+	qdf_mem_copy(&mlme_obj->cfg.mlme_uhr_caps, uhr_cap,
+		     sizeof(struct wlan_mlme_uhr_caps));
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS mlme_cfg_get_uhr_caps(struct wlan_objmgr_psoc *psoc,
+				 struct wlan_mlme_uhr_caps *uhr_cap)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*uhr_cap = mlme_obj->cfg.mlme_uhr_caps;
 
 	return QDF_STATUS_SUCCESS;
 }

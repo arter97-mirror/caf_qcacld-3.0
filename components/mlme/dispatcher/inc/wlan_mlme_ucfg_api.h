@@ -31,6 +31,7 @@
 #include <wlan_mlme_main.h>
 #include "wma_tgt_cfg.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
+#include "wlan_cmn_ieee80211.h"
 
 /**
  * ucfg_mlme_init() - initialize mlme_ctx context.
@@ -4174,6 +4175,40 @@ static inline QDF_STATUS
 ucfg_mlme_update_dual_sap_sta_support(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BN
+/**
+ * ucfg_mlme_update_tgt_uhr_cap() - Update tgt UHR cap in mlme component
+ *
+ * @psoc: pointer to psoc object
+ * @cfg: pointer to config params from target
+ *
+ * Inline UCFG API to be used by HDD/OSIF callers to update
+ * UHR caps in mlme.
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline QDF_STATUS
+ucfg_mlme_update_tgt_uhr_cap(struct wlan_objmgr_psoc *psoc,
+			     struct wma_tgt_cfg *cfg)
+{
+	return mlme_update_tgt_uhr_caps_in_cfg(psoc, cfg);
+}
+
+/**
+ * ucfg_mlme_cfg_get_uhr_caps() - Get the UHR capability info
+ * @psoc: pointer to psoc object
+ * @uhr_cap: Caps that needs to be filled.
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_cfg_get_uhr_caps(struct wlan_objmgr_psoc *psoc,
+				      struct wlan_mlme_uhr_caps *uhr_cap)
+{
+	return mlme_cfg_get_uhr_caps(psoc, uhr_cap);
 }
 #endif
 

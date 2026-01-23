@@ -1962,6 +1962,12 @@ _conditional_srcs = {
             "cmn/umac/mlo_mgr/src/wlan_mlo_link_recfg.c",
         ],
     },
+    "CONFIG_WLAN_FEATURE_11BN": {
+        True: [
+            "core/hdd/src/wlan_hdd_uhr.c",
+            "core/wma/src/wma_uhr.c",
+        ],
+    },
     "CONFIG_WLAN_FEATURE_ACTION_OUI": {
         True: [
             "components/action_oui/core/src/wlan_action_oui_main.c",
