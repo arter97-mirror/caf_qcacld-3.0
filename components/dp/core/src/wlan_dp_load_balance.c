@@ -139,6 +139,9 @@ wlan_dp_lb_irq_balance_handler(struct wlan_dp_psoc_context *dp_ctx,
 							 weightages[i].ring_id);
 		if (grp_id < 0) {
 			dp_err("failed to get grp id");
+			i++;
+			if (i >= MAX_REO_DEST_RINGS)
+				break;
 			continue;
 		}
 
