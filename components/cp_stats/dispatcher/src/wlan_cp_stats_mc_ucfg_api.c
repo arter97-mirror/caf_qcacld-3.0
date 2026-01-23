@@ -789,6 +789,26 @@ QDF_STATUS ucfg_send_big_data_stats_request(struct wlan_objmgr_vdev *vdev,
 	return tgt_send_mc_cp_stats_req(wlan_vdev_get_psoc(vdev), type, info);
 }
 
+QDF_STATUS ucfg_send_power_datapath_stats_request(struct wlan_objmgr_vdev *vdev,
+						  enum stats_req_type type,
+						  struct request_info *info)
+{
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!vdev) {
+		cp_stats_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		cp_stats_err("psoc is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return tgt_send_mc_cp_stats_req(psoc, type, info);
+}
+
 void ucfg_mc_cp_set_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
 					bool enable)
 {

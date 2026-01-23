@@ -1750,6 +1750,30 @@ tgt_mc_cp_stats_process_big_data_stats_event(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+static QDF_STATUS
+send_power_datapath_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
+			      struct wlan_objmgr_psoc *psoc,
+			      struct request_info *req)
+{
+	if (!tx_ops->send_req_power_datapath_stats) {
+		cp_stats_err("could not get send_req_power_datapath_stats");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return tx_ops->send_req_power_datapath_stats(psoc, req);
+}
+#else
+static QDF_STATUS
+send_power_datapath_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
+			      struct wlan_objmgr_psoc *psoc,
+			      struct request_info *req)
+{
+	cp_stats_err("Power datapath stats feature not supported");
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
 QDF_STATUS tgt_mc_cp_stats_inc_wake_lock_stats(struct wlan_objmgr_psoc *psoc,
 					       uint32_t reason,
 					       struct wake_lock_stats *stats,
@@ -1789,6 +1813,9 @@ QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 		break;
 	case TYPE_BIG_DATA_STATS:
 		status = send_big_data_stats_req(tx_ops, psoc, req);
+		break;
+	case TYPE_POWER_DATAPATH_STATS:
+		status = send_power_datapath_stats_req(tx_ops, psoc, req);
 		break;
 	default:
 		if (!tx_ops->send_req_stats) {

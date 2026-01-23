@@ -64,6 +64,7 @@
  * @TYPE_PEER_STATS_INFO_EXT: peer stats info ext was requested
  * @TYPE_CONGESTION_STATS: congestion stats was requested
  * @TYPE_BIG_DATA_STATS: big data stats was requested
+ * @TYPE_POWER_DATAPATH_STATS: power datapath stats was requested
  * @TYPE_MAX: maximum value
  */
 enum stats_req_type {
@@ -74,6 +75,7 @@ enum stats_req_type {
 	TYPE_PEER_STATS_INFO_EXT,
 	TYPE_CONGESTION_STATS,
 	TYPE_BIG_DATA_STATS,
+	TYPE_POWER_DATAPATH_STATS,
 	TYPE_MAX,
 };
 
@@ -249,6 +251,11 @@ struct medium_assess_data {
  * @peer_mac_addr: peer mac address
  * @ml_vdev_info: mlo_stats_vdev_params structure
  * @ml_peer_mac_addr: Array of ml peer mac addresses
+ * @power_dp_operation: Power datapath operation type (0=disable, 1=enable,
+ *                      2=retrieve)
+ * @power_dp_stats_type: Power datapath stats type (0x01=power, 0x02=datapath,
+ *                       0x03=all)
+ * @power_dp_core_index: Power datapath core index (0=MAC0, 0xFF=all MACs)
  */
 struct request_info {
 	void *cookie;
@@ -275,6 +282,11 @@ struct request_info {
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct mlo_stats_vdev_params ml_vdev_info;
 	uint8_t ml_peer_mac_addr[WLAN_UMAC_MLO_MAX_VDEVS][QDF_MAC_ADDR_SIZE];
+#endif
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+	uint32_t power_dp_operation;
+	uint32_t power_dp_stats_type;
+	uint32_t power_dp_core_index;
 #endif
 };
 

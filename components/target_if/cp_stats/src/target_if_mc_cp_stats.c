@@ -1272,6 +1272,42 @@ static QDF_STATUS target_if_cp_stats_send_big_data_stats_req(
 }
 #endif
 
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+/**
+ * target_if_cp_stats_send_power_datapath_stats_req() - Send stats request
+ * @psoc: pointer to psoc object
+ * @req: pointer to object containing stats request parameters
+ *
+ * Return: status of operation.
+ */
+static QDF_STATUS target_if_cp_stats_send_power_datapath_stats_req(
+				struct wlan_objmgr_psoc *psoc,
+				struct request_info *req)
+{
+	struct wmi_unified *wmi_handle;
+	struct wmi_power_datapath_stats_cmd_param param = {0};
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		cp_stats_err("wmi_handle is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	/* Validate req pointer */
+	if (!req) {
+		cp_stats_err("req is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	param.core_index = req->power_dp_core_index;
+	param.operation = req->power_dp_operation;
+	param.stats_type = req->power_dp_stats_type;
+
+	return wmi_unified_power_datapath_stats_request_send(wmi_handle,
+							      &param);
+}
+#endif
+
 static QDF_STATUS
 target_if_cp_stats_extract_peer_stats_event(struct wmi_unified *wmi_hdl,
 					    struct stats_event *ev,
@@ -1577,6 +1613,41 @@ target_if_big_data_stats_register_tx_ops(struct wlan_lmac_if_cp_stats_tx_ops
 static void
 target_if_big_data_stats_unregister_tx_ops(struct wlan_lmac_if_cp_stats_tx_ops
 					   *cp_stats_tx_ops)
+{}
+#endif
+
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+static QDF_STATUS
+target_if_power_datapath_stats_register_tx_ops(
+			struct wlan_lmac_if_cp_stats_tx_ops *cp_stats_tx_ops)
+{
+	cp_stats_tx_ops->send_req_power_datapath_stats =
+			target_if_cp_stats_send_power_datapath_stats_req;
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+target_if_power_datapath_stats_unregister_tx_ops(
+			struct wlan_lmac_if_cp_stats_tx_ops *cp_stats_tx_ops)
+{
+	if (!cp_stats_tx_ops) {
+		cp_stats_err("cp_stats_tx_ops is null");
+		return;
+	}
+
+	cp_stats_tx_ops->send_req_power_datapath_stats = NULL;
+}
+#else
+static QDF_STATUS
+target_if_power_datapath_stats_register_tx_ops(
+			struct wlan_lmac_if_cp_stats_tx_ops *cp_stats_tx_ops)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+target_if_power_datapath_stats_unregister_tx_ops(
+			struct wlan_lmac_if_cp_stats_tx_ops *cp_stats_tx_ops)
 {}
 #endif
 
@@ -1926,6 +1997,7 @@ target_if_mc_cp_stats_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 		target_if_cp_stats_send_peer_stats_req;
 
 	target_if_big_data_stats_register_tx_ops(cp_stats_tx_ops);
+	target_if_power_datapath_stats_register_tx_ops(cp_stats_tx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1947,6 +2019,7 @@ target_if_mc_cp_stats_unregister_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	}
 
 	target_if_big_data_stats_unregister_tx_ops(cp_stats_tx_ops);
+	target_if_power_datapath_stats_unregister_tx_ops(cp_stats_tx_ops);
 	cp_stats_tx_ops->inc_wake_lock_stats = NULL;
 	cp_stats_tx_ops->send_req_stats = NULL;
 	cp_stats_tx_ops->set_pdev_stats_update_period = NULL;

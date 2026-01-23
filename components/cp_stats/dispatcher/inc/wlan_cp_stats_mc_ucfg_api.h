@@ -325,6 +325,19 @@ QDF_STATUS ucfg_send_big_data_stats_request(struct wlan_objmgr_vdev *vdev,
 					    struct request_info *info);
 
 /**
+ * ucfg_send_power_datapath_stats_request() - API to send power datapath stats
+ * request
+ * @vdev: pointer to vdev object
+ * @type: request type
+ * @info: request info
+ *
+ * Return: status of operation
+ */
+QDF_STATUS ucfg_send_power_datapath_stats_request(struct wlan_objmgr_vdev *vdev,
+						  enum stats_req_type type,
+						  struct request_info *info);
+
+/**
  * ucfg_mc_cp_set_big_data_fw_support() - set big data fw support
  * @psoc: PSOC object
  * @enable: Set true if firmware supports big data, otherwise false
