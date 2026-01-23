@@ -789,26 +789,6 @@ QDF_STATUS ucfg_send_big_data_stats_request(struct wlan_objmgr_vdev *vdev,
 	return tgt_send_mc_cp_stats_req(wlan_vdev_get_psoc(vdev), type, info);
 }
 
-QDF_STATUS ucfg_send_power_datapath_stats_request(struct wlan_objmgr_vdev *vdev,
-						  enum stats_req_type type,
-						  struct request_info *info)
-{
-	struct wlan_objmgr_psoc *psoc;
-
-	if (!vdev) {
-		cp_stats_err("vdev is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		cp_stats_err("psoc is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	return tgt_send_mc_cp_stats_req(psoc, type, info);
-}
-
 void ucfg_mc_cp_set_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
 					bool enable)
 {
@@ -845,6 +825,26 @@ void ucfg_mc_cp_get_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
 	wlan_cp_stats_psoc_obj_unlock(psoc_cp_stats_priv);
 }
 #endif
+
+QDF_STATUS ucfg_send_power_datapath_stats_request(struct wlan_objmgr_vdev *vdev,
+						  enum stats_req_type type,
+						  struct request_info *info)
+{
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!vdev) {
+		cp_stats_err("vdev is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		cp_stats_err("psoc is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return tgt_send_mc_cp_stats_req(psoc, type, info);
+}
 
 QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 					 int *dbm)
@@ -1554,4 +1554,46 @@ void ucfg_mc_cp_stats_clear_channel_status(struct wlan_objmgr_pdev *pdev)
 	}
 }
 
+#endif
+
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+QDF_STATUS
+ucfg_cp_stats_get_power_datapath_stats(struct wlan_objmgr_pdev *pdev,
+				       struct cp_stats_power_datapath_info *stats)
+{
+	struct pdev_cp_stats *pdev_cp_stats_priv;
+	struct pdev_mc_cp_stats *pdev_mc_stats;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	if (!pdev || !stats) {
+		cp_stats_err("Invalid input parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Get CP stats pdev object */
+	pdev_cp_stats_priv = wlan_cp_stats_get_pdev_stats_obj(pdev);
+	if (!pdev_cp_stats_priv) {
+		cp_stats_err("Failed to get pdev CP stats object");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Read stats with locking */
+	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
+	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
+
+	if (!pdev_mc_stats->power_datapath_stats_valid) {
+		cp_stats_debug("Power datapath stats not valid");
+		status = QDF_STATUS_E_EMPTY;
+		goto unlock_and_exit;
+	}
+
+	/* Copy stats to output buffer */
+	qdf_mem_copy(stats, &pdev_mc_stats->power_datapath_stats,
+		     sizeof(*stats));
+	status = QDF_STATUS_SUCCESS;
+
+unlock_and_exit:
+	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
+	return status;
+}
 #endif

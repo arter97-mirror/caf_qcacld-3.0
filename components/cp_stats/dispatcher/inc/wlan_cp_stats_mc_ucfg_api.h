@@ -325,19 +325,6 @@ QDF_STATUS ucfg_send_big_data_stats_request(struct wlan_objmgr_vdev *vdev,
 					    struct request_info *info);
 
 /**
- * ucfg_send_power_datapath_stats_request() - API to send power datapath stats
- * request
- * @vdev: pointer to vdev object
- * @type: request type
- * @info: request info
- *
- * Return: status of operation
- */
-QDF_STATUS ucfg_send_power_datapath_stats_request(struct wlan_objmgr_vdev *vdev,
-						  enum stats_req_type type,
-						  struct request_info *info);
-
-/**
  * ucfg_mc_cp_set_big_data_fw_support() - set big data fw support
  * @psoc: PSOC object
  * @enable: Set true if firmware supports big data, otherwise false
@@ -381,6 +368,19 @@ ucfg_mc_cp_get_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
 				   bool *enable)
 {}
 #endif
+
+/**
+ * ucfg_send_power_datapath_stats_request() - API to send power datapath stats
+ * request
+ * @vdev: pointer to vdev object
+ * @type: request type
+ * @info: request info
+ *
+ * Return: status of operation
+ */
+QDF_STATUS ucfg_send_power_datapath_stats_request(struct wlan_objmgr_vdev *vdev,
+						  enum stats_req_type type,
+						  struct request_info *info);
 
 #ifdef CONFIG_WLAN_BMISS
 /**
@@ -561,4 +561,19 @@ ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
 	return NULL;
 }
 #endif /* QCA_SUPPORT_CP_STATS */
+
+#ifdef WLAN_FEATURE_POWER_STATISTICS
+/**
+ * ucfg_cp_stats_get_power_datapath_stats() - Get power and datapath statistics
+ * @pdev: Pointer to pdev object
+ * @stats: Pointer to output buffer to store statistics
+ *
+ * Return: QDF_STATUS_SUCCESS on statistics successfully retrieved
+ */
+QDF_STATUS
+ucfg_cp_stats_get_power_datapath_stats(struct wlan_objmgr_pdev *pdev,
+				       struct cp_stats_power_datapath_info *stats);
+
+#endif /* WLAN_FEATURE_POWER_STATISTICS */
+
 #endif /* __WLAN_CP_STATS_MC_UCFG_API_H__ */
