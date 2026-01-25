@@ -87,6 +87,7 @@
 #define HDD_INFO_STA_FLAGS              BIT(NL80211_STA_INFO_STA_FLAGS)
 #define HDD_INFO_RX_MPDUS             BIT_ULL(NL80211_STA_INFO_RX_MPDUS)
 #define HDD_INFO_FCS_ERROR_COUNT      BIT_ULL(NL80211_STA_INFO_FCS_ERROR_COUNT)
+#define HDD_INFO_PENDING_MPDU_MSDUS     BIT_ULL(NL80211_STA_INFO_PENDING_MPDU_MSDUS)
 #endif /* kernel version less than 4.0.0 && no_backport */
 
 #define HDD_LINK_STATS_MAX		5
@@ -4289,6 +4290,7 @@ static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
 	}
 
 	info->rx_dropped_misc = stats->rx_error_cnt;
+	info->pending_mpdu_msdus = stats->pending_mpdu_msdus;
 
 	if (cds_dp_get_vdev_stats(vdev_id, &dp_stats)) {
 		orig_cnt = info->tx_retries;
@@ -4301,11 +4303,12 @@ static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
 			  orig_fail_cnt, info->tx_failed);
 	}
 
-	info->filled |= HDD_INFO_TX_PACKETS |
-			HDD_INFO_TX_RETRIES |
-			HDD_INFO_TX_FAILED  |
-			HDD_INFO_RX_PACKETS |
-			HDD_INFO_RX_DROP_MISC;
+	info->filled |= HDD_INFO_TX_PACKETS   |
+			HDD_INFO_TX_RETRIES   |
+			HDD_INFO_TX_FAILED    |
+			HDD_INFO_RX_PACKETS   |
+			HDD_INFO_RX_DROP_MISC |
+			HDD_INFO_PENDING_MPDU_MSDUS;
 }
 
 /**

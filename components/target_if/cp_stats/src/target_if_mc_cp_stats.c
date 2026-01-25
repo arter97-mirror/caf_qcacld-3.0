@@ -492,6 +492,8 @@ target_if_cp_stats_extract_pdev_extd_stats(struct wmi_unified *wmi_hdl,
 			pdev_extd_stats->rx_matched_11ax_msdu_cnt;
 		ev->pdev_extd_stats[i].rx_other_11ax_msdu_cnt =
 			pdev_extd_stats->rx_other_11ax_msdu_cnt;
+		ev->pdev_extd_stats[i].pending_mpdu_msdus =
+            		pdev_extd_stats->pending_mpdu_msdus;
 	}
 
 	qdf_mem_free(pdev_extd_stats);
@@ -1483,7 +1485,8 @@ static uint32_t get_stats_id(enum stats_req_type type)
 			WMI_REQUEST_PDEV_STAT |
 			WMI_REQUEST_PEER_EXTD2_STAT |
 			WMI_REQUEST_RSSI_PER_CHAIN_STAT |
-			WMI_REQUEST_PMF_BCN_PROTECT_STAT);
+			WMI_REQUEST_PMF_BCN_PROTECT_STAT|
+			WMI_REQUEST_PDEV_EXTD_STAT);
 	case TYPE_MIB_STATS:
 		return (WMI_REQUEST_MIB_STAT | WMI_REQUEST_MIB_EXTD_STAT);
 	}

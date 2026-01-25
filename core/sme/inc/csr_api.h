@@ -657,7 +657,7 @@ typedef struct tagCsrSummaryStatsInfo {
 	uint32_t rx_discard_cnt;
 	uint32_t rx_error_cnt;
 	uint32_t tx_byte_cnt;
-
+	uint32_t pending_mpdu_msdus;
 } tCsrSummaryStatsInfo;
 
 typedef struct tagCsrGlobalClassAStatsInfo {

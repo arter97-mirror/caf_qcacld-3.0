@@ -305,12 +305,14 @@ struct psoc_mc_cp_stats {
  *                            counter updated at EOP (end of packet)
  * @rx_other_11ax_msdu_cnt: number of Rx 11ax MSDUs with other BSS color counter
  *                          updated at EOP (end of packet)
+ * @pending_mpdu_msdus: number of pending MPDU MSDUs
  */
 struct pdev_mc_cp_extd_stats {
 	uint32_t pdev_id;
 	uint32_t my_rx_count;
 	uint32_t rx_matched_11ax_msdu_cnt;
 	uint32_t rx_other_11ax_msdu_cnt;
+	uint32_t pending_mpdu_msdus;
 };
 
 /**
@@ -449,6 +451,17 @@ struct peer_adv_mc_cp_stats {
 	uint32_t fcs_count;
 	uint32_t rx_count;
 	uint64_t rx_bytes;
+};
+
+/**
+ * struct vdev_extd_stats - vdev extended stats
+ * @vdev_id: virtual device id
+ * @pending_mpdu_msdus: number of pending MPDU MSDUs
+ *
+ */
+struct pdev_extd_stats {
+	uint32_t vdev_id;
+	uint32_t pending_mpdu_msdus;
 };
 
 #ifdef WLAN_FEATURE_MIB_STATS
