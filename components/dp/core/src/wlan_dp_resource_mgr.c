@@ -1266,6 +1266,21 @@ wlan_dp_resource_mgr_set_req_resources(
 	dp_rsrc_mgr_debug("req_rx_buffer_desc:%llu set", req_rx_buff_descs);
 }
 
+uint16_t dp_rx_pool_get_dynamic_size(uint32_t rsrc_level)
+{
+	if (rsrc_level >= RESOURCE_LVL_MAX) {
+		dp_info("Incorrect rsrc_level %d", rsrc_level);
+		return 0;
+	}
+
+	/* For rsrc_level = 0, consider prev_num_rx_buffers = 0 */
+	if (rsrc_level == 0)
+		return dp_resource_map[rsrc_level].num_rx_buffers;
+
+	return dp_resource_map[rsrc_level].num_rx_buffers -
+			dp_resource_map[rsrc_level - 1].num_rx_buffers;
+}
+
 void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 {
 	struct wlan_dp_resource_mgr_ctx *rsrc_ctx;

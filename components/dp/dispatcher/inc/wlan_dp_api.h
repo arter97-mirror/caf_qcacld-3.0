@@ -196,6 +196,13 @@ void wlan_dp_notify_vdev_mac_id_migration(struct wlan_objmgr_vdev *vdev,
 					  uint32_t old_mac_id,
 					  uint32_t new_mac_id);
 
+/**
+ * dp_rx_pool_get_dynamic_size() - get page pool size based resource level
+ * @rsrc_level: resource level
+ *
+ * Return: size of page pool
+ */
+uint16_t dp_rx_pool_get_dynamic_size(uint32_t rsrc_level);
 #ifdef WLAN_FEATURE_NAN
 /**
  * wlan_dp_notify_ndp_channel_info() - Notify DP about NDP peer channel info

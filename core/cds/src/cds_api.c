@@ -215,6 +215,9 @@ static struct ol_if_ops dp_ol_if_ops = {
 	.dp_page_pool_init = dp_prealloc_page_pool_init,
 #endif
 #endif
+#if defined(WLAN_DP_DYNAMIC_RESOURCE_MGMT)
+	.dp_get_dynamic_pool_size = dp_rx_pool_get_dynamic_size,
+#endif
 	.dp_get_tx_inqueue = dp_get_tx_inqueue,
 	.dp_send_unit_test_cmd = wma_form_unit_test_cmd_and_send,
 	.dp_print_fisa_stats = wlan_dp_print_fisa_rx_stats,
