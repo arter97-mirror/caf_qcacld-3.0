@@ -607,6 +607,9 @@ QDF_STATUS lim_ll_sap_send_ecsa_action_frame(struct wlan_objmgr_vdev *vdev,
 	ch_width = session_entry->gLimChannelSwitch.ch_width;
 	switch_count = session_entry->gLimChannelSwitch.switchCount;
 	switch_mode = session_entry->gLimChannelSwitch.switchMode;
+	lim_update_switchmode_dfs_sap(mac_ctx, session_entry,
+				      &switch_mode);
+
 	sec_ch_offset = session_entry->gLimChannelSwitch.sec_ch_offset;
 	op_class = lim_op_class_from_bandwidth(mac_ctx, new_channel_freq,
 					       ch_width, sec_ch_offset);
@@ -5391,6 +5394,20 @@ void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
 		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
 					      WLAN_VDEV_SM_EV_DOWN, 0, NULL);
 		pe_delete_session(mac_ptr, session);
+	}
+}
+#endif
+
+#ifdef FEATURE_DFS_SAP_SWITCHMODE_OVERRIDE
+void lim_update_switchmode_dfs_sap(struct mac_context *mac_ctx,
+				   struct pe_session *session,
+				   uint8_t *switch_mode)
+{
+	if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
+				     session->curr_op_freq) &&
+	    !*switch_mode) {
+		pe_debug("override switch mode since was dfs channel");
+		*switch_mode = 1;
 	}
 }
 #endif

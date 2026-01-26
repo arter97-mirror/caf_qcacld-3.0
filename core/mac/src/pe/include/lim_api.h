@@ -1225,4 +1225,28 @@ void lim_passthrough_deinit_session(struct mac_context *mac_ptr,
 {
 }
 #endif
+
+#ifdef FEATURE_DFS_SAP_SWITCHMODE_OVERRIDE
+/**
+ * lim_update_switchmode_dfs_sap() - Update switch mode for DFS SAP
+ * @mac_ctx: Pointer to mac context
+ * @session: pe session
+ * @switch_mode: switch mode pointer
+ *
+ * This api will update the switch mode for DFS SAP
+ *
+ * Return: None
+ */
+void
+lim_update_switchmode_dfs_sap(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      uint8_t *switch_mode);
+#else
+static inline void
+lim_update_switchmode_dfs_sap(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      uint8_t *switch_mode)
+{
+}
+#endif
 #endif /* __LIM_API_H */

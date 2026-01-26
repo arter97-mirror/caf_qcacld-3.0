@@ -307,6 +307,9 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 	ch_offset = session_entry->gLimChannelSwitch.legacy_sec_ch_offset;
 
 	dot_11_ptr->switch_mode = session_entry->gLimChannelSwitch.switchMode;
+	lim_update_switchmode_dfs_sap(mac_ptr, session_entry,
+				      &dot_11_ptr->switch_mode);
+
 	dot_11_ptr->new_reg_class =
 		lim_op_class_from_bandwidth(mac_ptr, sw_target_freq, ch_width,
 					    ch_offset);
@@ -378,6 +381,10 @@ populate_dot11f_chan_switch_ann(struct mac_context *mac,
 				struct pe_session *pe_session)
 {
 	pDot11f->switchMode = pe_session->gLimChannelSwitch.switchMode;
+
+	lim_update_switchmode_dfs_sap(mac, pe_session,
+				      &pDot11f->switchMode);
+
 	pDot11f->newChannel = pe_session->gLimChannelSwitch.primaryChannel;
 	pDot11f->switchCount =
 		(uint8_t) pe_session->gLimChannelSwitch.switchCount;

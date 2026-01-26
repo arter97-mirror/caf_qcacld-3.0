@@ -10898,8 +10898,11 @@ void send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 					    ch_switch->sec_ch_offset);
 	new_channel = wlan_reg_freq_to_chan(mac_ctx->pdev, new_channel_freq);
 	if (LIM_IS_AP_ROLE(session_entry) &&
-		(mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch == false))
+		(mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch == false)) {
 		switch_mode = ch_switch->switchMode;
+		lim_update_switchmode_dfs_sap(mac_ctx, session_entry,
+					      &switch_mode);
+	}
 
 	if (LIM_IS_AP_ROLE(session_entry)) {
 		for (i = 0; i <= mac_ctx->lim.max_sta_of_pe_session; i++) {
@@ -10948,8 +10951,11 @@ void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
 	new_channel = wlan_reg_freq_to_chan(mac_ctx->pdev, new_channel_freq);
 
 	if (LIM_IS_AP_ROLE(session_entry) &&
-	    (false == mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch))
+	    (false == mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch)) {
 		switch_mode = session_entry->gLimChannelSwitch.switchMode;
+		lim_update_switchmode_dfs_sap(mac_ctx, session_entry,
+					      &switch_mode);
+	}
 
 	switch_count = session_entry->gLimChannelSwitch.switchCount;
 
