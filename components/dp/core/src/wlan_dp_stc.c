@@ -2594,6 +2594,13 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 			flow->idx.sample_win_idx =
 					(s_entry->next_sample_idx << 16) |
 					(s_entry->next_win_idx);
+			/*
+			 * Set transition flag to skip first IAT calculation
+			 * after PROVISIONAL state to avoid corrupting TxRx
+			 * stats with incorrect large IAT
+			 */
+			qdf_atomic_set_bit(WLAN_DP_STC_TRANSITION_FLAG_SAMPLE,
+					   &flow->transition_flags);
 			qdf_mem_copy(&s_entry->tx_stats_ref,
 				     &flow->txrx_stats,
 				     sizeof(s_entry->tx_stats_ref));
@@ -2606,6 +2613,13 @@ wlan_dp_stc_sample_flow(struct wlan_dp_stc *dp_stc,
 			flow->idx.sample_win_idx =
 					(s_entry->next_sample_idx << 16) |
 					(s_entry->next_win_idx);
+			/*
+			 * Set transition flag to skip first IAT calculation
+			 * after PROVISIONAL state to avoid corrupting TxRx
+			 * stats with incorrect large IAT
+			 */
+			qdf_atomic_set_bit(WLAN_DP_STC_TRANSITION_FLAG_SAMPLE,
+					   &flow->transition_flags);
 			qdf_mem_copy(&s_entry->rx_stats_ref,
 				     &flow->txrx_stats,
 				     sizeof(s_entry->rx_stats_ref));
