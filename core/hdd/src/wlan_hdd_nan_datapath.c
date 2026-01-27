@@ -1016,7 +1016,7 @@ hdd_ndi_ipa_event_deliver(struct hdd_context *hdd_ctx,
 	status = ucfg_ipa_wlan_evt(hdd_ctx->pdev,
 				   adapter->dev,
 				   adapter->device_mode,
-				   vdev_id,
+				   vdev_id, false,
 				   ipa_event_type,
 				   adapter->dev->dev_addr,
 				   false);

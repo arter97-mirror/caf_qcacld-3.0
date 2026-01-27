@@ -1735,6 +1735,30 @@ hdd_cm_prot_dhcp_after_connect(struct hdd_adapter *adapter,
 
 #endif
 
+#ifdef WLAN_STA_SEAMLESS_ROAMING
+static bool
+hdd_cm_is_seamless_roaming_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_mlme_cfg *mlme_cfg;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		hdd_err("Failed to get MLME Obj");
+		return false;
+	}
+	mlme_cfg = &mlme_obj->cfg;
+
+	return mlme_cfg->lfr.seamless_roaming_enabled;
+}
+#else
+static bool
+hdd_cm_is_seamless_roaming_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
+
 static void
 hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				       struct wlan_cm_connect_resp *rsp)
@@ -1757,6 +1781,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	struct wlan_hdd_link_info *link_info;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	bool alt_pipe;
+	bool is_seamless_roam = false;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
@@ -1940,10 +1965,13 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				  link_info->vdev_id);
 			alt_pipe = false;
 		}
-
+		if (is_roam && hdd_cm_is_seamless_roaming_enabled(hdd_ctx->psoc))
+			is_seamless_roam = true;
+		else
+			is_seamless_roam = false;
 		ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
-				  link_info->vdev_id,
+				  link_info->vdev_id, is_seamless_roam,
 				  WLAN_IPA_STA_CONNECT,
 				  rsp->bssid.bytes,
 				  alt_pipe);

@@ -200,7 +200,7 @@ __hdd_cm_disconnect_handler_pre_user_update(struct wlan_hdd_link_info *link_info
 	    hdd_handle_ipa_sta_mlo_disconn(link_info, sta_ctx, &mac_addr))
 		ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
-				  link_info->vdev_id,
+				  link_info->vdev_id, false,
 				  WLAN_IPA_STA_DISCONNECT,
 				  mac_addr,
 				  false);

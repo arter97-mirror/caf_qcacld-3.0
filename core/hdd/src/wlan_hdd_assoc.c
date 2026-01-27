@@ -2740,7 +2740,7 @@ hdd_change_sta_state_authenticated(struct wlan_hdd_link_info *link_info,
 
 		ucfg_ipa_wlan_evt(adapter->hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
-				  link_info->vdev_id,
+				  link_info->vdev_id, false,
 				  WLAN_IPA_STA_CONNECT, mac_addr,
 				  alt_pipe);
 	}

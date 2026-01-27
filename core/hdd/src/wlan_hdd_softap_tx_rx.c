@@ -580,7 +580,7 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
 				      adapter->device_mode,
 				      sta->link_info ?
 				      sta->link_info->vdev_id :
-				      adapter->deflink->vdev_id,
+				      adapter->deflink->vdev_id, false,
 				      WLAN_IPA_CLIENT_DISCONNECT,
 				      mac_addr->bytes,
 				      false) != QDF_STATUS_SUCCESS)
@@ -821,7 +821,7 @@ QDF_STATUS hdd_softap_stop_bss(struct wlan_hdd_link_info *link_info)
 		if (ucfg_ipa_wlan_evt(hdd_ctx->pdev,
 				      adapter->dev,
 				      adapter->device_mode,
-				      link_info->vdev_id,
+				      link_info->vdev_id, false,
 				      WLAN_IPA_AP_DISCONNECT,
 				      adapter->dev->dev_addr,
 				      false) != QDF_STATUS_SUCCESS)

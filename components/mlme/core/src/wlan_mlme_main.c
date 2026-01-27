@@ -3474,6 +3474,27 @@ static void mlme_init_band_weightage(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_STA_SEAMLESS_ROAMING
+/**
+ * mlme_init_seamless_roam_cfg() - Init seamless_roam_cfg
+ * @psoc: Pointer to psoc
+ * @lfr: Pointer to lfr config
+ *
+ * Return: None
+ */
+static void mlme_init_seamless_roam_cfg(struct wlan_objmgr_psoc *psoc,
+					struct wlan_mlme_lfr_cfg *lfr)
+{
+	lfr->seamless_roaming_enabled =
+		cfg_get(psoc, CFG_STA_SEAMLESS_ROAMING);
+}
+#else
+static void mlme_init_seamless_roam_cfg(struct wlan_objmgr_psoc *psoc,
+					struct wlan_mlme_lfr_cfg *lfr)
+{
+}
+#endif
+
 static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_lfr_cfg *lfr)
 {
@@ -3677,6 +3698,7 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	lfr->hs20_btm_offload_disable = cfg_get(psoc,
 						CFG_HS_20_BTM_OFFLOAD_DISABLE);
 	mlme_init_roam_periodic_scan_interval(psoc, lfr);
+	mlme_init_seamless_roam_cfg(psoc, lfr);
 }
 
 static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,

@@ -3204,6 +3204,38 @@ enum roam_bg_scan {
 #define ADAPTIVE_11R_ALL
 #endif
 
+
+#ifdef WLAN_STA_SEAMLESS_ROAMING
+/*
+ * <ini>
+ * enable_sta_seamless_roaming - Enable/disable sta seamless roaming.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable the feature of seamless roaming
+ * for STA mode.
+ * 0 - To disable the sta seamless roaming
+ * 1 - To enable the sta seamless roaming
+ *
+ * Related: None.
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STA_SEAMLESS_ROAMING CFG_INI_BOOL( \
+		"enable_sta_seamless_roaming", \
+		false, \
+		"Enable/disable sta seamless roaming")
+
+#define STA_SEAMLESS_ROAMING_ALL CFG(CFG_STA_SEAMLESS_ROAMING)
+#else
+#define STA_SEAMLESS_ROAMING_ALL
+#endif
+
 /*
  * <ini>
  * roaming_scan_policy - To config roaming scan policy
@@ -3597,6 +3629,7 @@ enum roam_bg_scan {
 	CFG(CFG_BSS_LOAD_TRIG_2G_RSSI_THRES) \
 	CFG(CFG_LFR_FULL_ROAM_SCAN_REFRESH_PERIOD) \
 	ADAPTIVE_11R_ALL \
+	STA_SEAMLESS_ROAMING_ALL \
 	ROAM_OFFLOAD_ALL \
 	LFR_ESE_ALL \
 	LFR_SUBNET_DETECTION_ALL \

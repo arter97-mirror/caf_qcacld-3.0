@@ -503,7 +503,7 @@ static QDF_STATUS hdd_process_ipa_wds_event(struct scheduler_msg *msg)
 	status = ucfg_ipa_wlan_evt(ipa_wds_evt->pdev,
 				   ipa_wds_evt->net_dev,
 				   QDF_SAP_MODE,
-				   ipa_wds_evt->vdev_id,
+				   ipa_wds_evt->vdev_id, false,
 				   ipa_wds_evt->event,
 				   ipa_wds_evt->mac_addr.bytes, false);
 	qdf_mem_free(msg->bodyptr);
