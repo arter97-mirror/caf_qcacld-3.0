@@ -4177,12 +4177,6 @@ static void lim_store_bw_in_peer_mlme(struct pe_session *pe_session,
 		wlan_peer_set_center_freq_seg1(peer, 0);
 	}
 
-	/* Retrieve values from peer MLME to populate AddBss params */
-	pAddBssParams->ch_width = wlan_peer_get_op_ch_width(peer);
-	pAddBssParams->staContext.ch_width = wlan_peer_get_op_ch_width(peer);
-	pAddBssParams->staContext.ap_max_ch_width =
-		wlan_peer_get_ap_max_ch_width(peer);
-
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
 /**
@@ -4329,12 +4323,6 @@ lim_update_add_bss_vht_params(struct mac_context *mac,
 
 	lim_update_vhtcaps_assoc_resp(mac, add_bss_params, vht_caps, peer);
 	lim_update_vht_oper_assoc_resp(mac, assoc_rsp, peer);
-
-	/* Read back from peer MLME (single source of truth) */
-	add_bss_params->ch_width = wlan_peer_get_op_ch_width(peer);
-	add_bss_params->staContext.ch_width = wlan_peer_get_op_ch_width(peer);
-	add_bss_params->staContext.ap_max_ch_width =
-				wlan_peer_get_ap_max_ch_width(peer);
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
@@ -4780,7 +4768,6 @@ static void lim_update_add_bss_he_params(struct mac_context *mac,
 					struct pe_session *pe_session)
 {
 	struct wlan_objmgr_peer *peer;
-	enum phy_ch_width op_ch_width;
 
 	peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
 					   add_bss_params->bssId,
@@ -4795,14 +4782,6 @@ static void lim_update_add_bss_he_params(struct mac_context *mac,
 				      pe_session, peer);
 	lim_sta_process_he_operation(mac, assoc_resp, add_bss_params,
 				     pe_session, peer);
-
-	/*
-	 * Finalize AddBssParams ch_width from peer_mlme.op_ch_width
-	 * (populated after HE op sanity checks).
-	 */
-	op_ch_width = wlan_peer_get_op_ch_width(peer);
-	add_bss_params->staContext.ch_width = op_ch_width;
-	add_bss_params->ch_width = op_ch_width;
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
@@ -5105,7 +5084,6 @@ static void lim_update_add_bss_eht_params(struct mac_context *mac,
 					  struct pe_session *pe_session)
 {
 	struct wlan_objmgr_peer *peer;
-	enum phy_ch_width op_ch_width;
 
 	peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
 					   pAddBssParams->bssId,
@@ -5120,16 +5098,6 @@ static void lim_update_add_bss_eht_params(struct mac_context *mac,
 				       pe_session, peer);
 	lim_sta_process_eht_operation(mac, pAssocRsp, pAddBssParams,
 				      pe_session, peer);
-
-	/*
-	 * Finalize AddBssParams ch_width from peer_mlme.op_ch_width
-	 * (populated after EHT op sanity checks).
-	 */
-	op_ch_width = wlan_peer_get_op_ch_width(peer);
-	pAddBssParams->staContext.ch_width = op_ch_width;
-	pAddBssParams->ch_width = op_ch_width;
-	pAddBssParams->staContext.ap_max_ch_width =
-		wlan_peer_get_ap_max_ch_width(peer);
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
@@ -5167,6 +5135,122 @@ lim_update_ap_max_eht_ch_width(struct mac_context *mac,
 {
 }
 #endif /* WLAN_FEATURE_11BE */
+
+/**
+ * lim_process_sta_bw_update() - Process STA bandwidth/capability updates
+ * @mac: MAC context
+ * @pe_session: PE session
+ * @pAssocRsp: Association response received from AP
+ * @bss_desc: BSS description corresponding to the AP (beacon IEs, chan, etc.)
+ * @pAddBssParams: Add BSS request parameters to be populated
+ *
+ * This helper consolidates the bandwidth negotiation/capability processing
+ * needed during STA association. It updates the peer bandwidth/capability
+ * state based on the negotiated connection mode and then copies the final
+ * values from peer MLME (single source of truth) into @pAddBssParams.
+ *
+ * Processing order / selection:
+ * - Run HT update logic if HT-capable
+ * - Run VHT update logic if VHT-capable
+ * - Run HE update logic if HE-capable
+ * - Run EHT update logic if EHT-capable
+ *
+ * Context:
+ * Called from lim_sta_send_add_bss() while preparing the peer assoc/add-bss
+ * request sent to firmware.
+ *
+ * Notes:
+ * - This function runs multiple capability update paths sequentially in
+ *   ascending order of capability (HT -> VHT -> HE -> EHT). This ensures
+ *   that higher capabilities can override bandwidth/segment state derived
+ *   from lower capabilities.
+ * - The following fields in @pAddBssParams are populated from peer MLME:
+ *     - pAddBssParams->ch_width
+ *     - pAddBssParams->staContext.ch_width
+ *     - pAddBssParams->staContext.ap_max_ch_width
+ *     - pAddBssParams->staContext.center_freq_seg0
+ *     - pAddBssParams->staContext.center_freq_seg1
+ * - This API is kept static to lim_assoc_utils.c as it is currently used at
+ *   a single call site.
+ *
+ * Return: None
+ */
+static void lim_process_sta_bw_update(struct mac_context *mac,
+				      struct pe_session *pe_session,
+				      tpSirAssocRsp pAssocRsp,
+				      struct bss_description *bss_desc,
+				      struct bss_params *pAddBssParams)
+{
+	struct wlan_objmgr_peer *peer;
+	enum phy_ch_width op_ch_width;
+
+	peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
+					   pAddBssParams->bssId,
+					   WLAN_LEGACY_MAC_ID);
+	if (!peer) {
+		pe_err("peer not found for BSSID: " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pAddBssParams->bssId));
+		/* Set safe default values */
+		pAddBssParams->ch_width = CH_WIDTH_20MHZ;
+		pAddBssParams->staContext.ch_width = CH_WIDTH_20MHZ;
+		pAddBssParams->staContext.ap_max_ch_width = CH_WIDTH_20MHZ;
+		pAddBssParams->staContext.center_freq_seg0 = 0;
+		pAddBssParams->staContext.center_freq_seg1 = 0;
+		return;
+	}
+
+	/*
+	 * Update bandwidth in ascending capability order.
+	 * Run all applicable update paths to ensure all capabilities are
+	 * processed. Lower capabilities (HT) run first, followed by higher
+	 * capabilities (VHT/HE/EHT), so that higher capabilities can
+	 * override bandwidth/segment state if necessary.
+	 *
+	 * Note: For HE connections:
+	 * - 6GHz: Peer bandwidth is updated in HE update path.
+	 * - 5GHz: Peer bandwidth is updated in VHT update path (using VHT Ops).
+	 * - 2.4GHz: Peer bandwidth is updated in HT update path (using HT Ops).
+	 * Thus, running VHT/HT paths is required even for HE sessions.
+	 */
+	if (IS_DOT11_MODE_HT(pe_session->dot11mode) &&
+	    pAssocRsp->HTCaps.present)
+		lim_update_add_bss_ht_params(mac, pe_session, pAssocRsp,
+					     bss_desc, pAddBssParams);
+
+	if (pe_session->vhtCapability && pAssocRsp->VHTCaps.present)
+		lim_update_add_bss_vht_params(mac, pe_session, pAssocRsp,
+					      pAddBssParams);
+
+	if (lim_is_session_he_capable(pe_session) &&
+	    pAssocRsp->he_cap.present)
+		lim_update_add_bss_he_params(mac, pAssocRsp, pAddBssParams,
+					     pe_session);
+
+	if (lim_is_session_eht_capable(pe_session) &&
+	    pAssocRsp->eht_cap.present)
+		lim_update_add_bss_eht_params(mac, pAssocRsp, pAddBssParams,
+					      pe_session);
+
+	/* Always fetch from peer MLME (single source of truth) */
+	op_ch_width = wlan_peer_get_op_ch_width(peer);
+	pAddBssParams->ch_width = op_ch_width;
+	pAddBssParams->staContext.ch_width = op_ch_width;
+	pAddBssParams->staContext.ap_max_ch_width =
+			wlan_peer_get_ap_max_ch_width(peer);
+	pAddBssParams->staContext.center_freq_seg0 =
+			wlan_peer_get_center_freq_seg0(peer);
+	pAddBssParams->staContext.center_freq_seg1 =
+			wlan_peer_get_center_freq_seg1(peer);
+
+	pe_debug("STA BW update: ch_width=%d sta_ch_width=%d ap_max_ch_width=%d seg0=%d seg1=%d",
+		 pAddBssParams->ch_width,
+		 pAddBssParams->staContext.ch_width,
+		 pAddBssParams->staContext.ap_max_ch_width,
+		 pAddBssParams->staContext.center_freq_seg0,
+		 pAddBssParams->staContext.center_freq_seg1);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+}
 
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 				tpSirAssocRsp pAssocRsp,
@@ -5214,18 +5298,9 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 	pAddBssParams->llbCoexist =
 		(uint8_t) pe_session->beaconParams.llbCoexist;
 
-	/* Configure HT capabilities */
-	lim_update_add_bss_ht_params(mac, pe_session, pAssocRsp,
-				     bss_desc, pAddBssParams);
-
-	/* Configure VHT capability */
-	lim_update_add_bss_vht_params(mac, pe_session, pAssocRsp,
-				      pAddBssParams);
-
-	lim_update_add_bss_he_params(mac, pAssocRsp, pAddBssParams, pe_session);
-
-	lim_update_add_bss_eht_params(mac, pAssocRsp, pAddBssParams,
-				      pe_session);
+	/* Update STA BW capabilities (HT/VHT/HE/EHT) */
+	lim_process_sta_bw_update(mac, pe_session, pAssocRsp, bss_desc,
+				  pAddBssParams);
 
 	if (pAssocRsp->bss_max_idle_period.present) {
 		pAddBssParams->bss_max_idle_period =
