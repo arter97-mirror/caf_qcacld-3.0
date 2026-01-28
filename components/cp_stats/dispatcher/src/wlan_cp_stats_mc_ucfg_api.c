@@ -830,6 +830,8 @@ QDF_STATUS ucfg_send_power_datapath_stats_request(struct wlan_objmgr_vdev *vdev,
 						  enum stats_req_type type,
 						  struct request_info *info)
 {
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	bool pending = false;
 	struct wlan_objmgr_psoc *psoc;
 
 	if (!vdev) {
@@ -843,7 +845,25 @@ QDF_STATUS ucfg_send_power_datapath_stats_request(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	return tgt_send_mc_cp_stats_req(psoc, type, info);
+	/* Store pending request with pdev_id */
+	status = ucfg_mc_cp_stats_set_pending_req(psoc, type, info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("ucfg_mc_cp_stats_set_pending_req failed: %d",
+			     status);
+		return status;
+	}
+
+	/* Send request to firmware */
+	status = tgt_send_mc_cp_stats_req(psoc, type, info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("send cp stats req type %d failed %d",
+			     type, status);
+		ucfg_mc_cp_stats_reset_pending_req(psoc, type, info, &pending);
+		if (!pending)
+			cp_stats_debug("No pending request found during cleanup - possible race condition");
+	}
+
+	return status;
 }
 
 QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,

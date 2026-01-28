@@ -1809,6 +1809,11 @@ tgt_mc_cp_stats_process_power_datapath_stats_event(
 	struct wlan_objmgr_pdev *pdev;
 	struct pdev_cp_stats *pdev_cp_stats_priv;
 	struct pdev_mc_cp_stats *pdev_mc_stats;
+	struct psoc_mc_cp_stats *psoc_mc_stats;
+	struct psoc_cp_stats *psoc_cp_stats_priv;
+	struct request_info pending_req = {0};
+	bool pending = false;
+	uint32_t pdev_id;
 	uint32_t i;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -1817,14 +1822,44 @@ tgt_mc_cp_stats_process_power_datapath_stats_event(
 		return QDF_STATUS_E_INVAL;
 	}
 
-	/*
-	 * Get pdev object - assuming pdev_id 0 for now,
-	 * may need to be dynamic
-	 */
-	pdev = wlan_objmgr_get_pdev_by_id(psoc, 0, WLAN_CP_STATS_ID);
-	if (!pdev) {
-		cp_stats_err("Failed to get pdev object");
+	/* Get pending request to retrieve correct pdev_id */
+	psoc_cp_stats_priv = wlan_cp_stats_get_psoc_stats_obj(psoc);
+	if (!psoc_cp_stats_priv) {
+		cp_stats_err("Failed to get psoc cp stats object");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_cp_stats_psoc_obj_lock(psoc_cp_stats_priv);
+	psoc_mc_stats = psoc_cp_stats_priv->obj_stats;
+
+	/* Validate psoc_mc_stats before using it */
+	if (!psoc_mc_stats) {
+		cp_stats_err("psoc mc stats is null");
+		wlan_cp_stats_psoc_obj_unlock(psoc_cp_stats_priv);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* Check if there's a pending request */
+	if (!(psoc_mc_stats->pending.type_map &
+	      (1 << TYPE_POWER_DATAPATH_STATS))) {
+		cp_stats_err("No pending request for power datapath stats");
+		wlan_cp_stats_psoc_obj_unlock(psoc_cp_stats_priv);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Get pdev_id from pending request */
+	pending_req = psoc_mc_stats->pending.req[TYPE_POWER_DATAPATH_STATS];
+	pdev_id = pending_req.pdev_id;
+
+	wlan_cp_stats_psoc_obj_unlock(psoc_cp_stats_priv);
+
+	/* Get pdev object using retrieved pdev_id */
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, WLAN_CP_STATS_ID);
+	if (!pdev) {
+		cp_stats_err("Failed to get pdev object for pdev_id %u",
+			     pdev_id);
+		status = QDF_STATUS_E_FAILURE;
+		goto clear_pending_req;
 	}
 
 	/* Get CP stats private object */
@@ -1835,8 +1870,10 @@ tgt_mc_cp_stats_process_power_datapath_stats_event(
 		goto release_pdev_ref;
 	}
 
-	/* Get MC stats object */
+	/* Lock pdev before accessing stats */
 	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
+
+	/* Get MC stats object */
 	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
 	if (!pdev_mc_stats) {
 		cp_stats_err("pdev mc stats is null");
@@ -1924,8 +1961,10 @@ tgt_mc_cp_stats_process_power_datapath_stats_event(
 	/* Mark stats as valid */
 	pdev_mc_stats->power_datapath_stats_valid = true;
 
-	cp_stats_debug("Updated power datapath stats: %u power cores, %u tx rates",
-		       event->num_power_stats, event->num_tx_rate_stats);
+	cp_stats_debug("Stored power datapath stats in pdev_id %u: %u power cores, %u tx rates",
+		       pdev_id, event->num_power_stats,
+		       event->num_tx_rate_stats);
+
 	goto unlock_pdev;
 
 free_rate_stats:
@@ -1941,10 +1980,11 @@ free_power_stats:
 	pdev_mc_stats->power_datapath_stats_valid = false;
 unlock_pdev:
 	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
-
 release_pdev_ref:
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_CP_STATS_ID);
-
+clear_pending_req:
+	ucfg_mc_cp_stats_reset_pending_req(psoc, TYPE_POWER_DATAPATH_STATS,
+					   &pending_req, &pending);
 	return status;
 }
 #endif
