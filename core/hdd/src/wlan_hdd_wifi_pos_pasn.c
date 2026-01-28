@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -447,7 +447,10 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed_mlo_vdev(struct hdd_context *hdd_ctx,
 
 		qdf_copy_macaddr(&data->peer_mac_addr, &peer_link_mac);
 		data->vdev_id = wlan_vdev_get_id(link_vdev);
-
+		hdd_debug("vdev:%d Peer_mac: " QDF_MAC_ADDR_FMT " key_seed_len:%d",
+			  data->vdev_id,
+			  QDF_MAC_ADDR_REF(data->peer_mac_addr.bytes),
+			  data->key_seed_len);
 		status = wlan_crypto_set_ltf_keyseed(hdd_ctx->psoc, data);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			hdd_err("Set LTF Keyseed failed vdev:%d for peer: "
@@ -486,12 +489,13 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_crypto_ltf_keyseed_data *data;
+	struct qdf_mac_addr bss_peer_addr = {0};
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	bool is_ltf_keyseed_required;
+	bool is_ltf_keyseed_required, is_keyseed_for_assoc_bss = false;
 	enum wlan_peer_type peer_type;
 	int ret;
 
-	hdd_enter();
+	hdd_enter_dev(dev);
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EPERM;
@@ -550,10 +554,15 @@ wlan_hdd_cfg80211_send_set_ltf_keyseed(struct wiphy *wiphy,
 		     data->key_seed_len);
 
 	/*
-	 * For MLO vdev send set LTF keyseed command on each link for the link
-	 * peer address similar to install key command
+	 * For MLO vdev send set LTF keyseed command on each link for the
+	 * associated BSS link peer addresses similar to install key command
 	 */
-	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+	status = wlan_vdev_get_bss_peer_mac(vdev, &bss_peer_addr);
+	if (QDF_IS_STATUS_SUCCESS(status) &&
+	    qdf_is_macaddr_equal(&bss_peer_addr, &data->peer_mac_addr))
+		is_keyseed_for_assoc_bss = true;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev) && is_keyseed_for_assoc_bss)
 		status = wlan_hdd_cfg80211_send_set_ltf_keyseed_mlo_vdev(
 						hdd_ctx, vdev, adapter,
 						data, MLO_ALL_VDEV_LINK_ID);
