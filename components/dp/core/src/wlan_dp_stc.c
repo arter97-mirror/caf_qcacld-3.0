@@ -3016,6 +3016,7 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 	struct wlan_dp_stc_sampling_table *s_table;
 	struct flow_info *flow_tuple = &flow_classify_result->flow_tuple;
 	struct wlan_dp_stc_sampling_table_entry *s_entry;
+	struct wlan_dp_stc_flow_table_entry *flow_entry;
 	uint64_t hash;
 	int i;
 	uint8_t buf[BUF_LEN_MAX];
@@ -3058,10 +3059,14 @@ wlan_dp_stc_handle_flow_classify_result(struct wlan_dp_stc_flow_classify_result 
 		wlan_dp_stc_save_classify_insights(dp_stc, flow_classify_result,
 						   s_entry, flow_tuple);
 
-		dp_info("STC: sampling flow %d tuple (%s) result %d ul_tid %u sample_start_ts %llu burst_sampling_start_ts %llu current stage %u samples %d",
+		flow_entry = wlan_dp_stc_get_flow_entry_from_sampling_entry(dp_stc,
+									    s_entry);
+		dp_info("STC: sampling flow %d tuple (%s) result %d ul_tid %u reclass_count %u sample_start_ts %llu burst_sampling_start_ts %llu current stage %u samples %d",
 			i, dp_print_tuple_to_str(flow_tuple, buf, BUF_LEN_MAX),
 			flow_classify_result->traffic_type,
 			flow_classify_result->ul_tid,
+			flow_entry ? flow_entry->reclassification_count :
+			DP_STC_RECLASSIFICATION_COUNT_INVALID,
 			s_entry->sampling_start_ts,
 			s_entry->burst_sampling_start_ts,
 			s_entry->flow_samples.curr_stats_stage,
