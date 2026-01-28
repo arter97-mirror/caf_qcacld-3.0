@@ -1922,10 +1922,6 @@ static void wlan_dp_stc_flow_monitor_work_handler(void *arg)
 		    WLAN_DP_STC_PROVISIONAL_TIMEOUT_NS)
 			continue;
 
-		dp_stc_info(dp_stc->logmask,
-			    "STC: Flow admission for rx_flow %u at age %llu ns",
-			    rx_flow_id, cur_ts - rx_flow->flow_init_ts);
-
 process_flow:
 		rx_flow_tuple_hash = wlan_dp_fisa_get_flow_tuple_hash(rx_flow);
 		/*
