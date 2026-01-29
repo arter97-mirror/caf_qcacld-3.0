@@ -30,4 +30,11 @@ enum {
 	HE_SRP_IE_SRG_PARTIAL_BSSID_BITMAP             = 2,
 };
 
+static inline void wlan_hdd_enable_wds_ext(struct wlan_objmgr_psoc *psoc,
+					   struct wlan_objmgr_vdev *vdev)
+{
+	(void)psoc;
+	(void)vdev;
+}
+
 #endif /* OL_ATH_UCFG_H_ */
