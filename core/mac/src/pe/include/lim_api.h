@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -664,5 +664,21 @@ lim_mlo_roam_delete_link_peer(struct pe_session *pe_session,
 {
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD && WLAN_FEATURE_11BE_MLO */
+
+/**
+ * lim_update_switchmode_dfs_sap() - Update switch mode for DFS SAP
+ * @mac_ctx: Pointer to mac context
+ * @session: pe session
+ * @switch_mode: switch mode pointer
+ *
+ * This api will update the switch mode for DFS SAP
+ *
+ * Return: None
+ */
+void
+lim_update_switchmode_dfs_sap(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      uint8_t *switch_mode);
+
 /************************************************************/
 #endif /* __LIM_API_H */
