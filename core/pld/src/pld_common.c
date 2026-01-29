@@ -1692,6 +1692,19 @@ void *pld_smmu_get_domain(struct device *dev)
 
 	return ptr;
 }
+
+bool pld_smmu_s1_enabled(struct device *dev)
+{
+	enum pld_bus_type type = pld_get_bus_type(dev);
+
+	switch (type) {
+	case PLD_BUS_TYPE_PCIE:
+		return pld_pcie_smmu_s1_enabled(dev);
+	default:
+		pr_err("Not supported on bus type %d\n", type);
+		return false;
+	}
+}
 #else
 void *pld_smmu_get_mapping(struct device *dev)
 {
