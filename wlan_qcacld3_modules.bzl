@@ -1,7 +1,7 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
-load(":target_variants.bzl", "get_all_variants")
 load("@rules_pkg//pkg:install.bzl", "pkg_install")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
+load(":target_variants.bzl", "get_all_variants", "targets", "get_16k_tv")
 
 _target_chipset_map = {
     "seraph": [
@@ -82,6 +82,7 @@ _target_chipset_map = {
         "fig",
     ],
 }
+_target_chipset_map["art16k"] = _target_chipset_map["art"]
 
 _chipset_hw_map = {
     "kiwi-v2": "BERYLLIUM",
@@ -2942,7 +2943,26 @@ def define_dist(target, variant, chipsets):
             destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         )
 
+def matching_la_variant(target_16k):
+    for target in targets:
+        if target_16k.startswith(target):
+            return target
+    return None
+
+def define_16k_aliases(chipset, target_16k, variant):
+    tv_16k = "{}_{}_{}".format(target_16k, variant, chipset)
+    tv = "{}_{}_{}".format(matching_la_variant(target_16k), variant, chipset)
+    native.alias(
+        name = "configs/{}_defconfig".format(tv_16k),
+        actual = "configs/{}_defconfig".format(tv),
+    )
+
 def define_modules():
+    for (t, v) in get_16k_tv():
+        chipsets = _target_chipset_map.get(t)
+        if chipsets:
+            for c in chipsets:
+                define_16k_aliases(c, t, v)
     for (t, v) in get_all_variants():
         chipsets = _target_chipset_map.get(t)
         if chipsets:

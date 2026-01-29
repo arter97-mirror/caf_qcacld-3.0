@@ -13,6 +13,10 @@ targets = [
     "art",
 ]
 
+target_16k = [
+    "art16k",
+]
+
 la_variants = [
     # keep sorted
     "consolidate",
@@ -69,6 +73,9 @@ vm_variants = [
     "defconfig",
 ]
 
+def get_16k_tv():
+    return [(t, v) for t in target_16k for v in la_variants]
+
 def get_all_la_variants():
     return [(t, v) for t in targets for v in la_variants]
 
@@ -88,4 +95,4 @@ def get_all_non_la_variants():
     return get_all_le_variants() + get_all_vm_variants()
 
 def get_all_variants():
-    return get_all_la_variants() + get_all_lv_variants() + get_all_le_variants() + get_all_vm_variants() + get_all_le_32_variants()
+    return get_all_la_variants() + get_all_lv_variants() + get_all_le_variants() + get_all_vm_variants() + get_all_le_32_variants() + get_16k_tv()
