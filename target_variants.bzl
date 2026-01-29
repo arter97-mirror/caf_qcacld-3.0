@@ -1,16 +1,16 @@
 targets = [
     # keep sorted
+    "art",
     "autoghgvm",
     "autogvm",
     "canoe",
     "gen3auto",
+    "hamoa",
     "neo-la",
-    "sun",
-    "vienna",
     "pineapple",
     "seraph",
-    "hamoa",
-    "art",
+    "sun",
+    "vienna",
 ]
 
 target_16k = [

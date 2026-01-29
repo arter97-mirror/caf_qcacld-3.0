@@ -1,7 +1,7 @@
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module")
 load("@rules_pkg//pkg:install.bzl", "pkg_install")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
-load(":target_variants.bzl", "get_all_variants", "targets", "get_16k_tv")
+load(":target_variants.bzl", "get_16k_tv", "get_all_variants", "targets")
 
 _target_chipset_map = {
     "seraph": [
@@ -815,7 +815,7 @@ _conditional_srcs = {
         True: [
             "cmn/dp/wifi3.0/bn/dp_bn_tx.c",
             "cmn/dp/wifi3.0/bn/dp_bn_rx.c",
-	],
+        ],
     },
     "CONFIG_BUS_AUTO_SUSPEND": {
         True: [
@@ -888,14 +888,12 @@ _conditional_srcs = {
             "cmn/hif/src/wcn7750def.c",
         ],
     },
-
     "CONFIG_QCC2072_HEADERS_DEF": {
         True: [
             "cmn/hal/wifi3.0/qcc2072/hal_qcc2072.c",
             "cmn/hif/src/qcc2072def.c",
         ],
     },
-
     "CONFIG_CP_STATS": {
         True: [
             "cmn/target_if/cp_stats/src/target_if_cp_stats.c",
@@ -1273,7 +1271,7 @@ _conditional_srcs = {
             "core/dp/txrx/ol_tx_hl.c",
             "core/dp/txrx/ol_tx_queue.c",
             "core/dp/txrx/ol_tx_sched.c",
-            "core/dp/htt/htt_rx_hl.c"
+            "core/dp/htt/htt_rx_hl.c",
         ],
     },
     "CONFIG_HOST_11D_SCAN": {
@@ -1300,7 +1298,7 @@ _conditional_srcs = {
     },
     "CONFIG_IPA_OPT_WIFI_DP_LOGGING": {
         True: [
-            "cmn/ipa/core/src/wlan_ipa_logging.c"
+            "cmn/ipa/core/src/wlan_ipa_logging.c",
         ],
     },
     "CONFIG_LEGACY_IPA_OFFLOAD": {
@@ -1367,24 +1365,24 @@ _conditional_srcs = {
     "CONFIG_AR6320_PCI": {
         True: [
             "cmn/hif/src/ce/ce_service_legacy.c",
-        ]
+        ],
     },
     "CONFIG_AR6320_TX_THROTTLE": {
         True: [
             "core/dp/txrx/ol_txrx_ipa.c",
-        ]
+        ],
     },
     "CONFIG_AR6320_LL_DP_SUPPORT": {
         True: [
             "core/dp/htt/htt_rx_ll.c",
             "core/dp/txrx/ol_tx_ll.c",
             "core/dp/txrx/ol_tx_ll_legacy.c",
-        ]
+        ],
     },
     "CONFIG_AR6320_MONITOR_MODE": {
         True: [
             "core/dp/htt/htt_monitor_rx.c",
-        ]
+        ],
     },
     "CONFIG_LITHIUM": {
         True: [
@@ -1482,7 +1480,7 @@ _conditional_srcs = {
             "components/pmo/core/src/wlan_pmo_wow.c",
             "components/pmo/dispatcher/src/wlan_pmo_obj_mgmt_api.c",
             "components/pmo/dispatcher/src/wlan_pmo_tgt_arp.c",
-	    "components/pmo/dispatcher/src/wlan_pmo_tgt_apf.c",
+            "components/pmo/dispatcher/src/wlan_pmo_tgt_apf.c",
             "components/pmo/dispatcher/src/wlan_pmo_tgt_gtk.c",
             "components/pmo/dispatcher/src/wlan_pmo_tgt_hw_filter.c",
             "components/pmo/dispatcher/src/wlan_pmo_tgt_lphb.c",
@@ -1492,7 +1490,7 @@ _conditional_srcs = {
             "components/pmo/dispatcher/src/wlan_pmo_tgt_wow.c",
             "components/pmo/dispatcher/src/wlan_pmo_ucfg_api.c",
             "components/target_if/pmo/src/target_if_pmo_arp.c",
-	    "components/target_if/pmo/src/target_if_pmo_apf.c",
+            "components/target_if/pmo/src/target_if_pmo_apf.c",
             "components/target_if/pmo/src/target_if_pmo_gtk.c",
             "components/target_if/pmo/src/target_if_pmo_hw_filter.c",
             "components/target_if/pmo/src/target_if_pmo_lphb.c",
@@ -1507,7 +1505,7 @@ _conditional_srcs = {
         True: [
             "core/hdd/src/wlan_hdd_apf.c",
             "cmn/wmi/src/wmi_unified_apf_tlv.c",
-	    "core/hdd/src/wlan_hdd_sysfs_apfmode.c",
+            "core/hdd/src/wlan_hdd_sysfs_apfmode.c",
         ],
     },
     "CONFIG_QCACLD_FEATURE_BTC_CHAIN_MODE": {
@@ -1907,7 +1905,7 @@ _conditional_srcs = {
     },
     "CONFIG_TX_LL_LEGACY": {
         True: [
-             "core/dp/txrx/ol_tx_ll_legacy.c",
+            "core/dp/txrx/ol_tx_ll_legacy.c",
         ],
     },
     "CONFIG_WLAN_FEATURE_11AX": {
@@ -2623,7 +2621,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
             "//build/qcom_build_extensions:qtisocrepo_false": [],
         })
     else:
-        deps = [ "//msm-kernel:all_headers_arm", ]
+        deps = ["//msm-kernel:all_headers_arm"]
 
     if target == "neo-la":
         kernel_build = select({
@@ -2825,11 +2823,11 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
         ]
     else:
         deps = deps + [
-                "//wlan/platform:{}_cnss_prealloc".format(tv),
-                "//wlan/platform:{}_cnss_utils".format(tv),
-                "//wlan/platform:{}_cnss_nl".format(tv),
-                "//wlan/platform:wlan-platform-headers",
-            ]
+            "//wlan/platform:{}_cnss_prealloc".format(tv),
+            "//wlan/platform:{}_cnss_utils".format(tv),
+            "//wlan/platform:{}_cnss_nl".format(tv),
+            "//wlan/platform:wlan-platform-headers",
+        ]
 
     if target == "sa510m" or target == "sa510m.1g":
         deps = deps + [
