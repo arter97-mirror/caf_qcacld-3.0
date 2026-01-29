@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3008,4 +3009,16 @@ enum ani_akm_type lim_translate_rsn_oui_to_akm_type(uint8_t auth_suite[4])
 	pe_debug("akm_type: %d", akm_type);
 
 	return akm_type;
+}
+
+void lim_update_switchmode_dfs_sap(struct mac_context *mac_ctx,
+				   struct pe_session *session,
+				   uint8_t *switch_mode)
+{
+	if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
+				     session->curr_op_freq) &&
+	    !*switch_mode) {
+		pe_debug("override switch mode since was dfs channel");
+		*switch_mode = 1;
+	}
 }

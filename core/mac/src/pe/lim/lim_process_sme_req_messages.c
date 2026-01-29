@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5463,8 +5464,11 @@ void send_extended_chan_switch_action_frame(struct mac_context *mac_ctx,
 					    session_entry->gLimChannelSwitch.sec_ch_offset);
 	new_channel = wlan_reg_freq_to_chan(mac_ctx->pdev, new_channel_freq);
 	if (LIM_IS_AP_ROLE(session_entry) &&
-		(mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch == false))
+		(mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch == false)) {
 		switch_mode = session_entry->gLimChannelSwitch.switchMode;
+		lim_update_switchmode_dfs_sap(mac_ctx, session_entry,
+					      &switch_mode);
+	}
 
 	switch_count = session_entry->gLimChannelSwitch.switchCount;
 
@@ -5507,9 +5511,11 @@ void lim_send_chan_switch_action_frame(struct mac_context *mac_ctx,
 	new_channel = wlan_reg_freq_to_chan(mac_ctx->pdev, new_channel_freq);
 
 	if (LIM_IS_AP_ROLE(session_entry) &&
-	    (false == mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch))
+	    (false == mac_ctx->sap.SapDfsInfo.disable_dfs_ch_switch)) {
 		switch_mode = session_entry->gLimChannelSwitch.switchMode;
-
+		lim_update_switchmode_dfs_sap(mac_ctx, session_entry,
+					      &switch_mode);
+	}
 	switch_count = session_entry->gLimChannelSwitch.switchCount;
 
 	if (LIM_IS_AP_ROLE(session_entry)) {

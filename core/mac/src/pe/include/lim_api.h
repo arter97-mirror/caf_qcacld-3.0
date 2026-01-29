@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -500,5 +501,20 @@ void lim_handle_sap_beacon(struct wlan_objmgr_pdev *pdev,
  */
 enum ani_akm_type lim_translate_rsn_oui_to_akm_type(uint8_t auth_suite[4]);
 
+
+/**
+ * lim_update_switchmode_dfs_sap() - Update switch mode for DFS SAP
+ * @mac_ctx: Pointer to mac context
+ * @session: pe session
+ * @switch_mode: switch mode pointer
+ *
+ * This api will update the switch mode for DFS SAP
+ *
+ * Return: None
+ */
+void
+lim_update_switchmode_dfs_sap(struct mac_context *mac_ctx,
+			      struct pe_session *session,
+			      uint8_t *switch_mode);
 /************************************************************/
 #endif /* __LIM_API_H */

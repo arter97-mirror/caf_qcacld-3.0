@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -187,6 +188,9 @@ void populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 	ch_offset = session_entry->gLimChannelSwitch.sec_ch_offset;
 
 	dot_11_ptr->switch_mode = session_entry->gLimChannelSwitch.switchMode;
+	lim_update_switchmode_dfs_sap(mac_ptr, session_entry,
+				      &dot_11_ptr->switch_mode);
+
 	sw_target_freq = session_entry->gLimChannelSwitch.sw_target_freq;
 	primary_channel = session_entry->gLimChannelSwitch.primaryChannel;
 	dot_11_ptr->new_reg_class =
@@ -213,6 +217,9 @@ populate_dot11f_chan_switch_ann(struct mac_context *mac,
 				struct pe_session *pe_session)
 {
 	pDot11f->switchMode = pe_session->gLimChannelSwitch.switchMode;
+	lim_update_switchmode_dfs_sap(mac, pe_session,
+				      &pDot11f->switchMode);
+
 	pDot11f->newChannel = pe_session->gLimChannelSwitch.primaryChannel;
 	pDot11f->switchCount =
 		(uint8_t) pe_session->gLimChannelSwitch.switchCount;
