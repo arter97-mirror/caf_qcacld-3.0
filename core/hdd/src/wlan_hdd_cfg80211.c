@@ -9717,6 +9717,8 @@ wlan_hdd_wifi_test_config_policy[
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_BTM_RECOMM_MULTI_AP_SUPPORT] = {
 			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_20MHZ_ONLY_STA] = {
+			.type = NLA_U8},
 };
 
 /**
