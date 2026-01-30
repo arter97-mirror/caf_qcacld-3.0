@@ -399,6 +399,7 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 		goto delete_pe_session;
 	}
 
+	wlan_vdev_mlme_cap_set(vdev, WLAN_VDEV_C_RESTRICT_OFFCHAN);
 	ucfg_fwol_set_ilp_config(hdd_ctx->psoc, hdd_ctx->pdev, 0);
 
 	if (wma_enable_disable_imps(hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id, 0))
@@ -429,6 +430,8 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 	dev_open(adapter->dev, NULL);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+	wlan_hdd_set_roaming_state(adapter->deflink, RSO_PASSTHRU_SET_CHANNEL,
+				   true);
 
 	return 0;
 
@@ -616,7 +619,7 @@ int wlan_hdd_wondertap_init(void **handle,
 		goto create_wondertap_intf_failed;
 	}
 
-	osif_vdev_sync_register(adapter->dev, vdev_sync);
+	osif_vdev_sync_register(adapter->dev, &adapter->wdev, vdev_sync);
 
 	errno = __wlan_hdd_start_wondertap_intf(hdd_ctx, adapter, params);
 	if (errno)
@@ -726,9 +729,6 @@ void wlan_hdd_wondertap_deinit(void *handle,
 			hdd_debug("Clear frame type/subtype based filter failed:%d",
 				  errno);
 	}
-
-	wlan_hdd_set_roaming_state(wt_adapter->deflink, RSO_PASSTHRU_SET_CHANNEL,
-				   true);
 
 	errno = __wlan_hdd_stop_wondertap_intf(hdd_ctx, wt_adapter);
 	if (errno)

@@ -11177,36 +11177,47 @@ policy_mgr_allow_passthru_concurrency(struct wlan_objmgr_psoc *psoc,
 	if (mode != PM_PASSTHRU_MODE && !conn_count)
 		return true;
 
-	if (mode == PM_PASSTHRU_MODE) {
+	switch (mode) {
+	case PM_PASSTHRU_MODE:
 		if (!pcl || !pcl->pcl_len)
 			return true;
 
+		policy_mgr_err("Unexpected scenario for Passthru mode ch_freq:%d pcl len:%d",
+			       ch_freq, pcl->pcl_len);
+		return false;
+	case PM_STA_MODE:
+		/*
+		 * STA + Passthru SCC concurrency is always supported
+		 * irrespective of HW capability.
+		 */
+		if (pm_conc_connection_list[list[0]].freq == ch_freq)
+			return true;
+
+		if (!pcl || !pcl->pcl_len) {
+			if (policy_mgr_2_freq_same_mac_in_dbs(psoc,
+						      pm_conc_connection_list[list[0]].freq,
+						      ch_freq))
+				return false;
+			else
+				return true;
+		}
+
 		for (i = 0; i < pcl->pcl_len; i++) {
 			if (pcl->pcl_list[i] == ch_freq) {
-				policy_mgr_debug("Passthrough mode allowed on %dMhz",
+				policy_mgr_debug("%s mode allowed on %dMhz",
+						 device_mode_to_string(mode),
 						 ch_freq);
 				return true;
 			}
 		}
 
-		policy_mgr_debug("Passthrough mode not allowed on %dMhz",
-				 ch_freq);
-		return false;
-	}
+		policy_mgr_debug("%s mode not allowed on %dMhz",
+				 device_mode_to_string(mode), ch_freq);
 
-	/*
-	 * This would only happen for DBS hw as we would reject initial
-	 * STA connection in case of non-DBS hw.
-	 */
-	if (mode == PM_STA_MODE &&
-	    policy_mgr_2_freq_same_mac_in_dbs(psoc,
-					      pm_conc_connection_list[list[0]].freq,
-					      ch_freq)) {
-		policy_mgr_debug("STA CSA to %dMHz not allowed", ch_freq);
 		return false;
+	default:
+		return true;
 	}
-
-	return true;
 }
 #else
 static inline bool
@@ -12671,6 +12682,12 @@ QDF_STATUS policy_mgr_is_chan_ok_for_dnbs(struct wlan_objmgr_psoc *psoc,
 			   policy_mgr_get_mode_specific_conn_info(
 					psoc, &op_ch_freq_list[cc_count],
 					&vdev_id[cc_count], PM_P2P_GO_MODE);
+
+	if (cc_count < MAX_NUMBER_OF_CONC_CONNECTIONS)
+		cc_count = cc_count +
+			   policy_mgr_get_mode_specific_conn_info(
+					psoc, &op_ch_freq_list[cc_count],
+					&vdev_id[cc_count], PM_PASSTHRU_MODE);
 
 	if (!cc_count) {
 		*ok = true;
