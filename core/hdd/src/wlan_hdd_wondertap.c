@@ -15,10 +15,11 @@
 #include <wlan_vdev_mgr_api.h>
 #include <wlan_fwol_ucfg_api.h>
 #include "wlan_tdls_cfg_api.h"
-#include <wma_api.h>
+#include <wma.h>
 #include "cds_api.h"
 #include "cdp_txrx_ctrl.h"
 #include <wlan_hdd_hostapd.h>
+#include "wlan_osif_request_manager.h"
 
 static struct hdd_wondertap_context *g_wt_ctx;
 static DEFINE_MUTEX(g_wt_ctx_mutex);
@@ -1149,20 +1150,18 @@ wlan_hdd_wondertap_set_fixed_tx_rate(void *handle,
 	hdd_ctx = g_wt_ctx->hdd_ctx;
 	wt_adapter = g_wt_ctx->wt_adapter;
 
-	errno = osif_vdev_sync_trans_start(wt_adapter->dev, &vdev_sync);
-	if (errno) {
-		/* Cache the command?? */
+	errno = osif_vdev_sync_op_start(wt_adapter->dev, &vdev_sync);
+	if (errno)
 		return errno;
-	}
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno)
-		goto stop_trans;
+		goto stop_op;
 
 	errno = __wlan_hdd_wondertap_set_fixed_tx_rate(wt_adapter, params);
 
-stop_trans:
-	osif_vdev_sync_trans_stop(vdev_sync);
+stop_op:
+	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;
 }
@@ -1201,6 +1200,7 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	int ret;
+	struct wmi_unified *wmi_handle;
 
 	if (!hdd_ctx)
 		return -EBUSY;
@@ -1217,10 +1217,249 @@ wlan_hdd_wondertap_get_capabilities(void *handle,
 	features->bits.custom_mgmt_retry_limit = 1;
 	features->bits.custom_data_retry_limit = 1;
 	features->bits.frame_type_filter = 1;
-	if (policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc))
-		features->bits.sta_coexist = 1;
+	features->bits.sta_coexist = 1;
+	wmi_handle = get_wmi_unified_hdl_from_psoc(hdd_ctx->psoc);
+	if (wmi_handle)
+		features->bits.channel_hopping = wmi_service_enabled(wmi_handle,
+			wmi_service_passthru_vdev_chan_hop_schedule_support);
+	else
+		hdd_err("wmi_handle is NULL, CH hopping is not set");
+
+	features->maximum_channel_switch_time_us = 50000;
 
 	return ret;
+}
+
+static
+wmi_channel_width hdd_convert_wondertap_bw_to_wmi_bw(qdf_wondertap_rate_bw_t bw)
+{
+	switch (bw) {
+	case WONDERTAP_RATE_BW_20:
+		return WMI_CHAN_WIDTH_20;
+	case WONDERTAP_RATE_BW_40:
+		return WMI_CHAN_WIDTH_40;
+	case WONDERTAP_RATE_BW_80:
+		return WMI_CHAN_WIDTH_80;
+	case WONDERTAP_RATE_BW_160:
+		return WMI_CHAN_WIDTH_160;
+	case WONDERTAP_RATE_BW_320:
+		return WMI_CHAN_WIDTH_320;
+	default:
+		return WMI_CHAN_WIDTH_20;
+	}
+}
+
+static wmi_channel_hopping_role
+hdd_convert_wondertap_role_to_wmi_role(qdf_wondertap_role_t role)
+{
+	switch (role) {
+	case WONDERTAP_ROLE_NOP:
+		return WMI_CHANNEL_HOPPING_ROLE_PASSTHRU;
+	default:
+		return WMI_CHANNEL_HOPPING_ROLE_NON_PASSTHRU;
+	}
+}
+
+/**
+ * wlan_hdd_wondertap_set_chan_sched() - Set MCC channel schedule for wondertap
+ * @handle: Wondertap handle
+ * @chan_sched: channel schedule parameters
+ *
+ * This function configures a channel schedule that needs to be followed
+ * based on the parameters provided.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int
+wlan_hdd_wondertap_set_chan_sched(void *handle,
+				  const qdf_wondertap_channel_sch_req_t *chan_sched)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *wt_adapter;
+	struct osif_vdev_sync *vdev_sync;
+	struct vdev_ch_hop_sched_params params = {0};
+	struct vdev_ch_hop_ch_params *ch_list;
+	QDF_STATUS status;
+	int errno;
+	uint8_t i;
+
+	hdd_info("channel list size:%d next_chan_idx:%d dwell_time:%dms target_switch_time:0x%x",
+		 chan_sched->channel_list_len, chan_sched->next_channel_index,
+		 chan_sched->dwell_time_tu, chan_sched->target_switch_time_tsf);
+
+	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic) {
+		hdd_debug("Incorrect handle received - rejecting set_chan_sched");
+		return -EINVAL;
+	}
+
+	hdd_ctx = g_wt_ctx->hdd_ctx;
+	wt_adapter = g_wt_ctx->wt_adapter;
+
+	errno = osif_vdev_sync_op_start(wt_adapter->dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		goto stop_op;
+
+	params.vdev_id = wt_adapter->deflink->vdev_id;
+	params.next_channel_idx = chan_sched->next_channel_index;
+	params.dwell_time_tu = chan_sched->dwell_time_tu;
+	params.target_switch_time_tsf = chan_sched->target_switch_time_tsf;
+	params.chan_list_len = chan_sched->channel_list_len;
+
+	params.chan_list = qdf_mem_malloc(sizeof(*params.chan_list) *
+					  params.chan_list_len);
+	if (!params.chan_list) {
+		hdd_err("Channel list malloc failed");
+		goto stop_op;
+	}
+
+	ch_list = params.chan_list;
+	for (i = 0; i < params.chan_list_len; i++) {
+		ch_list[i].freq = chan_sched->channel_list[i].freq;
+		ch_list[i].bandwidth =
+			hdd_convert_wondertap_bw_to_wmi_bw(chan_sched->channel_list[i].bandwidth);
+		ch_list[i].role =
+			hdd_convert_wondertap_role_to_wmi_role(chan_sched->channel_list[i].role);
+	}
+
+	status = wma_send_vdev_ch_hop_sched(&params);
+	errno = qdf_status_to_os_return(status);
+	qdf_mem_free(params.chan_list);
+
+stop_op:
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+/**
+ * struct hdd_wondertap_get_tsf_timer_priv - Wondertap get tsf priv context
+ * @response: response containing tsf
+ * @status: status
+ */
+struct hdd_wondertap_get_tsf_timer_priv {
+	struct ocb_get_tsf_timer_response response;
+	int status;
+};
+
+#define WLAN_WONDERTAP_GET_TSF_WAIT_TIME_MS 1000
+
+static void hdd_wondertap_get_tsf_resp_cb(void *ctx, void *response_ptr)
+{
+	struct osif_request *request;
+	struct hdd_wondertap_get_tsf_timer_priv *priv;
+	struct ocb_get_tsf_timer_response *response = response_ptr;
+
+	request = osif_request_get(ctx);
+	if (!request) {
+		hdd_err("obsolete get_tsf request");
+		return;
+	}
+
+	priv = osif_request_priv(request);
+	if (response) {
+		priv->response = *response;
+		priv->status = 0;
+	} else {
+		priv->status = -EINVAL;
+	}
+
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+
+#define WLAN_HDD_MAC_TSF_LSHIFT_VAL 10
+#define WLAN_HDD_MAC_TSF_CLK_MHZ    960
+
+/**
+ * wlan_hdd_wondertap_get_mac_tsf() - Get MAC TSF timestamp
+ * @handle: Wondertap handle
+ * @mac_tsf: MAC TSF utilized for channel hopping schedule
+ *
+ * This function is used to get the MAC TSF timestamp to be used
+ * for channel hopping schedule.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int wlan_hdd_wondertap_get_mac_tsf(void *handle, uint32_t *mac_tsf)
+{
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *wt_adapter;
+	struct osif_vdev_sync *vdev_sync;
+	struct ocb_get_tsf_timer_param req = {0};
+	struct osif_request *request;
+	struct hdd_wondertap_get_tsf_timer_priv *priv;
+	void *cookie;
+	static const struct osif_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = WLAN_WONDERTAP_GET_TSF_WAIT_TIME_MS,
+	};
+	QDF_STATUS status;
+	int errno;
+
+	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic) {
+		hdd_debug("Incorrect handle received - rejecting set_chan_sched");
+		return -EINVAL;
+	}
+
+	hdd_ctx = g_wt_ctx->hdd_ctx;
+	wt_adapter = g_wt_ctx->wt_adapter;
+
+	errno = osif_vdev_sync_op_start(wt_adapter->dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		goto stop_op;
+
+	request = osif_request_alloc(&params);
+	if (!request) {
+		hdd_err("osif request alloc failure");
+		errno = -ENOMEM;
+		goto stop_op;
+	}
+	cookie = osif_request_cookie(request);
+
+	req.vdev_id = wt_adapter->deflink->vdev_id;
+	status = wma_passthru_get_tsf_timer(&req, hdd_wondertap_get_tsf_resp_cb,
+					    cookie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send get_tsf timer command");
+		errno = qdf_status_to_os_return(status);
+		goto osif_req_put;
+	}
+
+	errno = osif_request_wait_for_response(request);
+	if (errno) {
+		hdd_err("get_tsf timed out");
+		goto osif_req_put;
+	}
+
+	priv = osif_request_priv(request);
+	errno = priv->status;
+	if (errno) {
+		hdd_err("get_tsf operation failed:%d", errno);
+		goto osif_req_put;
+	}
+
+	*mac_tsf = ((uint64_t)priv->response.timer_low <<
+		    WLAN_HDD_MAC_TSF_LSHIFT_VAL) / WLAN_HDD_MAC_TSF_CLK_MHZ;
+
+	hdd_debug("TSF timer high:0x%x low:0x%x out:0x%x",
+		  priv->response.timer_high, priv->response.timer_low,
+		  *mac_tsf);
+
+osif_req_put:
+	osif_request_put(request);
+
+stop_op:
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
 }
 
 void hdd_sme_passthrough_mode_callback(uint8_t vdev_id, bool is_up)
@@ -1249,6 +1488,8 @@ static const qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
 	.set_fixed_tx_rate = wlan_hdd_wondertap_set_fixed_tx_rate,
 	.set_tx_rate_mask = wlan_hdd_wondertap_set_tx_rate_mask,
 	.get_capabilities = wlan_hdd_wondertap_get_capabilities,
+	.channel_schedule_request = wlan_hdd_wondertap_set_chan_sched,
+	.get_mac_tsf = wlan_hdd_wondertap_get_mac_tsf,
 };
 
 /**
@@ -1258,7 +1499,7 @@ static const qdf_wondertap_ops_t wlan_drv_wondertap_ops = {
  * version supported and the operations table.
  */
 static const qdf_wondertap_priv_t wlan_drv_wondertap_priv = {
-	.ver = WONDER_VERSION_1_4_1,
+	.ver = WONDER_VERSION_1_6_1,
 	.wonder_ops = &wlan_drv_wondertap_ops,
 };
 

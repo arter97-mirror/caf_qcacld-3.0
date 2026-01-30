@@ -1609,6 +1609,51 @@ QDF_STATUS wma_set_peer_param(void *wma_ctx, uint8_t *peer_addr,
 	return status;
 }
 
+#ifdef DRIVER_PASSTHRU_MODE
+QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params)
+{
+	tp_wma_handle wma_handle;
+	QDF_STATUS status;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle)
+		return QDF_STATUS_E_INVAL;
+
+	status = wmi_unified_send_vdev_ch_hop_sched_cmd(wma_handle->wmi_handle,
+							params);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("vdev_id: %d ch hop sched send failed",
+			params->vdev_id);
+
+	return status;
+}
+
+QDF_STATUS
+wma_passthru_get_tsf_timer(struct ocb_get_tsf_timer_param *req,
+			   wma_get_tsf_timer_cb cb, void *ctx)
+{
+	tp_wma_handle wma_handle;
+	QDF_STATUS status;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle)
+		return QDF_STATUS_E_INVAL;
+
+	wma_handle->get_tsf_cb = cb;
+	wma_handle->get_tsf_cb_ctx = ctx;
+
+	status = wmi_unified_ocb_get_tsf_timer(wma_handle->wmi_handle, req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("vdev_id: %d get tsf timer send failed",
+			req->vdev_id);
+		wma_handle->get_tsf_cb = NULL;
+		wma_handle->get_tsf_cb_ctx = NULL;
+	}
+
+	return status;
+}
+#endif
+
 /**
  * wma_peer_unmap_conf_send - send peer unmap conf cmnd to fw
  * @wma: wma handle

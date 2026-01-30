@@ -3610,6 +3610,54 @@ mem_err:
 	return QDF_STATUS_E_NOMEM;
 }
 
+#ifdef DRIVER_PASSTHRU_MODE
+static
+int wma_passthru_get_tsf_timer_resp_handler(ol_scn_t scn, uint8_t *event_buf,
+					    uint32_t len)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)scn;
+	WMI_OCB_GET_TSF_TIMER_RESP_EVENTID_param_tlvs *param_tlvs;
+	wmi_ocb_get_tsf_timer_resp_event_fixed_param *fix_param;
+	struct ocb_get_tsf_timer_response response;
+
+	if (!scn || !event_buf) {
+		wma_err("scn: 0x%pK, data: 0x%pK", scn, event_buf);
+		return -EINVAL;
+	}
+
+	param_tlvs = (WMI_OCB_GET_TSF_TIMER_RESP_EVENTID_param_tlvs *)event_buf;
+	fix_param = param_tlvs->fixed_param;
+	response.vdev_id = fix_param->vdev_id;
+	response.timer_high = fix_param->tsf_timer_high;
+	response.timer_low = fix_param->tsf_timer_low;
+
+	if (wma_handle->get_tsf_cb)
+		wma_handle->get_tsf_cb(wma_handle->get_tsf_cb_ctx, &response);
+
+	wma_handle->get_tsf_cb = NULL;
+	wma_handle->get_tsf_cb_ctx = NULL;
+
+	return 0;
+}
+
+static
+void wma_register_passthru_events(tp_wma_handle wma_handle)
+{
+	QDF_STATUS status;
+
+	status = wmi_unified_register_event(wma_handle->wmi_handle,
+					    wmi_ocb_get_tsf_timer_resp_event_id,
+					    wma_passthru_get_tsf_timer_resp_handler);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to register Passthru TSF resp event cb");
+}
+#else
+static inline
+void wma_register_passthru_events(tp_wma_handle wma_handle)
+{
+}
+#endif
+
 /**
  * wma_open() - Allocate wma context and initialize it.
  * @psoc: psoc object
@@ -4127,6 +4175,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wma_register_wlm_stats_events(wma_handle);
 	wma_register_wlm_latency_level_event(wma_handle);
 	wma_register_mws_coex_events(wma_handle);
+	wma_register_passthru_events(wma_handle);
 	wma_trace_init();
 	return QDF_STATUS_SUCCESS;
 
