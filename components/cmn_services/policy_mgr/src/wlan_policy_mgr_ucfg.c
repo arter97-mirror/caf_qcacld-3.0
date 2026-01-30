@@ -150,7 +150,7 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_SAP_DEFAULT_BW_FOR_RESTART);
 	cfg->move_sap_go_1st_on_dfs_sta_csa =
 		cfg_get(psoc, CFG_MOVE_SAP_GO_1ST_ON_DFS_STA_CSA);
-	cfg->cfg_sta_indoor_ch_peer_scc = false;
+	cfg->cfg_sta_indoor_ch_peer_scc = 0;
 	cfg->cfg_sta_dfs_ch_peer_scc = false;
 
 	return QDF_STATUS_SUCCESS;

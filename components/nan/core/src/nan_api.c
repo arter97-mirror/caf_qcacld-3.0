@@ -474,7 +474,7 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 	wmi_unified_t wmi_handle;
 	uint8_t sta_count = 0;
 	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	bool cfg_sta_indoor_ch_peer_scc = false;
+	uint8_t cfg_sta_indoor_ch_peer_scc = 0;
 	uint8_t i;
 	QDF_STATUS status;
 
@@ -496,7 +496,7 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		nan_err("Failed to get cfg_sta_indoor_ch_peer_scc");
-		cfg_sta_indoor_ch_peer_scc = false;
+		cfg_sta_indoor_ch_peer_scc = 0;
 	}
 
 	/* Check for 6GHz channels */
@@ -518,7 +518,7 @@ bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
 		} else
 			return false;
 	} else if (wlan_reg_is_freq_indoor(pdev, freq)) {
-		if (cfg_sta_indoor_ch_peer_scc) {
+		if ((cfg_sta_indoor_ch_peer_scc & PM_INDOOR_STA_NAN_SCC)) {
 			for (i = 0; i < sta_count; i++) {
 				if (freq_list[i] == freq)
 					return true;

@@ -6130,7 +6130,7 @@ uint32_t policy_mgr_get_alternate_channel_for_sap(
 	uint8_t i;
 	enum policy_mgr_con_mode con_mode;
 	bool is_6ghz_cap;
-	bool cfg_sta_indoor_ch_peer_scc = false;
+	uint8_t cfg_sta_indoor_ch_peer_scc = 0;
 	bool cfg_sta_dfs_ch_peer_scc = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
@@ -6173,7 +6173,7 @@ uint32_t policy_mgr_get_alternate_channel_for_sap(
 							       sap_ch_freq,
 							       pcl_channels[i])))
 				continue;
-			if ((cfg_sta_indoor_ch_peer_scc ||
+			if (((cfg_sta_indoor_ch_peer_scc & PM_INDOOR_STA_P2P_SCC) ||
 			     cfg_sta_dfs_ch_peer_scc) &&
 			    con_mode == PM_P2P_GO_MODE &&
 			    ((WLAN_REG_IS_5GHZ_CH_FREQ(pcl_channels[i]) &&
@@ -6738,7 +6738,7 @@ policy_mgr_modify_pcl_sta_p2p_indoor_dfs_scc(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	struct wlan_objmgr_pdev *pdev;
 	qdf_freq_t sta_freq = 0;
-	bool cfg_sta_indoor_ch_peer_scc = false;
+	uint8_t cfg_sta_indoor_ch_peer_scc = 0;
 	bool cfg_sta_dfs_ch_peer_scc = false;
 	bool is_indoor, is_dfs;
 
@@ -6748,7 +6748,8 @@ policy_mgr_modify_pcl_sta_p2p_indoor_dfs_scc(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc,
 					       &cfg_sta_dfs_ch_peer_scc);
 
-	if (!cfg_sta_indoor_ch_peer_scc && !cfg_sta_dfs_ch_peer_scc)
+	if (!(cfg_sta_indoor_ch_peer_scc & PM_INDOOR_STA_P2P_SCC) &&
+	    !cfg_sta_dfs_ch_peer_scc)
 		return QDF_STATUS_SUCCESS;
 
 	pm_ctx = policy_mgr_get_context(psoc);

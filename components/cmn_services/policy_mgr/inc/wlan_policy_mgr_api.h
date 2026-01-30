@@ -6571,7 +6571,7 @@ policy_mgr_set_sta_sap_scc_on_indoor_channel(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS
 policy_mgr_get_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
-					  bool *cfg_sta_indoor_ch_peer_scc);
+					  uint8_t *cfg_sta_indoor_ch_peer_scc);
 
 /**
  * policy_mgr_set_cfg_sta_indoor_ch_peer_scc() - To enable/disable value of
@@ -6580,13 +6580,13 @@ policy_mgr_get_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
  * @psoc: pointer to psoc
  * @cfg_sta_indoor_ch_peer_scc: value to be set
  *
- * Sets the value of enable_sta_indoor_ch_scc.
+ * Sets the value of cfg_sta_indoor_ch_scc.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 policy_mgr_set_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
-					  bool cfg_sta_indoor_ch_peer_scc);
+					  uint8_t cfg_sta_indoor_ch_peer_scc);
 
 /**
  * policy_mgr_enforce_high_priority_entry - Sanitizes a PCL to ensure only

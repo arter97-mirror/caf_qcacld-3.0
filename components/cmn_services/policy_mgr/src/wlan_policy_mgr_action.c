@@ -2078,7 +2078,7 @@ policy_mgr_check_go_restart_for_non_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
 	uint32_t i;
 	uint8_t cur_sap_vdev_id = INVALID_VDEV_ID;
 	qdf_freq_t sap_freq = 0;
-	bool cfg_sta_indoor_ch_peer_scc = false;
+	uint8_t cfg_sta_indoor_ch_peer_scc = 0;
 	bool cfg_sta_dfs_ch_peer_scc = false;
 
 	cfg_sta_indoor_ch_peer_scc = pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc;
@@ -2094,7 +2094,7 @@ policy_mgr_check_go_restart_for_non_dbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
 			!policy_mgr_is_sta_sap_scc(pm_ctx->psoc,
 						   op_ch_freq_list[i],
 						   true))) &&
-			(cfg_sta_indoor_ch_peer_scc ||
+			((cfg_sta_indoor_ch_peer_scc & PM_INDOOR_STA_P2P_SCC) ||
 			 cfg_sta_dfs_ch_peer_scc)) {
 			cur_sap_vdev_id = vdev_id[i];
 			sap_freq = op_ch_freq_list[i];
@@ -4246,7 +4246,8 @@ sap_restart:
 
 		if (policy_mgr_mode_specific_connection_count(
 					psoc, PM_P2P_GO_MODE, NULL) &&
-					(!pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc &&
+					(!(pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc &
+					   PM_INDOOR_STA_P2P_SCC) &&
 					 !pm_ctx->cfg.cfg_sta_dfs_ch_peer_scc))
 			timeout_ms = MAX_NOA_TIME;
 

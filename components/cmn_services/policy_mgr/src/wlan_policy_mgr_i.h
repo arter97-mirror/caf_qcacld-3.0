@@ -308,7 +308,7 @@ extern enum policy_mgr_conc_next_action
  * @cfg_sta_indoor_ch_peer_scc: Enable/disable STA connected indoor channel for
  * peer-to-peer connections and from SCC.
  * @cfg_sta_dfs_ch_peer_scc: Enable/disable STA connected DFS channel for
- * peer-to-peer connections and form SCC. (Currently only for P2P).
+ * peer-to-peer connections and from SCC. (Currently only for P2P).
  */
 struct policy_mgr_cfg {
 	uint8_t mcc_to_scc_switch;
@@ -342,7 +342,7 @@ struct policy_mgr_cfg {
 	bool use_sap_original_bw;
 	bool move_sap_go_1st_on_dfs_sta_csa;
 	bool force_sap_20mhz_cc_id;
-	bool cfg_sta_indoor_ch_peer_scc;
+	uint8_t cfg_sta_indoor_ch_peer_scc;
 	bool cfg_sta_dfs_ch_peer_scc;
 };
 

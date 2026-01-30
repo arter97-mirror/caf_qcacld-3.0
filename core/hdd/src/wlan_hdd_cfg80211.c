@@ -9766,7 +9766,7 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_TX_POWER_LIMIT_ENABLE] = {
 		.type = NLA_U8},
-	[QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_INDOOR_CH_SCC] = {
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_PEER_PROTOCOL_INDOOR_CH_STA_SCC] = {
 		.type = NLA_U8},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_DFS_CH_SCC_P2P] = {
 		.type = NLA_U8},
@@ -15347,7 +15347,7 @@ static const struct independent_setters independent_setters[] = {
 	 hdd_set_eht_emlsr_links},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_TX_POWER_LIMIT_ENABLE,
 	 hdd_set_tx_power_limit_enable},
-	{QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_INDOOR_CH_SCC,
+	{QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_PEER_PROTOCOL_INDOOR_CH_STA_SCC,
 	 hdd_set_cfg_sta_indoor_ch_peer_scc},
 	{QCA_WLAN_VENDOR_ATTR_CONFIG_ALLOW_STA_DFS_CH_SCC_P2P,
 	 hdd_set_cfg_sta_dfs_ch_peer_scc},

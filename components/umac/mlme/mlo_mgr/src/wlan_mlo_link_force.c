@@ -2901,7 +2901,7 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 	uint8_t i;
 	bool force_link_required = false;
 	uint32_t mcc_to_scc_switch;
-	bool cfg_sta_indoor_ch_peer_scc = false;
+	uint8_t cfg_sta_indoor_ch_peer_scc = 0;
 	bool cfg_sta_dfs_ch_peer_scc = false;
 	QDF_STATUS status;
 
@@ -2916,7 +2916,7 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_debug("Failed to get cfg_sta_indoor_ch_peer_scc");
-		cfg_sta_indoor_ch_peer_scc = false;
+		cfg_sta_indoor_ch_peer_scc = 0;
 	}
 
 	status = policy_mgr_get_cfg_sta_dfs_ch_peer_scc(psoc,
@@ -2933,7 +2933,8 @@ ml_nlink_handle_comm_intf_non_dbs(struct wlan_objmgr_psoc *psoc,
 	switch (pm_mode) {
 	case PM_P2P_CLIENT_MODE:
 	case PM_P2P_GO_MODE:
-		if (cfg_sta_indoor_ch_peer_scc || cfg_sta_dfs_ch_peer_scc) {
+		if ((cfg_sta_indoor_ch_peer_scc & PM_INDOOR_STA_P2P_SCC) ||
+		    cfg_sta_dfs_ch_peer_scc) {
 			force_link_required = true;
 			break;
 		}

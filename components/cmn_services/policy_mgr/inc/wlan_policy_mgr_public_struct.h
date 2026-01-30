@@ -2208,4 +2208,17 @@ struct weighed_pcl {
 	uint32_t flag;
 };
 
+/**
+ * enum policy_mgr_indoor_sta_scc_mode: Bitmask for cfg_sta_indoor_ch_peer_scc
+ *
+ * @PM_INDOOR_STA_P2P_SCC: STA and P2P SCC
+ * @PM_INDOOR_STA_NAN_SCC: STA and NAN SCC
+ * @PM_INDOOR_STA_SAP_SCC: STA and SAP SCC
+ */
+enum policy_mgr_indoor_sta_scc_mode {
+	PM_INDOOR_STA_P2P_SCC = BIT(0),
+	PM_INDOOR_STA_NAN_SCC = BIT(1),
+	PM_INDOOR_STA_SAP_SCC = BIT(2),
+};
+
 #endif /* __WLAN_POLICY_MGR_PUBLIC_STRUCT_H */

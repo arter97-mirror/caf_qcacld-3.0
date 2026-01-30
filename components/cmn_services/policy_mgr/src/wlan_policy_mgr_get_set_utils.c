@@ -13214,7 +13214,7 @@ policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 	struct wlan_objmgr_psoc *psoc;
 	bool is_scc = false, indoor_support = false;
 	enum QDF_OPMODE mode;
-	bool cfg_sta_indoor_ch_peer_scc = false;
+	uint8_t cfg_sta_indoor_ch_peer_scc = 0;
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 
@@ -13232,7 +13232,7 @@ policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 							   &cfg_sta_indoor_ch_peer_scc);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("Failed to get cfg_sta_indoor_ch_peer_scc");
-		cfg_sta_indoor_ch_peer_scc = false;
+		cfg_sta_indoor_ch_peer_scc = 0;
 	}
 
 	/*
@@ -13275,9 +13275,8 @@ policy_mgr_is_sap_go_interface_allowed_on_indoor(struct wlan_objmgr_pdev *pdev,
 	}
 
 	if (mode == QDF_P2P_GO_MODE) {
-		if (is_scc && cfg_sta_indoor_ch_peer_scc &&
-		    wlan_vdev_mlme_is_init_state(vdev) &&
-		    policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc)) {
+		if (is_scc && (cfg_sta_indoor_ch_peer_scc & PM_INDOOR_STA_P2P_SCC) &&
+		    (wlan_vdev_mlme_is_init_state(vdev) == QDF_STATUS_SUCCESS)) {
 			policy_mgr_rl_debug("GO operation is allowed on STA connected indoor channel");
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 			return true;
@@ -14852,7 +14851,7 @@ policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	enum phy_ch_width ch_width = CH_WIDTH_INVALID;
 	bool indoor_support = false;
-	bool cfg_sta_indoor_ch_peer_scc;
+	uint8_t cfg_sta_indoor_ch_peer_scc = 0;
 	uint8_t partner_vdev_id = INVALID_VDEV_ID;
 	enum phy_ch_width partner_width = CH_WIDTH_INVALID;
 	uint32_t partner_freq = 0;
@@ -14864,9 +14863,12 @@ policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,
 		return false;
 	}
 
+	cfg_sta_indoor_ch_peer_scc = pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc;
+
 	ucfg_mlme_get_indoor_channel_support(psoc, &indoor_support);
-	if (indoor_support ||
-	    !policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc))
+	if ((indoor_support ||
+	     !policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc)) &&
+	    !cfg_sta_indoor_ch_peer_scc)
 		return false;
 
 	mode = wlan_get_opmode_from_vdev_id(pm_ctx->pdev, vdev_id);
@@ -14896,8 +14898,7 @@ policy_mgr_update_indoor_concurrency(struct wlan_objmgr_psoc *psoc,
 		 * frequency. For non ML STA the ch_freq and ch_width remain
 		 * unchanged.
 		 */
-		cfg_sta_indoor_ch_peer_scc =
-			pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc;
+
 		if (mode == QDF_STA_MODE && cfg_sta_indoor_ch_peer_scc &&
 		    !(WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq)) &&
 		    !(wlan_reg_is_freq_indoor(pm_ctx->pdev, ch_freq))) {
@@ -15687,7 +15688,7 @@ policy_mgr_set_sta_sap_scc_on_indoor_channel(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS
 policy_mgr_get_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
-					  bool *cfg_sta_indoor_ch_peer_scc)
+					  uint8_t *cfg_sta_indoor_ch_peer_scc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
@@ -15704,7 +15705,7 @@ policy_mgr_get_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS
 policy_mgr_set_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
-					  bool cfg_sta_indoor_ch_peer_scc)
+					  uint8_t cfg_sta_indoor_ch_peer_scc)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint8_t num_connections = 0;
@@ -15730,7 +15731,7 @@ policy_mgr_set_cfg_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
 	}
 
 	pm_ctx->cfg.cfg_sta_indoor_ch_peer_scc = cfg_sta_indoor_ch_peer_scc;
-	if (cfg_sta_indoor_ch_peer_scc) {
+	if (cfg_sta_indoor_ch_peer_scc & PM_INDOOR_STA_SAP_SCC) {
 		sta_sap_scc_on_indoor_channel = true;
 		policy_mgr_set_sta_sap_scc_on_indoor_channel(psoc,
 							     sta_sap_scc_on_indoor_channel);
