@@ -554,11 +554,6 @@ static int __wlan_hdd_cfg80211_scan(struct wlan_hdd_link_info *link_info,
 		hdd_err("Scan not supported for %s",
 			qdf_opmode_str(adapter->device_mode));
 		return -EINVAL;
-	} else if (policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
-							     PM_PASSTHRU_MODE,
-							     NULL)) {
-		hdd_err("Passthru mode active - rejecting scan req");
-		return -EINVAL;
 	}
 
 	scan_info = &adapter->scan_info;
