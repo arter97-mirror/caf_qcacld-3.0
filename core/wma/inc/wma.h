@@ -1004,6 +1004,8 @@ typedef void (*qos_null_tx_compl_cb)(uint8_t vdev_id, uint32_t status,
  * @wma_pf_hist: PF symbol history
  * @qos_null_tx_compl_cb: QoS NULL frame TX completion callback
  * @qos_null_tx_compl_cb_context: Context for QoS NULL TX completion callback
+ * @get_tsf_cb: get tsf timer callback
+ * @get_tsf_cb_ctx: context passed to get tsf callback
  *
  * This structure is the global wma context.  It contains global wma
  * module parameters and handles of other modules.
@@ -1144,6 +1146,10 @@ typedef struct {
 	void *qos_null_tx_compl_cb_context;
 	uint8_t qos_null_tx_vdev_id;
 	qdf_spinlock_t qos_null_tx_lock;
+#ifdef DRIVER_PASSTHRU_MODE
+	wma_get_tsf_timer_cb get_tsf_cb;
+	void *get_tsf_cb_ctx;
+#endif
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -2896,4 +2902,33 @@ void wma_qos_null_tx_timeout_handler(tp_wma_handle wma,
  */
 QDF_STATUS wma_peer_delete_resp_notify(tp_wma_handle wma,
 				       struct wma_target_req *req_msg);
+
+#ifdef DRIVER_PASSTHRU_MODE
+/**
+ * wma_send_vdev_ch_hop_sched() - send vdev channel hopping schedule
+ *  parameters to fw
+ * @params: vdev channel hopping schedule parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params);
+
+/**
+ * wma_passthru_get_tsf_timer() - Get MAC TSF timestamp
+ * @req: get tsf timer request
+ * @cb: callback triggered on receiving response
+ * @ctx: context provided to callback
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wma_passthru_get_tsf_timer(struct ocb_get_tsf_timer_param *req,
+			   wma_get_tsf_timer_cb cb, void *ctx);
+#else
+static inline
+QDF_STATUS wma_send_vdev_ch_hop_sched(struct vdev_ch_hop_sched_params *params)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif

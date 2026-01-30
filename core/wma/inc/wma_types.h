@@ -512,6 +512,8 @@ typedef QDF_STATUS (*wma_tx_ota_comp_callback)(void *context, qdf_nbuf_t buf,
 /* generic callback for updating parameters from target to HDD */
 typedef int (*wma_tgt_cfg_cb)(hdd_handle_t handle, struct wma_tgt_cfg *cfg);
 
+typedef void (*wma_get_tsf_timer_cb)(void *ctx, void *response_ptr);
+
 /**
  * struct wma_cli_set_cmd_t - set command parameters
  * @param_id: parameter id
