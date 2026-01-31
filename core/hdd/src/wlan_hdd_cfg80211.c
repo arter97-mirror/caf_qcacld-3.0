@@ -5626,6 +5626,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 
 	uint8_t feature_flags[(NUM_QCA_WLAN_VENDOR_FEATURES + 7) / 8] = {0};
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	uint8_t sta_indoor_ch_peer_scc = 0;
 
 	hdd_enter_dev(wdev->netdev);
 
@@ -5705,11 +5706,13 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 					  QCA_WLAN_VENDOR_FEATURE_TWT_ASYNC_SUPPORT);
 	}
 
-	status = ucfg_mlme_get_sta_indoor_ch_peer_scc(hdd_ctx->psoc, &value);
+	status = ucfg_mlme_get_sta_indoor_ch_peer_scc(hdd_ctx->psoc,
+						      &sta_indoor_ch_peer_scc);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Invalid sta_indoor_ch_peer_scc support");
-	if (value) {
-		hdd_debug("sta_indoor_ch_peer_scc is supported");
+	if (sta_indoor_ch_peer_scc) {
+		hdd_debug("sta_indoor_ch_peer_scc value 0x%x",
+			  sta_indoor_ch_peer_scc);
 		wlan_cfg80211_set_feature(feature_flags,
 					  QCA_WLAN_VENDOR_FEATURE_SUPPORT_STA_INDOOR_CH_SCC);
 	}

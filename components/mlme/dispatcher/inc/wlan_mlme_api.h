@@ -6091,7 +6091,7 @@ QDF_STATUS wlan_mlme_update_mcc_cck_support(struct wlan_objmgr_psoc *psoc);
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_mlme_get_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
-						bool *value);
+						uint8_t *value);
 
 /**
  * wlan_mlme_get_sta_dfs_ch_peer_scc() - Query STA connected DFS channel

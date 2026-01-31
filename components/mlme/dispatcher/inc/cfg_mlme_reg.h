@@ -536,32 +536,34 @@ enum ignore_fw_coex_info_modes {
  * sta_indoor_ch_peer_scc – Support STA connected indoor channel for
  * peer-to-peer (SAP/P2P GO/NAN) connections.
  * @Min: 0
- * @Max: 1
+ * @Max: 7
  * @Default: 0
  *
  * This ini is used to enable or disable support for STA
  * connected indoor channel for peer-to-peer connections
  * (SAP/P2P GO/NAN) and form SCC.
  *
- * With sta_indoor_ch_peer_scc = 1, driver can concurrently support SAP,
- * P2P GO, and NAN operations on STA connected indoor only channels.
+ * BIT 0 - SUPPORT STA-P2P SCC
+ * BIT 1 - SUPPORT STA-NAN SCC
+ * BIT 2 - SUPPORT STA-SAP SCC
  *
  * SAP:
- * If sta_indoor_ch_peer_scc = 1, even with sta_sap_scc_on_indoor_chan = 0,
- * STA+SAP SCC is allowed on Indoor only channel.
+ * If sta_indoor_ch_peer_scc has BIT 2 set, even with
+ * sta_sap_scc_on_indoor_chan = 0, STA+SAP SCC is allowed on
+ * Indoor only channel.
  * This feature leverages the configuration set by ini value
  * sta_sap_scc_on_indoor_chan, and sets its value to 1.
  *
  * P2P:
  * p2p_go_on_5ghz_indoor_chan = 1, P2P GO allowed on indoor channels with or
  * without concurrency.
- * sta_indoor_ch_peer_scc = 1, Allow P2P GO operation only on STA connected
- * indoor only channel.
+ * If sta_indoor_ch_peer_scc has BIT 0 set, allow P2P GO operation
+ * only on STA connected indoor only channel.
  *
  * NAN:
  * enable_nan_indoor_channel = 1, allows NAN connections on all indoor channels
- * sta_indoor_ch_peer_scc =1, allows NAN connection only on STA connected indoor
- * only channel.
+ * If sta_indoor_ch_peer_scc has BIT 1 set, allow NAN connection only on
+ * STA connected indoor only channel.
  *
  * Related: sta_sap_scc_on_indoor_chan/p2p_go_on_5ghz_indoor_chan/
  *          enable_nan_indoor_channel
@@ -570,9 +572,12 @@ enum ignore_fw_coex_info_modes {
  *
  * </ini>
  */
-#define CFG_ENABLE_STA_INDOOR_CH_PEER_SCC CFG_INI_BOOL( \
+#define CFG_ENABLE_STA_INDOOR_CH_PEER_SCC CFG_INI_UINT( \
 	"sta_indoor_ch_peer_scc", \
 	0, \
+	7, \
+	0, \
+	CFG_VALUE_OR_DEFAULT, \
 	"enable/disable sta_indoor_ch_peer_scc")
 
 /* <ini>

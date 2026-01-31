@@ -2933,7 +2933,7 @@ struct wlan_mlme_reg {
 #ifdef CONFIG_BAND_6GHZ
 	bool enable_c2c_support;
 #endif
-	bool sta_indoor_ch_peer_scc;
+	uint8_t sta_indoor_ch_peer_scc;
 	bool sta_dfs_ch_peer_scc;
 };
 

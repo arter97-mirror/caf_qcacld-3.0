@@ -5974,7 +5974,7 @@ ucfg_mlme_update_mcc_cck_support(struct wlan_objmgr_psoc *psoc)
  */
 static inline QDF_STATUS
 ucfg_mlme_get_sta_indoor_ch_peer_scc(struct wlan_objmgr_psoc *psoc,
-				     bool *value)
+				     uint8_t *value)
 {
 	return wlan_mlme_get_sta_indoor_ch_peer_scc(psoc, value);
 }
