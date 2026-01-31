@@ -652,9 +652,8 @@ union wlan_tp_data {
 
 #define WLAN_DP_STC_UL_TID_INVALID 31
 #define WLAN_DP_STC_UL_TID_MASK 0xFF
-#define WLAN_DP_STC_CLASSIFIED_TAG  0xCAFD0000
 #define WLAN_DP_STC_ENCRYPT_UL_TID(ul_tid) \
-	WLAN_DP_STC_CLASSIFIED_TAG | ((ul_tid) & WLAN_DP_STC_UL_TID_MASK)
+	CDP_STC_CLASSIFIED_TAG | ((ul_tid) & WLAN_DP_STC_UL_TID_MASK)
 
 /*
  * Flow tuple related flags
