@@ -641,6 +641,7 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	uint8_t dfs_beacon_start_req = 0;
 	bool sap_scc_dfs;
 	struct sap_ch_switch_info *ch_switch_info;
+	bool new_freq_lead_to_mcc;
 
 	ch_switch_info = wlan_get_sap_ch_sw_info(sap_ctx->vdev);
 	if (!ch_switch_info) {
@@ -719,10 +720,14 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	 *
 	 */
 	sap_scc_dfs = sap_is_conc_sap_doing_scc_dfs(mac_handle, sap_ctx);
+	new_freq_lead_to_mcc = policy_mgr_will_freq_lead_to_mcc(mac_ctx->psoc,
+				   ch_switch_info->target_chan_freq);
+
 	if (sap_get_total_number_sap_intf(mac_handle) <= 1 ||
 	    policy_mgr_is_current_hwmode_dbs(mac_ctx->psoc) ||
 	    policy_mgr_is_current_hwmode_sbs(mac_ctx->psoc) ||
 	    sap_ctx->csa_reason == CSA_REASON_DCS ||
+	    !new_freq_lead_to_mcc ||
 	    !sap_scc_dfs) {
 		/*
 		 * Most likely, radar has been detected and SAP wants to
