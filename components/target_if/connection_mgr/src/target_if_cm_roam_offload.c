@@ -320,6 +320,27 @@ target_if_cm_roam_register_linkspeed_state(struct wlan_cm_roam_tx_ops *tx_ops)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * target_if_cm_roam_register_smd_roam() - Register tx ops to send
+ * SMD roam command to fw
+ * @tx_ops: structure of tx function pointers for roaming related commands
+ *
+ * Return: none
+ */
+static inline void
+target_if_cm_roam_register_smd_roam(struct wlan_cm_roam_tx_ops *tx_ops)
+{
+	tx_ops->send_smd_roam_start_status_cmd =
+				target_if_cm_send_smd_roam_start_status_cmd;
+}
+#else
+static inline void
+target_if_cm_roam_register_smd_roam(struct wlan_cm_roam_tx_ops *tx_ops)
+{
+}
+#endif
+
 /**
  * target_if_cm_roam_ho_delay_config() - Send roam HO delay value to wmi
  * @vdev: vdev object
@@ -2370,6 +2391,57 @@ end:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * target_if_cm_send_smd_roam_start_status_cmd() - Send SMD roam start status
+ * command to firmware
+ * @psoc: psoc object
+ * @params: SMD start status parameters
+ *
+ * This function sends the WMI_ROAM_SMD_START_STATUS_CMDID command to firmware
+ * with the host's response to SMD start notification.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+target_if_cm_send_smd_roam_start_status_cmd(struct wlan_objmgr_psoc *psoc,
+					     struct wlan_roam_smd_start_status_params *params)
+{
+	QDF_STATUS status;
+	wmi_unified_t wmi_handle;
+
+	if (!psoc || !params) {
+		target_if_err("Invalid parameters: psoc %pK params %pK",
+			      psoc, params);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!target_if_is_vdev_valid(params->vdev_id)) {
+		target_if_err("Invalid vdev id:%d", params->vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	target_if_debug("Sending SMD start status cmd: vdev_id=%u status=%u ie_len=%u num_prep_status=%u kck_len=%u",
+			params->vdev_id, params->status,
+			params->smd_transition_ie_len,
+			params->num_prep_status, params->kck_len);
+
+	status = wmi_send_roam_smd_start_status_cmd(wmi_handle, params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("Failed to send SMD roam start status cmd, status: %d",
+			      status);
+	}
+
+	return status;
+}
+#endif
+
 /**
  * target_if_cm_roam_register_rso_req_ops() - Register rso req tx ops functions
  * @tx_ops: tx ops
@@ -2395,6 +2467,10 @@ target_if_cm_roam_register_rso_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 	target_if_cm_roam_register_mlo_req_ops(tx_ops);
 	tx_ops->send_roam_disconnect_params =
 					target_if_cm_roam_disconnect_params;
+#ifdef WLAN_FEATURE_11BN_SMD
+	tx_ops->send_smd_roam_start_status_cmd =
+					target_if_cm_send_smd_roam_start_status_cmd;
+#endif
 }
 
 QDF_STATUS target_if_cm_roam_register_tx_ops(struct wlan_cm_roam_tx_ops *tx_ops)

@@ -564,6 +564,19 @@ wmi_unified_roam_mlo_config_cmd(wmi_unified_t wmi_handle,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+QDF_STATUS
+wmi_send_roam_smd_start_status_cmd(wmi_unified_t wmi_handle,
+				   struct wlan_roam_smd_start_status_params *params);
+#else
+static inline QDF_STATUS
+wmi_send_roam_smd_start_status_cmd(wmi_unified_t wmi_handle,
+				   struct wlan_roam_smd_start_status_params *params)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
 /**
  * wmi_unified_roam_scan_offload_mode_cmd() - set roam scan parameters
  * @wmi_handle: wmi handle

@@ -375,4 +375,18 @@ wlan_cm_tgt_send_disconnect_roam_params(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS wlan_cm_tgt_send_roam_disable_config(struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id,
 						struct roam_disable_cfg *req);
+
+/**
+ * wlan_cm_roam_get_tx_ops_from_vdev() - Get roam TX ops from VDEV object
+ * @vdev: VDEV object manager pointer
+ *
+ * Retrieves the roam TX ops structure associated with the PSOC derived
+ * from the given VDEV. Used by callers outside of wlan_cm_tgt_if_tx_api.c
+ * that need to invoke roam target interface operations directly.
+ *
+ * Return: Pointer to struct wlan_cm_roam_tx_ops, or NULL on failure
+ */
+struct wlan_cm_roam_tx_ops *wlan_cm_roam_get_tx_ops_from_vdev(
+					struct wlan_objmgr_vdev *vdev);
+
 #endif /* CM_TGT_IF_TX_API_H__ */

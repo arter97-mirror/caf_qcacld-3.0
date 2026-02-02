@@ -32,7 +32,6 @@
 #include "wlan_cm_roam_api.h"
 #include "target_if.h"
 
-static inline
 struct wlan_cm_roam_tx_ops *wlan_cm_roam_get_tx_ops_from_vdev(
 				struct wlan_objmgr_vdev *vdev)
 {

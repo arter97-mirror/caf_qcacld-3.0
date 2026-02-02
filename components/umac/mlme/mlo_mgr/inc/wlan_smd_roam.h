@@ -26,6 +26,22 @@
 #define LS_SMD_LNK_REMOVE_BIT 1
 
 /**
+ * enum smd_prep_status - Overall SMD ST Prep phase status reported to FW
+ * @SMD_PREP_STATUS_SUCCESS:            ST Prep succeeded; proceed to ST Exec
+ * @SMD_PREP_STATUS_UNSPECIFIC_FAIL:    Unspecified failure during ST Prep
+ * @SMD_PREP_STATUS_VDEV_REPURPOSE_FAIL: VDEV repurpose operation failed
+ * @SMD_PREP_STATUS_PREP_REQ_TX_NO_ACK: PREP Request frame was not acknowledged
+ * @SMD_PREP_STATUS_PREP_RESP_RX_TIMEOUT: PREP Response not received in time
+ */
+enum smd_prep_status {
+	SMD_PREP_STATUS_SUCCESS             = 0,
+	SMD_PREP_STATUS_UNSPECIFIC_FAIL     = 1,
+	SMD_PREP_STATUS_VDEV_REPURPOSE_FAIL = 2,
+	SMD_PREP_STATUS_PREP_REQ_TX_NO_ACK  = 3,
+	SMD_PREP_STATUS_PREP_RESP_RX_TIMEOUT = 4,
+};
+
+/**
  * smd_fw_roam_start - Handler for SMD roam start event handler
  *
  * @vdev: vdev pointer
@@ -216,12 +232,12 @@ smd_get_prep_ap_link_info(struct wlan_objmgr_vdev *vdev,
 			  struct wlan_mlo_link_switch_req *req);
 
 /**
- * smd_roam_prep_complete() - API to send
- * SMD roam status command
+ * smd_roam_prep_complete() - Send SMD roam start status to FW on prep success
  * @recfg_ctx: Link Recfg ctx pointer
- * @req: Link recfg state req pointer
+ * @req: Link recfg state req pointer (tran->req with updated status codes)
  *
- * API to send SMD roam status command
+ * Thin wrapper around smd_send_roam_start_status_cmd() called when ST Prep
+ * completes successfully. Always passes SMD_PREP_STATUS_SUCCESS.
  *
  * Return: QDF_STATUS success or failure
  */

@@ -2911,6 +2911,39 @@ struct roam_pmkid_req_event {
 };
 
 /**
+ * struct roam_smd_prep_resp_status - Per-link PREP response status
+ * @ieee_link_id: IEEE link ID
+ * @status: Status for this link
+ */
+struct roam_smd_prep_resp_status {
+	uint32_t ieee_link_id;
+	uint32_t status;
+};
+
+/**
+ * struct wlan_roam_smd_start_status_params - SMD start status command params
+ * @vdev_id: VDEV ID
+ * @status: Overall status (0=SUCCESS, 1=UNSPECIFIC_FAIL, 2=VDEV_REPURPOSE_FAIL,
+ *          3=PREP_REQ_TX_NO_ACK, 4=PREP_RESP_RX_TIMEOUT)
+ * @smd_transition_ie_len: Length of SMD transition IE
+ * @smd_transition_ie: SMD transition IE buffer from AP
+ * @num_prep_status: Number of per-link PREP status entries
+ * @prep_status_list: Array of per-link PREP response status
+ * @kck_len: KCK length for per AP-MLD PTK mode
+ * @kck: KCK buffer
+ */
+struct wlan_roam_smd_start_status_params {
+	uint32_t vdev_id;
+	uint32_t status;
+	uint32_t smd_transition_ie_len;
+	uint8_t *smd_transition_ie;
+	uint32_t num_prep_status;
+	struct roam_smd_prep_resp_status prep_status_list[WLAN_MAX_ML_BSS_LINKS];
+	uint32_t kck_len;
+	uint8_t *kck;
+};
+
+/**
  * struct wlan_cm_roam_tx_ops  - structure of tx function pointers for
  * roaming related commands
  * @send_vdev_set_pcl_cmd: TX ops function pointer to send set vdev PCL
@@ -2944,6 +2977,7 @@ struct roam_pmkid_req_event {
  * @send_roam_disconnect_params: Send roam disconnect params to FW
  * @allow_pm_after_roam: Allow runtime PM suspernd after roam synch
  * is complete or after roam abort/ho-failure
+ * @send_smd_roam_start_status_cmd: Send SMD roam start status to FW
  */
 struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_vdev_set_pcl_cmd)(struct wlan_objmgr_vdev *vdev,
@@ -3012,6 +3046,10 @@ struct wlan_cm_roam_tx_ops {
 						  uint8_t command,
 						  struct wlan_roam_disconnect_params *req);
 	void (*allow_pm_after_roam)(struct wlan_objmgr_psoc *psoc);
+#ifdef WLAN_FEATURE_11BN_SMD
+	QDF_STATUS (*send_smd_roam_start_status_cmd)(struct wlan_objmgr_psoc *psoc,
+					struct wlan_roam_smd_start_status_params *params);
+#endif
 };
 
 /**

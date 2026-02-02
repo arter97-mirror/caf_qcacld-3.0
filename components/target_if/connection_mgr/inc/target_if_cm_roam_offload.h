@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -71,6 +71,26 @@ target_if_cm_send_rso_stop_failure_rsp(struct wlan_objmgr_psoc *psoc,
 static inline QDF_STATUS
 target_if_cm_send_rso_stop_failure_rsp(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * target_if_cm_send_smd_roam_start_status_cmd() - Send SMD roam start status
+ * @psoc: psoc object
+ * @params: SMD start status parameters
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+target_if_cm_send_smd_roam_start_status_cmd(struct wlan_objmgr_psoc *psoc,
+					    struct wlan_roam_smd_start_status_params *params);
+#else
+static inline QDF_STATUS
+target_if_cm_send_smd_roam_start_status_cmd(struct wlan_objmgr_psoc *psoc,
+					    struct wlan_roam_smd_start_status_params *params)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

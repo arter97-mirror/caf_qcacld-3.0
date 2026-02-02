@@ -5711,11 +5711,107 @@ send_roam_mlo_config_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * send_smd_roam_start_status_cmd_tlv() - Send SMD roam start status to FW
+ * @wmi_handle: wmi handle
+ * @params: SMD roam start status parameters
+ *
+ * This function sends the WMI_ROAM_SMD_START_STATUS_CMDID command to fw.
+ *
+ * Return: QDF status
+ */
+#ifdef WLAN_FEATURE_11BN_SMD
+static QDF_STATUS
+send_smd_roam_start_status_cmd_tlv(wmi_unified_t wmi_handle,
+				   struct wlan_roam_smd_start_status_params *params)
+{
+	wmi_roam_smd_start_status_cmd_fixed_param *cmd;
+	wmi_prep_resp_status_list *status_list;
+	wmi_buf_t buf;
+	uint32_t len;
+	uint8_t i;
+	uint8_t *buf_ptr;
+
+	len = sizeof(*cmd) +
+	      WMI_TLV_HDR_SIZE +
+	      qdf_roundup(params->smd_transition_ie_len, sizeof(uint32_t)) +
+	      WMI_TLV_HDR_SIZE +
+	      params->num_prep_status * sizeof(wmi_prep_resp_status_list) +
+	      WMI_TLV_HDR_SIZE +
+	      qdf_roundup(params->kck_len, sizeof(uint32_t));
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_roam_smd_start_status_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(
+	    &cmd->tlv_header,
+	    WMITLV_TAG_STRUC_wmi_roam_smd_start_status_cmd_fixed_param,
+	    WMITLV_GET_STRUCT_TLVLEN(wmi_roam_smd_start_status_cmd_fixed_param));
+
+	cmd->vdev_id = params->vdev_id;
+	cmd->status = params->status;
+	cmd->kck_len = params->kck_len;
+
+	wmi_debug("Send SMD ROAM STATUS command to FW: vdev_id:%d status:%d",
+		  cmd->vdev_id, cmd->status);
+
+	buf_ptr += sizeof(*cmd);
+
+	/* smd_transition_ie byte array */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE,
+		       qdf_roundup(params->smd_transition_ie_len,
+				   sizeof(uint32_t)));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	if (params->smd_transition_ie_len && params->smd_transition_ie)
+		qdf_mem_copy(buf_ptr, params->smd_transition_ie,
+			     params->smd_transition_ie_len);
+	buf_ptr += qdf_roundup(params->smd_transition_ie_len, sizeof(uint32_t));
+
+	/* prep_resp_status_list struct array */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       params->num_prep_status *
+		       sizeof(wmi_prep_resp_status_list));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	status_list = (wmi_prep_resp_status_list *)buf_ptr;
+	for (i = 0; i < params->num_prep_status; i++) {
+		WMITLV_SET_HDR(&status_list[i].tlv_header,
+			       WMITLV_TAG_STRUC_wmi_prep_resp_status_list,
+			       WMITLV_GET_STRUCT_TLVLEN(wmi_prep_resp_status_list));
+		status_list[i].ieee_link_id =
+				params->prep_status_list[i].ieee_link_id;
+		status_list[i].status_code = params->prep_status_list[i].status;
+	}
+	buf_ptr += params->num_prep_status * sizeof(wmi_prep_resp_status_list);
+
+	/* kck byte array */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE,
+		       qdf_roundup(params->kck_len, sizeof(uint32_t)));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+	if (params->kck_len && params->kck)
+		qdf_mem_copy(buf_ptr, params->kck, params->kck_len);
+
+	wmi_mtrace(WMI_ROAM_SMD_START_STATUS_CMDID, cmd->vdev_id, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_ROAM_SMD_START_STATUS_CMDID)) {
+		wmi_err("Failed to send WMI_ROAM_SMD_START_STATUS_CMDID");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
+
 static void wmi_roam_mlo_attach_tlv(struct wmi_unified *wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
 
 	ops->send_roam_mlo_config = send_roam_mlo_config_tlv;
+#ifdef WLAN_FEATURE_11BN_SMD
+	ops->send_smd_roam_start_status_cmd = send_smd_roam_start_status_cmd_tlv;
+#endif
 }
 
 #else

@@ -608,7 +608,15 @@ QDF_STATUS wmi_unified_vdev_repurpose_resp_cmd(
 							vdev_id,
 							repurpose_resp,
 							num_repurpose_resp);
-
+	return QDF_STATUS_E_FAILURE;
+}
+QDF_STATUS
+wmi_send_roam_smd_start_status_cmd(wmi_unified_t wmi_handle,
+				   struct wlan_roam_smd_start_status_params *params)
+{
+	if (wmi_handle->ops->send_smd_roam_start_status_cmd)
+		return wmi_handle->ops->send_smd_roam_start_status_cmd(
+				wmi_handle, params);
 	return QDF_STATUS_E_FAILURE;
 }
 #endif
