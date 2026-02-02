@@ -636,16 +636,24 @@ cm_roam_update_mlo_mgr_info(struct wlan_objmgr_vdev *vdev,
 		channel.ch_cfreq1 = ml_link->channel.band_center_freq1;
 		channel.ch_cfreq2 = ml_link->channel.band_center_freq2;
 
+		/* Firmware must provide band_center_freq1 for all links */
+		if (!channel.ch_cfreq1 && channel.ch_freq) {
+			mlme_debug("FW did not provide band_center_freq1 for link %d, ch_freq %d",
+				   i, channel.ch_freq);
+		}
+
 		/*
-		 * Update Link switch context for each vdev with roamed AP link
-		 * address and self link address for each vdev
+		 * Update Link switch context for each vdev with
+		 * roamed AP link address and self link address for
+		 * each vdev.
 		 */
 		mlo_mgr_roam_update_ap_link_info(vdev, ml_link, &channel);
 
 		/*
-		 * Above roam_update_ap_link_info doesn't update the phymode to
-		 * the link context, so call the dedicated channel update API
-		 * to update all the channel related info properly
+		 * Above roam_update_ap_link_info doesn't update the
+		 * phymode to the link context, so call the dedicated
+		 * channel update API to update all the channel
+		 * related info properly
 		 */
 		cm_update_link_channel_info(vdev, &ml_link->link_addr,
 					    ml_link->channel.mhz);

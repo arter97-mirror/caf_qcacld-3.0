@@ -34,9 +34,11 @@
 #include "wlan_dlm_api.h"
 #include <../../core/src/wlan_cm_roam_i.h>
 #include "wlan_reg_ucfg_api.h"
+#include "wlan_reg_services_api.h"
 #include "wlan_connectivity_logging.h"
 #include "target_if.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_mlo_mgr_link_switch.h"
 #include "wlan_psoc_mlme_api.h"
 #include <wlan_cp_stats_chipset_stats.h>
 #include "wlan_dlm_api.h"
@@ -2576,18 +2578,279 @@ QDF_STATUS wlan_cm_update_fils_ft(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_cm_get_active_link_sec_2g_freq() - Get sec_2g_freq for
+ * active link (associated link or partner link with vdev)
+ * @vdev: vdev pointer
+ * @link_vdev_id: vdev id of the active link
+ * @assoc_chan_info: associated channel info to populate
+ *
+ * This helper function retrieves the secondary 2G frequency
+ * for an active link. An active link is either:
+ * 1. Associated link - The primary link where connection happened
+ * 2. Partner link with vdev - Additional MLO link with vdev
+ *
+ * Both types have valid vdev_id and their sec_2g_freq is stored
+ * in the vdev's mlme_priv, which is updated during
+ * connection/update.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+static QDF_STATUS
+wlan_cm_get_active_link_sec_2g_freq(struct wlan_objmgr_vdev *vdev,
+				     uint8_t link_vdev_id,
+				     struct assoc_channel_info
+				     *assoc_chan_info)
+{
+	struct wlan_objmgr_vdev *mlo_vdev;
+	struct mlme_legacy_priv *mlme_priv;
+	struct assoc_channel_info *temp_assoc_chan_info;
+
+	mlo_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+			wlan_vdev_get_psoc(vdev),
+			link_vdev_id,
+			WLAN_MLME_NB_ID);
+	if (!mlo_vdev)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(mlo_vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("mlme_priv is NULL");
+		wlan_objmgr_vdev_release_ref(mlo_vdev,
+					      WLAN_MLME_NB_ID);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	temp_assoc_chan_info =
+		&mlme_priv->connect_info.assoc_chan_info;
+	assoc_chan_info->sec_2g_freq =
+		temp_assoc_chan_info->sec_2g_freq;
+
+	mlme_debug("vdev %d: assoc sec_2g_freq:%d",
+		   mlo_vdev->vdev_objmgr.vdev_id,
+		   assoc_chan_info->sec_2g_freq);
+
+	wlan_objmgr_vdev_release_ref(mlo_vdev, WLAN_MLME_NB_ID);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_cm_is_valid_2g_40mhz_link() - Check if link is valid 2.4GHz 40MHz
+ * @link_info: pointer to link info structure
+ *
+ * Return: true if link is 2.4GHz 40MHz, false otherwise
+ */
+static bool
+wlan_cm_is_valid_2g_40mhz_link(struct mlo_link_info *link_info)
+{
+	if (!link_info->link_chan_info) {
+		mlme_legacy_err("link_chan_info is NULL");
+		return false;
+	}
+
+	if (!WLAN_REG_IS_24GHZ_CH_FREQ(link_info->link_chan_info->ch_freq)) {
+		mlme_debug("link ch_freq %d is not 2.4GHz",
+			   link_info->link_chan_info->ch_freq);
+		return false;
+	}
+
+	if (link_info->link_chan_info->ch_width != CH_WIDTH_40MHZ) {
+		mlme_debug("link ch_width %d is not 40MHz",
+			   link_info->link_chan_info->ch_width);
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * wlan_cm_calculate_sec_2g_freq() - Calculate secondary 2G frequency
+ * @pdev: pdev pointer
+ * @ch_freq: channel frequency
+ *
+ * Return: calculated secondary 2G frequency
+ */
+static qdf_freq_t
+wlan_cm_calculate_sec_2g_freq(struct wlan_objmgr_pdev *pdev,
+			       qdf_freq_t ch_freq)
+{
+	struct ch_params ch_params = {0};
+	qdf_freq_t sec_2g_freq;
+
+	ch_params.ch_width = CH_WIDTH_40MHZ;
+	wlan_reg_set_channel_params_for_pwrmode(pdev, ch_freq, 0,
+						&ch_params,
+						REG_CURRENT_PWR_MODE);
+
+	sec_2g_freq = ch_params.mhz_freq_seg0;
+	if (ch_params.center_freq_seg0)
+		sec_2g_freq = wlan_reg_chan_band_to_freq(pdev,
+						ch_params.center_freq_seg0,
+						BIT(REG_BAND_2G));
+
+	mlme_debug("calculated sec_2g_freq: %d for ch_freq: %d",
+		   sec_2g_freq, ch_freq);
+
+	return sec_2g_freq;
+}
+
+/**
+ * wlan_cm_get_standby_link_sec_2g_freq() - Get sec_2g_freq for
+ * standby link
+ * @vdev: vdev pointer
+ * @link_info: pointer to link info structure
+ * @assoc_chan_info: associated channel info to populate
+ *
+ * This helper function retrieves or calculates the secondary
+ * 2G frequency for a standby link (link without a vdev).
+ * For 2.4GHz 40MHz channels, it first attempts to use the
+ * ch_cfreq1 from link_chan_info. If ch_cfreq1 is not
+ * available (0), it calculates it on-demand using regulatory
+ * APIs.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+static QDF_STATUS
+wlan_cm_get_standby_link_sec_2g_freq(struct wlan_objmgr_vdev *vdev,
+				      struct mlo_link_info *link_info,
+				      struct assoc_channel_info
+				      *assoc_chan_info)
+{
+	struct wlan_objmgr_pdev *pdev;
+	qdf_freq_t ch_freq;
+
+	/* Only handle 2.4GHz 40MHz channels */
+	if (!wlan_cm_is_valid_2g_40mhz_link(link_info))
+		return QDF_STATUS_E_INVAL;
+
+	/*
+	 * For standby links, ch_cfreq1 may be calculated and
+	 * populated in cm_roam_update_mlo_mgr_info if provided
+	 * by firmware. Try to use it first.
+	 */
+	assoc_chan_info->sec_2g_freq = link_info->link_chan_info->ch_cfreq1;
+
+	/*
+	 * If ch_cfreq1 is 0, calculate it on-demand. This
+	 * handles the case where firmware doesn't provide it
+	 * for standby links during initial connection.
+	 */
+	if (assoc_chan_info->sec_2g_freq)
+		goto done;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		mlme_err("pdev is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ch_freq = link_info->link_chan_info->ch_freq;
+	assoc_chan_info->sec_2g_freq =
+		wlan_cm_calculate_sec_2g_freq(pdev, ch_freq);
+
+done:
+	mlme_debug("standby link id %d: assoc sec_2g_freq:%d",
+		   link_info->link_id, assoc_chan_info->sec_2g_freq);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_cm_process_mlo_link_info() - Process single MLO link info
+ * @vdev: vdev pointer
+ * @link_info: pointer to link info structure
+ * @scanned_ch_width: scanned channel width
+ * @assoc_chan_info: associated channel info to populate
+ *
+ * Return: QDF_STATUS_SUCCESS if link processed successfully
+ */
+static QDF_STATUS
+wlan_cm_process_mlo_link_info(struct wlan_objmgr_vdev *vdev,
+			      struct mlo_link_info *link_info,
+			      enum phy_ch_width scanned_ch_width,
+			      struct assoc_channel_info *assoc_chan_info)
+{
+	QDF_STATUS status;
+
+	if (qdf_is_macaddr_zero(&link_info->ap_link_addr)) {
+		mlme_debug("Zero AP link address");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!link_info->link_chan_info) {
+		mlme_err("link_chan_info is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (link_info->link_chan_info->ch_width != scanned_ch_width) {
+		mlme_debug("link ch width %d scanned ch width %d",
+			   link_info->link_chan_info->ch_width,
+			   scanned_ch_width);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/*
+	 * If the link has a valid vdev_id, it is an active link
+	 * (associated link or partner link with vdev). Otherwise,
+	 * it's a standby link.
+	 */
+	if (link_info->vdev_id != WLAN_INVALID_VDEV_ID)
+		status = wlan_cm_get_active_link_sec_2g_freq(vdev,
+							      link_info->vdev_id,
+							      assoc_chan_info);
+	else
+		status = wlan_cm_get_standby_link_sec_2g_freq(vdev,
+							       link_info,
+							       assoc_chan_info);
+
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		assoc_chan_info->assoc_ch_width = scanned_ch_width;
+		mlme_debug("Assoc ch info updated width: %d sec_2g_freq: %d",
+			   assoc_chan_info->assoc_ch_width,
+			   assoc_chan_info->sec_2g_freq);
+	}
+
+	return status;
+}
+
+/**
+ * wlan_cm_get_mlo_associated_ch_info() - Get MLO associated
+ * channel info
+ * @vdev: vdev pointer
+ * @scanned_ch_width: scanned channel width
+ * @assoc_chan_info: associated channel info
+ *
+ * This function retrieves the associated channel info for MLO
+ * connection. It iterates through the links in the MLO
+ * connection and checks if the link channel width matches the
+ * scanned channel width. If a match is found, it populates
+ * the associated channel info.
+ *
+ * Link Types:
+ * 1. Active links (vdev_id != INVALID):
+ *    - Associated link: Primary connection link
+ *    - Partner link: Additional MLO link with vdev
+ *    Both retrieve sec_2g_freq from vdev's mlme_priv
+ *
+ * 2. Standby links (vdev_id == INVALID):
+ *    - Links without vdev assignment
+ *    Retrieve sec_2g_freq from link context or calculate
+ *    on-demand
+ *
+ * Return: None
+ */
 static void
 wlan_cm_get_mlo_associated_ch_info(struct wlan_objmgr_vdev *vdev,
-				   enum phy_ch_width scanned_ch_width,
-				   struct assoc_channel_info *assoc_chan_info)
+				    enum phy_ch_width scanned_ch_width,
+				    struct assoc_channel_info
+				    *assoc_chan_info)
 {
-	struct mlme_legacy_priv *mlme_priv;
-	struct wlan_channel *des_chan;
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
-	struct wlan_mlo_sta *sta_ctx = NULL;
+	struct wlan_mlo_sta *sta_ctx;
+	struct mlo_link_switch_context *link_ctx;
+	struct mlo_link_info *link_info;
 	uint8_t i;
-	struct wlan_objmgr_vdev *mlo_vdev;
-	struct assoc_channel_info *temp_assoc_chan_info;
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	if (!mlo_dev_ctx) {
@@ -2598,39 +2861,23 @@ wlan_cm_get_mlo_associated_ch_info(struct wlan_objmgr_vdev *vdev,
 
 	sta_ctx = mlo_dev_ctx->sta_ctx;
 	if (!sta_ctx) {
-		mlme_err("vdev %d :mlo_dev_ctx is NULL",
+		mlme_err("vdev %d :sta_ctx is NULL",
 			 vdev->vdev_objmgr.vdev_id);
 		return;
 	}
 
-	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
-		if (!mlo_dev_ctx->wlan_vdev_list[i])
-			continue;
-		if (qdf_test_bit(i, sta_ctx->wlan_connected_links)) {
-			mlo_vdev = mlo_dev_ctx->wlan_vdev_list[i];
-			des_chan = wlan_vdev_mlme_get_des_chan(mlo_vdev);
-			if (!des_chan) {
-				mlme_debug("NULL des_chan");
-				return;
-			}
+	link_ctx = mlo_dev_ctx->link_ctx;
+	if (!link_ctx)
+		return;
 
-			if (des_chan->ch_width == scanned_ch_width) {
-				mlme_priv =
-					wlan_vdev_mlme_get_ext_hdl(mlo_vdev);
-				if (!mlme_priv) {
-					mlme_legacy_err("mlme_priv is NULL");
-					return;
-				}
-				temp_assoc_chan_info =
-				    &mlme_priv->connect_info.assoc_chan_info;
-				assoc_chan_info->sec_2g_freq =
-					temp_assoc_chan_info->sec_2g_freq;
-				mlme_debug("vdev %d: assoc sec_2g_freq:%d",
-					   mlo_vdev->vdev_objmgr.vdev_id,
-					   assoc_chan_info->sec_2g_freq);
-				break;
-			}
-		}
+	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
+		link_info = &link_ctx->links_info[i];
+
+		if (QDF_IS_STATUS_SUCCESS(
+			wlan_cm_process_mlo_link_info(vdev, link_info,
+						      scanned_ch_width,
+						      assoc_chan_info)))
+			break;
 	}
 }
 #else
