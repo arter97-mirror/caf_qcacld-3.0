@@ -16314,4 +16314,322 @@ finalize:
 	return uhr_op_ie->num_data;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BN
+/**
+ * lim_unpack_ieee80211_uhr_op_payload() - Unpack UHR OP
+ * @uhr_op_payload: UHR OP payload pointer
+ * @uhr_op_payload_len: UHR OP payload length
+ * @uhr_op: UHR OP struct pointer
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+lim_unpack_ieee80211_uhr_op_payload(uint8_t *uhr_op_payload,
+				    qdf_size_t uhr_op_payload_len,
+				    struct wlan_uhr_op_ie *uhr_op)
+{
+	qdf_size_t parsed_len = 0;
+	uint16_t op_params = 0;
+	qdf_size_t fixed_opt_len = 0;
+	qdf_size_t opinfo_len = 0;
+	qdf_size_t min_header_len = UHR_OP_OUI_SIZE * 2 + ONE_BYTE;
+
+	if (!uhr_op_payload || !uhr_op) {
+		pe_err("UHR payload or output struct is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!uhr_op_payload_len || (uhr_op_payload_len < min_header_len)) {
+		pe_err("UHR payload len is 0 or less than min header len");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	parsed_len = min_header_len;
+	qdf_mem_zero(uhr_op, sizeof(*uhr_op));
+
+	/* Fixed minimum: Op Params (2) + Basic MCS/NSS (4) */
+	if (uhr_op_payload_len <
+	    (sizeof(op_params) + WLAN_UHR_BASIC_MCS_NSS_SET_LEN)) {
+		pe_err_rl("UHR payload len %zu insufficient for fixed fields %zu",
+			  uhr_op_payload_len,
+			  (qdf_size_t)(sizeof(op_params) +
+				       WLAN_UHR_BASIC_MCS_NSS_SET_LEN));
+		return QDF_STATUS_E_PROTO;
+	}
+
+	/* ---- UHR Operation Parameters (2 octets) ---- */
+	qdf_mem_copy(&op_params, uhr_op_payload + parsed_len,
+		     sizeof(op_params));
+	op_params = qdf_le16_to_cpu(op_params);
+	parsed_len += sizeof(op_params);
+
+	uhr_op->present = true;
+	uhr_op->dps_enabled =
+		QDF_GET_BITS(op_params, WLAN_UHR_OPPARAM_DPS_EN_IDX, 1);
+	uhr_op->npca_enabled =
+		QDF_GET_BITS(op_params, WLAN_UHR_OPPARAM_NPCA_EN_IDX, 1);
+	uhr_op->dbe_enabled =
+		QDF_GET_BITS(op_params, WLAN_UHR_OPPARAM_DBE_EN_IDX, 1);
+	uhr_op->p_edca_enabled =
+		QDF_GET_BITS(op_params, WLAN_UHR_OPPARAM_PEDCA_EN_IDX, 1);
+	uhr_op->dbe_bandwidth =
+		QDF_GET_BITS(op_params, WLAN_UHR_OPPARAM_DBE_BW_IDX,
+			     WLAN_UHR_OPPARAM_DBE_BW_BITS);
+
+	/* ---- Basic UHR-MCS And NSS Set (4 octets) ---- */
+	qdf_mem_copy(uhr_op->basic_uhr_mcs_nss_set,
+		     uhr_op_payload + parsed_len,
+		     WLAN_UHR_BASIC_MCS_NSS_SET_LEN);
+	parsed_len += WLAN_UHR_BASIC_MCS_NSS_SET_LEN;
+
+	/* Enabled-block sizes are fixed */
+	if (uhr_op->dps_enabled)
+		fixed_opt_len += WLAN_UHR_DPS_OP_PARAM_LEN;   /* 4 */
+	if (uhr_op->npca_enabled)
+		fixed_opt_len += WLAN_UHR_NPCA_OP_PARAM_LEN;  /* 6 */
+	if (uhr_op->p_edca_enabled)
+		fixed_opt_len += WLAN_UHR_PEDCA_OP_PARAM_LEN; /* 3 */
+	if (uhr_op->dbe_enabled)
+		fixed_opt_len += WLAN_UHR_DBE_OP_PARAM_LEN;   /* 3 */
+
+	qdf_trace_hex_dump(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   uhr_op_payload, uhr_op_payload_len);
+	/* Remaining bytes = OpInfo(0/3/5) + enabled blocks */
+	if (uhr_op_payload_len < parsed_len) {
+		pe_err_rl("UHR parsed_len %zu > payload_len %zu",
+			  parsed_len, uhr_op_payload_len);
+		return QDF_STATUS_E_PROTO;
+	}
+
+	if ((uhr_op_payload_len - parsed_len) < fixed_opt_len) {
+		pe_err_rl("UHR payload len %zu insufficient for enabled blocks %zu after parsed %zu",
+			  uhr_op_payload_len, fixed_opt_len, parsed_len);
+		return QDF_STATUS_E_PROTO;
+	}
+
+	opinfo_len = (uhr_op_payload_len - parsed_len) - fixed_opt_len;
+
+	/* UHR Op Info length must be 0, 3, or 5 */
+	if (!(opinfo_len == 0 || opinfo_len == 3 || opinfo_len == 5)) {
+		pe_err_rl("Invalid UHR OpInfo len %zu (expected 0/3/5)",
+			  opinfo_len);
+		return QDF_STATUS_E_PROTO;
+	}
+
+	uhr_op->uhr_op_info_present = (opinfo_len != 0);
+	uhr_op->uhr_op_info_len = (uint8_t)opinfo_len;
+
+	if (opinfo_len) {
+		if (uhr_op_payload_len < (parsed_len + opinfo_len)) {
+			pe_err_rl("UHR payload len %zu insufficient for OpInfo len %zu after parsed %zu",
+				  uhr_op_payload_len, opinfo_len, parsed_len);
+			return QDF_STATUS_E_PROTO;
+		}
+
+		qdf_mem_copy(uhr_op->uhr_op_info,
+			     uhr_op_payload + parsed_len, opinfo_len);
+		parsed_len += opinfo_len;
+	}
+
+	/* ---- DPS Operation Parameters (4 octets) ---- */
+	if (uhr_op->dps_enabled) {
+		uint32_t dps = 0;
+
+		if (uhr_op_payload_len <
+		    (parsed_len + WLAN_UHR_DPS_OP_PARAM_LEN)) {
+			pe_err_rl("UHR payload len %zu insufficient for DPS len %u after parsed %zu",
+				  uhr_op_payload_len, WLAN_UHR_DPS_OP_PARAM_LEN,
+				  parsed_len);
+			return QDF_STATUS_E_PROTO;
+		}
+
+		qdf_mem_copy(&dps, uhr_op_payload + parsed_len,
+			     WLAN_UHR_DPS_OP_PARAM_LEN);
+		dps = qdf_le32_to_cpu(dps);
+		parsed_len += WLAN_UHR_DPS_OP_PARAM_LEN;
+
+		uhr_op->dps_params.present = true;
+		uhr_op->dps_params.dps_padding_delay =
+			QDF_GET_BITS(dps, WLAN_UHR_DPS_PADDING_DELAY_IDX,
+				     WLAN_UHR_DPS_PADDING_DELAY_BITS);
+		uhr_op->dps_params.dps_transition_delay =
+			QDF_GET_BITS(dps, WLAN_UHR_DPS_TRANS_DELAY_IDX,
+				     WLAN_UHR_DPS_TRANS_DELAY_BITS);
+		uhr_op->dps_params.icf_required =
+			QDF_GET_BITS(dps, WLAN_UHR_DPS_ICF_REQ_IDX,
+				     WLAN_UHR_DPS_ICF_REQ_BITS);
+		uhr_op->dps_params.parameterize_mode =
+			QDF_GET_BITS(dps, WLAN_UHR_DPS_PARAM_MODE_IDX,
+				     WLAN_UHR_DPS_PARAM_MODE_BITS);
+		uhr_op->dps_params.lc_mode_bandwidth =
+			QDF_GET_BITS(dps, WLAN_UHR_DPS_LC_BW_IDX,
+				     WLAN_UHR_DPS_LC_BW_BITS);
+		uhr_op->dps_params.lc_mode_nss =
+			QDF_GET_BITS(dps, WLAN_UHR_DPS_LC_NSS_IDX,
+				     WLAN_UHR_DPS_LC_NSS_BITS);
+		uhr_op->dps_params.lc_mode_mcs =
+			QDF_GET_BITS(dps, WLAN_UHR_DPS_LC_MCS_IDX,
+				     WLAN_UHR_DPS_LC_MCS_BITS);
+		uhr_op->dps_params.mobile_ap_dps_static_hcm =
+			QDF_GET_BITS(dps, WLAN_UHR_DPS_MOBILE_AP_HCM_IDX,
+				     WLAN_UHR_DPS_MOBILE_AP_HCM_BITS);
+	}
+
+	/* ---- NPCA Operation Parameters (6 octets) ---- */
+	if (uhr_op->npca_enabled) {
+		uint64_t npca = 0;
+
+		if (uhr_op_payload_len <
+		    (parsed_len + WLAN_UHR_NPCA_OP_PARAM_LEN)) {
+			pe_err_rl("UHR payload len %zu insufficient for NPCA len %u after parsed %zu",
+				  uhr_op_payload_len,
+				  WLAN_UHR_NPCA_OP_PARAM_LEN, parsed_len);
+			return QDF_STATUS_E_PROTO;
+		}
+
+		/* Inline LE48 read: zero-init + copy 6 bytes + le64_to_cpu */
+		qdf_mem_copy(&npca, uhr_op_payload + parsed_len,
+			     WLAN_UHR_NPCA_OP_PARAM_LEN);
+		npca = qdf_le64_to_cpu(npca);
+		parsed_len += WLAN_UHR_NPCA_OP_PARAM_LEN;
+
+		uhr_op->npca_params.present = true;
+		uhr_op->npca_params.npca_primary_channel =
+			QDF_GET_BITS(npca, WLAN_UHR_NPCA_PRIMARY_CH_IDX,
+				     WLAN_UHR_NPCA_PRIMARY_CH_BITS);
+		uhr_op->npca_params.npca_min_duration_threshold =
+			QDF_GET_BITS(npca, WLAN_UHR_NPCA_MIN_DUR_TH_IDX,
+				     WLAN_UHR_NPCA_MIN_DUR_TH_BITS);
+		uhr_op->npca_params.npca_switch_delay =
+			QDF_GET_BITS(npca, WLAN_UHR_NPCA_SWITCH_DELAY_IDX,
+				     WLAN_UHR_NPCA_SWITCH_DELAY_BITS);
+		uhr_op->npca_params.npca_switch_back_delay =
+			QDF_GET_BITS(npca, WLAN_UHR_NPCA_SWITCHBACK_DELAY_IDX,
+				     WLAN_UHR_NPCA_SWITCHBACK_DELAY_BITS);
+		uhr_op->npca_params.initial_npca_qsrc =
+			QDF_GET_BITS(npca, WLAN_UHR_NPCA_INIT_QSRC_IDX,
+				     WLAN_UHR_NPCA_INIT_QSRC_BITS);
+		uhr_op->npca_params.moplen_npca =
+			QDF_GET_BITS(npca, WLAN_UHR_NPCA_MOPLEN_IDX,
+				     WLAN_UHR_NPCA_MOPLEN_BITS);
+		uhr_op->npca_params.disabled_subchan_bmap_present =
+			QDF_GET_BITS(npca, WLAN_UHR_NPCA_DSBMP_PRESENT_IDX,
+				     WLAN_UHR_NPCA_DSBMP_PRESENT_BITS);
+		uhr_op->npca_params.disabled_subchannel_bitmap =
+			QDF_GET_BITS(npca, WLAN_UHR_NPCA_DSBMP_IDX,
+				     WLAN_UHR_NPCA_DSBMP_BITS);
+	}
+
+	/* ---- P-EDCA Operation Parameters (3 octets) ---- */
+	if (uhr_op->p_edca_enabled) {
+		uint32_t pedca = 0;
+
+		if (uhr_op_payload_len <
+		    (parsed_len + WLAN_UHR_PEDCA_OP_PARAM_LEN)) {
+			pe_err_rl("UHR payload len %zu insufficient for P-EDCA len %u after parsed %zu",
+				  uhr_op_payload_len,
+				  WLAN_UHR_PEDCA_OP_PARAM_LEN, parsed_len);
+			return QDF_STATUS_E_PROTO;
+		}
+
+		/* Inline LE24 read: zero-init + copy 3 bytes + le32_to_cpu */
+		qdf_mem_copy(&pedca, uhr_op_payload + parsed_len,
+			     WLAN_UHR_PEDCA_OP_PARAM_LEN);
+		pedca = qdf_le32_to_cpu(pedca);
+		parsed_len += WLAN_UHR_PEDCA_OP_PARAM_LEN;
+
+		uhr_op->pedca_params.present = true;
+		uhr_op->pedca_params.ecw_min =
+			QDF_GET_BITS(pedca, WLAN_UHR_PEDCA_ECWMIN_IDX,
+				     WLAN_UHR_PEDCA_ECWMIN_BITS);
+		uhr_op->pedca_params.ecw_max =
+			QDF_GET_BITS(pedca, WLAN_UHR_PEDCA_ECWMAX_IDX,
+				     WLAN_UHR_PEDCA_ECWMAX_BITS);
+		uhr_op->pedca_params.aifsn =
+			QDF_GET_BITS(pedca, WLAN_UHR_PEDCA_AIFSN_IDX,
+				     WLAN_UHR_PEDCA_AIFSN_BITS);
+		uhr_op->pedca_params.cw_ds =
+			QDF_GET_BITS(pedca, WLAN_UHR_PEDCA_CWDS_IDX,
+				     WLAN_UHR_PEDCA_CWDS_BITS);
+		uhr_op->pedca_params.psrc_threshold =
+			QDF_GET_BITS(pedca, WLAN_UHR_PEDCA_PSRC_TH_IDX,
+				     WLAN_UHR_PEDCA_PSRC_TH_BITS);
+		uhr_op->pedca_params.qsrc_threshold =
+			QDF_GET_BITS(pedca, WLAN_UHR_PEDCA_QSRC_TH_IDX,
+				     WLAN_UHR_PEDCA_QSRC_TH_BITS);
+	}
+
+	/* ---- DBE Operation Parameters (3 octets) ---- */
+	if (uhr_op->dbe_enabled) {
+		uint32_t dbe = 0;
+
+		if (uhr_op_payload_len <
+		    (parsed_len + WLAN_UHR_DBE_OP_PARAM_LEN)) {
+			pe_err_rl("UHR payload len %zu insufficient for DBE len %u after parsed %zu",
+				  uhr_op_payload_len,
+				  WLAN_UHR_DBE_OP_PARAM_LEN, parsed_len);
+			return QDF_STATUS_E_PROTO;
+		}
+
+		/* Inline LE24 read */
+		qdf_mem_copy(&dbe, uhr_op_payload + parsed_len,
+			     WLAN_UHR_DBE_OP_PARAM_LEN);
+		dbe = qdf_le32_to_cpu(dbe);
+		parsed_len += WLAN_UHR_DBE_OP_PARAM_LEN;
+
+		uhr_op->dbe_params.present = true;
+		uhr_op->dbe_params.dbe_bandwidth =
+			QDF_GET_BITS(dbe, WLAN_UHR_DBE_BW_IDX,
+				     WLAN_UHR_DBE_BW_BITS);
+		uhr_op->dbe_params.disabled_subchan_bmap_present =
+			QDF_GET_BITS(dbe, WLAN_UHR_DBE_DSBMP_PRESENT_IDX,
+				     WLAN_UHR_DBE_DSBMP_PRESENT_BITS);
+		uhr_op->dbe_params.disabled_subchannel_bitmap =
+			QDF_GET_BITS(dbe, WLAN_UHR_DBE_DSBMP_IDX,
+				     WLAN_UHR_DBE_DSBMP_BITS);
+	}
+
+	/* Must consume exactly all payload bytes */
+	if (parsed_len != uhr_op_payload_len) {
+		pe_err_rl("UHR parse mismatch: parsed %zu, payload %zu",
+			  parsed_len, uhr_op_payload_len);
+		return QDF_STATUS_E_PROTO;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+find_uhr_op_ie(uint8_t *buf, qdf_size_t buflen, uint8_t **ie, qdf_size_t *ielen)
+{
+	uint8_t *p;
+	uint8_t *end;
+
+	if (!buf || !buflen || !ie || !ielen)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	*ie = NULL;
+	*ielen = 0;
+
+	p = util_find_extn_eid(WLAN_ELEMID_EXTN_ELEM,
+			       WLAN_EXTN_ELEMID_UHROP,
+			       buf, buflen);
+
+	if (!p)
+		return QDF_STATUS_SUCCESS;
+
+	end = buf + buflen;
+
+	if ((p + MIN_IE_LEN) > end)
+		return QDF_STATUS_E_INVAL;
+
+	if ((p + MIN_IE_LEN + p[TAG_LEN_POS]) > end)
+		return QDF_STATUS_E_INVAL;
+
+	*ie = p;
+	*ielen = MIN_IE_LEN + p[TAG_LEN_POS];
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 /* parser_api.c ends here. */
