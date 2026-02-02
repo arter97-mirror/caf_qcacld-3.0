@@ -342,6 +342,9 @@ typedef struct sSirProbeRespBeacon {
 	struct wlan_t2lm_context t2lm_ctx;
 #endif
 	tDot11fIEWMMParams wmm_params;
+#ifdef WLAN_FEATURE_11BN
+	struct wlan_uhr_op_ie uhr_op_ie;
+#endif
 } tSirProbeRespBeacon, *tpSirProbeRespBeacon;
 
 /* probe Request structure */
@@ -554,6 +557,9 @@ typedef struct sSirAssocRsp {
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct sir_multi_link_ie mlo_ie;
 	struct wlan_t2lm_context t2lm_ctx;
+#endif
+#ifdef WLAN_FEATURE_11BN
+	struct wlan_uhr_op_ie uhr_op_ie;
 #endif
 } tSirAssocRsp, *tpSirAssocRsp;
 
@@ -2227,6 +2233,48 @@ static inline
 void populate_dot11f_ecsa_param_set_for_ll_sap(
 			struct wlan_objmgr_vdev *vdev,
 			tDot11fIEqcn_ie *qcn_ie)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BN
+void
+sir_convert_assoc_resp_frame2_uhr_op_struct(uint8_t *frame,
+					    uint32_t frame_len,
+					    tDot11fAssocResponse *ar,
+					    tpSirAssocRsp p_assoc_rsp);
+
+void
+sir_convert_probe_frame2_uhr_op_struct(uint8_t *pframe,
+				       uint32_t nframe,
+				       tDot11fProbeResponse *pr,
+				       tpSirProbeRespBeacon p_probe_resp);
+
+void
+sir_convert_beacon_frame2_uhr_op_struct(uint8_t *pframe, uint32_t nframe,
+					tDot11fBeacon *bcn_frm,
+					tpSirProbeRespBeacon bcn_struct);
+#else
+static inline void
+sir_convert_assoc_resp_frame2_uhr_op_struct(uint8_t *frame,
+					    uint32_t frame_len,
+					    tDot11fAssocResponse *ar,
+					    tpSirAssocRsp p_assoc_rsp)
+{
+}
+
+static inline void
+sir_convert_probe_frame2_uhr_op_struct(uint8_t *pframe,
+				       uint32_t nframe,
+				       tDot11fProbeResponse *pr,
+				       tpSirProbeRespBeacon p_probe_resp)
+{
+}
+
+static inline void
+sir_convert_beacon_frame2_uhr_op_struct(uint8_t *pframe, uint32_t nframe,
+					tDot11fBeacon *bcn_frm,
+					tpSirProbeRespBeacon bcn_struct)
 {
 }
 #endif

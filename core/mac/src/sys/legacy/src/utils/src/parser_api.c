@@ -3908,6 +3908,7 @@ QDF_STATUS sir_convert_probe_frame2_struct(struct mac_context *mac,
 	update_bss_color_change_ie_from_probe_rsp(pr, pProbeResp);
 	sir_convert_probe_frame2_mlo_struct(pFrame, nFrame, pr, pProbeResp);
 	sir_convert_probe_frame2_t2lm_struct(pr, pProbeResp);
+	sir_convert_probe_frame2_uhr_op_struct(pFrame, nFrame, pr, pProbeResp);
 
 	qdf_mem_free(pr);
 	return QDF_STATUS_SUCCESS;
@@ -5117,6 +5118,8 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 						 session_entry, ar, pAssocRsp);
 	sir_convert_assoc_resp_frame2_t2lm_struct(mac, frame, frame_len,
 						  session_entry, ar, pAssocRsp);
+	sir_convert_assoc_resp_frame2_uhr_op_struct(frame, frame_len,
+						    ar, pAssocRsp);
 	pe_debug("ht %d vht %d vendor vht: cap %d op %d, he %d he 6ghband %d eht %d eht320 %d, max idle: present %d val %d, he mu edca %d wmm %d qos %d mlo %d",
 		 ar->HTCaps.present, ar->VHTCaps.present,
 		 ar->vendor_vht_ie.VHTCaps.present,
@@ -6672,6 +6675,8 @@ QDF_STATUS sir_convert_beacon_frame2_struct(struct mac_context *mac,
 					     pBeaconStruct);
 	sir_convert_beacon_frame2_t2lm_struct(pBeacon, pBeaconStruct);
 	sir_convert_beacon_frame2_sr_struct(pBeacon, pBeaconStruct);
+	sir_convert_beacon_frame2_uhr_op_struct(pPayload, nPayload,
+						pBeacon, pBeaconStruct);
 
 	qdf_mem_free(pBeacon);
 	return QDF_STATUS_SUCCESS;
@@ -16630,6 +16635,115 @@ find_uhr_op_ie(uint8_t *buf, qdf_size_t buflen, uint8_t **ie, qdf_size_t *ielen)
 	*ie = p;
 	*ielen = MIN_IE_LEN + p[TAG_LEN_POS];
 	return QDF_STATUS_SUCCESS;
+}
+
+void
+sir_convert_assoc_resp_frame2_uhr_op_struct(uint8_t *frame,
+					    uint32_t frame_len,
+					    tDot11fAssocResponse *ar,
+					    tpSirAssocRsp p_assoc_rsp)
+{
+	uint8_t *uhr_op_ie;
+	qdf_size_t uhr_ie_len;
+	QDF_STATUS status;
+
+	if (frame_len <= WLAN_ASSOC_RSP_IES_OFFSET)
+		return;
+
+	status = find_uhr_op_ie(frame + WLAN_ASSOC_RSP_IES_OFFSET,
+				frame_len - WLAN_ASSOC_RSP_IES_OFFSET,
+				&uhr_op_ie, &uhr_ie_len);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	/* Not found => success */
+	if (!uhr_op_ie)
+		return;
+
+	/* Ensure assoc rsp has a container for it:
+	 * p_assoc_rsp->uhr_op_ie (struct wlan_uhr_op_ie)
+	 */
+	status = lim_unpack_ieee80211_uhr_op_payload(uhr_op_ie, uhr_ie_len,
+						     &p_assoc_rsp->uhr_op_ie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("UHR Op IE parse failed: %d", status);
+		return;
+	}
+
+	pe_debug("UHR Op: dps:%d npca:%d dbe:%d pedca:%d bw:%d opinfo_len:%d",
+		 p_assoc_rsp->uhr_op_ie.dps_enabled,
+		 p_assoc_rsp->uhr_op_ie.npca_enabled,
+		 p_assoc_rsp->uhr_op_ie.dbe_enabled,
+		 p_assoc_rsp->uhr_op_ie.p_edca_enabled,
+		 p_assoc_rsp->uhr_op_ie.dbe_bandwidth,
+		 p_assoc_rsp->uhr_op_ie.uhr_op_info_len);
+}
+
+void
+sir_convert_probe_frame2_uhr_op_struct(uint8_t *pframe,
+				       uint32_t nframe,
+				       tDot11fProbeResponse *pr,
+				       tpSirProbeRespBeacon p_probe_resp)
+{
+	uint8_t *uhr_op_ie;
+	qdf_size_t uhr_ie_len;
+	QDF_STATUS status;
+
+	status = find_uhr_op_ie(pframe + WLAN_PROBE_RESP_IES_OFFSET,
+				nframe - WLAN_PROBE_RESP_IES_OFFSET,
+				&uhr_op_ie, &uhr_ie_len);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		status = lim_unpack_ieee80211_uhr_op_payload(
+				uhr_op_ie, uhr_ie_len,
+				&p_probe_resp->uhr_op_ie);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			/* optionally pe_debug for visibility */
+			pe_err("UHR Op IE parse failed: %d", status);
+			return;
+		}
+
+		pe_debug("UHR Op: dps:%d npca:%d dbe:%d pedca:%d bw:%d opinfo_len:%d",
+			 p_probe_resp->uhr_op_ie.dps_enabled,
+			 p_probe_resp->uhr_op_ie.npca_enabled,
+			 p_probe_resp->uhr_op_ie.dbe_enabled,
+			 p_probe_resp->uhr_op_ie.p_edca_enabled,
+			 p_probe_resp->uhr_op_ie.dbe_bandwidth,
+			 p_probe_resp->uhr_op_ie.uhr_op_info_len);
+	}
+}
+
+void
+sir_convert_beacon_frame2_uhr_op_struct(uint8_t *pframe, uint32_t nframe,
+					tDot11fBeacon *bcn_frm,
+					tpSirProbeRespBeacon bcn_struct)
+{
+	uint8_t *uhr_op_ie;
+	qdf_size_t uhr_ie_len;
+	QDF_STATUS status;
+
+	status = find_uhr_op_ie(pframe + WLAN_BEACON_IES_OFFSET,
+				nframe - WLAN_BEACON_IES_OFFSET,
+				&uhr_op_ie, &uhr_ie_len);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		status = lim_unpack_ieee80211_uhr_op_payload(
+				uhr_op_ie, uhr_ie_len,
+				&bcn_struct->uhr_op_ie);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			/* optionally pe_debug for visibility */
+			pe_err("UHR Op IE parse failed: %d", status);
+			return;
+		}
+
+		pe_debug("UHR Op: dps:%d npca:%d dbe:%d pedca:%d bw:%d opinfo_len:%d",
+			 bcn_struct->uhr_op_ie.dps_enabled,
+			 bcn_struct->uhr_op_ie.npca_enabled,
+			 bcn_struct->uhr_op_ie.dbe_enabled,
+			 bcn_struct->uhr_op_ie.p_edca_enabled,
+			 bcn_struct->uhr_op_ie.dbe_bandwidth,
+			 bcn_struct->uhr_op_ie.uhr_op_info_len);
+	}
 }
 #endif
 /* parser_api.c ends here. */
