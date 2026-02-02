@@ -3821,10 +3821,14 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 {
 	uint32_t ret;
 	uint8_t *rsn_ie;
-	uint16_t rsn_ie_len, i;
+	uint16_t rsn_ie_len, akm_idx;
+	uint32_t validated_akm_count;
 	tDot11fIERSN dot11_rsn_ie = {0};
 	tDot11fIEWPA dot11_wpa_ie = {0};
 	tDot11fIEWAPI dot11_wapi_ie = {0};
+	uint32_t akm_list_capacity =
+		(sizeof(akm_list->authType) /
+		 sizeof(akm_list->authType[0]));
 
 	if (!mac_handle) {
 		hdd_err("NULL mac Handle");
@@ -3868,11 +3872,21 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		/*
 		 * Translate akms in akm suite
 		 */
-		for (i = 0; i < dot11_rsn_ie.akm_suite_cnt; i++)
-			akm_list->authType[i] =
+		if (dot11_rsn_ie.akm_suite_cnt >= akm_list_capacity) {
+			hdd_err("RSN IE akm_suite_cnt %d exceeds capacity %u - rejecting configuration",
+				dot11_rsn_ie.akm_suite_cnt,
+				akm_list_capacity);
+			return -EINVAL;
+		}
+		validated_akm_count =
+			dot11_rsn_ie.akm_suite_cnt;
+
+		for (akm_idx = 0; akm_idx < validated_akm_count;
+		     akm_idx++)
+			akm_list->authType[akm_idx] =
 				hdd_translate_rsn_to_csr_auth_type(
-						       dot11_rsn_ie.akm_suite[i]);
-		akm_list->numEntries = dot11_rsn_ie.akm_suite_cnt;
+					dot11_rsn_ie.akm_suite[akm_idx]);
+		akm_list->numEntries = validated_akm_count;
 		/* dot11_rsn_ie.pwise_cipher_suite_count */
 		*encrypt_type =
 			hdd_translate_rsn_to_csr_encryption_type(dot11_rsn_ie.
@@ -3909,11 +3923,21 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		/*
 		 * Translate akms in akm suite
 		 */
-		for (i = 0; i < dot11_wpa_ie.auth_suite_count; i++)
-			akm_list->authType[i] =
+		if (dot11_wpa_ie.auth_suite_count >= akm_list_capacity) {
+			hdd_err("WPA IE auth_suite_count %d exceeds capacity %u - rejecting configuration",
+				dot11_wpa_ie.auth_suite_count,
+				akm_list_capacity);
+			return -EINVAL;
+		}
+		validated_akm_count =
+			dot11_wpa_ie.auth_suite_count;
+
+		for (akm_idx = 0; akm_idx < validated_akm_count;
+		     akm_idx++)
+			akm_list->authType[akm_idx] =
 				hdd_translate_wpa_to_csr_auth_type(
-						     dot11_wpa_ie.auth_suites[i]);
-		akm_list->numEntries = dot11_wpa_ie.auth_suite_count;
+					dot11_wpa_ie.auth_suites[akm_idx]);
+		akm_list->numEntries = validated_akm_count;
 		/* dot11_wpa_ie.unicast_cipher_count */
 		*encrypt_type =
 			hdd_translate_wpa_to_csr_encryption_type(dot11_wpa_ie.
@@ -3949,12 +3973,22 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		/*
 		 * Translate akms in akm suite
 		 */
-		for (i = 0; i < dot11_wapi_ie.akm_suite_count; i++)
-			akm_list->authType[i] =
-				hdd_translate_wapi_to_csr_auth_type(
-						dot11_wapi_ie.akm_suites[i]);
+		if (dot11_wapi_ie.akm_suite_count >= akm_list_capacity) {
+			hdd_err("WAPI IE akm_suite_count %d exceeds capacity %u - rejecting configuration",
+				dot11_wapi_ie.akm_suite_count,
+				akm_list_capacity);
+			return -EINVAL;
+		}
+		validated_akm_count =
+			dot11_wapi_ie.akm_suite_count;
 
-		akm_list->numEntries = dot11_wapi_ie.akm_suite_count;
+		for (akm_idx = 0; akm_idx < validated_akm_count;
+		     akm_idx++)
+			akm_list->authType[akm_idx] =
+				hdd_translate_wapi_to_csr_auth_type(
+					dot11_wapi_ie.akm_suites[akm_idx]);
+
+		akm_list->numEntries = validated_akm_count;
 		/* dot11_wapi_ie.akm_suite_count */
 		*encrypt_type =
 			hdd_translate_wapi_to_csr_encryption_type(
