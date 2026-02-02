@@ -607,20 +607,13 @@ static int wlan_hdd_tdls_disable(struct hdd_context *hdd_ctx,
 {
 	struct wlan_hdd_link_info *link_info;
 	struct wlan_objmgr_vdev *vdev;
-	bool tdls_chan_switch_prohibited;
 
 	hdd_adapter_for_each_active_link_info(adapter, link_info) {
 		vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_TDLS_NB_ID);
 		if (!vdev)
 			return -EINVAL;
 
-		tdls_chan_switch_prohibited =
-				ucfg_mlme_get_tdls_chan_switch_prohibited(vdev);
-
-		wlan_tdls_notify_sta_disconnect(wlan_vdev_get_id(vdev),
-						tdls_chan_switch_prohibited,
-						true, vdev);
-
+		ucfg_tdls_teardown_links(hdd_ctx->psoc);
 		ucfg_tdls_set_user_tdls_enable(vdev, false);
 
 		if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
