@@ -504,11 +504,12 @@ uint32_t wma_mcs_rate_match(uint16_t raw_rate, bool is_he,
 	uint8_t gi_index_max = 2;
 	uint32_t ret_rate = 0;
 	uint8_t current_nss;
+	uint8_t max_nss = (*nss) ? (*nss) : 4;
 
 	if (is_he)
 		gi_index_max = 3;
 
-	for (current_nss = 0; current_nss < 4; current_nss++) {
+	for (current_nss = 0; current_nss < max_nss; current_nss++) {
 		for (gi_index = 0; gi_index < gi_index_max; gi_index++) {
 			if (raw_rate == nss_rate[current_nss][gi_index]) {
 				*nss = current_nss + 1;
