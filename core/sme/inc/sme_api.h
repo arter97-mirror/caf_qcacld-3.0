@@ -5059,6 +5059,26 @@ void sme_register_set_disconnect_cb(mac_handle_t mac_handle,
  */
 void sme_deregister_disconnect_cb(mac_handle_t mac_handle);
 
+/**
+ * sme_register_sap_channel_bw_update_cb - Notify hostapd sap channel bw
+ * change
+ * @mac_handle: Opaque handle to the MAC context
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void sme_register_sap_channel_bw_update_cb(mac_handle_t mac_handle,
+			void (*sap_channel_bw_update_cb)(uint8_t vdev_id));
+
+/**
+ * sme_deregister_sap_channel_bw_update_cb - Deregister sap channel bw
+ * update cb
+ * @mac_handle: Opaque handle to the MAC context
+ *
+ * Return: None
+ */
+void sme_deregister_sap_channel_bw_update_cb(mac_handle_t mac_handle);
+
 #if defined(WLAN_FEATURE_MULTI_LINK_SAP) && defined(WLAN_FEATURE_11BE_MLO)
 /**
  * sme_pmkid_get_mld_addr - Get mld address from preauth list
