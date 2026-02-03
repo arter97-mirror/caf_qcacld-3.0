@@ -540,6 +540,7 @@ struct sme_context {
 				      struct wlan_objmgr_vdev *vdev);
 	void (*set_disconnect_link_info_cb)(uint8_t vdev_id,
 					    bool is_disconnect_sent);
+	void (*sap_channel_bw_update_cb)(uint8_t vdev_id);
 };
 
 #endif /* #if !defined( __SMEINTERNAL_H ) */
