@@ -719,7 +719,8 @@ static void hdd_dcs_hostapd_enable_wlan_interference_mitigation(
 	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(link_info);
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(link_info);
 	if (wlansap_dcs_is_wlan_interference_mitigation_enabled(sap_ctx) &&
-	    !WLAN_REG_IS_24GHZ_CH_FREQ(ap_ctx->operating_chan_freq))
+	    (!WLAN_REG_IS_24GHZ_CH_FREQ(ap_ctx->operating_chan_freq) ||
+	     ucfg_is_two_vdev_dcs_supported(hdd_ctx->psoc)))
 		ucfg_config_dcs_event_data(hdd_ctx->psoc, mac_id,
 					   vdev_id, true);
 }

@@ -60,6 +60,7 @@
 #include "wlan_hdd_regulatory.h"
 #include "wlan_ll_sap_api.h"
 #include <wlan_dnw_api.h>
+#include <wlan_dcs_ucfg_api.h>
 
 #define SAP_DEBUG
 static struct sap_context *gp_sap_ctx[SAP_MAX_NUM_SESSION];
@@ -4809,8 +4810,21 @@ QDF_STATUS wlansap_dcs_set_wlan_interference_mitigation_on_band(
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool wlan_interference_mitigation_enable = false;
+	struct mac_context *mac;
 
-	if (!WLAN_REG_IS_24GHZ_CH_FREQ(sap_cfg->acs_cfg.pri_ch_freq))
+	if (!sap_context || !sap_cfg) {
+		sap_err("NULL param");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	if (!WLAN_REG_IS_24GHZ_CH_FREQ(sap_cfg->acs_cfg.pri_ch_freq) ||
+	    ucfg_is_two_vdev_dcs_supported(mac->psoc))
 		wlan_interference_mitigation_enable = true;
 
 	status = wlansap_dcs_set_vdev_wlan_interference_mitigation(
