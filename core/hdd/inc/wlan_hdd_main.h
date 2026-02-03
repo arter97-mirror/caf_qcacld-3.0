@@ -6045,6 +6045,14 @@ bool hdd_allow_new_intf(struct hdd_context *hdd_ctx,
 void
 hdd_set_disconnect_link_info_cb(uint8_t vdev_id);
 
+/**
+ * hdd_sap_channel_bw_update_cb() - Notify hostapd sap channel bw change
+ * @vdev_id: vdev_id
+ *
+ * Return: None
+ */
+void hdd_sap_channel_bw_update_cb(uint8_t vdev_id);
+
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /*
  * wlan_hdd_is_link_switch_in_progress() - Function to check if there is any
