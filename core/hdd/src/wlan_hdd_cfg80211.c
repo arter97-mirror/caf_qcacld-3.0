@@ -25851,6 +25851,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 		vendor_command_policy(wlan_hdd_cfg80211_set_action_oui_policy,
 				      QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_MAX)
 	},
+	FEATURE_DCS_VENDOR_COMMANDS
 
 };
 

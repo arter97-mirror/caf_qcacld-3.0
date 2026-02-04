@@ -27,6 +27,7 @@
 #include <wlan_hdd_includes.h>
 #include <wlan_dcs_ucfg_api.h>
 #include <wlan_dlm_ucfg_api.h>
+#include <cfg_ucfg_api.h>
 #include <wlan_osif_priv.h>
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_dcs_ucfg_api.h>
@@ -36,6 +37,7 @@
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_ll_sap_api.h"
 #include "wlan_hdd_regulatory.h"
+#include "osif_sync.h"
 
 /* Time(in milliseconds) before which the AP doesn't expect a connection */
 #define HDD_DCS_AWGN_BSS_RETRY_DELAY (5 * 60 * 1000)
@@ -785,3 +787,332 @@ void hdd_dcs_clear(struct hdd_adapter *adapter)
 	wlansap_dcs_set_vdev_wlan_interference_mitigation(sap_ctx, false);
 	wlansap_dcs_set_vdev_starting(sap_ctx, false);
 }
+
+#ifdef WLAN_FEATURE_VDEV_DCS
+
+/* DCS configuration reply SKB size */
+#define DCS_CONFIG_REPLY_SKB_SIZE 512
+
+/* Macro definitions to avoid line length issues */
+#define DCS_INTFR_DETECT_THRESH \
+	QCA_WLAN_VENDOR_ATTR_DCS_INTERFERENCE_DETECTION_THRESHOLD
+#define DCS_INTFR_DETECT_WINDOW \
+	QCA_WLAN_VENDOR_ATTR_DCS_INTERFERENCE_DETECTION_WINDOW
+#define DCS_COCH_INTFR_THRESH \
+	QCA_WLAN_VENDOR_ATTR_DCS_COCHANNEL_INTERFERENCE_THRESHOLD
+#define DCS_PHY_ERR_PENALTY \
+	QCA_WLAN_VENDOR_ATTR_DCS_PHY_ERR_PENALTY
+#define DCS_PHY_ERR_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_DCS_PHY_ERR_THRESHOLD
+#define DCS_RADAR_ERR_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_DCS_RADAR_ERR_THRESHOLD
+#define DCS_TX_ERR_THRESHOLD \
+	QCA_WLAN_VENDOR_ATTR_DCS_TX_ERR_THRESHOLD
+
+const struct nla_policy dcs_config_policy[QCA_WLAN_VENDOR_ATTR_DCS_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_DCS_LINK_ID] = {
+		.type = NLA_U8
+	},
+	[QCA_WLAN_VENDOR_ATTR_DCS_CMD_TYPE] = {
+		.type = NLA_U8
+	},
+	[QCA_WLAN_VENDOR_ATTR_DCS_ENABLE] = {
+		.type = NLA_U16
+	},
+	[DCS_INTFR_DETECT_THRESH] = {
+		.type = NLA_U32
+	},
+	[QCA_WLAN_VENDOR_ATTR_DCS_PHY_ERR_PENALTY] = {
+		.type = NLA_U32
+	},
+	[QCA_WLAN_VENDOR_ATTR_DCS_PHY_ERR_THRESHOLD] = {
+		.type = NLA_U32
+	},
+	[QCA_WLAN_VENDOR_ATTR_DCS_RADAR_ERR_THRESHOLD] = {
+		.type = NLA_U32
+	},
+	[QCA_WLAN_VENDOR_ATTR_DCS_TX_ERR_THRESHOLD] = {
+		.type = NLA_U32
+	},
+	[DCS_INTFR_DETECT_WINDOW] = {
+		.type = NLA_U32
+	},
+	[DCS_COCH_INTFR_THRESH] = {
+		.type = NLA_U8
+	},
+	[QCA_WLAN_VENDOR_ATTR_DCS_MAX_CU] = {
+		.type = NLA_U8
+	},
+};
+
+/**
+ * wlan_hdd_dcs_get_config() - Get DCS configuration
+ * @adapter: Pointer to adapter
+ * @link_info: Pointer to link information
+ *
+ * This function retrieves the current DCS configuration and sends it
+ * back to userspace.
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int wlan_hdd_dcs_get_config(struct hdd_adapter *adapter,
+				   struct wlan_hdd_link_info *link_info)
+{
+	struct sk_buff *reply_skb;
+	struct wlan_dcs_user_config config;
+	QDF_STATUS status;
+	int ret;
+
+	status = ucfg_dcs_get_config(link_info->vdev, &config);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get DCS config, status: %d", status);
+		return -EINVAL;
+	}
+
+	hdd_debug("Get DCS config: enable=%d, intfr_thresh=%d, phy_err_pen=%d",
+		  config.dcs_enable, config.intfr_detection_threshold,
+		  config.phy_err_penalty);
+
+	reply_skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(
+			adapter->hdd_ctx->wiphy,
+			NLMSG_HDRLEN + DCS_CONFIG_REPLY_SKB_SIZE);
+	if (!reply_skb) {
+		hdd_err("Failed to allocate reply skb");
+		return -ENOMEM;
+	}
+
+	if (nla_put_u16(reply_skb, QCA_WLAN_VENDOR_ATTR_DCS_ENABLE,
+			config.dcs_enable) ||
+	    nla_put_u32(reply_skb, DCS_INTFR_DETECT_THRESH,
+			config.intfr_detection_threshold) ||
+	    nla_put_u32(reply_skb, QCA_WLAN_VENDOR_ATTR_DCS_PHY_ERR_PENALTY,
+			config.phy_err_penalty) ||
+	    nla_put_u32(reply_skb,
+			QCA_WLAN_VENDOR_ATTR_DCS_PHY_ERR_THRESHOLD,
+			config.phy_err_threshold) ||
+	    nla_put_u32(reply_skb,
+			QCA_WLAN_VENDOR_ATTR_DCS_RADAR_ERR_THRESHOLD,
+			config.radar_err_threshold) ||
+	    nla_put_u32(reply_skb,
+			QCA_WLAN_VENDOR_ATTR_DCS_TX_ERR_THRESHOLD,
+			config.tx_err_threshold) ||
+	    nla_put_u32(reply_skb, DCS_INTFR_DETECT_WINDOW,
+			config.intfr_detection_window) ||
+	    nla_put_u8(reply_skb, DCS_COCH_INTFR_THRESH,
+		       config.coch_intfr_threshold) ||
+	    nla_put_u8(reply_skb, QCA_WLAN_VENDOR_ATTR_DCS_MAX_CU,
+		       config.max_cu)) {
+		hdd_err("Failed to put DCS config attributes");
+		kfree_skb(reply_skb);
+		return -EINVAL;
+	}
+
+	ret = cfg80211_vendor_cmd_reply(reply_skb);
+	if (ret)
+		hdd_err("Failed to send reply, ret: %d", ret);
+
+	return ret;
+}
+
+/**
+ * wlan_hdd_dcs_set_config() - Set DCS configuration
+ * @adapter: Pointer to adapter
+ * @tb: Pointer to parsed netlink attributes
+ * @link_info: pointer to link information
+ *
+ * This function sets the DCS configuration based on the attributes
+ * provided by userspace.
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int wlan_hdd_dcs_set_config(struct hdd_adapter *adapter,
+				   struct nlattr **tb,
+				   struct wlan_hdd_link_info *link_info)
+{
+	struct wlan_dcs_user_config config;
+	QDF_STATUS status;
+
+	/* Get current configuration first */
+	status = ucfg_dcs_get_config(link_info->vdev, &config);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get current DCS config, status: %d", status);
+		return -EINVAL;
+	}
+
+	/* Update only the parameters provided by user */
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_DCS_ENABLE])
+		config.dcs_enable =
+			nla_get_u16(tb[QCA_WLAN_VENDOR_ATTR_DCS_ENABLE]);
+
+	if (tb[DCS_INTFR_DETECT_THRESH])
+		config.intfr_detection_threshold =
+			nla_get_u32(tb[DCS_INTFR_DETECT_THRESH]);
+
+	if (tb[DCS_PHY_ERR_PENALTY])
+		config.phy_err_penalty =
+			nla_get_u32(tb[DCS_PHY_ERR_PENALTY]);
+
+	if (tb[DCS_PHY_ERR_THRESHOLD])
+		config.phy_err_threshold =
+			nla_get_u32(tb[DCS_PHY_ERR_THRESHOLD]);
+
+	if (tb[DCS_RADAR_ERR_THRESHOLD])
+		config.radar_err_threshold =
+			nla_get_u32(tb[DCS_RADAR_ERR_THRESHOLD]);
+
+	if (tb[DCS_TX_ERR_THRESHOLD])
+		config.tx_err_threshold =
+			nla_get_u32(tb[DCS_TX_ERR_THRESHOLD]);
+
+	if (tb[DCS_INTFR_DETECT_WINDOW])
+		config.intfr_detection_window =
+			nla_get_u32(tb[DCS_INTFR_DETECT_WINDOW]);
+
+	if (tb[DCS_COCH_INTFR_THRESH])
+		config.coch_intfr_threshold =
+			nla_get_u8(tb[DCS_COCH_INTFR_THRESH]);
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_DCS_MAX_CU])
+		config.max_cu =
+			nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_DCS_MAX_CU]);
+
+	status = ucfg_dcs_set_config(link_info->vdev, &config);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to set DCS config, status: %d", status);
+		return -EINVAL;
+	}
+
+	hdd_debug("Set DCS config successfully");
+
+	return 0;
+}
+
+/**
+ * __wlan_hdd_cfg80211_dcs_config() - Handle DCS config vendor command
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @data: Pointer to data
+ * @data_len: Data length
+ *
+ * This function handles QCA_NL80211_VENDOR_SUBCMD_DCS_CONFIG vendor
+ * command to get or set DCS configuration parameters.
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int
+__wlan_hdd_cfg80211_dcs_config(struct wiphy *wiphy,
+			       struct wireless_dev *wdev,
+			       const void *data, int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct wlan_hdd_link_info *link_info;
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_DCS_MAX + 1];
+	uint8_t cmd_type;
+	uint8_t link_id = 0;
+	int ret;
+
+	hdd_enter();
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	if (adapter->device_mode != QDF_SAP_MODE &&
+	    adapter->device_mode != QDF_P2P_GO_MODE) {
+		hdd_err("DCS config not supported for device mode %d",
+			adapter->device_mode);
+		return -EINVAL;
+	}
+
+	if (wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_DCS_MAX,
+				    data, data_len, dcs_config_policy)) {
+		hdd_err("Invalid DCS config attr");
+		return -EINVAL;
+	}
+
+	/*
+	 * Get link_info based on link_id,
+	 * default to deflink if not specified
+	 */
+	if (tb[QCA_WLAN_VENDOR_ATTR_DCS_LINK_ID]) {
+		link_id = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_DCS_LINK_ID]);
+		if (link_id >= WLAN_MAX_ML_BSS_LINKS) {
+			hdd_err("Invalid link_id: %d, max allowed: %d",
+				link_id, WLAN_MAX_ML_BSS_LINKS - 1);
+			return -EINVAL;
+		}
+		link_info = hdd_get_link_info_by_link_id(adapter, link_id);
+	} else {
+		link_info = adapter->deflink;
+	}
+
+	if (!link_info || !link_info->vdev) {
+		hdd_err("Invalid link_id: %d", link_id);
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_DCS_CMD_TYPE]) {
+		hdd_err("DCS command type not specified");
+		return -EINVAL;
+	}
+
+	cmd_type = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_DCS_CMD_TYPE]);
+
+	hdd_debug("DCS config cmd_type: %d, link_id: %d", cmd_type, link_id);
+
+	switch (cmd_type) {
+	case QCA_WLAN_VENDOR_DCS_CMD_GET:
+		ret = wlan_hdd_dcs_get_config(adapter, link_info);
+		break;
+	case QCA_WLAN_VENDOR_DCS_CMD_SET:
+		ret = wlan_hdd_dcs_set_config(adapter, tb, link_info);
+		break;
+	default:
+		hdd_err("Invalid DCS command type: %d", cmd_type);
+		ret = -EINVAL;
+		break;
+	}
+
+	hdd_exit();
+	return ret;
+}
+
+/**
+ * wlan_hdd_cfg80211_dcs_config() - Handle DCS config vendor command
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @data: Pointer to data
+ * @data_len: Data length
+ *
+ * Wrapper function for __wlan_hdd_cfg80211_dcs_config() with SSR
+ * protection.
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int wlan_hdd_cfg80211_dcs_config(struct wiphy *wiphy,
+				 struct wireless_dev *wdev,
+				 const void *data, int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_dcs_config(wiphy, wdev, data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
+#endif /* WLAN_FEATURE_VDEV_DCS */
