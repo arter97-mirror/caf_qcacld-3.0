@@ -163,9 +163,12 @@ static int dp_intf_is_tx_allowed(qdf_nbuf_t nbuf,
 				 struct cdp_peer_output_param *peer_info)
 {
 	enum ol_txrx_peer_state peer_state;
+
 	cdp_peer_get_info_by_peer_addr(soc, peer_mac, dp_link->link_id,
 				       peer_info);
 	dp_get_bss_peer_on_active_tdls(soc, peer_mac, dp_link, peer_info);
+
+	dp_set_peer_txpt_idx(nbuf, peer_info);
 
 	peer_state = peer_info->state;
 
