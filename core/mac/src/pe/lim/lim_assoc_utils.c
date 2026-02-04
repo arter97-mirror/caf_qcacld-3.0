@@ -3660,21 +3660,12 @@ static enum phy_ch_width lim_get_min_ch_width(enum phy_ch_width ch_width1,
  */
 void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 				   struct bss_params *pAddBssParams,
-				   tDot11fIEVHTCaps *vht_caps)
+				   tDot11fIEVHTCaps *vht_caps,
+				   struct wlan_objmgr_peer *peer)
 {
 	uint8_t claimed_ch_width;
 	bool mcs_valid;
-
-	pAddBssParams->staContext.ap_max_ch_width = 0;
-
-	if (!vht_caps) {
-		pe_err("vht_caps is NULL, vht ap max ch width stays 0");
-		return;
-	}
-
-	pe_debug("VHT caps present: claimed supportedChannelWidthSet=%d rxMCSMap=0x%x txMCSMap=0x%x",
-		 vht_caps->supportedChannelWidthSet, vht_caps->rxMCSMap,
-		 vht_caps->txMCSMap);
+	enum phy_ch_width ap_max_ch_width = CH_WIDTH_INVALID;
 
 	pAddBssParams->staContext.vht_caps =
 		((vht_caps->maxMPDULen <<
@@ -3729,8 +3720,7 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 		mcs_valid = lim_validate_vht_mcs_for_bw(vht_caps->rxMCSMap,
 							vht_caps->txMCSMap);
 		if (mcs_valid) {
-			pAddBssParams->staContext.ap_max_ch_width =
-				CH_WIDTH_80MHZ;
+			ap_max_ch_width = CH_WIDTH_80MHZ;
 		} else {
 			pe_debug("VHT BW fallback: claimed 80MHz but MCS invalid");
 		}
@@ -3739,8 +3729,7 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 		mcs_valid = lim_validate_vht_mcs_for_bw(vht_caps->rxMCSMap,
 							vht_caps->txMCSMap);
 		if (mcs_valid) {
-			pAddBssParams->staContext.ap_max_ch_width =
-				CH_WIDTH_160MHZ;
+			ap_max_ch_width = CH_WIDTH_160MHZ;
 		} else {
 			pe_debug("VHT BW fallback: claimed 160MHz but MCS invalid");
 		}
@@ -3749,8 +3738,7 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 		mcs_valid = lim_validate_vht_mcs_for_bw(vht_caps->rxMCSMap,
 							vht_caps->txMCSMap);
 		if (mcs_valid) {
-			pAddBssParams->staContext.ap_max_ch_width =
-				CH_WIDTH_80P80MHZ;
+			ap_max_ch_width = CH_WIDTH_80P80MHZ;
 		} else {
 			pe_debug("VHT BW fallback: claimed 80+80MHz but MCS invalid");
 		}
@@ -3761,8 +3749,7 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 		break;
 	}
 
-	pe_debug("VHT caps BW result: ap_max_ch_width=%d",
-		 pAddBssParams->staContext.ap_max_ch_width);
+	wlan_peer_set_ap_max_ch_width(peer, ap_max_ch_width);
 }
 
 /**
@@ -3780,57 +3767,60 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
  */
 static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 					   struct bss_params *pAddBssParams,
-					   tpSirAssocRsp assoc_rsp)
+					   tpSirAssocRsp assoc_rsp,
+					   struct wlan_objmgr_peer *peer)
 {
-	tDot11fIEVHTOperation *vht_oper_ie = NULL;
+	tDot11fIEVHTOperation *vht_op = NULL;
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	enum phy_ch_width ap_bcon_ch_width;
 	enum phy_ch_width final_ch_width;
 	enum phy_ch_width fw_vht_ch_wd;
+	enum phy_ch_width ap_max_ch_width;
 	uint32_t fw_vht_ch_wd_cfg;
+	uint8_t ccfs0, ccfs1;
 
-	if (pAddBssParams->staContext.ap_max_ch_width == 0) {
+	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
+	if (ap_max_ch_width == CH_WIDTH_INVALID) {
 		pe_debug("VHT ops BW fallback: VHT disabled in caps processing");
 		return;
 	}
 
 	if (assoc_rsp->VHTOperation.present)
-		vht_oper_ie = &assoc_rsp->VHTOperation;
+		vht_op = &assoc_rsp->VHTOperation;
 	else if (assoc_rsp->vendor_vht_ie.VHTOperation.present)
-		vht_oper_ie = &assoc_rsp->vendor_vht_ie.VHTOperation;
+		vht_op = &assoc_rsp->vendor_vht_ie.VHTOperation;
 
 	if (assoc_rsp->VHTCaps.present)
 		vht_caps = &assoc_rsp->VHTCaps;
 	else if (assoc_rsp->vendor_vht_ie.VHTCaps.present)
 		vht_caps = &assoc_rsp->vendor_vht_ie.VHTCaps;
 
-	if (vht_oper_ie && vht_caps) {
-		ap_bcon_ch_width = lim_get_vht_ch_width(vht_caps, vht_oper_ie,
-							&assoc_rsp->HTInfo,
-							&assoc_rsp->HTCaps,
-							&assoc_rsp->OperatingMode);
-	} else if (vht_oper_ie) {
-		ap_bcon_ch_width = vht_oper_ie->chanWidth;
+	if (vht_op && vht_caps) {
+		ap_bcon_ch_width = lim_get_vht_ch_width(vht_caps, vht_op,
+						&assoc_rsp->HTInfo,
+						&assoc_rsp->HTCaps,
+						&assoc_rsp->OperatingMode);
+	} else if (vht_op) {
+		ap_bcon_ch_width = vht_op->chanWidth;
 		pe_debug("VHT ops BW fallback: missing vht_caps");
 	} else {
 		pe_debug("VHT ops BW fallback: missing VHT Operation IE");
 		return;
 	}
 
+	ccfs0 = vht_op->chan_center_freq_seg0;
+	ccfs1 = vht_op->chan_center_freq_seg1;
+
 	fw_vht_ch_wd_cfg = wma_get_vht_ch_width();
 	fw_vht_ch_wd = lim_convert_vht_width_to_phy_width(fw_vht_ch_wd_cfg);
 
-	final_ch_width = lim_get_min_ch_width(
-				fw_vht_ch_wd,
-				pAddBssParams->staContext.ap_max_ch_width);
+	final_ch_width = lim_get_min_ch_width(fw_vht_ch_wd, ap_max_ch_width);
 	final_ch_width = lim_get_min_ch_width(final_ch_width, ap_bcon_ch_width);
 
-	pe_debug("VHT BW calc: fw_vht_ch_wd=%d ap_max_ch_width=%d ap_bcon_ch_width=%d final=%d",
-		 fw_vht_ch_wd, pAddBssParams->staContext.ap_max_ch_width,
-		 ap_bcon_ch_width, final_ch_width);
-
-	pAddBssParams->ch_width = final_ch_width;
-	pAddBssParams->staContext.ch_width = final_ch_width;
+	/* Store in peer MLME (source of truth) */
+	wlan_peer_set_op_ch_width(peer, final_ch_width);
+	wlan_peer_set_center_freq_seg0(peer, ccfs0);
+	wlan_peer_set_center_freq_seg1(peer, ccfs1);
 }
 
 #ifdef WLAN_FEATURE_11BE
@@ -4280,7 +4270,7 @@ static void lim_update_add_bss_ht_params(struct mac_context *mac,
 }
 
 /**
- * lim_sta_configure_vht_capability() - Configure VHT capability for STA
+ * lim_update_add_bss_vht_params() - Configure VHT capability for STA
  * @mac: Pointer to MAC context
  * @pe_session: Pointer to PE session
  * @pAssocRsp: Pointer to Association Response frame
@@ -4294,24 +4284,33 @@ static void lim_update_add_bss_ht_params(struct mac_context *mac,
  * Return: None
  */
 static void
-lim_sta_configure_vht_capability(struct mac_context *mac,
+lim_update_add_bss_vht_params(struct mac_context *mac,
 				 struct pe_session *pe_session,
 				 tpSirAssocRsp pAssocRsp,
 				 struct bss_params *pAddBssParams)
 {
 	tDot11fIEVHTCaps *vht_caps = NULL;
+	struct wlan_objmgr_peer *peer;
 	struct mlme_vht_capabilities_info *vht_cap_info;
+
+	peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
+					   pAddBssParams->bssId,
+					   WLAN_LEGACY_MAC_ID);
+	if (!peer) {
+		pe_err("Failed to get peer for BSSID: " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pAddBssParams->bssId));
+		pAddBssParams->vhtCapable = 0;
+		pe_session->vhtCapability = false;
+		return;
+	}
 
 	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
 
-	if (pe_session->vhtCapability &&
-	    pAssocRsp->VHTCaps.present) {
-		pAddBssParams->vhtCapable =
-			pAssocRsp->VHTCaps.present;
+	if (pe_session->vhtCapability && pAssocRsp->VHTCaps.present) {
+		pAddBssParams->vhtCapable = pAssocRsp->VHTCaps.present;
 		vht_caps = &pAssocRsp->VHTCaps;
 	} else if (pe_session->vhtCapability &&
 		   pAssocRsp->vendor_vht_ie.VHTCaps.present) {
-
 		pAddBssParams->vhtCapable =
 			pAssocRsp->vendor_vht_ie.VHTCaps.present;
 		/*
@@ -4328,29 +4327,30 @@ lim_sta_configure_vht_capability(struct mac_context *mac,
 		 */
 		pAddBssParams->vhtCapable = 0;
 		pe_session->vhtCapability = false;
-		pe_debug("No VHT capability, disabling VHT");
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 		return;
 	}
 
 	if (pAddBssParams->vhtCapable) {
 		if (vht_caps)
-			lim_update_vhtcaps_assoc_resp(mac,
-						      pAddBssParams,
-						      vht_caps);
+			lim_update_vhtcaps_assoc_resp(mac, pAddBssParams,
+						      vht_caps, peer);
 
-		lim_update_vht_oper_assoc_resp(mac,
-					       pAddBssParams,
-					       pAssocRsp);
+		lim_update_vht_oper_assoc_resp(mac, pAddBssParams,
+					       pAssocRsp, peer);
 	} else {
 		/* VHT not capable: Check VHT TxBF 20MHz setting */
 		if (!vht_cap_info->enable_txbf_20mhz)
 			pAddBssParams->staContext.vhtTxBFCapable = 0;
 	}
 
-	if (pAddBssParams->ch_width > pe_session->ch_width) {
-		pAddBssParams->ch_width = pe_session->ch_width;
-		pAddBssParams->staContext.ch_width = pe_session->ch_width;
-	}
+	/* Read back from peer MLME (single source of truth) */
+	pAddBssParams->ch_width = wlan_peer_get_op_ch_width(peer);
+	pAddBssParams->staContext.ch_width = wlan_peer_get_op_ch_width(peer);
+	pAddBssParams->staContext.ap_max_ch_width =
+				wlan_peer_get_ap_max_ch_width(peer);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
 
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
@@ -4404,8 +4404,8 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 				     bss_desc, pAddBssParams);
 
 	/* Configure VHT capability */
-	lim_sta_configure_vht_capability(mac, pe_session, pAssocRsp,
-					 pAddBssParams);
+	lim_update_add_bss_vht_params(mac, pe_session, pAssocRsp,
+				      pAddBssParams);
 
 	if (lim_is_session_he_capable(pe_session) &&
 	    pAssocRsp->he_cap.present) {
