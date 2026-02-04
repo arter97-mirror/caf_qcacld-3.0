@@ -16,6 +16,8 @@
 #include <cdp_txrx_ctrl.h>
 #include "cfg_ucfg_api.h"
 
+#define WLAN_DP_RESOURCE_MGR_DEFAULT_RX_NSS 2
+
 /*DP resource MAP used in resource level selection*/
 static struct wlan_dp_resource_map dp_resource_map[] = {
 	{RESOURCE_LVL_1, RESOURCE_LVL_1_TPUT_MBPS, RESOURCE_LVL_1_RX_BUFFERS},
@@ -23,94 +25,140 @@ static struct wlan_dp_resource_map dp_resource_map[] = {
 };
 
 static uint64_t
-wlan_dp_resource_mgr_phymode_to_tput(enum wlan_phymode phymode)
+wlan_dp_resource_mgr_phymode_to_tput(enum wlan_phymode phymode,
+				     uint8_t op_rx_nss)
 {
+	uint64_t tput = 0;
+
 	switch (phymode) {
 	case WLAN_PHYMODE_11A:
-		return WLAN_PHYMODE_11A_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11A_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11B:
-		return WLAN_PHYMODE_11B_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11B_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11G:
-		return WLAN_PHYMODE_11G_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11G_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11G_ONLY:
-		return WLAN_PHYMODE_11G_ONLY_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11G_ONLY_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11NA_HT20:
-		return WLAN_PHYMODE_11NA_HT20_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11NA_HT20_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11NG_HT20:
-		return WLAN_PHYMODE_11NG_HT20_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11NG_HT20_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11NA_HT40:
-		return WLAN_PHYMODE_11NA_HT40_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11NA_HT40_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11NG_HT40PLUS:
-		return WLAN_PHYMODE_11NG_HT40PLUS_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11NG_HT40PLUS_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11NG_HT40MINUS:
-		return WLAN_PHYMODE_11NG_HT40MINUS_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11NG_HT40MINUS_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11NG_HT40:
-		return WLAN_PHYMODE_11NG_HT40_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11NG_HT40_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AC_VHT20:
-		return WLAN_PHYMODE_11AC_VHT20_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AC_VHT20_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AC_VHT20_2G:
-		return WLAN_PHYMODE_11AC_VHT20_2G_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AC_VHT20_2G_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AC_VHT40:
-		return WLAN_PHYMODE_11AC_VHT40_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AC_VHT40_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AC_VHT40PLUS_2G:
-		return WLAN_PHYMODE_11AC_VHT40PLUS_2G_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AC_VHT40PLUS_2G_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AC_VHT40MINUS_2G:
-		return WLAN_PHYMODE_11AC_VHT40MINUS_2G_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AC_VHT40MINUS_2G_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AC_VHT40_2G:
-		return WLAN_PHYMODE_11AC_VHT40_2G_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AC_VHT40_2G_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AC_VHT80:
-		return WLAN_PHYMODE_11AC_VHT80_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AC_VHT80_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AC_VHT80_2G:
-		return WLAN_PHYMODE_11AC_VHT80_2G_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AC_VHT80_2G_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AC_VHT160:
-		return WLAN_PHYMODE_11AC_VHT160_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AC_VHT160_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AC_VHT80_80:
-		return WLAN_PHYMODE_11AC_VHT80_80_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AC_VHT80_80_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AXA_HE20:
-		return WLAN_PHYMODE_11AXA_HE20_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AXA_HE20_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AXG_HE20:
-		return WLAN_PHYMODE_11AXG_HE20_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AXG_HE20_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AXA_HE40:
-		return WLAN_PHYMODE_11AXA_HE40_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AXA_HE40_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AXG_HE40PLUS:
-		return WLAN_PHYMODE_11AXG_HE40PLUS_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AXG_HE40PLUS_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AXG_HE40MINUS:
-		return WLAN_PHYMODE_11AXG_HE40MINUS_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AXG_HE40MINUS_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AXG_HE40:
-		return WLAN_PHYMODE_11AXG_HE40_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AXG_HE40_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AXA_HE80:
-		return WLAN_PHYMODE_11AXA_HE80_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AXA_HE80_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AXG_HE80:
-		return WLAN_PHYMODE_11AXG_HE80_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AXG_HE80_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AXA_HE160:
-		return WLAN_PHYMODE_11AXA_HE160_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AXA_HE160_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11AXA_HE80_80:
-		return WLAN_PHYMODE_11AXA_HE80_80_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11AXA_HE80_80_TPUT_MBPS;
+		break;
 #ifdef WLAN_FEATURE_11BE
 	case WLAN_PHYMODE_11BEA_EHT20:
-		return WLAN_PHYMODE_11BEA_EHT20_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11BEA_EHT20_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11BEG_EHT20:
-		return WLAN_PHYMODE_11BEG_EHT20_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11BEG_EHT20_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11BEA_EHT40:
-		return WLAN_PHYMODE_11BEA_EHT40_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11BEA_EHT40_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11BEG_EHT40PLUS:
-		return WLAN_PHYMODE_11BEG_EHT40PLUS_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11BEG_EHT40PLUS_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11BEG_EHT40MINUS:
-		return WLAN_PHYMODE_11BEG_EHT40MINUS_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11BEG_EHT40MINUS_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11BEG_EHT40:
-		return WLAN_PHYMODE_11BEG_EHT40_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11BEG_EHT40_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11BEA_EHT80:
-		return WLAN_PHYMODE_11BEA_EHT80_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11BEA_EHT80_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11BEG_EHT80:
-		return WLAN_PHYMODE_11BEG_EHT80_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11BEG_EHT80_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11BEA_EHT160:
-		return WLAN_PHYMODE_11BEA_EHT160_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11BEA_EHT160_TPUT_MBPS;
+		break;
 	case WLAN_PHYMODE_11BEA_EHT320:
-		return WLAN_PHYMODE_11BEA_EHT320_TPUT_MBPS;
+		tput = WLAN_PHYMODE_11BEA_EHT320_TPUT_MBPS;
+		break;
 #endif
 	default:
-		return WLAN_PHYMODE_DEFAULT_TPUT_MBPS;
+		tput = WLAN_PHYMODE_DEFAULT_TPUT_MBPS;
+		break;
 	}
+
+	return op_rx_nss * tput;
 }
 
 static void
@@ -688,7 +736,8 @@ static struct wlan_dp_resource_vote_node *
 wlan_dp_resource_mgr_add_vote_node(struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
 				   struct wlan_objmgr_peer *peer,
 				   enum wlan_phymode phymode,
-				   enum QDF_OPMODE opmode)
+				   enum QDF_OPMODE opmode,
+				   uint8_t nss_cnt)
 {
 	struct wlan_dp_resource_vote_node *vote_node;
 	qdf_list_t *mac_list;
@@ -701,7 +750,8 @@ wlan_dp_resource_mgr_add_vote_node(struct wlan_dp_resource_mgr_ctx *rsrc_ctx,
 	}
 
 	vote_node->phymode = phymode;
-	vote_node->tput = wlan_dp_resource_mgr_phymode_to_tput(phymode);
+	vote_node->tput = wlan_dp_resource_mgr_phymode_to_tput(
+						phymode, nss_cnt);
 	mac_id = wlan_dp_resource_mgr_get_mac_id(wlan_peer_get_vdev(peer));
 	if (mac_id > MAX_MAC_RESOURCES) {
 		dp_err("MAC id is not valid");
@@ -732,6 +782,11 @@ wlan_dp_resource_mgr_notify_ndp_channel_info(
 	uint64_t mac0_tput = 0, mac1_tput = 0;
 	enum wlan_phymode host_phymode;
 	int i;
+	uint8_t cap_tx_nss;
+	uint8_t cap_rx_nss;
+	uint8_t op_tx_nss;
+	uint8_t op_rx_nss;
+	QDF_STATUS status;
 
 	if (!rsrc_ctx)
 		return;
@@ -750,20 +805,32 @@ wlan_dp_resource_mgr_notify_ndp_channel_info(
 		return;
 	}
 
-	dp_rsrc_mgr_debug("NDP notify channel info called");
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev, &cap_tx_nss,
+						   &cap_rx_nss, &op_tx_nss,
+						   &op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_info("Get NSS failed for %d with %d",
+			wlan_vdev_get_id(vdev), status);
+		op_rx_nss = WLAN_DP_RESOURCE_MGR_DEFAULT_RX_NSS;
+	}
+
+	dp_rsrc_mgr_debug("NDP notify channel info called, nss value - %u",
+			  op_rx_nss);
 	for (i = 0; i < num_channels; i++) {
 		host_phymode = wma_fw_to_host_phymode(ch_info->phymode);
 		if (!ch_info->mac_id &&
-		    (wlan_dp_resource_mgr_phymode_to_tput(host_phymode) >
-		     mac0_tput)) {
+		    (wlan_dp_resource_mgr_phymode_to_tput(
+			host_phymode, op_rx_nss) > mac0_tput)) {
 			mac0_phymode = host_phymode;
 			mac0_tput =
-			wlan_dp_resource_mgr_phymode_to_tput(mac0_phymode);
+			wlan_dp_resource_mgr_phymode_to_tput(mac0_phymode,
+							     op_rx_nss);
 		} else if (ch_info->mac_id &&
-			   (wlan_dp_resource_mgr_phymode_to_tput(host_phymode) >
-			    mac1_tput)) {
+			   (wlan_dp_resource_mgr_phymode_to_tput(
+				host_phymode, op_rx_nss) > mac1_tput)) {
 			mac1_phymode = host_phymode;
-			mac1_tput = wlan_dp_resource_mgr_phymode_to_tput(mac1_phymode);
+			mac1_tput = wlan_dp_resource_mgr_phymode_to_tput(
+					mac1_phymode, op_rx_nss);
 		}
 		ch_info++;
 	}
@@ -839,11 +906,27 @@ wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 	struct wlan_channel *desc_chan;
 	enum QDF_OPMODE opmode;
 	uint64_t prev_tput;
+	uint8_t cap_tx_nss;
+	uint8_t cap_rx_nss;
+	uint8_t op_tx_nss;
+	uint8_t op_rx_nss;
+	QDF_STATUS status;
+
 
 	vdev = wlan_peer_get_vdev(peer);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev, &cap_tx_nss,
+						   &cap_rx_nss, &op_tx_nss,
+						   &op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_info("Get NSS failed for %d with %d,",
+			wlan_vdev_get_id(vdev), status);
+		op_rx_nss = WLAN_DP_RESOURCE_MGR_DEFAULT_RX_NSS;
+	}
 
-	dp_info("update phymode called for opmode:%u", opmode);
+
+	dp_info("update phymode called for opmode:%u, op_rx_nss:%d",
+		opmode, op_rx_nss);
 
 	/*NAN peers handled by NDP events*/
 	if (opmode == QDF_NDI_MODE)
@@ -870,6 +953,7 @@ wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 		dp_err("DP peer priv ctx not present");
 		return;
 	}
+
 	if (priv_ctx->vote_node) {
 		vote_node = priv_ctx->vote_node;
 		if (vote_node->phymode == vote_phymode) {
@@ -881,7 +965,8 @@ wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 		prev_tput = vote_node->tput;
 		vote_node->phymode = vote_phymode;
 		vote_node->tput =
-			wlan_dp_resource_mgr_phymode_to_tput(vote_phymode);
+			wlan_dp_resource_mgr_phymode_to_tput(vote_phymode,
+							     op_rx_nss);
 
 		/*
 		 * Removing from the sorted list, since phymode changed.
@@ -911,7 +996,7 @@ wlan_dp_resource_mgr_phymode_update(struct wlan_objmgr_peer *peer, void *arg)
 	priv_ctx->vote_node =
 		wlan_dp_resource_mgr_add_vote_node(rsrc_ctx,
 						   vote_peer, vote_phymode,
-						   opmode);
+						   opmode, op_rx_nss);
 select_max_phymodes:
 	wlan_dp_resource_mgr_select_max_phymodes(rsrc_ctx);
 	qdf_spin_unlock_bh(&rsrc_ctx->rsrc_mgr_lock);
