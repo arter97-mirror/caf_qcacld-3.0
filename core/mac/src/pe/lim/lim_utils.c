@@ -7350,9 +7350,9 @@ void lim_add_bss_he_cfg(struct bss_params *add_bss, struct pe_session *session)
 
 #ifdef WLAN_FEATURE_11AX
 void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
-				  tDot11fIEhe_op *he_op,
-				  struct pe_session *pe_session,
-				  struct wlan_objmgr_peer *peer)
+				   tDot11fIEhe_op *he_op,
+				   struct pe_session *pe_session,
+				   struct wlan_objmgr_peer *peer)
 {
 	uint8_t op_ch_width;
 	uint8_t ap_max_ch_width;
@@ -7386,6 +7386,7 @@ void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
 	     op_ch_width == CH_WIDTH_80P80MHZ) &&
 	    !he_op->oper_info_6g.info.center_freq_seg1) {
 		op_ch_width = CH_WIDTH_80MHZ;
+		return;
 	}
 
 	/*

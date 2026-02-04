@@ -484,6 +484,7 @@ struct wlan_sha384_ftinfo {
 typedef struct sSirAssocRsp {
 
 	tSirMacCapabilityInfo capabilityInfo;
+	tSirMacAddr peer_macaddr;
 	uint16_t aid;
 	uint16_t status_code;
 	tSirMacRateSet supportedRates;

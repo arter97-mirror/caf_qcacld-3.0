@@ -4471,29 +4471,37 @@ static bool lim_validate_he_mcs_for_bw(uint16_t rx_he_mcs_map,
  *
  * Return: None
  */
+
 static void lim_update_ap_max_ch_width(struct mac_context *mac,
 				       tpSirAssocRsp pAssocRsp,
-				       struct bss_params *pAddBssParams,
-				       struct pe_session *pe_session)
+				       struct pe_session *pe_session,
+				       struct wlan_objmgr_peer *peer)
 {
 	tDot11fIEhe_cap *he_cap;
 	uint16_t rx_mcs_160, tx_mcs_160;
 	bool mcs_valid;
-
-	/* Initialize to safe default */
-	pAddBssParams->staContext.ap_max_ch_width = CH_WIDTH_20MHZ;
+	enum phy_ch_width ap_max_ch_width;
 
 	/* Validate input parameters */
-	if (!pAssocRsp || !pAddBssParams || !pe_session) {
-		pe_debug("Invalid parameters: pAssocRsp=%pK pAddBssParams=%pK pe_session=%pK",
-			 pAssocRsp, pAddBssParams, pe_session);
+	if (!pAssocRsp || !pe_session || !peer) {
+		pe_debug("Invalid parameters: pAssocRsp=%pK pe_session=%pK peer=%pK",
+			 pAssocRsp, pe_session, peer);
 		return;
 	}
 
+	/*
+	 * Default to the peer stored value so that even if HE caps are not
+	 * present/valid in this call, we still persist a consistent value.
+	 */
+	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
+	if (!ap_max_ch_width)
+		ap_max_ch_width = CH_WIDTH_20MHZ;
+
 	/* Check if HE capability is present */
 	if (!pAssocRsp->he_cap.present) {
-		pe_debug("HE capability not present, using default 20MHz");
-		return;
+		pe_debug("HE capability not present, using ap_max_ch_width %d",
+			 ap_max_ch_width);
+		goto out;
 	}
 
 	he_cap = &pAssocRsp->he_cap;
@@ -4508,11 +4516,11 @@ static void lim_update_ap_max_ch_width(struct mac_context *mac,
 
 	if (!mcs_valid) {
 		pe_debug("Invalid HE MCS for <= 80MHz, using 20MHz");
-		return;
+		goto out;
 	}
 
 	/* Set minimum supported bandwidth after baseline validation */
-	pAddBssParams->staContext.ap_max_ch_width = CH_WIDTH_80MHZ;
+	ap_max_ch_width = CH_WIDTH_80MHZ;
 
 	/*
 	 * Step 2: Band-specific validation.
@@ -4532,8 +4540,7 @@ static void lim_update_ap_max_ch_width(struct mac_context *mac,
 	 * preserving backward compatibility and avoiding connection
 	 * failures.
 	 */
-	if (WLAN_REG_IS_5GHZ_CH_FREQ(pe_session->curr_op_freq) ||
-	    lim_is_he_6ghz_band(pe_session)) {
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(pe_session->curr_op_freq)) {
 		/* Try 80+80MHz first (highest bandwidth) */
 		if (he_cap->chan_width_3) {
 			/* Safely extract MCS maps with bounds checking */
@@ -4550,14 +4557,12 @@ static void lim_update_ap_max_ch_width(struct mac_context *mac,
 
 				if (lim_validate_he_mcs_for_bw(rx_mcs_160,
 							       tx_mcs_160)) {
-					pAddBssParams->staContext.
-						ap_max_ch_width =
-							CH_WIDTH_80P80MHZ;
-					pe_debug("AP supports 80+80MHz");
-					goto log_final_bw;
+					ap_max_ch_width = CH_WIDTH_80P80MHZ;
+					pe_debug("HE 5GHz AP max ch width: 80+80MHz");
+					goto out;
 				}
 			}
-			pe_debug("Invalid HE MCS for 80+80MHz, trying 160MHz");
+			pe_debug("Invalid HE MCS 80+80MHz, check 160MHz");
 		}
 
 		/* Try 160MHz */
@@ -4576,50 +4581,105 @@ static void lim_update_ap_max_ch_width(struct mac_context *mac,
 
 				if (lim_validate_he_mcs_for_bw(rx_mcs_160,
 							       tx_mcs_160)) {
-					pAddBssParams->staContext.
-						ap_max_ch_width =
-							CH_WIDTH_160MHZ;
-					pe_debug("AP supports 160MHz");
+					ap_max_ch_width = CH_WIDTH_160MHZ;
 				} else {
-					pe_debug("Invalid HE MCS for 160MHz, falling back to 80MHz");
-					pAddBssParams->staContext.
-						ap_max_ch_width =
-							CH_WIDTH_80MHZ;
+					pe_debug("Invalid HE MCS 160MHz, use 80MHz");
+					ap_max_ch_width = CH_WIDTH_80MHZ;
 				}
 			} else {
-				pe_debug("Invalid HE MCS map size for 160MHz, falling back to 80MHz");
-				pAddBssParams->staContext.
-					ap_max_ch_width =
-						CH_WIDTH_80MHZ;
+				pe_debug("Invalid HE MCS map size for 160MHz, use 80MHz");
+				ap_max_ch_width = CH_WIDTH_80MHZ;
 			}
 		} else if (he_cap->chan_width_1) {
-			/* 80MHz support */
-			pAddBssParams->staContext.ap_max_ch_width =
-							CH_WIDTH_80MHZ;
-			pe_debug("AP supports 80MHz");
+			ap_max_ch_width = CH_WIDTH_80MHZ;
 		} else {
-			/* Fallback to 40MHz */
-			pAddBssParams->staContext.ap_max_ch_width =
-							CH_WIDTH_40MHZ;
-			pe_debug("AP supports 40MHz (5GHz/6GHz)");
+			ap_max_ch_width = CH_WIDTH_40MHZ;
 		}
+
+		pe_debug("HE 5GHz AP max ch width: %d", ap_max_ch_width);
+	} else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq) ||
+		   lim_is_he_6ghz_band(pe_session)) {
+		/*
+		 * 6 GHz:
+		 * dot11f may indicate 80/160 support either using the
+		 * "5 GHz style" bits (chan_width_1/2/3) or "6 GHz style"
+		 * bits (chan_width_5/6). Handle both to avoid incorrectly
+		 * downgrading to 40/20.
+		 */
+		if (he_cap->chan_width_3) {
+			/* Safely extract MCS maps with bounds checking */
+			if (sizeof(he_cap->rx_he_mcs_map_80_80) >=
+			    sizeof(uint16_t) &&
+			    sizeof(he_cap->tx_he_mcs_map_80_80) >=
+			    sizeof(uint16_t)) {
+				qdf_mem_copy(&rx_mcs_160,
+					     he_cap->rx_he_mcs_map_80_80,
+					     sizeof(uint16_t));
+				qdf_mem_copy(&tx_mcs_160,
+					     he_cap->tx_he_mcs_map_80_80,
+					     sizeof(uint16_t));
+
+				if (lim_validate_he_mcs_for_bw(rx_mcs_160,
+							       tx_mcs_160)) {
+					ap_max_ch_width = CH_WIDTH_80P80MHZ;
+					pe_debug("HE 6GHz AP max ch width: 80+80MHz");
+					goto out;
+				}
+			}
+			pe_debug("Invalid HE MCS 80+80MHz, check 160MHz");
+		}
+
+		if (he_cap->chan_width_5 || he_cap->chan_width_2) {
+			/* Safely extract MCS maps with bounds checking */
+			if (sizeof(he_cap->rx_he_mcs_map_160) >=
+			    sizeof(uint16_t) &&
+			    sizeof(he_cap->tx_he_mcs_map_160) >=
+			    sizeof(uint16_t)) {
+				qdf_mem_copy(&rx_mcs_160,
+					     he_cap->rx_he_mcs_map_160,
+					     sizeof(uint16_t));
+				qdf_mem_copy(&tx_mcs_160,
+					     he_cap->tx_he_mcs_map_160,
+					     sizeof(uint16_t));
+
+				if (lim_validate_he_mcs_for_bw(rx_mcs_160,
+							       tx_mcs_160)) {
+					ap_max_ch_width = CH_WIDTH_160MHZ;
+				} else {
+					pe_debug("Invalid HE MCS 160MHz, use 80MHz");
+					ap_max_ch_width = CH_WIDTH_80MHZ;
+				}
+			} else {
+				pe_debug("Invalid HE MCS map size for 160MHz, use 80MHz");
+				ap_max_ch_width = CH_WIDTH_80MHZ;
+			}
+		} else if (he_cap->chan_width_6 || he_cap->chan_width_1) {
+			ap_max_ch_width = CH_WIDTH_80MHZ;
+		} else {
+			ap_max_ch_width = CH_WIDTH_40MHZ;
+		}
+
+		pe_debug("HE 6GHz AP max ch width: %d", ap_max_ch_width);
 	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq)) {
 		/* 2.4GHz band: Check for 40MHz support */
-		if (he_cap->chan_width_0) {
-			pAddBssParams->staContext.ap_max_ch_width =
-							CH_WIDTH_40MHZ;
-			pe_debug("AP supports 40MHz (2.4GHz)");
-		} else {
-			pe_debug("AP supports 20MHz (2.4GHz)");
-		}
+		if (he_cap->chan_width_0)
+			ap_max_ch_width = CH_WIDTH_40MHZ;
+
+		pe_debug("HE 2.4GHz AP max ch width: %d", ap_max_ch_width);
 	} else {
 		pe_debug("Unknown frequency band, using 20MHz");
 	}
 
-log_final_bw:
-	pe_debug("Final AP max channel width: %d for vdev %d",
-		 pAddBssParams->staContext.ap_max_ch_width,
-		 pe_session->vdev_id);
+out:
+	/*
+	 * Persist into peer MLME (single source of truth).
+	 *
+	 * Update peer irrespective of whether ap_max_ch_width was derived in
+	 * this call (e.g., he_cap not present or validation failure). This
+	 * makes peer the authoritative store and avoids conditional update
+	 * behavior.
+	 */
+	wlan_peer_set_ap_max_ch_width(peer, ap_max_ch_width);
 }
 
 /**
@@ -4638,7 +4698,8 @@ log_final_bw:
 static void lim_sta_process_he_capability(struct mac_context *mac,
 					  tpSirAssocRsp pAssocRsp,
 					  struct bss_params *pAddBssParams,
-					  struct pe_session *pe_session)
+					  struct pe_session *pe_session,
+					  struct wlan_objmgr_peer *peer)
 {
 	tpDphHashNode sta = NULL;
 	struct bss_description *bss_desc;
@@ -4695,10 +4756,18 @@ static void lim_sta_process_he_capability(struct mac_context *mac,
 		lim_update_he_6ghz_band_caps(mac,
 				&pAssocRsp->he_6ghz_band_cap,
 				&pAddBssParams->staContext);
-	}
 
-	lim_update_ap_max_ch_width(mac, pAssocRsp, pAddBssParams,
-				   pe_session);
+		/*
+		 * Calculate AP max BW using existing helper, but do not
+		 * update AddBssParams as the source of truth. Store in peer.
+		 */
+		if (peer)
+			lim_update_ap_max_ch_width(mac, pAssocRsp,
+						   pe_session, peer);
+
+	} else {
+		lim_reset_session_he_capable(pe_session);
+	}
 }
 
 /**
@@ -4717,7 +4786,8 @@ static void lim_sta_process_he_capability(struct mac_context *mac,
 static void lim_sta_process_he_operation(struct mac_context *mac,
 					 tpSirAssocRsp pAssocRsp,
 					 struct bss_params *pAddBssParams,
-					 struct pe_session *pe_session)
+					 struct pe_session *pe_session,
+					 struct wlan_objmgr_peer *peer)
 {
 	struct bss_description *bss_desc =
 		&pe_session->lim_join_req->bssDescription;
@@ -4731,10 +4801,10 @@ static void lim_sta_process_he_operation(struct mac_context *mac,
 		if (lim_is_session_he_capable(pe_session) &&
 		    pAssocRsp->he_cap.present) {
 			if (!lim_is_eht_connection_op_info_present(
-					pe_session, pAssocRsp))
+					pe_session, pAssocRsp) && peer)
 				lim_update_he_6gop_assoc_resp(pAddBssParams,
 							      &pAssocRsp->he_op,
-							      pe_session);
+							      pe_session, peer);
 		}
 	}
 
@@ -4744,7 +4814,7 @@ static void lim_sta_process_he_operation(struct mac_context *mac,
 		lim_update_bss_he_capable(mac, pAddBssParams);
 	}
 
-	if (lim_is_he_6ghz_band(pe_session)) {
+	if (lim_is_he_6ghz_band(pe_session) && peer) {
 		/* Process EHT capabilities for 6 GHz */
 		if (lim_is_session_eht_capable(pe_session) &&
 		    pAssocRsp->eht_cap.present)
@@ -4754,7 +4824,7 @@ static void lim_sta_process_he_operation(struct mac_context *mac,
 }
 
 /**
- * lim_sta_configure_he_capability() - Configure HE capability for
+ * lim_update_add_bss_he_params() - Configure HE capability for
  *                                     STA connection
  * @mac: Pointer to MAC context
  * @pAssocRsp: Pointer to Association Response frame
@@ -4768,22 +4838,44 @@ static void lim_sta_process_he_operation(struct mac_context *mac,
  *
  * Return: None
  */
-static void lim_sta_configure_he_capability(struct mac_context *mac,
+static void lim_update_add_bss_he_params(struct mac_context *mac,
 					    tpSirAssocRsp pAssocRsp,
 					    struct bss_params *pAddBssParams,
 					    struct pe_session *pe_session)
 {
+	struct wlan_objmgr_peer *peer;
+	enum phy_ch_width op_ch_width;
+
+	peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
+					   pAddBssParams->bssId,
+					   WLAN_LEGACY_MAC_ID);
+	if (!peer) {
+		pe_err("Failed to get peer for BSSID: " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pAddBssParams->bssId));
+		return;
+	}
+
 	lim_sta_process_he_capability(mac, pAssocRsp, pAddBssParams,
-				      pe_session);
+				      pe_session, peer);
 	lim_sta_process_he_operation(mac, pAssocRsp, pAddBssParams,
-				     pe_session);
+				     pe_session, peer);
+
+	/*
+	 * Finalize AddBssParams ch_width from peer_mlme.op_ch_width
+	 * (populated after HE op sanity checks).
+	 */
+	op_ch_width = wlan_peer_get_op_ch_width(peer);
+	pAddBssParams->staContext.ch_width = op_ch_width;
+	pAddBssParams->ch_width = op_ch_width;
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
 
 #else /* !WLAN_FEATURE_11AX */
 
 
 static inline void
-lim_sta_configure_he_capability(struct mac_context *mac,
+lim_update_add_bss_he_params(struct mac_context *mac,
 				tpSirAssocRsp pAssocRsp,
 				struct bss_params *pAddBssParams,
 				struct pe_session *pe_session)
@@ -4846,8 +4938,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 	lim_update_add_bss_vht_params(mac, pe_session, pAssocRsp,
 				      pAddBssParams);
 
-	lim_sta_configure_he_capability(mac, pAssocRsp, pAddBssParams,
-					pe_session);
+	lim_update_add_bss_he_params(mac, pAssocRsp, pAddBssParams, pe_session);
 
 	if (lim_is_session_eht_capable(pe_session) &&
 	    (pAssocRsp->eht_cap.present)) {
@@ -5101,7 +5192,6 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 		pAddBssParams->staContext.rmfEnabled = 1;
 	}
 
-	/* Set a new state for MLME */
 	if (eLIM_MLM_WT_ASSOC_RSP_STATE == pe_session->limMlmState)
 		pe_session->limMlmState =
 			eLIM_MLM_WT_ADD_BSS_RSP_ASSOC_STATE;

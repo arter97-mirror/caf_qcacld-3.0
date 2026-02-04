@@ -1490,7 +1490,8 @@ void lim_copy_bss_he_cap(struct pe_session *session);
  */
 void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
 				   tDot11fIEhe_op *he_op,
-				   struct pe_session *pe_session);
+				   struct pe_session *pe_session,
+				   struct wlan_objmgr_peer *peer);
 /**
  * lim_copy_join_req_he_cap() - Copy HE capability to PE session from Join req
  * and update as per bandwidth supported
@@ -1843,7 +1844,8 @@ static inline void lim_add_bss_he_cfg(struct bss_params *add_bss,
 static inline void lim_update_he_6gop_assoc_resp(
 					struct bss_params *pAddBssParams,
 					tDot11fIEhe_op *he_op,
-					struct pe_session *pe_session)
+					struct pe_session *pe_session,
+					struct wlan_objmgr_peer *peer)
 {
 }
 
