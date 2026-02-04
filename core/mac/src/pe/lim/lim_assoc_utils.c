@@ -3891,15 +3891,55 @@ static enum phy_ch_width lim_get_bw_from_ht_caps(tDot11fIEHTCaps *ht_cap)
 }
 
 /**
- * lim_get_bw_from_ht_ops() - Get bandwidth from HT operations
- * @ht_info: Pointer to HT information/operations
+ * lim_get_min_ch_width() - Get minimum of two channel widths
+ * @ch_width1: First channel width
+ * @ch_width2: Second channel width
  *
- * Determines the bandwidth from HT operations based on:
- * - recommendedTxWidthSet field
- * - secondaryChannelOffset field
+ * Return: Minimum channel width
+ */
+static enum phy_ch_width lim_get_min_ch_width(enum phy_ch_width ch_width1,
+					       enum phy_ch_width ch_width2)
+{
+	/* Channel width priority: 20 < 40 < 80 < 80+80 < 160 < 320 */
+	if (ch_width1 == CH_WIDTH_INVALID || ch_width2 == CH_WIDTH_INVALID)
+		return CH_WIDTH_20MHZ;
+
+	return (wlan_reg_get_bw_value(ch_width1) <
+		wlan_reg_get_bw_value(ch_width2)) ? ch_width1 : ch_width2;
+}
+
+/**
+ * lim_calculate_assoc_resp_ht_bandwidth() - Calculate HT bandwidth
+ * from Association Response
+ * @pe_session: Pointer to PE session
+ * @pAssocRsp: Pointer to Association Response
+ * @bcn_ies: Pointer to Beacon IEs
+ *
+ * This function calculates the HT bandwidth indicated in the Association
+ * Response by processing HT capabilities and HT operations IEs. It performs
+ * comprehensive validation to ensure the bandwidth is correctly determined.
+ *
+ * Processing Steps:
+ * ----------------
+ * 1. Validate HT mode and HT capabilities presence
+ * 2. Extract bandwidth from HT capabilities (maximum supported)
+ * 3. Extract bandwidth from HT operations (actual operational)
+ * 4. Validate HT ops BW against HT caps BW
+ * 5. Return the validated bandwidth
+ *
+ * HT Capabilities Processing:
+ * --------------------------
+ * - Checks supportedChannelWidthSet field
+ * - Returns CH_WIDTH_40MHZ if 40MHz is supported
+ * - Returns CH_WIDTH_20MHZ otherwise
+ *
+ * HT Operations Processing:
+ * ------------------------
+ * - Checks recommendedTxWidthSet field
+ * - Validates secondaryChannelOffset field
  *
  * HT40 Channel Configuration:
- * ---------------------------
+ * --------------------------
  * HT40+ (Secondary Channel Above Primary):
  *   - secondaryChannelOffset = PHY_DOUBLE_CHANNEL_LOW_PRIMARY (1)
  *   - Example: Primary channel 36, Secondary channel 40
@@ -3915,164 +3955,78 @@ static enum phy_ch_width lim_get_bw_from_ht_caps(tDot11fIEHTCaps *ht_cap)
  *   - Only primary channel used
  *   - Total bandwidth: 20 MHz
  *
- * Return: Channel width enum (CH_WIDTH_20MHZ or CH_WIDTH_40MHZ)
- */
-static enum phy_ch_width lim_get_bw_from_ht_ops(tDot11fIEHTInfo *ht_info)
-{
-	if (!ht_info || !ht_info->present)
-		return CH_WIDTH_20MHZ;
-
-	/* Check recommended TX width set */
-	if (ht_info->recommendedTxWidthSet) {
-		/*
-		 * Validate secondary channel offset to determine HT40+/HT40-
-		 *
-		 * PHY_DOUBLE_CHANNEL_LOW_PRIMARY (1):
-		 *   - HT40+ configuration
-		 *   - Secondary channel is above primary channel
-		 *   - Example: Primary=36, Secondary=40
-		 *
-		 * PHY_DOUBLE_CHANNEL_HIGH_PRIMARY (3):
-		 *   - HT40- configuration
-		 *   - Secondary channel is below primary channel
-		 *   - Example: Primary=40, Secondary=36
-		 *
-		 * Both configurations result in 40 MHz total bandwidth
-		 */
-		if (ht_info->secondaryChannelOffset ==
-		    PHY_DOUBLE_CHANNEL_LOW_PRIMARY ||
-		    ht_info->secondaryChannelOffset ==
-		    PHY_DOUBLE_CHANNEL_HIGH_PRIMARY) {
-			return CH_WIDTH_40MHZ;
-		}
-	}
-
-	/* Return 20 MHz for HT20 or invalid configurations */
-	return CH_WIDTH_20MHZ;
-}
-
-/**
- * lim_validate_ht_bw() - Validate HT bandwidth
- * @ht_cap_bw: Bandwidth from HT capabilities
- * @ht_op_bw: Bandwidth from HT operations
+ * Bandwidth Validation:
+ * --------------------
+ * - HT ops BW must not exceed HT caps BW
+ * - Prefers HT ops BW (actual operational) when valid
+ * - Falls back to HT caps BW when HT ops is INVALID
  *
- * Validates that HT operations bandwidth does not exceed HT
- * capabilities bandwidth.
- *
- * Return: Validated channel width
- */
-static enum phy_ch_width lim_validate_ht_bw(enum phy_ch_width ht_cap_bw,
-					     enum phy_ch_width ht_op_bw)
-{
-	/* HT ops BW should not be greater than HT caps BW */
-	if (ht_op_bw > ht_cap_bw) {
-		pe_debug("HT ops BW %d > HT caps BW %d, using HT caps BW",
-			 ht_op_bw, ht_cap_bw);
-		return ht_cap_bw;
-	}
-
-	/* Use HT ops bandwidth if valid, otherwise HT caps */
-	return (ht_op_bw != CH_WIDTH_20MHZ) ? ht_op_bw : ht_cap_bw;
-}
-
-/**
- * lim_get_min_ch_width() - Get minimum of two channel widths
- * @ch_width1: First channel width
- * @ch_width2: Second channel width
- *
- * Return: Minimum channel width
- */
-static enum phy_ch_width lim_get_min_ch_width(enum phy_ch_width ch_width1,
-					       enum phy_ch_width ch_width2)
-{
-	/* Channel width priority: 20 < 40 < 80 < 80+80 < 160 < 320 */
-	if (ch_width1 == CH_WIDTH_INVALID || ch_width2 == CH_WIDTH_INVALID)
-		return CH_WIDTH_20MHZ;
-
-	return (wlan_reg_get_bw_value(ch_width1) <=
-		wlan_reg_get_bw_value(ch_width2)) ? ch_width1 : ch_width2;
-}
-
-/**
- * lim_calculate_assoc_resp_ht_bandwidth() - Calculate HT bandwidth
- * from Association Response
- * @pe_session: Pointer to PE session
- * @pAssocRsp: Pointer to Association Response
- * @chan_width_support: HT channel width support flag
- * @bcn_ies: Pointer to Beacon IEs
- *
- * Calculates the HT bandwidth indicated in the Association Response.
- * Validates BW indicated by HT ops against HT caps.
- * For HT mode, maximum bandwidth is 40MHz.
- *
- * Return: Channel width enum (CH_WIDTH_20MHZ or CH_WIDTH_40MHZ)
+ * Return: Channel width enum
+ *         - CH_WIDTH_INVALID: Not HT mode or HT caps not present
+ *         - CH_WIDTH_20MHZ: Valid HT20 mode
+ *         - CH_WIDTH_40MHZ: Valid HT40 mode
  */
 static enum phy_ch_width lim_calculate_assoc_resp_ht_bandwidth(
 					struct pe_session *pe_session,
 					tpSirAssocRsp pAssocRsp,
-					bool chan_width_support,
 					tDot11fBeaconIEs *bcn_ies)
 {
 	enum phy_ch_width ht_cap_bw = CH_WIDTH_20MHZ;
 	enum phy_ch_width ht_op_bw = CH_WIDTH_20MHZ;
 	enum phy_ch_width assoc_resp_bw = CH_WIDTH_20MHZ;
+	tDot11fIEHTCaps *ht_cap;
+	tDot11fIEHTInfo *ht_info;
 
-	/* Check if HT mode and HT capabilities are present */
-	if (!IS_DOT11_MODE_HT(pe_session->dot11mode) ||
-	    !pAssocRsp->HTCaps.present) {
+	/*
+	 * Step 1: Validate HT IEs availability
+	 *
+	 * Caller is expected to gate this helper by ensuring HT mode and
+	 * presence of HTCaps. This helper only validates HTInfo/HT operation
+	 * fields and performs safe fallback to 20 MHz when HTInfo is missing
+	 * or malformed.
+	 */
+	ht_cap = &pAssocRsp->HTCaps;
+	ht_info = &pAssocRsp->HTInfo;
+
+	/* Step 2: Extract bandwidth from HT capabilities (maximum supported) */
+	ht_cap_bw = ht_cap->supportedChannelWidthSet ?
+				CH_WIDTH_40MHZ : CH_WIDTH_20MHZ;
+
+	/*
+	 * Step 3: Extract bandwidth from HT operations (actual operational)
+	 * If HT Info is not present, treat as buggy AP and fall back to HT20.
+	 */
+	if (!ht_info->present)
 		return CH_WIDTH_20MHZ;
+
+	/* Check recommended TX width - if not set, it's HT20 mode */
+	if (!ht_info->recommendedTxWidthSet) {
+		ht_op_bw = CH_WIDTH_20MHZ;
+	} else {
+		/*
+		 * For 40 MHz operation, validate the secondary channel offset.
+		 * If it's invalid, treat it as malformed and fall back to
+		 * 20 MHz.
+		 */
+		if (ht_info->secondaryChannelOffset ==
+		    PHY_DOUBLE_CHANNEL_LOW_PRIMARY ||
+		    ht_info->secondaryChannelOffset ==
+		    PHY_DOUBLE_CHANNEL_HIGH_PRIMARY)
+			ht_op_bw = CH_WIDTH_40MHZ;
+		else
+			ht_op_bw = CH_WIDTH_20MHZ;
 	}
 
-	/* Check if channel width is supported by STA */
-	if (!chan_width_support) {
-		pe_debug("Channel width not supported by STA");
-		return CH_WIDTH_20MHZ;
-	}
-
-	/* Step 1: Get bandwidth from HT capabilities */
-	ht_cap_bw = lim_get_bw_from_ht_caps(&pAssocRsp->HTCaps);
-
-	/* Also check beacon IEs for HT caps as fallback */
-	if (ht_cap_bw == CH_WIDTH_20MHZ && bcn_ies->HTCaps.present) {
-		ht_cap_bw = lim_get_bw_from_ht_caps(&bcn_ies->HTCaps);
-		pe_debug("Using HT caps from beacon IEs, BW: %d", ht_cap_bw);
-	}
-
-	/* Step 2: Get bandwidth from HT operations */
-	if (pAssocRsp->HTInfo.present)
-		ht_op_bw = lim_get_bw_from_ht_ops(&pAssocRsp->HTInfo);
-
-	/* Step 3: Validate HT ops BW against HT caps BW */
-	assoc_resp_bw = lim_validate_ht_bw(ht_cap_bw, ht_op_bw);
+	/*
+	 * Step 4: Validate HT ops BW against HT caps BW
+	 * HT ops BW should not be greater than HT caps BW
+	 */
+	if (ht_op_bw > ht_cap_bw)
+		assoc_resp_bw = ht_cap_bw;
+	else
+		assoc_resp_bw = ht_op_bw;
 
 	return assoc_resp_bw;
-}
-
-/**
- * lim_is_assoc_rsp_vht_or_eht_op() - Check if VHT or EHT op info present
- * @pe_session: Pointer to PE session
- * @pAssocRsp: Pointer to Association Response
- *
- * Return: true if VHT caps or EHT op info present, false otherwise
- */
-static bool lim_is_assoc_rsp_vht_or_eht_op(struct pe_session *pe_session,
-					   tpSirAssocRsp pAssocRsp)
-{
-	return (lim_is_eht_connection_op_info_present(pe_session, pAssocRsp) ||
-		pAssocRsp->VHTCaps.present);
-}
-
-/**
- * lim_cap_bw() - Cap bandwidth to specified limit
- * @bw: Bandwidth to cap
- * @cap: Maximum allowed bandwidth
- *
- * Return: Minimum of bw and cap
- */
-static enum phy_ch_width lim_cap_bw(enum phy_ch_width bw,
-				    enum phy_ch_width cap)
-{
-	return lim_get_min_ch_width(bw, cap);
 }
 
 /**
@@ -4080,47 +4034,41 @@ static enum phy_ch_width lim_cap_bw(enum phy_ch_width bw,
  * @pe_session: Pointer to PE session
  * @pAssocRsp: Pointer to Association Response
  * @pAddBssParams: Pointer to Add BSS parameters
- * @negotiated_bw: Negotiated operational bandwidth
- * @operational_bw: Operational bandwidth from session
+ * @final_bw: Final negotiated operational bandwidth
  *
- * Stores negotiated bandwidth values in peer MLME object (single source
- * of truth) and then retrieves them back to populate AddBss parameters.
+ * Stores bandwidth values in peer MLME object (single source of truth)
+ * and then retrieves them back to populate AddBss parameters.
  *
  * Return: None
  */
 static void lim_store_bw_in_peer_mlme(struct pe_session *pe_session,
 				      tpSirAssocRsp pAssocRsp,
 				      struct bss_params *pAddBssParams,
-				      enum phy_ch_width negotiated_bw,
-				      enum phy_ch_width operational_bw)
+				      enum phy_ch_width final_bw)
 {
-	enum phy_ch_width ap_max_bw;
-	struct wlan_objmgr_peer *peer = NULL;
-	struct wlan_objmgr_psoc *psoc = NULL;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_psoc *psoc;
 	uint8_t center_freq_seg0;
+	enum phy_ch_width ht_cap_bw;
 
-	/* Determine AP max BW */
-	if (lim_is_assoc_rsp_vht_or_eht_op(pe_session, pAssocRsp))
-		ap_max_bw = operational_bw;
-	else
-		ap_max_bw = lim_get_bw_from_ht_caps(&pAssocRsp->HTCaps);
-
-	/* Get peer object */
 	psoc = wlan_vdev_get_psoc(pe_session->vdev);
-	if (psoc)
-		peer = wlan_objmgr_get_peer_by_mac(psoc,
-						   pAddBssParams->bssId,
-						   WLAN_LEGACY_MAC_ID);
+	if (!psoc)
+		return;
 
+	peer = wlan_objmgr_get_peer_by_mac(psoc, pAddBssParams->bssId,
+					   WLAN_LEGACY_MAC_ID);
 	if (!peer) {
 		pe_err("Failed to get peer for BSSID: " QDF_MAC_ADDR_FMT,
 		       QDF_MAC_ADDR_REF(pAddBssParams->bssId));
 		return;
 	}
 
-	/* STEP 1: Store negotiated values in peer MLME (single source of truth) */
-	wlan_peer_set_op_ch_width(peer, negotiated_bw);
-	wlan_peer_set_ap_max_ch_width(peer, ap_max_bw);
+	/* Get HT caps BW (AP max BW for HT-only case) */
+	ht_cap_bw = lim_get_bw_from_ht_caps(&pAssocRsp->HTCaps);
+
+	/* Update peer with AP max BW and operational BW */
+	wlan_peer_set_ap_max_ch_width(peer, ht_cap_bw);
+	wlan_peer_set_op_ch_width(peer, final_bw);
 
 	/* Center freq seg0/seg1 for HT is derived from HTInfo */
 	if (pAssocRsp->HTInfo.present) {
@@ -4137,7 +4085,7 @@ static void lim_store_bw_in_peer_mlme(struct pe_session *pe_session,
 		wlan_peer_set_center_freq_seg1(peer, 0);
 	}
 
-	/* STEP 2: Retrieve values from peer MLME to populate AddBss params */
+	/* Retrieve values from peer MLME to populate AddBss params */
 	pAddBssParams->ch_width = wlan_peer_get_op_ch_width(peer);
 	pAddBssParams->staContext.ch_width = wlan_peer_get_op_ch_width(peer);
 	pAddBssParams->staContext.ap_max_ch_width =
@@ -4145,7 +4093,6 @@ static void lim_store_bw_in_peer_mlme(struct pe_session *pe_session,
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
-
 /**
  * lim_update_add_bss_ht_params() - Configure channel width for STA connection
  * @mac: Pointer to MAC context
@@ -4156,9 +4103,9 @@ static void lim_store_bw_in_peer_mlme(struct pe_session *pe_session,
  *
  * This function determines and configures the appropriate channel
  * bandwidth for the STA's connection to the AP during BSS addition.
- * It processes the HT capabilities and HT operations from the
- * Association Response frame and sets the final channel width in
- * the BSS parameters.
+ * It calculates the bandwidth based on the Association Response HT
+ * Capabilities and HT Operation elements, intersected with the session's
+ * operational bandwidth.
  *
  * Return: None (updates pAddBssParams in-place)
  */
@@ -4169,23 +4116,29 @@ static void lim_update_add_bss_ht_params(struct mac_context *mac,
 					 struct bss_params *pAddBssParams)
 {
 	bool chan_width_support;
-	struct mlme_vht_capabilities_info *vht_cap_info;
 	tDot11fBeaconIEs *bcn_ies = &bss_desc->bcn_ies;
 	enum phy_ch_width assoc_resp_bw, operational_bw, final_bw;
 
-	/* Early return if not HT mode or no HT caps */
+	/*
+	 * IEEE 802.11-2024 (HT operation is explicit):
+	 * If we are not in HT mode or the peer does not advertise HT
+	 * capabilities in Assoc Response, we must not assume HT operation.
+	 * Fallback to non-HT (20 MHz) operation.
+	 */
 	if (!IS_DOT11_MODE_HT(pe_session->dot11mode) ||
 	    !pAssocRsp->HTCaps.present) {
 		pe_session->htCapability = false;
+		pe_session->ch_width = CH_WIDTH_20MHZ;
+		pe_session->ap_ch_width = pe_session->ch_width;
+		pe_session->ch_center_freq_seg0 = 0;
+		pe_session->ch_center_freq_seg1 = 0;
 		return;
 	}
 
-	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
-
 	/* Get HT channel width support capability */
 	chan_width_support = lim_get_ht_capability(mac,
-					eHT_SUPPORTED_CHANNEL_WIDTH_SET,
-					pe_session);
+						eHT_SUPPORTED_CHANNEL_WIDTH_SET,
+						pe_session);
 
 	/* Update HT parameters */
 	lim_sta_add_bss_update_ht_parameter(bss_desc->chan_freq,
@@ -4194,11 +4147,10 @@ static void lim_update_add_bss_ht_params(struct mac_context *mac,
 					    chan_width_support,
 					    pAddBssParams);
 
-	/* Calculate HT bandwidth from Association Response */
+	/* Calculate HT bandwidth from Association Response (validated) */
 	assoc_resp_bw = lim_calculate_assoc_resp_ht_bandwidth(pe_session,
-							pAssocRsp,
-							chan_width_support,
-							bcn_ies);
+							      pAssocRsp,
+							      bcn_ies);
 
 	/*
 	 * Operational BW: intersection of FW advertised channel width
@@ -4207,51 +4159,12 @@ static void lim_update_add_bss_ht_params(struct mac_context *mac,
 	operational_bw = pe_session->ch_width;
 
 	/* Compute final bandwidth as minimum of both */
-	final_bw = lim_cap_bw(assoc_resp_bw, operational_bw);
+	final_bw = lim_get_min_ch_width(assoc_resp_bw, operational_bw);
 
-	pe_debug("HT BW: assoc_resp=%d, operational=%d, final=%d",
-		 assoc_resp_bw, operational_bw, final_bw);
-
-	/* Determine negotiated bandwidth based on connection type */
-	if (lim_is_assoc_rsp_vht_or_eht_op(pe_session, pAssocRsp)) {
-		/* EHT or VHT connection: Use final_bw directly */
-		final_bw = final_bw;
-
-	} else if (chan_width_support &&
-		   (pAssocRsp->HTCaps.supportedChannelWidthSet ||
-		    (bcn_ies->HTCaps.present &&
-		     bcn_ies->HTCaps.supportedChannelWidthSet))) {
-		/*
-		 * HT 40MHz capable: Cap at 40MHz
-		 *
-		 * IEEE 802.11-2024 Standards Compliance Note:
-		 * Per IEEE 802.11-2024 Clause 9.4.2.54 and 11.15, the
-		 * Association Response HT Capabilities should be authoritative.
-		 *
-		 * WORKAROUND for Non-Compliant APs:
-		 * Some APs don't properly set supportedChannelWidthSet in
-		 * Association Response HT Capabilities, even though they
-		 * advertise 40MHz support in Beacon HT Capabilities.
-		 * This fallback to Beacon IEs maintains interoperability.
-		 */
-		final_bw = lim_cap_bw(final_bw, CH_WIDTH_40MHZ);
-
-	} else {
-		/* HT 20MHz only: Cap at 20MHz */
-		final_bw = lim_cap_bw(final_bw, CH_WIDTH_20MHZ);
-
-		if (!vht_cap_info->enable_txbf_20mhz)
-			pAddBssParams->staContext.vhtTxBFCapable = 0;
-	}
-
-	/*
-	 * Store negotiated BW in peer MLME (single source of truth),
-	 * then retrieve and populate AddBss params from peer
-	 */
+	/* Store negotiated BW in peer MLME (single source of truth) */
 	lim_store_bw_in_peer_mlme(pe_session, pAssocRsp, pAddBssParams,
-				  final_bw, operational_bw);
+				  final_bw);
 }
-
 QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 				tpSirAssocRsp pAssocRsp,
 				struct bss_description *bss_desc,
@@ -4327,6 +4240,10 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 		if (vht_caps)
 			lim_update_vhtcaps_assoc_resp(mac, pAddBssParams,
 						      vht_caps, pe_session);
+	} else {
+		/* VHT not capable: Check VHT TxBF 20MHz setting */
+		if (!vht_cap_info->enable_txbf_20mhz)
+			pAddBssParams->staContext.vhtTxBFCapable = 0;
 	}
 
 	if (lim_is_session_he_capable(pe_session) &&
