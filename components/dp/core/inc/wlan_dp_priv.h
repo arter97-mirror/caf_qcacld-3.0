@@ -633,7 +633,7 @@ struct dp_rx_fst {
 	qdf_work_t fst_update_work;
 	qdf_workqueue_t *fst_update_wq;
 	qdf_list_t fst_update_list;
-	qdf_time_t last_update_time_ns;
+	uint64_t last_update_time_ns;
 	uint32_t update_count;
 	uint32_t meta_counter;
 	uint32_t cmem_ba;
