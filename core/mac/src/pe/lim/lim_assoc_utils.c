@@ -3868,7 +3868,8 @@ static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
  */
 static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
 					   struct bss_params *pAddBssParams,
-					   tDot11fIEeht_op *eht_op)
+					   tDot11fIEeht_op *eht_op,
+					   struct wlan_objmgr_peer *peer)
 {
 	enum phy_ch_width op_ch_width;
 	uint8_t center_freq_diff;
@@ -3877,7 +3878,7 @@ static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
 	op_ch_width = wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 						eht_op->channel_width);
 
-	ap_max_ch_width = pAddBssParams->staContext.ap_max_ch_width;
+	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
 
 	/*
 	 * Correct CCFS0/CCFS1 interpretation based on IEEE 802.11be:
@@ -3915,14 +3916,18 @@ static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
 	}
 
 	/*
-	 * Ensure oper BW does not exceed AP max BW and
-	 * host initiated VDEV start BW
+	 * Ensure oper BW does not exceed AP max BW and host initiated VDEV
+	 * start BW. Apply constraints in order: session -> AP max -> oper
 	 */
-	pAddBssParams->ch_width = QDF_MIN(op_ch_width, ap_max_ch_width);
-	pAddBssParams->ch_width = QDF_MIN(pAddBssParams->ch_width,
-					  pe_session->ch_width);
+	if (op_ch_width > ap_max_ch_width)
+		op_ch_width = ap_max_ch_width;
 
-	pAddBssParams->staContext.ch_width = pAddBssParams->ch_width;
+	if (op_ch_width > pe_session->ch_width)
+		op_ch_width = pe_session->ch_width;
+
+	wlan_peer_set_op_ch_width(peer, op_ch_width);
+	wlan_peer_set_center_freq_seg0(peer, eht_op->ccfs0);
+	wlan_peer_set_center_freq_seg1(peer, eht_op->ccfs1);
 }
 #endif
 
@@ -4772,7 +4777,6 @@ static void lim_sta_process_he_capability(struct mac_context *mac,
 		if (peer)
 			lim_update_ap_max_ch_width(mac, assoc_resp,
 						   pe_session, peer);
-
 	} else {
 		lim_reset_session_he_capable(pe_session);
 	}
@@ -4968,13 +4972,22 @@ static bool lim_validate_eht_mcs_le_80(tDot11fIEeht_cap *eht_cap)
  */
 static void lim_update_ap_max_eht_ch_width(struct mac_context *mac,
 					   tpSirAssocRsp pAssocRsp,
-					   struct bss_params *pAddBssParams,
-					   struct pe_session *pe_session)
+					   struct pe_session *pe_session,
+					   struct wlan_objmgr_peer *peer)
 {
 	tDot11fIEeht_cap *eht_cap;
+	enum phy_ch_width ap_max_ch_width;
+
+	/*
+	 * Default to the peer stored value so that even if EHT caps are not
+	 * present/valid in this call, we still persist a consistent value.
+	 */
+	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
+	if (!ap_max_ch_width)
+		ap_max_ch_width = CH_WIDTH_20MHZ;
 
 	if (!pAssocRsp->eht_cap.present)
-		return;
+		goto out;
 
 	eht_cap = &pAssocRsp->eht_cap;
 
@@ -4985,44 +4998,54 @@ static void lim_update_ap_max_eht_ch_width(struct mac_context *mac,
 			 QDF_MAC_ADDR_REF(pe_session->bssId));
 		/*
 		 * Baseline invalid, cannot support EHT.
-		 * Don't modify ap_max_ch_width - it retains value from
-		 * VHT/HE processing, allowing fallback to those modes.
+		 * Keep ap_max_ch_width as-is to allow fallback to HE/VHT.
 		 */
-		return;
+		goto out;
 	}
+
+	/*
+	 * Baseline validation passed - EHT is supported.
+	 * Set minimum EHT bandwidth (80 MHz) as starting point.
+	 */
+	ap_max_ch_width = CH_WIDTH_80MHZ;
 
 	/* Step 2: Band-specific validation for wider channels */
 	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq) &&
 	    eht_cap->support_320mhz_6ghz &&
 	    lim_validate_eht_mcs_320(eht_cap)) {
-		pAddBssParams->staContext.ap_max_ch_width =
-						CH_WIDTH_320MHZ;
+		ap_max_ch_width = CH_WIDTH_320MHZ;
 	} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(pe_session->curr_op_freq) ||
 		    WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq)) &&
 		   pAssocRsp->he_cap.chan_width_2 &&
 		   lim_validate_eht_mcs_160(eht_cap)) {
 		/* 160 MHz support indicated in HE Cap, validated in EHT Cap */
-		pAddBssParams->staContext.ap_max_ch_width =
-						CH_WIDTH_160MHZ;
+		ap_max_ch_width = CH_WIDTH_160MHZ;
 	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq)) {
-		pAddBssParams->staContext.ap_max_ch_width =
-						CH_WIDTH_40MHZ;
-	} else {
-		/* Fallback to 80 MHz for 5/6 GHz */
-		pAddBssParams->staContext.ap_max_ch_width =
-						CH_WIDTH_80MHZ;
+		ap_max_ch_width = CH_WIDTH_40MHZ;
 	}
+
+out:
+	/*
+	 * Persist into peer MLME (single source of truth).
+	 *
+	 * Update peer irrespective of whether ap_max_ch_width was derived in
+	 * this call (e.g., EHT cap missing or validation failure). This
+	 * makes peer the authoritative store and avoids conditional update
+	 * behavior.
+	 */
+	wlan_peer_set_ap_max_ch_width(peer, ap_max_ch_width);
 }
 
 static void lim_sta_process_eht_capability(struct mac_context *mac,
 					   tpSirAssocRsp pAssocRsp,
 					   struct bss_params *pAddBssParams,
-					   struct pe_session *pe_session)
+					   struct pe_session *pe_session,
+					   struct wlan_objmgr_peer *peer)
 {
 	struct bss_description *bss_desc;
 	tDot11fBeaconIEs *bcn_ies;
 
-	if (!pAssocRsp || !pAddBssParams || !pe_session) {
+	if (!pAssocRsp || !pAddBssParams || !pe_session || !peer) {
 		pe_err("NULL pointer passed to lim_sta_process_eht_capability");
 		return;
 	}
@@ -5042,8 +5065,8 @@ static void lim_sta_process_eht_capability(struct mac_context *mac,
 							  bcn_ies, pAssocRsp);
 		}
 
-		lim_update_ap_max_eht_ch_width(mac, pAssocRsp,
-					       pAddBssParams, pe_session);
+		lim_update_ap_max_eht_ch_width(mac, pAssocRsp, pe_session,
+					       peer);
 	} else {
 		lim_update_session_eht_capable(pe_session, false);
 	}
@@ -5063,21 +5086,73 @@ static void lim_sta_process_eht_capability(struct mac_context *mac,
  * Return: None
  */
 static void lim_sta_process_eht_operation(struct mac_context *mac,
-					  tpSirAssocRsp pAssocRsp,
-					  struct bss_params *pAddBssParams,
-					  struct pe_session *pe_session)
+					 tpSirAssocRsp pAssocRsp,
+					 struct bss_params *pAddBssParams,
+					 struct pe_session *pe_session,
+					 struct wlan_objmgr_peer *peer)
 {
 	/* Validate both EHT capability and operation are present */
 	if (lim_is_session_eht_capable(pe_session) &&
 	    pAssocRsp->eht_cap.present &&
 	    pAssocRsp->eht_op.present &&
-	    pAssocRsp->eht_op.eht_op_information_present)
+	    pAssocRsp->eht_op.eht_op_information_present) {
+		/*
+		 * Persist EHT operation BW + seg0/seg1 into peer MLME after
+		 * sanity checks (ap_max_ch_width validation is done inside).
+		 */
 		lim_update_eht_oper_assoc_resp(pe_session, pAddBssParams,
-					       &pAssocRsp->eht_op);
+					       &pAssocRsp->eht_op, peer);
+	}
 }
 
-#else /* !WLAN_FEATURE_11BE */
+/**
+ * lim_update_add_bss_eht_params() - Configure EHT capability for STA connection
+ * @mac: Pointer to MAC context
+ * @pAssocRsp: Pointer to Association Response frame
+ * @pAddBssParams: Pointer to Add BSS parameters structure
+ * @pe_session: Pointer to PE session
+ *
+ * This function orchestrates the parsing of EHT Capabilities and EHT
+ * Operation IEs to determine the final supported parameters for the
+ * connection. It processes both EHT Capability IE and EHT Operation IE.
+ *
+ * Return: None
+ */
+static void lim_update_add_bss_eht_params(struct mac_context *mac,
+					  tpSirAssocRsp pAssocRsp,
+					  struct bss_params *pAddBssParams,
+					  struct pe_session *pe_session)
+{
+	struct wlan_objmgr_peer *peer;
+	enum phy_ch_width op_ch_width;
 
+	peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
+					   pAddBssParams->bssId,
+					   WLAN_LEGACY_MAC_ID);
+	if (!peer) {
+		pe_err("Failed to get peer for BSSID: " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pAddBssParams->bssId));
+		return;
+	}
+
+	lim_sta_process_eht_capability(mac, pAssocRsp, pAddBssParams,
+				       pe_session, peer);
+	lim_sta_process_eht_operation(mac, pAssocRsp, pAddBssParams,
+				      pe_session, peer);
+
+	/*
+	 * Finalize AddBssParams ch_width from peer_mlme.op_ch_width
+	 * (populated after EHT op sanity checks).
+	 */
+	op_ch_width = wlan_peer_get_op_ch_width(peer);
+	pAddBssParams->staContext.ch_width = op_ch_width;
+	pAddBssParams->ch_width = op_ch_width;
+	pAddBssParams->staContext.ap_max_ch_width =
+		wlan_peer_get_ap_max_ch_width(peer);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+}
+#else /* !WLAN_FEATURE_11BE */
 static inline void
 lim_sta_process_eht_capability(struct mac_context *mac,
 			       tpSirAssocRsp pAssocRsp,
@@ -5088,6 +5163,15 @@ lim_sta_process_eht_capability(struct mac_context *mac,
 
 static inline void
 lim_sta_process_eht_operation(struct mac_context *mac,
+			      tpSirAssocRsp pAssocRsp,
+			      struct bss_params *pAddBssParams,
+			      struct pe_session *pe_session,
+			      struct wlan_objmgr_peer *peer)
+{
+}
+
+static inline void
+lim_update_add_bss_eht_params(struct mac_context *mac,
 			      tpSirAssocRsp pAssocRsp,
 			      struct bss_params *pAddBssParams,
 			      struct pe_session *pe_session)
@@ -5159,10 +5243,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 
 	lim_update_add_bss_he_params(mac, pAssocRsp, pAddBssParams, pe_session);
 
-	/* Configure EHT capability */
-	lim_sta_process_eht_capability(mac, pAssocRsp, pAddBssParams,
-				       pe_session);
-	lim_sta_process_eht_operation(mac, pAssocRsp, pAddBssParams,
+	lim_update_add_bss_eht_params(mac, pAssocRsp, pAddBssParams,
 				      pe_session);
 
 	if (pAssocRsp->bss_max_idle_period.present) {
