@@ -6133,14 +6133,15 @@ QDF_STATUS sme_deregister_mgmt_frame(mac_handle_t mac_handle, uint8_t sessionId,
  */
 static QDF_STATUS sme_prepare_mgmt_tx(mac_handle_t mac_handle,
 				      uint8_t vdev_id,
-				      const uint8_t *buf, uint32_t len)
+				      const uint8_t *buf, uint32_t len,
+				      uint64_t cookie)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct sir_mgmt_msg *msg;
 	uint16_t msg_len;
 	struct scheduler_msg sch_msg = {0};
 
-	sme_debug("prepares auth frame");
+	sme_debug("prepares auth frame, cookie: 0x%llx", cookie);
 
 	msg_len = sizeof(*msg) + len;
 	msg = qdf_mem_malloc(msg_len);
@@ -6150,6 +6151,7 @@ static QDF_STATUS sme_prepare_mgmt_tx(mac_handle_t mac_handle,
 		msg->type = eWNI_SME_SEND_MGMT_FRAME_TX;
 		msg->msg_len = msg_len;
 		msg->vdev_id = vdev_id;
+		msg->cookie = cookie;
 		msg->data = (uint8_t *)msg + sizeof(*msg);
 		qdf_mem_copy(msg->data, buf, len);
 
@@ -6163,14 +6165,15 @@ static QDF_STATUS sme_prepare_mgmt_tx(mac_handle_t mac_handle,
 }
 
 QDF_STATUS sme_send_mgmt_tx(mac_handle_t mac_handle, uint8_t session_id,
-			    const uint8_t *buf, uint32_t len)
+			    const uint8_t *buf, uint32_t len, uint64_t cookie)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		status = sme_prepare_mgmt_tx(mac_handle, session_id, buf, len);
+		status = sme_prepare_mgmt_tx(mac_handle, session_id,
+					     buf, len, cookie);
 		sme_release_global_lock(&mac->sme);
 	}
 

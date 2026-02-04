@@ -1168,6 +1168,21 @@ bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 				       struct sk_buff *skb,
 				       bool unencrypted);
 
+/**
+ * wlan_hdd_cfg80211_mgmt_tx_status() - mgmt tx status
+ * @wdev: Wireless device structure pointer
+ * @cookie: Cookie
+ * @buf: Buffer
+ * @len: Length
+ * @ack: Ack
+ * @gfp: GFP flags
+ *
+ * Return: None
+ */
+void wlan_hdd_cfg80211_mgmt_tx_status(struct wireless_dev *wdev, u64 cookie,
+				      const u8 *buf, size_t len, bool ack,
+				      gfp_t gfp);
+
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 /**
  * hdd_send_dbam_config() - send DBAM config

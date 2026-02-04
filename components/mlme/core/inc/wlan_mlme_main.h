@@ -189,10 +189,12 @@ struct wlan_disconnect_info {
 /**
  * struct sae_auth_retry - SAE auth retry Information
  * @sae_auth_max_retry: Max number of sae auth retries
+ * @cookie: cookie value
  * @sae_auth: SAE auth frame information
  */
 struct sae_auth_retry {
 	uint8_t sae_auth_max_retry;
+	uint64_t cookie;
 	struct element_info sae_auth;
 };
 

@@ -39138,6 +39138,13 @@ bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 }
 #endif
 
+void wlan_hdd_cfg80211_mgmt_tx_status(struct wireless_dev *wdev, u64 cookie,
+				      const u8 *buf, size_t len, bool ack,
+				      gfp_t gfp)
+{
+	cfg80211_mgmt_tx_status(wdev, cookie, buf, len, ack, gfp);
+}
+
 #if defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT) && \
 	defined(WLAN_FEATURE_MULTI_LINK_SAP)
 /**

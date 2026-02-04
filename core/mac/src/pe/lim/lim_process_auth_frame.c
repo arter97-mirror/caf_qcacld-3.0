@@ -647,12 +647,13 @@ static void lim_get_sta_mld_address(struct wlan_objmgr_vdev *vdev,
  * @mac_ctx: Pointer to mac context
  * @vdev: vdev
  * @mac_hdr: Pointer to MAC management header
+ * @is_tx: Conversion is required for TX frame or RX frame
  *
  * Return: void
  */
-static QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
-						 struct wlan_objmgr_vdev *vdev,
-						 tpSirMacMgmtHdr mac_hdr)
+QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
+					  struct wlan_objmgr_vdev *vdev,
+					  tpSirMacMgmtHdr mac_hdr, bool is_tx)
 {
 	struct qdf_mac_addr *self_mld_addr;
 	struct tLimPreAuthNode *pre_auth_node;
@@ -699,8 +700,13 @@ static QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
 				return status;
 		}
 
-		qdf_mem_copy(mac_hdr->sa, peer_mld_addr.bytes,
-			     QDF_MAC_ADDR_SIZE);
+		if (is_tx)
+			qdf_copy_macaddr((struct qdf_mac_addr *)mac_hdr->da,
+					 &peer_mld_addr);
+		else
+			qdf_copy_macaddr((struct qdf_mac_addr *)mac_hdr->sa,
+					 &peer_mld_addr);
+
 		qdf_mem_copy(mac_hdr->bssId, peer_mld_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 		break;
@@ -708,7 +714,12 @@ static QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
 		return QDF_STATUS_SUCCESS;
 	}
 
-	qdf_mem_copy(mac_hdr->da, self_mld_addr->bytes, QDF_MAC_ADDR_SIZE);
+	if (is_tx)
+		qdf_copy_macaddr((struct qdf_mac_addr *)mac_hdr->sa,
+				 self_mld_addr);
+	else
+		qdf_copy_macaddr((struct qdf_mac_addr *)mac_hdr->da,
+				 self_mld_addr);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -717,13 +728,6 @@ static void lim_get_sta_mld_address(struct wlan_objmgr_vdev *vdev,
 				    uint8_t *body_ptr, uint32_t frame_len,
 				    struct qdf_mac_addr *peer_mld)
 {
-}
-
-static QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
-						 struct wlan_objmgr_vdev *vdev,
-						 tpSirMacMgmtHdr mac_hdr)
-{
-	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -886,7 +890,7 @@ lim_process_sae_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			 */
 			status = lim_update_link_to_mld_address(mac_ctx,
 								pe_session->vdev,
-								mac_hdr);
+								mac_hdr, false);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				pe_debug("SAE address conversion failure with status:%d",
 					 status);
@@ -925,7 +929,7 @@ lim_process_sae_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 		status = lim_update_link_to_mld_address(mac_ctx,
 							pe_session->vdev,
-							mac_hdr);
+							mac_hdr, false);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_debug("vdev:%d STA SAE address conversion failed status:%d",
 				 pe_session->vdev_id, status);
@@ -2343,7 +2347,7 @@ lim_process_external_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	lim_sae_auth_cleanup_retry(mac, vdev_id);
-	status = lim_update_link_to_mld_address(mac, vdev, dot11_hdr);
+	status = lim_update_link_to_mld_address(mac, vdev, dot11_hdr, false);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("vdev:%d dropping auth frame BSSID: " QDF_MAC_ADDR_FMT ", SAE address conversion failure",

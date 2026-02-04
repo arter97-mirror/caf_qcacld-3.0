@@ -33,6 +33,7 @@
 #ifndef __SIRPARAMS_H
 #define __SIRPARAMS_H
 
+#include <linux/types.h>
 #include "sir_types.h"
 
 #define WAKELOCK_DURATION_RECOMMENDED	1000
@@ -161,12 +162,14 @@ typedef struct sSirMbMsg {
  * struct sir_mgmt_msg - Structure used to send auth frame from CSR to LIM
  * @type: Message type
  * @msg_len: Message length
+ * @cookie: nl80211 cookie for mgmt tx status
  * @vdev_id: vdev id
  * @data: Pointer to data tobe transmitted
  */
 struct sir_mgmt_msg {
 	uint16_t type;
 	uint16_t msg_len;
+	uint64_t cookie;
 	uint8_t vdev_id;
 	uint8_t *data;
 };

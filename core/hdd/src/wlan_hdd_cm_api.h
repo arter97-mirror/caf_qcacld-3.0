@@ -118,6 +118,9 @@ QDF_STATUS hdd_cm_send_vdev_keys(struct wlan_objmgr_vdev *vdev,
 				 u8 key_index, bool pairwise,
 				 enum wlan_crypto_cipher_type cipher_type);
 
+QDF_STATUS hdd_cm_mgmt_tx_status(struct wlan_objmgr_vdev *vdev, u64 cookie,
+				 const u8 *buf, uint32_t len, bool ack);
+
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 /**
  * hdd_cm_get_vendor_handoff_params() - to get vendor handoff params from fw

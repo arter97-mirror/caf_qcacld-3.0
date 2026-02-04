@@ -532,6 +532,32 @@ bool lim_is_same_mld_addr(struct mac_context *mac_ctx,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_update_link_to_mld_address() - Update SA/DA in auth frame header
+ * to MLD addresses for MLO peers.
+ * @mac_ctx: Pointer to mac context
+ * @vdev: vdev
+ * @mac_hdr: Pointer to MAC management header
+ * @is_tx: true for TX frame, false for RX frame
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
+					  struct wlan_objmgr_vdev *vdev,
+					  tpSirMacMgmtHdr mac_hdr,
+					  bool is_tx);
+#else
+static inline
+QDF_STATUS lim_update_link_to_mld_address(struct mac_context *mac_ctx,
+					  struct wlan_objmgr_vdev *vdev,
+					  tpSirMacMgmtHdr mac_hdr,
+					  bool is_tx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 void lim_process_beacon_frame(struct mac_context *, uint8_t *, struct pe_session *);
 void lim_process_probe_req_frame(struct mac_context *, uint8_t *, struct pe_session *);
 void lim_process_probe_rsp_frame(struct mac_context *, uint8_t *, struct pe_session *);

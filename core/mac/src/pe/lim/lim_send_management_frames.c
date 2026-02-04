@@ -4584,7 +4584,7 @@ error:
 
 #define SAE_AUTH_ALGO_LEN 2
 #define SAE_AUTH_ALGO_OFFSET 0
-static bool lim_is_ack_for_sae_auth(qdf_nbuf_t buf)
+static bool lim_is_ack_for_external_auth(qdf_nbuf_t buf)
 {
 	tpSirMacMgmtHdr mac_hdr;
 	uint16_t *sae_auth, min_len;
@@ -4605,12 +4605,39 @@ static bool lim_is_ack_for_sae_auth(qdf_nbuf_t buf)
 	if (mac_hdr->fc.subType == SIR_MAC_MGMT_AUTH) {
 		sae_auth = (uint16_t *)((uint8_t *)mac_hdr +
 					sizeof(tSirMacMgmtHdr));
-		if (sae_auth[SAE_AUTH_ALGO_OFFSET] ==
-		    eSIR_AUTH_TYPE_SAE)
+		if (sae_auth[SAE_AUTH_ALGO_OFFSET] == eSIR_AUTH_TYPE_SAE ||
+		    sae_auth[SAE_AUTH_ALGO_OFFSET] == eSIR_AUTH_TYPE_EPPKE ||
+		    sae_auth[SAE_AUTH_ALGO_OFFSET] ==
+		    eSIR_AUTH_TYPE_8021X_IN_AUTH)
 			return true;
 	}
 
 	return false;
+}
+
+static inline uint16_t lim_get_auth_algorithm(qdf_nbuf_t buf)
+{
+	tpSirMacMgmtHdr mac_hdr;
+	uint16_t min_len, algo;
+
+	if (!buf)
+		return 0;
+
+	min_len = sizeof(tSirMacMgmtHdr) + SAE_AUTH_ALGO_LEN;
+	if (qdf_nbuf_len(buf) < min_len)
+		return 0;
+
+	mac_hdr = (tpSirMacMgmtHdr)(qdf_nbuf_data(buf));
+	if (mac_hdr->fc.subType != SIR_MAC_MGMT_AUTH)
+		return 0;
+
+	algo = *(uint16_t *)((uint8_t *)mac_hdr + sizeof(tSirMacMgmtHdr));
+
+	/* Shared Key auth frames 3/4 are WEP-encrypted; fc.wep identifies them */
+	if (mac_hdr->fc.wep)
+		algo = eSIR_SHARED_KEY;
+
+	return algo;
 }
 
 /**
@@ -4628,9 +4655,17 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
 					   void *params)
 {
 	struct mac_context *mac_ctx = (struct mac_context *)context;
+	struct wmi_mgmt_params *mgmt_params = params;
 	uint16_t auth_ack_status;
 	uint16_t reason_code;
-	bool sae_auth_acked;
+	bool ext_auth_acked;
+	bool ack = false;
+	struct pe_session *session;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct sae_auth_retry *ext_auth_info;
+	uint64_t cookie = 0;
+	uint16_t auth_algo;
+	uint8_t vdev_id = WLAN_INVALID_VDEV_ID;
 
 	if (params)
 		wlan_send_tx_complete_event(context, buf, params, tx_complete,
@@ -4643,22 +4678,62 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
 		mac_ctx->auth_ack_status = LIM_ACK_RCD_SUCCESS;
 		auth_ack_status = ACKED;
 		reason_code = QDF_STATUS_SUCCESS;
-		sae_auth_acked = lim_is_ack_for_sae_auth(buf);
+		ack = true;
+		ext_auth_acked = lim_is_ack_for_external_auth(buf);
 		/*
 		 * 'Change' timer for future activations only if ack
-		 * received is not for WPA SAE auth frames.
+		 * received is not for WPA SAE/EDPKE auth frames.
 		 */
-		if (!sae_auth_acked)
+		if (!ext_auth_acked)
 			lim_deactivate_and_change_timer(mac_ctx,
 							eLIM_AUTH_RETRY_TIMER);
 	} else if (tx_complete == WMI_MGMT_TX_COMP_TYPE_COMPLETE_NO_ACK) {
 		mac_ctx->auth_ack_status = LIM_ACK_RCD_FAILURE;
 		auth_ack_status = NOT_ACKED;
 		reason_code = QDF_STATUS_E_FAILURE;
+		ack = false;
 	} else {
 		mac_ctx->auth_ack_status = LIM_TX_FAILED;
 		auth_ack_status = SENT_FAIL;
 		reason_code = QDF_STATUS_E_FAILURE;
+		ack = false;
+	}
+
+	/*
+	 * For EDPKE/EPPKE Authentication frames, notify userspace via
+	 * cfg80211_mgmt_tx_status() through HDD wrapper.
+	 *
+	 * Layering: LIM -> CM (ucfg) -> OSIF/HDD -> cfg80211
+	 */
+	if (mgmt_params)
+		vdev_id = mgmt_params->vdev_id;
+
+	if (vdev_id != WLAN_INVALID_VDEV_ID) {
+		session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+		if (session)
+			vdev = session->vdev;
+	}
+
+	auth_algo = lim_get_auth_algorithm(buf);
+	if (buf && vdev &&
+	    (auth_algo == eSIR_AUTH_TYPE_EPPKE ||
+	     auth_algo == eSIR_AUTH_TYPE_8021X_IN_AUTH)) {
+		tpSirMacMgmtHdr mac_hdr;
+		QDF_STATUS status;
+
+		mac_hdr = (tpSirMacMgmtHdr)qdf_nbuf_data(buf);
+		status = lim_update_link_to_mld_address(mac_ctx, vdev,
+							mac_hdr, true);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_err("failed to update to MLD address");
+
+		ext_auth_info = mlme_get_sae_auth_retry(vdev);
+		if (ext_auth_info)
+			cookie = ext_auth_info->cookie;
+
+		pe_debug("vdev:%d cookie:%llu ack:%d", vdev_id, cookie, ack);
+		wlan_cm_mgmt_tx_status(vdev, cookie, qdf_nbuf_data(buf),
+				       qdf_nbuf_len(buf), ack);
 	}
 
 	if (buf)
@@ -9326,7 +9401,7 @@ tx_frame:
 
 static void
 lim_handle_sae_auth_retry(struct mac_context *mac_ctx, uint8_t vdev_id,
-			  uint8_t *frame, uint32_t frame_len)
+			  uint8_t *frame, uint32_t frame_len, uint64_t cookie)
 {
 	struct pe_session *session;
 	struct sae_auth_retry *sae_retry;
@@ -9362,13 +9437,14 @@ lim_handle_sae_auth_retry(struct mac_context *mac_ctx, uint8_t vdev_id,
 
 	if (sae_retry->sae_auth.ptr)
 		lim_sae_auth_cleanup_retry(mac_ctx, vdev_id);
+	sae_retry->cookie = cookie;
 
 	sae_retry->sae_auth.ptr = qdf_mem_malloc(frame_len);
 	if (!sae_retry->sae_auth.ptr)
 		return;
 
-	pe_debug("SAE auth frame queued vdev_id %d seq_num %d",
-		 vdev_id, mac_ctx->mgmtSeqNum + 1);
+	pe_debug("SAE auth frame queued vdev_id %d seq_num %d cookie:0x%llx",
+		 vdev_id, mac_ctx->mgmtSeqNum + 1, cookie);
 	qdf_mem_copy(sae_retry->sae_auth.ptr, frame, frame_len);
 	mac_ctx->lim.lim_timers.g_lim_periodic_auth_retry_timer.sessionId =
 					session->peSessionId;
@@ -9558,7 +9634,8 @@ void lim_send_mgmt_frame_tx(struct mac_context *mac_ctx,
 					sizeof(tSirMacMgmtHdr));
 		if (auth_algo == eSIR_AUTH_TYPE_SAE)
 			lim_handle_sae_auth_retry(mac_ctx, vdev_id,
-						  mb_msg->data, msg_len);
+						  mb_msg->data, msg_len,
+						  mb_msg->cookie);
 		if (auth_algo == eSIR_FT_AUTH) {
 			struct tLimPreAuthNode *sta_pre_auth_ctx;
 

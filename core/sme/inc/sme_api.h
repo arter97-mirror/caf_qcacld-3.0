@@ -3445,7 +3445,7 @@ int sme_get_sec20chan_freq_mhz(struct wlan_objmgr_vdev *vdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS sme_send_mgmt_tx(mac_handle_t mac_handle, uint8_t session_id,
-			    const uint8_t *buf, uint32_t len);
+			    const uint8_t *buf, uint32_t len, uint64_t cookie);
 
 #ifdef WLAN_FEATURE_SAE
 /**

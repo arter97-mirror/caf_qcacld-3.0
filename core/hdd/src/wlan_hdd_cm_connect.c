@@ -2260,6 +2260,37 @@ QDF_STATUS hdd_cm_send_vdev_keys(struct wlan_objmgr_vdev *vdev,
 	return wlan_hdd_send_key_vdev(vdev, key_index, pairwise, cipher_type);
 }
 
+QDF_STATUS hdd_cm_mgmt_tx_status(struct wlan_objmgr_vdev *vdev, u64 cookie,
+				 const u8 *buf, uint32_t len, bool ack)
+{
+	struct vdev_osif_priv *osif_priv;
+	struct wireless_dev *wdev;
+	gfp_t gfp = cds_get_gfp_flags();
+
+	if (!cookie || !buf || !len) {
+		hdd_debug("invalid params: cookie:%llu buf:%pK len:%u",
+			  cookie, buf, len);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv) {
+		hdd_err("Invalid vdev osif priv");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wdev = osif_priv->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	hdd_debug("indicate TX auth status, cookie:0x%llx", cookie);
+	wlan_hdd_cfg80211_mgmt_tx_status(wdev, cookie, buf, len, ack, gfp);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 #define WLAN_WAIT_TIME_HANDOFF_PARAMS 1000
 QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,

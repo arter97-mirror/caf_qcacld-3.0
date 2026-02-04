@@ -464,9 +464,10 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			   TRACE_CODE_HDD_SEND_MGMT_TX,
 			   link_info->vdev_id, 0);
 
+		qdf_get_random_bytes(cookie, sizeof(*cookie));
 		qdf_status = sme_send_mgmt_tx(hdd_ctx->mac_handle,
 					      link_info->vdev_id,
-					      buf, len);
+					      buf, len, *cookie);
 
 		if (QDF_IS_STATUS_SUCCESS(qdf_status))
 			return qdf_status_to_os_return(qdf_status);
