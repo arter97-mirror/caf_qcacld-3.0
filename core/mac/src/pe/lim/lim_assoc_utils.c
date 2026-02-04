@@ -3869,53 +3869,30 @@ lim_update_add_sta_cck_5g_support(struct mac_context *mac_ctx,
 		add_sta->peer_cck_tx_support_5ghz = 1;
 }
 
-QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
-				tpSirAssocRsp pAssocRsp,
-				struct bss_description *bss_desc,
-				uint8_t updateEntry,
-				struct pe_session *pe_session)
+/**
+ * lim_update_add_bss_ht_params() - Update HT params in Add BSS params
+ * @mac: Pointer to mac context
+ * @pe_session: Pointer to PE session
+ * @pAssocRsp: Pointer to Association Response
+ * @bss_desc: Pointer to BSS description
+ * @pAddBssParams: Pointer to Add BSS parameters
+ *
+ * On receiving assoc response, parse HT capability and HT information
+ * and store information to pAddBssParams.
+ *
+ * Return: None
+ */
+static void lim_update_add_bss_ht_params(struct mac_context *mac,
+					 struct pe_session *pe_session,
+					 tpSirAssocRsp pAssocRsp,
+					 struct bss_description *bss_desc,
+					 struct bss_params *pAddBssParams)
 {
-	struct bss_params *pAddBssParams = NULL;
-	QDF_STATUS retCode;
-	tpDphHashNode sta = NULL;
 	bool chan_width_support = false;
-	bool is_vht_cap_in_vendor_ie = false;
-	tDot11fIEVHTCaps *vht_caps = NULL;
-	tDot11fIEVHTOperation *vht_oper = NULL;
-	tAddStaParams *sta_context;
-	struct sir_dot11f_nss_info nss_ies;
-	uint32_t listen_interval = MLME_CFG_LISTEN_INTERVAL;
 	struct mlme_vht_capabilities_info *vht_cap_info;
 	tDot11fBeaconIEs *bcn_ies = &bss_desc->bcn_ies;
 
 	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
-
-	/* Package SIR_HAL_ADD_BSS_REQ message parameters */
-	pAddBssParams = qdf_mem_malloc(sizeof(struct bss_params));
-	if (!pAddBssParams) {
-		retCode = QDF_STATUS_E_NOMEM;
-		goto returnFailure;
-	}
-
-	qdf_mem_copy(pAddBssParams->bssId, bss_desc->bssId,
-		     sizeof(tSirMacAddr));
-
-	pAddBssParams->beaconInterval = bss_desc->beaconInterval;
-
-	pAddBssParams->dtimPeriod = bcn_ies->TIM.dtim_period;
-	pAddBssParams->updateBss = updateEntry;
-
-	if (IS_DOT11_MODE_11B(pe_session->dot11mode) &&
-	    bss_desc->nwType != eSIR_11B_NW_TYPE) {
-		pAddBssParams->nwType = eSIR_11B_NW_TYPE;
-	} else {
-		pAddBssParams->nwType = bss_desc->nwType;
-	}
-
-	pAddBssParams->shortSlotTimeSupported =
-		(uint8_t) pAssocRsp->capabilityInfo.shortSlotTime;
-	pAddBssParams->llbCoexist =
-		(uint8_t) pe_session->beaconParams.llbCoexist;
 
 	/* Use the advertised capabilities from the received beacon/PR */
 	if (IS_DOT11_MODE_HT(pe_session->dot11mode) &&
@@ -3959,6 +3936,58 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 	} else {
 		pe_session->htCapability = false;
 	}
+}
+
+QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
+				tpSirAssocRsp pAssocRsp,
+				struct bss_description *bss_desc,
+				uint8_t updateEntry,
+				struct pe_session *pe_session)
+{
+	struct bss_params *pAddBssParams = NULL;
+	QDF_STATUS retCode;
+	tpDphHashNode sta = NULL;
+	bool is_vht_cap_in_vendor_ie = false;
+	tDot11fIEVHTCaps *vht_caps = NULL;
+	tDot11fIEVHTOperation *vht_oper = NULL;
+	tAddStaParams *sta_context;
+	struct sir_dot11f_nss_info nss_ies;
+	uint32_t listen_interval = MLME_CFG_LISTEN_INTERVAL;
+	struct mlme_vht_capabilities_info *vht_cap_info;
+	tDot11fBeaconIEs *bcn_ies = &bss_desc->bcn_ies;
+
+	vht_cap_info = &mac->mlme_cfg->vht_caps.vht_cap_info;
+
+	/* Package SIR_HAL_ADD_BSS_REQ message parameters */
+	pAddBssParams = qdf_mem_malloc(sizeof(struct bss_params));
+	if (!pAddBssParams) {
+		retCode = QDF_STATUS_E_NOMEM;
+		goto returnFailure;
+	}
+
+	qdf_mem_copy(pAddBssParams->bssId, bss_desc->bssId,
+		     sizeof(tSirMacAddr));
+
+	pAddBssParams->beaconInterval = bss_desc->beaconInterval;
+
+	pAddBssParams->dtimPeriod = bcn_ies->TIM.dtim_period;
+	pAddBssParams->updateBss = updateEntry;
+
+	if (IS_DOT11_MODE_11B(pe_session->dot11mode) &&
+	    bss_desc->nwType != eSIR_11B_NW_TYPE) {
+		pAddBssParams->nwType = eSIR_11B_NW_TYPE;
+	} else {
+		pAddBssParams->nwType = bss_desc->nwType;
+	}
+
+	pAddBssParams->shortSlotTimeSupported =
+		(uint8_t) pAssocRsp->capabilityInfo.shortSlotTime;
+	pAddBssParams->llbCoexist =
+		(uint8_t) pe_session->beaconParams.llbCoexist;
+
+	/* Configure HT capabilities */
+	lim_update_add_bss_ht_params(mac, pe_session, pAssocRsp,
+				     bss_desc, pAddBssParams);
 
 	if (pe_session->vhtCapability && (pAssocRsp->VHTCaps.present)) {
 		pAddBssParams->vhtCapable = pAssocRsp->VHTCaps.present;
