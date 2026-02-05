@@ -18759,7 +18759,7 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 
 cds_disable:
 	cds_disable(hdd_ctx->psoc);
-
+	ucfg_ipa_uc_ol_deinit(hdd_ctx->pdev);
 out:
 	return -EINVAL;
 }
