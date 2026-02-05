@@ -45,43 +45,6 @@
 #include <net/gro.h>
 #endif
 
-/**
- * osif_dp_classify_pkt() - classify packet
- * @skb:  sk buff
- *
- * Return: none
- */
-void osif_dp_classify_pkt(struct sk_buff *skb)
-{
-	struct ethhdr *eh = (struct ethhdr *)skb->data;
-
-	qdf_mem_zero(skb->cb, sizeof(skb->cb));
-
-	/* check destination mac address is broadcast/multicast */
-	if (is_broadcast_ether_addr((uint8_t *)eh))
-		QDF_NBUF_CB_GET_IS_BCAST(skb) = true;
-	else if (is_multicast_ether_addr((uint8_t *)eh))
-		QDF_NBUF_CB_GET_IS_MCAST(skb) = true;
-
-	if (qdf_nbuf_is_ipv4_arp_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_ARP;
-	else if (qdf_nbuf_is_ipv4_dhcp_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_DHCP;
-	else if (qdf_nbuf_is_ipv4_eapol_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_EAPOL;
-	else if (qdf_nbuf_is_ipv4_wapi_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_WAPI;
-	else if (qdf_nbuf_is_icmp_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_ICMP;
-	else if (qdf_nbuf_is_icmpv6_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_ICMPv6;
-}
 
 /**
  * osif_dp_mark_critical_pkt() - Identify and mark critical packets
