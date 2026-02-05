@@ -18402,6 +18402,9 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 		else
 			reason_code = WLAN_LOG_REASON_CODE_UNUSED;
 
+		if (reason_code == WLAN_LOG_REASON_DUMP_IN_PROGRESS)
+			hdd_apf_dump_history(hdd_ctx);
+
 		status = cds_flush_logs(WLAN_LOG_TYPE_NON_FATAL,
 				WLAN_LOG_INDICATOR_FRAMEWORK,
 				reason_code, false, false);
@@ -18413,9 +18416,6 @@ static int __wlan_hdd_cfg80211_wifi_logger_get_ring_data(struct wiphy *wiphy,
 		wlan_set_chipset_stats_bit(
 				hdd_ctx->is_drv_dump_in_progress_valid,
 				hdd_ctx->dump_in_progress);
-
-		if (reason_code == WLAN_LOG_REASON_DUMP_IN_PROGRESS)
-			hdd_apf_dump_history(hdd_ctx);
 
 		status = wlan_logging_wait_for_flush_log_completion();
 		if (!QDF_IS_STATUS_SUCCESS(status)) {

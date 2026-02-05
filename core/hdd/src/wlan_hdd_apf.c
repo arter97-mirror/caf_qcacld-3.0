@@ -102,6 +102,7 @@ void hdd_apf_reset_history(struct hdd_adapter *adapter)
 	struct hdd_apf_context *context = &adapter->apf_context;
 	int i;
 
+	hdd_enter();
 	qdf_spin_lock_bh(&context->lock);
 	for (i = 0; i < APF_HISTORY_LEN; i++) {
 		if (context->apf_inst_pool[i]) {
@@ -113,6 +114,7 @@ void hdd_apf_reset_history(struct hdd_adapter *adapter)
 	}
 	context->apf_inst_index = 0;
 	qdf_spin_unlock_bh(&context->lock);
+	hdd_exit();
 }
 
 /**
@@ -395,7 +397,7 @@ static void hdd_apf_store_instruction(struct hdd_adapter *adapter,
 		/* Check if complete */
 		if (context->apf_inst_curr_len[idx] == context->apf_inst_total_len[idx]) {
 			/* Capture timestamp when instruction is complete */
-			context->apf_inst_timestamp[idx] = qdf_get_log_timestamp();
+			context->apf_inst_timestamp[idx] = qdf_get_time_of_the_day_us();
 
 			/* Move to next slot */
 			context->apf_inst_index = (idx + 1) % APF_HISTORY_LEN;
