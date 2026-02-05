@@ -47,6 +47,7 @@
 #include "wlan_policy_mgr_ll_sap.h"
 #include "wlan_cm_roam_api.h"
 #include "wlan_ll_sap_api.h"
+#include "target_if_cm_roam_offload.h"
 
 enum policy_mgr_conc_next_action (*policy_mgr_get_current_pref_hw_mode_ptr)
 	(struct wlan_objmgr_psoc *psoc);
@@ -4139,6 +4140,7 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 	uint32_t timeout_ms = 0;
 	bool restart_sap = false;
 	uint32_t sap_freq;
+	bool is_host_4way_hs_supported = false;
 	/*
 	 * if no sta, sap/p2p go may need switch channel for band
 	 * capability change.
@@ -4158,6 +4160,20 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 	if (!policy_mgr_is_sap_go_existed(psoc)) {
 		policy_mgr_debug(
 			"No action taken at check_concurrent_intf_and_restart_sap");
+		return;
+	}
+	/*
+	 * Do not allow SAP start while EAPOL is in progress.
+	 * Allowing SAP start during EAPOL triggers an RSO stop and prevents
+	 * firmware from handling deauth/roam triggers, which can potentially
+	 * lead to an unintended disconnection.
+	 */
+	is_host_4way_hs_supported =
+		wlan_psoc_nif_fw_ext2_cap_get(psoc,
+					      WLAN_ROAM_4WAY_HS_OFFLOAD_DISABLE);
+	if (is_host_4way_hs_supported &&
+	    policy_mgr_is_roamed_eapol_in_progress(psoc)) {
+		policy_mgr_debug("roaming install key in progress, deferring SAP restart");
 		return;
 	}
 
