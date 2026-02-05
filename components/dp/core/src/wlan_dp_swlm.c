@@ -135,34 +135,46 @@ coalescing_fail:
 	return 1;
 }
 
+#define SWLM_LOG_STR_SIZE 1024
 QDF_STATUS dp_print_swlm_stats(struct dp_soc *soc)
 {
 	struct dp_swlm *swlm = &soc->swlm;
 	int i;
+	char *log_str;
+	int str_bytes = 0;
 
-	for (i = 0; i < soc->num_tcl_data_rings; i++) {
-		dp_info("TCL: %u Coalescing stats:", i);
-		dp_info("Num coalesce success: %d",
-			swlm->stats.tcl[i].coalesce_success);
-		dp_info("Num coalesce fail: %d",
-			swlm->stats.tcl[i].coalesce_fail);
-		dp_info("Timer flush success: %d",
-			swlm->stats.tcl[i].timer_flush_success);
-		dp_info("Timer flush fail: %d",
-			swlm->stats.tcl[i].timer_flush_fail);
-		dp_info("Coalesce fail (TID): %d",
-			swlm->stats.tcl[i].tid_fail);
-		dp_info("Coalesce fail (special frame): %d",
-			swlm->stats.tcl[i].sp_frames);
-		dp_info("Coalesce fail (Low latency connection): %d",
-			swlm->stats.tcl[i].ll_connection);
-		dp_info("Coalesce fail (bytes thresh crossed): %d",
-			swlm->stats.tcl[i].bytes_thresh_reached);
-		dp_info("Coalesce fail (time thresh crossed): %d",
-			swlm->stats.tcl[i].time_thresh_reached);
-		dp_info("Coalesce fail (TPUT sampling fail): %d",
-			swlm->stats.tcl[i].tput_criteria_fail);
+	log_str = qdf_mem_malloc(SWLM_LOG_STR_SIZE);
+	if (!log_str)
+		return QDF_STATUS_E_NOMEM;
+
+	/*
+	 * Format: [ring_id] (coalesce_success/coalesce_fail)
+	 *         (timer_flush_success/timer_flush_fail)
+	 *         (tid_fail sp_frames ll_connection bytes_thresh
+	 *          time_thresh tput_criteria_fail) |
+	 *
+	 * Example: [0] (1234/56) (78/9) (10 11 12 13 14 15) |
+	 *          [1] (2345/67) (89/10) (20 21 22 23 24 25) |
+	 */
+	for (i = 0; i < soc->num_tcl_data_rings && str_bytes < SWLM_LOG_STR_SIZE; i++) {
+		str_bytes += qdf_snprint(log_str + str_bytes,
+					 SWLM_LOG_STR_SIZE - str_bytes,
+					 "[%u] (%d/%d) (%d/%d) (%d %d %d %d %d %d) | ",
+					 i,
+					 swlm->stats.tcl[i].coalesce_success,
+					 swlm->stats.tcl[i].coalesce_fail,
+					 swlm->stats.tcl[i].timer_flush_success,
+					 swlm->stats.tcl[i].timer_flush_fail,
+					 swlm->stats.tcl[i].tid_fail,
+					 swlm->stats.tcl[i].sp_frames,
+					 swlm->stats.tcl[i].ll_connection,
+					 swlm->stats.tcl[i].bytes_thresh_reached,
+					 swlm->stats.tcl[i].time_thresh_reached,
+					 swlm->stats.tcl[i].tput_criteria_fail);
 	}
+
+	dp_nofl_info("SWLM_STATS |%s", log_str);
+	qdf_mem_free(log_str);
 
 	return QDF_STATUS_SUCCESS;
 }
