@@ -2110,9 +2110,6 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 	if (dp_ctx->is_suspend)
 		return;
 
-	if (soc)
-		cdp_trigger_page_pool_shrink(soc, OL_TXRX_PDEV_ID);
-
 	bw_interval_us = dp_ctx->dp_cfg.bus_bw_compute_interval * 1000;
 
 	curr_time_us = qdf_get_log_timestamp();
@@ -2145,6 +2142,8 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 			dp_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 			continue;
 		}
+
+		cdp_trigger_page_pool_shrink(soc, dp_intf->def_link->link_id);
 
 		if (dp_ctx->dp_agg_param.tc_based_dyn_gro)
 			dp_rx_check_qdisc_for_intf(dp_intf);
