@@ -3208,6 +3208,25 @@ QDF_STATUS __wlan_dp_bus_resume(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	return status;
 }
 
+#ifdef DP_FEATURE_DIRECT_REFILL
+static inline void
+dp_soc_check_n_set_direct_refill_support(struct wlan_dp_psoc_context *dp_ctx,
+					 struct cdp_soc_attach_params *params)
+{
+	if (!pld_is_direct_refill_supported(dp_ctx->qdf_dev->dev))
+		return;
+
+	dp_info("FW supports direct refill");
+	params->direct_refill_support = 1;
+}
+#else
+static inline void
+dp_soc_check_n_set_direct_refill_support(struct wlan_dp_psoc_context *dp_ctx,
+					 struct cdp_soc_attach_params *params)
+{
+}
+#endif
+
 void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 			      bool *is_wifi3_0_target)
 {
@@ -3225,6 +3244,7 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 	cdp_params.htc_handle = htc_ctx;
 	cdp_params.qdf_osdev = qdf_ctx;
 	cdp_params.ol_ops = params->dp_ol_if_ops;
+	dp_soc_check_n_set_direct_refill_support(dp_ctx, &cdp_params);
 
 	if (TARGET_TYPE_QCA6290 == params->target_type ||
 	    TARGET_TYPE_QCA6390 == params->target_type ||

@@ -1258,6 +1258,16 @@ int pld_force_wake_request(struct device *dev);
 bool pld_is_direct_link_supported(struct device *dev);
 
 /**
+ * pld_is_direct_refill_supported() - Get whether direct_link is supported
+ *                                    by FW or not
+ * @dev: device
+ *
+ * Return: true if supported
+ *         false on failure or if not supported
+ */
+bool pld_is_direct_refill_supported(struct device *dev);
+
+/**
  * pld_ce_cmn_cfg_supported() - Get whether ce cmn register config is supported
  *                              by FW or not
  * @dev: device

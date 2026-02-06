@@ -545,6 +545,11 @@ static inline bool pld_pcie_platform_driver_support(void)
 	return false;
 }
 
+static inline bool pld_pcie_is_direct_refill_supported(struct device *dev)
+{
+	return false;
+}
+
 static inline bool pld_pcie_is_direct_link_supported(struct device *dev)
 {
 	return false;
@@ -1108,6 +1113,11 @@ static inline int pld_pci_get_thermal_state(struct device *dev,
 					    int mon_id)
 {
 	return cnss_get_curr_therm_cdev_state(dev, thermal_state, mon_id);
+}
+
+static inline bool pld_pcie_is_direct_refill_supported(struct device *dev)
+{
+	return cnss_get_fw_cap(dev, CNSS_FW_CAP_DIRECT_REFILL_SUPPORT);
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
