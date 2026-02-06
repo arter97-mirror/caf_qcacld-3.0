@@ -647,6 +647,10 @@ config QCACLD_FEATURE_SON
 	bool "Enable easymesh for QCACLD"
 	default n
 
+config QCA_SUPPORT_WDS_EXTENDED
+	bool "Enable WDS EXTENDED for SON"
+	default n
+
 config WLAN_FEATURE_MC_BC_4_ADDR
 	bool "Enable TX MC/BC with 4 address"
 	default n

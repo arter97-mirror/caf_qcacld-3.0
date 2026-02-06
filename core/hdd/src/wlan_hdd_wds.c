@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,6 +27,7 @@
 /* Include Files */
 #include <cdp_txrx_ctrl.h>
 #include <wlan_hdd_main.h>
+#include "wlan_osif_priv.h"
 #include "wlan_hdd_wds.h"
 
 void hdd_wds_config_dp_repeater_mode(struct wlan_objmgr_vdev *vdev)
@@ -81,3 +82,21 @@ hdd_wds_replace_peer_mac(void *soc, struct hdd_adapter *adapter,
 			     QDF_MAC_ADDR_SIZE);
 	}
 }
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+void
+hdd_wds_ext_peer_learn(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mac_addr)
+{
+	struct vdev_osif_priv *priv;
+
+	priv = wlan_vdev_get_ospriv(vdev);
+	if (!priv || !priv->wdev || !priv->wdev->netdev) {
+		hdd_err("priv or wdev/netdev is null");
+		return;
+	}
+
+	cfg80211_rx_unexpected_4addr_frame(priv->wdev->netdev,
+					   peer_mac_addr,
+					   GFP_ATOMIC);
+}
+#endif

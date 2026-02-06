@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -87,6 +87,41 @@ netdev_tx_t hdd_softap_hard_start_xmit(struct sk_buff *skb,
  * Return: Status of the transmission
  */
 QDF_STATUS hdd_softap_ipa_start_xmit(qdf_nbuf_t nbuf, qdf_netdev_t dev);
+
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * hdd_softap_wds_ext_start_xmit() - Transmit a frame on wds_ext interface
+ * @skb: pointer to OS packet
+ * @dev: pointer to wds_ext net_device structure
+ *
+ * Function registered as a net_device .ndo_start_xmit() method for
+ * wds_ext interface, called by the OS if any packet needs to be transmitted.
+ * Parent net_device of wds_ext interface points to a SoftAP interface.
+ *
+ * For any unicast packets, regular TX path is used with net_device replaced to
+ * parent net_device of the wds_ext interface.
+ *
+ * For multicast packets, tx_exception_metadata.peer_id and
+ * tx_exception_metadata.is_wds_extended_mc_bc are set. Then TX exception path
+ * is used with net_device replaced to parent net_device of the wds_ext
+ * interface.
+ *
+ * Return: Status of the transmission
+ */
+netdev_tx_t hdd_softap_wds_ext_start_xmit(struct sk_buff *skb,
+					  struct net_device *dev);
+
+/**
+ * hdd_softap_wds_ext_rx_handler() - Passing RX packets to network stack from the
+ *			     wds_ext virtual interface
+ * @osif_dev: pointer of hdd_wds_ext structure
+ * @rxbuf: pointer of RX socket buffer
+ *
+ * Return: QDF_STATUS_STATUS for success otherwise failure
+ */
+QDF_STATUS hdd_softap_wds_ext_rx_handler(void *osif_dev, qdf_nbuf_t rxbuf);
+
+#endif /* QCA_SUPPORT_WDS_EXTENDED */
 
 /**
  * hdd_softap_tx_timeout() - TX timeout handler
