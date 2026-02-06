@@ -7316,12 +7316,6 @@ void lim_intersect_ap_he_caps(struct pe_session *session,
 
 void lim_add_bss_he_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
 {
-	tDot11fIEhe_cap *he_cap;
-	tDot11fIEhe_op *he_op;
-
-	he_cap = &assoc_rsp->he_cap;
-	he_op = &assoc_rsp->he_op;
-
 	/*
 	 * IMPORTANT:
 	 * - add_bss->he_capable is used for vdev/bss level decisions.
@@ -7332,15 +7326,13 @@ void lim_add_bss_he_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
 	 * not populate HE caps even when assoc_rsp->he_cap is present, causing
 	 * STA to associate as non-HE (often falling back to 11ac).
 	 */
-	add_bss->he_capable = he_cap->present;
-	add_bss->staContext.he_capable = he_cap->present;
+	add_bss->he_capable = assoc_rsp->he_cap.present;
+	add_bss->staContext.he_capable = assoc_rsp->he_cap.present;
 
-	if (he_cap)
-		qdf_mem_copy(&add_bss->staContext.he_config,
-			     he_cap, sizeof(*he_cap));
-	if (he_op)
-		qdf_mem_copy(&add_bss->staContext.he_op,
-			     he_op, sizeof(*he_op));
+	qdf_mem_copy(&add_bss->staContext.he_config, &assoc_rsp->he_cap,
+		     sizeof(assoc_rsp->he_cap));
+	qdf_mem_copy(&add_bss->staContext.he_op, &assoc_rsp->he_op,
+		     sizeof(assoc_rsp->he_op));
 }
 
 void lim_add_bss_he_cfg(struct bss_params *add_bss, struct pe_session *session)
