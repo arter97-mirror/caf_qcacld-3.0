@@ -3853,84 +3853,6 @@ static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 	wlan_peer_set_center_freq_seg1(peer, ccfs1);
 }
 
-#ifdef WLAN_FEATURE_11BE
-/**
- * lim_update_eht_oper_assoc_resp() - Update BW based on EHT operation IE
- * @pe_session: Pointer to PE session
- * @pAddBssParams: Pointer to Add BSS parameters
- * @eht_op: Pointer to EHT operation IE
- *
- * This function validates the channel width derived from EHT Operation
- * IE against the Center Frequency Segments (CCFS0/CCFS1) and updates
- * the BSS parameters.
- *
- * Return: None
- */
-static void lim_update_eht_oper_assoc_resp(struct pe_session *pe_session,
-					   struct bss_params *pAddBssParams,
-					   tDot11fIEeht_op *eht_op,
-					   struct wlan_objmgr_peer *peer)
-{
-	enum phy_ch_width op_ch_width;
-	uint8_t center_freq_diff;
-	uint8_t ap_max_ch_width;
-
-	op_ch_width = wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
-						eht_op->channel_width);
-
-	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
-
-	/*
-	 * Correct CCFS0/CCFS1 interpretation based on IEEE 802.11be:
-	 *
-	 * If CCFS1 is missing:
-	 *    - AP cannot encode >80 MHz -> clamp to <= 80 MHz
-	 *
-	 * If CCFS1 is present:
-	 *    Let diff = |CCFS1 - CCFS0|
-	 *
-	 *    diff == 16    -> 320 MHz (primary 160 MHz segment is +/-16)
-	 *    diff == 8    -> 160 MHz
-	 *    diff < 8    -> 80 MHz
-	 *    diff > 16    -> 80+80 MHz (non-contiguous channels)
-	 *
-	 * Matches 11be channelization Table 9-417e & section 36.3.24.2.
-	 */
-	if (!eht_op->ccfs1 && op_ch_width > CH_WIDTH_80MHZ) {
-		pe_debug("vdev %d: EHT oper IE: CCFS1 absent -> forcing 80 MHz, AP " QDF_MAC_ADDR_FMT,
-			 pe_session->vdev_id,
-			 QDF_MAC_ADDR_REF(pe_session->bssId));
-		op_ch_width = CH_WIDTH_80MHZ;
-	}
-
-	center_freq_diff = abs(eht_op->ccfs1 - eht_op->ccfs0);
-
-	if (center_freq_diff == 16) {
-		op_ch_width = CH_WIDTH_320MHZ;
-	} else if (center_freq_diff == 8) {
-		op_ch_width = CH_WIDTH_160MHZ;
-	} else if (center_freq_diff > 16) {
-		op_ch_width = CH_WIDTH_80P80MHZ;
-	} else {
-		op_ch_width = CH_WIDTH_80MHZ;
-	}
-
-	/*
-	 * Ensure oper BW does not exceed AP max BW and host initiated VDEV
-	 * start BW. Apply constraints in order: session -> AP max -> oper
-	 */
-	if (op_ch_width > ap_max_ch_width)
-		op_ch_width = ap_max_ch_width;
-
-	if (op_ch_width > pe_session->ch_width)
-		op_ch_width = pe_session->ch_width;
-
-	wlan_peer_set_op_ch_width(peer, op_ch_width);
-	wlan_peer_set_center_freq_seg0(peer, eht_op->ccfs0);
-	wlan_peer_set_center_freq_seg1(peer, eht_op->ccfs1);
-}
-#endif
-
 #ifdef WLAN_SUPPORT_TWT
 /**
  * lim_set_sta_ctx_twt() - Save the TWT settings in STA context
@@ -4895,67 +4817,68 @@ lim_update_add_bss_he_params(struct mac_context *mac,
 #endif /* WLAN_FEATURE_11AX */
 #ifdef WLAN_FEATURE_11BE
 /**
- * lim_validate_eht_mcs_160() - Validate EHT 160 MHz MCS map
- * @eht_cap: Pointer to EHT capability IE
+ * lim_validate_eht_mcs_fields() - Generic EHT MCS field validator
+ * @rx_mcs_0_9: RX NSS for MCS 0-9
+ * @tx_mcs_0_9: TX NSS for MCS 0-9
+ * @rx_mcs_10_11: RX NSS for MCS 10-11
+ * @tx_mcs_10_11: TX NSS for MCS 10-11
+ * @rx_mcs_12_13: RX NSS for MCS 12-13
+ * @tx_mcs_12_13: TX NSS for MCS 12-13
  *
- * Checks if at least one spatial stream is supported for 160 MHz.
- *
- * Return: true if valid, false otherwise
+ * Return: true if at least one field is non-zero
  */
-static bool lim_validate_eht_mcs_160(tDot11fIEeht_cap *eht_cap)
+static bool lim_validate_eht_mcs_fields(uint8_t rx_mcs_0_9,
+				       uint8_t tx_mcs_0_9,
+				       uint8_t rx_mcs_10_11,
+				       uint8_t tx_mcs_10_11,
+				       uint8_t rx_mcs_12_13,
+				       uint8_t tx_mcs_12_13)
 {
-	/* Check if any spatial stream supports Rx or Tx for 160 MHz */
-	if (eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9 ||
-	    eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9 ||
-	    eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11 ||
-	    eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11 ||
-	    eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13 ||
-	    eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13)
-		return true;
-
-	return false;
+	return (rx_mcs_0_9 || tx_mcs_0_9 ||
+		rx_mcs_10_11 || tx_mcs_10_11 ||
+		rx_mcs_12_13 || tx_mcs_12_13);
 }
 
 /**
- * lim_validate_eht_mcs_320() - Validate EHT 320 MHz MCS map
+ * lim_validate_eht_mcs() - Validate EHT MCS map for a given bandwidth
  * @eht_cap: Pointer to EHT capability IE
+ * @ch_width: Channel width to validate (<=80, 160, 320)
  *
- * Checks if at least one spatial stream is supported for 320 MHz.
+ * Note: EHT NSS fields are grouped by bandwidth in `tDot11fIEeht_cap`.
+ * For <=80 MHz, the `bw_le_80_*` fields are used.
  *
- * Return: true if valid, false otherwise
+ * Return: true if at least one spatial stream is supported for the given BW
  */
-static bool lim_validate_eht_mcs_320(tDot11fIEeht_cap *eht_cap)
+static bool lim_validate_eht_mcs(tDot11fIEeht_cap *eht_cap,
+				enum phy_ch_width ch_width)
 {
-	if (eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9 ||
-	    eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9 ||
-	    eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11 ||
-	    eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11 ||
-	    eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13 ||
-	    eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13)
-		return true;
-
-	return false;
-}
-
-/**
- * lim_validate_eht_mcs_le_80() - Validate EHT <= 80 MHz MCS map
- * @eht_cap: Pointer to EHT capability IE
- *
- * Checks if at least one spatial stream is supported for <= 80 MHz.
- *
- * Return: true if valid, false otherwise
- */
-static bool lim_validate_eht_mcs_le_80(tDot11fIEeht_cap *eht_cap)
-{
-	if (eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9 ||
-	    eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9 ||
-	    eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11 ||
-	    eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11 ||
-	    eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13 ||
-	    eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13)
-		return true;
-
-	return false;
+	switch (ch_width) {
+	case CH_WIDTH_320MHZ:
+		return lim_validate_eht_mcs_fields(
+			eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_320_rx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13);
+	case CH_WIDTH_160MHZ:
+		return lim_validate_eht_mcs_fields(
+			eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_160_rx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13);
+	default:
+		/* <= 80 MHz */
+		return lim_validate_eht_mcs_fields(
+			eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9,
+			eht_cap->bw_le_80_rx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_le_80_tx_max_nss_for_mcs_10_and_11,
+			eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13,
+			eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13);
+	}
 }
 
 /**
@@ -4971,7 +4894,7 @@ static bool lim_validate_eht_mcs_le_80(tDot11fIEeht_cap *eht_cap)
  * Return: None
  */
 static void lim_update_ap_max_eht_ch_width(struct mac_context *mac,
-					   tpSirAssocRsp pAssocRsp,
+					   tpSirAssocRsp assoc_resp,
 					   struct pe_session *pe_session,
 					   struct wlan_objmgr_peer *peer)
 {
@@ -4979,20 +4902,18 @@ static void lim_update_ap_max_eht_ch_width(struct mac_context *mac,
 	enum phy_ch_width ap_max_ch_width;
 
 	/*
-	 * Default to the peer stored value so that even if EHT caps are not
-	 * present/valid in this call, we still persist a consistent value.
+	 * Initialize to a safe default. If EHT caps are not present or invalid,
+	 * this will be the fallback value persisted to peer.
 	 */
-	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
-	if (!ap_max_ch_width)
-		ap_max_ch_width = CH_WIDTH_20MHZ;
+	ap_max_ch_width = CH_WIDTH_20MHZ;
 
-	if (!pAssocRsp->eht_cap.present)
+	if (!assoc_resp->eht_cap.present)
 		goto out;
 
-	eht_cap = &pAssocRsp->eht_cap;
+	eht_cap = &assoc_resp->eht_cap;
 
 	/* Step 1: Baseline validation (<= 80 MHz) */
-	if (!lim_validate_eht_mcs_le_80(eht_cap)) {
+	if (!lim_validate_eht_mcs(eht_cap, CH_WIDTH_80MHZ)) {
 		pe_debug("vdev %d: Invalid EHT MCS for <= 80MHz, AP " QDF_MAC_ADDR_FMT,
 			 pe_session->vdev_id,
 			 QDF_MAC_ADDR_REF(pe_session->bssId));
@@ -5012,12 +4933,12 @@ static void lim_update_ap_max_eht_ch_width(struct mac_context *mac,
 	/* Step 2: Band-specific validation for wider channels */
 	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq) &&
 	    eht_cap->support_320mhz_6ghz &&
-	    lim_validate_eht_mcs_320(eht_cap)) {
+	    lim_validate_eht_mcs(eht_cap, CH_WIDTH_320MHZ)) {
 		ap_max_ch_width = CH_WIDTH_320MHZ;
 	} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(pe_session->curr_op_freq) ||
 		    WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq)) &&
-		   pAssocRsp->he_cap.chan_width_2 &&
-		   lim_validate_eht_mcs_160(eht_cap)) {
+		   assoc_resp->he_cap.chan_width_2 &&
+		   lim_validate_eht_mcs(eht_cap, CH_WIDTH_160MHZ)) {
 		/* 160 MHz support indicated in HE Cap, validated in EHT Cap */
 		ap_max_ch_width = CH_WIDTH_160MHZ;
 	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq)) {
@@ -5037,39 +4958,50 @@ out:
 }
 
 static void lim_sta_process_eht_capability(struct mac_context *mac,
-					   tpSirAssocRsp pAssocRsp,
-					   struct bss_params *pAddBssParams,
-					   struct pe_session *pe_session,
-					   struct wlan_objmgr_peer *peer)
+				       tpSirAssocRsp assoc_resp,
+				       struct bss_params *add_bss_params,
+				       struct pe_session *pe_session,
+				       struct wlan_objmgr_peer *peer)
 {
 	struct bss_description *bss_desc;
 	tDot11fBeaconIEs *bcn_ies;
 
-	if (!pAssocRsp || !pAddBssParams || !pe_session || !peer) {
-		pe_err("NULL pointer passed to lim_sta_process_eht_capability");
+	if (!assoc_resp || !add_bss_params || !pe_session || !peer) {
+		pe_debug("vdev %d: Invalid parameters in %s",
+			 pe_session ? pe_session->vdev_id : 0, __func__);
 		return;
 	}
 
-	/* Validate EHT capability is present */
-	if (lim_is_session_eht_capable(pe_session) &&
-	    pAssocRsp->eht_cap.present) {
-		lim_add_bss_eht_cap(pAddBssParams, pAssocRsp);
-		lim_add_bss_eht_cfg(pAddBssParams, pe_session);
-		/* Process EHT capabilities intersection for 6 GHz */
-		if (pe_session->lim_join_req) {
-			bss_desc = &pe_session->lim_join_req->bssDescription;
-			bcn_ies = &bss_desc->bcn_ies;
-			if (lim_is_he_6ghz_band(pe_session))
-				lim_intersect_ap_eht_caps(pe_session,
-							  pAddBssParams,
-							  bcn_ies, pAssocRsp);
-		}
-
-		lim_update_ap_max_eht_ch_width(mac, pAssocRsp, pe_session,
-					       peer);
-	} else {
-		lim_update_session_eht_capable(pe_session, false);
+	/*
+	 * Guard EHT processing:
+	 * - session must be EHT capable
+	 * - association response must contain EHT Capability IE
+	 */
+	if (!lim_is_session_eht_capable(pe_session) ||
+	    !assoc_resp->eht_cap.present) {
+		pe_debug("vdev %d: EHT not supported or EHT cap not present",
+			 pe_session->vdev_id);
+		return;
 	}
+
+	lim_add_bss_eht_cap(add_bss_params, assoc_resp);
+	lim_add_bss_eht_cfg(add_bss_params, pe_session);
+
+	/* Process EHT capabilities intersection for 6 GHz */
+	if (pe_session->lim_join_req) {
+		bss_desc = &pe_session->lim_join_req->bssDescription;
+		bcn_ies = &bss_desc->bcn_ies;
+		if (lim_is_he_6ghz_band(pe_session))
+			lim_intersect_ap_eht_caps(pe_session,
+						  add_bss_params,
+						  bcn_ies, assoc_resp);
+	} else {
+		pe_debug("vdev %d: lim_join_req is NULL for " QDF_MAC_ADDR_FMT ", skip intersection",
+			 pe_session->vdev_id,
+			 QDF_MAC_ADDR_REF(pe_session->bssId));
+	}
+
+	lim_update_ap_max_eht_ch_width(mac, assoc_resp, pe_session, peer);
 }
 
 /**
@@ -5086,23 +5018,72 @@ static void lim_sta_process_eht_capability(struct mac_context *mac,
  * Return: None
  */
 static void lim_sta_process_eht_operation(struct mac_context *mac,
-					 tpSirAssocRsp pAssocRsp,
-					 struct bss_params *pAddBssParams,
-					 struct pe_session *pe_session,
-					 struct wlan_objmgr_peer *peer)
+					  tpSirAssocRsp assoc_resp,
+					  struct bss_params *add_bss_params,
+					  struct pe_session *pe_session,
+					  struct wlan_objmgr_peer *peer)
 {
-	/* Validate both EHT capability and operation are present */
-	if (lim_is_session_eht_capable(pe_session) &&
-	    pAssocRsp->eht_cap.present &&
-	    pAssocRsp->eht_op.present &&
-	    pAssocRsp->eht_op.eht_op_information_present) {
-		/*
-		 * Persist EHT operation BW + seg0/seg1 into peer MLME after
-		 * sanity checks (ap_max_ch_width validation is done inside).
-		 */
-		lim_update_eht_oper_assoc_resp(pe_session, pAddBssParams,
-					       &pAssocRsp->eht_op, peer);
+	enum phy_ch_width op_ch_width;
+	enum phy_ch_width ap_max_ch_width;
+	enum phy_ch_width fw_max_ch_width;
+	uint32_t fw_eht_bw;
+	tDot11fIEeht_op *eht_op;
+
+	if (!assoc_resp || !add_bss_params || !pe_session || !peer)
+		return;
+
+	eht_op = &assoc_resp->eht_op;
+
+	if (!eht_op->present || !eht_op->eht_op_information_present)
+		return;
+
+	/* Step 1: EHT Operation channel_width is authoritative */
+	switch (eht_op->channel_width) {
+	case WLAN_EHT_CHWIDTH_320:
+		op_ch_width = CH_WIDTH_320MHZ;
+		break;
+	case WLAN_EHT_CHWIDTH_160:
+		op_ch_width = CH_WIDTH_160MHZ;
+		break;
+	case WLAN_EHT_CHWIDTH_80:
+		op_ch_width = CH_WIDTH_80MHZ;
+		break;
+	case WLAN_EHT_CHWIDTH_40:
+		op_ch_width = CH_WIDTH_40MHZ;
+		break;
+	default:
+		op_ch_width = CH_WIDTH_20MHZ;
+		break;
 	}
+
+	/* Step 2: CCFS1 validation for >80 MHz */
+	if ((op_ch_width == CH_WIDTH_160MHZ ||
+	     op_ch_width == CH_WIDTH_320MHZ) && !eht_op->ccfs1)
+		op_ch_width = CH_WIDTH_80MHZ;
+
+	/* Step 3: Cap by AP max capability */
+	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
+	op_ch_width = QDF_MIN(op_ch_width, ap_max_ch_width);
+
+	/* Step 4: Cap by firmware capability */
+	fw_eht_bw = wma_get_eht_ch_width();
+	if (fw_eht_bw == WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ)
+		fw_max_ch_width = CH_WIDTH_320MHZ;
+	else if (fw_eht_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+		fw_max_ch_width = CH_WIDTH_160MHZ;
+	else
+		fw_max_ch_width = CH_WIDTH_80MHZ;
+
+	op_ch_width = QDF_MIN(op_ch_width, fw_max_ch_width);
+
+	/* Step 5: Store results */
+	wlan_peer_set_op_ch_width(peer, op_ch_width);
+	wlan_peer_set_center_freq_seg0(peer, eht_op->ccfs0);
+
+	if (op_ch_width > CH_WIDTH_80MHZ)
+		wlan_peer_set_center_freq_seg1(peer, eht_op->ccfs1);
+	else
+		wlan_peer_set_center_freq_seg1(peer, 0);
 }
 
 /**
@@ -5155,16 +5136,16 @@ static void lim_update_add_bss_eht_params(struct mac_context *mac,
 #else /* !WLAN_FEATURE_11BE */
 static inline void
 lim_sta_process_eht_capability(struct mac_context *mac,
-			       tpSirAssocRsp pAssocRsp,
-			       struct bss_params *pAddBssParams,
+			       tpSirAssocRsp assoc_resp,
+			       struct bss_params *add_bss_params,
 			       struct pe_session *pe_session)
 {
 }
 
 static inline void
 lim_sta_process_eht_operation(struct mac_context *mac,
-			      tpSirAssocRsp pAssocRsp,
-			      struct bss_params *pAddBssParams,
+			      tpSirAssocRsp assoc_resp,
+			      struct bss_params *add_bss_params,
 			      struct pe_session *pe_session,
 			      struct wlan_objmgr_peer *peer)
 {
@@ -5172,16 +5153,16 @@ lim_sta_process_eht_operation(struct mac_context *mac,
 
 static inline void
 lim_update_add_bss_eht_params(struct mac_context *mac,
-			      tpSirAssocRsp pAssocRsp,
-			      struct bss_params *pAddBssParams,
+			      tpSirAssocRsp assoc_resp,
+			      struct bss_params *add_bss_params,
 			      struct pe_session *pe_session)
 {
 }
 
 static inline void
 lim_update_ap_max_eht_ch_width(struct mac_context *mac,
-			       tpSirAssocRsp pAssocRsp,
-			       struct bss_params *pAddBssParams,
+			       tpSirAssocRsp assoc_resp,
+			       struct bss_params *add_bss_params,
 			       struct pe_session *pe_session)
 {
 }
