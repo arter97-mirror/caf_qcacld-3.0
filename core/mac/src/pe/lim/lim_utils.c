@@ -10434,9 +10434,9 @@ bool lim_is_csa_tx_pending(uint8_t vdev_id)
 	}
 
 	if (session->dfsIncludeChanSwIe &&
-	    (session->gLimChannelSwitch.switchCount ==
-	     ch_switch_info->sap_ch_switch_beacon_cnt) &&
-	     csa_tx_offload) {
+	    ((session->gLimChannelSwitch.switchCount ==
+	     ch_switch_info->sap_ch_switch_beacon_cnt) ||
+	     csa_tx_offload)) {
 		return true;
 	}
 
