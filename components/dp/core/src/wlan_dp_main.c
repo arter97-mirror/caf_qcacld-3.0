@@ -3216,18 +3216,22 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 	struct hif_opaque_softc *hif_context;
 	HTC_HANDLE htc_ctx = cds_get_context(QDF_MODULE_ID_HTC);
 	qdf_device_t qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
+	struct cdp_soc_attach_params cdp_params = {0};
 
 	dp_ctx = dp_get_context();
 	hif_context = cds_get_context(QDF_MODULE_ID_HIF);
+
+	cdp_params.hif_handle = hif_context;
+	cdp_params.htc_handle = htc_ctx;
+	cdp_params.qdf_osdev = qdf_ctx;
+	cdp_params.ol_ops = params->dp_ol_if_ops;
 
 	if (TARGET_TYPE_QCA6290 == params->target_type ||
 	    TARGET_TYPE_QCA6390 == params->target_type ||
 	    TARGET_TYPE_QCA6490 == params->target_type ||
 	    TARGET_TYPE_QCA6750 == params->target_type) {
-		dp_soc = cdp_soc_attach(LITHIUM_DP, hif_context,
-					params->target_psoc, htc_ctx,
-					qdf_ctx, params->dp_ol_if_ops);
-
+		cdp_params.device_id = LITHIUM_DP;
+		dp_soc = cdp_soc_attach(params->target_psoc, &cdp_params);
 		if (dp_soc)
 			if (!cdp_soc_init(dp_soc, LITHIUM_DP,
 					  hif_context, params->target_psoc,
@@ -3241,10 +3245,8 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 		   params->target_type == TARGET_TYPE_WCN7750 ||
 		   params->target_type == TARGET_TYPE_QCC2072 ||
 		   params->target_type == TARGET_TYPE_FIG) {
-		dp_soc = cdp_soc_attach(BERYLLIUM_DP, hif_context,
-					params->target_psoc,
-					htc_ctx, qdf_ctx,
-					params->dp_ol_if_ops);
+		cdp_params.device_id = BERYLLIUM_DP;
+		dp_soc = cdp_soc_attach(params->target_psoc, &cdp_params);
 		if (dp_soc)
 			if (!cdp_soc_init(dp_soc, BERYLLIUM_DP, hif_context,
 					  params->target_psoc, htc_ctx,
@@ -3252,10 +3254,8 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 				goto err_soc_detach;
 		*is_wifi3_0_target = true;
 	} else if (params->target_type == TARGET_TYPE_WCN6450) {
-		dp_soc =
-			cdp_soc_attach(RHINE_DP, hif_context,
-				       params->target_psoc, htc_ctx,
-				       qdf_ctx, params->dp_ol_if_ops);
+		cdp_params.device_id = RHINE_DP;
+		dp_soc = cdp_soc_attach(params->target_psoc, &cdp_params);
 		if (dp_soc)
 			if (!cdp_soc_init(dp_soc, RHINE_DP, hif_context,
 					  params->target_psoc, htc_ctx,
@@ -3263,9 +3263,8 @@ void *wlan_dp_txrx_soc_attach(struct dp_txrx_soc_attach_params *params,
 				goto err_soc_detach;
 		*is_wifi3_0_target = true;
 	} else {
-		dp_soc = cdp_soc_attach(MOB_DRV_LEGACY_DP, hif_context,
-					params->target_psoc, htc_ctx, qdf_ctx,
-					params->dp_ol_if_ops);
+		cdp_params.device_id = MOB_DRV_LEGACY_DP;
+		dp_soc = cdp_soc_attach(params->target_psoc, &cdp_params);
 	}
 
 	if (!dp_soc)
