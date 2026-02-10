@@ -548,6 +548,9 @@ void lim_extract_eht_op(struct mac_context *mac,
 void lim_update_eht_bw_cap_mcs(struct pe_session *session,
 			       tDot11fBeaconIEs *bcn_ies)
 {
+	enum phy_ch_width ap_max_ch_width;
+	tDot11fIEeht_cap *eht_cap;
+
 	if (!session->eht_capable)
 		return;
 
@@ -561,6 +564,25 @@ void lim_update_eht_bw_cap_mcs(struct pe_session *session,
 			session->eht_config.num_sounding_dim_320mhz = 0;
 	}
 
+	if (!bcn_ies || !bcn_ies->eht_cap.present)
+		return;
+
+	eht_cap = &bcn_ies->eht_cap;
+
+	ap_max_ch_width = lim_calculate_ap_max_eht_ch_width(session, eht_cap);
+	/*
+	 * Only update ap_ch_width if EHT baseline MCS validation passed.
+	 * lim_calculate_ap_max_eht_ch_width() returns CH_WIDTH_INVALID when
+	 * the baseline EHT MCS validation fails; writing that back would
+	 * corrupt the session's ap_ch_width.
+	 */
+	if (ap_max_ch_width != CH_WIDTH_INVALID)
+		session->ap_ch_width = ap_max_ch_width;
+	else
+		pe_debug("vdev %d: EHT MCS validation failed for AP "
+			 QDF_MAC_ADDR_FMT ", not updating ap_ch_width",
+			 session->vdev_id,
+			 QDF_MAC_ADDR_REF(session->bssId));
 }
 #endif
 

@@ -223,11 +223,32 @@ lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
 {
 	return add_sta_params->eht_capable;
 }
+
+/**
+ * lim_calculate_ap_max_eht_ch_width() - Calculate AP max supported EHT width
+ * @pe_session: PE session entry
+ * @eht_cap: Pointer to EHT Capability IE (mandatory for EHT validation)
+ *
+ * This helper encapsulates the EHT max bandwidth decision logic so it can be
+ * used from multiple paths (e.g., assoc response and beacon-based validation).
+ *
+ * Return: Maximum AP supported channel width for EHT.
+ */
+enum phy_ch_width
+lim_calculate_ap_max_eht_ch_width(struct pe_session *pe_session,
+				  tDot11fIEeht_cap *eht_cap);
 #else
 static inline bool
 lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
 {
 	return false;
+}
+
+static inline enum phy_ch_width
+lim_calculate_ap_max_eht_ch_width(struct pe_session *pe_session,
+				  tDot11fIEeht_cap *eht_cap)
+{
+	return CH_WIDTH_INVALID;
 }
 #endif
 

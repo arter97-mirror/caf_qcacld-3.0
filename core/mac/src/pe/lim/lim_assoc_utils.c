@@ -4417,9 +4417,12 @@ static bool lim_validate_eht_mcs_fields(uint8_t rx_mcs_0_9,
 				       uint8_t rx_mcs_12_13,
 				       uint8_t tx_mcs_12_13)
 {
-	return (rx_mcs_0_9 || tx_mcs_0_9 ||
-		rx_mcs_10_11 || tx_mcs_10_11 ||
-		rx_mcs_12_13 || tx_mcs_12_13);
+	/*
+	 * MCS 0-9 is mandatory per IEEE 802.11be §9.4.2.313.
+	 * Both RX and TX NSS must be non-zero for a valid EHT STA.
+	 * MCS 10-11 and 12-13 are optional extensions.
+	 */
+	return (rx_mcs_0_9 && tx_mcs_0_9);
 }
 
 /**
@@ -4435,8 +4438,17 @@ static bool lim_validate_eht_mcs_fields(uint8_t rx_mcs_0_9,
 static bool lim_validate_eht_mcs(tDot11fIEeht_cap *eht_cap,
 				enum phy_ch_width ch_width)
 {
+	/* Defensive check */
+	if (!eht_cap)
+		return false;
+
 	switch (ch_width) {
+
 	case CH_WIDTH_320MHZ:
+		/*
+		 * EHT-only bandwidth.
+		 * Validate using 320 MHz EHT MCS/NSS maps.
+		 */
 		return lim_validate_eht_mcs_fields(
 			eht_cap->bw_320_rx_max_nss_for_mcs_0_to_9,
 			eht_cap->bw_320_tx_max_nss_for_mcs_0_to_9,
@@ -4444,7 +4456,12 @@ static bool lim_validate_eht_mcs(tDot11fIEeht_cap *eht_cap,
 			eht_cap->bw_320_tx_max_nss_for_mcs_10_and_11,
 			eht_cap->bw_320_rx_max_nss_for_mcs_12_and_13,
 			eht_cap->bw_320_tx_max_nss_for_mcs_12_and_13);
+
 	case CH_WIDTH_160MHZ:
+		/*
+		 * Validate using 160 MHz EHT MCS/NSS maps.
+		 * HE capabilities must NOT gate this decision.
+		 */
 		return lim_validate_eht_mcs_fields(
 			eht_cap->bw_160_rx_max_nss_for_mcs_0_to_9,
 			eht_cap->bw_160_tx_max_nss_for_mcs_0_to_9,
@@ -4452,8 +4469,15 @@ static bool lim_validate_eht_mcs(tDot11fIEeht_cap *eht_cap,
 			eht_cap->bw_160_tx_max_nss_for_mcs_10_and_11,
 			eht_cap->bw_160_rx_max_nss_for_mcs_12_and_13,
 			eht_cap->bw_160_tx_max_nss_for_mcs_12_and_13);
+
+	case CH_WIDTH_80MHZ:
+	case CH_WIDTH_40MHZ:
+	case CH_WIDTH_20MHZ:
 	default:
-		/* <= 80 MHz */
+		/*
+		 * Baseline EHT validation (≤ 80 MHz).
+		 * Mandatory for any EHT operation.
+		 */
 		return lim_validate_eht_mcs_fields(
 			eht_cap->bw_le_80_rx_max_nss_for_mcs_0_to_9,
 			eht_cap->bw_le_80_tx_max_nss_for_mcs_0_to_9,
@@ -4462,6 +4486,68 @@ static bool lim_validate_eht_mcs(tDot11fIEeht_cap *eht_cap,
 			eht_cap->bw_le_80_rx_max_nss_for_mcs_12_and_13,
 			eht_cap->bw_le_80_tx_max_nss_for_mcs_12_and_13);
 	}
+}
+
+enum phy_ch_width
+lim_calculate_ap_max_eht_ch_width(struct pe_session *pe_session,
+				  tDot11fIEeht_cap *eht_cap)
+{
+	enum phy_ch_width ap_max_ch_width;
+
+	if (!pe_session || !eht_cap || !eht_cap->present)
+		return CH_WIDTH_INVALID;
+
+	/* Step 1: Baseline EHT validation (mandatory ≤ 80 MHz) */
+	if (!lim_validate_eht_mcs(eht_cap, CH_WIDTH_80MHZ)) {
+		pe_debug("vdev %d: EHT MCS 0-9 validation failed for <= 80MHz, AP "
+			 QDF_MAC_ADDR_FMT ", EHT not usable",
+			 pe_session->vdev_id,
+			 QDF_MAC_ADDR_REF(pe_session->bssId));
+		/*
+		 * Mandatory EHT MCS 0-9 NSS fields are zero; EHT is not
+		 * usable. Return CH_WIDTH_INVALID to signal failure to
+		 * callers (consistent with lim_get_he_max_ch_width()).
+		 */
+		return CH_WIDTH_INVALID;
+	}
+
+	/* EHT baseline supported; start at 80 MHz */
+	ap_max_ch_width = CH_WIDTH_80MHZ;
+
+	/* Step 2: 320 MHz (EHT-only, 6 GHz only) */
+	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq) &&
+	    eht_cap->support_320mhz_6ghz) {
+		if (lim_validate_eht_mcs(eht_cap, CH_WIDTH_320MHZ)) {
+			ap_max_ch_width = CH_WIDTH_320MHZ;
+		} else {
+			/*
+			 * support_320mhz_6ghz is set but 320 MHz MCS 0-9
+			 * NSS fields are zero - malformed AP capability.
+			 * ap_max_ch_width remains CH_WIDTH_80MHZ here; the
+			 * 160 MHz check below (Step 3) will promote it to
+			 * CH_WIDTH_160MHZ if the 160 MHz MCS fields are valid.
+			 */
+			pe_debug("vdev %d: AP " QDF_MAC_ADDR_FMT
+				 " support_320mhz_6ghz=1 but 320MHz MCS 0-9 NSS=0,"
+				 " falling back to 160MHz check",
+				 pe_session->vdev_id,
+				 QDF_MAC_ADDR_REF(pe_session->bssId));
+		}
+	}
+
+	/* Step 3: 160 MHz (5/6 GHz) - also fallback when 320 MHz MCS fails */
+	if (ap_max_ch_width < CH_WIDTH_320MHZ &&
+	    (WLAN_REG_IS_5GHZ_CH_FREQ(pe_session->curr_op_freq) ||
+	     WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq)) &&
+	    lim_validate_eht_mcs(eht_cap, CH_WIDTH_160MHZ))
+		ap_max_ch_width = CH_WIDTH_160MHZ;
+
+	/* Step 4: 2.4 GHz - EHT max is 40 MHz per IEEE 802.11be */
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq) &&
+	    ap_max_ch_width == CH_WIDTH_80MHZ)
+		ap_max_ch_width = CH_WIDTH_40MHZ;
+
+	return ap_max_ch_width;
 }
 
 /**
@@ -4481,58 +4567,22 @@ static void lim_update_ap_max_eht_ch_width(struct mac_context *mac,
 					   struct pe_session *pe_session,
 					   struct wlan_objmgr_peer *peer)
 {
-	tDot11fIEeht_cap *eht_cap;
-	enum phy_ch_width ap_max_ch_width;
+	enum phy_ch_width ap_max_ch_width = CH_WIDTH_20MHZ;
 
-	/*
-	 * Default to the peer stored value so that even if EHT MCS validation
-	 * fails, we still persist a consistent value (preserving HE/VHT/HT BW).
-	 */
-	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
+	if (!assoc_resp->eht_cap.present)
+		return;
 
-	/* Step 1: Baseline validation (<= 80 MHz) */
-	eht_cap = &assoc_resp->eht_cap;
-	if (!lim_validate_eht_mcs(eht_cap, CH_WIDTH_80MHZ)) {
-		pe_debug("vdev %d: Invalid EHT MCS for <= 80MHz, AP " QDF_MAC_ADDR_FMT,
+	ap_max_ch_width = lim_calculate_ap_max_eht_ch_width(
+					pe_session,
+					&assoc_resp->eht_cap);
+	if (ap_max_ch_width == CH_WIDTH_INVALID) {
+		pe_debug("vdev %d: EHT MCS validation failed for AP " QDF_MAC_ADDR_FMT", not updating ap_max_ch_width",
 			 pe_session->vdev_id,
 			 QDF_MAC_ADDR_REF(pe_session->bssId));
-		/*
-		 * Baseline invalid, cannot support EHT.
-		 * Keep ap_max_ch_width as-is to allow fallback to HE/VHT.
-		 */
-		goto out;
+		return;
 	}
 
-	/*
-	 * Baseline validation passed - EHT is supported.
-	 * Set minimum EHT bandwidth (80 MHz) as starting point.
-	 */
-	ap_max_ch_width = CH_WIDTH_80MHZ;
-
-	/* Step 2: Band-specific validation for wider channels */
-	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq) &&
-	    eht_cap->support_320mhz_6ghz &&
-	    lim_validate_eht_mcs(eht_cap, CH_WIDTH_320MHZ)) {
-		ap_max_ch_width = CH_WIDTH_320MHZ;
-	} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(pe_session->curr_op_freq) ||
-		    WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq)) &&
-		   assoc_resp->he_cap.chan_width_2 &&
-		   lim_validate_eht_mcs(eht_cap, CH_WIDTH_160MHZ)) {
-		/* 160 MHz support indicated in HE Cap, validated in EHT Cap */
-		ap_max_ch_width = CH_WIDTH_160MHZ;
-	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq)) {
-		ap_max_ch_width = CH_WIDTH_40MHZ;
-	}
-
-out:
-	/*
-	 * Persist into peer MLME (single source of truth).
-	 *
-	 * Update peer irrespective of whether ap_max_ch_width was derived in
-	 * this call (e.g., EHT MCS validation failure). This
-	 * makes peer the authoritative store and avoids conditional update
-	 * behavior.
-	 */
+	/* Persist into peer MLME (single source of truth). */
 	wlan_peer_set_ap_max_ch_width(peer, ap_max_ch_width);
 }
 
