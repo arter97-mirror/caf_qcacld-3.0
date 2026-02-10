@@ -27581,6 +27581,27 @@ static int wlan_hdd_add_key_mlo_vdev(mac_handle_t mac_handle,
 		}
 	}
 
+	if (pairwise && adapter->device_mode == QDF_STA_MODE) {
+		struct wlan_objmgr_peer *peer;
+		enum wlan_peer_type peer_type;
+		struct qdf_mac_addr mac_address = {0};
+
+		qdf_mem_copy(mac_address.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
+		peer = wlan_objmgr_get_peer_by_mac(adapter->hdd_ctx->psoc,
+						   mac_address.bytes,
+						   WLAN_OSIF_ID);
+		if (peer) {
+			peer_type = wlan_peer_get_peer_type(peer);
+			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
+			if (peer_type == WLAN_PEER_TDLS &&
+			    !ucfg_tdls_is_key_install_allowed(vdev,
+							      &mac_address)) {
+				hdd_debug("TDLS peer's key install disallowed");
+				return 0;
+			}
+		}
+	}
+
 	link_vdev = ucfg_tdls_get_tdls_link_vdev(vdev, WLAN_OSIF_TDLS_ID);
 	if (pairwise && link_id == -1 && !link_vdev)
 		return wlan_hdd_add_key_all_mlo_vdev(mac_handle, vdev,
