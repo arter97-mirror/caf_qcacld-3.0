@@ -3,14 +3,15 @@ targets = [
     "autoghgvm",
     "autogvm",
     "canoe",
+    "chora",
     "gen3auto",
+    "hamoa",
     "neo-la",
-    "sun",
-    "vienna",
     "pineapple",
     "seraph",
-    "hamoa",
-    "chora",
+    "shikra",
+    "sun",
+    "vienna",
 ]
 
 la_variants = [
