@@ -5152,7 +5152,7 @@ QDF_STATUS wlan_strip_ie(uint8_t *addn_ie, uint16_t *addn_ielen,
 		qdf_mem_zero(extracted_ie, eid_max_len + size_of_len_field + 1);
 
 	while (left >= 2) {
-		elem_id  = ptr[0];
+		elem_id = ptr[0];
 		left -= 1;
 		if (size_of_len_field == TWO_BYTE) {
 			elem_len = *((uint16_t *)&ptr[1]);
@@ -5162,17 +5162,31 @@ QDF_STATUS wlan_strip_ie(uint8_t *addn_ie, uint16_t *addn_ielen,
 			left -= 1;
 		}
 		if (elem_len > left) {
-			mlme_err("Invalid IEs eid: %d elem_len: %d left: %d",
-				 elem_id, elem_len, left);
+			mlme_rl_nofl_err("Invalid IEs eid: %d elem_len: %d left: %d",
+					 elem_id, elem_len, left);
 			qdf_mem_free(tmp_buf);
 			return QDF_STATUS_E_FAILURE;
 		}
 
 		ie_len = elem_len + size_of_len_field + 1;
+
+		/* Check for integer overflow */
+		if (ie_len < elem_len) {
+			mlme_rl_nofl_err("Integer overflow in ie_len calculation, elem_len=%d, ie_len=%d",
+					 elem_len, ie_len);
+			qdf_mem_free(tmp_buf);
+			return QDF_STATUS_E_FAILURE;
+		}
 		if (eid != elem_id ||
 				(oui && qdf_mem_cmp(oui,
 						&ptr[size_of_len_field + 1],
 						oui_length))) {
+			if (tmp_len + ie_len > *addn_ielen) {
+				mlme_rl_nofl_err("tmp_buf overflow tmp_len=%d, ie_len=%d, addn_ielen=%d",
+						 tmp_len, ie_len, *addn_ielen);
+				qdf_mem_free(tmp_buf);
+				return QDF_STATUS_E_FAILURE;
+			}
 			qdf_mem_copy(tmp_buf + tmp_len, &ptr[0], ie_len);
 			tmp_len += ie_len;
 		} else {
@@ -5181,13 +5195,18 @@ QDF_STATUS wlan_strip_ie(uint8_t *addn_ie, uint16_t *addn_ielen,
 			 * take oui IE and store in provided buffer.
 			 */
 			if (extracted_ie) {
-				if (ie_len <= (eid_max_len + size_of_len_field +
-					       1 - extracted_ie_len)) {
+				if (ie_len + extracted_ie_len <= (eid_max_len +
+						 size_of_len_field + 1)) {
 					qdf_mem_copy(
 					extracted_ie + extracted_ie_len,
 					&ptr[0], ie_len);
 					extracted_ie_len += ie_len;
 				} else {
+					if (tmp_len + ie_len > *addn_ielen) {
+						mlme_rl_nofl_err("tmp_buf overflow in extract path");
+						qdf_mem_free(tmp_buf);
+						return QDF_STATUS_E_FAILURE;
+					}
 					qdf_mem_copy(tmp_buf + tmp_len, &ptr[0],
 						     ie_len);
 					tmp_len += ie_len;
