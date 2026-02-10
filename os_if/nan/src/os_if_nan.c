@@ -176,6 +176,14 @@ const struct nla_policy vendor_attr_policy[
 	[QCA_WLAN_VENDOR_ATTR_NDP_GTK_REQUIRED] = {
 						.type = NLA_FLAG,
 	},
+	[QCA_WLAN_VENDOR_ATTR_NDP_MAX_LATENCY_MS] = {
+						.type = NLA_U32,
+						.len = sizeof(uint32_t)
+	},
+	[QCA_WLAN_VENDOR_ATTR_NDP_TPUT] = {
+						.type = NLA_U32,
+						.len = sizeof(uint32_t)
+	},
 };
 
 /**
@@ -1160,6 +1168,86 @@ static int os_if_nan_process_ndp_end_req(struct wlan_objmgr_psoc *psoc,
 	return errno;
 }
 
+static int __os_if_nan_process_ndp_update_config(struct wlan_objmgr_psoc *psoc,
+						 struct nlattr **tb)
+{
+	int ret = 0;
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *ndi_vdev;
+	struct nan_datapath_update_config config = {0};
+
+	if (!tb[QCA_WLAN_VENDOR_NDP_SUB_CMD_UPDATE_CONFIG]) {
+		osif_err("ndp update config is unavailable");
+		return -EINVAL;
+	}
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_NDP_INSTANCE_ID]) {
+		osif_err("Instance ID is unavailable");
+		return -EINVAL;
+	}
+	config.ndp_instance_id =
+		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NDP_INSTANCE_ID]);
+
+	if (!tb[QCA_WLAN_VENDOR_ATTR_NDP_MAX_LATENCY_MS] &&
+	    !tb[QCA_WLAN_VENDOR_ATTR_NDP_TPUT]) {
+		osif_err("Max latency and throughput are unavailable");
+		return -EINVAL;
+	}
+	if (tb[QCA_WLAN_VENDOR_ATTR_NDP_MAX_LATENCY_MS])
+		config.latency_ms =
+		nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NDP_MAX_LATENCY_MS]);
+	if (tb[QCA_WLAN_VENDOR_ATTR_NDP_TPUT])
+		config.tput_mbps =
+			nla_get_u32(tb[QCA_WLAN_VENDOR_ATTR_NDP_TPUT]);
+
+	ndi_vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NDI_MODE,
+							    WLAN_NAN_ID);
+	if (!ndi_vdev) {
+		osif_err("NAN data interface is not available");
+		return -EINVAL;
+	}
+
+	config.vdev = ndi_vdev;
+
+	status = ucfg_nan_req_processor(ndi_vdev, &config, NDP_UPDATE_CONFIG);
+	ret = qdf_status_to_os_return(status);
+
+	if (ret)
+		wlan_objmgr_vdev_release_ref(ndi_vdev, WLAN_NAN_ID);
+	return ret;
+}
+
+static int os_if_nan_process_ndp_update_config(struct wlan_objmgr_psoc *psoc,
+					       struct nlattr **tb)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct net_device *net_dev;
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	vdev = wlan_objmgr_get_vdev_by_opmode_from_psoc(psoc, QDF_NDI_MODE,
+							WLAN_NAN_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	errno = osif_net_dev_from_vdev(vdev, &net_dev);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_NAN_ID);
+
+	if (errno)
+		return errno;
+
+	errno = osif_vdev_sync_op_start(net_dev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __os_if_nan_process_ndp_update_config(psoc, tb);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+
 int os_if_nan_process_ndp_cmd(struct wlan_objmgr_psoc *psoc,
 			      const void *data, int data_len,
 			      bool is_ndp_allowed,
@@ -1233,6 +1321,8 @@ int os_if_nan_process_ndp_cmd(struct wlan_objmgr_psoc *psoc,
 			return -EOPNOTSUPP;
 		}
 		return os_if_nan_process_ndp_end_req(psoc, tb);
+	case QCA_WLAN_VENDOR_NDP_SUB_CMD_UPDATE_CONFIG:
+		return os_if_nan_process_ndp_update_config(psoc, tb);
 	default:
 		osif_err("Unrecognized NDP vendor cmd %d", ndp_cmd_type);
 		return -EINVAL;
