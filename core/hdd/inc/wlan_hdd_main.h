@@ -2665,6 +2665,10 @@ struct hdd_context {
 #ifdef FEATURE_WLAN_TX_POWERBOOST
 	struct hdd_tx_powerboost tx_pb;
 #endif
+#if defined(WLAN_SYSFS) && defined(WLAN_TAS_SYSFS)
+	bool tas_enabled;
+	bool tas_send_to_fw;
+#endif
 };
 
 /**
@@ -4746,6 +4750,24 @@ QDF_STATUS hdd_start_ap_link(struct wlan_hdd_link_info *link_info);
 int hdd_start_ap_adapter(struct hdd_adapter *adapter, bool rtnl_held);
 int hdd_configure_cds(struct hdd_context *hdd_ctx);
 int hdd_set_fw_params(struct hdd_adapter *adapter);
+
+/**
+ * hdd_send_tas_mode() - Retrieve TAS mode and send pdev param to firmware
+ * @hdd_ctx: HDD context
+ *
+ * This function reads the TAS configuration stored in hdd context and
+ * sends the TAS mode parameter to firmware via mlme_check_index_setparam.
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+#if defined(WLAN_SYSFS) && defined(WLAN_TAS_SYSFS)
+int hdd_send_tas_mode(struct hdd_context *hdd_ctx);
+#else
+static inline int hdd_send_tas_mode(struct hdd_context *hdd_ctx)
+{
+	return 0;
+}
+#endif
 
 #ifdef MULTI_CLIENT_LL_SUPPORT
 /**

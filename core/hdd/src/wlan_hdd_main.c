@@ -147,6 +147,7 @@
 #include "enet.h"
 #include <cdp_txrx_cmn_struct.h>
 #include "wlan_hdd_sysfs.h"
+#include "wlan_hdd_sysfs_tas.h"
 #include "wlan_disa_ucfg_api.h"
 #include "wlan_disa_obj_mgmt_api.h"
 #include "wlan_action_oui_ucfg_api.h"
@@ -364,6 +365,7 @@ static qdf_wake_lock_t wlan_wake_lock;
 
 #define MAX_PDEV_PRE_ENABLE_PARAMS 8
 #define FTM_MAX_PDEV_PARAMS 1
+#define MAX_PDEV_TAS_FW_PARAMS 1
 
 #define WOW_MAX_FILTER_LISTS 1
 #define WOW_MAX_FILTERS_PER_LIST 4
@@ -18442,6 +18444,8 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 					       DEFAULT_KEYMGMT_6G_MASK);
 	}
 
+	hdd_send_tas_mode(hdd_ctx);
+
 	status = ucfg_mlme_is_standard_6ghz_conn_policy_enabled(hdd_ctx->psoc,
 							&std_6ghz_conn_policy);
 
@@ -24460,6 +24464,48 @@ static int timer_multiplier_set_handler(const char *kmessage,
 
 	return 0;
 }
+
+#if defined(WLAN_SYSFS) && defined(WLAN_TAS_SYSFS)
+int hdd_send_tas_mode(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS ret;
+	struct dev_set_param setparam[MAX_PDEV_TAS_FW_PARAMS] = { };
+	uint8_t index = 0;
+
+	if (!hdd_ctx) {
+		hdd_err("Invalid HDD context");
+		return -EINVAL;
+	}
+
+	if (!hdd_ctx->tas_send_to_fw)
+		return 0;
+
+	/* Send TAS mode configuration to firmware */
+	ret = mlme_check_index_setparam(setparam,
+					wmi_pdev_param_set_tas_mode,
+					hdd_ctx->tas_enabled, index++,
+					MAX_PDEV_TAS_FW_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("Failed to set TAS mode param, tas_enabled: %d",
+			hdd_ctx->tas_enabled);
+		return -EINVAL;
+	}
+
+	/* Send the parameter to firmware */
+	ret = sme_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						  WMI_PDEV_ID_SOC, setparam,
+						  index);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("Failed to send TAS mode param to FW, ret: %d", ret);
+		return -EINVAL;
+	}
+
+	hdd_info("TAS mode configuration successfully sent to FW: %s",
+		 hdd_ctx->tas_enabled ? "ENABLED" : "DISABLED");
+
+	return 0;
+}
+#endif
 
 static const struct kernel_param_ops timer_multiplier_ops = {
 	.get = timer_multiplier_get_handler,

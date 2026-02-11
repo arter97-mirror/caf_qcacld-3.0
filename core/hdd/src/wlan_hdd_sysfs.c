@@ -101,6 +101,7 @@
 #include "wlan_module_ids.h"
 #include <wlan_coex_ucfg_api.h>
 #include <wlan_hdd_sysfs_apfmode.h>
+#include <wlan_hdd_sysfs_tas.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -1377,6 +1378,7 @@ void hdd_create_sysfs_files(struct hdd_context *hdd_ctx)
 		hdd_sysfs_wds_mode_create(driver_kobject);
 		hdd_sysfs_roam_trigger_bitmap_create(driver_kobject);
 		hdd_sysfs_rf_test_mode_create(driver_kobject);
+		hdd_sysfs_tas_create(driver_kobject);
 		hdd_sysfs_create_logging_config_interface(driver_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_create(driver_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_rm_create(driver_kobject);
@@ -1399,6 +1401,7 @@ void hdd_destroy_sysfs_files(void)
 		hdd_sysfs_ipa_opt_dp_ctrl_rm_destroy(driver_kobject);
 		hdd_sysfs_ipa_opt_dp_ctrl_destroy(driver_kobject);
 		hdd_sysfs_destroy_logging_config_interface(driver_kobject);
+		hdd_sysfs_tas_destroy(driver_kobject);
 		hdd_sysfs_rf_test_mode_destroy(driver_kobject);
 		hdd_sysfs_roam_trigger_bitmap_destroy(driver_kobject);
 		hdd_sysfs_wds_mode_destroy(driver_kobject);
