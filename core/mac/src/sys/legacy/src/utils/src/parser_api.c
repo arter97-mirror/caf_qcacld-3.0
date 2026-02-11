@@ -1343,6 +1343,7 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 	uint32_t sec_ch_freq = 0;
 	uint32_t self_cb_mode;
 	struct ch_params ch_params = {0};
+	bool has_vht_he_80mhz = false;
 
 	self_cb_mode = lim_get_cb_mode_for_freq(mac, pe_session, ch_freq);
 	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
@@ -1391,6 +1392,19 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 		break;
 	}
 
+	/*
+	 * Check if AP has valid VHT/HE 80MHz or higher capability.
+	 * If yes, skip HT info validation and trust VHT/HE capability.
+	 * This prevents unnecessary downgrade to 20MHz when AP has
+	 * invalid HT info but valid VHT/HE 80MHz capability.
+	 */
+	if ((ie_struct->VHTCaps.present && ie_struct->VHTOperation.present &&
+	     ie_struct->VHTOperation.chanWidth >= 1) ||
+	    (ie_struct->he_cap.present && ie_struct->he_op.present &&
+	     ie_struct->he_op.oper_info_6g_present &&
+	     ie_struct->he_op.oper_info_6g.info.ch_width >= 1))
+		has_vht_he_80mhz = true;
+
 	if (cb_mode != PHY_SINGLE_CHANNEL_CENTERED) {
 		ch_params.ch_width = CH_WIDTH_40MHZ;
 		wlan_reg_set_channel_params_for_pwrmode(mac->pdev, ch_freq,
@@ -1398,6 +1412,10 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 							REG_CURRENT_PWR_MODE);
 		if (ch_params.ch_width == CH_WIDTH_20MHZ ||
 		    ch_params.sec_ch_offset != cb_mode) {
+			if (has_vht_he_80mhz) {
+				pe_debug("AP has VHT/HE 80MHz, skipping HT info validation");
+				return cb_mode;
+			}
 			pe_err("ch freq %d :: Supported HT BW %d and cbmode %d, APs HT BW %d and cbmode %d, so switch to 20Mhz",
 				ch_freq, ch_params.ch_width,
 				ch_params.sec_ch_offset,
