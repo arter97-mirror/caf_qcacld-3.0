@@ -25336,6 +25336,114 @@ const struct nla_policy wlan_hdd_cfg80211_set_action_oui_policy[
 	[QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_DATA_OP] = {.type = NLA_U8},
 };
 
+#ifdef WLAN_FEATURE_QSH_SCAN
+/**
+ * __wlan_hdd_cfg80211_qsh_get_stats() - Get QSH scan statistics
+ * @wiphy: wiphy pointer
+ * @wdev: wireless device pointer
+ * @data: vendor command data (unused)
+ * @data_len: vendor command data length (unused)
+ *
+ * This function retrieves the Wi-Fi scan count from the sensor to enable
+ * analysis of power usage related to QSH-driven scans.
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int __wlan_hdd_cfg80211_qsh_get_stats(struct wiphy *wiphy,
+					     struct wireless_dev *wdev,
+					     const void *data,
+					     int data_len)
+{
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct sk_buff *skb;
+	uint32_t scan_count = 0;
+	int ret;
+	struct wlan_objmgr_vdev *vdev;
+
+	hdd_enter_dev(dev);
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret)
+		return ret;
+
+	ret = wlan_hdd_validate_vdev_id(adapter->deflink->vdev_id);
+	if (ret)
+		return ret;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
+	/* Get QSH scan statistics */
+	ret = wlan_cfg80211_mc_cp_stats_get_qsh_stats(vdev, &scan_count);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	if (ret) {
+		hdd_err("Failed to get QSH stats: %d", ret);
+		return ret;
+	}
+
+	/* Allocate response buffer */
+	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, NLMSG_HDRLEN +
+			nla_total_size(sizeof(scan_count)) + NLMSG_HDRLEN);
+	if (!skb) {
+		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		return -ENOMEM;
+	}
+
+	/* Populate scan count attribute */
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_QSH_STATS_SCAN_COUNT,
+			scan_count)) {
+		hdd_err("nla_put_u32 failed");
+		kfree_skb(skb);
+		return -EINVAL;
+	}
+
+	hdd_debug("QSH scan count: %u", scan_count);
+
+	return cfg80211_vendor_cmd_reply(skb);
+}
+
+/**
+ * wlan_hdd_cfg80211_qsh_get_stats() - Get QSH scan statistics
+ * @wiphy: wiphy pointer
+ * @wdev: wireless device pointer
+ * @data: vendor command data
+ * @data_len: vendor command data length
+ *
+ * Wrapper function with vdev synchronization for QSH stats retrieval.
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int wlan_hdd_cfg80211_qsh_get_stats(struct wiphy *wiphy,
+					   struct wireless_dev *wdev,
+					   const void *data,
+					   int data_len)
+{
+	struct osif_vdev_sync *vdev_sync;
+	int errno;
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_qsh_get_stats(wiphy, wdev, data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	return errno;
+}
+#endif
+
 const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	{
 		.info.vendor_id = QCA_NL80211_VENDOR_ID,
@@ -25924,6 +26032,17 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 				      QCA_WLAN_VENDOR_ATTR_FEATURE_CONFIG_MAX)
 	},
 	FEATURE_DCS_VENDOR_COMMANDS
+#ifdef WLAN_FEATURE_QSH_SCAN
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_QSH_GET_STATS,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			 WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_qsh_get_stats,
+		vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)
+	},
+#endif
 
 };
 

@@ -457,6 +457,92 @@ peer_is_null:
 	return ret;
 }
 
+#ifdef WLAN_FEATURE_QSH_SCAN
+struct qsh_stats_priv {
+	uint8_t scan_req_id;
+	uint32_t scan_count;
+};
+
+/**
+ * get_qsh_stats_cb() - QSH stats callback function
+ * @ev: qsh stats event
+ * @cookie: a cookie for the request context
+ *
+ * Return: None
+ */
+static void get_qsh_stats_cb(struct qsh_stats_event *ev,
+			     void *cookie)
+{
+	struct osif_request *request;
+	struct qsh_stats_priv *priv;
+
+	request = osif_request_get(cookie);
+	if (!request) {
+		osif_err("Obsolete request");
+		return;
+	}
+
+	priv = osif_request_priv(request);
+	priv->scan_req_id = ev->scan_req_id;
+	priv->scan_count = ev->scan_count;
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+
+int wlan_cfg80211_mc_cp_stats_get_qsh_stats(struct wlan_objmgr_vdev *vdev,
+					    uint32_t *scan_count)
+{
+	int ret = 0;
+	void *cookie;
+	QDF_STATUS status;
+	struct request_info info = {0};
+	struct qsh_stats_priv *priv = NULL;
+	struct osif_request *request = NULL;
+	static const struct osif_request_params params = {
+		.priv_size = sizeof(*priv),
+		.timeout_ms = CP_STATS_WAIT_TIME_STAT,
+	};
+
+	request = osif_request_alloc(&params);
+	if (!request) {
+		osif_err("Request allocation failure");
+		return -ENOMEM;
+	}
+
+	cookie = osif_request_cookie(request);
+	info.cookie = cookie;
+	info.u.get_qsh_stats_cb = get_qsh_stats_cb;
+	info.vdev_id = wlan_vdev_get_id(vdev);
+	info.pdev_id = wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev));
+
+	status = ucfg_mc_cp_stats_send_stats_request(vdev,
+						     TYPE_QSH_SCAN_STATS,
+						     &info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to send QSH stats request status: %d", status);
+		ret = qdf_status_to_os_return(status);
+		goto qsh_stats_fail;
+	}
+
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		osif_err("wait failed or timed out ret: %d", ret);
+		goto qsh_stats_fail;
+	}
+
+	priv = osif_request_priv(request);
+	*scan_count = priv->scan_count;
+
+	osif_debug("QSH scan count: %u", *scan_count);
+
+qsh_stats_fail:
+	if (request)
+		osif_request_put(request);
+
+	return ret;
+}
+#endif
+
 /**
  * get_peer_rssi_cb() - get_peer_rssi_cb callback function
  * @ev: peer stats buffer

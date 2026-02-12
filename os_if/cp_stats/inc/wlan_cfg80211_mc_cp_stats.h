@@ -53,6 +53,19 @@ int wlan_cfg80211_mc_cp_stats_get_wakelock_stats(struct wlan_objmgr_psoc *psoc,
  */
 int wlan_cfg80211_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 					   int *dbm);
+
+#ifdef WLAN_FEATURE_QSH_SCAN
+/**
+ * wlan_cfg80211_mc_cp_stats_get_qsh_stats() - API to fetch QSH scan stats
+ * @vdev:        Pointer to vdev
+ * @scan_count:  Pointer to scan count
+ *
+ * Return: 0 on success, negative value on failure
+ */
+int wlan_cfg80211_mc_cp_stats_get_qsh_stats(struct wlan_objmgr_vdev *vdev,
+					    uint32_t *scan_count);
+#endif
+
 #ifdef WLAN_FEATURE_MIB_STATS
 /**
  * wlan_cfg80211_mc_cp_stats_get_mib_stats() - API to get mib stats
