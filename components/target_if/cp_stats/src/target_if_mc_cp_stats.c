@@ -1741,6 +1741,77 @@ target_if_power_datapath_stats_unregister_tx_ops(
 {}
 #endif
 
+#ifdef WLAN_FEATURE_QSH_SCAN
+/**
+ * target_if_cp_stats_send_qsh_req() - API to send QSH scan stats
+ * request to wmi
+ * @psoc: pointer to psoc object
+ * @req: pointer to object containing stats request parameters
+ *
+ * Return: status of operation.
+ */
+static QDF_STATUS target_if_cp_stats_send_qsh_req(
+					struct wlan_objmgr_psoc *psoc,
+					struct request_info *req)
+{
+	struct wmi_unified *wmi_handle;
+	struct wmi_get_scan_stats_param param = {0};
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		cp_stats_err("wmi_handle is null.");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	/* Validate request parameters */
+	if (!req) {
+		cp_stats_err("Invalid request parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* Use LPI client ID for QSH scan stats */
+	param.scan_req_id = WMI_SCAN_CLIENT_LPI;
+
+	cp_stats_debug("Sending QSH scan stats request with client_id: %u",
+		       param.scan_req_id);
+
+	return wmi_unified_get_scan_stats_cmd_send(wmi_handle, &param);
+}
+
+static QDF_STATUS
+target_if_qsh_stats_register_tx_ops(
+			struct wlan_lmac_if_cp_stats_tx_ops *cp_stats_tx_ops)
+{
+	cp_stats_tx_ops->send_req_qsh_stats =
+			target_if_cp_stats_send_qsh_req;
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+target_if_qsh_stats_unregister_tx_ops(
+			struct wlan_lmac_if_cp_stats_tx_ops *cp_stats_tx_ops)
+{
+	if (!cp_stats_tx_ops) {
+		cp_stats_err("cp_stats_tx_ops is null");
+		return;
+	}
+
+	cp_stats_tx_ops->send_req_qsh_stats = NULL;
+}
+#else
+static QDF_STATUS
+target_if_qsh_stats_register_tx_ops(
+			struct wlan_lmac_if_cp_stats_tx_ops *cp_stats_tx_ops)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+target_if_qsh_stats_unregister_tx_ops(
+			struct wlan_lmac_if_cp_stats_tx_ops *cp_stats_tx_ops)
+{}
+#endif /* WLAN_FEATURE_QSH_SCAN */
+
 #ifdef WLAN_FEATURE_SON
 static int
 target_if_mc_cp_stats_inst_rssi_stats_event_handler(ol_scn_t scn,
@@ -2093,6 +2164,7 @@ target_if_mc_cp_stats_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 
 	target_if_big_data_stats_register_tx_ops(cp_stats_tx_ops);
 	target_if_power_datapath_stats_register_tx_ops(cp_stats_tx_ops);
+	target_if_qsh_stats_register_tx_ops(cp_stats_tx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2115,6 +2187,7 @@ target_if_mc_cp_stats_unregister_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 
 	target_if_big_data_stats_unregister_tx_ops(cp_stats_tx_ops);
 	target_if_power_datapath_stats_unregister_tx_ops(cp_stats_tx_ops);
+	target_if_qsh_stats_unregister_tx_ops(cp_stats_tx_ops);
 	cp_stats_tx_ops->inc_wake_lock_stats = NULL;
 	cp_stats_tx_ops->send_req_stats = NULL;
 	cp_stats_tx_ops->set_pdev_stats_update_period = NULL;

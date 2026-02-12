@@ -65,6 +65,7 @@
  * @TYPE_CONGESTION_STATS: congestion stats was requested
  * @TYPE_BIG_DATA_STATS: big data stats was requested
  * @TYPE_POWER_DATAPATH_STATS: power datapath stats was requested
+ * @TYPE_QSH_SCAN_STATS: QSH scan stats was requested
  * @TYPE_MAX: maximum value
  */
 enum stats_req_type {
@@ -76,6 +77,7 @@ enum stats_req_type {
 	TYPE_CONGESTION_STATS,
 	TYPE_BIG_DATA_STATS,
 	TYPE_POWER_DATAPATH_STATS,
+	TYPE_QSH_SCAN_STATS,
 	TYPE_MAX,
 };
 
@@ -274,6 +276,10 @@ struct request_info {
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 		void (*get_big_data_stats_cb)(struct big_data_stats_event *ev,
 					      void *cookie);
+#endif
+#ifdef WLAN_FEATURE_QSH_SCAN
+		void (*get_qsh_stats_cb)(struct qsh_stats_event *ev,
+					 void *cookie);
 #endif
 	} u;
 	uint32_t vdev_id;
@@ -826,6 +832,16 @@ struct summary_stats_event {
 struct chain_rssi_event {
 	uint8_t vdev_id;
 	int8_t chain_rssi[WLAN_MAX_VDEV_CHAINS];
+};
+
+/**
+ * struct qsh_stats_event - QSH scan stats event param
+ * @scan_req_id: scan module id of the event
+ * @scan_count: Wi-Fi scan count from sensor
+ */
+struct qsh_stats_event {
+	uint8_t scan_req_id;
+	uint32_t scan_count;
 };
 
 /**

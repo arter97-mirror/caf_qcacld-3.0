@@ -117,6 +117,20 @@ tgt_cp_stats_register_power_datapath_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
 }
 #endif
 
+#ifdef WLAN_FEATURE_QSH_SCAN
+static void
+tgt_cp_stats_register_qsh_scan_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	rx_ops->cp_stats_rx_ops.process_scan_stats_event =
+			tgt_mc_cp_stats_process_qsh_scan_stats;
+}
+#else
+static void
+tgt_cp_stats_register_qsh_scan_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+}
+#endif
+
 void tgt_cp_stats_register_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
 {
 	rx_ops->cp_stats_rx_ops.process_stats_event =
@@ -124,6 +138,7 @@ void tgt_cp_stats_register_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
 	tgt_cp_stats_register_infra_cp_stats_rx_ops(rx_ops);
 	tgt_cp_stats_register_big_data_rx_ops(rx_ops);
 	tgt_cp_stats_register_power_datapath_rx_ops(rx_ops);
+	tgt_cp_stats_register_qsh_scan_rx_ops(rx_ops);
 }
 
 static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
@@ -1684,6 +1699,45 @@ static void tgt_mc_cp_send_lost_link_stats(struct wlan_objmgr_psoc *psoc,
 		psoc_cp_stats_priv->legacy_stats_cb(ev);
 }
 
+#ifdef WLAN_FEATURE_QSH_SCAN
+QDF_STATUS
+tgt_mc_cp_stats_process_qsh_scan_stats(struct wlan_objmgr_psoc *psoc,
+				       struct qsh_stats_event *ev)
+{
+	QDF_STATUS status;
+	struct request_info last_req = {0};
+	bool pending = false;
+
+	if (!ev) {
+		cp_stats_err("Scan stats event is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	status = ucfg_mc_cp_stats_get_pending_req(psoc,
+						  TYPE_QSH_SCAN_STATS,
+						  &last_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		cp_stats_err("ucfg_mc_cp_stats_get_pending_req failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cp_stats_debug("QSH scan stats: scan_count=%u", ev->scan_count);
+
+	ucfg_mc_cp_stats_reset_pending_req(psoc, TYPE_QSH_SCAN_STATS,
+					   &last_req, &pending);
+
+	if (!last_req.u.get_qsh_stats_cb || !pending) {
+		cp_stats_err("QSH stats fetch failed: pending : %d", pending);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	last_req.u.get_qsh_stats_cb(ev, last_req.cookie);
+	last_req.u.get_qsh_stats_cb = NULL;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_QSH_SCAN */
+
 #ifdef WLAN_SUPPORT_INFRA_CTRL_PATH_STATS
 QDF_STATUS tgt_mc_cp_stats_process_infra_stats_event(
 				struct wlan_objmgr_psoc *psoc,
@@ -1785,6 +1839,30 @@ send_power_datapath_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
 			      struct request_info *req)
 {
 	cp_stats_err("Power datapath stats feature not supported");
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
+#ifdef WLAN_FEATURE_QSH_SCAN
+static QDF_STATUS
+send_qsh_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
+		   struct wlan_objmgr_psoc *psoc,
+		   struct request_info *req)
+{
+	if (!tx_ops->send_req_qsh_stats) {
+		cp_stats_err("could not get send_req_qsh_stats");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	return tx_ops->send_req_qsh_stats(psoc, req);
+}
+#else
+static QDF_STATUS
+send_qsh_stats_req(struct wlan_lmac_if_cp_stats_tx_ops *tx_ops,
+		   struct wlan_objmgr_psoc *psoc,
+		   struct request_info *req)
+{
+	cp_stats_err("QSH scan stats feature not supported");
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
@@ -2031,6 +2109,9 @@ QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 		break;
 	case TYPE_POWER_DATAPATH_STATS:
 		status = send_power_datapath_stats_req(tx_ops, psoc, req);
+		break;
+	case TYPE_QSH_SCAN_STATS:
+		status = send_qsh_stats_req(tx_ops, psoc, req);
 		break;
 	default:
 		if (!tx_ops->send_req_stats) {

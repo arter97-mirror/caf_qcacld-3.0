@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2018, 2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -68,6 +69,20 @@ uint8_t target_if_mc_cp_get_mac_id(struct vdev_mlme_obj *vdev_mlme);
 QDF_STATUS
 tgt_mc_cp_stats_process_stats_event(struct wlan_objmgr_psoc *psoc,
 				    struct stats_event *ev);
+
+#ifdef WLAN_FEATURE_QSH_SCAN
+/**
+ * tgt_mc_cp_stats_process_qsh_scan_stats(): API to process QSH stats event
+ * @psoc: pointer to psoc object
+ * @ev: event parameters
+ *
+ * Return: QDF_STATUS_SUCCESS on Success, other QDF_STATUS error codes on
+ * failure
+ */
+QDF_STATUS
+tgt_mc_cp_stats_process_qsh_scan_stats(struct wlan_objmgr_psoc *psoc,
+				       struct qsh_stats_event *ev);
+#endif
 
 #ifdef WLAN_SUPPORT_INFRA_CTRL_PATH_STATS
 /**
