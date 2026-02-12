@@ -205,13 +205,17 @@ static void lim_check_is_he_mcs_valid(struct pe_session *session,
 	if (!bcn_ies->he_cap.present)
 		goto downgrade_11ac;
 
-	mcs_map = bcn_ies->he_cap.rx_he_mcs_map_lt_80 |
-		  HE_DISABLE_MCS_OVER_NSS(session->cap_tx_nss);
+	mcs_map = bcn_ies->he_cap.rx_he_mcs_map_lt_80;
+
+	if (session->cap_tx_nss)
+		mcs_map |= HE_DISABLE_MCS_OVER_NSS(session->cap_tx_nss);
+
 	if (mcs_map != HE_MCS_ALL_DISABLED)
 		return;
 
 downgrade_11ac:
 	session->he_capable = false;
+	lim_update_session_eht_capable(session, false);
 	if (session->vhtCapability)
 		session->dot11mode = MLME_DOT11_MODE_11AC;
 	else
