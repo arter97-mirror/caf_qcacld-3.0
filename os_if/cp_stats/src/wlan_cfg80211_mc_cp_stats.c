@@ -1865,6 +1865,7 @@ wlan_cfg80211_mc_cp_stats_get_station_stats(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_peer *peer;
 	struct osif_request *request;
 	struct request_info info = {0};
+	bool pending = false;
 	static const struct osif_request_params params = {
 		.priv_size = sizeof(*priv),
 		.timeout_ms = 2 * CP_STATS_WAIT_TIME_STAT,
@@ -1913,6 +1914,9 @@ wlan_cfg80211_mc_cp_stats_get_station_stats(struct wlan_objmgr_vdev *vdev,
 	*errno = osif_request_wait_for_response(request);
 	if (*errno) {
 		osif_err("wait failed or timed out ret: %d", *errno);
+		ucfg_mc_cp_stats_reset_pending_req(wlan_vdev_get_psoc(vdev),
+						   TYPE_STATION_STATS,
+						   &info, &pending);
 		goto get_station_stats_fail;
 	}
 
