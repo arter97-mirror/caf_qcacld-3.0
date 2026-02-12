@@ -408,6 +408,7 @@ extract_peer_tx_pkt_per_mcs_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		wmi_err("invalid idx %d curr peer tx_rate_counts %d total tx_rate_count %d",
 			index, peer_stats_info->num_tx_rate_counts,
 			param_buf->num_tx_rate_counts);
+		return QDF_STATUS_E_INVAL;
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -449,6 +450,7 @@ extract_peer_rx_pkt_per_mcs_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 		wmi_err("invalid idx %d curr peer rx_rate_counts %d total rx_rate_count %d",
 			index, peer_stats_info->num_rx_rate_counts,
 			param_buf->num_rx_rate_counts);
+		return QDF_STATUS_E_INVAL;
 	}
 	return QDF_STATUS_SUCCESS;
 }
