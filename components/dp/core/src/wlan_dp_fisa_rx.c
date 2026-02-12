@@ -24,6 +24,7 @@
 #include "dp_internal.h"
 #include "hif.h"
 #include <wlan_dp_stc.h>
+#include <qdf_tracepoint.h>
 
 static void dp_rx_fisa_flush_flow_wrap(struct dp_fisa_rx_sw_ft *sw_ft);
 
@@ -2025,7 +2026,12 @@ dp_rx_fisa_aggr_udp(struct dp_rx_fst *fisa_hdl,
 		if (qdf_likely(fisa_flow->last_skb)) {
 			qdf_nbuf_set_next(fisa_flow->last_skb, nbuf);
 		} else {
-			qdf_nbuf_free(nbuf);
+		DP_STATS_INC(fisa_hdl, udp_aggr_append_fail, 1);
+		if (qdf_unlikely(qdf_trace_dp_fisa_udp_aggr_append_fail_enabled()))
+			qdf_trace_dp_fisa_udp_aggr_append_fail(fisa_flow->flow_id, nbuf,
+							       (uint32_t)qdf_nbuf_len(nbuf), head_skb,
+							       fisa_hdl->stats.udp_aggr_append_fail);
+		qdf_nbuf_free(nbuf);
 			return FISA_AGGR_DONE;
 		}
 	} else {
@@ -2082,25 +2088,69 @@ get_new_vdev_ref:
 						cdp_soc_t_to_dp_soc(cdp_soc),
 						vdev_id, DP_MOD_ID_RX);
 	if (qdf_unlikely(!fisa_flow_head_skb_vdev)) {
+		fisa_flow->flush_head_vdev_ref_fail++;
+		if (qdf_unlikely(qdf_trace_dp_fisa_flush_vdev_fail_enabled()))
+			qdf_trace_dp_fisa_flush_vdev_fail(vdev_id,
+							  fisa_flow->vdev_id, 0,
+							  fisa_flow->flow_id,
+							  NULL,
+							  fisa_flow->vdev,
+							  fisa_flow->flush_head_vdev_ref_fail,
+							  fisa_flow->flush_flow_vdev_ref_fail,
+							  fisa_flow->flush_vdev_ptr_mismatch,
+							  fisa_flow->flush_mld_mismatch_drop);
 		qdf_nbuf_free(fisa_flow->head_skb);
 		goto out;
 	}
 
 	if (qdf_unlikely(fisa_flow_head_skb_vdev != fisa_flow->vdev)) {
 		if (qdf_unlikely(fisa_flow_head_skb_vdev->vdev_id ==
-				 fisa_flow->vdev_id))
+				 fisa_flow->vdev_id)) {
+			fisa_flow->flush_vdev_ptr_mismatch++;
+			if (qdf_unlikely(qdf_trace_dp_fisa_flush_vdev_fail_enabled()))
+				qdf_trace_dp_fisa_flush_vdev_fail(fisa_flow_head_skb_vdev->vdev_id,
+								  fisa_flow->vdev_id, 2,
+								  fisa_flow->flow_id, fisa_flow_head_skb_vdev,
+								  fisa_flow->vdev,
+								  fisa_flow->flush_head_vdev_ref_fail,
+								  fisa_flow->flush_flow_vdev_ref_fail,
+								  fisa_flow->flush_vdev_ptr_mismatch,
+								  fisa_flow->flush_mld_mismatch_drop);
 			goto fisa_flow_vdev_fail;
+		}
 
 		fisa_flow_vdev = dp_vdev_get_ref_by_id(
 						cdp_soc_t_to_dp_soc(cdp_soc),
 						fisa_flow->vdev_id,
 						DP_MOD_ID_RX);
-		if (qdf_unlikely(!fisa_flow_vdev))
+		if (qdf_unlikely(!fisa_flow_vdev)) {
+			fisa_flow->flush_flow_vdev_ref_fail++;
+			if (qdf_unlikely(qdf_trace_dp_fisa_flush_vdev_fail_enabled()))
+				qdf_trace_dp_fisa_flush_vdev_fail(fisa_flow_head_skb_vdev->vdev_id,
+								  fisa_flow->vdev_id, 1,
+								  fisa_flow->flow_id,
+								  fisa_flow_head_skb_vdev,
+								  NULL,
+								  fisa_flow->flush_head_vdev_ref_fail,
+								  fisa_flow->flush_flow_vdev_ref_fail,
+								  fisa_flow->flush_vdev_ptr_mismatch,
+								  fisa_flow->flush_mld_mismatch_drop);
 			goto fisa_flow_vdev_fail;
+		}
 
-		if (qdf_unlikely(fisa_flow_vdev != fisa_flow->vdev))
+		if (qdf_unlikely(fisa_flow_vdev != fisa_flow->vdev)) {
+			fisa_flow->flush_vdev_ptr_mismatch++;
+			if (qdf_unlikely(qdf_trace_dp_fisa_flush_vdev_fail_enabled()))
+				qdf_trace_dp_fisa_flush_vdev_fail(fisa_flow_head_skb_vdev->vdev_id,
+								  fisa_flow->vdev_id, 2,
+								  fisa_flow->flow_id, fisa_flow_head_skb_vdev,
+								  fisa_flow_vdev,
+								  fisa_flow->flush_head_vdev_ref_fail,
+								  fisa_flow->flush_flow_vdev_ref_fail,
+								  fisa_flow->flush_vdev_ptr_mismatch,
+								  fisa_flow->flush_mld_mismatch_drop);
 			goto fisa_flow_vdev_mismatch;
-
+		}
 		/*
 		 * vdev_id may mismatch in case of MLO link switch.
 		 * Check if the vdevs belong to same MLD,
@@ -2110,6 +2160,16 @@ get_new_vdev_ref:
 				fisa_flow_vdev->mld_mac_addr.raw,
 				fisa_flow_head_skb_vdev->mld_mac_addr.raw,
 				QDF_MAC_ADDR_SIZE) != 0)) {
+			fisa_flow->flush_mld_mismatch_drop++;
+			if (qdf_unlikely(qdf_trace_dp_fisa_flush_vdev_fail_enabled()))
+				qdf_trace_dp_fisa_flush_vdev_fail(fisa_flow_head_skb_vdev->vdev_id,
+								  fisa_flow->vdev_id, 3,
+								  fisa_flow->flow_id, fisa_flow_head_skb_vdev,
+								  fisa_flow_vdev,
+								  fisa_flow->flush_head_vdev_ref_fail,
+								  fisa_flow->flush_flow_vdev_ref_fail,
+								  fisa_flow->flush_vdev_ptr_mismatch,
+								  fisa_flow->flush_mld_mismatch_drop);
 			goto fisa_flow_vdev_mismatch;
 		} else {
 			fisa_flow->same_mld_vdev_mismatch++;
@@ -2194,6 +2254,7 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 	qdf_nbuf_t linear_skb;
 	struct dp_vdev *fisa_flow_vdev;
 	ol_txrx_soc_handle cdp_soc = fisa_flow->dp_ctx->cdp_soc;
+	struct dp_rx_fst *rx_fst = fisa_flow->dp_ctx->rx_fst;
 
 	dp_fisa_debug("head_skb %pK", head_skb);
 	dp_fisa_debug("cumulative ip length %d",
@@ -2271,15 +2332,31 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 	hex_dump_skb_data(fisa_flow->head_skb, false);
 
 	fisa_flow_vdev = dp_fisa_rx_get_flow_flush_vdev_ref(cdp_soc, fisa_flow);
-	if (!fisa_flow_vdev)
+	if (!fisa_flow_vdev) {
+		DP_STATS_INC(rx_fst, flush_vdev_ref_fail, 1);
+		if (qdf_unlikely(qdf_trace_dp_fisa_udp_flush_stats_enabled()))
+			qdf_trace_dp_fisa_udp_flush_stats(fisa_flow->flow_id, 1,
+							  rx_fst->stats.flush_vdev_ref_fail,
+							  rx_fst->stats.udp_flush_linear_osif_rx_fail,
+							  rx_fst->stats.udp_flush_sanity_len_mismatch_drop,
+							  rx_fst->stats.udp_flush_nonlinear_osif_rx_fail);
 		goto vdev_ref_get_fail;
+	}
 
 	dp_fisa_debug("fisa_flow->curr_aggr %d", fisa_flow->cur_aggr);
 	linear_skb = dp_fisa_rx_linear_skb(vdev, fisa_flow->head_skb, 24000);
 	if (linear_skb) {
 		if (!vdev->osif_rx || QDF_STATUS_SUCCESS !=
-		    vdev->osif_rx(vdev->osif_vdev, linear_skb))
+		    vdev->osif_rx(vdev->osif_vdev, linear_skb)) {
+			DP_STATS_INC(rx_fst, udp_flush_linear_osif_rx_fail, 1);
+			if (qdf_unlikely(qdf_trace_dp_fisa_udp_flush_stats_enabled()))
+				qdf_trace_dp_fisa_udp_flush_stats(fisa_flow->flow_id, 2,
+								  rx_fst->stats.flush_vdev_ref_fail,
+								  rx_fst->stats.udp_flush_linear_osif_rx_fail,
+								  rx_fst->stats.udp_flush_sanity_len_mismatch_drop,
+								  rx_fst->stats.udp_flush_nonlinear_osif_rx_fail);
 			qdf_nbuf_free(linear_skb);
+		}
 		/* Free non linear skb */
 		qdf_nbuf_free(fisa_flow->head_skb);
 	} else {
@@ -2289,6 +2366,13 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 		 */
 		if (qdf_unlikely(fisa_flow->frags_cumulative_len !=
 				 qdf_nbuf_get_only_data_len(fisa_flow->head_skb))) {
+			DP_STATS_INC(rx_fst, udp_flush_sanity_len_mismatch_drop, 1);
+			if (qdf_unlikely(qdf_trace_dp_fisa_udp_flush_stats_enabled()))
+				qdf_trace_dp_fisa_udp_flush_stats(fisa_flow->flow_id, 3,
+								  rx_fst->stats.flush_vdev_ref_fail,
+								  rx_fst->stats.udp_flush_linear_osif_rx_fail,
+								  rx_fst->stats.udp_flush_sanity_len_mismatch_drop,
+								  rx_fst->stats.udp_flush_nonlinear_osif_rx_fail);
 			qdf_assert(0);
 			/* Drop the aggregate */
 			qdf_nbuf_free(fisa_flow->head_skb);
@@ -2296,8 +2380,17 @@ dp_rx_fisa_flush_udp_flow(struct dp_vdev *vdev,
 		}
 
 		if (!vdev->osif_rx || QDF_STATUS_SUCCESS !=
-		    vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb))
+		    vdev->osif_rx(vdev->osif_vdev, fisa_flow->head_skb)) {
+			DP_STATS_INC(rx_fst, udp_flush_nonlinear_osif_rx_fail,
+				     1);
+			if (qdf_unlikely(qdf_trace_dp_fisa_udp_flush_stats_enabled()))
+				qdf_trace_dp_fisa_udp_flush_stats(fisa_flow->flow_id, 4,
+								  rx_fst->stats.flush_vdev_ref_fail,
+								  rx_fst->stats.udp_flush_linear_osif_rx_fail,
+								  rx_fst->stats.udp_flush_sanity_len_mismatch_drop,
+								  rx_fst->stats.udp_flush_nonlinear_osif_rx_fail);
 			qdf_nbuf_free(fisa_flow->head_skb);
+		}
 	}
 
 out:
@@ -2799,6 +2892,9 @@ QDF_STATUS dp_fisa_rx(struct wlan_dp_psoc_context *dp_ctx,
 
 		/* Skip FISA aggregation and drop the frame if RDI is REO2TCL. */
 		if (qdf_unlikely(tlv_reo_dest_ind == REO_REMAP_TCL)) {
+			if (qdf_unlikely(qdf_trace_dp_fisa_trace_rdi_invalid_enabled()))
+				qdf_trace_dp_fisa_trace_rdi_invalid(tlv_reo_dest_ind);
+
 			qdf_nbuf_free(head_nbuf);
 			head_nbuf = next_nbuf;
 			DP_STATS_INC(dp_fisa_rx_hdl, incorrect_rdi, 1);
@@ -2863,9 +2959,26 @@ deliver_nbuf: /* Deliver without FISA */
 		QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(head_nbuf) = 1;
 		qdf_nbuf_set_next(head_nbuf, NULL);
 		hex_dump_skb_data(head_nbuf, false);
+
+		if (qdf_unlikely(qdf_trace_dp_fisa_hex_dump_skb_data_enabled()))
+			qdf_trace_dp_fisa_hex_dump_skb_data(0, (void *)QDF_RET_IP, 0,
+							    head_nbuf, qdf_nbuf_next(head_nbuf),
+							    qdf_nbuf_get_ext_list(head_nbuf),
+							    qdf_nbuf_data(head_nbuf),
+							    (uint32_t)qdf_nbuf_len(head_nbuf),
+							    (uint32_t)qdf_nbuf_get_only_data_len(head_nbuf));
+
 		if (!vdev->osif_rx || QDF_STATUS_SUCCESS !=
-		    vdev->osif_rx(vdev->osif_vdev, head_nbuf))
+		    vdev->osif_rx(vdev->osif_vdev, head_nbuf)) {
+			DP_STATS_INC(dp_fisa_rx_hdl, osif_rx_fail, 1);
+			if (qdf_unlikely(qdf_trace_dp_fisa_osif_rx_fail_enabled()))
+				qdf_trace_dp_fisa_osif_rx_fail(fisa_flow->flow_id,
+							       vdev->vdev_id,
+							       rx_ctx_id,
+							       head_nbuf,
+							       dp_fisa_rx_hdl->stats.osif_rx_fail);
 			qdf_nbuf_free(head_nbuf);
+		}
 next_msdu:
 		head_nbuf = next_nbuf;
 	}

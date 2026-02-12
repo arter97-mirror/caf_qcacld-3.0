@@ -463,12 +463,24 @@ struct dp_fisa_reo_mismatch_stats {
  * @reo_mismatch: REO ID mismatch
  * @incorrect_rdi: Incorrect REO dest indication in TLV
  *		   (typically used for RDI = 0)
+ * @flush_vdev_ref_fail: Failed to get vdev ref while flushing UDP flow
+ * @udp_flush_linear_osif_rx_fail: udp_flush_linear_osif_rx_fail
+ * @udp_flush_sanity_len_mismatch_drop: udp_flush_sanity_len_mismatch_drop
+ * @udp_flush_nonlinear_osif_rx_fail: udp_flush_nonlinear_osif_rx_fail
+ * @udp_aggr_append_fail: udp_aggr_append_fail
+ * @osif_rx_fail: Packets freed because osif_rx is NULL or returned failure
  */
 struct dp_fisa_stats {
 	uint32_t invalid_flow_index;
 	uint32_t update_deferred;
 	struct dp_fisa_reo_mismatch_stats reo_mismatch;
 	uint32_t incorrect_rdi;
+	uint32_t flush_vdev_ref_fail;
+	uint32_t udp_flush_linear_osif_rx_fail;
+	uint32_t udp_flush_sanity_len_mismatch_drop;
+	uint32_t udp_flush_nonlinear_osif_rx_fail;
+	uint32_t udp_aggr_append_fail;
+	uint32_t osif_rx_fail;
 };
 
 /**
@@ -544,6 +556,10 @@ struct fisa_pkt_hist {
  * @last_accessed_ts: Timestamp when the flow was last accessed
  * @pkt_hist: FISA aggreagtion packets history
  * @same_mld_vdev_mismatch: Packets flushed after vdev_mismatch on same MLD
+ * @flush_head_vdev_ref_fail: head vdev ref null
+ * @flush_flow_vdev_ref_fail: flow vdev ref null
+ * @flush_vdev_ptr_mismatch: vdev pointer mismatch
+ * @flush_mld_mismatch_drop: flush_mld_mismatch_drop
  * @add_timestamp: FISA entry created timestamp
  * @num_pkts: number of packets received on this flow
  * @num_pkts_prev: number of packets received on this flow previously
@@ -609,6 +625,10 @@ struct dp_fisa_rx_sw_ft {
 	struct fisa_pkt_hist pkt_hist;
 #endif
 	uint64_t same_mld_vdev_mismatch;
+	uint32_t flush_head_vdev_ref_fail;
+	uint32_t flush_flow_vdev_ref_fail;
+	uint32_t flush_vdev_ptr_mismatch;
+	uint32_t flush_mld_mismatch_drop;
 	uint64_t add_timestamp;
 	uint64_t num_pkts;
 #ifdef WLAN_DP_FLOW_BALANCE_SUPPORT
