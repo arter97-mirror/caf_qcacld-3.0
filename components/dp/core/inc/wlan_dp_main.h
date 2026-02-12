@@ -1480,4 +1480,21 @@ wlan_dp_find_dl_flow(struct wlan_dp_psoc_context *dp_ctx,
 }
 #endif
 
+#ifdef DP_FEATURE_DIRECT_REFILL
+static inline bool dp_direct_refill_adjust_dyn_rsc_mgmt(qdf_device_t qdf_ctx,
+							bool dyn_rx_buf_alloc)
+{
+	if (dyn_rx_buf_alloc && pld_is_direct_refill_supported(qdf_ctx->dev))
+		return true;
+
+	return false;
+}
+#else
+static inline bool dp_direct_refill_adjust_dyn_rsc_mgmt(qdf_device_t qdf_ctx,
+							bool dyn_rx_buf_alloc)
+{
+	return dyn_rx_buf_alloc;
+}
+#endif
+
 #endif

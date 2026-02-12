@@ -752,6 +752,7 @@ dp_prealloc_is_dynamic_rsc_mgmt_enabled(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 	return false;
 }
 #endif
+
 static void dp_prealloc_rx_pp_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 				   qdf_device_t qdf_ctx)
 {
@@ -771,6 +772,8 @@ static void dp_prealloc_rx_pp_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 		return;
 
 	dyn_rx_buf_alloc = dp_prealloc_is_dynamic_rsc_mgmt_enabled(ctrl_psoc);
+	dyn_rx_buf_alloc = dp_direct_refill_adjust_dyn_rsc_mgmt(qdf_ctx,
+							dyn_rx_buf_alloc);
 	dp_rx_page_pool_get_buf_params(&rx_buf_size, &align);
 
 	if (dyn_rx_buf_alloc) {

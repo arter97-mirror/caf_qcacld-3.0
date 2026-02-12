@@ -1230,10 +1230,21 @@ void wlan_dp_resource_mgr_attach(struct wlan_dp_psoc_context *dp_ctx)
 	cdp_config_param_type val = {0};
 	cdp_config_param_type set_val = {0};
 	QDF_STATUS status;
+	bool dyn_rsc_mgr_allowed = false;
 	int i;
 
-	if (!cfg_get(dp_ctx->psoc, CFG_DP_DYNAMIC_RESOURCE_MGMT_ENABLE)) {
+	dyn_rsc_mgr_allowed = cfg_get(dp_ctx->psoc,
+				      CFG_DP_DYNAMIC_RESOURCE_MGMT_ENABLE);
+	if (!dyn_rsc_mgr_allowed) {
 		dp_info("DP dynamic resourec mgmt cfg disabled");
+		return;
+	}
+
+	dyn_rsc_mgr_allowed =
+		dp_direct_refill_adjust_dyn_rsc_mgmt(dp_ctx->qdf_dev,
+						     dyn_rsc_mgr_allowed);
+	if (!dyn_rsc_mgr_allowed) {
+		dp_info("Disabling dynamic rsc mgmt since direct refill is disabled");
 		return;
 	}
 
