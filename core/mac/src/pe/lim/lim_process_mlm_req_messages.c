@@ -768,6 +768,116 @@ static QDF_STATUS lim_process_mlm_auth_req_sae(struct mac_context *mac_ctx,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BI_SECURITY
+static
+QDF_STATUS lim_initiate_external_auth_req(struct mac_context *mac_ctx,
+					  struct pe_session *session,
+					  struct qdf_mac_addr *peer_bssid)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct external_auth_info *ext_auth;
+	struct scheduler_msg msg = {0};
+	uint32_t keymgmt;
+
+	ext_auth = qdf_mem_malloc(sizeof(*ext_auth));
+	if (!ext_auth)
+		return QDF_STATUS_E_NOMEM;
+
+	ext_auth->msg_type = WNI_SME_TRIGGER_EXTERNAL_AUTH;
+	ext_auth->msg_len = sizeof(*ext_auth);
+	ext_auth->vdev_id = session->vdev_id;
+
+	keymgmt = wlan_crypto_get_param(session->vdev,
+					WLAN_CRYPTO_PARAM_KEY_MGMT);
+	ext_auth->akm = keymgmt;
+	ext_auth->auth_algo = mac_ctx->lim.gpLimMlmAuthReq->authType;
+	ext_auth->pairwise_cipher =
+		wlan_crypto_get_param(session->vdev,
+				      WLAN_CRYPTO_PARAM_UCAST_CIPHER);
+	ext_auth->group_cipher =
+		wlan_crypto_get_param(session->vdev,
+				      WLAN_CRYPTO_PARAM_MCAST_CIPHER);
+	ext_auth->group_mgmt_cipher =
+		wlan_crypto_get_param(session->vdev,
+				      WLAN_CRYPTO_PARAM_MGMT_CIPHER);
+	ext_auth->peer_mac_addr = *peer_bssid;
+	ext_auth->ssid.length = session->ssId.length;
+	qdf_mem_copy(ext_auth->ssid.ssId, session->ssId.ssId,
+		     ext_auth->ssid.length);
+
+	status = wlan_vdev_get_bss_peer_mld_mac(session->vdev,
+						&ext_auth->peer_mld_addr);
+	if (QDF_IS_STATUS_ERROR(status))
+		pe_err("Failed to fetch peer mld address");
+
+	pe_debug("vdev_id %d ssid " QDF_SSID_FMT " " QDF_MAC_ADDR_FMT " akm:0x%x algo:%d pairwise:0x%x grp:0x%x grp_mgmt:0x%x",
+		 ext_auth->vdev_id,
+		 QDF_SSID_REF(ext_auth->ssid.length, ext_auth->ssid.ssId),
+		 QDF_MAC_ADDR_REF(ext_auth->peer_mac_addr.bytes),
+		 ext_auth->akm, ext_auth->auth_algo,
+		 ext_auth->pairwise_cipher, ext_auth->group_cipher,
+		 ext_auth->group_mgmt_cipher);
+
+	msg.type = WNI_SME_TRIGGER_EXTERNAL_AUTH;
+	msg.bodyptr = ext_auth;
+	msg.bodyval = 0;
+
+	status = mac_ctx->lim.sme_msg_callback(mac_ctx, &msg);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		pe_err("Failed to initiate external authentication");
+		qdf_mem_free(ext_auth);
+		return status;
+	}
+
+	return status;
+}
+
+/**
+ * lim_process_mlm_external_auth_req() - Handle external authentication for
+ * suitable AKMs
+ * @mac_ctx: global MAC context
+ * @session: PE session entry
+ *
+ * This function is called by lim_process_mlm_auth_req to initiate external
+ * authentication.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+lim_process_mlm_external_auth_req(struct mac_context *mac_ctx,
+				  struct pe_session *session)
+{
+	QDF_STATUS qdf_status;
+	tLimTimers *lim_timers = &mac_ctx->lim.lim_timers;
+
+	qdf_status = lim_initiate_external_auth_req(mac_ctx, session,
+						    (struct qdf_mac_addr *)session->bssId);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status;
+
+	session->limMlmState = eLIM_MLM_WT_EXTERNAL_AUTH_STATE;
+
+	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE, session->peSessionId,
+			 session->limMlmState));
+
+	lim_timers->external_auth_timer.sessionId = session->peSessionId;
+
+	/* Activate External auth timer */
+	MTRACE(mac_trace(mac_ctx, TRACE_CODE_TIMER_ACTIVATE,
+			 session->peSessionId, eLIM_AUTH_EXTERNAL_AUTH_TIMER));
+	if (tx_timer_activate(&lim_timers->external_auth_timer) != TX_SUCCESS)
+		pe_err("could not start External Auth timer");
+
+	return qdf_status;
+}
+#else
+static QDF_STATUS
+lim_process_mlm_external_auth_req(struct mac_context *mac_ctx,
+				  struct pe_session *session)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 
 /**
  * lim_process_mlm_auth_req() - process lim auth request
@@ -882,8 +992,37 @@ static void lim_process_mlm_auth_req(struct mac_context *mac_ctx, uint32_t *msg)
 			qdf_mem_free(auth_frame_body);
 			return;
 		}
-	} else
-		session->limMlmState = eLIM_MLM_WT_AUTH_FRAME2_STATE;
+	} else if (mac_ctx->lim.gpLimMlmAuthReq->authType ==
+		   eSIR_AUTH_TYPE_EPPKE ||
+		   mac_ctx->lim.gpLimMlmAuthReq->authType ==
+		   eSIR_AUTH_TYPE_8021X_IN_AUTH) {
+		QDF_STATUS status;
+
+		status = lim_process_mlm_external_auth_req(mac_ctx, session);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("vdev:%d EDPKE External Authentication request failed",
+			       session->vdev_id);
+			mlm_auth_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
+			qdf_mem_free(auth_frame_body);
+			goto end;
+		}
+
+		pe_debug("vdev:%d EDPKE External Authentication request is successful",
+			 session->vdev_id);
+		auth_frame_body->authAlgoNumber =
+				mac_ctx->lim.gpLimMlmAuthReq->authType;
+		auth_frame_body->authTransactionSeqNumber =
+						SIR_MAC_AUTH_FRAME_1;
+		auth_frame_body->authStatusCode = 0;
+		host_log_wlan_auth_info(auth_frame_body->authAlgoNumber,
+					auth_frame_body->authTransactionSeqNumber,
+					auth_frame_body->authStatusCode);
+
+		qdf_mem_free(auth_frame_body);
+
+		return;
+	}
+	session->limMlmState = eLIM_MLM_WT_AUTH_FRAME2_STATE;
 
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE, session->peSessionId,
 		       session->limMlmState));
