@@ -16,6 +16,7 @@ targets = [
 
 target_16k = [
     "art16k",
+    "hamoa_la",
 ]
 
 la_variants = [
@@ -65,6 +66,7 @@ vm_target_bases = [
     "canoe",
     "hamoa",
     "chora",
+    "hamoa_la",
 ]
 
 vm_targets = ["{}-{}".format(t, vt) for t in vm_target_bases for vt in vm_types]

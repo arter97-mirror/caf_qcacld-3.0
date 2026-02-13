@@ -85,12 +85,15 @@ _target_chipset_map = {
         "fig",
         "fig-v2",
         "wcn7750",
-	"kiwi-v2",
+        "kiwi-v2",
     ],
     "chora": [
-	"wcn7750",
-	"wcn6450",
-    ]
+        "wcn7750",
+        "wcn6450",
+    ],
+    "hamoa_la": [
+        "kiwi-v2",
+    ],
 }
 _target_chipset_map["art16k"] = _target_chipset_map["art"]
 
