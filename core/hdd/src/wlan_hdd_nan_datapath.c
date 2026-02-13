@@ -714,6 +714,46 @@ wext_unregister:
 	return ret_val;
 }
 
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * hdd_ndi_start_bss_and_init() - Initialize NDI and start BSS for standard mode
+ * @adapter: adapter context
+ *
+ * This function initializes NAN data mode and starts BSS when NAN standard
+ * mode is supported by firmware. This is called from hdd_start_adapter when
+ * device mode is NDI and firmware supports standard mode.
+ *
+ * Returns: 0 on success, negative error code on error
+ */
+int hdd_ndi_start_bss_and_init(struct hdd_adapter *adapter)
+{
+	int ret;
+
+	hdd_enter();
+
+	/* Initialize NAN data mode - creates vdev and sets up adapter */
+	ret = hdd_init_nan_data_mode(adapter);
+	if (ret) {
+		hdd_err("failed to init nan data intf, err:%d", ret);
+		goto end;
+	}
+
+	/* Start BSS on the NDI */
+	ret = hdd_ndi_start_bss(adapter);
+	if (ret) {
+		hdd_err("NDI start bss failed");
+		/* Clean up on failure */
+		hdd_close_ndi(adapter);
+		goto end;
+	}
+
+	ret = 0;
+end:
+	hdd_exit();
+	return ret;
+}
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 /**
  * hdd_is_max_ndi_count_reached() - Check the NDI max limit
  * @hdd_ctx: Pointer to HDD context

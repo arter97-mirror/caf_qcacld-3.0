@@ -106,6 +106,7 @@
 #include "pld_common.h"
 #include "wlan_hdd_ocb.h"
 #include "wlan_hdd_nan.h"
+#include "wlan_hdd_nan_datapath.h"
 #include "wlan_hdd_debugfs.h"
 #include "wlan_hdd_debugfs_csr.h"
 #include "wlan_hdd_driver_ops.h"
@@ -4458,6 +4459,27 @@ int hdd_start_adapter(struct hdd_adapter *adapter, bool rtnl_held)
 			if (ret)
 				hdd_err("Failed to start link adapter:%d", ret);
 		}
+		break;
+	case QDF_NDI_MODE:
+		if (!ucfg_nan_is_fw_support_standard_mode(
+				adapter->hdd_ctx->psoc)) {
+			hdd_err("NDI start not supported: NAN standard mode disabled");
+			return -EOPNOTSUPP;
+		}
+		/*
+		 * Locking: hdd_ndi_start_bss_and_init() and the functions it
+		 * calls (hdd_init_nan_data_mode, hdd_ndi_start_bss) acquire
+		 * their own internal locks (vdev object manager lock, WMM
+		 * lock, SME lock) as needed. No additional HDD-wide lock is
+		 * required here because the NDI adapter is not yet visible to
+		 * other threads at this point in the start sequence.
+		 * On failure, hdd_ndi_start_bss_and_init() performs its own
+		 * cleanup and returns the actual errno; return it directly
+		 * rather than going through err_start_adapter.
+		 */
+		ret = hdd_ndi_start_bss_and_init(adapter);
+		if (ret)
+			return ret;
 		break;
 	case QDF_P2P_GO_MODE:
 	case QDF_SAP_MODE:

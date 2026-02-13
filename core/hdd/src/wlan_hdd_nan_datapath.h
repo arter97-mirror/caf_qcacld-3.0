@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -67,6 +67,30 @@ void hdd_ndp_event_handler(struct wlan_hdd_link_info *link_info,
 int wlan_hdd_cfg80211_process_ndp_cmd(struct wiphy *wiphy,
 	struct wireless_dev *wdev, const void *data, int data_len);
 int hdd_init_nan_data_mode(struct hdd_adapter *adapter);
+
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * hdd_ndi_start_bss_and_init() - Initialize NDI and start BSS for standard mode
+ * @adapter: adapter context
+ *
+ * This function initializes NAN data mode and starts BSS when NAN standard
+ * mode is supported by firmware. Called from hdd_start_adapter() when
+ * device mode is NDI and firmware supports standard mode.
+ *
+ * Locking: The called functions (hdd_init_nan_data_mode, hdd_ndi_start_bss)
+ * acquire their own internal locks as needed. No additional HDD-wide lock
+ * is required at this level.
+ *
+ * Returns: 0 on success, negative error code on error
+ */
+int hdd_ndi_start_bss_and_init(struct hdd_adapter *adapter);
+#else
+static inline int hdd_ndi_start_bss_and_init(struct hdd_adapter *adapter)
+{
+	return 0;
+}
+#endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */
+
 void hdd_ndp_session_end_handler(struct hdd_adapter *adapter);
 
 /**
@@ -232,6 +256,12 @@ static inline int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 {
 	return 0;
 }
+
+static inline int hdd_ndi_start_bss_and_init(struct hdd_adapter *adapter)
+{
+	return 0;
+}
+
 static inline void hdd_ndp_session_end_handler(struct hdd_adapter *adapter)
 {
 }
