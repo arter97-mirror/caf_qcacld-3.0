@@ -3528,6 +3528,7 @@ struct osif_cm_ops osif_ops = {
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	.roam_rt_stats_event_cb = wlan_hdd_cfg80211_roam_events_callback,
 	.roam_complete_notify_cb = hdd_cm_roam_connect_complete,
+	.reset_scan_reject_params_cb = hdd_reset_scan_reject_params,
 #endif
 #ifdef WLAN_FEATURE_FILS_SK
 	.set_hlp_data_cb = hdd_cm_set_hlp_data,
