@@ -139,6 +139,131 @@ hdd_sysfs_dp_stc_logmask_store(struct kobject *kobj,
 	return errno_size;
 }
 
+static ssize_t
+__hdd_sysfs_spm_logmask_show(struct hdd_context *hdd_ctx,
+			     struct kobj_attribute *attr, char *buf)
+{
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	uint32_t logmask;
+	int ret;
+
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	if (!psoc) {
+		hdd_err("psoc is null");
+		return -EINVAL;
+	}
+
+	logmask = ucfg_dp_spm_get_logmask(psoc);
+
+	ret = scnprintf(buf, PAGE_SIZE,
+			"SPM logmask: 0x%x\n"
+			"Bit definitions:\n"
+			"  BIT(0) - FLOW_ADD\n"
+			"  BIT(1) - FLOW_RETIRE\n",
+			logmask);
+
+	return ret;
+}
+
+static ssize_t
+hdd_sysfs_spm_logmask_show(struct kobject *kobj,
+			   struct kobj_attribute *attr,
+			   char *buf)
+{
+	struct osif_psoc_sync *psoc_sync;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	ssize_t errno_size;
+	int ret;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+					     &psoc_sync);
+	if (errno_size)
+		return errno_size;
+
+	errno_size = __hdd_sysfs_spm_logmask_show(hdd_ctx, attr, buf);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno_size;
+}
+
+static ssize_t
+__hdd_sysfs_spm_logmask_store(struct hdd_context *hdd_ctx,
+			      struct kobj_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	char buf_local[MAX_SYSFS_USER_COMMAND_SIZE_LENGTH + 1];
+	char *sptr, *token;
+	uint32_t logmask;
+	int ret;
+
+	if (!wlan_hdd_validate_modules_state(hdd_ctx))
+		return -EINVAL;
+
+	if (!psoc) {
+		hdd_err("psoc is null");
+		return -EINVAL;
+	}
+
+	ret = hdd_sysfs_validate_and_copy_buf(buf_local, sizeof(buf_local),
+					      buf, count);
+	if (ret) {
+		hdd_err_rl("invalid input");
+		return ret;
+	}
+
+	sptr = buf_local;
+	token = strsep(&sptr, " ");
+	if (!token)
+		return -EINVAL;
+
+	if (kstrtou32(token, 0, &logmask)) {
+		hdd_err_rl("Invalid logmask");
+		return -EINVAL;
+	}
+
+	hdd_debug("Setting SPM logmask to: 0x%x", logmask);
+
+	ucfg_dp_spm_set_logmask(psoc, logmask);
+
+	return count;
+}
+
+static ssize_t
+hdd_sysfs_spm_logmask_store(struct kobject *kobj,
+			    struct kobj_attribute *attr,
+			    const char *buf,
+			    size_t count)
+{
+	struct osif_psoc_sync *psoc_sync;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	ssize_t errno_size;
+	int ret;
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	errno_size = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy),
+					     &psoc_sync);
+	if (errno_size)
+		return errno_size;
+
+	errno_size = __hdd_sysfs_spm_logmask_store(hdd_ctx, attr,
+						   buf, count);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno_size;
+}
+
 static ssize_t __hdd_sysfs_dp_stc_c_table_show(struct hdd_context *hdd_ctx,
 					       struct kobj_attribute *attr,
 					       char *buf)
@@ -307,6 +432,10 @@ static struct kobj_attribute dp_stc_logmask_attribute =
 	__ATTR(stc_logmask, 0664, hdd_sysfs_dp_stc_logmask_show,
 	       hdd_sysfs_dp_stc_logmask_store);
 
+static struct kobj_attribute spm_logmask_attribute =
+	__ATTR(spm_logmask, 0664, hdd_sysfs_spm_logmask_show,
+	       hdd_sysfs_spm_logmask_store);
+
 int hdd_sysfs_dp_stc_create(struct kobject *driver_kobject)
 {
 	int error;
@@ -341,6 +470,11 @@ int hdd_sysfs_dp_stc_create(struct kobject *driver_kobject)
 	if (error)
 		hdd_err("could not create stc_tx_aft sysfs file");
 
+	error = sysfs_create_file(driver_kobject,
+				  &spm_logmask_attribute.attr);
+	if (error)
+		hdd_err("could not create spm_logmask sysfs file");
+
 	return error;
 }
 
@@ -357,4 +491,5 @@ void hdd_sysfs_dp_stc_destroy(struct kobject *driver_kobject)
 	sysfs_remove_file(driver_kobject,
 			  &dp_stc_active_traffic_map_attribute.attr);
 	sysfs_remove_file(driver_kobject, &dp_stc_tx_aft_attribute.attr);
+	sysfs_remove_file(driver_kobject, &spm_logmask_attribute.attr);
 }

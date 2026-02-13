@@ -24,6 +24,7 @@
 #include "wlan_ipa_ucfg_api.h"
 #include "wlan_dp_main.h"
 #include "wlan_dp_objmgr.h"
+#include "wlan_dp_spm.h"
 #include "wlan_pmo_obj_mgmt_api.h"
 #include "cdp_txrx_cmn.h"
 #include "cfg_ucfg_api.h"
@@ -3635,3 +3636,31 @@ QDF_STATUS ucfg_dp_softap_wds_ext_rx_handler(struct wlan_objmgr_vdev *vdev,
 	return dp_softap_wds_ext_rx_handler(dp_link, dev, nbuf);
 }
 #endif /* QCA_SUPPORT_WDS_EXTENDED */
+
+#if defined(WLAN_FEATURE_SAWFISH) || defined(WLAN_DP_FEATURE_STC)
+uint32_t ucfg_dp_spm_get_logmask(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+	if (!dp_ctx) {
+		dp_err("DP context not found");
+		return 0;
+	}
+
+	return wlan_dp_spm_get_logmask(dp_ctx);
+}
+
+void ucfg_dp_spm_set_logmask(struct wlan_objmgr_psoc *psoc, uint32_t mask)
+{
+	struct wlan_dp_psoc_context *dp_ctx;
+
+	dp_ctx = dp_psoc_get_priv(psoc);
+	if (!dp_ctx) {
+		dp_err("DP context not found");
+		return;
+	}
+
+	wlan_dp_spm_set_logmask(dp_ctx, mask);
+}
+#endif

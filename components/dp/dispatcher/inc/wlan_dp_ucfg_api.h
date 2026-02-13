@@ -2219,6 +2219,23 @@ uint32_t ucfg_dp_stc_get_logmask(struct wlan_objmgr_psoc *psoc);
  */
 void ucfg_dp_stc_update_logmask(struct wlan_objmgr_psoc *psoc, uint32_t mask);
 
+/**
+ * ucfg_dp_spm_get_logmask() - Get SPM log mask
+ * @psoc: Objmgr psoc handle
+ *
+ * Return: logmask configured in SPM
+ */
+uint32_t ucfg_dp_spm_get_logmask(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_spm_set_logmask() - Set SPM log mask
+ * @psoc: Objmgr psoc handle
+ * @mask: new log mask to be set
+ *
+ * Return: None
+ */
+void ucfg_dp_spm_set_logmask(struct wlan_objmgr_psoc *psoc, uint32_t mask);
+
 QDF_STATUS
 ucfg_telemetry_start_opm_stats(struct wlan_objmgr_vdev *vdev,
 			       uint32_t periodicity);

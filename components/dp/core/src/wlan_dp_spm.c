@@ -834,13 +834,24 @@ dp_spm_flow_retire_nolock(struct wlan_dp_spm_intf_context *spm_intf,
 	struct wlan_dp_spm_flow_info *flow_rec;
 	uint16_t flow_id;
 	uint8_t flow_evict_success_code;
+	uint8_t buf[BUF_LEN_MAX];
 
 	if (flow_idx == SAWFISH_INVALID_FLOW_ID)
 		return NULL;
 
 	flow_rec = &dp_ctx->gl_flow_recs[flow_idx];
 	flow_evict_success_code = wlan_dp_spm_flow_evict_check(flow_rec);
+
 	if (clear_table || flow_evict_success_code) {
+		dp_spm_debug(dp_ctx->spm_logmask,
+			     WLAN_DP_SPM_LOGMASK_FLOW_RETIRE,
+			     "STC: Flow RETIRE flow_id %u guid 0x%x evict_code %u tuple (%s) num_pkts %llu active_ts %llu",
+			     flow_rec->id, flow_rec->guid,
+			     flow_evict_success_code,
+			     dp_print_tuple_to_str(&flow_rec->info, buf,
+						   BUF_LEN_MAX),
+			     flow_rec->num_pkts, flow_rec->active_ts);
+
 		wlan_dp_stc_tx_flow_retire_ind(dp_ctx, flow_rec->classified,
 					       flow_rec->c_flow_id,
 					       flow_evict_success_code);
@@ -851,6 +862,12 @@ dp_spm_flow_retire_nolock(struct wlan_dp_spm_intf_context *spm_intf,
 		spm_intf->o_stats.active--;
 		spm_intf->o_stats.deleted++;
 	} else {
+		dp_spm_debug(dp_ctx->spm_logmask,
+			     WLAN_DP_SPM_LOGMASK_FLOW_RETIRE,
+			     "STC: Flow retire DENIED flow_id %u evict_code %u tuple (%s)",
+			     flow_rec->id, flow_evict_success_code,
+			     dp_print_tuple_to_str(&flow_rec->info, buf,
+						   BUF_LEN_MAX));
 		flow_rec = NULL;
 	}
 
@@ -1142,6 +1159,24 @@ void wlan_dp_spm_flow_table_detach(struct wlan_dp_psoc_context *dp_ctx)
 	__qdf_mem_free(dp_ctx->gl_flow_recs);
 	dp_ctx->gl_flow_recs = NULL;
 }
+
+uint32_t wlan_dp_spm_get_logmask(struct wlan_dp_psoc_context *dp_ctx)
+{
+	if (!dp_ctx)
+		return 0;
+
+	return dp_ctx->spm_logmask;
+}
+
+void wlan_dp_spm_set_logmask(struct wlan_dp_psoc_context *dp_ctx,
+			     uint32_t mask)
+{
+	if (!dp_ctx)
+		return;
+
+	dp_ctx->spm_logmask = mask;
+	dp_info("SPM logmask updated to: 0x%x", mask);
+}
 #endif
 
 /**
@@ -1364,6 +1399,11 @@ QDF_STATUS dp_spm_add_tx_flow(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
 
 		if (!flow_rec) {
 			qdf_spinlock_release(&dp_ctx->flow_list_lock);
+			dp_spm_debug(dp_ctx->spm_logmask,
+				     WLAN_DP_SPM_LOGMASK_FLOW_ADD,
+				     "STC: Add TX flow FAILED - no space tuple (%s)",
+				     dp_print_tuple_to_str(flow_info, buf,
+							   BUF_LEN_MAX));
 			return QDF_STATUS_E_EMPTY;
 		}
 	}
@@ -1394,6 +1434,9 @@ QDF_STATUS dp_spm_add_tx_flow(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
 	/* Trigger flow retiring event at threshold */
 	if (qdf_unlikely(dp_ctx->o_flow_rec_freelist.count <
 				WLAN_DP_SPM_LOW_AVAILABLE_FLOWS_WATERMARK)) {
+		dp_spm_debug(dp_ctx->spm_logmask,
+			     WLAN_DP_SPM_LOGMASK_FLOW_RETIRE,
+			     "STC: Low watermark reached, triggering flow retire");
 		if (!wlan_dp_spm_get_context())
 			wlan_dp_spm_flow_retire(dp_intf->spm_intf_ctx, false);
 		else

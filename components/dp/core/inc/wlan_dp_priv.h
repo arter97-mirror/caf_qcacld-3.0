@@ -1196,6 +1196,7 @@ struct wlan_dp_psoc_context {
 	struct wlan_dp_spm_flow_info *gl_flow_recs;
 	qdf_list_t o_flow_rec_freelist;
 	qdf_spinlock_t flow_list_lock;
+	uint32_t spm_logmask;
 #endif
 	struct wlan_dp_resource_mgr_ctx *rsrc_mgr_ctx;
 	uint32_t monitor_flag;

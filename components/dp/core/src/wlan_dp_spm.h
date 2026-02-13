@@ -10,6 +10,17 @@
 #include <qdf_nbuf.h>
 #include "wlan_dp_main.h"
 
+/* SPM Log mask bit definitions */
+#define WLAN_DP_SPM_LOGMASK_FLOW_ADD       BIT(0)
+#define WLAN_DP_SPM_LOGMASK_FLOW_RETIRE    BIT(1)
+
+#define dp_spm_debug(logmask, mask, params...)                  \
+	do {                                                        \
+		if (unlikely((logmask) & (mask)))                       \
+			__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH,          \
+				       QDF_MODULE_ID_DP, ## params);        \
+	} while (0)
+
 #define WLAN_DP_SPM_FLOW_REC_TBL_MAX 256
 #define WLAN_DP_SPM_HASH_TBL_MAX 64
 
@@ -487,6 +498,24 @@ QDF_STATUS dp_spm_add_tx_flow(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
 			      uint16_t *tx_flow_id, struct flow_info *flow_info,
 			      uint16_t peer_id);
 
+/**
+ * wlan_dp_spm_get_logmask() - Get SPM log mask
+ * @dp_ctx: DP context
+ *
+ * Return: Current SPM logmask value
+ */
+uint32_t wlan_dp_spm_get_logmask(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * wlan_dp_spm_set_logmask() - Update SPM log mask
+ * @dp_ctx: DP context
+ * @mask: New logmask value
+ *
+ * Return: None
+ */
+void wlan_dp_spm_set_logmask(struct wlan_dp_psoc_context *dp_ctx,
+			     uint32_t mask);
+
 #else
 static inline void wlan_dp_spm_dump_tx_aft(struct wlan_dp_psoc_context *dp_ctx)
 {
@@ -540,6 +569,18 @@ QDF_STATUS dp_spm_add_tx_flow(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf,
 			      uint16_t peer_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+uint32_t wlan_dp_spm_get_logmask(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+void wlan_dp_spm_set_logmask(struct wlan_dp_psoc_context *dp_ctx,
+			     uint32_t mask)
+{
 }
 #endif
 #endif
