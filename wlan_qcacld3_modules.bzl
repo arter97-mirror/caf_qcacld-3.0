@@ -77,6 +77,9 @@ _target_chipset_map = {
     "shikra":[
             "wlan",
     ],
+    "hamoa_la": [
+        "kiwi-v2",
+    ],
 }
 
 _chipset_hw_map = {
