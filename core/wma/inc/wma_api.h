@@ -853,4 +853,18 @@ void wma_cleanup_vdev(struct wlan_objmgr_vdev *vdev);
  */
 void wma_set_wakeup_logs_to_console(bool value);
 
+#ifdef IPA_WDI3_VLAN_SUPPORT
+/**
+ * wma_send_pdev_pkt_routing_vlan() - Send pdev update packet routing cmd
+ * @psoc: psoc handle
+ * @pdev_id: DP pdev id
+ * @dest_ring: REO destination ring
+ *
+ * Return: void
+ */
+void wma_send_pdev_pkt_routing_vlan(struct wlan_objmgr_psoc *psoc,
+				    uint8_t pdev_id,
+				    uint8_t dest_ring);
+#endif /* IPA_WDI3_VLAN_SUPPORT */
+
 #endif /* WMA_API_H */

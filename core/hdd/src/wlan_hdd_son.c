@@ -34,6 +34,7 @@
 #include <wlan_hdd_stats.h>
 #include "wlan_cfg80211_mc_cp_stats.h"
 #include "cdp_txrx_host_stats.h"
+#include "cdp_txrx_ctrl.h"
 
 static const struct son_chan_width {
 	enum ieee80211_cwm_width son_chwidth;
@@ -2614,6 +2615,50 @@ static int hdd_son_get_sta_stats(struct wlan_objmgr_vdev *vdev,
 	return ret;
 }
 
+/**
+ * hdd_son_set_def_tidmap_prty() - set default tidmap priority
+ * @vdev: vdev
+ * @pri: tidmap priority
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int hdd_son_set_def_tidmap_prty(struct wlan_objmgr_vdev *vdev,
+				       uint32_t pri)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	ol_txrx_soc_handle soc_txrx_handle;
+	cdp_config_param_type value = {0};
+	QDF_STATUS status;
+
+	if (!vdev) {
+		hdd_err("null vdev");
+		return -EINVAL;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		hdd_err("null pdev");
+		return -EINVAL;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+	if (!soc_txrx_handle) {
+		hdd_err("dp handle is null");
+		return -EINVAL;
+	}
+
+	value.cdp_pdev_param_tidmap_prty = pri;
+
+	status = cdp_txrx_set_pdev_param(soc_txrx_handle,
+					 wlan_objmgr_pdev_get_pdev_id(pdev),
+					 CDP_TIDMAP_PRTY, value);
+
+	return qdf_status_to_os_return(status);
+}
+
 void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 {
 	struct son_callbacks cb_obj = {0};
@@ -2653,6 +2698,7 @@ void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.os_if_get_peer_capability = hdd_son_get_peer_capability;
 	cb_obj.os_if_get_peer_max_mcs_idx = hdd_son_get_peer_max_mcs_idx;
 	cb_obj.os_if_get_sta_stats = hdd_son_get_sta_stats;
+	cb_obj.os_if_set_def_tidmap_prty = hdd_son_set_def_tidmap_prty;
 
 	os_if_son_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 

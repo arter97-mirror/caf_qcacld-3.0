@@ -13666,6 +13666,34 @@ static void hdd_thermal_stats_cmd_init(struct hdd_context *hdd_ctx)
 }
 #endif
 
+#ifdef IPA_WDI3_VLAN_SUPPORT
+/**
+ * hdd_dp_send_pdev_pkt_routing_vlan() - Initialize pdev pkt routing config to
+ *					 Target
+ * @hdd_ctx: hdd context pointer
+ *
+ * Return: None
+ */
+static void hdd_dp_send_pdev_pkt_routing_vlan(struct hdd_context *hdd_ctx)
+{
+	uint32_t mac_id;
+
+	if (!ucfg_ipa_is_vlan_enabled()) {
+		hdd_info("IPA VLAN feature is not enabled");
+		return;
+	}
+
+	for (mac_id = 0; mac_id < MAX_MAC; mac_id++)
+		wma_send_pdev_pkt_routing_vlan(hdd_ctx->psoc, mac_id,
+					       cdp_host_reo_dest_ring_3);
+}
+#else /* !IPA_WDI3_VLAN_SUPPORT */
+static inline void
+hdd_dp_send_pdev_pkt_routing_vlan(struct hdd_context *hdd_ctx)
+{
+}
+#endif /* IPA_WDI3_VLAN_SUPPORT */
+
 /**
  * hdd_features_init() - Init features
  * @hdd_ctx:	HDD context
@@ -13776,6 +13804,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 					       ALLOWED_KEYMGMT_6G_MASK);
 	}
 	hdd_thermal_stats_cmd_init(hdd_ctx);
+	hdd_dp_send_pdev_pkt_routing_vlan(hdd_ctx);
 
 	hdd_exit();
 	return 0;
