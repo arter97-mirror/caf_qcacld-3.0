@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -783,6 +783,11 @@ int pld_pcie_fw_sim_get_platform_cap(struct device *dev,
 
 	memcpy(cap, &cnss_cap, sizeof(*cap));
 	return 0;
+}
+
+bool pld_pcie_fw_sim_is_direct_refill_supported(struct device *dev)
+{
+	return cnss_get_fw_sim_cap(dev, CNSS_FW_CAP_DIRECT_REFILL_SUPPORT);
 }
 
 /*

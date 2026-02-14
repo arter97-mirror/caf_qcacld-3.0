@@ -56,6 +56,12 @@ static inline int pld_pcie_fw_sim_is_fw_down(struct device *dev)
 	return 0;
 }
 
+static inline bool
+pld_pcie_fw_sim_is_direct_refill_supported(struct device *dev)
+{
+	return 0;
+}
+
 static inline int pld_pcie_fw_sim_get_platform_cap(struct device *dev,
 						   struct pld_platform_cap *cap)
 {
@@ -178,6 +184,7 @@ int pld_pcie_fw_sim_register_driver(void);
 void pld_pcie_fw_sim_unregister_driver(void);
 int pld_pcie_fw_sim_get_platform_cap(struct device *dev,
 				     struct pld_platform_cap *cap);
+bool pld_pcie_fw_sim_is_direct_refill_supported(struct device *dev);
 int pld_pcie_fw_sim_get_soc_info(struct device *dev, struct pld_soc_info *info);
 int pld_pcie_fw_sim_get_irq(struct device *dev, int ce_id);
 
