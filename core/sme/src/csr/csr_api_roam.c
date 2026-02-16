@@ -4345,63 +4345,26 @@ static void
 csr_roam_chk_lnk_swt_ch_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 {
 	struct csr_roam_session *session;
-	uint32_t sessionId = WLAN_UMAC_VDEV_ID_MAX;
-	QDF_STATUS status;
-	struct switch_channel_ind *pSwitchChnInd;
-	struct csr_roam_info *roam_info;
+	uint8_t vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	struct switch_channel_ind *chan_sw_ind;
 
-	/* in case of STA, the SWITCH_CHANNEL originates from its AP */
-	sme_debug("eWNI_SME_SWITCH_CHL_IND from SME");
-	pSwitchChnInd = (struct switch_channel_ind *)msg_ptr;
-	/* Update with the new channel id. The channel id is hidden in the
-	 * status_code.
-	 */
-	status = csr_roam_get_session_id_from_bssid(mac_ctx,
-			&pSwitchChnInd->bssid, &sessionId);
-	if (QDF_IS_STATUS_ERROR(status))
-		return;
+	chan_sw_ind = (struct switch_channel_ind *)msg_ptr;
+	vdev_id = chan_sw_ind->vdev_id;
 
-	session = CSR_GET_SESSION(mac_ctx, sessionId);
+	sme_debug("Vdev %d eWNI_SME_SWITCH_CHL_IND", vdev_id);
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
 	if (!session) {
-		sme_err("session %d not found", sessionId);
+		sme_err("session %d not found", vdev_id);
 		return;
 	}
 
-	if (QDF_IS_STATUS_ERROR(pSwitchChnInd->status)) {
-		sme_err("Channel switch failed");
-		return;
-	}
 	/* Update the occupied channel list with the new switched channel */
 	wlan_cm_init_occupied_ch_freq_list(mac_ctx->pdev, mac_ctx->psoc,
-					   sessionId);
-	roam_info = qdf_mem_malloc(sizeof(*roam_info));
-	if (!roam_info)
-		return;
-	roam_info->chan_info.mhz = pSwitchChnInd->freq;
-	roam_info->chan_info.ch_width = pSwitchChnInd->chan_params.ch_width;
-	roam_info->chan_info.sec_ch_offset =
-				pSwitchChnInd->chan_params.sec_ch_offset;
-	roam_info->chan_info.band_center_freq1 =
-				pSwitchChnInd->chan_params.mhz_freq_seg0;
-	roam_info->chan_info.band_center_freq2 =
-				pSwitchChnInd->chan_params.mhz_freq_seg1;
+					   vdev_id);
 
-	if (IS_WLAN_PHYMODE_HT(pSwitchChnInd->ch_phymode))
-		roam_info->mode = SIR_SME_PHY_MODE_HT;
-	else if (IS_WLAN_PHYMODE_VHT(pSwitchChnInd->ch_phymode) ||
-		 IS_WLAN_PHYMODE_HE(pSwitchChnInd->ch_phymode))
-		roam_info->mode = SIR_SME_PHY_MODE_VHT;
-#ifdef WLAN_FEATURE_11BE
-	else if (IS_WLAN_PHYMODE_EHT(pSwitchChnInd->ch_phymode))
-		roam_info->mode = SIR_SME_PHY_MODE_VHT;
-#endif
-	else
-		roam_info->mode = SIR_SME_PHY_MODE_LEGACY;
-
-	status = csr_roam_call_callback(mac_ctx, sessionId, roam_info,
-					eCSR_ROAM_STA_CHANNEL_SWITCH,
-					eCSR_ROAM_RESULT_NONE);
-	qdf_mem_free(roam_info);
+	csr_roam_call_callback(mac_ctx, vdev_id, NULL,
+			       eCSR_ROAM_STA_CHANNEL_SWITCH,
+			       eCSR_ROAM_RESULT_NONE);
 }
 
 static
@@ -4613,10 +4576,10 @@ csr_roam_channel_switch_started_notify(struct mac_context *mac,
 				       tSirSmeRsp *msg_ptr)
 {
 	struct csr_roam_info *roam_info;
-	struct switch_channel_ind *pSirSmeSwitchChInd;
+	struct switch_channel_ind *chan_sw_ind;
 
-	pSirSmeSwitchChInd = (struct switch_channel_ind *)msg_ptr;
-	if (!pSirSmeSwitchChInd) {
+	chan_sw_ind = (struct switch_channel_ind *)msg_ptr;
+	if (!chan_sw_ind) {
 		sme_err("ch_switch_started_ind is null");
 		return;
 	}
@@ -4625,9 +4588,9 @@ csr_roam_channel_switch_started_notify(struct mac_context *mac,
 	if (!roam_info)
 		return;
 
-	roam_info->pSirSmeSwitchChInd = pSirSmeSwitchChInd;
+	roam_info->pSirSmeSwitchChInd = chan_sw_ind;
 
-	csr_roam_call_callback(mac, pSirSmeSwitchChInd->sessionId,
+	csr_roam_call_callback(mac, chan_sw_ind->vdev_id,
 			       roam_info, eCSR_ROAM_CHANNEL_SWITCH_STARTED_IND,
 			       eCSR_ROAM_RESULT_CHANNEL_SWITCH_STARTED_NOTIFY);
 

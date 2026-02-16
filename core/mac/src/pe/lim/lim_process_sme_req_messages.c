@@ -10994,30 +10994,20 @@ void
 lim_notify_channel_switch_started(struct mac_context *mac_ctx,
 				  struct pe_session *session)
 {
-	struct switch_channel_ind *pSirSmeSwitchChInd;
+	struct switch_channel_ind *chan_sw_ind;
 	struct scheduler_msg msg = {0};
 	struct ch_params ch_params = {0};
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	pSirSmeSwitchChInd = qdf_mem_malloc(sizeof(*pSirSmeSwitchChInd));
-	if (!pSirSmeSwitchChInd)
+	chan_sw_ind = qdf_mem_malloc(sizeof(*chan_sw_ind));
+	if (!chan_sw_ind)
 		return;
 
-	pSirSmeSwitchChInd->messageType = eWNI_SME_CH_SWITCH_STARTED_NOTIFY;
-	pSirSmeSwitchChInd->length = sizeof(*pSirSmeSwitchChInd);
-	pSirSmeSwitchChInd->sessionId = session->vdev_id;
-	pSirSmeSwitchChInd->freq =
+	chan_sw_ind->messageType = eWNI_SME_CH_SWITCH_STARTED_NOTIFY;
+	chan_sw_ind->length = sizeof(*chan_sw_ind);
+	chan_sw_ind->vdev_id = session->vdev_id;
+	chan_sw_ind->freq =
 			session->gLimChannelSwitch.sw_target_freq;
-	pSirSmeSwitchChInd->status = status;
-	qdf_mem_copy(pSirSmeSwitchChInd->bssid.bytes, session->bssId,
-		     QDF_MAC_ADDR_SIZE);
-
-	pSirSmeSwitchChInd->ch_phymode =
-			wma_chan_phy_mode(
-				session->gLimChannelSwitch.sw_target_freq,
-				session->gLimChannelSwitch.ch_width,
-				session->dot11mode);
-
 	ch_params.ch_width = session->gLimChannelSwitch.ch_width;
 	wlan_reg_set_channel_params_for_pwrmode(
 				wlan_vdev_get_pdev(session->vdev),
@@ -11025,15 +11015,15 @@ lim_notify_channel_switch_started(struct mac_context *mac_ctx,
 				session->gLimChannelSwitch.sec_ch_offset,
 				&ch_params, REG_CURRENT_PWR_MODE);
 
-	pSirSmeSwitchChInd->chan_params = ch_params;
+	chan_sw_ind->chan_params = ch_params;
 
 	msg.type = eWNI_SME_CH_SWITCH_STARTED_NOTIFY;
-	msg.bodyptr = pSirSmeSwitchChInd;
+	msg.bodyptr = chan_sw_ind;
 
 	status = mac_ctx->lim.sme_msg_callback(mac_ctx, &msg);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("channel switch started notify failed");
-		qdf_mem_free(pSirSmeSwitchChInd);
+		qdf_mem_free(chan_sw_ind);
 	}
 }
 

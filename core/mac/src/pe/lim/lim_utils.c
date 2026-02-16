@@ -2067,7 +2067,7 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 			      uint32_t *data, struct pe_session *pe_session)
 {
 	struct scheduler_msg mmhMsg = { 0 };
-	struct switch_channel_ind *pSirSmeSwitchChInd;
+	struct switch_channel_ind *chan_sw_ind;
 	struct wlan_channel *des_chan;
 	struct vdev_mlme_obj *mlme_obj;
 
@@ -2098,33 +2098,15 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 	}
 
 	mmhMsg.type = eWNI_SME_SWITCH_CHL_IND;
-	pSirSmeSwitchChInd = qdf_mem_malloc(sizeof(*pSirSmeSwitchChInd));
-	if (!pSirSmeSwitchChInd)
+	chan_sw_ind = qdf_mem_malloc(sizeof(*chan_sw_ind));
+	if (!chan_sw_ind)
 		return;
 
-	pSirSmeSwitchChInd->messageType = eWNI_SME_SWITCH_CHL_IND;
-	pSirSmeSwitchChInd->length = sizeof(*pSirSmeSwitchChInd);
-	pSirSmeSwitchChInd->freq = des_chan->ch_freq;
-	pSirSmeSwitchChInd->sessionId = pe_session->smeSessionId;
-	pSirSmeSwitchChInd->chan_params.ch_width = des_chan->ch_width;
-	if (des_chan->ch_width > CH_WIDTH_20MHZ) {
-		pSirSmeSwitchChInd->chan_params.sec_ch_offset =
-			pe_session->gLimChannelSwitch.sec_ch_offset;
-		pSirSmeSwitchChInd->chan_params.center_freq_seg0 =
-							des_chan->ch_freq_seg1;
-		pSirSmeSwitchChInd->chan_params.mhz_freq_seg0 =
-							des_chan->ch_cfreq1;
-		pSirSmeSwitchChInd->chan_params.center_freq_seg1 =
-							des_chan->ch_freq_seg2;
-		pSirSmeSwitchChInd->chan_params.mhz_freq_seg1 =
-							des_chan->ch_cfreq2;
-	}
-	pSirSmeSwitchChInd->ch_phymode = des_chan->ch_phymode;
+	chan_sw_ind->messageType = eWNI_SME_SWITCH_CHL_IND;
+	chan_sw_ind->length = sizeof(*chan_sw_ind);
+	chan_sw_ind->vdev_id = pe_session->vdev_id;
 
-	pSirSmeSwitchChInd->status = status;
-	qdf_mem_copy(pSirSmeSwitchChInd->bssid.bytes, pe_session->bssId,
-		     QDF_MAC_ADDR_SIZE);
-	mmhMsg.bodyptr = pSirSmeSwitchChInd;
+	mmhMsg.bodyptr = chan_sw_ind;
 	mmhMsg.bodyval = 0;
 
 	MTRACE(mac_trace(mac, TRACE_CODE_TX_SME_MSG,

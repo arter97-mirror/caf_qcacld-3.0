@@ -3430,20 +3430,18 @@ hdd_indicate_ese_bcn_report_ind(const struct hdd_adapter *adapter,
 /*
  * hdd_roam_channel_switch_handler() - hdd channel switch handler
  * @link_info: Link info pointer in HDD adapter
- * @roam_info: Pointer to roam info
  *
  * Return: None
  */
 static void
-hdd_roam_channel_switch_handler(struct wlan_hdd_link_info *link_info,
-				struct csr_roam_info *roam_info)
+hdd_roam_channel_switch_handler(struct wlan_hdd_link_info *link_info)
 {
-	struct hdd_chan_change_params chan_change = {0};
 	QDF_STATUS status;
 	struct hdd_adapter *adapter = link_info->adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	mac_handle_t mac_handle;
 	struct hdd_station_ctx *sta_ctx;
+	struct wlan_channel *chan_ptr;
 	uint8_t connected_vdev;
 	bool notify = true, is_sap_go_moved_before_sta = false;
 	struct wlan_objmgr_vdev *vdev;
@@ -3458,28 +3456,21 @@ hdd_roam_channel_switch_handler(struct wlan_hdd_link_info *link_info,
 				  REASON_VDEV_RESTART_FROM_HOST,
 				  RSO_CHANNEL_SWITCH);
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
-	if (sta_ctx) {
-		sta_ctx->conn_info.chan_freq = roam_info->chan_info.mhz;
-		sta_ctx->conn_info.ch_width = roam_info->chan_info.ch_width;
-	}
-
-	chan_change.chan_freq = roam_info->chan_info.mhz;
-	chan_change.chan_params.ch_width =
-		roam_info->chan_info.ch_width;
-	chan_change.chan_params.sec_ch_offset =
-		roam_info->chan_info.sec_ch_offset;
-	chan_change.chan_params.mhz_freq_seg0 =
-		roam_info->chan_info.band_center_freq1;
-	chan_change.chan_params.mhz_freq_seg1 =
-		roam_info->chan_info.band_center_freq2;
-
 	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("Invalid vdev");
 		return;
 	}
+	chan_ptr = wlan_vdev_get_active_channel(vdev);
+	if (!chan_ptr) {
+		hdd_err("vdev %d: No channel info present", link_info->vdev_id);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return;
+	}
 
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
+	sta_ctx->conn_info.ch_width = chan_ptr->ch_width;
+	sta_ctx->conn_info.chan_freq = chan_ptr->ch_freq;
 	if ((adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
 		if (!wlan_get_connected_vdev_by_bssid(
@@ -3606,7 +3597,7 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 		break;
 #endif /* FEATURE_WLAN_ESE */
 	case eCSR_ROAM_STA_CHANNEL_SWITCH:
-		hdd_roam_channel_switch_handler(link_info, roam_info);
+		hdd_roam_channel_switch_handler(link_info);
 		break;
 
 	case eCSR_ROAM_NDP_STATUS_UPDATE:

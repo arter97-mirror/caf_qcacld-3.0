@@ -1286,17 +1286,20 @@ struct stop_bss_rsp {
 	tSirResultCodes status_code;
 };
 
-/* / Definition for Channel Switch indication for station */
-/* / MAC ---> */
+/**
+ * struct switch_channel_ind - Channel Switch indication for station
+ * @messageType: msg type eWNI_SME_SWITCH_CHL_IND
+ * @length: length of the msg
+ * @vdev_id: STA vdev id
+ * @freq: new freq
+ * @chan_params: Channel params
+ */
 struct switch_channel_ind {
 	uint16_t messageType;   /* eWNI_SME_SWITCH_CHL_IND */
 	uint16_t length;
-	uint8_t sessionId;
+	uint8_t vdev_id;
 	uint32_t freq;
 	struct ch_params chan_params;
-	struct qdf_mac_addr bssid;      /* BSSID */
-	QDF_STATUS status;
-	enum wlan_phymode ch_phymode;
 };
 
 /* / Definition for MIC failure indication */
