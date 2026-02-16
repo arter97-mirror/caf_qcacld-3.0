@@ -1504,6 +1504,10 @@ config WLAN_FEATURE_11BE_MLO
 	bool "Enable WLAN_FEATURE_11BE_MLO"
 	default n
 
+config WLAN_FEATURE_11BN_SMD
+	bool "Enable WLAN_FEATURE_11BN_SMD"
+	default n
+
 config WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
 	bool "Enable WLAN_HDD_MULTI_VDEV_SINGLE_NDEV"
 	default n
