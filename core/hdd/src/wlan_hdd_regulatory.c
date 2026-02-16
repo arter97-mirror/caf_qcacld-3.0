@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2017,6 +2017,10 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 	bool reg_flag;
 
 	pdev_priv = wlan_pdev_get_ospriv(pdev);
+	if (!pdev_priv) {
+		hdd_err("pdev_priv null");
+		return;
+	}
 	wiphy = pdev_priv->wiphy;
 	hdd_ctx = wiphy_priv(wiphy);
 

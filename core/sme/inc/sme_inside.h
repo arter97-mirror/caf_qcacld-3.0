@@ -129,6 +129,15 @@ typedef struct tagSmeCmd {
  * Return: serialization cmd type based on sme command type
  */
 enum wlan_serialization_cmd_type csr_get_cmd_type(tSmeCmd *sme_cmd);
+
+/**
+ * csr_is_sme_umac_ser_cmd_type() - Check if cmd is sme umac initiated cmd
+ * @cmd: ser command pointer
+ *
+ * Return: true if its sme umac cmd type
+ */
+bool csr_is_sme_umac_ser_cmd_type(struct wlan_serialization_command *cmd);
+
 /**
  * csr_set_serialization_params_to_cmd() - take sme params and create new
  *						serialization command

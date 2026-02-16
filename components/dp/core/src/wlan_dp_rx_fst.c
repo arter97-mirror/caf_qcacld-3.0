@@ -317,6 +317,9 @@ static QDF_STATUS dp_rx_fst_cmem_init(struct dp_rx_fst *fst)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	fst->last_update_time_ns = 0;
+	fst->update_count = 0;
+
 	qdf_create_work(0, &fst->fst_update_work,
 			dp_fisa_rx_fst_update_work, fst);
 	qdf_list_create(&fst->fst_update_list, 128);

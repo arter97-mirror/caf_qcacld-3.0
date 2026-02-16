@@ -1382,6 +1382,7 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t vdev_id;
 	uint8_t rso_stop_req_bitmap;
+	enum roam_offload_state rso_cmd = WLAN_ROAM_RSO_ENABLED;
 
 	roam_synch_data = (struct roam_offload_synch_ind *)data;
 	vdev_id = wlan_vdev_get_id(cm_ctx->vdev);
@@ -1487,18 +1488,20 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 
 	wlan_cm_handle_sta_sta_roaming_enablement(psoc, vdev_id);
 
-	if (wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev)) {
+	if (wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev))
 		status = wlan_cm_roam_state_change(pdev,
 						   vdev_id,
 						   WLAN_ROAM_DEINIT,
 						   REASON_ROAM_HANDOFF_DONE);
-	}
 
-	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
+	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED) {
+		if (policy_mgr_is_chan_switch_in_progress(psoc) ||
+		    policy_mgr_is_conc_sap_ready_for_mcc_to_scc_trans(psoc))
+			rso_cmd = WLAN_ROAM_RSO_STOPPED;
+
 		wlan_cm_roam_state_change(pdev, vdev_id,
-					  WLAN_ROAM_RSO_ENABLED,
-					  REASON_CONNECT);
-	else
+					  rso_cmd, REASON_CONNECT);
+	} else
 		/*
 		 * STA is just in associated state here, RSO
 		 * enable will be sent once EAP & EAPOL will be done by
