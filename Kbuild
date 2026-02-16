@@ -491,6 +491,8 @@ ifeq ($(CONFIG_QCACLD_FEATURE_APF), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_apfmode.o
 endif
 
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_power_datapath_stats.o
+
 endif # CONFIG_WLAN_SYSFS
 
 ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
