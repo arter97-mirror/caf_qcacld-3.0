@@ -365,7 +365,10 @@ static void hdd_apf_store_instruction(struct hdd_adapter *adapter,
 	idx = context->apf_inst_index;
 
 	/* New instruction stream? */
-	if (context->apf_inst_curr_len[idx] == 0) {
+	if (context->apf_inst_curr_len[idx] == 0 ||
+	    (context->apf_inst_curr_len[idx] ==
+	     context->apf_inst_total_len[idx] &&
+	     context->apf_inst_total_len[idx] > 0)) {
 		/* Free old if exists */
 		if (context->apf_inst_pool[idx]) {
 			qdf_mem_free(context->apf_inst_pool[idx]);
@@ -380,6 +383,8 @@ static void hdd_apf_store_instruction(struct hdd_adapter *adapter,
 			/* Ensure total_len is 0 so we don't try to use this slot */
 			context->apf_inst_total_len[idx] = 0;
 		}
+		context->apf_inst_curr_len[idx] = 0;
+		context->apf_inst_timestamp[idx] = 0;
 	}
 
 	if (context->apf_inst_pool[idx] &&
@@ -401,16 +406,6 @@ static void hdd_apf_store_instruction(struct hdd_adapter *adapter,
 
 			/* Move to next slot */
 			context->apf_inst_index = (idx + 1) % APF_HISTORY_LEN;
-
-			/* Pre-clean next slot */
-			idx = context->apf_inst_index;
-			if (context->apf_inst_pool[idx]) {
-				qdf_mem_free(context->apf_inst_pool[idx]);
-				context->apf_inst_pool[idx] = NULL;
-			}
-			context->apf_inst_total_len[idx] = 0;
-			context->apf_inst_curr_len[idx] = 0;
-			context->apf_inst_timestamp[idx] = 0;
 		}
 	} else {
 		hdd_err("APF History Store Failed: idx=%d pool=%pK total=%d/%d off=%d len=%d",
