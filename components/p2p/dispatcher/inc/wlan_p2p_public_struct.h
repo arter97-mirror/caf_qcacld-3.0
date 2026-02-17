@@ -312,6 +312,8 @@ struct p2p_chan_switch_req_params {
  * @wake_intvl_exp: Wake interval exponent
  * @is_trigger_enabled: TWT with trigger support
  * @is_protection_enabled: Protection required
+ * @mac_addr: Optional peer MAC address
+ * @mac_addr_valid: Indicates if mac_addr field is valid
  */
 struct p2p_chan_usage_unavail_params {
 	uint32_t wake_duration;
@@ -322,6 +324,8 @@ struct p2p_chan_usage_unavail_params {
 	uint8_t wake_intvl_exp;
 	bool is_trigger_enabled;
 	bool is_protection_enabled;
+	struct qdf_mac_addr mac_addr;
+	bool mac_addr_valid;
 };
 
 /**

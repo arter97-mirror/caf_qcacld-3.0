@@ -29,6 +29,7 @@
 #include <wlan_twt_public_structs.h>
 #include <qca_vendor.h>
 #include <wlan_objmgr_peer_obj.h>
+#include <wlan_p2p_public_struct.h>
 
 #define TWT_WAKE_INTVL_MULTIPLICATION_FACTOR    1024
 #define TWT_WAKE_DURATION_MULTIPLICATION_FACTOR 256
@@ -227,6 +228,20 @@ int osif_twt_set_param(struct wlan_objmgr_vdev *vdev,
 		       struct nlattr *twt_param_attr);
 
 /**
+ * osif_twt_handle_p2p_chan_usage_unavail_req() - Handle P2P channel usage
+ * unavailability request
+ * @psoc: pointer to global psoc structure
+ * @vdev: pointer to vdev object
+ * @params: pointer to P2P channel usage unavailability parameters
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int osif_twt_handle_p2p_chan_usage_unavail_req(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct p2p_chan_usage_unavail_params *params);
+
+/**
  * __osif_twt_work_handler() - TWT work handler
  * @vdev: vdev pointer
  *
@@ -348,6 +363,15 @@ int osif_twt_clear_session_traffic_stats(struct wlan_objmgr_vdev *vdev,
 static inline
 int osif_twt_set_param(struct wlan_objmgr_vdev *vdev,
 		       struct nlattr *twt_param_attr)
+{
+	return 0;
+}
+
+static inline
+int osif_twt_handle_p2p_chan_usage_unavail_req(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct p2p_chan_usage_unavail_params *params)
 {
 	return 0;
 }

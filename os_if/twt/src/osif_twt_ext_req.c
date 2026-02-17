@@ -2983,6 +2983,74 @@ static int osif_twt_send_unavailability_mode(struct wlan_objmgr_vdev *vdev,
 	return 0;
 }
 
+int osif_twt_handle_p2p_chan_usage_unavail_req(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct p2p_chan_usage_unavail_params *params)
+{
+	struct twt_p2p_chan_usage_unavail_params twt_params = {0};
+	QDF_STATUS status;
+	int ret;
+
+	if (!psoc || !vdev || !params) {
+		osif_err("Invalid parameters");
+		return -EINVAL;
+	}
+
+	/* use from userspace if valid, else get from BSS peer */
+	if (params->mac_addr_valid) {
+		qdf_mem_copy(twt_params.peer_macaddr.bytes,
+			     params->mac_addr.bytes, QDF_MAC_ADDR_SIZE);
+		osif_debug("Using MAC address from user: " QDF_MAC_ADDR_FMT,
+			   QDF_MAC_ADDR_REF(twt_params.peer_macaddr.bytes));
+	} else {
+		/* Fill peer MAC address from BSS peer */
+		ret = osif_fill_peer_macaddr(vdev,
+					     twt_params.peer_macaddr.bytes);
+		if (ret) {
+			osif_err("Failed to get peer macaddr: %d", ret);
+			return ret;
+		}
+		osif_debug("Using MAC address from BSS peer: " QDF_MAC_ADDR_FMT,
+			   QDF_MAC_ADDR_REF(twt_params.peer_macaddr.bytes));
+	}
+
+	twt_params.vdev_id = wlan_vdev_get_id(vdev);
+	twt_params.responder_pm_mode = params->responder_pm_mode;
+	twt_params.req_type = params->req_type;
+	twt_params.twt_request = 1; /* always a request from host */
+
+	status = osif_twt_setup_req_type_to_cmd(params->req_type,
+						&twt_params.twt_setup_cmd);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Invalid req_type %u", params->req_type);
+		return qdf_status_to_os_return(status);
+	}
+
+	twt_params.is_trigger_enabled = params->is_trigger_enabled;
+	twt_params.flow_type = params->flow_type;
+	twt_params.wake_intvl_exp = params->wake_intvl_exp;
+	twt_params.is_protection_enabled = params->is_protection_enabled;
+	twt_params.wake_duration = params->wake_duration;
+	twt_params.wake_intvl_mantissa = params->wake_intvl_mantissa;
+
+	osif_debug("P2P chan usage unavail: vdev=%u peer=" QDF_MAC_ADDR_FMT" req_type=%u twt_cmd=%u trigger=%u flow=%u exp=%u prot=%u dur_us=%u intvl_us=%u",
+		   twt_params.vdev_id,
+		   QDF_MAC_ADDR_REF(twt_params.peer_macaddr.bytes),
+		   twt_params.req_type, twt_params.twt_setup_cmd,
+		   twt_params.is_trigger_enabled, twt_params.flow_type,
+		   twt_params.wake_intvl_exp, twt_params.is_protection_enabled,
+		   twt_params.wake_duration, twt_params.wake_intvl_mantissa);
+
+	status = ucfg_twt_handle_p2p_chan_usage_unavail(psoc, &twt_params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("P2P chan usage unavail failed: %d", status);
+		return qdf_status_to_os_return(status);
+	}
+
+	return 0;
+}
+
 int osif_twt_set_param(struct wlan_objmgr_vdev *vdev,
 		       struct nlattr *twt_param_attr)
 {

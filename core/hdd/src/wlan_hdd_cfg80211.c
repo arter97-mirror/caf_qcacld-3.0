@@ -244,6 +244,8 @@
 #ifdef WLAN_FEATURE_NAN
 #include "wlan_nan_api.h"
 #endif
+#include "osif_twt_ext_req.h"
+#include "osif_twt_internal.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -23214,6 +23216,7 @@ qca_wlan_vendor_chan_usage_unavail_policy[TWT_SETUP_ATTR_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_DURATION] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_INTVL_MANTISSA] =
 							{.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAC_ADDR] = VENDOR_NLA_POLICY_MAC_ADDR,
 };
 
 const struct nla_policy
@@ -23223,10 +23226,37 @@ qca_wlan_vendor_p2p_chan_req_mode[CHAN_USAGE_REQ_MAX + 1] = {
 	[CHAN_USAGE_REQ_UNAVAIL_CONFIG] = {.type = NLA_NESTED},
 };
 
+static int
+wlan_hdd_cfg80211_p2p_chan_usage_unavail_req(struct hdd_adapter *adapter,
+			struct p2p_chan_usage_unavail_params params)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+	int ret;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink, WLAN_TWT_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("psoc is NULL");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_TWT_ID);
+		return -EINVAL;
+	}
+
+	ret = osif_twt_handle_p2p_chan_usage_unavail_req(psoc, vdev, &params);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_TWT_ID);
+	return ret;
+}
+
 /**
- * wlan_hdd_cfg80211_p2p_chan_usage_unavail_req() - Process P2P channel
+ * wlan_hdd_cfg80211_parse_p2p_chan_usage_unavail_req() - Process P2P channel
  * usage unavailability request
  * @unavail_attr: Nested attribute containing TWT setup parameters
+ * @adapter: HDD adapter pointer
  *
  * This function parses the TWT setup parameters from the nested attribute
  * and populates the p2p_chan_usage_unavail_params structure.
@@ -23234,17 +23264,20 @@ qca_wlan_vendor_p2p_chan_req_mode[CHAN_USAGE_REQ_MAX + 1] = {
  * Return: 0 on success, -EINVAL on failure
  */
 static int
-wlan_hdd_cfg80211_p2p_chan_usage_unavail_req(struct nlattr *unavail_attr)
+wlan_hdd_cfg80211_parse_p2p_chan_usage_unavail_req(struct nlattr *unavail_attr,
+						   struct hdd_adapter *adapter)
 {
 	struct nlattr *tb3[TWT_SETUP_ATTR_MAX + 1];
 	struct p2p_chan_usage_unavail_params params = {0};
 	uint32_t wake_intvl_exp;
+	int ret;
 
-	if (wlan_cfg80211_nla_parse_nested(tb3, TWT_SETUP_ATTR_MAX,
+	ret = wlan_cfg80211_nla_parse_nested(tb3, TWT_SETUP_ATTR_MAX,
 				unavail_attr,
-				qca_wlan_vendor_chan_usage_unavail_policy)) {
-		hdd_debug("Failed to parse unavailability params");
-		return -EINVAL;
+				qca_wlan_vendor_chan_usage_unavail_policy);
+	if (ret) {
+		hdd_err_rl("Failed to parse unavailability params: %d", ret);
+		return ret;
 	}
 
 	if (tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_RESPONDER_PM_MODE]) {
@@ -23324,15 +23357,29 @@ wlan_hdd_cfg80211_p2p_chan_usage_unavail_req(struct nlattr *unavail_attr)
 		}
 	}
 
-	hdd_debug_rl("P2P chan usage unavail params: pm_mode=%u req_type=%u trigger=%u flow_type=%u wake_intvl_exp=%u protection=%u wake_duration=%u wake_intvl_mantissa=%u",
+	/* Parse optional MAC address attribute */
+	if (tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAC_ADDR]) {
+		qdf_mem_copy(params.mac_addr.bytes,
+				nla_data(tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_MAC_ADDR]),
+				QDF_MAC_ADDR_SIZE);
+		params.mac_addr_valid = true;
+		hdd_debug_rl("MAC address provided: " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(params.mac_addr.bytes));
+	} else {
+		params.mac_addr_valid = false;
+		hdd_debug_rl("No MAC address provided");
+	}
+
+	hdd_debug_rl("P2P chan usage unavail params: pm_mode=%u req_type=%u trigger=%u flow_type=%u wake_intvl_exp=%u protection=%u wake_duration=%u wake_intvl_mantissa=%u mac_addr_valid=%u",
 		     params.responder_pm_mode, params.req_type,
 		     params.is_trigger_enabled, params.flow_type,
 		     params.wake_intvl_exp, params.is_protection_enabled,
-		     params.wake_duration, params.wake_intvl_mantissa);
+		     params.wake_duration, params.wake_intvl_mantissa,
+		     params.mac_addr_valid);
 
-	// TODO: Add call to backend function to configure unavailability
+	ret = wlan_hdd_cfg80211_p2p_chan_usage_unavail_req(adapter, params);
 
-	return 0;
+	return ret;
 }
 
 /**
@@ -23366,7 +23413,8 @@ static int __wlan_hdd_cfg80211_p2p_chan_usage_req(struct wiphy *wiphy,
 	uint8_t mode;
 	int ret;
 
-	hdd_enter();
+	hdd_debug("CHAN_USAGE_REQ for mode: %d vdev_id: %d",
+		  adapter->device_mode, adapter->deflink->vdev_id);
 
 	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
 		hdd_err_rl("Command not allowed in FTM mode");
@@ -23392,17 +23440,20 @@ static int __wlan_hdd_cfg80211_p2p_chan_usage_req(struct wiphy *wiphy,
 	}
 
 	mode = nla_get_u8(tb1[CHAN_USAGE_REQ_MODE]);
-	if (mode == QCA_CHAN_USAGE_MODE_UNAVAILABILITY_INDICATION) {
-		if (!tb1[CHAN_USAGE_REQ_UNAVAIL_CONFIG])
-			return 0;
+	switch (mode) {
+	case QCA_CHAN_USAGE_MODE_UNAVAILABILITY_INDICATION:
+		if (!tb1[CHAN_USAGE_REQ_UNAVAIL_CONFIG]) {
+			hdd_debug("Required attribute unavailable config not set");
+			return -EINVAL;
+		}
 
-		ret = wlan_hdd_cfg80211_p2p_chan_usage_unavail_req(
-			tb1[CHAN_USAGE_REQ_UNAVAIL_CONFIG]);
+		ret = wlan_hdd_cfg80211_parse_p2p_chan_usage_unavail_req(
+			tb1[CHAN_USAGE_REQ_UNAVAIL_CONFIG], adapter);
 
 		return ret;
-	}
-
-	if (mode != QCA_CHAN_USAGE_MODE_CHANNEL_SWITCH_REQ) {
+	case QCA_CHAN_USAGE_MODE_CHANNEL_SWITCH_REQ:
+		break;
+	default:
 		hdd_debug("Invalid usage mode %d", mode);
 		return -EINVAL;
 	}
