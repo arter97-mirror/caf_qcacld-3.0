@@ -62,7 +62,7 @@ uint16_t t2lm_get_connected_link_id(struct wlan_objmgr_vdev *vdev)
 		return false;
 	}
 
-	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	link_info = &vdev->mlo_dev_ctx->sta_ctx->links_info[0];
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
 		link_id = link_info[i].link_id;

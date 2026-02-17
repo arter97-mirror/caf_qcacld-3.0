@@ -520,29 +520,29 @@ wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 			struct wlan_diag_sta_info *wlan_diag_event)
 {
 	uint i = 0;
-	struct mlo_link_switch_context *link_ctx = vdev->mlo_dev_ctx->link_ctx;
+	struct wlan_mlo_sta *sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
 	struct wlan_channel *link_chan_info;
 
-	if (!link_ctx)
+	if (!sta_ctx)
 		return QDF_STATUS_E_FAILURE;
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_chan_info = link_ctx->links_info[i].link_chan_info;
+		link_chan_info = sta_ctx->links_info[i].link_chan_info;
 
 		if (wlan_reg_is_24ghz_ch_freq(
 		    (qdf_freq_t)link_chan_info->ch_freq)) {
 			qdf_mem_copy(wlan_diag_event->mac_2g,
-				     link_ctx->links_info[i].link_addr.bytes,
+				     sta_ctx->links_info[i].link_addr.bytes,
 				     QDF_MAC_ADDR_SIZE);
 		} else if (wlan_reg_is_5ghz_ch_freq(
 			   (qdf_freq_t)link_chan_info->ch_freq)) {
 			qdf_mem_copy(wlan_diag_event->mac_5g,
-				     link_ctx->links_info[i].link_addr.bytes,
+				     sta_ctx->links_info[i].link_addr.bytes,
 				     QDF_MAC_ADDR_SIZE);
 		} else if (wlan_reg_is_6ghz_chan_freq(
 			   link_chan_info->ch_freq)) {
 			qdf_mem_copy(wlan_diag_event->mac_6g,
-				     link_ctx->links_info[i].link_addr.bytes,
+				     sta_ctx->links_info[i].link_addr.bytes,
 				     QDF_MAC_ADDR_SIZE);
 		}
 	}
@@ -551,13 +551,13 @@ wlan_populate_link_addr(struct wlan_objmgr_vdev *vdev,
 }
 
 static uint8_t
-wlan_populate_band_bitmap(struct mlo_link_switch_context *link_ctx)
+wlan_populate_band_bitmap(struct wlan_mlo_sta *sta_ctx)
 {
 	uint8_t i, band_bitmap = 0, band;
 	struct wlan_channel *link_chan_info;
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_chan_info = link_ctx->links_info[i].link_chan_info;
+		link_chan_info = sta_ctx->links_info[i].link_chan_info;
 
 		band = wlan_reg_freq_to_band((qdf_freq_t)
 					     link_chan_info->ch_freq);
@@ -573,7 +573,7 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_diag_packet_info *data,
 				   enum wlan_main_tag tag)
 {
-	struct mlo_link_switch_context *link_ctx;
+	struct wlan_mlo_sta *sta_ctx;
 	struct qdf_mac_addr peer_mac, peer_mld_mac;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
@@ -604,14 +604,14 @@ wlan_populate_mlo_mgmt_event_param(struct wlan_objmgr_vdev *vdev,
 	if (tag != WLAN_ASSOC_REQ && tag != WLAN_REASSOC_REQ)
 		return status;
 
-	link_ctx = vdev->mlo_dev_ctx->link_ctx;
-	if (!link_ctx) {
-		logging_debug("vdev: %d link_ctx not found",
+	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx) {
+		logging_debug("vdev: %d sta_ctx not found",
 			      wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
 
-	data->supported_links = wlan_populate_band_bitmap(link_ctx);
+	data->supported_links = wlan_populate_band_bitmap(sta_ctx);
 
 	return status;
 }
@@ -644,7 +644,7 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
 				  bool is_band_present)
 {
 	uint i = 0;
-	struct mlo_link_switch_context *link_ctx = NULL;
+	struct wlan_mlo_sta *sta_ctx = NULL;
 	struct wlan_channel *chan_info;
 	uint8_t num_links = 0;
 
@@ -675,31 +675,31 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	link_ctx = vdev->mlo_dev_ctx->link_ctx;
-	if (!link_ctx) {
-		logging_err("vdev: %d mlo link ctx not found",
+	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx) {
+		logging_err("vdev: %d mlo sta ctx not found",
 			    wlan_vdev_get_id(vdev));
 		return;
 	}
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		if (link_ctx->links_info[i].link_id == WLAN_INVALID_LINK_ID)
+		if (sta_ctx->links_info[i].link_id == WLAN_INVALID_LINK_ID)
 			continue;
 
-		chan_info = link_ctx->links_info[i].link_chan_info;
+		chan_info = sta_ctx->links_info[i].link_chan_info;
 		if (!chan_info) {
 			logging_debug("link %d: chan_info not found",
-				      link_ctx->links_info[i].link_id);
+				      sta_ctx->links_info[i].link_id);
 			continue;
 		}
 
 		wlan_diag_event.mlo_cmn_info[num_links].link_id =
-				link_ctx->links_info[i].link_id;
+				sta_ctx->links_info[i].link_id;
 		wlan_diag_event.mlo_cmn_info[num_links].vdev_id =
-				link_ctx->links_info[i].vdev_id;
+				sta_ctx->links_info[i].vdev_id;
 
 		qdf_mem_copy(wlan_diag_event.mlo_cmn_info[num_links].link_addr,
-			     link_ctx->links_info[i].ap_link_addr.bytes,
+			     sta_ctx->links_info[i].ap_link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 
 		wlan_diag_event.mlo_cmn_info[num_links].band =
@@ -720,12 +720,12 @@ wlan_connectivity_mlo_setup_event(struct wlan_objmgr_vdev *vdev,
 		 */
 
 		wlan_diag_event.mlo_cmn_info_ext[num_links].link_id =
-				link_ctx->links_info[i].link_id;
+				sta_ctx->links_info[i].link_id;
 		wlan_diag_event.mlo_cmn_info_ext[num_links].vdev_id =
-				link_ctx->links_info[i].vdev_id;
+				sta_ctx->links_info[i].vdev_id;
 
 		qdf_mem_copy(wlan_diag_event.mlo_cmn_info_ext[num_links].link_addr,
-			     link_ctx->links_info[i].ap_link_addr.bytes,
+			     sta_ctx->links_info[i].ap_link_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 
 		wlan_diag_event.mlo_cmn_info_ext[num_links].freq =
@@ -1435,7 +1435,7 @@ wlan_convert_link_id_to_diag_band(struct qdf_mac_addr *peer_mld,
 }
 
 static uint8_t
-wlan_get_supported_link_band_bitmap(struct mlo_link_switch_context *link_ctx)
+wlan_get_supported_link_band_bitmap(struct wlan_mlo_sta *sta_ctx)
 {
 	uint8_t band_bitmap = 0, i = 0;
 	struct mlo_link_info link_info;
@@ -1443,7 +1443,7 @@ wlan_get_supported_link_band_bitmap(struct mlo_link_switch_context *link_ctx)
 	enum wlan_diag_wifi_band band;
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_info = link_ctx->links_info[i];
+		link_info = sta_ctx->links_info[i];
 
 		chan_info = link_info.link_chan_info;
 		if (!chan_info)
@@ -1494,8 +1494,8 @@ void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 		wlan_convert_link_id_to_diag_band(&src->mld_addr,
 						  src->prev_link_bitmap);
 
-	if (!mld_ctx->link_ctx) {
-		logging_err("link ctx for mld_mac: "
+	if (!mld_ctx->sta_ctx) {
+		logging_err("sta ctx for mld_mac: "
 			    QDF_MAC_ADDR_FMT
 			    " not found",
 			    QDF_MAC_ADDR_REF(src->mld_addr.bytes));
@@ -1503,7 +1503,7 @@ void wlan_connectivity_mld_link_status_event(struct wlan_objmgr_psoc *psoc,
 	}
 
 	wlan_diag_event.associated_links =
-			wlan_get_supported_link_band_bitmap(mld_ctx->link_ctx);
+			wlan_get_supported_link_band_bitmap(mld_ctx->sta_ctx);
 
 	if (!wlan_diag_event.associated_links)
 		return;

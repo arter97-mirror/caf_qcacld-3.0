@@ -927,7 +927,7 @@ target_if_roam_synch_key_event_handler(ol_scn_t scn, uint8_t *event,
 		    keys[i].link_id != MLO_INVALID_LINK_IDX &&
 		    ml_ctx->link_ctx) {
 			for (j = 0; j < WLAN_MAX_ML_BSS_LINKS; j++) {
-				link_info = &ml_ctx->link_ctx->links_info[j];
+				link_info = &ml_ctx->sta_ctx->links_info[j];
 				if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
 					continue;
 

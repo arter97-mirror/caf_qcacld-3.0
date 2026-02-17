@@ -7001,9 +7001,12 @@ mlo_get_curr_link_combination(struct wlan_objmgr_vdev *vdev)
 	uint8_t i = 0;
 	uint8_t curr_link_comb = 0;
 
+	if (!vdev->mlo_dev_ctx)
+		return 0;
+
 	/* Iterate from 1st index, because assoc link is at 0th index */
 	for (i = 1; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_info = vdev->mlo_dev_ctx->link_ctx->links_info[i];
+		link_info = vdev->mlo_dev_ctx->sta_ctx->links_info[i];
 		if (qdf_is_macaddr_zero(&link_info.ap_link_addr))
 			break;
 

@@ -827,7 +827,7 @@ mlme_fill_freq_in_mlo_wide_band_scan_start_req(struct wlan_objmgr_vdev *vdev,
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	uint8_t i;
 	QDF_STATUS status;
-	struct mlo_link_switch_context *link_ctx;
+	struct wlan_mlo_sta *sta_ctx;
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	if (!mlo_dev_ctx) {
@@ -835,20 +835,20 @@ mlme_fill_freq_in_mlo_wide_band_scan_start_req(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	link_ctx = mlo_dev_ctx->link_ctx;
-	if (!link_ctx) {
-		mlme_err("vdev %d :mlo_link_ctx is NULL",
+	sta_ctx = mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx) {
+		mlme_err("vdev %d :mlo_sta_ctx is NULL",
 			 req->scan_req.vdev_id);
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS  &&
-	     link_ctx->links_info[i].link_id != WLAN_INVALID_LINK_ID; i++) {
+	     sta_ctx->links_info[i].link_id != WLAN_INVALID_LINK_ID; i++) {
 		status = mlme_update_freq_from_link_ctx(
-						&link_ctx->links_info[i], req);
+						&sta_ctx->links_info[i], req);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlme_debug("freq update fails for link id %d",
-				   link_ctx->links_info[i].link_id);
+				   sta_ctx->links_info[i].link_id);
 			return status;
 		}
 	}

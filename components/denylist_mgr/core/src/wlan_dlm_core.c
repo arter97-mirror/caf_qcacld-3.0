@@ -1876,7 +1876,7 @@ dlm_get_link_action(struct wlan_objmgr_vdev *vdev,
 			return WLAN_HOST_AVOID_ASSOC_LINK;
 		}
 		for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-			link_info = vdev->mlo_dev_ctx->link_ctx->links_info[i];
+			link_info = vdev->mlo_dev_ctx->sta_ctx->links_info[i];
 
 			if (qdf_is_macaddr_zero(&link_info.ap_link_addr))
 				break;

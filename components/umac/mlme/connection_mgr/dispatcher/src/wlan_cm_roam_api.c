@@ -2920,7 +2920,6 @@ wlan_cm_get_mlo_associated_ch_info(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx;
 	struct wlan_mlo_sta *sta_ctx;
-	struct mlo_link_switch_context *link_ctx;
 	struct mlo_link_info *link_info;
 	uint8_t i;
 
@@ -2938,12 +2937,8 @@ wlan_cm_get_mlo_associated_ch_info(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	link_ctx = mlo_dev_ctx->link_ctx;
-	if (!link_ctx)
-		return;
-
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_info = &link_ctx->links_info[i];
+		link_info = &sta_ctx->links_info[i];
 
 		if (QDF_IS_STATUS_SUCCESS(
 			wlan_cm_process_mlo_link_info(vdev, link_info,

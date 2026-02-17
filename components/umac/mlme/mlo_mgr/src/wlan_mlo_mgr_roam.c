@@ -241,7 +241,7 @@ mlo_mgr_get_link_info_by_vdev_id(struct wlan_mlo_dev_context *mlo_dev_ctx,
 	 * one entry in link may match based on the number of VDEVs and links
 	 */
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
-		link_info = &mlo_dev_ctx->link_ctx->links_info[i];
+		link_info = &mlo_dev_ctx->sta_ctx->links_info[i];
 		if (link_info->vdev_id == vdev_id)
 			return link_info;
 	}
@@ -297,7 +297,7 @@ mlo_roam_update_all_vdev_macaddr(struct wlan_objmgr_psoc *psoc,
 	}
 
 	mlo_dev_ctx = roamed_vdev->mlo_dev_ctx;
-	if (!mlo_dev_ctx || !mlo_dev_ctx->link_ctx) {
+	if (!mlo_dev_ctx || !mlo_dev_ctx->sta_ctx) {
 		mlo_err("Invalid mlo_dev_ctx for vdev %d", roamed_vdev_id);
 		status = QDF_STATUS_E_INVAL;
 		goto rel_ref;
@@ -443,12 +443,12 @@ mlo_mgr_get_link_info_by_self_addr(struct wlan_objmgr_vdev *vdev,
 	uint8_t iter;
 	struct mlo_link_info *mlo_link;
 
-	if (!vdev || !vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->link_ctx ||
+	if (!vdev || !vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->sta_ctx ||
 	    !self_addr || qdf_is_macaddr_zero(self_addr))
 		return NULL;
 
 	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
-		mlo_link = &vdev->mlo_dev_ctx->link_ctx->links_info[iter];
+		mlo_link = &vdev->mlo_dev_ctx->sta_ctx->links_info[iter];
 
 		if (qdf_is_macaddr_equal(&mlo_link->link_addr, self_addr))
 			return mlo_link;

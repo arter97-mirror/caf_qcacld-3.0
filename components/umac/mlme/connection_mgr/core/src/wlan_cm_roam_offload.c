@@ -2664,7 +2664,7 @@ static void cm_update_rso_freq_list_from_partner_link(
 	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
 		return;
 
-	mlo_link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	mlo_link_info = &vdev->mlo_dev_ctx->sta_ctx->links_info[0];
 	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
 	     link_info_iter++, mlo_link_info++) {
 		if (qdf_is_macaddr_zero(&mlo_link_info->ap_link_addr) ||
@@ -7626,7 +7626,7 @@ bool cm_is_bssid_present_on_any_assoc_link(struct wlan_objmgr_vdev *vdev,
 		return qdf_is_macaddr_equal(bssid, &connected_bssid);
 	}
 
-	links_info = mlo_dev_ctx->link_ctx->links_info;
+	links_info = mlo_dev_ctx->sta_ctx->links_info;
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
 		if (links_info[i].link_id == WLAN_INVALID_LINK_ID)
 			continue;

@@ -31620,7 +31620,7 @@ static void wlan_hdd_mlo_link_add_pairwise_key(struct wlan_objmgr_vdev *vdev,
 	struct mlo_link_info *mlo_link_info;
 	uint8_t link_info_iter = 0;
 
-	mlo_link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	mlo_link_info = &vdev->mlo_dev_ctx->sta_ctx->links_info[0];
 	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
 	     link_info_iter++, mlo_link_info++) {
 		if (qdf_is_macaddr_zero(&mlo_link_info->ap_link_addr) ||
@@ -39096,7 +39096,7 @@ static void hdd_get_connected_link_id(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	link_info = &vdev->mlo_dev_ctx->sta_ctx->links_info[0];
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
 		link_id = link_info[i].link_id;
 		if (link_id == WLAN_INVALID_LINK_ID)

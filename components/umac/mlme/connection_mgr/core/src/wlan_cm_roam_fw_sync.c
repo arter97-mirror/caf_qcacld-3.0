@@ -299,7 +299,7 @@ void cm_update_scan_mlme_for_mlo_roam(struct wlan_objmgr_vdev *vdev)
 
 	mlme.assoc_state = SCAN_ENTRY_CON_STATE_NONE;
 
-	link_info = &ml_dev->link_ctx->links_info[0];
+	link_info = &ml_dev->sta_ctx->links_info[0];
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++, link_info++) {
 		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
 			continue;
@@ -1186,10 +1186,10 @@ void cm_delete_crypto_keys_for_all_links(struct wlan_objmgr_vdev *vdev)
 	uint8_t i;
 
 	ml_dev = vdev->mlo_dev_ctx;
-	if (!ml_dev || !ml_dev->link_ctx)
+	if (!ml_dev || !ml_dev->sta_ctx)
 		return;
 
-	link_info = &ml_dev->link_ctx->links_info[0];
+	link_info = &ml_dev->sta_ctx->links_info[0];
 	for (i = 0; i < WLAN_MAX_ML_BSS_LINKS; i++) {
 		if (qdf_is_macaddr_zero(&link_info->ap_link_addr))
 			continue;
@@ -1735,7 +1735,7 @@ cm_ho_fail_is_avoid_list_candidate(struct wlan_objmgr_vdev *vdev,
 			return true;
 	}
 
-	mlo_link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
+	mlo_link_info = &vdev->mlo_dev_ctx->sta_ctx->links_info[0];
 	for (link_info_iter = 0; link_info_iter < WLAN_MAX_ML_BSS_LINKS;
 	     link_info_iter++, mlo_link_info++) {
 		if (qdf_is_macaddr_equal(&mlo_link_info->ap_link_addr,
