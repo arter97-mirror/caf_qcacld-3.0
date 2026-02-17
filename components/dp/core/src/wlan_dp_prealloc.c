@@ -370,7 +370,11 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 };
 
 /* Number of HW link descriptors needed (rounded to power of 2) */
+#ifndef WLAN_SOFTUMAC_SUPPORT
 #define NUM_HW_LINK_DESCS (32 * 1024)
+#else
+#define NUM_HW_LINK_DESCS (32 * 64)
+#endif
 
 /* Size in bytes of HW LINK DESC */
 #define HW_LINK_DESC_SIZE 128
