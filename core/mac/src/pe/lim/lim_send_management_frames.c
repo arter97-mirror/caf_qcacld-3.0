@@ -67,6 +67,8 @@
 #include "wlan_action_oui_main.h"
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_mgmt_txrx_utils_api.h"
+#include "wlan_mgmt_txrx_tgt_api.h"
+
 /**
  *
  * \brief This function is called to add the sequence number to the
@@ -9369,7 +9371,7 @@ QDF_STATUS lim_process_qos_null_req(struct scheduler_msg *msg)
 
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to send QoS null frame to WMA: %d", status);
-		wlan_mgmt_txrx_desc_id_free(pdev, desc_id, frame, NULL);
+		wlan_mgmt_txrx_desc_id_free(pdev, desc_id, NULL);
 		if (status != QDF_STATUS_E_PENDING)
 			qdf_nbuf_free(frame);
 		frame = NULL;
@@ -9386,7 +9388,6 @@ cleanup:
 	qdf_mem_free(req);
 	return status;
 }
-
 
 QDF_STATUS lim_process_qos_null_tx_completion(struct mac_context *mac_ctx,
 					      uint32_t desc_id,
@@ -9405,7 +9406,6 @@ QDF_STATUS lim_process_qos_null_tx_completion(struct mac_context *mac_ctx,
 	}
 
 	qdf_dev = wlan_psoc_get_qdf_dev(mac_ctx->psoc);
-
 	if (!qdf_dev) {
 		pe_err("Failed to get qdf_dev from psoc");
 		return QDF_STATUS_E_INVAL;
@@ -9413,7 +9413,6 @@ QDF_STATUS lim_process_qos_null_tx_completion(struct mac_context *mac_ctx,
 
 	pdev = wlan_objmgr_get_pdev_by_id(mac_ctx->psoc, pdev_id,
 					  WLAN_LEGACY_MAC_ID);
-
 	if (!pdev) {
 		pe_err("Failed to get pdev for pdev_id=%u", pdev_id);
 		return QDF_STATUS_E_INVAL;
@@ -9425,19 +9424,24 @@ QDF_STATUS lim_process_qos_null_tx_completion(struct mac_context *mac_ctx,
 		goto release_pdev;
 	}
 
-	status = wlan_mgmt_txrx_desc_id_free(pdev, desc_id, frame, vdev_id);
-	if (QDF_IS_STATUS_ERROR(status)) {
+	frame = tgt_mgmt_txrx_get_nbuf_from_desc_id(pdev, desc_id);
+	if (!frame) {
+		pe_err("Failed to get frame for desc_id=%u", desc_id);
 		status = QDF_STATUS_E_INVAL;
 		goto release_pdev;
 	}
 
-	if (frame) {
-		qdf_nbuf_unmap_single(qdf_dev, frame, QDF_DMA_TO_DEVICE);
-		qdf_nbuf_free(frame);
-		pe_debug("Unmapped DMA buffer for desc_id=%u", desc_id);
+	qdf_nbuf_unmap_single(qdf_dev, frame, QDF_DMA_TO_DEVICE);
+	pe_debug("Unmapped DMA buffer for desc_id=%u", desc_id);
+
+	status = wlan_mgmt_txrx_desc_id_free(pdev, desc_id, vdev_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Failed to free desc_id=%u, status=%d", desc_id, status);
+
 	}
 
-	pe_debug("Freed descriptor: desc_id=%u", desc_id);
+	qdf_nbuf_free(frame);
+	pe_debug("Freed frame and descriptor: desc_id=%u", desc_id);
 
 	status = QDF_STATUS_SUCCESS;
 

@@ -3177,7 +3177,9 @@ QDF_STATUS wma_send_qos_null_frame(struct mac_context *mac, uint8_t vdev_id,
 {
 	tp_wma_handle wma_handle;
 	struct qos_null_frame_tx_params param;
+	struct wma_target_req *msg;
 	QDF_STATUS status;
+	uint8_t pending_vdev_id;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma_handle || !frame || !peer_addr) {
@@ -3188,6 +3190,29 @@ QDF_STATUS wma_send_qos_null_frame(struct mac_context *mac, uint8_t vdev_id,
 	if (vdev_id >= wma_handle->max_bssid) {
 		wma_err("Invalid vdev_id: %d", vdev_id);
 		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_spin_lock_bh(&wma_handle->qos_null_tx_lock);
+	pending_vdev_id = wma_handle->qos_null_tx_vdev_id;
+	if (pending_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
+		qdf_spin_unlock_bh(&wma_handle->qos_null_tx_lock);
+		wma_err("Request pending for vdev %d, rejecting for vdev %d",
+			pending_vdev_id, vdev_id);
+		return QDF_STATUS_E_BUSY;
+	}
+
+	wma_handle->qos_null_tx_vdev_id = vdev_id;
+	qdf_spin_unlock_bh(&wma_handle->qos_null_tx_lock);
+
+	msg = wma_fill_hold_req(wma_handle, vdev_id, WMA_QOS_NULL_TX_REQ,
+				WMA_QOS_NULL_TX_REQ, peer_addr,
+				(void *)(uintptr_t)desc_id,
+				WMA_QOS_NULL_TX_TIMEOUT);
+
+	if (!msg) {
+		wma_err("Failed to allocate request for vdev_id %d", vdev_id);
+		status = QDF_STATUS_E_NOMEM;
+		goto unlock_and_cleanup;
 	}
 
 	qdf_mem_zero(&param, sizeof(param));
@@ -3205,8 +3230,15 @@ QDF_STATUS wma_send_qos_null_frame(struct mac_context *mac, uint8_t vdev_id,
 							&param);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		wma_err("WMI send_qos_null_frame_cmd failed: %d", status);
-		return status;
+		wma_remove_req(wma_handle, vdev_id, WMA_QOS_NULL_TX_REQ);
+		goto unlock_and_cleanup;
 	}
 
 	return QDF_STATUS_SUCCESS;
+
+unlock_and_cleanup:
+	qdf_spin_lock_bh(&wma_handle->qos_null_tx_lock);
+	wma_handle->qos_null_tx_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	qdf_spin_unlock_bh(&wma_handle->qos_null_tx_lock);
+	return status;
 }

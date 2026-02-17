@@ -4462,6 +4462,8 @@ void wma_hold_req_timer(void *data)
 					      pAddStaParams->updateSta, NULL,
 					      QDF_STATUS_E_FAILURE);
 		qdf_mem_free(tgt_req->user_data);
+	} else if (tgt_req->type == WMA_QOS_NULL_TX_REQ) {
+		wma_qos_null_tx_timeout_handler(wma, tgt_req);
 	} else {
 		wma_err("Unhandled timeout for msg_type:%d and type:%d",
 				tgt_req->msg_type, tgt_req->type);

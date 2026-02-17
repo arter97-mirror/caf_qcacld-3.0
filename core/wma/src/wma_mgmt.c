@@ -4948,18 +4948,86 @@ cm_send_ies_for_roam_invoke(struct wlan_objmgr_vdev *vdev, uint16_t dot11_mode)
 	return status;
 }
 
+void wma_qos_null_tx_timeout_handler(tp_wma_handle wma,
+				     struct wma_target_req *req)
+{
+	uint32_t desc_id = (uint32_t)(uintptr_t)req->user_data;
+	uint8_t vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	uint8_t expected_vdev_id;
+	QDF_STATUS status;
+
+	qdf_spin_lock_bh(&wma->qos_null_tx_lock);
+	expected_vdev_id = wma->qos_null_tx_vdev_id;
+	qdf_spin_unlock_bh(&wma->qos_null_tx_lock);
+
+	status = lim_process_qos_null_tx_completion(wma->mac_context, desc_id,
+						    &vdev_id);
+
+	wma_err("QoS NULL TX timeout for vdev %d desc_id %d", vdev_id, desc_id);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("QoS NULL completion failed: desc_id=%u status=%d",
+			desc_id, status);
+		return;
+	}
+
+	if (vdev_id != expected_vdev_id) {
+		wma_err("vdev_id mismatch: expected=%u actual=%u",
+			expected_vdev_id, vdev_id);
+		return;
+	}
+
+	qdf_spin_lock_bh(&wma->qos_null_tx_lock);
+	wma->qos_null_tx_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	qdf_spin_unlock_bh(&wma->qos_null_tx_lock);
+
+	if (wma->qos_null_tx_compl_cb) {
+		wma->qos_null_tx_compl_cb(vdev_id,
+					  WMI_MGMT_TX_COMP_TYPE_COMPLETE_NO_ACK,
+					  -128, 0, 0, 0,
+					  wma->qos_null_tx_compl_cb_context);
+
+		wma_debug("Invoked HDD callback with timeout: vdev_id=%u",
+			  vdev_id);
+	}
+}
+
 int wma_qos_null_tx_compl_event_handler(void *handle, uint8_t *event_buff,
 					uint32_t len)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle)handle;
 	struct qos_null_frame_tx_compl_params event = {0};
 	uint8_t vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	struct wma_target_req *req_msg;
 	QDF_STATUS status;
 
 	if (!wma_handle) {
 		wma_err("Invalid WMA handle");
 		return -EINVAL;
 	}
+
+	qdf_spin_lock_bh(&wma_handle->qos_null_tx_lock);
+	vdev_id = wma_handle->qos_null_tx_vdev_id;
+	qdf_spin_unlock_bh(&wma_handle->qos_null_tx_lock);
+
+	if (vdev_id == WLAN_UMAC_VDEV_ID_MAX) {
+		wma_err("Late QoS NULL TX completion event");
+		return -ETIMEDOUT;
+	}
+
+	req_msg = wma_find_remove_req_msgtype(wma_handle, vdev_id, NULL,
+					     WMA_QOS_NULL_TX_REQ);
+	if (req_msg) {
+		qdf_mc_timer_stop(&req_msg->event_timeout);
+		qdf_mc_timer_destroy(&req_msg->event_timeout);
+		qdf_mem_free(req_msg);
+		wma_debug("Stopped and removed QoS NULL TX timer for vdev %d",
+			  vdev_id);
+	}
+
+	qdf_spin_lock_bh(&wma_handle->qos_null_tx_lock);
+	wma_handle->qos_null_tx_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	qdf_spin_unlock_bh(&wma_handle->qos_null_tx_lock);
 
 	if (wmi_extract_qos_null_frame_tx_compl_event(wma_handle->wmi_handle,
 						      event_buff, &event)) {

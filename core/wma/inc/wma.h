@@ -196,6 +196,9 @@
 /* Delete peer response for existing ranging peer */
 #define WMA_DELETE_STA_EXISTING_PASN_PEER_RSP 0x11
 
+#define WMA_QOS_NULL_TX_REQ 0x12
+#define WMA_QOS_NULL_TX_TIMEOUT 2000
+
 /* FW response timeout values in milli seconds */
 #define WMA_VDEV_PLCY_MGR_TIMEOUT        SIR_VDEV_PLCY_MGR_TIMEOUT
 #define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT WMA_VDEV_PLCY_MGR_TIMEOUT
@@ -1139,6 +1142,8 @@ typedef struct {
 	struct wma_pf_sym_hist wma_pf_hist;
 	qos_null_tx_compl_cb qos_null_tx_compl_cb;
 	void *qos_null_tx_compl_cb_context;
+	uint8_t qos_null_tx_vdev_id;
+	qdf_spinlock_t qos_null_tx_lock;
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -2859,5 +2864,18 @@ QDF_STATUS wma_deregister_qos_null_hdd_cb(void);
  */
 QDF_STATUS
 wma_set_vdev_mac_id_from_response(struct vdev_unified_connect_response *rsp);
+/*
+ * wma_qos_null_tx_timeout_handler() - QoS NULL TX timeout handler
+ * @wma: wma handle
+ * @req: timeout request
+ *
+ * This function handles QoS NULL frame TX timeout by calling
+ * lim_process_qos_null_tx_completion and invoking the HDD callback
+ * with timeout status.
+ *
+ * Return: None
+ */
+void wma_qos_null_tx_timeout_handler(tp_wma_handle wma,
+                                     struct wma_target_req *req);
 
 #endif
