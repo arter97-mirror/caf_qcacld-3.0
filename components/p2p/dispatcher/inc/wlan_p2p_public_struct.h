@@ -303,6 +303,28 @@ struct p2p_chan_switch_req_params {
 };
 
 /**
+ * struct p2p_chan_usage_unavail_params - Unavailability parameters for P2P
+ * @wake_duration: Wake duration in multiples of 256us
+ * @wake_intvl_mantissa: Wake interval mantissa in TU
+ * @req_type: TWT request type
+ * @responder_pm_mode: Responder PM mode (0 or 1)
+ * @flow_type: Flow type (0: Announced, 1: Unannounced)
+ * @wake_intvl_exp: Wake interval exponent
+ * @is_trigger_enabled: TWT with trigger support
+ * @is_protection_enabled: Protection required
+ */
+struct p2p_chan_usage_unavail_params {
+	uint32_t wake_duration;
+	uint32_t wake_intvl_mantissa;
+	uint8_t req_type;
+	uint8_t responder_pm_mode;
+	uint8_t flow_type;
+	uint8_t wake_intvl_exp;
+	bool is_trigger_enabled;
+	bool is_protection_enabled;
+};
+
+/**
  * struct p2p_ap_assist_dfs_group_params - Params of assisted AP for DFS
  * P2P group
  * @vdev_id: VDEV ID of p2p entity

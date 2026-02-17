@@ -32,6 +32,11 @@
 
 #define TWT_WAKE_INTVL_MULTIPLICATION_FACTOR    1024
 #define TWT_WAKE_DURATION_MULTIPLICATION_FACTOR 256
+#define TWT_FLOW_TYPE_ANNOUNCED                 0
+#define TWT_FLOW_TYPE_UNANNOUNCED               1
+#define TWT_SETUP_WAKE_INTVL_EXP_MAX            31
+#define TWT_SETUP_WAKE_DURATION_MAX             0xFFFF
+#define TWT_SETUP_WAKE_INTVL_MANTISSA_MAX       0xFFFF
 
 #if defined(WLAN_SUPPORT_TWT) && defined(WLAN_TWT_CONV_SUPPORTED)
 /**
@@ -366,4 +371,3 @@ osif_twt_send_responder_disable_per_vdev(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 #endif /* _OSIF_TWT_EXT_REQ_H_ */
-

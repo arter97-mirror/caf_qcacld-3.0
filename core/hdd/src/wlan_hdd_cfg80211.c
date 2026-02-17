@@ -164,6 +164,7 @@
 #include "wlan_reg_ucfg_api.h"
 #include "wlan_hdd_afc.h"
 #include "wlan_hdd_twt.h"
+#include "osif_twt_ext_req.h"
 #include "wlan_hdd_gpio.h"
 #include "wlan_hdd_medium_assess.h"
 #include "wlan_if_mgr_ucfg_api.h"
@@ -23169,12 +23170,153 @@ qca_wlan_vendor_p2p_chan_switch_params[CHAN_USAGE_REQ_CHAN_LIST_MAX + 1] = {
 	[CHAN_USAGE_REQ_CHAN_LIST_OP_CLASS] = {.type = NLA_U8},
 };
 
+static const struct nla_policy
+qca_wlan_vendor_chan_usage_unavail_policy[TWT_SETUP_ATTR_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_RESPONDER_PM_MODE] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_REQ_TYPE] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_TRIGGER] = {.type = NLA_FLAG},
+	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_FLOW_TYPE] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_INTVL_EXP] = {.type = NLA_U8},
+	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_PROTECTION] = {.type = NLA_FLAG},
+	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_DURATION] = {.type = NLA_U32},
+	[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_INTVL_MANTISSA] =
+							{.type = NLA_U32},
+};
+
 const struct nla_policy
 qca_wlan_vendor_p2p_chan_req_mode[CHAN_USAGE_REQ_MAX + 1] = {
 	[CHAN_USAGE_REQ_MODE] = {.type = NLA_U8},
 	[CHAN_USAGE_REQ_CHAN_LIST] = {.type = NLA_NESTED},
+	[CHAN_USAGE_REQ_UNAVAIL_CONFIG] = {.type = NLA_NESTED},
 };
 
+/**
+ * wlan_hdd_cfg80211_p2p_chan_usage_unavail_req() - Process P2P channel
+ * usage unavailability request
+ * @unavail_attr: Nested attribute containing TWT setup parameters
+ *
+ * This function parses the TWT setup parameters from the nested attribute
+ * and populates the p2p_chan_usage_unavail_params structure.
+ *
+ * Return: 0 on success, -EINVAL on failure
+ */
+static int
+wlan_hdd_cfg80211_p2p_chan_usage_unavail_req(struct nlattr *unavail_attr)
+{
+	struct nlattr *tb3[TWT_SETUP_ATTR_MAX + 1];
+	struct p2p_chan_usage_unavail_params params = {0};
+	uint32_t wake_intvl_exp;
+
+	if (wlan_cfg80211_nla_parse_nested(tb3, TWT_SETUP_ATTR_MAX,
+				unavail_attr,
+				qca_wlan_vendor_chan_usage_unavail_policy)) {
+		hdd_debug("Failed to parse unavailability params");
+		return -EINVAL;
+	}
+
+	if (tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_RESPONDER_PM_MODE]) {
+		params.responder_pm_mode = nla_get_u8(
+			tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_RESPONDER_PM_MODE]);
+	}
+
+	if (!tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_REQ_TYPE]) {
+		hdd_err_rl("TWT_SETUP_REQ_TYPE is must");
+		return -EINVAL;
+	}
+	params.req_type = nla_get_u8(
+			tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_REQ_TYPE]);
+
+	if (tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_TRIGGER])
+		params.is_trigger_enabled = true;
+
+	if (!tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_FLOW_TYPE]) {
+		hdd_err_rl("TWT_SETUP_FLOW_TYPE is must");
+		return -EINVAL;
+	}
+	params.flow_type = nla_get_u8(
+			tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_FLOW_TYPE]);
+	if (params.flow_type != TWT_FLOW_TYPE_ANNOUNCED &&
+	    params.flow_type != TWT_FLOW_TYPE_UNANNOUNCED)
+		return -EINVAL;
+
+	if (!tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_INTVL_EXP]) {
+		osif_err_rl("TWT_SETUP_WAKE_INTVL_EXP is must");
+		return -EINVAL;
+	}
+	wake_intvl_exp = nla_get_u8(
+			tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_INTVL_EXP]);
+	if (wake_intvl_exp > TWT_SETUP_WAKE_INTVL_EXP_MAX) {
+		hdd_err_rl("Invalid wake_intvl_exp %u > %u", wake_intvl_exp,
+			   TWT_SETUP_WAKE_INTVL_EXP_MAX);
+		return -EINVAL;
+	}
+	params.wake_intvl_exp = wake_intvl_exp;
+
+	if (tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_PROTECTION])
+		params.is_protection_enabled = true;
+
+	if (!tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_DURATION]) {
+		osif_err_rl("TWT_SETUP_WAKE_DURATION is must");
+		return -EINVAL;
+	}
+	params.wake_duration = nla_get_u32(
+			tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_DURATION]);
+
+	if (params.wake_duration > TWT_SETUP_WAKE_DURATION_MAX) {
+		osif_err_rl("Invalid wake_duration: %u", params.wake_duration);
+		return -EINVAL;
+	}
+
+	if (!tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_INTVL_MANTISSA]) {
+		hdd_err_rl("SETUP_WAKE_INTVL_MANTISSA is must");
+		return -EINVAL;
+	}
+	params.wake_intvl_mantissa = nla_get_u32(
+		      tb3[QCA_WLAN_VENDOR_ATTR_TWT_SETUP_WAKE_INTVL_MANTISSA]);
+	if (params.wake_intvl_mantissa > TWT_SETUP_WAKE_INTVL_MANTISSA_MAX) {
+		hdd_err_rl("Invalid wake_intvl_mantis: %u",
+			   params.wake_intvl_mantissa);
+		return -EINVAL;
+	}
+
+	/* Validate combined wake interval to prevent integer overflow */
+	if (wake_intvl_exp > 0) {
+		uint32_t result = 2 << (wake_intvl_exp - 1);
+
+		if (params.wake_intvl_mantissa > 0 &&
+		    result > (UINT_MAX / params.wake_intvl_mantissa)) {
+			hdd_err_rl("Invalid wake interval: exp=%u mantissa=%u would overflow",
+				   wake_intvl_exp, params.wake_intvl_mantissa);
+			return -EINVAL;
+		}
+	}
+
+	hdd_debug_rl("P2P chan usage unavail params: pm_mode=%u req_type=%u trigger=%u flow_type=%u wake_intvl_exp=%u protection=%u wake_duration=%u wake_intvl_mantissa=%u",
+		     params.responder_pm_mode, params.req_type,
+		     params.is_trigger_enabled, params.flow_type,
+		     params.wake_intvl_exp, params.is_protection_enabled,
+		     params.wake_duration, params.wake_intvl_mantissa);
+
+	// TODO: Add call to backend function to configure unavailability
+
+	return 0;
+}
+
+/**
+ * __wlan_hdd_cfg80211_p2p_chan_usage_req() - Process P2P channel usage request
+ * @wiphy: Pointer to wireless phy
+ * @wdev: Pointer to wireless device
+ * @data: Pointer to data
+ * @data_len: Length of @data
+ *
+ * This function handles P2P channel usage requests from userspace.
+ * It supports two modes:
+ * 1. QCA_CHAN_USAGE_MODE_CHANNEL_SWITCH_REQ: Process channel switch request
+ * 2. QCA_CHAN_USAGE_MODE_UNAVAILABILITY_INDICATION: Process unavailability
+ *    indication with TWT parameters
+ *
+ * Return: 0 on success, negative errno on failure
+ */
 static int __wlan_hdd_cfg80211_p2p_chan_usage_req(struct wiphy *wiphy,
 						  struct wireless_dev *wdev,
 						  const void *data,
@@ -23188,6 +23330,8 @@ static int __wlan_hdd_cfg80211_p2p_chan_usage_req(struct wiphy *wiphy,
 	struct nlattr *tb1[CHAN_USAGE_REQ_MAX + 1];
 	struct nlattr *tb2[CHAN_USAGE_REQ_CHAN_LIST_MAX + 1];
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	uint8_t mode;
+	int ret;
 
 	hdd_enter();
 
@@ -23209,18 +23353,32 @@ static int __wlan_hdd_cfg80211_p2p_chan_usage_req(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (!tb1[CHAN_USAGE_REQ_MODE] ||
-	    (nla_get_u8(tb1[CHAN_USAGE_REQ_MODE]) !=
-	     QCA_CHAN_USAGE_MODE_CHANNEL_SWITCH_REQ)) {
-		hdd_debug("Required attribute not set or invalid usage mode");
+	if (!tb1[CHAN_USAGE_REQ_MODE]) {
+		hdd_debug("Required attribute not set");
+		return -EINVAL;
+	}
+
+	mode = nla_get_u8(tb1[CHAN_USAGE_REQ_MODE]);
+	if (mode == QCA_CHAN_USAGE_MODE_UNAVAILABILITY_INDICATION) {
+		if (!tb1[CHAN_USAGE_REQ_UNAVAIL_CONFIG])
+			return 0;
+
+		ret = wlan_hdd_cfg80211_p2p_chan_usage_unavail_req(
+			tb1[CHAN_USAGE_REQ_UNAVAIL_CONFIG]);
+
+		return ret;
+	}
+
+	if (mode != QCA_CHAN_USAGE_MODE_CHANNEL_SWITCH_REQ) {
+		hdd_debug("Invalid usage mode %d", mode);
 		return -EINVAL;
 	}
 
 	if (tb1[CHAN_USAGE_REQ_CHAN_LIST]) {
 		if (wlan_cfg80211_nla_parse_nested(tb2,
-						   CHAN_USAGE_REQ_CHAN_LIST,
-						   tb1[CHAN_USAGE_REQ_CHAN_LIST],
-						   qca_wlan_vendor_p2p_chan_switch_params)) {
+				CHAN_USAGE_REQ_CHAN_LIST,
+				tb1[CHAN_USAGE_REQ_CHAN_LIST],
+				qca_wlan_vendor_p2p_chan_switch_params)) {
 			hdd_debug("Failed to parse channel switch params");
 			return -EINVAL;
 		}
@@ -23235,20 +23393,19 @@ static int __wlan_hdd_cfg80211_p2p_chan_usage_req(struct wiphy *wiphy,
 	}
 
 	if (adapter->device_mode == QDF_P2P_GO_MODE) {
-		if (wlan_reg_is_6ghz_op_class(hdd_ctx->pdev, opclass)) {
+		if (wlan_reg_is_6ghz_op_class(hdd_ctx->pdev, opclass))
 			freq = wlan_reg_chan_opclass_to_freq(chan, opclass,
 							     false);
-		} else {
+		else
 			freq = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
 							    chan);
-		}
 
 		wlan_reg_read_current_country(hdd_ctx->psoc, reg_cc);
 		ch_width = wlan_reg_dmn_get_chanwidth_from_opclass(reg_cc, chan,
 								   opclass);
 		policy_mgr_change_sap_channel_with_csa(hdd_ctx->psoc,
-						       adapter->deflink->vdev_id,
-						       freq, ch_width, true);
+						adapter->deflink->vdev_id,
+						freq, ch_width, true);
 	} else {
 		ucfg_p2p_send_chan_switch_req(hdd_ctx->psoc,
 					      adapter->deflink->vdev_id,
