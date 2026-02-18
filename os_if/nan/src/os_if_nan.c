@@ -1176,11 +1176,6 @@ static int __os_if_nan_process_ndp_update_config(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_vdev *ndi_vdev;
 	struct nan_datapath_update_config config = {0};
 
-	if (!tb[QCA_WLAN_VENDOR_NDP_SUB_CMD_UPDATE_CONFIG]) {
-		osif_err("ndp update config is unavailable");
-		return -EINVAL;
-	}
-
 	if (!tb[QCA_WLAN_VENDOR_ATTR_NDP_INSTANCE_ID]) {
 		osif_err("Instance ID is unavailable");
 		return -EINVAL;
