@@ -820,4 +820,9 @@ int pld_pcie_fw_sim_get_irq(struct device *dev, int ce_id)
 
 	return ret;
 }
+
+int pld_pcie_fw_sim_is_device_awake(struct device *dev)
+{
+	return cnss_fw_sim_is_device_awake(dev);
+}
 #endif

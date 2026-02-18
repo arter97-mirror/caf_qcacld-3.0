@@ -172,6 +172,11 @@ static inline int pld_pcie_fw_sim_get_irq(struct device *dev, int ce_id)
 {
 	return 0;
 }
+
+static inline int pld_pcie_fw_sim_is_device_awake(struct device *dev)
+{
+	return 1;
+}
 #else
 #include <net/cnss2.h>
 
@@ -187,6 +192,7 @@ int pld_pcie_fw_sim_get_platform_cap(struct device *dev,
 bool pld_pcie_fw_sim_is_direct_refill_supported(struct device *dev);
 int pld_pcie_fw_sim_get_soc_info(struct device *dev, struct pld_soc_info *info);
 int pld_pcie_fw_sim_get_irq(struct device *dev, int ce_id);
+int pld_pcie_fw_sim_is_device_awake(struct device *dev);
 
 static inline int pld_pcie_fw_sim_get_user_msi_assignment(struct device *dev,
 							  char *user_name,
