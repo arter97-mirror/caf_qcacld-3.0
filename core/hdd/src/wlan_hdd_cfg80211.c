@@ -12671,8 +12671,6 @@ QDF_STATUS wlan_hdd_set_wlm_client_latency_level(struct hdd_adapter *adapter,
 						client_id_bitmap,
 						false);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_debug("Fail to set latency level for client_id:%d",
-			  client_id);
 		wlan_hdd_reset_client_info(adapter, client_id);
 		return status;
 	}

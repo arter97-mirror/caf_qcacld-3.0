@@ -16549,14 +16549,14 @@ hdd_adapter_set_wlm_client_latency_level(struct hdd_adapter *adapter)
 						adapter, port_id,
 						adapter->latency_level);
 		if (QDF_IS_STATUS_ERROR(status))
-			hdd_warn("Fail to set latency level:%u", status);
+			hdd_debug("Fail to set latency level:%u", status);
 	} else {
 		status = sme_set_wlm_latency_level(hdd_ctx->mac_handle,
 						   adapter->deflink->vdev_id,
 						   adapter->latency_level,
 						   0, false);
 		if (QDF_IS_STATUS_ERROR(status))
-			hdd_warn("set wlm mode failed, %u", status);
+			hdd_debug("set wlm mode failed, %u", status);
 	}
 out:
 	hdd_debug("wlm initial mode %u", adapter->latency_level);
