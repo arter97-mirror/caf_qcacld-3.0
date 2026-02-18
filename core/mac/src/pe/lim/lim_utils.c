@@ -7316,23 +7316,18 @@ void lim_intersect_ap_he_caps(struct pe_session *session,
 
 void lim_add_bss_he_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
 {
-	/*
-	 * IMPORTANT:
-	 * - add_bss->he_capable is used for vdev/bss level decisions.
-	 * - add_bss->staContext.he_capable is consumed by WMA peer assoc
-	 *   (tpAddStaParams->he_capable) via wma_send_peer_assoc().
-	 *
-	 * If staContext.he_capable is not set for 2G/5G, FW peer assoc will
-	 * not populate HE caps even when assoc_rsp->he_cap is present, causing
-	 * STA to associate as non-HE (often falling back to 11ac).
-	 */
-	add_bss->he_capable = assoc_rsp->he_cap.present;
-	add_bss->staContext.he_capable = assoc_rsp->he_cap.present;
+	tDot11fIEhe_cap *he_cap;
+	tDot11fIEhe_op *he_op;
 
-	qdf_mem_copy(&add_bss->staContext.he_config, &assoc_rsp->he_cap,
-		     sizeof(assoc_rsp->he_cap));
-	qdf_mem_copy(&add_bss->staContext.he_op, &assoc_rsp->he_op,
-		     sizeof(assoc_rsp->he_op));
+	he_cap = &assoc_rsp->he_cap;
+	he_op = &assoc_rsp->he_op;
+	add_bss->he_capable = he_cap->present;
+	if (he_cap)
+		qdf_mem_copy(&add_bss->staContext.he_config,
+			     he_cap, sizeof(*he_cap));
+	if (he_op)
+		qdf_mem_copy(&add_bss->staContext.he_op,
+			     he_op, sizeof(*he_op));
 }
 
 void lim_add_bss_he_cfg(struct bss_params *add_bss, struct pe_session *session)
@@ -7340,16 +7335,10 @@ void lim_add_bss_he_cfg(struct bss_params *add_bss, struct pe_session *session)
 	add_bss->he_sta_obsspd = session->he_sta_obsspd;
 }
 
-#ifdef WLAN_FEATURE_11AX
 void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
 				   tDot11fIEhe_op *he_op,
-				   struct pe_session *pe_session,
-				   struct wlan_objmgr_peer *peer)
+				   struct pe_session *pe_session)
 {
-	uint8_t op_ch_width;
-	uint8_t ap_max_ch_width;
-
-	/* Applicable only for HE 6 GHz */
 	if (!pe_session->he_6ghz_band)
 		return;
 
@@ -7357,59 +7346,16 @@ void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
 		pe_debug("6G operation info not present in beacon");
 		return;
 	}
-
 	if (!pe_session->ch_width)
 		return;
 
-	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
+	pAddBssParams->ch_width = QDF_MIN(he_op->oper_info_6g.info.ch_width,
+					  pe_session->ch_width);
 
-	/*
-	 * HE 6 GHz rule:
-	 * HE Operation ch_width is authoritative
-	 */
-	op_ch_width = he_op->oper_info_6g.info.ch_width;
-
-	/*
-	 * Validate CCFS1 presence:
-	 * - 160 MHz / 80+80 MHz require CCFS1
-	 * - If missing, fall back to 80 MHz
-	 */
-	if ((op_ch_width == CH_WIDTH_160MHZ ||
-	     op_ch_width == CH_WIDTH_80P80MHZ) &&
-	    !he_op->oper_info_6g.info.center_freq_seg1) {
-		op_ch_width = CH_WIDTH_80MHZ;
-		return;
-	}
-
-	/*
-	 * Defensive fallback if AP advertises invalid/zero BW
-	 */
-	if (!op_ch_width) {
-		op_ch_width = QDF_MIN(pe_session->ch_width,
-				      ap_max_ch_width);
-	}
-
-	/*
-	 * Ensure operational BW does not exceed:
-	 *  - AP max supported BW
-	 *  - Host initiated VDEV start BW
-	 */
-	op_ch_width = QDF_MIN(op_ch_width, ap_max_ch_width);
-	op_ch_width = QDF_MIN(op_ch_width, pe_session->ch_width);
-
-	wlan_peer_set_op_ch_width(peer, op_ch_width);
-
-	/*
-	 * Center frequency segments are descriptive only.
-	 * Copied as advertised; never used for BW derivation.
-	 */
-	wlan_peer_set_center_freq_seg0(peer,
-				he_op->oper_info_6g.info.center_freq_seg0);
-
-	wlan_peer_set_center_freq_seg1(peer,
-				he_op->oper_info_6g.info.center_freq_seg1);
+	if (pAddBssParams->ch_width == CH_WIDTH_160MHZ)
+		pAddBssParams->ch_width = pe_session->ch_width;
+	pAddBssParams->staContext.ch_width = pAddBssParams->ch_width;
 }
-#endif
 
 void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 			      tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
@@ -7978,14 +7924,7 @@ void lim_update_sta_he_capable(struct mac_context *mac,
 void lim_update_bss_he_capable(struct mac_context *mac,
 			       struct bss_params *add_bss)
 {
-	/*
-	 * Keep bss/vdev and peer-assoc (staContext) HE capability in sync.
-	 * Some call sites (e.g. 6 GHz HE operation handling) "force enable"
-	 * HE at BSS level via this helper; make sure peer assoc sees it too.
-	 */
 	add_bss->he_capable = true;
-	add_bss->staContext.he_capable = true;
-
 	pe_debug("he_capable: %d", add_bss->he_capable);
 }
 
@@ -9138,19 +9077,7 @@ void lim_add_bss_eht_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
 
 	eht_cap = &assoc_rsp->eht_cap;
 	eht_op = &assoc_rsp->eht_op;
-
-	/*
-	 * - add_bss->eht_capable is used for vdev/bss level decisions.
-	 * - add_bss->staContext.eht_capable is consumed by WMA peer assoc
-	 *   (tpAddStaParams->eht_capable) via wma_send_peer_assoc().
-	 *
-	 * If staContext.eht_capable is not set for 2G/5G, FW peer assoc will
-	 * not populate EHT caps even when assoc_rsp->eht_cap is present,
-	 * causing STA to associate as non-EHT (often falling back to 11ax/ac).
-	 */
 	add_bss->eht_capable = eht_cap->present;
-	add_bss->staContext.eht_capable = eht_cap->present;
-
 	if (eht_cap)
 		qdf_mem_copy(&add_bss->staContext.eht_config,
 			     eht_cap, sizeof(*eht_cap));
@@ -9314,13 +9241,7 @@ void lim_update_session_eht_capable_chan_switch(struct mac_context *mac,
 void lim_update_bss_eht_capable(struct mac_context *mac,
 				struct bss_params *add_bss)
 {
-	/*
-	 * Keep bss/vdev and peer-assoc (staContext) EHT capability in sync.
-	 * make sure peer assoc sees it too.
-	 */
 	add_bss->eht_capable = true;
-	add_bss->staContext.eht_capable = true;
-
 	pe_debug("eht_capable: %d", add_bss->eht_capable);
 }
 
@@ -11930,28 +11851,6 @@ uint8_t lim_convert_phy_width_to_vht_width(enum phy_ch_width ch_width)
 		return WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
 
 	return WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
-}
-
-/**
- * lim_convert_vht_width_to_phy_width() - Convert FW/CFG VHT channel width
- * definition to enum phy_ch_width.
- * @vht_ch_width: FW/CFG VHT channel width value (WNI_CFG_VHT_CHANNEL_WIDTH_*)
- *
- * Return: enum phy_ch_width corresponding to @vht_ch_width
- */
-enum phy_ch_width lim_convert_vht_width_to_phy_width(uint32_t vht_ch_width)
-{
-	switch (vht_ch_width) {
-	case WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ:
-		return CH_WIDTH_80MHZ;
-	case WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ:
-		return CH_WIDTH_160MHZ;
-	case WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ:
-		return CH_WIDTH_80P80MHZ;
-	case WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ:
-	default:
-		return CH_WIDTH_20MHZ;
-	}
 }
 
 bool lim_update_channel_width(struct mac_context *mac_ctx,

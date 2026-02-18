@@ -246,14 +246,6 @@ typedef struct {
 	uint8_t maxSPLen;
 	uint8_t htCapable;
 	enum phy_ch_width ch_width;
-	/*
-	 * AP maximum supported channel width (derived from peer capabilities).
-	 * This is distinct from the negotiated operational channel width
-	 * (ch_width) which may be capped by STA/session/firmware constraints.
-	 */
-	enum phy_ch_width ap_max_ch_width;
-	uint8_t center_freq_seg0;
-	uint8_t center_freq_seg1;
 	tSirMacHTMIMOPowerSaveState mimoPS;
 	uint8_t maxAmpduSize;
 	uint8_t maxAmpduDensity;

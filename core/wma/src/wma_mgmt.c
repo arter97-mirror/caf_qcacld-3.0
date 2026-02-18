@@ -1639,70 +1639,6 @@ static inline void wma_set_mlo_assoc_vdev(struct wlan_objmgr_vdev *vdev,
 #endif
 
 /**
- * wma_get_peer_phymode() - Determine and set peer phymode
- * @wma: wma handle
- * @nw_type: network type
- * @params: add sta params
- * @vdev_phymode: vdev phymode
- * @is_ap_mode: true if vdev is in AP mode
- * @peer_mac: peer mac address
- *
- * This helper function determines the appropriate phymode for a peer
- * based on network type, peer capabilities, and vdev configuration.
- * It performs validation and adjustments as needed, and updates the
- * peer object with the calculated phymode.
- *
- * Return: Calculated phymode for the peer
- */
-static enum wlan_phymode
-wma_get_peer_phymode(tp_wma_handle wma, tSirNwType nw_type,
-		     tpAddStaParams params, enum wlan_phymode vdev_phymode,
-		     bool is_ap_mode, uint8_t *peer_mac)
-{
-	enum wlan_phymode phymode;
-	bool is_he;
-	bool is_eht;
-
-	/* Determine HE and EHT capabilities */
-	is_he = wma_is_peer_he_capable(params);
-	is_eht = wma_is_peer_eht_capable(params);
-
-	/*
-	 * Validate and adjust channel width for 11G/11B networks.
-	 * These networks should not use channel widths greater than 40MHz.
-	 */
-	if ((params->ch_width > CH_WIDTH_40MHZ) &&
-	    ((nw_type == eSIR_11G_NW_TYPE) ||
-	     (nw_type == eSIR_11B_NW_TYPE))) {
-		wma_err("ch_width %d sent in 11G, configure to 40MHz",
-			params->ch_width);
-		params->ch_width = CH_WIDTH_40MHZ;
-	}
-
-	/* Calculate phymode based on peer capabilities */
-	phymode = wma_peer_phymode(nw_type, params->staType,
-				   params->htCapable, params->ch_width,
-				   params->vhtCapable, is_he, is_eht);
-
-	/*
-	 * For AP mode, ensure peer phymode does not exceed vdev phymode.
-	 * This prevents peers from using capabilities not supported by
-	 * the AP.
-	 */
-	if (is_ap_mode && (phymode > vdev_phymode)) {
-		wma_nofl_debug("Peer phymode %d not allowed. Set to sap/go "
-			       "phymode %d",
-			       phymode, vdev_phymode);
-		phymode = vdev_phymode;
-	}
-
-	/* Set the peer phymode in the object manager */
-	wma_objmgr_set_peer_mlme_phymode(wma, peer_mac, phymode);
-
-	return phymode;
-}
-
-/**
  * wmi_unified_send_peer_assoc() - send peer assoc command to fw
  * @wma: wma handle
  * @params: add sta params
@@ -1774,6 +1710,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	enum wlan_phymode phymode, vdev_phymode;
 	uint32_t peer_nss = 1;
 	struct wma_txrx_node *intr = NULL;
+	bool is_he;
+	bool is_eht;
 	QDF_STATUS status;
 	struct mac_context *mac = wma->mac_context;
 	struct wlan_channel *des_chan;
@@ -1793,24 +1731,26 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	qdf_mem_zero(&peer_ht_rates, sizeof(wmi_rate_set));
 	qdf_mem_zero(cmd, sizeof(struct peer_assoc_params));
 
-	/* in ap mode and for tdls peer, use mac address of the peer in
-	 * the other end as the new peer address; in sta mode, use bss id to
-	 * be the new peer address
-	 */
-	if ((wma_is_vdev_in_ap_mode(wma, params->smesessionId))
-#ifdef FEATURE_WLAN_TDLS
-	    || (STA_ENTRY_TDLS_PEER == params->staType)
-#endif /* FEATURE_WLAN_TDLS */
-	    ) {
-		qdf_mem_copy(cmd->peer_mac, params->staMac,
-						sizeof(cmd->peer_mac));
-	} else {
-		qdf_mem_copy(cmd->peer_mac, params->bssId,
-						sizeof(cmd->peer_mac));
+	is_he = wma_is_peer_he_capable(params);
+	is_eht = wma_is_peer_eht_capable(params);
+	if ((params->ch_width > CH_WIDTH_40MHZ) &&
+	    ((nw_type == eSIR_11G_NW_TYPE) ||
+	     (nw_type == eSIR_11B_NW_TYPE))) {
+		wma_err("ch_width %d sent in 11G, configure to 40MHz",
+			params->ch_width);
+		params->ch_width = CH_WIDTH_40MHZ;
 	}
+	phymode = wma_peer_phymode(nw_type, params->staType,
+				   params->htCapable, params->ch_width,
+				   params->vhtCapable, is_he, is_eht);
 
 	des_chan = wlan_vdev_mlme_get_des_chan(intr->vdev);
 	vdev_phymode = des_chan->ch_phymode;
+	if ((intr->type == WMI_VDEV_TYPE_AP) && (phymode > vdev_phymode)) {
+		wma_nofl_debug("Peer phymode %d is not allowed. Set it equal to sap/go phymode %d",
+			       phymode, vdev_phymode);
+		phymode = vdev_phymode;
+	}
 
 	if (!mac->mlme_cfg->rates.disable_abg_rate_txdata &&
 	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(des_chan->ch_freq)) {
@@ -1831,11 +1771,6 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 			num_peer_11a_rates++;
 		}
 	}
-
-	/* Determine and set peer phymode using the new helper function */
-	phymode = wma_get_peer_phymode(wma, nw_type, params, vdev_phymode,
-				       (intr->type == WMI_VDEV_TYPE_AP),
-				       cmd->peer_mac);
 
 	if ((phymode == WLAN_PHYMODE_11A && num_peer_11a_rates == 0) ||
 	    (phymode == WLAN_PHYMODE_11B && num_peer_11b_rates == 0)) {
@@ -1878,6 +1813,23 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 		qdf_mem_copy((uint8_t *) peer_ht_rates.rates, temp_ni_rates,
 			     peer_ht_rates.num_rates);
 	}
+
+	/* in ap mode and for tdls peer, use mac address of the peer in
+	 * the other end as the new peer address; in sta mode, use bss id to
+	 * be the new peer address
+	 */
+	if ((wma_is_vdev_in_ap_mode(wma, params->smesessionId))
+#ifdef FEATURE_WLAN_TDLS
+	    || (STA_ENTRY_TDLS_PEER == params->staType)
+#endif /* FEATURE_WLAN_TDLS */
+	    ) {
+		qdf_mem_copy(cmd->peer_mac, params->staMac,
+						sizeof(cmd->peer_mac));
+	} else {
+		qdf_mem_copy(cmd->peer_mac, params->bssId,
+						sizeof(cmd->peer_mac));
+	}
+	wma_objmgr_set_peer_mlme_phymode(wma, cmd->peer_mac, phymode);
 
 	cmd->vdev_id = params->smesessionId;
 	cmd->peer_new_assoc = 1;

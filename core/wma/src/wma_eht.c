@@ -1018,8 +1018,7 @@ void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
 	uint32_t *phy_cap = peer->peer_eht_cap_phyinfo;
 	uint32_t *mac_cap = peer->peer_eht_cap_macinfo;
 	struct supported_rates *rates;
-	enum phy_ch_width sta_max_ch_width, ap_max_ch_width;
-	enum phy_ch_width ch_width_for_mcs_rates, max_potential_bw;
+	enum phy_ch_width ch_width, max_ch_width;
 	uint8_t ehtop_param;
 
 	if (!params->eht_capable)
@@ -1128,25 +1127,14 @@ void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
 	peer->peer_eht_mcs_count = 0;
 	rates = &params->supportedRates;
 
-	ch_width_for_mcs_rates = params->ch_width;
-
-	/*
-	 * Determine the maximum potential bandwidth by taking the minimum of
-	 * the STA's and AP's maximum channel width capabilities. This ensures
-	 * the firmware is always populated with the highest possible MCS rates,
-	 * allowing for dynamic upgrades to 160 MHz or 320 MHz in the future.
+	ch_width = params->ch_width;
+	max_ch_width = wlan_mlme_get_max_bw();
+	/* In case AP start on band width 80MHz and then upgrade to
+	 * 160MHz, add 160MHz nss/mcs rate during peer association.
 	 */
-	sta_max_ch_width = wlan_mlme_get_max_bw();
-	ap_max_ch_width = params->ap_max_ch_width;
-	max_potential_bw = QDF_MIN(sta_max_ch_width, ap_max_ch_width);
-
-	if (max_potential_bw > ch_width_for_mcs_rates) {
-		ch_width_for_mcs_rates = max_potential_bw;
-
-		wma_debug("EHT MCS: STA max BW:%d, AP max BW:%d, Final width for MCS rates:%d",
-			  sta_max_ch_width, ap_max_ch_width,
-			  ch_width_for_mcs_rates);
-	}
+	if (ch_width == CH_WIDTH_80MHZ &&
+	    max_ch_width >= CH_WIDTH_160MHZ)
+		ch_width = CH_WIDTH_160MHZ;
 
 	/*
 	 * Convert eht mcs to firmware understandable format
@@ -1155,7 +1143,7 @@ void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
 	 * BITS 8:11 indicates support for mcs 10 and 11
 	 * BITS 12:15 indicates support for mcs 12 and 13
 	 */
-	switch (ch_width_for_mcs_rates) {
+	switch (ch_width) {
 	case CH_WIDTH_320MHZ:
 		peer->peer_eht_mcs_count++;
 		QDF_SET_BITS(peer->peer_eht_rx_mcs_set[EHTCAP_TXRX_MCS_NSS_IDX2],

@@ -1463,35 +1463,16 @@ void lim_add_bss_he_cfg(struct bss_params *add_bss, struct pe_session *session);
 void lim_copy_bss_he_cap(struct pe_session *session);
 
 /**
- * lim_update_he_6gop_assoc_resp() - Update HE 6 GHz operation parameters
- * @pAddBssParams: Pointer to BSS parameters to be updated
- * @he_op: Pointer to HE operation IE (from beacon/assoc response)
- * @pe_session: Pointer to PE session
- *
- * This function validates and updates the HE 6 GHz operation fields in the
- * BSS (add_bss) context based on the HE Operation element:
- *
- * - Only applies when the session is in 6 GHz HE mode
- * - Derives the operational channel width from he_op and the current session
- *   configuration
- * - Ensures the resulting channel width does not exceed the session's
- *   configured channel width
- * - Updates the session's HE operation (he_op) structure so it reflects the
- *   final operating bandwidth and center frequency segments
- * - Programs the per-peer MLME state with the negotiated bandwidth so FW
- *   uses consistent HE 6 GHz operating parameters
- *
- * This helper does not return a value; it directly updates:
- * - pAddBssParams->staContext.he_op
- * - pe_session->he_op
- * and associated bandwidth fields in the session.
+ * lim_update_he_6gop_assoc_resp() - Update HE 6GHz op info to BSS params
+ * @add_bss: pointer to add bss params
+ * @he_op: Pointer to HE operation info IE
+ * @session: Pointer to Session entry struct
  *
  * Return: None
  */
 void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
 				   tDot11fIEhe_op *he_op,
-				   struct pe_session *pe_session,
-				   struct wlan_objmgr_peer *peer);
+				   struct pe_session *pe_session);
 /**
  * lim_copy_join_req_he_cap() - Copy HE capability to PE session from Join req
  * and update as per bandwidth supported
@@ -1844,8 +1825,7 @@ static inline void lim_add_bss_he_cfg(struct bss_params *add_bss,
 static inline void lim_update_he_6gop_assoc_resp(
 					struct bss_params *pAddBssParams,
 					tDot11fIEhe_op *he_op,
-					struct pe_session *pe_session,
-					struct wlan_objmgr_peer *peer)
+					struct pe_session *pe_session)
 {
 }
 
@@ -3496,15 +3476,6 @@ void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
  * Return: VHT channel width
  */
 uint8_t lim_convert_phy_width_to_vht_width(enum phy_ch_width ch_width);
-
-/**
- * lim_convert_vht_width_to_phy_width() - Convert FW/CFG VHT channel width
- * definition to enum phy_ch_width.
- * @vht_ch_width: FW/CFG VHT channel width value (WNI_CFG_VHT_CHANNEL_WIDTH_*)
- *
- * Return: enum phy_ch_width corresponding to @vht_ch_width
- */
-enum phy_ch_width lim_convert_vht_width_to_phy_width(uint32_t vht_ch_width);
 
 /**
  * lim_update_channel_width() - Function to update channel width
