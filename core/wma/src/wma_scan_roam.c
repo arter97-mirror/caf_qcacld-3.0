@@ -684,6 +684,52 @@ wma_delete_all_peers(tp_wma_handle wma,
 	return wma_delete_bss_peer(wma, vdev_id);
 }
 #endif
+
+/**
+ * wma_roam_set_peer_ap_max_ch_width() - set peer max bw after roam peer create
+ * @wma: WMA handle
+ * @vdev_id: VDEV id
+ * @peer_mac: Peer MAC address
+ * @add_bss_params: Roam add bss params containing staContext params
+ *
+ * During FT roaming, the peer is created in WMA after roam sync. PE stores
+ * AP max channel width in add_bss_params->staContext.ap_max_ch_width while
+ * preparing add bss. This helper fetches the created peer and updates its
+ * ap_max_ch_width via wlan_peer_set_ap_max_ch_width().
+ *
+ * Return: None
+ */
+static void wma_roam_set_peer_ap_max_ch_width(tp_wma_handle wma,
+					      struct bss_params *add_bss_params)
+{
+	struct wlan_objmgr_peer *peer;
+	enum phy_ch_width ap_max_ch_width;
+	uint8_t vdev_id;
+	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
+
+	if (!wma || !wma->psoc || !add_bss_params)
+		return;
+
+	qdf_mem_copy(peer_mac, add_bss_params->bssId, QDF_MAC_ADDR_SIZE);
+
+	vdev_id = add_bss_params->staContext.smesessionId;
+	ap_max_ch_width = add_bss_params->staContext.ap_max_ch_width;
+
+	peer = wlan_objmgr_get_peer_by_mac(wma->psoc, peer_mac,
+					   WLAN_LEGACY_WMA_ID);
+	if (!peer) {
+		wma_debug("Peer not found for ap_max_ch_width update vdev %d "
+			  QDF_MAC_ADDR_FMT,
+			  vdev_id, QDF_MAC_ADDR_REF(peer_mac));
+		return;
+	}
+
+	wlan_peer_set_ap_max_ch_width(peer, ap_max_ch_width);
+	wma_debug("Set peer ap_max_ch_width=%d vdev %d " QDF_MAC_ADDR_FMT,
+		  ap_max_ch_width, vdev_id, QDF_MAC_ADDR_REF(peer_mac));
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+}
+
 /**
  * wma_roam_update_vdev() - Update the STA and BSS
  * @wma: Global WMA Handle
@@ -799,6 +845,8 @@ wma_roam_update_vdev(tp_wma_handle wma,
 					   WLAN_CRYPTO_PARAM_CIPHER_CAP);
 	wma_set_peer_ucast_cipher(mac_addr.bytes, uc_cipher,
 				  cipher_cap);
+	wma_roam_set_peer_ap_max_ch_width(wma,
+					  roam_synch_ind_ptr->add_bss_params);
 	wma_add_bss_lfr3(wma, roam_synch_ind_ptr->add_bss_params);
 	wma_add_sta(wma, add_sta_params);
 	qdf_mem_copy(bssid, mac_addr.bytes,

@@ -3783,7 +3783,15 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 			 vht_caps->txMCSMap, vdev_id,
 			 QDF_MAC_ADDR_REF(pAddBssParams->bssId));
 
-	wlan_peer_set_ap_max_ch_width(peer, ap_max_ch_width);
+	if (peer) {
+		wlan_peer_set_ap_max_ch_width(peer, ap_max_ch_width);
+	} else {
+		/* During FT roaming, peer for new AP doesn't exist yet.
+		 * It will be created later via wma_roam_update_vdev().
+		 * Continue with BSS preparation.
+		 */
+		pAddBssParams->staContext.ap_max_ch_width = ap_max_ch_width;
+	}
 }
 
 /**
