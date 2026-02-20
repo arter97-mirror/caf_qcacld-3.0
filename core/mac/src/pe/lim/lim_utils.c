@@ -7330,6 +7330,7 @@ void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
 {
 	uint8_t op_ch_width;
 	uint8_t ap_max_ch_width;
+	enum phy_ch_width fw_max_ch_width;
 
 	/* Applicable only for HE 6 GHz */
 	if (!pe_session->he_6ghz_band)
@@ -7343,53 +7344,50 @@ void lim_update_he_6gop_assoc_resp(struct bss_params *pAddBssParams,
 	if (!pe_session->ch_width)
 		return;
 
-	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
-
-	/*
-	 * HE 6 GHz rule:
-	 * HE Operation ch_width is authoritative
-	 */
+	/* Step 1: HE Operation ch_width is authoritative */
 	op_ch_width = he_op->oper_info_6g.info.ch_width;
 
-	/*
-	 * Validate CCFS1 presence:
-	 * - 160 MHz / 80+80 MHz require CCFS1
-	 * - If missing, fall back to 80 MHz
-	 */
+	/* Step 2: CCFS1 validation for >80 MHz */
 	if ((op_ch_width == CH_WIDTH_160MHZ ||
 	     op_ch_width == CH_WIDTH_80P80MHZ) &&
 	    !he_op->oper_info_6g.info.center_freq_seg1) {
+		pe_debug("vdev %d: HE 6G OP BW downgrade %d -> %d: seg1 missing for 160/80+80",
+			 pe_session->vdev_id, op_ch_width, CH_WIDTH_80MHZ);
 		op_ch_width = CH_WIDTH_80MHZ;
 		return;
 	}
 
-	/*
-	 * Defensive fallback if AP advertises invalid/zero BW
-	 */
-	if (!op_ch_width) {
-		op_ch_width = QDF_MIN(pe_session->ch_width,
-				      ap_max_ch_width);
+	/* Step 3: Cap by AP max capability */
+	ap_max_ch_width = wlan_peer_get_ap_max_ch_width(peer);
+	if (op_ch_width > ap_max_ch_width) {
+		pe_debug("vdev %d: HE 6G OP BW downgrade %d -> %d: capped by AP max BW",
+			 pe_session->vdev_id, op_ch_width, ap_max_ch_width);
+		op_ch_width = ap_max_ch_width;
 	}
 
-	/*
-	 * Ensure operational BW does not exceed:
-	 *  - AP max supported BW
-	 *  - Host initiated VDEV start BW
-	 */
-	op_ch_width = QDF_MIN(op_ch_width, ap_max_ch_width);
-	op_ch_width = QDF_MIN(op_ch_width, pe_session->ch_width);
+	/* Step 4: Cap by firmware capability */
+	fw_max_ch_width = mlme_get_vht_ch_width();
+	if (op_ch_width > fw_max_ch_width) {
+		pe_debug("vdev %d: HE 6G OP BW downgrade %d -> %d: capped by FW max ch width",
+			 pe_session->vdev_id, op_ch_width, fw_max_ch_width);
+		op_ch_width = fw_max_ch_width;
+	}
+
+	/* Step 5: Cap by Host initiated VDEV start BW */
+	if (op_ch_width > pe_session->ch_width) {
+		pe_debug("vdev %d: EHT BW downgrade %d -> %d: capped by VDEV start BW",
+			 pe_session->vdev_id, op_ch_width, pe_session->ch_width);
+		op_ch_width = pe_session->ch_width;
+	}
 
 	wlan_peer_set_op_ch_width(peer, op_ch_width);
-
-	/*
-	 * Center frequency segments are descriptive only.
-	 * Copied as advertised; never used for BW derivation.
-	 */
 	wlan_peer_set_center_freq_seg0(peer,
 				he_op->oper_info_6g.info.center_freq_seg0);
-
-	wlan_peer_set_center_freq_seg1(peer,
+	if (op_ch_width > CH_WIDTH_80MHZ)
+		wlan_peer_set_center_freq_seg1(peer,
 				he_op->oper_info_6g.info.center_freq_seg1);
+	else
+		wlan_peer_set_center_freq_seg1(peer, 0);
 }
 #endif
 
