@@ -1374,15 +1374,15 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 		goto fail;
 	}
 
-	status = pmo_core_psoc_bus_resume_req(psoc, QDF_RUNTIME_SUSPEND);
-	if (status != QDF_STATUS_SUCCESS)
-		goto fail;
-
 	status = cdp_dal_notify_resume(cds_get_context(QDF_MODULE_ID_SOC));
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pmo_debug("Prevent resume, dal resume rejected");
 		goto fail;
 	}
+
+	status = pmo_core_psoc_bus_resume_req(psoc, QDF_RUNTIME_SUSPEND);
+	if (status != QDF_STATUS_SUCCESS)
+		goto fail;
 
 	status = pmo_core_txrx_resume(psoc);
 	if (QDF_IS_STATUS_ERROR(status))
