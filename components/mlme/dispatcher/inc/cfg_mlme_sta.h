@@ -709,7 +709,7 @@
  *
  * </cfg>
  */
-#define CFG_MLO_UNIFIED_CONNECT_DISCONNECT CFG_BOOL( \
+#define CFG_MLO_UNIFIED_CONNECT_DISCONNECT CFG_INI_BOOL( \
 		"mlo_unified_connect_disconnect",\
 		0, \
 		"unified connect/disconnect for MLO")

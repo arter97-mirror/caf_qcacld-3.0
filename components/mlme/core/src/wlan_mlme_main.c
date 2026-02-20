@@ -2757,10 +2757,11 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 	sta->epcs_capability =
 		cfg_get(psoc, CFG_MLO_EPCS_SUPPORT_ENABLE);
 	sta->mlo_unified_connect_disconnect =
-		cfg_default(CFG_MLO_UNIFIED_CONNECT_DISCONNECT);
+		cfg_get(psoc, CFG_MLO_UNIFIED_CONNECT_DISCONNECT);
 
-	mlme_debug("mlo_support_link_num: %d, mlo_support_link_band: 0x%x",
-		   sta->mlo_support_link_num, sta->mlo_support_link_band);
+	mlme_debug("mlo_support_link_num: %d, mlo_support_link_band: 0x%x mlo_unified_connect_disconnect:%d",
+		   sta->mlo_support_link_num, sta->mlo_support_link_band,
+		   sta->mlo_unified_connect_disconnect);
 }
 
 static bool
