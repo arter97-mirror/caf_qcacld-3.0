@@ -9731,9 +9731,16 @@ wlan_mlme_get_high_band_roaming_threshold_time_ms(
 		return cfg_get(psoc, CFG_HIGH_BAND_ROAMING_THRESHOLD_TIME_MS);
 	}
 
+	if (mlme_obj->cfg.lfr.roam_scan_hi_rssi_delay <
+	    mlme_obj->cfg.sta.high_band_roaming_threshold_time_ms) {
+	      mlme_debug("Capping high band threshold time %u to roam_scan_hi_rssi_delay %u",
+			 mlme_obj->cfg.sta.high_band_roaming_threshold_time_ms,
+			 mlme_obj->cfg.lfr.roam_scan_hi_rssi_delay);
+		return mlme_obj->cfg.lfr.roam_scan_hi_rssi_delay;
+	}
+
 	mlme_debug("high_band_roaming_threshold_time_ms %u",
 		   mlme_obj->cfg.sta.high_band_roaming_threshold_time_ms);
-
 	return mlme_obj->cfg.sta.high_band_roaming_threshold_time_ms;
 }
 
