@@ -422,14 +422,12 @@ lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
  * @mac_ctx Pointer to Global MAC structure
  * @pAddBssParams: parameters required for add bss params.
  * @vht_caps: VHT capabilities.
- * @peer: Pointer to peer object
  *
  * Return : void
  */
 void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 				   struct bss_params *pAddBssParams,
-				   tDot11fIEVHTCaps *vht_caps,
-				   struct wlan_objmgr_peer *peer);
+				   tDot11fIEVHTCaps *vht_caps);
 
 /**
  * lim_free_assoc_req_frm_buf() - free assoc request frame buffer

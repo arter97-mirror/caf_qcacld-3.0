@@ -192,15 +192,14 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 		pAddBssParams->vhtCapable = bcn_ies->VHTCaps.present;
 		vht_caps = &bcn_ies->VHTCaps;
 		lim_update_vhtcaps_assoc_resp(mac, pAddBssParams,
-					      vht_caps, NULL);
+					      vht_caps);
 	} else if (ft_session->vhtCapability &&
 		   bcn_ies->vendor_vht_ie.VHTCaps.present) {
 		pe_debug("VHT caps are present in vendor specific IE");
 		pAddBssParams->vhtCapable =
 			bcn_ies->vendor_vht_ie.VHTCaps.present;
 		vht_caps = &bcn_ies->vendor_vht_ie.VHTCaps;
-		lim_update_vhtcaps_assoc_resp(mac, pAddBssParams,
-					      vht_caps, NULL);
+		lim_update_vhtcaps_assoc_resp(mac, pAddBssParams, vht_caps);
 	} else {
 		pAddBssParams->vhtCapable = 0;
 	}
