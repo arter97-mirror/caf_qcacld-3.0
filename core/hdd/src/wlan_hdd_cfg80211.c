@@ -247,6 +247,7 @@
 #endif
 #include "osif_twt_ext_req.h"
 #include "osif_twt_internal.h"
+#include "wlan_vdev_mgr_utils_api.h"
 
 /*
  * A value of 100 (milliseconds) can be sent to FW.
@@ -17572,6 +17573,75 @@ wlan_hdd_connect_ext_attr[QCA_WLAN_VENDOR_ATTR_CONNECT_EXT_MAX + 1] = {
 						.type = NLA_NESTED},
 };
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * hdd_validate_smd_connect_ext_feature() - Validate SMD connect_ext feature
+ * @hdd_ctx: HDD context
+ * @adapter: HDD adapter
+ *
+ * This function validates if SMD connect extension feature can be enabled
+ * by checking driver capabilities and configuration.
+ *
+ * Return: true if SMD can be enabled, false otherwise
+ */
+static bool
+hdd_validate_smd_connect_ext_feature(struct hdd_context *hdd_ctx,
+				     struct hdd_adapter *adapter)
+{
+	bool smd_supported = false;
+	struct wmi_unified *wmi_handle;
+
+	if (!hdd_ctx || !adapter)
+		return false;
+
+	/* Check if SMD client capability is supported */
+	wmi_handle = get_wmi_unified_hdl_from_psoc(hdd_ctx->psoc);
+	smd_supported = wmi_service_enabled(wmi_handle,
+					    wmi_service_smd_bss_transition_support);
+	if (!smd_supported) {
+		hdd_debug("SMD client not supported by driver");
+		return smd_supported;
+	}
+
+	hdd_debug("SMD connect extension feature validation: %s",
+		  smd_supported ? "PASS" : "FAIL");
+
+	return smd_supported;
+}
+
+static void
+hdd_handle_smd_connect_ext_feature(struct hdd_context *hdd_ctx,
+				   struct hdd_adapter *adapter,
+				   uint8_t *ext_features,
+				   bool *smd_enabled)
+{
+	if (!(*ext_features & BIT(QCA_CONNECT_EXT_FEATURE_EXT_AUTH_SMD)))
+		return;
+
+	if (hdd_validate_smd_connect_ext_feature(hdd_ctx, adapter)) {
+		*smd_enabled = true;
+		hdd_debug("SMD connect extension feature enabled");
+	} else {
+		hdd_err("SMD connect extension feature validation failed");
+		*ext_features &= ~BIT(QCA_CONNECT_EXT_FEATURE_EXT_AUTH_SMD);
+	}
+}
+#else
+static inline bool
+hdd_validate_smd_connect_ext_feature(struct hdd_context *hdd_ctx,
+				     struct hdd_adapter *adapter)
+{
+	return false;
+}
+
+static inline void
+hdd_handle_smd_connect_ext_feature(struct hdd_context *hdd_ctx,
+				   struct hdd_adapter *adapter,
+				   uint8_t *ext_features,
+				   bool *smd_enabled)
+{
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
 static int
 __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 					     struct wireless_dev *wdev,
@@ -17583,6 +17653,7 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 	struct wlan_hdd_link_info *link_info;
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t ext_features = 0, rsno_gen = 0;
+	bool smd_enabled = false;
 	int8_t ret = 0;
 	struct nlattr *curr_attr;
 	struct qdf_mac_addr allowed_bss_link_addr[WLAN_MAX_NUM_ALLOWED_BSSIDS];
@@ -17619,10 +17690,15 @@ __wlan_hdd_cfg80211_set_connect_ext_features(struct wiphy *wiphy,
 	if (ext_features &  BIT(QCA_CONNECT_EXT_FEATURE_RSNO))
 		rsno_gen = RSNO_GEN_WIFI7;
 
+	hdd_handle_smd_connect_ext_feature(hdd_ctx, adapter,
+					   &ext_features, &smd_enabled);
+
 	hdd_adapter_for_each_link_info(adapter, link_info) {
 		if (!link_info->vdev)
 			continue;
 		wlan_vdev_set_rsno_gen_supported(link_info->vdev, rsno_gen);
+		if (smd_enabled)
+			wlan_vdev_set_smd_enabled(vdev, smd_enabled);
 		wma_cli_set_command(link_info->vdev_id,
 				    wmi_vdev_param_connect_ext_features,
 				    ext_features, VDEV_CMD);
