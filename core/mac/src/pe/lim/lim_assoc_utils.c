@@ -3667,6 +3667,44 @@ static bool lim_validate_vht_mcs_for_bw(uint16_t rx_mcs_map,
 }
 
 /**
+ * lim_get_vht_ap_max_ch_width() - Get AP max channel width from VHT caps
+ * @vht_caps: VHT capabilities IE from AP
+ *
+ * This function validates the VHT MCS maps and calculates the AP's maximum
+ * supported channel width based on the VHT Capabilities IE
+ * (supportedChannelWidthSet field).
+ *
+ * Return: AP max channel width on success, CH_WIDTH_INVALID if MCS maps
+ *         are invalid (all spatial streams disabled).
+ */
+enum phy_ch_width lim_get_vht_ap_max_ch_width(tDot11fIEVHTCaps *vht_caps)
+{
+	bool mcs_valid;
+	uint8_t claimed_ch_width;
+	enum phy_ch_width ap_max_ch_width;
+
+	mcs_valid = lim_validate_vht_mcs_for_bw(vht_caps->rxMCSMap,
+						vht_caps->txMCSMap);
+	if (!mcs_valid)
+		return CH_WIDTH_INVALID;
+
+	claimed_ch_width = vht_caps->supportedChannelWidthSet;
+
+	switch (claimed_ch_width) {
+	case LIM_VHT_CAP_CH_WIDTH_80MHZ:
+		ap_max_ch_width = CH_WIDTH_80MHZ;
+		break;
+	case LIM_VHT_CAP_CH_WIDTH_160_AND_80P80MHZ:
+		ap_max_ch_width = CH_WIDTH_160MHZ;
+		break;
+	default:
+		ap_max_ch_width = CH_WIDTH_80MHZ;
+	}
+
+	return ap_max_ch_width;
+}
+
+/**
  * lim_update_vhtcaps_assoc_resp : Update VHT caps in assoc response.
  * @mac_ctx Pointer to Global MAC structure
  * @pAddBssParams: parameters required for add bss params.
@@ -3749,27 +3787,11 @@ bool lim_update_vhtcaps_assoc_resp_bw(struct mac_context *mac_ctx,
 				      tDot11fIEVHTCaps *vht_caps,
 				      struct wlan_objmgr_peer *peer)
 {
-	uint8_t claimed_ch_width;
-	bool mcs_valid;
-	enum phy_ch_width ap_max_ch_width = CH_WIDTH_INVALID;
+	enum phy_ch_width ap_max_ch_width;
 
-	claimed_ch_width = vht_caps->supportedChannelWidthSet;
-
-	mcs_valid = lim_validate_vht_mcs_for_bw(vht_caps->rxMCSMap,
-						vht_caps->txMCSMap);
-	if (!mcs_valid)
+	ap_max_ch_width = lim_get_vht_ap_max_ch_width(vht_caps);
+	if (ap_max_ch_width == CH_WIDTH_INVALID)
 		return false;
-
-	switch (claimed_ch_width) {
-	case LIM_VHT_CAP_CH_WIDTH_80MHZ:
-		ap_max_ch_width = CH_WIDTH_80MHZ;
-		break;
-	case LIM_VHT_CAP_CH_WIDTH_160_AND_80P80MHZ:
-		ap_max_ch_width = CH_WIDTH_160MHZ;
-		break;
-	default:
-		ap_max_ch_width = CH_WIDTH_80MHZ;
-	}
 
 	wlan_peer_set_ap_max_ch_width(peer, ap_max_ch_width);
 	return true;

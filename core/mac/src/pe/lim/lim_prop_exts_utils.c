@@ -686,6 +686,28 @@ static void lim_configure_operating_mode_notification(
 }
 
 /**
+ * lim_extract_ap_max_bw_from_vht_caps() - Extract AP max BW from VHT caps
+ * @session: Pointer to PE session
+ * @vht_caps: Pointer to VHT Capabilities IE
+ *
+ * Derives the AP's maximum supported channel bandwidth from the VHT
+ * Capabilities IE (supportedChannelWidthSet field) and stores it in
+ * session->ap_ch_width. Falls back to session->ch_width if the VHT
+ * MCS maps are invalid (all spatial streams disabled).
+ *
+ * Return: None
+ */
+static void lim_extract_ap_max_bw_from_vht_caps(struct pe_session *session,
+						 tDot11fIEVHTCaps *vht_caps)
+{
+	enum phy_ch_width ap_max_ch_width;
+
+	ap_max_ch_width = lim_get_vht_ap_max_ch_width(vht_caps);
+	session->ap_ch_width = (ap_max_ch_width != CH_WIDTH_INVALID) ?
+				ap_max_ch_width : session->ch_width;
+}
+
+/**
  * lim_extract_vht_bw_params() - Extract VHT bandwidth-related session params
  * @mac_ctx: Pointer to Global MAC structure
  * @session: Pointer to PE session
@@ -713,6 +735,9 @@ static void lim_extract_vht_bw_params(struct mac_context *mac_ctx,
 
 	vht_op = &bcn_ies->VHTOperation;
 	vht_caps = &bcn_ies->VHTCaps;
+
+	/* Extract AP max bandwidth from VHT caps before VHT ops processing */
+	lim_extract_ap_max_bw_from_vht_caps(session, vht_caps);
 
 	sta_prefer_80mhz_over_160mhz =
 		session->mac_ctx->mlme_cfg->sta.sta_prefer_80mhz_over_160mhz;
@@ -827,7 +852,6 @@ static void lim_extract_vht_bw_params(struct mac_context *mac_ctx,
 		session->ch_center_freq_seg1 = 0;
 	}
 	session->ch_width = vht_ch_wd + 1;
-	session->ap_ch_width = session->ch_width;
 }
 
 QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,

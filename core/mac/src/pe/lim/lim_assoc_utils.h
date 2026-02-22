@@ -418,6 +418,19 @@ lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 				     uint16_t deauth_disassoc_frame_len);
 
 /**
+ * lim_get_vht_ap_max_ch_width() - Get AP max channel width from VHT caps
+ * @vht_caps: VHT capabilities IE from AP
+ *
+ * This function validates the VHT MCS maps and calculates the AP's maximum
+ * supported channel width based on the VHT Capabilities IE
+ * (supportedChannelWidthSet field).
+ *
+ * Return: AP max channel width on success, CH_WIDTH_INVALID if MCS maps
+ *         are invalid (all spatial streams disabled).
+ */
+enum phy_ch_width lim_get_vht_ap_max_ch_width(tDot11fIEVHTCaps *vht_caps);
+
+/**
  * lim_update_vhtcaps_assoc_resp : Update VHT caps in assoc response.
  * @mac_ctx Pointer to Global MAC structure
  * @pAddBssParams: parameters required for add bss params.
