@@ -685,6 +685,151 @@ static void lim_configure_operating_mode_notification(
 	}
 }
 
+/**
+ * lim_extract_vht_bw_params() - Extract VHT bandwidth-related session params
+ * @mac_ctx: Pointer to Global MAC structure
+ * @session: Pointer to PE session
+ * @bcn_ies: Pointer to parsed beacon IEs
+ * @chan_freq: Operating channel frequency in MHz
+ *
+ * This function extracts and updates the bandwidth-related session parameters
+ * (ch_width, ap_ch_width, ch_center_freq_seg0, ch_center_freq_seg1) based on
+ * the AP's VHT Operation IE and VHT Capabilities IE.
+ *
+ * Return: None
+ */
+static void lim_extract_vht_bw_params(struct mac_context *mac_ctx,
+				       struct pe_session *session,
+				       tDot11fBeaconIEs *bcn_ies,
+				       uint32_t chan_freq)
+{
+	bool new_ch_width_dfn = false;
+	tDot11fIEVHTOperation *vht_op;
+	tDot11fIEVHTCaps *vht_caps;
+	uint8_t fw_vht_ch_wd, vht_ch_wd, center_freq_diff;
+	uint8_t channel, chan_center_freq_seg1, ap_bcon_ch_width;
+	uint8_t sta_prefer_80mhz_over_160mhz;
+	struct mlme_vht_capabilities_info *mlme_vht_cap;
+
+	vht_op = &bcn_ies->VHTOperation;
+	vht_caps = &bcn_ies->VHTCaps;
+
+	sta_prefer_80mhz_over_160mhz =
+		session->mac_ctx->mlme_cfg->sta.sta_prefer_80mhz_over_160mhz;
+	mlme_vht_cap = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
+
+	/* If VHT is supported min 80 MHz support is must */
+	ap_bcon_ch_width = vht_op->chanWidth;
+	if (vht_caps->vht_extended_nss_bw_cap) {
+		if (!vht_caps->extended_nss_bw_supp)
+			chan_center_freq_seg1 =
+				vht_op->chan_center_freq_seg1;
+		else
+			chan_center_freq_seg1 =
+				bcn_ies->HTInfo.chan_center_freq_seg2;
+	} else {
+		chan_center_freq_seg1 = vht_op->chan_center_freq_seg1;
+	}
+	if (chan_center_freq_seg1 &&
+	    (ap_bcon_ch_width == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)) {
+		new_ch_width_dfn = true;
+		if (chan_center_freq_seg1 >
+				vht_op->chan_center_freq_seg0)
+		    center_freq_diff = chan_center_freq_seg1 -
+					vht_op->chan_center_freq_seg0;
+		else
+		    center_freq_diff = vht_op->chan_center_freq_seg0 -
+					chan_center_freq_seg1;
+		if (center_freq_diff == 8)
+			ap_bcon_ch_width =
+				WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+		else if (center_freq_diff > 16)
+			ap_bcon_ch_width =
+				WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
+		else
+			ap_bcon_ch_width =
+				WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+	}
+
+	fw_vht_ch_wd = wma_get_vht_ch_width();
+	vht_ch_wd = QDF_MIN(fw_vht_ch_wd, ap_bcon_ch_width);
+
+	if ((vht_ch_wd > WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ) &&
+	    (ap_bcon_ch_width ==
+	     WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ) &&
+	    mlme_vht_cap->restricted_80p80_bw_supp) {
+		if ((chan_center_freq_seg1 == 138 &&
+		     vht_op->chan_center_freq_seg0 == 155) ||
+		    (vht_op->chan_center_freq_seg0 == 138 &&
+		     chan_center_freq_seg1 == 155))
+			vht_ch_wd =
+				WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
+		else
+			vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
+	}
+	/*
+	 * If the supported channel width is greater than 80MHz and
+	 * AP supports Nss > 1 in 160MHz mode then connect the STA
+	 * in 2x2 80MHz mode instead of connecting in 160MHz mode.
+	 */
+	if (vht_ch_wd > WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ) {
+		if (sta_prefer_80mhz_over_160mhz == STA_PREFER_BW_80MHZ)
+			vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+		else if ((sta_prefer_80mhz_over_160mhz ==
+					STA_PREFER_BW_VHT80MHZ) &&
+		  (!(IS_VHT_NSS_1x1(bcn_ies->VHTCaps.txMCSMap)) &&
+		    (!IS_VHT_NSS_1x1(bcn_ies->VHTCaps.rxMCSMap))))
+			vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+	}
+	/*
+	 * VHT OP IE old definition:
+	 * vht_op->chan_center_freq_seg0: center freq of 80MHz/160MHz/
+	 * primary 80 in 80+80MHz.
+	 *
+	 * vht_op->chan_center_freq_seg1: center freq of secondary 80
+	 * in 80+80MHz.
+	 *
+	 * VHT OP IE NEW definition:
+	 * vht_op->chan_center_freq_seg0: center freq of 80MHz/primary
+	 * 80 in 80+80MHz/center freq of the 80 MHz channel segment
+	 * that contains the primary channel in 160MHz mode.
+	 *
+	 * vht_op->chan_center_freq_seg1: center freq of secondary 80
+	 * in 80+80MHz/center freq of 160MHz.
+	 */
+	session->ch_center_freq_seg0 = vht_op->chan_center_freq_seg0;
+	session->ch_center_freq_seg1 = chan_center_freq_seg1;
+	channel = wlan_reg_freq_to_chan(mac_ctx->pdev, chan_freq);
+	if (vht_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
+		/* DUT or AP supports only 160MHz */
+		if (ap_bcon_ch_width ==
+				WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
+			/* AP is in 160MHz mode */
+			if (!new_ch_width_dfn) {
+				session->ch_center_freq_seg1 =
+					vht_op->chan_center_freq_seg0;
+				session->ch_center_freq_seg0 =
+					lim_get_80Mhz_center_channel(channel);
+			}
+		} else {
+			/* DUT supports only 160MHz and AP is
+			 * in 80+80 mode
+			 */
+			vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
+			session->ch_center_freq_seg1 = 0;
+			session->ch_center_freq_seg0 =
+				lim_get_80Mhz_center_channel(channel);
+		}
+	} else if (vht_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ) {
+		/* DUT or AP supports only 80MHz */
+		session->ch_center_freq_seg0 =
+			lim_get_80Mhz_center_channel(channel);
+		session->ch_center_freq_seg1 = 0;
+	}
+	session->ch_width = vht_ch_wd + 1;
+	session->ap_ch_width = session->ch_width;
+}
+
 QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 				     struct pe_session *session,
 				     struct bss_description *bss_desc,
@@ -692,26 +837,18 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 				     int8_t *local_constraint,
 				     bool *is_pwr_constraint)
 {
-	bool new_ch_width_dfn = false;
 	tDot11fIEVHTOperation *vht_op;
-	tDot11fIEVHTCaps *vht_caps;
-	uint8_t fw_vht_ch_wd, vht_ch_wd, center_freq_diff;
-	uint8_t channel, chan_center_freq_seg1, ap_bcon_ch_width;
-	uint8_t sta_prefer_80mhz_over_160mhz, *ie;
+	uint8_t *ie;
 	uint16_t ie_len;
 	tDot11fBeaconIEs *bcn_ies;
-	struct mlme_vht_capabilities_info *mlme_vht_cap;
 
 	*qos_cap = 0;
 	*uapsd = 0;
-	sta_prefer_80mhz_over_160mhz =
-		session->mac_ctx->mlme_cfg->sta.sta_prefer_80mhz_over_160mhz;
 
 	bcn_ies = &bss_desc->bcn_ies;
 	ie = (uint8_t *)&bss_desc->ieFields[0];
 	ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 
-	mlme_vht_cap = &mac_ctx->mlme_cfg->vht_caps.vht_cap_info;
 	if (bcn_ies->WMMInfoAp.present || bcn_ies->WMMParams.present ||
 	    bcn_ies->HTCaps.present)
 		LIM_BSS_CAPS_SET(WME, *qos_cap);
@@ -722,7 +859,6 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 	mac_ctx->lim.htCapabilityPresentInBeacon = bcn_ies->HTCaps.present;
 
 	vht_op = &bcn_ies->VHTOperation;
-	vht_caps = &bcn_ies->VHTCaps;
 	if (IS_BSS_VHT_CAPABLE(bcn_ies->VHTCaps) && vht_op->present &&
 	    session->vhtCapability) {
 		session->vhtCapabilityPresentInBeacon = 1;
@@ -753,117 +889,8 @@ QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
 			lim_update_ch_width_for_p2p_client(mac_ctx, session,
 							   bss_desc->chan_freq);
 	} else if (session->vhtCapabilityPresentInBeacon && vht_op->chanWidth) {
-		/* If VHT is supported min 80 MHz support is must */
-		ap_bcon_ch_width = vht_op->chanWidth;
-		if (vht_caps->vht_extended_nss_bw_cap) {
-			if (!vht_caps->extended_nss_bw_supp)
-				chan_center_freq_seg1 =
-					vht_op->chan_center_freq_seg1;
-			else
-				chan_center_freq_seg1 =
-					bcn_ies->HTInfo.chan_center_freq_seg2;
-		} else {
-			chan_center_freq_seg1 = vht_op->chan_center_freq_seg1;
-		}
-		if (chan_center_freq_seg1 &&
-		    (ap_bcon_ch_width == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)) {
-			new_ch_width_dfn = true;
-			if (chan_center_freq_seg1 >
-					vht_op->chan_center_freq_seg0)
-			    center_freq_diff = chan_center_freq_seg1 -
-						vht_op->chan_center_freq_seg0;
-			else
-			    center_freq_diff = vht_op->chan_center_freq_seg0 -
-						chan_center_freq_seg1;
-			if (center_freq_diff == 8)
-				ap_bcon_ch_width =
-					WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
-			else if (center_freq_diff > 16)
-				ap_bcon_ch_width =
-					WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
-			else
-				ap_bcon_ch_width =
-					WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
-		}
-
-		fw_vht_ch_wd = wma_get_vht_ch_width();
-		vht_ch_wd = QDF_MIN(fw_vht_ch_wd, ap_bcon_ch_width);
-
-		if ((vht_ch_wd > WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ) &&
-		    (ap_bcon_ch_width ==
-		     WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ) &&
-		    mlme_vht_cap->restricted_80p80_bw_supp) {
-			if ((chan_center_freq_seg1 == 138 &&
-			     vht_op->chan_center_freq_seg0 == 155) ||
-			    (vht_op->chan_center_freq_seg0 == 138 &&
-			     chan_center_freq_seg1 == 155))
-				vht_ch_wd =
-					WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ;
-			else
-				vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ;
-		}
-		/*
-		 * If the supported channel width is greater than 80MHz and
-		 * AP supports Nss > 1 in 160MHz mode then connect the STA
-		 * in 2x2 80MHz mode instead of connecting in 160MHz mode.
-		 */
-		if (vht_ch_wd > WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ) {
-			if (sta_prefer_80mhz_over_160mhz == STA_PREFER_BW_80MHZ)
-				vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
-			else if ((sta_prefer_80mhz_over_160mhz ==
-						STA_PREFER_BW_VHT80MHZ) &&
-			  (!(IS_VHT_NSS_1x1(bcn_ies->VHTCaps.txMCSMap)) &&
-			    (!IS_VHT_NSS_1x1(bcn_ies->VHTCaps.rxMCSMap))))
-				vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
-		}
-		/*
-		 * VHT OP IE old definition:
-		 * vht_op->chan_center_freq_seg0: center freq of 80MHz/160MHz/
-		 * primary 80 in 80+80MHz.
-		 *
-		 * vht_op->chan_center_freq_seg1: center freq of secondary 80
-		 * in 80+80MHz.
-		 *
-		 * VHT OP IE NEW definition:
-		 * vht_op->chan_center_freq_seg0: center freq of 80MHz/primary
-		 * 80 in 80+80MHz/center freq of the 80 MHz channel segment
-		 * that contains the primary channel in 160MHz mode.
-		 *
-		 * vht_op->chan_center_freq_seg1: center freq of secondary 80
-		 * in 80+80MHz/center freq of 160MHz.
-		 */
-		session->ch_center_freq_seg0 = vht_op->chan_center_freq_seg0;
-		session->ch_center_freq_seg1 = chan_center_freq_seg1;
-		channel = wlan_reg_freq_to_chan(mac_ctx->pdev,
-						bss_desc->chan_freq);
-		if (vht_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
-			/* DUT or AP supports only 160MHz */
-			if (ap_bcon_ch_width ==
-					WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ) {
-				/* AP is in 160MHz mode */
-				if (!new_ch_width_dfn) {
-					session->ch_center_freq_seg1 =
-						vht_op->chan_center_freq_seg0;
-					session->ch_center_freq_seg0 =
-						lim_get_80Mhz_center_channel(channel);
-				}
-			} else {
-				/* DUT supports only 160MHz and AP is
-				 * in 80+80 mode
-				 */
-				vht_ch_wd = WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ;
-				session->ch_center_freq_seg1 = 0;
-				session->ch_center_freq_seg0 =
-					lim_get_80Mhz_center_channel(channel);
-			}
-		} else if (vht_ch_wd == WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ) {
-			/* DUT or AP supports only 80MHz */
-			session->ch_center_freq_seg0 =
-				lim_get_80Mhz_center_channel(channel);
-			session->ch_center_freq_seg1 = 0;
-		}
-		session->ch_width = vht_ch_wd + 1;
-		session->ap_ch_width = session->ch_width;
+		lim_extract_vht_bw_params(mac_ctx, session, bcn_ies,
+					  bss_desc->chan_freq);
 	}
 
 	/* Configure Operating Mode Notification parameters */
