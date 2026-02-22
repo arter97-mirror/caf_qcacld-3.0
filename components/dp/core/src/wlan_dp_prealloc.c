@@ -519,21 +519,22 @@ static struct dp_consistent_prealloc_unaligned
 
 static struct dp_page_pool_t g_dp_rx_pp_allocs[] = {
 	/* Keep RX AUX pool always at the top */
-	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PP_AUX_POOL_SIZE, 0, 0, false},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false},
-	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false},
+	{QDF_DP_PAGE_POOL_RX, NULL, DP_RX_PP_AUX_POOL_SIZE, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_RX, NULL, 0, 0, 0, false, 0},
 };
 
 static struct dp_page_pool_t g_dp_tx_pp_allocs[] = {
-	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
-	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
-	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false},
+	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false, 0},
+	{QDF_DP_PAGE_POOL_TX, NULL, DP_TX_PAGE_POOL_SIZE, 0, 0, false, 0},
 };
 
 struct dp_page_pool_t*
-dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size)
+dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size,
+			  int *pp_track_id)
 {
 	struct dp_page_pool_t *base_pp;
 	struct dp_page_pool_t *pp_t;
@@ -564,6 +565,9 @@ dp_prealloc_get_page_pool(enum qdf_dp_tx_pp_type type, uint32_t pool_size)
 		if (type == pp_t->type && !pp_t->in_use &&
 		    pool_size == pp_t->pool_size) {
 			pp_t->in_use = true;
+			if (pp_track_id)
+				*pp_track_id = pp_t->pp_track_id;
+
 			dp_info("get page pool %d type %d size %d success",
 				i, type, pp_t->pool_size);
 			return pp_t;
@@ -653,7 +657,8 @@ out_put_page:
 static qdf_page_pool_t
 dp_prealloc_page_pool_create(qdf_device_t osdev, uint32_t pool_size,
 			     size_t buf_size, size_t *page_size,
-			     size_t *pp_size, qdf_dma_dir_t dir)
+			     size_t *pp_size, qdf_dma_dir_t dir,
+			     int *pp_track_id)
 {
 	qdf_page_pool_t pp;
 	size_t bufs_per_page;
@@ -666,7 +671,8 @@ alloc_page_pool:
 	if (pool_size % bufs_per_page)
 		*pp_size = (*pp_size + 1);
 
-	pp = qdf_page_pool_create(osdev, *pp_size, *page_size, dir);
+	pp = qdf_page_pool_create(osdev, *pp_size,
+				  *page_size, dir, pp_track_id);
 	if (!pp) {
 		dp_err("Failed to create page pool");
 		return NULL;
@@ -775,7 +781,8 @@ void dp_prealloc_page_pool_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
 							rx_buf_size,
 							&pp_t->page_size,
 							&pp_t->pp_size,
-							QDF_DMA_FROM_DEVICE);
+							QDF_DMA_FROM_DEVICE,
+							&pp_t->pp_track_id);
 		if (pp_t->pp) {
 			dp_info("RX page pool %d pre-alloc succ pool_size %u pp_size %zu page_size %zu",
 				i, pp_t->pool_size, pp_t->pp_size,
@@ -806,7 +813,8 @@ tx_pp_alloc:
 							DP_TX_PAGE_POOL_BUFSIZE,
 							&pp_t->page_size,
 							&pp_t->pp_size,
-							QDF_DMA_BIDIRECTIONAL);
+							QDF_DMA_BIDIRECTIONAL,
+							NULL);
 		if (pp_t->pp) {
 			dp_info("TX page pool %d pre-alloc succ pool_size %u pp_size %zu page_size %zu",
 				i, pp_t->pool_size, pp_t->pp_size,
