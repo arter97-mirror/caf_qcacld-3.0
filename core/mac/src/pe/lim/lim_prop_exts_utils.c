@@ -852,6 +852,28 @@ static void lim_extract_vht_bw_params(struct mac_context *mac_ctx,
 		session->ch_center_freq_seg1 = 0;
 	}
 	session->ch_width = vht_ch_wd + 1;
+
+	/*
+	 * Sanity check: If CCFS1 is not present in VHT operation IE,
+	 * ensure ch_width is capped to 80MHz
+	 */
+	if (!chan_center_freq_seg1 &&
+	    session->ch_width > CH_WIDTH_80MHZ) {
+		pe_debug("vdev %d AP " QDF_MAC_ADDR_FMT " CCFS1 not present, capping ch_width %d to 80MHz",
+			 session->vdev_id, QDF_MAC_ADDR_REF(session->bssId),
+			 session->ch_width);
+		session->ch_width = CH_WIDTH_80MHZ;
+		session->ch_center_freq_seg1 = 0;
+	}
+
+	/* Sanity check: Ensure ch_width does not exceed AP's max capability */
+	if (session->ap_ch_width != CH_WIDTH_INVALID &&
+	    session->ch_width > session->ap_ch_width) {
+		pe_debug("vdev %d AP " QDF_MAC_ADDR_FMT " ch_width %d exceeds ap_ch_width %d, capping to ap_ch_width",
+			 session->vdev_id, QDF_MAC_ADDR_REF(session->bssId),
+			 session->ch_width, session->ap_ch_width);
+		session->ch_width = session->ap_ch_width;
+	}
 }
 
 QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
