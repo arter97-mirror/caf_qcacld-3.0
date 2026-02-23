@@ -2222,8 +2222,9 @@ static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
 	return false;
 }
 #else
-static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
-						  tpSirAssocRsp assoc_rsp)
+static inline bool
+lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
+				      tpSirAssocRsp assoc_rsp)
 {
 	return false;
 }
@@ -3764,24 +3765,6 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 				pAddBssParams->staContext.vht_caps);
 }
 
-/**
- * lim_update_vhtcaps_assoc_resp_bw() - Update VHT capabilities from Assoc Rsp
- * @mac_ctx: Pointer to Global MAC structure
- * @pAddBssParams: Parameters required for add bss params
- * @vht_caps: VHT capabilities from association response
- *
- * Note: VHT rxMCSMap/txMCSMap (Supported MCS/NSS Set) is bandwidth-independent
- * (same MCS index 0-9 applies for 20/40/80/160 MHz). Channel bandwidth is
- * applied orthogonally during rate computation and via operational IEs
- * (e.g., VHT Operation IE).
- *
- * This function processes the VHT Capability IE from the AP's association
- * response frame. It validates the claimed bandwidth against the VHT
- * Supported MCS Set to ensure the AP has valid MCS support. The result
- * is stored in pAddBssParams->staContext.ap_max_ch_width.
- *
- * Return: true/false
- */
 bool lim_update_vhtcaps_assoc_resp_bw(struct mac_context *mac_ctx,
 				      struct bss_params *pAddBssParams,
 				      tDot11fIEVHTCaps *vht_caps,
@@ -3817,6 +3800,12 @@ static void lim_update_vht_oper_assoc_resp(struct mac_context *mac_ctx,
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	tDot11fIEVHTOperation *vht_oper = NULL;
 	enum phy_ch_width ch_width, fw_max_ch_width, ap_max_ch_width;
+
+	if (!peer) {
+		pe_err("vdev %d: peer is NULL, cannot update VHT oper",
+		       pe_session ? pe_session->vdev_id : WLAN_UMAC_VDEV_ID_MAX);
+		return;
+	}
 
 	if (assoc_rsp->VHTCaps.present) {
 		vht_caps = &assoc_rsp->VHTCaps;
@@ -4027,7 +4016,7 @@ static void lim_update_add_bss_ht_params(struct mac_context *mac,
 	enum phy_ch_width assoc_resp_ht_op_bw;
 	struct wlan_objmgr_peer *peer;
 	struct wlan_objmgr_psoc *psoc;
-	uint8_t center_freq_seg0;
+	uint8_t center_freq_seg0 = 0;
 	enum phy_ch_width ap_max_ch_width;
 	tDot11fIEHTInfo *ht_info;
 
@@ -4388,6 +4377,12 @@ static void lim_update_add_bss_he_params(struct mac_context *mac,
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 }
 #else /* !WLAN_FEATURE_11AX */
+bool lim_validate_he_mcs_for_bw(uint16_t rx_he_mcs_map,
+				uint16_t tx_he_mcs_map)
+{
+	return true;
+}
+
 static inline void
 lim_update_add_bss_he_params(struct mac_context *mac,
 				tpSirAssocRsp pAssocRsp,

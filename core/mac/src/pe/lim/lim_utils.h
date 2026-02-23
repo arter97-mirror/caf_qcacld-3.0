@@ -1956,11 +1956,6 @@ static inline void lim_log_he_cap(struct mac_context *mac,
 {
 }
 
-static inline enum phy_ch_width
-lim_get_he_max_ch_width(tDot11fIEhe_cap *he_cap, struct pe_session *session)
-{
-	return CH_WIDTH_INVALID;
-}
 
 static inline void lim_update_sta_he_capable(struct mac_context *mac,
 			tpAddStaParams add_sta_params,
@@ -1973,10 +1968,30 @@ static inline bool lim_is_session_he_capable(struct pe_session *session)
 	return false;
 }
 
+static inline void lim_extract_he_op(struct mac_context *mac,
+				     struct pe_session *session,
+				     tDot11fBeaconIEs *bcn_ies)
+{
+}
+
+static inline void lim_check_is_he_mcs_valid(struct pe_session *session,
+					     tDot11fBeaconIEs *bcn_ies)
+{
+}
+
+static inline void
+lim_process_he_capability_validation(struct pe_session *session,
+				     tDot11fBeaconIEs *bcn_ies)
+{
+}
+
 static inline void lim_update_he_bw_cap_mcs(struct pe_session *session,
 					    tDot11fBeaconIEs *bcn_ies)
 {
 }
+
+void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id, uint16_t he_mcs_12_13_map);
 
 static inline bool lim_is_he_6ghz_band(struct pe_session *session)
 {

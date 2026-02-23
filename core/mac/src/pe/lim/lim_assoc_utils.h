@@ -486,6 +486,29 @@ void lim_update_vhtcaps_assoc_resp(struct mac_context *mac_ctx,
 				   tDot11fIEVHTCaps *vht_caps);
 
 /**
+ * lim_update_vhtcaps_assoc_resp_bw() - Update VHT capabilities from Assoc Rsp
+ * @mac_ctx: Pointer to Global MAC structure
+ * @pAddBssParams: Parameters required for add bss params
+ * @vht_caps: VHT capabilities from association response
+ *
+ * Note: VHT rxMCSMap/txMCSMap (Supported MCS/NSS Set) is bandwidth-independent
+ * (same MCS index 0-9 applies for 20/40/80/160 MHz). Channel bandwidth is
+ * applied orthogonally during rate computation and via operational IEs
+ * (e.g., VHT Operation IE).
+ *
+ * This function processes the VHT Capability IE from the AP's association
+ * response frame. It validates the claimed bandwidth against the VHT
+ * Supported MCS Set to ensure the AP has valid MCS support. The result
+ * is stored in pAddBssParams->staContext.ap_max_ch_width.
+ *
+ * Return: true/false
+ */
+bool lim_update_vhtcaps_assoc_resp_bw(struct mac_context *mac_ctx,
+				      struct bss_params *pAddBssParams,
+				      tDot11fIEVHTCaps *vht_caps,
+				      struct wlan_objmgr_peer *peer);
+
+/**
  * lim_free_assoc_req_frm_buf() - free assoc request frame buffer
  * @assoc_req: pointer to tpSirAssocReq
  *

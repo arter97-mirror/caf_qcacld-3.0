@@ -475,21 +475,6 @@ void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
 	wlan_vdev_obj_unlock(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
-#else
-static inline void lim_extract_he_op(struct mac_context *mac,
-				     struct pe_session *session,
-				     tDot11fBeaconIEs *bcn_ies)
-{}
-
-static inline void lim_check_is_he_mcs_valid(struct pe_session *session,
-					     tDot11fBeaconIEs *bcn_ies)
-{
-}
-
-void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id, uint16_t he_mcs_12_13_map)
-{
-}
 #endif
 
 #ifdef WLAN_FEATURE_11BE
