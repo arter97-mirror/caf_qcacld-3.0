@@ -45,6 +45,7 @@
 #include "lim_ft_defs.h"
 #include "lim_session.h"
 #include "wma.h"
+#include "wlan_mlme_api.h"
 #include "wlan_utility.h"
 #include "wlan_mlo_mgr_sta.h"
 
@@ -128,8 +129,7 @@ static void lim_extract_he_op(struct mac_context *mac,
 			      struct pe_session *session,
 			      tDot11fBeaconIEs *bcn_ies)
 {
-	uint8_t fw_vht_ch_wd;
-	uint8_t ap_bcon_ch_width;
+	enum phy_ch_width fw_vht_ch_wd, ap_bcon_ch_width;
 	uint8_t center_freq_diff;
 	uint32_t self_cb_mode;
 
@@ -166,31 +166,82 @@ static void lim_extract_he_op(struct mac_context *mac,
 		 session->ch_width, session->ch_center_freq_seg0,
 		 session->ch_center_freq_seg1);
 
-	if (!session->ch_center_freq_seg1)
-		return;
+	fw_vht_ch_wd = mlme_get_vht_ch_width();
 
-	fw_vht_ch_wd = wma_get_vht_ch_width();
-	if (fw_vht_ch_wd <= WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ) {
-		session->ch_width = CH_WIDTH_80MHZ;
+	/*
+	 * Per IEEE 802.11ax, 6GHz Operation Information ch_width field:
+	 *   0 = 20 MHz, 1 = 40 MHz, 2 = 80 MHz, 3 = 160 or 80+80 MHz
+	 *
+	 * For ch_width 0/1/2 (20/40/80 MHz), CCFS1 is always 0 and
+	 * ch_width already maps directly to enum phy_ch_width.
+	 *
+	 * For ch_width 3 (160/80+80 MHz), use CCFS1 and center_freq_diff
+	 * to distinguish between 160 MHz and 80+80 MHz.
+	 */
+	if (session->ch_width < CH_WIDTH_160MHZ) {
+		/* 20/40/80 MHz: ch_width maps directly, CCFS1 unused */
 		session->ch_center_freq_seg1 = 0;
-		return;
-	}
-	center_freq_diff = abs(session->ch_center_freq_seg1 -
-			       session->ch_center_freq_seg0);
-	if (center_freq_diff == 8) {
-		ap_bcon_ch_width = CH_WIDTH_160MHZ;
-	} else if (center_freq_diff > 16) {
-		ap_bcon_ch_width = CH_WIDTH_80P80MHZ;
 	} else {
-		session->ch_width = CH_WIDTH_80MHZ;
-		session->ch_center_freq_seg1 = 0;
-		return;
+		/* ch_width == 3: 160 or 80+80 MHz, resolve via CCFS1 */
+		if (!session->ch_center_freq_seg1) {
+			/* No CCFS1 present, fall back to 80 MHz */
+			session->ch_width = CH_WIDTH_80MHZ;
+		} else {
+			/*
+			 * |CCFS1 - CCFS0| == 8 channels (40 MHz offset):
+			 *   160 MHz (CCFS1 = center of 160 MHz channel)
+			 * |CCFS1 - CCFS0| > 16 channels (>80 MHz offset):
+			 *   80+80 MHz (CCFS1 = center of secondary 80 MHz)
+			 */
+			center_freq_diff = abs(session->ch_center_freq_seg1 -
+					       session->ch_center_freq_seg0);
+			if (center_freq_diff == 8) {
+				ap_bcon_ch_width = CH_WIDTH_160MHZ;
+			} else if (center_freq_diff > 16) {
+				ap_bcon_ch_width = CH_WIDTH_80P80MHZ;
+			} else {
+				pe_debug("vdev %d: Invalid center freq diff %d with CCFS1 present, falling back to 80MHz",
+					 session->vdev_id, center_freq_diff);
+				ap_bcon_ch_width = CH_WIDTH_80MHZ;
+				session->ch_center_freq_seg1 = 0;
+			}
+			session->ch_width = ap_bcon_ch_width;
+		}
 	}
 
-	if ((ap_bcon_ch_width == CH_WIDTH_80P80MHZ) &&
-	    (fw_vht_ch_wd != WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)) {
-		session->ch_width = CH_WIDTH_80MHZ;
-		session->ch_center_freq_seg1 = 0;
+	/* Cap ch_width to FW max supported BW */
+	if (session->ch_width > fw_vht_ch_wd) {
+		pe_debug("vdev %d: AP " QDF_MAC_ADDR_FMT " ch_width %d exceeds FW max %d, capping",
+			 session->vdev_id, QDF_MAC_ADDR_REF(session->bssId),
+			 session->ch_width, fw_vht_ch_wd);
+		/*
+		 * 80+80 MHz cannot be downgraded to any other width as the
+		 * channel configuration differs; fall back to 80 MHz instead.
+		 */
+		if (session->ch_width == CH_WIDTH_80P80MHZ &&
+		    fw_vht_ch_wd != CH_WIDTH_80P80MHZ)
+			session->ch_width = CH_WIDTH_80MHZ;
+		else
+			session->ch_width = fw_vht_ch_wd;
+		/* Clear CCFS1 only when capping to 80MHz or below;
+		 * 160MHz still requires a valid CCFS1.
+		 */
+		if (session->ch_width <= CH_WIDTH_80MHZ)
+			session->ch_center_freq_seg1 = 0;
+	}
+
+	/* Cap ch_width to AP's max supported BW */
+	if (session->ap_ch_width != CH_WIDTH_INVALID &&
+	    session->ch_width > session->ap_ch_width) {
+		pe_debug("vdev %d: AP " QDF_MAC_ADDR_FMT " ch_width %d exceeds ap_ch_width %d, capping",
+			 session->vdev_id, QDF_MAC_ADDR_REF(session->bssId),
+			 session->ch_width, session->ap_ch_width);
+		session->ch_width = session->ap_ch_width;
+		/* Clear CCFS1 only when capping to 80MHz or below;
+		 * 160MHz still requires a valid CCFS1.
+		 */
+		if (session->ap_ch_width <= CH_WIDTH_80MHZ)
+			session->ch_center_freq_seg1 = 0;
 	}
 }
 
@@ -1001,10 +1052,14 @@ static void lim_configure_he_eht_params(struct mac_context *mac_ctx,
 {
 	lim_check_is_he_mcs_valid(session, bcn_ies);
 	lim_check_peer_ldpc_and_update(session, bcn_ies);
+	/*
+	 * Validate HE capability and set session->ap_ch_width before
+	 * lim_extract_he_op() so that the AP BW cap in lim_extract_he_op()
+	 * can use the correct ap_ch_width value.
+	 */
+	lim_process_he_capability_validation(session, bcn_ies);
 	lim_extract_he_op(mac_ctx, session, bcn_ies);
 	lim_extract_eht_op(mac_ctx, session, bcn_ies);
-
-	lim_process_he_capability_validation(session, bcn_ies);
 
 	if (!mac_ctx->usr_eht_testbed_cfg)
 		lim_update_he_bw_cap_mcs(session, bcn_ies);
