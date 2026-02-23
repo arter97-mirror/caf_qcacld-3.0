@@ -1286,11 +1286,13 @@ hdd_sysfs_create_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_direct_link_ut_cmd_create(adapter);
 	hdd_sysfs_dfsnol_create(adapter);
 	hdd_sysfs_sap_bitrates_create(adapter);
+	hdd_sysfs_power_datapath_stats_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sap_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_power_datapath_stats_destroy(adapter);
 	hdd_sysfs_sap_bitrates_destroy(adapter);
 	hdd_sysfs_dfsnol_destroy(adapter);
 	hdd_sysfs_direct_link_ut_destroy(adapter);
