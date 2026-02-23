@@ -691,8 +691,9 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 	QDF_STATUS status;
 	struct scheduler_msg cds_msg = {0};
 	uint8_t *buf_ptr;
-	uint32_t alloc_len = 0, i, partner_links_data_len = 0;
+	uint32_t alloc_len = 0, i;
 	struct cdp_txrx_ext_stats ext_stats = {0};
+	size_t event_data_capacity = 0;
 	struct cdp_soc_t *soc_hdl = cds_get_context(QDF_MODULE_ID_SOC);
 	wmi_partner_link_stats *link_stats;
 
@@ -715,15 +716,41 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 	alloc_len += sizeof(struct cdp_txrx_ext_stats);
 
 	if (param_buf->num_partner_link_stats) {
+		uint32_t total_data_len = 0;
+
 		link_stats = param_buf->partner_link_stats;
 		if (link_stats) {
 			for (i = 0; i < param_buf->num_partner_link_stats; i++) {
-				partner_links_data_len += link_stats->data_length;
+				uint32_t data_len = link_stats->offset +
+					       link_stats->data_length;
+
+				if (data_len > total_data_len)
+					total_data_len = data_len;
+
 				link_stats++;
 			}
-		alloc_len += partner_links_data_len;
-		alloc_len += param_buf->num_partner_link_stats *
-			     sizeof(struct cdp_txrx_ext_stats);
+
+			/* Validate partner_link_data buffer existence and
+			 * size
+			 */
+			if (!param_buf->partner_link_data) {
+				wma_err("partner_link_data is NULL while partner_link_stats present");
+				return -EINVAL;
+			}
+
+			/* If the TLV provides partner data length, ensure
+			 * bounds
+			 */
+			if (total_data_len > param_buf->num_partner_link_data) {
+				wma_err("partner_link_data out of bounds: required %u available %u",
+					total_data_len,
+					param_buf->num_partner_link_data);
+				return -EINVAL;
+			}
+
+			alloc_len += total_data_len;
+			alloc_len += param_buf->num_partner_link_stats *
+				     sizeof(struct cdp_txrx_ext_stats);
 		}
 	}
 
@@ -738,14 +765,39 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 	if (!stats_ext_event)
 		return -ENOMEM;
 
+	if (!param_buf->data) {
+		wma_err("stats ext event data TLV is NULL");
+		qdf_mem_free(stats_ext_event);
+		return -EINVAL;
+	}
 	buf_ptr = (uint8_t *)param_buf->data;
 
 	stats_ext_event->vdev_id = stats_ext_info->vdev_id;
 	stats_ext_event->event_data_len = stats_ext_info->data_len;
+	event_data_capacity = alloc_len - sizeof(*stats_ext_event);
+
+	if (stats_ext_event->event_data_len > event_data_capacity) {
+		wma_err("Initial event_data_len:%u exceeds capacity:%zu",
+			stats_ext_event->event_data_len, event_data_capacity);
+		qdf_mem_free(stats_ext_event);
+		return -EINVAL;
+	}
+
 	qdf_mem_copy(stats_ext_event->event_data,
 		     buf_ptr, stats_ext_event->event_data_len);
 
 	cdp_txrx_ext_stats_request(soc_hdl, OL_TXRX_PDEV_ID, &ext_stats);
+
+	if (stats_ext_event->event_data_len + sizeof(struct cdp_txrx_ext_stats) >
+	    event_data_capacity) {
+		wma_err("Ext stats copy overflow: used:%u add:%zu cap:%zu",
+			stats_ext_event->event_data_len,
+			sizeof(struct cdp_txrx_ext_stats),
+			event_data_capacity);
+		qdf_mem_free(stats_ext_event);
+		return -EINVAL;
+	}
+
 	qdf_mem_copy(stats_ext_event->event_data +
 		     stats_ext_event->event_data_len,
 		     &ext_stats, sizeof(struct cdp_txrx_ext_stats));
@@ -755,7 +807,39 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 	if (param_buf->num_partner_link_stats) {
 		link_stats = param_buf->partner_link_stats;
 		if (link_stats) {
+			if (!param_buf->partner_link_data) {
+				wma_err("partner_link_data is NULL");
+				qdf_mem_free(stats_ext_event);
+				return -EINVAL;
+			}
 			for (i = 0; i < param_buf->num_partner_link_stats; i++) {
+				/* Per-entry bounds check before copy */
+				if (link_stats->offset >
+				    param_buf->num_partner_link_data ||
+				    link_stats->data_length >
+				    (param_buf->num_partner_link_data -
+				     link_stats->offset)) {
+					wma_err("Invalid partner_link_data bounds: offset %u len %u avail %u",
+						link_stats->offset,
+						link_stats->data_length,
+						param_buf->num_partner_link_data);
+					qdf_mem_free(stats_ext_event);
+					return -EINVAL;
+				}
+
+				/* Ensure partner data + ext_stats fits into event_data buffer */
+				if (stats_ext_event->event_data_len +
+				    link_stats->data_length +
+				    sizeof(struct cdp_txrx_ext_stats) > event_data_capacity) {
+					wma_err("partner_link copy overflow: used:%u link:%u ext:%zu cap:%zu",
+						stats_ext_event->event_data_len,
+						link_stats->data_length,
+						sizeof(struct cdp_txrx_ext_stats),
+						event_data_capacity);
+					qdf_mem_free(stats_ext_event);
+					return -EINVAL;
+				}
+
 				qdf_mem_copy(((uint8_t *)stats_ext_event->event_data) +
 					     stats_ext_event->event_data_len,
 					     param_buf->partner_link_data +
