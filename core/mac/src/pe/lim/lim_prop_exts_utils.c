@@ -499,6 +499,7 @@ void lim_extract_eht_op(struct mac_context *mac,
 {
 	uint32_t max_eht_bw;
 	uint32_t self_cb_mode;
+	enum phy_ch_width fw_max_ch_width;
 
 	if (!session->eht_capable || !bcn_ies->eht_op.present ||
 	    !bcn_ies->eht_op.eht_op_information_present)
@@ -514,6 +515,7 @@ void lim_extract_eht_op(struct mac_context *mac,
 
 	max_eht_bw = wma_get_eht_ch_width();
 
+	/* Step 1 : Get BW from EHT ops */
 	if (session->eht_op.channel_width == WLAN_EHT_CHWIDTH_320) {
 		if (max_eht_bw == WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ) {
 			session->ch_width = CH_WIDTH_320MHZ;
@@ -541,8 +543,41 @@ void lim_extract_eht_op(struct mac_context *mac,
 		session->ch_center_freq_seg1 = 0;
 	}
 
+	/*
+	 * Step 2: Validate CCFS1 presence for >80 MHz
+	 */
+	if ((session->ch_width == CH_WIDTH_160MHZ ||
+	     session->ch_width == CH_WIDTH_320MHZ) && !session->eht_op.ccfs1) {
+		pe_debug("vdev %d: AP " QDF_MAC_ADDR_FMT" CCFS1 absent, downgrading ch_width %d to 80MHz",
+			 session->vdev_id, QDF_MAC_ADDR_REF(session->bssId),
+			 session->ch_width);
+		session->ch_width = CH_WIDTH_80MHZ;
+	}
+
+	/* Step 3: Cap ch_width to FW max supported BW */
+	fw_max_ch_width = wlan_mlme_get_max_bw();
+	if (session->ch_width > fw_max_ch_width) {
+		pe_debug("vdev %d: AP " QDF_MAC_ADDR_FMT" ch_width %d exceeds FW max %d, capping",
+			 session->vdev_id, QDF_MAC_ADDR_REF(session->bssId),
+			 session->ch_width, fw_max_ch_width);
+		session->ch_width = fw_max_ch_width;
+	}
+
+	/* Step 4: Cap ch_width to AP's max supported BW */
+	if (session->ap_ch_width != CH_WIDTH_INVALID &&
+	    session->ch_width > session->ap_ch_width) {
+		pe_debug("vdev %d: AP " QDF_MAC_ADDR_FMT" ch_width %d exceeds ap_ch_width %d, capping",
+			 session->vdev_id, QDF_MAC_ADDR_REF(session->bssId),
+			 session->ch_width, session->ap_ch_width);
+		session->ch_width = session->ap_ch_width;
+	}
+
+	/* Step 4: Set CCFS0/1 as per final BW */
 	session->ch_center_freq_seg0 = session->eht_op.ccfs0;
-	session->ch_center_freq_seg1 = session->eht_op.ccfs1;
+	if (session->ch_width > CH_WIDTH_80MHZ)
+		session->ch_center_freq_seg1 = session->eht_op.ccfs1;
+	else
+		session->ch_center_freq_seg1 = 0;
 }
 
 void lim_update_eht_bw_cap_mcs(struct pe_session *session,
@@ -1080,12 +1115,17 @@ static void lim_configure_he_eht_params(struct mac_context *mac_ctx,
 	 * can use the correct ap_ch_width value.
 	 */
 	lim_process_he_capability_validation(session, bcn_ies);
+	/*
+	 * Validate EHT capability and update session->ap_ch_width before
+	 * lim_extract_eht_op() so that the AP BW cap in lim_extract_eht_op()
+	 * (Step 4) uses the EHT-validated ap_ch_width, not just the HE value.
+	 */
+	lim_update_eht_bw_cap_mcs(session, bcn_ies);
 	lim_extract_he_op(mac_ctx, session, bcn_ies);
 	lim_extract_eht_op(mac_ctx, session, bcn_ies);
 
 	if (!mac_ctx->usr_eht_testbed_cfg)
 		lim_update_he_bw_cap_mcs(session, bcn_ies);
-	lim_update_eht_bw_cap_mcs(session, bcn_ies);
 }
 
 QDF_STATUS lim_extract_ap_capability(struct mac_context *mac_ctx,
