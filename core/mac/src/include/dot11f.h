@@ -10519,6 +10519,24 @@ typedef struct sDot11fIEmlo_ie {
 
 #define DOT11F_IE_MLO_IE_MAX_LEN (255)
 
+/**
+ * struct tDot11fIEsmd_ie - SMD Information Element
+ * @element_id: 255 (Extension Element)
+ * @length: Variable length
+ * @element_id_extension: 154 for SMD Information
+ * @smd_identifier: 48-bit MAC address format (6 bytes)
+ * @smd_capabilities: SMD Capabilities field (1 byte)
+ * @timeout_value: TUs between ST prep response and ST exec request (1 byte)
+ */
+typedef struct tDot11fIEsmd_ie {
+	uint8_t element_id;
+	uint8_t length;
+	uint8_t element_id_extension;
+	uint8_t smd_identifier[6];
+	uint8_t smd_capabilities;
+	uint8_t timeout_value;
+} tDot11fIEsmd_ie;
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
@@ -11360,6 +11378,7 @@ typedef struct sDot11fAssocRequest{
 	tDot11fIEqcn_ie                        qcn_ie;
 	tDot11fIEosen_ie                       osen_ie;
 	tDot11fIEroaming_consortium_sel        roaming_consortium_sel;
+	tDot11fIEsmd_ie                        smd_ie;
 } tDot11fAssocRequest;
 
 #define DOT11F_ASSOCREQUEST (3)
@@ -11439,6 +11458,7 @@ typedef struct sDot11fAssocResponse{
 	tDot11fIEqcn_ie                         qcn_ie;
 	tDot11fIEMBO_IE                         MBO_IE;
 	tDot11fIEreduced_neighbor_report        reduced_neighbor_report;
+	tDot11fIEsmd_ie                         smd_ie;
 } tDot11fAssocResponse;
 
 #define DOT11F_ASSOCRESPONSE (4)

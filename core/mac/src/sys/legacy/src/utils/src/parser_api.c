@@ -4136,7 +4136,6 @@ sir_convert_assoc_req_frame2_mlo_struct(uint8_t *pFrame,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-
 #ifdef WLAN_FEATURE_11BN_SMD
 /**
  * find_smd_ie() - Find SMD Information Element in frame
@@ -4280,6 +4279,112 @@ static QDF_STATUS lim_unpack_ieee80211_smd_payload(uint8_t *smd_ie,
 		 (smd->smd_timeout * 1024) / 1000);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * sir_convert_assoc_req_frame2_smd_struct() - Parse SMD IE from assoc request
+ * @frame: Frame buffer
+ * @frame_len: Frame length
+ * @ar: Parsed association request structure
+ * @p_assoc_req: Output structure to store parsed SMD IE
+ *
+ * Extracts and parses SMD Information Element from association request frame.
+ *
+ * Return: void
+ */
+static void
+sir_convert_assoc_req_frame2_smd_struct(uint8_t *frame,
+					uint32_t frame_len,
+					tDot11fAssocRequest *ar,
+					tpSirAssocReq p_assoc_req)
+{
+	uint8_t *smd_ie;
+	qdf_size_t smd_ie_len;
+	QDF_STATUS status;
+
+	if (frame_len <= WLAN_ASSOC_REQ_IES_OFFSET)
+		return;
+
+	status = find_smd_ie(frame + WLAN_ASSOC_REQ_IES_OFFSET,
+			     frame_len - WLAN_ASSOC_REQ_IES_OFFSET,
+			     &smd_ie, &smd_ie_len);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	if (!smd_ie)
+		return;
+
+	status = lim_unpack_ieee80211_smd_payload(smd_ie, smd_ie_len,
+						  &p_assoc_req->smd_ie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("SMD IE parse failed: %d", status);
+		return;
+	}
+
+	pe_debug("SMD IE: id=" QDF_MAC_ADDR_FMT " timeout=%u",
+		 QDF_MAC_ADDR_REF(p_assoc_req->smd_ie.smd_identifier),
+		 p_assoc_req->smd_ie.smd_timeout);
+}
+
+/**
+ * sir_convert_assoc_resp_frame2_smd_struct() - Parse SMD IE from assoc response
+ * @frame: Frame buffer
+ * @frame_len: Frame length
+ * @ar: Parsed association response structure
+ * @p_assoc_rsp: Output structure to store parsed SMD IE
+ *
+ * Extracts and parses SMD Information Element from association response frame.
+ *
+ * Return: void
+ */
+static void
+sir_convert_assoc_resp_frame2_smd_struct(uint8_t *frame,
+					 uint32_t frame_len,
+					 tDot11fAssocResponse *ar,
+					 tpSirAssocRsp p_assoc_rsp)
+{
+	uint8_t *smd_ie;
+	qdf_size_t smd_ie_len;
+	QDF_STATUS status;
+
+	if (frame_len <= WLAN_ASSOC_RSP_IES_OFFSET)
+		return;
+
+	status = find_smd_ie(frame + WLAN_ASSOC_RSP_IES_OFFSET,
+			frame_len - WLAN_ASSOC_RSP_IES_OFFSET,
+			&smd_ie, &smd_ie_len);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	if (!smd_ie)
+		return;
+
+	status = lim_unpack_ieee80211_smd_payload(smd_ie, smd_ie_len,
+			&p_assoc_rsp->smd_ie);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_debug("SMD IE parse failed: %d", status);
+		return;
+	}
+
+	pe_debug("SMD IE: id=" QDF_MAC_ADDR_FMT " timeout=%u",
+		 QDF_MAC_ADDR_REF(p_assoc_rsp->smd_ie.smd_identifier),
+		 p_assoc_rsp->smd_ie.smd_timeout);
+}
+#else
+static inline void
+sir_convert_assoc_req_frame2_smd_struct(uint8_t *frame,
+					uint32_t frame_len,
+					tDot11fAssocRequest *ar,
+					tpSirAssocReq p_assoc_req)
+{
+}
+
+static void
+sir_convert_assoc_resp_frame2_smd_struct(uint8_t *frame,
+					 uint32_t frame_len,
+					 tDot11fAssocResponse *ar,
+					 tpSirAssocRsp p_assoc_rsp)
+{
 }
 #endif /* WLAN_FEATURE_11BN_SMD */
 
@@ -4502,6 +4607,8 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 	if (ar->uhr_cap.present)
 		sir_convert_assoc_req_frame2_uhr_cap_struct(pFrame, nFrame,
 							    pAssocReq);
+	sir_convert_assoc_req_frame2_smd_struct(pFrame, nFrame,
+						ar, pAssocReq);
 
 	pe_debug("ht %d vht %d opmode %d vendor vht %d he %d he 6ghband %d eht %d",
 		 ar->HTCaps.present, ar->VHTCaps.present,
@@ -5343,6 +5450,9 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 	if (ar->uhr_cap.present)
 		sir_convert_assoc_resp_frame2_uhr_cap_struct(frame, frame_len,
 							     pAssocRsp);
+	sir_convert_assoc_resp_frame2_smd_struct(frame,
+						 frame_len,
+						 ar, pAssocRsp);
 	pe_debug("ht %d vht %d vendor vht: cap %d op %d, he %d he 6ghband %d eht %d eht320 %d, max idle: present %d val %d, he mu edca %d wmm %d qos %d mlo %d",
 		 ar->HTCaps.present, ar->VHTCaps.present,
 		 ar->vendor_vht_ie.VHTCaps.present,

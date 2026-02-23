@@ -439,6 +439,9 @@ typedef struct sSirAssocReq {
 #ifdef WLAN_FEATURE_11BN
 	struct wlan_uhr_cap_info uhr_cap_ie;
 #endif
+#ifdef WLAN_FEATURE_11BN_SMD
+	struct wlan_smd_ie smd_ie;
+#endif
 } tSirAssocReq, *tpSirAssocReq;
 
 #define FTIE_SUBELEM_R1KH_ID 1
@@ -565,6 +568,9 @@ typedef struct sSirAssocRsp {
 #ifdef WLAN_FEATURE_11BN
 	struct wlan_uhr_op_ie uhr_op_ie;
 	struct wlan_uhr_cap_info uhr_cap_ie;
+#endif
+#ifdef WLAN_FEATURE_11BN_SMD
+	struct wlan_smd_ie smd_ie;
 #endif
 } tSirAssocRsp, *tpSirAssocRsp;
 

@@ -69,6 +69,7 @@
 #include "wlan_mgmt_txrx_utils_api.h"
 #include "wlan_mgmt_txrx_tgt_api.h"
 #include "utils_parser.h"
+#include "wlan_vdev_mgr_utils_api.h"
 
 /**
  *
@@ -3278,6 +3279,85 @@ lim_override_extcap_struct(struct mac_context *mac_ctx,
 	p_ext_cap->twt_requestor_support = 1;
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * lim_fill_assoc_req_smd_ie() - Add SMD IE to association request
+ * @mac_ctx: MAC context
+ * @pe_session: PE session
+ * @frm: Association request frame structure
+ *
+ * This function adds SMD Information Element to the association request
+ * frame. The SMD context must already be populated by connection manager
+ * when candidate was selected.
+ *
+ * Return: Length of SMD IE added
+ */
+static uint32_t
+lim_fill_assoc_req_smd_ie(struct mac_context *mac_ctx,
+			  struct pe_session *pe_session,
+			  tDot11fAssocRequest *frm)
+{
+	struct wlan_mlo_dev_context *mlo_dev;
+	struct smd_context *smd_ctx;
+	tDot11fIEsmd_ie smd_ie;
+	uint32_t ie_len = sizeof(smd_ie);
+
+	if (!pe_session->vdev)
+		return 0;
+
+	mlo_dev = pe_session->vdev->mlo_dev_ctx;
+	if (!mlo_dev || !mlo_dev->smd_ctx)
+		return 0;
+
+	smd_ctx = mlo_dev->smd_ctx;
+	if (qdf_is_macaddr_zero(&smd_ctx->smd_identifier))
+		return 0;
+
+	qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
+
+	smd_ie.element_id = WLAN_ELEMID_EXTN_ELEM;
+	smd_ie.length = WLAN_SMD_INFO_IE_MIN_LEN;
+	smd_ie.element_id_extension = WLAN_EXTN_ELEMID_SMD_INFO;
+
+	qdf_mem_copy(smd_ie.smd_identifier,
+		     smd_ctx->smd_identifier.bytes,
+		     QDF_MAC_ADDR_SIZE);
+
+	smd_ie.smd_capabilities = (uint8_t)(
+			(((smd_ctx->smd_capabilities.smd_type <<
+			   SMD_CAP_TYPE_SHIFT) &
+			   SMD_CAP_TYPE_MASK)) |
+			(((smd_ctx->smd_capabilities.ptk_mode <<
+			   SMD_CAP_PTK_MODE_SHIFT) &
+			   SMD_CAP_PTK_MODE_MASK)) |
+			(((smd_ctx->smd_capabilities.dl_data_forwarding <<
+			   SMD_CAP_DL_DATA_FWD_SHIFT) &
+			   SMD_CAP_DL_DATA_FWD_MASK)) |
+			(((smd_ctx->smd_capabilities.max_prepared_targets <<
+			   SMD_CAP_MAX_TARGET_SHIFT) &
+			   SMD_CAP_MAX_TARGET_MASK)) |
+			(((smd_ctx->smd_capabilities.neighbor_ap_probe_support <<
+			   SMD_CAP_NEIGH_AP_PROBE_SHIFT) &
+			   SMD_CAP_NEIGH_AP_PROBE_MASK)));
+
+	smd_ie.timeout_value = smd_ctx->timeout_tu;
+
+	qdf_mem_copy(&frm->smd_ie, &smd_ie, ie_len);
+
+	qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+	pe_debug("Added SMD IE to assoc request, len=%u", ie_len);
+
+	return ie_len;
+}
+#else
+static inline
+uint32_t lim_fill_assoc_req_smd_ie(struct mac_context *mac_ctx,
+				   struct pe_session *pe_session,
+				   tDot11fAssocRequest *frm)
+{
+	return 0;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
 /**
  * lim_send_assoc_req_mgmt_frame() - Send association request
  * @mac_ctx: Handle to MAC context
@@ -3332,6 +3412,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t rsn_sel_ie[] = {0xdd, 0x5, 0x50, 0x6f, 0x9a, 0x2c, 0x00};
 	bool eht_capable = false;
 	uint8_t uhr_cap_ie_len = 0;
+	uint16_t smd_ie_len = 0;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -3939,7 +4020,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (is_ml_ap)
 		mlo_ie_len = lim_fill_assoc_req_mlo_ie(mac_ctx, pe_session,
 						       frm);
-
+	if (wlan_vdev_is_smd_enabled(pe_session->vdev))
+		smd_ie_len = lim_fill_assoc_req_smd_ie(mac_ctx, pe_session,
+						       frm);
 	/**
 	 * In case of ML connection, if ML IE length is 0 then return failure.
 	 */
@@ -4052,6 +4135,13 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			mlo_ie_len = 0;
 		}
 		payload = payload + mlo_ie_len;
+	}
+
+	if (smd_ie_len > 0) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     &frm->smd_ie, smd_ie_len);
+		payload += smd_ie_len;
+		pe_debug("Manually appended SMD IE, len=%u", smd_ie_len);
 	}
 
 	if (eht_cap_ie_len) {

@@ -1118,7 +1118,69 @@ lim_get_dlm_reject_reason(uint16_t status_code)
 	return REASON_UNKNOWN;
 }
 #endif
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * lim_process_assoc_rsp_smd() - Process SMD IE from association response
+ * @mac_ctx: MAC context
+ * @session_entry: PE session
+ * @assoc_rsp: Parsed association response
+ *
+ * This function processes SMD IE from association response and validates
+ * it against the SMD context that was populated from scan entry. It also
+ * updates any dynamic SMD parameters that may have changed.
+ *
+ * Return: None
+ */
+static void
+lim_process_assoc_rsp_smd(struct mac_context *mac_ctx,
+			  struct pe_session *session_entry,
+			  tpSirAssocRsp assoc_rsp)
+{
+	struct wlan_mlo_dev_context *mlo_dev;
+	struct smd_context *smd_ctx;
 
+	if (!session_entry->vdev)
+		return;
+
+	if (!assoc_rsp->smd_ie.present)
+		return;
+
+	mlo_dev = session_entry->vdev->mlo_dev_ctx;
+	if (!mlo_dev || !mlo_dev->smd_ctx)
+		return;
+
+	smd_ctx = mlo_dev->smd_ctx;
+
+	qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
+
+	if (qdf_mem_cmp(smd_ctx->smd_identifier.bytes,
+			assoc_rsp->smd_ie.smd_identifier,
+			QDF_MAC_ADDR_SIZE) != 0) {
+		pe_err("SMD Identifier mismatch between beacon and assoc response");
+		qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+		return;
+	}
+
+	if (assoc_rsp->smd_ie.smd_timeout != smd_ctx->timeout_tu) {
+		pe_debug("SMD timeout updated: %u -> %u TUs",
+			 smd_ctx->timeout_tu,
+			 assoc_rsp->smd_ie.smd_timeout);
+		smd_ctx->timeout_tu = assoc_rsp->smd_ie.smd_timeout;
+	}
+
+	qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+	pe_info("SMD association complete: ID=" QDF_MAC_ADDR_FMT " timeout=%u",
+		QDF_MAC_ADDR_REF(smd_ctx->smd_identifier.bytes),
+		smd_ctx->timeout_tu);
+}
+#else
+static inline
+void lim_process_assoc_rsp_smd(struct mac_context *mac_ctx,
+			       struct pe_session *session_entry,
+			       tpSirAssocRsp assoc_rsp)
+{
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
 /**
  * lim_send_join_fail_on_vdev() - Send join failure for link vdev
  * @mac_ctx: Pointer to Global MAC structure
@@ -1585,6 +1647,9 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	}
 
 	wlan_mlme_set_ap_nss(session_entry->vdev, nss_ies.cap_rx_nss);
+	lim_process_assoc_rsp_smd(mac_ctx,
+				  session_entry,
+				  assoc_rsp);
 	pe_debug("AP supported NSS = %dx%d, OP %dx%d",
 		 nss_ies.cap_tx_nss, nss_ies.cap_rx_nss,
 		 nss_ies.op_tx_nss, nss_ies.op_rx_nss);
