@@ -1208,10 +1208,21 @@ int osif_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	ret = osif_twt_send_requestor_enable_cmd(psoc, mac_id);
 	if (ret) {
 		osif_err("Failed to Enable TWT");
-		return -EOPNOTSUPP;
+		ret = -EOPNOTSUPP;
+		goto end;
 	}
 
-	return osif_send_twt_setup_req(vdev, psoc, &params);
+	ret = osif_send_twt_setup_req(vdev, psoc, &params);
+	if (ret)
+		goto end;
+
+	return 0;
+
+end:
+	if (congestion_timeout)
+		ucfg_twt_cfg_reset_congestion_timeout_per_mac_to_ini(psoc,
+								     mac_id);
+	return ret;
 }
 
 /**
