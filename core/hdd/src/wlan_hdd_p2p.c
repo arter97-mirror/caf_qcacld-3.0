@@ -2134,6 +2134,14 @@ static int __wlan_hdd_cfg80211_p2p_parse_noa_params(struct wiphy *wiphy,
 	if (ret)
 		return ret;
 
+	/* Try to handle NoA cancellation first */
+	ret = osif_p2p_noa_cancel(adapter, data, data_len);
+	if (!ret || ret != -ENOENT) {
+		/* NOA cancel and NoA start attributes won't come together */
+		return ret;
+	}
+
+	/* No cancellation attributes found, proceed with regular NoA parsing */
 	if (adapter->device_mode != QDF_P2P_GO_MODE) {
 		hdd_err_rl("Device is not GO");
 		return -EPERM;

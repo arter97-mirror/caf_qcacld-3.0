@@ -157,4 +157,13 @@ QDF_STATUS target_if_p2p_send_usd_params(struct wlan_objmgr_psoc *psoc,
  */
 bool target_if_p2p_is_fw_support_usd(struct wlan_objmgr_psoc *psoc);
 #endif /* FEATURE_WLAN_SUPPORT_USD */
+
+/**
+ * target_if_p2p_is_fw_cancel_one_shot_noa_supported() - Check if FW supports
+ * cancel one shot NoA
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if FW supports cancel one shot NoA, false otherwise
+ */
+bool target_if_p2p_is_fw_cancel_one_shot_noa_supported(struct wlan_objmgr_psoc *psoc);
 #endif /* _TARGET_IF_P2P_H_ */

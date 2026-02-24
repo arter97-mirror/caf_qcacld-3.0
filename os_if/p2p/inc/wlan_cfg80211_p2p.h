@@ -180,6 +180,18 @@ int osif_p2p_parse_wfd_params(struct hdd_adapter *adapter, const void *data,
 #endif /* FEATURE_WLAN_SUPPORT_USD */
 
 /**
+ * osif_p2p_noa_cancel - Handle P2P NoA cancellation commands
+ * @adapter: pointer to adapter object
+ * @data: pointer to data
+ * @data_len: data length
+ *
+ * Return: 0 on success, -ENOENT if no cancellation attributes present,
+ *         negative errno on error
+ */
+int osif_p2p_noa_cancel(struct hdd_adapter *adapter, const void *data,
+			int data_len);
+
+/**
  * osif_p2p_parse_noa_params - This function parse P2P NOA params
  * @adapter: pointer to adapter object
  * @noa: pointer to power save configure
