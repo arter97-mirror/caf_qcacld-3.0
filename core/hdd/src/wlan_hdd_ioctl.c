@@ -4803,11 +4803,6 @@ static int drv_cmd_bt_coex_mode(struct wlan_hdd_link_info *link_info,
 	if ('1' == *coex_mode) {
 		hdd_debug("BTCOEXMODE %d", *coex_mode);
 		hdd_ctx->bt_coex_mode_set = true;
-		ret = wlan_hdd_scan_abort(link_info);
-		if (ret < 0) {
-			hdd_err("Failed to abort existing scan status: %d",
-				ret);
-		}
 	} else if ('2' == *coex_mode) {
 		hdd_debug("BTCOEXMODE %d", *coex_mode);
 		hdd_ctx->bt_coex_mode_set = false;
