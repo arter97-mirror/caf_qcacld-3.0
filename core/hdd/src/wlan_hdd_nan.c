@@ -66,12 +66,43 @@ static inline void hdd_nan_fill_wiphy_he_caps(struct hdd_context *hdd_ctx,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+static bool hdd_nan_has_eht_caps(struct hdd_context *hdd_ctx)
+{
+	return hdd_ctx->nan_caps.eht.has_eht;
+}
+#else
+static inline bool hdd_nan_has_eht_caps(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
+#endif
+
+#if defined(WLAN_FEATURE_11BE) && defined(CFG80211_NAN_EHT_SUPPORTED)
+/*
+ * wiphy_nan_capa.phy.eht is only present when the kernel has been
+ * updated to include EHT support in struct wiphy_nan_capa. Guard with
+ * CFG80211_NAN_EHT_SUPPORTED until that kernel patch is merged into
+ * the target tree.
+ */
+static void hdd_nan_fill_wiphy_eht_caps(struct hdd_context *hdd_ctx,
+					struct wiphy_nan_capa *nan_capa)
+{
+	nan_capa->phy.eht = hdd_ctx->nan_caps.eht;
+}
+#else
+static inline void hdd_nan_fill_wiphy_eht_caps(struct hdd_context *hdd_ctx,
+					       struct wiphy_nan_capa *nan_capa)
+{
+}
+#endif
+
 /**
  * hdd_nan_fill_wiphy_caps() - Fill NAN PHY capabilities into wiphy
  * @hdd_ctx: Pointer to hdd context
  * @nan_capa: Pointer to wiphy NAN capability structure to fill
  *
- * Copies the cached NAN PHY capabilities (HT/VHT/HE) from the HDD
+ * Copies the cached NAN PHY capabilities (HT/VHT/HE/EHT) from the HDD
  * context into the provided wiphy NAN capability structure.
  *
  * Return: None
@@ -88,11 +119,13 @@ void hdd_nan_fill_wiphy_caps(struct hdd_context *hdd_ctx,
 	 */
 	if (!hdd_ctx->nan_caps.ht.ht_supported &&
 	    !hdd_ctx->nan_caps.vht.vht_supported &&
-	    !hdd_nan_has_he_caps(hdd_ctx))
+	    !hdd_nan_has_he_caps(hdd_ctx) &&
+	    !hdd_nan_has_eht_caps(hdd_ctx))
 		hdd_warn("NAN PHY caps not yet populated; wiphy will advertise no NAN PHY caps");
 	nan_capa->phy.ht = hdd_ctx->nan_caps.ht;
 	nan_capa->phy.vht = hdd_ctx->nan_caps.vht;
 	hdd_nan_fill_wiphy_he_caps(hdd_ctx, nan_capa);
+	hdd_nan_fill_wiphy_eht_caps(hdd_ctx, nan_capa);
 }
 #endif
 
@@ -381,6 +414,7 @@ void hdd_ndp_update_peer_bw(uint8_t vdev_id, struct qdf_mac_addr *peer_mac,
 #endif
 
 #if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+
 #if defined(CONFIG_BAND_6GHZ) && \
 	(defined(CFG80211_6GHZ_BAND_SUPPORTED) || \
 	 (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)))
@@ -470,8 +504,49 @@ static inline void hdd_nan_render_he_caps(struct hdd_context *hdd_ctx,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
 /**
- * hdd_populate_nan_phy_caps() - Populate NAN PHY capabilities (HT/VHT/HE)
+ * hdd_nan_render_eht_caps() - Render the NAN component's EHT PHY capability
+ * result into the kernel-facing ieee80211_sta_eht_cap structure
+ * @hdd_ctx: HDD context
+ * @caps: NAN PHY capability result from the NAN component
+ *
+ * Return: None
+ */
+static void hdd_nan_render_eht_caps(struct hdd_context *hdd_ctx,
+				    struct nan_phy_caps *caps)
+{
+	struct ieee80211_sta_eht_cap *eht = &hdd_ctx->nan_caps.eht;
+
+	eht->has_eht = caps->eht_supported;
+	if (!eht->has_eht) {
+		qdf_mem_zero(eht, sizeof(*eht));
+		return;
+	}
+
+	qdf_mem_copy(eht->eht_cap_elem.mac_cap_info,
+		     caps->eht_mac_cap_info,
+		     sizeof(eht->eht_cap_elem.mac_cap_info));
+	qdf_mem_copy(eht->eht_cap_elem.phy_cap_info,
+		     caps->eht_phy_cap_info,
+		     sizeof(eht->eht_cap_elem.phy_cap_info));
+	qdf_mem_zero(&eht->eht_mcs_nss_supp, sizeof(eht->eht_mcs_nss_supp));
+	qdf_mem_copy(&eht->eht_mcs_nss_supp,
+		     caps->eht_mcs_nss_supp,
+		     QDF_MIN(caps->eht_mcs_nss_supp_len,
+			     (uint32_t)sizeof(eht->eht_mcs_nss_supp)));
+	/* PPE thresholds: Not advertised for merged NAN PHY */
+	qdf_mem_zero(eht->eht_ppe_thres, sizeof(eht->eht_ppe_thres));
+}
+#else
+static inline void hdd_nan_render_eht_caps(struct hdd_context *hdd_ctx,
+					   struct nan_phy_caps *caps)
+{
+}
+#endif
+
+/**
+ * hdd_populate_nan_phy_caps() - Populate NAN PHY capabilities (HT/VHT/HE/EHT)
  * @hdd_ctx: HDD context
  * @cfg: effective target config (FW intersected with host)
  *
@@ -590,10 +665,12 @@ void hdd_populate_nan_phy_caps(struct hdd_context *hdd_ctx,
 	}
 
 	hdd_nan_render_he_caps(hdd_ctx, &caps);
+	hdd_nan_render_eht_caps(hdd_ctx, &caps);
 
-	hdd_debug("NAN PHY caps: HT=%d cap=0x%x, VHT=%d cap=0x%x",
+	hdd_debug("NAN PHY caps: HT=%d cap=0x%x VHT=%d cap=0x%x HE=%d EHT=%d",
 		  ht->ht_supported, ht->cap,
-		  vht->vht_supported, vht->cap);
+		  vht->vht_supported, vht->cap,
+		  hdd_nan_has_he_caps(hdd_ctx), hdd_nan_has_eht_caps(hdd_ctx));
 }
 #endif
 #endif

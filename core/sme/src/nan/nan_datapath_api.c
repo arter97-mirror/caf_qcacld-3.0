@@ -28,6 +28,38 @@
 #include "sme_inside.h"
 #include "csr_internal.h"
 #include "sme_nan_datapath.h"
+#ifdef WLAN_FEATURE_11AX
+#include "dot11f.h"
+#endif
+
+#ifdef WLAN_FEATURE_11AX
+#if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+QDF_STATUS sme_nan_pack_he_cap(const tDot11fIEhe_cap *he_cap_cfg,
+			       uint8_t *buf, uint32_t buf_len,
+			       uint32_t *consumed)
+{
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	/*
+	 * dot11f_pack_ie_he_cap() does not modify its input in practice, but
+	 * its generated signature does not take a const pointer. Make a local
+	 * copy to avoid casting away const from the caller's data.
+	 */
+	tDot11fIEhe_cap he_cap_local;
+	uint32_t status;
+
+	if (!mac_ctx || !he_cap_cfg || !buf || !consumed)
+		return QDF_STATUS_E_INVAL;
+
+	he_cap_local = *he_cap_cfg;
+	status = dot11f_pack_ie_he_cap(mac_ctx, &he_cap_local,
+				       buf, buf_len, consumed);
+	if (!DOT11F_SUCCEEDED(status))
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+#endif
 
 /**
  * csr_roam_update_ndp_return_params() - updates ndp return parameters

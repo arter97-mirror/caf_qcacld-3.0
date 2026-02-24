@@ -27,6 +27,9 @@
 #define __SME_NAN_DATAPATH_H
 
 #include "csr_inside_api.h"
+#ifdef WLAN_FEATURE_11AX
+#include "dot11f.h"
+#endif
 
 #ifdef WLAN_FEATURE_NAN
 void csr_roam_update_ndp_return_params(struct mac_context *mac_ctx,
@@ -35,6 +38,30 @@ void csr_roam_update_ndp_return_params(struct mac_context *mac_ctx,
 					uint32_t *roam_result,
 					struct csr_roam_info *roam_info);
 
+#ifdef WLAN_FEATURE_11AX
+#if defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
+/**
+ * sme_nan_pack_he_cap() - Pack HE capability IE
+ * @he_cap_cfg: dot11f HE capability structure
+ * @buf: Output buffer
+ * @buf_len: Size of output buffer
+ * @consumed: Output number of bytes consumed
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_nan_pack_he_cap(const tDot11fIEhe_cap * he_cap_cfg,
+			       uint8_t *buf, uint32_t buf_len,
+			       uint32_t *consumed);
+#else
+static inline QDF_STATUS
+sme_nan_pack_he_cap(const tDot11fIEhe_cap *he_cap_cfg,
+		    uint8_t *buf, uint32_t buf_len,
+		    uint32_t *consumed)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+#endif
 #else /* WLAN_FEATURE_NAN */
 
 static inline void csr_roam_update_ndp_return_params(struct mac_context *mac_ctx,

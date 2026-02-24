@@ -2780,7 +2780,7 @@ struct hdd_context {
 #endif
 #if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 	/*
-	 * nan_caps: Cached NAN PHY capabilities (HT/VHT/HE) for advertising
+	 * nan_caps: Cached NAN PHY capabilities (HT/VHT/HE/EHT) for advertising
 	 * to kernel/userspace.
 	 */
 	struct {
@@ -2788,6 +2788,9 @@ struct hdd_context {
 		struct ieee80211_sta_vht_cap vht;
 #ifdef WLAN_FEATURE_11AX
 		struct ieee80211_sta_he_cap he;
+#ifdef WLAN_FEATURE_11BE
+		struct ieee80211_sta_eht_cap eht;
+#endif
 #endif
 	} nan_caps;
 #endif

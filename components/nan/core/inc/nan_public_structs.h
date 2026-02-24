@@ -1214,8 +1214,11 @@ struct nan_capabilities {
 	u8 dev_capabilities;
 } qdf_packed;
 
+/* Max bytes cached for the packed EHT Supported MCS and NSS Set field */
+#define NAN_EHT_MCS_NSS_MAX_LEN  16
+
 /**
- * struct nan_phy_caps - NAN PHY capability intersection result (HT/VHT/HE)
+ * struct nan_phy_caps - NAN PHY capability intersection result (HT/VHT/HE/EHT)
  * @ht_supported: whether HT is supported for NAN
  * @ht_ldpc: HT RX LDPC supported
  * @ht_sgi_20: HT short GI for 20 MHz supported
@@ -1244,11 +1247,19 @@ struct nan_capabilities {
  * @he_tx_mcs_map_160: HE TX MCS map for 160 MHz, 2 bits per NSS
  * @he_rx_mcs_map_80p80: HE RX MCS map for 80+80 MHz, 2 bits per NSS
  * @he_tx_mcs_map_80p80: HE TX MCS map for 80+80 MHz, 2 bits per NSS
+ * @eht_supported: whether EHT is supported for NAN
+ * @eht_mac_cap_info: packed EHT MAC capability bytes, as in the EHT
+ *     Capabilities element (mirrors ieee80211_eht_cap_elem_fixed.mac_cap_info)
+ * @eht_phy_cap_info: packed EHT PHY capability bytes, as in the EHT
+ *     Capabilities element (mirrors ieee80211_eht_cap_elem_fixed.phy_cap_info)
+ * @eht_mcs_nss_supp: packed EHT Supported MCS and NSS Set bytes, as in the
+ *     EHT Capabilities element (mirrors ieee80211_eht_mcs_nss_supp)
+ * @eht_mcs_nss_supp_len: number of valid bytes in @eht_mcs_nss_supp
  *
- * OS-agnostic representation of the HT/VHT/HE capability bits relevant to
- * NAN, after intersecting FW-effective target capability with NAN band
+ * OS-agnostic representation of the HT/VHT/HE/EHT capability bits relevant
+ * to NAN, after intersecting FW-effective target capability with NAN band
  * enablement. HDD renders this into kernel-facing
- * ieee80211_sta_ht_cap/vht_cap/he_cap structures.
+ * ieee80211_sta_ht_cap/vht_cap/he_cap/eht_cap structures.
  */
 struct nan_phy_caps {
 	bool ht_supported;
@@ -1280,6 +1291,14 @@ struct nan_phy_caps {
 	uint16_t he_tx_mcs_map_160;
 	uint16_t he_rx_mcs_map_80p80;
 	uint16_t he_tx_mcs_map_80p80;
+
+#ifdef WLAN_FEATURE_11BE
+	bool eht_supported;
+	uint8_t eht_mac_cap_info[2];
+	uint8_t eht_phy_cap_info[9];
+	uint8_t eht_mcs_nss_supp[NAN_EHT_MCS_NSS_MAX_LEN];
+	uint32_t eht_mcs_nss_supp_len;
+#endif
 #endif
 };
 #endif /* WLAN_FEATURE_NAN && FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE */

@@ -35,9 +35,12 @@
 #include "cfg_ucfg_api.h"
 #if defined(WLAN_FEATURE_NAN) && defined(FEATURE_WLAN_SUPPORT_NAN_STANDARD_MODE)
 #include "wma_tgt_cfg.h"
-#ifdef WLAN_FEATURE_11AX
+#if defined(WLAN_FEATURE_11AX) || defined(WLAN_FEATURE_11BE)
 #include "dot11f.h"
 #include "cds_api.h"
+#endif
+#ifdef WLAN_FEATURE_11BE
+#include "wlan_cmn_ieee80211.h"
 #endif
 #endif
 
@@ -1005,6 +1008,105 @@ static inline void nan_populate_he_phy_caps(struct wma_tgt_cfg *cfg,
 }
 #endif /* WLAN_FEATURE_11AX */
 
+#ifdef WLAN_FEATURE_11BE
+/**
+ * nan_pack_eht_cap_ie() - Pack a dot11f EHT capability into its on-wire IE
+ * bytes and extract the MAC/PHY capability fields and MCS/NSS set
+ * @eht_cap_cfg: dot11f EHT capability
+ * @mac_cap_info: output 2-byte MAC capability info
+ * @phy_cap_info: output 9-byte PHY capability info
+ * @mcs_nss_supp: output buffer for the packed MCS/NSS Set bytes, sized
+ *     NAN_EHT_MCS_NSS_MAX_LEN
+ * @mcs_nss_supp_len: output number of valid bytes written to @mcs_nss_supp
+ *
+ * Return: None
+ */
+static void nan_pack_eht_cap_ie(const tDot11fIEeht_cap *eht_cap_cfg,
+				uint8_t mac_cap_info[2],
+				uint8_t phy_cap_info[9],
+				uint8_t mcs_nss_supp[NAN_EHT_MCS_NSS_MAX_LEN],
+				uint32_t *mcs_nss_supp_len)
+{
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	uint8_t buf[128];
+	uint32_t consumed = 0;
+	uint32_t status;
+	const uint8_t *payload;
+	/*
+	 * dot11f_pack_ie_eht_cap() does not modify its input in practice, but
+	 * its generated signature does not take a const pointer. Make a local
+	 * copy to avoid casting away const from the caller's data.
+	 */
+	tDot11fIEeht_cap eht_cap_local;
+	/*
+	 * Minimum valid EHT cap IE size: 3-byte header (elem_id + length +
+	 * ext_id) + 2-byte MAC cap + 9-byte PHY cap = 14 bytes total.
+	 */
+	uint32_t min_len = 3 + 2 + 9;
+
+	qdf_mem_zero(mac_cap_info, 2);
+	qdf_mem_zero(phy_cap_info, 9);
+	qdf_mem_zero(mcs_nss_supp, NAN_EHT_MCS_NSS_MAX_LEN);
+	*mcs_nss_supp_len = 0;
+	if (!mac_ctx || !eht_cap_cfg || !eht_cap_cfg->present)
+		return;
+
+	eht_cap_local = *eht_cap_cfg;
+	status = dot11f_pack_ie_eht_cap(mac_ctx, &eht_cap_local,
+					buf, sizeof(buf), &consumed);
+	if (!DOT11F_SUCCEEDED(status) || consumed < min_len)
+		return;
+
+	/*
+	 * Packed layout: Element ID (255, Extension Element), Length,
+	 * Extension ID (108, EHT Capabilities), then 2 bytes MAC cap info +
+	 * 9 bytes PHY cap info + variable-length MCS/NSS Set.
+	 */
+	if (buf[0] != WLAN_ELEMID_EXTN_ELEM ||
+	    buf[2] != WLAN_EXTN_ELEMID_EHTCAP)
+		return;
+
+	payload = &buf[3];
+	qdf_mem_copy(mac_cap_info, payload, 2);
+	qdf_mem_copy(phy_cap_info, payload + 2, 9);
+
+	if (consumed > min_len)
+		*mcs_nss_supp_len = QDF_MIN(consumed - min_len,
+					    (uint32_t)NAN_EHT_MCS_NSS_MAX_LEN);
+	if (*mcs_nss_supp_len)
+		qdf_mem_copy(mcs_nss_supp, &buf[min_len], *mcs_nss_supp_len);
+}
+
+/**
+ * nan_populate_eht_phy_caps() - Compute the NAN EHT PHY capability and
+ * store it into @caps
+ * @cfg: effective target config (FW intersected with host)
+ * @caps: output NAN PHY capability struct
+ *
+ * Populates EHT capabilities for NAN from the aggregated target EHT cap
+ * (cfg->eht_cap). Per-band intersection (using eht_cap_2g/eht_cap_5g) is not
+ * yet implemented, analogous to the HE path.
+ *
+ * Return: None
+ */
+static void nan_populate_eht_phy_caps(struct wma_tgt_cfg *cfg,
+				      struct nan_phy_caps *caps)
+{
+	caps->eht_supported = cfg->eht_cap.present;
+	if (!caps->eht_supported)
+		return;
+
+	nan_pack_eht_cap_ie(&cfg->eht_cap, caps->eht_mac_cap_info,
+			    caps->eht_phy_cap_info, caps->eht_mcs_nss_supp,
+			    &caps->eht_mcs_nss_supp_len);
+}
+#else
+static inline void nan_populate_eht_phy_caps(struct wma_tgt_cfg *cfg,
+					     struct nan_phy_caps *caps)
+{
+}
+#endif /* WLAN_FEATURE_11BE */
+
 void nan_populate_phy_caps(struct wlan_objmgr_psoc *psoc,
 			   struct wma_tgt_cfg *cfg, uint8_t num_rf_chains,
 			   bool enable_2g, bool enable_5g, bool enable_6g)
@@ -1079,6 +1181,7 @@ void nan_populate_phy_caps(struct wlan_objmgr_psoc *psoc,
 			       caps->vht_rx_mcs_map != 0xFFFF;
 
 	nan_populate_he_phy_caps(cfg, enable_2g, enable_5g, enable_6g, caps);
+	nan_populate_eht_phy_caps(cfg, caps);
 }
 
 void nan_get_phy_caps(struct wlan_objmgr_psoc *psoc,
