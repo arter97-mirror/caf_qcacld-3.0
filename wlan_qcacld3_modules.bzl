@@ -56,6 +56,7 @@ _target_chipset_map = {
         "fig",
         "fig-v2",
         "wcn6450",
+        "adrastea",
     ],
     "alor-le": [
         "wcn7750",
@@ -109,6 +110,7 @@ _chipset_hw_map = {
     "wcn7760": "BERYLLIUM",
     "qca6574": "ROME",
     "qca6574au-3": "ROME-SDIO",
+    "adrastea" : "ADRASTEA",
 }
 
 _chipset_header_map = {
@@ -166,6 +168,8 @@ _chipset_header_map = {
     ],
     "qca6574au-3": [
     ],
+    "adrastea" : [
+    ],
 }
 
 _hw_header_map = {
@@ -190,6 +194,8 @@ _hw_header_map = {
     "ROME": [
     ],
     "ROME-SDIO": [
+    ],
+    "ADRASTEA" : [
     ],
 }
 
@@ -472,6 +478,7 @@ _fixed_ipaths = [
     "os_if/twt/inc",
     "os_if/telemetry/inc",
     "uapi/linux",
+    "cmn/hif/src/snoc",
 ]
 
 # paths where include files are private in src folders
@@ -1476,6 +1483,7 @@ _conditional_srcs = {
     "CONFIG_PLD_SNOC_ICNSS_FLAG": {
         True: [
             "core/pld/src/pld_snoc.c",
+	    "cmn/hif/src/snoc/if_snoc.c",
         ],
     },
     "CONFIG_POWER_MANAGEMENT_OFFLOAD": {
@@ -2823,7 +2831,7 @@ def _define_module_for_target_variant_chipset(target, variant, chipset):
     kconfig = "Kconfig"
     defconfig = ":configs/{}_defconfig_generate_{}".format(tvc, variant)
 
-    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450":
+    if chipset == "qca6750" or chipset == "wcn7750" or chipset == "wcn6450" or chipset == "adrastea":
         deps += [
             "//vendor/qcom/opensource/wlan/platform:{}_icnss2".format(tv),
         ]
