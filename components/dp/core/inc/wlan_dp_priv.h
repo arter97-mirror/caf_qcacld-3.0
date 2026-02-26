@@ -469,6 +469,7 @@ struct dp_fisa_reo_mismatch_stats {
  * @udp_flush_nonlinear_osif_rx_fail: udp_flush_nonlinear_osif_rx_fail
  * @udp_aggr_append_fail: udp_aggr_append_fail
  * @osif_rx_fail: Packets freed because osif_rx is NULL or returned failure
+ * @flow_migration: Number of RX flows migrated across NAPI/REO rings
  */
 struct dp_fisa_stats {
 	uint32_t invalid_flow_index;
@@ -481,6 +482,7 @@ struct dp_fisa_stats {
 	uint32_t udp_flush_nonlinear_osif_rx_fail;
 	uint32_t udp_aggr_append_fail;
 	uint32_t osif_rx_fail;
+	uint32_t flow_migration;
 };
 
 /**

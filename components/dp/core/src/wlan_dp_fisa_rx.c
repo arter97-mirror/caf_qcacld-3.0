@@ -367,6 +367,7 @@ void dp_fisa_update_fst_table(struct wlan_dp_psoc_context *dp_ctx,
 		sw_ft_entry->is_mig = true;
 		sw_ft_entry->prev_napi_id = sw_ft_entry->napi_id;
 		sw_ft_entry->napi_id = flow_details->napi_id;
+		DP_STATS_INC(rx_fst, flow_migration, 1);
 
 		dp_info("moving flow %d from napi_id%d to napi_id%d",
 			sw_ft_entry->flow_id, sw_ft_entry->prev_napi_id,

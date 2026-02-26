@@ -102,6 +102,8 @@ static void dp_print_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 		fst->stats.udp_flush_nonlinear_osif_rx_fail);
 	dp_info("udp_aggr_append_fail: %u", fst->stats.udp_aggr_append_fail);
 	dp_info("osif_rx_fail: %u", fst->stats.osif_rx_fail);
+	dp_info("flow_migration: Number of RX flows migrated: %u",
+		fst->stats.flow_migration);
 }
 
 /* Length of string to store tuple information for printing */
