@@ -577,9 +577,9 @@ void wlan_tdls_increment_discovery_attempts(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	peer = tdls_get_peer(tdls_vdev_obj, peer_addr);
+	peer = tdls_find_peer(tdls_vdev_obj, peer_addr);
 	if (!peer) {
-		tdls_err("tdls_peer is NULL");
+		tdls_err("vdev_id:%d tdls_peer is NULL", vdev_id);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_TDLS_NB_ID);
 		return;
 	}

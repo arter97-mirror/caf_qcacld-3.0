@@ -1136,7 +1136,8 @@ static void tdls_ct_process_cap_unknown(struct tdls_peer *curr_peer,
 	if (curr_peer->is_forced_peer ||
 	    curr_peer->discovery_attempt <
 	    tdls_vdev->threshold_config.discovery_tries_n) {
-		tdls_debug("TDLS initiate discovery is_forced_peer:%d disc_attempts:%d",
+		tdls_debug("vdev_id:%d TDLS initiate discovery is_forced_peer:%d disc_attempts:%d",
+			   wlan_vdev_get_id(tdls_vdev->vdev),
 			   curr_peer->is_forced_peer,
 			   curr_peer->discovery_attempt);
 		tdls_vdev->curr_candidate = curr_peer;
