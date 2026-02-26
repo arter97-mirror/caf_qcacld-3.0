@@ -1121,7 +1121,7 @@ static inline bool wma_is_phymode_eht(enum wlan_phymode phymode)
 }
 #endif
 
-#ifdef CONFIG_160MHZ_SUPPORT
+#if CONFIG_160MHZ_SUPPORT
 /**
  * wma_fw_to_host_phymode_160() - convert fw to host phymode for 160 mhz
  * phymodes
@@ -2406,7 +2406,7 @@ static int wmi_unified_probe_rsp_tmpl_send(tp_wma_handle wma,
 	 */
 	adjusted_tsf_le = cpu_to_le64(0ULL -
 				      wma->interfaces[vdev_id].tsfadjust);
-	/* Update the timstamp in the probe response buffer with adjusted TSF */
+	/* Update the timestamp in the probe response buffer with adjusted TSF */
 	wh = (struct ieee80211_frame *)probe_rsp_info->probeRespTemplate;
 	A_MEMCPY(&wh[1], &adjusted_tsf_le, sizeof(adjusted_tsf_le));
 
@@ -2712,7 +2712,7 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 	 */
 	adjusted_tsf_le = cpu_to_le64(0ULL -
 				      wma->interfaces[vdev_id].tsfadjust);
-	/* Update the timstamp in the beacon buffer with adjusted TSF */
+	/* Update the timestamp in the beacon buffer with adjusted TSF */
 	wh = (struct ieee80211_frame *)frm;
 	A_MEMCPY(&wh[1], &adjusted_tsf_le, sizeof(adjusted_tsf_le));
 
