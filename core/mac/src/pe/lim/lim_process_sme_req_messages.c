@@ -9638,6 +9638,33 @@ end:
 				       REASON_CH_WIDTH_UPDATE);
 }
 
+static bool lim_is_valid_dnw(struct pe_session *session,
+			     enum phy_ch_width ch_width,
+			     enum phy_ch_width new_ch_width)
+{
+	struct mac_context *mac_ctx;
+	struct wlan_channel *des_chan;
+
+	if (!session || !session->vdev) {
+		pe_err("NULL session or vdev");
+		return false;
+	}
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx || !mac_ctx->pdev) {
+		pe_err("NULL mac_ctx or pdev");
+		return false;
+	}
+	des_chan = wlan_vdev_mlme_get_des_chan(session->vdev);
+	if (!des_chan) {
+		pe_err("NULL des_chan");
+		return false;
+	}
+
+	return wlan_is_valid_dnw(mac_ctx->pdev, des_chan->ch_freq,
+				 ch_width, new_ch_width);
+}
+
 static enum phy_ch_width
 lim_calculate_peer_ch_width(struct pe_session *session,
 			    uint8_t *mac_addr,
@@ -9655,7 +9682,9 @@ lim_calculate_peer_ch_width(struct pe_session *session,
 	qdf_mem_copy(&data.peer_mac_address.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
 	status = wlan_mlme_get_peer_indicated_ch_width(
 				wlan_vdev_get_psoc(session->vdev), &data);
-	if (QDF_IS_STATUS_SUCCESS(status))
+	/* Allow BW upgrade for DFS No Wait case */
+	if (QDF_IS_STATUS_SUCCESS(status) &&
+	    !lim_is_valid_dnw(session, session->ch_width, new_ch_width))
 		updated_bw = data.new_bw;
 
 	pe_debug("Peer: " QDF_MAC_ADDR_FMT " dot11 max bw %d, peer updated bw %d, new target bw %d",
