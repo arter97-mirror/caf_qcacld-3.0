@@ -10388,7 +10388,7 @@ policy_mgr_update_active_mlo_num_nlink(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct mlo_link_info *link_info;
-	uint8_t iter, cnt = 0;
+	uint8_t iter;
 	uint8_t *link_mac_addr;
 	uint32_t link_bitmap = 0;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -10420,19 +10420,12 @@ policy_mgr_update_active_mlo_num_nlink(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_debug("Num active links: %d", force_active_cnt);
 	link_info = &vdev->mlo_dev_ctx->link_ctx->links_info[0];
 	for (iter = 0; iter < WLAN_MAX_ML_BSS_LINKS; iter++) {
-		if (cnt >= force_active_cnt)
-			break;
 		if (link_info->link_id == WLAN_INVALID_LINK_ID) {
 			link_info++;
 			continue;
 		}
 
 		if (qdf_is_macaddr_zero(&link_info->ap_link_addr)) {
-			link_info++;
-			continue;
-		}
-
-		if (link_info->vdev_id == WLAN_INVALID_VDEV_ID) {
 			link_info++;
 			continue;
 		}
@@ -11011,7 +11004,7 @@ policy_mgr_allow_passthru_concurrency(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/*
-	 * This would only happen for DBS hw as we would reject inital
+	 * This would only happen for DBS hw as we would reject initial
 	 * STA connection in case of non-DBS hw.
 	 */
 	if (mode == PM_STA_MODE &&
