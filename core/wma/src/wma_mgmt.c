@@ -1746,13 +1746,16 @@ static QDF_STATUS wma_handle_peer_assoc_send(tp_wma_handle wma,
 		if (QDF_IS_STATUS_ERROR(status))
 			return status;
 
-		wma_handle_peer_assoc_conf(
-			wma, params->smesessionId,
-			QDF_STATUS_SUCCESS,
-			wma_is_vdev_in_ap_mode(wma, params->smesessionId) ?
-			params->staMac : params->bssId);
+		status = wma_handle_peer_assoc_conf(
+				wma, params->smesessionId,
+				QDF_STATUS_SUCCESS,
+				wma_is_vdev_in_ap_mode(wma, params->smesessionId) ?
+				params->staMac : params->bssId);
 
-		return QDF_STATUS_SUCCESS;
+		if (QDF_IS_STATUS_ERROR(status))
+			mlo_mgr_cleanup_cached_connect_params(intr->vdev);
+
+		return status;
 	}
 
 	status = wmi_unified_peer_assoc_send(wma->wmi_handle, cmd);

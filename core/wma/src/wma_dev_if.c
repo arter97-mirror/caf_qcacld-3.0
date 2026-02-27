@@ -2571,25 +2571,29 @@ wma_handle_peer_create_cmd(tp_wma_handle wma,
 			   struct qdf_mac_addr *peer_mac)
 {
 	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	int ret;
 
 	vdev = wma->interfaces[vdev_id].vdev;
 	if (vdev && mlo_mgr_is_link_switch_in_progress(vdev) &&
 	    mlo_mgr_is_sta_mlo_unified_connect_disconnect_enabled(wma->psoc)) {
-		QDF_STATUS cache_status;
-
 		wma_debug("vdev:%d MLO link switch in progress, skip WMI_PEER_CREATE_CMDID",
 			  vdev_id);
-
-		cache_status = mlo_mgr_cache_peer_create_params(vdev, param);
-		if (QDF_IS_STATUS_ERROR(cache_status)) {
+		status = mlo_mgr_cache_peer_create_params(vdev, param);
+		if (QDF_IS_STATUS_ERROR(status)) {
 			wma_err("vdev:%d Failed to cache peer create params, status: %d",
-				vdev_id, cache_status);
-			return cache_status;
+				vdev_id, status);
+			return status;
 		}
 
-		wma_peer_create_resp_notify(wma, vdev_id, peer_mac,
-					    QDF_STATUS_SUCCESS);
-		return QDF_STATUS_SUCCESS;
+		ret = wma_peer_create_resp_notify(wma, vdev_id, peer_mac,
+						  QDF_STATUS_SUCCESS);
+		if (ret) {
+			mlo_mgr_cleanup_cached_connect_params(vdev);
+			status = QDF_STATUS_E_FAILURE;
+		}
+
+		return status;
 	}
 
 	/* No link switch in progress: send WMI_PEER_CREATE_CMDID */
