@@ -41,6 +41,7 @@
 #include <wlan_action_oui_main.h>
 #include <wlan_p2p_api.h>
 #include <wlan_t2lm_api.h>
+#include <wlan_scan_utils_api.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 bool if_mgr_is_assoc_link_of_vdev(struct wlan_objmgr_pdev *pdev,
@@ -973,6 +974,29 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 				    chan_freq,
 				    wlan_reg_is_freq_indoor(pdev, chan_freq));
 			return QDF_STATUS_E_INVAL;
+		}
+
+		/*
+		 * 6 GHz connection-time security validation
+		 * Mode 2: Connect Validation (check_6ghz_security_on_connect=1)
+		 * This validation happens here in if_mgr_validate_candidate
+		 * instead of cm_if_mgr_validate_candidate to ensure it's
+		 * applied consistently across all connection paths.
+		 */
+		if (wlan_cm_get_check_6ghz_security(psoc) &&
+		    wlan_cm_get_check_6ghz_security_on_connect(psoc) &&
+		    wlan_reg_is_6ghz_chan_freq(chan_freq)) {
+			status = scm_validate_6ghz_security_and_policy(
+					psoc, candidate_info->scan_entry, true);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				ifmgr_info("6GHz candidate " QDF_MAC_ADDR_FMT " at freq %d rejected due to security validation",
+					   QDF_MAC_ADDR_REF(candidate_info->peer_addr.bytes),
+					   chan_freq);
+				return QDF_STATUS_E_INVAL;
+			}
+			ifmgr_debug("6 GHz candidate " QDF_MAC_ADDR_FMT " at freq %d passed security validation",
+				    QDF_MAC_ADDR_REF(candidate_info->peer_addr.bytes),
+				    chan_freq);
 		}
 	}
 
