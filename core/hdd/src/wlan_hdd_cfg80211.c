@@ -5730,6 +5730,8 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 		hdd_debug("sta_dfs_ch_peer_scc is supported");
 		wlan_cfg80211_set_feature(feature_flags,
 					  QCA_WLAN_VENDOR_FEATURE_SUPPORT_STA_DFS_CH_SCC_P2P);
+		wlan_cfg80211_set_feature(feature_flags,
+					  QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_ASSISTED_DFS);
 	}
 
 	/* Check the kernel version for upstream commit aced43ce780dc5 that
