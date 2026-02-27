@@ -1507,6 +1507,7 @@ static QDF_STATUS hdd_qdf_to_nl_iface_type(enum nl80211_iftype *nl_type,
 		*nl_type = NL80211_IFTYPE_AP;
 		break;
 	case QDF_MONITOR_MODE:
+	case QDF_PASSTHRU_MODE:
 		*nl_type = NL80211_IFTYPE_MONITOR;
 		break;
 	case QDF_OCB_MODE:
@@ -10107,7 +10108,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 			adapter->wdev.iftype = NL80211_IFTYPE_P2P_CLIENT;
 		else if (QDF_P2P_DEVICE_MODE == session_type)
 			adapter->wdev.iftype = NL80211_IFTYPE_P2P_DEVICE;
-		else if (QDF_MONITOR_MODE == session_type)
+		else if (QDF_MONITOR_MODE == session_type ||
+			 QDF_PASSTHRU_MODE == session_type)
 			adapter->wdev.iftype = NL80211_IFTYPE_MONITOR;
 		else if (QDF_NAN_DISC_MODE == session_type)
 			wlan_hdd_set_nan_if_type(adapter);

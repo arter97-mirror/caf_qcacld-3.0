@@ -855,6 +855,12 @@ static const struct ieee80211_iface_limit
 		.max = 2,
 		.types = BIT(NL80211_IFTYPE_MONITOR),
 	},
+	/* STA + MONITOR */
+	{
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_STATION),
+	},
+
 };
 
 #if defined(WLAN_FEATURE_NAN) && \
@@ -1052,7 +1058,7 @@ static struct ieee80211_iface_combination
 	/* Monitor */
 	{
 		.limits = wlan_hdd_mon_iface_limit,
-		.max_interfaces = 2,
+		.max_interfaces = 3,
 		.num_different_channels = 2,
 		.n_limits = ARRAY_SIZE(wlan_hdd_mon_iface_limit),
 	},
