@@ -268,7 +268,7 @@
 			"gSoftApMaxPeers", \
 			1, \
 			64, \
-			10, \
+			32, \
 			CFG_VALUE_OR_DEFAULT, \
 			"max no of peers")
 
