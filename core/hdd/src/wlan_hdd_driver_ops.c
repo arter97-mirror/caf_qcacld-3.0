@@ -942,8 +942,8 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 	 * in progress
 	 */
 	if (!qdf_is_fw_down()) {
-		cds_set_recovery_in_progress(false);
 		hdd_handle_cached_commands();
+		cds_set_recovery_in_progress(false);
 	}
 
 	if (!hdd_is_any_interface_open(hdd_ctx)) {

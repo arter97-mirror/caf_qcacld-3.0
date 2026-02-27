@@ -6002,7 +6002,6 @@ int hdd_stop_no_trans(struct net_device *dev)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	int ret;
 	mac_handle_t mac_handle;
 
 	hdd_enter_dev(dev);
@@ -6011,9 +6010,8 @@ int hdd_stop_no_trans(struct net_device *dev)
 		   TRACE_CODE_HDD_STOP_REQUEST,
 		   adapter->deflink->vdev_id, adapter->device_mode);
 
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (ret)
-		return ret;
+	if (!hdd_ctx)
+		return -EINVAL;
 
 	/* Nothing to be done if the interface is not opened */
 	if (false == test_bit(DEVICE_IFACE_OPENED, &adapter->event_flags)) {
