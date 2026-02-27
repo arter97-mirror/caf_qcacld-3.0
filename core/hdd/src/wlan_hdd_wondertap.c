@@ -639,6 +639,7 @@ static
 void wlan_hdd_wondertap_deinit(void *handle,
 			       const qdf_wondertap_deinit_params_t *params)
 {
+	struct hdd_wondertap_context *wt_ctx;
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *wt_adapter;
 	struct hdd_adapter *sta_adapter;
@@ -648,15 +649,24 @@ void wlan_hdd_wondertap_deinit(void *handle,
 	int errno;
 
 	hdd_enter();
-	if (!g_wt_ctx || handle != (void *)g_wt_ctx->magic) {
+
+	/*
+	 * Serialize access to g_wt_ctx across init/deinit/setters and avoid
+	 * races where multiple deinit callers free g_wt_ctx concurrently.
+	 */
+	mutex_lock(&g_wt_ctx_mutex);
+	wt_ctx = g_wt_ctx;
+	if (!wt_ctx || handle != (void *)wt_ctx->magic) {
+		mutex_unlock(&g_wt_ctx_mutex);
 		hdd_debug("Incorrect handle received - rejecting deinit");
 		return;
 	}
 
-	ASSERT_RTNL();
+	hdd_ctx = wt_ctx->hdd_ctx;
+	wt_adapter = wt_ctx->wt_adapter;
+	mutex_unlock(&g_wt_ctx_mutex);
 
-	hdd_ctx = g_wt_ctx->hdd_ctx;
-	wt_adapter = g_wt_ctx->wt_adapter;
+	ASSERT_RTNL();
 
 	errno = osif_vdev_sync_trans_start_wait(wt_adapter->dev, &vdev_sync);
 	if (errno)
@@ -666,7 +676,7 @@ void wlan_hdd_wondertap_deinit(void *handle,
 	if (errno)
 		goto destroy_sync;
 
-	if (g_wt_ctx->is_frame_filter_set) {
+	if (wt_ctx->is_frame_filter_set) {
 		filter_req.filter_action = HDD_RCV_FILTER_CLEAR;
 		errno = wlan_hdd_set_filter(hdd_ctx, &filter_req,
 					    wt_adapter->deflink->vdev_id);
@@ -698,17 +708,27 @@ void wlan_hdd_wondertap_deinit(void *handle,
 			wlan_hdd_set_powersave(sta_link_info, true, 0);
 	}
 
-	qdf_runtime_pm_allow_suspend(&g_wt_ctx->wondertap_rtpm_lock);
-	qdf_wake_lock_release(&g_wt_ctx->wondertap_wakelock,
+	qdf_runtime_pm_allow_suspend(&wt_ctx->wondertap_rtpm_lock);
+	qdf_wake_lock_release(&wt_ctx->wondertap_wakelock,
 			      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
-	qdf_wake_lock_destroy(&g_wt_ctx->wondertap_wakelock);
-	qdf_runtime_lock_deinit(&g_wt_ctx->wondertap_rtpm_lock);
+	qdf_wake_lock_destroy(&wt_ctx->wondertap_wakelock);
+	qdf_runtime_lock_deinit(&wt_ctx->wondertap_rtpm_lock);
 
 	mutex_lock(&g_wt_ctx_mutex);
-	qdf_event_destroy(&g_wt_ctx->wondertap_vdev_event);
-	qdf_mem_free(g_wt_ctx);
-	g_wt_ctx = NULL;
-	mutex_unlock(&g_wt_ctx_mutex);
+	/*
+	 * Ensure only the matching instance clears/frees the global context.
+	 * If a new session got created concurrently (unlikely, but possible),
+	 * avoid tearing it down here.
+	 */
+	if (g_wt_ctx == wt_ctx) {
+		qdf_event_destroy(&wt_ctx->wondertap_vdev_event);
+		g_wt_ctx = NULL;
+		mutex_unlock(&g_wt_ctx_mutex);
+
+		qdf_mem_free(wt_ctx);
+	} else {
+		mutex_unlock(&g_wt_ctx_mutex);
+	}
 
 destroy_sync:
 	osif_vdev_sync_trans_stop(vdev_sync);
