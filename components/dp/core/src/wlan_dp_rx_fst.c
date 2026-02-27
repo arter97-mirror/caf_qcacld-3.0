@@ -93,6 +93,15 @@ static void dp_print_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 		fst->stats.reo_mismatch.allow_fse_metdata_mismatch);
 	dp_info("reo_mismatch: allow_non_aggr: %u",
 		fst->stats.reo_mismatch.allow_non_aggr);
+	dp_info("flush_vdev_ref_fail: %u", fst->stats.flush_vdev_ref_fail);
+	dp_info("udp_flush_linear_osif_rx_fail: %u",
+		fst->stats.udp_flush_linear_osif_rx_fail);
+	dp_info("udp_flush_sanity_len_mismatch_drop: %u",
+		fst->stats.udp_flush_sanity_len_mismatch_drop);
+	dp_info("udp_flush_nonlinear_osif_rx_fail: %u",
+		fst->stats.udp_flush_nonlinear_osif_rx_fail);
+	dp_info("udp_aggr_append_fail: %u", fst->stats.udp_aggr_append_fail);
+	dp_info("osif_rx_fail: %u", fst->stats.osif_rx_fail);
 }
 
 /* Length of string to store tuple information for printing */
@@ -147,7 +156,7 @@ static QDF_STATUS dp_rx_dump_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 				 tuple_str,
 				 sizeof(tuple_str));
 
-		dp_info("Flow[%d][%s][%s] ring %d msdu-aggr %d flushes %d bytes-agg %llu avg-bytes-aggr %llu same_mld_vdev_mismatch %llu",
+		dp_info("Flow[%d][%s][%s] ring %d msdu-aggr %d flushes %d bytes-agg %llu avg-bytes-aggr %llu same_mld_vdev_mismatch %llu head_vdev_ref_fail %u flow_vdev_ref_fail %u vdev_ptr_mismatch %u mld_mismatch_drop %u",
 			sw_ft_entry->flow_id,
 			sw_ft_entry->is_flow_udp ? "udp" : "tcp",
 			tuple_str,
@@ -158,7 +167,11 @@ static QDF_STATUS dp_rx_dump_fisa_stats(struct wlan_dp_psoc_context *dp_ctx)
 			sw_ft_entry->flush_count ?
 				qdf_do_div(sw_ft_entry->bytes_aggregated,
 					   sw_ft_entry->flush_count) : 0,
-			sw_ft_entry->same_mld_vdev_mismatch);
+			sw_ft_entry->same_mld_vdev_mismatch,
+			sw_ft_entry->flush_head_vdev_ref_fail,
+			sw_ft_entry->flush_flow_vdev_ref_fail,
+			sw_ft_entry->flush_vdev_ptr_mismatch,
+			sw_ft_entry->flush_mld_mismatch_drop);
 	}
 	return QDF_STATUS_SUCCESS;
 }
