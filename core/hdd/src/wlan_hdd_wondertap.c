@@ -1083,10 +1083,14 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 		  g_wt_ctx ? 1 : 0, force_cleanup);
 
 	hdd_hold_rtnl_lock();
+	mutex_lock(&g_wt_ctx_mutex);
 
 	if (force_cleanup && g_wt_ctx) {
 		hdd_ctx = g_wt_ctx->hdd_ctx;
 		adapter = g_wt_ctx->wt_adapter;
+		/* Keep reference to event for later use */
+		qdf_event_t *vdev_event = &g_wt_ctx->wondertap_vdev_event;
+		mutex_unlock(&g_wt_ctx_mutex);
 
 		wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -1094,11 +1098,11 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 
 		dev_close(adapter->dev);
 
-		qdf_event_reset(&g_wt_ctx->wondertap_vdev_event);
+		qdf_event_reset(vdev_event);
 		sme_delete_pe_session(hdd_ctx->mac_handle, adapter->deflink->vdev_id,
 				      QDF_PASSTHRU_MODE);
 
-		status = qdf_wait_for_event_completion(&g_wt_ctx->wondertap_vdev_event,
+		status = qdf_wait_for_event_completion(vdev_event,
 						       WLAN_WONDERTAP_VDEV_OP_TIMEOUT_MS);
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err("wondertap vdev teardown failed:%d", status);
@@ -1114,18 +1118,24 @@ void wlan_hdd_wondertap_unregister_ops(struct device *dev, bool force_cleanup)
 
 		__wlan_hdd_destroy_wondertap_intf(hdd_ctx, adapter);
 
-		qdf_runtime_pm_allow_suspend(&g_wt_ctx->wondertap_rtpm_lock);
-		qdf_wake_lock_release(&g_wt_ctx->wondertap_wakelock,
-				      WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
-		qdf_wake_lock_destroy(&g_wt_ctx->wondertap_wakelock);
-		qdf_runtime_lock_deinit(&g_wt_ctx->wondertap_rtpm_lock);
-
+		/* Final cleanup under mutex */
 		mutex_lock(&g_wt_ctx_mutex);
-		qdf_event_destroy(&g_wt_ctx->wondertap_vdev_event);
-		qdf_mem_free(g_wt_ctx);
-		g_wt_ctx = NULL;
-		mutex_unlock(&g_wt_ctx_mutex);
+		if (g_wt_ctx) {
+			qdf_runtime_pm_allow_suspend(
+						&g_wt_ctx->wondertap_rtpm_lock);
+			qdf_wake_lock_release(
+					&g_wt_ctx->wondertap_wakelock,
+					WIFI_POWER_EVENT_WAKELOCK_PASSTHRU);
+			qdf_wake_lock_destroy(&g_wt_ctx->wondertap_wakelock);
+			qdf_runtime_lock_deinit(&g_wt_ctx->wondertap_rtpm_lock);
+
+			qdf_event_destroy(&g_wt_ctx->wondertap_vdev_event);
+			qdf_mem_free(g_wt_ctx);
+			g_wt_ctx = NULL;
+		}
 	}
+
+	mutex_unlock(&g_wt_ctx_mutex);
 
 	hdd_release_rtnl_lock();
 	hdd_exit();
