@@ -5722,6 +5722,33 @@ static void wmi_roam_mlo_attach_tlv(struct wmi_unified *wmi_handle)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * send_update_smd_roam_params() - Update SMD roam scoring params
+ * @score_param: pointer to wmi_roam_cnd_scoring_param to be filled
+ * @ap_profile: pointer to ap_profile_params containing host config
+ *
+ * Populate uhr_weightage_pcnt and smd_weightage_pcnt fields in the WMI
+ * scoring param TLV from the corresponding host-side ap_profile parameters.
+ *
+ * Return: None
+ */
+static void
+send_update_smd_roam_params(wmi_roam_cnd_scoring_param *score_param,
+			    struct ap_profile_params *ap_profile)
+{
+	score_param->smd_weightage_pcnt = ap_profile->param.smd_weightage;
+	wmi_debug("SMD score params weightage: SMD %d",
+		  score_param->smd_weightage_pcnt);
+}
+#else
+static void
+send_update_smd_roam_params(wmi_roam_cnd_scoring_param *score_param,
+			    struct ap_profile_params *ap_profile)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * update_mlo_prefer_percentage() - Update mlo preference with configured value
@@ -5900,6 +5927,7 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 			ap_profile->param.sta_sap_mcc_weightage;
 	send_update_mlo_roam_params(score_param, ap_profile);
 	send_update_uhr_roam_params(score_param, ap_profile);
+	send_update_smd_roam_params(score_param, ap_profile);
 	wmi_debug("Score params weightage: disable_bitmap %x rssi %d ht %d vht %d he %d BW %d band %d NSS %d ESP %d BF %d PCL %d OCE WAN %d APTX %d roam score algo %d subnet id %d sae-pk %d security %d mlo_etp_weight_pct %d sta_sap_mcc_pcnt %d",
 		  score_param->disable_bitmap, score_param->rssi_weightage_pcnt,
 		  score_param->ht_weightage_pcnt,

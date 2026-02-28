@@ -1664,6 +1664,23 @@ cm_update_mlo_score_params(struct scoring_param *req_score_params,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+static void
+cm_update_smd_score_params(struct scoring_param *req_score_params,
+			   struct weight_cfg *weight_config)
+{
+	req_score_params->smd_weightage = weight_config->smd_weightage;
+	mlme_debug("smd score params: smd_weightage 0x%x",
+		   req_score_params->smd_weightage);
+}
+#else
+static void
+cm_update_smd_score_params(struct scoring_param *req_score_params,
+			   struct weight_cfg *weight_config)
+{
+}
+#endif
+
 void cm_update_owe_info(struct wlan_objmgr_vdev *vdev,
 			struct wlan_cm_connect_resp *rsp, uint8_t vdev_id)
 {
@@ -1877,6 +1894,7 @@ static void cm_update_score_params(struct wlan_objmgr_psoc *psoc,
 	req_score_params->band_2g_weightage = cfg_params->band_2g_weightage;
 	req_score_params->band_5g_weightage = cfg_params->band_5g_weightage;
 	req_score_params->band_6g_weightage = cfg_params->band_6g_weightage;
+	cm_update_smd_score_params(req_score_params, weight_config);
 }
 
 static uint32_t cm_crpto_cipher_wmi_cipher(int32_t cipherset)
