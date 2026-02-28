@@ -72,6 +72,10 @@
  * @WLAN_EAP_SUCCESS: EAP success
  * @WLAN_EAP_FAILURE: EAP failure
  * @WLAN_CUSTOM_LOG: Additional WLAN logs
+ * @WLAN_ST_PREP_REQ: ST prep request frame
+ * @WLAN_ST_PREP_RESP: ST prep response frame
+ * @WLAN_ST_EXEC_REQ: ST exec request frame
+ * @WLAN_ST_EXEC_RESP: ST exec response frame
  * @WLAN_TAG_MAX: MAX tag
  */
 enum wlan_main_tag {
@@ -115,6 +119,10 @@ enum wlan_main_tag {
 	WLAN_EAP_SUCCESS,
 	WLAN_EAP_FAILURE,
 	WLAN_CUSTOM_LOG,
+	WLAN_ST_PREP_REQ,
+	WLAN_ST_PREP_RESP,
+	WLAN_ST_EXEC_REQ,
+	WLAN_ST_EXEC_RESP,
 	/* Keep at last */
 	WLAN_TAG_MAX,
 };

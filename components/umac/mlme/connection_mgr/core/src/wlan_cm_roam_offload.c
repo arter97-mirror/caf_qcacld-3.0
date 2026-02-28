@@ -7882,11 +7882,64 @@ cm_roam_get_eapol_tag(enum wlan_roam_frame_subtype subtype)
 		return WLAN_GTK_M1;
 	case ROAM_FRAME_SUBTYPE_GTK_M2:
 		return WLAN_GTK_M2;
+	case ROAM_FRAME_SUBTYPE_ST_PREP_REQ:
+		return WLAN_ST_PREP_REQ;
+	case ROAM_FRAME_SUBTYPE_ST_PREP_RESP:
+		return WLAN_ST_PREP_RESP;
+	case ROAM_FRAME_SUBTYPE_ST_EXEC_REQ:
+		return WLAN_ST_EXEC_REQ;
+	case ROAM_FRAME_SUBTYPE_ST_EXEC_RESP:
+		return WLAN_ST_EXEC_RESP;
 	default:
 		break;
 	}
 
 	return WLAN_TAG_MAX;
+}
+#endif
+
+#if defined(CONNECTIVITY_DIAG_EVENT) && defined(WLAN_FEATURE_ROAM_OFFLOAD) && \
+    defined(WLAN_FEATURE_11BN_SMD)
+/**
+ * cm_roam_log_smd_st_prep_frame() - Log SMD ST Preparation frame for
+ *                                   connectivity diagnostics
+ * @vdev: vdev pointer
+ * @bssid: BSSID of the AP with which ST Prep frame is exchanged
+ * @is_req: true if ST_PREP_REQ (TX), false if ST_PREP_RESP (RX)
+ * @tx_status: TX status for request frame, 0 for response frame
+ * @status_code: Status code from ST_PREP_RESP, 0 for request frame
+ *
+ * Called by the host ST Preparation frame TX/RX path to log the frame
+ * via connectivity diagnostics. ST_PREP_REQ and ST_PREP_RESP are
+ * host-handled (not reported by FW via roam frame info event).
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_roam_log_smd_st_prep_frame(struct wlan_objmgr_vdev *vdev,
+			      struct qdf_mac_addr *bssid,
+			      bool is_req, uint32_t tx_status,
+			      uint16_t status_code)
+{
+	struct roam_frame_info frame_data = {0};
+	struct wmi_roam_scan_data scan_data = {0};
+	struct wmi_roam_result result = {0};
+
+	if (!vdev || !bssid)
+		return QDF_STATUS_E_INVAL;
+
+	frame_data.present = true;
+	qdf_mem_copy(&frame_data.bssid, bssid, sizeof(*bssid));
+	frame_data.timestamp = (uint32_t)qdf_get_time_of_the_day_ms();
+	frame_data.type = ROAM_FRAME_INFO_FRAME_TYPE_EXT;
+	frame_data.subtype = is_req ? ROAM_FRAME_SUBTYPE_ST_PREP_REQ :
+				      ROAM_FRAME_SUBTYPE_ST_PREP_RESP;
+	frame_data.is_rsp = !is_req;
+	frame_data.tx_status = tx_status;
+	frame_data.status_code = status_code;
+
+	return cm_roam_mgmt_frame_event(vdev, &frame_data,
+					&scan_data, &result);
 }
 #endif
 

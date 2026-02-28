@@ -25,6 +25,7 @@
 #include "wlan_scan_api.h"
 #include "lim_types.h"
 #include <wlan_smd_roam.h>
+#include "wlan_cm_roam_offload.h"
 
 #ifdef WLAN_FEATURE_11BN_SMD
 static inline QDF_STATUS

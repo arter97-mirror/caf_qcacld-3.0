@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -670,6 +670,33 @@ cm_roam_mgmt_frame_event(struct wlan_objmgr_vdev *vdev,
 			 struct roam_frame_info *frame_data,
 			 struct wmi_roam_scan_data *scan_data,
 			 struct wmi_roam_result *result);
+
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * cm_roam_log_smd_st_prep_frame() - Log SMD ST Preparation frame
+ * @vdev: vdev pointer
+ * @bssid: BSSID of the AP with which ST Prep frame is exchanged
+ * @is_req: true if ST_PREP_REQ (TX), false if ST_PREP_RESP (RX)
+ * @tx_status: TX status for request frame, 0 for response frame
+ * @status_code: Status code from ST_PREP_RESP, 0 for request frame
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_roam_log_smd_st_prep_frame(struct wlan_objmgr_vdev *vdev,
+			      struct qdf_mac_addr *bssid,
+			      bool is_req, uint32_t tx_status,
+			      uint16_t status_code);
+#else
+static inline QDF_STATUS
+cm_roam_log_smd_st_prep_frame(struct wlan_objmgr_vdev *vdev,
+			      struct qdf_mac_addr *bssid,
+			      bool is_req, uint32_t tx_status,
+			      uint16_t status_code)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
