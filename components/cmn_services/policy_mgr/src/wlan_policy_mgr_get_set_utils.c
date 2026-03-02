@@ -9159,23 +9159,11 @@ policy_mgr_handle_mcc_ml_sta(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-/*
- * policy_mgr_sta_ml_link_enable_allowed() - Check with given ML links and
- * existing concurrencies, a disabled ml link can be enabled back.
- * @psoc: psoc ctx
- * @num_disabled_ml_sta: Number of existing disabled links
- * @num_ml_sta: Number of total ML STA links
- * @ml_freq_lst: ML STA freq list
- * @ml_vdev_lst: ML STA vdev id list
- *
- * Return: if link can be enabled or not
- */
-static bool
-policy_mgr_sta_ml_link_enable_allowed(struct wlan_objmgr_psoc *psoc,
-				      uint8_t num_disabled_ml_sta,
-				      uint8_t num_ml_sta,
-				      qdf_freq_t *ml_freq_lst,
-				      uint8_t *ml_vdev_lst)
+bool policy_mgr_sta_ml_link_enable_allowed(struct wlan_objmgr_psoc *psoc,
+					   uint8_t num_disabled_ml_sta,
+					   uint8_t num_ml_sta,
+					   qdf_freq_t *ml_freq_lst,
+					   uint8_t *ml_vdev_lst)
 {
 	union conc_ext_flag conc_ext_flags;
 	uint8_t disabled_link_vdev_id;

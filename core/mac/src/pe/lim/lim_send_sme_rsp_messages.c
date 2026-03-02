@@ -1847,6 +1847,7 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	enum channel_state chan_state = CHANNEL_STATE_ENABLE;
 	enum reg_6g_ap_type power_type;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint32_t passthru_vdev_id, passthru_freq = 0;
 
 	if (!session_entry->vdev ||
 	    wlan_cm_is_vdev_disconnecting(session_entry->vdev) ||
@@ -1898,6 +1899,24 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 	    (csa_params->ies_present_flag & MLME_CSWRAP_IE_EXT_V2_PRESENT)) {
 		if (!lim_is_validate_punc_bitmap(csa_params))
 			return false;
+	}
+	if (policy_mgr_mode_specific_connection_count(mac_ctx->psoc,
+						      PM_PASSTHRU_MODE, NULL)) {
+		passthru_vdev_id =
+			policy_mgr_mode_specific_vdev_id(mac_ctx->psoc,
+							 PM_PASSTHRU_MODE);
+		if (WLAN_INVALID_VDEV_ID != passthru_vdev_id) {
+			status =
+			policy_mgr_get_chan_by_session_id(mac_ctx->psoc,
+							  passthru_vdev_id,
+							  &passthru_freq);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    (passthru_freq != csa_freq)) {
+				pe_warn("Ignore CSA: Passthru freq %d, csa %d",
+					passthru_freq, csa_freq);
+				return false;
+			}
+		}
 	}
 
 	mode = wlan_vdev_mlme_get_opmode(session_entry->vdev);

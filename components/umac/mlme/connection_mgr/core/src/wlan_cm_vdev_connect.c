@@ -25,6 +25,7 @@
 #include "wlan_mlme_dbg.h"
 #include "wlan_cm_api.h"
 #include "wlan_policy_mgr_api.h"
+#include "wlan_policy_mgr_i.h"
 #include "wlan_p2p_api.h"
 #include "wlan_tdls_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
@@ -1194,7 +1195,8 @@ set_partner_info_for_2link_sap(struct scan_cache_entry *scan_entry,
 #endif
 
 QDF_STATUS
-cm_get_ml_partner_info(struct cm_connect_req *conn_req,
+cm_get_ml_partner_info(struct wlan_objmgr_psoc *psoc,
+		       struct cm_connect_req *conn_req,
 		       uint8_t mlo_support_link_num)
 {
 	uint8_t i, j = 0;
@@ -1234,6 +1236,16 @@ cm_get_ml_partner_info(struct cm_connect_req *conn_req,
 		if (!scan_entry->ml_info.link_info[i].is_valid_link)
 			continue;
 
+		if (policy_mgr_mode_specific_connection_count(psoc,
+							      PM_PASSTHRU_MODE,
+							      NULL) &&
+		    (!policy_mgr_is_concurrency_allowed(psoc, PM_STA_MODE,
+					scan_entry->ml_info.link_info[i].freq,
+					HW_MODE_20_MHZ, 1, NULL))) {
+			mlme_debug("Concurrency not allowed for partner link freq: %d",
+				   scan_entry->ml_info.link_info[i].freq);
+			continue;
+		}
 		partner_info->partner_link_info[j].link_addr =
 				scan_entry->ml_info.link_info[i].link_addr;
 		partner_info->partner_link_info[j].link_id =
