@@ -17,6 +17,7 @@
 #include <wma_api.h>
 #include "cds_api.h"
 #include "cdp_txrx_ctrl.h"
+#include <wlan_hdd_hostapd.h>
 
 static struct hdd_wondertap_context *g_wt_ctx;
 static DEFINE_MUTEX(g_wt_ctx_mutex);
@@ -308,6 +309,15 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 	}
 	set_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
 
+	if (hdd_is_connection_in_progress(NULL, NULL) ||
+	    hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx,
+						      adapter->device_mode)) {
+		ret = -EBUSY;
+		hdd_err_rl("Failed to start wonder tap as either connection or link switch is in progress ret = %d",
+			   ret);
+		goto stop_adapter;
+	}
+
 	if (!policy_mgr_allow_concurrency(hdd_ctx->psoc,
 					  PM_PASSTHRU_MODE,
 					  params->channel.freq,
@@ -498,8 +508,12 @@ int wlan_hdd_wondertap_init(void **handle,
 		goto destroy_sync;
 	}
 
-	if (hdd_is_connection_in_progress(NULL, NULL)) {
+	if (hdd_is_connection_in_progress(NULL, NULL) ||
+	    hdd_is_sta_connect_or_link_switch_in_prog(hdd_ctx,
+						      QDF_PASSTHRU_MODE)) {
 		errno = -EBUSY;
+		hdd_err_rl("Failed to start wonder tap as either connection or link switch is in progress errno = %d",
+			   errno);
 		goto destroy_sync;
 	}
 
