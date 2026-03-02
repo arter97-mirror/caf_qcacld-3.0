@@ -247,6 +247,9 @@ int __wlan_hdd_stop_wondertap_intf(struct hdd_context *hdd_ctx,
 				   struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
+	uint8_t num_ml_sta = 0, num_disabled_ml = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
@@ -275,6 +278,25 @@ int __wlan_hdd_stop_wondertap_intf(struct hdd_context *hdd_ctx,
 	policy_mgr_decr_session_set_pcl(hdd_ctx->psoc, QDF_PASSTHRU_MODE,
 					adapter->deflink->vdev_id);
 
+	if (policy_mgr_is_mlo_sta_present(hdd_ctx->psoc)) {
+		policy_mgr_get_ml_sta_info_psoc(hdd_ctx->psoc, &num_ml_sta,
+						&num_disabled_ml,
+						ml_vdev_lst,
+						ml_freq_lst, NULL,
+						NULL, NULL);
+		hdd_debug("num_ml_sta %d num_disabled_ml %d", num_ml_sta,
+			  num_disabled_ml);
+		if (policy_mgr_sta_ml_link_enable_allowed(hdd_ctx->psoc,
+							  num_disabled_ml,
+							  num_ml_sta,
+							  ml_freq_lst,
+							  ml_vdev_lst)) {
+			policy_mgr_mlo_sta_set_link(hdd_ctx->psoc,
+					MLO_LINK_FORCE_REASON_DISCONNECT,
+					MLO_LINK_FORCE_MODE_NO_FORCE,
+					num_ml_sta, ml_vdev_lst);
+		}
+	}
 	hdd_stop_adapter(hdd_ctx, adapter);
 	hdd_deinit_adapter(hdd_ctx, adapter, true);
 	clear_bit(DEVICE_IFACE_OPENED, &adapter->event_flags);
@@ -302,6 +324,13 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 	enum phy_ch_width ch_width;
 	QDF_STATUS status;
 	int ret;
+	uint8_t num_ml_sta = 0, num_disabled_ml = 0, num_active_ml = 0;
+	uint8_t ml_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	qdf_freq_t ml_freq_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	struct qdf_mac_addr active_link_addr[WLAN_MAX_ML_BSS_LINKS];
+	uint32_t num_links = 0, i = 0, sta_cnt;
+	uint8_t active_links_same_mac = 0, active_links_other_mac = 0;
+	bool is_mcc = false;
 
 	ret = hdd_start_adapter(adapter, true);
 	if (ret) {
@@ -325,6 +354,155 @@ int __wlan_hdd_start_wondertap_intf(struct hdd_context *hdd_ctx,
 					  wlan_hdd_wondertap_bw_to_hw_mode_bw(params->channel.bandwidth),
 					  0, adapter->deflink->vdev_id)) {
 		ret = -EPERM;
+		goto stop_adapter;
+	}
+
+	/*
+	 * sta > 2 : (STA + STA + STA) or (ML STA + STA) or (ML STA + ML STA),
+	 * STA concurrency will be present.
+	 *
+	 * ML STA: Although both links would be treated as separate STAs
+	 * (sta cnt = 2) from policy mgr perspective, but it is not considered
+	 * as STA concurrency
+	 */
+	sta_cnt = policy_mgr_mode_specific_connection_count(hdd_ctx->psoc,
+							    PM_STA_MODE, NULL);
+	if (sta_cnt > 2 ||
+	    (sta_cnt == 2 && policy_mgr_is_non_ml_sta_present(hdd_ctx->psoc))) {
+		hdd_info("STA+STA present, wonder tap is not allowed");
+		ret = -EPERM;
+		goto stop_adapter;
+	}
+
+	/*
+	 * If STA+PASSTHRU is MCC, and ML-STA is not present, skip the ML
+	 * disable functionality as its similar to legacy STA+PASSTHRU.
+	 */
+	is_mcc = policy_mgr_will_freq_lead_to_mcc(hdd_ctx->psoc,
+						  params->channel.freq);
+	if (!(policy_mgr_is_mlo_sta_present(hdd_ctx->psoc) && is_mcc))
+		goto skip_mlo_check;
+
+	hdd_debug("ML STA MCC present, disable link");
+	policy_mgr_get_ml_sta_info_psoc(hdd_ctx->psoc, &num_ml_sta,
+					&num_disabled_ml, ml_vdev_lst,
+					ml_freq_lst, NULL, NULL, NULL);
+	hdd_debug("num_ml_sta %d num_disabled_ml %d", num_ml_sta,
+		  num_disabled_ml);
+	if (num_ml_sta > WLAN_MAX_ML_BSS_LINKS) {
+		hdd_err("Invalid no.of links %d", num_ml_sta);
+		num_ml_sta = WLAN_MAX_ML_BSS_LINKS;
+	}
+
+	/*
+	 * If ML STA has more than 1 link, then determine the links that is
+	 * leading to MCC with PASSTHRU, and disable the corresponding links,
+	 * and if there is any inactive link on the other MAC, activate that
+	 * link.
+	 */
+	num_active_ml = num_ml_sta - num_disabled_ml;
+	if (num_ml_sta > 1 && num_active_ml > 0) {
+		for (i = 0; i < num_active_ml; i++) {
+			hdd_debug("ml_vdev_lst[%d] %d ml_freq_lst[%d] %d",
+				  i, ml_vdev_lst[i], i, ml_freq_lst[i]);
+			if (!(policy_mgr_2_freq_always_on_same_mac(
+							hdd_ctx->psoc,
+							params->channel.freq,
+							ml_freq_lst[i]))) {
+				status = wlan_get_self_macaddr_from_vdev_id(
+							hdd_ctx->psoc,
+							ml_vdev_lst[i],
+							WLAN_DP_ID,
+							&active_link_addr[active_links_other_mac]);
+				if (QDF_IS_STATUS_ERROR(status)) {
+					hdd_err("Invalid link vdev, %d",
+						ml_vdev_lst[i]);
+					continue;
+				}
+				active_links_other_mac++;
+			} else {
+				active_links_same_mac++;
+			}
+		}
+	}
+
+	/* If active links are present on both the macs, then disable
+	 * the same mac links by setting num_links to other MAC active
+	 * links and the link address is already fetched in the above
+	 * for loop.
+	 */
+	if (active_links_same_mac && active_links_other_mac) {
+		num_links = active_links_other_mac;
+		is_mcc = false;
+	} else if (active_links_same_mac) {
+		if (!num_disabled_ml) {
+			/* The below condition is true for 5G+6G MLO
+			 * with both links active then disable the
+			 * 6G link.
+			 */
+			if (active_links_same_mac > 1) {
+				hdd_debug("%d MLO links on same MAC",
+					  active_links_same_mac);
+				for (i = 0; i < num_active_ml; i++) {
+					if (!WLAN_REG_IS_6GHZ_CHAN_FREQ(
+							ml_freq_lst[i])) {
+						status =
+						wlan_get_self_macaddr_from_vdev_id(
+									hdd_ctx->psoc,
+									ml_vdev_lst[i],
+									WLAN_DP_ID,
+									&active_link_addr[0]);
+						if (QDF_IS_STATUS_ERROR(status)) {
+							hdd_err("Invalid link vdev, %d",
+								ml_vdev_lst[i]);
+							continue;
+						}
+						num_links = 1;
+						break;
+					}
+				}
+			}
+		} else {
+			/* If there are no active links on other mac
+			 * and STA have disabled links, check if the
+			 * disabled link is on other mac or SCC, if so,
+			 * activate the disabled link.
+			 */
+			while (i < num_ml_sta) {
+				if (!(policy_mgr_2_freq_always_on_same_mac(
+							hdd_ctx->psoc,
+							params->channel.freq,
+							ml_freq_lst[i])) ||
+				    (params->channel.freq == ml_freq_lst[i])) {
+					status =
+					wlan_get_self_macaddr_from_vdev_id(
+								hdd_ctx->psoc,
+								ml_vdev_lst[i],
+								WLAN_DP_ID,
+								&active_link_addr[active_links_other_mac]);
+					if (QDF_IS_STATUS_ERROR(status)) {
+						hdd_err("Invalid link vdev, %d",
+							ml_vdev_lst[i]);
+						i++;
+						continue;
+					}
+					active_links_other_mac++;
+					is_mcc = false;
+				}
+				i++;
+			}
+			num_links = active_links_other_mac;
+		}
+	}
+	if (num_links) {
+		sme_activate_mlo_links(hdd_ctx->mac_handle, ml_vdev_lst[0],
+				       num_links, active_link_addr,
+				       MLO_LINK_FORCE_REASON_CONNECT);
+	}
+skip_mlo_check:
+	if (is_mcc && !params->channel_hopping_enable) {
+		hdd_err("STA MCC, CH hopping disabled, dont allow connection");
+		ret = -EINVAL;
 		goto stop_adapter;
 	}
 
