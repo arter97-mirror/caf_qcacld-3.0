@@ -1523,6 +1523,7 @@ static QDF_STATUS hdd_qdf_to_nl_iface_type(enum nl80211_iftype *nl_type,
 		*nl_type = NL80211_IFTYPE_P2P_GO;
 		break;
 	case QDF_STA_MODE:
+	case QDF_FTM_MODE:
 		*nl_type = NL80211_IFTYPE_STATION;
 		break;
 	case QDF_WDS_MODE:
@@ -4136,7 +4137,8 @@ static int hdd_cfg80211_validate_add_iface(struct hdd_context *hdd_ctx,
 		if (hdd_is_interface_up(adapter)) {
 			wdev = &adapter->wdev;
 			if (wdev->iftype < NUM_NL80211_IFTYPES &&
-			    adapter->device_mode != QDF_P2P_DEVICE_MODE)
+			    adapter->device_mode != QDF_P2P_DEVICE_MODE &&
+			    adapter->device_mode != QDF_NDI_MODE)
 				params.iftype_num[wdev->iftype]++;
 		}
 		hdd_adapter_dev_put_debug(adapter,
