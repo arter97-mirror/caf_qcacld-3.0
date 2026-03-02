@@ -359,6 +359,11 @@ typedef struct {
 	struct wlan_uhr_cap_info uhr_config;
 	struct wlan_uhr_op_ie uhr_op_ie;
 #endif
+#ifdef WLAN_FEATURE_11BN_SMD
+	bool roam_enabled;
+	bool dl_data_forwarding;
+	bool ul_data_forwarding;
+#endif
 } tAddStaParams, *tpAddStaParams;
 
 /**

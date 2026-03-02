@@ -1682,6 +1682,52 @@ static inline void wma_set_mlo_assoc_vdev(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * wma_set_smd_capability() - set SMD caps to the peer assoc request
+ * @vdev: vdev object
+ * @params: Add sta params
+ * @req: peer assoc request parameters
+ *
+ * Fill peer_assoc_params->smd_params with default values.
+ *
+ * Return: None
+ */
+static void wma_set_smd_capability(struct wlan_objmgr_vdev *vdev,
+				   tpAddStaParams params,
+				   struct peer_assoc_params *req)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct smd_context *smd_ctx;
+
+	if (!params || !req)
+		return;
+
+	mlo_dev_ctx = wlan_vdev_get_mlo_dev_ctx(vdev);
+	if (!mlo_dev_ctx || !mlo_dev_ctx->smd_ctx)
+		return;
+
+	smd_ctx = mlo_dev_ctx->smd_ctx;
+	qdf_mutex_acquire(&smd_ctx->smd_ctx_lock);
+
+	WLAN_ADDR_COPY(req->smd_id,
+		       smd_ctx->smd_identifier.bytes);
+	qdf_mem_copy(&req->smd_capabilities, &smd_ctx->smd_capabilities,
+		     sizeof(smd_ctx->smd_capabilities));
+	req->roam_enabled = params->roam_enabled;
+	req->dl_data_forwarding = params->dl_data_forwarding;
+	req->ul_data_forwarding = params->ul_data_forwarding;
+
+	qdf_mutex_release(&smd_ctx->smd_ctx_lock);
+}
+#else
+static inline void wma_set_smd_capability(struct wlan_objmgr_vdev *vdev,
+					  tpAddStaParams params,
+					  struct peer_assoc_params *req)
+{
+}
+#endif
+
 /**
  * wma_get_peer_phymode() - Determine and set peer phymode
  * @wma: wma handle
@@ -2157,6 +2203,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	}
 
 	wma_set_mlo_capability(wma, intr->vdev, params, cmd);
+	wma_set_smd_capability(intr->vdev, params, cmd);
 
 	wma_set_mlo_assoc_vdev(intr->vdev, cmd);
 
