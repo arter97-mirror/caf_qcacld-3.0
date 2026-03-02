@@ -2343,7 +2343,7 @@ static int wma_peer_create_resp_notify(tp_wma_handle wma,
 				       QDF_STATUS status)
 {
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
-	struct wlan_objmgr_vdev *vdev = wma->interfaces[vdev_id].vdev;
+	struct wlan_objmgr_vdev *vdev;
 	void *dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct wlan_objmgr_peer *peer;
 	struct wma_target_req *req_msg = NULL;
@@ -2351,6 +2351,15 @@ static int wma_peer_create_resp_notify(tp_wma_handle wma,
 	struct peer_create_rsp_params *rsp_data;
 	uint8_t req_msg_type;
 	int ret = 0;
+
+	if (!wma_is_vdev_valid(vdev_id))
+		return -EINVAL;
+
+	vdev = wma->interfaces[vdev_id].vdev;
+	if (!vdev) {
+		wma_err("Couldn't find vdev for vdev id %d", vdev_id);
+		return -EINVAL;
+	}
 
 	req_msg = wma_find_remove_req_msgtype(wma, vdev_id,
 					      NULL,
@@ -3923,6 +3932,9 @@ QDF_STATUS wma_handle_peer_assoc_conf(tp_wma_handle wma, uint8_t vdev_id,
 	struct wma_target_req *req_msg;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	struct wlan_objmgr_vdev *vdev;
+
+	if (!wma_is_vdev_valid(vdev_id))
+		return QDF_STATUS_E_INVAL;
 
 	req_msg = wma_find_req(wma, vdev_id, WMA_PEER_ASSOC_CNF_START, NULL);
 
