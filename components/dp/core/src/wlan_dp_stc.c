@@ -414,7 +414,7 @@ wlan_dp_get_free_sampling_table_entry(struct wlan_dp_stc *dp_stc)
 	return NULL;
 }
 
-struct wlan_dp_stc_flow_table_entry *
+static struct wlan_dp_stc_flow_table_entry *
 wlan_dp_stc_get_flow_entry_from_sampling_entry(struct wlan_dp_stc *dp_stc,
 					       struct wlan_dp_stc_sampling_table_entry *s_entry)
 {
