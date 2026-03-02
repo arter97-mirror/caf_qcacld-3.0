@@ -878,7 +878,8 @@ wlan_mlo_roam_abort_on_link(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < sync_ind->num_setup_links; i++) {
 		if (sync_ind->ml_link[i].vdev_id != vdev_id) {
 			status = cm_fw_roam_abort_req(psoc,
-						      sync_ind->ml_link[i].vdev_id);
+						      sync_ind->ml_link[i].vdev_id,
+						      NULL);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				mlo_err("LFR3: Fail to abort roam on vdev: %u",
 					sync_ind->ml_link[i].vdev_id);

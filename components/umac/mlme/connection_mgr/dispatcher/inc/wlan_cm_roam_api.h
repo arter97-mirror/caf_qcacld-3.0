@@ -1107,13 +1107,14 @@ cm_akm_roam_allowed(struct wlan_objmgr_psoc *psoc,
 
 /**
  * cm_invalid_roam_reason_handler() - Handler for invalid roam reason
- * @vdev_id: vdev id
+ * @roam_event: roam offload event ptr
  * @notif: roam notification of type enum cm_roam_notif
  * @reason: Notif param value from the roam event that carries trigger reason
  *
  * Return: QDF_STATUS
  */
-void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif,
+void cm_invalid_roam_reason_handler(struct roam_offload_roam_event *roam_event,
+				    enum cm_roam_notif notif,
 				    uint32_t reason);
 
 /**

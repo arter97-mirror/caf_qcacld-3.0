@@ -38,6 +38,7 @@
 #include "connection_mgr/core/src/wlan_cm_main_api.h"
 #include "wlan_roam_debug.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_smd_roam.h"
 
 static QDF_STATUS
 cm_fw_roam_ser_cb(struct wlan_serialization_command *cmd,
@@ -153,9 +154,62 @@ cm_add_fw_roam_dummy_ser_cb(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+static QDF_STATUS
+cm_prepare_smd_roam(struct cnx_mgr *cm_ctx,
+		    struct roam_offload_roam_event *roam_event)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_link_recfg_context *recfg_ctx;
+
+	if (!cm_ctx || !cm_ctx->vdev || !roam_event)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	vdev = cm_ctx->vdev;
+	if (!vdev->mlo_dev_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx->link_recfg_ctx)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	recfg_ctx = mlo_dev_ctx->link_recfg_ctx;
+	recfg_ctx->num_vdev_repurpose_req = roam_event->num_vdev_repurpose_req;
+	recfg_ctx->tgt_ap_link_bitmap = roam_event->notif_params1;
+
+	if (recfg_ctx->num_vdev_repurpose_req > 0) {
+		qdf_mem_copy(&recfg_ctx->vdev_repurpose_req,
+			     &roam_event->vdev_repurpose_req,
+			     sizeof(struct smd_vdev_repurpose_req) *
+			     recfg_ctx->num_vdev_repurpose_req);
+		recfg_ctx->smd_roam_in_progress = true;
+	}
+
+	if (roam_event->smd_transition_ie) {
+		recfg_ctx->smd_transition_ie.ie_len = roam_event->smd_transition_ie->ie_len;
+		if (recfg_ctx->smd_transition_ie.ie_len > 0) {
+			qdf_mem_copy(&recfg_ctx->smd_transition_ie.ie_data,
+				     &roam_event->smd_transition_ie->ie_data,
+				     recfg_ctx->smd_transition_ie.ie_len);
+		}
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+#else
+static inline QDF_STATUS
+cm_prepare_smd_roam(struct cnx_mgr *cm_ctx,
+		    struct roam_offload_roam_event *roam_event)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
 QDF_STATUS cm_prepare_roam_cmd(struct cnx_mgr *cm_ctx,
 			       struct cm_req **roam_req,
-			       enum wlan_cm_source source)
+			       enum wlan_cm_source source,
+			       struct roam_offload_roam_event *roam_event)
 {
 	struct cm_req *req;
 
@@ -165,6 +219,7 @@ QDF_STATUS cm_prepare_roam_cmd(struct cnx_mgr *cm_ctx,
 
 	req = *roam_req;
 	req->roam_req.req.source = source;
+	cm_prepare_smd_roam(cm_ctx, roam_event);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -207,10 +262,19 @@ QDF_STATUS cm_add_fw_roam_cmd_to_list_n_ser(struct cnx_mgr *cm_ctx,
 	return status;
 }
 
-QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc,
+				struct roam_offload_roam_event *roam_event)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+
+	if (!roam_event) {
+		mlme_err("roam_event is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	vdev_id = roam_event->vdev_id;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
@@ -224,7 +288,7 @@ QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	wlan_cm_roam_set_ipa_sw_routing(psoc, vdev, NULL, vdev_id, true);
 
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_START,
-				     0, NULL);
+				     sizeof(*roam_event), roam_event);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_err("EV ROAM START not handled");
@@ -279,6 +343,9 @@ QDF_STATUS cm_fw_roam_start(struct cnx_mgr *cm_ctx)
 		goto error;
 
 	mlme_cm_osif_roam_start_ind(cm_ctx->vdev);
+
+	smd_fw_roam_start(cm_ctx->vdev);
+
 	/*
 	 * For emergency deauth roaming, firmware sends ROAM start
 	 * instead of ROAM scan start notification as data path queues
@@ -311,7 +378,9 @@ error:
 	return status;
 }
 
-QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id,
+				struct roam_offload_roam_event *roam_event)
 {
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_vdev *vdev;

@@ -53,25 +53,30 @@ cm_add_fw_roam_dummy_ser_cb(struct wlan_objmgr_pdev *pdev,
 /**
  * cm_fw_roam_start_req() - Post roam start req to CM SM
  * @psoc: psoc pointer
- * @vdev_id: vdev id
+ * @roam_event: roam event structure containing vdev_id and other info
  *
  * This function posts roam start event change to connection manager
  * state machine
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+QDF_STATUS cm_fw_roam_start_req(struct wlan_objmgr_psoc *psoc,
+				struct roam_offload_roam_event *roam_event);
 /**
  * cm_fw_roam_abort_req() - Post roam abort req to CM SM
  * @psoc: psoc pointer
  * @vdev_id: vdev id
+ * @roam_event: roam event structure containing vdev_id and other info
  *
  * This function posts roam abort event change to connection manager
  * state machine
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+QDF_STATUS
+cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc,
+		     uint8_t vdev_id,
+		     struct roam_offload_roam_event *roam_event);
 
 /**
  * cm_update_scan_mlme_on_roam() - update the scan mlme info

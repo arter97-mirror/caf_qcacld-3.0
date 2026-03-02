@@ -467,7 +467,7 @@ bool wlan_cm_is_linkspeed_roam_trigger_supported(struct wlan_objmgr_psoc *psoc)
 QDF_STATUS
 wlan_cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
-	return cm_fw_roam_abort_req(psoc, vdev_id);
+	return cm_fw_roam_abort_req(psoc, vdev_id, NULL);
 }
 
 uint32_t wlan_cm_get_roam_band_value(struct wlan_objmgr_psoc *psoc,
@@ -3461,7 +3461,7 @@ cm_handle_roam_offload_events(struct roam_offload_roam_event *roam_event)
 	}
 	break;
 	case ROAM_REASON_INVALID:
-		cm_invalid_roam_reason_handler(roam_event->vdev_id,
+		cm_invalid_roam_reason_handler(roam_event,
 					       roam_event->notif,
 					       roam_event->notif_params);
 		break;

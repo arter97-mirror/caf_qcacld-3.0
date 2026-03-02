@@ -2735,12 +2735,21 @@ void wma_roam_better_ap_handler(tp_wma_handle wma, uint32_t vdev_id)
  *
  * Return: None
  */
-static void wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
-					    uint32_t vdev_id,
-					    enum cm_roam_notif notif)
+static void
+wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
+				struct roam_offload_roam_event *roam_event,
+				enum cm_roam_notif notif)
 {
 	struct roam_offload_synch_ind *roam_synch_data;
 	enum sir_roam_op_code op_code;
+	uint32_t vdev_id;
+
+	if (!roam_event) {
+		wma_err("roam_event is NULL");
+		return;
+	}
+
+	vdev_id = roam_event->vdev_id;
 
 	if (notif == CM_ROAM_NOTIF_ROAM_START) {
 		op_code = SIR_ROAMING_START;
@@ -2762,23 +2771,32 @@ static void wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
 					     roam_synch_data, 0, op_code);
 
 	if (notif == CM_ROAM_NOTIF_ROAM_START)
-		cm_fw_roam_start_req(wma_handle->psoc, vdev_id);
+		cm_fw_roam_start_req(wma_handle->psoc, roam_event);
 	else
-		cm_fw_roam_abort_req(wma_handle->psoc, vdev_id);
+		cm_fw_roam_abort_req(wma_handle->psoc, vdev_id, roam_event);
 
 	qdf_mem_free(roam_synch_data);
 }
 
-void cm_invalid_roam_reason_handler(uint32_t vdev_id, enum cm_roam_notif notif,
+void cm_invalid_roam_reason_handler(struct roam_offload_roam_event *roam_event,
+				    enum cm_roam_notif notif,
 				    uint32_t reason)
 {
 	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	uint32_t vdev_id;
 
 	if (!wma_handle) {
 		QDF_ASSERT(0);
 		return;
 	}
-	wma_invalid_roam_reason_handler(wma_handle, vdev_id, notif);
+
+	if (!roam_event) {
+		wma_err("roam_event is NULL");
+		return;
+	}
+
+	vdev_id = roam_event->vdev_id;
+	wma_invalid_roam_reason_handler(wma_handle, roam_event, notif);
 
 	if (notif == CM_ROAM_NOTIF_SCAN_START ||
 	    notif == CM_ROAM_NOTIF_SCAN_END)
