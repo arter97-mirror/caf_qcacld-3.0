@@ -102,12 +102,14 @@ static inline void get_ese_version_ie_probe_response(struct mac_context *mac_ctx
 #endif
 
 #ifdef WLAN_FEATURE_11AX
-static void lim_extract_he_op(struct pe_session *session,
-		tSirProbeRespBeacon *beacon_struct)
+static void lim_extract_he_op(struct mac_context *mac,
+			      struct pe_session *session,
+			      tSirProbeRespBeacon *beacon_struct)
 {
 	uint8_t fw_vht_ch_wd;
 	uint8_t ap_bcon_ch_width;
 	uint8_t center_freq_diff;
+	uint32_t self_cb_mode;
 
 	if (!session->he_capable)
 		return;
@@ -118,6 +120,12 @@ static void lim_extract_he_op(struct pe_session *session,
 			sizeof(session->he_op));
 	if (!session->he_6ghz_band)
 		return;
+
+	self_cb_mode = lim_get_cb_mode_for_freq(mac, session,
+						session->curr_op_freq);
+	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
+		return;
+
 	if (!session->he_op.oper_info_6g_present) {
 		session->ap_defined_power_type_6g = REG_CURRENT_MAX_AP_TYPE;
 		return;
@@ -323,8 +331,9 @@ void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
 #else
-static inline void lim_extract_he_op(struct pe_session *session,
-		tSirProbeRespBeacon *beacon_struct)
+static inline void lim_extract_he_op(struct mac_context *mac,
+				     struct pe_session *session,
+				     tSirProbeRespBeacon *beacon_struct)
 {}
 static void lim_check_is_he_mcs_valid(struct pe_session *session,
 				      tSirProbeRespBeacon *beacon_struct)
@@ -338,10 +347,12 @@ void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #ifdef WLAN_FEATURE_11BE
-void lim_extract_eht_op(struct pe_session *session,
+void lim_extract_eht_op(struct mac_context *mac,
+			struct pe_session *session,
 			tSirProbeRespBeacon *beacon_struct)
 {
 	uint32_t max_eht_bw;
+	uint32_t self_cb_mode;
 
 	if (!session->eht_capable)
 		return;
@@ -354,6 +365,11 @@ void lim_extract_eht_op(struct pe_session *session,
 
 	qdf_mem_copy(&session->eht_op, &beacon_struct->eht_op,
 		     sizeof(session->eht_op));
+
+	self_cb_mode = lim_get_cb_mode_for_freq(mac, session,
+						session->curr_op_freq);
+	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
+		return;
 
 	max_eht_bw = wma_get_eht_ch_width();
 
@@ -833,8 +849,8 @@ lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 
 	lim_check_is_he_mcs_valid(session, beacon_struct);
 	lim_check_peer_ldpc_and_update(session, beacon_struct);
-	lim_extract_he_op(session, beacon_struct);
-	lim_extract_eht_op(session, beacon_struct);
+	lim_extract_he_op(mac_ctx, session, beacon_struct);
+	lim_extract_eht_op(mac_ctx, session, beacon_struct);
 	if (!mac_ctx->usr_eht_testbed_cfg)
 		lim_update_he_bw_cap_mcs(session, beacon_struct);
 	lim_update_eht_bw_cap_mcs(session, beacon_struct);

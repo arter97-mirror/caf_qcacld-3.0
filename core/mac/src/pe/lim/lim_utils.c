@@ -3837,6 +3837,12 @@ uint8_t lim_get_cb_mode_for_freq(struct mac_context *mac,
 {
 	uint8_t cb_mode = mac->roam.configParam.channelBondingMode5GHz;
 
+	if (LIM_IS_STA_ROLE(session) &&
+	    wlan_vdev_mlme_get_sta_in_20mhz(session->vdev)) {
+		pe_debug_rl("vdev %d force 20 Mhz", session->vdev_id);
+		return WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
+	}
+
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
 		if (wlan_cm_get_force_20mhz_in_24ghz(session->vdev)) {
 			cb_mode = WNI_CFG_CHANNEL_BONDING_MODE_DISABLE;
@@ -5825,12 +5831,27 @@ void lim_set_stads_rtt_cap(tpDphHashNode sta_ds, struct s_ext_cap *ext_cap,
 #ifdef WLAN_SUPPORT_TWT
 void lim_set_peer_twt_cap(struct pe_session *session, struct s_ext_cap *ext_cap)
 {
+	struct wlan_objmgr_psoc *psoc;
+	bool twt_ht_vht_sup = false;
+
+	psoc = wlan_vdev_get_psoc(session->vdev);
+	if (!psoc)
+		return;
+
 	if (session->enable_session_twt_support) {
-		session->peer_twt_requestor = ext_cap->twt_requestor_support;
+		wlan_twt_cfg_get_req_support_for_ht_vht(psoc, &twt_ht_vht_sup);
+		if (session->dot11mode < MLME_DOT11_MODE_11AX &&
+		    !twt_ht_vht_sup)
+			session->peer_twt_requestor = 0;
+		else
+			session->peer_twt_requestor =
+					ext_cap->twt_requestor_support;
+
 		session->peer_twt_responder = ext_cap->twt_responder_support;
 	}
 
-	pe_debug("Ext Cap peer TWT requestor: %d, responder: %d, enable_twt %d",
+	pe_debug("Dot11mode: %d, Ext Cap peer TWT requestor: %d, responder: %d, enable_twt %d",
+		 session->dot11mode,
 		 ext_cap->twt_requestor_support,
 		 ext_cap->twt_responder_support,
 		 session->enable_session_twt_support);

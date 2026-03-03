@@ -4577,7 +4577,7 @@ wma_vdev_set_bss_params(tp_wma_handle wma, int vdev_id,
 	if (intr[vdev_id].type == WMI_VDEV_TYPE_STA &&
 	    WLAN_REG_IS_5GHZ_CH_FREQ(vdev->vdev_mlme.bss_chan->ch_freq)) {
 		edca_txop_duration_us =
-		    wlan_mlme_get_edca_txop_duration_ms(mac_ctx->psoc) * 1024;
+		    wlan_mlme_get_edca_txop_duration_ms(mac_ctx->psoc) * 1000;
 
 		ret = mlme_check_index_setparam(
 					setparam,

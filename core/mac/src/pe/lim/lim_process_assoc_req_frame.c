@@ -48,6 +48,7 @@
 #include "lim_process_fils.h"
 #include <son_api.h>
 #include "wlan_dnw_api.h"
+#include "wlan_twt_cfg_ext_api.h"
 
 /**
  * lim_convert_supported_channels - Parses channel support IE
@@ -2725,10 +2726,24 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 static void lim_set_sap_peer_twt_cap(struct pe_session *session,
 				     struct s_ext_cap *ext_cap)
 {
-	session->peer_twt_requestor = ext_cap->twt_requestor_support;
-	session->peer_twt_responder = ext_cap->twt_responder_support;
+	struct wlan_objmgr_psoc *psoc;
+	bool twt_ht_vht_sup = false;
 
-	pe_debug("Ext Cap peer TWT requestor: %d, responder: %d",
+	psoc = wlan_vdev_get_psoc(session->vdev);
+	if (!psoc)
+		return;
+
+	wlan_twt_cfg_get_res_support_for_ht_vht(psoc, &twt_ht_vht_sup);
+	if (!policy_mgr_is_vdev_ll_lt_sap(psoc, session->vdev_id) &&
+	    session->dot11mode < MLME_DOT11_MODE_11AX && !twt_ht_vht_sup)
+		session->peer_twt_responder = 0;
+	else
+		session->peer_twt_responder = ext_cap->twt_responder_support;
+
+	session->peer_twt_requestor = ext_cap->twt_requestor_support;
+
+	pe_debug("Dot11mode: %d, Ext Cap peer TWT requestor: %d, responder: %d",
+		 session->dot11mode,
 		 ext_cap->twt_requestor_support,
 		 ext_cap->twt_responder_support);
 }

@@ -560,6 +560,13 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 		goto free_req;
 	}
 
+	ucfg_pmo_set_ns_offload_enable_dynamic(vdev, trigger, true);
+
+	if (!ucfg_pmo_get_ns_offload_enable_dynamic(vdev)) {
+		hdd_debug("NS offload is dynamically disabled");
+		goto free_req;
+	}
+
 	if (ucfg_pmo_get_arp_ns_offload_dynamic_disable(vdev)) {
 		hdd_debug("Dynamic arp ns offload disabled");
 		ucfg_pmo_flush_ns_offload_req(vdev);
@@ -631,6 +638,12 @@ void hdd_disable_ns_offload(struct hdd_adapter *adapter,
 		goto out;
 	}
 
+	if (!ucfg_pmo_get_ns_offload_enable_dynamic(vdev)) {
+		hdd_debug("NS offload is already dynamically disabled");
+		goto out;
+	}
+
+	ucfg_pmo_set_ns_offload_enable_dynamic(vdev, trigger, false);
 	status = ucfg_pmo_disable_ns_offload_in_fwr(vdev, trigger);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_err("Failed to disable NS Offload");
@@ -1859,11 +1872,14 @@ static void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,
 				       struct hdd_adapter *adapter)
 {
 	bool twt_responder;
+	eCsrPhyMode sap_hw_mode;
 
 	twt_responder =
 		adapter->deflink->session.ap.sap_config.cfg80211_twt_responder;
+	sap_hw_mode = adapter->deflink->session.ap.sap_config.SapHw_mode;
 	wlan_hdd_configure_twt_responder(hdd_ctx, twt_responder,
-					 adapter->deflink->vdev_id);
+					 adapter->deflink->vdev_id,
+					 sap_hw_mode);
 }
 #else
 static inline void wlan_hdd_set_twt_responder(struct hdd_context *hdd_ctx,

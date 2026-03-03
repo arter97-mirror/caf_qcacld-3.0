@@ -5401,6 +5401,20 @@ static inline void wlan_hdd_set_wfd_r2_feature(struct wlan_objmgr_psoc *psoc,
 }
 #endif /* FEATURE_WLAN_SUPPORT_P2P_R2 */
 
+static inline void wlan_hdd_set_cancel_noa_feature(struct wlan_objmgr_psoc *psoc,
+						   uint8_t *feature_flags)
+{
+	if (!ucfg_p2p_is_fw_cancel_one_shot_noa_supported(psoc)) {
+		hdd_debug("cancel one shot noa feature is not supported by FW");
+		return;
+	}
+
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GO_CANCEL_ONE_SHOT_NOA);
+	wlan_cfg80211_set_feature(feature_flags,
+				  QCA_WLAN_VENDOR_FEATURE_SUPPORT_P2P_GC_KEEP_AWAKE_DURING_ONE_SHOT_NOA);
+}
+
 #ifdef FEATURE_WLAN_SUPPORT_PCC
 static inline void wlan_hdd_set_pcc_feature(struct wlan_objmgr_psoc *psoc,
 					    uint8_t *feature_flags)
@@ -5588,6 +5602,7 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	wlan_hdd_set_usd_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_mrsno_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_wfd_r2_feature(hdd_ctx->psoc, feature_flags);
+	wlan_hdd_set_cancel_noa_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_tx_power_feature(hdd_ctx->psoc, feature_flags);
 	wlan_hdd_set_pcc_feature(hdd_ctx->psoc, feature_flags);
 
@@ -9701,6 +9716,8 @@ wlan_hdd_wifi_test_config_policy[
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_RTWT_SUPPORT] = {
 			.type = NLA_U8},
 		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_EHT_BTM_RECOMM_MULTI_AP_SUPPORT] = {
+			.type = NLA_U8},
+		[QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_20MHZ_ONLY_STA] = {
 			.type = NLA_U8},
 };
 
@@ -18071,6 +18088,30 @@ BTM_REQ_RESP_DONE:
 			sme_send_ext_mld_cap_wfatest_cmd(mac_handle,
 							 link_info->vdev_id,
 							 true);
+		}
+	}
+
+	cmd_id = QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_20MHZ_ONLY_STA;
+	if (tb[cmd_id]) {
+		cfg_val = nla_get_u8(tb[cmd_id]);
+		hdd_debug("STA 20Mhz only support: %d for vdev:%d", cfg_val, link_info->vdev_id);
+		if (cfg_val) {
+			vdev = hdd_objmgr_get_vdev_by_user(link_info,
+							   WLAN_OSIF_ID);
+			if (vdev) {
+				status =
+					wlan_vdev_mlme_set_sta_in_20mhz(
+								vdev,
+								true);
+				hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+				ret_val = qdf_status_to_os_return(status);
+			} else {
+				ret_val = qdf_status_to_os_return(
+							QDF_STATUS_E_INVAL);
+			}
+
+			if (ret_val)
+				hdd_err("Failed to set STA 20 MHz only support");
 		}
 	}
 
