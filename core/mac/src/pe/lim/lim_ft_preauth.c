@@ -185,25 +185,8 @@ bool lim_process_ft_pre_auth_req(struct mac_context *mac_ctx,
 			      session, 0, 0);
 #endif
 
-	/*
-	 * Dont need to suspend if APs are in same channel and DUT
-	 * is not in MCC state
-	 */
-	if ((session->curr_op_freq !=
-	     session->ftPEContext.pFTPreAuthReq->pre_auth_channel_freq)
-	    || lim_is_in_mcc(mac_ctx)) {
-		/* Need to suspend link only if the channels are different */
-		pe_debug("Performing pre-auth on diff channel(session %pK)",
-			session);
-		lim_send_preauth_scan_offload(mac_ctx, session,
-					session->ftPEContext.pFTPreAuthReq);
-	} else {
-		pe_debug("Performing pre-auth on same channel (session %pK)",
-			session);
-		/* We are in the same channel. Perform pre-auth */
-		lim_perform_ft_pre_auth(mac_ctx, QDF_STATUS_SUCCESS, NULL,
-					session);
-	}
+	lim_send_preauth_scan_offload(mac_ctx, session,
+				session->ftPEContext.pFTPreAuthReq);
 
 	return buf_consumed;
 }
