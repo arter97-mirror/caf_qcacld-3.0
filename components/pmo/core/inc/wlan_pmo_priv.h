@@ -39,6 +39,17 @@
 #define PMO_PS_DATA_SPEC_WAKE (0)
 
 /**
+ * typedef pmo_wow_user_pattern_del_cb - Callback for user pattern deletion
+ * @vdev_id: vdev identifier
+ * @pattern_id: pattern identifier that was deleted
+ *
+ * This callback is invoked when PMO deletes a user WoW pattern, allowing
+ * upper layers (like HDD) to clean up their pattern context.
+ */
+typedef void (*pmo_wow_user_pattern_del_cb)(uint8_t vdev_id,
+					     uint8_t pattern_id);
+
+/**
  * struct pmo_psoc_priv_obj - psoc related data require for pmo
  * @psoc_cfg: place holder for psoc configuration
  * @pmo_tx_ops: transmit ops for PMO
@@ -55,6 +66,7 @@
  *                             device is in low power mode
  * @get_dtim_period: register callback to get dtim period from mlme
  * @get_beacon_interval: register callback to get beacon interval from mlme
+ * @wow_user_pattern_del_cb: callback for user pattern deletion notification
  * @lock: spin lock for pmo psoc
  */
 struct pmo_psoc_priv_obj {
@@ -72,6 +84,7 @@ struct pmo_psoc_priv_obj {
 	pmo_is_device_in_low_pwr_mode is_device_in_low_pwr_mode;
 	pmo_get_dtim_period get_dtim_period;
 	pmo_get_beacon_interval get_beacon_interval;
+	pmo_wow_user_pattern_del_cb wow_user_pattern_del_cb;
 	qdf_spinlock_t lock;
 };
 

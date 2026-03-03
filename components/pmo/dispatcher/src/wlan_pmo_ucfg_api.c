@@ -504,6 +504,48 @@ ucfg_pmo_del_wow_user_pattern(struct wlan_objmgr_vdev *vdev,
 }
 
 QDF_STATUS
+ucfg_pmo_register_wow_user_pattern_del_cb(struct wlan_objmgr_psoc *psoc,
+					  void (*callback)(uint8_t vdev_id,
+							   uint8_t pattern_id))
+{
+	struct pmo_psoc_priv_obj *psoc_priv;
+
+	QDF_BUG(psoc);
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	psoc_priv = pmo_psoc_get_priv(psoc);
+	if (!psoc_priv) {
+		pmo_err("psoc priv is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc_priv->wow_user_pattern_del_cb = callback;
+	pmo_debug("Registered WoW user pattern deletion callback");
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void
+ucfg_pmo_deregister_wow_user_pattern_del_cb(struct wlan_objmgr_psoc *psoc)
+{
+	struct pmo_psoc_priv_obj *psoc_priv;
+
+	QDF_BUG(psoc);
+	if (!psoc)
+		return;
+
+	psoc_priv = pmo_psoc_get_priv(psoc);
+	if (!psoc_priv) {
+		pmo_err("psoc priv is NULL");
+		return;
+	}
+
+	psoc_priv->wow_user_pattern_del_cb = NULL;
+	pmo_debug("Deregistered WoW user pattern deletion callback");
+}
+
+QDF_STATUS
 ucfg_pmo_psoc_bus_resume_req(struct wlan_objmgr_psoc *psoc,
 			     enum qdf_suspend_type type)
 {

@@ -321,15 +321,7 @@ bool hdd_del_wowl_ptrn(struct hdd_adapter *adapter, const char *ptrn)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	if (QDF_IS_STATUS_ERROR(status))
 		return false;
-
-	/* Remove from local storage as well */
-	hdd_err("Deleted pattern with vdev %d and id %d [%s]", vdev_id, id,
-		g_hdd_wowl_ptrns[vdev_id][id]);
-
-	qdf_mem_free(g_hdd_wowl_ptrns[vdev_id][id]);
-	g_hdd_wowl_ptrns[vdev_id][id] = NULL;
-	g_hdd_wowl_ptrns_count--;
-
+	/* local storage will be cleared in hdd_wow_user_pattern_del_callback*/
 	return true;
 }
 
@@ -514,4 +506,136 @@ void hdd_free_user_wowl_ptrns(void)
 				g_hdd_wowl_ptrns[i][j] = NULL;
 			}
 		}
+}
+
+/**
+ * hdd_wow_user_pattern_del_callback() - Callback for WoW user pattern deletion
+ * @vdev_id: vdev identifier
+ * @pattern_id: pattern identifier that was deleted
+ *
+ * This callback is invoked by PMO when a WoW user pattern is deleted by the
+ * firmware or PMO layer. It cleans up HDD's local pattern storage to maintain
+ * synchronization between HDD and PMO/FW state.
+ *
+ * Context: Can be called from PMO context, potentially in atomic context
+ * Return: None
+ */
+static void hdd_wow_user_pattern_del_callback(uint8_t vdev_id,
+					      uint8_t pattern_id)
+{
+	/* Validate input parameters */
+	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
+		hdd_err("Invalid vdev_id %d (max: %d)", vdev_id,
+			WLAN_UMAC_PSOC_MAX_VDEVS);
+		return;
+	}
+
+	if (pattern_id >= WOWL_MAX_PTRNS_ALLOWED) {
+		hdd_err("Invalid pattern_id %d (max: %d)", pattern_id,
+			WOWL_MAX_PTRNS_ALLOWED);
+		return;
+	}
+
+	hdd_debug("WoW ptr deletion notification: vdev_id=%d, pattern_id=%d",
+		  vdev_id, pattern_id);
+
+	/* Clean up regular pattern (string-based) if present */
+	if (g_hdd_wowl_ptrns[vdev_id][pattern_id]) {
+		hdd_info("Clean pattern string for vdev %d pattern %d: [%s]",
+			 vdev_id, pattern_id,
+			 g_hdd_wowl_ptrns[vdev_id][pattern_id]);
+
+		/* Free the dynamically allocated pattern string */
+		qdf_mem_free(g_hdd_wowl_ptrns[vdev_id][pattern_id]);
+		g_hdd_wowl_ptrns[vdev_id][pattern_id] = NULL;
+
+		/* Decrement the global pattern counter */
+		if (g_hdd_wowl_ptrns_count > 0)
+			g_hdd_wowl_ptrns_count--;
+		else
+			hdd_warn("Pattern count already zero!");
+	}
+
+	/* Clean up debugfs pattern flag if present */
+	if (g_hdd_wowl_ptrns_debugfs[vdev_id][pattern_id]) {
+		hdd_info("Clean debugfs pattern flag for vdev %d pattern %d",
+			 vdev_id, pattern_id);
+
+		g_hdd_wowl_ptrns_debugfs[vdev_id][pattern_id] = 0;
+
+		/* Dec counter if regular pattern wasn't already cleaned */
+		if (!g_hdd_wowl_ptrns[vdev_id][pattern_id]) {
+			if (g_hdd_wowl_ptrns_count > 0)
+				g_hdd_wowl_ptrns_count--;
+			else
+				hdd_warn("Pattern count already zero!");
+		}
+	}
+
+	hdd_debug("Pattern cleanup complete. Remaining patterns: %d",
+		  g_hdd_wowl_ptrns_count);
+}
+
+QDF_STATUS hdd_register_wow_pattern_del_callback(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = hdd_ctx->psoc;
+	if (!psoc) {
+		hdd_err("PSOC is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_HDD_ID_OBJ_MGR);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get PSOC reference");
+		return status;
+	}
+
+	status = ucfg_pmo_register_wow_user_pattern_del_cb(psoc,
+					hdd_wow_user_pattern_del_callback);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to register WoW pattern deletion callback: %d",
+			status);
+	} else {
+		hdd_debug("Registered WoW pattern deletion callback");
+	}
+
+	wlan_objmgr_psoc_release_ref(psoc, WLAN_HDD_ID_OBJ_MGR);
+
+	return status;
+}
+
+void hdd_deregister_wow_pattern_del_callback(struct hdd_context *hdd_ctx)
+{
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is NULL");
+		return;
+	}
+
+	psoc = hdd_ctx->psoc;
+	if (!psoc) {
+		hdd_err("PSOC is NULL");
+		return;
+	}
+
+	status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_HDD_ID_OBJ_MGR);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to get PSOC reference");
+		return;
+	}
+
+	ucfg_pmo_deregister_wow_user_pattern_del_cb(psoc);
+	hdd_debug("Deregistered WoW pattern deletion callback");
+
+	wlan_objmgr_psoc_release_ref(psoc, WLAN_HDD_ID_OBJ_MGR);
 }

@@ -5310,6 +5310,14 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			goto ipa_component_free;
 		}
 
+		status = hdd_register_wow_pattern_del_callback(hdd_ctx);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_err("Failed to register WoW pattern del callback; status: %d",
+				status);
+			ret = qdf_status_to_os_return(status);
+			goto psoc_close;
+		}
+
 		ret = hdd_update_config(hdd_ctx);
 		if (ret) {
 			hdd_err("Failed to update configuration; errno: %d",
@@ -19359,6 +19367,8 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 	hdd_thermal_unregister_callbacks(hdd_ctx);
 	sme_deregister_oem_data_rsp_callback(mac_handle);
 	sme_multi_client_ll_rsp_deregister_callback(mac_handle);
+
+	hdd_deregister_wow_pattern_del_callback(hdd_ctx);
 
 	hdd_exit();
 }

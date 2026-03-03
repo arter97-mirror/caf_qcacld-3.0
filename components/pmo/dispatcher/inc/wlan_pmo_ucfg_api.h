@@ -1110,6 +1110,36 @@ ucfg_pmo_del_wow_user_pattern(struct wlan_objmgr_vdev *vdev,
 			      uint8_t pattern_id);
 
 /**
+ * ucfg_pmo_register_wow_user_pattern_del_cb() - Register callback for user
+ *                                                pattern deletion notification
+ * @psoc: objmgr psoc handle
+ * @callback: callback function to be invoked when user pattern is deleted
+ *
+ * This API allows upper layers (like HDD) to register a callback that will
+ * be invoked whenever PMO deletes a user WoW pattern. This enables proper
+ * cleanup of pattern context maintained by upper layers.
+ *
+ * Return: QDF_STATUS_SUCCESS on success else error code
+ */
+QDF_STATUS
+ucfg_pmo_register_wow_user_pattern_del_cb(struct wlan_objmgr_psoc *psoc,
+					  void (*callback)(uint8_t vdev_id,
+							   uint8_t pattern_id));
+
+/**
+ * ucfg_pmo_deregister_wow_user_pattern_del_cb() - Deregister callback for
+ *                                                  user pattern deletion
+ * @psoc: objmgr psoc handle
+ *
+ * This API deregisters the previously registered callback for user pattern
+ * deletion notification.
+ *
+ * Return: None
+ */
+void
+ucfg_pmo_deregister_wow_user_pattern_del_cb(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_pmo_psoc_bus_resume_req() - handle bus resume request for psoc
  * @psoc: objmgr psoc handle
  * @type: is this suspend part of runtime suspend or system suspend?

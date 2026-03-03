@@ -153,4 +153,28 @@ bool hdd_del_wowl_ptrn_debugfs(struct hdd_adapter *adapter,
  */
 void hdd_free_user_wowl_ptrns(void);
 
+/**
+ * hdd_register_wow_pattern_del_callback() - Register WoW pattern deletion
+ * callback
+ * @hdd_ctx: HDD context
+ *
+ * Registers the callback with PMO to receive notifications when user patterns
+ * are deleted by the firmware or PMO layer. This ensures HDD's local pattern
+ * storage stays synchronized with the firmware state.
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error code otherwise
+ */
+QDF_STATUS hdd_register_wow_pattern_del_callback(struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_deregister_wow_pattern_del_callback() - Deregister WoW pattern deletion
+ * callback
+ * @hdd_ctx: HDD context
+ *
+ * Deregisters the callback with PMO during driver unload or cleanup.
+ *
+ * Return: None
+ */
+void hdd_deregister_wow_pattern_del_callback(struct hdd_context *hdd_ctx);
+
 #endif /* #ifndef _WLAN_HDD_WOWL_H */

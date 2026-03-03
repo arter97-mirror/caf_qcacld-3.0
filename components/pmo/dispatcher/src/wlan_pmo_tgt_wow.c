@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -133,9 +133,12 @@ QDF_STATUS pmo_tgt_del_wow_pattern(
 	struct pmo_vdev_priv_obj *vdev_ctx;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_pmo_tx_ops pmo_tx_ops;
+	struct pmo_psoc_priv_obj *psoc_priv;
+	uint8_t vdev_id;
 
 	psoc = pmo_vdev_get_psoc(vdev);
 	vdev_ctx = pmo_vdev_get_priv(vdev);
+	vdev_id = pmo_vdev_get_id(vdev);
 
 	pmo_tx_ops = GET_PMO_TX_OPS_FROM_PSOC(psoc);
 	if (!pmo_tx_ops.del_wow_pattern) {
@@ -149,10 +152,18 @@ QDF_STATUS pmo_tgt_del_wow_pattern(
 		goto out;
 	}
 
-	if (user)
+	if (user) {
 		pmo_decrement_wow_user_ptrn(vdev_ctx);
-	else
+
+		psoc_priv = pmo_psoc_get_priv(psoc);
+		if (psoc_priv && psoc_priv->wow_user_pattern_del_cb) {
+			pmo_debug("call wow cb for vdev_id %d pattern_id %d",
+				  vdev_id, ptrn_id);
+			psoc_priv->wow_user_pattern_del_cb(vdev_id, ptrn_id);
+		}
+	} else {
 		pmo_decrement_wow_default_ptrn(vdev_ctx);
+	}
 out:
 
 	return status;
