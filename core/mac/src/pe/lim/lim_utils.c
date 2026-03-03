@@ -80,8 +80,8 @@
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <lim_mlo.h>
-#include "wlan_mlo_mgr_sta.h"
 #endif
+#include "wlan_mlo_mgr_sta.h"
 #include "wlan_cmn_ieee80211.h"
 #include <wlan_cm_api.h>
 #include <wlan_vdev_mgr_utils_api.h>

@@ -43,6 +43,7 @@
 #include <lim_process_fils.h>
 #include <wlan_action_oui_main.h>
 #include <lim_mlo.h>
+#include "wlan_mlo_mgr_link_switch.h"
 
 #ifdef WLAN_ALLOCATE_GLOBAL_BUFFERS_DYNAMICALLY
 static struct sDphHashNode *g_dph_node_array;
