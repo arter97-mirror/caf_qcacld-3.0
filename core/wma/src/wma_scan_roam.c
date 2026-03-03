@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -79,6 +80,8 @@
 #include <wlan_crypto_global_api.h>
 #include <cdp_txrx_mon.h>
 #include "wlan_blm_api.h"
+
+#include <wlan_crypto_def_i.h>
 
 #ifdef FEATURE_WLAN_EXTSCAN
 #define WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION WAKELOCK_DURATION_RECOMMENDED
@@ -931,6 +934,120 @@ uint32_t wma_roam_scan_get_cckm_mode(struct roam_offload_scan_req *roam_req,
 	return WMI_AUTH_CCKM;
 }
 #endif
+
+static uint32_t cm_get_rsn_wmi_auth_type(int32_t akm)
+{
+	/* Try the more preferred ones first. */
+	if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384))
+		return WMI_AUTH_FT_RSNA_FILS_SHA384;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256))
+		return WMI_AUTH_FT_RSNA_FILS_SHA256;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384))
+		return WMI_AUTH_RSNA_FILS_SHA384;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA256))
+		return WMI_AUTH_RSNA_FILS_SHA256;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE))
+		return WMI_AUTH_FT_RSNA_SAE;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE))
+		return WMI_AUTH_WPA3_SAE;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OWE))
+		return WMI_AUTH_WPA3_OWE;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X))
+		return WMI_AUTH_FT_RSNA;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_PSK))
+		return WMI_AUTH_FT_RSNA_PSK;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X))
+		return WMI_AUTH_RSNA;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_PSK))
+		return WMI_AUTH_RSNA_PSK;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_CCKM))
+		return WMI_AUTH_CCKM_RSNA;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_PSK_SHA256))
+		return WMI_AUTH_RSNA_PSK_SHA256;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SHA256))
+		return WMI_AUTH_RSNA_8021X_SHA256;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B))
+		return WMI_AUTH_RSNA_SUITE_B_8021X_SHA256;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X_SUITE_B_192))
+		return WMI_AUTH_RSNA_SUITE_B_8021X_SHA384;
+	else
+		return WMI_AUTH_NONE;
+}
+
+static uint32_t cm_get_wpa_wmi_auth_type(int32_t akm)
+{
+	/* Try the more preferred ones first. */
+	if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_IEEE8021X))
+		return WMI_AUTH_WPA;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_PSK))
+		return WMI_AUTH_WPA_PSK;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_CCKM))
+		return WMI_AUTH_CCKM_WPA;
+	else
+		return WMI_AUTH_NONE;
+}
+
+static uint32_t cm_get_wapi_wmi_auth_type(int32_t akm)
+{
+	/* Try the more preferred ones first. */
+	if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_WAPI_CERT))
+		return WMI_AUTH_WAPI;
+	else if (HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_WAPI_PSK))
+		return WMI_AUTH_WAPI_PSK;
+	else
+		return WMI_AUTH_NONE;
+}
+
+static uint32_t cm_crypto_authmode_to_wmi_authmode(int32_t authmodeset,
+						   int32_t akm, int32_t ucastcipherset)
+{
+	if (!authmodeset || authmodeset < 0)
+		return WMI_AUTH_OPEN;
+
+	if (HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_OPEN))
+		return WMI_AUTH_OPEN;
+
+	if (HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_AUTO) ||
+	    HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_NONE)) {
+		if ((HAS_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_WEP) ||
+		    HAS_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_WEP_40) ||
+		    HAS_PARAM(ucastcipherset,
+			      WLAN_CRYPTO_CIPHER_WEP_104) ||
+		    HAS_PARAM(ucastcipherset, WLAN_CRYPTO_CIPHER_TKIP) ||
+		    HAS_PARAM(ucastcipherset,
+			      WLAN_CRYPTO_CIPHER_AES_GCM) ||
+		    HAS_PARAM(ucastcipherset,
+			      WLAN_CRYPTO_CIPHER_AES_GCM_256) ||
+		    HAS_PARAM(ucastcipherset,
+			      WLAN_CRYPTO_CIPHER_AES_CCM) ||
+		    HAS_PARAM(ucastcipherset,
+			      WLAN_CRYPTO_CIPHER_AES_OCB) ||
+		    HAS_PARAM(ucastcipherset,
+			      WLAN_CRYPTO_CIPHER_AES_CCM_256)))
+			return WMI_AUTH_OPEN;
+		else
+			return WMI_AUTH_NONE;
+	}
+
+	if (HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_SHARED))
+		return WMI_AUTH_SHARED;
+
+	if (HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_8021X) ||
+	    HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_RSNA) ||
+	    HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_CCKM) ||
+	    HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_SAE) ||
+	    HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_FILS_SK))
+		return cm_get_rsn_wmi_auth_type(akm);
+
+	if (HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_WPA))
+		return cm_get_wpa_wmi_auth_type(akm);
+
+	if (HAS_PARAM(authmodeset, WLAN_CRYPTO_AUTH_WAPI))
+		return cm_get_wapi_wmi_auth_type(akm);
+
+	return WMI_AUTH_OPEN;
+}
+
 /**
  * wma_roam_scan_fill_ap_profile() - fill ap_profile
  * @roam_req: roam offload scan request
@@ -945,6 +1062,11 @@ wma_roam_scan_fill_ap_profile(struct roam_offload_scan_req *roam_req,
 			      struct ap_profile *profile)
 {
 	uint32_t rsn_authmode;
+	int32_t num_allowed_authmode = 0, key_mgmt;
+	enum wlan_crypto_key_mgmt i;
+	struct wlan_objmgr_vdev *vdev;
+	struct mac_context *mac_ctx = NULL;
+	int32_t crypto_auth_mode;
 
 	qdf_mem_zero(profile, sizeof(*profile));
 	if (!roam_req) {
@@ -996,6 +1118,44 @@ wma_roam_scan_fill_ap_profile(struct roam_offload_scan_req *roam_req,
 	if (roam_req->ConnectedNetwork.mfp_enabled)
 		profile->flags |= WMI_AP_PROFILE_FLAG_PMF;
 #endif
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx) {
+		WMA_LOGE("%s:NULL mac ptr. Exiting", __func__);
+		return;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    roam_req->roam_triggers.vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		WMA_LOGE("Invalid vdev");
+		return;
+	}
+
+	/* Get keymgmt from self security info */
+	key_mgmt = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_ORIG_KEY_MGMT);
+
+	crypto_auth_mode = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE);
+	if (crypto_auth_mode < 0)
+		crypto_auth_mode = 0;
+
+	for (i = 0; i < WLAN_CRYPTO_KEY_MGMT_MAX; i++) {
+		/*
+		 * Send AKM in allowed list which are not present in connected
+		 * akm
+		 */
+		if (HAS_PARAM(key_mgmt, i) &&
+		    num_allowed_authmode < WLAN_CRYPTO_AUTH_MAX) {
+			profile->allowed_authmode[num_allowed_authmode++] =
+			cm_crypto_authmode_to_wmi_authmode(crypto_auth_mode,
+							   (key_mgmt & (1 << i)),
+							   roam_req->ConnectedNetwork.encryption);
+		}
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+	profile->num_allowed_authmode = num_allowed_authmode;
 }
 
 /**
@@ -3893,10 +4053,13 @@ QDF_STATUS wma_roam_scan_fill_self_caps(tp_wma_handle wma_handle,
 	qdf_size_t val_len;
 	struct mac_context *mac = NULL;
 	tSirMacCapabilityInfo selfCaps;
-	uint32_t val = 0;
+	uint32_t val = 0, rsn_caps_32 = 0;
 	uint16_t *pCfgValue16;
 	uint8_t nCfgValue8, *pCfgValue8;
 	tSirMacQosInfoStation macQosInfoSta;
+	uint16_t vdev_id = roam_req->roam_triggers.vdev_id;
+	struct wlan_objmgr_vdev *vdev;
+	int32_t crypto_rsn = 0;
 
 	qdf_mem_zero(&macQosInfoSta, sizeof(tSirMacQosInfoStation));
 	/* Roaming is done only for INFRA STA type.
@@ -3943,17 +4106,31 @@ QDF_STATUS wma_roam_scan_fill_self_caps(tp_wma_handle wma_handle,
 		(uint16_t) ((val >> WNI_CFG_BLOCK_ACK_ENABLED_IMMEDIATE) & 1);
 	pCfgValue16 = (uint16_t *) &selfCaps;
 
-	/*
-	 * RSN caps arent been sent to firmware, so in case of PMF required,
-	 * the firmware connects to a non PMF AP advertising PMF not required
-	 * in the re-assoc request which violates protocol.
-	 * So send this to firmware in the roam SCAN offload command to
-	 * let it configure the params in the re-assoc request too.
-	 * Instead of making another infra, send the RSN-CAPS in MSB of
-	 * beacon Caps.
-	 */
-	roam_offload_params->capability = *((uint32_t *)(&roam_req->rsn_caps));
-	roam_offload_params->capability <<= RSN_CAPS_SHIFT;
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc,
+						    vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (vdev) {
+		/*
+		 * Self rsn caps aren't sent to firmware, so in case of PMF
+		 * required, the firmware connects to a non PMF AP advertising
+		 * PMF not required in the re-assoc request which violates
+		 * protocol. So send self RSN caps to firmware in roam SCAN
+		 * offload command to let it configure the params in the
+		 * re-assoc request too. Instead of making another infra, send
+		 * the RSN-CAPS in MSB of beacon Caps.
+		 */
+		crypto_rsn = wlan_crypto_get_param(vdev,
+						   WLAN_CRYPTO_PARAM_RSN_CAP);
+		if (crypto_rsn < 0) {
+			sme_err("Invalid RSN capabilities");
+		} else {
+			uint16_t rsn_val = (uint16_t)crypto_rsn;
+			qdf_mem_copy(&roam_req->rsn_caps, &rsn_val, sizeof(uint16_t));
+		}
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+	}
+	rsn_caps_32 = (uint32_t)(*((uint16_t *)&roam_req->rsn_caps));
+	roam_offload_params->capability = (rsn_caps_32 << RSN_CAPS_SHIFT);
 	roam_offload_params->capability |= ((*pCfgValue16) & 0xFFFF);
 
 	roam_offload_params->ht_caps_info =
