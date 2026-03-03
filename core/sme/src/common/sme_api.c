@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -15658,6 +15658,8 @@ void sme_update_score_config(mac_handle_t mac_handle,
 		mlme_scoring_cfg->weight_cfg.channel_congestion_weightage;
 	score_config->weight_cfg.oce_wan_weightage =
 		mlme_scoring_cfg->weight_cfg.oce_wan_weightage;
+	score_config->weight_cfg.security_weightage =
+		mlme_scoring_cfg->weight_cfg.security_weightage;
 
 	score_config->bandwidth_weight_per_index =
 		mlme_scoring_cfg->bandwidth_weight_per_index;
@@ -15704,6 +15706,9 @@ void sme_update_score_config(mac_handle_t mac_handle,
 		mlme_scoring_cfg->oce_wan_scoring.score_pcnt11_to_8;
 	score_config->oce_wan_scoring.score_pcnt15_to_12 =
 		mlme_scoring_cfg->oce_wan_scoring.score_pcnt15_to_12;
+
+	score_config->security_weight_per_index =
+		mlme_scoring_cfg->security_weight_per_index;
 }
 
 void sme_enable_fw_module_log_level(mac_handle_t mac_handle, int vdev_id)
