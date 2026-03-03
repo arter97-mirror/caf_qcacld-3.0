@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -148,6 +149,24 @@ struct hdd_context;
 #define TWT_SETUP_WAKE_INTVL_MANTISSA_MAX 0xFFFF
 #define TWT_SETUP_WAKE_DURATION_MAX       0xFFFF
 #define TWT_SETUP_WAKE_INTVL_EXP_MAX      31
+
+/*
+ * CFG80211_MULTI_AKM_CONNECT_SUPPORT
+ * used to indicate the Linux kernel contains support for multi AKM connect
+ * support
+ *
+ * This feature was introduced in Linux Kernel 6.0 via:
+ * ecad3b0b99bf wifi: cfg80211: Increase akm_suites array size in
+ * cfg80211_crypto_settings.
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0) || \
+	(defined CFG80211_MAX_NUM_AKM_SUITES))
+#define CFG80211_MULTI_AKM_CONNECT_SUPPORT 1
+#endif
+
+#ifdef CFG80211_MULTI_AKM_CONNECT_SUPPORT
+#define WLAN_CM_MAX_CONNECT_AKMS 5
+#endif
 
 /**
  * enum eDFS_CAC_STATUS: CAC status
