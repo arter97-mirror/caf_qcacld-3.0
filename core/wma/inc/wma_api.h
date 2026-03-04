@@ -316,6 +316,15 @@ static inline bool wma_is_p2p_lo_capable(void)
 }
 #endif
 bool wma_capability_enhanced_mcast_filter(void);
+
+/**
+ * wma_is_vdev_operating_params_event_support_enabled() - Check if vdev
+ * operating params event is supported
+ *
+ * Return: true if supported, false otherwise
+ */
+bool wma_is_vdev_operating_params_event_support_enabled(void);
+
 void wma_process_pdev_hw_mode_trans_ind(void *wma,
 	wmi_pdev_hw_mode_transition_event_fixed_param *fixed_param,
 	wmi_pdev_set_hw_mode_response_vdev_mac_entry *vdev_mac_entry,

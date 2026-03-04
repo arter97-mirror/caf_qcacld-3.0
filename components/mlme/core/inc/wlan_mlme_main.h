@@ -1116,6 +1116,19 @@ mlme_peer_object_destroyed_notification(struct wlan_objmgr_peer *peer,
 uint8_t *mlme_get_dynamic_oce_flags(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlme_is_nss_chains_force_config() - Check if NSS/chains have forced
+ * configuration
+ * @cfg: Pointer to the MLME NSS chains configuration structure
+ *
+ * This function checks if any of the NSS or chains configurations for 2.4GHz or
+ * 5GHz bands are set to forced mode (BAND_REQ_FORCE).
+ *
+ * Return: true if any band has forced NSS or chains configuration,
+ *         false otherwise
+ */
+bool mlme_is_nss_chains_force_config(struct wlan_mlme_nss_chains *cfg);
+
+/**
  * mlme_get_ini_vdev_config() - get the vdev ini config params
  * @vdev: vdev pointer
  *
@@ -1326,6 +1339,49 @@ mlme_is_vdev_nss_differs_across_bands_from_dyn(struct wlan_objmgr_vdev *vdev)
 
 	return mlme_is_vdev_nss_differs_across_bands_from_cfg(vdev, cfg);
 }
+
+/**
+ * mlme_vdev_get_bss_oper_ch_width_res() - Get BSS operational channel width
+ * @vdev: Pointer to vdev object
+ * @ch_width: Pointer to store the channel width
+ *
+ * This function retrieves the BSS operational channel width from the vdev's
+ * BSS operational resource parameters. If the channel width is not valid,
+ * CH_WIDTH_INVALID is returned.
+ *
+ * Return: QDF_STATUS - QDF_STATUS_SUCCESS on successful retrieval of channel
+ *                      width or QDF_STATUS_E_* on error
+ */
+QDF_STATUS mlme_vdev_get_bss_oper_ch_width_res(struct wlan_objmgr_vdev *vdev,
+					       enum phy_ch_width *ch_width);
+
+/**
+ * mlme_vdev_determine_bss_oper_nss_chains_res() - Determine BSS operational
+ * NSS and chains
+ * @vdev: Pointer to vdev object
+ * @tx_nss: Pointer to store the determined transmit NSS
+ * @rx_nss: Pointer to store the determined receive NSS
+ * @tx_chains: Pointer to store the determined transmit chains
+ * @rx_chains: Pointer to store the determined receive chains
+ *
+ * This function determines the operational NSS (Number of Spatial Streams) and
+ * chains for a BSS by considering multiple factors:
+ * - Hardware capabilities (available chains)
+ * - BSS operational parameters
+ * - Dynamic and static vdev NSS/Chains configurations
+ * - Band-specific settings (2.4GHz or 5GHz)
+ *
+ * The function calculates the final values by taking the minimum of all
+ * applicable constraints to ensure compatibility across all layers.
+ *
+ * Return: QDF_STATUS_SUCCESS on successful determination
+ *         Other QDF_STATUS error codes on failure
+ */
+QDF_STATUS
+mlme_vdev_determine_bss_oper_nss_chains_res(struct wlan_objmgr_vdev *vdev,
+					    uint8_t *tx_nss, uint8_t *rx_nss,
+					    uint8_t *tx_chains,
+					    uint8_t *rx_chains);
 
 /**
  * mlme_get_vdev_he_ops()  - Get vdev HE operations IE info

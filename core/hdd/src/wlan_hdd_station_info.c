@@ -47,6 +47,7 @@
 #include <osif_cm_util.h>
 #include <wlan_cp_stats_ucfg_api.h>
 #include "wlan_hdd_stats.h"
+#include <wma_api.h>
 
 /*
  * define short names for the global vendor params
@@ -2606,6 +2607,172 @@ static int hdd_get_station_remote_ex(struct hdd_context *hdd_ctx,
 	return status;
 }
 
+static int
+hdd_adapter_get_bss_oper_res_len(struct wlan_hdd_link_info *link_info)
+{
+	uint16_t per_mlo_link_addn_len;
+	uint16_t bss_op_res_len = 0, per_bssid_len = 0;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_hdd_link_info *iter_info;
+	struct hdd_adapter *adapter = link_info->adapter;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return 0;
+
+	if (!ucfg_cm_is_vdev_connected(vdev))
+		goto exit;
+
+	/* Tx + Rx NSS */
+	per_bssid_len += nla_total_size(sizeof(uint8_t)) * 2;
+	/* Tx + Rx Chains */
+	per_bssid_len += nla_total_size(sizeof(uint8_t)) * 2;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		bss_op_res_len = per_bssid_len;
+		goto exit;
+	}
+
+	/* MLO Link ID */
+	per_mlo_link_addn_len = nla_total_size(sizeof(uint8_t));
+
+	/* Start of nested attributes */
+	bss_op_res_len += NLA_HDRLEN;
+	hdd_adapter_for_each_link_info(adapter, iter_info) {
+		if (hdd_cm_get_ieee_link_id(iter_info, false) ==
+		    WLAN_INVALID_LINK_ID)
+			continue;
+
+		/* Each element of nested attributes */
+		bss_op_res_len += NLA_HDRLEN;
+		bss_op_res_len += per_bssid_len + per_mlo_link_addn_len;
+	}
+exit:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+	hdd_debug("OP BSS Len %d", bss_op_res_len);
+	return bss_op_res_len;
+}
+
+static int
+hdd_adapter_fill_bss_oper_res_params(struct wlan_hdd_link_info *link_info,
+				     struct sk_buff *skb)
+{
+	int ret = 0;
+	QDF_STATUS status;
+	uint8_t i = 0, link_id;
+	uint8_t tx_nss = 0xFF, rx_nss = 0xFF;
+	uint8_t tx_chains = 0xFF, rx_chains = 0xFF;
+	struct wlan_objmgr_vdev *vdev;
+	struct nlattr *mlo_info_nest, *mlo_link_nest;
+	struct wlan_hdd_link_info *iter_info;
+
+	vdev = hdd_objmgr_get_vdev_by_user(link_info, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	if (!ucfg_cm_is_vdev_connected(vdev)) {
+		ret = 0;
+		goto exit;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		status = ucfg_mlme_vdev_determine_bss_oper_nss_chains_res(vdev,
+									  &tx_nss,
+									  &rx_nss,
+									  &tx_chains,
+									  &rx_chains);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			ret = qdf_status_to_os_return(status);
+			goto exit;
+		}
+
+		hdd_debug("Non-MLO Tx/Rx NSS %dx%d, Tx/Rx Chains %dx%d",
+			  tx_nss, rx_nss, tx_chains, rx_chains);
+
+		if (nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS,
+			       tx_nss) ||
+		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS,
+			       rx_nss) ||
+		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS,
+			       tx_chains) ||
+		    nla_put_u8(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS,
+			       rx_chains))
+			ret = -EINVAL;
+
+		goto exit;
+	}
+
+	mlo_info_nest =
+		nla_nest_start(skb,
+			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINKS);
+	if (!mlo_info_nest) {
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	hdd_adapter_for_each_link_info(link_info->adapter, iter_info) {
+		link_id = hdd_cm_get_ieee_link_id(iter_info, false);
+		if (link_id == WLAN_INVALID_LINK_ID)
+			continue;
+
+		if (iter_info->vdev_id == WLAN_INVALID_VDEV_ID ||
+		    !iter_info->is_mlo_vdev_active) {
+			tx_nss = 0xFF;
+			rx_nss = 0xFF;
+			tx_chains = 0xFF;
+			rx_chains = 0xFF;
+		} else {
+			status = ucfg_mlme_vdev_determine_bss_oper_nss_chains_res(iter_info->vdev,
+										  &tx_nss,
+										  &rx_nss,
+										  &tx_chains,
+										  &rx_chains);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				ret = qdf_status_to_os_return(status);
+				goto exit;
+			}
+		}
+
+		hdd_debug("Link-ID %d Tx/Rx NSS %dx%d, Tx/Rx Chains %dx%d",
+			  link_id, tx_nss, rx_nss, tx_chains, rx_chains);
+
+		mlo_link_nest = nla_nest_start(skb, i++);
+		if (!mlo_link_nest) {
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		if (nla_put_u8(skb,
+			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MLO_LINK_ID,
+			       link_id) ||
+		    nla_put_u8(skb,
+			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_NSS,
+			       tx_nss) ||
+		    nla_put_u8(skb,
+			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_NSS,
+			       rx_nss) ||
+		    nla_put_u8(skb,
+			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TX_CHAINS,
+			       tx_chains) ||
+		    nla_put_u8(skb,
+			       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_CHAINS,
+			       rx_chains)) {
+			ret = -EINVAL;
+			goto exit;
+		}
+
+		nla_nest_end(skb, mlo_link_nest);
+	}
+
+	nla_nest_end(skb, mlo_info_nest);
+
+exit:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	hdd_debug("Status %d", ret);
+	return ret;
+}
+
 #define MCS_COUNT_MAX 16
 #define BW_COUNT_MAX 5
 #define SS_COUNT_JITTER 4
@@ -2630,6 +2797,7 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 	struct qdf_mac_addr *peer_mac_addr;
 	struct wlan_objmgr_vdev *vdev;
 	bool is_enhanced_stats_support;
+	uint16_t vdev_bss_oper_res_len = 0;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(link_info);
 	ucfg_mc_cp_get_big_data_fw_support(hdd_ctx->psoc, &big_data_fw_support);
@@ -2671,14 +2839,19 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 		}
 	}
 
+	if (wma_is_vdev_operating_params_event_support_enabled())
+		vdev_bss_oper_res_len =
+				hdd_adapter_get_bss_oper_res_len(link_info);
+
 	if (big_data_stats_req) {
 		if (wlan_hdd_get_big_data_station_stats(link_info)) {
 			hdd_err_rl("wlan_hdd_get_big_data_station_stats fail");
 			goto free_sta_info;
 		}
-		nl_buf_len = hdd_get_big_data_stats_len(link_info);
+		nl_buf_len += hdd_get_big_data_stats_len(link_info);
 	}
 
+	nl_buf_len += vdev_bss_oper_res_len;
 	nl_buf_len += hdd_get_pmf_bcn_protect_stats_len(link_info);
 	connect_fail_rsn_len = hdd_get_connect_fail_reason_code_len(adapter);
 	nl_buf_len += connect_fail_rsn_len;
@@ -2771,6 +2944,10 @@ static int hdd_get_station_info_ex(struct wlan_hdd_link_info *link_info)
 		hdd_err_rl("hdd_add_uplink_jitter fail");
 		goto error;
 	}
+
+	if (vdev_bss_oper_res_len &&
+	    hdd_adapter_fill_bss_oper_res_params(link_info, skb))
+		goto error;
 
 	ret = wlan_cfg80211_vendor_cmd_reply(skb);
 	hdd_reset_roam_params(hdd_ctx->psoc, link_info->vdev_id);

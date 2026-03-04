@@ -4339,6 +4339,17 @@ bool wma_is_p2p_lo_capable(void)
 }
 #endif
 
+bool wma_is_vdev_operating_params_event_support_enabled(void)
+{
+	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma)
+		return false;
+
+	return wmi_service_enabled(wma->wmi_handle,
+				   wmi_service_vdev_operating_params_event_support);
+}
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS wma_get_roam_scan_ch(wmi_unified_t wmi_handle,
 				uint8_t vdev_id)
@@ -5163,7 +5174,9 @@ QDF_STATUS wma_mon_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 	vdev_mlme->proto.sta.assoc_id = 0;
 
 	status = vdev_mgr_up_send(vdev_mlme);
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_SUCCESS(status))
+		status = wma_post_vdev_up_config(vdev_mlme->vdev);
+	else
 		wma_err("Failed to send vdev up cmd: vdev %d", vdev_id);
 
 	return status;

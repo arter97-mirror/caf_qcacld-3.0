@@ -3299,6 +3299,12 @@ void lim_update_session_nss_for_state(struct pe_session *session,
 			pe_debug("Failed to fetch curr bss nss %d", status);
 			return;
 		}
+
+		status = wlan_vdev_mlme_init_bss_oper_res_params(session->vdev);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_debug("Failed to init bss_oper res %d", status);
+			return;
+		}
 		break;
 	default:
 		pe_debug("Unexpected call to update session in %d for %d",

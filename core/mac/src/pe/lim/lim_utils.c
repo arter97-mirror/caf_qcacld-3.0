@@ -2240,6 +2240,12 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 
 	sys_process_mmh_msg(mac, &mmhMsg);
 
+	if (LIM_IS_STA_ROLE(pe_session)) {
+		status = wlan_vdev_mlme_reset_bss_oper_res_ch_width_params(mlme_obj->vdev);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_debug("Failed to reset bss oper ch width");
+	}
+
 	lim_switch_channel_vdev_started(pe_session);
 }
 

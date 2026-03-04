@@ -78,6 +78,17 @@ struct wlan_mlme_psoc_ext_obj *mlme_get_psoc_ext_obj_fl(
 	return wlan_psoc_mlme_get_ext_hdl(psoc);
 }
 
+bool mlme_is_nss_chains_force_config(struct wlan_mlme_nss_chains *cfg)
+{
+	if (cfg->nss_band_state[NSS_CHAINS_BAND_2GHZ] == BAND_REQ_FORCE |
+	    cfg->nss_band_state[NSS_CHAINS_BAND_5GHZ] == BAND_REQ_FORCE |
+	    cfg->chains_band_state[NSS_CHAINS_BAND_2GHZ] == BAND_REQ_FORCE |
+	    cfg->chains_band_state[NSS_CHAINS_BAND_5GHZ] == BAND_REQ_FORCE)
+		return true;
+
+	return false;
+}
+
 struct wlan_mlme_nss_chains *mlme_get_dynamic_vdev_config(
 				struct wlan_objmgr_vdev *vdev)
 {
@@ -149,6 +160,114 @@ mlme_is_vdev_nss_differs_across_bands_from_cfg(struct wlan_objmgr_vdev *vdev,
 
 	return true;
 }
+
+QDF_STATUS mlme_vdev_get_bss_oper_ch_width_res(struct wlan_objmgr_vdev *vdev,
+					       enum phy_ch_width *ch_width)
+{
+	QDF_STATUS status;
+	struct wlan_bss_op_res bss_op_res;
+
+	status = wlan_vdev_mlme_get_bss_oper_res_params(vdev, &bss_op_res);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	*ch_width = bss_op_res.ch_width_valid ? bss_op_res.ch_width :
+		    CH_WIDTH_INVALID;
+
+	return status;
+}
+
+QDF_STATUS
+mlme_vdev_determine_bss_oper_nss_chains_res(struct wlan_objmgr_vdev *vdev,
+					    uint8_t *tx_nss, uint8_t *rx_nss,
+					    uint8_t *tx_chains,
+					    uint8_t *rx_chains)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_mlme_nss_chains *dyn, *ini;
+	struct wlan_bss_op_res bss_op_res;
+	uint8_t cap_tx_nss, cap_rx_nss, op_tx_nss, op_rx_nss;
+	uint8_t hw_tx_chains, hw_rx_chains, vdev_tx_chains, vdev_rx_chains;
+	uint8_t final_tx_nss, final_rx_nss, final_tx_chains, final_rx_chains;
+	qdf_freq_t oper_freq;
+	enum nss_chains_band_info band;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	dyn = mlme_get_dynamic_vdev_config(vdev);
+	if (!dyn)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	ini = mlme_get_ini_vdev_config(vdev);
+	if (!ini)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	status = wlan_vdev_mlme_get_bss_oper_res_params(vdev, &bss_op_res);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = wlan_vdev_mlme_get_bss_nss_params(vdev,
+						   &cap_tx_nss, &cap_rx_nss,
+						   &op_tx_nss, &op_rx_nss);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	oper_freq = wlan_get_operation_chan_freq(vdev);
+	if (!oper_freq)
+		return QDF_STATUS_E_INVAL;
+
+	status = policy_mgr_curr_hwmode_fetch_chains_for_freq(psoc, oper_freq,
+							      &hw_tx_chains,
+							      &hw_rx_chains);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	band = wlan_reg_is_24ghz_ch_freq(oper_freq) ? NSS_CHAINS_BAND_2GHZ :
+	       NSS_CHAINS_BAND_5GHZ;
+
+	final_tx_nss = QDF_MIN(hw_tx_chains, op_tx_nss);
+	final_rx_nss = QDF_MIN(hw_rx_chains, op_rx_nss);
+
+	if (dyn->nss_band_state[band] == BAND_REQ_FORCE) {
+		final_tx_nss = QDF_MIN(final_tx_nss, dyn->tx_nss[band]);
+		final_rx_nss = QDF_MIN(final_rx_nss, dyn->rx_nss[band]);
+	}
+
+	if (bss_op_res.nss_valid) {
+		final_tx_nss = QDF_MIN(final_tx_nss, bss_op_res.tx_nss);
+		final_rx_nss = QDF_MIN(final_rx_nss, bss_op_res.rx_nss);
+	}
+
+	if (dyn->chains_band_state[band] == BAND_REQ_FORCE) {
+		vdev_tx_chains = dyn->num_tx_chains[band];
+		vdev_rx_chains = dyn->num_rx_chains[band];
+	} else {
+		vdev_tx_chains = ini->num_tx_chains[band];
+		vdev_rx_chains = ini->num_rx_chains[band];
+	}
+
+	final_tx_chains = QDF_MIN(hw_tx_chains, vdev_tx_chains);
+	final_rx_chains = QDF_MIN(hw_rx_chains, vdev_rx_chains);
+
+	if (bss_op_res.chains_valid) {
+		final_tx_chains =
+			QDF_MIN(final_tx_chains, bss_op_res.tx_chains);
+		final_rx_chains =
+			QDF_MIN(final_rx_chains, bss_op_res.rx_chains);
+	}
+
+	*tx_nss = final_tx_nss;
+	*rx_nss = final_rx_nss;
+
+	*tx_chains = final_tx_chains;
+	*rx_chains = final_rx_chains;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /* Buffer len size to consider the 4 char freq, and a space, Total 5 */
 #define MLME_CHAN_WEIGHT_CHAR_LEN 5
 #define MLME_MAX_CHAN_TO_PRINT 39

@@ -1134,6 +1134,10 @@ lim_roam_store_nss_from_reassoc_req(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	qdf_mem_copy(mlme_get_dynamic_vdev_config(vdev),
+		     mlme_get_ini_vdev_config(vdev),
+		     sizeof(struct wlan_mlme_nss_chains));
+
 	assoc_req = qdf_mem_malloc(sizeof(*assoc_req));
 	if (!assoc_req) {
 		status = QDF_STATUS_E_NOMEM;

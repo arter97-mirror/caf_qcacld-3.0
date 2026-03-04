@@ -3760,6 +3760,31 @@ static void wma_update_beacon_tx_rate_code(struct vdev_mlme_obj *mlme_obj)
 }
 #endif
 
+QDF_STATUS wma_post_vdev_up_config(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_mlme_nss_chains *dyn_cfg =
+				mlme_get_dynamic_vdev_config(vdev);
+
+	if (!dyn_cfg) {
+		wma_debug("Failed to get vdev %d dyn config",
+			  wlan_vdev_get_id(vdev));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (mlme_is_nss_chains_force_config(dyn_cfg)) {
+		status = wma_vdev_nss_chain_params_send(wlan_vdev_get_id(vdev),
+							dyn_cfg);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug("Failed to config dyn nss on vdev %d",
+				  wlan_vdev_get_id(vdev));
+			return status;
+		}
+	}
+
+	return status;
+}
+
 QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);

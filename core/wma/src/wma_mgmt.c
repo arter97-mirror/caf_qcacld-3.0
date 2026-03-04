@@ -3025,6 +3025,7 @@ QDF_STATUS wma_set_ap_vdev_up(tp_wma_handle wma, uint8_t vdev_id)
 	if (wlan_vdev_mlme_is_mlo_ap(vdev))
 		wmi_unified_send_vdev_tsf_tstamp_action_cmd(wma->wmi_handle,
 							    vdev_id);
+	status = wma_post_vdev_up_config(vdev);
 
 	return status;
 }

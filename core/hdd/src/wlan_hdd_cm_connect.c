@@ -1073,6 +1073,9 @@ hdd_cm_connect_failure_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	qdf_mem_zero(hdd_sta_ctx->conn_info.connect_time, time_buffer_size);
 	hdd_init_scan_reject_params(hdd_ctx);
 	hdd_cm_save_connect_status(link_info, rsp->status_code);
+
+	link_info->is_mlo_vdev_active = false;
+
 	if (!is_link_switch) {
 		/* For link switch connection failure, do not clear existing
 		 * connection info in OSIF.

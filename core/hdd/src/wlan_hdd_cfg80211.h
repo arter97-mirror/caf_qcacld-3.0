@@ -735,6 +735,33 @@ enum hdd_chain_mode {
 };
 
 /**
+ * enum wlan_vendor_nss_chains_req_type - Vendor request type to configure
+ * NSS and chains
+ * @WLAN_VENDOR_NSS_CHAIN_REQ_INVALID: Invalid request params.
+ * @WLAN_VENDOR_NSS_CHAIN_REQ_NONE: No change requested
+ * @WLAN_VENDOR_NSS_CHAIN_REQ_NO_FORCE: Request to configure
+ * NSS/chains as no-force
+ * @WLAN_VENDOR_NSS_CHAIN_REQ_FORCE: Request to configure NSS/Chains to vendor
+ * force value.
+ */
+enum wlan_vendor_nss_chains_req_type {
+	WLAN_VENDOR_NSS_CHAIN_REQ_INVALID = -1,
+	WLAN_VENDOR_NSS_CHAIN_REQ_NONE,
+	WLAN_VENDOR_NSS_CHAIN_REQ_NO_FORCE,
+	WLAN_VENDOR_NSS_CHAIN_REQ_FORCE,
+};
+
+/**
+ * enum wlan_vendor_nss_chains_parse_type - Type of vendor params to parse
+ * @WLAN_VENDOR_PARSE_TYPE_NSS: Parse NSS attributes
+ * @WLAN_VENDOR_PARSE_TYPE_CHAINS: Parse Chains attributes
+ */
+enum wlan_vendor_nss_chains_parse_type {
+	WLAN_VENDOR_PARSE_TYPE_NSS,
+	WLAN_VENDOR_PARSE_TYPE_CHAINS,
+};
+
+/**
  * enum hdd_ba_mode: Representation of Number to configure BA mode
  * @HDD_BA_MODE_AUTO: Auto mode
  * @HDD_BA_MODE_MANUAL: Manual mode

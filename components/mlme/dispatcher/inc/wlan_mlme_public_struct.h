@@ -1928,6 +1928,16 @@ enum dot11p_mode {
 #endif
 
 /**
+ * enum wlan_mlme_nss_chains_state - per band request state
+ * @BAND_REQ_FORCE: vendor specified numeric non-255 values
+ * @BAND_REQ_NO_FORCE: vendor specified 255
+ */
+enum wlan_mlme_nss_chains_state {
+	BAND_REQ_NO_FORCE = 0,
+	BAND_REQ_FORCE,
+};
+
+/**
  * struct wlan_mlme_nss_chains -     MLME vdev config of nss, and chains
  * @num_tx_chains:                   tx chains of vdev config
  * @num_rx_chains:                   rx chains of vdev config
@@ -1946,7 +1956,10 @@ enum dot11p_mode {
  * current HW-mode NSS over the maximum supported NSS when selecting the
  * effective NSS
  * @better_chain_rssi_threshold:     rssi threshold for better chain selection
+ * @nss_band_state:  Per-band NSS config state
+ * @chains_band_state:  Per-band chains config state
  */
+
 struct wlan_mlme_nss_chains {
 	uint32_t num_tx_chains[NSS_CHAINS_BAND_MAX];
 	uint32_t num_rx_chains[NSS_CHAINS_BAND_MAX];
@@ -1962,6 +1975,8 @@ struct wlan_mlme_nss_chains {
 	bool fast_chain_selection;
 	bool prefer_curr_hw_mode_nss;
 	uint32_t better_chain_rssi_threshold;
+	enum wlan_mlme_nss_chains_state nss_band_state[NSS_CHAINS_BAND_MAX];
+	enum wlan_mlme_nss_chains_state chains_band_state[NSS_CHAINS_BAND_MAX];
 };
 
 /**

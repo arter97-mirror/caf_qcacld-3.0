@@ -2882,6 +2882,25 @@ ucfg_mlme_get_dynamic_vdev_config(struct wlan_objmgr_vdev *vdev)
 	return mlme_get_dynamic_vdev_config(vdev);
 }
 
+static inline QDF_STATUS
+ucfg_mlme_vdev_get_bss_oper_ch_width_res(struct wlan_objmgr_vdev *vdev,
+					 enum phy_ch_width *ch_width)
+{
+	return mlme_vdev_get_bss_oper_ch_width_res(vdev, ch_width);
+}
+
+static inline QDF_STATUS
+ucfg_mlme_vdev_determine_bss_oper_nss_chains_res(struct wlan_objmgr_vdev *vdev,
+						 uint8_t *tx_nss,
+						 uint8_t *rx_nss,
+						 uint8_t *tx_chains,
+						 uint8_t *rx_chains)
+{
+	return mlme_vdev_determine_bss_oper_nss_chains_res(vdev, tx_nss, rx_nss,
+							   tx_chains,
+							   rx_chains);
+}
+
 /**
  * ucfg_mlme_get_vht20_mcs9() - Enables VHT MCS9 in 20M BW operation
  * @psoc: psoc context

@@ -350,6 +350,8 @@ cm_disconnect_complete_ind(struct wlan_objmgr_vdev *vdev,
 			     sizeof(struct wlan_mlme_nss_chains));
 	}
 
+	wlan_vdev_mlme_init_bss_oper_res_params(vdev);
+
 	return QDF_STATUS_SUCCESS;
 }
 

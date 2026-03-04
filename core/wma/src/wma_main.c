@@ -2099,9 +2099,11 @@ wma_vdev_nss_chain_params_send(uint8_t vdev_id,
 	vdev_user_cfg.better_chain_rssi_threshold =
 					user_cfg->better_chain_rssi_threshold;
 
+	vdev_user_cfg.force_nss_chains =
+			mlme_is_nss_chains_force_config(user_cfg);
+
 	return wmi_unified_vdev_nss_chain_params_send(wma_handle->wmi_handle,
-						      vdev_id,
-						      &vdev_user_cfg);
+						      vdev_id, &vdev_user_cfg);
 }
 
 /**

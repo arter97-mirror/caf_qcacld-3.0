@@ -314,6 +314,8 @@ __hdd_cm_disconnect_handler_post_user_update(struct wlan_hdd_link_info *link_inf
 						 SCAN_EVENT_TYPE_MAX, true);
 	}
 
+	link_info->is_mlo_vdev_active = false;
+
 	if (!is_link_switch) {
 		/* Clear saved connection information in HDD */
 		hdd_conn_remove_connect_info(sta_ctx);

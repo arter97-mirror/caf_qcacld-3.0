@@ -2653,6 +2653,8 @@ QDF_STATUS wma_pre_chan_switch_setup(uint8_t vdev_id);
  */
 QDF_STATUS wma_post_chan_switch_setup(uint8_t vdev_id);
 
+QDF_STATUS wma_post_vdev_up_config(struct wlan_objmgr_vdev *vdev);
+
 /**
  * wma_vdev_pre_start() - prepare vdev start
  * @vdev_id: vdev id

@@ -456,15 +456,17 @@ static QDF_STATUS sta_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 					uint16_t event_data_len,
 					void *event_data)
 {
+	uint8_t vdev_id;
 	QDF_STATUS status;
 
-	mlme_legacy_debug("vdev id = %d ",
-			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
-	status = wma_sta_vdev_up_send(vdev_mlme, event_data_len, event_data);
+	vdev_id = wlan_vdev_get_id(vdev_mlme->vdev);
+	mlme_legacy_debug("vdev id = %d ", vdev_id);
 
+	status = wma_sta_vdev_up_send(vdev_mlme, event_data_len, event_data);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		mlme_sr_update(vdev_mlme->vdev, true);
 		wlan_p2p_validate_ap_assist_dfs_group(vdev_mlme->vdev);
+		status = wma_post_vdev_up_config(vdev_mlme->vdev);
 	}
 
 	return status;
@@ -2742,6 +2744,44 @@ wlan_sap_get_user_config_acs_ch_list(uint8_t vdev_id,
 	return wlansap_get_user_config_acs_ch_list(vdev_id, filter);
 }
 
+static QDF_STATUS
+vdevmgr_vdev_bss_oper_res_change(struct vdev_mlme_obj *vdev_mlme,
+				 struct wlan_bss_op_res *params)
+{
+	struct wlan_bss_op_res updated_params;
+
+	qdf_mem_copy(&updated_params, &vdev_mlme->proto.generic.bss_op_res,
+		     sizeof(struct wlan_bss_op_res));
+
+	if (params->ch_width_valid) {
+		updated_params.ch_width = params->ch_width;
+		updated_params.ch_width_valid = true;
+	}
+
+	if (params->nss_valid) {
+		updated_params.tx_nss = params->tx_nss;
+		updated_params.rx_nss = params->rx_nss;
+		updated_params.nss_valid = true;
+	}
+
+	if (params->chains_valid) {
+		updated_params.tx_chains = params->tx_chains;
+		updated_params.rx_chains = params->rx_chains;
+		updated_params.chains_valid = true;
+	}
+
+	qdf_mem_copy(&vdev_mlme->proto.generic.bss_op_res, &updated_params,
+		     sizeof(struct wlan_bss_op_res));
+
+	mlme_nofl_debug("VDEV-%d curr bss oper res: Tx/Rx NSS: %dx%d, Tx/Rx Chains: %dx%d BW: %d",
+			wlan_vdev_get_id(vdev_mlme->vdev),
+			updated_params.tx_nss, updated_params.rx_nss,
+			updated_params.tx_chains, updated_params.rx_chains,
+			updated_params.ch_width);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_start_send = sta_mlme_vdev_start_send,
 	.mlme_vdev_restart_send = sta_mlme_vdev_restart_send,
@@ -2773,6 +2813,7 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 
 #endif
 	.mlme_vdev_peer_oper_mode_notify = vdevmgr_peer_oper_mode_notify,
+	.mlme_vdev_op_res_chg_evt = vdevmgr_vdev_bss_oper_res_change,
 };
 
 static struct vdev_mlme_ops ap_mlme_ops = {
@@ -2799,6 +2840,7 @@ static struct vdev_mlme_ops ap_mlme_ops = {
 	.mlme_vdev_link_reconfig_remove = ap_mlme_vdev_send_link_removal,
 	.mlme_vdev_set_link_remove_delay = ap_mlme_vdev_set_link_removal_delay,
 	.mlme_vdev_peer_oper_mode_notify = vdevmgr_peer_oper_mode_notify,
+	.mlme_vdev_op_res_chg_evt = vdevmgr_vdev_bss_oper_res_change,
 };
 
 static struct vdev_mlme_ops mon_mlme_ops = {
