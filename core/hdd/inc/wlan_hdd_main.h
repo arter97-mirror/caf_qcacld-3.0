@@ -1046,6 +1046,8 @@ struct hdd_mic_work {
  * @rssi: The signal strength (dbm)
  * @tx_rate: last used tx rate info
  * @rx_rate: last used rx rate info
+ * @fcs_count: Number of MPDUs received from this station with an FCS error
+ * @rx_mpdu_count: Number of MPDUs received from this station
  *
  * fw txrx status in HDD
  */
@@ -1060,6 +1062,8 @@ struct hdd_fw_txrx_stats {
 	int8_t rssi;
 	struct hdd_rate_info tx_rate;
 	struct hdd_rate_info rx_rate;
+	uint32_t fcs_count;
+	uint32_t rx_mpdu_count;
 };
 
 /**
