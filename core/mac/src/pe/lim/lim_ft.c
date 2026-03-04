@@ -124,6 +124,8 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 	bool chan_width_support = false;
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	tDot11fBeaconIEs *bcn_ies;
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_objmgr_psoc *psoc;
 
 	/* Nothing to be done if the session is not in STA mode */
 	if (!LIM_IS_STA_ROLE(ft_session)) {
@@ -135,6 +137,22 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 	pAddBssParams = qdf_mem_malloc(sizeof(struct bss_params));
 	if (!pAddBssParams)
 		return;
+
+	psoc = wlan_vdev_get_psoc(ft_session->vdev);
+	if (!psoc) {
+		pe_err("vdev %d: psoc is NULL", ft_session->vdev_id);
+		qdf_mem_free(pAddBssParams);
+		return;
+	}
+
+	peer = wlan_objmgr_get_peer_by_mac(psoc, bss_desc->bssId,
+					   WLAN_LEGACY_MAC_ID);
+	if (!peer) {
+		pe_err("vdev %d: peer not found for bssid " QDF_MAC_ADDR_FMT,
+		       ft_session->vdev_id, QDF_MAC_ADDR_REF(bss_desc->bssId));
+		qdf_mem_free(pAddBssParams);
+		return;
+	}
 
 	bcn_ies = &bss_desc->bcn_ies;
 	if (mac->lim.gLimProtectionControl !=
@@ -192,7 +210,7 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 		pAddBssParams->vhtCapable = bcn_ies->VHTCaps.present;
 		vht_caps = &bcn_ies->VHTCaps;
 		lim_update_vhtcaps_assoc_resp(mac, pAddBssParams,
-					      vht_caps, ft_session);
+					      vht_caps, peer);
 	} else if (ft_session->vhtCapability &&
 		   bcn_ies->vendor_vht_ie.VHTCaps.present) {
 		pe_debug("VHT caps are present in vendor specific IE");
@@ -200,7 +218,7 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 			bcn_ies->vendor_vht_ie.VHTCaps.present;
 		vht_caps = &bcn_ies->vendor_vht_ie.VHTCaps;
 		lim_update_vhtcaps_assoc_resp(mac, pAddBssParams,
-					      vht_caps, ft_session);
+					      vht_caps, peer);
 	} else {
 		pAddBssParams->vhtCapable = 0;
 	}
@@ -327,6 +345,8 @@ void lim_ft_prepare_add_bss_req(struct mac_context *mac,
 	ft_session->ftPEContext.pAddBssReq = pAddBssParams;
 
 	pe_debug("Saving SIR_HAL_ADD_BSS_REQ for pre-auth ap");
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
 
 	return;
 }
