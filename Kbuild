@@ -507,6 +507,10 @@ ifeq ($(CONFIG_FEATURE_WLAN_HOST_TXRX_STATS),y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_host_txrx_stats.o
 endif
 
+ifeq ($(CONFIG_FEATURE_IPA_RING_STATS),y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_ipa_ring_stats.o
+endif
+
 $(call add-wlan-objs,hdd,$(HDD_OBJS))
 
 ###### OSIF_SYNC ########
@@ -1165,6 +1169,32 @@ WLAN_HOST_TXRX_STATS_OBJS := \
 endif
 
 $(call add-wlan-objs,wlan_host_txrx_stats,$(WLAN_HOST_TXRX_STATS_OBJS))
+
+############# IPA_RING_STATS ############
+IPA_RING_STATS_OS_IF_INC      := -I$(WLAN_COMMON_INC)/os_if/linux/ipa_ring_stats/inc
+IPA_RING_STATS_TGT_INC        := -I$(WLAN_COMMON_INC)/target_if/ipa_ring_stats/inc
+IPA_RING_STATS_DISPATCHER_INC := -I$(WLAN_COMMON_INC)/ipa/dispatcher/inc
+IPA_RING_STATS_PRIV_INC       := -I$(WLAN_COMMON_INC)/ipa/core/inc
+IPA_RING_STATS_HAL_INC        := -I$(WLAN_COMMON_INC)/hal/wifi3.0
+
+IPA_RING_STATS_INC := \
+	$(IPA_RING_STATS_OS_IF_INC) \
+	$(IPA_RING_STATS_TGT_INC) \
+	$(IPA_RING_STATS_DISPATCHER_INC) \
+	$(IPA_RING_STATS_PRIV_INC) \
+	$(IPA_RING_STATS_HAL_INC)
+
+ifeq ($(CONFIG_FEATURE_IPA_RING_STATS), y)
+IPA_RING_STATS_OBJS := \
+	$(WLAN_COMMON_ROOT)/os_if/linux/ipa_ring_stats/src/wlan_cfg80211_ipa_ring_stats.o \
+	$(WLAN_COMMON_ROOT)/ipa/dispatcher/src/wlan_ipa_ring_stats_ucfg_api.o \
+	$(WLAN_COMMON_ROOT)/ipa/dispatcher/src/wlan_ipa_ring_stats_tgt_api.o \
+	$(WLAN_COMMON_ROOT)/target_if/ipa_ring_stats/src/target_if_ipa_ring_stats.o \
+	$(WLAN_COMMON_ROOT)/ipa/core/src/wlan_ipa_ring_stats_api.o
+
+endif
+
+$(call add-wlan-objs,ipa_ring_stats,$(IPA_RING_STATS_OBJS))
 
 ############# UMAC_GREEN_AP ############
 UMAC_GREEN_AP_DIR := umac/green_ap
@@ -1959,6 +1989,11 @@ endif
 ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_11be_tlv.o
 WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_11be_api.o
+endif
+
+ifeq ($(CONFIG_FEATURE_IPA_RING_STATS), y)
+WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_ipa_ring_stats_api.o
+WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_ipa_ring_stats_tlv.o
 endif
 
 $(call add-wlan-objs,wmi,$(WMI_OBJS))
@@ -2987,6 +3022,7 @@ INCS +=		$(COEX_TGT_INC)
 INCS +=		$(COEX_DISPATCHER_INC)
 INCS +=		$(COEX_CORE_INC)
 INCS +=		$(WLAN_HOST_TXRX_STATS_INC)
+INCS +=		$(IPA_RING_STATS_INC)
 
 ccflags-y += $(INCS)
 
@@ -3091,6 +3127,7 @@ cppflags-$(CONFIG_FEATURE_BUS_BANDWIDTH_MGR) += -DFEATURE_BUS_BANDWIDTH_MGR
 cppflags-$(CONFIG_DP_BE_WAR) += -DDP_BE_WAR
 cppflags-y += -DWLAN_REG_PARTIAL_OFFLOAD
 ccflags-$(CONFIG_FEATURE_WLAN_HOST_TXRX_STATS) += -DFEATURE_WLAN_HOST_TXRX_STATS
+ccflags-$(CONFIG_FEATURE_IPA_RING_STATS) += -DWLAN_FEATURE_IPA_RING_STATS
 
 ifeq ($(CONFIG_IPCIE_FW_SIM), y)
 cppflags-y += -DCONFIG_PLD_IPCIE_FW_SIM
