@@ -912,6 +912,32 @@ static const struct ieee80211_iface_limit
 	},
 };
 
+/* STA + NAN + P2P + MON. NAN represents NAN disc+NDI support */
+static const struct ieee80211_iface_limit
+	wlan_hdd_sta_nan_p2p_mon_iface_limit[] = {
+	{
+		/* STA */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_STATION)
+	},
+	{
+		/* NAN */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_NAN),
+	},
+	{
+		/* P2P */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_P2P_GO) |
+			 BIT(NL80211_IFTYPE_P2P_CLIENT),
+	},
+	{
+		/* MONITOR/PASSTHRU */
+		.max = 1,
+		.types = BIT(NL80211_IFTYPE_MONITOR),
+	},
+};
+
 /* SAP + NAN disc combination */
 static const struct ieee80211_iface_limit
 	wlan_hdd_sap_nan_iface_limit[] = {
@@ -1041,6 +1067,13 @@ static struct ieee80211_iface_combination
 		.max_interfaces = 3,
 		.num_different_channels = 3,
 		.n_limits = ARRAY_SIZE(wlan_hdd_sta_nan_p2p_iface_limit),
+	},
+	/* NAN + STA + P2P + MON. NAN represents NAN disc+NDI support */
+	{
+		.limits = wlan_hdd_sta_nan_p2p_mon_iface_limit,
+		.max_interfaces = 4,
+		.num_different_channels = 3,
+		.n_limits = ARRAY_SIZE(wlan_hdd_sta_nan_p2p_mon_iface_limit),
 	},
 	/* NAN + SAP */
 	{
@@ -26906,29 +26939,59 @@ static bool wlan_hdd_is_sta_p2p_concurrency_present(
 /**
  * wlan_hdd_is_p2p_nan_sta_conc_present() - This API checks whether P2P
  * NAN and STA present in the interface combination
+ * @combination: interface combination array to refer
  * @idx: index for interface combination array
  *
  * Return: true if P2P + NAN + STA interface is present otherwise false
  */
-static bool wlan_hdd_is_p2p_nan_sta_conc_present(uint8_t idx)
+static bool wlan_hdd_is_p2p_nan_sta_conc_present(
+			struct ieee80211_iface_combination *combination,
+			uint8_t idx)
 {
 	int j = 0;
 	bool p2p_present = false, nan_present = false, sta_present = false;
 
-	for (j = 0; j < wlan_hdd_iface_combination[idx].n_limits; j++) {
-		if (wlan_hdd_iface_combination[idx].limits[j].types ==
+	for (j = 0; j < combination[idx].n_limits; j++) {
+		if (combination[idx].limits[j].types ==
 		    BIT(NL80211_IFTYPE_NAN))
 			nan_present = true;
-		else if (wlan_hdd_iface_combination[idx].limits[j].types ==
+		else if (combination[idx].limits[j].types ==
 				(BIT(NL80211_IFTYPE_P2P_CLIENT) |
 				 BIT(NL80211_IFTYPE_P2P_GO)))
 			p2p_present = true;
-		else if (wlan_hdd_iface_combination[idx].limits[j].types ==
+		else if (combination[idx].limits[j].types ==
 				 BIT(NL80211_IFTYPE_STATION))
 			sta_present = true;
 	}
 
 	return (nan_present && p2p_present && sta_present);
+}
+
+/**
+ * wlan_hdd_is_p2p_nan_sta_mon_conc_present() - This API checks whether P2P
+ * NAN, STA and MONITOR present in the interface combination
+ * @combination: interface combination array to refer
+ * @idx: index for interface combination array
+ *
+ * Return: true if P2P + NAN + STA + MON interface is present otherwise false
+ */
+static bool wlan_hdd_is_p2p_nan_sta_mon_conc_present(
+			struct ieee80211_iface_combination *combination,
+			uint8_t idx)
+{
+	int j = 0;
+	bool mon_present = false;
+
+	for (j = 0; j < combination[idx].n_limits; j++) {
+		if (combination[idx].limits[j].types ==
+		    BIT(NL80211_IFTYPE_MONITOR)) {
+			mon_present = true;
+			break;
+		}
+	}
+
+	return (mon_present &&
+		wlan_hdd_is_p2p_nan_sta_conc_present(combination, idx));
 }
 
 /**
@@ -26961,7 +27024,8 @@ static bool wlan_hdd_is_p2p_concurrency_present(bool sta_sap_p2p_concurrency,
 		return false;
 
 	if (sta_p2p_ndp_concurrency &&
-	    wlan_hdd_is_p2p_nan_sta_conc_present(idx))
+	    wlan_hdd_is_p2p_nan_sta_conc_present(wlan_hdd_iface_combination,
+						 idx))
 		return false;
 
 	return true;
@@ -27032,6 +27096,29 @@ wlan_hdd_remove_sta_p2p_conc(struct ieee80211_iface_combination *combination,
 	return 0;
 }
 
+static uint8_t
+wlan_hdd_remove_sta_p2p_nan_conc(
+			struct ieee80211_iface_combination *combination,
+			uint8_t filled)
+{
+	uint8_t i = 0;
+	bool found = false;
+
+	for (i = 0; i < filled; i++)
+		if (wlan_hdd_is_p2p_nan_sta_conc_present(combination, i)) {
+			found = true;
+			break;
+		}
+
+	if (found) {
+		for (; i < filled - 1; i++)
+			combination[i] = combination[i + 1];
+		return 1;
+	}
+
+	return 0;
+}
+
 /**
  * wlan_hdd_is_iface_nan() - This API checks whether NAN interface is present
  * in the interface combination
@@ -27075,6 +27162,9 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 	uint8_t num;
 	QDF_STATUS status;
 	bool is_nan_allowed;
+	struct wmi_unified *wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 
 	if (!hdd_ctx->config->advertise_concurrent_operation)
 		return;
@@ -27162,17 +27252,32 @@ static void wlan_hdd_update_iface_combination(struct hdd_context *hdd_ctx,
 		 * STA + P2P + NDP concurrency is not supported
 		 */
 		if (!ucfg_nan_is_sta_p2p_ndp_supported(hdd_ctx->psoc) &&
-		    wlan_hdd_is_p2p_nan_sta_conc_present(i))
+		    (wlan_hdd_is_p2p_nan_sta_conc_present(
+					wlan_hdd_iface_combination, i) ||
+		    wlan_hdd_is_p2p_nan_sta_mon_conc_present(
+					wlan_hdd_iface_combination, i)))
 			continue;
 
 		/* STA + P2P + NAN concurrency is present */
-		if (wlan_hdd_is_p2p_nan_sta_conc_present(i)) {
+		if (wlan_hdd_is_p2p_nan_sta_conc_present(wlan_hdd_iface_combination,
+							 i)) {
 			/* Remove STA NAN 2-iface sub concurrency */
 			j -= wlan_hdd_remove_sta_nan_conc(hdd_ctx->combination,
 							  j);
 			/* Remove STA P2P 2-iface sub concurrency */
 			j -= wlan_hdd_remove_sta_p2p_conc(hdd_ctx->combination,
 							  j);
+		}
+
+		if (wlan_hdd_is_p2p_nan_sta_mon_conc_present(wlan_hdd_iface_combination,
+							     i)) {
+			if (wmi_handle &&
+			    wmi_service_enabled(wmi_handle,
+						wmi_service_passthru_vdev_chan_hop_schedule_support))
+				j -= wlan_hdd_remove_sta_p2p_nan_conc(hdd_ctx->combination,
+								      j);
+			else
+				continue;
 		}
 
 		hdd_ctx->combination[j] = wlan_hdd_iface_combination[i];
