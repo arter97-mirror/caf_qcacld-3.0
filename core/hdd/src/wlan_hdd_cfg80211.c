@@ -21469,6 +21469,248 @@ static int wlan_hdd_cfg80211_get_wakelock_stats(struct wiphy *wiphy,
 	return errno;
 }
 
+/* Timeout in milliseconds to wait for coex stats response from firmware */
+#define COEX_STATS_WAIT_TIMEOUT_MS 5000
+
+/**
+ * hdd_coex_stats_cb() - Coex stats callback
+ * @stats: pointer to coex policy stats from firmware
+ * @cookie: osif_request cookie
+ *
+ * This callback is invoked by cp_stats layer when coex stats event is
+ * received from firmware. It retrieves the osif_request, copies stats
+ * data to the private buffer, and signals the waiting thread.
+ *
+ * Return: None
+ */
+static void hdd_coex_stats_cb(struct wlan_coex_policy_stats *stats,
+			      void *cookie)
+{
+	struct osif_request *request;
+	struct wlan_coex_policy_stats *priv;
+
+	/* Get request from cookie */
+	request = osif_request_get(cookie);
+	if (!request) {
+		hdd_err("Obsolete coex stats request");
+		return;
+	}
+
+	priv = osif_request_priv(request);
+
+	/* Validate incoming data */
+	if (!stats) {
+		hdd_err("Invalid coex stats");
+		goto coex_stats_cb_fail;
+	}
+
+	/* Check for double-callback (shouldn't happen but be defensive) */
+	if (priv->btc_policy != 0 || priv->mws_policy != 0) {
+		hdd_warn("Coex stats already populated, cookie %pK request %pK",
+			 cookie, request);
+		goto coex_stats_cb_fail;
+	}
+
+	/* Copy stats data */
+	priv->btc_policy = stats->btc_policy;
+	priv->mws_policy = stats->mws_policy;
+	priv->uwb_policy = stats->uwb_policy;
+	priv->ocs_active_percent = stats->ocs_active_percent;
+	priv->ocs_non_wlan_percent = stats->ocs_non_wlan_percent;
+	priv->monitoring_period = stats->monitoring_period;
+
+	hdd_debug("Coex stats: btc=%u mws=%u uwb=%u period=%u ocs_active=%u ocs_non_wlan=%u",
+		  priv->btc_policy, priv->mws_policy, priv->uwb_policy,
+		  priv->monitoring_period, priv->ocs_active_percent,
+		  priv->ocs_non_wlan_percent);
+
+coex_stats_cb_fail:
+	/* Always complete and release */
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+
+/**
+ * __wlan_hdd_cfg80211_get_coex_stats() - Get coexistence statistics
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * This function retrieves coexistence policy statistics from firmware
+ * using the standard cp_stats request/callback pattern. It registers
+ * a callback, sends the request, waits for the response, and returns
+ * the statistics to userspace via NL80211 vendor attributes.
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int __wlan_hdd_cfg80211_get_coex_stats(struct wiphy *wiphy,
+					      struct wireless_dev *wdev,
+					      const void *data,
+					      int data_len)
+{
+	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_coex_policy_stats *priv;
+	struct osif_request *request;
+	struct request_info info = {0};
+	void *cookie;
+	struct sk_buff *reply_skb;
+	struct nlattr *nested_attr;
+	bool pending = false;
+	int ret;
+	static const struct osif_request_params params = {
+		.priv_size  = sizeof(struct wlan_coex_policy_stats),
+		.timeout_ms = COEX_STATS_WAIT_TIMEOUT_MS,
+		.dealloc = NULL,  /* No dynamic allocations to free */
+	};
+
+	hdd_enter();
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EINVAL;
+	}
+
+	ret = wlan_hdd_validate_context(hdd_ctx);
+	if (ret != 0)
+		return ret;
+
+	if (!adapter) {
+		hdd_err("Invalid adapter");
+		return -EINVAL;
+	}
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter->deflink,
+					   WLAN_OSIF_STATS_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
+	}
+
+	/* Allocate per-request object with private data for coex stats */
+	request = osif_request_alloc(&params);
+	if (!request) {
+		hdd_err("Failed to allocate osif_request for coex stats");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+		return -ENOMEM;
+	}
+
+	cookie = osif_request_cookie(request);
+	priv = osif_request_priv(request);
+
+	/* Setup request_info with callback */
+	info.cookie = cookie;
+	info.u.get_coex_stats_cb = hdd_coex_stats_cb;
+	info.vdev_id = wlan_vdev_get_id(vdev);
+	info.pdev_id = wlan_objmgr_pdev_get_pdev_id(wlan_vdev_get_pdev(vdev));
+
+	/* Send stats request with TYPE */
+	status = ucfg_mc_cp_stats_send_stats_request(vdev, TYPE_COEX_STATS,
+						     &info);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Failed to send coex stats req, status: %d", status);
+		osif_request_put(request);
+		return qdf_status_to_os_return(status);
+	}
+
+	/* Wait for response */
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		hdd_err("Timeout waiting for coex stats response");
+		/* Reset pending request on timeout */
+		ucfg_mc_cp_stats_reset_pending_req(wlan_vdev_get_psoc(vdev),
+						   TYPE_COEX_STATS,
+						   &info, &pending);
+		osif_request_put(request);
+		return -ETIMEDOUT;
+	}
+
+	/* Get pointer to private data filled by the callback */
+	priv = osif_request_priv(request);
+
+	/* Allocate reply skb */
+	reply_skb = cfg80211_vendor_cmd_alloc_reply_skb(
+			wiphy,
+			NLA_HDRLEN + sizeof(*priv) + NLMSG_HDRLEN);
+	if (!reply_skb) {
+		hdd_err("Failed to allocate reply skb");
+		osif_request_put(request);
+		return -ENOMEM;
+	}
+
+	/* Build nested attribute with coex stats */
+	nested_attr = nla_nest_start(
+				reply_skb,
+				QCA_WLAN_VENDOR_ATTR_COEX_STATS_ARRAY_INDEX);
+	if (!nested_attr) {
+		hdd_err("Failed to start nested attribute");
+		kfree_skb(reply_skb);
+		osif_request_put(request);
+		return -ENOMEM;
+	}
+
+	if (nla_put_u8(reply_skb, QCA_WLAN_VENDOR_ATTR_COEX_BTC_POLICY,
+		       priv->btc_policy) ||
+	    nla_put_u8(reply_skb, QCA_WLAN_VENDOR_ATTR_COEX_MWS_POLICY,
+		       priv->mws_policy) ||
+	    nla_put_u8(reply_skb, QCA_WLAN_VENDOR_ATTR_COEX_UWB_POLICY,
+		       priv->uwb_policy) ||
+	    nla_put_u32(reply_skb, QCA_WLAN_VENDOR_ATTR_COEX_MONITORING_PERIOD,
+			priv->monitoring_period) ||
+	    nla_put_u8(reply_skb, QCA_WLAN_VENDOR_ATTR_COEX_OCS_ACTIVE_PERCENT,
+		       priv->ocs_active_percent) ||
+	    nla_put_u8(reply_skb,
+		       QCA_WLAN_VENDOR_ATTR_COEX_OCS_NON_WLAN_PERCENT,
+		       priv->ocs_non_wlan_percent)) {
+		hdd_err("Failed to put coex stats attributes");
+		kfree_skb(reply_skb);
+		osif_request_put(request);
+		return -EINVAL;
+	}
+
+	nla_nest_end(reply_skb, nested_attr);
+
+	osif_request_put(request);
+	hdd_exit();
+	return cfg80211_vendor_cmd_reply(reply_skb);
+}
+
+/**
+ * wlan_hdd_cfg80211_get_coex_stats() - Get coexistence statistics
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * This function is the wrapper for __wlan_hdd_cfg80211_get_coex_stats()
+ * with OSIF sync operations.
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int wlan_hdd_cfg80211_get_coex_stats(struct wiphy *wiphy,
+					    struct wireless_dev *wdev,
+					    const void *data,
+					    int data_len)
+{
+	struct osif_psoc_sync *psoc_sync;
+	int errno;
+
+	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_get_coex_stats(wiphy, wdev,
+						   data, data_len);
+
+	osif_psoc_sync_op_stop(psoc_sync);
+
+	return errno;
+}
 /**
  * __wlan_hdd_cfg80211_get_bus_size() - Get WMI Bus size
  * @wiphy:    wiphy structure pointer
@@ -26146,6 +26388,15 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 			 WIPHY_VENDOR_CMD_NEED_NETDEV |
 			 WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = wlan_hdd_cfg80211_get_bus_size,
+		vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)
+	},
+	{
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_GET_COEX_STATS,
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |
+			 WIPHY_VENDOR_CMD_NEED_NETDEV |
+			 WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = wlan_hdd_cfg80211_get_coex_stats,
 		vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)
 	},
 	{

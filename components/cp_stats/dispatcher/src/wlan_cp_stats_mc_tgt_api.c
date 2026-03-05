@@ -2113,6 +2113,13 @@ QDF_STATUS tgt_send_mc_cp_stats_req(struct wlan_objmgr_psoc *psoc,
 	case TYPE_QSH_SCAN_STATS:
 		status = send_qsh_stats_req(tx_ops, psoc, req);
 		break;
+	case TYPE_COEX_STATS:
+		if (!tx_ops->send_req_coex_stats) {
+			cp_stats_err("could not get send_req_coex_stats");
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+		status = tx_ops->send_req_coex_stats(psoc);
+		break;
 	default:
 		if (!tx_ops->send_req_stats) {
 			cp_stats_err("could not get send_req_stats");

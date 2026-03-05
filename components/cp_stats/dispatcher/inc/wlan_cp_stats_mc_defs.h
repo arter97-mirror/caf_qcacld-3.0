@@ -66,6 +66,7 @@
  * @TYPE_BIG_DATA_STATS: big data stats was requested
  * @TYPE_POWER_DATAPATH_STATS: power datapath stats was requested
  * @TYPE_QSH_SCAN_STATS: QSH scan stats was requested
+ * @TYPE_COEX_STATS: coex stats requested
  * @TYPE_MAX: maximum value
  */
 enum stats_req_type {
@@ -78,6 +79,7 @@ enum stats_req_type {
 	TYPE_BIG_DATA_STATS,
 	TYPE_POWER_DATAPATH_STATS,
 	TYPE_QSH_SCAN_STATS,
+	TYPE_COEX_STATS,
 	TYPE_MAX,
 };
 
@@ -246,8 +248,8 @@ struct medium_assess_data {
  * struct request_info: details of each request
  * @cookie: identifier for os_if request
  * @u: unified data type for callback to process tx power/peer rssi/
- *     station stats/mib stats/peer stats request when response comes and
- *     congestion notification callback.
+ *     station stats/mib stats/peer stats/coex policy stats request when
+ *     response comes and congestion notification callback.
  * @vdev_id: vdev_id of request
  * @pdev_id: pdev_id of request
  * @peer_mac_addr: peer mac address
@@ -273,6 +275,8 @@ struct request_info {
 		void (*congestion_notif_cb)(uint8_t vdev_id,
 					  struct medium_assess_data *data,
 					  bool last);
+		void (*get_coex_stats_cb)(struct wlan_coex_policy_stats *stats,
+					  void *cookie);
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 		void (*get_big_data_stats_cb)(struct big_data_stats_event *ev,
 					      void *cookie);
