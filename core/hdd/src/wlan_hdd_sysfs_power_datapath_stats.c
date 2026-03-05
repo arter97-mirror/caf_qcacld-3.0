@@ -265,12 +265,11 @@ __hdd_sysfs_power_datapath_stats_show(struct net_device *net_dev, char *buf)
 				   cp_stats.num_tx_rate_stats) < 0)
 			goto release_vdev;
 
-		/* Display top 10 rates or all if less than 10 */
 		if (SAFE_SCNPRINTF(buf, PAGE_SIZE, ret,
-				   "\nTop TX Rates:\n") < 0)
+				   "\nTX Rates:\n") < 0)
 			goto release_vdev;
 
-		for (i = 0; i < cp_stats.num_tx_rate_stats && i < 10; i++) {
+		for (i = 0; i < cp_stats.num_tx_rate_stats; i++) {
 			rate = &cp_stats.tx_rate_stats[i];
 
 			if (SAFE_SCNPRINTF(buf, PAGE_SIZE, ret,
@@ -283,14 +282,6 @@ __hdd_sysfs_power_datapath_stats_show(struct net_device *net_dev, char *buf)
 					   rate->nss + 1,
 					   rate->count,
 					   rate->tx_retry_count) < 0)
-				goto release_vdev;
-		}
-
-		if (cp_stats.num_tx_rate_stats > 10) {
-			if (SAFE_SCNPRINTF(buf, PAGE_SIZE, ret,
-					   "  ... (%u more entries)\n",
-					   cp_stats.num_tx_rate_stats -
-					   10) < 0)
 				goto release_vdev;
 		}
 	} else {
