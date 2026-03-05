@@ -83,6 +83,8 @@ _target_chipset_map = {
         "peach-v2",
         "fig",
         "fig-v2",
+        "wcn7750",
+	"kiwi-v2",
     ],
     "chora": [
 	"wcn7750",
