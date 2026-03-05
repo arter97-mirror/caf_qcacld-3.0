@@ -503,6 +503,10 @@ ifeq ($(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_connectivity_logging.o
 endif
 
+ifeq ($(CONFIG_FEATURE_WLAN_HOST_TXRX_STATS),y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_host_txrx_stats.o
+endif
+
 $(call add-wlan-objs,hdd,$(HDD_OBJS))
 
 ###### OSIF_SYNC ########
@@ -1146,6 +1150,21 @@ UMAC_GPIO_OBJS := $(UMAC_GPIO_DISP_DIR)/wlan_gpio_tgt_api.o \
 endif
 
 $(call add-wlan-objs,umac_gpio,$(UMAC_GPIO_OBJS))
+
+############# WLAN_HOST_TXRX_STATA ############
+WLAN_HOST_TXRX_STATS_OS_IF_INC := -I$(WLAN_COMMON_INC)/os_if/linux/host_txrx_stats/inc
+
+WLAN_HOST_TXRX_STATS_INC := \
+	$(WLAN_HOST_TXRX_STATS_OS_IF_INC)
+
+ifeq ($(CONFIG_FEATURE_WLAN_HOST_TXRX_STATS), y)
+
+WLAN_HOST_TXRX_STATS_OBJS := \
+	$(WLAN_COMMON_ROOT)/os_if/linux/host_txrx_stats/src/wlan_cfg80211_host_txrx_stats.o
+
+endif
+
+$(call add-wlan-objs,wlan_host_txrx_stats,$(WLAN_HOST_TXRX_STATS_OBJS))
 
 ############# UMAC_GREEN_AP ############
 UMAC_GREEN_AP_DIR := umac/green_ap
@@ -2967,6 +2986,7 @@ INCS +=		$(COEX_OS_IF_INC)
 INCS +=		$(COEX_TGT_INC)
 INCS +=		$(COEX_DISPATCHER_INC)
 INCS +=		$(COEX_CORE_INC)
+INCS +=		$(WLAN_HOST_TXRX_STATS_INC)
 
 ccflags-y += $(INCS)
 
@@ -3070,6 +3090,7 @@ cppflags-$(CONFIG_FEATURE_GPIO_CFG) += -DWLAN_FEATURE_GPIO_CFG
 cppflags-$(CONFIG_FEATURE_BUS_BANDWIDTH_MGR) += -DFEATURE_BUS_BANDWIDTH_MGR
 cppflags-$(CONFIG_DP_BE_WAR) += -DDP_BE_WAR
 cppflags-y += -DWLAN_REG_PARTIAL_OFFLOAD
+ccflags-$(CONFIG_FEATURE_WLAN_HOST_TXRX_STATS) += -DFEATURE_WLAN_HOST_TXRX_STATS
 
 ifeq ($(CONFIG_IPCIE_FW_SIM), y)
 cppflags-y += -DCONFIG_PLD_IPCIE_FW_SIM
