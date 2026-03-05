@@ -1513,6 +1513,9 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 		qdf_mem_copy(nan_req->params.request_data, data, data_len);
 	}
 
+	if (!ucfg_nan_is_vdev_creation_allowed(psoc))
+		goto nan_disable;
+
 	if (cds_is_driver_recovering()) {
 		/* only delete the object manager peer */
 		nan_cleanup_pasn_peers(psoc);
@@ -1525,6 +1528,7 @@ QDF_STATUS ucfg_disable_nan_discovery(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
+nan_disable:
 	status = ucfg_nan_discovery_req(nan_req, NAN_DISABLE_REQ);
 
 	if (QDF_IS_STATUS_SUCCESS(status))
