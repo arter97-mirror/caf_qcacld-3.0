@@ -276,4 +276,84 @@ void wma_update_target_ext_uhr_cap(struct target_psoc_info *tgt_hdl,
 	wma_debug("Aggregated 5g caps");
 	wma_print_uhr_cap(uhr_cap_5g);
 }
+
+void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
+			       tpAddStaParams params)
+{
+	struct wlan_uhr_cap_info *uhr_cap = &params->uhr_config;
+	uint32_t *phy_cap = peer->peer_uhr_cap_phyinfo;
+	uint32_t *mac_cap = peer->peer_uhr_cap_macinfo;
+	uint32_t uhrop_param;
+
+	if (!params->uhr_capable)
+		return;
+
+	peer->uhr_flag = 1;
+	peer->qos_flag = 1;
+
+	uhrop_param = ((uint32_t *)(&params->uhr_op_ie))[1];
+	peer->peer_uhr_ops = uhrop_param;
+
+	/* UHR MAC Capabilities */
+	WMI_UHRCAP_MAC_DPS_SET(mac_cap, uhr_cap->dps_present);
+	WMI_UHRCAP_MAC_DPS_ASSIS_SET(mac_cap, uhr_cap->dps_assist_support);
+	WMI_UHRCAP_MAC_DPS_AP_HCM_SET(
+			mac_cap, uhr_cap->ap_static_hcm_support);
+	WMI_UHRCAP_MAC_MULTI_LINK_PM_SET(mac_cap, uhr_cap->ml_power_mgmt);
+	WMI_UHRCAP_MAC_NPCA_SET(
+			mac_cap, uhr_cap->npca_support);
+	WMI_UHRCAP_MAC_BSR_SET(mac_cap, uhr_cap->bsr_support);
+	WMI_UHRCAP_MAC_ADDITIONAL_TID_SET(
+			mac_cap, uhr_cap->addn_mapped_tid_support);
+	WMI_UHRCAP_MAC_EOTSP_SET(
+			mac_cap, uhr_cap->eotsp_support);
+	WMI_UHRCAP_MAC_DSO_SET(mac_cap, uhr_cap->dso_support);
+	WMI_UHRCAP_MAC_P_EDCA_SET(mac_cap, uhr_cap->p_edca_support);
+	WMI_UHRCAP_MAC_DBE_SET(mac_cap, uhr_cap->dbe_support);
+	WMI_UHRCAP_MAC_UL_LLI_SET(mac_cap, uhr_cap->ul_lli_support);
+	WMI_UHRCAP_MAC_PEER_LLI_SET(mac_cap, uhr_cap->p2p_lli_support);
+	WMI_UHRCAP_MAC_PUO_SET(mac_cap, uhr_cap->puo_support);
+	WMI_UHRCAP_MAC_AP_PUO_SET(mac_cap, uhr_cap->ap_puo_support);
+	WMI_UHRCAP_MAC_DUO_SET(mac_cap, uhr_cap->duo_support);
+	WMI_UHRCAP_MAC_OM_CTRL_UL_MU_DISABLE_RX_SET(
+			mac_cap, uhr_cap->ul_mu_data_disable_rx_support);
+	WMI_UHRCAP_MAC_AOM_SET(mac_cap, uhr_cap->aom_support);
+	WMI_UHRCAP_MAC_IFCS_LOC_SET(mac_cap, uhr_cap->ifcs_support);
+	WMI_UHRCAP_MAC_UHR_TRS_SET(mac_cap, uhr_cap->uhr_trs_support);
+	WMI_UHRCAP_MAC_TXSPG_SET(mac_cap, uhr_cap->txspg_support);
+	WMI_UHRCAP_MAC_TXOP_RETURN_SET(
+			mac_cap, uhr_cap->txop_return_support_intxspg);
+	WMI_UHRCAP_MAC_UHR_OPMODE_TIMEOUT_SET(
+			mac_cap, uhr_cap->uhr_op_mode_param_update_timeout);
+	WMI_UHRCAP_MAC_PARAM_UPDATE_ADV_SET(
+			mac_cap, uhr_cap->param_update_adv_notify);
+	WMI_UHRCAP_MAC_UPDATE_IND_TIM_SET(
+			mac_cap, uhr_cap->update_ind_in_tim);
+	WMI_UHRCAP_MAC_BOUNDED_ESS_SET(mac_cap, uhr_cap->bounded_ess);
+	WMI_UHRCAP_MAC_BTM_ASSURANCE_SET(mac_cap, uhr_cap->btm_assurance);
+
+	/* UHR PHY Capabilities */
+	WMI_UHRCAP_PHY_MAX_NSS_RX_80_SET(
+			phy_cap, uhr_cap->max_nss_rx_ndp_sounding_80mhz);
+	WMI_UHRCAP_PHY_MAX_NSS_DL_MU_80_SET(
+			phy_cap, uhr_cap->max_nss_rx_dl_mumimo_80mhz);
+	WMI_UHRCAP_PHY_MAX_NSS_RX_160_SET(
+			phy_cap, uhr_cap->max_nss_rx_ndp_sounding_160mhz);
+	WMI_UHRCAP_PHY_MAX_NSS_DL_MU_160_SET(
+			phy_cap, uhr_cap->max_nss_total_rx_dl_mumimo_160mhz);
+	WMI_UHRCAP_PHY_MAX_NSS_RX_320_SET(
+			phy_cap, uhr_cap->max_nss_rx_ndp_sounding_320mhz);
+	WMI_UHRCAP_PHY_MAX_NSS_DL_MU_320_SET(
+			phy_cap, uhr_cap->max_nss_total_rx_dl_mumimo_320mhz);
+	WMI_UHRCAP_PHY_ELR_RX_SET(phy_cap, uhr_cap->elr_rx_support);
+	WMI_UHRCAP_PHY_ELR_TX_SET(phy_cap, uhr_cap->elr_tx_support);
+
+	wma_print_uhr_cap(uhr_cap);
+	wma_debug("Peer UHR Capabilities:");
+}
+
+bool wma_get_bss_uhr_capable(struct bss_params *add_bss)
+{
+	return add_bss->uhr_capable;
+}
 #endif /* WLAN_FEATURE_11BN */

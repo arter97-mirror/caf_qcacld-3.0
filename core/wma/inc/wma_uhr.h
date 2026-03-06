@@ -44,6 +44,42 @@ void wma_uhr_update_tgt_services(struct wmi_unified *wmi_handle,
  */
 void wma_update_target_ext_uhr_cap(struct target_psoc_info *tgt_hdl,
 				   struct wma_tgt_cfg *tgt_cfg);
+
+/**
+ * wma_populate_peer_uhr_cap() - populate peer UHR capabilities in
+ *                               peer assoc cmd
+ * @peer: pointer to peer assoc params
+ * @params: pointer to ADD STA params
+ *
+ * Return: None
+ */
+void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
+			       tpAddStaParams params);
+
+/**
+ * wma_is_peer_uhr_capable() - whether peer is uhr capable or not
+ * @params: add sta params
+ *
+ * Return: true if uhr capable is present
+ */
+static inline bool wma_is_peer_uhr_capable(tpAddStaParams params)
+{
+	return params->uhr_capable;
+}
+
+/**
+ * wma_get_bss_uhr_capable() - whether bss is uhr capable or not
+ * @add_bss: add_bss params
+ *
+ * Return: true if uhr capable is present
+ */
+bool wma_get_bss_uhr_capable(struct bss_params *add_bss);
+
+static
+inline bool wma_is_uhr_phymode_supported(enum wlan_phymode bss_phymode)
+{
+	return IS_WLAN_PHYMODE_UHR(bss_phymode);
+}
 #else
 static inline void wma_uhr_update_tgt_services(struct wmi_unified *wmi_handle,
 					       struct wma_tgt_services *cfg)
@@ -55,6 +91,28 @@ static inline
 void wma_update_target_ext_uhr_cap(struct target_psoc_info *tgt_hdl,
 				   struct wma_tgt_cfg *tgt_cfg)
 {
+}
+
+static inline
+void wma_populate_peer_uhr_cap(struct peer_assoc_params *peer,
+			       tpAddStaParams params)
+{
+}
+
+static inline bool wma_is_peer_uhr_capable(tpAddStaParams params)
+{
+	return false;
+}
+
+static inline
+bool wma_get_bss_uhr_capable(struct bss_params *add_bss)
+{
+	return false;
+}
+
+static inline bool wma_is_uhr_phymode_supported(enum wlan_phymode bss_phymode)
+{
+	return false;
 }
 #endif
 #endif /* __WMA_UHR_H */

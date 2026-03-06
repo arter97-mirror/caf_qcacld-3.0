@@ -3822,7 +3822,8 @@ int wma_unified_debug_print_event_handler(void *handle, uint8_t *datap,
 enum wlan_phymode
 wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 		 uint8_t is_ht, uint8_t ch_width,
-		 uint8_t is_vht, bool is_he, bool is_eht)
+		 uint8_t is_vht, bool is_he, bool is_eht,
+		 bool is_uhr)
 {
 	enum wlan_phymode phymode = WLAN_PHYMODE_AUTO;
 
@@ -3842,18 +3843,32 @@ wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 #endif /* FEATURE_WLAN_TDLS */
 	{
 		phymode = WLAN_PHYMODE_11B;
-		if (is_ht || is_vht || is_he || is_eht)
+		if (is_ht || is_vht || is_he || is_eht || is_uhr)
 			wma_err("HT/VHT is enabled with 11B NW type");
 	}
 		break;
 	case eSIR_11G_NW_TYPE:
-		if (!(is_ht || is_vht || is_he || is_eht)) {
+		if (!(is_ht || is_vht || is_he || is_eht || is_uhr)) {
 			phymode = WLAN_PHYMODE_11G;
 			break;
 		}
 		if (CH_WIDTH_40MHZ < ch_width)
 			wma_err("80/160 MHz BW sent in 11G, configured 40MHz");
-#ifdef WLAN_FEATURE_11BE
+
+#ifdef WLAN_FEATURE_11BN
+	if (ch_width)
+		phymode = (is_uhr) ? WLAN_PHYMODE_11BNG_UHR40 :
+			  (is_eht) ? WLAN_PHYMODE_11BEG_EHT40 :
+			  (is_he) ? WLAN_PHYMODE_11AXG_HE40 :
+			  (is_vht) ? WLAN_PHYMODE_11AC_VHT40_2G :
+			  WLAN_PHYMODE_11NG_HT40;
+	else
+		phymode = (is_uhr) ? WLAN_PHYMODE_11BNG_UHR20 :
+			  (is_eht) ? WLAN_PHYMODE_11BEG_EHT20 :
+			  (is_he) ? WLAN_PHYMODE_11AXG_HE20 :
+			  (is_vht) ? WLAN_PHYMODE_11AC_VHT20_2G :
+			  WLAN_PHYMODE_11NG_HT20;
+#elif WLAN_FEATURE_11BE
 		if (ch_width)
 			phymode = (is_eht) ? WLAN_PHYMODE_11BEG_EHT40 :
 					(is_he) ? WLAN_PHYMODE_11AXG_HE40 :
@@ -3876,10 +3891,24 @@ wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 #endif
 		break;
 	case eSIR_11A_NW_TYPE:
-		if (!(is_ht || is_vht || is_he || is_eht)) {
+		if (!(is_ht || is_vht || is_he || is_eht || is_uhr)) {
 			phymode = WLAN_PHYMODE_11A;
 			break;
 		}
+#if defined(WLAN_FEATURE_11BN)
+		if (is_uhr) {
+			if (ch_width == CH_WIDTH_160MHZ)
+				phymode = WLAN_PHYMODE_11BNA_UHR160;
+			else if (ch_width == CH_WIDTH_320MHZ)
+				phymode = WLAN_PHYMODE_11BNA_UHR320;
+			else if (ch_width == CH_WIDTH_80MHZ)
+				phymode = WLAN_PHYMODE_11BNA_UHR80;
+			else
+				phymode = (ch_width) ?
+					WLAN_PHYMODE_11BNA_UHR40 :
+					WLAN_PHYMODE_11BNA_UHR20;
+		} else
+#endif
 #if defined(WLAN_FEATURE_11BE)
 		if (is_eht) {
 			if (ch_width == CH_WIDTH_160MHZ)
@@ -3924,8 +3953,9 @@ wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 		wma_err("Invalid nw type %d", nw_type);
 		break;
 	}
-	wma_debug("nw_type %d is_ht %d ch_width %d is_vht %d is_he %d is_eht %d phymode %d",
-		  nw_type, is_ht, ch_width, is_vht, is_he, is_eht, phymode);
+	wma_debug("nw_type %d is_ht %d ch_width %d is_vht %d is_he %d is_eht %d is_uhr %d phymode %d",
+		  nw_type, is_ht, ch_width, is_vht, is_he, is_eht,
+		  is_uhr, phymode);
 
 	return phymode;
 }

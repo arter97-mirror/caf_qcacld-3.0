@@ -227,6 +227,8 @@ struct peer_ml_info {
  * @emlsr_trans_timeout: EMLSR transition timeout value
  * @eml_info: EMLSR capability info for sta peer under mlo sap mode
  * @mld_info: mld and operation capability info for sta peer under mlo sap mode
+ * @uhr_capable: is UHR capabale or not
+ * @uhr_config: UHR capability
  *
  * This structure contains parameter required for
  * add sta request of upper layer.
@@ -342,6 +344,11 @@ typedef struct {
 	struct security_info sec_info;
 	uint8_t peer_cck_rx_support_5ghz : 1,
 	peer_cck_tx_support_5ghz : 1;
+#ifdef WLAN_FEATURE_11BN
+	bool uhr_capable;
+	struct wlan_uhr_cap_info uhr_config;
+	struct wlan_uhr_op_ie uhr_op_ie;
+#endif
 } tAddStaParams, *tpAddStaParams;
 
 /**
@@ -411,6 +418,7 @@ typedef struct {
  * @he_capable: HE Capability
  * @no_ptk_4_way: Do not need 4-way handshake
  * @eht_capable: EHT capability
+ * @uhr_capable: UHR capability
  */
 struct bss_params {
 	tSirMacAddr bssId;
@@ -439,6 +447,9 @@ struct bss_params {
 	uint16_t bss_max_idle_period;
 #ifdef WLAN_FEATURE_11BE
 	bool eht_capable;
+#endif
+#ifdef WLAN_FEATURE_11BN
+	bool uhr_capable;
 #endif
 };
 

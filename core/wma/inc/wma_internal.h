@@ -1064,13 +1064,15 @@ int wma_unified_debug_print_event_handler(void *handle, uint8_t *datap,
  * @is_vht: is vht supported
  * @is_he: is HE supported
  * @is_eht: is EHT supported
+ * @@is_uhr: is UHR supported
  *
  * Return: host phymode
  */
 enum wlan_phymode
 wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 		 uint8_t is_ht, uint8_t ch_width,
-		 uint8_t is_vht, bool is_he, bool is_eht);
+		 uint8_t is_vht, bool is_he, bool is_eht,
+		 bool is_uhr);
 
 int32_t wma_txrx_fw_stats_reset(tp_wma_handle wma_handle,
 				uint8_t vdev_id, uint32_t value);

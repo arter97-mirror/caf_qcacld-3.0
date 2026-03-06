@@ -1047,7 +1047,8 @@ wma_get_peer_phymode(tSirNwType nw_type, enum wlan_phymode old_peer_phymode,
 				       vdev_chan->ch_width,
 				       IS_WLAN_PHYMODE_VHT(old_peer_phymode),
 				       IS_WLAN_PHYMODE_HE(old_peer_phymode),
-				       IS_WLAN_PHYMODE_EHT(old_peer_phymode));
+				       IS_WLAN_PHYMODE_EHT(old_peer_phymode),
+				       IS_WLAN_PHYMODE_UHR(old_peer_phymode));
 	*is_eht = IS_WLAN_PHYMODE_EHT(new_phymode);
 	if (*is_eht)
 		*puncture_bitmap = vdev_chan->puncture_bitmap;
@@ -1067,7 +1068,7 @@ wma_get_peer_phymode(tSirNwType nw_type, enum wlan_phymode old_peer_phymode,
 				       vdev_chan->ch_width,
 				       IS_WLAN_PHYMODE_VHT(old_peer_phymode),
 				       IS_WLAN_PHYMODE_HE(old_peer_phymode),
-				       0);
+				       0, 0);
 
 	return new_phymode;
 }

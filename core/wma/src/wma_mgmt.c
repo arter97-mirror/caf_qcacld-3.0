@@ -98,6 +98,7 @@
 #endif
 
 #include <wlan_dnw_api.h>
+#include "wma_uhr.h"
 
 /* Max debug string size for WMM in bytes */
 #define WMA_WMM_DEBUG_STRING_SIZE    512
@@ -1664,10 +1665,12 @@ wma_get_peer_phymode(tp_wma_handle wma, tSirNwType nw_type,
 	enum wlan_phymode phymode;
 	bool is_he;
 	bool is_eht;
+	bool is_uhr;
 
-	/* Determine HE and EHT capabilities */
+	/* Determine HE, EHT and UHR capabilities */
 	is_he = wma_is_peer_he_capable(params);
 	is_eht = wma_is_peer_eht_capable(params);
+	is_uhr = wma_is_peer_uhr_capable(params);
 
 	/*
 	 * Validate and adjust channel width for 11G/11B networks.
@@ -1684,7 +1687,7 @@ wma_get_peer_phymode(tp_wma_handle wma, tSirNwType nw_type,
 	/* Calculate phymode based on peer capabilities */
 	phymode = wma_peer_phymode(nw_type, params->staType,
 				   params->htCapable, params->ch_width,
-				   params->vhtCapable, is_he, is_eht);
+				   params->vhtCapable, is_he, is_eht, is_uhr);
 
 	/*
 	 * For AP mode, ensure peer phymode does not exceed vdev phymode.
@@ -1703,6 +1706,26 @@ wma_get_peer_phymode(tp_wma_handle wma, tSirNwType nw_type,
 
 	return phymode;
 }
+
+#ifdef WLAN_FEATURE_11BN
+/**
+ * wma_is_11bn_service_enabled() - check if 11bn service is enabled
+ * @wma: wma handle
+ *
+ * Return: true if 11bn service is enabled, false otherwise
+ */
+static inline bool
+wma_is_11bn_service_enabled(tp_wma_handle wma)
+{
+	return wmi_service_enabled(wma->wmi_handle, wmi_service_11bn);
+}
+#else
+static inline bool
+wma_is_11bn_service_enabled(tp_wma_handle wma)
+{
+	return false;
+}
+#endif
 
 /**
  * wmi_unified_send_peer_assoc() - send peer assoc command to fw
@@ -1758,10 +1781,17 @@ static QDF_STATUS wma_handle_peer_assoc_send(tp_wma_handle wma,
 		return status;
 	}
 
-	status = wmi_unified_peer_assoc_send(wma->wmi_handle, cmd);
-	if (QDF_IS_STATUS_ERROR(status))
-		wma_err("Failed to send peer assoc command status = %d",
-			status);
+	if (wma_is_11bn_service_enabled(wma)) {
+		status = wmi_unified_peer_assoc_v2_send(wma->wmi_handle, cmd);
+		if (QDF_IS_STATUS_ERROR(status))
+			wma_err("Failed to send peer assoc v2 cmd status = %d",
+				status);
+	} else {
+		status = wmi_unified_peer_assoc_send(wma->wmi_handle, cmd);
+		if (QDF_IS_STATUS_ERROR(status))
+			wma_err("Failed to send peer assoc command status = %d",
+				status);
+	}
 
 	return status;
 }
@@ -2105,6 +2135,7 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 	wma_populate_peer_eht_cap(cmd, params);
 	wma_populate_peer_puncture(cmd, des_chan);
 	wma_populate_peer_mlo_cap(cmd, params);
+	wma_populate_peer_uhr_cap(cmd, params);
 
 	/* Till conversion is not done in WMI we need to fill fw phy mode */
 	cmd->peer_phymode = wmi_host_to_fw_phymode(phymode);
@@ -3552,7 +3583,8 @@ wma_update_peer_phymode(struct wlan_objmgr_pdev *pdev,
 					 new_ch_width,
 					 IS_WLAN_PHYMODE_VHT(old_phymode),
 					 IS_WLAN_PHYMODE_HE(old_phymode),
-					 IS_WLAN_PHYMODE_EHT(old_phymode));
+					 IS_WLAN_PHYMODE_EHT(old_phymode),
+					 IS_WLAN_PHYMODE_UHR(old_phymode));
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4906,7 +4938,8 @@ wma_update_bss_peer_phy_mode(struct wlan_channel *des_chan,
 				       des_chan->ch_width,
 				       IS_WLAN_PHYMODE_VHT(old_peer_phymode),
 				       IS_WLAN_PHYMODE_HE(old_peer_phymode),
-				       wma_is_phymode_eht(old_peer_phymode));
+				       wma_is_phymode_eht(old_peer_phymode),
+				       IS_WLAN_PHYMODE_UHR(old_peer_phymode));
 
 	if (new_phymode == old_peer_phymode) {
 		wma_debug("Ignore update, old %d and new %d phymode are same, vdev_id : %d",
