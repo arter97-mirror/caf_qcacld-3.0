@@ -34764,12 +34764,33 @@ static void wlan_hdd_fill_subband_scan_info(struct hdd_context *hdd_ctx,
 		hdd_debug("vdev %d :assoc freq %d sec_2g_freq:%d, bw %d",
 			  info->subband_info.vdev_id, info->freq,
 			  sec_2g_freq, scanned_ch_width);
+		/*
+		 * sec_2g_freq is the center freq of the 40 MHz channel
+		 * (cfreq0), not the secondary 20 MHz sub-channel center.
+		 * The two 20 MHz sub-channels are BW_20_MHZ apart from
+		 * each other, centered around sec_2g_freq. Compute the
+		 * actual secondary sub-channel as primary +/- BW_20_MHZ.
+		 */
 		if (info->freq > sec_2g_freq) {
-			start_freq = sec_2g_freq;
+			/* HT40-: secondary sub-channel is below primary */
+			start_freq = info->freq - BW_20_MHZ;
+			if (start_freq < WLAN_REG_MIN_24GHZ_CHAN_FREQ) {
+				mlme_debug("vdev %d: Invalid start_freq %d for freq %d",
+					   info->subband_info.vdev_id,
+					   start_freq, info->freq);
+				return;
+			}
 			end_freq = info->freq;
 		} else {
 			start_freq = info->freq;
-			end_freq = sec_2g_freq;
+			/* HT40+: secondary sub-channel is above primary */
+			end_freq = info->freq + BW_20_MHZ;
+			if (end_freq > WLAN_REG_MAX_24GHZ_CHAN_FREQ) {
+				mlme_debug("vdev %d: Invalid end_freq %d for freq %d",
+					   info->subband_info.vdev_id,
+					   end_freq, info->freq);
+				return;
+			}
 		}
 	} else {
 		range = wlan_reg_get_bonded_chan_entry(info->freq,
