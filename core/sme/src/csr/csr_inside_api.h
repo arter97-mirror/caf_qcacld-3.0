@@ -501,6 +501,26 @@ static inline void csr_update_session_eht_cap(struct mac_context *mac_ctx,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN
+/**
+ * csr_update_session_uhr_cap() - update sme session uhr capabilities
+ * @mac_ctx: pointer to mac
+ * @session: sme session pointer
+ * @vdev: vdev object pointer
+ *
+ * Return: None
+ */
+void csr_update_session_uhr_cap(struct mac_context *mac_ctx,
+				struct csr_roam_session *session,
+				struct wlan_objmgr_vdev *vdev);
+#else
+static inline void csr_update_session_uhr_cap(struct mac_context *mac_ctx,
+					      struct csr_roam_session *session,
+					      struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 void csr_update_session_he_cap(struct mac_context *mac_ctx,
 			struct csr_roam_session *session);

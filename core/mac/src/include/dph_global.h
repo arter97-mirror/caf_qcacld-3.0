@@ -195,6 +195,10 @@ typedef struct sDphHashNode {
 #endif
 	uint8_t peer_cck_rx_support_5ghz: 1,
 		peer_cck_tx_support_5ghz: 1;
+#ifdef WLAN_FEATURE_11BN
+	struct wlan_uhr_cap_info uhr_config;
+	struct wlan_uhr_op_ie uhr_op;
+#endif
 } tDphHashNode, *tpDphHashNode;
 
 #include "dph_hash_table.h"

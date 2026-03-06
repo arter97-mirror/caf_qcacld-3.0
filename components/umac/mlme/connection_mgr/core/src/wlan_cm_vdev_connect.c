@@ -301,18 +301,6 @@ error:
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 #ifdef WLAN_FEATURE_11BE
-static const
-char *cm_diag_get_eht_dot11_mode_str(enum mgmt_dot11_mode dot11mode)
-{
-
-	switch (dot11mode) {
-	CASE_RETURN_STRING(DOT11_MODE_11BE);
-	CASE_RETURN_STRING(DOT11_MODE_11BE_ONLY);
-	default:
-		return "Unknown";
-	}
-}
-
 static const char *cm_diag_get_320_ch_width_str(uint8_t ch_width)
 {
 	switch (ch_width) {
@@ -322,12 +310,6 @@ static const char *cm_diag_get_320_ch_width_str(uint8_t ch_width)
 	}
 }
 #else
-static const
-char *cm_diag_get_eht_dot11_mode_str(enum mgmt_dot11_mode dot11mode)
-{
-	return "Unknown";
-}
-
 static const char *cm_diag_get_320_ch_width_str(uint8_t ch_width)
 {
 	return "Unknown";
@@ -364,8 +346,12 @@ static const char *cm_diag_get_dot11_mode_str(enum mgmt_dot11_mode dot11mode)
 	CASE_RETURN_STRING(DOT11_MODE_11AC_ONLY);
 	CASE_RETURN_STRING(DOT11_MODE_11AX);
 	CASE_RETURN_STRING(DOT11_MODE_11AX_ONLY);
+	CASE_RETURN_STRING(DOT11_MODE_11BE);
+	CASE_RETURN_STRING(DOT11_MODE_11BE_ONLY);
+	CASE_RETURN_STRING(DOT11_MODE_11BN);
+	CASE_RETURN_STRING(DOT11_MODE_11BN_ONLY);
 	default:
-		return cm_diag_get_eht_dot11_mode_str(dot11mode);
+		return "unknown";
 	}
 }
 
@@ -482,6 +468,23 @@ cm_get_diag_eht_320_ch_width(enum phy_ch_width ch_width)
 }
 #endif
 
+#if defined(WLAN_FEATURE_11BN)
+static enum mgmt_dot11_mode
+cm_diag_uhr_dot11_mode_from_phy_mode(enum wlan_phymode phymode)
+{
+	if (IS_WLAN_PHYMODE_UHR(phymode))
+		return DOT11_MODE_11BN;
+	else
+		return DOT11_MODE_MAX;
+}
+#else
+static enum mgmt_dot11_mode
+cm_diag_uhr_dot11_mode_from_phy_mode(enum wlan_phymode phymode)
+{
+	return DOT11_MODE_MAX;
+}
+#endif
+
 static enum mgmt_dot11_mode
 cm_diag_dot11_mode_from_phy_mode(enum wlan_phymode phymode)
 {
@@ -503,8 +506,11 @@ cm_diag_dot11_mode_from_phy_mode(enum wlan_phymode phymode)
 			return DOT11_MODE_11AC;
 		else if (IS_WLAN_PHYMODE_HE(phymode))
 			return DOT11_MODE_11AX;
-		else
+		else if (cm_diag_eht_dot11_mode_from_phy_mode(phymode) !=
+			 DOT11_MODE_MAX)
 			return cm_diag_eht_dot11_mode_from_phy_mode(phymode);
+		else
+			return cm_diag_uhr_dot11_mode_from_phy_mode(phymode);
 	}
 }
 

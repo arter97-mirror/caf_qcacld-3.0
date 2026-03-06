@@ -1777,6 +1777,19 @@ static QDF_STATUS lim_ap_determine_nss_for_sta_ds(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BN
+static inline void
+lim_update_stads_uhr_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
+{
+	sta_ds->mlmStaContext.uhr_capable = assoc_req->uhr_cap_ie.present;
+}
+#else
+static inline void
+lim_update_stads_uhr_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
+{
+}
+#endif
+
 /**
  * lim_update_sta_ds() - updates ds dph entry
  * @mac_ctx: pointer to Global MAC structure
@@ -1852,6 +1865,7 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 
 	lim_update_stads_he_capable(sta_ds, assoc_req);
 	lim_update_stads_eht_capable(sta_ds, assoc_req);
+	lim_update_stads_uhr_capable(sta_ds, assoc_req);
 	sta_ds->qos.addtsPresent =
 		(assoc_req->addtsPresent == 0) ? false : true;
 	sta_ds->qos.addts = assoc_req->addtsReq;

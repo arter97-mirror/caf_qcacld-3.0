@@ -4163,4 +4163,94 @@ QDF_STATUS lim_set_session_channel_params(struct mac_context *mac,
  * Return: true if bssid and destination address are different
  */
 bool lim_mismatch_bssid_da(tpSirMacMgmtHdr hdr);
+
+#ifdef WLAN_FEATURE_11BN
+/**
+ * lim_revise_req_uhr_cap_per_band() - Revise UHR caps as per operation band
+ * @mlme_priv: Pointer to MLME priv
+ * @session: PE session entry
+ *
+ * Return: None
+ */
+void
+lim_revise_req_uhr_cap_per_band(struct mlme_legacy_priv *mlme_priv,
+				struct pe_session *session);
+
+/**
+ * lim_update_sta_uhr_capable() - Update UHR capable flag in Add STA params and
+ *                               STA DPH hash table entry
+ * @mac: pointer to mac context
+ * @add_sta_params: pointer to ADD STA params
+ * @sta_ds: pointer to sta dph hash table entry
+ * @session_entry: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_update_sta_uhr_capable(struct mac_context *mac,
+				tpAddStaParams add_sta_params,
+				tpDphHashNode sta_ds,
+				struct pe_session *session_entry);
+
+/**
+ * lim_add_bss_uhr_cap() - Copy UHR capability into ADD BSS params
+ * @add_bss: pointer to add bss params
+ * @assoc_rsp: pointer to assoc response
+ *
+ * Return: None
+ */
+void lim_add_bss_uhr_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp);
+
+/**
+ * lim_update_stads_uhr_caps() - Copy UHR capability into STA DPH hash table
+ *                               entry
+ * @mac_ctx: pointer to mac context
+ * @sta_ds: pointer to sta dph hash table entry
+ * @assoc_rsp: pointer to assoc response
+ * @session_entry: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_update_stads_uhr_caps(struct mac_context *mac_ctx,
+			       tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
+			       struct pe_session *session_entry);
+
+/**
+ * lim_intersect_ap_uhr_caps() - Intersect AP and self STA UHR capabilities
+ * @session: pointer to PE session
+ * @add_bss: pointer to ADD BSS params
+ * @assoc_rsp: pointer to assoc response
+ *
+ * Return: None
+ */
+void lim_intersect_ap_uhr_caps(struct pe_session *session,
+			       struct bss_params *add_bss,
+			       tpSirAssocRsp assoc_rsp);
+#else
+static inline void
+lim_update_sta_uhr_capable(struct mac_context *mac,
+			   tpAddStaParams add_sta_params,
+			   tpDphHashNode sta_ds,
+			   struct pe_session *session_entry)
+{
+}
+
+static inline void lim_add_bss_uhr_cap(struct bss_params *add_bss,
+				       tpSirAssocRsp assoc_rsp)
+{
+}
+
+static inline void
+lim_update_stads_uhr_caps(struct mac_context *mac_ctx,
+			  tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
+			  struct pe_session *session_entry)
+{
+}
+
+static inline
+void lim_intersect_ap_uhr_caps(struct pe_session *session,
+			       struct bss_params *add_bss,
+			       tpSirAssocRsp assoc_rsp)
+{
+}
+#endif
 #endif /* __LIM_UTILS_H */

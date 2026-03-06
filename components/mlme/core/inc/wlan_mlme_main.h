@@ -949,6 +949,7 @@ struct enhance_roam_info {
  * @peer_set_key_rt_wakelock: runtime pm wakelock for set key
  * @set_key_wakelock_counter: Counter for runtime pm wakelock
  * @is_acs_sap: Sets to true if this is an ACS SAP
+ * @uhr_config: UHR capability configuration
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -1035,6 +1036,9 @@ struct mlme_legacy_priv {
 	qdf_runtime_lock_t peer_set_key_rt_wakelock;
 	qdf_atomic_t set_key_wakelock_counter;
 	bool is_acs_sap;
+#ifdef WLAN_FEATURE_11BN
+	struct wlan_mlme_uhr_caps uhr_config;
+#endif
 };
 
 /**

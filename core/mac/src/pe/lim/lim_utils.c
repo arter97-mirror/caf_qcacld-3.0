@@ -9392,6 +9392,105 @@ void lim_decide_eht_op(struct mac_context *mac_ctx, uint32_t *mlme_eht_ops,
 	session->eht_op.mcs15_disable = true;
 }
 
+#ifdef WLAN_FEATURE_11BN
+static void lim_intersect_uhr_caps(struct wlan_uhr_cap_info *rcvd_uhr,
+				   struct wlan_uhr_cap_info *peer_uhr,
+				   struct pe_session *session)
+{
+	struct wlan_uhr_cap_info *session_uhr = &session->uhr_config;
+
+	qdf_mem_copy(peer_uhr, rcvd_uhr, sizeof(*peer_uhr));
+
+	peer_uhr->max_nss_rx_ndp_sounding_80mhz =
+			session_uhr->max_nss_rx_ndp_sounding_80mhz ?
+			peer_uhr->max_nss_rx_ndp_sounding_80mhz : 0;
+
+	peer_uhr->max_nss_rx_ndp_sounding_160mhz =
+			session_uhr->max_nss_rx_ndp_sounding_160mhz ?
+			peer_uhr->max_nss_rx_ndp_sounding_160mhz : 0;
+	peer_uhr->max_nss_rx_ndp_sounding_320mhz =
+			session_uhr->max_nss_rx_ndp_sounding_320mhz ?
+			peer_uhr->max_nss_rx_ndp_sounding_320mhz : 0;
+	peer_uhr->elr_rx_support = session_uhr->elr_tx_support &
+				rcvd_uhr->elr_rx_support;
+	peer_uhr->elr_tx_support = session_uhr->elr_rx_support &
+				rcvd_uhr->elr_tx_support;
+}
+
+void lim_intersect_ap_uhr_caps(struct pe_session *session,
+			       struct bss_params *add_bss,
+			       tpSirAssocRsp assoc_rsp)
+{
+	struct wlan_uhr_cap_info *rcvd_uhr;
+	struct wlan_uhr_cap_info *peer_uhr = &add_bss->staContext.uhr_config;
+
+	if (!assoc_rsp || !assoc_rsp->uhr_cap_ie.present) {
+		pe_err("UHR cap not present in assoc response");
+		return;
+	}
+
+	rcvd_uhr = &assoc_rsp->uhr_cap_ie;
+
+	lim_intersect_uhr_caps(rcvd_uhr, peer_uhr, session);
+	add_bss->staContext.uhr_capable = true;
+}
+
+void lim_update_sta_uhr_capable(struct mac_context *mac,
+				tpAddStaParams add_sta_params,
+				tpDphHashNode sta_ds,
+				struct pe_session *session_entry)
+{
+	if (LIM_IS_AP_ROLE(session_entry))
+		add_sta_params->uhr_capable =
+			sta_ds->mlmStaContext.uhr_capable &&
+				session_entry->uhr_capable;
+	else
+		add_sta_params->uhr_capable = session_entry->uhr_capable;
+
+	pe_debug("STA uhr capable: %d", add_sta_params->uhr_capable);
+}
+
+void lim_update_stads_uhr_caps(struct mac_context *mac_ctx,
+			       tpDphHashNode sta_ds,
+			       tpSirAssocRsp assoc_rsp,
+			       struct pe_session *session_entry)
+{
+	/* If UHR is not supported, do not fill sta_ds and return */
+	if (!IS_DOT11_MODE_UHR(session_entry->dot11mode))
+		return;
+
+	/* assoc resp and beacon doesn't have uhr caps */
+	if (!assoc_rsp->uhr_cap_ie.present) {
+		pe_err("UHR cap IE is missing in assoc response");
+		return;
+	}
+
+	sta_ds->mlmStaContext.uhr_capable = assoc_rsp->uhr_cap_ie.present;
+
+	qdf_mem_copy(&sta_ds->uhr_config, &assoc_rsp->uhr_cap_ie,
+		     sizeof(struct wlan_uhr_cap_info));
+}
+
+void lim_add_bss_uhr_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
+{
+	struct wlan_uhr_cap_info *uhr_cap;
+	struct wlan_uhr_op_ie *uhr_op;
+
+	if (!assoc_rsp->uhr_cap_ie.present)
+		return;
+
+	uhr_cap = &assoc_rsp->uhr_cap_ie;
+	uhr_op = &assoc_rsp->uhr_op_ie;
+	add_bss->uhr_capable = uhr_cap->present;
+	if (uhr_cap)
+		qdf_mem_copy(&add_bss->staContext.uhr_config,
+			     uhr_cap, sizeof(*uhr_cap));
+	if (uhr_op)
+		qdf_mem_copy(&add_bss->staContext.uhr_op_ie,
+			     uhr_op, sizeof(*uhr_op));
+}
+#endif
+
 void lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
 {
 	sta_ds->mlmStaContext.eht_capable = assoc_req->eht_cap.present;
@@ -10175,6 +10274,48 @@ void lim_extract_ext_mld_caps(struct mac_context *mac_ctx,
 	pe_debug("Ext mld caps: %d, single link emlsr support: %d",
 		 add_bss->staContext.ext_mld_caps_present,
 		 add_bss->staContext.ext_mld_cap.emlsr_one_link_support);
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BN
+void lim_add_self_uhr_cap(tpAddStaParams add_sta_params,
+			  struct pe_session *session)
+{
+	if (!session)
+		return;
+
+	add_sta_params->uhr_capable = true;
+
+	qdf_mem_copy(&add_sta_params->uhr_config, &session->uhr_config,
+		     sizeof(add_sta_params->uhr_config));
+	/* TODO: Copy UHR OP */
+}
+
+void
+lim_revise_req_uhr_cap_per_band(struct mlme_legacy_priv *mlme_priv,
+				struct pe_session *session)
+{
+	struct mac_context *mac = session->mac_ctx;
+
+	if (wlan_reg_is_24ghz_ch_freq(session->curr_op_freq))
+		qdf_mem_copy(&mlme_priv->uhr_config, &mac->uhr_cap_2g,
+			     sizeof(struct wlan_mlme_uhr_caps));
+	else
+		qdf_mem_copy(&mlme_priv->uhr_config, &mac->uhr_cap_5g,
+			     sizeof(struct wlan_mlme_uhr_caps));
+}
+
+void lim_copy_join_req_uhr_cap(struct pe_session *session)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session->vdev);
+	if (!mlme_priv)
+		return;
+
+	lim_revise_req_uhr_cap_per_band(mlme_priv, session);
+	qdf_mem_copy(&session->uhr_config, &mlme_priv->uhr_config,
+		     sizeof(session->uhr_config));
 }
 #endif
 

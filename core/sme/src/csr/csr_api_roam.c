@@ -1861,6 +1861,26 @@ void csr_update_session_eht_cap(struct mac_context *mac_ctx,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BN
+void csr_update_session_uhr_cap(struct mac_context *mac_ctx,
+				struct csr_roam_session *session,
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlme_uhr_caps *uhr_cap;
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return;
+
+	qdf_mem_copy(&mlme_priv->uhr_config,
+		     &mac_ctx->mlme_cfg->mlme_uhr_caps,
+		     sizeof(mlme_priv->uhr_config));
+	uhr_cap = &mlme_priv->uhr_config;
+	uhr_cap->present = true;
+}
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 void csr_update_session_he_cap(struct mac_context *mac_ctx,
 			       struct csr_roam_session *session)
@@ -6563,6 +6583,7 @@ QDF_STATUS csr_setup_vdev_session(struct vdev_mlme_obj *vdev_mlme)
 	vdev_mlme->proto.vht_info.caps = vht_config.caps;
 	csr_update_session_he_cap(mac_ctx, session);
 	csr_update_session_eht_cap(mac_ctx, session);
+	csr_update_session_uhr_cap(mac_ctx, session, vdev);
 
 	csr_send_set_ie(vdev_mlme->mgmt.generic.type,
 			vdev_mlme->mgmt.generic.subtype,

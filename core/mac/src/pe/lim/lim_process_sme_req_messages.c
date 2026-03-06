@@ -1810,8 +1810,11 @@ lim_get_bss_dot11_mode(struct mac_context *mac_ctx,
 		bss_dot11_mode = MLME_DOT11_MODE_11AX;
 
 	if (ie_struct->eht_cap.present &&
-	    lim_get_bss_11be_mode_allowed(mac_ctx, bss_desc, vdev_id))
+	    lim_get_bss_11be_mode_allowed(mac_ctx, bss_desc, vdev_id)) {
 		bss_dot11_mode = MLME_DOT11_MODE_11BE;
+		if (ie_struct->uhr_op.present)
+			bss_dot11_mode = MLME_DOT11_MODE_11BN;
+	}
 
 	return bss_dot11_mode;
 }
@@ -2122,6 +2125,45 @@ lim_handle_11ax_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 
 static QDF_STATUS
 lim_handle_11be_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
+			   enum mlme_dot11_mode *intersected_mode,
+			   enum mlme_dot11_mode self_dot11_mode)
+{
+	switch (bss_dot11_mode) {
+	case MLME_DOT11_MODE_11N:
+		*intersected_mode = MLME_DOT11_MODE_11N;
+		break;
+	case MLME_DOT11_MODE_11AC:
+		*intersected_mode = MLME_DOT11_MODE_11AC;
+		break;
+	case MLME_DOT11_MODE_11AX:
+		*intersected_mode = MLME_DOT11_MODE_11AX;
+		break;
+	case MLME_DOT11_MODE_11BE:
+		*intersected_mode = MLME_DOT11_MODE_11BE;
+		break;
+	case MLME_DOT11_MODE_11BN:
+		*intersected_mode = self_dot11_mode;
+		pe_debug("Downgrade to self dot11mode: %d", self_dot11_mode);
+		break;
+	case MLME_DOT11_MODE_11G:
+		*intersected_mode = MLME_DOT11_MODE_11G;
+		break;
+	case MLME_DOT11_MODE_11B:
+		*intersected_mode = MLME_DOT11_MODE_11B;
+		break;
+	case MLME_DOT11_MODE_11A:
+		*intersected_mode = MLME_DOT11_MODE_11A;
+		break;
+	default:
+		pe_err("Invalid bss dot11mode %d passed", bss_dot11_mode);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+lim_handle_11bn_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 			   enum mlme_dot11_mode *intersected_mode)
 {
 	switch (bss_dot11_mode) {
@@ -2136,6 +2178,9 @@ lim_handle_11be_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 		break;
 	case MLME_DOT11_MODE_11BE:
 		*intersected_mode = MLME_DOT11_MODE_11BE;
+		break;
+	case MLME_DOT11_MODE_11BN:
+		*intersected_mode = MLME_DOT11_MODE_11BN;
 		break;
 	case MLME_DOT11_MODE_11G:
 		*intersected_mode = MLME_DOT11_MODE_11G;
@@ -2326,6 +2371,32 @@ lim_handle_11be_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 }
 
 static QDF_STATUS
+lim_handle_11bn_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
+				enum mlme_dot11_mode *intersected_mode)
+{
+	switch (bss_dot11_mode) {
+	case MLME_DOT11_MODE_11BN:
+		*intersected_mode = MLME_DOT11_MODE_11BN;
+		break;
+	case MLME_DOT11_MODE_11N:
+	case MLME_DOT11_MODE_11AC:
+	case MLME_DOT11_MODE_11AX:
+	case MLME_DOT11_MODE_11BE:
+	case MLME_DOT11_MODE_11G:
+	case MLME_DOT11_MODE_11B:
+	case MLME_DOT11_MODE_11A:
+		pe_err("Self dot11mode 11BN only, bss dot11mode %d not compatible",
+		       bss_dot11_mode);
+		return QDF_STATUS_E_INVAL;
+	default:
+		pe_err("Invalid bss dot11mode %d passed", bss_dot11_mode);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
 lim_get_intersected_dot11_mode_sta_ap(struct mac_context *mac_ctx,
 				      enum mlme_dot11_mode self_dot11_mode,
 				      enum mlme_dot11_mode bss_dot11_mode,
@@ -2372,9 +2443,16 @@ lim_get_intersected_dot11_mode_sta_ap(struct mac_context *mac_ctx,
 						       &bss_desc->bcn_ies);
 	case MLME_DOT11_MODE_11BE:
 		return lim_handle_11be_dot11_mode(bss_dot11_mode,
-						  intersected_mode);
+						  intersected_mode,
+						  self_dot11_mode);
 	case MLME_DOT11_MODE_11BE_ONLY:
 		return lim_handle_11be_only_dot11_mode(bss_dot11_mode,
+						       intersected_mode);
+	case MLME_DOT11_MODE_11BN:
+		return lim_handle_11bn_dot11_mode(bss_dot11_mode,
+						  intersected_mode);
+	case MLME_DOT11_MODE_11BN_ONLY:
+		return lim_handle_11bn_only_dot11_mode(bss_dot11_mode,
 						       intersected_mode);
 	case MLME_DOT11_MODE_ABG:
 		return lim_handle_11abg_dot11_mode(bss_dot11_mode,
@@ -2396,7 +2474,8 @@ lim_verify_dot11_mode_with_crypto(struct pe_session *session)
 	if (!(session->dot11mode == MLME_DOT11_MODE_11N ||
 	    session->dot11mode == MLME_DOT11_MODE_11AC ||
 	    session->dot11mode == MLME_DOT11_MODE_11AX ||
-	    session->dot11mode == MLME_DOT11_MODE_11BE))
+	    session->dot11mode == MLME_DOT11_MODE_11BE ||
+	    session->dot11mode == MLME_DOT11_MODE_11BN))
 		return;
 
 	ucast_cipher = wlan_crypto_get_param(session->vdev,
@@ -3449,6 +3528,11 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		lim_update_session_eht_capable(session, true);
 		lim_reset_self_ocv_caps(session);
 		lim_copy_join_req_eht_cap(session);
+	}
+
+	if (IS_DOT11_MODE_UHR(session->dot11mode)) {
+		lim_update_session_uhr_capable(session, true);
+		lim_copy_join_req_uhr_cap(session);
 	}
 
 	/* Record if management frames need to be protected */

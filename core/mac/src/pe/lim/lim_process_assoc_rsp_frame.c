@@ -200,6 +200,7 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 				 (bss_desc ? &bss_desc->bcn_ies.he_cap : NULL));
 
 	lim_update_stads_eht_caps(mac_ctx, sta_ds, assoc_rsp, session_entry);
+	lim_update_stads_uhr_caps(mac_ctx, sta_ds, assoc_rsp, session_entry);
 	if (lim_is_sta_he_capable(sta_ds))
 		he_cap = &assoc_rsp->he_cap;
 

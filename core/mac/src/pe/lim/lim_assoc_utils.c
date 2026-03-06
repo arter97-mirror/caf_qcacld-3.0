@@ -2408,6 +2408,9 @@ lim_add_sta(struct mac_context *mac_ctx,
 	lim_update_sta_eht_capable(mac_ctx, add_sta_params, sta_ds,
 				   session_entry);
 
+	lim_update_sta_uhr_capable(mac_ctx, add_sta_params, sta_ds,
+				   session_entry);
+
 	lim_update_tdls_sta_eht_capable(mac_ctx, add_sta_params, sta_ds,
 					session_entry);
 
@@ -3026,6 +3029,9 @@ lim_add_sta_self(struct mac_context *mac, uint8_t updateSta,
 
 	if (IS_DOT11_MODE_EHT(selfStaDot11Mode))
 		lim_add_self_eht_cap(pAddStaParams, pe_session);
+
+	if (IS_DOT11_MODE_UHR(selfStaDot11Mode))
+		lim_add_self_uhr_cap(pAddStaParams, pe_session);
 
 	if (lim_is_fils_connection(pe_session))
 		pAddStaParams->no_ptk_4_way = true;
@@ -4738,6 +4744,122 @@ lim_update_ap_max_eht_ch_width(struct mac_context *mac,
 }
 #endif /* WLAN_FEATURE_11BE */
 
+#ifdef WLAN_FEATURE_11BN
+/**
+ * lim_sta_process_uhr_capability() - Process UHR cap for STA connection
+ * @assoc_resp: Association Response frame
+ * @add_bss_params: Pointer to Add BSS parameters structure
+ * @pe_session: Pointer to PE session
+ * @peer: Pointer to peer struct
+ *
+ * This function orchestrates the parsing of UHR Capabilities and UHR
+ * Operation IEs to determine the final supported parameters for the
+ * connection. It processes both UHR Capability IE and UHR Operation IE.
+ *
+ * Return: None
+ */
+static void lim_sta_process_uhr_capability(
+				tpSirAssocRsp assoc_resp,
+				struct bss_params *add_bss_params,
+				struct pe_session *pe_session,
+				struct wlan_objmgr_peer *peer)
+{
+	if (!assoc_resp || !add_bss_params || !pe_session || !peer) {
+		pe_err("vdev %d: Invalid parameters",
+		       pe_session ? pe_session->vdev_id : WLAN_INVALID_VDEV_ID);
+		return;
+	}
+
+	if (!lim_is_session_uhr_capable(pe_session) ||
+	    !assoc_resp->uhr_cap_ie.present) {
+		pe_debug("vdev %d: UHR not supported or UHR cap not present",
+			 pe_session->vdev_id);
+		return;
+	}
+
+	lim_add_bss_uhr_cap(add_bss_params, assoc_resp);
+
+	/* Process UHR capabilities intersection for 6 GHz */
+	if (pe_session->lim_join_req) {
+		lim_intersect_ap_uhr_caps(pe_session, add_bss_params,
+					  assoc_resp);
+	} else {
+		pe_debug("vdev %d: lim_join_req is NULL for " QDF_MAC_ADDR_FMT ", skip intersection",
+			 pe_session->vdev_id,
+			 QDF_MAC_ADDR_REF(pe_session->bssId));
+	}
+}
+
+/**
+ * lim_sta_process_uhr_operation() - Process UHR operation from
+ *                                   Association Response
+ * @assoc_resp: Association Response frame
+ *
+ * This function processes the UHR Operation IE from the association
+ * response and updates BSS parameters accordingly.
+ *
+ * Return: None
+ */
+static void lim_sta_process_uhr_operation(tpSirAssocRsp assoc_resp)
+{
+	struct wlan_uhr_op_ie *uhr_op;
+
+	if (!assoc_resp)
+		return;
+
+	uhr_op = &assoc_resp->uhr_op_ie;
+
+	if (!uhr_op->present)
+		return;
+
+	/* TODO Rest of the function to be implemented later */
+}
+
+/**
+ * lim_update_add_bss_uhr_params() - Configure UHR capability for STA connection
+ * @mac: Pointer to MAC context
+ * @assoc_resp: Pointer to Association Response frame
+ * @pAddBssParams: Pointer to Add BSS parameters structure
+ * @pe_session: Pointer to PE session
+ *
+ * This function orchestrates the parsing of UHR Capabilities and UHR
+ * Operation IEs to determine the final supported parameters for the
+ * connection. It processes both UHR Capability IE and UHR Operation IE.
+ *
+ * Return: None
+ */
+static void lim_update_add_bss_uhr_params(struct mac_context *mac,
+					  tpSirAssocRsp assoc_resp,
+					  struct bss_params *pAddBssParams,
+					  struct pe_session *pe_session)
+{
+	struct wlan_objmgr_peer *peer;
+
+	peer = wlan_objmgr_get_peer_by_mac(mac->psoc,
+					   pAddBssParams->bssId,
+					   WLAN_LEGACY_MAC_ID);
+	if (!peer) {
+		pe_err("Failed to get peer for BSSID: " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(pAddBssParams->bssId));
+		return;
+	}
+
+	lim_sta_process_uhr_capability(assoc_resp, pAddBssParams, pe_session,
+				       peer);
+	lim_sta_process_uhr_operation(assoc_resp);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+}
+#else /* !WLAN_FEATURE_11BN */
+static inline void
+lim_update_add_bss_uhr_params(struct mac_context *mac,
+			      tpSirAssocRsp assoc_resp,
+			      struct bss_params *add_bss_params,
+			      struct pe_session *pe_session)
+{
+}
+#endif /* WLAN_FEATURE_11BN */
+
 /**
  * lim_process_sta_bw_update() - Process STA bandwidth/capability updates
  * @mac: MAC context
@@ -4838,6 +4960,10 @@ static void lim_process_sta_bw_update(struct mac_context *mac,
 	if (lim_is_session_eht_capable(pe_session) &&
 	    pAssocRsp->eht_cap.present)
 		lim_update_add_bss_eht_params(mac, pAssocRsp, pAddBssParams,
+					      pe_session);
+
+	if (lim_is_session_uhr_capable(pe_session))
+		lim_update_add_bss_uhr_params(mac, pAssocRsp, pAddBssParams,
 					      pe_session);
 
 	/* Always fetch from peer MLME (single source of truth) */
@@ -5154,7 +5280,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac,
 		}
 	}
 
-	/* Update STA BW capabilities (HT/VHT/HE/EHT) */
+	/* Update STA BW capabilities (HT/VHT/HE/EHT/UHR) */
 	lim_process_sta_bw_update(mac, pe_session, pAssocRsp, bss_desc,
 				  pAddBssParams, sta);
 
@@ -5436,6 +5562,11 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 		    bcn_ies->eht_cap.present)
 			lim_intersect_ap_eht_caps(pe_session, pAddBssParams,
 						  bcn_ies, NULL);
+
+		if (lim_is_session_uhr_capable(pe_session))
+			lim_intersect_ap_uhr_caps(pe_session,
+						  pAddBssParams,
+						  NULL);
 
 		if (bcn_ies->HTCaps.supportedChannelWidthSet &&
 		    chan_width_support) {
