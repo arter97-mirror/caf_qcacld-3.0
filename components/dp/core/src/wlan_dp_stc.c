@@ -1460,7 +1460,8 @@ wlan_dp_stc_get_avg_pkt_rate(struct wlan_dp_stc_flow_table_entry *flow_entry)
 /**
  * wlan_dp_stc_determine_reclass_stages() - Determine which stages to attempt
  * for reclassification
- * @flow_entry: Flow table entry containing ML results
+ * @dp_stc: STC context
+ * @rx_flow_id: RX flow ID
  * @stage_flags: Output parameter for stage flags to set
  *
  * Logic:
@@ -1473,13 +1474,17 @@ wlan_dp_stc_get_avg_pkt_rate(struct wlan_dp_stc_flow_table_entry *flow_entry)
  * Return: QDF_STATUS
  */
 static inline QDF_STATUS
-wlan_dp_stc_determine_reclass_stages(struct wlan_dp_stc_flow_table_entry *flow_entry,
+wlan_dp_stc_determine_reclass_stages(struct wlan_dp_stc *dp_stc,
+				     uint16_t rx_flow_id,
 				     uint32_t *stage_flags)
 {
+	struct wlan_dp_stc_flow_table_entry *flow_entry;
 	struct wlan_dp_stc_classify_insights *classify_results;
 	int stage;
 	uint8_t i;
 	uint8_t max_confidence;
+
+	flow_entry = &dp_stc->rx_flow_table->entries[rx_flow_id];
 
 	/*
 	 * Mapping array for stage enum to corresponding bit flags.
@@ -1500,6 +1505,19 @@ wlan_dp_stc_determine_reclass_stages(struct wlan_dp_stc_flow_table_entry *flow_e
 	*stage_flags = WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_1_VALID |
 		       WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_2_VALID |
 		       WLAN_DP_STC_CLASSIFY_INSIGHT_STAGE_3_VALID;
+
+	/*
+	 * First reclassification attempt: enable all stages unconditionally.
+	 * reclassification_count is already 1 at this point.
+	 * Subsequent attempts use confidence-based stage determination.
+	 */
+	if (flow_entry->reclassification_count == 1) {
+		dp_stc_debug(dp_stc->logmask,
+			     "STC: First reclass attempt flow_id %u mdata 0x%x (count=1) - all stages enabled unconditionally",
+			     rx_flow_id, flow_entry->metadata);
+		return QDF_STATUS_SUCCESS;
+	}
+
 	classify_results = &flow_entry->classify_results;
 
 	/*
@@ -1582,7 +1600,8 @@ wlan_dp_stc_check_reclass_eligibility(struct wlan_dp_stc *dp_stc,
 	flow_entry->flags &= ~WLAN_DP_STC_RECLASS_PENDING;
 
 	/* Determine stages based on ML results */
-	wlan_dp_stc_determine_reclass_stages(flow_entry, &sampling_stages);
+	wlan_dp_stc_determine_reclass_stages(dp_stc, rx_flow_id,
+					     &sampling_stages);
 
 	/*
 	 * If no stages meet the confidence threshold, mark flow as classified
@@ -2457,6 +2476,14 @@ wlan_dp_stc_check_provisional_transition(struct wlan_dp_stc *dp_stc,
 	uint32_t pkt_rate;
 	uint8_t buf[BUF_LEN_MAX];
 
+	/* Reclassification flows completely bypass provisional checks */
+	if (s_entry->flags & (WLAN_DP_SAMPLING_FLAGS_STAGE_1 |
+			      WLAN_DP_SAMPLING_FLAGS_STAGE_2 |
+			      WLAN_DP_SAMPLING_FLAGS_STAGE_3)) {
+		s_entry->state = WLAN_DP_SAMPLING_STATE_FLOW_ADDED;
+		return true;
+	}
+
 	if (!(s_entry->flags & WLAN_DP_SAMPLING_FLAGS_RX_FLOW_VALID))
 		return false;
 
@@ -2466,7 +2493,7 @@ wlan_dp_stc_check_provisional_transition(struct wlan_dp_stc *dp_stc,
 	if (flow_age < WLAN_DP_STC_COMMITTED_TIMEOUT_NS)
 		return false;
 
-	/* Calculate packet rate */
+	/* Calculate historical packet rate for new flows */
 	pkt_rate = (rx_flow->num_pkts * QDF_NSEC_PER_SEC) / flow_age;
 
 	if (pkt_rate < FLOW_SHORTLIST_TXRX_PKT_RATE_PER_SEC_THRESH) {
