@@ -1424,6 +1424,12 @@ mlo_roam_prepare_and_send_link_connect_req(struct wlan_objmgr_vdev *assoc_vdev,
 	if (!assoc_vdev->mlo_dev_ctx || !assoc_vdev->mlo_dev_ctx->sta_ctx)
 		return QDF_STATUS_E_FAILURE;
 
+	if (wlan_cm_is_vdev_roaming(assoc_vdev)) {
+		mlo_err("Assoc vdev is in roaming state, ignore connect req");
+		status = QDF_STATUS_SUCCESS;
+		goto err;
+	}
+
 	sta_ctx = assoc_vdev->mlo_dev_ctx->sta_ctx;
 
 	wlan_vdev_mlme_get_ssid(assoc_vdev, ssid.ssid,
