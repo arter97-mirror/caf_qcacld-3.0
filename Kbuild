@@ -46,7 +46,7 @@ endif
 # CONFIG_QCA_CLD_WLAN_PROFILE support multiple profiles in a way that's
 # compatible with Bazel.
 # Example:
-# CONFIG_QCA_CLD_WLAN_PROFILE := "sdxecho_gki_fig sdxecho_consolidate_fig"
+# CONFIG_QCA_CLD_WLAN_PROFILE := "echo_gki_fig echo_consolidate_fig"
 # Loop through each WLAN profile defined in CONFIG_QCA_CLD_WLAN_PROFILE
 $(foreach profile,$(CONFIG_QCA_CLD_WLAN_PROFILE), \
 	$(info Including profile: $(profile)_defconfig) \
