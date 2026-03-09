@@ -40,6 +40,7 @@
 #define WCN6750_DEVICE_ID 0x6750
 #define WCN6450_DEVICE_ID 0x6450
 #define WCN7750_DEVICE_ID 0x7750
+#define WCN8750_DEVICE_ID 0x8750
 /**
  * pld_ipci_probe() - Probe function for platform driver
  * @dev: device
@@ -518,6 +519,8 @@ static struct device_info pld_ipci_dev_info[] = {
 	{ "wcn6450", WCN6450_DEVICE_ID },
 #elif defined(QCA_WIFI_WCN7750)
 	{ "wcn7750", WCN7750_DEVICE_ID },
+#elif defined(QCA_WIFI_WCN8750)
+	{ "wcn8750", WCN8750_DEVICE_ID },
 #endif
 	{ { 0 } }
 };
