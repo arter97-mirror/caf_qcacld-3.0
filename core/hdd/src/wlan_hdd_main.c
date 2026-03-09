@@ -24195,8 +24195,7 @@ static const struct hdd_chwidth_info chwidth_info[] = {
 enum phy_ch_width
 hdd_nl80211_chwidth_to_phychwidth(uint8_t nl80211_chwidth)
 {
-	if (nl80211_chwidth >= ARRAY_SIZE(chwidth_info) ||
-	    !chwidth_info[nl80211_chwidth].phy_chwidth) {
+	if (nl80211_chwidth >= ARRAY_SIZE(chwidth_info)) {
 		hdd_err("Unsupported channel width %d", nl80211_chwidth);
 		return -EINVAL;
 	}
