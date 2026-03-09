@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -273,6 +274,28 @@
 		1, \
 		"Enable/disable support")
 
+/*
+ * <ini>
+ * oce_enable_fils_discovery_sap_6g_only - Enable/disable 6G SAP FILS discovery
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable fils discovery in sap mode for 6g only
+ *
+ * Related: None
+ *
+ * Supported Feature: FILS
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_FILS_DISCOVERY_SAP_6G_ONLY CFG_INI_BOOL( \
+		"oce_enable_fils_discovery_sap_6g_only", \
+		1, \
+		"Enable/disable fils discovery in 6g sap mode")
+
 #define CFG_OCE_ALL \
 	CFG(CFG_ENABLE_BCAST_PROBE_RESP) \
 	CFG(CFG_OCE_ENABLE_STA) \
@@ -284,5 +307,6 @@
 	CFG(CFG_ENABLE_PROBE_REQ_DEFERRAL) \
 	CFG(CFG_ENABLE_FILS_DISCOVERY_SAP) \
 	CFG(CFG_ENABLE_ESP_FEATURE) \
-	CFG(CFG_IS_FILS_ENABLED)
+	CFG(CFG_IS_FILS_ENABLED) \
+	CFG(CFG_ENABLE_FILS_DISCOVERY_SAP_6G_ONLY)
 #endif /* __CFG_MLME_OCE_H */
