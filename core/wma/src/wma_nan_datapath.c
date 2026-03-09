@@ -112,7 +112,7 @@ QDF_STATUS wma_delete_sta_req_ndi_mode(tp_wma_handle wma,
 	struct wma_target_req *del_req;
 
 	status = wma_remove_peer(wma, del_sta->staMac, vdev_id, false);
-	del_sta->status = QDF_STATUS_SUCCESS;
+	del_sta->status = status;
 
 	if (QDF_IS_STATUS_SUCCESS(status) &&
 	    wmi_service_enabled(wma->wmi_handle,
