@@ -2571,6 +2571,51 @@ wma_increment_peer_count(tp_wma_handle wma, uint8_t vdev_id)
 	wma->interfaces[vdev_id].peer_count++;
 }
 
+#ifdef WLAN_FEATURE_11BN_SMD
+/**
+ * wma_get_peer_mld_or_smd_addr() - Get MLD MAC or SMD identifier for peer
+ * @peer: Peer object
+ *
+ * This function checks if the peer is part of an SMD association and returns
+ * the appropriate MAC address:
+ * - For SMD associations: Returns SMD identifier
+ * - For MLO associations: Returns MLD MAC address
+ * - For non-MLO: Returns NULL
+ *
+ * Return: Pointer to MAC address or NULL
+ */
+static uint8_t *wma_get_peer_mld_or_smd_addr(struct wlan_objmgr_peer *peer)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+
+	if (!peer)
+		return NULL;
+
+	vdev = wlan_peer_get_vdev(peer);
+	if (!vdev)
+		return wlan_peer_mlme_get_mldaddr(peer);
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+
+	/* Check if this is an SMD association */
+	if (mlo_dev_ctx && mlo_dev_ctx->smd_ctx &&
+	    !qdf_is_macaddr_zero(&mlo_dev_ctx->smd_ctx->smd_identifier)) {
+		/* SMD association: Return SMD identifier */
+		wma_debug("Peer " QDF_MAC_ADDR_FMT " using SMD identifier " QDF_MAC_ADDR_FMT,
+			  QDF_MAC_ADDR_REF(wlan_peer_get_macaddr(peer)),
+			  QDF_MAC_ADDR_REF(mlo_dev_ctx->smd_ctx->smd_identifier.bytes));
+		return mlo_dev_ctx->smd_ctx->smd_identifier.bytes;
+	}
+
+	return wlan_peer_mlme_get_mldaddr(peer);
+}
+#else
+static inline uint8_t *wma_get_peer_mld_or_smd_addr(struct wlan_objmgr_peer *peer)
+{
+    return wlan_peer_mlme_get_mldaddr(peer);
+}
+#endif /* WLAN_FEATURE_11BN_SMD */
 /**
  * wma_update_mlo_peer_create() - update mlo parameter for peer creation
  * @param: peer create param
@@ -2591,7 +2636,7 @@ static void wma_peer_setup_fill_info(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
 
-	peer_info->mld_peer_mac = wlan_peer_mlme_get_mldaddr(peer);
+	peer_info->mld_peer_mac = wma_get_peer_mld_or_smd_addr(peer);
 	if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) &&
 	    wlan_vdev_mlme_get_is_mlo_link(psoc, vdev_id)) {
 		peer_info->is_first_link = true;
