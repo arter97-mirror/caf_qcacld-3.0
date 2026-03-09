@@ -1821,7 +1821,7 @@ enum hdd_ts_status hdd_check_timestamp_status(uint64_t last_target_time,
 
 static void hdd_update_timestamp(struct hdd_adapter *adapter)
 {
-	int interval = 0;
+	uint32_t interval = 0;
 	enum hdd_ts_status sync_status;
 	struct hdd_vdev_tsf *tsf;
 	struct hdd_context *hddctx;
@@ -1946,7 +1946,7 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter)
 	}
 	qdf_spin_unlock_bh(&tsf->host_target_sync_lock);
 
-	if (interval > 0) {
+	if (adapter->tsf.tsf_capture_initialized && interval) {
 		if (sync_status == HDD_TS_STATUS_READY)
 			hdd_tsf_setup_gpio_toggle(adapter);
 		qdf_mc_timer_start(&tsf->host_target_sync_timer, interval);
