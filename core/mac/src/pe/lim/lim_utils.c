@@ -9520,9 +9520,9 @@ void lim_set_eht_caps(struct mac_context *mac,
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 		return;
 	}
-	wlan_mlme_set_eht_mcsset_for_nss(&dot11_cap, tx_nss, rx_nss);
 
 	populate_dot11f_eht_caps_by_band(mac, is_band_2g, &dot11_cap, NULL);
+	wlan_mlme_set_eht_mcsset_for_nss(&dot11_cap, tx_nss, rx_nss);
 	lim_revise_eht_caps_per_band(mac, band, &dot11_cap);
 	populate_dot11f_he_caps_by_band(mac, is_band_2g, &dot11_he_cap,
 					vdev_id);
