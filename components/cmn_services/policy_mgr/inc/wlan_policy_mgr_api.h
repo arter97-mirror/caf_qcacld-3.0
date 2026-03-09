@@ -2435,6 +2435,7 @@ struct policy_mgr_sme_cbacks {
  * @wlan_get_sap_acs_band: get acs band from sap config
  * @wlan_check_cc_intf_cb: get interference frequency of input SAP/GO interface
  * @wlan_set_tx_rx_nss_cb: set NSS dynamically for STA
+ * @hdd_get_sap_connected_sta_band: Get bands supported by connected STA to SAP
  */
 struct policy_mgr_hdd_cbacks {
 	QDF_STATUS (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
@@ -2469,6 +2470,8 @@ struct policy_mgr_hdd_cbacks {
 	QDF_STATUS (*wlan_set_tx_rx_nss_cb)(struct wlan_objmgr_psoc *psoc,
 					    uint8_t vdev_id, uint8_t tx_nss,
 					    uint8_t rx_nss);
+	uint8_t (*hdd_get_sap_connected_sta_band)(struct wlan_objmgr_psoc *psoc,
+						  uint8_t vdev_id);
 };
 
 /**
