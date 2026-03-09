@@ -3522,6 +3522,7 @@ static void mlme_init_oce_cfg(struct wlan_objmgr_psoc *psoc,
 	bool probe_req_deferral_enabled;
 	bool fils_discovery_sap_enabled;
 	bool esp_for_roam_enabled;
+	bool fils_discovery_sap_enabled_6g_only;
 
 	oce->enable_bcast_probe_rsp =
 		cfg_get(psoc, CFG_ENABLE_BCAST_PROBE_RESP);
@@ -3539,6 +3540,8 @@ static void mlme_init_oce_cfg(struct wlan_objmgr_psoc *psoc,
 	fils_discovery_sap_enabled =
 		cfg_get(psoc, CFG_ENABLE_FILS_DISCOVERY_SAP);
 	esp_for_roam_enabled = cfg_get(psoc, CFG_ENABLE_ESP_FEATURE);
+	fils_discovery_sap_enabled_6g_only =
+		cfg_get(psoc, CFG_ENABLE_FILS_DISCOVERY_SAP_6G_ONLY);
 
 	if (!rssi_assoc_reject_enabled ||
 	    !oce->enable_bcast_probe_rsp) {
@@ -3558,7 +3561,9 @@ static void mlme_init_oce_cfg(struct wlan_objmgr_psoc *psoc,
 	(esp_for_roam_enabled *
 	 WMI_VDEV_OCE_ESP_FEATURE_BITMAP) +
 	(rssi_assoc_reject_enabled *
-	 WMI_VDEV_OCE_REASSOC_REJECT_FEATURE_BITMAP);
+	 WMI_VDEV_OCE_REASSOC_REJECT_FEATURE_BITMAP) +
+	(fils_discovery_sap_enabled_6g_only *
+	 WMI_VDEV_OCE_FILS_DISCOVERY_FRAME_6G_ONLY_FEATURE_BITMAP);
 	oce->feature_bitmap = val;
 }
 
