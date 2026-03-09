@@ -18500,6 +18500,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 	if (hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
 		hdd_restore_all_ps(hdd_ctx);
 
+	wlan_hdd_sar_timers_stop(hdd_ctx);
 	/* Once the firmware sequence is completed reset this flag */
 	hdd_ctx->imps_enabled = false;
 	hdd_ctx->is_dual_mac_cfg_updated = false;
