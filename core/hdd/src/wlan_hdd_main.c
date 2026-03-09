@@ -4576,6 +4576,56 @@ wlan_hdd_set_tx_rx_nss_cb(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	return hdd_update_nss(link_info, tx_nss, rx_nss);
 }
 
+static uint8_t
+hdd_get_sap_connected_sta_band(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	struct wlan_hdd_link_info *link_info;
+	uint8_t band_mask = REG_BAND_MASK_ALL, peer_count = 0;
+	struct hdd_adapter *adapter;
+	struct hdd_station_info *sta_info, *tmp = NULL;
+
+	link_info = wlan_hdd_get_link_info_from_vdev(psoc, vdev_id);
+	if (!link_info) {
+		hdd_err("Invalid vdev %d", vdev_id);
+		return 0;
+	}
+
+	adapter = link_info->adapter;
+	if (!adapter) {
+		hdd_err("vdev %d, adapter not found", vdev_id);
+		return 0;
+	}
+
+	if (adapter->device_mode != QDF_SAP_MODE &&
+	    adapter->device_mode != QDF_P2P_GO_MODE)
+		return 0;
+
+	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
+				  STA_INFO_GET_BAND_INFO) {
+		/*
+		 * Update band mask only if its non zero.
+		 * ANDing all peers band mask will provide the common bands
+		 * supported.
+		 */
+		if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac) &&
+		    sta_info->supported_band) {
+			peer_count++;
+			band_mask &= sta_info->supported_band;
+		}
+		hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
+				     STA_INFO_GET_BAND_INFO);
+	}
+
+	/* If no peer connected then reset band mask to 0 */
+	if (!peer_count)
+		band_mask = 0;
+
+	hdd_debug("vdev %d peer's with band info %d band_mask 0x%x", vdev_id,
+		  peer_count, band_mask);
+
+	return band_mask;
+}
+
 static void hdd_register_policy_manager_callback(
 			struct wlan_objmgr_psoc *psoc)
 {
@@ -4604,6 +4654,8 @@ static void hdd_register_policy_manager_callback(
 			wlan_get_sap_acs_band;
 	hdd_cbacks.wlan_check_cc_intf_cb = wlan_hdd_check_cc_intf_cb;
 	hdd_cbacks.wlan_set_tx_rx_nss_cb = wlan_hdd_set_tx_rx_nss_cb;
+	hdd_cbacks.hdd_get_sap_connected_sta_band =
+				hdd_get_sap_connected_sta_band;
 
 	if (QDF_STATUS_SUCCESS !=
 	    policy_mgr_register_hdd_cb(psoc, &hdd_cbacks)) {
